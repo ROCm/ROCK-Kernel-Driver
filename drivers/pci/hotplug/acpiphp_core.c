@@ -88,42 +88,6 @@ static struct hotplug_slot_ops acpi_hotplug_slot_ops = {
 	.get_cur_bus_speed	= get_cur_bus_speed,
 };
 
-
-/* Inline functions to check the sanity of a pointer that is passed to us */
-static inline int slot_paranoia_check (struct slot *slot, const char *function)
-{
-	if (!slot) {
-		dbg("%s - slot == NULL\n", function);
-		return -1;
-	}
-	if (slot->magic != SLOT_MAGIC) {
-		dbg("%s - bad magic number for slot\n", function);
-		return -1;
-	}
-	if (!slot->hotplug_slot) {
-		dbg("%s - slot->hotplug_slot == NULL!\n", function);
-		return -1;
-	}
-	return 0;
-}
-
-
-static inline struct slot *get_slot (struct hotplug_slot *hotplug_slot, const char *function)
-{
-	struct slot *slot;
-
-	if (!hotplug_slot) {
-		dbg("%s - hotplug_slot == NULL\n", function);
-		return NULL;
-	}
-
-	slot = (struct slot *)hotplug_slot->private;
-	if (slot_paranoia_check(slot, function))
-                return NULL;
-	return slot;
-}
-
-
 /**
  * enable_slot - power on and enable a slot
  * @hotplug_slot: slot to enable
@@ -133,7 +97,7 @@ static inline struct slot *get_slot (struct hotplug_slot *hotplug_slot, const ch
  */
 static int enable_slot (struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
@@ -154,7 +118,7 @@ static int enable_slot (struct hotplug_slot *hotplug_slot)
  */
 static int disable_slot (struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
@@ -205,7 +169,7 @@ static int set_attention_status (struct hotplug_slot *hotplug_slot, u8 status)
  */
 static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
@@ -228,7 +192,7 @@ static int hardware_test (struct hotplug_slot *hotplug_slot, u32 value)
  */
 static int get_power_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
@@ -269,7 +233,7 @@ static int get_attention_status (struct hotplug_slot *hotplug_slot, u8 *value)
  */
 static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
@@ -291,7 +255,7 @@ static int get_latch_status (struct hotplug_slot *hotplug_slot, u8 *value)
  */
 static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
@@ -310,7 +274,7 @@ static int get_adapter_status (struct hotplug_slot *hotplug_slot, u8 *value)
  */
 static int get_address (struct hotplug_slot *hotplug_slot, u32 *value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 	int retval = 0;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
@@ -324,8 +288,6 @@ static int get_address (struct hotplug_slot *hotplug_slot, u32 *value)
 /* return dummy value because ACPI doesn't provide any method... */
 static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
 	*value = PCI_SPEED_UNKNOWN;
 
 	return 0;
@@ -335,8 +297,6 @@ static int get_max_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_sp
 /* return dummy value because ACPI doesn't provide any method... */
 static int get_cur_bus_speed (struct hotplug_slot *hotplug_slot, enum pci_bus_speed *value)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
-
 	*value = PCI_SPEED_UNKNOWN;
 
 	return 0;
@@ -378,7 +338,7 @@ static void make_slot_name (struct slot *slot)
  */
 static void release_slot(struct hotplug_slot *hotplug_slot)
 {
-	struct slot *slot = get_slot(hotplug_slot, __FUNCTION__);
+	struct slot *slot = hotplug_slot->private;
 
 	dbg("%s - physical_slot = %s\n", __FUNCTION__, hotplug_slot->name);
 
