@@ -4820,6 +4820,7 @@ static int __devinit dc395x_init_one(struct pci_dev *dev,
 	}
  	acb = (struct AdapterCtlBlk*)scsi_host->hostdata;
  	acb->scsi_host = scsi_host;
+ 	acb->dev = dev;
 
 	/* initialise the adapter and everything we need */
  	if (adapter_init(acb, io_port_base, io_port_len, irq)) {
