@@ -798,9 +798,9 @@ static int __devinit aureon_init(ice1712_t *ice)
 	};
 	static unsigned short cs_inits[] = {
 		0x0441, /* RUN */
-		0x0100, /* no mute */
+		0x0180, /* no mute, OMCK output on RMCK pin */
 		0x0201, /* S/PDIF source on RXP1 */
-		0x0600, /* slave, 24bit */
+		0x0605, /* slave, 24bit, MSB on second OSCLK, SDOUT for right channel when OLRCK is high */
 		(unsigned short)-1
 	};
 	unsigned int tmp;
