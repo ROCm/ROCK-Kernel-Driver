@@ -178,21 +178,11 @@ int map_vm_area(struct vm_struct *area, pgprot_t prot, struct page ***pages)
 	return err;
 }
 
-
-/**
- *	get_vm_area  -  reserve a contingous kernel virtual area
- *
- *	@size:		size of the area
- *	@flags:		%VM_IOREMAP for I/O mappings or VM_ALLOC
- *
- *	Search an area of @size in the kernel virtual mapping area,
- *	and reserved it for out purposes.  Returns the area descriptor
- *	on success or %NULL on failure.
- */
-struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
+struct vm_struct *__get_vm_area(unsigned long size, unsigned long flags,
+				unsigned long start, unsigned long end)
 {
 	struct vm_struct **p, *tmp, *area;
-	unsigned long addr = VMALLOC_START;
+	unsigned long addr = start;
 
 	area = kmalloc(sizeof(*area), GFP_KERNEL);
 	if (unlikely(!area))
@@ -209,12 +199,14 @@ struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
 
 	write_lock(&vmlist_lock);
 	for (p = &vmlist; (tmp = *p) ;p = &tmp->next) {
+		if ((unsigned long)tmp->addr < addr)
+			continue;
 		if ((size + addr) < addr)
 			goto out;
 		if (size + addr <= (unsigned long)tmp->addr)
 			goto found;
 		addr = tmp->size + (unsigned long)tmp->addr;
-		if (addr > VMALLOC_END-size)
+		if (addr > end - size)
 			goto out;
 	}
 
@@ -236,6 +228,21 @@ out:
 	write_unlock(&vmlist_lock);
 	kfree(area);
 	return NULL;
+}
+
+/**
+ *	get_vm_area  -  reserve a contingous kernel virtual area
+ *
+ *	@size:		size of the area
+ *	@flags:		%VM_IOREMAP for I/O mappings or VM_ALLOC
+ *
+ *	Search an area of @size in the kernel virtual mapping area,
+ *	and reserved it for out purposes.  Returns the area descriptor
+ *	on success or %NULL on failure.
+ */
+struct vm_struct *get_vm_area(unsigned long size, unsigned long flags)
+{
+	return __get_vm_area(size, flags, VMALLOC_START, VMALLOC_END);
 }
 
 /**
