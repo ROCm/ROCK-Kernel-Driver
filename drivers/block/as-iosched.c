@@ -1469,14 +1469,11 @@ static void as_deactivate_request(request_queue_t *q, struct request *rq)
 	struct as_rq *arq = RQ_DATA(rq);
 
 	if (arq) {
-		if (arq->state != AS_RQ_REMOVED) {
-			printk("arq->state %d\n", arq->state);
-			WARN_ON(1);
+		if (arq->state == AS_RQ_REMOVED) {
+			arq->state = AS_RQ_DISPATCHED;
+			if (arq->io_context && arq->io_context->aic)
+				atomic_inc(&arq->io_context->aic->nr_dispatched);
 		}
-
-		arq->state = AS_RQ_DISPATCHED;
-		if (arq->io_context && arq->io_context->aic)
-			atomic_inc(&arq->io_context->aic->nr_dispatched);
 	} else
 		WARN_ON(blk_fs_request(rq)
 			&& (!(rq->flags & (REQ_HARDBARRIER|REQ_SOFTBARRIER))) );
