@@ -63,7 +63,9 @@ static int raw_open(struct inode *inode, struct file *filp)
 		err = bd_claim(bdev, raw_open);
 		if (err)
 			goto out;
-		atomic_inc(&bdev->bd_count);
+		err = -ENODEV;
+		if (!igrab(bdev->bd_inode))
+			goto out;
 		err = blkdev_get(bdev, filp->f_mode, 0, BDEV_RAW);
 		if (err) {
 			bd_release(bdev);

@@ -336,10 +336,8 @@ struct address_space {
 };
 
 struct block_device {
-	struct list_head	bd_hash;
-	atomic_t		bd_count;
-	struct inode *		bd_inode;
 	dev_t			bd_dev;  /* not a kdev_t - it's a search key */
+	struct inode *		bd_inode;	/* will die */
 	int			bd_openers;
 	struct semaphore	bd_sem;	/* open/close mutex */
 	struct list_head	bd_inodes;
@@ -351,6 +349,7 @@ struct block_device {
 	unsigned		bd_part_count;
 	int			bd_invalidated;
 	struct gendisk *	bd_disk;
+	struct list_head	bd_list;
 };
 
 /*
