@@ -276,10 +276,12 @@ _arm3_xchg_4:	swp	r0, r0, [r1]
 _arm2_3_check_bugs:
 		bics	pc, lr, #0x04000000		@ Clear FIQ disable bit
 
-armvlsi_name:	.asciz	"ARM/VLSI"
-_arm2_name:	.asciz	"ARM 2"
-_arm250_name:	.asciz	"ARM 250"
-_arm3_name:	.asciz	"ARM 3"
+cpu_arm2_name:
+		.asciz	"ARM 2"
+cpu_arm250_name:
+		.asciz	"ARM 250"
+cpu_arm3_name:
+		.asciz	"ARM 3"
 
 		__INIT
 /*
@@ -295,10 +297,6 @@ arm2_processor_functions:
 		.word	_arm2_xchg_1
 		.word	_arm2_xchg_4
 
-cpu_arm2_info:
-		.long	armvlsi_name
-		.long	_arm2_name
-
 		.globl	arm250_processor_functions
 arm250_processor_functions:
 		.word	_arm2_3_check_bugs
@@ -308,10 +306,6 @@ arm250_processor_functions:
 		.word	_arm3_xchg_1
 		.word	_arm3_xchg_4
 
-cpu_arm250_info:
-		.long	armvlsi_name
-		.long	_arm250_name
-
 		.globl	arm3_processor_functions
 arm3_processor_functions:
 		.word	_arm2_3_check_bugs
@@ -320,10 +314,6 @@ arm3_processor_functions:
 		.word	_arm3_set_pgd
 		.word	_arm3_xchg_1
 		.word	_arm3_xchg_4
-
-cpu_arm3_info:
-		.long	armvlsi_name
-		.long	_arm3_name
 
 arm2_arch_name:	.asciz	"armv1"
 arm3_arch_name:	.asciz	"armv2"
@@ -340,7 +330,7 @@ arm3_elf_name:	.asciz	"v2"
 		.long	arm2_arch_name
 		.long	arm2_elf_name
 		.long	0
-		.long	cpu_arm2_info
+		.long	cpu_arm2_name
 		.long	arm2_processor_functions
 		.long	0
 		.long	0
@@ -352,7 +342,7 @@ arm3_elf_name:	.asciz	"v2"
 		.long	arm3_arch_name
 		.long	arm3_elf_name
 		.long	0
-		.long	cpu_arm250_info
+		.long	cpu_arm250_name
 		.long	arm250_processor_functions
 		.long	0
 		.long	0
@@ -364,7 +354,7 @@ arm3_elf_name:	.asciz	"v2"
 		.long	arm3_arch_name
 		.long	arm3_elf_name
 		.long	0
-		.long	cpu_arm3_info
+		.long	cpu_arm3_name
 		.long	arm3_processor_functions
 		.long	0
 		.long	0

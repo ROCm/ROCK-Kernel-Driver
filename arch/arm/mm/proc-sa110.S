@@ -473,8 +473,6 @@ ENTRY(cpu_sa1100_set_pte)
 	mov	pc, lr
 
 
-cpu_manu_name:
-	.asciz	"Intel"
 cpu_sa110_name:
 	.asciz	"StrongARM-110"
 cpu_sa1100_name:
@@ -547,13 +545,6 @@ ENTRY(sa110_processor_functions)
 
 	.size	sa110_processor_functions, . - sa110_processor_functions
 
-	.type	cpu_sa110_info, #object
-cpu_sa110_info:
-	.long	cpu_manu_name
-	.long	cpu_sa110_name
-	.size	cpu_sa110_info, . - cpu_sa110_info
-
-
 /*
  * SA1100 and SA1110 share the same function calls
  */
@@ -587,16 +578,6 @@ ENTRY(sa1100_processor_functions)
 
 	.size	sa1100_processor_functions, . - sa1100_processor_functions
 
-cpu_sa1100_info:
-	.long	cpu_manu_name
-	.long	cpu_sa1100_name
-	.size	cpu_sa1100_info, . - cpu_sa1100_info
-
-cpu_sa1110_info:
-	.long	cpu_manu_name
-	.long	cpu_sa1110_name
-	.size	cpu_sa1110_info, . - cpu_sa1110_info
-
 	.type	cpu_arch_name, #object
 cpu_arch_name:
 	.asciz	"armv4"
@@ -620,7 +601,7 @@ __sa110_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
-	.long	cpu_sa110_info
+	.long	cpu_sa110_name
 	.long	sa110_processor_functions
 	.long	v4wb_tlb_fns
 	.long	v4wb_user_fns
@@ -637,7 +618,7 @@ __sa1100_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
-	.long	cpu_sa1100_info
+	.long	cpu_sa1100_name
 	.long	sa1100_processor_functions
 	.long	v4wb_tlb_fns
 	.long	v4_mc_user_fns
@@ -652,7 +633,7 @@ __sa1110_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_26BIT | HWCAP_FAST_MULT
-	.long	cpu_sa1110_info
+	.long	cpu_sa1110_name
 	.long	sa1100_processor_functions
 	.long	v4wb_tlb_fns
 	.long	v4_mc_user_fns

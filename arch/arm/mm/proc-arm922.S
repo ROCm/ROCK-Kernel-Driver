@@ -418,8 +418,6 @@ ENTRY(cpu_arm922_set_pte)
 	mov	pc, lr
 
 
-cpu_manu_name:
-	.asciz	"ARM/ALTERA"
 ENTRY(cpu_arm922_name)
 	.ascii	"Arm922T"
 #ifndef CONFIG_CPU_ICACHE_DISABLE
@@ -505,15 +503,9 @@ arm922_processor_functions:
 
 	.size	arm922_processor_functions, . - arm922_processor_functions
 
-	.type	cpu_arm922_info, #object
-cpu_arm922_info:
-	.long	cpu_manu_name
-	.long	cpu_arm922_name
-	.size	cpu_arm922_info, . - cpu_arm922_info
-
 	.type	cpu_arch_name, #object
 cpu_arch_name:
-	.asciz	"armv4"
+	.asciz	"armv4t"
 	.size	cpu_arch_name, . - cpu_arch_name
 
 	.type	cpu_elf_name, #object
@@ -533,7 +525,7 @@ __arm922_proc_info:
 	.long	cpu_arch_name
 	.long	cpu_elf_name
 	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB
-	.long	cpu_arm922_info
+	.long	cpu_arm922_name
 	.long	arm922_processor_functions
 	.long	v4wbi_tlb_fns
 	.long	v4wb_user_fns
