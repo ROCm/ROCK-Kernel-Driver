@@ -1,5 +1,5 @@
 /*
- * $Id: iforce-main.c,v 1.18 2002/06/09 11:03:03 jdeneux Exp $
+ * $Id: iforce-main.c,v 1.19 2002/07/07 10:22:50 jdeneux Exp $
  *
  *  Copyright (c) 2000-2002 Vojtech Pavlik <vojtech@ucw.cz>
  *  Copyright (c) 2001-2002 Johann Deneux <deneux@ifrance.com>
@@ -248,7 +248,7 @@ static int iforce_open(struct input_dev *dev)
 	struct iforce *iforce = dev->private;
 
 	switch (iforce->bus) {
-#ifdef IFORCE_USB
+#ifdef CONFIG_JOYSTICK_IFORCE_USB
 		case IFORCE_USB:
 			iforce->irq->dev = iforce->usbdev;
 			if (usb_submit_urb(iforce->irq, GFP_KERNEL))
@@ -305,7 +305,7 @@ static void iforce_release(struct input_dev *dev)
 	iforce_send_packet(iforce, FF_CMD_ENABLE, "\001");
 
 	switch (iforce->bus) {
-#ifdef IFORCE_USB
+#ifdef CONFIG_JOYSTICK_IFORCE_USB
 		case IFORCE_USB:
 			usb_unlink_urb(iforce->irq);
 
@@ -323,12 +323,12 @@ static void iforce_release(struct input_dev *dev)
 void iforce_delete_device(struct iforce *iforce)
 {
 	switch (iforce->bus) {
-#ifdef IFORCE_USB
+#ifdef CONFIG_JOYSTICK_IFORCE_USB
 	case IFORCE_USB:
 		iforce_usb_delete(iforce);
 		break;
 #endif
-#ifdef IFORCE_232
+#ifdef CONFIG_JOYSTICK_IFORCE_232
 	case IFORCE_232:
 		//TODO: Wait for the last packets to be sent
 		break;
@@ -520,10 +520,10 @@ int iforce_init_device(struct iforce *iforce)
 
 static int __init iforce_init(void)
 {
-#ifdef IFORCE_USB
+#ifdef CONFIG_JOYSTICK_IFORCE_USB
 	usb_register(&iforce_usb_driver);
 #endif
-#ifdef IFORCE_232
+#ifdef CONFIG_JOYSTICK_IFORCE_232
 	serio_register_device(&iforce_serio_dev);
 #endif
 	return 0;
@@ -531,10 +531,10 @@ static int __init iforce_init(void)
 
 static void __exit iforce_exit(void)
 {
-#ifdef IFORCE_USB
+#ifdef CONFIG_JOYSTICK_IFORCE_USB
 	usb_deregister(&iforce_usb_driver);
 #endif
-#ifdef IFORCE_232
+#ifdef CONFIG_JOYSTICK_IFORCE_232
 	serio_unregister_device(&iforce_serio_dev);
 #endif
 }
