@@ -796,6 +796,11 @@ static void hci_usb_destruct(struct hci_dev *hdev)
 	kfree(husb);
 }
 
+static void hci_usb_notify(struct hci_dev *hdev, unsigned int evt)
+{
+	BT_DBG("%s evt %d", hdev->name, evt);
+}
+
 int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
@@ -912,7 +917,9 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 				BT_ERR("Can't claim isoc interface");
 			else if (usb_set_interface(udev, isoc_ifnum, isoc_alts)) {
 				BT_ERR("Can't set isoc interface settings");
+				husb->isoc_iface = isoc_iface;
 				usb_driver_release_interface(&hci_usb_driver, isoc_iface);
+				husb->isoc_iface = NULL;
 			} else {
 				husb->isoc_iface  = isoc_iface;
 				husb->isoc_in_ep  = isoc_in_ep;
@@ -948,6 +955,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	hdev->flush    = hci_usb_flush;
 	hdev->send     = hci_usb_send_frame;
 	hdev->destruct = hci_usb_destruct;
+	hdev->notify   = hci_usb_notify;
 
 	hdev->owner = THIS_MODULE;
 
