@@ -87,6 +87,10 @@ EXPORT_SYMBOL(i8253_lock);
 
 struct timer_opts *cur_timer = &timer_none;
 
+#ifdef CONFIG_VSYSCALL_GTOD
+extern int vgettimeofday_enable;
+#endif
+
 /*
  * This version of gettimeofday has microsecond resolution
  * and better than microsecond precision on fast x86 machines with TSC.
@@ -394,7 +398,12 @@ void __init time_init(void)
 	printk(KERN_INFO "Using %s for high-res timesource\n",cur_timer->name);
 
 	/* set vsyscall to use selected time source */
-	vsyscall_set_timesource(cur_timer->name);
+#ifdef CONFIG_VSYSCALL_GTOD
+	if (vgettimeofday_enable) {
+		printk(KERN_INFO "Enabling gettimeofday vsyscall\n");
+		vsyscall_set_timesource(cur_timer->name);
+	}
+#endif
 
 	time_init_hook();
 }

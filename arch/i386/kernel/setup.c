@@ -71,6 +71,9 @@ static inline char * __init machine_specific_memory_setup(void);
 #ifdef CONFIG_EFI
 int efi_enabled = 0;
 #endif
+#ifdef CONFIG_VSYSCALL_GTOD
+int vgettimeofday_enable = 0;
+#endif
 
 /* cpu data as detected by the assembly code in head.S */
 struct cpuinfo_x86 new_cpu_data __initdata = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
@@ -641,6 +644,11 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 		} 		     	
 #endif /* CONFIG_X86_LOCAL_APIC */
 #endif /* CONFIG_ACPI_BOOT */
+
+#ifdef CONFIG_VSYSCALL_GTOD
+		else if (!memcmp(from, "vgettimeofday=1", 15))
+			vgettimeofday_enable = 1;
+#endif
 
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.
