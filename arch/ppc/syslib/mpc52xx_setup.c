@@ -146,8 +146,6 @@ mpc52xx_find_end_of_memory(void)
 		if (((sdram_config_1 & 0x1f) >= 0x13) &&
 				((sdram_config_1 & 0xfff00000) == ramsize))
 			ramsize += 1 << ((sdram_config_1 & 0xf) + 17);
-
-		iounmap(mmap_ctl);
 	}
 
 	return ramsize;
