@@ -1195,6 +1195,8 @@ extern int generic_file_readonly_mmap(struct file *, struct vm_area_struct *);
 extern int file_read_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern int file_send_actor(read_descriptor_t * desc, struct page *page, unsigned long offset, unsigned long size);
 extern ssize_t generic_file_read(struct file *, char *, size_t, loff_t *);
+int generic_write_checks(struct inode *inode, struct file *file,
+			loff_t *pos, size_t *count, int isblk);
 extern ssize_t generic_file_write(struct file *, const char *, size_t, loff_t *);
 extern ssize_t generic_file_aio_read(struct kiocb *, char *, size_t, loff_t);
 extern ssize_t generic_file_aio_write(struct kiocb *, const char *, size_t, loff_t);
