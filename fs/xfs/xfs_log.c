@@ -777,7 +777,7 @@ xfs_log_move_tail(xfs_mount_t	*mp,
 
 	s = GRANT_LOCK(log);
 
-	/* Also an illegal lsn.  1 implies that we aren't passing in a legal
+	/* Also an invalid lsn.  1 implies that we aren't passing in a valid
 	 * tail_lsn.
 	 */
 	if (tail_lsn != 1)
@@ -1160,7 +1160,7 @@ xlog_get_iclog_buffer_size(xfs_mount_t	*mp,
 				log->l_iclog_bufs = 8;
 				break;
 			    default:
-				xlog_panic("XFS: Illegal blocksize");
+				xlog_panic("XFS: Invalid blocksize");
 				break;
 			}
 		}
@@ -3394,7 +3394,7 @@ xlog_verify_iclog(xlog_t	 *log,
 	icptr = log->l_iclog;
 	for (i=0; i < log->l_iclog_bufs; i++) {
 		if (icptr == 0)
-			xlog_panic("xlog_verify_iclog: illegal ptr");
+			xlog_panic("xlog_verify_iclog: invalid ptr");
 		icptr = icptr->ic_next;
 	}
 	if (icptr != log->l_iclog)
@@ -3404,7 +3404,7 @@ xlog_verify_iclog(xlog_t	 *log,
 	/* check log magic numbers */
 	ptr = (xfs_caddr_t) &(iclog->ic_header);
 	if (INT_GET(*(uint *)ptr, ARCH_CONVERT) != XLOG_HEADER_MAGIC_NUM)
-		xlog_panic("xlog_verify_iclog: illegal magic num");
+		xlog_panic("xlog_verify_iclog: invalid magic num");
 
 	for (ptr += BBSIZE; ptr < ((xfs_caddr_t)&(iclog->ic_header))+count;
 	     ptr += BBSIZE) {
@@ -3437,7 +3437,7 @@ xlog_verify_iclog(xlog_t	 *log,
 			}
 		}
 		if (clientid != XFS_TRANSACTION && clientid != XFS_LOG)
-			cmn_err(CE_WARN, "xlog_verify_iclog: illegal clientid %d op 0x%p offset 0x%x", clientid, ophead, field_offset);
+			cmn_err(CE_WARN, "xlog_verify_iclog: invalid clientid %d op 0x%p offset 0x%x", clientid, ophead, field_offset);
 
 		/* check length */
 		field_offset = (__psint_t)

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -672,7 +672,7 @@ xfs_trans_unreserve_and_mod_sb(
  * be inconsistent. In such cases, this returns an error, and the
  * caller may assume that all locked objects joined to the transaction
  * have already been unlocked as if the commit had succeeded.
- * It's illegal to reference the transaction structure after this call.
+ * Do not reference the transaction structure after this call.
  */
  /*ARGSUSED*/
 int

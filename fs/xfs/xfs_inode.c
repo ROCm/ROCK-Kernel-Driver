@@ -1040,7 +1040,7 @@ xfs_iread_extents(
 	size = XFS_IFORK_NEXTENTS(ip, whichfork) * (uint)sizeof(xfs_bmbt_rec_t);
 	ifp = XFS_IFORK_PTR(ip, whichfork);
 	/*
-	 * We know that the size is legal (it's checked in iformat_btree)
+	 * We know that the size is valid (it's checked in iformat_btree)
 	 */
 	ifp->if_u1.if_extents = kmem_alloc(size, KM_SLEEP);
 	ASSERT(ifp->if_u1.if_extents != NULL);

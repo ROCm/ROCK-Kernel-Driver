@@ -54,7 +54,7 @@ struct xfs_mount;
 #define XLOG_MED_ICLOGS		4
 #define XLOG_MAX_ICLOGS		8
 #define XLOG_CALLBACK_SIZE	10
-#define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Illegal cycle number */
+#define XLOG_HEADER_MAGIC_NUM	0xFEEDbabe	/* Invalid cycle number */
 #define XLOG_VERSION_1		1
 #define XLOG_VERSION_2		2		/* Large IClogs, Log sunit */
 #define XLOG_VERSION_OKBITS	(XLOG_VERSION_1 | XLOG_VERSION_2)

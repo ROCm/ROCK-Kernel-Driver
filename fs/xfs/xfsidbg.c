@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -4091,7 +4091,7 @@ xfsidbg_xiclog(xlog_in_core_t *iclog)
 	if (iclog->ic_state & XLOG_STATE_ALL)
 		printflags(iclog->ic_state, ic_flags, "state:");
 	else
-		kdb_printf("state: ILLEGAL 0x%x", iclog->ic_state);
+		kdb_printf("state: INVALID 0x%x", iclog->ic_state);
 	kdb_printf("\n");
 }	/* xfsidbg_xiclog */
 
