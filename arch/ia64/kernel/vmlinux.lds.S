@@ -151,7 +151,7 @@ SECTIONS
 	{ *(.con_initcall.init) }
   __con_initcall_end = .;
   __security_initcall_start = .;
-  .security_initcall.init : AT(ADDR(.security_initcall.init) - PAGE_OFFSET)
+  .security_initcall.init : AT(ADDR(.security_initcall.init) - LOAD_OFFSET)
 	{ *(.security_initcall.init) }
   __security_initcall_end = .;
   . = ALIGN(PAGE_SIZE);
