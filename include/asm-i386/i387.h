@@ -21,23 +21,41 @@ extern void init_fpu(struct task_struct *);
 /*
  * FPU lazy state save handling...
  */
-extern void save_init_fpu( struct task_struct *tsk );
 extern void restore_fpu( struct task_struct *tsk );
 
 extern void kernel_fpu_begin(void);
 #define kernel_fpu_end() do { stts(); preempt_enable(); } while(0)
 
 
+static inline void __save_init_fpu( struct task_struct *tsk )
+{
+	if ( cpu_has_fxsr ) {
+		asm volatile( "fxsave %0 ; fnclex"
+			      : "=m" (tsk->thread.i387.fxsave) );
+	} else {
+		asm volatile( "fnsave %0 ; fwait"
+			      : "=m" (tsk->thread.i387.fsave) );
+	}
+	tsk->thread_info->flags &= ~TIF_USEDFPU;
+}
+
+static inline void save_init_fpu( struct task_struct *tsk )
+{
+	__save_init_fpu(tsk);
+	stts();
+}
+
+
 #define unlazy_fpu( tsk ) do { \
-	if (test_tsk_thread_flag(tsk, TIF_USEDFPU)) \
+	if ((tsk)->thread_info->flags & _TIF_USEDFPU) \
 		save_init_fpu( tsk ); \
 } while (0)
 
 #define clear_fpu( tsk )					\
 do {								\
-	if (test_tsk_thread_flag(tsk, TIF_USEDFPU)) {		\
+	if ((tsk)->thread_info->flags & _TIF_USEDFPU) {		\
 		asm volatile("fwait");				\
-		clear_tsk_thread_flag(tsk, TIF_USEDFPU);	\
+		(tsk)->thread_info->flags &= ~_TIF_USEDFPU;	\
 		stts();						\
 	}							\
 } while (0)
