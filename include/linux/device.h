@@ -54,14 +54,13 @@ enum {
 };
 
 struct device;
-struct iobus;
 
 struct device_driver {
 	int	(*probe)	(struct device * dev);
 	int 	(*remove)	(struct device * dev, u32 flags);
 
-	int	(*suspend)	(struct device * dev, u32 state, u32 stage);
-	int	(*resume)	(struct device * dev, u32 stage);
+	int	(*suspend)	(struct device * dev, u32 state, u32 level);
+	int	(*resume)	(struct device * dev, u32 level);
 };
 
 struct device {
@@ -94,23 +93,6 @@ struct device {
 	unsigned char *saved_state;	/* saved device state */
 };
 
-/*
- * struct bus_type - descriptor for a type of bus
- * There are some instances when you need to know what type of bus a
- * device is on. Instead of having some sort of enumerated integer type,
- * each struct iobus will have a pointer to a struct bus_type that gives
- * actually meaningful data.
- * There should be one struct bus_type for each type of bus (one for PCI,
- * one for USB, etc).
- */
-struct iobus_driver {
-	char	name[16];	/* ascii descriptor of type of bus */
-	struct	list_head node; /* node in global list of bus drivers */
-
-	int	(*scan)		(struct iobus*);
-	int	(*add_device)	(struct iobus*, char*);
-};
-
 static inline struct device *
 list_to_dev(struct list_head *node)
 {
@@ -121,8 +103,6 @@ list_to_dev(struct list_head *node)
  * High level routines for use by the bus drivers
  */
 extern int device_register(struct device * dev);
-
-extern int iobus_register(struct iobus * iobus);
 
 extern int device_create_file(struct device *device, struct driver_file_entry * entry);
 extern void device_remove_file(struct device * dev, const char * name);

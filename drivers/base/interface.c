@@ -99,10 +99,10 @@ static ssize_t
 device_write_power(struct device * dev, const char * buf, size_t count, loff_t off)
 {
 	char	str_command[20];
-	char	str_stage[20];
+	char	str_level[20];
 	int	num_args;
 	u32	state;
-	u32	int_stage;
+	u32	int_level;
 	int	error = 0;
 
 	if (off)
@@ -111,7 +111,7 @@ device_write_power(struct device * dev, const char * buf, size_t count, loff_t o
 	if (!dev->driver)
 		goto done;
 
-	num_args = sscanf(buf,"%10s %10s %u",str_command,str_stage,&state);
+	num_args = sscanf(buf,"%10s %10s %u",str_command,str_level,&state);
 
 	error = -EINVAL;
 
@@ -121,36 +121,36 @@ device_write_power(struct device * dev, const char * buf, size_t count, loff_t o
 	if (!strnicmp(str_command,"suspend",7)) {
 		if (num_args != 3)
 			goto done;
-		if (!strnicmp(str_stage,"notify",6))
-			int_stage = SUSPEND_NOTIFY;
-		else if (!strnicmp(str_stage,"save",4))
-			int_stage = SUSPEND_SAVE_STATE;
-		else if (!strnicmp(str_stage,"disable",7))
-			int_stage = SUSPEND_DISABLE;
-		else if (!strnicmp(str_stage,"powerdown",8))
-			int_stage = SUSPEND_POWER_DOWN;
+		if (!strnicmp(str_level,"notify",6))
+			int_level = SUSPEND_NOTIFY;
+		else if (!strnicmp(str_level,"save",4))
+			int_level = SUSPEND_SAVE_STATE;
+		else if (!strnicmp(str_level,"disable",7))
+			int_level = SUSPEND_DISABLE;
+		else if (!strnicmp(str_level,"powerdown",8))
+			int_level = SUSPEND_POWER_DOWN;
 		else
 			goto done;
 
 		if (dev->driver->suspend)
-			error = dev->driver->suspend(dev,state,int_stage);
+			error = dev->driver->suspend(dev,state,int_level);
 		else
 			error = 0;
 	} else if (!strnicmp(str_command,"resume",6)) {
 		if (num_args != 2)
 			goto done;
 
-		if (!strnicmp(str_stage,"poweron",7))
-			int_stage = RESUME_POWER_ON;
-		else if (!strnicmp(str_stage,"restore",7))
-			int_stage = RESUME_RESTORE_STATE;
-		else if (!strnicmp(str_stage,"enable",6))
-			int_stage = RESUME_ENABLE;
+		if (!strnicmp(str_level,"poweron",7))
+			int_level = RESUME_POWER_ON;
+		else if (!strnicmp(str_level,"restore",7))
+			int_level = RESUME_RESTORE_STATE;
+		else if (!strnicmp(str_level,"enable",6))
+			int_level = RESUME_ENABLE;
 		else
 			goto done;
 
 		if (dev->driver->resume)
-			error = dev->driver->resume(dev,int_stage);
+			error = dev->driver->resume(dev,int_level);
 		else
 			error = 0;
 	}

@@ -48,13 +48,11 @@
 #define DRIVERFS_MAGIC 0x42454552
 
 static struct super_operations driverfs_ops;
-static struct address_space_operations driverfs_aops;
 static struct file_operations driverfs_dir_operations;
 static struct file_operations driverfs_file_operations;
 static struct inode_operations driverfs_dir_inode_operations;
 static struct dentry_operations driverfs_dentry_dir_ops;
 static struct dentry_operations driverfs_dentry_file_ops;
-
 
 static struct vfsmount *driverfs_mount;
 static spinlock_t mount_lock = SPIN_LOCK_UNLOCKED;
@@ -86,7 +84,6 @@ struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 		inode->i_blksize = PAGE_CACHE_SIZE;
 		inode->i_blocks = 0;
 		inode->i_rdev = NODEV;
-		inode->i_mapping->a_ops = &driverfs_aops;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		switch (mode & S_IFMT) {
 		default:
@@ -135,21 +132,6 @@ static int driverfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	return res;
 }
 
-static int
-driverfs_link(struct dentry *old_dentry, struct inode *dir, struct dentry *dentry)
-{
-	struct inode *inode = old_dentry->d_inode;
-
-	if(S_ISDIR(inode->i_mode))
-		return -EPERM;
-
-	inode->i_nlink++;
-	atomic_inc(&inode->i_count);
- 	dget(dentry);
-	d_instantiate(dentry, inode);
-	return 0;
-}
-
 static inline int driverfs_positive(struct dentry *dentry)
 {
 	return (dentry->d_inode && !d_unhashed(dentry));
@@ -185,36 +167,6 @@ static int driverfs_unlink(struct inode *dir, struct dentry *dentry)
 		unlock_kernel();
 		dput(dentry);
 		error = 0;
-	}
-	return error;
-}
-
-static int
-driverfs_rename(struct inode *old_dir, struct dentry *old_dentry,
-		 struct inode *new_dir, struct dentry *new_dentry)
-{
-	int error = -ENOTEMPTY;
-
-	if (driverfs_empty(new_dentry)) {
-		struct inode *inode = new_dentry->d_inode;
-		if (inode) {
-			inode->i_nlink--;
-			dput(new_dentry);
-		}
-		error = 0;
-	}
-	return error;
-}
-
-static int driverfs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
-{
-	int error;
-
-	error = driverfs_mknod(dir, dentry, S_IFLNK | S_IRWXUGO, 0);
-	if (!error) {
-		int l = strlen(symname) + 1;
-		struct inode *inode = dentry->d_inode;
-		error = block_symlink(inode,symname,l);
 	}
 	return error;
 }
@@ -401,14 +353,6 @@ static int driverfs_release(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-static int driverfs_sync_file (struct file *file, struct dentry *dentry, int datasync)
-{
-	return 0;
-}
-
-/* When the dentry goes away (the refcount hits 0), free the
- * driver_file_entry for it.
- */
 static int driverfs_d_delete_file (struct dentry * dentry)
 {
 	struct driver_file_entry * entry;
@@ -419,36 +363,25 @@ static int driverfs_d_delete_file (struct dentry * dentry)
 	return 0;
 }
 
-static struct address_space_operations driverfs_aops = {
-
-};
-
 static struct file_operations driverfs_file_operations = {
 	read:		driverfs_read_file,
 	write:		driverfs_write_file,
 	llseek:		driverfs_file_lseek,
-	mmap:		generic_file_mmap,
 	open:		driverfs_open_file,
 	release:	driverfs_release,
-	fsync:		driverfs_sync_file,
 };
 
 static struct file_operations driverfs_dir_operations = {
 	read:		generic_read_dir,
 	readdir:	dcache_readdir,
-	fsync:		driverfs_sync_file,
 };
 
 static struct inode_operations driverfs_dir_inode_operations = {
 	create:		driverfs_create,
 	lookup:		driverfs_lookup,
-	link:		driverfs_link,
 	unlink:		driverfs_unlink,
-	symlink:	driverfs_symlink,
 	mkdir:		driverfs_mkdir,
 	rmdir:		driverfs_rmdir,
-	mknod:		driverfs_mknod,
-	rename:		driverfs_rename,
 };
 
 static struct dentry_operations driverfs_dentry_file_ops = {
@@ -552,34 +485,8 @@ static void put_mount(void)
 
 int __init init_driverfs_fs(void)
 {
-	int error;
-
-	DBG("%s: registering filesystem.\n",__FUNCTION__);
-	error = register_filesystem(&driverfs_fs_type);
-
-	if (error)
-		DBG(KERN_ERR "%s: register_filesystem failed with %d\n",
-		       __FUNCTION__,error);
-
-	return error;
+	return register_filesystem(&driverfs_fs_type);
 }
-
-static void __exit exit_driverfs_fs(void)
-{
-	unregister_filesystem(&driverfs_fs_type);
-}
-#if 0
-module_init(init_driverfs_fs);
-module_exit(exit_driverfs_fs);
-#endif
-
-EXPORT_SYMBOL(driverfs_create_file);
-EXPORT_SYMBOL(driverfs_create_dir);
-EXPORT_SYMBOL(driverfs_remove_file);
-EXPORT_SYMBOL(driverfs_remove_dir);
-
-MODULE_DESCRIPTION("The device driver filesystem");
-MODULE_LICENSE("GPL");
 
 /**
  * driverfs_create_dir - create a directory in the filesystem
@@ -611,24 +518,18 @@ driverfs_create_dir(struct driver_dir_entry * entry,
 		return -EFAULT;
 	}
 
-	dget(parent_dentry);
 	down(&parent_dentry->d_inode->i_sem);
-
 	qstr.name = entry->name;
 	qstr.len = strlen(entry->name);
 	qstr.hash = full_name_hash(entry->name,qstr.len);
-
 	dentry = lookup_hash(&qstr,parent_dentry);
-	if (IS_ERR(dentry)) {
-		error = PTR_ERR(dentry);
-		up(&parent_dentry->d_inode->i_sem);
-		dput(parent_dentry);
-	} else {
+	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *) entry;
 		entry->dentry = dentry;
 		error = vfs_mkdir(parent_dentry->d_inode,dentry,entry->mode);
-		up(&parent_dentry->d_inode->i_sem);
-	}
+	} else
+		error = PTR_ERR(dentry);
+	up(&parent_dentry->d_inode->i_sem);
 
 	if (error)
 		put_mount();
@@ -645,7 +546,6 @@ driverfs_create_file(struct driver_file_entry * entry,
 		     struct driver_dir_entry * parent)
 {
 	struct dentry * dentry;
-	struct dentry * parent_dentry;
 	struct qstr qstr;
 	int error = 0;
 
@@ -660,37 +560,27 @@ driverfs_create_file(struct driver_file_entry * entry,
 		return -EINVAL;
 	}
 
-	/* make sure daddy doesn't run out on us again... */
-	parent_dentry = dget(parent->dentry);
-	down(&parent_dentry->d_inode->i_sem);
-
+	down(&parent->dentry->d_inode->i_sem);
 	qstr.name = entry->name;
 	qstr.len = strlen(entry->name);
 	qstr.hash = full_name_hash(entry->name,qstr.len);
-
-	dentry = lookup_hash(&qstr,parent_dentry);
-	if (IS_ERR(dentry))
-		error = PTR_ERR(dentry);
-	else {
+	dentry = lookup_hash(&qstr,parent->dentry);
+	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *)entry;
-		error = vfs_create(parent_dentry->d_inode,dentry,entry->mode);
-	}
+		error = vfs_create(parent->dentry->d_inode,dentry,entry->mode);
 
-	/* Still good? Ok, then fill in the blanks: */
-	if (!error) {
-		dentry->d_inode->u.generic_ip = (void *)entry;
-
-		entry->dentry = dentry;
-		entry->parent = parent;
-
-		list_add_tail(&entry->node,&parent->files);
-	}
-	up(&parent_dentry->d_inode->i_sem);
-
-	if (error) {
-		dput(parent_dentry);
+		/* Still good? Ok, then fill in the blanks: */
+		if (!error) {
+			dentry->d_inode->u.generic_ip = (void *)entry;
+			entry->dentry = dentry;
+			entry->parent = parent;
+			list_add_tail(&entry->node,&parent->files);
+		}
+	} else
+		error = PTR_ERR(dentry);
+	up(&parent->dentry->d_inode->i_sem);
+	if (error)
 		put_mount();
-	}
 	return error;
 }
 
@@ -764,13 +654,12 @@ void driverfs_remove_file(struct driver_dir_entry * dir, const char * name)
 void driverfs_remove_dir(struct driver_dir_entry * dir)
 {
 	struct list_head * node;
-	struct dentry * dentry;
+	struct dentry * dentry = dir->dentry;
 
-	if (!dir->dentry)
+	if (!dentry)
 		goto done;
 
-	dentry = dget(dir->dentry);
-	dget(dentry->d_parent);
+	dget(dentry);
 	down(&dentry->d_parent->d_inode->i_sem);
 	down(&dentry->d_inode->i_sem);
 
@@ -789,9 +678,12 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 	vfs_rmdir(dentry->d_parent->d_inode,dentry);
 	up(&dentry->d_parent->d_inode->i_sem);
 	up(&dentry->d_inode->i_sem);
-
-	/* remove reference count from when directory was created */
 	dput(dentry);
  done:
 	put_mount();
 }
+
+EXPORT_SYMBOL(driverfs_create_file);
+EXPORT_SYMBOL(driverfs_create_dir);
+EXPORT_SYMBOL(driverfs_remove_file);
+EXPORT_SYMBOL(driverfs_remove_dir);
