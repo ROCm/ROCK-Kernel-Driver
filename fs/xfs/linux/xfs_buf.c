@@ -334,10 +334,14 @@ pagebuf_free(
 
 	if (pb->pb_flags & _PBF_MEM_ALLOCATED) {
 		if (pb->pb_pages) {
-			/* release the pages in the address list */
-			if ((pb->pb_pages[0]) &&
-			    (pb->pb_flags & _PBF_MEM_SLAB)) {
-				kfree(pb->pb_addr);
+			if (pb->pb_flags & _PBF_MEM_SLAB) {
+				 /*
+				  * XXX: bp->pb_count_desired might be incorrect
+				  * (see pagebuf_associate_memory for details),
+				  * but fortunately the Linux version of
+				  * kmem_free ignores the len argument..
+				  */
+				kmem_free(pb->pb_addr, pb->pb_count_desired);
 			} else {
 				_pagebuf_freepages(pb);
 			}
@@ -843,54 +847,54 @@ pagebuf_associate_memory(
 	return 0;
 }
 
-page_buf_t *
+xfs_buf_t *
 pagebuf_get_no_daddr(
 	size_t			len,
-	pb_target_t		*target)
+	xfs_buftarg_t		*target)
 {
-	int			rval;
-	void			*rmem = NULL;
-	page_buf_flags_t	flags = PBF_FORCEIO;
-	page_buf_t		*pb;
-	size_t			tlen = 0;
+	size_t			malloc_len = len;
+	xfs_buf_t		*bp;
+	void			*data;
+	int			error;
 
 	if (unlikely(len > 0x20000))
-		return NULL;
+		goto fail;
 
-	pb = pagebuf_allocate(flags);
-	if (!pb)
-		return NULL;
+	bp = pagebuf_allocate(0);
+	if (unlikely(bp == NULL))
+		goto fail;
+	_pagebuf_initialize(bp, target, 0, len, PBF_FORCEIO);
 
-	_pagebuf_initialize(pb, target, 0, len, flags);
+ try_again:
+	data = kmem_alloc(malloc_len, KM_SLEEP);
+	if (unlikely(data == NULL))
+		goto fail_free_buf;
 
-	do {
-		if (tlen == 0) {
-			tlen = len; /* first time */
-		} else {
-			kfree(rmem); /* free the mem from the previous try */
-			tlen <<= 1; /* double the size and try again */
-		}
-		if ((rmem = kmalloc(tlen, GFP_KERNEL)) == 0) {
-			pagebuf_free(pb);
-			return NULL;
-		}
-	} while ((size_t)rmem != ((size_t)rmem & ~target->pbr_smask));
-
-	if ((rval = pagebuf_associate_memory(pb, rmem, len)) != 0) {
-		kfree(rmem);
-		pagebuf_free(pb);
-		return NULL;
+	/* check whether alignment matches.. */
+	if ((__psunsigned_t)data !=
+	    ((__psunsigned_t)data & ~target->pbr_smask)) {
+		/* .. else double the size and try again */
+		kmem_free(data, malloc_len);
+		malloc_len <<= 1;
+		goto try_again;
 	}
-	/* otherwise pagebuf_free just ignores it */
-	pb->pb_flags |= (_PBF_MEM_ALLOCATED | _PBF_MEM_SLAB);
-	PB_CLEAR_OWNER(pb);
-	up(&pb->pb_sema);	/* Return unlocked pagebuf */
 
-	PB_TRACE(pb, "no_daddr", rmem);
+	error = pagebuf_associate_memory(bp, data, len);
+	if (error)
+		goto fail_free_mem;
+	bp->pb_flags |= (_PBF_MEM_ALLOCATED | _PBF_MEM_SLAB);
 
-	return pb;
+	pagebuf_unlock(bp);
+
+	PB_TRACE(bp, "no_daddr", data);
+	return bp;
+ fail_free_mem:
+	kmem_free(data, malloc_len);
+ fail_free_buf:
+	pagebuf_free(bp);
+ fail:
+	return NULL;
 }
-
 
 /*
  *	pagebuf_hold
