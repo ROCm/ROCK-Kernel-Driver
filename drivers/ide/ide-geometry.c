@@ -6,8 +6,6 @@
 #include <linux/mc146818rtc.h>
 #include <asm/io.h>
 
-#ifdef CONFIG_BLK_DEV_IDE
-
 /*
  * We query CMOS about hard disks : it could be that we have a SCSI/ESDI/etc
  * controller that is BIOS compatible with ST-506, and thus showing up in our
@@ -25,14 +23,12 @@
  * If a drive is not actually on the primary interface, then these parameters
  * will be ignored.  This results in the user having to supply the logical
  * drive geometry as a boot parameter for each drive not on the primary i/f.
- */
-/*
+ *
  * The only "perfect" way to handle this would be to modify the setup.[cS] code
  * to do BIOS calls Int13h/Fn08h and Int13h/Fn48h to get all of the drive info
  * for us during initialization.  I have the necessary docs -- any takers?  -ml
- */
-/*
- * I did this, but it doesnt work - there is no reasonable way to find the
+ *
+ * I did this, but it doesn't work - there is no reasonable way to find the
  * correspondence between the BIOS numbering of the disks and the Linux
  * numbering. -aeb
  *
@@ -51,14 +47,13 @@ void probe_cmos_for_drives (ide_hwif_t *hwif)
 {
 #ifdef __i386__
 	extern struct drive_info_struct drive_info;
-	byte cmos_disks, *BIOS = (byte *) &drive_info;
+	u8 cmos_disks, *BIOS = (u8 *) &drive_info;
 	int unit;
 	unsigned long flags;
 
-#ifdef CONFIG_BLK_DEV_PDC4030
 	if (hwif->chipset == ide_pdc4030 && hwif->channel != 0)
 		return;
-#endif /* CONFIG_BLK_DEV_PDC4030 */
+
 	spin_lock_irqsave(&rtc_lock, flags);
 	cmos_disks = CMOS_READ(0x12);
 	spin_unlock_irqrestore(&rtc_lock, flags);
@@ -68,7 +63,7 @@ void probe_cmos_for_drives (ide_hwif_t *hwif)
 
 		if ((cmos_disks & (0xf0 >> (unit*4)))
 		   && !drive->present && !drive->nobios) {
-			unsigned short cyl = *(unsigned short *)BIOS;
+			u16 cyl = *(u16 *)BIOS;
 			unsigned char head = *(BIOS+2);
 			unsigned char sect = *(BIOS+14);
 			if (cyl > 0 && head > 0 && sect > 0 && sect < 64) {
@@ -86,10 +81,7 @@ void probe_cmos_for_drives (ide_hwif_t *hwif)
 	}
 #endif
 }
-#endif /* CONFIG_BLK_DEV_IDE */
 
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 
 extern ide_drive_t * get_info_ptr(kdev_t);
 extern unsigned long current_capacity (ide_drive_t *);
@@ -98,10 +90,11 @@ extern unsigned long current_capacity (ide_drive_t *);
  * If heads is nonzero: find a translation with this many heads and S=63.
  * Otherwise: find out how OnTrack Disk Manager would translate the disk.
  */
-static void
-ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int *s) {
-	static const byte dm_head_vals[] = {4, 8, 16, 32, 64, 128, 255, 0};
-	const byte *headp = dm_head_vals;
+
+static void ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int *s) 
+{
+	static const u8 dm_head_vals[] = {4, 8, 16, 32, 64, 128, 255, 0};
+	const u8 *headp = dm_head_vals;
 	unsigned long total;
 
 	/*
@@ -153,6 +146,7 @@ ontrack(ide_drive_t *drive, int heads, unsigned int *c, int *h, int *s) {
  * an IDE disk drive, or if a geometry was "forced" on the commandline.
  * Returns 1 if the geometry translation was successful.
  */
+
 int ide_xlate_1024 (kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 {
 	ide_drive_t *drive;
@@ -217,8 +211,7 @@ int ide_xlate_1024 (kdev_t i_rdev, int xparm, int ptheads, const char *msg)
 	set_capacity(drive->disk, current_capacity(drive));
 
 	if (ret)
-		printk("%s%s [%d/%d/%d]", msg, msg1,
+		printk(KERN_INFO "%s%s [%d/%d/%d]", msg, msg1,
 		       drive->bios_cyl, drive->bios_head, drive->bios_sect);
 	return ret;
 }
-#endif /* defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE) */

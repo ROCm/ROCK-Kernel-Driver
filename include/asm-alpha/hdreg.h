@@ -7,6 +7,6 @@
 #ifndef __ASMalpha_HDREG_H
 #define __ASMalpha_HDREG_H
 
-typedef unsigned short ide_ioreg_t;
+typedef unsigned long ide_ioreg_t;
 
 #endif /* __ASMalpha_HDREG_H */

@@ -221,20 +221,28 @@ flush_signals(struct task_struct *t)
 	flush_sigqueue(&t->pending);
 }
 
+static inline void __remove_thread_group(struct task_struct *tsk, struct signal_struct *sig)
+{
+	if (tsk == sig->curr_target)
+		sig->curr_target = next_thread(tsk);
+	list_del_init(&tsk->thread_group);
+}
+
 void remove_thread_group(struct task_struct *tsk, struct signal_struct *sig)
 {
 	write_lock_irq(&tasklist_lock);
 	spin_lock(&tsk->sig->siglock);
 
-	if (tsk == sig->curr_target)
-		sig->curr_target = next_thread(tsk);
-	list_del_init(&tsk->thread_group);
+	__remove_thread_group(tsk, sig);
 
 	spin_unlock(&tsk->sig->siglock);
 	write_unlock_irq(&tasklist_lock);
 }
 
-void exit_sighand(struct task_struct *tsk)
+/*
+ * This function expects the tasklist_lock write-locked.
+ */
+void __exit_sighand(struct task_struct *tsk)
 {
 	struct signal_struct * sig = tsk->sig;
 
@@ -242,19 +250,49 @@ void exit_sighand(struct task_struct *tsk)
 		BUG();
 	if (!atomic_read(&sig->count))
 		BUG();
-	remove_thread_group(tsk, sig);
+	spin_lock(&sig->siglock);
+	/*
+	 * Do not let the thread group leader exit until all other
+	 * threads are done:
+	 */
+	while (!list_empty(&current->thread_group) &&
+			current->tgid == current->pid &&
+			atomic_read(&sig->count) > 1) {
 
-	spin_lock_irq(&tsk->sigmask_lock);
-	if (sig) {
-		tsk->sig = NULL;
-		if (atomic_dec_and_test(&sig->count)) {
-			flush_sigqueue(&sig->shared_pending);
-			kmem_cache_free(sigact_cachep, sig);
-		}
+		spin_unlock(&sig->siglock);
+		write_unlock_irq(&tasklist_lock);
+
+		wait_for_completion(&sig->group_exit_done);
+
+		write_lock_irq(&tasklist_lock);
+		spin_lock(&sig->siglock);
+	}
+
+	spin_lock(&tsk->sigmask_lock);
+	tsk->sig = NULL;
+	if (atomic_dec_and_test(&sig->count)) {
+		__remove_thread_group(tsk, sig);
+		spin_unlock(&sig->siglock);
+		flush_sigqueue(&sig->shared_pending);
+		kmem_cache_free(sigact_cachep, sig);
+	} else {
+		if (!list_empty(&current->thread_group) &&
+					atomic_read(&sig->count) == 1)
+			complete(&sig->group_exit_done);
+		__remove_thread_group(tsk, sig);
+		spin_unlock(&sig->siglock);
 	}
 	clear_tsk_thread_flag(tsk,TIF_SIGPENDING);
 	flush_sigqueue(&tsk->pending);
-	spin_unlock_irq(&tsk->sigmask_lock);
+
+	spin_unlock(&tsk->sigmask_lock);
+}
+
+void exit_sighand(struct task_struct *tsk)
+{
+	write_lock_irq(&tasklist_lock);
+	__exit_sighand(tsk);
+	write_unlock_irq(&tasklist_lock);
 }
 
 /*
@@ -285,6 +323,9 @@ sig_exit(int sig, int exit_code, struct siginfo *info)
 	sigaddset(&current->pending.signal, sig);
 	recalc_sigpending();
 	current->flags |= PF_SIGNALED;
+
+	if (current->sig->group_exit)
+		exit_code = current->sig->group_exit_code;
 
 	do_exit(exit_code);
 	/* NOTREACHED */
