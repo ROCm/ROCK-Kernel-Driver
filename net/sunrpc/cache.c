@@ -910,9 +910,8 @@ void warn_no_listener(struct cache_detail *detail)
 {
 	if (detail->last_warn != detail->last_close) {
 		detail->last_warn = detail->last_close;
-		printk(KERN_WARNING "nfsd: nobody listening for %s upcall;"
-				" has some daemon %s?\n", detail->name,
-		      		detail->last_close?"died" : "not been started");
+		if (detail->warn_no_listener)
+			detail->warn_no_listener(detail);
 	}
 }
 

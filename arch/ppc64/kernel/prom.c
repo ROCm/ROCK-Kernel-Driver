@@ -2189,11 +2189,13 @@ map_interrupt(unsigned int **irq, struct device_node **ictrler,
 		ints = imap - nintrc;
 		reg = ints - naddrc;
 	}
+	if (p == NULL) {
 #ifdef DEBUG_IRQ
-	if (p == NULL)
 		printk("hmmm, int tree for %s doesn't have ctrler\n",
 		       np->full_name);
 #endif
+		return 0;
+	}
 	*irq = ints;
 	*ictrler = p;
 	return nintrc;
@@ -2204,7 +2206,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start,
 		       int measure_only)
 {
 	unsigned int *ints;
-	int intlen, intrcells;
+	int intlen, intrcells, intrcount;
 	int i, j, n;
 	unsigned int *irq, virq;
 	struct device_node *ic;
@@ -2214,34 +2216,40 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start,
 		return mem_start;
 	intrcells = prom_n_intr_cells(np);
 	intlen /= intrcells * sizeof(unsigned int);
-	np->n_intrs = intlen;
 	np->intrs = (struct interrupt_info *) mem_start;
 	mem_start += intlen * sizeof(struct interrupt_info);
 
 	if (measure_only)
 		return mem_start;
 
-	for (i = 0; i < intlen; ++i) {
-		np->intrs[i].line = 0;
-		np->intrs[i].sense = 1;
+	intrcount = 0;
+	for (i = 0; i < intlen; ++i, ints += intrcells) {
 		n = map_interrupt(&irq, &ic, np, ints, intrcells);
 		if (n <= 0)
 			continue;
-		virq = virt_irq_create_mapping(irq[0]);
-		if (virq == NO_IRQ) {
-			printk(KERN_CRIT "Could not allocate interrupt "
-			       "number for %s\n", np->full_name);
-		} else
-			np->intrs[i].line = irq_offset_up(virq);
+
+		/* don't map IRQ numbers under a cascaded 8259 controller */
+		if (ic && device_is_compatible(ic, "chrp,iic")) {
+			np->intrs[intrcount].line = irq[0];
+		} else {
+			virq = virt_irq_create_mapping(irq[0]);
+			if (virq == NO_IRQ) {
+				printk(KERN_CRIT "Could not allocate interrupt"
+				       " number for %s\n", np->full_name);
+				continue;
+			}
+			np->intrs[intrcount].line = irq_offset_up(virq);
+		}
 
 		/* We offset irq numbers for the u3 MPIC by 128 in PowerMac */
 		if (systemcfg->platform == PLATFORM_POWERMAC && ic && ic->parent) {
 			char *name = get_property(ic->parent, "name", NULL);
 			if (name && !strcmp(name, "u3"))
-				np->intrs[i].line += 128;
+				np->intrs[intrcount].line += 128;
 		}
+		np->intrs[intrcount].sense = 1;
 		if (n > 1)
-			np->intrs[i].sense = irq[1];
+			np->intrs[intrcount].sense = irq[1];
 		if (n > 2) {
 			printk("hmmm, got %d intr cells for %s:", n,
 			       np->full_name);
@@ -2249,8 +2257,9 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start,
 				printk(" %d", irq[j]);
 			printk("\n");
 		}
-		ints += intrcells;
+		++intrcount;
 	}
+	np->n_intrs = intrcount;
 
 	return mem_start;
 }

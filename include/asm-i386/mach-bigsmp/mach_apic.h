@@ -22,13 +22,21 @@ static inline int apic_id_registered(void)
 }
 
 #define APIC_DFR_VALUE	(APIC_DFR_CLUSTER)
+/* Round robin the irqs amoung the online cpus */
 static inline cpumask_t target_cpus(void)
 { 
-	return cpu_online_map;
+	static unsigned long cpu = NR_CPUS;
+	do {
+		if (cpu >= NR_CPUS)
+			cpu = first_cpu_const(cpu_online_map);
+		else
+			cpu = next_cpu_const(cpu, cpu_online_map);
+	} while (cpu >= NR_CPUS);
+	return mk_cpumask_const(cpumask_of_cpu(cpu));
 }
 #define TARGET_CPUS	(target_cpus())
 
-#define INT_DELIVERY_MODE dest_LowestPrio
+#define INT_DELIVERY_MODE dest_Fixed
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */
 
 #define APIC_BROADCAST_ID     (0xff)
@@ -141,36 +149,14 @@ static inline int check_phys_apicid_present(int boot_cpu_physical_apicid)
 	return (1);
 }
 
+/* As we are using single CPU as destination, pick only one CPU here */
 static inline unsigned int cpu_mask_to_apicid(cpumask_const_t cpumask)
 {
-	int num_bits_set;
-	int cpus_found = 0;
 	int cpu;
 	int apicid;	
 
-	num_bits_set = cpus_weight_const(cpumask);
-	/* Return id to all */
-	if (num_bits_set == NR_CPUS)
-		return (int) 0xFF;
-	/* 
-	 * The cpus in the mask must all be on the apic cluster.  If are not 
-	 * on the same apicid cluster return default value of TARGET_CPUS. 
-	 */
 	cpu = first_cpu_const(cpumask);
 	apicid = cpu_to_logical_apicid(cpu);
-	while (cpus_found < num_bits_set) {
-		if (cpu_isset_const(cpu, cpumask)) {
-			int new_apicid = cpu_to_logical_apicid(cpu);
-			if (apicid_cluster(apicid) != 
-					apicid_cluster(new_apicid)){
-				printk ("%s: Not a valid mask!\n",__FUNCTION__);
-				return 0xFF;
-			}
-			apicid = apicid | new_apicid;
-			cpus_found++;
-		}
-		cpu++;
-	}
 	return apicid;
 }
 

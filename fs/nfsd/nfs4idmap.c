@@ -175,6 +175,14 @@ idtoname_show(struct seq_file *m, struct cache_detail *cd, struct cache_head *h)
 	return 0;
 }
 
+static void
+warn_no_idmapd(struct cache_detail *detail)
+{
+	printk("nfsd: nfsv4 idmapping failing: has idmapd %s?\n",
+			detail->last_close? "died" : "not been started");
+}
+
+
 static int         idtoname_parse(struct cache_detail *, char *, int);
 static struct ent *idtoname_lookup(struct ent *, int);
 
@@ -186,6 +194,7 @@ struct cache_detail idtoname_cache = {
 	.cache_request	= idtoname_request,
 	.cache_parse	= idtoname_parse,
 	.cache_show	= idtoname_show,
+	.warn_no_listener = warn_no_idmapd,
 };
 
 int
@@ -318,6 +327,7 @@ struct cache_detail nametoid_cache = {
 	.cache_request	= nametoid_request,
 	.cache_parse	= nametoid_parse,
 	.cache_show	= nametoid_show,
+	.warn_no_listener = warn_no_idmapd,
 };
 
 int

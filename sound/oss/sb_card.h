@@ -140,6 +140,8 @@ static struct pnp_card_device_id sb_pnp_card_table[] = {
 	{.id = "RTL3000", .driver_data = 0, .devs = { {.id="@@@2001"},
 						     {.id="@X@2001"},
 						     {.id="@H@0001"}, } },
+	/* Sound Blaster 16 (Virtual PC 2004) */
+	{.id = "tBA03b0", .driver_data = 0, .devs = { {.id="PNPb003"}, } },
 	/* -end- */
 	{.id = "", }
 };

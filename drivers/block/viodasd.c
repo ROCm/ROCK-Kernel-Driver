@@ -40,8 +40,11 @@
 #include <linux/string.h>
 #include <linux/dma-mapping.h>
 #include <linux/completion.h>
+#include <linux/device.h>
+#include <linux/kernel.h>
 
 #include <asm/uaccess.h>
+#include <asm/vio.h>
 #include <asm/iSeries/HvTypes.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/iSeries/HvLpConfig.h>
@@ -519,13 +522,6 @@ retry:
 		       "bad rc sending event to OS/400 %d\n", (int)hvrc);
 		return;
 	}
-	printk(VIOD_KERN_INFO "disk %d: %lu sectors (%lu MB) "
-			"CHS=%d/%d/%d sector size %d%s\n",
-			dev_no, (unsigned long)(d->size >> 9),
-			(unsigned long)(d->size >> 20),
-			(int)d->cylinders, (int)d->tracks,
-			(int)d->sectors, (int)d->bytes_per_sector,
-			d->read_only ? " (RO)" : "");
 	/* create the request queue for the disk */
 	spin_lock_init(&d->q_lock);
 	q = blk_init_queue(do_viodasd_request, &d->q_lock);
@@ -562,6 +558,14 @@ retry:
 	g->queue = q;
 	g->private_data = d;
 	set_capacity(g, d->size >> 9);
+
+	printk(VIOD_KERN_INFO "disk %d: %lu sectors (%lu MB) "
+			"CHS=%d/%d/%d sector size %d%s\n",
+			dev_no, (unsigned long)(d->size >> 9),
+			(unsigned long)(d->size >> 20),
+			(int)d->cylinders, (int)d->tracks,
+			(int)d->sectors, (int)d->bytes_per_sector,
+			d->read_only ? " (RO)" : "");
 
 	/* register us in the global list */
 	add_disk(g);
@@ -725,6 +729,26 @@ static void handle_block_event(struct HvLpEvent *event)
 }
 
 /*
+ * Get the driver to reprobe for more disks.
+ */
+static ssize_t probe_disks(struct device_driver *drv, const char *buf,
+		size_t count)
+{
+	struct viodasd_device *d;
+
+	for (d = viodasd_devices; d < &viodasd_devices[MAX_DISKNO]; d++) {
+		if (d->disk == NULL)
+			probe_disk(d);
+	}
+	return count;
+}
+static DRIVER_ATTR(probe, S_IWUSR, NULL, probe_disks)
+
+static struct vio_driver viodasd_driver = {
+	.name = "viodasd"
+};
+
+/*
  * Initialize the whole device driver.  Handle module and non-module
  * versions
  */
@@ -767,6 +791,9 @@ static int __init viodasd_init(void)
 	for (i = 0; i < MAX_DISKNO; i++)
 		probe_disk(&viodasd_devices[i]);
 
+	vio_register_driver(&viodasd_driver);	/* FIX ME - error checking */
+	driver_create_file(&viodasd_driver.driver, &driver_attr_probe);
+
 	return 0;
 }
 module_init(viodasd_init);
@@ -775,6 +802,9 @@ void viodasd_exit(void)
 {
 	int i;
 	struct viodasd_device *d;
+
+	driver_remove_file(&viodasd_driver.driver, &driver_attr_probe);
+	vio_unregister_driver(&viodasd_driver);
 
         for (i = 0; i < MAX_DISKNO; i++) {
 		d = &viodasd_devices[i];

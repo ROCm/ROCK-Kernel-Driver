@@ -90,9 +90,7 @@ __xfrm6_find_acq(u8 mode, u32 reqid, u8 proto,
 			    break;
 		    }
 	}
-	if (x0) {
-		xfrm_state_hold(x0);
-	} else if (create && (x0 = xfrm_state_alloc()) != NULL) {
+	if (!x0 && create && (x0 = xfrm_state_alloc()) != NULL) {
 		ipv6_addr_copy((struct in6_addr *)x0->sel.daddr.a6,
 			       (struct in6_addr *)daddr);
 		ipv6_addr_copy((struct in6_addr *)x0->sel.saddr.a6,
@@ -110,11 +108,14 @@ __xfrm6_find_acq(u8 mode, u32 reqid, u8 proto,
 		x0->props.reqid = reqid;
 		x0->lft.hard_add_expires_seconds = XFRM_ACQ_EXPIRES;
 		xfrm_state_hold(x0);
-		mod_timer(&x0->timer, jiffies + XFRM_ACQ_EXPIRES*HZ);
+		x0->timer.expires = jiffies + XFRM_ACQ_EXPIRES*HZ;
+		add_timer(&x0->timer);
 		xfrm_state_hold(x0);
 		list_add_tail(&x0->bydst, xfrm6_state_afinfo.state_bydst+h);
 		wake_up(&km_waitq);
 	}
+	if (x0)
+		xfrm_state_hold(x0);
 	return x0;
 }
 

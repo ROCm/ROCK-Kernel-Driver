@@ -18,6 +18,13 @@
 #include "hfsplus_fs.h"
 #include "hfsplus_raw.h"
 
+static inline void hfsplus_instantiate(struct dentry *dentry,
+				       struct inode *inode, u32 cnid)
+{
+	dentry->d_fsdata = (void *)(unsigned long)cnid;
+	d_instantiate(dentry, inode);
+}
+
 /* Find the entry inside dir named dentry->d_name */
 static struct dentry *hfsplus_lookup(struct inode *dir, struct dentry *dentry,
 				     struct nameidata *nd)
@@ -52,6 +59,7 @@ again:
 			goto fail;
 		}
 		cnid = be32_to_cpu(entry.folder.id);
+		dentry->d_fsdata = (void *)(unsigned long)cnid;
 	} else if (type == HFSPLUS_FILE) {
 		if (fd.entrylength < sizeof(struct hfsplus_cat_file)) {
 			err = -EIO;
@@ -233,11 +241,11 @@ int hfsplus_create(struct inode *dir, struct dentry *dentry, int mode,
 	res = hfsplus_create_cat(inode->i_ino, dir, &dentry->d_name, inode);
 	if (res) {
 		inode->i_nlink = 0;
+		hfsplus_delete_inode(inode);
 		iput(inode);
 		return res;
 	}
-	dentry->d_fsdata = (void *)inode->i_ino;
-	d_instantiate(dentry, inode);
+	hfsplus_instantiate(dentry, inode, inode->i_ino);
 	mark_inode_dirty(inode);
 	return 0;
 }
@@ -284,8 +292,7 @@ int hfsplus_link(struct dentry *src_dentry, struct inode *dst_dir, struct dentry
 		return res;
 
 	inode->i_nlink++;
-	dst_dentry->d_fsdata = (void *)(unsigned long)cnid;
-	d_instantiate(dst_dentry, inode);
+	hfsplus_instantiate(dst_dentry, inode, cnid);
 	atomic_inc(&inode->i_count);
 	inode->i_ctime = CURRENT_TIME;
 	mark_inode_dirty(inode);
@@ -351,10 +358,11 @@ int hfsplus_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	res = hfsplus_create_cat(inode->i_ino, dir, &dentry->d_name, inode);
 	if (res) {
 		inode->i_nlink = 0;
+		hfsplus_delete_inode(inode);
 		iput(inode);
 		return res;
 	}
-	d_instantiate(dentry, inode);
+	hfsplus_instantiate(dentry, inode, inode->i_ino);
 	mark_inode_dirty(inode);
 	return 0;
 }
@@ -391,7 +399,8 @@ int hfsplus_symlink(struct inode *dir, struct dentry *dentry, const char *symnam
 	res = page_symlink(inode, symname, strlen(symname) + 1);
 	if (res) {
 		inode->i_nlink = 0;
-		iput (inode);
+		hfsplus_delete_inode(inode);
+		iput(inode);
 		return res;
 	}
 
@@ -399,8 +408,7 @@ int hfsplus_symlink(struct inode *dir, struct dentry *dentry, const char *symnam
 	res = hfsplus_create_cat(inode->i_ino, dir, &dentry->d_name, inode);
 
 	if (!res) {
-		dentry->d_fsdata = (void *)inode->i_ino;
-		d_instantiate(dentry, inode);
+		hfsplus_instantiate(dentry, inode, inode->i_ino);
 		mark_inode_dirty(inode);
 	}
 
@@ -421,12 +429,12 @@ int hfsplus_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev
 	res = hfsplus_create_cat(inode->i_ino, dir, &dentry->d_name, inode);
 	if (res) {
 		inode->i_nlink = 0;
+		hfsplus_delete_inode(inode);
 		iput(inode);
 		return res;
 	}
 	init_special_inode(inode, mode, rdev);
-	dentry->d_fsdata = (void *)inode->i_ino;
-	d_instantiate(dentry, inode);
+	hfsplus_instantiate(dentry, inode, inode->i_ino);
 	mark_inode_dirty(inode);
 
 	return 0;

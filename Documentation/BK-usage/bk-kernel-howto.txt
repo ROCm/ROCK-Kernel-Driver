@@ -279,5 +279,5 @@ specific state of the tree).
    for my long-lived kernel branch?
 A. Yes.  This requires BK 3.x, though.
 
-	bk export -tpatch -r`bk repogca http://linux.bkbits.net/linux-2.5`,+
+	bk export -tpatch -r`bk repogca bk://linux.bkbits.net/linux-2.5`,+
 

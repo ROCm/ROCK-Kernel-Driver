@@ -293,7 +293,7 @@ struct signal_struct {
  * in the range MAX_RT_PRIO..MAX_PRIO-1. Priority values
  * are inverted: lower p->prio value means higher priority.
  *
- * The MAX_RT_USER_PRIO value allows the actual maximum
+ * The MAX_USER_RT_PRIO value allows the actual maximum
  * RT priority to be separate from the value exported to
  * user-space.  This allows kernel threads to set their
  * priority to a value higher than any user task. Note:

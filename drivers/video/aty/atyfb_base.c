@@ -1938,6 +1938,19 @@ int __init atyfb_init(void)
 			if (i < 0)
 				continue;
 
+			rp = &pdev->resource[0];
+			if (rp->flags & IORESOURCE_IO)
+				rp = &pdev->resource[1];
+			addr = rp->start;
+			if (!addr)
+				continue;
+
+			res_start = rp->start;
+			res_size = rp->end - rp->start + 1;
+			if (!request_mem_region
+			    (res_start, res_size, "atyfb"))
+				continue;
+
 			info =
 			    kmalloc(sizeof(struct fb_info), GFP_ATOMIC);
 			if (!info) {
@@ -1959,19 +1972,6 @@ int __init atyfb_init(void)
 
 			info->fix = atyfb_fix;
 			info->par = default_par;
-
-			rp = &pdev->resource[0];
-			if (rp->flags & IORESOURCE_IO)
-				rp = &pdev->resource[1];
-			addr = rp->start;
-			if (!addr)
-				continue;
-
-			res_start = rp->start;
-			res_size = rp->end - rp->start + 1;
-			if (!request_mem_region
-			    (res_start, res_size, "atyfb"))
-				continue;
 
 #ifdef __sparc__
 			/*
@@ -2000,6 +2000,7 @@ int __init atyfb_init(void)
 			if (!default_par->mmap_map) {
 				printk
 				    ("atyfb_init: can't alloc mmap_map\n");
+				kfree(default_par);
 				kfree(info);
 				release_mem_region(res_start, res_size);
 				return -ENXIO;
@@ -2217,6 +2218,9 @@ int __init atyfb_init(void)
 			    ioremap(info->fix.mmio_start, 0x1000);
 
 			if (!default_par->ati_regbase) {
+#ifdef __sparc__
+				kfree(default_par->mmap_map);
+#endif
 				kfree(default_par);
 				kfree(info);
 				release_mem_region(res_start, res_size);
@@ -2247,6 +2251,10 @@ int __init atyfb_init(void)
 			    (char *) ioremap(addr, 0x800000);
 
 			if (!info->screen_base) {
+#ifdef __sparc__
+				kfree(default_par->mmap_map);
+#endif
+				kfree(default_par);
 				kfree(info);
 				release_mem_region(res_start, res_size);
 				return -ENXIO;
@@ -2258,6 +2266,7 @@ int __init atyfb_init(void)
 				if (default_par->mmap_map)
 					kfree(default_par->mmap_map);
 #endif
+				kfree(default_par);
 				kfree(info);
 				release_mem_region(res_start, res_size);
 				return -ENXIO;
@@ -2326,6 +2335,7 @@ int __init atyfb_init(void)
 		memset(default_par, 0, sizeof(struct atyfb_par));
 
 		info->fix = atyfb_fix;
+		info->par = default_par;
 
 		/*
 		 *  Map the video memory (physical address given) to somewhere in the
@@ -2357,6 +2367,7 @@ int __init atyfb_init(void)
 		}
 
 		if (!aty_init(info, "ISA bus")) {
+			kfree(default_par);
 			kfree(info);
 			/* This is insufficient! kernel_map has added two large chunks!! */
 			return -ENXIO;

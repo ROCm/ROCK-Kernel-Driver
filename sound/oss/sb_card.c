@@ -181,6 +181,13 @@ static void sb_dev2cfg(struct pnp_dev *dev, struct sb_card_config *scc)
 		scc->mpucnf.io_base = pnp_port_start(dev,1);
 		return;
 	}
+	if(!strncmp("tBA",scc->card_id,3)) {
+		scc->conf.io_base   = pnp_port_start(dev,0);
+		scc->conf.irq       = pnp_irq(dev,0);
+		scc->conf.dma       = pnp_dma(dev,0);
+		scc->conf.dma2      = pnp_dma(dev,1);
+		return;
+	}
 	if(!strncmp("ESS",scc->card_id,3)) {
 		scc->conf.io_base   = pnp_port_start(dev,0);
 		scc->conf.irq       = pnp_irq(dev,0);

@@ -7,7 +7,7 @@
 /* #define VLAN_DEBUG */
 
 #define VLAN_ERR KERN_ERR
-#define VLAN_INF KERN_ALERT
+#define VLAN_INF KERN_INFO
 #define VLAN_DBG KERN_ALERT /* change these... to debug, having a hard time
                              * changing the log level at run-time..for some reason.
                              */

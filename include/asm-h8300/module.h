@@ -8,4 +8,6 @@ struct mod_arch_specific { };
 #define Elf_Sym Elf32_Sym
 #define Elf_Ehdr Elf32_Ehdr
 
+#define MODULE_SYMBOL_PREFIX "_"
+
 #endif /* _ASM_H8/300_MODULE_H */
