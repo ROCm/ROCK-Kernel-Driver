@@ -19,6 +19,7 @@ obj-$(CONFIG_FB_PM3)		  += pm3fb.o
 obj-$(CONFIG_FB_APOLLO)           += dnfb.o cfbfillrect.o cfbimgblt.o
 obj-$(CONFIG_FB_Q40)              += q40fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_ATARI)            += atafb.o
+obj-$(CONFIG_FB_68328)            += 68328fb.o
 obj-$(CONFIG_FB_ATY128)           += aty128fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_RADEON)		  += radeonfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 obj-$(CONFIG_FB_NEOMAGIC)         += neofb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
