@@ -3279,6 +3279,29 @@ int pci_test_config_bits(struct pci_dev *pdev, struct pci_bits *bits)
 	return (tmp == bits->val) ? 1 : 0;
 }
 
+
+/**
+ *	ata_std_bios_param - generic bios head/sector/cylinder calculator
+ *	    used by sd. Most BIOSes nowadays expect a XXX/255/16  (CHS) 
+ *	    mapping. Some situations may arise where the disk is not 
+ *	    bootable if this is not used.
+ *
+ *	LOCKING:
+ *
+ *	RETURNS:
+ *
+ */
+int ata_std_bios_param(Disk * disk,	/* SCSI disk */
+		       kdev_t dev,	/* Device major, minor */
+		  int *ip /* Heads, sectors, cylinders in that order */ )
+{
+	ip[0] = 255;
+	ip[1] = 63;
+	ip[2] = disk->capacity / (ip[0] * ip[1]);
+
+	return 0;
+}
+
 /**
  *	ata_init -
  *
@@ -3304,6 +3327,7 @@ module_init(ata_init);
  */
 
 EXPORT_SYMBOL_GPL(pci_test_config_bits);
+EXPORT_SYMBOL_GPL(ata_std_bios_param);
 EXPORT_SYMBOL_GPL(ata_std_ports);
 EXPORT_SYMBOL_GPL(ata_device_add);
 EXPORT_SYMBOL_GPL(ata_qc_complete);
