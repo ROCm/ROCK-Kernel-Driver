@@ -1270,7 +1270,7 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 		while (!tu->qused) {
 			wait_queue_t wait;
 
-			if (file->f_flags & O_NONBLOCK) {
+			if ((file->f_flags & O_NONBLOCK) != 0 || result > 0) {
 				spin_unlock_irq(&tu->qlock);
 				err = -EAGAIN;
 				break;
@@ -1285,6 +1285,7 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 			spin_lock_irq(&tu->qlock);
 
 			remove_wait_queue(&tu->qchange_sleep, &wait);
+			set_current_state(TASK_RUNNING);
 
 			if (signal_pending(current)) {
 				err = -ERESTARTSYS;
@@ -1307,7 +1308,7 @@ static ssize_t snd_timer_user_read(struct file *file, char *buffer, size_t count
 		result += sizeof(snd_timer_read_t);
 		buffer += sizeof(snd_timer_read_t);
 	}
-	return err? err: result;
+	return result > 0 ? result : err;
 }
 
 static unsigned int snd_timer_user_poll(struct file *file, poll_table * wait)

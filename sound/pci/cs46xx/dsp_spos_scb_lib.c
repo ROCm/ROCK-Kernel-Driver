@@ -697,7 +697,7 @@ cs46xx_dsp_create_mix_to_ostream_scb(cs46xx_t * chip,char * scb_name,
 			DMA_RQ_C2_AC_NONE +
 			DMA_RQ_C2_SIGNAL_DEST_PINGPONG + 
       
-			1,                                 
+			CS46XX_DSP_CAPTURE_CHANNEL,                                 
 			DMA_RQ_SD_SP_SAMPLE_ADDR + 
 			mix_buffer_addr, 
 			0x0                   
@@ -1108,7 +1108,7 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,u32 sa
 
 		/* virtual channel reserved 
 		   for capture */
-		if (i == 1) continue;
+		if (i == CS46XX_DSP_CAPTURE_CHANNEL) continue;
 
 		if (ins->pcm_channels[i].active) {
 			if (!src_scb && ins->pcm_channels[i].sample_rate == sample_rate) {

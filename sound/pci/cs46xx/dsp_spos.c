@@ -735,7 +735,7 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 
 	snd_iprintf(buffer,"\nOUTPUT_SNOOP:\n");
 	col = 0;
-	for (i = 0x1200;i < 0x1240; i += sizeof(u32),col ++) {
+	for (i = OUTPUT_SNOOP_BUFFER;i < OUTPUT_SNOOP_BUFFER + 0x40; i += sizeof(u32),col ++) {
 		if (col == 4) {
 			snd_iprintf(buffer,"\n");
 			col = 0;
@@ -748,9 +748,24 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 		snd_iprintf(buffer,"%08X ",readl(dst + i));
 	}
 
-	snd_iprintf(buffer,"\n...\n");
+	snd_iprintf(buffer,"\nCODEC_INPUT_BUF1: \n");
 	col = 0;
-	for (i = 0x12D0;i < 0x1310; i += sizeof(u32),col ++) {
+	for (i = CODEC_INPUT_BUF1;i < CODEC_INPUT_BUF1 + 0x40; i += sizeof(u32),col ++) {
+		if (col == 4) {
+			snd_iprintf(buffer,"\n");
+			col = 0;
+		}
+
+		if (col == 0) {
+			snd_iprintf(buffer, "%04X ",i);
+		}
+
+		snd_iprintf(buffer,"%08X ",readl(dst + i));
+	}
+
+	snd_iprintf(buffer,"\nWRITE_BACK_BUF1: \n");
+	col = 0;
+	for (i = WRITE_BACK_BUF1;i < WRITE_BACK_BUF1 + 0x40; i += sizeof(u32),col ++) {
 		if (col == 4) {
 			snd_iprintf(buffer,"\n");
 			col = 0;
@@ -765,18 +780,6 @@ static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_
 
 	snd_iprintf(buffer,"\n");
 }
-
-#if 0
-static void snd_ac97_proc_regs_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, int subidx)
-{
-	int reg, val;
-
-	for (reg = 0; reg < 0x80; reg += 2) {
-		val = snd_ac97_read(ac97, reg);
-		snd_iprintf(buffer, "%i:%02x = %04x\n", subidx, reg, val);
-	}
-}
-#endif
 
 int cs46xx_dsp_proc_init (snd_card_t * card, cs46xx_t *chip)
 {
@@ -1349,9 +1352,9 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 
 	/* create codec in */
 	codec_in_scb = cs46xx_dsp_create_codec_in_scb(chip,"CodecInSCB",0x0010,0x00A0,
-						       MIX_SAMPLE_BUF1,
-						       CODECIN_SCB_ADDR,codec_out_scb,
-						       SCB_ON_PARENT_NEXT_SCB);
+                                                  CODEC_INPUT_BUF1,
+                                                  CODECIN_SCB_ADDR,codec_out_scb,
+                                                  SCB_ON_PARENT_NEXT_SCB);
 	if (!codec_in_scb) goto _fail_end;
   
 	/* create write back scb */

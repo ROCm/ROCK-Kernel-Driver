@@ -8,11 +8,12 @@
  *    --
  *
  *  TODO:
- *    We need a DSP code to support multichannel outputs and S/PDIF.
- *    Unfortunately, it seems that Cirrus Logic, Inc. is not willing
- *    to provide us sufficient information about the DSP processor,
- *    so we can't update the driver.
+ *    SPDIF input.
+ *    Secondary CODEC on some soundcards
  *
+ *  NOTE: with CONFIG_SND_CS46XX_NEW_DSP unset uses old DSP image (which
+ *        is default configuration), no SPDIF, no secondary codec, no
+ *        multi channel PCM.  But known to work.
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -334,7 +335,6 @@ int snd_cs46xx_download(cs46xx_t *chip,
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 
-// #include "imgs/cwcemb80.h"
 #include "imgs/cwc4630.h"
 #include "imgs/cwcasync.h"
 #include "imgs/cwcsnoop.h"
@@ -880,12 +880,14 @@ static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
-		if (substream->runtime->periods != CS46XX_FRAGS)
-			snd_cs46xx_playback_transfer(substream, 0);
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
 		if (cpcm->pcm_channel->unlinked)
 			cs46xx_dsp_pcm_link(chip,cpcm->pcm_channel);
+		if (substream->runtime->periods != CS46XX_FRAGS)
+			snd_cs46xx_playback_transfer(substream, 0);
 #else
+		if (substream->runtime->periods != CS46XX_FRAGS)
+			snd_cs46xx_playback_transfer(substream, 0);
 		{ unsigned int tmp;
 		tmp = snd_cs46xx_peek(chip, BA1_PCTL);
 		tmp &= 0x0000ffff;
@@ -1165,7 +1167,7 @@ static void snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	for (i = 0; i < DSP_MAX_PCM_CHANNELS; ++i) {
 		if (i <= 15) {
 			if ( status1 & (1 << i) ) {
-				if (i == 1) {
+				if (i == CS46XX_DSP_CAPTURE_CHANNEL) {
 					if (chip->capt.substream)
 						snd_pcm_period_elapsed(chip->capt.substream);
 				} else {
@@ -2447,6 +2449,106 @@ static void amp_none(cs46xx_t *chip, int change)
 {	
 }
 
+
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+static int voyetra_setup_eapd_slot(cs46xx_t *chip)
+{
+	int i;
+    u32 idx;
+    u16 modem_power,pin_config,logic_type,valid_slots,status;
+
+	snd_printd ("cs46xx: cs46xx_setup_eapd_slot()+\n");
+	/*
+	* Clear PRA.  The Bonzo chip will be used for GPIO not for modem
+	* stuff.
+	*/
+	if(chip->nr_ac97_codecs != 2)
+	{
+      snd_printk (KERN_ERR "cs46xx: cs46xx_setup_eapd_slot() - no secondary codec configured\n");
+      return -EINVAL;
+	}
+
+	modem_power = snd_cs46xx_codec_read (chip, 
+                                         BA0_AC97_EXT_MODEM_POWER,
+                                         CS46XX_SECONDARY_CODEC_INDEX);
+	modem_power &=0xFEFF;
+
+	snd_cs46xx_codec_write(chip, 
+                           BA0_AC97_EXT_MODEM_POWER, modem_power,
+                           CS46XX_SECONDARY_CODEC_INDEX);
+
+    /*
+     * Set GPIO pin's 7 and 8 so that they are configured for output.
+     */
+	pin_config = snd_cs46xx_codec_read (chip, 
+                                        BA0_AC97_GPIO_PIN_CONFIG,
+                                        CS46XX_SECONDARY_CODEC_INDEX);
+	pin_config &=0x27F;
+
+	snd_cs46xx_codec_write(chip, 
+                           BA0_AC97_GPIO_PIN_CONFIG, pin_config,
+                           CS46XX_SECONDARY_CODEC_INDEX);
+    
+    /*
+     * Set GPIO pin's 7 and 8 so that they are compatible with CMOS logic.
+     */
+
+	logic_type = snd_cs46xx_codec_read(chip, BA0_AC97_GPIO_PIN_TYPE,
+                                       CS46XX_SECONDARY_CODEC_INDEX);
+	logic_type &=0x27F;
+	snd_cs46xx_codec_write (chip, BA0_AC97_GPIO_PIN_TYPE, logic_type,
+                            CS46XX_SECONDARY_CODEC_INDEX);
+
+	valid_slots = snd_cs46xx_peekBA0(chip, BA0_ACOSV);
+	valid_slots |= 0x200;
+	snd_cs46xx_pokeBA0(chip, BA0_ACOSV, valid_slots);
+
+    /*
+     * Fill slots 12 with the correct value for the GPIO pins. 
+     */
+	for(idx = 0x90; idx <= 0x9F; idx++) {
+
+      /*
+       * Initialize the fifo so that bits 7 and 8 are on.
+       *
+       * Remember that the GPIO pins in bonzo are shifted by 4 bits to
+       * the left.  0x1800 corresponds to bits 7 and 8.
+       */
+      snd_cs46xx_pokeBA0(chip, BA0_SERBWP, 0x1800);
+      
+      /*
+       * Make sure the previous FIFO write operation has completed.
+       */
+      for(i = 0; i < 5; i++){
+        status = snd_cs46xx_peekBA0(chip, BA0_SERBST);
+
+        if( !(status & SERBST_WBSY) ) {
+          break;
+        }
+        mdelay(100);
+      }
+
+      if(status & SERBST_WBSY) {
+        snd_printk( KERN_ERR "cs46xx: cs46xx_setup_eapd_slot() " \
+                             "Failure to write the GPIO pins for slot 12.\n");
+         return -EINVAL;
+      }
+      
+      /*
+       * Write the serial port FIFO index.
+       */
+      snd_cs46xx_pokeBA0(chip, BA0_SERBAD, idx);
+      
+      /*
+       * Tell the serial port to load the new value into the FIFO location.
+       */
+      snd_cs46xx_pokeBA0(chip, BA0_SERBCM, SERBCM_WRC);
+	}
+
+	return 0;
+}
+#endif
+
 /*
  *	Crystal EAPD mode
  */
@@ -2477,6 +2579,12 @@ static void amp_voyetra(cs46xx_t *chip, int change)
 			snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 				       &chip->eapd_switch->id);
 	}
+
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
+    if (chip->amplifier && !old) {
+      voyetra_setup_eapd_slot(chip);
+    }
+#endif
 }
 
 

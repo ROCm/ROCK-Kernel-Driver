@@ -195,6 +195,81 @@
 #define BA1_FRSC                                0x00030038
 #define BA1_OMNI_MEM                            0x000E0000
 
+
+
+
+/*
+ * The following define the offsets of the AC97 shadow registers, which appear
+ * as a virtual extension to the base address register zero memory range.
+ */
+#define AC97_REG_OFFSET_MASK                    0x0000007EL
+#define AC97_CODEC_NUMBER_MASK                  0x00003000L
+
+#define BA0_AC97_RESET                          0x00001000L
+#define BA0_AC97_MASTER_VOLUME                  0x00001002L
+#define BA0_AC97_HEADPHONE_VOLUME               0x00001004L
+#define BA0_AC97_MASTER_VOLUME_MONO             0x00001006L
+#define BA0_AC97_MASTER_TONE                    0x00001008L
+#define BA0_AC97_PC_BEEP_VOLUME                 0x0000100AL
+#define BA0_AC97_PHONE_VOLUME                   0x0000100CL
+#define BA0_AC97_MIC_VOLUME                     0x0000100EL
+#define BA0_AC97_LINE_IN_VOLUME                 0x00001010L
+#define BA0_AC97_CD_VOLUME                      0x00001012L
+#define BA0_AC97_VIDEO_VOLUME                   0x00001014L
+#define BA0_AC97_AUX_VOLUME                     0x00001016L
+#define BA0_AC97_PCM_OUT_VOLUME                 0x00001018L
+#define BA0_AC97_RECORD_SELECT                  0x0000101AL
+#define BA0_AC97_RECORD_GAIN                    0x0000101CL
+#define BA0_AC97_RECORD_GAIN_MIC                0x0000101EL
+#define BA0_AC97_GENERAL_PURPOSE                0x00001020L
+#define BA0_AC97_3D_CONTROL                     0x00001022L
+#define BA0_AC97_MODEM_RATE                     0x00001024L
+#define BA0_AC97_POWERDOWN                      0x00001026L
+#define BA0_AC97_EXT_AUDIO_ID                   0x00001028L
+#define BA0_AC97_EXT_AUDIO_POWER                0x0000102AL
+#define BA0_AC97_PCM_FRONT_DAC_RATE             0x0000102CL
+#define BA0_AC97_PCM_SURR_DAC_RATE              0x0000102EL
+#define BA0_AC97_PCM_LFE_DAC_RATE               0x00001030L
+#define BA0_AC97_PCM_LR_ADC_RATE                0x00001032L
+#define BA0_AC97_MIC_ADC_RATE                   0x00001034L
+#define BA0_AC97_6CH_VOL_C_LFE                  0x00001036L
+#define BA0_AC97_6CH_VOL_SURROUND               0x00001038L
+#define BA0_AC97_RESERVED_3A                    0x0000103AL
+#define BA0_AC97_EXT_MODEM_ID                   0x0000103CL
+#define BA0_AC97_EXT_MODEM_POWER                0x0000103EL
+#define BA0_AC97_LINE1_CODEC_RATE               0x00001040L
+#define BA0_AC97_LINE2_CODEC_RATE               0x00001042L
+#define BA0_AC97_HANDSET_CODEC_RATE             0x00001044L
+#define BA0_AC97_LINE1_CODEC_LEVEL              0x00001046L
+#define BA0_AC97_LINE2_CODEC_LEVEL              0x00001048L
+#define BA0_AC97_HANDSET_CODEC_LEVEL            0x0000104AL
+#define BA0_AC97_GPIO_PIN_CONFIG                0x0000104CL
+#define BA0_AC97_GPIO_PIN_TYPE                  0x0000104EL
+#define BA0_AC97_GPIO_PIN_STICKY                0x00001050L
+#define BA0_AC97_GPIO_PIN_WAKEUP                0x00001052L
+#define BA0_AC97_GPIO_PIN_STATUS                0x00001054L
+#define BA0_AC97_MISC_MODEM_AFE_STAT            0x00001056L
+#define BA0_AC97_RESERVED_58                    0x00001058L
+#define BA0_AC97_CRYSTAL_REV_N_FAB_ID           0x0000105AL
+#define BA0_AC97_TEST_AND_MISC_CTRL             0x0000105CL
+#define BA0_AC97_AC_MODE                        0x0000105EL
+#define BA0_AC97_MISC_CRYSTAL_CONTROL           0x00001060L
+#define BA0_AC97_LINE1_HYPRID_CTRL              0x00001062L
+#define BA0_AC97_VENDOR_RESERVED_64             0x00001064L
+#define BA0_AC97_VENDOR_RESERVED_66             0x00001066L
+#define BA0_AC97_SPDIF_CONTROL                  0x00001068L
+#define BA0_AC97_VENDOR_RESERVED_6A             0x0000106AL
+#define BA0_AC97_VENDOR_RESERVED_6C             0x0000106CL
+#define BA0_AC97_VENDOR_RESERVED_6E             0x0000106EL
+#define BA0_AC97_VENDOR_RESERVED_70             0x00001070L
+#define BA0_AC97_VENDOR_RESERVED_72             0x00001072L
+#define BA0_AC97_VENDOR_RESERVED_74             0x00001074L
+#define BA0_AC97_CAL_ADDRESS                    0x00001076L
+#define BA0_AC97_CAL_DATA                       0x00001078L
+#define BA0_AC97_VENDOR_RESERVED_7A             0x0000107AL
+#define BA0_AC97_VENDOR_ID1                     0x0000107CL
+#define BA0_AC97_VENDOR_ID2                     0x0000107EL
+
 /*
  *  The following defines are for the flags in the host interrupt status
  *  register.
@@ -1629,10 +1704,11 @@
 #define POWER_DOWN_ALL         0x7f0f
 
 /* maxinum number of AC97 codecs connected, AC97 2.0 defined 4 */
-#define MAX_NR_AC97				4
-#define CS46XX_PRIMARY_CODEC_INDEX		0
+#define MAX_NR_AC97				            4
+#define CS46XX_PRIMARY_CODEC_INDEX          0
 #define CS46XX_SECONDARY_CODEC_INDEX		1
 #define CS46XX_SECONDARY_CODEC_OFFSET		0x80
+#define CS46XX_DSP_CAPTURE_CHANNEL          1
 
 /*
  *
