@@ -26,6 +26,7 @@
 #include <linux/serial.h>
 #include <linux/serialP.h>
 #include <linux/list.h>
+#include <linux/8250_pci.h>
 
 #include <asm/serial.h>
 
@@ -150,12 +151,12 @@ struct pci_board_no_ids {
 
 static int __devinit siig10x_init_fn(struct pci_dev *dev, struct pci_board_no_ids *board, int enable)
 {
-	return pci_siig10x_fn(dev, NULL, enable);
+	return pci_siig10x_fn(dev, enable);
 }
 
 static int __devinit siig20x_init_fn(struct pci_dev *dev, struct pci_board_no_ids *board, int enable)
 {
-	return pci_siig20x_fn(dev, NULL, enable);
+	return pci_siig20x_fn(dev, enable);
 }
 
 static struct pci_board_no_ids pci_boards[] __devinitdata = {
