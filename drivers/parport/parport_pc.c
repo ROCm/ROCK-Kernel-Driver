@@ -2114,39 +2114,30 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 {
 	struct parport_pc_private *priv;
 	struct parport_operations *ops;
-	struct parport tmp;
-	struct parport *p = &tmp;
+	struct parport *p;
 	int probedirq = PARPORT_IRQ_NONE;
 	struct resource *base_res;
 	struct resource	*ECR_res = NULL;
 	struct resource	*EPP_res = NULL;
-	char *fake_name = "parport probe";
 
-	/*
-	 * Chicken and Egg problem.  request_region() wants the name of
-	 * the owner, but this instance will not know that name until
-	 * after the parport_register_port() call.  Give request_region()
-	 * a fake name until after parport_register_port(), then use
-	 * rename_region() to set correct name.
-	 */
-	base_res = request_region(base, 3, fake_name);
-	if (base_res == NULL)
-		return NULL;
+	ops = kmalloc(sizeof (struct parport_operations), GFP_KERNEL);
+	if (!ops)
+		goto out1;
+
 	priv = kmalloc (sizeof (struct parport_pc_private), GFP_KERNEL);
-	if (!priv) {
-		printk (KERN_DEBUG "parport (0x%lx): no memory!\n", base);
-		release_region(base, 3);
-		return NULL;
-	}
-	ops = kmalloc (sizeof (struct parport_operations), GFP_KERNEL);
-	if (!ops) {
-		printk (KERN_DEBUG "parport (0x%lx): no memory for ops!\n",
-			base);
-		release_region(base, 3);
-		kfree (priv);
-		return NULL;
-	}
-	memcpy (ops, &parport_pc_ops, sizeof (struct parport_operations));
+	if (!priv)
+		goto out2;
+
+	/* a misnomer, actually - it's allocate and reserve parport number */
+	p = parport_register_port(base, irq, dma, ops);
+	if (!p)
+		goto out3;
+
+	base_res = request_region(base, 3, p->name);
+	if (!base_res)
+		goto out4;
+
+	memcpy(ops, &parport_pc_ops, sizeof (struct parport_operations));
 	priv->ctr = 0xc;
 	priv->ctr_writable = ~0x10;
 	priv->ecr = 0;
@@ -2154,59 +2145,35 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	priv->dma_buf = 0;
 	priv->dma_handle = 0;
 	priv->dev = dev;
-	p->base = base;
 	p->base_hi = base_hi;
-	p->irq = irq;
-	p->dma = dma;
 	p->modes = PARPORT_MODE_PCSPP | PARPORT_MODE_SAFEININT;
-	p->ops = ops;
 	p->private_data = priv;
-	p->physport = p;
 
 	if (base_hi) {
-		ECR_res = request_region(base_hi, 3, fake_name);
+		ECR_res = request_region(base_hi, 3, p->name);
 		if (ECR_res)
 			parport_ECR_present(p);
 	}
 
 	if (base != 0x3bc) {
-		EPP_res = request_region(base+0x3, 5, fake_name);
+		EPP_res = request_region(base+0x3, 5, p->name);
 		if (EPP_res)
 			if (!parport_EPP_supported(p))
 				parport_ECPEPP_supported(p);
 	}
 	if (!parport_SPP_supported (p))
 		/* No port. */
-		goto errout;
+		goto out5;
 	if (priv->ecr)
 		parport_ECPPS2_supported(p);
 	else
-		parport_PS2_supported (p);
+		parport_PS2_supported(p);
 
-	if (!(p = parport_register_port(base, PARPORT_IRQ_NONE,
-					PARPORT_DMA_NONE, ops)))
-		goto errout;
-
-	/*
-	 * Now the real name is known... Replace the fake name
-	 * in the resources with the correct one.
-	 */
-	rename_region(base_res, p->name);
-	if (ECR_res)
-		rename_region(ECR_res, p->name);
-	if (EPP_res)
-		rename_region(EPP_res, p->name);
-
-	p->base_hi = base_hi;
-	p->modes = tmp.modes;
 	p->size = (p->modes & PARPORT_MODE_EPP)?8:3;
-	p->private_data = priv;
 
 	printk(KERN_INFO "%s: PC-style at 0x%lx", p->name, p->base);
 	if (p->base_hi && priv->ecr)
 		printk(" (0x%lx)", p->base_hi);
-	p->irq = irq;
-	p->dma = dma;
 	if (p->irq == PARPORT_IRQ_AUTO) {
 		p->irq = PARPORT_IRQ_NONE;
 		parport_irq_probe(p);
@@ -2334,15 +2301,19 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 
 	return p;
 
-errout:
-	release_region(p->base, 3);
+out5:
 	if (ECR_res)
 		release_region(base_hi, 3);
 	if (EPP_res)
 		release_region(base+0x3, 5);
-
+	release_region(base, 3);
+out4:
+	parport_put_port(p);
+out3:
 	kfree (priv);
+out2:
 	kfree (ops);
+out1:
 	return NULL;
 }
 
