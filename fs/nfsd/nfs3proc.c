@@ -664,7 +664,7 @@ struct nfsd3_voidargs { int dummy; };
 #define pAT (1+AT)	/* post attributes - conditional */
 #define WC (7+pAT)	/* WCC attributes */
 
-struct svc_procedure		nfsd_procedures3[22] = {
+static struct svc_procedure		nfsd_procedures3[22] = {
   PROC(null,	 void,		void,		void,	  RC_NOCACHE, ST),
   PROC(getattr,	 fhandle,	attrstat,	fhandle,  RC_NOCACHE, ST+AT),
   PROC(setattr,  sattr,		wccstat,	fhandle,  RC_REPLBUFF, ST+WC),
@@ -687,4 +687,12 @@ struct svc_procedure		nfsd_procedures3[22] = {
   PROC(fsinfo,   fhandle,	fsinfo,		void,     RC_NOCACHE, ST+pAT+12),
   PROC(pathconf, fhandle,	pathconf,	void,     RC_NOCACHE, ST+pAT+6),
   PROC(commit,	 commit,	commit,		fhandle,  RC_NOCACHE, ST+WC+2),
+};
+
+struct svc_version	nfsd_version3 = {
+		.vs_vers	= 3,
+		.vs_nproc	= 22,
+		.vs_proc	= nfsd_procedures3,
+		.vs_dispatch	= nfsd_dispatch,
+		.vs_xdrsize	= NFS3_SVC_XDRSIZE,
 };

@@ -732,9 +732,17 @@ struct nfsd4_voidargs { int dummy; };
  * XID's liberally, so I've left it unimplemented until pynfs generates
  * better XID's.
  */
-struct svc_procedure		nfsd_procedures4[2] = {
+static struct svc_procedure		nfsd_procedures4[2] = {
   PROC(null,	 void,		void,		void,	  RC_NOCACHE, 1),
   PROC(compound, compound,	compound,	compound, RC_NOCACHE, NFSD_BUFSIZE)
+};
+
+struct svc_version	nfsd_version4 = {
+		.vs_vers	= 4,
+		.vs_nproc	= 2,
+		.vs_proc	= nfsd_procedures4,
+		.vs_dispatch	= nfsd_dispatch,
+		.vs_xdrsize	= NFS4_SVC_XDRSIZE,
 };
 
 /*

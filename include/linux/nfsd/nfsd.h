@@ -63,22 +63,15 @@ typedef int		(*encode_dent_fn)(struct readdir_cd *, const char *,
 						int, loff_t, ino_t, unsigned int);
 typedef int (*nfsd_dirop_t)(struct inode *, struct dentry *, int, int);
 
-/*
- * Procedure table for NFSv2
- */
-extern struct svc_procedure	nfsd_procedures2[];
-#ifdef CONFIG_NFSD_V3
-extern struct svc_procedure	nfsd_procedures3[];
-#endif /* CONFIG_NFSD_V3 */
-#ifdef CONFIG_NFSD_V4
-extern struct svc_procedure	nfsd_procedures4[];
-#endif /* CONFIG_NFSD_V4 */
 extern struct svc_program	nfsd_program;
+extern struct svc_version	nfsd_version2, nfsd_version3,
+				nfsd_version4;
 
 /*
  * Function prototypes.
  */
 int		nfsd_svc(unsigned short port, int nrservs);
+int		nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp);
 
 /* nfsd/vfs.c */
 int		fh_lock_parent(struct svc_fh *, struct dentry *);

@@ -27,9 +27,11 @@
  * Create an RPC service
  */
 struct svc_serv *
-svc_create(struct svc_program *prog, unsigned int bufsize, unsigned int xdrsize)
+svc_create(struct svc_program *prog, unsigned int bufsize)
 {
 	struct svc_serv	*serv;
+	int vers;
+	unsigned int xdrsize;
 
 	if (!(serv = (struct svc_serv *) kmalloc(sizeof(*serv), GFP_KERNEL)))
 		return NULL;
@@ -39,6 +41,16 @@ svc_create(struct svc_program *prog, unsigned int bufsize, unsigned int xdrsize)
 	serv->sv_nrthreads = 1;
 	serv->sv_stats     = prog->pg_stats;
 	serv->sv_bufsz	   = bufsize? bufsize : 4096;
+	prog->pg_lovers = prog->pg_nvers-1;
+	xdrsize = 0;
+	for (vers=0; vers<prog->pg_nvers ; vers++)
+		if (prog->pg_vers[vers]) {
+			prog->pg_hivers = vers;
+			if (prog->pg_lovers > vers)
+				prog->pg_lovers = vers;
+			if (prog->pg_vers[vers]->vs_xdrsize > xdrsize)
+				xdrsize = prog->pg_vers[vers]->vs_xdrsize;
+		}
 	serv->sv_xdrsize   = xdrsize;
 	INIT_LIST_HEAD(&serv->sv_threads);
 	INIT_LIST_HEAD(&serv->sv_sockets);

@@ -167,6 +167,7 @@ struct svc_version {
 	u32			vs_vers;	/* version number */
 	u32			vs_nproc;	/* number of procedures */
 	struct svc_procedure *	vs_proc;	/* per-procedure info */
+	u32			vs_xdrsize;	/* xdrsize needed for this version */
 
 	/* Override dispatch function (e.g. when caching replies).
 	 * A return value of 0 means drop the request. 
@@ -199,7 +200,7 @@ typedef void		(*svc_thread_fn)(struct svc_rqst *);
 /*
  * Function prototypes.
  */
-struct svc_serv *  svc_create(struct svc_program *, unsigned int, unsigned int);
+struct svc_serv *  svc_create(struct svc_program *, unsigned int);
 int		   svc_create_thread(svc_thread_fn, struct svc_serv *);
 void		   svc_exit_thread(struct svc_rqst *);
 void		   svc_destroy(struct svc_serv *);
