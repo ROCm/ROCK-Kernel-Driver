@@ -642,7 +642,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file, unsigned int cmd
 				goto inval;
 
 			if (cmd == HIDIOCGUSAGES || cmd == HIDIOCSUSAGES) {
-				if (uref_multi->num_values >= HID_MAX_USAGES || 
+				if (uref_multi->num_values >= HID_MAX_MULTI_USAGES || 
 				    uref->usage_index >= field->maxusage || 
 				   (uref->usage_index + uref_multi->num_values) >= field->maxusage)
 					goto inval;

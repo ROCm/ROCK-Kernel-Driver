@@ -114,6 +114,8 @@
 #include <linux/filter.h>
 #include <linux/msdos_fs.h>
 
+#include <linux/hiddev.h>
+
 #undef INCLUDES
 #endif
 
