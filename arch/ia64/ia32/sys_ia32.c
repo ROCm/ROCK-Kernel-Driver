@@ -3151,6 +3151,7 @@ extern asmlinkage long sys_sysctl(struct __sysctl_args *args);
 asmlinkage long
 sys32_sysctl (struct sysctl32 *args)
 {
+#ifdef CONFIG_SYSCTL
 	struct sysctl32 a32;
 	mm_segment_t old_fs = get_fs ();
 	void *oldvalp, *newvalp;
@@ -3188,6 +3189,9 @@ sys32_sysctl (struct sysctl32 *args)
 		return -EFAULT;
 
 	return ret;
+#else
+	return -ENOSYS;
+#endif
 }
 
 asmlinkage long
