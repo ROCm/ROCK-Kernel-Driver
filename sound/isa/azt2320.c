@@ -271,6 +271,11 @@ static int __devinit snd_card_azt2320_probe(int dev,
 		return error;
 	}
 
+	strcpy(card->driver, "AZT2320");
+	strcpy(card->shortname, "Aztech AZT2320");
+	sprintf(card->longname, "%s, WSS at 0x%lx, irq %i, dma %i&%i",
+		card->shortname, chip->port, irq[dev], dma1[dev], dma2[dev]);
+
 	if ((error = snd_cs4231_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return error;
@@ -309,11 +314,6 @@ static int __devinit snd_card_azt2320_probe(int dev,
 			}
 		}
 	}
-
-	strcpy(card->driver, "AZT2320");
-	strcpy(card->shortname, "Aztech AZT2320");
-	sprintf(card->longname, "%s soundcard, WSS at 0x%lx, irq %i, dma %i&%i",
-		card->shortname, chip->port, irq[dev], dma1[dev], dma2[dev]);
 
 	if ((error = snd_card_register(card)) < 0) {
 		snd_card_free(card);

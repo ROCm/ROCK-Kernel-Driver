@@ -240,6 +240,12 @@ static int __init snd_card_als100_probe(int dev,
 		return error;
 	}
 
+	strcpy(card->driver, "ALS100");
+	strcpy(card->shortname, "Avance Logic ALS100");
+	sprintf(card->longname, "%s, %s at 0x%lx, irq %d, dma %d&%d",
+		card->shortname, chip->name, chip->port,
+		irq[dev], dma8[dev], dma16[dev]);
+
 	if ((error = snd_sb16dsp_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return error;
@@ -276,11 +282,6 @@ static int __init snd_card_als100_probe(int dev,
 		}
 	}
 
-	strcpy(card->driver, "ALS100");
-	strcpy(card->shortname, "Avance Logic ALS100");
-	sprintf(card->longname, "%s soundcard, %s at 0x%lx, irq %d, dma %d&%d",
-		card->shortname, chip->name, chip->port,
-		irq[dev], dma8[dev], dma16[dev]);
 	if ((error = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return error;

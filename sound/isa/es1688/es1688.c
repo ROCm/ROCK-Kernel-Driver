@@ -130,6 +130,10 @@ static int __init snd_audiodrive_probe(int dev)
 		return err;
 	}
 
+	strcpy(card->driver, "ES1688");
+	strcpy(card->shortname, pcm->name);
+	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %i", pcm->name, chip->port, xirq, xdma);
+
 	if ((snd_opl3_create(card, chip->port, chip->port + 2, OPL3_HW_OPL3, 0, &opl3)) < 0) {
 		printk(KERN_ERR "es1688: opl3 not detected at 0x%lx\n", chip->port);
 	} else {
@@ -149,9 +153,6 @@ static int __init snd_audiodrive_probe(int dev)
 			return err;
 		}
 	}
-	strcpy(card->driver, "ES1688");
-	strcpy(card->shortname, pcm->name);
-	sprintf(card->longname, "%s at 0x%lx, irq %i, dma %i", pcm->name, chip->port, xirq, xdma);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;

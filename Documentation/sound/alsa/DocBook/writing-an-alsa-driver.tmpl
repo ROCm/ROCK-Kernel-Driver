@@ -496,13 +496,13 @@
           }
 
           // (4)
-          // implemented later
-
-          // (5)
           strcpy(card->driver, "My Chip");
           strcpy(card->shortname, "My Own Chip 123");
           sprintf(card->longname, "%s at 0x%lx irq %i",
                   card->shortname, chip->ioport, chip->irq);
+
+          // (5)
+          // implemented later
 
           // (6)
           if ((err = snd_card_register(card)) < 0) {
@@ -622,21 +622,8 @@
         </para>
       </section>
 
-      <section id="basic-flow-constructor-create-other">
-        <title>4) Create other components, such as mixer, MIDI, etc.</title>
-        <para>
-          Here you define the basic components such as
-          <link linkend="pcm-interface"><citetitle>PCM</citetitle></link>,
-          mixer (e.g. <link linkend="api-ac97"><citetitle>AC97</citetitle></link>),
-          MIDI (e.g. <link linkend="midi-interface"><citetitle>MPU-401</citetitle></link>),
-          and other interfaces.
-          Also, if you want a <link linkend="proc-interface"><citetitle>proc
-        file</citetitle></link>, define it here, too.
-        </para>
-      </section>
-        
       <section id="basic-flow-constructor-main-component">
-        <title>5) Set the driver ID and name strings.</title>
+        <title>4) Set the driver ID and name strings.</title>
         <para>
           <informalexample>
             <programlisting>
@@ -660,6 +647,19 @@
           The shortname field is a string shown as more verbose
         name. The longname field contains the information which is
         shown in <filename>/proc/asound/cards</filename>. 
+        </para>
+      </section>
+
+      <section id="basic-flow-constructor-create-other">
+        <title>5) Create other components, such as mixer, MIDI, etc.</title>
+        <para>
+          Here you define the basic components such as
+          <link linkend="pcm-interface"><citetitle>PCM</citetitle></link>,
+          mixer (e.g. <link linkend="api-ac97"><citetitle>AC97</citetitle></link>),
+          MIDI (e.g. <link linkend="midi-interface"><citetitle>MPU-401</citetitle></link>),
+          and other interfaces.
+          Also, if you want a <link linkend="proc-interface"><citetitle>proc
+        file</citetitle></link>, define it here, too.
         </para>
       </section>
 

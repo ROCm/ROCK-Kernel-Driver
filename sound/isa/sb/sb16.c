@@ -470,6 +470,22 @@ static int __init snd_sb16_probe(int dev,
 		return -ENXIO;
 	}
 
+	strcpy(card->driver,
+#ifdef SNDRV_SBAWE_EMU8000
+			awe_port[dev] > 0 ? "SB AWE" :
+#endif
+			"SB16");
+	strcpy(card->shortname, chip->name);
+	sprintf(card->longname, "%s at 0x%lx, irq %i, dma ",
+		chip->name,
+		chip->port,
+		xirq);
+	if (xdma8 >= 0)
+		sprintf(card->longname + strlen(card->longname), "%d", xdma8);
+	if (xdma16 >= 0)
+		sprintf(card->longname + strlen(card->longname), "%s%d",
+			xdma8 >= 0 ? "&" : "", xdma16);
+
 	if (chip->mpu_port > 0 && chip->mpu_port != SNDRV_AUTO_PORT) {
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_SB,
 					       chip->mpu_port, 0,
@@ -540,21 +556,6 @@ static int __init snd_sb16_probe(int dev,
 		(mic_agc[dev] ? 0x00 : 0x01));
 	spin_unlock_irqrestore(&chip->mixer_lock, flags);
 
-	strcpy(card->driver, 
-#ifdef SNDRV_SBAWE_EMU8000
-			awe_port[dev] > 0 ? "SB AWE" :
-#endif
-			"SB16");
-	strcpy(card->shortname, chip->name);
-	sprintf(card->longname, "%s at 0x%lx, irq %i, dma ",
-		chip->name,
-		chip->port,
-		xirq);
-	if (xdma8 >= 0)
-		sprintf(card->longname + strlen(card->longname), "%d", xdma8);
-	if (xdma16 >= 0)
-		sprintf(card->longname + strlen(card->longname), "%s%d",
-			xdma8 >= 0 ? "&" : "", xdma16);
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
 		return err;

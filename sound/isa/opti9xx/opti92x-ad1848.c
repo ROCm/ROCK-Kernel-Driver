@@ -2106,6 +2106,17 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 		return error;
 	}
 #endif
+	strcpy(card->driver, chip->name);
+	sprintf(card->shortname, "OPTi %s", card->driver);
+#if defined(CS4231) || defined(OPTi93X)
+	sprintf(card->longname, "%s, %s at 0x%lx, irq %d, dma %d&%d",
+		card->shortname, pcm->name, chip->wss_base + 4,
+		chip->irq, chip->dma1, chip->dma2);
+#else
+	sprintf(card->longname, "%s, %s at 0x%lx, irq %d, dma %d",
+		card->shortname, pcm->name, chip->wss_base + 4,
+		chip->irq, chip->dma1);
+#endif	/* CS4231 || OPTi93X */
 
 	if (chip->mpu_port <= 0 || chip->mpu_port == SNDRV_AUTO_PORT)
 		rmidi = NULL;
@@ -2159,17 +2170,6 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 		}
 	}
 
-	strcpy(card->driver, chip->name);
-	sprintf(card->shortname, "OPTi %s", card->driver);
-#if defined(CS4231) || defined(OPTi93X)
-	sprintf(card->longname, "%s soundcard, %s at 0x%lx, irq %d, dma %d&%d",
-		card->shortname, pcm->name, chip->wss_base + 4,
-		chip->irq, chip->dma1, chip->dma2);
-#else
-	sprintf(card->longname, "%s soundcard, %s at 0x%lx, irq %d, dma %d",
-		card->shortname, pcm->name, chip->wss_base + 4,
-		chip->irq, chip->dma1);
-#endif	/* CS4231 || OPTi93X */
 	if ((error = snd_card_register(card))) {
 		snd_card_free(card);
 		return error;

@@ -1469,6 +1469,15 @@ static int __devinit snd_sonic_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+
+	strcpy(card->driver, "SonicVibes");
+	strcpy(card->shortname, "S3 SonicVibes");
+	sprintf(card->longname, "%s rev %i at 0x%lx, irq %i",
+		card->shortname,
+		sonic->revision,
+		pci_resource_start(pci, 1),
+		sonic->irq);
+
 	if ((err = snd_sonicvibes_pcm(sonic, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -1499,13 +1508,6 @@ static int __devinit snd_sonic_probe(struct pci_dev *pci,
 	sonic->gameport.io = sonic->game_port;
 	gameport_register_port(&sonic->gameport);
 #endif
-	strcpy(card->driver, "SonicVibes");
-	strcpy(card->shortname, "S3 SonicVibes");
-	sprintf(card->longname, "%s rev %i at 0x%lx, irq %i",
-		card->shortname,
-		sonic->revision,
-		pci_resource_start(pci, 1),
-		sonic->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

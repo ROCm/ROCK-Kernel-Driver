@@ -1083,6 +1083,13 @@ static int __devinit snd_card_fm801_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+
+	strcpy(card->driver, "FM801");
+	strcpy(card->shortname, "ForteMedia FM801-");
+	strcat(card->shortname, chip->multichannel ? "AU" : "AS");
+	sprintf(card->longname, "%s at 0x%lx, irq %i",
+		card->shortname, chip->port, chip->irq);
+
 	if ((err = snd_fm801_pcm(chip, 0, NULL)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -1107,12 +1114,6 @@ static int __devinit snd_card_fm801_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
-
-	strcpy(card->driver, "FM801");
-	strcpy(card->shortname, "ForteMedia FM801-");
-	strcat(card->shortname, chip->multichannel ? "AU" : "AS");
-	sprintf(card->longname, "%s at 0x%lx, irq %i",
-		card->shortname, chip->port, chip->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);

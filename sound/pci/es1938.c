@@ -1635,6 +1635,14 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 		snd_card_free(card);
 		return err;
 	}
+
+	strcpy(card->driver, "ES1938");
+	strcpy(card->shortname, "ESS ES1938 (Solo-1)");
+	sprintf(card->longname, "%s rev %i, irq %i",
+		card->shortname,
+		chip->revision,
+		chip->irq);
+
 	if ((err = snd_es1938_new_pcm(chip, 0, &pcm)) < 0) {
 		snd_card_free(card);
 		return err;
@@ -1669,13 +1677,6 @@ static int __devinit snd_es1938_probe(struct pci_dev *pci,
 	chip->gameport.io = chip->game_port;
 	gameport_register_port(&chip->gameport);
 #endif
-
-	strcpy(card->driver, "ES1938");
-	strcpy(card->shortname, "ESS ES1938 (Solo-1)");
-	sprintf(card->longname, "%s rev %i, irq %i",
-		card->shortname,
-		chip->revision,
-		chip->irq);
 
 	if ((err = snd_card_register(card)) < 0) {
 		snd_card_free(card);
