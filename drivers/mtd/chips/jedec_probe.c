@@ -1,7 +1,7 @@
 /* 
    Common Flash Interface probe code.
    (C) 2000 Red Hat. GPL'd.
-   $Id: jedec_probe.c,v 1.59 2004/11/17 09:46:24 dvrabel Exp $
+   $Id: jedec_probe.c,v 1.61 2004/11/19 20:52:16 thayne Exp $
    See JEDEC (http://www.jedec.org/) standard JESD21C (section 3.5)
    for the standard this probe goes back to.
 
@@ -227,6 +227,11 @@ static const struct unlock_addr  unlock_addrs[] = {
 	[MTD_UADDR_DONT_CARE] = {
 		.addr1 = 0x0000,      /* Doesn't matter which address */
 		.addr2 = 0x0000       /* is used - must be last entry */
+	},
+
+	[MTD_UADDR_UNNECESSARY] = {
+		.addr1 = 0x0000,
+		.addr2 = 0x0000
 	}
 };
 
@@ -1795,7 +1800,6 @@ static int cfi_jedec_setup(struct cfi_private *p_cfi, int index)
 		return 0;
 	}
 
-	/* Mask out address bits which are smaller than the device type */
 	p_cfi->addr_unlock1 = unlock_addrs[uaddr].addr1;
 	p_cfi->addr_unlock2 = unlock_addrs[uaddr].addr2;
 
@@ -1938,7 +1942,6 @@ static int jedec_probe_chip(struct map_info *map, __u32 base,
 		if (MTD_UADDR_UNNECESSARY == uaddr_idx)
 			return 0;
 
-		/* Mask out address bits which are smaller than the device type */
 		cfi->addr_unlock1 = unlock_addrs[uaddr_idx].addr1;
 		cfi->addr_unlock2 = unlock_addrs[uaddr_idx].addr2;
 	}
