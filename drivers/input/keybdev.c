@@ -1,11 +1,9 @@
 /*
- * $Id: keybdev.c,v 1.3 2000/05/28 17:31:36 vojtech Exp $
+ * $Id: keybdev.c,v 1.16 2002/01/09 04:21:41 lethal Exp $
  *
- *  Copyright (c) 1999-2000 Vojtech Pavlik
+ *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
- *  Input driver to keyboard driver binding.
- *
- *  Sponsored by SuSE
+ *  Input core to console keyboard binding.
  */
 
 /*
@@ -24,8 +22,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #include <linux/config.h>
@@ -37,18 +35,22 @@
 #include <linux/module.h>
 #include <linux/kbd_kern.h>
 
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Input core to console keyboard binding");
+MODULE_LICENSE("GPL");
+
+char keybdev_name[] = "keyboard";
+
 #if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(__alpha__) || \
     defined(__mips__) || defined(CONFIG_SPARC64) || defined(CONFIG_SUPERH) || \
     defined(CONFIG_PPC) || defined(__mc68000__) || defined(__hppa__) || \
-    defined(__arm__)
+    defined(__arm__) || defined(__x86_64__)
 
 static int x86_sysrq_alt = 0;
 #ifdef CONFIG_SPARC64
 static int sparc_l1_a_state = 0;
 extern void batten_down_hatches(void);
 #endif
-
-static int jp_kbd_109 = 1;	/* Yes, .jp is the default. See 51142. */
 
 static unsigned short x86_keycodes[256] =
 	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
@@ -62,7 +64,7 @@ static unsigned short x86_keycodes[256] =
 	360, 93, 94, 95, 98,376,100,101,357,316,354,304,289,102,351,355,
 	103,104,105,275,281,272,306,106,274,107,288,364,358,363,362,361,
 	291,108,381,290,287,292,279,305,280, 99,112,257,258,113,270,114,
-	118,117,125,374,379,259,260,261,262,263,264,265,266,267,268,269,
+	118,117,125,374,379,115,112,125,121,123,264,265,266,267,268,269,
 	271,273,276,277,278,282,283,295,296,297,299,300,301,302,303,307,
 	308,310,313,314,315,317,318,319,320,321,322,323,324,325,326,330,
 	332,340,341,342,343,344,345,346,356,359,365,368,369,370,371,372 };
@@ -167,26 +169,38 @@ void keybdev_ledfunc(unsigned int led)
 	}
 }
 
+/* Tell the user who may be running in X and not see the console that we have 
+   panic'ed. This is to distingush panics from "real" lockups. 
+   Could in theory send the panic message as morse, but that is left as an
+   exercise for the reader.  */ 
+
+void panic_blink(void)
+{ 
+	static unsigned long last_jiffie;
+	static char led;
+	/* Roughly 1/2s frequency. KDB uses about 1s. Make sure it is different. */
+	if (jiffies - last_jiffie > HZ/2) {
+		led ^= 0x01 | 0x04;
+		keybdev_ledfunc(led);
+		last_jiffie = jiffies;
+	}
+}  
+
 void keybdev_event(struct input_handle *handle, unsigned int type, unsigned int code, int down)
 {
 	if (type != EV_KEY) return;
-
-	if (emulate_raw(code, down))
-		printk(KERN_WARNING "keyboard.c: can't emulate rawmode for keycode %d\n", code);
-
+	emulate_raw(code, down);
 	tasklet_schedule(&keyboard_tasklet);
 }
 
-static struct input_handle *keybdev_connect(struct input_handler *handler, struct input_dev *dev)
+static struct input_handle *keybdev_connect(struct input_handler *handler, struct input_dev *dev, struct input_device_id *id)
 {
 	struct input_handle *handle;
 	int i;
 
-	if (!test_bit(EV_KEY, dev->evbit))
-		return NULL;
-
-	for (i = KEY_RESERVED; i < BTN_MISC; i++)
-		if (test_bit(i, dev->keybit)) break;
+	for (i = KEY_ESC; i < BTN_MISC; i++)
+		if (test_bit(i, dev->keybit))
+			break;
 
 	if (i == BTN_MISC)
  		return NULL;
@@ -196,41 +210,42 @@ static struct input_handle *keybdev_connect(struct input_handler *handler, struc
 	memset(handle, 0, sizeof(struct input_handle));
 
 	handle->dev = dev;
+	handle->name = keybdev_name;
 	handle->handler = handler;
 
 	input_open_device(handle);
-
-//	printk(KERN_INFO "keybdev.c: Adding keyboard: input%d\n", dev->number);
 
 	return handle;
 }
 
 static void keybdev_disconnect(struct input_handle *handle)
 {
-//	printk(KERN_INFO "keybdev.c: Removing keyboard: input%d\n", handle->dev->number);
 	input_close_device(handle);
 	kfree(handle);
 }
+
+static struct input_device_id keybdev_ids[] = {
+	{
+		flags: INPUT_DEVICE_ID_MATCH_EVBIT,
+		evbit: { BIT(EV_KEY) },
+	},	
+	{ }, 	/* Terminating entry */
+};
+
+MODULE_DEVICE_TABLE(input, keybdev_ids);
 	
 static struct input_handler keybdev_handler = {
 	event:		keybdev_event,
 	connect:	keybdev_connect,
 	disconnect:	keybdev_disconnect,
+	name:		"keybdev",
+	id_table:	keybdev_ids,
 };
 
 static int __init keybdev_init(void)
 {
 	input_register_handler(&keybdev_handler);
 	kbd_ledfunc = keybdev_ledfunc;
-
-	if (jp_kbd_109) {
-		x86_keycodes[0xb5] = 0x73;	/* backslash, underscore */
-		x86_keycodes[0xb6] = 0x70;
-		x86_keycodes[0xb7] = 0x7d;	/* Yen, pipe */
-		x86_keycodes[0xb8] = 0x79;
-		x86_keycodes[0xb9] = 0x7b;
-	}
-
 	return 0;
 }
 
@@ -243,7 +258,3 @@ static void __exit keybdev_exit(void)
 module_init(keybdev_init);
 module_exit(keybdev_exit);
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("Input driver to keyboard driver binding");
-MODULE_PARM(jp_kbd_109, "i");
-MODULE_LICENSE("GPL");

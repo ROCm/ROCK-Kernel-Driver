@@ -116,7 +116,8 @@ extern char _stext, _etext;
 
 #define GET_CURRENT \
 	"movl %esp, %ebx\n\t" \
-	"andl $-8192, %ebx\n\t"
+	"andl $-8192, %ebx\n\t" \
+	"movl (%ebx),%ebx\n\t"
 
 /*
  *	SMP has a few special interrupts for IPI messages

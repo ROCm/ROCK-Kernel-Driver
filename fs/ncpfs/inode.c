@@ -300,8 +300,7 @@ ncp_delete_inode(struct inode *inode)
 	clear_inode(inode);
 }
 
-struct super_block *
-ncp_read_super(struct super_block *sb, void *raw_data, int silent)
+static int ncp_fill_super(struct super_block *sb, void *raw_data, int silent)
 {
 	struct ncp_mount_data_kernel data;
 	struct ncp_server *server;
@@ -434,7 +433,7 @@ ncp_read_super(struct super_block *sb, void *raw_data, int silent)
 	ncp_unlock_server(server);
 	if (error < 0)
 		goto out_no_connect;
-	DPRINTK("ncp_read_super: NCP_SBP(sb) = %x\n", (int) NCP_SBP(sb));
+	DPRINTK("ncp_fill_super: NCP_SBP(sb) = %x\n", (int) NCP_SBP(sb));
 
 #ifdef CONFIG_NCPFS_PACKET_SIGNING
 	if (ncp_negotiate_size_and_options(server, default_bufsize,
@@ -486,31 +485,31 @@ ncp_read_super(struct super_block *sb, void *raw_data, int silent)
         root_inode = ncp_iget(sb, &finfo);
         if (!root_inode)
 		goto out_no_root;
-	DPRINTK("ncp_read_super: root vol=%d\n", NCP_FINFO(root_inode)->volNumber);
+	DPRINTK("ncp_fill_super: root vol=%d\n", NCP_FINFO(root_inode)->volNumber);
 	sb->s_root = d_alloc_root(root_inode);
         if (!sb->s_root)
 		goto out_no_root;
 	sb->s_root->d_op = &ncp_dentry_operations;
-	return sb;
+	return 0;
 
 out_no_root:
-	printk(KERN_ERR "ncp_read_super: get root inode failed\n");
+	printk(KERN_ERR "ncp_fill_super: get root inode failed\n");
 	iput(root_inode);
 	goto out_disconnect;
 out_no_bufsize:
-	printk(KERN_ERR "ncp_read_super: could not get bufsize\n");
+	printk(KERN_ERR "ncp_fill_super: could not get bufsize\n");
 out_disconnect:
 	ncp_lock_server(server);
 	ncp_disconnect(server);
 	ncp_unlock_server(server);
 	goto out_free_packet;
 out_no_connect:
-	printk(KERN_ERR "ncp_read_super: Failed connection, error=%d\n", error);
+	printk(KERN_ERR "ncp_fill_super: Failed connection, error=%d\n", error);
 out_free_packet:
 	vfree(server->packet);
 	goto out_free_server;
 out_no_packet:
-	printk(KERN_ERR "ncp_read_super: could not alloc packet\n");
+	printk(KERN_ERR "ncp_fill_super: could not alloc packet\n");
 out_free_server:
 #ifdef CONFIG_NCPFS_NLS
 	unload_nls(server->nls_io);
@@ -527,16 +526,16 @@ out_free_server:
 out_bad_file2:
 	fput(ncp_filp);
 out_bad_file:
-	printk(KERN_ERR "ncp_read_super: invalid ncp socket\n");
+	printk(KERN_ERR "ncp_fill_super: invalid ncp socket\n");
 	goto out;
 out_bad_mount:
-	printk(KERN_INFO "ncp_read_super: kernel requires mount version %d\n",
+	printk(KERN_INFO "ncp_fill_super: kernel requires mount version %d\n",
 		NCP_MOUNT_VERSION);
 	goto out;
 out_no_data:
-	printk(KERN_ERR "ncp_read_super: missing data argument\n");
+	printk(KERN_ERR "ncp_fill_super: missing data argument\n");
 out:
-	return NULL;
+	return -EINVAL;
 }
 
 static void ncp_put_super(struct super_block *sb)
@@ -750,7 +749,17 @@ int ncp_malloced;
 int ncp_current_malloced;
 #endif
 
-static DECLARE_FSTYPE(ncp_fs_type, "ncpfs", ncp_read_super, 0);
+static struct super_block *ncp_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, ncp_fill_super);
+}
+
+static struct file_system_type ncp_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"ncpfs",
+	get_sb:		ncp_get_sb,
+};
 
 static int __init init_ncp_fs(void)
 {

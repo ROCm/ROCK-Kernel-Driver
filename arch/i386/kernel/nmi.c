@@ -263,8 +263,9 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 {
 
 	/*
-	 * Since current-> is always on the stack, and we always switch
-	 * the stack NMI-atomically, it's safe to use smp_processor_id().
+	 * Since current_thread_info()-> is always on the stack, and we
+	 * always switch the stack NMI-atomically, it's safe to use
+	 * smp_processor_id().
 	 */
 	int sum, cpu = smp_processor_id();
 

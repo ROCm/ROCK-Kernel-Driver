@@ -67,8 +67,8 @@ default_handler(int segment, struct pt_regs *regp)
 	}
 	set_personality(pers);
 
-	if (current->exec_domain->handler != default_handler)
-		current->exec_domain->handler(segment, regp);
+	if (current_thread_info()->exec_domain->handler != default_handler)
+		current_thread_info()->exec_domain->handler(segment, regp);
 	else
 		send_sig(SIGSEGV, current, 1);
 }
@@ -162,7 +162,7 @@ __set_personality(u_long personality)
 	struct exec_domain	*ep, *oep;
 
 	ep = lookup_exec_domain(personality);
-	if (ep == current->exec_domain) {
+	if (ep == current_thread_info()->exec_domain) {
 		current->personality = personality;
 		return 0;
 	}
@@ -190,8 +190,8 @@ __set_personality(u_long personality)
 	 */
 
 	current->personality = personality;
-	oep = current->exec_domain;
-	current->exec_domain = ep;
+	oep = current_thread_info()->exec_domain;
+	current_thread_info()->exec_domain = ep;
 	set_fs_altroot();
 
 	put_exec_domain(oep);

@@ -525,7 +525,7 @@ static void fs_remove_file (struct dentry *dentry)
 static struct super_block *usb_get_sb(struct file_system_type *fs_type,
 	int flags, char *dev_name, void *data)
 {
-	return get_sb_single(fs_type, flags, data, usb_fill_super);
+	return get_sb_single(fs_type, flags, data, usbfs_fill_super);
 }
 
 static struct file_system_type usbdevice_fs_type = {

@@ -23,7 +23,7 @@
 #define DEBUG_SIG 0
 
 #if DEBUG_SIG
-#define SIG_SLAB_DEBUG	(SLAB_DEBUG_FREE | SLAB_RED_ZONE /* | SLAB_POISON */)
+#define SIG_SLAB_DEBUG	(SLAB_RED_ZONE /* | SLAB_POISON */)
 #else
 #define SIG_SLAB_DEBUG	0
 #endif
@@ -105,7 +105,7 @@ static void flush_sigqueue(struct sigpending *queue)
 void
 flush_signals(struct task_struct *t)
 {
-	t->work.sigpending = 0;
+	clear_tsk_thread_flag(t,TIF_SIGPENDING);
 	flush_sigqueue(&t->pending);
 }
 
@@ -119,7 +119,7 @@ void exit_sighand(struct task_struct *tsk)
 		if (atomic_dec_and_test(&sig->count))
 			kmem_cache_free(sigact_cachep, sig);
 	}
-	tsk->work.sigpending = 0;
+	clear_tsk_thread_flag(tsk,TIF_SIGPENDING);
 	flush_sigqueue(&tsk->pending);
 	spin_unlock_irq(&tsk->sigmask_lock);
 }
@@ -275,7 +275,7 @@ printk("SIG dequeue (%s:%d): %d ", current->comm, current->pid,
 		if (current->notifier) {
 			if (sigismember(current->notifier_mask, sig)) {
 				if (!(current->notifier)(current->notifier_data)) {
-					current->work.sigpending = 0;
+					clear_thread_flag(TIF_SIGPENDING);
 					return 0;
 				}
 			}
@@ -494,7 +494,7 @@ static int send_signal(int sig, struct siginfo *info, struct sigpending *signals
  */
 static inline void signal_wake_up(struct task_struct *t)
 {
-	t->work.sigpending = 1;
+	set_tsk_thread_flag(t,TIF_SIGPENDING);
 
 #ifdef CONFIG_SMP
 	/*
@@ -507,7 +507,7 @@ static inline void signal_wake_up(struct task_struct *t)
 	 * process of changing - but no harm is done by that
 	 * other than doing an extra (lightweight) IPI interrupt.
 	 */
-	if ((t->state == TASK_RUNNING) && (t->cpu != smp_processor_id()))
+	if ((t->state == TASK_RUNNING) && (t->thread_info->cpu != smp_processor_id()))
 		kick_if_running(t);
 #endif
 	if (t->state & TASK_INTERRUPTIBLE) {

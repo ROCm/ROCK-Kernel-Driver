@@ -301,7 +301,7 @@ extern void hfs_nat_ifill(struct inode *, ino_t, const int);
 extern void hfs_sngl_ifill(struct inode *, ino_t, const int);
 
 /* super.c */
-extern struct super_block *hfs_read_super(struct super_block *,void *,int);
+extern int hfs_fill_super(struct super_block *,void *,int);
 
 /* trans.c */
 extern void hfs_colon2mac(struct hfs_name *, const char *, int);

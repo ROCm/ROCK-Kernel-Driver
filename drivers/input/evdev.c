@@ -1,11 +1,9 @@
 /*
- * $Id: evdev.c,v 1.27 2001/05/28 09:06:44 vojtech Exp $
+ * $Id: evdev.c,v 1.42 2002/01/02 11:59:56 vojtech Exp $
  *
  *  Copyright (c) 1999-2001 Vojtech Pavlik
  *
  *  Event char devices, giving access to raw input device events.
- *
- *  Sponsored by SuSE
  */
 
 /*
@@ -24,8 +22,8 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  * Should you need to contact me, the author, you can do so either by
- * e-mail - mail your message to <vojtech@suse.cz>, or by paper mail:
- * Vojtech Pavlik, Ucitelska 1576, Prague 8, 182 00 Czech Republic
+ * e-mail - mail your message to <vojtech@ucw.cz>, or by paper mail:
+ * Vojtech Pavlik, Simunkova 1594, Prague 8, 182 00 Czech Republic
  */
 
 #define EVDEV_MINOR_BASE	64
@@ -42,7 +40,9 @@
 struct evdev {
 	int exist;
 	int open;
+	int open_for_write;
 	int minor;
+	char name[16];
 	struct input_handle handle;
 	wait_queue_head_t wait;
 	devfs_handle_t devfs;
@@ -89,6 +89,11 @@ static int evdev_fasync(int fd, struct file *file, int on)
 	return retval < 0 ? retval : 0;
 }
 
+static int evdev_flush(struct file * file)
+{
+	return input_flush_device(&((struct evdev_list*)file->private_data)->evdev->handle, file);
+}
+
 static int evdev_release(struct inode * inode, struct file * file)
 {
 	struct evdev_list *list = file->private_data;
@@ -120,9 +125,15 @@ static int evdev_open(struct inode * inode, struct file * file)
 {
 	struct evdev_list *list;
 	int i = minor(inode->i_rdev) - EVDEV_MINOR_BASE;
+	int accept_err;
 
 	if (i >= EVDEV_MINORS || !evdev_table[i])
 		return -ENODEV;
+
+	/* Ask the driver if he wishes to accept the open() */
+	if ((accept_err = input_accept_process(&(evdev_table[i]->handle), file))) {
+		return accept_err;
+	}
 
 	if (!(list = kmalloc(sizeof(struct evdev_list), GFP_KERNEL)))
 		return -ENOMEM;
@@ -167,7 +178,7 @@ static ssize_t evdev_read(struct file * file, char * buffer, size_t count, loff_
 	if (list->head == list->tail) {
 
 		add_wait_queue(&list->evdev->wait, &wait);
-		current->state = TASK_INTERRUPTIBLE;
+		set_current_state(TASK_INTERRUPTIBLE);
 
 		while (list->head == list->tail) {
 
@@ -187,7 +198,7 @@ static ssize_t evdev_read(struct file * file, char * buffer, size_t count, loff_
 			schedule();
 		}
 
-		current->state = TASK_RUNNING;
+		set_current_state(TASK_RUNNING);
 		remove_wait_queue(&list->evdev->wait, &wait);
 	}
 
@@ -219,7 +230,7 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 	struct evdev_list *list = file->private_data;
 	struct evdev *evdev = list->evdev;
 	struct input_dev *dev = evdev->handle.dev;
-	int retval;
+	int retval, t, u;
 
 	switch (cmd) {
 
@@ -231,6 +242,40 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			if ((retval = put_user(dev->idvendor,  ((short *) arg) + 1))) return retval;
 			if ((retval = put_user(dev->idproduct, ((short *) arg) + 2))) return retval;
 			if ((retval = put_user(dev->idversion, ((short *) arg) + 3))) return retval;
+			return 0;
+		
+		case EVIOCGREP:
+			if ((retval = put_user(dev->rep[0], ((int *) arg) + 0))) return retval;
+			if ((retval = put_user(dev->rep[1], ((int *) arg) + 1))) return retval;
+			return 0;
+
+		case EVIOCSREP:
+			if ((retval = get_user(dev->rep[0], ((int *) arg) + 0))) return retval;
+			if ((retval = get_user(dev->rep[1], ((int *) arg) + 1))) return retval;
+			return 0;
+
+		case EVIOCGKEYCODE:
+			if ((retval = get_user(t, ((int *) arg) + 0))) return retval;
+			if (t < 0 || t > dev->keycodemax) return -EINVAL;
+			switch (dev->keycodesize) {
+				case 1: u = *(u8*)(dev->keycode + t); break;
+				case 2: u = *(u16*)(dev->keycode + t * 2); break;
+				case 4: u = *(u32*)(dev->keycode + t * 4); break;
+				default: return -EINVAL;
+			}
+			if ((retval = put_user(u, ((int *) arg) + 1))) return retval;
+			return 0;
+
+		case EVIOCSKEYCODE:
+			if ((retval = get_user(t, ((int *) arg) + 0))) return retval;
+			if (t < 0 || t > dev->keycodemax) return -EINVAL;
+			if ((retval = get_user(u, ((int *) arg) + 1))) return retval;
+			switch (dev->keycodesize) {
+				case 1: *(u8*)(dev->keycode + t) = u; break;
+				case 2: *(u16*)(dev->keycode + t * 2) = u; break;
+				case 4: *(u32*)(dev->keycode + t * 4) = u; break;
+				default: return -EINVAL;
+			}
 			return 0;
 
 		case EVIOCSFF:
@@ -280,20 +325,53 @@ static int evdev_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 					default: return -EINVAL;
 				}
 				len = NBITS(len) * sizeof(long);
-				if (len > _IOC_SIZE(cmd)) {
-					printk(KERN_WARNING "evdev.c: Truncating bitfield length from %d to %d\n",
-						len, _IOC_SIZE(cmd));
-					len = _IOC_SIZE(cmd);
-				}
+				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
 				return copy_to_user((char *) arg, bits, len) ? -EFAULT : len;
+			}
+
+			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGKEY(0))) {
+				int len;
+				len = NBITS(KEY_MAX) * sizeof(long);
+				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+				return copy_to_user((char *) arg, dev->key, len) ? -EFAULT : len;
+			}
+
+			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGLED(0))) {
+				int len;
+				len = NBITS(LED_MAX) * sizeof(long);
+				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+				return copy_to_user((char *) arg, dev->led, len) ? -EFAULT : len;
+			}
+
+			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGSND(0))) {
+				int len;
+				len = NBITS(SND_MAX) * sizeof(long);
+				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+				return copy_to_user((char *) arg, dev->snd, len) ? -EFAULT : len;
 			}
 
 			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGNAME(0))) {
 				int len;
-				if (!dev->name) return 0;
+				if (!dev->name) return -ENOENT;
 				len = strlen(dev->name) + 1;
 				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
 				return copy_to_user((char *) arg, dev->name, len) ? -EFAULT : len;
+			}
+
+			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGPHYS(0))) {
+				int len;
+				if (!dev->phys) return -ENOENT;
+				len = strlen(dev->phys) + 1;
+				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+				return copy_to_user((char *) arg, dev->phys, len) ? -EFAULT : len;
+			}
+
+			if (_IOC_NR(cmd) == _IOC_NR(EVIOCGUNIQ(0))) {
+				int len;
+				if (!dev->uniq) return -ENOENT;
+				len = strlen(dev->uniq) + 1;
+				if (len > _IOC_SIZE(cmd)) len = _IOC_SIZE(cmd);
+				return copy_to_user((char *) arg, dev->uniq, len) ? -EFAULT : len;
 			}
 
 			if ((_IOC_NR(cmd) & ~ABS_MAX) == _IOC_NR(EVIOCGABS(0))) {
@@ -321,9 +399,10 @@ static struct file_operations evdev_fops = {
 	release:	evdev_release,
 	ioctl:		evdev_ioctl,
 	fasync:		evdev_fasync,
+	flush:		evdev_flush
 };
 
-static struct input_handle *evdev_connect(struct input_handler *handler, struct input_dev *dev)
+static struct input_handle *evdev_connect(struct input_handler *handler, struct input_dev *dev, struct input_device_id *id)
 {
 	struct evdev *evdev;
 	int minor;
@@ -342,16 +421,17 @@ static struct input_handle *evdev_connect(struct input_handler *handler, struct 
 
 	evdev->minor = minor;
 	evdev_table[minor] = evdev;
+	
+	sprintf(evdev->name, "event%d", minor);
 
 	evdev->handle.dev = dev;
+	evdev->handle.name = evdev->name;
 	evdev->handle.handler = handler;
 	evdev->handle.private = evdev;
 
-	evdev->exist = 1;
-
 	evdev->devfs = input_register_minor("event%d", minor, EVDEV_MINOR_BASE);
 
-//	printk(KERN_INFO "event%d: Event device for input%d\n", minor, dev->number);
+	evdev->exist = 1;
 
 	return &evdev->handle;
 }
@@ -372,12 +452,21 @@ static void evdev_disconnect(struct input_handle *handle)
 	}
 }
 
+static struct input_device_id evdev_ids[] = {
+	{ driver_info: 1 },	/* Matches all devices */
+	{ },			/* Terminating zero entry */
+};
+
+MODULE_DEVICE_TABLE(input, evdev_ids);
+
 static struct input_handler evdev_handler = {
 	event:		evdev_event,
 	connect:	evdev_connect,
 	disconnect:	evdev_disconnect,
 	fops:		&evdev_fops,
 	minor:		EVDEV_MINOR_BASE,
+	name:		"evdev",
+	id_table:	evdev_ids,
 };
 
 static int __init evdev_init(void)
@@ -394,7 +483,6 @@ static void __exit evdev_exit(void)
 module_init(evdev_init);
 module_exit(evdev_exit);
 
-MODULE_AUTHOR("Vojtech Pavlik <vojtech@suse.cz>");
-MODULE_DESCRIPTION("Event character device driver");
+MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
+MODULE_DESCRIPTION("Input driver event char devices");
 MODULE_LICENSE("GPL");
-

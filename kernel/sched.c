@@ -51,7 +51,7 @@ static struct runqueue runqueues[NR_CPUS] __cacheline_aligned;
 
 #define cpu_rq(cpu)		(runqueues + (cpu))
 #define this_rq()		cpu_rq(smp_processor_id())
-#define task_rq(p)		cpu_rq((p)->cpu)
+#define task_rq(p)		cpu_rq((p)->thread_info->cpu)
 #define cpu_curr(cpu)		(cpu_rq(cpu)->curr)
 #define rt_task(p)		((p)->policy != SCHED_OTHER)
 
@@ -192,13 +192,19 @@ static inline void deactivate_task(struct task_struct *p, runqueue_t *rq)
 
 static inline void resched_task(task_t *p)
 {
-	int need_resched;
+#ifdef CONFIG_SMP
+	int need_resched, nrpolling;
 
-	need_resched = p->work.need_resched;
-	wmb();
-	p->work.need_resched = 1;
-	if (!need_resched && (p->cpu != smp_processor_id()))
-		smp_send_reschedule(p->cpu);
+	/* minimise the chance of sending an interrupt to poll_idle() */
+	nrpolling = test_tsk_thread_flag(p,TIF_POLLING_NRFLAG);
+	need_resched = test_and_set_tsk_thread_flag(p,TIF_NEED_RESCHED);
+	nrpolling |= test_tsk_thread_flag(p,TIF_POLLING_NRFLAG);
+
+	if (!need_resched && !nrpolling && (p->thread_info->cpu != smp_processor_id()))
+		smp_send_reschedule(p->thread_info->cpu);
+#else
+	set_tsk_need_resched(p);
+#endif
 }
 
 #ifdef CONFIG_SMP
@@ -236,7 +242,7 @@ repeat:
 void sched_task_migrated(task_t *new_task)
 {
 	wait_task_inactive(new_task);
-	new_task->cpu = smp_processor_id();
+	new_task->thread_info->cpu = smp_processor_id();
 	wake_up_process(new_task);
 }
 
@@ -299,7 +305,7 @@ void wake_up_forked_process(task_t * p)
 		current->sleep_avg = current->sleep_avg * PARENT_FORK_PENALTY / 100;
 	}
 	spin_lock_irq(&rq->lock);
-	p->cpu = smp_processor_id();
+	p->thread_info->cpu = smp_processor_id();
 	activate_task(p, rq);
 	spin_unlock_irq(&rq->lock);
 }
@@ -519,11 +525,11 @@ skip_queue:
 	 */
 	dequeue_task(next, array);
 	busiest->nr_running--;
-	next->cpu = this_cpu;
+	next->thread_info->cpu = this_cpu;
 	this_rq->nr_running++;
 	enqueue_task(next, this_rq->active);
 	if (next->prio < current->prio)
-		current->work.need_resched = 1;
+		set_need_resched();
 	if (!idle && --imbalance) {
 		if (array == busiest->expired) {
 			array = busiest->active;
@@ -572,7 +578,7 @@ void scheduler_tick(task_t *p)
 #endif
 	/* Task might have expired already, but not scheduled off yet */
 	if (p->array != rq->active) {
-		p->work.need_resched = 1;
+		set_tsk_need_resched(p);
 		return;
 	}
 	spin_lock(&rq->lock);
@@ -583,7 +589,7 @@ void scheduler_tick(task_t *p)
 		 */
 		if ((p->policy == SCHED_RR) && !--p->time_slice) {
 			p->time_slice = NICE_TO_TIMESLICE(p->__nice);
-			p->work.need_resched = 1;
+			set_tsk_need_resched(p);
 
 			/* put it at the end of the queue: */
 			dequeue_task(p, rq->active);
@@ -603,7 +609,7 @@ void scheduler_tick(task_t *p)
 		p->sleep_avg--;
 	if (!--p->time_slice) {
 		dequeue_task(p, rq->active);
-		p->work.need_resched = 1;
+		set_tsk_need_resched(p);
 		p->prio = effective_prio(p);
 		p->time_slice = NICE_TO_TIMESLICE(p->__nice);
 
@@ -684,7 +690,7 @@ pick_next_task:
 
 switch_tasks:
 	prefetch(next);
-	prev->work.need_resched = 0;
+	clear_tsk_need_resched(prev);
 
 	if (likely(prev != next)) {
 		rq->nr_switches++;
@@ -1316,9 +1322,9 @@ void __init init_idle(task_t *idle, int cpu)
 	idle->array = NULL;
 	idle->prio = MAX_PRIO;
 	idle->state = TASK_RUNNING;
-	idle->cpu = cpu;
+	idle->thread_info->cpu = cpu;
 	double_rq_unlock(idle_rq, rq);
-	idle->work.need_resched = 1;
+	set_tsk_need_resched(idle);
 	__restore_flags(flags);
 }
 

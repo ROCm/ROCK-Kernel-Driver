@@ -52,7 +52,7 @@ static inline void __save_init_fpu( struct task_struct *tsk )
 		asm volatile( "fnsave %0 ; fwait"
 			      : "=m" (tsk->thread.i387.fsave) );
 	}
-	tsk->flags &= ~PF_USEDFPU;
+	clear_thread_flag(TIF_USEDFPU);
 }
 
 void save_init_fpu( struct task_struct *tsk )
@@ -65,7 +65,7 @@ void kernel_fpu_begin(void)
 {
 	struct task_struct *tsk = current;
 
-	if (tsk->flags & PF_USEDFPU) {
+	if (test_thread_flag(TIF_USEDFPU)) {
 		__save_init_fpu(tsk);
 		return;
 	}

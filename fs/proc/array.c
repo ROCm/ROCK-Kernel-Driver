@@ -391,7 +391,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 		task->nswap,
 		task->cnswap,
 		task->exit_signal,
-		task->cpu);
+		task->thread_info->cpu);
 	if(mm)
 		mmput(mm);
 	return res;

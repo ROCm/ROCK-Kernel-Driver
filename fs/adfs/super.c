@@ -346,7 +346,7 @@ static inline unsigned long adfs_discsize(struct adfs_discrecord *dr, int block_
 	return discsize;
 }
 
-struct super_block *adfs_read_super(struct super_block *sb, void *data, int silent)
+static int adfs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct adfs_discrecord *dr;
 	struct buffer_head *bh;
@@ -467,15 +467,26 @@ struct super_block *adfs_read_super(struct super_block *sb, void *data, int sile
 		goto error;
 	} else
 		sb->s_root->d_op = &adfs_dentry_operations;
-	return sb;
+	return 0;
 
 error_free_bh:
 	brelse(bh);
 error:
-	return NULL;
+	return -EINVAL;
 }
 
-static DECLARE_FSTYPE_DEV(adfs_fs_type, "adfs", adfs_read_super);
+static struct super_block *adfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, adfs_fill_super);
+}
+
+static struct file_system_type adfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"adfs",
+	get_sb:		adfs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_adfs_fs(void)
 {

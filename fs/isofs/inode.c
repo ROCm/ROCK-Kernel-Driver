@@ -510,8 +510,7 @@ static unsigned int isofs_get_last_session(struct super_block *sb,s32 session )
  * Note: a check_disk_change() has been done immediately prior
  * to this call, so we don't need to check again.
  */
-static struct super_block *isofs_read_super(struct super_block *s, void *data,
-					    int silent)
+static int isofs_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct buffer_head	      * bh = NULL, *pri_bh = NULL;
 	struct hs_primary_descriptor  * h_pri = NULL;
@@ -843,16 +842,16 @@ root_found:
 	if (opt.check == 'r') table++;
 	s->s_root->d_op = &isofs_dentry_ops[table];
 
-	return s;
+	return 0;
 
 	/*
 	 * Display error messages and free resources.
 	 */
 out_bad_root:
-	printk(KERN_WARNING "isofs_read_super: root inode not initialized\n");
+	printk(KERN_WARNING "isofs_fill_super: root inode not initialized\n");
 	goto out_iput;
 out_no_root:
-	printk(KERN_WARNING "isofs_read_super: get root inode failed\n");
+	printk(KERN_WARNING "isofs_fill_super: get root inode failed\n");
 out_iput:
 	iput(inode);
 #ifdef CONFIG_JOLIET
@@ -861,7 +860,7 @@ out_iput:
 #endif
 	goto out_unlock;
 out_no_read:
-	printk(KERN_WARNING "isofs_read_super: "
+	printk(KERN_WARNING "isofs_fill_super: "
 		"bread failed, dev=%s, iso_blknum=%d, block=%d\n",
 		s->s_id, iso_blknum, block);
 	goto out_unlock;
@@ -885,7 +884,7 @@ out_unknown_format:
 out_freebh:
 	brelse(bh);
 out_unlock:
-	return NULL;
+	return -EINVAL;
 }
 
 static int isofs_statfs (struct super_block *sb, struct statfs *buf)
@@ -1395,7 +1394,18 @@ void leak_check_brelse(struct buffer_head * bh){
 
 #endif
 
-static DECLARE_FSTYPE_DEV(iso9660_fs_type, "iso9660", isofs_read_super);
+static struct super_block *isofs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, isofs_fill_super);
+}
+
+static struct file_system_type iso9660_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"iso9660",
+	get_sb:		isofs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_iso9660_fs(void)
 {

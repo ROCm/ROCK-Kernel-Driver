@@ -228,7 +228,6 @@ static inline void ncp_kfree_s(void *obj, int size)
 
 /* linux/fs/ncpfs/inode.c */
 int ncp_notify_change(struct dentry *, struct iattr *);
-struct super_block *ncp_read_super(struct super_block *, void *, int);
 struct inode *ncp_iget(struct super_block *, struct ncp_entry_info *);
 void ncp_update_inode(struct inode *, struct ncp_entry_info *);
 void ncp_update_inode2(struct inode *, struct ncp_entry_info *);

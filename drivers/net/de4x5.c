@@ -3645,7 +3645,7 @@ de4x5_alloc_rx_buff(struct net_device *dev, int index, int len)
     tmp = virt_to_bus(p->data);
     i = ((tmp + ALIGN) & ~ALIGN) - tmp;
     skb_reserve(p, i);
-    lp->rx_ring[index].buf = tmp + i;
+    lp->rx_ring[index].buf = cpu_to_le32(tmp + i);
 
     ret = lp->rx_skb[index];
     lp->rx_skb[index] = p;
@@ -5616,7 +5616,7 @@ de4x5_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	if (!capable(CAP_NET_ADMIN)) return -EPERM;
 	omr = inl(DE4X5_OMR);
 	omr &= ~OMR_PR;
-	outb(omr, DE4X5_OMR);
+	outl(omr, DE4X5_OMR);
 	dev->flags &= ~IFF_PROMISC;
 	break;
 

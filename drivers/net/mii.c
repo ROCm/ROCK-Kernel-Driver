@@ -168,6 +168,10 @@ int mii_nway_restart (struct mii_if_info *mii)
 	return r;
 }
 
+MODULE_AUTHOR ("Jeff Garzik <jgarzik@mandrakesoft.com>");
+MODULE_DESCRIPTION ("MII hardware support library");
+MODULE_LICENSE("GPL");
+
 EXPORT_SYMBOL(mii_link_ok);
 EXPORT_SYMBOL(mii_nway_restart);
 EXPORT_SYMBOL(mii_ethtool_gset);

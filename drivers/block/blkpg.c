@@ -280,7 +280,8 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 
 			if (cmd == BLKGETSIZE)
 				return put_user((unsigned long)ullval, (unsigned long *)arg);
-			return put_user(ullval, (u64 *)arg);
+			else
+				return put_user((u64)ullval << 9 , (u64 *)arg);
 #if 0
 		case BLKRRPART: /* Re-read partition tables */
 			if (!capable(CAP_SYS_ADMIN)) 

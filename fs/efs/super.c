@@ -14,7 +14,18 @@
 #include <linux/efs_fs_sb.h>
 #include <linux/slab.h>
 
-static DECLARE_FSTYPE_DEV(efs_fs_type, "efs", efs_read_super);
+static struct super_block *efs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, efs_fill_super);
+}
+
+static struct file_system_type efs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"efs",
+	get_sb:		efs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static kmem_cache_t * efs_inode_cachep;
 
@@ -188,7 +199,8 @@ static int efs_validate_super(struct efs_sb_info *sb, struct efs_super *super) {
 	return 0;    
 }
 
-struct super_block *efs_read_super(struct super_block *s, void *d, int silent) {
+int efs_fill_super(struct super_block *s, void *d, int silent)
+{
 	struct efs_sb_info *sb;
 	struct buffer_head *bh;
 
@@ -246,11 +258,11 @@ struct super_block *efs_read_super(struct super_block *s, void *d, int silent) {
 		goto out_no_fs;
 	}
 
-	return(s);
+	return 0;
 
 out_no_fs_ul:
 out_no_fs:
-	return(NULL);
+	return -EINVAL;
 }
 
 int efs_statfs(struct super_block *s, struct statfs *buf) {

@@ -460,8 +460,7 @@ smb_put_super(struct super_block *sb)
 	}
 }
 
-struct super_block *
-smb_read_super(struct super_block *sb, void *raw_data, int silent)
+int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 {
 	struct smb_sb_info *server = &sb->u.smbfs_sb;
 	struct smb_mount_data_kernel *mnt;
@@ -561,7 +560,7 @@ smb_read_super(struct super_block *sb, void *raw_data, int silent)
 		goto out_no_root;
 	smb_new_dentry(sb->s_root);
 
-	return sb;
+	return 0;
 
 out_no_root:
 	iput(root_inode);
@@ -573,15 +572,15 @@ out_no_temp:
 	smb_vfree(server->packet);
 out_no_mem:
 	if (!server->mnt)
-		printk(KERN_ERR "smb_read_super: allocation failure\n");
+		printk(KERN_ERR "smb_fill_super: allocation failure\n");
 	goto out_fail;
 out_wrong_data:
 	printk(KERN_ERR "smbfs: mount_data version %d is not supported\n", ver);
 	goto out_fail;
 out_no_data:
-	printk(KERN_ERR "smb_read_super: missing data argument\n");
+	printk(KERN_ERR "smb_fill_super: missing data argument\n");
 out_fail:
-	return NULL;
+	return -EINVAL;
 }
 
 static int
@@ -706,7 +705,17 @@ int smb_current_kmalloced;
 int smb_current_vmalloced;
 #endif
 
-static DECLARE_FSTYPE( smb_fs_type, "smbfs", smb_read_super, 0);
+static struct super_block *smb_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_nodev(fs_type, flags, data, smb_fill_super);
+}
+
+static struct file_system_type smb_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"smbfs",
+	get_sb:		smb_get_sb,
+};
 
 static int __init init_smb_fs(void)
 {

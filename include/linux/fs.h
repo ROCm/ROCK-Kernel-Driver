@@ -934,21 +934,10 @@ struct dquot_operations {
 	int (*transfer) (struct inode *, struct iattr *);
 };
 
-/*
- *		NOTE NOTE NOTE
- *
- *	->read_super() is going to die.  New method (->get_sb) should replace
- * it.  The only reason why ->read_super() is left for _SHORT_ transition
- * period is to avoid a single patch touching every fs.  They will be
- * converted one-by-one and ONCE THAT IS DONE OR TWO WEEKS HAD PASSED
- * (whatever sooner) ->read_super() WILL DISAPPEAR.  
- */
-
 struct file_system_type {
 	const char *name;
 	int fs_flags;
 	struct super_block *(*get_sb) (struct file_system_type *, int, char *, void *);
-	struct super_block *(*read_super) (struct super_block *, void *, int);
 	struct module *owner;
 	struct file_system_type * next;
 	struct list_head fs_supers;
@@ -963,17 +952,6 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 struct super_block *get_sb_nodev(struct file_system_type *fs_type,
 	int flags, void *data,
 	int (*fill_super)(struct super_block *, void *, int));
-
-#define DECLARE_FSTYPE(var,type,read,flags) \
-struct file_system_type var = { \
-	name:		type, \
-	read_super:	read, \
-	fs_flags:	flags, \
-	owner:		THIS_MODULE, \
-}
-
-#define DECLARE_FSTYPE_DEV(var,type,read) \
-	DECLARE_FSTYPE(var,type,read,FS_REQUIRES_DEV)
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
 #define fops_get(fops) \

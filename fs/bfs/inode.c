@@ -279,8 +279,7 @@ void dump_imap(const char *prefix, struct super_block * s)
 #endif
 }
 
-static struct super_block * bfs_read_super(struct super_block * s, 
-	void * data, int silent)
+static int bfs_fill_super(struct super_block *s, void *data, int silent)
 {
 	struct buffer_head * bh;
 	struct bfs_super_block * bfs_sb;
@@ -355,14 +354,25 @@ static struct super_block * bfs_read_super(struct super_block * s,
 		s->s_dirt = 1;
 	} 
 	dump_imap("read_super", s);
-	return s;
+	return 0;
 
 out:
 	brelse(bh);
-	return NULL;
+	return -EINVAL;
 }
 
-static DECLARE_FSTYPE_DEV(bfs_fs_type, "bfs", bfs_read_super);
+static struct super_block *bfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, bfs_fill_super);
+}
+
+static struct file_system_type bfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"bfs",
+	get_sb:		bfs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_bfs_fs(void)
 {

@@ -834,7 +834,7 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 		printk (KERN_INFO
 			"%s: Media type forced to Full Duplex.\n",
 			dev->name);
-		mdio_write (dev, tp->phys[0], 4, 0x141);
+		mdio_write (dev, tp->phys[0], MII_ADVERTISE, ADVERTISE_FULL);
 		tp->duplex_lock = 1;
 	}
 
@@ -1235,20 +1235,20 @@ static void netdrv_timer (unsigned long data)
 	struct netdrv_private *tp = dev->priv;
 	void *ioaddr = tp->mmio_addr;
 	int next_tick = 60 * HZ;
-	int mii_reg5;
+	int mii_lpa;
 
-	mii_reg5 = mdio_read (dev, tp->phys[0], 5);
+	mii_lpa = mdio_read (dev, tp->phys[0], MII_LPA);
 
-	if (!tp->duplex_lock && mii_reg5 != 0xffff) {
-		int duplex = (mii_reg5 & 0x0100)
-		    || (mii_reg5 & 0x01C0) == 0x0040;
+	if (!tp->duplex_lock && mii_lpa != 0xffff) {
+		int duplex = (mii_lpa & LPA_100FULL)
+		    || (mii_lpa & 0x01C0) == 0x0040;
 		if (tp->full_duplex != duplex) {
 			tp->full_duplex = duplex;
 			printk (KERN_INFO
 				"%s: Setting %s-duplex based on MII #%d link"
 				" partner ability of %4.4x.\n", dev->name,
 				tp->full_duplex ? "full" : "half",
-				tp->phys[0], mii_reg5);
+				tp->phys[0], mii_lpa);
 			NETDRV_W8 (Cfg9346, Cfg9346_Unlock);
 			NETDRV_W8 (Config1, tp->full_duplex ? 0x60 : 0x20);
 			NETDRV_W8 (Cfg9346, Cfg9346_Lock);
@@ -1793,19 +1793,16 @@ static int netdrv_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
 	switch (cmd) {
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-	case SIOCDEVPRIVATE:		/* for binary compat, remove in 2.5 */
 		data->phy_id = tp->phys[0] & 0x3f;
 		/* Fall Through */
 
 	case SIOCGMIIREG:		/* Read MII PHY register. */
-	case SIOCDEVPRIVATE+1:		/* for binary compat, remove in 2.5 */
 		spin_lock_irqsave (&tp->lock, flags);
 		data->val_out = mdio_read (dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
 		spin_unlock_irqrestore (&tp->lock, flags);
 		break;
 
 	case SIOCSMIIREG:		/* Write MII PHY register. */
-	case SIOCDEVPRIVATE+2:		/* for binary compat, remove in 2.5 */
 		if (!capable (CAP_NET_ADMIN)) {
 			rc = -EPERM;
 			break;

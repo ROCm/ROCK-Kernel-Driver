@@ -35,14 +35,6 @@
 	siglock:	SPIN_LOCK_UNLOCKED 		\
 }
 
-#define INIT_TASK_WORK				\
-{						\
-	need_resched:	0,			\
-	syscall_trace:	0,			\
-	sigpending:	0,			\
-	notify_resume:	0,			\
-}
-
 /*
  *  INIT_TASK is used to set up the first task table, touch at
  * your own risk!. Base=0, limit=0x1fffff (=2MB)
@@ -50,10 +42,8 @@
 #define INIT_TASK(tsk)	\
 {									\
     state:		0,						\
+    thread_info:	&init_thread_info,				\
     flags:		0,						\
-    work:		INIT_TASK_WORK,					\
-    addr_limit:		KERNEL_DS,					\
-    exec_domain:	&default_exec_domain,				\
     lock_depth:		-1,						\
     __nice:		DEF_USER_NICE,					\
     policy:		SCHED_OTHER,					\

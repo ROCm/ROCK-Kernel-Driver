@@ -20,7 +20,7 @@
 
 #define FPU_SAVE							\
   do {									\
-	if (!(current->flags & PF_USEDFPU))				\
+	if (!test_thread_flag(TIF_USEDFPU))				\
 		__asm__ __volatile__ (" clts;\n");			\
 	__asm__ __volatile__ ("fsave %0; fwait": "=m"(fpu_save[0]));	\
   } while (0)
@@ -28,7 +28,7 @@
 #define FPU_RESTORE							\
   do {									\
 	__asm__ __volatile__ ("frstor %0": : "m"(fpu_save[0]));		\
-	if (!(current->flags & PF_USEDFPU))				\
+	if (!test_thread_flag(TIF_USEDFPU))				\
 		stts();							\
   } while (0)
 

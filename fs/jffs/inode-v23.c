@@ -71,8 +71,7 @@ kmem_cache_t     *node_cache = NULL;
 kmem_cache_t     *fm_cache = NULL;
 
 /* Called by the VFS at mount time to initialize the whole file system.  */
-static struct super_block *
-jffs_read_super(struct super_block *sb, void *data, int silent)
+static int jffs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	kdev_t dev = sb->s_dev;
 	struct inode *root_inode;
@@ -84,7 +83,7 @@ jffs_read_super(struct super_block *sb, void *data, int silent)
 	if (major(dev) != MTD_BLOCK_MAJOR) {
 		printk(KERN_WARNING "JFFS: Trying to mount a "
 		       "non-mtd device.\n");
-		return 0;
+		return -EINVAL;
 	}
 
 	sb->s_blocksize = PAGE_CACHE_SIZE;
@@ -145,7 +144,7 @@ jffs_read_super(struct super_block *sb, void *data, int silent)
 
 	D1(printk(KERN_NOTICE "JFFS: Successfully mounted device %s.\n",
 	       sb->s_id));
-	return sb;
+	return 0;
 
 jffs_sb_err3:
 	iput(root_inode);
@@ -154,7 +153,7 @@ jffs_sb_err2:
 jffs_sb_err1:
 	printk(KERN_WARNING "JFFS: Failed to mount device %s.\n",
 	       sb->s_id);
-	return 0;
+	return -EINVAL;
 }
 
 
@@ -1730,8 +1729,18 @@ static struct super_operations jffs_ops =
 	statfs:       jffs_statfs,
 };
 
+static struct super_block *jffs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, jffs_fill_super);
+}
 
-static DECLARE_FSTYPE_DEV(jffs_fs_type, "jffs", jffs_read_super);
+static struct file_system_type jffs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"jffs",
+	get_sb:		jffs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init
 init_jffs_fs(void)

@@ -597,11 +597,8 @@ static void put_anon_dev(kdev_t dev)
  *
  *	Rather than duplicating all that logics every time when
  *	we want something that doesn't fit "nodev" and "single" we pull
- *	the relevant code into common helper and let get_sb_...() call
+ *	the relevant code into common helper and let ->get_sb() call
  *	it.
- *
- *	NB: get_sb_...() is going to become an fs type method, with
- *	current ->read_super() becoming a callback used by common instances.
  */
 struct super_block *get_anon_super(struct file_system_type *type,
 	int (*compare)(struct super_block *,void *), void *data)
@@ -787,22 +784,6 @@ struct super_block *get_sb_single(struct file_system_type *fs_type,
 	return s;
 }
 
-/* Will go away */
-static int fill_super(struct super_block *sb, void *data, int verbose)
-{
-	return sb->s_type->read_super(sb, data, verbose) ? 0 : -EINVAL;
-}
-static struct super_block *__get_sb_bdev(struct file_system_type *fs_type,
-	int flags, char *dev_name, void * data)
-{
-	return get_sb_bdev(fs_type, flags, dev_name, data, fill_super);
-}
-static struct super_block *__get_sb_nodev(struct file_system_type *fs_type,
-	int flags, char *dev_name, void * data)
-{
-	return get_sb_nodev(fs_type, flags, data, fill_super);
-}
-
 struct vfsmount *
 do_kern_mount(const char *fstype, int flags, char *name, void *data)
 {
@@ -816,12 +797,7 @@ do_kern_mount(const char *fstype, int flags, char *name, void *data)
 	mnt = alloc_vfsmnt(name);
 	if (!mnt)
 		goto out;
-	if (type->get_sb)
-		sb = type->get_sb(type, flags, name, data);
-	else if (type->fs_flags & FS_REQUIRES_DEV)
-		sb = __get_sb_bdev(type, flags, name, data);
-	else
-		sb = __get_sb_nodev(type, flags, name, data);
+	sb = type->get_sb(type, flags, name, data);
 	if (IS_ERR(sb))
 		goto out_mnt;
 	if (type->fs_flags & FS_NOMOUNT)

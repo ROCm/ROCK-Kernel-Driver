@@ -96,7 +96,10 @@ AT-2500TX 10/100 PCI Fast Ethernet Network Adapter Card
 KTI KF-230TX
 KTI KF-230TX/2
 Lantech FastNet TX
+Ovislink Fast Ethernet
+Planet ENW-9504 (V.4) 10/100
 SMC EZNET 10/100
+UNEX NexNIC ND012C
 
 (please add your adapter model to this list)
 
@@ -181,11 +184,18 @@ suggestions welcome)  (WIP)
 Change History
 --------------
 
+Version 0.9.23 - In progress
+
+* New, compile-time conditional for testing better RX reset
+* Only account specific RX errors if rx_status is !OK
+
+
 Version 0.9.22 - November 8, 2001
 
 * Additional retries before aborting Tx
 * Do not write other TxConfig bits when writing clear-abort bit.
 * Ack TxErr intr status after each Tx abort, too.
+* Fix oops in interface restart
 
 
 Version 0.9.21 - November 1, 2001

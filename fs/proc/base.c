@@ -1035,7 +1035,7 @@ struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry)
 
 	inode = proc_pid_make_inode(dir->i_sb, task, PROC_PID_INO);
 
-	free_task_struct(task);
+	put_task_struct(task);
 
 	if (!inode)
 		goto out;
@@ -1057,7 +1057,7 @@ void proc_pid_delete_inode(struct inode *inode)
 	if (PROC_I(inode)->file)
 		fput(PROC_I(inode)->file);
 	if (proc_task(inode))
-		free_task_struct(proc_task(inode));
+		put_task_struct(proc_task(inode));
 }
 
 #define PROC_NUMBUF 10

@@ -135,8 +135,7 @@ vxfs_statfs(struct super_block *sbp, struct statfs *bufp)
  * Locking:
  *   We are under the bkl and @sbp->s_lock.
  */
-static struct super_block *
-vxfs_read_super(struct super_block *sbp, void *dp, int silent)
+static int vxfs_fill_super(struct super_block *sbp, void *dp, int silent)
 {
 	struct vxfs_sb_info	*infp;
 	struct vxfs_sb		*rsbp;
@@ -146,7 +145,7 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 	infp = kmalloc(sizeof(*infp), GFP_KERNEL);
 	if (!infp) {
 		printk(KERN_WARNING "vxfs: unable to allocate incore superblock\n");
-		return NULL;
+		return -ENOMEM;
 	}
 	memset(infp, 0, sizeof(*infp));
 
@@ -213,7 +212,7 @@ vxfs_read_super(struct super_block *sbp, void *dp, int silent)
 		goto out_free_ilist;
 	}
 
-	return (sbp);
+	return 0;
 	
 out_free_ilist:
 	vxfs_put_fake_inode(infp->vsi_fship);
@@ -222,13 +221,24 @@ out_free_ilist:
 out:
 	brelse(bp);
 	kfree(infp);
-	return NULL;
+	return -EINVAL;
 }
 
 /*
  * The usual module blurb.
  */
-static DECLARE_FSTYPE_DEV(vxfs_fs_type, "vxfs", vxfs_read_super);
+static struct super_block *vxfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, vxfs_fill_super);
+}
+
+static struct file_system_type vxfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"vxfs",
+	get_sb:		vxfs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init
 vxfs_init(void)

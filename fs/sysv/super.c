@@ -340,8 +340,7 @@ static int complete_read_super(struct super_block *sb, int silent, int size)
 	return 1;
 }
 
-static struct super_block *sysv_read_super(struct super_block *sb,
-					   void *data, int silent)
+static int sysv_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct buffer_head *bh1;
 	struct buffer_head *bh = NULL;
@@ -397,7 +396,7 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 		sb->sv_bh1 = bh1;
 		sb->sv_bh2 = bh;
 		if (complete_read_super(sb, silent, size))
-			return sb;
+			return 0;
 	}
 
 	brelse(bh1);
@@ -405,7 +404,7 @@ static struct super_block *sysv_read_super(struct super_block *sb,
 	sb_set_blocksize(sb, BLOCK_SIZE);
 	printk("oldfs: cannot read superblock\n");
 failed:
-	return NULL;
+	return -EINVAL;
 
 Eunknown:
 	brelse(bh);
@@ -421,8 +420,7 @@ Ebadsize:
 	goto failed;
 }
 
-static struct super_block *v7_read_super(struct super_block *sb,void *data,
-				  int silent)
+static int v7_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct buffer_head *bh, *bh2 = NULL;
 	struct v7_super_block *v7sb;
@@ -466,18 +464,41 @@ static struct super_block *v7_read_super(struct super_block *sb,void *data,
 	sb->sv_bh1 = bh;
 	sb->sv_bh2 = bh;
 	if (complete_read_super(sb, silent, 1))
-		return sb;
+		return 0;
 
 failed:
 	brelse(bh2);
 	brelse(bh);
-	return NULL;
+	return -EINVAL;
 }
 
 /* Every kernel module contains stuff like this. */
 
-static DECLARE_FSTYPE_DEV(sysv_fs_type, "sysv", sysv_read_super);
-static DECLARE_FSTYPE_DEV(v7_fs_type, "v7", v7_read_super);
+static struct super_block *sysv_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, sysv_fill_super);
+}
+
+static struct super_block *v7_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, v7_fill_super);
+}
+
+static struct file_system_type sysv_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"sysv",
+	get_sb:		sysv_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
+
+static struct file_system_type v7_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"v7",
+	get_sb:		v7_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 extern int sysv_init_icache(void) __init;
 extern void sysv_destroy_icache(void);

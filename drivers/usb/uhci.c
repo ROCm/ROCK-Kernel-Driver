@@ -2842,7 +2842,7 @@ static int alloc_uhci(struct pci_dev *dev, unsigned int io_addr, unsigned int io
 
 	usb_connect(uhci->rh.dev);
 
-	if (usb_new_device(uhci->rh.dev) != 0) {
+	if (usb_register_root_hub(uhci->rh.dev, &dev->dev) != 0) {
 		err("unable to start root hub");
 		retval = -ENOMEM;
 		goto err_start_root_hub;

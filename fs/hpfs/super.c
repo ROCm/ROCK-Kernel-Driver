@@ -405,8 +405,7 @@ int hpfs_remount_fs(struct super_block *s, int *flags, char *data)
 	return 0;
 }
 
-struct super_block *hpfs_read_super(struct super_block *s, void *options,
-				    int silent)
+static int hpfs_fill_super(struct super_block *s, void *options, int silent)
 {
 	struct buffer_head *bh0, *bh1, *bh2;
 	struct hpfs_boot_block *bootblock;
@@ -598,7 +597,7 @@ struct super_block *hpfs_read_super(struct super_block *s, void *options,
 	}
 	if (de) hpfs_brelse4(&qbh);
 
-	return s;
+	return 0;
 
 bail4:	brelse(bh2);
 bail3:	brelse(bh1);
@@ -607,10 +606,21 @@ bail1:
 bail0:
 	if (s->s_hpfs_bmp_dir) kfree(s->s_hpfs_bmp_dir);
 	if (s->s_hpfs_cp_table) kfree(s->s_hpfs_cp_table);
-	return NULL;
+	return -EINVAL;
 }
 
-DECLARE_FSTYPE_DEV(hpfs_fs_type, "hpfs", hpfs_read_super);
+static struct super_block *hpfs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, hpfs_fill_super);
+}
+
+static struct file_system_type hpfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"hpfs",
+	get_sb:		hpfs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_hpfs_fs(void)
 {

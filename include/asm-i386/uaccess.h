@@ -27,14 +27,14 @@
 #define USER_DS		MAKE_MM_SEG(PAGE_OFFSET)
 
 #define get_ds()	(KERNEL_DS)
-#define get_fs()	(current->addr_limit)
-#define set_fs(x)	(current->addr_limit = (x))
+#define get_fs()	(current_thread_info()->addr_limit)
+#define set_fs(x)	(current_thread_info()->addr_limit = (x))
 
 #define segment_eq(a,b)	((a).seg == (b).seg)
 
 extern int __verify_write(const void *, unsigned long);
 
-#define __addr_ok(addr) ((unsigned long)(addr) < (current->addr_limit.seg))
+#define __addr_ok(addr) ((unsigned long)(addr) < (current_thread_info()->addr_limit.seg))
 
 /*
  * Uhhuh, this needs 33-bit arithmetic. We have a carry..
@@ -43,7 +43,7 @@ extern int __verify_write(const void *, unsigned long);
 	unsigned long flag,sum; \
 	asm("addl %3,%1 ; sbbl %0,%0; cmpl %1,%4; sbbl $0,%0" \
 		:"=&r" (flag), "=r" (sum) \
-		:"1" (addr),"g" ((int)(size)),"g" (current->addr_limit.seg)); \
+		:"1" (addr),"g" ((int)(size)),"g" (current_thread_info()->addr_limit.seg)); \
 	flag; })
 
 #ifdef CONFIG_X86_WP_WORKS_OK

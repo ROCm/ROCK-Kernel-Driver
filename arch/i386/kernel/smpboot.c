@@ -818,7 +818,7 @@ static void __init do_boot_cpu (int apicid)
 
 	/* So we see what's up   */
 	printk("Booting processor %d/%d eip %lx\n", cpu, apicid, start_eip);
-	stack_start.esp = (void *) (1024 + PAGE_SIZE + (char *)idle);
+	stack_start.esp = (void *) (1024 + PAGE_SIZE + (char *)idle->thread_info);
 
 	/*
 	 * This grunge runs the startup process for
@@ -1024,7 +1024,7 @@ void __init smp_boot_cpus(void)
 	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
 
 	global_irq_holder = NO_PROC_ID;
-	current->cpu = 0;
+	current_thread_info()->cpu = 0;
 	smp_tune_scheduling();
 
 	/*

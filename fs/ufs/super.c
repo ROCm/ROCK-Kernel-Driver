@@ -434,8 +434,7 @@ void ufs_put_cylinder_structures (struct super_block * sb) {
 	UFSD(("EXIT\n"))
 }
 
-struct super_block * ufs_read_super (struct super_block * sb, void * data,
-	int silent)
+static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 {
 	struct ufs_sb_private_info * uspi;
 	struct ufs_super_block_first * usb1;
@@ -807,7 +806,7 @@ magic_found:
 			goto failed;
 
 	UFSD(("EXIT\n"))
-	return(sb);
+	return 0;
 
 dalloc_failed:
 	iput(inode);
@@ -815,7 +814,7 @@ failed:
 	if (ubh) ubh_brelse_uspi (uspi);
 	if (uspi) kfree (uspi);
 	UFSD(("EXIT (FAILED)\n"))
-	return(NULL);
+	return -EINVAL;
 }
 
 void ufs_write_super (struct super_block * sb) {
@@ -1009,7 +1008,18 @@ static struct super_operations ufs_super_ops = {
 	remount_fs:	ufs_remount,
 };
 
-static DECLARE_FSTYPE_DEV(ufs_fs_type, "ufs", ufs_read_super);
+static struct super_block *ufs_get_sb(struct file_system_type *fs_type,
+	int flags, char *dev_name, void *data)
+{
+	return get_sb_bdev(fs_type, flags, dev_name, data, ufs_fill_super);
+}
+
+static struct file_system_type ufs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"ufs",
+	get_sb:		ufs_get_sb,
+	fs_flags:	FS_REQUIRES_DEV,
+};
 
 static int __init init_ufs_fs(void)
 {

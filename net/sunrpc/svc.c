@@ -185,7 +185,7 @@ svc_register(struct svc_serv *serv, int proto, unsigned short port)
 		progp->pg_name, proto == IPPROTO_UDP? "udp" : "tcp", port);
 
 	if (!port)
-		current->work.sigpending = 0;
+		clear_thread_flag(TIF_SIGPENDING);
 
 	for (i = 0; i < progp->pg_nvers; i++) {
 		if (progp->pg_vers[i] == NULL)

@@ -436,8 +436,8 @@ static void srm_console_write(struct console *co, const char *s,
 
 static kdev_t srm_console_device(struct console *c)
 {
-  /* Huh? */
-        return MKDEV(TTY_MAJOR, 64 + c->index);
+	/* Huh? */
+        return mk_kdev(TTY_MAJOR, 64 + c->index);
 }
 
 static int __init srm_console_setup(struct console *co, char *options)

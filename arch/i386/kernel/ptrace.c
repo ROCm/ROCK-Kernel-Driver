@@ -278,16 +278,10 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		if ((unsigned long) data > _NSIG)
 			break;
 		if (request == PTRACE_SYSCALL) {
-			if (!(child->ptrace & PT_SYSCALLTRACE)) {
-				child->ptrace |= PT_SYSCALLTRACE;
-				child->work.syscall_trace++;
-			}
+			set_thread_flag(TIF_SYSCALL_TRACE);
 		}
 		else {
-			if (child->ptrace & PT_SYSCALLTRACE) {
-				child->ptrace &= ~PT_SYSCALLTRACE;
-				child->work.syscall_trace--;
-			}
+			clear_thread_flag(TIF_SYSCALL_TRACE);
 		}
 		child->exit_code = data;
 	/* make sure the single step bit is not set. */
@@ -323,10 +317,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		ret = -EIO;
 		if ((unsigned long) data > _NSIG)
 			break;
-		if (child->ptrace & PT_SYSCALLTRACE) {
-			child->ptrace &= ~PT_SYSCALLTRACE;
-			child->work.syscall_trace--;
-		}
+		clear_thread_flag(TIF_SYSCALL_TRACE);
 		if ((child->ptrace & PT_DTRACE) == 0) {
 			/* Spurious delayed TF traps may occur */
 			child->ptrace |= PT_DTRACE;
@@ -444,7 +435,7 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		break;
 	}
 out_tsk:
-	free_task_struct(child);
+	put_task_struct(child);
 out:
 	unlock_kernel();
 	return ret;
@@ -456,8 +447,9 @@ out:
 __attribute__((regparm(3)))
 void do_syscall_trace(struct pt_regs *regs, int entryexit)
 {
-	if ((current->ptrace & (PT_PTRACED|PT_SYSCALLTRACE)) !=
-	    (PT_PTRACED|PT_SYSCALLTRACE))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+		return;
+	if (current->ptrace & PT_PTRACED)
 		return;
 	/* the 0x80 provides a way for the tracing parent to distinguish
 	   between a syscall stop and SIGTRAP delivery */
@@ -475,16 +467,4 @@ void do_syscall_trace(struct pt_regs *regs, int entryexit)
 		send_sig(current->exit_code, current, 1);
 		current->exit_code = 0;
 	}
-}
-
-/* notification of userspace execution resumption
- * - triggered by current->work.notify_resume
- */
-__attribute__((regparm(3)))
-void do_notify_resume(struct pt_regs *regs, sigset_t *oldset,
-		      struct task_work work_pending)
-{
-	/* deal with pending signal delivery */
-	if (work_pending.sigpending)
-		do_signal(regs,oldset);
 }

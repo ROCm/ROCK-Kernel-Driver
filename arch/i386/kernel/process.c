@@ -102,15 +102,21 @@ static void poll_idle (void)
 	 * Deal with another CPU just having chosen a thread to
 	 * run here:
 	 */
-	oldval = xchg(&current->work.need_resched, -1);
+	oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
 
-	if (!oldval)
+	if (!oldval) {
+		set_thread_flag(TIF_POLLING_NRFLAG);
 		asm volatile(
 			"2:"
-			"cmpb $-1, %0;"
+			"testl %0, %1;"
 			"rep; nop;"
 			"je 2b;"
-				: :"m" (current->work.need_resched));
+			: : "i"(_TIF_NEED_RESCHED), "m" (current_thread_info()->flags));
+
+		clear_thread_flag(TIF_POLLING_NRFLAG);
+	} else {
+		set_need_resched();
+	}
 }
 
 /*
@@ -576,7 +582,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 {
 	struct pt_regs * childregs;
 
-	childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p)) - 1;
+	childregs = ((struct pt_regs *) (THREAD_SIZE + (unsigned long) p->thread_info)) - 1;
 	struct_cpy(childregs, regs);
 	childregs->eax = 0;
 	childregs->esp = esp;
@@ -673,6 +679,8 @@ void __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	struct thread_struct *prev = &prev_p->thread,
 				 *next = &next_p->thread;
 	struct tss_struct *tss = init_tss + smp_processor_id();
+
+	/* never put a printk in __switch_to... printk() calls wake_up*() indirectly */
 
 	unlazy_fpu(prev_p);
 

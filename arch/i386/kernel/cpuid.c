@@ -95,6 +95,7 @@ static loff_t cpuid_seek(struct file *file, loff_t offset, int orig)
   case 1:
     file->f_pos += offset;
     ret = file->f_pos;
+    break;
   default:
     ret = -EINVAL;
   }
