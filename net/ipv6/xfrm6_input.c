@@ -67,10 +67,8 @@ int xfrm6_rcv(struct sk_buff **pskb, unsigned int *nhoffp)
 
 		xfrm_vec[xfrm_nr++].xvec = x;
 
-		iph = skb->nh.ipv6h;
-
 		if (x->props.mode) { /* XXX */
-			if (iph->nexthdr != IPPROTO_IPV6)
+			if (nexthdr != IPPROTO_IPV6)
 				goto drop;
 			skb->nh.raw = skb->data;
 			iph = skb->nh.ipv6h;
