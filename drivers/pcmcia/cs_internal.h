@@ -177,10 +177,6 @@ void release_resource_db(void);
 extern struct rw_semaphore pcmcia_socket_list_rwsem;
 extern struct list_head pcmcia_socket_list;
 
-#ifdef CONFIG_PROC_FS
-extern struct proc_dir_entry *proc_pccard;
-#endif
-
 #ifdef PCMCIA_DEBUG
 extern int pc_debug;
 #define DEBUG(n, args...) do { if (pc_debug>(n)) printk(KERN_DEBUG args); } while (0)

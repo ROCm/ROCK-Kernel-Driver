@@ -44,7 +44,6 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/proc_fs.h>
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/device.h>
@@ -128,11 +127,6 @@ socket_state_t dead_socket = {
 /* List of all sockets, protected by a rwsem */
 LIST_HEAD(pcmcia_socket_list);
 DECLARE_RWSEM(pcmcia_socket_list_rwsem);
-
-
-#ifdef CONFIG_PROC_FS
-struct proc_dir_entry *proc_pccard = NULL;
-#endif
 
 /*====================================================================*/
 
@@ -2500,9 +2494,6 @@ EXPORT_SYMBOL(pcmcia_write_memory);
 EXPORT_SYMBOL(dead_socket);
 EXPORT_SYMBOL(CardServices);
 EXPORT_SYMBOL(MTDHelperEntry);
-#ifdef CONFIG_PROC_FS
-EXPORT_SYMBOL(proc_pccard);
-#endif
 
 struct class pcmcia_socket_class = {
 	.name = "pcmcia_socket",
@@ -2523,9 +2514,6 @@ static int __init init_pcmcia_cs(void)
     DEBUG(0, "%s\n", version);
     class_register(&pcmcia_socket_class);
     class_interface_register(&pcmcia_socket);
-#ifdef CONFIG_PROC_FS
-    proc_pccard = proc_mkdir("pccard", proc_bus);
-#endif
 
     return 0;
 }
@@ -2533,11 +2521,6 @@ static int __init init_pcmcia_cs(void)
 static void __exit exit_pcmcia_cs(void)
 {
     printk(KERN_INFO "unloading Kernel Card Services\n");
-#ifdef CONFIG_PROC_FS
-    if (proc_pccard) {
-	remove_proc_entry("pccard", proc_bus);
-    }
-#endif
     release_resource_db();
     class_interface_unregister(&pcmcia_socket);
     class_unregister(&pcmcia_socket_class);
