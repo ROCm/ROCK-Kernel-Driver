@@ -84,15 +84,8 @@ typedef struct {
 	u_short cylinders;
 	u_char sectors;
 	u_char control;
+	int unit;
 } XD_INFO;
-
-/* this structure is returned to the HDIO_GETGEO ioctl */
-typedef struct {
-	__u8 heads;
-	__u8 sectors;
-	__u8 cylinders;
-	__u32 start;
-} XD_GEOMETRY;
 
 /* this structure defines a ROM BIOS signature */
 typedef struct {
@@ -111,7 +104,7 @@ static u_char xd_initdrives (void (*init_drive)(u_char drive));
 
 static void do_xd_request (request_queue_t * q);
 static int xd_ioctl (struct inode *inode,struct file *file,unsigned int cmd,unsigned long arg);
-static int xd_readwrite (u_char operation,u_char drive,char *buffer,u_int block,u_int count);
+static int xd_readwrite (u_char operation,XD_INFO *disk,char *buffer,u_int block,u_int count);
 static void xd_recalibrate (u_char drive);
 
 static void xd_interrupt_handler (int irq, void *dev_id, struct pt_regs *regs);
