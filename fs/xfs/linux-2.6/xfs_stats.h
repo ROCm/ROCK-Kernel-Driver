@@ -140,11 +140,13 @@ struct xfsstats {
 
 DECLARE_PER_CPU(struct xfsstats, xfsstats);
 
-/* We don't disable preempt, not too worried about poking the
- * wrong cpu's stat for now */
-#define XFS_STATS_INC(count)		(__get_cpu_var(xfsstats).count++)
-#define XFS_STATS_DEC(count)		(__get_cpu_var(xfsstats).count--)
-#define XFS_STATS_ADD(count, inc)	(__get_cpu_var(xfsstats).count += (inc))
+/*
+ * We don't disable preempt, not too worried about poking the
+ * wrong CPU's stat for now (also aggregated before reporting).
+ */
+#define XFS_STATS_INC(v)	(per_cpu(xfsstats, current_cpu()).v++)
+#define XFS_STATS_DEC(v)	(per_cpu(xfsstats, current_cpu()).v--)
+#define XFS_STATS_ADD(v, inc)	(per_cpu(xfsstats, current_cpu()).v += (inc))
 
 extern void xfs_init_procfs(void);
 extern void xfs_cleanup_procfs(void);
