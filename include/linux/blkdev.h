@@ -579,6 +579,14 @@ extern void end_that_request_last(struct request *);
 extern int process_that_request_first(struct request *, unsigned int);
 extern void end_request(struct request *req, int uptodate);
 
+/*
+ * end_that_request_first/chunk() takes an uptodate argument. we account
+ * any value <= as an io error. 0 means -EIO for compatability reasons,
+ * any other < 0 value is the direct error type. An uptodate value of
+ * 1 indicates successful io completion
+ */
+#define end_io_error(uptodate)	(unlikely((uptodate) <= 0))
+
 static inline void blkdev_dequeue_request(struct request *req)
 {
 	BUG_ON(list_empty(&req->queuelist));

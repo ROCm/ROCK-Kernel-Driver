@@ -2719,8 +2719,15 @@ void blk_recalc_rq_sectors(struct request *rq, int nsect)
 static int __end_that_request_first(struct request *req, int uptodate,
 				    int nr_bytes)
 {
-	int total_bytes, bio_nbytes, error = 0, next_idx = 0;
+	int total_bytes, bio_nbytes, error, next_idx = 0;
 	struct bio *bio;
+
+	/*
+	 * extend uptodate bool to allow < 0 value to be direct io error
+	 */
+	error = 0;
+	if (end_io_error(uptodate))
+		error = !uptodate ? -EIO : uptodate;
 
 	/*
 	 * for a REQ_BLOCK_PC request, we want to carry any eventual
@@ -2730,7 +2737,6 @@ static int __end_that_request_first(struct request *req, int uptodate,
 		req->errors = 0;
 
 	if (!uptodate) {
-		error = -EIO;
 		if (blk_fs_request(req) && !(req->flags & REQ_QUIET))
 			printk("end_request: I/O error, dev %s, sector %llu\n",
 				req->rq_disk ? req->rq_disk->disk_name : "?",
@@ -2813,7 +2819,7 @@ static int __end_that_request_first(struct request *req, int uptodate,
 /**
  * end_that_request_first - end I/O on a request
  * @req:      the request being processed
- * @uptodate: 0 for I/O error
+ * @uptodate: 1 for success, 0 for I/O error, < 0 for specific error
  * @nr_sectors: number of sectors to end I/O on
  *
  * Description:
@@ -2834,7 +2840,7 @@ EXPORT_SYMBOL(end_that_request_first);
 /**
  * end_that_request_chunk - end I/O on a request
  * @req:      the request being processed
- * @uptodate: 0 for I/O error
+ * @uptodate: 1 for success, 0 for I/O error, < 0 for specific error
  * @nr_bytes: number of bytes to complete
  *
  * Description:

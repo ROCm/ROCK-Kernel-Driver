@@ -67,7 +67,7 @@ static void ide_fill_flush_cmd(ide_drive_t *drive, struct request *rq)
 	rq->buffer = buf;
 	rq->buffer[0] = WIN_FLUSH_CACHE;
 
-	if (drive->id->cfs_enable_2 & 0x2400)
+	if (ide_id_has_flush_cache_ext(drive->id))
 		rq->buffer[0] = WIN_FLUSH_CACHE_EXT;
 }
 
@@ -115,10 +115,10 @@ static int __ide_end_request(ide_drive_t *drive, struct request *rq,
 	 * if failfast is set on a request, override number of sectors and
 	 * complete the whole request right now
 	 */
-	if (blk_noretry_request(rq) && !uptodate)
+	if (blk_noretry_request(rq) && end_io_error(uptodate))
 		nr_sectors = rq->hard_nr_sectors;
 
-	if (!blk_fs_request(rq) && !uptodate && !rq->errors)
+	if (!blk_fs_request(rq) && end_io_error(uptodate) && !rq->errors)
 		rq->errors = -EIO;
 
 	/*
@@ -229,7 +229,7 @@ u64 ide_get_error_location(ide_drive_t *drive, char *args)
 	lcyl = args[4];
 	sect = args[3];
 	
-	if (drive->id->cfs_enable_2 & 0x2400) {
+	if (ide_id_has_flush_cache_ext(drive->id)) {
 		low = (hcyl << 16) | (lcyl << 8) | sect;
 		HWIF(drive)->OUTB(drive->ctl|0x80, IDE_CONTROL_REG);
 		high = ide_read_24(drive);
@@ -247,6 +247,7 @@ u64 ide_get_error_location(ide_drive_t *drive, char *args)
 	sector = ((u64) high << 24) | low;
 	return sector;
 }
+EXPORT_SYMBOL(ide_get_error_location);
 
 static void ide_complete_barrier(ide_drive_t *drive, struct request *rq,
 				 int error)
@@ -276,29 +277,49 @@ static void ide_complete_barrier(ide_drive_t *drive, struct request *rq,
 	}
 
 	/*
-	 * bummer, flush failed. if it was the pre-flush, fail the barrier.
-	 * if it was the post-flush, complete the succesful part of the request
-	 * and fail the rest
+	 * we need to end real_rq, but it's not on the queue currently.
+	 * put it back on the queue, so we don't have to special case
+	 * anything else for completing it
 	 */
-	good_sectors = 0;
-	if (blk_barrier_postflush(rq)) {
-		sector = ide_get_error_location(drive, rq->buffer);
+	if (!blk_barrier_postflush(rq))
+		elv_requeue_request(drive->queue, real_rq);
+	
+	/*
+	 * drive aborted flush command, assume FLUSH_CACHE_* doesn't
+	 * work and disable barrier support
+	 */
+	if (error & ABRT_ERR) {
+		printk(KERN_ERR "%s: barrier support doesn't work\n", drive->name);
+		__ide_end_request(drive, real_rq, -EOPNOTSUPP, real_rq->hard_nr_sectors);
+		blk_queue_ordered(drive->queue, 0);
+		blk_queue_issue_flush_fn(drive->queue, NULL);
+	} else {
+		/*
+		 * find out what part of the request failed
+		 */
+		good_sectors = 0;
+		if (blk_barrier_postflush(rq)) {
+			sector = ide_get_error_location(drive, rq->buffer);
 
-		if ((sector >= real_rq->hard_sector) &&
-		    (sector < real_rq->hard_sector + real_rq->hard_nr_sectors))
-			good_sectors = sector - real_rq->hard_sector;
-	} else
-		sector = real_rq->hard_sector;
+			if ((sector >= real_rq->hard_sector) &&
+			    (sector < real_rq->hard_sector + real_rq->hard_nr_sectors))
+				good_sectors = sector - real_rq->hard_sector;
+		} else
+			sector = real_rq->hard_sector;
 
-	bad_sectors = real_rq->hard_nr_sectors - good_sectors;
-	if (good_sectors)
-		__ide_end_request(drive, real_rq, 1, good_sectors);
-	if (bad_sectors)
-		__ide_end_request(drive, real_rq, 0, bad_sectors);
+		bad_sectors = real_rq->hard_nr_sectors - good_sectors;
+		if (good_sectors)
+			__ide_end_request(drive, real_rq, 1, good_sectors);
+		if (bad_sectors)
+			__ide_end_request(drive, real_rq, 0, bad_sectors);
+
+		printk(KERN_ERR "%s: failed barrier write: "
+				"sector=%Lx(good=%d/bad=%d)\n",
+				drive->name, (unsigned long long)sector,
+				good_sectors, bad_sectors);
+	}
 
 	drive->doing_barrier = 0;
-
-	printk(KERN_ERR "%s: failed barrier write: sector=%Lx(good=%d/bad=%d)\n", drive->name, sector, good_sectors, bad_sectors);
 }
 
 /**

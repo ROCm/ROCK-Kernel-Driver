@@ -1675,4 +1675,11 @@ static inline int ata_can_queue(ide_drive_t *drive)
 
 extern struct bus_type ide_bus_type;
 
+/* check if CACHE FLUSH (EXT) command is supported (bits defined in ATA-6) */
+#define ide_id_has_flush_cache(id)	((id)->cfs_enable_2 & 0x3000)
+
+/* some Maxtor disks have bit 13 defined incorrectly so check bit 10 too */
+#define ide_id_has_flush_cache_ext(id)	\
+	(((id)->cfs_enable_2 & 0x2400) == 0x2400)
+
 #endif /* _IDE_H */

@@ -1597,6 +1597,7 @@ static void idedisk_setup (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
 	unsigned long long capacity;
+	int barrier;
 
 	idedisk_add_settings(drive);
 
@@ -1725,8 +1726,26 @@ static void idedisk_setup (ide_drive_t *drive)
 	if (drive->id->cfs_enable_2 & 0x3000)
 		write_cache(drive, (id->cfs_enable_2 & 0x3000));
 
-	blk_queue_ordered(drive->queue, 1);
-	blk_queue_issue_flush_fn(drive->queue, idedisk_issue_flush);
+	/*
+	 * decide if we can sanely support flushes and barriers on
+	 * this drive. unfortunately not all drives advertise FLUSH_CACHE
+	 * support even if they support it. So assume FLUSH_CACHE is there
+	 * if write back caching is enabled. LBA48 drives are newer, so
+	 * expect it to flag support properly. We can safely support
+	 * FLUSH_CACHE on lba48, if capacity doesn't exceed lba28
+	 */
+	barrier = 1;
+	if (drive->addressing == 1) {
+		barrier = ide_id_has_flush_cache(id);
+		if (capacity > (1ULL << 28) && !ide_id_has_flush_cache_ext(id))
+			barrier = 0;
+	}
+
+	printk("%s: cache flushes %ssupported\n", drive->name, barrier ? "" : "not ");
+	if (barrier) {
+		blk_queue_ordered(drive->queue, 1);
+		blk_queue_issue_flush_fn(drive->queue, idedisk_issue_flush);
+	}
 
 #ifdef CONFIG_BLK_DEV_IDE_TCQ_DEFAULT
 	if (drive->using_dma)
