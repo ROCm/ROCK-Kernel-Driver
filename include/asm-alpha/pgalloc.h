@@ -229,6 +229,7 @@ extern void flush_tlb_range(struct mm_struct *, unsigned long, unsigned long);
 #ifndef CONFIG_SMP
 extern struct pgtable_cache_struct {
 	unsigned long *pgd_cache;
+	unsigned long *pmd_cache;
 	unsigned long *pte_cache;
 	unsigned long pgtable_cache_sz;
 } quicklists;
@@ -237,7 +238,7 @@ extern struct pgtable_cache_struct {
 #define quicklists cpu_data[smp_processor_id()]
 #endif
 #define pgd_quicklist (quicklists.pgd_cache)
-#define pmd_quicklist ((unsigned long *)0)
+#define pmd_quicklist (quicklists.pmd_cache)
 #define pte_quicklist (quicklists.pte_cache)
 #define pgtable_cache_size (quicklists.pgtable_cache_sz)
 
@@ -252,7 +253,7 @@ static inline pgd_t *get_pgd_fast(void)
 
 	if ((ret = pgd_quicklist) != NULL) {
 		pgd_quicklist = (unsigned long *)(*ret);
-		ret[0] = ret[1];
+		ret[0] = 0;
 		pgtable_cache_size--;
 	} else
 		ret = (unsigned long *)get_pgd_slow();
@@ -285,7 +286,7 @@ static inline pmd_t *pmd_alloc_one_fast(struct mm_struct *mm, unsigned long addr
 
 	if ((ret = (unsigned long *)pte_quicklist) != NULL) {
 		pte_quicklist = (unsigned long *)(*ret);
-		ret[0] = ret[1];
+		ret[0] = 0;
 		pgtable_cache_size--;
 	}
 	return (pmd_t *)ret;
@@ -317,7 +318,7 @@ static inline pte_t *pte_alloc_one_fast(struct mm_struct *mm, unsigned long addr
 
 	if ((ret = (unsigned long *)pte_quicklist) != NULL) {
 		pte_quicklist = (unsigned long *)(*ret);
-		ret[0] = ret[1];
+		ret[0] = 0;
 		pgtable_cache_size--;
 	}
 	return (pte_t *)ret;

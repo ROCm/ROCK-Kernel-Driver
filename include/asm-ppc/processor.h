@@ -554,10 +554,10 @@ n:
 #define SR15	15
 
 #ifndef __ASSEMBLY__
-#ifndef CONFIG_MACH_SPECIFIC
+#if defined(CONFIG_ALL_PPC)
 extern int _machine;
 extern int have_of;
-#endif /* CONFIG_MACH_SPECIFIC */
+#endif /* CONFIG_ALL_PPC */
 
 /* what kind of prep workstation we are */
 extern int _prep_type;
@@ -681,29 +681,24 @@ void _nmask_and_or_msr(unsigned long nmask, unsigned long or_val);
 
 #endif /* ndef ASSEMBLY*/
 
-#ifdef CONFIG_MACH_SPECIFIC
-#if defined(CONFIG_8xx)
-#define _machine _MACH_8xx
-#define have_of 0
-#elif defined(CONFIG_OAK)
-#define _machine _MACH_oak
-#define have_of	0
-#elif defined(CONFIG_WALNUT)
-#define _machine _MACH_walnut
-#define have_of 0
-#elif defined(CONFIG_APUS)
+#ifndef CONFIG_ALL_PPC
+#if defined(CONFIG_APUS)
 #define _machine _MACH_apus
-#define have_of 0
 #elif defined(CONFIG_GEMINI)
 #define _machine _MACH_gemini
-#define have_of 0
+#elif defined(CONFIG_OAK)
+#define _machine _MACH_oak
+#elif defined(CONFIG_WALNUT)
+#define _machine _MACH_walnut
+#elif defined(CONFIG_8xx)
+#define _machine _MACH_8xx
 #elif defined(CONFIG_8260)
 #define _machine _MACH_8260
-#define have_of 0
 #else
 #error "Machine not defined correctly"
 #endif
-#endif /* CONFIG_MACH_SPECIFIC */
+#define have_of 0
+#endif /* !CONFIG_ALL_PPC */
 
 #endif /* __ASM_PPC_PROCESSOR_H */
 #endif /* __KERNEL__ */

@@ -47,7 +47,7 @@
  * Version Information
  */
 #define DRIVER_VERSION "v1.0.0"
-#define DRIVER_AUTHOR "Johannes Erdfelt, Randy Dunlap"
+#define DRIVER_AUTHOR "http://www.linux-usb.org/ibmcam/"
 #define DRIVER_DESC "IBM/Xirlink C-it USB Camera Driver for Linux (c) 2000"
 
 #define	ENABLE_HEXDUMP	0	/* Enable if you need it */

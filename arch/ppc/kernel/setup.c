@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.setup.c 1.23 05/21/01 16:08:53 cort
+ * BK Id: SCCS/s.setup.c 1.32 05/23/01 00:38:42 cort
  */
 /*
  * Common prep/pmac/chrp boot and setup code.
@@ -80,6 +80,10 @@ extern void gemini_init(unsigned long r3,
                       unsigned long r5,
                       unsigned long r6,
                       unsigned long r7);
+
+
+extern void bootx_init(unsigned long r4, unsigned long phys);
+extern unsigned long reloc_offset(void);
 
 #ifdef CONFIG_XMON
 extern void xmon_map_scc(void);
@@ -437,6 +441,79 @@ intuit_machine_type(void)
 }
 #endif /* CONFIG_ALL_PPC */
 
+#ifdef CONFIG_6xx
+/*
+ * We're called here very early in the boot.  We determine the machine
+ * type and call the appropriate low-level setup functions.
+ *  -- Cort <cort@fsmlabs.com>
+ */
+__init
+unsigned long
+early_init(int r3, int r4, int r5)
+{
+	extern char __bss_start, _end;
+ 	unsigned long phys;
+	unsigned long offset = reloc_offset();
+	unsigned long local_have_of = 1, local_machine;
+	struct bi_record *rec;
+	
+ 	/* Default */
+ 	phys = offset + KERNELBASE;
+	
+#if defined(CONFIG_APUS)
+	return phys;
+#endif	
+	
+	/* First zero the BSS -- use memset, some arches don't have
+	 * caches on yet */
+	memset_io(PTRRELOC(&__bss_start),0 , &_end - &__bss_start);
+
+#if defined(CONFIG_ALL_PPC) || defined(CONFIG_GEMINI)
+	/* If we came here from BootX, clear the screen,
+	 * set up some pointers and return. */
+#if defined(CONFIG_ALL_PPC)	
+	if ((r3 == 0x426f6f58) && (r5 == 0)) {
+		bootx_init(r4, phys);
+		return phys;
+	}
+#endif
+
+	/* check if we're prep, return if we are */
+	if ( *(unsigned long *)(0) == 0xdeadc0de )
+		return phys;
+	
+	/*
+	 * See if we have any bootloader info passed along.  If we do,
+	 * get the machine type and find out if we have OF.
+	 *
+	 * The strategy here is to assume that we want to call prom_init()
+	 * unless the bootinfo data passed to us tell us that we don't
+	 * have OF.
+	 * -- Cort <cort@fsmlabs.com>
+	 */
+	rec = (struct bi_record *)_ALIGN((ulong)PTRRELOC(&__bss_start)+(1<<20)-1,(1<<20));
+	if ( rec->tag == BI_FIRST )
+	{
+		for ( ; rec->tag != BI_LAST ;
+		      rec = (struct bi_record *)((ulong)rec + rec->size) )
+		{
+			ulong *data = rec->data;
+			if ( rec->tag == BI_MACHTYPE )
+			{
+				local_machine = data[0];
+				local_have_of = data[1];
+			}
+		}
+	}
+
+	if ( local_have_of )
+		phys = prom_init( r3, r4, (prom_entry)r5);
+#endif	
+	
+	return phys;
+}
+#endif /* CONFIG_6xx */
+
 /*
  * Find out what kind of machine we're on and save any data we need
  * from the early boot process (devtree is copied on pmac by prom_init() )
@@ -480,7 +557,6 @@ identify_machine(unsigned long r3, unsigned long r4, unsigned long r5,
 		 * are used for initrd_start and initrd_size,
 		 * otherwise they contain 0xdeadbeef.  
 		 */
-		cmd_line[0] = 0;
 		if (r3 >= 0x4000 && r3 < 0x800000 && r4 == 0) {
 			strncpy(cmd_line, (char *)r3 + KERNELBASE,
 				sizeof(cmd_line));
@@ -517,7 +593,7 @@ identify_machine(unsigned long r3, unsigned long r4, unsigned long r5,
 			chosen = find_devices("chosen");
 			if (chosen != NULL) {
 				p = get_property(chosen, "bootargs", NULL);
-				if (p != NULL) {
+				if (p && *p) {
 					cmd_line[0] = 0;
 					strncpy(cmd_line, p, sizeof(cmd_line));
 				}

@@ -83,6 +83,14 @@ static void __init reserve_bootmem_core(bootmem_data_t *bdata, unsigned long add
 
 	if (!size) BUG();
 
+	if (sidx < 0)
+		BUG();
+	if (eidx < 0)
+		BUG();
+	if (sidx >= eidx)
+		BUG();
+	if ((addr >> PAGE_SHIFT) >= bdata->node_low_pfn)
+		BUG();
 	if (end > bdata->node_low_pfn)
 		BUG();
 	for (i = sidx; i < eidx; i++)
@@ -142,6 +150,9 @@ static void * __init __alloc_bootmem_core (bootmem_data_t *bdata,
 							PAGE_SHIFT);
 
 	if (!size) BUG();
+
+	if (align & (align-1))
+		BUG();
 
 	/*
 	 * We try to allocate bootmem pages above 'goal'

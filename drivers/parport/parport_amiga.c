@@ -34,7 +34,7 @@ static struct parport *this_port = NULL;
 
 static void amiga_write_data(struct parport *p, unsigned char data)
 {
-	DPRINTK("write_data %c\n",data);
+	DPRINTK(KERN_DEBUG "write_data %c\n",data);
 	/* Triggers also /STROBE. This behavior cannot be changed */
 	ciaa.prb = data;
 	mb();
@@ -73,13 +73,13 @@ static unsigned char control_amiga_to_pc(unsigned char control)
 
 static void amiga_write_control(struct parport *p, unsigned char control)
 {
-	DPRINTK("write_control %02x\n",control);
+	DPRINTK(KERN_DEBUG "write_control %02x\n",control);
 	/* No implementation possible */
 }
 	
 static unsigned char amiga_read_control( struct parport *p)
 {
-	DPRINTK("read_control \n");
+	DPRINTK(KERN_DEBUG "read_control \n");
 	return control_amiga_to_pc(0);
 }
 
@@ -87,7 +87,7 @@ static unsigned char amiga_frob_control( struct parport *p, unsigned char mask, 
 {
 	unsigned char old;
 
-	DPRINTK("frob_control mask %02x, value %02x\n",mask,val);
+	DPRINTK(KERN_DEBUG "frob_control mask %02x, value %02x\n",mask,val);
 	old = amiga_read_control(p);
 	amiga_write_control(p, (old & ~mask) ^ val);
 	return old;
@@ -132,7 +132,7 @@ static unsigned char amiga_read_status(struct parport *p)
 	unsigned char status;
 
 	status = status_amiga_to_pc(ciab.pra & 7);
-	DPRINTK("read_status %02x\n", status);
+	DPRINTK(KERN_DEBUG "read_status %02x\n", status);
 	return status;
 }
 
@@ -154,14 +154,14 @@ static void amiga_disable_irq(struct parport *p)
 
 static void amiga_data_forward(struct parport *p)
 {
-	DPRINTK("forward\n");
+	DPRINTK(KERN_DEBUG "forward\n");
 	ciaa.ddrb = 0xff; /* all pins output */
 	mb();
 }
 
 static void amiga_data_reverse(struct parport *p)
 {
-	DPRINTK("reverse\n");
+	DPRINTK(KERN_DEBUG "reverse\n");
 	ciaa.ddrb = 0; /* all pins input */
 	mb();
 }

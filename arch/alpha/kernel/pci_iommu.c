@@ -175,7 +175,7 @@ pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size, int direction)
 	/* If the machine doesn't define a pci_tbi routine, we have to
 	   assume it doesn't support sg mapping.  */
 	if (! alpha_mv.mv_pci_tbi) {
-		printk(KERN_INFO "pci_map_single failed: no hw sg\n");
+		printk(KERN_WARNING "pci_map_single failed: no hw sg\n");
 		return 0;
 	}
 		
@@ -186,7 +186,7 @@ pci_map_single(struct pci_dev *pdev, void *cpu_addr, long size, int direction)
 	npages = calc_npages((paddr & ~PAGE_MASK) + size);
 	dma_ofs = iommu_arena_alloc(arena, npages);
 	if (dma_ofs < 0) {
-		printk(KERN_INFO "pci_map_single failed: "
+		printk(KERN_WARNING "pci_map_single failed: "
 		       "could not allocate dma page tables\n");
 		return 0;
 	}
@@ -215,6 +215,7 @@ void
 pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
 		 int direction)
 {
+	unsigned long flags;
 	struct pci_controller *hose = pdev ? pdev->sysdata : pci_isa_hose;
 	struct pci_iommu_arena *arena;
 	long dma_ofs, npages;
@@ -248,6 +249,9 @@ pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
 	}
 
 	npages = calc_npages((dma_addr & ~PAGE_MASK) + size);
+
+	spin_lock_irqsave(&arena->lock, flags);
+
 	iommu_arena_free(arena, dma_ofs, npages);
 
 
@@ -258,6 +262,8 @@ pci_unmap_single(struct pci_dev *pdev, dma_addr_t dma_addr, long size,
 	*/
 	if (dma_ofs >= arena->next_entry)
 		alpha_mv.mv_pci_tbi(hose, dma_addr, dma_addr + size - 1);
+
+	spin_unlock_irqrestore(&arena->lock, flags);
 
 	DBGA("pci_unmap_single: sg [%x,%lx] np %ld from %p\n",
 	     dma_addr, size, npages, __builtin_return_address(0));
@@ -410,7 +416,7 @@ sg_fill(struct scatterlist *leader, struct scatterlist *end,
 		/* Otherwise, break up the remaining virtually contiguous
 		   hunks into individual direct maps.  */
 		for (sg = leader; sg < end; ++sg)
-			if (sg->dma_address == 2 || sg->dma_address == -2)
+			if (sg->dma_address == 1 || sg->dma_address == -2)
 				sg->dma_address = 0;
 
 		/* Retry.  */
@@ -515,13 +521,13 @@ pci_map_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 		out->dma_length = 0;
 
 	if (out - start == 0)
-		printk(KERN_INFO "pci_map_sg failed: no entries?\n");
+		printk(KERN_WARNING "pci_map_sg failed: no entries?\n");
 	DBGA("pci_map_sg: %ld entries\n", out - start);
 
 	return out - start;
 
 error:
-	printk(KERN_INFO "pci_map_sg failed: "
+	printk(KERN_WARNING "pci_map_sg failed: "
 	       "could not allocate dma page tables\n");
 
 	/* Some allocation failed while mapping the scatterlist
@@ -540,6 +546,7 @@ void
 pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	     int direction)
 {
+	unsigned long flags;
 	struct pci_controller *hose;
 	struct pci_iommu_arena *arena;
 	struct scatterlist *end;
@@ -559,6 +566,9 @@ pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 		arena = hose->sg_isa;
 
 	fbeg = -1, fend = 0;
+
+	spin_lock_irqsave(&arena->lock, flags);
+
 	for (end = sg + nents; sg < end; ++sg) {
 		unsigned long addr, size;
 		long npages, ofs;
@@ -598,6 +608,8 @@ pci_unmap_sg(struct pci_dev *pdev, struct scatterlist *sg, int nents,
 	*/
 	if ((fend - arena->dma_base) >> PAGE_SHIFT >= arena->next_entry)
 		alpha_mv.mv_pci_tbi(hose, fbeg, fend);
+
+	spin_unlock_irqrestore(&arena->lock, flags);
 
 	DBGA("pci_unmap_sg: %d entries\n", nents - (end - sg));
 }

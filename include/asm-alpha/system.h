@@ -35,6 +35,18 @@
 
 #define START_ADDR	(PAGE_OFFSET+KERNEL_START_PHYS+0x10000)
 
+/*
+ * This is setup by the secondary bootstrap loader.  Because
+ * the zero page is zeroed out as soon as the vm system is
+ * initialized, we need to copy things out into a more permanent
+ * place.
+ */
+#define PARAM			ZERO_PGE
+#define COMMAND_LINE		((char*)(PARAM + 0x0000))
+#define COMMAND_LINE_SIZE	256
+#define INITRD_START		(*(unsigned long *) (PARAM+0x100))
+#define INITRD_SIZE		(*(unsigned long *) (PARAM+0x108))
+
 #ifndef __ASSEMBLY__
 #include <linux/kernel.h>
 

@@ -428,6 +428,7 @@ struct proc_dir_entry *proc_symlink(const char *name,
 	ent->data = kmalloc((ent->size=strlen(dest))+1, GFP_KERNEL);
 	if (!ent->data) {
 		kfree(ent);
+		ent = NULL;
 		goto out;
 	}
 	strcpy((char*)ent->data,dest);

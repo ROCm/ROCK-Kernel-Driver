@@ -49,6 +49,7 @@
  *	20010228-dh	patch from David Huggins - cs_update_ptr recursion.
  *	20010409-tw	add hercules game theatre XP amp code.
  *	20010420-tw	cleanup powerdown/up code.
+ *	20010521-tw	eliminate pops, and fixes for powerdown.
  *
  *	Status:
  *	Playback/Capture supported from 8k-48k.
@@ -198,7 +199,7 @@ struct cs_channel
 };
 
 #define CS46XX_MAJOR_VERSION "1"
-#define CS46XX_MINOR_VERSION "26"
+#define CS46XX_MINOR_VERSION "27"
 
 #ifdef __ia64__
 #define CS46XX_ARCH	     	"64"	//architecture key
@@ -687,6 +688,9 @@ static void cs_mute(struct cs_card *card, int state)
 {
 	struct ac97_codec *dev=card->ac97_codec[0];
 
+	CS_DBGOUT(CS_FUNCTION, 2, printk("cs46xx: cs_mute()+ %s\n",
+		(state == CS_TRUE) ? "Muting" : "UnMuting") );
+
 	if(state == CS_TRUE)
 	{
 	/*
@@ -713,6 +717,7 @@ static void cs_mute(struct cs_card *card, int state)
 		cs_ac97_set(dev, (u8)BA0_AC97_MASTER_VOLUME_MONO, card->pm.u32AC97_master_volume_mono);
 		cs_ac97_set(dev, (u8)BA0_AC97_PCM_OUT_VOLUME, card->pm.u32AC97_pcm_out_volume);
 	}
+	CS_DBGOUT(CS_FUNCTION, 2, printk("cs46xx: cs_mute()-\n"));
 }
 
 /* set playback sample rate */
@@ -1485,8 +1490,6 @@ static int drain_dac(struct cs_state *state, int nonblock)
 		/*
 		* set to silence and let that clear the fifos.
 		*/
-		memset(dmabuf->rawbuf, (dmabuf->fmt & CS_FMT_16BIT) ? 0 : 0x80,
-		       dmabuf->dmasize);
 		cs461x_clear_serial_FIFOs(card, CS_TYPE_DAC);
 		return -ERESTARTSYS;
 	}
@@ -4370,6 +4373,12 @@ static int cs461x_powerdown(struct cs_card *card, unsigned int type)
 			"cs46xx: cs461x_powerdown()- 0  unable to powerdown. tmp=0x%x\n",tmp));
 		return 0;
 	}
+/*
+* for now, always keep power to the mixer block.
+* not sure why it's a problem but it seems to be if we power off.
+*/
+	type &= ~CS_POWER_MIXVON;
+	type &= ~CS_POWER_MIXVOFF;
 
 	cs_mute(card, CS_TRUE);
 

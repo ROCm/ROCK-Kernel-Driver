@@ -10,7 +10,7 @@
 
 #define SIGCHLD 20
 
-#define NR_SYSCALLS 377
+#define NR_SYSCALLS 378
 
 /*
  * These offsets must match with alpha_mv in <asm/machvec.h>.
@@ -709,16 +709,14 @@ signal_return:
 	br	restore_all
 .end entSys
 
-#ifdef CONFIG_SMP
-        .globl  ret_from_smp_fork
+        .globl  ret_from_fork
 .align 3
-.ent ret_from_smp_fork
-ret_from_smp_fork:
+.ent ret_from_fork
+ret_from_fork:
 	lda	$26,ret_from_sys_call
 	mov	$17,$16
 	jsr	$31,schedule_tail
-.end ret_from_smp_fork
-#endif /* CONFIG_SMP */
+.end ret_from_fork
 
 .align 3
 .ent reschedule

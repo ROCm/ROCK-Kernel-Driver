@@ -1,4 +1,14 @@
- 2001-05-10  Fred Barnes  <frmb2@ukc.ac.uk>
+2001-05-22  Juan Quintela  <quintela@mandrakesoft.com>
+
+	* parport_amiga.c: Set printk levels.
+	* parport_gsc.c: Likewise.
+	* parport_mfc3.c: Likewise.
+	* parport_pc.c: Likewise.
+	* parport_sunbpp.c: Likewise.
+	* probe.c: Likewise.
+	* share.c: Likewise.
+
+2001-05-10  Fred Barnes  <frmb2@ukc.ac.uk>
 
        * parport_pc.c (parport_pc_epp_read_data): added support for
        reading from a w91284pic peripheral, flag is PARPORT_W91284PIC.

@@ -59,7 +59,7 @@ choice 'Alpha system type' \
 	 Wildfire		CONFIG_ALPHA_WILDFIRE" Generic
 
 # clear all implied options (don't want default values for those):
-unset CONFIG_ALPHA_EV4 CONFIG_ALPHA_EV5 CONFIG_ALPHA_EV6 CONFIG_ALPHA_EV67
+unset CONFIG_ALPHA_EV4 CONFIG_ALPHA_EV5 CONFIG_ALPHA_EV6
 unset CONFIG_ALPHA_EISA
 unset CONFIG_ALPHA_LCA CONFIG_ALPHA_APECS CONFIG_ALPHA_CIA
 unset CONFIG_ALPHA_T2 CONFIG_ALPHA_PYXIS CONFIG_ALPHA_POLARIS
@@ -141,12 +141,10 @@ if [ "$CONFIG_ALPHA_DP264" = "y" -o "$CONFIG_ALPHA_EIGER" = "y" ]
 then
 	define_bool CONFIG_ALPHA_EV6 y
 	define_bool CONFIG_ALPHA_TSUNAMI y
-	bool 'EV67 (or later) CPU (speed > 600MHz)?' CONFIG_ALPHA_EV67
 fi
 if [ "$CONFIG_ALPHA_WILDFIRE" = "y" -o "$CONFIG_ALPHA_TITAN" = "y" ]
 then
         define_bool CONFIG_ALPHA_EV6 y
-	define_bool CONFIG_ALPHA_EV67 y
 fi
 if [ "$CONFIG_ALPHA_RAWHIDE" = "y" ]
 then
@@ -166,7 +164,6 @@ if [ "$CONFIG_ALPHA_NAUTILUS" = "y" ]
 then
 	define_bool CONFIG_ALPHA_IRONGATE y
 	define_bool CONFIG_ALPHA_EV6 y
-	define_bool CONFIG_ALPHA_EV67 y
 fi
 
 if [ "$CONFIG_ALPHA_JENSEN" = "y" -o "$CONFIG_ALPHA_MIKASA" = "y" \
@@ -207,6 +204,13 @@ if [ "$CONFIG_ALPHA_SABLE" = "y" -o "$CONFIG_ALPHA_RAWHIDE" = "y" \
 	-o "$CONFIG_ALPHA_TITAN" = "y" -o "$CONFIG_ALPHA_GENERIC" = "y" ]
 then
 	bool 'Symmetric multi-processing support' CONFIG_SMP
+fi
+
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   bool 'Discontiguous Memory Support' CONFIG_DISCONTIGMEM
+   if [ "$CONFIG_DISCONTIGMEM" = "y" ]; then
+      bool ' NUMA Support' CONFIG_NUMA
+   fi
 fi
 
 # The machine must be able to support more than 8GB physical memory

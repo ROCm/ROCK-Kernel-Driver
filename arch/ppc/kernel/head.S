@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.head.S 1.18 05/21/01 11:49:59 paulus
+ * BK Id: SCCS/s.head.S 1.21 05/23/01 00:38:42 cort
  */
 /*
  *  PowerPC version 
@@ -135,9 +135,12 @@ __start:
 	mr	r28,r6
 	mr	r27,r7
 	li	r24,0			/* cpu # */
-	/* N.B. prom_init clears the BSS even if it doesn't do
-	 * anything else -- paulus. */
-	bl	prom_init
+/*
+ * early_init() does the early machine identification and does
+ * the necessary low-level setup and clears the BSS
+ *  -- Cort <cort@fsmlabs.com>
+ */ 
+	bl	early_init
 
 #ifdef CONFIG_APUS
 /* On APUS the __va/__pa constants need to be set to the correct 
@@ -1697,7 +1700,7 @@ cmd_line:
 
 	.globl intercept_table
 intercept_table:
-	.long 0, i0x100, i0x200, i0x300, i0x400, 0, i0x600, i0x700
+	.long 0, 0, i0x200, i0x300, i0x400, 0, i0x600, i0x700
 	.long i0x800, 0, 0, 0, 0, i0xd00, 0, 0
 	.long 0, 0, 0, i0x1300, 0, 0, 0, 0
 	.long 0, 0, 0, 0, 0, 0, 0, 0

@@ -1103,7 +1103,7 @@ static int parport_parse_params (int nports, const char *str[], int val[],
 			if (ep != str[i])
 				val[i] = r;
 			else {
-				printk("parport: bad specifier `%s'\n", str[i]);
+				printk(KERN_ERR "parport: bad specifier `%s'\n", str[i]);
 				return -1;
 			}
 		}

@@ -83,10 +83,11 @@ cpu_idle(void)
 
 		/* Although we are an idle CPU, we do not want to 
 		   get into the scheduler unnecessarily.  */
-		if (current->need_resched) {
-			schedule();
-			check_pgt_cache();
-		}
+		long oldval = xchg(&current->need_resched, -1UL);
+		if (!oldval)
+			while (current->need_resched < 0);
+		schedule();
+		check_pgt_cache();
 	}
 }
 
@@ -303,7 +304,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	    struct task_struct * p, struct pt_regs * regs)
 {
 	extern void ret_from_sys_call(void);
-	extern void ret_from_smp_fork(void);
+	extern void ret_from_fork(void);
 
 	struct pt_regs * childregs;
 	struct switch_stack * childstack, *stack;
@@ -322,11 +323,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	stack = ((struct switch_stack *) regs) - 1;
 	childstack = ((struct switch_stack *) childregs) - 1;
 	*childstack = *stack;
-#ifdef CONFIG_SMP
-	childstack->r26 = (unsigned long) ret_from_smp_fork;
-#else
-	childstack->r26 = (unsigned long) ret_from_sys_call;
-#endif
+	childstack->r26 = (unsigned long) ret_from_fork;
 	p->thread.usp = usp;
 	p->thread.ksp = (unsigned long) childstack;
 	p->thread.pal_flags = 1;	/* set FEN, clear everything else */

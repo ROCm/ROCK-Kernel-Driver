@@ -1154,8 +1154,6 @@ int init_module(void)
 
 void cleanup_module(void)
 {
-	int partition,dev,start;
-
 	devfs_unregister_blkdev(MAJOR_NR, "xd");
 	xd_done();
 	devfs_unregister (devfs_handle);

@@ -123,6 +123,22 @@ smp_setup_percpu_timer(int cpuid)
 	cpu_data[cpuid].prof_multiplier = 1;
 }
 
+static void __init
+wait_boot_cpu_to_stop(int cpuid)
+{
+	long stop = jiffies + 10*HZ;
+
+	while (time_before(jiffies, stop)) {
+	        if (!smp_secondary_alive)
+			return;
+		barrier();
+	}
+
+	printk("wait_boot_cpu_to_stop: FAILED on CPU %d, hanging now\n", cpuid);
+	for (;;)
+		barrier();
+}
+
 /*
  * Where secondaries begin a life of C.
  */
@@ -130,6 +146,11 @@ void __init
 smp_callin(void)
 {
 	int cpuid = hard_smp_processor_id();
+
+	if (current != init_tasks[cpu_number_map(cpuid)]) {
+		printk("BUG: smp_calling: cpu %d current %p init_tasks[cpu_number_map(cpuid)] %p\n",
+		       cpuid, current, init_tasks[cpu_number_map(cpuid)]);
+	}
 
 	DBGS(("CALLIN %d state 0x%lx\n", cpuid, current->state));
 
@@ -154,12 +175,22 @@ smp_callin(void)
 
 	/* Must have completely accurate bogos.  */
 	__sti();
-	calibrate_delay();
-	smp_store_cpu_info(cpuid);
 
-	/* Allow master to continue. */
+	/*
+	 * Wait boot CPU to stop with irq enabled before
+	 * running calibrate_delay().
+	 */
+	wait_boot_cpu_to_stop(cpuid);
+	mb();
+	calibrate_delay();
+
+	smp_store_cpu_info(cpuid);
+	/*
+	 * Allow master to continue only after we written
+	 * the loops_per_jiffy.
+	 */
 	wmb();
-	smp_secondary_alive = cpuid;
+	smp_secondary_alive = 1;
 
 	/* Wait for the go code.  */
 	while (!smp_threads_ready)
@@ -203,6 +234,7 @@ smp_tune_scheduling (void)
 		break;
 
 	case EV6_CPU:
+	case EV67_CPU:
 		on_chip_cache = 64 + 64;
 		break;
 
@@ -246,7 +278,7 @@ send_secondary_console_msg(char *str, int cpuid)
 		 + hwrpb->processor_offset
 		 + cpuid * hwrpb->processor_size);
 
-	cpumask = (1L << cpuid);
+	cpumask = (1UL << cpuid);
 	if (hwrpb->txrdy & cpumask)
 		goto delay1;
 	ready1:
@@ -267,8 +299,8 @@ send_secondary_console_msg(char *str, int cpuid)
 	return;
 
 delay1:
-	/* Wait one second.  Note that jiffies aren't ticking yet.  */
-	for (timeout = 100000; timeout > 0; --timeout) {
+	/* Wait 10 seconds.  Note that jiffies aren't ticking yet.  */
+	for (timeout = 1000000; timeout > 0; --timeout) {
 		if (!(hwrpb->txrdy & cpumask))
 			goto ready1;
 		udelay(10);
@@ -277,8 +309,8 @@ delay1:
 	goto timeout;
 
 delay2:
-	/* Wait one second.  */
-	for (timeout = 100000; timeout > 0; --timeout) {
+	/* Wait 10 seconds.  */
+	for (timeout = 1000000; timeout > 0; --timeout) {
 		if (!(hwrpb->txrdy & cpumask))
 			goto ready2;
 		udelay(10);
@@ -307,7 +339,7 @@ recv_secondary_console_msg(void)
 	mycpu = hard_smp_processor_id();
 
 	for (i = 0; i < NR_CPUS; i++) {
-		if (!(txrdy & (1L << i)))
+		if (!(txrdy & (1UL << i)))
 			continue;
 
 		DBGS(("recv_secondary_console_msg: "
@@ -375,7 +407,7 @@ secondary_cpu_start(int cpuid, struct task_struct *idle)
 
 #if 0
 	DBGS(("KSP 0x%lx PTBR 0x%lx VPTBR 0x%lx UNIQUE 0x%lx\n",
-	      hwpcb->ksp, hwpcb->ptbr, hwrpb->vptb, hwcpb->unique));
+	      hwpcb->ksp, hwpcb->ptbr, hwrpb->vptb, hwpcb->unique));
 #endif
 	DBGS(("Starting secondary cpu %d: state 0x%lx pal_flags 0x%lx\n",
 	      cpuid, idle->state, idle->thread.pal_flags));
@@ -398,9 +430,9 @@ secondary_cpu_start(int cpuid, struct task_struct *idle)
 
 	send_secondary_console_msg("START\r\n", cpuid);
 
-	/* Wait 1 second for an ACK from the console.  Note that jiffies 
+	/* Wait 10 seconds for an ACK from the console.  Note that jiffies 
 	   aren't ticking yet.  */
-	for (timeout = 100000; timeout > 0; timeout--) {
+	for (timeout = 1000000; timeout > 0; timeout--) {
 		if (cpu->flags & 1)
 			goto started;
 		udelay(10);
@@ -447,6 +479,8 @@ smp_boot_one_cpu(int cpuid, int cpunum)
 	idle = init_task.prev_task;
 	if (!idle)
 		panic("No idle process for CPU %d", cpuid);
+	if (idle == &init_task)
+		panic("idle process is init_task for CPU %d", cpuid);
 
 	idle->processor = cpuid;
 	__cpu_logical_map[cpunum] = cpuid;
@@ -468,10 +502,14 @@ smp_boot_one_cpu(int cpuid, int cpunum)
 	if (secondary_cpu_start(cpuid, idle))
 		return -1;
 
+	mb();
+	/* Notify the secondary CPU it can run calibrate_delay() */
+	smp_secondary_alive = 0;
+
 	/* We've been acked by the console; wait one second for the task
 	   to start up for real.  Note that jiffies aren't ticking yet.  */
-	for (timeout = 0; timeout < 100000; timeout++) {
-		if (smp_secondary_alive != -1)
+	for (timeout = 0; timeout < 1000000; timeout++) {
+		if (smp_secondary_alive == 1)
 			goto alive;
 		udelay(10);
 		barrier();
@@ -523,7 +561,7 @@ setup_smp(void)
 			if ((cpu->flags & 0x1cc) == 0x1cc) {
 				smp_num_probed++;
 				/* Assume here that "whami" == index */
-				hwrpb_cpu_present_mask |= (1L << i);
+				hwrpb_cpu_present_mask |= (1UL << i);
 				cpu->pal_revision = boot_cpu_palrev;
 			}
 
@@ -534,9 +572,9 @@ setup_smp(void)
 		}
 	} else {
 		smp_num_probed = 1;
-		hwrpb_cpu_present_mask = (1L << boot_cpuid);
+		hwrpb_cpu_present_mask = (1UL << boot_cpuid);
 	}
-	cpu_present_mask = 1L << boot_cpuid;
+	cpu_present_mask = 1UL << boot_cpuid;
 
 	printk(KERN_INFO "SMP: %d CPUs probed -- cpu_present_mask = %lx\n",
 	       smp_num_probed, hwrpb_cpu_present_mask);
@@ -589,7 +627,7 @@ smp_boot_cpus(void)
 		if (smp_boot_one_cpu(i, cpu_count))
 			continue;
 
-		cpu_present_mask |= 1L << i;
+		cpu_present_mask |= 1UL << i;
 		cpu_count++;
 	}
 
@@ -600,7 +638,7 @@ smp_boot_cpus(void)
 
 	bogosum = 0;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_present_mask & (1L << i))
+		if (cpu_present_mask & (1UL << i))
 			bogosum += cpu_data[i].loops_per_jiffy;
 	}
 	printk(KERN_INFO "SMP: Total of %d processors activated "
@@ -798,13 +836,13 @@ smp_send_reschedule(int cpu)
 		printk(KERN_WARNING
 		       "smp_send_reschedule: Sending IPI to self.\n");
 #endif
-	send_ipi_message(1L << cpu, IPI_RESCHEDULE);
+	send_ipi_message(1UL << cpu, IPI_RESCHEDULE);
 }
 
 void
 smp_send_stop(void)
 {
-	unsigned long to_whom = cpu_present_mask ^ (1L << smp_processor_id());
+	unsigned long to_whom = cpu_present_mask ^ (1UL << smp_processor_id());
 #if DEBUG_IPI_MSG
 	if (hard_smp_processor_id() != boot_cpu_id)
 		printk(KERN_WARNING "smp_send_stop: Not on boot cpu.\n");
@@ -827,7 +865,7 @@ smp_send_stop(void)
 int
 smp_call_function (void (*func) (void *info), void *info, int retry, int wait)
 {
-	unsigned long to_whom = cpu_present_mask ^ (1L << smp_processor_id());
+	unsigned long to_whom = cpu_present_mask ^ (1UL << smp_processor_id());
 	struct smp_call_struct data;
 	long timeout;
 	
@@ -1060,7 +1098,7 @@ debug_spin_lock(spinlock_t * lock, const char *base_file, int line_no)
 	int printed = 0;
 	int cpu = smp_processor_id();
 
-	stuck = 1L << 28;
+	stuck = 1L << 30;
  try_again:
 
 	/* Use sub-sections to put the actual loop at the end
@@ -1137,8 +1175,8 @@ void write_lock(rwlock_t * lock)
 
  try_again:
 
-	stuck_lock = 1<<26;
-	stuck_reader = 1<<26;
+	stuck_lock = 1<<30;
+	stuck_reader = 1<<30;
 
 	__asm__ __volatile__(
 	"1:	ldl_l	%1,%0\n"
@@ -1182,7 +1220,7 @@ void read_lock(rwlock_t * lock)
 
  try_again:
 
-	stuck_lock = 1<<26;
+	stuck_lock = 1<<30;
 
 	__asm__ __volatile__(
 	"1:	ldl_l	%1,%0;"

@@ -79,6 +79,23 @@ static __inline__ void clear_bit(int nr, volatile void * addr)
 #define smp_mb__after_clear_bit()	barrier()
 
 /**
+ * __change_bit - Toggle a bit in memory
+ * @nr: the bit to set
+ * @addr: the address to start counting from
+ *
+ * Unlike change_bit(), this function is non-atomic and may be reordered.
+ * If it's called on the same region of memory simultaneously, the effect
+ * may be that only one operation succeeds.
+ */
+static __inline__ void __change_bit(int nr, volatile void * addr)
+{
+	__asm__ __volatile__(
+		"btcl %1,%0"
+		:"=m" (ADDR)
+		:"Ir" (nr));
+}
+
+/**
  * change_bit - Toggle a bit in memory
  * @nr: Bit to clear
  * @addr: Address to start counting from
@@ -170,6 +187,18 @@ static __inline__ int __test_and_clear_bit(int nr, volatile void * addr)
 		"btrl %2,%1\n\tsbbl %0,%0"
 		:"=r" (oldbit),"=m" (ADDR)
 		:"Ir" (nr));
+	return oldbit;
+}
+
+/* WARNING: non atomic and it can be reordered! */
+static __inline__ int __test_and_change_bit(int nr, volatile void * addr)
+{
+	int oldbit;
+
+	__asm__ __volatile__(
+		"btcl %2,%1\n\tsbbl %0,%0"
+		:"=r" (oldbit),"=m" (ADDR)
+		:"Ir" (nr) : "memory");
 	return oldbit;
 }
 

@@ -908,10 +908,10 @@ do {	\
 extern int register_filesystem(struct file_system_type *);
 extern int unregister_filesystem(struct file_system_type *);
 extern struct vfsmount *kern_mount(struct file_system_type *);
-extern void kern_umount(struct vfsmount *);
 extern int may_umount(struct vfsmount *);
 extern long do_mount(char *, char *, char *, unsigned long, void *);
 
+#define kern_umount mntput
 
 extern int vfs_statfs(struct super_block *, struct statfs *);
 

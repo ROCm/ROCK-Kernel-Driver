@@ -16,7 +16,7 @@
 
 typedef struct free_area_struct {
 	struct list_head	free_list;
-	unsigned int		*map;
+	unsigned long		*map;
 } free_area_t;
 
 struct pglist_data;
@@ -34,7 +34,6 @@ typedef struct zone_struct {
 	 * Commonly accessed fields:
 	 */
 	spinlock_t		lock;
-	unsigned long		offset;
 	unsigned long		free_pages;
 	unsigned long		inactive_clean_pages;
 	unsigned long		inactive_dirty_pages;
@@ -47,17 +46,18 @@ typedef struct zone_struct {
 	free_area_t		free_area[MAX_ORDER];
 
 	/*
+	 * Discontig memory support fields.
+	 */
+	struct pglist_data	*zone_pgdat;
+	struct page		*zone_mem_map;
+	unsigned long		zone_start_paddr;
+	unsigned long		zone_start_mapnr;
+
+	/*
 	 * rarely used fields:
 	 */
 	char			*name;
 	unsigned long		size;
-	/*
-	 * Discontig memory support fields.
-	 */
-	struct pglist_data	*zone_pgdat;
-	unsigned long		zone_start_paddr;
-	unsigned long		zone_start_mapnr;
-	struct page		*zone_mem_map;
 } zone_t;
 
 #define ZONE_DMA		0
@@ -81,7 +81,7 @@ typedef struct zonelist_struct {
 	int gfp_mask;
 } zonelist_t;
 
-#define NR_GFPINDEX		0x100
+#define NR_GFPINDEX		0x20
 
 /*
  * The pg_data_t structure is used in machines with CONFIG_DISCONTIGMEM
@@ -112,8 +112,7 @@ extern int numnodes;
 extern pg_data_t *pgdat_list;
 
 #define memclass(pgzone, tzone)	(((pgzone)->zone_pgdat == (tzone)->zone_pgdat) \
-			&& (((pgzone) - (pgzone)->zone_pgdat->node_zones) <= \
-			((tzone) - (pgzone)->zone_pgdat->node_zones)))
+			&& ((pgzone) <= (tzone)))
 
 /*
  * The following two are not meant for general usage. They are here as

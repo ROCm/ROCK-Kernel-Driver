@@ -9,6 +9,7 @@
  * in <asm/page.h> (currently 8192).
  */
 #include <linux/config.h>
+#include <linux/mmzone.h>
 
 #include <asm/page.h>
 #include <asm/processor.h>	/* For TASK_SIZE */
@@ -189,6 +190,15 @@ extern unsigned long __zero_page(void);
  * Conversion functions:  convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  */
+#ifndef CONFIG_DISCONTIGMEM
+#define PAGE_TO_PA(page)	((page - mem_map) << PAGE_SHIFT)
+#else
+#define PAGE_TO_PA(page) \
+		((((page)-(page)->zone->zone_mem_map) << PAGE_SHIFT) \
+		+ (page)->zone->zone_start_paddr)
+#endif
+
+#ifndef CONFIG_DISCONTIGMEM
 #define mk_pte(page, pgprot)						\
 ({									\
 	pte_t pte;							\
@@ -197,6 +207,19 @@ extern unsigned long __zero_page(void);
 		       pgprot_val(pgprot);				\
 	pte;								\
 })
+#else
+#define mk_pte(page, pgprot)							\
+({										\
+	pte_t pte;								\
+	unsigned long pfn;							\
+										\
+	pfn = ((unsigned long)((page)-(page)->zone->zone_mem_map)) << 32;	\
+	pfn += (page)->zone->zone_start_paddr << (32-PAGE_SHIFT);		\
+	pte_val(pte) = pfn | pgprot_val(pgprot);				\
+										\
+	pte;									\
+})
+#endif
 
 extern inline pte_t mk_pte_phys(unsigned long physpage, pgprot_t pgprot)
 { pte_t pte; pte_val(pte) = (PHYS_TWIDDLE(physpage) << (32-PAGE_SHIFT)) | pgprot_val(pgprot); return pte; }
@@ -210,7 +233,20 @@ extern inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
 extern inline void pgd_set(pgd_t * pgdp, pmd_t * pmdp)
 { pgd_val(*pgdp) = _PAGE_TABLE | ((((unsigned long) pmdp) - PAGE_OFFSET) << (32-PAGE_SHIFT)); }
 
+#ifndef CONFIG_DISCONTIGMEM
 #define pte_page(x)	(mem_map+(unsigned long)((pte_val(x) >> 32)))
+#else
+#define pte_page(x)							\
+({									\
+	unsigned long kvirt;						\
+	struct page * __xx;						\
+									\
+	kvirt = (unsigned long)__va(pte_val(x) >> (32-PAGE_SHIFT));	\
+	__xx = virt_to_page(kvirt);					\
+									\
+	__xx;								\
+})
+#endif
 
 extern inline unsigned long pmd_page(pmd_t pmd)
 { return PAGE_OFFSET + ((pmd_val(pmd) & _PFN_MASK) >> (32-PAGE_SHIFT)); }
@@ -303,7 +339,10 @@ extern inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 
 /* Needs to be defined here and not in linux/mm.h, as it is arch dependent */
 #define PageSkip(page)		(0)
+
+#ifndef CONFIG_DISCONTIGMEM
 #define kern_addr_valid(addr)	(1)
+#endif
 
 #define io_remap_page_range(start, busaddr, size, prot) \
 	remap_page_range(start, virt_to_phys(__ioremap(busaddr)), size, prot)

@@ -298,7 +298,7 @@ static void raid1_shrink_buffers (raid1_conf_t *conf)
 	md_spin_unlock_irq(&conf->device_lock);
 }
 
-static int raid1_map (mddev_t *mddev, kdev_t *rdev, unsigned long size)
+static int raid1_map (mddev_t *mddev, kdev_t *rdev)
 {
 	raid1_conf_t *conf = mddev_to_conf(mddev);
 	int i, disks = MD_SB_DISKS;
@@ -602,7 +602,7 @@ static int raid1_make_request (mddev_t *mddev, int rw,
 
 		bh_req = &r1_bh->bh_req;
 		memcpy(bh_req, bh, sizeof(*bh));
-		bh_req->b_blocknr = bh->b_rsector / sectors;
+		bh_req->b_blocknr = bh->b_rsector;
 		bh_req->b_dev = mirror->dev;
 		bh_req->b_rdev = mirror->dev;
 	/*	bh_req->b_rsector = bh->n_rsector; */
@@ -646,7 +646,7 @@ static int raid1_make_request (mddev_t *mddev, int rw,
  	/*
  	 * prepare mirrored mbh (fields ordered for max mem throughput):
  	 */
-		mbh->b_blocknr    = bh->b_rsector / sectors;
+		mbh->b_blocknr    = bh->b_rsector;
 		mbh->b_dev        = conf->mirrors[i].dev;
 		mbh->b_rdev	  = conf->mirrors[i].dev;
 		mbh->b_rsector	  = bh->b_rsector;
@@ -1138,7 +1138,6 @@ static void raid1d (void *data)
 				int disks = MD_SB_DISKS;
 				struct buffer_head *bhl, *mbh;
 				raid1_conf_t *conf;
-				int sectors = bh->b_size >> 9;
 				
 				conf = mddev_to_conf(mddev);
 				bhl = raid1_alloc_bh(conf, conf->raid_disks); /* don't really need this many */
@@ -1168,7 +1167,7 @@ static void raid1d (void *data)
 					mbh->b_blocknr    = bh->b_blocknr;
 					mbh->b_dev        = conf->mirrors[i].dev;
 					mbh->b_rdev	  = conf->mirrors[i].dev;
-					mbh->b_rsector	  = bh->b_blocknr * sectors;
+					mbh->b_rsector	  = bh->b_blocknr;
 					mbh->b_state      = (1<<BH_Req) | (1<<BH_Dirty) |
 						(1<<BH_Mapped) | (1<<BH_Lock);
 					atomic_set(&mbh->b_count, 1);
@@ -1195,7 +1194,7 @@ static void raid1d (void *data)
 				}
 			} else {
 				dev = bh->b_dev;
-				raid1_map (mddev, &bh->b_dev, bh->b_size >> 9);
+				raid1_map (mddev, &bh->b_dev);
 				if (bh->b_dev == dev) {
 					printk (IO_ERROR, partition_name(bh->b_dev), bh->b_blocknr);
 					md_done_sync(mddev, bh->b_size>>9, 0);
@@ -1203,6 +1202,7 @@ static void raid1d (void *data)
 					printk (REDIRECT_SECTOR,
 						partition_name(bh->b_dev), bh->b_blocknr);
 					bh->b_rdev = bh->b_dev;
+					bh->b_rsector = bh->b_blocknr; 
 					generic_make_request(READ, bh);
 				}
 			}
@@ -1211,8 +1211,7 @@ static void raid1d (void *data)
 		case READ:
 		case READA:
 			dev = bh->b_dev;
-		
-			raid1_map (mddev, &bh->b_dev, bh->b_size >> 9);
+			raid1_map (mddev, &bh->b_dev);
 			if (bh->b_dev == dev) {
 				printk (IO_ERROR, partition_name(bh->b_dev), bh->b_blocknr);
 				raid1_end_bh_io(r1_bh, 0);
@@ -1220,6 +1219,7 @@ static void raid1d (void *data)
 				printk (REDIRECT_SECTOR,
 					partition_name(bh->b_dev), bh->b_blocknr);
 				bh->b_rdev = bh->b_dev;
+				bh->b_rsector = bh->b_blocknr;
 				generic_make_request (r1_bh->cmd, bh);
 			}
 			break;
@@ -1313,6 +1313,7 @@ static int raid1_sync_request (mddev_t *mddev, unsigned long sector_nr)
 	struct buffer_head *bh;
 	int bsize;
 	int disk;
+	int block_nr;
 
 	spin_lock_irq(&conf->segment_lock);
 	if (!sector_nr) {
@@ -1383,11 +1384,11 @@ static int raid1_sync_request (mddev_t *mddev, unsigned long sector_nr)
 	r1_bh->cmd = SPECIAL;
 	bh = &r1_bh->bh_req;
 
-	bh->b_blocknr = sector_nr;
+	block_nr = sector_nr;
 	bsize = 512;
-	while (!(bh->b_blocknr & 1) && bsize < PAGE_SIZE
-			&& (bh->b_blocknr+2)*(bsize>>9) < (mddev->sb->size *2)) {
-		bh->b_blocknr >>= 1;
+	while (!(block_nr & 1) && bsize < PAGE_SIZE
+			&& (block_nr+2)*(bsize>>9) < (mddev->sb->size *2)) {
+		block_nr >>= 1;
 		bsize <<= 1;
 	}
 	bh->b_size = bsize;
@@ -1403,6 +1404,7 @@ static int raid1_sync_request (mddev_t *mddev, unsigned long sector_nr)
 		BUG();
 	bh->b_end_io = end_sync_read;
 	bh->b_private = r1_bh;
+	bh->b_blocknr = sector_nr;
 	bh->b_rsector = sector_nr;
 	init_waitqueue_head(&bh->b_wait);
 
@@ -1440,7 +1442,7 @@ static void end_sync_write(struct buffer_head *bh, int uptodate)
  		md_error (r1_bh->mddev, bh->b_dev);
 	if (atomic_dec_and_test(&r1_bh->remaining)) {
 		mddev_t *mddev = r1_bh->mddev;
- 		unsigned long sect = bh->b_blocknr * (bh->b_size>>9);
+ 		unsigned long sect = bh->b_blocknr;
 		int size = bh->b_size;
 		raid1_free_buf(r1_bh);
 		sync_request_done(sect, mddev_to_conf(mddev));

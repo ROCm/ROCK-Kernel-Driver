@@ -336,8 +336,9 @@ static int camera_release (struct inode *inode, struct file *file)
 	if (!camera->dev) {
 		minor_data [subminor] = NULL;
 		kfree (camera);
-	}
-	up (&camera->sem);
+	} else
+		up (&camera->sem);
+	
 	up (&state_table_mutex);
 
 	dbg ("close #%d", subminor); 
@@ -397,7 +398,6 @@ camera_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_devic
 	}
 	if (i >= MAX_CAMERAS) {
 		info ("Ignoring additional USB Camera");
-		up (&state_table_mutex);
 		goto bye;
 	}
 
@@ -405,7 +405,6 @@ camera_probe (struct usb_device *dev, unsigned int ifnum, const struct usb_devic
 	camera = minor_data [i] = kmalloc (sizeof *camera, GFP_KERNEL);
 	if (!camera) {
 		err ("no memory!");
-		up (&state_table_mutex);
 		goto bye;
 	}
 
@@ -472,13 +471,15 @@ static void camera_disconnect(struct usb_device *dev, void *ptr)
 	if (!camera->buf) {
 		minor_data [subminor] = NULL;
 		kfree (camera);
+		camera = NULL;
 	} else
 		camera->dev = NULL;
 
 	info ("USB Camera #%d disconnected", subminor);
 	usb_dec_dev_use (dev);
 
-	up (&camera->sem);
+	if (camera != NULL)
+		up (&camera->sem);
 	up (&state_table_mutex);
 }
 

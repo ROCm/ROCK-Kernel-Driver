@@ -1,6 +1,8 @@
 #ifndef _ALPHA_PAGE_H
 #define _ALPHA_PAGE_H
 
+#include <asm/pal.h>
+
 /* PAGE_SHIFT determines the page size */
 #define PAGE_SHIFT	13
 #define PAGE_SIZE	(1UL << PAGE_SHIFT)
@@ -33,6 +35,7 @@ typedef struct { unsigned long pgprot; } pgprot_t;
 #define pgprot_val(x)	((x).pgprot)
 
 #define __pte(x)	((pte_t) { (x) } )
+#define __pmd(x)	((pmd_t) { (x) } )
 #define __pgd(x)	((pgd_t) { (x) } )
 #define __pgprot(x)	((pgprot_t) { (x) } )
 
@@ -56,7 +59,11 @@ typedef unsigned long pgprot_t;
 
 #endif /* STRICT_MM_TYPECHECKS */
 
-#define BUG()		__asm__ __volatile__("call_pal 129 # bugchk")
+#define BUG()									\
+do {										\
+	printk("kernel BUG at %s:%d!\n", __FILE__, __LINE__);			\
+	__asm__ __volatile__("call_pal %0  # bugchk" : : "i" (PAL_bugchk));	\
+} while (0)
 #define PAGE_BUG(page)	BUG()
 
 /* Pure 2^n version of get_order */
@@ -86,8 +93,10 @@ extern __inline__ int get_order(unsigned long size)
 
 #define __pa(x)			((unsigned long) (x) - PAGE_OFFSET)
 #define __va(x)			((void *)((unsigned long) (x) + PAGE_OFFSET))
+#ifndef CONFIG_DISCONTIGMEM
 #define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))
-#define VALID_PAGE(page)	((page - mem_map) < max_mapnr)
+#define VALID_PAGE(page)	(((page) - mem_map) < max_mapnr)
+#endif /* CONFIG_DISCONTIGMEM */
 
 #endif /* __KERNEL__ */
 

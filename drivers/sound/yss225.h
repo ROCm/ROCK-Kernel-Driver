@@ -20,5 +20,5 @@ extern unsigned char coefficients2[56];
 extern unsigned char coefficients3[404];
 
 
-#endif __ys225_h__
+#endif /* __ys225_h__ */
 

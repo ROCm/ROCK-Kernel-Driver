@@ -1051,8 +1051,8 @@ static void handle_stripe(struct stripe_head *sh)
 			action[failed_num] = WRITE+1;
 			locked++;
 			set_bit(STRIPE_INSYNC, &sh->state);
-			if (conf->disks[i].operational)
-				md_sync_acct(conf->disks[i].dev, bh->b_size>>9);
+			if (conf->disks[failed_num].operational)
+				md_sync_acct(conf->disks[failed_num].dev, bh->b_size>>9);
 			else if (conf->spare)
 				md_sync_acct(conf->spare->dev, bh->b_size>>9);
 

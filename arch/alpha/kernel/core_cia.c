@@ -308,66 +308,29 @@ cia_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 }
 
 /*
- * Fixup attempt number 1.
- *
- * Write zeros directly into the tag registers.
+ * On PYXIS, even if the tbia works, we cannot use it. It effectively locks
+ * the chip (as well as direct write to the tag registers) if there is a
+ * SG DMA operation in progress. This is true at least for PYXIS rev. 1,
+ * so always use the method below.
  */
-
-static void
-cia_pci_tbi_try1(struct pci_controller *hose,
-		 dma_addr_t start, dma_addr_t end)
-{
-	wmb();
-	*(vip)CIA_IOC_TB_TAGn(0) = 0;
-	*(vip)CIA_IOC_TB_TAGn(1) = 0;
-	*(vip)CIA_IOC_TB_TAGn(2) = 0;
-	*(vip)CIA_IOC_TB_TAGn(3) = 0;
-	*(vip)CIA_IOC_TB_TAGn(4) = 0;
-	*(vip)CIA_IOC_TB_TAGn(5) = 0;
-	*(vip)CIA_IOC_TB_TAGn(6) = 0;
-	*(vip)CIA_IOC_TB_TAGn(7) = 0;
-	mb();
-	*(vip)CIA_IOC_TB_TAGn(0);
-}
-
-#if 0
 /*
- * Fixup attempt number 2.  This is the method NT and NetBSD use.
+ * This is the method NT and NetBSD use.
  *
  * Allocate mappings, and put the chip into DMA loopback mode to read a
  * garbage page.  This works by causing TLB misses, causing old entries to
  * be purged to make room for the new entries coming in for the garbage page.
  */
 
-#define CIA_BROKEN_TBI_TRY2_BASE	0xE0000000
+#define CIA_BROKEN_TBIA_BASE	0xE0000000
+#define CIA_BROKEN_TBIA_SIZE	1024
 
-static void __init
-cia_enable_broken_tbi_try2(void)
-{
-	unsigned long *ppte, pte;
-	long i;
-
-	ppte = __alloc_bootmem(PAGE_SIZE, 32768, 0);
-	pte = (virt_to_phys(ppte) >> (PAGE_SHIFT - 1)) | 1;
-
-	for (i = 0; i < PAGE_SIZE / sizeof(unsigned long); ++i)
-		ppte[i] = pte;
-
-	*(vip)CIA_IOC_PCI_W3_BASE = CIA_BROKEN_TBI_TRY2_BASE | 3;
-	*(vip)CIA_IOC_PCI_W3_MASK = (PAGE_SIZE - 1) & 0xfff00000;
-	*(vip)CIA_IOC_PCI_T3_BASE = virt_to_phys(ppte) >> 2;
-}
-
-static void
+/* Always called with interrupts disabled */
+void
 cia_pci_tbi_try2(struct pci_controller *hose,
 		 dma_addr_t start, dma_addr_t end)
 {
-	unsigned long flags;
 	unsigned long bus_addr;
 	int ctrl;
-	long i;
-
-	__save_and_cli(flags);
 
 	/* Put the chip into PCI loopback mode.  */
 	mb();
@@ -382,10 +345,19 @@ cia_pci_tbi_try2(struct pci_controller *hose,
 	   TLB entries are not quite LRU, meaning that we need to read more
 	   times than there are actual tags.  The 2117x docs claim strict
 	   round-robin.  Oh well, we've come this far...  */
+	/* Even better - as seen on the PYXIS rev 1 the TLB tags 0-3 can
+	   be filled by the TLB misses *only once* after being invalidated
+	   (by tbia or direct write). Next misses won't update them even
+	   though the lock bits are cleared. Tags 4-7 are "quite LRU" though,
+	   so use them and read at window 3 base exactly 4 times. Reading
+	   more sometimes makes the chip crazy.  -ink */
 
-	bus_addr = cia_ioremap(CIA_BROKEN_TBI_TRY2_BASE);
-	for (i = 0; i < 12; ++i, bus_addr += 32768)
-		cia_readl(bus_addr);
+	bus_addr = cia_ioremap(CIA_BROKEN_TBIA_BASE);
+
+	cia_readl(bus_addr + 0x00000);
+	cia_readl(bus_addr + 0x08000);
+	cia_readl(bus_addr + 0x10000);
+	cia_readl(bus_addr + 0x18000);
 
 	/* Restore normal PCI operation.  */
 	mb();
@@ -393,10 +365,26 @@ cia_pci_tbi_try2(struct pci_controller *hose,
 	mb();
 	*(vip)CIA_IOC_CIA_CTRL;
 	mb();
-
-	__restore_flags(flags);
 }
-#endif
+
+static inline void
+cia_prepare_tbia_workaround(void)
+{
+	unsigned long *ppte, pte;
+	long i;
+
+	/* Use minimal 1K map. */
+	ppte = __alloc_bootmem(CIA_BROKEN_TBIA_SIZE, 32768, 0);
+	pte = (virt_to_phys(ppte) >> (PAGE_SHIFT - 1)) | 1;
+
+	for (i = 0; i < CIA_BROKEN_TBIA_SIZE / sizeof(unsigned long); ++i)
+		ppte[i] = pte;
+
+	*(vip)CIA_IOC_PCI_W3_BASE = CIA_BROKEN_TBIA_BASE | 3;
+	*(vip)CIA_IOC_PCI_W3_MASK = (CIA_BROKEN_TBIA_SIZE*1024 - 1)
+				    & 0xfff00000;
+	*(vip)CIA_IOC_PCI_T3_BASE = virt_to_phys(ppte) >> 2;
+}
 
 static void __init
 verify_tb_operation(void)
@@ -407,7 +395,11 @@ verify_tb_operation(void)
 
 	struct pci_iommu_arena *arena = pci_isa_hose->sg_isa;
 	int ctrl, addr0, tag0, pte0, data0;
-	int temp;
+	int temp, use_tbia_try2 = 0;
+
+	/* pyxis -- tbia is broken */
+	if (pci_isa_hose->dense_io_base)
+		use_tbia_try2 = 1;
 
 	/* Put the chip into PCI loopback mode.  */
 	mb();
@@ -489,22 +481,15 @@ verify_tb_operation(void)
 
 	/* Third, try to invalidate the TLB.  */
 
-	cia_pci_tbi(arena->hose, 0, -1);
-	temp = *(vip)CIA_IOC_TB_TAGn(0);
-	if (temp & 1) {
-		cia_pci_tbi_try1(arena->hose, 0, -1);
-	
+	if (! use_tbia_try2) {
+		cia_pci_tbi(arena->hose, 0, -1);
 		temp = *(vip)CIA_IOC_TB_TAGn(0);
 		if (temp & 1) {
-			printk("pci: failed tbia test; "
-			       "no usable workaround\n");
-			goto failed;
+			use_tbia_try2 = 1;
+			printk("pci: failed tbia test; workaround available\n");
+		} else {
+			printk("pci: passed tbia test\n");
 		}
-
-		alpha_mv.mv_pci_tbi = cia_pci_tbi_try1;
-		printk("pci: failed tbia test; workaround 1 succeeded\n");
-	} else {
-		printk("pci: passed tbia test\n");
 	}
 
 	/* Fourth, verify the TLB snoops the EV5's caches when
@@ -574,6 +559,19 @@ verify_tb_operation(void)
 	/* Clean up after the tests.  */
 	arena->ptes[4] = 0;
 	arena->ptes[5] = 0;
+
+	if (use_tbia_try2) {
+		alpha_mv.mv_pci_tbi = cia_pci_tbi_try2;
+
+		/* Tags 0-3 must be disabled if we use this workaraund. */
+		wmb();
+		*(vip)CIA_IOC_TB_TAGn(0) = 2;
+		*(vip)CIA_IOC_TB_TAGn(1) = 2;
+		*(vip)CIA_IOC_TB_TAGn(2) = 2;
+		*(vip)CIA_IOC_TB_TAGn(3) = 2;
+
+		printk("pci: tbia workaround enabled\n");
+	}
 	alpha_mv.mv_pci_tbi(arena->hose, 0, -1);
 
 exit:
@@ -706,7 +704,8 @@ do_init_arch(int is_pyxis)
 	*(vip)CIA_IOC_PCI_W2_MASK = (0x40000000 - 1) & 0xfff00000;
 	*(vip)CIA_IOC_PCI_T2_BASE = 0x40000000 >> 2;
 
-	*(vip)CIA_IOC_PCI_W3_BASE = 0;
+	/* Prepare workaround for apparently broken tbia. */
+	cia_prepare_tbia_workaround();
 }
 
 void __init

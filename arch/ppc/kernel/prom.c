@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prom.c 1.17 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.prom.c 1.20 05/23/01 00:38:42 cort
  */
 /*
  * Procedures for interfacing to the Open Firmware PROM on
@@ -32,7 +32,7 @@
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
 #include <asm/bitops.h>
-/* for openpic_to_irq */
+#include <asm/bootinfo.h>
 #include "open_pic.h"
 
 #ifdef CONFIG_FB
@@ -182,26 +182,6 @@ boot_infos_t *disp_bi;
 boot_infos_t fake_bi;
 #endif
 unsigned long dev_tree_size;
-
-/*
- * prom_init() is called very early on, before the kernel text
- * and data have been mapped to KERNELBASE.  At this point the code
- * is running at whatever address it has been loaded at, so
- * references to extern and static variables must be relocated
- * explicitly.  The procedure reloc_offset() returns the address
- * we're currently running at minus the address we were linked at.
- * (Note that strings count as static variables.)
- *
- * Because OF may have mapped I/O devices into the area starting at
- * KERNELBASE, particularly on CHRP machines, we can't safely call
- * OF once the kernel has been mapped to KERNELBASE.  Therefore all
- * OF calls should be done within prom_init(), and prom_init()
- * and all routines called within it must be careful to relocate
- * references as necessary.
- */
-#define PTRRELOC(x)	((typeof(x))((unsigned long)(x) + offset))
-#define PTRUNRELOC(x)	((typeof(x))((unsigned long)(x) - offset))
-#define RELOC(x)	(*PTRRELOC(&(x)))
 
 #define ALIGN(x) (((x) + sizeof(unsigned long)-1) & -sizeof(unsigned long))
 
@@ -617,29 +597,9 @@ prom_init(int r3, int r4, prom_entry pp)
 	char *p, *d;
 	int prom_version = 0;
  	unsigned long phys;
-	extern char __bss_start, _end;
-
-	/* First zero the BSS -- use memset, some arches don't have
-	 * caches on yet */
-	memset_io(PTRRELOC(&__bss_start),0 , &_end - &__bss_start);
 
  	/* Default */
  	phys = offset + KERNELBASE;
-
-	/* check if we're apus, return if we are */
-	if ( r3 == 0x61707573 )
-		return phys;
-
-	/* If we came here from BootX, clear the screen,
-	 * set up some pointers and return. */
-	if (r3 == 0x426f6f58 && pp == NULL) {
-		bootx_init(r4, phys);
-		return phys;
-	}
-
-	/* check if we're prep, return if we are */
-	if ( *(unsigned long *)(0) == 0xdeadc0de )
-		return phys;
 
 	/* First get a handle for the stdout device */
 	RELOC(prom) = pp;

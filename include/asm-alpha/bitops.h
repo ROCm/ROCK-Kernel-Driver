@@ -46,7 +46,7 @@ __set_bit(unsigned long nr, volatile void * addr)
 {
 	int *m = ((int *) addr) + (nr >> 5);
 
-	*m |= 1UL << (nr & 31);
+	*m |= 1 << (nr & 31);
 }
 
 #define smp_mb__before_clear_bit()	smp_mb()
@@ -68,6 +68,17 @@ clear_bit(unsigned long nr, volatile void * addr)
 	".previous"
 	:"=&r" (temp), "=m" (*m)
 	:"Ir" (~(1UL << (nr & 31))), "m" (*m));
+}
+
+/*
+ * WARNING: non atomic version.
+ */
+static __inline__ void
+__change_bit(unsigned long nr, volatile void * addr)
+{
+	int *m = ((int *) addr) + (nr >> 5);
+
+	*m ^= 1 << (nr & 31);
 }
 
 extern __inline__ void
@@ -167,6 +178,20 @@ __test_and_clear_bit(unsigned long nr, volatile void * addr)
 	int old = *m;
 
 	*m = old & ~mask;
+	return (old & mask) != 0;
+}
+
+/*
+ * WARNING: non atomic version.
+ */
+static __inline__ int
+__test_and_change_bit(unsigned long nr, volatile void * addr)
+{
+	unsigned long mask = 1 << (nr & 0x1f);
+	int *m = ((int *) addr) + (nr >> 5);
+	int old = *m;
+
+	*m = old ^ mask;
 	return (old & mask) != 0;
 }
 

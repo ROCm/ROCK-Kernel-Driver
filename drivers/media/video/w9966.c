@@ -760,7 +760,7 @@ static int w9966_v4l_ioctl(struct video_device *vdev, unsigned int cmd, void *ar
 		if(vtune.tuner != 0);
 			return -EINVAL;
 		
-		strcpy(vtune.name, "Foo-tuner");
+		strcpy(vtune.name, "no tuner");
 		vtune.rangelow = 0;
 		vtune.rangehigh = 0;
 		vtune.flags = VIDEO_TUNER_NORM;

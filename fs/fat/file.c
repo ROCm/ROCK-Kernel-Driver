@@ -54,8 +54,11 @@ ssize_t fat_file_read(
 }
 
 
-int fat_get_block(struct inode *inode, long iblock, struct buffer_head *bh_result, int create) {
+int fat_get_block(struct inode *inode, long iblock, struct buffer_head *bh_result, int create)
+{
+	struct super_block *sb = inode->i_sb;
 	unsigned long phys;
+
 	phys = fat_bmap(inode, iblock);
 	if (phys) {
 		bh_result->b_dev = inode->i_dev;
@@ -65,7 +68,7 @@ int fat_get_block(struct inode *inode, long iblock, struct buffer_head *bh_resul
 	}
 	if (!create)
 		return 0;
-	if (iblock<<9 != MSDOS_I(inode)->mmu_private) {
+	if (iblock << sb->s_blocksize_bits != MSDOS_I(inode)->mmu_private) {
 		BUG();
 		return -EIO;
 	}
@@ -73,8 +76,8 @@ int fat_get_block(struct inode *inode, long iblock, struct buffer_head *bh_resul
 		if (fat_add_cluster(inode))
 			return -ENOSPC;
 	}
-	MSDOS_I(inode)->mmu_private += 512;
-	phys=fat_bmap(inode, iblock);
+	MSDOS_I(inode)->mmu_private += sb->s_blocksize;
+	phys = fat_bmap(inode, iblock);
 	if (!phys)
 		BUG();
 	bh_result->b_dev = inode->i_dev;
@@ -124,7 +127,7 @@ void fat_truncate(struct inode *inode)
 		return /* -EPERM */;
 	if (IS_IMMUTABLE(inode))
 		return /* -EPERM */;
-	cluster = SECTOR_SIZE*sbi->cluster_size;
+	cluster = 1 << sbi->cluster_bits;
 	/* 
 	 * This protects against truncating a file bigger than it was then
 	 * trying to write into the hole.
@@ -132,7 +135,7 @@ void fat_truncate(struct inode *inode)
 	if (MSDOS_I(inode)->mmu_private > inode->i_size)
 		MSDOS_I(inode)->mmu_private = inode->i_size;
 
-	fat_free(inode,(inode->i_size+(cluster-1))>>sbi->cluster_bits);
+	fat_free(inode, (inode->i_size + (cluster - 1)) >> sbi->cluster_bits);
 	MSDOS_I(inode)->i_attrs |= ATTR_ARCH;
 	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 	mark_inode_dirty(inode);

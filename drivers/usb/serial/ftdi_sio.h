@@ -146,7 +146,7 @@ typedef enum {
 #define FTDI_SIO_SET_DATA_STOP_BITS_1 (0x0 << 11 )
 #define FTDI_SIO_SET_DATA_STOP_BITS_15 (0x1 << 11 )
 #define FTDI_SIO_SET_DATA_STOP_BITS_2 (0x2 << 11 )
-
+#define FTDI_SIO_SET_BREAK (0x1 << 14)
 /* FTDI_SIO_SET_DATA */
 
 /*
@@ -170,7 +170,10 @@ typedef enum {
  *           0 = 1
  *           1 = 1.5
  *           2 = 2
- *   B14..15 Reserved
+ *   B14
+ *           1 = TX ON (break)
+ *           0 = TX OFF (normal state)
+ *   B15 Reserved
  *
  */
 
@@ -434,6 +437,17 @@ typedef enum {
  * B6	Transmitter Empty (TEMT)
  * B7	Error in RCVR FIFO
  * 
+ */
+#define FTDI_RS_DR  1
+#define FTDI_RS_OE (1<<1)
+#define FTDI_RS_PE (1<<2)
+#define FTDI_RS_FE (1<<3)
+#define FTDI_RS_BI (1<<4)
+#define FTDI_RS_THRE (1<<5)
+#define FTDI_RS_TEMT (1<<6)
+#define FTDI_RS_FIFO  (1<<7)
+
+/*
  * OUT Endpoint
  * 
  * This device reserves the first bytes of data on this endpoint contain the length

@@ -1,4 +1,4 @@
-/* $Id: sbus.c,v 1.13 2001/02/13 01:16:44 davem Exp $
+/* $Id: sbus.c,v 1.14 2001/05/23 03:06:51 davem Exp $
  * sbus.c: UltraSparc SBUS controller support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -133,7 +133,7 @@ static void strbuf_flush(struct sbus_iommu *iommu, u32 base, unsigned long npage
 
 static iopte_t *alloc_streaming_cluster(struct sbus_iommu *iommu, unsigned long npages)
 {
-	iopte_t *iopte, *limit;
+	iopte_t *iopte, *limit, *first;
 	unsigned long cnum, ent, flush_point;
 
 	cnum = 0;
@@ -150,6 +150,7 @@ static iopte_t *alloc_streaming_cluster(struct sbus_iommu *iommu, unsigned long 
 	iopte += ((ent = iommu->alloc_info[cnum].next) << cnum);
 	flush_point = iommu->alloc_info[cnum].flush;
 
+	first = iopte;
 	for (;;) {
 		if (iopte_val(*iopte) == 0UL) {
 			if ((iopte + (1 << cnum)) >= limit)
@@ -169,10 +170,17 @@ static iopte_t *alloc_streaming_cluster(struct sbus_iommu *iommu, unsigned long 
 		}
 		if (ent == flush_point)
 			__iommu_flushall(iommu);
+		if (iopte == first)
+			goto bad;
 	}
 
 	/* I've got your streaming cluster right here buddy boy... */
 	return iopte;
+
+bad:
+	printk(KERN_EMERG "sbus: alloc_streaming_cluster of npages(%ld) failed!\n",
+	       npages);
+	return NULL;
 }
 
 static void free_streaming_cluster(struct sbus_iommu *iommu, u32 base, unsigned long npages)
@@ -332,6 +340,8 @@ dma_addr_t sbus_map_single(struct sbus_dev *sdev, void *ptr, size_t size, int di
 	spin_lock_irqsave(&iommu->lock, flags);
 	npages = size >> PAGE_SHIFT;
 	iopte = alloc_streaming_cluster(iommu, npages);
+	if (iopte == NULL)
+		goto bad;
 	dma_base = MAP_BASE + ((iopte - iommu->page_table) << PAGE_SHIFT);
 	npages = size >> PAGE_SHIFT;
 	iopte_bits = IOPTE_VALID | IOPTE_STBUF | IOPTE_CACHE;
@@ -345,6 +355,11 @@ dma_addr_t sbus_map_single(struct sbus_dev *sdev, void *ptr, size_t size, int di
 	spin_unlock_irqrestore(&iommu->lock, flags);
 
 	return (dma_base | offset);
+
+bad:
+	spin_unlock_irqrestore(&iommu->lock, flags);
+	BUG();
+	return 0;
 }
 
 void sbus_unmap_single(struct sbus_dev *sdev, dma_addr_t dma_addr, size_t size, int direction)
@@ -455,6 +470,8 @@ int sbus_map_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int di
 
 	spin_lock_irqsave(&iommu->lock, flags);
 	iopte = alloc_streaming_cluster(iommu, npages);
+	if (iopte == NULL)
+		goto bad;
 	dma_base = MAP_BASE + ((iopte - iommu->page_table) << PAGE_SHIFT);
 
 	/* Normalize DVMA addresses. */
@@ -479,6 +496,11 @@ int sbus_map_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int di
 	spin_unlock_irqrestore(&iommu->lock, flags);
 
 	return used;
+
+bad:
+	spin_unlock_irqrestore(&iommu->lock, flags);
+	BUG();
+	return 0;
 }
 
 void sbus_unmap_sg(struct sbus_dev *sdev, struct scatterlist *sg, int nents, int direction)

@@ -33,7 +33,7 @@
 #include <asm/mmu_context.h>
 #include <asm/console.h>
 
-static unsigned long totalram_pages;
+unsigned long totalram_pages;
 
 extern void die_if_kernel(char *,struct pt_regs *,long);
 
@@ -115,6 +115,7 @@ __bad_page(void)
 	return pte_mkdirty(mk_pte(virt_to_page(EMPTY_PGE), PAGE_SHARED));
 }
 
+#ifndef CONFIG_DISCONTIGMEM
 void
 show_mem(void)
 {
@@ -144,6 +145,7 @@ show_mem(void)
 	printk("%ld pages in page table cache\n",pgtable_cache_size);
 	show_buffers();
 }
+#endif
 
 static inline unsigned long
 load_PCB(struct thread_struct * pcb)
@@ -275,6 +277,7 @@ callback_init(void * kernel_end)
 }
 
 
+#ifndef CONFIG_DISCONTIGMEM
 /*
  * paging_init() sets up the memory map.
  */
@@ -287,16 +290,7 @@ paging_init(void)
 	dma_pfn = virt_to_phys((char *)MAX_DMA_ADDRESS) >> PAGE_SHIFT;
 	high_pfn = max_low_pfn;
 
-#define ORDER_MASK (~((1L << (MAX_ORDER-1))-1))
-#define ORDER_ALIGN(n)	(((n) +  ~ORDER_MASK) & ORDER_MASK)
-
-	dma_pfn = ORDER_ALIGN(dma_pfn);
-	high_pfn = ORDER_ALIGN(high_pfn);
-
-#undef ORDER_MASK
-#undef ORDER_ALIGN
-
-	if (dma_pfn > high_pfn)
+	if (dma_pfn >= high_pfn)
 		zones_size[ZONE_DMA] = high_pfn;
 	else {
 		zones_size[ZONE_DMA] = dma_pfn;
@@ -309,6 +303,7 @@ paging_init(void)
 	/* Initialize the kernel's ZERO_PGE. */
 	memset((void *)ZERO_PGE, 0, PAGE_SIZE);
 }
+#endif /* CONFIG_DISCONTIGMEM */
 
 #if defined(CONFIG_ALPHA_GENERIC) || defined(CONFIG_ALPHA_SRM)
 void
@@ -327,6 +322,7 @@ srm_paging_stop (void)
 }
 #endif
 
+#ifndef CONFIG_DISCONTIGMEM
 static void __init
 printk_memory_info(void)
 {
@@ -366,6 +362,7 @@ mem_init(void)
 
 	printk_memory_info();
 }
+#endif /* CONFIG_DISCONTIGMEM */
 
 void
 free_initmem (void)
@@ -388,13 +385,14 @@ free_initmem (void)
 void
 free_initrd_mem(unsigned long start, unsigned long end)
 {
+	unsigned long __start = start;
 	for (; start < end; start += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(start));
 		set_page_count(virt_to_page(start), 1);
 		free_page(start);
 		totalram_pages++;
 	}
-	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
+	printk ("Freeing initrd memory: %ldk freed\n", (end - __start) >> 10);
 }
 #endif
 

@@ -98,6 +98,8 @@ EXPORT_SYMBOL(__free_pages);
 EXPORT_SYMBOL(free_pages);
 #ifndef CONFIG_DISCONTIGMEM
 EXPORT_SYMBOL(contig_page_data);
+#else
+EXPORT_SYMBOL(alloc_pages);
 #endif
 EXPORT_SYMBOL(num_physpages);
 EXPORT_SYMBOL(kmem_find_general_cachep);
@@ -320,7 +322,7 @@ EXPORT_SYMBOL(console_loglevel);
 EXPORT_SYMBOL(register_filesystem);
 EXPORT_SYMBOL(unregister_filesystem);
 EXPORT_SYMBOL(kern_mount);
-EXPORT_SYMBOL(kern_umount);
+EXPORT_SYMBOL(__mntput);
 EXPORT_SYMBOL(may_umount);
 
 /* executable format registration */

@@ -120,8 +120,9 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04b8, 0x0104) },	/* Perfection 1200U and 1200Photo*/
 	{ USB_DEVICE(0x04b8, 0x0106) },	/* Stylus Scan 2500 */
 	{ USB_DEVICE(0x04b8, 0x0107) },	/* Expression 1600 */
-	{ USB_DEVICE(0x04b8, 0x010b) }, /* Perfection 1240U */
 	{ USB_DEVICE(0x04b8, 0x010a) }, /* Perfection 1640SU and 1640SU Photo */
+	{ USB_DEVICE(0x04b8, 0x010b) }, /* Perfection 1240U */
+	{ USB_DEVICE(0x04b8, 0x010c) }, /* Perfection 640U */
 	/* Umax */
 	{ USB_DEVICE(0x1606, 0x0010) },	/* Astra 1220U */
 	{ USB_DEVICE(0x1606, 0x0030) },	/* Astra 2000U */

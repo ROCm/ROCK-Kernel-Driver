@@ -29,6 +29,7 @@ struct cpuinfo_alpha {
 	int need_new_asn;
 	int asn_lock;
 	unsigned long *pgd_cache;
+	unsigned long *pmd_cache;
 	unsigned long *pte_cache;
 	unsigned long pgtable_cache_sz;
 	unsigned long ipi_count;

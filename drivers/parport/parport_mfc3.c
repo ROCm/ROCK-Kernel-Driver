@@ -82,7 +82,7 @@ static struct parport_operations pp_mfc3_ops;
 
 static void mfc3_write_data(struct parport *p, unsigned char data)
 {
-DPRINTK("write_data %c\n",data);
+DPRINTK(KERN_DEBUG "write_data %c\n",data);
 
 	dummy = pia(p)->pprb; /* clears irq bit */
 	/* Triggers also /STROBE.*/
@@ -126,13 +126,13 @@ static unsigned char control_mfc3_to_pc(unsigned char control)
 
 static void mfc3_write_control(struct parport *p, unsigned char control)
 {
-DPRINTK("write_control %02x\n",control);
+DPRINTK(KERN_DEBUG "write_control %02x\n",control);
 	pia(p)->ppra = (pia(p)->ppra & 0x1f) | control_pc_to_mfc3(control);
 }
 	
 static unsigned char mfc3_read_control( struct parport *p)
 {
-DPRINTK("read_control \n");
+DPRINTK(KERN_DEBUG "read_control \n");
 	return control_mfc3_to_pc(pia(p)->ppra & 0xe0);
 }
 
@@ -140,7 +140,7 @@ static unsigned char mfc3_frob_control( struct parport *p, unsigned char mask, u
 {
 	unsigned char old;
 
-DPRINTK("frob_control mask %02x, value %02x\n",mask,val);
+DPRINTK(KERN_DEBUG "frob_control mask %02x, value %02x\n",mask,val);
 	old = mfc3_read_control(p);
 	mfc3_write_control(p, (old & ~mask) ^ val);
 	return old;
@@ -186,7 +186,7 @@ static unsigned char status_mfc3_to_pc(unsigned char status)
 #if 0 /* currently unused */
 static void mfc3_write_status( struct parport *p, unsigned char status)
 {
-DPRINTK("write_status %02x\n",status);
+DPRINTK(KERN_DEBUG "write_status %02x\n",status);
 	pia(p)->ppra = (pia(p)->ppra & 0xe0) | status_pc_to_mfc3(status);
 }
 #endif
@@ -196,7 +196,7 @@ static unsigned char mfc3_read_status(struct parport *p)
 	unsigned char status;
 
 	status = status_mfc3_to_pc(pia(p)->ppra & 0x1f);
-DPRINTK("read_status %02x\n", status);
+DPRINTK(KERN_DEBUG "read_status %02x\n", status);
 	return status;
 }
 
@@ -234,7 +234,7 @@ static void mfc3_disable_irq(struct parport *p)
 
 static void mfc3_data_forward(struct parport *p)
 {
-	DPRINTK("forward\n");
+	DPRINTK(KERN_DEBUG "forward\n");
 	pia(p)->crb &= ~PIA_DDR; /* make data direction register visible */
 	pia(p)->pddrb = 255; /* all pins output */
 	pia(p)->crb |= PIA_DDR; /* make data register visible - default */
@@ -242,7 +242,7 @@ static void mfc3_data_forward(struct parport *p)
 
 static void mfc3_data_reverse(struct parport *p)
 {
-	DPRINTK("reverse\n");
+	DPRINTK(KERN_DEBUG "reverse\n");
 	pia(p)->crb &= ~PIA_DDR; /* make data direction register visible */
 	pia(p)->pddrb = 0; /* all pins input */
 	pia(p)->crb |= PIA_DDR; /* make data register visible - default */

@@ -54,7 +54,7 @@ int vm_enough_memory(long pages)
 	 * of num_physpages for safety margin.
 	 */
 
-	long free;
+	unsigned long free;
 	
         /* Sometimes we want to use more memory than we have. */
 	if (sysctl_overcommit_memory)

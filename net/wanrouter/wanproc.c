@@ -267,8 +267,10 @@ typedef struct wan_stat_entry
 		offs = file->f_pos;
 		if (offs < pos) {
 			len = min(pos - offs, count);
-			if(copy_to_user(buf, (page + offs), len))
+			if (copy_to_user(buf, (page + offs), len)) {
+				kfree(page);
 				return -EFAULT;
+			}
 			file->f_pos += len;
 		}
 		else

@@ -100,9 +100,9 @@ Here are the installation steps in detail:
 	you will see login prompts appear on your 3270s as soon as
 	boot is complete (or with emulated 3270s, as soon as you dial
 	into your vm guest using the command "DIAL <vmguestname>").
-	Since the line-mode major number is 212, the line to add to
+	Since the line-mode major number is 227, the line to add to
 	/etc/modules.conf should be:
-		alias char-major-212 tub3270
+		alias char-major-227 tub3270
 
 	3. Define graphic devices to your vm guest machine, if you
 	haven't already.  Define them before you reboot (reipl):
@@ -175,7 +175,7 @@ Here are the testing steps in detail:
 	C. Are the device special files created, as in installation
 	step 2 above?  Use the ls -l command to find out; for instance,
 	issue "ls -l /dev/3270/tty620".  The output should start with the
-	letter "c" meaning character device and should contain "212, 1"
+	letter "c" meaning character device and should contain "227, 1"
 	just to the left of the device name.  No such file?  no "c"?
 	Wrong major number?  Wrong minor number?  There's your
 	problem!

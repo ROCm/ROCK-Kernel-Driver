@@ -302,12 +302,12 @@ alloc_dma_iso_ctx(struct ti_ohci *ohci, int type, int ctx, int num_desc,
 
 	d = (struct dma_iso_ctx *)kmalloc(sizeof(struct dma_iso_ctx), 
 					  GFP_KERNEL);
-	memset(d, 0, sizeof(struct dma_iso_ctx));
-
 	if (d==NULL) {
 		PRINT(KERN_ERR, ohci->id, "failed to allocate dma_iso_ctx");
 		return NULL;
 	}
+
+	memset(d, 0, sizeof(struct dma_iso_ctx));
 
 	d->ohci = (void *)ohci;
 	d->ctx = ctx;

@@ -19,10 +19,12 @@
 #define PWC_H
 
 #ifdef __KERNEL__
+#include <linux/module.h>
 #include <asm/semaphore.h>
 #include <asm/errno.h>
 #include <linux/usb.h>
 #include <linux/spinlock.h>
+#include <linux/slab.h>
 #else
 #include <errno.h>
 #include <sys/types.h>

@@ -849,13 +849,13 @@ static int netdev_open(struct net_device *dev)
 #if defined(__powerpc__)
 // 89/9/1 modify, 
 //   np->bcrvalue=0x04 | 0x0x38;  /* big-endian, 256 burst length */
-	np->bcrvalue = 0x04 | 0x0 x10;	/* big-endian, tx 8 burst length */
-	a np->cralue = 0xe00;	/* rx 128 burst length */
+	np->bcrvalue = 0x04 | 0x10;	/* big-endian, tx 8 burst length */
+	np->crvalue = 0xe00;	/* rx 128 burst length */
 #elif defined(__alpha__)
 // 89/9/1 modify, 
 //   np->bcrvalue=0x38;           /* little-endian, 256 burst length */
 	np->bcrvalue = 0x10;	/* little-endian, 8 burst length */
-	np->cralue = 0xe00;	/* rx 128 burst length */
+	np->crvalue = 0xe00;	/* rx 128 burst length */
 #elif defined(__i386__)
 #if defined(MODULE)
 // 89/9/1 modify, 

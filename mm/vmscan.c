@@ -923,8 +923,7 @@ int kswapd(void *unused)
 {
 	struct task_struct *tsk = current;
 
-	tsk->session = 1;
-	tsk->pgrp = 1;
+	daemonize();
 	strcpy(tsk->comm, "kswapd");
 	sigfillset(&tsk->blocked);
 	
@@ -1028,8 +1027,7 @@ int kreclaimd(void *unused)
 	struct task_struct *tsk = current;
 	pg_data_t *pgdat;
 
-	tsk->session = 1;
-	tsk->pgrp = 1;
+	daemonize();
 	strcpy(tsk->comm, "kreclaimd");
 	sigfillset(&tsk->blocked);
 	current->flags |= PF_MEMALLOC;

@@ -843,7 +843,7 @@ void scsi_do_req(Scsi_Request * SRpnt, const void *cmnd,
 	 */
 	scsi_insert_special_req(SRpnt, 0);
 
-	SCSI_LOG_MLQUEUE(3, printk("Leaving scsi_do_cmd()\n"));
+	SCSI_LOG_MLQUEUE(3, printk("Leaving scsi_do_req()\n"));
 }
  
 /*
@@ -929,7 +929,7 @@ void scsi_init_cmd_from_req(Scsi_Cmnd * SCpnt, Scsi_Request * SRpnt)
 	SCpnt->abort_reason = 0;
 	SCpnt->result = 0;
 
-	SCSI_LOG_MLQUEUE(3, printk("Leaving scsi_do_cmd()\n"));
+	SCSI_LOG_MLQUEUE(3, printk("Leaving scsi_init_cmd_from_req()\n"));
 }
 
 /*

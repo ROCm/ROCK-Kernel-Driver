@@ -67,10 +67,6 @@ CORE_FILES += arch/ppc/xmon/x.o
 endif
 
 MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
-MAKECOFFBOOT = $(MAKE) -C arch/$(ARCH)/coffboot
-MAKECHRPBOOT = $(MAKE) -C arch/$(ARCH)/chrpboot
-MAKEMBXBOOT = $(MAKE) -C arch/$(ARCH)/mbxboot
-MAKETREEBOOT = $(MAKE) -C arch/$(ARCH)/treeboot
 
 ifdef CONFIG_8xx
 SUBDIRS += arch/ppc/8xx_io
@@ -91,57 +87,10 @@ endif
 checks:
 	@$(MAKE) -C arch/$(ARCH)/kernel checks
 
-BOOT_TARGETS = zImage znetboot.initrd zImage.initrd
+BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd
 
-ifdef CONFIG_4xx
 $(BOOT_TARGETS): $(CHECKS) vmlinux
-	@$(MAKETREEBOOT) $@
-endif
-
-ifdef CONFIG_8xx
-$(BOOT_TARGETS): $(CHECKS) vmlinux
-	@$(MAKECOFFBOOT) $@
-	@$(MAKEMBXBOOT) $@
-endif
-
-ifdef CONFIG_6xx
-ifndef CONFIG_8260
-$(BOOT_TARGETS): $(CHECKS) vmlinux
-	@$(MAKECOFFBOOT) $@
 	@$(MAKEBOOT) $@
-	@$(MAKECHRPBOOT) $@
-
-znetboot: $(CHECKS) vmlinux
-ifdef CONFIG_ALL_PPC
-ifdef CONFIG_SMP
-	cp -f vmlinux /tftpboot/vmlinux.smp
-else
-	cp -f vmlinux /tftpboot/vmlinux
-endif
-endif
-	@$(MAKECOFFBOOT) $@
-	@$(MAKEBOOT) $@
-	@$(MAKECHRPBOOT) $@
-else
-# 8260 is custom 6xx
-$(BOOT_TARGETS): $(CHECKS) vmlinux
-	@$(MAKECOFFBOOT) $@
-	@$(MAKEMBXBOOT) $@
-endif
-endif
-
-ifdef CONFIG_PPC64BRIDGE
-$(BOOT_TARGETS): $(CHECKS) vmlinux
-	@$(MAKECOFFBOOT) $@
-	@$(MAKEBOOT) $@
-	@$(MAKECHRPBOOT) $@
-
-znetboot: $(CHECKS) vmlinux
-	cp -f vmlinux /tftpboot/vmlinux.64
-	@$(MAKECOFFBOOT) $@
-	@$(MAKEBOOT) $@
-	@$(MAKECHRPBOOT) $@
-endif
 
 %_config: arch/ppc/configs/%_defconfig
 	rm -f .config arch/ppc/defconfig
@@ -149,14 +98,9 @@ endif
 
 archclean:
 	rm -f arch/ppc/kernel/{mk_defs,ppc_defs.h,find_name,checks}
-	@$(MAKECOFFBOOT) clean
 	@$(MAKEBOOT) clean
-	@$(MAKECHRPBOOT) clean
-	@$(MAKEMBXBOOT) clean
-	@$(MAKETREEBOOT) clean
 
 archmrproper:
 
 archdep:
-	$(MAKEBOOT) fastdep
-	$(MAKECHRPBOOT) fastdep
+	$(MAKEBOOT) dep

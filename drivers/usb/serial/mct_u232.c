@@ -24,6 +24,14 @@
  *   Basic tests have been performed with minicom/zmodem transfers and
  *   modem dialing under Linux 2.4.0-test10 (for me it works fine).
  *
+ * 04-May-2001 Stelian Pop
+ *   - Set the maximum bulk output size for Sitecom U232-P25 model to 16 bytes
+ *     instead of the device reported 32 (using 32 bytes causes many data
+ *     loss, Windows driver uses 16 too).
+ *
+ * 02-May-2001 Stelian Pop
+ *   - Fixed the baud calculation for Sitecom U232-P25 model
+ *
  * 08-Apr-2001 gb
  *   - Identify version on module load.
  *

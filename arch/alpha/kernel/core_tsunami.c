@@ -11,6 +11,7 @@
 #include <linux/pci.h>
 #include <linux/sched.h>
 #include <linux/init.h>
+#include <linux/bootmem.h>
 
 #include <asm/ptrace.h>
 #include <asm/system.h>
@@ -222,7 +223,6 @@ tsunami_pci_tbi(struct pci_controller *hose, dma_addr_t start, dma_addr_t end)
 	   it's the shifted tag bits.  */
 	value = (start & 0xffff0000) >> 12;
 
-	wmb();
 	*csr = value;
 	mb();
 	*csr;
@@ -276,6 +276,16 @@ tsunami_probe_write(volatile unsigned long *vaddr)
 #endif /* NXM_MACHINE_CHECKS_ON_TSUNAMI */
 
 #define FN __FUNCTION__
+
+static void __init
+tsunami_monster_window_enable(tsunami_pchip * pchip)
+{
+	volatile unsigned long * csr = &pchip->pctl.csr;
+
+	*csr |= pctl_m_mwin;
+	mb();
+	*csr;
+}
 
 static void __init
 tsunami_init_one_pchip(tsunami_pchip *pchip, int index)
@@ -358,7 +368,13 @@ tsunami_init_one_pchip(tsunami_pchip *pchip, int index)
 	 * address range.
 	 */
 	hose->sg_isa = iommu_arena_new(hose, 0x00800000, 0x00800000, 0);
-	hose->sg_pci = iommu_arena_new(hose, 0xc0000000, 0x08000000, 0);
+	{
+		unsigned long size = 0x08000000;
+		if (max_low_pfn > (0x80000000 >> PAGE_SHIFT))
+			size = 0x40000000;
+		hose->sg_pci = iommu_arena_new(hose, 0xc0000000, size, 0);
+	}
+	
 	__direct_map_base = 0x40000000;
 	__direct_map_size = 0x80000000;
 
@@ -379,6 +395,9 @@ tsunami_init_one_pchip(tsunami_pchip *pchip, int index)
 	pchip->tba[3].csr  = virt_to_phys(hose->sg_pci->ptes);
 
 	tsunami_pci_tbi(hose, 0, -1);
+
+	/* Enable the Monster Window to make DAC pci64 possible. */
+	tsunami_monster_window_enable(pchip);
 }
 
 void __init

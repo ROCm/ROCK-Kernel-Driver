@@ -1,86 +1,9 @@
 /*
- * $Id: capifs.c,v 1.14.6.5 2001/03/21 08:52:21 kai Exp $
- * 
+ * $Id: capifs.c,v 1.14.6.7 2001/05/24 08:29:08 kai Exp $
+ *
  * (c) Copyright 2000 by Carsten Paeth (calle@calle.de)
  *
  * Heavily based on devpts filesystem from H. Peter Anvin
- * 
- * $Log: capifs.c,v $
- * Revision 1.14.6.5  2001/03/21 08:52:21  kai
- * merge from main branch: fix buffer for revision string (calle)
- *
- * Revision 1.14.6.4  2001/03/15 15:11:24  kai
- * *** empty log message ***
- *
- * Revision 1.14.6.3  2001/02/13 11:43:29  kai
- * more compatility changes for 2.2.19
- *
- * Revision 1.14.6.2  2001/02/10 14:41:20  kai
- * Changes from kernel tree
- *
- * Revision 1.14.6.1  2000/11/28 12:02:45  kai
- * MODULE_DEVICE_TABLE for 2.4
- *
- * Revision 1.14.2.1  2000/11/26 17:47:53  kai
- * added PCI_DEV_TABLE for 2.4
- *
- * Revision 1.14  2000/11/23 20:45:14  kai
- * fixed module_init/exit stuff
- * Note: compiled-in kernel doesn't work pre 2.2.18 anymore.
- *
- * Revision 1.13  2000/11/18 16:17:25  kai
- * change from 2.4 tree
- *
- * Revision 1.12  2000/11/01 14:05:02  calle
- * - use module_init/module_exit from linux/init.h.
- * - all static struct variables are initialized with "membername:" now.
- * - avm_cs.c, let it work with newer pcmcia-cs.
- *
- * Revision 1.11  2000/10/24 15:08:47  calle
- * Too much includes.
- *
- * Revision 1.10  2000/10/12 10:12:35  calle
- * Bugfix: second iput(inode) on umount, destroies a foreign inode.
- *
- * Revision 1.9  2000/08/20 07:30:13  keil
- * changes for 2.4
- *
- * Revision 1.8  2000/07/20 10:23:13  calle
- * Include isdn_compat.h for people that don't use -p option of std2kern.
- *
- * Revision 1.7  2000/06/18 16:09:54  keil
- * more changes for 2.4
- *
- * Revision 1.6  2000/04/03 13:29:25  calle
- * make Tim Waugh happy (module unload races in 2.3.99-pre3).
- * no real problem there, but now it is much cleaner ...
- *
- * Revision 1.5  2000/03/13 17:49:52  calle
- * make it running with 2.3.51.
- *
- * Revision 1.4  2000/03/08 17:06:33  calle
- * - changes for devfs and 2.3.49
- * - capifs now configurable (no need with devfs)
- * - New Middleware ioctl CAPI_NCCI_GETUNIT
- * - Middleware again tested with 2.2.14 and 2.3.49 (with and without devfs)
- *
- * Revision 1.3  2000/03/06 18:00:23  calle
- * - Middleware extention now working with 2.3.49 (capifs).
- * - Fixed typos in debug section of capi.c
- * - Bugfix: Makefile corrected for b1pcmcia.c
- *
- * Revision 1.2  2000/03/06 09:17:07  calle
- * - capifs: fileoperations now in inode (change for 2.3.49)
- * - Config.in: Middleware extention not a tristate, uups.
- *
- * Revision 1.1  2000/03/03 16:48:38  calle
- * - Added CAPI2.0 Middleware support (CONFIG_ISDN_CAPI)
- *   It is now possible to create a connection with a CAPI2.0 applikation
- *   and than to handle the data connection from /dev/capi/ (capifs) and also
- *   using async or sync PPP on this connection.
- *   The two major device number 190 and 191 are not confirmed yet,
- *   but I want to save the code in cvs, before I go on.
- *
  *
  */
 
@@ -105,7 +28,7 @@
 
 MODULE_AUTHOR("Carsten Paeth <calle@calle.de>");
 
-static char *revision = "$Revision: 1.14.6.6 $";
+static char *revision = "$Revision: 1.14.6.7 $";
 
 struct capifs_ncci {
 	struct inode *inode;
@@ -142,6 +65,7 @@ static inline struct capifs_sb_info *SBI(struct super_block *sb)
 static int capifs_root_readdir(struct file *,void *,filldir_t);
 static struct dentry *capifs_root_lookup(struct inode *,struct dentry *);
 static int capifs_revalidate(struct dentry *, int);
+static struct inode *capifs_new_inode(struct super_block *sb);
 
 static struct file_operations capifs_root_operations = {
 	read:		generic_read_dir,
@@ -285,9 +209,6 @@ static void capifs_put_super(struct super_block *sb)
 
 	kfree(sbi->nccis);
 	kfree(sbi);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,51)
-	MOD_DEC_USE_COUNT;
-#endif
 }
 
 static int capifs_statfs(struct super_block *sb, struct statfs *buf);
@@ -363,10 +284,6 @@ struct super_block *capifs_read_super(struct super_block *s, void *data,
 	struct dentry * root;
 	struct capifs_sb_info *sbi;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,51)
-	MOD_INC_USE_COUNT;
-	lock_super(s);
-#endif
 	/* Super block already completed? */
 	if (s->s_root)
 		goto out;
@@ -449,34 +366,11 @@ struct super_block *capifs_read_super(struct super_block *s, void *data,
 	mounts = s;
 
 out:	/* Success ... somebody else completed the super block for us. */ 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,51)
-	unlock_super(s);
-#endif
 	return s;
 fail:
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,51)
-	unlock_super(s);
-	MOD_DEC_USE_COUNT;
-#endif
 	return NULL;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,51)
-static int capifs_statfs(struct super_block *sb, struct statfs *buf, int bufsiz)
-{
-	struct statfs tmp;
-
-	tmp.f_type = CAPIFS_SUPER_MAGIC;
-	tmp.f_bsize = 1024;
-	tmp.f_blocks = 0;
-	tmp.f_bfree = 0;
-	tmp.f_bavail = 0;
-	tmp.f_files = 0;
-	tmp.f_ffree = 0;
-	tmp.f_namelen = NAME_MAX;
-	return copy_to_user(buf, &tmp, bufsiz) ? -EFAULT : 0;
-}
-#else
 static int capifs_statfs(struct super_block *sb, struct statfs *buf)
 {
 	buf->f_type = CAPIFS_SUPER_MAGIC;
@@ -489,11 +383,10 @@ static int capifs_statfs(struct super_block *sb, struct statfs *buf)
 	buf->f_namelen = NAME_MAX;
 	return 0;
 }
-#endif
 
-static struct inode *capifs_new_inode(struct super_block *sb);
+static struct inode *capifs_new_inode(struct super_block *sb)
 {
-	inode = new_inode(sb);
+	struct inode *inode = new_inode(sb);
 	if (inode) {
 		inode->i_mtime = inode->i_atime = inode->i_ctime = CURRENT_TIME;
 		inode->i_blocks = 0;
@@ -503,16 +396,7 @@ static struct inode *capifs_new_inode(struct super_block *sb);
 	return inode;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,51)
-static struct file_system_type capifs_fs_type = {
-	"capifs",
-	0,
-	capifs_read_super,
-	NULL
-};
-#else
 static DECLARE_FSTYPE(capifs_fs_type, "capifs", capifs_read_super, 0);
-#endif
 
 void capifs_new_ncci(char type, unsigned int num, kdev_t device)
 {
@@ -594,11 +478,7 @@ static int __init capifs_init(void)
 		MOD_DEC_USE_COUNT;
 		return err;
 	}
-#ifdef MODULE
-        printk(KERN_NOTICE "capifs: Rev %s: loaded\n", rev);
-#else
-	printk(KERN_NOTICE "capifs: Rev %s: started\n", rev);
-#endif
+        printk(KERN_NOTICE "capifs: Rev %s\n", rev);
 	MOD_DEC_USE_COUNT;
 	return 0;
 }

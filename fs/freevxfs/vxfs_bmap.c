@@ -169,7 +169,7 @@ vxfs_bmap_indir(struct inode *ip, long indir, int size, long block)
 			struct vxfs_typed_dev4	*typ4 = (struct vxfs_typed_dev4 *)typ;
 			printk(KERN_INFO "\n\nTYPED_DEV4 detected!\n");
 			printk(KERN_INFO "block: %Ld\tsize: %Ld\tdev: %d\n",
-					typ4->vd4_block, typ4->vd4_size, typ4->vd4_dev);
+			       (long long)typ4->vd4_block, (long long)typ4->vd4_size, typ4->vd4_dev);
 			goto fail;
 		}
 		default:
@@ -228,7 +228,7 @@ vxfs_bmap_typed(struct inode *ip, long iblock)
 			struct vxfs_typed_dev4	*typ4 = (struct vxfs_typed_dev4 *)typ;
 			printk(KERN_INFO "\n\nTYPED_DEV4 detected!\n");
 			printk(KERN_INFO "block: %Ld\tsize: %Ld\tdev: %d\n",
-					typ4->vd4_block, typ4->vd4_size, typ4->vd4_dev);
+			       (long long)typ4->vd4_block, (long long)typ4->vd4_size, typ4->vd4_dev);
 			return 0;
 		}
 		default:

@@ -182,7 +182,7 @@ struct vm_struct * get_vm_area(unsigned long size, unsigned long flags)
 	for (p = &vmlist; (tmp = *p) ; p = &tmp->next) {
 		if ((size + addr) < addr)
 			goto out;
-		if (size + addr < (unsigned long) tmp->addr)
+		if (size + addr <= (unsigned long) tmp->addr)
 			break;
 		addr = tmp->size + (unsigned long) tmp->addr;
 		if (addr > VMALLOC_END-size)

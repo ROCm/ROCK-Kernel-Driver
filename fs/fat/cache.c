@@ -41,9 +41,9 @@ int fat_bmap(struct inode *inode,int sector)
 
 int default_fat_access(struct super_block *sb,int nr,int new_value)
 {
-	struct buffer_head *bh,*bh2,*c_bh,*c_bh2;
-	unsigned char *p_first,*p_last;
-	int copy,first,last,next,b;
+	struct buffer_head *bh, *bh2, *c_bh, *c_bh2;
+	unsigned char *p_first, *p_last;
+	int copy, first, last, next, b;
 
 	if ((unsigned) (nr-2) >= MSDOS_SB(sb)->clusters)
 		return 0;
@@ -55,12 +55,12 @@ int default_fat_access(struct super_block *sb,int nr,int new_value)
 		first = nr*3/2;
 		last = first+1;
 	}
-	b = MSDOS_SB(sb)->fat_start + (first >> SECTOR_BITS);
+	b = MSDOS_SB(sb)->fat_start + (first >> sb->s_blocksize_bits);
 	if (!(bh = fat_bread(sb, b))) {
 		printk("bread in fat_access failed\n");
 		return 0;
 	}
-	if ((first >> SECTOR_BITS) == (last >> SECTOR_BITS)) {
+	if ((first >> sb->s_blocksize_bits) == (last >> sb->s_blocksize_bits)) {
 		bh2 = bh;
 	} else {
 		if (!(bh2 = fat_bread(sb, b+1))) {
@@ -72,7 +72,7 @@ int default_fat_access(struct super_block *sb,int nr,int new_value)
 	if (MSDOS_SB(sb)->fat_bits == 32) {
 		p_first = p_last = NULL; /* GCC needs that stuff */
 		next = CF_LE_L(((__u32 *) bh->b_data)[(first &
-		    (SECTOR_SIZE-1)) >> 2]);
+		    (sb->s_blocksize - 1)) >> 2]);
 		/* Fscking Microsoft marketing department. Their "32" is 28. */
 		next &= 0xfffffff;
 		if (next >= 0xffffff7) next = -1;
@@ -81,23 +81,22 @@ int default_fat_access(struct super_block *sb,int nr,int new_value)
 	} else if (MSDOS_SB(sb)->fat_bits == 16) {
 		p_first = p_last = NULL; /* GCC needs that stuff */
 		next = CF_LE_W(((__u16 *) bh->b_data)[(first &
-		    (SECTOR_SIZE-1)) >> 1]);
+		    (sb->s_blocksize - 1)) >> 1]);
 		if (next >= 0xfff7) next = -1;
 	} else {
-		p_first = &((__u8 *) bh->b_data)[first & (SECTOR_SIZE-1)];
-		p_last = &((__u8 *) bh2->b_data)[(first+1) &
-		    (SECTOR_SIZE-1)];
+		p_first = &((__u8 *)bh->b_data)[first & (sb->s_blocksize - 1)];
+		p_last = &((__u8 *)bh2->b_data)[(first + 1) & (sb->s_blocksize - 1)];
 		if (nr & 1) next = ((*p_first >> 4) | (*p_last << 4)) & 0xfff;
 		else next = (*p_first+(*p_last << 8)) & 0xfff;
 		if (next >= 0xff7) next = -1;
 	}
 	if (new_value != -1) {
 		if (MSDOS_SB(sb)->fat_bits == 32) {
-			((__u32 *) bh->b_data)[(first & (SECTOR_SIZE-1)) >>
-			    2] = CT_LE_L(new_value);
+			((__u32 *)bh->b_data)[(first & (sb->s_blocksize - 1)) >> 2]
+				= CT_LE_L(new_value);
 		} else if (MSDOS_SB(sb)->fat_bits == 16) {
-			((__u16 *) bh->b_data)[(first & (SECTOR_SIZE-1)) >>
-			    1] = CT_LE_W(new_value);
+			((__u16 *)bh->b_data)[(first & (sb->s_blocksize - 1)) >> 1]
+				= CT_LE_W(new_value);
 		} else {
 			if (nr & 1) {
 				*p_first = (*p_first & 0xf) | (new_value << 4);
@@ -111,20 +110,21 @@ int default_fat_access(struct super_block *sb,int nr,int new_value)
 		}
 		fat_mark_buffer_dirty(sb, bh);
 		for (copy = 1; copy < MSDOS_SB(sb)->fats; copy++) {
-			b = MSDOS_SB(sb)->fat_start + (first >> SECTOR_BITS) +
-				MSDOS_SB(sb)->fat_length * copy;
+			b = MSDOS_SB(sb)->fat_start + (first >> sb->s_blocksize_bits)
+				+ MSDOS_SB(sb)->fat_length * copy;
 			if (!(c_bh = fat_bread(sb, b)))
 				break;
-			memcpy(c_bh->b_data,bh->b_data,SECTOR_SIZE);
-			fat_mark_buffer_dirty(sb, c_bh);
 			if (bh != bh2) {
 				if (!(c_bh2 = fat_bread(sb, b+1))) {
 					fat_brelse(sb, c_bh);
 					break;
 				}
-				memcpy(c_bh2->b_data,bh2->b_data,SECTOR_SIZE);
+				memcpy(c_bh2->b_data, bh2->b_data, sb->s_blocksize);
+				fat_mark_buffer_dirty(sb, c_bh2);
 				fat_brelse(sb, c_bh2);
 			}
+			memcpy(c_bh->b_data, bh->b_data, sb->s_blocksize);
+			fat_mark_buffer_dirty(sb, c_bh);
 			fat_brelse(sb, c_bh);
 		}
 	}
@@ -143,7 +143,7 @@ void fat_cache_init(void)
 	if (initialized) {
 		spin_unlock(&fat_cache_lock);
 		return;
-		}
+	}
 	fat_cache = &cache[0];
 	for (count = 0; count < FAT_CACHE; count++) {
 		cache[count].device = 0;
@@ -294,22 +294,28 @@ int fat_get_cluster(struct inode *inode,int cluster)
 
 int default_fat_bmap(struct inode *inode,int sector)
 {
-	struct msdos_sb_info *sb=MSDOS_SB(inode->i_sb);
-	int cluster,offset;
+	struct super_block *sb = inode->i_sb;
+	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+	int cluster, offset, last_block;
 
-	if ((sb->fat_bits != 32) &&
+	if ((sbi->fat_bits != 32) &&
 	    (inode->i_ino == MSDOS_ROOT_INO || (S_ISDIR(inode->i_mode) &&
 	     !MSDOS_I(inode)->i_start))) {
-		if (sector >= sb->dir_entries >> MSDOS_DPS_BITS)
+		if (sector >= sbi->dir_entries >> sbi->dir_per_block_bits)
 			return 0;
-		return sector+sb->dir_start;
+		return sector + sbi->dir_start;
 	}
-	if (sector >= (MSDOS_I(inode)->mmu_private+511)>>9)
+	last_block = (MSDOS_I(inode)->mmu_private + (sb->s_blocksize - 1))
+		>> sb->s_blocksize_bits;
+	if (sector >= last_block)
 		return 0;
-	cluster = sector/sb->cluster_size;
-	offset = sector % sb->cluster_size;
-	if (!(cluster = fat_get_cluster(inode,cluster))) return 0;
-	return (cluster-2)*sb->cluster_size+sb->data_start+offset;
+
+	cluster = sector / sbi->cluster_size;
+	offset  = sector % sbi->cluster_size;
+	if (!(cluster = fat_get_cluster(inode, cluster)))
+		return 0;
+
+	return (cluster - 2) * sbi->cluster_size + sbi->data_start + offset;
 }
 
 
@@ -351,7 +357,7 @@ int fat_free(struct inode *inode,int skip)
 				fat_clusters_flush(inode->i_sb);
 			}
 		}
-		inode->i_blocks -= MSDOS_SB(inode->i_sb)->cluster_size;
+		inode->i_blocks -= (1 << MSDOS_SB(inode->i_sb)->cluster_bits) / 512;
 	}
 	unlock_fat(inode->i_sb);
 	return 0;

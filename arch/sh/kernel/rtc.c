@@ -143,7 +143,6 @@ void sh_rtc_gettimeofday(struct timeval *tv)
 
 static int set_rtc_time(unsigned long nowtime)
 {
-	extern int abs (int);
 	int retval = 0;
 	int real_seconds, real_minutes, cmos_minutes;
 

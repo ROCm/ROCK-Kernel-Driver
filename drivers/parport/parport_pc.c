@@ -118,7 +118,7 @@ static int change_mode(struct parport *p, int m)
 	unsigned char oecr;
 	int mode;
 
-	DPRINTK("parport change_mode ECP-ISA to mode 0x%02x\n",m);
+	DPRINTK(KERN_INFO "parport change_mode ECP-ISA to mode 0x%02x\n",m);
 
 	if (!priv->ecr) {
 		printk (KERN_DEBUG "change_mode: but there's no ECR!\n");
@@ -1265,20 +1265,20 @@ static void __devinit show_parconfig_smsc37c669(int io, int key)
 	cr27=inb(io+1);
 	outb(0xaa,io);
 
-	printk ("SMSC 37c669 LPT Config: cr_1=0x%02x, 4=0x%02x, "
+	printk (KERN_INFO "SMSC 37c669 LPT Config: cr_1=0x%02x, 4=0x%02x, "
 		"A=0x%2x, 23=0x%02x, 26=0x%02x, 27=0x%02x\n",
 		cr1,cr4,cra,cr23,cr26,cr27);
 
 	/* The documentation calls DMA and IRQ-Lines by letters, so
 	   the board maker can/will wire them
 	   appropriately/randomly...  G=reserved H=IDE-irq, */
-	printk ("SMSC LPT Config: io=0x%04x, irq=%c, dma=%c, "
+	printk (KERN_INFO "SMSC LPT Config: io=0x%04x, irq=%c, dma=%c, "
 		"fifo threshold=%d\n", cr23*4,
 		(cr27 &0x0f) ? 'A'-1+(cr27 &0x0f): '-',
 		(cr26 &0x0f) ? 'A'-1+(cr26 &0x0f): '-', cra & 0x0f);
-	printk("SMSC LPT Config: enabled=%s power=%s\n",
+	printk(KERN_INFO "SMSC LPT Config: enabled=%s power=%s\n",
 	       (cr23*4 >=0x100) ?"yes":"no", (cr1 & 4) ? "yes" : "no");
-	printk("SMSC LPT Config: Port mode=%s, EPP version =%s\n",
+	printk(KERN_INFO "SMSC LPT Config: Port mode=%s, EPP version =%s\n",
 	       (cr1 & 0x08 ) ? "Standard mode only (SPP)" : modes[cr4 & 0x03], 
 	       (cr4 & 0x40) ? "1.7" : "1.9");
 
@@ -1290,7 +1290,7 @@ static void __devinit show_parconfig_smsc37c669(int io, int key)
 		while((superios[i].io!= 0) && (i<NR_SUPERIOS))
 			i++;
 		if(i==NR_SUPERIOS)
-			printk("Super-IO: too many chips!\n");
+			printk(KERN_INFO "Super-IO: too many chips!\n");
 		else {
 			int d;
 			switch (cr23*4) {
@@ -1350,23 +1350,23 @@ static void __devinit show_parconfig_winbond(int io, int key)
 	crf0=inb(io+1);
 	outb(0xaa,io);
 
-	printk("Winbond LPT Config: cr_30=%02x 60,61=%02x%02x "
+	printk(KERN_INFO "Winbond LPT Config: cr_30=%02x 60,61=%02x%02x "
 	       "70=%02x 74=%02x, f0=%02x\n", cr30,cr60,cr61,cr70,cr74,crf0);
-	printk("Winbond LPT Config: active=%s, io=0x%02x%02x irq=%d, ", 
+	printk(KERN_INFO "Winbond LPT Config: active=%s, io=0x%02x%02x irq=%d, ", 
 	       (cr30 & 0x01) ? "yes":"no", cr60,cr61,cr70&0x0f );
 	if ((cr74 & 0x07) > 3)
 		printk("dma=none\n");
 	else
 		printk("dma=%d\n",cr74 & 0x07);
-	printk("Winbond LPT Config: irqtype=%s, ECP fifo threshold=%d\n",
+	printk(KERN_INFO "Winbond LPT Config: irqtype=%s, ECP fifo threshold=%d\n",
 	       irqtypes[crf0>>7], (crf0>>3)&0x0f);
-	printk("Winbond LPT Config: Port mode=%s\n", modes[crf0 & 0x07]);
+	printk(KERN_INFO "Winbond LPT Config: Port mode=%s\n", modes[crf0 & 0x07]);
 
 	if(cr30 & 0x01) { /* the settings can be interrogated later ... */
 		while((superios[i].io!= 0) && (i<NR_SUPERIOS))
 			i++;
 		if(i==NR_SUPERIOS) 
-			printk("Super-IO: too many chips!\n");
+			printk(KERN_INFO "Super-IO: too many chips!\n");
 		else {
 			superios[i].io = (cr60<<8)|cr61;
 			superios[i].irq = cr70&0x0f;
@@ -1386,7 +1386,7 @@ static void __devinit decode_winbond(int efer, int key, int devid, int devrev, i
                    non-winbond register */
 		return;
 
-	printk("Winbond chip at EFER=0x%x key=0x%02x devid=%02x devrev=%02x "
+	printk(KERN_INFO "Winbond chip at EFER=0x%x key=0x%02x devid=%02x devrev=%02x "
 	       "oldid=%02x\n", efer,key,devid,devrev,oldid);
 	id=(devid<<8) | devrev;
 
@@ -1406,9 +1406,9 @@ static void __devinit decode_winbond(int efer, int key, int devid, int devrev, i
 	else progif=0;
 
 	if(type==NULL) 
-		printk("Winbond unknown chip type\n");
+		printk(KERN_INFO "Winbond unknown chip type\n");
 	else	
-	 	printk("Winbond chip type %s\n",type);
+	 	printk(KERN_INFO "Winbond chip type %s\n",type);
 
 	if(progif==2)
 		show_parconfig_winbond(efer,key);
@@ -1427,7 +1427,7 @@ static void __devinit decode_smsc(int efer, int key, int devid, int devrev)
 		return;
 
 	func=NULL;
-        printk("SMSC chip at EFER=0x%x key=0x%02x devid=%02x devrev=%02x\n",
+        printk(KERN_INFO "SMSC chip at EFER=0x%x key=0x%02x devid=%02x devrev=%02x\n",
 	       efer,key,devid,devrev);
         id=(devid<<8) | devrev;
 
@@ -1437,9 +1437,9 @@ static void __devinit decode_smsc(int efer, int key, int devid, int devrev)
 	else if	(devid==0x66) type="37c666GT";
 
 	if(type==NULL)
-                printk("SMSC unknown chip type\n");
+                printk(KERN_INFO "SMSC unknown chip type\n");
         else
-                printk("SMSC chip type %s\n",type);
+                printk(KERN_INFO "SMSC chip type %s\n",type);
 
 	if(func) (func)(efer,key);
 	return;
@@ -1540,7 +1540,7 @@ static void __devinit smsc_check(int io, int key)
 
 static void __devinit detect_and_report_winbond (void)
 { 
-	printk("Winbond Super-IO detection, now testing ports 3F0,370,250,4E,2E ...\n");
+	printk(KERN_DEBUG "Winbond Super-IO detection, now testing ports 3F0,370,250,4E,2E ...\n");
 
 	winbond_check(0x3f0,0x87);
 	winbond_check(0x370,0x87);
@@ -1553,7 +1553,7 @@ static void __devinit detect_and_report_winbond (void)
 
 static void __devinit detect_and_report_smsc (void)
 {
-	printk("SMSC Super-IO detection, now testing Ports 2F0, 370 ...\n");
+	printk(KERN_DEBUG "SMSC Super-IO detection, now testing Ports 2F0, 370 ...\n");
 	smsc_check(0x3f0,0x55);
 	smsc_check(0x370,0x55);
 	smsc_check(0x3f0,0x44);
@@ -1863,7 +1863,7 @@ static int __devinit parport_ECP_supported(struct parport *pb)
 		printk("%d",intrline[(configb >>3) & 0x07]);
 	else
 		printk("<none or set by other means>");
-	printk ( " dma=");
+	printk (" dma=");
 	if( (configb & 0x03 ) == 0x00)
 		printk("<none or set by other means>\n");
 	else

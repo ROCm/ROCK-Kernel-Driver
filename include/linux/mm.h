@@ -480,7 +480,6 @@ extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 #else
 #define __GFP_HIGHMEM	0x0 /* noop */
 #endif
-#define __GFP_VM	0x20
 
 
 #define GFP_BUFFER	(__GFP_HIGH | __GFP_WAIT)

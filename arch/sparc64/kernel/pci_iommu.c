@@ -1,4 +1,4 @@
-/* $Id: pci_iommu.c,v 1.13 2001/03/14 08:42:38 davem Exp $
+/* $Id: pci_iommu.c,v 1.14 2001/05/23 03:06:51 davem Exp $
  * pci_iommu.c: UltraSparc PCI controller IOM/STC support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -58,7 +58,7 @@ static void __iommu_flushall(struct pci_iommu *iommu)
 
 static iopte_t *alloc_streaming_cluster(struct pci_iommu *iommu, unsigned long npages)
 {
-	iopte_t *iopte, *limit;
+	iopte_t *iopte, *limit, *first;
 	unsigned long cnum, ent, flush_point;
 
 	cnum = 0;
@@ -77,6 +77,7 @@ static iopte_t *alloc_streaming_cluster(struct pci_iommu *iommu, unsigned long n
 	iopte += ((ent = iommu->alloc_info[cnum].next) << cnum);
 	flush_point = iommu->alloc_info[cnum].flush;
 	
+	first = iopte;
 	for (;;) {
 		if (iopte_val(*iopte) == 0UL) {
 			if ((iopte + (1 << cnum)) >= limit)
@@ -98,10 +99,17 @@ static iopte_t *alloc_streaming_cluster(struct pci_iommu *iommu, unsigned long n
 		}
 		if (ent == flush_point)
 			__iommu_flushall(iommu);
+		if (iopte == first)
+			goto bad;
 	}
 
 	/* I've got your streaming cluster right here buddy boy... */
 	return iopte;
+
+bad:
+	printk(KERN_EMERG "pci_iommu: alloc_streaming_cluster of npages(%ld) failed!\n",
+	       npages);
+	return NULL;
 }
 
 static void free_streaming_cluster(struct pci_iommu *iommu, dma_addr_t base,
@@ -319,6 +327,8 @@ dma_addr_t pci_map_single(struct pci_dev *pdev, void *ptr, size_t sz, int direct
 	spin_lock_irqsave(&iommu->lock, flags);
 
 	base = alloc_streaming_cluster(iommu, npages);
+	if (base == NULL)
+		goto bad;
 	bus_addr = (iommu->page_table_map_base +
 		    ((base - iommu->page_table) << PAGE_SHIFT));
 	ret = bus_addr | (oaddr & ~PAGE_MASK);
@@ -339,6 +349,11 @@ dma_addr_t pci_map_single(struct pci_dev *pdev, void *ptr, size_t sz, int direct
 	spin_unlock_irqrestore(&iommu->lock, flags);
 
 	return ret;
+
+bad:
+	spin_unlock_irqrestore(&iommu->lock, flags);
+	BUG();
+	return 0;
 }
 
 /* Unmap a single streaming mode DMA translation. */
@@ -517,6 +532,8 @@ int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, int
 	spin_lock_irqsave(&iommu->lock, flags);
 
 	base = alloc_streaming_cluster(iommu, npages);
+	if (base == NULL)
+		goto bad;
 	dma_base = iommu->page_table_map_base + ((base - iommu->page_table) << PAGE_SHIFT);
 
 	/* Step 3: Normalize DMA addresses. */
@@ -550,6 +567,11 @@ int pci_map_sg(struct pci_dev *pdev, struct scatterlist *sglist, int nelems, int
 	spin_unlock_irqrestore(&iommu->lock, flags);
 
 	return used;
+
+bad:
+	spin_unlock_irqrestore(&iommu->lock, flags);
+	BUG();
+	return 0;
 }
 
 /* Unmap a set of streaming mode DMA translations. */

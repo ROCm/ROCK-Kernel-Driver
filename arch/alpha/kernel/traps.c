@@ -291,12 +291,40 @@ dik_show_trace(unsigned long *sp)
 		 * is interesting.
 		 */
 		printk("%6x%c", (int)tmp & 0xffffff, (++i % 11) ? ' ' : '\n');
+#if 0
 		if (i > 40) {
 			printk(" ...");
 			break;
 		}
+#endif
 	}
 	printk("\n");
+}
+
+int kstack_depth_to_print = 24;
+
+void show_stack(unsigned long *sp)
+{
+	unsigned long *stack;
+	int i;
+
+	/*
+	 * debugging aid: "show_stack(NULL);" prints the
+	 * back trace for this cpu.
+	 */
+	if(sp==NULL)
+		sp=(unsigned long*)&sp;
+
+	stack = sp;
+	for(i=0; i < kstack_depth_to_print; i++) {
+		if (((long) stack & (THREAD_SIZE-1)) == 0)
+			break;
+		if (i && ((i % 4) == 0))
+			printk("\n       ");
+		printk("%016lx ", *stack++);
+	}
+	printk("\n");
+	dik_show_trace(sp);
 }
 
 void

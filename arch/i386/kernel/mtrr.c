@@ -1997,47 +1997,40 @@ static void __init cyrix_arr_init(void)
     if ( ccrc[6] ) printk ("mtrr: ARR3 was write protected, unprotected\n");
 }   /*  End Function cyrix_arr_init  */
 
-static void __init centaur_mcr_init(void)
+/*
+ *	Initialise the later (saner) Winchip MCR variant. In this version
+ *	the BIOS can pass us the registers it has used (but not their values)
+ *	and the control register is read/write
+ */
+ 
+static void __init centaur_mcr1_init(void)
 {
     unsigned i;
-    struct set_mtrr_context ctxt;
     u32 lo, hi;
-    int wc2 = -1;
 
-    set_mtrr_prepare (&ctxt);
     /* Unfortunately, MCR's are read-only, so there is no way to
      * find out what the bios might have done.
      */
      
-    /*
-     *	Enable MCR key if we are using a winchip2
-     */
-     
-    if(boot_cpu_data.x86_model==4)
-    	wc2 = 0;
-    	
-    if(boot_cpu_data.x86_model==8 || boot_cpu_data.x86_model == 9)
+    rdmsr(0x120, lo, hi);
+    if(((lo>>17)&7)==1)		/* Type 1 Winchip2 MCR */
     {
-	    rdmsr(0x120, lo, hi);
-	    if(((lo>>17)&7)==1)		/* Type 1 Winchip2 MCR */
-	    {
-	    	lo&= ~0x1C0;		/* clear key */
-	    	lo|= 0x040;		/* set key to 1 */
-		wrmsr(0x120, lo, hi);	/* unlock MCR */
-		wc2 = 1;
-		centaur_mcr_type = 1;
-	    }
+    	lo&= ~0x1C0;		/* clear key */
+    	lo|= 0x040;		/* set key to 1 */
+	wrmsr(0x120, lo, hi);	/* unlock MCR */
     }    
-    /* Clear any unconfigured MCR's.
-     * This way we are sure that the centaur_mcr array contains the actual
-     * values. The disadvantage is that any BIOS tweaks are thus undone.
-     *
+    
+    centaur_mcr_type = 1;
+    
+    /*
+     *	Clear any unconfigured MCR's.
      */
+
     for (i = 0; i < 8; ++i)
     {
     	if(centaur_mcr[i]. high == 0 && centaur_mcr[i].low == 0)
     	{
-    		if(wc2 == 0 || ( wc2 == 1 && !(lo & (1<<(9+i)))))
+    		if(!(lo & (1<<(9+i))))
 			wrmsr (0x110 + i , 0, 0);
 		else
 			/*
@@ -2047,18 +2040,58 @@ static void __init centaur_mcr_init(void)
 			centaur_mcr_reserved |= (1<<i);
 	}
     }
-    /*  Throw the main write-combining switch... 
-        However if OOSTORE is enabled then people have already done far
-        cleverer things and we should behave. 
+    /*  
+     *	Throw the main write-combining switch... 
+     *	However if OOSTORE is enabled then people have already done far
+     *  cleverer things and we should behave. 
      */
 
-    if(wc2 == 1)
-    {     
-	    lo |= 15;			/* Write combine enables */
-	    wrmsr(0x120, lo, hi);
+    lo |= 15;			/* Write combine enables */
+    wrmsr(0x120, lo, hi);
+}   /*  End Function centaur_mcr1_init  */
+
+/*
+ *	Initialise the original winchip with read only MCR registers
+ *	no used bitmask for the BIOS to pass on and write only control
+ */
+ 
+static void __init centaur_mcr0_init(void)
+{
+    unsigned i;
+
+    /* Unfortunately, MCR's are read-only, so there is no way to
+     * find out what the bios might have done.
+     */
+     
+    /* Clear any unconfigured MCR's.
+     * This way we are sure that the centaur_mcr array contains the actual
+     * values. The disadvantage is that any BIOS tweaks are thus undone.
+     *
+     */
+    for (i = 0; i < 8; ++i)
+    {
+    	if(centaur_mcr[i]. high == 0 && centaur_mcr[i].low == 0)
+		wrmsr (0x110 + i , 0, 0);
     }
-    else if(wc2 == 0)
-    	wrmsr(0x120, 0x01F0001F, 0);	/* Write only */
+
+    wrmsr(0x120, 0x01F0001F, 0);	/* Write only */
+}   /*  End Function centaur_mcr0_init  */
+
+/*
+ *	Initialise Winchip series MCR registers
+ */
+ 
+static void __init centaur_mcr_init(void)
+{
+    struct set_mtrr_context ctxt;
+
+    set_mtrr_prepare (&ctxt);
+
+    if(boot_cpu_data.x86_model==4)
+    	centaur_mcr0_init();
+    else if(boot_cpu_data.x86_model==8 || boot_cpu_data.x86_model == 9)
+    	centaur_mcr1_init();
+
     set_mtrr_done (&ctxt);
 }   /*  End Function centaur_mcr_init  */
 

@@ -473,7 +473,7 @@ static int __init parport_init_chip(struct hp_device *d, struct pa_iodc_driver *
 	irq = busdevice_alloc_irq(d); 
 
 	if (!irq) {
-	    printk("IRQ not found for parallel device at 0x%p\n", d->hpa);
+	    printk(KERN_DEBUG "IRQ not found for parallel device at 0x%p\n", d->hpa);
 	    return -ENODEV;
 	}
 
@@ -484,10 +484,10 @@ static int __init parport_init_chip(struct hp_device *d, struct pa_iodc_driver *
 	*/
 	if (!pdc_add_valid( (void *)(port+4))) {
 	    /* Initialize bidirectional-mode (0x10) & data-tranfer-mode #1 (0x20) */
-	    printk("%s: initialize bidirectional-mode.\n", __FUNCTION__);
+	    printk(KERN_DEBUG "%s: initialize bidirectional-mode.\n", __FUNCTION__);
 	    parport_writeb ( (0x10 + 0x20), port + 4);
 	} else {
-	    printk("%s: enhanced parport-modes not supported.\n", __FUNCTION__);
+	    printk(KERN_DEBUG "%s: enhanced parport-modes not supported.\n", __FUNCTION__);
 	}
 	
 	if (parport_gsc_probe_port(port, 0, 

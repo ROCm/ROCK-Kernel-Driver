@@ -189,7 +189,6 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 struct page * read_swap_cache_async(swp_entry_t entry)
 {
 	struct page *found_page = 0, *new_page;
-	unsigned long new_page_addr;
 	
 	/*
 	 * Make sure the swap entry is still in use.
@@ -203,10 +202,9 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 	if (found_page)
 		goto out_free_swap;
 
-	new_page_addr = __get_free_page(GFP_USER);
-	if (!new_page_addr)
+	new_page = alloc_page(GFP_USER);
+	if (!new_page)
 		goto out_free_swap;	/* Out of memory */
-	new_page = virt_to_page(new_page_addr);
 
 	/*
 	 * Check the swap cache again, in case we stalled above.
@@ -217,7 +215,8 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 	/* 
 	 * Add it to the swap cache and read its contents.
 	 */
-	lock_page(new_page);
+	if (TryLockPage(new_page))
+		BUG();
 	add_to_swap_cache(new_page, entry);
 	rw_swap_page(READ, new_page);
 	return new_page;

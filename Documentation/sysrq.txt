@@ -29,7 +29,8 @@ On the serial console (PC style standard serial ports only) -
            You send a BREAK, then within 5 seconds a command key. Sending
            BREAK twice is interpreted as a normal BREAK.
 
-On Mac   - Press 'Keypad+-F13-<command key>'
+On PowerPC - Press 'ALT - Print Screen (or F13) - <command key>,  
+             Print Screen (or F13) - <command key> may suffice.
 
 On other - If you know of the key combos for other architectures, please
            let me know so I can add them to this section. 

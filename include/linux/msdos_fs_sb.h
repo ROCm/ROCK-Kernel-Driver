@@ -44,7 +44,7 @@ struct msdos_sb_info {
 	unsigned long data_start;    /* first data sector */
 	unsigned long clusters;      /* number of clusters */
 	unsigned long root_cluster;  /* first cluster of the root directory */
-	unsigned long fsinfo_offset; /* FAT32 fsinfo offset from start of disk */
+	unsigned long fsinfo_sector; /* FAT32 fsinfo offset from start of disk */
 	wait_queue_head_t fat_wait;
 	struct semaphore fat_lock;
 	int prev_free;               /* previously returned free cluster number */
@@ -54,7 +54,9 @@ struct msdos_sb_info {
 	struct nls_table *nls_io;    /* Charset used for input and display */
 	struct cvf_format* cvf_format;
 	void *dir_ops;		     /* Opaque; default directory operations */
-	void *private_data;	
+	void *private_data;
+	int dir_per_block;	     /* dir entries per block */
+	int dir_per_block_bits;	     /* log2(dir_per_block) */
 };
 
 #endif
