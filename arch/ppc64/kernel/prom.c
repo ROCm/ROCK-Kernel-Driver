@@ -877,11 +877,10 @@ static void
 prom_hold_cpus(unsigned long mem)
 {
 	unsigned long i;
-	unsigned int reg;
+	unsigned int cpuid;
 	phandle node;
 	unsigned long offset = reloc_offset();
 	char type[64], *path;
-	int cpuid = 0;
 	extern void __secondary_hold(void);
         extern unsigned long __secondary_hold_spinloop;
         extern unsigned long __secondary_hold_acknowledge;
@@ -940,12 +939,12 @@ prom_hold_cpus(unsigned long mem)
 		if (strcmp(type, RELOC("okay")) != 0)
 			continue;
 
-                reg = -1;
+                cpuid = -1;
 		call_prom(RELOC("getprop"), 4, 1, node, RELOC("reg"),
-			  &reg, sizeof(reg));
+			  &cpuid, sizeof(cpuid));
 
 		/* Only need to start secondary procs, not ourself. */
-		if ( reg == _prom->cpu )
+		if ( cpuid == _prom->cpu )
 			continue;
 
 		path = (char *) mem;
@@ -954,15 +953,10 @@ prom_hold_cpus(unsigned long mem)
 				     node, path, 255) < 0)
 			continue;
 
-		cpuid++;
-
 #ifdef DEBUG_PROM
 		prom_print_nl();
-		prom_print(RELOC("cpuid        = 0x"));
-		prom_print_hex(cpuid);
-		prom_print_nl();
 		prom_print(RELOC("cpu hw idx   = 0x"));
-		prom_print_hex(reg);
+		prom_print_hex(cpuid);
 		prom_print_nl();
 #endif
 		prom_print(RELOC("starting cpu "));
@@ -989,9 +983,6 @@ prom_hold_cpus(unsigned long mem)
 		prom_print_nl();
 		prom_print(RELOC("    3) secondary_hold = 0x"));
 		prom_print_hex(secondary_hold);
-		prom_print_nl();
-		prom_print(RELOC("    3) cpuid = 0x"));
-		prom_print_hex(cpuid);
 		prom_print_nl();
 #endif
 		call_prom(RELOC("start-cpu"), 3, 0, node, secondary_hold, cpuid);
