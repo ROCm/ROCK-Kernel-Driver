@@ -53,7 +53,7 @@ struct tblock {
 	u32 logtid;		/* log transaction id */
 
 	/* commit management */
-	struct list_head cqueue;	/* commit queue list */
+	struct tblock *cqnext;	/* commit queue link */
 	s32 clsn;		/* commit lsn */
 	struct lbuf *bp;
 	s32 pn;			/* commit record log page number */

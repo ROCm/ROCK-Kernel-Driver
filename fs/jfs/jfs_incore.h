@@ -163,11 +163,6 @@ struct jfs_sb_info {
 	pxd_t		ait2;		/* pxd describing AIT copy	*/
 	char		uuid[16];	/* 128-bit uuid for volume	*/
 	char		loguuid[16];	/* 128-bit uuid for log	*/
-	/*
-	 * commit_state is used for synchronization of the jfs_commit
-	 * threads.  It is protected by LAZY_LOCK().
-	 */
-	int		commit_state;	/* commit state */
 	/* Formerly in ipimap */
 	uint		gengen;		/* inode generation generator*/
 	uint		inostamp;	/* shows inode belongs to fileset*/
@@ -186,9 +181,6 @@ struct jfs_sb_info {
 	char		dm_mtpt[JFS_NAME_MAX+1];	/* 256: mount point */
 #endif	
 };
-
-/* jfs_sb_info commit_state */
-#define IN_LAZYCOMMIT 1
 
 static inline struct jfs_inode_info *JFS_IP(struct inode *inode)
 {
