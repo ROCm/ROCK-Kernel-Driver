@@ -2018,5 +2018,3 @@ NCR_700_slave_destroy(Scsi_Device *SDp)
 EXPORT_SYMBOL(NCR_700_detect);
 EXPORT_SYMBOL(NCR_700_release);
 EXPORT_SYMBOL(NCR_700_intr);
-
-no_module_init;
