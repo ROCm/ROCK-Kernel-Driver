@@ -449,7 +449,7 @@ synergy_perf_ioctl(struct inode *inode, struct file *file,
 }
 
 struct file_operations synergy_mon_fops = {
-        ioctl:		synergy_perf_ioctl,
+        .ioctl		= synergy_perf_ioctl,
 };
 
 void
