@@ -543,11 +543,11 @@ static int __devinit snd_opti9xx_configure(opti9xx_t *chip)
 
 __skip_base:
 	switch (chip->irq) {
-#ifdef OPTi93X
+//#ifdef OPTi93X
 	case 5:
 		irq_bits = 0x05;
 		break;
-#endif	/* OPTi93X */
+//#endif	/* OPTi93X */
 	case 7:
 		irq_bits = 0x01;
 		break;
@@ -1735,15 +1735,23 @@ static int __devinit snd_card_opti9xx_pnp(opti9xx_t *chip, struct pnp_card_link 
 #if defined(CS4231) || defined(OPTi93X)
 	if (dma2 != SNDRV_AUTO_DMA)
 		pnp_resource_change(&cfg->dma_resource[1], dma2, 1);
+#else
+#ifdef snd_opti9xx_fixup_dma2
+	snd_opti9xx_fixup_dma2(pdev);
+#endif
 #endif	/* CS4231 || OPTi93X */
-	if (fm_port != SNDRV_AUTO_PORT)
+#ifdef OPTi93X
+	if (fm_port > 0 && fm_port != SNDRV_AUTO_PORT)
 		pnp_resource_change(&cfg->port_resource[1], fm_port, 4);
-
+#else
+	if (fm_port > 0 && fm_port != SNDRV_AUTO_PORT)
+		pnp_resource_change(&cfg->port_resource[2], fm_port, 4);
+#endif
 	if (pnp_manual_config_dev(pdev, cfg, 0) < 0)
 		snd_printk(KERN_ERR "AUDIO the requested resources are invalid, using auto config\n");
 	err = pnp_activate_dev(pdev);
 	if (err < 0) {
-		snd_printk(KERN_ERR "AUDIO pnp configure failure\n");
+		snd_printk(KERN_ERR "AUDIO pnp configure failure: %d\n", err);
 		kfree(cfg);
 		return err;
 	}
@@ -1763,7 +1771,7 @@ static int __devinit snd_card_opti9xx_pnp(opti9xx_t *chip, struct pnp_card_link 
 #endif	/* CS4231 || OPTi93X */
 
 	pdev = chip->devmpu;
-	if (pdev) {
+	if (pdev && mpu_port > 0) {
 		pnp_init_resource_table(cfg);
 
 		if (mpu_port != SNDRV_AUTO_PORT)
@@ -1986,9 +1994,6 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 	chip->dma2 = dma2;
 #endif
 
-#ifdef CONFIG_PNP
-	if (!isapnp) {
-#endif
 	if (chip->wss_base == SNDRV_AUTO_PORT) {
 		if ((chip->wss_base = snd_legacy_find_free_ioport(possible_ports, 4)) < 0) {
 			snd_card_free(card);
@@ -1996,6 +2001,9 @@ static int __devinit snd_card_opti9xx_probe(struct pnp_card_link *pcard,
 			return -EBUSY;
 		}
 	}
+#ifdef CONFIG_PNP
+	if (!isapnp) {
+#endif
 	if (chip->mpu_port == SNDRV_AUTO_PORT) {
 		if ((chip->mpu_port = snd_legacy_find_free_ioport(possible_mpu_ports, 2)) < 0) {
 			snd_card_free(card);
