@@ -41,6 +41,11 @@
 #endif
 #include <linux/usb.h>
 
+#include <asm/io.h>
+#include <asm/scatterlist.h>
+#include <linux/mm.h>
+#include <linux/dma-mapping.h>
+
 #include "hcd.h"
 #include "usb.h"
 
@@ -803,7 +808,7 @@ void usb_disconnect(struct usb_device **pdev)
 
 	*pdev = NULL;
 
-	info("USB disconnect on device %d", dev->devnum);
+	dev_info (dev->dev, "USB disconnect, address %d\n", dev->devnum);
 
 	/* Free up all the children before we remove this device */
 	for (i = 0; i < USB_MAXCHILDREN; i++) {
@@ -812,7 +817,7 @@ void usb_disconnect(struct usb_device **pdev)
 			usb_disconnect(child);
 	}
 
-	dbg ("unregistering interfaces on device %d", dev->devnum);
+	dev_dbg (dev->dev, "unregistering interfaces\n");
 	if (dev->actconfig) {
 		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 			struct usb_interface *interface = &dev->actconfig->interface[i];
@@ -822,7 +827,7 @@ void usb_disconnect(struct usb_device **pdev)
 		}
 	}
 
-	dbg ("unregistering the device %d", dev->devnum);
+	dev_dbg (dev->dev, "unregistering device\n");
 	/* Free the device number and remove the /proc/bus/usb entry */
 	if (dev->devnum > 0) {
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
@@ -980,6 +985,9 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		sprintf (&dev->dev.bus_id[0], "%d-%s",
 			 dev->bus->busnum, dev->devpath);
 
+	/* dma masks come from the controller; readonly, except to hcd */
+	dev->dev.dma_mask = parent->dma_mask;
+
 	/* USB device state == default ... it's not usable yet */
 
 	/* USB 2.0 section 5.5.3 talks about ep0 maxpacket ...
@@ -1104,6 +1112,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		interface->dev.parent = &dev->dev;
 		interface->dev.driver = NULL;
 		interface->dev.bus = &usb_bus_type;
+		interface->dev.dma_mask = parent->dma_mask;
 		sprintf (&interface->dev.bus_id[0], "%d-%s:%d",
 			 dev->bus->busnum, dev->devpath,
 			 desc->bInterfaceNumber);
@@ -1206,24 +1215,21 @@ void usb_buffer_free (
 struct urb *usb_buffer_map (struct urb *urb)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!urb
 			|| usb_pipecontrol (urb->pipe)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_map)
+			|| !(controller = bus->controller))
 		return 0;
 
-	if (op->buffer_map (bus,
-			urb->transfer_buffer,
-			&urb->transfer_dma,
-			urb->transfer_buffer_length,
+	urb->transfer_dma = dma_map_single (controller,
+			urb->transfer_buffer, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
-				? USB_DIR_IN
-				: USB_DIR_OUT))
-		return 0;
+				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
+	// FIXME generic api broken like pci, can't report errors
+	// if (urb->transfer_dma == DMA_ADDR_INVALID) return 0;
 	urb->transfer_flags |= URB_NO_DMA_MAP;
 	return urb;
 }
@@ -1235,22 +1241,19 @@ struct urb *usb_buffer_map (struct urb *urb)
 void usb_buffer_dmasync (struct urb *urb)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!urb
 			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_dmasync)
+			|| !(controller = bus->controller))
 		return;
 
-	op->buffer_dmasync (bus,
-			urb->transfer_dma,
-			urb->transfer_buffer_length,
+	dma_sync_single (controller,
+			urb->transfer_dma, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
-				? USB_DIR_IN
-				: USB_DIR_OUT);
+				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
 /**
@@ -1262,23 +1265,21 @@ void usb_buffer_dmasync (struct urb *urb)
 void usb_buffer_unmap (struct urb *urb)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!urb
 			|| !(urb->transfer_flags & URB_NO_DMA_MAP)
 			|| !urb->dev
 			|| !(bus = urb->dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_unmap)
+			|| !(controller = bus->controller))
 		return;
 
-	op->buffer_unmap (bus,
-			urb->transfer_dma,
-			urb->transfer_buffer_length,
+	dma_unmap_single (controller,
+			urb->transfer_dma, urb->transfer_buffer_length,
 			usb_pipein (urb->pipe)
-				? USB_DIR_IN
-				: USB_DIR_OUT);
+				? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
+
 /**
  * usb_buffer_map_sg - create scatterlist DMA mapping(s) for an endpoint
  * @dev: device to which the scatterlist will be mapped
@@ -1297,6 +1298,7 @@ void usb_buffer_unmap (struct urb *urb)
  * to complete before starting the next I/O.   This is particularly easy
  * to do with scatterlists.  Just allocate and submit one URB for each DMA
  * mapping entry returned, stopping on the first error or when all succeed.
+ * Better yet, use the usb_sg_*() calls, which do that (and more) for you.
  *
  * This call would normally be used when translating scatterlist requests,
  * rather than usb_buffer_map(), since on some hardware (with IOMMUs) it
@@ -1308,26 +1310,17 @@ int usb_buffer_map_sg (struct usb_device *dev, unsigned pipe,
 		struct scatterlist *sg, int nents)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
-	int n_hw_ents;
+	struct device		*controller;
 
 	if (!dev
 			|| usb_pipecontrol (pipe)
 			|| !(bus = dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_map_sg)
+			|| !(controller = bus->controller))
 		return -1;
 
-	if (op->buffer_map_sg (bus,
-			       sg,
-			       &n_hw_ents,
-			       nents,
-			       usb_pipein (pipe)
-				       ? USB_DIR_IN
-				       : USB_DIR_OUT))
-		return -1;
-
-	return n_hw_ents;
+	// FIXME generic api broken like pci, can't report errors
+	return dma_map_sg (controller, sg, nents,
+			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
 /**
@@ -1344,20 +1337,15 @@ void usb_buffer_dmasync_sg (struct usb_device *dev, unsigned pipe,
 		struct scatterlist *sg, int n_hw_ents)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!dev
 			|| !(bus = dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_dmasync_sg)
+			|| !(controller = bus->controller))
 		return;
 
-	op->buffer_dmasync_sg (bus,
-			       sg,
-			       n_hw_ents,
-			       usb_pipein (pipe)
-				       ? USB_DIR_IN
-				       : USB_DIR_OUT);
+	dma_sync_sg (controller, sg, n_hw_ents,
+			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
 /**
@@ -1373,20 +1361,15 @@ void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
 		struct scatterlist *sg, int n_hw_ents)
 {
 	struct usb_bus		*bus;
-	struct usb_operations	*op;
+	struct device		*controller;
 
 	if (!dev
 			|| !(bus = dev->bus)
-			|| !(op = bus->op)
-			|| !op->buffer_unmap_sg)
+			|| !(controller = bus->controller))
 		return;
 
-	op->buffer_unmap_sg (bus,
-			     sg,
-			     n_hw_ents,
-			     usb_pipein (pipe)
-				     ? USB_DIR_IN
-				     : USB_DIR_OUT);
+	dma_unmap_sg (controller, sg, n_hw_ents,
+			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
 

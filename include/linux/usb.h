@@ -28,14 +28,6 @@ static __inline__ void wait_ms(unsigned int ms)
 		mdelay(ms);
 }
 
-/*
- * USB device number allocation bitmap. There's one bitmap
- * per USB tree.
- */
-struct usb_devmap {
-	unsigned long devicemap[128 / (8*sizeof(unsigned long))];
-};
-
 struct usb_device;
 
 /*-------------------------------------------------------------------------*/
@@ -159,10 +151,16 @@ int __usb_get_extra_descriptor(char *buffer, unsigned size,
 
 struct usb_operations;
 
+/* USB device number allocation bitmap */
+struct usb_devmap {
+	unsigned long devicemap[128 / (8*sizeof(unsigned long))];
+};
+
 /*
- * Allocated per bus we have
+ * Allocated per bus (tree of devices) we have:
  */
 struct usb_bus {
+	struct device *controller;	/* host/master side hardware */
 	int busnum;			/* Bus number (in order of reg) */
 	char *bus_name;			/* stable id (PCI slot_name etc) */
 

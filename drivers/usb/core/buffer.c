@@ -24,11 +24,14 @@
 
 
 /*
- * DMA-Consistent Buffers
+ * DMA-Coherent Buffers
  */
 
 /* FIXME tune these based on pool statistics ... */
 static const size_t	pool_max [HCD_BUFFER_POOLS] = {
+	/* platforms without dma-friendly caches might need to
+	 * prevent cacheline sharing...
+	 */
 	32,
 	128,
 	512,
@@ -132,99 +135,4 @@ void hcd_buffer_free (
 		}
 	}
 	pci_free_consistent (hcd->pdev, size, addr, dma);
-}
-
-
-/*
- * DMA-Mappings for arbitrary memory buffers
- */
-
-int hcd_buffer_map (
-	struct usb_bus	*bus,
-	void		*addr,
-	dma_addr_t	*dma,
-	size_t		size,
-	int		direction
-) {
-	struct usb_hcd	*hcd = bus->hcpriv;
-
-	// FIXME pci_map_single() has no standard failure mode!
-	*dma = pci_map_single (hcd->pdev, addr, size,
-			(direction == USB_DIR_IN)
-				? PCI_DMA_FROMDEVICE
-				: PCI_DMA_TODEVICE);
-	return 0;
-}
-
-void hcd_buffer_dmasync (
-	struct usb_bus	*bus,
-	dma_addr_t	dma,
-	size_t		size,
-	int		direction
-) {
-	struct usb_hcd *hcd = bus->hcpriv;
-
-	pci_dma_sync_single (hcd->pdev, dma, size,
-			(direction == USB_DIR_IN)
-				? PCI_DMA_FROMDEVICE
-				: PCI_DMA_TODEVICE);
-}
-
-void hcd_buffer_unmap (
-	struct usb_bus	*bus,
-	dma_addr_t	dma,
-	size_t		size,
-	int		direction
-) {
-	struct usb_hcd *hcd = bus->hcpriv;
-
-	pci_unmap_single (hcd->pdev, dma, size,
-			(direction == USB_DIR_IN)
-				? PCI_DMA_FROMDEVICE
-				: PCI_DMA_TODEVICE);
-}
-
-int hcd_buffer_map_sg (
-	struct usb_bus		*bus,
-	struct scatterlist	*sg,
-	int			*n_hw_ents,
-	int			nents,
-	int			direction
-) {
-	struct usb_hcd *hcd = bus->hcpriv;
-
-	// FIXME pci_map_sg() has no standard failure mode!
-	*n_hw_ents = pci_map_sg(hcd->pdev, sg, nents,
-				(direction == USB_DIR_IN)
-				? PCI_DMA_FROMDEVICE
-				: PCI_DMA_TODEVICE);
-	return 0;
-}
-
-void hcd_buffer_sync_sg (
-	struct usb_bus		*bus,
-	struct scatterlist	*sg,
-	int			n_hw_ents,
-	int			direction
-) {
-	struct usb_hcd *hcd = bus->hcpriv;
-
-	pci_dma_sync_sg(hcd->pdev, sg, n_hw_ents,
-			(direction == USB_DIR_IN)
-			? PCI_DMA_FROMDEVICE
-			: PCI_DMA_TODEVICE);
-}
-
-void hcd_buffer_unmap_sg (
-	struct usb_bus		*bus,
-	struct scatterlist	*sg,
-	int			n_hw_ents,
-	int			direction
-) {
-	struct usb_hcd *hcd = bus->hcpriv;
-
-	pci_unmap_sg(hcd->pdev, sg, n_hw_ents,
-		     (direction == USB_DIR_IN)
-		     ? PCI_DMA_FROMDEVICE
-		     : PCI_DMA_TODEVICE);
 }
