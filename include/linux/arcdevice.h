@@ -333,14 +333,5 @@ void arcnet_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 void arcdev_setup(struct net_device *dev);
 void arcnet_rx(struct net_device *dev, int bufnum);
 
-void arcnet_init(void);
-
-void arcnet_rfc1201_init(void);
-void arcnet_rfc1051_init(void);
-void arcnet_raw_init(void);
-
-int com90xx_probe(struct net_device *dev);
-
 #endif				/* __KERNEL__ */
-
 #endif				/* _LINUX_ARCDEVICE_H */

@@ -29,7 +29,6 @@
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/netdevice.h>
-#include <linux/bootmem.h>
 #include <asm/io.h>
 #include <linux/arcdevice.h>
 
@@ -100,7 +99,7 @@ static int numcards;
 
 static int com90xx_skip_probe __initdata = 0;
 
-int __init com90xx_probe(struct net_device *dev)
+static int __init com90xx_probe(struct net_device *dev)
 {
 	int count, status, ioaddr, numprint, airq, retval = -ENODEV,
 	 openparen = 0;
@@ -114,10 +113,6 @@ int __init com90xx_probe(struct net_device *dev)
 
 	if (!dev && com90xx_skip_probe)
 		return -ENODEV;
-
-#ifndef MODULE
-	arcnet_init();
-#endif
 
 	BUGLVL(D_NORMAL) printk(VERSION);
 
@@ -603,9 +598,6 @@ static void com90xx_copy_from_card(struct net_device *dev, int bufnum, int offse
 }
 
 
-
-#ifdef MODULE
-
 /* Module parameters */
 
 static int io;			/* use the insmod io= irq= shmem= options */
@@ -619,7 +611,7 @@ MODULE_PARM(shmem, "i");
 MODULE_PARM(device, "s");
 MODULE_LICENSE("GPL");
 
-int init_module(void)
+static int __init com90xx_init(void)
 {
 	struct net_device *dev;
 	int err;
@@ -642,8 +634,7 @@ int init_module(void)
 	return 0;
 }
 
-
-void cleanup_module(void)
+static void __exit com90xx_exit(void)
 {
 	struct net_device *dev;
 	struct arcnet_local *lp;
@@ -663,44 +654,38 @@ void cleanup_module(void)
 	}
 }
 
-#else
+module_init(com90xx_init);
+module_exit(com90xx_exit);
 
+#ifndef MODULE
 static int __init com90xx_setup(char *s)
 {
-	struct net_device *dev;
 	int ints[8];
-
-	com90xx_skip_probe = 1;
 
 	s = get_options(s, 8, ints);
 	if (!ints[0] && !*s) {
 		printk("com90xx: Disabled.\n");
 		return 1;
 	}
-	dev = alloc_bootmem(sizeof(struct net_device));
-	memset(dev, 0, sizeof(struct net_device));
-	dev->init = com90xx_probe;
 
 	switch (ints[0]) {
 	default:		/* ERROR */
 		printk("com90xx: Too many arguments.\n");
 	case 3:		/* Mem address */
-		dev->mem_start = ints[3];
+		shmem = ints[3];
 	case 2:		/* IRQ */
-		dev->irq = ints[2];
+		irq = ints[2];
 	case 1:		/* IO address */
-		dev->base_addr = ints[1];
+		io = ints[1];
 	}
+
 	if (*s)
-		strncpy(dev->name, s, 9);
+		strncpy(device, s, 9);
 	else
-		strcpy(dev->name, "arc%d");
-	if (register_netdev(dev))
-		printk(KERN_ERR "com90xx: Cannot register arcnet device\n");
+		strcpy(device, "arc%d");
 
 	return 1;
 }
 
 __setup("com90xx=", com90xx_setup);
-
-#endif				/* MODULE */
+#endif
