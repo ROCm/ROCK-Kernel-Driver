@@ -241,41 +241,6 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 }
 
 /*
- * Lost tick detection and compensation
- */
-static inline void detect_lost_tick(void)
-{
-	/* read time since last interrupt */
-	unsigned long delta = timer->get_offset();
-	static unsigned long dbg_print;
-	
-	/* check if delta is greater then two ticks */
-	if(delta >= 2*(1000000/HZ)){
-
-		/*
-		 * only print debug info first 5 times
-		 */
-		/*
-		 * AKPM: disable this for now; it's nice, but irritating.
-		 */
-		if (0 && dbg_print < 5) {
-			printk(KERN_WARNING "\nWarning! Detected %lu "
-				"micro-second gap between interrupts.\n",
-				delta);
-			printk(KERN_WARNING "  Compensating for %lu lost "
-				"ticks.\n",
-				delta/(1000000/HZ)-1);
-			dump_stack();
-			dbg_print++;
-		}
-		/* calculate number of missed ticks */
-		delta = delta/(1000000/HZ)-1;
-		jiffies += delta;
-	}
-		
-}
-
-/*
  * This is the same as the above, except we _also_ save the current
  * Time Stamp Counter value at the time of the timer interrupt, so that
  * we later on can estimate the time of day more exactly.
@@ -291,7 +256,6 @@ void timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	 */
 	write_seqlock(&xtime_lock);
 
-	detect_lost_tick();
 	timer->mark_offset();
  
 	do_timer_interrupt(irq, NULL, regs);
