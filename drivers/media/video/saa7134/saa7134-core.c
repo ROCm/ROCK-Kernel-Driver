@@ -101,7 +101,7 @@ unsigned int      saa7134_devcount;
 /* debug help functions                                               */
 
 static const char *v4l1_ioctls[] = {
-	"0", "CGAP", "GCHAN", "SCHAN", "GTUNER", "STUNER", "GPICT", "SPICT",
+	"0", "GCAP", "GCHAN", "SCHAN", "GTUNER", "STUNER", "GPICT", "SPICT",
 	"CCAPTURE", "GWIN", "SWIN", "GFBUF", "SFBUF", "KEY", "GFREQ",
 	"SFREQ", "GAUDIO", "SAUDIO", "SYNC", "MCAPTURE", "GMBUF", "GUNIT",
 	"GCAPTURE", "SCAPTURE", "SPLAYMODE", "SWRITEMODE", "GPLAYINFO",
@@ -466,7 +466,7 @@ int saa7134_set_dmabits(struct saa7134_dev *dev)
 	}
 
 	/* audio capture -- dma 3 */
-	if (dev->oss.recording) {
+	if (dev->oss.dma_running) {
 		ctrl |= SAA7134_MAIN_CTRL_TE6;
 		irq  |= SAA7134_IRQ1_INTE_RA3_1 |
 			SAA7134_IRQ1_INTE_RA3_0;
@@ -607,10 +607,18 @@ static irqreturn_t saa7134_irq(int irq, void *dev_id, struct pt_regs *regs)
 	};
 	if (10 == loop) {
 		print_irqstatus(dev,loop,report,status);
-		printk(KERN_WARNING "%s/irq: looping -- clearing enable bits\n",dev->name);
-		/* disable all irqs */
-		saa_writel(SAA7134_IRQ1,0);
-		saa_writel(SAA7134_IRQ2,0);
+		if (report & SAA7134_IRQ_REPORT_PE) {
+			/* disable all parity error */
+			printk(KERN_WARNING "%s/irq: looping -- "
+			       "clearing PE (parity error!) enable bit\n",dev->name);
+			saa_clearl(SAA7134_IRQ2,SAA7134_IRQ2_INTE_PE);
+		} else {
+			/* disable all irqs */
+			printk(KERN_WARNING "%s/irq: looping -- "
+			       "clearing all enable bits\n",dev->name);
+			saa_writel(SAA7134_IRQ1,0);
+			saa_writel(SAA7134_IRQ2,0);
+		}
 	}
 
  out:

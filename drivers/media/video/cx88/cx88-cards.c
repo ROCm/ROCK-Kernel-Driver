@@ -111,6 +111,7 @@ struct cx88_board cx88_boards[] = {
         [CX88_BOARD_WINFAST2000XP] = {
                 .name           = "Leadtek Winfast 2000XP Expert",
                 .tuner_type     = 44,
+		.needs_tda9887  = 1,
                 .input          = {{
                         .type   = CX88_VMUX_TELEVISION,
                         .vmux   = 0,
@@ -173,6 +174,7 @@ struct cx88_board cx88_boards[] = {
 	[CX88_BOARD_WINFAST_DV2000] = {
                 .name           = "Leadtek Winfast DV2000",
                 .tuner_type     = 38,
+		.needs_tda9887  = 1,
                 .input          = {{
                         .type   = CX88_VMUX_TELEVISION,
                         .vmux   = 0,
@@ -239,6 +241,10 @@ struct cx88_subid cx88_subids[] = {
 		.subvendor = 0x107d,
                 .subdevice = 0x6620,
                 .card      = CX88_BOARD_WINFAST_DV2000,
+        },{
+                .subvendor = 0x107d,
+                .subdevice = 0x663b,
+                .card      = CX88_BOARD_LEADTEK_PVR2000,
         },{
                 .subvendor = 0x107d,
                 .subdevice = 0x663C,

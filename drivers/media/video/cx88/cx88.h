@@ -32,7 +32,7 @@
 #include "cx88-reg.h"
 
 #include <linux/version.h>
-#define CX88_VERSION_CODE KERNEL_VERSION(0,0,2)
+#define CX88_VERSION_CODE KERNEL_VERSION(0,0,4)
 
 #ifndef TRUE
 # define TRUE (1==1)
@@ -146,6 +146,7 @@ struct cx88_input {
 struct cx88_board {
 	char                    *name;
 	unsigned int            tuner_type;
+	int                     needs_tda9887:1;
 	struct cx88_input       input[8];
 	struct cx88_input       radio;
 };
@@ -262,6 +263,9 @@ struct cx8800_dev {
 
 	/* other global state info */
 	u32                         shadow[SHADOW_MAX];
+	int                         shutdown;
+	pid_t                       tpid;
+	struct completion           texit;
 	struct cx8800_suspend_state state;
 };
 
@@ -371,6 +375,7 @@ extern void __devinit cx88_card_setup(struct cx8800_dev *dev);
 void cx88_set_tvaudio(struct cx8800_dev *dev);
 void cx88_get_stereo(struct cx8800_dev *dev, struct v4l2_tuner *t);
 void cx88_set_stereo(struct cx8800_dev *dev, u32 mode);
+int cx88_audio_thread(void *data);
 
 /*
  * Local variables:

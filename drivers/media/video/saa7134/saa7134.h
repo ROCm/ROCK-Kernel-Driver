@@ -19,7 +19,7 @@
  */
 
 #include <linux/version.h>
-#define SAA7134_VERSION_CODE KERNEL_VERSION(0,2,9)
+#define SAA7134_VERSION_CODE KERNEL_VERSION(0,2,12)
 
 #include <linux/pci.h>
 #include <linux/i2c.h>
@@ -73,8 +73,6 @@ enum saa7134_video_out {
 struct saa7134_tvnorm {
 	char          *name;
 	v4l2_std_id   id;
-	unsigned int  width;
-	unsigned int  height;
 
 	/* video decoder */
 	unsigned int  sync_control;
@@ -154,6 +152,9 @@ struct saa7134_format {
 #define SAA7134_BOARD_ECS_TVP3XP_4CB5  31
 #define SAA7134_BOARD_AVACSSMARTTV     32
 #define SAA7134_BOARD_AVERMEDIA_DVD_EZMAKER 33
+#define SAA7134_BOARD_NOVAC_PRIMETV7133 34
+#define SAA7134_BOARD_AVERMEDIA_305    35
+#define SAA7133_BOARD_UPMOST_PURPLE_TV 36
 
 #define SAA7134_INPUT_MAX 8
 
@@ -301,7 +302,8 @@ struct saa7134_oss {
 	unsigned int               afmt;
 	unsigned int               rate;
 	unsigned int               channels;
-	unsigned int               recording;
+	unsigned int               recording_on;
+	unsigned int               dma_running;
 	unsigned int               blocks;
 	unsigned int               blksize;
 	unsigned int               bufsize;
@@ -394,7 +396,12 @@ struct saa7134_dev {
 	int                        ctl_mirror;
 	int                        ctl_y_odd;
 	int                        ctl_y_even;
-
+	
+	/* crop */
+	struct v4l2_rect           crop_bounds;
+	struct v4l2_rect           crop_defrect;
+	struct v4l2_rect           crop_current;
+	
 	/* other global state info */
 	unsigned int               automute;
 	struct saa7134_thread      thread;

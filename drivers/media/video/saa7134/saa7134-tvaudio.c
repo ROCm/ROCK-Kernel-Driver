@@ -60,8 +60,9 @@ MODULE_PARM_DESC(audio_clock_tweak, "Audio clock tick fine tuning for cards with
 #define print_regb(reg) printk("%s:   reg 0x%03x [%-16s]: 0x%02x\n", \
 		dev->name,(SAA7134_##reg),(#reg),saa_readb((SAA7134_##reg)))
 
-#define SCAN_INITIAL_DELAY  (HZ)
-#define SCAN_SAMPLE_DELAY   (HZ/5)
+#define SCAN_INITIAL_DELAY     (HZ)
+#define SCAN_SAMPLE_DELAY      (HZ/5)
+#define SCAN_SUBCARRIER_DELAY  (HZ*2)
 
 /* ------------------------------------------------------------------ */
 /* saa7134 code                                                       */
@@ -145,7 +146,7 @@ static void tvaudio_init(struct saa7134_dev *dev)
 
 	if (UNSET != audio_clock_override)
 	        clock = audio_clock_override;
-
+	
 	/* init all audio registers */
 	saa_writeb(SAA7134_AUDIO_PLL_CTRL,   0x00);
 	if (need_resched())
@@ -383,6 +384,7 @@ static int tvaudio_getstereo(struct saa7134_dev *dev, struct saa7134_tvaudio *au
 	case TVAUDIO_FM_K_STEREO:
 	case TVAUDIO_FM_BG_STEREO:
 		idp = (saa_readb(SAA7134_IDENT_SIF) & 0xe0) >> 5;
+		dprintk("getstereo: fm/stereo: idp=0x%x\n",idp);
 		if (0x03 == (idp & 0x03))
 			retval = V4L2_TUNER_SUB_LANG1 | V4L2_TUNER_SUB_LANG2;
 		else if (0x05 == (idp & 0x05))
@@ -396,6 +398,7 @@ static int tvaudio_getstereo(struct saa7134_dev *dev, struct saa7134_tvaudio *au
 	case TVAUDIO_NICAM_FM:
 	case TVAUDIO_NICAM_AM:
 		nicam = saa_readb(SAA7134_NICAM_STATUS);
+		dprintk("getstereo: nicam=0x%x\n",nicam);
 		switch (nicam & 0x0b) {
 		case 0x08:
 			retval = V4L2_TUNER_SUB_MONO;
@@ -465,7 +468,7 @@ static int tvaudio_thread(void *data)
 	struct saa7134_dev *dev = data;
 	const int *carr_scan;
 	int carr_vals[4];
-	unsigned int i, audio;
+	unsigned int i, audio, retries;
 	int max1,max2,carrier,rx,mode,lastmode;
 
 	daemonize("%s", dev->name);
@@ -497,22 +500,26 @@ static int tvaudio_thread(void *data)
 			carr_scan = carr_secam;
 		saa_writeb(SAA7134_MONITOR_SELECT,0x00);
 		tvaudio_setmode(dev,&tvaudio[0],NULL);
-		for (i = 0; i < MAX_SCAN; i++) {
-			if (!carr_scan[i])
-				continue;
-			carr_vals[i] = tvaudio_checkcarrier(dev,carr_scan[i]);
-			if (dev->thread.scan1 != dev->thread.scan2)
-				goto restart;
-		}
-		for (carrier = 0, max1 = 0, max2 = 0, i = 0; i < MAX_SCAN; i++) {
-			if (!carr_scan[i])
-				continue;
-			if (max1 < carr_vals[i]) {
-				max2 = max1;
-				max1 = carr_vals[i];
-				carrier = carr_scan[i];
-			} else if (max2 < carr_vals[i]) {
-				max2 = carr_vals[i];
+
+		carrier = 0;
+		for (retries = 3; retries > 0 && 0 == carrier; retries--) {
+			for (i = 0; i < MAX_SCAN; i++) {
+				if (!carr_scan[i])
+					continue;
+				carr_vals[i] = tvaudio_checkcarrier(dev,carr_scan[i]);
+				if (dev->thread.scan1 != dev->thread.scan2)
+					goto restart;
+			}
+			for (max1 = 0, max2 = 0, i = 0; i < MAX_SCAN; i++) {
+				if (!carr_scan[i])
+					continue;
+				if (max1 < carr_vals[i]) {
+					max2 = max1;
+					max1 = carr_vals[i];
+					carrier = carr_scan[i];
+				} else if (max2 < carr_vals[i]) {
+					max2 = carr_vals[i];
+				}
 			}
 		}
 
@@ -557,7 +564,7 @@ static int tvaudio_thread(void *data)
 			if (UNSET == audio)
 				audio = i;
 			tvaudio_setmode(dev,&tvaudio[i],"trying");
-			if (tvaudio_sleep(dev,HZ*2))
+			if (tvaudio_sleep(dev,SCAN_SUBCARRIER_DELAY))
 				goto restart;
 			if (-1 != tvaudio_getstereo(dev,&tvaudio[i])) {
 				audio = i;
@@ -721,15 +728,20 @@ static int mute_input_7133(struct saa7134_dev *dev)
 static int tvaudio_thread_ddep(void *data)
 {
 	struct saa7134_dev *dev = data;
-	u32 value, norms;
+	u32 value, norms, clock;
 
 	daemonize("%s", dev->name);
 	allow_signal(SIGTERM);
 
+	clock = saa7134_boards[dev->board].audio_clock;
+	if (UNSET != audio_clock_override)
+		clock = audio_clock_override;
+	saa_writel(0x598 >> 2, clock);
+	
 	/* unmute */
 	saa_dsp_writel(dev, 0x474 >> 2, 0x00);
 	saa_dsp_writel(dev, 0x450 >> 2, 0x00);
-
+	
 	for (;;) {
 		tvaudio_sleep(dev,-1);
 		if (dev->thread.shutdown || signal_pending(current))
@@ -768,9 +780,11 @@ static int tvaudio_thread_ddep(void *data)
 				(norms & 0x40) ? " M"    : "");
 		}
 
-		/* quick & dirty -- to be fixed up later ... */
+		/* kick automatic standard detection */
 		saa_dsp_writel(dev, 0x454 >> 2, 0);
 		saa_dsp_writel(dev, 0x454 >> 2, norms | 0x80);
+
+		/* setup crossbars */
 		saa_dsp_writel(dev, 0x464 >> 2, 0x000000);
 		saa_dsp_writel(dev, 0x470 >> 2, 0x101010);
 

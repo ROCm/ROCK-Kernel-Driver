@@ -526,12 +526,13 @@ typedef __u64 v4l2_std_id;
 				 V4L2_STD_PAL_I)
 #define V4L2_STD_NTSC           (V4L2_STD_NTSC_M	|\
 				 V4L2_STD_NTSC_M_JP)
+#define V4L2_STD_SECAM_DK      	(V4L2_STD_SECAM_D	|\
+				 V4L2_STD_SECAM_K	|\
+				 V4L2_STD_SECAM_K1)
 #define V4L2_STD_SECAM		(V4L2_STD_SECAM_B	|\
-				 V4L2_STD_SECAM_D	|\
 				 V4L2_STD_SECAM_G	|\
 				 V4L2_STD_SECAM_H	|\
-				 V4L2_STD_SECAM_K	|\
-				 V4L2_STD_SECAM_K1	|\
+				 V4L2_STD_SECAM_DK	|\
 				 V4L2_STD_SECAM_L)
 
 #define V4L2_STD_525_60		(V4L2_STD_PAL_M		|\
@@ -541,6 +542,8 @@ typedef __u64 v4l2_std_id;
 				 V4L2_STD_PAL_N		|\
 				 V4L2_STD_PAL_Nc	|\
 				 V4L2_STD_SECAM)
+#define V4L2_STD_ATSC           (V4L2_STD_ATSC_8_VSB    |\
+		                 V4L2_STD_ATSC_16_VSB)
 
 #define V4L2_STD_UNKNOWN        0
 #define V4L2_STD_ALL            (V4L2_STD_525_60	|\

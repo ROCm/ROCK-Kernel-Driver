@@ -194,8 +194,13 @@ static struct cx8800_tvnorm tvnorms[] = {
 		.cxiformat = VideoFormatPAL60,
 		.cxoformat = 0x181f0008,
 	},{
-		.name      = "SECAM",
-		.id        = V4L2_STD_SECAM,
+		.name      = "SECAM-L",
+		.id        = V4L2_STD_SECAM_L,
+		.cxiformat = VideoFormatSECAM,
+		.cxoformat = 0x181f0008,
+	},{
+		.name      = "SECAM-DK",
+		.id        = V4L2_STD_SECAM_DK,
 		.cxiformat = VideoFormatSECAM,
 		.cxoformat = 0x181f0008,
 	}
@@ -483,26 +488,28 @@ static int set_tvaudio(struct cx8800_dev *dev)
 	if (CX88_VMUX_TELEVISION != INPUT(dev->input)->type)
 		return 0;
 
-	switch (dev->tvnorm->id) {
-	case V4L2_STD_PAL_BG:
+	if (V4L2_STD_PAL_BG & dev->tvnorm->id) {
 		dev->tvaudio = nicam ? WW_NICAM_BGDKL : WW_A2_BG;
-		break;
-	case V4L2_STD_PAL_DK:
+
+	} else if (V4L2_STD_PAL_DK & dev->tvnorm->id) {
 		dev->tvaudio = nicam ? WW_NICAM_BGDKL : WW_A2_DK;
-		break;
-	case V4L2_STD_PAL_I:
+
+	} else if (V4L2_STD_PAL_I & dev->tvnorm->id) {
 		dev->tvaudio = WW_NICAM_I;
-		break;
-	case V4L2_STD_SECAM:
-		dev->tvaudio = WW_SYSTEM_L_AM;  /* FIXME: fr != ru */
-		break;
-	case V4L2_STD_NTSC_M:
+
+	} else if (V4L2_STD_SECAM_L & dev->tvnorm->id) {
+		dev->tvaudio = WW_SYSTEM_L_AM;
+
+	} else if (V4L2_STD_SECAM_DK & dev->tvnorm->id) {
+		dev->tvaudio = WW_A2_DK;
+
+	} else if (V4L2_STD_NTSC_M & dev->tvnorm->id) {
 		dev->tvaudio = WW_BTSC;
-		break;
-	case V4L2_STD_NTSC_M_JP:
+
+	} else if (V4L2_STD_NTSC_M_JP & dev->tvnorm->id) {
 		dev->tvaudio = WW_EIAJ;
-		break;
-	default:
+
+	} else {
 		dprintk(1,"tvaudio support needs work for this tv norm [%s], sorry\n",
 			dev->tvnorm->name);
 		dev->tvaudio = 0;
@@ -616,6 +623,7 @@ static int set_scale(struct cx8800_dev *dev, unsigned int width, unsigned int he
 
 	// recalc H delay and scale registers
 	value = (width * norm_hdelay(dev->tvnorm)) / swidth;
+	value &= 0x3fe;
 	cx_write(MO_HDELAY_EVEN,  value);
 	cx_write(MO_HDELAY_ODD,   value);
 	dprintk(1,"set_scale: hdelay  0x%04x\n", value);
@@ -675,10 +683,12 @@ static int video_mux(struct cx8800_dev *dev, unsigned int input)
 
 	switch (INPUT(input)->type) {
 	case CX88_VMUX_SVIDEO:
-		cx_andor(MO_AFECFG_IO, 0x01, 0x01);
+		cx_set(MO_AFECFG_IO,    0x00000001);
+		cx_set(MO_INPUT_FORMAT, 0x00010010);
 		break;
 	default:
-		cx_andor(MO_AFECFG_IO, 0x01, 0x00);
+		cx_clear(MO_AFECFG_IO,    0x00000001);
+		cx_clear(MO_INPUT_FORMAT, 0x00010010);
 		break;
 	}
 	return 0;
@@ -1350,6 +1360,9 @@ static int get_control(struct cx8800_dev *dev, struct v4l2_control *ctl)
 	case V4L2_CID_AUDIO_BALANCE:
 		ctl->value = (value & 0x40) ? (value & 0x3f) : (0x40 - (value & 0x3f));
 		break;
+	case V4L2_CID_AUDIO_VOLUME:
+		ctl->value = 0x3f - (value & 0x3f);
+		break;
 	default:
 		ctl->value = ((value + (c->off << c->shift)) & c->mask) >> c->shift;
 		break;
@@ -1377,6 +1390,9 @@ static int set_control(struct cx8800_dev *dev, struct v4l2_control *ctl)
 	switch (ctl->id) {
 	case V4L2_CID_AUDIO_BALANCE:
 		value = (ctl->value < 0x40) ? (0x40 - ctl->value) : ctl->value;
+		break;
+	case V4L2_CID_AUDIO_VOLUME:
+		value = 0x3f - (ctl->value & 0x3f);
 		break;
 	case V4L2_CID_SATURATION:
 		/* special v_sat handling */
@@ -1409,7 +1425,7 @@ static void init_controls(struct cx8800_dev *dev)
 	};
 	static struct v4l2_control volume = {
 		.id    = V4L2_CID_AUDIO_VOLUME,
-		.value = 0,
+		.value = 0x3f,
 	};
 
 	set_control(dev,&mute);
@@ -2413,6 +2429,8 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
 	OOPS("configure i2c clients");
 	if (TUNER_ABSENT != dev->tuner_type)
 		request_module("tuner");
+	if (cx88_boards[dev->board].needs_tda9887)
+		request_module("tda9887");
 	if (dev->tuner_type != UNSET)
 		cx8800_call_i2c_clients(dev,TUNER_SET_TYPE,&dev->tuner_type);
 
@@ -2468,6 +2486,10 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
 	set_tvnorm(dev,tvnorms);
 	video_mux(dev,0);
 	up(&dev->lock);
+
+	/* start tvaudio thread */
+	init_completion(&dev->texit);
+	dev->tpid = kernel_thread(cx88_audio_thread, dev, 0);
 	return 0;
 
  fail3:
@@ -2489,6 +2511,11 @@ static int __devinit cx8800_initdev(struct pci_dev *pci_dev,
 static void __devexit cx8800_finidev(struct pci_dev *pci_dev)
 {
         struct cx8800_dev *dev = pci_get_drvdata(pci_dev);
+
+	/* stop thread */
+	dev->shutdown = 1;
+	if (dev->tpid >= 0)
+		wait_for_completion(&dev->texit);
 
 	cx8800_shutdown(dev);
 	pci_disable_device(pci_dev);
