@@ -358,18 +358,15 @@ EXPORT_SYMBOL(ide_error);
  *	Issue a simple drive command with interrupts.
  *	The drive must be selected beforehand.
  */
- 
+
 void ide_cmd (ide_drive_t *drive, u8 cmd, u8 nsect, ide_handler_t *handler)
 {
 	ide_hwif_t *hwif = HWIF(drive);
-	if (HWGROUP(drive)->handler != NULL)
-		BUG();
-	ide_set_handler(drive, handler, WAIT_CMD, NULL);
 	if (IDE_CONTROL_REG)
 		hwif->OUTB(drive->ctl,IDE_CONTROL_REG);	/* clear nIEN */
 	SELECT_MASK(drive,0);
 	hwif->OUTB(nsect,IDE_NSECTOR_REG);
-	hwif->OUTB(cmd,IDE_COMMAND_REG);
+	ide_execute_command(drive, cmd, handler, WAIT_CMD, NULL);
 }
 
 EXPORT_SYMBOL(ide_cmd);
@@ -841,14 +838,14 @@ queue_next:
 		 * happens anyway when any interrupt comes in, IDE or otherwise
 		 *  -- the kernel masks the IRQ while it is being handled.
 		 */
-		if (masked_irq && hwif->irq != masked_irq)
+		if (hwif->irq != masked_irq)
 			disable_irq_nosync(hwif->irq);
 		spin_unlock(&ide_lock);
 		local_irq_enable();
 			/* allow other IRQs while we start this request */
 		startstop = start_request(drive, rq);
 		spin_lock_irq(&ide_lock);
-		if (masked_irq && hwif->irq != masked_irq)
+		if (hwif->irq != masked_irq)
 			enable_irq(hwif->irq);
 		if (startstop == ide_released)
 			goto queue_next;
@@ -864,7 +861,7 @@ EXPORT_SYMBOL(ide_do_request);
  */
 void do_ide_request(request_queue_t *q)
 {
-	ide_do_request(q->queuedata, 0);
+	ide_do_request(q->queuedata, IDE_NO_IRQ);
 }
 
 /*
@@ -1012,7 +1009,7 @@ void ide_timer_expiry (unsigned long data)
 				hwgroup->busy = 0;
 		}
 	}
-	ide_do_request(hwgroup, 0);
+	ide_do_request(hwgroup, IDE_NO_IRQ);
 	spin_unlock_irqrestore(&ide_lock, flags);
 }
 
@@ -1302,7 +1299,7 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 		insert_end = 0;
 	}
 	__elv_add_request(&drive->queue, rq, insert_end, 0);
-	ide_do_request(hwgroup, 0);
+	ide_do_request(hwgroup, IDE_NO_IRQ);
 	spin_unlock_irqrestore(&ide_lock, flags);
 
 	err = 0;
