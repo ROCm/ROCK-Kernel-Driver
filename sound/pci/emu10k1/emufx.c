@@ -1821,28 +1821,28 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	snd_emu10k1_init_stereo_onoff_control(controls + i++, "Music Capture Switch", gpr + 2, 0);
 	gpr += 4;
 
-	/* Surround Digital Playback Volume */
+	/* Surround Digital Playback Volume (renamed later without Digital) */
 	for (z = 0; z < 2; z++)
 		VOLUME_ADD(icode, &ptr, playback + 2 + z, 4 + z, gpr + z);
 	snd_emu10k1_init_stereo_control(controls + i++, "Surround Digital Playback Volume", gpr, 100);
 	gpr += 2;
 
-	/* Surround Digital Capture Volume + Switch */
+	/* Surround Capture Volume + Switch */
 	for (z = 0; z < 2; z++) {
 		SWITCH(icode, &ptr, tmp + 0, 4 + z, gpr + 2 + z);
 		VOLUME_ADD(icode, &ptr, capture + z, tmp + 0, gpr + z);
 	}
-	snd_emu10k1_init_stereo_control(controls + i++, "Surround Digital Capture Volume", gpr, 0);
-	snd_emu10k1_init_stereo_onoff_control(controls + i++, "Surround Digital Capture Switch", gpr + 2, 0);
+	snd_emu10k1_init_stereo_control(controls + i++, "Surround Capture Volume", gpr, 0);
+	snd_emu10k1_init_stereo_onoff_control(controls + i++, "Surround Capture Switch", gpr + 2, 0);
 	gpr += 4;
 
-	/* Center Playback Volume */
+	/* Center Playback Volume (renamed later without Digital) */
 	VOLUME_ADD(icode, &ptr, playback + 4, 6, gpr);
-	snd_emu10k1_init_mono_control(controls + i++, "Center Playback Volume", gpr++, 100);
+	snd_emu10k1_init_mono_control(controls + i++, "Center Digital Playback Volume", gpr++, 100);
 
-	/* LFE Playback Volume + Switch */
+	/* LFE Playback Volume + Switch (renamed later without Digital) */
 	VOLUME_ADD(icode, &ptr, playback + 5, 7, gpr);
-	snd_emu10k1_init_mono_control(controls + i++, "LFE Playback Volume", gpr++, 100);
+	snd_emu10k1_init_mono_control(controls + i++, "LFE Digital Playback Volume", gpr++, 100);
 
 	/*
 	 *  Process inputs
@@ -1897,7 +1897,7 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 		/* IEC958 Optical Playback Volume */
 		for (z = 0; z < 2; z++)
 			VOLUME_ADDIN(icode, &ptr, playback + z, EXTIN_TOSLINK_L + z, gpr + z);
-		snd_emu10k1_init_stereo_control(controls + i++, "IEC958 Optical Playback Volume", gpr, 0);
+		snd_emu10k1_init_stereo_control(controls + i++, "IEC958 LiveDrive Playback Volume", gpr, 0);
 		gpr += 2;
 	
 		/* IEC958 Optical Capture Volume */
@@ -1905,8 +1905,8 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 			SWITCH_IN(icode, &ptr, tmp + 0, EXTIN_TOSLINK_L + z, gpr + 2 + z);
 			VOLUME_ADD(icode, &ptr, capture + z, tmp + 0, gpr + z);
 		}
-		snd_emu10k1_init_stereo_control(controls + i++, "IEC958 Optical Capture Volume", gpr, 0);
-		snd_emu10k1_init_stereo_onoff_control(controls + i++, "IEC958 Optical Capture Switch", gpr + 2, 0);
+		snd_emu10k1_init_stereo_control(controls + i++, "IEC958 LiveDrive Capture Volume", gpr, 0);
+		snd_emu10k1_init_stereo_onoff_control(controls + i++, "IEC958 LiveDrive Capture Switch", gpr + 2, 0);
 		gpr += 4;
 	}
 	
