@@ -38,13 +38,14 @@ SECTIONS
 
   _edata = .;			/* End of data section */
 
+  /* will be freed after init */
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { *(.data.init) }
+  .init.text : { *(.init.text) }
+  .init.data : { *(.init.data) }
   . = ALIGN(16);
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
   __initcall_start = .;
   .initcall.init : {
@@ -63,6 +64,13 @@ SECTIONS
   .data.init_task : { *(.data.init_task) }	/* The initial task and kernel stack */
 
   _end = . ;
+
+  /* Sections to be discarded */
+  /DISCARD/ : {
+	*(.exit.text)
+	*(.exit.data)
+	*(.exitcall.exit)
+	}
 
   /* Stabs debugging sections.  */
   .stab 0 : { *(.stab) }
