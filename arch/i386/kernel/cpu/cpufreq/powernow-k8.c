@@ -869,11 +869,8 @@ static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsi
 
 	if (smp_processor_id() != pol->cpu) {
 		printk(KERN_ERR "limiting to cpu %u failed\n", pol->cpu);
-		goto sched_out;
+		goto err_out;
 	}
-
-	/* from this point, do not exit without restoring preempt and cpu */
-	preempt_disable();
 
 	if (pending_bit_stuck()) {
 		printk(KERN_ERR PFX "failing targ, change pending bit set\n");
@@ -912,8 +909,6 @@ static int powernowk8_target(struct cpufreq_policy *pol, unsigned targfreq, unsi
 	ret = 0;
 
 err_out:
-	preempt_enable_no_resched();
-sched_out:
 	set_cpus_allowed(current, oldmask);
 	schedule();
 
