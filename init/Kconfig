@@ -116,21 +116,14 @@ config MODULES
 	  may want to make use of modules with this kernel in the future, then
 	  say Y here.  If unsure, say Y.
 
-config MODVERSIONS
-	bool "Set version information on all module symbols"
+config MODULE_UNLOAD
+	bool "Module unloading"
 	depends on MODULES
-	---help---
-	  Usually, modules have to be recompiled whenever you switch to a new
-	  kernel.  Saying Y here makes it possible, and safe, to use the
-	  same modules even after compiling a new kernel; this requires the
-	  program modprobe. All the software needed for module support is in
-	  the modutils package (check the file <file:Documentation/Changes>
-	  for location and latest version).  NOTE: if you say Y here but don't
-	  have the program genksyms (which is also contained in the above
-	  mentioned modutils package), then the building of your kernel will
-	  fail.  If you are going to use modules that are generated from
-	  non-kernel sources, you would benefit from this option.  Otherwise
-	  it's not that important.  So, N ought to be a safe bet.
+	help
+	  Without this option you will not be able to unload any
+	  modules (note that some modules may not be unloadable
+	  anyway), which makes your kernel slightly smaller and
+	  simpler.  If unsure, say Y.
 
 config KMOD
 	bool "Kernel module loader"

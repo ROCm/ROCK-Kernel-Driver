@@ -296,17 +296,6 @@ static struct file_operations proc_modules_operations = {
 	.llseek		= seq_lseek,
 	.release	= seq_release,
 };
-extern struct seq_operations ksyms_op;
-static int ksyms_open(struct inode *inode, struct file *file)
-{
-	return seq_open(file, &ksyms_op);
-}
-static struct file_operations proc_ksyms_operations = {
-	.open		= ksyms_open,
-	.read		= seq_read,
-	.llseek		= seq_lseek,
-	.release	= seq_release,
-};
 #endif
 
 extern struct seq_operations slabinfo_op;
@@ -604,7 +593,6 @@ void __init proc_misc_init(void)
 	create_seq_entry("vmstat",S_IRUGO, &proc_vmstat_file_operations);
 #ifdef CONFIG_MODULES
 	create_seq_entry("modules", 0, &proc_modules_operations);
-	create_seq_entry("ksyms", 0, &proc_ksyms_operations);
 #endif
 	proc_root_kcore = create_proc_entry("kcore", S_IRUSR, NULL);
 	if (proc_root_kcore) {

@@ -71,14 +71,6 @@ __attribute__((section("__ksymtab"))) = {
 };
 #endif
 
-
-EXPORT_SYMBOL(inter_module_register);
-EXPORT_SYMBOL(inter_module_unregister);
-EXPORT_SYMBOL(inter_module_get);
-EXPORT_SYMBOL(inter_module_get_request);
-EXPORT_SYMBOL(inter_module_put);
-EXPORT_SYMBOL(try_inc_mod_count);
-
 /* process memory management */
 EXPORT_SYMBOL(do_mmap_pgoff);
 EXPORT_SYMBOL(do_munmap);

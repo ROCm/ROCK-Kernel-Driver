@@ -406,9 +406,6 @@ asmlinkage void __init start_kernel(void)
 	 * this. But we do want output early, in case something goes wrong.
 	 */
 	console_init();
-#ifdef CONFIG_MODULES
-	init_modules();
-#endif
 	profile_init();
 	kmem_cache_init();
 	local_irq_enable();
@@ -456,6 +453,8 @@ asmlinkage void __init start_kernel(void)
 }
 
 struct task_struct *child_reaper = &init_task;
+
+extern initcall_t __initcall_start, __initcall_end;
 
 static void __init do_initcalls(void)
 {
