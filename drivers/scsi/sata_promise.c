@@ -1180,14 +1180,14 @@ static void pdc_dma_start(struct ata_queued_cmd *qc)
 
 static void pdc_tf_load_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	if (tf->protocol != ATA_PROT_DMA)
+	if (tf->protocol == ATA_PROT_PIO)
 		ata_tf_load_mmio(ap, tf);
 }
 
 
 static void pdc_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf)
 {
-	if (tf->protocol != ATA_PROT_DMA)
+	if (tf->protocol == ATA_PROT_PIO)
 		ata_exec_command_mmio(ap, tf);
 }
 
