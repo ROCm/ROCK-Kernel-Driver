@@ -84,10 +84,7 @@ static struct ipt_target ipt_tos_reg = {
 
 static int __init init(void)
 {
-	if (ipt_register_target(&ipt_tos_reg))
-		return -EINVAL;
-
-	return 0;
+	return ipt_register_target(&ipt_tos_reg);
 }
 
 static void __exit fini(void)
