@@ -1628,30 +1628,6 @@ static ide_startstop_t idedisk_start_power_step (ide_drive_t *drive, struct requ
 	return ide_stopped;
 }
 
-typedef enum
-{
-	barrier_default,
-	barrier_on,
-	barrier_off
-} barrier_mode_t;
-static barrier_mode_t chosen_barrier_mode = barrier_default;
-
-static int __init barrier_setup (char *str)
-{
-	if (!strcmp (str, "on"))
-		chosen_barrier_mode = barrier_on;
-	else if (!strcmp (str, "off"))
-		chosen_barrier_mode = barrier_off;
-	return 1;
-}
-__setup ("barrier=", barrier_setup);
-
-/* returns true if ide barriers are globally disabled */
-int flush_barriers_disabled() {
-	return chosen_barrier_mode == barrier_off;
-}
-EXPORT_SYMBOL(flush_barriers_disabled);
-
 static void idedisk_setup (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;

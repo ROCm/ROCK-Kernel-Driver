@@ -646,7 +646,6 @@ extern long blk_congestion_wait(int rw, long timeout);
 extern void blk_rq_bio_prep(request_queue_t *, struct request *, struct bio *);
 extern void blk_rq_prep_restart(struct request *);
 extern int blkdev_issue_flush(struct block_device *, sector_t *);
-extern int flush_barriers_disabled(void);
 
 #define MAX_PHYS_SEGMENTS 128
 #define MAX_HW_SEGMENTS 128
@@ -739,5 +738,15 @@ void kblockd_flush(void);
 #define MODULE_ALIAS_BLOCKDEV_MAJOR(major) \
 	MODULE_ALIAS("block-major-" __stringify(major) "-*")
 
+
+typedef enum {
+	barrier_default,
+	barrier_on,
+	barrier_off
+} barrier_mode_t;
+
+extern barrier_mode_t chosen_barrier_mode;
+
+extern int flush_barriers_disabled(void);
 
 #endif

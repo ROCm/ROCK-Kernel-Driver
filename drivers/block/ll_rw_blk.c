@@ -3298,3 +3298,21 @@ void blk_unregister_queue(struct gendisk *disk)
 		kobject_put(&disk->kobj);
 	}
 }
+
+barrier_mode_t chosen_barrier_mode = barrier_default;
+
+static int __init barrier_setup (char *str)
+{
+	if (!strcmp (str, "on"))
+		chosen_barrier_mode = barrier_on;
+	else if (!strcmp (str, "off"))
+		chosen_barrier_mode = barrier_off;
+	return 1;
+}
+__setup ("barrier=", barrier_setup);
+
+/* returns true if ide barriers are globally disabled */
+int flush_barriers_disabled(void) {
+	return chosen_barrier_mode == barrier_off;
+}
+EXPORT_SYMBOL(flush_barriers_disabled);
