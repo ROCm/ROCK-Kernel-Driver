@@ -1134,13 +1134,12 @@ ide_settings_t *ide_find_setting_by_name (ide_drive_t *drive, char *name)
  *
  *	Automatically remove all the driver specific settings for this
  *	drive. This function may sleep and must not be called from IRQ
- *	context. Takes the settings_lock
+ *	context. The caller must hold ide_setting_sem.
  */
  
 static void auto_remove_settings (ide_drive_t *drive)
 {
 	ide_settings_t *setting;
-	down(&ide_setting_sem);
 repeat:
 	setting = drive->settings;
 	while (setting) {
@@ -1150,7 +1149,6 @@ repeat:
 		}
 		setting = setting->next;
 	}
-	up(&ide_setting_sem);
 }
 
 /**
@@ -2408,9 +2406,11 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 {
 	unsigned long flags;
 	
+	down(&ide_setting_sem);
 	spin_lock_irqsave(&ide_lock, flags);
 	if (drive->usage || drive->driver == &idedefault_driver || DRIVER(drive)->busy) {
 		spin_unlock_irqrestore(&ide_lock, flags);
+		up(&ide_setting_sem);
 		return 1;
 	}
 #if defined(CONFIG_BLK_DEV_IDEPNP) && defined(CONFIG_PNP) && defined(MODULE)
@@ -2424,6 +2424,7 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 	drive->driver = &idedefault_driver;
 	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
+	up(&ide_setting_sem);
 	spin_lock(&drives_lock);
 	list_del_init(&drive->list);
 	spin_unlock(&drives_lock);
