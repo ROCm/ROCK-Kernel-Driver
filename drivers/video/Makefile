@@ -13,7 +13,7 @@ obj-$(CONFIG_PPC)                 += macmodes.o
 endif
 
 obj-$(CONFIG_FB_ACORN)            += acornfb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
-obj-$(CONFIG_FB_AMIGA)            += amifb.o
+obj-$(CONFIG_FB_AMIGA)            += amifb.o c2p.o
 obj-$(CONFIG_FB_PM2)              += pm2fb.o
 obj-$(CONFIG_FB_PM3)		  += pm3fb.o
 obj-$(CONFIG_FB_APOLLO)           += dnfb.o cfbfillrect.o cfbimgblt.o
