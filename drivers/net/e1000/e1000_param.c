@@ -322,7 +322,7 @@ e1000_check_options(struct e1000_adapter *adapter)
 			.name = "Transmit Descriptors",
 			.err  = "using default of " __MODULE_STRING(DEFAULT_TXD),
 			.def  = DEFAULT_TXD,
-			.arg  = { .r { .min = MIN_TXD }}
+			.arg  = { .r = { .min = MIN_TXD }}
 		};
 		struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 		e1000_mac_type mac_type = adapter->hw.mac_type;
