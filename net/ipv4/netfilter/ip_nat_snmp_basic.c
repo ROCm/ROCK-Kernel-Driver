@@ -1252,6 +1252,9 @@ static unsigned int nat_help(struct ip_conntrack *ct,
 	int dir = CTINFO2DIR(ctinfo);
 	struct iphdr *iph = (*pskb)->nh.iph;
 	struct udphdr *udph = (struct udphdr *)((u_int32_t *)iph + iph->ihl);
+	
+	if (!skb_ip_make_writable(pskb, (*pskb)->len))
+		return NF_DROP;
 
 	spin_lock_bh(&snmp_lock);
 	
