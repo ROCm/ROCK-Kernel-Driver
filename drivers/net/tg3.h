@@ -1666,6 +1666,12 @@ struct ring_info {
 	DECLARE_PCI_UNMAP_ADDR(mapping)
 };
 
+struct tx_ring_info {
+	struct sk_buff			*skb;
+	DECLARE_PCI_UNMAP_ADDR(mapping)
+	u32				prev_vlan_tag;
+};
+
 struct tg3_config_info {
 	u32				flags;
 };
@@ -1860,7 +1866,7 @@ struct tg3 {
 
 	/* TX descs are only used if TG3_FLAG_HOST_TXDS is set. */
 	struct tg3_tx_buffer_desc	*tx_ring;
-	struct ring_info		*tx_buffers;
+	struct tx_ring_info		*tx_buffers;
 	dma_addr_t			tx_desc_mapping;
 
 	struct tg3_hw_status		*hw_status;

@@ -1661,7 +1661,7 @@ static void tg3_tx(struct tg3 *tp)
 	u32 sw_idx = tp->tx_cons;
 
 	while (sw_idx != hw_idx) {
-		struct ring_info *ri = &tp->tx_buffers[sw_idx];
+		struct tx_ring_info *ri = &tp->tx_buffers[sw_idx];
 		struct sk_buff *skb = ri->skb;
 		int i;
 
@@ -2286,6 +2286,7 @@ static void tg3_set_txd(struct tg3 *tp, int entry,
 		txd->len_flags = (len << TXD_LEN_SHIFT) | flags;
 		txd->vlan_tag = vlan_tag << TXD_VLAN_TAG_SHIFT;
 	} else {
+		struct tx_ring_info *txr = &tp->tx_buffers[entry];
 		unsigned long txd;
 
 		txd = (tp->regs +
@@ -2301,7 +2302,10 @@ static void tg3_set_txd(struct tg3 *tp, int entry,
 		writel(((u64) mapping & 0xffffffff),
 		       txd + TXD_ADDR + TG3_64BIT_REG_LOW);
 		writel(len << TXD_LEN_SHIFT | flags, txd + TXD_LEN_FLAGS);
-		writel(vlan_tag << TXD_VLAN_TAG_SHIFT, txd + TXD_VLAN_TAG);
+		if (txr->prev_vlan_tag != vlan_tag) {
+			writel(vlan_tag << TXD_VLAN_TAG_SHIFT, txd + TXD_VLAN_TAG);
+			txr->prev_vlan_tag = vlan_tag;
+		}
 	}
 }
 
@@ -2684,7 +2688,7 @@ static void tg3_free_rings(struct tg3 *tp)
 	}
 
 	for (i = 0; i < TG3_TX_RING_SIZE; ) {
-		struct ring_info *txp;
+		struct tx_ring_info *txp;
 		struct sk_buff *skb;
 		int j;
 
@@ -2751,6 +2755,8 @@ static void tg3_init_rings(struct tg3 *tp)
 			writel(0, start);
 			start += 4;
 		}
+		for (i = 0; i < TG3_TX_RING_SIZE; i++)
+			tp->tx_buffers[i].prev_vlan_tag = 0;
 	}
 
 	/* Initialize invariants of the rings, we only set this
@@ -2873,12 +2879,13 @@ static void tg3_free_consistent(struct tg3 *tp)
  */
 static int tg3_alloc_consistent(struct tg3 *tp)
 {
-	tp->rx_std_buffers = kmalloc(sizeof(struct ring_info) *
-				     (TG3_RX_RING_SIZE +
+	tp->rx_std_buffers = kmalloc((sizeof(struct ring_info) *
+				      (TG3_RX_RING_SIZE +
 #if TG3_MINI_RING_WORKS
-				      TG3_RX_MINI_RING_SIZE +
+				       TG3_RX_MINI_RING_SIZE +
 #endif
-				      TG3_RX_JUMBO_RING_SIZE +
+				       TG3_RX_JUMBO_RING_SIZE)) +
+				     (sizeof(struct tx_ring_info) *
 				      TG3_TX_RING_SIZE),
 				     GFP_KERNEL);
 	if (!tp->rx_std_buffers)
@@ -2889,14 +2896,16 @@ static int tg3_alloc_consistent(struct tg3 *tp)
 	       (sizeof(struct ring_info) *
 		(TG3_RX_RING_SIZE +
 		 TG3_RX_MINI_RING_SIZE +
-		 TG3_RX_JUMBO_RING_SIZE +
-		 TG3_TX_RING_SIZE)));
+		 TG3_RX_JUMBO_RING_SIZE)) +
+	       (sizeof(struct tx_ring_info) *
+		TG3_TX_RING_SIZE));
 #else
 	memset(tp->rx_std_buffers, 0,
 	       (sizeof(struct ring_info) *
 		(TG3_RX_RING_SIZE +
-		 TG3_RX_JUMBO_RING_SIZE +
-		 TG3_TX_RING_SIZE)));
+		 TG3_RX_JUMBO_RING_SIZE)) +
+	       (sizeof(struct tx_ring_info) *
+		TG3_TX_RING_SIZE));
 #endif
 
 #if TG3_MINI_RING_WORKS
@@ -2905,7 +2914,8 @@ static int tg3_alloc_consistent(struct tg3 *tp)
 #else
 	tp->rx_jumbo_buffers = &tp->rx_std_buffers[TG3_RX_RING_SIZE];
 #endif
-	tp->tx_buffers = &tp->rx_jumbo_buffers[TG3_RX_JUMBO_RING_SIZE];
+	tp->tx_buffers = (struct tx_ring_info *)
+		&tp->rx_jumbo_buffers[TG3_RX_JUMBO_RING_SIZE];
 
 	tp->rx_std = pci_alloc_consistent(tp->pdev, TG3_RX_RING_BYTES,
 					  &tp->rx_std_mapping);
