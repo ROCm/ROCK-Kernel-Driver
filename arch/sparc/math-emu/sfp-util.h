@@ -4,8 +4,8 @@
 #include <asm/byteorder.h>
 
 #define add_ssaaaa(sh, sl, ah, al, bh, bl) 				\
-  __asm__ ("addcc %r4,%5,%1
-	addx %r2,%3,%0"							\
+  __asm__ ("addcc %r4,%5,%1\n\t"						\
+	   "addx %r2,%3,%0\n"						\
 	   : "=r" ((USItype)(sh)),					\
 	     "=&r" ((USItype)(sl))					\
 	   : "%rJ" ((USItype)(ah)),					\
@@ -14,8 +14,8 @@
 	     "rI" ((USItype)(bl))					\
 	   : "cc")
 #define sub_ddmmss(sh, sl, ah, al, bh, bl) 				\
-  __asm__ ("subcc %r4,%5,%1
-	subx %r2,%3,%0"							\
+  __asm__ ("subcc %r4,%5,%1\n\t"						\
+	   "subx %r2,%3,%0\n"						\
 	   : "=r" ((USItype)(sh)),					\
 	     "=&r" ((USItype)(sl))					\
 	   : "rJ" ((USItype)(ah)),					\
@@ -25,46 +25,46 @@
 	   : "cc")
 
 #define umul_ppmm(w1, w0, u, v) \
-  __asm__ ("! Inlined umul_ppmm
-	wr	%%g0,%2,%%y	! SPARC has 0-3 delay insn after a wr
-	sra	%3,31,%%g2	! Don't move this insn
-	and	%2,%%g2,%%g2	! Don't move this insn
-	andcc	%%g0,0,%%g1	! Don't move this insn
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,%3,%%g1
-	mulscc	%%g1,0,%%g1
-	add	%%g1,%%g2,%0
-	rd	%%y,%1"							\
+  __asm__ ("! Inlined umul_ppmm\n\t"					\
+	"wr	%%g0,%2,%%y	! SPARC has 0-3 delay insn after a wr\n\t" \
+	"sra	%3,31,%%g2	! Don't move this insn\n\t"		\
+	"and	%2,%%g2,%%g2	! Don't move this insn\n\t"		\
+	"andcc	%%g0,0,%%g1	! Don't move this insn\n\t"		\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,%3,%%g1\n\t"					\
+	"mulscc	%%g1,0,%%g1\n\t" 					\
+	"add	%%g1,%%g2,%0\n\t" 					\
+	"rd	%%y,%1\n"						\
 	   : "=r" ((USItype)(w1)),					\
 	     "=r" ((USItype)(w0))					\
 	   : "%rI" ((USItype)(u)),					\
@@ -74,30 +74,30 @@
 /* It's quite necessary to add this much assembler for the sparc.
    The default udiv_qrnnd (in C) is more than 10 times slower!  */
 #define udiv_qrnnd(q, r, n1, n0, d) \
-  __asm__ ("! Inlined udiv_qrnnd
-	mov	32,%%g1
-	subcc	%1,%2,%%g0
-1:	bcs	5f
-	 addxcc %0,%0,%0	! shift n1n0 and a q-bit in lsb
-	sub	%1,%2,%1	! this kills msb of n
-	addx	%1,%1,%1	! so this can't give carry
-	subcc	%%g1,1,%%g1
-2:	bne	1b
-	 subcc	%1,%2,%%g0
-	bcs	3f
-	 addxcc %0,%0,%0	! shift n1n0 and a q-bit in lsb
-	b	3f
-	 sub	%1,%2,%1	! this kills msb of n
-4:	sub	%1,%2,%1
-5:	addxcc	%1,%1,%1
-	bcc	2b
-	 subcc	%%g1,1,%%g1
-! Got carry from n.  Subtract next step to cancel this carry.
-	bne	4b
-	 addcc	%0,%0,%0	! shift n1n0 and a 0-bit in lsb
-	sub	%1,%2,%1
-3:	xnor	%0,0,%0
-	! End of inline udiv_qrnnd"					\
+  __asm__ ("! Inlined udiv_qrnnd\n\t"					\
+	   "mov	32,%%g1\n\t"						\
+	   "subcc	%1,%2,%%g0\n\t"					\
+	   "1:	bcs	5f\n\t"						\
+	   "addxcc %0,%0,%0	! shift n1n0 and a q-bit in lsb\n\t"	\
+	   "sub	%1,%2,%1	! this kills msb of n\n\t"		\
+	   "addx	%1,%1,%1	! so this can't give carry\n\t"	\
+	   "subcc	%%g1,1,%%g1\n\t"				\
+	   "2:	bne	1b\n\t"						\
+	   "subcc	%1,%2,%%g0\n\t"					\
+	   "bcs	3f\n\t"							\
+	   "addxcc %0,%0,%0	! shift n1n0 and a q-bit in lsb\n\t"	\
+	   "b		3f\n\t"						\
+	   "sub	%1,%2,%1	! this kills msb of n\n\t"		\
+	   "4:	sub	%1,%2,%1\n\t"					\
+	   "5:	addxcc	%1,%1,%1\n\t"					\
+	   "bcc	2b\n\t"							\
+	   "subcc	%%g1,1,%%g1\n\t"				\
+	   "! Got carry from n.  Subtract next step to cancel this carry.\n\t" \
+	   "bne	4b\n\t"							\
+	   "addcc	%0,%0,%0	! shift n1n0 and a 0-bit in lsb\n\t" \
+	   "sub	%1,%2,%1\n\t"						\
+	   "3:	xnor	%0,0,%0\n\t"					\
+	   "! End of inline udiv_qrnnd\n"				\
 	   : "=&r" ((USItype)(q)),					\
 	     "=&r" ((USItype)(r))					\
 	   : "r" ((USItype)(d)),					\
