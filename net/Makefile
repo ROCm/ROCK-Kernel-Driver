@@ -7,7 +7,7 @@
 
 O_TARGET :=	network.o
 
-mod-subdirs :=	ipv4 ipv4/netfilter ipv6/netfilter ipx irda bluetooth atm netlink sched
+mod-subdirs :=	ipv4 ipv4/netfilter ipv6/netfilter ipx irda bluetooth atm netlink llc sched
 export-objs :=	netsyms.o
 
 obj-y	:= socket.o core/
@@ -43,6 +43,7 @@ obj-$(CONFIG_ATM)		+= atm/
 obj-$(CONFIG_DECNET)		+= decnet/
 obj-$(CONFIG_ECONET)		+= econet/
 obj-$(CONFIG_VLAN_8021Q)	+= 8021q/
+obj-$(CONFIG_LLC)		+= llc/
 
 ifeq ($(CONFIG_NET),y)
 obj-$(CONFIG_MODULES)		+= netsyms.o
