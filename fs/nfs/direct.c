@@ -52,7 +52,6 @@
 #include <asm/uaccess.h>
 
 #define NFSDBG_FACILITY		NFSDBG_VFS
-#define VERF_SIZE		(2 * sizeof(__u32))
 #define MAX_DIRECTIO_SIZE	(4096UL << PAGE_SHIFT)
 
 
@@ -303,11 +302,11 @@ retry:
 
 		if (tot_bytes == 0)
 			memcpy(&first_verf.verifier, &wdata.verf.verifier,
-								VERF_SIZE);
+						sizeof(first_verf.verifier));
 		if (wdata.verf.committed != NFS_FILE_SYNC) {
 			need_commit = 1;
-			if (memcmp(&first_verf.verifier,
-					&wdata.verf.verifier, VERF_SIZE))
+			if (memcmp(&first_verf.verifier, &wdata.verf.verifier,
+					sizeof(first_verf.verifier)));
 				goto sync_retry;
 		}
 
@@ -331,8 +330,8 @@ retry:
 		unlock_kernel();
 
 		if (result < 0 || memcmp(&first_verf.verifier,
-						&wdata.verf.verifier,
-						VERF_SIZE) != 0)
+					 &wdata.verf.verifier,
+					 sizeof(first_verf.verifier)) != 0)
 			goto sync_retry;
 	}
 	result = tot_bytes;
