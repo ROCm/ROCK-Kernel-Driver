@@ -19,7 +19,6 @@
 #include <linux/blk.h>
 #include <linux/kmod.h>
 #include <linux/ctype.h>
-#include <../drivers/base/fs/fs.h>	/* Eeeeewwwww */
 
 #include "check.h"
 
@@ -399,13 +398,15 @@ void register_disk(struct gendisk *disk)
 	struct block_device *bdev;
 	char *s;
 	int j;
+	int err;
 
 	strncpy(disk->kobj.name,disk->disk_name,KOBJ_NAME_LEN);
 	/* ewww... some of these buggers have / in name... */
 	s = strchr(disk->kobj.name, '/');
 	if (s)
 		*s = '!';
-	kobject_add(&disk->kobj);
+	if ((err = kobject_add(&disk->kobj)))
+		return;
 	disk_sysfs_symlinks(disk);
 
 	if (disk->flags & GENHD_FL_CD)
