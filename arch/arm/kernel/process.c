@@ -264,7 +264,7 @@ struct thread_info *alloc_thread_info(struct task_struct *task)
 	if (!thread)
 		thread = ll_alloc_task_struct();
 
-#ifdef CONFIG_SYSRQ
+#ifdef CONFIG_MAGIC_SYSRQ
 	/*
 	 * The stack must be cleared if you want SYSRQ-T to
 	 * give sensible stack usage information

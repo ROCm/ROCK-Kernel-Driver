@@ -376,7 +376,7 @@ int linux_main(int argc, char **argv)
 static int panic_exit(struct notifier_block *self, unsigned long unused1,
 		      void *unused2)
 {
-#ifdef CONFIG_SYSRQ
+#ifdef CONFIG_MAGIC_SYSRQ
 	handle_sysrq('p', &current->thread.regs, NULL, NULL);
 #endif
 	machine_halt();
