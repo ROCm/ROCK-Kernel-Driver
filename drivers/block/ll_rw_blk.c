@@ -2224,7 +2224,7 @@ int blk_execute_rq(request_queue_t *q, struct gendisk *bd_disk,
 	rq->end_io = blk_end_sync_rq;
 	elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
 	generic_unplug_device(q);
-	wait_for_completion(rq->waiting);
+	wait_for_completion(&wait);
 	rq->waiting = NULL;
 
 	if (rq->errors)
