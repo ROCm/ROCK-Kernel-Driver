@@ -255,12 +255,12 @@ static kdev_t nb85e_uart_cons_device (struct console *c)
 
 static struct console nb85e_uart_cons =
 {
-    name:	"ttyS",
-    write:	nb85e_uart_cons_write,
-    device:	nb85e_uart_cons_device,
-    flags:	CON_PRINTBUFFER,
-    cflag:	NB85E_UART_INIT_CFLAGS,
-    index:	-1,
+    .name	= "ttyS",
+    .write	= nb85e_uart_cons_write,
+    .device	= nb85e_uart_cons_device,
+    .flags	= CON_PRINTBUFFER,
+    .cflag	= NB85E_UART_INIT_CFLAGS,
+    .index	= -1,
 };
 
 void nb85e_uart_cons_init (unsigned chan)

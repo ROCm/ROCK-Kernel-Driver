@@ -1853,12 +1853,12 @@ void mcfrs_console_write(struct console *cp, const char *p, unsigned len)
  */
 
 struct console mcfrs_console = {
-	name:		"ttyS",
-	write:		mcfrs_console_write,
-	device:		mcfrs_console_device,
-	setup:		mcfrs_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "ttyS",
+	.write		= mcfrs_console_write,
+	.device		= mcfrs_console_device,
+	.setup		= mcfrs_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 void __init mcfrs_console_init(void)
