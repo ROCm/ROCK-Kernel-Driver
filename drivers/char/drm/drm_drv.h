@@ -865,6 +865,9 @@ int DRM(release)( struct inode *inode, struct file *filp )
 	}
 	up( &dev->struct_sem );
 	
+	if (dev->fn_tbl.free_filp_priv)
+		dev->fn_tbl.free_filp_priv(dev, priv);
+
 	DRM(free)( priv, sizeof(*priv), DRM_MEM_FILES );
 
 	/* ========================================================

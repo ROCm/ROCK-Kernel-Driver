@@ -60,6 +60,9 @@ typedef struct drm_radeon_depth_clear_t {
 	u32 se_cntl;
 } drm_radeon_depth_clear_t;
 
+struct drm_radeon_driver_file_fields {
+	int64_t radeon_fb_delta;
+};
 
 struct mem_block {
 	struct mem_block *next;

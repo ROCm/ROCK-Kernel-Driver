@@ -53,6 +53,7 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 {
 	int	     minor = iminor(inode);
 	drm_file_t   *priv;
+	int ret;
 
 	if (filp->f_flags & O_EXCL)   return -EBUSY; /* No exclusive opens */
 	if (!DRM(cpu_valid)())        return -EINVAL;
@@ -72,8 +73,11 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 	priv->authenticated = capable(CAP_SYS_ADMIN);
 	priv->lock_count    = 0;
 
-	if (dev->fn_tbl.open_helper)
-	  dev->fn_tbl.open_helper(dev, priv);
+	if (dev->fn_tbl.open_helper) {
+		ret=dev->fn_tbl.open_helper(dev, priv);
+		if (ret < 0)
+			goto out_free;
+	}
 
 	down(&dev->struct_sem);
 	if (!dev->file_last) {
@@ -105,6 +109,10 @@ int DRM(open_helper)(struct inode *inode, struct file *filp, drm_device_t *dev)
 #endif
 
 	return 0;
+out_free:
+	DRM(free)(priv, sizeof(*priv), DRM_MEM_FILES);
+	filp->private_data=NULL;
+	return ret;
 }
 
 /** No-op. */

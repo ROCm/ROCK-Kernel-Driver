@@ -43,12 +43,14 @@ static __inline__ int radeon_check_and_fixup_offset( drm_radeon_private_t *dev_p
 						     drm_file_t *filp_priv,
 						     u32 *offset ) {
 	u32 off = *offset;
+	struct drm_radeon_driver_file_fields *radeon_priv;
 
 	if ( off >= dev_priv->fb_location &&
 	     off < ( dev_priv->gart_vm_start + dev_priv->gart_size ) )
 		return 0;
 
-	off += filp_priv->radeon_fb_delta;
+	radeon_priv = filp_priv->driver_priv;
+	off += radeon_priv->radeon_fb_delta;
 
 	DRM_DEBUG( "offset fixed up to 0x%x\n", off );
 
@@ -2525,6 +2527,7 @@ int radeon_cp_setparam( DRM_IOCTL_ARGS ) {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	drm_file_t *filp_priv;
 	drm_radeon_setparam_t sp;
+	struct drm_radeon_driver_file_fields *radeon_priv;
 
 	if ( !dev_priv ) {
 		DRM_ERROR( "%s called with no initialization\n", __FUNCTION__ );
@@ -2538,7 +2541,8 @@ int radeon_cp_setparam( DRM_IOCTL_ARGS ) {
 
 	switch( sp.param ) {
 	case RADEON_SETPARAM_FB_LOCATION:
-		filp_priv->radeon_fb_delta = dev_priv->fb_location - sp.value;
+		radeon_priv = filp_priv->driver_priv;
+		radeon_priv->radeon_fb_delta = dev_priv->fb_location - sp.value;
 		break;
 	default:
 		DRM_DEBUG( "Invalid parameter %d\n", sp.param );
@@ -2571,13 +2575,30 @@ static void radeon_driver_pretakedown(drm_device_t *dev)
 	radeon_do_release(dev);
 }
 
-static void radeon_driver_open_helper(drm_device_t *dev, drm_file_t *filp_priv)
+static int radeon_driver_open_helper(drm_device_t *dev, drm_file_t *filp_priv)
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
+	struct drm_radeon_driver_file_fields *radeon_priv;
+	
+	radeon_priv = (struct drm_radeon_driver_file_fields *)DRM(alloc)(sizeof(*radeon_priv), DRM_MEM_FILES);
+	
+	if (!radeon_priv)
+		return -ENOMEM;
+
+	filp_priv->driver_priv = radeon_priv;
 	if ( dev_priv )
-		filp_priv->radeon_fb_delta = dev_priv->fb_location;
+		radeon_priv->radeon_fb_delta = dev_priv->fb_location;
 	else
-		filp_priv->radeon_fb_delta = 0;
+		radeon_priv->radeon_fb_delta = 0;
+	return 0;
+}
+
+
+static void radeon_driver_free_filp_priv(drm_device_t *dev, drm_file_t *filp_priv)
+{
+	 struct drm_radeon_driver_file_fields *radeon_priv = filp_priv->driver_priv;
+	 
+	 DRM(free)(radeon_priv, sizeof(*radeon_priv), DRM_MEM_FILES);
 }
 
 void radeon_driver_register_fns(struct drm_device *dev)
@@ -2587,4 +2608,5 @@ void radeon_driver_register_fns(struct drm_device *dev)
 	dev->fn_tbl.prerelease = radeon_driver_prerelease;
 	dev->fn_tbl.pretakedown = radeon_driver_pretakedown;
 	dev->fn_tbl.open_helper = radeon_driver_open_helper;
+	dev->fn_tbl.free_filp_priv = radeon_driver_free_filp_priv;
 }

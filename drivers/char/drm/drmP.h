@@ -411,9 +411,7 @@ typedef struct drm_file {
 	struct drm_device *dev;
 	int 		  remove_auth_on_close;
 	unsigned long     lock_count;
-#ifdef DRIVER_FILE_FIELDS
-	DRIVER_FILE_FIELDS;
-#endif
+	void              *driver_priv;
 } drm_file_t;
 
 /** Wait queue */
@@ -559,7 +557,8 @@ struct drm_driver_fn {
 	int (*postcleanup)(struct drm_device *);
 	int (*presetup)(struct drm_device *);
 	int (*postsetup)(struct drm_device *);
-	void (*open_helper)(struct drm_device *, drm_file_t *);
+	int (*open_helper)(struct drm_device *, drm_file_t *);
+	void (*free_filp_priv)(struct drm_device *, drm_file_t *);
 	void (*release)(struct drm_device *, struct file *filp);
 	void (*dma_ready)(struct drm_device *);
 	int (*dma_quiescent)(struct drm_device *);
