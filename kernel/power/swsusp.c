@@ -552,10 +552,15 @@ static int prepare_suspend_processes(void)
  */
 static void free_some_memory(void)
 {
+	int i;
 	printk("Freeing memory: ");
-	while (shrink_all_memory(10000))
-		printk(".");
-	printk("|\n");
+	for (i=0; i<5; ++i) {
+		while (shrink_all_memory(10000))
+			printk(".");
+		printk("|\n");
+		current->state = TASK_INTERRUPTIBLE;
+		schedule_timeout(HZ/5);
+	}
 }
 
 static int suspend_prepare_image(void)
