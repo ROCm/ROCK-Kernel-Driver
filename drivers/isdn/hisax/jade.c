@@ -32,6 +32,24 @@ jade_write_reg(struct IsdnCardState *cs, int jade, u8 addr, u8 val)
 	cs->bc_hw_ops->write_reg(cs, jade, addr, val);
 }
 
+static inline void
+jade_read_fifo(struct BCState *bcs, u8 *p, int len)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	u8 hscx = bcs->hw.hscx.hscx;
+
+	cs->bc_hw_ops->read_fifo(cs, hscx, p, len);
+}
+
+static inline void
+jade_write_fifo(struct BCState *bcs, u8 *p, int len)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	u8 hscx = bcs->hw.hscx.hscx;
+
+	cs->bc_hw_ops->write_fifo(cs, hscx, p, len);
+}
+
 int __init
 JadeVersion(struct IsdnCardState *cs, char *s)
 {
@@ -296,3 +314,4 @@ initjade(struct IsdnCardState *cs)
 	modejade(cs->bcs + 1, 0, 0);
 }
 
+#include "jade_irq.c"

@@ -78,71 +78,69 @@ writefifo(unsigned int ale, unsigned long adr, u8 off, u8 * data, int size)
 }
 
 
-/* Interface functions */
-
 static u8
-ReadISAC(struct IsdnCardState *cs, u8 offset)
+isac_read(struct IsdnCardState *cs, u8 offset)
 {
 	return (readreg(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, offset));
 }
 
 static void
-WriteISAC(struct IsdnCardState *cs, u8 offset, u8 value)
+isac_write(struct IsdnCardState *cs, u8 offset, u8 value)
 {
 	writereg(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, offset, value);
 }
 
 static void
-ReadISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_read_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	readfifo(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, 0, data, size);
 }
 
 static void
-WriteISACfifo(struct IsdnCardState *cs, u8 * data, int size)
+isac_write_fifo(struct IsdnCardState *cs, u8 * data, int size)
 {
 	writefifo(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, 0, data, size);
 }
 
 static struct dc_hw_ops isac_ops = {
-	.read_reg   = ReadISAC,
-	.write_reg  = WriteISAC,
-	.read_fifo  = ReadISACfifo,
-	.write_fifo = WriteISACfifo,
+	.read_reg   = isac_read,
+	.write_reg  = isac_write,
+	.read_fifo  = isac_read_fifo,
+	.write_fifo = isac_write_fifo,
 };
 
 static u8
-ReadJADE(struct IsdnCardState *cs, int jade, u8 offset)
+jade_read(struct IsdnCardState *cs, int jade, u8 offset)
 {
-	return (readreg(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr, offset + (jade == -1 ? 0 : (jade ? 0xC0 : 0x80))));
+	return readreg(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr, offset + (jade == -1 ? 0 : (jade ? 0xC0 : 0x80)));
 }
 
 static void
-WriteJADE(struct IsdnCardState *cs, int jade, u8 offset, u8 value)
+jade_write(struct IsdnCardState *cs, int jade, u8 offset, u8 value)
 {
 	writereg(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr, offset + (jade == -1 ? 0 : (jade ? 0xC0 : 0x80)), value);
 }
 
+static void
+jade_read_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	readfifo(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr,
+		 (hscx == -1 ? 0 : (hscx ? 0xc0 : 0x80)), data, size);
+}
+
+static void
+jade_write_fifo(struct IsdnCardState *cs, int hscx, u8 *data, int size)
+{
+	writefifo(cs->hw.ax.jade_ale, cs->hw.ax.jade_adr,
+		  (hscx == -1 ? 0 : (hscx ? 0xc0 : 0x80)), data, size);
+}
+
 static struct bc_hw_ops jade_ops = {
-	.read_reg  = ReadJADE,
-	.write_reg = WriteJADE,
+	.read_reg   = jade_read,
+	.write_reg  = jade_write,
+	.read_fifo  = jade_read_fifo,
+	.write_fifo = jade_write_fifo,
 };
-
-/*
- * fast interrupt JADE stuff goes here
- */
-
-#define READJADE(cs, nr, reg) readreg(cs->hw.ax.jade_ale,\
- 		cs->hw.ax.jade_adr, reg + (nr == -1 ? 0 : (nr ? 0xC0 : 0x80)))
-#define WRITEJADE(cs, nr, reg, data) writereg(cs->hw.ax.jade_ale,\
- 		cs->hw.ax.jade_adr, reg + (nr == -1 ? 0 : (nr ? 0xC0 : 0x80)), data)
-
-#define READJADEFIFO(cs, nr, ptr, cnt) readfifo(cs->hw.ax.jade_ale,\
-		cs->hw.ax.jade_adr, (nr == -1 ? 0 : (nr ? 0xC0 : 0x80)), ptr, cnt)
-#define WRITEJADEFIFO(cs, nr, ptr, cnt) writefifo( cs->hw.ax.jade_ale,\
-		cs->hw.ax.jade_adr, (nr == -1 ? 0 : (nr ? 0xC0 : 0x80)), ptr, cnt)
-
-#include "jade_irq.c"
 
 static void
 bkm_interrupt(int intno, void *dev_id, struct pt_regs *regs)
