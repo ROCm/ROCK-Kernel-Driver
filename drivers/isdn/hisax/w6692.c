@@ -45,6 +45,18 @@ const char *w6692_revision = "$Revision: 1.12.6.6 $";
 
 #define DBUSY_TIMER_VALUE 80
 
+static inline u8
+w6692_bc_read_reg(struct IsdnCardState *cs, int bchan, u8 offset)
+{
+	return (inb(cs->hw.w6692.iobase + (bchan ? 0x40 : 0) + offset));
+}
+
+static inline void
+w6692_bc_write_reg(struct IsdnCardState *cs, int bchan, u8 offset, u8 value)
+{
+	outb(value, cs->hw.w6692.iobase + (bchan ? 0x40 : 0) + offset);
+}
+
 static char *W6692Ver[] __initdata =
 {"W6692 V00", "W6692 V01", "W6692 V10",
  "W6692 V11"};
@@ -194,14 +206,14 @@ W6692B_empty_fifo(struct BCState *bcs, int count)
 	if (bcs->hw.w6692.rcvidx + count > HSCX_BUFMAX) {
 		if (cs->debug & L1_DEB_WARN)
 			debugl1(cs, "W6692B_empty_fifo: incoming packet too large");
-		cs->BC_Write_Reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
+		w6692_bc_write_reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
 		bcs->hw.w6692.rcvidx = 0;
 		return;
 	}
 	ptr = bcs->hw.w6692.rcvbuf + bcs->hw.w6692.rcvidx;
 	bcs->hw.w6692.rcvidx += count;
 	READW6692BFIFO(cs, bcs->channel, ptr, count);
-	cs->BC_Write_Reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
+	w6692_bc_write_reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -224,14 +236,14 @@ W6692B_fill_fifo(struct BCState *bcs)
 		return;
 
 	WRITEW6692BFIFO(cs, bcs->channel, p, count);
-	cs->BC_Write_Reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACT | W_B_CMDR_XMS | (more ? 0 : W_B_CMDR_XME));
+	w6692_bc_write_reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACT | W_B_CMDR_XMS | (more ? 0 : W_B_CMDR_XME));
 }
 
 static void
 reset_xmit(struct BCState *bcs)
 {
-	bcs->cs->BC_Write_Reg(bcs->cs, bcs->channel, W_B_CMDR,
-			      W_B_CMDR_XRST | W_B_CMDR_RACT);
+	w6692_bc_write_reg(bcs->cs, bcs->channel, W_B_CMDR,
+			   W_B_CMDR_XRST | W_B_CMDR_RACT);
 }
 
 static void
@@ -244,7 +256,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 	int count;
 
 	bcs = (cs->bcs->channel == bchan) ? cs->bcs : (cs->bcs+1);
-	val = cs->BC_Read_Reg(cs, bchan, W_B_EXIR);
+	val = w6692_bc_read_reg(cs, bchan, W_B_EXIR);
 	debugl1(cs, "W6692B chan %d B_EXIR 0x%02X", bchan, val);
 
 	if (!test_bit(BC_FLG_INIT, &bcs->Flag)) {
@@ -252,7 +264,7 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 		return;
 	}
 	if (val & W_B_EXI_RME) {	/* RME */
-		r = cs->BC_Read_Reg(cs, bchan, W_B_STAR);
+		r = w6692_bc_read_reg(cs, bchan, W_B_STAR);
 		if (r & (W_B_STAR_RDOV | W_B_STAR_CRCE | W_B_STAR_RMB | W_B_STAR_XDOW)) {
 			if ((r & W_B_STAR_RDOV) && bcs->mode)
 				if (cs->debug & L1_DEB_WARN)
@@ -261,9 +273,9 @@ W6692B_interrupt(struct IsdnCardState *cs, u_char bchan)
 			if (r & W_B_STAR_CRCE)
 				if (cs->debug & L1_DEB_WARN)
 					debugl1(cs, "W6692 B CRC error");
-			cs->BC_Write_Reg(cs, bchan, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RRST | W_B_CMDR_RACT);
+			w6692_bc_write_reg(cs, bchan, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RRST | W_B_CMDR_RACT);
 		} else {
-			count = cs->BC_Read_Reg(cs, bchan, W_B_RBCL) & (W_B_FIFO_THRESH - 1);
+			count = w6692_bc_read_reg(cs, bchan, W_B_RBCL) & (W_B_FIFO_THRESH - 1);
 			if (count == 0)
 				count = W_B_FIFO_THRESH;
 			W6692B_empty_fifo(bcs, count);
@@ -543,21 +555,21 @@ W6692Bmode(struct BCState *bcs, int mode, int bchan)
 
 	switch (mode) {
 		case (L1_MODE_NULL):
-			cs->BC_Write_Reg(cs, bchan, W_B_MODE, 0);
+			w6692_bc_write_reg(cs, bchan, W_B_MODE, 0);
 			break;
 		case (L1_MODE_TRANS):
-			cs->BC_Write_Reg(cs, bchan, W_B_MODE, W_B_MODE_MMS);
+			w6692_bc_write_reg(cs, bchan, W_B_MODE, W_B_MODE_MMS);
 			break;
 		case (L1_MODE_HDLC):
-			cs->BC_Write_Reg(cs, bchan, W_B_MODE, W_B_MODE_ITF);
-			cs->BC_Write_Reg(cs, bchan, W_B_ADM1, 0xff);
-			cs->BC_Write_Reg(cs, bchan, W_B_ADM2, 0xff);
+			w6692_bc_write_reg(cs, bchan, W_B_MODE, W_B_MODE_ITF);
+			w6692_bc_write_reg(cs, bchan, W_B_ADM1, 0xff);
+			w6692_bc_write_reg(cs, bchan, W_B_ADM2, 0xff);
 			break;
 	}
 	if (mode)
-		cs->BC_Write_Reg(cs, bchan, W_B_CMDR, W_B_CMDR_RRST |
+		w6692_bc_write_reg(cs, bchan, W_B_CMDR, W_B_CMDR_RRST |
 				 W_B_CMDR_RACT | W_B_CMDR_XRST);
-	cs->BC_Write_Reg(cs, bchan, W_B_EXIM, 0x00);
+	w6692_bc_write_reg(cs, bchan, W_B_EXIM, 0x00);
 }
 
 static void
@@ -706,8 +718,8 @@ void __init initW6692(struct IsdnCardState *cs, int part)
 		/* Reenable all IRQ */
 		cs->writeW6692(cs, W_IMASK, 0x18);
 		cs->writeW6692(cs, W_D_EXIM, 0x00);
-		cs->BC_Write_Reg(cs, 0, W_B_EXIM, 0x00);
-		cs->BC_Write_Reg(cs, 1, W_B_EXIM, 0x00);
+		w6692_bc_write_reg(cs, 0, W_B_EXIM, 0x00);
+		w6692_bc_write_reg(cs, 1, W_B_EXIM, 0x00);
 		/* Reset D-chan receiver and transmitter */
 		cs->writeW6692(cs, W_D_CMDR, W_D_CMDR_RRST | W_D_CMDR_XRST);
 	}
@@ -737,18 +749,6 @@ static void
 WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 {
 	outsb(cs->hw.w6692.iobase + W_D_XFIFO, data, size);
-}
-
-static u_char
-ReadW6692B(struct IsdnCardState *cs, int bchan, u_char offset)
-{
-	return (inb(cs->hw.w6692.iobase + (bchan ? 0x40 : 0) + offset));
-}
-
-static void
-WriteW6692B(struct IsdnCardState *cs, int bchan, u_char offset, u_char value)
-{
-	outb(value, cs->hw.w6692.iobase + (bchan ? 0x40 : 0) + offset);
 }
 
 static int
@@ -868,8 +868,6 @@ setup_w6692(struct IsdnCard *card)
 	cs->writeW6692 = &WriteW6692;
 	cs->readisacfifo = &ReadISACfifo;
 	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Read_Reg = &ReadW6692B;
-	cs->BC_Write_Reg = &WriteW6692B;
 	cs->BC_Send_Data = &W6692B_fill_fifo;
 	cs->DC_Send_Data = &W6692_fill_fifo;
 	cs->cardmsg = &w6692_card_msg;
