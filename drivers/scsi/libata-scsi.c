@@ -219,6 +219,124 @@ int ata_scsi_error(struct Scsi_Host *host)
 }
 
 /**
+ *	ata_scsi_flush_xlat - Translate SCSI SYNCHRONIZE CACHE command
+ *	@qc: Storage for translated ATA taskfile
+ *	@scsicmd: SCSI command to translate (ignored)
+ *
+ *	Sets up an ATA taskfile to issue FLUSH CACHE or
+ *	FLUSH CACHE EXT.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ *
+ *	RETURNS:
+ *	Zero on success, non-zero on error.
+ */
+
+static unsigned int ata_scsi_flush_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
+{
+	struct ata_taskfile *tf = &qc->tf;
+
+	tf->flags |= ATA_TFLAG_DEVICE;
+	tf->protocol = ATA_PROT_NODATA;
+
+	if ((tf->flags & ATA_TFLAG_LBA48) &&
+	    (ata_id_has_flush_ext(qc->dev)))
+		tf->command = ATA_CMD_FLUSH_EXT;
+	else
+		tf->command = ATA_CMD_FLUSH;
+
+	return 0;
+}
+
+/**
+ *	ata_scsi_verify_xlat - Translate SCSI VERIFY command into an ATA one
+ *	@qc: Storage for translated ATA taskfile
+ *	@scsicmd: SCSI command to translate
+ *
+ *	Converts SCSI VERIFY command to an ATA READ VERIFY command.
+ *
+ *	LOCKING:
+ *	spin_lock_irqsave(host_set lock)
+ *
+ *	RETURNS:
+ *	Zero on success, non-zero on error.
+ */
+
+static unsigned int ata_scsi_verify_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
+{
+	struct ata_taskfile *tf = &qc->tf;
+	unsigned int lba48 = tf->flags & ATA_TFLAG_LBA48;
+	u64 dev_sectors = qc->dev->n_sectors;
+	u64 sect = 0;
+	u32 n_sect = 0;
+
+	tf->flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
+	tf->protocol = ATA_PROT_NODATA;
+	tf->device |= ATA_LBA;
+
+	if (scsicmd[0] == VERIFY) {
+		sect |= ((u64)scsicmd[2]) << 24;
+		sect |= ((u64)scsicmd[3]) << 16;
+		sect |= ((u64)scsicmd[4]) << 8;
+		sect |= ((u64)scsicmd[5]);
+
+		n_sect |= ((u32)scsicmd[7]) << 8;
+		n_sect |= ((u32)scsicmd[8]);
+	}
+
+	else if (scsicmd[0] == VERIFY_16) {
+		sect |= ((u64)scsicmd[2]) << 56;
+		sect |= ((u64)scsicmd[3]) << 48;
+		sect |= ((u64)scsicmd[4]) << 40;
+		sect |= ((u64)scsicmd[5]) << 32;
+		sect |= ((u64)scsicmd[6]) << 24;
+		sect |= ((u64)scsicmd[7]) << 16;
+		sect |= ((u64)scsicmd[8]) << 8;
+		sect |= ((u64)scsicmd[9]);
+
+		n_sect |= ((u32)scsicmd[10]) << 24;
+		n_sect |= ((u32)scsicmd[11]) << 16;
+		n_sect |= ((u32)scsicmd[12]) << 8;
+		n_sect |= ((u32)scsicmd[13]);
+	}
+
+	else
+		return 1;
+
+	if (!n_sect)
+		return 1;
+	if (sect >= dev_sectors)
+		return 1;
+	if ((sect + n_sect) > dev_sectors)
+		return 1;
+	if (lba48) {
+		if (n_sect > (64 * 1024))
+			return 1;
+	} else {
+		if (n_sect > 256)
+			return 1;
+	}
+
+	if (lba48) {
+		tf->hob_nsect = (n_sect >> 8) & 0xff;
+
+		tf->hob_lbah = (sect >> 40) & 0xff;
+		tf->hob_lbam = (sect >> 32) & 0xff;
+		tf->hob_lbal = (sect >> 24) & 0xff;
+	} else
+		tf->device |= (sect >> 24) & 0xf;
+
+	tf->nsect = n_sect & 0xff;
+
+	tf->hob_lbah = (sect >> 16) & 0xff;
+	tf->hob_lbam = (sect >> 8) & 0xff;
+	tf->hob_lbal = sect & 0xff;
+
+	return 0;
+}
+
+/**
  *	ata_scsi_rw_xlat - Translate SCSI r/w command into an ATA one
  *	@qc: Storage for translated ATA taskfile
  *	@scsicmd: SCSI command to translate
@@ -244,10 +362,6 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd)
 	unsigned int lba48 = tf->flags & ATA_TFLAG_LBA48;
 
 	tf->flags |= ATA_TFLAG_ISADDR | ATA_TFLAG_DEVICE;
-	tf->hob_nsect = 0;
-	tf->hob_lbal = 0;
-	tf->hob_lbam = 0;
-	tf->hob_lbah = 0;
 	tf->protocol = qc->dev->xfer_protocol;
 	tf->device |= ATA_LBA;
 
@@ -1086,6 +1200,7 @@ ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
 
 /**
  *	ata_get_xlat_func - check if SCSI to ATA translation is possible
+ *	@dev: ATA device
  *	@cmd: SCSI command opcode to consider
  *
  *	Look up the SCSI command given, and determine whether the
@@ -1095,7 +1210,7 @@ ata_scsi_find_dev(struct ata_port *ap, struct scsi_cmnd *cmd)
  *	Pointer to translation function if possible, %NULL if not.
  */
 
-static inline ata_xlat_func_t ata_get_xlat_func(u8 cmd)
+static inline ata_xlat_func_t ata_get_xlat_func(struct ata_device *dev, u8 cmd)
 {
 	switch (cmd) {
 	case READ_6:
@@ -1106,6 +1221,15 @@ static inline ata_xlat_func_t ata_get_xlat_func(u8 cmd)
 	case WRITE_10:
 	case WRITE_16:
 		return ata_scsi_rw_xlat;
+
+	case SYNCHRONIZE_CACHE:
+		if (ata_try_flush_cache(dev))
+			return ata_scsi_flush_xlat;
+		break;
+
+	case VERIFY:
+	case VERIFY_16:
+		return ata_scsi_verify_xlat;
 	}
 
 	return NULL;
@@ -1170,7 +1294,8 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 	}
 
 	if (dev->class == ATA_DEV_ATA) {
-		ata_xlat_func_t xlat_func = ata_get_xlat_func(cmd->cmnd[0]);
+		ata_xlat_func_t xlat_func = ata_get_xlat_func(dev,
+							      cmd->cmnd[0]);
 
 		if (xlat_func)
 			ata_scsi_translate(ap, dev, cmd, done, xlat_func);
@@ -1211,7 +1336,7 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 
 	switch(scsicmd[0]) {
 		/* no-op's, complete with success */
-		case SYNCHRONIZE_CACHE:		/* FIXME: temporary */
+		case SYNCHRONIZE_CACHE:
 		case REZERO_UNIT:
 		case SEEK_6:
 		case SEEK_10:

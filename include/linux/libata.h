@@ -607,4 +607,11 @@ static inline u8 ata_bmdma_status(struct ata_port *ap)
 	return host_stat;
 }
 
+static inline int ata_try_flush_cache(struct ata_device *dev)
+{
+	return ata_id_wcache_enabled(dev) ||
+	       ata_id_has_flush(dev) ||
+	       ata_id_has_flush_ext(dev);
+}
+
 #endif /* __LINUX_LIBATA_H__ */
