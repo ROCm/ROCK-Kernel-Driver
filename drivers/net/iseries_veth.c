@@ -940,7 +940,7 @@ static HvLpIndexMap veth_transmit_to_many(struct sk_buff *skb,
 	for (i = 0; i < HVMAXARCHITECTEDLPS; i++) {
 		struct sk_buff *clone;
 
-		if (! lpmask & (1<<i))
+		if ((lpmask & (1 << i)) == 0)
 			continue;
 
 		clone = skb_clone(skb, GFP_ATOMIC);
