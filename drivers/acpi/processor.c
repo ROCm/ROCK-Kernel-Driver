@@ -1481,6 +1481,9 @@ acpi_processor_set_thermal_limit (
 	px = pr->limit.thermal.px;
 	tx = pr->limit.thermal.tx;
 
+	px = pr->limit.thermal.px;
+	tx = pr->limit.thermal.tx;
+
 	switch (type) {
 
 	case ACPI_PROCESSOR_LIMIT_NONE:
