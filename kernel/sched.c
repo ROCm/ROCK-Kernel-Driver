@@ -228,20 +228,22 @@ struct runqueue {
 	int best_expired_prio;
 	atomic_t nr_iowait;
 
+#ifdef CONFIG_SMP
+	struct sched_domain *sd;
+
 	/* For active balancing */
 	int active_balance;
 	int push_cpu;
 
 	task_t *migration_thread;
 	struct list_head migration_queue;
+#endif
 };
 
 static DEFINE_PER_CPU(struct runqueue, runqueues);
 
-#ifdef CONFIG_SMP
-/* Mandatory scheduling domains */
-DEFINE_PER_CPU(struct sched_domain, base_domains);
-#endif
+#define for_each_domain(cpu, domain) \
+	for (domain = cpu_rq(cpu)->sd; domain; domain = domain->parent)
 
 #define cpu_rq(cpu)		(&per_cpu(runqueues, (cpu)))
 #define this_rq()		(&__get_cpu_var(runqueues))
@@ -531,10 +533,22 @@ inline int task_curr(task_t *p)
 }
 
 #ifdef CONFIG_SMP
+enum request_type {
+	REQ_MOVE_TASK,
+	REQ_SET_DOMAIN,
+};
+
 typedef struct {
 	struct list_head list;
+	enum request_type type;
+
+	/* For REQ_MOVE_TASK */
 	task_t *task;
 	int dest_cpu;
+
+	/* For REQ_SET_DOMAIN */
+	struct sched_domain *sd;
+
 	struct completion done;
 } migration_req_t;
 
@@ -556,6 +570,7 @@ static int migrate_task(task_t *p, int dest_cpu, migration_req_t *req)
 	}
 
 	init_completion(&req->done);
+	req->type = REQ_MOVE_TASK;
 	req->task = p;
 	req->dest_cpu = dest_cpu;
 	list_add(&req->list, &rq->migration_queue);
@@ -644,13 +659,14 @@ static inline unsigned long get_high_cpu_load(int cpu)
 static int wake_idle(int cpu, task_t *p)
 {
 	cpumask_t tmp;
+	runqueue_t *rq = cpu_rq(cpu);
 	struct sched_domain *sd;
 	int i;
 
 	if (idle_cpu(cpu))
 		return cpu;
 
-	sd = cpu_sched_domain(cpu);
+	sd = rq->sd;
 	if (!(sd->flags & SD_WAKE_IDLE))
 		return cpu;
 
@@ -1382,9 +1398,6 @@ find_busiest_group(struct sched_domain *sd, int this_cpu,
 	struct sched_group *busiest = NULL, *this = NULL, *group = sd->groups;
 	unsigned long max_load, avg_load, total_load, this_load, total_pwr;
 
-	if (unlikely(!group))
-		return NULL;
-
 	max_load = this_load = total_load = total_pwr = 0;
 
 	do {
@@ -1661,9 +1674,6 @@ static inline void idle_balance(int this_cpu, runqueue_t *this_rq)
 		return;
 
 	for_each_domain(this_cpu, sd) {
-		if (unlikely(!sd->groups))
-			return;
-
 		if (sd->flags & SD_BALANCE_NEWIDLE) {
 			if (load_balance_newidle(this_cpu, this_rq, sd)) {
 				/* We've pulled tasks over so stop searching */
@@ -1761,9 +1771,6 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 
 	for_each_domain(this_cpu, sd) {
 		unsigned long interval = sd->balance_interval;
-
-		if (unlikely(!sd->groups))
-			return;
 
 		if (idle != IDLE)
 			interval *= sd->busy_factor;
@@ -1955,16 +1962,18 @@ out:
 static inline void wake_sleeping_dependent(int cpu, runqueue_t *rq)
 {
 	int i;
-	struct sched_domain *sd = cpu_sched_domain(cpu);
+	struct sched_domain *sd = rq->sd;
 	cpumask_t sibling_map;
 
 	if (!(sd->flags & SD_SHARE_CPUPOWER))
 		return;
 
 	cpus_and(sibling_map, sd->span, cpu_online_map);
-	cpu_clear(cpu, sibling_map);
 	for_each_cpu_mask(i, sibling_map) {
 		runqueue_t *smt_rq;
+
+		if (i == cpu)
+			continue;
 
 		smt_rq = cpu_rq(i);
 
@@ -1979,7 +1988,7 @@ static inline void wake_sleeping_dependent(int cpu, runqueue_t *rq)
 
 static inline int dependent_sleeper(int cpu, runqueue_t *rq, task_t *p)
 {
-	struct sched_domain *sd = cpu_sched_domain(cpu);
+	struct sched_domain *sd = rq->sd;
 	cpumask_t sibling_map;
 	int ret = 0, i;
 
@@ -1987,10 +1996,12 @@ static inline int dependent_sleeper(int cpu, runqueue_t *rq, task_t *p)
 		return 0;
 
 	cpus_and(sibling_map, sd->span, cpu_online_map);
-	cpu_clear(cpu, sibling_map);
 	for_each_cpu_mask(i, sibling_map) {
 		runqueue_t *smt_rq;
 		task_t *smt_curr;
+
+		if (i == cpu)
+			continue;
 
 		smt_rq = cpu_rq(i);
 		smt_curr = smt_rq->curr;
@@ -3269,10 +3280,19 @@ static int migration_thread(void * data)
 		}
 		req = list_entry(head->next, migration_req_t, list);
 		list_del_init(head->next);
+
 		spin_unlock(&rq->lock);
 
-		__migrate_task(req->task, req->dest_cpu);
+		if (req->type == REQ_MOVE_TASK) {
+			__migrate_task(req->task, req->dest_cpu);
+		} else if (req->type == REQ_SET_DOMAIN) {
+			rq->sd = req->sd;
+		} else {
+			WARN_ON(1);
+		}
+
 		local_irq_enable();
+
 		complete(&req->done);
 	}
 	return 0;
@@ -3423,13 +3443,42 @@ spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(kernel_flag);
 
 #ifdef CONFIG_SMP
+/* Attach the domain 'sd' to 'cpu' as its base domain */
+void cpu_attach_domain(struct sched_domain *sd, int cpu)
+{
+	migration_req_t req;
+	unsigned long flags;
+	runqueue_t *rq = cpu_rq(cpu);
+	int local = 1;
+
+	spin_lock_irqsave(&rq->lock, flags);
+
+	if (cpu == smp_processor_id() || cpu_is_offline(cpu)) {
+		rq->sd = sd;
+	} else {
+		init_completion(&req.done);
+		req.type = REQ_SET_DOMAIN;
+		req.sd = sd;
+		list_add(&req.list, &rq->migration_queue);
+		local = 0;
+	}
+
+	spin_unlock_irqrestore(&rq->lock, flags);
+
+	if (!local) {
+		wake_up_process(rq->migration_thread);
+		wait_for_completion(&req.done);
+	}
+}
+
 #ifdef ARCH_HAS_SCHED_DOMAIN
 extern void __init arch_init_sched_domains(void);
 #else
 static struct sched_group sched_group_cpus[NR_CPUS];
+static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
 #ifdef CONFIG_NUMA
 static struct sched_group sched_group_nodes[MAX_NUMNODES];
-DEFINE_PER_CPU(struct sched_domain, node_domains);
+static DEFINE_PER_CPU(struct sched_domain, node_domains);
 static void __init arch_init_sched_domains(void)
 {
 	int i;
@@ -3440,13 +3489,15 @@ static void __init arch_init_sched_domains(void)
 		int node = cpu_to_node(i);
 		cpumask_t nodemask = node_to_cpumask(node);
 		struct sched_domain *node_sd = &per_cpu(node_domains, i);
-		struct sched_domain *cpu_sd = cpu_sched_domain(i);
+		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
 
 		*node_sd = SD_NODE_INIT;
 		node_sd->span = cpu_possible_map;
+		node_sd->groups = &sched_group_nodes[cpu_to_node(i)];
 
 		*cpu_sd = SD_CPU_INIT;
 		cpus_and(cpu_sd->span, nodemask, cpu_possible_map);
+		cpu_sd->groups = &sched_group_cpus[i];
 		cpu_sd->parent = node_sd;
 	}
 
@@ -3491,10 +3542,8 @@ static void __init arch_init_sched_domains(void)
 
 	mb();
 	for_each_cpu(i) {
-		struct sched_domain *node_sd = &per_cpu(node_domains, i);
-		struct sched_domain *cpu_sd = cpu_sched_domain(i);
-		node_sd->groups = &sched_group_nodes[cpu_to_node(i)];
-		cpu_sd->groups = &sched_group_cpus[i];
+		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
+		cpu_attach_domain(cpu_sd, i);
 	}
 }
 
@@ -3506,10 +3555,11 @@ static void __init arch_init_sched_domains(void)
 
 	/* Set up domains */
 	for_each_cpu(i) {
-		struct sched_domain *cpu_sd = cpu_sched_domain(i);
+		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
 
 		*cpu_sd = SD_CPU_INIT;
 		cpu_sd->span = cpu_possible_map;
+		cpu_sd->groups = &sched_group_cpus[i];
 	}
 
 	/* Set up CPU groups */
@@ -3528,10 +3578,10 @@ static void __init arch_init_sched_domains(void)
 	}
 	last_cpu->next = first_cpu;
 
-	mb();
+	mb(); /* domains were modified outside the lock */
 	for_each_cpu(i) {
-		struct sched_domain *cpu_sd = cpu_sched_domain(i);
-		cpu_sd->groups = &sched_group_cpus[i];
+		struct sched_domain *cpu_sd = &per_cpu(cpu_domains, i);
+		cpu_attach_domain(cpu_sd, i);
 	}
 }
 
@@ -3545,8 +3595,11 @@ void sched_domain_debug(void)
 	int i;
 
 	for_each_cpu(i) {
+		runqueue_t *rq = cpu_rq(i);
+		struct sched_domain *sd;
 		int level = 0;
-		struct sched_domain *cpu_sd = cpu_sched_domain(i);
+
+		sd = rq->sd;
 
 		printk(KERN_DEBUG "CPU%d: %s\n",
 				i, (cpu_online(i) ? " online" : "offline"));
@@ -3554,10 +3607,10 @@ void sched_domain_debug(void)
 		do {
 			int j;
 			char str[NR_CPUS];
-			struct sched_group *group = cpu_sd->groups;
+			struct sched_group *group = sd->groups;
 			cpumask_t groupmask, tmp;
 
-			cpumask_scnprintf(str, NR_CPUS, cpu_sd->span);
+			cpumask_scnprintf(str, NR_CPUS, sd->span);
 			cpus_clear(groupmask);
 
 			printk(KERN_DEBUG);
@@ -3565,7 +3618,7 @@ void sched_domain_debug(void)
 				printk(" ");
 			printk("domain %d: span %s\n", level, str);
 
-			if (!cpu_isset(i, cpu_sd->span))
+			if (!cpu_isset(i, sd->span))
 				printk(KERN_DEBUG "ERROR domain->span does not contain CPU%d\n", i);
 			if (!cpu_isset(i, group->cpumask))
 				printk(KERN_DEBUG "ERROR domain->groups does not contain CPU%d\n", i);
@@ -3595,22 +3648,22 @@ void sched_domain_debug(void)
 				printk(" %s", str);
 
 				group = group->next;
-			} while (group != cpu_sd->groups);
+			} while (group != sd->groups);
 			printk("\n");
 
-			if (!cpus_equal(cpu_sd->span, groupmask))
+			if (!cpus_equal(sd->span, groupmask))
 				printk(KERN_DEBUG "ERROR groups don't span domain->span\n");
 
 			level++;
-			cpu_sd = cpu_sd->parent;
+			sd = sd->parent;
 
-			if (cpu_sd) {
-				cpus_and(tmp, groupmask, cpu_sd->span);
+			if (sd) {
+				cpus_and(tmp, groupmask, sd->span);
 				if (!cpus_equal(tmp, groupmask))
 					printk(KERN_DEBUG "ERROR parent span is not a superset of domain->span\n");
 			}
 
-		} while (cpu_sd);
+		} while (sd);
 	}
 }
 #else
@@ -3633,21 +3686,41 @@ void __init sched_init(void)
 	runqueue_t *rq;
 	int i, j, k;
 
-	for (i = 0; i < NR_CPUS; i++) {
-		prio_array_t *array;
 #ifdef CONFIG_SMP
-		struct sched_domain *domain;
-		domain = cpu_sched_domain(i);
-		memset(domain, 0, sizeof(struct sched_domain));
+	/* Set up an initial dummy domain for early boot */
+	static struct sched_domain sched_domain_init;
+	static struct sched_group sched_group_init;
+	cpumask_t cpu_mask_all = CPU_MASK_ALL;
+
+	memset(&sched_domain_init, 0, sizeof(struct sched_domain));
+	sched_domain_init.span = cpu_mask_all;
+	sched_domain_init.groups = &sched_group_init;
+	sched_domain_init.last_balance = jiffies;
+	sched_domain_init.balance_interval = INT_MAX; /* Don't balance */
+
+	memset(&sched_group_init, 0, sizeof(struct sched_group));
+	sched_group_init.cpumask = cpu_mask_all;
+	sched_group_init.next = &sched_group_init;
+	sched_group_init.cpu_power = SCHED_LOAD_SCALE;
 #endif
 
+	for (i = 0; i < NR_CPUS; i++) {
+		prio_array_t *array;
+
 		rq = cpu_rq(i);
+		spin_lock_init(&rq->lock);
 		rq->active = rq->arrays;
 		rq->expired = rq->arrays + 1;
 		rq->best_expired_prio = MAX_PRIO;
 
-		spin_lock_init(&rq->lock);
+#ifdef CONFIG_SMP
+		rq->sd = &sched_domain_init;
+		rq->cpu_load = 0;
+		rq->active_balance = 0;
+		rq->push_cpu = 0;
+		rq->migration_thread = NULL;
 		INIT_LIST_HEAD(&rq->migration_queue);
+#endif
 		atomic_set(&rq->nr_iowait, 0);
 
 		for (j = 0; j < 2; j++) {

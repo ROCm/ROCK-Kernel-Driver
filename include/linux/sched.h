@@ -598,7 +598,8 @@ struct sched_domain {
 	.per_cpu_gain		= 15,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
 				 | SD_WAKE_AFFINE	\
-				 | SD_WAKE_IDLE,	\
+				 | SD_WAKE_IDLE		\
+				 | SD_SHARE_CPUPOWER,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
 	.nr_balance_failed	= 0,			\
@@ -643,12 +644,7 @@ struct sched_domain {
 }
 #endif
 
-DECLARE_PER_CPU(struct sched_domain, base_domains);
-#define cpu_sched_domain(cpu)	(&per_cpu(base_domains, (cpu)))
-#define this_sched_domain()	(&__get_cpu_var(base_domains))
-
-#define for_each_domain(cpu, domain) \
-	for (domain = cpu_sched_domain(cpu); domain; domain = domain->parent)
+extern void cpu_attach_domain(struct sched_domain *sd, int cpu);
 
 extern int set_cpus_allowed(task_t *p, cpumask_t new_mask);
 #else
