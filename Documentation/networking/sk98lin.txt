@@ -174,7 +174,7 @@ In some distributions, the configuration tools are able to pass parameters
 to the driver module.
 
 If you use the kernel module loader, you can set driver parameters
-in the file /etc/modules.conf (or old name: /etc/conf.modules).
+in the file /etc/modprobe.conf (or /etc/modules.conf in 2.4 or earlier).
 To set the driver parameters in this file, proceed as follows:
 
 1. Insert a line of the form :

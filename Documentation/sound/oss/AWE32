@@ -47,12 +47,12 @@ SB32.
 
    Copy it to a directory of your choice, and unpack it there.
 
-4) Edit /etc/modules.conf, and insert the following lines at the end of the
+4) Edit /etc/modprobe.conf, and insert the following lines at the end of the
    file:
 
   alias sound-slot-0 sb
   alias sound-service-0-1 awe_wave
-  post-install awe_wave /usr/local/bin/sfxload PATH_TO_SOUND_BANK_FILE
+  install awe_wave /sbin/modprobe --first-time -i awe_wave && /usr/local/bin/sfxload PATH_TO_SOUND_BANK_FILE
 
   You will of course have to change "PATH_TO_SOUND_BANK_FILE" to the full
   path of of the sound bank file. That will enable the Sound Blaster and AWE

@@ -74,13 +74,8 @@ To install ifenslave.c, do:
 Bond Configuration
 ==================
 
-You will need to add at least the following line to /etc/modules.conf
-so the bonding driver will automatically load when the bond0 interface is
-configured. Refer to the modules.conf manual page for specific modules.conf
-syntax details. The Module Parameters section of this document describes each
-bonding driver parameter.
-
-	alias bond0 bonding
+In Linux kernels 2.6 and above, the module creates its own "bond?" alias, so
+any access to eg.  bond0 will load the bonding module.
 
 Use standard distribution techniques to define the bond0 network interface. For
 example, on modern Red Hat distributions, create an ifcfg-bond0 file in
@@ -133,10 +128,10 @@ You can then create a script containing these commands and place it in the
 appropriate rc directory.
 
 If you specifically need all network drivers loaded before the bonding driver,
-adding the following line to modules.conf will cause the network driver for
+adding the following line to modprobe.conf will cause the network driver for
 eth0 and eth1 to be loaded before the bonding driver.
 
-probeall bond0 eth0 eth1 bonding
+install bond0 /sbin/modprobe -a eth0 eth1 && /sbin/modprobe bonding
 
 Be careful not to reference bond0 itself at the end of the line, or modprobe
 will die in an endless recursive loop.
@@ -188,7 +183,7 @@ Module Parameters
 
 Optional parameters for the bonding driver can be supplied as command line
 arguments to the insmod command. Typically, these parameters are specified in
-the file /etc/modules.conf (see the manual page for modules.conf). The
+the file /etc/modprobe.conf (see the manual page for modprobe.conf). The
 available bonding driver parameters are listed below. If a parameter is not
 specified the default value is used. When initially configuring a bond, it
 is recommended "tail -f /var/log/messages" be run in a separate window to
@@ -731,9 +726,8 @@ Example:
 
    # modprobe bonding miimon=100
 
-Or, put the following lines in /etc/modules.conf:
+Or, put the following line in /etc/modprobe.conf:
 
-   alias bond0 bonding
    options bond0 miimon=100
 
 There are currently two policies for high availability. They are dependent on
@@ -804,9 +798,8 @@ To use this mode, pass "mode=1" to the module at load time :
 
     # modprobe bonding miimon=100 mode=1
 
-Or, put in your /etc/modules.conf :
+Or, put in your /etc/modprobe.conf :
 
-    alias bond0 bonding
     options bond0 miimon=100 mode=active-backup
 
 Example 1: Using multiple host and multiple switches to build a "no single
@@ -908,7 +901,6 @@ setting by hand. Specifically, when you "ifconfing bond0 up" you
 must add the promisc flag there; it will be propagated down to the
 slave interfaces at ifenslave time; a full example might look like:
 
-   grep bond0 /etc/modules.conf || echo alias bond0 bonding >/etc/modules.conf
    ifconfig bond0 promisc up
    for if in eth1 eth2 ...;do
        ifconfig $if up
