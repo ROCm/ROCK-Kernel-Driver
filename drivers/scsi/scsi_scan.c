@@ -1313,14 +1313,6 @@ static int scsi_add_lun(Scsi_Device *sdev, Scsi_Request *sreq,
 	return SCSI_SCAN_LUN_PRESENT;
 }
 
-static void scsi_remove_lun(struct scsi_device *sdev)
-{
-	devfs_unregister(sdev->de);
-	scsi_device_unregister(sdev);
-
-	scsi_free_sdev(sdev);
-}
-
 /**
  * scsi_probe_and_add_lun - probe a LUN, if a LUN is found add it
  * @sdevscan:	probe the LUN corresponding to this Scsi_Device
@@ -1338,90 +1330,77 @@ static void scsi_remove_lun(struct scsi_device *sdev)
  *     SCSI_SCAN_LUN_PRESENT: a new Scsi_Device was allocated and initialized
  **/
 static int scsi_probe_and_add_lun(struct Scsi_Host *host,
-		struct request_queue **q, uint channel, uint id,
-	       	uint lun, int *bflagsp)
+		struct request_queue **q, uint channel, uint id, uint lun,
+		int *bflagsp, struct scsi_device **sdevp)
 {
-	Scsi_Device *sdev = NULL;
-	Scsi_Request *sreq = NULL;
-	unsigned char *scsi_result = NULL;
-	int bflags;
-	int res;
+	struct scsi_device *sdev;
+	struct scsi_request *sreq;
+	unsigned char *result;
+	int bflags, res = SCSI_SCAN_NO_RESPONSE;
 
 	sdev = scsi_alloc_sdev(host, q, channel, id, lun);
-	if (sdev == NULL)
-		return SCSI_SCAN_NO_RESPONSE;
+	if (!sdev)
+		goto out;
 	sreq = scsi_allocate_request(sdev);
-	if (sreq == NULL) {
-		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-		res = SCSI_SCAN_NO_RESPONSE;
-		goto bail_out;
-	}
-	/*
-	 * The sreq is for use only with sdevscan.
-	 */
+	if (!sreq)
+		goto out_free_sdev;
+	result = kmalloc(256, GFP_ATOMIC |
+			(host->unchecked_isa_dma) ? __GFP_DMA : 0);
+	if (!result)
+		goto out_free_sreq;
 
-	scsi_result = kmalloc(256, GFP_ATOMIC |
-			      (host->unchecked_isa_dma) ?
-			      GFP_DMA : 0);
-	if (scsi_result == NULL) {
-		printk(ALLOC_FAILURE_MSG, __FUNCTION__);
-		res = SCSI_SCAN_NO_RESPONSE;
-		goto bail_out;
-	}
-
-	scsi_probe_lun(sreq, scsi_result, &bflags);
+	scsi_probe_lun(sreq, result, &bflags);
 	if (sreq->sr_result)
-		res = SCSI_SCAN_NO_RESPONSE;
-	else {
+		goto out_free_result;
+
+	/*
+	 * result contains valid SCSI INQUIRY data.
+	 */
+	if ((result[0] >> 5) == 3) {
 		/*
-		 * scsi_result contains valid SCSI INQUIRY data.
+		 * For a Peripheral qualifier 3 (011b), the SCSI
+		 * spec says: The device server is not capable of
+		 * supporting a physical device on this logical
+		 * unit.
+		 *
+		 * For disks, this implies that there is no
+		 * logical disk configured at sdev->lun, but there
+		 * is a target id responding.
 		 */
-		if ((scsi_result[0] >> 5) == 3) {
-			/*
-			 * For a Peripheral qualifier 3 (011b), the SCSI
-			 * spec says: The device server is not capable of
-			 * supporting a physical device on this logical
-			 * unit.
-			 *
-			 * For disks, this implies that there is no
-			 * logical disk configured at sdev->lun, but there
-			 * is a target id responding.
-			 */
-			SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO
+		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO
 					"scsi scan: peripheral qualifier of 3,"
 					" no device added\n"));
-			res = SCSI_SCAN_TARGET_PRESENT;
-		} else {
-			res = scsi_add_lun(sdev, sreq, scsi_result, &bflags);
-			if (res == SCSI_SCAN_LUN_PRESENT) {
-				if ((bflags & BLIST_KEY) != 0) {
-					sdev->lockable = 0;
-					scsi_unlock_floptical(sreq,
-							      scsi_result);
-					/*
-					 * scsi_result no longer contains
-					 * the INQUIRY data.
-					 */
-				}
-				if (bflagsp != NULL)
-					*bflagsp = bflags;
-			}
-		}
+		res = SCSI_SCAN_TARGET_PRESENT;
+		goto out_free_result;
 	}
-bail_out:
-	if (scsi_result != NULL)
-		kfree(scsi_result);
-	if (sreq != NULL)
-		scsi_release_request(sreq);
-	if (res != SCSI_SCAN_LUN_PRESENT) {
-		if(q) {
+
+	res = scsi_add_lun(sdev, sreq, result, &bflags);
+	if (res == SCSI_SCAN_LUN_PRESENT) {
+		if (bflags & BLIST_KEY) {
+			sdev->lockable = 0;
+			scsi_unlock_floptical(sreq, result);
+		}
+		if (bflagsp)
+			*bflagsp = bflags;
+	}
+
+ out_free_result:
+	kfree(result);
+ out_free_sreq:
+	scsi_release_request(sreq);
+ out_free_sdev:
+	if (res == SCSI_SCAN_LUN_PRESENT) {
+		if (*sdevp)
+			*sdevp = sdev;
+	} else {
+		if (q) {
 			*q = sdev->request_queue;
 			sdev->request_queue = NULL;
 		}
 		scsi_free_sdev(sdev);
 	}
+ out:
 	return res;
-
 }
 
 /**
@@ -1507,8 +1486,8 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost,
 	 * sparse_lun.
 	 */
 	for (lun = 1; lun < max_dev_lun; ++lun)
-		if ((scsi_probe_and_add_lun(shost, q, channel, id, lun, NULL)
-		     != SCSI_SCAN_LUN_PRESENT) && !sparse_lun)
+		if ((scsi_probe_and_add_lun(shost, q, channel, id, lun,
+		      NULL, NULL) != SCSI_SCAN_LUN_PRESENT) && !sparse_lun)
 			return;
 }
 
@@ -1723,7 +1702,7 @@ static int scsi_report_lun_scan(Scsi_Device *sdev, struct request_queue **q,
 			int res;
 
 			res = scsi_probe_and_add_lun(sdev->host, q,
-				       	sdev->channel, sdev->id, lun, NULL);
+				sdev->channel, sdev->id, lun, NULL, NULL);
 			if (res == SCSI_SCAN_NO_RESPONSE) {
 				/*
 				 * Got some results, but now none, abort.
@@ -1745,55 +1724,33 @@ static int scsi_report_lun_scan(Scsi_Device *sdev, struct request_queue **q,
 
 }
 
-int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
+struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
+				    uint channel, uint id, uint lun)
 {
-	struct Scsi_Host *shost;
-	int error = -ENODEV;
 	struct scsi_device *sdev;
+	int error = -ENODEV, res;
 
-	shost = scsi_host_hn_get(host);
-	if (!shost)
-		return -ENODEV;
-	if(scsi_find_device(shost, channel, id, lun) != NULL)
-		goto out;
+	res = scsi_probe_and_add_lun(shost, NULL, channel, id, lun,
+			NULL, &sdev);
+	if (res == SCSI_SCAN_LUN_PRESENT)
+		error = scsi_attach_device(sdev);
 
-	if (scsi_probe_and_add_lun(shost, NULL, channel, id, lun, NULL) ==
-			SCSI_SCAN_LUN_PRESENT) {
-		error = 0;
-		sdev = scsi_find_device(shost, channel, id, lun);
-		scsi_attach_device(sdev);
-	}
-out:
-	scsi_host_put(shost);
-	return error;
+	if (error)
+		sdev = ERR_PTR(error);
+	return sdev;
 }
 
-int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
+int scsi_remove_device(struct scsi_device *sdev)
 {
-	struct scsi_device *sdev;
-	struct Scsi_Host *shost;
-	int error = -ENODEV;
-
-	shost = scsi_host_hn_get(host);
-	if (!shost)
-		return -ENODEV;
-	sdev = scsi_find_device(shost, channel, id, lun);
-	if (!sdev)
-		goto out;
-
-	error = -EBUSY;
-	if (sdev->access_count)
-		goto out;
 	scsi_detach_device(sdev);
 	if (sdev->attached)
-		goto out;
+		return -EINVAL;
 
-	scsi_remove_lun(sdev);
-	error = 0;
+	devfs_unregister(sdev->de);
+	scsi_device_unregister(sdev);
 
-out:
-	scsi_host_put(shost);
-	return error;
+	scsi_free_sdev(sdev);
+	return 0;
 }
 
 /**
@@ -1832,9 +1789,8 @@ static void scsi_scan_target(struct Scsi_Host *shost, struct request_queue **q,
 	 * Scan LUN 0, if there is some response, scan further. Ideally, we
 	 * would not configure LUN 0 until all LUNs are scanned.
 	 */
-	res = scsi_probe_and_add_lun(shost, q, channel, id, 0, &bflags);
+	res = scsi_probe_and_add_lun(shost, q, channel, id, 0, &bflags, &sdev);
 	if (res == SCSI_SCAN_LUN_PRESENT) {
-		sdev = scsi_find_device(shost, channel, id, 0);
 		if (scsi_report_lun_scan(sdev, q, bflags) != 0)
 			/*
 			 * The REPORT LUN did not scan the target,
@@ -1900,9 +1856,13 @@ void scsi_scan_host(struct Scsi_Host *shost)
 void scsi_forget_host(struct Scsi_Host *shost)
 {
 	struct list_head *le, *lh;
+	struct scsi_device *sdev;
 
-	list_for_each_safe(le, lh, &shost->my_devices)
-		scsi_remove_lun(list_entry(le, struct scsi_device, siblings));
+	list_for_each_safe(le, lh, &shost->my_devices) {
+		sdev = list_entry(le, struct scsi_device, siblings);
+		
+		scsi_remove_device(sdev);
+	}
 }
 
 /*

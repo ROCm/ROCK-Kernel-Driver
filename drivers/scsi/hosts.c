@@ -270,21 +270,6 @@ int scsi_remove_host(struct Scsi_Host *shost)
 		if (scsi_check_device_busy(sdev))
 			return 1;
 
-	/*
-	 * Next we detach the high level drivers from the Scsi_Device
-	 * structures
-	 */
-	list_for_each_entry(sdev, &shost->my_devices, siblings) {
-		scsi_detach_device(sdev);
-
-		/* If something still attached, punt */
-		if (sdev->attached) {
-			printk(KERN_ERR "Attached usage count = %d\n",
-			       sdev->attached);
-			return 1;
-		}
-	}
-
 	scsi_forget_host(shost);
 	return 0;
 }

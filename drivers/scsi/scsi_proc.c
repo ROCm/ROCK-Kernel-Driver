@@ -398,6 +398,50 @@ static void scsi_dump_status(int level)
 }
 #endif	/* CONFIG_SCSI_LOGGING */ 
 
+static int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
+{
+	struct Scsi_Host *shost;
+	struct scsi_device *sdev;
+	int error = -ENODEV;
+
+	shost = scsi_host_hn_get(host);
+	if (!shost)
+		return -ENODEV;
+
+	if (!scsi_find_device(shost, channel, id, lun)) {
+		sdev = scsi_add_device(shost, channel, id, lun);
+		if (IS_ERR(sdev))
+			error = PTR_ERR(sdev);
+		else
+			error = 0;
+	}
+
+	scsi_host_put(shost);
+	return error;
+}
+
+static int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
+{
+	struct scsi_device *sdev;
+	struct Scsi_Host *shost;
+	int error = -ENODEV;
+
+	shost = scsi_host_hn_get(host);
+	if (!shost)
+		return -ENODEV;
+	sdev = scsi_find_device(shost, channel, id, lun);
+	if (!sdev)
+		goto out;
+	if (sdev->access_count)
+		goto out;
+
+	error = scsi_remove_device(sdev);
+out:
+	scsi_host_put(shost);
+	return error;
+}
+
+
 static int proc_scsi_gen_write(struct file * file, const char * buf,
                               unsigned long length, void *data)
 {
