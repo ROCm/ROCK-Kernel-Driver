@@ -331,6 +331,7 @@ int kobject_set_name(struct kobject * kobj, const char * fmt, ...)
 	int limit = KOBJ_NAME_LEN;
 	int need;
 	va_list args;
+	char * name;
 
 	va_start(args,fmt);
 	/* 
@@ -338,25 +339,33 @@ int kobject_set_name(struct kobject * kobj, const char * fmt, ...)
 	 */
 	need = vsnprintf(kobj->name,limit,fmt,args);
 	if (need < limit) 
-		kobj->k_name = kobj->name;
+		name = kobj->name;
 	else {
 		/* 
 		 * Need more space? Allocate it and try again 
 		 */
-		kobj->k_name = kmalloc(need,GFP_KERNEL);
-		if (!kobj->k_name) {
+		name = kmalloc(need,GFP_KERNEL);
+		if (!name) {
 			error = -ENOMEM;
 			goto Done;
 		}
 		limit = need;
-		need = vsnprintf(kobj->k_name,limit,fmt,args);
+		need = vsnprintf(name,limit,fmt,args);
 
 		/* Still? Give up. */
 		if (need > limit) {
-			kfree(kobj->k_name);
+			kfree(name);
 			error = -EFAULT;
+			goto Done;
 		}
 	}
+
+	/* Free the old name, if necessary. */
+	if (kobj->k_name && kobj->k_name != kobj->name)
+		kfree(kobj->k_name);
+
+	/* Now, set the new name */
+	kobj->k_name = name;
  Done:
 	va_end(args);
 	return error;
@@ -627,6 +636,8 @@ EXPORT_SYMBOL(kobject_unregister);
 EXPORT_SYMBOL(kobject_get);
 EXPORT_SYMBOL(kobject_put);
 
+EXPORT_SYMBOL(kset_register);
+EXPORT_SYMBOL(kset_unregister);
 EXPORT_SYMBOL(kset_find_obj);
 
 EXPORT_SYMBOL(subsystem_init);

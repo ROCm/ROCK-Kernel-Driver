@@ -459,10 +459,6 @@ int bus_add_driver(struct device_driver * drv)
 		driver_attach(drv);
 		up_write(&bus->subsys.rwsem);
 
-		if (error) {
-			kobject_unregister(&drv->kobj);
-			put_bus(bus);
-		}
 	}
 	return error;
 }
