@@ -430,7 +430,6 @@ sn_cpu_init(void)
 void
 scan_for_ionodes(void) {
 	int nasid = 0;
-	lboard_t *brd;
 
 	/* Setup ionodes with memory */
 	for (nasid = 0; nasid < MAX_PHYSNODE_ID; nasid +=2) {
