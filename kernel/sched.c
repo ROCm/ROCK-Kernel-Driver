@@ -782,7 +782,7 @@ need_resched:
 	 */
 	if (unlikely(preempt_get_count() & PREEMPT_ACTIVE))
 		goto pick_next_task;
-	
+
 	switch (prev->state) {
 	case TASK_INTERRUPTIBLE:
 		if (unlikely(signal_pending(prev))) {
@@ -1144,7 +1144,7 @@ static int setscheduler(pid_t pid, int policy, struct sched_param *param)
 				policy != SCHED_OTHER)
 			goto out_unlock;
 	}
-	
+
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
 	 * 1..MAX_USER_RT_PRIO, valid priority for SCHED_OTHER is 0.
@@ -1377,6 +1377,7 @@ asmlinkage long sys_sched_yield(void)
 
 	return 0;
 }
+
 asmlinkage long sys_sched_get_priority_max(int policy)
 {
 	int ret = -EINVAL;
@@ -1683,16 +1684,6 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 * migrate the process off to a proper CPU.
 	 */
 	if (new_mask & (1UL << p->thread_info->cpu)) {
-		task_rq_unlock(rq, &flags);
-		goto out;
-	}
-
-	/*
-	 * If the task is not on a runqueue, then it is sufficient
-	 * to simply update the task's cpu field.
-	 */
-	if (!p->array) {
-		p->thread_info->cpu = __ffs(p->cpus_allowed);
 		task_rq_unlock(rq, &flags);
 		goto out;
 	}
