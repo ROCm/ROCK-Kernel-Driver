@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2002 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -535,6 +535,8 @@ typedef struct log {
     struct xfs_buf_cancel **l_buf_cancel_table;
     int			l_iclog_hsize;  /* size of iclog header */
     int			l_iclog_heads;  /* number of iclog header sectors */
+    uint		l_sectbb_log;   /* log2 of sector size in bbs */
+    uint		l_sectbb_mask;  /* sector size in bbs alignment mask */
 } xlog_t;
 
 
@@ -549,10 +551,12 @@ extern int	 xlog_print_find_oldest(xlog_t *log, xfs_daddr_t *last_blk);
 extern int	 xlog_recover(xlog_t *log, int readonly);
 extern int	 xlog_recover_finish(xlog_t *log, int mfsi_flags);
 extern void	 xlog_pack_data(xlog_t *log, xlog_in_core_t *iclog);
-extern struct xfs_buf *xlog_get_bp(int,xfs_mount_t *);
-extern void	 xlog_put_bp(struct xfs_buf *);
-extern int	 xlog_bread(xlog_t *, xfs_daddr_t blkno, int bblks, struct xfs_buf *bp);
 extern void	 xlog_recover_process_iunlinks(xlog_t *log);
+
+extern struct xfs_buf *xlog_get_bp(xlog_t *, int);
+extern void	 xlog_put_bp(struct xfs_buf *);
+extern int	 xlog_bread(xlog_t *, xfs_daddr_t, int, struct xfs_buf *);
+extern xfs_caddr_t xlog_align(xlog_t *, xfs_daddr_t, int, struct xfs_buf *);
 
 #define XLOG_TRACE_GRAB_FLUSH  1
 #define XLOG_TRACE_REL_FLUSH   2
