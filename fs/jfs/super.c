@@ -23,6 +23,7 @@
 #include <linux/parser.h>
 #include <linux/completion.h>
 #include <linux/vfs.h>
+#include <linux/moduleparam.h>
 #include <asm/uaccess.h>
 
 #include "jfs_incore.h"
@@ -44,15 +45,20 @@ static struct super_operations jfs_super_operations;
 static struct export_operations jfs_export_operations;
 static struct file_system_type jfs_fs_type;
 
+#define MAX_COMMIT_THREADS 64
+static int commit_threads = 0;
+module_param(commit_threads, int, 0);
+MODULE_PARM_DESC(commit_threads, "Number of commit threads");
+
 int jfs_stop_threads;
 static pid_t jfsIOthread;
-static pid_t jfsCommitThread;
+static pid_t jfsCommitThread[MAX_COMMIT_THREADS];
 static pid_t jfsSyncThread;
 DECLARE_COMPLETION(jfsIOwait);
 
 #ifdef CONFIG_JFS_DEBUG
 int jfsloglevel = JFS_LOGLEVEL_WARN;
-MODULE_PARM(jfsloglevel, "i");
+module_param(jfsloglevel, int, 644);
 MODULE_PARM_DESC(jfsloglevel, "Specify JFS loglevel (0, 1 or 2)");
 #endif
 
@@ -564,6 +570,7 @@ static void init_once(void *foo, kmem_cache_t * cachep, unsigned long flags)
 
 static int __init init_jfs_fs(void)
 {
+	int i;
 	int rc;
 
 	jfs_inode_cachep =
@@ -600,12 +607,23 @@ static int __init init_jfs_fs(void)
 	}
 	wait_for_completion(&jfsIOwait);	/* Wait until thread starts */
 
-	jfsCommitThread = kernel_thread(jfs_lazycommit, 0, CLONE_KERNEL);
-	if (jfsCommitThread < 0) {
-		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsCommitThread);
-		goto kill_iotask;
+	if (commit_threads < 1)
+		commit_threads = num_online_cpus();
+	else if (commit_threads > MAX_COMMIT_THREADS)
+		commit_threads = MAX_COMMIT_THREADS;
+
+	for (i = 0; i < commit_threads; i++) {
+		jfsCommitThread[i] = kernel_thread(jfs_lazycommit, 0,
+						   CLONE_KERNEL);
+		if (jfsCommitThread[i] < 0) {
+			jfs_err("init_jfs_fs: fork failed w/rc = %d",
+				jfsCommitThread[i]);
+			commit_threads = i;
+			goto kill_committask;
+		}
+		/* Wait until thread starts */
+		wait_for_completion(&jfsIOwait);
 	}
-	wait_for_completion(&jfsIOwait);	/* Wait until thread starts */
 
 	jfsSyncThread = kernel_thread(jfs_sync, 0, CLONE_KERNEL);
 	if (jfsSyncThread < 0) {
@@ -622,10 +640,10 @@ static int __init init_jfs_fs(void)
 
 kill_committask:
 	jfs_stop_threads = 1;
-	wake_up(&jfs_commit_thread_wait);
-	wait_for_completion(&jfsIOwait);	/* Wait for thread exit */
-kill_iotask:
-	jfs_stop_threads = 1;
+	wake_up_all(&jfs_commit_thread_wait);
+	for (i = 0; i < commit_threads; i++)
+		wait_for_completion(&jfsIOwait);
+
 	wake_up(&jfs_IO_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait for thread exit */
 end_txmngr:
@@ -639,6 +657,8 @@ free_slab:
 
 static void __exit exit_jfs_fs(void)
 {
+	int i;
+
 	jfs_info("exit_jfs_fs called");
 
 	jfs_stop_threads = 1;
@@ -646,8 +666,9 @@ static void __exit exit_jfs_fs(void)
 	metapage_exit();
 	wake_up(&jfs_IO_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait until IO thread exits */
-	wake_up(&jfs_commit_thread_wait);
-	wait_for_completion(&jfsIOwait);	/* Wait until Commit thread exits */
+	wake_up_all(&jfs_commit_thread_wait);
+	for (i = 0; i < commit_threads; i++)
+		wait_for_completion(&jfsIOwait);
 	wake_up(&jfs_sync_thread_wait);
 	wait_for_completion(&jfsIOwait);	/* Wait until Sync thread exits */
 #ifdef PROC_FS_JFS
