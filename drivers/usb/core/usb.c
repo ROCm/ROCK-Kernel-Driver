@@ -994,7 +994,7 @@ int usb_set_address(struct usb_device *dev)
 #define SET_ADDRESS_RETRYS	2
 int usb_new_device(struct usb_device *dev, struct device *parent)
 {
-	int err = 0;
+	int err = -EINVAL;
 	int i;
 	int j;
 
@@ -1036,7 +1036,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 		i = 8;
 		break;
 	default:
-		return -EINVAL;
+		goto fail;
 	}
 	dev->epmaxpacketin [0] = i;
 	dev->epmaxpacketout[0] = i;
@@ -1050,12 +1050,10 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 			wait_ms(200);
 		}
 		if (err < 0) {
-			dev_err(&dev->dev, "USB device not accepting new address=%d (error=%d)\n",
+			dev_err(&dev->dev,
+				"device not accepting address %d, error %d\n",
 				dev->devnum, err);
-			dev->state = USB_STATE_DEFAULT;
-			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-			dev->devnum = -1;
-			return 1;
+			goto fail;
 		}
 
 		wait_ms(10);	/* Let the SET_ADDRESS settle */
@@ -1068,13 +1066,8 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	}
 
 	if (err < 8) {
-		if (err < 0)
-			dev_err(&dev->dev, "USB device not responding, giving up (error=%d)\n", err);
-		else
-			dev_err(&dev->dev, "USB device descriptor short read (expected %i, got %i)\n", 8, err);
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+		dev_err(&dev->dev, "device descriptor read/8, error %d\n", err);
+		goto fail;
 	}
 	if (dev->speed == USB_SPEED_FULL) {
 		dev->epmaxpacketin [0] = dev->descriptor.bMaxPacketSize0;
@@ -1085,34 +1078,29 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	err = usb_get_device_descriptor(dev);
 	if (err < (signed)sizeof(dev->descriptor)) {
-		if (err < 0)
-			dev_err(&dev->dev, "unable to get device descriptor (error=%d)\n", err);
-		else
-			dev_err(&dev->dev, "USB device descriptor short read (expected %Zi, got %i)\n",
-				sizeof(dev->descriptor), err);
-	
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+		dev_err(&dev->dev, "device descriptor read/all, error %d\n", err);
+		goto fail;
 	}
 
 	err = usb_get_configuration(dev);
 	if (err < 0) {
 		dev_err(&dev->dev, "unable to get device %d configuration (error=%d)\n",
 			dev->devnum, err);
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+		goto fail;
 	}
 
-	/* we set the default configuration here */
+	/* choose and set the configuration here */
+	if (dev->descriptor.bNumConfigurations != 1) {
+		dev_info(&dev->dev,
+			"configuration #%d chosen from %d choices\n",
+			dev->config[0].desc.bConfigurationValue,
+			dev->descriptor.bNumConfigurations);
+	}
 	err = usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue);
 	if (err) {
 		dev_err(&dev->dev, "failed to set device %d default configuration (error=%d)\n",
 			dev->devnum, err);
-		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
-		dev->devnum = -1;
-		return 1;
+		goto fail;
 	}
 
 	/* USB device state == configured ... tell the world! */
@@ -1132,7 +1120,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	/* put into sysfs, with device and config specific files */
 	err = device_add (&dev->dev);
 	if (err)
-		return err;
+		goto fail;
 	usb_create_driverfs_dev_files (dev);
 
 	/* Register all of the interfaces for this device with the driver core.
@@ -1158,6 +1146,12 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	usbfs_add_device(dev);
 
 	return 0;
+fail:
+	dev->state = USB_STATE_DEFAULT;
+	clear_bit(dev->devnum, dev->bus->devmap.devicemap);
+	dev->devnum = -1;
+	usb_put_dev(dev);
+	return err;
 }
 
 /**
