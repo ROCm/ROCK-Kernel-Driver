@@ -2399,7 +2399,7 @@ nfsd4_encode_replay(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 
 	RESERVE_SPACE(8);
 	WRITE32(op->opnum);
-	WRITE32(NFS_OK);
+	*p++ = rp->rp_status;  /* already xdr'ed */
 	ADJUST_ARGS();
 
 	RESERVE_SPACE(rp->rp_buflen);

@@ -776,6 +776,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 			break;
 		case OP_LOCK:
 			op->status = nfsd4_lock(rqstp, &current_fh, &op->u.lock);
+			op->replay = &op->u.lock.lk_stateowner->so_replay;
 			break;
 		case OP_LOCKT:
 			op->status = nfsd4_lockt(rqstp, &current_fh, &op->u.lockt);
@@ -864,7 +865,7 @@ nfsd4_proc_compound(struct svc_rqst *rqstp,
 encode_op:
 		if (op->status == NFSERR_REPLAY_ME) {
 			nfsd4_encode_replay(resp, op);
-			status = op->status = NFS_OK;
+			status = op->status = op->replay->rp_status;
 		} else {
 			nfsd4_encode_operation(resp, op);
 			status = op->status;
