@@ -42,6 +42,7 @@
   Alan Cox		: Spinlocking work, added 'BUG_83C690'
   Paul Gortmaker	: Separate out Tx timeout code from Tx path.
   Paul Gortmaker	: Remove old unused single Tx buffer code.
+  Hayato Fujiwara	: Add m32r support.
 
   Sources:
   The National Semiconductor LAN Databook, and the 3Com 3c503 databook.
@@ -219,6 +220,15 @@ void ei_tx_timeout(struct net_device *dev)
 	int txsr, isr, tickssofar = jiffies - dev->trans_start;
 	unsigned long flags;
 
+#if defined(CONFIG_M32R) && defined(CONFIG_SMP)
+	unsigned long icucr;
+
+	local_irq_save(flags);
+	icucr = inl(ICUCR1);
+	icucr |= M32R_ICUCR_ISMOD11;
+	outl(icucr, ICUCR1);
+	local_irq_restore(flags);
+#endif
 	ei_local->stat.tx_errors++;
 
 	spin_lock_irqsave(&ei_local->page_lock, flags);

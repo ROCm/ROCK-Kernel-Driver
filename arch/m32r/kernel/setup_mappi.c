@@ -92,7 +92,7 @@ void __init init_IRQ(void)
 	else
 		once++;
 
-#ifdef CONFIG_M32R_NE2000
+#ifdef CONFIG_NE2000
 	/* INT0 : LAN controller (RTL8019AS) */
 	irq_desc[M32R_IRQ_INT0].status = IRQ_DISABLED;
 	irq_desc[M32R_IRQ_INT0].handler = &mappi_irq_type;
