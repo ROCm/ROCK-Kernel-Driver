@@ -366,7 +366,6 @@ struct cp_private {
 	struct sk_buff		*frag_skb;
 	unsigned		dropping_frag : 1;
 	unsigned		pci_using_dac : 1;
-	unsigned int		board_type;
 
 	unsigned int		wol_enabled : 1; /* Is Wake-on-LAN enabled? */
 	u32			power_state[16];
@@ -398,20 +397,9 @@ static void __cp_set_rx_mode (struct net_device *dev);
 static void cp_tx (struct cp_private *cp);
 static void cp_clean_rings (struct cp_private *cp);
 
-enum board_type {
-	RTL8139Cp,
-};
-
-static struct cp_board_info {
-	const char *name;
-} cp_board_tbl[] = {
-	/* RTL8139Cp */
-	{ "RTL-8139C+" },
-};
-
 static struct pci_device_id cp_pci_tbl[] = {
 	{ PCI_VENDOR_ID_REALTEK, PCI_DEVICE_ID_REALTEK_8139,
-	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, RTL8139Cp },
+	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, },
 	{ },
 };
 MODULE_DEVICE_TABLE(pci, cp_pci_tbl);
@@ -525,9 +513,10 @@ static int cp_rx_poll (struct net_device *dev, int *budget)
 	struct cp_private *cp = dev->priv;
 	unsigned rx_tail = cp->rx_tail;
 	unsigned rx_work = dev->quota;
-	unsigned rx = 0;
+	unsigned rx;
 
 rx_status_loop:
+	rx = 0;
 	cpw16(IntrStatus, cp_rx_intr_mask);
 
 	while (1) {
@@ -1030,10 +1019,9 @@ static void cp_init_hw (struct cp_private *cp)
 
 	cpw8(Config1, cpr8(Config1) | DriverLoaded | PMEnable);
 	/* Disable Wake-on-LAN. Can be turned on with ETHTOOL_SWOL */
-	if (cp->board_type == RTL8139Cp) {
-		cpw8(Config3, PARMEnable);
-		cp->wol_enabled = 0;
-	}
+	cpw8(Config3, PARMEnable);
+	cp->wol_enabled = 0;
+
 	cpw8(Config5, cpr8(Config5) & PMEStatus); 
 
 	cpw32_f(HiTxRingAddr, 0);
@@ -1628,7 +1616,6 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	long pciaddr;
 	unsigned int addr_len, i;
 	u8 pci_rev, cache_size;
-	unsigned int board_type = (unsigned int) ent->driver_data;
 
 #ifndef MODULE
 	static int version_printed;
@@ -1654,7 +1641,6 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 
 	cp = dev->priv;
 	cp->pdev = pdev;
-	cp->board_type = board_type;
 	cp->dev = dev;
 	cp->msg_enable = (debug < 0 ? CP_DEF_MSG_ENABLE : debug);
 	spin_lock_init (&cp->lock);
@@ -1754,11 +1740,10 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	if (rc)
 		goto err_out_iomap;
 
-	printk (KERN_INFO "%s: %s at 0x%lx, "
+	printk (KERN_INFO "%s: RTL-8139C+ at 0x%lx, "
 		"%02x:%02x:%02x:%02x:%02x:%02x, "
 		"IRQ %d\n",
 		dev->name,
-		cp_board_tbl[board_type].name,
 		dev->base_addr,
 		dev->dev_addr[0], dev->dev_addr[1],
 		dev->dev_addr[2], dev->dev_addr[3],
