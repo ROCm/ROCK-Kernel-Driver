@@ -150,7 +150,7 @@
  *	SNMP management statistics
  */
 
-DEFINE_SNMP_STAT(struct ip_mib, ip_statistics);
+DEFINE_SNMP_STAT(struct ipstats_mib, ip_statistics);
 
 /*
  *	Process Router Attention IP option
@@ -249,16 +249,16 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 				protocol = -ret;
 				goto resubmit;
 			}
-			IP_INC_STATS_BH(IpInDelivers);
+			IP_INC_STATS_BH(InDelivers);
 		} else {
 			if (!raw_sk) {
 				if (xfrm4_policy_check(NULL, XFRM_POLICY_IN, skb)) {
-					IP_INC_STATS_BH(IpInUnknownProtos);
+					IP_INC_STATS_BH(InUnknownProtos);
 					icmp_send(skb, ICMP_DEST_UNREACH,
 						  ICMP_PROT_UNREACH, 0);
 				}
 			} else
-				IP_INC_STATS_BH(IpInDelivers);
+				IP_INC_STATS_BH(InDelivers);
 			kfree_skb(skb);
 		}
 	}
@@ -324,7 +324,7 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 		*/
 
 		if (skb_cow(skb, skb_headroom(skb))) {
-			IP_INC_STATS_BH(IpInDiscards);
+			IP_INC_STATS_BH(InDiscards);
 			goto drop;
 		}
 		iph = skb->nh.iph;
@@ -353,7 +353,7 @@ static inline int ip_rcv_finish(struct sk_buff *skb)
 	return dst_input(skb);
 
 inhdr_error:
-	IP_INC_STATS_BH(IpInHdrErrors);
+	IP_INC_STATS_BH(InHdrErrors);
 drop:
         kfree_skb(skb);
         return NET_RX_DROP;
@@ -372,10 +372,10 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 	if (skb->pkt_type == PACKET_OTHERHOST)
 		goto drop;
 
-	IP_INC_STATS_BH(IpInReceives);
+	IP_INC_STATS_BH(InReceives);
 
 	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL) {
-		IP_INC_STATS_BH(IpInDiscards);
+		IP_INC_STATS_BH(InDiscards);
 		goto out;
 	}
 
@@ -426,7 +426,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt)
 		       ip_rcv_finish);
 
 inhdr_error:
-	IP_INC_STATS_BH(IpInHdrErrors);
+	IP_INC_STATS_BH(InHdrErrors);
 drop:
         kfree_skb(skb);
 out:

@@ -60,30 +60,6 @@ struct snmp_item {
  * RFC 1213:  MIB-II
  * RFC 2011 (updates 1213):  SNMPv2-MIB-IP
  * RFC 2863:  Interfaces Group MIB
- */
-struct ip_mib
-{
- 	unsigned long	IpInReceives;
- 	unsigned long	IpInHdrErrors;
- 	unsigned long	IpInAddrErrors;
- 	unsigned long	IpForwDatagrams;
- 	unsigned long	IpInUnknownProtos;
- 	unsigned long	IpInDiscards;
- 	unsigned long	IpInDelivers;
- 	unsigned long	IpOutRequests;
- 	unsigned long	IpOutDiscards;
- 	unsigned long	IpOutNoRoutes;
- 	unsigned long	IpReasmTimeout;
- 	unsigned long	IpReasmReqds;
- 	unsigned long	IpReasmOKs;
- 	unsigned long	IpReasmFails;
- 	unsigned long	IpFragOKs;
- 	unsigned long	IpFragFails;
- 	unsigned long	IpFragCreates;
-	unsigned long   __pad[0]; 
-};
- 
-/*
  * RFC 2465:  IPv6 MIB: General Group
  * draft-ietf-ipv6-rfc2011-update-10.txt: MIB for IP: IP Statistics Tables
  */

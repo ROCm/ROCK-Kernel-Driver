@@ -88,7 +88,7 @@ static struct file_operations sockstat_seq_fops = {
 };
 
 static unsigned long
-fold_field(void *mib[], int nr)
+__fold_field(void *mib[], int offt)
 {
 	unsigned long res = 0;
 	int i;
@@ -98,13 +98,40 @@ fold_field(void *mib[], int nr)
 			continue;
 		res +=
 		    *((unsigned long *) (((void *) per_cpu_ptr(mib[0], i)) +
-					 sizeof (unsigned long) * nr));
+					 offt));
 		res +=
 		    *((unsigned long *) (((void *) per_cpu_ptr(mib[1], i)) +
-					 sizeof (unsigned long) * nr));
+					 offt));
 	}
 	return res;
 }
+
+#define fold_field(_mib, _nr)	__fold_field(_mib, (sizeof(unsigned long) * (_nr)))
+
+/* snmp items */
+static struct snmp_item snmp4_ipstats_list[] = {
+#define __SNMP_GEN(x,y)	SNMP_ITEM(struct ipstats_mib, x, y)
+#define SNMP_GEN(x)	__SNMP_GEN(x, #x)
+	SNMP_GEN(InReceives),
+	SNMP_GEN(InHdrErrors),
+	SNMP_GEN(InAddrErrors),
+	__SNMP_GEN(OutForwDatagrams,"ForwDatagrams"),	/* for backward compatibility */
+	SNMP_GEN(InUnknownProtos),
+	SNMP_GEN(InDiscards),
+	SNMP_GEN(InDelivers),
+	SNMP_GEN(OutRequests),
+	SNMP_GEN(OutDiscards),
+	SNMP_GEN(OutNoRoutes),
+	SNMP_GEN(ReasmTimeout),
+	SNMP_GEN(ReasmReqds),
+	SNMP_GEN(ReasmOKs),
+	SNMP_GEN(ReasmFails),
+	SNMP_GEN(FragOKs),
+	SNMP_GEN(FragFails),
+	SNMP_GEN(FragCreates),
+	SNMP_ITEM_SENTINEL
+#undef SNMP_GEN
+};
 
 /*
  *	Called from the PROCfs module. This outputs /proc/net/snmp.
@@ -113,17 +140,18 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 {
 	int i;
 
-	seq_printf(seq, "Ip: Forwarding DefaultTTL InReceives InHdrErrors "
-			"InAddrErrors ForwDatagrams InUnknownProtos "
-			"InDiscards InDelivers OutRequests OutDiscards "
-			"OutNoRoutes ReasmTimeout ReasmReqds ReasmOKs "
-			"ReasmFails FragOKs FragFails FragCreates\nIp: %d %d",
+	seq_printf(seq, "Ip: Forwarding DefaultTTL");
+
+	for (i = 0; snmp4_ipstats_list[i].name != NULL; i++)
+		seq_printf(seq, " %s", snmp4_ipstats_list[i].name);
+
+	seq_printf(seq, "\nIp: %d %d",
 			ipv4_devconf.forwarding ? 1 : 2, sysctl_ip_default_ttl);
 
-	for (i = 0;
-	     i < offsetof(struct ip_mib, __pad) / sizeof(unsigned long); i++)
+	for (i = 0; snmp4_ipstats_list[i].name != NULL; i++)
 		seq_printf(seq, " %lu",
-			   fold_field((void **) ip_statistics, i));
+			   __fold_field((void **) ip_statistics, 
+					snmp4_ipstats_list[i].offset));
 
 	seq_printf(seq, "\nIcmp: InMsgs InErrors InDestUnreachs InTimeExcds "
 			"InParmProbs InSrcQuenchs InRedirects InEchos "
