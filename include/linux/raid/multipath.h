@@ -5,8 +5,6 @@
 #include <linux/bio.h>
 
 struct multipath_info {
-	int		number;
-	int		raid_disk;
 	struct block_device *bdev;
 
 	/*

@@ -1410,8 +1410,6 @@ static int run (mddev_t *mddev)
 
 		if (rdev->faulty) {
 			printk(KERN_ERR "raid5: disabled device %s (errors detected)\n", bdev_partition_name(rdev->bdev));
-			disk->number = rdev->desc_nr;
-			disk->raid_disk = raid_disk;
 			disk->bdev = rdev->bdev;
 
 			disk->operational = 0;
@@ -1427,8 +1425,6 @@ static int run (mddev_t *mddev)
 			}
 			printk(KERN_INFO "raid5: device %s operational as raid disk %d\n", bdev_partition_name(rdev->bdev), raid_disk);
 	
-			disk->number = rdev->desc_nr;
-			disk->raid_disk = raid_disk;
 			disk->bdev = rdev->bdev;
 			disk->operational = 1;
 			disk->used_slot = 1;
@@ -1439,8 +1435,6 @@ static int run (mddev_t *mddev)
 			 * Must be a spare disk ..
 			 */
 			printk(KERN_INFO "raid5: spare disk %s\n", bdev_partition_name(rdev->bdev));
-			disk->number = rdev->desc_nr;
-			disk->raid_disk = raid_disk;
 			disk->bdev = rdev->bdev;
 
 			disk->operational = 0;
@@ -1454,9 +1448,6 @@ static int run (mddev_t *mddev)
 		disk = conf->disks + i;
 
 		if (!disk->used_slot) {
-
-			disk->number = i;
-			disk->raid_disk = i;
 			disk->bdev = NULL;
 
 			disk->operational = 0;
@@ -1634,9 +1625,9 @@ static void print_raid5_conf (raid5_conf_t *conf)
 	for (i = 0; i < conf->working_disks+conf->failed_disks; i++) {
 #endif
 		tmp = conf->disks + i;
-		printk(" disk %d, s:%d, o:%d, n:%d rd:%d us:%d dev:%s\n",
+		printk(" disk %d, s:%d, o:%d, us:%d dev:%s\n",
 			i, tmp->spare,tmp->operational,
-			tmp->number,tmp->raid_disk,tmp->used_slot,
+			tmp->used_slot,
 			bdev_partition_name(tmp->bdev));
 	}
 }
@@ -1703,9 +1694,6 @@ static int raid5_spare_active(mddev_t *mddev)
 	 * give the proper raid_disk number to the now activated
 	 * disk. (this means we switch back these values)
 	 */
-
-	xchg_values(sdisk->raid_disk, fdisk->raid_disk);
-	xchg_values(sdisk->number, fdisk->number);
 
 	if (!sdisk->bdev)
 		sdisk->used_slot = 0;
@@ -1815,8 +1803,6 @@ static int raid5_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	 */
 
 	if (!p->used_slot) {
-		p->number = rdev->desc_nr;
-		p->raid_disk = rdev->raid_disk;
 		/* it will be held open by rdev */
 		p->bdev = rdev->bdev;
 		p->operational = 0;

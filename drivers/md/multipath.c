@@ -279,11 +279,10 @@ static void print_multipath_conf (multipath_conf_t *conf)
 
 	for (i = 0; i < MD_SB_DISKS; i++) {
 		tmp = conf->multipaths + i;
-		if (tmp->operational || tmp->number ||
-				tmp->raid_disk || tmp->used_slot)
-			printk(" disk%d, o:%d, n:%d rd:%d us:%d dev:%s\n",
+		if (tmp->operational || tmp->used_slot)
+			printk(" disk%d, o:%d, us:%d dev:%s\n",
 				i,tmp->operational,
-				tmp->number,tmp->raid_disk,tmp->used_slot,
+				tmp->used_slot,
 				bdev_partition_name(tmp->bdev));
 	}
 }
@@ -298,8 +297,6 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	print_multipath_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 	if (!p->used_slot) {
-		p->number = rdev->desc_nr;
-		p->raid_disk = rdev->raid_disk;
 		p->bdev = rdev->bdev;
 		p->operational = 1;
 		p->used_slot = 1;
@@ -489,8 +486,6 @@ static int multipath_run (mddev_t *mddev)
 		 * spares.  multipath_read_balance deals with choose
 		 * the "best" operational device.
 		 */
-		disk->number = rdev->desc_nr;
-		disk->raid_disk = disk_idx;
 		disk->bdev = rdev->bdev;
 		disk->operational = 1;
 		disk->used_slot = 1;

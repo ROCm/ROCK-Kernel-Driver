@@ -630,9 +630,9 @@ static void print_conf(conf_t *conf)
 
 	for (i = 0; i < MD_SB_DISKS; i++) {
 		tmp = conf->mirrors + i;
-		printk(" disk %d, s:%d, o:%d, n:%d rd:%d us:%d dev:%s\n",
+		printk(" disk %d, s:%d, o:%d, us:%d dev:%s\n",
 			i, tmp->spare, tmp->operational,
-			tmp->number, tmp->raid_disk, tmp->used_slot,
+			tmp->used_slot,
 			bdev_partition_name(tmp->bdev));
 	}
 }
@@ -717,8 +717,6 @@ static int raid1_spare_active(mddev_t *mddev)
 	 * give the proper raid_disk number to the now activated
 	 * disk. (this means we switch back these values)
 	 */
-	xchg_values(sdisk->raid_disk, fdisk->raid_disk);
-	xchg_values(sdisk->number, fdisk->number);
 
 	if (!sdisk->bdev)
 		sdisk->used_slot = 0;
@@ -794,8 +792,6 @@ static int raid1_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	print_conf(conf);
 	spin_lock_irq(&conf->device_lock);
 	if (!p->used_slot) {
-		p->number = rdev->desc_nr;
-		p->raid_disk = rdev->raid_disk;
 		/* it will be held open by rdev */
 		p->bdev = rdev->bdev;
 		p->operational = 0;
@@ -1233,8 +1229,6 @@ static int run(mddev_t *mddev)
 		disk = conf->mirrors + disk_idx;
 
 		if (rdev->faulty) {
-			disk->number = rdev->desc_nr;
-			disk->raid_disk = disk_idx;
 			disk->bdev = rdev->bdev;
 			disk->operational = 0;
 			disk->write_only = 0;
@@ -1252,8 +1246,6 @@ static int run(mddev_t *mddev)
 			}
 			printk(OPERATIONAL, bdev_partition_name(rdev->bdev),
 					disk_idx);
-			disk->number = rdev->desc_nr;
-			disk->raid_disk = disk_idx;
 			disk->bdev = rdev->bdev;
 			disk->operational = 1;
 			disk->write_only = 0;
@@ -1266,8 +1258,6 @@ static int run(mddev_t *mddev)
 		 * Must be a spare disk ..
 		 */
 			printk(SPARE, bdev_partition_name(rdev->bdev));
-			disk->number = rdev->desc_nr;
-			disk->raid_disk = disk_idx;
 			disk->bdev = rdev->bdev;
 			disk->operational = 0;
 			disk->write_only = 0;
@@ -1295,8 +1285,6 @@ static int run(mddev_t *mddev)
 		disk = conf->mirrors + i;
 
 		if (!disk->used_slot) {
-			disk->number = i;
-			disk->raid_disk = i;
 			disk->bdev = NULL;
 			disk->operational = 0;
 			disk->write_only = 0;
