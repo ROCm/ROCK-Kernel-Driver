@@ -59,7 +59,7 @@ extern struct node_cpuid_s node_cpuid[NR_CPUS];
  */
 
 extern u8 numa_slit[MAX_NUMNODES * MAX_NUMNODES];
-#define node_distance(from,to) (numa_slit[from * numnodes + to])
+#define node_distance(from,to) (numa_slit[(from) * numnodes + (to)])
 
 extern int paddr_to_nid(unsigned long paddr);
 
