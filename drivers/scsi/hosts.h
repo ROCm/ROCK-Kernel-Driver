@@ -562,6 +562,26 @@ extern int scsi_unregister_host(Scsi_Host_Template *);
 #define SD_EXTRA_DEVS CONFIG_SD_EXTRA_DEVS
 #define SR_EXTRA_DEVS CONFIG_SR_EXTRA_DEVS
 
+
+/**
+ * scsi_find_device - find a device given the host
+ * @channel:	SCSI channel (zero if only one channel)
+ * @pun:	SCSI target number (physical unit number)
+ * @lun:	SCSI Logical Unit Number
+ **/
+static inline Scsi_Device *scsi_find_device(struct Scsi_Host *host,
+                                            int channel, int pun, int lun) {
+        Scsi_Device *SDpnt;
+
+        for(SDpnt = host->host_queue;
+            SDpnt != NULL;
+            SDpnt = SDpnt->next)
+                if(SDpnt->channel == channel && SDpnt->id == pun
+                   && SDpnt->lun ==lun)
+                        break;
+        return SDpnt;
+}
+    
 #endif
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

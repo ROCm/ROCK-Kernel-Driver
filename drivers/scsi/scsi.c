@@ -254,10 +254,19 @@ __setup("scsi_logging=", scsi_logging_setup);
  
 static void scsi_wait_done(Scsi_Cmnd * SCpnt)
 {
-	struct request *req;
+	struct request *req = SCpnt->request;
+        struct request_queue *q = &SCpnt->device->request_queue;
+        unsigned long flags;
 
-	req = SCpnt->request;
+        ASSERT_LOCK(q->queue_lock, 0);
 	req->rq_status = RQ_SCSI_DONE;	/* Busy, but indicate request done */
+
+        spin_lock_irqsave(q->queue_lock, flags);
+
+        if(blk_rq_tagged(req))
+                blk_queue_end_tag(q, req);
+
+        spin_unlock_irqrestore(q->queue_lock, flags);
 
 	if (req->waiting)
 		complete(req->waiting);

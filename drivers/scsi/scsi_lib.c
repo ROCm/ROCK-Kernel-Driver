@@ -76,7 +76,8 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 	 * must not attempt merges on this) and that it acts as a soft
 	 * barrier
 	 */
-	rq->flags = REQ_SPECIAL | REQ_BARRIER;
+	rq->flags &= REQ_QUEUED;
+	rq->flags |= REQ_SPECIAL | REQ_BARRIER;
 
 	rq->special = data;
 
@@ -87,6 +88,9 @@ static void __scsi_insert_special(request_queue_t *q, struct request *rq,
 	 * device, or a host that is unable to accept a particular command.
 	 */
 	spin_lock_irqsave(q->queue_lock, flags);
+	/* If command is tagged, release the tag */
+	if(blk_rq_tagged(rq))
+		blk_queue_end_tag(q, rq);
 	_elv_add_request(q, rq, !at_head, 0);
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
@@ -927,11 +931,13 @@ void scsi_request_fn(request_queue_t * q)
 		 * reason to search the list, because all of the commands
 		 * in this queue are for the same device.
 		 */
-		if(blk_queue_tagged(q))
-			blk_queue_start_tag(q, req);
-		else
+		if(!(blk_queue_tagged(q) && (blk_queue_start_tag(q, req) == 0)))
 			blkdev_dequeue_request(req);
 
+		/* note the overloading of req->special.  When the tag
+		 * is active it always means SCpnt.  If the tag goes
+		 * back for re-queueing, it may be reset */
+		req->special = SCpnt;
 		SCpnt->request = req;
 
 		/*
