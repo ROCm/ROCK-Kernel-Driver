@@ -1904,6 +1904,134 @@ findFirstRetry:
 	return rc;
 }
 
+#ifdef CIFS_EXPERIMENTAL
+/* xid, tcon, searchName and codepage are input parms, rest are returned */
+int
+CIFSFindFirst2(const int xid, struct cifsTconInfo *tcon,
+	      const char *searchName, 
+	      const struct nls_table *nls_codepage,
+	      char ** ppfindData /* first search entries */,
+	      char ** ppbuf /* beginning of smb response */,
+	      int  *searchCount, __u16 *searchHandle,
+	      int *pUnicodeFlag, int *pEndOfSearchFlag,
+	      int *level)
+{
+/* level 257 SMB_ */
+	TRANSACTION2_FFIRST_REQ *pSMB = NULL;
+	TRANSACTION2_FFIRST_RSP *pSMBr = NULL;
+	T2_FFIRST_RSP_PARMS * parms;
+	int rc = 0;
+	int bytes_returned;
+	int name_len;
+	__u16 params, byte_count;
+
+	cFYI(1, ("In FindFirst2"));
+
+	if(ppbuf)
+		*ppbuf = NULL;
+	else
+		return -EINVAL;
+
+findFirst2Retry:
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
+		      (void **) &pSMBr);
+	if (rc)
+		return rc;
+
+	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
+		name_len =
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+				  /* find define for this maxpathcomponent */
+				  , nls_codepage);
+		name_len++;	/* trailing null */
+		name_len *= 2;
+	} else {		/* BB improve the check for buffer overruns BB */
+		name_len = strnlen(searchName, 530);
+		name_len++;	/* trailing null */
+		strncpy(pSMB->FileName, searchName, name_len);
+	}
+
+	params = 12 + name_len /* includes null */ ;
+	pSMB->TotalDataCount = 0;	/* no EAs */
+	pSMB->MaxParameterCount = cpu_to_le16(10);
+	pSMB->MaxDataCount = cpu_to_le16((tcon->ses->server->maxBuf -
+					  MAX_CIFS_HDR_SIZE) & 0xFFFFFF00);
+	pSMB->MaxSetupCount = 0;
+	pSMB->Reserved = 0;
+	pSMB->Flags = 0;
+	pSMB->Timeout = 0;
+	pSMB->Reserved2 = 0;
+	byte_count = params + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(params);
+	pSMB->ParameterCount = pSMB->TotalParameterCount;
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(struct 
+        smb_com_transaction2_ffirst_req, SearchAttributes) - 4);
+	pSMB->DataCount = 0;
+	pSMB->DataOffset = 0;
+	pSMB->SetupCount = 1;	/* one byte no need to make endian neutral */
+	pSMB->Reserved3 = 0;
+	pSMB->SubCommand = cpu_to_le16(TRANS2_FIND_FIRST);
+	pSMB->SearchAttributes =
+	    cpu_to_le16(ATTR_READONLY | ATTR_HIDDEN | ATTR_SYSTEM |
+			ATTR_DIRECTORY);
+	pSMB->SearchCount = cpu_to_le16(CIFS_MAX_MSGSIZE / sizeof (FILE_DIRECTORY_INFO));	/* should this be shrunk even more ? */
+	pSMB->SearchFlags = cpu_to_le16(CIFS_SEARCH_CLOSE_AT_END | CIFS_SEARCH_RETURN_RESUME);
+
+	/* test for Unix extensions */
+	if (tcon->ses->capabilities & CAP_UNIX) {
+		pSMB->InformationLevel = cpu_to_le16(SMB_FIND_FILE_UNIX);
+		*level = SMB_FIND_FILE_UNIX;
+	} else {
+		pSMB->InformationLevel =
+		    cpu_to_le16(SMB_FIND_FILE_DIRECTORY_INFO);
+		*level = SMB_FIND_FILE_DIRECTORY_INFO;
+	}
+	pSMB->SearchStorageType = 0;	/* BB what should we set this to? It is not clear if it matters BB */
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
+
+	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
+			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+
+	if (rc) {/* BB add logic to retry regular search if Unix search rejected unexpectedly by server */
+		/* BB Add code to handle unsupported level rc */
+		cFYI(1, ("Error in FindFirst = %d", rc));
+
+		if (pSMB)
+			cifs_buf_release(pSMB);
+
+		/* BB eventually could optimize out free and realloc of buf */
+		/*    for this case */
+		if (rc == -EAGAIN)
+			goto findFirst2Retry;
+	} else { /* decode response */
+
+		/* BB fixme - Add safety check parm and data fields 
+		and do it for all transact SMBs - 
+		and remember to free buffer if error BB */
+
+		if (pSMBr->hdr.Flags2 & SMBFLG2_UNICODE)
+			*pUnicodeFlag = TRUE;
+		else
+			*pUnicodeFlag = FALSE;
+
+		if(ppfindData)
+			*ppfindData = (char *) &pSMBr->hdr.Protocol + 
+				le16_to_cpu(pSMBr->DataOffset);
+
+		parms = (T2_FFIRST_RSP_PARMS *)((char *) &pSMBr->hdr.Protocol +
+		       le16_to_cpu(pSMBr->ParameterOffset));
+
+		*pEndOfSearchFlag = parms->EndofSearch;
+		*searchCount  = parms->SearchCount;
+		*searchHandle = parms->SearchHandle;
+
+	}
+
+	return rc;
+}
+#endif /* CIFS_EXPERIMENTAL */
+
 int
 CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 		FILE_DIRECTORY_INFO * findData, T2_FNEXT_RSP_PARMS * findParms,
