@@ -484,6 +484,9 @@ static int __init set_preferred_console(void)
 	char *name;
 	int offset;
 
+	if (of_stdout_device == NULL)
+		return -ENODEV;
+
 	/* The user has requested a console so this is already set up. */
 	if (strstr(saved_command_line, "console="))
 		return -EBUSY;
