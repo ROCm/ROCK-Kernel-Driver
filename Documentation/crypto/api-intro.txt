@@ -221,6 +221,12 @@ AES algorithm contributors:
 CAST5 algorithm contributors:
   Kartikey Mahendra Bhatt (original developers unknown, FSF copyright).
 
+TEA/XTEA algorithm contributors:
+  Aaron Grothe
+
+Khazad algorithm contributors:
+  Aaron Grothe
+
 Generic scatterwalk code by Adam J. Richter <adam@yggdrasil.com>
 
 Please send any credits updates or corrections to:

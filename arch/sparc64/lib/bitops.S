@@ -8,9 +8,6 @@
 
 	.text
 	.align	64
-	.globl	__bitops_begin
-__bitops_begin:
-
 	.globl	___test_and_set_bit
 ___test_and_set_bit:	/* %o0=nr, %o1=addr */
 	srlx	%o0, 6, %g1
@@ -105,6 +102,3 @@ ___test_and_clear_le_bit:	/* %o0=nr, %o1=addr */
 	 lduwa	[%o1] ASI_PL, %g7
 2:	retl
 	 membar	#StoreLoad | #StoreStore
-
-	.globl	__bitops_end
-__bitops_end:

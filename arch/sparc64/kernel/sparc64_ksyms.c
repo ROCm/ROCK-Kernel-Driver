@@ -259,7 +259,7 @@ EXPORT_SYMBOL(verify_compat_iovec);
 
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_fpu);
-EXPORT_SYMBOL(pte_alloc_one_kernel);
+EXPORT_SYMBOL(__pte_alloc_one_kernel);
 #ifndef CONFIG_SMP
 EXPORT_SYMBOL(pgt_quicklists);
 #endif

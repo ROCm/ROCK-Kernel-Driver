@@ -67,12 +67,6 @@
 
 #include <linux/sched.h>
 
-/* Certain architectures need to do special things when pte's
- * within a page table are directly modified.  Thus, the following
- * hook is made available.
- */
-#define set_pte(pteptr, pteval) ((*(pteptr)) = (pteval))
-
 /* Entries per page directory level. */
 #define PTRS_PER_PTE		(1UL << (PAGE_SHIFT-3))
 
@@ -80,9 +74,12 @@
  * is different so we can optimize correctly for 32-bit tasks.
  */
 #define REAL_PTRS_PER_PMD	(1UL << PMD_BITS)
-#define PTRS_PER_PMD		((const int)(test_thread_flag(TIF_32BIT) ? \
-				 (1UL << (32 - (PAGE_SHIFT-3) - PAGE_SHIFT)) : \
-				 (REAL_PTRS_PER_PMD)))
+
+/* This is gross, but unless we do this gcc retests the
+ * thread flag every interation in pmd traversal loops.
+ */
+extern unsigned long __ptrs_per_pmd(void) __attribute_const__;
+#define PTRS_PER_PMD		__ptrs_per_pmd()
 
 /*
  * We cannot use the top address range because VPTE table lives there. This
@@ -273,7 +270,6 @@ static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 	((unsigned long) __va((((unsigned long)pgd_val(pgd))<<11UL)))
 #define pte_none(pte) 			(!pte_val(pte))
 #define pte_present(pte)		(pte_val(pte) & _PAGE_PRESENT)
-#define pte_clear(pte)			(pte_val(*(pte)) = 0UL)
 #define pmd_none(pmd)			(!pmd_val(pmd))
 #define pmd_bad(pmd)			(0)
 #define pmd_present(pmd)		(pmd_val(pmd) != 0U)
@@ -287,7 +283,7 @@ static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
  * Undefined behaviour if not..
  */
 #define pte_read(pte)		(pte_val(pte) & _PAGE_READ)
-#define pte_exec(pte)		pte_read(pte)
+#define pte_exec(pte)		(pte_val(pte) & _PAGE_EXEC)
 #define pte_write(pte)		(pte_val(pte) & _PAGE_WRITE)
 #define pte_dirty(pte)		(pte_val(pte) & _PAGE_MODIFIED)
 #define pte_young(pte)		(pte_val(pte) & _PAGE_ACCESSED)
@@ -328,6 +324,20 @@ static inline pte_t pte_modify(pte_t orig_pte, pgprot_t new_prot)
 #define pte_offset_map_nested		pte_index
 #define pte_unmap(pte)			do { } while (0)
 #define pte_unmap_nested(pte)		do { } while (0)
+
+/* Actual page table PTE updates.  */
+extern void tlb_batch_add(pte_t *ptep, pte_t orig);
+
+static inline void set_pte(pte_t *ptep, pte_t pte)
+{
+	pte_t orig = *ptep;
+
+	*ptep = pte;
+	if (pte_present(orig))
+		tlb_batch_add(ptep, orig);
+}
+
+#define pte_clear(ptep)		set_pte((ptep), __pte(0UL))
 
 extern pgd_t swapper_pg_dir[1];
 

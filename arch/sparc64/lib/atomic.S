@@ -9,10 +9,7 @@
 	.text
 	.align	64
 
-	.globl	atomic_impl_begin, atomic_impl_end
-
 	.globl	__atomic_add
-atomic_impl_begin:
 __atomic_add: /* %o0 = increment, %o1 = atomic_ptr */
 	lduw	[%o1], %g5
 	add	%g5, %o0, %g7
@@ -56,4 +53,3 @@ __atomic64_sub: /* %o0 = increment, %o1 = atomic_ptr */
 	retl
 	 sub	%g7, %o0, %o0
 
-atomic_impl_end:

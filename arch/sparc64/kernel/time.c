@@ -423,7 +423,7 @@ static unsigned long timer_ticks_per_nsec_quotient;
 
 #define TICK_SIZE (tick_nsec / 1000)
 
-static __inline__ void timer_check_rtc(void)
+static inline void timer_check_rtc(void)
 {
 	/* last time the cmos clock got updated */
 	static long last_rtc_update;
@@ -443,8 +443,7 @@ static __inline__ void timer_check_rtc(void)
 
 void sparc64_do_profile(struct pt_regs *regs)
 {
-	unsigned long pc = regs->tpc;
-	unsigned long o7 = regs->u_regs[UREG_RETPC];
+	unsigned long pc;
 
 	profile_hook(regs);
 
@@ -454,32 +453,14 @@ void sparc64_do_profile(struct pt_regs *regs)
 	if (!prof_buffer)
 		return;
 
-	{
-		extern int rwlock_impl_begin, rwlock_impl_end;
-		extern int atomic_impl_begin, atomic_impl_end;
-		extern int __memcpy_begin, __memcpy_end;
-		extern int __bzero_begin, __bzero_end;
-		extern int __bitops_begin, __bitops_end;
+	pc = regs->tpc;
 
-		if ((pc >= (unsigned long) &atomic_impl_begin &&
-		     pc < (unsigned long) &atomic_impl_end) ||
-		    (pc >= (unsigned long) &rwlock_impl_begin &&
-		     pc < (unsigned long) &rwlock_impl_end) ||
-		    (pc >= (unsigned long) &__memcpy_begin &&
-		     pc < (unsigned long) &__memcpy_end) ||
-		    (pc >= (unsigned long) &__bzero_begin &&
-		     pc < (unsigned long) &__bzero_end) ||
-		    (pc >= (unsigned long) &__bitops_begin &&
-		     pc < (unsigned long) &__bitops_end))
-			pc = o7;
+	pc -= (unsigned long) _stext;
+	pc >>= prof_shift;
 
-		pc -= (unsigned long) _stext;
-		pc >>= prof_shift;
-
-		if(pc >= prof_len)
-			pc = prof_len - 1;
-		atomic_inc((atomic_t *)&prof_buffer[pc]);
-	}
+	if(pc >= prof_len)
+		pc = prof_len - 1;
+	atomic_inc((atomic_t *)&prof_buffer[pc]);
 }
 
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
@@ -1139,7 +1120,6 @@ EXPORT_SYMBOL(do_settimeofday);
  */
 void do_gettimeofday(struct timeval *tv)
 {
-	unsigned long flags;
 	unsigned long seq;
 	unsigned long usec, sec;
 	unsigned long max_ntp_tick = tick_usec - tickadj;
@@ -1147,7 +1127,7 @@ void do_gettimeofday(struct timeval *tv)
 	do {
 		unsigned long lost;
 
-		seq = read_seqbegin_irqsave(&xtime_lock, flags);
+		seq = read_seqbegin(&xtime_lock);
 		usec = do_gettimeoffset();
 		lost = jiffies - wall_jiffies;
 
@@ -1166,8 +1146,18 @@ void do_gettimeofday(struct timeval *tv)
 			usec += lost * tick_usec;
 
 		sec = xtime.tv_sec;
-		usec += (xtime.tv_nsec / 1000);
-	} while (read_seqretry_irqrestore(&xtime_lock, seq, flags));
+
+		/* Believe it or not, this divide shows up on
+		 * kernel profiles.  The problem is that it is
+		 * both 64-bit and signed.  Happily, 32-bits
+		 * of precision is all we really need and in
+		 * doing so gcc ends up emitting a cheap multiply.
+		 *
+		 * XXX Why is tv_nsec 'long' and 'signed' in
+		 * XXX the first place, can it even be negative?
+		 */
+		usec += ((unsigned int) xtime.tv_nsec / 1000U);
+	} while (read_seqretry(&xtime_lock, seq));
 
 	while (usec >= 1000000) {
 		usec -= 1000000;
