@@ -71,76 +71,41 @@ static struct matrox_altout matroxfb_g450_altout = {
 	matroxfb_g450_get_mode
 };
 
-static int matroxfb_g450_connect(struct matroxfb_g450_info* m2info) {
-	MINFO_FROM(m2info->primary_dev);
-
+void matroxfb_g450_connect(WPMINFO2) {
+	struct matroxfb_g450_info* m2info;
+	
+	/* hardware is not G450... */
+	if (!ACCESS_FBINFO(devflags.g450dac))
+		return;
+	m2info = (struct matroxfb_g450_info*)kmalloc(sizeof(*m2info), GFP_KERNEL);
+	if (!m2info) {
+		printk(KERN_ERR "matroxfb_g450: Not enough memory for G450 DAC control structs\n");
+		return;
+	}
+	memset(m2info, 0, sizeof(*m2info));
 	down_write(&ACCESS_FBINFO(altout.lock));
+	m2info->primary_dev = MINFO;
 	ACCESS_FBINFO(altout.device) = m2info;
 	ACCESS_FBINFO(altout.output) = &matroxfb_g450_altout;
 	up_write(&ACCESS_FBINFO(altout.lock));
 	ACCESS_FBINFO(output.all) |= MATROXFB_OUTPUT_CONN_SECONDARY;
-	matroxfb_switch(ACCESS_FBINFO(fbcon.currcon), (struct fb_info*)MINFO);	
-	return 0;
+	matroxfb_switch(ACCESS_FBINFO(fbcon.currcon), (struct fb_info*)MINFO);
 }
 
-static void matroxfb_g450_shutdown(struct matroxfb_g450_info* m2info) {
-	MINFO_FROM(m2info->primary_dev);
-	
-	if (MINFO) {
-		ACCESS_FBINFO(output.all) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		ACCESS_FBINFO(output.ph) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		ACCESS_FBINFO(output.sh) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
-		down_write(&ACCESS_FBINFO(altout.lock));
-		ACCESS_FBINFO(altout.device) = NULL;
-		ACCESS_FBINFO(altout.output) = NULL;
-		up_write(&ACCESS_FBINFO(altout.lock));
-		m2info->primary_dev = NULL;
-	}
+void matroxfb_g450_shutdown(WPMINFO2) {
+	ACCESS_FBINFO(output.all) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
+	ACCESS_FBINFO(output.ph) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
+	ACCESS_FBINFO(output.sh) &= ~MATROXFB_OUTPUT_CONN_SECONDARY;
+	down_write(&ACCESS_FBINFO(altout.lock));
+	kfree(ACCESS_FBINFO(altout.device));
+	ACCESS_FBINFO(altout.device) = NULL;
+	ACCESS_FBINFO(altout.output) = NULL;
+	up_write(&ACCESS_FBINFO(altout.lock));
 }
 
-/* we do not have __setup() yet */
-static void* matroxfb_g450_probe(struct matrox_fb_info* minfo) {
-	struct matroxfb_g450_info* m2info;
-
-	/* hardware is not G450... */
-	if (!ACCESS_FBINFO(devflags.g450dac))
-		return NULL;
-	m2info = (struct matroxfb_g450_info*)kmalloc(sizeof(*m2info), GFP_KERNEL);
-	if (!m2info) {
-		printk(KERN_ERR "matroxfb_g450: Not enough memory for G450 DAC control structs\n");
-		return NULL;
-	}
-	memset(m2info, 0, sizeof(*m2info));
-	m2info->primary_dev = MINFO;
-	if (matroxfb_g450_connect(m2info)) {
-		kfree(m2info);
-		printk(KERN_ERR "matroxfb_g450: G450 DAC failed to initialize\n");
-		return NULL;
-	}
-	return m2info;
-}
-
-static void matroxfb_g450_remove(struct matrox_fb_info* minfo, void* g450) {
-	matroxfb_g450_shutdown(g450);
-	kfree(g450);
-}
-
-static struct matroxfb_driver g450 = {
-		.name =		"Matrox G450 output #2",
-		.probe =	matroxfb_g450_probe,
-		.remove =	matroxfb_g450_remove };
-
-static int matroxfb_g450_init(void) {
-	matroxfb_register_driver(&g450);
-	return 0;
-}
-
-static void matroxfb_g450_exit(void) {
-	matroxfb_unregister_driver(&g450);
-}
+EXPORT_SYMBOL(matroxfb_g450_connect);
+EXPORT_SYMBOL(matroxfb_g450_shutdown);
 
 MODULE_AUTHOR("(c) 2000-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Matrox G450 secondary output driver");
 MODULE_LICENSE("GPL");
-module_init(matroxfb_g450_init);
-module_exit(matroxfb_g450_exit);

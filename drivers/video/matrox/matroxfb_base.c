@@ -100,6 +100,7 @@
 #include "matroxfb_Ti3026.h"
 #include "matroxfb_maven.h"
 #include "matroxfb_crtc2.h"
+#include "matroxfb_g450.h"
 #include <linux/matroxfb.h>
 #include <asm/uaccess.h>
 
@@ -212,6 +213,7 @@ static void matroxfb_remove(WPMINFO int dummy) {
 	}
 	matroxfb_unregister_device(MINFO);
 	unregister_framebuffer(&ACCESS_FBINFO(fbcon));
+	matroxfb_g450_shutdown(PMINFO2);
 	del_timer_sync(&ACCESS_FBINFO(cursor.timer));
 #ifdef CONFIG_MTRR
 	if (ACCESS_FBINFO(mtrr.vram_valid))
@@ -1732,6 +1734,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 
 	if (!ACCESS_FBINFO(devflags.novga))
 		request_region(0x3C0, 32, "matrox");
+	matroxfb_g450_connect(PMINFO2);
 	ACCESS_FBINFO(hw_switch->reset(PMINFO2));
 
 	ACCESS_FBINFO(fbcon.monspecs.hfmin) = 0;
@@ -1885,6 +1888,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 	}
 	return 0;
 failVideoIO:;
+	matroxfb_g450_shutdown(PMINFO2);
 	mga_iounmap(ACCESS_FBINFO(video.vbase));
 failCtrlIO:;
 	mga_iounmap(ACCESS_FBINFO(mmio.vbase));

@@ -1,7 +1,6 @@
 #ifndef __MATROXFB_G450_H__
 #define __MATROXFB_G450_H__
 
-#include <linux/ioctl.h>
 #include "matroxfb_base.h"
 
 struct matroxfb_g450_info {
@@ -9,4 +8,12 @@ struct matroxfb_g450_info {
 	unsigned int		timmings;
 };
 
-#endif /* __MATROXFB_MAVEN_H__ */
+#ifdef CONFIG_FB_MATROX_G450
+void matroxfb_g450_connect(WPMINFO2);
+void matroxfb_g450_shutdown(WPMINFO2);
+#else
+static inline void matroxfb_g450_connect(WPMINFO2) { };
+static inline void matroxfb_g450_shutdown(WPMINFO2) { };
+#endif
+
+#endif /* __MATROXFB_G450_H__ */
