@@ -28,27 +28,30 @@
 #define BAD_PROT    CIFS_PROT+1
 
 /* SMB command codes */
-#define SMB_COM_CREATE_DIRECTORY      0x00
-#define SMB_COM_DELETE_DIRECTORY      0x01
-#define SMB_COM_CLOSE                 0x04
-#define SMB_COM_DELETE                0x06
-#define SMB_COM_RENAME                0x07
-#define SMB_COM_LOCKING_ANDX          0x24
-#define SMB_COM_COPY                  0x29
+/* Some commands have minimal (wct=0,bcc=0), or uninteresting, responses
+ (ie which include no useful data other than the SMB error code itself).
+ Knowing this helps avoid response buffer allocations and copy in some cases */
+#define SMB_COM_CREATE_DIRECTORY      0x00 /* trivial response */
+#define SMB_COM_DELETE_DIRECTORY      0x01 /* trivial response */
+#define SMB_COM_CLOSE                 0x04 /* trivial rsp, timestamp ignored */
+#define SMB_COM_DELETE                0x06 /* trivial response */
+#define SMB_COM_RENAME                0x07 /* trivial response */
+#define SMB_COM_LOCKING_ANDX          0x24 /* trivial response */
+#define SMB_COM_COPY                  0x29 /* trivial rsp, fail filename ignrd*/
 #define SMB_COM_READ_ANDX             0x2E
 #define SMB_COM_WRITE_ANDX            0x2F
 #define SMB_COM_TRANSACTION2          0x32
 #define SMB_COM_TRANSACTION2_SECONDARY 0x33
-#define SMB_COM_FIND_CLOSE2           0x34
-#define SMB_COM_TREE_DISCONNECT       0x71
+#define SMB_COM_FIND_CLOSE2           0x34 /* trivial response */
+#define SMB_COM_TREE_DISCONNECT       0x71 /* trivial response */
 #define SMB_COM_NEGOTIATE             0x72
 #define SMB_COM_SESSION_SETUP_ANDX    0x73
-#define SMB_COM_LOGOFF_ANDX           0x74
+#define SMB_COM_LOGOFF_ANDX           0x74 /* trivial response */
 #define SMB_COM_TREE_CONNECT_ANDX     0x75
 #define SMB_COM_NT_TRANSACT           0xA0
 #define SMB_COM_NT_TRANSACT_SECONDARY 0xA1
 #define SMB_COM_NT_CREATE_ANDX        0xA2
-#define SMB_COM_NT_RENAME             0xA5
+#define SMB_COM_NT_RENAME             0xA5 /* trivial response */
 
 /* Transact2 subcommand codes */
 #define TRANS2_OPEN                   0x00
