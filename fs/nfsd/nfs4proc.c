@@ -95,6 +95,7 @@ do_open_lookup(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_o
 			accmode = MAY_READ;
 		if (open->op_share_deny & NFS4_SHARE_ACCESS_WRITE)
 			accmode |= (MAY_WRITE | MAY_TRUNC);
+		accmode |= MAY_OWNER_OVERRIDE;
 		status = fh_verify(rqstp, current_fh, S_IFREG, accmode);
 	}
 
