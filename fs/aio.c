@@ -608,7 +608,7 @@ void fastcall kick_iocb(struct kiocb *iocb)
 		spin_lock_irqsave(&ctx->ctx_lock, flags);
 		list_add_tail(&iocb->ki_run_list, &ctx->run_list);
 		spin_unlock_irqrestore(&ctx->ctx_lock, flags);
-		schedule_work(&ctx->wq);
+		queue_work(aio_wq, &ctx->wq);
 	}
 }
 
