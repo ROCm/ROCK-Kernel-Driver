@@ -1213,7 +1213,7 @@ nfsd_symlink(struct svc_rqst *rqstp, struct svc_fh *fhp,
 		if (EX_ISSYNC(fhp->fh_export))
 			nfsd_sync_dir(dentry);
 		if (iap) {
-			iap->ia_valid &= ATTR_MODE /* ~(ATTR_MODE|ATTR_UID|ATTR_GID)*/;
+			iap->ia_valid &= ~ATTR_MODE;
 			if (iap->ia_valid) {
 				iap->ia_valid |= ATTR_CTIME;
 				iap->ia_mode = (iap->ia_mode&S_IALLUGO)
