@@ -1,7 +1,8 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 2
-EXTRAVERSION =-rc3
+EXTRAVERSION =
+NAME=Feisty Dunnart
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
