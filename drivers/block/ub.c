@@ -1842,6 +1842,7 @@ static int ub_probe(struct usb_interface *intf,
 	disk->first_minor = sc->id * UB_MINORS_PER_MAJOR;
 	disk->fops = &ub_bd_fops;
 	disk->private_data = sc;
+	disk->driverfs_dev = &intf->dev;
 
 	rc = -ENOMEM;
 	if ((q = blk_init_queue(ub_bd_rq_fn, &sc->lock)) == NULL)
