@@ -289,14 +289,14 @@ hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
 		 */
 		if (h_vm_pgoff >= h_pgoff) {
 			zap_hugepage_range(vma, vma->vm_start, v_length);
-			continue;
+			goto next;
 		}
 
 		/*
 		 * Is this VMA fully inside the truncaton point?
 		 */
 		if (h_vm_pgoff + (v_length >> HPAGE_SHIFT) <= h_pgoff)
-			continue;
+			  goto next;
 
 		/*
 		 * The VMA straddles the truncation point.  v_offset is the
@@ -306,6 +306,7 @@ hugetlb_vmtruncate_list(struct prio_tree_root *root, unsigned long h_pgoff)
 				vma->vm_start + v_offset,
 				v_length - v_offset);
 
+	next:
 		vma = __vma_prio_tree_next(vma, root, &iter, h_pgoff, ULONG_MAX);
 	}
 }
