@@ -157,8 +157,8 @@ struct cifsSesInfo {
 	int capabilities;
 	char serverName[SERVER_NAME_LEN_WITH_NULL * 2];	/* BB make bigger for tcp names - will ipv6 and sctp addresses fit here?? */
 	char userName[MAX_USERNAME_SIZE + 1];
-    char domainName[MAX_USERNAME_SIZE + 1];
-    char password_with_pad[CIFS_ENCPWD_SIZE];
+	char domainName[MAX_USERNAME_SIZE + 1];
+	char password_with_pad[CIFS_ENCPWD_SIZE];
 };
 
 /*

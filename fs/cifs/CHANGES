@@ -1,3 +1,8 @@
+Version 0.76
+------------
+Clean up options displayed in /proc/mounts by show_options to
+be more consistent with other filesystems.
+
 Version 0.75
 ------------
 Fix delete of readonly file to Windows servers.  Reflect
