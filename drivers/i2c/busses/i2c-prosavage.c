@@ -228,7 +228,7 @@ static void prosavage_remove(struct pci_dev *dev)
 
 		ret = i2c_bit_del_bus(&chip->i2c_bus[i].adap);
 	        if (ret) {
-			dev_err(&dev->dev, ": %s not removed\n",
+			dev_err(&dev->dev, "%s not removed\n",
 				chip->i2c_bus[i].adap.name);
 		}
 	}
@@ -298,7 +298,7 @@ static int __devinit prosavage_probe(struct pci_dev *dev, const struct pci_devic
 	}
 	return 0;
 err_adap:
-	dev_err(&dev->dev, ": %s failed\n", bus->adap.name);
+	dev_err(&dev->dev, "%s failed\n", bus->adap.name);
 	prosavage_remove(dev);
 	return ret;
 }

@@ -116,14 +116,14 @@ static int amd756_transaction(struct i2c_adapter *adap)
 	int result = 0;
 	int timeout = 0;
 
-	dev_dbg(&adap->dev, ": Transaction (pre): GS=%04x, GE=%04x, ADD=%04x, "
+	dev_dbg(&adap->dev, "Transaction (pre): GS=%04x, GE=%04x, ADD=%04x, "
 		"DAT=%04x\n", inw_p(SMB_GLOBAL_STATUS),
 		inw_p(SMB_GLOBAL_ENABLE), inw_p(SMB_HOST_ADDRESS),
 		inb_p(SMB_HOST_DATA));
 
 	/* Make sure the SMBus host is ready to start transmitting */
 	if ((temp = inw_p(SMB_GLOBAL_STATUS)) & (GS_HST_STS | GS_SMB_STS)) {
-		dev_dbg(&adap->dev, ": SMBus busy (%04x). Waiting... \n", temp);
+		dev_dbg(&adap->dev, "SMBus busy (%04x). Waiting...\n", temp);
 		do {
 			msleep(1);
 			temp = inw_p(SMB_GLOBAL_STATUS);
@@ -131,7 +131,7 @@ static int amd756_transaction(struct i2c_adapter *adap)
 		         (timeout++ < MAX_TIMEOUT));
 		/* If the SMBus is still busy, we give up */
 		if (timeout >= MAX_TIMEOUT) {
-			dev_dbg(&adap->dev, ": Busy wait timeout (%04x)\n", temp);
+			dev_dbg(&adap->dev, "Busy wait timeout (%04x)\n", temp);
 			goto abort;
 		}
 		timeout = 0;
@@ -148,46 +148,46 @@ static int amd756_transaction(struct i2c_adapter *adap)
 
 	/* If the SMBus is still busy, we give up */
 	if (timeout >= MAX_TIMEOUT) {
-		dev_dbg(&adap->dev, ": Completion timeout!\n");
+		dev_dbg(&adap->dev, "Completion timeout!\n");
 		goto abort;
 	}
 
 	if (temp & GS_PRERR_STS) {
 		result = -1;
-		dev_dbg(&adap->dev, ": SMBus Protocol error (no response)!\n");
+		dev_dbg(&adap->dev, "SMBus Protocol error (no response)!\n");
 	}
 
 	if (temp & GS_COL_STS) {
 		result = -1;
-		dev_warn(&adap->dev, " SMBus collision!\n");
+		dev_warn(&adap->dev, "SMBus collision!\n");
 	}
 
 	if (temp & GS_TO_STS) {
 		result = -1;
-		dev_dbg(&adap->dev, ": SMBus protocol timeout!\n");
+		dev_dbg(&adap->dev, "SMBus protocol timeout!\n");
 	}
 
 	if (temp & GS_HCYC_STS)
-		dev_dbg(&adap->dev, " SMBus protocol success!\n");
+		dev_dbg(&adap->dev, "SMBus protocol success!\n");
 
 	outw_p(GS_CLEAR_STS, SMB_GLOBAL_STATUS);
 
 #ifdef DEBUG
 	if (((temp = inw_p(SMB_GLOBAL_STATUS)) & GS_CLEAR_STS) != 0x00) {
 		dev_dbg(&adap->dev,
-			": Failed reset at end of transaction (%04x)\n", temp);
+			"Failed reset at end of transaction (%04x)\n", temp);
 	}
 #endif
 
 	dev_dbg(&adap->dev,
-		": Transaction (post): GS=%04x, GE=%04x, ADD=%04x, DAT=%04x\n",
+		"Transaction (post): GS=%04x, GE=%04x, ADD=%04x, DAT=%04x\n",
 		inw_p(SMB_GLOBAL_STATUS), inw_p(SMB_GLOBAL_ENABLE),
 		inw_p(SMB_HOST_ADDRESS), inb_p(SMB_HOST_DATA));
 
 	return result;
 
  abort:
-	dev_warn(&adap->dev, ": Sending abort.\n");
+	dev_warn(&adap->dev, "Sending abort\n");
 	outw_p(inw(SMB_GLOBAL_ENABLE) | GE_ABORT, SMB_GLOBAL_ENABLE);
 	msleep(100);
 	outw_p(GS_CLEAR_STS, SMB_GLOBAL_STATUS);
@@ -204,7 +204,7 @@ static s32 amd756_access(struct i2c_adapter * adap, u16 addr,
 	/** TODO: Should I supporte the 10-bit transfers? */
 	switch (size) {
 	case I2C_SMBUS_PROC_CALL:
-		dev_dbg(&adap->dev, ": I2C_SMBUS_PROC_CALL not supported!\n");
+		dev_dbg(&adap->dev, "I2C_SMBUS_PROC_CALL not supported!\n");
 		/* TODO: Well... It is supported, I'm just not sure what to do here... */
 		return -1;
 	case I2C_SMBUS_QUICK:
@@ -334,8 +334,8 @@ static int __devinit amd756_probe(struct pci_dev *pdev,
 	u8 temp;
 	
 	if (amd756_ioport) {
-		dev_err(&pdev->dev, ": Only one device supported. "
-		       "(you have a strange motherboard, btw..)\n");
+		dev_err(&pdev->dev, "Only one device supported "
+		       "(you have a strange motherboard, btw)\n");
 		return -ENODEV;
 	}
 
@@ -352,7 +352,7 @@ static int __devinit amd756_probe(struct pci_dev *pdev,
 		pci_read_config_byte(pdev, SMBGCFG, &temp);
 		if ((temp & 128) == 0) {
 			dev_err(&pdev->dev,
-				": Error: SMBus controller I/O not enabled!\n");
+				"Error: SMBus controller I/O not enabled!\n");
 			return -ENODEV;
 		}
 
@@ -364,14 +364,14 @@ static int __devinit amd756_probe(struct pci_dev *pdev,
 	}
 
 	if (!request_region(amd756_ioport, SMB_IOSIZE, "amd756-smbus")) {
-		dev_err(&pdev->dev, ": SMB region 0x%x already in use!\n",
+		dev_err(&pdev->dev, "SMB region 0x%x already in use!\n",
 			amd756_ioport);
 		return -ENODEV;
 	}
 
 	pci_read_config_byte(pdev, SMBREV, &temp);
-	dev_dbg(&pdev->dev, ": SMBREV = 0x%X\n", temp);
-	dev_dbg(&pdev->dev, ": AMD756_smba = 0x%X\n", amd756_ioport);
+	dev_dbg(&pdev->dev, "SMBREV = 0x%X\n", temp);
+	dev_dbg(&pdev->dev, "AMD756_smba = 0x%X\n", amd756_ioport);
 
 	/* set up the driverfs linkage to our parent device */
 	amd756_adapter.dev.parent = &pdev->dev;
@@ -382,7 +382,7 @@ static int __devinit amd756_probe(struct pci_dev *pdev,
 	error = i2c_add_adapter(&amd756_adapter);
 	if (error) {
 		dev_err(&pdev->dev,
-			": Adapter registration failed, module not inserted.\n");
+			"Adapter registration failed, module not inserted\n");
 		goto out_err;
 	}
 
