@@ -516,7 +516,7 @@ struct sctp_chunk *sctp_make_datafrag_empty(struct sctp_association *asoc,
 	 */
 	dp.tsn = 0;
 	dp.stream = htons(sinfo->sinfo_stream);
-	dp.ppid   = htonl(sinfo->sinfo_ppid);
+	dp.ppid   = sinfo->sinfo_ppid;
 
 	/* Set the flags for an unordered send.  */
 	if (sinfo->sinfo_flags & MSG_UNORDERED) {

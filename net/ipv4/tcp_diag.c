@@ -167,10 +167,8 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 			info->tcpi_snd_wscale = 0;
 			info->tcpi_rcv_wscale = 0;
 		}
-#ifdef CONFIG_INET_ECN
 		if (tp->ecn_flags&TCP_ECN_OK)
 			info->tcpi_options |= TCPI_OPT_ECN;
-#endif
 
 		info->tcpi_rto = (1000000*tp->rto)/HZ;
 		info->tcpi_ato = (1000000*tp->ack.ato)/HZ;

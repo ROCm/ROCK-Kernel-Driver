@@ -1356,9 +1356,6 @@ static int txLog(struct jfs_log * log, struct tblock * tblk, struct commit * cd)
 		lrd->log.redopage.fileset = cpu_to_le32(JFS_IP(ip)->fileset);
 		lrd->log.redopage.inode = cpu_to_le32(ip->i_ino);
 
-		if (tlck->mp)
-			hold_metapage(tlck->mp, 0);
-
 		/* write log record of page from the tlock */
 		switch (tlck->type & tlckTYPE) {
 		case tlckXTREE:
@@ -1384,8 +1381,6 @@ static int txLog(struct jfs_log * log, struct tblock * tblk, struct commit * cd)
 		default:
 			jfs_err("UFO tlock:0x%p", tlck);
 		}
-		if (tlck->mp)
-			release_metapage(tlck->mp);
 	}
 
 	return rc;
@@ -1535,6 +1530,7 @@ static int dataLog(struct jfs_log * log, struct tblock * tblk, struct lrd * lrd,
 		 * the last entry, so don't bother logging this
 		 */
 		mp->lid = 0;
+		hold_metapage(mp, 0);
 		atomic_dec(&mp->nohomeok);
 		discard_metapage(mp);
 		tlck->mp = 0;

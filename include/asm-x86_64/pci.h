@@ -49,7 +49,7 @@ struct pci_dev;
 extern int iommu_setup(char *opt);
 
 extern dma_addr_t bad_dma_address;
-#define pci_dma_error(x) ((x) == bad_dma_address)
+#define pci_dma_mapping_error(x) ((x) == bad_dma_address)
 
 /* Allocate and map kernel buffer using consistent mode DMA for a device.
  * hwdev should be valid struct pci_dev pointer for PCI devices,

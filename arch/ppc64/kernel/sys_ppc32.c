@@ -405,13 +405,12 @@ asmlinkage long sys32_mount(char *dev_name, char *dir_name, char *type, unsigned
 	if (err)
 		goto out;
 
-	if (!type_page) {
-		err = -EINVAL;
-		goto out;
+	if (type_page) {
+		is_smb = !strcmp((char *)type_page, SMBFS_NAME);
+		is_ncp = !strcmp((char *)type_page, NCPFS_NAME);
+	} else {
+		is_smb = is_ncp = 0;
 	}
-
-	is_smb = !strcmp((char *)type_page, SMBFS_NAME);
-	is_ncp = !strcmp((char *)type_page, NCPFS_NAME);
 
 	err = copy_mount_stuff_to_kernel((const void *)AA(data), &data_page);
 	if (err)
@@ -534,7 +533,7 @@ filldir(void * __buf, const char * name, int namlen, off_t offset, ino_t ino,
 {
 	struct linux_dirent32 * dirent;
 	struct getdents_callback32 * buf = (struct getdents_callback32 *) __buf;
-	int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1);
+	int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 2);
 
 	buf->error = -EINVAL;	/* only used if we fail.. */
 	if (reclen > buf->count)
@@ -548,6 +547,7 @@ filldir(void * __buf, const char * name, int namlen, off_t offset, ino_t ino,
 	put_user(reclen, &dirent->d_reclen);
 	copy_to_user(dirent->d_name, name, namlen);
 	put_user(0, dirent->d_name + namlen);
+	put_user(d_type, (char *) dirent + reclen - 1);
 	((char *) dirent) += reclen;
 	buf->current_dir = dirent;
 	buf->count -= reclen;

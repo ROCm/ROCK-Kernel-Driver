@@ -821,6 +821,9 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 						       sk->sk_allocation);
 				if (unlikely(np->cork.opt == NULL))
 					return -ENOBUFS;
+			} else if (np->cork.opt->tot_len < opt->tot_len) {
+				printk(KERN_DEBUG "ip6_append_data: invalid option length\n");
+				return -EINVAL;
 			}
 			memcpy(np->cork.opt, opt, opt->tot_len);
 			inet->cork.flags |= IPCORK_OPT;
