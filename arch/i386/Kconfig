@@ -269,9 +269,6 @@ config MK8
 	  use of some extended instructions, and passes appropriate optimization
 	  flags to GCC.
 
-config MELAN
-	bool "Elan"
-
 config MCRUSOE
 	bool "Crusoe"
 	help
