@@ -194,17 +194,16 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 			}
 			if (joystick_res)
 				joystick_port[dev] = p;
-		} else {
-			switch (joystick_port[dev]) {
-			case 0x201: legacy_ctrl2 |= 0 << 6; break;
-			case 0x202: legacy_ctrl2 |= 1 << 6; break;
-			case 0x204: legacy_ctrl2 |= 2 << 6; break;
-			case 0x205: legacy_ctrl2 |= 3 << 6; break;
-			default: joystick_port[dev] = -1; break;
-			}
-			if (joystick_port[dev] > 0)
-				joystick_res = request_region(joystick_port[dev], 1, "YMFPCI gameport");
 		}
+		switch (joystick_port[dev]) {
+		case 0x201: legacy_ctrl2 |= 0 << 6; break;
+		case 0x202: legacy_ctrl2 |= 1 << 6; break;
+		case 0x204: legacy_ctrl2 |= 2 << 6; break;
+		case 0x205: legacy_ctrl2 |= 3 << 6; break;
+		default: joystick_port[dev] = -1; break;
+		}
+		if (! joystick_res && joystick_port[dev] > 0)
+			joystick_res = request_region(joystick_port[dev], 1, "YMFPCI gameport");
 		if (joystick_res) {
 			legacy_ctrl |= YMFPCI_LEGACY_JPEN;
 		} else {
