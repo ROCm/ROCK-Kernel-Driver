@@ -55,6 +55,10 @@
 #define TRUE 1
 #endif
 
+#ifndef XATTR_DOS_ATTRIB
+#define XATTR_DOS_ATTRIB "user.DOSATTRIB"
+#endif
+
 /*
  * This information is kept on every Server we know about.
  *
@@ -182,6 +186,7 @@ struct cifsTconInfo {
 	FILE_SYSTEM_DEVICE_INFO fsDevInfo;
 	FILE_SYSTEM_ATTRIBUTE_INFO fsAttrInfo;	/* ok if file system name truncated */
 	FILE_SYSTEM_UNIX_INFO fsUnixInfo;
+	int retry:1;
 	/* BB add field for back pointer to sb struct? */
 };
 

@@ -78,16 +78,23 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 	if(tcon) {
 		if((tcon->ses) && (tcon->ses->server)){
 			struct nls_table *nls_codepage = load_nls_default();
-			if(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
 				/* Give Demultiplex thread up to 10 seconds to 
 					reconnect, should be greater than cifs socket
 					timeout which is 7 seconds */
+			while(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
 				wait_event_interruptible_timeout(tcon->ses->server->response_q,
 					(tcon->ses->server->tcpStatus == CifsGood), 10 * HZ);
 				if(tcon->ses->server->tcpStatus == CifsNeedReconnect) {
-					unload_nls(nls_codepage);
-					return -EHOSTDOWN;
-				}
+					/* on "soft" mounts we wait once */
+					if((tcon->retry == FALSE) || 
+					   (tcon->ses->status == CifsExiting)) {
+						unload_nls(nls_codepage);
+						return -EHOSTDOWN;
+					} /* else "hard" mount - keep retrying until 
+					process is killed or server comes back up */
+				} else /* TCP session is reestablished now */
+					break;
+				 
 			}
 			
 		/* need to prevent multiple threads trying to
@@ -163,7 +170,6 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 		rc = -EIO;
 		return rc;
 	}
-NegotiateRetry:
 	rc = smb_init(SMB_COM_NEGOTIATE, 0, 0 /* no tcon yet */ ,
 		      (void **) &pSMB, (void **) &pSMBr);
 	if (rc)
@@ -253,8 +259,6 @@ NegotiateRetry:
 	}
 	if (pSMB)
 		buf_release(pSMB);
-	if (rc == -EAGAIN)
-		goto NegotiateRetry;
 	return rc;
 }
 

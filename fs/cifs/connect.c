@@ -58,7 +58,8 @@ struct smb_vol {
 	gid_t linux_gid;
 	mode_t file_mode;
 	mode_t dir_mode;
-	int rw;
+	int rw:1;
+	int retry:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
@@ -386,6 +387,7 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 	/* 2767 perms indicate mandatory locking support */
 	vol->file_mode = S_IALLUGO & ~(S_ISUID | S_IXGRP);
 
+	/* vol->retry default is 0 (i.e. "soft" limited retry not hard retry) */
 	vol->rw = TRUE;
 
 	if (!options)
@@ -530,6 +532,14 @@ parse_mount_options(char *options, const char *devname, struct smb_vol *vol)
 			vol->rw = TRUE;
 		} else if (strnicmp(data, "ro", 2) == 0) {
 			vol->rw = FALSE;
+		} else if (strnicmp(data, "hard", 4) == 0) {
+			vol->retry = 1;
+		} else if (strnicmp(data, "soft", 4) == 0) {
+			vol->retry = 0;
+		} else if (strnicmp(data, "nohard", 6) == 0) {
+			vol->retry = 0;
+		} else if (strnicmp(data, "nosoft", 6) == 0) {
+			vol->retry = 1;
 		} else
 			printk(KERN_WARNING "CIFS: Unknown mount option %s\n",data);
 	}
@@ -695,8 +705,14 @@ int setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo, struct nls_tab
 	int ntlmv2_flag = FALSE;
 
     /* what if server changes its buffer size after dropping the session? */
-	if(pSesInfo->server->maxBuf == 0) /* no need to send on reconnect */
+	if(pSesInfo->server->maxBuf == 0) /* no need to send on reconnect */ {
 		rc = CIFSSMBNegotiate(xid, pSesInfo);
+		if(rc == -EAGAIN) /* retry only once on 1st time connection */ {
+			rc = CIFSSMBNegotiate(xid, pSesInfo);
+			if(rc == -EAGAIN) 
+				rc = -EHOSTDOWN;
+		}
+	}
 	pSesInfo->capabilities = pSesInfo->server->capabilities;
 	pSesInfo->sequence_number = 0;
 	if (!rc) {
@@ -1036,6 +1052,11 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			     volume_info.username);
 		if (tcon) {
 			cFYI(1, ("Found match on UNC path "));
+			/* we can have only one retry value for a connection
+			   to a share so for resources mounted more than once
+			   to the same server share the last value passed in 
+			   for the retry flag is used */
+			tcon->retry = volume_info.retry;
 		} else {
 			tcon = tconInfoAlloc();
 			if (tcon == NULL)
@@ -1062,8 +1083,10 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 						tcon, cifs_sb->local_nls);
 					cFYI(1, ("CIFS Tcon rc = %d", rc));
 				}
-				if (!rc)
+				if (!rc) {
 					atomic_inc(&pSesInfo->inUse);
+					tcon->retry = volume_info.retry;
+				}
 			}
 		}
 	}
