@@ -49,6 +49,7 @@
 
 #define MAJOR_NR MD_MAJOR
 #define MD_DRIVER
+#define DEVICE_NR(device) (minor(device))
 
 #include <linux/blk.h>
 

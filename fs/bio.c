@@ -341,11 +341,10 @@ void ll_rw_kio(int rw, struct kiobuf *kio, struct block_device *bdev, sector_t s
 	int i, offset, size, err, map_i, total_nr_pages, nr_pages;
 	struct bio_vec *bvec;
 	struct bio *bio;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	err = 0;
-	if ((rw & WRITE) && is_read_only(dev)) {
-		printk("ll_rw_bio: WRITE to ro device %s\n", kdevname(dev));
+	if ((rw & WRITE) && bdev_read_only(bdev)) {
+		printk("ll_rw_bio: WRITE to ro device %s\n", bdevname(bdev));
 		err = -EPERM;
 		goto out;
 	}

@@ -41,6 +41,7 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 
 #include <asm/sections.h>
 #include <asm/mmu.h>
@@ -346,20 +347,20 @@ prep_setup_arch(void)
 	case _PREP_IBM:
 		/* Enable L2.  Assume we don't need to flush -- Cort*/
 		*(unsigned char *)(0x8000081c) |= 3;
-		ROOT_DEV = to_kdev_t(0x0301); /* hda1 */
+		ROOT_DEV = Root_HDA1;
 		break;
 	case _PREP_Motorola:
 		/* Enable L2.  Assume we don't need to flush -- Cort*/
 		*(unsigned char *)(0x8000081c) |= 3;
 #ifdef CONFIG_BLK_DEV_INITRD
 		if (initrd_start)
-			ROOT_DEV = mk_kdev(RAMDISK_MAJOR, 0); /* /dev/ram */
+			ROOT_DEV = Root_RAM0;
 		else
 #endif
 #ifdef CONFIG_ROOT_NFS
-			ROOT_DEV = to_kdev_t(0x00ff); /* /dev/nfs */
+			ROOT_DEV = Root_NFS;
 #else
-			ROOT_DEV = to_kdev_t(0x0802); /* /dev/sda2 */
+			ROOT_DEV = Root_SDA2;
 #endif
 		break;
 	}

@@ -507,7 +507,7 @@ static int logMOUNT(struct super_block *sb)
 	lrd.backchain = 0;
 	lrd.type = cpu_to_le16(LOG_MOUNT);
 	lrd.length = 0;
-	lrd.aggregate = cpu_to_le32(kdev_t_to_nr(sb->s_dev));
+	lrd.aggregate = cpu_to_le32(sb->s_bdev->bd_dev);
 	lmLog(log, NULL, &lrd, NULL);
 
 	return 0;

@@ -48,6 +48,7 @@
 #include <linux/udp.h>
 #include <linux/proc_fs.h>
 #include <linux/major.h>
+#include <linux/root_dev.h>
 #include <net/arp.h>
 #include <net/ip.h>
 #include <net/ipconfig.h>
@@ -1145,7 +1146,7 @@ static int __init ip_auto_config(void)
 	 */
 	if (ic_myaddr == INADDR_NONE ||
 #ifdef CONFIG_ROOT_NFS
-	    (major(ROOT_DEV) == UNNAMED_MAJOR
+	    (MAJOR(ROOT_DEV) == UNNAMED_MAJOR
 	     && root_server_addr == INADDR_NONE
 	     && ic_servaddr == INADDR_NONE) ||
 #endif
@@ -1172,7 +1173,7 @@ static int __init ip_auto_config(void)
 			 * 				-- Chip
 			 */
 #ifdef CONFIG_ROOT_NFS
-			if (kdev_same(ROOT_DEV, mk_kdev(UNNAMED_MAJOR, 255))) {
+			if (ROOT_DEV ==  Root_NFS) {
 				printk(KERN_ERR 
 					"IP-Config: Retrying forever (NFS root)...\n");
 				goto try_try_again;

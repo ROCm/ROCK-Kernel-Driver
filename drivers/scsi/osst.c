@@ -60,6 +60,7 @@ const char * osst_version = "0.9.10";
 #define OSST_DEB_MSG  KERN_NOTICE
 
 #define MAJOR_NR OSST_MAJOR
+#define DEVICE_NR(device) (minor(device) & 0x7f) 
 #include <linux/blk.h>
 
 #include "scsi.h"

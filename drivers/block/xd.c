@@ -52,6 +52,7 @@
 #include <asm/dma.h>
 
 #define MAJOR_NR XT_DISK_MAJOR
+#define DEVICE_NR(device) (minor(device) >> 6)
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 
@@ -283,10 +284,8 @@ static void do_xd_request (request_queue_t * q)
 	while (1) {
 		code = 0;
 		/* do some checking on the request structure */
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		if (DEVICE_NR(CURRENT->rq_dev) < xd_drives
 		    && (CURRENT->flags & REQ_CMD)
@@ -307,7 +306,7 @@ static void do_xd_request (request_queue_t * q)
 					break;
 			}
 		}
-		end_request(code);	/* wrap up, 0 = fail, 1 = success */
+		end_request(CURRENT, code);	/* wrap up, 0 = fail, 1 = success */
 	}
 }
 

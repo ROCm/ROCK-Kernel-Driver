@@ -73,7 +73,7 @@ kmem_cache_t     *fm_cache = NULL;
 /* Called by the VFS at mount time to initialize the whole file system.  */
 static int jffs_fill_super(struct super_block *sb, void *data, int silent)
 {
-	kdev_t dev = sb->s_dev;
+	kdev_t dev = to_kdev_t(sb->s_dev);
 	struct inode *root_inode;
 	struct jffs_control *c;
 

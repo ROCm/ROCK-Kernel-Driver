@@ -134,38 +134,43 @@ decode_sattr(u32 *p, struct iattr *iap)
 static inline u32 *
 encode_fattr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 {
-	struct inode *inode = fhp->fh_dentry->d_inode;
-	int type = (inode->i_mode & S_IFMT);
+	struct vfsmount *mnt = fhp->fh_export->ex_mnt;
+	struct dentry	*dentry = fhp->fh_dentry;
+	struct kstat stat;
+	int type;
+
+	vfs_getattr(mnt, dentry, &stat);
+	type = (stat.mode & S_IFMT);
 
 	*p++ = htonl(nfs_ftypes[type >> 12]);
-	*p++ = htonl((u32) inode->i_mode);
-	*p++ = htonl((u32) inode->i_nlink);
-	*p++ = htonl((u32) nfsd_ruid(rqstp, inode->i_uid));
-	*p++ = htonl((u32) nfsd_rgid(rqstp, inode->i_gid));
+	*p++ = htonl((u32) stat.mode);
+	*p++ = htonl((u32) stat.nlink);
+	*p++ = htonl((u32) nfsd_ruid(rqstp, stat.uid));
+	*p++ = htonl((u32) nfsd_rgid(rqstp, stat.gid));
 
-	if (S_ISLNK(type) && inode->i_size > NFS_MAXPATHLEN) {
+	if (S_ISLNK(type) && stat.size > NFS_MAXPATHLEN) {
 		*p++ = htonl(NFS_MAXPATHLEN);
 	} else {
-		*p++ = htonl((u32) inode->i_size);
+		*p++ = htonl((u32) stat.size);
 	}
-	*p++ = htonl((u32) inode->i_blksize);
+	*p++ = htonl((u32) stat.blksize);
 	if (S_ISCHR(type) || S_ISBLK(type))
-		*p++ = htonl((u32) kdev_t_to_nr(inode->i_rdev));
+		*p++ = htonl((u32) stat.rdev);
 	else
 		*p++ = htonl(0xffffffff);
-	*p++ = htonl((u32) inode->i_blocks);
+	*p++ = htonl((u32) stat.blocks);
 	if (rqstp->rq_reffh->fh_version == 1 
 	    && rqstp->rq_reffh->fh_fsid_type == 1
 	    && (fhp->fh_export->ex_flags & NFSEXP_FSID))
 		*p++ = htonl((u32) fhp->fh_export->ex_fsid);
 	else
-		*p++ = htonl((u32) kdev_t_to_nr(inode->i_dev));
-	*p++ = htonl((u32) inode->i_ino);
-	*p++ = htonl((u32) inode->i_atime);
+		*p++ = htonl((u32) stat.dev);
+	*p++ = htonl((u32) stat.ino);
+	*p++ = htonl((u32) stat.atime);
 	*p++ = 0;
-	*p++ = htonl((u32) lease_get_mtime(inode));
+	*p++ = htonl((u32) lease_get_mtime(dentry->d_inode));
 	*p++ = 0;
-	*p++ = htonl((u32) inode->i_ctime);
+	*p++ = htonl((u32) stat.ctime);
 	*p++ = 0;
 
 	return p;

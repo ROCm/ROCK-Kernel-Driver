@@ -105,7 +105,7 @@ find_exported_dentry(struct super_block *sb, void *obj, void *parent,
 	/* It's a directory, or we are required to confirm the file's
 	 * location in the tree based on the parent information
  	 */
-	dprintk("find_exported_dentry: need to look harder for %d/%d\n",kdev_t_to_nr(sb->s_dev),*(int*)obj);
+	dprintk("find_exported_dentry: need to look harder for %s/%d\n",sb->s_id,*(int*)obj);
 	if (S_ISDIR(result->d_inode->i_mode))
 		target_dir = dget(result);
 	else {

@@ -1358,6 +1358,8 @@ static int shmem_fill_super(struct super_block * sb, void * data, int silent)
 		err = -EINVAL;
 		goto failed;
 	}
+#else
+	sb->s_flags |= MS_NOUSER;
 #endif
 
 	spin_lock_init (&sbinfo->stat_lock);
@@ -1505,21 +1507,13 @@ static struct file_system_type shmem_fs_type = {
 	get_sb:		shmem_get_sb,
 	kill_sb:	kill_litter_super,
 };
-static struct file_system_type tmpfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"tmpfs",
-	get_sb:		shmem_get_sb,
-	kill_sb:	kill_litter_super,
-};
-#else
-static struct file_system_type tmpfs_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"tmpfs",
-	get_sb:		shmem_get_sb,
-	kill_sb:	kill_litter_super,
-	fs_flags:	FS_NOMOUNT,
-};
 #endif
+static struct file_system_type tmpfs_fs_type = {
+	owner:		THIS_MODULE,
+	name:		"tmpfs",
+	get_sb:		shmem_get_sb,
+	kill_sb:	kill_litter_super,
+};
 static struct vfsmount *shm_mnt;
 
 static int __init init_shmem_fs(void)

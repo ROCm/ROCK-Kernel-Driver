@@ -105,11 +105,9 @@ static struct sysrq_key_op sysrq_reboot_op = {
 
 /* do_emergency_sync helper function */
 /* Guesses if the device is a local hard drive */
-static int is_local_disk(kdev_t dev) {
-	unsigned int major;
-	major = major(dev);
-
-	switch (major) {
+static int is_local_disk(struct block_device *bdev)
+{
+	switch (MAJOR(bdev->bd_dev)) {
 	case IDE0_MAJOR:
 	case IDE1_MAJOR:
 	case IDE2_MAJOR:
@@ -143,7 +141,7 @@ static void go_sync(struct super_block *sb, int remount_flag)
 	console_loglevel = 7;
 	printk(KERN_INFO "%sing device %s ... ",
 	       remount_flag ? "Remount" : "Sync",
-	       kdevname(sb->s_dev));
+	       sb->s_id);
 
 	if (remount_flag) { /* Remount R/O */
 		int ret, flags;
@@ -202,13 +200,13 @@ void do_emergency_sync(void) {
 	for (sb = sb_entry(super_blocks.next);
 	     sb != sb_entry(&super_blocks); 
 	     sb = sb_entry(sb->s_list.next))
-		if (is_local_disk(sb->s_dev))
+		if (sb->s_bdev && is_local_disk(sb->s_bdev))
 			go_sync(sb, remount_flag);
 
 	for (sb = sb_entry(super_blocks.next);
 	     sb != sb_entry(&super_blocks); 
 	     sb = sb_entry(sb->s_list.next))
-		if (!is_local_disk(sb->s_dev) && major(sb->s_dev))
+		if (sb->s_bdev && !is_local_disk(sb->s_bdev))
 			go_sync(sb, remount_flag);
 
 	unlock_kernel();

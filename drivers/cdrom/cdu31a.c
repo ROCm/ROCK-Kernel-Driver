@@ -177,6 +177,7 @@
 #include "cdu31a.h"
 
 #define MAJOR_NR CDU31A_CDROM_MAJOR
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 
 #define CDU31A_READAHEAD 4	/* 128 sector, 64kB, 32 reads read-ahead */
@@ -1593,10 +1594,8 @@ static void do_cdu31a_request(request_queue_t * q)
 		 * The beginning here is stolen from the hard disk driver.  I hope
 		 * it's right.
 		 */
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			goto end_do_cdu31a_request;
-		}
 
 		if (!sony_spun_up) {
 			scd_spinup();
@@ -1607,7 +1606,7 @@ static void do_cdu31a_request(request_queue_t * q)
 
 		if (!sony_toc_read) {
 			printk("CDU31A: TOC not read\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 			goto cdu31a_request_startover;
 		}
 
@@ -1621,14 +1620,14 @@ static void do_cdu31a_request(request_queue_t * q)
 				if ((block / 4) >= sony_toc.lead_out_start_lba) {
 					printk
 						("CDU31A: Request past end of media\n");
-					end_request(0);
+					end_request(CURRENT, 0);
 					goto cdu31a_request_startover;
 				}
 				if (((block + nblock) / 4) >=
 				    sony_toc.lead_out_start_lba) {
 					printk
 						("CDU31A: Request past end of media\n");
-					end_request(0);
+					end_request(CURRENT, 0);
 					goto cdu31a_request_startover;
 				}
 
@@ -1639,7 +1638,7 @@ static void do_cdu31a_request(request_queue_t * q)
 
 				if (!sony_toc_read) {
 					printk("CDU31A: TOC not read\n");
-					end_request(0);
+					end_request(CURRENT, 0);
 					goto cdu31a_request_startover;
 				}
 
@@ -1648,7 +1647,7 @@ static void do_cdu31a_request(request_queue_t * q)
 				if (sony_blocks_left == 0) {
 					if (start_request
 					    (block / 4, CDU31A_READAHEAD / 4, 0)) {
-						end_request(0);
+						end_request(CURRENT, 0);
 						goto cdu31a_request_startover;
 					}
 				}
@@ -1664,14 +1663,14 @@ static void do_cdu31a_request(request_queue_t * q)
 					abort_read();
 					if (!sony_toc_read) {
 						printk("CDU31A: TOC not read\n");
-						end_request(0);
+						end_request(CURRENT, 0);
 						goto cdu31a_request_startover;
 					}
 					if (start_request
 					    (block / 4, CDU31A_READAHEAD / 4, 0)) {
 						printk
 							("CDU31a: start request failed\n");
-						end_request(0);
+						end_request(CURRENT, 0);
 						goto cdu31a_request_startover;
 					}
 				}
@@ -1680,7 +1679,7 @@ static void do_cdu31a_request(request_queue_t * q)
 						res_reg, &res_size);
 				if (res_reg[0] == 0x20) {
 					if (num_retries > MAX_CDU31A_RETRIES) {
-						end_request(0);
+						end_request(CURRENT, 0);
 						goto cdu31a_request_startover;
 					}
 
@@ -1697,12 +1696,12 @@ static void do_cdu31a_request(request_queue_t * q)
 					}
 					goto try_read_again;
 				} else {
-					end_request(1);
+					end_request(CURRENT, 1);
 				}
 				break;
 
 			case WRITE:
-				end_request(0);
+				end_request(CURRENT, 0);
 				break;
 
 			default:
