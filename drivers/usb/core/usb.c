@@ -2757,12 +2757,16 @@ struct list_head *usb_bus_get_list(void)
 }
 #endif
 
+struct bus_type usb_bus_type = {
+	name:	"usb",
+};
 
 /*
  * Init
  */
 static int __init usb_init(void)
 {
+	bus_register(&usb_bus_type);
 	usb_major_init();
 	usbfs_init();
 	usb_hub_init();
@@ -2775,6 +2779,7 @@ static int __init usb_init(void)
  */
 static void __exit usb_exit(void)
 {
+	put_bus(&usb_bus_type);
 	usb_major_cleanup();
 	usbfs_cleanup();
 	usb_hub_cleanup();
