@@ -227,6 +227,10 @@ static struct rt6_info *rt6_best_dflt(struct rt6_info *rt, int oif)
 		     sprt->rt6i_dev->ifindex == oif))
 			m += 8;
 
+		if (sprt->rt6i_expires &&
+		    time_after(jiffies, sprt->rt6i_expires))
+			continue;
+
 		if (sprt == rt6_dflt_pointer)
 			m += 4;
 
