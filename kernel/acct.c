@@ -160,8 +160,6 @@ void acct_file_reopen(struct file *file)
 {
 	struct file *old_acct = NULL;
 
-	BUG_ON(!spin_is_locked(&acct_globals.lock));
-
 	if (acct_globals.file) {
 		old_acct = acct_globals.file;
 		del_timer(&acct_globals.timer);
