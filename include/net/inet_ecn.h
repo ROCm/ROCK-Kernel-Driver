@@ -49,19 +49,25 @@ static inline __u8 INET_ECN_encapsulate(__u8 outer, __u8 inner)
 static inline void IP_ECN_set_ce(struct iphdr *iph)
 {
 	u32 check = iph->check;
+	u32 ecn = (iph->tos + 1) & INET_ECN_MASK;
 
-	switch (iph->tos & INET_ECN_MASK) {
-	default:
-	case INET_ECN_NOT_ECT:
-	case INET_ECN_CE:
+	/*
+	 * After the last operation we have (in binary):
+	 * INET_ECN_NOT_ECT => 01
+	 * INET_ECN_ECT_1   => 10
+	 * INET_ECN_ECT_0   => 11
+	 * INET_ECN_CE      => 00
+	 */
+	if (!(ecn & 2))
 		return;
-	case INET_ECN_ECT_1:
-		check += __constant_htons(0xFFFD);
-		break;
-	case INET_ECN_ECT_0:
-		check += __constant_htons(0xFFFE);
-		break;
-	}
+
+	/*
+	 * The following gives us:
+	 * INET_ECN_ECT_1 => check += htons(0xFFFD)
+	 * INET_ECN_ECT_0 => check += htons(0xFFFE)
+	 */
+	check += htons(0xFFFB) + htons(ecn);
+
 	iph->check = check + (check>=0xFFFF);
 	iph->tos |= INET_ECN_CE;
 }
