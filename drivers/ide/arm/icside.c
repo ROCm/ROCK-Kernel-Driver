@@ -428,11 +428,6 @@ static int icside_dma_begin(ide_drive_t *drive)
 	return 0;
 }
 
-static int icside_dma_count(ide_drive_t *drive)
-{
-	return icside_dma_begin(drive);
-}
-
 /*
  * dma_intr() is the handler for disk read/write DMA interrupts
  */
@@ -653,7 +648,6 @@ static int icside_dma_init(ide_hwif_t *hwif)
 	hwif->ide_dma_on	= icside_dma_on;
 	hwif->ide_dma_read	= icside_dma_read;
 	hwif->ide_dma_write	= icside_dma_write;
-	hwif->ide_dma_count	= icside_dma_count;
 	hwif->ide_dma_begin	= icside_dma_begin;
 	hwif->ide_dma_end	= icside_dma_end;
 	hwif->ide_dma_test_irq	= icside_dma_test_irq;

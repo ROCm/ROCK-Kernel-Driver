@@ -545,6 +545,7 @@ static int siimage_io_ide_dma_test_irq (ide_drive_t *drive)
 	return 0;
 }
 
+#if 0
 /**
  *	siimage_mmio_ide_dma_count	-	DMA bytes done
  *	@drive
@@ -572,6 +573,7 @@ static int siimage_mmio_ide_dma_count (ide_drive_t *drive)
 #endif /* SIIMAGE_VIRTUAL_DMAPIO */
 	return __ide_dma_count(drive);
 }
+#endif
 
 /**
  *	siimage_mmio_ide_dma_test_irq	-	check we caused an IRQ
@@ -1133,7 +1135,6 @@ static void __init init_hwif_siimage (ide_hwif_t *hwif)
 		hwif->udma_four = ata66_siimage(hwif);
 
 	if (hwif->mmio) {
-		hwif->ide_dma_count = &siimage_mmio_ide_dma_count;
 		hwif->ide_dma_test_irq = &siimage_mmio_ide_dma_test_irq;
 		hwif->ide_dma_verbose = &siimage_mmio_ide_dma_verbose;
 	} else {

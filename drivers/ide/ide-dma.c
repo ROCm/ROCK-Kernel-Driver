@@ -662,7 +662,7 @@ int __ide_dma_read (ide_drive_t *drive /*, struct request *rq */)
 
 	/* issue cmd to drive */
 	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
-	return HWIF(drive)->ide_dma_count(drive);
+	return hwif->ide_dma_begin(drive);
 }
 
 EXPORT_SYMBOL(__ide_dma_read);
@@ -694,7 +694,7 @@ int __ide_dma_write (ide_drive_t *drive /*, struct request *rq */)
 	/* issue cmd to drive */
 	ide_execute_command(drive, command, &ide_dma_intr, 2*WAIT_CMD, dma_timer_expiry);
 
-	return HWIF(drive)->ide_dma_count(drive);
+	return hwif->ide_dma_begin(drive);
 }
 
 EXPORT_SYMBOL(__ide_dma_write);
@@ -791,17 +791,6 @@ int __ide_dma_good_drive (ide_drive_t *drive)
 EXPORT_SYMBOL(__ide_dma_good_drive);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PCI
-/*
- * Used for HOST FIFO counters for VDMA
- * PIO over DMA, effective ATA-Bridge operator.
- */
-int __ide_dma_count (ide_drive_t *drive)
-{
-	return HWIF(drive)->ide_dma_begin(drive);
-}
-
-EXPORT_SYMBOL(__ide_dma_count);
-
 int __ide_dma_verbose (ide_drive_t *drive)
 {
 	struct hd_driveid *id	= drive->id;
@@ -1076,8 +1065,6 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 		hwif->ide_dma_read = &__ide_dma_read;
 	if (!hwif->ide_dma_write)
 		hwif->ide_dma_write = &__ide_dma_write;
-	if (!hwif->ide_dma_count)
-		hwif->ide_dma_count = &__ide_dma_count;
 	if (!hwif->ide_dma_begin)
 		hwif->ide_dma_begin = &__ide_dma_begin;
 	if (!hwif->ide_dma_end)

@@ -1988,12 +1988,6 @@ pmac_ide_dma_write (ide_drive_t *drive)
 	return pmac_ide_dma_begin(drive);
 }
 
-static int __pmac
-pmac_ide_dma_count (ide_drive_t *drive)
-{
-	return HWIF(drive)->ide_dma_begin(drive);
-}
-
 /*
  * Kick the DMA controller into life after the DMA command has been issued
  * to the drive.
@@ -2165,7 +2159,6 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 	hwif->ide_dma_check = &pmac_ide_dma_check;
 	hwif->ide_dma_read = &pmac_ide_dma_read;
 	hwif->ide_dma_write = &pmac_ide_dma_write;
-	hwif->ide_dma_count = &pmac_ide_dma_count;
 	hwif->ide_dma_begin = &pmac_ide_dma_begin;
 	hwif->ide_dma_end = &pmac_ide_dma_end;
 	hwif->ide_dma_test_irq = &pmac_ide_dma_test_irq;

@@ -844,7 +844,6 @@ void ide_unregister (unsigned int index)
 	hwif->ide_dma_test_irq		= old_hwif.ide_dma_test_irq;
 	hwif->ide_dma_host_on		= old_hwif.ide_dma_host_on;
 	hwif->ide_dma_host_off		= old_hwif.ide_dma_host_off;
-	hwif->ide_dma_count		= old_hwif.ide_dma_count;
 	hwif->ide_dma_verbose		= old_hwif.ide_dma_verbose;
 	hwif->ide_dma_lostirq		= old_hwif.ide_dma_lostirq;
 	hwif->ide_dma_timeout		= old_hwif.ide_dma_timeout;
