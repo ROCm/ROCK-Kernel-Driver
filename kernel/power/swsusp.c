@@ -225,7 +225,7 @@ static void mark_swapfiles(swp_entry_t prev, int mode)
 static void read_swapfiles(void) /* This is called before saving image */
 {
 	int i, len;
-	char buff[sizeof(resume_file)], *sname;
+	static char buff[sizeof(resume_file)], *sname;
 	
 	len=strlen(resume_file);
 	root_swap = 0xFFFF;
@@ -366,6 +366,7 @@ static int write_suspend_image(void)
 	return 0;
 }
 
+#ifdef CONFIG_HIGHMEM
 struct highmem_page {
 	char *data;
 	struct page *page;
@@ -374,7 +375,7 @@ struct highmem_page {
 
 struct highmem_page *highmem_copy = NULL;
 
-static void save_highmem_zone(struct zone *zone)
+static int save_highmem_zone(struct zone *zone)
 {
 	unsigned long zone_pfn;
 	for (zone_pfn = 0; zone_pfn < zone->spanned_pages; ++zone_pfn) {
@@ -384,7 +385,7 @@ static void save_highmem_zone(struct zone *zone)
 		unsigned long pfn = zone_pfn + zone->zone_start_pfn;
 		int chunk_size;
 
-		if (!(pfn%200))
+		if (!(pfn%1000))
 			printk(".");
 		if (!pfn_valid(pfn))
 			continue;
@@ -397,7 +398,7 @@ static void save_highmem_zone(struct zone *zone)
 		 */
 		if (PageReserved(page)) {
 			printk("highmem reserved page?!\n");
-			BUG();
+			continue;
 		}
 		if ((chunk_size = is_head_of_free_region(page))) {
 			pfn += chunk_size - 1;
@@ -406,26 +407,33 @@ static void save_highmem_zone(struct zone *zone)
 		}
 		save = kmalloc(sizeof(struct highmem_page), GFP_ATOMIC);
 		if (!save)
-			panic("Not enough memory");
+			return -ENOMEM;
 		save->next = highmem_copy;
 		save->page = page;
 		save->data = (void *) get_zeroed_page(GFP_ATOMIC);
-		if (!save->data)
-			panic("Not enough memory");
+		if (!save->data) {
+			kfree(save);
+			return -ENOMEM;
+		}
 		kaddr = kmap_atomic(page, KM_USER0);
 		memcpy(save->data, kaddr, PAGE_SIZE);
 		kunmap_atomic(kaddr, KM_USER0);
 		highmem_copy = save;
 	}
+	return 0;
 }
 
-static void save_highmem(void)
+static int save_highmem(void)
 {
 	struct zone *zone;
+	int res = 0;
 	for_each_zone(zone) {
 		if (is_highmem(zone))
-			save_highmem_zone(zone);
+			res = save_highmem_zone(zone);
+		if (res)
+			return res;
 	}
+	return 0;
 }
 
 static int restore_highmem(void)
@@ -443,6 +451,7 @@ static int restore_highmem(void)
 	}
 	return 0;
 }
+#endif
 
 static int pfn_is_nosave(unsigned long pfn)
 {
@@ -460,7 +469,7 @@ static int count_and_copy_zone(struct zone *zone, struct pbe **pagedir_p)
 		struct page *page;
 		unsigned long pfn = zone_pfn + zone->zone_start_pfn;
 
-		if (!(pfn%200))
+		if (!(pfn%1000))
 			printk(".");
 		if (!pfn_valid(pfn))
 			continue;
@@ -548,7 +557,7 @@ static suspend_pagedir_t *create_suspend_pagedir(int nr_copy_pages)
 		
 	while(nr_copy_pages--) {
 		p->address = get_zeroed_page(GFP_ATOMIC | __GFP_COLD);
-		if(!p->address) {
+		if (!p->address) {
 			free_suspend_pagedir((unsigned long) pagedir);
 			return NULL;
 		}
@@ -589,10 +598,17 @@ static int suspend_prepare_image(void)
 	unsigned int nr_needed_pages = 0;
 
 	pagedir_nosave = NULL;
-	printk( "/critical section: Handling highmem" );
-	save_highmem();
+	printk( "/critical section: ");
+#ifdef CONFIG_HIGHMEM
+	printk( "handling highmem" );
+	if (save_highmem()) {
+		printk(KERN_CRIT "%sNot enough free pages for highmem\n", name_suspend);
+		return -ENOMEM;
+	}
+	printk(", ");
+#endif
 
-	printk(", counting pages to copy" );
+	printk("counting pages to copy" );
 	drain_local_pages();
 	nr_copy_pages = count_and_copy_data_pages(NULL);
 	nr_needed_pages = nr_copy_pages + PAGES_FOR_IO;
@@ -602,23 +618,22 @@ static int suspend_prepare_image(void)
 		printk(KERN_CRIT "%sCouldn't get enough free pages, on %d pages short\n",
 		       name_suspend, nr_needed_pages-nr_free_pages());
 		root_swap = 0xFFFF;
-		return 1;
+		return -ENOMEM;
 	}
 	si_swapinfo(&i);	/* FIXME: si_swapinfo(&i) returns all swap devices information.
 				   We should only consider resume_device. */
 	if (i.freeswap < nr_needed_pages)  {
 		printk(KERN_CRIT "%sThere's not enough swap space available, on %ld pages short\n",
 		       name_suspend, nr_needed_pages-i.freeswap);
-		return 1;
+		return -ENOSPC;
 	}
 
 	PRINTK( "Alloc pagedir\n" ); 
 	pagedir_save = pagedir_nosave = create_suspend_pagedir(nr_copy_pages);
-	if(!pagedir_nosave) {
-		/* Shouldn't happen */
-		printk(KERN_CRIT "%sCouldn't allocate enough pages\n",name_suspend);
-		panic("Really should not happen");
-		return 1;
+	if (!pagedir_nosave) {
+		/* Pagedir is big, one-chunk allocation. It is easily possible for this allocation to fail */
+		printk(KERN_CRIT "%sCouldn't allocate continuous pagedir\n", name_suspend);
+		return -ENOMEM;
 	}
 	nr_copy_pages_check = nr_copy_pages;
 	pagedir_order_check = pagedir_order;
@@ -702,8 +717,10 @@ asmlinkage void do_magic_resume_2(void)
 	PRINTK( "Freeing prev allocated pagedir\n" );
 	free_suspend_pagedir((unsigned long) pagedir_save);
 
+#ifdef CONFIG_HIGHMEM
 	printk( "Restoring highmem\n" );
 	restore_highmem();
+#endif
 	printk("done, devices\n");
 
 	device_power_up();
