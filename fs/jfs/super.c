@@ -389,8 +389,6 @@ static int __init init_jfs_fs(void)
 {
 	int rc;
 
-	printk("JFS development version: $Name:  $\n");
-
 	jfs_inode_cachep =
 	    kmem_cache_create("jfs_ip",
 			    sizeof(struct jfs_inode_info),
