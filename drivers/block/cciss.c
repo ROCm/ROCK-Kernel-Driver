@@ -866,6 +866,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 				kfree(buff);
 				return -EFAULT;
 			}
+		} else {
+			memset(buff, 0, iocommand.buf_size);
 		}
 		if ((c = cmd_alloc(host , 0)) == NULL)
 		{
@@ -1012,6 +1014,8 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 				copy_from_user(buff[sg_used], data_ptr, sz)) {
 					status = -ENOMEM;
 					goto cleanup1;			
+			} else {
+				memset(buff[sg_used], 0, sz);
 			}
 			left -= sz;
 			data_ptr += sz;
