@@ -11,7 +11,7 @@
  *	28-Sep-2004  BJD  Fixed ECC placement for Hardware mode
  *	12-Oct-2004  BJD  Fixed errors in use of platform data
  *
- * $Id: s3c2410.c,v 1.5 2004/10/12 10:10:15 bjd Exp $
+ * $Id: s3c2410.c,v 1.6 2004/11/24 12:25:48 bjd Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -167,7 +167,7 @@ static int s3c2410_nand_inithw(struct s3c2410_nand_info *info,
 	if (plat != NULL) {
 		tacls = s3c2410_nand_calc_rate(plat->tacls, clkrate, 8);
 		twrph0 = s3c2410_nand_calc_rate(plat->twrph0, clkrate, 8);
-		twrph1 = s3c2410_nand_calc_rate(plat->twrph0, clkrate, 8);
+		twrph1 = s3c2410_nand_calc_rate(plat->twrph1, clkrate, 8);
 	} else {
 		/* default timings */
 		tacls = 8;
