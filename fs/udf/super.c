@@ -1504,6 +1504,8 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 	sb->s_fs_info = sbi;
 	memset(UDF_SB(sb), 0x00, sizeof(struct udf_sb_info));
 
+	init_MUTEX(&sbi->s_alloc_sem);
+
 	if (!udf_parse_options((char *)options, &uopt))
 		goto error_out;
 

@@ -35,6 +35,10 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/timex.h>
+#include <linux/termios.h>
+#include <linux/tty.h>
+#include <linux/serial.h>
+#include <linux/serial_core.h>
 
 #include <asm/time.h>
 #include <asm/bootinfo.h>
@@ -45,84 +49,80 @@
 #include <asm/ptrace.h>
 #include <asm/reboot.h>
 #include <asm/serial.h>
-#include <linux/termios.h>
-#include <linux/tty.h>
-#include <linux/serial.h>
-#include <linux/serial_core.h>
 #include <asm/titan_dep.h>
+#include <asm/m48t37.h>
 
 #include "setup.h"
 
 unsigned char titan_ge_mac_addr_base[6] = {
-	0x00, 0x03, 0xcc, 0x1d, 0x22, 0x00
+	// 0x00, 0x03, 0xcc, 0x1d, 0x22, 0x00
+	0x00, 0xe0, 0x04, 0x00, 0x00, 0x21
 };
 
 unsigned long cpu_clock;
 unsigned long yosemite_base;
+
+static struct m48t37_rtc *m48t37_base;
 
 void __init bus_error_init(void)
 {
 	/* Do nothing */
 }
 
+
 unsigned long m48t37y_get_time(void)
 {
-	//unsigned char *rtc_base = (unsigned char *) YOSEMITE_RTC_BASE;
-	unsigned char *rtc_base = (unsigned char *) 0xfc000000UL;
 	unsigned int year, month, day, hour, min, sec;
-return;
 
 	/* Stop the update to the time */
-	rtc_base[0x7ff8] = 0x40;
+	m48t37_base->control = 0x40;
 
-	year = BCD2BIN(rtc_base[0x7fff]);
-	year += BCD2BIN(rtc_base[0x7fff1]) * 100;
+	year = BCD2BIN(m48t37_base->year);
+	year += BCD2BIN(m48t37_base->century) * 100;
 
-	month = BCD2BIN(rtc_base[0x7ffe]);
-	day = BCD2BIN(rtc_base[0x7ffd]);
-	hour = BCD2BIN(rtc_base[0x7ffb]);
-	min = BCD2BIN(rtc_base[0x7ffa]);
-	sec = BCD2BIN(rtc_base[0x7ff9]);
+	month = BCD2BIN(m48t37_base->month);
+	day = BCD2BIN(m48t37_base->date);
+	hour = BCD2BIN(m48t37_base->hour);
+	min = BCD2BIN(m48t37_base->min);
+	sec = BCD2BIN(m48t37_base->sec);
 
 	/* Start the update to the time again */
-	rtc_base[0x7ff8] = 0x00;
+	m48t37_base->control = 0x00;
 
 	return mktime(year, month, day, hour, min, sec);
 }
 
 int m48t37y_set_time(unsigned long sec)
 {
-	unsigned char *rtc_base = (unsigned char *) YOSEMITE_RTC_BASE;
 	struct rtc_time tm;
-return;
 
 	/* convert to a more useful format -- note months count from 0 */
 	to_tm(sec, &tm);
 	tm.tm_mon += 1;
 
 	/* enable writing */
-	rtc_base[0x7ff8] = 0x80;
+	m48t37_base->control = 0x80;
 
 	/* year */
-	rtc_base[0x7fff] = BIN2BCD(tm.tm_year % 100);
-	rtc_base[0x7ff1] = BIN2BCD(tm.tm_year / 100);
+	m48t37_base->year = BIN2BCD(tm.tm_year % 100);
+	m48t37_base->century = BIN2BCD(tm.tm_year / 100);
 
 	/* month */
-	rtc_base[0x7ffe] = BIN2BCD(tm.tm_mon);
+	m48t37_base->month = BIN2BCD(tm.tm_mon);
 
 	/* day */
-	rtc_base[0x7ffd] = BIN2BCD(tm.tm_mday);
+	m48t37_base->date = BIN2BCD(tm.tm_mday);
 
 	/* hour/min/sec */
-	rtc_base[0x7ffb] = BIN2BCD(tm.tm_hour);
-	rtc_base[0x7ffa] = BIN2BCD(tm.tm_min);
-	rtc_base[0x7ff9] = BIN2BCD(tm.tm_sec);
+	m48t37_base->hour = BIN2BCD(tm.tm_hour);
+	m48t37_base->min = BIN2BCD(tm.tm_min);
+	m48t37_base->sec = BIN2BCD(tm.tm_sec);
 
 	/* day of week -- not really used, but let's keep it up-to-date */
-	rtc_base[0x7ffc] = BIN2BCD(tm.tm_wday + 1);
+	m48t37_base->day = BIN2BCD(tm.tm_wday + 1);
 
 	/* disable writing */
-	rtc_base[0x7ff8] = 0x00;
+	m48t37_base->control = 0x00;
 
 	return 0;
 }
@@ -136,12 +136,8 @@ void yosemite_time_init(void)
 {
 	board_timer_setup = yosemite_timer_setup;
 	mips_hpt_frequency = cpu_clock / 2;
-
-	rtc_get_time = m48t37y_get_time;
-	rtc_set_time = m48t37y_set_time;
+mips_hpt_frequency = 33000000 * 3 * 5;
 }
-
-unsigned long uart_base = 0xfd000000L;
 
 /* No other usable initialization hook than this ...  */
 extern void (*late_time_init)(void);
@@ -161,15 +157,17 @@ EXPORT_SYMBOL(ocd_base);
 
 static void __init py_map_ocd(void)
 {
-        struct uart_port up;
-
-	/*
-	 * Not specifically interrupt stuff but in case of SMP core_send_ipi
-	 * needs this first so I'm mapping it here ...
-	 */
 	ocd_base = (unsigned long) ioremap(OCD_BASE, OCD_SIZE);
 	if (!ocd_base)
 		panic("Mapping OCD failed - game over.  Your score is 0.");
+
+	/* Kludge for PMON bug ... */
+	OCD_WRITE(0x0710, 0x0ffff029);
+}
+
+static void __init py_uart_setup(void)
+{
+	struct uart_port up;
 
 	/*
 	 * Register to interrupt zero because we share the interrupt with
@@ -188,12 +186,36 @@ static void __init py_map_ocd(void)
 		printk(KERN_ERR "Early serial init of port 0 failed\n");
 }
 
+static void __init py_rtc_setup(void)
+{
+	m48t37_base = ioremap(YOSEMITE_RTC_BASE, YOSEMITE_RTC_SIZE);
+	if (!m48t37_base)
+		printk(KERN_ERR "Mapping the RTC failed\n");
+
+	rtc_get_time = m48t37y_get_time;
+	rtc_set_time = m48t37y_set_time;
+
+	write_seqlock(&xtime_lock);
+	xtime.tv_sec = m48t37y_get_time();
+	xtime.tv_nsec = 0;
+
+	set_normalized_timespec(&wall_to_monotonic,
+	                        -xtime.tv_sec, -xtime.tv_nsec);
+	write_sequnlock(&xtime_lock);
+}
+
+/* Not only time init but that's what the hook it's called through is named */
+static void __init py_late_time_init(void)
+{
+	py_map_ocd();
+	py_uart_setup();
+	py_rtc_setup();
+}
+
 static int __init pmc_yosemite_setup(void)
 {
-	extern void pmon_smp_bootstrap(void);
-
 	board_time_init = yosemite_time_init;
-	late_time_init = py_map_ocd;
+	late_time_init = py_late_time_init;
 
 	/* Add memory regions */
 	add_memory_region(0x00000000, 0x10000000, BOOT_MEM_RAM);

@@ -2536,9 +2536,9 @@ MODULE_PARM_DESC(dfp_type, "Specifies DFP interface type (0 to 255) (default=rea
 module_param_string(outputs, outputs, sizeof(outputs), 0);
 MODULE_PARM_DESC(outputs, "Specifies which CRTC is mapped to which output (string of up to three letters, consisting of 0 (disabled), 1 (CRTC1), 2 (CRTC2)) (default=111 for Gx50, 101 for G200/G400 with DFP, and 100 for all other devices)");
 #ifdef CONFIG_PPC_PMAC
-module_param(vmode, int, 0);
+module_param_named(vmode, default_vmode, int, 0);
 MODULE_PARM_DESC(vmode, "Specify the vmode mode number that should be used (640x480 default)");
-module_param(cmode, int, 0);
+module_param_named(cmode, default_cmode, int, 0);
 MODULE_PARM_DESC(cmode, "Specify the video depth that should be used (8bit default)");
 #endif
 

@@ -352,6 +352,9 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long stack_start,
 	thread->cpu_context.sp = (unsigned long)childregs;
 	thread->cpu_context.pc = (unsigned long)ret_from_fork;
 
+	if (clone_flags & CLONE_SETTLS)
+		thread->tp_value = regs->ARM_r3;
+
 	return 0;
 }
 

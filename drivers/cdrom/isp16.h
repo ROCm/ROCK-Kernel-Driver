@@ -70,5 +70,3 @@
 
 #define ISP16_IO_BASE 0xF8D
 #define ISP16_IO_SIZE 5  /* ports used from 0xF8D up to 0xF91 */
-
-int isp16_init(void);

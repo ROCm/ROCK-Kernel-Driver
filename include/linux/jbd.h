@@ -1062,12 +1062,6 @@ extern int jbd_blocks_per_page(struct inode *inode);
 
 #ifdef __KERNEL__
 
-#ifdef CONFIG_SMP
-#define assert_spin_locked(lock)	J_ASSERT(spin_is_locked(lock))
-#else
-#define assert_spin_locked(lock)	do {} while(0)
-#endif
-
 #define buffer_trace_init(bh)	do {} while (0)
 #define print_buffer_fields(bh)	do {} while (0)
 #define print_buffer_trace(bh)	do {} while (0)

@@ -919,6 +919,42 @@ config FB_PM3
 	  similar boards, 3DLabs Permedia3 Create!, Appian Jeronimo 2000
 	  and maybe other boards.
 
+config FB_E1356
+	tristate "Epson SED1356 framebuffer support"
+	depends on FB && EXPERIMENTAL && PCI && MIPS
+
+config PB1000_CRT
+	bool "Use CRT on Pb1000 (J65)"
+	depends on MIPS_PB1000=y && FB_E1356
+
+config PB1000_NTSC
+	bool "Use Compsite NTSC on Pb1000 (J63)"
+	depends on MIPS_PB1000=y && FB_E1356
+
+config PB1000_TFT
+	bool "Use TFT Panel on Pb1000 (J64)"
+	depends on MIPS_PB1000=y && FB_E1356
+
+config PB1500_CRT
+	bool "Use CRT on Pb1500 " if MIPS_PB1500=y
+	depends on FB_E1356
+
+config PB1500_CRT
+	prompt "Use CRT on Pb1100 "
+	depends on FB_E1356 && MIPS_PB1100=y
+
+config PB1500_TFT
+	bool "Use TFT Panel on Pb1500 " if MIPS_PB1500=y
+	depends on FB_E1356
+
+config PB1500_TFT
+	prompt "Use TFT Panel on Pb1100 "
+	depends on FB_E1356 && MIPS_PB1100=y
+
+config FB_AU1100
+	bool "Au1100 LCD Driver"
+	depends on FB && EXPERIMENTAL && PCI && MIPS && MIPS_PB1100=y
+
 config FB_SBUS
 	bool "SBUS and UPA framebuffers"
 	depends on FB && (SPARC32 || SPARC64)
@@ -978,29 +1014,35 @@ config FB_HIT
 	  This is the frame buffer device driver for the Hitachi HD64461 LCD
 	  frame buffer card.
 
+config FB_PMAG_AA
+	bool "PMAG-AA TURBOchannel framebuffer support"
+	depends on FB && MACH_DECSTATION && TC
+	help
+	  Support for the PMAG-AA TURBOchannel framebuffer card (1280x1024x1)
+	  used mainly in the MIPS-based DECstation series.
+
 config FB_PMAG_BA
 	bool "PMAG-BA TURBOchannel framebuffer support"
-	depends on FB && DECSTATION && TC
+	depends on FB && MACH_DECSTATION && TC
 	help
-	  Say Y here to directly support the on-board PMAG-BA framebuffer in
-	  the 5000/1xx versions of the DECstation.  There is a page dedicated
-	  to Linux on DECstations at <http://decstation.unix-ag.org/>.
+	  Support for the PMAG-BA TURBOchannel framebuffer card (1024x864x8)
+	  used mainly in the MIPS-based DECstation series.
 
 config FB_PMAGB_B
-	bool "PMAGB-B TURBOchannel framebuffer spport"
-	depends on FB && DECSTATION && TC
+	bool "PMAGB-B TURBOchannel framebuffer support"
+	depends on FB && MACH_DECSTATION && TC
 	help
-	  Say Y here to directly support the on-board PMAGB-B framebuffer in
-	  the 5000/1xx versions of the DECstation.  There is a page dedicated
-	  to Linux on DECstations at <http://decstation.unix-ag.org/>.
+	  Support for the PMAGB-B TURBOchannel framebuffer card used mainly
+	  in the MIPS-based DECstation series. The card is currently only
+	  supported in 1280x1024x8 mode.
 
 config FB_MAXINE
-	bool "Maxine (Personal DECstation) onboard framebuffer spport"
-	depends on FB && DECSTATION && TC
+	bool "Maxine (Personal DECstation) onboard framebuffer support"
+	depends on FB && MACH_DECSTATION && TC
 	help
-	  Say Y here to directly support the on-board framebuffer in the
-	  Maxine (5000/20, /25, /33) version of the DECstation.  There is a
-	  page dedicated to Linux on DECstations at <http://decstation.unix-ag.org/>.
+	  Support for the onboard framebuffer (1024x768x8) in the Personal
+	  DECstation series (Personal DECstation 5000/20, /25, /33, /50,
+	  Codename "Maxine").
 
 config FB_TX3912
 	bool "TMPTX3912/PR31700 frame buffer support"
@@ -1010,6 +1052,13 @@ config FB_TX3912
 	  see <http://www.toshiba.com/taec/components/Generic/risc/tx3912.htm>.
 
 	  Say Y here to enable kernel support for the on-board framebuffer.
+
+config FB_G364
+	bool
+	depends on MIPS_MAGNUM_4000 || OLIVETTI_M700
+	help
+	  The G364 driver is the framebuffer used in MIPS Magnum 4000 and
+	  Olivetti M700-10 systems.
 
 config FB_68328
 	bool "Motorola 68328 native frame buffer support"

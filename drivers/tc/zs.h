@@ -1,13 +1,17 @@
 /*
- * macserial.h: Definitions for the Macintosh Z8530 serial driver.
+ * drivers/tc/zs.h: Definitions for the DECstation Z85C30 serial driver.
  *
  * Adapted from drivers/sbus/char/sunserial.h by Paul Mackerras.
+ * Adapted from drivers/macintosh/macserial.h by Harald Koerfgen.
  *
  * Copyright (C) 1996 Paul Mackerras (Paul.Mackerras@cs.anu.edu.au)
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
+ * Copyright (C) 2004  Maciej W. Rozycki
  */
 #ifndef _DECSERIAL_H
 #define _DECSERIAL_H
+
+#include <asm/dec/serial.h>
 
 #define NUM_ZSREGS    16
 
@@ -89,61 +93,48 @@ struct dec_zschannel {
 	unsigned char curregs[NUM_ZSREGS];
 };
 
-struct dec_serial;
-
-struct zs_hook {
-	int (*init_channel)(struct dec_serial* info);
-	void (*init_info)(struct dec_serial* info);
-	void (*rx_char)(unsigned char ch, unsigned char stat);
-	int  (*poll_rx_char)(struct dec_serial* info);
-	int  (*poll_tx_char)(struct dec_serial* info,
-			     unsigned char ch);
-	unsigned cflags;
-};
-
 struct dec_serial {
-	struct dec_serial *zs_next;	/* For IRQ servicing chain */
-	struct dec_zschannel *zs_channel; /* Channel registers */
-	struct dec_zschannel *zs_chan_a;	/* A side registers */
-	unsigned char read_reg_zero;
+	struct dec_serial	*zs_next;	/* For IRQ servicing chain.  */
+	struct dec_zschannel	*zs_channel;	/* Channel registers.  */
+	struct dec_zschannel	*zs_chan_a;	/* A side registers.  */
+	unsigned char		read_reg_zero;
 
-	char soft_carrier;  /* Use soft carrier on this channel */
-	char break_abort;   /* Is serial console in, so process brk/abrt */
-	struct zs_hook *hook;  /* Hook on this channel */
-	char is_cons;       /* Is this our console. */
-	unsigned char tx_active; /* character is being xmitted */
-	unsigned char tx_stopped; /* output is suspended */
+	struct dec_serial_hook	*hook;		/* Hook on this channel.  */
+	int			tty_break;	/* Set on BREAK condition.  */
+	int			is_cons;	/* Is this our console.  */
+	int			tx_active;	/* Char is being xmitted.  */
+	int			tx_stopped;	/* Output is suspended.  */
 
-	/* We need to know the current clock divisor
-	 * to read the bps rate the chip has currently
-	 * loaded.
+	/*
+	 * We need to know the current clock divisor
+	 * to read the bps rate the chip has currently loaded.
 	 */
-	unsigned char clk_divisor;  /* May be 1, 16, 32, or 64 */
-	int zs_baud;
+	int			clk_divisor;	/* May be 1, 16, 32, or 64.  */
+	int			zs_baud;
 
-	char change_needed;
+	char			change_needed;
 
 	int			magic;
 	int			baud_base;
 	int			port;
 	int			irq;
-	int			flags; 		/* defined in tty.h */
-	int			type; 		/* UART type */
+	int			flags; 		/* Defined in tty.h.  */
+	int			type; 		/* UART type.  */
 	struct tty_struct 	*tty;
 	int			read_status_mask;
 	int			ignore_status_mask;
 	int			timeout;
 	int			xmit_fifo_size;
 	int			custom_divisor;
-	int			x_char;	/* xon/xoff character */
+	int			x_char;		/* XON/XOFF character.  */
 	int			close_delay;
 	unsigned short		closing_wait;
 	unsigned short		closing_wait2;
 	unsigned long		event;
 	unsigned long		last_active;
 	int			line;
-	int			count;	    /* # of fd on device */
-	int			blocked_open; /* # of blocked opens */
+	int			count;		/* # of fds on device.  */
+	int			blocked_open;	/* # of blocked opens.  */
 	unsigned char 		*xmit_buf;
 	int			xmit_head;
 	int			xmit_tail;
@@ -219,8 +210,9 @@ struct dec_serial {
 
 #define	RxINT_DISAB	0	/* Rx Int Disable */
 #define	RxINT_FCERR	0x8	/* Rx Int on First Character Only or Error */
-#define	INT_ALL_Rx	0x10	/* Int on all Rx Characters or error */
-#define	INT_ERR_Rx	0x18	/* Int on error only */
+#define	RxINT_ALL	0x10	/* Int on all Rx Characters or error */
+#define	RxINT_ERR	0x18	/* Int on error only */
+#define	RxINT_MASK	0x18
 
 #define	WT_RDY_RT	0x20	/* Wait/Ready on R/T */
 #define	WT_FN_RDYFN	0x40	/* Wait/FN/Ready FN */

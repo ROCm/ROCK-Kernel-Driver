@@ -73,6 +73,9 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
 #ifdef CONFIG_EFI_PARTITION
 	efi_partition,		/* this must come before msdos */
 #endif
+#ifdef CONFIG_SGI_PARTITION
+	sgi_partition,
+#endif
 #ifdef CONFIG_LDM_PARTITION
 	ldm_partition,		/* this must come before msdos */
 #endif
@@ -96,9 +99,6 @@ static int (*check_part[])(struct parsed_partitions *, struct block_device *) = 
 #endif
 #ifdef CONFIG_MAC_PARTITION
 	mac_partition,
-#endif
-#ifdef CONFIG_SGI_PARTITION
-	sgi_partition,
 #endif
 #ifdef CONFIG_ULTRIX_PARTITION
 	ultrix_partition,

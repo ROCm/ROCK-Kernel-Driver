@@ -8,9 +8,9 @@
  * Based on code done by Rabeeh Khoury - rabeeh@galileo.co.il
  * Based on code done by - Mark A. Greer <mgreer@mvista.com>
  *
- * This program is free software; you can redistribute  it and/or modify it
- * under  the terms of  the GNU General  Public License as published by the
- * Free Software Foundation;  either version 2 of the  License, or (at your
+ * This program is free software; you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation; either version 2 of the License, or (at your
  * option) any later version.
  */
 /*
@@ -194,6 +194,14 @@ katana_bus_freq(void)
 	bd_cfg_0 = in_8((volatile char *)(cpld_base + KATANA_CPLD_BD_CFG_0));
 
 	switch (bd_cfg_0 & KATANA_CPLD_BD_CFG_0_SYSCLK_MASK) {
+	case KATANA_CPLD_BD_CFG_0_SYSCLK_200:
+		return 200000000;
+		break;
+
+	case KATANA_CPLD_BD_CFG_0_SYSCLK_166:
+		return 166666666;
+		break;
+
 	case KATANA_CPLD_BD_CFG_0_SYSCLK_133:
 		return 133333333;
 		break;
@@ -234,7 +242,7 @@ katana_intr_setup(void)
 	/* Config GPP intr ctlr to respond to level trigger */
 	mv64x60_set_bits(&bh, MV64x60_COMM_ARBITER_CNTL, (1<<10));
 
-	/* XXXX Erranum FEr PCI-#8 */
+	/* Erranum FEr PCI-#8 */
 	mv64x60_clr_bits(&bh, MV64x60_PCI0_CMD, (1<<5) | (1<<9));
 	mv64x60_clr_bits(&bh, MV64x60_PCI1_CMD, (1<<5) | (1<<9));
 
@@ -392,7 +400,7 @@ katana_setup_bridge(void)
 
 	/* Lookup PCI host bridges */
 	if (mv64x60_init(&bh, &si))
-		printk("Bridge initialization failed.\n");
+		printk(KERN_WARNING "Bridge initialization failed.\n");
 
 	pci_dram_offset = 0; /* sys mem at same addr on PCI & cpu bus */
 	ppc_md.pci_swizzle = common_swizzle;
@@ -433,7 +441,7 @@ katana_setup_arch(void)
 	 * avoid dirty data in cache
 	 */
 	if (PVR_REV(mfspr(PVR)) == 0x0200) {
-		printk("DD2.0 detected. Setting L2 cache"
+		printk(KERN_INFO "DD2.0 detected. Setting L2 cache"
 			"to Writethrough mode\n");
 		_set_L2CR(L2CR_L2E | L2CR_L2PE | L2CR_L2WT);
 	}
@@ -447,82 +455,95 @@ katana_setup_arch(void)
 	katana_setup_peripherals();
 	katana_enable_ipmi();
 
-	printk("Artesyn Communication Products, LLC - Katana(TM)\n");
+	printk(KERN_INFO "Artesyn Communication Products, LLC - Katana(TM)\n");
 	if (ppc_md.progress)
 		ppc_md.progress("katana_setup_arch: exit", 0);
 	return;
 }
 
-/* Platform device data fixup routine. */
-static int __init
-katana_fixup_pd(void)
-{
-	struct list_head	*entry;
-	struct platform_device	*pd;
-	struct device		*dev;
+/* Platform device data fixup routines. */
 #if defined(CONFIG_SERIAL_MPSC)
-	struct mpsc_pd_dd	*dd;
+static void __init
+katana_fixup_mpsc_pdata(struct platform_device *pdev)
+{
+	struct mpsc_pdata *pdata;
+
+	pdata = (struct mpsc_pdata *)pdev->dev.platform_data;
+
+	pdata->max_idle = 40;
+	pdata->default_baud = KATANA_DEFAULT_BAUD;
+	pdata->brg_clk_src = KATANA_MPSC_CLK_SRC;
+	pdata->brg_clk_freq = KATANA_MPSC_CLK_FREQ;
+
+	return;
+}
 #endif
+
 #if defined(CONFIG_MV643XX_ETH)
-	struct mv64xxx_eth_pd_dd *eth_dd;
+static void __init
+katana_fixup_eth_pdata(struct platform_device *pdev)
+{
+	struct mv64xxx_eth_platform_data *eth_pd;
 	static u16 phy_addr[] = {
 		KATANA_ETH0_PHY_ADDR,
 		KATANA_ETH1_PHY_ADDR,
 		KATANA_ETH2_PHY_ADDR,
 	};
-	struct resource	*rx_r;
-	struct resource	*tx_r;
-	int		rx_size = KATANA_ETH_RX_QUEUE_SIZE * ETH_DESC_SIZE;
-	int		tx_size = KATANA_ETH_TX_QUEUE_SIZE * ETH_DESC_SIZE;
+	int	rx_size = KATANA_ETH_RX_QUEUE_SIZE * MV64340_ETH_DESC_SIZE;
+	int	tx_size = KATANA_ETH_TX_QUEUE_SIZE * MV64340_ETH_DESC_SIZE;
+
+	eth_pd = pdev->dev.platform_data;
+	eth_pd->force_phy_addr = 1;
+	eth_pd->phy_addr = phy_addr[pdev->id];
+	eth_pd->tx_queue_size = KATANA_ETH_TX_QUEUE_SIZE;
+	eth_pd->rx_queue_size = KATANA_ETH_RX_QUEUE_SIZE;
+	eth_pd->tx_sram_addr = mv643xx_sram_alloc(tx_size);
+
+	if (eth_pd->tx_sram_addr)
+		eth_pd->tx_sram_size = tx_size;
+	else
+		printk(KERN_ERR "mv643xx_sram_alloc failed\n");
+
+	eth_pd->rx_sram_addr = mv643xx_sram_alloc(rx_size);
+	if (eth_pd->rx_sram_addr)
+		eth_pd->rx_sram_size = rx_size;
+	else
+		printk(KERN_ERR "mv643xx_sram_alloc failed\n");
+}
 #endif
 
-	list_for_each(entry, &platform_bus_type.devices.list) {
-		dev = container_of(entry, struct device, bus_list);
-		pd = container_of(dev, struct platform_device, dev);
-
+static int __init
+katana_platform_notify(struct device *dev)
+{
+	static struct {
+		char	*bus_id;
+		void	((*rtn)(struct platform_device *pdev));
+	} dev_map[] = {
 #if defined(CONFIG_SERIAL_MPSC)
-		if (!strncmp(pd->name, MPSC_CTLR_NAME, BUS_ID_SIZE)) {
-			dd = (struct mpsc_pd_dd *)dev_get_drvdata(&pd->dev);
-
-			dd->max_idle = 40;	/* XXXX what should be? */
-			dd->default_baud = KATANA_DEFAULT_BAUD;
-			dd->brg_clk_src = KATANA_MPSC_CLK_SRC;
-			dd->brg_clk_freq = KATANA_MPSC_CLK_FREQ;
-		}
+		{ MPSC_CTLR_NAME "0", katana_fixup_mpsc_pdata },
+		{ MPSC_CTLR_NAME "1", katana_fixup_mpsc_pdata },
 #endif
 #if defined(CONFIG_MV643XX_ETH)
-		if (!strncmp(pd->name, MV64XXX_ETH_NAME, BUS_ID_SIZE)) {
-			eth_dd = (struct mv64xxx_eth_pd_dd *)
-						dev_get_drvdata(&pd->dev);
-			eth_dd->phy_addr = phy_addr[pd->id];
-			eth_dd->port_config = KATANA_ETH_PORT_CONFIG_VALUE;
-			eth_dd->port_config_extend =
-					KATANA_ETH_PORT_CONFIG_EXTEND_VALUE;
-			eth_dd->port_sdma_config =
-					KATANA_ETH_PORT_SDMA_CONFIG_VALUE;
-			eth_dd->port_serial_control =
-					KATANA_ETH_PORT_SERIAL_CONTROL_VALUE;
-			eth_dd->tx_queue_size = KATANA_ETH_TX_QUEUE_SIZE;
-			eth_dd->rx_queue_size = KATANA_ETH_RX_QUEUE_SIZE;
-
-			rx_r = &pd->resource[5];
-			rx_r->start = KATANA_INTERNAL_SRAM_BASE +
-						(rx_size + tx_size) * pd->id;
-			rx_r->end = rx_r->start + rx_size - 1;
-			rx_r->flags = IORESOURCE_MEM;
-
-			tx_r = &pd->resource[6];
-			tx_r->start = rx_r->start + rx_size;
-			tx_r->end = tx_r->start + tx_size - 1;
-			tx_r->flags = IORESOURCE_MEM;
-		}
+		{ MV64XXX_ETH_NAME "0", katana_fixup_eth_pdata },
+		{ MV64XXX_ETH_NAME "1", katana_fixup_eth_pdata },
+		{ MV64XXX_ETH_NAME "2", katana_fixup_eth_pdata },
 #endif
-	}
+	};
+	struct platform_device	*pdev;
+	int	i;
+
+	if (dev && dev->bus_id)
+		for (i=0; i<ARRAY_SIZE(dev_map); i++)
+			if (!strncmp(dev->bus_id, dev_map[i].bus_id,
+				BUS_ID_SIZE)) {
+
+				pdev = container_of(dev,
+					struct platform_device, dev);
+				dev_map[i].rtn(pdev);
+			}
 
 	return 0;
 }
-
-subsys_initcall(katana_fixup_pd);
 
 static void
 katana_restart(char *cmd)
@@ -595,7 +616,7 @@ katana_calibrate_decr(void)
 
 	freq = katana_bus_freq() / 4;
 
-	printk("time_init: decrementer frequency = %lu.%.6lu MHz\n",
+	printk(KERN_INFO "time_init: decrementer frequency = %lu.%.6lu MHz\n",
 	       freq / 1000000, freq % 1000000);
 
 	tb_ticks_per_jiffy = freq / HZ;
@@ -654,7 +675,10 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	mv64x60_progress_init(KATANA_BRIDGE_REG_BASE);
 #endif
 
-	katana_set_bat(); /* Need for katana_find_end_of_memory and progress */
+#if defined(CONFIG_SERIAL_MPSC) || defined(CONFIG_MV643XX_ETH)
+	platform_notify = katana_platform_notify;
+#endif
 
+	katana_set_bat(); /* Need for katana_find_end_of_memory and progress */
 	return;
 }

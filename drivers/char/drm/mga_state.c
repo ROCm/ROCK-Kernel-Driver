@@ -37,6 +37,20 @@
 #include "mga_drm.h"
 #include "mga_drv.h"
 
+drm_ioctl_desc_t mga_ioctls[] = {
+	[DRM_IOCTL_NR(DRM_MGA_INIT)]    = { mga_dma_init,    1, 1 },
+	[DRM_IOCTL_NR(DRM_MGA_FLUSH)]   = { mga_dma_flush,   1, 0 },
+	[DRM_IOCTL_NR(DRM_MGA_RESET)]   = { mga_dma_reset,   1, 0 },
+	[DRM_IOCTL_NR(DRM_MGA_SWAP)]    = { mga_dma_swap,    1, 0 },
+	[DRM_IOCTL_NR(DRM_MGA_CLEAR)]   = { mga_dma_clear,   1, 0 },
+	[DRM_IOCTL_NR(DRM_MGA_VERTEX)]  = { mga_dma_vertex,  1, 0 },
+	[DRM_IOCTL_NR(DRM_MGA_INDICES)] = { mga_dma_indices, 1, 0 },
+	[DRM_IOCTL_NR(DRM_MGA_ILOAD)]   = { mga_dma_iload,   1, 0 },
+	[DRM_IOCTL_NR(DRM_MGA_BLIT)]    = { mga_dma_blit,    1, 0 },
+	[DRM_IOCTL_NR(DRM_MGA_GETPARAM)]= { mga_getparam,    1, 0 },
+};
+
+int mga_max_ioctl = DRM_ARRAY_SIZE(mga_ioctls);
 
 /* ================================================================
  * DMA hardware state programming functions

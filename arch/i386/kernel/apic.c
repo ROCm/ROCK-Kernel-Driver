@@ -518,8 +518,7 @@ void __init setup_local_APIC (void)
  * disable it down before re-entering the BIOS on shutdown.
  * Otherwise the BIOS may get confused and not power-off.
  */
-void
-lapic_shutdown()
+void lapic_shutdown(void)
 {
 	if (!cpu_has_apic || !enabled_via_apicbase)
 		return;

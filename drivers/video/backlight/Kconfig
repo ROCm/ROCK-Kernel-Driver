@@ -41,3 +41,12 @@ config LCD_DEVICE
 	bool
 	depends on LCD_CLASS_DEVICE
 	default y
+
+config BACKLIGHT_CORGI
+	tristate "Sharp Corgi Backlight Driver (SL-C7xx Series)"
+	depends on BACKLIGHT_DEVICE && PXA_SHARPSL
+	default y
+	help
+	  If you have a Sharp Zaurus SL-C7xx, say y to enable the
+	  backlight driver.
+

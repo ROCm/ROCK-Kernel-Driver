@@ -162,7 +162,7 @@ struct snd_bt87x {
 	snd_card_t *card;
 	struct pci_dev *pci;
 
-	void *mmio;
+	void __iomem *mmio;
 	int irq;
 
 	int dig_rate;

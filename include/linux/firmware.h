@@ -7,6 +7,7 @@ struct firmware {
 	size_t size;
 	u8 *data;
 };
+struct device;
 int request_firmware(const struct firmware **fw, const char *name,
 		     struct device *device);
 int request_firmware_nowait(

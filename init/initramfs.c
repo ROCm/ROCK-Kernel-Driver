@@ -26,7 +26,7 @@ static void __init free(void *where)
 
 /* link hash */
 
-static struct hash {
+static __initdata struct hash {
 	int ino, minor, major;
 	struct hash *next;
 	char *name;

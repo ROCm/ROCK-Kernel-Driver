@@ -1302,7 +1302,7 @@ static const struct amd_flash_info jedec_table[] = {
  		.DevSize	= SIZE_256KiB,
  		.CmdSet		= P_ID_SST_PAGE,
  		.NumEraseRegions= 1,
- 		regions: {ERASEINFO(0x01000,64),
+ 		.regions = {ERASEINFO(0x01000,64),
  		}
          }, {
  		.mfr_id		= MANUFACTURER_SST,
@@ -1314,7 +1314,7 @@ static const struct amd_flash_info jedec_table[] = {
  		.DevSize	= SIZE_256KiB,
  		.CmdSet		= P_ID_SST_PAGE,
  		.NumEraseRegions= 1,
- 		regions: {ERASEINFO(0x01000,64),
+ 		.regions = {ERASEINFO(0x01000,64),
  		}
 	}, {
 		.mfr_id		= MANUFACTURER_SST,

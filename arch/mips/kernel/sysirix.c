@@ -1648,7 +1648,7 @@ asmlinkage int irix_statvfs64(char *fname, struct irix_statvfs64 *buf)
 	struct kstatfs kbuf;
 	int error, i;
 
-	printk("[%s:%d] Wheee.. irix_statvfs(%s,%p)\n",
+	printk("[%s:%d] Wheee.. irix_statvfs64(%s,%p)\n",
 	       current->comm, current->pid, fname, buf);
 	error = verify_area(VERIFY_WRITE, buf, sizeof(struct irix_statvfs64));
 	if(error)
@@ -1694,7 +1694,7 @@ asmlinkage int irix_fstatvfs64(int fd, struct irix_statvfs *buf)
 	struct file *file;
 	int error, i;
 
-	printk("[%s:%d] Wheee.. irix_fstatvfs(%d,%p)\n",
+	printk("[%s:%d] Wheee.. irix_fstatvfs64(%d,%p)\n",
 	       current->comm, current->pid, fd, buf);
 
 	error = verify_area(VERIFY_WRITE, buf, sizeof(struct irix_statvfs));

@@ -304,7 +304,7 @@ static void __init momenco_ocelot_setup(void)
 	}
 
 	/* Fix up the DiskOnChip mapping */
-	GT_WRITE(0x468, 0xfef73);
+	GT_WRITE(GT_DEV_B3_OFS, 0xfef73);
 }
 
 early_initcall(momenco_ocelot_setup);
@@ -322,8 +322,8 @@ static void __init setup_l3cache(unsigned long size)
 	printk("Enabling L3 cache...");
 
 	/* Enable the L3 cache in the GT64120A's CPU Configuration register */
-	tmp =  GT_READ(0);
-	GT_WRITE(0, tmp | (1<<14));
+	tmp = GT_READ(GT_CPU_OFS);
+	GT_WRITE(GT_CPU_OFS, tmp | (1<<14));
 
 	/* Enable the L3 cache in the CPU */
 	set_c0_config(1<<12 /* CONF_TE */);

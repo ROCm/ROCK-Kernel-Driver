@@ -136,6 +136,7 @@ static int spi_host_match(struct attribute_container *cont,
 			  struct device *dev)
 {
 	struct Scsi_Host *shost;
+	struct spi_internal *i;
 
 	if (!scsi_is_host_device(dev))
 		return 0;
@@ -144,7 +145,10 @@ static int spi_host_match(struct attribute_container *cont,
 	if (!shost->transportt  || shost->transportt->host_attrs.class
 	    != &spi_host_class.class)
 		return 0;
-	return 1;
+
+	i = to_spi_internal(shost->transportt);
+	
+	return &i->t.host_attrs == cont;
 }
 
 static int spi_device_configure(struct device *dev)
@@ -824,6 +828,9 @@ static int spi_device_match(struct attribute_container *cont,
 	if (!shost->transportt  || shost->transportt->host_attrs.class
 	    != &spi_host_class.class)
 		return 0;
+	/* Note: this class has no device attributes, so it has
+	 * no per-HBA allocation and thus we don't need to distinguish
+	 * the attribute containers for the device */
 	return 1;
 }
 
@@ -831,6 +838,7 @@ static int spi_target_match(struct attribute_container *cont,
 			    struct device *dev)
 {
 	struct Scsi_Host *shost;
+	struct spi_internal *i;
 
 	if (!scsi_is_target_device(dev))
 		return 0;
@@ -839,7 +847,10 @@ static int spi_target_match(struct attribute_container *cont,
 	if (!shost->transportt  || shost->transportt->host_attrs.class
 	    != &spi_host_class.class)
 		return 0;
-	return 1;
+
+	i = to_spi_internal(shost->transportt);
+	
+	return &i->t.target_attrs == cont;
 }
 
 static DECLARE_TRANSPORT_CLASS(spi_transport_class,

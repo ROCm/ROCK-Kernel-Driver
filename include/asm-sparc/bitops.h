@@ -312,10 +312,10 @@ static inline int ffs(int x)
  * 'size' bits, starting the search at bit 'offset'. This is largely based
  * on Linus's ALPHA routines, which are pretty portable BTW.
  */
-static inline unsigned long find_next_zero_bit(unsigned long *addr,
+static inline unsigned long find_next_zero_bit(const unsigned long *addr,
     unsigned long size, unsigned long offset)
 {
-	unsigned long *p = addr + (offset >> 5);
+	const unsigned long *p = addr + (offset >> 5);
 	unsigned long result = offset & ~31UL;
 	unsigned long tmp;
 
@@ -446,10 +446,10 @@ static inline int __test_and_clear_le_bit(int nr, unsigned long *addr)
 	return retval;
 }
 
-static inline unsigned long find_next_zero_le_bit(unsigned long *addr,
+static inline unsigned long find_next_zero_le_bit(const unsigned long *addr,
     unsigned long size, unsigned long offset)
 {
-	unsigned long *p = addr + (offset >> 5);
+	const unsigned long *p = addr + (offset >> 5);
 	unsigned long result = offset & ~31UL;
 	unsigned long tmp;
 

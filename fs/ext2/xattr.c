@@ -706,8 +706,14 @@ ext2_xattr_set2(struct inode *inode, struct buffer_head *old_bh,
 	inode->i_ctime = CURRENT_TIME_SEC;
 	if (IS_SYNC(inode)) {
 		error = ext2_sync_inode (inode);
-		if (error)
+		/* In case sync failed due to ENOSPC the inode was actually
+		 * written (only some dirty data were not) so we just proceed
+		 * as if nothing happened and cleanup the unused block */
+		if (error && error != -ENOSPC) {
+			if (new_bh && new_bh != old_bh)
+				DQUOT_FREE_BLOCK(inode, 1);
 			goto cleanup;
+		}
 	} else
 		mark_inode_dirty(inode);
 

@@ -117,6 +117,21 @@ static inline void protected_writeback_dcache_line(unsigned long addr)
 		: "i" (Hit_Writeback_Inv_D), "r" (addr));
 }
 
+static inline void protected_writeback_scache_line(unsigned long addr)
+{
+	__asm__ __volatile__(
+		".set noreorder\n\t"
+		".set mips3\n"
+		"1:\tcache %0,(%1)\n"
+		"2:\t.set mips0\n\t"
+		".set reorder\n\t"
+		".section\t__ex_table,\"a\"\n\t"
+		STR(PTR)"\t1b,2b\n\t"
+		".previous"
+		:
+		: "i" (Hit_Writeback_Inv_SD), "r" (addr));
+}
+
 /*
  * This one is RM7000-specific
  */

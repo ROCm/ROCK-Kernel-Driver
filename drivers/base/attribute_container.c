@@ -150,7 +150,7 @@ attribute_container_add_device(struct device *dev,
 		if (fn)
 			fn(cont, dev, &ic->classdev);
 		else
-			class_device_add(&ic->classdev);
+			attribute_container_add_class_device(&ic->classdev);
 		list_add_tail(&ic->node, &cont->containers);
 	}
 	up(&attribute_container_mutex);
@@ -195,8 +195,10 @@ attribute_container_remove_device(struct device *dev,
 			list_del(&ic->node);
 			if (fn)
 				fn(cont, dev, &ic->classdev);
-			else
+			else {
+				attribute_container_remove_attrs(&ic->classdev);
 				class_device_unregister(&ic->classdev);
+			}
 		}
 	}
 	up(&attribute_container_mutex);
@@ -264,7 +266,107 @@ attribute_container_trigger(struct device *dev,
 	up(&attribute_container_mutex);
 }
 EXPORT_SYMBOL_GPL(attribute_container_trigger);
-     
+
+/**
+ * attribute_container_add_attrs - add attributes
+ *
+ * @classdev: The class device
+ *
+ * This simply creates all the class device sysfs files from the
+ * attributes listed in the container
+ */
+int
+attribute_container_add_attrs(struct class_device *classdev)
+{
+	struct attribute_container *cont =
+		attribute_container_classdev_to_container(classdev);
+	struct class_device_attribute **attrs =	cont->attrs;
+	int i, error;
+
+	if (!attrs)
+		return 0;
+
+	for (i = 0; attrs[i]; i++) {
+		error = class_device_create_file(classdev, attrs[i]);
+		if (error)
+			return error;
+	}
+
+	return 0;
+}
+EXPORT_SYMBOL_GPL(attribute_container_add_attrs);
+
+/**
+ * attribute_container_add_class_device - same function as class_device_add
+ *
+ * @classdev:	the class device to add
+ *
+ * This performs essentially the same function as class_device_add except for
+ * attribute containers, namely add the classdev to the system and then
+ * create the attribute files
+ */
+int
+attribute_container_add_class_device(struct class_device *classdev)
+{
+	int error = class_device_add(classdev);
+	if (error)
+		return error;
+	return attribute_container_add_attrs(classdev);
+}
+EXPORT_SYMBOL_GPL(attribute_container_add_class_device);
+
+/**
+ * attribute_container_add_class_device_adapter - simple adapter for triggers
+ *
+ * This function is identical to attribute_container_add_class_device except
+ * that it is designed to be called from the triggers
+ */
+int
+attribute_container_add_class_device_adapter(struct attribute_container *cont,
+					     struct device *dev,
+					     struct class_device *classdev)
+{
+	return attribute_container_add_class_device(classdev);
+}
+EXPORT_SYMBOL_GPL(attribute_container_add_class_device_adapter);
+
+/**
+ * attribute_container_remove_attrs - remove any attribute files
+ *
+ * @classdev: The class device to remove the files from
+ *
+ */
+void
+attribute_container_remove_attrs(struct class_device *classdev)
+{
+	struct attribute_container *cont =
+		attribute_container_classdev_to_container(classdev);
+	struct class_device_attribute **attrs =	cont->attrs;
+	int i;
+
+	if (!attrs)
+		return;
+
+	for (i = 0; attrs[i]; i++)
+		class_device_remove_file(classdev, attrs[i]);
+}
+EXPORT_SYMBOL_GPL(attribute_container_remove_attrs);
+
+/**
+ * attribute_container_class_device_del - equivalent of class_device_del
+ *
+ * @classdev: the class device
+ *
+ * This function simply removes all the attribute files and then calls
+ * class_device_del.
+ */
+void
+attribute_container_class_device_del(struct class_device *classdev)
+{
+	attribute_container_remove_attrs(classdev);
+	class_device_del(classdev);
+}
+EXPORT_SYMBOL_GPL(attribute_container_class_device_del);
 
 int __init
 attribute_container_init(void)

@@ -39,6 +39,7 @@
 #include <linux/sonet.h>
 #include <linux/atm_suni.h>
 #include <linux/dma-mapping.h>
+#include <linux/delay.h>
 #include <asm/io.h>
 #include <asm/string.h>
 #include <asm/page.h>

@@ -137,7 +137,7 @@ ENTRY(vector_swi)
 	tst	ip, #_TIF_SYSCALL_TRACE		@ are we tracing syscalls?
 	bne	__sys_trace
 
-	adrsvc	al, lr, ret_fast_syscall	@ return address
+	adr	lr, ret_fast_syscall		@ return address
 	cmp	scno, #NR_syscalls		@ check upper syscall limit
 	ldrcc	pc, [tbl, scno, lsl #2]		@ call sys_* routine
 
@@ -157,7 +157,7 @@ __sys_trace:
 	mov	r0, #0				@ trace entry [IP = 0]
 	bl	syscall_trace
 
-	adrsvc	al, lr, __sys_trace_return	@ return address
+	adr	lr, __sys_trace_return		@ return address
 	add	r1, sp, #S_R0 + S_OFF		@ pointer to regs
 	cmp	scno, #NR_syscalls		@ check upper syscall limit
 	ldmccia	r1, {r0 - r3}			@ have to reload r0 - r3
@@ -212,7 +212,8 @@ sys_execve_wrapper:
 		b	sys_execve
 
 sys_clone_wapper:
-		add	r2, sp, #S_OFF
+		add	ip, sp, #S_OFF
+		str	ip, [sp, #4]
 		b	sys_clone
 
 sys_sigsuspend_wrapper:

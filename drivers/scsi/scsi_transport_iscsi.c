@@ -258,6 +258,7 @@ static int iscsi_host_match(struct attribute_container *cont,
 			  struct device *dev)
 {
 	struct Scsi_Host *shost;
+	struct iscsi_internal *i;
 
 	if (!scsi_is_host_device(dev))
 		return 0;
@@ -266,13 +267,17 @@ static int iscsi_host_match(struct attribute_container *cont,
 	if (!shost->transportt  || shost->transportt->host_attrs.class
 	    != &iscsi_host_class.class)
 		return 0;
-	return 1;
+
+	i = to_iscsi_internal(shost->transportt);
+	
+	return &i->t.host_attrs == cont;
 }
 
 static int iscsi_target_match(struct attribute_container *cont,
 			    struct device *dev)
 {
 	struct Scsi_Host *shost;
+	struct iscsi_internal *i;
 
 	if (!scsi_is_target_device(dev))
 		return 0;
@@ -281,7 +286,10 @@ static int iscsi_target_match(struct attribute_container *cont,
 	if (!shost->transportt  || shost->transportt->host_attrs.class
 	    != &iscsi_host_class.class)
 		return 0;
-	return 1;
+
+	i = to_iscsi_internal(shost->transportt);
+	
+	return &i->t.target_attrs == cont;
 }
 
 struct scsi_transport_template *

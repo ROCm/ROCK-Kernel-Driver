@@ -45,6 +45,7 @@
 #include <linux/device.h>
 #include <linux/suspend.h>
 #include <linux/syscalls.h>
+#include <linux/cpu.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
 #include <asm/io.h>
@@ -152,7 +153,6 @@ static int drop_interrupts;
 #ifdef CONFIG_PMAC_PBOOK
 static int option_lid_wakeup = 1;
 static int sleep_in_progress;
-static int can_sleep;
 #endif /* CONFIG_PMAC_PBOOK */
 static unsigned long async_req_locks;
 static unsigned int pmu_irq_stats[11];
@@ -406,8 +406,6 @@ static int __init via_pmu_start(void)
 	bright_req_2.complete = 1;
 #ifdef CONFIG_PMAC_PBOOK
 	batt_req.complete = 1;
-	if (pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,0,-1) >= 0)
-		can_sleep = 1;
 #endif
 
 	if (request_irq(vias->intrs[0].line, via_pmu_interrupt, 0, "VIA-PMU",
@@ -885,7 +883,8 @@ proc_read_options(char *page, char **start, off_t off,
 	char *p = page;
 
 #ifdef CONFIG_PMAC_PBOOK
-	if (pmu_kind == PMU_KEYLARGO_BASED && can_sleep)
+	if (pmu_kind == PMU_KEYLARGO_BASED &&
+	    pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,0,-1) >= 0)
 		p += sprintf(p, "lid_wakeup=%d\n", option_lid_wakeup);
 #endif /* CONFIG_PMAC_PBOOK */
 	if (pmu_kind == PMU_KEYLARGO_BASED)
@@ -925,7 +924,8 @@ proc_write_options(struct file *file, const char __user *buffer,
 	while(*val == ' ')
 		val++;
 #ifdef CONFIG_PMAC_PBOOK
-	if (pmu_kind == PMU_KEYLARGO_BASED && can_sleep)
+	if (pmu_kind == PMU_KEYLARGO_BASED &&
+	    pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,0,-1) >= 0)
 		if (!strcmp(label, "lid_wakeup"))
 			option_lid_wakeup = ((*val) == '1');
 #endif /* CONFIG_PMAC_PBOOK */
@@ -2313,7 +2313,7 @@ static int __pmac
 pmac_suspend_devices(void)
 {
 	int ret;
-	
+
 	pm_prepare_console();
 	
 	/* Notify old-style device drivers & userland */
@@ -2341,13 +2341,13 @@ pmac_suspend_devices(void)
 	/* Send suspend call to devices, hold the device core's dpm_sem */
 	ret = device_suspend(PM_SUSPEND_MEM);
 	if (ret) {
-		printk(KERN_ERR "Driver sleep failed\n");
 		broadcast_wake();
+		printk(KERN_ERR "Driver sleep failed\n");
 		return -EBUSY;
 	}
-	
+
 	preempt_disable();
-	
+
 	/* Make sure the decrementer won't interrupt us */
 	asm volatile("mtdec %0" : : "r" (0x7fffffff));
 	/* Make sure any pending DEC interrupt occurring while we did
@@ -2404,8 +2404,6 @@ pmac_wakeup_devices(void)
 	/* Power back up system devices (including the PIC) */
 	device_power_up();
 
-	pmu_blink(1);
-
 	/* Force a poll of ADB interrupts */
 	adb_int_pending = 1;
 	via_pmu_interrupt(0, NULL, NULL);
@@ -2416,7 +2414,7 @@ pmac_wakeup_devices(void)
 	/* Re-enable local CPU interrupts */
 	local_irq_enable();
 
-	pmu_blink(1);
+	mdelay(100);
 
 	preempt_enable();
 
@@ -2464,8 +2462,6 @@ powerbook_sleep_grackle(void)
 
 	/* For 750, save backside cache setting and disable it */
 	save_l2cr = _get_L2CR();	/* (returns -1 if not available) */
-	if (save_l2cr != 0xffffffff && (save_l2cr & L2CR_L2E) != 0)
-		_set_L2CR(save_l2cr & 0x7fffffff);
 
 	if (!__fake_sleep) {
 		/* Ask the PMU to put us to sleep */
@@ -2530,17 +2526,22 @@ powerbook_sleep_Core99(void)
 	struct adb_request req;
 	int ret;
 	
-	if (!can_sleep) {
+	if (pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,0,-1) < 0) {
 		printk(KERN_ERR "Sleep mode not supported on this machine\n");
 		return -ENOSYS;
 	}
-	
+
+	if (num_online_cpus() > 1 || cpu_is_offline(0))
+		return -EAGAIN;
+
 	ret = pmac_suspend_devices();
 	if (ret) {
 		printk(KERN_ERR "Sleep rejected by devices\n");
 		return ret;
 	}
-	
+
+	printk(KERN_DEBUG "HID1, before: %x\n", mfspr(SPRN_HID1));
+
 	/* Tell PMU what events will wake us up */
 	pmu_request(&req, NULL, 4, PMU_POWER_EVENTS, PMU_PWR_CLR_WAKEUP_EVENTS,
 		0xff, 0xff);
@@ -2550,16 +2551,9 @@ powerbook_sleep_Core99(void)
 		(option_lid_wakeup ? PMU_PWR_WAKEUP_LID_OPEN : 0));
 	pmu_wait_complete(&req);
 
-	/* Save & disable L2 and L3 caches*/
+	/* Save the state of the L2 and L3 caches */
 	save_l3cr = _get_L3CR();	/* (returns -1 if not available) */
 	save_l2cr = _get_L2CR();	/* (returns -1 if not available) */
-	if (save_l3cr != 0xffffffff && (save_l3cr & L3CR_L3E) != 0)
-		_set_L3CR(save_l3cr & 0x7fffffff);
-	if (save_l2cr != 0xffffffff && (save_l2cr & L2CR_L2E) != 0)
-		_set_L2CR(save_l2cr & 0x7fffffff);
-
-	/* Save the state of PCI config space for some slots */
-	//pbook_pci_save();
 
 	if (!__fake_sleep) {
 		/* Ask the PMU to put us to sleep */
@@ -2574,7 +2568,7 @@ powerbook_sleep_Core99(void)
 	 * talk to the PMU after this, so I moved it to _after_ sending the
 	 * sleep command to it. Still need to be checked.
 	 */
-	pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,0,1);
+	pmac_call_feature(PMAC_FTR_SLEEP_STATE, NULL, 0, 1);
 
 	/* Call low-level ASM sleep handler */
 	if (__fake_sleep)
@@ -2583,18 +2577,13 @@ powerbook_sleep_Core99(void)
 		low_sleep_handler();
 
 	/* Restore Apple core ASICs state */
-	pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,0,0);
+	pmac_call_feature(PMAC_FTR_SLEEP_STATE, NULL, 0, 0);
 
 	/* Restore VIA */
 	restore_via_state();
 
-	/* Restore PCI config space. This should be overridable by PCI device
-	 * drivers as some of them may need special restore code. That's yet
-	 * another issue that should be handled by the common code properly,
-	 * maybe one day ?
-	 */
-	/* Don't restore PCI for now, it crashes. Maybe unnecessary on pbook */
-	//pbook_pci_restore();
+	/* Restore video */
+	pmac_call_early_video_resume();
 
 	/* Restore L2 cache */
 	if (save_l2cr != 0xffffffff && (save_l2cr & L2CR_L2E) != 0)
@@ -2613,7 +2602,7 @@ powerbook_sleep_Core99(void)
 	pmu_request(&req, NULL, 2, PMU_SET_INTR_MASK, pmu_intr_mask);
 	pmu_wait_complete(&req);
 
-	pmu_blink(1);
+	printk(KERN_DEBUG "HID1, after: %x\n", mfspr(SPRN_HID1));
 
 	pmac_wakeup_devices();
 
@@ -2909,7 +2898,10 @@ pmu_ioctl(struct inode * inode, struct file *filp,
 		sleep_in_progress = 0;
 		return error;
 	case PMU_IOC_CAN_SLEEP:
-		return put_user((u32)can_sleep, argp);
+		if (pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,0,-1) < 0)
+			return put_user(0, argp);
+		else
+			return put_user(1, argp);
 
 #ifdef CONFIG_PMAC_BACKLIGHT
 	/* Backlight should have its own device or go via

@@ -200,6 +200,7 @@
 
 #define I2C_ALGO_SIBYTE 0x150000	/* Broadcom SiByte SOCs		*/
 #define I2C_ALGO_SGI	0x160000        /* SGI algorithm                */
+#define I2C_ALGO_AU1550	0x170000        /* Au1550 PSC algorithm		*/
 
 #define I2C_ALGO_EXP	0x800000	/* experimental			*/
 
@@ -273,6 +274,9 @@
 
 /* --- XSCALE on-chip adapters                          */
 #define I2C_HW_IOP3XX 0x00
+
+/* --- Au1550 PSC adapters adapters					*/
+#define I2C_HW_AU1550_PSC	0x00
 
 /* --- SMBus only adapters						*/
 #define I2C_HW_SMBUS_PIIX4	0x00

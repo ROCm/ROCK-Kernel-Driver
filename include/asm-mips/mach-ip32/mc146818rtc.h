@@ -15,7 +15,6 @@
 #include <asm/ip32/mace.h>
 
 #define RTC_PORT(x)	(0x70 + (x))
-#define RTC_IRQ		MACEISA_RTC_IRQ
 
 static unsigned char CMOS_READ(unsigned long addr)
 {

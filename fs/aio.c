@@ -1285,6 +1285,7 @@ asmlinkage long sys_io_setup(unsigned nr_events, aio_context_t __user *ctxp)
 		if (!ret)
 			return 0;
 
+		get_ioctx(ioctx); /* io_destroy() expects us to hold a ref */
 		io_destroy(ioctx);
 	}
 

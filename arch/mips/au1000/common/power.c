@@ -66,7 +66,7 @@ extern void local_enable_irq(unsigned int irq_nr);
 #define	ACPI_SLEEP 21
 
 
-static spinlock_t pm_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pm_lock);
 
 /* We need to save/restore a bunch of core registers that are
  * either volatile or reset to some state across a processor sleep.

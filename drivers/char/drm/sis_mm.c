@@ -36,6 +36,17 @@
 #include <video/sisfb.h>
 #endif
 
+drm_ioctl_desc_t sis_ioctls[] = {
+	[DRM_IOCTL_NR(DRM_SIS_FB_ALLOC)]  = { sis_fb_alloc,        1, 0 },
+	[DRM_IOCTL_NR(DRM_SIS_FB_FREE)]   = { sis_fb_free,         1, 0 },
+	[DRM_IOCTL_NR(DRM_SIS_AGP_INIT)]  = { sis_ioctl_agp_init,  1, 1 },
+	[DRM_IOCTL_NR(DRM_SIS_AGP_ALLOC)] = { sis_ioctl_agp_alloc, 1, 0 },
+	[DRM_IOCTL_NR(DRM_SIS_AGP_FREE)]  = { sis_ioctl_agp_free,  1, 0 },
+	[DRM_IOCTL_NR(DRM_SIS_FB_INIT)]   = { sis_fb_init,         1, 1 }
+};
+
+int sis_max_ioctl = DRM_ARRAY_SIZE(sis_ioctls);
+
 #define MAX_CONTEXT 100
 #define VIDEO_TYPE 0 
 #define AGP_TYPE 1

@@ -64,6 +64,9 @@ static int serport_ldisc_open(struct tty_struct *tty)
 	struct serio *serio;
 	char name[64];
 
+	if (!capable(CAP_SYS_ADMIN))
+		return -EPERM;
+
 	serport = kmalloc(sizeof(struct serport), GFP_KERNEL);
 	serio = kmalloc(sizeof(struct serio), GFP_KERNEL);
 	if (unlikely(!serport || !serio)) {

@@ -117,7 +117,7 @@ segment_by_name (char *name)
 	struct list_head *l;
 	struct dcss_segment *tmp, *retval = NULL;
 
-	BUG_ON (!spin_is_locked(&dcss_lock));
+	assert_spin_locked(&dcss_lock);
 	dcss_mkname (name, dcss_name);
 	list_for_each (l, &dcss_list) {
 		tmp = list_entry (l, struct dcss_segment, list);
@@ -271,7 +271,7 @@ segment_overlaps_others (struct dcss_segment *seg)
 	struct list_head *l;
 	struct dcss_segment *tmp;
 
-	BUG_ON (!spin_is_locked(&dcss_lock));
+	assert_spin_locked(&dcss_lock);
 	list_for_each(l, &dcss_list) {
 		tmp = list_entry(l, struct dcss_segment, list);
 		if ((tmp->start_addr >> 20) > (seg->end >> 20))

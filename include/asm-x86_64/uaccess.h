@@ -198,7 +198,7 @@ struct __large_struct { unsigned long buf[100]; };
 #define __get_user_nocheck(x,ptr,size)				\
 ({								\
 	int __gu_err;						\
-	long __gu_val;						\
+	unsigned long __gu_val;					\
 	__get_user_size(__gu_val,(ptr),(size),__gu_err);	\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\

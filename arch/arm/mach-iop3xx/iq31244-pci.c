@@ -78,13 +78,13 @@ static int iq31244_setup(int nr, struct pci_sys_data *sys)
 
 	memset(res, 0, sizeof(struct resource) * 2);
 
-	res[0].start = IOP321_PCI_LOWER_IO_BA + IOP321_PCI_IO_OFFSET;
-	res[0].end   = IOP321_PCI_UPPER_IO_BA + IOP321_PCI_IO_OFFSET;
+	res[0].start = IOP321_PCI_LOWER_IO_VA;
+	res[0].end   = IOP321_PCI_UPPER_IO_VA;
 	res[0].name  = "IQ31244 PCI I/O Space";
 	res[0].flags = IORESOURCE_IO;
 
-	res[1].start = IOP321_PCI_LOWER_MEM_BA + IOP321_PCI_MEM_OFFSET;
-	res[1].end   = IOP321_PCI_UPPER_MEM_BA + IOP321_PCI_MEM_OFFSET;
+	res[1].start = IOP321_PCI_LOWER_MEM_PA;
+	res[1].end   = IOP321_PCI_UPPER_MEM_PA;
 	res[1].name  = "IQ31244 PCI Memory Space";
 	res[1].flags = IORESOURCE_MEM;
 
@@ -97,9 +97,6 @@ static int iq31244_setup(int nr, struct pci_sys_data *sys)
 	sys->resource[0] = &res[0];
 	sys->resource[1] = &res[1];
 	sys->resource[2] = NULL;
-
-	iop3xx_pcibios_min_io = IOP321_PCI_LOWER_IO_VA;
-	iop3xx_pcibios_min_mem = IOP321_PCI_LOWER_MEM_VA;
 
 	return 1;
 }

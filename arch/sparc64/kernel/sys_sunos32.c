@@ -1177,11 +1177,11 @@ asmlinkage int sunos_shmsys(int op, u32 arg1, u32 arg2, u32 arg3)
 	return rval;
 }
 
-extern asmlinkage long sparc32_open(const char * filename, int flags, int mode);
+extern asmlinkage long sparc32_open(const char __user * filename, int flags, int mode);
 
 asmlinkage int sunos_open(u32 fname, int flags, int mode)
 {
-	const char *filename = (const char *)(long)fname;
+	const char __user *filename = compat_ptr(fname);
 
 	return sparc32_open(filename, flags, mode);
 }
@@ -1294,7 +1294,7 @@ asmlinkage int sunos_sigaction (int sig,
 
 	if (!ret && oact) {
 		old_ka.sa.sa_flags ^= SUNOS_SV_INTERRUPT;
-		if (put_user((long)old_ka.sa.sa_handler, &oact->sa_handler) ||
+		if (put_user(ptr_to_compat(old_ka.sa.sa_handler), &oact->sa_handler) ||
 		    __put_user(old_ka.sa.sa_flags, &oact->sa_flags))
 			return -EFAULT;
 		__put_user(old_ka.sa.sa_mask.sig[0], &oact->sa_mask);

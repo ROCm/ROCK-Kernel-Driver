@@ -317,7 +317,7 @@ xfs_read(
 	xfs_rw_enter_trace(XFS_READ_ENTER, &ip->i_iocore,
 				(void *)iovp, segs, *offset, ioflags);
 	ret = __generic_file_aio_read(iocb, iovp, segs, offset);
-	if (ret == -EIOCBQUEUED)
+	if (ret == -EIOCBQUEUED && !(ioflags & IO_ISAIO))
 		ret = wait_on_sync_kiocb(iocb);
 	if (ret > 0)
 		XFS_STATS_ADD(xs_read_bytes, ret);
@@ -854,7 +854,7 @@ retry:
 
 	current->backing_dev_info = NULL;
 
-	if (ret == -EIOCBQUEUED)
+	if (ret == -EIOCBQUEUED && !(ioflags & IO_ISAIO))
 		ret = wait_on_sync_kiocb(iocb);
 
 	if ((ret == -ENOSPC) &&

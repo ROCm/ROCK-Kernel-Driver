@@ -34,37 +34,24 @@
 
 		and	t0, t2
 
+		andi	t2, t0, STATUSF_IP7	/* INTB5 hardware line */
+		bnez	t2, ll_timer_irq	/* Timer */
 		andi	t1, t0, STATUSF_IP2	/* INTB0 hardware line */
 		bnez	t1, ll_pcia_irq		/* 64-bit PCI */
-		andi	t1, t0, STATUSF_IP3	/* INTB1 hardware line */
-		bnez	t1, ll_pcib_irq		/* second 64-bit PCI slot */
+		andi	t2, t0, STATUSF_IP3	/* INTB1 hardware line */
+		bnez	t2, ll_pcib_irq		/* second 64-bit PCI slot */
 		andi	t1, t0, STATUSF_IP4	/* INTB2 hardware line */
 		bnez	t1, ll_duart_irq	/* UART	*/
-		andi    t1, t0, STATUSF_IP5	/* SMP inter-core interrupts */
-		bnez    t1, ll_smp_irq
+		andi    t2, t0, STATUSF_IP5	/* SMP inter-core interrupts */
+		bnez    t2, ll_smp_irq
 		andi	t1, t0, STATUSF_IP6
 		bnez	t1, ll_ht_irq		/* Hypertransport */
-		andi	t1, t0, STATUSF_IP7	/* INTB5 hardware line */
-		bnez	t1, ll_timer_irq	/* Timer */
 
-		nop
-		nop
-
-		/* Extended interrupts */
-                mfc0    t0, CP0_CAUSE
-                cfc0    t1, CP0_S1_INTCONTROL
-
-                sll     t2, t1, 8
-
-                and     t0, t2
-                srl     t0, t0, 16
-
-		.set	reorder
-
-		j	spurious_interrupt
-		nop
+		move	a0, sp
+		j	do_extended_irq
 		END(titan_handle_int)
 
+		.set	reorder
 		.align	5
 
 ll_pcia_irq:

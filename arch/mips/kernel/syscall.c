@@ -3,10 +3,11 @@
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1995, 1996, 1997, 2000, 2001 by Ralf Baechle
+ * Copyright (C) 1995, 1996, 1997, 2000, 2001, 05 by Ralf Baechle
  * Copyright (C) 1999, 2000 Silicon Graphics, Inc.
  * Copyright (C) 2001 MIPS Technologies, Inc.
  */
+#include <linux/a.out.h>
 #include <linux/errno.h>
 #include <linux/linkage.h>
 #include <linux/mm.h>
@@ -66,11 +67,7 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 	int do_color_align;
 	unsigned long task_size;
 
-#ifdef CONFIG_MIPS32
-	task_size = TASK_SIZE;
-#else
-	task_size = (current->thread.mflags & MF_32BIT_ADDR) ? TASK_SIZE32 : TASK_SIZE;
-#endif
+	task_size = STACK_TOP;
 
 	if (flags & MAP_FIXED) {
 		/*
@@ -116,7 +113,7 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 }
 
 /* common code for old and new mmaps */
-static inline long
+static inline unsigned long
 do_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
         unsigned long flags, unsigned long fd, unsigned long pgoff)
 {
@@ -140,8 +137,9 @@ out:
 	return error;
 }
 
-asmlinkage unsigned long old_mmap(unsigned long addr, size_t len, int prot,
-                                  int flags, int fd, off_t offset)
+asmlinkage unsigned long
+old_mmap(unsigned long addr, unsigned long len, int prot,
+	int flags, int fd, off_t offset)
 {
 	unsigned long result;
 
@@ -155,7 +153,7 @@ out:
 	return result;
 }
 
-asmlinkage long
+asmlinkage unsigned long
 sys_mmap2(unsigned long addr, unsigned long len, unsigned long prot,
           unsigned long flags, unsigned long fd, unsigned long pgoff)
 {

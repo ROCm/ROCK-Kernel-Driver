@@ -55,22 +55,32 @@
 #include "xfs_inode.h"
 #include "xfs_quota.h"
 #include "xfs_utils.h"
+#include "xfs_bit.h"
 
 /*
  * Initialize the inode hash table for the newly mounted file system.
- *
- * mp -- this is the mount point structure for the file system being
- *       initialized
+ * Choose an initial table size based on user specified value, else
+ * use a simple algorithm using the maximum number of inodes as an
+ * indicator for table size, and cap it at 16 pages (gettin' big).
  */
 void
 xfs_ihash_init(xfs_mount_t *mp)
 {
-	int	i;
+	__uint64_t	icount;
+	uint		i, flags = KM_SLEEP | KM_MAYFAIL;
 
-	mp->m_ihsize = XFS_BUCKETS(mp);
-	mp->m_ihash = (xfs_ihash_t *)kmem_zalloc(mp->m_ihsize
-				      * sizeof(xfs_ihash_t), KM_SLEEP);
-	ASSERT(mp->m_ihash != NULL);
+	if (!mp->m_ihsize) {
+		icount = mp->m_maxicount ? mp->m_maxicount :
+			 (mp->m_sb.sb_dblocks << mp->m_sb.sb_inopblog);
+		mp->m_ihsize = 1 << max_t(uint, xfs_highbit64(icount) / 3, 8);
+		mp->m_ihsize = min_t(uint, mp->m_ihsize, 16 * PAGE_SIZE);
+	}
+
+	while (!(mp->m_ihash = (xfs_ihash_t *)kmem_zalloc(mp->m_ihsize *
+						sizeof(xfs_ihash_t), flags))) {
+		if ((mp->m_ihsize >>= 1) <= NBPP)
+			flags = KM_SLEEP;
+	}
 	for (i = 0; i < mp->m_ihsize; i++) {
 		rwlock_init(&(mp->m_ihash[i].ih_lock));
 	}
@@ -88,29 +98,19 @@ xfs_ihash_free(xfs_mount_t *mp)
 
 /*
  * Initialize the inode cluster hash table for the newly mounted file system.
- *
- * mp -- this is the mount point structure for the file system being
- *       initialized
+ * Its size is derived from the ihash table size.
  */
 void
 xfs_chash_init(xfs_mount_t *mp)
 {
-	int	i;
+	uint	i;
 
-	/*
-	 * m_chash size is based on m_ihash
-	 * with a minimum of 37 entries
-	 */
-	mp->m_chsize = (XFS_BUCKETS(mp)) /
-			 (XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_inodelog);
-	if (mp->m_chsize < 37) {
-		mp->m_chsize = 37;
-	}
+	mp->m_chsize = max_t(uint, 1, mp->m_ihsize /
+			 (XFS_INODE_CLUSTER_SIZE(mp) >> mp->m_sb.sb_inodelog));
+	mp->m_chsize = min_t(uint, mp->m_chsize, mp->m_ihsize);
 	mp->m_chash = (xfs_chash_t *)kmem_zalloc(mp->m_chsize
 						 * sizeof(xfs_chash_t),
 						 KM_SLEEP);
-	ASSERT(mp->m_chash != NULL);
-
 	for (i = 0; i < mp->m_chsize; i++) {
 		spinlock_init(&mp->m_chash[i].ch_lock,"xfshash");
 	}

@@ -156,6 +156,7 @@ SECTIONS
 	*(.options)
 	*(.pdr)
 	*(.reginfo)
+	*(.mdebug*)
   }
 
   /* This is the MIPS specific mdebug section.  */

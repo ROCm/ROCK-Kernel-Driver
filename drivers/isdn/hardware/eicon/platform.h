@@ -1,4 +1,4 @@
-/* $Id: platform.h,v 1.37.4.2 2004/08/28 20:03:53 armin Exp $
+/* $Id: platform.h,v 1.37.4.6 2005/01/31 12:22:20 armin Exp $
  *
  * platform.h
  * 
@@ -195,9 +195,7 @@ static __inline__ void* diva_os_malloc (unsigned long flags, unsigned long size)
 }
 static __inline__ void  diva_os_free   (unsigned long flags, void* ptr)
 {
-	if (ptr) {
-		vfree(ptr);
-	}
+	vfree(ptr);
 }
 
 /*

@@ -7,6 +7,7 @@
 #include <linux/init.h>
 #include <linux/mmzone.h>
 #include <linux/kernel.h>
+#include <linux/nodemask.h>
 #include <linux/string.h>
 
 #include <asm/page.h>
@@ -19,7 +20,6 @@
 #include <asm/sn/mapped_kernel.h>
 #include <asm/sn/sn_private.h>
 
-extern char _end;
 static cpumask_t ktext_repmask;
 
 /*
@@ -118,12 +118,12 @@ void __init replicate_kernel_text()
  */
 pfn_t node_getfirstfree(cnodeid_t cnode)
 {
-	unsigned long loadbase = CKSEG0;
+	unsigned long loadbase = REP_BASE;
 	nasid_t nasid = COMPACT_TO_NASID_NODEID(cnode);
 	unsigned long offset;
 
 #ifdef CONFIG_MAPPED_KERNEL
-	loadbase = CKSSEG + 16777216;
+	loadbase += 16777216;
 #endif
 	offset = PAGE_ALIGN((unsigned long)(&_end)) - loadbase;
 	if ((cnode == 0) || (cpu_isset(cnode, ktext_repmask)))

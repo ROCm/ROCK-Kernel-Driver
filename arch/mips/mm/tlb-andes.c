@@ -7,7 +7,6 @@
  * Copyright (C) 1999 Silicon Graphics, Inc.
  * Copyright (C) 2000 Kanoj Sarcar (kanoj@sgi.com)
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>

@@ -287,6 +287,19 @@ static inline unsigned long msecs_to_jiffies(const unsigned int m)
 #endif
 }
 
+static inline unsigned long usecs_to_jiffies(const unsigned int u)
+{
+	if (u > jiffies_to_usecs(MAX_JIFFY_OFFSET))
+		return MAX_JIFFY_OFFSET;
+#if HZ <= 1000 && !(1000 % HZ)
+	return (u + (1000000 / HZ) - 1000) / (1000000 / HZ);
+#elif HZ > 1000 && !(HZ % 1000)
+	return u * (HZ / 1000000);
+#else
+	return (u * HZ + 999999) / 1000000;
+#endif
+}
+
 /*
  * The TICK_NSEC - 1 rounds up the value to the next resolution.  Note
  * that a remainder subtract here would not do the right thing as the

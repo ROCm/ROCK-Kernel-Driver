@@ -17,6 +17,7 @@ typedef unsigned long elf_freg_t[3];
 #define EM_ARM	40
 #define EF_ARM_APCS26 0x08
 #define EF_ARM_SOFT_FLOAT 0x200
+#define EF_ARM_EABI_MASK 0xFF000000
 
 #define R_ARM_NONE	0
 #define R_ARM_PC24	1
@@ -120,7 +121,8 @@ extern char elf_platform[];
 #define SET_PERSONALITY(ex,ibcs2) \
 do { \
 	set_personality(PER_LINUX_32BIT); \
-	if ((ex).e_flags & EF_ARM_SOFT_FLOAT) \
+	if (((ex).e_flags & EF_ARM_EABI_MASK) || \
+	    ((ex).e_flags & EF_ARM_SOFT_FLOAT)) \
 		set_thread_flag(TIF_USING_IWMMXT); \
 } while (0)
 

@@ -56,7 +56,7 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 	points = p->mm->total_vm;
 
 	/*
-	 * Processes which fork a lot of child processes are likely 
+	 * Processes which fork a lot of child processes are likely
 	 * a good choice. We add the vmsize of the childs if they
 	 * have an own mm. This prevents forking servers to flood the
 	 * machine with an endless amount of childs
@@ -112,7 +112,7 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO))
 		points /= 4;
 
-	/* 
+	/*
 	 * Adjust the score by oomkilladj.
 	 */
 	if (p->oomkilladj) {
@@ -121,7 +121,7 @@ unsigned long badness(struct task_struct *p, unsigned long uptime)
 		else
 			points >>= -(p->oomkilladj);
 	}
-		
+
 #ifdef DEBUG
 	printk(KERN_DEBUG "OOMkill: task %d (%s) got %d points\n",
 	p->pid, p->comm, points);
@@ -199,12 +199,7 @@ static void __oom_kill_task(task_t *p)
 	p->time_slice = HZ;
 	set_tsk_thread_flag(p, TIF_MEMDIE);
 
-	/* This process has hardware access, be more careful. */
-	if (cap_t(p->cap_effective) & CAP_TO_MASK(CAP_SYS_RAWIO)) {
-		force_sig(SIGTERM, p);
-	} else {
-		force_sig(SIGKILL, p);
-	}
+	force_sig(SIGKILL, p);
 }
 
 static struct mm_struct *oom_kill_task(task_t *p)
@@ -232,7 +227,7 @@ static struct mm_struct *oom_kill_task(task_t *p)
 	return mm;
 }
 
-static struct mm_struct *oom_kill_process(task_t *p)
+static struct mm_struct *oom_kill_process(struct task_struct *p)
 {
  	struct mm_struct *mm;
 	struct task_struct *c;

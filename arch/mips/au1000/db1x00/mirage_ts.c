@@ -42,6 +42,7 @@
 #include <linux/proc_fs.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
+#include <linux/wait.h>
 
 #include <asm/segment.h>
 #include <asm/irq.h>
@@ -147,10 +148,7 @@ static int ts_thread(void *id)
 	ts = wm97xx_ts_get_handle(0);
 
 	/* proceed only after everybody is ready */
-	while ( ! wm97xx_ts_ready(ts) ) {
-		/* give a little time for initializations to complete */
-		interruptible_sleep_on_timeout(&pendown_wait, HZ / 4);
-	}
+	wait_event_timeout(pendown_wait, wm97xx_ts_ready(ts), HZ/4);
 
 	/* board-specific calibration */
 	wm97xx_ts_set_cal(ts,

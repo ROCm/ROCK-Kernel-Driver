@@ -84,20 +84,6 @@ EXPORT_SYMBOL(high_memory);
 EXPORT_SYMBOL(vmalloc_earlyreserve);
 
 /*
- * We special-case the C-O-W ZERO_PAGE, because it's such
- * a common occurrence (no need to read the page to know
- * that it's zero - better for the cache and memory subsystem).
- */
-static inline void copy_cow_page(struct page * from, struct page * to, unsigned long address)
-{
-	if (from == ZERO_PAGE(address)) {
-		clear_user_highpage(to, address);
-		return;
-	}
-	copy_user_highpage(to, from, address);
-}
-
-/*
  * Note: this doesn't free the actual pages themselves. That
  * has been handled earlier when unmapping all the memory regions.
  */
@@ -1331,11 +1317,16 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 
 	if (unlikely(anon_vma_prepare(vma)))
 		goto no_new_page;
-	new_page = alloc_page_vma(GFP_HIGHUSER, vma, address);
-	if (!new_page)
-		goto no_new_page;
-	copy_cow_page(old_page,new_page,address);
-
+	if (old_page == ZERO_PAGE(address)) {
+		new_page = alloc_zeroed_user_highpage(vma, address);
+		if (!new_page)
+			goto no_new_page;
+	} else {
+		new_page = alloc_page_vma(GFP_HIGHUSER, vma, address);
+		if (!new_page)
+			goto no_new_page;
+		copy_user_highpage(new_page, old_page, address);
+	}
 	/*
 	 * Re-check the pte - we dropped the lock
 	 */
@@ -1806,10 +1797,9 @@ do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 		if (unlikely(anon_vma_prepare(vma)))
 			goto no_mem;
-		page = alloc_page_vma(GFP_HIGHUSER, vma, addr);
+		page = alloc_zeroed_user_highpage(vma, addr);
 		if (!page)
 			goto no_mem;
-		clear_user_highpage(page, addr);
 
 		spin_lock(&mm->page_table_lock);
 		page_table = pte_offset_map(pmd, addr);
@@ -2107,7 +2097,6 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 }
 
 #ifndef __ARCH_HAS_4LEVEL_HACK
-#if (PTRS_PER_PUD > 1)
 /*
  * Allocate page upper directory.
  *
@@ -2136,12 +2125,10 @@ pud_t fastcall *__pud_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long addr
 		goto out;
 	}
 	pgd_populate(mm, pgd, new);
-out:
+ out:
 	return pud_offset(pgd, address);
 }
-#endif
 
-#if (PTRS_PER_PMD > 1)
 /*
  * Allocate page middle directory.
  *
@@ -2170,10 +2157,9 @@ pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long addr
 		goto out;
 	}
 	pud_populate(mm, pud, new);
-out:
+ out:
 	return pmd_offset(pud, address);
 }
-#endif
 #else
 pmd_t fastcall *__pmd_alloc(struct mm_struct *mm, pud_t *pud, unsigned long address)
 {

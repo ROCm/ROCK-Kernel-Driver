@@ -21,9 +21,9 @@
  *
  * ASIC PCI only supports type 1 config cycles.
  */
-static int set_config_address(unsigned char busno, unsigned int devfn, int reg)
+static int set_config_address(unsigned int busno, unsigned int devfn, int reg)
 {
-	if ((busno > 255) || (devfn > 255) || (reg > 255))
+	if ((devfn > 255) || (reg > 255))
 		return PCIBIOS_BAD_REGISTER_NUMBER;
 
 	if (busno == 0 && devfn >= PCI_DEVFN(8, 0))

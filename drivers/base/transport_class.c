@@ -146,25 +146,6 @@ void transport_setup_device(struct device *dev)
 EXPORT_SYMBOL_GPL(transport_setup_device);
 
 
-static int transport_add_classdev(struct attribute_container *cont,
-				  struct device *dev,
-				  struct class_device *classdev)
-{
-	struct class_device_attribute **attrs =	cont->attrs;
-	int i, error;
-
-	error = class_device_add(classdev);
-	if (error)
-		return error;
-	for (i = 0; attrs[i]; i++) {
-		error = class_device_create_file(classdev, attrs[i]);
-		if (error)
-			return error;
-	}
-
-	return 0;
-}
-
 /**
  * transport_add_device - declare a new dev for transport class association
  *
@@ -178,7 +159,8 @@ static int transport_add_classdev(struct attribute_container *cont,
 
 void transport_add_device(struct device *dev)
 {
-	attribute_container_device_trigger(dev, transport_add_classdev);
+	attribute_container_device_trigger(dev,
+			   attribute_container_add_class_device_adapter);
 }
 EXPORT_SYMBOL_GPL(transport_add_device);
 
@@ -219,6 +201,9 @@ static int transport_remove_classdev(struct attribute_container *cont,
 
 	if (tclass->remove)
 		tclass->remove(dev);
+
+	if (tclass->remove != anon_transport_dummy_function)
+		attribute_container_class_device_del(classdev);
 
 	return 0;
 }

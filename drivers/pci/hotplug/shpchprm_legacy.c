@@ -41,16 +41,16 @@
 #include "shpchprm.h"
 #include "shpchprm_legacy.h"
 
-static void *shpchp_rom_start;
+static void __iomem *shpchp_rom_start;
 static u16 unused_IRQ;
 
-void shpchprm_cleanup()
+void shpchprm_cleanup(void)
 {
 	if (shpchp_rom_start)
 		iounmap(shpchp_rom_start);
 }
 
-int shpchprm_print_pirt()
+int shpchprm_print_pirt(void)
 {
 	return 0;
 }
@@ -64,10 +64,10 @@ int shpchprm_get_physical_slot_number(struct controller *ctrl, u32 *sun, u8 busn
 }
 
 /* Find the Hot Plug Resource Table in the specified region of memory */
-static void *detect_HRT_floating_pointer(void *begin, void *end)
+static void __iomem *detect_HRT_floating_pointer(void __iomem *begin, void __iomem *end)
 {
-	void *fp;
-	void *endp;
+	void __iomem *fp;
+	void __iomem *endp;
 	u8 temp1, temp2, temp3, temp4;
 	int status = 0;
 
@@ -104,7 +104,7 @@ int shpchprm_find_available_resources(struct controller *ctrl)
 {
 	u8 populated_slot;
 	u8 bridged_slot;
-	void *one_slot;
+	void __iomem *one_slot;
 	struct pci_func *func = NULL;
 	int i = 10, index = 0;
 	u32 temp_dword, rc;
@@ -113,7 +113,7 @@ int shpchprm_find_available_resources(struct controller *ctrl)
 	struct pci_resource *p_mem_node;
 	struct pci_resource *io_node;
 	struct pci_resource *bus_node;
-	void *rom_resource_table;
+	void __iomem *rom_resource_table;
 	struct pci_bus lpci_bus, *pci_bus;
 	u8 cfgspc_irq, temp;
 
@@ -413,7 +413,7 @@ void shpchprm_enable_card(
 
 static int legacy_shpchprm_init_pci(void)
 {
-	shpchp_rom_start = (u8 *) ioremap(ROM_PHY_ADDR, ROM_PHY_LEN);
+	shpchp_rom_start = ioremap(ROM_PHY_ADDR, ROM_PHY_LEN);
 	if (!shpchp_rom_start) {
 		err("Could not ioremap memory region for ROM\n");
 		return -EIO;

@@ -1,6 +1,6 @@
 /*
  * Carsten Langgaard, carstenl@mips.com
- * Copyright (C) 2000, 2001 MIPS Technologies, Inc.
+ * Copyright (C) 2000, 2001, 2004 MIPS Technologies, Inc.
  * Copyright (C) 2001 Ralf Baechle
  *
  *  This program is free software; you can distribute it and/or modify it
@@ -21,7 +21,6 @@
  * The interrupt controller is located in the South Bridge a PIIX4 device
  * with two internal 82C95 interrupt controllers.
  */
-#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/irq.h>
 #include <linux/sched.h>
@@ -41,7 +40,7 @@
 
 extern asmlinkage void mipsIRQ(void);
 
-static spinlock_t mips_irq_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mips_irq_lock);
 
 static inline int mips_pcibios_iack(void)
 {
@@ -155,9 +154,9 @@ void corehi_irqdispatch(struct pt_regs *regs)
         case MIPS_REVISION_CORID_CORE_FPGAR2:
                 data = GT_READ(GT_INTRCAUSE_OFS);
                 printk("GT_INTRCAUSE = %08x\n", data);
-                data = GT_READ(0x70);
-                datahi = GT_READ(0x78);
-                printk("GT_CPU_ERR_ADDR = %02x%08x\n", datahi, data);
+                data = GT_READ(GT_CPUERR_ADDRLO_OFS);
+                datahi = GT_READ(GT_CPUERR_ADDRHI_OFS);
+                printk("GT_CPUERR_ADDR = %02x%08x\n", datahi, data);
                 break;
         case MIPS_REVISION_CORID_BONITO64:
         case MIPS_REVISION_CORID_CORE_20K:

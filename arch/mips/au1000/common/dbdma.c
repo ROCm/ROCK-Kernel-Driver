@@ -29,7 +29,7 @@
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
-
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
@@ -55,7 +55,7 @@
  * functions.  The drivers allocate the data buffers and assign them
  * to the descriptors.
  */
-static spinlock_t au1xxx_dbdma_spin_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(au1xxx_dbdma_spin_lock);
 
 /* I couldn't find a macro that did this......
 */
@@ -370,7 +370,7 @@ au1xxx_dbdma_ring_alloc(u32 chanid, int entries)
 	 * and if we try that first we are likely to not waste larger
 	 * slabs of memory.
 	 */
-	desc_base = kmalloc(entries * sizeof(au1x_ddma_desc_t), GFP_KERNEL);
+	desc_base = (u32)kmalloc(entries * sizeof(au1x_ddma_desc_t), GFP_KERNEL);
 	if (desc_base == 0)
 		return 0;
 
@@ -381,7 +381,7 @@ au1xxx_dbdma_ring_alloc(u32 chanid, int entries)
 		kfree((const void *)desc_base);
 		i = entries * sizeof(au1x_ddma_desc_t);
 		i += (sizeof(au1x_ddma_desc_t) - 1);
-		if ((desc_base = kmalloc(i, GFP_KERNEL)) == 0)
+		if ((desc_base = (u32)kmalloc(i, GFP_KERNEL)) == 0)
 			return 0;
 
 		desc_base = ALIGN_ADDR(desc_base, sizeof(au1x_ddma_desc_t));

@@ -53,8 +53,10 @@ NESTED(handle_sys64, PT_SIZE, sp)
 
 	sd	a3, PT_R26(sp)		# save a3 for syscall restarting
 
-	LONG_L	t0, TI_FLAGS($28)
-	bltz	t0, syscall_trace_entry	# syscall tracing enabled?
+	li	t1, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
+	LONG_L	t0, TI_FLAGS($28)	# syscall tracing enabled?
+	and	t0, t1, t0
+	bnez	t0, syscall_trace_entry
 
 	jalr	t2			# Do The Real Thing (TM)
 
@@ -112,7 +114,7 @@ syscall_trace_entry:
 
 illegal_syscall:
 	/* This also isn't a 64-bit syscall, throw an error.  */
-	li	v0, ENOSYS			# error
+	li	v0, -ENOSYS			# error
 	sd	v0, PT_R2(sp)
 	li	t0, 1				# set error flag
 	sd	t0, PT_R7(sp)
@@ -173,8 +175,8 @@ illegal_syscall:
 	sd	v0, PT_R2(sp)		# result
 
 	/* Success, so skip usual error handling garbage.  */
-	LONG_L	a2, TI_FLAGS($28)	# syscall tracing enabled?
 	li	t0, _TIF_SYSCALL_TRACE | _TIF_SYSCALL_AUDIT
+	LONG_L	a2, TI_FLAGS($28)	# syscall tracing enabled?
 	and	t0, a2, t0
 	bnez	t0, 1f
 

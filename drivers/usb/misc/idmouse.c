@@ -296,7 +296,8 @@ static ssize_t idmouse_read(struct file *file, char __user *buffer, size_t count
 		return 0;
 	}
 
-	count = min ((loff_t)count, IMGSIZE - (*ppos));
+	if (count > IMGSIZE - *ppos)
+		count = IMGSIZE - *ppos;
 
 	if (copy_to_user (buffer, dev->bulk_in_buffer + *ppos, count)) {
 		result = -EFAULT;
