@@ -7,22 +7,22 @@ CONFIG_BLUEZ
   Bluetooth can be found at <http://www.bluetooth.com/>.
 
   Linux Bluetooth subsystem consist of several layers:
-               BlueZ Core (HCI device and connection manager, scheduler)
+               Bluetooth Core (HCI device and connection manager, scheduler)
                HCI Device drivers (interface to the hardware)
                L2CAP Module (L2CAP protocol)
                SCO Module (SCO links)
                RFCOMM Module (RFCOMM protocol)  
                BNEP Module (BNEP protocol)
 
-  Say Y here to enable Linux Bluetooth support and to build BlueZ Core
+  Say Y here to enable Linux Bluetooth support and to build Bluetooth Core
   layer.
 
   To use Linux Bluetooth subsystem, you will need several user-space
   utilities like hciconfig and hcid.  These utilities and updates to
-  Bluetooth kernel modules are provided in the BlueZ package.
+  Bluetooth kernel modules are provided in the BlueZ packages.
   For more information, see <http://bluez.sourceforge.net/>.
 
-  If you want to compile BlueZ Core as module (bluez.o) say M here.
+  If you want to compile Bluetooth Core as module (bluetooth.o) say M here.
 
 L2CAP protocol support
 CONFIG_BLUEZ_L2CAP
