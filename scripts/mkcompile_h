@@ -14,6 +14,9 @@ if [ -r $TARGET -a ! -O ../include/linux/autoconf.h ]; then
   exit 0
 fi
 
+# Do not expand names
+set -f
+
 if [ -r ../.version ]; then
   VERSION=`cat ../.version`
 else
