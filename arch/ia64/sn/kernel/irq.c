@@ -294,7 +294,7 @@ irq_to_bit_pos(int irq) {
 #ifdef ajmtestintr
 
 #include <linux/timer.h>
-struct timer_list intr_test_timer;
+struct timer_list intr_test_timer = TIMER_INITIALIZER(NULL, 0, 0);
 int intr_test_icount[NR_IRQS];
 struct intr_test_reg_struct {
 	pcibr_soft_t pcibr_soft;

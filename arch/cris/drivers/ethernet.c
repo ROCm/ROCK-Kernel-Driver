@@ -234,8 +234,8 @@ static struct sk_buff *tx_skb;
 static unsigned int network_rec_config_shadow = 0;
 
 /* Network speed indication. */
-static struct timer_list speed_timer;
-static struct timer_list clear_led_timer;
+static struct timer_list speed_timer = TIMER_INITIALIZER(NULL, 0, 0);
+static struct timer_list clear_led_timer = TIMER_INITIALIZER(NULL, 0, 0);
 static int current_speed; /* Speed read from tranceiver */
 static int current_speed_selection; /* Speed selected by user */
 static int led_next_time;
