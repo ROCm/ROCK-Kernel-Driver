@@ -8,6 +8,7 @@
  *
  * Copyright 2001 MontaVista Software Inc.
  * Author: jsun@mvista.com or jsun@junsun.net
+ * Copyright (C) 2005 Ralf Baechle (ralf@linux-mips.org)
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -15,7 +16,6 @@
  *
  */
 
-#include <linux/config.h>
 #include <linux/ide.h>
 #include <linux/init.h>
 #include <linux/delay.h>
