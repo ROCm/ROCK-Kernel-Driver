@@ -366,7 +366,7 @@
 #define	IMISS	SPRN_IMISS	/* Instruction TLB Miss Register */
 #define	IMMR	SPRN_IMMR      	/* PPC 860/821 Internal Memory Map Register */
 #define	L2CR	SPRN_L2CR    	/* PPC 750 L2 control register */
-#define	LR	SPRN_LR
+#define	__LR	SPRN_LR
 #define	PVR	SPRN_PVR	/* Processor Version */
 #define	PIR	SPRN_PIR	/* Processor ID */
 #define	RPA	SPRN_RPA	/* Required Physical Address Register */

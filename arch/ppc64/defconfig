@@ -229,7 +229,8 @@ CONFIG_SYN_COOKIES=y
 CONFIG_IPV6=m
 # CONFIG_ATM is not set
 # CONFIG_VLAN_8021Q is not set
-# CONFIG_LLC is not set
+CONFIG_LLC=y
+# CONFIG_LLC_UI is not set
 # CONFIG_IPX is not set
 # CONFIG_ATALK is not set
 # CONFIG_DEV_APPLETALK is not set
