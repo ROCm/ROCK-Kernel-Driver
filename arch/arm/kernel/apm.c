@@ -179,13 +179,10 @@ static void queue_event(apm_event_t event, struct apm_user *sender)
 	wake_up_interruptible(&apm_waitqueue);
 }
 
-/* defined in pm.c */
-extern int suspend(void);
-
 static int apm_suspend(void)
 {
 	struct list_head *l;
-	int err = suspend();
+	int err = pm_suspend(PM_SUSPEND_MEM);
 
 	/*
 	 * Anyone on the APM queues will think we're still suspended.

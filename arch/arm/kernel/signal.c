@@ -21,6 +21,7 @@
 #include <linux/tty.h>
 #include <linux/binfmts.h>
 #include <linux/elf.h>
+#include <linux/suspend.h>
 
 #include <asm/pgalloc.h>
 #include <asm/ucontext.h>
@@ -539,6 +540,11 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 	if (!user_mode(regs))
 		return 0;
 
+	if (current->flags & PF_FREEZE) {
+		refrigerator(0);
+		goto no_signal;
+	}
+
 	if (current->ptrace & PT_SINGLESTEP)
 		ptrace_cancel_bpt(current);
 
@@ -550,6 +556,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 		return 1;
 	}
 
+ no_signal:
 	/*
 	 * No signal to deliver to the process - restart the syscall.
 	 */

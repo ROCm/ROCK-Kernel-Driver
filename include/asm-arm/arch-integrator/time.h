@@ -86,7 +86,7 @@ static unsigned long integrator_gettimeoffset(void)
 	/*
 	 * Interrupt pending?  If so, we've reloaded once already.
 	 */
-	if (status & IRQMASK_TIMERINT1)
+	if (status & (1 << IRQ_TIMERINT1))
 		ticks1 += TIMER_RELOAD;
 
 	/*

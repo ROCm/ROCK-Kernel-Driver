@@ -117,12 +117,10 @@ __setup("reboot=", reboot_setup);
 
 void machine_halt(void)
 {
-	leds_event(led_halted);
 }
 
 void machine_power_off(void)
 {
-	leds_event(led_halted);
 	if (pm_power_off)
 		pm_power_off();
 }

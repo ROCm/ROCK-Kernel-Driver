@@ -24,12 +24,12 @@ static int  ep7211_ir_change_speed(struct irda_task *task);
 static int  ep7211_ir_reset(struct irda_task *task);
 
 static struct dongle_reg dongle = {
-	Q_NULL,
-	IRDA_EP7211_IR,
-	ep7211_ir_open,
-	ep7211_ir_close,
-	ep7211_ir_reset,
-	ep7211_ir_change_speed,
+	.type = IRDA_EP7211_IR,
+	.open = ep7211_ir_open,
+	.close = ep7211_ir_close,
+	.reset = ep7211_ir_reset,
+	.change_speed = ep7211_ir_change_speed,
+	.owner = THIS_MODULE,
 };
 
 static void ep7211_ir_open(dongle_t *self, struct qos_info *qos)
@@ -47,8 +47,6 @@ static void ep7211_ir_open(dongle_t *self, struct qos_info *qos)
 		UART (interrupt #14). */
 
 	restore_flags(flags);
-
-	MOD_INC_USE_COUNT;
 }
 
 static void ep7211_ir_close(dongle_t *self)
@@ -66,8 +64,6 @@ static void ep7211_ir_close(dongle_t *self)
 		reset them back to their original state. */
 
 	restore_flags(flags);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /*
