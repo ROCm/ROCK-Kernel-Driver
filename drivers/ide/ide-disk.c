@@ -539,13 +539,6 @@ static ide_startstop_t lba_48_rw_disk(ide_drive_t *, struct request *, unsigned 
  */
 ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
-	BUG_ON(drive->blocked);
-	if (!blk_fs_request(rq)) {
-		blk_dump_rq_flags(rq, "__ide_do_rw_disk - bad command");
-		ide_end_request(drive, 0, 0);
-		return ide_stopped;
-	}
-
 	/*
 	 * 268435455  == 137439 MB or 28bit limit
 	 *
@@ -733,6 +726,17 @@ static ide_startstop_t lba_48_rw_disk (ide_drive_t *drive, struct request *rq, u
 static ide_startstop_t ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector_t block)
 {
 	ide_hwif_t *hwif = HWIF(drive);
+
+	BUG_ON(drive->blocked);
+
+	/*
+	 * ide-disk only understands file system requests
+	 */
+	if (!blk_fs_request(rq)) {
+		blk_dump_rq_flags(rq, "__ide_do_rw_disk - bad command");
+		ide_end_request(drive, 0, 0);
+		return ide_stopped;
+	}
 
 	if (hwif->rw_disk)
 		return hwif->rw_disk(drive, rq, block);
