@@ -1921,6 +1921,7 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	char *response_data;
 	int rc = 0;
 	int bytes_returned;
+	__u16 params, byte_count;
 
 	cFYI(1, ("In FindNext"));
 
@@ -1932,7 +1933,8 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	if (rc)
 		return rc;
 
-	pSMB->TotalParameterCount = 14;	/* includes 2 bytes of null string, converted to LE below */
+	params = 14;	/* includes 2 bytes of null string, converted to LE below */
+	byte_count = 0;
 	pSMB->TotalDataCount = 0;	/* no EAs */
 	pSMB->MaxParameterCount = cpu_to_le16(8);
 	pSMB->MaxDataCount =
@@ -1968,15 +1970,15 @@ CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 	/* BB add check to make sure we do not cross end of smb */
 	if(name_len < CIFS_MAX_MSGSIZE) {
 		memcpy(pSMB->ResumeFileName, resume_file_name, name_len);
-		pSMB->ByteCount += name_len;
+		byte_count += name_len;
 	}
-	pSMB->TotalParameterCount += name_len;
-	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
-	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
+	params += name_len;
+	byte_count = params + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(params);
 	pSMB->ParameterCount = pSMB->TotalParameterCount;
 	/* BB improve error handling here */
-	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
-	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+	pSMB->hdr.smb_buf_length += byte_count;
+	pSMB->ByteCount = cpu_to_le16(byte_count);
 
 	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
 			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
