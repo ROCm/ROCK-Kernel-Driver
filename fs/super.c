@@ -728,7 +728,8 @@ restart:
 	spin_lock(&sb_lock);
 
 	list_for_each(p, &fs_type->fs_supers) {
-		struct super_block *old = sb_entry(p);
+		struct super_block *old;
+		old = list_entry(p, struct super_block, s_instances);
 		if (old->s_bdev != bdev)
 			continue;
 		if (!grab_super(old))
