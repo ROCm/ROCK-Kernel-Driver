@@ -60,8 +60,7 @@ static int find_boot_record(struct INFTLrecord *inftl)
 	struct INFTLPartition *ip;
 	size_t retlen;
 
-	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: find_boot_record(inftl=0x%x)\n",
-		(int)inftl);
+	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: find_boot_record(inftl=%p)\n", inftl);
 
         /*
 	 * Assume logical EraseSize == physical erasesize for starting the
@@ -352,8 +351,8 @@ static int check_free_sectors(struct INFTLrecord *inftl, unsigned int address,
 	size_t retlen;
 	int i;
 
-	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: check_free_sectors(inftl=0x%x,"
-		"address=0x%x,len=%d,check_oob=%d)\n", (int)inftl,
+	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: check_free_sectors(inftl=%p,"
+		"address=0x%x,len=%d,check_oob=%d)\n", inftl,
 		address, len, check_oob);
 
 	for (i = 0; i < len; i += SECTORSIZE) {
@@ -388,8 +387,8 @@ int INFTL_formatblock(struct INFTLrecord *inftl, int block)
 	struct erase_info *instr = &inftl->instr;
 	int physblock;
 
-	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: INFTL_formatblock(inftl=0x%x,"
-		"block=%d)\n", (int)inftl, block);
+	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: INFTL_formatblock(inftl=%p,"
+		"block=%d)\n", inftl, block);
 
 	memset(instr, 0, sizeof(struct erase_info));
 
@@ -556,7 +555,7 @@ int INFTL_mount(struct INFTLrecord *s)
 	int i;
 	u8 *ANACtable, ANAC;
 
-	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: INFTL_mount(inftl=0x%x)\n", (int)s);
+	DEBUG(MTD_DEBUG_LEVEL3, "INFTL: INFTL_mount(inftl=%p)\n", s);
 
 	/* Search for INFTL MediaHeader and Spare INFTL Media Header */
 	if (find_boot_record(s) < 0) {

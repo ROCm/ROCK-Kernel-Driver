@@ -1415,7 +1415,7 @@ int cfi_amdstd_erase_varsize(struct mtd_info *mtd, struct erase_info *instr)
 	ofs = instr->addr;
 	len = instr->len;
 
-	ret = cfi_amdstd_varsize_frob(mtd, do_erase_oneblock, ofs, len, 0);
+	ret = cfi_amdstd_varsize_frob(mtd, do_erase_oneblock, ofs, len, NULL);
 	if (ret)
 		return ret;
 

@@ -511,7 +511,7 @@ static int mtd_ioctl(struct inode *inode, struct file *file,
 	}
 
 	default:
-		DEBUG(MTD_DEBUG_LEVEL0, "Invalid ioctl %x (MEMGETINFO = %x)\n", cmd, MEMGETINFO);
+		DEBUG(MTD_DEBUG_LEVEL0, "Invalid ioctl %x (MEMGETINFO = %lx)\n", cmd, (unsigned long)MEMGETINFO);
 		ret = -ENOTTY;
 	}
 
