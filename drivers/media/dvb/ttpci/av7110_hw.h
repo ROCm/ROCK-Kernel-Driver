@@ -362,7 +362,7 @@ enum av7110_command_type {
 
 extern void av7110_reset_arm(struct av7110 *av7110);
 extern int av7110_bootarm(struct av7110 *av7110);
-extern void av7110_firmversion(struct av7110 *av7110);
+extern int av7110_firmversion(struct av7110 *av7110);
 #define FW_CI_LL_SUPPORT(arm_app) ((arm_app) & 0x80000000)
 #define FW_VERSION(arm_app)	  ((arm_app) & 0x0000FFFF)
 
