@@ -819,6 +819,24 @@ struct page * __find_get_page(struct address_space *mapping,
 }
 
 /*
+ * Same as above, but trylock it instead of incrementing the count.
+ */
+struct page *find_trylock_page(struct address_space *mapping, unsigned long offset)
+{
+	struct page *page;
+	struct page **hash = page_hash(mapping, offset);
+
+	spin_lock(&pagecache_lock);
+	page = __find_page_nolock(mapping, offset, *hash);
+	if (page) {
+		if (TryLockPage(page))
+			page = NULL;
+	}
+	spin_unlock(&pagecache_lock);
+	return page;
+}
+
+/*
  * Must be called with the pagecache lock held,
  * will return with it held (but it may be dropped
  * during blocking operations..

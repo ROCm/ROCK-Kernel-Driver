@@ -145,6 +145,7 @@ extern int swap_duplicate(swp_entry_t);
 extern int swap_count(struct page *);
 extern int valid_swaphandles(swp_entry_t, unsigned long *);
 extern void swap_free(swp_entry_t);
+extern void free_swap_and_cache(swp_entry_t);
 struct swap_list_t {
 	int head;	/* head of priority-ordered swapfile list */
 	int next;	/* swapfile to be used next */

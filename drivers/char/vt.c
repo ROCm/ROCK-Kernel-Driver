@@ -1184,6 +1184,24 @@ void complete_change_console(unsigned int new_console)
 	switch_screen(new_console);
 
 	/*
+	 * This can't appear below a successful kill_proc().  If it did,
+	 * then the *blank_screen operation could occur while X, having
+	 * received acqsig, is waking up on another processor.  This
+	 * condition can lead to overlapping accesses to the VGA range
+	 * and the framebuffer (causing system lockups).
+	 *
+	 * To account for this we duplicate this code below only if the
+	 * controlling process is gone and we've called reset_vc.
+	 */
+	if (old_vc_mode != vt_cons[new_console]->vc_mode)
+	{
+		if (vt_cons[new_console]->vc_mode == KD_TEXT)
+			unblank_screen();
+		else
+			do_blank_screen(1);
+	}
+
+	/*
 	 * If this new console is under process control, send it a signal
 	 * telling it that it has acquired. Also check if it has died and
 	 * clean up (similar to logic employed in change_console())
@@ -1209,19 +1227,15 @@ void complete_change_console(unsigned int new_console)
 		 * to account for and tracking tty count may be undesirable.
 		 */
 		        reset_vc(new_console);
-		}
-	}
 
-	/*
-	 * We do this here because the controlling process above may have
-	 * gone, and so there is now a new vc_mode
-	 */
-	if (old_vc_mode != vt_cons[new_console]->vc_mode)
-	{
-		if (vt_cons[new_console]->vc_mode == KD_TEXT)
-			unblank_screen();
-		else
-			do_blank_screen(1);
+			if (old_vc_mode != vt_cons[new_console]->vc_mode)
+			{
+				if (vt_cons[new_console]->vc_mode == KD_TEXT)
+					unblank_screen();
+				else
+					do_blank_screen(1);
+			}
+		}
 	}
 
 	/*

@@ -471,7 +471,7 @@ static int nbd_release(struct inode *inode, struct file *file)
 
 static struct block_device_operations nbd_fops =
 {
-	owner:		THIS_MODULE.
+	owner:		THIS_MODULE,
 	open:		nbd_open,
 	release:	nbd_release,
 	ioctl:		nbd_ioctl,

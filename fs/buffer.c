@@ -705,8 +705,12 @@ void __invalidate_buffers(kdev_t dev, int destroy_dirty_buffers)
 
 static void free_more_memory(void)
 {
+	zone_t * zone = contig_page_data.node_zonelists[GFP_NOFS & GFP_ZONEMASK].zones[0];
+	
 	balance_dirty();
 	wakeup_bdflush();
+	try_to_free_pages(zone, GFP_NOFS, 0);
+	run_task_queue(&tq_disk);
 	current->policy |= SCHED_YIELD;
 	__set_current_state(TASK_RUNNING);
 	schedule();

@@ -1253,7 +1253,7 @@ static inline void xfer_secondary_pool(struct entropy_store *r,
 			  r == sec_random_state ? "secondary" : "unknown",
 			  r->entropy_count, nbytes * 8);
 
-		extract_entropy(random_state, tmp, nwords, 0);
+		extract_entropy(random_state, tmp, nwords * 4, 0);
 		add_entropy_words(r, tmp, nwords);
 		credit_entropy_store(r, nwords * 32);
 	}

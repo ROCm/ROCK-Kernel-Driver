@@ -292,8 +292,7 @@ static int swap_out(unsigned int priority, unsigned int gfp_mask, zone_t * class
 	int counter, nr_pages = SWAP_CLUSTER_MAX;
 	struct mm_struct *mm;
 
-	/* Then, look at the other mm's */
-	counter = mmlist_nr / priority;
+	counter = mmlist_nr;
 	do {
 		if (unlikely(current->need_resched)) {
 			__set_current_state(TASK_RUNNING);
@@ -334,7 +333,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 {
 	struct list_head * entry;
 	int max_scan = nr_inactive_pages / priority;
-	int max_mapped = max_scan / 4;
+	int max_mapped = nr_pages*10;
 
 	spin_lock(&pagemap_lru_lock);
 	while (--max_scan >= 0 && (entry = inactive_list.prev) != &inactive_list) {

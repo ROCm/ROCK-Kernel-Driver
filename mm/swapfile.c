@@ -145,18 +145,13 @@ out:
 	return entry;
 }
 
-/*
- * Caller has made sure that the swapdevice corresponding to entry
- * is still around or has not been recycled.
- */
-void swap_free(swp_entry_t entry)
+static struct swap_info_struct * swap_info_get(swp_entry_t entry)
 {
 	struct swap_info_struct * p;
 	unsigned long offset, type;
 
 	if (!entry.val)
 		goto out;
-
 	type = SWP_TYPE(entry);
 	if (type >= nr_swapfiles)
 		goto bad_nofile;
@@ -172,8 +167,37 @@ void swap_free(swp_entry_t entry)
 	if (p->prio > swap_info[swap_list.next].prio)
 		swap_list.next = type;
 	swap_device_lock(p);
-	if (p->swap_map[offset] < SWAP_MAP_MAX) {
-		if (!--(p->swap_map[offset])) {
+	return p;
+
+bad_free:
+	printk(KERN_ERR "swap_free: %s%08lx\n", Unused_offset, entry.val);
+	goto out;
+bad_offset:
+	printk(KERN_ERR "swap_free: %s%08lx\n", Bad_offset, entry.val);
+	goto out;
+bad_device:
+	printk(KERN_ERR "swap_free: %s%08lx\n", Unused_file, entry.val);
+	goto out;
+bad_nofile:
+	printk(KERN_ERR "swap_free: %s%08lx\n", Bad_file, entry.val);
+out:
+	return NULL;
+}	
+
+static void swap_info_put(struct swap_info_struct * p)
+{
+	swap_device_unlock(p);
+	swap_list_unlock();
+}
+
+static int swap_entry_free(struct swap_info_struct *p, unsigned long offset)
+{
+	int count = p->swap_map[offset];
+
+	if (count < SWAP_MAP_MAX) {
+		count--;
+		p->swap_map[offset] = count;
+		if (!count) {
 			if (offset < p->lowest_bit)
 				p->lowest_bit = offset;
 			if (offset > p->highest_bit)
@@ -181,23 +205,45 @@ void swap_free(swp_entry_t entry)
 			nr_swap_pages++;
 		}
 	}
-	swap_device_unlock(p);
-	swap_list_unlock();
-out:
-	return;
+	return count;
+}
 
-bad_nofile:
-	printk(KERN_ERR "swap_free: %s%08lx\n", Bad_file, entry.val);
-	goto out;
-bad_device:
-	printk(KERN_ERR "swap_free: %s%08lx\n", Unused_file, entry.val);
-	goto out;
-bad_offset:
-	printk(KERN_ERR "swap_free: %s%08lx\n", Bad_offset, entry.val);
-	goto out;
-bad_free:
-	printk(KERN_ERR "swap_free: %s%08lx\n", Unused_offset, entry.val);
-	goto out;
+/*
+ * Caller has made sure that the swapdevice corresponding to entry
+ * is still around or has not been recycled.
+ */
+void swap_free(swp_entry_t entry)
+{
+	struct swap_info_struct * p;
+
+	p = swap_info_get(entry);
+	if (p) {
+		swap_entry_free(p, SWP_OFFSET(entry));
+		swap_info_put(p);
+	}
+}
+
+/*
+ * Free the swap entry like above, but also try to
+ * free the page cache entry if it is the last user.
+ */
+void free_swap_and_cache(swp_entry_t entry)
+{
+	struct swap_info_struct * p;
+	struct page *page = NULL;
+
+	p = swap_info_get(entry);
+	if (p) {
+		if (swap_entry_free(p, SWP_OFFSET(entry)) == 1)
+			page = find_trylock_page(&swapper_space, entry.val);
+		swap_info_put(p);
+	}
+	if (page) {
+		page_cache_get(page);
+		delete_from_swap_cache(page);
+		UnlockPage(page);
+		page_cache_release(page);
+	}
 }
 
 /*

@@ -82,6 +82,7 @@ extern struct page * find_or_create_page(struct address_space *mapping,
 extern void lock_page(struct page *page);
 #define find_lock_page(mapping, index) \
 	__find_lock_page(mapping, index, page_hash(mapping, index))
+extern struct page *find_trylock_page(struct address_space *, unsigned long);
 
 extern void add_to_page_cache(struct page * page, struct address_space *mapping, unsigned long index);
 extern void add_to_page_cache_locked(struct page * page, struct address_space *mapping, unsigned long index);

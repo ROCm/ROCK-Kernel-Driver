@@ -66,14 +66,17 @@ typedef void (unplug_device_fn) (void *q);
  */
 #define QUEUE_NR_REQUESTS	8192
 
+struct request_list {
+	unsigned int count;
+	struct list_head free;
+};
+
 struct request_queue
 {
 	/*
 	 * the queue request freelist, one for reads and one for writes
 	 */
-	struct list_head	request_freelist[2];
-	struct list_head	pending_freelist[2];
-	int			pending_free[2];
+	struct request_list	rq[2];
 
 	/*
 	 * Together with queue_head for cacheline sharing
