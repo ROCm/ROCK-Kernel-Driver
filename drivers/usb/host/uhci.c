@@ -1820,6 +1820,9 @@ static int uhci_unlink_urb(struct urb *urb)
 		} else {
 			urb->status = -ENOENT;
 
+			spin_unlock(&urb->lock);
+			spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
+
 			if (in_interrupt()) {	/* wait at least 1 frame */
 				static int errorcount = 10;
 
@@ -1828,9 +1831,6 @@ static int uhci_unlink_urb(struct urb *urb)
 				udelay(1000);
 			} else
 				schedule_timeout(1+1*HZ/1000); 
-
-			spin_unlock(&urb->lock);
-			spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 
 			uhci_call_completion(urb);
 		}
@@ -2202,12 +2202,12 @@ static int rh_submit_urb(struct urb *urb)
 			OK(0);
 		case RH_PORT_RESET:
 			SET_RH_PORTSTAT(USBPORTSC_PR);
-			wait_ms(50);	/* USB v1.1 7.1.7.3 */
+			mdelay(50);	/* USB v1.1 7.1.7.3 */
 			uhci->rh.c_p_r[wIndex - 1] = 1;
 			CLR_RH_PORTSTAT(USBPORTSC_PR);
 			udelay(10);
 			SET_RH_PORTSTAT(USBPORTSC_PE);
-			wait_ms(10);
+			mdelay(10);
 			SET_RH_PORTSTAT(0xa);
 			OK(0);
 		case RH_PORT_POWER:
