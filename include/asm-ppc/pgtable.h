@@ -560,12 +560,12 @@ extern void flush_hash_one_pte(pte_t *ptep);
 static inline int ptep_test_and_clear_young(pte_t *ptep)
 {
 	unsigned long old;
-	old = (pte_update(ptep, _PAGE_ACCESSED, 0) & _PAGE_ACCESSED);
+	old = pte_update(ptep, _PAGE_ACCESSED, 0);
 #if _PAGE_HASHPTE != 0
 	if (old & _PAGE_HASHPTE)
 		flush_hash_one_pte(ptep);
 #endif
-	return old != 0;
+	return (old & _PAGE_ACCESSED) != 0;
 }
 
 static inline int ptep_test_and_clear_dirty(pte_t *ptep)
