@@ -131,9 +131,12 @@ void remove_from_page_cache(struct page *page)
 	spin_unlock_irq(&mapping->tree_lock);
 }
 
-static inline int sync_page(struct page *page)
+static int sync_page(void *word)
 {
 	struct address_space *mapping;
+	struct page *page;
+
+	page = container_of((page_flags_t *)word, struct page, flags);
 
 	/*
 	 * FIXME, fercrissake.  What is this barrier here for?
@@ -141,7 +144,8 @@ static inline int sync_page(struct page *page)
 	smp_mb();
 	mapping = page_mapping(page);
 	if (mapping && mapping->a_ops && mapping->a_ops->sync_page)
-		return mapping->a_ops->sync_page(page);
+		mapping->a_ops->sync_page(page);
+	io_schedule();
 	return 0;
 }
 
@@ -367,19 +371,19 @@ static wait_queue_head_t *page_waitqueue(struct page *page)
 	return &zone->wait_table[hash_ptr(page, zone->wait_table_bits)];
 }
 
-void fastcall wait_on_page_bit(struct page *page, int bit_nr)
+static inline void wake_up_page(struct page *page, int bit)
 {
-	wait_queue_head_t *waitqueue = page_waitqueue(page);
-	DEFINE_WAIT_BIT(wait, &page->flags, bit_nr);
-
-	prepare_to_wait(waitqueue, &wait.wait, TASK_UNINTERRUPTIBLE);
-	if (test_bit(bit_nr, &page->flags)) {
-		sync_page(page);
-		io_schedule();
-	}
-	finish_wait(waitqueue, &wait.wait);
+	__wake_up_bit(page_waitqueue(page), &page->flags, bit);
 }
 
+void fastcall wait_on_page_bit(struct page *page, int bit_nr)
+{
+	DEFINE_WAIT_BIT(wait, &page->flags, bit_nr);
+
+	if (test_bit(bit_nr, &page->flags))
+		__wait_on_bit(page_waitqueue(page), &wait, wait.key.flags,
+				bit_nr, sync_page, TASK_UNINTERRUPTIBLE);
+}
 EXPORT_SYMBOL(wait_on_page_bit);
 
 /**
@@ -403,7 +407,7 @@ void fastcall unlock_page(struct page *page)
 	if (!TestClearPageLocked(page))
 		BUG();
 	smp_mb__after_clear_bit(); 
-	__wake_up_bit(page_waitqueue(page), &page->flags, PG_locked);
+	wake_up_page(page, PG_locked);
 }
 
 EXPORT_SYMBOL(unlock_page);
@@ -419,7 +423,7 @@ void end_page_writeback(struct page *page)
 			BUG();
 		smp_mb__after_clear_bit();
 	}
-	__wake_up_bit(page_waitqueue(page), &page->flags, PG_writeback);
+	wake_up_page(page, PG_writeback);
 }
 
 EXPORT_SYMBOL(end_page_writeback);
@@ -434,19 +438,11 @@ EXPORT_SYMBOL(end_page_writeback);
  */
 void fastcall __lock_page(struct page *page)
 {
-	wait_queue_head_t *wqh = page_waitqueue(page);
 	DEFINE_WAIT_BIT(wait, &page->flags, PG_locked);
 
-	while (TestSetPageLocked(page)) {
-		prepare_to_wait_exclusive(wqh, &wait.wait, TASK_UNINTERRUPTIBLE);
-		if (PageLocked(page)) {
-			sync_page(page);
-			io_schedule();
-		}
-	}
-	finish_wait(wqh, &wait.wait);
+	__wait_on_bit_lock(page_waitqueue(page), &wait, wait.key.flags,
+				PG_locked, sync_page, TASK_UNINTERRUPTIBLE);
 }
-
 EXPORT_SYMBOL(__lock_page);
 
 /*

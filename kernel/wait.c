@@ -143,6 +143,43 @@ int wake_bit_function(wait_queue_t *wait, unsigned mode, int sync, void *arg)
 }
 EXPORT_SYMBOL(wake_bit_function);
 
+/*
+ * To allow interruptible waiting and asynchronous (i.e. nonblocking)
+ * waiting, the actions of __wait_on_bit() and __wait_on_bit_lock() are
+ * permitted return codes. Nonzero return codes halt waiting and return.
+ */
+int __sched fastcall
+__wait_on_bit(wait_queue_head_t *wq, struct wait_bit_queue *q,
+		void *word, int bit, int (*action)(void *), unsigned mode)
+{
+	int ret = 0;
+
+	prepare_to_wait(wq, &q->wait, mode);
+	if (test_bit(bit, word))
+		ret = (*action)(word);
+	finish_wait(wq, &q->wait);
+	return ret;
+}
+EXPORT_SYMBOL(__wait_on_bit);
+
+int __sched fastcall
+__wait_on_bit_lock(wait_queue_head_t *wq, struct wait_bit_queue *q,
+		void *word, int bit, int (*action)(void *), unsigned mode)
+{
+	int ret = 0;
+
+	while (test_and_set_bit(bit, word)) {
+		prepare_to_wait_exclusive(wq, &q->wait, mode);
+		if (test_bit(bit, word)) {
+			if ((ret = (*action)(word)))
+				break;
+		}
+	}
+	finish_wait(wq, &q->wait);
+	return ret;
+}
+EXPORT_SYMBOL(__wait_on_bit_lock);
+
 void fastcall __wake_up_bit(wait_queue_head_t *wq, void *word, int bit)
 {
 	struct wait_bit_key key = __WAIT_BIT_KEY_INITIALIZER(word, bit);
