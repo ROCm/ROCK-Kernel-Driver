@@ -734,7 +734,7 @@ static void cpu_cmd(void)
 		printf("cpus stopped:");
 		for (cpu = 0; cpu < NR_CPUS; ++cpu) {
 			if (test_bit(cpu, &cpus_in_xmon)) {
-				printf(" %d", cpu);
+				printf(" %x", cpu);
 				if (cpu == smp_processor_id())
 					printf("*", cpu);
 			}
