@@ -73,7 +73,6 @@ typedef unsigned char	byte;	/* used everywhere */
  */
 #define DMA_PIO_RETRY	1	/* retrying in PIO */
 
-#define HWIF(drive)		((drive)->channel)
 #define HWGROUP(drive)		(drive->channel->hwgroup)
 
 /*
@@ -254,7 +253,7 @@ void ide_setup_ports(hw_regs_t *hw,
 #endif
 
 /*
- * Now for the data we need to maintain per-drive:  ide_drive_t
+ * Device types - the nomenclature is analogous to SCSI code.
  */
 
 #define ATA_DISK        0x20
@@ -266,7 +265,10 @@ void ide_setup_ports(hw_regs_t *hw,
 #define ATA_NO_LUN      0x7f
 
 struct ide_settings_s;
-/* structure describing an ATA/ATAPI device */
+
+/*
+ * ATA/ATAPI device structure :
+ */
 typedef
 struct ata_device {
 	struct ata_channel *	channel;
@@ -401,7 +403,6 @@ struct ata_channel {
 	struct device	dev;		/* device handle */
 	int		unit;		/* channel number */
 
-	struct ata_channel *next;	/* for linked-list in ide_hwgroup_t */
 	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
 
 	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
@@ -516,17 +517,14 @@ typedef int (ide_expiry_t)(ide_drive_t *);
 #define IDE_DMA		2	/* DMA in progress */
 
 typedef struct hwgroup_s {
-	ide_handler_t		*handler;/* irq handler, if active */
-	unsigned long		flags;	/* BUSY, SLEEPING */
-	ide_drive_t		*drive;	/* current drive */
-	struct ata_channel	*hwif;	/* ptr to current hwif in linked-list */
-
-	struct request		*rq;	/* current request */
-
-	struct timer_list	timer;	/* failsafe timer */
-	struct request		wrq;	/* local copy of current write rq */
-	unsigned long		poll_timeout;	/* timeout value during long polls */
-	ide_expiry_t		*expiry;	/* queried upon timeouts */
+	ide_handler_t *handler;		/* irq handler, if active */
+	unsigned long flags;		/* BUSY, SLEEPING */
+	struct ata_device *drive;	/* current drive */
+	struct request *rq;		/* current request */
+	struct timer_list timer;	/* failsafe timer */
+	struct request wrq;		/* local copy of current write rq */
+	unsigned long poll_timeout;	/* timeout value during long polls */
+	ide_expiry_t *expiry;		/* queried upon timeouts */
 } ide_hwgroup_t;
 
 /* structure attached to the request for IDE_TASK_CMDS */
@@ -827,7 +825,7 @@ extern int drive_is_flashcard(ide_drive_t *drive);
 
 int ide_spin_wait_hwgroup (ide_drive_t *drive);
 void ide_timer_expiry (unsigned long data);
-void ide_intr (int irq, void *dev_id, struct pt_regs *regs);
+extern void ata_irq_request(int irq, void *data, struct pt_regs *regs);
 void do_ide_request (request_queue_t * q);
 void ide_init_subdrivers (void);
 

@@ -601,45 +601,6 @@ pmac_halt(void)
    pmac_power_off();
 }
 
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-/*
- * IDE stuff.
- */
-static int __pmac
-pmac_ide_check_region(ide_ioreg_t from, unsigned int extent)
-{
-#ifdef CONFIG_BLK_DEV_IDE_PMAC
-	if (pmac_ide_check_base(from) >= 0)
-		return 0;
-#endif
-	return check_region(from, extent);
-}
-
-static void __pmac
-pmac_ide_request_region(ide_ioreg_t from,
-			unsigned int extent,
-			const char *name)
-{
-#ifdef CONFIG_BLK_DEV_IDE_PMAC
-	if (pmac_ide_check_base(from) >= 0)
-		return;
-#endif
-	request_region(from, extent, name);
-}
-
-static void __pmac
-pmac_ide_release_region(ide_ioreg_t from,
-			unsigned int extent)
-{
-#ifdef CONFIG_BLK_DEV_IDE_PMAC
-	if (pmac_ide_check_base(from) >= 0)
-		return;
-#endif
-	release_region(from, extent);
-}
-#endif /* defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE) */
-
 /*
  * Read in a property describing some pieces of memory.
  */
@@ -795,12 +756,6 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.feature_call   = pmac_do_feature_call;
 
 	select_adb_keyboard();
-
-#if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
-        ppc_ide_md.ide_check_region	= pmac_ide_check_region;
-        ppc_ide_md.ide_request_region	= pmac_ide_request_region;
-        ppc_ide_md.ide_release_region	= pmac_ide_release_region;
-#endif /* defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE) */
 
 #ifdef CONFIG_BOOTX_TEXT
 	ppc_md.progress = pmac_progress;
