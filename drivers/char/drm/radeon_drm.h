@@ -538,6 +538,7 @@ typedef struct drm_radeon_indirect {
 #define RADEON_PARAM_STATUS_HANDLE         8
 #define RADEON_PARAM_SAREA_HANDLE          9
 #define RADEON_PARAM_GART_TEX_HANDLE       10
+#define RADEON_PARAM_SCRATCH_OFFSET        11
 
 typedef struct drm_radeon_getparam {
 	int param;
