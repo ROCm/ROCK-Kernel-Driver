@@ -407,9 +407,11 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 		if ((dev->flags&IFF_LOOPBACK) ||
 		    dev->type == ARPHRD_TUNNEL ||
 		    dev->type == ARPHRD_SIT) {
+#if 0
 			printk(KERN_INFO
 				"Disabled Privacy Extensions on device %p(%s)\n",
 				dev, dev->name);
+#endif
 			ndev->cnf.use_tempaddr = -1;
 		} else {
 			in6_dev_hold(ndev);
