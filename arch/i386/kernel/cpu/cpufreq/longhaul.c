@@ -36,6 +36,7 @@
 static unsigned int numscales=16, numvscales;
 static unsigned int fsb;
 static int minvid, maxvid;
+static unsigned int minmult, maxmult;
 static int can_scale_voltage;
 static int vrmrev;
 
@@ -227,7 +228,6 @@ static int __init longhaul_get_ranges (void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 	unsigned long invalue;
-	unsigned int minmult=0, maxmult=0;
 	unsigned int multipliers[32]= {
 		50,30,40,100,55,35,45,95,90,70,80,60,120,75,85,65,
 		-1,110,120,-1,135,115,125,105,130,150,160,140,-1,155,-1,145 };
@@ -555,6 +555,15 @@ static int __init longhaul_init (void)
 
 static void __exit longhaul_exit (void)
 {
+	int i=0;
+	unsigned int new_clock_ratio;
+
+	while (clock_ratio[i] != maxmult)
+		i++;
+
+	new_clock_ratio = longhaul_table[i].index & 0xFF;
+	longhaul_setstate(new_clock_ratio);
+
 	cpufreq_unregister_driver(&longhaul_driver);
 	kfree(longhaul_table);
 }
