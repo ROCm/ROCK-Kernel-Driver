@@ -110,19 +110,19 @@ DMA READ OPERATIONS.
 #define DMA_WRITE_TO_HOST 1
 
 struct mm_dma_desc {
-	u64	pci_addr;
-	u64	local_addr;
-	u32	transfer_size;
+	__le64	pci_addr;
+	__le64	local_addr;
+	__le32	transfer_size;
 	u32	zero1;
-	u64	next_desc_addr;
-	u64	sem_addr;
-	u32	control_bits;
+	__le64	next_desc_addr;
+	__le64	sem_addr;
+	__le32	control_bits;
 	u32	zero2;
 
 	dma_addr_t data_dma_handle;
 
 	/* Copy of the bits */
-	u64	sem_control_bits;
+	__le64	sem_control_bits;
 } __attribute__((aligned(8)));
 
 #define PCI_VENDOR_ID_MICRO_MEMORY		0x1332
