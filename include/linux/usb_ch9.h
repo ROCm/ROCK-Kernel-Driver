@@ -116,6 +116,17 @@ struct usb_ctrlrequest {
 #define USB_DT_DEVICE_QUALIFIER		0x06
 #define USB_DT_OTHER_SPEED_CONFIG	0x07
 #define USB_DT_INTERFACE_POWER		0x08
+/* these are from a minor usb 2.0 revision (ECN) */
+#define USB_DT_OTG			0x09
+#define USB_DT_DEBUG			0x0a
+#define USB_DT_INTERFACE_ASSOCIATION	0x0b
+
+/* conventional codes for class-specific descriptors */
+#define USB_DT_CS_DEVICE		0x21
+#define USB_DT_CS_CONFIG		0x22
+#define USB_DT_CS_STRING		0x23
+#define USB_DT_CS_INTERFACE		0x24
+#define USB_DT_CS_ENDPOINT		0x25
 
 /* All standard descriptors have these 2 fields at the beginning */
 struct usb_descriptor_header {
@@ -165,6 +176,7 @@ struct usb_device_descriptor {
 #define USB_CLASS_CDC_DATA		0x0a
 #define USB_CLASS_CSCID			0x0b	/* chip+ smart card */
 #define USB_CLASS_CONTENT_SEC		0x0d	/* content security */
+#define USB_CLASS_VIDEO			0x0e
 #define USB_CLASS_APP_SPEC		0xfe
 #define USB_CLASS_VENDOR_SPEC		0xff
 
@@ -278,6 +290,36 @@ struct usb_qualifier_descriptor {
 	__u8  bMaxPacketSize0;
 	__u8  bNumConfigurations;
 	__u8  bRESERVED;
+} __attribute__ ((packed));
+
+
+/*-------------------------------------------------------------------------*/
+
+/* USB_DT_OTG (from OTG 1.0a supplement) */
+struct usb_otg_descriptor {
+	__u8  bLength;
+	__u8  bDescriptorType;
+
+	__u8  bmAttributes;	/* support for HNP, SRP, etc */
+} __attribute__ ((packed));
+
+/* from usb_otg_descriptor.bmAttributes */
+#define USB_OTG_SRP		(1 << 0)
+#define USB_OTG_HNP		(1 << 1)	/* swap host/device roles */
+
+/*-------------------------------------------------------------------------*/
+
+/* USB_DT_INTERFACE_ASSOCIATION: groups interfaces */
+struct usb_interface_assoc_descriptor {
+	__u8  bLength;
+	__u8  bDescriptorType;
+
+	__u8  bFirstInterface;
+	__u8  bInterfaceCount;
+	__u8  bFunctionClass;
+	__u8  bFunctionSubClass;
+	__u8  bFunctionProtocol;
+	__u8  iFunction;
 } __attribute__ ((packed));
 
 

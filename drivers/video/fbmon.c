@@ -890,30 +890,6 @@ struct __fb_timings {
 	u32 vtotal;
 };
 
-/*
- * a simple function to get the square root of integers 
- */
-static u32 fb_sqrt(int x)
-{
-	register int op, res, one;
-
-	op = x;
-	res = 0;
-
-	one = 1 << 30;
-	while (one > op) one >>= 2;
-
-	while (one != 0) {
-		if (op >= res + one) {
-			op = op - (res + one);
-			res = res +  2 * one;
-		}
-		res /= 2;
-		one /= 4;
-	}
-	return((u32) res);
-}
-
 /**
  * fb_get_vblank - get vertical blank time
  * @hfreq: horizontal freq
@@ -1002,7 +978,7 @@ static u32 fb_get_hblank_by_dclk(u32 dclk, u32 xres)
 	h_period += (M_VAL * xres * 2 * 1000)/(5 * dclk);
 	h_period *=10000; 
 
-	h_period = fb_sqrt((int) h_period);
+	h_period = int_sqrt(h_period);
 	h_period -= (100 - C_VAL) * 100;
 	h_period *= 1000; 
 	h_period /= 2 * M_VAL;

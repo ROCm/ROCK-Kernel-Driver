@@ -36,7 +36,7 @@ void flush_user_windows(void)
 	: "g4", "cc");
 }
 
-static inline void shift_window_buffer(int first_win, int last_win, struct thread_struct *tp)
+static inline void shift_window_buffer(int first_win, int last_win, struct thread_info *tp)
 {
 	int i;
 
@@ -57,11 +57,10 @@ static inline void shift_window_buffer(int first_win, int last_win, struct threa
  */
 void synchronize_user_stack(void)
 {
-	struct thread_struct *tp;
+	struct thread_info *tp = current_thread_info();
 	int window;
 
 	flush_user_windows();
-	tp = &current->thread;
 	if(!tp->w_saved)
 		return;
 
@@ -110,12 +109,11 @@ static inline void copy_aligned_window(void *dest, const void *src)
 
 void try_to_clear_window_buffer(struct pt_regs *regs, int who)
 {
-	struct thread_struct *tp;
+	struct thread_info *tp = current_thread_info();
 	int window;
 
 	lock_kernel();
 	flush_user_windows();
-	tp = &current->thread;
 	for(window = 0; window < tp->w_saved; window++) {
 		unsigned long sp = tp->rwbuf_stkptrs[window];
 

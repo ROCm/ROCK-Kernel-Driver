@@ -28,7 +28,6 @@
  */
 
 #include "transport.h"
-#include "raw_bulk.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
@@ -66,7 +65,7 @@ struct nand_flash_dev {
  * NAND Flash Manufacturer ID Codes
  */
 #define NAND_MFR_AMD		0x01
-#define NAND_MFR_NS		0x8f
+#define NAND_MFR_NATSEMI	0x8f
 #define NAND_MFR_TOSHIBA	0x98
 #define NAND_MFR_SAMSUNG	0xec
 
@@ -74,8 +73,8 @@ static inline char *nand_flash_manufacturer(int manuf_id) {
 	switch(manuf_id) {
 	case NAND_MFR_AMD:
 		return "AMD";
-	case NAND_MFR_NS:
-		return "NS";
+	case NAND_MFR_NATSEMI:
+		return "NATSEMI";
 	case NAND_MFR_TOSHIBA:
 		return "Toshiba";
 	case NAND_MFR_SAMSUNG:
@@ -302,8 +301,7 @@ sddr09_request_sense(struct us_data *us, unsigned char *sensebuf, int buflen) {
 	if (result != USB_STOR_XFER_GOOD) {
 		US_DEBUGP("request sense bulk in failed\n");
 		return USB_STOR_TRANSPORT_ERROR;
-	}
-	else {
+	} else {
 		US_DEBUGP("request sense worked\n");
 		return USB_STOR_TRANSPORT_GOOD;
 	}
@@ -468,6 +466,8 @@ static int
 sddr09_erase(struct us_data *us, unsigned long Eaddress) {
 	unsigned char *command = us->iobuf;
 	int result;
+
+	US_DEBUGP("sddr09_erase: erase address %lu\n", Eaddress);
 
 	memset(command, 0, 12);
 	command[0] = 0xEA;
@@ -663,30 +663,31 @@ static int
 sddr09_read_data(struct us_data *us,
 		 unsigned long address,
 		 unsigned int sectors,
-		 unsigned char *content,
+		 unsigned char *buffer,
 		 int use_sg) {
 
 	struct sddr09_card_info *info = (struct sddr09_card_info *) us->extra;
 	unsigned int lba, maxlba, pba;
 	unsigned int page, pages;
-	unsigned char *buffer = NULL;
-	unsigned char *ptr;
-	int result, len;
+	unsigned int len, index, offset;
+	int result;
 
-	// If we're using scatter-gather, we have to create a new
-	// buffer to read all of the data in first, since a
-	// scatter-gather buffer could in theory start in the middle
-	// of a page, which would be bad. A developer who wants a
-	// challenge might want to write a limited-buffer
-	// version of this code.
+	// Since we only read in one block at a time, we have to create
+	// a bounce buffer if the transfer uses scatter-gather.  We will
+	// move the data a piece at a time between the bounce buffer and
+	// the actual transfer buffer.  If we're not using scatter-gather,
+	// we can simply update the transfer buffer pointer to get the
+	// same effect.
 
-	len = sectors*info->pagesize;
-
-	buffer = (use_sg ? kmalloc(len, GFP_NOIO) : content);
-	if (buffer == NULL)
-		return USB_STOR_TRANSPORT_ERROR;
-
-	ptr = buffer;
+	if (use_sg) {
+		len = min(sectors, (unsigned int) info->blocksize) *
+				info->pagesize;
+		buffer = kmalloc(len, GFP_NOIO);
+		if (buffer == NULL) {
+			printk("sddr09_read_data: Out of memory\n");
+			return USB_STOR_TRANSPORT_ERROR;
+		}
+	}
 
 	// Figure out the initial LBA and page
 	lba = address >> info->blockshift;
@@ -697,13 +698,13 @@ sddr09_read_data(struct us_data *us,
 	// contiguous LBA's. Another exercise left to the student.
 
 	result = USB_STOR_TRANSPORT_GOOD;
+	index = offset = 0;
 
 	while (sectors > 0) {
 
 		/* Find number of pages we can read in this block */
-		pages = info->blocksize - page;
-		if (pages > sectors)
-			pages = sectors;
+		pages = min(sectors, info->blocksize - page);
+		len = pages << info->pageshift;
 
 		/* Not overflowing capacity? */
 		if (lba >= maxlba) {
@@ -726,7 +727,7 @@ sddr09_read_data(struct us_data *us,
 			   Instead of returning USB_STOR_TRANSPORT_ERROR
 			   it is better to return all zero data. */
 
-			memset(ptr, 0, pages << info->pageshift);
+			memset(buffer, 0, len);
 
 		} else {
 			US_DEBUGP("Read %d pages, from PBA %d"
@@ -737,19 +738,22 @@ sddr09_read_data(struct us_data *us,
 				info->pageshift;
 
 			result = sddr09_read20(us, address>>1,
-					       pages, info->pageshift, ptr, 0);
+					pages, info->pageshift, buffer, 0);
 			if (result != USB_STOR_TRANSPORT_GOOD)
 				break;
 		}
 
+		// Store the data (s-g) or update the pointer (!s-g)
+		if (use_sg)
+			usb_stor_access_xfer_buf(buffer, len, us->srb,
+					&index, &offset, TO_XFER_BUF);
+		else
+			buffer += len;
+
 		page = 0;
 		lba++;
 		sectors -= pages;
-		ptr += (pages << info->pageshift);
 	}
-
-	if (use_sg && result == USB_STOR_TRANSPORT_GOOD)
-		us_copy_to_sgbuf_all(buffer, len, content, use_sg);
 
 	if (use_sg)
 		kfree(buffer);
@@ -757,17 +761,27 @@ sddr09_read_data(struct us_data *us,
 	return result;
 }
 
-/* we never free blocks, so lastpba can only increase */
 static unsigned int
-sddr09_find_unused_pba(struct sddr09_card_info *info) {
+sddr09_find_unused_pba(struct sddr09_card_info *info, unsigned int lba) {
 	static unsigned int lastpba = 1;
-	int numblocks = info->capacity >> (info->blockshift + info->pageshift);
-	int i;
+	int zonestart, end, i;
 
-	for (i = lastpba+1; i < numblocks; i++) {
-		if (info->pba_to_lba[i] == UNDEF) {
+	zonestart = (lba/1000) << 10;
+	end = info->capacity >> (info->blockshift + info->pageshift);
+	end -= zonestart;
+	if (end > 1024)
+		end = 1024;
+
+	for (i = lastpba+1; i < end; i++) {
+		if (info->pba_to_lba[zonestart+i] == UNDEF) {
 			lastpba = i;
-			return i;
+			return zonestart+i;
+		}
+	}
+	for (i = 0; i <= lastpba; i++) {
+		if (info->pba_to_lba[zonestart+i] == UNDEF) {
+			lastpba = i;
+			return zonestart+i;
 		}
 	}
 	return 0;
@@ -776,29 +790,31 @@ sddr09_find_unused_pba(struct sddr09_card_info *info) {
 static int
 sddr09_write_lba(struct us_data *us, unsigned int lba,
 		 unsigned int page, unsigned int pages,
-		 unsigned char *ptr) {
+		 unsigned char *ptr, unsigned char *blockbuffer) {
 
 	struct sddr09_card_info *info = (struct sddr09_card_info *) us->extra;
 	unsigned long address;
 	unsigned int pba, lbap;
-	unsigned int pagelen, blocklen;
-	unsigned char *blockbuffer, *bptr, *cptr, *xptr;
+	unsigned int pagelen;
+	unsigned char *bptr, *cptr, *xptr;
 	unsigned char ecc[3];
-	int i, result;
+	int i, result, isnew;
 
-	lbap = ((lba & 0x3ff) << 1) | 0x1000;
+	lbap = ((lba % 1000) << 1) | 0x1000;
 	if (parity[MSB_of(lbap) ^ LSB_of(lbap)])
 		lbap ^= 1;
 	pba = info->lba_to_pba[lba];
+	isnew = 0;
 
 	if (pba == UNDEF) {
-		pba = sddr09_find_unused_pba(info);
+		pba = sddr09_find_unused_pba(info, lba);
 		if (!pba) {
 			printk("sddr09_write_lba: Out of unused blocks\n");
 			return USB_STOR_TRANSPORT_ERROR;
 		}
 		info->pba_to_lba[pba] = lba;
 		info->lba_to_pba[lba] = pba;
+		isnew = 1;
 	}
 
 	if (pba == 1) {
@@ -809,22 +825,16 @@ sddr09_write_lba(struct us_data *us, unsigned int lba,
 	}
 
 	pagelen = (1 << info->pageshift) + (1 << CONTROL_SHIFT);
-	blocklen = (pagelen << info->blockshift);
-	blockbuffer = kmalloc(blocklen, GFP_NOIO);
-	if (!blockbuffer) {
-		printk("sddr09_write_lba: Out of memory\n");
-		return USB_STOR_TRANSPORT_ERROR;
-	}
 
 	/* read old contents */
 	address = (pba << (info->pageshift + info->blockshift));
 	result = sddr09_read22(us, address>>1, info->blocksize,
 			       info->pageshift, blockbuffer, 0);
 	if (result != USB_STOR_TRANSPORT_GOOD)
-		goto err;
+		return result;
 
-	/* check old contents */
-	for (i = 0; i < info->blockshift; i++) {
+	/* check old contents and fill lba */
+	for (i = 0; i < info->blocksize; i++) {
 		bptr = blockbuffer + i*pagelen;
 		cptr = bptr + info->pagesize;
 		nand_compute_ecc(bptr, ecc);
@@ -839,6 +849,8 @@ sddr09_write_lba(struct us_data *us, unsigned int lba,
 				  i, pba);
 			nand_store_ecc(cptr+8, ecc);
 		}
+		cptr[6] = cptr[11] = MSB_of(lbap);
+		cptr[7] = cptr[12] = LSB_of(lbap);
 	}
 
 	/* copy in new stuff and compute ECC */
@@ -852,8 +864,6 @@ sddr09_write_lba(struct us_data *us, unsigned int lba,
 		nand_store_ecc(cptr+13, ecc);
 		nand_compute_ecc(bptr+(info->pagesize / 2), ecc);
 		nand_store_ecc(cptr+8, ecc);
-		cptr[6] = cptr[11] = MSB_of(lbap);
-		cptr[7] = cptr[12] = LSB_of(lbap);
 	}
 
 	US_DEBUGP("Rewrite PBA %d (LBA %d)\n", pba, lba);
@@ -880,11 +890,6 @@ sddr09_write_lba(struct us_data *us, unsigned int lba,
 		int result2 = sddr09_test_unit_ready(us);
 	}
 #endif
- err:
-	kfree(blockbuffer);
-
-	/* TODO: instead of doing kmalloc/kfree for each block,
-	   add a bufferpointer to the info structure */
 
 	return result;
 }
@@ -893,49 +898,84 @@ static int
 sddr09_write_data(struct us_data *us,
 		  unsigned long address,
 		  unsigned int sectors,
-		  unsigned char *content,
+		  unsigned char *buffer,
 		  int use_sg) {
 
 	struct sddr09_card_info *info = (struct sddr09_card_info *) us->extra;
 	unsigned int lba, page, pages;
-	unsigned char *buffer = NULL;
-	unsigned char *ptr;
-	int result, len;
+	unsigned int pagelen, blocklen;
+	unsigned char *blockbuffer;
+	unsigned int len, index, offset;
+	int result;
 
-	len = sectors*info->pagesize;
+	// blockbuffer is used for reading in the old data, overwriting
+	// with the new data, and performing ECC calculations
 
-	buffer = us_copy_from_sgbuf_all(content, len, use_sg);
-	if (buffer == NULL)
+	/* TODO: instead of doing kmalloc/kfree for each write,
+	   add a bufferpointer to the info structure */
+
+	pagelen = (1 << info->pageshift) + (1 << CONTROL_SHIFT);
+	blocklen = (pagelen << info->blockshift);
+	blockbuffer = kmalloc(blocklen, GFP_NOIO);
+	if (!blockbuffer) {
+		printk("sddr09_write_data: Out of memory\n");
 		return USB_STOR_TRANSPORT_ERROR;
+	}
 
-	ptr = buffer;
+	// Since we don't write the user data directly to the device,
+	// we have to create a bounce buffer if the transfer uses
+	// scatter-gather.  We will move the data a piece at a time
+	// between the bounce buffer and the actual transfer buffer.
+	// If we're not using scatter-gather, we can simply update
+	// the transfer buffer pointer to get the same effect.
+
+	if (use_sg) {
+		len = min(sectors, (unsigned int) info->blocksize) *
+				info->pagesize;
+		buffer = kmalloc(len, GFP_NOIO);
+		if (buffer == NULL) {
+			printk("sddr09_write_data: Out of memory\n");
+			kfree(blockbuffer);
+			return USB_STOR_TRANSPORT_ERROR;
+		}
+	}
 
 	// Figure out the initial LBA and page
 	lba = address >> info->blockshift;
 	page = (address & info->blockmask);
 
 	result = USB_STOR_TRANSPORT_GOOD;
+	index = offset = 0;
 
 	while (sectors > 0) {
 
 		// Write as many sectors as possible in this block
 
-		pages = info->blocksize - page;
-		if (pages > sectors)
-			pages = sectors;
+		pages = min(sectors, info->blocksize - page);
+		len = (pages << info->pageshift);
 
-		result = sddr09_write_lba(us, lba, page, pages, ptr);
+		// Get the data from the transfer buffer (s-g)
+		if (use_sg)
+			usb_stor_access_xfer_buf(buffer, len, us->srb,
+					&index, &offset, FROM_XFER_BUF);
+
+		result = sddr09_write_lba(us, lba, page, pages,
+				buffer, blockbuffer);
 		if (result != USB_STOR_TRANSPORT_GOOD)
 			break;
+
+		// Update the transfer buffer pointer (!s-g)
+		if (!use_sg)
+			buffer += len;
 
 		page = 0;
 		lba++;
 		sectors -= pages;
-		ptr += (pages << info->pageshift);
 	}
 
 	if (use_sg)
 		kfree(buffer);
+	kfree(blockbuffer);
 
 	return result;
 }
@@ -947,10 +987,11 @@ sddr09_read_control(struct us_data *us,
 		unsigned char *content,
 		int use_sg) {
 
-	US_DEBUGP("Read control address %08lX blocks %04X\n",
+	US_DEBUGP("Read control address %lu, blocks %d\n",
 		address, blocks);
 
-	return sddr09_read21(us, address, blocks, CONTROL_SHIFT, content, use_sg);
+	return sddr09_read21(us, address, blocks,
+			     CONTROL_SHIFT, content, use_sg);
 }
 
 /*
@@ -997,7 +1038,7 @@ sddr09_get_wp(struct us_data *us, struct sddr09_card_info *info) {
 		US_DEBUGP("sddr09_get_wp: read_status fails\n");
 		return result;
 	}
-	US_DEBUGP("sddr09_get_wp: status %02X", status);
+	US_DEBUGP("sddr09_get_wp: status 0x%02X", status);
 	if ((status & 0x80) == 0) {
 		info->flags |= SDDR09_WP;	/* write protected */
 		US_DEBUGP(" WP");
@@ -1092,69 +1133,36 @@ sddr09_get_cardinfo(struct us_data *us, unsigned char flags) {
 static int
 sddr09_read_map(struct us_data *us) {
 
-	struct scatterlist *sg;
 	struct sddr09_card_info *info = (struct sddr09_card_info *) us->extra;
 	int numblocks, alloc_len, alloc_blocks;
 	int i, j, result;
-	unsigned char *ptr;
+	unsigned char *buffer, *buffer_end, *ptr;
 	unsigned int lba, lbact;
 
 	if (!info->capacity)
 		return -1;
 
-	// read 64 (1<<6) bytes for every block 
-	// ( 1 << ( blockshift + pageshift ) bytes)
-	//	 of capacity:
-	// (1<<6)*capacity/(1<<(b+p)) =
-	// ((1<<6)*capacity)>>(b+p) =
-	// capacity>>(b+p-6)
-
-	alloc_len = info->capacity >> 
-		(info->blockshift + info->pageshift - CONTROL_SHIFT);
-
-	// Allocate a number of scatterlist structures according to
-	// the number of 128k blocks in the alloc_len. Adding 128k-1
-	// and then dividing by 128k gives the correct number of blocks.
-	// 128k = 1<<17
-
-	alloc_blocks = (alloc_len + (1<<17) - 1) >> 17;
-	sg = kmalloc(alloc_blocks*sizeof(struct scatterlist),
-		     GFP_NOIO);
-	if (sg == NULL)
-		return 0;
-
-	for (i=0; i<alloc_blocks; i++) {
-		int alloc_req = (i < alloc_blocks-1 ? 1 << 17 : alloc_len);
-		char *vaddr = kmalloc(alloc_req, GFP_NOIO);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)
-		sg[i].page = virt_to_page(vaddr);
-		sg[i].offset = offset_in_page(vaddr);
-#else
-		sg[i].address = vaddr;
-#endif
-		sg[i].length = alloc_req;
-		alloc_len -= alloc_req;
-	}
-
-	for (i=0; i<alloc_blocks; i++)
-		if (sg[i].page == NULL) {
-			for (i=0; i<alloc_blocks; i++)
-				if (sg[i].page != NULL)
-					kfree(sg_address(sg[i]));
-			kfree(sg);
-			return 0;
-		}
+	// size of a block is 1 << (blockshift + pageshift) bytes
+	// divide into the total capacity to get the number of blocks
 
 	numblocks = info->capacity >> (info->blockshift + info->pageshift);
 
-	result = sddr09_read_control(us, 0, numblocks,
-				     (unsigned char *)sg, alloc_blocks);
-	if (result != USB_STOR_TRANSPORT_GOOD) {
-		for (i=0; i<alloc_blocks; i++)
-			kfree(sg_address(sg[i]));
-		kfree(sg);
-		return -1;
+	// read 64 bytes for every block (actually 1 << CONTROL_SHIFT)
+	// but only use a 64 KB buffer
+	// buffer size used must be a multiple of (1 << CONTROL_SHIFT)
+#define SDDR09_READ_MAP_BUFSZ 65536
+
+	alloc_blocks = min(numblocks, SDDR09_READ_MAP_BUFSZ >> CONTROL_SHIFT);
+	alloc_len = (alloc_blocks << CONTROL_SHIFT);
+	buffer = kmalloc(alloc_len, GFP_NOIO);
+	if (buffer == NULL) {
+		printk("sddr09_read_map: out of memory\n");
+		result = -1;
+		goto done;
 	}
+	buffer_end = buffer + alloc_len;
+
+#undef SDDR09_READ_MAP_BUFSZ
 
 	kfree(info->lba_to_pba);
 	kfree(info->pba_to_lba);
@@ -1162,29 +1170,35 @@ sddr09_read_map(struct us_data *us) {
 	info->pba_to_lba = kmalloc(numblocks*sizeof(int), GFP_NOIO);
 
 	if (info->lba_to_pba == NULL || info->pba_to_lba == NULL) {
-		kfree(info->lba_to_pba);
-		kfree(info->pba_to_lba);
-		info->lba_to_pba = NULL;
-		info->pba_to_lba = NULL;
-		for (i=0; i<alloc_blocks; i++)
-			kfree(sg_address(sg[i]));
-		kfree(sg);
-		return 0;
+		printk("sddr09_read_map: out of memory\n");
+		result = -1;
+		goto done;
 	}
 
 	for (i = 0; i < numblocks; i++)
 		info->lba_to_pba[i] = info->pba_to_lba[i] = UNDEF;
 
-	ptr = sg_address(sg[0]);
-
 	/*
 	 * Define lba-pba translation table
 	 */
-	// Each block is 64 bytes of control data, so block i is located in
-	// scatterlist block i*64/128k = i*(2^6)*(2^-17) = i*(2^-11)
 
-	for (i=0; i<numblocks; i++) {
-		ptr = sg_address(sg[i>>11]) + ((i&0x7ff)<<6);
+	ptr = buffer_end;
+	for (i = 0; i < numblocks; i++) {
+		ptr += (1 << CONTROL_SHIFT);
+		if (ptr >= buffer_end) {
+			unsigned long address;
+
+			address = i << (info->pageshift + info->blockshift);
+			result = sddr09_read_control(
+				us, address>>1,
+				min(alloc_blocks, numblocks - i),
+				buffer, 0);
+			if (result != USB_STOR_TRANSPORT_GOOD) {
+				result = -1;
+				goto done;
+			}
+			ptr = buffer;
+		}
 
 		if (i == 0 || i == 1) {
 			info->pba_to_lba[i] = UNUSABLE;
@@ -1196,7 +1210,7 @@ sddr09_read_map(struct us_data *us) {
 			if (ptr[j] != 0)
 				goto nonz;
 		info->pba_to_lba[i] = UNUSABLE;
-		printk("sddr09: PBA %04X has no logical mapping\n", i);
+		printk("sddr09: PBA %d has no logical mapping\n", i);
 		continue;
 
 	nonz:
@@ -1209,7 +1223,7 @@ sddr09_read_map(struct us_data *us) {
 	nonff:
 		/* normal PBAs start with six FFs */
 		if (j < 6) {
-			printk("sddr09: PBA %04X has no logical mapping: "
+			printk("sddr09: PBA %d has no logical mapping: "
 			       "reserved area = %02X%02X%02X%02X "
 			       "data status %02X block status %02X\n",
 			       i, ptr[0], ptr[1], ptr[2], ptr[3],
@@ -1219,7 +1233,7 @@ sddr09_read_map(struct us_data *us) {
 		}
 
 		if ((ptr[6] >> 4) != 0x01) {
-			printk("sddr09: PBA %04X has invalid address field "
+			printk("sddr09: PBA %d has invalid address field "
 			       "%02X%02X/%02X%02X\n",
 			       i, ptr[6], ptr[7], ptr[11], ptr[12]);
 			info->pba_to_lba[i] = UNUSABLE;
@@ -1228,7 +1242,7 @@ sddr09_read_map(struct us_data *us) {
 
 		/* check even parity */
 		if (parity[ptr[6] ^ ptr[7]]) {
-			printk("sddr09: Bad parity in LBA for block %04X"
+			printk("sddr09: Bad parity in LBA for block %d"
 			       " (%02X %02X)\n", i, ptr[6], ptr[7]);
 			info->pba_to_lba[i] = UNUSABLE;
 			continue;
@@ -1247,27 +1261,32 @@ sddr09_read_map(struct us_data *us) {
 		 */
 
 		if (lba >= 1000) {
-			unsigned long address;
-
-			printk("sddr09: Bad LBA %04X for block %04X\n",
+			printk("sddr09: Bad low LBA %d for block %d\n",
 			       lba, i);
-			info->pba_to_lba[i] = UNDEF /* UNUSABLE */;
-			if (erase_bad_lba_entries) {
-				/* some cameras cannot erase a card if it has
-				   bad entries, so we supply this function */
-				address = (i << (info->pageshift + info->blockshift));
-				sddr09_erase(us, address>>1);
-			}
-			continue;
+			goto possibly_erase;
 		}
 
 		lba += 1000*(i/0x400);
 
-		if (lba<0x10 || (lba >= 0x3E0 && lba < 0x3EF))
-			US_DEBUGP("LBA %04X <-> PBA %04X\n", lba, i);
+		if (info->lba_to_pba[lba] != UNDEF) {
+			printk("sddr09: LBA %d seen for PBA %d and %d\n",
+			       lba, info->lba_to_pba[lba], i);
+			goto possibly_erase;
+		}
 
 		info->pba_to_lba[i] = lba;
 		info->lba_to_pba[lba] = i;
+		continue;
+
+	possibly_erase:
+		if (erase_bad_lba_entries) {
+			unsigned long address;
+
+			address = (i << (info->pageshift + info->blockshift));
+			sddr09_erase(us, address>>1);
+			info->pba_to_lba[i] = UNDEF;
+		} else
+			info->pba_to_lba[i] = UNUSABLE;
 	}
 
 	/*
@@ -1292,11 +1311,17 @@ sddr09_read_map(struct us_data *us) {
 	}
 	info->lbact = lbact;
 	US_DEBUGP("Found %d LBA's\n", lbact);
+	result = 0;
 
-	for (i=0; i<alloc_blocks; i++)
-		kfree(sg_address(sg[i]));
-	kfree(sg);
-	return 0;
+ done:
+	if (result != 0) {
+		kfree(info->lba_to_pba);
+		kfree(info->pba_to_lba);
+		info->lba_to_pba = NULL;
+		info->pba_to_lba = NULL;
+	}
+	kfree(buffer);
+	return result;
 }
 
 static void
@@ -1438,6 +1463,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		cardinfo = sddr09_get_cardinfo(us, info->flags);
 		if (!cardinfo) {
 			/* probably no media */
+		init_error:
 			sensekey = 0x02;	/* not ready */
 			sensecode = 0x3a;	/* medium not present */
 			return USB_STOR_TRANSPORT_FAILED;
@@ -1451,7 +1477,10 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		info->blockmask = info->blocksize - 1;
 
 		// map initialization, must follow get_cardinfo()
-		sddr09_read_map(us);
+		if (sddr09_read_map(us)) {
+			/* probably out of memory */
+			goto init_error;
+		}
 
 		// Report capacity
 
@@ -1472,12 +1501,13 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 		return USB_STOR_TRANSPORT_GOOD;
 	}
 
-	if (srb->cmnd[0] == MODE_SENSE) {
+	if (srb->cmnd[0] == MODE_SENSE || srb->cmnd[0] == MODE_SENSE_10) {
 		int modepage = (srb->cmnd[2] & 0x3F);
 		int len;
 
 		/* They ask for the Read/Write error recovery page,
 		   or for all pages. Give as much as they have room for. */
+		/* %% We should check DBD %% */
 		if (modepage == 0x01 || modepage == 0x3F) {
 
 			US_DEBUGP("SDDR09: Dummy up request for "
@@ -1496,19 +1526,13 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 			return USB_STOR_TRANSPORT_GOOD;
 		}
 
-		return USB_STOR_TRANSPORT_ERROR;
+		sensekey = 0x05;	/* illegal request */
+		sensecode = 0x24;	/* invalid field in CDB */
+		return USB_STOR_TRANSPORT_FAILED;
 	}
 
-	if (srb->cmnd[0] == ALLOW_MEDIUM_REMOVAL) {
-
-		US_DEBUGP(
-			"SDDR09: %s medium removal. Not that I can do"
-			" anything about it...\n",
-			(srb->cmnd[4]&0x03) ? "Prevent" : "Allow");
-
+	if (srb->cmnd[0] == ALLOW_MEDIUM_REMOVAL)
 		return USB_STOR_TRANSPORT_GOOD;
-
-	}
 
 	havefakesense = 0;
 
@@ -1542,8 +1566,10 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 
 	if (srb->cmnd[0] != TEST_UNIT_READY &&
 	    srb->cmnd[0] != REQUEST_SENSE) {
+		sensekey = 0x05;	/* illegal request */
+		sensecode = 0x20;	/* invalid command */
 		havefakesense = 1;
-		return USB_STOR_TRANSPORT_ERROR;
+		return USB_STOR_TRANSPORT_FAILED;
 	}
 
 	for (; srb->cmd_len<12; srb->cmd_len++)
@@ -1555,8 +1581,7 @@ int sddr09_transport(Scsi_Cmnd *srb, struct us_data *us)
 	for (i=0; i<12; i++)
 		sprintf(string+strlen(string), "%02X ", srb->cmnd[i]);
 
-	US_DEBUGP("SDDR09: Send control for command %s\n",
-		  string);
+	US_DEBUGP("SDDR09: Send control for command %s\n", string);
 
 	result = sddr09_send_scsi_command(us, srb->cmnd, 12);
 	if (result != USB_STOR_TRANSPORT_GOOD) {

@@ -26,6 +26,7 @@
 #include <linux/bootmem.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
+#include <linux/efi.h>
 
 #include <asm/processor.h>
 #include <asm/system.h>
@@ -165,12 +166,30 @@ static inline int page_kills_ppro(unsigned long pagenr)
 	return 0;
 }
 
+extern int is_available_memory(efi_memory_desc_t *);
+
 static inline int page_is_ram(unsigned long pagenr)
 {
 	int i;
+	unsigned long addr, end;
+
+	if (efi_enabled) {
+		efi_memory_desc_t *md;
+
+		for (i = 0; i < memmap.nr_map; i++) {
+			md = &memmap.map[i];
+			if (!is_available_memory(md))
+				continue;
+			addr = (md->phys_addr+PAGE_SIZE-1) >> PAGE_SHIFT;
+			end = (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT)) >> PAGE_SHIFT;
+
+			if ((pagenr >= addr) && (pagenr < end))
+				return 1;
+		}
+		return 0;
+	}
 
 	for (i = 0; i < e820.nr_map; i++) {
-		unsigned long addr, end;
 
 		if (e820.map[i].type != E820_RAM)	/* not usable memory */
 			continue;
@@ -388,12 +407,6 @@ void __init paging_init(void)
 
 void __init test_wp_bit(void)
 {
-	if (cpu_has_pse) {
-		/* Ok, all PSE-capable CPUs are definitely handling the WP bit right. */
-		boot_cpu_data.wp_works_ok = 1;
-		return;
-	}
-
 	printk("Checking if this processor honours the WP bit even in supervisor mode... ");
 
 	/* Any page-aligned address will do, the test is non-destructive */

@@ -557,7 +557,7 @@ ippp_ccp_send_ccp(struct ippp_ccp *ccp, struct sk_buff *skb)
 }
 
 static LIST_HEAD(ipc_head);
-static spinlock_t ipc_head_lock;
+static spinlock_t ipc_head_lock = SPIN_LOCK_UNLOCKED;
 
 int
 ippp_ccp_set_compressor(struct ippp_ccp *ccp, int unit,

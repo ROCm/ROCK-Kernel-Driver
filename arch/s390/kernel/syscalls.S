@@ -251,11 +251,11 @@ SYSCALL(sys_sched_setaffinity,sys_sched_setaffinity,sys32_sched_setaffinity_wrap
 SYSCALL(sys_sched_getaffinity,sys_sched_getaffinity,sys32_sched_getaffinity_wrapper)	/* 240 */
 SYSCALL(sys_tgkill,sys_tgkill,sys_tgkill)
 NI_SYSCALL							/* reserved for TUX */
-SYSCALL(sys_io_setup,sys_io_setup,sys_ni_syscall)
-SYSCALL(sys_io_destroy,sys_io_destroy,sys_ni_syscall)
-SYSCALL(sys_io_getevents,sys_io_getevents,sys_ni_syscall)	/* 245 */
-SYSCALL(sys_io_submit,sys_io_submit,sys_ni_syscall)
-SYSCALL(sys_io_cancel,sys_io_cancel,sys_ni_syscall)
+SYSCALL(sys_io_setup,sys_io_setup,sys32_io_setup_wrapper)
+SYSCALL(sys_io_destroy,sys_io_destroy,sys32_io_destroy_wrapper)
+SYSCALL(sys_io_getevents,sys_io_getevents,sys32_io_getevents_wrapper)	/* 245 */
+SYSCALL(sys_io_submit,sys_io_submit,sys32_io_submit_wrapper)
+SYSCALL(sys_io_cancel,sys_io_cancel,sys32_io_cancel_wrapper)
 SYSCALL(sys_exit_group,sys_exit_group,sys32_exit_group_wrapper)
 SYSCALL(sys_epoll_create,sys_epoll_create,sys_epoll_create_wrapper)
 SYSCALL(sys_epoll_ctl,sys_epoll_ctl,sys_epoll_ctl_wrapper)	/* 250 */

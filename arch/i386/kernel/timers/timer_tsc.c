@@ -472,6 +472,7 @@ __setup("notsc", tsc_setup);
 
 /* tsc timer_opts struct */
 struct timer_opts timer_tsc = {
+	.name = 	"tsc",
 	.init =		init_tsc,
 	.mark_offset =	mark_offset_tsc, 
 	.get_offset =	get_offset_tsc,

@@ -371,6 +371,12 @@ config IA32_EMULATION
 	  turn this on, unless you're 100% sure that you don't have any 32-bit programs
 	  left.
 
+config IA32_AOUT
+       bool "IA32 a.out support"
+       depends on IA32_EMULATION
+       help
+         Support old a.out binaries in the 32bit emulation.
+
 config COMPAT
 	bool
 	depends on IA32_EMULATION
@@ -505,6 +511,7 @@ config FRAME_POINTER
 	 Normally you should say N.
 
 config IOMMU_DEBUG
+       depends on GART_IOMMU && DEBUG_KERNEL
        bool "Force IOMMU to on" 
        help
          Force the IOMMU to on even when you have less than 4GB of memory and add 

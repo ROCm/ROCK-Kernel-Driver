@@ -25,7 +25,7 @@ config SOUND_CMPCI
 	depends on SOUND_PRIME!=n && SOUND && PCI
 	help
 	  Say Y or M if you have a PCI sound card using the CMI8338
-	  or the CMI8378 chipset.  Data on these chips are available at
+	  or the CMI8738 chipset.  Data on these chips are available at
 	  <http://www.cmedia.com.tw/>.
 
 	  A userspace utility to control some internal registers of these

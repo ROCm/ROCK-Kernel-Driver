@@ -1463,4 +1463,5 @@ static void __exit exit_iso9660_fs(void)
 module_init(init_iso9660_fs)
 module_exit(exit_iso9660_fs)
 MODULE_LICENSE("GPL");
-
+/* Actual filesystem name is iso9660, as requested in filesystems.c */
+MODULE_ALIAS("iso9660");

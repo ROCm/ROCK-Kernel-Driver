@@ -31,6 +31,7 @@
 #include <sound/initval.h>
 #include <linux/kmod.h>
 #include <linux/devfs_fs_kernel.h>
+#include <linux/device.h>
 
 #define SNDRV_OS_MINORS 256
 
@@ -52,6 +53,7 @@ MODULE_PARM_SYNTAX(major, "default:116,skill:devel");
 MODULE_PARM(cards_limit, "i");
 MODULE_PARM_DESC(cards_limit, "Count of soundcards installed in the system.");
 MODULE_PARM_SYNTAX(cards_limit, "default:8,skill:advanced");
+MODULE_ALIAS_CHARDEV_MAJOR(CONFIG_SND_MAJOR);
 #ifdef CONFIG_DEVFS_FS
 MODULE_PARM(device_mode, "i");
 MODULE_PARM_DESC(device_mode, "Device file permission mask for devfs.");

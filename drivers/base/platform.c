@@ -14,8 +14,8 @@
 #include <linux/module.h>
 #include <linux/init.h>
 
-struct device legacy_bus = {
-	.bus_id		= "legacy",
+struct device platform_bus = {
+	.bus_id		= "platform",
 };
 
 /**
@@ -29,7 +29,7 @@ int platform_device_register(struct platform_device * pdev)
 		return -EINVAL;
 
 	if (!pdev->dev.parent)
-		pdev->dev.parent = &legacy_bus;
+		pdev->dev.parent = &platform_bus;
 
 	pdev->dev.bus = &platform_bus_type;
 	
@@ -105,11 +105,11 @@ struct bus_type platform_bus_type = {
 
 int __init platform_bus_init(void)
 {
-	device_register(&legacy_bus);
+	device_register(&platform_bus);
 	return bus_register(&platform_bus_type);
 }
 
-EXPORT_SYMBOL(legacy_bus);
+EXPORT_SYMBOL(platform_bus);
 EXPORT_SYMBOL(platform_bus_type);
 EXPORT_SYMBOL(platform_device_register);
 EXPORT_SYMBOL(platform_device_unregister);

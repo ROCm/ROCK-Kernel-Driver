@@ -378,7 +378,7 @@ static void dsmark_destroy(struct Qdisc *sch)
 	while (p->filter_list) {
 		tp = p->filter_list;
 		p->filter_list = tp->next;
-		tp->ops->destroy(tp);
+		tcf_destroy(tp);
 	}
 	qdisc_destroy(p->q);
 	p->q = &noop_qdisc;

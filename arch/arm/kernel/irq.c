@@ -169,11 +169,11 @@ void disable_irq_wake(unsigned int irq)
 
 int show_interrupts(struct seq_file *p, void *v)
 {
-	int i;
+	int i = *(loff_t *) v;
 	struct irqaction * action;
 	unsigned long flags;
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		spin_lock_irqsave(&irq_controller_lock, flags);
 	    	action = irq_desc[i].action;
 		if (!action)
@@ -187,12 +187,12 @@ int show_interrupts(struct seq_file *p, void *v)
 		seq_putc(p, '\n');
 unlock:
 		spin_unlock_irqrestore(&irq_controller_lock, flags);
-	}
-
+	} else if (i == NR_IRQS) {
 #ifdef CONFIG_ARCH_ACORN
-	show_fiq_list(p, v);
+		show_fiq_list(p, v);
 #endif
-	seq_printf(p, "Err: %10lu\n", irq_err_count);
+		seq_printf(p, "Err: %10lu\n", irq_err_count);
+	}
 	return 0;
 }
 

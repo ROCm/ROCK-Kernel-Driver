@@ -748,13 +748,13 @@ static int start_tx (struct sk_buff *skb, struct net_device *dev)
 	
 	if(priv->station_state != STATION_STATE_READY) {
 		priv->stats.tx_errors++;
-		return 0;
+		goto done;
 	}
 	
 	if (priv->card && priv->present_callback && 
 	    !(*priv->present_callback)(priv->card)) {
 		priv->stats.tx_errors++;
-		return 0;
+		goto done;
 	}
 	
 	/* first ensure the timer func cannot run */
@@ -804,6 +804,8 @@ static int start_tx (struct sk_buff *skb, struct net_device *dev)
 	
 	spin_unlock_irqrestore(&priv->irqlock, flags);
 	spin_unlock_bh(&priv->timerlock);
+
+done:
 	dev_kfree_skb(skb);
 	
 	return 0;	

@@ -25,6 +25,6 @@ obj-$(CONFIG_DUMMY_IOMMU)	+= pci-nommu.o pci-dma.o
 obj-$(CONFIG_MODULES)		+= module.o
 
 bootflag-y			+= ../../i386/kernel/bootflag.o
-cpuid-$(CONFIG_X86_CPUID)	+= ../../i386/kernel/cpuid.o
+cpuid-$(subst m,y,$(CONFIG_X86_CPUID))  += ../../i386/kernel/cpuid.o
 
 obj-$(CONFIG_CPU_FREQ)	+=	cpufreq/

@@ -93,6 +93,8 @@ restore_sigcontext(struct pt_regs *regs, struct sigcontext *sc, unsigned long *p
 {
 	unsigned int err = 0;
 
+	/* Always make any pending restarted system calls return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
 
 #define COPY(x)		err |= __get_user(regs->x, &sc->x)
 
@@ -355,8 +357,6 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		/* If so, check system call restarting.. */
 		switch (regs->rax) {
 		        case -ERESTART_RESTARTBLOCK:
-				current_thread_info()->restart_block.fn = do_no_restart_syscall;
-				/* FALL THROUGH */
 			case -ERESTARTNOHAND:
 				regs->rax = -EINTR;
 				break;
@@ -371,10 +371,6 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 				regs->rax = regs->orig_rax;
 				regs->rip -= 2;
 		}
-		if (regs->rax == (unsigned long)-ERESTART_RESTARTBLOCK){
-			regs->rax = __NR_restart_syscall;
- 			regs->rip -= 2;
- 		}		
 	}
 
 #ifdef CONFIG_IA32_EMULATION
@@ -451,6 +447,10 @@ int do_signal(struct pt_regs *regs, sigset_t *oldset)
 		    res == -ERESTARTSYS ||
 		    res == -ERESTARTNOINTR) {
 			regs->rax = regs->orig_rax;
+			regs->rip -= 2;
+		}
+		if (regs->rax == (unsigned long)-ERESTART_RESTARTBLOCK) {
+			regs->rax = __NR_restart_syscall;
 			regs->rip -= 2;
 		}
 	}

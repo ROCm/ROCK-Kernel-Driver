@@ -12,6 +12,7 @@
 #include <linux/namei.h>
 #include <linux/ctype.h>
 #include <linux/slab.h>
+#include <linux/interrupt.h>
 #include <asm/atomic.h>
 
 #define MAX_DEPTH 16
@@ -202,7 +203,7 @@ static int alloc_targets(struct dm_table *t, unsigned int num)
 	return 0;
 }
 
-int dm_table_create(struct dm_table **result, int mode)
+int dm_table_create(struct dm_table **result, int mode, unsigned num_targets)
 {
 	struct dm_table *t = kmalloc(sizeof(*t), GFP_NOIO);
 
@@ -213,8 +214,12 @@ int dm_table_create(struct dm_table **result, int mode)
 	INIT_LIST_HEAD(&t->devices);
 	atomic_set(&t->holders, 1);
 
-	/* allocate a single nodes worth of targets to begin with */
-	if (alloc_targets(t, KEYS_PER_NODE)) {
+	if (!num_targets)
+		num_targets = KEYS_PER_NODE;
+
+	num_targets = dm_round_up(num_targets, KEYS_PER_NODE);
+
+	if (alloc_targets(t, num_targets)) {
 		kfree(t);
 		t = NULL;
 		return -ENOMEM;
@@ -626,6 +631,16 @@ static int split_args(int *argc, char ***argvp, char *input)
 	return 0;
 }
 
+static void set_default_limits(struct io_restrictions *rs)
+{
+	rs->max_sectors = MAX_SECTORS;
+	rs->max_phys_segments = MAX_PHYS_SEGMENTS;
+	rs->max_hw_segments = MAX_HW_SEGMENTS;
+	rs->hardsect_size = 1 << SECTOR_SHIFT;
+	rs->max_segment_size = MAX_SEGMENT_SIZE;
+	rs->seg_boundary_mask = -1;
+}
+
 int dm_table_add_target(struct dm_table *t, const char *type,
 			sector_t start, sector_t len, char *params)
 {
@@ -638,6 +653,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 
 	tgt = t->targets + t->num_targets;
 	memset(tgt, 0, sizeof(*tgt));
+	set_default_limits(&tgt->limits);
 
 	tgt->type = dm_get_target_type(type);
 	if (!tgt->type) {
@@ -731,22 +747,28 @@ int dm_table_complete(struct dm_table *t)
 	return r;
 }
 
-static spinlock_t _event_lock = SPIN_LOCK_UNLOCKED;
+static DECLARE_MUTEX(_event_lock);
 void dm_table_event_callback(struct dm_table *t,
 			     void (*fn)(void *), void *context)
 {
-	spin_lock_irq(&_event_lock);
+	down(&_event_lock);
 	t->event_fn = fn;
 	t->event_context = context;
-	spin_unlock_irq(&_event_lock);
+	up(&_event_lock);
 }
 
 void dm_table_event(struct dm_table *t)
 {
-	spin_lock(&_event_lock);
+	/*
+	 * You can no longer call dm_table_event() from interrupt
+	 * context, use a bottom half instead.
+	 */
+	BUG_ON(in_interrupt());
+
+	down(&_event_lock);
 	if (t->event_fn)
 		t->event_fn(t->event_context);
-	spin_unlock(&_event_lock);
+	up(&_event_lock);
 }
 
 sector_t dm_table_get_size(struct dm_table *t)

@@ -24,6 +24,7 @@ extern void disable_irq(unsigned int);
 extern void disable_irq_nosync(unsigned int);
 extern void enable_irq(unsigned int);
 extern void release_x86_irqs(struct task_struct *);
+extern int can_request_irq(unsigned int, unsigned long flags);
 
 #ifdef CONFIG_X86_LOCAL_APIC
 #define ARCH_HAS_NMI_WATCHDOG		/* See include/linux/nmi.h */

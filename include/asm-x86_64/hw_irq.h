@@ -173,6 +173,8 @@ static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {}
 #endif
 
+#define platform_legacy_irq(irq)	((irq) < 16)
+
 #endif
 
 #endif /* _ASM_HW_IRQ_H */

@@ -990,7 +990,7 @@ static int page_cache_read(struct file * file, unsigned long offset)
  * it in the page cache, and handles the special cases reasonably without
  * having a lot of duplicated code.
  */
-struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address, int unused)
+struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address, int *type)
 {
 	int error;
 	struct file *file = area->vm_file;
@@ -999,7 +999,7 @@ struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address
 	struct inode *inode = mapping->host;
 	struct page *page;
 	unsigned long size, pgoff, endoff;
-	int did_readaround = 0;
+	int did_readaround = 0, majmin = VM_FAULT_MINOR;
 
 	pgoff = ((address - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
 	endoff = ((area->vm_end - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
@@ -1048,6 +1048,14 @@ retry_find:
 		if (ra->mmap_miss > ra->mmap_hit + MMAP_LOTSAMISS)
 			goto no_cached_page;
 
+		/*
+		 * To keep the pgmajfault counter straight, we need to
+		 * check did_readaround, as this is an inner loop.
+		 */
+		if (!did_readaround) {
+			majmin = VM_FAULT_MAJOR;
+			inc_page_state(pgmajfault);
+		}
 		did_readaround = 1;
 		do_page_cache_readahead(mapping, file,
 				pgoff & ~(MMAP_READAROUND-1), MMAP_READAROUND);
@@ -1069,6 +1077,8 @@ success:
 	 * Found the page and have a reference on it.
 	 */
 	mark_page_accessed(page);
+	if (type)
+		*type = majmin;
 	return page;
 
 outside_data_content:
@@ -1104,7 +1114,10 @@ no_cached_page:
 	return NULL;
 
 page_not_uptodate:
-	inc_page_state(pgmajfault);
+	if (!did_readaround) {
+		majmin = VM_FAULT_MAJOR;
+		inc_page_state(pgmajfault);
+	}
 	lock_page(page);
 
 	/* Did it get unhashed while we waited for it? */

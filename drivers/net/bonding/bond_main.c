@@ -3910,7 +3910,6 @@ static void bond_free_all(void)
 
 		unregister_netdevice(dev);
 		bond_deinit(dev);
-		free_netdev(dev);
 	}
 
 #ifdef CONFIG_PROC_FS
@@ -4007,6 +4006,8 @@ static int __init bond_init(struct net_device *dev)
 #ifdef CONFIG_PROC_FS
 	bond_create_proc_info(bond);
 #endif
+
+	dev->destructor = free_netdev;
 
 	list_add_tail(&bond->bond_list, &bond_dev_list);
 

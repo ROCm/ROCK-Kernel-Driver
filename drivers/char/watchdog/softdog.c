@@ -155,9 +155,8 @@ static ssize_t softdog_write(struct file *file, const char *data, size_t len, lo
 			}
 		}
 		mod_timer(&watchdog_ticktock, jiffies+(soft_margin*HZ));
-		return 1;
 	}
-	return 0;
+	return len;
 }
 
 static int softdog_ioctl(struct inode *inode, struct file *file,

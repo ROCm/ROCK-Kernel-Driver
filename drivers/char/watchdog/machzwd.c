@@ -343,10 +343,9 @@ static ssize_t zf_write(struct file *file, const char *buf, size_t count,
 		next_heartbeat = jiffies + ZF_USER_TIMEO;
 		dprintk("user ping at %ld\n", jiffies);
 		
-		return 1;
 	}
 
-	return 0;
+	return count;
 }
 
 static int zf_ioctl(struct inode *inode, struct file *file, unsigned int cmd,

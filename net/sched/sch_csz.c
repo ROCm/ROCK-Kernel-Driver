@@ -752,7 +752,7 @@ csz_destroy(struct Qdisc* sch)
 
 	while ((tp = q->filter_list) != NULL) {
 		q->filter_list = tp->next;
-		tp->ops->destroy(tp);
+		tcf_destroy(tp);
 	}
 }
 

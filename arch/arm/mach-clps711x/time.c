@@ -40,6 +40,7 @@ static unsigned long clps711x_gettimeoffset(void)
 
 void __init clps711x_setup_timer(void)
 {
+	struct timespec tv;
 	unsigned int syscon;
 
 	gettimeoffset = clps711x_gettimeoffset;
@@ -50,5 +51,7 @@ void __init clps711x_setup_timer(void)
 
 	clps_writel(LATCH-1, TC2D); /* 512kHz / 100Hz - 1 */
 
-	xtime.tv_sec = clps_readl(RTCDR);
+	tv.tv_nsec = 0;
+	tv.tv_sec = clps_readl(RTCDR);
+	do_settimeofday(&tv);
 }

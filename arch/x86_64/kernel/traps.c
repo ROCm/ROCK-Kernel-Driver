@@ -218,8 +218,12 @@ void show_stack(struct task_struct *tsk, unsigned long * rsp)
 	// debugging aid: "show_stack(NULL, NULL);" prints the
 	// back trace for this cpu.
 
-	if(rsp==NULL)
-		rsp=(unsigned long*)&rsp;
+	if (rsp == NULL) {
+		if (tsk)
+			rsp = (unsigned long *)tsk->thread.rsp;
+		else
+			rsp = (unsigned long *)&rsp;
+	}
 
 	stack = rsp;
 	for(i=0; i < kstack_depth_to_print; i++) {

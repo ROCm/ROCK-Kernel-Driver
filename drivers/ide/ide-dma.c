@@ -200,8 +200,8 @@ EXPORT_SYMBOL_GPL(ide_dma_intr);
  *	kernel provide the necessary cache management so that we can
  *	operate in a portable fashion
  */
- 
-static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
+
+int ide_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct scatterlist *sg = hwif->sg_table;
@@ -220,6 +220,8 @@ static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
 
+EXPORT_SYMBOL_GPL(ide_build_sglist);
+
 /**
  *	ide_raw_build_sglist	-	map IDE scatter gather for DMA
  *	@drive: the drive to build the DMA table for
@@ -230,8 +232,8 @@ static int ide_build_sglist (ide_drive_t *drive, struct request *rq)
  *	of the  kernel provide the necessary cache management so that we can
  *	operate in a portable fashion
  */
- 
-static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
+
+int ide_raw_build_sglist(ide_drive_t *drive, struct request *rq)
 {
 	ide_hwif_t *hwif = HWIF(drive);
 	struct scatterlist *sg = hwif->sg_table;
@@ -269,6 +271,8 @@ static int ide_raw_build_sglist (ide_drive_t *drive, struct request *rq)
 
 	return pci_map_sg(hwif->pci_dev, sg, nents, hwif->sg_dma_direction);
 }
+
+EXPORT_SYMBOL_GPL(ide_raw_build_sglist);
 
 /**
  *	ide_build_dmatable	-	build IDE DMA table
@@ -925,11 +929,13 @@ int ide_release_iomio_dma (ide_hwif_t *hwif)
  */
 int ide_release_dma (ide_hwif_t *hwif)
 {
+	if (hwif->mmio == 2)
+		return 1;
 	if (hwif->chipset == ide_etrax100)
 		return 1;
 
 	ide_release_dma_engine(hwif);
-	if (hwif->mmio)
+	if (hwif->mmio == 1)
 		return ide_release_mmio_dma(hwif);
 	return ide_release_iomio_dma(hwif);
 }
@@ -986,6 +992,21 @@ fail:
 	return 1;
 }
 
+int ide_mapped_mmio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
+{
+	printk(KERN_INFO "    %s: MMIO-DMA ", hwif->name);
+
+	hwif->dma_base = base;
+	if (hwif->cds->extra && hwif->channel == 0)
+		hwif->dma_extra = hwif->cds->extra;
+
+	if(hwif->mate)
+		hwif->dma_master = (hwif->channel) ? hwif->mate->dma_base : base;
+	else
+		hwif->dma_master = base;
+	return 0;
+}
+
 int ide_iomio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 {
 	printk(KERN_INFO "    %s: BM-DMA at 0x%04lx-0x%04lx",
@@ -1020,7 +1041,9 @@ int ide_iomio_dma (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
  */
 int ide_dma_iobase (ide_hwif_t *hwif, unsigned long base, unsigned int ports)
 {
-	if (hwif->mmio)
+	if (hwif->mmio == 2)
+		return ide_mapped_mmio_dma(hwif, base,ports);
+	if (hwif->mmio == 1)
 		return ide_mmio_dma(hwif, base, ports);
 	return ide_iomio_dma(hwif, base, ports);
 }

@@ -253,6 +253,7 @@ static void delay_cyclone(unsigned long loops)
 
 /* cyclone timer_opts struct */
 struct timer_opts timer_cyclone = {
+	.name = "cyclone",
 	.init = init_cyclone, 
 	.mark_offset = mark_offset_cyclone, 
 	.get_offset = get_offset_cyclone,
