@@ -1343,6 +1343,8 @@ int ideprobe_init (void)
 			int unit;
 			if (!hwif->present)
 				continue;
+			if (hwif->chipset == ide_unknown || hwif->chipset == ide_forced)
+				hwif->chipset = ide_generic;
 			for (unit = 0; unit < MAX_DRIVES; ++unit)
 				if (hwif->drives[unit].present)
 					ata_attach(&hwif->drives[unit]);

@@ -59,7 +59,7 @@ static ide_hwif_t *ide_match_hwif(unsigned long io_base, u8 bootable, const char
 	for (h = 0; h < MAX_HWIFS; ++h) {
 		hwif = &ide_hwifs[h];
 		if (hwif->io_ports[IDE_DATA_OFFSET] == io_base) {
-			if (hwif->chipset == ide_generic)
+			if (hwif->chipset == ide_forced)
 				return hwif; /* a perfect match */
 		}
 	}

@@ -2179,7 +2179,7 @@ int __init ide_setup (char *s)
 				memcpy(hwif->io_ports, hwif->hw.io_ports, sizeof(hwif->io_ports));
 				hwif->irq      = vals[2];
 				hwif->noprobe  = 0;
-				hwif->chipset  = ide_generic;
+				hwif->chipset  = ide_forced;
 				goto done;
 
 			case 0: goto bad_option;
