@@ -249,15 +249,13 @@ setup_teles0(struct IsdnCard *card)
 	}
 	cs->irq = card->para[0];
 	if (cs->hw.teles0.cfg_reg) {
-		if (check_region(cs->hw.teles0.cfg_reg, 8)) {
+		if (!request_region(cs->hw.teles0.cfg_reg, 8, "teles cfg")) {
 			printk(KERN_WARNING
 			  "HiSax: %s config port %x-%x already in use\n",
 			       CardType[card->typ],
 			       cs->hw.teles0.cfg_reg,
 			       cs->hw.teles0.cfg_reg + 8);
 			return (0);
-		} else {
-			request_region(cs->hw.teles0.cfg_reg, 8, "teles cfg");
 		}
 	}
 	if (cs->hw.teles0.cfg_reg) {
