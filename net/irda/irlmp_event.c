@@ -459,6 +459,15 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 					    LM_LAP_DISCONNECT_INDICATION,
 					    NULL);
 		}
+
+		/* Force an expiry of the discovery log.
+		 * Now that the LAP is free, the system may attempt to
+		 * connect to another device. Unfortunately, our entries
+		 * are stale. There is a small window (<3s) before the
+		 * normal discovery will run and where irlmp_connect_request()
+		 * can get the wrong info, so make sure things get
+		 * cleaned *NOW* ;-) - Jean II */
+		irlmp_do_expiry();
 		break;
 	default:
 		IRDA_DEBUG(0, __FUNCTION__ "(), Unknown event %s\n",

@@ -415,6 +415,7 @@ static void irda_getvalue_confirm(int result, __u16 obj_id,
  * hint bits), and then wake up any process waiting for answer...
  */
 static void irda_selective_discovery_indication(discovery_t *discovery,
+						DISCOVERY_MODE mode,
 						void *priv)
 {
 	struct irda_sock *self;
