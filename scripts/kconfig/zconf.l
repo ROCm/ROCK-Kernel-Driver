@@ -96,6 +96,7 @@ n	[A-Za-z0-9_]
 	"endchoice"		BEGIN(PARAM); return T_ENDCHOICE;
 	"comment"		BEGIN(PARAM); return T_COMMENT;
 	"config"		BEGIN(PARAM); return T_CONFIG;
+	"menuconfig"		BEGIN(PARAM); return T_MENUCONFIG;
 	"help"			BEGIN(PARAM); return T_HELP;
 	"if"			BEGIN(PARAM); return T_IF;
 	"endif"			BEGIN(PARAM); return T_ENDIF;
@@ -141,6 +142,7 @@ n	[A-Za-z0-9_]
 		zconflval.string = text;
 		return T_WORD;
 	}
+	#.*	/* comment */
 	\\\n	current_file->lineno++;
 	.
 	<<EOF>> {
@@ -208,7 +210,7 @@ n	[A-Za-z0-9_]
 		}
 		
 	}
-	\n/[^ \t\n] {
+	[ \t]*\n/[^ \t\n] {
 		current_file->lineno++;
 		zconf_endhelp();
 		return T_HELPTEXT;

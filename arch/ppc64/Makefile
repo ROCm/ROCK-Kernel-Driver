@@ -18,9 +18,8 @@ KERNELLOAD	= 0xc000000000000000
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 LDFLAGS_BLOB	:= --format binary --oformat elf64-powerpc
-CFLAGS		+= -msoft-float -pipe \
-		-Wno-uninitialized -mminimal-toc -mtraceback=full \
-		-finline-limit-2000 -mcpu=power4
+CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
+		-mtraceback=full -mcpu=power4
 
 head-y := arch/ppc64/kernel/head.o
 

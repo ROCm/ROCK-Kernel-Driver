@@ -2041,11 +2041,11 @@ prom_bi_rec_verify(struct bi_record *bi_recs)
 	if ( bi_recs == NULL || bi_recs->tag != BI_FIRST )
 		return NULL;
 
-	last = (struct bi_record *)bi_recs->data[0];
+	last = (struct bi_record *)(long)bi_recs->data[0];
 	if ( last == NULL || last->tag != BI_LAST )
 		return NULL;
 
-	first = (struct bi_record *)last->data[0];
+	first = (struct bi_record *)(long)last->data[0];
 	if ( first == NULL || first != bi_recs )
 		return NULL;
 

@@ -101,10 +101,14 @@ public:
 	void setAllOpen(bool open);
 	void setParentMenu(void);
 
+	template <class P>
+	void ConfigList::updateMenuList(P*, struct menu*);
+
 	bool updateAll;
 
 	QPixmap symbolYesPix, symbolModPix, symbolNoPix;
-	QPixmap choiceYesPix, choiceNoPix, menuPix, menuInvPix;
+	QPixmap choiceYesPix, choiceNoPix;
+	QPixmap menuPix, menuInvPix, menuBackPix;
 
 	bool showAll, showName, showRange, showData;
 	enum listMode mode;
@@ -121,12 +125,17 @@ class ConfigItem : public QListViewItem {
 	typedef class QListViewItem Parent;
 public:
 	ConfigItem(QListView *parent, ConfigItem *after, struct menu *m, bool v)
-	: Parent(parent, after), menu(m), visible(v)
+	: Parent(parent, after), menu(m), visible(v), goParent(false)
 	{
 		init();
 	}
 	ConfigItem(ConfigItem *parent, ConfigItem *after, struct menu *m, bool v)
-	: Parent(parent, after), menu(m), visible(v)
+	: Parent(parent, after), menu(m), visible(v), goParent(false)
+	{
+		init();
+	}
+	ConfigItem(QListView *parent, ConfigItem *after, bool v)
+	: Parent(parent, after), menu(0), visible(v), goParent(true)
 	{
 		init();
 	}
@@ -136,7 +145,7 @@ public:
 	void okRename(int col);
 #endif
 	void updateMenu(void);
-	bool updateNeeded(void);
+	void testUpdateMenu(bool v);
 	ConfigList* listView() const
 	{
 		return (ConfigList*)Parent::listView();
@@ -170,6 +179,7 @@ public:
 	ConfigItem* nextItem;
 	struct menu *menu;
 	bool visible;
+	bool goParent;
 };
 
 class ConfigLineEdit : public QLineEdit {
@@ -216,7 +226,9 @@ public slots:
 protected:
 	void closeEvent(QCloseEvent *e);
 
+	ConfigView *menuView;
 	ConfigList *menuList;
+	ConfigView *configView;
 	ConfigList *configList;
 	QTextView *helpText;
 	QToolBar *toolBar;

@@ -14,7 +14,7 @@
  *	   trini@mvista.com
  * Derived from arch/ppc/boot/prep/head.S (Cort Dougan, many others).
  *
- * 2001 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2001-2003 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -98,7 +98,7 @@ _setup_L2CR:
 	isync
 	mfspr	r8,L2CR
 	rlwinm	r8,r8,0,1,31
-	oris	r8,r8,0x0020
+	oris	r8,r8,L2CR_L2I@h
 	sync
 	isync
 	mtspr	L2CR,r8
@@ -106,14 +106,55 @@ _setup_L2CR:
 	isync
 
 	/* Wait for the invalidation to complete */
-1:	mfspr	r8,L2CR
-	rlwinm.	r9,r8,0,31,31
-	bne	1b
+	mfspr   r8,PVR
+	srwi    r8,r8,16
+	cmpli	cr0,r8,0x8000			/* 7450 */
+	cmpli	cr1,r8,0x8001			/* 7455 */
+	cmpli	cr2,r8,0x8002			/* 7457 */
+	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq	/* Now test if any are true. */
+	cror	4*cr0+eq,4*cr0+eq,4*cr2+eq
+	bne     2f
 
-	rlwinm	r8,r8,0,11,9		/* Turn off L2I bit */
+1:	mfspr	r8,L2CR		/* On 745x, poll L2I bit (bit 10) */
+	rlwinm.	r9,r8,0,10,10
+	bne	1b
+	b	3f
+
+2:      mfspr   r8,L2CR		/* On 75x & 74[01]0, poll L2IP bit (bit 31) */
+	rlwinm. r9,r8,0,31,31
+	bne     2b
+
+3:	rlwinm	r8,r8,0,11,9	/* Turn off L2I bit */
 	sync
 	isync
 	mtspr	L2CR,r8
+	sync
+	isync
+	blr
+
+	.globl	_setup_L3CR
+_setup_L3CR:
+	/* Invalidate/disable L3 cache */
+	sync
+	isync
+	mfspr	r8,L3CR
+	rlwinm	r8,r8,0,1,31
+	ori	r8,r8,L3CR_L3I@l
+	sync
+	isync
+	mtspr	L3CR,r8
+	sync
+	isync
+
+	/* Wait for the invalidation to complete */
+1:	mfspr	r8,L3CR
+	rlwinm.	r9,r8,0,21,21
+	bne	1b
+
+	rlwinm	r8,r8,0,22,20		/* Turn off L3I bit */
+	sync
+	isync
+	mtspr	L3CR,r8
 	sync
 	isync
 	blr
