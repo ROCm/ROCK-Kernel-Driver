@@ -3,6 +3,22 @@ PATCHLEVEL = 5
 SUBLEVEL = 19
 EXTRAVERSION =
 
+# We are using a recursive build, so we need to do a little thinking
+# to get the ordering right.
+#
+# Most importantly: sub-Makefiles should only ever modify files in
+# their own directory. If in some directory we have a dependency on
+# a file in another dir (which doesn't happen often, but it's of
+# unavoidable when linking the built-in.o targets which finally
+# turn into vmlinux), we will call a sub make in that other dir, and
+# after that we are sure that everything which is in that other dir
+# is now up to date.
+#
+# The only cases where we need to modify files which have global
+# effects are thus separated out and done before the recursive
+# descending is started. They are now explicitly listed as the
+# prepare rule.
+
 KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 
 ARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ -e s/arm.*/arm/ -e s/sa110/arm/)
@@ -172,8 +188,13 @@ $(sort $(vmlinux-objs)): $(SUBDIRS) ;
 # 	Handle descending into subdirectories listed in $(SUBDIRS)
 
 .PHONY: $(SUBDIRS)
-$(SUBDIRS): FORCE include/linux/version.h include/config/MARKER
+$(SUBDIRS): prepare
 	@$(MAKE) -C $@
+
+#	Things we need done before we even start the actual build
+
+.PHONY: prepare
+prepare: symlinks include/linux/version.h include/config/MARKER .hdepend
 
 # Single targets
 # ---------------------------------------------------------------------------
