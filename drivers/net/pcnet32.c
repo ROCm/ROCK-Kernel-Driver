@@ -1003,7 +1003,7 @@ pcnet32_init_ring(struct net_device *dev)
 	    skb_reserve (rx_skbuff, 2);
 	}
 
-	if (lp->rx_dma_addr[i] == 0) 
+	if (lp->rx_dma_addr[i] == 0)
 		lp->rx_dma_addr[i] = pci_map_single(lp->pci_dev, rx_skbuff->tail, rx_skbuff->len, PCI_DMA_FROMDEVICE);
 	lp->rx_ring[i].base = (u32)le32_to_cpu(lp->rx_dma_addr[i]);
 	lp->rx_ring[i].buf_length = le16_to_cpu(-PKT_BUF_SZ);

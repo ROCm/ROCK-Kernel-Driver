@@ -492,7 +492,7 @@ static void conf(struct menu *menu)
 			switch (type) {
 			case 'm':
 				if (single_menu_mode)
-					submenu->data = (void *) !submenu->data;
+					submenu->data = (void *) (long) !submenu->data;
 				else
 					conf(submenu);
 				break;

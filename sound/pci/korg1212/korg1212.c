@@ -2070,7 +2070,7 @@ static void snd_korg1212_proc_read(snd_info_entry_t *entry, snd_info_buffer_t *b
 	snd_iprintf(buffer, korg1212->card->longname);
 	snd_iprintf(buffer, " (index #%d)\n", korg1212->card->number + 1);
 	snd_iprintf(buffer, "\nGeneral settings\n");
-	snd_iprintf(buffer, "    period size: %d bytes\n", K1212_PERIOD_BYTES);
+	snd_iprintf(buffer, "    period size: %Zd bytes\n", K1212_PERIOD_BYTES);
 	snd_iprintf(buffer, "     clock mode: %s\n", clockSourceName[korg1212->clkSrcRate] );
 	snd_iprintf(buffer, "  left ADC Sens: %d\n", korg1212->leftADCInSens );
 	snd_iprintf(buffer, " right ADC Sens: %d\n", korg1212->rightADCInSens );
@@ -2336,7 +2336,7 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 	korg1212->sharedBufferPhy = (unsigned long)phys_addr;
 
         if (korg1212->sharedBufferPtr == NULL) {
-		snd_printk(KERN_ERR "can not allocate shared buffer memory (%d bytes)\n", sizeof(KorgSharedBuffer));
+		snd_printk(KERN_ERR "can not allocate shared buffer memory (%Zd bytes)\n", sizeof(KorgSharedBuffer));
                 return -ENOMEM;
         }
 
@@ -2385,9 +2385,12 @@ static int __devinit snd_korg1212_create(snd_card_t * card, struct pci_dev *pci,
 
         korg1212->dspCodeSize = sizeof (dspCode);
 
-        korg1212->VolumeTablePhy = (u32) &((KorgSharedBuffer *) korg1212->sharedBufferPhy)->volumeData;
-        korg1212->RoutingTablePhy = (u32) &((KorgSharedBuffer *) korg1212->sharedBufferPhy)->routeData;
-        korg1212->AdatTimeCodePhy = (u32) &((KorgSharedBuffer *) korg1212->sharedBufferPhy)->AdatTimeCode;
+        korg1212->VolumeTablePhy = korg1212->sharedBufferPhy +
+		offsetof(KorgSharedBuffer, volumeData);
+        korg1212->RoutingTablePhy = korg1212->sharedBufferPhy +
+		offsetof(KorgSharedBuffer, routeData);
+        korg1212->AdatTimeCodePhy = korg1212->sharedBufferPhy +
+		offsetof(KorgSharedBuffer, AdatTimeCode);
 
         korg1212->dspMemPtr = snd_malloc_pci_pages(korg1212->pci, korg1212->dspCodeSize, &phys_addr);
 	korg1212->dspMemPhy = (u32)phys_addr;
