@@ -6140,7 +6140,12 @@ static ide_proc_entry_t idetape_proc[] = {
 
 #endif
 
-static int idetape_reinit(ide_drive_t *drive);
+static void idetape_revalidate(ide_drive_t *_dummy)
+{
+	/* We don't have to handle any partition information here, which is the
+	 * default behaviour of this method.
+	 */
+}
 
 /*
  *	IDE subdriver functions, registered with ide.c
@@ -6149,18 +6154,16 @@ static struct ata_operations idetape_driver = {
 	owner:			THIS_MODULE,
 	cleanup:		idetape_cleanup,
 	standby:		NULL,
-	flushcache:		NULL,
 	do_request:		idetape_do_request,
 	end_request:		idetape_end_request,
 	ioctl:			idetape_blkdev_ioctl,
 	open:			idetape_blkdev_open,
 	release:		idetape_blkdev_release,
-	media_change:		NULL,
-	revalidate:		NULL,
+	check_media_change:	NULL,
+	revalidate:		idetape_revalidate,
 	pre_reset:		idetape_pre_reset,
 	capacity:		NULL,
-	proc:			idetape_proc,
-	driver_reinit:		idetape_reinit,
+	proc:			idetape_proc
 };
 
 /*
@@ -6174,12 +6177,6 @@ static struct file_operations idetape_fops = {
 	open:		idetape_chrdev_open,
 	release:	idetape_chrdev_release,
 };
-
-/* This will propably just go entierly away... */
-static int idetape_reinit (ide_drive_t *drive)
-{
-	return 1;
-}
 
 MODULE_DESCRIPTION("ATAPI Streaming TAPE Driver");
 MODULE_LICENSE("GPL");

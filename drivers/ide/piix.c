@@ -214,7 +214,7 @@ static void piix_tune_drive (ide_drive_t *drive, byte pio)
 {
 	unsigned long flags;
 	u16 master_data;
-	byte slave_data;
+	u8 slave_data;
 	int is_slave		= (&HWIF(drive)->drives[1] == drive);
 	int master_port		= HWIF(drive)->index ? 0x42 : 0x40;
 	int slave_port		= 0x44;

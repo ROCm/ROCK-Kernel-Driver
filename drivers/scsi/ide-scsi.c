@@ -536,7 +536,11 @@ static int idescsi_cleanup (ide_drive_t *drive)
 	return 0;
 }
 
-static int idescsi_reinit(ide_drive_t *drive);
+static void idescsi_revalidate(ide_drive_t *_dummy)
+{
+	/* The partition information will be handled by the SCSI layer.
+	 */
+}
 
 /*
  *	IDE subdriver functions, registered with ide.c
@@ -545,25 +549,18 @@ static struct ata_operations idescsi_driver = {
 	owner:			THIS_MODULE,
 	cleanup:		idescsi_cleanup,
 	standby:		NULL,
-	flushcache:		NULL,
 	do_request:		idescsi_do_request,
 	end_request:		idescsi_end_request,
 	ioctl:			NULL,
 	open:			idescsi_open,
 	release:		idescsi_ide_release,
-	media_change:		NULL,
-	revalidate:		NULL,
+	check_media_change:	NULL,
+	revalidate:		idescsi_revalidate,
 	pre_reset:		NULL,
 	capacity:		NULL,
 	special:		NULL,
-	proc:			NULL,
-	driver_reinit:		idescsi_reinit,
+	proc:			NULL
 };
-
-static int idescsi_reinit (ide_drive_t *drive)
-{
-	return 0;
-}
 
 /*
  *	idescsi_init will register the driver for each scsi.

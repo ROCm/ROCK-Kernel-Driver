@@ -2906,68 +2906,28 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 	return 0;
 }
 
-static int ide_cdrom_reinit (ide_drive_t *drive);
-
 static struct ata_operations ide_cdrom_driver = {
 	owner:			THIS_MODULE,
 	cleanup:		ide_cdrom_cleanup,
 	standby:		NULL,
-	flushcache:		NULL,
 	do_request:		ide_do_rw_cdrom,
 	end_request:		NULL,
 	ioctl:			ide_cdrom_ioctl,
 	open:			ide_cdrom_open,
 	release:		ide_cdrom_release,
-	media_change:		ide_cdrom_check_media_change,
+	check_media_change:	ide_cdrom_check_media_change,
 	revalidate:		ide_cdrom_revalidate,
 	pre_reset:		NULL,
 	capacity:		ide_cdrom_capacity,
 	special:		NULL,
-	proc:			NULL,
-	driver_reinit:		ide_cdrom_reinit,
+	proc:			NULL
 };
 
 /* options */
-char *ignore = NULL;
+static char *ignore = NULL;
 
 MODULE_PARM(ignore, "s");
 MODULE_DESCRIPTION("ATAPI CD-ROM Driver");
-
-static int ide_cdrom_reinit (ide_drive_t *drive)
-{
-	struct cdrom_info *info;
-	int failed = 0;
-
-	MOD_INC_USE_COUNT;
-	info = (struct cdrom_info *) kmalloc (sizeof (struct cdrom_info), GFP_KERNEL);
-	if (info == NULL) {
-		printk ("%s: Can't allocate a cdrom structure\n", drive->name);
-		return 1;
-	}
-	if (ide_register_subdriver (drive, &ide_cdrom_driver)) {
-		printk ("%s: Failed to register the driver with ide.c\n", drive->name);
-		kfree (info);
-		return 1;
-	}
-	memset (info, 0, sizeof (struct cdrom_info));
-	drive->driver_data = info;
-
-	/* ATA-PATTERN */
-	ata_ops(drive)->busy++;
-	if (ide_cdrom_setup (drive)) {
-		ata_ops(drive)->busy--;
-		if (ide_cdrom_cleanup (drive))
-			printk ("%s: ide_cdrom_cleanup failed in ide_cdrom_init\n", drive->name);
-		return 1;
-	}
-	ata_ops(drive)->busy--;
-
-	failed--;
-
-	revalidate_drives();
-	MOD_DEC_USE_COUNT;
-	return 0;
-}
 
 static void __exit ide_cdrom_exit(void)
 {
@@ -2980,7 +2940,7 @@ static void __exit ide_cdrom_exit(void)
 			failed++;
 		}
 }
- 
+
 int ide_cdrom_init(void)
 {
 	ide_drive_t *drive;

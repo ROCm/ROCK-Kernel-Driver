@@ -660,8 +660,10 @@ void __init ide_init_svwks (ide_hwif_t *hwif)
 	hwif->autodma = 0;
 #else /* CONFIG_BLK_DEV_IDEDMA */
 	if (hwif->dma_base) {
+#ifdef CONFIG_IDEDMA_AUTO
 		if (!noautodma)
 			hwif->autodma = 1;
+#endif
 		hwif->dmaproc = &svwks_dmaproc;
 		hwif->highmem = 1;
 	} else {

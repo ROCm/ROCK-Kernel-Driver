@@ -378,7 +378,6 @@ CONFIG_BLK_DEV_IDE=m
 # CONFIG_BLK_DEV_IDECD is not set
 # CONFIG_BLK_DEV_IDETAPE is not set
 # CONFIG_BLK_DEV_IDEFLOPPY is not set
-# CONFIG_IDE_TASK_IOCTL is not set
 
 #
 # IDE chipset support/bugfixes

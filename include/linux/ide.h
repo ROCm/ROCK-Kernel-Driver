@@ -51,27 +51,15 @@
 #endif
 
 #ifdef CONFIG_BLK_DEV_CMD640
-#if 0	/* change to 1 when debugging cmd640 problems */
+# if 0	/* change to 1 when debugging cmd640 problems */
 void cmd640_dump_regs (void);
-#define CMD640_DUMP_REGS cmd640_dump_regs() /* for debugging cmd640 chipset */
+#  define CMD640_DUMP_REGS cmd640_dump_regs() /* for debugging cmd640 chipset */
+# endif
 #endif
-#endif  /* CONFIG_BLK_DEV_CMD640 */
 
 #ifndef DISABLE_IRQ_NOSYNC
-#define DISABLE_IRQ_NOSYNC	0
+# define DISABLE_IRQ_NOSYNC	0
 #endif
-
-/*
- * IDE_DRIVE_CMD is used to implement many features of the hdparm utility
- */
-#define IDE_DRIVE_CMD			99	/* (magic) undef to reduce kernel size*/
-
-#define IDE_DRIVE_TASK			98
-
-/*
- * IDE_DRIVE_TASKFILE is used to implement many features needed for raw tasks
- */
-#define IDE_DRIVE_TASKFILE		97
 
 /*
  *  "No user-serviceable parts" beyond this point  :)
@@ -95,7 +83,7 @@ typedef unsigned char	byte;	/* used everywhere */
  * Ensure that various configuration flags have compatible settings
  */
 #ifdef REALLY_SLOW_IO
-#undef REALLY_FAST_IO
+# undef REALLY_FAST_IO
 #endif
 
 #define HWIF(drive)		((drive)->hwif)
@@ -705,21 +693,19 @@ struct ata_operations {
 	unsigned busy: 1; /* FIXME: this will go soon away... */
 	int (*cleanup)(ide_drive_t *);
 	int (*standby)(ide_drive_t *);
-	int (*flushcache)(ide_drive_t *);
 	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, unsigned long);
 	int (*end_request)(ide_drive_t *drive, int uptodate);
 
 	int (*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	int (*open)(struct inode *, struct file *, ide_drive_t *);
 	void (*release)(struct inode *, struct file *, ide_drive_t *);
-	int (*media_change)(ide_drive_t *);
+	int (*check_media_change)(ide_drive_t *);
 	void (*revalidate)(ide_drive_t *);
 
 	void (*pre_reset)(ide_drive_t *);
 	unsigned long (*capacity)(ide_drive_t *);
 	ide_startstop_t	(*special)(ide_drive_t *);
-	ide_proc_entry_t		*proc;
-	int (*driver_reinit)(ide_drive_t *);
+	ide_proc_entry_t *proc;
 };
 
 /* Alas, no aliases. Too much hassle with bringing module.h everywhere */
@@ -734,6 +720,7 @@ do {	\
 		__MOD_DEC_USE_COUNT((ata)->owner);	\
 } while(0)
 
+extern unsigned long ata_capacity(ide_drive_t *drive);
 
 /* FIXME: Actually implement and use them as soon as possible!  to make the
  * ide_scan_devices() go away! */
@@ -819,16 +806,6 @@ int ide_xlate_1024 (kdev_t, int, int, const char *);
 ide_drive_t *get_info_ptr (kdev_t i_rdev);
 
 /*
- * Return the current idea about the total capacity of this drive.
- */
-unsigned long current_capacity (ide_drive_t *drive);
-
-/*
- * Revalidate (read partition tables)
- */
-extern void ide_revalidate_drive (ide_drive_t *drive);
-
-/*
  * Start a reset operation for an IDE interface.
  * The caller should return immediately after invoking this.
  */
@@ -892,18 +869,9 @@ int ide_do_drive_cmd (ide_drive_t *drive, struct request *rq, ide_action_t actio
 
 /*
  * Clean up after success/failure of an explicit drive cmd.
- * stat/err are used only when (HWGROUP(drive)->rq->cmd == IDE_DRIVE_CMD).
- * stat/err are used only when (HWGROUP(drive)->rq->cmd == IDE_DRIVE_TASK_MASK).
  */
 void ide_end_drive_cmd (ide_drive_t *drive, byte stat, byte err);
 
-/*
- * Issue ATA command and wait for completion. use for implementing commands in kernel
- */
-int ide_wait_cmd (ide_drive_t *drive, int cmd, int nsect, int feature, int sectors, byte *buf);
-
-int ide_wait_cmd_task (ide_drive_t *drive, byte *buf);
- 
 typedef struct ide_task_s {
 	task_ioreg_t		tfRegister[8];
 	task_ioreg_t		hobRegister[8];

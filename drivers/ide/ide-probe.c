@@ -471,9 +471,11 @@ static void hwif_register (ide_hwif_t *hwif)
 	sprintf(hwif->device.bus_id, "%04x", hwif->io_ports[IDE_DATA_OFFSET]);
 	sprintf(hwif->device.name, "ide");
 	hwif->device.driver_data = hwif;
+#ifdef CONFIG_BLK_DEV_IDEPCI
 	if (hwif->pci_dev)
 		hwif->device.parent = &hwif->pci_dev->dev;
 	else
+#endif
 		hwif->device.parent = NULL; /* Would like to do = &device_legacy */
 	device_register(&hwif->device);
 
