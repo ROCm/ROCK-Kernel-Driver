@@ -58,7 +58,7 @@ static int input_devices_state;
 
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
-	struct list_head * node;
+	struct input_handle *handle;
 
 	if (dev->pm_dev)
 		pm_access(dev->pm_dev);
@@ -177,11 +177,9 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 	if (type != EV_SYN) 
 		dev->sync = 0;
 
-	list_for_each(node,&dev->h_list) {
-		struct input_handle *handle = to_handle(node);
+	list_for_each_entry(handle, &dev->h_list, d_node)
 		if (handle->open)
 			handle->handler->event(handle, type, code, value);
-	}
 }
 
 static void input_repeat_key(unsigned long data)
@@ -234,8 +232,8 @@ void input_close_device(struct input_handle *handle)
 
 static void input_link_handle(struct input_handle *handle)
 {
-	list_add_tail(&handle->d_node,&handle->dev->h_list);
-	list_add_tail(&handle->h_node,&handle->handler->h_list);
+	list_add_tail(&handle->d_node, &handle->dev->h_list);
+	list_add_tail(&handle->h_node, &handle->handler->h_list);
 }
 
 #define MATCH_BIT(bit, max) \
@@ -400,8 +398,8 @@ static void input_call_hotplug(char *verb, struct input_dev *dev)
 
 void input_register_device(struct input_dev *dev)
 {
-	struct list_head * node;
 	struct input_handle *handle;
+	struct input_handler *handler;
 	struct input_device_id *id;
 
 	set_bit(EV_SYN, dev->evbit);
@@ -415,12 +413,10 @@ void input_register_device(struct input_dev *dev)
 	INIT_LIST_HEAD(&dev->h_list);
 	list_add_tail(&dev->node,&input_dev_list);
 
-	list_for_each(node,&input_handler_list) {
-		struct input_handler *handler = to_handler(node);
+	list_for_each_entry(handler, &input_handler_list, node)
 		if ((id = input_match_device(handler->id_table, dev)))
 			if ((handle = handler->connect(handler, dev, id)))
 				input_link_handle(handle);
-	}
 
 #ifdef CONFIG_HOTPLUG
 	input_call_hotplug("add", dev);
@@ -443,7 +439,7 @@ void input_unregister_device(struct input_dev *dev)
 
 	del_timer_sync(&dev->timer);
 
-	list_for_each_safe(node,next,&dev->h_list) {
+	list_for_each_safe(node, next, &dev->h_list) {
 		struct input_handle * handle = to_handle(node);
 		list_del_init(&handle->d_node);
 		list_del_init(&handle->h_node);
@@ -464,7 +460,7 @@ void input_unregister_device(struct input_dev *dev)
 
 void input_register_handler(struct input_handler *handler)
 {
-	struct list_head * node;
+	struct input_dev *dev;
 	struct input_handle *handle;
 	struct input_device_id *id;
 
@@ -477,12 +473,10 @@ void input_register_handler(struct input_handler *handler)
 
 	list_add_tail(&handler->node,&input_handler_list);
 	
-	list_for_each(node,&input_dev_list) {
-		struct input_dev *dev = to_dev(node);
+	list_for_each_entry(dev, &input_dev_list, node)
 		if ((id = input_match_device(handler->id_table, dev)))
 			if ((handle = handler->connect(handler, dev, id)))
 				input_link_handle(handle);
-	}
 
 #ifdef CONFIG_PROC_FS
 	input_devices_state++;
@@ -494,7 +488,7 @@ void input_unregister_handler(struct input_handler *handler)
 {
 	struct list_head * node, * next;
 
-	list_for_each_safe(node,next,&handler->h_list) {
+	list_for_each_safe(node, next, &handler->h_list) {
 		struct input_handle * handle = to_handle_h(node);
 		list_del_init(&handle->h_node);
 		list_del_init(&handle->d_node);
@@ -591,14 +585,13 @@ static unsigned int input_devices_poll(struct file *file, poll_table *wait)
 
 static int input_devices_read(char *buf, char **start, off_t pos, int count, int *eof, void *data)
 {
-	struct list_head * node;
+	struct input_dev *dev;
+	struct input_handle *handle;
 
 	off_t at = 0;
 	int i, len, cnt = 0;
 
-	list_for_each(node,&input_dev_list) {
-		struct input_dev * dev = to_dev(node);
-		struct list_head * hnode;
+	list_for_each_entry(dev, &input_dev_list, node) {
 
 		len = sprintf(buf, "I: Bus=%04x Vendor=%04x Product=%04x Version=%04x\n",
 			dev->id.bustype, dev->id.vendor, dev->id.product, dev->id.version);
@@ -607,10 +600,8 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 		len += sprintf(buf + len, "P: Phys=%s\n", dev->phys ? dev->phys : "");
 		len += sprintf(buf + len, "H: Handlers=");
 
-		list_for_each(hnode,&dev->h_list) {
-			struct input_handle * handle = to_handle(hnode);
+		list_for_each_entry(handle, &dev->h_list, d_node)
 			len += sprintf(buf + len, "%s ", handle->name);
-		}
 
 		len += sprintf(buf + len, "\n");
 
@@ -638,7 +629,7 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 		}
 	}
 
-	if (node == &input_dev_list)
+	if (&dev->node == &input_dev_list)
 		*eof = 1;
 
 	return (count > cnt) ? cnt : count;
@@ -646,14 +637,13 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 
 static int input_handlers_read(char *buf, char **start, off_t pos, int count, int *eof, void *data)
 {
-	struct list_head * node;
+	struct input_handler *handler;
 
 	off_t at = 0;
 	int len = 0, cnt = 0;
 	int i = 0;
 
-	list_for_each(node,&input_handler_list) {
-		struct input_handler *handler = to_handler(node);
+	list_for_each_entry(handler, &input_handler_list, node) {
 
 		if (handler->fops)
 			len = sprintf(buf, "N: Number=%d Name=%s Minor=%d\n",
@@ -674,7 +664,7 @@ static int input_handlers_read(char *buf, char **start, off_t pos, int count, in
 				break;
 		}
 	}
-	if (node == &input_handler_list)
+	if (&handler->node == &input_handler_list)
 		*eof = 1;
 
 	return (count > cnt) ? cnt : count;
