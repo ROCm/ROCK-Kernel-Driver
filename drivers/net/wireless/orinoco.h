@@ -7,39 +7,19 @@
 #ifndef _ORINOCO_H
 #define _ORINOCO_H
 
+#define DRIVER_VERSION "0.13e"
+
 #include <linux/types.h>
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>
 #include <linux/wireless.h>
 #include <linux/version.h>
+
 #include "hermes.h"
-
-/* Workqueue / task queue backwards compatibility stuff */
-
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,41)
-#include <linux/workqueue.h>
-#else
-#include <linux/tqueue.h>
-#define work_struct tq_struct
-#define INIT_WORK INIT_TQUEUE
-#define schedule_work schedule_task
-#endif
-
-/* Interrupt handler backwards compatibility stuff */
-#ifndef IRQ_NONE
-
-#define IRQ_NONE
-#define IRQ_HANDLED
-typedef void irqreturn_t;
-
-#endif
 
 /* To enable debug messages */
 //#define ORINOCO_DEBUG		3
 
-#if (! defined (WIRELESS_EXT)) || (WIRELESS_EXT < 10)
-#error "orinoco driver requires Wireless extensions v10 or later."
-#endif /* (! defined (WIRELESS_EXT)) || (WIRELESS_EXT < 10) */
 #define WIRELESS_SPY		// enable iwspy support
 
 #define ORINOCO_MAX_KEY_SIZE	14
@@ -49,11 +29,6 @@ struct orinoco_key {
 	u16 len;	/* always stored as little-endian */
 	char data[ORINOCO_MAX_KEY_SIZE];
 } __attribute__ ((packed));
-
-#define ORINOCO_INTEN	 	( HERMES_EV_RX | HERMES_EV_ALLOC | HERMES_EV_TX | \
-				HERMES_EV_TXEXC | HERMES_EV_WTERR | HERMES_EV_INFO | \
-				HERMES_EV_INFDROP )
-
 
 struct orinoco_private {
 	void *card;	/* Pointer to card dependent structure */
@@ -77,7 +52,6 @@ struct orinoco_private {
 	/* Hardware control variables */
 	hermes_t hw;
 	u16 txfid;
-
 
 	/* Capabilities of the hardware/firmware */
 	int firmware_type;
@@ -127,6 +101,10 @@ extern int orinoco_debug;
 
 #define TRACE_ENTER(devname) DEBUG(2, "%s: -> %s()\n", devname, __FUNCTION__);
 #define TRACE_EXIT(devname)  DEBUG(2, "%s: <- %s()\n", devname, __FUNCTION__);
+
+/********************************************************************/
+/* Exported prototypes                                              */
+/********************************************************************/
 
 extern struct net_device *alloc_orinocodev(int sizeof_card,
 					   int (*hard_reset)(struct orinoco_private *));
