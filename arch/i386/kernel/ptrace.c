@@ -802,7 +802,7 @@ int do_syscall_trace(struct pt_regs *regs, int entryexit)
 	if (is_singlestep)
 		send_sigtrap(current, regs, 0);
 
-	if (!test_thread_flag(TIF_SYSCALL_TRACE))
+	if (!test_thread_flag(TIF_SYSCALL_TRACE) && !is_sysemu)
 		return 0;
 
 	/* the 0x80 provides a way for the tracing parent to distinguish
