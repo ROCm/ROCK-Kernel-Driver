@@ -71,7 +71,7 @@ union sctp_addr {
 };
 
 /* Forward declarations for data structures. */
-struct sctp_protocol;
+struct sctp_globals;
 struct sctp_endpoint;
 struct sctp_association;
 struct sctp_transport;
@@ -112,8 +112,8 @@ struct sctp_hashbucket {
 } __attribute__((__aligned__(8)));
 
 
-/* The SCTP protocol structure. */
-struct sctp_protocol {
+/* The SCTP globals structure. */
+extern struct sctp_globals {
 	/* RFC2960 Section 14. Suggested SCTP Protocol Parameter Values
 	 *
 	 * The following protocol parameters are RECOMMENDED:
@@ -187,8 +187,33 @@ struct sctp_protocol {
 	 */
 	struct list_head local_addr_list;
 	spinlock_t local_addr_lock;
-};
+} sctp_globals;
 
+#define sctp_rto_initial		(sctp_globals.rto_initial)
+#define sctp_rto_min			(sctp_globals.rto_min)
+#define sctp_rto_max			(sctp_globals.rto_max)
+#define sctp_rto_alpha			(sctp_globals.rto_alpha)
+#define sctp_rto_beta			(sctp_globals.rto_beta)
+#define sctp_max_burst			(sctp_globals.max_burst)
+#define sctp_valid_cookie_life		(sctp_globals.valid_cookie_life)
+#define sctp_cookie_preserve_enable	(sctp_globals.cookie_preserve_enable)
+#define sctp_max_retrans_association	(sctp_globals.max_retrans_association)
+#define sctp_max_retrans_path		(sctp_globals.max_retrans_path)
+#define sctp_max_retrans_init		(sctp_globals.max_retrans_init)
+#define sctp_hb_interval		(sctp_globals.hb_interval)
+#define sctp_max_instreams		(sctp_globals.max_instreams)
+#define sctp_max_outstreams		(sctp_globals.max_outstreams)
+#define sctp_address_families		(sctp_globals.address_families)
+#define sctp_ep_hashsize		(sctp_globals.ep_hashsize)
+#define sctp_ep_hashbucket		(sctp_globals.ep_hashbucket)
+#define sctp_assoc_hashsize		(sctp_globals.assoc_hashsize)
+#define sctp_assoc_hashbucket		(sctp_globals.assoc_hashbucket)
+#define sctp_port_hashsize		(sctp_globals.port_hashsize)
+#define sctp_port_rover			(sctp_globals.port_rover)
+#define sctp_port_alloc_lock		(sctp_globals.port_alloc_lock)
+#define sctp_port_hashtable		(sctp_globals.port_hashtable)
+#define sctp_local_addr_list		(sctp_globals.local_addr_list)
+#define sctp_local_addr_lock		(sctp_globals.local_addr_lock)
 
 /*
  * Pointers to address related SCTP functions.

@@ -1992,12 +1992,9 @@ SCTP_STATIC int sctp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 SCTP_STATIC int sctp_init_sock(struct sock *sk)
 {
 	struct sctp_endpoint *ep;
-	struct sctp_protocol *proto;
 	struct sctp_opt *sp;
 
 	SCTP_DEBUG_PRINTK("sctp_init_sock(sk: %p)\n", sk);
-
-	proto = sctp_get_protocol();
 
 	sp = sctp_sk(sk);
 
@@ -2027,18 +2024,18 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	 * can be modified with the SCTP_INITMSG socket option or
 	 * overridden by the SCTP_INIT CMSG.
 	 */
-	sp->initmsg.sinit_num_ostreams   = proto->max_outstreams;
-	sp->initmsg.sinit_max_instreams  = proto->max_instreams;
-	sp->initmsg.sinit_max_attempts   = proto->max_retrans_init;
-	sp->initmsg.sinit_max_init_timeo = proto->rto_max / HZ;
+	sp->initmsg.sinit_num_ostreams   = sctp_max_outstreams;
+	sp->initmsg.sinit_max_instreams  = sctp_max_instreams;
+	sp->initmsg.sinit_max_attempts   = sctp_max_retrans_init;
+	sp->initmsg.sinit_max_init_timeo = sctp_rto_max / HZ;
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
 	 * FIXME: These are not used yet.
 	 */
-	sp->rtoinfo.srto_initial = proto->rto_initial;
-	sp->rtoinfo.srto_max     = proto->rto_max;
-	sp->rtoinfo.srto_min     = proto->rto_min;
+	sp->rtoinfo.srto_initial = sctp_rto_initial;
+	sp->rtoinfo.srto_max     = sctp_rto_max;
+	sp->rtoinfo.srto_min     = sctp_rto_min;
 
 	/* Initialize default event subscriptions.
 	 * the struct sock is initialized to zero, so only
@@ -2053,8 +2050,8 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	/* Default Peer Address Parameters.  These defaults can
 	 * be modified via SCTP_SET_PEER_ADDR_PARAMS
 	 */
-	sp->paddrparam.spp_hbinterval = proto->hb_interval / HZ;
-	sp->paddrparam.spp_pathmaxrxt = proto->max_retrans_path;
+	sp->paddrparam.spp_hbinterval = sctp_hb_interval / HZ;
+	sp->paddrparam.spp_pathmaxrxt = sctp_max_retrans_path;
 
 	/* If enabled no SCTP message fragmentation will be performed.
 	 * Configure through SCTP_DISABLE_FRAGMENTS socket option.
@@ -2947,7 +2944,6 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 {
 	struct sctp_bind_hashbucket *head; /* hash list */
 	struct sctp_bind_bucket *pp; /* hash list port iterator */
-	struct sctp_protocol *sctp = sctp_get_protocol();
 	unsigned short snum;
 	int ret;
 
@@ -2962,8 +2958,8 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 	if (snum == 0) {
 		/* Search for an available port.
 		 *
-		 * 'sctp->port_rover' was the last port assigned, so
-		 * we start to search from 'sctp->port_rover +
+		 * 'sctp_port_rover' was the last port assigned, so
+		 * we start to search from 'sctp_port_rover +
 		 * 1'. What we do is first check if port 'rover' is
 		 * already in the hash table; if not, we use that; if
 		 * it is, we try next.
@@ -2974,14 +2970,14 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		int rover;
 		int index;
 
-		sctp_spin_lock(&sctp->port_alloc_lock);
-		rover = sctp->port_rover;
+		sctp_spin_lock(&sctp_port_alloc_lock);
+		rover = sctp_port_rover;
 		do {
 			rover++;
 			if ((rover < low) || (rover > high))
 				rover = low;
 			index = sctp_phashfn(rover);
-			head = &sctp->port_hashtable[index];
+			head = &sctp_port_hashtable[index];
 			sctp_spin_lock(&head->lock);
 			for (pp = head->chain; pp; pp = pp->next)
 				if (pp->port == rover)
@@ -2990,8 +2986,8 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		next:
 			sctp_spin_unlock(&head->lock);
 		} while (--remaining > 0);
-		sctp->port_rover = rover;
-		sctp_spin_unlock(&sctp->port_alloc_lock);
+		sctp_port_rover = rover;
+		sctp_spin_unlock(&sctp_port_alloc_lock);
 
 		/* Exhausted local port range during search? */
 		ret = 1;
@@ -3011,7 +3007,7 @@ static long sctp_get_port_local(struct sock *sk, union sctp_addr *addr)
 		 * to the port number (snum) - we detect that with the
 		 * port iterator, pp being NULL.
 		 */
-		head = &sctp->port_hashtable[sctp_phashfn(snum)];
+		head = &sctp_port_hashtable[sctp_phashfn(snum)];
 		sctp_spin_lock(&head->lock);
 		for (pp = head->chain; pp; pp = pp->next) {
 			if (pp->port == snum)
@@ -3351,9 +3347,8 @@ static void sctp_bucket_destroy(struct sctp_bind_bucket *pp)
 /* FIXME: Comments! */
 static __inline__ void __sctp_put_port(struct sock *sk)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
 	struct sctp_bind_hashbucket *head =
-		&sctp_proto->port_hashtable[sctp_phashfn(inet_sk(sk)->num)];
+		&sctp_port_hashtable[sctp_phashfn(inet_sk(sk)->num)];
 	struct sctp_bind_bucket *pp;
 
 	sctp_spin_lock(&head->lock);

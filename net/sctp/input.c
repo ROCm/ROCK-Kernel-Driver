@@ -528,7 +528,7 @@ void __sctp_hash_endpoint(struct sctp_endpoint *ep)
 	epb = &ep->base;
 
 	epb->hashent = sctp_ep_hashfn(epb->bind_addr.port);
-	head = &sctp_proto.ep_hashbucket[epb->hashent];
+	head = &sctp_ep_hashbucket[epb->hashent];
 
 	sctp_write_lock(&head->lock);
 	epp = &head->chain;
@@ -558,7 +558,7 @@ void __sctp_unhash_endpoint(struct sctp_endpoint *ep)
 
 	epb->hashent = sctp_ep_hashfn(epb->bind_addr.port);
 
-	head = &sctp_proto.ep_hashbucket[epb->hashent];
+	head = &sctp_ep_hashbucket[epb->hashent];
 
 	sctp_write_lock(&head->lock);
 
@@ -589,7 +589,7 @@ struct sctp_endpoint *__sctp_rcv_lookup_endpoint(const union sctp_addr *laddr)
 	int hash;
 
 	hash = sctp_ep_hashfn(laddr->v4.sin_port);
-	head = &sctp_proto.ep_hashbucket[hash];
+	head = &sctp_ep_hashbucket[hash];
 	read_lock(&head->lock);
 	for (epb = head->chain; epb; epb = epb->next) {
 		ep = sctp_ep(epb);
@@ -627,7 +627,7 @@ void __sctp_hash_established(struct sctp_association *asoc)
 	/* Calculate which chain this entry will belong to. */
 	epb->hashent = sctp_assoc_hashfn(epb->bind_addr.port, asoc->peer.port);
 
-	head = &sctp_proto.assoc_hashbucket[epb->hashent];
+	head = &sctp_assoc_hashbucket[epb->hashent];
 
 	sctp_write_lock(&head->lock);
 	epp = &head->chain;
@@ -658,7 +658,7 @@ void __sctp_unhash_established(struct sctp_association *asoc)
 	epb->hashent = sctp_assoc_hashfn(epb->bind_addr.port,
 					 asoc->peer.port);
 
-	head = &sctp_proto.assoc_hashbucket[epb->hashent];
+	head = &sctp_assoc_hashbucket[epb->hashent];
 
 	sctp_write_lock(&head->lock);
 
@@ -688,7 +688,7 @@ struct sctp_association *__sctp_lookup_association(
 	 * have wildcards anyways.
 	 */
 	hash = sctp_assoc_hashfn(local->v4.sin_port, peer->v4.sin_port);
-	head = &sctp_proto.assoc_hashbucket[hash];
+	head = &sctp_assoc_hashbucket[hash];
 	read_lock(&head->lock);
 	for (epb = head->chain; epb; epb = epb->next) {
 		asoc = sctp_assoc(epb);

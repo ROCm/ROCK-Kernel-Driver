@@ -42,13 +42,11 @@
 #include <net/sctp/structs.h>
 #include <linux/sysctl.h>
 
-extern struct sctp_protocol sctp_proto;
-
 static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_RTO_INITIAL,
 		.procname	= "rto_initial",
-		.data		= &sctp_proto.rto_initial,
+		.data		= &sctp_rto_initial,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
@@ -57,7 +55,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_RTO_MIN,
 		.procname	= "rto_min",
-		.data		= &sctp_proto.rto_min,
+		.data		= &sctp_rto_min,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
@@ -66,7 +64,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_RTO_MAX,
 		.procname	= "rto_max",
-		.data		= &sctp_proto.rto_max,
+		.data		= &sctp_rto_max,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
@@ -75,7 +73,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_VALID_COOKIE_LIFE,
 		.procname	= "valid_cookie_life",
-		.data		= &sctp_proto.valid_cookie_life,
+		.data		= &sctp_valid_cookie_life,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
@@ -84,7 +82,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_MAX_BURST,
 		.procname	= "max_burst",
-		.data		= &sctp_proto.max_burst,
+		.data		= &sctp_max_burst,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
@@ -92,7 +90,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_ASSOCIATION_MAX_RETRANS,
 		.procname	= "association_max_retrans",
-		.data		= &sctp_proto.max_retrans_association,
+		.data		= &sctp_max_retrans_association,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
@@ -100,7 +98,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_PATH_MAX_RETRANS,
 		.procname	= "path_max_retrans",
-		.data		= &sctp_proto.max_retrans_path,
+		.data		= &sctp_max_retrans_path,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
@@ -108,7 +106,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_MAX_INIT_RETRANSMITS,
 		.procname	= "max_init_retransmits",
-		.data		= &sctp_proto.max_retrans_init,
+		.data		= &sctp_max_retrans_init,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
@@ -116,7 +114,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_HB_INTERVAL,
 		.procname	= "hb_interval",
-		.data		= &sctp_proto.hb_interval,
+		.data		= &sctp_hb_interval,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
@@ -125,7 +123,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_PRESERVE_ENABLE,
 		.procname	= "cookie_preserve_enable",
-		.data		= &sctp_proto.cookie_preserve_enable,
+		.data		= &sctp_cookie_preserve_enable,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec_jiffies,
@@ -134,7 +132,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_RTO_ALPHA,
 		.procname	= "rto_alpha_exp_divisor",
-		.data		= &sctp_proto.rto_alpha,
+		.data		= &sctp_rto_alpha,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec
@@ -142,7 +140,7 @@ static ctl_table sctp_table[] = {
 	{
 		.ctl_name	= NET_SCTP_RTO_BETA,
 		.procname	= "rto_beta_exp_divisor",
-		.data		= &sctp_proto.rto_beta,
+		.data		= &sctp_rto_beta,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec

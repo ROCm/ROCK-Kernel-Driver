@@ -119,12 +119,10 @@
  */
 
 /*
- * sctp_protocol.c
+ * sctp/protocol.c
  */
-extern struct sctp_protocol sctp_proto;
 extern struct sock *sctp_get_ctl_sock(void);
-extern int sctp_copy_local_addr_list(struct sctp_protocol  *,
-				     struct sctp_bind_addr *,
+extern int sctp_copy_local_addr_list(struct sctp_bind_addr *,
 				     sctp_scope_t, int gfp, int flags);
 extern struct sctp_pf *sctp_get_pf_specific(sa_family_t family);
 extern int sctp_register_pf(struct sctp_pf *, sa_family_t);
@@ -504,12 +502,6 @@ void sctp_put_port(struct sock *sk);
 
 /* Static inline functions. */
 
-/* Return the SCTP protocol structure. */
-static inline struct sctp_protocol *sctp_get_protocol(void)
-{
-	return &sctp_proto;
-}
-
 /* Convert from an IP version number to an Address Family symbol.  */
 static inline int ipver2af(__u8 ipver)
 {
@@ -537,24 +529,21 @@ static inline int sctp_sanity_check(void)
 /* This is the hash function for the SCTP port hash table. */
 static inline int sctp_phashfn(__u16 lport)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
-	return (lport & (sctp_proto->port_hashsize - 1));
+	return (lport & (sctp_port_hashsize - 1));
 }
 
 /* This is the hash function for the endpoint hash table. */
 static inline int sctp_ep_hashfn(__u16 lport)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
-	return (lport & (sctp_proto->ep_hashsize - 1));
+	return (lport & (sctp_ep_hashsize - 1));
 }
 
 /* This is the hash function for the association hash table. */
 static inline int sctp_assoc_hashfn(__u16 lport, __u16 rport)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
 	int h = (lport << 16) + rport;
 	h ^= h>>8;
-	return (h & (sctp_proto->assoc_hashsize - 1));
+	return (h & (sctp_assoc_hashsize - 1));
 }
 
 /* This is the hash function for the association hash table.  This is
@@ -563,10 +552,9 @@ static inline int sctp_assoc_hashfn(__u16 lport, __u16 rport)
  */
 static inline int sctp_vtag_hashfn(__u16 lport, __u16 rport, __u32 vtag)
 {
-	struct sctp_protocol *sctp_proto = sctp_get_protocol();
 	int h = (lport << 16) + rport;
 	h ^= vtag;
-	return (h & (sctp_proto->assoc_hashsize-1));
+	return (h & (sctp_assoc_hashsize-1));
 }
 
 /* WARNING: Do not change the layout of the members in sctp_sock! */

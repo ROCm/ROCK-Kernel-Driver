@@ -1909,7 +1909,7 @@ int sctp_process_param(struct sctp_association *asoc, union sctp_params param,
 		break;
 
 	case SCTP_PARAM_COOKIE_PRESERVATIVE:
-		if (!sctp_proto.cookie_preserve_enable)
+		if (!sctp_cookie_preserve_enable)
 			break;
 
 		stale = ntohl(param.life->lifespan_increment);
