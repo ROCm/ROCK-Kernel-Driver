@@ -112,6 +112,7 @@ static const ac97_codec_id_t snd_ac97_codec_ids[] = {
 { 0x414c4721, 0xfffffff0, "ALC650D",		patch_alc650,	NULL },
 { 0x414c4722, 0xfffffff0, "ALC650E",		patch_alc650,	NULL },
 { 0x414c4723, 0xfffffff0, "ALC650F",		patch_alc650,	NULL },
+{ 0x414c4760, 0xfffffff0, "ALC655",		patch_alc650,	NULL },
 { 0x414c4730, 0xffffffff, "ALC101",		NULL,		NULL },
 { 0x414c4740, 0xfffffff0, "ALC202",		NULL,		NULL },
 { 0x414c4750, 0xfffffff0, "ALC250",		NULL,		NULL },
