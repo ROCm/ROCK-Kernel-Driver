@@ -51,7 +51,7 @@ spinlock_t kbd98io_lock = SPIN_LOCK_UNLOCKED;
 static struct serio kbd98_port;
 extern struct pt_regs *kbd_pt_regs;
 
-static void kbd98io_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t kbd98io_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /*
  * kbd98_flush() flushes all data that may be in the keyboard buffers
@@ -143,7 +143,7 @@ static struct serio kbd98_port =
  * to the upper layers.
  */
 
-static void kbd98io_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t kbd98io_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	unsigned long flags;
 	unsigned char data;
@@ -154,6 +154,7 @@ static void kbd98io_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	spin_unlock_irqrestore(&kbd98io_lock, flags);
 	serio_interrupt(&kbd98_port, data, 0, regs);
 
+	return IRQ_HANDLED;
 }
 
 int __init kbd98io_init(void)
