@@ -127,21 +127,6 @@ struct knfsd_fh {
  * The high 16 bits contain the rest (4 bits major
  * and 12 bits minor),
  */
-static inline __u32 kdev_t_to_u32(kdev_t dev)
-{
-	unsigned int minor = minor(dev);
-	unsigned int major = major(dev);
-	__u32 udev;
-
-	/* Create the low 16 bits.. */
-	udev = ((major & 0xff) << 8) + (minor & 0xff);
-
-	/* ..and then the rest. */
-	major >>= 8; minor >>= 8;
-	udev |= (major << 28) | (minor << 16);
-
-	return udev;
-}
 
 static inline dev_t u32_to_dev_t(__u32 udev)
 {
@@ -191,7 +176,7 @@ typedef struct svc_fh {
 	__u64			fh_post_size;	/* i_size */
 	unsigned long		fh_post_blocks; /* i_blocks */
 	unsigned long		fh_post_blksize;/* i_blksize */
-	kdev_t			fh_post_rdev;	/* i_rdev */
+	__u32			fh_post_rdev[2];/* i_rdev */
 	time_t			fh_post_atime;	/* i_atime */
 	time_t			fh_post_mtime;	/* i_mtime */
 	time_t			fh_post_ctime;	/* i_ctime */
@@ -309,7 +294,8 @@ fill_post_wcc(struct svc_fh *fhp)
 		/* how much do we care for accuracy with MinixFS? */
 		fhp->fh_post_blocks     = (inode->i_size+511) >> 9;
 	}
-	fhp->fh_post_rdev       = inode->i_rdev;
+	fhp->fh_post_rdev[0]    = htonl((u32)major(inode->i_rdev));
+	fhp->fh_post_rdev[1]    = htonl((u32)minor(inode->i_rdev));
 	fhp->fh_post_atime      = inode->i_atime;
 	fhp->fh_post_mtime      = inode->i_mtime;
 	fhp->fh_post_ctime      = inode->i_ctime;

@@ -212,8 +212,8 @@ encode_saved_post_attr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 		p = xdr_encode_hyper(p, (u64) fhp->fh_post_size);
 	}
 	p = xdr_encode_hyper(p, ((u64)fhp->fh_post_blocks) << 9);
-	*p++ = htonl((u32) major(fhp->fh_post_rdev));
-	*p++ = htonl((u32) minor(fhp->fh_post_rdev));
+	*p++ = fhp->fh_post_rdev[0];
+	*p++ = fhp->fh_post_rdev[1];
 	if (rqstp->rq_reffh->fh_version == 1
 	    && rqstp->rq_reffh->fh_fsid_type == 1
 	    && (fhp->fh_export->ex_flags & NFSEXP_FSID))

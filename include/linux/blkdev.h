@@ -131,7 +131,6 @@ typedef int (merge_request_fn) (request_queue_t *, struct request *,
 typedef int (merge_requests_fn) (request_queue_t *, struct request *,
 				 struct request *);
 typedef void (request_fn_proc) (request_queue_t *q);
-typedef request_queue_t * (queue_proc) (kdev_t dev);
 typedef int (make_request_fn) (request_queue_t *q, struct bio *bio);
 typedef int (prep_rq_fn) (request_queue_t *, struct request *);
 typedef void (unplug_fn) (void *q);
