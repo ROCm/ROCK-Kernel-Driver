@@ -158,6 +158,36 @@ static struct resource *make_resource(unsigned long b, unsigned long n,
 	return res;
 }
 
+static struct resource *
+claim_region(struct pcmcia_socket *s, unsigned long base, unsigned long size,
+	     int type, char *name)
+{
+	struct resource *res, *parent;
+
+	parent = type & IORESOURCE_MEM ? &iomem_resource : &ioport_resource;
+	res = make_resource(base, size, type | IORESOURCE_BUSY, name);
+
+	if (res) {
+#ifdef CONFIG_PCI
+		if (s && s->cb_dev)
+			parent = pci_find_parent_resource(s->cb_dev, res);
+#endif
+		if (!parent || request_resource(parent, res)) {
+			kfree(res);
+			res = NULL;
+		}
+	}
+	return res;
+}
+
+static void free_region(struct resource *res)
+{
+	if (res) {
+		release_resource(res);
+		kfree(res);
+	}
+}
+
 static int request_io_resource(unsigned long b, unsigned long n,
 			       char *name, struct pci_dev *dev)
 {
@@ -389,18 +419,16 @@ cis_readable(struct pcmcia_socket *s, unsigned long base, unsigned long size)
 	cisinfo_t info1, info2;
 	int ret = 0;
 
-	res1 = request_mem_region(base, size/2, "cs memory probe");
-	res2 = request_mem_region(base + size/2, size/2, "cs memory probe");
+	res1 = claim_region(s, base, size/2, IORESOURCE_MEM, "cs memory probe");
+	res2 = claim_region(s, base + size/2, size/2, IORESOURCE_MEM, "cs memory probe");
 
 	if (res1 && res2) {
 		ret = readable(s, res1, &info1);
 		ret += readable(s, res2, &info2);
 	}
 
-	if (res2)
-		release_resource(res2);
-	if (res1)
-		release_resource(res1);
+	free_region(res2);
+	free_region(res1);
 
 	return (ret == 2) && (info1.Chains == info2.Chains);
 }
@@ -411,18 +439,16 @@ checksum_match(struct pcmcia_socket *s, unsigned long base, unsigned long size)
 	struct resource *res1, *res2;
 	int a = -1, b = -1;
 
-	res1 = request_mem_region(base, size/2, "cs memory probe");
-	res2 = request_mem_region(base + size/2, size/2, "cs memory probe");
+	res1 = claim_region(s, base, size/2, IORESOURCE_MEM, "cs memory probe");
+	res2 = claim_region(s, base + size/2, size/2, IORESOURCE_MEM, "cs memory probe");
 
 	if (res1 && res2) {
 		a = checksum(s, res1);
 		b = checksum(s, res2);
 	}
 
-	if (res2)
-		release_resource(res2);
-	if (res1)
-		release_resource(res1);
+	free_region(res2);
+	free_region(res1);
 
 	return (a == b) && (a >= 0);
 }
