@@ -474,14 +474,12 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 				);
 
 			priv->cur_pos = priv->cur_pos + length;
-			result = usb_submit_urb( port->write_urb, GFP_ATOMIC );
+			result = usb_submit_urb( port->write_urb, GFP_NOIO );
 			dbg("%s - port %d Send write URB returns: %i", __FUNCTION__, port->number, result);
 			todo = priv->filled - priv->cur_pos;
 
 			if (todo > 0) {
-				//mdelay(16);
-				set_current_state(TASK_UNINTERRUPTIBLE);
-				schedule_timeout(24 * HZ / 1000);
+				msleep(24);
 			}
 
 		} // end while
@@ -493,7 +491,7 @@ static int kobil_write (struct usb_serial_port *port, int from_user,
 		port->interrupt_in_urb->dev = port->serial->dev;
 		
 		// start reading
-		result = usb_submit_urb( port->interrupt_in_urb, GFP_ATOMIC ); 
+		result = usb_submit_urb( port->interrupt_in_urb, GFP_NOIO ); 
 		dbg("%s - port %d Send read URB returns: %i", __FUNCTION__, port->number, result);
 	}
 	return count;
