@@ -677,7 +677,7 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	struct super_block *s;
 	int error = 0;
 
-	bdev = __open_bdev_excl(dev_name, flags, fs_type, BD_EXCL|BD_WAIT);
+	bdev = open_bdev_excl(dev_name, flags, fs_type);
 	if (IS_ERR(bdev))
 		return (struct super_block *)bdev;
 

@@ -238,7 +238,6 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
  */
 
 static  __cacheline_aligned_in_smp DEFINE_SPINLOCK(bdev_lock);
-static DECLARE_WAIT_QUEUE_HEAD(bdev_wq);
 static kmem_cache_t * bdev_cachep;
 
 static struct inode *bdev_alloc_inode(struct super_block *sb)
@@ -444,33 +443,20 @@ void bd_forget(struct inode *inode)
 	spin_unlock(&bdev_lock);
 }
 
-/*
- * flags:
- * BD_NONE: No special behavior.
- * BD_EXCL: Must have sole access to device, even if holder is the same.
- *          This is really enforced by the holder always using BD_EXCL.
- * BD_WAIT: Wait until access is available before returning.
- */
-int __bd_claim(struct block_device *bdev, void *holder, int flags)
+int bd_claim(struct block_device *bdev, void *holder)
 {
 	int res;
-	DEFINE_WAIT (wait);
-
-retry:
 	spin_lock(&bdev_lock);
-	prepare_to_wait (&bdev_wq, &wait, TASK_UNINTERRUPTIBLE);
 
 	/* first decide result */
-	if (bdev->bd_holder == holder) {
+	if (bdev->bd_holder == holder)
 		res = 0;	 /* already a holder */
-		if (flags & BD_EXCL)
-			res = -EBUSY;
-	} else if (bdev->bd_holder != NULL)
+	else if (bdev->bd_holder != NULL)
 		res = -EBUSY; 	 /* held by someone else */
 	else if (bdev->bd_contains == bdev)
 		res = 0;  	 /* is a whole device which isn't held */
 
-	else if (bdev->bd_contains->bd_holder == __bd_claim)
+	else if (bdev->bd_contains->bd_holder == bd_claim)
 		res = 0; 	 /* is a partition of a device that is being partitioned */
 	else if (bdev->bd_contains->bd_holder != NULL)
 		res = -EBUSY;	 /* is a partition of a held device */
@@ -484,21 +470,15 @@ retry:
 		 * be set to bd_claim before being set to holder
 		 */
 		bdev->bd_contains->bd_holders ++;
-		bdev->bd_contains->bd_holder = __bd_claim;
+		bdev->bd_contains->bd_holder = bd_claim;
 		bdev->bd_holders++;
 		bdev->bd_holder = holder;
-	} else if (flags & BD_WAIT) {
-		spin_unlock (&bdev_lock);
-		schedule();
-		goto retry;
 	}
-
-	finish_wait (&bdev_wq, &wait);
 	spin_unlock(&bdev_lock);
 	return res;
 }
 
-EXPORT_SYMBOL(__bd_claim);
+EXPORT_SYMBOL(bd_claim);
 
 void bd_release(struct block_device *bdev)
 {
@@ -508,7 +488,6 @@ void bd_release(struct block_device *bdev)
 	if (!--bdev->bd_holders)
 		bdev->bd_holder = NULL;
 	spin_unlock(&bdev_lock);
-	wake_up_all (&bdev_wq);
 }
 
 EXPORT_SYMBOL(bd_release);
@@ -897,8 +876,7 @@ fail:
  * Open the blockdevice described by the special file at @path, claim it
  * for the @holder.
  */
-struct block_device *__open_bdev_excl(const char *path, int flags,
-                                      void *holder, int bdflags)
+struct block_device *open_bdev_excl(const char *path, int flags, void *holder)
 {
 	struct block_device *bdev;
 	mode_t mode = FMODE_READ;
@@ -916,7 +894,7 @@ struct block_device *__open_bdev_excl(const char *path, int flags,
 	error = -EACCES;
 	if (!(flags & MS_RDONLY) && bdev_read_only(bdev))
 		goto blkdev_put;
-	error = __bd_claim(bdev, holder, bdflags);
+	error = bd_claim(bdev, holder);
 	if (error)
 		goto blkdev_put;
 
@@ -927,7 +905,7 @@ blkdev_put:
 	return ERR_PTR(error);
 }
 
-EXPORT_SYMBOL(__open_bdev_excl);
+EXPORT_SYMBOL(open_bdev_excl);
 
 /**
  * close_bdev_excl  -  release a blockdevice openen by open_bdev_excl()
