@@ -40,6 +40,7 @@
 #include <asm/bitops.h>
 #include <linux/module.h>
 #include <linux/completion.h>
+#include <linux/moduleparam.h>
 #include <linux/percpu.h>
 #include <linux/notifier.h>
 #include <linux/rcupdate.h>
@@ -63,6 +64,7 @@ DEFINE_PER_CPU(struct rcu_data, rcu_data) = { 0L };
 /* Fake initialization required by compiler */
 static DEFINE_PER_CPU(struct tasklet_struct, rcu_tasklet) = {NULL};
 #define RCU_tasklet(cpu) (per_cpu(rcu_tasklet, cpu))
+static int maxbatch = 10;
 
 /**
  * call_rcu - Queue an RCU update request.
@@ -93,15 +95,23 @@ void fastcall call_rcu(struct rcu_head *head,
  * Invoke the completed RCU callbacks. They are expected to be in
  * a per-cpu list.
  */
-static void rcu_do_batch(struct rcu_head *list)
+static void rcu_do_batch(int cpu)
 {
-	struct rcu_head *next;
+	struct rcu_head *next, *list;
+	int count = 0;
 
+	list = RCU_donelist(cpu);
 	while (list) {
-		next = list->next;
+		next = RCU_donelist(cpu) = list->next;
 		list->func(list);
 		list = next;
+		if (++count >= maxbatch)
+			break;
 	}
+	if (!RCU_donelist(cpu))
+		RCU_donetail(cpu) = &RCU_donelist(cpu);
+	else
+		tasklet_schedule(&RCU_tasklet(cpu));
 }
 
 /*
@@ -261,11 +271,11 @@ void rcu_restart_cpu(int cpu)
 static void rcu_process_callbacks(unsigned long unused)
 {
 	int cpu = smp_processor_id();
-	struct rcu_head *rcu_list = NULL;
 
 	if (RCU_curlist(cpu) &&
 	    !rcu_batch_before(rcu_ctrlblk.completed, RCU_batch(cpu))) {
-		rcu_list = RCU_curlist(cpu);
+		*RCU_donetail(cpu) = RCU_curlist(cpu);
+		RCU_donetail(cpu) = RCU_curtail(cpu);
 		RCU_curlist(cpu) = NULL;
 		RCU_curtail(cpu) = &RCU_curlist(cpu);
 	}
@@ -300,8 +310,8 @@ static void rcu_process_callbacks(unsigned long unused)
 		local_irq_enable();
 	}
 	rcu_check_quiescent_state();
-	if (rcu_list)
-		rcu_do_batch(rcu_list);
+	if (RCU_donelist(cpu))
+		rcu_do_batch(cpu);
 }
 
 void rcu_check_callbacks(int cpu, int user)
@@ -319,6 +329,7 @@ static void __devinit rcu_online_cpu(int cpu)
 	tasklet_init(&RCU_tasklet(cpu), rcu_process_callbacks, 0UL);
 	RCU_curtail(cpu) = &RCU_curlist(cpu);
 	RCU_nxttail(cpu) = &RCU_nxtlist(cpu);
+	RCU_donetail(cpu) = &RCU_donelist(cpu);
 	RCU_quiescbatch(cpu) = rcu_ctrlblk.completed;
 	RCU_qs_pending(cpu) = 0;
 }
@@ -388,6 +399,6 @@ void synchronize_kernel(void)
 	wait_for_completion(&rcu.completion);
 }
 
-
+module_param(maxbatch, int, 0);
 EXPORT_SYMBOL(call_rcu);
 EXPORT_SYMBOL(synchronize_kernel);

@@ -99,6 +99,8 @@ struct rcu_data {
 	struct rcu_head **nxttail;
         struct rcu_head *curlist;
         struct rcu_head **curtail;
+        struct rcu_head *donelist;
+        struct rcu_head **donetail;
 };
 
 DECLARE_PER_CPU(struct rcu_data, rcu_data);
@@ -113,6 +115,8 @@ extern struct rcu_ctrlblk rcu_ctrlblk;
 #define RCU_curlist(cpu) 	(per_cpu(rcu_data, (cpu)).curlist)
 #define RCU_nxttail(cpu) 	(per_cpu(rcu_data, (cpu)).nxttail)
 #define RCU_curtail(cpu) 	(per_cpu(rcu_data, (cpu)).curtail)
+#define RCU_donelist(cpu) 	(per_cpu(rcu_data, (cpu)).donelist)
+#define RCU_donetail(cpu) 	(per_cpu(rcu_data, (cpu)).donetail)
 
 static inline int rcu_pending(int cpu) 
 {
@@ -125,6 +129,9 @@ static inline int rcu_pending(int cpu)
 
 	/* This cpu has no pending entries, but there are new entries */
 	if (!RCU_curlist(cpu) && RCU_nxtlist(cpu))
+		return 1;
+
+	if (RCU_donelist(cpu))
 		return 1;
 
 	/* The rcu core waits for a quiescent state from the cpu */
