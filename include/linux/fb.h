@@ -125,7 +125,8 @@ struct fb_fix_screeninfo {
 	unsigned long mmio_start;	/* Start of Memory Mapped I/O   */
 					/* (physical address) */
 	__u32 mmio_len;			/* Length of Memory Mapped I/O  */
-	__u32 accel;			/* Type of acceleration available */
+	__u32 accel;			/* Indicate to driver which	*/
+					/*  specific chip/card we have	*/
 	__u16 reserved[3];		/* Reserved for future compatibility */
 };
 
@@ -154,7 +155,7 @@ struct fb_bitfield {
 #define FB_ACTIVATE_ALL	       64	/* change all VCs on this fb	*/
 #define FB_ACTIVATE_FORCE     128	/* force apply even when no change*/
 
-#define FB_ACCELF_TEXT		1	/* text mode acceleration */
+#define FB_ACCELF_TEXT		1	/* (OBSOLETE) see fb_info.flags and vc_mode */
 
 #define FB_SYNC_HOR_HIGH_ACT	1	/* horizontal sync high active	*/
 #define FB_SYNC_VERT_HIGH_ACT	2	/* vertical sync high active	*/
@@ -200,7 +201,7 @@ struct fb_var_screeninfo {
 	__u32 height;			/* height of picture in mm    */
 	__u32 width;			/* width of picture in mm     */
 
-	__u32 accel_flags;		/* acceleration flags (hints)	*/
+	__u32 accel_flags;		/* (OBSOLETE) see fb_info.flags */
 
 	/* Timing: All values in pixclocks, except pixclock (of course) */
 	__u32 pixclock;			/* pixel clock in ps (pico seconds) */
@@ -502,10 +503,37 @@ struct fb_ops {
 	int (*fb_mmap)(struct fb_info *info, struct file *file, struct vm_area_struct *vma);
 };
 
+/* FBINFO_* = fb_info.flags bit flags */
+#define FBINFO_MODULE		0x0001	/* Low-level driver is a module */
+#define FBINFO_HWACCEL_DISABLED	0x0002
+	/* When FBINFO_HWACCEL_DISABLED is set:
+	 *  Hardware acceleration is turned off.  Software implementations
+	 *  of required functions (copyarea(), fillrect(), and imageblit())
+	 *  takes over; acceleration engine should be in a quiescent state */
+
+/* hints */
+#define FBINFO_PARTIAL_PAN_OK	0x0040 /* otw use pan only for double-buffering */
+#define FBINFO_READS_FAST	0x0080 /* soft-copy faster than rendering */
+
+/* hardware supported ops */
+/*  semantics: when a bit is set, it indicates that the operation is
+ *   accelerated by hardware.
+ *  required functions will still work even if the bit is not set.
+ *  optional functions may not even exist if the flag bit is not set.
+ */
+#define FBINFO_HWACCEL_NONE		0x0000
+#define FBINFO_HWACCEL_COPYAREA		0x0100 /* required */
+#define FBINFO_HWACCEL_FILLRECT		0x0200 /* required */
+#define FBINFO_HWACCEL_IMAGEBLIT	0x0400 /* required */
+#define FBINFO_HWACCEL_ROTATE		0x0800 /* optional */
+#define FBINFO_HWACCEL_XPAN		0x1000 /* optional */
+#define FBINFO_HWACCEL_YPAN		0x2000 /* optional */
+#define FBINFO_HWACCEL_YWRAP		0x4000 /* optional */
+
+
 struct fb_info {
 	int node;
 	int flags;
-#define FBINFO_FLAG_MODULE	1	/* Low-level driver is a module */
 	struct fb_var_screeninfo var;	/* Current var */
 	struct fb_fix_screeninfo fix;	/* Current fix */
 	struct fb_monspecs monspecs;	/* Current Monitor specs */
@@ -527,10 +555,22 @@ struct fb_info {
 };
 
 #ifdef MODULE
-#define FBINFO_FLAG_DEFAULT	FBINFO_FLAG_MODULE
+#define FBINFO_DEFAULT	FBINFO_MODULE
 #else
-#define FBINFO_FLAG_DEFAULT	0
+#define FBINFO_DEFAULT	0
 #endif
+
+// This will go away
+#define FBINFO_FLAG_MODULE	FBINFO_MODULE
+#define FBINFO_FLAG_DEFAULT	FBINFO_DEFAULT
+
+/* This will go away
+ * fbset currently hacks in FB_ACCELF_TEXT into var.accel_flags
+ * when it wants to turn the acceleration engine on.  This is
+ * really a separate operation, and should be modified via sysfs.
+ *  But for now, we leave it broken with the following define
+ */
+#define STUPID_ACCELF_TEXT_SHIT
 
 // This will go away
 #if defined(__sparc__)
