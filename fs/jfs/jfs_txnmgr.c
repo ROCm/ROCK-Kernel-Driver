@@ -2755,7 +2755,7 @@ void txLazyCommit(tblock_t * tblk)
  *	context, or where blocking is not wanted, this routine will process
  *	committed transactions from the unlock queue.
  */
-int jfs_lazycommit(void)
+int jfs_lazycommit(void *arg)
 {
 	int WorkDone;
 	tblock_t *tblk;
@@ -2952,7 +2952,7 @@ void txResume(struct super_block *sb)
  *	We write any inodes that have anonymous tlocks so they will become
  *	available.
  */
-int jfs_sync(void)
+int jfs_sync(void *arg)
 {
 	struct inode *ip;
 	struct jfs_inode_info *jfs_ip;

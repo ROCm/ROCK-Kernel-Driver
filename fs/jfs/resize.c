@@ -312,8 +312,7 @@ int jfs_extendfs(struct super_block *sb, s64 newLVSize, int newLogSize)
 	/* compute number of blocks that can be extended by current mapfile */
 	t64 = dbMapFileSizeToMapSize(ipbmap);
 	if (mapSize > t64) {
-		printk(KERN_ERR
-		       "jfs_extendfs: mapSize (0x%llx) > t64 (0x%llx)\n",
+		printk(KERN_ERR "jfs_extendfs: mapSize (0x%Lx) > t64 (0x%Lx)\n",
 		       (long long) mapSize, (long long) t64);
 		rc = EIO;
 		goto error_out;
