@@ -516,7 +516,7 @@ static struct pnp_device_id cadet_pnp_devices[] = {
 	{.id = ""}
 };
 
-MODULE_DEVICE_TABLE(pnp, id_table);
+MODULE_DEVICE_TABLE(pnp, cadet_pnp_devices);
 
 static int cadet_pnp_probe(struct pnp_dev * dev, const struct pnp_device_id *dev_id)
 {
