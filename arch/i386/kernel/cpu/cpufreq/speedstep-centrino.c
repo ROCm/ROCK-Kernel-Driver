@@ -40,32 +40,24 @@
 
 struct cpu_id
 {
-	__u8	x86;            /* CPU family */
 	__u8	x86_vendor;     /* CPU vendor */
+	__u8	x86;            /* CPU family */
 	__u8	x86_model;	/* model */
 	__u8	x86_mask;	/* stepping */
 };
 
-static const struct cpu_id cpu_id_banias = {
-	.x86_vendor = X86_VENDOR_INTEL,
-	.x86 = 6,
-	.x86_model = 9,
-	.x86_mask = 5,
+enum {
+	CPU_BANIAS,
+	CPU_DOTHAN_A1,
+	CPU_DOTHAN_B0,
 };
 
-static const struct cpu_id cpu_id_dothan_a1 = {
-	.x86_vendor = X86_VENDOR_INTEL,
-	.x86 = 6,
-	.x86_model = 13,
-	.x86_mask = 1,
+static const struct cpu_id cpu_ids[] = {
+	[CPU_BANIAS]	= { X86_VENDOR_INTEL,	6,  9, 5 },
+	[CPU_DOTHAN_A1]	= { X86_VENDOR_INTEL,	6, 13, 1 },
+	[CPU_DOTHAN_B0]	= { X86_VENDOR_INTEL,	6, 13, 6 },
 };
-
-static const struct cpu_id cpu_id_dothan_b0 = {
-	.x86_vendor = X86_VENDOR_INTEL,
-	.x86 = 6,
-	.x86_model = 13,
-	.x86_mask = 6,
-};
+#define N_IDS	(sizeof(cpu_ids)/sizeof(cpu_ids[0]))
 
 struct cpu_model
 {
@@ -75,7 +67,7 @@ struct cpu_model
 
 	struct cpufreq_frequency_table *op_points; /* clock/voltage pairs */
 };
-static int centrino_verify_cpu_id(struct cpuinfo_x86 *c, const struct cpu_id *x);
+static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_id *x);
 
 /* Operating points for current CPU */
 static struct cpu_model *centrino_model;
@@ -110,9 +102,9 @@ static struct cpufreq_frequency_table banias_900[] =
 /* Ultra Low Voltage Intel Pentium M processor 1000MHz (Banias) */
 static struct cpufreq_frequency_table banias_1000[] =
 {
-	OP(600,  844),
-	OP(800,  972),
-	OP(900,  988),
+	OP(600,   844),
+	OP(800,   972),
+	OP(900,   988),
 	OP(1000, 1004),
 	{ .frequency = CPUFREQ_TABLE_END }
 };
@@ -206,13 +198,13 @@ static struct cpufreq_frequency_table banias_1700[] =
 	.max_freq	= (max)*1000,	\
 	.op_points	= banias_##max,	\
 }
-#define BANIAS(max)	_BANIAS(&cpu_id_banias, max, #max)
+#define BANIAS(max)	_BANIAS(&cpu_ids[CPU_BANIAS], max, #max)
 
 /* CPU models, their operating frequency range, and freq/voltage
    operating points */
 static struct cpu_model models[] = 
 {
-	_BANIAS(&cpu_id_banias, 900, " 900"),
+	_BANIAS(&cpu_ids[CPU_BANIAS], 900, " 900"),
 	BANIAS(1000),
 	BANIAS(1100),
 	BANIAS(1200),
@@ -221,6 +213,11 @@ static struct cpu_model models[] =
 	BANIAS(1500),
 	BANIAS(1600),
 	BANIAS(1700),
+
+	/* NULL model_name is a wildcard */
+	{ &cpu_ids[CPU_DOTHAN_A1], NULL, 0, NULL },
+	{ &cpu_ids[CPU_DOTHAN_B0], NULL, 0, NULL },
+
 	{ NULL, }
 };
 #undef _BANIAS
@@ -231,17 +228,28 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 	struct cpuinfo_x86 *cpu = &cpu_data[policy->cpu];
 	struct cpu_model *model;
 
-	for(model = models; model->model_name != NULL; model++)
-		if ((strcmp(cpu->x86_model_id, model->model_name) == 0) &&
-		    (!centrino_verify_cpu_id(cpu, model->cpu_id)))
+	for(model = models; model->cpu_id != NULL; model++)
+		if (centrino_verify_cpu_id(cpu, model->cpu_id) &&
+		    (model->model_name == NULL ||
+		     strcmp(cpu->x86_model_id, model->model_name) == 0))
 			break;
-	if (model->model_name == NULL) {
+	
+	if (model->cpu_id == NULL) {
+		/* No match at all */
 		printk(KERN_INFO PFX "no support for CPU model \"%s\": "
 		       "send /proc/cpuinfo to " MAINTAINER "\n",
 		       cpu->x86_model_id);
 		return -ENOENT;
 	}
 
+	if (model->op_points == NULL) {
+		/* Matched a non-match */
+		printk(KERN_INFO PFX "no table support for CPU model \"%s\": \n",
+		       cpu->x86_model_id);
+		printk(KERN_INFO PFX "try compiling with CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI enabled\n");
+		return -ENOENT;
+	}
+		
 	centrino_model = model;
 		
 	printk(KERN_INFO PFX "found \"%s\": max frequency: %dkHz\n",
@@ -254,14 +262,14 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 static inline int centrino_cpu_init_table(struct cpufreq_policy *policy) { return -ENODEV; }
 #endif /* CONFIG_X86_SPEEDSTEP_CENTRINO_TABLE */
 
-static int centrino_verify_cpu_id(struct cpuinfo_x86 *c, const struct cpu_id *x)
+static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_id *x)
 {
 	if ((c->x86 == x->x86) &&
 	    (c->x86_vendor == x->x86_vendor) &&
 	    (c->x86_model == x->x86_model) &&
 	    (c->x86_mask == x->x86_mask))
-		return 0;
-	return -ENODEV;
+		return 1;
+	return 0;
 }
 
 /* Extract clock in kHz from PERF_CTL value */
@@ -407,16 +415,20 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 	unsigned freq;
 	unsigned l, h;
 	int ret;
+	int i;
 
 	if (policy->cpu != 0)
 		return -ENODEV;
 
-	if (!cpu_has(cpu, X86_FEATURE_EST))
+	/* Only Intel makes Enhanced Speedstep-capable CPUs */
+	if (cpu->x86_vendor != X86_VENDOR_INTEL || !cpu_has(cpu, X86_FEATURE_EST))
 		return -ENODEV;
 
-	if ((centrino_verify_cpu_id(cpu, &cpu_id_banias)) &&
-	    (centrino_verify_cpu_id(cpu, &cpu_id_dothan_a1)) &&
-		(centrino_verify_cpu_id(cpu, &cpu_id_dothan_b0))) {
+	for (i = 0; i < N_IDS; i++)
+		if (centrino_verify_cpu_id(cpu, &cpu_ids[i]))
+			break;
+
+	if (i == N_IDS) {
 		printk(KERN_INFO PFX "found unsupported CPU with Enhanced SpeedStep: "
 		       "send /proc/cpuinfo to " MAINTAINER "\n");
 		return -ENODEV;
