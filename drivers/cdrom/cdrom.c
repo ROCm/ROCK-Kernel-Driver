@@ -443,15 +443,16 @@ int cdrom_open(struct inode *ip, struct file *fp)
 	if ((cdi = cdrom_find_device(dev)) == NULL)
 		return -ENODEV;
 
-	if ((fp->f_mode & FMODE_WRITE) && !CDROM_CAN(CDC_DVD_RAM))
-		return -EROFS;
-
 	/* if this was a O_NONBLOCK open and we should honor the flags,
 	 * do a quick open without drive/disc integrity checks. */
 	if ((fp->f_flags & O_NONBLOCK) && (cdi->options & CDO_USE_FFLAGS))
 		ret = cdi->ops->open(cdi, 1);
-	else
+	else {
+		if ((fp->f_mode & FMODE_WRITE) && !CDROM_CAN(CDC_DVD_RAM))
+			return -EROFS;
+
 		ret = open_for_data(cdi);
+	}
 
 	if (!ret) cdi->use_count++;
 
