@@ -20,6 +20,7 @@
 #include <linux/poll.h>
 #include <linux/init.h>
 #include <linux/smp_lock.h>
+#include <asm/io.h>
 #include <asm/mostek.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -30,7 +31,7 @@ static int rtc_busy = 0;
 /* Retrieve the current date and time from the real time clock. */
 static void get_rtc_time(struct rtc_time *t)
 {
-	unsigned long regs = mstk48t02_regs;
+	void * __iomem regs = mstk48t02_regs;
 	u8 tmp;
 
 	spin_lock_irq(&mostek_lock);
@@ -57,7 +58,7 @@ static void get_rtc_time(struct rtc_time *t)
 /* Set the current date and time inthe real time clock. */
 void set_rtc_time(struct rtc_time *t)
 {
-	unsigned long regs = mstk48t02_regs;
+	void * __iomem regs = mstk48t02_regs;
 	u8 tmp;
 
 	spin_lock_irq(&mostek_lock);
