@@ -490,16 +490,6 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
-	/*
-	 * Tell the world that we're going to be the grim
-	 * reaper of innocent orphaned children.
-	 *
-	 * We don't want people to have to make incorrect
-	 * assumptions about where in the task array this
-	 * can be found.
-	 */
-	child_reaper = current;
-
 #if defined(CONFIG_MTRR)	/* Do this after SMP initialization */
 /*
  * We should probably create some architecture-dependent "fixup after
@@ -545,6 +535,16 @@ static int init(void * unused)
 	static char * argv_sh[] = { "sh", NULL, };
 
 	lock_kernel();
+	/*
+	 * Tell the world that we're going to be the grim
+	 * reaper of innocent orphaned children.
+	 *
+	 * We don't want people to have to make incorrect
+	 * assumptions about where in the task array this
+	 * can be found.
+	 */
+	child_reaper = current;
+
 	/* Sets up cpus_possible() */
 	smp_prepare_cpus(max_cpus);
 
