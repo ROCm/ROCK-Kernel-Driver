@@ -804,10 +804,15 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 	spin_lock(&chip->reg_lock);
 	status = igetdword(chip, chip->int_sta_reg);
 	if ((status & chip->int_sta_mask) == 0) {
+		static int err_count = 10;
 		if (status)
 			iputdword(chip, chip->int_sta_reg, status);
 		spin_unlock(&chip->reg_lock);
-		return IRQ_NONE;
+		if (status && err_count) {
+			err_count--;
+			snd_printk(KERN_DEBUG "intel8x0: unknown IRQ bits 0x%x (sta_mask=0x%x)\n", status, chip->int_sta_mask);
+		}
+		return IRQ_RETVAL(status);
 	}
 
 	for (i = 0; i < chip->bdbars_count; i++) {
