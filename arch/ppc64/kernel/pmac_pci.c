@@ -152,7 +152,6 @@ static int __pmac macrisc_read_config(struct pci_bus *bus, unsigned int devfn,
 	struct pci_controller *hose;
 	struct device_node *busdn;
 	unsigned long addr;
-	int i;
 
 	if (bus->self)
 		busdn = pci_device_to_OF_node(bus->self);
@@ -164,24 +163,6 @@ static int __pmac macrisc_read_config(struct pci_bus *bus, unsigned int devfn,
 	if (hose == NULL)
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	/*
-	 * When a device in K2 is powered down, we die on config
-	 * cycle accesses. Fix that here.
-	 */
-	for (i=0; i<2; i++)
-		if (k2_skiplist[i] && k2_skiplist[i]->bus == bus &&
-		    k2_skiplist[i]->devfn == devfn) {
-			switch (len) {
-			case 1:
-				*val = 0xff; break;
-			case 2:
-				*val = 0xffff; break;
-			default:
-				*val = 0xfffffffful; break;
-			}
-			return PCIBIOS_SUCCESSFUL;
-		}
-	    
 	addr = macrisc_cfg_access(hose, bus->number, devfn, offset);
 	if (!addr)
 		return PCIBIOS_DEVICE_NOT_FOUND;
@@ -209,7 +190,6 @@ static int __pmac macrisc_write_config(struct pci_bus *bus, unsigned int devfn,
 	struct pci_controller *hose;
 	struct device_node *busdn;
 	unsigned long addr;
-	int i;
 
 	if (bus->self)
 		busdn = pci_device_to_OF_node(bus->self);
@@ -220,15 +200,6 @@ static int __pmac macrisc_write_config(struct pci_bus *bus, unsigned int devfn,
 	hose = busdn->phb;
 	if (hose == NULL)
 		return PCIBIOS_DEVICE_NOT_FOUND;
-
-	/*
-	 * When a device in K2 is powered down, we die on config
-	 * cycle accesses. Fix that here.
-	 */
-	for (i=0; i<2; i++)
-		if (k2_skiplist[i] && k2_skiplist[i]->bus == bus &&
-		    k2_skiplist[i]->devfn == devfn)
-			return PCIBIOS_SUCCESSFUL;
 
 	addr = macrisc_cfg_access(hose, bus->number, devfn, offset);
 	if (!addr)
@@ -264,6 +235,17 @@ static struct pci_ops macrisc_pci_ops =
  * These versions of U3 HyperTransport config space access ops do not
  * implement self-view of the HT host yet
  */
+
+static int skip_k2_device(struct pci_bus *bus, unsigned int devfn)
+{
+	int i;
+
+	for (i=0; i<2; i++)
+		if (k2_skiplist[i] && k2_skiplist[i]->bus == bus &&
+		    k2_skiplist[i]->devfn == devfn)
+			return 1;
+	return 0;
+}
 
 #define U3_HT_CFA0(devfn, off)		\
 		((((unsigned long)devfn) << 8) | offset)
@@ -306,6 +288,24 @@ static int __pmac u3_ht_read_config(struct pci_bus *bus, unsigned int devfn,
 	if (!addr)
 		return PCIBIOS_DEVICE_NOT_FOUND;
 	/*
+	 * When a device in K2 is powered down, we die on config
+	 * cycle accesses. Fix that here. We may ultimately want
+	 * to cache the config space for those instead of returning
+	 * 0xffffffff's to make life easier to HW detection tools
+	 */
+	if (skip_k2_device(bus, devfn)) {
+		switch (len) {
+		case 1:
+			*val = 0xff; break;
+		case 2:
+			*val = 0xffff; break;
+		default:
+			*val = 0xfffffffful; break;
+		}
+		return PCIBIOS_SUCCESSFUL;
+	}
+
+	/*
 	 * Note: the caller has already checked that offset is
 	 * suitably aligned and that len is 1, 2 or 4.
 	 */
@@ -343,6 +343,13 @@ static int __pmac u3_ht_write_config(struct pci_bus *bus, unsigned int devfn,
 	addr = u3_ht_cfg_access(hose, bus->number, devfn, offset);
 	if (!addr)
 		return PCIBIOS_DEVICE_NOT_FOUND;
+	/*
+	 * When a device in K2 is powered down, we die on config
+	 * cycle accesses. Fix that here.
+	 */
+	if (skip_k2_device(bus, devfn))
+		return PCIBIOS_SUCCESSFUL;
+
 	/*
 	 * Note: the caller has already checked that offset is
 	 * suitably aligned and that len is 1, 2 or 4.
