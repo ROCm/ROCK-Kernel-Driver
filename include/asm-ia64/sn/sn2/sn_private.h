@@ -207,6 +207,7 @@ typedef struct cpuinfo_s {
 extern void xswitch_vertex_init(vertex_hdl_t xswitch);
 
 extern xtalk_provider_t hub_provider;
+extern int numionodes;
 
 /* du.c */
 int ducons_write(char *buf, int len);

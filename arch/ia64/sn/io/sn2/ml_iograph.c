@@ -679,7 +679,7 @@ init_all_devices(void)
 	cnodeid_t cnodeid, active;
 
 	active = 0;
-	for (cnodeid = 0; cnodeid < numnodes; cnodeid++) {
+	for (cnodeid = 0; cnodeid < numionodes; cnodeid++) {
                 DBG("init_all_devices: Calling io_init_node() for cnode %d\n", cnodeid);
                 io_init_node(cnodeid);
 

@@ -449,7 +449,7 @@ klhwg_connect_hubs(vertex_hdl_t hwgraph_root)
 	graph_error_t rc;
 	int port;
 
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for (cnode = 0; cnode < numionodes; cnode++) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
 
 		brd = find_lboard((lboard_t *)KL_CONFIG_INFO(nasid), KLTYPE_SNIA);
@@ -621,11 +621,11 @@ klhwg_add_all_nodes(vertex_hdl_t hwgraph_root)
 {
 	cnodeid_t	cnode;
 
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for (cnode = 0; cnode < numionodes; cnode++) {
 		klhwg_add_node(hwgraph_root, cnode);
 	}
 
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for (cnode = 0; cnode < numionodes; cnode++) {
 		klhwg_add_xbow(cnode, cnodeid_to_nasid(cnode));
 	}
 
