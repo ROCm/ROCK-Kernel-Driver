@@ -136,6 +136,7 @@ static struct ata_port_operations piix_pata_ops = {
 
 	.phy_reset		= piix_pata_phy_reset,
 
+	.bmdma_setup		= ata_bmdma_setup_pio,
 	.bmdma_start		= ata_bmdma_start_pio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,
@@ -158,6 +159,7 @@ static struct ata_port_operations piix_sata_ops = {
 
 	.phy_reset		= piix_sata_phy_reset,
 
+	.bmdma_setup		= ata_bmdma_setup_pio,
 	.bmdma_start		= ata_bmdma_start_pio,
 	.fill_sg		= ata_fill_sg,
 	.eng_timeout		= ata_eng_timeout,

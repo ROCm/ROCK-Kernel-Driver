@@ -74,6 +74,7 @@ struct pdc_port_priv {
 static u32 pdc_sata_scr_read (struct ata_port *ap, unsigned int sc_reg);
 static void pdc_sata_scr_write (struct ata_port *ap, unsigned int sc_reg, u32 val);
 static int pdc_sata_init_one (struct pci_dev *pdev, const struct pci_device_id *ent);
+static void pdc_dma_setup(struct ata_queued_cmd *qc);
 static void pdc_dma_start(struct ata_queued_cmd *qc);
 static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
 static void pdc_eng_timeout(struct ata_port *ap);
@@ -111,6 +112,7 @@ static struct ata_port_operations pdc_sata_ops = {
 	.check_status		= ata_check_status_mmio,
 	.exec_command		= pdc_exec_command_mmio,
 	.phy_reset		= pdc_phy_reset,
+	.bmdma_setup            = pdc_dma_setup,
 	.bmdma_start            = pdc_dma_start,
 	.fill_sg		= pdc_fill_sg,
 	.eng_timeout		= pdc_eng_timeout,
@@ -429,6 +431,12 @@ static irqreturn_t pdc_interrupt (int irq, void *dev_instance, struct pt_regs *r
 	VPRINTK("EXIT\n");
 
 	return IRQ_RETVAL(handled);
+}
+
+static void pdc_dma_setup(struct ata_queued_cmd *qc)
+{
+	/* nothing for now.  later, we will call standard
+	 * code in libata-core for ATAPI here */
 }
 
 static void pdc_dma_start(struct ata_queued_cmd *qc)
