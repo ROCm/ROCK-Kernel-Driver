@@ -1120,7 +1120,9 @@ void d_rehash(struct dentry * entry)
 {
 	struct hlist_head *list = d_hash(entry->d_parent, entry->d_name.hash);
 	spin_lock(&dcache_lock);
+	spin_lock(&entry->d_lock);
  	entry->d_vfs_flags &= ~DCACHE_UNHASHED;
+	spin_unlock(&entry->d_lock);
 	entry->d_bucket = list;
  	hlist_add_head_rcu(&entry->d_hash, list);
 	spin_unlock(&dcache_lock);
