@@ -512,6 +512,7 @@ static struct __initdata pci_driver agp_amdk8_pci_driver = {
 	.probe		= agp_amdk8_probe,
 };
 
+/* Not static due to IOMMU code calling it early. */
 int __init agp_amdk8_init(void)
 {
 	int ret_val;
