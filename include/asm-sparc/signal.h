@@ -3,6 +3,7 @@
 #define _ASMSPARC_SIGNAL_H
 
 #include <asm/sigcontext.h>
+#include <linux/compiler.h>
 
 #ifdef __KERNEL__
 #ifndef __ASSEMBLY__
@@ -111,11 +112,14 @@ typedef struct {
 	unsigned long	sig[_NSIG_WORDS];
 } __new_sigset_t;
 
+
+#ifdef __KERNEL__
 /* A SunOS sigstack */
 struct sigstack {
 	char *the_stack;
 	int   cur_status;
 };
+#endif
 
 /* Sigvec flags */
 #define _SV_SSTACK    1u    /* This signal handler should use sig-stack */
@@ -189,6 +193,7 @@ typedef void (*__sighandler_t)(int);
 #define SIG_IGN	((__sighandler_t)1)	/* ignore signal */
 #define SIG_ERR	((__sighandler_t)-1)	/* error return from signal */
 
+#ifdef __KERNEL__
 struct __new_sigaction {
 	__sighandler_t	sa_handler;
 	unsigned long	sa_flags;
@@ -196,12 +201,10 @@ struct __new_sigaction {
 	__new_sigset_t	sa_mask;
 };
 
-#ifdef __KERNEL__
 struct k_sigaction {
 	struct __new_sigaction	sa;
 	void			__user *ka_restorer;
 };
-#endif
 
 struct __old_sigaction {
 	__sighandler_t	sa_handler;
@@ -216,7 +219,6 @@ typedef struct sigaltstack {
 	size_t		ss_size;
 } stack_t;
 
-#ifdef __KERNEL__
 struct sparc_deliver_cookie {
 	int restart_syscall;
 	unsigned long orig_i0;
