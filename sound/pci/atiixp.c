@@ -377,7 +377,7 @@ static int atiixp_build_dma_packets(atiixp_t *chip, atiixp_dma_t *dma,
 		dma->period_bytes = dma->periods = 0; /* clear */
 	}
 
-	if (dma->periods == dma->periods && dma->period_bytes == period_bytes)
+	if (dma->periods == periods && dma->period_bytes == period_bytes)
 		return 0;
 
 	/* reset DMA before changing the descriptor table */
