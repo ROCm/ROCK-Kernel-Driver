@@ -614,16 +614,10 @@ static void cfq_requeue_request(request_queue_t *q, struct request *rq)
 			WARN_ON(!cfqq->in_flight);
 			cfqq->in_flight--;
 		}
+		crq->requeued = 1;
 	}
 
-	if (blk_fs_request(rq)) {
-		struct cfq_queue *cfqq = crq->cfq_queue;
-
-		cfqq->next_crq = crq;
-		crq->requeued = 1;
-		cfq_enqueue(cfqd, rq);
-	} else
-		list_add(&rq->queuelist, &q->queue_head);
+	list_add(&rq->queuelist, &q->queue_head);
 }
 
 static void cfq_remove_request(request_queue_t *q, struct request *rq)
@@ -904,9 +898,13 @@ static void cfq_dispatch_sort(request_queue_t *q, struct cfq_rq *crq)
 
 	last = cfqd->last_sector;
 	list_for_each_entry_reverse(__rq, head, queuelist) {
+		struct cfq_rq *__crq = RQ_DATA(__rq);
+
 		if (blk_barrier_rq(__rq))
 			break;
 		if (!blk_fs_request(__rq))
+			break;
+		if (__crq->requeued)
 			break;
 
 		if (__rq->sector <= crq->request->sector)
