@@ -24,7 +24,8 @@
 #define HSM               6UL
 #define MULTIPATH         7UL
 #define RAID6		  8UL
-#define MAX_PERSONALITY   9UL
+#define	RAID10		  9UL
+#define MAX_PERSONALITY   10UL
 
 #define	LEVEL_MULTIPATH		(-4)
 #define	LEVEL_LINEAR		(-1)
@@ -43,6 +44,7 @@ static inline int pers_to_level (int pers)
 		case RAID1:		return 1;
 		case RAID5:		return 5;
 		case RAID6:		return 6;
+		case RAID10:		return 10;
 	}
 	BUG();
 	return MD_RESERVED;
@@ -60,6 +62,7 @@ static inline int level_to_pers (int level)
 		case 4:
 		case 5: return RAID5;
 		case 6: return RAID6;
+		case 10: return RAID10;
 	}
 	return MD_RESERVED;
 }

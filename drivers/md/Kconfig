@@ -85,6 +85,24 @@ config MD_RAID1
 
 	  If unsure, say Y.
 
+config MD_RAID10
+	tristate "RAID-10 (mirrored striping) mode (EXPERIMENTAL)"
+	depends on BLK_DEV_MD && EXPERIMENTAL
+	---help---
+	  RAID-10 provides a combination of striping (RAID-0) and
+	  mirroring (RAID-1) with easier configuration and more flexable
+	  layout.
+	  Unlike RAID-0, but like RAID-1, RAID-10 requires all devices to
+	  be the same size (or atleast, only as much as the smallest device
+	  will be used).
+	  RAID-10 provides a variety of layouts that provide different levels
+	  of redundancy and performance.
+
+	  RAID-10 requires mdadm-1.7.0 or later, available at:
+
+	  ftp://ftp.kernel.org/pub/linux/utils/raid/mdadm/
+
+
 config MD_RAID5
 	tristate "RAID-4/RAID-5 mode"
 	depends on BLK_DEV_MD
