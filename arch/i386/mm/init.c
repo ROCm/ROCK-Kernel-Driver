@@ -506,7 +506,7 @@ void __init mem_init(void)
 		/*Will make this kernel command line. */
 		INIT_LIST_HEAD(&htlbpage_freelist);
 		for (i=0; i<htlbzone_pages; i++) {
-			page = alloc_pages(GFP_ATOMIC, HUGETLB_PAGE_ORDER);
+			page = alloc_pages(__GFP_HIGHMEM, HUGETLB_PAGE_ORDER);
 			if (page == NULL)
 				break;
 			map = page;
