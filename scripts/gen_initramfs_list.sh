@@ -9,8 +9,6 @@
 #
 # The output is suitable for gen_init_cpio as found in usr/Makefile.
 #
-# TODO:  Add support for symlinks, sockets and pipes when gen_init_cpio
-#        supports them.
 
 simple_initramfs() {
 	cat <<-EOF
@@ -25,12 +23,19 @@ simple_initramfs() {
 filetype() {
 	local argv1="$1"
 
-	if [ -f "${argv1}" ]; then
+	# symlink test must come before file test
+	if [ -L "${argv1}" ]; then
+		echo "slink"
+	elif [ -f "${argv1}" ]; then
 		echo "file"
 	elif [ -d "${argv1}" ]; then
 		echo "dir"
 	elif [ -b "${argv1}" -o -c "${argv1}" ]; then
 		echo "nod"
+	elif [ -p "${argv1}" ]; then
+		echo "pipe"
+	elif [ -S "${argv1}" ]; then
+		echo "sock"
 	else
 		echo "invalid"
 	fi
@@ -52,6 +57,8 @@ print_mtime() {
 parse() {
 	local location="$1"
 	local name="${location/${srcdir}//}"
+	# change '//' into '/'
+	name="${name//\/\///}"
 	local mode="$2"
 	local uid="$3"
 	local gid="$4"
@@ -78,6 +85,11 @@ parse() {
 				dev_type="c"
 			fi
 			str="${ftype} ${name} ${str} ${dev_type} ${maj} ${min}"
+			;;
+		"slink")
+			local target=$(LC_ALL=C ls -l "${location}" | \
+					gawk '{print $11}')
+			str="${ftype} ${name} ${target} ${str}"
 			;;
 		*)
 			str="${ftype} ${name} ${str}"

@@ -1,7 +1,7 @@
 Early userspace support
 =======================
 
-Last update: 2003-08-21
+Last update: 2004-11-12
 
 
 "Early userspace" is a set of libraries and programs that provide
@@ -17,14 +17,22 @@ It consists of several major infrastructure components:
 - initramfs, a chunk of code that unpacks the compressed cpio image
   midway through the kernel boot process.
 - klibc, a userspace C library, currently packaged separately, that is
-  optimised for correctness and small size.
+  optimized for correctness and small size.
 
 The cpio file format used by initramfs is the "newc" (aka "cpio -c")
-format, and is documented in the file "buffer-format.txt".  If you
-want to generate your own cpio files directly instead of hacking on
-gen_init_cpio, you will need to short-circuit the build process in
-usr/ so that gen_init_cpio does not get run, then simply pop your own
-initramfs_data.cpio.gz file into place.
+format, and is documented in the file "buffer-format.txt".  There are
+three ways to add an early userspace filesystem:
+
+1) Put your gzip'ed cpio in usr/initramfs_data.cpio.gz.
+
+2) Set CONFIG_INITRAMFS_SOURCE to the filename of a gen_init_cpio
+input file.  This provides the most flexibility and allows creation of
+archives with files not owned by the build user.  This means that an
+unprivileged user can create an early userspace with files owned by
+root.
+
+3) Set CONFIG_INITRAMFS_SOURCE to point to a directory containing the
+files for your filesystem.
 
 
 Where's this all leading?
