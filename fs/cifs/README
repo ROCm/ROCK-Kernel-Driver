@@ -200,7 +200,20 @@ Servers must support the NTLM SMB dialect (which is the most recent, supported
 by Samba and Windows NT version 4, 2000 and XP and many other SMB/CIFS servers) 
 Servers must support either "pure-TCP" (port 445 TCP/IP CIFS connections) or RFC 
 1001/1002 support for "Netbios-Over-TCP/IP." Neither of these is likely to be a 
-problem as most servers support this.  IPv6 support is planned for the future.  
+problem as most servers support this.  IPv6 support is planned for the future,
+and is almost complete.
+
+Valid filenames differ between Windows and Linux.  Windows typically restricts
+filenames which contain certain reserved characters (e.g.the character : 
+which is used to delimit the beginning of a stream name by Windows), while
+Linux allows a slightly wider set of valid characters in filenames. Windows
+servers can remap such characters when an explicit mapping is specified in
+the Server's registry.  Samba starting with version 3.10 will allow such 
+filenames (ie those which contain valid Linux characters, which normally
+would be forbidden for Windows/CIFS semantics) as long as the server is
+configured for Unix Extensions (and the client has not disabled
+/proc/fs/cifs/LinuxExtensionsEnabled).
+  
 
 CIFS VFS Mount Options
 ======================
@@ -421,11 +434,11 @@ and for more extensive tracing including the start of smb requests and responses
 	echo 1 > /proc/fs/cifs/traceSMB
 
 Two other experimental features are under development and to test 
-require enabling an ifdef (e.g. by  adding "#define CIFS_FCNTL" in cifsglob.h)
+require enabling CONFIG_CIFS_EXPERIMENTAL
 
-	CONFIG_CIFS_QUOTA
+	More efficient write operations and SMB buffer handling
 
-	CONFIG_CIFS_FCNTL  (fcntl needed for support of directory change 
+	DNOTIFY fcntl: needed for support of directory change 
 			    notification and perhaps later for file leases)
 
 Per share (per client mount) statistics are available in /proc/fs/cifs/Stats

@@ -330,8 +330,8 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				csocket = server->ssocket;
 				continue;
 			} else {
-				if ((length != sizeof (struct smb_hdr) - 1)
-				    || (pdu_length >
+				if (/*(length != sizeof (struct smb_hdr) - 1)
+				    ||*/ (pdu_length >
 					CIFS_MAX_MSGSIZE + MAX_CIFS_HDR_SIZE)
 				    || (pdu_length <
 					sizeof (struct smb_hdr) - 1)
@@ -341,7 +341,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 					cERROR(1,
 					    ("Invalid size or format for SMB found with length %d and pdu_length %d",
 						length, pdu_length));
-					cifs_dump_mem("Received Data is: ",temp,sizeof(struct smb_hdr));
+					cifs_dump_mem("Received Data is: ",temp,sizeof(struct smb_hdr)+3);
 					/* could we fix this network corruption by finding next 
 						smb header (instead of killing the session) and
 						restart reading from next valid SMB found? */
