@@ -25,8 +25,6 @@ typedef hwgfs_handle_t vertex_hdl_t;
 #define MAXDEVNAME 256
 #endif
 
-typedef enum { B_FALSE, B_TRUE } boolean_t;
-
 
 /*
  * Possible return values from graph routines.

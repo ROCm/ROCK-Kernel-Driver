@@ -231,10 +231,6 @@ hwgraph_info_get_LBL(v, INFO_LBL_ERROR_SKIP_ENV, (arbitrary_info_t *)&l)
 #define v_error_skip_env_clear(v)		\
 hwgraph_info_remove_LBL(v, INFO_LBL_ERROR_SKIP_ENV, 0)
 
-/* Skip point interfaces */
-extern error_return_code_t	error_skip_point_jump(vertex_hdl_t, boolean_t);
-extern error_return_code_t	error_skip_point_clear(vertex_hdl_t);
-
 /* REFERENCED */
 #if defined(CONFIG_SGI_IO_ERROR_HANDLING)
 
@@ -283,14 +279,6 @@ extern counter_t		error_retry_count_decrement(vertex_hdl_t);
  */
 #define	IS_ERROR_INTR_CONTEXT(_ec)	((_ec & IOECODE_DMA) 		|| \
 					 (_ec == IOECODE_PIO_WRITE))
-
-/* Some convenience macros on device state. This state is accessed only 
- * thru the calls the io error handling layer.
- */
-#if defined(CONFIG_SGI_IO_ERROR_HANDLING)
-extern boolean_t		is_device_shutdown(vertex_hdl_t);
-#define IS_DEVICE_SHUTDOWN(_d) 	(is_device_shutdown(_d))
-#endif
 
 #endif /* __KERNEL__ */
 #endif /* _ASM_IA64_SN_IOERROR_HANDLING_H */
