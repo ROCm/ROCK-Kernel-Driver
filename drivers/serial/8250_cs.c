@@ -42,7 +42,7 @@
 #include <linux/tty.h>
 #include <linux/serial.h>
 #include <linux/major.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -107,7 +107,7 @@ typedef struct serial_info {
 	int			manfid;
 	dev_node_t		node[4];
 	int			line[4];
-	struct tq_struct	remove;
+	struct work_struct	remove;
 } serial_info_t;
 
 static void serial_config(dev_link_t * link);
@@ -182,7 +182,7 @@ static void serial_remove(dev_link_t *link)
 	 */
 
 	if (link->state & DEV_CONFIG)
-		schedule_task(&info->remove);
+		schedule_work(&info->remove);
 }
 
 /*======================================================================
@@ -210,7 +210,7 @@ static dev_link_t *serial_attach(void)
 	link = &info->link;
 	link->priv = info;
 
-	INIT_TQUEUE(&info->remove, do_serial_release, info);
+	INIT_WORK(&info->remove, do_serial_release, info);
 
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
 	link->io.NumPorts1 = 8;
@@ -278,7 +278,7 @@ static void serial_detach(dev_link_t * link)
 	/*
 	 * Ensure any outstanding scheduled tasks are completed.
 	 */
-	flush_scheduled_tasks();
+	flush_scheduled_work();
 
 	/*
 	 * Ensure that the ports have been released.

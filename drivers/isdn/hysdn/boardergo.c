@@ -59,10 +59,8 @@ ergo_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	b |= dpr->ToHyInt;	/* and for champ */
 
 	/* start kernel task immediately after leaving all interrupts */
-	if (!card->hw_lock) {
-		queue_task(&card->irq_queue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
-	}
+	if (!card->hw_lock)
+		schedule_work(&card->irq_queue);
 	restore_flags(flags);
 }				/* ergo_interrupt */
 
@@ -177,8 +175,7 @@ ergo_set_errlog_state(hysdn_card * card, int on)
 		card->err_log_state = ERRLOG_STATE_STOP;	/* request stop */
 
 	restore_flags(flags);
-	queue_task(&card->irq_queue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&card->irq_queue);
 }				/* ergo_set_errlog_state */
 
 /******************************************/
@@ -450,9 +447,7 @@ ergo_inithardware(hysdn_card * card)
 	card->writebootseq = ergo_writebootseq;
 	card->waitpofready = ergo_waitpofready;
 	card->set_errlog_state = ergo_set_errlog_state;
-	card->irq_queue.sync = 0;
-	card->irq_queue.data = card;	/* init task queue for interrupt */
-	card->irq_queue.routine = (void *) (void *) ergo_irq_bh;
+	INIT_WORK(&card->irq_queue, (void *) (void *) ergo_irq_bh, card);
 
 	return (0);
 }				/* ergo_inithardware */

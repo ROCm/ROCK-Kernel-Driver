@@ -538,7 +538,7 @@ void tty_hangup(struct tty_struct * tty)
 	
 	printk(KERN_DEBUG "%s hangup...\n", tty_name(tty, buf));
 #endif
-	schedule_task(&tty->tq_hangup);
+	schedule_work(&tty->hangup_work);
 }
 
 void tty_vhangup(struct tty_struct * tty)
@@ -1265,7 +1265,7 @@ static void release_dev(struct file * filp)
 	/*
 	 * Make sure that the tty's task queue isn't activated. 
 	 */
-	flush_scheduled_tasks();
+	flush_scheduled_work();
 
 	/* 
 	 * The release_mem function takes care of the details of clearing
@@ -1874,8 +1874,8 @@ static void __do_SAK(void *arg)
 }
 
 /*
- * The tq handling here is a little racy - tty->SAK_tq may already be queued.
- * Fortunately we don't need to worry, because if ->SAK_tq is already queued,
+ * The tq handling here is a little racy - tty->SAK_work may already be queued.
+ * Fortunately we don't need to worry, because if ->SAK_work is already queued,
  * the values which we write to it will be identical to the values which it
  * already has. --akpm
  */
@@ -1883,8 +1883,8 @@ void do_SAK(struct tty_struct *tty)
 {
 	if (!tty)
 		return;
-	PREPARE_TQUEUE(&tty->SAK_tq, __do_SAK, tty);
-	schedule_task(&tty->SAK_tq);
+	PREPARE_WORK(&tty->SAK_work, __do_SAK, tty);
+	schedule_work(&tty->SAK_work);
 }
 
 /*
@@ -1900,7 +1900,10 @@ static void flush_to_ldisc(void *private_)
 	unsigned long flags;
 
 	if (test_bit(TTY_DONT_FLIP, &tty->flags)) {
-		schedule_task(&tty->flip.tqueue);
+		/*
+		 * Do it after the next timer tick:
+		 */
+		schedule_delayed_work(&tty->flip.work, 1);
 		return;
 	}
 	if (tty->flip.buf_num) {
@@ -1977,7 +1980,7 @@ void tty_flip_buffer_push(struct tty_struct *tty)
 	if (tty->low_latency)
 		flush_to_ldisc((void *) tty);
 	else
-		schedule_task(&tty->flip.tqueue);
+		schedule_delayed_work(&tty->flip.work, 1);
 }
 
 /*
@@ -1991,18 +1994,16 @@ static void initialize_tty_struct(struct tty_struct *tty)
 	tty->pgrp = -1;
 	tty->flip.char_buf_ptr = tty->flip.char_buf;
 	tty->flip.flag_buf_ptr = tty->flip.flag_buf;
-	tty->flip.tqueue.routine = flush_to_ldisc;
-	tty->flip.tqueue.data = tty;
+	INIT_WORK(&tty->flip.work, flush_to_ldisc, tty);
 	init_MUTEX(&tty->flip.pty_sem);
 	init_waitqueue_head(&tty->write_wait);
 	init_waitqueue_head(&tty->read_wait);
-	tty->tq_hangup.routine = do_tty_hangup;
-	tty->tq_hangup.data = tty;
+	INIT_WORK(&tty->hangup_work, do_tty_hangup, tty);
 	sema_init(&tty->atomic_read, 1);
 	sema_init(&tty->atomic_write, 1);
 	spin_lock_init(&tty->read_lock);
 	INIT_LIST_HEAD(&tty->tty_files);
-	INIT_TQUEUE(&tty->SAK_tq, 0, 0);
+	INIT_WORK(&tty->SAK_work, NULL, NULL);
 }
 
 /*

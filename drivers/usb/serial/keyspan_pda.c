@@ -76,7 +76,7 @@
 #include <linux/tty_flip.h>
 #include <linux/module.h>
 #include <linux/spinlock.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <asm/uaccess.h>
 #include <linux/usb.h>
 
@@ -125,8 +125,8 @@ struct ezusb_hex_record {
 struct keyspan_pda_private {
 	int			tx_room;
 	int			tx_throttled;
-	struct tq_struct	wakeup_task;
-	struct tq_struct	unthrottle_task;
+	struct work_struct			wakeup_work;
+	struct work_struct			unthrottle_work;
 };
 
 
@@ -267,7 +267,7 @@ static void keyspan_pda_rx_interrupt (struct urb *urb)
 			tty = serial->port[0].tty;
 			priv->tx_throttled = 0;
 			/* queue up a wakeup at scheduler time */
-			schedule_task(&priv->wakeup_task);
+			schedule_work(&priv->wakeup_work);
 			break;
 		default:
 			break;
@@ -611,7 +611,7 @@ static int keyspan_pda_write(struct usb_serial_port *port, int from_user,
 
 	if (request_unthrottle) {
 		priv->tx_throttled = 1; /* block writers */
-		schedule_task(&priv->unthrottle_task);
+		schedule_work(&priv->unthrottle_work);
 	}
 
 	rc = count;
@@ -638,7 +638,7 @@ static void keyspan_pda_write_bulk_callback (struct urb *urb)
 	}
 	
 	/* queue up a wakeup at scheduler time */
-	schedule_task(&priv->wakeup_task);
+	schedule_work(&priv->wakeup_work);
 }
 
 
@@ -791,14 +791,11 @@ static int keyspan_pda_startup (struct usb_serial *serial)
 	if (!priv)
 		return (1); /* error */
 	init_waitqueue_head(&serial->port[0].write_wait);
-	INIT_LIST_HEAD(&priv->wakeup_task.list);
-	priv->wakeup_task.sync = 0;
-	priv->wakeup_task.routine = (void *)keyspan_pda_wakeup_write;
-	priv->wakeup_task.data = (void *)(&serial->port[0]);
-	INIT_LIST_HEAD(&priv->unthrottle_task.list);
-	priv->unthrottle_task.sync = 0;
-	priv->unthrottle_task.routine = (void *)keyspan_pda_request_unthrottle;
-	priv->unthrottle_task.data = (void *)(serial);
+	INIT_WORK(&priv->wakeup_work, (void *)keyspan_pda_wakeup_write,
+			(void *)(&serial->port[0]));
+	INIT_WORK(&priv->unthrottle_work,
+			(void *)keyspan_pda_request_unthrottle,
+			(void *)(serial));
 	return (0);
 }
 

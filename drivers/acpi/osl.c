@@ -33,7 +33,7 @@
 #include <linux/interrupt.h>
 #include <linux/kmod.h>
 #include <linux/delay.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <asm/io.h>
 #include "acpi.h"
 
@@ -579,8 +579,8 @@ acpi_os_queue_for_execution(
 	 * Queue via DPC:
 	 * --------------
 	 * Note that we have to use two different processes for queuing DPCs:
-	 *	 Interrupt-Level: Use schedule_task; can't spawn a new thread.
-	 *	    Kernel-Level: Spawn a new kernel thread, as schedule_task has
+	 *	 Interrupt-Level: Use schedule_work; can't spawn a new thread.
+	 *	    Kernel-Level: Spawn a new kernel thread, as schedule_work has
 	 *			  its limitations (e.g. single-threaded model), and
 	 *			  all other task queues run at interrupt-level.
 	 */
@@ -598,9 +598,9 @@ acpi_os_queue_for_execution(
 		 * We can save time and code by allocating the DPC and tq_structs
 		 * from the same memory.
 		 */
-		struct tq_struct *task;
+		struct work_struct *task;
 
-		dpc = kmalloc(sizeof(ACPI_OS_DPC)+sizeof(struct tq_struct), GFP_ATOMIC);
+		dpc = kmalloc(sizeof(ACPI_OS_DPC)+sizeof(struct work_struct), GFP_ATOMIC);
 		if (!dpc)
 			return_ACPI_STATUS (AE_NO_MEMORY);
 
@@ -608,10 +608,10 @@ acpi_os_queue_for_execution(
 		dpc->context = context;
 
 		task = (void *)(dpc+1);
-		INIT_TQUEUE(task, acpi_os_schedule_exec, (void*)dpc);
+		INIT_WORK(task, acpi_os_schedule_exec, (void*)dpc);
 
-		if (schedule_task(task) < 0) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to schedule_task() failed.\n"));
+		if (schedule_work(task) < 0) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Call to schedule_work() failed.\n"));
 			kfree(dpc);
 			status = AE_ERROR;
 		}

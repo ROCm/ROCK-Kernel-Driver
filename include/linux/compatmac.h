@@ -102,7 +102,7 @@ static inline void *ioremap(unsigned long base, long length)
 
 #define my_iounmap(x, b)             (((long)x<0x100000)?0:vfree ((void*)x))
 
-#define tty_flip_buffer_push(tty)    queue_task(&tty->flip.tqueue, &tq_timer)
+#define tty_flip_buffer_push(tty)    schedule_delayed_work(&tty->flip.work, 1)
 #define signal_pending(current)      (current->signal & ~current->blocked)
 #define schedule_timeout(to)         do {current->timeout = jiffies + (to);schedule ();} while (0)
 #define time_after(t1,t2)            (((long)t1-t2) > 0)

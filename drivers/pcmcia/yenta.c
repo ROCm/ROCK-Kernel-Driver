@@ -6,7 +6,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/sched.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/delay.h>
 #include <linux/module.h>
@@ -492,7 +492,7 @@ static void yenta_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		spin_lock(&socket->event_lock);
 		socket->events |= events;
 		spin_unlock(&socket->event_lock);
-		schedule_task(&socket->tq_task);
+		schedule_work(&socket->tq_task);
 	}
 }
 
@@ -583,7 +583,7 @@ static void yenta_open_bh(void * data)
 	pci_socket_t * socket = (pci_socket_t *) data;
 
 	/* It's OK to overwrite this now */
-	socket->tq_task.routine = yenta_bh;
+	INIT_WORK(&socket->tq_task, yenta_bh, NULL);
 
 	if (!socket->cb_irq || request_irq(socket->cb_irq, yenta_interrupt, SA_SHIRQ, socket->dev->name, socket)) {
 		/* No IRQ or request_irq failed. Poll */
@@ -876,11 +876,10 @@ static int yenta_open(pci_socket_t *socket)
 	   initialisation later. We can't do this here,
 	   because, er, because Linus says so :)
 	*/
-	socket->tq_task.routine = yenta_open_bh;
-	socket->tq_task.data = socket;
+	INIT_WORK(&socket->tq_task, yenta_open_bh, socket);
 
 	MOD_INC_USE_COUNT;
-	schedule_task(&socket->tq_task);
+	schedule_work(&socket->tq_task);
 
 	return 0;
 }

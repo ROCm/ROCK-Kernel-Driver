@@ -9,7 +9,7 @@
  */
 
 #include <linux/list.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #include <linux/compiler.h>	/* likely()/unlikely() */
 
 /*
@@ -158,7 +158,7 @@ struct usb_tt {
 	/* for control/bulk error recovery (CLEAR_TT_BUFFER) */
 	spinlock_t		lock;
 	struct list_head	clear_list;	/* of usb_tt_clear */
-	struct tq_struct	kevent;
+	struct work_struct			kevent;
 };
 
 struct usb_tt_clear {

@@ -28,7 +28,7 @@
 #include <linux/namespace.h>
 #include <linux/completion.h>
 #include <linux/file.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <asm/uaccess.h>
 
@@ -346,18 +346,15 @@ static void __call_usermodehelper(void *data)
  */
 int call_usermodehelper(char *path, char **argv, char **envp)
 {
-	DECLARE_COMPLETION(work);
+	DECLARE_COMPLETION(done);
 	struct subprocess_info sub_info = {
-		.complete	= &work,
+		.complete	= &done,
 		.path		= path,
 		.argv		= argv,
 		.envp		= envp,
 		.retval		= 0,
 	};
-	struct tq_struct tqs = {
-		.routine	= __call_usermodehelper,
-		.data		= &sub_info,
-	};
+	DECLARE_WORK(work, __call_usermodehelper, &sub_info);
 
 	if (!system_running)
 		return -EBUSY;
@@ -369,8 +366,8 @@ int call_usermodehelper(char *path, char **argv, char **envp)
 		/* We can't wait on keventd! */
 		__call_usermodehelper(&sub_info);
 	} else {
-		schedule_task(&tqs);
-		wait_for_completion(&work);
+		schedule_work(&work);
+		wait_for_completion(&done);
 	}
 out:
 	return sub_info.retval;

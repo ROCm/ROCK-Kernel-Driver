@@ -485,7 +485,7 @@ static void ftdi_sio_write_bulk_callback (struct urb *urb)
 		return;
 	}
 
-	schedule_task(&port->tqueue);
+	schedule_work(&port->work);
 } /* ftdi_sio_write_bulk_callback */
 
 

@@ -448,7 +448,7 @@ static void	usa2x_outdat_callback(struct urb *urb)
 	dbg ("%s - urb %d", __FUNCTION__, urb == p_priv->out_urbs[1]); 
 
 	if (port->open_count)
-		schedule_task(&port->tqueue);
+		schedule_work(&port->work);
 }
 
 static void	usa26_inack_callback(struct urb *urb)

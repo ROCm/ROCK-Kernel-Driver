@@ -532,10 +532,7 @@ int DRM(irq_install)( drm_device_t *dev, int irq )
 	dev->dma->this_buffer = NULL;
 
 #if __HAVE_DMA_IRQ_BH
-	INIT_LIST_HEAD( &dev->tq.list );
-	dev->tq.sync = 0;
-	dev->tq.routine = DRM(dma_immediate_bh);
-	dev->tq.data = dev;
+	INIT_WORK(&dev->work, DRM(dma_immediate_bh), dev);
 #endif
 
 				/* Before installing handler */

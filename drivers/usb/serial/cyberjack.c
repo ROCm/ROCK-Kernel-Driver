@@ -454,7 +454,7 @@ static void cyberjack_write_bulk_callback (struct urb *urb)
 	}
 
 exit:
-	schedule_task(&port->tqueue);
+	schedule_work(&port->work);
 }
 
 static int __init cyberjack_init (void)

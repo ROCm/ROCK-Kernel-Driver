@@ -262,7 +262,7 @@ struct mxser_struct {
 	int xmit_head;
 	int xmit_tail;
 	int xmit_cnt;
-	struct tq_struct tqueue;
+	struct work_struct tqueue;
 	struct termios normal_termios;
 	struct termios callout_termios;
 	wait_queue_head_t open_wait;
@@ -449,8 +449,7 @@ int mxser_initbrd(int board, struct mxser_hwconf *hwconf)
 		info->custom_divisor = hwconf->baud_base[i] * 16;
 		info->close_delay = 5 * HZ / 10;
 		info->closing_wait = 30 * HZ;
-		info->tqueue.routine = mxser_do_softint;
-		info->tqueue.data = info;
+		INIT_WORK(&info->tqueue, mxser_do_softint, info);
 		info->callout_termios = mxvar_cdriver.init_termios;
 		info->normal_termios = mxvar_sdriver.init_termios;
 		init_waitqueue_head(&info->open_wait);
@@ -1480,7 +1479,7 @@ static inline void mxser_receive_chars(struct mxser_struct *info,
 		*status = inb(info->base + UART_LSR) & info->read_status_mask;
 	} while (*status & UART_LSR_DR);
 	mxvar_log.rxcnt[info->port] += cnt;
-	queue_task(&tty->flip.tqueue, &tq_timer);
+	schedule_delayed_work(&tty->flip.work, 1);
 
 }
 
@@ -1513,7 +1512,7 @@ static inline void mxser_transmit_chars(struct mxser_struct *info)
 	if (info->xmit_cnt < WAKEUP_CHARS) {
 		set_bit(MXSER_EVENT_TXLOW, &info->event);
 		MOD_INC_USE_COUNT;
-		if (schedule_task(&info->tqueue) == 0)
+		if (schedule_work(&info->tqueue) == 0)
 		    MOD_DEC_USE_COUNT;
 	}
 	if (info->xmit_cnt <= 0) {
@@ -1544,7 +1543,7 @@ static inline void mxser_check_modem_status(struct mxser_struct *info,
 			   (info->flags & ASYNC_CALLOUT_NOHUP)))
 			set_bit(MXSER_EVENT_HANGUP, &info->event);
 		MOD_INC_USE_COUNT;
-		if (schedule_task(&info->tqueue) == 0)
+		if (schedule_work(&info->tqueue) == 0)
 		    MOD_DEC_USE_COUNT;
 	}
 	if (info->flags & ASYNC_CTS_FLOW) {
@@ -1556,7 +1555,7 @@ static inline void mxser_check_modem_status(struct mxser_struct *info,
 
 				set_bit(MXSER_EVENT_TXLOW, &info->event);
 				MOD_INC_USE_COUNT;
-				if (schedule_task(&info->tqueue) == 0)
+				if (schedule_work(&info->tqueue) == 0)
 					MOD_DEC_USE_COUNT;
 			}
 		} else {

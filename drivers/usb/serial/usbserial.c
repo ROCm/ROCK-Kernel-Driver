@@ -1092,7 +1092,7 @@ static void generic_write_bulk_callback (struct urb *urb)
 
 	usb_serial_port_softint((void *)port);
 
-	schedule_task(&port->tqueue);
+	schedule_work(&port->work);
 }
 
 static void generic_shutdown (struct usb_serial *serial)
@@ -1402,8 +1402,7 @@ int usb_serial_probe(struct usb_interface *interface,
 		port->number = i + serial->minor;
 		port->serial = serial;
 		port->magic = USB_SERIAL_PORT_MAGIC;
-		port->tqueue.routine = usb_serial_port_softint;
-		port->tqueue.data = port;
+		INIT_WORK(&port->work, usb_serial_port_softint, port);
 		init_MUTEX (&port->sem);
 	}
 
@@ -1887,7 +1886,7 @@ static void usb_console_write(struct console *co, const char *buf, unsigned coun
 	dbg("%s - port %d, %d byte(s)", __FUNCTION__, port->number, count);
 
 	if (!port->open_count) {
-		dbg (__FUNCTION__ " - port not opened");
+		dbg ("%s - port not opened", __FUNCTION__);
 		goto exit;
 	}
 

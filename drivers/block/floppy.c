@@ -150,7 +150,7 @@ static int print_unex=1;
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/timer.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 #define FDPATCHES
 #include <linux/fdreg.h>
 
@@ -1004,12 +1004,12 @@ static void empty(void)
 {
 }
 
-static struct tq_struct floppy_tq;
+static DECLARE_WORK(floppy_work, NULL, NULL);
 
 static void schedule_bh( void (*handler)(void*) )
 {
-	floppy_tq.routine = (void *)(void *) handler;
-	schedule_task(&floppy_tq);
+	PREPARE_WORK(&floppy_work, handler, NULL);
+	schedule_work(&floppy_work);
 }
 
 static struct timer_list fd_timer;
@@ -1017,7 +1017,7 @@ static struct timer_list fd_timer;
 static void cancel_activity(void)
 {
 	do_floppy = NULL;
-	floppy_tq.routine = (void *)(void *) empty;
+	PREPARE_WORK(&floppy_work, (void*)(void*)empty, NULL);
 	del_timer(&fd_timer);
 }
 
@@ -1886,8 +1886,8 @@ static void show_floppy(void)
 	printk("fdc_busy=%lu\n", fdc_busy);
 	if (do_floppy)
 		printk("do_floppy=%p\n", do_floppy);
-	if (floppy_tq.sync)
-		printk("floppy_tq.routine=%p\n", floppy_tq.routine);
+	if (floppy_work.pending)
+		printk("floppy_work.func=%p\n", floppy_work.func);
 	if (timer_pending(&fd_timer))
 		printk("fd_timer.function=%p\n", fd_timer.function);
 	if (timer_pending(&fd_timeout)){
@@ -4355,7 +4355,7 @@ int __init floppy_init(void)
 	if (have_no_fdc) 
 	{
 		DPRINT("no floppy controllers found\n");
-		flush_scheduled_tasks();
+		flush_scheduled_work();
 		if (usage_count)
 			floppy_release_irq_and_dma();
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
@@ -4511,8 +4511,8 @@ static void floppy_release_irq_and_dma(void)
 		printk("floppy timer still active:%s\n", timeout_message);
 	if (timer_pending(&fd_timer))
 		printk("auxiliary floppy timer still active\n");
-	if (floppy_tq.sync)
-		printk("task queue still active\n");
+	if (floppy_work.pending)
+		printk("work still pending\n");
 #endif
 	old_fdc = fdc;
 	for (fdc = 0; fdc < N_FDC; fdc++)

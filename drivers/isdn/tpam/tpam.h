@@ -16,7 +16,7 @@
 
 #include <linux/isdnif.h>
 #include <linux/init.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 /* Maximum number of channels for this board */
 #define TPAM_NBCHANNEL		30
@@ -86,8 +86,8 @@ typedef struct tpam_card {
 	int roundrobin;			/* round robin between channels */
 	struct sk_buff_head sendq;	/* send queue */
 	struct sk_buff_head recvq;	/* receive queue */
-	struct tq_struct send_tq;	/* send task queue */
-	struct tq_struct recv_tq;	/* receive task queue */
+	struct work_struct send_tq;	/* send task queue */
+	struct work_struct recv_tq;	/* receive task queue */
 	spinlock_t lock;		/* lock for the card */
 } tpam_card;
 

@@ -142,7 +142,7 @@ struct channel
 	struct termios              callout_termios;
 	wait_queue_head_t           open_wait;
 	wait_queue_head_t           close_wait;
-	struct tq_struct            tqueue;
+	struct work_struct            tqueue;
 	volatile struct global_data *mailbox;
 };
 

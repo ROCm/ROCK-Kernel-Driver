@@ -37,7 +37,7 @@
 #include <linux/vmalloc.h>
 #include <asm/errno.h>
 #include <linux/irq.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 #include <asm/io.h>
 #include <asm/hd64465.h>
@@ -791,7 +791,7 @@ static int hs_irq_demux(int irq, void *dev)
 /*
  * Interrupt handling routine.
  *
- * This uses the schedule_task() technique to cause reportable events
+ * This uses the schedule_work() technique to cause reportable events
  * such as card insertion and removal to be handled in keventd's
  * process context.
  */
@@ -816,9 +816,7 @@ static void hs_events_bh(void *dummy)
 	}
 }
 
-static struct tq_struct hs_events_task = {
-	routine:	hs_events_bh
-};
+static DECLARE_WORK(hs_events_task, hs_events_bh, NULL);
 
 static void hs_interrupt(int irq, void *dev, struct pt_regs *regs)
 {
@@ -885,7 +883,7 @@ static void hs_interrupt(int irq, void *dev, struct pt_regs *regs)
 	    sp->pending_events |= events;
 	    spin_unlock(&hs_pending_event_lock);
 	    
-	    schedule_task(&hs_events_task);
+	    schedule_work(&hs_events_task);
 	}
 }
 

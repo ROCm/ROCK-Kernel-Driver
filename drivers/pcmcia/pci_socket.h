@@ -21,7 +21,7 @@ typedef struct pci_socket {
 	spinlock_t event_lock;
 	unsigned int events;
 	struct socket_info_t *pcmcia_socket;
-	struct tq_struct tq_task;
+	struct work_struct tq_task;
 	struct timer_list poll_timer;
 
 	/* A few words of private data for the low-level driver.. */

@@ -712,8 +712,6 @@ cy_get_user(unsigned long *addr)
 
 #define	JIFFIES_DIFF(n, j)	((j) - (n))
 
-static DECLARE_TASK_QUEUE(tq_cyclades);
-
 static struct tty_driver cy_serial_driver, cy_callout_driver;
 static int serial_refcount;
 
@@ -934,8 +932,7 @@ static inline void
 cy_sched_event(struct cyclades_port *info, int event)
 {
     info->event |= 1 << event; /* remember what kind of event and who */
-    queue_task(&info->tqueue, &tq_cyclades); /* it belongs to */
-    mark_bh(CYCLADES_BH);                       /* then trigger event */
+    schedule_work(&info->tqueue);
 } /* cy_sched_event */
 
 
@@ -951,9 +948,7 @@ cy_sched_event(struct cyclades_port *info, int event)
  * This is done through one level of indirection--the task queue.
  * When a hardware interrupt service routine wants service by the
  * driver's bottom half, it enqueues the appropriate tq_struct (one
- * per port) to the tq_cyclades work queue and sets a request flag
- * via mark_bh for processing that queue.  When the time is right,
- * do_cyclades_bh is called (because of the mark_bh) and it requests
+ * per port) to the keventd work queue and sets a request flag
  * that the work queue be processed.
  *
  * Although this may seem unwieldy, it gives the system a way to
@@ -961,12 +956,6 @@ cy_sched_event(struct cyclades_port *info, int event)
  * structure) to the bottom half of the driver.  Previous kernels
  * had to poll every port to see if that port needed servicing.
  */
-static void
-do_cyclades_bh(void)
-{
-    run_task_queue(&tq_cyclades);
-} /* do_cyclades_bh */
-
 static void
 do_softint(void *private_)
 {
@@ -1291,7 +1280,7 @@ cyy_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 #endif
                             }
                         }
-                        queue_task(&tty->flip.tqueue, &tq_timer);
+                        schedule_delayed_work(&tty->flip.work, 1);
                     }
                     /* end of service */
                     cy_writeb((u_long)base_addr+(CyRIR<<index), (save_xir & 0x3f));
@@ -1673,7 +1662,7 @@ cyz_handle_rx(struct cyclades_port *info, volatile struct CH_CTRL *ch_ctrl,
 	    }
 #endif
 	    info->idle_stats.recv_idle = jiffies;
-	    queue_task(&tty->flip.tqueue, &tq_timer);
+	    schedule_delayed_work(&tty->flip.work, 1);
 	}
 	/* Update rx_get */
 	cy_writel(&buf_ctrl->rx_get, new_rx_get);
@@ -1888,7 +1877,7 @@ cyz_handle_cmd(struct cyclades_card *cinfo)
 	if(delta_count)
 	    cy_sched_event(info, Cy_EVENT_DELTA_WAKEUP);
 	if(special_count)
-	    queue_task(&tty->flip.tqueue, &tq_timer);
+	    schedule_delayed_work(&tty->flip.work, 1);
     }
 }
 
@@ -5513,8 +5502,6 @@ cy_init(void)
   unsigned short chip_number;
   int nports;
 
-    init_bh(CYCLADES_BH, do_cyclades_bh);
-
     show_version();
 
     /* Initialize the tty_driver structure */
@@ -5661,8 +5648,7 @@ cy_init(void)
                     info->blocked_open = 0;
                     info->default_threshold = 0;
                     info->default_timeout = 0;
-                    info->tqueue.routine = do_softint;
-                    info->tqueue.data = info;
+		    INIT_WORK(&info->tqueue, do_softint, info);
                     info->callout_termios =
 		                cy_callout_driver.init_termios;
                     info->normal_termios =
@@ -5740,8 +5726,7 @@ cy_init(void)
                     info->blocked_open = 0;
                     info->default_threshold = 0;
                     info->default_timeout = 0;
-                    info->tqueue.routine = do_softint;
-                    info->tqueue.data = info;
+		    INIT_WORK(&info->tqueue, do_softint, info);
                     info->callout_termios =
 		               cy_callout_driver.init_termios;
                     info->normal_termios =
@@ -5791,7 +5776,6 @@ cy_cleanup_module(void)
 #endif /* CONFIG_CYZ_INTR */
 
     save_flags(flags); cli();
-    remove_bh(CYCLADES_BH);
 
     if ((e1 = tty_unregister_driver(&cy_serial_driver)))
             printk("cyc: failed to unregister Cyclades serial driver(%d)\n",

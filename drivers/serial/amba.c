@@ -152,7 +152,7 @@ ambauart_rx_chars(struct uart_port *port)
 	status = UART_GET_FR(port);
 	while (UART_RX_DATA(status) && max_count--) {
 		if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
-			tty->flip.tqueue.routine((void *)tty);
+			tty->flip.work.func((void *)tty);
 			if (tty->flip.count >= TTY_FLIPBUF_SIZE) {
 				printk(KERN_WARNING "TTY_DONT_FLIP set\n");
 				return;

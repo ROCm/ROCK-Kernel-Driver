@@ -202,8 +202,7 @@ static void
 hfc_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	queue_task(&bcs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&bcs->tqueue);
 }
 
 static struct sk_buff
@@ -646,8 +645,7 @@ void
 sched_event_D(struct IsdnCardState *cs, int event)
 {
 	test_and_set_bit(event, &cs->event);
-	queue_task(&cs->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&cs->tqueue);
 }
 
 static
@@ -1129,7 +1127,7 @@ init2bds0(struct IsdnCardState *cs)
 	cs->dbusytimer.function = (void *) hfc_dbusy_timer;
 	cs->dbusytimer.data = (long) cs;
 	init_timer(&cs->dbusytimer);
-	cs->tqueue.routine = (void *) (void *) hfcd_bh;
+	INIT_WORK(&cs->tqueue, (void *) (void *) hfcd_bh, NULL);
 	if (!cs->hw.hfcD.send)
 		cs->hw.hfcD.send = init_send_hfcd(16);
 	if (!cs->bcs[0].hw.hfc.send)

@@ -30,8 +30,8 @@
 #include <linux/compiler.h>
 #include <linux/brlock.h>
 #include <linux/module.h>
-#include <linux/tqueue.h>
 #include <linux/highmem.h>
+#include <linux/workqueue.h>
 
 #include <asm/kmap_types.h>
 #include <asm/uaccess.h>
@@ -50,11 +50,11 @@ unsigned aio_max_nr = 0x10000;	/* system wide maximum number of aio requests */
 static kmem_cache_t	*kiocb_cachep;
 static kmem_cache_t	*kioctx_cachep;
 
+static struct workqueue_struct *aio_wq;
+
 /* Used for rare fput completion. */
 static void aio_fput_routine(void *);
-static struct tq_struct	fput_tqueue = {
-	.routine	= aio_fput_routine,
-};
+static DECLARE_WORK(fput_work, aio_fput_routine, NULL);
 
 static spinlock_t	fput_lock = SPIN_LOCK_UNLOCKED;
 LIST_HEAD(fput_head);
@@ -74,6 +74,8 @@ static int __init aio_setup(void)
 				0, SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!kioctx_cachep)
 		panic("unable to create kioctx cache");
+
+	aio_wq = create_workqueue("aio");
 
 	printk(KERN_NOTICE "aio_setup: sizeof(struct page) = %d\n", (int)sizeof(struct page));
 
@@ -196,8 +198,7 @@ static inline struct io_event *aio_ring_event(struct aio_ring_info *info, int nr
 
 static inline void put_aio_ring_event(struct io_event *event, enum km_type km)
 {
-	void *p = (void *)((unsigned long)event & PAGE_MASK);
-	kunmap_atomic(p, km);
+	kunmap_atomic((void *)((unsigned long)event & PAGE_MASK), km);
 }
 
 /* ioctx_alloc
@@ -475,14 +476,14 @@ static inline int __aio_put_req(struct kioctx *ctx, struct kiocb *req)
 	req->ki_cancel = NULL;
 
 	/* Must be done under the lock to serialise against cancellation.
-	 * Call this aio_fput as it duplicates fput via the fput_tqueue.
+	 * Call this aio_fput as it duplicates fput via the fput_work.
 	 */
 	if (unlikely(atomic_dec_and_test(&req->ki_filp->f_count))) {
 		get_ioctx(ctx);
 		spin_lock(&fput_lock);
 		list_add(&req->ki_list, &fput_head);
 		spin_unlock(&fput_lock);
-		schedule_task(&fput_tqueue);
+		queue_work(aio_wq, &fput_work);
 	} else
 		really_put_req(ctx, req);
 	return 1;

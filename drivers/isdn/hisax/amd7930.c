@@ -120,16 +120,14 @@ Bchan_xmt_bh(struct BCState *bcs)
 	} else {
 		clear_bit(BC_FLG_BUSY, &bcs->Flag);
 		bcs->event |= 1 << B_XMTBUFREADY;
-		queue_task(&bcs->tqueue, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		schedule_work(&bcs->tqueue);
 	}
 }
 
 static void
 Bchan_xmit_callback(struct BCState *bcs)
 {
-	queue_task(&bcs->hw.amd7930.tq_xmt, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&bcs->hw.amd7930.tq_xmt);
 }
 
 /* B channel transmission: two modes (three, if you count L1_MODE_NULL)
@@ -261,8 +259,7 @@ Bchan_recv_callback(struct BCState *bcs)
 			      (void *) &Bchan_recv_callback, (void *) bcs);
 	}
 
-	queue_task(&hw->tq_rcv, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&hw->tq_rcv);
 }
 
 static void
@@ -308,7 +305,7 @@ Bchan_rcv_bh(struct BCState *bcs)
 						skb_queue_tail(&bcs->rqueue, hw->rv_skb);
 						hw->rv_skb = skb;
 						bcs->event |= 1 << B_RCVBUFREADY;
-						queue_task(&bcs->tqueue, &tq_immediate);
+						schedule_work(&bcs->tqueue);
 					}
 				} else if (len > 0) {
 					/* Small packet received */
@@ -319,8 +316,7 @@ Bchan_rcv_bh(struct BCState *bcs)
 						memcpy(skb_put(skb, len), hw->rv_skb->tail, len);
 						skb_queue_tail(&bcs->rqueue, skb);
 						bcs->event |= 1 << B_RCVBUFREADY;
-						queue_task(&bcs->tqueue, &tq_immediate);
-						mark_bh(IMMEDIATE_BH);
+						schedule_work(&bcs->tqueue);
 					}
 				} else {
 					/* Reception Error */
@@ -336,8 +332,7 @@ Bchan_rcv_bh(struct BCState *bcs)
 				       RCV_BUFSIZE/RCV_BUFBLKS);
 				skb_queue_tail(&bcs->rqueue, skb);
 				bcs->event |= 1 << B_RCVBUFREADY;
-				queue_task(&bcs->tqueue, &tq_immediate);
-				mark_bh(IMMEDIATE_BH);
+				schedule_work(&bcs->tqueue);
 			}
 		}
 
@@ -422,12 +417,11 @@ Bchan_init(struct BCState *bcs)
 	}
 
 	bcs->hw.amd7930.tq_rcv.sync = 0;
-	bcs->hw.amd7930.tq_rcv.routine = (void (*)(void *)) &Bchan_rcv_bh;
-	bcs->hw.amd7930.tq_rcv.data = (void *) bcs;
+	INIT_WORK(&bcs->hw.amd7930.tq_rcv, (void (*)(void *)) &Bchan_rcv_bh,
+			(void *) bcs);
 
-	bcs->hw.amd7930.tq_xmt.sync = 0;
-	bcs->hw.amd7930.tq_xmt.routine = (void (*)(void *)) &Bchan_xmt_bh;
-	bcs->hw.amd7930.tq_xmt.data = (void *) bcs;
+	INIT_WORK(&bcs->hw.amd7930.tq_xmt, (void (*)(void *)) &Bchan_xmt_bh,
+			(void *) bcs);
 }
 
 static void
@@ -466,7 +460,7 @@ static void
 amd7930_drecv_callback(void *arg, int error, unsigned int count)
 {
 	struct IsdnCardState *cs = (struct IsdnCardState *) arg;
-	static struct tq_struct task;
+	static struct work_struct task;
 	struct sk_buff *skb;
 
         /* NOTE: This function is called directly from an interrupt handler */
@@ -479,10 +473,8 @@ amd7930_drecv_callback(void *arg, int error, unsigned int count)
 			skb_queue_tail(&cs->rq, skb);
 		}
 
-		task.routine = (void *) DChannel_proc_rcv;
-		task.data = (void *) cs;
-		queue_task(&task, &tq_immediate);
-		mark_bh(IMMEDIATE_BH);
+		INIT_WORK(&task, (void *) DChannel_proc_rcv, (void *) cs);
+		schedule_work(&task);
 	}
 
 	if (cs->debug & L1_DEB_ISAC_FIFO) {
@@ -503,7 +495,7 @@ static void
 amd7930_dxmit_callback(void *arg, int error)
 {
 	struct IsdnCardState *cs = (struct IsdnCardState *) arg;
-	static struct tq_struct task;
+	static struct work_struct task;
 
         /* NOTE: This function is called directly from an interrupt handler */
 
@@ -521,10 +513,8 @@ amd7930_dxmit_callback(void *arg, int error)
 
 	cs->tx_skb = NULL;
 
-	task.routine = (void *) DChannel_proc_xmt;
-	task.data = (void *) cs;
-	queue_task(&task, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	INIT_WORK(&task, (void *) DChannel_proc_xmt, (void *) cs);
+	schedule_work(&task);
 }
 
 static void
@@ -643,7 +633,7 @@ amd7930_new_ph(struct IsdnCardState *cs)
 static void
 amd7930_liu_callback(struct IsdnCardState *cs)
 {
-	static struct tq_struct task;
+	static struct work_struct task;
 
 	if (!cs)
 		return;
@@ -654,11 +644,8 @@ amd7930_liu_callback(struct IsdnCardState *cs)
 		debugl1(cs, tmp);
 	}
 
-	task.sync = 0;
-	task.routine = (void *) &amd7930_new_ph;
-	task.data = (void *) cs;
-	queue_task(&task, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	INIT_WORK(&task, (void *) &amd7930_new_ph, (void *) cs);
+	schedule_work(&task);
 }
 
 void

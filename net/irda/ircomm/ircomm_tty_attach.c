@@ -535,8 +535,7 @@ void ircomm_tty_link_established(struct ircomm_tty_cb *self)
 		wake_up_interruptible(&self->open_wait);
 	}
 
-	queue_task(&self->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	schedule_work(&self->tqueue);
 }
 
 /*

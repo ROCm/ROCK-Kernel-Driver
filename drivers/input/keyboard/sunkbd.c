@@ -35,7 +35,7 @@
 #include <linux/init.h>
 #include <linux/input.h>
 #include <linux/serio.h>
-#include <linux/tqueue.h>
+#include <linux/workqueue.h>
 
 MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Sun keyboard driver");
@@ -76,7 +76,7 @@ struct sunkbd {
 	unsigned char keycode[128];
 	struct input_dev dev;
 	struct serio *serio;
-	struct tq_struct tq;
+	struct work_struct tq;
 	char name[64];
 	char phys[32];
 	char type;
@@ -106,7 +106,7 @@ static void sunkbd_interrupt(struct serio *serio, unsigned char data, unsigned i
 	switch (data) {
 
 		case SUNKBD_RET_RESET:
-			schedule_task(&sunkbd->tq);
+			schedule_work(&sunkbd->tq);
 			sunkbd->reset = -1;
 			return;
 
@@ -240,8 +240,7 @@ static void sunkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	sunkbd->serio = serio;
 
-	sunkbd->tq.routine = sunkbd_reinit;
-	sunkbd->tq.data = sunkbd;
+	INIT_WORK(&sunkbd->tq, sunkbd_reinit, sunkbd);
 
 	sunkbd->dev.keycode = sunkbd->keycode;
 	sunkbd->dev.keycodesize = sizeof(unsigned char);

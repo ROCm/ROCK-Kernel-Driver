@@ -616,12 +616,9 @@ act2000_alloccard(int bus, int port, int irq, char *id)
 	skb_queue_head_init(&card->sndq);
 	skb_queue_head_init(&card->rcvq);
 	skb_queue_head_init(&card->ackq);
-	card->snd_tq.routine = (void *) (void *) act2000_transmit;
-	card->snd_tq.data = card;
-	card->rcv_tq.routine = (void *) (void *) actcapi_dispatch;
-	card->rcv_tq.data = card;
-	card->poll_tq.routine = (void *) (void *) act2000_receive;
-	card->poll_tq.data = card;
+	INIT_WORK(&card->snd_tq, (void *) (void *) act2000_transmit, card);
+	INIT_WORK(&card->rcv_tq, (void *) (void *) actcapi_dispatch, card);
+	INIT_WORK(&card->poll_tq, (void *) (void *) act2000_receive, card);
 	init_timer(&card->ptimer);
         card->interface.channels = ACT2000_BCH;
         card->interface.maxbufsize = 4000;

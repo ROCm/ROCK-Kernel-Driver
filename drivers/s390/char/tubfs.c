@@ -265,10 +265,8 @@ fs3270_sched_bh(tub_t *tubp)
 	if (tubp->flags & TUB_BHPENDING)
 		return;
 	tubp->flags |= TUB_BHPENDING;
-	tubp->tqueue.routine = fs3270_bh;
-	tubp->tqueue.data = tubp;
-	queue_task(&tubp->tqueue, &tq_immediate);
-	mark_bh(IMMEDIATE_BH);
+	INIT_WORK(&tubp->tqueue, fs3270_bh, tubp);
+	schedule_work(&tubp->tqueue);
 }
 
 /*
