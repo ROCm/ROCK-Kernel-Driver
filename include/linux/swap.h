@@ -178,18 +178,17 @@ struct pte_chain *FASTCALL(page_add_rmap(struct page *, pte_t *,
 void FASTCALL(page_remove_rmap(struct page *, pte_t *));
 int FASTCALL(try_to_unmap(struct page *));
 
+/* linux/mm/shmem.c */
+extern int shmem_unuse(swp_entry_t entry, struct page *page);
+#else
+#define page_referenced(page)	TestClearPageReferenced(page)
+#define try_to_unmap(page)	SWAP_FAIL
+#endif /* CONFIG_MMU */
+
 /* return values of try_to_unmap */
 #define	SWAP_SUCCESS	0
 #define	SWAP_AGAIN	1
 #define	SWAP_FAIL	2
-
-/* linux/mm/shmem.c */
-extern int shmem_unuse(swp_entry_t entry, struct page *page);
-
-#else
-#define page_referenced(page) \
-	TestClearPageReferenced(page)
-#endif /* CONFIG_MMU */
 
 #ifdef CONFIG_SWAP
 /* linux/mm/page_io.c */
