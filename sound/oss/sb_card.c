@@ -252,14 +252,14 @@ static int sb_pnp_probe(struct pnp_card *card, const struct pnp_card_id *card_id
 	       "dma=%d, dma16=%d\n", scc->conf.io_base, scc->conf.irq,
 	       scc->conf.dma, scc->conf.dma2);
 
-	pnpc_set_drvdata(card, scc);
+	pnp_set_card_drvdata(card, scc);
 
 	return sb_register_oss(scc, &sbmo);
 }
 
 static void sb_pnp_remove(struct pnp_card *card)
 {
-	struct sb_card_config *scc = pnpc_get_drvdata(card);
+	struct sb_card_config *scc = pnp_get_card_drvdata(card);
 
 	if(!scc)
 		return;
@@ -269,7 +269,7 @@ static void sb_pnp_remove(struct pnp_card *card)
 	sb_unload(scc);
 }
 
-static struct pnpc_driver sb_pnp_driver = {
+static struct pnp_card_driver sb_pnp_driver = {
 	.name          = "OSS SndBlstr", /* 16 character limit */
 	.id_table      = sb_pnp_card_table,
 	.probe         = sb_pnp_probe,
@@ -295,7 +295,7 @@ static int __init sb_init(void)
 
 #ifdef CONFIG_PNP_CARD
 	if(pnp) {
-		pres = pnpc_register_driver(&sb_pnp_driver);
+		pres = pnp_register_card_driver(&sb_pnp_driver);
 	}
 #endif
 	printk(KERN_INFO "sb: Init: Done\n");
@@ -316,7 +316,7 @@ static void __exit sb_exit(void)
 	}
 
 #ifdef CONFIG_PNP_CARD
-	pnpc_unregister_driver(&sb_pnp_driver);
+	pnp_unregister_card_driver(&sb_pnp_driver);
 #endif
 
 	if (smw_free) {
