@@ -44,6 +44,10 @@ int io_bat_index;
 
 extern char etext[], _stext[];
 
+#ifdef CONFIG_SMP
+extern void hash_page_sync(void);
+#endif
+
 #ifdef HAVE_BATS
 extern unsigned long v_mapped_by_bats(unsigned long va);
 extern unsigned long p_mapped_by_bats(unsigned long pa);
@@ -109,11 +113,17 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 
 void pte_free_kernel(pte_t *pte)
 {
+#ifdef CONFIG_SMP
+	hash_page_sync();
+#endif
 	free_page((unsigned long)pte);
 }
 
 void pte_free(struct page *pte)
 {
+#ifdef CONFIG_SMP
+	hash_page_sync();
+#endif
 	__free_page(pte);
 }
 
