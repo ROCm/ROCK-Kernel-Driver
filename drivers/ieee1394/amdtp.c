@@ -1095,7 +1095,7 @@ void stream_free(struct stream *s)
 
 /* File operations */
 
-static ssize_t amdtp_write(struct file *file, const char *buffer, size_t count,
+static ssize_t amdtp_write(struct file *file, const char __user *buffer, size_t count,
 			   loff_t *offset_is_ignored)
 {
 	struct stream *s = file->private_data;
@@ -1150,7 +1150,7 @@ static int amdtp_ioctl(struct inode *inode, struct file *file,
 	{
 	case AMDTP_IOC_PLUG:
 	case AMDTP_IOC_CHANNEL:
-		if (copy_from_user(&cfg, (struct amdtp_ioctl *) arg, sizeof cfg))
+		if (copy_from_user(&cfg, (struct amdtp_ioctl __user *) arg, sizeof cfg))
 			return -EFAULT;
 		else
 			return stream_configure(s, cmd, &cfg);
