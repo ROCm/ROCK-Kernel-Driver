@@ -294,6 +294,13 @@ UNUSUAL_DEV(  0x054c, 0x0032, 0x0000, 0x9999,
 		"Memorystick MSC-U01N",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_SINGLE_LUN ),
+
+/* Submitted by Michal Mlotek <mlotek@foobar.pl> */
+UNUSUAL_DEV(  0x054c, 0x0058, 0x0000, 0x9999,
+		"Sony",
+		"PEG N760c Memorystick",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
 		
 UNUSUAL_DEV(  0x054c, 0x0069, 0x0000, 0x9999,
 		"Sony",
@@ -719,6 +726,17 @@ UNUSUAL_DEV(  0x0d96, 0x5200, 0x0001, 0x0200,
 		"Jenoptik",
 		"JD 5200 z3",
 		US_SC_DEVICE, US_PR_DEVICE, NULL, US_FL_FIX_INQUIRY),
+
+/* Reported by Lubomir Blaha <tritol@trilogic.cz>
+ * I _REALLY_ don't know what 3rd, 4th number and all defines mean, but this
+ * works for me. Can anybody correct these values? (I able to test corrected
+ * version.)
+ */
+UNUSUAL_DEV( 0x0dd8, 0x1060, 0x0000, 0xffff,
+		"Netac",
+		"USB-CF-Card",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_INQUIRY ),
 
 /* Submitted by Antoine Mairesse <antoine.mairesse@free.fr> */
 UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
