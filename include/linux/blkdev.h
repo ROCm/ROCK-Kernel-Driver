@@ -8,7 +8,6 @@
 #include <linux/list.h>
 #include <linux/pagemap.h>
 #include <linux/backing-dev.h>
-#include <linux/interrupt.h>
 
 #include <asm/scatterlist.h>
 
@@ -137,11 +136,6 @@ struct blk_queue_tag {
 	int max_depth;
 };
 
-struct blk_plug {
-	struct list_head list;
-	struct tasklet_struct task;
-};
-
 /*
  * Default nr free requests per queue, ll_rw_blk will scale it down
  * according to available RAM at init time
@@ -183,7 +177,7 @@ struct request_queue
 	unsigned long		bounce_pfn;
 	int			bounce_gfp;
 
-	struct blk_plug		plug;
+	struct list_head	plug_list;
 
 	/*
 	 * various queue flags, see QUEUE_* below
