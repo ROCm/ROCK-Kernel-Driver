@@ -191,15 +191,20 @@ __pabt_svc:
 /*
  * User mode handlers
  */
+	.macro	usr_entry, sym
+	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
+	stmia	sp, {r0 - r12}			@ save r0 - r12
+	ldr	r7, .LC\sym
+	add	r5, sp, #S_PC
+	ldmia	r7, {r2 - r4}			@ Get USR pc, cpsr
+	stmia	r5, {r2 - r4}			@ Save USR pc, cpsr, old_r0
+	stmdb	r5, {sp, lr}^
+	.endm
+
 		.align	5
-__dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r7, .LCabt
-		add	r5, sp, #S_PC
-		ldmia	r7, {r2 - r4}			@ Get USR pc, cpsr
-		stmia	r5, {r2 - r4}			@ Save USR pc, cpsr, old_r0
-		stmdb	r5, {sp, lr}^
-		alignment_trap r7, r7, __temp_abt
+__dabt_usr:
+		usr_entry abt
+		alignment_trap r7, r0, __temp_abt
 		zero_fp
 #ifdef MULTI_ABORT
 		ldr	r4, .LCprocfns			@ pass r2, r3 to
@@ -214,14 +219,9 @@ __dabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
 		b	do_DataAbort
 
 		.align	5
-__irq_usr:	sub	sp, sp, #S_FRAME_SIZE
-		stmia	sp, {r0 - r12}			@ save r0 - r12
-		ldr	r4, .LCirq
-		add	r8, sp, #S_PC
-		ldmia	r4, {r5 - r7}			@ get saved PC, SPSR
-		stmia	r8, {r5 - r7}			@ save pc, psr, old_r0
-		stmdb	r8, {sp, lr}^
-		alignment_trap r4, r7, __temp_irq
+__irq_usr:
+		usr_entry irq
+		alignment_trap r7, r0, __temp_irq
 		zero_fp
 #ifdef CONFIG_PREEMPT
 		get_thread_info r8
@@ -251,18 +251,13 @@ __irq_usr:	sub	sp, sp, #S_FRAME_SIZE
 		.ltorg
 
 		.align	5
-__und_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
-		stmia	sp, {r0 - r12}			@ Save r0 - r12
-		ldr	r4, .LCund
-		add	r8, sp, #S_PC
-		ldmia	r4, {r5 - r7}
-		stmia	r8, {r5 - r7}			@ Save USR pc, cpsr, old_r0
-		stmdb	r8, {sp, lr}^			@ Save user sp, lr
-		alignment_trap r4, r7, __temp_und
+__und_usr:
+		usr_entry und
+		alignment_trap r7, r0, __temp_und
 		zero_fp
-		tst	r6, #PSR_T_BIT			@ Thumb mode?
+		tst	r3, #PSR_T_BIT			@ Thumb mode?
 		bne	fpundefinstr			@ ignore FP
-		sub	r4, r5, #4
+		sub	r4, r2, #4
 1:		ldrt	r0, [r4]			@ r0  = instruction
 		adrsvc	al, r9, ret_from_exception	@ r9  = normal FP return
 		adrsvc	al, lr, fpundefinstr		@ lr  = undefined instr return
@@ -361,14 +356,9 @@ fpundefinstr:	mov	r0, sp
 		b	do_undefinstr
 
 		.align	5
-__pabt_usr:	sub	sp, sp, #S_FRAME_SIZE		@ Allocate frame size in one go
-		stmia	sp, {r0 - r12}			@ Save r0 - r12
-		ldr	r4, .LCabt
-		add	r8, sp, #S_PC
-		ldmia	r4, {r5 - r7}			@ Get USR pc, cpsr
-		stmia	r8, {r5 - r7}			@ Save USR pc, cpsr, old_r0
-		stmdb	r8, {sp, lr}^			@ Save sp_usr lr_usr
-		alignment_trap r4, r7, __temp_abt
+__pabt_usr:
+		usr_entry abt
+		alignment_trap r7, r0, __temp_abt
 		zero_fp
 		enable_irq r0				@ Enable interrupts
 		mov	r0, r5				@ address (pc)
