@@ -156,7 +156,7 @@ xfs_iomap(
 		if (flags & BMAP_IGNSTATE)
 			bmap_flags |= XFS_BMAPI_IGSTATE;
 		break;
-	case PBF_WRITE:
+	case BMAP_WRITE:
 		lockmode = XFS_ILOCK_EXCL|XFS_EXTSIZE_WR;
 		bmap_flags = 0;
 		XFS_ILOCK(mp, io, lockmode);
