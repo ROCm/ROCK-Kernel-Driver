@@ -89,11 +89,6 @@ int usb_device_probe(struct device *dev)
 	if (!driver->probe)
 		return error;
 
-	if (!try_module_get(driver->owner)) {
-		dev_err (dev, "Can't get a module reference for %s\n", driver->name);
-		return error;
-	}
-
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {
 		dev_dbg (dev, "%s - got id\n", __FUNCTION__);
@@ -103,8 +98,6 @@ int usb_device_probe(struct device *dev)
 	}
 	if (!error)
 		intf->driver = driver;
-
-	module_put(driver->owner);
 
 	return error;
 }
@@ -123,16 +116,6 @@ int usb_device_remove(struct device *dev)
 		return -ENODEV;
 	}
 
-	if (!try_module_get(driver->owner)) {
-		// FIXME this happens even when we just rmmod
-		// drivers that aren't in active use...
-		dev_err(dev, "Dieing driver still bound to device.\n");
-		return -EIO;
-	}
-
-	/* if we sleep here on an umanaged driver 
-	 * the holder of the lock guards against 
-	 * module unload */
 	down(&driver->serialize);
 
 	if (intf->driver && intf->driver->disconnect)
@@ -143,7 +126,6 @@ int usb_device_remove(struct device *dev)
 		usb_driver_release_interface(driver, intf);
 
 	up(&driver->serialize);
-	module_put(driver->owner);
 
 	return 0;
 }
