@@ -1058,6 +1058,7 @@ int radeon_cp_clear( struct inode *inode, struct file *filp,
 
 	radeon_cp_dispatch_clear( dev, &clear, depth_boxes );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1118,6 +1119,7 @@ int radeon_cp_flip( struct inode *inode, struct file *filp,
 		
 	radeon_cp_dispatch_flip( dev );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1140,6 +1142,7 @@ int radeon_cp_swap( struct inode *inode, struct file *filp,
 	radeon_cp_dispatch_swap( dev );
 	dev_priv->sarea_priv->ctx_owner = 0;
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1228,6 +1231,7 @@ int radeon_cp_vertex( struct inode *inode, struct file *filp,
 		radeon_cp_discard_buffer( dev, buf );
 	}
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1328,6 +1332,7 @@ int radeon_cp_indices( struct inode *inode, struct file *filp,
 		radeon_cp_discard_buffer( dev, buf );
 	}
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1339,6 +1344,7 @@ int radeon_cp_texture( struct inode *inode, struct file *filp,
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	drm_radeon_texture_t tex;
 	drm_radeon_tex_image_t image;
+	int ret;
 
 	LOCK_TEST_WITH_RETURN( dev );
 
@@ -1358,7 +1364,10 @@ int radeon_cp_texture( struct inode *inode, struct file *filp,
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
 
-	return radeon_cp_dispatch_texture( dev, &tex, &image );
+	ret = radeon_cp_dispatch_texture( dev, &tex, &image );
+
+	COMMIT_RING();
+	return ret;
 }
 
 int radeon_cp_stipple( struct inode *inode, struct file *filp,
@@ -1383,6 +1392,7 @@ int radeon_cp_stipple( struct inode *inode, struct file *filp,
 
 	radeon_cp_dispatch_stipple( dev, mask );
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1460,6 +1470,7 @@ int radeon_cp_indirect( struct inode *inode, struct file *filp,
 	}
 
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1564,6 +1575,7 @@ int radeon_cp_vertex2( struct inode *inode, struct file *filp,
 		radeon_cp_discard_buffer( dev, buf );
 	}
 
+	COMMIT_RING();
 	return 0;
 }
 
@@ -1575,19 +1587,16 @@ static int radeon_emit_packets(
 {
 	int sz = packet[(int)header.packet.packet_id].len;
 	int reg = packet[(int)header.packet.packet_id].start;
-	int i, tmp, *data = (int *)cmdbuf->buf;
+	int tmp, *data = (int *)cmdbuf->buf;
 	RING_LOCALS;
    
 	if (sz * sizeof(int) > cmdbuf->bufsz) 
 		return -EINVAL;
 
-	BEGIN_RING( (sz+1) );
+
+	BEGIN_RING(sz+1);
 	OUT_RING( CP_PACKET0( reg, (sz-1) ) );
-	for ( i = 0 ; i < sz ; i++ ) {
-		if (__get_user( tmp, &data[i] ))
-			return -EFAULT;
-		OUT_RING( tmp );
-	}
+	OUT_RING_USER_TABLE( data, sz );
 	ADVANCE_RING();
 
 	cmdbuf->buf += sz * sizeof(int);
@@ -1601,7 +1610,7 @@ static inline int radeon_emit_scalars(
 	drm_radeon_cmd_buffer_t *cmdbuf )
 {
 	int sz = header.scalars.count;
-	int i, tmp, *data = (int *)cmdbuf->buf;
+	int tmp, *data = (int *)cmdbuf->buf;
 	int start = header.scalars.offset;
 	int stride = header.scalars.stride;
 	RING_LOCALS;
@@ -1610,11 +1619,7 @@ static inline int radeon_emit_scalars(
 	OUT_RING( CP_PACKET0( RADEON_SE_TCL_SCALAR_INDX_REG, 0 ) );
 	OUT_RING( start | (stride << RADEON_SCAL_INDX_DWORD_STRIDE_SHIFT));
 	OUT_RING( CP_PACKET0_TABLE( RADEON_SE_TCL_SCALAR_DATA_REG, sz-1 ) );
-	for ( i = 0 ; i < sz ; i++ ) {
-		if (__get_user( tmp, &data[i] ))
-			return -EFAULT;
-		OUT_RING( tmp );
-	}	
+	OUT_RING_USER_TABLE( data, sz );
 	ADVANCE_RING();
 	cmdbuf->buf += sz * sizeof(int);
 	cmdbuf->bufsz -= sz * sizeof(int);
@@ -1627,7 +1632,7 @@ static inline int radeon_emit_vectors(
 	drm_radeon_cmd_buffer_t *cmdbuf )
 {
 	int sz = header.vectors.count;
-	int i, tmp, *data = (int *)cmdbuf->buf;
+	int tmp, *data = (int *)cmdbuf->buf;
 	int start = header.vectors.offset;
 	int stride = header.vectors.stride;
 	RING_LOCALS;
@@ -1636,11 +1641,7 @@ static inline int radeon_emit_vectors(
 	OUT_RING( CP_PACKET0( RADEON_SE_TCL_VECTOR_INDX_REG, 0 ) );
 	OUT_RING( start | (stride << RADEON_VEC_INDX_OCTWORD_STRIDE_SHIFT));
 	OUT_RING( CP_PACKET0_TABLE( RADEON_SE_TCL_VECTOR_DATA_REG, (sz-1) ) );
-	for ( i = 0 ; i < sz ; i++ ) {
-		if (__get_user( tmp, &data[i] ))
-			return -EFAULT;
-		OUT_RING( tmp );
-	}	
+	OUT_RING_USER_TABLE( data, sz );
 	ADVANCE_RING();
 
 	cmdbuf->buf += sz * sizeof(int);
@@ -1655,8 +1656,8 @@ static int radeon_emit_packet3( drm_device_t *dev,
 	drm_radeon_private_t *dev_priv = dev->dev_private;
 	int cmdsz, tmp;
 	int *cmd = (int *)cmdbuf->buf;
-	int j;
 	RING_LOCALS;
+
 
 	DRM_DEBUG("%s\n", __FUNCTION__);
 
@@ -1669,14 +1670,8 @@ static int radeon_emit_packet3( drm_device_t *dev,
 	    cmdsz * 4 > cmdbuf->bufsz)
 		return -EINVAL;
 
-
 	BEGIN_RING( cmdsz );
-	for (j = 0 ; j < cmdsz ; j++) {
-		if (__get_user( tmp, &cmd[j] ))
-			return -EFAULT;
-/*  		printk( "pk3 %d: %x\n", j, tmp); */
-		OUT_RING( tmp );
-	}
+	OUT_RING_USER_TABLE( cmd, cmdsz );
 	ADVANCE_RING();
 
 	cmdbuf->buf += cmdsz * 4;
@@ -1693,7 +1688,7 @@ static int radeon_emit_packet3_cliprect( drm_device_t *dev,
 	int cmdsz, tmp;
 	int *cmd = (int *)cmdbuf->buf;
 	drm_clip_rect_t *boxes = cmdbuf->boxes;
-	int i = 0, j;
+	int i = 0;
 	RING_LOCALS;
 
 	DRM_DEBUG("%s\n", __FUNCTION__);
@@ -1715,12 +1710,7 @@ static int radeon_emit_packet3_cliprect( drm_device_t *dev,
 		}
 		
 		BEGIN_RING( cmdsz );
-		for (j = 0 ; j < cmdsz ; j++) {
-			if (__get_user( tmp, &cmd[j] ))
-				return -EFAULT;
-/*  			printk( "pk3_clip %d: %x\n", j, tmp); */
-			OUT_RING( tmp );
-		}
+		OUT_RING_USER_TABLE( cmd, cmdsz );
 		ADVANCE_RING();
 
 	} while ( ++i < cmdbuf->nbox );
@@ -1768,7 +1758,8 @@ int radeon_cp_cmdbuf( struct inode *inode, struct file *filp,
 	if (verify_area( VERIFY_READ, cmdbuf.buf, cmdbuf.bufsz ))
 		return -EFAULT;
 
-	if (verify_area( VERIFY_READ, cmdbuf.boxes, 
+	if (cmdbuf.nbox &&
+	    verify_area( VERIFY_READ, cmdbuf.boxes, 
 			 cmdbuf.nbox * sizeof(drm_clip_rect_t)))
 		return -EFAULT;
 
@@ -1844,6 +1835,7 @@ int radeon_cp_cmdbuf( struct inode *inode, struct file *filp,
 	}
 
 
+	COMMIT_RING();
 	return 0;
 }
 
