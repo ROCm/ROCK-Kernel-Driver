@@ -12,10 +12,6 @@
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pcibr_private.h>
 #include <asm/sn/pci/pci_defs.h>
-#include <asm/sn/prio.h>
-#include <asm/sn/xtalk/xbow.h>
-#include <asm/sn/io.h>
-#include <asm/sn/sn_private.h>
 
 pcibr_hints_t           pcibr_hints_get(vertex_hdl_t, int);
 void                    pcibr_hints_fix_rrbs(vertex_hdl_t);
