@@ -68,22 +68,12 @@ static struct i2c_driver *drivers[I2C_DRIVER_MAX];
 /**** debug level */
 static int i2c_debug;
 
-/* ---------------------------------------------------
- * /proc entry declarations
- *----------------------------------------------------
- */
-
 #ifdef CONFIG_PROC_FS
-static ssize_t i2cproc_bus_read(struct file * file, char * buf,size_t count, 
-                                loff_t *ppos);
-static int read_bus_i2c(char *buf, char **start, off_t offset, int len,
-                           int *eof , void *private);
-
-/* To implement the dynamic /proc/bus/i2c-? files, we need our own 
-   implementation of the read hook */
-static struct file_operations i2cproc_operations = {
-	.read		= i2cproc_bus_read,
-};
+static int i2cproc_register(struct i2c_adapter *adap, int bus);
+static void i2cproc_remove(int bus);
+#else
+# define i2cproc_register(adap, bus)	0
+# define i2cproc_remove(bus)		do { } while (0)
 #endif /* CONFIG_PROC_FS */
 
 
@@ -109,8 +99,7 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 		printk(KERN_WARNING 
 		       " i2c-core.o: register_adapter(%s) - enlarge I2C_ADAP_MAX.\n",
 			adap->name);
-		res = -ENOMEM;
-		goto ERROR0;
+		goto fail;
 	}
 
 	adapters[i] = adap;
@@ -119,26 +108,9 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 	/* init data types */
 	init_MUTEX(&adap->lock);
 
-#ifdef CONFIG_PROC_FS
-	{
-		char name[8];
-		struct proc_dir_entry *proc_entry;
-
-		sprintf(name,"i2c-%d", i);
-
-		proc_entry = create_proc_entry(name,0,proc_bus);
-		if (! proc_entry) {
-			printk(KERN_ERR "i2c-core.o: Could not create /proc/bus/%s\n",
-			       name);
-			res = -ENOENT;
-			goto ERROR1;
-		}
-
-		proc_entry->proc_fops = &i2cproc_operations;
-		proc_entry->owner = THIS_MODULE;
-		adap->inode = proc_entry->low_ino;
-	}
-#endif /* def CONFIG_PROC_FS */
+	res = i2cproc_register(adap, i);
+	if (res)
+		return res;
 
 	/* inform drivers of new adapters */
 	DRV_LOCK();	
@@ -154,13 +126,9 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 
 	return 0;	
 
-
-ERROR1:
-	ADAP_LOCK();
-	adapters[i] = NULL;
-ERROR0:
+ fail:
 	ADAP_UNLOCK();
-	return res;
+	return -ENOMEM;
 }
 
 
@@ -214,13 +182,8 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 				goto ERROR0;
 			}
 	}
-#ifdef CONFIG_PROC_FS
-	{
-		char name[8];
-		sprintf(name,"i2c-%d", i);
-		remove_proc_entry(name, proc_bus);
-	}
-#endif /* def CONFIG_PROC_FS */
+
+	i2cproc_remove(i);
 
 	adapters[i] = NULL;
 	
@@ -501,10 +464,9 @@ int i2c_release_client(struct i2c_client *client)
  */
 
 #ifdef CONFIG_PROC_FS
-
 /* This function generates the output for /proc/bus/i2c */
-int read_bus_i2c(char *buf, char **start, off_t offset, int len, int *eof, 
-                 void *private)
+static int read_bus_i2c(char *buf, char **start, off_t offset,
+			int len, int *eof, void *private)
 {
 	int i;
 	int nr = 0;
@@ -529,10 +491,10 @@ int read_bus_i2c(char *buf, char **start, off_t offset, int len, int *eof,
 }
 
 /* This function generates the output for /proc/bus/i2c-? */
-ssize_t i2cproc_bus_read(struct file * file, char * buf,size_t count, 
-                         loff_t *ppos)
+static ssize_t i2cproc_bus_read(struct file *file, char *buf,
+				size_t count, loff_t *ppos)
 {
-	struct inode * inode = file->f_dentry->d_inode;
+	struct inode *inode = file->f_dentry->d_inode;
 	char *kbuf;
 	struct i2c_client *client;
 	int i,j,k,order_nr,len=0;
@@ -593,6 +555,38 @@ ssize_t i2cproc_bus_read(struct file * file, char * buf,size_t count,
 	return -ENOENT;
 }
 
+static struct file_operations i2cproc_operations = {
+	.read		= i2cproc_bus_read,
+};
+
+static int i2cproc_register(struct i2c_adapter *adap, int bus)
+{
+	struct proc_dir_entry *proc_entry;
+	char name[8];
+
+	sprintf(name, "i2c-%d", bus);
+
+	proc_entry = create_proc_entry(name, 0, proc_bus);
+	if (!proc_entry)
+		goto fail;
+
+	proc_entry->proc_fops = &i2cproc_operations;
+	proc_entry->owner = THIS_MODULE;
+	adap->inode = proc_entry->low_ino;
+	return 0;
+ fail:
+	printk(KERN_ERR "i2c-core.o: Could not create /proc/bus/%s\n", name);
+	return -ENOENT;
+}
+
+static void i2cproc_remove(int bus)
+{
+	char name[8];
+
+	sprintf(name,"i2c-%d", bus);
+	remove_proc_entry(name, proc_bus);
+}
+
 static int i2cproc_init(void)
 {
 
@@ -611,7 +605,6 @@ static int i2cproc_init(void)
 
 static void __exit i2cproc_cleanup(void)
 {
-
 	remove_proc_entry("i2c",proc_bus);
 }
 
