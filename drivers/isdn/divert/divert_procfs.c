@@ -182,7 +182,6 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 	divert_ioctl dioctl;
 	int i;
 	unsigned long flags;
-	spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
 	divert_rule *rulep;
 	char *cp;
 

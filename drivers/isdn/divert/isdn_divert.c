@@ -48,13 +48,14 @@ static struct deflect_struc *table_head = NULL;
 static struct deflect_struc *table_tail = NULL; 
 static unsigned char extern_wait_max = 4; /* maximum wait in s for external process */ 
 
+spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
+
 /***************************/
 /* timer callback function */
 /***************************/
 static void deflect_timer_expire(ulong arg)
 {
   unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
   struct call_struc *cs = (struct call_struc *) arg;
 
   spin_lock_irqsave(&divert_lock, flags);
@@ -109,7 +110,6 @@ int cf_command(int drvid, int mode,
                u_char proc, char *msn, 
                u_char service, char *fwd_nr, ulong *procid)
 { unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
   int retval,msnlen;
   int fwd_len;
   char *p,*ielenp,tmp[60];
@@ -204,7 +204,6 @@ int deflect_extern_action(u_char cmd, ulong callid, char *to_nr)
 { struct call_struc *cs;
   isdn_ctrl ic;
   unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
   int i;
 
   if ((cmd & 0x7F) > 2) return(-EINVAL); /* invalid command */
@@ -275,7 +274,6 @@ int deflect_extern_action(u_char cmd, ulong callid, char *to_nr)
 int insertrule(int idx, divert_rule *newrule)
 { struct deflect_struc *ds,*ds1=NULL;
   unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
 
   if (!(ds = (struct deflect_struc *) kmalloc(sizeof(struct deflect_struc), 
                                               GFP_KERNEL))) 
@@ -321,7 +319,6 @@ int insertrule(int idx, divert_rule *newrule)
 int deleterule(int idx)
 { struct deflect_struc *ds,*ds1;
   unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
   
   if (idx < 0) 
    { spin_lock_irqsave(&divert_lock, flags);
@@ -389,7 +386,6 @@ divert_rule *getruleptr(int idx)
 int isdn_divert_icall(isdn_ctrl *ic)
 { int retval = 0;
   unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
   struct call_struc *cs = NULL; 
   struct deflect_struc *dv;
   char *p,*p1;
@@ -540,7 +536,6 @@ int isdn_divert_icall(isdn_ctrl *ic)
 void deleteprocs(void)
 { struct call_struc *cs, *cs1; 
   unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
 
   spin_lock_irqsave(&divert_lock, flags);
   cs = divert_head;
@@ -698,7 +693,6 @@ int prot_stat_callback(isdn_ctrl *ic)
 { struct call_struc *cs, *cs1;
   int i;
   unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
 
   cs = divert_head; /* start of list */
   cs1 = NULL;
@@ -790,7 +784,6 @@ int prot_stat_callback(isdn_ctrl *ic)
 int isdn_divert_stat_callback(isdn_ctrl *ic)
 { struct call_struc *cs, *cs1;
   unsigned long flags;
-  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
   int retval;
 
   retval = -1;

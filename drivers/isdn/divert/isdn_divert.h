@@ -114,6 +114,8 @@ struct divert_info
 /**************/
 /* Prototypes */
 /**************/
+extern spinlock_t divert_lock;
+
 extern ulong if_used; /* number of interface users */
 extern int divert_dev_deinit(void);
 extern int divert_dev_init(void);
