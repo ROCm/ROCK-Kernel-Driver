@@ -16,7 +16,6 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/ctype.h>
-#include <linux/version.h>
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 
@@ -1111,17 +1110,10 @@ int debug_dflt_header_fn(debug_info_t * id, struct debug_view *view,
 		except_str = "*";
 	else
 		except_str = "-";
-	caller = (unsigned long) entry->caller;
-#if defined(CONFIG_ARCH_S390X)
-	rc += sprintf(out_buf, "%02i %011lu:%06lu %1u %1s %02i %016lx  ",
+	caller = ((unsigned long) entry->caller) & PSW_ADDR_INSN;
+	rc += sprintf(out_buf, "%02i %011lu:%06lu %1u %1s %02i %p  ",
 		      area, time_val.tv_sec, time_val.tv_usec, level,
-		      except_str, entry->id.fields.cpuid, caller);
-#else
-	caller &= 0x7fffffff;
-	rc += sprintf(out_buf, "%02i %011lu:%06lu %1u %1s %02i %08lx  ",
-		      area, time_val.tv_sec, time_val.tv_usec, level,
-		      except_str, entry->id.fields.cpuid, caller);
-#endif
+		      except_str, entry->id.fields.cpuid, (void *) caller);
 	return rc;
 }
 
