@@ -87,10 +87,10 @@ static struct device_node * __init find_cpu_node(unsigned int cpu)
 /* must hold reference to node during call */
 static int *of_get_associativity(struct device_node *dev)
  {
-	int *result;
+	unsigned int *result;
 	int len;
 	
-	result = (int *)get_property(dev, "ibm,associativity", &len);
+	result = (unsigned int *)get_property(dev, "ibm,associativity", &len);
 
 	if (len <= 0)
 		return NULL;
@@ -136,7 +136,7 @@ static int find_assoc_diff_depth(char *node_type)
 	struct device_node *device;
 	struct device_node *base_device;
 	int smallest_depth = -1;
-	int *base_assoc;
+	unsigned int *base_assoc;
 
 	device = of_find_node_by_type(NULL, node_type);
 	if (!device)
@@ -152,9 +152,9 @@ static int find_assoc_diff_depth(char *node_type)
 	base_assoc = of_get_associativity(base_device);
 
 	for (; device; device = of_find_node_by_type(device, node_type)) {
-		int depth;
-		int length;
-		int *assoc = of_get_associativity(device);
+		unsigned int depth;
+		unsigned int length;
+		unsigned int *assoc = of_get_associativity(device);
 
 		if (!assoc)
 			goto err;
@@ -273,7 +273,7 @@ static int __init parse_numa_properties(void)
 		int numa_domain;
 		int ranges;
 		unsigned int *memcell_buf;
-		int len;
+		unsigned int len;
 
 		memcell_buf = (unsigned int *)get_property(memory, "reg", &len);
 		if (!memcell_buf || len <= 0)
@@ -283,7 +283,7 @@ static int __init parse_numa_properties(void)
 new_range:
 		/* these are order-sensitive, and modify the buffer pointer */
 		start = read_cell_ul(memory, &memcell_buf);
-		 size = read_cell_ul(memory, &memcell_buf);
+		size = read_cell_ul(memory, &memcell_buf);
 
 		start = _ALIGN_DOWN(start, MEMORY_INCREMENT);
 		size = _ALIGN_UP(size, MEMORY_INCREMENT);
