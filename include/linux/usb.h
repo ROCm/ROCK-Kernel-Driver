@@ -974,7 +974,7 @@ void usb_show_device(struct usb_device *);
 void usb_show_string(struct usb_device *dev, char *id, int index);
 
 #ifdef DEBUG
-#define dbg(format, arg...) printk(KERN_DEBUG __FILE__ ": " format "\n" , ## arg)
+#define dbg(format, arg...) printk(KERN_DEBUG "%s: " format "\n" , __FILE__ , ## arg)
 #else
 #define dbg(format, arg...) do {} while (0)
 #endif
