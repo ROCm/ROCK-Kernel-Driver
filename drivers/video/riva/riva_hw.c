@@ -2112,7 +2112,7 @@ static void nv10GetConfig
 #ifdef __BIG_ENDIAN
     /* turn on big endian register access */
     if(!(NV_RD32(chip->PMC, 0x00000004) & 0x01000001))
-    	NV_WR32(chip->PMC, 0x00000004], 0x01000001);
+    	NV_WR32(chip->PMC, 0x00000004, 0x01000001);
 #endif
 
     /*
