@@ -225,4 +225,8 @@ extern int CIFSSMBNotify(const int xid, struct cifsTconInfo *tcon,
 extern ssize_t CIFSSMBQAllEAs(const int xid, struct cifsTconInfo *tcon,
 			const unsigned char *searchName, char * EAData,
 			size_t bufsize, const struct nls_table *nls_codepage);
+extern ssize_t CIFSSMBQueryEA(const int xid,struct cifsTconInfo * tcon,
+		const unsigned char * searchName,const unsigned char * ea_name,
+		unsigned char * ea_value, size_t buf_size, 
+		const struct nls_table *nls_codepage);
 #endif			/* _CIFSPROTO_H */

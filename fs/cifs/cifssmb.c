@@ -3086,6 +3086,8 @@ QAllEAsRetry:
 			ea_response_data = (struct fealist *)
 				(((char *) &pSMBr->hdr.Protocol) +
 				pSMBr->DataOffset);
+			ea_response_data->list_len = 
+				cpu_to_le32(ea_response_data->list_len);
 			cFYI(1,("ea length %d",ea_response_data->list_len));
 			name_len = ea_response_data->list_len;
 			if(name_len <= 8) {
@@ -3122,8 +3124,10 @@ QAllEAsRetry:
 					/* account for trailing null */
 					name_len--;
 					temp_ptr++;
+					temp_fea->value_len = cpu_to_le16(temp_fea->value_len);
 					name_len -= temp_fea->value_len;
 					temp_ptr += temp_fea->value_len;
+					/* BB check that temp_ptr is still within smb BB*/
 				/* no trailing null to account for in value len */
 					/* go on to next EA */
 					temp_fea = (struct fea *)temp_ptr;
@@ -3138,4 +3142,152 @@ QAllEAsRetry:
 
 	return rc;
 }
+
+ssize_t CIFSSMBQueryEA(const int xid,struct cifsTconInfo * tcon,
+		const unsigned char * searchName,const unsigned char * ea_name,
+		unsigned char * ea_value, size_t buf_size, 
+		const struct nls_table *nls_codepage)
+{
+	TRANSACTION2_QPI_REQ *pSMB = NULL;
+	TRANSACTION2_QPI_RSP *pSMBr = NULL;
+	int rc = 0;
+	int bytes_returned;
+	int name_len;
+	struct fea * temp_fea;
+	char * temp_ptr;
+
+	cFYI(1, ("In Query EA path %s", searchName));
+QEARetry:
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, tcon, (void **) &pSMB,
+		      (void **) &pSMBr);
+	if (rc)
+		return rc;
+
+	if (pSMB->hdr.Flags2 & SMBFLG2_UNICODE) {
+		name_len =
+		    cifs_strtoUCS((wchar_t *) pSMB->FileName, searchName, 530
+				  /* find define for this maxpathcomponent */
+				  , nls_codepage);
+		name_len++;	/* trailing null */
+		name_len *= 2;
+	} else {	/* BB improve the check for buffer overruns BB */
+		name_len = strnlen(searchName, 530);
+		name_len++;	/* trailing null */
+		strncpy(pSMB->FileName, searchName, name_len);
+	}
+
+	pSMB->TotalParameterCount = 2 /* level */  + 4 /* reserved */  +
+	    name_len /* includes null */ ;
+	pSMB->TotalDataCount = 0;
+	pSMB->MaxParameterCount = cpu_to_le16(2);
+	pSMB->MaxDataCount = cpu_to_le16(4000);	/* BB find exact max SMB PDU from sess structure BB */
+	pSMB->MaxSetupCount = 0;
+	pSMB->Reserved = 0;
+	pSMB->Flags = 0;
+	pSMB->Timeout = 0;
+	pSMB->Reserved2 = 0;
+	pSMB->ParameterOffset = cpu_to_le16(offsetof(
+        struct smb_com_transaction2_qpi_req ,InformationLevel) - 4);
+	pSMB->DataCount = 0;
+	pSMB->DataOffset = 0;
+	pSMB->SetupCount = 1;
+	pSMB->Reserved3 = 0;
+	pSMB->SubCommand = cpu_to_le16(TRANS2_QUERY_PATH_INFORMATION);
+	pSMB->ByteCount = pSMB->TotalParameterCount + 1 /* pad */ ;
+	pSMB->TotalParameterCount = cpu_to_le16(pSMB->TotalParameterCount);
+	pSMB->ParameterCount = pSMB->TotalParameterCount;
+	pSMB->InformationLevel = cpu_to_le16(SMB_INFO_QUERY_ALL_EAS);
+	pSMB->Reserved4 = 0;
+	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	pSMB->ByteCount = cpu_to_le16(pSMB->ByteCount);
+
+	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
+			 (struct smb_hdr *) pSMBr, &bytes_returned, 0);
+	if (rc) {
+		cFYI(1, ("Send error in Query EA = %d", rc));
+	} else {		/* decode response */
+		pSMBr->DataOffset = le16_to_cpu(pSMBr->DataOffset);
+		/* BB also check enough total bytes returned */
+		/* BB we need to improve the validity checking
+		of these trans2 responses */
+		if ((pSMBr->ByteCount < 4) || (pSMBr->DataOffset > 512)) 
+			rc = -EIO;	/* bad smb */
+	   /* else if (pFindData){
+			memcpy((char *) pFindData,
+			       (char *) &pSMBr->hdr.Protocol +
+			       pSMBr->DataOffset, kl);
+		}*/ else {
+			/* check that length of list is not more than bcc */
+			/* check that each entry does not go beyond length
+			   of list */
+			/* check that each element of each entry does not
+			   go beyond end of list */
+			struct fealist * ea_response_data;
+			rc = -ENOENT;
+			/* validate_trans2_offsets() */
+			/* BB to check if(start of smb + pSMBr->DataOffset > &bcc+ bcc)*/
+			ea_response_data = (struct fealist *)
+				(((char *) &pSMBr->hdr.Protocol) +
+				pSMBr->DataOffset);
+			ea_response_data->list_len = 
+				cpu_to_le32(ea_response_data->list_len);
+			cFYI(1,("ea length %d",ea_response_data->list_len));
+			name_len = ea_response_data->list_len;
+			if(name_len <= 8) {
+			/* returned EA size zeroed at top of function */
+				cFYI(1,("empty EA list returned from server"));
+			} else {
+				/* account for ea list len */
+				name_len -= 4;
+				temp_fea = ea_response_data->list;
+				temp_ptr = (char *)temp_fea;
+				/* loop through checking if we have a matching
+				name and then return the associated value */
+				while(name_len > 0) {
+					name_len -= 4;
+					temp_ptr += 4;
+					temp_fea->value_len = cpu_to_le16(temp_fea->value_len);
+				/* BB validate that value_len falls within SMB, 
+				even though maximum for name_len is 255 */ 
+					if(memcmp(temp_fea->name,ea_name,
+						  temp_fea->name_len) == 0) {
+						/* found a match */
+						rc = temp_fea->value_len;
+				/* account for prefix user. and trailing null */
+						if(rc<=buf_size) {
+							memcpy(ea_value,
+								temp_fea->name+temp_fea->name_len+1,
+								rc);
+							/* ea values, unlike ea names,
+							are not null terminated */
+						} else if(buf_size == 0) {
+						/* skip copy - calc size only */
+						} else {
+							/* stop before overrun buffer */
+							rc = -ERANGE;
+						}
+						break;
+					}
+					name_len -= temp_fea->name_len;
+					temp_ptr += temp_fea->name_len;
+					/* account for trailing null */
+					name_len--;
+					temp_ptr++;
+					name_len -= temp_fea->value_len;
+					temp_ptr += temp_fea->value_len;
+				/* no trailing null to account for in value len */
+					/* go on to next EA */
+					temp_fea = (struct fea *)temp_ptr;
+				}
+			} 
+		}
+	}
+	if (pSMB)
+		cifs_buf_release(pSMB);
+	if (rc == -EAGAIN)
+		goto QEARetry;
+
+	return rc;
+}
+
 #endif
