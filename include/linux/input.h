@@ -473,6 +473,28 @@ struct input_absinfo {
 #define KEY_INS_LINE		0x1c2
 #define KEY_DEL_LINE		0x1c3
 
+#define KEY_FN			0x1d0
+#define KEY_FN_ESC		0x1d1
+#define KEY_FN_F1		0x1d2
+#define KEY_FN_F2		0x1d3
+#define KEY_FN_F3		0x1d4
+#define KEY_FN_F4		0x1d5
+#define KEY_FN_F5		0x1d6
+#define KEY_FN_F6		0x1d7
+#define KEY_FN_F7		0x1d8
+#define KEY_FN_F8		0x1d9
+#define KEY_FN_F9		0x1da
+#define KEY_FN_F10		0x1db
+#define KEY_FN_F11		0x1dc
+#define KEY_FN_F12		0x1dd
+#define KEY_FN_1		0x1de
+#define KEY_FN_2		0x1df
+#define KEY_FN_D		0x1e0
+#define KEY_FN_E		0x1e1
+#define KEY_FN_F		0x1e2
+#define KEY_FN_S		0x1e3
+#define KEY_FN_B		0x1e4
+
 #define KEY_MAX			0x1ff
 
 /*

@@ -518,7 +518,7 @@ static int ax_open(struct net_device *dev)
 
 	ax->flags   &= (1 << AXF_INUSE);      /* Clear ESCAPE & ERROR flags */
 
-	ax->buflock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&ax->buflock);
 
 	netif_start_queue(dev);
 	return 0;

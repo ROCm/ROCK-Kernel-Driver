@@ -1293,6 +1293,7 @@ static int ttusb_dec_init_stb(struct ttusb_dec *dec)
 				ttusb_dec_set_model(dec, TTUSB_DEC3000S);
 				break;
 			case 0x00070009:
+			case 0x00070013:
 				ttusb_dec_set_model(dec, TTUSB_DEC2000T);
 				break;
 			case 0x00070011:

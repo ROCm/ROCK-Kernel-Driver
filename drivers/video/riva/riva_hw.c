@@ -1536,13 +1536,13 @@ static void LoadStateExt
             chip->PMC[0x00001588/4] = 0;
 
             chip->PFB[0x00000240/4] = 0;
-            chip->PFB[0x00000244/4] = 0;
-            chip->PFB[0x00000248/4] = 0;
-            chip->PFB[0x0000024C/4] = 0;
             chip->PFB[0x00000250/4] = 0;
-            chip->PFB[0x00000254/4] = 0;
-            chip->PFB[0x00000258/4] = 0;
-            chip->PFB[0x0000025C/4] = 0;
+            chip->PFB[0x00000260/4] = 0;
+            chip->PFB[0x00000270/4] = 0;
+            chip->PFB[0x00000280/4] = 0;
+            chip->PFB[0x00000290/4] = 0;
+            chip->PFB[0x000002A0/4] = 0;
+            chip->PFB[0x000002B0/4] = 0;
 
             chip->PGRAPH[0x00000B00/4] = chip->PFB[0x00000240/4];
             chip->PGRAPH[0x00000B04/4] = chip->PFB[0x00000244/4];
@@ -2067,7 +2067,8 @@ static void nv10GetConfig
 
 #ifdef __BIG_ENDIAN
     /* turn on big endian register access */
-    chip->PMC[0x00000004/4] = 0x01000001;
+    if(!(chip->PMC[0x00000004/4] & 0x01000001))
+    	chip->PMC[0x00000004/4] = 0x01000001;
 #endif
 
     /*
@@ -2128,6 +2129,11 @@ static void nv10GetConfig
     case 0x01F0:
     case 0x0250:
     case 0x0280:
+    case 0x0300:
+    case 0x0310:
+    case 0x0320:
+    case 0x0330:
+    case 0x0340:
        if(chip->PEXTDEV[0x0000/4] & (1 << 22))
            chip->CrystalFreqKHz = 27000;
        break;
@@ -2159,6 +2165,11 @@ static void nv10GetConfig
     case 0x01F0:
     case 0x0250:
     case 0x0280:
+    case 0x0300:
+    case 0x0310:
+    case 0x0320:
+    case 0x0330:
+    case 0x0340:
         chip->twoHeads = TRUE;
         break;
     default:

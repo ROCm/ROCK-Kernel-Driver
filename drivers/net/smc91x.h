@@ -245,7 +245,7 @@ smc_pxa_dma_insl(u_long ioaddr, u_long physaddr, int reg, int dma,
 	while (!(DCSR(dma) & DCSR_STOPSTATE))
 		cpu_relax();
 	DCSR(dma) = 0;
-	dma_unmap_single(NULL, dmabuf, len, PCI_DMA_FROMDEVICE);
+	dma_unmap_single(NULL, dmabuf, len, DMA_FROM_DEVICE);
 }
 #endif
 
@@ -273,7 +273,7 @@ smc_pxa_dma_insw(u_long ioaddr, u_long physaddr, int reg, int dma,
 	}
 
 	len *= 2;
-	dmabuf = dma_map_single(NULL, buf, len, PCI_DMA_FROMDEVICE);
+	dmabuf = dma_map_single(NULL, buf, len, DMA_FROM_DEVICE);
 	DCSR(dma) = DCSR_NODESC;
 	DTADR(dma) = dmabuf;
 	DSADR(dma) = physaddr + reg;

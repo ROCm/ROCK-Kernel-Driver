@@ -24,4 +24,11 @@ pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
 
 #define pcibios_scan_all_fns(a, b)	0
 
+#ifndef HAVE_ARCH_PCI_GET_LEGACY_IDE_IRQ
+static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
+{
+	return channel ? 15 : 14;
+}
+#endif /* HAVE_ARCH_PCI_GET_LEGACY_IDE_IRQ */
+
 #endif

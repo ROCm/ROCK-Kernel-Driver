@@ -18,6 +18,7 @@
 #include <linux/wait.h>
 #include <linux/completion.h>
 #include <linux/interrupt.h>
+#include <linux/err.h>
 
 #include <asm/delay.h>
 #include <asm/io.h>
@@ -27,6 +28,8 @@
 #include <asm/arch/mux.h>
 #include <asm/arch/irqs.h>
 #include <asm/arch/mcbsp.h>
+
+#include <asm/hardware/clock.h>
 
 #ifdef CONFIG_MCBSP_DEBUG
 #define DBG(x...)	printk(x)
@@ -61,6 +64,8 @@ struct omap_mcbsp {
 };
 
 static struct omap_mcbsp mcbsp[OMAP_MAX_MCBSP_COUNT];
+static struct clk *mcbsp_dsp_ck = 0;
+static struct clk *mcbsp_api_ck = 0;
 
 
 static void omap_mcbsp_dump_reg(u8 id)
@@ -153,8 +158,8 @@ void omap_mcbsp_config(unsigned int id, const struct omap_mcbsp_reg_cfg * config
 	OMAP_MCBSP_WRITE(io_base, XCR1, config->xcr1);
 	OMAP_MCBSP_WRITE(io_base, SRGR2, config->srgr2);
 	OMAP_MCBSP_WRITE(io_base, SRGR1, config->srgr1);
-	OMAP_MCBSP_WRITE(io_base, SRGR2, config->mcr2);
-	OMAP_MCBSP_WRITE(io_base, SRGR1, config->mcr1);
+	OMAP_MCBSP_WRITE(io_base, MCR2, config->mcr2);
+	OMAP_MCBSP_WRITE(io_base, MCR1, config->mcr1);
 	OMAP_MCBSP_WRITE(io_base, PCR0, config->pcr0);
 }
 
@@ -181,6 +186,7 @@ static int omap_mcbsp_check(unsigned int id)
 	return -1;
 }
 
+#define EN_XORPCK		1
 #define DSP_RSTCT2              0xe1008014
 
 static void omap_mcbsp_dsp_request(void)
@@ -188,10 +194,8 @@ static void omap_mcbsp_dsp_request(void)
 	if (cpu_is_omap1510() || cpu_is_omap1610() || cpu_is_omap1710()) {
 		omap_writew((omap_readw(ARM_RSTCT1) | (1 << 1) | (1 << 2)),
 			    ARM_RSTCT1);
-		omap_writew((omap_readw(ARM_CKCTL) | 1 << EN_DSPCK),
-			    ARM_CKCTL);
-		omap_writew((omap_readw(ARM_IDLECT2) | (1 << EN_APICK)),
-			    ARM_IDLECT2);
+		clk_enable(mcbsp_dsp_ck);
+		clk_enable(mcbsp_api_ck);
 
 		/* enable 12MHz clock to mcbsp 1 & 3 */
 		__raw_writew(__raw_readw(DSP_IDLECT2) | (1 << EN_XORPCK),
@@ -588,7 +592,7 @@ static const struct omap_mcbsp_info mcbsp_1510[] = {
 };
 #endif
 
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710)
+#if defined(CONFIG_ARCH_OMAP16XX)
 static const struct omap_mcbsp_info mcbsp_1610[] = {
 	[0] = { .virt_base = OMAP1610_MCBSP1_BASE,
 		.dma_rx_sync = OMAP_DMA_MCBSP1_RX,
@@ -614,6 +618,18 @@ static int __init omap_mcbsp_init(void)
 	static const struct omap_mcbsp_info *mcbsp_info;
 
 	printk("Initializing OMAP McBSP system\n");
+
+	mcbsp_dsp_ck = clk_get(0, "dsp_ck");
+	if (IS_ERR(mcbsp_dsp_ck)) {
+		printk(KERN_ERR "mcbsp: could not acquire dsp_ck handle.\n");
+		return PTR_ERR(mcbsp_dsp_ck);
+	}
+	mcbsp_api_ck = clk_get(0, "api_ck");
+	if (IS_ERR(mcbsp_dsp_ck)) {
+		printk(KERN_ERR "mcbsp: could not acquire api_ck handle.\n");
+		return PTR_ERR(mcbsp_api_ck);
+	}
+
 #ifdef CONFIG_ARCH_OMAP730
 	if (cpu_is_omap730()) {
 		mcbsp_info = mcbsp_730;
@@ -626,7 +642,7 @@ static int __init omap_mcbsp_init(void)
 		mcbsp_count = ARRAY_SIZE(mcbsp_1510);
 	}
 #endif
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP1710)
+#if defined(CONFIG_ARCH_OMAP16XX)
 	if (cpu_is_omap1610() || cpu_is_omap1710()) {
 		mcbsp_info = mcbsp_1610;
 		mcbsp_count = ARRAY_SIZE(mcbsp_1610);

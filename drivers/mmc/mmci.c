@@ -69,7 +69,7 @@ static void mmci_stop_data(struct mmci_host *host)
 static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 {
 	unsigned int datactrl, timeout, irqmask;
-	void *base;
+	void __iomem *base;
 
 	DBG(host, "blksz %04x blks %04x flags %08x\n",
 	    1 << data->blksz_bits, data->blocks, data->flags);
@@ -108,7 +108,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 static void
 mmci_start_command(struct mmci_host *host, struct mmc_command *cmd, u32 c)
 {
-	void *base = host->base;
+	void __iomem *base = host->base;
 
 	DBG(host, "op %02x arg %08x flags %08x\n",
 	    cmd->opcode, cmd->arg, cmd->flags);
@@ -169,7 +169,7 @@ static void
 mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 	     unsigned int status)
 {
-	void *base = host->base;
+	void __iomem *base = host->base;
 
 	host->cmd = NULL;
 
@@ -193,7 +193,7 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 
 static int mmci_pio_read(struct mmci_host *host, char *buffer, unsigned int remain)
 {
-	void *base = host->base;
+	void __iomem *base = host->base;
 	char *ptr = buffer;
 	u32 status;
 
@@ -222,7 +222,7 @@ static int mmci_pio_read(struct mmci_host *host, char *buffer, unsigned int rema
 
 static int mmci_pio_write(struct mmci_host *host, char *buffer, unsigned int remain, u32 status)
 {
-	void *base = host->base;
+	void __iomem *base = host->base;
 	char *ptr = buffer;
 
 	do {
@@ -251,7 +251,7 @@ static int mmci_pio_write(struct mmci_host *host, char *buffer, unsigned int rem
 static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct mmci_host *host = dev_id;
-	void *base = host->base;
+	void __iomem *base = host->base;
 	u32 status;
 
 	status = readl(base + MMCISTATUS);
@@ -501,7 +501,7 @@ static int mmci_probe(struct amba_device *dev, void *id)
 	 * We can do SGIO
 	 */
 	mmc->max_hw_segs = 16;
-	mmc->max_phys_segs = 16;
+	mmc->max_phys_segs = NR_SG;
 
 	/*
 	 * Since we only have a 16-bit data length register, we must

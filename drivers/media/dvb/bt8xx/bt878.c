@@ -511,7 +511,7 @@ static void __devexit bt878_remove(struct pci_dev *pci_dev)
 		printk("bt878(%d): unloading\n", bt->nr);
 
 	/* turn off all capturing, DMA and IRQs */
-	btand(~13, BT878_AGPIO_DMA_CTL);
+	btand(~0x13, BT878_AGPIO_DMA_CTL);
 
 	/* first disable interrupts before unmapping the memory! */
 	btwrite(0, BT878_AINT_MASK);
@@ -554,7 +554,7 @@ static struct pci_driver bt878_pci_driver = {
       .name 	= "bt878",
       .id_table = bt878_pci_tbl,
       .probe 	= bt878_probe,
-      .remove 	= __devexit_p(bt878_remove),
+      .remove 	= bt878_remove,
 };
 
 static int bt878_pci_driver_registered = 0;

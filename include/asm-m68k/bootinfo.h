@@ -213,7 +213,13 @@ extern struct mac_booter_data
 
 #define BI_APOLLO_MODEL         0x8000  /* model (u_long) */
 
+    /*
+     *  HP300-specific tags
+     */
 
+#define BI_HP300_MODEL		0x8000	/* model (u_long) */
+#define BI_HP300_UART_SCODE	0x8001	/* UART select code (u_long) */
+#define BI_HP300_UART_ADDR	0x8002	/* phys. addr of UART (u_long) */
 
     /*
      * Stuff for bootinfo interface versioning
@@ -255,6 +261,7 @@ struct bootversion {
 #define MVME16x_BOOTI_VERSION  MK_BI_VERSION( 2, 0 )
 #define BVME6000_BOOTI_VERSION MK_BI_VERSION( 2, 0 )
 #define Q40_BOOTI_VERSION      MK_BI_VERSION( 2, 0 )
+#define HP300_BOOTI_VERSION    MK_BI_VERSION( 2, 0 )
 
 #ifdef BOOTINFO_COMPAT_1_0
 

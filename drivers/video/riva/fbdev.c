@@ -205,6 +205,7 @@ MODULE_DEVICE_TABLE(pci, rivafb_pci_tbl);
 /* command line data, set in rivafb_setup() */
 static int flatpanel __initdata = -1; /* Autodetect later */
 static int forceCRTC __initdata = -1;
+static int noaccel   __initdata = 0;
 #ifdef CONFIG_MTRR
 static int nomtrr __initdata = 0;
 #endif
@@ -231,7 +232,6 @@ static struct fb_var_screeninfo __initdata rivafb_default_var = {
 	.activate	= FB_ACTIVATE_NOW,
 	.height		= -1,
 	.width		= -1,
-	.accel_flags	= FB_ACCELF_TEXT,
 	.pixclock	= 39721,
 	.left_margin	= 40,
 	.right_margin	= 24,
@@ -1008,8 +1008,6 @@ static int rivafb_open(struct fb_info *info, int user)
 			par->state.flags |= VGA_SAVE_CMAP;
 		save_vga(&par->state);
 #endif
-		riva_common_setup(par);
-		RivaGetConfig(&par->riva, par->Chipset);
 		/* vgaHWunlock() + riva unlock (0x7F) */
 		CRTCout(par, 0x11, 0xFF);
 		par->riva.LockUnlock(&par->riva, 0);
@@ -1157,20 +1155,22 @@ static int rivafb_set_par(struct fb_info *info)
 	struct riva_par *par = (struct riva_par *) info->par;
 
 	NVTRACE_ENTER();
-	riva_common_setup(par);
-	RivaGetConfig(&par->riva, par->Chipset);
 	/* vgaHWunlock() + riva unlock (0x7F) */
 	CRTCout(par, 0x11, 0xFF);
 	par->riva.LockUnlock(&par->riva, 0);
-
 	riva_load_video_mode(info);
-	riva_setup_accel(info);
+	if(!(info->flags & FBINFO_HWACCEL_DISABLED))
+		riva_setup_accel(info);
 	
 	par->cursor_reset = 1;
 	info->fix.line_length = (info->var.xres_virtual * (info->var.bits_per_pixel >> 3));
 	info->fix.visual = (info->var.bits_per_pixel == 8) ?
 				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
 
+	if (info->flags & FBINFO_HWACCEL_DISABLED)
+		info->pixmap.scan_align = 1;
+	else
+		info->pixmap.scan_align = 4;
 	NVTRACE_LEAVE();
 	return 0;
 }
@@ -1378,6 +1378,11 @@ static void rivafb_fillrect(struct fb_info *info, const struct fb_fillrect *rect
 	struct riva_par *par = (struct riva_par *) info->par;
 	u_int color, rop = 0;
 
+	if ((info->flags & FBINFO_HWACCEL_DISABLED)) {
+		cfb_fillrect(info, rect);
+		return;
+	}
+
 	if (info->var.bits_per_pixel == 8)
 		color = rect->color;
 	else {
@@ -1428,6 +1433,11 @@ static void rivafb_copyarea(struct fb_info *info, const struct fb_copyarea *regi
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 
+	if ((info->flags & FBINFO_HWACCEL_DISABLED)) {
+		cfb_copyarea(info, region);
+		return;
+	}
+
 	RIVA_FIFO_FREE(par->riva, Blt, 3);
 	par->riva.Blt->TopLeftSrc  = (region->sy << 16) | region->sx;
 	par->riva.Blt->TopLeftDst  = (region->dy << 16) | region->dx;
@@ -1470,7 +1480,7 @@ static void rivafb_imageblit(struct fb_info *info,
 	volatile u32 *d;
 	int i, size;
 
-	if (image->depth != 1) {
+	if ((info->flags & FBINFO_HWACCEL_DISABLED) || image->depth != 1) {
 		cfb_imageblit(info, image);
 		return;
 	}
@@ -1667,6 +1677,13 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 		    | FBINFO_HWACCEL_FILLRECT
 		    | FBINFO_HWACCEL_IMAGEBLIT
 	            | FBINFO_MISC_MODESWITCHLATE;
+
+	/* Accel seems to not work properly on NV30 yet...*/
+	if ((par->riva.Architecture == NV_ARCH_30) || noaccel) {
+	    	printk(KERN_DEBUG PFX "disabling acceleration\n");
+  		info->flags |= FBINFO_HWACCEL_DISABLED;
+	}
+
 	info->var = rivafb_default_var;
 	info->fix.visual = (info->var.bits_per_pixel == 8) ?
 				FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
@@ -1678,7 +1695,6 @@ static int __devinit riva_set_fbinfo(struct fb_info *info)
 
 	info->pixmap.size = 8 * 1024;
 	info->pixmap.buf_align = 4;
-	info->pixmap.scan_align = 4;
 	info->pixmap.flags = FB_PIXMAP_SYSTEM;
 	info->var.yres_virtual = -1;
 	NVTRACE_LEAVE();
@@ -1708,13 +1724,14 @@ static int __devinit riva_get_EDID_OF(struct fb_info *info, struct pci_dev *pd)
 			pedid = (unsigned char *)
 				get_property(dp, propnames[i], NULL);
 			if (pedid != NULL) {
-		par->EDID = pedid;
-		return 1;
+				par->EDID = pedid;
+				NVTRACE("LCD found.\n");
+				return 1;
 			}
 		}
 	}
 	NVTRACE_LEAVE();
-		return 0;
+	return 0;
 }
 #endif /* CONFIG_PPC_OF */
 
@@ -1729,7 +1746,7 @@ static int __devinit riva_get_EDID_i2c(struct fb_info *info)
 	for (i = par->bus; i >= 1; i--) {
 		riva_probe_i2c_connector(par, i, &par->EDID);
 		if (par->EDID) {
-			printk("rivafb: Found EDID Block from BUS %i\n", i);
+			printk(PFX "Found EDID Block from BUS %i\n", i);
 			break;
 		}
 	}
@@ -1768,7 +1785,6 @@ static void __devinit riva_update_default_var(struct fb_var_screeninfo *var,
 		var->bits_per_pixel = 8;
 		riva_update_var(var, &modedb);
 	}
-	var->accel_flags |= FB_ACCELF_TEXT;
 	NVTRACE_LEAVE();
 }
 
@@ -1778,10 +1794,10 @@ static void __devinit riva_get_EDID(struct fb_info *info, struct pci_dev *pdev)
 	NVTRACE_ENTER();
 #ifdef CONFIG_PPC_OF
 	if (!riva_get_EDID_OF(info, pdev))
-		printk("rivafb: could not retrieve EDID from OF\n");
+		printk(PFX "could not retrieve EDID from OF\n");
 #elif CONFIG_FB_RIVA_I2C
 	if (!riva_get_EDID_i2c(info))
-		printk("rivafb: could not retrieve EDID from DDC/I2C\n");
+		printk(PFX "could not retrieve EDID from DDC/I2C\n");
 #endif
 	NVTRACE_LEAVE();
 }
@@ -1939,7 +1955,6 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 			printk(KERN_ERR PFX "cannot ioremap PRAMIN region\n");
 			goto err_out_free_nv3_pramin;
 		}
-		rivafb_fix.accel = FB_ACCEL_NV3;
 		break;
 	case NV_ARCH_04:
 	case NV_ARCH_10:
@@ -1947,14 +1962,13 @@ static int __devinit rivafb_probe(struct pci_dev *pd,
 	case NV_ARCH_30:
 		default_par->riva.PCRTC0 = (unsigned *)(default_par->ctrl_base + 0x00600000);
 		default_par->riva.PRAMIN = (unsigned *)(default_par->ctrl_base + 0x00710000);
-		rivafb_fix.accel = FB_ACCEL_NV4;
 		break;
 	}
-
 	riva_common_setup(default_par);
 
 	if (default_par->riva.Architecture == NV_ARCH_03) {
-		default_par->riva.PCRTC = default_par->riva.PCRTC0 = default_par->riva.PGRAPH;
+		default_par->riva.PCRTC = default_par->riva.PCRTC0
+		                        = default_par->riva.PGRAPH;
 	}
 
 	rivafb_fix.smem_len = riva_get_memlen(default_par) * 1024;
@@ -2104,6 +2118,8 @@ int __init rivafb_setup(char *options)
 #endif
 		} else if (!strncmp(this_opt, "strictmode", 10)) {
 			strictmode = 1;
+		} else if (!strncmp(this_opt, "noaccel", 7)) {
+			noaccel = 1;
 		} else
 			mode_option = this_opt;
 	}
@@ -2149,19 +2165,20 @@ static void __exit rivafb_exit(void)
 }
 
 module_exit(rivafb_exit);
+#endif /* MODULE */
 
-MODULE_PARM(flatpanel, "i");
+module_param(noaccel, bool, 0);
+MODULE_PARM_DESC(noaccel, "bool: disable acceleration");
+module_param(flatpanel, int, -1);
 MODULE_PARM_DESC(flatpanel, "Enables experimental flat panel support for some chipsets. (0 or 1=enabled) (default=0)");
-MODULE_PARM(forceCRTC, "i");
+module_param(forceCRTC, int, -1);
 MODULE_PARM_DESC(forceCRTC, "Forces usage of a particular CRTC in case autodetection fails. (0 or 1) (default=autodetect)");
-
 #ifdef CONFIG_MTRR
-MODULE_PARM(nomtrr, "i");
+module_param(nomtrr, bool, 0);
 MODULE_PARM_DESC(nomtrr, "Disables MTRR support (0 or 1=disabled) (default=0)");
 #endif
-MODULE_PARM(strictmode, "i");
+module_param(strictmode, bool, 0);
 MODULE_PARM_DESC(strictmode, "Only use video modes from EDID");
-#endif /* MODULE */
 
 MODULE_AUTHOR("Ani Joshi, maintainer");
 MODULE_DESCRIPTION("Framebuffer driver for nVidia Riva 128, TNT, TNT2, and the GeForce series");

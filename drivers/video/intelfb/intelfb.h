@@ -97,12 +97,12 @@
 /* module parameters */
 #define INTELFB_INT_PARAM(name, default, desc)				\
 	static int name = default;					\
-	MODULE_PARM(name, "i");					        \
+	module_param(name, int, default);			        \
 	MODULE_PARM_DESC(name, desc);
 
 #define INTELFB_STR_PARAM(name, default, desc)				\
-	static const char *name = default;				\
-	MODULE_PARM(name, "s");				                \
+	static char *name = (char *) default;				\
+	module_param(name, charp, default);		                \
 	MODULE_PARM_DESC(name, desc);
 
 /* misc macros */
@@ -205,7 +205,7 @@ struct intelfb_hwstate {
 
 struct intelfb_heap_data {
 	u32 physical;
-	u32 virtual;
+	u32 __iomem *virtual;
 	u32 offset;  // in GATT pages
 	u32 size;    // in bytes
 };
@@ -234,13 +234,13 @@ struct intelfb_info {
 
 	/* mmio regs */
 	u32 mmio_base_phys;
-	u32 mmio_base;
+	u32 __iomem *mmio_base;
 
 	/* fb start offset (in bytes) */
 	u32 fb_start;
 
 	/* ring buffer */
-	u32 ring_head;
+	u32 __iomem *ring_head;
 	u32 ring_tail;
 	u32 ring_tail_mask;
 	u32 ring_space;

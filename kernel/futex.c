@@ -732,7 +732,7 @@ static int __init init(void)
 
 	for (i = 0; i < ARRAY_SIZE(futex_queues); i++) {
 		INIT_LIST_HEAD(&futex_queues[i].chain);
-		futex_queues[i].lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&futex_queues[i].lock);
 	}
 	return 0;
 }

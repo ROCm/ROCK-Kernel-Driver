@@ -12,8 +12,8 @@
  * We don't actually have real ISA nor PCI buses, but there is so many
  * drivers out there that might just work if we fake them...
  */
-#define __io(a)			(a)
-#define __mem_pci(a)		((unsigned long)(a))
-#define __mem_isa(a)		((unsigned long)(a))
+#define __io(a)			((void __iomem *)(a))
+#define __mem_pci(a)		(a)
+#define __mem_isa(a)		(a)
 
 #endif

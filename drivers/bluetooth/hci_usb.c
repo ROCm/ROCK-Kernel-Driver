@@ -106,8 +106,9 @@ static struct usb_device_id blacklist_ids[] = {
 	/* ISSC Bluetooth Adapter v3.1 */
 	{ USB_DEVICE(0x1131, 0x1001), .driver_info = HCI_RESET },
 
-	/* Digianswer device */
+	/* Digianswer devices */
 	{ USB_DEVICE(0x08fd, 0x0001), .driver_info = HCI_DIGIANSWER },
+	{ USB_DEVICE(0x08fd, 0x0002), .driver_info = HCI_IGNORE },
 
 	/* RTX Telecom based adapter with buggy SCO support */
 	{ USB_DEVICE(0x0400, 0x0807), .driver_info = HCI_BROKEN_ISOC },
@@ -795,6 +796,11 @@ static void hci_usb_destruct(struct hci_dev *hdev)
 	kfree(husb);
 }
 
+static void hci_usb_notify(struct hci_dev *hdev, unsigned int evt)
+{
+	BT_DBG("%s evt %d", hdev->name, evt);
+}
+
 int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *udev = interface_to_usbdev(intf);
@@ -861,9 +867,9 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	husb->intr_in_ep  = intr_in_ep;
 
 	if (id->driver_info & HCI_DIGIANSWER)
-		husb->ctrl_req = HCI_DIGI_REQ;
+		husb->ctrl_req = USB_TYPE_VENDOR;
 	else
-		husb->ctrl_req = HCI_CTRL_REQ;
+		husb->ctrl_req = USB_TYPE_CLASS;
 
 	/* Find isochronous endpoints that we can use */
 	size = 0; 
@@ -911,7 +917,9 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 				BT_ERR("Can't claim isoc interface");
 			else if (usb_set_interface(udev, isoc_ifnum, isoc_alts)) {
 				BT_ERR("Can't set isoc interface settings");
+				husb->isoc_iface = isoc_iface;
 				usb_driver_release_interface(&hci_usb_driver, isoc_iface);
+				husb->isoc_iface = NULL;
 			} else {
 				husb->isoc_iface  = isoc_iface;
 				husb->isoc_in_ep  = isoc_in_ep;
@@ -947,6 +955,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	hdev->flush    = hci_usb_flush;
 	hdev->send     = hci_usb_send_frame;
 	hdev->destruct = hci_usb_destruct;
+	hdev->notify   = hci_usb_notify;
 
 	hdev->owner = THIS_MODULE;
 

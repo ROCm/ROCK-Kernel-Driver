@@ -478,6 +478,12 @@ int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
 	int index;
 	int err;
 
+#ifdef CONFIG_HUGETLB_PAGE
+	/* We leave htlb_segs as it was, but for a fork, we need to
+	 * clear the huge_pgdir. */
+	mm->context.huge_pgdir = NULL;
+#endif
+
 again:
 	if (!idr_pre_get(&mmu_context_idr, GFP_KERNEL))
 		return -ENOMEM;
@@ -508,6 +514,8 @@ void destroy_context(struct mm_struct *mm)
 	spin_unlock(&mmu_context_lock);
 
 	mm->context.id = NO_CONTEXT;
+
+	hugetlb_mm_free_pgd(mm);
 }
 
 static int __init mmu_context_init(void)

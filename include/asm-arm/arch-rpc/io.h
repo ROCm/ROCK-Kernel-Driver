@@ -250,6 +250,6 @@ DECLARE_IO(int,l,"")
 /*
  * 1:1 mapping for ioremapped regions.
  */
-#define __mem_pci(x)	((unsigned long)(x))
+#define __mem_pci(x)	(x)
 
 #endif

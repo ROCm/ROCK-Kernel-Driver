@@ -64,7 +64,6 @@
 #define is_hugepage_only_range(addr, len) \
 	(touches_hugepage_high_range((addr), (len)) || \
 	  touches_hugepage_low_range((addr), (len)))
-#define hugetlb_free_pgtables free_pgtables
 #define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 
 #define in_hugepage_area(context, addr) \

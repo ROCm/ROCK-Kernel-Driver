@@ -1,4 +1,4 @@
-/* 
+/*
     bt848.h - Bt848 register offsets
 
     Copyright (C) 1996,97,98 Ralph Metzler (rjkm@thp.uni-koeln.de)
@@ -22,10 +22,10 @@
 #define _BT848_H_
 
 #ifndef PCI_VENDOR_ID_BROOKTREE
-#define PCI_VENDOR_ID_BROOKTREE 0x109e 
+#define PCI_VENDOR_ID_BROOKTREE 0x109e
 #endif
 #ifndef PCI_DEVICE_ID_BT848
-#define PCI_DEVICE_ID_BT848     0x350	
+#define PCI_DEVICE_ID_BT848     0x350
 #endif
 #ifndef PCI_DEVICE_ID_BT849
 #define PCI_DEVICE_ID_BT849     0x351
@@ -50,7 +50,7 @@
 #define BT848_DSTATUS_LOF      (1<<1)
 #define BT848_DSTATUS_COF      (1<<0)
 
-#define BT848_IFORM            0x004  
+#define BT848_IFORM            0x004
 #define BT848_IFORM_HACTIVE    (1<<7)
 #define BT848_IFORM_MUXSEL     (3<<5)
 #define BT848_IFORM_MUX0       (2<<5)
@@ -71,7 +71,7 @@
 #define BT848_IFORM_AUTO       0
 #define BT848_IFORM_NORM       7
 
-#define BT848_TDEC             0x008  
+#define BT848_TDEC             0x008
 #define BT848_TDEC_DEC_FIELD   (1<<7)
 #define BT848_TDEC_FLDALIGN    (1<<6)
 #define BT848_TDEC_DEC_RAT     (0x1f)

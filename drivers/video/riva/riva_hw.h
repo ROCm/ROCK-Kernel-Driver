@@ -541,8 +541,10 @@ int RivaGetConfig(RIVA_HW_INST *, unsigned int);
 
 #define RIVA_FIFO_FREE(hwinst,hwptr,cnt)                            \
 {                                                                   \
-    while ((hwinst).FifoFreeCount < (cnt))                          \
+    while ((hwinst).FifoFreeCount < (cnt)) {                        \
+	mb();mb();						    \
         (hwinst).FifoFreeCount = (hwinst).hwptr->FifoFree >> 2;     \
+    }								    \
     (hwinst).FifoFreeCount -= (cnt);                                \
 }
 #endif /* __RIVA_HW_H__ */

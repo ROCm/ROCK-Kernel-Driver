@@ -377,6 +377,8 @@ struct request_queue
 	 */
 	unsigned int		sg_timeout;
 	unsigned int		sg_reserved_size;
+
+	struct list_head	drain_list;
 };
 
 #define RQ_INACTIVE		(-1)
@@ -604,7 +606,7 @@ extern void blk_dump_rq_flags(struct request *, char *);
 extern void generic_unplug_device(request_queue_t *);
 extern void __generic_unplug_device(request_queue_t *);
 extern long nr_blockdev_pages(void);
-extern void blk_wait_queue_drained(request_queue_t *);
+extern void blk_wait_queue_drained(request_queue_t *, int);
 extern void blk_finish_queue_drain(request_queue_t *);
 
 int blk_get_queue(request_queue_t *);

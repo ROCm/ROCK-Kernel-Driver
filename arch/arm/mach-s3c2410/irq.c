@@ -33,8 +33,10 @@
  *
  *   05-Oct-2004  Ben Dooks <ben@simtec.co.uk>
  *		  Tidy up KF's patch and sort out new release
+ *
+ *   05-Oct-2004  Ben Dooks <ben@simtec.co.uk>
+ *		  Add support for power management controls
 */
-
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -52,9 +54,72 @@
 #include <asm/arch/regs-irq.h>
 #include <asm/arch/regs-gpio.h>
 
+#include "pm.h"
 
 #define irqdbf(x...)
 #define irqdbf2(x...)
+
+#define EXTINT_OFF (IRQ_EINT4 - 4)
+
+/* wakeup irq control */
+
+#ifdef CONFIG_PM
+
+/* state for IRQs over sleep */
+
+/* default is to allow for EINT0..EINT15, and IRQ_RTC as wakeup sources
+ *
+ * set bit to 1 in allow bitfield to enable the wakeup settings on it
+*/
+
+unsigned long s3c_irqwake_intallow	= 1L << (IRQ_RTC - IRQ_EINT0) | 0xfL;
+unsigned long s3c_irqwake_intmask	= 0xffffffffL;
+unsigned long s3c_irqwake_eintallow	= 0x0000fff0L;
+unsigned long s3c_irqwake_eintmask	= 0xffffffffL;
+
+static int
+s3c_irq_wake(unsigned int irqno, unsigned int state)
+{
+	unsigned long irqbit = 1 << (irqno - IRQ_EINT0);
+
+	if (!(s3c_irqwake_intallow & irqbit))
+		return -ENOENT;
+
+	printk(KERN_INFO "wake %s for irq %d\n",
+	       state ? "enabled" : "disabled", irqno);
+
+	if (!state)
+		s3c_irqwake_intmask |= irqbit;
+	else
+		s3c_irqwake_intmask &= irqbit;
+
+	return 0;
+}
+
+static int
+s3c_irqext_wake(unsigned int irqno, unsigned int state)
+{
+	unsigned long bit = 1L << (irqno - EXTINT_OFF);
+
+	if (!(s3c_irqwake_eintallow & bit))
+		return -ENOENT;
+
+	printk(KERN_INFO "wake %s for irq %d\n",
+	       state ? "enabled" : "disabled", irqno);
+
+	if (!state)
+		s3c_irqwake_eintmask |= bit;
+	else
+		s3c_irqwake_eintmask &= ~bit;
+
+	return 0;
+}
+
+#else
+#define s3c_irqext_wake NULL
+#define s3c_irq_wake NULL
+#endif
+
 
 static void
 s3c_irq_mask(unsigned int irqno)
@@ -109,20 +174,20 @@ s3c_irq_unmask(unsigned int irqno)
 static struct irqchip s3c_irq_level_chip = {
 	.ack	   = s3c_irq_maskack,
 	.mask	   = s3c_irq_mask,
-	.unmask	   = s3c_irq_unmask
+	.unmask	   = s3c_irq_unmask,
+	.wake	   = s3c_irq_wake
 };
 
 static struct irqchip s3c_irq_chip = {
 	.ack	   = s3c_irq_ack,
 	.mask	   = s3c_irq_mask,
-	.unmask	   = s3c_irq_unmask
+	.unmask	   = s3c_irq_unmask,
+	.wake	   = s3c_irq_wake
 };
 
 /* S3C2410_EINTMASK
  * S3C2410_EINTPEND
  */
-
-#define EXTINT_OFF (IRQ_EINT4 - 4)
 
 static void
 s3c_irqext_mask(unsigned int irqno)
@@ -276,14 +341,16 @@ static struct irqchip s3c_irqext_chip = {
 	.mask	    = s3c_irqext_mask,
 	.unmask	    = s3c_irqext_unmask,
 	.ack	    = s3c_irqext_ack,
-	.type	    = s3c_irqext_type
+	.type	    = s3c_irqext_type,
+	.wake	    = s3c_irqext_wake
 };
 
 static struct irqchip s3c_irq_eint0t4 = {
 	.ack	   = s3c_irq_ack,
 	.mask	   = s3c_irq_mask,
 	.unmask	   = s3c_irq_unmask,
-	.type	   = s3c_irqext_type
+	.wake	   = s3c_irq_wake,
+	.type	   = s3c_irqext_type,
 };
 
 /* mask values for the parent registers for each of the interrupt types */

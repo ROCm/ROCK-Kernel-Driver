@@ -288,7 +288,7 @@ extern unsigned int kobjsize(const void *objp);
 
 #if defined(CONFIG_CPU_SH4) || defined(CONFIG_SH7705_CACHE_32KB)
 #define __HAVE_ARCH_PTEP_GET_AND_CLEAR
-extern inline pte_t ptep_get_and_clear(pte_t *ptep);
+extern pte_t ptep_get_and_clear(pte_t *ptep);
 #endif
 
 #include <asm-generic/pgtable.h>

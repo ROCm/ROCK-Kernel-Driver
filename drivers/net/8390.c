@@ -813,7 +813,7 @@ static void ei_rx_overrun(struct net_device *dev)
 	 * We wait at least 10ms.
 	 */
 
-	udelay(10*1000);
+	mdelay(10);
 
 	/*
 	 * Reset RBCR[01] back to zero as per magic incantation.

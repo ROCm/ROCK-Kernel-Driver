@@ -52,65 +52,8 @@ static struct sock *tcpnl;
    rta->rta_len = rtalen;                   \
    RTA_DATA(rta); })
 
-/* Return information about state of tcp endpoint in API format. */
-void tcp_get_info(struct sock *sk, struct tcp_info *info)
-{
-	struct tcp_opt *tp = tcp_sk(sk);
-	u32 now = tcp_time_stamp;
-
-	memset(info, 0, sizeof(*info));
-
-	info->tcpi_state = sk->sk_state;
-	info->tcpi_ca_state = tp->ca_state;
-	info->tcpi_retransmits = tp->retransmits;
-	info->tcpi_probes = tp->probes_out;
-	info->tcpi_backoff = tp->backoff;
-
-	if (tp->tstamp_ok)
-		info->tcpi_options |= TCPI_OPT_TIMESTAMPS;
-	if (tp->sack_ok)
-		info->tcpi_options |= TCPI_OPT_SACK;
-	if (tp->wscale_ok) {
-		info->tcpi_options |= TCPI_OPT_WSCALE;
-		info->tcpi_snd_wscale = tp->snd_wscale;
-		info->tcpi_rcv_wscale = tp->rcv_wscale;
-	} 
-
-	if (tp->ecn_flags&TCP_ECN_OK)
-		info->tcpi_options |= TCPI_OPT_ECN;
-
-	info->tcpi_rto = jiffies_to_usecs(tp->rto);
-	info->tcpi_ato = jiffies_to_usecs(tp->ack.ato);
-	info->tcpi_snd_mss = tp->mss_cache_std;
-	info->tcpi_rcv_mss = tp->ack.rcv_mss;
-
-	info->tcpi_unacked = tcp_get_pcount(&tp->packets_out);
-	info->tcpi_sacked = tcp_get_pcount(&tp->sacked_out);
-	info->tcpi_lost = tcp_get_pcount(&tp->lost_out);
-	info->tcpi_retrans = tcp_get_pcount(&tp->retrans_out);
-	info->tcpi_fackets = tcp_get_pcount(&tp->fackets_out);
-
-	info->tcpi_last_data_sent = jiffies_to_msecs(now - tp->lsndtime);
-	info->tcpi_last_data_recv = jiffies_to_msecs(now - tp->ack.lrcvtime);
-	info->tcpi_last_ack_recv = jiffies_to_msecs(now - tp->rcv_tstamp);
-
-	info->tcpi_pmtu = tp->pmtu_cookie;
-	info->tcpi_rcv_ssthresh = tp->rcv_ssthresh;
-	info->tcpi_rtt = jiffies_to_usecs(tp->srtt)>>3;
-	info->tcpi_rttvar = jiffies_to_usecs(tp->mdev)>>2;
-	info->tcpi_snd_ssthresh = tp->snd_ssthresh;
-	info->tcpi_snd_cwnd = tp->snd_cwnd;
-	info->tcpi_advmss = tp->advmss;
-	info->tcpi_reordering = tp->reordering;
-
-	info->tcpi_rcv_rtt = jiffies_to_usecs(tp->rcv_rtt_est.rtt)>>3;
-	info->tcpi_rcv_space = tp->rcvq_space.space;
-
-	info->tcpi_total_retrans = tp->total_retrans;
-}
-
 static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
-			int ext, u32 pid, u32 seq)
+			int ext, u32 pid, u32 seq, u16 nlmsg_flags)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	struct tcp_opt *tp = tcp_sk(sk);
@@ -122,6 +65,7 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 	unsigned char	 *b = skb->tail;
 
 	nlh = NLMSG_PUT(skb, pid, seq, TCPDIAG_GETSOCK, sizeof(*r));
+	nlh->nlmsg_flags = nlmsg_flags;
 	r = NLMSG_DATA(nlh);
 	if (sk->sk_state != TCP_TIME_WAIT) {
 		if (ext & (1<<(TCPDIAG_MEMINFO-1)))
@@ -293,7 +237,7 @@ static int tcpdiag_get_exact(struct sk_buff *in_skb, const struct nlmsghdr *nlh)
 
 	if (tcpdiag_fill(rep, sk, req->tcpdiag_ext,
 			 NETLINK_CB(in_skb).pid,
-			 nlh->nlmsg_seq) <= 0)
+			 nlh->nlmsg_seq, 0) <= 0)
 		BUG();
 
 	err = netlink_unicast(tcpnl, rep, NETLINK_CB(in_skb).pid, MSG_DONTWAIT);
@@ -499,7 +443,7 @@ static int tcpdiag_dump_sock(struct sk_buff *skb, struct sock *sk,
 	}
 
 	return tcpdiag_fill(skb, sk, r->tcpdiag_ext, NETLINK_CB(cb->skb).pid,
-			    cb->nlh->nlmsg_seq);
+			    cb->nlh->nlmsg_seq, NLM_F_MULTI);
 }
 
 static int tcpdiag_fill_req(struct sk_buff *skb, struct sock *sk,
@@ -513,6 +457,7 @@ static int tcpdiag_fill_req(struct sk_buff *skb, struct sock *sk,
 	long tmo;
 
 	nlh = NLMSG_PUT(skb, pid, seq, TCPDIAG_GETSOCK, sizeof(*r));
+	nlh->nlmsg_flags = NLM_F_MULTI;
 	r = NLMSG_DATA(nlh);
 
 	r->tcpdiag_family = sk->sk_family;

@@ -73,6 +73,7 @@ EXPORT_SYMBOL(__ia64_memset_c_io);
 #undef __ia64_writew
 #undef __ia64_writel
 #undef __ia64_writeq
+#undef __ia64_mmiowb
 
 unsigned int
 __ia64_inb (unsigned long port)
@@ -156,6 +157,12 @@ unsigned long
 __ia64_readq_relaxed (void __iomem *addr)
 {
 	return ___ia64_readq (addr);
+}
+
+void
+__ia64_mmiowb(void)
+{
+	___ia64_mmiowb();
 }
 
 #endif /* CONFIG_IA64_GENERIC */

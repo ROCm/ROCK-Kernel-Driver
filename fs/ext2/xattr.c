@@ -64,11 +64,6 @@
 #include "xattr.h"
 #include "acl.h"
 
-/* These symbols may be needed by a module. */
-EXPORT_SYMBOL(ext2_xattr_get);
-EXPORT_SYMBOL(ext2_xattr_list);
-EXPORT_SYMBOL(ext2_xattr_set);
-
 #define HDR(bh) ((struct ext2_xattr_header *)((bh)->b_data))
 #define ENTRY(ptr) ((struct ext2_xattr_entry *)(ptr))
 #define FIRST_ENTRY(bh) ENTRY(HDR(bh)+1)

@@ -153,8 +153,8 @@ static int drop_interrupts;
 static int option_lid_wakeup = 1;
 static int sleep_in_progress;
 static int can_sleep;
-static unsigned long async_req_locks;
 #endif /* CONFIG_PMAC_PBOOK */
+static unsigned long async_req_locks;
 static unsigned int pmu_irq_stats[11];
 
 static struct proc_dir_entry *proc_pmu_root;

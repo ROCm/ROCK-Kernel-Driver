@@ -96,7 +96,7 @@ static struct platform_device *smdk2410_devices[] __initdata = {
 	&s3c_device_iis,
 };
 
-static struct s3c2410_board smdk2410_board __initdata = {
+static struct s3c24xx_board smdk2410_board __initdata = {
 	.devices       = smdk2410_devices,
 	.devices_count = ARRAY_SIZE(smdk2410_devices)
 };
@@ -105,7 +105,7 @@ void __init smdk2410_map_io(void)
 {
 	s3c24xx_init_io(smdk2410_iodesc, ARRAY_SIZE(smdk2410_iodesc));
 	s3c2410_init_uarts(smdk2410_uartcfgs, ARRAY_SIZE(smdk2410_uartcfgs));
-	s3c2410_set_board(&smdk2410_board);
+	s3c24xx_set_board(&smdk2410_board);
 }
 
 void __init smdk2410_init_irq(void)

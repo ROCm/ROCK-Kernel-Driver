@@ -1,6 +1,8 @@
 #ifndef __ARCH_M68K_ATOMIC__
 #define __ARCH_M68K_ATOMIC__
 
+#include <linux/config.h>
+
 #include <asm/system.h>	/* local_irq_XXX() */
 
 /*

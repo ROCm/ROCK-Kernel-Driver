@@ -42,7 +42,7 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 
-#include "hpt34x.h"
+#define HPT343_DEBUG_DRIVE_INFO		0
 
 static u8 hpt34x_ratemask (ide_drive_t *drive)
 {
@@ -69,7 +69,8 @@ static int hpt34x_tune_chipset (ide_drive_t *drive, u8 xferspeed)
 	u32 reg1= 0, tmp1 = 0, reg2 = 0, tmp2 = 0;
 	u8			hi_speed, lo_speed;
 
-	SPLIT_BYTE(speed, hi_speed, lo_speed);
+	hi_speed = speed >> 4;
+	lo_speed = speed & 0x0f;
 
 	if (hi_speed & 7) {
 		hi_speed = (hi_speed & 4) ? 0x01 : 0x10;
@@ -130,40 +131,20 @@ static int hpt34x_config_drive_xfer_rate (ide_drive_t *drive)
 	drive->init_speed = 0;
 
 	if (id && (id->capability & 1) && drive->autodma) {
-		/* Consult the list of known "bad" drives */
-		if (__ide_dma_bad_drive(drive))
-			goto fast_ata_pio;
-		if (id->field_valid & 4) {
-			if (id->dma_ultra & hwif->ultra_mask) {
-				/* Force if Capable UltraDMA */
-				int dma = config_chipset_for_dma(drive);
-				if ((id->field_valid & 2) && dma)
-					goto try_dma_modes;
-			}
-		} else if (id->field_valid & 2) {
-try_dma_modes:
-			if ((id->dma_mword & hwif->mwdma_mask) ||
-			    (id->dma_1word & hwif->swdma_mask)) {
-				/* Force if Capable regular DMA modes */
-				if (!config_chipset_for_dma(drive))
-					goto no_dma_set;
-			}
-		} else if (__ide_dma_good_drive(drive) &&
-			   (id->eide_dma_time < 150)) {
-			/* Consult the list of known "good" drives */
-			if (!config_chipset_for_dma(drive))
-				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
-		}
+
+		if (ide_use_dma(drive)) {
+			if (config_chipset_for_dma(drive))
 #ifndef CONFIG_HPT34X_AUTODMA
-		return hwif->ide_dma_off_quietly(drive);
+				return hwif->ide_dma_off_quietly(drive);
 #else
-		return hwif->ide_dma_on(drive);
+				return hwif->ide_dma_on(drive);
 #endif
+		}
+
+		goto fast_ata_pio;
+
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
 fast_ata_pio:
-no_dma_set:
 		hpt34x_tune_drive(drive, 255);
 		return hwif->ide_dma_off_quietly(drive);
 	}
@@ -249,9 +230,19 @@ static void __devinit init_hwif_hpt34x(ide_hwif_t *hwif)
 	hwif->drives[1].autodma = hwif->autodma;
 }
 
+static ide_pci_device_t hpt34x_chipset __devinitdata = {
+	.name		= "HPT34X",
+	.init_chipset	= init_chipset_hpt34x,
+	.init_hwif	= init_hwif_hpt34x,
+	.channels	= 2,
+	.autodma	= NOAUTODMA,
+	.bootable	= NEVER_BOARD,
+	.extra		= 16
+};
+
 static int __devinit hpt34x_init_one(struct pci_dev *dev, const struct pci_device_id *id)
 {
-	ide_pci_device_t *d = &hpt34x_chipsets[id->driver_data];
+	ide_pci_device_t *d = &hpt34x_chipset;
 	static char *chipset_names[] = {"HPT343", "HPT345"};
 	u16 pcicmd = 0;
 

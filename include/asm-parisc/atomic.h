@@ -14,9 +14,8 @@
  */
 
 #ifdef CONFIG_SMP
+#include <asm/spinlock.h>
 #include <asm/cache.h>		/* we use L1_CACHE_BYTES */
-
-typedef spinlock_t atomic_lock_t;
 
 /* Use an array of spinlocks for our atomic_ts.
  * Hash function to index into a different SPINLOCK.
@@ -25,36 +24,27 @@ typedef spinlock_t atomic_lock_t;
 #  define ATOMIC_HASH_SIZE 4
 #  define ATOMIC_HASH(a) (&(__atomic_hash[ (((unsigned long) a)/L1_CACHE_BYTES) & (ATOMIC_HASH_SIZE-1) ]))
 
-extern atomic_lock_t __atomic_hash[ATOMIC_HASH_SIZE] __lock_aligned;
+extern spinlock_t __atomic_hash[ATOMIC_HASH_SIZE] __lock_aligned;
 
-static inline void atomic_spin_lock(atomic_lock_t *a)
-{
-	while (__ldcw(a) == 0)
-		while (a->lock[0] == 0);
-}
+/* Can't use _raw_spin_lock_irq because of #include problems, so
+ * this is the substitute */
+#define _atomic_spin_lock_irqsave(l,f) do {	\
+	spinlock_t *s = ATOMIC_HASH(l);		\
+	local_irq_save(f);			\
+	_raw_spin_lock(s);			\
+} while(0)
 
-static inline void atomic_spin_unlock(atomic_lock_t *a)
-{
-	a->lock[0] = 1;
-}
+#define _atomic_spin_unlock_irqrestore(l,f) do {	\
+	spinlock_t *s = ATOMIC_HASH(l);			\
+	_raw_spin_unlock(s);				\
+	local_irq_restore(f);				\
+} while(0)
+
 
 #else
-#  define ATOMIC_HASH_SIZE 1
-#  define ATOMIC_HASH(a)	(0)
-#  define atomic_spin_lock(x) (void)(x)
-#  define atomic_spin_unlock(x) do { } while(0)
+#  define _atomic_spin_lock_irqsave(l,f) do { local_irq_save(f); } while (0)
+#  define _atomic_spin_unlock_irqrestore(l,f) do { local_irq_restore(f); } while (0)
 #endif
-
-/* copied from <linux/spinlock.h> and modified */
-#define atomic_spin_lock_irqsave(lock, flags)	do { 	\
-	local_irq_save(flags);				\
-	atomic_spin_lock(lock); 			\
-} while (0)
-
-#define atomic_spin_unlock_irqrestore(lock, flags) do {	\
-	atomic_spin_unlock(lock);			\
-	local_irq_restore(flags);			\
-} while (0)
 
 /* Note that we need not lock read accesses - aligned word writes/reads
  * are atomic, so a reader never sees unconsistent values.
@@ -62,7 +52,7 @@ static inline void atomic_spin_unlock(atomic_lock_t *a)
  * Cache-line alignment would conflict with, for example, linux/module.h
  */
 
-typedef struct { volatile long counter; } atomic_t;
+typedef struct { volatile int counter; } atomic_t;
 
 
 /* This should get optimized out since it's never called.
@@ -150,22 +140,22 @@ static __inline__ int __atomic_add_return(int i, atomic_t *v)
 {
 	int ret;
 	unsigned long flags;
-	atomic_spin_lock_irqsave(ATOMIC_HASH(v), flags);
+	_atomic_spin_lock_irqsave(v, flags);
 
 	ret = (v->counter += i);
 
-	atomic_spin_unlock_irqrestore(ATOMIC_HASH(v), flags);
+	_atomic_spin_unlock_irqrestore(v, flags);
 	return ret;
 }
 
 static __inline__ void atomic_set(atomic_t *v, int i) 
 {
 	unsigned long flags;
-	atomic_spin_lock_irqsave(ATOMIC_HASH(v), flags);
+	_atomic_spin_lock_irqsave(v, flags);
 
 	v->counter = i;
 
-	atomic_spin_unlock_irqrestore(ATOMIC_HASH(v), flags);
+	_atomic_spin_unlock_irqrestore(v, flags);
 }
 
 static __inline__ int atomic_read(const atomic_t *v)

@@ -24,6 +24,7 @@ typedef unsigned long mm_context_id_t;
 typedef struct {
 	mm_context_id_t id;
 #ifdef CONFIG_HUGETLB_PAGE
+	pgd_t *huge_pgdir;
 	u16 htlb_segs; /* bitmask */
 #endif
 } mm_context_t;

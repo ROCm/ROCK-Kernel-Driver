@@ -847,8 +847,11 @@ asmlinkage int swsusp_save(void)
 {
 	int error = 0;
 
-	if ((error = swsusp_swap_check()))
+	if ((error = swsusp_swap_check())) {
+		printk(KERN_ERR "swsusp: FATAL: cannot find swap device, try "
+				"swapon -a!\n");
 		return error;
+	}
 	return suspend_prepare_image();
 }
 

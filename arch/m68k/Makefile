@@ -28,7 +28,7 @@ ifdef CONFIG_SUN3
 LDFLAGS_vmlinux = -N
 endif
 
-CHECKFLAGS += -D__mc68000__ -I$(shell $(CC) -print-file-name=include)
+CHECKFLAGS += -D__mc68000__
 
 # without -fno-strength-reduce the 53c7xx.c driver fails ;-(
 CFLAGS += -pipe -fno-strength-reduce -ffixed-a2

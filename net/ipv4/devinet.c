@@ -158,8 +158,7 @@ struct in_device *inetdev_init(struct net_device *dev)
 
 	/* Account for reference dev->ip_ptr */
 	in_dev_hold(in_dev);
-	smp_wmb();
-	dev->ip_ptr = in_dev;
+	rcu_assign_pointer(dev->ip_ptr, in_dev);
 
 #ifdef CONFIG_SYSCTL
 	devinet_sysctl_register(in_dev, &in_dev->cnf);

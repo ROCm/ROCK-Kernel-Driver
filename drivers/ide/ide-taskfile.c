@@ -63,17 +63,14 @@ static void ata_bswap_data (void *buffer, int wcount)
 	}
 }
 
-
-void taskfile_input_data (ide_drive_t *drive, void *buffer, u32 wcount)
+static void taskfile_input_data(ide_drive_t *drive, void *buffer, u32 wcount)
 {
 	HWIF(drive)->ata_input_data(drive, buffer, wcount);
 	if (drive->bswap)
 		ata_bswap_data(buffer, wcount);
 }
 
-EXPORT_SYMBOL(taskfile_input_data);
-
-void taskfile_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
+static void taskfile_output_data(ide_drive_t *drive, void *buffer, u32 wcount)
 {
 	if (drive->bswap) {
 		ata_bswap_data(buffer, wcount);
@@ -83,8 +80,6 @@ void taskfile_output_data (ide_drive_t *drive, void *buffer, u32 wcount)
 		HWIF(drive)->ata_output_data(drive, buffer, wcount);
 	}
 }
-
-EXPORT_SYMBOL(taskfile_output_data);
 
 int taskfile_lib_get_identify (ide_drive_t *drive, u8 *buf)
 {
@@ -100,8 +95,6 @@ int taskfile_lib_get_identify (ide_drive_t *drive, u8 *buf)
 	args.handler	  = &task_in_intr;
 	return ide_raw_taskfile(drive, &args, buf);
 }
-
-EXPORT_SYMBOL(taskfile_lib_get_identify);
 
 ide_startstop_t do_rw_taskfile (ide_drive_t *drive, ide_task_t *task)
 {
@@ -281,14 +274,20 @@ static void ide_pio_sector(ide_drive_t *drive, unsigned int write)
 #ifdef CONFIG_HIGHMEM
 	unsigned long flags;
 #endif
+	unsigned int offset;
 	u8 *buf;
 
 	page = sg[hwif->cursg].page;
+	offset = sg[hwif->cursg].offset + hwif->cursg_ofs * SECTOR_SIZE;
+
+	/* get the current page and offset */
+	page = nth_page(page, (offset >> PAGE_SHIFT));
+	offset %= PAGE_SIZE;
+
 #ifdef CONFIG_HIGHMEM
 	local_irq_save(flags);
 #endif
-	buf = kmap_atomic(page, KM_BIO_SRC_IRQ) +
-	      sg[hwif->cursg].offset + (hwif->cursg_ofs * SECTOR_SIZE);
+	buf = kmap_atomic(page, KM_BIO_SRC_IRQ) + offset;
 
 	hwif->nleft--;
 	hwif->cursg_ofs++;
@@ -470,7 +469,7 @@ ide_startstop_t pre_task_out_intr (ide_drive_t *drive, struct request *rq)
 }
 EXPORT_SYMBOL(pre_task_out_intr);
 
-int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_size, u8 *buf)
+static int ide_diag_taskfile(ide_drive_t *drive, ide_task_t *args, unsigned long data_size, u8 *buf)
 {
 	struct request rq;
 
@@ -507,18 +506,12 @@ int ide_diag_taskfile (ide_drive_t *drive, ide_task_t *args, unsigned long data_
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
 
-EXPORT_SYMBOL(ide_diag_taskfile);
-
 int ide_raw_taskfile (ide_drive_t *drive, ide_task_t *args, u8 *buf)
 {
 	return ide_diag_taskfile(drive, args, 0, buf);
 }
 
 EXPORT_SYMBOL(ide_raw_taskfile);
-
-#define MAX_DMA		(256*SECTOR_WORDS)
-
-ide_startstop_t flagged_taskfile(ide_drive_t *, ide_task_t *);
 
 int ide_taskfile_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 {
@@ -670,8 +663,6 @@ abort:
 	return err;
 }
 
-EXPORT_SYMBOL(ide_taskfile_ioctl);
-
 int ide_wait_cmd (ide_drive_t *drive, u8 cmd, u8 nsect, u8 feature, u8 sectors, u8 *buf)
 {
 	struct request rq;
@@ -688,8 +679,6 @@ int ide_wait_cmd (ide_drive_t *drive, u8 cmd, u8 nsect, u8 feature, u8 sectors, 
 	*buf++ = sectors;
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
-
-EXPORT_SYMBOL(ide_wait_cmd);
 
 /*
  * FIXME : this needs to map into at taskfile. <andre@linux-ide.org>
@@ -748,9 +737,7 @@ abort:
 	return err;
 }
 
-EXPORT_SYMBOL(ide_cmd_ioctl);
-
-int ide_wait_cmd_task (ide_drive_t *drive, u8 *buf)
+static int ide_wait_cmd_task(ide_drive_t *drive, u8 *buf)
 {
 	struct request rq;
 
@@ -759,8 +746,6 @@ int ide_wait_cmd_task (ide_drive_t *drive, u8 *buf)
 	rq.buffer = buf;
 	return ide_do_drive_cmd(drive, &rq, ide_wait);
 }
-
-EXPORT_SYMBOL(ide_wait_cmd_task);
 
 /*
  * FIXME : this needs to map into at taskfile. <andre@linux-ide.org>
@@ -779,8 +764,6 @@ int ide_task_ioctl (ide_drive_t *drive, unsigned int cmd, unsigned long arg)
 		err = -EFAULT;
 	return err;
 }
-
-EXPORT_SYMBOL(ide_task_ioctl);
 
 /*
  * NOTICE: This is additions from IBM to provide a discrete interface,
@@ -902,5 +885,3 @@ ide_startstop_t flagged_taskfile (ide_drive_t *drive, ide_task_t *task)
 
 	return ide_started;
 }
-
-EXPORT_SYMBOL(flagged_taskfile);

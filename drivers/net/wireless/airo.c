@@ -2722,7 +2722,7 @@ struct net_device *_init_airo_card( unsigned short irq, int port,
 		set_bit(FLAG_MPI, &ai->flags);
 	}
         ai->dev = dev;
-	ai->aux_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&ai->aux_lock);
 	sema_init(&ai->sem, 1);
 	ai->config.len = 0;
 	ai->pci = pci;

@@ -1,5 +1,5 @@
 config DVB_DIBUSB
-	tristate "Twinhan/KWorld/Hama/Artec USB DVB-T devices"
+	tristate "DiBcom/Twinhan/KWorld/Hama/Artec/Compro USB DVB-T devices"
 	depends on DVB_CORE && USB
 	select FW_LOADER
 	help
@@ -8,11 +8,13 @@ config DVB_DIBUSB
 
 	  Devices supported by this driver:
 
-	    Twinhan VisionPlus VisionDTV USB-Ter (VP7041)
+	    TwinhanDTV USB-Ter (VP7041)
+		TwinhanDTV Magic Box (VP7041e)
 	    KWorld V-Stream XPERT DTV - DVB-T USB
 	    Hama DVB-T USB-Box
 	    DiBcom reference device (non-public)
 	    Ultima Electronic/Artec T1 USB TVBOX
+	    Compro Videomate DVB-U2000 - DVB-T USB
 
 	  The VP7041 seems to be identical to "CTS Portable" (Chinese
 	  Television System).
@@ -20,7 +22,7 @@ config DVB_DIBUSB
 	  These devices can be understood as budget ones, they "only" deliver
 	  the MPEG data.
 
-	  Currently all known copies of the DiBcom reference design have the DiBcom 3000MB
+	  Currently all known copies of the DiBcom reference design have the DiBcom 3000-MB 
 	  frontend onboard. Please enable and load this one manually in order to use this
 	  device.
 

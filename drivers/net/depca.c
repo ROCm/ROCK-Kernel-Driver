@@ -666,7 +666,7 @@ static int __init depca_hw_init (struct net_device *dev, struct device *device)
 		outb(nicsr, DEPCA_NICSR);
 	}
 
-	lp->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&lp->lock);
 	sprintf(lp->adapter_name, "%s (%s)",
 		depca_signature[lp->adapter], device->bus_id);
 	status = -EBUSY;

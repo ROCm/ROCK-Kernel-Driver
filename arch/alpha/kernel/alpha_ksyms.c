@@ -185,7 +185,7 @@ EXPORT_SYMBOL(cpu_data);
 EXPORT_SYMBOL(smp_num_cpus);
 EXPORT_SYMBOL(smp_call_function);
 EXPORT_SYMBOL(smp_call_function_on_cpu);
-EXPORT_SYMBOL(atomic_dec_and_lock);
+EXPORT_SYMBOL(_atomic_dec_and_lock);
 #ifdef CONFIG_DEBUG_SPINLOCK
 EXPORT_SYMBOL(_raw_spin_unlock);
 EXPORT_SYMBOL(debug_spin_lock);

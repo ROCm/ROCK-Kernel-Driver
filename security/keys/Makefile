@@ -10,4 +10,5 @@ obj-y := \
 	user_defined.o \
 	request_key.o
 
+obj-$(CONFIG_KEYS_COMPAT) += compat.o
 obj-$(CONFIG_PROC_FS) += proc.o

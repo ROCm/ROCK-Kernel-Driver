@@ -31,6 +31,7 @@
 #define  SN_SAL_NO_FAULT_ZONE_VIRTUAL		   0x02000010
 #define  SN_SAL_NO_FAULT_ZONE_PHYSICAL		   0x02000011
 #define  SN_SAL_PRINT_ERROR			   0x02000012
+#define  SN_SAL_GET_SAPIC_INFO                     0x02009999	//ZZZZ fix
 #define  SN_SAL_SET_ERROR_HANDLING_FEATURES	   0x0200001a	// reentrant
 #define  SN_SAL_GET_FIT_COMPT			   0x0200001b	// reentrant
 #define  SN_SAL_CONSOLE_PUTC                       0x02000021
@@ -843,6 +844,37 @@ ia64_sn_irtr_init(nasid_t nasid, void *buf, int len)
 	return (int) rv.status;
 }
 
+/*
+ * Returns the nasid, subnode & slice corresponding to a SAPIC ID
+ */
+static inline u64
+ia64_sn_get_sapic_info(int sapicid, int *nasid, int *subnode, int *slice)
+{
+	struct ia64_sal_retval ret_stuff;
+
+	ret_stuff.status = 0;
+	ret_stuff.v0 = 0;
+	ret_stuff.v1 = 0;
+	ret_stuff.v2 = 0;
+	SAL_CALL_NOLOCK(ret_stuff, SN_SAL_GET_SAPIC_INFO, sapicid, 0, 0, 0, 0, 0, 0);
+
+/***** BEGIN HACK - temp til new proms available ********/
+	if (ret_stuff.status == SALRET_NOT_IMPLEMENTED) {
+		if (nasid) *nasid = sapicid & 0xfff;
+		if (subnode) *subnode = (sapicid >> 13) & 1;
+		if (slice) *slice = (sapicid >> 12) & 3;
+		return 0;
+	}
+/***** END HACK *******/
+
+	if (ret_stuff.status < 0)
+		return ret_stuff.status;
+
+	if (nasid) *nasid = (int) ret_stuff.v0;
+	if (subnode) *subnode = (int) ret_stuff.v1;
+	if (slice) *slice = (int) ret_stuff.v2;
+	return 0;
+}
 /*
  * This is the access point to the Altix PROM hardware performance
  * and status monitoring interface. For info on using this, see

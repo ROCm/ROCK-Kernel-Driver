@@ -4,18 +4,13 @@
 #include <linux/moduleparam.h>
 #include <linux/input.h>
 #include <linux/proc_fs.h>
-#include <linux/bitops.h>
+#include <asm/bitops.h>
 
 #include "av7110.h"
 
 #define UP_TIMEOUT (HZ/4)
 
-static int av7110_ir_debug;
-
-module_param_named(debug_ir, av7110_ir_debug, int, 0644);
-MODULE_PARM_DESC(av7110_ir_debug, "Turn on/off IR debugging (default:off).");
-
-#define dprintk(x...)  do { if (av7110_ir_debug) printk (x); } while (0)
+/* enable ir debugging by or'ing av7110_debug with 16 */
 
 static struct input_dev input_dev;
 
@@ -78,7 +73,7 @@ static void av7110_emit_key (u32 ircom)
 
 	keycode = key_map[data];
 	
-	dprintk ("#########%08x######### addr %i data 0x%02x (keycode %i)\n",
+	dprintk(16, "#########%08x######### addr %i data 0x%02x (keycode %i)\n",
 		 ircom, addr, data, keycode);
 
 	/* check device address (if selected) */

@@ -9,8 +9,13 @@ comment "Video Adapters"
 
 config VIDEO_BT848
 	tristate "BT848 Video For Linux"
-	depends on VIDEO_DEV && PCI && I2C && FW_LOADER
+	depends on VIDEO_DEV && PCI && I2C
 	select I2C_ALGOBIT
+	select FW_LOADER
+	select VIDEO_BTCX
+	select VIDEO_BUF
+	select VIDEO_IR
+	select VIDEO_TUNER
 	---help---
 	  Support for BT848 based frame grabber/overlay boards. This includes
 	  the Miro, Hauppauge and STB boards. Please read the material in
@@ -230,6 +235,9 @@ config VIDEO_MEYE
 config VIDEO_SAA7134
 	tristate "Philips SAA7134 support"
 	depends on VIDEO_DEV && PCI && I2C
+	select VIDEO_BUF
+	select VIDEO_IR
+	select VIDEO_TUNER
 	---help---
 	  This is a video4linux driver for Philips SAA7130/7134 based
 	  TV cards.
@@ -241,6 +249,7 @@ config VIDEO_MXB
 	tristate "Siemens-Nixdorf 'Multimedia eXtension Board'"
 	depends on VIDEO_DEV && PCI
 	select VIDEO_SAA7146_VV
+	select VIDEO_TUNER
 	---help---
 	  This is a video4linux driver for the 'Multimedia eXtension Board'
 	  TV card by Siemens-Nixdorf.
@@ -287,7 +296,11 @@ config VIDEO_HEXIUM_GEMINI
 
 config VIDEO_CX88
 	tristate "Conexant 2388x (bt878 successor) support"
-	depends on VIDEO_DEV && PCI && I2C_ALGOBIT && EXPERIMENTAL
+	depends on VIDEO_DEV && PCI && EXPERIMENTAL
+	select I2C_ALGOBIT
+	select VIDEO_BTCX
+	select VIDEO_BUF
+	select VIDEO_TUNER
 	---help---
 	  This is a video4linux driver for Conexant 2388x based
 	  TV cards.

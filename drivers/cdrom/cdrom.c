@@ -546,6 +546,8 @@ int cdrom_is_mrw(struct cdrom_device_info *cdi, int *write)
 		return ret;
 
 	mfd = (struct mrw_feature_desc *)&buffer[sizeof(struct feature_header)];
+	if (be16_to_cpu(mfd->feature_code) != CDF_MRW)
+		return 1;
 	*write = mfd->write;
 
 	if ((ret = cdrom_mrw_probe_pc(cdi))) {
@@ -868,13 +870,11 @@ static void cdrom_mmc3_profile(struct cdrom_device_info *cdi)
 	cgc.cmd[8] = sizeof(buffer);		/* Allocation Length */
 	cgc.quiet = 1;
 
-	if ((ret = cdi->ops->generic_packet(cdi, &cgc))) {
+	if ((ret = cdi->ops->generic_packet(cdi, &cgc)))
 		mmc3_profile = 0xffff;
-	} else {
+	else
 		mmc3_profile = (buffer[6] << 8) | buffer[7];
-		printk(KERN_INFO "cdrom: %s: mmc-3 profile capable, current profile: %Xh\n",
-		       cdi->name, mmc3_profile);
-	}
+
 	cdi->mmc3_profile = mmc3_profile;
 }
 

@@ -120,7 +120,7 @@
 struct clk;
 
 struct mmci_host {
-	void			*base;
+	void __iomem		*base;
 	struct mmc_request	*mrq;
 	struct mmc_command	*cmd;
 	struct mmc_data		*data;
@@ -139,7 +139,6 @@ struct mmci_host {
 	struct timer_list	timer;
 	unsigned int		oldstat;
 
-	struct scatterlist	sg[NR_SG];
 	unsigned int		sg_len;
 
 	/* pio stuff */
@@ -150,14 +149,11 @@ struct mmci_host {
 
 static inline void mmci_init_sg(struct mmci_host *host, struct mmc_data *data)
 {
-	struct scatterlist *sg = host->sg;
-	struct request *req = data->req;
-
 	/*
 	 * Ideally, we want the higher levels to pass us a scatter list.
 	 */
-	host->sg_len = blk_rq_map_sg(req->q, req, sg);
-	host->sg_ptr = sg;
+	host->sg_len = data->sg_len;
+	host->sg_ptr = data->sg;
 	host->sg_off = 0;
 }
 

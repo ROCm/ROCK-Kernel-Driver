@@ -776,31 +776,9 @@ static __init int late_hpet_init(void)
 fs_initcall(late_hpet_init);
 #endif
 
-static int hpet_init(void)
+static int hpet_timer_stop_set_go(unsigned long tick)
 {
-	unsigned int cfg, id;
-
-	if (!vxtime.hpet_address)
-		return -1;
-	set_fixmap_nocache(FIX_HPET_BASE, vxtime.hpet_address);
-	__set_fixmap(VSYSCALL_HPET, vxtime.hpet_address, PAGE_KERNEL_VSYSCALL_NOCACHE);
-
-/*
- * Read the period, compute tick and quotient.
- */
-
-	id = hpet_readl(HPET_ID);
-
-	if (!(id & HPET_ID_VENDOR) || !(id & HPET_ID_NUMBER) ||
-	    !(id & HPET_ID_LEGSUP))
-		return -1;
-
-	hpet_period = hpet_readl(HPET_PERIOD);
-	if (hpet_period < 100000 || hpet_period > 100000000)
-		return -1;
-
-	hpet_tick = (1000000000L * (USEC_PER_SEC / HZ) + hpet_period / 2) /
-		hpet_period;
+	unsigned int cfg;
 
 /*
  * Stop the timers and reset the main counter.
@@ -830,6 +808,40 @@ static int hpet_init(void)
 	hpet_writel(cfg, HPET_CFG);
 
 	return 0;
+}
+
+static int hpet_init(void)
+{
+	unsigned int id;
+
+	if (!vxtime.hpet_address)
+		return -1;
+	set_fixmap_nocache(FIX_HPET_BASE, vxtime.hpet_address);
+	__set_fixmap(VSYSCALL_HPET, vxtime.hpet_address, PAGE_KERNEL_VSYSCALL_NOCACHE);
+
+/*
+ * Read the period, compute tick and quotient.
+ */
+
+	id = hpet_readl(HPET_ID);
+
+	if (!(id & HPET_ID_VENDOR) || !(id & HPET_ID_NUMBER) ||
+	    !(id & HPET_ID_LEGSUP))
+		return -1;
+
+	hpet_period = hpet_readl(HPET_PERIOD);
+	if (hpet_period < 100000 || hpet_period > 100000000)
+		return -1;
+
+	hpet_tick = (1000000000L * (USEC_PER_SEC / HZ) + hpet_period / 2) /
+		hpet_period;
+
+	return hpet_timer_stop_set_go(hpet_tick);
+}
+
+static int hpet_reenable(void)
+{
+	return hpet_timer_stop_set_go(hpet_tick);
 }
 
 void __init pit_init(void)
@@ -941,7 +953,7 @@ __setup("report_lost_ticks", time_setup);
 
 static long clock_cmos_diff;
 
-static int time_suspend(struct sys_device *dev, u32 state)
+static int timer_suspend(struct sys_device *dev, u32 state)
 {
 	/*
 	 * Estimate time zone so that set_time can update the clock
@@ -951,10 +963,15 @@ static int time_suspend(struct sys_device *dev, u32 state)
 	return 0;
 }
 
-static int time_resume(struct sys_device *dev)
+static int timer_resume(struct sys_device *dev)
 {
 	unsigned long flags;
-	unsigned long sec = get_cmos_time() + clock_cmos_diff;
+	unsigned long sec;
+
+	if (vxtime.hpet_address)
+		hpet_reenable();
+
+	sec = get_cmos_time() + clock_cmos_diff;
 	write_seqlock_irqsave(&xtime_lock,flags);
 	xtime.tv_sec = sec;
 	xtime.tv_nsec = 0;
@@ -962,24 +979,24 @@ static int time_resume(struct sys_device *dev)
 	return 0;
 }
 
-static struct sysdev_class pit_sysclass = {
-	.resume = time_resume,
-	.suspend = time_suspend,
-	set_kset_name("pit"),
+static struct sysdev_class timer_sysclass = {
+	.resume = timer_resume,
+	.suspend = timer_suspend,
+	set_kset_name("timer"),
 };
 
 
 /* XXX this driverfs stuff should probably go elsewhere later -john */
-static struct sys_device device_i8253 = {
+static struct sys_device device_timer = {
 	.id	= 0,
-	.cls	= &pit_sysclass,
+	.cls	= &timer_sysclass,
 };
 
 static int time_init_device(void)
 {
-	int error = sysdev_class_register(&pit_sysclass);
+	int error = sysdev_class_register(&timer_sysclass);
 	if (!error)
-		error = sysdev_register(&device_i8253);
+		error = sysdev_register(&device_timer);
 	return error;
 }
 

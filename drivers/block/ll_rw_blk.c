@@ -261,6 +261,8 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
 
 	blk_queue_activity_fn(q, NULL, NULL);
+
+	INIT_LIST_HEAD(&q->drain_list);
 }
 
 EXPORT_SYMBOL(blk_queue_make_request);
@@ -2481,11 +2483,33 @@ static inline void blk_partition_remap(struct bio *bio)
 void blk_finish_queue_drain(request_queue_t *q)
 {
 	struct request_list *rl = &q->rq;
+	struct request *rq;
 
+	spin_lock_irq(q->queue_lock);
 	clear_bit(QUEUE_FLAG_DRAIN, &q->queue_flags);
+
+	while (!list_empty(&q->drain_list)) {
+		rq = list_entry_rq(q->drain_list.next);
+
+		list_del_init(&rq->queuelist);
+		__elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 1);
+	}
+
+	spin_unlock_irq(q->queue_lock);
+
 	wake_up(&rl->wait[0]);
 	wake_up(&rl->wait[1]);
 	wake_up(&rl->drain);
+}
+
+static int wait_drain(request_queue_t *q, struct request_list *rl, int dispatch)
+{
+	int wait = rl->count[READ] + rl->count[WRITE];
+
+	if (dispatch)
+		wait += !list_empty(&q->queue_head);
+
+	return wait;
 }
 
 /*
@@ -2494,7 +2518,7 @@ void blk_finish_queue_drain(request_queue_t *q)
  * type of request (allocated on stack or through kmalloc()) should not go
  * to the io scheduler core, but be attached to the queue head instead.
  */
-void blk_wait_queue_drained(request_queue_t *q)
+void blk_wait_queue_drained(request_queue_t *q, int wait_dispatch)
 {
 	struct request_list *rl = &q->rq;
 	DEFINE_WAIT(wait);
@@ -2502,10 +2526,10 @@ void blk_wait_queue_drained(request_queue_t *q)
 	spin_lock_irq(q->queue_lock);
 	set_bit(QUEUE_FLAG_DRAIN, &q->queue_flags);
 
-	while (rl->count[READ] || rl->count[WRITE]) {
+	while (wait_drain(q, rl, wait_dispatch)) {
 		prepare_to_wait(&rl->drain, &wait, TASK_UNINTERRUPTIBLE);
 
-		if (rl->count[READ] || rl->count[WRITE]) {
+		if (wait_drain(q, rl, wait_dispatch)) {
 			__generic_unplug_device(q);
 			spin_unlock_irq(q->queue_lock);
 			io_schedule();

@@ -39,7 +39,6 @@ int audio_ioctl (int dev, struct file *file,
 	   unsigned int cmd, void __user *arg);
 void audio_init_devices (void);
 void reorganize_buffers (int dev, struct dma_buffparms *dmap, int recording);
-int dma_ioctl (int dev, unsigned int cmd, void __user *arg);
 
 /*
  *	System calls for the /dev/sequencer

@@ -818,11 +818,11 @@ W:	http://www.farsite.co.uk/
 S:	Supported
 
 FRAMEBUFFER LAYER
-P:	James Simmons, Geert Uytterhoeven	
-M:	jsimmons@infradead.org, geert@linux-m68k.org	
+P:	Antonino Daplas
+M:	adaplas@pol.net
 L:	linux-fbdev-devel@lists.sourceforge.net	
 W:	http://linux-fbdev.sourceforge.net/
-S:	Supported
+S:	Maintained
 
 FILE LOCKING (flock() and fcntl()/lockf())
 P:	Matthew Wilcox
@@ -858,11 +858,9 @@ W:	ftp://ftp.openlinux.org/pub/people/hch/vxfs
 S:	Maintained
 
 FTAPE/QIC-117
-P:	Claus-Justus Heine
-M:	claus@momo.math.rwth-aachen.de
 L:	linux-tape@vger.kernel.org
-W:	http://www-math.math.rwth-aachen.de/~LBFM/claus/ftape/
-S:	Maintained
+W:	http://sourceforge.net/projects/ftape
+S:	Orphan
 
 FUTURE DOMAIN TMC-16x0 SCSI DRIVER (16-bit)
 P:	Rik Faith
@@ -1112,8 +1110,8 @@ P:	John Ronciak
 M:	john.ronciak@intel.com
 P:	Ganesh Venkatesan
 M:	ganesh.venkatesan@intel.com
-P:	Scott Feldman
-M:	scott.feldman@intel.com
+P:	Jesse Brandeburg
+M:	jesse.brandeburg@intel.com
 W:	http://sourceforge.net/projects/e1000/
 S:	Supported
 

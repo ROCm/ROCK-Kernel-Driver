@@ -887,12 +887,12 @@ int mpol_node_valid(int nid, struct vm_area_struct *vma, unsigned long addr)
  *
  * Remember policies even when nobody has shared memory mapped.
  * The policies are kept in Red-Black tree linked from the inode.
- * They are protected by the sp->sem semaphore, which should be held
+ * They are protected by the sp->lock spinlock, which should be held
  * for any accesses to the tree.
  */
 
 /* lookup first element intersecting start-end */
-/* Caller holds sp->sem */
+/* Caller holds sp->lock */
 static struct sp_node *
 sp_lookup(struct shared_policy *sp, unsigned long start, unsigned long end)
 {
@@ -924,7 +924,7 @@ sp_lookup(struct shared_policy *sp, unsigned long start, unsigned long end)
 }
 
 /* Insert a new shared policy into the list. */
-/* Caller holds sp->sem */
+/* Caller holds sp->lock */
 static void sp_insert(struct shared_policy *sp, struct sp_node *new)
 {
 	struct rb_node **p = &sp->root.rb_node;
@@ -954,13 +954,15 @@ mpol_shared_policy_lookup(struct shared_policy *sp, unsigned long idx)
 	struct mempolicy *pol = NULL;
 	struct sp_node *sn;
 
-	down(&sp->sem);
+	if (!sp->root.rb_node)
+		return NULL;
+	spin_lock(&sp->lock);
 	sn = sp_lookup(sp, idx, idx+1);
 	if (sn) {
 		mpol_get(sn->policy);
 		pol = sn->policy;
 	}
-	up(&sp->sem);
+	spin_unlock(&sp->lock);
 	return pol;
 }
 
@@ -990,9 +992,10 @@ sp_alloc(unsigned long start, unsigned long end, struct mempolicy *pol)
 static int shared_policy_replace(struct shared_policy *sp, unsigned long start,
 				 unsigned long end, struct sp_node *new)
 {
-	struct sp_node *n, *new2;
+	struct sp_node *n, *new2 = NULL;
 
-	down(&sp->sem);
+restart:
+	spin_lock(&sp->lock);
 	n = sp_lookup(sp, start, end);
 	/* Take care of old policies in the same range. */
 	while (n && n->start < end) {
@@ -1005,13 +1008,16 @@ static int shared_policy_replace(struct shared_policy *sp, unsigned long start,
 		} else {
 			/* Old policy spanning whole new range. */
 			if (n->end > end) {
-				new2 = sp_alloc(end, n->end, n->policy);
 				if (!new2) {
-					up(&sp->sem);
-					return -ENOMEM;
+					spin_unlock(&sp->lock);
+					new2 = sp_alloc(end, n->end, n->policy);
+					if (!new2)
+						return -ENOMEM;
+					goto restart;
 				}
 				n->end = end;
 				sp_insert(sp, new2);
+				new2 = NULL;
 			}
 			/* Old crossing beginning, but not end (easy) */
 			if (n->start < start && n->end > start)
@@ -1023,7 +1029,11 @@ static int shared_policy_replace(struct shared_policy *sp, unsigned long start,
 	}
 	if (new)
 		sp_insert(sp, new);
-	up(&sp->sem);
+	spin_unlock(&sp->lock);
+	if (new2) {
+		mpol_free(new2->policy);
+		kmem_cache_free(sn_cache, new2);
+	}
 	return 0;
 }
 
@@ -1056,7 +1066,9 @@ void mpol_free_shared_policy(struct shared_policy *p)
 	struct sp_node *n;
 	struct rb_node *next;
 
-	down(&p->sem);
+	if (!p->root.rb_node)
+		return;
+	spin_lock(&p->lock);
 	next = rb_first(&p->root);
 	while (next) {
 		n = rb_entry(next, struct sp_node, nd);
@@ -1065,7 +1077,7 @@ void mpol_free_shared_policy(struct shared_policy *p)
 		mpol_free(n->policy);
 		kmem_cache_free(sn_cache, n);
 	}
-	up(&p->sem);
+	spin_unlock(&p->lock);
 }
 
 /* assumes fs == KERNEL_DS */

@@ -191,6 +191,7 @@ ppc4xx_calibrate_decr(void)
 }
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
 
+#ifdef SERIAL_DEBUG_IO_BASE
 /* We assume that the UART has already been initialized by the
    firmware or the boot loader */
 static void
@@ -204,7 +205,6 @@ static void
 ppc4xx_progress(char *s, unsigned short hex)
 {
 	char c;
-#ifdef SERIAL_DEBUG_IO_BASE
 	u8 *com_port = (u8 *) SERIAL_DEBUG_IO_BASE;
 
 	while ((c = *s++) != '\0') {
@@ -212,10 +212,14 @@ ppc4xx_progress(char *s, unsigned short hex)
 	}
 	serial_putc(com_port, '\r');
 	serial_putc(com_port, '\n');
-#else
-	printk("%s\r\n");
-#endif
 }
+#else
+static void
+ppc4xx_progress(char *s, unsigned short hex)
+{
+	printk("%s\r\n", s);
+}
+#endif
 #endif				/* CONFIG_SERIAL_TEXT_DEBUG */
 
 /*

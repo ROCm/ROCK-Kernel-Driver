@@ -14,11 +14,8 @@
 #define _7990_H
 
 /* The lance only has two register locations. We communicate mostly via memory. */
-struct lance_regs 
-{
-        unsigned short rdp;                       /* Register Data Port */
-        unsigned short rap;                       /* Register Address Port */
-};
+#define LANCE_RDP	0	/* Register Data Port */
+#define LANCE_RAP	2	/* Register Address Port */
 
 /* Transmit/receive ring definitions.
  * We allow the specific drivers to override these defaults if they want to.
@@ -104,7 +101,7 @@ struct lance_init_block {
 struct lance_private
 {
         char *name;
-        volatile struct lance_regs *ll;
+	unsigned long base;
         volatile struct lance_init_block *init_block; /* CPU address of RAM */
         volatile struct lance_init_block *lance_init_block; /* LANCE address of RAM */
         
@@ -252,5 +249,8 @@ extern int lance_start_xmit (struct sk_buff *skb, struct net_device *dev);
 extern struct net_device_stats *lance_get_stats (struct net_device *dev);
 extern void lance_set_multicast (struct net_device *dev);
 extern void lance_tx_timeout(struct net_device *dev);
+#ifdef CONFIG_NET_POLL_CONTROLLER
+extern void lance_poll(struct net_device *dev);
+#endif
 
 #endif /* ndef _7990_H */
