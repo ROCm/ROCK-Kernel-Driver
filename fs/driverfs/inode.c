@@ -119,6 +119,9 @@ struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 		case S_IFDIR:
 			inode->i_op = &driverfs_dir_inode_operations;
 			inode->i_fop = &simple_dir_operations;
+
+			/* directory inodes start off with i_nlink == 2 (for "." entry) */
+			inode->i_nlink++;
 			break;
 		case S_IFLNK:
 			inode->i_op = &page_symlink_inode_operations;
@@ -149,10 +152,8 @@ static int driverfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 	lock_kernel();
 	dentry->d_op = &driverfs_dentry_dir_ops;
  	res = driverfs_mknod(dir, dentry, mode | S_IFDIR, 0);
- 	if (!res) {
+ 	if (!res)
  		dir->i_nlink++;
- 		dentry->d_inode->i_nlink++;
- 	}
 	unlock_kernel();
 	return res;
 }
