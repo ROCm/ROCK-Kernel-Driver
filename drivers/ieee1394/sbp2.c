@@ -67,6 +67,7 @@
 #include "../scsi/scsi.h"
 #include "../scsi/hosts.h"
 
+#include "csr1212.h"
 #include "ieee1394.h"
 #include "ieee1394_types.h"
 #include "ieee1394_core.h"
@@ -77,7 +78,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1096 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1130 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -233,6 +234,7 @@ const u8 sbp2_speedto_max_payload[] = { 0x7, 0x8, 0x9, 0xA, 0xB, 0xC };
 static struct hpsb_highlevel sbp2_highlevel = {
 	.name =		SBP2_DEVICE_NAME,
 	.remove_host =	sbp2_remove_host,
+	.host_reset =	sbp2_host_reset,
 };
 
 static struct hpsb_address_ops sbp2_ops = {
@@ -468,14 +470,12 @@ static void sbp2util_remove_command_orb_pool(struct scsi_id_instance_data *scsi_
 static struct sbp2_command_info *sbp2util_find_command_for_orb(
 		struct scsi_id_instance_data *scsi_id, dma_addr_t orb)
 {
-	struct list_head *lh;
 	struct sbp2_command_info *command;
 	unsigned long flags;
 
 	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	if (!list_empty(&scsi_id->sbp2_command_orb_inuse)) {
-		list_for_each(lh, &scsi_id->sbp2_command_orb_inuse) {
-			command = list_entry(lh, struct sbp2_command_info, list);
+		list_for_each_entry(command, &scsi_id->sbp2_command_orb_inuse, list) {
 			if (command->command_orb_dma == orb) {
 				spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 				return (command);
@@ -495,14 +495,12 @@ static struct sbp2_command_info *sbp2util_find_command_for_orb(
  */
 static struct sbp2_command_info *sbp2util_find_command_for_SCpnt(struct scsi_id_instance_data *scsi_id, void *SCpnt)
 {
-	struct list_head *lh;
 	struct sbp2_command_info *command;
 	unsigned long flags;
 
 	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	if (!list_empty(&scsi_id->sbp2_command_orb_inuse)) {
-		list_for_each(lh, &scsi_id->sbp2_command_orb_inuse) {
-			command = list_entry(lh, struct sbp2_command_info, list);
+		list_for_each_entry(command, &scsi_id->sbp2_command_orb_inuse, list) {
 			if (command->Current_SCpnt == SCpnt) {
 				spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 				return (command);
@@ -665,6 +663,8 @@ static void sbp2_update(struct unit_directory *ud)
 			 * Ok, reconnect has failed. Perhaps we didn't
 			 * reconnect fast enough. Try doing a regular login.
 			 */
+			sbp2_logout_device(scsi_id);
+
 			if (sbp2_login_device(scsi_id)) {
 				/* Login failed too, just remove the device. */
 				SBP2_ERR("sbp2_reconnect_device failed!");
@@ -771,9 +771,8 @@ static void sbp2_remove_host(struct hpsb_host *host)
 
 static int sbp2_start_ud(struct sbp2scsi_host_info *hi, struct unit_directory *ud)
 {
-	struct scsi_id_instance_data *scsi_id;
+	struct scsi_id_instance_data *scsi_id, *scsi_id_tmp;
 	struct scsi_id_group *scsi_group;
-	struct list_head *lh, *next;
 
 	SBP2_DEBUG("sbp2_start_ud");
 
@@ -785,22 +784,13 @@ static int sbp2_start_ud(struct sbp2scsi_host_info *hi, struct unit_directory *u
 
 	INIT_LIST_HEAD(&scsi_group->scsi_id_list);
 	ud->device.driver_data = scsi_group;
-	sbp2_parse_unit_directory(scsi_group, ud);
+	sbp2_parse_unit_directory(scsi_group, ud, hi);
 
-	list_for_each_safe (lh, next, &scsi_group->scsi_id_list) {
-		scsi_id = list_entry(lh, struct scsi_id_instance_data, list);
+	/* Make sure the scsi_host is ready for this */
+	scsi_unblock_requests(hi->scsi_host);
 
-		scsi_id->ne = ud->ne;
-		scsi_id->hi = hi;
-		scsi_id->speed_code = IEEE1394_SPEED_100;
-		scsi_id->max_payload_size = sbp2_speedto_max_payload[IEEE1394_SPEED_100];
-		atomic_set(&scsi_id->sbp2_login_complete, 0);
-		INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_inuse);
-		INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_completed);
-		scsi_id->sbp2_command_orb_lock = SPIN_LOCK_UNLOCKED;
-
+	list_for_each_entry_safe(scsi_id, scsi_id_tmp, &scsi_group->scsi_id_list, list)
 		sbp2_start_device(scsi_id);
-	}
 
 	/* Check to see if any of our devices survived the ordeal */
 	if (list_empty(&scsi_group->scsi_id_list)) {
@@ -809,6 +799,17 @@ static int sbp2_start_ud(struct sbp2scsi_host_info *hi, struct unit_directory *u
 	}
 
 	return 0;
+}
+
+
+static void sbp2_host_reset(struct hpsb_host *host)
+{
+	struct sbp2scsi_host_info *hi;
+
+	hi = hpsb_get_hostinfo(&sbp2_highlevel, host);
+
+	if (hi)
+		scsi_block_requests(hi->scsi_host);
 }
 
 
@@ -1012,7 +1013,7 @@ static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 	/* Remove it from the scsi layer now */
 	if (scsi_id->sdev) {
 		scsi_remove_device(scsi_id->sdev);
-		scsi_device_put(scsi_id->sdev);
+		//scsi_device_put(scsi_id->sdev);
 	}
 
 	sbp2util_remove_command_orb_pool(scsi_id);
@@ -1530,16 +1531,46 @@ static int sbp2_set_busy_timeout(struct scsi_id_instance_data *scsi_id)
 	return(0);
 }
 
+
+static struct scsi_id_instance_data *sbp2_alloc_scsi_id(struct scsi_id_group *scsi_group,
+							struct unit_directory *ud,
+							struct sbp2scsi_host_info *hi)
+{
+	struct scsi_id_instance_data *scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
+
+	if (!scsi_id)
+		return NULL;
+
+	memset(scsi_id, 0, sizeof(*scsi_id));
+
+	scsi_id->ne = ud->ne;
+	scsi_id->hi = hi;
+	scsi_id->ud = ud;
+	scsi_id->speed_code = IEEE1394_SPEED_100;
+	scsi_id->max_payload_size = sbp2_speedto_max_payload[IEEE1394_SPEED_100];
+	atomic_set(&scsi_id->sbp2_login_complete, 0);
+	INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_inuse);
+	INIT_LIST_HEAD(&scsi_id->sbp2_command_orb_completed);
+	scsi_id->sbp2_command_orb_lock = SPIN_LOCK_UNLOCKED;
+	scsi_id->sbp2_device_type_and_lun = SBP2_DEVICE_TYPE_LUN_UNINITIALIZED;
+
+	list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
+
+	return scsi_id;
+}
+
 /*
  * This function is called to parse sbp2 device's config rom unit
  * directory. Used to determine things like sbp2 management agent offset,
  * and command set used (SCSI or RBC). 
  */
 static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
-				      struct unit_directory *ud)
+				      struct unit_directory *ud,
+				      struct sbp2scsi_host_info *hi)
 {
+	struct csr1212_keyval *kv;
+	struct csr1212_dentry *dentry;
 	struct scsi_id_instance_data *scsi_id;
-	struct list_head *lh;
 	u64 management_agent_addr;
 	u32 command_set_spec_id, command_set, unit_characteristics,
 		firmware_revision, workarounds;
@@ -1554,29 +1585,42 @@ static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 	firmware_revision = 0x0;
 
 	/* Handle different fields in the unit directory, based on keys */
-	for (i = 0; i < ud->length; i++) {
-		switch (CONFIG_ROM_KEY(ud->quadlets[i])) {
-		case SBP2_CSR_OFFSET_KEY:
-			/* Save off the management agent address */
-			management_agent_addr =
-				CSR_REGISTER_BASE + 
-				(CONFIG_ROM_VALUE(ud->quadlets[i]) << 2);
+	csr1212_for_each_dir_entry(ud->ne->csr, kv, ud->ud_kv, dentry) {
+		switch (kv->key.id) {
+		case CSR1212_KV_ID_DEPENDENT_INFO:
+			if (kv->key.type == CSR1212_KV_TYPE_CSR_OFFSET) {
+				/* Save off the management agent address */
+				management_agent_addr =
+					CSR1212_REGISTER_SPACE_BASE +
+					(kv->value.csr_offset << 2);
 
-			SBP2_DEBUG("sbp2_management_agent_addr = %x",
-				   (unsigned int) management_agent_addr);
+				SBP2_DEBUG("sbp2_management_agent_addr = %x",
+					   (unsigned int) management_agent_addr);
+			} else {
+				/*
+				 * Device type and lun (used for
+				 * detemining type of sbp2 device)
+				 */
+				scsi_id = sbp2_alloc_scsi_id(scsi_group, ud, hi);
+				if (!scsi_id) {
+					SBP2_ERR("Out of memory adding scsi_id, not all LUN's will be added");
+					break;
+				}
+
+				scsi_id->sbp2_device_type_and_lun = kv->value.immediate;
+			}
 			break;
 
 		case SBP2_COMMAND_SET_SPEC_ID_KEY:
 			/* Command spec organization */
-			command_set_spec_id
-				= CONFIG_ROM_VALUE(ud->quadlets[i]);
+			command_set_spec_id = kv->value.immediate;
 			SBP2_DEBUG("sbp2_command_set_spec_id = %x",
 				   (unsigned int) command_set_spec_id);
 			break;
 
 		case SBP2_COMMAND_SET_KEY:
 			/* Command set used by sbp2 device */
-			command_set = CONFIG_ROM_VALUE(ud->quadlets[i]);
+			command_set = kv->value.immediate;
 			SBP2_DEBUG("sbp2_command_set = %x",
 				   (unsigned int) command_set);
 			break;
@@ -1586,35 +1630,14 @@ static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 			 * Unit characterisitcs (orb related stuff
 			 * that I'm not yet paying attention to)
 			 */
-			unit_characteristics
-				= CONFIG_ROM_VALUE(ud->quadlets[i]);
+			unit_characteristics = kv->value.immediate;
 			SBP2_DEBUG("sbp2_unit_characteristics = %x",
 				   (unsigned int) unit_characteristics);
 			break;
 
-		case SBP2_DEVICE_TYPE_AND_LUN_KEY:
-			/*
-			 * Device type and lun (used for
-			 * detemining type of sbp2 device)
-			 */
-			scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
-			if (!scsi_id) {
-				SBP2_ERR("Out of memory adding scsi_id, not all LUN's will be added");
-				break;
-			}
-			memset(scsi_id, 0, sizeof(*scsi_id));
-
-			scsi_id->sbp2_device_type_and_lun
-				= CONFIG_ROM_VALUE(ud->quadlets[i]);
-			SBP2_DEBUG("sbp2_device_type_and_lun = %x",
-				   (unsigned int) scsi_id->sbp2_device_type_and_lun);
-			list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
-			break;
-
 		case SBP2_FIRMWARE_REVISION_KEY:
 			/* Firmware revision */
-			firmware_revision
-				= CONFIG_ROM_VALUE(ud->quadlets[i]);
+			firmware_revision = kv->value.immediate;
 			if (force_inquiry_hack)
 				SBP2_INFO("sbp2_firmware_revision = %x",
 				   (unsigned int) firmware_revision);
@@ -1668,26 +1691,20 @@ static void sbp2_parse_unit_directory(struct scsi_id_group *scsi_group,
 	if (ud->flags & UNIT_DIRECTORY_LUN_DIRECTORY) {
 		struct unit_directory *parent_ud =
 			container_of(ud->device.parent, struct unit_directory, device);
-		sbp2_parse_unit_directory(scsi_group, parent_ud);
+		sbp2_parse_unit_directory(scsi_group, parent_ud, hi);
 	} else {
 		/* If our list is empty, add a base scsi_id (happens in a normal
 		 * case where there is no logical_unit_number entry */
 		if (list_empty(&scsi_group->scsi_id_list)) {
-			scsi_id = kmalloc(sizeof(*scsi_id), GFP_KERNEL);
+			scsi_id = sbp2_alloc_scsi_id(scsi_group, ud, hi);
 			if (!scsi_id) {
 				SBP2_ERR("Out of memory adding scsi_id");
 				return;
 			}
-			memset(scsi_id, 0, sizeof(*scsi_id));
-
-			scsi_id->sbp2_device_type_and_lun = SBP2_DEVICE_TYPE_LUN_UNINITIALIZED;
-			list_add_tail(&scsi_id->list, &scsi_group->scsi_id_list);
 		}
 
 		/* Update the generic fields in all the LUN's */
-		list_for_each (lh, &scsi_group->scsi_id_list) {
-			scsi_id = list_entry(lh, struct scsi_id_instance_data, list);
-
+		list_for_each_entry(scsi_id, &scsi_group->scsi_id_list, list) {
 			scsi_id->sbp2_management_agent_addr = management_agent_addr;
 			scsi_id->sbp2_command_set_spec_id = command_set_spec_id;
 			scsi_id->sbp2_command_set = command_set;
@@ -1727,7 +1744,7 @@ static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id)
 	/* Payload size is the lesser of what our speed supports and what
 	 * our host supports.  */
 	scsi_id->max_payload_size = min(sbp2_speedto_max_payload[scsi_id->speed_code],
-					(u8)(((be32_to_cpu(hi->host->csr.rom[2]) >> 12) & 0xf) - 1));
+					(u8)(hi->host->csr.max_rec - 1));
 
 	SBP2_ERR("Node " NODE_BUS_FMT ": Max speed [%s] - Max payload [%u]",
 		 NODE_BUS_ARGS(hi->host, scsi_id->ne->nodeid),
@@ -2654,6 +2671,8 @@ static void sbp2scsi_complete_all_commands(struct scsi_id_instance_data *scsi_id
 		}
 	}
 
+	scsi_unblock_requests(hi->scsi_host);
+
 	return;
 }
 
@@ -2849,10 +2868,11 @@ static const char *sbp2scsi_info (struct Scsi_Host *host)
         return "SCSI emulation for IEEE-1394 SBP-2 Devices";
 }
 
-static ssize_t sbp2_sysfs_ieee1394_guid_show(struct device *dev, char *buf)
+static ssize_t sbp2_sysfs_ieee1394_id_show(struct device *dev, char *buf)
 {
 	struct scsi_device *sdev;
 	struct scsi_id_instance_data *scsi_id;
+	int lun;
 
 	if (!(sdev = to_scsi_device(dev)))
 		return 0;
@@ -2860,13 +2880,18 @@ static ssize_t sbp2_sysfs_ieee1394_guid_show(struct device *dev, char *buf)
 	if (!(scsi_id = sdev->hostdata))
 		return 0;
 
-	return sprintf(buf, "%016Lx\n", (unsigned long long)scsi_id->ne->guid);
-}
+	if (scsi_id->sbp2_device_type_and_lun == SBP2_DEVICE_TYPE_LUN_UNINITIALIZED)
+		lun = 0;
+	else
+		lun = ORB_SET_LUN(scsi_id->sbp2_device_type_and_lun);
 
-static DEVICE_ATTR(ieee1394_guid, S_IRUGO, sbp2_sysfs_ieee1394_guid_show, NULL);
+	return sprintf(buf, "%016Lx:%d:%d\n", (unsigned long long)scsi_id->ne->guid,
+		       scsi_id->ud->id, lun);
+}
+static DEVICE_ATTR(ieee1394_id, S_IRUGO, sbp2_sysfs_ieee1394_id_show, NULL);
 
 static struct device_attribute *sbp2_sysfs_sdev_attrs[] = {
-	&dev_attr_ieee1394_guid,
+	&dev_attr_ieee1394_id,
 	NULL
 };
 

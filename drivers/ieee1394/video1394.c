@@ -476,11 +476,9 @@ static void initialize_dma_ir_ctx(struct dma_iso_ctx *d, int tag, int flags)
 static struct dma_iso_ctx *
 find_ctx(struct list_head *list, int type, int channel)
 {
-	struct list_head *lh;
+	struct dma_iso_ctx *ctx;
 
-	list_for_each(lh, list) {
-		struct dma_iso_ctx *ctx;
-		ctx = list_entry(lh, struct dma_iso_ctx, link);
+	list_for_each_entry(ctx, list, link) {
 		if (ctx->type == type && ctx->channel == channel)
 			return ctx;
 	}
