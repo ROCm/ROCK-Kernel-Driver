@@ -64,6 +64,8 @@ static struct cpufreq_frequency_table speedstep_freqs[] = {
 #endif
 
 
+static unsigned int speedstep_get(unsigned int cpu);
+
 /**
  * speedstep_set_state - set the SpeedStep state
  * @state: new processor frequency state (SPEEDSTEP_LOW or SPEEDSTEP_HIGH)
