@@ -205,6 +205,8 @@ static int ntfs_read_block(struct page *page)
 	rl = NULL;
 	nr = i = 0;
 	do {
+		u8 *kaddr;
+
 		if (unlikely(buffer_uptodate(bh)))
 			continue;
 		if (unlikely(buffer_mapped(bh))) {
@@ -280,9 +282,10 @@ handle_hole:
 		bh->b_blocknr = -1UL;
 		clear_buffer_mapped(bh);
 handle_zblock:
-		memset(kmap(page) + i * blocksize, 0, blocksize);
+		kaddr = kmap_atomic(page, KM_USER0);
+		memset(kaddr + i * blocksize, 0, blocksize);
 		flush_dcache_page(page);
-		kunmap(page);
+		kunmap_atomic(kaddr, KM_USER0);
 		set_buffer_uptodate(bh);
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
 
@@ -344,7 +347,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 {
 	s64 attr_pos;
 	ntfs_inode *ni, *base_ni;
-	char *addr;
+	u8 *kaddr;
 	attr_search_context *ctx;
 	MFT_RECORD *mrec;
 	u32 attr_len;
@@ -363,6 +366,7 @@ int ntfs_readpage(struct file *file, struct page *page)
 
 	ni = NTFS_I(page->mapping->host);
 
+	/* NInoNonResident() == NInoIndexAllocPresent() */
 	if (NInoNonResident(ni)) {
 		/*
 		 * Only unnamed $DATA attributes can be compressed or
@@ -410,22 +414,22 @@ int ntfs_readpage(struct file *file, struct page *page)
 	/* The total length of the attribute value. */
 	attr_len = le32_to_cpu(ctx->attr->data.resident.value_length);
 
-	addr = kmap(page);
+	kaddr = kmap_atomic(page, KM_USER0);
 	/* Copy over in bounds data, zeroing the remainder of the page. */
 	if (attr_pos < attr_len) {
 		u32 bytes = attr_len - attr_pos;
 		if (bytes > PAGE_CACHE_SIZE)
 			bytes = PAGE_CACHE_SIZE;
 		else if (bytes < PAGE_CACHE_SIZE)
-			memset(addr + bytes, 0, PAGE_CACHE_SIZE - bytes);
+			memset(kaddr + bytes, 0, PAGE_CACHE_SIZE - bytes);
 		/* Copy the data to the page. */
-		memcpy(addr, attr_pos + (char*)ctx->attr +
+		memcpy(kaddr, attr_pos + (char*)ctx->attr +
 				le16_to_cpu(
 				ctx->attr->data.resident.value_offset), bytes);
 	} else
-		memset(addr, 0, PAGE_CACHE_SIZE);
+		memset(kaddr, 0, PAGE_CACHE_SIZE);
 	flush_dcache_page(page);
-	kunmap(page);
+	kunmap_atomic(kaddr, KM_USER0);
 
 	SetPageUptodate(page);
 put_unm_err_out:
@@ -813,6 +817,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 
 	ni = NTFS_I(vi);
 
+	/* NInoNonResident() == NInoIndexAllocPresent() */
 	if (NInoNonResident(ni)) {
 		/*
 		 * Only unnamed $DATA attributes can be compressed, encrypted,
@@ -1784,7 +1789,7 @@ struct address_space_operations ntfs_aops = {
 	.prepare_write	= ntfs_prepare_write,	/* Prepare page and buffers
 						   ready to receive data. */
 	.commit_write	= ntfs_commit_write,	/* Commit received data. */
-#endif
+#endif /* NTFS_RW */
 };
 
 /**

@@ -53,6 +53,8 @@ ToDo/Notes:
 	  ntfs_attr_iget() to obtain an index inode would be confusing.
 	- Ensure that there is no overflow when doing page->index <<
 	  PAGE_CACHE_SHIFT by casting page->index to s64 in fs/ntfs/aops.c.
+	- Use atomic kmap instead of kmap() in fs/ntfs/aops.c::ntfs_read_page()
+	  and ntfs_read_block().
 
 2.1.14 - Fix an NFSd caused deadlock reported by several users.
 
