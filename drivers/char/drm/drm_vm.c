@@ -612,8 +612,13 @@ int drm_mmap(struct file *filp, struct vm_area_struct *vma)
 			vma->vm_flags |= VM_IO;	/* not in core dump */
 		}
 #if defined(__ia64__)
-		if (map->type != _DRM_AGP)
-			vma->vm_page_prot = pgprot_writecombine(vma->vm_page_prot);
+		if (efi_range_is_wc(vma->vm_start, vma->vm_end -
+				    vma->vm_start))
+			vma->vm_page_prot =
+				pgprot_writecombine(vma->vm_page_prot);
+		else
+			vma->vm_page_prot =
+				pgprot_noncached(vma->vm_page_prot);
 #endif
 		offset = dev->driver->get_reg_ofs(dev);
 #ifdef __sparc__
