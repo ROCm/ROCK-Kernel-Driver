@@ -19,6 +19,10 @@ ToDo:
 	  sufficient for synchronisation here. We then just need to make sure
 	  ntfs_readpage/writepage/truncate interoperate properly with us.
 
+2.1.10 - .
+
+	- Finish off the white space cleanups (remove trailing spaces, etc).
+
 2.1.9 - Fix two bugs in decompression engine.
 
 	- Fix a bug where we would not always detect that we have reached the
@@ -880,4 +884,3 @@ tng-0.0.0 - Initial version tag.
 	working nicely, too. Proof of inode metadata in the page cache and non-
 	resident file unnamed stream data in the page cache concepts is thus
 	complete.
-

@@ -2,8 +2,8 @@
  * volume.h - Defines for volume structures in NTFS Linux kernel driver. Part
  *	      of the Linux-NTFS project.
  *
- * Copyright (c) 2001-2004 Anton Altaparmakov.
- * Copyright (c) 2002 Richard Russon.
+ * Copyright (c) 2001-2004 Anton Altaparmakov
+ * Copyright (c) 2002 Richard Russon
  *
  * This program/include file is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License as published

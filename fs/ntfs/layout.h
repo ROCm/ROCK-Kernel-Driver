@@ -2280,4 +2280,3 @@ typedef struct {
 } __attribute__ ((__packed__)) LOGGED_UTILITY_STREAM, EFS_ATTR;
 
 #endif /* _LINUX_NTFS_LAYOUT_H */
-

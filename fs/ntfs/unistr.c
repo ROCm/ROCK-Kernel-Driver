@@ -8,13 +8,13 @@
  * by the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
  *
- * This program/include file is distributed in the hope that it will be 
- * useful, but WITHOUT ANY WARRANTY; without even the implied warranty 
+ * This program/include file is distributed in the hope that it will be
+ * useful, but WITHOUT ANY WARRANTY; without even the implied warranty
  * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
- * along with this program (in the main directory of the Linux-NTFS 
+ * along with this program (in the main directory of the Linux-NTFS
  * distribution in the file COPYING); if not, write to the Free Software
  * Foundation,Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
@@ -62,9 +62,8 @@ static const u8 legal_ansi_char_array[0x40] = {
  * the @upcase table is used to performa a case insensitive comparison.
  */
 BOOL ntfs_are_names_equal(const uchar_t *s1, size_t s1_len,
-		     const uchar_t *s2, size_t s2_len,
-		     const IGNORE_CASE_BOOL ic,
-		     const uchar_t *upcase, const u32 upcase_size)
+		const uchar_t *s2, size_t s2_len, const IGNORE_CASE_BOOL ic,
+		const uchar_t *upcase, const u32 upcase_size)
 {
 	if (s1_len != s2_len)
 		return FALSE;
@@ -78,12 +77,12 @@ BOOL ntfs_are_names_equal(const uchar_t *s1, size_t s1_len,
  * @name1:	first Unicode name to compare
  * @name2:	second Unicode name to compare
  * @err_val:	if @name1 contains an invalid character return this value
- * @ic:         either CASE_SENSITIVE or IGNORE_CASE
+ * @ic:		either CASE_SENSITIVE or IGNORE_CASE
  * @upcase:	upcase table (ignored if @ic is CASE_SENSITIVE)
  * @upcase_len:	upcase table size (ignored if @ic is CASE_SENSITIVE)
  *
  * ntfs_collate_names collates two Unicode names and returns:
- * 
+ *
  *  -1 if the first name collates before the second one,
  *   0 if the names match,
  *   1 if the second name collates before the first one, or
@@ -138,7 +137,7 @@ int ntfs_collate_names(const uchar_t *name1, const u32 name1_len,
  * Compare the first @n characters of the Unicode strings @s1 and @s2,
  * The strings in little endian format and appropriate le16_to_cpu()
  * conversion is performed on non-little endian machines.
- * 
+ *
  * The function returns an integer less than, equal to, or greater than zero
  * if @s1 (or the first @n Unicode characters thereof) is found, respectively,
  * to be less than, to match, or be greater than @s2.
@@ -172,7 +171,7 @@ int ntfs_ucsncmp(const uchar_t *s1, const uchar_t *s2, size_t n)
  * Compare the first @n characters of the Unicode strings @s1 and @s2,
  * ignoring case. The strings in little endian format and appropriate
  * le16_to_cpu() conversion is performed on non-little endian machines.
- * 
+ *
  * Each character is uppercased using the @upcase table before the comparison.
  *
  * The function returns an integer less than, equal to, or greater than zero
@@ -180,7 +179,7 @@ int ntfs_ucsncmp(const uchar_t *s1, const uchar_t *s2, size_t n)
  * to be less than, to match, or be greater than @s2.
  */
 int ntfs_ucsncasecmp(const uchar_t *s1, const uchar_t *s2, size_t n,
-		     const uchar_t *upcase, const u32 upcase_size)
+		const uchar_t *upcase, const u32 upcase_size)
 {
 	uchar_t c1, c2;
 	size_t i;
@@ -381,4 +380,3 @@ mem_err_out:
 	ntfs_error(vol->sb, "Failed to allocate name!");
 	return -ENOMEM;
 }
-
