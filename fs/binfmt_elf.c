@@ -123,7 +123,7 @@ static void padzero(unsigned long elf_bss)
 #define STACK_ADD(sp, items) ((elf_addr_t *)(sp) - (items))
 #define STACK_ROUND(sp, items) \
 	(((unsigned long) (sp - items)) &~ 15UL)
-#define STACK_ALLOC(sp, len) sp -= len
+#define STACK_ALLOC(sp, len) ({ sp -= len ; sp; })
 #endif
 
 static void
@@ -168,7 +168,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 		if (smp_num_siblings > 1)
 			STACK_ALLOC(p, ((current->pid % 64) << 7));
 #endif
-		u_platform = (elf_addr_t *) STACK_ALLOC(p, len);
+		u_platform = (elf_addr_t *)STACK_ALLOC(p, len);
 		__copy_to_user(u_platform, k_platform, len);
 	}
 
