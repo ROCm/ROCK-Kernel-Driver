@@ -836,6 +836,7 @@ static void handle_stripe(struct stripe_head *sh)
 	int i;
 	int syncing;
 	int locked=0, uptodate=0, to_read=0, to_write=0, failed=0, written=0;
+	int non_overwrite = 0;
 	int failed_num=0;
 	struct r5dev *dev;
 
@@ -883,7 +884,11 @@ static void handle_stripe(struct stripe_head *sh)
 
 		
 		if (dev->toread) to_read++;
-		if (dev->towrite) to_write++;
+		if (dev->towrite) {
+			to_write++;
+			if (!test_bit(R5_OVERWRITE, &dev->flags))
+				non_overwrite++;
+		}
 		if (dev->written) written++;
 		rdev = conf->disks[i].rdev; /* FIXME, should I be looking rdev */
 		if (!rdev || !rdev->in_sync) {
@@ -975,12 +980,19 @@ static void handle_stripe(struct stripe_head *sh)
 
 	/* Now we might consider reading some blocks, either to check/generate
 	 * parity, or to satisfy requests
+	 * or to load a block that is being partially written.
 	 */
-	if (to_read || (syncing && (uptodate+failed < disks))) {
+	if (to_read || non_overwrite || (syncing && (uptodate+failed < disks))) {
 		for (i=disks; i--;) {
 			dev = &sh->dev[i];
 			if (!test_bit(R5_LOCKED, &dev->flags) && !test_bit(R5_UPTODATE, &dev->flags) &&
-			    (dev->toread || syncing || (failed && sh->dev[failed_num].toread))) {
+			    (dev->toread ||
+			     (dev->towrite && !test_bit(R5_OVERWRITE, &dev->flags)) ||
+			     syncing ||
+			     (failed && (sh->dev[failed_num].toread ||
+					 (sh->dev[failed_num].towrite && !test_bit(R5_OVERWRITE, &sh->dev[failed_num].flags))))
+				    )
+				) {
 				/* we would like to get this block, possibly
 				 * by computing it, but we might not be able to
 				 */
