@@ -420,13 +420,11 @@ int udma_pci_start(struct ata_device *drive, struct request *rq)
 	struct ata_channel *ch = drive->channel;
 	unsigned long dma_base = ch->dma_base;
 
-	/* Note that this is done *after* the cmd has
-	 * been issued to the drive, as per the BM-IDE spec.
-	 * The Promise Ultra33 doesn't work correctly when
-	 * we do this part before issuing the drive cmd.
+	/* Note that this is done *after* the cmd has been issued to the drive,
+	 * as per the BM-IDE spec.  The Promise Ultra33 doesn't work correctly
+	 * when we do this part before issuing the drive cmd.
 	 */
-	outb(inb(dma_base)|1, dma_base);		/* start DMA */
-	return 0;
+	outb(inb(dma_base) | 1, dma_base);	/* start DMA */
 }
 
 /*
@@ -545,11 +543,11 @@ int udma_pci_init(struct ata_device *drive, struct request *rq)
 	u8 cmd;
 
 	if (ata_start_dma(drive, rq))
-		return 1;
+		return ide_stopped;
 
 	/* No DMA transfers on ATAPI devices. */
 	if (drive->type != ATA_DISK)
-		return 0;
+		return ide_started;
 
 	if (rq_data_dir(rq) == READ)
 		cmd = 0x08;
@@ -562,7 +560,9 @@ int udma_pci_init(struct ata_device *drive, struct request *rq)
 	else
 		outb(cmd ? WIN_READDMA : WIN_WRITEDMA, IDE_COMMAND_REG);
 
-	return udma_start(drive, rq);
+	udma_start(drive, rq);
+
+	return ide_started;
 }
 
 EXPORT_SYMBOL(ide_dma_intr);

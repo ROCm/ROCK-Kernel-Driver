@@ -850,10 +850,11 @@ static void channel_probe(struct ata_channel *ch)
 		goto not_found;
 
 	/* Register this hardware interface within the global device tree.
+	 *
+	 * FIXME: This should be handled as a pci subdevice in a generic way.
 	 */
-	sprintf(ch->dev.bus_id, "%04lx",
-		(unsigned long) ch->io_ports[IDE_DATA_OFFSET]);
-	sprintf(ch->dev.name, "ide");
+	sprintf(ch->dev.bus_id, "ata@%02x", ch->unit);
+	strcpy(ch->dev.name, "ATA/ATAPI Host-Channel");
 	ch->dev.driver_data = ch;
 #ifdef CONFIG_PCI
 	if (ch->pci_dev)

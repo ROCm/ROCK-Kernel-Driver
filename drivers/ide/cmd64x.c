@@ -152,16 +152,14 @@ static void program_drive_counts(struct ata_device *drive, int setup_count, int 
 }
 
 /*
- * Attempts to set the interface PIO mode.
- * The preferred method of selecting PIO modes (e.g. mode 4) is
- * "echo 'piomode:4' > /proc/ide/hdx/settings".  Special cases are
+ * Attempts to set the interface PIO mode. Special cases are
  * 8: prefetch off, 9: prefetch on, 255: auto-select best mode.
  * Called with 255 at boot time.
  */
 static void cmd64x_tuneproc(struct ata_device *drive, byte mode_wanted)
 {
 	int recovery_time, clock_time;
-	byte recovery_count2, cycle_count;
+	u8 recovery_count2, cycle_count, speed;
 	int setup_count, active_count, recovery_count;
 	struct ata_timing *t;
 
@@ -172,10 +170,14 @@ static void cmd64x_tuneproc(struct ata_device *drive, byte mode_wanted)
 			/*set_prefetch_mode(index, mode_wanted);*/
 			cmdprintk("%s: %sabled cmd640 prefetch\n", drive->name, mode_wanted ? "en" : "dis");
 			return;
-		case 255: mode_wanted = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
 	}
 
-	t = ata_timing_data(XFER_PIO_0 + min_t(byte, mode_wanted, 4));
+	if (mode_wanted == 255)
+		speed = ata_best_pio_mode(drive);
+	else
+		speed = XFER_PIO_0 + min_t(u8, mode_wanted, 4);
+
+	t = ata_timing_data(speed);
 
 	/*
 	 * I copied all this complicated stuff from cmd640.c and made a few minor changes.
@@ -213,6 +215,9 @@ static void cmd64x_tuneproc(struct ata_device *drive, byte mode_wanted)
 	cmdprintk("%s: selected cmd646 PIO mode%d : %d (%dns), clocks=%d/%d/%d\n",
 		drive->name, t.mode - XFER_PIO_0, mode_wanted, cycle_time,
 		setup_count, active_count, recovery_count);
+
+	drive->current_speed = speed;
+	ide_config_drive_speed(drive, speed);
 }
 
 static int cmd64x_ratemask(struct ata_device *drive)
@@ -283,12 +288,25 @@ static u8 cmd680_taskfile_timing(struct ata_channel *ch)
 	}
 }
 
-static void cmd680_tuneproc(struct ata_device *drive, u8 mode_wanted)
+static void cmd680_tuneproc(struct ata_device *drive, u8 pio)
 {
-	struct ata_channel *hwif = drive->channel;
-	struct pci_dev *dev	= hwif->pci_dev;
-	u8 drive_pci;
+	struct ata_channel *ch = drive->channel;
+	struct pci_dev *dev = ch->pci_dev;
+	u8 unit	= (drive->select.b.unit & 0x01);
+	u8 addr_mask = (ch->unit) ? 0x84 : 0x80;
+	u8 drive_pci, mode_pci, speed;
+	u8 channel_timings = cmd680_taskfile_timing(ch);
 	u16 speedt;
+
+	pci_read_config_byte(dev, addr_mask, &mode_pci);
+	mode_pci &= ~(unit ? 0x30 : 0x03);
+
+	if (pio == 255)
+		pio = ata_best_pio_mode(drive) - XFER_PIO_0;
+
+	/* WARNING PIO timing mess is going to happen b/w devices, argh */
+	if ((channel_timings != pio) && (pio > channel_timings))
+		pio = channel_timings;
 
 	switch (drive->dn) {
 		case 0: drive_pci = 0xA4; break;
@@ -302,7 +320,7 @@ static void cmd680_tuneproc(struct ata_device *drive, u8 mode_wanted)
 
 	/* cheat for now and use the docs */
 //	switch(cmd680_taskfile_timing(hwif)) {
-	switch(mode_wanted) {
+	switch(pio) {
 		case 4:		speedt = 0x10c1; break;
 		case 3:		speedt = 0x10C3; break;
 		case 2:		speedt = 0x1104; break;
@@ -311,50 +329,11 @@ static void cmd680_tuneproc(struct ata_device *drive, u8 mode_wanted)
 		default:	speedt = 0x328A; break;
 	}
 	pci_write_config_word(dev, drive_pci, speedt);
-}
 
-static void config_cmd64x_chipset_for_pio(struct ata_device *drive, u8 set_speed)
-{
-	u8 set_pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
+	speed = XFER_PIO_0 + min_t(u8, pio, 4);
 
-	cmd64x_tuneproc(drive, set_pio);
-	if (set_speed)
-		(void) ide_config_drive_speed(drive, XFER_PIO_0 + set_pio);
-}
-
-static void config_cmd680_chipset_for_pio(struct ata_device *drive, u8 set_speed)
-{
-	struct ata_channel *hwif = drive->channel;
-	struct pci_dev *dev	= hwif->pci_dev;
-	u8 unit			= (drive->select.b.unit & 0x01);
-	u8 addr_mask		= (hwif->unit) ? 0x84 : 0x80;
-	u8 speed;
-	u8 mode_pci;
-	u8 channel_timings	= cmd680_taskfile_timing(hwif);
-	u8 set_pio		= ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
-
-	pci_read_config_byte(dev, addr_mask, &mode_pci);
-	mode_pci &= ~((unit) ? 0x30 : 0x03);
-
-	/* WARNING PIO timing mess is going to happen b/w devices, argh */
-	if ((channel_timings != set_pio) && (set_pio > channel_timings))
-		set_pio = channel_timings;
-
-	cmd680_tuneproc(drive, set_pio);
-	speed = XFER_PIO_0 + set_pio;
-	if (set_speed) {
-		(void) ide_config_drive_speed(drive, speed);
-		drive->current_speed = speed;
-	}
-}
-
-static void config_chipset_for_pio(struct ata_device *drive, byte set_speed)
-{
-        if (drive->channel->pci_dev->device == PCI_DEVICE_ID_CMD_680) {
-		config_cmd680_chipset_for_pio(drive, set_speed);
-	} else {
-		config_cmd64x_chipset_for_pio(drive, set_speed);
-	}
+	drive->current_speed = speed;
+	ide_config_drive_speed(drive, speed);
 }
 
 static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
@@ -403,11 +382,13 @@ static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
 		case XFER_PIO_1:
 		case XFER_PIO_0:
 			cmd64x_tuneproc(drive, speed - XFER_PIO_0);
-			break;
+			/* FIXME: error checking  --bkz */
+			return 0;
 		default:
 			return 1;
 	}
 
+	cmd64x_tuneproc(drive, 255);
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	(void) pci_write_config_byte(dev, pciU, regU);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -510,14 +491,13 @@ speed_break :
 		case XFER_PIO_1:
 		case XFER_PIO_0:
 			cmd680_tuneproc(drive, speed - XFER_PIO_0);
-			break;
+			/* FIXME: error checking  --bkz */
+			return 0;
 		default:
 			return 1;
 	}
 
-	if (speed >= XFER_MW_DMA_0) 
-		config_cmd680_chipset_for_pio(drive, 0);
-
+	cmd680_tuneproc(drive, 255);
 	if (speed >= XFER_UDMA_0)
 		mode_pci |= ((unit) ? 0x30 : 0x03);
 	else if (speed >= XFER_MW_DMA_0)
@@ -552,12 +532,6 @@ static int config_chipset_for_dma(struct ata_device *drive, u8 udma)
 
 	mode = ata_timing_mode(drive, map);
 
-	if (mode < XFER_SW_DMA_0) {
-		config_chipset_for_pio(drive, 1);
-		return 0;
-	}
-
-	config_chipset_for_pio(drive, 0);
 	return !drive->channel->speedproc(drive, mode);
 }
 
@@ -567,6 +541,8 @@ static int cmd6xx_udma_setup(struct ata_device *drive)
 	struct ata_channel *hwif = drive->channel;
 	int on = 1;
 	int verbose = 1;
+
+	hwif->tuneproc(drive, 255);
 
 	if ((id != NULL) && ((id->capability & 1) != 0) &&
 	    hwif->autodma && (drive->type == ATA_DISK)) {
@@ -610,7 +586,7 @@ fast_ata_pio:
 		on = 0;
 		verbose = 0;
 no_dma_set:
-		config_chipset_for_pio(drive, 1);
+		hwif->tuneproc(drive, 255);
 	}
 
 	udma_enable(drive, on, verbose);

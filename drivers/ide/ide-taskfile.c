@@ -177,144 +177,6 @@ int drive_is_ready(struct ata_device *drive)
 }
 
 /*
- * FIXME: Channel lock should be held on entry.
- */
-ide_startstop_t ata_taskfile(struct ata_device *drive,
-		struct ata_taskfile *ar, struct request *rq)
-{
-	struct hd_driveid *id = drive->id;
-
-	/* (ks/hs): Moved to start, do not use for multiple out commands.
-	 * FIXME: why not?! */
-	if (!(ar->cmd == CFA_WRITE_MULTI_WO_ERASE ||
-	      ar->cmd == WIN_MULTWRITE ||
-	      ar->cmd == WIN_MULTWRITE_EXT)) {
-		ata_irq_enable(drive, 1);
-		ata_mask(drive);
-	}
-
-	if ((id->command_set_2 & 0x0400) && (id->cfs_enable_2 & 0x0400) &&
-	    (drive->addressing == 1))
-		ata_out_regfile(drive, &ar->hobfile);
-	ata_out_regfile(drive, &ar->taskfile);
-
-	OUT_BYTE((ar->taskfile.device_head & (drive->addressing ? 0xE0 : 0xEF)) | drive->select.all,
-			IDE_SELECT_REG);
-
-	if (ar->handler) {
-		unsigned long flags;
-		struct ata_channel *ch = drive->channel;
-
-		/* This is apparently supposed to reset the wait timeout for
-		 * the interrupt to accur.
-		 */
-
-		/* FIXME: this locking should encompass the above register
-		 * file access too.
-		 */
-
-		spin_lock_irqsave(ch->lock, flags);
-		ata_set_handler(drive, ar->handler, WAIT_CMD, NULL);
-		OUT_BYTE(ar->cmd, IDE_COMMAND_REG);
-		spin_unlock_irqrestore(ch->lock, flags);
-
-		/* FIXME: Warning check for race between handler and prehandler
-		 * for writing first block of data.  however since we are well
-		 * inside the boundaries of the seek, we should be okay.
-		 *
-		 * FIXME: Replace the switch by using a proper command_type.
-		 */
-
-		if (ar->cmd == CFA_WRITE_SECT_WO_ERASE ||
-		    ar->cmd == WIN_WRITE ||
-		    ar->cmd == WIN_WRITE_EXT ||
-		    ar->cmd == WIN_WRITE_VERIFY ||
-		    ar->cmd == WIN_WRITE_BUFFER ||
-		    ar->cmd == WIN_DOWNLOAD_MICROCODE ||
-		    ar->cmd == CFA_WRITE_MULTI_WO_ERASE ||
-		    ar->cmd == WIN_MULTWRITE ||
-		    ar->cmd == WIN_MULTWRITE_EXT) {
-			ide_startstop_t startstop;
-
-			if (ata_status_poll(drive, DATA_READY, drive->bad_wstat,
-						WAIT_DRQ, rq, &startstop)) {
-				printk(KERN_ERR "%s: no DRQ after issuing %s\n",
-						drive->name, drive->mult_count ? "MULTWRITE" : "WRITE");
-				return startstop;
-			}
-
-			/* FIXME: This doesn't make the slightest sense.
-			 * (ks/hs): Fixed Multi Write
-			 */
-			if (!(ar->cmd == CFA_WRITE_MULTI_WO_ERASE ||
-			      ar->cmd == WIN_MULTWRITE ||
-			      ar->cmd == WIN_MULTWRITE_EXT)) {
-				unsigned long flags;
-				char *buf = ide_map_rq(rq, &flags);
-
-				/* For Write_sectors we need to stuff the first sector */
-				ata_write(drive, buf, SECTOR_WORDS);
-
-				rq->current_nr_sectors--;
-				ide_unmap_rq(rq, buf, &flags);
-
-				return ide_started;
-			} else {
-				int i;
-
-				/* Polling wait until the drive is ready.
-				 *
-				 * Stuff the first sector(s) by calling the
-				 * handler driectly therafter.
-				 *
-				 * FIXME: Replace hard-coded 100, what about
-				 * error handling?
-				 */
-
-				for (i = 0; i < 100; ++i) {
-					if (drive_is_ready(drive))
-						break;
-				}
-				if (!drive_is_ready(drive)) {
-					printk(KERN_ERR "DISASTER WAITING TO HAPPEN!\n");
-				}
-				return ar->handler(drive, rq);
-			}
-		}
-	} else {
-		/*
-		 * FIXME: This is a gross hack, need to unify tcq dma proc and
-		 * regular dma proc. It should now be easier.
-		 *
-		 * FIXME: Handle the alternateives by a command type.
-		 */
-
-		if (!drive->using_dma)
-			return ide_started;
-
-		/* for dma commands we don't set the handler */
-		if (ar->cmd == WIN_WRITEDMA ||
-		    ar->cmd == WIN_WRITEDMA_EXT ||
-		    ar->cmd == WIN_READDMA ||
-		    ar->cmd == WIN_READDMA_EXT)
-			return !udma_init(drive, rq);
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-		else if (ar->cmd == WIN_WRITEDMA_QUEUED ||
-			 ar->cmd == WIN_WRITEDMA_QUEUED_EXT ||
-			 ar->cmd == WIN_READDMA_QUEUED ||
-			 ar->cmd == WIN_READDMA_QUEUED_EXT)
-			return udma_tcq_taskfile(drive, rq);
-#endif
-		else {
-			printk(KERN_ERR "%s: unknown command %x\n", __FUNCTION__, ar->cmd);
-			return ide_stopped;
-		}
-	}
-
-	return ide_started;
-}
-
-/*
  * This function issues a special IDE device request onto the request queue.
  *
  * If action is ide_wait, then the rq is queued at the end of the request
@@ -435,7 +297,7 @@ int ide_raw_taskfile(struct ata_device *drive, struct ata_taskfile *ar)
 	struct request req;
 
 	ar->command_type = IDE_DRIVE_TASK_NO_DATA;
-	ar->handler = ata_special_intr;
+	ar->XXX_handler = ata_special_intr;
 
 	memset(&req, 0, sizeof(req));
 	req.flags = REQ_SPECIAL;
@@ -448,6 +310,5 @@ EXPORT_SYMBOL(drive_is_ready);
 EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ata_read);
 EXPORT_SYMBOL(ata_write);
-EXPORT_SYMBOL(ata_taskfile);
 EXPORT_SYMBOL(ata_special_intr);
 EXPORT_SYMBOL(ide_raw_taskfile);
