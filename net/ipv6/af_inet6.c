@@ -67,11 +67,9 @@ static int unloadable = 0; /* XX: Turn to one when all is ok within the
 			      module for allowing unload */
 #endif
 
-#if defined(MODULE) && LINUX_VERSION_CODE > 0x20115
 MODULE_AUTHOR("Cast of dozens");
 MODULE_DESCRIPTION("IPv6 protocol stack for Linux");
 MODULE_PARM(unloadable, "i");
-#endif
 
 /* IPv6 procfs goodies... */
 
