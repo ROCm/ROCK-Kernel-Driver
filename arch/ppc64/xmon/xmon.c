@@ -1381,16 +1381,23 @@ mread(unsigned long adrs, void *buf, int size)
 	char *p, *q;
 
 	n = 0;
-	if( setjmp(bus_error_jmp) == 0 ){
+	if (setjmp(bus_error_jmp) == 0) {
 		debugger_fault_handler = handle_fault;
 		sync();
-		p = (char *) adrs;
-		q = (char *) buf;
+		p = (char *)adrs;
+		q = (char *)buf;
 		switch (size) {
-		case 2: *(short *)q = *(short *)p;	break;
-		case 4: *(int *)q = *(int *)p;		break;
+		case 2:
+			*(short *)q = *(short *)p;
+			break;
+		case 4:
+			*(int *)q = *(int *)p;
+			break;
+		case 8:
+			*(long *)q = *(long *)p;
+			break;
 		default:
-			for( ; n < size; ++n ) {
+			for( ; n < size; ++n) {
 				*q++ = *p++;
 				sync();
 			}
@@ -1411,16 +1418,23 @@ mwrite(unsigned long adrs, void *buf, int size)
 	char *p, *q;
 
 	n = 0;
-	if( setjmp(bus_error_jmp) == 0 ){
+	if (setjmp(bus_error_jmp) == 0) {
 		debugger_fault_handler = handle_fault;
 		sync();
 		p = (char *) adrs;
 		q = (char *) buf;
 		switch (size) {
-		case 2: *(short *)p = *(short *)q;	break;
-		case 4: *(int *)p = *(int *)q;		break;
+		case 2:
+			*(short *)p = *(short *)q;
+			break;
+		case 4:
+			*(int *)p = *(int *)q;
+			break;
+		case 8:
+			*(long *)p = *(long *)q;
+			break;
 		default:
-			for( ; n < size; ++n ) {
+			for ( ; n < size; ++n) {
 				*p++ = *q++;
 				sync();
 			}
