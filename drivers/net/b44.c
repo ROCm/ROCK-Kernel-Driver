@@ -96,7 +96,7 @@ MODULE_DEVICE_TABLE(pci, b44_pci_tbl);
 
 static void b44_halt(struct b44 *);
 static void b44_init_rings(struct b44 *);
-static int b44_init_hw(struct b44 *);
+static void b44_init_hw(struct b44 *);
 
 static int b44_wait_bit(struct b44 *bp, unsigned long reg,
 			u32 bit, unsigned long timeout, const int clear)
@@ -1180,7 +1180,7 @@ static int b44_set_mac_addr(struct net_device *dev, void *p)
  * packet processing.  Invoked with bp->lock held.
  */
 static void __b44_set_rx_mode(struct net_device *);
-static int b44_init_hw(struct b44 *bp)
+static void b44_init_hw(struct b44 *bp)
 {
 	u32 val;
 
@@ -1212,8 +1212,6 @@ static int b44_init_hw(struct b44 *bp)
 
 	val = br32(B44_ENET_CTRL);
 	bw32(B44_ENET_CTRL, (val | ENET_CTRL_ENABLE));
-
-	return 0;
 }
 
 static int b44_open(struct net_device *dev)
@@ -1232,9 +1230,7 @@ static int b44_open(struct net_device *dev)
 	spin_lock_irq(&bp->lock);
 
 	b44_init_rings(bp);
-	err = b44_init_hw(bp);
-	if (err)
-		goto err_out_noinit;
+	b44_init_hw(bp);
 	bp->flags |= B44_FLAG_INIT_COMPLETE;
 
 	spin_unlock_irq(&bp->lock);
@@ -1249,11 +1245,6 @@ static int b44_open(struct net_device *dev)
 
 	return 0;
 
-err_out_noinit:
-	b44_halt(bp);
-	b44_free_rings(bp);
-	spin_unlock_irq(&bp->lock);
-	free_irq(dev->irq, dev);
 err_out_free:
 	b44_free_consistent(bp);
 	return err;
@@ -1392,7 +1383,7 @@ static int b44_ethtool_ioctl (struct net_device *dev, void __user *useraddr)
 		return -EFAULT;
 
 	switch (ethcmd) {
-	case ETHTOOL_GDRVINFO:{
+	case ETHTOOL_GDRVINFO: {
 		struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 		strcpy (info.driver, DRV_MODULE_NAME);
 		strcpy (info.version, DRV_MODULE_VERSION);
