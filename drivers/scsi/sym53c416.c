@@ -679,7 +679,7 @@ int __init sym53c416_detect(Scsi_Host_Template *tpnt)
 				printk(KERN_WARNING "sym53c416: unable to attach PnP device.\n");
 				continue;
 			}
-			if(pnp_activate_dev(idev, NULL)<0)
+			if(pnp_activate_dev(idev) < 0)
 			{
 				printk(KERN_WARNING "sym53c416: unable to activate PnP device.\n");
 				pnp_device_detach(idev);
