@@ -7,14 +7,14 @@ The world of PCI is vast and it's full of (mostly unpleasant) surprises.
 Different PCI devices have different requirements and different bugs --
 because of this, the PCI support layer in Linux kernel is not as trivial
 as one would wish. This short pamphlet tries to help all potential driver
-authors to find their way through the deep forests of PCI handling.
+authors find their way through the deep forests of PCI handling.
 
 
 0. Structure of PCI drivers
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 There exist two kinds of PCI drivers: new-style ones (which leave most of
 probing for devices to the PCI layer and support online insertion and removal
-of devices [thus supporting PCI, hot-pluggable PCI and CardBus in single
+of devices [thus supporting PCI, hot-pluggable PCI and CardBus in a single
 driver]) and old-style ones which just do all the probing themselves. Unless
 you have a very good reason to do so, please don't use the old way of probing
 in any new code. After the driver finds the devices it wishes to operate
@@ -174,7 +174,7 @@ which enables the bus master bit in PCI_COMMAND register and also fixes
 the latency timer value if it's set to something bogus by the BIOS.
 
    If you want to use the PCI Memory-Write-Invalidate transaction,
-call pci_set_mwi().  This enables bit PCI_COMMAND bit for Mem-Wr-Inval
+call pci_set_mwi().  This enables the PCI_COMMAND bit for Mem-Wr-Inval
 and also ensures that the cache line size register is set correctly.
 Make sure to check the return value of pci_set_mwi(), not all architectures
 may support Memory-Write-Invalidate.
@@ -236,7 +236,7 @@ pci_clear_mwi()			Disable Memory-Write-Invalidate transactions.
 7. Miscellaneous hints
 ~~~~~~~~~~~~~~~~~~~~~~
 When displaying PCI slot names to the user (for example when a driver wants
-to tell the user what card has it found), please use pci_dev->slot_name
+to tell the user what card has it found), please use pci_name(pci_dev)
 for this purpose.
 
 Always refer to the PCI devices by a pointer to the pci_dev structure.
@@ -247,6 +247,10 @@ can be pretty complex.
 
 If you're going to use PCI bus mastering DMA, take a look at
 Documentation/DMA-mapping.txt.
+
+Don't try to turn on Fast Back to Back writes in your driver.  All devices
+on the bus need to be capable of doing it, so this is something which needs
+to be handled by platform and generic code, not individual drivers.
 
 
 8. Obsolete functions

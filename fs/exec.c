@@ -117,7 +117,8 @@ asmlinkage long sys_uselib(const char __user * library)
 	struct nameidata nd;
 	int error;
 
-	error = user_path_walk(library, &nd);
+	nd.intent.open.flags = O_RDONLY;
+	error = __user_walk(library, LOOKUP_FOLLOW|LOOKUP_OPEN, &nd);
 	if (error)
 		goto out;
 
@@ -125,7 +126,7 @@ asmlinkage long sys_uselib(const char __user * library)
 	if (!S_ISREG(nd.dentry->d_inode->i_mode))
 		goto exit;
 
-	error = permission(nd.dentry->d_inode, MAY_READ | MAY_EXEC);
+	error = permission(nd.dentry->d_inode, MAY_READ | MAY_EXEC, &nd);
 	if (error)
 		goto exit;
 
@@ -461,7 +462,7 @@ struct file *open_exec(const char *name)
 		file = ERR_PTR(-EACCES);
 		if (!(nd.mnt->mnt_flags & MNT_NOEXEC) &&
 		    S_ISREG(inode->i_mode)) {
-			int err = permission(inode, MAY_EXEC);
+			int err = permission(inode, MAY_EXEC, &nd);
 			if (!err && !(inode->i_mode & 0111))
 				err = -EACCES;
 			file = ERR_PTR(err);
@@ -793,7 +794,7 @@ int flush_old_exec(struct linux_binprm * bprm)
 	flush_thread();
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
-	    permission(bprm->file->f_dentry->d_inode,MAY_READ))
+	    permission(bprm->file->f_dentry->d_inode,MAY_READ, NULL))
 		current->mm->dumpable = 0;
 
 	/* An exec changes our domain. We are no longer part of the thread

@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
+#include <linux/percpu.h>
 #include <linux/cpu.h>
 
 /*
@@ -41,15 +42,18 @@ EXPORT_SYMBOL(irq_stat);
 
 static struct softirq_action softirq_vec[32] __cacheline_aligned_in_smp;
 
+static DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
+
 /*
  * we cannot loop indefinitely here to avoid userspace starvation,
  * but we also don't want to introduce a worst case 1/HZ latency
  * to the pending events, so lets the scheduler to balance
  * the softirq load for us.
  */
-static inline void wakeup_softirqd(unsigned cpu)
+static inline void wakeup_softirqd(void)
 {
-	struct task_struct * tsk = ksoftirqd_task(cpu);
+	/* Interrupts are disabled: no need to stop preemption */
+	struct task_struct *tsk = __get_cpu_var(ksoftirqd);
 
 	if (tsk && tsk->state != TASK_RUNNING)
 		wake_up_process(tsk);
@@ -96,7 +100,7 @@ restart:
 			goto restart;
 		}
 		if (pending)
-			wakeup_softirqd(smp_processor_id());
+			wakeup_softirqd();
 		__local_bh_enable();
 	}
 
@@ -117,9 +121,9 @@ EXPORT_SYMBOL(local_bh_enable);
 /*
  * This function must run with irqs disabled!
  */
-inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
+inline void raise_softirq_irqoff(unsigned int nr)
 {
-	__cpu_raise_softirq(cpu, nr);
+	__raise_softirq_irqoff(nr);
 
 	/*
 	 * If we're in an interrupt or softirq, we're done
@@ -131,7 +135,7 @@ inline void cpu_raise_softirq(unsigned int cpu, unsigned int nr)
 	 * schedule the softirq soon.
 	 */
 	if (!in_interrupt())
-		wakeup_softirqd(cpu);
+		wakeup_softirqd();
 }
 
 void raise_softirq(unsigned int nr)
@@ -139,7 +143,7 @@ void raise_softirq(unsigned int nr)
 	unsigned long flags;
 
 	local_irq_save(flags);
-	cpu_raise_softirq(smp_processor_id(), nr);
+	raise_softirq_irqoff(nr);
 	local_irq_restore(flags);
 }
 
@@ -168,7 +172,7 @@ void __tasklet_schedule(struct tasklet_struct *t)
 	local_irq_save(flags);
 	t->next = __get_cpu_var(tasklet_vec).list;
 	__get_cpu_var(tasklet_vec).list = t;
-	cpu_raise_softirq(smp_processor_id(), TASKLET_SOFTIRQ);
+	raise_softirq_irqoff(TASKLET_SOFTIRQ);
 	local_irq_restore(flags);
 }
 
@@ -179,7 +183,7 @@ void __tasklet_hi_schedule(struct tasklet_struct *t)
 	local_irq_save(flags);
 	t->next = __get_cpu_var(tasklet_hi_vec).list;
 	__get_cpu_var(tasklet_hi_vec).list = t;
-	cpu_raise_softirq(smp_processor_id(), HI_SOFTIRQ);
+	raise_softirq_irqoff(HI_SOFTIRQ);
 	local_irq_restore(flags);
 }
 
@@ -211,7 +215,7 @@ static void tasklet_action(struct softirq_action *a)
 		local_irq_disable();
 		t->next = __get_cpu_var(tasklet_vec).list;
 		__get_cpu_var(tasklet_vec).list = t;
-		__cpu_raise_softirq(smp_processor_id(), TASKLET_SOFTIRQ);
+		__raise_softirq_irqoff(TASKLET_SOFTIRQ);
 		local_irq_enable();
 	}
 }
@@ -244,7 +248,7 @@ static void tasklet_hi_action(struct softirq_action *a)
 		local_irq_disable();
 		t->next = __get_cpu_var(tasklet_hi_vec).list;
 		__get_cpu_var(tasklet_hi_vec).list = t;
-		__cpu_raise_softirq(smp_processor_id(), HI_SOFTIRQ);
+		__raise_softirq_irqoff(HI_SOFTIRQ);
 		local_irq_enable();
 	}
 }
@@ -325,7 +329,7 @@ static int ksoftirqd(void * __bind_cpu)
 	__set_current_state(TASK_INTERRUPTIBLE);
 	mb();
 
-	local_ksoftirqd_task() = current;
+	__get_cpu_var(ksoftirqd) = current;
 
 	for (;;) {
 		if (!local_softirq_pending())
@@ -354,7 +358,7 @@ static int __devinit cpu_callback(struct notifier_block *nfb,
 			return NOTIFY_BAD;
 		}
 
-		while (!ksoftirqd_task(hotcpu))
+		while (!per_cpu(ksoftirqd, hotcpu))
 			yield();
  	}
 	return NOTIFY_OK;

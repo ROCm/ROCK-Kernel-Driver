@@ -582,7 +582,7 @@ void scsi_done(struct scsi_cmnd *cmd)
 	local_irq_save(flags);
 	cpu = smp_processor_id();
 	list_add_tail(&cmd->eh_entry, &done_q[cpu]);
-	cpu_raise_softirq(cpu, SCSI_SOFTIRQ);
+	raise_softirq_irqoff(SCSI_SOFTIRQ);
 	local_irq_restore(flags);
 }
 

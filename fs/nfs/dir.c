@@ -37,10 +37,10 @@
 
 static int nfs_opendir(struct inode *, struct file *);
 static int nfs_readdir(struct file *, void *, filldir_t);
-static struct dentry *nfs_lookup(struct inode *, struct dentry *);
+static struct dentry *nfs_lookup(struct inode *, struct dentry *, struct nameidata *);
 static int nfs_cached_lookup(struct inode *, struct dentry *,
 				struct nfs_fh *, struct nfs_fattr *);
-static int nfs_create(struct inode *, struct dentry *, int);
+static int nfs_create(struct inode *, struct dentry *, int, struct nameidata *);
 static int nfs_mkdir(struct inode *, struct dentry *, int);
 static int nfs_rmdir(struct inode *, struct dentry *);
 static int nfs_unlink(struct inode *, struct dentry *);
@@ -78,13 +78,9 @@ struct inode_operations nfs_dir_inode_operations = {
 static int
 nfs_opendir(struct inode *inode, struct file *filp)
 {
-	struct nfs_server *server = NFS_SERVER(inode);
 	int res = 0;
 
 	lock_kernel();
-	/* Do cto revalidation */
-	if (!(server->flags & NFS_MOUNT_NOCTO))
-		res = __nfs_revalidate_inode(server, inode);
 	/* Call generic open code in order to cache credentials */
 	if (!res)
 		res = nfs_open(inode, filp);
@@ -485,9 +481,13 @@ static inline void nfs_renew_times(struct dentry * dentry)
 }
 
 static inline
-int nfs_lookup_verify_inode(struct inode *inode)
+int nfs_lookup_verify_inode(struct inode *inode, int isopen)
 {
-	return nfs_revalidate_inode(NFS_SERVER(inode), inode);
+	struct nfs_server *server = NFS_SERVER(inode);
+
+	if (isopen && !(server->flags & NFS_MOUNT_NOCTO))
+		return __nfs_revalidate_inode(server, inode);
+	return nfs_revalidate_inode(server, inode);
 }
 
 /*
@@ -497,8 +497,17 @@ int nfs_lookup_verify_inode(struct inode *inode)
  * If parent mtime has changed, we revalidate, else we wait for a
  * period corresponding to the parent's attribute cache timeout value.
  */
-static inline int nfs_neg_need_reval(struct inode *dir, struct dentry *dentry)
+static inline
+int nfs_neg_need_reval(struct inode *dir, struct dentry *dentry,
+		       struct nameidata *nd)
 {
+	int ndflags = 0;
+
+	if (nd)
+		ndflags = nd->flags;
+	/* Don't revalidate a negative dentry if we're creating a new file */
+	if ((ndflags & LOOKUP_CREATE) && !(ndflags & LOOKUP_CONTINUE))
+		return 0;
 	if (!nfs_check_verifier(dir, dentry))
 		return 1;
 	return time_after(jiffies, dentry->d_time + NFS_ATTRTIMEO(dir));
@@ -515,7 +524,7 @@ static inline int nfs_neg_need_reval(struct inode *dir, struct dentry *dentry)
  * If the parent directory is seen to have changed, we throw out the
  * cached dentry and do a new lookup.
  */
-static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
+static int nfs_lookup_revalidate(struct dentry * dentry, struct nameidata *nd)
 {
 	struct inode *dir;
 	struct inode *inode;
@@ -523,14 +532,18 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 	int error;
 	struct nfs_fh fhandle;
 	struct nfs_fattr fattr;
+	int isopen = 0;
 
 	parent = dget_parent(dentry);
 	lock_kernel();
 	dir = parent->d_inode;
 	inode = dentry->d_inode;
 
+	if (nd && !(nd->flags & LOOKUP_CONTINUE) && (nd->flags & LOOKUP_OPEN))
+		isopen = 1;
+
 	if (!inode) {
-		if (nfs_neg_need_reval(dir, dentry))
+		if (nfs_neg_need_reval(dir, dentry, nd))
 			goto out_bad;
 		goto out_valid;
 	}
@@ -543,7 +556,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 
 	/* Force a full look up iff the parent directory has changed */
 	if (nfs_check_verifier(dir, dentry)) {
-		if (nfs_lookup_verify_inode(inode))
+		if (nfs_lookup_verify_inode(inode, isopen))
 			goto out_bad;
 		goto out_valid;
 	}
@@ -552,7 +565,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 	if (!error) {
 		if (memcmp(NFS_FH(inode), &fhandle, sizeof(struct nfs_fh))!= 0)
 			goto out_bad;
-		if (nfs_lookup_verify_inode(inode))
+		if (nfs_lookup_verify_inode(inode, isopen))
 			goto out_bad;
 		goto out_valid_renew;
 	}
@@ -630,7 +643,17 @@ struct dentry_operations nfs_dentry_operations = {
 	.d_iput		= nfs_dentry_iput,
 };
 
-static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
+static inline
+int nfs_is_exclusive_create(struct inode *dir, struct nameidata *nd)
+{
+	if (NFS_PROTO(dir)->version == 2)
+		return 0;
+	if (!nd || (nd->flags & LOOKUP_CONTINUE) || !(nd->flags & LOOKUP_CREATE))
+		return 0;
+	return (nd->intent.open.flags & O_EXCL) != 0;
+}
+
+static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *nd)
 {
 	struct inode *inode = NULL;
 	int error;
@@ -646,6 +669,10 @@ static struct dentry *nfs_lookup(struct inode *dir, struct dentry * dentry)
 
 	error = -ENOMEM;
 	dentry->d_op = &nfs_dentry_operations;
+
+	/* If we're doing an exclusive create, optimize away the lookup */
+	if (nfs_is_exclusive_create(dir, nd))
+		return NULL;
 
 	lock_kernel();
 	error = nfs_cached_lookup(dir, dentry, &fhandle, &fattr);
@@ -787,18 +814,23 @@ out_err:
  * that the operation succeeded on the server, but an error in the
  * reply path made it appear to have failed.
  */
-static int nfs_create(struct inode *dir, struct dentry *dentry, int mode)
+static int nfs_create(struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	struct iattr attr;
 	struct nfs_fattr fattr;
 	struct nfs_fh fhandle;
 	int error;
+	int open_flags = 0;
 
 	dfprintk(VFS, "NFS: create(%s/%ld, %s\n", dir->i_sb->s_id, 
 		dir->i_ino, dentry->d_name.name);
 
 	attr.ia_mode = mode;
 	attr.ia_valid = ATTR_MODE;
+
+	if (nd && (nd->flags & LOOKUP_CREATE))
+		open_flags = nd->intent.open.flags;
 
 	/*
 	 * The 0 argument passed into the create function should one day
@@ -809,7 +841,7 @@ static int nfs_create(struct inode *dir, struct dentry *dentry, int mode)
 	lock_kernel();
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->create(dir, &dentry->d_name,
-					 &attr, 0, &fhandle, &fattr);
+					 &attr, open_flags, &fhandle, &fattr);
 	if (!error)
 		error = nfs_instantiate(dentry, &fhandle, &fattr);
 	else
@@ -1239,12 +1271,19 @@ out:
 }
 
 int
-nfs_permission(struct inode *inode, int mask)
+nfs_permission(struct inode *inode, int mask, struct nameidata *nd)
 {
 	struct nfs_access_cache *cache = &NFS_I(inode)->cache_access;
 	struct rpc_cred *cred;
 	int mode = inode->i_mode;
 	int res;
+
+	/* Are we checking permissions on anything other than lookup? */
+	if (!(mask & MAY_EXEC)) {
+		/* We only need to check permissions on file open() and access() */
+		if (!nd || !(nd->flags & (LOOKUP_OPEN|LOOKUP_ACCESS)))
+			return 0;
+	}
 
 	if (mask & MAY_WRITE) {
 		/*

@@ -29,7 +29,7 @@ int simple_statfs(struct super_block *sb, struct kstatfs *buf)
  * exist, we know it is negative.
  */
 
-struct dentry *simple_lookup(struct inode *dir, struct dentry *dentry)
+struct dentry *simple_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
 {
 	d_add(dentry, NULL);
 	return NULL;

@@ -774,7 +774,7 @@ static u8 bus_structure_fixup (u8 busno)
 	struct pci_dev *dev;
 	u16 l;
 
-	if (pci_find_bus(busno) || !(ibmphp_find_same_bus_num (busno)))
+	if (pci_find_bus(0, busno) || !(ibmphp_find_same_bus_num (busno)))
 		return 1;
 
 	bus = kmalloc (sizeof (*bus), GFP_KERNEL);
@@ -819,7 +819,7 @@ static int ibm_configure_device (struct pci_func *func)
 		func->dev = pci_find_slot (func->busno, PCI_DEVFN(func->device, func->function));
 
 	if (func->dev == NULL) {
-		struct pci_bus *bus = pci_find_bus(func->busno);
+		struct pci_bus *bus = pci_find_bus(0, func->busno);
 		if (!bus)
 			return 0;
 
@@ -1335,7 +1335,7 @@ static int __init ibmphp_init (void)
 		goto exit;
 	}
 
-	bus = pci_find_bus(0);
+	bus = pci_find_bus(0, 0);
 	if (!bus) {
 		err ("Can't find the root pci bus, can not continue\n");
 		rc = -ENODEV;

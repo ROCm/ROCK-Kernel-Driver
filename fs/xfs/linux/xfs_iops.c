@@ -175,7 +175,8 @@ STATIC int
 linvfs_create(
 	struct inode	*dir,
 	struct dentry	*dentry,
-	int		mode)
+	int		mode,
+	struct nameidata *nd)
 {
 	return linvfs_mknod(dir, dentry, mode, 0);
 }
@@ -192,7 +193,8 @@ linvfs_mkdir(
 STATIC struct dentry *
 linvfs_lookup(
 	struct inode	*dir,
-	struct dentry	*dentry)
+	struct dentry	*dentry,
+	struct nameidata *nd)
 {
 	struct inode	*ip = NULL;
 	vnode_t		*vp, *cvp = NULL;
@@ -429,7 +431,8 @@ linvfs_follow_link(
 STATIC int
 linvfs_permission(
 	struct inode	*inode,
-	int		mode)
+	int		mode,
+	struct nameidata *nd)
 {
 	vnode_t		*vp = LINVFS_GET_VP(inode);
 	int		error;

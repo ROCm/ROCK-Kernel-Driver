@@ -475,7 +475,7 @@ enum {
 	FULL
 } g_cpucache_up;
 
-static struct timer_list reap_timers[NR_CPUS];
+static DEFINE_PER_CPU(struct timer_list, reap_timers);
 
 static void reap_timer_fnc(unsigned long data);
 
@@ -525,7 +525,7 @@ static void __slab_error(const char *function, kmem_cache_t *cachep, char *msg)
  */
 static void start_cpu_timer(int cpu)
 {
-	struct timer_list *rt = &reap_timers[cpu];
+	struct timer_list *rt = &per_cpu(reap_timers, cpu);
 
 	if (rt->function == NULL) {
 		init_timer(rt);
@@ -2457,7 +2457,7 @@ next:
 static void reap_timer_fnc(unsigned long data)
 {
 	int cpu = smp_processor_id();
-	struct timer_list *rt = &reap_timers[cpu];
+	struct timer_list *rt = &__get_cpu_var(reap_timers);
 
 	cache_reap();
 	mod_timer(rt, jiffies + REAPTIMEOUT_CPUC + cpu);

@@ -106,7 +106,7 @@ bail:
 	return -ENOSPC;
 }
 
-int hpfs_create(struct inode *dir, struct dentry *dentry, int mode)
+int hpfs_create(struct inode *dir, struct dentry *dentry, int mode, struct nameidata *nd)
 {
 	const char *name = dentry->d_name.name;
 	unsigned len = dentry->d_name.len;
@@ -374,7 +374,7 @@ again:
 		d_drop(dentry);
 		spin_lock(&dentry->d_lock);
 		if (atomic_read(&dentry->d_count) > 1 ||
-		    permission(inode, MAY_WRITE) ||
+		    permission(inode, MAY_WRITE, NULL) ||
 		    get_write_access(inode)) {
 			spin_unlock(&dentry->d_lock);
 			d_rehash(dentry);

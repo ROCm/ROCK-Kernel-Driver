@@ -79,7 +79,7 @@ void __init proc_root_init(void)
 	proc_bus = proc_mkdir("bus", 0);
 }
 
-static struct dentry *proc_root_lookup(struct inode * dir, struct dentry * dentry)
+static struct dentry *proc_root_lookup(struct inode * dir, struct dentry * dentry, struct nameidata *nd)
 {
 	/*
 	 * nr_threads is actually protected by the tasklist_lock;
@@ -89,11 +89,11 @@ static struct dentry *proc_root_lookup(struct inode * dir, struct dentry * dentr
 	if (dir->i_ino == PROC_ROOT_INO) /* check for safety... */
 		dir->i_nlink = proc_root.nlink + nr_threads;
 
-	if (!proc_lookup(dir, dentry)) {
+	if (!proc_lookup(dir, dentry, nd)) {
 		return NULL;
 	}
 	
-	return proc_pid_lookup(dir, dentry);
+	return proc_pid_lookup(dir, dentry, nd);
 }
 
 static int proc_root_readdir(struct file * filp,

@@ -54,7 +54,7 @@ struct dentry_operations minix_dentry_operations = {
 	.d_hash		= minix_hash,
 };
 
-static struct dentry *minix_lookup(struct inode * dir, struct dentry *dentry)
+static struct dentry *minix_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode * inode = NULL;
 	ino_t ino;
@@ -89,7 +89,8 @@ static int minix_mknod(struct inode * dir, struct dentry *dentry, int mode, dev_
 	return error;
 }
 
-static int minix_create(struct inode * dir, struct dentry *dentry, int mode)
+static int minix_create(struct inode * dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	return minix_mknod(dir, dentry, mode, 0);
 }

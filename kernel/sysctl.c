@@ -130,7 +130,7 @@ extern ctl_table random_table[];
 
 static ssize_t proc_readsys(struct file *, char __user *, size_t, loff_t *);
 static ssize_t proc_writesys(struct file *, const char __user *, size_t, loff_t *);
-static int proc_sys_permission(struct inode *, int);
+static int proc_sys_permission(struct inode *, int, struct nameidata *);
 
 struct file_operations proc_sys_file_operations = {
 	.read		= proc_readsys,
@@ -1177,7 +1177,7 @@ static ssize_t proc_writesys(struct file * file, const char __user * buf,
 	return do_rw_proc(1, file, (char __user *) buf, count, ppos);
 }
 
-static int proc_sys_permission(struct inode *inode, int op)
+static int proc_sys_permission(struct inode *inode, int op, struct nameidata *nd)
 {
 	return test_perm(inode->i_mode, op);
 }

@@ -64,7 +64,7 @@ struct dentry_operations sysv_dentry_operations = {
 	.d_hash		= sysv_hash,
 };
 
-static struct dentry *sysv_lookup(struct inode * dir, struct dentry * dentry)
+static struct dentry *sysv_lookup(struct inode * dir, struct dentry * dentry, struct nameidata *nd)
 {
 	struct inode * inode = NULL;
 	ino_t ino;
@@ -96,7 +96,7 @@ static int sysv_mknod(struct inode * dir, struct dentry * dentry, int mode, dev_
 	return err;
 }
 
-static int sysv_create(struct inode * dir, struct dentry * dentry, int mode)
+static int sysv_create(struct inode * dir, struct dentry * dentry, int mode, struct nameidata *nd)
 {
 	return sysv_mknod(dir, dentry, mode, 0);
 }

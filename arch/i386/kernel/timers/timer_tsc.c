@@ -9,6 +9,7 @@
 #include <linux/errno.h>
 #include <linux/cpufreq.h>
 #include <linux/string.h>
+#include <linux/jiffies.h>
 
 #include <asm/timer.h>
 #include <asm/io.h>
@@ -21,7 +22,6 @@
 int tsc_disable __initdata = 0;
 
 extern spinlock_t i8253_lock;
-extern unsigned long jiffies;
 
 static int use_tsc;
 /* Number of usecs that the last interrupt was delayed */

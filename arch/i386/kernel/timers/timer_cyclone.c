@@ -11,6 +11,7 @@
 #include <linux/timex.h>
 #include <linux/errno.h>
 #include <linux/string.h>
+#include <linux/jiffies.h>
 
 #include <asm/timer.h>
 #include <asm/io.h>
@@ -18,7 +19,6 @@
 #include <asm/fixmap.h>
 
 extern spinlock_t i8253_lock;
-extern unsigned long jiffies;
 extern unsigned long calibrate_tsc(void);
 
 /* Number of usecs that the last interrupt was delayed */

@@ -259,7 +259,10 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 	for (i = 0; i < PNP_MAX_PORT; i++) {
 		if (pnp_port_valid(dev, i)) {
 			pnp_printf(buffer,"io");
-			pnp_printf(buffer," 0x%lx-0x%lx \n",
+			if (pnp_port_flags(dev, i) & IORESOURCE_DISABLED)
+				pnp_printf(buffer," disabled\n");
+			else
+				pnp_printf(buffer," 0x%lx-0x%lx\n",
 						pnp_port_start(dev, i),
 						pnp_port_end(dev, i));
 		}
@@ -267,7 +270,10 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 	for (i = 0; i < PNP_MAX_MEM; i++) {
 		if (pnp_mem_valid(dev, i)) {
 			pnp_printf(buffer,"mem");
-			pnp_printf(buffer," 0x%lx-0x%lx \n",
+			if (pnp_mem_flags(dev, i) & IORESOURCE_DISABLED)
+				pnp_printf(buffer," disabled\n");
+			else
+				pnp_printf(buffer," 0x%lx-0x%lx\n",
 						pnp_mem_start(dev, i),
 						pnp_mem_end(dev, i));
 		}
@@ -275,13 +281,21 @@ static ssize_t pnp_show_current_resources(struct device *dmdev, char *buf)
 	for (i = 0; i < PNP_MAX_IRQ; i++) {
 		if (pnp_irq_valid(dev, i)) {
 			pnp_printf(buffer,"irq");
-			pnp_printf(buffer," %ld \n", pnp_irq(dev, i));
+			if (pnp_irq_flags(dev, i) & IORESOURCE_DISABLED)
+				pnp_printf(buffer," disabled\n");
+			else
+				pnp_printf(buffer," %ld\n",
+						pnp_irq(dev, i));
 		}
 	}
 	for (i = 0; i < PNP_MAX_DMA; i++) {
 		if (pnp_dma_valid(dev, i)) {
 			pnp_printf(buffer,"dma");
-			pnp_printf(buffer," %ld \n", pnp_dma(dev, i));
+			if (pnp_dma_flags(dev, i) & IORESOURCE_DISABLED)
+				pnp_printf(buffer," disabled\n");
+			else
+				pnp_printf(buffer," %ld\n",
+						pnp_dma(dev, i));
 		}
 	}
 	ret = (buffer->curr - buf);

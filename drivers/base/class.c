@@ -3,6 +3,8 @@
  *
  * Copyright (c) 2002-3 Patrick Mochel
  * Copyright (c) 2002-3 Open Source Development Labs
+ * Copyright (c) 2003 Greg Kroah-Hartman
+ * Copyright (c) 2003 IBM Corp.
  * 
  * This file is released under the GPLv2
  *
@@ -337,6 +339,24 @@ void class_device_unregister(struct class_device *class_dev)
 		 class_dev->class_id);
 	class_device_del(class_dev);
 	class_device_put(class_dev);
+}
+
+int class_device_rename(struct class_device *class_dev, char *new_name)
+{
+	class_dev = class_device_get(class_dev);
+	if (!class_dev)
+		return -EINVAL;
+
+	pr_debug("CLASS: renaming '%s' to '%s'\n", class_dev->class_id,
+		 new_name);
+
+	strlcpy(class_dev->class_id, new_name, KOBJ_NAME_LEN);
+
+	kobject_rename(&class_dev->kobj, new_name);
+
+	class_device_put(class_dev);
+
+	return 0;
 }
 
 struct class_device * class_device_get(struct class_device *class_dev)

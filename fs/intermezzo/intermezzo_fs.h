@@ -370,7 +370,7 @@ extern int presto_ilookup_uid;
 # define PRESTO_ILOOKUP_MAGIC "...ino:"
 # define PRESTO_ILOOKUP_SEP ':'
 int izo_dentry_is_ilookup(struct dentry *, ino_t *id, unsigned int *generation);
-struct dentry *presto_lookup(struct inode * dir, struct dentry *dentry);
+struct dentry *presto_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd);
 
 struct presto_dentry_data {
         int dd_count; /* how mnay dentries are using this dentry */

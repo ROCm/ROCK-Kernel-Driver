@@ -385,7 +385,7 @@ static void add_host_bridge (acpi_handle *handle, int seg, int bus)
 	bridge->seg = seg;
 	bridge->bus = bus;
 
-	bridge->pci_bus = pci_find_bus(bus);
+	bridge->pci_bus = pci_find_bus(seg, bus);
 
 	bridge->res_lock = SPIN_LOCK_UNLOCKED;
 

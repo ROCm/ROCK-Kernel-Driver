@@ -59,9 +59,9 @@ static char *alias_names [ALIASES_NNODES];
 #define NODE2INO(node) (node + OPENPROM_FIRST_INO)
 #define NODEP2INO(no) (no + OPENPROM_FIRST_INO + last_node)
 
-static int openpromfs_create (struct inode *, struct dentry *, int);
+static int openpromfs_create (struct inode *, struct dentry *, int, struct nameidata *);
 static int openpromfs_readdir(struct file *, void *, filldir_t);
-static struct dentry *openpromfs_lookup(struct inode *, struct dentry *dentry);
+static struct dentry *openpromfs_lookup(struct inode *, struct dentry *dentry, struct nameidata *nd);
 static int openpromfs_unlink (struct inode *, struct dentry *dentry);
 
 static ssize_t nodenum_read(struct file *file, char *buf,
@@ -639,7 +639,7 @@ static int lookup_children(u16 n, const char * name, int len)
 	return 0;
 }
 
-static struct dentry *openpromfs_lookup(struct inode * dir, struct dentry *dentry)
+static struct dentry *openpromfs_lookup(struct inode * dir, struct dentry *dentry, struct nameidata *nd)
 {
 	int ino = 0;
 #define OPFSL_DIR	0
@@ -854,7 +854,8 @@ out:
 	return 0;
 }
 
-static int openpromfs_create (struct inode *dir, struct dentry *dentry, int mode)
+static int openpromfs_create (struct inode *dir, struct dentry *dentry, int mode,
+		struct nameidata *nd)
 {
 	char *p;
 	struct inode *inode;
