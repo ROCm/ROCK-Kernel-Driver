@@ -894,8 +894,8 @@ unsigned int ss_vendor, unsigned int ss_device, struct pci_dev *from)
 
 static inline struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from)
 { return NULL; }
-static inline int pci_dev_present(const struct pci_device_id *ids)
-{ return 0; }
+
+#define pci_dev_present(ids)	(0)
 
 static inline void pci_set_master(struct pci_dev *dev) { }
 static inline int pci_enable_device(struct pci_dev *dev) { return -EIO; }
