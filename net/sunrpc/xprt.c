@@ -389,28 +389,26 @@ xprt_adjust_timeout(struct rpc_timeout *to)
 static void
 xprt_close(struct rpc_xprt *xprt)
 {
-	struct socket	*sock;
-	struct sock	*sk;
+	struct socket	*sock = xprt->sock;
+	struct sock	*sk = xprt->inet;
+
+	if (!sk)
+		return;
 
 	write_lock_bh(&sk->sk_callback_lock);
-	sock = xprt->sock;
-	sk = xprt->inet;
-	if (sk != NULL) {
-		xprt->inet = NULL;
-		xprt->sock = NULL;
+	xprt->inet = NULL;
+	xprt->sock = NULL;
 
-		sk->sk_user_data    = NULL;
-		sk->sk_data_ready   = xprt->old_data_ready;
-		sk->sk_state_change = xprt->old_state_change;
-		sk->sk_write_space  = xprt->old_write_space;
-		sk->sk_no_check	 = 0;
-	}
+	sk->sk_user_data    = NULL;
+	sk->sk_data_ready   = xprt->old_data_ready;
+	sk->sk_state_change = xprt->old_state_change;
+	sk->sk_write_space  = xprt->old_write_space;
 	write_unlock_bh(&sk->sk_callback_lock);
 
 	xprt_disconnect(xprt);
+	sk->sk_no_check	 = 0;
 
-	if (sock)
-		sock_release(sock);
+	sock_release(sock);
 }
 
 static void
