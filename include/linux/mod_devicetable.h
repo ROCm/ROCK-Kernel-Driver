@@ -148,4 +148,21 @@ struct ccw_device_id {
 #define CCW_DEVICE_ID_MATCH_DEVICE_MODEL	0x08
 
 
+#define PNP_ID_LEN	8
+#define PNP_MAX_DEVICES	8
+
+struct pnp_device_id {
+	__u8 id[PNP_ID_LEN];
+	kernel_ulong_t driver_data;
+};
+
+struct pnp_card_device_id {
+	__u8 id[PNP_ID_LEN];
+	kernel_ulong_t driver_data;
+	struct {
+		__u8 id[PNP_ID_LEN];
+	} devs[PNP_MAX_DEVICES];
+};
+
+
 #endif /* LINUX_MOD_DEVICETABLE_H */
