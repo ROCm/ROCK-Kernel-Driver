@@ -1825,8 +1825,6 @@ xfs_lookup(
 }
 
 
-#define	XFS_CREATE_NEW_MAXTRIES	10000
-
 /*
  * xfs_create (create a new file).
  */

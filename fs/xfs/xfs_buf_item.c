@@ -55,8 +55,6 @@
 #include "xfs_error.h"
 
 
-#define	ROUNDUPNBWORD(x)	(((x) + (NBWORD - 1)) & ~(NBWORD - 1))
-
 kmem_zone_t	*xfs_buf_item_zone;
 
 #ifdef XFS_TRANS_DEBUG

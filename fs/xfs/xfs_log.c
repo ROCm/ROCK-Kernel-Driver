@@ -122,7 +122,6 @@ STATIC void		xlog_ticket_put(xlog_t *log, xlog_ticket_t *ticket);
 /* local debug functions */
 #if defined(DEBUG) && !defined(XLOG_NOLOG)
 STATIC void	xlog_verify_dest_ptr(xlog_t *log, __psint_t ptr);
-STATIC void	xlog_verify_disk_cycle_no(xlog_t *log, xlog_in_core_t *iclog);
 STATIC void	xlog_verify_grant_head(xlog_t *log, int equals);
 STATIC void	xlog_verify_iclog(xlog_t *log, xlog_in_core_t *iclog,
 				  int count, boolean_t syncing);
@@ -130,7 +129,6 @@ STATIC void	xlog_verify_tail_lsn(xlog_t *log, xlog_in_core_t *iclog,
 				     xfs_lsn_t tail_lsn);
 #else
 #define xlog_verify_dest_ptr(a,b)
-#define xlog_verify_disk_cycle_no(a,b)
 #define xlog_verify_grant_head(a,b)
 #define xlog_verify_iclog(a,b,c,d)
 #define xlog_verify_tail_lsn(a,b,c)
@@ -3241,33 +3239,6 @@ xlog_verify_dest_ptr(xlog_t     *log,
 	if (! good_ptr)
 		xlog_panic("xlog_verify_dest_ptr: invalid ptr");
 }	/* xlog_verify_dest_ptr */
-
-
-#ifdef DEBUG
-/* check split LR write */
-STATIC void
-xlog_verify_disk_cycle_no(xlog_t	 *log,
-			  xlog_in_core_t *iclog)
-{
-    xfs_buf_t	*bp;
-    uint	cycle_no;
-    xfs_caddr_t ptr;
-    xfs_daddr_t	i;
-
-    if (BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT) < 10) {
-	cycle_no = CYCLE_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT);
-	bp = xlog_get_bp(log, 1);
-	ASSERT(bp);
-	for (i = 0; i < BLOCK_LSN(iclog->ic_header.h_lsn, ARCH_CONVERT); i++) {
-	    xlog_bread(log, i, 1, bp);
-	    ptr = xlog_align(log, i, 1, bp);
-	    if (GET_CYCLE(ptr, ARCH_CONVERT) != cycle_no)
-		xlog_warn("XFS: xlog_verify_disk_cycle_no: bad cycle no");
-	}
-	xlog_put_bp(bp);
-    }
-}	/* xlog_verify_disk_cycle_no */
-#endif
 
 STATIC void
 xlog_verify_grant_head(xlog_t *log, int equals)
