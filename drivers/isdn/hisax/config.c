@@ -703,16 +703,16 @@ int jiftime(char *s, long mark)
 	return 8;
 }
 
-static u8 tmpbuf[HISAX_STATUS_BUFSIZE];
+static char tmpbuf[HISAX_STATUS_BUFSIZE];
 
-void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt,
+void VHiSax_putstatus(struct IsdnCardState *cs, char *head, const char *fmt,
 		      va_list args)
 {
 	/* if head == NULL the fmt contains the full info */
 
 	unsigned long flags;
 	int count, i;
-	u8 *p;
+	char *p;
 	isdn_ctrl ic;
 	int len;
 
@@ -727,7 +727,7 @@ void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt,
 		len = p - tmpbuf;
 		p = tmpbuf;
 	} else {
-		p = fmt;
+		p = (char *) fmt;
 		len = strlen(fmt);
 	}
 	if (!cs) {

@@ -1037,7 +1037,7 @@ isdn_ppp_start_xmit(struct sk_buff *skb, struct net_device *ndev)
                 isdn_ppp_frame_log("xmit1", skb->data, skb->len, 32, ipppd->unit, -1);
 
 	ippp_push_proto(ind_ppp, skb, proto);
-	ippp_mp_xmit(idev, skb, proto);
+	ippp_mp_xmit(idev, skb);
 	return 0;
 
  drop:

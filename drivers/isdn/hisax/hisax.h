@@ -1402,7 +1402,7 @@ int jiftime(char *s, long mark);
 int HiSax_command(isdn_ctrl * ic);
 int HiSax_writebuf_skb(int id, int chan, int ack, struct sk_buff *skb);
 void HiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt, ...);
-void VHiSax_putstatus(struct IsdnCardState *cs, char *head, char *fmt, va_list args);
+void VHiSax_putstatus(struct IsdnCardState *cs, char *head, const char *fmt, va_list args);
 void HiSax_reportcard(int cardnr, int sel);
 int QuickHex(char *txt, u8 * p, int cnt);
 void LogFrame(struct IsdnCardState *cs, u8 * p, int size);
