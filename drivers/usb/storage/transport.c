@@ -784,6 +784,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	int result;
 
 	/* send the command to the transport layer */
+	srb->resid = 0;
 	result = us->transport(srb, us);
 
 	/* if the command gets aborted by the higher layers, we need to

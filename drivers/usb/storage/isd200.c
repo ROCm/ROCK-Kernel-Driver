@@ -817,6 +817,7 @@ void isd200_invoke_transport( struct us_data *us,
 	int transferStatus;
 
 	/* send the command to the transport layer */
+	srb->resid = 0;
 	transferStatus = isd200_Bulk_transport(us, srb, ataCdb,
 					       sizeof(ataCdb->generic));
 	switch (transferStatus) {

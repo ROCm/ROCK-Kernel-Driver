@@ -775,7 +775,6 @@ int hp8200e_transport(Scsi_Cmnd *srb, struct us_data *us)
 	int i;
 	char string[64];
 
-	srb->resid = 0;
 	len = srb->request_bufflen;
 
 	/* Send A0 (ATA PACKET COMMAND).
