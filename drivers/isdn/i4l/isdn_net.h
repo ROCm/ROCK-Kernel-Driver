@@ -32,6 +32,8 @@
 #define CISCO_SLARP_REPLY     1
 #define CISCO_SLARP_KEEPALIVE 2
 
+extern void isdn_net_init_module(void);
+
 extern int isdn_net_new(char *, struct net_device *);
 extern int isdn_net_newslave(char *);
 extern int isdn_net_rm(char *);

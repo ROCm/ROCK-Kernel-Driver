@@ -13,6 +13,7 @@
 #include <linux/isdn_ppp.h>	/* for isdn_ppp info */
 
 extern struct file_operations isdn_ppp_fops;
+extern struct isdn_netif_ops isdn_ppp_ops;
 
 extern int isdn_ppp_init(void);
 extern void isdn_ppp_cleanup(void);
@@ -21,24 +22,9 @@ extern int isdn_ppp_hangup_slave(char *);
 
 #ifdef CONFIG_ISDN_PPP
 
-int  isdn_ppp_setup(isdn_net_dev *p);
-int  isdn_ppp_bind(isdn_net_local *);
 int  isdn_ppp_xmit(struct sk_buff *, struct net_device *);
 
 #else
-
-static inline int
-isdn_ppp_setup(isdn_net_dev *p)
-{
-	printk(KERN_WARNING "ISDN: SyncPPP support not configured\n");
-	return -EINVAL;
-}
-
-static inline int
-isdn_ppp_bind(isdn_net_local *)
-{
-	return 0;
-}
 
 static inline int
 isdn_ppp_xmit(struct sk_buff *, struct net_device *);

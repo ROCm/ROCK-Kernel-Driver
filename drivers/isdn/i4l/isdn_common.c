@@ -2415,6 +2415,7 @@ static int __init isdn_init(void)
 	printk("\n");
 #endif
 	isdn_info_update();
+	isdn_net_init_module();
 	return 0;
 
  err_tty_modem:

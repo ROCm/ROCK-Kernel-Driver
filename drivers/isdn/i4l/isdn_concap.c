@@ -126,16 +126,26 @@ void isdn_x25_cleanup(isdn_net_dev *p)
 
 void isdn_x25_open(struct net_device *dev)
 {
-	struct concap_device_ops * dops =
-		( (isdn_net_local *) dev->priv ) -> dops;
-	struct concap_proto * cprot =
-		( (isdn_net_local *) dev->priv ) -> netdev -> cprot;
 	unsigned long flags;
+
+	isdn_net_local *lp = dev->priv;
+
+	/* ... ,  prepare for configuration of new one ... */
+	switch ( lp->p_encap ){
+	case ISDN_NET_ENCAP_X25IFACE:
+		lp -> dops = &isdn_concap_reliable_dl_dops;
+	}
+	/* ... and allocate new one ... */
+	p -> cprot = isdn_concap_new( cfg -> p_encap );
+	/* p -> cprot == NULL now if p_encap is not supported
+	   by means of the concap_proto mechanism */
+	if (!p->cprot)
+		return;
 
 	save_flags(flags);
 	cli();                  /* Avoid glitch on writes to CMD regs */
-	if( cprot && cprot -> pops && dops )
-		cprot -> pops -> restart ( cprot, dev, dops );
+	if( p -> cprot -> pops && lp -> dops )
+		p -> cprot -> pops -> restart ( p -> cprot, dev, lp -> dops );
 	restore_flags(flags);
 }
 
@@ -216,35 +226,12 @@ void isdn_x25_realrm(isdn_net_dev *p)
 		p -> cprot -> pops -> proto_del ( p -> cprot );
 }
 
-int isdn_x25_setup(isdn_net_dev *p, int encap)
-{
-	isdn_net_local *lp = &p->local;
-
-	/* ... ,  prepare for configuration of new one ... */
-	switch ( encap ){
-	case ISDN_NET_ENCAP_X25IFACE:
-		lp -> dops = &isdn_concap_reliable_dl_dops;
-	}
-	/* ... and allocate new one ... */
-	p -> cprot = isdn_concap_new( cfg -> p_encap );
-	/* p -> cprot == NULL now if p_encap is not supported
-	   by means of the concap_proto mechanism */
-	if (!p->cprot)
-		return -EINVAL;
-
-	p->dev.type = ARPHRD_X25;	/* change ARP type */
-	p->dev.addr_len = 0;
-	p->dev.hard_header = NULL;
-	p->dev.hard_header_cache = NULL;
-	p->dev.header_cache_update = NULL;
-	p->local.receive = isdn_x25_receive;
-	p->local.connected = isdn_x25_connected;
-	p->local.disconnected = isdn_x25_disconnected;
-
-	/* the protocol is not configured yet; this will
-	   happen later when isdn_x25_open() is called */
-
-	return 0;
-}
+struct isdn_netif_ops isdn_x25_ops = {
+	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.type                = ARPHRD_X25,
+	.receive             = isdn_x25_receive,
+	.connected           = isdn_x25_connected,
+	.disconnected        = isdn_x25_disconnected,
+};
 
 #endif /* CONFIG_ISDN_X25 */

@@ -2913,22 +2913,14 @@ isdn_ppp_header(struct sk_buff *skb, struct net_device *dev,
 	return IPPP_MAX_HEADER;
 }
 
-
-
-int
-isdn_ppp_setup(isdn_net_dev *p)
-{
-	p->dev.hard_header = isdn_ppp_header;
-	p->dev.hard_header_cache = NULL;
-	p->dev.header_cache_update = NULL;
-	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
-	p->dev.type = ARPHRD_PPP;	/* change ARP type */
-	p->dev.addr_len = 0;
-	p->dev.do_ioctl = isdn_ppp_dev_ioctl;
-	p->local.receive = isdn_ppp_receive;
-	p->local.connected = isdn_ppp_wakeup_daemon;
-	p->local.bind = isdn_ppp_bind;
-	p->local.unbind = isdn_ppp_free;
-
-	return 0;
-}
+struct isdn_netif_ops isdn_ppp_ops = {
+	.hard_header         = isdn_ppp_header,
+	.do_ioctl            = isdn_ppp_dev_ioctl,
+	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.type                = ARPHRD_PPP,
+	.receive             = isdn_ppp_receive,
+	.connected           = isdn_ppp_wakeup_daemon,
+	.bind                = isdn_ppp_bind,
+	.unbind              = isdn_ppp_free,
+	
+};

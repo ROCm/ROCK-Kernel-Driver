@@ -75,6 +75,7 @@
 #define ISDN_NET_ENCAP_UIHDLC     5
 #define ISDN_NET_ENCAP_CISCOHDLCK 6 /* With SLARP and keepalive    */
 #define ISDN_NET_ENCAP_X25IFACE   7 /* Documentation/networking/x25-iface.txt*/
+#define ISDN_NET_ENCAP_NR         8
 
 /* Facility which currently uses an ISDN-channel */
 #define ISDN_USAGE_NONE       0
@@ -277,6 +278,36 @@ struct isdn_net_phone {
      which holds the linux device structure (here: isdn_net_device)
 */
 
+struct isdn_net_dev_s;
+struct isdn_net_local_s;
+
+struct isdn_netif_ops {
+	int			(*hard_header) (struct sk_buff *skb,
+						struct net_device *dev,
+						unsigned short type,
+						void *daddr,
+						void *saddr,
+						unsigned len);
+	int			(*rebuild_header)(struct sk_buff *skb);
+	int			(*do_ioctl)(struct net_device *dev,
+					    struct ifreq *ifr, int cmd);
+	int			(*hard_header_cache)(struct neighbour *neigh,
+						     struct hh_cache *hh);
+	void			(*header_cache_update)(struct hh_cache *hh,
+						       struct net_device *dev,
+						       unsigned char *  haddr);
+	unsigned short		flags;	/* interface flags (a la BSD)	*/
+	unsigned short		type;	/* interface hardware type	*/
+	unsigned char		addr_len;/* hardware address length	*/
+	void                    (*receive)(struct isdn_net_dev_s *p,
+					   struct isdn_net_local_s *olp,
+					   struct sk_buff *skb);
+	void                    (*connected)(struct isdn_net_local_s *lp);
+	void                    (*disconnected)(struct isdn_net_local_s *lp);
+	int                     (*bind)(struct isdn_net_local_s *lp);
+	void                    (*unbind)(struct isdn_net_local_s *lp);
+};
+
 /* Local interface-data */
 typedef struct isdn_net_local_s {
   spinlock_t             lock;
@@ -370,13 +401,7 @@ typedef struct isdn_net_local_s {
   char cisco_debserint;			/* debugging flag of cisco hdlc with slarp */
   struct timer_list cisco_timer;
   struct tq_struct tqueue;
-  void                   (*receive)(struct isdn_net_dev_s *p,
-				    struct isdn_net_local_s *olp,
-				    struct sk_buff *skb);
-  void                   (*connected)(struct isdn_net_local_s *lp);
-  void                   (*disconnected)(struct isdn_net_local_s *lp);
-  int                    (*bind)(struct isdn_net_local_s *lp);
-  void                   (*unbind)(struct isdn_net_local_s *lp);
+  struct isdn_netif_ops   *ops;
 } isdn_net_local;
 
 /* the interface itself */

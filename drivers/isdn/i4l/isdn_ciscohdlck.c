@@ -390,18 +390,11 @@ isdn_ciscohdlck_header(struct sk_buff *skb, struct net_device *dev,
 	return 4;
 }
 
-int
-isdn_ciscohdlck_setup(isdn_net_dev *p)
-{
-	p->dev.hard_header = isdn_ciscohdlck_header;
-	p->dev.hard_header_cache = NULL;
-	p->dev.header_cache_update = NULL;
-	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
-	p->dev.do_ioctl = isdn_ciscohdlck_dev_ioctl;
-	p->local.receive = isdn_ciscohdlck_receive;
-	p->local.connected = isdn_ciscohdlck_connected;
-	p->local.disconnected = isdn_ciscohdlck_disconnected;
-
-	return 0;
-}
-
+struct isdn_netif_ops ciscohdlck_ops = {
+	.hard_header         = isdn_ciscohdlck_header,
+	.do_ioctl            = isdn_ciscohdlck_dev_ioctl,
+	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.receive             = isdn_ciscohdlck_receive,
+	.connected           = isdn_ciscohdlck_connected,
+	.disconnected        = isdn_ciscohdlck_disconnected,
+};

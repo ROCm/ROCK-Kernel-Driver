@@ -11,6 +11,6 @@
 #ifndef ISDN_CISCOHDLCK_H
 #define ISDN_CISCOHDLCK_H
 
-int  isdn_ciscohdlck_setup(isdn_net_dev *p);
+extern struct isdn_netif_ops ciscohdlck_ops;
 
 #endif

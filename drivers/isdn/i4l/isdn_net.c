@@ -185,6 +185,22 @@ static __inline__ void isdn_net_zero_frame_cnt(isdn_net_local *lp)
 
 #define ISDN_NET_TX_TIMEOUT (20*HZ) 
 
+static struct isdn_netif_ops *netif_ops[ISDN_NET_ENCAP_NR];
+
+int
+register_isdn_netif(int encap, struct isdn_netif_ops *ops)
+{
+	if (encap < 0 || encap >= ISDN_NET_ENCAP_NR)
+		return -EINVAL;
+
+	if (netif_ops[encap])
+		return -EBUSY;
+
+	netif_ops[encap] = ops;
+
+	return 0;
+}
+
 /* Prototypes */
 
 int isdn_net_force_dial_lp(isdn_net_local *);
@@ -192,11 +208,6 @@ static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
 static void do_dialout(isdn_net_local *lp);
 
 static int isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg);
-
-static int isdn_rawip_setup(isdn_net_dev *p);
-static int isdn_ether_setup(isdn_net_dev *p);
-static int isdn_uihdlc_setup(isdn_net_dev *p);
-static int isdn_iptyp_setup(isdn_net_dev *p);
 
 char *isdn_net_revision = "$Revision: 1.140.6.11 $";
 
@@ -266,8 +277,8 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 	save_flags(flags);
 	cli();
 
-	if (lp->unbind)
-		lp->unbind(lp);
+	if (lp->ops->unbind)
+		lp->ops->unbind(lp);
 
 	skb_queue_purge(&lp->super_tx_queue);
 
@@ -305,8 +316,8 @@ isdn_net_bind_channel(isdn_net_local *lp, int idx)
 	isdn_slot_set_rx_netdev(lp->isdn_slot, lp->netdev);
 	isdn_slot_set_st_netdev(lp->isdn_slot, lp->netdev);
 
-	if (lp->bind)
-		retval = lp->bind(lp);
+	if (lp->ops->bind)
+		retval = lp->ops->bind(lp);
 
 	if (retval < 0)
 		isdn_net_unbind_channel(lp);
@@ -405,7 +416,10 @@ static void isdn_net_connected(isdn_net_local *lp)
 	lp->cps = 0;
 	lp->last_jiffies = jiffies;
 
-	lp->connected(lp);
+	if (lp->ops->connected)
+		lp->ops->connected(lp);
+	else
+		isdn_net_device_wake_queue(lp);
 }
 
 /*
@@ -563,8 +577,8 @@ isdn_net_handle_event(isdn_net_local *lp, int pr, void *arg)
 			if (!isdn_net_bound(lp))
 				break;
 
-			if (lp->disconnected)
-				lp->disconnected(lp);
+			if (lp->ops->disconnected)
+				lp->ops->disconnected(lp);
 
 			isdn_net_lp_disconnected(lp);
 			isdn_slot_all_eaz(lp->isdn_slot);
@@ -718,8 +732,8 @@ isdn_net_hangup(isdn_net_local *lp)
 			}
 		}
 		printk(KERN_INFO "isdn_net: local hangup %s\n", lp->name);
-		if (lp->disconnected)
-			lp->disconnected(lp);
+		if (lp->ops->disconnected)
+			lp->ops->disconnected(lp);
 
 		isdn_net_lp_disconnected(lp);
 
@@ -1171,7 +1185,7 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 	skb->mac.raw = skb->data;
 	isdn_dumppkt("R:", skb->data, skb->len, 40);
 
-	lp->receive(lp->netdev, olp, skb);
+	lp->ops->receive(lp->netdev, olp, skb);
 }
 
 /*
@@ -1698,7 +1712,7 @@ static int
 isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 {
 	isdn_net_local *lp = &p->local;
-	int retval;
+	int retval = 0;
 
 	if (lp->p_encap == cfg->p_encap){
 		/* nothing to do */
@@ -1715,35 +1729,21 @@ isdn_net_set_encap(isdn_net_dev *p, isdn_net_ioctl_cfg *cfg)
 		break;
 	}
 
-	lp->p_encap = cfg->p_encap;
-
-	switch (lp->p_encap) {
-	case ISDN_NET_ENCAP_SYNCPPP:
-		retval = isdn_ppp_setup(p);
-		break;
-	case ISDN_NET_ENCAP_X25IFACE:
-		retval = isdn_x25_setup(p, cfg->p_encap);
-		break;
-	case ISDN_NET_ENCAP_CISCOHDLC:
-	case ISDN_NET_ENCAP_CISCOHDLCK:
-		retval = isdn_ciscohdlck_setup(p);
-		break;
-	case ISDN_NET_ENCAP_RAWIP:
-		retval = isdn_rawip_setup(p);
-		break;
-	case ISDN_NET_ENCAP_ETHER:
-		retval = isdn_ether_setup(p);
-		break;
-	case ISDN_NET_ENCAP_UIHDLC:
-		retval = isdn_uihdlc_setup(p);
-		break;
-	case ISDN_NET_ENCAP_IPTYP:
-		retval = isdn_iptyp_setup(p);
-		break;
-	default:
+	if (cfg->p_encap < 0 || cfg->p_encap >= ISDN_NET_ENCAP_NR) {
+		lp->p_encap = -1;
+		lp->ops = NULL;
 		retval = -EINVAL;
-		break;
+		goto out;
 	}
+	p->dev.hard_header         = lp->ops->hard_header;
+	p->dev.rebuild_header      = lp->ops->rebuild_header;
+	p->dev.do_ioctl            = lp->ops->do_ioctl;
+	p->dev.hard_header_cache   = lp->ops->hard_header_cache;
+	p->dev.header_cache_update = lp->ops->header_cache_update;
+		
+	lp->p_encap = cfg->p_encap;
+	lp->ops = netif_ops[lp->p_encap];
+
 	if (retval != 0)
 		lp->p_encap = -1;
 
@@ -2268,19 +2268,12 @@ isdn_iptyp_receive(isdn_net_dev *p, isdn_net_local *olp,
 	netif_rx(skb);
 }
 
-static int
-isdn_iptyp_setup(isdn_net_dev *p)
-{
-	p->dev.hard_header = isdn_iptyp_header;
-	p->dev.hard_header_cache = NULL;
-	p->dev.header_cache_update = NULL;
-	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
-	p->local.receive = isdn_iptyp_receive;
-	p->local.connected = isdn_net_device_wake_queue;
-	p->local.disconnected = NULL;
-
-	return 0;
-}
+static struct isdn_netif_ops iptyp_ops = {
+	.hard_header         = isdn_iptyp_header,
+	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.addr_len            = 2,
+	.receive             = isdn_iptyp_receive,
+};
 
 // ISDN_NET_ENCAP_UIHDLC
 // HDLC with UI-Frames (for ispa with -h1 option) */
@@ -2307,19 +2300,12 @@ isdn_uihdlc_receive(isdn_net_dev *p, isdn_net_local *olp,
 	netif_rx(skb);
 }
 
-static int
-isdn_uihdlc_setup(isdn_net_dev *p)
-{
-	p->dev.hard_header = isdn_uihdlc_header;
-	p->dev.hard_header_cache = NULL;
-	p->dev.header_cache_update = NULL;
-	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
-	p->local.receive = isdn_uihdlc_receive;
-	p->local.connected = isdn_net_device_wake_queue;
-	p->local.disconnected = NULL;
-
-	return 0;
-}
+static struct isdn_netif_ops uihdlc_ops = {
+	.hard_header         = isdn_uihdlc_header,
+	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.addr_len            = 2,
+	.receive             = isdn_uihdlc_receive,
+};
 
 // ISDN_NET_ENCAP_RAWIP
 // RAW-IP without MAC-Header
@@ -2336,19 +2322,10 @@ isdn_rawip_receive(isdn_net_dev *p, isdn_net_local *olp,
 	netif_rx(skb);
 }
 
-static int
-isdn_rawip_setup(isdn_net_dev *p)
-{
-	p->dev.hard_header = NULL;
-	p->dev.hard_header_cache = NULL;
-	p->dev.header_cache_update = NULL;
-	p->dev.flags = IFF_NOARP|IFF_POINTOPOINT;
-	p->local.receive = isdn_rawip_receive;
-	p->local.connected = isdn_net_device_wake_queue;
-	p->local.disconnected = NULL;
-
-	return 0;
-}
+static struct isdn_netif_ops rawip_ops = {
+	.flags               = IFF_NOARP | IFF_POINTOPOINT,
+	.receive             = isdn_rawip_receive,
+};
 
 // ISDN_NET_ENCAP_ETHER
 // Ethernet over ISDN
@@ -2419,17 +2396,32 @@ isdn_ether_receive(isdn_net_dev *p, isdn_net_local *olp,
 	netif_rx(skb);
 }
 
-static int
-isdn_ether_setup(isdn_net_dev *p)
-{
-	p->dev.hard_header = eth_header;
-	p->dev.hard_header_cache = eth_header_cache;
-	p->dev.header_cache_update = eth_header_cache_update;
-	p->dev.rebuild_header = eth_rebuild_header;
-	p->dev.flags = IFF_BROADCAST | IFF_MULTICAST;
-	p->local.receive = isdn_ether_receive;
-	p->local.connected = isdn_net_device_wake_queue;
-	p->local.disconnected = NULL;
+static struct isdn_netif_ops ether_ops = {
+	.hard_header         = eth_header,
+	.hard_header_cache   = eth_header_cache,
+	.header_cache_update = eth_header_cache_update,
+	.rebuild_header      = eth_rebuild_header,
+	.flags               = IFF_BROADCAST | IFF_MULTICAST,
+	.type                = ARPHRD_ETHER,
+	.addr_len            = ETH_ALEN,
+	.receive             = isdn_ether_receive,
+};
 
-	return 0;
+// ======================================================================
+
+void
+isdn_net_init_module(void)
+{
+	register_isdn_netif(ISDN_NET_ENCAP_ETHER,      &ether_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_RAWIP,      &rawip_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_IPTYP,      &iptyp_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_UIHDLC,     &uihdlc_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_CISCOHDLC,  &ciscohdlck_ops);
+	register_isdn_netif(ISDN_NET_ENCAP_CISCOHDLCK, &ciscohdlck_ops);
+#ifdef CONFIG_ISDN_X25
+	register_isdn_netif(ISDN_NET_ENCAP_X25IFACE,   &isdn_x25_ops);
+#endif
+#ifdef CONFIG_ISDN_PPP
+	register_isdn_netif(ISDN_NET_ENCAP_SYNCPPP,    &isdn_ppp_ops);
+#endif
 }
