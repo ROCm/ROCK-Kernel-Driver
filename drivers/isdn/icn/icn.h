@@ -174,7 +174,7 @@ typedef struct icn_card {
 typedef struct icn_dev {
 	spinlock_t devlock;     /* spinlock to protect this struct  */
 	unsigned long memaddr;	/* Address of memory mapped buffers */
-	icn_shmem *shmem;       /* Pointer to memory-mapped-buffers */
+	icn_shmem __iomem *shmem;       /* Pointer to memory-mapped-buffers */
 	int mvalid;             /* IO-shmem has been requested      */
 	int channel;            /* Currently mapped channel         */
 	struct icn_card *mcard; /* Currently mapped card            */
