@@ -21,6 +21,7 @@
 #include <sound/driver.h>
 #include <linux/time.h>
 #include <linux/slab.h>
+#include <linux/compat.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include "ioctl32.h"
@@ -136,15 +137,10 @@ struct sndrv_pcm_channel_info32 {
 	COPY(step);\
 }
 
-struct timeval32 {
-	s32 tv_sec;
-	s32 tv_usec;
-} __attribute__((packed));
-
 struct sndrv_pcm_status32 {
 	s32 state;
-	struct timeval32 trigger_tstamp;
-	struct timeval32 tstamp;
+	struct compat_timespec trigger_tstamp;
+	struct compat_timespec tstamp;
 	u32 appl_ptr;
 	u32 hw_ptr;
 	s32 delay;
@@ -159,9 +155,9 @@ struct sndrv_pcm_status32 {
 {\
 	COPY(state);\
 	COPY(trigger_tstamp.tv_sec);\
-	COPY(trigger_tstamp.tv_usec);\
+	COPY(trigger_tstamp.tv_nsec);\
 	COPY(tstamp.tv_sec);\
-	COPY(tstamp.tv_usec);\
+	COPY(tstamp.tv_nsec);\
 	COPY(appl_ptr);\
 	COPY(hw_ptr);\
 	COPY(delay);\
