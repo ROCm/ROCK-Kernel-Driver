@@ -82,7 +82,7 @@ static void sg_proc_cleanup(void);
 #define SG_ALLOW_DIO_DEF 0
 #define SG_ALLOW_DIO_CODE /* compile out by commenting this define */
 
-#define SG_MAX_DEVS 8192
+#define SG_MAX_DEVS 32768
 
 /*
  * Suppose you want to calculate the formula muldiv(x,m,d)=int(x * m / d)
