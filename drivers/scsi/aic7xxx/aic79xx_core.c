@@ -37,7 +37,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#193 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic79xx.c#194 $
  *
  * $FreeBSD$
  */
@@ -8500,7 +8500,7 @@ sized:
 }
 
 void
-ahd_dump_all_cards_state()
+ahd_dump_all_cards_state(void)
 {
 	struct ahd_softc *list_ahd;
 

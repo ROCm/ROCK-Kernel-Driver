@@ -1,7 +1,7 @@
 /*
  * Adaptec AIC79xx device driver for Linux.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#168 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.c#169 $
  *
  * --------------------------------------------------------------------------
  * Copyright (c) 1994-2000 Justin T. Gibbs.
@@ -2179,7 +2179,7 @@ ahd_linux_register_host(struct ahd_softc *ahd, Scsi_Host_Template *template)
 }
 
 uint64_t
-ahd_linux_get_memsize()
+ahd_linux_get_memsize(void)
 {
 	struct sysinfo si;
 
@@ -2194,7 +2194,7 @@ ahd_linux_get_memsize()
  * scenario.
  */
 static int
-ahd_linux_next_unit()
+ahd_linux_next_unit(void)
 {
 	struct ahd_softc *ahd;
 	int unit;

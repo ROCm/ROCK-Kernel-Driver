@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#146 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#147 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -778,7 +778,7 @@ ahc_done_unlock(struct ahc_softc *ahc, unsigned long *flags)
 }
 
 static __inline void
-ahc_list_lockinit()
+ahc_list_lockinit(void)
 {
 	spin_lock_init(&ahc_list_spinlock);
 }
