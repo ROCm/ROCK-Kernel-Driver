@@ -1851,7 +1851,7 @@ static int wl3501_get_freq(struct net_device *dev, struct iw_request_info *info,
 {
 	struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 
-	wrqu->freq.m = wl3501_chan2freq[this->chan] * 100000;
+	wrqu->freq.m = wl3501_chan2freq[this->chan - 1] * 100000;
 	wrqu->freq.e = 1;
 	return 0;
 }
