@@ -360,7 +360,7 @@ acpi_battery_read_info (
 
 	ACPI_FUNCTION_TRACE("acpi_battery_read_info");
 
-	if (!battery)
+	if (!battery || (off != 0))
 		goto end;
 
 	if (battery->flags.present)
@@ -459,7 +459,7 @@ acpi_battery_read_state (
 
 	ACPI_FUNCTION_TRACE("acpi_battery_read_state");
 
-	if (!battery)
+	if (!battery || (off != 0))
 		goto end;
 
 	if (battery->flags.present)
@@ -543,7 +543,7 @@ acpi_battery_read_alarm (
 
 	ACPI_FUNCTION_TRACE("acpi_battery_read_alarm");
 
-	if (!battery)
+	if (!battery || (off != 0))
 		goto end;
 
 	if (!battery->flags.present) {
