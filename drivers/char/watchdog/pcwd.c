@@ -70,7 +70,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-#define WD_VER                  "1.16 (03/27/2004)"
+#define WD_VER                  "1.16 (06/12/2004)"
 #define PFX			"pcwd: "
 
 /*
@@ -299,10 +299,11 @@ static int pcwd_stop(void)
 	return 0;
 }
 
-static void pcwd_keepalive(void)
+static int pcwd_keepalive(void)
 {
 	/* user land ping */
 	next_heartbeat = jiffies + (heartbeat * HZ);
+	return 0;
 }
 
 static int pcwd_set_heartbeat(int t)
@@ -529,12 +530,12 @@ static int pcwd_close(struct inode *inode, struct file *file)
 {
 	if (expect_close == 42) {
 		pcwd_stop();
-		atomic_inc( &open_allowed );
 	} else {
 		printk(KERN_CRIT PFX "Unexpected close, not stopping watchdog!\n");
 		pcwd_keepalive();
 	}
 	expect_close = 0;
+	atomic_inc( &open_allowed );
 	return 0;
 }
 

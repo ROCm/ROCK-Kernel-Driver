@@ -190,26 +190,26 @@ cifs_stats_read(char *buf, char **beginBuffer, off_t offset,
 	struct cifsTconInfo *tcon;
 
 	length = sprintf(buf,
-			"Currently Allocated structures\nCIFS Sessions: %d\n",
+			"Resources in use\nCIFS Session: %d\n",
 			sesInfoAllocCount.counter);
 	buf += length;
 	item_length = 
-		sprintf(buf,"Shares (unique mount targets): %d\n",
+		sprintf(buf,"Share (unique mount targets): %d\n",
 			tconInfoAllocCount.counter);
 	length += item_length;
 	buf += item_length;      
 	item_length = 
-		sprintf(buf,"Allocated SMB Request/Response Buffers: %d\n",
+		sprintf(buf,"SMB Request/Response Buffer: %d\n",
 			bufAllocCount.counter);
 	length += item_length;
 	buf += item_length;      
 	item_length = 
-		sprintf(buf,"Active Operations (MIDs in use): %d\n",
+		sprintf(buf,"Operations (MIDs): %d\n",
 			midCount.counter);
 	length += item_length;
 	buf += item_length;
 	item_length = sprintf(buf,
-		"%d sessions and %d shares reconnected after failure\n",
+		"\n%d session %d share reconnects\n",
 		tcpSesReconnectCount.counter,tconInfoReconnectCount.counter);
 	length += item_length;
 	buf += item_length;
@@ -400,7 +400,7 @@ cifsFYI_read(char *page, char **start, off_t off, int count,
 	return len;
 }
 static int
-cifsFYI_write(struct file *file, const char *buffer,
+cifsFYI_write(struct file *file, const char __user *buffer,
 	      unsigned long count, void *data)
 {
 	char c;
@@ -439,7 +439,7 @@ oplockEnabled_read(char *page, char **start, off_t off,
 	return len;
 }
 static int
-oplockEnabled_write(struct file *file, const char *buffer,
+oplockEnabled_write(struct file *file, const char __user *buffer,
 		    unsigned long count, void *data)
 {
 	char c;
@@ -479,7 +479,7 @@ quotaEnabled_read(char *page, char **start, off_t off,
         return len;
 }
 static int
-quotaEnabled_write(struct file *file, const char *buffer,
+quotaEnabled_write(struct file *file, const char __user *buffer,
                     unsigned long count, void *data)
 {
         char c;
@@ -519,7 +519,7 @@ linuxExtensionsEnabled_read(char *page, char **start, off_t off,
         return len;
 }
 static int
-linuxExtensionsEnabled_write(struct file *file, const char *buffer,
+linuxExtensionsEnabled_write(struct file *file, const char __user *buffer,
                     unsigned long count, void *data)
 {
         char c;
@@ -559,7 +559,7 @@ lookupFlag_read(char *page, char **start, off_t off,
 	return len;
 }
 static int
-lookupFlag_write(struct file *file, const char *buffer,
+lookupFlag_write(struct file *file, const char __user *buffer,
 		    unsigned long count, void *data)
 {
 	char c;
@@ -597,7 +597,7 @@ traceSMB_read(char *page, char **start, off_t off, int count,
 	return len;
 }
 static int
-traceSMB_write(struct file *file, const char *buffer,
+traceSMB_write(struct file *file, const char __user *buffer,
 	       unsigned long count, void *data)
 {
 	char c;
@@ -636,7 +636,7 @@ multiuser_mount_read(char *page, char **start, off_t off,
 	return len;
 }
 static int
-multiuser_mount_write(struct file *file, const char *buffer,
+multiuser_mount_write(struct file *file, const char __user *buffer,
 		      unsigned long count, void *data)
 {
 	char c;
@@ -675,7 +675,7 @@ extended_security_read(char *page, char **start, off_t off,
 	return len;
 }
 static int
-extended_security_write(struct file *file, const char *buffer,
+extended_security_write(struct file *file, const char __user *buffer,
 			unsigned long count, void *data)
 {
 	char c;
@@ -714,7 +714,7 @@ ntlmv2_enabled_read(char *page, char **start, off_t off,
 	return len;
 }
 static int
-ntlmv2_enabled_write(struct file *file, const char *buffer,
+ntlmv2_enabled_write(struct file *file, const char __user *buffer,
 			unsigned long count, void *data)
 {
 	char c;
@@ -753,7 +753,7 @@ packet_signing_enabled_read(char *page, char **start, off_t off,
 	return len;
 }
 static int
-packet_signing_enabled_write(struct file *file, const char *buffer,
+packet_signing_enabled_write(struct file *file, const char __user *buffer,
 			unsigned long count, void *data)
 {
 	char c;
