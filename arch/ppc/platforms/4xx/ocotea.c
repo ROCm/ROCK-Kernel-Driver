@@ -47,6 +47,7 @@
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 #include <asm/ppc4xx_pic.h>
+#include <asm/ppcboot.h>
 
 #include <syslib/ibm440gx_common.h>
 
@@ -58,13 +59,25 @@
 #include "../../../../drivers/net/ibm_emac/ibm_emac_phy.h"
 
 extern void abort(void);
+bd_t __res;
+
+static struct ibm44x_clocks clocks;
+
+static int __init
+ocotea_get_dec_freq(void)
+{
+	if (mfspr(SPRN_CCR1) & CCR1_TCS)
+		return OCOTEA_TMR_CLK;
+	else
+		return clocks.cpu;
+}
 
 static void __init
 ocotea_calibrate_decr(void)
 {
 	unsigned int freq;
 
-	freq = OCOTEA_SYSCLK;
+	freq = ocotea_get_dec_freq();
 
 	tb_ticks_per_jiffy = freq / HZ;
 	tb_to_us = mulhwu_scale_factor(freq, 1000000);
@@ -105,6 +118,46 @@ ocotea_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 
 	const long min_idsel = 1, max_idsel = 4, irqs_per_slot = 4;
 	return PCI_IRQ_TABLE_LOOKUP;
+}
+
+static void __init ocotea_set_emacdata(void)
+{
+	struct ocp_def *def;
+	struct ocp_func_emac_data *emacdata;
+	int i;
+
+	/*
+	 * Note: Current rev. board only operates in Group 4a
+	 * mode, so we always set EMAC0-1 for SMII and EMAC2-3
+	 * for RGMII (though these could run in RTBI just the same).
+	 *
+	 * The FPGA reg 3 information isn't even suitable for
+	 * determining the phy_mode, so if the board becomes
+	 * usable in !4a, it will be necessary to parse an environment
+	 * variable from the firmware or similar to properly configure
+	 * the phy_map/phy_mode.
+	 */
+	/* Set phy_map, phy_mode, and mac_addr for each EMAC */
+	for (i=0; i<4; i++) {
+		def = ocp_get_one_device(OCP_VENDOR_IBM, OCP_FUNC_EMAC, i);
+		emacdata = def->additions;
+		if (i < 2) {
+			emacdata->phy_map = 0x00000001;	/* Skip 0x00 */
+			emacdata->phy_mode = PHY_MODE_SMII;
+		}
+		else {
+			emacdata->phy_map = 0x0000ffff; /* Skip 0x00-0x0f */
+			emacdata->phy_mode = PHY_MODE_RGMII;
+		}
+		if (i == 0)
+			memcpy(emacdata->mac_addr, __res.bi_enetaddr, 6);
+		else if (i == 1)
+			memcpy(emacdata->mac_addr, __res.bi_enet1addr, 6);
+		else if (i == 2)
+			memcpy(emacdata->mac_addr, __res.bi_enet2addr, 6);
+		else if (i == 3)
+			memcpy(emacdata->mac_addr, __res.bi_enet3addr, 6);
+	}
 }
 
 #define PCIX_READW(offset) \
@@ -209,7 +262,7 @@ ocotea_setup_hose(void)
 TODC_ALLOC();
 
 static void __init
-ocotea_early_serial_map(const struct ibm44x_clocks *clks)
+ocotea_early_serial_map(void)
 {
 	struct uart_port port;
 
@@ -217,7 +270,7 @@ ocotea_early_serial_map(const struct ibm44x_clocks *clks)
 	memset(&port, 0, sizeof(port));
 	port.membase = ioremap64(PPC440GX_UART0_ADDR, 8);
 	port.irq = UART0_INT;
-	port.uartclk = clks->uart0;
+	port.uartclk = clocks.uart0;
 	port.regshift = 0;
 	port.iotype = SERIAL_IO_MEM;
 	port.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST;
@@ -229,7 +282,7 @@ ocotea_early_serial_map(const struct ibm44x_clocks *clks)
 
 	port.membase = ioremap64(PPC440GX_UART1_ADDR, 8);
 	port.irq = UART1_INT;
-	port.uartclk = clks->uart1;
+	port.uartclk = clocks.uart1;
 	port.line = 1;
 
 	if (early_serial_setup(&port) != 0) {
@@ -240,41 +293,7 @@ ocotea_early_serial_map(const struct ibm44x_clocks *clks)
 static void __init
 ocotea_setup_arch(void)
 {
-	unsigned char *addr;
-	unsigned long long mac64;
-	struct ocp_def *def;
-	struct ocp_func_emac_data *emacdata;
-	int i;
-	struct ibm44x_clocks clocks;
-
-	/*
-	 * Note: Current rev. board only operates in Group 4a
-	 * mode, so we always set EMAC0-1 for SMII and EMAC2-3
-	 * for RGMII (though these could run in RTBI just the same).
-	 *
-	 * The FPGA reg 3 information isn't even suitable for
-	 * determining the phy_mode, so if the board becomes
-	 * usable in !4a, it will be necessary to parse an environment
-	 * variable from the firmware or similar to properly configure
-	 * the phy_map/phy_mode.
-	 */
-	/* Set phy_map, phy_mode, and mac_addr for each EMAC */
-	addr = ioremap64(OCOTEA_MAC_BASE, OCOTEA_MAC_SIZE);
-	for (i=0; i<4; i++) {
-		mac64 = simple_strtoull(addr+OCOTEA_MAC_OFFSET*i, 0, 16);
-		def = ocp_get_one_device(OCP_VENDOR_IBM, OCP_FUNC_EMAC, i);
-		emacdata = def->additions;
-		if (i < 2) {
-			emacdata->phy_map = 0x00000001;	/* Skip 0x00 */
-			emacdata->phy_mode = PHY_MODE_SMII;
-		}
-		else {
-			emacdata->phy_map = 0x0000ffff; /* Skip 0x00-0x0f */
-			emacdata->phy_mode = PHY_MODE_RGMII;
-		}
-		memcpy(emacdata->mac_addr, (char *)&mac64+2, 6);
-	}
-	iounmap(addr);
+	ocotea_set_emacdata();
 
 	ibm440gx_tah_enable();
 
@@ -319,7 +338,7 @@ ocotea_setup_arch(void)
 		ROOT_DEV = Root_HDA1;
 #endif
 
-	ocotea_early_serial_map(&clocks);
+	ocotea_early_serial_map();
 
 	/* Identify the system */
 	printk("IBM Ocotea port (MontaVista Software, Inc. <source@mvista.com>)\n");
@@ -454,19 +473,17 @@ ocotea_progress(char *s, unsigned short hex)
 }
 #endif /* CONFIG_SERIAL_TEXT_DEBUG */
 
-#if 0
-static void __init
-ocotea_map_io(void)
-{
-	io_block_mapping(0xe0000000, 0x0000000140000000,
-			 0x00001000, _PAGE_IO);
-}
-#endif
-
 void __init platform_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7)
 {
-	parse_bootinfo((struct bi_record *) (r3 + KERNELBASE));
+	parse_bootinfo(find_bootinfo());
+
+	/*
+	 * If we were passed in a board information, copy it into the
+	 * residual data area.
+	 */
+	if (r3)
+		__res = *(bd_t *)(r3 + KERNELBASE);
 
 	/* Disable L2-Cache due to hardware issues */
 	ibm440gx_l2c_disable();
