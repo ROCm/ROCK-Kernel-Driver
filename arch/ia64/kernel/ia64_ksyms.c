@@ -60,7 +60,9 @@ EXPORT_SYMBOL(clear_page);
 #ifdef CONFIG_VIRTUAL_MEM_MAP
 #include <asm/pgtable.h>
 EXPORT_SYMBOL(vmalloc_end);
+#ifndef CONFIG_DISCONTIGMEM
 EXPORT_SYMBOL(ia64_pfn_valid);
+#endif
 #endif
 
 #include <asm/processor.h>
