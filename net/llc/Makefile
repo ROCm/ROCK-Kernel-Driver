@@ -15,7 +15,7 @@
 obj-$(CONFIG_LLC_CORE) += llc_core.o
 
 llc_core-y := llc_mac.o llc_sap.o llc_s_st.o llc_s_ac.o llc_s_ev.o llc_main.o \
-	      llc_actn.o llc_stat.o llc_evnt.o
+	      llc_actn.o llc_stat.o llc_evnt.o llc_output.o
 
 obj-$(CONFIG_LLC2) += llc2.o
 

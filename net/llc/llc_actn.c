@@ -23,6 +23,7 @@
 #include <net/llc_evnt.h>
 #include <net/llc_pdu.h>
 #include <net/llc_mac.h>
+#include "llc_output.h"
 
 int llc_station_ac_start_ack_timer(struct llc_station *station,
 				   struct sk_buff *skb)
@@ -67,13 +68,17 @@ int llc_station_ac_send_null_dsap_xid_c(struct llc_station *station,
 
 	if (!nskb)
 		goto out;
-	rc = 0;
 	llc_pdu_header_init(nskb, LLC_PDU_TYPE_U, 0, 0, LLC_PDU_CMD);
 	llc_pdu_init_as_xid_cmd(nskb, LLC_XID_NULL_CLASS_2, 127);
-	lan_hdrs_init(nskb, station->mac_sa, station->mac_sa);
+	rc = llc_mac_hdr_init(nskb, station->mac_sa, station->mac_sa);
+	if (rc)
+		goto free;
 	llc_station_send_pdu(station, nskb);
 out:
 	return rc;
+free:
+	kfree_skb(skb);
+	goto out;
 }
 
 int llc_station_ac_send_xid_r(struct llc_station *station,
@@ -91,10 +96,15 @@ int llc_station_ac_send_xid_r(struct llc_station *station,
 	llc_pdu_decode_ssap(skb, &dsap);
 	llc_pdu_header_init(nskb, LLC_PDU_TYPE_U, 0, dsap, LLC_PDU_RSP);
 	llc_pdu_init_as_xid_rsp(nskb, LLC_XID_NULL_CLASS_2, 127);
-	lan_hdrs_init(nskb, station->mac_sa, mac_da);
+	rc = llc_mac_hdr_init(nskb, station->mac_sa, mac_da);
+	if (rc)
+		goto free;
 	llc_station_send_pdu(station, nskb);
 out:
 	return rc;
+free:
+	kfree_skb(skb);
+	goto out;
 }
 
 int llc_station_ac_send_test_r(struct llc_station *station,
@@ -112,10 +122,15 @@ int llc_station_ac_send_test_r(struct llc_station *station,
 	llc_pdu_decode_ssap(skb, &dsap);
 	llc_pdu_header_init(nskb, LLC_PDU_TYPE_U, 0, dsap, LLC_PDU_RSP);
        	llc_pdu_init_as_test_rsp(nskb, skb);
-	lan_hdrs_init(nskb, station->mac_sa, mac_da);
+	rc = llc_mac_hdr_init(nskb, station->mac_sa, mac_da);
+	if (rc)
+		goto free;
 	llc_station_send_pdu(station, nskb);
 out:
 	return rc;
+free:
+	kfree_skb(skb);
+	goto out;
 }
 
 int llc_station_ac_report_status(struct llc_station *station,
