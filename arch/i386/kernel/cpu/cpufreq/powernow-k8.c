@@ -44,7 +44,6 @@ static u32 numps;	/* number of p-states, from PSB */
 static u32 rvo;		/* ramp voltage offset, from PSB */
 static u32 irt;		/* isochronous relief time, from PSB */
 static u32 vidmvs;	/* usable value calculated from mvs, from PSB */
-struct pst_s *ppst;	/* array of p states, valid for this part */
 static u32 currvid;	/* keep track of the current fid / vid */
 static u32 currfid;
 
@@ -540,6 +539,7 @@ find_psb_table(void)
 {
 	struct psb_s *psb;
 	struct pst_s *pst;
+	struct pst_s *ppst;
 	unsigned i, j;
 	u32 lastfid;
 	u32 mvs;
@@ -718,10 +718,13 @@ find_psb_table(void)
 		       currfid, currvid);
 
 		for (j = 0; j < numps; j++)
-			if ((ppst[j].fid==currfid) && (ppst[j].vid==currvid))
+			if ((ppst[j].fid==currfid) && (ppst[j].vid==currvid)) {
+				kfree(ppst);
 				return 0;
+			}
 
 		printk(KERN_ERR BFX "currfid/vid do not match PST, ignoring\n");
+		kfree(ppst);
 		return 0;
 	}
 
@@ -865,9 +868,6 @@ powernowk8_cpu_init(struct cpufreq_policy *pol)
 		return -EINVAL;
 	}
 
-	if (!ppst)
-		return -EINVAL;
-
 	printk(KERN_INFO PFX "cpu_init done, current fid 0x%x, vid 0x%x\n",
 	       currfid, currvid);
 
@@ -891,7 +891,6 @@ powernowk8_init(void)
 
 	if (pending_bit_stuck()) {
 		printk(KERN_ERR PFX "powernowk8_init fail, change pending bit set\n");
-		kfree(ppst);
 		return -EIO;
 	}
 
@@ -905,7 +904,6 @@ powernowk8_exit(void)
 	dprintk(KERN_INFO PFX "powernowk8_exit\n");
 
 	cpufreq_unregister_driver(&cpufreq_amd64_driver);
-	kfree(ppst);
 }
 
 MODULE_AUTHOR("Paul Devriendt <paul.devriendt@amd.com>");
