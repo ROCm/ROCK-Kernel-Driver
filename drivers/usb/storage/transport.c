@@ -790,13 +790,14 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* if the command gets aborted by the higher layers, we need to
 	 * short-circuit all other processing
 	 */
-	if (result == USB_STOR_TRANSPORT_ABORTED) {
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 		US_DEBUGP("-- transport indicates command was aborted\n");
 		srb->result = DID_ABORT << 16;
 		return;
 	}
 
 	/* if there is a transport error, reset and don't auto-sense */
+	/* What if we want to abort during the reset? */
 	if (result == USB_STOR_TRANSPORT_ERROR) {
 		US_DEBUGP("-- transport indicates error, resetting\n");
 		us->transport_reset(us);
@@ -904,7 +905,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		srb->sc_data_direction = old_sc_data_direction;
 		memcpy(srb->cmnd, old_cmnd, MAX_COMMAND_SIZE);
 
-		if (temp_result == USB_STOR_TRANSPORT_ABORTED) {
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
 			US_DEBUGP("-- auto-sense aborted\n");
 			srb->result = DID_ABORT << 16;
 			return;
@@ -917,6 +918,7 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 			 * auto-sense is perfectly valid
 			 */
 			if (!(us->flags & US_FL_SCM_MULT_TARG)) {
+				/* What if we try to abort during the reset? */
 				us->transport_reset(us);
 			}
 			srb->result = DID_ERROR << 16;

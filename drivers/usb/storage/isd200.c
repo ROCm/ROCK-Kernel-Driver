@@ -818,11 +818,22 @@ void isd200_invoke_transport( struct us_data *us,
 {
 	int need_auto_sense = 0;
 	int transferStatus;
+	int result;
 
 	/* send the command to the transport layer */
 	srb->resid = 0;
 	transferStatus = isd200_Bulk_transport(us, srb, ataCdb,
 					       sizeof(ataCdb->generic));
+
+	/* if the command gets aborted by the higher layers, we need to
+	 * short-circuit all other processing
+	 */
+	if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+		US_DEBUGP("-- transport indicates command was aborted\n");
+		srb->result = DID_ABORT << 16;
+		return;
+	}
+
 	switch (transferStatus) {
 
 	case ISD200_TRANSPORT_GOOD:
@@ -866,9 +877,14 @@ void isd200_invoke_transport( struct us_data *us,
        
 	}
 
-	if (need_auto_sense)
-		if (isd200_read_regs(us) == ISD200_GOOD)
+	if (need_auto_sense) {
+		result = isd200_read_regs(us);
+		if (atomic_read(&us->sm_state) == US_STATE_ABORTING) {
+			US_DEBUGP("-- auto-sense aborted\n");
+			srb->result = DID_ABORT << 16;
+		} else if (result == ISD200_GOOD)
 			isd200_build_sense(us, srb);
+	}
 
 	/* Regardless of auto-sense, if we _know_ we have an error
 	 * condition, show that in the result code
