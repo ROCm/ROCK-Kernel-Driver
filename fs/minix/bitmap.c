@@ -13,6 +13,7 @@
 
 #include "minix.h"
 #include <linux/locks.h>
+#include <linux/smp_lock.h>
 
 #include <asm/bitops.h>
 
@@ -72,9 +73,11 @@ void minix_free_block(struct inode * inode, int block)
 		return;
 	}
 	bh = sbi->s_zmap[zone];
+	lock_kernel();
 	if (!minix_test_and_clear_bit(bit,bh->b_data))
 		printk("free_block (%s:%d): bit already cleared\n",
 		       sb->s_id, block);
+	unlock_kernel();
 	mark_buffer_dirty(bh);
 	return;
 }
@@ -90,6 +93,7 @@ int minix_new_block(struct inode * inode)
 		printk("trying to get new block from nonexistent device\n");
 		return 0;
 	}
+	lock_kernel();
 repeat:
 	j = 8192;
 	bh = NULL;
@@ -98,12 +102,15 @@ repeat:
 		if ((j = minix_find_first_zero_bit(bh->b_data, 8192)) < 8192)
 			break;
 	}
-	if (!bh || j >= 8192)
+	if (!bh || j >= 8192) {
+		unlock_kernel();
 		return 0;
+	}
 	if (minix_test_and_set_bit(j,bh->b_data)) {
 		printk("new_block: bit already set");
 		goto repeat;
 	}
+	unlock_kernel();
 	mark_buffer_dirty(bh);
 	j += i*8192 + sbi->s_firstdatazone-1;
 	if (j < sbi->s_firstdatazone ||

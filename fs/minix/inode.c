@@ -534,12 +534,10 @@ int minix_sync_inode(struct inode * inode)
  */
 void minix_truncate(struct inode * inode)
 {
-	lock_kernel();
 	if (INODE_VERSION(inode) == MINIX_V1)
 		V1_minix_truncate(inode);
 	else
 		V2_minix_truncate(inode);
-	unlock_kernel();
 }
 
 static struct super_block *minix_get_sb(struct file_system_type *fs_type,
