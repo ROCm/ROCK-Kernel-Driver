@@ -282,6 +282,7 @@ void __init
 setup_arch (char **cmdline_p)
 {
 	extern unsigned long ia64_iobase;
+	unsigned long phys_iobase;
 
 	unw_init();
 
@@ -322,16 +323,16 @@ setup_arch (char **cmdline_p)
 	 *  clear in future SAL specs. We'll fall back to getting it out of
 	 *  AR.KR0 if no appropriate entry is found in the memory map.
 	 */
-	ia64_iobase = efi_get_iobase();
-	if (ia64_iobase)
+	phys_iobase = efi_get_iobase();
+	if (phys_iobase)
 		/* set AR.KR0 since this is all we use it for anyway */
-		ia64_set_kr(IA64_KR_IO_BASE, ia64_iobase);
+		ia64_set_kr(IA64_KR_IO_BASE, phys_iobase);
 	else {
-		ia64_iobase = ia64_get_kr(IA64_KR_IO_BASE);
+		phys_iobase = ia64_get_kr(IA64_KR_IO_BASE);
 		printk("No I/O port range found in EFI memory map, falling back to AR.KR0\n");
-		printk("I/O port base = 0x%lx\n", ia64_iobase);
+		printk("I/O port base = 0x%lx\n", phys_iobase);
 	}
-	ia64_iobase = __IA64_UNCACHED_OFFSET | (ia64_iobase & ~PAGE_OFFSET);
+	ia64_iobase = ioremap(phys_iobase);
 
 #ifdef CONFIG_SMP
 	cpu_physical_id(0) = hard_smp_processor_id();

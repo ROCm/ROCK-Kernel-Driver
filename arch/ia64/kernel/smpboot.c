@@ -345,6 +345,11 @@ smp_callin (void)
 	 */
 	ia64_init_itm();
 
+	/*
+	 * Set I/O port base per CPU
+	 */
+	ia64_set_kr(IA64_KR_IO_BASE, __pa(ia64_iobase));
+
 #ifdef CONFIG_IA64_MCA
 	ia64_mca_cmc_vector_setup();	/* Setup vector on AP & enable */
 	ia64_mca_check_errors();	/* For post-failure MCA error logging */
