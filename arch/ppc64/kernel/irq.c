@@ -40,6 +40,7 @@
 #include <linux/irq.h>
 #include <linux/proc_fs.h>
 #include <linux/random.h>
+#include <linux/bootmem.h>
 #include <linux/kallsyms.h>
 
 #include <asm/uaccess.h>
@@ -55,21 +56,262 @@
 #include <asm/machdep.h>
 #include <asm/paca.h>
 
+/*
+ * Because the name space for interrupts is so large on ppc64 systems we
+ * avoid declaring a single array of "NR_IRQ" interrupts and instead build
+ * a three level tree leading to the irq_desc_t (similar to page tables).
+ *
+ * Currently we cover 24-bit irq values:
+ *    10-bits:  the "base" dir (2-pages)
+ *     9-bits:  the "middle" dir (1-page)
+ *     5-bits:  the "bottom" page (1-page) holding 128byte irq_desc's.
+ *
+ * We pack a hw_irq_stat struct directly after the irq_desc in the otherwise
+ * wasted space of the cacheline.
+ *
+ * MAX_IRQS is the max this implementation will support.
+ * It is much larger than NR_IRQS which is bogus on this arch and often used
+ * to declare arrays.
+ *
+ * Note that all "undefined" mid table and bottom table pointers will point
+ * to dummy tables.  Therefore, we don't need to check for NULL on spurious
+ * interrupts.
+ */
+
+#define IRQ_BASE_INDEX_SIZE  10
+#define IRQ_MID_INDEX_SIZE  9
+#define IRQ_BOT_DESC_SIZE 5
+
+#define IRQ_BASE_PTRS	(1 << IRQ_BASE_INDEX_SIZE)
+#define IRQ_MID_PTRS	(1 << IRQ_MID_INDEX_SIZE)
+#define IRQ_BOT_DESCS (1 << IRQ_BOT_DESC_SIZE)
+
+#define IRQ_BASE_IDX_SHIFT (IRQ_MID_INDEX_SIZE + IRQ_BOT_DESC_SIZE)
+#define IRQ_MID_IDX_SHIFT (IRQ_BOT_DESC_SIZE)
+
+#define IRQ_MID_IDX_MASK  ((1 << IRQ_MID_INDEX_SIZE) - 1)
+#define IRQ_BOT_IDX_MASK  ((1 << IRQ_BOT_DESC_SIZE) - 1)
+
+
+/* The hw_irq_stat struct is stored directly after the irq_desc_t
+ * in the same cacheline.  We need to use care to make sure we don't
+ * overrun the size of the cacheline.
+ *
+ * Currently sizeof(irq_desc_t) is 32 bytes or less and this hw_irq_stat
+ * fills the rest of the cache line.
+ *
+ * The irqs_per_cpu field is an optimization for systems with 4 cpus or less
+ * to avoid allocating space for irq-per-cpu statistics (and hitting another
+ * cacheline to do the counting).  This field could be discarded.
+ */
+struct hw_irq_stat {
+	unsigned long irqs;		/* statistic per irq */
+	unsigned long *per_cpu_stats;
+	struct proc_dir_entry *irq_dir, *smp_affinity;
+	cpumask_t irq_affinity;
+	unsigned long irqs_per_cpu[4];
+};
+static inline struct hw_irq_stat *get_irq_stat(irq_desc_t *desc)
+{
+	/* WARNING: this assume lock is the last field! */
+	return (struct hw_irq_stat *)(&desc->lock+1);
+}
+static inline unsigned long *get_irq_per_cpu(struct hw_irq_stat *hw)
+{
+	return hw->per_cpu_stats;
+}
+
 #ifdef CONFIG_SMP
 extern void iSeries_smp_message_recv( struct pt_regs * );
 #endif
 
-volatile unsigned char *chrp_int_ack_special;
 static void register_irq_proc (unsigned int irq);
-
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
-	[0 ... NR_IRQS-1] = {
-		.lock = SPIN_LOCK_UNLOCKED
-	}
-};
+static irq_desc_t *add_irq_desc(unsigned int irq);
 	
 int ppc_spurious_interrupts = 0;
 unsigned long lpEvent_count = 0;
+
+extern int mem_init_done;
+
+irq_desc_t **irq_desc_base_dir[IRQ_BASE_PTRS] __page_aligned = {0};
+irq_desc_t **irq_desc_mid_null;
+irq_desc_t *irq_desc_bot_null;
+
+static inline irq_desc_t **get_irq_mid_table(unsigned int irq)
+{
+	/* Assume irq < MAX_IRQS so we won't index off the end. */
+	return irq_desc_base_dir[irq >> IRQ_BASE_IDX_SHIFT];
+}
+
+static inline irq_desc_t *get_irq_bot_table(unsigned int irq,
+					    irq_desc_t **mid_ptr)
+{
+	return mid_ptr[(irq >> IRQ_MID_IDX_SHIFT) & IRQ_MID_IDX_MASK];
+}
+
+
+/* This should be inline. */
+void *_get_irq_desc(unsigned int irq)
+{
+	irq_desc_t **mid_table, *bot_table, *desc;
+
+	mid_table = get_irq_mid_table(irq);
+	bot_table = get_irq_bot_table(irq, mid_table);
+
+	desc = bot_table + (irq & IRQ_BOT_IDX_MASK);
+	return desc;
+}
+
+/* This is used by the for_each_irq(i) macro to iterate quickly over
+ * all interrupt.  It optimizes by skipping over ptrs to the null tables
+ * when possible, but it may produce false positives.
+ */
+unsigned int _next_irq(unsigned int irq)
+{
+	irq_desc_t **mid_table, *bot_table;
+
+	irq++;
+	/* Easy case first...staying on the current bot_table. */
+	if (irq & IRQ_BOT_IDX_MASK)
+		return irq;
+
+	/* Now skip empty mid tables */
+	while (irq < MAX_IRQS &&
+	       (mid_table = get_irq_mid_table(irq)) == irq_desc_mid_null) {
+		/* index to the next base index (i.e. the next mid table) */
+		irq = (irq & ~(IRQ_BASE_IDX_SHIFT-1)) + IRQ_BASE_IDX_SHIFT;
+	}
+	/* And skip empty bot tables */
+	while (irq < MAX_IRQS &&
+	       (bot_table = get_irq_bot_table(irq, mid_table)) == irq_desc_bot_null) {
+		/* index to the next mid index (i.e. the next bot table) */
+		irq = (irq & ~(IRQ_MID_IDX_SHIFT-1)) + IRQ_MID_IDX_SHIFT;
+	}
+	return irq;
+}
+
+
+/* Same as get_irq_desc(irq) except it will "fault in" a real desc as needed
+ * rather than return the null entry.
+ * This is used by code that is actually defining the irq.
+ *
+ * NULL may be returned on memory allocation failure.  In general, init code
+ * doesn't look for this, but setup_irq does.  In this failure case the desc
+ * is left pointing at the null pages so callers of get_irq_desc() should
+ * always return something.
+ */
+void *_get_real_irq_desc(unsigned int irq)
+{
+	irq_desc_t *desc = get_irq_desc(irq);
+	if (((unsigned long)desc & PAGE_MASK) ==
+	    (unsigned long)irq_desc_bot_null) {
+		desc = add_irq_desc(irq);
+	}
+	return desc;
+}
+
+/* Allocate an irq middle page and init entries to null page. */
+static irq_desc_t **alloc_irq_mid_page(void)
+{
+	irq_desc_t **m, **ent;
+
+	if (mem_init_done)
+		m = (irq_desc_t **)__get_free_page(GFP_KERNEL);
+	else
+		m = (irq_desc_t **)alloc_bootmem_pages(PAGE_SIZE);
+	if (m) {
+		for (ent = m; ent < m + IRQ_MID_PTRS; ent++) {
+			*ent = irq_desc_bot_null;
+		}
+	}
+	return m;
+}
+
+/* Allocate an irq bottom page and init the entries. */
+static irq_desc_t *alloc_irq_bot_page(void)
+{
+	irq_desc_t *b, *ent;
+	if (mem_init_done)
+		b = (irq_desc_t *)get_zeroed_page(GFP_KERNEL);
+	else
+		b = (irq_desc_t *)alloc_bootmem_pages(PAGE_SIZE);
+	if (b) {
+		for (ent = b; ent < b + IRQ_BOT_DESCS; ent++) {
+			ent->lock = SPIN_LOCK_UNLOCKED;
+		}
+	}
+	return b;
+}
+
+/*
+ * The universe of interrupt numbers ranges from 0 to 2^24.
+ * Use a sparsely populated tree to map from the irq to the handler.
+ * Top level is 2 contiguous pages, covering the 10 most significant 
+ * bits.  Mid level is 1 page, covering 9 bits.  Last page covering
+ * 5 bits is the irq_desc, each of which is 128B.
+ */
+static void irq_desc_init(void) {
+	irq_desc_t ***entry_p;
+
+	/* 
+	 * Now initialize the tables to point though the NULL tables for
+	 * the default case of no interrupt handler (spurious).
+	 */
+	irq_desc_bot_null = alloc_irq_bot_page();
+	irq_desc_mid_null = alloc_irq_mid_page();
+	if (!irq_desc_bot_null || !irq_desc_mid_null)
+		panic("irq_desc_init: could not allocate pages\n");
+	for(entry_p = irq_desc_base_dir;
+	    entry_p < irq_desc_base_dir + IRQ_BASE_PTRS;
+	    entry_p++) {
+		*entry_p = irq_desc_mid_null;
+	}
+}
+
+/*
+ * Add a new irq desc for the given irq if needed.
+ * This breaks any ptr to the "null" middle or "bottom" irq desc page.
+ * Note that we don't ever coalesce pages as the interrupts are released.
+ * This isn't worth the effort.  We add the cpu stats info when the
+ * interrupt is actually requested.
+ *
+ * May return NULL if memory could not be allocated.
+ */
+static irq_desc_t *add_irq_desc(unsigned int irq)
+{
+	irq_desc_t **mid_table_p, *bot_table_p;
+
+	mid_table_p = get_irq_mid_table(irq); 
+	if(mid_table_p == irq_desc_mid_null) {
+		/* No mid table for this IRQ - create it */
+		mid_table_p = alloc_irq_mid_page();
+		if (!mid_table_p) return NULL;
+		irq_desc_base_dir[irq >> IRQ_BASE_IDX_SHIFT] = mid_table_p;
+	}
+
+	bot_table_p = (irq_desc_t *)(*(mid_table_p + ((irq >> 5) & 0x1ff)));
+
+	if(bot_table_p == irq_desc_bot_null) {
+		/* No bot table for this IRQ - create it */
+		bot_table_p = alloc_irq_bot_page();
+		if (!bot_table_p) return NULL;
+		mid_table_p[(irq >> IRQ_MID_IDX_SHIFT) & IRQ_MID_IDX_MASK] = bot_table_p;
+	}
+
+	return bot_table_p + (irq & IRQ_BOT_IDX_MASK);
+}
+
+void allocate_per_cpu_stats(struct hw_irq_stat *hwstat)
+{
+	unsigned long *p;
+
+	if (mem_init_done) {
+		p = (unsigned long *)kmalloc(sizeof(long)*NR_CPUS, GFP_KERNEL);
+		if (p) memset(p, 0, sizeof(long)*NR_CPUS);
+	} else
+		p = (unsigned long *)alloc_bootmem(sizeof(long)*NR_CPUS);
+	hwstat->per_cpu_stats = p;
+}
 
 int
 setup_irq(unsigned int irq, struct irqaction * new)
@@ -77,8 +319,26 @@ setup_irq(unsigned int irq, struct irqaction * new)
 	int shared = 0;
 	unsigned long flags;
 	struct irqaction *old, **p;
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_real_irq_desc(irq);
+	struct hw_irq_stat *hwstat;
 
+	if (!desc)
+		return -ENOMEM;
+
+	ppc_md.init_irq_desc(desc);
+
+	hwstat = get_irq_stat(desc);
+
+#ifdef CONFIG_IRQ_ALL_CPUS
+	hwstat->irq_affinity = CPU_MASK_ALL;
+#else
+	hwstat->irq_affinity = CPU_MASK_NONE;
+#endif
+
+	/* Now is the time to add per-cpu kstat data to the desc
+	 * since it appears we are actually going to use the irq.
+	 */
+	allocate_per_cpu_stats(hwstat);
 	/*
 	 * Some drivers like serial.c use request_irq() heavily,
 	 * so we have to be careful not to interfere with a
@@ -133,7 +393,7 @@ setup_irq(unsigned int irq, struct irqaction * new)
 
 inline void synchronize_irq(unsigned int irq)
 {
-	while (irq_desc[irq].status & IRQ_INPROGRESS)
+	while (get_irq_desc(irq)->status & IRQ_INPROGRESS)
 		cpu_relax();
 }
 
@@ -147,11 +407,10 @@ EXPORT_SYMBOL(synchronize_irq);
 static int
 do_free_irq(int irq, void* dev_id)
 {
-	irq_desc_t *desc;
+	irq_desc_t *desc = get_irq_desc(irq);
 	struct irqaction **p;
 	unsigned long flags;
 
-	desc = irq_desc + irq;
 	spin_lock_irqsave(&desc->lock,flags);
 	p = &desc->action;
 	for (;;) {
@@ -182,41 +441,6 @@ do_free_irq(int irq, void* dev_id)
 	return -ENOENT;
 }
 
-int request_irq(unsigned int irq,
-	irqreturn_t (*handler)(int, void *, struct pt_regs *),
-	unsigned long irqflags, const char * devname, void *dev_id)
-{
-	struct irqaction *action;
-	int retval;
-
-	if (irq >= NR_IRQS)
-		return -EINVAL;
-	if (!handler)
-		/* We could implement really free_irq() instead of that... */
-		return do_free_irq(irq, dev_id);
-	
-	action = (struct irqaction *)
-		kmalloc(sizeof(struct irqaction), GFP_KERNEL);
-	if (!action) {
-		printk(KERN_ERR "kmalloc() failed for irq %d !\n", irq);
-		return -ENOMEM;
-	}
-	
-	action->handler = handler;
-	action->flags = irqflags;					
-	action->mask = 0;
-	action->name = devname;
-	action->dev_id = dev_id;
-	action->next = NULL;
-	
-	retval = setup_irq(irq, action);
-	if (retval)
-		kfree(action);
-		
-	return 0;
-}
-
-EXPORT_SYMBOL(request_irq);
 
 void free_irq(unsigned int irq, void *dev_id)
 {
@@ -245,7 +469,7 @@ EXPORT_SYMBOL(free_irq);
  
 inline void disable_irq_nosync(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_irq_desc(irq);
 	unsigned long flags;
 
 	spin_lock_irqsave(&desc->lock, flags);
@@ -274,7 +498,7 @@ EXPORT_SYMBOL(disable_irq_nosync);
  
 void disable_irq(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_irq_desc(irq);
 	disable_irq_nosync(irq);
 	if (desc->action)
 		synchronize_irq(irq);
@@ -294,13 +518,13 @@ EXPORT_SYMBOL(disable_irq);
  
 void enable_irq(unsigned int irq)
 {
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_irq_desc(irq);
 	unsigned long flags;
 
 	spin_lock_irqsave(&desc->lock, flags);
 	switch (desc->depth) {
 	case 1: {
-		unsigned int status = desc->status & ~(IRQ_DISABLED | IRQ_INPROGRESS);
+		unsigned int status = desc->status & ~IRQ_DISABLED;
 		desc->status = status;
 		if ((status & (IRQ_PENDING | IRQ_REPLAY)) == IRQ_PENDING) {
 			desc->status = status | IRQ_REPLAY;
@@ -321,10 +545,49 @@ void enable_irq(unsigned int irq)
 
 EXPORT_SYMBOL(enable_irq);
 
+int request_irq(unsigned int irq,
+	irqreturn_t (*handler)(int, void *, struct pt_regs *),
+	unsigned long irqflags, const char * devname, void *dev_id)
+{
+	struct irqaction *action;
+	int retval;
+
+	if (irq >= MAX_IRQS)
+		return -EINVAL;
+	if (!handler)
+		/* We could implement really free_irq() instead of that... */
+		return do_free_irq(irq, dev_id);
+	
+	action = (struct irqaction *)
+		kmalloc(sizeof(struct irqaction), GFP_KERNEL);
+	if (!action) {
+		printk(KERN_ERR "kmalloc() failed for irq %d !\n", irq);
+		return -ENOMEM;
+	}
+	
+	action->handler = handler;
+	action->flags = irqflags;					
+	action->mask = 0;
+	action->name = devname;
+	action->dev_id = dev_id;
+	action->next = NULL;
+	
+	retval = setup_irq(irq, action);
+	if (retval)
+		kfree(action);
+		
+	return 0;
+}
+
+EXPORT_SYMBOL(request_irq);
+
 int show_interrupts(struct seq_file *p, void *v)
 {
 	int i = *(loff_t *) v, j;
 	struct irqaction * action;
+	irq_desc_t *desc;
+	struct hw_irq_stat *hwstat;
+	unsigned long *per_cpus;
 	unsigned long flags;
 
 	if (i == 0) {
@@ -337,30 +600,33 @@ int show_interrupts(struct seq_file *p, void *v)
 	}
 
 	if (i < NR_IRQS) {
-		spin_lock_irqsave(&irq_desc[i].lock, flags);
-		action = irq_desc[i].action;
+		desc = get_irq_desc(i);
+		spin_lock_irqsave(&desc->lock, flags);
+		action = desc->action;
 		if (!action || !action->handler)
 			goto skip;
-		seq_printf(p, "%3d: ", i);		
-#ifdef CONFIG_SMP
-		for (j = 0; j < NR_CPUS; j++) {
-			if (cpu_online(j))
-				seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
+		seq_printf(p, "%3d: ", i);
+		hwstat = get_irq_stat(desc);
+		per_cpus = get_irq_per_cpu(hwstat);
+		if (per_cpus) {
+			for (j = 0; j < NR_CPUS; j++) {
+				if (cpu_online(j))
+					seq_printf(p, "%10lu ", per_cpus[j]);
+			}
+		} else {
+			seq_printf(p, "%10lu ", hwstat->irqs);
 		}
-#else		
-		seq_printf(p, "%10u ", kstat_irqs(i));
-#endif /* CONFIG_SMP */
-		if (irq_desc[i].handler)		
-			seq_printf(p, " %s ", irq_desc[i].handler->typename );
+		if (get_irq_desc(i)->handler)		
+			seq_printf(p, " %s ", get_irq_desc(i)->handler->typename );
 		else
 			seq_printf(p, "  None      ");
-		seq_printf(p, "%s", (irq_desc[i].status & IRQ_LEVEL) ? "Level " : "Edge  ");
+		seq_printf(p, "%s", (get_irq_desc(i)->status & IRQ_LEVEL) ? "Level " : "Edge  ");
 		seq_printf(p, "    %s",action->name);
 		for (action=action->next; action; action = action->next)
 			seq_printf(p, ", %s", action->name);
 		seq_putc(p, '\n');
 skip:
-		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
+		spin_unlock_irqrestore(&desc->lock, flags);
 	} else if (i == NR_IRQS)
 		seq_printf(p, "BAD: %10u\n", ppc_spurious_interrupts);
 	return 0;
@@ -476,9 +742,17 @@ void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq)
 	int status;
 	struct irqaction *action;
 	int cpu = smp_processor_id();
-	irq_desc_t *desc = irq_desc + irq;
+	irq_desc_t *desc = get_irq_desc(irq);
+	struct hw_irq_stat *hwstat;
+	unsigned long *per_cpus;
 
-	kstat_cpu(cpu).irqs[irq]++;
+	/* Statistics. */
+	hwstat = get_irq_stat(desc);	/* same cache line as desc */
+	hwstat->irqs++;
+	per_cpus = get_irq_per_cpu(hwstat); /* same cache line for < 8 cpus */
+	if (per_cpus)
+		per_cpus[cpu]++;
+
 	spin_lock(&desc->lock);
 	ack_irq(irq);	
 	/*
@@ -552,26 +826,23 @@ out:
 	 * The ->end() handler has to deal with interrupts which got
 	 * disabled while the handler was running.
 	 */
-	if (irq_desc[irq].handler) {
-		if (irq_desc[irq].handler->end)
-			irq_desc[irq].handler->end(irq);
-		else if (irq_desc[irq].handler->enable)
-			irq_desc[irq].handler->enable(irq);
+	if (desc->handler) {
+		if (desc->handler->end)
+			desc->handler->end(irq);
+		else if (desc->handler->enable)
+			desc->handler->enable(irq);
 	}
 	spin_unlock(&desc->lock);
 }
 
+#ifdef CONFIG_PPC_ISERIES
 int do_IRQ(struct pt_regs *regs)
 {
-	int irq, first = 1;
-#ifdef CONFIG_PPC_ISERIES
 	struct paca_struct *lpaca;
 	struct ItLpQueue *lpq;
-#endif
 
 	irq_enter();
 
-#ifdef CONFIG_PPC_ISERIES
 	lpaca = get_paca();
 #ifdef CONFIG_SMP
 	if (lpaca->xLpPaca.xIntDword.xFields.xIpiCnt) {
@@ -582,7 +853,26 @@ int do_IRQ(struct pt_regs *regs)
 	lpq = lpaca->lpQueuePtr;
 	if (lpq && ItLpQueue_isLpIntPending(lpq))
 		lpEvent_count += ItLpQueue_process(lpq, regs);
-#else
+
+	irq_exit();
+
+	if (lpaca->xLpPaca.xIntDword.xFields.xDecrInt) {
+		lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
+		/* Signal a fake decrementer interrupt */
+		timer_interrupt(regs);
+	}
+
+	return 1; /* lets ret_from_int know we can do checks */
+}
+
+#else	/* CONFIG_PPC_ISERIES */
+
+int do_IRQ(struct pt_regs *regs)
+{
+	int irq, first = 1;
+
+	irq_enter();
+
 	/*
 	 * Every arch is required to implement ppc_md.get_irq.
 	 * This function will either return an irq number or -1 to
@@ -598,20 +888,12 @@ int do_IRQ(struct pt_regs *regs)
 	if (irq != -2 && first)
 		/* That's not SMP safe ... but who cares ? */
 		ppc_spurious_interrupts++;
-#endif
 
 	irq_exit();
 
-#ifdef CONFIG_PPC_ISERIES
-	if (lpaca->xLpPaca.xIntDword.xFields.xDecrInt) {
-		lpaca->xLpPaca.xIntDword.xFields.xDecrInt = 0;
-		/* Signal a fake decrementer interrupt */
-		timer_interrupt(regs);
-	}
-#endif
-
 	return 1; /* lets ret_from_int know we can do checks */
 }
+#endif	/* CONFIG_PPC_ISERIES */
 
 unsigned long probe_irq_on (void)
 {
@@ -636,28 +918,35 @@ void __init init_IRQ(void)
 {
 	static int once = 0;
 
-	if ( once )
+	if (once)
 		return;
-	else
-		once++;
-	
+
+	once++;
+
+	/* Initialize the irq tree */
+	irq_desc_init();
+
 	ppc_md.init_IRQ();
 }
 
 static struct proc_dir_entry * root_irq_dir;
-static struct proc_dir_entry * irq_dir [NR_IRQS];
-static struct proc_dir_entry * smp_affinity_entry [NR_IRQS];
 
-#ifdef CONFIG_IRQ_ALL_CPUS
-cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_ALL };
-#else  /* CONFIG_IRQ_ALL_CPUS */
-cpumask_t irq_affinity [NR_IRQS] = { [0 ... NR_IRQS-1] = CPU_MASK_NONE };
-#endif /* CONFIG_IRQ_ALL_CPUS */
+/* XXX Fix this when we clean up large irq support */
+cpumask_t get_irq_affinity(unsigned int irq)
+{
+	irq_desc_t *desc = get_irq_desc(irq);
+	struct hw_irq_stat *hwstat = get_irq_stat(desc);
+
+	return hwstat->irq_affinity;
+}
 
 static int irq_affinity_read_proc (char *page, char **start, off_t off,
 			int count, int *eof, void *data)
 {
-	int len = cpumask_snprintf(page, count, irq_affinity[(long)data]);
+	unsigned int irq = (long)data;
+	irq_desc_t *desc = get_irq_desc(irq);
+	struct hw_irq_stat *hwstat = get_irq_stat(desc);
+	int len = cpumask_snprintf(page, count, hwstat->irq_affinity);
 	if (count - len < 2)
 		return -EINVAL;
 	len += sprintf(page + len, "\n");
@@ -667,15 +956,27 @@ static int irq_affinity_read_proc (char *page, char **start, off_t off,
 static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
-	int irq = (long)data, full_count = count, err;
+	unsigned int irq = (long)data;
+	irq_desc_t *desc = get_irq_desc(irq);
+	struct hw_irq_stat *hwstat = get_irq_stat(desc);
+	int full_count = count, err;
 	cpumask_t new_value, tmp;
+	cpumask_t allcpus = CPU_MASK_ALL;
 
-	if (!irq_desc[irq].handler->set_affinity)
+	if (!desc->handler->set_affinity)
 		return -EIO;
 
 	err = cpumask_parse(buffer, count, new_value);
 	if (err)
 		return err;
+
+	/* 
+	 * We check for CPU_MASK_ALL in xics to send irqs to all cpus.
+	 * In some cases CPU_MASK_ALL is smaller than the cpumask (eg
+	 * NR_CPUS == 32 and cpumask is a long), so we mask it here to
+	 * be consistent.
+	 */
+	cpus_and(new_value, new_value, allcpus);
 
 	/*
 	 * Do not allow disabling IRQs completely - it's a too easy
@@ -686,9 +987,8 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	if (cpus_empty(tmp))
 		return -EINVAL;
 
-	irq_affinity[irq] = new_value;
-	irq_desc[irq].handler->set_affinity(irq, new_value);
-
+	hwstat->irq_affinity = new_value;
+	desc->handler->set_affinity(irq, new_value);
 	return full_count;
 }
 
@@ -737,18 +1037,24 @@ static void register_irq_proc (unsigned int irq)
 {
 	struct proc_dir_entry *entry;
 	char name [MAX_NAMELEN];
+	irq_desc_t *desc;
+	struct hw_irq_stat *hwstat;
 
-	if (!root_irq_dir || (irq_desc[irq].handler == NULL) || irq_dir[irq])
+	desc = get_real_irq_desc(irq);
+	if (!root_irq_dir || !desc || !desc->handler)
+		return;
+	hwstat = get_irq_stat(desc);
+	if (hwstat->irq_dir)
 		return;
 
 	memset(name, 0, MAX_NAMELEN);
 	sprintf(name, "%d", irq);
 
 	/* create /proc/irq/1234 */
-	irq_dir[irq] = proc_mkdir(name, root_irq_dir);
+	hwstat->irq_dir = proc_mkdir(name, root_irq_dir);	
 
 	/* create /proc/irq/1234/smp_affinity */
-	entry = create_proc_entry("smp_affinity", 0600, irq_dir[irq]);
+	entry = create_proc_entry("smp_affinity", 0600, hwstat->irq_dir);
 
 	if (entry) {
 		entry->nlink = 1;
@@ -756,8 +1062,7 @@ static void register_irq_proc (unsigned int irq)
 		entry->read_proc = irq_affinity_read_proc;
 		entry->write_proc = irq_affinity_write_proc;
 	}
-
-	smp_affinity_entry[irq] = entry;
+	hwstat->smp_affinity = entry;
 }
 
 unsigned long prof_cpu_mask = -1;
@@ -784,8 +1089,8 @@ void init_irq_proc (void)
 	/*
 	 * Create entries for all existing IRQs.
 	 */
-	for (i = 0; i < NR_IRQS; i++) {
-		if (irq_desc[i].handler == NULL)
+	for_each_irq(i) {
+		if (get_irq_desc(i)->handler == NULL)
 			continue;
 		register_irq_proc(i);
 	}

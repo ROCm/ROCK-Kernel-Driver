@@ -15,6 +15,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
+#include <linux/stat.h>
 #include <linux/pci.h>
 #include <linux/stat.h>
 

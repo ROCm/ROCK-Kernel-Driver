@@ -38,4 +38,6 @@ obj-$(CONFIG_BLK_DEV_DAC960)	+= DAC960.o
 obj-$(CONFIG_BLK_DEV_UMEM)	+= umem.o
 obj-$(CONFIG_BLK_DEV_NBD)	+= nbd.o
 obj-$(CONFIG_BLK_DEV_CRYPTOLOOP) += cryptoloop.o
+
+obj-$(CONFIG_VIODASD)		+= viodasd.o
 obj-$(CONFIG_CIPHER_TWOFISH) 	+= loop_fish2.o

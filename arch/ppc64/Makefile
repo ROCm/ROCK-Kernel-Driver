@@ -15,15 +15,25 @@
 
 KERNELLOAD	:= 0xc000000000000000
 
+HAS_BIARCH      := $(shell if $(CC) -m64 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
+ifeq ($(HAS_BIARCH),y)
+AS              := $(AS) -64
+LD              := $(LD) -m elf64ppc
+CC		:= $(CC) -m64
+endif
+
 LDFLAGS		:= -m elf64ppc
 LDFLAGS_vmlinux	:= -Bstatic -e $(KERNELLOAD) -Ttext $(KERNELLOAD)
 CFLAGS		+= -msoft-float -pipe -Wno-uninitialized -mminimal-toc \
-		-mcpu=power4
+		   -mtraceback=none
 
-have_zero_bss := $(shell if $(CC) -fno-zero-initialized-in-bss -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi)
-
-ifeq ($(have_zero_bss),y)
-CFLAGS		+= -fno-zero-initialized-in-bss
+HAS_POWER4	:= $(shell if $(CC) -mcpu=power4 -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo y; else echo n; fi;)
+ifeq ($(HAS_POWER4),y)
+ifeq ($(CONFIG_POWER4_ONLY),y)
+CFLAGS		+= -mcpu=power4
+else
+CFLAGS		+= -mtune=power4
+endif
 endif
 
 head-y := arch/ppc64/kernel/head.o
@@ -32,6 +42,11 @@ libs-y				+= arch/ppc64/lib/
 core-y				+= arch/ppc64/kernel/
 core-y				+= arch/ppc64/mm/
 core-$(CONFIG_XMON)		+= arch/ppc64/xmon/
+ifeq ($(CONFIG_KDB),y)
+  # Use ifeq for now because kdb subdirs are not in bk yet
+  # Otherwise make mrproper will die because it also cleans core-n
+  core-y			+= arch/ppc64/kdb/
+endif
 drivers-$(CONFIG_OPROFILE)	+= arch/ppc64/oprofile/
 
 boot := arch/ppc64/boot
@@ -46,6 +61,8 @@ bootimage-$(CONFIG_PPC_ISERIES) := vmlinux.sm
 BOOTIMAGE := $(bootimage-y)
 install: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) BOOTIMAGE=$(BOOTIMAGE) $@
+
+all: $(BOOTIMAGE)
 
 archclean:
 	$(Q)$(MAKE) $(clean)=$(boot)

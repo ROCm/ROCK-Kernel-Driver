@@ -2074,9 +2074,18 @@ config IXGB_NAPI
 endmenu
 
 
-config VETH
+config ISERIES_VETH
 	tristate "iSeries Virtual Ethernet driver support"
 	depends on NETDEVICES && PPC_ISERIES
+
+config IBMVETH
+	tristate "IBM LAN Virtual Ethernet support"
+	depends on NET_ETHERNET && PPC_PSERIES
+	---help---
+	  This is the Virtual Ethernet adapter driver.  
+
+	  To compile this driver as a module, choose M here and read
+	  <file:Documentation/networking/net-modules.txt>. 
 
 config FDDI
 	bool "FDDI driver support"

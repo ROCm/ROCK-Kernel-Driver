@@ -21,6 +21,13 @@
 
 struct cpu_spec* cur_cpu_spec = NULL;
 
+/* NOTE:
+ * Unlike ppc32, ppc64 will only call this once for the boot CPU, it's
+ * the responsibility of the appropriate CPU save/restore functions to
+ * eventually copy these settings over. Those save/restore aren't yet
+ * part of the cputable though. That has to be fixed for both ppc32
+ * and ppc64
+ */
 extern void __setup_cpu_power3(unsigned long offset, struct cpu_spec* spec);
 extern void __setup_cpu_power4(unsigned long offset, struct cpu_spec* spec);
 
@@ -30,8 +37,10 @@ extern void __setup_cpu_power4(unsigned long offset, struct cpu_spec* spec);
  */
 #ifdef CONFIG_ALTIVEC
 #define CPU_FTR_ALTIVEC_COMP	CPU_FTR_ALTIVEC
+#define PPC_FEATURE_HAS_ALTIVEC_COMP PPC_FEATURE_HAS_ALTIVEC
 #else
 #define CPU_FTR_ALTIVEC_COMP	0
+#define PPC_FEATURE_HAS_ALTIVEC_COMP    0
 #endif
 
 struct cpu_spec	cpu_specs[] = {
@@ -107,6 +116,24 @@ struct cpu_spec	cpu_specs[] = {
 	    __setup_cpu_power4,
 	    COMMON_PPC64_FW
     },
+    {	/* PPC970 */
+	    0xffff0000, 0x00390000, "PPC970",
+	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+	    CPU_FTR_PPCAS_ARCH_V2 | CPU_FTR_ALTIVEC_COMP,
+	    COMMON_USER_PPC64 | PPC_FEATURE_HAS_ALTIVEC_COMP,
+	    128, 128,
+	    __setup_cpu_power4,
+	    COMMON_PPC64_FW
+    },
+    {	/* Power5 */
+	    0xffff0000, 0x003a0000, "Power5",
+	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
+	    CPU_FTR_PPCAS_ARCH_V2,
+	    COMMON_USER_PPC64,
+	    128, 128,
+	    __setup_cpu_power4,
+	    COMMON_PPC64_FW
+    },
     {	/* default match */
 	    0x00000000, 0x00000000, "(Power4-Compatible)",
   	    CPU_FTR_SPLIT_ID_CACHE | CPU_FTR_USE_TB | CPU_FTR_HPTE_TABLE |
@@ -130,4 +157,13 @@ firmware_feature_t firmware_features_table[FIRMWARE_MAX_FEATURES] = {
     {FW_FEATURE_DUMP,		"hcall-dump"},
     {FW_FEATURE_INTERRUPT,	"hcall-interrupt"},
     {FW_FEATURE_MIGRATE,	"hcall-migrate"},
+    {FW_FEATURE_PERFMON,	"hcall-perfmon"},
+    {FW_FEATURE_CRQ,    	"hcall-crq"},
+    {FW_FEATURE_VIO,	        "hcall-vio"},
+    {FW_FEATURE_RDMA,	        "hcall-rdma"},
+    {FW_FEATURE_LLAN,	        "hcall-lLAN"},
+    {FW_FEATURE_BULK,   	"hcall-bulk"},
+    {FW_FEATURE_XDABR,  	"hcall-xdabr"},
+    {FW_FEATURE_MULTITCE,	"hcall-multi-tce"},
+    {FW_FEATURE_SPLPAR,	        "hcall-splpar"},
 };

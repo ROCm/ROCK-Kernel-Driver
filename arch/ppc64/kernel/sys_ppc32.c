@@ -746,30 +746,31 @@ int ppc32_select(u32 n, u32* inp, u32* outp, u32* exp, u32 tvp_x)
 
 int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
-	int err;
+	long err;
 
 	if (stat->size > MAX_NON_LFS || !new_valid_dev(stat->dev) ||
 	    !new_valid_dev(stat->rdev))
 		return -EOVERFLOW;
 
-	err  = put_user(new_encode_dev(stat->dev), &statbuf->st_dev);
-	err |= put_user(stat->ino, &statbuf->st_ino);
-	err |= put_user(stat->mode, &statbuf->st_mode);
-	err |= put_user(stat->nlink, &statbuf->st_nlink);
-	err |= put_user(stat->uid, &statbuf->st_uid);
-	err |= put_user(stat->gid, &statbuf->st_gid);
-	err |= put_user(new_encode_dev(stat->rdev), &statbuf->st_rdev);
-	err |= put_user(stat->size, &statbuf->st_size);
-	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
-	err |= put_user(0, &statbuf->__unused1);
-	err |= put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
-	err |= put_user(0, &statbuf->__unused2);
-	err |= put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
-	err |= put_user(0, &statbuf->__unused3);
-	err |= put_user(stat->blksize, &statbuf->st_blksize);
-	err |= put_user(stat->blocks, &statbuf->st_blocks);
-	err |= put_user(0, &statbuf->__unused4[0]);
-	err |= put_user(0, &statbuf->__unused4[1]);
+	err  = verify_area(VERIFY_WRITE, statbuf, sizeof(*statbuf));
+	err |= __put_user(new_encode_dev(stat->dev), &statbuf->st_dev);
+	err |= __put_user(stat->ino, &statbuf->st_ino);
+	err |= __put_user(stat->mode, &statbuf->st_mode);
+	err |= __put_user(stat->nlink, &statbuf->st_nlink);
+	err |= __put_user(stat->uid, &statbuf->st_uid);
+	err |= __put_user(stat->gid, &statbuf->st_gid);
+	err |= __put_user(new_encode_dev(stat->rdev), &statbuf->st_rdev);
+	err |= __put_user(stat->size, &statbuf->st_size);
+	err |= __put_user(stat->atime.tv_sec, &statbuf->st_atime);
+	err |= __put_user(stat->atime.tv_nsec, &statbuf->st_atime_nsec);
+	err |= __put_user(stat->mtime.tv_sec, &statbuf->st_mtime);
+	err |= __put_user(stat->mtime.tv_nsec, &statbuf->st_mtime_nsec);
+	err |= __put_user(stat->ctime.tv_sec, &statbuf->st_ctime);
+	err |= __put_user(stat->ctime.tv_nsec, &statbuf->st_ctime_nsec);
+	err |= __put_user(stat->blksize, &statbuf->st_blksize);
+	err |= __put_user(stat->blocks, &statbuf->st_blocks);
+	err |= __put_user(0, &statbuf->__unused4[0]);
+	err |= __put_user(0, &statbuf->__unused4[1]);
 
 	return err;
 }
@@ -2106,6 +2107,10 @@ long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 		goto out;
 	if (regs->msr & MSR_FP)
 		giveup_fpu(current);
+#ifdef CONFIG_ALTIVEC
+	if (regs->msr & MSR_VEC)
+		giveup_altivec(current);
+#endif /* CONFIG_ALTIVEC */
 
 	error = do_execve32(filename, (u32*) a1, (u32*) a2, regs);
 
@@ -2126,9 +2131,25 @@ void start_thread32(struct pt_regs* regs, unsigned long nip, unsigned long sp)
 	regs->nip = nip;
 	regs->gpr[1] = sp;
 	regs->msr = MSR_USER32;
+#ifndef CONFIG_SMP
 	if (last_task_used_math == current)
 		last_task_used_math = 0;
+#endif /* CONFIG_SMP */
 	current->thread.fpscr = 0;
+	memset(current->thread.fpr, 0, sizeof(current->thread.fpr));
+#ifdef CONFIG_ALTIVEC
+#ifndef CONFIG_SMP
+	if (last_task_used_altivec == current)
+		last_task_used_altivec = 0;
+#endif /* CONFIG_SMP */
+	memset(current->thread.vr, 0, sizeof(current->thread.vr));
+	current->thread.vscr.u[0] = 0;
+	current->thread.vscr.u[1] = 0;
+	current->thread.vscr.u[2] = 0;
+	current->thread.vscr.u[3] = 0x00010000; /* Java mode disabled */
+	current->thread.vrsave = 0;
+	current->thread.used_vr = 0;
+#endif /* CONFIG_ALTIVEC */
 }
 
 extern asmlinkage int sys_prctl(int option, unsigned long arg2, unsigned long arg3,
@@ -2878,3 +2899,46 @@ long ppc32_fadvise64(int fd, u32 unused, u32 offset_high, u32 offset_low,
 			     advice);
 }
 
+long ppc32_fadvise64_64(int fd, int advice, u32 offset_high, u32 offset_low,
+			u32 len_high, u32 len_low)
+{
+	return sys_fadvise64(fd, (u64)offset_high << 32 | offset_low,
+			     (u64)len_high << 32 | len_low, advice);
+}
+
+extern long sys_timer_create(clockid_t, sigevent_t *, timer_t *);
+
+long ppc32_timer_create(clockid_t clock,
+			struct compat_sigevent __user *ev32,
+			timer_t __user *timer_id)
+{
+	sigevent_t event;
+	timer_t t;
+	long err;
+	mm_segment_t savefs;
+
+	if (ev32 == NULL)
+		return sys_timer_create(clock, NULL, timer_id);
+
+	memset(&event, 0, sizeof(event));
+	if (!access_ok(VERIFY_READ, ev32, sizeof(struct compat_sigevent))
+	    || __get_user(event.sigev_value.sival_int,
+			  &ev32->sigev_value.sival_int)
+	    || __get_user(event.sigev_signo, &ev32->sigev_signo)
+	    || __get_user(event.sigev_notify, &ev32->sigev_notify)
+	    || __get_user(event.sigev_notify_thread_id,
+			  &ev32->sigev_notify_thread_id))
+		return -EFAULT;
+
+	if (!access_ok(VERIFY_WRITE, timer_id, sizeof(timer_t)))
+		return -EFAULT;
+
+	savefs = get_fs();
+	err = sys_timer_create(clock, &event, &t);
+	set_fs(savefs);
+
+	if (err == 0)
+		err = __put_user(t, timer_id);
+
+	return err;
+}

@@ -16,13 +16,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
-
-#ifndef  _HVTYPES_H
-#include <asm/iSeries/HvTypes.h>
-#endif
-
 #ifndef _HVCALLSC_H
 #define _HVCALLSC_H
+
+#include <asm/iSeries/HvTypes.h>
 
 #define HvCallBase		0x8000000000000000
 #define HvCallCc		0x8001000000000000

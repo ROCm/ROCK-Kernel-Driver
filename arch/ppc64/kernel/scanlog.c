@@ -28,6 +28,7 @@
 #include <asm/uaccess.h>
 #include <asm/rtas.h>
 #include <asm/prom.h>
+#include <asm/proc_fs.h>
 
 #define MODULE_VERSION "1.0"
 #define MODULE_NAME "scanlog"
@@ -42,9 +43,6 @@
 static int scanlog_debug;
 static unsigned int ibm_scan_log_dump;			/* RTAS token */
 static struct proc_dir_entry *proc_ppc64_scan_log_dump;	/* The proc file */
-
-extern struct proc_dir_entry *proc_rtas;
-
 
 static ssize_t scanlog_read(struct file *file, char *buf,
 			    size_t count, loff_t *ppos)
@@ -214,15 +212,16 @@ int __init scanlog_init(void)
 		return -EIO;
 	}
 
-	if (proc_rtas == NULL)
-                proc_rtas = proc_mkdir("rtas", 0);
+	if (proc_ppc64.rtas == NULL) {
+		proc_ppc64_init();
+	}
 
-	if (proc_rtas == NULL) {
+	if (proc_ppc64.rtas == NULL) {
 		printk(KERN_ERR "Failed to create /proc/rtas in scanlog_init\n");
 		return -EIO;
 	}
 
-        ent = create_proc_entry("scan-log-dump",  S_IRUSR, proc_rtas);
+        ent = create_proc_entry("scan-log-dump",  S_IRUSR, proc_ppc64.rtas);
 	if (ent) {
 		ent->proc_fops = &scanlog_fops;
 		/* Ideally we could allocate a buffer < 4G */
