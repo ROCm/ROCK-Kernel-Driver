@@ -320,8 +320,8 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 
 		if ((reg_config1 & 0x2A) != 0x00
 		 || reg_convrate > 0x0A) {
-			dev_dbg(&client->dev,
-				"LM90 detection failed at 0x%02x.\n"
+			dev_dbg(&adapter->dev,
+				"LM90 detection failed at 0x%02x.\n",
 				address);
 			goto exit_free;
 		}
