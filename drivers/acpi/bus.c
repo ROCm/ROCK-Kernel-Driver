@@ -62,123 +62,6 @@ struct proc_dir_entry		*acpi_root_dir;
                           Linux Driver Model (LDM) Support
    -------------------------------------------------------------------------- */
 
-#ifdef CONFIG_LDM
-
-static int acpi_device_probe(struct device *dev);
-static int acpi_device_remove(struct device *dev);
-static int acpi_device_suspend(struct device *dev, u32 state, u32 stage);
-static int acpi_device_resume(struct device *dev, u32 stage);
-
-static struct device_driver acpi_bus_driver = {
-	.probe = acpi_device_probe,
-	.remove = acpi_device_remove,	
-	.suspend = acpi_device_suspend,
-	.resume = acpi_device_resume,
-};
-
-
-static int
-acpi_device_probe (
-	struct device		*dev)
-{
-	ACPI_FUNCTION_TRACE("acpi_device_probe");
-
-	if (!dev)
-		return_VALUE(-EINVAL);
-
-	/* TBD */
-
-	return_VALUE(0);
-}
-
-
-static int
-acpi_device_remove (
-	struct device		*dev)
-{
-	ACPI_FUNCTION_TRACE("acpi_device_remove");
-
-	if (!dev)
-		return_VALUE(-EINVAL);
-
-	/* TBD */
-
-	return_VALUE(0);
-}
-
-
-static int
-acpi_device_suspend (
-	struct device		*dev,
-	u32			state,
-	u32			stage)
-{
-	ACPI_FUNCTION_TRACE("acpi_device_suspend");
-
-	if (!dev)
-		return_VALUE(-EINVAL);
-
-	/* TBD */
-
-	return_VALUE(0);
-}
-
-
-static int
-acpi_device_resume (
-	struct device		*dev,
-	u32			stage)
-{
-	ACPI_FUNCTION_TRACE("acpi_device_resume");
-
-	if (!dev)
-		return_VALUE(-EINVAL);
-
-	/* TBD */
-
-	return_VALUE(0);
-}
-
-#if 0 /* not used ATM */
-static int
-acpi_platform_add (
-	struct device		*dev)
-{
-	ACPI_FUNCTION_TRACE("acpi_platform_add");
-
-	if (!dev)
-		return -EINVAL;
-
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device %s (%s) added\n",
-		dev->name, dev->bus_id));
-
-	/* TBD */
-
-	return_VALUE(0);
-}
-
-
-static int
-acpi_platform_remove (
-	struct device		*dev)
-{
-	ACPI_FUNCTION_TRACE("acpi_platform_add");
-
-	if (!dev)
-		return -EINVAL;
-
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device %s (%s) removed\n",
-		dev->name, dev->bus_id));
-
-	/* TBD */
-
-	return_VALUE(0);
-}
-#endif /* unused */
-
-
-#endif /*CONFIG_LDM*/
-
 
 static int
 acpi_device_register (
@@ -192,16 +75,13 @@ acpi_device_register (
 	if (!device)
 		return_VALUE(-EINVAL);
 
-#ifdef CONFIG_LDM
 	sprintf(device->dev.name, "ACPI device %s:%s", 
 		device->pnp.hardware_id, device->pnp.unique_id);
 	strncpy(device->dev.bus_id, device->pnp.bus_id, sizeof(acpi_bus_id));
 	if (parent)
 		device->dev.parent = &parent->dev;
-	device->dev.driver = &acpi_bus_driver;
 
 	result = device_register(&device->dev);
-#endif /*CONFIG_LDM*/
 
 	return_VALUE(result);
 }
@@ -213,12 +93,8 @@ acpi_device_unregister (
 {
 	ACPI_FUNCTION_TRACE("acpi_device_unregister");
 
-	if (!device)
-		return_VALUE(-EINVAL);
-
-#ifdef CONFIG_LDM
-	put_device(&device->dev);
-#endif /*CONFIG_LDM*/
+	if (device)
+		put_device(&device->dev);
 
 	return_VALUE(0);
 }
@@ -302,57 +178,6 @@ acpi_bus_get_status (
 
 	return_VALUE(0);
 }
-
-
-/*
-static int
-acpi_bus_create_device_fs (struct device *device)
-{
-	ACPI_FUNCTION_TRACE("acpi_bus_create_device_fs");
-
-	if (!device)
-		return_VALUE(-EINVAL);
-
-	if (device->dir.entry)
-		return_VALUE(-EEXIST);
-
-	if (!device->parent)
-		device->dir.entry = proc_mkdir(device->pnp.bus_id, NULL);
-	else
-		device->dir.entry = proc_mkdir(device->pnp.bus_id,
-			device->parent->fs.entry);
-
-	if (!device->dir.entry) {
-		printk(KERN_ERR PREFIX "Unable to create fs entry '%s'\n",
-			device->pnp.bus_id);
-		return_VALUE(-ENODEV);
-	}
-
-	return_VALUE(0);
-}
-
-
-static int
-acpi_bus_remove_device_fs (struct device *device)
-{
-	ACPI_FUNCTION_TRACE("acpi_bus_create_device_fs");
-
-	if (!device)
-		return_VALUE(-EINVAL);
-
-	if (!device->dir.entry)
-		return_VALUE(-ENODEV);
-
-	if (!device->parent)
-		remove_proc_entry(device->pnp_bus_id, NULL);
-	else
-		remove_proc_entry(device->pnp.bus_id, device->parent->fs.entry);
-
-	device->dir.entry = NULL;
-
-	return_VALUE(0);
-}
-*/
 
 
 /* --------------------------------------------------------------------------
