@@ -102,9 +102,6 @@ int __init irport_init(void)
  	int i;
 
  	for (i=0; (io[i] < 2000) && (i < 4); i++) {
- 		int ioaddr = io[i];
- 		if (check_region(ioaddr, IO_EXTENT))
- 			continue;
  		if (irport_open(i, io[i], irq[i]) != NULL)
  			return 0;
  	}
@@ -142,6 +139,14 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 
 	IRDA_DEBUG(1, "%s()\n", __FUNCTION__);
 
+	/* Lock the port that we need */
+	ret = request_region(iobase, IO_EXTENT, driver_name);
+	if (!ret) {
+		IRDA_DEBUG(0, "%s(), can't get iobase of 0x%03x\n",
+			   __FUNCTION__, iobase);
+		return NULL;
+	}
+
 	/*
 	 *  Allocate new instance of the driver
 	 */
@@ -149,6 +154,7 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
 	if (!self) {
 		ERROR("%s(), can't allocate memory for "
 		      "control block!\n", __FUNCTION__);
+		release_region(iobase, IO_EXTENT);
 		return NULL;
 	}
 	memset(self, 0, sizeof(struct irport_cb));
@@ -164,14 +170,6 @@ irport_open(int i, unsigned int iobase, unsigned int irq)
         self->io.sir_ext   = IO_EXTENT;
         self->io.irq       = irq;
         self->io.fifo_size = 16;
-
-	/* Lock the port that we need */
-	ret = request_region(self->io.sir_base, self->io.sir_ext, driver_name);
-	if (!ret) { 
-		IRDA_DEBUG(0, "%s(), can't get iobase of 0x%03x\n",
-			   __FUNCTION__, self->io.sir_base);
-		return NULL;
-	}
 
 	/* Initialize QoS for this device */
 	irda_init_max_qos_capabilies(&self->qos);
