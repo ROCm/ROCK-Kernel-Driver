@@ -55,7 +55,7 @@ ACPI_MODULE_NAME                ("acpi_processor")
 #define C3_OVERHEAD			4	/* 1us (3.579 ticks per us) */
 
 static void (*pm_idle_save)(void);
-module_param_named(max_cstate, max_cstate, uint, 0);
+module_param_named(max_cstate, max_cstate, uint, 0644);
 
 /* --------------------------------------------------------------------------
                                 Power Management
