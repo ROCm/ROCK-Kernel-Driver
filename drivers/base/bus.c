@@ -544,12 +544,11 @@ void bus_unregister(struct bus_type * bus)
 	subsystem_unregister(&bus->subsys);
 }
 
-static int __init bus_subsys_init(void)
+int __init buses_init(void)
 {
 	return subsystem_register(&bus_subsys);
 }
 
-core_initcall(bus_subsys_init);
 
 EXPORT_SYMBOL(bus_for_each_dev);
 EXPORT_SYMBOL(bus_for_each_drv);
