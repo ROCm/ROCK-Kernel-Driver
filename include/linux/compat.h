@@ -90,5 +90,12 @@ struct compat_statfs64 {
 	__u32 f_spare[5];
 };
 
+struct compat_dirent {
+	u32		d_ino;
+	compat_off_t	d_off;
+	u16		d_reclen;
+	char		d_name[256];
+};
+
 #endif /* CONFIG_COMPAT */
 #endif /* _LINUX_COMPAT_H */
