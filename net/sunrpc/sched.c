@@ -25,6 +25,7 @@
 
 #ifdef RPC_DEBUG
 #define RPCDBG_FACILITY		RPCDBG_SCHED
+#define RPC_TASK_MAGIC_ID	0xf00baa
 static int			rpc_task_id;
 #endif
 
@@ -348,12 +349,7 @@ static void __rpc_do_wake_up_task(struct rpc_task *task)
 	dprintk("RPC: %4d __rpc_wake_up_task (now %ld)\n", task->tk_pid, jiffies);
 
 #ifdef RPC_DEBUG
-	if (task->tk_magic != 0xf00baa) {
-		printk(KERN_ERR "RPC: attempt to wake up non-existing task!\n");
-		rpc_debug = ~0;
-		rpc_show_tasks();
-		return;
-	}
+	BUG_ON(task->tk_magic != RPC_TASK_MAGIC_ID);
 #endif
 	/* Has the task been executed yet? If not, we cannot wake it up! */
 	if (!RPC_IS_ACTIVATED(task)) {
@@ -771,7 +767,7 @@ void rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt, rpc_action call
 	}
 
 #ifdef RPC_DEBUG
-	task->tk_magic = 0xf00baa;
+	task->tk_magic = RPC_TASK_MAGIC_ID;
 	task->tk_pid = rpc_task_id++;
 #endif
 	/* Add to global list of all tasks */
@@ -836,12 +832,7 @@ void rpc_release_task(struct rpc_task *task)
 	dprintk("RPC: %4d release task\n", task->tk_pid);
 
 #ifdef RPC_DEBUG
-	if (task->tk_magic != 0xf00baa) {
-		printk(KERN_ERR "RPC: attempt to release a non-existing task!\n");
-		rpc_debug = ~0;
-		rpc_show_tasks();
-		return;
-	}
+	BUG_ON(task->tk_magic != RPC_TASK_MAGIC_ID);
 #endif
 
 	/* Remove from global task list */
