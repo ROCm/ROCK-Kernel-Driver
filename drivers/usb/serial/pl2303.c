@@ -148,7 +148,8 @@ static struct usb_serial_device_type pl2303_device = {
 	.shutdown =		pl2303_shutdown,
 };
 
-struct pl2303_private { 
+struct pl2303_private {
+	spinlock_t lock;
 	u8 line_control;
 	u8 termios_initialized;
 };
@@ -164,6 +165,7 @@ static int pl2303_startup (struct usb_serial *serial)
 		if (!priv)
 			return -ENOMEM;
 		memset (priv, 0x00, sizeof (struct pl2303_private));
+		spin_lock_init(&priv->lock);
 		usb_set_serial_port_data(&serial->port[i], priv);
 	}
 	return 0;
@@ -223,18 +225,21 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	int baud;
 	int i;
 
-	dbg("%s -  port %d, initialized = %d", __FUNCTION__, port->number, priv->termios_initialized);
+	dbg("%s -  port %d", __FUNCTION__, port->number);
 
 	if ((!port->tty) || (!port->tty->termios)) {
 		dbg("%s - no tty structures", __FUNCTION__);
 		return;
 	}
 
+	spin_lock(&priv->lock);
 	if (!priv->termios_initialized) {
 		*(port->tty->termios) = tty_std_termios;
 		port->tty->termios->c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 		priv->termios_initialized = 1;
 	}
+	spin_unlock(&priv->lock);
+
 	cflag = port->tty->termios->c_cflag;
 	/* check that they really want us to change something */
 	if (old_termios) {
@@ -341,11 +346,16 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	dbg ("0x21:0x20:0:0  %d", i);
 
 	if (cflag && CBAUD) {
+		u8 control;
+
+		spin_lock (&priv->lock);
 		if ((cflag && CBAUD) == B0)
 			priv->line_control &= ~(CONTROL_DTR | CONTROL_RTS);
 		else
 			priv->line_control |= (CONTROL_DTR | CONTROL_RTS);
-		set_control_lines (serial->dev, priv->line_control);
+		control = priv->line_control;
+		spin_unlock (&priv->lock);
+		set_control_lines (serial->dev, control);
 	}
 	
 	buf[0] = buf[1] = buf[2] = buf[3] = buf[4] = buf[5] = buf[6] = 0;
@@ -444,48 +454,50 @@ static void pl2303_close (struct usb_serial_port *port, struct file *filp)
 	
 	dbg("%s - port %d", __FUNCTION__, port->number);
 
-	if (serial->dev) {
-		if (port->tty) {
-			c_cflag = port->tty->termios->c_cflag;
-			if (c_cflag & HUPCL) {
-				/* drop DTR and RTS */
-				priv = usb_get_serial_port_data(port);
-				priv->line_control = 0;
-				set_control_lines (port->serial->dev,
-						   priv->line_control);
-			}
+	/* shutdown our urbs */
+	dbg("%s - shutting down urbs", __FUNCTION__);
+	result = usb_unlink_urb (port->write_urb);
+	if (result)
+		dbg("%s - usb_unlink_urb (write_urb)"
+		    " failed with reason: %d", __FUNCTION__,
+		     result);
+
+	result = usb_unlink_urb (port->read_urb);
+	if (result)
+		dbg("%s - usb_unlink_urb (read_urb) "
+		    "failed with reason: %d", __FUNCTION__,
+		     result);
+
+	result = usb_unlink_urb (port->interrupt_in_urb);
+	if (result)
+		dbg("%s - usb_unlink_urb (interrupt_in_urb)"
+		    " failed with reason: %d", __FUNCTION__,
+		     result);
+
+	if (port->tty) {
+		c_cflag = port->tty->termios->c_cflag;
+		if (c_cflag & HUPCL) {
+			/* drop DTR and RTS */
+			priv = usb_get_serial_port_data(port);
+			spin_lock (&priv->lock);
+			priv->line_control = 0;
+			spin_unlock (&priv->lock);
+			set_control_lines (port->serial->dev, 0);
 		}
-
-		/* shutdown our urbs */
-		dbg("%s - shutting down urbs", __FUNCTION__);
-		result = usb_unlink_urb (port->write_urb);
-		if (result)
-			dbg("%s - usb_unlink_urb (write_urb)"
-			    " failed with reason: %d", __FUNCTION__,
-			     result);
-
-		result = usb_unlink_urb (port->read_urb);
-		if (result)
-			dbg("%s - usb_unlink_urb (read_urb) "
-			    "failed with reason: %d", __FUNCTION__,
-			     result);
-
-		result = usb_unlink_urb (port->interrupt_in_urb);
-		if (result)
-			dbg("%s - usb_unlink_urb (interrupt_in_urb)"
-			    " failed with reason: %d", __FUNCTION__,
-			     result);
 	}
+
 }
 
 static int set_modem_info (struct usb_serial_port *port, unsigned int cmd, unsigned int *value)
 {
 	struct pl2303_private *priv = usb_get_serial_port_data(port);
 	unsigned int arg;
+	u8 control;
 
 	if (copy_from_user(&arg, value, sizeof(int)))
 		return -EFAULT;
 
+	spin_lock (&priv->lock);
 	switch (cmd) {
 		case TIOCMBIS:
 			if (arg & TIOCM_RTS)
@@ -509,15 +521,21 @@ static int set_modem_info (struct usb_serial_port *port, unsigned int cmd, unsig
 			priv->line_control |= ((arg & TIOCM_DTR) ? CONTROL_DTR : 0);
 			break;
 	}
+	control = priv->line_control;
+	spin_unlock (&priv->lock);
 
-	return set_control_lines (port->serial->dev, priv->line_control);
+	return set_control_lines (port->serial->dev, control);
 }
 
 static int get_modem_info (struct usb_serial_port *port, unsigned int *value)
 {
 	struct pl2303_private *priv = usb_get_serial_port_data(port);
-	unsigned int mcr = priv->line_control;
+	unsigned int mcr;
 	unsigned int result;
+
+	spin_lock (&priv->lock);
+	mcr = priv->line_control;
+	spin_unlock (&priv->lock);
 
 	result = ((mcr & CONTROL_DTR)		? TIOCM_DTR : 0)
 		  | ((mcr & CONTROL_RTS)	? TIOCM_RTS : 0);

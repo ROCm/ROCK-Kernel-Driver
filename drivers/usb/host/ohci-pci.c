@@ -29,17 +29,6 @@
 
 /*-------------------------------------------------------------------------*/
 
-struct ohci_hcd *dev_to_ohci(struct device *dev) {
-	struct pci_dev *pdev = 
-		container_of (dev, struct pci_dev, dev);
-	struct ohci_hcd	*ohci = 
-		container_of (pci_get_drvdata (pdev), struct ohci_hcd, hcd);
-
-	return ohci;
-}
-
-/*-------------------------------------------------------------------------*/
-
 static int __devinit
 ohci_pci_start (struct usb_hcd *hcd)
 {
@@ -55,22 +44,43 @@ ohci_pci_start (struct usb_hcd *hcd)
 		/* AMD 756, for most chips (early revs), corrupts register
 		 * values on read ... so enable the vendor workaround.
 		 */
-		if (hcd->pdev->vendor == 0x1022
+		if (hcd->pdev->vendor == PCI_VENDOR_ID_AMD
 				&& hcd->pdev->device == 0x740c) {
 			ohci->flags = OHCI_QUIRK_AMD756;
-			info ("%s: AMD756 erratum 4 workaround",
-				hcd->self.bus_name);
+			ohci_info (ohci, "AMD756 erratum 4 workaround\n");
 		}
+
+		/* FIXME for some of the early AMD 760 southbridges, OHCI
+		 * won't work at all.  blacklist them.
+		 */
 
 		/* Apple's OHCI driver has a lot of bizarre workarounds
 		 * for this chip.  Evidently control and bulk lists
 		 * can get confused.  (B&W G3 models, and ...)
 		 */
-		else if (hcd->pdev->vendor == 0x1045
+		else if (hcd->pdev->vendor == PCI_VENDOR_ID_OPTI
 				&& hcd->pdev->device == 0xc861) {
-			info ("%s: WARNING: OPTi workarounds unavailable",
-				hcd->self.bus_name);
+			ohci_info (ohci,
+				"WARNING: OPTi workarounds unavailable\n");
 		}
+
+		/* Check for NSC87560. We have to look at the bridge (fn1) to
+		 * identify the USB (fn2). This quirk might apply to more or
+		 * even all NSC stuff.
+		 */
+		else if (hcd->pdev->vendor == PCI_VENDOR_ID_NS) {
+			struct pci_dev	*b, *hc;
+
+			hc = hcd->pdev;
+			b  = pci_find_slot (hc->bus->number,
+					PCI_DEVFN (PCI_SLOT (hc->devfn), 1));
+			if (b && b->device == PCI_DEVICE_ID_NS_87560_LIO
+					&& b->vendor == PCI_VENDOR_ID_NS) {
+				ohci->flags |= OHCI_QUIRK_SUPERIO;
+				ohci_info (ohci, "Using NSC SuperIO setup\n");
+			}
+		}
+	
 	}
 
         memset (ohci->hcca, 0, sizeof (struct ohci_hcca));
@@ -86,7 +96,7 @@ ohci_pci_start (struct usb_hcd *hcd)
 	}
 
 	if (hc_start (ohci) < 0) {
-		err ("can't start %s", ohci->hcd.self.bus_name);
+		ohci_err (ohci, "can't start\n");
 		ohci_stop (hcd);
 		return -EBUSY;
 	}
@@ -106,13 +116,13 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 	u16			cmd;
 
 	if ((ohci->hc_control & OHCI_CTRL_HCFS) != OHCI_USB_OPER) {
-		dbg ("can't suspend %s (state is %s)", hcd->self.bus_name,
+		ohci_dbg (ohci, "can't suspend (state is %s)\n",
 			hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS));
 		return -EIO;
 	}
 
 	/* act as if usb suspend can always be used */
-	dbg ("%s: suspend to %d", hcd->self.bus_name, state);
+	ohci_dbg (ohci, "suspend to %d\n", state);
 	ohci->sleeping = 1;
 
 	/* First stop processing */
@@ -147,16 +157,16 @@ static int ohci_pci_suspend (struct usb_hcd *hcd, u32 state)
 
 	switch (readl (&ohci->regs->control) & OHCI_CTRL_HCFS) {
 		case OHCI_USB_RESET:
-			dbg ("%s suspend->reset ?", hcd->self.bus_name);
+			ohci_dbg (ohci, "suspend->reset ?\n");
 			break;
 		case OHCI_USB_RESUME:
-			dbg ("%s suspend->resume ?", hcd->self.bus_name);
+			ohci_dbg (ohci, "suspend->resume ?\n");
 			break;
 		case OHCI_USB_OPER:
-			dbg ("%s suspend->operational ?", hcd->self.bus_name);
+			ohci_dbg (ohci, "suspend->operational ?\n");
 			break;
 		case OHCI_USB_SUSPEND:
-			dbg ("%s suspended", hcd->self.bus_name);
+			ohci_dbg (ohci, "suspended\n");
 			break;
 	}
 
@@ -204,7 +214,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 
 #ifdef DEBUG
 	/* the registers may look crazy here */
-	ohci_dump_status (ohci);
+	ohci_dump_status (ohci, 0, 0);
 #endif
 
 	/* Re-enable bus mastering */
@@ -213,13 +223,13 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 	switch (temp) {
 
 	case OHCI_USB_RESET:	// lost power
-		info ("USB restart: %s", hcd->self.bus_name);
+		ohci_info (ohci, "USB restart\n");
 		retval = hc_restart (ohci);
 		break;
 
 	case OHCI_USB_SUSPEND:	// host wakeup
 	case OHCI_USB_RESUME:	// remote wakeup
-		info ("USB continue: %s from %s wakeup", hcd->self.bus_name,
+		ohci_info (ohci, "USB continue from %s wakeup\n",
 			 (temp == OHCI_USB_SUSPEND)
 				? "host" : "remote");
 		ohci->hc_control = OHCI_USB_RESUME;
@@ -232,7 +242,7 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 		temp = readl (&ohci->regs->control);
 		temp = ohci->hc_control & OHCI_CTRL_HCFS;
 		if (temp != OHCI_USB_RESUME) {
-			err ("controller %s won't resume", hcd->self.bus_name);
+			ohci_err (ohci, "controller won't resume\n");
 			ohci->disabled = 1;
 			retval = -EIO;
 			break;
@@ -278,11 +288,12 @@ static int ohci_pci_resume (struct usb_hcd *hcd)
 		writel (OHCI_BLF | OHCI_CLF, &ohci->regs->cmdstatus);
 
 // ohci_dump_status (ohci);
-dbg ("sleeping = %d, disabled = %d", ohci->sleeping, ohci->disabled);
+ohci_dbg (ohci, "sleeping = %d, disabled = %d\n",
+		ohci->sleeping, ohci->disabled);
 		break;
 
 	default:
-		warn ("odd PCI resume for %s", hcd->self.bus_name);
+		ohci_warn (ohci, "odd PCI resume\n");
 	}
 	return retval;
 }
@@ -373,11 +384,11 @@ static struct pci_driver ohci_pci_driver = {
  
 static int __init ohci_hcd_pci_init (void) 
 {
-	dbg (DRIVER_INFO " (PCI)");
+	printk (KERN_DEBUG "%s: " DRIVER_INFO " (PCI)\n", hcd_name);
 	if (usb_disabled())
 		return -ENODEV;
 
-	dbg ("block sizes: ed %d td %d",
+	printk (KERN_DEBUG "%s: block sizes: ed %d td %d\n", hcd_name,
 		sizeof (struct ed), sizeof (struct td));
 	return pci_module_init (&ohci_pci_driver);
 }

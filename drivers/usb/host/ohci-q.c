@@ -30,29 +30,28 @@ static void urb_free_priv (struct ohci_hcd *hc, urb_priv_t *urb_priv)
 /*
  * URB goes back to driver, and isn't reissued.
  * It's completely gone from HC data structures.
- * PRECONDITION:  no locks held  (Giveback can call into HCD.)
+ * PRECONDITION:  no locks held, irqs blocked  (Giveback can call into HCD.)
  */
-static void finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
+static void
+finish_urb (struct ohci_hcd *ohci, struct urb *urb, struct pt_regs *regs)
 {
-	unsigned long	flags;
-
 	// ASSERT (urb->hcpriv != 0);
 
 	urb_free_priv (ohci, urb->hcpriv);
 	urb->hcpriv = NULL;
 
-	spin_lock_irqsave (&urb->lock, flags);
+	spin_lock (&urb->lock);
 	if (likely (urb->status == -EINPROGRESS))
 		urb->status = 0;
-	spin_unlock_irqrestore (&urb->lock, flags);
+	spin_unlock (&urb->lock);
 
 	// what lock protects these?
 	switch (usb_pipetype (urb->pipe)) {
 	case PIPE_ISOCHRONOUS:
-		ohci->hcd.self.bandwidth_isoc_reqs--;
+		hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs--;
 		break;
 	case PIPE_INTERRUPT:
-		ohci->hcd.self.bandwidth_int_reqs--;
+		hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs--;
 		break;
 	}
 
@@ -110,12 +109,9 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 {
 	unsigned	i;
 
-#ifdef OHCI_VERBOSE_DEBUG
-	dbg ("%s: link %sed %p branch %d [%dus.], interval %d",
-		ohci->hcd.self.bus_name,
+	ohci_vdbg (ohci, "link %sed %p branch %d [%dus.], interval %d\n",
 		(ed->hwINFO & ED_ISO) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
-#endif
 
 	for (i = ed->branch; i < NUM_INTS; i += ed->interval) {
 		struct ed	**prev = &ohci->periodic [i];
@@ -143,7 +139,7 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 		}
 		ohci->load [i] += ed->load;
 	}
-	ohci->hcd.self.bandwidth_allocated += ed->load / ed->interval;
+	hcd_to_bus (&ohci->hcd)->bandwidth_allocated += ed->load / ed->interval;
 }
 
 /* link an ed into one of the HC chains */
@@ -206,7 +202,7 @@ static int ed_schedule (struct ohci_hcd *ohci, struct ed *ed)
 	default:
 		branch = balance (ohci, ed->interval, ed->load);
 		if (branch < 0) {
-			dev_dbg (ohci->hcd.controller,
+			ohci_dbg (ohci,
 				"ERR %d, interval %d msecs, load %d\n",
 				branch, ed->interval, ed->load);
 			// FIXME if there are TDs queued, fail them!
@@ -244,14 +240,11 @@ static void periodic_unlink (struct ohci_hcd *ohci, struct ed *ed)
 		}
 		ohci->load [i] -= ed->load;
 	}	
-	ohci->hcd.self.bandwidth_allocated -= ed->load / ed->interval;
+	hcd_to_bus (&ohci->hcd)->bandwidth_allocated -= ed->load / ed->interval;
 
-#ifdef OHCI_VERBOSE_DEBUG
-	dbg ("%s: unlink %sed %p branch %d [%dus.], interval %d",
-		ohci->hcd.self.bus_name,
+	ohci_vdbg (ohci, "unlink %sed %p branch %d [%dus.], interval %d\n",
 		(ed->hwINFO & ED_ISO) ? "iso " : "",
 		ed, ed->branch, ed->load, ed->interval);
-#endif
 }
 
 /* unlink an ed from one of the HC chains. 
@@ -576,7 +569,7 @@ static void td_submit_urb (
 	 */
 	case PIPE_INTERRUPT:
 		/* ... and periodic urbs have extra accounting */
-		ohci->hcd.self.bandwidth_int_reqs++;
+		hcd_to_bus (&ohci->hcd)->bandwidth_int_reqs++;
 		/* FALLTHROUGH */
 	case PIPE_BULK:
 		info = is_out
@@ -644,7 +637,7 @@ static void td_submit_urb (
 				data + urb->iso_frame_desc [cnt].offset,
 				urb->iso_frame_desc [cnt].length, urb, cnt);
 		}
-		ohci->hcd.self.bandwidth_isoc_reqs++;
+		hcd_to_bus (&ohci->hcd)->bandwidth_isoc_reqs++;
 		break;
 	}
 	// ASSERT (urb_priv->length == cnt);
@@ -687,11 +680,10 @@ static void td_done (struct urb *urb, struct td *td)
 		urb->iso_frame_desc [td->index].actual_length = dlen;
 		urb->iso_frame_desc [td->index].status = cc_to_error [cc];
 
-#ifdef VERBOSE_DEBUG
 		if (cc != TD_CC_NOERROR)
-			dbg ("  urb %p iso TD %p (%d) len %d CC %d",
+			ohci_vdbg (ohci,
+				"urb %p iso td %p (%d) len %d cc %d\n",
 				urb, td, 1 + td->index, dlen, cc);
-#endif
 
 	/* BULK, INT, CONTROL ... drivers see aggregate length/status,
 	 * except that "setup" bytes aren't counted and "short" transfers
@@ -730,13 +722,12 @@ static void td_done (struct urb *urb, struct td *td)
 					- td->data_dma;
 		}
 
-#ifdef VERBOSE_DEBUG
 		if (cc != TD_CC_NOERROR && cc < 0x0E)
-			dbg ("  urb %p TD %p (%d) CC %d, len=%d/%d",
+			ohci_vdbg (ohci,
+				"urb %p td %p (%d) cc %d, len=%d/%d\n",
 				urb, td, 1 + td->index, cc,
 				urb->actual_length,
 				urb->transfer_buffer_length);
-#endif
   	}
 }
 
@@ -791,14 +782,18 @@ ed_halted (struct ohci_hcd *ohci, struct td *td, int cc, struct td *rev)
 		ed->hwHeadP = next->hwNextTD | toggle;
 	}
 
-	/* help for troubleshooting: */
-	dev_dbg (&urb->dev->dev,
-		"urb %p usb-%s-%s ep-%d-%s cc %d --> status %d\n",
-		urb,
-		urb->dev->bus->bus_name, urb->dev->devpath,
-		usb_pipeendpoint (urb->pipe),
-		usb_pipein (urb->pipe) ? "IN" : "OUT",
-		cc, cc_to_error [cc]);
+	/* help for troubleshooting:  report anything that
+	 * looks odd ... that doesn't include protocol stalls
+	 * (or maybe some other things)
+	 */
+	if (cc != TD_CC_STALL || !usb_pipecontrol (urb->pipe))
+		ohci_dbg (ohci,
+			"urb %p path %s ep%d%s %08x cc %d --> status %d\n",
+			urb, urb->dev->devpath,
+			usb_pipeendpoint (urb->pipe),
+			usb_pipein (urb->pipe) ? "in" : "out",
+			le32_to_cpu (td->hwINFO),
+			cc, cc_to_error [cc]);
 
 	return rev;
 }
@@ -826,8 +821,7 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 
 		td = dma_to_td (ohci, td_dma);
 		if (!td) {
-			err ("%s bad entry %8x",
-				ohci->hcd.self.bus_name, td_dma);
+			ohci_err (ohci, "bad entry %8x\n", td_dma);
 			break;
 		}
 
@@ -855,7 +849,8 @@ static struct td *dl_reverse_done_list (struct ohci_hcd *ohci)
 #define tick_before(t1,t2) ((((s16)(t1))-((s16)(t2))) < 0)
 
 /* there are some urbs/eds to unlink; called in_irq(), with HCD locked */
-static void finish_unlinks (struct ohci_hcd *ohci, u16 tick, struct pt_regs *regs)
+static void
+finish_unlinks (struct ohci_hcd *ohci, u16 tick, struct pt_regs *regs)
 {
 	struct ed	*ed, **last;
 
@@ -983,7 +978,8 @@ rescan_this:
  * path is finish_unlinks(), which unlinks URBs using ed_rm_list, instead of
  * scanning the (re-reversed) donelist as this does.
  */
-static void dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
+static void
+dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *regs)
 {
 	unsigned long	flags;
 
@@ -1000,9 +996,9 @@ static void dl_done_list (struct ohci_hcd *ohci, struct td *td, struct pt_regs *
 
 		/* If all this urb's TDs are done, call complete() */
   		if (urb_priv->td_cnt == urb_priv->length) {
-     			spin_unlock_irqrestore (&ohci->lock, flags);
+     			spin_unlock (&ohci->lock);
   			finish_urb (ohci, urb, regs);
-  			spin_lock_irqsave (&ohci->lock, flags);
+  			spin_lock (&ohci->lock);
   		}
 
 		/* clean schedule:  unlink EDs that are no longer busy */

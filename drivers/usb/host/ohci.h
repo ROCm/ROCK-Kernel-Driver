@@ -372,6 +372,7 @@ struct ohci_hcd {
 
 	unsigned long		flags;		/* for HC bugs */
 #define	OHCI_QUIRK_AMD756	0x01			/* erratum #4 */
+#define	OHCI_QUIRK_SUPERIO	0x02			/* natsemi */
 	// there are also chip quirks/bugs in init logic
 
 	/*
@@ -382,4 +383,24 @@ struct ohci_hcd {
 
 #define hcd_to_ohci(hcd_ptr) container_of(hcd_ptr, struct ohci_hcd, hcd)
 
-struct ohci_hcd *dev_to_ohci(struct device *);
+/*-------------------------------------------------------------------------*/
+
+#ifndef DEBUG
+#define STUB_DEBUG_FILES
+#endif	/* DEBUG */
+
+#define ohci_dbg(ohci, fmt, args...) \
+	dev_dbg ((ohci)->hcd.controller , fmt , ## args )
+#define ohci_err(ohci, fmt, args...) \
+	dev_err ((ohci)->hcd.controller , fmt , ## args )
+#define ohci_info(ohci, fmt, args...) \
+	dev_info ((ohci)->hcd.controller , fmt , ## args )
+#define ohci_warn(ohci, fmt, args...) \
+	dev_warn ((ohci)->hcd.controller , fmt , ## args )
+
+#ifdef OHCI_VERBOSE_DEBUG
+#	define ohci_vdbg ohci_dbg
+#else
+#	define ohci_vdbg(ohci, fmt, args...) do { } while (0)
+#endif
+

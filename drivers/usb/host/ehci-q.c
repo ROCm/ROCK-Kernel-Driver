@@ -800,6 +800,7 @@ static struct ehci_qh *qh_append_tds (
 				&& !usb_pipecontrol (urb->pipe)) {
 			/* "never happens": drivers do stall cleanup right */
 			if (qh->qh_state != QH_STATE_IDLE
+					&& !list_empty (&qh->qtd_list)
 					&& qh->qh_state != QH_STATE_COMPLETING)
 				ehci_warn (ehci, "clear toggle dev%d "
 						"ep%d%s: not idle\n",
@@ -1014,6 +1015,7 @@ static void
 scan_async (struct ehci_hcd *ehci, struct pt_regs *regs)
 {
 	struct ehci_qh		*qh;
+	int			unlink_delay = 0;
 
 	if (!++(ehci->stamp))
 		ehci->stamp++;
@@ -1040,17 +1042,25 @@ rescan:
 				}
 			}
 
-			/* unlink idle entries, reducing HC PCI usage as
-			 * well as HCD schedule-scanning costs.
-			 *
-			 * FIXME don't unlink idle entries so quickly; it
-			 * can penalize (common) half duplex protocols.
+			/* unlink idle entries, reducing HC PCI usage as well
+			 * as HCD schedule-scanning costs.  delay for any qh
+			 * we just scanned, there's a not-unusual case that it
+			 * doesn't stay idle for long.
+			 * (plus, avoids some kind of re-activation race.)
 			 */
-			if (list_empty (&qh->qtd_list) && !ehci->reclaim) {
-				start_unlink_async (ehci, qh);
+			if (list_empty (&qh->qtd_list)) {
+				if (qh->stamp == ehci->stamp)
+					unlink_delay = 1;
+				else if (!ehci->reclaim) {
+					start_unlink_async (ehci, qh);
+					unlink_delay = 0;
+				}
 			}
 
 			qh = qh->qh_next.qh;
 		} while (qh);
 	}
+
+	if (unlink_delay && !timer_pending (&ehci->watchdog))
+		mod_timer (&ehci->watchdog, jiffies + EHCI_WATCHDOG_JIFFIES/2);
 }

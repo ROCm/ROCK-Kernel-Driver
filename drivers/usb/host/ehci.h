@@ -27,6 +27,7 @@ struct ehci_stats {
 	unsigned long		normal;
 	unsigned long		error;
 	unsigned long		reclaim;
+	unsigned long		lost_iaa;
 
 	/* termination of urbs from core */
 	unsigned long		complete;
