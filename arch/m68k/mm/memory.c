@@ -19,11 +19,7 @@
 #include <asm/pgalloc.h>
 #include <asm/system.h>
 #include <asm/traps.h>
-#include <asm/io.h>
 #include <asm/machdep.h>
-#ifdef CONFIG_AMIGA
-#include <asm/amigahw.h>
-#endif
 
 
 /* ++andreas: {get,free}_pointer_table rewritten to use unused fields from
