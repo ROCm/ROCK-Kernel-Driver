@@ -149,8 +149,6 @@ MODULE_PARM_DESC(dumppix, "Dump raw pixel data, in one of 3 formats. See ov511_d
 MODULE_AUTHOR("Mark McClelland <mwm@i.am> & Bret Wallach & Orion Sky Lawlor <olawlor@acm.org> & Kevin Moore & Charl P. Botha <cpbotha@ieee.org> & Claudio Matsuoka <claudio@conectiva.com>");
 MODULE_DESCRIPTION("OV511 USB Camera Driver");
 
-char kernel_version[] = UTS_RELEASE;
-
 static struct usb_driver ov511_driver;
 
 /* I know, I know, global variables suck. This is only a temporary hack */

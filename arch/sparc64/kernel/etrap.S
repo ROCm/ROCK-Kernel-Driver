@@ -1,4 +1,4 @@
-/* $Id: etrap.S,v 1.43 2000/03/29 09:55:30 davem Exp $
+/* $Id: etrap.S,v 1.44 2001/03/22 00:51:25 davem Exp $
  * etrap.S: Preparing for entry into the kernel on Sparc V9.
  *
  * Copyright (C) 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -186,3 +186,5 @@ scetrap:	rdpr	%pil, %g2						! Single 	Group
 		nop
 
 #undef TASK_REGOFF
+#undef ETRAP_PSTATE1
+#undef ETRAP_PSTATE2

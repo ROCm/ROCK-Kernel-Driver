@@ -149,6 +149,9 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
       dep_tristate '    Novell/Eagle/Microdyne NE3210 EISA support (EXPERIMENTAL)' CONFIG_NE3210 $CONFIG_EISA $CONFIG_EXPERIMENTAL
       dep_tristate '    Racal-Interlan EISA ES3210 support (EXPERIMENTAL)' CONFIG_ES3210 $CONFIG_EISA $CONFIG_EXPERIMENTAL
       dep_tristate '    RealTek RTL-8139 PCI Fast Ethernet Adapter support' CONFIG_8139TOO $CONFIG_PCI
+      dep_mbool '      Use PIO instead of MMIO' CONFIG_8139TOO_PIO $CONFIG_8139TOO
+      dep_mbool '      Support for automatic channel equalization (EXPERIMENTAL)' CONFIG_8139TOO_TUNE_TWISTER $CONFIG_8139TOO $CONFIG_EXPERIMENTAL
+      dep_mbool '      Support for older RTL-8129/8130 boards' CONFIG_8139TOO_8129 $CONFIG_8139TOO
       dep_tristate '    SiS 900/7016 PCI Fast Ethernet Adapter support' CONFIG_SIS900 $CONFIG_PCI
       dep_tristate '    SMC EtherPower II' CONFIG_EPIC100 $CONFIG_PCI
       dep_tristate '    Sundance Alta support' CONFIG_SUNDANCE $CONFIG_PCI

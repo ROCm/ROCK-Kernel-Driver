@@ -40,6 +40,12 @@ DOCUMENTATION:
    contains information about the problems, which may result by upgrading
    your kernel.
 
+ - The Documentation/DocBook/ subdirectory contains several guides for
+   kernel developers and users.  These guides can be rendered in a
+   number of formats:  PostScript (.ps), PDF, and HTML, among others.
+   After installation, "make psdocs", "make pdfdocs", or "make htmldocs"
+   will render the documentation in the requested format.
+
 INSTALLING the kernel:
 
  - If you install the full sources, put the kernel tarball in a

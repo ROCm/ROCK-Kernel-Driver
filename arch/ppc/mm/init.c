@@ -110,7 +110,7 @@ pgprot_t kmap_prot;
 #endif
 
 void MMU_init(void);
-static void *MMU_get_page(void);
+void *early_get_page(void);
 unsigned long prep_find_end_of_memory(void);
 unsigned long pmac_find_end_of_memory(void);
 unsigned long apus_find_end_of_memory(void);
@@ -125,7 +125,7 @@ unsigned long oak_find_end_of_memory(void);
 unsigned long m8260_find_end_of_memory(void);
 #endif /* CONFIG_8260 */
 static void mapin_ram(void);
-void map_page(unsigned long va, unsigned long pa, int flags);
+int map_page(unsigned long va, unsigned long pa, int flags);
 void set_phys_avail(unsigned long total_ram);
 extern void die_if_kernel(char *,struct pt_regs *,long);
 
@@ -206,41 +206,20 @@ void __bad_pte(pmd_t *pmd)
 	pmd_val(*pmd) = (unsigned long) BAD_PAGETABLE;
 }
 
-pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
-{
-        pte_t *pte;
-
-        if (pmd_none(*pmd)) {
-		if (!mem_init_done)
-			pte = (pte_t *) MMU_get_page();
-		else if ((pte = (pte_t *) __get_free_page(GFP_KERNEL)))
-			clear_page(pte);
-                if (pte) {
-                        pmd_val(*pmd) = (unsigned long)pte;
-                        return pte + offset;
-                }
-		pmd_val(*pmd) = (unsigned long)BAD_PAGETABLE;
-                return NULL;
-        }
-        if (pmd_bad(*pmd)) {
-                __bad_pte(pmd);
-                return NULL;
-        }
-        return (pte_t *) pmd_page(*pmd) + offset;
-}
-
 int do_check_pgt_cache(int low, int high)
 {
 	int freed = 0;
-	if(pgtable_cache_size > high) {
+	if (pgtable_cache_size > high) {
 		do {
-			if(pgd_quicklist)
-				free_pgd_slow(get_pgd_fast()), freed++;
-			if(pmd_quicklist)
-				free_pmd_slow(get_pmd_fast()), freed++;
-			if(pte_quicklist)
-				free_pte_slow(get_pte_fast()), freed++;
-		} while(pgtable_cache_size > low);
+                        if (pgd_quicklist) {
+				free_pgd_slow(get_pgd_fast());
+				freed++;
+			}
+			if (pte_quicklist) {
+				pte_free_slow(pte_alloc_one_fast(0));
+				freed++;
+			}
+		} while (pgtable_cache_size > low);
 	}
 	return freed;
 }
@@ -383,6 +362,7 @@ void *
 __ioremap(unsigned long addr, unsigned long size, unsigned long flags)
 {
 	unsigned long p, v, i;
+	int err;
 
 	/*
 	 * Choose an address to map it to.
@@ -453,10 +433,20 @@ __ioremap(unsigned long addr, unsigned long size, unsigned long flags)
 		flags |= _PAGE_GUARDED;
 
 	/*
-	 * Is it a candidate for a BAT mapping?
+	 * Should check if it is a candidate for a BAT mapping
 	 */
-	for (i = 0; i < size; i += PAGE_SIZE)
-		map_page(v+i, p+i, flags);
+
+	spin_lock(&init_mm.page_table_lock);
+	err = 0;
+	for (i = 0; i < size && err == 0; i += PAGE_SIZE)
+		err = map_page(v+i, p+i, flags);
+	spin_unlock(&init_mm.page_table_lock);
+	if (err) {
+		if (mem_init_done)
+			vfree((void *)v);
+		return NULL;
+	}
+
 out:
 	return (void *) (v + (addr & ~PAGE_MASK));
 }
@@ -492,7 +482,7 @@ unsigned long iopa(unsigned long addr)
 	return (pte_val(*pg) & PAGE_MASK) | (addr & ~PAGE_MASK);
 }
 
-void
+int
 map_page(unsigned long va, unsigned long pa, int flags)
 {
 	pmd_t *pd;
@@ -501,10 +491,13 @@ map_page(unsigned long va, unsigned long pa, int flags)
 	/* Use upper 10 bits of VA to index the first level map */
 	pd = pmd_offset(pgd_offset_k(va), va);
 	/* Use middle 10 bits of VA to index the second-level map */
-	pg = pte_alloc(pd, va);
+	pg = pte_alloc(&init_mm, pd, va);
+	if (pg == 0)
+		return -ENOMEM;
 	set_pte(pg, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
 	if (mem_init_done)
 		flush_hash_page(0, va);
+	return 0;
 }
 
 #ifndef CONFIG_8xx
@@ -830,21 +823,16 @@ static void __init mapin_ram(void)
 	}
 }
 
-/* In fact this is only called until mem_init is done. */
-static void __init *MMU_get_page(void)
+/* This is only called until mem_init is done. */
+void __init *early_get_page(void)
 {
 	void *p;
 
-	if (mem_init_done) {
-		p = (void *) __get_free_page(GFP_KERNEL);
-	} else if (init_bootmem_done) {
+	if (init_bootmem_done) {
 		p = alloc_bootmem_pages(PAGE_SIZE);
 	} else {
 		p = mem_pieces_find(PAGE_SIZE, PAGE_SIZE);
 	}
-	if (p == 0)
-		panic("couldn't get a page in MMU_get_page");
-	__clear_user(p, PAGE_SIZE);
 	return p;
 }
 

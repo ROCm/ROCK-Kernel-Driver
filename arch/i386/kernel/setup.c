@@ -294,7 +294,7 @@ visws_get_board_type_and_rev(void)
 			visws_board_rev = raw;
 		}
 
-		printk("Silicon Graphics %s (rev %d)\n",
+		printk(KERN_INFO "Silicon Graphics %s (rev %d)\n",
 			visws_board_type == VISWS_320 ? "320" :
 			(visws_board_type == VISWS_540 ? "540" :
 					"unknown"),
@@ -401,7 +401,7 @@ void __init add_memory_region(unsigned long long start,
 	int x = e820.nr_map;
 
 	if (x == E820MAX) {
-	    printk("Ooops! Too many entries in the memory map!\n");
+	    printk(KERN_ERR "Ooops! Too many entries in the memory map!\n");
 	    return;
 	}
 
@@ -522,7 +522,7 @@ void __init setup_memory_region(void)
 		add_memory_region(0, LOWMEMSIZE(), E820_RAM);
 		add_memory_region(HIGH_MEMORY, mem_size << 10, E820_RAM);
   	}
-	printk("BIOS-provided physical RAM map:\n");
+	printk(KERN_INFO "BIOS-provided physical RAM map:\n");
 	print_memory_map(who);
 } /* setup_memory_region */
 
@@ -592,7 +592,7 @@ static inline void parse_mem_cmdline (char ** cmdline_p)
 	*to = '\0';
 	*cmdline_p = command_line;
 	if (usermem) {
-		printk("user-defined physical RAM map:\n");
+		printk(KERN_INFO "user-defined physical RAM map:\n");
 		print_memory_map("user");
 	}
 }
@@ -799,7 +799,7 @@ void __init setup_arch(char **cmdline_p)
 			initrd_end = initrd_start+INITRD_SIZE;
 		}
 		else {
-			printk("initrd extends beyond end of memory "
+			printk(KERN_ERR "initrd extends beyond end of memory "
 			    "(0x%08lx > 0x%08lx)\ndisabling initrd\n",
 			    INITRD_START + INITRD_SIZE,
 			    max_low_pfn << PAGE_SHIFT);
@@ -903,7 +903,7 @@ static void __init display_cacheinfo(struct cpuinfo_x86 *c)
 
 	if (n >= 0x80000005) {
 		cpuid(0x80000005, &dummy, &dummy, &ecx, &edx);
-		printk("CPU: L1 I Cache: %dK (%d bytes/line), D cache %dK (%d bytes/line)\n",
+		printk(KERN_INFO "CPU: L1 I Cache: %dK (%d bytes/line), D cache %dK (%d bytes/line)\n",
 			edx>>24, edx&0xFF, ecx>>24, ecx&0xFF);
 		c->x86_cache_size=(ecx>>24)+(edx>>24);	
 	}
@@ -927,7 +927,7 @@ static void __init display_cacheinfo(struct cpuinfo_x86 *c)
 
 	c->x86_cache_size = l2size;
 
-	printk("CPU: L2 Cache: %dK (%d bytes/line)\n",
+	printk(KERN_INFO "CPU: L2 Cache: %dK (%d bytes/line)\n",
 	       l2size, ecx & 0xFF);
 }
 
@@ -1340,7 +1340,7 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 				name="C6";
 				fcr_set=ECX8|DSMC|EDCTLB|EMMX|ERETSTK;
 				fcr_clr=DPDC;
-				printk("Disabling bugged TSC.\n");
+				printk(KERN_NOTICE "Disabling bugged TSC.\n");
 				clear_bit(X86_FEATURE_TSC, &c->x86_capability);
 				break;
 			case 8:
@@ -1377,10 +1377,10 @@ static void __init init_centaur(struct cpuinfo_x86 *c)
 			newlo=(lo|fcr_set) & (~fcr_clr);
 
 			if (newlo!=lo) {
-				printk("Centaur FCR was 0x%X now 0x%X\n", lo, newlo );
+				printk(KERN_INFO "Centaur FCR was 0x%X now 0x%X\n", lo, newlo );
 				wrmsr(0x107, newlo, hi );
 			} else {
-				printk("Centaur FCR is 0x%X\n",lo);
+				printk(KERN_INFO "Centaur FCR is 0x%X\n",lo);
 			}
 			/* Emulate MTRRs using Centaur's MCR. */
 			set_bit(X86_FEATURE_CENTAUR_MCR, &c->x86_capability);
@@ -1433,7 +1433,7 @@ static void __init init_transmeta(struct cpuinfo_x86 *c)
 	max = cpuid_eax(0x80860000);
 	if ( max >= 0x80860001 ) {
 		cpuid(0x80860001, &dummy, &cpu_rev, &cpu_freq, &cpu_flags); 
-		printk("CPU: Processor revision %u.%u.%u.%u, %u MHz\n",
+		printk(KERN_INFO "CPU: Processor revision %u.%u.%u.%u, %u MHz\n",
 		       (cpu_rev >> 24) & 0xff,
 		       (cpu_rev >> 16) & 0xff,
 		       (cpu_rev >> 8) & 0xff,
@@ -1442,7 +1442,7 @@ static void __init init_transmeta(struct cpuinfo_x86 *c)
 	}
 	if ( max >= 0x80860002 ) {
 		cpuid(0x80860002, &dummy, &cms_rev1, &cms_rev2, &dummy);
-		printk("CPU: Code Morphing Software revision %u.%u.%u-%u-%u\n",
+		printk(KERN_INFO "CPU: Code Morphing Software revision %u.%u.%u-%u-%u\n",
 		       (cms_rev1 >> 24) & 0xff,
 		       (cms_rev1 >> 16) & 0xff,
 		       (cms_rev1 >> 8) & 0xff,
@@ -1471,7 +1471,7 @@ static void __init init_transmeta(struct cpuinfo_x86 *c)
 		      (void *)&cpu_info[56],
 		      (void *)&cpu_info[60]);
 		cpu_info[64] = '\0';
-		printk("CPU: %s\n", cpu_info);
+		printk(KERN_INFO "CPU: %s\n", cpu_info);
 	}
 
 	/* Unhide possibly hidden capability flags */
@@ -1503,7 +1503,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 		c->f00f_bug = 1;
 		if ( !f00f_workaround_enabled ) {
 			trap_init_f00f_bug();
-			printk(KERN_INFO "Intel Pentium with F0 0F bug - workaround enabled.\n");
+			printk(KERN_NOTICE "Intel Pentium with F0 0F bug - workaround enabled.\n");
 			f00f_workaround_enabled = 1;
 		}
 	}
@@ -1611,12 +1611,12 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 			}
 		}
 		if ( l1i || l1d )
-			printk("CPU: L1 I cache: %dK, L1 D cache: %dK\n",
+			printk(KERN_INFO "CPU: L1 I cache: %dK, L1 D cache: %dK\n",
 			       l1i, l1d);
 		if ( l2 )
-			printk("CPU: L2 cache: %dK\n", l2);
+			printk(KERN_INFO "CPU: L2 cache: %dK\n", l2);
 		if ( l3 )
-			printk("CPU: L3 cache: %dK\n", l3);
+			printk(KERN_INFO "CPU: L3 cache: %dK\n", l3);
 
 		/*
 		 * This assumes the L3 cache is shared; it typically lives in
@@ -1786,7 +1786,7 @@ static void __init squash_the_stupid_serial_number(struct cpuinfo_x86 *c)
 		rdmsr(0x119,lo,hi);
 		lo |= 0x200000;
 		wrmsr(0x119,lo,hi);
-		printk(KERN_INFO "CPU serial number disabled.\n");
+		printk(KERN_NOTICE "CPU serial number disabled.\n");
 		clear_bit(X86_FEATURE_PN, &c->x86_capability);
 	}
 }
@@ -1977,7 +1977,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		}
 	}
 
-	printk("CPU: Before vendor init, caps: %08x %08x %08x, vendor = %d\n",
+	printk(KERN_DEBUG "CPU: Before vendor init, caps: %08x %08x %08x, vendor = %d\n",
 	       c->x86_capability[0],
 	       c->x86_capability[1],
 	       c->x86_capability[2],
@@ -2024,7 +2024,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 		break;
 	}
 	
-	printk("CPU: After vendor init, caps: %08x %08x %08x %08x\n",
+	printk(KERN_DEBUG "CPU: After vendor init, caps: %08x %08x %08x %08x\n",
 	       c->x86_capability[0],
 	       c->x86_capability[1],
 	       c->x86_capability[2],
@@ -2064,7 +2064,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 
 	/* Now the feature flags better reflect actual CPU features! */
 
-	printk("CPU: After generic, caps: %08x %08x %08x %08x\n",
+	printk(KERN_DEBUG "CPU: After generic, caps: %08x %08x %08x %08x\n",
 	       c->x86_capability[0],
 	       c->x86_capability[1],
 	       c->x86_capability[2],
@@ -2082,7 +2082,7 @@ void __init identify_cpu(struct cpuinfo_x86 *c)
 			boot_cpu_data.x86_capability[i] &= c->x86_capability[i];
 	}
 
-	printk("CPU: Common caps: %08x %08x %08x %08x\n",
+	printk(KERN_DEBUG "CPU: Common caps: %08x %08x %08x %08x\n",
 	       boot_cpu_data.x86_capability[0],
 	       boot_cpu_data.x86_capability[1],
 	       boot_cpu_data.x86_capability[2],
@@ -2250,16 +2250,16 @@ void __init cpu_init (void)
 	struct tss_struct * t = &init_tss[nr];
 
 	if (test_and_set_bit(nr, &cpu_initialized)) {
-		printk("CPU#%d already initialized!\n", nr);
+		printk(KERN_WARNING "CPU#%d already initialized!\n", nr);
 		for (;;) __sti();
 	}
-	printk("Initializing CPU#%d\n", nr);
+	printk(KERN_INFO "Initializing CPU#%d\n", nr);
 
 	if (cpu_has_vme || cpu_has_tsc || cpu_has_de)
 		clear_in_cr4(X86_CR4_VME|X86_CR4_PVI|X86_CR4_TSD|X86_CR4_DE);
 #ifndef CONFIG_X86_TSC
 	if (tsc_disable && cpu_has_tsc) {
-		printk("Disabling TSC...\n");
+		printk(KERN_NOTICE "Disabling TSC...\n");
 		/**** FIX-HPA: DOES THIS REALLY BELONG HERE? ****/
 		clear_bit(X86_FEATURE_TSC, boot_cpu_data.x86_capability);
 		set_in_cr4(X86_CR4_TSD);

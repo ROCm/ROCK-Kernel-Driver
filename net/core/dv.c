@@ -172,7 +172,7 @@ int check_args(struct divert_cf *div_cf, struct net_device **dev)
 		return -EINVAL;
 	
 	/* user issuing the ioctl must be a super one :) */
-	if (!suser())
+	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
 	/* Device must have a divert_blk member NOT null */

@@ -1,4 +1,4 @@
-/* $Id: U3copy_in_user.S,v 1.3 2000/11/01 09:29:19 davem Exp $
+/* $Id: U3copy_in_user.S,v 1.4 2001/03/21 05:58:47 davem Exp $
  * U3memcpy.S: UltraSparc-III optimized copy within userspace.
  *
  * Copyright (C) 1999, 2000 David S. Miller (davem@redhat.com)
@@ -231,25 +231,25 @@ U3copy_in_user_enter:
 
 	.align		64
 U3copy_in_user_begin:
-	prefetch	[%o1 + 0x000], #one_read	! MS	Group1
-	prefetch	[%o1 + 0x040], #one_read	! MS	Group2
+	prefetcha	[%o1 + 0x000] %asi, #one_read	! MS	Group1
+	prefetcha	[%o1 + 0x040] %asi, #one_read	! MS	Group2
 	andn		%o2, (0x40 - 1), %o4		! A0
-	prefetch	[%o1 + 0x080], #one_read	! MS	Group3
+	prefetcha	[%o1 + 0x080] %asi, #one_read	! MS	Group3
 	cmp		%o4, 0x140			! A0
-	prefetch	[%o1 + 0x0c0], #one_read	! MS	Group4
+	prefetcha	[%o1 + 0x0c0] %asi, #one_read	! MS	Group4
 	EX(ldda [%o1 + 0x000] %asi, %f0, add %o2, %g0)	! MS	Group5 (%f0 results at G8)
 	bge,a,pt	%icc, 1f			! BR
 
-	 prefetch	[%o1 + 0x100], #one_read	! MS	Group6
+	 prefetcha	[%o1 + 0x100] %asi, #one_read	! MS	Group6
 1:	EX(ldda [%o1 + 0x008] %asi, %f2, add %o2, %g0)	! AX	       (%f2 results at G9)
 	cmp		%o4, 0x180			! A1
 	bge,a,pt	%icc, 1f			! BR
-	 prefetch	[%o1 + 0x140], #one_read	! MS	Group7
+	 prefetcha	[%o1 + 0x140] %asi, #one_read	! MS	Group7
 1:	EX(ldda [%o1 + 0x010] %asi, %f4, add %o2, %g0)	! AX	       (%f4 results at G10)
 	cmp		%o4, 0x1c0			! A1
 	bge,a,pt	%icc, 1f			! BR
 
-	 prefetch	[%o1 + 0x180], #one_read	! MS	Group8
+	 prefetcha	[%o1 + 0x180] %asi, #one_read	! MS	Group8
 1:	faligndata	%f0, %f2, %f16			! FGA	Group9 (%f16 at G12)
 	EX(ldda [%o1 + 0x018] %asi, %f6, add %o2, %g0)	! AX	       (%f6 results at G12)
 	faligndata	%f2, %f4, %f18			! FGA	Group10 (%f18 results at G13)
@@ -305,7 +305,7 @@ U3copy_in_user_loop1:
 
 	faligndata	%f8, %f10, %f24			! FGA	Group16	(%f24 results at G19)
 	EXBLK1(ldda [%o1 + 0x040] %asi, %f0)		! AX		(%f0 results at G19)
-	prefetch	[%o1 + 0x180], #one_read	! MS
+	prefetcha	[%o1 + 0x180] %asi, #one_read	! MS
 	faligndata	%f10, %f12, %f26		! FGA	Group17	(%f26 results at G20)
 	subcc		%o4, 0x40, %o4			! A0
 	add		%o1, 0x40, %o1			! A1

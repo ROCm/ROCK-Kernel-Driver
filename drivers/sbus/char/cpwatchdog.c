@@ -173,7 +173,7 @@ static struct wd_device wd_dev = {
 		0, SPIN_LOCK_UNLOCKED, 0, 0, 0, 0,
 };
 
-struct timer_list wd_timer;
+static struct timer_list wd_timer;
 
 static int wd0_timeout = 0;
 static int wd1_timeout = 0;
@@ -199,20 +199,20 @@ MODULE_SUPPORTED_DEVICE
 
 /* Forward declarations of internal methods
  */
-void wd_dumpregs(void);
-void wd_interrupt(int irq, void *dev_id, struct pt_regs *regs);
-void wd_toggleintr(struct wd_timer* pTimer, int enable);
-void wd_pingtimer(struct wd_timer* pTimer);
-void wd_starttimer(struct wd_timer* pTimer);
-void wd_resetbrokentimer(struct wd_timer* pTimer);
-void wd_stoptimer(struct wd_timer* pTimer);
-void wd_brokentimer(unsigned long data);
-int  wd_getstatus(struct wd_timer* pTimer);
+static void wd_dumpregs(void);
+static void wd_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static void wd_toggleintr(struct wd_timer* pTimer, int enable);
+static void wd_pingtimer(struct wd_timer* pTimer);
+static void wd_starttimer(struct wd_timer* pTimer);
+static void wd_resetbrokentimer(struct wd_timer* pTimer);
+static void wd_stoptimer(struct wd_timer* pTimer);
+static void wd_brokentimer(unsigned long data);
+static int  wd_getstatus(struct wd_timer* pTimer);
 
 /* PLD expects words to be written in LSB format,
  * so we must flip all words prior to writing them to regs
  */
-inline unsigned short flip_word(unsigned short word)
+static inline unsigned short flip_word(unsigned short word)
 {
 	return ((word & 0xff) << 8) | ((word >> 8) & 0xff);
 }
@@ -355,9 +355,14 @@ static int wd_ioctl(struct inode *inode, struct file *file,
 		case WDIOC_GETSUPPORT:
 			if(copy_to_user((struct watchdog_info *)arg, 
 							(struct watchdog_info *)&info, 
-							sizeof(struct watchdog_info *))) {
+							sizeof(struct watchdog_info))) {
 				return(-EFAULT);
 			}
+			break;
+		case WDIOC_GETSTATUS:
+		case WDIOC_GETBOOTSTATUS:
+			if (put_user(0, (int *) arg))
+				return -EFAULT;
 			break;
 		case WDIOC_KEEPALIVE:
 			wd_pingtimer(pTimer);
@@ -417,8 +422,14 @@ static ssize_t wd_write(	struct file 	*file,
 		return(-EINVAL);
 	}
 
-	wd_pingtimer(pTimer);
-	return(count);
+	if (ppos != &file->f_pos)
+		return -ESPIPE;
+
+	if (count) {
+		wd_pingtimer(pTimer);
+		return 1;
+	}
+	return 0;
 }
 
 static ssize_t wd_read(struct file * file, char * buffer,
@@ -432,7 +443,7 @@ static ssize_t wd_read(struct file * file, char * buffer,
 #endif /* ifdef WD_DEBUG */
 }
 
-void wd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static void wd_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	/* Only WD0 will interrupt-- others are NMI and we won't
 	 * see them here....
@@ -460,7 +471,7 @@ static struct miscdevice wd0_miscdev = { WD0_MINOR, WD0_DEVNAME, &wd_fops };
 static struct miscdevice wd1_miscdev = { WD1_MINOR, WD1_DEVNAME, &wd_fops };
 static struct miscdevice wd2_miscdev = { WD2_MINOR, WD2_DEVNAME, &wd_fops };
 
-void wd_dumpregs(void)
+static void wd_dumpregs(void)
 {
 	/* Reading from downcounters initiates watchdog countdown--
 	 * Example is included below for illustration purposes.
@@ -504,7 +515,7 @@ void wd_dumpregs(void)
  * pTimer 	- pointer to timer device, or NULL to indicate all timers 
  * enable	- non-zero to enable interrupts, zero to disable
  */
-void wd_toggleintr(struct wd_timer* pTimer, int enable)
+static void wd_toggleintr(struct wd_timer* pTimer, int enable)
 {
 	unsigned char curregs = wd_readb(&wd_dev.regs->pld_regs.intr_mask);
 	unsigned char setregs = 
@@ -525,7 +536,7 @@ void wd_toggleintr(struct wd_timer* pTimer, int enable)
  *
  * pTimer	- pointer to timer device
  */
-void wd_pingtimer(struct wd_timer* pTimer)
+static void wd_pingtimer(struct wd_timer* pTimer)
 {
 	if(wd_readb(&pTimer->regs->status) & WD_S_RUNNING) {
 		wd_readb(&pTimer->regs->dcntr);
@@ -538,7 +549,7 @@ void wd_pingtimer(struct wd_timer* pTimer)
  *
  * pTimer	- pointer to timer device
  */
-void wd_stoptimer(struct wd_timer* pTimer)
+static void wd_stoptimer(struct wd_timer* pTimer)
 {
 	if(wd_readb(&pTimer->regs->status) & WD_S_RUNNING) {
 		wd_toggleintr(pTimer, WD_INTR_OFF);
@@ -560,7 +571,7 @@ void wd_stoptimer(struct wd_timer* pTimer)
  * pTimer	- pointer to timer device
  * limit	- limit (countdown) value in 1/10th seconds
  */
-void wd_starttimer(struct wd_timer* pTimer)
+static void wd_starttimer(struct wd_timer* pTimer)
 {
 	if(wd_dev.isbaddoggie) {
 		pTimer->runstatus &= ~WD_STAT_BSTOP;
@@ -574,7 +585,7 @@ void wd_starttimer(struct wd_timer* pTimer)
 /* Restarts timer with maximum limit value and
  * does not unset 'brokenstop' value.
  */
-void wd_resetbrokentimer(struct wd_timer* pTimer)
+static void wd_resetbrokentimer(struct wd_timer* pTimer)
 {
 	wd_toggleintr(pTimer, WD_INTR_ON);
 	wd_writew(WD_BLIMIT, &pTimer->regs->limit);
@@ -583,7 +594,7 @@ void wd_resetbrokentimer(struct wd_timer* pTimer)
 /* Timer device initialization helper.
  * Returns 0 on success, other on failure
  */
-int wd_inittimer(int whichdog)
+static int wd_inittimer(int whichdog)
 {
 	struct miscdevice 				*whichmisc;
 	volatile struct wd_timer_regblk	*whichregs;
@@ -650,7 +661,7 @@ int wd_inittimer(int whichdog)
  * interrupts within the PLD so me must continually
  * reset the timers ad infinitum.
  */
-void wd_brokentimer(unsigned long data)
+static void wd_brokentimer(unsigned long data)
 {
 	struct wd_device* pDev = (struct wd_device*)data;
 	int id, tripped = 0;
@@ -676,7 +687,7 @@ void wd_brokentimer(unsigned long data)
 	}
 }
 
-int wd_getstatus(struct wd_timer* pTimer)
+static int wd_getstatus(struct wd_timer* pTimer)
 {
 	unsigned char stat = wd_readb(&pTimer->regs->status);
 	unsigned char intr = wd_readb(&wd_dev.regs->pld_regs.intr_mask);

@@ -1,4 +1,4 @@
-/* $Id: sys_sunos32.c,v 1.57 2001/02/13 01:16:44 davem Exp $
+/* $Id: sys_sunos32.c,v 1.59 2001/03/24 09:36:11 davem Exp $
  * sys_sunos32.c: SunOS binary compatability layer on sparc64.
  *
  * Copyright (C) 1995, 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -456,6 +456,10 @@ asmlinkage int sunos_nosys(void)
 	static int cnt;
 
 	regs = current->thread.kregs;
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 	info.si_signo = SIGSYS;
 	info.si_errno = 0;
 	info.si_code = __SI_FAULT|0x100;

@@ -1,4 +1,4 @@
-/* $Id: blockops.S,v 1.27 2000/07/14 01:12:49 davem Exp $
+/* $Id: blockops.S,v 1.30 2001/03/22 13:10:10 davem Exp $
  * blockops.S: UltraSparc block zero optimized routines.
  *
  * Copyright (C) 1996, 1998, 1999, 2000 David S. Miller (davem@redhat.com)
@@ -83,6 +83,8 @@ copy_user_page: /* %o0=dest, %o1=src, %o2=vaddr */
 	or		%g2, %g3, %g2
 	add		%o0, %o3, %o0
 	add		%o0, %o1, %o1
+#define FIX_INSN_1	0x96102068 /* mov (13 << 3), %o3 */
+cheetah_patch_1:
 	mov		TLBTEMP_ENT1, %o3
 	rdpr		%pstate, %g3
 	wrpr		%g3, PSTATE_IE, %pstate
@@ -96,16 +98,14 @@ copy_user_page: /* %o0=dest, %o1=src, %o2=vaddr */
 	/* Spitfire Errata #32 workaround */
 	mov		0x8, %o4
 	stxa		%g0, [%o4] ASI_DMMU
-	sethi		%hi(empty_zero_page), %o4
-	flush		%o4
+	membar		#Sync
 
 	ldxa		[%o3] ASI_DTLB_TAG_READ, %o4
 
 	/* Spitfire Errata #32 workaround */
 	mov		0x8, %o5
 	stxa		%g0, [%o5] ASI_DMMU
-	sethi		%hi(empty_zero_page), %o5
-	flush		%o5
+	membar		#Sync
 
 	ldxa		[%o3] ASI_DTLB_DATA_ACCESS, %o5
 	stxa		%o0, [%o2] ASI_DMMU
@@ -116,16 +116,14 @@ copy_user_page: /* %o0=dest, %o1=src, %o2=vaddr */
 	/* Spitfire Errata #32 workaround */
 	mov		0x8, %g5
 	stxa		%g0, [%g5] ASI_DMMU
-	sethi		%hi(empty_zero_page), %g5
-	flush		%g5
+	membar		#Sync
 
 	ldxa		[%o3] ASI_DTLB_TAG_READ, %g5
 
 	/* Spitfire Errata #32 workaround */
 	mov		0x8, %g7
 	stxa		%g0, [%g7] ASI_DMMU
-	sethi		%hi(empty_zero_page), %g7
-	flush		%g7
+	membar		#Sync
 
 	ldxa		[%o3] ASI_DTLB_DATA_ACCESS, %g7
 	stxa		%o1, [%o2] ASI_DMMU
@@ -136,6 +134,107 @@ copy_user_page: /* %o0=dest, %o1=src, %o2=vaddr */
 	bne,pn		%xcc, copy_page_using_blkcommit
 	 nop
 
+	rdpr		%ver, %g3
+	sllx		%g3, 16, %g3
+	srlx		%g3, 32 + 16, %g3
+	cmp		%g3, 0x14
+	bne,pt		%icc, spitfire_copy_user_page
+	 nop
+
+cheetah_copy_user_page:
+	mov		121, %o2			! A0 Group
+	prefetch	[%o1 + 0x000], #one_read	! MS
+	prefetch	[%o1 + 0x040], #one_read	! MS Group
+	prefetch	[%o1 + 0x080], #one_read	! MS Group
+	prefetch	[%o1 + 0x0c0], #one_read	! MS Group
+	ldd		[%o1 + 0x000], %f0		! MS Group
+	prefetch	[%o1 + 0x100], #one_read	! MS Group
+	ldd		[%o1 + 0x008], %f2		! AX
+	prefetch	[%o1 + 0x140], #one_read	! MS Group
+	ldd		[%o1 + 0x010], %f4		! AX
+	prefetch	[%o1 + 0x180], #one_read	! MS Group
+	fmovd		%f0, %f32			! FGA Group
+	ldd		[%o1 + 0x018], %f6		! AX
+	fmovd		%f2, %f34			! FGA Group
+	ldd		[%o1 + 0x020], %f8		! MS
+	fmovd		%f4, %f36			! FGA Group
+	ldd		[%o1 + 0x028], %f10		! AX
+	membar		#StoreStore			! MS
+	fmovd		%f6, %f38			! FGA Group
+	ldd		[%o1 + 0x030], %f12		! MS
+	fmovd		%f8, %f40			! FGA Group
+	ldd		[%o1 + 0x038], %f14		! AX
+	fmovd		%f10, %f42			! FGA Group
+	ldd		[%o1 + 0x040], %f16		! MS
+1:	ldd		[%o1 + 0x048], %f2		! AX (Group)
+	fmovd		%f12, %f44			! FGA
+	ldd		[%o1 + 0x050], %f4		! MS
+	fmovd		%f14, %f46			! FGA Group
+	stda		%f32, [%o0] ASI_BLK_P		! MS
+	ldd		[%o1 + 0x058], %f6		! AX
+	fmovd		%f16, %f32			! FGA Group (8-cycle stall)
+	ldd		[%o1 + 0x060], %f8		! MS
+	fmovd		%f2, %f34			! FGA Group
+	ldd		[%o1 + 0x068], %f10		! AX
+	fmovd		%f4, %f36			! FGA Group
+	ldd		[%o1 + 0x070], %f12		! MS
+	fmovd		%f6, %f38			! FGA Group
+	ldd		[%o1 + 0x078], %f14		! AX
+	fmovd		%f8, %f40			! FGA Group
+	ldd		[%o1 + 0x080], %f16		! AX
+	prefetch	[%o1 + 0x180], #one_read	! MS
+	fmovd		%f10, %f42			! FGA Group
+	subcc		%o2, 1, %o2			! A0
+	add		%o0, 0x40, %o0			! A1
+	bne,pt		%xcc, 1b			! BR
+	 add		%o1, 0x40, %o1			! A0 Group
+
+	mov		5, %o2				! A0 Group
+1:	ldd		[%o1 + 0x048], %f2		! AX
+	fmovd		%f12, %f44			! FGA
+	ldd		[%o1 + 0x050], %f4		! MS
+	fmovd		%f14, %f46			! FGA Group
+	stda		%f32, [%o0] ASI_BLK_P		! MS
+	ldd		[%o1 + 0x058], %f6		! AX
+	fmovd		%f16, %f32			! FGA Group (8-cycle stall)
+	ldd		[%o1 + 0x060], %f8		! MS
+	fmovd		%f2, %f34			! FGA Group
+	ldd		[%o1 + 0x068], %f10		! AX
+	fmovd		%f4, %f36			! FGA Group
+	ldd		[%o1 + 0x070], %f12		! MS
+	fmovd		%f6, %f38			! FGA Group
+	ldd		[%o1 + 0x078], %f14		! AX
+	fmovd		%f8, %f40			! FGA Group
+	ldd		[%o1 + 0x080], %f16		! MS
+	fmovd		%f10, %f42			! FGA Group
+	subcc		%o2, 1, %o2			! A0
+	add		%o0, 0x40, %o0			! A1
+	bne,pt		%xcc, 1b			! BR
+	 add		%o1, 0x40, %o1			! A0 Group
+
+	ldd		[%o1 + 0x048], %f2		! AX
+	fmovd		%f12, %f44			! FGA
+	ldd		[%o1 + 0x050], %f4		! MS
+	fmovd		%f14, %f46			! FGA Group
+	stda		%f32, [%o0] ASI_BLK_P		! MS
+	ldd		[%o1 + 0x058], %f6		! AX
+	fmovd		%f16, %f32			! FGA Group (8-cycle stall)
+	ldd		[%o1 + 0x060], %f8		! MS
+	fmovd		%f2, %f34			! FGA Group
+	ldd		[%o1 + 0x068], %f10		! AX
+	fmovd		%f4, %f36			! FGA Group
+	ldd		[%o1 + 0x070], %f12		! MS
+	fmovd		%f6, %f38			! FGA Group
+	add		%o0, 0x40, %o0			! A0
+	ldd		[%o1 + 0x078], %f14		! AX
+	fmovd		%f8, %f40			! FGA Group
+	fmovd		%f10, %f42			! FGA Group
+	fmovd		%f12, %f44			! FGA Group
+	fmovd		%f14, %f46			! FGA Group
+	stda		%f32, [%o0] ASI_BLK_P		! MS
+	ba,a,pt		%xcc, copy_user_page_continue
+
+spitfire_copy_user_page:
 	ldda		[%o1] ASI_BLK_P, %f0
 	add		%o1, 0x40, %o1
 	ldda		[%o1] ASI_BLK_P, %f16
@@ -237,6 +336,8 @@ clear_user_page:	/* %o0=dest, %o1=vaddr */
 	or		%g3, (_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_L | _PAGE_W), %g3
 	or		%g1, %g3, %g1
 	add		%o0, %o3, %o0
+#define FIX_INSN_2	0x96102070 /* mov (14 << 3), %o3 */
+cheetah_patch_2:
 	mov		TLBTEMP_ENT2, %o3
 	rdpr		%pstate, %g3
 	wrpr		%g3, PSTATE_IE, %pstate
@@ -244,16 +345,14 @@ clear_user_page:	/* %o0=dest, %o1=vaddr */
 	/* Spitfire Errata #32 workaround */
 	mov		0x8, %g5
 	stxa		%g0, [%g5] ASI_DMMU
-	sethi		%hi(empty_zero_page), %g5
-	flush		%g5
+	membar		#Sync
 
 	ldxa		[%o3] ASI_DTLB_TAG_READ, %g5
 
 	/* Spitfire Errata #32 workaround */
 	mov		0x8, %g7
 	stxa		%g0, [%g7] ASI_DMMU
-	sethi		%hi(empty_zero_page), %g7
-	flush		%g7
+	membar		#Sync
 
 	ldxa		[%o3] ASI_DTLB_DATA_ACCESS, %g7
 	stxa		%o0, [%o2] ASI_DMMU
@@ -299,3 +398,24 @@ clear_page_common:
 	membar		#Sync
 	jmpl		%o7 + 0x8, %g0
 	 wrpr		%g3, 0x0, %pstate
+
+	/* We will write cheetah optimized versions later. */
+	.globl		cheetah_patch_pgcopyops
+cheetah_patch_pgcopyops:
+	sethi		%hi(FIX_INSN_1), %g1
+	or		%g1, %lo(FIX_INSN_1), %g1
+	sethi		%hi(cheetah_patch_1), %g2
+	or		%g2, %lo(cheetah_patch_1), %g2
+	stw		%g1, [%g2]
+	flush		%g2
+	sethi		%hi(FIX_INSN_2), %g1
+	or		%g1, %lo(FIX_INSN_2), %g1
+	sethi		%hi(cheetah_patch_2), %g2
+	or		%g2, %lo(cheetah_patch_2), %g2
+	stw		%g1, [%g2]
+	flush		%g2
+	retl
+	 nop
+
+#undef FIX_INSN1
+#undef FIX_INSN2

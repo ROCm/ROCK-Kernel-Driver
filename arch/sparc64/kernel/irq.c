@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.95 2001/02/13 01:16:44 davem Exp $
+/* $Id: irq.c,v 1.99 2001/03/22 02:19:23 davem Exp $
  * irq.c: UltraSparc IRQ handling/init/registry.
  *
  * Copyright (C) 1997  David S. Miller  (davem@caip.rutgers.edu)
@@ -132,14 +132,23 @@ void enable_irq(unsigned int irq)
 	if (imap == 0UL)
 		return;
 
-	if(this_is_starfire == 0) {
+	if (tlb_type == cheetah) {
+		/* We set it to our Safari AID. */
+		__asm__ __volatile__("ldxa [%%g0] %1, %0"
+				     : "=r" (tid)
+				     : "i" (ASI_SAFARI_CONFIG));
+		tid = ((tid & (0x3ffUL<<17)) << 9);
+		tid &= IMAP_AID_SAFARI;
+	} else if (this_is_starfire == 0) {
 		/* We set it to our UPA MID. */
 		__asm__ __volatile__("ldxa [%%g0] %1, %0"
 				     : "=r" (tid)
 				     : "i" (ASI_UPA_CONFIG));
 		tid = ((tid & UPA_CONFIG_MID) << 9);
+		tid &= IMAP_TID_UPA;
 	} else {
 		tid = (starfire_translate(imap, current->processor) << 26);
+		tid &= IMAP_TID_UPA;
 	}
 
 	/* NOTE NOTE NOTE, IGN and INO are read-only, IGN is a product
@@ -150,7 +159,7 @@ void enable_irq(unsigned int irq)
 	 *
 	 * Things like FFB can now be handled via the new IRQ mechanism.
 	 */
-	upa_writel(IMAP_VALID | (tid & IMAP_TID), imap);
+	upa_writel(tid | IMAP_VALID, imap);
 }
 
 /* This now gets passed true ino's as well. */
@@ -729,6 +738,10 @@ void handler_irq(int irq, struct pt_regs *regs)
 		/* Voo-doo programming. */
 		if (cpu_data[buddy].idle_volume < FORWARD_VOLUME)
 			should_forward = 0;
+
+		/* This just so happens to be correct on Cheetah
+		 * at the moment.
+		 */
 		buddy <<= 26;
 	}
 #endif
@@ -737,10 +750,23 @@ void handler_irq(int irq, struct pt_regs *regs)
 	/*
 	 * Check for TICK_INT on level 14 softint.
 	 */
-	if ((irq == 14) && (get_softint() & (1UL << 0)))
-		irq = 0;
-#endif
+	{
+		unsigned long clr_mask = 1 << irq;
+		unsigned long tick_mask;
+
+		if (SPARC64_USE_STICK)
+			tick_mask = (1UL << 16);
+		else
+			tick_mask = (1UL << 0);
+		if ((irq == 14) && (get_softint() & tick_mask)) {
+			irq = 0;
+			clr_mask = tick_mask;
+		}
+		clear_softint(clr_mask);
+	}
+#else
 	clear_softint(1 << irq);
+#endif
 
 	irq_enter(cpu, irq);
 	kstat.irqs[cpu][irq]++;
@@ -952,8 +978,13 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 	extern void smp_tick_init(void);
 #endif
 
-	node = linux_cpus[0].prom_node;
-	*clock = prom_getint(node, "clock-frequency");
+	if (!SPARC64_USE_STICK) {
+		node = linux_cpus[0].prom_node;
+		*clock = prom_getint(node, "clock-frequency");
+	} else {
+		node = prom_root_node;
+		*clock = prom_getint(node, "stick-frequency");
+	}
 	timer_tick_offset = *clock / HZ;
 #ifdef CONFIG_SMP
 	smp_tick_init();
@@ -1003,6 +1034,7 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 	 * at the start of an I-cache line, and perform a dummy
 	 * read back from %tick_cmpr right after writing to it. -DaveM
 	 */
+	if (!SPARC64_USE_STICK) {
 	__asm__ __volatile__("
 		rd	%%tick, %%g1
 		ba,pt	%%xcc, 1f
@@ -1013,6 +1045,26 @@ void init_timers(void (*cfunc)(int, void *, struct pt_regs *),
 	: /* no outputs */
 	: "r" (timer_tick_offset)
 	: "g1");
+	} else {
+	/* Let the user get at STICK too. */
+	__asm__ __volatile__("
+		sethi	%%hi(0x80000000), %%g1
+		sllx	%%g1, 32, %%g1
+		rd	%%asr24, %%g2
+		andn	%%g2, %%g1, %%g2
+		wr	%%g2, 0, %%asr24"
+	: /* no outputs */
+	: /* no inputs */
+	: "g1", "g2");
+
+	__asm__ __volatile__("
+		rd	%%asr24, %%g1
+		add	%%g1, %0, %%g1
+		wr	%%g1, 0x0, %%asr25"
+	: /* no outputs */
+	: "r" (timer_tick_offset)
+	: "g1");
+	}
 
 	/* Restore PSTATE_IE. */
 	__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
@@ -1033,12 +1085,17 @@ static int retarget_one_irq(struct irqaction *p, int goal_cpu)
 	if (bucket->pil == 12)
 		return goal_cpu;
 
-	if(this_is_starfire == 0) {
+	if (tlb_type == cheetah) {
 		tid = __cpu_logical_map[goal_cpu] << 26;
+		tid &= IMAP_AID_SAFARI;
+	} else if (this_is_starfire == 0) {
+		tid = __cpu_logical_map[goal_cpu] << 26;
+		tid &= IMAP_TID_UPA;
 	} else {
 		tid = (starfire_translate(imap, __cpu_logical_map[goal_cpu]) << 26);
+		tid &= IMAP_TID_UPA;
 	}
-	upa_writel(IMAP_VALID | (tid & IMAP_TID), imap);
+	upa_writel(tid | IMAP_VALID, imap);
 
 	goal_cpu++;
 	if(goal_cpu >= NR_CPUS ||
@@ -1120,7 +1177,7 @@ static void kill_prom_timer(void)
 	stxa	%%g0, [%%g0] %0
 	membar	#Sync
 "	: /* no outputs */
-	: "i" (ASI_INTR_RECEIVE), "i" (ASI_UDB_INTR_R)
+	: "i" (ASI_INTR_RECEIVE), "i" (ASI_INTR_R)
 	: "g1", "g2");
 }
 

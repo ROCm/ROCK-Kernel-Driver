@@ -278,7 +278,8 @@ static ssize_t mousedev_write(struct file * file, const char * buffer, size_t co
 
 	for (i = 0; i < count; i++) {
 
-		c = buffer[i];
+		if (get_user(c, &buffer[i]))
+			return -EFAULT;
 
 		if (c == mousedev_genius_seq[list->genseq]) {
 			if (++list->genseq == MOUSEDEV_GENIUS_LEN) {

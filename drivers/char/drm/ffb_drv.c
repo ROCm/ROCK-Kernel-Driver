@@ -1,4 +1,4 @@
-/* $Id: ffb_drv.c,v 1.7 2000/11/12 10:01:41 davem Exp $
+/* $Id: ffb_drv.c,v 1.9 2001/03/23 07:58:39 davem Exp $
  * ffb_drv.c: Creator/Creator3D direct rendering driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -244,7 +244,37 @@ static void get_ffb_type(ffb_dev_priv_t *ffb_priv, int instance)
 	};
 }
 
-static int __init ffb_init_one(int prom_node, int instance)
+static void __init ffb_apply_upa_parent_ranges(int parent, struct linux_prom64_registers *regs)
+{
+	struct linux_prom64_ranges ranges[PROMREG_MAX];
+	char name[128];
+	int len, i;
+
+	prom_getproperty(parent, "name", name, sizeof(name));
+	if (strcmp(name, "upa") != 0)
+		return;
+
+	len = prom_getproperty(parent, "ranges", (void *) ranges, sizeof(ranges));
+	if (len <= 0)
+		return;
+
+	len /= sizeof(struct linux_prom64_ranges);
+	for (i = 0; i < len; i++) {
+		struct linux_prom64_ranges *rng = &ranges[i];
+		u64 phys_addr = regs->phys_addr;
+
+		if (phys_addr >= rng->ot_child_base &&
+		    phys_addr < (rng->ot_child_base + rng->or_size)) {
+			regs->phys_addr -= rng->ot_child_base;
+			regs->phys_addr += rng->ot_parent_base;
+			return;
+		}
+	}
+
+	return;
+}
+
+static int __init ffb_init_one(int prom_node, int parent_node, int instance)
 {
 	struct linux_prom64_registers regs[2*PROMREG_MAX];
 	drm_device_t *dev;
@@ -266,6 +296,7 @@ static int __init ffb_init_one(int prom_node, int instance)
 		kfree(dev);
 		return -EINVAL;
 	}
+	ffb_apply_upa_parent_ranges(parent_node, &regs[0]);
 	ffb_priv->card_phys_base = regs[0].phys_addr;
 	ffb_priv->regs = (ffb_fbcPtr)
 		(regs[0].phys_addr + 0x00600000UL);
@@ -305,15 +336,30 @@ static int __init ffb_init_one(int prom_node, int instance)
 	return 0;
 }
 
+static int __init ffb_count_siblings(int root)
+{
+	int node, child, count = 0;
+
+	child = prom_getchild(root);
+	for (node = prom_searchsiblings(child, "SUNW,ffb"); node;
+	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb"))
+		count++;
+
+	return count;
+}
+
 static int __init ffb_init_dev_table(void)
 {
-	int root, node;
-	int total = 0;
+	int root, total;
 
+	total = ffb_count_siblings(prom_root_node);
 	root = prom_getchild(prom_root_node);
-	for (node = prom_searchsiblings(root, "SUNW,ffb"); node;
-	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb"))
-		total++;
+	for (root = prom_searchsiblings(root, "upa"); root;
+	     root = prom_searchsiblings(prom_getsibling(root), "upa"))
+		total += ffb_count_siblings(root);
+
+	if (!total)
+		return -ENODEV;
 
 	ffb_dev_table = kmalloc(sizeof(drm_device_t *) * total, GFP_KERNEL);
 	if (!ffb_dev_table)
@@ -324,23 +370,34 @@ static int __init ffb_init_dev_table(void)
 	return 0;
 }
 
+static int __init ffb_scan_siblings(int root, int instance)
+{
+	int node, child;
+
+	child = prom_getchild(root);
+	for (node = prom_searchsiblings(child, "SUNW,ffb"); node;
+	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb")) {
+		ffb_init_one(node, root, instance);
+		instance++;
+	}
+
+	return instance;
+}
+
 int __init ffb_init(void)
 {
-	int root, node, instance, ret;
+	int root, instance, ret;
 
 	ret = ffb_init_dev_table();
 	if (ret)
 		return ret;
 
-	instance = 0;
+	instance = ffb_scan_siblings(prom_root_node, 0);
+
 	root = prom_getchild(prom_root_node);
-	for (node = prom_searchsiblings(root, "SUNW,ffb"); node;
-	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb")) {
-		ret = ffb_init_one(node, instance);
-		if (ret)
-			return ret;
-		instance++;
-	}
+	for (root = prom_searchsiblings(root, "upa"); root;
+	     root = prom_searchsiblings(prom_getsibling(root), "upa"))
+		instance = ffb_scan_siblings(root, instance);
 
 	return 0;
 }

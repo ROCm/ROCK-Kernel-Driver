@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.107 2001/02/13 01:16:44 davem Exp $
+/* $Id: ioctl32.c,v 1.110 2001/03/22 12:51:25 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -48,6 +48,7 @@
 #include <linux/blkpg.h>
 #include <linux/blk.h>
 #include <linux/elevator.h>
+#include <linux/rtc.h>
 #if defined(CONFIG_BLK_DEV_LVM) || defined(CONFIG_BLK_DEV_LVM_MODULE)
 /* Ugh. This header really is not clean */
 #define min min
@@ -67,7 +68,6 @@
 #include <asm/fbio.h>
 #include <asm/kbio.h>
 #include <asm/vuid_event.h>
-#include <asm/rtc.h>
 #include <asm/openpromio.h>
 #include <asm/envctrl.h>
 #include <asm/audioio.h>
@@ -2068,6 +2068,7 @@ typedef struct {
 	u32 proc;
 	u32 pv[ABS_MAX_PV + 1];
 	u32 lv[ABS_MAX_LV + 1];
+    	uint8_t vg_uuid[UUID_LEN+1];	/* volume group UUID */
 } vg32_t;
 
 typedef struct {
@@ -2093,6 +2094,7 @@ typedef struct {
 	uint32_t pe_stale;
 	u32 pe;
 	u32 inode;
+	uint8_t pv_uuid[UUID_LEN+1];
 } pv32_t;
 
 typedef struct {
@@ -2103,7 +2105,14 @@ typedef struct {
 typedef struct {
 	u32 lv_index;
 	u32 lv;
+	/* Transfer size because user space and kernel space differ */
+	uint16_t size;
 } lv_status_byindex_req32_t;
+
+typedef struct {
+	dev_t dev;
+	u32   lv;
+} lv_status_bydev_req32_t;
 
 typedef struct {
 	uint8_t lv_name[NAME_LEN];
@@ -2204,11 +2213,12 @@ static lv_t *get_lv_t(u32 p, int *errp)
 		if (l->lv_block_exception) {
 			lbe32 = (lv_block_exception32_t *)A(ptr2);
 			memset(lbe, 0, size);
-			for (i = 0; i < l->lv_remap_end; i++, lbe++, lbe32++) {
-				err |= get_user(lbe->rsector_org, &lbe32->rsector_org);
-				err |= __get_user(lbe->rdev_org, &lbe32->rdev_org);
-				err |= __get_user(lbe->rsector_new, &lbe32->rsector_new);
-				err |= __get_user(lbe->rdev_new, &lbe32->rdev_new);
+                       for (i = 0; i < l->lv_remap_end; i++, lbe++, lbe32++) {
+                               err |= get_user(lbe->rsector_org, &lbe32->rsector_org);
+                               err |= __get_user(lbe->rdev_org, &lbe32->rdev_org);
+                               err |= __get_user(lbe->rsector_new, &lbe32->rsector_new);
+                               err |= __get_user(lbe->rdev_new, &lbe32->rdev_new);
+
 			}
 		}
 	}
@@ -2239,8 +2249,9 @@ static int copy_lv_t(u32 ptr, lv_t *l)
 	err |= __copy_to_user(&ul->lv_remap_ptr, &l->lv_remap_ptr,
 				((long)&ul->dummy[0]) - ((long)&ul->lv_remap_ptr));
 	size = l->lv_allocated_le * sizeof(pe_t);
-	err |= __copy_to_user((void *)A(ptr1), l->lv_current_pe, size);
-	return -EFAULT;
+	if (ptr1)
+		err |= __copy_to_user((void *)A(ptr1), l->lv_current_pe, size);
+	return err ? -EFAULT : 0;
 }
 
 static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
@@ -2250,7 +2261,8 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		lv_req_t lv_req;
 		le_remap_req_t le_remap;
 		lv_status_byindex_req_t lv_byindex;
-		pv_status_req32_t pv_status;
+	        lv_status_bydev_req_t lv_bydev;
+		pv_status_req_t pv_status;
 	} u;
 	pv_t p;
 	int err;
@@ -2273,6 +2285,11 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 			kfree(v);
 			return -EFAULT;
 		}
+		if (copy_from_user(v->vg_uuid, ((vg32_t *)arg)->vg_uuid, UUID_LEN+1)) {
+			kfree(v);
+			return -EFAULT;
+		}
+		    
 		karg = v;
 		memset(v->pv, 0, sizeof(v->pv) + sizeof(v->lv));
 		if (v->pv_max > ABS_MAX_PV || v->lv_max > ABS_MAX_LV)
@@ -2286,11 +2303,18 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 					err = -ENOMEM;
 					break;
 				}
-				err = copy_from_user(v->pv[i], (void *)A(ptr), sizeof(pv32_t) - 8);
+				err = copy_from_user(v->pv[i], (void *)A(ptr), sizeof(pv32_t) - 8 - UUID_LEN+1);
 				if (err) {
 					err = -EFAULT;
 					break;
 				}
+				err = copy_from_user(v->pv[i]->pv_uuid, ((pv32_t *)A(ptr))->pv_uuid, UUID_LEN+1);
+				if (err) {
+				        err = -EFAULT;
+					break;
+				}
+
+				
 				v->pv[i]->pe = NULL; v->pv[i]->inode = NULL;
 			}
 		}
@@ -2309,8 +2333,9 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 	case LV_EXTEND:
 	case LV_REDUCE:
 	case LV_REMOVE:
+	case LV_RENAME:
 	case LV_STATUS_BYNAME:
-		err = copy_from_user(&u.pv_status, arg, sizeof(u.pv_status.pv_name));
+	        err = copy_from_user(&u.pv_status, arg, sizeof(u.pv_status.pv_name));
 		if (err) return -EFAULT;
 		if (cmd != LV_REMOVE) {
 			err = __get_user(ptr, &((lv_req32_t *)arg)->lv);
@@ -2319,23 +2344,28 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		} else
 			u.lv_req.lv = NULL;
 		break;
+
+
 	case LV_STATUS_BYINDEX:
 		err = get_user(u.lv_byindex.lv_index, &((lv_status_byindex_req32_t *)arg)->lv_index);
 		err |= __get_user(ptr, &((lv_status_byindex_req32_t *)arg)->lv);
 		if (err) return err;
 		u.lv_byindex.lv = get_lv_t(ptr, &err);
 		break;
+	case LV_STATUS_BYDEV:
+	        err = get_user(u.lv_bydev.dev, &((lv_status_bydev_req32_t *)arg)->dev);
+		u.lv_bydev.lv = get_lv_t(ptr, &err);
+		if (err) return err;
+		u.lv_bydev.lv = &p;
+		p.pe = NULL; p.inode = NULL;		
+		break;		
 	case VG_EXTEND:
-		err = copy_from_user(&p, (void *)arg, sizeof(pv32_t) - 8);
+		err = copy_from_user(&p, (void *)arg, sizeof(pv32_t) - 8 - UUID_LEN+1);
+		if (err) return -EFAULT;
+		err = copy_from_user(p.pv_uuid, ((pv32_t *)arg)->pv_uuid, UUID_LEN+1);
 		if (err) return -EFAULT;
 		p.pe = NULL; p.inode = NULL;
 		karg = &p;
-		break;
-	case LE_REMAP:
-		err = copy_from_user(&u.le_remap, (void *)arg, sizeof(le_remap_req32_t));
-		if (err) return -EFAULT;
-		u.le_remap.new_pe = ((le_remap_req32_t *)&u.le_remap)->new_pe;
-		u.le_remap.old_pe = ((le_remap_req32_t *)&u.le_remap)->old_pe;
 		break;
 	case PV_CHANGE:
 	case PV_STATUS:
@@ -2345,7 +2375,7 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 		if (err) return err;
 		u.pv_status.pv = &p;
 		if (cmd == PV_CHANGE) {
-			err = copy_from_user(&p, (void *)A(ptr), sizeof(pv32_t) - 8);
+			err = copy_from_user(&p, (void *)A(ptr), sizeof(pv32_t) - 8 - UUID_LEN+1);
 			if (err) return -EFAULT;
 			p.pe = NULL; p.inode = NULL;
 		}
@@ -2360,6 +2390,9 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 			if (copy_to_user((void *)arg, v, (long)&((vg32_t *)0)->proc) ||
 			    clear_user(&((vg32_t *)arg)->proc, sizeof(vg32_t) - (long)&((vg32_t *)0)->proc))
 				err = -EFAULT;
+		}
+		if (copy_to_user(((vg32_t *)arg)->vg_uuid, v->vg_uuid, UUID_LEN+1)) {
+		        err = -EFAULT;
 		}
 		kfree(v);
 		break;
@@ -2383,12 +2416,21 @@ static int do_lvm_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
 			if (!err) err = copy_lv_t(ptr, u.lv_byindex.lv);
 			put_lv_t(u.lv_byindex.lv);
 		}
+		break;
 	case PV_STATUS:
 		if (!err) {
-			err = copy_to_user((void *)A(ptr), &p, sizeof(pv32_t) - 8);
-			if (err) return -EFAULT;		
+			err = copy_to_user((void *)A(ptr), &p, sizeof(pv32_t) - 8 - UUID_LEN+1);
+			if (err) return -EFAULT;
+			err = copy_to_user(((pv_t *)A(ptr))->pv_uuid, p.pv_uuid, UUID_LEN + 1);
+			if (err) return -EFAULT;
 		}
 		break;
+	case LV_STATUS_BYDEV:
+	        if (!err) {
+			if (!err) err = copy_lv_t(ptr, u.lv_bydev.lv);
+			put_lv_t(u.lv_byindex.lv);
+	        }
+	        break;
 	}
 	return err;
 }
@@ -3222,8 +3264,22 @@ COMPATIBLE_IOCTL(_IOR('v' , BASE_VIDIOCPRIVATE+5, int))
 COMPATIBLE_IOCTL(_IOR('v' , BASE_VIDIOCPRIVATE+6, int))
 COMPATIBLE_IOCTL(_IOR('v' , BASE_VIDIOCPRIVATE+7, int))
 /* Little p (/dev/rtc, /dev/envctrl, etc.) */
-COMPATIBLE_IOCTL(RTCGET)
-COMPATIBLE_IOCTL(RTCSET)
+COMPATIBLE_IOCTL(_IOR('p', 20, int[7])) /* RTCGET */
+COMPATIBLE_IOCTL(_IOW('p', 21, int[7])) /* RTCSET */
+COMPATIBLE_IOCTL(RTC_AIE_ON)
+COMPATIBLE_IOCTL(RTC_AIE_OFF)
+COMPATIBLE_IOCTL(RTC_UIE_ON)
+COMPATIBLE_IOCTL(RTC_UIE_OFF)
+COMPATIBLE_IOCTL(RTC_PIE_ON)
+COMPATIBLE_IOCTL(RTC_PIE_OFF)
+COMPATIBLE_IOCTL(RTC_WIE_ON)
+COMPATIBLE_IOCTL(RTC_WIE_OFF)
+COMPATIBLE_IOCTL(RTC_ALM_SET)
+COMPATIBLE_IOCTL(RTC_ALM_READ)
+COMPATIBLE_IOCTL(RTC_RD_TIME)
+COMPATIBLE_IOCTL(RTC_SET_TIME)
+COMPATIBLE_IOCTL(RTC_WKALM_SET)
+COMPATIBLE_IOCTL(RTC_WKALM_RD)
 COMPATIBLE_IOCTL(ENVCTRL_RD_WARNING_TEMPERATURE)
 COMPATIBLE_IOCTL(ENVCTRL_RD_SHUTDOWN_TEMPERATURE)
 COMPATIBLE_IOCTL(ENVCTRL_RD_CPU_TEMPERATURE)
@@ -3566,6 +3622,7 @@ COMPATIBLE_IOCTL(VG_SET_EXTENDABLE)
 COMPATIBLE_IOCTL(VG_STATUS_GET_COUNT)
 COMPATIBLE_IOCTL(VG_STATUS_GET_NAMELIST)
 COMPATIBLE_IOCTL(VG_REMOVE)
+COMPATIBLE_IOCTL(VG_RENAME)
 COMPATIBLE_IOCTL(VG_REDUCE)
 COMPATIBLE_IOCTL(PE_LOCK_UNLOCK)
 COMPATIBLE_IOCTL(PV_FLUSH)
@@ -3577,6 +3634,9 @@ COMPATIBLE_IOCTL(LVM_RESET)
 COMPATIBLE_IOCTL(LV_SET_ACCESS)
 COMPATIBLE_IOCTL(LV_SET_STATUS)
 COMPATIBLE_IOCTL(LV_SET_ALLOCATION)
+COMPATIBLE_IOCTL(LE_REMAP)
+COMPATIBLE_IOCTL(LV_BMAP)
+COMPATIBLE_IOCTL(LV_SNAPSHOT_USE_RATE)
 #endif /* LVM */
 #if defined(CONFIG_DRM) || defined(CONFIG_DRM_MODULE)
 COMPATIBLE_IOCTL(DRM_IOCTL_GET_MAGIC)
@@ -3750,9 +3810,9 @@ HANDLE_IOCTL(LV_CREATE, do_lvm_ioctl)
 HANDLE_IOCTL(LV_REMOVE, do_lvm_ioctl)
 HANDLE_IOCTL(LV_EXTEND, do_lvm_ioctl)
 HANDLE_IOCTL(LV_REDUCE, do_lvm_ioctl)
+HANDLE_IOCTL(LV_RENAME, do_lvm_ioctl)
 HANDLE_IOCTL(LV_STATUS_BYNAME, do_lvm_ioctl)
 HANDLE_IOCTL(LV_STATUS_BYINDEX, do_lvm_ioctl)
-HANDLE_IOCTL(LE_REMAP, do_lvm_ioctl)
 HANDLE_IOCTL(PV_CHANGE, do_lvm_ioctl)
 HANDLE_IOCTL(PV_STATUS, do_lvm_ioctl)
 #endif /* LVM */
@@ -3767,6 +3827,12 @@ HANDLE_IOCTL(DRM32_IOCTL_MAP_BUFS, drm32_map_bufs);
 HANDLE_IOCTL(DRM32_IOCTL_DMA, drm32_dma);
 HANDLE_IOCTL(DRM32_IOCTL_RES_CTX, drm32_res_ctx);
 #endif /* DRM */
+#if 0
+HANDLE_IOCTL(RTC32_IRQP_READ, do_rtc_ioctl)
+HANDLE_IOCTL(RTC32_IRQP_SET, do_rtc_ioctl)
+HANDLE_IOCTL(RTC32_EPOCH_READ, do_rtc_ioctl)
+HANDLE_IOCTL(RTC32_EPOCH_SET, do_rtc_ioctl)
+#endif
 IOCTL_TABLE_END
 
 unsigned int ioctl32_hash_table[1024];

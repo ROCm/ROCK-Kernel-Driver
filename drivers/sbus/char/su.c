@@ -1,4 +1,4 @@
-/* $Id: su.c,v 1.44 2001/02/13 01:17:00 davem Exp $
+/* $Id: su.c,v 1.45 2001/03/15 02:11:10 davem Exp $
  * su.c: Small serial driver for keyboard/mouse interface on sparc32/PCI
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -352,16 +352,16 @@ receive_kbd_ms_chars(struct su_struct *info, struct pt_regs *regs, int is_brk)
 	do {
 		ch = serial_inp(info, UART_RX);
 		if (info->port_type == SU_PORT_KBD) {
-			if(ch == SUNKBD_RESET) {
+			if (ch == SUNKBD_RESET) {
                         	l1a_state.kbd_id = 1;
                         	l1a_state.l1_down = 0;
-                	} else if(l1a_state.kbd_id) {
+                	} else if (l1a_state.kbd_id) {
                         	l1a_state.kbd_id = 0;
-                	} else if(ch == SUNKBD_L1) {
+                	} else if (ch == SUNKBD_L1) {
                         	l1a_state.l1_down = 1;
-                	} else if(ch == (SUNKBD_L1|SUNKBD_UP)) {
+                	} else if (ch == (SUNKBD_L1|SUNKBD_UP)) {
                         	l1a_state.l1_down = 0;
-                	} else if(ch == SUNKBD_A && l1a_state.l1_down) {
+                	} else if (ch == SUNKBD_A && l1a_state.l1_down) {
                         	/* whee... */
                         	batten_down_hatches();
                         	/* Continue execution... */
@@ -1166,7 +1166,7 @@ su_change_mouse_baud(int baud)
 		return;
 
 	info->cflag &= ~(CBAUDEX | CBAUD);
-	switch(baud) {
+	switch (baud) {
 		case 1200:
 			info->cflag |= B1200;
 			break;
@@ -2220,7 +2220,7 @@ done:
  */
 static __inline__ void __init show_su_version(void)
 {
-	char *revision = "$Revision: 1.44 $";
+	char *revision = "$Revision: 1.45 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');
@@ -2578,6 +2578,30 @@ int __init su_kbd_ms_init(void)
 	return 0;
 }
 
+static int su_node_ok(int node, char *name, int namelen)
+{
+	if (strncmp(name, "su", namelen) == 0 ||
+	    strncmp(name, "su_pnp", namelen) == 0)
+		return 1;
+
+	if (strncmp(name, "serial", namelen) == 0) {
+		char compat[32];
+		int clen;
+
+		/* Is it _really_ a 'su' device? */
+		clen = prom_getproperty(node, "compatible", compat, sizeof(compat));
+		if (clen > 0) {
+			if (strncmp(compat, "sab82532", 8) == 0) {
+				/* Nope, Siemens serial, not for us. */
+				return 0;
+			}
+		}
+		return 1;
+	}
+
+	return 0;
+}
+
 /*
  * We got several platforms which present 'su' in different parts
  * of device tree. 'su' may be found under obio, ebus, isa and pci.
@@ -2593,9 +2617,7 @@ void __init su_probe_any(struct su_probe_scan *t, int sunode)
 	for (; sunode != 0; sunode = prom_getsibling(sunode)) {
 		len = prom_getproperty(sunode, "name", t->prop, SU_PROPSIZE);
 		if (len <= 1) continue;		/* Broken PROM node */
-		if (strncmp(t->prop, "su", len) == 0 ||
-		    strncmp(t->prop, "serial", len) == 0 ||
-		    strncmp(t->prop, "su_pnp", len) == 0) {
+		if (su_node_ok(sunode, t->prop, len)) {
 			info = &su_table[t->devices];
 			if (t->kbnode != 0 && sunode == t->kbnode) {
 				t->kbx = t->devices;
@@ -2844,7 +2866,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 	if (options) {
 		baud = simple_strtoul(options, NULL, 10);
 		s = options;
-		while(*s >= '0' && *s <= '9')
+		while (*s >= '0' && *s <= '9')
 			s++;
 		if (*s) parity = *s++;
 		if (*s) bits   = *s - '0';
@@ -2853,7 +2875,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 	/*
 	 *	Now construct a cflag setting.
 	 */
-	switch(baud) {
+	switch (baud) {
 		case 1200:
 			cflag |= B1200;
 			break;
@@ -2880,7 +2902,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 			cflag |= B9600;
 			break;
 	}
-	switch(bits) {
+	switch (bits) {
 		case 7:
 			cflag |= CS7;
 			break;
@@ -2889,7 +2911,7 @@ static int __init serial_console_setup(struct console *co, char *options)
 			cflag |= CS8;
 			break;
 	}
-	switch(parity) {
+	switch (parity) {
 		case 'o': case 'O':
 			cflag |= PARODD;
 			break;

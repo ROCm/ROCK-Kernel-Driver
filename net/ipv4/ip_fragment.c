@@ -213,18 +213,17 @@ static void ip_evictor(void)
 			if (ipq_hash[i] == NULL)
 				continue;
 
-			write_lock(&ipfrag_lock);
+			read_lock(&ipfrag_lock);
 			if ((qp = ipq_hash[i]) != NULL) {
 				/* find the oldest queue for this hash bucket */
 				while (qp->next)
 					qp = qp->next;
-				__ipq_unlink(qp);
-				write_unlock(&ipfrag_lock);
+				atomic_inc(&qp->refcnt);
+				read_unlock(&ipfrag_lock);
 
 				spin_lock(&qp->lock);
-				if (del_timer(&qp->timer))
-					atomic_dec(&qp->refcnt);
-				qp->last_in |= COMPLETE;
+				if (!(qp->last_in&COMPLETE))
+					ipq_kill(qp);
 				spin_unlock(&qp->lock);
 
 				ipq_put(qp);
@@ -232,7 +231,7 @@ static void ip_evictor(void)
 				progress = 1;
 				continue;
 			}
-			write_unlock(&ipfrag_lock);
+			read_unlock(&ipfrag_lock);
 		}
 	} while (progress);
 }

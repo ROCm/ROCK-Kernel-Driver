@@ -64,14 +64,14 @@ extern void __up(struct semaphore * sem);
 
 static inline void down(struct semaphore * sem)
 {
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
-	ptr = (atomic_t *) __atomic_fool_gcc(sem);
+	ptr = &(sem->count.counter);
 	increment = 1;
 
 	__asm__ __volatile__("
@@ -99,14 +99,14 @@ static inline void down(struct semaphore * sem)
 
 static inline int down_interruptible(struct semaphore * sem)
 {
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
-	ptr = (atomic_t *) __atomic_fool_gcc(sem);
+	ptr = &(sem->count.counter);
 	increment = 1;
 
 	__asm__ __volatile__("
@@ -137,14 +137,14 @@ static inline int down_interruptible(struct semaphore * sem)
 
 static inline int down_trylock(struct semaphore * sem)
 {
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
-	ptr = (atomic_t *) __atomic_fool_gcc(sem);
+	ptr = &(sem->count.counter);
 	increment = 1;
 
 	__asm__ __volatile__("
@@ -175,14 +175,14 @@ static inline int down_trylock(struct semaphore * sem)
 
 static inline void up(struct semaphore * sem)
 {
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
-	ptr = (atomic_t *) __atomic_fool_gcc(sem);
+	ptr = &(sem->count.counter);
 	increment = 1;
 
 	__asm__ __volatile__("
@@ -284,13 +284,13 @@ extern void ___up_write(/* Special calling convention */ void);
 
 static inline void down_read(struct rw_semaphore *sem)
 {
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
-	ptr = (atomic_t *) __atomic_fool_gcc(sem);
+	ptr = &sem->count;
 
 	__asm__ __volatile__("
 	mov	%%o7, %%g4
@@ -310,13 +310,13 @@ static inline void down_read(struct rw_semaphore *sem)
 
 static inline void down_write(struct rw_semaphore *sem)
 {
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 
 #if WAITQUEUE_DEBUG
 	CHECK_MAGIC(sem->__magic);
 #endif
 
-	ptr = (atomic_t *) __atomic_fool_gcc(sem);
+	ptr = &sem->count;
 
 	__asm__ __volatile__("
 	mov	%%o7, %%g4
@@ -344,9 +344,9 @@ static inline void down_write(struct rw_semaphore *sem)
  */
 static inline void __up_read(struct rw_semaphore *sem)
 {
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 
-	ptr = (atomic_t *) __atomic_fool_gcc(sem);
+	ptr = &sem->count;
 
 	__asm__ __volatile__("
 	mov	%%o7, %%g4
@@ -362,9 +362,9 @@ static inline void __up_read(struct rw_semaphore *sem)
  */
 static inline void __up_write(struct rw_semaphore *sem)
 {
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 
-	ptr = (atomic_t *) __atomic_fool_gcc(sem);
+	ptr = &sem->count;
 
 	__asm__ __volatile__("
 	mov	%%o7, %%g4

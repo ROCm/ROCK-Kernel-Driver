@@ -1,4 +1,4 @@
-/* $Id: trampoline.S,v 1.14 2001/03/04 18:31:00 davem Exp $
+/* $Id: trampoline.S,v 1.19 2001/03/22 09:54:26 davem Exp $
  * trampoline.S: Jump start slave processors on sparc64.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -41,16 +41,22 @@ sparc64_cpu_startup:
 	 nop
 
 cheetah_startup:
-	mov		DCR_BPE | DCR_RPE | DCR_SI | DCR_MS, %g1
+	mov		DCR_BPE | DCR_RPE | DCR_SI | DCR_IFPOE | DCR_MS, %g1
 	wr		%g1, %asr18
 
 	sethi		%uhi(DCU_ME | DCU_RE | DCU_PE | DCU_HPE | DCU_SPE | DCU_SL | DCU_WE), %g5
 	or		%g5, %ulo(DCU_ME | DCU_RE | DCU_PE | DCU_HPE | DCU_SPE | DCU_SL | DCU_WE), %g5
 	sllx		%g5, 32, %g5
-	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g1
-	or		%g1, %g5, %g1
+	or		%g5, DCU_DM | DCU_IM | DCU_DC | DCU_IC, %g5
+	ldxa		[%g0] ASI_DCU_CONTROL_REG, %g3
+	or		%g5, %g3, %g5
 	stxa		%g5, [%g0] ASI_DCU_CONTROL_REG
 	membar		#Sync
+
+	/* Disable STICK_INT interrupts. */
+	sethi		%hi(0x80000000), %g5
+	sllx		%g5, 32, %g5
+	wr		%g5, %asr25
 
 	ba,pt		%xcc, startup_continue
 	 nop
@@ -196,11 +202,15 @@ startup_continue:
 	mov		%o2, %g6
 
 	wrpr		%o1, PSTATE_MG, %pstate
-#define KERN_HIGHBITS		((_PAGE_VALID | _PAGE_SZ4MB) ^ 0xfffff80000000000)
+#define KERN_HIGHBITS		((_PAGE_VALID|_PAGE_SZ4MB)^0xfffff80000000000)
 #define KERN_LOWBITS		(_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_W)
 
-#define VPTE_BASE_CHEETAH	0xffe0000000000000
 #define VPTE_BASE_SPITFIRE	0xfffffffe00000000
+#if 1
+#define VPTE_BASE_CHEETAH	VPTE_BASE_SPITFIRE
+#else
+#define VPTE_BASE_CHEETAH	0xffe0000000000000
+#endif
 
 	mov		TSB_REG, %g1
 	stxa		%g0, [%g1] ASI_DMMU
@@ -222,7 +232,7 @@ startup_continue:
 	sethi		%uhi(VPTE_BASE_CHEETAH), %g3
 	or		%g3, %ulo(VPTE_BASE_CHEETAH), %g3
 	ba,pt		%xcc, 2f
-	sllx		%g3, 32, %g3
+	 sllx		%g3, 32, %g3
 1:
 	sethi		%uhi(VPTE_BASE_SPITFIRE), %g3
 	or		%g3, %ulo(VPTE_BASE_SPITFIRE), %g3
@@ -232,7 +242,8 @@ startup_continue:
 	clr	%g7
 #undef KERN_HIGHBITS
 #undef KERN_LOWBITS
-#undef VPTE_BASE
+#undef VPTE_BASE_SPITFIRE
+#undef VPTE_BASE_CHEETAH
 
 	/* Setup interrupt globals, we are always SMP. */
 	wrpr		%o1, PSTATE_IG, %pstate

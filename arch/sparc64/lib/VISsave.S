@@ -1,4 +1,4 @@
-/* $Id: VISsave.S,v 1.4 1999/07/30 09:35:37 davem Exp $
+/* $Id: VISsave.S,v 1.5 2001/03/08 22:08:51 davem Exp $
  * VISsave.S: Code for saving FPU register state for
  *            VIS routines. One should not call this directly,
  *            but use macros provided in <asm/visasm.h>.
@@ -37,14 +37,15 @@ vis1:	ldub		[%g6 + AOFF_task_thread + AOFF_thread_fpsaved], %g3
 	clr		%g1
 	ba,pt		%xcc, 3f
 
-	 stb		%g3, [%g6 + AOFF_task_thread + AOFF_thread_gsr]
+	 stx		%g3, [%g6 + AOFF_task_thread + AOFF_thread_gsr]
 2:	add		%g6, %g1, %g3
 	cmp		%o5, FPRS_DU
 	be,pn		%icc, 6f
 	 sll		%g1, 3, %g1
 	stb		%o5, [%g3 + AOFF_task_thread + AOFF_thread_fpsaved]
 	rd		%gsr, %g2
-	stb		%g2, [%g3 + AOFF_task_thread + AOFF_thread_gsr]
+	add		%g6, %g1, %g3
+	stx		%g2, [%g3 + AOFF_task_thread + AOFF_thread_gsr]
 
 	add		%g6, %g1, %g2
 	stx		%fsr, [%g2 + AOFF_task_thread + AOFF_thread_xfsr]
@@ -106,7 +107,8 @@ VISenterhalf:
 	stb		%g2, [%g3 + AOFF_task_thread + AOFF_thread_fpsaved]
 
 	rd		%gsr, %g2
-	stb		%g2, [%g3 + AOFF_task_thread + AOFF_thread_gsr]
+	add		%g6, %g1, %g3
+	stx		%g2, [%g3 + AOFF_task_thread + AOFF_thread_gsr]
 	add		%g6, %g1, %g2
 	stx		%fsr, [%g2 + AOFF_task_thread + AOFF_thread_xfsr]
 	sll		%g1, 5, %g1

@@ -307,8 +307,8 @@ E: bir7@leland.Stanford.Edu
 D: Original author of the Linux networking code
 
 N: Anton Blanchard
-E: anton@linuxcare.com
-W: http://linuxcare.com.au/anton/
+E: anton@samba.org
+W: http://samba.org/~anton/
 P: 1024/8462A731 4C 55 86 34 44 59 A7 99  2B 97 88 4A 88 9A 0D 97
 D: sun4 port, Sparc hacker
 S: 47 Robert Street
@@ -331,9 +331,6 @@ D: m68k port to HP9000/300
 D: AUN network protocols
 D: Co-architect of the parallel port sharing system
 D: IPv6 netfilter
-S: FutureTV Labs Ltd
-S: Brunswick House, 61-69 Newmarket Rd, Cambridge CB5 8EG
-S: United Kingdom
 
 N: Thomas Bogendörfer
 E: tsbogend@alpha.franken.de

@@ -5,7 +5,7 @@
 *		the following common services for the WAN Link Drivers:
 *		 o WAN device managenment (registering, unregistering)
 *		 o Network interface management
-*		 o Physical connection management (dial-up, incomming calls)
+*		 o Physical connection management (dial-up, incoming calls)
 *		 o Logical connection management (switched virtual circuits)
 *		 o Protocol encapsulation/decapsulation
 *

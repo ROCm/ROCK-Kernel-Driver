@@ -38,19 +38,28 @@ extern int		eth_header_cache(struct neighbour *neigh,
 					 struct hh_cache *hh);
 extern int		eth_header_parse(struct sk_buff *skb,
 					 unsigned char *haddr);
-extern struct net_device	* init_etherdev(struct net_device *, int);
+extern struct net_device *init_etherdev(struct net_device *dev, int sizeof_priv);
+extern struct net_device *alloc_etherdev(int sizeof_priv);
 
-static __inline__ void eth_copy_and_sum (struct sk_buff *dest, unsigned char *src, int len, int base)
+static inline void eth_copy_and_sum (struct sk_buff *dest, unsigned char *src, int len, int base)
 {
 	memcpy (dest->data, src, len);
 }
 
-/* Check that the ethernet address (MAC) is not 00:00:00:00:00:00 and is not
- * a multicast address.  Return true if the address is valid.
+/**
+ * is_valid_ether_addr - Determine if the given Ethernet address is valid
+ * @addr: Pointer to a six-byte array containing the Ethernet address
+ *
+ * Check that the Ethernet address (MAC) is not 00:00:00:00:00:00, is not
+ * a multicast address, and is not FF:FF:FF:FF:FF:FF.
+ *
+ * Return true if the address is valid.
  */
-static __inline__ int is_valid_ether_addr( u8 *addr )
+static inline int is_valid_ether_addr( u8 *addr )
 {
-	return !(addr[0]&1) && memcmp( addr, "\0\0\0\0\0\0", 6);
+	const char zaddr[6] = {0,};
+
+	return !(addr[0]&1) && memcmp( addr, zaddr, 6);
 }
 
 #endif

@@ -1412,6 +1412,8 @@ fs_out:
 	return retval;
 
 fail:
+	if (fstype->fs_flags & FS_SINGLE)
+		put_filesystem(fstype);
 	if (list_empty(&sb->s_mounts))
 		kill_super(sb, 0);
 	goto unlock_out;

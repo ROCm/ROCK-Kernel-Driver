@@ -1,4 +1,4 @@
-/* $Id: ebus.h,v 1.9 1999/08/30 10:14:37 davem Exp $
+/* $Id: ebus.h,v 1.10 2001/03/14 05:00:55 davem Exp $
  * ebus.h: PCI to Ebus pseudo driver software state.
  *
  * Copyright (C) 1997 Eddie C. Dost (ecd@skynet.be)
@@ -41,6 +41,7 @@ struct linux_ebus {
 	struct pci_pbm_info		*parent;
 	struct pci_dev			*self;
 	int				 index;
+	int				 is_rio;
 	int				 prom_node;
 	char				 prom_name[64];
 	struct linux_prom_ebus_ranges	 ebus_ranges[PROMREG_MAX];

@@ -1,4 +1,4 @@
-/* $Id: traps.c,v 1.70 2001/02/09 05:46:44 davem Exp $
+/* $Id: traps.c,v 1.73 2001/03/22 07:26:03 davem Exp $
  * arch/sparc64/kernel/traps.c
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -26,6 +26,7 @@
 #include <asm/uaccess.h>
 #include <asm/fpumacro.h>
 #include <asm/lsu.h>
+#include <asm/dcu.h>
 #include <asm/psrcompat.h>
 #ifdef CONFIG_KMOD
 #include <linux/kmod.h>
@@ -263,6 +264,10 @@ void bad_trap (struct pt_regs *regs, long lvl)
 	}
 	if (regs->tstate & TSTATE_PRIV)
 		die_if_kernel ("Kernel bad trap", regs);
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLTRP;
@@ -290,6 +295,10 @@ void instruction_access_exception (struct pt_regs *regs,
 		       sfsr, sfar);
 #endif
 		die_if_kernel("Iax", regs);
+	}
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
 	}
 	info.si_signo = SIGSEGV;
 	info.si_errno = 0;
@@ -342,32 +351,41 @@ void data_access_exception (struct pt_regs *regs,
 
 #ifdef CONFIG_PCI
 /* This is really pathetic... */
-/* #define DEBUG_PCI_POKES */
 extern volatile int pci_poke_in_progress;
 extern volatile int pci_poke_faulted;
 #endif
 
 /* When access exceptions happen, we must do this. */
-static __inline__ void clean_and_reenable_l1_caches(void)
+static void clean_and_reenable_l1_caches(void)
 {
 	unsigned long va;
 
-	/* Clean 'em. */
-	for(va =  0; va < (PAGE_SIZE << 1); va += 32) {
-		spitfire_put_icache_tag(va, 0x0);
-		spitfire_put_dcache_tag(va, 0x0);
-	}
+	if (tlb_type == spitfire) {
+		/* Clean 'em. */
+		for (va =  0; va < (PAGE_SIZE << 1); va += 32) {
+			spitfire_put_icache_tag(va, 0x0);
+			spitfire_put_dcache_tag(va, 0x0);
+		}
 
-	/* Re-enable. */
-	__asm__ __volatile__("flush %%g6\n\t"
-			     "membar #Sync\n\t"
-			     "stxa %0, [%%g0] %1\n\t"
-			     "membar #Sync"
-			     : /* no outputs */
-			     : "r" (LSU_CONTROL_IC | LSU_CONTROL_DC |
-				    LSU_CONTROL_IM | LSU_CONTROL_DM),
-			     "i" (ASI_LSU_CONTROL)
-			     : "memory");
+		/* Re-enable in LSU. */
+		__asm__ __volatile__("flush %%g6\n\t"
+				     "membar #Sync\n\t"
+				     "stxa %0, [%%g0] %1\n\t"
+				     "membar #Sync"
+				     : /* no outputs */
+				     : "r" (LSU_CONTROL_IC | LSU_CONTROL_DC |
+					    LSU_CONTROL_IM | LSU_CONTROL_DM),
+				     "i" (ASI_LSU_CONTROL)
+				     : "memory");
+	} else if (tlb_type == cheetah) {
+		/* Flush D-cache */
+		for (va = 0; va < (1 << 16); va += (1 << 5)) {
+			__asm__ __volatile__("stxa %%g0, [%0] %1\n\t"
+					     "membar #Sync"
+					     : /* no outputs */
+					     : "r" (va), "i" (ASI_DCACHE_TAG));
+		}
+	}
 }
 
 void do_iae(struct pt_regs *regs)
@@ -387,20 +405,16 @@ void do_iae(struct pt_regs *regs)
 void do_dae(struct pt_regs *regs)
 {
 #ifdef CONFIG_PCI
-	if(pci_poke_in_progress) {
-#ifdef DEBUG_PCI_POKES
-		prom_printf(" (POKE tpc[%016lx] tnpc[%016lx] ",
-			    regs->tpc, regs->tnpc);
-#endif
-		pci_poke_faulted = 1;
-		regs->tnpc = regs->tpc + 4;
-
-
-#ifdef DEBUG_PCI_POKES
-		prom_printf("PCI) ");
-		/* prom_halt(); */
-#endif
+	if (pci_poke_in_progress) {
 		clean_and_reenable_l1_caches();
+
+		pci_poke_faulted = 1;
+
+		/* Why the fuck did they have to change this? */
+		if (tlb_type == cheetah)
+			regs->tpc += 4;
+
+		regs->tnpc = regs->tpc + 4;
 		return;
 	}
 #endif
@@ -534,6 +548,10 @@ void do_fpe_common(struct pt_regs *regs)
 		unsigned long fsr = current->thread.xfsr[0];
 		siginfo_t info;
 
+		if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+			regs->tpc &= 0xffffffff;
+			regs->tnpc &= 0xffffffff;
+		}
 		info.si_signo = SIGFPE;
 		info.si_errno = 0;
 		info.si_addr = (void *)regs->tpc;
@@ -589,6 +607,10 @@ void do_tof(struct pt_regs *regs)
 
 	if(regs->tstate & TSTATE_PRIV)
 		die_if_kernel("Penguin overflow trap from kernel mode", regs);
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 	info.si_signo = SIGEMT;
 	info.si_errno = 0;
 	info.si_code = EMT_TAGOVF;
@@ -601,6 +623,10 @@ void do_div0(struct pt_regs *regs)
 {
 	siginfo_t info;
 
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 	info.si_signo = SIGFPE;
 	info.si_errno = 0;
 	info.si_code = FPE_INTDIV;
@@ -700,8 +726,13 @@ void die_if_kernel(char *str, struct pt_regs *regs)
 				(rw->ins[6] + STACK_BIAS);
 		}
 		instruction_dump ((unsigned int *) regs->tpc);
-	} else
+	} else {
+		if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+			regs->tpc &= 0xffffffff;
+			regs->tnpc &= 0xffffffff;
+		}
 		user_instruction_dump ((unsigned int *) regs->tpc);
+	}
 #ifdef CONFIG_SMP
 	smp_report_regs();
 #endif
@@ -765,6 +796,10 @@ void do_privop(struct pt_regs *regs)
 {
 	siginfo_t info;
 
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_PRVOPC;
@@ -907,6 +942,10 @@ void do_getpsr(struct pt_regs *regs)
 	regs->u_regs[UREG_I0] = tstate_to_psr(regs->tstate);
 	regs->tpc   = regs->tnpc;
 	regs->tnpc += 4;
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 }
 
 void trap_init(void)

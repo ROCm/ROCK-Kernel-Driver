@@ -1,4 +1,4 @@
-/* $Id: ebus.c,v 1.57 2001/02/28 03:28:55 davem Exp $
+/* $Id: ebus.c,v 1.60 2001/03/15 02:11:09 davem Exp $
  * ebus.c: PCI to EBus bridge device.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -25,6 +25,7 @@ struct linux_ebus *ebus_chain = 0;
 #ifdef CONFIG_SUN_AUXIO
 extern void auxio_probe(void);
 #endif
+extern void rs_init(void);
 
 static inline void *ebus_alloc(size_t size)
 {
@@ -200,7 +201,10 @@ void __init fill_ebus_device(int node, struct linux_ebus_device *dev)
 	dev->num_addrs = len / sizeof(struct linux_prom_registers);
 
 	for (i = 0; i < dev->num_addrs; i++) {
-		n = (regs[i].which_io - 0x10) >> 2;
+		if (dev->bus->is_rio == 0)
+			n = (regs[i].which_io - 0x10) >> 2;
+		else
+			n = regs[i].which_io;
 
 		dev->resource[i].start  = dev->bus->self->resource[n].start;
 		dev->resource[i].start += (unsigned long)regs[i].phys_addr;
@@ -269,13 +273,18 @@ void __init ebus_init(void)
 	struct linux_ebus *ebus;
 	struct pci_dev *pdev;
 	struct pcidev_cookie *cookie;
-	int nd, ebusnd;
+	int nd, ebusnd, is_rio;
 	int num_ebus = 0;
 
 	if (!pci_present())
 		return;
 
+	is_rio = 0;
 	pdev = pci_find_device(PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_EBUS, 0);
+	if (!pdev) {
+		pdev = pci_find_device(PCI_VENDOR_ID_SUN, PCI_DEVICE_ID_SUN_RIO_EBUS, 0);
+		is_rio = 1;
+	}
 	if (!pdev) {
 		printk("ebus: No EBus's found.\n");
 		return;
@@ -286,6 +295,7 @@ void __init ebus_init(void)
 
 	ebus_chain = ebus = ebus_alloc(sizeof(struct linux_ebus));
 	ebus->next = 0;
+	ebus->is_rio = is_rio;
 
 	while (ebusnd) {
 		/* SUNW,pci-qfe uses four empty ebuses on it.
@@ -295,8 +305,16 @@ void __init ebus_init(void)
 		   we'd have to tweak with the ebus_chain
 		   in the runtime after initialization. -jj */
 		if (!prom_getchild (ebusnd)) {
+			struct pci_dev *orig_pdev = pdev;
+
+			is_rio = 0;
 			pdev = pci_find_device(PCI_VENDOR_ID_SUN, 
-					       PCI_DEVICE_ID_SUN_EBUS, pdev);
+					       PCI_DEVICE_ID_SUN_EBUS, orig_pdev);
+			if (!pdev) {
+				pdev = pci_find_device(PCI_VENDOR_ID_SUN, 
+						       PCI_DEVICE_ID_SUN_RIO_EBUS, orig_pdev);
+				is_rio = 1;
+			}
 			if (!pdev) {
 				if (ebus == ebus_chain) {
 					ebus_chain = NULL;
@@ -305,7 +323,7 @@ void __init ebus_init(void)
 				}
 				break;
 			}
-			
+			ebus->is_rio = is_rio;
 			cookie = pdev->sysdata;
 			ebusnd = cookie->prom_node;
 			continue;
@@ -346,10 +364,20 @@ void __init ebus_init(void)
 	next_ebus:
 		printk("\n");
 
-		pdev = pci_find_device(PCI_VENDOR_ID_SUN,
-				       PCI_DEVICE_ID_SUN_EBUS, pdev);
-		if (!pdev)
-			break;
+		{
+			struct pci_dev *orig_pdev = pdev;
+
+			is_rio = 0;
+			pdev = pci_find_device(PCI_VENDOR_ID_SUN,
+					       PCI_DEVICE_ID_SUN_EBUS, orig_pdev);
+			if (!pdev) {
+				pdev = pci_find_device(PCI_VENDOR_ID_SUN,
+						       PCI_DEVICE_ID_SUN_RIO_EBUS, orig_pdev);
+				is_rio = 1;
+			}
+			if (!pdev)
+				break;
+		}
 
 		cookie = pdev->sysdata;
 		ebusnd = cookie->prom_node;
@@ -357,9 +385,11 @@ void __init ebus_init(void)
 		ebus->next = ebus_alloc(sizeof(struct linux_ebus));
 		ebus = ebus->next;
 		ebus->next = 0;
+		ebus->is_rio = is_rio;
 		++num_ebus;
 	}
 
+	rs_init();
 #ifdef CONFIG_SUN_AUXIO
 	auxio_probe();
 #endif

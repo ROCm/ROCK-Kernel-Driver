@@ -1,3 +1,22 @@
+2001-03-02  Tim Waugh  <twaugh@redhat.com>
+
+	* ieee1284_ops.c (parport_ieee1284_read_nibble): Reset nAutoFd
+	on timeout.  Matches 2.2.x behaviour.
+
+2001-03-02  Andrew Morton <andrewm@uow.edu.au>
+
+	* parport_pc.c (registered_parport): New static variable.
+	(parport_pc_find_ports): Set it when we register PCI driver.
+	(init_module): Unregister PCI driver if necessary when we
+	fail.
+
+2001-03-02  Tim Waugh  <twaugh@redhat.com>
+
+	* ieee1284_ops.c (parport_ieee1284_write_compat): Don't use
+	down_trylock to reset the IRQ count.  Don't even use sema_init,
+	because it's not even necessary to reset the count.  I can't
+	remember why we ever did.
+
 2001-01-04  Peter Osterlund  <peter.osterlund@mailbox.swipnet.se>
 
 	* ieee1284.c (parport_negotiate): Fix missing printk argument.

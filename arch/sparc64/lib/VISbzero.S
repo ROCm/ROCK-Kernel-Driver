@@ -1,4 +1,4 @@
-/* $Id: VISbzero.S,v 1.10 1999/05/25 16:52:56 jj Exp $
+/* $Id: VISbzero.S,v 1.11 2001/03/15 08:51:24 anton Exp $
  * VISbzero.S: High speed clear operations utilizing the UltraSparc
  *        Visual Instruction Set.
  *
@@ -83,6 +83,8 @@
 	.text
 	.align		32
 #ifdef __KERNEL__
+	.globl		__bzero_begin
+__bzero_begin:
 	.globl		__bzero, __bzero_noasi
 __bzero_noasi:
 	rd		%asi, %g5
@@ -272,3 +274,5 @@ VISbzerofixup_zb:
 	ba,pt		%xcc, VISbzerofixup_ret0
 	 sub		%o1, %g2, %o0
 #endif
+	.globl		__bzero_end
+__bzero_end:

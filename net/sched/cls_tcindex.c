@@ -76,7 +76,7 @@ static struct tcindex_filter_result *lookup(struct tcindex_data *p,__u16 key)
 	struct tcindex_filter *f;
 
 	if (p->perfect)
-		return p->perfect[key].res.classid ? p->perfect+key : NULL;
+		return p->perfect[key].res.class ? p->perfect+key : NULL;
 	if (!p->h)
 		return NULL;
 	for (f = p->h[key % p->hash]; f; f = f->next) {
@@ -122,8 +122,14 @@ static int tcindex_classify(struct sk_buff *skb, struct tcf_proto *tp,
 
 static unsigned long tcindex_get(struct tcf_proto *tp, u32 handle)
 {
+	struct tcindex_data *p = PRIV(tp);
+	struct tcindex_filter_result *r;
+
 	DPRINTK("tcindex_get(tp %p,handle 0x%08x)\n",tp,handle);
-	return (unsigned long) lookup(PRIV(tp),handle);
+	if (p->perfect && handle >= p->alloc_hash)
+		return 0;
+	r = lookup(PRIV(tp),handle);
+	return r && r->res.class ? (unsigned long) r : 0;
 }
 
 
@@ -164,7 +170,7 @@ static int tcindex_delete(struct tcf_proto *tp, unsigned long arg)
 
 	DPRINTK("tcindex_delete(tp %p,arg 0x%lx),p %p,f %p\n",tp,arg,p,f);
 	if (p->perfect) {
-		if (!r->res.classid)
+		if (!r->res.class)
 			return -ENOENT;
 	} else {
 		int i;
@@ -212,7 +218,7 @@ static int tcindex_change(struct tcf_proto *tp,unsigned long base,u32 handle,
 	struct tcindex_filter *f;
 	struct tcindex_filter_result *r = (struct tcindex_filter_result *) *arg;
 	struct tcindex_filter **walk;
-	int hash;
+	int hash,shift;
 	__u16 mask;
 
 	DPRINTK("tcindex_change(tp %p,handle 0x%08x,tca %p,arg %p),opt %p,"
@@ -237,17 +243,22 @@ static int tcindex_change(struct tcf_proto *tp,unsigned long base,u32 handle,
 			return -EINVAL;
 		mask = *(__u16 *) RTA_DATA(tb[TCA_TCINDEX_MASK-1]);
 	}
-	if (p->perfect && hash <= mask)
+	if (!tb[TCA_TCINDEX_SHIFT-1])
+		shift = p->shift;
+	else {
+		if (RTA_PAYLOAD(tb[TCA_TCINDEX_SHIFT-1]) < sizeof(__u16))
+			return -EINVAL;
+		shift = *(int *) RTA_DATA(tb[TCA_TCINDEX_SHIFT-1]);
+	}
+	if (p->perfect && hash <= (mask >> shift))
 		return -EBUSY;
-	if ((p->perfect || p->h) && hash > p->alloc_hash)
+	if (p->perfect && hash > p->alloc_hash)
+		return -EBUSY;
+	if (p->h && hash != p->alloc_hash)
 		return -EBUSY;
 	p->hash = hash;
 	p->mask = mask;
-	if (tb[TCA_TCINDEX_SHIFT-1]) {
-		if (RTA_PAYLOAD(tb[TCA_TCINDEX_SHIFT-1]) < sizeof(__u16))
-			return -EINVAL;
-		p->shift = *(int *) RTA_DATA(tb[TCA_TCINDEX_SHIFT-1]);
-	}
+	p->shift = shift;
 	if (tb[TCA_TCINDEX_FALL_THROUGH-1]) {
 		if (RTA_PAYLOAD(tb[TCA_TCINDEX_FALL_THROUGH-1]) < sizeof(int))
 			return -EINVAL;
@@ -258,9 +269,9 @@ static int tcindex_change(struct tcf_proto *tp,unsigned long base,u32 handle,
 	    tb[TCA_TCINDEX_POLICE-1]);
 	if (!tb[TCA_TCINDEX_CLASSID-1] && !tb[TCA_TCINDEX_POLICE-1])
 		return 0;
-	if (!p->hash) {
-		if (p->mask < PERFECT_HASH_THRESHOLD) {
-			p->hash = p->mask+1;
+	if (!hash) {
+		if ((mask >> shift) < PERFECT_HASH_THRESHOLD) {
+			p->hash = (mask >> shift)+1;
 		} else {
 			p->hash = DEFAULT_HASH_SIZE;
 		}
@@ -268,7 +279,7 @@ static int tcindex_change(struct tcf_proto *tp,unsigned long base,u32 handle,
 	if (!p->perfect && !p->h) {
 		p->alloc_hash = p->hash;
 		DPRINTK("hash %d mask %d\n",p->hash,p->mask);
-		if (p->hash > p->mask) {
+		if (p->hash > (mask >> shift)) {
 			p->perfect = kmalloc(p->hash*
 			    sizeof(struct tcindex_filter_result),GFP_KERNEL);
 			if (!p->perfect)
@@ -283,7 +294,15 @@ static int tcindex_change(struct tcf_proto *tp,unsigned long base,u32 handle,
 			memset(p->h, 0, p->hash*sizeof(struct tcindex_filter *));
 		}
 	}
-	if (handle > p->mask)
+	/*
+	 * Note: this could be as restrictive as
+	 * if (handle & ~(mask >> shift))
+	 * but then, we'd fail handles that may become valid after some
+	 * future mask change. While this is extremely unlikely to ever
+	 * matter, the check below is safer (and also more
+	 * backwards-compatible).
+	 */
+	if (p->perfect && handle >= p->alloc_hash)
 		return -EINVAL;
 	if (p->perfect) {
 		r = p->perfect+handle;
@@ -308,17 +327,16 @@ static int tcindex_change(struct tcf_proto *tp,unsigned long base,u32 handle,
 		}
         }
 #ifdef CONFIG_NET_CLS_POLICE
-	if (!tb[TCA_TCINDEX_POLICE-1]) {
-		r->police = NULL;
-	} else {
-		struct tcf_police *police =
-		    tcf_police_locate(tb[TCA_TCINDEX_POLICE-1],NULL);
+	{
+		struct tcf_police *police;
 
-                tcf_tree_lock(tp);
+		police = tb[TCA_TCINDEX_POLICE-1] ?
+		    tcf_police_locate(tb[TCA_TCINDEX_POLICE-1],NULL) : NULL;
+		tcf_tree_lock(tp);
 		police = xchg(&r->police,police);
-                tcf_tree_unlock(tp);
+		tcf_tree_unlock(tp);
 		tcf_police_release(police);
-        }
+	}
 #endif
 	if (r != &new_filter_result)
 		return 0;
@@ -345,7 +363,7 @@ static void tcindex_walk(struct tcf_proto *tp, struct tcf_walker *walker)
 	DPRINTK("tcindex_walk(tp %p,walker %p),p %p\n",tp,walker,p);
 	if (p->perfect) {
 		for (i = 0; i < p->hash; i++) {
-			if (!p->perfect[i].res.classid)
+			if (!p->perfect[i].res.class)
 				continue;
 			if (walker->count >= walker->skip) {
 				if (walker->fn(tp,

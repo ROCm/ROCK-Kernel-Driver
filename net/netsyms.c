@@ -432,17 +432,7 @@ EXPORT_SYMBOL(arp_find);
 #endif  /* CONFIG_INET */
 
 #ifdef CONFIG_TR
-EXPORT_SYMBOL(tr_setup);
 EXPORT_SYMBOL(tr_type_trans);
-EXPORT_SYMBOL(register_trdev);
-EXPORT_SYMBOL(unregister_trdev);
-EXPORT_SYMBOL(init_trdev);
-#endif
-
-#ifdef CONFIG_NET_FC
-EXPORT_SYMBOL(register_fcdev);
-EXPORT_SYMBOL(unregister_fcdev);
-EXPORT_SYMBOL(init_fcdev);
 #endif
 
 /* Device callback registration */
@@ -451,14 +441,10 @@ EXPORT_SYMBOL(unregister_netdevice_notifier);
 
 /* support for loadable net drivers */
 #ifdef CONFIG_NET
-EXPORT_SYMBOL(init_etherdev);
 EXPORT_SYMBOL(loopback_dev);
 EXPORT_SYMBOL(register_netdevice);
 EXPORT_SYMBOL(unregister_netdevice);
-EXPORT_SYMBOL(register_netdev);
-EXPORT_SYMBOL(unregister_netdev);
 EXPORT_SYMBOL(netdev_state_change);
-EXPORT_SYMBOL(ether_setup);
 EXPORT_SYMBOL(dev_new_index);
 EXPORT_SYMBOL(dev_get_by_index);
 EXPORT_SYMBOL(__dev_get_by_index);
@@ -469,8 +455,6 @@ EXPORT_SYMBOL(netdev_set_master);
 EXPORT_SYMBOL(eth_type_trans);
 #ifdef CONFIG_FDDI
 EXPORT_SYMBOL(fddi_type_trans);
-EXPORT_SYMBOL(fddi_setup);
-EXPORT_SYMBOL(init_fddidev);
 #endif /* CONFIG_FDDI */
 #if 0
 EXPORT_SYMBOL(eth_copy_and_sum);
@@ -511,8 +495,6 @@ EXPORT_SYMBOL(if_port_text);
 
 #ifdef CONFIG_HIPPI
 EXPORT_SYMBOL(hippi_type_trans);
-EXPORT_SYMBOL(init_hippi_dev);
-EXPORT_SYMBOL(unregister_hipdev);
 #endif
 
 #ifdef CONFIG_SYSCTL
@@ -522,12 +504,6 @@ EXPORT_SYMBOL(sysctl_rmem_max);
 EXPORT_SYMBOL(sysctl_ip_default_ttl);
 #endif
 #endif
-
-#if defined(CONFIG_ATALK) || defined(CONFIG_ATALK_MODULE) 
-#include<linux/if_ltalk.h>
-EXPORT_SYMBOL(ltalk_setup);
-#endif
-
 
 /* Packet scheduler modules want these. */
 EXPORT_SYMBOL(qdisc_destroy);

@@ -887,7 +887,7 @@ int plusb_net_init(struct net_device *dev)
 
 /* --------------------------------------------------------------------- */
 
-static void *plusb_probe (struct usb_device *usbdev, unsigned int ifnum)
+static void *plusb_probe (struct usb_device *usbdev, unsigned int ifnum, const struct usb_device_id *id)
 {
 	plusb_t *s;
 

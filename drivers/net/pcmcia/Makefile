@@ -12,7 +12,7 @@ obj-n		:=
 obj-		:=
 
 # Things that need to export symbols
-export-objs	:= ray_cs.o
+export-objs	:= ray_cs.o hermes.o
 
 # 16-bit client drivers
 obj-$(CONFIG_PCMCIA_3C589)	+= 3c589_cs.o

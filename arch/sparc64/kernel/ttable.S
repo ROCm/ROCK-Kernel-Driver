@@ -1,4 +1,4 @@
-/* $Id: ttable.S,v 1.31 2000/05/09 17:40:14 davem Exp $
+/* $Id: ttable.S,v 1.32 2001/03/23 07:56:30 davem Exp $
  * ttable.S: Sparc V9 Trap Table(s) with SpitFire extensions.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -22,7 +22,7 @@ tl0_resv018:	BTRAP(0x18) BTRAP(0x19) BTRAP(0x1a) BTRAP(0x1b) BTRAP(0x1c) BTRAP(0
 tl0_resv01e:	BTRAP(0x1e) BTRAP(0x1f)
 tl0_fpdis:	TRAP_NOSAVE(do_fpdis)
 tl0_fpieee:	TRAP_SAVEFPU(do_fpieee)
-tl0_fpother:	TRAP_SAVEFPU(do_fpother)
+tl0_fpother:	TRAP_NOSAVE(do_fpother_check_fitos)
 tl0_tof:	TRAP(do_tof)
 tl0_cwin:	CLEAN_WINDOW
 tl0_div0:	TRAP(do_div0)

@@ -90,7 +90,7 @@
 #define	SKFDDI_PSZ	32		/* address PROM size */
 
 /*
- * address transmision from logical to physical offset address on board
+ * address transmission from logical to physical offset address on board
  */
 #define FMA(a)	(0x0400|((a)<<1))	/* FORMAC+ (r/w) */
 #define P1A(a)	(0x0800|((a)<<1))	/* PLC1 (r/w) */
@@ -347,7 +347,7 @@
 #define SA_PMD_TYPE	(8)	/* start addr. PMD-Type	*/
 
 /*
- * address transmision from logical to physical offset address on board
+ * address transmission from logical to physical offset address on board
  */
 #define	FMA(a)	(0x0100|((a)<<1))	/* FORMAC+ (r/w) */
 #define	P2(a)	(0x00c0|((a)<<1))	/* PLC2 (r/w) (DAS) */
@@ -677,7 +677,7 @@
 #ifdef	ISA
 
 /*
- * address transmision from logic NPADDR6-0 to physical offset address on board
+ * address transmission from logic NPADDR6-0 to physical offset address on board
  */
 #define FMA(a)	(0x8000|(((a)&0x07)<<1)|(((a)&0x78)<<7))  /* FORMAC+ (r/w) */
 #define PRA(a)	(0x1000|(((a)&0x07)<<1)|(((a)&0x18)<<7))  /* PROM (read only)*/
@@ -942,7 +942,7 @@
 /*	PCI_SUB_ID	16 bit	Subsystem ID */
 
 /*	PCI_BASE_ROM	32 bit	Expansion ROM Base Address */
-#define	PCI_ROMBASE	0xfffe0000L  /* Bit 31..17: ROM BASE addres (1st) */
+#define	PCI_ROMBASE	0xfffe0000L  /* Bit 31..17: ROM BASE address (1st) */
 #define	PCI_ROMBASZ	0x0001c000L  /* Bit 16..14: Treat as BASE or SIZE */
 #define	PCI_ROMSIZE	0x00003800L  /* Bit 13..11: ROM Size Requirements */
 #define	PCI_ROMEN	0x00000001L  /* Bit 0:	    Address Decode enable */
@@ -1685,7 +1685,7 @@
 #define PCI_PROG_INTFC	0x00		/* PCI programming Interface (=0) */
 
 /*
- * address transmision from logical to physical offset address on board
+ * address transmission from logical to physical offset address on board
  */
 #define	FMA(a)	(0x0400|((a)<<2))	/* FORMAC+ (r/w) (SN3) */
 #define	P1(a)	(0x0380|((a)<<2))	/* PLC1 (r/w) (DAS) */

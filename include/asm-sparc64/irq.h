@@ -1,4 +1,4 @@
-/* $Id: irq.h,v 1.19 2000/06/26 19:40:27 davem Exp $
+/* $Id: irq.h,v 1.20 2001/03/09 01:31:40 davem Exp $
  * irq.h: IRQ registers on the 64-bit Sparc.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -77,7 +77,9 @@ extern unsigned char dma_sync_reg_table_entry;
 
 /* IMAP/ICLR register defines */
 #define IMAP_VALID		0x80000000	/* IRQ Enabled		*/
-#define IMAP_TID		0x7c000000	/* UPA TargetID		*/
+#define IMAP_TID_UPA		0x7c000000	/* UPA TargetID		*/
+#define IMAP_AID_SAFARI		0x7c000000	/* Safari AgentID	*/
+#define IMAP_NID_SAFARI		0x03e00000	/* Safari NodeID	*/
 #define IMAP_IGN		0x000007c0	/* IRQ Group Number	*/
 #define IMAP_INO		0x0000003f	/* IRQ Number		*/
 #define IMAP_INR		0x000007ff	/* Full interrupt number*/

@@ -1186,6 +1186,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 	} else {
 		/* One of our sibling threads was faster, back out. */
 		page_cache_release(new_page);
+		return 1;
 	}
 
 	/* no need to invalidate: a not-present page shouldn't be cached */
@@ -1317,10 +1318,10 @@ pte_t *pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 		pte_t *new;
 
 		/* "fast" allocation can happen without dropping the lock.. */
-		new = pte_alloc_one_fast();
+		new = pte_alloc_one_fast(address);
 		if (!new) {
 			spin_unlock(&mm->page_table_lock);
-			new = pte_alloc_one();
+			new = pte_alloc_one(address);
 			spin_lock(&mm->page_table_lock);
 			if (!new)
 				return NULL;

@@ -1183,10 +1183,17 @@
 	0001  EBUS
 	1000  EBUS
 	1001  Happy Meal
+	1100  RIO EBUS
+	1101  RIO GEM
+	1102  RIO 1394
+	1103  RIO USB
+	2bad  GEM
 	5000  Simba Advanced PCI Bridge
 	5043  SunPCI Co-processor
-	8000  PCI Bus Module
+	8000  Psycho PCI Bus Module
+	8001  Schizo PCI Bus Module
 	a000  Ultra IIi
+	a001  Ultra IIe
 108f  Systemsoft
 1090  Encore Computer Corporation
 1091  Intergraph Corporation

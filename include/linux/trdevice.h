@@ -33,7 +33,10 @@ extern int		tr_header(struct sk_buff *skb, struct net_device *dev,
 				   void *saddr, unsigned len);
 extern int		tr_rebuild_header(struct sk_buff *skb);
 extern unsigned short	tr_type_trans(struct sk_buff *skb, struct net_device *dev);
-extern struct net_device    * init_trdev(struct net_device *, int);
+extern struct net_device *init_trdev(struct net_device *dev, int sizeof_priv);
+extern struct net_device *alloc_trdev(int sizeof_priv);
+extern int register_trdev(struct net_device *dev);
+extern void unregister_trdev(struct net_device *dev);
 
 #endif
 

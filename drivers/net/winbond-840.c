@@ -390,17 +390,17 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 
 	irq = pdev->irq;
 
-	if(pci_set_dma_mask(pdev,0xFFFFffff)) {
+	if (pci_set_dma_mask(pdev,0xFFFFffff)) {
 		printk(KERN_WARNING "Winbond-840: Device %s disabled due to DMA limitations.\n",
-				pdev->name);
+		       pdev->slot_name);
 		return -EIO;
 	}
-	dev = init_etherdev(NULL, sizeof(*np));
+	dev = alloc_etherdev(sizeof(*np));
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
 
-	if (pci_request_regions(pdev, dev->name))
+	if (pci_request_regions(pdev, "winbond-840"))
 		goto err_out_netdev;
 
 #ifdef USE_IO_OPS
@@ -412,16 +412,9 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 		goto err_out_free_res;
 #endif
 
-	printk(KERN_INFO "%s: %s at 0x%lx, ",
-		   dev->name, pci_id_tbl[chip_idx].name, ioaddr);
-
 	/* Warning: broken for big-endian machines. */
 	for (i = 0; i < 3; i++)
 		((u16 *)dev->dev_addr)[i] = le16_to_cpu(eeprom_read(ioaddr, i));
-
-	for (i = 0; i < 5; i++)
-			printk("%2.2x:", dev->dev_addr[i]);
-	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
 
 	/* Reset the chip to erase previous misconfiguration.
 	   No hold time required! */
@@ -465,6 +458,16 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 	dev->tx_timeout = &tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
+	i = register_netdev(dev);
+	if (i)
+		goto err_out_cleardev;
+
+	printk(KERN_INFO "%s: %s at 0x%lx, ",
+		   dev->name, pci_id_tbl[chip_idx].name, ioaddr);
+	for (i = 0; i < 5; i++)
+			printk("%2.2x:", dev->dev_addr[i]);
+	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
+
 	if (np->drv_flags & CanHaveMII) {
 		int phy, phy_idx = 0;
 		for (phy = 1; phy < 32 && phy_idx < MII_CNT; phy++) {
@@ -487,12 +490,14 @@ static int __devinit w840_probe1 (struct pci_dev *pdev,
 	find_cnt++;
 	return 0;
 
+err_out_cleardev:
+	pci_set_drvdata(pdev, NULL);
 #ifndef USE_IO_OPS
+	iounmap((void *)ioaddr);
 err_out_free_res:
-	pci_release_regions(pdev);
 #endif
+	pci_release_regions(pdev);
 err_out_netdev:
-	unregister_netdev (dev);
 	kfree (dev);
 	return -ENODEV;
 }

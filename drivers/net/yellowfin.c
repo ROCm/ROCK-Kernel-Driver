@@ -394,7 +394,7 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	i = pci_enable_device(pdev);
 	if (i) return i;
 
-	dev = init_etherdev(NULL, sizeof(*np));
+	dev = alloc_etherdev(sizeof(*np));
 	if (!dev) {
 		printk (KERN_ERR "yellowfin: cannot allocate ethernet device\n");
 		return -ENOMEM;
@@ -418,9 +418,6 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 #endif
 	irq = pdev->irq;
 
-	printk(KERN_INFO "%s: %s type %8x at 0x%lx, ",
-		   dev->name, pci_id_tbl[chip_idx].name, inl(ioaddr + ChipRev), ioaddr);
-
 	if (drv_flags & IsGigabit)
 		for (i = 0; i < 6; i++)
 			dev->dev_addr[i] = inb(ioaddr + StnAddr + i);
@@ -429,9 +426,6 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 		for (i = 0; i < 6; i++)
 			dev->dev_addr[i] = read_eeprom(ioaddr, ee_offset + i);
 	}
-	for (i = 0; i < 5; i++)
-			printk("%2.2x:", dev->dev_addr[i]);
-	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
 
 	/* Reset the chip. */
 	outl(0x80000000, ioaddr + DMACtrl);
@@ -476,6 +470,16 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	if (mtu)
 		dev->mtu = mtu;
 
+	i = register_netdev(dev);
+	if (i)
+		goto err_out_cleardev;
+
+	printk(KERN_INFO "%s: %s type %8x at 0x%lx, ",
+		   dev->name, pci_id_tbl[chip_idx].name, inl(ioaddr + ChipRev), ioaddr);
+	for (i = 0; i < 5; i++)
+			printk("%2.2x:", dev->dev_addr[i]);
+	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
+
 	if (np->drv_flags & HasMII) {
 		int phy, phy_idx = 0;
 		for (phy = 0; phy < 32 && phy_idx < MII_CNT; phy++) {
@@ -495,12 +499,14 @@ static int __devinit yellowfin_init_one(struct pci_dev *pdev,
 	
 	return 0;
 
+err_out_cleardev:
+	pci_set_drvdata(pdev, NULL);
 #ifndef USE_IO_OPS
+	iounmap((void *)ioaddr);
 err_out_free_res:
-	pci_release_regions(pdev);
 #endif
+	pci_release_regions(pdev);
 err_out_free_netdev:
-	unregister_netdev (dev);
 	kfree (dev);
 	return -ENODEV;
 }
@@ -549,7 +555,7 @@ static void mdio_write(long ioaddr, int phy_id, int location, int value)
 
 static int yellowfin_open(struct net_device *dev)
 {
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 	long ioaddr = dev->base_addr;
 	int i;
 
@@ -631,7 +637,7 @@ static int yellowfin_open(struct net_device *dev)
 static void yellowfin_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 	long ioaddr = dev->base_addr;
 	int next_tick = 60*HZ;
 
@@ -668,7 +674,7 @@ static void yellowfin_timer(unsigned long data)
 
 static void yellowfin_tx_timeout(struct net_device *dev)
 {
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 	long ioaddr = dev->base_addr;
 
 	printk(KERN_WARNING "%s: Yellowfin transmit timed out at %d/%d Tx "
@@ -705,7 +711,7 @@ static void yellowfin_tx_timeout(struct net_device *dev)
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void yellowfin_init_ring(struct net_device *dev)
 {
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 	int i;
 
 	yp->tx_full = 0;
@@ -777,7 +783,7 @@ static void yellowfin_init_ring(struct net_device *dev)
 
 static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 	unsigned entry;
 
 	netif_stop_queue (dev);
@@ -850,7 +856,7 @@ static int yellowfin_start_xmit(struct sk_buff *skb, struct net_device *dev)
    after the Tx thread. */
 static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
-	struct net_device *dev = (struct net_device *)dev_instance;
+	struct net_device *dev = dev_instance;
 	struct yellowfin_private *yp;
 	long ioaddr;
 	int boguscnt = max_interrupt_work;
@@ -863,7 +869,7 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
 #endif
 
 	ioaddr = dev->base_addr;
-	yp = (struct yellowfin_private *)dev->priv;
+	yp = dev->priv;
 	
 	spin_lock (&yp->lock);
 
@@ -1001,7 +1007,7 @@ static void yellowfin_interrupt(int irq, void *dev_instance, struct pt_regs *reg
    for clarity and better register allocation. */
 static int yellowfin_rx(struct net_device *dev)
 {
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 	int entry = yp->cur_rx % RX_RING_SIZE;
 	int boguscnt = yp->dirty_rx + RX_RING_SIZE - yp->cur_rx;
 
@@ -1140,7 +1146,7 @@ static int yellowfin_rx(struct net_device *dev)
 
 static void yellowfin_error(struct net_device *dev, int intr_status)
 {
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 
 	printk(KERN_ERR "%s: Something Wicked happened! %4.4x.\n",
 		   dev->name, intr_status);
@@ -1154,7 +1160,7 @@ static void yellowfin_error(struct net_device *dev, int intr_status)
 static int yellowfin_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 	int i;
 
 	netif_stop_queue (dev);
@@ -1241,7 +1247,7 @@ static int yellowfin_close(struct net_device *dev)
 
 static struct net_device_stats *yellowfin_get_stats(struct net_device *dev)
 {
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 	return &yp->stats;
 }
 
@@ -1272,7 +1278,7 @@ static inline unsigned ether_crc_le(int length, unsigned char *data)
 
 static void set_rx_mode(struct net_device *dev)
 {
-	struct yellowfin_private *yp = (struct yellowfin_private *)dev->priv;
+	struct yellowfin_private *yp = dev->priv;
 	long ioaddr = dev->base_addr;
 	u16 cfg_value = inw(ioaddr + Cnfg);
 
@@ -1318,7 +1324,7 @@ static void set_rx_mode(struct net_device *dev)
 
 static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct yellowfin_private *np = (void *)dev->priv;
+	struct yellowfin_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
 	u16 *data = (u16 *)&rq->ifr_data;
 

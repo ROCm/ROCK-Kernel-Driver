@@ -1,4 +1,4 @@
-/* $Id: dtlb_base.S,v 1.8 2000/11/10 08:28:45 davem Exp $
+/* $Id: dtlb_base.S,v 1.9 2001/03/22 00:12:32 davem Exp $
  * dtlb_base.S:	Front end to DTLB miss replacement strategy.
  *              This is included directly into the trap table.
  *
@@ -10,8 +10,6 @@
 #define VPTE_SHIFT		(PAGE_SHIFT - 3)
 #define KERN_HIGHBITS		((_PAGE_VALID | _PAGE_SZ4MB) ^ 0xfffff80000000000)
 #define KERN_LOWBITS		(_PAGE_CP | _PAGE_CV | _PAGE_P | _PAGE_W)
-#define KERN_LOWBITS_IO		(_PAGE_E | _PAGE_P | _PAGE_W)
-#define KERN_IOBITS		(KERN_LOWBITS ^ KERN_LOWBITS_IO)
 
 /* %g1	TLB_SFSR	(%g1 + %g1 == TLB_TAG_ACCESS)
  * %g2	(KERN_HIGHBITS | KERN_LOWBITS)
@@ -94,5 +92,3 @@
 #undef VPTE_SHIFT
 #undef KERN_HIGHBITS
 #undef KERN_LOWBITS
-#undef KERN_LOWBITS_IO
-#undef KERN_IOBITS

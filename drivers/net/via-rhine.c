@@ -514,7 +514,7 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	if (pci_flags & PCI_USES_MASTER)
 		pci_set_master (pdev);
 
-	dev = init_etherdev(NULL, sizeof(*np));
+	dev = alloc_etherdev(sizeof(*np));
 	if (dev == NULL) {
 		printk (KERN_ERR "init_ethernet failed for card #%d\n",
 			card_idx);
@@ -522,28 +522,22 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	}
 	SET_MODULE_OWNER(dev);
 	
-	if (pci_request_regions(pdev, dev->name))
+	if (pci_request_regions(pdev, "via-rhine"))
 		goto err_out_free_netdev;
 
 #ifndef USE_IO
 	ioaddr = (long) ioremap (ioaddr, io_size);
 	if (!ioaddr) {
 		printk (KERN_ERR "ioremap failed for device %s, region 0x%X @ 0x%X\n",
-			dev->name, io_size,
+			pdev->slot_name, io_size,
 			pci_resource_start (pdev, 1));
 		goto err_out_free_res;
 	}
 #endif
 
-	printk(KERN_INFO "%s: %s at 0x%lx, ",
-		   dev->name, via_rhine_chip_info[chip_id].name, ioaddr);
-
 	/* Ideally we would read the EEPROM but access may be locked. */
 	for (i = 0; i < 6; i++)
 		dev->dev_addr[i] = readb(ioaddr + StationAddr + i);
-	for (i = 0; i < 5; i++)
-			printk("%2.2x:", dev->dev_addr[i]);
-	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], pdev->irq);
 
 	/* Reset the chip to erase previous misconfiguration. */
 	writew(CmdReset, ioaddr + ChipCmd);
@@ -583,6 +577,16 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 	dev->tx_timeout = via_rhine_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	
+	i = register_netdev(dev);
+	if (i)
+		goto err_out_unmap;
+
+	printk(KERN_INFO "%s: %s at 0x%lx, ",
+		   dev->name, via_rhine_chip_info[chip_id].name, ioaddr);
+	for (i = 0; i < 5; i++)
+			printk("%2.2x:", dev->dev_addr[i]);
+	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], pdev->irq);
+
 	pci_set_drvdata(pdev, dev);
 
 	if (np->drv_flags & CanHaveMII) {
@@ -610,15 +614,13 @@ static int __devinit via_rhine_init_one (struct pci_dev *pdev,
 
 	return 0;
 
+err_out_unmap:
 #ifndef USE_IO
-/* note this is ifdef'd because the ioremap is ifdef'd...
- * so additional exit conditions above this must move
- * pci_release_regions outside of the ifdef */
+	iounmap((void *)ioaddr);
 err_out_free_res:
-	pci_release_regions(pdev);
 #endif
+	pci_release_regions(pdev);
 err_out_free_netdev:
-	unregister_netdev (dev);
 	kfree (dev);
 err_out:
 	return -ENODEV;
@@ -1064,7 +1066,7 @@ static int via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
    after the Tx thread. */
 static void via_rhine_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 {
-	struct net_device *dev = (struct net_device *)dev_instance;
+	struct net_device *dev = dev_instance;
 	long ioaddr;
 	u32 intr_status;
 	int boguscnt = max_interrupt_work;
@@ -1466,7 +1468,7 @@ static int via_rhine_close(struct net_device *dev)
 static void __devexit via_rhine_remove_one (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
-	struct netdev_private *np = (struct netdev_private *)(dev->priv);
+	struct netdev_private *np = dev->priv;
 	
 	unregister_netdev(dev);
 

@@ -276,16 +276,14 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	irq = pci_dev->irq;
 	ioaddr = pci_resource_start(pci_dev, 0);
 
-	net_dev = init_etherdev(NULL, sizeof(struct sis900_private));
+	net_dev = alloc_etherdev(sizeof(struct sis900_private));
 	if (!net_dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(net_dev);
 
-	if (!request_region(ioaddr, SIS900_TOTAL_SIZE, net_dev->name)) {
-		printk(KERN_ERR "sis900.c: can't allocate I/O space at 0x%lX\n", ioaddr);
-		ret = -EBUSY;
+	ret = pci_request_regions(pci_dev, "sis900");
+	if (ret)
 		goto err_out;
-	}
 
 	pci_read_config_byte(pci_dev, PCI_CLASS_REVISION, &revision);
 	if (revision == SIS630E_900_REV || revision == SIS630EA1_900_REV)
@@ -299,13 +297,6 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 		ret = -ENODEV;
 		goto err_out_region;
 	}
-
-	/* print some information about our NIC */
-	printk(KERN_INFO "%s: %s at %#lx, IRQ %d, ", net_dev->name,
-	       card_name, ioaddr, irq);
-	for (i = 0; i < 5; i++)
-		printk("%2.2x:", (u8)net_dev->dev_addr[i]);
-	printk("%2.2x.\n", net_dev->dev_addr[i]);
 
 	sis_priv = net_dev->priv;
 
@@ -334,12 +325,24 @@ static int __devinit sis900_probe (struct pci_dev *pci_dev, const struct pci_dev
 	net_dev->tx_timeout = sis900_tx_timeout;
 	net_dev->watchdog_timeo = TX_TIMEOUT;
 
+	ret = register_netdev(net_dev);
+	if (ret)
+		goto err_out_cleardev;
+
+	/* print some information about our NIC */
+	printk(KERN_INFO "%s: %s at %#lx, IRQ %d, ", net_dev->name,
+	       card_name, ioaddr, irq);
+	for (i = 0; i < 5; i++)
+		printk("%2.2x:", (u8)net_dev->dev_addr[i]);
+	printk("%2.2x.\n", net_dev->dev_addr[i]);
+
 	return 0;
 
+err_out_cleardev:
+	pci_set_drvdata(pci_dev, NULL);
 err_out_region:
-	release_region(ioaddr, SIS900_TOTAL_SIZE);
+	pci_release_regions(pci_dev);
 err_out:
-	unregister_netdev(net_dev);
 	kfree(net_dev);
 	return ret;
 }
@@ -355,7 +358,7 @@ err_out:
 
 static int __init sis900_mii_probe (struct net_device * net_dev)
 {
-	struct sis900_private * sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private * sis_priv = net_dev->priv;
 	int phy_addr;
 	u8 revision;
 
@@ -613,7 +616,7 @@ static void mdio_write(struct net_device *net_dev, int phy_id, int location, int
 static int
 sis900_open(struct net_device *net_dev)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	long ioaddr = net_dev->base_addr;
 	u8  revision;
 	int ret;
@@ -706,7 +709,7 @@ sis900_init_rxfilter (struct net_device * net_dev)
 static void
 sis900_init_tx_ring(struct net_device *net_dev)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	long ioaddr = net_dev->base_addr;
 	int i;
 
@@ -740,7 +743,7 @@ sis900_init_tx_ring(struct net_device *net_dev)
 static void 
 sis900_init_rx_ring(struct net_device *net_dev)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	long ioaddr = net_dev->base_addr;
 	int i;
 
@@ -811,7 +814,7 @@ sis900_init_rx_ring(struct net_device *net_dev)
 
 static void sis630_set_eq(struct net_device *net_dev, u8 revision)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	u16 reg14h, eq_value, max_value=0, min_value=0;
 	u8 host_bridge_rev;
 	int i, maxcount=10;
@@ -878,7 +881,7 @@ static void sis630_set_eq(struct net_device *net_dev, u8 revision)
 static void sis900_timer(unsigned long data)
 {
 	struct net_device *net_dev = (struct net_device *)data;
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	struct mii_phy *mii_phy = sis_priv->mii;
 	static int next_tick = 5*HZ;
 	u16 status;
@@ -955,7 +958,7 @@ static void sis900_timer(unsigned long data)
 
 static void sis900_check_mode (struct net_device *net_dev, struct mii_phy *mii_phy)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	long ioaddr = net_dev->base_addr;
 	int speed, duplex;
 	u32 tx_flags = 0, rx_flags = 0;
@@ -1174,7 +1177,7 @@ static void rtl8201_read_mode(struct net_device *net_dev, int phy_addr, int *spe
 
 static void sis900_tx_timeout(struct net_device *net_dev)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	long ioaddr = net_dev->base_addr;
 	unsigned long flags;
 	int i;
@@ -1227,7 +1230,7 @@ static void sis900_tx_timeout(struct net_device *net_dev)
 static int
 sis900_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	long ioaddr = net_dev->base_addr;
 	unsigned int  entry;
 	unsigned long flags;
@@ -1276,8 +1279,8 @@ sis900_start_xmit(struct sk_buff *skb, struct net_device *net_dev)
 
 static void sis900_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
-	struct net_device *net_dev = (struct net_device *)dev_instance;
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct net_device *net_dev = dev_instance;
+	struct sis900_private *sis_priv = net_dev->priv;
 	int boguscnt = max_interrupt_work;
 	long ioaddr = net_dev->base_addr;
 	u32 status;
@@ -1335,7 +1338,7 @@ static void sis900_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 
 static int sis900_rx(struct net_device *net_dev)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	long ioaddr = net_dev->base_addr;
 	unsigned int entry = sis_priv->cur_rx % NUM_RX_DESC;
 	u32 rx_status = sis_priv->rx_ring[entry].cmdsts;
@@ -1464,7 +1467,7 @@ static int sis900_rx(struct net_device *net_dev)
 
 static void sis900_finish_xmit (struct net_device *net_dev)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 
 	for (; sis_priv->dirty_tx < sis_priv->cur_tx; sis_priv->dirty_tx++) {
 		unsigned int entry;
@@ -1529,7 +1532,7 @@ static int
 sis900_close(struct net_device *net_dev)
 {
 	long ioaddr = net_dev->base_addr;
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	int i;
 
 	netif_stop_queue(net_dev);
@@ -1573,7 +1576,7 @@ sis900_close(struct net_device *net_dev)
 
 static int mii_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 	u16 *data = (u16 *)&rq->ifr_data;
 
 	switch(cmd) {
@@ -1603,7 +1606,7 @@ static int mii_ioctl(struct net_device *net_dev, struct ifreq *rq, int cmd)
 static struct net_device_stats *
 sis900_get_stats(struct net_device *net_dev)
 {
-	struct sis900_private *sis_priv = (struct sis900_private *)net_dev->priv;
+	struct sis900_private *sis_priv = net_dev->priv;
 
 	return &sis_priv->stats;
 }
@@ -1620,7 +1623,7 @@ sis900_get_stats(struct net_device *net_dev)
 
 static int sis900_set_config(struct net_device *dev, struct ifmap *map)
 {    
-	struct sis900_private *sis_priv = (struct sis900_private *)dev->priv;
+	struct sis900_private *sis_priv = dev->priv;
 	struct mii_phy *mii_phy = sis_priv->mii;
         
 	u16 status;
@@ -1846,8 +1849,8 @@ static void __devexit sis900_remove(struct pci_dev *pci_dev)
 	struct net_device *net_dev = pci_get_drvdata(pci_dev);
 		
 	unregister_netdev(net_dev);
-	release_region(net_dev->base_addr, SIS900_TOTAL_SIZE);
 	kfree(net_dev);
+	pci_release_regions(pci_dev);
 	pci_set_drvdata(pci_dev, NULL);
 }
 

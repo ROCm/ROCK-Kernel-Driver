@@ -203,18 +203,17 @@ static void ip6_evictor(void)
 			if (ip6_frag_hash[i] == NULL)
 				continue;
 
-			write_lock(&ip6_frag_lock);
+			read_lock(&ip6_frag_lock);
 			if ((fq = ip6_frag_hash[i]) != NULL) {
 				/* find the oldest queue for this hash bucket */
 				while (fq->next)
 					fq = fq->next;
-				__fq_unlink(fq);
-				write_unlock(&ip6_frag_lock);
+				atomic_inc(&fq->refcnt);
+				read_unlock(&ip6_frag_lock);
 
 				spin_lock(&fq->lock);
-				if (del_timer(&fq->timer))
-					atomic_dec(&fq->refcnt);
-				fq->last_in |= COMPLETE;
+				if (!(fq->last_in&COMPLETE))
+					fq_kill(fq);
 				spin_unlock(&fq->lock);
 
 				fq_put(fq);
@@ -222,7 +221,7 @@ static void ip6_evictor(void)
 				progress = 1;
 				continue;
 			}
-			write_unlock(&ip6_frag_lock);
+			read_unlock(&ip6_frag_lock);
 		}
 	} while (progress);
 }

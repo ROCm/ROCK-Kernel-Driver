@@ -2192,11 +2192,11 @@ static void tms380tr_rcv_status_irq(struct net_device *dev)
 				}
 			}
 
-			if(rpl->SkbStat == SKB_DATA_COPY
-				|| rpl->SkbStat == SKB_DMA_DIRECT)
+			if(skb && (rpl->SkbStat == SKB_DATA_COPY
+				|| rpl->SkbStat == SKB_DMA_DIRECT))
 			{
 				if(rpl->SkbStat == SKB_DATA_COPY)
-					memmove(skb->data, ReceiveDataPtr, Length);
+					memcpy(skb->data, ReceiveDataPtr, Length);
 
 				/* Deliver frame to system */
 				rpl->Skb = NULL;

@@ -7474,17 +7474,23 @@ CONFIG_NET_PCMCIA_RADIO
   location). You also want to check out the PCMCIA-HOWTO, available
   from http://www.linuxdoc.org/docs.html#howto .
 
-Hermes (AT&T/Lucent/Orinoco/3com) wireless support
+Hermes support (Orinoco/WavelanIEEE/PrismII/Symbol 802.11b cards)
 CONFIG_PCMCIA_HERMES
   A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
-  as the Lucent/Orinoco cards and the Cabletron RoamAbout. It should
-  also be usable on Prism II based cards such as the Farallon Skyline
-  and the 3Com AirConnect.
+  as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
+  EnteraSys RoamAbout 802.11, ELSA Airlancer, Melco Buffalo and others).
+  It should also be usable on various Prism II based cards such as the
+  Linksys, D-Link and Farallon Skyline. It should also work on Symbol
+  cards such as the 3Com AirConnect and Ericsson WLAN.
 
   To use your PC-cards, you will need supporting software from David
   Hinds' pcmcia-cs package (see the file Documentation/Changes for
   location). You also want to check out the PCMCIA-HOWTO, available
   from http://www.linuxdoc.org/docs.html#howto .
+
+  You will also very likely also need the Wireless Tools in order to
+  configure your card and that /etc/pcmcia/wireless.opts works :
+    http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/Tools.html
 
 Aviator/Raytheon 2.4MHz wireless support
 CONFIG_PCMCIA_RAYCS
@@ -8529,6 +8535,26 @@ CONFIG_8139TOO
   inserted in and removed from the running kernel whenever you want),
   say M here and read Documentation/modules.txt. This is recommended.
   The module will be called 8139too.o.
+
+Use PIO instead of MMIO
+CONFIG_8139TOO_PIO
+  This instructs the driver to use programmed I/O ports (PIO) instead
+  of PCI shared memory (MMIO). This can possibly solve some problems in
+  case your mainboard has memory consistency issues.  If unsure, say N.
+
+Support for automatic channel equalization (EXPERIMENTAL)
+CONFIG_8139TOO_TUNE_TWISTER
+  This implements a function which might come in handy in case you are
+  using low quality on long cabling. It tries to match the transceiver
+  to the cable characteristics. This is experimental since hardly
+  documented by the manufacturer.  If unsure, say N.
+
+Support for older RTL-8129/8130 boards
+CONFIG_8139TOO_8129
+  This enables support for the older and uncommon RTL-8129 and
+  RTL-8130 chips, which support MII via an external transceiver, instead
+  of an internal one.  Disabling this option will save some memory
+  by making the code size smaller.  If unsure, say Y.
 
 SiS 900 PCI Fast Ethernet Adapter support
 CONFIG_SIS900

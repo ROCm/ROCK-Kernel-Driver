@@ -40,77 +40,6 @@ unsigned long highstart_pfn, highend_pfn;
 static unsigned long totalram_pages;
 static unsigned long totalhigh_pages;
 
-/*
- * BAD_PAGE is the page that is used for page faults when linux
- * is out-of-memory. Older versions of linux just did a
- * do_exit(), but using this instead means there is less risk
- * for a process dying in kernel mode, possibly leaving an inode
- * unused etc..
- *
- * BAD_PAGETABLE is the accompanying page-table: it is initialized
- * to point to BAD_PAGE entries.
- *
- * ZERO_PAGE is a special page that is used for zero-initialized
- * data and COW.
- */
-
-/*
- * These are allocated in head.S so that we get proper page alignment.
- * If you change the size of these then change head.S as well.
- */
-extern char empty_bad_page[PAGE_SIZE];
-#if CONFIG_X86_PAE
-extern pmd_t empty_bad_pmd_table[PTRS_PER_PMD];
-#endif
-extern pte_t empty_bad_pte_table[PTRS_PER_PTE];
-
-/*
- * We init them before every return and make them writable-shared.
- * This guarantees we get out of the kernel in some more or less sane
- * way.
- */
-#if CONFIG_X86_PAE
-static pmd_t * get_bad_pmd_table(void)
-{
-	pmd_t v;
-	int i;
-
-	set_pmd(&v, __pmd(_PAGE_TABLE + __pa(empty_bad_pte_table)));
-
-	for (i = 0; i < PAGE_SIZE/sizeof(pmd_t); i++)
-		empty_bad_pmd_table[i] = v;
-
-	return empty_bad_pmd_table;
-}
-#endif
-
-static pte_t * get_bad_pte_table(void)
-{
-	pte_t v;
-	int i;
-
-	v = pte_mkdirty(mk_pte_phys(__pa(empty_bad_page), PAGE_SHARED));
-
-	for (i = 0; i < PAGE_SIZE/sizeof(pte_t); i++)
-		empty_bad_pte_table[i] = v;
-
-	return empty_bad_pte_table;
-}
-
-
-
-void __handle_bad_pmd(pmd_t *pmd)
-{
-	pmd_ERROR(*pmd);
-	set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(get_bad_pte_table())));
-}
-
-void __handle_bad_pmd_kernel(pmd_t *pmd)
-{
-	pmd_ERROR(*pmd);
-	set_pmd(pmd, __pmd(_KERNPG_TABLE + __pa(get_bad_pte_table())));
-}
-
 int do_check_pgt_cache(int low, int high)
 {
 	int freed = 0;
@@ -125,7 +54,7 @@ int do_check_pgt_cache(int low, int high)
 				freed++;
 			}
 			if (pte_quicklist) {
-				pte_free_slow(pte_alloc_one_fast());
+				pte_free_slow(pte_alloc_one_fast(0));
 				freed++;
 			}
 		} while(pgtable_cache_size > low);
@@ -289,10 +218,8 @@ static void __init pagetable_init (void)
 
 	pgd_base = swapper_pg_dir;
 #if CONFIG_X86_PAE
-	for (i = 0; i < PTRS_PER_PGD; i++) {
-		pgd = pgd_base + i;
-		__pgd_clear(pgd);
-	}
+	for (i = 0; i < PTRS_PER_PGD; i++)
+		set_pgd(pgd_base + i, __pgd(1 + __pa(empty_zero_page)));
 #endif
 	i = __pgd_offset(PAGE_OFFSET);
 	pgd = pgd_base + i;

@@ -1834,6 +1834,7 @@ static int lmc_rx (struct net_device *dev) /*fold00*/
         
         dev->last_rx = jiffies;
         sc->stats.rx_packets++;
+        sc->stats.rx_bytes += len;
 
         LMC_CONSOLE_LOG("recv", skb->data, len);
 

@@ -299,7 +299,7 @@ typedef struct {
 #define HWCAP_SPARC_SWAP        4
 #define HWCAP_SPARC_MULDIV      8
 #define HWCAP_SPARC_V9		16
-
+#define HWCAP_SPARC_ULTRA3	32
 
 /*
  * 68k ELF relocation types

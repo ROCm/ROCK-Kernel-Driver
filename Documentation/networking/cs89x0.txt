@@ -242,13 +242,18 @@ a) If an EEPROM is present, any specified command-line parameter
 
 b) The "io" parameter must be specified on the command-line.  
 
-c) In case you can not re-load the driver because Linux system
-   returns the "device or resource busy" message, try to re-load it by
-   increment the IO port address by one.  The driver will write
-   commands to the IO base addresses to reset the data port pointer. 
-   You can specify an I/O address with an address value one greater
-   than the configured address.  Example, to scan for an adapter
-   located at IO base 0x300, specify an IO address of 0x301.  
+c) The driver's hardware probe routine is designed to avoid
+   writing to I/O space until it knows that there is a cs89x0
+   card at the written addresses.  This could cause problems
+   with device probing.  To avoid this behaviour, add one
+   to the `io=' module parameter.  This doesn't actually change
+   the I/O address, but it is a flag to tell the driver
+   topartially initialise the hardware before trying to
+   identify the card.  This could be dangerous if you are
+   not sure that there is a cs89x0 card at the provided address.
+
+   For example, to scan for an adapter located at IO base 0x300,
+   specify an IO address of 0x301.  
 
 d) The "duplex=auto" parameter is only supported for the CS8920.
 

@@ -378,6 +378,10 @@ enum {
 };
 
 /* /proc/sys/net/ipx */
+enum {
+	NET_IPX_PPROP_BROADCASTING=1,
+	NET_IPX_FORWARDING=2
+};
 
 
 /* /proc/sys/net/appletalk */

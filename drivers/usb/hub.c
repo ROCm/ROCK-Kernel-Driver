@@ -146,6 +146,8 @@ static int usb_hub_configure(struct usb_hub *hub, struct usb_endpoint_descriptor
 		return -1;
 	}
 
+	le16_to_cpus(&hub->descriptor->wHubCharacteristics);
+
 	hub->nports = dev->maxchild = hub->descriptor->bNbrPorts;
 	info("%d port%s detected", hub->nports, (hub->nports == 1) ? "" : "s");
 
@@ -918,7 +920,7 @@ int usb_reset_device(struct usb_device *dev)
 			if (ret < 0)
 				err("unable to get device descriptor (error=%d)", ret);
 			else
-				err("USB device descriptor short read (expected %i, got %i)", sizeof(dev->descriptor), ret);
+				err("USB device descriptor short read (expected %Zi, got %i)", sizeof(dev->descriptor), ret);
         
 			clear_bit(dev->devnum, &dev->bus->devmap.devicemap);
 			dev->devnum = -1;

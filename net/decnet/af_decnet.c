@@ -1431,10 +1431,13 @@ static int __dn_getsockopt(struct socket *sock, int level,int optname, char *opt
 	struct	sock *sk = sock->sk;
 	struct dn_scp *scp = DN_SK(sk);
 	struct linkinfo_dn link;
-	int r_len = *optlen;
+	int r_len;
 	void *r_data = NULL;
-	int val;
+	unsigned int val;
 
+	if(get_user(r_len , optlen))
+		return -EFAULT;
+		
 	switch(optname) {
 		case DSO_CONDATA:
 			if (r_len > sizeof(struct optdata_dn))

@@ -129,7 +129,6 @@ static int tx_params[MAX_UNITS] = {-1, -1, -1, -1, -1, -1, -1, -1};
  * Enable mii_ioctl.  Added interrupt coalescing parameter adjustment.
  * 2/19/99 Pete Wyckoff <wyckoff@ca.sandia.gov>
  */
-#define HAVE_PRIVATE_IOCTL
 
 /* play with 64-bit addrlen; seems to be a teensy bit slower  --pw */
 /* #define ADDRLEN 64 */
@@ -532,9 +531,7 @@ static int read_eeprom(long ioaddr, int location);
 static int mdio_read(long ioaddr, int phy_id, int location);
 static void mdio_write(long ioaddr, int phy_id, int location, int value);
 static int hamachi_open(struct net_device *dev);
-#ifdef HAVE_PRIVATE_IOCTL
 static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
-#endif
 static void hamachi_timer(unsigned long data);
 static void hamachi_tx_timeout(struct net_device *dev);
 static void hamachi_init_ring(struct net_device *dev);
@@ -573,13 +570,19 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 
 	pci_set_master(pdev);
 
+	i = pci_request_regions(pdev, "hamachi");
+	if (i) return i;
+
 	irq = pdev->irq;
 	ioaddr = (long) ioremap(ioaddr, 0x400);
-	if (!ioaddr)
+	if (!ioaddr) {
+		pci_release_regions(pdev);
 		return -ENOMEM;
+	}
 
-	dev = init_etherdev(NULL, sizeof(struct hamachi_private));
+	dev = alloc_etherdev(sizeof(struct hamachi_private));
 	if (!dev) {
+		pci_release_regions(pdev);
 		iounmap((char *)ioaddr);
 		return -ENOMEM;
 	}
@@ -590,31 +593,15 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 	dev->hard_header_len += 8;  /* for cksum tag */
 #endif
 
-	printk(KERN_INFO "%s: %s type %x at 0x%lx, ",
-		   dev->name, chip_tbl[chip_id].name, readl(ioaddr + ChipRev),
-		   ioaddr);
-
 	for (i = 0; i < 6; i++)
 		dev->dev_addr[i] = 1 ? read_eeprom(ioaddr, 4 + i)
 			: readb(ioaddr + StationAddr + i);
-	for (i = 0; i < 5; i++)
-			printk("%2.2x:", dev->dev_addr[i]);
-	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
 
 #if ! defined(final_version)
 	if (hamachi_debug > 4)
 		for (i = 0; i < 0x10; i++)
 			printk("%2.2x%s",
 				   read_eeprom(ioaddr, i), i % 16 != 15 ? " " : "\n");
-#endif
-
-#if 0 /* Moving this until after the force 32 check and reset. */
-	i = readb(ioaddr + PCIClkMeas);
-	printk(KERN_INFO "%s:  %d-bit %d Mhz PCI bus (%d), Virtual Jumpers "
-		   "%2.2x, LPA %4.4x.\n",
-		   dev->name, readw(ioaddr + MiscStatus) & 1 ? 64 : 32,
-		   i ? 2000/(i&0x7f) : 0, i&0x7f, (int)readb(ioaddr + VirtualJumpers),
-		   readw(ioaddr + ANLinkPartnerAbility));
 #endif
 
 	hmp = dev->priv;
@@ -644,12 +631,6 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 		udelay(10);	
 		i = readb(ioaddr + PCIClkMeas);	
 	}
-
-	printk(KERN_INFO "%s:  %d-bit %d Mhz PCI bus (%d), Virtual Jumpers "
-		   "%2.2x, LPA %4.4x.\n",
-		   dev->name, readw(ioaddr + MiscStatus) & 1 ? 64 : 32,
-		   i ? 2000/(i&0x7f) : 0, i&0x7f, (int)readb(ioaddr + VirtualJumpers),
-		   readw(ioaddr + ANLinkPartnerAbility));
 
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
@@ -696,13 +677,32 @@ static int __init hamachi_init_one (struct pci_dev *pdev,
 	dev->stop = &hamachi_close;
 	dev->get_stats = &hamachi_get_stats;
 	dev->set_multicast_list = &set_rx_mode;
-#ifdef HAVE_PRIVATE_IOCTL
 	dev->do_ioctl = &mii_ioctl;
-#endif
 	dev->tx_timeout = &hamachi_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 	if (mtu)
 		dev->mtu = mtu;
+
+	i = register_netdev(dev);
+	if (i) {
+		kfree(dev);
+		iounmap((char *)ioaddr);
+		pci_release_regions(pdev);
+		return i;
+	}
+
+	printk(KERN_INFO "%s: %s type %x at 0x%lx, ",
+		   dev->name, chip_tbl[chip_id].name, readl(ioaddr + ChipRev),
+		   ioaddr);
+	for (i = 0; i < 5; i++)
+			printk("%2.2x:", dev->dev_addr[i]);
+	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
+	i = readb(ioaddr + PCIClkMeas);
+	printk(KERN_INFO "%s:  %d-bit %d Mhz PCI bus (%d), Virtual Jumpers "
+		   "%2.2x, LPA %4.4x.\n",
+		   dev->name, readw(ioaddr + MiscStatus) & 1 ? 64 : 32,
+		   i ? 2000/(i&0x7f) : 0, i&0x7f, (int)readb(ioaddr + VirtualJumpers),
+		   readw(ioaddr + ANLinkPartnerAbility));
 
 	if (chip_tbl[hmp->chip_id].flags & CanHaveMII) {
 		int phy, phy_idx = 0;
@@ -785,7 +785,7 @@ static void mdio_write(long ioaddr, int phy_id, int location, int value)
 
 static int hamachi_open(struct net_device *dev)
 {
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 	long ioaddr = dev->base_addr;
 	int i;
 	u_int32_t rx_int_var, tx_int_var;
@@ -933,7 +933,7 @@ static int hamachi_open(struct net_device *dev)
 
 static inline int hamachi_tx(struct net_device *dev)
 {
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 
 	/* Update the dirty pointer until we find an entry that is
 		still owned by the card */
@@ -959,7 +959,7 @@ static inline int hamachi_tx(struct net_device *dev)
 static void hamachi_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 	long ioaddr = dev->base_addr;
 	int next_tick = 10*HZ;
 
@@ -984,7 +984,7 @@ static void hamachi_timer(unsigned long data)
 static void hamachi_tx_timeout(struct net_device *dev)
 {
 	int i;
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 	long ioaddr = dev->base_addr;
 
 	printk(KERN_WARNING "%s: Hamachi transmit timed out, status %8.8x,"
@@ -1074,13 +1074,15 @@ static void hamachi_tx_timeout(struct net_device *dev)
 	writew(0x0002, dev->base_addr + TxCmd); /* STOP Tx */
 	writew(0x0001, dev->base_addr + TxCmd); /* START Tx */
 	writew(0x0001, dev->base_addr + RxCmd); /* START Rx */
+
+	netif_wake_queue(dev);
 }
 
 
 /* Initialize the Rx and Tx rings, along with various 'dev' bits. */
 static void hamachi_init_ring(struct net_device *dev)
 {
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 	int i;
 
 	hmp->tx_full = 0;
@@ -1178,7 +1180,7 @@ do { \
 
 static int hamachi_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 	unsigned entry;
 	u16 status;
 
@@ -1292,7 +1294,7 @@ static int hamachi_start_xmit(struct sk_buff *skb, struct net_device *dev)
    after the Tx thread. */
 static void hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 {
-	struct net_device *dev = (struct net_device *)dev_instance;
+	struct net_device *dev = dev_instance;
 	struct hamachi_private *hmp;
 	long ioaddr, boguscnt = max_interrupt_work;
 
@@ -1304,7 +1306,7 @@ static void hamachi_interrupt(int irq, void *dev_instance, struct pt_regs *rgs)
 #endif
 
 	ioaddr = dev->base_addr;
-	hmp = (struct hamachi_private *)dev->priv;
+	hmp = dev->priv;
 	spin_lock(&hmp->lock);
 
 	do {
@@ -1446,7 +1448,7 @@ static unsigned short hamachi_eth_type_trans(struct sk_buff *skb,
    for clarity and better register allocation. */
 static int hamachi_rx(struct net_device *dev)
 {
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 	int entry = hmp->cur_rx % RX_RING_SIZE;
 	int boguscnt = (hmp->dirty_rx + RX_RING_SIZE) - hmp->cur_rx;
 
@@ -1653,7 +1655,7 @@ static int hamachi_rx(struct net_device *dev)
 static void hamachi_error(struct net_device *dev, int intr_status)
 {
 	long ioaddr = dev->base_addr;
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 
 	if (intr_status & (LinkChange|NegotiationChange)) {
 		if (hamachi_debug > 1)
@@ -1687,7 +1689,7 @@ static void hamachi_error(struct net_device *dev, int intr_status)
 static int hamachi_close(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 	int i;
 
 	netif_stop_queue(dev);
@@ -1760,7 +1762,7 @@ static int hamachi_close(struct net_device *dev)
 static struct net_device_stats *hamachi_get_stats(struct net_device *dev)
 {
 	long ioaddr = dev->base_addr;
-	struct hamachi_private *hmp = (struct hamachi_private *)dev->priv;
+	struct hamachi_private *hmp = dev->priv;
 
 	/* We should lock this segment of code for SMP eventually, although
 	   the vulnerability window is very small and statistics are
@@ -1814,7 +1816,6 @@ static void set_rx_mode(struct net_device *dev)
 	}
 }
 
-#ifdef HAVE_PRIVATE_IOCTL
 static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	long ioaddr = dev->base_addr;
@@ -1855,7 +1856,6 @@ static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		return -EOPNOTSUPP;
 	}
 }
-#endif  /* HAVE_PRIVATE_IOCTL */
 
 
 static void __exit hamachi_remove_one (struct pci_dev *pdev)
@@ -1867,6 +1867,7 @@ static void __exit hamachi_remove_one (struct pci_dev *pdev)
 		unregister_netdev(dev);
 		iounmap((char *)dev->base_addr);
 		kfree(dev);
+		pci_release_regions(pdev);
 		pci_set_drvdata(pdev, NULL);
 	}
 }

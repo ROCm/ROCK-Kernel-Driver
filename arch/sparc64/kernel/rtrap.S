@@ -1,4 +1,4 @@
-/* $Id: rtrap.S,v 1.53 2000/08/06 05:20:35 davem Exp $
+/* $Id: rtrap.S,v 1.54 2001/03/08 22:08:51 davem Exp $
  * rtrap.S: Preparing for return from trap on Sparc V9.
  *
  * Copyright (C) 1997,1998 Jakub Jelinek (jj@sunsite.mff.cuni.cz)
@@ -192,7 +192,7 @@ to_kernel:	ldub			[%g6 + AOFF_task_thread + AOFF_thread_fpdepth], %l5
 		rd			%fprs, %g5
 
 		wr			%g5, FPRS_FEF, %fprs
-		ldub			[%o1 + %o0], %g5
+		ldx			[%o1 + %o5], %g5
 		add			%g6, AOFF_task_thread + AOFF_thread_xfsr, %o1
 		membar			#StoreLoad | #LoadLoad
 		sll			%o0, 8, %o2

@@ -1517,7 +1517,6 @@ void * kmalloc (size_t size, int flags)
 		return __kmem_cache_alloc(flags & GFP_DMA ?
 			 csizep->cs_dmacachep : csizep->cs_cachep, flags);
 	}
-	BUG(); // too big size
 	return NULL;
 }
 

@@ -1,11 +1,14 @@
 /*
- * $Id: t1pci.c,v 1.13.6.2 2001/02/13 11:43:29 kai Exp $
+ * $Id: t1pci.c,v 1.13.6.3 2001/03/21 08:52:21 kai Exp $
  * 
  * Module for AVM T1 PCI-card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: t1pci.c,v $
+ * Revision 1.13.6.3  2001/03/21 08:52:21  kai
+ * merge from main branch: fix buffer for revision string (calle)
+ *
  * Revision 1.13.6.2  2001/02/13 11:43:29  kai
  * more compatility changes for 2.2.19
  *
@@ -91,7 +94,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.13.6.2 $";
+static char *revision = "$Revision: 1.13.6.3 $";
 
 #undef CONFIG_T1PCI_DEBUG
 #undef CONFIG_T1PCI_POLLDEBUG
@@ -305,10 +308,11 @@ static int __init t1pci_init(void)
 
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':'))) {
-		strncpy(driver->revision, p + 1, sizeof(driver->revision));
-		p = strchr(driver->revision, '$');
-		*p = 0;
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strncpy(driver->revision, p + 2, sizeof(driver->revision));
+		driver->revision[sizeof(driver->revision)-1] = 0;
+		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
+			*(p-1) = 0;
 	}
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);

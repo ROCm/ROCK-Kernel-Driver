@@ -421,7 +421,7 @@ static int tcp_v6_check_established(struct sock *sk)
 	struct sock *sk2, **skp;
 	struct tcp_tw_bucket *tw;
 
-	write_lock(&head->lock);
+	write_lock_bh(&head->lock);
 
 	for(skp = &(head + tcp_ehash_size)->chain; (sk2=*skp)!=NULL; skp = &sk2->next) {
 		tw = (struct tcp_tw_bucket*)sk2;

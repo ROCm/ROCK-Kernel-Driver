@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.51 2000/09/14 06:22:32 anton Exp $
+/* $Id: fault.c,v 1.54 2001/03/24 09:36:11 davem Exp $
  * arch/sparc64/mm/fault.c: Page fault handlers for the 64-bit Sparc.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -142,7 +142,7 @@ static void do_kernel_fault(struct pt_regs *regs, int si_code, int fault_code,
 {
 	unsigned long g2;
 	unsigned char asi = ASI_P;
-		
+
 	if (!insn) {
 		if (regs->tstate & TSTATE_PRIV) {
 			if (!regs->tpc || (regs->tpc & 0x3))
@@ -234,6 +234,11 @@ asmlinkage void do_sparc64_fault(struct pt_regs *regs)
 	if (in_interrupt() || !mm)
 		goto handle_kernel_fault;
 
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		address &= 0xffffffff;
+	}
+
 	down_read(&mm->mmap_sem);
 	vma = find_vma(mm, address);
 	if (!vma)
@@ -286,7 +291,12 @@ good_area:
 	if (fault_code & FAULT_CODE_WRITE) {
 		if (!(vma->vm_flags & VM_WRITE))
 			goto bad_area;
-		if ((vma->vm_flags & VM_EXEC) != 0 &&
+
+		/* Spitfire has an icache which does not snoop
+		 * processor stores.  Later processors do...
+		 */
+		if (tlb_type == spitfire &&
+		    (vma->vm_flags & VM_EXEC) != 0 &&
 		    vma->vm_file != NULL)
 			current->thread.use_blkcommit = 1;
 	} else {

@@ -84,7 +84,9 @@ static int dsmark_graft(struct Qdisc *sch,unsigned long arg,
 
 static struct Qdisc *dsmark_leaf(struct Qdisc *sch, unsigned long arg)
 {
-	return NULL;
+	struct dsmark_qdisc_data *p = PRIV(sch);
+
+	return p->q;
 }
 
 
@@ -187,7 +189,7 @@ static int dsmark_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 	struct dsmark_qdisc_data *p = PRIV(sch);
 	struct tcf_result res;
 	int result;
-	int ret;
+	int ret = NET_XMIT_POLICED;
 
 	D2PRINTK("dsmark_enqueue(skb %p,sch %p,[qdisc %p])\n",skb,sch,p);
 	if (p->set_tc_index) {
@@ -237,7 +239,7 @@ static int dsmark_enqueue(struct sk_buff *skb,struct Qdisc *sch)
 
 	    ((ret = p->q->enqueue(skb,p->q)) != 0)) {
 		sch->stats.drops++;
-		return 0;
+		return ret;
 	}
 	sch->stats.bytes += skb->len;
 	sch->stats.packets++;

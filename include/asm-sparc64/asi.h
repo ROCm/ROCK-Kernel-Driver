@@ -1,4 +1,4 @@
-/* $Id: asi.h,v 1.2 2001/03/01 21:28:37 davem Exp $ */
+/* $Id: asi.h,v 1.4 2001/03/15 02:08:46 davem Exp $ */
 #ifndef _SPARC64_ASI_H
 #define _SPARC64_ASI_H
 
@@ -27,9 +27,9 @@
  * UltraSparc-III specific ASIs.
  */
 #define ASI_PHYS_USE_EC		0x14 /* PADDR, E-cachable			*/
-#define ASI_PHYS_BYPASS_EC_E	0x15 /* PADDR, E-cachable, E-bit		*/
+#define ASI_PHYS_BYPASS_EC_E	0x15 /* PADDR, E-bit				*/
 #define ASI_PHYS_USE_EC_L	0x1c /* PADDR, E-cachable, little endian	*/
-#define ASI_PHYS_BYPASS_EC_E_L	0x1d /* PADDR, E-cachable, E-bit, little endian	*/
+#define ASI_PHYS_BYPASS_EC_E_L	0x1d /* PADDR, E-bit, little endian		*/
 #define ASI_NUCLEUS_QUAD_LDD	0x24 /* Cachable, qword load			*/
 #define ASI_NUCLEUS_QUAD_LDD_L	0x2c /* Cachable, qword load, little endian 	*/
 #define ASI_PCACHE_DATA_STATUS	0x30 /* (III) PCache data status RAM diag	*/
@@ -85,7 +85,7 @@
 #define ASI_EC_W		0x76 /* E-cache diag write access		*/
 #define ASI_UDB_ERROR_W		0x77 /* External UDB error registers write	*/
 #define ASI_UDB_CONTROL_W	0x77 /* External UDB control registers write	*/
-#define ASI_UDB_INTR_W		0x77 /* External UDB IRQ vector dispatch write	*/
+#define ASI_INTR_W		0x77 /* IRQ vector dispatch write		*/
 #define ASI_INTR_DATAN_W	0x77 /* (III) Outgoing irq vector data reg N	*/
 #define ASI_INTR_DISPATCH_W	0x77 /* (III) Interrupt vector dispatch		*/
 #define ASI_BLK_AIUPL		0x78 /* Primary, user, little, blk ld/st	*/
@@ -95,7 +95,7 @@
 #define ASI_UDBL_ERROR_R	0x7f /* External UDB error registers read low	*/
 #define ASI_UDBH_CONTROL_R	0x7f /* External UDB control registers read hi	*/
 #define ASI_UDBL_CONTROL_R	0x7f /* External UDB control registers read low	*/
-#define ASI_UDB_INTR_R		0x7f /* External UDB IRQ vector dispatch read	*/
+#define ASI_INTR_R		0x7f /* IRQ vector dispatch read		*/
 #define ASI_INTR_DATAN_R	0x7f /* (III) Incoming irq vector data reg N	*/
 #define ASI_PST8_P		0xc0 /* Primary, 8 8-bit, partial		*/
 #define ASI_PST8_S		0xc1 /* Secondary, 8 8-bit, partial		*/

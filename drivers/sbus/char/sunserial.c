@@ -1,4 +1,4 @@
-/* $Id: sunserial.c,v 1.75 2000/03/22 02:45:36 davem Exp $
+/* $Id: sunserial.c,v 1.78 2001/03/21 22:43:11 davem Exp $
  * serial.c: Serial port driver infrastructure for the Sparc.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -54,20 +54,22 @@ struct sunserial_operations rs_ops = {
 	nop_rs_read_proc
 };
 
-int rs_init(void)
+void rs_init(void)
 {
-	struct initfunc *init;
-	int err = -ENODEV;
+	static int invoked = 0;
 
-	init = rs_ops.rs_init;
-	while (init) {
-		err = init->init();
-		init = init->next;
+	if (!invoked) {
+		struct initfunc *init;
+
+		invoked = 1;
+
+		init = rs_ops.rs_init;
+		while (init) {
+			(void) init->init();
+			init = init->next;
+		}
 	}
-	return err;
 }
-
-__initcall(rs_init);
 
 void __init rs_kgdb_hook(int channel)
 {
@@ -137,6 +139,15 @@ struct sunkbd_operations kbd_ops = {
 	nop_getkeycode
 };
 
+#ifdef CONFIG_USB
+extern void pci_compute_shiftstate(void);
+extern int pci_setkeycode(unsigned int, unsigned int);
+extern int pci_getkeycode(unsigned int);
+extern void pci_setledstate(struct kbd_struct *, unsigned int);
+extern unsigned char pci_getledstate(void);
+extern int pcikbd_init(void);
+#endif
+
 int kbd_init(void)
 {
 	struct initfunc *init;
@@ -147,6 +158,18 @@ int kbd_init(void)
 		err = init->init();
 		init = init->next;
 	}
+#ifdef CONFIG_USB
+	if (!serial_console &&
+	    kbd_ops.compute_shiftstate == nop_compute_shiftstate) {
+		printk("kbd_init: Assuming USB keyboard.\n");
+		kbd_ops.compute_shiftstate = pci_compute_shiftstate;
+		kbd_ops.setledstate = pci_setledstate;
+		kbd_ops.getledstate = pci_getledstate;
+		kbd_ops.setkeycode = pci_setkeycode;
+		kbd_ops.getkeycode = pci_getkeycode;
+		pcikbd_init();
+	}
+#endif
 	return err;
 }
 

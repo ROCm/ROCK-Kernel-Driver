@@ -18,6 +18,7 @@
 #include <asm/sbus.h>
 #include <asm/ebus.h>
 #include <asm/fhc.h>
+#include <asm/spitfire.h>
 #include <asm/starfire.h>
 
 /* Probe and map in the Auxiliary I/O register */
@@ -56,7 +57,7 @@ found_sdev:
 			return;
 		}
 #endif
-		if(central_bus || this_is_starfire) {
+		if (central_bus || this_is_starfire || (tlb_type == cheetah)) {
 			auxio_register = 0UL;
 			return;
 		}

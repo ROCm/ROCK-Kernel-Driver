@@ -1,4 +1,4 @@
-/* $Id: sys_sparc.c,v 1.48 2001/02/13 01:16:44 davem Exp $
+/* $Id: sys_sparc.c,v 1.50 2001/03/24 09:36:10 davem Exp $
  * linux/arch/sparc64/kernel/sys_sparc.c
  *
  * This file contains various random system calls that
@@ -335,6 +335,10 @@ sparc_breakpoint (struct pt_regs *regs)
 {
 	siginfo_t info;
 
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 #ifdef DEBUG_SPARC_BREAKPOINT
         printk ("TRAP: Entering kernel PC=%lx, nPC=%lx\n", regs->tpc, regs->tnpc);
 #endif
@@ -384,6 +388,10 @@ asmlinkage int solaris_syscall(struct pt_regs *regs)
 
 	regs->tpc = regs->tnpc;
 	regs->tnpc += 4;
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 	if(++count <= 5) {
 		printk ("For Solaris binary emulation you need solaris module loaded\n");
 		show_regs (regs);
@@ -400,6 +408,10 @@ asmlinkage int sunos_syscall(struct pt_regs *regs)
 
 	regs->tpc = regs->tnpc;
 	regs->tnpc += 4;
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 	if(++count <= 20)
 		printk ("SunOS binary emulation not compiled in\n");
 	force_sig(SIGSEGV, current);

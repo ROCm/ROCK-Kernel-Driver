@@ -1,4 +1,4 @@
-/* $Id: sbus.c,v 1.94 2001/02/13 07:34:40 davem Exp $
+/* $Id: sbus.c,v 1.95 2001/03/15 02:11:10 davem Exp $
  * sbus.c:  SBus support routines.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -280,6 +280,8 @@ static void __init sbus_fixup_all_regs(struct sbus_dev *first_sdev)
 }
 
 extern void register_proc_sparc_ioport(void);
+extern void firetruck_init(void);
+extern void rs_init(void);
 
 void __init sbus_init(void)
 {
@@ -310,7 +312,6 @@ void __init sbus_init(void)
 				prom_halt();
 			} else {
 #ifdef __sparc_v9__
-				extern void firetruck_init(void);
 				firetruck_init();
 #endif
 			}
@@ -488,10 +489,10 @@ void __init sbus_init(void)
 		sun4d_init_sbi_irq();
 	}
 	
+	rs_init();
+
 #ifdef __sparc_v9__
 	if (sparc_cpu_model == sun4u) {
-		extern void firetruck_init(void);
-
 		firetruck_init();
 	}
 #endif

@@ -1,5 +1,5 @@
 /*
- * $Id: capiutil.c,v 1.13.6.1 2001/02/13 11:43:29 kai Exp $
+ * $Id: capiutil.c,v 1.13.6.2 2001/03/15 15:11:24 kai Exp $
  *
  * CAPI 2.0 convert capi message to capi message struct
  *
@@ -7,6 +7,9 @@
  * Rewritten for Linux 1996 by Carsten Paeth (calle@calle.in-berlin.de)
  *
  * $Log: capiutil.c,v $
+ * Revision 1.13.6.2  2001/03/15 15:11:24  kai
+ * *** empty log message ***
+ *
  * Revision 1.13.6.1  2001/02/13 11:43:29  kai
  * more compatility changes for 2.2.19
  *
@@ -96,7 +99,6 @@
 #include <linux/init.h>
 #include <asm/segment.h>
 #include <linux/config.h>
-
 #include "capiutil.h"
 
 /* from CAPI2.0 DDK AVM Berlin GmbH */

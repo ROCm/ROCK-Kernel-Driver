@@ -272,6 +272,12 @@ tcp_adv_win_scale - INTEGER
 	if it is <= 0.
 	Default: 2
 
+tcp_rfc1337 - BOOLEAN
+	If set, the TCP stack behaves conforming to RFC1337. If unset,
+	we are not conforming to RFC, but prevent TCP TIME_WAIT
+	asassination.	
+	Default: 0
+
 ip_local_port_range - 2 INTEGERS
 	Defines the local port range that is used by TCP and UDP to
 	choose the local port. The first number is the first, the 
@@ -284,6 +290,18 @@ ip_local_port_range - 2 INTEGERS
 	TCP extensions (timestamps). With tcp_tw_recycle enabled
 	(i.e. by default) range 1024-4999 is enough to issue up to
 	2000 connections per second to systems supporting timestamps.
+
+ip_nonlocal_bind - BOOLEAN
+	If set, allows processes to bind() to non-local IP adresses,
+	which can be quite useful - but may break some applications.
+	Default: 0
+
+ip_dynaddr - BOOLEAN
+	If set non-zero, enables support for dynamic addresses.
+	If set to a non-zero value larger than 1, a kernel log
+	message will be printed when dynamic address rewriting
+	occurs.
+	Default: 0
 
 icmp_echo_ignore_all - BOOLEAN
 icmp_echo_ignore_broadcasts - BOOLEAN
@@ -309,6 +327,10 @@ icmp_ignore_bogus_error_responses - BOOLEAN
 (1) Jiffie: internal timeunit for the kernel. On the i386 1/100s, on the
 Alpha 1/1024s. See the HZ define in /usr/include/asm/param.h for the exact
 value on your system. 
+
+igmp_max_memberships - INTEGER
+	Change the maximum number of multicast groups we can subscribe to.
+	Default: 20
 
 conf/interface/*: 
 conf/all/* is special and changes the settings for all interfaces.
@@ -376,4 +398,4 @@ kuznet@ms2.inr.ac.ru
 Updated by:
 Andi Kleen
 ak@muc.de
-$Id: ip-sysctl.txt,v 1.17 2000/11/06 07:15:36 davem Exp $
+$Id: ip-sysctl.txt,v 1.18 2001/03/16 06:49:20 davem Exp $

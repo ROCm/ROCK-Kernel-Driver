@@ -1,7 +1,7 @@
 /*
  *	NET3	IP device support routines.
  *
- *	Version: $Id: devinet.c,v 1.40 2001/02/05 06:03:47 davem Exp $
+ *	Version: $Id: devinet.c,v 1.41 2001/02/18 09:26:26 davem Exp $
  *
  *		This program is free software; you can redistribute it and/or
  *		modify it under the terms of the GNU General Public License
@@ -827,10 +827,8 @@ static int inetdev_event(struct notifier_block *this, unsigned long event, void 
 	return NOTIFY_DONE;
 }
 
-struct notifier_block ip_netdev_notifier={
-	inetdev_event,
-	NULL,
-	0
+struct notifier_block ip_netdev_notifier = {
+	notifier_call:	inetdev_event,
 };
 
 #ifdef CONFIG_RTNETLINK

@@ -5,7 +5,7 @@
  *	Authors:
  *	Pedro Roque		<roque@di.fc.ul.pt>	
  *
- *	$Id: ip6_fib.c,v 1.22 2000/09/12 00:38:34 davem Exp $
+ *	$Id: ip6_fib.c,v 1.23 2001/03/19 20:31:17 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *      modify it under the terms of the GNU General Public License
@@ -76,7 +76,7 @@ rwlock_t fib6_walker_lock = RW_LOCK_UNLOCKED;
 #endif
 
 static void fib6_prune_clones(struct fib6_node *fn, struct rt6_info *rt);
-static void fib6_repair_tree(struct fib6_node *fn);
+static struct fib6_node * fib6_repair_tree(struct fib6_node *fn);
 
 /*
  *	A routing update causes an increase of the serial number on the
@@ -774,7 +774,7 @@ static struct rt6_info * fib6_find_prefix(struct fib6_node *fn)
  *	is the node we want to try and remove.
  */
 
-static void fib6_repair_tree(struct fib6_node *fn)
+static struct fib6_node * fib6_repair_tree(struct fib6_node *fn)
 {
 	int children;
 	int nstate;
@@ -809,7 +809,7 @@ static void fib6_repair_tree(struct fib6_node *fn)
 			}
 #endif
 			atomic_inc(&fn->leaf->rt6i_ref);
-			return;
+			return fn->parent;
 		}
 
 		pn = fn->parent;
@@ -865,7 +865,7 @@ static void fib6_repair_tree(struct fib6_node *fn)
 
 		node_free(fn);
 		if (pn->fn_flags&RTN_RTINFO || SUBTREE(pn))
-			return;
+			return pn;
 
 		rt6_release(pn->leaf);
 		pn->leaf = NULL;
@@ -903,7 +903,26 @@ static void fib6_del_route(struct fib6_node *fn, struct rt6_info **rtp)
 	if (fn->leaf == NULL) {
 		fn->fn_flags &= ~RTN_RTINFO;
 		rt6_stats.fib_route_nodes--;
-		fib6_repair_tree(fn);
+		fn = fib6_repair_tree(fn);
+	}
+
+	if (atomic_read(&rt->rt6i_ref) != 1) {
+		/* This route is used as dummy address holder in some split
+		 * nodes. It is not leaked, but it still holds other resources,
+		 * which must be released in time. So, scan ascendant nodes
+		 * and replace dummy references to this route with references
+		 * to still alive ones.
+		 */
+		while (fn) {
+			if (!(fn->fn_flags&RTN_RTINFO) && fn->leaf == rt) {
+				fn->leaf = fib6_find_prefix(fn);
+				atomic_inc(&fn->leaf->rt6i_ref);
+				rt6_release(rt);
+			}
+			fn = fn->parent;
+		}
+		/* No more references are possiible at this point. */
+		if (atomic_read(&rt->rt6i_ref) != 1) BUG();
 	}
 
 #ifdef CONFIG_RTNETLINK

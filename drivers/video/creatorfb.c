@@ -1,4 +1,4 @@
-/* $Id: creatorfb.c,v 1.33 2001/02/13 01:17:14 davem Exp $
+/* $Id: creatorfb.c,v 1.34 2001/03/16 10:22:02 davem Exp $
  * creatorfb.c: Creator/Creator3D frame buffer driver
  *
  * Copyright (C) 1997,1998,1999 Jakub Jelinek (jj@ultra.linux.cz)
@@ -751,6 +751,36 @@ static int __init ffb_rasterimg (struct fb_info *info, int start)
 
 static char idstring[60] __initdata = { 0 };
 
+static int __init creator_apply_upa_parent_ranges(int parent, struct linux_prom64_registers *regs)
+{
+	struct linux_prom64_ranges ranges[PROMREG_MAX];
+	char name[128];
+	int len, i;
+
+	prom_getproperty(parent, "name", name, sizeof(name));
+	if (strcmp(name, "upa") != 0)
+		return 0;
+
+	len = prom_getproperty(parent, "ranges", (void *) ranges, sizeof(ranges));
+	if (len <= 0)
+		return 1;
+
+	len /= sizeof(struct linux_prom64_ranges);
+	for (i = 0; i < len; i++) {
+		struct linux_prom64_ranges *rng = &ranges[i];
+		u64 phys_addr = regs->phys_addr;
+
+		if (phys_addr >= rng->ot_child_base &&
+		    phys_addr < (rng->ot_child_base + rng->or_size)) {
+			regs->phys_addr -= rng->ot_child_base;
+			regs->phys_addr += rng->ot_parent_base;
+			return 0;
+		}
+	}
+
+	return 1;
+}
+
 char __init *creatorfb_init(struct fb_info_sbusfb *fb)
 {
 	struct fb_fix_screeninfo *fix = &fb->fix;
@@ -764,6 +794,9 @@ char __init *creatorfb_init(struct fb_info_sbusfb *fb)
 	struct fb_ops *fbops;
 
 	if (prom_getproperty(fb->prom_node, "reg", (void *) regs, sizeof(regs)) <= 0)
+		return NULL;
+
+	if (creator_apply_upa_parent_ranges(fb->prom_parent, &regs[0]))
 		return NULL;
 		
 	disp->dispsw_data = (void *)kmalloc(16 * sizeof(u32), GFP_KERNEL);

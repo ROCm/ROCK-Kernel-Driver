@@ -1,4 +1,4 @@
-/* $Id: srmmu.c,v 1.226 2001/02/13 01:16:44 davem Exp $
+/* $Id: srmmu.c,v 1.228 2001/03/16 06:56:20 davem Exp $
  * srmmu.c:  SRMMU specific routines for memory management.
  *
  * Copyright (C) 1995 David S. Miller  (davem@caip.rutgers.edu)
@@ -1124,6 +1124,15 @@ static unsigned long __init map_spbank(unsigned long vbase, int sp_entry)
 	unsigned long pstart = (sp_banks[sp_entry].base_addr & SRMMU_PGDIR_MASK);
 	unsigned long vstart = (vbase & SRMMU_PGDIR_MASK);
 	unsigned long vend = SRMMU_PGDIR_ALIGN(vbase + sp_banks[sp_entry].num_bytes);
+	/* Map "low" memory only */
+	const unsigned long min_vaddr = PAGE_OFFSET;
+	const unsigned long max_vaddr = PAGE_OFFSET + SRMMU_MAXMEM;
+
+	if (vstart < min_vaddr || vstart >= max_vaddr)
+		return vstart;
+	
+	if (vend > max_vaddr || vend < min_vaddr)
+		vend = max_vaddr;
 
 	while(vstart < vend) {
 		do_large_mapping(vstart, pstart);
@@ -1159,10 +1168,11 @@ static inline void map_kernel(void)
 extern void sparc_context_init(int);
 
 extern int linux_num_cpus;
+extern unsigned long totalhigh_pages;
 
 void (*poke_srmmu)(void) __initdata = NULL;
 
-extern void bootmem_init(void);
+extern unsigned long bootmem_init(unsigned long *pages_avail);
 extern void sun_serial_setup(void);
 
 void __init srmmu_paging_init(void)
@@ -1172,6 +1182,7 @@ void __init srmmu_paging_init(void)
 	pgd_t *pgd;
 	pmd_t *pmd;
 	pte_t *pte;
+	unsigned long pages_avail;
 
 	sparc_iomap.start = SUN4M_IOBASE_VADDR;	/* 16MB of IOSPACE on all sun4m's. */
 
@@ -1196,7 +1207,8 @@ void __init srmmu_paging_init(void)
 		prom_halt();
 	}
 
-	bootmem_init();
+	pages_avail = 0;
+	last_valid_pfn = bootmem_init(&pages_avail);
 
 	srmmu_nocache_init();
         srmmu_inherit_prom_mappings(0xfe400000,(LINUX_OPPROM_ENDVM-PAGE_SIZE));
@@ -1245,11 +1257,25 @@ void __init srmmu_paging_init(void)
 	kmap_init();
 
 	{
-		unsigned long zones_size[MAX_NR_ZONES] = { 0, 0, 0};
+		unsigned long zones_size[MAX_NR_ZONES];
+		unsigned long zholes_size[MAX_NR_ZONES];
+		unsigned long npages;
+		int znum;
 
-		zones_size[ZONE_DMA] = max_low_pfn;
-		zones_size[ZONE_HIGHMEM] = highend_pfn - max_low_pfn;
-		free_area_init(zones_size);
+		for (znum = 0; znum < MAX_NR_ZONES; znum++)
+			zones_size[znum] = zholes_size[znum] = 0;
+
+		npages = max_low_pfn - (phys_base >> PAGE_SHIFT);
+
+		zones_size[ZONE_DMA] = npages;
+		zholes_size[ZONE_DMA] = npages - pages_avail;
+
+		npages = highend_pfn - max_low_pfn;
+		zones_size[ZONE_HIGHMEM] = npages;
+		zholes_size[ZONE_HIGHMEM] = npages - calc_highpages();
+
+		free_area_init_node(0, NULL, NULL, zones_size,
+				    phys_base, zholes_size);
 	}
 }
 

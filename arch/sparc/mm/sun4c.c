@@ -1,4 +1,4 @@
-/* $Id: sun4c.c,v 1.202 2000/12/01 03:17:31 anton Exp $
+/* $Id: sun4c.c,v 1.205 2001/03/16 06:57:41 davem Exp $
  * sun4c.c: Doing in software what should be done in hardware.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -15,6 +15,7 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/highmem.h>
 
 #include <asm/scatterlist.h>
 #include <asm/page.h>
@@ -31,6 +32,7 @@
 #include <asm/openprom.h>
 #include <asm/mmu_context.h>
 #include <asm/sun4paddr.h>
+#include <asm/highmem.h>
 
 /* Because of our dynamic kernel TLB miss strategy, and how
  * our DVMA mapping allocation works, you _MUST_:
@@ -2432,7 +2434,7 @@ void sun4c_update_mmu_cache(struct vm_area_struct *vma, unsigned long address, p
 
 extern void sparc_context_init(int);
 extern unsigned long end;
-extern void bootmem_init(void);
+extern unsigned long bootmem_init(unsigned long *pages_avail);
 extern unsigned long last_valid_pfn;
 extern void sun_serial_setup(void);
 
@@ -2441,13 +2443,14 @@ void __init sun4c_paging_init(void)
 	int i, cnt;
 	unsigned long kernel_end, vaddr;
 	extern struct resource sparc_iomap;
-	unsigned long end_pfn;
+	unsigned long end_pfn, pages_avail;
 
 	kernel_end = (unsigned long) &end;
 	kernel_end += (SUN4C_REAL_PGDIR_SIZE * 4);
 	kernel_end = SUN4C_REAL_PGDIR_ALIGN(kernel_end);
 
-	bootmem_init();
+	pages_avail = 0;
+	last_valid_pfn = bootmem_init(&pages_avail);
 	end_pfn = last_valid_pfn;
 
 	/* This does not logically belong here, but we need to
@@ -2488,10 +2491,25 @@ void __init sun4c_paging_init(void)
 	sparc_context_init(num_contexts);
 
 	{
-		unsigned long zones_size[MAX_NR_ZONES] = { 0, 0, 0};
+		unsigned long zones_size[MAX_NR_ZONES];
+		unsigned long zholes_size[MAX_NR_ZONES];
+		unsigned long npages;
+		int znum;
 
-		zones_size[ZONE_DMA] = end_pfn;
-		free_area_init(zones_size);
+		for (znum = 0; znum < MAX_NR_ZONES; znum++)
+			zones_size[znum] = zholes_size[znum] = 0;
+
+		npages = max_low_pfn - (phys_base >> PAGE_SHIFT);
+
+		zones_size[ZONE_DMA] = npages;
+		zholes_size[ZONE_DMA] = npages - pages_avail;
+
+		npages = highend_pfn - max_low_pfn;
+		zones_size[ZONE_HIGHMEM] = npages;
+		zholes_size[ZONE_HIGHMEM] = npages - calc_highpages();
+
+		free_area_init_node(0, NULL, NULL, zones_size,
+				    phys_base, zholes_size);
 	}
 
 	cnt = 0;

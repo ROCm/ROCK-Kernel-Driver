@@ -1,4 +1,4 @@
-/* $Id: pci_iommu.c,v 1.12 2001/01/11 16:26:45 davem Exp $
+/* $Id: pci_iommu.c,v 1.13 2001/03/14 08:42:38 davem Exp $
  * pci_iommu.c: UltraSparc PCI controller IOM/STC support.
  *
  * Copyright (C) 1999 David S. Miller (davem@redhat.com)
@@ -213,9 +213,7 @@ void *pci_alloc_consistent(struct pci_dev *pdev, size_t size, dma_addr_t *dma_ad
 		first_page += PAGE_SIZE;
 	}
 
-	if (iommu->iommu_ctxflush) {
-		pci_iommu_write(iommu->iommu_ctxflush, ctx);
-	} else {
+	{
 		int i;
 		u32 daddr = *dma_addrp;
 

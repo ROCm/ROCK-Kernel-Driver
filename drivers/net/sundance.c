@@ -390,12 +390,12 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 
 	irq = pdev->irq;
 
-	dev = init_etherdev(NULL, sizeof(*np));
+	dev = alloc_etherdev(sizeof(*np));
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
 
-	if (pci_request_regions(pdev, dev->name))
+	if (pci_request_regions(pdev, "sundance"))
 		goto err_out_netdev;
 
 #ifdef USE_IO_OPS
@@ -407,15 +407,9 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 		goto err_out_iomem;
 #endif
 
-	printk(KERN_INFO "%s: %s at 0x%lx, ",
-		   dev->name, pci_id_tbl[chip_idx].name, ioaddr);
-
 	for (i = 0; i < 3; i++)
 		((u16 *)dev->dev_addr)[i] =
 			le16_to_cpu(eeprom_read(ioaddr, i + EEPROM_SA_OFFSET));
-	for (i = 0; i < 5; i++)
-			printk("%2.2x:", dev->dev_addr[i]);
-	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
 
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
@@ -455,6 +449,16 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	if (mtu)
 		dev->mtu = mtu;
 
+	i = register_netdev(dev);
+	if (i)
+		goto err_out_cleardev;
+
+	printk(KERN_INFO "%s: %s at 0x%lx, ",
+		   dev->name, pci_id_tbl[chip_idx].name, ioaddr);
+	for (i = 0; i < 5; i++)
+			printk("%2.2x:", dev->dev_addr[i]);
+	printk("%2.2x, IRQ %d.\n", dev->dev_addr[i], irq);
+
 	if (1) {
 		int phy, phy_idx = 0;
 		np->phys[0] = 1;		/* Default setting */
@@ -485,12 +489,14 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	card_idx++;
 	return 0;
 
+err_out_cleardev:
+	pci_set_drvdata(pdev, NULL);
 #ifndef USE_IO_OPS
+	iounmap((void *)ioaddr);
 err_out_iomem:
-	pci_release_regions(pdev);
 #endif
+	pci_release_regions(pdev);
 err_out_netdev:
-	unregister_netdev (dev);
 	kfree (dev);
 	return -ENODEV;
 }

@@ -1,8 +1,8 @@
 /* 3c509.c: A 3c509 EtherLink3 ethernet driver for linux. */
 /*
-	Written 1993-1998 by Donald Becker.
+	Written 1993-2000 by Donald Becker.
 
-	Copyright 1994-1998 by Donald Becker.
+	Copyright 1994-2000 by Donald Becker.
 	Copyright 1993 United States Government as represented by the
 	Director, National Security Agency.	 This software may be used and
 	distributed according to the terms of the GNU General Public License,
@@ -39,9 +39,11 @@
 		v1.14 10/15/97 Avoided waiting..discard message for fast machines -djb
 		v1.15 1/31/98 Faster recovery for Tx errors. -djb
 		v1.16 2/3/98 Different ID port handling to avoid sound cards. -djb
+		v1.18 12Mar2001 Andrew Morton <andrewm@uow.edu.au>
+			- Avoid bogus detect of 3c590's (Andrzej Krzysztofowicz)
+			- Reviewed against 1.18 from scyld.com
 */
 
-static char *version = "3c509.c:1.16 (2.2) 2/3/98 becker@cesdis.gsfc.nasa.gov.\n";
 /* A few values that may be tweaked. */
 
 /* Time in jiffies before concluding the transmitter is hung. */
@@ -61,6 +63,7 @@ static int max_interrupt_work = 10;
 #include <linux/in.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
+#include <linux/init.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
@@ -70,6 +73,9 @@ static int max_interrupt_work = 10;
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/irq.h>
+
+static char versionA[] __initdata = "3c509.c:1.18 12Mar2001 becker@scyld.com\n";
+static char versionB[] __initdata = "http://www.scyld.com/network/3c509.html\n";
 
 #ifdef EL3_DEBUG
 static int el3_debug = EL3_DEBUG;
@@ -137,7 +143,7 @@ struct el3_private {
 	struct sk_buff *queue[SKB_QUEUE_SIZE];
 	char mca_slot;
 };
-static int id_port = 0x110;		/* Start with 0x110 to avoid new sound cards.*/
+static int id_port __initdata = 0x110;	/* Start with 0x110 to avoid new sound cards.*/
 static struct net_device *el3_root_dev = NULL;
 
 static ushort id_read_eeprom(int index);
@@ -158,7 +164,7 @@ struct el3_mca_adapters_struct {
 	int id;
 };
 
-static struct el3_mca_adapters_struct el3_mca_adapters[] = {
+static struct el3_mca_adapters_struct el3_mca_adapters[] __initdata = {
 	{ "3Com 3c529 EtherLink III (10base2)", 0x627c },
 	{ "3Com 3c529 EtherLink III (10baseT)", 0x627d },
 	{ "3Com 3c529 EtherLink III (test mode)", 0x62db },
@@ -169,7 +175,7 @@ static struct el3_mca_adapters_struct el3_mca_adapters[] = {
 #endif /* CONFIG_MCA */
 
 #ifdef CONFIG_ISAPNP
-static struct isapnp_device_id el3_isapnp_adapters[] = {
+static struct isapnp_device_id el3_isapnp_adapters[] __initdata = {
 	{	ISAPNP_ANY_ID, ISAPNP_ANY_ID,
 		ISAPNP_VENDOR('T', 'C', 'M'), ISAPNP_FUNCTION(0x5090),
 		(long) "3Com Etherlink III (TP)" },
@@ -197,7 +203,7 @@ static u16 el3_isapnp_phys_addr[8][3];
 static int nopnp;
 #endif /* CONFIG_ISAPNP */
 
-int el3_probe(struct net_device *dev)
+int __init el3_probe(struct net_device *dev)
 {
 	struct el3_private *lp;
 	short lrs_state = 0xff, i;
@@ -216,12 +222,20 @@ int el3_probe(struct net_device *dev)
 	if (EISA_bus) {
 		static int eisa_addr = 0x1000;
 		while (eisa_addr < 0x9000) {
+			int device_id;
+
 			ioaddr = eisa_addr;
 			eisa_addr += 0x1000;
 
 			/* Check the standard EISA ID register for an encoded '3Com'. */
 			if (inw(ioaddr + 0xC80) != 0x6d50)
 				continue;
+
+			/* Avoid conflict with 3c590, 3c592, 3c597, etc */
+			device_id = (inb(ioaddr + 0xC82)<<8) + inb(ioaddr + 0xC83);
+			if ((device_id & 0xFF00) == 0x5900) {
+				continue;
+			}
 
 			/* Change the register set to the configuration window 0. */
 			outw(SelectWindow | 0, ioaddr + 0xC80 + EL3_CMD);
@@ -460,7 +474,7 @@ no_pnp:
 
 	{
 		const char *if_names[] = {"10baseT", "AUI", "undefined", "BNC"};
-		printk("%s: 3c509 at %#3.3lx, %s port, address ",
+		printk("%s: 3c5x9 at %#3.3lx, %s port, address ",
 			   dev->name, dev->base_addr, if_names[dev->if_port]);
 	}
 
@@ -483,7 +497,7 @@ no_pnp:
 	el3_root_dev = dev;
 
 	if (el3_debug > 0)
-		printk(version);
+		printk(KERN_INFO "%s" KERN_INFO "%s", versionA, versionB);
 
 	/* The EL3-specific entries in the device structure. */
 	dev->open = &el3_open;
@@ -502,7 +516,7 @@ no_pnp:
 /* Read a word from the EEPROM using the regular EEPROM access register.
    Assume that we are in register window zero.
  */
-static ushort read_eeprom(int ioaddr, int index)
+static ushort __init read_eeprom(int ioaddr, int index)
 {
 	outw(EEPROM_READ + index, ioaddr + 10);
 	/* Pause for at least 162 us. for the read to take place. */
@@ -511,7 +525,7 @@ static ushort read_eeprom(int ioaddr, int index)
 }
 
 /* Read a word from the EEPROM when in the ISA ID probe state. */
-static ushort id_read_eeprom(int index)
+static ushort __init id_read_eeprom(int index)
 {
 	int bit, word = 0;
 

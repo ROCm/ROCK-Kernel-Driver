@@ -51,7 +51,9 @@ extern int hippi_header_parse(struct sk_buff *skb, unsigned char *haddr);
 extern void hippi_net_init(void);
 void hippi_setup(struct net_device *dev);
 
-extern struct net_device *init_hippi_dev(struct net_device *, int);
+extern struct net_device *init_hippi_dev(struct net_device *dev, int sizeof_priv);
+extern struct net_device *alloc_hippi_dev(int sizeof_priv);
+extern int register_hipdev(struct net_device *dev);
 extern void unregister_hipdev(struct net_device *dev);
 #endif
 

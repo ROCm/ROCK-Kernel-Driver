@@ -174,7 +174,7 @@ static ssize_t camera_read (struct file *file,
 			  usb_rcvbulkpipe (camera->dev, camera->inEP),
 			  camera->buf, len, &count, HZ*10);
 
-		dbg ("read (%d) - 0x%x %d", len, retval, count);
+		dbg ("read (%Zd) - 0x%x %d", len, retval, count);
 
 		if (!retval) {
 			if (copy_to_user (buf, camera->buf, count))
@@ -187,7 +187,7 @@ static ssize_t camera_read (struct file *file,
 			break;
 		interruptible_sleep_on_timeout (&camera->wait, RETRY_TIMEOUT);
 
-		dbg ("read (%d) - retry", len);
+		dbg ("read (%Zd) - retry", len);
 	}
 	up (&camera->sem);
 	return retval;
@@ -271,7 +271,7 @@ static ssize_t camera_write (struct file *file,
 	}
 done:
 	up (&camera->sem);
-	dbg ("wrote %d", bytes_written); 
+	dbg ("wrote %Zd", bytes_written); 
 	return bytes_written;
 }
 

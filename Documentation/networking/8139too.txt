@@ -1,8 +1,10 @@
 
 		"8139too" Fast Ethernet driver for Linux
-	  Improved support for RTL-8139 10/100 Fast Ethernet adapters
+	 RTL-8139, -8129, and -8130 10/100 Fast Ethernet adapters
 
-	 Copyright 2000 Jeff Garzik <jgarzik@mandrakesoft.com>
+	Copyright 2000,2001 Jeff Garzik <jgarzik@mandrakesoft.com>
+
+                http://sourceforge.net/projects/gkernel/
 
 
 	      Architectures supported (all PCI platforms):
@@ -25,7 +27,7 @@ completely different and maintained independently of the 8139too code base.
 
 Requirements
 ------------
-Kernel 2.3.41 or later.
+Kernel 2.4.3 or later.
 A Fast Ethernet adapter containing an RTL8139-based chip.
 
 
@@ -95,6 +97,8 @@ Tested Adapters
 AOpen ALN-325C
 KTI KF-230TX
 KTI KF-230TX/2
+Lantech FastNet TX
+SMC EZNET 10/100
 
 (please add your adapter model to this list)
 
@@ -138,12 +142,13 @@ And thanks to every supporter free software.
 Submitting Bug Reports
 ----------------------
 Obtain and compile the modified rtl8139-diag source code from the 
-8139too driver Web site.  This diagnostics programs, originally
-from Donald Becker, has been modified to display all registers
-on your RTL8139 chip, not just the first 0x80.
+8139too driver Web site, http://sourceforge.net/projects/gkernel/
+This diagnostics programs, originally from Donald Becker, has been
+modified to display all registers on your RTL8139 chip, not just the
+first 0x80.
 
 If possible, send the output of a working and broken driver with
-	rtl8139-diag -mmmaaavvveefN > my-output-file.txt
+	rtl8139-diag -mmaaavvveefN > my-output-file.txt
 
 Send "lspci -vvv" or "cat /proc/pci" output for PCI information.
 

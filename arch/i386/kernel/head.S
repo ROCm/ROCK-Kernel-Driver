@@ -415,23 +415,6 @@ ENTRY(pg1)
 ENTRY(empty_zero_page)
 
 .org 0x5000
-ENTRY(empty_bad_page)
-
-.org 0x6000
-ENTRY(empty_bad_pte_table)
-
-#if CONFIG_X86_PAE
-
- .org 0x7000
- ENTRY(empty_bad_pmd_table)
-
- .org 0x8000
-
-#else
-
- .org 0x7000
-
-#endif
 
 /*
  * This starts the data section. Note that the above is all

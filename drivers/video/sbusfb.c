@@ -1179,6 +1179,33 @@ static inline int known_card(char *name)
 	return FBTYPE_NOTYPE;
 }
 
+#ifdef CONFIG_FB_CREATOR
+static void creator_fb_scan_siblings(int root)
+{
+	int node, child;
+
+	child = prom_getchild(root);
+	for (node = prom_searchsiblings(child, "SUNW,ffb"); node;
+	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb"))
+		sbusfb_init_fb(node, root, FBTYPE_CREATOR, NULL);
+	for (node = prom_searchsiblings(child, "SUNW,afb"); node;
+	     node = prom_searchsiblings(prom_getsibling(node), "SUNW,afb"))
+		sbusfb_init_fb(node, root, FBTYPE_CREATOR, NULL);
+}
+
+static void creator_fb_scan(void)
+{
+	int root;
+
+	creator_fb_scan_siblings(prom_root_node);
+
+	root = prom_getchild(prom_root_node);
+	for (root = prom_searchsiblings(root, "upa"); root;
+	     root = prom_searchsiblings(prom_getsibling(root), "upa"))
+		creator_fb_scan_siblings(root);
+}
+#endif
+
 int __init sbusfb_init(void)
 {
 	int type;
@@ -1190,16 +1217,7 @@ int __init sbusfb_init(void)
 	if (!con_is_present()) return -ENXIO;
 	
 #ifdef CONFIG_FB_CREATOR
-	{
-		int root, node;
-		root = prom_getchild(prom_root_node);
-		for (node = prom_searchsiblings(root, "SUNW,ffb"); node;
-		     node = prom_searchsiblings(prom_getsibling(node), "SUNW,ffb"))
-			sbusfb_init_fb(node, prom_root_node, FBTYPE_CREATOR, NULL);
-		for (node = prom_searchsiblings(root, "SUNW,afb"); node;
-		     node = prom_searchsiblings(prom_getsibling(node), "SUNW,afb"))
-			sbusfb_init_fb(node, prom_root_node, FBTYPE_CREATOR, NULL);
-	}
+	creator_fb_scan();
 #endif
 #ifdef CONFIG_SUN4
 	sbusfb_init_fb(0, 0, FBTYPE_SUN2BW, NULL);

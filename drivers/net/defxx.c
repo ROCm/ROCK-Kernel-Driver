@@ -553,7 +553,7 @@ static int __init dfx_eisa_init(void)
 
 static void __devinit dfx_bus_init(struct net_device *dev)
 {
-	DFX_board_t *bp = (DFX_board_t *)dev->priv;
+	DFX_board_t *bp = dev->priv;
 	u8			val;	/* used for I/O read/writes */
 
 	DBG_printk("In dfx_bus_init...\n");
@@ -787,7 +787,7 @@ static void __devinit dfx_bus_config_check(DFX_board_t *bp)
 
 static int __devinit dfx_driver_init(struct net_device *dev)
 {
-	DFX_board_t *bp = (DFX_board_t *)dev->priv;
+	DFX_board_t *bp = dev->priv;
 	int			alloc_size;			/* total buffer size needed */
 	char		*top_v, *curr_v;	/* virtual addrs into memory block */
 	u32			top_p, curr_p;		/* physical addrs into memory block */
@@ -1209,7 +1209,7 @@ static int dfx_adap_init(DFX_board_t *bp, int get_buffers)
 static int dfx_open(struct net_device *dev)
 {
 	int ret;
-	DFX_board_t	*bp = (DFX_board_t *)dev->priv;
+	DFX_board_t	*bp = dev->priv;
 
 	DBG_printk("In dfx_open...\n");
 	
@@ -1298,7 +1298,7 @@ static int dfx_open(struct net_device *dev)
 
 static int dfx_close(struct net_device *dev)
 {
-	DFX_board_t	*bp = (DFX_board_t *)dev->priv;
+	DFX_board_t	*bp = dev->priv;
 
 	DBG_printk("In dfx_close...\n");
 
@@ -1634,7 +1634,7 @@ static void dfx_int_type_0_process(DFX_board_t	*bp)
 
 static void dfx_int_common(struct net_device *dev)
 {
-	DFX_board_t 	*bp = (DFX_board_t *) dev->priv;
+	DFX_board_t 	*bp = dev->priv;
 	PI_UINT32	port_status;		/* Port Status register */
 
 	/* Process xmt interrupts - frequent case, so always call this routine */
@@ -1704,13 +1704,13 @@ static void dfx_int_common(struct net_device *dev)
 
 static void dfx_interrupt(int irq, void *dev_id, struct pt_regs	*regs)
 	{
-	struct net_device	*dev = (struct net_device *) dev_id;
+	struct net_device	*dev = dev_id;
 	DFX_board_t		*bp;	/* private board structure pointer */
 	u8				tmp;	/* used for disabling/enabling ints */
 
 	/* Get board pointer only if device structure is valid */
 
-	bp = (DFX_board_t *) dev->priv;
+	bp = dev->priv;
 
 	spin_lock(&bp->lock);
 	
@@ -1802,7 +1802,7 @@ static void dfx_interrupt(int irq, void *dev_id, struct pt_regs	*regs)
 
 static struct net_device_stats *dfx_ctl_get_stats(struct net_device *dev)
 	{
-	DFX_board_t	*bp = (DFX_board_t *)dev->priv;
+	DFX_board_t	*bp = dev->priv;
 
 	/* Fill the bp->stats structure with driver-maintained counters */
 
@@ -1987,7 +1987,7 @@ static struct net_device_stats *dfx_ctl_get_stats(struct net_device *dev)
 
 static void dfx_ctl_set_multicast_list(struct net_device *dev)
 	{
-	DFX_board_t			*bp = (DFX_board_t *)dev->priv;
+	DFX_board_t			*bp = dev->priv;
 	int					i;			/* used as index in for loop */
 	struct dev_mc_list	*dmi;		/* ptr to multicast addr entry */
 
@@ -2101,7 +2101,7 @@ static void dfx_ctl_set_multicast_list(struct net_device *dev)
 
 static int dfx_ctl_set_mac_address(struct net_device *dev, void *addr)
 	{
-	DFX_board_t		*bp = (DFX_board_t *)dev->priv;
+	DFX_board_t		*bp = dev->priv;
 	struct sockaddr	*p_sockaddr = (struct sockaddr *)addr;
 
 	/* Copy unicast address to driver-maintained structs and update count */
@@ -2976,7 +2976,7 @@ static int dfx_xmt_queue_pkt(
 	)
 
 	{
-	DFX_board_t		*bp = (DFX_board_t *) dev->priv;
+	DFX_board_t		*bp = dev->priv;
 	u8			prod;				/* local transmit producer index */
 	PI_XMT_DESCR		*p_xmt_descr;		/* ptr to transmit descriptor block entry */
 	XMT_DRIVER_DESCR	*p_xmt_drv_descr;	/* ptr to transmit driver descriptor */
@@ -3332,7 +3332,7 @@ static void dfx_xmt_flush( DFX_board_t *bp )
 
 static void __devexit dfx_remove_one_pci_or_eisa(struct pci_dev *pdev, struct net_device *dev)
 {
-	DFX_board_t	  *bp = (DFX_board_t*)dev->priv;
+	DFX_board_t	  *bp = dev->priv;
 
 	unregister_netdev(dev);
 	release_region(dev->base_addr,  pdev ? PFI_K_CSR_IO_LEN : PI_ESIC_K_CSR_IO_LEN );

@@ -1,4 +1,4 @@
-/* $Id: pcikbd.c,v 1.51 2001/02/13 01:17:00 davem Exp $
+/* $Id: pcikbd.c,v 1.53 2001/03/21 00:28:33 davem Exp $
  * pcikbd.c: Ultra/AX PC keyboard support.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -369,9 +369,10 @@ out_ack:
 
 void pcikbd_leds(unsigned char leds)
 {
-	if(!send_data(KBD_CMD_SET_LEDS) || !send_data(leds))
+	if (!pcikbd_iobase)
+		return;
+	if (!send_data(KBD_CMD_SET_LEDS) || !send_data(leds))
 		send_data(KBD_CMD_ENABLE);
-		
 }
 
 static int __init pcikbd_wait_for_input(void)
@@ -414,7 +415,10 @@ static unsigned long pcibeep_iobase = 0;
 /* Timer routine to turn off the beep after the interval expires. */
 static void pcikbd_kd_nosound(unsigned long __unused)
 {
-	outl(0, pcibeep_iobase);
+	if (pcibeep_iobase & 0x2UL)
+		outb(0, pcibeep_iobase);
+	else
+		outl(0, pcibeep_iobase);
 }
 
 /*
@@ -431,13 +435,20 @@ static void pcikbd_kd_mksound(unsigned int hz, unsigned int ticks)
 	save_flags(flags); cli();
 	del_timer(&sound_timer);
 	if (hz) {
-		outl(1, pcibeep_iobase);
+		if (pcibeep_iobase & 0x2UL)
+			outb(1, pcibeep_iobase);
+		else
+			outl(1, pcibeep_iobase);
 		if (ticks) {
 			sound_timer.expires = jiffies + ticks;
 			add_timer(&sound_timer);
 		}
-	} else
-		outl(0, pcibeep_iobase);
+	} else {
+		if (pcibeep_iobase & 0x2UL)
+			outb(0, pcibeep_iobase);
+		else
+			outl(0, pcibeep_iobase);
+	}
 	restore_flags(flags);
 }
 #endif
@@ -523,6 +534,25 @@ void __init pcikbd_init_hw(void)
 				}
 			}
 		}
+#ifdef CONFIG_USB
+		/* We are being called for the sake of USB keyboard
+		 * state initialization.  So we should check for beeper
+		 * device in this case.
+		 */
+		edev = 0;
+		for_each_ebus(ebus) {
+			for_each_ebusdev(edev, ebus) {
+				if (!strcmp(edev->prom_name, "beep")) {
+					pcibeep_iobase = edev->resource[0].start;
+					kd_mksound = pcikbd_kd_mksound;
+					printk("8042(speaker): iobase[%016lx]\n", pcibeep_iobase);
+					return;
+				}
+			}
+		}
+
+		/* No beeper found, ok complain. */
+#endif
 		printk("pcikbd_init_hw: no 8042 found\n");
 		return;
 

@@ -1891,14 +1891,15 @@ static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id
 {
 	struct i810_card *card;
 
-	if (!pci_dma_supported(pci_dev, I810_DMA_MASK)) {
+	if (pci_enable_device(pci_dev))
+		return -EIO;
+
+	if (pci_set_dma_mask(pci_dev, I810_DMA_MASK)) {
 		printk(KERN_ERR "intel810: architecture does not support"
 		       " 32bit PCI busmaster DMA\n");
 		return -ENODEV;
 	}
 
-	if (pci_enable_device(pci_dev))
-		return -EIO;
 	if ((card = kmalloc(sizeof(struct i810_card), GFP_KERNEL)) == NULL) {
 		printk(KERN_ERR "i810_audio: out of memory\n");
 		return -ENOMEM;
@@ -1968,7 +1969,6 @@ static int __init i810_probe(struct pci_dev *pci_dev, const struct pci_device_id
 		return -ENODEV;
 	}
 	pci_dev->driver_data = card;
-	pci_dev->dma_mask = I810_DMA_MASK;
 	return 0;
 }
 

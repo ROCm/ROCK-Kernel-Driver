@@ -1,4 +1,4 @@
-/* $Id: rtc.c,v 1.25 2001/02/13 01:17:00 davem Exp $
+/* $Id: rtc.c,v 1.26 2001/03/14 09:30:31 davem Exp $
  *
  * Linux/SPARC Real Time Clock Driver
  * Copyright (C) 1996 Thomas K. Dyas (tdyas@eden.rutgers.edu)
@@ -157,11 +157,11 @@ static int __init rtc_sun_init(void)
 {
 	int error;
 
-	if (mstk48t02_regs == 0) {
-		/* This diagnostic is a debugging aid... But a useful one. */
-		printk(KERN_ERR "rtc: no Mostek in this computer\n");
+	/* It is possible we are being driven by some other RTC chip
+	 * and thus another RTC driver is handling things.
+	 */
+	if (mstk48t02_regs == 0)
 		return -ENODEV;
-	}
 
 	error = misc_register(&rtc_dev);
 	if (error) {

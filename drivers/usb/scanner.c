@@ -537,7 +537,7 @@ read_scanner(struct file * file, char * buffer,
 		
 		if (result == -EPIPE) { /* No hope */
 			if(usb_clear_halt(dev, scn->bulk_in_ep)) {
-				err("read_scanner(%d): Failure to clear endpoint halt condition (%d).", scn_minor, ret);
+				err("read_scanner(%d): Failure to clear endpoint halt condition (%Zd).", scn_minor, ret);
 			}
 			ret = result;
 			break;

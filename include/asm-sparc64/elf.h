@@ -1,4 +1,4 @@
-/* $Id: elf.h,v 1.25 2000/07/12 01:27:08 davem Exp $ */
+/* $Id: elf.h,v 1.28 2001/03/24 09:36:02 davem Exp $ */
 #ifndef __ASM_SPARC64_ELF_H
 #define __ASM_SPARC64_ELF_H
 
@@ -56,9 +56,10 @@ typedef struct {
    instruction set this cpu supports.  */
 
 /* On Ultra, we support all of the v8 capabilities. */
-#define ELF_HWCAP	(HWCAP_SPARC_FLUSH | HWCAP_SPARC_STBAR | \
-			 HWCAP_SPARC_SWAP | HWCAP_SPARC_MULDIV | \
-			 HWCAP_SPARC_V9)
+#define ELF_HWCAP	((HWCAP_SPARC_FLUSH | HWCAP_SPARC_STBAR | \
+			  HWCAP_SPARC_SWAP | HWCAP_SPARC_MULDIV | \
+			  HWCAP_SPARC_V9) | \
+			 ((tlb_type == cheetah) ? HWCAP_SPARC_ULTRA3 : 0))
 
 /* This yields a string that ld.so will use to load implementation
    specific libraries for optimization.  This is more specific in
@@ -78,16 +79,16 @@ do {	unsigned char flags = current->thread.flags;	\
 		if (flags & SPARC_FLAG_32BIT) {		\
 		  pgd_t *pgd0 = &current->mm->pgd[0];	\
 		  if (pgd_none (*pgd0)) {		\
-		    pmd_t *page = get_pmd_fast();	\
+		    pmd_t *page = pmd_alloc_one_fast();	\
 		    if (!page)				\
-		      (void) get_pmd_slow(pgd0, 0);	\
-                    else				\
-                      pgd_set(pgd0, page);		\
+		      page = pmd_alloc_one();		\
+                    pgd_set(pgd0, page);		\
 		  }					\
 		  pgd_cache = pgd_val(*pgd0) << 11UL;	\
 		}					\
 		__asm__ __volatile__(			\
-			"stxa\t%0, [%1] %2"		\
+			"stxa\t%0, [%1] %2\n\t"		\
+			"membar #Sync"			\
 			: /* no outputs */		\
 			: "r" (pgd_cache),		\
 			  "r" (TSB_REG),		\

@@ -370,7 +370,15 @@ int awc4500_pnp_probe(struct net_device *dev)
 		request_region(isa_ioaddr, AIRONET4X00_IO_SIZE, "aironet4x00 ioaddr");
 
 		if (!dev) {
-			dev = init_etherdev(dev, 0 );	
+			dev = init_etherdev(NULL, 0);	
+			if (!dev) {
+				release_region(isa_ioaddr, AIRONET4X00_IO_SIZE);
+				isapnp_cfg_begin(logdev->PNP_BUS->PNP_BUS_NUMBER,
+						 logdev->PNP_DEV_NUMBER);
+				isapnp_deactivate(logdev->PNP_DEV_NUMBER);
+				isapnp_cfg_end();
+				return -ENOMEM;
+			}
 		}
 		dev->priv = kmalloc(sizeof(struct awc_private),GFP_KERNEL );
 		memset(dev->priv,0,sizeof(struct awc_private));
@@ -524,7 +532,7 @@ int awc4500_isa_probe(struct net_device *dev)
 	printk(KERN_WARNING "     Use aironet4500_pnp if any problems(i.e. card malfunctioning). \n");
 	printk(KERN_WARNING "     Note that this isa probe is not friendly... must give exact parameters \n");
 
-	while (irq[card] !=0){
+	while (irq[card] != 0){
 	
 		isa_ioaddr = io[card];
 		isa_irq_line = irq[card];
@@ -532,7 +540,11 @@ int awc4500_isa_probe(struct net_device *dev)
 		request_region(isa_ioaddr, AIRONET4X00_IO_SIZE, "aironet4x00 ioaddr");
 
 		if (!dev) {
-			dev = init_etherdev(dev, 0 );	
+			dev = init_etherdev(NULL, 0);	
+			if (!dev) {
+				release_region(isa_ioaddr, AIRONET4X00_IO_SIZE);
+				return (card == 0) ? -ENOMEM : 0;
+			}
 		}
 		dev->priv = kmalloc(sizeof(struct awc_private),GFP_KERNEL );
 		memset(dev->priv,0,sizeof(struct awc_private));

@@ -10,6 +10,7 @@
 #include <linux/threads.h>
 #include <asm/asi.h>
 #include <asm/starfire.h>
+#include <asm/spitfire.h>
 
 #ifndef __ASSEMBLY__
 /* PROM provided per-processor information we need
@@ -84,7 +85,13 @@ extern __inline__ int cpu_number_map(int cpu)
 
 extern __inline__ int hard_smp_processor_id(void)
 {
-	if(this_is_starfire != 0) {
+	if (tlb_type == cheetah) {
+		unsigned long safari_config;
+		__asm__ __volatile__("ldxa [%%g0] %1, %0"
+				     : "=r" (safari_config)
+				     : "i" (ASI_SAFARI_CONFIG));
+		return ((safari_config >> 17) & 0x3ff);
+	} else if (this_is_starfire != 0) {
 		return starfire_hard_smp_processor_id();
 	} else {
 		unsigned long upaconfig;

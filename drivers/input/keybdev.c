@@ -37,9 +37,13 @@
 #include <linux/module.h>
 #include <linux/kbd_kern.h>
 
-#if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(__alpha__) || defined(__mips__)
+#if defined(CONFIG_X86) || defined(CONFIG_IA64) || defined(__alpha__) || defined(__mips__) || defined(CONFIG_SPARC64)
 
 static int x86_sysrq_alt = 0;
+#ifdef CONFIG_SPARC64
+static int sparc_l1_a_state = 0;
+extern void batten_down_hatches(void);
+#endif
 
 static unsigned short x86_keycodes[256] =
 	{ 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
@@ -75,6 +79,13 @@ static int emulate_raw(unsigned int keycode, int down)
 		return 0;
 	}
 
+#ifdef CONFIG_SPARC64
+	if (keycode == KEY_A && sparc_l1_a_state) {
+		sparc_l1_a_state = 0;
+		batten_down_hatches();
+	}
+#endif
+
 	if (x86_keycodes[keycode] & 0x100)
 		handle_scancode(0xe0, 1);
 
@@ -87,6 +98,10 @@ static int emulate_raw(unsigned int keycode, int down)
 
 	if (keycode == KEY_LEFTALT || keycode == KEY_RIGHTALT)
 		x86_sysrq_alt = down;
+#ifdef CONFIG_SPARC64
+	if (keycode == KEY_STOP)
+		sparc_l1_a_state = down;
+#endif
 
 	return 0;
 }

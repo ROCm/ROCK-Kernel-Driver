@@ -1,4 +1,4 @@
-/* $Id: floppy.h,v 1.28 2000/02/18 13:50:54 davem Exp $
+/* $Id: floppy.h,v 1.29 2001/03/24 00:07:23 davem Exp $
  * asm-sparc64/floppy.h: Sparc specific parts of the Floppy driver.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -565,6 +565,24 @@ static int sun_pci_fd_test_drive(unsigned long port, int drive)
 
 #endif /* CONFIG_PCI */
 
+#ifdef CONFIG_PCI
+static int __init ebus_fdthree_p(struct linux_ebus_device *edev)
+{
+	if (!strcmp(edev->prom_name, "fdthree"))
+		return 1;
+	if (!strcmp(edev->prom_name, "floppy")) {
+		char compat[16];
+		prom_getstring(edev->prom_node,
+			       "compatible",
+			       compat, sizeof(compat));
+		compat[15] = '\0';
+		if (!strcmp(compat, "fdthree"))
+			return 1;
+	}
+	return 0;
+}
+#endif
+
 static unsigned long __init sun_floppy_init(void)
 {
 	char state[128];
@@ -592,7 +610,7 @@ static unsigned long __init sun_floppy_init(void)
 
 		for_each_ebus(ebus) {
 			for_each_ebusdev(edev, ebus) {
-				if (!strcmp(edev->prom_name, "fdthree"))
+				if (ebus_fdthree_p(edev))
 					goto ebus_done;
 			}
 		}

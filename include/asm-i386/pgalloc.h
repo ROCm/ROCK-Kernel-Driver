@@ -11,36 +11,55 @@
 #define pte_quicklist (current_cpu_data.pte_quick)
 #define pgtable_cache_size (current_cpu_data.pgtable_cache_sz)
 
-#define pmd_populate(pmd, pte)		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
-
-#if CONFIG_X86_PAE
-# include <asm/pgalloc-3level.h>
-#else
-# include <asm/pgalloc-2level.h>
-#endif
+#define pmd_populate(pmd, pte) \
+		set_pmd(pmd, __pmd(_PAGE_TABLE + __pa(pte)))
 
 /*
- * Allocate and free page tables. The xxx_kernel() versions are
- * used to allocate a kernel page table - this turns on ASN bits
- * if any.
+ * Allocate and free page tables.
  */
+
+#if CONFIG_X86_PAE
+
+extern void *kmalloc(size_t, int);
+extern void kfree(const void *);
 
 extern __inline__ pgd_t *get_pgd_slow(void)
 {
-	pgd_t *ret = (pgd_t *)__get_free_page(GFP_KERNEL);
+	int i;
+	pgd_t *pgd = kmalloc(PTRS_PER_PGD * sizeof(pgd_t), GFP_KERNEL);
 
-	if (ret) {
-#if CONFIG_X86_PAE
-		int i;
-		for (i = 0; i < USER_PTRS_PER_PGD; i++)
-			__pgd_clear(ret + i);
-#else
-		memset(ret, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
-#endif
-		memcpy(ret + USER_PTRS_PER_PGD, swapper_pg_dir + USER_PTRS_PER_PGD, (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+	if (pgd) {
+		for (i = 0; i < USER_PTRS_PER_PGD; i++) {
+			unsigned long pmd = __get_free_page(GFP_KERNEL);
+			if (!pmd)
+				goto out_oom;
+			clear_page(pmd);
+			set_pgd(pgd + i, __pgd(1 + __pa(pmd)));
+		}
+		memcpy(pgd + USER_PTRS_PER_PGD, swapper_pg_dir + USER_PTRS_PER_PGD, (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
 	}
-	return ret;
+	return pgd;
+out_oom:
+	for (i--; i >= 0; i--)
+		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
+	kfree(pgd);
+	return NULL;
 }
+
+#else
+
+extern __inline__ pgd_t *get_pgd_slow(void)
+{
+	pgd_t *pgd = (pgd_t *)__get_free_page(GFP_KERNEL);
+
+	if (pgd) {
+		memset(pgd, 0, USER_PTRS_PER_PGD * sizeof(pgd_t));
+		memcpy(pgd + USER_PTRS_PER_PGD, swapper_pg_dir + USER_PTRS_PER_PGD, (PTRS_PER_PGD - USER_PTRS_PER_PGD) * sizeof(pgd_t));
+	}
+	return pgd;
+}
+
+#endif
 
 extern __inline__ pgd_t *get_pgd_fast(void)
 {
@@ -64,19 +83,28 @@ extern __inline__ void free_pgd_fast(pgd_t *pgd)
 
 extern __inline__ void free_pgd_slow(pgd_t *pgd)
 {
+#if CONFIG_X86_PAE
+	int i;
+
+	for (i = 0; i < USER_PTRS_PER_PGD; i++)
+		free_page((unsigned long)__va(pgd_val(pgd[i])-1));
+	kfree(pgd);
+#else
 	free_page((unsigned long)pgd);
+#endif
 }
 
-static inline pte_t *pte_alloc_one(void)
+static inline pte_t *pte_alloc_one(unsigned long address)
 {
 	pte_t *pte;
 
 	pte = (pte_t *) __get_free_page(GFP_KERNEL);
-	clear_page(pte);
+	if (pte)
+		clear_page(pte);
 	return pte;
 }
 
-static inline pte_t *pte_alloc_one_fast(void)
+static inline pte_t *pte_alloc_one_fast(unsigned long address)
 {
 	unsigned long *ret;
 
@@ -100,7 +128,6 @@ extern __inline__ void pte_free_slow(pte_t *pte)
 	free_page((unsigned long)pte);
 }
 
-#define pte_free_kernel(pte)	pte_free_slow(pte)
 #define pte_free(pte)		pte_free_slow(pte)
 #define pgd_free(pgd)		free_pgd_slow(pgd)
 #define pgd_alloc()		get_pgd_fast()
@@ -108,12 +135,15 @@ extern __inline__ void pte_free_slow(pte_t *pte)
 /*
  * allocating and freeing a pmd is trivial: the 1-entry pmd is
  * inside the pgd, so has no extra memory associated with it.
- * (In the PAE case we free the page.)
+ * (In the PAE case we free the pmds as part of the pgd.)
  */
-#define pmd_free_one(pmd)	free_pmd_slow(pmd)
 
-#define pmd_free_kernel		pmd_free
-#define pmd_alloc_kernel	pmd_alloc
+#define pmd_alloc_one_fast()		({ BUG(); ((pmd_t *)1); })
+#define pmd_alloc_one()			({ BUG(); ((pmd_t *)2); })
+#define pmd_free_slow(x)		do { } while (0)
+#define pmd_free_fast(x)		do { } while (0)
+#define pmd_free(x)			do { } while (0)
+#define pgd_populate(pmd, pte)		BUG()
 
 extern int do_check_pgt_cache(int, int);
 

@@ -101,7 +101,7 @@ char *ResolveMimeType(const char *File,__kernel_size_t *Len)
 /*
 
 	The returned string is for READ ONLY, ownership of the memory is NOT
-	transfered.
+	transferred.
 
 */
 {	

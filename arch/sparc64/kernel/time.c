@@ -1,4 +1,4 @@
-/* $Id: time.c,v 1.33 2001/01/11 15:07:09 davem Exp $
+/* $Id: time.c,v 1.36 2001/03/15 08:51:24 anton Exp $
  * time.c: UltraSparc timer and TOD clock support.
  *
  * Copyright (C) 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -20,6 +20,8 @@
 #include <linux/timex.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/mc146818rtc.h>
+#include <linux/delay.h>
 
 #include <asm/oplib.h>
 #include <asm/mostek.h>
@@ -35,7 +37,11 @@
 extern rwlock_t xtime_lock;
 
 spinlock_t mostek_lock = SPIN_LOCK_UNLOCKED;
+spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
 unsigned long mstk48t02_regs = 0UL;
+#ifdef CONFIG_PCI
+unsigned long ds1287_regs = 0UL;
+#endif
 
 static unsigned long mstk48t08_regs = 0UL;
 static unsigned long mstk48t59_regs = 0UL;
@@ -77,6 +83,7 @@ void sparc64_do_profile(unsigned long pc, unsigned long o7)
 		extern int rwlock_impl_begin, rwlock_impl_end;
 		extern int atomic_impl_begin, atomic_impl_end;
 		extern int __memcpy_begin, __memcpy_end;
+		extern int __bzero_begin, __bzero_end;
 		extern int __bitops_begin, __bitops_end;
 
 		if ((pc >= (unsigned long) &atomic_impl_begin &&
@@ -85,6 +92,8 @@ void sparc64_do_profile(unsigned long pc, unsigned long o7)
 		     pc < (unsigned long) &rwlock_impl_end) ||
 		    (pc >= (unsigned long) &__memcpy_begin &&
 		     pc < (unsigned long) &__memcpy_end) ||
+		    (pc >= (unsigned long) &__bzero_begin &&
+		     pc < (unsigned long) &__bzero_end) ||
 		    (pc >= (unsigned long) &__bitops_begin &&
 		     pc < (unsigned long) &__bitops_end))
 			pc = o7;
@@ -135,6 +144,7 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 		 * that %tick is not prone to this bug, but I am not
 		 * taking any chances.
 		 */
+		if (!SPARC64_USE_STICK) {
 		__asm__ __volatile__("
 			rd	%%tick_cmpr, %0
 			ba,pt	%%xcc, 1f
@@ -146,6 +156,15 @@ static void timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 			mov	%1, %1"
 			: "=&r" (timer_tick_compare), "=r" (ticks)
 			: "r" (timer_tick_offset));
+		} else {
+		__asm__ __volatile__("
+			rd	%%asr25, %0
+			add	%0, %2, %0
+			wr	%0, 0, %%asr25
+			rd	%%asr24, %1"
+			: "=&r" (timer_tick_compare), "=r" (ticks)
+			: "r" (timer_tick_offset));
+		}
 
 		/* Restore PSTATE_IE. */
 		__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
@@ -168,11 +187,19 @@ void timer_tick_interrupt(struct pt_regs *regs)
 	/*
 	 * Only keep timer_tick_offset uptodate, but don't set TICK_CMPR.
 	 */
+	if (!SPARC64_USE_STICK) {
 	__asm__ __volatile__("
 		rd	%%tick_cmpr, %0
 		add	%0, %1, %0"
 		: "=&r" (timer_tick_compare)
 		: "r" (timer_tick_offset));
+	} else {
+	__asm__ __volatile__("
+		rd	%%asr25, %0
+		add	%0, %1, %0"
+		: "=&r" (timer_tick_compare)
+		: "r" (timer_tick_offset));
+	}
 
 	timer_check_rtc();
 
@@ -282,41 +309,95 @@ static int __init has_low_battery(void)
 	return (data1 == data2);	/* Was the write blocked? */
 }
 
+#ifndef BCD_TO_BIN
+#define BCD_TO_BIN(val) (((val)&15) + ((val)>>4)*10)
+#endif
+
+#ifndef BIN_TO_BCD
+#define BIN_TO_BCD(val) ((((val)/10)<<4) + (val)%10)
+#endif
 
 /* Probe for the real time clock chip. */
 static void __init set_system_time(void)
 {
 	unsigned int year, mon, day, hour, min, sec;
 	unsigned long mregs = mstk48t02_regs;
+#ifdef CONFIG_PCI
+	unsigned long dregs = ds1287_regs;
+#else
+	unsigned long dregs = 0UL;
+#endif
 	u8 tmp;
 
 	do_get_fast_time = do_gettimeofday;
 
-	if(!mregs) {
+	if (!mregs && !dregs) {
 		prom_printf("Something wrong, clock regs not mapped yet.\n");
 		prom_halt();
 	}		
 
-	spin_lock_irq(&mostek_lock);
+	if (mregs) {
+		spin_lock_irq(&mostek_lock);
 
-	tmp = mostek_read(mregs + MOSTEK_CREG);
-	tmp |= MSTK_CREG_READ;
-	mostek_write(mregs + MOSTEK_CREG, tmp);
+		/* Traditional Mostek chip. */
+		tmp = mostek_read(mregs + MOSTEK_CREG);
+		tmp |= MSTK_CREG_READ;
+		mostek_write(mregs + MOSTEK_CREG, tmp);
 
-	sec = MSTK_REG_SEC(mregs);
-	min = MSTK_REG_MIN(mregs);
-	hour = MSTK_REG_HOUR(mregs);
-	day = MSTK_REG_DOM(mregs);
-	mon = MSTK_REG_MONTH(mregs);
-	year = MSTK_CVT_YEAR( MSTK_REG_YEAR(mregs) );
+		sec = MSTK_REG_SEC(mregs);
+		min = MSTK_REG_MIN(mregs);
+		hour = MSTK_REG_HOUR(mregs);
+		day = MSTK_REG_DOM(mregs);
+		mon = MSTK_REG_MONTH(mregs);
+		year = MSTK_CVT_YEAR( MSTK_REG_YEAR(mregs) );
+	} else {
+		int i;
+
+		/* Dallas 12887 RTC chip. */
+
+		/* Stolen from arch/i386/kernel/time.c, see there for
+		 * credits and descriptive comments.
+		 */
+		for (i = 0; i < 1000000; i++) {
+			if (CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP)
+				break;
+			udelay(10);
+		}
+		for (i = 0; i < 1000000; i++) {
+			if (!(CMOS_READ(RTC_FREQ_SELECT) & RTC_UIP))
+				break;
+			udelay(10);
+		}
+		do {
+			sec  = CMOS_READ(RTC_SECONDS);
+			min  = CMOS_READ(RTC_MINUTES);
+			hour = CMOS_READ(RTC_HOURS);
+			day  = CMOS_READ(RTC_DAY_OF_MONTH);
+			mon  = CMOS_READ(RTC_MONTH);
+			year = CMOS_READ(RTC_YEAR);
+		} while (sec != CMOS_READ(RTC_SECONDS));
+		if (!(CMOS_READ(RTC_CONTROL) & RTC_DM_BINARY) || RTC_ALWAYS_BCD) {
+			BCD_TO_BIN(sec);
+			BCD_TO_BIN(min);
+			BCD_TO_BIN(hour);
+			BCD_TO_BIN(day);
+			BCD_TO_BIN(mon);
+			BCD_TO_BIN(year);
+		}
+		if ((year += 1900) < 1970)
+			year += 100;
+	}
+
 	xtime.tv_sec = mktime(year, mon, day, hour, min, sec);
 	xtime.tv_usec = 0;
 
-	tmp = mostek_read(mregs + MOSTEK_CREG);
-	tmp &= ~MSTK_CREG_READ;
-	mostek_write(mregs + MOSTEK_CREG, tmp);
+	if (mregs) {
+		tmp = mostek_read(mregs + MOSTEK_CREG);
+		tmp &= ~MSTK_CREG_READ;
+		mostek_write(mregs + MOSTEK_CREG, tmp);
 
-	spin_unlock_irq(&mostek_lock);
+		spin_unlock_irq(&mostek_lock);
+	}
 }
 
 void __init clock_probe(void)
@@ -358,21 +439,22 @@ void __init clock_probe(void)
 		busnd = sbus_root->prom_node;
 	}
 
-	if(busnd == -1) {
+	if (busnd == -1) {
 		prom_printf("clock_probe: problem, cannot find bus to search.\n");
 		prom_halt();
 	}
 
 	node = prom_getchild(busnd);
 
-	while(1) {
+	while (1) {
 		if (!node)
 			model[0] = 0;
 		else
 			prom_getstring(node, "model", model, sizeof(model));
-		if(strcmp(model, "mk48t02") &&
-		   strcmp(model, "mk48t08") &&
-		   strcmp(model, "mk48t59")) {
+		if (strcmp(model, "mk48t02") &&
+		    strcmp(model, "mk48t08") &&
+		    strcmp(model, "mk48t59") &&
+		    strcmp(model, "ds1287")) {
 		   	if (node)
 				node = prom_getsibling(node);
 #ifdef CONFIG_PCI
@@ -384,7 +466,7 @@ void __init clock_probe(void)
 				}
 			}
 #endif
-			if(node == 0) {
+			if (node == 0) {
 				prom_printf("clock_probe: Cannot find timer chip\n");
 				prom_halt();
 			}
@@ -415,8 +497,12 @@ void __init clock_probe(void)
 				prom_halt();
 			}
 
-			mstk48t59_regs = edev->resource[0].start;
-			mstk48t02_regs = mstk48t59_regs + MOSTEK_48T59_48T02;
+			if (!strcmp(model, "ds1287")) {
+				ds1287_regs = edev->resource[0].start;
+			} else {
+				mstk48t59_regs = edev->resource[0].start;
+				mstk48t02_regs = mstk48t59_regs + MOSTEK_48T59_48T02;
+			}
 			break;
 		}
 #endif
@@ -456,26 +542,20 @@ void __init clock_probe(void)
 		break;
 	}
 
-	/* Report a low battery voltage condition. */
-	if (has_low_battery())
-		prom_printf("NVRAM: Low battery voltage!\n");
+	if (mstk48t02_regs != 0UL) {
+		/* Report a low battery voltage condition. */
+		if (has_low_battery())
+			prom_printf("NVRAM: Low battery voltage!\n");
 
-	/* Kick start the clock if it is completely stopped. */
-	if (mostek_read(mstk48t02_regs + MOSTEK_SEC) & MSTK_STOP)
-		kick_start_clock();
+		/* Kick start the clock if it is completely stopped. */
+		if (mostek_read(mstk48t02_regs + MOSTEK_SEC) & MSTK_STOP)
+			kick_start_clock();
+	}
 
 	set_system_time();
 	
 	__restore_flags(flags);
 }
-
-#ifndef BCD_TO_BIN
-#define BCD_TO_BIN(val) (((val)&15) + ((val)>>4)*10)
-#endif
-
-#ifndef BIN_TO_BCD
-#define BIN_TO_BCD(val) ((((val)/10)<<4) + (val)%10)
-#endif
 
 extern void init_timers(void (*func)(int, void *, struct pt_regs *),
 			unsigned long *);
@@ -497,6 +577,7 @@ static __inline__ unsigned long do_gettimeoffset(void)
 {
 	unsigned long ticks;
 
+	if (!SPARC64_USE_STICK) {
 	__asm__ __volatile__("
 		rd	%%tick, %%g1
 		add	%1, %%g1, %0
@@ -505,6 +586,14 @@ static __inline__ unsigned long do_gettimeoffset(void)
 		: "=r" (ticks)
 		: "r" (timer_tick_offset), "r" (timer_tick_compare)
 		: "g1", "g2");
+	} else {
+	__asm__ __volatile__("rd	%%asr24, %%g1\n\t"
+			     "add	%1, %%g1, %0\n\t"
+			     "sub	%0, %2, %0\n\t"
+			     : "=&r" (ticks)
+			     : "r" (timer_tick_offset), "r" (timer_tick_compare)
+			     : "g1");
+	}
 
 	return (ticks * timer_ticks_per_usec_quotient) >> 32UL;
 }
@@ -533,8 +622,13 @@ void do_settimeofday(struct timeval *tv)
 
 static int set_rtc_mmss(unsigned long nowtime)
 {
-	int real_seconds, real_minutes, mostek_minutes;
-	unsigned long regs = mstk48t02_regs;
+	int real_seconds, real_minutes, chip_minutes;
+	unsigned long mregs = mstk48t02_regs;
+#ifdef CONFIG_PCI
+	unsigned long dregs = ds1287_regs;
+#else
+	unsigned long dregs = 0UL;
+#endif
 	unsigned long flags;
 	u8 tmp;
 
@@ -542,52 +636,96 @@ static int set_rtc_mmss(unsigned long nowtime)
 	 * Not having a register set can lead to trouble.
 	 * Also starfire doesnt have a tod clock.
 	 */
-	if (!regs) 
+	if (!mregs && !dregs) 
 		return -1;
 
-	spin_lock_irqsave(&mostek_lock, flags);
+	if (mregs) {
+		spin_lock_irqsave(&mostek_lock, flags);
 
-	/* Read the current RTC minutes. */
-	tmp = mostek_read(regs + MOSTEK_CREG);
-	tmp |= MSTK_CREG_READ;
-	mostek_write(regs + MOSTEK_CREG, tmp);
+		/* Read the current RTC minutes. */
+		tmp = mostek_read(mregs + MOSTEK_CREG);
+		tmp |= MSTK_CREG_READ;
+		mostek_write(mregs + MOSTEK_CREG, tmp);
 
-	mostek_minutes = MSTK_REG_MIN(regs);
+		chip_minutes = MSTK_REG_MIN(mregs);
 
-	tmp = mostek_read(regs + MOSTEK_CREG);
-	tmp &= ~MSTK_CREG_READ;
-	mostek_write(regs + MOSTEK_CREG, tmp);
+		tmp = mostek_read(mregs + MOSTEK_CREG);
+		tmp &= ~MSTK_CREG_READ;
+		mostek_write(mregs + MOSTEK_CREG, tmp);
 
-	/*
-	 * since we're only adjusting minutes and seconds,
-	 * don't interfere with hour overflow. This avoids
-	 * messing with unknown time zones but requires your
-	 * RTC not to be off by more than 15 minutes
-	 */
-	real_seconds = nowtime % 60;
-	real_minutes = nowtime / 60;
-	if (((abs(real_minutes - mostek_minutes) + 15)/30) & 1)
-		real_minutes += 30;	/* correct for half hour time zone */
-	real_minutes %= 60;
+		/*
+		 * since we're only adjusting minutes and seconds,
+		 * don't interfere with hour overflow. This avoids
+		 * messing with unknown time zones but requires your
+		 * RTC not to be off by more than 15 minutes
+		 */
+		real_seconds = nowtime % 60;
+		real_minutes = nowtime / 60;
+		if (((abs(real_minutes - chip_minutes) + 15)/30) & 1)
+			real_minutes += 30;	/* correct for half hour time zone */
+		real_minutes %= 60;
 
-	if (abs(real_minutes - mostek_minutes) < 30) {
-		tmp = mostek_read(regs + MOSTEK_CREG);
-		tmp |= MSTK_CREG_WRITE;
-		mostek_write(regs + MOSTEK_CREG, tmp);
+		if (abs(real_minutes - chip_minutes) < 30) {
+			tmp = mostek_read(mregs + MOSTEK_CREG);
+			tmp |= MSTK_CREG_WRITE;
+			mostek_write(mregs + MOSTEK_CREG, tmp);
 
-		MSTK_SET_REG_SEC(regs,real_seconds);
-		MSTK_SET_REG_MIN(regs,real_minutes);
+			MSTK_SET_REG_SEC(mregs,real_seconds);
+			MSTK_SET_REG_MIN(mregs,real_minutes);
 
-		tmp = mostek_read(regs + MOSTEK_CREG);
-		tmp &= ~MSTK_CREG_WRITE;
-		mostek_write(regs + MOSTEK_CREG, tmp);
+			tmp = mostek_read(mregs + MOSTEK_CREG);
+			tmp &= ~MSTK_CREG_WRITE;
+			mostek_write(mregs + MOSTEK_CREG, tmp);
 
-		spin_unlock_irqrestore(&mostek_lock, flags);
+			spin_unlock_irqrestore(&mostek_lock, flags);
 
-		return 0;
+			return 0;
+		} else {
+			spin_unlock_irqrestore(&mostek_lock, flags);
+
+			return -1;
+		}
 	} else {
-		spin_unlock_irqrestore(&mostek_lock, flags);
+		int retval = 0;
+		unsigned char save_control, save_freq_select;
 
-		return -1;
+		/* Stolen from arch/i386/kernel/time.c, see there for
+		 * credits and descriptive comments.
+		 */
+		spin_lock_irqsave(&rtc_lock, flags);
+		save_control = CMOS_READ(RTC_CONTROL); /* tell the clock it's being set */
+		CMOS_WRITE((save_control|RTC_SET), RTC_CONTROL);
+
+		save_freq_select = CMOS_READ(RTC_FREQ_SELECT); /* stop and reset prescaler */
+		CMOS_WRITE((save_freq_select|RTC_DIV_RESET2), RTC_FREQ_SELECT);
+
+		chip_minutes = CMOS_READ(RTC_MINUTES);
+		if (!(save_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD)
+			BCD_TO_BIN(chip_minutes);
+		real_seconds = nowtime % 60;
+		real_minutes = nowtime / 60;
+		if (((abs(real_minutes - chip_minutes) + 15)/30) & 1)
+			real_minutes += 30;
+		real_minutes %= 60;
+
+		if (abs(real_minutes - chip_minutes) < 30) {
+			if (!(save_control & RTC_DM_BINARY) || RTC_ALWAYS_BCD) {
+				BIN_TO_BCD(real_seconds);
+				BIN_TO_BCD(real_minutes);
+			}
+			CMOS_WRITE(real_seconds,RTC_SECONDS);
+			CMOS_WRITE(real_minutes,RTC_MINUTES);
+		} else {
+			printk(KERN_WARNING
+			       "set_rtc_mmss: can't update from %d to %d\n",
+			       chip_minutes, real_minutes);
+			retval = -1;
+		}
+
+		CMOS_WRITE(save_control, RTC_CONTROL);
+		CMOS_WRITE(save_freq_select, RTC_FREQ_SELECT);
+		spin_unlock_irqrestore(&rtc_lock, flags);
+
+		return retval;
 	}
 }

@@ -561,7 +561,6 @@ int atm_proc_dev_register(struct atm_dev *dev)
 	dev->proc_entry->proc_fops = &proc_dev_atm_operations;
 	dev->proc_entry->owner = THIS_MODULE;
 	return 0;
-	kfree(dev->proc_entry);
 fail0:
 	kfree(dev->proc_name);
 fail1:

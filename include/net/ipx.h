@@ -24,6 +24,8 @@ typedef struct
 #define ipx_broadcast_node	"\377\377\377\377\377\377"
 #define ipx_this_node           "\0\0\0\0\0\0"
 
+#define IPX_MAX_PPROP_HOPS 8
+
 struct ipxhdr
 {
 	__u16           ipx_checksum __attribute__ ((packed));
@@ -36,7 +38,7 @@ struct ipxhdr
 #define IPX_TYPE_SAP		0x04	/* may also be 0 */
 #define IPX_TYPE_SPX		0x05	/* SPX protocol */
 #define IPX_TYPE_NCP		0x11	/* $lots for docs on this (SPIT) */
-#define IPX_TYPE_PPROP		0x14	/* complicated flood fill brdcast [Not supported] */
+#define IPX_TYPE_PPROP		0x14	/* complicated flood fill brdcast */
 	ipx_address	ipx_dest __attribute__ ((packed));
 	ipx_address	ipx_source __attribute__ ((packed));
 };
@@ -71,6 +73,7 @@ typedef struct ipx_route {
 	unsigned char ir_routed;
 	unsigned char ir_router_node[IPX_NODE_LEN];
 	struct ipx_route *ir_next;
+	atomic_t      refcnt;
 }	ipx_route;
 
 #ifdef __KERNEL__
@@ -78,7 +81,10 @@ struct ipx_cb {
 	u8 ipx_tctrl;
 	u32 ipx_dest_net;
 	u32 ipx_source_net;
-	int last_hop_index;
+	struct {
+		u32 netnum;
+		int index;
+	} last_hop;
 };
 #endif
 #define IPX_MIN_EPHEMERAL_SOCKET	0x4000

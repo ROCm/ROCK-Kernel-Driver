@@ -1,11 +1,17 @@
 /*
- * $Id: capidrv.c,v 1.39.6.2 2001/02/13 11:43:29 kai Exp $
+ * $Id: capidrv.c,v 1.39.6.4 2001/03/21 08:52:21 kai Exp $
  *
  * ISDN4Linux Driver, using capi20 interface (kernelcapi)
  *
  * Copyright 1997 by Carsten Paeth (calle@calle.in-berlin.de)
  *
  * $Log: capidrv.c,v $
+ * Revision 1.39.6.4  2001/03/21 08:52:21  kai
+ * merge from main branch: fix buffer for revision string (calle)
+ *
+ * Revision 1.39.6.3  2001/03/13 16:17:07  kai
+ * spelling fixes from 2.4.3-pre
+ *
  * Revision 1.39.6.2  2001/02/13 11:43:29  kai
  * more compatility changes for 2.2.19
  *
@@ -225,7 +231,7 @@
 #include "capicmd.h"
 #include "capidrv.h"
 
-static char *revision = "$Revision: 1.39.6.2 $";
+static char *revision = "$Revision: 1.39.6.4 $";
 static int debugmode = 0;
 
 MODULE_AUTHOR("Carsten Paeth <calle@calle.in-berlin.de>");
@@ -2490,7 +2496,7 @@ static int __init capidrv_init(void)
 {
 	struct capi_register_params rparam;
 	capi_profile profile;
-	char rev[10];
+	char rev[32];
 	char *p;
 	__u32 ncontr, contr;
 	__u16 errcode;
@@ -2504,12 +2510,13 @@ static int __init capidrv_init(void)
 		return -EIO;
 	}
 
-	if ((p = strchr(revision, ':'))) {
-		strcpy(rev, p + 1);
-		p = strchr(rev, '$');
-		*p = 0;
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strncpy(rev, p + 2, sizeof(rev));
+		rev[sizeof(rev)-1] = 0;
+		if ((p = strchr(rev, '$')) != 0 && p > rev)
+		   *(p-1) = 0;
 	} else
-		strcpy(rev, " ??? ");
+		strcpy(rev, "1.0");
 
 	rparam.level3cnt = -2;  /* number of bchannels twice */
 	rparam.datablkcnt = 16;
@@ -2540,7 +2547,7 @@ static int __init capidrv_init(void)
 	}
 	proc_init();
 
-	printk(KERN_NOTICE "capidrv: Rev%s: loaded\n", rev);
+	printk(KERN_NOTICE "capidrv: Rev %s: loaded\n", rev);
 	MOD_DEC_USE_COUNT;
 
 	return 0;

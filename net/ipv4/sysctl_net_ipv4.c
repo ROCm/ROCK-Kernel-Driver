@@ -1,7 +1,7 @@
 /*
  * sysctl_net_ipv4.c: sysctl interface to net IPV4 subsystem.
  *
- * $Id: sysctl_net_ipv4.c,v 1.47 2000/10/19 15:51:02 davem Exp $
+ * $Id: sysctl_net_ipv4.c,v 1.48 2001/02/23 01:39:05 davem Exp $
  *
  * Begun April 1, 1996, Mike Shaver.
  * Added /proc/sys/net/ipv4 directory entry (empty =) ). [MS]
@@ -47,10 +47,11 @@ extern int inet_peer_maxttl;
 extern int inet_peer_gc_mintime;
 extern int inet_peer_gc_maxtime;
 
+#ifdef CONFIG_SYSCTL
 static int tcp_retr1_max = 255; 
-
 static int ip_local_port_range_min[] = { 1, 1 };
 static int ip_local_port_range_max[] = { 65535, 65535 };
+#endif
 
 struct ipv4_config ipv4_config;
 

@@ -2146,7 +2146,7 @@ int usb_new_device(struct usb_device *dev)
 		if (err < 0)
 			err("unable to get device descriptor (error=%d)", err);
 		else
-			err("USB device descriptor short read (expected %i, got %i)",
+			err("USB device descriptor short read (expected %Zi, got %i)",
 				sizeof(dev->descriptor), err);
 	
 		clear_bit(dev->devnum, &dev->bus->devmap.devicemap);

@@ -207,12 +207,6 @@
 #endif /* NS_DEBUG_SPINLOCKS */
 
 
-/* Version definition *********************************************************/
-/*
-#include <linux/version.h>
-char kernel_version[] = UTS_RELEASE;
-*/
-
 /* Function declarations ******************************************************/
 
 static u32 ns_read_sram(ns_dev *card, u32 sram_address);
@@ -793,7 +787,7 @@ static int ns_init_card(int i, struct pci_dev *pcidev)
    u32d[0] = NS_RCTE_RAWCELLINTEN;
 #else
    u32d[0] = 0x00000000;
-#endif RCQ_SUPPORT
+#endif /* RCQ_SUPPORT */
    u32d[1] = 0x00000000;
    u32d[2] = 0x00000000;
    u32d[3] = 0xFFFFFFFF;

@@ -160,7 +160,7 @@ static int omninet_open (struct usb_serial_port *port, struct file *filp)
 
 		od = kmalloc( sizeof(struct omninet_data), GFP_KERNEL );
 		if( !od ) {
-			err(__FUNCTION__"- kmalloc(%d) failed.", sizeof(struct omninet_data));
+			err(__FUNCTION__"- kmalloc(%Zd) failed.", sizeof(struct omninet_data));
 			--port->open_count;
 			port->active = 0;
 			spin_unlock_irqrestore (&port->port_lock, flags);

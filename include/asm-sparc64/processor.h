@@ -1,4 +1,4 @@
-/* $Id: processor.h,v 1.68 2000/12/31 10:05:43 davem Exp $
+/* $Id: processor.h,v 1.69 2001/03/08 22:08:51 davem Exp $
  * include/asm-sparc64/processor.h
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -60,8 +60,7 @@ struct thread_struct {
 	/* D$ line 2, 3, 4 */
 	struct pt_regs *kregs;
 	unsigned long *utraps;
-	unsigned char gsr[7];
-	unsigned char __pad3;
+	unsigned long gsr[7];
 	unsigned long xfsr[7];
 
 	struct reg_window reg_window[NSWINS];
@@ -97,8 +96,8 @@ struct thread_struct {
    0,       0,       0,          0,			\
 /* fault_address, fpsaved, __pad2, kregs, */		\
    0,             { 0 },   0,      0,			\
-/* utraps, gsr,   __pad3, xfsr, */			\
-   0,	   { 0 }, 0,      { 0 },			\
+/* utraps, gsr,   xfsr, */				\
+   0,	   { 0 }, { 0 },				\
 /* reg_window */					\
    { { { 0, }, { 0, } }, }, 				\
 /* rwbuf_stkptrs */					\

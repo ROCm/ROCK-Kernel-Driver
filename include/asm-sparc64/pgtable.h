@@ -1,4 +1,4 @@
-/* $Id: pgtable.h,v 1.137 2001/03/02 03:12:01 davem Exp $
+/* $Id: pgtable.h,v 1.138 2001/03/08 09:55:56 davem Exp $
  * pgtable.h: SpitFire page table operations.
  *
  * Copyright 1996,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -26,6 +26,11 @@
  * hook is made available.
  */
 #define set_pte(pteptr, pteval) ((*(pteptr)) = (pteval))
+
+/* XXX All of this needs to be rethought so we can take advantage
+ * XXX cheetah's full 64-bit virtual address space, ie. no more hole
+ * XXX in the middle like on spitfire. -DaveM
+ */
 
 /* PMD_SHIFT determines the size of the area a second-level page table can map */
 #define PMD_SHIFT	(PAGE_SHIFT + (PAGE_SHIFT-3))
@@ -79,7 +84,7 @@
 #define _PAGE_SZ8K	0x0000000000000000	/* 8K Page                            */
 #define _PAGE_NFO	0x1000000000000000	/* No Fault Only                      */
 #define _PAGE_IE	0x0800000000000000	/* Invert Endianness                  */
-#define _PAGE_SN	0x0000800000000000	/* Snoop                              */
+#define _PAGE_SN	0x0000800000000000	/* (Cheetah) Snoop                    */
 #define _PAGE_PADDR_SF	0x000001FFFFFFE000	/* (Spitfire) Phys Address [40:13]    */
 #define _PAGE_PADDR	0x000007FFFFFFE000	/* (Cheetah) Phys Address [42:13]     */
 #define _PAGE_SOFT	0x0000000000001F80	/* Software bits                      */

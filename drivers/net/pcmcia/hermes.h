@@ -162,6 +162,7 @@
 #define		HERMES_RID_CNF_PM_ENABLE	((uint16_t)0xfc09)
 #define		HERMES_RID_CNF_PM_MCAST_RX	((uint16_t)0xfc0b)
 #define		HERMES_RID_CNF_PM_PERIOD	((uint16_t)0xfc0c)
+#define		HERMES_RID_CNF_PM_HOLDOVER	((uint16_t)0xfc0d)
 #define		HERMES_RID_CNF_NICKNAME		((uint16_t)0xfc0e)
 #define		HERMES_RID_CNF_WEP_ON		((uint16_t)0xfc20)
 #define		HERMES_RID_CNF_MWO_ROBUST	((uint16_t)0xfc25)
@@ -181,6 +182,10 @@
 #define		HERMES_RID_CNF_PRISM2_KEY1	((uint16_t)0xfc25)
 #define		HERMES_RID_CNF_PRISM2_KEY2	((uint16_t)0xfc26)
 #define		HERMES_RID_CNF_PRISM2_KEY3	((uint16_t)0xfc27)
+#define		HERMES_RID_CNF_SYMBOL_AUTH_TYPE		((uint16_t)0xfc2A)
+/* This one is read only */
+#define		HERMES_RID_CNF_SYMBOL_KEY_LENGTH	((uint16_t)0xfc2B)
+#define		HERMES_RID_CNF_SYMBOL_BASIC_RATES	((uint16_t)0xfc8A)
 
 /*
  * Information RIDs
@@ -323,6 +328,8 @@ static inline int hermes_disable_port(hermes_t *hw, int port)
 	(hermes_read_ltv((hw),(bap),(rid), sizeof(*buf), NULL, (buf)))
 #define HERMES_WRITE_RECORD(hw, bap, rid, buf) \
 	(hermes_write_ltv((hw),(bap),(rid),HERMES_BYTES_TO_RECLEN(sizeof(*buf)),(buf)))
+#define HERMES_WRITE_RECORD_LEN(hw, bap, rid, buf, len) \
+	(hermes_write_ltv((hw),(bap),(rid),HERMES_BYTES_TO_RECLEN(len),(buf)))
 
 static inline int hermes_read_wordrec(hermes_t *hw, int bap, uint16_t rid, uint16_t *word)
 {

@@ -1,4 +1,4 @@
-/* $Id: entry.S,v 1.120 2000/09/08 13:58:12 jj Exp $
+/* $Id: entry.S,v 1.127 2001/03/23 07:56:30 davem Exp $
  * arch/sparc64/kernel/entry.S:  Sparc64 trap low-level entry points.
  *
  * Copyright (C) 1995,1997 David S. Miller (davem@caip.rutgers.edu)
@@ -42,13 +42,29 @@ sparc64_vpte_patchme2:
 	/* This is trivial with the new code... */
 	.globl		do_fpdis
 do_fpdis:
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_fpsaved], %g5	! Load	Group
 	sethi		%hi(TSTATE_PEF), %g4					! IEU0
+	rdpr		%tstate, %g5
+	andcc		%g5, %g4, %g0
+	be,pt		%xcc, 1f
+	 nop
+	rd		%fprs, %g5
+	andcc		%g5, FPRS_FEF, %g0
+	be,pt		%xcc, 1f
+	 nop
+
+	/* Legal state when DCR_IFPOE is set in Cheetah %dcr. */
+	sethi		%hi(109f), %g7
+	ba,pt		%xcc, etrap
+109:	 or		%g7, %lo(109b), %g7
+	add		%g0, %g0, %g0
+	ba,a,pt		%xcc, rtrap_clr_l6
+
+1:	ldub		[%g6 + AOFF_task_thread + AOFF_thread_fpsaved], %g5	! Load	Group
 	wr		%g0, FPRS_FEF, %fprs					! LSU	Group+4bubbles
 	andcc		%g5, FPRS_FEF, %g0					! IEU1	Group
 	be,a,pt		%icc, 1f						! CTI
 	 clr		%g7							! IEU0
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_gsr], %g7		! Load	Group
+	ldx		[%g6 + AOFF_task_thread + AOFF_thread_gsr], %g7		! Load	Group
 1:	andcc		%g5, FPRS_DL, %g0					! IEU1
 	bne,pn		%icc, 2f						! CTI
 	 fzero		%f0							! FPA
@@ -92,10 +108,9 @@ do_fpdis:
 	ldxa		[%g3] ASI_DMMU, %g5
 	add		%g6, AOFF_task_fpregs + 0xc0, %g2
 	stxa		%g0, [%g3] ASI_DMMU
+	membar		#Sync
 	faddd		%f0, %f2, %f8
 	fmuld		%f0, %f2, %f10
-	flush		%g6
-	membar		#StoreLoad | #LoadLoad
 	ldda		[%g1] ASI_BLK_S, %f32	! grrr, where is ASI_BLK_NUCLEUS 8-(
 	ldda		[%g2] ASI_BLK_S, %f48
 	faddd		%f0, %f2, %f12
@@ -118,11 +133,10 @@ do_fpdis:
 	ldxa		[%g3] ASI_DMMU, %g5
 	add		%g6, AOFF_task_fpregs, %g1
 	stxa		%g0, [%g3] ASI_DMMU
+	membar		#Sync
 	add		%g6, AOFF_task_fpregs + 0x40, %g2
 	faddd		%f32, %f34, %f36
 	fmuld		%f32, %f34, %f38
-	flush		%g6
-	membar		#StoreLoad | #LoadLoad
 	ldda		[%g1] ASI_BLK_S, %f0	! grrr, where is ASI_BLK_NUCLEUS 8-(
 	ldda		[%g2] ASI_BLK_S, %f16
 	faddd		%f32, %f34, %f40
@@ -137,15 +151,14 @@ do_fpdis:
 	fmuld		%f32, %f34, %f58
 	faddd		%f32, %f34, %f60
 	fmuld		%f32, %f34, %f62
-	b,pt		%xcc, fpdis_exit
+	ba,pt		%xcc, fpdis_exit
 	 membar		#Sync
 3:	mov		SECONDARY_CONTEXT, %g3
 	add		%g6, AOFF_task_fpregs, %g1
 	ldxa		[%g3] ASI_DMMU, %g5
 	mov		0x40, %g2
 	stxa		%g0, [%g3] ASI_DMMU
-	flush		%g6
-	membar		#StoreLoad | #LoadLoad
+	membar		#Sync
 	ldda		[%g1] ASI_BLK_S, %f0		! grrr, where is ASI_BLK_NUCLEUS 8-(
 	ldda		[%g1 + %g2] ASI_BLK_S, %f16
 	add		%g1, 0x80, %g1
@@ -154,7 +167,7 @@ do_fpdis:
 	membar		#Sync
 fpdis_exit:
 	stxa		%g5, [%g3] ASI_DMMU
-	flush		%g6
+	membar		#Sync
 fpdis_exit2:
 	wr		%g7, 0, %gsr
 	ldx		[%g6 + AOFF_task_thread + AOFF_thread_xfsr], %fsr
@@ -164,22 +177,152 @@ fpdis_exit2:
 	wr		%g0, FPRS_FEF, %fprs	! clean DU/DL bits
 	retry
 
+	.align		32
+fp_other_bounce:
+	call		do_fpother
+	 add		%sp, STACK_BIAS + REGWIN_SZ, %o0
+	ba,pt		%xcc, rtrap
+	 clr		%l6
+
+	.globl		do_fpother_check_fitos
+	.align		32
+do_fpother_check_fitos:
+	sethi		%hi(fp_other_bounce - 4), %g7
+	or		%g7, %lo(fp_other_bounce - 4), %g7
+
+	/* NOTE: Need to preserve %g7 until we fully commit
+	 *       to the fitos fixup.
+	 */
+	stx		%fsr, [%g6 + AOFF_task_thread + AOFF_thread_xfsr]
+	rdpr		%tstate, %g3
+	andcc		%g3, TSTATE_PRIV, %g0
+	bne,pn		%xcc, do_fptrap_after_fsr
+	 nop
+	ldx		[%g6 + AOFF_task_thread + AOFF_thread_xfsr], %g3
+	srlx		%g3, 14, %g1
+	and		%g1, 7, %g1
+	cmp		%g1, 2			! Unfinished FP-OP
+	bne,pn		%xcc, do_fptrap_after_fsr
+	 sethi		%hi(1 << 23), %g1	! Inexact
+	andcc		%g3, %g1, %g0
+	bne,pn		%xcc, do_fptrap_after_fsr
+	 rdpr		%tpc, %g1
+	lduwa		[%g1] ASI_AIUP, %g3	! This cannot ever fail
+#define FITOS_MASK	0xc1f83fe0
+#define FITOS_COMPARE	0x81a01880
+	sethi		%hi(FITOS_MASK), %g1
+	or		%g1, %lo(FITOS_MASK), %g1
+	and		%g3, %g1, %g1
+	sethi		%hi(FITOS_COMPARE), %g2
+	or		%g2, %lo(FITOS_COMPARE), %g2
+	cmp		%g1, %g2
+	bne,pn		%xcc, do_fptrap_after_fsr
+	 nop
+	std		%f62, [%g6 + AOFF_task_fpregs + (62 * 4)]
+	sethi		%hi(fitos_table_1), %g1
+	and		%g3, 0x1f, %g2
+	or		%g1, %lo(fitos_table_1),  %g1
+	sllx		%g2, 2, %g2
+	jmpl		%g1 + %g2, %g0
+	 ba,pt		%xcc, fitos_emul_continue
+
+fitos_table_1:
+	fitod		%f0, %f62
+	fitod		%f1, %f62
+	fitod		%f2, %f62
+	fitod		%f3, %f62
+	fitod		%f4, %f62
+	fitod		%f5, %f62
+	fitod		%f6, %f62
+	fitod		%f7, %f62
+	fitod		%f8, %f62
+	fitod		%f9, %f62
+	fitod		%f10, %f62
+	fitod		%f11, %f62
+	fitod		%f12, %f62
+	fitod		%f13, %f62
+	fitod		%f14, %f62
+	fitod		%f15, %f62
+	fitod		%f16, %f62
+	fitod		%f17, %f62
+	fitod		%f18, %f62
+	fitod		%f19, %f62
+	fitod		%f20, %f62
+	fitod		%f21, %f62
+	fitod		%f22, %f62
+	fitod		%f23, %f62
+	fitod		%f24, %f62
+	fitod		%f25, %f62
+	fitod		%f26, %f62
+	fitod		%f27, %f62
+	fitod		%f28, %f62
+	fitod		%f29, %f62
+	fitod		%f30, %f62
+	fitod		%f31, %f62
+
+fitos_emul_continue:
+	sethi		%hi(fitos_table_2), %g1
+	srl		%g3, 25, %g2
+	or		%g1, %lo(fitos_table_2), %g1
+	and		%g2, 0x1f, %g2
+	sllx		%g2, 2, %g2
+	jmpl		%g1 + %g2, %g0
+	 ba,pt		%xcc, fitos_emul_fini
+
+fitos_table_2:
+	fdtos		%f62, %f0
+	fdtos		%f62, %f1
+	fdtos		%f62, %f2
+	fdtos		%f62, %f3
+	fdtos		%f62, %f4
+	fdtos		%f62, %f5
+	fdtos		%f62, %f6
+	fdtos		%f62, %f7
+	fdtos		%f62, %f8
+	fdtos		%f62, %f9
+	fdtos		%f62, %f10
+	fdtos		%f62, %f11
+	fdtos		%f62, %f12
+	fdtos		%f62, %f13
+	fdtos		%f62, %f14
+	fdtos		%f62, %f15
+	fdtos		%f62, %f16
+	fdtos		%f62, %f17
+	fdtos		%f62, %f18
+	fdtos		%f62, %f19
+	fdtos		%f62, %f20
+	fdtos		%f62, %f21
+	fdtos		%f62, %f22
+	fdtos		%f62, %f23
+	fdtos		%f62, %f24
+	fdtos		%f62, %f25
+	fdtos		%f62, %f26
+	fdtos		%f62, %f27
+	fdtos		%f62, %f28
+	fdtos		%f62, %f29
+	fdtos		%f62, %f30
+	fdtos		%f62, %f31
+
+fitos_emul_fini:
+	ldd		[%g6 + AOFF_task_fpregs + (62 * 4)], %f62
+	done
+
 	.globl		do_fptrap
 	.align		32
 do_fptrap:
-	ldub		[%g6 + AOFF_task_thread + AOFF_thread_fpsaved], %g3
 	stx		%fsr, [%g6 + AOFF_task_thread + AOFF_thread_xfsr]
+do_fptrap_after_fsr:
+	ldub		[%g6 + AOFF_task_thread + AOFF_thread_fpsaved], %g3
 	rd		%fprs, %g1
 	or		%g3, %g1, %g3
 	stb		%g3, [%g6 + AOFF_task_thread + AOFF_thread_fpsaved]
 	rd		%gsr, %g3
-	stb		%g3, [%g6 + AOFF_task_thread + AOFF_thread_gsr]
+	stx		%g3, [%g6 + AOFF_task_thread + AOFF_thread_gsr]
 	mov		SECONDARY_CONTEXT, %g3
 	add		%g6, AOFF_task_fpregs, %g2
 	ldxa		[%g3] ASI_DMMU, %g5
 	stxa		%g0, [%g3] ASI_DMMU
-	flush		%g6
-	membar		#StoreStore | #LoadStore
+	membar		#Sync
 	andcc		%g1, FPRS_DL, %g0
 	be,pn		%icc, 4f
 	 mov		0x40, %g3
@@ -193,7 +336,7 @@ do_fptrap:
 5:	mov		SECONDARY_CONTEXT, %g1
 	membar		#Sync
 	stxa		%g5, [%g1] ASI_DMMU
-	flush		%g6
+	membar		#Sync
 	ba,pt		%xcc, etrap
 	 wr		%g0, 0, %fprs
 
@@ -215,7 +358,7 @@ do_fptrap:
 	.globl		do_ivec
 do_ivec:
 	mov		0x40, %g3
-	ldxa		[%g3 + %g0] ASI_UDB_INTR_R, %g3
+	ldxa		[%g3 + %g0] ASI_INTR_R, %g3
 	sethi		%hi(KERNBASE), %g4
 	cmp		%g3, %g4
 	bgeu,pn		%xcc, do_ivec_xcall
@@ -242,10 +385,10 @@ do_ivec:
 do_ivec_xcall:
 	mov		0x50, %g1
 
-	ldxa		[%g1 + %g0] ASI_UDB_INTR_R, %g1
+	ldxa		[%g1 + %g0] ASI_INTR_R, %g1
 	srl		%g3, 0, %g3
 	mov		0x60, %g7
-	ldxa		[%g7 + %g0] ASI_UDB_INTR_R, %g7
+	ldxa		[%g7 + %g0] ASI_INTR_R, %g7
 	stxa		%g0, [%g0] ASI_INTR_RECEIVE
 	membar		#Sync
 	jmpl		%g3, %g0
@@ -1114,9 +1257,18 @@ do_gettimeofday:	/* %o0 = timevalp */
 	ldx	[%g3 + %lo(timer_tick_offset)], %g3
 	or	%g2, %lo(xtime), %g2
 	or	%g1, %lo(timer_tick_compare), %g1
-1:	ldda	[%g2] ASI_NUCLEUS_QUAD_LDD, %o4
-	rd	%tick, %o1
-	ldx	[%g1], %g7
+1:	rdpr	%ver, %o2
+	sethi	%hi(0x003e0014), %o1
+	srlx	%o2, 32, %o2
+	or	%o1, %lo(0x003e0014), %o1
+	ldda	[%g2] ASI_NUCLEUS_QUAD_LDD, %o4
+	cmp	%o2, %o1
+	bne,pt	%xcc, 2f
+	 nop
+	ba,pt	%xcc, 3f
+	 rd	%asr24, %o1
+2:	rd	%tick, %o1
+3:	ldx	[%g1], %g7
 	ldda	[%g2] ASI_NUCLEUS_QUAD_LDD, %o2
 	xor	%o4, %o2, %o2
 	xor	%o5, %o3, %o3

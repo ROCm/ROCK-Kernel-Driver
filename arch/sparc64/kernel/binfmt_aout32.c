@@ -318,7 +318,8 @@ beyond_if:
 		unsigned long pgd_cache;
 
 		pgd_cache = ((unsigned long)current->mm->pgd[0])<<11UL;
-		__asm__ __volatile__("stxa\t%0, [%1] %2"
+		__asm__ __volatile__("stxa\t%0, [%1] %2\n\t"
+				     "membar #Sync"
 				     : /* no outputs */
 				     : "r" (pgd_cache),
 				       "r" (TSB_REG), "i" (ASI_DMMU));

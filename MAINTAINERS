@@ -1142,7 +1142,7 @@ M:	ecd@skynet.be
 P:	Jakub Jelinek
 M:	jj@sunsite.ms.mff.cuni.cz
 P:	Anton Blanchard
-M:	anton@linuxcare.com
+M:	anton@samba.org
 L:	sparclinux@vger.kernel.org
 L:	ultralinux@vger.kernel.org
 W:	http://ultra.linux.cz
@@ -1452,6 +1452,11 @@ X.25 NETWORK LAYER
 P:	Henner Eisen
 M:	eis@baty.hanse.de
 L:	linux-x25@vger.kernel.org
+S:	Maintained
+
+X86 3-LEVEL PAGING (PAE) SUPPORT
+P:	Ingo Molnar
+M:	mingo@redhat.com
 S:	Maintained
 
 Z85230 SYNCHRONOUS DRIVER

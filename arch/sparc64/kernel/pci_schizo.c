@@ -1,4 +1,4 @@
-/* $Id: pci_schizo.c,v 1.8 2001/03/01 08:05:32 davem Exp $
+/* $Id: pci_schizo.c,v 1.13 2001/03/21 00:29:58 davem Exp $
  * pci_schizo.c: SCHIZO specific PCI controller support.
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -13,6 +13,7 @@
 #include <asm/pbm.h>
 #include <asm/iommu.h>
 #include <asm/irq.h>
+#include <asm/upa.h>
 
 #include "pci_impl.h"
 
@@ -282,17 +283,20 @@ static unsigned long schizo_iclr_offset(unsigned long ino)
  * EBUS devices and PCI controller internal error interrupts.
  */
 static unsigned char schizo_pil_table[] = {
-/*0x00*/0, 0, 0, 0,	/* PCI slot 0  Int A, B, C, D */
-/*0x04*/0, 0, 0, 0,	/* PCI slot 1  Int A, B, C, D */
-/*0x08*/0, 0, 0, 0,	/* PCI slot 2  Int A, B, C, D */
-/*0x0c*/0, 0, 0, 0,	/* PCI slot 3  Int A, B, C, D */
-/*0x10*/0, 0, 0, 0,	/* PCI slot 4  Int A, B, C, D */
-/*0x14*/0, 0, 0, 0,	/* PCI slot 5  Int A, B, C, D */
-/*0x18*/0, 0, 0, 0,	/* PCI slot 6  Int A, B, C, D */
+/*0x00*/0, 0, 0, 0,	/* PCI slot 0  Int A, B, C, D	*/
+/*0x04*/0, 0, 0, 0,	/* PCI slot 1  Int A, B, C, D	*/
+/*0x08*/0, 0, 0, 0,	/* PCI slot 2  Int A, B, C, D	*/
+/*0x0c*/0, 0, 0, 0,	/* PCI slot 3  Int A, B, C, D	*/
+/*0x10*/0, 0, 0, 0,	/* PCI slot 4  Int A, B, C, D	*/
+/*0x14*/0, 0, 0, 0,	/* PCI slot 5  Int A, B, C, D	*/
+/*0x18*/3,		/* SCSI				*/
+/*0x19*/3,		/* second SCSI			*/
+/*0x1a*/0,		/* UNKNOWN			*/
+/*0x1b*/0,		/* UNKNOWN			*/
 /*0x1c*/8,		/* Parallel			*/
-/*0x1d*/0,		/* UNKNOWN			*/
-/*0x1e*/0,		/* UNKNOWN			*/
-/*0x1f*/0,		/* UNKNOWN			*/
+/*0x1d*/5,		/* Ethernet			*/
+/*0x1e*/8,		/* Firewire-1394		*/
+/*0x1f*/9,		/* USB				*/
 /*0x20*/13,		/* Audio Record			*/
 /*0x21*/14,		/* Audio Playback		*/
 /*0x22*/12,		/* Serial			*/
@@ -385,7 +389,7 @@ static unsigned int __init schizo_irq_build(struct pci_pbm_info *pbm,
 	iclr = p->controller_regs + pbm_off + iclr_off;
 	iclr += 4;
 
-	if ((ino & 0x20) == 0)
+	if (ino < 0x18)
 		inofixup = ino & 0x03;
 
 	bucket = __bucket(build_irq(pil, inofixup, iclr, imap));
@@ -403,6 +407,15 @@ static spinlock_t stc_buf_lock = SPIN_LOCK_UNLOCKED;
 static unsigned long stc_error_buf[128];
 static unsigned long stc_tag_buf[16];
 static unsigned long stc_line_buf[16];
+
+static void schizo_clear_other_err_intr(int irq)
+{
+	struct ino_bucket *bucket = __bucket(irq);
+	unsigned long iclr = bucket->iclr;
+
+	iclr += (SCHIZO_PBM_B_REGS_OFF - SCHIZO_PBM_A_REGS_OFF);
+	upa_writel(ICLR_IDLE, iclr);
+}
 
 #define SCHIZO_STC_ERR	0xb800UL /* --> 0xba00 */
 #define SCHIZO_STC_TAG	0xba00UL /* --> 0xba80 */
@@ -743,6 +756,8 @@ static void schizo_ue_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	/* Interrogate IOMMU for error status. */
 	schizo_check_iommu_error(p, UE_ERR);
+
+	schizo_clear_other_err_intr(irq);
 }
 
 #define SCHIZO_CE_AFSR	0x10040UL
@@ -828,6 +843,8 @@ static void schizo_ce_intr(int irq, void *dev_id, struct pt_regs *regs)
 	if (!reported)
 		printk("(none)");
 	printk("]\n");
+
+	schizo_clear_other_err_intr(irq);
 }
 
 #define SCHIZO_PCI_AFSR	0x2010UL
@@ -969,6 +986,8 @@ static void schizo_pcierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (error_bits & (SCHIZO_PCIAFSR_PPERR | SCHIZO_PCIAFSR_SPERR))
 		pci_scan_for_parity_error(p, pbm, pbm->pci_bus);
+
+	schizo_clear_other_err_intr(irq);
 }
 
 #define SCHIZO_SAFARI_ERRLOG	0x10018UL
@@ -1009,12 +1028,16 @@ static void schizo_safarierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 	if (!(errlog & SAFARI_ERROR_UNMAP)) {
 		printk("SCHIZO%d: Unexpected Safari error interrupt, errlog[%016lx]\n",
 		       p->index, errlog);
+
+		schizo_clear_other_err_intr(irq);
 		return;
 	}
 
 	printk("SCHIZO%d: Safari interrupt, UNMAPPED error, interrogating IOMMUs.\n",
 	       p->index);
 	schizo_check_iommu_error(p, SAFARI_ERR);
+
+	schizo_clear_other_err_intr(irq);
 }
 
 /* Nearly identical to PSYCHO equivalents... */
@@ -1036,62 +1059,80 @@ static void schizo_safarierr_intr(int irq, void *dev_id, struct pt_regs *regs)
 
 #define SCHIZO_PCIA_CTRL	(SCHIZO_PBM_A_REGS_OFF + 0x2000UL)
 #define SCHIZO_PCIB_CTRL	(SCHIZO_PBM_B_REGS_OFF + 0x2000UL)
+#define SCHIZO_PCICTRL_BUNUS	(1UL << 63UL)
+#define SCHIZO_PCICTRL_ESLCK	(1UL << 51UL)
+#define SCHIZO_PCICTRL_TTO_ERR	(1UL << 38UL)
+#define SCHIZO_PCICTRL_RTRY_ERR	(1UL << 37UL)
+#define SCHIZO_PCICTRL_DTO_ERR	(1UL << 36UL)
 #define SCHIZO_PCICTRL_SBH_ERR	(1UL << 35UL)
 #define SCHIZO_PCICTRL_SERR	(1UL << 34UL)
 #define SCHIZO_PCICTRL_SBH_INT	(1UL << 18UL)
 #define SCHIZO_PCICTRL_EEN	(1UL << 17UL)
 
-/* XXX It is not entirely clear if I need to enable the PCI controller interrupts
- * XXX in both PBMs, the documentation is very vague about this point.  For now
- * XXX I'll just enable it on PBM A but this needs to be verified! -DaveM
- */
 static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 {
-	struct pci_pbm_info *pbm = &p->pbm_A; /* XXX verify me XXX */
+	struct pci_pbm_info *pbm_a = &p->pbm_A;
+	struct pci_pbm_info *pbm_b = &p->pbm_B;
 	unsigned long base = p->controller_regs;
 	unsigned int irq, portid = p->portid;
+	struct ino_bucket *bucket;
 	u64 tmp;
 
 	/* Build IRQs and register handlers. */
-	irq = schizo_irq_build(pbm, NULL, (portid << 6) | SCHIZO_UE_INO);
+	irq = schizo_irq_build(pbm_a, NULL, (portid << 6) | SCHIZO_UE_INO);
 	if (request_irq(irq, schizo_ue_intr,
 			SA_SHIRQ, "SCHIZO UE", p) < 0) {
 		prom_printf("SCHIZO%d: Cannot register UE interrupt.\n",
 			    p->index);
 		prom_halt();
 	}
+	bucket = __bucket(irq);
+	tmp = readl(bucket->imap);
+	upa_writel(tmp, (base + SCHIZO_PBM_B_REGS_OFF + schizo_imap_offset(SCHIZO_UE_INO) + 4));
 
-	irq = schizo_irq_build(pbm, NULL, (portid << 6) | SCHIZO_CE_INO);
+	irq = schizo_irq_build(pbm_a, NULL, (portid << 6) | SCHIZO_CE_INO);
 	if (request_irq(irq, schizo_ce_intr,
 			SA_SHIRQ, "SCHIZO CE", p) < 0) {
 		prom_printf("SCHIZO%d: Cannot register CE interrupt.\n",
 			    p->index);
 		prom_halt();
 	}
+	bucket = __bucket(irq);
+	tmp = upa_readl(bucket->imap);
+	upa_writel(tmp, (base + SCHIZO_PBM_B_REGS_OFF + schizo_imap_offset(SCHIZO_CE_INO) + 4));
 
-	irq = schizo_irq_build(pbm, NULL, (portid << 6) | SCHIZO_PCIERR_A_INO);
+	irq = schizo_irq_build(pbm_a, NULL, (portid << 6) | SCHIZO_PCIERR_A_INO);
 	if (request_irq(irq, schizo_pcierr_intr,
-			SA_SHIRQ, "SCHIZO PCIERR", &p->pbm_A) < 0) {
+			SA_SHIRQ, "SCHIZO PCIERR", pbm_a) < 0) {
 		prom_printf("SCHIZO%d(PBMA): Cannot register PciERR interrupt.\n",
 			    p->index);
 		prom_halt();
 	}
+	bucket = __bucket(irq);
+	tmp = upa_readl(bucket->imap);
+	upa_writel(tmp, (base + SCHIZO_PBM_B_REGS_OFF + schizo_imap_offset(SCHIZO_PCIERR_A_INO) + 4));
 
-	irq = schizo_irq_build(pbm, NULL, (portid << 6) | SCHIZO_PCIERR_B_INO);
+	irq = schizo_irq_build(pbm_a, NULL, (portid << 6) | SCHIZO_PCIERR_B_INO);
 	if (request_irq(irq, schizo_pcierr_intr,
-			SA_SHIRQ, "SCHIZO PCIERR", &p->pbm_B) < 0) {
+			SA_SHIRQ, "SCHIZO PCIERR", pbm_b) < 0) {
 		prom_printf("SCHIZO%d(PBMB): Cannot register PciERR interrupt.\n",
 			    p->index);
 		prom_halt();
 	}
+	bucket = __bucket(irq);
+	tmp = upa_readl(bucket->imap);
+	upa_writel(tmp, (base + SCHIZO_PBM_B_REGS_OFF + schizo_imap_offset(SCHIZO_PCIERR_B_INO) + 4));
 
-	irq = schizo_irq_build(pbm, NULL, (portid << 6) | SCHIZO_SERR_INO);
+	irq = schizo_irq_build(pbm_a, NULL, (portid << 6) | SCHIZO_SERR_INO);
 	if (request_irq(irq, schizo_safarierr_intr,
 			SA_SHIRQ, "SCHIZO SERR", p) < 0) {
 		prom_printf("SCHIZO%d(PBMB): Cannot register SafariERR interrupt.\n",
 			    p->index);
 		prom_halt();
 	}
+	bucket = __bucket(irq);
+	tmp = upa_readl(bucket->imap);
+	upa_writel(tmp, (base + SCHIZO_PBM_B_REGS_OFF + schizo_imap_offset(SCHIZO_SERR_INO) + 4));
 
 	/* Enable UE and CE interrupts for controller. */
 	schizo_write(base + SCHIZO_ECC_CTRL,
@@ -1101,23 +1142,45 @@ static void __init schizo_register_error_handlers(struct pci_controller_info *p)
 
 	/* Enable PCI Error interrupts and clear error
 	 * bits for each PBM.
-	 *
-	 * XXX More error bits should be cleared, this is
-	 * XXX just the stuff which is identical on Psycho. -DaveM
 	 */
 	tmp = schizo_read(base + SCHIZO_PCIA_CTRL);
-	tmp |= (SCHIZO_PCICTRL_SBH_ERR |
+	tmp |= (SCHIZO_PCICTRL_BUNUS |
+		SCHIZO_PCICTRL_ESLCK |
+		SCHIZO_PCICTRL_TTO_ERR |
+		SCHIZO_PCICTRL_RTRY_ERR |
+		SCHIZO_PCICTRL_DTO_ERR |
+		SCHIZO_PCICTRL_SBH_ERR |
 		SCHIZO_PCICTRL_SERR |
 		SCHIZO_PCICTRL_SBH_INT |
 		SCHIZO_PCICTRL_EEN);
 	schizo_write(base + SCHIZO_PCIA_CTRL, tmp);
 
 	tmp = schizo_read(base + SCHIZO_PCIB_CTRL);
-	tmp |= (SCHIZO_PCICTRL_SBH_ERR |
+	tmp |= (SCHIZO_PCICTRL_BUNUS |
+		SCHIZO_PCICTRL_ESLCK |
+		SCHIZO_PCICTRL_TTO_ERR |
+		SCHIZO_PCICTRL_RTRY_ERR |
+		SCHIZO_PCICTRL_DTO_ERR |
+		SCHIZO_PCICTRL_SBH_ERR |
 		SCHIZO_PCICTRL_SERR |
 		SCHIZO_PCICTRL_SBH_INT |
 		SCHIZO_PCICTRL_EEN);
 	schizo_write(base + SCHIZO_PCIB_CTRL, tmp);
+
+	schizo_write(base + SCHIZO_PBM_A_REGS_OFF + SCHIZO_PCI_AFSR,
+		     (SCHIZO_PCIAFSR_PMA | SCHIZO_PCIAFSR_PTA |
+		      SCHIZO_PCIAFSR_PRTRY | SCHIZO_PCIAFSR_PPERR |
+		      SCHIZO_PCIAFSR_PTTO | SCHIZO_PCIAFSR_PUNUS |
+		      SCHIZO_PCIAFSR_SMA | SCHIZO_PCIAFSR_STA |
+		      SCHIZO_PCIAFSR_SRTRY | SCHIZO_PCIAFSR_SPERR |
+		      SCHIZO_PCIAFSR_STTO | SCHIZO_PCIAFSR_SUNUS));
+	schizo_write(base + SCHIZO_PBM_B_REGS_OFF + SCHIZO_PCI_AFSR,
+		     (SCHIZO_PCIAFSR_PMA | SCHIZO_PCIAFSR_PTA |
+		      SCHIZO_PCIAFSR_PRTRY | SCHIZO_PCIAFSR_PPERR |
+		      SCHIZO_PCIAFSR_PTTO | SCHIZO_PCIAFSR_PUNUS |
+		      SCHIZO_PCIAFSR_SMA | SCHIZO_PCIAFSR_STA |
+		      SCHIZO_PCIAFSR_SRTRY | SCHIZO_PCIAFSR_SPERR |
+		      SCHIZO_PCIAFSR_STTO | SCHIZO_PCIAFSR_SUNUS));
 
 	/* Make all Safari error conditions fatal except unmapped errors
 	 * which we make generate interrupts.
@@ -1701,7 +1764,7 @@ void __init schizo_init(int node)
 	/* Three OBP regs:
 	 * 1) PBM controller regs
 	 * 2) Schizo front-end controller regs (same for both PBMs)
-	 * 3) Unknown... (0x7ffec000000 and 0x7ffee000000 on Excalibur)
+	 * 3) PBM PCI config space
 	 */
 	err = prom_getproperty(node, "reg",
 			       (char *)&pr_regs[0],

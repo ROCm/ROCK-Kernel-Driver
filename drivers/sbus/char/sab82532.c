@@ -1,4 +1,4 @@
-/* $Id: sab82532.c,v 1.55 2001/02/13 01:17:00 davem Exp $
+/* $Id: sab82532.c,v 1.56 2001/03/15 02:11:10 davem Exp $
  * sab82532.c: ASYNC Driver for the SIEMENS SAB82532 DUSCC.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -2084,6 +2084,23 @@ static int __init get_sab82532(unsigned long *memory_start)
 		for_each_ebusdev(edev, ebus) {
 			if (!strcmp(edev->prom_name, "se"))
 				goto ebus_done;
+
+			if (!strcmp(edev->prom_name, "serial")) {
+				char compat[32];
+				int clen;
+
+				/* On RIO this can be an SE, check it.  We could
+				 * just check ebus->is_rio, but this is more portable.
+				 */
+				clen = prom_getproperty(edev->prom_node, "compatible",
+							compat, sizeof(compat));
+				if (clen > 0) {
+					if (strncmp(compat, "sab82532", 8) == 0) {
+						/* Yep. */
+						goto ebus_done;
+					}
+				}
+			}
 		}
 	}
 ebus_done:
@@ -2134,7 +2151,7 @@ static void __init sab82532_kgdb_hook(int line)
 
 static inline void __init show_serial_version(void)
 {
-	char *revision = "$Revision: 1.55 $";
+	char *revision = "$Revision: 1.56 $";
 	char *version, *p;
 
 	version = strchr(revision, ' ');
@@ -2316,10 +2333,25 @@ int __init sab82532_probe(void)
 		 * For each EBus on this PCI...
 		 */
 		while (enode) {
-			snode = prom_getchild(enode);
-			snode = prom_searchsiblings(snode, "se");
+			int child;
+
+			child = prom_getchild(enode);
+			snode = prom_searchsiblings(child, "se");
 			if (snode)
 				goto found;
+
+			snode = prom_searchsiblings(child, "serial");
+			if (snode) {
+				char compat[32];
+				int clen;
+
+				clen = prom_getproperty(snode, "compatible",
+							compat, sizeof(compat));
+				if (clen > 0) {
+					if (strncmp(compat, "sab82532", 8) == 0)
+						goto found;
+				}
+			}
 
 			enode = prom_getsibling(enode);
 			enode = prom_searchsiblings(enode, "ebus");

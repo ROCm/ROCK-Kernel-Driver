@@ -24,10 +24,22 @@ struct ethtool_cmd {
 	u32	reserved[4];
 };
 
+/* these strings are set to whatever the driver author decides... */
+struct ethtool_drvinfo {
+	u32	cmd;
+	char	driver[32];	/* driver short name, "tulip", "eepro100" */
+	char	version[32];	/* driver version string */
+	char	fw_version[32];	/* firmware version string, if applicable */
+	char	bus_info[32];	/* Bus info for this interface.  For PCI
+				 * devices, use pci_dev->slot_name. */
+	char	reserved1[32];
+	char	reserved2[32];
+};
 
 /* CMDs currently supported */
-#define ETHTOOL_GSET		0x00000001 /* Get settings, non-privileged. */
+#define ETHTOOL_GSET		0x00000001 /* Get settings. */
 #define ETHTOOL_SSET		0x00000002 /* Set settings, privileged. */
+#define ETHTOOL_GDRVINFO	0x00000003 /* Get driver info. */
 
 /* compatibility with older code */
 #define SPARC_ETH_GSET		ETHTOOL_GSET

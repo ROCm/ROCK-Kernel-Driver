@@ -520,7 +520,7 @@ static struct net_device *tulip_probe1(struct pci_dev *pdev,
 	if (tulip_debug > 0  &&  did_version++ == 0)
 		printk(KERN_INFO "%s", version);
 
-	dev = init_etherdev(NULL, 0);
+	dev = alloc_etherdev(0);
 	if (!dev)
 		return NULL;
 
@@ -530,22 +530,10 @@ static struct net_device *tulip_probe1(struct pci_dev *pdev,
 	if (tulip_tbl[chip_idx].flags & HAS_ACPI)
 		pci_write_config_dword(pdev, 0x40, 0x00000000);
 
-	printk(KERN_INFO "%s: %s rev %d at %#3lx,",
-		   dev->name, tulip_tbl[chip_idx].chip_name, chip_rev, ioaddr);
-
 	/* Stop the chip's Tx and Rx processes. */
 	outl_CSR6(inl(ioaddr + CSR6) & ~0x2002, ioaddr, chip_idx);
 	/* Clear the missed-packet counter. */
 	(volatile int)inl(ioaddr + CSR8);
-
-	if (chip_idx == DC21041) {
-		if (inl(ioaddr + CSR9) & 0x8000) {
-			printk(" 21040 compatible mode,");
-			chip_idx = DC21040;
-		} else {
-			printk(" 21041 mode,");
-		}
-	}
 
 	/* The station address ROM is read byte serially.  The register must
 	   be polled, waiting for the value to be read bit serially from the
@@ -664,14 +652,10 @@ static struct net_device *tulip_probe1(struct pci_dev *pdev,
 #endif
 	}
 
-	for (i = 0; i < 6; i++)
-		printk("%c%2.2X", i ? ':' : ' ', last_phys_addr[i] = dev->dev_addr[i]);
-	printk(", IRQ %d.\n", irq);
 	last_irq = irq;
 
 	/* We do a request_region() only to register /proc/ioports info. */
-	/* Note that proper size is tulip_tbl[chip_idx].chip_name, but... */
-	request_region(ioaddr, tulip_tbl[chip_idx].io_size, dev->name);
+	request_region(ioaddr, tulip_tbl[chip_idx].io_size, "xircom_tulip_cb");
 
 	dev->base_addr = ioaddr;
 	dev->irq = irq;
@@ -695,17 +679,6 @@ static struct net_device *tulip_probe1(struct pci_dev *pdev,
 		tp->csr0 &= ~0x01000000;
 	else if (chip_idx == AX88140)
 		tp->csr0 |= 0x2000;
-
-#ifdef TULIP_FULL_DUPLEX
-	tp->full_duplex = 1;
-	tp->full_duplex_lock = 1;
-#endif
-#ifdef TULIP_DEFAULT_MEDIA
-	tp->default_port = TULIP_DEFAULT_MEDIA;
-#endif
-#ifdef TULIP_NO_MEDIA_SWITCH
-	tp->medialock = 1;
-#endif
 
 	/* The lower four bits are the media type. */
 	if (board_idx >= 0  &&  board_idx < MAX_UNITS) {
@@ -762,14 +735,14 @@ static struct net_device *tulip_probe1(struct pci_dev *pdev,
 				int reg4 = ((mii_status>>6) & tp->to_advertise) | 1;
 				tp->phys[phy_idx] = phy;
 				tp->advertising[phy_idx++] = reg4;
-				printk(KERN_INFO "%s:  MII transceiver #%d "
+				printk(KERN_INFO "xircom(%s):  MII transceiver #%d "
 					   "config %4.4x status %4.4x advertising %4.4x.\n",
-					   dev->name, phy, mii_reg0, mii_status, mii_advert);
+					   pdev->slot_name, phy, mii_reg0, mii_status, mii_advert);
 				/* Fixup for DLink with miswired PHY. */
 				if (mii_advert != reg4) {
-					printk(KERN_DEBUG "%s:  Advertising %4.4x on PHY %d,"
+					printk(KERN_DEBUG "xircom(%s):  Advertising %4.4x on PHY %d,"
 						   " previously advertising %4.4x.\n",
-						   dev->name, reg4, phy, mii_advert);
+						   pdev->slot_name, reg4, phy, mii_advert);
 					mdio_write(dev, phy, 4, reg4);
 				}
 				/* Enable autonegotiation: some boards default to off. */
@@ -780,8 +753,8 @@ static struct net_device *tulip_probe1(struct pci_dev *pdev,
 		}
 		tp->mii_cnt = phy_idx;
 		if (tp->mtable  &&  tp->mtable->has_mii  &&  phy_idx == 0) {
-			printk(KERN_INFO "%s: ***WARNING***: No MII transceiver found!\n",
-				   dev->name);
+			printk(KERN_INFO "xircom(%s): ***WARNING***: No MII transceiver found!\n",
+			       pdev->slot_name);
 			tp->phys[0] = 1;
 		}
 	}
@@ -802,36 +775,9 @@ static struct net_device *tulip_probe1(struct pci_dev *pdev,
 
 	/* Reset the xcvr interface and turn on heartbeat. */
 	switch (chip_idx) {
-	case DC21041:
-		outl(0x00000000, ioaddr + CSR13);
-		outl(0xFFFFFFFF, ioaddr + CSR14);
-		outl(0x00000008, ioaddr + CSR15); /* Listen on AUI also. */
-		outl_CSR6(inl(ioaddr + CSR6) | 0x0200, ioaddr, chip_idx);
-		outl(0x0000EF05, ioaddr + CSR13);
-		break;
-	case DC21040:
-		outl(0x00000000, ioaddr + CSR13);
-		outl(0x00000004, ioaddr + CSR13);
-		break;
 	case DC21140: default:
 		if (tp->mtable)
 			outl(tp->mtable->csr12dir | 0x100, ioaddr + CSR12);
-		break;
-	case DC21142:
-	case PNIC2:
-		if (tp->mii_cnt  ||  media_cap[dev->if_port] & MediaIsMII) {
-			outl_CSR6(0x82020000, ioaddr, chip_idx);
-			outl(0x0000, ioaddr + CSR13);
-			outl(0x0000, ioaddr + CSR14);
-			outl_CSR6(0x820E0000, ioaddr, chip_idx);
-		} else {
-			outl_CSR6(0x82420200, ioaddr, chip_idx);
-			outl(0x0001, ioaddr + CSR13);
-			outl(0x0003FFFF, ioaddr + CSR14);
-			outl(0x0008, ioaddr + CSR15);
-			outl(0x0001, ioaddr + CSR13);
-			outl(0x1301, ioaddr + CSR12); /* Start NWay. */
-		}
 		break;
 	case X3201_3:
 		outl(0x0008, ioaddr + CSR15);
@@ -845,28 +791,23 @@ static struct net_device *tulip_probe1(struct pci_dev *pdev,
 		udelay(5);
 		outl_CSR6(0x32000200, ioaddr, chip_idx);
 		break;
-	case LC82C168:
-		if ( ! tp->mii_cnt) {
-			outl_CSR6(0x00420000, ioaddr, chip_idx);
-			outl(0x30, ioaddr + CSR12);
-			outl(0x0001F078, ioaddr + 0xB8);
-			outl(0x0201F078, ioaddr + 0xB8); /* Turn on autonegotiation. */
-		}
-		break;
-	case MX98713: case COMPEX9881:
-		outl_CSR6(0x00000000, ioaddr, chip_idx);
-		outl(0x000711C0, ioaddr + CSR14); /* Turn on NWay. */
-		outl(0x00000001, ioaddr + CSR13);
-		break;
-	case MX98715: case MX98725:
-		outl_CSR6(0x01a80000, ioaddr, chip_idx);
-		outl(0xFFFFFFFF, ioaddr + CSR14);
-		outl(0x00001000, ioaddr + CSR12);
-		break;
-	case COMET:
-		/* No initialization necessary. */
-		break;
 	}
+
+	if (register_netdev(dev)) {
+		request_region(ioaddr, tulip_tbl[chip_idx].io_size, "xircom_tulip_cb");
+		if (tp->mtable)
+			kfree(tp->mtable);
+		kfree(dev->priv);
+		kfree(dev);
+		return NULL;
+	}
+
+	printk(KERN_INFO "%s: %s rev %d at %#3lx,",
+	       dev->name, tulip_tbl[chip_idx].chip_name, chip_rev, ioaddr);
+	for (i = 0; i < 6; i++)
+		printk("%c%2.2X", i ? ':' : ' ',
+		       last_phys_addr[i] = dev->dev_addr[i]);
+	printk(", IRQ %d.\n", irq);
 
 	return dev;
 }
@@ -1350,11 +1291,11 @@ tulip_up(struct net_device *dev)
 		}
 
 		/* Put the setup frame on the Tx list. */
-		tp->tx_ring[0].length = 0x08000000 | 192;
+		tp->tx_ring[tp->cur_tx].length = 0x08000000 | 192;
 		/* Lie about the address of our setup frame to make the */
 		/* chip happy */
-		tp->tx_ring[0].buffer1 = virt_to_bus(tp->setup_frame);
-		tp->tx_ring[0].status = DescOwned;
+		tp->tx_ring[tp->cur_tx].buffer1 = virt_to_bus(tp->setup_frame);
+		tp->tx_ring[tp->cur_tx].status = DescOwned;
 
 		tp->cur_tx++;
 	}
@@ -2391,7 +2332,7 @@ static void tulip_init_ring(struct net_device *dev)
 #ifdef CARDBUS
 		if (tp->chip_id == X3201_3)
 			tp->tx_aligned_skbuff[i] = dev_alloc_skb(PKT_BUF_SZ);
-#endif CARDBUS
+#endif /* CARDBUS */
 	}
 	tp->tx_ring[i-1].buffer2 = virt_to_bus(&tp->tx_ring[0]);
 }

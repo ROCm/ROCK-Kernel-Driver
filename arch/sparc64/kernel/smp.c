@@ -65,7 +65,7 @@ int smp_info(char *buf)
 	
 	strcpy(buf, "State:\n");
 	for (i = 0; i < NR_CPUS; i++)
-		if(cpu_present_map & (1UL << i))
+		if (cpu_present_map & (1UL << i))
 			len += sprintf(buf + len,
 					"CPU%d:\t\tonline\n", i);
 	return len;
@@ -76,7 +76,7 @@ int smp_bogo(char *buf)
 	int len = 0, i;
 	
 	for (i = 0; i < NR_CPUS; i++)
-		if(cpu_present_map & (1UL << i))
+		if (cpu_present_map & (1UL << i))
 			len += sprintf(buf + len,
 				       "Cpu%dBogo\t: %lu.%02lu\n",
 				       i, cpu_data[i].udelay_val / (500000/HZ),
@@ -99,7 +99,7 @@ void __init smp_store_cpu_info(int id)
 	cpu_data[id].pgd_cache			= NULL;
 	cpu_data[id].idle_volume		= 1;
 
-	for(i = 0; i < 16; i++)
+	for (i = 0; i < 16; i++)
 		cpu_data[id].irq_worklists[i] = 0;
 }
 
@@ -153,6 +153,19 @@ void __init smp_callin(void)
 	: /* no inputs */
 	: "g1", "g2");
 
+	if (SPARC64_USE_STICK) {
+		/* Let the user get at STICK too. */
+		__asm__ __volatile__("
+			sethi	%%hi(0x80000000), %%g1
+			sllx	%%g1, 32, %%g1
+			rd	%%asr24, %%g2
+			andn	%%g2, %%g1, %%g2
+			wr	%%g2, 0, %%asr24"
+		: /* no outputs */
+		: /* no inputs */
+		: "g1", "g2");
+	}
+
 	/* Restore PSTATE_IE. */
 	__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
 			     : /* no outputs */
@@ -177,7 +190,7 @@ void __init smp_callin(void)
 	atomic_inc(&init_mm.mm_count);
 	current->active_mm = &init_mm;
 
-	while(!smp_processors_ready)
+	while (!smp_processors_ready)
 		membar("#LoadLoad");
 }
 
@@ -222,14 +235,14 @@ void __init smp_boot_cpus(void)
 	smp_tune_scheduling();
 	init_idle();
 
-	if(linux_num_cpus == 1)
+	if (linux_num_cpus == 1)
 		return;
 
-	for(i = 0; i < NR_CPUS; i++) {
-		if(i == boot_cpu_id)
+	for (i = 0; i < NR_CPUS; i++) {
+		if (i == boot_cpu_id)
 			continue;
 
-		if(cpu_present_map & (1UL << i)) {
+		if (cpu_present_map & (1UL << i)) {
 			unsigned long entry = (unsigned long)(&sparc64_cpu_startup);
 			unsigned long cookie = (unsigned long)(&cpu_new_task);
 			struct task_struct *p;
@@ -256,12 +269,12 @@ void __init smp_boot_cpus(void)
 			cpu_new_task = p;
 			prom_startcpu(linux_cpus[no].prom_node,
 				      entry, cookie);
-			for(timeout = 0; timeout < 5000000; timeout++) {
-				if(callin_flag)
+			for (timeout = 0; timeout < 5000000; timeout++) {
+				if (callin_flag)
 					break;
 				udelay(100);
 			}
-			if(callin_flag) {
+			if (callin_flag) {
 				__cpu_number_map[i] = cpucount;
 				__cpu_logical_map[cpucount] = i;
 				prom_cpu_nodes[i] = linux_cpus[no].prom_node;
@@ -272,20 +285,20 @@ void __init smp_boot_cpus(void)
 				prom_printf("FAILED\n");
 			}
 		}
-		if(!callin_flag) {
+		if (!callin_flag) {
 			cpu_present_map &= ~(1UL << i);
 			__cpu_number_map[i] = -1;
 		}
 	}
 	cpu_new_task = NULL;
-	if(cpucount == 0) {
+	if (cpucount == 0) {
 		printk("Error: only one processor found.\n");
 		cpu_present_map = (1UL << smp_processor_id());
 	} else {
 		unsigned long bogosum = 0;
 
-		for(i = 0; i < NR_CPUS; i++) {
-			if(cpu_present_map & (1UL << i))
+		for (i = 0; i < NR_CPUS; i++) {
+			if (cpu_present_map & (1UL << i))
 				bogosum += cpu_data[i].udelay_val;
 		}
 		printk("Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
@@ -299,9 +312,7 @@ void __init smp_boot_cpus(void)
 	membar("#StoreStore | #StoreLoad");
 }
 
-/* #define XCALL_DEBUG */
-
-static inline void xcall_deliver(u64 data0, u64 data1, u64 data2, u64 pstate, unsigned long cpu)
+static void spitfire_xcall_helper(u64 data0, u64 data1, u64 data2, u64 pstate, unsigned long cpu)
 {
 	u64 result, target;
 	int stuck, tmp;
@@ -314,10 +325,6 @@ static inline void xcall_deliver(u64 data0, u64 data1, u64 data2, u64 pstate, un
 	}
 
 	target = (cpu << 14) | 0x70;
-#ifdef XCALL_DEBUG
-	printk("CPU[%d]: xcall(data[%016lx:%016lx:%016lx],tgt[%016lx])\n",
-	       smp_processor_id(), data0, data1, data2, target);
-#endif
 again:
 	/* Ok, this is the real Spitfire Errata #54.
 	 * One must read back from a UDB internal register
@@ -340,7 +347,7 @@ again:
 	ldxa	[%%g1] 0x7f, %%g0
 	membar	#Sync"
 	: "=r" (tmp)
-	: "r" (pstate), "i" (PSTATE_IE), "i" (ASI_UDB_INTR_W),
+	: "r" (pstate), "i" (PSTATE_IE), "i" (ASI_INTR_W),
 	  "r" (data0), "r" (data1), "r" (data2), "r" (target), "r" (0x10), "0" (tmp)
        : "g1");
 
@@ -350,46 +357,155 @@ again:
 		__asm__ __volatile__("ldxa [%%g0] %1, %0"
 			: "=r" (result)
 			: "i" (ASI_INTR_DISPATCH_STAT));
-		if(result == 0) {
+		if (result == 0) {
 			__asm__ __volatile__("wrpr %0, 0x0, %%pstate"
 					     : : "r" (pstate));
 			return;
 		}
 		stuck -= 1;
-		if(stuck == 0)
+		if (stuck == 0)
 			break;
-	} while(result & 0x1);
+	} while (result & 0x1);
 	__asm__ __volatile__("wrpr %0, 0x0, %%pstate"
 			     : : "r" (pstate));
-	if(stuck == 0) {
-#ifdef XCALL_DEBUG
+	if (stuck == 0) {
 		printk("CPU[%d]: mondo stuckage result[%016lx]\n",
 		       smp_processor_id(), result);
-#endif
 	} else {
-#ifdef XCALL_DEBUG
-		printk("CPU[%d]: Penguin %d NACK's master.\n", smp_processor_id(), cpu);
-#endif
 		udelay(2);
 		goto again;
 	}
 }
 
-void smp_cross_call(unsigned long *func, u32 ctx, u64 data1, u64 data2)
+static __inline__ void spitfire_xcall_deliver(u64 data0, u64 data1, u64 data2, unsigned long mask)
 {
-	if(smp_processors_ready) {
-		unsigned long mask = (cpu_present_map & ~(1UL<<smp_processor_id()));
-		u64 pstate, data0 = (((u64)ctx)<<32 | (((u64)func) & 0xffffffff));
+	int ncpus = smp_num_cpus - 1;
+	int i;
+	u64 pstate;
+
+	__asm__ __volatile__("rdpr %%pstate, %0" : "=r" (pstate));
+	for (i = 0; (i < NR_CPUS) && ncpus; i++) {
+		if (mask & (1UL << i)) {
+			spitfire_xcall_helper(data0, data1, data2, pstate, i);
+			ncpus--;
+		}
+	}
+}
+
+/* Cheetah now allows to send the whole 64-bytes of data in the interrupt
+ * packet, but we have no use for that.  However we do take advantage of
+ * the new pipelining feature (ie. dispatch to multiple cpus simultaneously).
+ */
+#if NR_CPUS > 32
+#error Fixup cheetah_xcall_deliver Dave...
+#endif
+static void cheetah_xcall_deliver(u64 data0, u64 data1, u64 data2, unsigned long mask)
+{
+	u64 pstate;
+	int nack_busy_id;
+
+	if (!mask)
+		return;
+
+	__asm__ __volatile__("rdpr %%pstate, %0" : "=r" (pstate));
+
+retry:
+	__asm__ __volatile__("wrpr %0, %1, %%pstate\n\t"
+			     : : "r" (pstate), "i" (PSTATE_IE));
+
+	/* Setup the dispatch data registers. */
+	__asm__ __volatile__("stxa	%0, [%3] %6\n\t"
+			     "membar	#Sync\n\t"
+			     "stxa	%1, [%4] %6\n\t"
+			     "membar	#Sync\n\t"
+			     "stxa	%2, [%5] %6\n\t"
+			     "membar	#Sync\n\t"
+			     : /* no outputs */
+			     : "r" (data0), "r" (data1), "r" (data2),
+			       "r" (0x40), "r" (0x50), "r" (0x60),
+			       "i" (ASI_INTR_W));
+
+	nack_busy_id = 0;
+	{
 		int i, ncpus = smp_num_cpus - 1;
 
-		__asm__ __volatile__("rdpr %%pstate, %0" : "=r" (pstate));
-		for(i = 0; i < NR_CPUS; i++) {
-			if(mask & (1UL << i)) {
-				xcall_deliver(data0, data1, data2, pstate, i);
+		for (i = 0; (i < NR_CPUS) && ncpus; i++) {
+			if (mask & (1UL << i)) {
+				u64 target = (i << 14) | 0x70;
+
+				target |= (nack_busy_id++ << 24);
+				__asm__ __volatile__("stxa	%%g0, [%0] %1\n\t"
+						     "membar	#Sync\n\t"
+						     : /* no outputs */
+						     : "r" (target), "i" (ASI_INTR_W));
 				ncpus--;
 			}
-			if (!ncpus) break;
 		}
+	}
+
+	/* Now, poll for completion. */
+	{
+		u64 dispatch_stat;
+		long stuck;
+
+		stuck = 100000 * nack_busy_id;
+		do {
+			__asm__ __volatile__("ldxa	[%%g0] %1, %0"
+					     : "=r" (dispatch_stat)
+					     : "i" (ASI_INTR_DISPATCH_STAT));
+			if (dispatch_stat == 0UL) {
+				__asm__ __volatile__("wrpr %0, 0x0, %%pstate"
+						     : : "r" (pstate));
+				return;
+			}
+			if (!--stuck)
+				break;
+		} while (dispatch_stat & 0x5555555555555555UL);
+
+		__asm__ __volatile__("wrpr %0, 0x0, %%pstate"
+				     : : "r" (pstate));
+
+		if ((stuck & ~(0x5555555555555555UL)) == 0) {
+			/* Busy bits will not clear, continue instead
+			 * of freezing up on this cpu.
+			 */
+			printk("CPU[%d]: mondo stuckage result[%016lx]\n",
+			       smp_processor_id(), dispatch_stat);
+		} else {
+			int i, this_busy_nack = 0;
+
+			/* Delay some random time with interrupts enabled
+			 * to prevent deadlock.
+			 */
+			udelay(2 * nack_busy_id);
+
+			/* Clear out the mask bits for cpus which did not
+			 * NACK us.
+			 */
+			for (i = 0; i < NR_CPUS; i++) {
+				if (mask & (1UL << i)) {
+					if ((dispatch_stat & (0x2 << this_busy_nack)) == 0)
+						mask &= ~(1UL << i);
+					this_busy_nack += 2;
+				}
+			}
+
+			goto retry;
+		}
+	}
+}
+
+void smp_cross_call(unsigned long *func, u32 ctx, u64 data1, u64 data2)
+{
+	if (smp_processors_ready) {
+		unsigned long mask = (cpu_present_map & ~(1UL<<smp_processor_id()));
+		u64 data0 = (((u64)ctx)<<32 | (((u64)func) & 0xffffffff));
+
+		if (tlb_type == spitfire)
+			spitfire_xcall_deliver(data0, data1, data2, mask);
+		else
+			cheetah_xcall_deliver(data0, data1, data2, mask);
+
 		/* NOTE: Caller runs local copy on master. */
 	}
 }
@@ -445,11 +561,17 @@ extern unsigned long xcall_receive_signal;
 
 void smp_receive_signal(int cpu)
 {
-	if(smp_processors_ready &&
-	   (cpu_present_map & (1UL<<cpu)) != 0) {
-		u64 pstate, data0 = (((u64)&xcall_receive_signal) & 0xffffffff);
-		__asm__ __volatile__("rdpr %%pstate, %0" : "=r" (pstate));
-		xcall_deliver(data0, 0, 0, pstate, cpu);
+	if (smp_processors_ready) {
+		unsigned long mask = 1UL << cpu;
+
+		if ((cpu_present_map & mask) != 0) {
+			u64 data0 = (((u64)&xcall_receive_signal) & 0xffffffff);
+
+			if (tlb_type == spitfire)
+				spitfire_xcall_deliver(data0, 0, 0, mask);
+			else
+				cheetah_xcall_deliver(data0, 0, 0, mask);
+		}
 	}
 }
 
@@ -609,7 +731,7 @@ void smp_capture(void)
 		int result = __atomic_add(1, &smp_capture_depth);
 
 		membar("#StoreStore | #LoadStore");
-		if(result == 1) {
+		if (result == 1) {
 			int ncpus = smp_num_cpus;
 
 #ifdef CAPTURE_DEBUG
@@ -620,7 +742,7 @@ void smp_capture(void)
 			membar("#StoreStore | #LoadStore");
 			atomic_inc(&smp_capture_registry);
 			smp_cross_call(&xcall_capture, 0, 0, 0);
-			while(atomic_read(&smp_capture_registry) != ncpus)
+			while (atomic_read(&smp_capture_registry) != ncpus)
 				membar("#LoadLoad");
 #ifdef CAPTURE_DEBUG
 			printk("done\n");
@@ -631,8 +753,8 @@ void smp_capture(void)
 
 void smp_release(void)
 {
-	if(smp_processors_ready) {
-		if(atomic_dec_and_test(&smp_capture_depth)) {
+	if (smp_processors_ready) {
+		if (atomic_dec_and_test(&smp_capture_depth)) {
 #ifdef CAPTURE_DEBUG
 			printk("CPU[%d]: Giving pardon to imprisoned penguins\n",
 			       smp_processor_id());
@@ -659,7 +781,7 @@ void smp_penguin_jailcell(void)
 	prom_world(1);
 	atomic_inc(&smp_capture_registry);
 	membar("#StoreLoad | #StoreStore");
-	while(penguins_are_doing_time)
+	while (penguins_are_doing_time)
 		membar("#LoadLoad");
 	restore_alternate_globals(global_save);
 	atomic_dec(&smp_capture_registry);
@@ -690,14 +812,23 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 	/*
 	 * Check for level 14 softint.
 	 */
-	if (!(get_softint() & (1UL << 0))) {
-		extern void handler_irq(int, struct pt_regs *);
+	{
+		unsigned long tick_mask;
 
-		handler_irq(14, regs);
-		return;
+		if (SPARC64_USE_STICK)
+			tick_mask = (1UL << 16);
+		else
+			tick_mask = (1UL << 0);
+
+		if (!(get_softint() & tick_mask)) {
+			extern void handler_irq(int, struct pt_regs *);
+
+			handler_irq(14, regs);
+			return;
+		}
+		clear_softint(tick_mask);
 	}
 
-	clear_softint((1UL << 0));
 	do {
 		if (!user)
 			sparc64_do_profile(regs->tpc, regs->u_regs[UREG_RETPC]);
@@ -740,6 +871,7 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 		 * that %tick is not prone to this bug, but I am not
 		 * taking any chances.
 		 */
+		if (!SPARC64_USE_STICK) {
 		__asm__ __volatile__("rd	%%tick_cmpr, %0\n\t"
 				     "ba,pt	%%xcc, 1f\n\t"
 				     " add	%0, %2, %0\n\t"
@@ -750,6 +882,14 @@ void smp_percpu_timer_interrupt(struct pt_regs *regs)
 				     "mov	%1, %1"
 				     : "=&r" (compare), "=r" (tick)
 				     : "r" (current_tick_offset));
+		} else {
+		__asm__ __volatile__("rd	%%asr25, %0\n\t"
+				     "add	%0, %2, %0\n\t"
+				     "wr	%0, 0x0, %%asr25\n\t"
+				     "rd	%%asr24, %1\n\t"
+				     : "=&r" (compare), "=r" (tick)
+				     : "r" (current_tick_offset));
+		}
 
 		/* Restore PSTATE_IE. */
 		__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
@@ -782,6 +922,7 @@ static void __init smp_setup_percpu_timer(void)
 	 * at the start of an I-cache line, and perform a dummy
 	 * read back from %tick_cmpr right after writing to it. -DaveM
 	 */
+	if (!SPARC64_USE_STICK) {
 	__asm__ __volatile__("
 		rd	%%tick, %%g1
 		ba,pt	%%xcc, 1f
@@ -792,6 +933,15 @@ static void __init smp_setup_percpu_timer(void)
 	: /* no outputs */
 	: "r" (current_tick_offset)
 	: "g1");
+	} else {
+	__asm__ __volatile__("
+		rd	%%asr24, %%g1
+		add	%%g1, %0, %%g1
+		wr	%%g1, 0x0, %%asr25"
+	: /* no outputs */
+	: "r" (current_tick_offset)
+	: "g1");
+	}
 
 	/* Restore PSTATE_IE. */
 	__asm__ __volatile__("wrpr	%0, 0x0, %%pstate"
@@ -806,9 +956,9 @@ void __init smp_tick_init(void)
 	boot_cpu_id = hard_smp_processor_id();
 	current_tick_offset = timer_tick_offset;
 	cpu_present_map = 0;
-	for(i = 0; i < linux_num_cpus; i++)
+	for (i = 0; i < linux_num_cpus; i++)
 		cpu_present_map |= (1UL << linux_cpus[i].mid);
-	for(i = 0; i < NR_CPUS; i++) {
+	for (i = 0; i < NR_CPUS; i++) {
 		__cpu_number_map[i] = -1;
 		__cpu_logical_map[i] = -1;
 	}
@@ -827,11 +977,11 @@ static inline unsigned long find_flush_base(unsigned long size)
 	size = PAGE_ALIGN(size);
 	found = size;
 	base = (unsigned long) page_address(p);
-	while(found != 0) {
+	while (found != 0) {
 		/* Failure. */
-		if(p >= (mem_map + max_mapnr))
+		if (p >= (mem_map + max_mapnr))
 			return 0UL;
-		if(PageReserved(p)) {
+		if (PageReserved(p)) {
 			found = size;
 			base = (unsigned long) page_address(p);
 		} else {
@@ -924,12 +1074,12 @@ int setup_profiling_timer(unsigned int multiplier)
 	unsigned long flags;
 	int i;
 
-	if((!multiplier) || (timer_tick_offset / multiplier) < 1000)
+	if ((!multiplier) || (timer_tick_offset / multiplier) < 1000)
 		return -EINVAL;
 
 	save_and_cli(flags);
-	for(i = 0; i < NR_CPUS; i++) {
-		if(cpu_present_map & (1UL << i))
+	for (i = 0; i < NR_CPUS; i++) {
+		if (cpu_present_map & (1UL << i))
 			prof_multiplier(i) = multiplier;
 	}
 	current_tick_offset = (timer_tick_offset / multiplier);

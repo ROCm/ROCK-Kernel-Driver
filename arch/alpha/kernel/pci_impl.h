@@ -68,6 +68,7 @@ struct pci_iommu_arena;
 /* ??? Experimenting with no HAE for CIA.  */
 #define CIA_DEFAULT_MEM_BASE ((32+2)*1024*1024)
 
+#define IRONGATE_DEFAULT_MEM_BASE ((256*8-16)*1024*1024)
 
 /* 
  * A small note about bridges and interrupts.  The DECchip 21050 (and

@@ -1,11 +1,17 @@
 /*
- * $Id: b1isa.c,v 1.10.6.2 2001/02/16 16:43:23 kai Exp $
+ * $Id: b1isa.c,v 1.10.6.4 2001/03/21 08:52:21 kai Exp $
  * 
  * Module for AVM B1 ISA-card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: b1isa.c,v $
+ * Revision 1.10.6.4  2001/03/21 08:52:21  kai
+ * merge from main branch: fix buffer for revision string (calle)
+ *
+ * Revision 1.10.6.3  2001/03/15 15:11:23  kai
+ * *** empty log message ***
+ *
  * Revision 1.10.6.2  2001/02/16 16:43:23  kai
  * Changes from -ac16, little bug fixes, typos and the like
  *
@@ -89,7 +95,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.10.6.2 $";
+static char *revision = "$Revision: 1.10.6.4 $";
 
 /* ------------------------------------------------------------- */
 
@@ -284,11 +290,12 @@ static int __init b1isa_init(void)
 
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':'))) {
-		strncpy(driver->revision, p + 1, sizeof(driver->revision));
-		p = strchr(driver->revision, '$');
-		*p = 0;
-	} 
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strncpy(driver->revision, p + 2, sizeof(driver->revision));
+		driver->revision[sizeof(driver->revision)-1] = 0;
+		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
+			*(p-1) = 0;
+	}
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 

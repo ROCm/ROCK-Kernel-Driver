@@ -1,4 +1,4 @@
-/* $Id: unaligned.c,v 1.20 2000/04/29 08:05:21 anton Exp $
+/* $Id: unaligned.c,v 1.21 2001/03/21 11:46:20 davem Exp $
  * unaligned.c: Unaligned load/store trap handling with special
  *              cases for the kernel to do them more quickly.
  *
@@ -334,6 +334,10 @@ static inline void advance(struct pt_regs *regs)
 {
 	regs->tpc   = regs->tnpc;
 	regs->tnpc += 4;
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 }
 
 static inline int floating_point_load_or_store_p(unsigned int insn)

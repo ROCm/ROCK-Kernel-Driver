@@ -1,4 +1,4 @@
-/*  $Id: signal.c,v 1.55 2001/01/24 21:05:13 davem Exp $
+/*  $Id: signal.c,v 1.56 2001/03/21 11:46:20 davem Exp $
  *  arch/sparc64/kernel/signal.c
  *
  *  Copyright (C) 1991, 1992  Linus Torvalds
@@ -108,6 +108,10 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 		recalc_sigpending(current);
 		spin_unlock_irq(&current->sigmask_lock);
 	}
+	if ((tp->flags & SPARC_FLAG_32BIT) != 0) {
+		pc &= 0xffffffff;
+		npc &= 0xffffffff;
+	}
 	regs->tpc = pc;
 	regs->tnpc = npc;
 	err |= __get_user(regs->y, &((*grp)[MC_Y]));
@@ -190,9 +194,13 @@ asmlinkage void sparc64_get_context(struct pt_regs *regs)
 	grp = &mcp->mc_gregs;
 
 	/* Skip over the trap instruction, first. */
-	regs->tpc   = regs->tnpc;
-	regs->tnpc += 4;
-
+	if ((tp->flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc   = (regs->tnpc & 0xffffffff);
+		regs->tnpc  = (regs->tnpc + 4) & 0xffffffff;
+	} else {
+		regs->tpc   = regs->tnpc;
+		regs->tnpc += 4;
+	}
 	err = 0;
 	if (_NSIG_WORDS == 1)
 		err |= __put_user(current->blocked.sig[0],
@@ -289,8 +297,13 @@ asmlinkage void _sigpause_common(old_sigset_t set, struct pt_regs *regs)
 	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 	
-	regs->tpc = regs->tnpc;
-	regs->tnpc += 4;
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc = (regs->tnpc & 0xffffffff);
+		regs->tnpc = (regs->tnpc + 4) & 0xffffffff;
+	} else {
+		regs->tpc = regs->tnpc;
+		regs->tnpc += 4;
+	}
 
 	/* Condition codes and return value where set here for sigpause,
 	 * and so got used by setup_frame, which again causes sigreturn()
@@ -344,8 +357,13 @@ asmlinkage void do_rt_sigsuspend(sigset_t *uset, size_t sigsetsize, struct pt_re
 	recalc_sigpending(current);
 	spin_unlock_irq(&current->sigmask_lock);
 	
-	regs->tpc = regs->tnpc;
-	regs->tnpc += 4;
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc = (regs->tnpc & 0xffffffff);
+		regs->tnpc = (regs->tnpc + 4) & 0xffffffff;
+	} else {
+		regs->tpc = regs->tnpc;
+		regs->tnpc += 4;
+	}
 
 	/* Condition codes and return value where set here for sigpause,
 	 * and so got used by setup_frame, which again causes sigreturn()
@@ -407,6 +425,10 @@ void do_rt_sigreturn(struct pt_regs *regs)
 
 	err = get_user(tpc, &sf->regs.tpc);
 	err |= __get_user(tnpc, &sf->regs.tnpc);
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		tpc &= 0xffffffff;
+		tnpc &= 0xffffffff;
+	}
 	err |= ((tpc | tnpc) & 3);
 
 	/* 2. Restore the state */
@@ -555,7 +577,10 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	/* 5. signal handler */
 	regs->tpc = (unsigned long) ka->sa.sa_handler;
 	regs->tnpc = (regs->tpc + 4);
-
+	if ((current->thread.flags & SPARC_FLAG_32BIT) != 0) {
+		regs->tpc &= 0xffffffff;
+		regs->tnpc &= 0xffffffff;
+	}
 	/* 4. return to kernel instructions */
 	regs->u_regs[UREG_I7] = (unsigned long)ka->ka_restorer;
 	return;

@@ -18,6 +18,10 @@ obj-$(CONFIG_SBUSCHAR) += char/sunchar.o
 
 subdir-y += audio
 subdir-m += audio
-obj-$(CONFIG_SPARCAUDIO) += audio/sparcaudio.o
+
+# This is grotty but works around some problems with modules.
+ifeq ($(CONFIG_SPARCAUDIO),y)
+obj-y += audio/sparcaudio.o
+endif
 
 include $(TOPDIR)/Rules.make

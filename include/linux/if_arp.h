@@ -50,9 +50,11 @@
 #define ARPHRD_X25	271		/* CCITT X.25			*/
 #define ARPHRD_HWX25	272		/* Boards with X.25 in firmware	*/
 #define ARPHRD_PPP	512
-#define ARPHRD_HDLC	513		/* (Cisco) HDLC 		*/
+#define ARPHRD_CISCO	513		/* Cisco HDLC	 		*/
+#define ARPHRD_HDLC	ARPHRD_CISCO
 #define ARPHRD_LAPB	516		/* LAPB				*/
 #define ARPHRD_DDCMP    517		/* Digital's DDCMP protocol     */
+#define ARPHRD_RAWHDLC	518		/* Raw HDLC			*/
 
 #define ARPHRD_TUNNEL	768		/* IPIP tunnel			*/
 #define ARPHRD_TUNNEL6	769		/* IPIP6 tunnel			*/

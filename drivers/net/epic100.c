@@ -365,14 +365,14 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	
 	pci_set_master(pdev);
 
-	dev = init_etherdev(NULL, sizeof (*ep));
+	dev = alloc_etherdev(sizeof (*ep));
 	if (!dev) {
 		printk (KERN_ERR "card %d: no memory for eth device\n", card_idx);
 		return -ENOMEM;
 	}
 	SET_MODULE_OWNER(dev);
 
-	if (pci_request_regions(pdev, dev->name))
+	if (pci_request_regions(pdev, "epic100"))
 		goto err_out_free_netdev;
 
 #ifdef USE_IO_OPS
@@ -416,9 +416,6 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 
 	spin_lock_init (&ep->lock);
 
-	printk(KERN_INFO "%s: %s at %#lx, IRQ %d, ",
-		   dev->name, pci_id_tbl[chip_idx].name, ioaddr, dev->irq);
-
 	/* Bring the chip out of low-power mode. */
 	outl(0x4200, ioaddr + GENCTL);
 	/* Magic?!  If we don't set this bit the MII interface won't work. */
@@ -434,12 +431,9 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	for (i = 0; i < 3; i++)
 		((u16 *)dev->dev_addr)[i] = le16_to_cpu(inw(ioaddr + LAN0 + i*4));
 
-	for (i = 0; i < 5; i++)
-		printk("%2.2x:", dev->dev_addr[i]);
-	printk("%2.2x.\n", dev->dev_addr[i]);
-
 	if (debug > 2) {
-		printk(KERN_DEBUG "%s: EEPROM contents\n", dev->name);
+		printk(KERN_DEBUG "epic100(%s): EEPROM contents\n",
+		       pdev->slot_name);
 		for (i = 0; i < 64; i++)
 			printk(" %4.4x%s", read_eeprom(ioaddr, i),
 				   i % 16 == 15 ? "\n" : "");
@@ -458,21 +452,21 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 			int mii_status = mdio_read(dev, phy, 1);
 			if (mii_status != 0xffff  &&  mii_status != 0x0000) {
 				ep->phys[phy_idx++] = phy;
-				printk(KERN_INFO "%s: MII transceiver #%d control "
+				printk(KERN_INFO "epic100(%s): MII transceiver #%d control "
 					   "%4.4x status %4.4x.\n",
-					   dev->name, phy, mdio_read(dev, phy, 0), mii_status);
+					   pdev->slot_name, phy, mdio_read(dev, phy, 0), mii_status);
 			}
 		}
 		ep->mii_phy_cnt = phy_idx;
 		if (phy_idx != 0) {
 			phy = ep->phys[0];
 			ep->advertising = mdio_read(dev, phy, 4);
-			printk(KERN_INFO "%s: Autonegotiation advertising %4.4x link "
+			printk(KERN_INFO "epic100(%s): Autonegotiation advertising %4.4x link "
 				   "partner %4.4x.\n",
-				   dev->name, ep->advertising, mdio_read(dev, phy, 5));
+				   pdev->slot_name, ep->advertising, mdio_read(dev, phy, 5));
 		} else if ( ! (ep->chip_flags & NO_MII)) {
-			printk(KERN_WARNING "%s: ***WARNING***: No MII transceiver found!\n",
-				   dev->name);
+			printk(KERN_WARNING "epic100(%s): ***WARNING***: No MII transceiver found!\n",
+			       pdev->slot_name);
 			/* Use the known PHY address of the EPII. */
 			ep->phys[0] = 3;
 		}
@@ -486,8 +480,8 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	/* The lower four bits are the media type. */
 	if (duplex) {
 		ep->duplex_lock = ep->full_duplex = 1;
-		printk(KERN_INFO "%s:  Forced full duplex operation requested.\n",
-			   dev->name);
+		printk(KERN_INFO "epic100(%s):  Forced full duplex operation requested.\n",
+		       pdev->slot_name);
 	}
 	dev->if_port = ep->default_port = option;
 	if (ep->default_port)
@@ -503,6 +497,16 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	dev->watchdog_timeo = TX_TIMEOUT;
 	dev->tx_timeout = &epic_tx_timeout;
 
+	i = register_netdev(dev);
+	if (i)
+		goto err_out_unmap_tx;
+
+	printk(KERN_INFO "%s: %s at %#lx, IRQ %d, ",
+		   dev->name, pci_id_tbl[chip_idx].name, ioaddr, dev->irq);
+	for (i = 0; i < 5; i++)
+		printk("%2.2x:", dev->dev_addr[i]);
+	printk("%2.2x.\n", dev->dev_addr[i]);
+
 	return 0;
 
 err_out_unmap_tx:
@@ -514,7 +518,6 @@ err_out_free_res:
 #endif
 	pci_release_regions(pdev);
 err_out_free_netdev:
-	unregister_netdev(dev);
 	kfree(dev);
 	return -ENODEV;
 }
@@ -586,7 +589,8 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 
 	outl(read_cmd, ioaddr + MIICtrl);
 	/* Typical operation takes 25 loops. */
-	for (i = 400; i > 0; i--)
+	for (i = 400; i > 0; i--) {
+		barrier();
 		if ((inl(ioaddr + MIICtrl) & MII_READOP) == 0) {
 			/* Work around read failure bug. */
 			if (phy_id == 1 && location < 6
@@ -596,6 +600,7 @@ static int mdio_read(struct net_device *dev, int phy_id, int location)
 			}
 			return inw(ioaddr + MIIData);
 		}
+	}
 	return 0xffff;
 }
 
@@ -606,7 +611,8 @@ static void mdio_write(struct net_device *dev, int phy_id, int loc, int value)
 
 	outw(value, ioaddr + MIIData);
 	outl((phy_id << 9) | (loc << 4) | MII_WRITEOP, ioaddr + MIICtrl);
-	for (i = 10000; i > 0; i--) {
+	for (i = 10000; i > 0; i--) { 
+		barrier();
 		if ((inl(ioaddr + MIICtrl) & MII_WRITEOP) == 0)
 			break;
 	}
@@ -970,7 +976,7 @@ static int epic_start_xmit(struct sk_buff *skb, struct net_device *dev)
    after the Tx thread. */
 static void epic_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 {
-	struct net_device *dev = (struct net_device *)dev_instance;
+	struct net_device *dev = dev_instance;
 	struct epic_private *ep = dev->priv;
 	long ioaddr = dev->base_addr;
 	int status, boguscnt = max_interrupt_work;
@@ -1324,7 +1330,7 @@ static void set_rx_mode(struct net_device *dev)
 
 static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct epic_private *ep = (void *)dev->priv;
+	struct epic_private *ep = dev->priv;
 	long ioaddr = dev->base_addr;
 	u16 *data = (u16 *)&rq->ifr_data;
 

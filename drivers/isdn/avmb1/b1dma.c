@@ -1,11 +1,17 @@
 /*
- * $Id: b1dma.c,v 1.11.6.1 2001/02/13 11:43:29 kai Exp $
+ * $Id: b1dma.c,v 1.11.6.3 2001/03/21 08:52:21 kai Exp $
  * 
  * Common module for AVM B1 cards that support dma with AMCC
  * 
  * (c) Copyright 2000 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: b1dma.c,v $
+ * Revision 1.11.6.3  2001/03/21 08:52:21  kai
+ * merge from main branch: fix buffer for revision string (calle)
+ *
+ * Revision 1.11.6.2  2001/03/15 15:11:23  kai
+ * *** empty log message ***
+ *
  * Revision 1.11.6.1  2001/02/13 11:43:29  kai
  * more compatility changes for 2.2.19
  *
@@ -65,7 +71,7 @@
 #include "capicmd.h"
 #include "capiutil.h"
 
-static char *revision = "$Revision: 1.11.6.1 $";
+static char *revision = "$Revision: 1.11.6.3 $";
 
 /* ------------------------------------------------------------- */
 
@@ -991,12 +997,13 @@ EXPORT_SYMBOL(b1dmactl_read_proc);
 int b1dma_init(void)
 {
 	char *p;
-	char rev[10];
+	char rev[32];
 
-	if ((p = strchr(revision, ':'))) {
-		strncpy(rev, p + 1, sizeof(rev));
-		p = strchr(rev, '$');
-		*p = 0;
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strncpy(rev, p + 2, sizeof(rev));
+		rev[sizeof(rev)-1] = 0;
+		if ((p = strchr(rev, '$')) != 0 && p > rev)
+		   *(p-1) = 0;
 	} else
 		strcpy(rev, "1.0");
 

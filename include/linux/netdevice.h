@@ -41,6 +41,9 @@
 
 struct divert_blk;
 
+#define HAVE_ALLOC_NETDEV		/* feature macro: alloc_xxxdev
+					   functions are available. */
+
 #define NET_XMIT_SUCCESS	0
 #define NET_XMIT_DROP		1	/* skb dropped			*/
 #define NET_XMIT_CN		2	/* congestion notification	*/
@@ -633,10 +636,6 @@ extern void		fc_freedev(struct net_device *dev);
 /* Support for loadable net-drivers */
 extern int		register_netdev(struct net_device *dev);
 extern void		unregister_netdev(struct net_device *dev);
-extern int		register_trdev(struct net_device *dev);
-extern void		unregister_trdev(struct net_device *dev);
-extern int		register_fcdev(struct net_device *dev);
-extern void		unregister_fcdev(struct net_device *dev);
 /* Functions used for multicast support */
 extern void		dev_mc_upload(struct net_device *dev);
 extern int 		dev_mc_delete(struct net_device *dev, void *addr, int alen, int all);

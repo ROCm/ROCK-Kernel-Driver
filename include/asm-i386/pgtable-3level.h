@@ -33,17 +33,9 @@
 #define pgd_ERROR(e) \
 	printk("%s:%d: bad pgd %p(%016Lx).\n", __FILE__, __LINE__, &(e), pgd_val(e))
 
-/*
- * Subtle, in PAE mode we cannot have zeroes in the top level
- * page directory, the CPU enforces this. (ie. the PGD entry
- * always has to have the present bit set.) The CPU caches
- * the 4 pgd entries internally, so there is no extra memory
- * load on TLB miss, despite one more level of indirection.
- */
-#define EMPTY_PGD (__pa(empty_zero_page) + 1)
-#define pgd_none(x)	(pgd_val(x) == EMPTY_PGD)
+extern inline int pgd_none(pgd_t pgd)		{ return 0; }
 extern inline int pgd_bad(pgd_t pgd)		{ return 0; }
-extern inline int pgd_present(pgd_t pgd)	{ return !pgd_none(pgd); }
+extern inline int pgd_present(pgd_t pgd)	{ return 1; }
 
 /* Rules for using set_pte: the pte being assigned *must* be
  * either not present or in a state where the hardware will
@@ -63,21 +55,12 @@ static inline void set_pte(pte_t *ptep, pte_t pte)
 		set_64bit((unsigned long long *)(pgdptr),pgd_val(pgdval))
 
 /*
- * Pentium-II errata A13: in PAE mode we explicitly have to flush
- * the TLB via cr3 if the top-level pgd is changed... This was one tough
- * thing to find out - guess i should first read all the documentation
- * next time around ;)
+ * Pentium-II erratum A13: in PAE mode we explicitly have to flush
+ * the TLB via cr3 if the top-level pgd is changed...
+ * We do not let the generic code free and clear pgd entries due to
+ * this erratum.
  */
-extern inline void __pgd_clear (pgd_t * pgd)
-{
-	set_pgd(pgd, __pgd(EMPTY_PGD));
-}
-
-extern inline void pgd_clear (pgd_t * pgd)
-{
-	__pgd_clear(pgd);
-	__flush_tlb();
-}
+extern inline void pgd_clear (pgd_t * pgd) { }
 
 #define pgd_page(pgd) \
 ((unsigned long) __va(pgd_val(pgd) & PAGE_MASK))

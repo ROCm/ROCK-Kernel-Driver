@@ -138,7 +138,7 @@ static int MainDaemon(void *cpu_pointer)
 			changes +=DataSending(CPUNR);
 			changes +=Userspace(CPUNR);
 			changes +=Logging(CPUNR);
-			/* Test for incomming connections _again_, because it is possible
+			/* Test for incoming connections _again_, because it is possible
 			   one came in during the other steps, and the wakeup doesn't happen
 			   then.
 			*/

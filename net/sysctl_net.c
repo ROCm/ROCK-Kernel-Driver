@@ -20,10 +20,6 @@
 extern ctl_table ipv4_table[];
 #endif
 
-#ifdef CONFIG_IPX
-extern ctl_table ipx_table[];
-#endif
-
 extern ctl_table core_table[];
 
 #ifdef CONFIG_NET
@@ -50,9 +46,6 @@ ctl_table net_table[] = {
 #endif
 #ifdef CONFIG_INET
 	{NET_IPV4,   "ipv4",      NULL, 0, 0555, ipv4_table},
-#endif
-#ifdef CONFIG_IPX
-        {NET_IPX,    "ipx",       NULL, 0, 0555, ipx_table},
 #endif
 #ifdef CONFIG_IPV6
 	{NET_IPV6, "ipv6", NULL, 0, 0555, ipv6_table},

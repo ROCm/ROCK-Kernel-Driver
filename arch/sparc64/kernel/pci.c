@@ -1,4 +1,4 @@
-/* $Id: pci.c,v 1.22 2001/02/28 05:59:45 davem Exp $
+/* $Id: pci.c,v 1.23 2001/03/14 04:17:14 davem Exp $
  * pci.c: UltraSparc PCI controller support.
  *
  * Copyright (C) 1997, 1998, 1999 David S. Miller (davem@redhat.com)
@@ -86,6 +86,7 @@ static struct {
 } pci_controller_table[] = {
 	{ "SUNW,sabre", sabre_init },
 	{ "pci108e,a000", sabre_init },
+	{ "pci108e,a001", sabre_init },
 	{ "SUNW,psycho", psycho_init },
 	{ "pci108e,8000", psycho_init },
 	{ "SUNW,schizo", schizo_init },

@@ -504,7 +504,7 @@ static int netdrv_start_xmit (struct sk_buff *skb,
 static void netdrv_interrupt (int irq, void *dev_instance,
 			       struct pt_regs *regs);
 static int netdrv_close (struct net_device *dev);
-static int mii_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
+static int netdrv_ioctl (struct net_device *dev, struct ifreq *rq, int cmd);
 static struct net_device_stats *netdrv_get_stats (struct net_device *dev);
 static inline u32 ether_crc (int length, unsigned char *data);
 static void netdrv_set_rx_mode (struct net_device *dev);
@@ -600,7 +600,7 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 	*dev_out = NULL;
 
 	/* dev zeroed in init_etherdev */
-	dev = init_etherdev (NULL, sizeof (*tp));
+	dev = alloc_etherdev (sizeof (*tp));
 	if (dev == NULL) {
 		printk (KERN_ERR PFX "unable to alloc new ethernet\n");
 		DPRINTK ("EXIT, returning -ENOMEM\n");
@@ -651,7 +651,7 @@ static int __devinit netdrv_init_board (struct pci_dev *pdev,
 		goto err_out;
 	}
 
-	rc = pci_request_regions (pdev, dev->name);
+	rc = pci_request_regions (pdev, "pci-skeleton");
 	if (rc)
 		goto err_out;
 
@@ -710,17 +710,22 @@ match:
 		tp->chipset,
 		rtl_chip_info[tp->chipset].name);
 
+	i = register_netdev (dev);
+	if (i)
+		goto err_out_unmap;
+
 	DPRINTK ("EXIT, returning 0\n");
 	*ioaddr_out = ioaddr;
 	*dev_out = dev;
 	return 0;
 
+err_out_unmap:
 #ifndef USE_IO_OPS
+	iounmap(ioaddr);
 err_out_free_res:
+#endif
 	pci_release_regions (pdev);
-#endif /* !USE_IO_OPS */
 err_out:
-	unregister_netdev (dev);
 	kfree (dev);
 	DPRINTK ("EXIT, returning %d\n", rc);
 	return rc;
@@ -773,7 +778,7 @@ static int __devinit netdrv_init_one (struct pci_dev *pdev,
 	dev->stop = netdrv_close;
 	dev->get_stats = netdrv_get_stats;
 	dev->set_multicast_list = netdrv_set_rx_mode;
-	dev->do_ioctl = mii_ioctl;
+	dev->do_ioctl = netdrv_ioctl;
 	dev->tx_timeout = netdrv_tx_timeout;
 	dev->watchdog_timeo = TX_TIMEOUT;
 
@@ -1550,18 +1555,6 @@ static void netdrv_rx_interrupt (struct net_device *dev,
 		}
 #endif
 
-		/* E. Gill */
-		/* Note from BSD driver:
-		 * Here's a totally undocumented fact for you. When the
-		 * RealTek chip is in the process of copying a packet into
-		 * RAM for you, the length will be 0xfff0. If you spot a
-		 * packet header with this value, you need to stop. The
-		 * datasheet makes absolutely no mention of this and
-		 * RealTek should be shot for this.
-		 */
-		if (rx_size == 0xfff0)
-			break;
-
 		/* If Rx err or invalid rx_size/rx_status received
 		 * (which happens if we get lost in the ring),
 		 * Rx process gets reset, so we abort any further
@@ -1785,7 +1778,7 @@ static int netdrv_close (struct net_device *dev)
 }
 
 
-static int mii_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
+static int netdrv_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct netdrv_private *tp = dev->priv;
 	u16 *data = (u16 *) & rq->ifr_data;

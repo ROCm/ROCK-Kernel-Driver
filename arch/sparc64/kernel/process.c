@@ -1,4 +1,4 @@
-/*  $Id: process.c,v 1.114 2001/02/13 01:16:44 davem Exp $
+/*  $Id: process.c,v 1.116 2001/03/24 09:36:01 davem Exp $
  *  arch/sparc64/kernel/process.c
  *
  *  Copyright (C) 1995, 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -416,14 +416,14 @@ void flush_thread(void)
 			unsigned long pgd_cache;
 
 			if (pgd_none(*pgd0)) {
-				pmd_t *page = get_pmd_fast();
+				pmd_t *page = pmd_alloc_one_fast();
 				if (!page)
-					(void) get_pmd_slow(pgd0, 0);
-				else
-					pgd_set(pgd0, page);
+					page = pmd_alloc_one();
+				pgd_set(pgd0, page);
 			}
 			pgd_cache = pgd_val(*pgd0) << 11UL;
-			__asm__ __volatile__("stxa %0, [%1] %2"
+			__asm__ __volatile__("stxa %0, [%1] %2\n\t"
+					     "membar #Sync"
 					     : /* no outputs */
 					     : "r" (pgd_cache),
 					       "r" (TSB_REG),

@@ -1,4 +1,4 @@
-/* $Id: parport.h,v 1.9 2000/03/16 07:47:27 davem Exp $
+/* $Id: parport.h,v 1.10 2001/03/24 00:18:57 davem Exp $
  * parport.h: sparc64 specific parport initialization and dma.
  *
  * Copyright (C) 1999  Eddie C. Dost  (ecd@skynet.be)
@@ -99,6 +99,25 @@ get_dma_residue(unsigned int dmanr)
 	return res;
 }
 
+static int ebus_ecpp_p(struct linux_ebus_device *edev)
+{
+	if (!strcmp(edev->prom_name, "ecpp"))
+		return 1;
+	if (!strcmp(edev->prom_name, "parallel")) {
+		char compat[19];
+		prom_getstring(edev->prom_node,
+			       "compatible",
+			       compat, sizeof(compat));
+		compat[18] = '\0';
+		if (!strcmp(compat, "ecpp"))
+			return 1;
+		if (!strcmp(compat, "ns87317-ecpp") &&
+		    !strcmp(compat + 13, "ecpp"))
+			return 1;
+	}
+	return 0;
+}
+
 static int parport_pc_find_nonpci_ports (int autoirq, int autodma)
 {
 	struct linux_ebus *ebus;
@@ -110,7 +129,7 @@ static int parport_pc_find_nonpci_ports (int autoirq, int autodma)
 
 	for_each_ebus(ebus) {
 		for_each_ebusdev(edev, ebus) {
-			if (!strcmp(edev->prom_name, "ecpp")) {
+			if (ebus_ecpp_p(edev)) {
 				unsigned long base = edev->resource[0].start;
 				unsigned long config = edev->resource[1].start;
 

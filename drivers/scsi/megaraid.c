@@ -404,7 +404,6 @@ static void WROUTDOOR (mega_host_config * megaCfg, ulong value)
 #include <linux/smp.h>
 #define cpuid smp_processor_id()
 
-char kernel_version[] = UTS_RELEASE;
 MODULE_AUTHOR ("American Megatrends Inc.");
 MODULE_DESCRIPTION ("AMI MegaRAID driver");
 
@@ -433,7 +432,6 @@ MODULE_DESCRIPTION ("AMI MegaRAID driver");
 #include <linux/smp.h>
 #define cpuid smp_processor_id()
 
-char kernel_version[] = UTS_RELEASE;
 MODULE_AUTHOR ("American Megatrends Inc.");
 MODULE_DESCRIPTION ("AMI MegaRAID driver");
 

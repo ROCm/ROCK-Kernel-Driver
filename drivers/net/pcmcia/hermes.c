@@ -19,6 +19,7 @@
 
 static const char *version = "hermes.c: 12 Dec 2000 David Gibson <hermes@gibson.dropbear.id.au>";
 
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/smp.h>
@@ -252,8 +253,11 @@ int hermes_allocate(hermes_t *hw, uint16_t size, uint16_t *fid)
 		return -EINVAL;
 
 	err = hermes_docmd_wait(hw, HERMES_CMD_ALLOC, size, &resp);
-	if (err)
+	if (err) {
+		printk(KERN_WARNING "hermes @ 0x%x: Frame allocation command failed (0x%X).\n",
+		       hw->iobase, err);
 		return err;
+	}
 
 	reg = hermes_read_regn(hw, EVSTAT);
 	k = ALLOC_COMPL_TIMEOUT;

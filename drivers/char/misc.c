@@ -75,7 +75,6 @@ extern int rtc_MK48T08_init(void);
 extern int ds1286_init(void);
 extern int dsp56k_init(void);
 extern int radio_init(void);
-extern int pc110pad_init(void);
 extern int pmu_device_init(void);
 extern int qpmouse_init(void);
 extern int tosh_init(void);
@@ -248,9 +247,6 @@ int __init misc_init(void)
 	create_proc_read_entry("misc", 0, 0, misc_read_proc, NULL);
 #if defined CONFIG_82C710_MOUSE
 	qpmouse_init();
-#endif
-#ifdef CONFIG_PC110_PAD
-	pc110pad_init();
 #endif
 #ifdef CONFIG_MVME16x
 	rtc_MK48T08_init();

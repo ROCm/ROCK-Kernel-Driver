@@ -13,6 +13,7 @@
 #include <asm/oplib.h>
 #include <asm/system.h>
 #include <asm/smp.h>
+#include <asm/spitfire.h>
 
 struct prom_cpuinfo linux_cpus[64] __initdata = { { 0 } };
 unsigned prom_cpu_nodes[64];
@@ -50,8 +51,14 @@ void __init device_scan(void)
 			if(strcmp(node_str, "cpu") == 0) {
 				cpu_nds[cpu_ctr] = scan;
 				linux_cpus[cpu_ctr].prom_node = scan;
-				prom_getproperty(scan, "upa-portid",
-						 (char *) &thismid, sizeof(thismid));
+				thismid = 0;
+				if (tlb_type == spitfire) {
+					prom_getproperty(scan, "upa-portid",
+							 (char *) &thismid, sizeof(thismid));
+				} else if (tlb_type == cheetah) {
+					prom_getproperty(scan, "portid",
+							 (char *) &thismid, sizeof(thismid));
+				}
 				linux_cpus[cpu_ctr].mid = thismid;
 				printk("Found CPU %d (node=%08x,mid=%d)\n",
 				       cpu_ctr, (unsigned) scan, thismid);

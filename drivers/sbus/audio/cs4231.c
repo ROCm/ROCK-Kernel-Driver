@@ -1,4 +1,4 @@
-/* $Id: cs4231.c,v 1.44 2001/02/13 01:16:59 davem Exp $
+/* $Id: cs4231.c,v 1.45 2001/03/23 08:16:13 davem Exp $
  * drivers/sbus/audio/cs4231.c
  *
  * Copyright 1996, 1997, 1998, 1999 Derrick J Brashear (shadow@andrew.cmu.edu)
@@ -2348,6 +2348,25 @@ static int eb4231_attach(struct sparcaudio_driver *drv,
 }
 #endif
 
+#ifdef EB4231_SUPPORT
+static int __init ebus_cs4231_p(struct linux_ebus_device *edev)
+{
+        if (!strcmp(edev->prom_name, "SUNW,CS4231"))
+                return 1;
+        if (!strcmp(edev->prom_name, "audio")) {
+                char compat[16];
+
+                prom_getstring(edev->prom_node, "compatible",
+                               compat, sizeof(compat));
+                compat[15] = '\0';
+                if (!strcmp(compat, "SUNW,CS4231"))
+                        return 1;
+        }
+
+        return 0;
+}
+#endif
+
 /* Probe for the cs4231 chip and then attach the driver. */
 #ifdef MODULE
 int init_module(void)
@@ -2379,7 +2398,7 @@ int __init cs4231_init(void)
 #ifdef EB4231_SUPPORT
         for_each_ebus(ebus) {
                 for_each_ebusdev(edev, ebus) {
-                        if (!strcmp(edev->prom_name, "SUNW,CS4231")) {
+                        if (ebus_cs4231_p(edev)) {
                                 /* Don't go over the max number of drivers. */
                                 if (num_drivers >= MAX_DRIVERS)
                                         continue;

@@ -119,20 +119,21 @@ struct rw_semaphore
 #endif
 };
 
-#define __RWSEM_INITIALIZER(name, rd, wr)		\
+#define RW_LOCK_BIAS	2	/* XXX bogus */
+#define __RWSEM_INITIALIZER(name, count)		\
 {							\
 	SPIN_LOCK_UNLOCKED,				\
-	(rd), (wr),					\
+	(count) == 1, (count) == 0,			\
 	__WAIT_QUEUE_HEAD_INITIALIZER((name).wait)	\
 	__SEM_DEBUG_INIT(name)				\
 }
 
-#define __DECLARE_RWSEM_GENERIC(name, rd, wr)		\
-	struct rw_semaphore name = __RWSEM_INITIALIZER(name, rd, wr)
+#define __DECLARE_RWSEM_GENERIC(name, count)		\
+	struct rw_semaphore name = __RWSEM_INITIALIZER(name, count)
 
-#define DECLARE_RWSEM(name) __DECLARE_RWSEM_GENERIC(name, 0, 0)
-#define DECLARE_RWSEM_READ_LOCKED(name) __DECLARE_RWSEM_GENERIC(name, 1, 0)
-#define DECLARE_RWSEM_WRITE_LOCKED(name) __DECLARE_RWSEM_GENERIC(name, 0, 1)
+#define DECLARE_RWSEM(name) __DECLARE_RWSEM_GENERIC(name, RW_LOCK_BIAS)
+#define DECLARE_RWSEM_READ_LOCKED(name) __DECLARE_RWSEM_GENERIC(name, RW_LOCK_BIAS-1)
+#define DECLARE_RWSEM_WRITE_LOCKED(name) __DECLARE_RWSEM_GENERIC(name, 0)
 
 extern inline void init_rwsem(struct rw_semaphore *sem)
 {

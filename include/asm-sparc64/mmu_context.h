@@ -1,4 +1,4 @@
-/* $Id: mmu_context.h,v 1.45 2000/08/12 13:25:52 davem Exp $ */
+/* $Id: mmu_context.h,v 1.47 2001/03/22 07:26:04 davem Exp $ */
 #ifndef __SPARC64_MMU_CONTEXT_H
 #define __SPARC64_MMU_CONTEXT_H
 
@@ -72,6 +72,7 @@ do { \
 			     "mov	%3, %%g4\n\t" \
 			     "mov	%0, %%g7\n\t" \
 			     "stxa	%1, [%%g4] %2\n\t" \
+			     "membar	#Sync\n\t" \
 			     "wrpr	%%g0, 0x096, %%pstate" \
 			     : /* no outputs */ \
 			     : "r" (paddr), "r" (pgd_cache),\
@@ -84,18 +85,9 @@ do { \
 			     "flush	%%g6" \
 			     : /* No outputs */ \
 			     : "r" (CTX_HWBITS((__mm)->context)), \
-			       "r" (0x10), "i" (0x58))
+			       "r" (0x10), "i" (ASI_DMMU))
 
-/* Clean out potential stale TLB entries due to previous
- * users of this TLB context.  We flush TLB contexts
- * lazily on sparc64.
- */
-#define clean_secondary_context() \
-	__asm__ __volatile__("stxa	%%g0, [%0] %1\n\t" \
-			     "stxa	%%g0, [%0] %2\n\t" \
-			     "flush	%%g6" \
-			     : /* No outputs */ \
-			     : "r" (0x50), "i" (0x5f), "i" (0x57))
+extern void __flush_tlb_mm(unsigned long, unsigned long);
 
 /* Switch the current MM context. */
 static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, struct task_struct *tsk, int cpu)
@@ -127,7 +119,7 @@ static inline void switch_mm(struct mm_struct *old_mm, struct mm_struct *mm, str
 		 */
 		if (!ctx_valid || !(mm->cpu_vm_mask & vm_mask)) {
 			mm->cpu_vm_mask |= vm_mask;
-			clean_secondary_context();
+			__flush_tlb_mm(CTX_HWBITS(mm->context), SECONDARY_CONTEXT);
 		}
 	}
 	spin_unlock(&mm->page_table_lock);
@@ -147,7 +139,7 @@ static inline void activate_mm(struct mm_struct *active_mm, struct mm_struct *mm
 	spin_unlock(&mm->page_table_lock);
 
 	load_secondary_context(mm);
-	clean_secondary_context();
+	__flush_tlb_mm(CTX_HWBITS(mm->context), SECONDARY_CONTEXT);
 	reload_tlbmiss_state(current, mm);
 }
 

@@ -276,7 +276,7 @@ static int
 RCopen(struct net_device *dev)
 {
     int post_buffers = MAX_NMBR_RCV_BUFFERS;
-    PDPA pDpa = (PDPA) dev->priv;
+    PDPA pDpa = dev->priv;
     int count = 0;
     int requested = 0;
     int error;
@@ -367,7 +367,7 @@ static int
 RC_xmit_packet(struct sk_buff *skb, struct net_device *dev)
 {
 
-    PDPA pDpa = (PDPA) dev->priv;
+    PDPA pDpa = dev->priv;
     singleTCB tcb;
     psingleTCB ptcb = &tcb;
     RC_RETURN status = 0;
@@ -668,9 +668,9 @@ RCinterrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 
     PDPA pDpa;
-    struct net_device *dev = (struct net_device *)(dev_id);
+    struct net_device *dev = dev_id;
 
-    pDpa = (PDPA) (dev->priv);
+    pDpa = dev->priv;
      
     if (pDpa->shutdown)
         dprintk("shutdown: service irq\n");
@@ -687,7 +687,7 @@ RCinterrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void rc_timer(unsigned long data)
 {
     struct net_device *dev = (struct net_device *)data;
-    PDPA pDpa = (PDPA) (dev->priv);
+    PDPA pDpa = dev->priv;
     int init_status;
     static int retry;
     int post_buffers = MAX_NMBR_RCV_BUFFERS;
@@ -766,7 +766,7 @@ static void rc_timer(unsigned long data)
 static int
 RCclose(struct net_device *dev)
 {
-    PDPA pDpa = (PDPA) dev->priv;
+    PDPA pDpa = dev->priv;
 
     netif_stop_queue(dev);
     

@@ -229,9 +229,9 @@ other cases.  Please keep in mind that fact that, for a given page
 mapped into some user address space, there is always at least one more
 mapping, that of the kernel in it's linear mapping starting at
 PAGE_OFFSET.  So immediately, once the first user maps a given
-physical page into it's address space, by implication the D-cache
+physical page into its address space, by implication the D-cache
 aliasing problem has the potential to exist since the kernel already
-maps this page at it's virtual address.
+maps this page at its virtual address.
 
 First, I describe the old method to deal with this problem.  I am
 describing it for documentation purposes, but it is deprecated and the
@@ -252,11 +252,11 @@ existing ports should move over to the new mechanism as well.
 
 Admittedly, the author did not think very much when designing this
 interface.  It does not give the architecture enough information about
-what exactly is going on, and there is not context with which to base
-any judgment about whether an alias is possible at all.  The new
-interfaces to deal with D-cache aliasing are meant to address this by
-telling the architecture specific code exactly which is going on at
-the proper points in time.
+what exactly is going on, and there is no context to base a judgment
+on about whether an alias is possible at all.  The new interfaces to
+deal with D-cache aliasing are meant to address this by telling the
+architecture specific code exactly which is going on at the proper points
+in time.
 
 Here is the new interface:
 

@@ -1,11 +1,17 @@
 /*
- * $Id: capifs.c,v 1.14.6.3 2001/02/13 11:43:29 kai Exp $
+ * $Id: capifs.c,v 1.14.6.5 2001/03/21 08:52:21 kai Exp $
  * 
  * (c) Copyright 2000 by Carsten Paeth (calle@calle.de)
  *
  * Heavily based on devpts filesystem from H. Peter Anvin
  * 
  * $Log: capifs.c,v $
+ * Revision 1.14.6.5  2001/03/21 08:52:21  kai
+ * merge from main branch: fix buffer for revision string (calle)
+ *
+ * Revision 1.14.6.4  2001/03/15 15:11:24  kai
+ * *** empty log message ***
+ *
  * Revision 1.14.6.3  2001/02/13 11:43:29  kai
  * more compatility changes for 2.2.19
  *
@@ -99,7 +105,7 @@
 
 MODULE_AUTHOR("Carsten Paeth <calle@calle.de>");
 
-static char *revision = "$Revision: 1.14.6.3 $";
+static char *revision = "$Revision: 1.14.6.5 $";
 
 struct capifs_ncci {
 	struct inode *inode;
@@ -587,16 +593,17 @@ void capifs_free_ncci(char type, unsigned int num)
 
 static int __init capifs_init(void)
 {
-	char rev[10];
+	char rev[32];
 	char *p;
 	int err;
 
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':'))) {
-		strcpy(rev, p + 1);
-		p = strchr(rev, '$');
-		*p = 0;
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strncpy(rev, p + 2, sizeof(rev));
+		rev[sizeof(rev)-1] = 0;
+		if ((p = strchr(rev, '$')) != 0 && p > rev)
+		   *(p-1) = 0;
 	} else
 		strcpy(rev, "1.0");
 
@@ -606,9 +613,9 @@ static int __init capifs_init(void)
 		return err;
 	}
 #ifdef MODULE
-        printk(KERN_NOTICE "capifs: Rev%s: loaded\n", rev);
+        printk(KERN_NOTICE "capifs: Rev %s: loaded\n", rev);
 #else
-	printk(KERN_NOTICE "capifs: Rev%s: started\n", rev);
+	printk(KERN_NOTICE "capifs: Rev %s: started\n", rev);
 #endif
 	MOD_DEC_USE_COUNT;
 	return 0;

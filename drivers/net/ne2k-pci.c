@@ -239,7 +239,7 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 		}
 	}
 
-	dev = init_etherdev(NULL, 0);
+	dev = alloc_etherdev(0);
 	if (!dev) {
 		printk (KERN_ERR "ne2k-pci: cannot allocate ethernet device\n");
 		goto err_out_free_res;
@@ -312,15 +312,9 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 
 	/* Allocate dev->priv and fill in 8390 specific dev fields. */
 	if (ethdev_init(dev)) {
-		printk (KERN_ERR "%s: unable to get memory for dev->priv.\n", dev->name);
+		printk (KERN_ERR "ne2kpci(%s): unable to get memory for dev->priv.\n",
+			pdev->slot_name);
 		goto err_out_free_netdev;
-	}
-
-	printk("%s: %s found at %#lx, IRQ %d, ",
-		   dev->name, pci_clone_list[chip_idx].name, ioaddr, dev->irq);
-	for(i = 0; i < 6; i++) {
-		printk("%2.2X%s", SA_prom[i], i == 5 ? ".\n": ":");
-		dev->dev_addr[i] = SA_prom[i];
 	}
 
 	ei_status.name = pci_clone_list[chip_idx].name;
@@ -346,13 +340,27 @@ static int __devinit ne2k_pci_init_one (struct pci_dev *pdev,
 	dev->open = &ne2k_pci_open;
 	dev->stop = &ne2k_pci_close;
 	NS8390_init(dev, 0);
+
+	i = register_netdev(dev);
+	if (i)
+		goto err_out_free_8390;
+
+	printk("%s: %s found at %#lx, IRQ %d, ",
+		   dev->name, pci_clone_list[chip_idx].name, ioaddr, dev->irq);
+	for(i = 0; i < 6; i++) {
+		printk("%2.2X%s", SA_prom[i], i == 5 ? ".\n": ":");
+		dev->dev_addr[i] = SA_prom[i];
+	}
+
 	return 0;
 
+err_out_free_8390:
+	kfree(dev->priv);
 err_out_free_netdev:
-	unregister_netdev (dev);
 	kfree (dev);
 err_out_free_res:
 	release_region (ioaddr, NE_IO_EXTENT);
+	pci_set_drvdata (pdev, NULL);
 	return -ENODEV;
 
 }

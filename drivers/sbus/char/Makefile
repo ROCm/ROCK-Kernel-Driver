@@ -20,6 +20,7 @@ obj-$(CONFIG_SAB82532)			+= sab82532.o
 obj-$(CONFIG_ENVCTRL)			+= envctrl.o
 obj-$(CONFIG_DISPLAY7SEG)		+= display7seg.o
 obj-$(CONFIG_WATCHDOG_CP1XXX)		+= cpwatchdog.o
+obj-$(CONFIG_WATCHDOG_RIO)		+= riowatchdog.o
 obj-$(CONFIG_OBP_FLASH)			+= flash.o
 obj-$(CONFIG_SUN_OPENPROMIO)		+= openprom.o
 obj-$(CONFIG_SUN_MOSTEK_RTC)		+= rtc.o

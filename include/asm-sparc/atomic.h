@@ -1,6 +1,7 @@
 /* atomic.h: These still suck, but the I-cache hit rate is higher.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
+ * Copyright (C) 2000 Anton Blanchard (anton@linuxcare.com.au)
  */
 
 #ifndef __ARCH_SPARC_ATOMIC__
@@ -47,51 +48,12 @@ static __inline__ int atomic_read(atomic_t *v)
 #define atomic_set(v, i)	(((v)->counter) = ((i) << 8))
 #endif
 
-/* Make sure gcc doesn't try to be clever and move things around
- * on us. We need to use _exactly_ the address the user gave us,
- * not some alias that contains the same information.
- */
-#define __atomic_fool_gcc(x) ((struct { int a[100]; } *)x)
-
-static __inline__ void atomic_add(int i, atomic_t *v)
+static __inline__ int __atomic_add(int i, atomic_t *v)
 {
-	register atomic_t *ptr asm("g1");
-	register int increment asm("g2");
-	ptr = (atomic_t *) __atomic_fool_gcc(v);
-	increment = i;
-
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___atomic_add
-	 add	%%o7, 8, %%o7
-"	: "=&r" (increment)
-	: "0" (increment), "r" (ptr)
-	: "g3", "g4", "g7", "memory", "cc");
-}
-
-static __inline__ void atomic_sub(int i, atomic_t *v)
-{
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
-	ptr = (atomic_t *) __atomic_fool_gcc(v);
-	increment = i;
-
-	__asm__ __volatile__("
-	mov	%%o7, %%g4
-	call	___atomic_sub
-	 add	%%o7, 8, %%o7
-"	: "=&r" (increment)
-	: "0" (increment), "r" (ptr)
-	: "g3", "g4", "g7", "memory", "cc");
-}
-
-static __inline__ int atomic_add_return(int i, atomic_t *v)
-{
-	register atomic_t *ptr asm("g1");
-	register int increment asm("g2");
-
-	ptr = (atomic_t *) __atomic_fool_gcc(v);
+	ptr = &v->counter;
 	increment = i;
 
 	__asm__ __volatile__("
@@ -105,12 +67,12 @@ static __inline__ int atomic_add_return(int i, atomic_t *v)
 	return increment;
 }
 
-static __inline__ int atomic_sub_return(int i, atomic_t *v)
+static __inline__ int __atomic_sub(int i, atomic_t *v)
 {
-	register atomic_t *ptr asm("g1");
+	register volatile int *ptr asm("g1");
 	register int increment asm("g2");
 
-	ptr = (atomic_t *) __atomic_fool_gcc(v);
+	ptr = &v->counter;
 	increment = i;
 
 	__asm__ __volatile__("
@@ -124,16 +86,19 @@ static __inline__ int atomic_sub_return(int i, atomic_t *v)
 	return increment;
 }
 
-#define atomic_dec_return(v) atomic_sub_return(1,(v))
-#define atomic_inc_return(v) atomic_add_return(1,(v))
+#define atomic_add(i, v) ((void)__atomic_add((i), (v)))
+#define atomic_sub(i, v) ((void)__atomic_sub((i), (v)))
 
-#define atomic_sub_and_test(i, v) (atomic_sub_return((i), (v)) == 0)
-#define atomic_dec_and_test(v) (atomic_sub_return(1, (v)) == 0)
+#define atomic_dec_return(v) __atomic_sub(1, (v))
+#define atomic_inc_return(v) __atomic_add(1, (v))
 
-#define atomic_inc(v) atomic_add(1,(v))
-#define atomic_dec(v) atomic_sub(1,(v))
+#define atomic_sub_and_test(i, v) (__atomic_sub((i), (v)) == 0)
+#define atomic_dec_and_test(v) (__atomic_sub(1, (v)) == 0)
 
-#define atomic_add_negative(i, v) (atomic_add_return((i), (v)) < 0)
+#define atomic_inc(v) ((void)__atomic_add(1, (v)))
+#define atomic_dec(v) ((void)__atomic_sub(1, (v)))
+
+#define atomic_add_negative(i, v) (__atomic_add((i), (v)) < 0)
 
 #endif /* !(__KERNEL__) */
 

@@ -1,11 +1,14 @@
 /*
- * $Id: b1pci.c,v 1.29.6.1 2000/11/28 12:02:45 kai Exp $
+ * $Id: b1pci.c,v 1.29.6.2 2001/03/21 08:52:21 kai Exp $
  * 
  * Module for AVM B1 PCI-card.
  * 
  * (c) Copyright 1999 by Carsten Paeth (calle@calle.in-berlin.de)
  * 
  * $Log: b1pci.c,v $
+ * Revision 1.29.6.2  2001/03/21 08:52:21  kai
+ * merge from main branch: fix buffer for revision string (calle)
+ *
  * Revision 1.29.6.1  2000/11/28 12:02:45  kai
  * MODULE_DEVICE_TABLE for 2.4
  *
@@ -119,7 +122,7 @@
 #include "capilli.h"
 #include "avmcard.h"
 
-static char *revision = "$Revision: 1.29.6.1 $";
+static char *revision = "$Revision: 1.29.6.2 $";
 
 /* ------------------------------------------------------------- */
 
@@ -571,17 +574,20 @@ static int __init b1pci_init(void)
 
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':'))) {
-		strncpy(driver->revision, p + 1, sizeof(driver->revision));
-		p = strchr(driver->revision, '$');
-		*p = 0;
-#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
-	        p = strchr(revision, ':');
-		strncpy(driverv4->revision, p + 1, sizeof(driverv4->revision));
-		p = strchr(driverv4->revision, '$');
-		*p = 0;
-#endif
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strncpy(driver->revision, p + 2, sizeof(driver->revision));
+		driver->revision[sizeof(driver->revision)-1] = 0;
+		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
+			*(p-1) = 0;
 	}
+#ifdef CONFIG_ISDN_DRV_AVMB1_B1PCIV4
+	if ((p = strchr(revision, ':')) != 0 && p[1]) {
+		strncpy(driverv4->revision, p + 2, sizeof(driverv4->revision));
+		driverv4->revision[sizeof(driverv4->revision)-1] = 0;
+		if ((p = strchr(driverv4->revision, '$')) != 0 && p > driverv4->revision)
+			*(p-1) = 0;
+	}
+#endif
 
 	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
 
