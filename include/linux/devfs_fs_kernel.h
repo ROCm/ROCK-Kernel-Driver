@@ -57,8 +57,6 @@ extern devfs_handle_t devfs_get_handle (devfs_handle_t dir, const char *name,
 					int traverse_symlinks);
 extern devfs_handle_t devfs_get_handle_from_inode (struct inode *inode);
 extern int devfs_generate_path (devfs_handle_t de, char *path, int buflen);
-extern void *devfs_get_ops (devfs_handle_t de);
-extern void devfs_put_ops (devfs_handle_t de);
 extern int devfs_set_file_size (devfs_handle_t de, unsigned long size);
 extern void *devfs_get_info (devfs_handle_t de);
 extern int devfs_set_info (devfs_handle_t de, void *info);
@@ -139,14 +137,6 @@ static inline int devfs_generate_path (devfs_handle_t de, char *path,
 				       int buflen)
 {
     return -ENOSYS;
-}
-static inline void *devfs_get_ops (devfs_handle_t de)
-{
-    return NULL;
-}
-static inline void devfs_put_ops (devfs_handle_t de)
-{
-    return;
 }
 static inline int devfs_set_file_size (devfs_handle_t de, unsigned long size)
 {
