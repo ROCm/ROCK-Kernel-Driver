@@ -94,6 +94,13 @@ MODULE_PARM_DESC(max_report_luns,
 		 "REPORT LUNS maximum number of LUNS received (should be"
 		 " between 1 and 16384)");
 
+static unsigned int scsi_inq_timeout = SCSI_TIMEOUT/HZ+3;
+
+module_param_named(inq_timeout, scsi_inq_timeout, int, S_IRUGO|S_IWUSR);
+MODULE_PARM_DESC(inq_timeout, 
+		 "Timeout (in seconds) waiting for devices to answer INQUIRY."
+		 " Default is 5. Some non-compliant devices need more.");
+
 /**
  * scsi_unlock_floptical - unlock device via a special MODE SENSE command
  * @sreq:	used to send the command
@@ -349,7 +356,7 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 
 	memset(inq_result, 0, 36);
 	scsi_wait_req(sreq, (void *) scsi_cmd, (void *) inq_result, 36,
-		      SCSI_TIMEOUT + 4 * HZ, 3);
+		      HZ/2 + HZ*scsi_inq_timeout, 3);
 
 	SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: 1st INQUIRY %s with"
 			" code 0x%x\n", sreq->sr_result ?
@@ -403,7 +410,7 @@ static void scsi_probe_lun(struct scsi_request *sreq, char *inq_result,
 		memset(inq_result, 0, possible_inq_resp_len);
 		scsi_wait_req(sreq, (void *) scsi_cmd,
 			      (void *) inq_result,
-			      possible_inq_resp_len, SCSI_TIMEOUT + 4 * HZ, 3);
+			      possible_inq_resp_len, (1+scsi_inq_timeout)*(HZ/2), 3);
 		SCSI_LOG_SCAN_BUS(3, printk(KERN_INFO "scsi scan: 2nd INQUIRY"
 				" %s with code 0x%x\n", sreq->sr_result ?
 				"failed" : "successful", sreq->sr_result));
