@@ -187,9 +187,9 @@ xfs_qm_dqdestroy(
  */
 STATIC void
 xfs_qm_dqinit_core(
-	xfs_dqid_t	 id,
-	uint		 type,
-	xfs_dqblk_t	 *d)
+	xfs_dqid_t	id,
+	uint		type,
+	xfs_dqblk_t	*d)
 {
 	/*
 	 * Caller has zero'd the entire dquot 'chunk' already.
@@ -250,6 +250,36 @@ __xfs_dqtrace_entry(
 
 
 /*
+ * If default limits are in force, push them into the dquot now.
+ * We overwrite the dquot limits only if they are zero and this
+ * is not the root dquot.
+ */
+void
+xfs_qm_adjust_dqlimits(
+	xfs_mount_t		*mp,
+	xfs_disk_dquot_t	*d)
+{
+	xfs_quotainfo_t		*q = mp->m_quotainfo;
+
+	ASSERT(!INT_ISZERO(d->d_id, ARCH_CONVERT));
+
+	if (q->qi_bsoftlimit && INT_ISZERO(d->d_blk_softlimit, ARCH_CONVERT))
+		INT_SET(d->d_blk_softlimit, ARCH_CONVERT, q->qi_bsoftlimit);
+	if (q->qi_bhardlimit && INT_ISZERO(d->d_blk_hardlimit, ARCH_CONVERT))
+		INT_SET(d->d_blk_hardlimit, ARCH_CONVERT, q->qi_bhardlimit);
+	if (q->qi_isoftlimit && INT_ISZERO(d->d_ino_softlimit, ARCH_CONVERT))
+		INT_SET(d->d_ino_softlimit, ARCH_CONVERT, q->qi_isoftlimit);
+	if (q->qi_ihardlimit && INT_ISZERO(d->d_ino_hardlimit, ARCH_CONVERT))
+		INT_SET(d->d_ino_hardlimit, ARCH_CONVERT, q->qi_ihardlimit);
+	if (q->qi_rtbsoftlimit &&
+	    INT_ISZERO(d->d_rtb_softlimit, ARCH_CONVERT))
+		INT_SET(d->d_rtb_softlimit, ARCH_CONVERT, q->qi_rtbsoftlimit);
+	if (q->qi_rtbhardlimit &&
+	    INT_ISZERO(d->d_rtb_hardlimit, ARCH_CONVERT))
+		INT_SET(d->d_rtb_hardlimit, ARCH_CONVERT, q->qi_rtbhardlimit);
+}
+
+/*
  * Check the limits and timers of a dquot and start or reset timers
  * if necessary.
  * This gets called even when quota enforcement is OFF, which makes our
@@ -265,51 +295,79 @@ xfs_qm_adjust_dqtimers(
 	xfs_mount_t		*mp,
 	xfs_disk_dquot_t	*d)
 {
-	/*
-	 * The dquot had better be locked. We are modifying it here.
-	 */
-
-	/*
-	 * root's limits are not real limits.
-	 */
-	if (INT_ISZERO(d->d_id, ARCH_CONVERT))
-		return;
+	ASSERT(!INT_ISZERO(d->d_id, ARCH_CONVERT));
 
 #ifdef QUOTADEBUG
 	if (INT_GET(d->d_blk_hardlimit, ARCH_CONVERT))
-		ASSERT(INT_GET(d->d_blk_softlimit, ARCH_CONVERT) <= INT_GET(d->d_blk_hardlimit, ARCH_CONVERT));
+		ASSERT(INT_GET(d->d_blk_softlimit, ARCH_CONVERT) <=
+			INT_GET(d->d_blk_hardlimit, ARCH_CONVERT));
 	if (INT_GET(d->d_ino_hardlimit, ARCH_CONVERT))
-		ASSERT(INT_GET(d->d_ino_softlimit, ARCH_CONVERT) <= INT_GET(d->d_ino_hardlimit, ARCH_CONVERT));
+		ASSERT(INT_GET(d->d_ino_softlimit, ARCH_CONVERT) <=
+			INT_GET(d->d_ino_hardlimit, ARCH_CONVERT));
+	if (INT_GET(d->d_rtb_hardlimit, ARCH_CONVERT))
+		ASSERT(INT_GET(d->d_rtb_softlimit, ARCH_CONVERT) <=
+			INT_GET(d->d_rtb_hardlimit, ARCH_CONVERT));
 #endif
 	if (INT_ISZERO(d->d_btimer, ARCH_CONVERT)) {
 		if ((INT_GET(d->d_blk_softlimit, ARCH_CONVERT) &&
-		    (INT_GET(d->d_bcount, ARCH_CONVERT) >= INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) ||
+		    (INT_GET(d->d_bcount, ARCH_CONVERT) >=
+				INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) ||
 		    (INT_GET(d->d_blk_hardlimit, ARCH_CONVERT) &&
-		    (INT_GET(d->d_bcount, ARCH_CONVERT) >= INT_GET(d->d_blk_hardlimit, ARCH_CONVERT)))) {
-			INT_SET(d->d_btimer, ARCH_CONVERT, get_seconds() + XFS_QI_BTIMELIMIT(mp));
+		    (INT_GET(d->d_bcount, ARCH_CONVERT) >=
+				INT_GET(d->d_blk_hardlimit, ARCH_CONVERT)))) {
+			INT_SET(d->d_btimer, ARCH_CONVERT,
+				get_seconds() + XFS_QI_BTIMELIMIT(mp));
 		}
 	} else {
 		if ((INT_ISZERO(d->d_blk_softlimit, ARCH_CONVERT) ||
-		    (INT_GET(d->d_bcount, ARCH_CONVERT) < INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) &&
+		    (INT_GET(d->d_bcount, ARCH_CONVERT) <
+				INT_GET(d->d_blk_softlimit, ARCH_CONVERT))) &&
 		    (INT_ISZERO(d->d_blk_hardlimit, ARCH_CONVERT) ||
-		    (INT_GET(d->d_bcount, ARCH_CONVERT) < INT_GET(d->d_blk_hardlimit, ARCH_CONVERT)))) {
+		    (INT_GET(d->d_bcount, ARCH_CONVERT) <
+				INT_GET(d->d_blk_hardlimit, ARCH_CONVERT)))) {
 			INT_ZERO(d->d_btimer, ARCH_CONVERT);
 		}
 	}
 
 	if (INT_ISZERO(d->d_itimer, ARCH_CONVERT)) {
 		if ((INT_GET(d->d_ino_softlimit, ARCH_CONVERT) &&
-		    (INT_GET(d->d_icount, ARCH_CONVERT) >= INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) ||
+		    (INT_GET(d->d_icount, ARCH_CONVERT) >=
+				INT_GET(d->d_ino_softlimit, ARCH_CONVERT))) ||
 		    (INT_GET(d->d_ino_hardlimit, ARCH_CONVERT) &&
-		    (INT_GET(d->d_icount, ARCH_CONVERT) >= INT_GET(d->d_ino_hardlimit, ARCH_CONVERT)))) {
-			INT_SET(d->d_itimer, ARCH_CONVERT, get_seconds() + XFS_QI_ITIMELIMIT(mp));
+		    (INT_GET(d->d_icount, ARCH_CONVERT) >=
+				INT_GET(d->d_ino_hardlimit, ARCH_CONVERT)))) {
+			INT_SET(d->d_itimer, ARCH_CONVERT,
+				get_seconds() + XFS_QI_ITIMELIMIT(mp));
 		}
 	} else {
 		if ((INT_ISZERO(d->d_ino_softlimit, ARCH_CONVERT) ||
-		    (INT_GET(d->d_icount, ARCH_CONVERT) < INT_GET(d->d_ino_softlimit, ARCH_CONVERT)))  &&
+		    (INT_GET(d->d_icount, ARCH_CONVERT) <
+				INT_GET(d->d_ino_softlimit, ARCH_CONVERT)))  &&
 		    (INT_ISZERO(d->d_ino_hardlimit, ARCH_CONVERT) ||
-		    (INT_GET(d->d_icount, ARCH_CONVERT) < INT_GET(d->d_ino_hardlimit, ARCH_CONVERT)))) {
+		    (INT_GET(d->d_icount, ARCH_CONVERT) <
+				INT_GET(d->d_ino_hardlimit, ARCH_CONVERT)))) {
 			INT_ZERO(d->d_itimer, ARCH_CONVERT);
+		}
+	}
+
+	if (INT_ISZERO(d->d_rtbtimer, ARCH_CONVERT)) {
+		if ((INT_GET(d->d_rtb_softlimit, ARCH_CONVERT) &&
+		    (INT_GET(d->d_rtbcount, ARCH_CONVERT) >=
+				INT_GET(d->d_rtb_softlimit, ARCH_CONVERT))) ||
+		    (INT_GET(d->d_rtb_hardlimit, ARCH_CONVERT) &&
+		    (INT_GET(d->d_rtbcount, ARCH_CONVERT) >=
+				INT_GET(d->d_rtb_hardlimit, ARCH_CONVERT)))) {
+			INT_SET(d->d_rtbtimer, ARCH_CONVERT,
+				get_seconds() + XFS_QI_RTBTIMELIMIT(mp));
+		}
+	} else {
+		if ((INT_ISZERO(d->d_rtb_softlimit, ARCH_CONVERT) ||
+		    (INT_GET(d->d_rtbcount, ARCH_CONVERT) <
+				INT_GET(d->d_rtb_softlimit, ARCH_CONVERT))) &&
+		    (INT_ISZERO(d->d_rtb_hardlimit, ARCH_CONVERT) ||
+		    (INT_GET(d->d_rtbcount, ARCH_CONVERT) <
+				INT_GET(d->d_rtb_hardlimit, ARCH_CONVERT)))) {
+			INT_ZERO(d->d_rtbtimer, ARCH_CONVERT);
 		}
 	}
 }
