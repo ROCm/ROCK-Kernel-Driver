@@ -170,16 +170,46 @@ static struct file_operations netlink_fops = {
 	.release =	netlink_release,
 };
 
-static struct { char *name; int minor; } entries[] = {
-	{"route", 0},
-	{"skip", 1},
-	{"usersock", 2},
-	{"fwmonitor", 3},
-	{"tcpdiag", 4},
-	{"arpd", 8},
-	{"route6", 11},
-	{"ip6_fw", 13},
-	{"dnrtmsg", 13},
+static struct {
+	char *name;
+	int minor;
+} entries[] = {
+	{
+		.name	= "route",
+		.minor	= 0,
+	},
+	{
+		.name	= "skip",
+		.minor	= 1,
+	},
+	{
+		.name	= "usersock",
+		.minor	= 2,
+	},
+	{
+		.name	= "fwmonitor",
+		.minor	= 3,
+	},
+	{
+		.name	= "tcpdiag",
+		.minor	= 4,
+	},
+	{
+		.name	= "arpd",
+		.minor	= 8,
+	},
+	{
+		.name	= "route6",
+		.minor	= 11,
+	},
+	{
+		.name	= "ip6_fw",
+		.minor	= 13,
+	},
+	{
+		.name	= "dnrtmsg",
+		.minor	= 13,
+	},
 };
 
 static void __init make_devfs_entries (const char *name, int minor)
