@@ -40,12 +40,84 @@
 #define DRIVER_DESC		"ATI Radeon"
 #define DRIVER_DATE		"20020828"
 
+/* Interface history:
+ *
+ * 1.1 - ??
+ * 1.2 - Add vertex2 ioctl (keith)
+ *     - Add stencil capability to clear ioctl (gareth, keith)
+ *     - Increase MAX_TEXTURE_LEVELS (brian)
+ * 1.3 - Add cmdbuf ioctl (keith)
+ *     - Add support for new radeon packets (keith)
+ *     - Add getparam ioctl (keith)
+ *     - Add flip-buffers ioctl, deprecate fullscreen foo (keith).
+ * 1.4 - Add scratch registers to get_param ioctl.
+ * 1.5 - Add r200 packets to cmdbuf ioctl
+ *     - Add r200 function to init ioctl
+ *     - Add 'scalar2' instruction to cmdbuf
+ * 1.6 - Add static GART memory manager
+ *       Add irq handler (won't be turned on unless X server knows to)
+ *       Add irq ioctls and irq_active getparam.
+ *       Add wait command for cmdbuf ioctl
+ *       Add GART offset query for getparam
+ * 1.7 - Add support for cube map registers: R200_PP_CUBIC_FACES_[0..5]
+ *       and R200_PP_CUBIC_OFFSET_F1_[0..5].
+ *       Added packets R200_EMIT_PP_CUBIC_FACES_[0..5] and
+ *       R200_EMIT_PP_CUBIC_OFFSETS_[0..5].  (brian)
+ * 1.8 - Remove need to call cleanup ioctls on last client exit (keith)
+ *       Add 'GET' queries for starting additional clients on different VT's.
+ * 1.9 - Add DRM_IOCTL_RADEON_CP_RESUME ioctl.
+ *       Add texture rectangle support for r100.
+ * 1.10- Add SETPARAM ioctl; first parameter to set is FB_LOCATION, which
+ *       clients use to tell the DRM where they think the framebuffer is 
+ *       located in the card's address space
+ * 1.11- Add packet R200_EMIT_RB3D_BLENDCOLOR to support GL_EXT_blend_color
+ *       and GL_EXT_blend_[func|equation]_separate on r200
+ * 1.12- Add R300 CP microcode support - this just loads the CP on r300
+ *       (No 3D support yet - just microcode loading)
+ */
 #define DRIVER_MAJOR		1
-#define DRIVER_MINOR		11
+#define DRIVER_MINOR		12
 #define DRIVER_PATCHLEVEL	0
 
 #define GET_RING_HEAD(dev_priv)		DRM_READ32(  (dev_priv)->ring_rptr, 0 )
 #define SET_RING_HEAD(dev_priv,val)	DRM_WRITE32( (dev_priv)->ring_rptr, 0, (val) )
+
+/*
+ * Radeon chip families
+ */
+enum radeon_family {
+	CHIP_R100,
+	CHIP_RS100,
+	CHIP_RV100,
+	CHIP_R200,
+	CHIP_RV200,
+	CHIP_RS200,
+	CHIP_R250,
+	CHIP_RS250,
+	CHIP_RV250,
+	CHIP_RV280,
+	CHIP_R300,
+	CHIP_RS300,
+	CHIP_RV350,
+	CHIP_LAST,
+};
+
+enum radeon_cp_microcode_version {
+	UCODE_R100,
+	UCODE_R200,
+	UCODE_R300,
+};
+
+/*
+ * Chip flags
+ */
+enum radeon_chip_flags {
+	CHIP_FAMILY_MASK = 0x0000ffffUL,
+	CHIP_FLAGS_MASK = 0xffff0000UL,
+	CHIP_IS_MOBILITY = 0x00010000UL,
+	CHIP_IS_IGP = 0x00020000UL,
+	CHIP_SINGLE_CRTC = 0x00040000UL,
+};
 
 typedef struct drm_radeon_freelist {
    	unsigned int age;
@@ -106,7 +178,7 @@ typedef struct drm_radeon_private {
 
 	int usec_timeout;
 
-	int is_r200;
+	int microcode_version;
 
 	int is_pci;
 	unsigned long phys_pci_gart;
