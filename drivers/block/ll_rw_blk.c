@@ -2275,9 +2275,9 @@ out:
 		__blk_put_request(q, freereq);
 
 	if (blk_queue_plugged(q)) {
-		int nr_queued = q->rq.count[READ] + q->rq.count[WRITE];
+		int nrq = q->rq.count[READ] + q->rq.count[WRITE] - q->in_flight;
 
-		if (nr_queued == q->unplug_thresh || bio_sync(bio))
+		if (nrq == q->unplug_thresh || bio_sync(bio))
 			__generic_unplug_device(q);
 	}
 	spin_unlock_irq(q->queue_lock);

@@ -348,6 +348,8 @@ struct request_queue
 
 	atomic_t		refcnt;
 
+	unsigned int		in_flight;
+
 	/*
 	 * sg stuff
 	 */
@@ -377,6 +379,9 @@ struct request_queue
 #define blk_fs_request(rq)	((rq)->flags & REQ_CMD)
 #define blk_pc_request(rq)	((rq)->flags & REQ_BLOCK_PC)
 #define blk_noretry_request(rq)	((rq)->flags & REQ_FAILFAST)
+#define blk_rq_started(rq)	((rq)->flags & REQ_STARTED)
+
+#define blk_account_rq(rq)	(blk_rq_started(rq) && blk_fs_request(rq))
 
 #define blk_pm_suspend_request(rq)	((rq)->flags & REQ_PM_SUSPEND)
 #define blk_pm_resume_request(rq)	((rq)->flags & REQ_PM_RESUME)
