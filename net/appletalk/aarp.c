@@ -981,7 +981,7 @@ static int aarp_get_info(char *buffer, char **start, off_t offset, int length)
 /* General module cleanup. Called from cleanup_module() in ddp.c. */
 void aarp_cleanup_module(void)
 {
-	del_timer(&aarp_timer);
+	del_timer_sync(&aarp_timer);
 	unregister_netdevice_notifier(&aarp_notifier);
 	unregister_snap_client(aarp_dl);
 	aarp_purge();
