@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.168 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.170 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.168 $	 $Date: 2004/11/08 15:55:12 $
+ *    $Revision: 1.170 $	 $Date: 2004/11/17 09:54:06 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.168 $"
+#define VERSION_QETH_C "$Revision: 1.170 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -2236,9 +2236,11 @@ qeth_rebuild_skb_vlan(struct qeth_card *card, struct sk_buff *skb,
 #ifdef CONFIG_QETH_VLAN
 	u16 *vlan_tag;
 
-	if (hdr->hdr.l3.ext_flags & QETH_HDR_EXT_VLAN_FRAME) {
+	if (hdr->hdr.l3.ext_flags &
+	    (QETH_HDR_EXT_VLAN_FRAME | QETH_HDR_EXT_INCLUDE_VLAN_TAG)) {
 		vlan_tag = (u16 *) skb_push(skb, VLAN_HLEN);
-		*vlan_tag = hdr->hdr.l3.vlan_id;
+		*vlan_tag = (hdr->hdr.l3.ext_flags & QETH_HDR_EXT_VLAN_FRAME)?
+			hdr->hdr.l3.vlan_id : *((u16 *)&hdr->hdr.l3.dest_addr[12]);
 		*(vlan_tag + 1) = skb->protocol;
 		skb->protocol = __constant_htons(ETH_P_8021Q);
 	}
@@ -3789,8 +3791,8 @@ qeth_fill_header(struct qeth_card *card, struct qeth_hdr *hdr,
 	 */
 	if (card->vlangrp && vlan_tx_tag_present(skb)) {
 		hdr->hdr.l3.ext_flags = (ipv == 4) ?
-			QETH_EXT_HDR_VLAN_FRAME :
-			QETH_EXT_HDR_INCLUDE_VLAN_TAG;
+			QETH_HDR_EXT_VLAN_FRAME :
+			QETH_HDR_EXT_INCLUDE_VLAN_TAG;
 		hdr->hdr.l3.vlan_id = vlan_tx_tag_get(skb);
 	}
 #endif /* CONFIG_QETH_VLAN */
@@ -6702,7 +6704,6 @@ qeth_wait_for_threads(struct qeth_card *card, unsigned long threads)
 static int
 qeth_stop_card(struct qeth_card *card)
 {
-	int recover_flag = 0;
 	int rc = 0;
 
 	QETH_DBF_TEXT(setup ,2,"stopcard");
@@ -6714,7 +6715,6 @@ qeth_stop_card(struct qeth_card *card)
 	if (card->read.state == CH_STATE_UP &&
 	    card->write.state == CH_STATE_UP &&
 	    (card->state == CARD_STATE_UP)) {
-		recover_flag = 1;
 		rtnl_lock();
 		dev_close(card->dev);
 		rtnl_unlock();
@@ -6733,7 +6733,7 @@ qeth_stop_card(struct qeth_card *card)
 		if (card->options.layer2)
 			qeth_layer2_process_vlans(card, 1);
 #endif
-		qeth_clear_ip_list(card, !card->use_hard_stop, recover_flag);
+		qeth_clear_ip_list(card, !card->use_hard_stop, 1);
 		qeth_clear_ipacmd_list(card);
 		card->state = CARD_STATE_HARDSETUP;
 	}
@@ -6901,6 +6901,7 @@ qeth_start_again(struct qeth_card *card)
 	rtnl_lock();
 	dev_open(card->dev);
 	rtnl_unlock();
+	/* this also sets saved unicast addresses */
 	qeth_set_multicast_list(card->dev);
 }
 
