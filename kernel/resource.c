@@ -244,9 +244,17 @@ static int find_resource(struct resource *root, struct resource *new,
 	struct resource *this = root->child;
 
 	new->start = root->start;
+	/*
+	 * Skip past an allocated resource that starts at 0, since the assignment
+	 * of this->start - 1 to new->end below would cause an underflow.
+	 */
+	if (this && this->start == 0) {
+		new->start = this->end + 1;
+		this = this->sibling;
+	}
 	for(;;) {
 		if (this)
-			new->end = this->start;
+			new->end = this->start - 1;
 		else
 			new->end = root->end;
 		if (new->start < min)
