@@ -62,13 +62,15 @@ void __put_task_struct(struct task_struct *tsk)
 		free_thread_info(tsk->thread_info);
 		kmem_cache_free(task_struct_cachep,tsk);
 	} else {
-		int cpu = smp_processor_id();
+		int cpu = get_cpu();
 
-		tsk = xchg(task_cache + cpu, tsk);
+		tsk = task_cache[cpu];
 		if (tsk) {
 			free_thread_info(tsk->thread_info);
 			kmem_cache_free(task_struct_cachep,tsk);
 		}
+		task_cache[cpu] = current;
+		put_cpu();
 	}
 }
 
@@ -126,8 +128,11 @@ static struct task_struct *dup_task_struct(struct task_struct *orig)
 {
 	struct task_struct *tsk;
 	struct thread_info *ti;
+	int cpu = get_cpu();
 
-	tsk = xchg(task_cache + smp_processor_id(), NULL);
+	tsk = task_cache[cpu];
+	task_cache[cpu] = NULL;
+	put_cpu();
 	if (!tsk) {
 		ti = alloc_thread_info();
 		if (!ti)
