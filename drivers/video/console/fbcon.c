@@ -2244,7 +2244,7 @@ static int fbcon_do_set_font(struct vc_data *vc, int w, int h,
 			yres = info->splash_data->splash_text_he;
 		}
 #endif
-		vc_resize(vc->vc_num, info->var.xres / w, info->var.yres / h);
+		vc_resize(vc->vc_num, xres / w, yres / h);
 		if (CON_IS_VISIBLE(vc) && softback_buf) {
 			int l = fbcon_softback_size / vc->vc_size_row;
 			if (l > 5)
