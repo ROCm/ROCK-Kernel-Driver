@@ -108,7 +108,7 @@ static const u8 reghyst[] = { 0x3a, 0x3e, 0x1e };
 #define VIA686A_TEMP_MODE_MASK 0x3F
 #define VIA686A_TEMP_MODE_CONTINUOUS (0x00)
 
-/* Conversions. Rounding and limit checking is only done on the TO_REG
+/* Conversions. Limit checking is only done on the TO_REG
    variants. 
 
 ********* VOLTAGE CONVERSIONS (Bob Dougherty) ********
@@ -123,49 +123,41 @@ static const u8 reghyst[] = { 0x3a, 0x3e, 0x1e };
  volts = (25*regVal+133)*factor
  regVal = (volts/factor-133)/25
  (These conversions were contributed by Jonathan Teh Soon Yew 
- <j.teh@iname.com>)
- 
- These get us close, but they don't completely agree with what my BIOS 
- says- they are all a bit low.  But, it all we have to go on... */
+ <j.teh@iname.com>) */
 static inline u8 IN_TO_REG(long val, int inNum)
 {
-	/* to avoid floating point, we multiply everything by 100.
-	 val is guaranteed to be positive, so we can achieve the effect of 
-	 rounding by (...*10+5)/10.  Note that the *10 is hidden in the 
-	 /250 (which should really be /2500).
-	 At the end, we need to /100 because we *100 everything and we need
-	 to /10 because of the rounding thing, so we /1000.   */
+	/* To avoid floating point, we multiply constants by 10 (100 for +12V).
+	   Rounding is done (120500 is actually 133000 - 12500).
+	   Remember that val is expressed in 0.001V/bit, which is why we divide
+	   by an additional 10000 (100000 for +12V): 1000 for val and 10 (100)
+	   for the constants. */
 	if (inNum <= 1)
 		return (u8)
-		    SENSORS_LIMIT(((val * 210240 - 13300) / 250 + 5) / 1000, 
-				  0, 255);
+		    SENSORS_LIMIT((val * 21024 - 1205000) / 250000, 0, 255);
 	else if (inNum == 2)
 		return (u8)
-		    SENSORS_LIMIT(((val * 157370 - 13300) / 250 + 5) / 1000, 
-				  0, 255);
+		    SENSORS_LIMIT((val * 15737 - 1205000) / 250000, 0, 255);
 	else if (inNum == 3)
 		return (u8)
-		    SENSORS_LIMIT(((val * 101080 - 13300) / 250 + 5) / 1000, 
-				  0, 255);
+		    SENSORS_LIMIT((val * 10108 - 1205000) / 250000, 0, 255);
 	else
-		return (u8) SENSORS_LIMIT(((val * 41714 - 13300) / 250 + 5)
-					  / 1000, 0, 255);
+		return (u8)
+		    SENSORS_LIMIT((val * 41714 - 12050000) / 2500000, 0, 255);
 }
 
 static inline long IN_FROM_REG(u8 val, int inNum)
 {
-	/* to avoid floating point, we multiply everything by 100.
-	 val is guaranteed to be positive, so we can achieve the effect of
-	 rounding by adding 0.5.  Or, to avoid fp math, we do (...*10+5)/10.
-	 We need to scale with *100 anyway, so no need to /100 at the end. */
+	/* To avoid floating point, we multiply constants by 10 (100 for +12V).
+	   We also multiply them by 1000 because we want 0.001V/bit for the
+	   output value. Rounding is done. */
 	if (inNum <= 1)
-		return (long) (((250000 * val + 13300) / 210240 * 10 + 5) /10);
+		return (long) ((250000 * val + 1330000 + 21024 / 2) / 21024);
 	else if (inNum == 2)
-		return (long) (((250000 * val + 13300) / 157370 * 10 + 5) /10);
+		return (long) ((250000 * val + 1330000 + 15737 / 2) / 15737);
 	else if (inNum == 3)
-		return (long) (((250000 * val + 13300) / 101080 * 10 + 5) /10);
+		return (long) ((250000 * val + 1330000 + 10108 / 2) / 10108);
 	else
-		return (long) (((250000 * val + 13300) / 41714 * 10 + 5) /10);
+		return (long) ((2500000 * val + 13300000 + 41714 / 2) / 41714);
 }
 
 /********* FAN RPM CONVERSIONS ********/
@@ -276,52 +268,31 @@ static const u8 viaLUT[] =
 	    239, 240
 };
 
-/* Converting temps to (8-bit) hyst and over registers 
- No interpolation here.  Just check the limits and go.
- The +5 effectively rounds off properly and the +50 is because 
- the temps start at -50 */
+/* Converting temps to (8-bit) hyst and over registers
+   No interpolation here.
+   The +50 is because the temps start at -50 */
 static inline u8 TEMP_TO_REG(long val)
 {
-	return (u8)
-	    SENSORS_LIMIT(viaLUT[((val <= -500) ? 0 : (val >= 1100) ? 160 : 
-				  ((val + 5) / 10 + 50))], 0, 255);
+	return viaLUT[val <= -50000 ? 0 : val >= 110000 ? 160 : 
+		      (val < 0 ? val - 500 : val + 500) / 1000 + 50];
 }
 
-/* for 8-bit temperature hyst and over registers 
- The temp values are already *10, so we don't need to do that.
- But we _will_ round these off to the nearest degree with (...*10+5)/10 */
-#define TEMP_FROM_REG(val) ((tempLUT[(val)]*10+5)/10)
+/* for 8-bit temperature hyst and over registers */
+#define TEMP_FROM_REG(val) (tempLUT[(val)] * 100)
 
-/* for 10-bit temperature readings 
- You might _think_ this is too long to inline, but's it's really only
- called once... */
+/* for 10-bit temperature readings */
 static inline long TEMP_FROM_REG10(u16 val)
 {
-	/* the temp values are already *10, so we don't need to do that. */
-	long temp;
 	u16 eightBits = val >> 2;
 	u16 twoBits = val & 3;
 
-	/* handle the extremes first (they won't interpolate well! ;-) */
-	if (val == 0)
-		return (long) tempLUT[0];
-	if (val == 1023)
-		return (long) tempLUT[255];
+	/* no interpolation for these */
+	if (twoBits == 0 || eightBits == 255)
+		return TEMP_FROM_REG(eightBits);
 
-	if (twoBits == 0)
-		return (long) tempLUT[eightBits];
-	else {
-		/* do some interpolation by multipying the lower and upper
-		 bounds by 25, 50 or 75, then /100. */
-		temp = ((25 * (4 - twoBits)) * tempLUT[eightBits]
-			+ (25 * twoBits) * tempLUT[eightBits + 1]);
-		/* increase the magnitude by 50 to achieve rounding. */
-		if (temp > 0)
-			temp += 50;
-		else
-			temp -= 50;
-		return (temp / 100);
-	}
+	/* do some linear interpolation */
+	return (tempLUT[eightBits] * (4 - twoBits) +
+	        tempLUT[eightBits + 1] * twoBits) * 25;
 }
 
 #define ALARMS_FROM_REG(val) (val)
@@ -375,24 +346,24 @@ static void via686a_init_client(struct i2c_client *client);
 /* 7 voltage sensors */
 static ssize_t show_in(struct device *dev, char *buf, int nr) {
 	struct via686a_data *data = via686a_update_device(dev);
-	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in[nr], nr)*10 );
+	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in[nr], nr));
 }
 
 static ssize_t show_in_min(struct device *dev, char *buf, int nr) {
 	struct via686a_data *data = via686a_update_device(dev);
-	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in_min[nr], nr)*10 );
+	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in_min[nr], nr));
 }
 
 static ssize_t show_in_max(struct device *dev, char *buf, int nr) {
 	struct via686a_data *data = via686a_update_device(dev);
-	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in_max[nr], nr)*10 );
+	return sprintf(buf, "%ld\n", IN_FROM_REG(data->in_max[nr], nr));
 }
 
 static ssize_t set_in_min(struct device *dev, const char *buf, 
 		size_t count, int nr) {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
-	unsigned long val = simple_strtoul(buf, NULL, 10)/10;
+	unsigned long val = simple_strtoul(buf, NULL, 10);
 	data->in_min[nr] = IN_TO_REG(val,nr);
 	via686a_write_value(client, VIA686A_REG_IN_MIN(nr), 
 			data->in_min[nr]);
@@ -402,7 +373,7 @@ static ssize_t set_in_max(struct device *dev, const char *buf,
 		size_t count, int nr) {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
-	unsigned long val = simple_strtoul(buf, NULL, 10)/10;
+	unsigned long val = simple_strtoul(buf, NULL, 10);
 	data->in_max[nr] = IN_TO_REG(val,nr);
 	via686a_write_value(client, VIA686A_REG_IN_MAX(nr), 
 			data->in_max[nr]);
@@ -449,21 +420,21 @@ show_in_offset(4);
 /* 3 temperatures */
 static ssize_t show_temp(struct device *dev, char *buf, int nr) {
 	struct via686a_data *data = via686a_update_device(dev);
-	return sprintf(buf, "%ld\n", TEMP_FROM_REG10(data->temp[nr])*100 );
+	return sprintf(buf, "%ld\n", TEMP_FROM_REG10(data->temp[nr]));
 }
 static ssize_t show_temp_over(struct device *dev, char *buf, int nr) {
 	struct via686a_data *data = via686a_update_device(dev);
-	return sprintf(buf, "%ld\n", TEMP_FROM_REG(data->temp_over[nr])*100);
+	return sprintf(buf, "%ld\n", TEMP_FROM_REG(data->temp_over[nr]));
 }
 static ssize_t show_temp_hyst(struct device *dev, char *buf, int nr) {
 	struct via686a_data *data = via686a_update_device(dev);
-	return sprintf(buf, "%ld\n", TEMP_FROM_REG(data->temp_hyst[nr])*100);
+	return sprintf(buf, "%ld\n", TEMP_FROM_REG(data->temp_hyst[nr]));
 }
 static ssize_t set_temp_over(struct device *dev, const char *buf, 
 		size_t count, int nr) {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
-	int val = simple_strtol(buf, NULL, 10)/100;
+	int val = simple_strtol(buf, NULL, 10);
 	data->temp_over[nr] = TEMP_TO_REG(val);
 	via686a_write_value(client, VIA686A_REG_TEMP_OVER(nr), data->temp_over[nr]);
 	return count;
@@ -472,7 +443,7 @@ static ssize_t set_temp_hyst(struct device *dev, const char *buf,
 		size_t count, int nr) {
 	struct i2c_client *client = to_i2c_client(dev);
 	struct via686a_data *data = i2c_get_clientdata(client);
-	int val = simple_strtol(buf, NULL, 10)/100;
+	int val = simple_strtol(buf, NULL, 10);
 	data->temp_hyst[nr] = TEMP_TO_REG(val);
 	via686a_write_value(client, VIA686A_REG_TEMP_HYST(nr), data->temp_hyst[nr]);
 	return count;
@@ -602,7 +573,7 @@ static struct i2c_driver via686a_driver = {
 /* This is called when the module is loaded */
 static int via686a_attach_adapter(struct i2c_adapter *adapter)
 {
-	if (!(adapter->class & I2C_ADAP_CLASS_SMBUS))
+	if (!(adapter->class & I2C_CLASS_HWMON))
 		return 0;
 	return i2c_detect(adapter, &addr_data, via686a_detect);
 }
