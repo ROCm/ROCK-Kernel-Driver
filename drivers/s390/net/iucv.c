@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.28 2004/04/15 06:34:58 braunu Exp $
+ * $Id: iucv.c,v 1.27.2.1 2004/04/15 09:18:47 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.28 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.27.2.1 $
  *
  */
 
@@ -351,7 +351,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.28 $";
+	char vbuf[] = "$Revision: 1.27.2.1 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
