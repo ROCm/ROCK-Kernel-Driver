@@ -104,7 +104,6 @@
 #include "seagate.h"
 #include <linux/stat.h>
 #include <asm/uaccess.h>
-#include "sd.h"
 #include <scsi/scsi_ioctl.h>
 
 #ifdef DEBUG

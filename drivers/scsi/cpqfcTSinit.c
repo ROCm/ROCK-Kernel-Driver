@@ -53,9 +53,9 @@
 #include <asm/uaccess.h>   // ioctl related
 #include <asm/irq.h>
 #include <linux/spinlock.h>
-#include "sd.h"
-#include <scsi/scsi_ioctl.h>
+#include "scsi.h"
 #include "hosts.h"
+#include <scsi/scsi_ioctl.h>
 #include "cpqfcTSchip.h"
 #include "cpqfcTSstructs.h"
 #include "cpqfcTStrigger.h"
@@ -1693,9 +1693,10 @@ int cpqfcTS_reset(Scsi_Cmnd *Cmnd, unsigned int reset_flags)
    (from hosts.h)
 */
 
-int cpqfcTS_biosparam(Disk *disk, struct block_device *n, int ip[])
+int cpqfcTS_biosparam(struct scsi_device *sdev, struct block_device *n,
+		sector_t capacity, int ip[])
 {
-  int size = disk->capacity;
+  int size = capacity;
   
   ENTER("cpqfcTS_biosparam");
   ip[0] = 64;

@@ -403,7 +403,6 @@ static Scsi_Host_Template cumanascsi_template = {
 	.eh_device_reset_handler= NCR5380_device_reset,
 	.eh_bus_reset_handler	= NCR5380_bus_reset,
 	.eh_host_reset_handler	= NCR5380_host_reset,
-	.bios_param		= scsicam_bios_param,
 	.can_queue		= 16,
 	.this_id		= 7,
 	.sg_tablesize		= SG_ALL,

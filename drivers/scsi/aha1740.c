@@ -36,7 +36,6 @@
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 
 #include "aha1740.h"
 #include<linux/stat.h>
@@ -590,10 +589,11 @@ int aha1740_reset(Scsi_Cmnd * SCpnt, unsigned int ignored)
     return SCSI_RESET_PUNT;
 }
 
-int aha1740_biosparam(Disk * disk, struct block_device *dev, int* ip)
+int aha1740_biosparam(struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int* ip)
 {
-    int size = disk->capacity;
-    int extended = HOSTDATA(disk->device->host)->translation;
+    int size = capacity;
+    int extended = HOSTDATA(sdev->host)->translation;
 
     DEB(printk("aha1740_biosparam\n"));
     if (extended && (ip[2] > 1024))

@@ -45,7 +45,6 @@
 #include <linux/isapnp.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include "sym53c416.h"
 
 #define VERSION_STRING        "Version 1.0.0-ac"
@@ -824,11 +823,13 @@ static int sym53c416_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
 	return SCSI_RESET_PENDING;
 }
 
-static int sym53c416_bios_param(Disk *disk, struct block_device *dev, int *ip)
+static int sym53c416_bios_param(struct scsi_device *sdev,
+		struct block_device *dev,
+		sector_t capacity, int *ip)
 {
 	int size;
 
-	size = disk->capacity;
+	size = capacity;
 	ip[0] = 64;				/* heads                        */
 	ip[1] = 32;				/* sectors                      */
 	if((ip[2] = size >> 11) > 1024)		/* cylinders, test for big disk */

@@ -1380,13 +1380,13 @@ int fd_mcs_reset( Scsi_Cmnd *SCpnt, unsigned int reset_flags )
   return SCSI_RESET_WAKEUP;
 }
 
-#include "sd.h"
 #include <scsi/scsi_ioctl.h>
 
-int fd_mcs_biosparam( Scsi_Disk *disk, struct block_device *bdev, int *info_array )
+int fd_mcs_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *info_array )
 {
   unsigned char    buf[512 + sizeof( int ) * 2];
-  int		    size      = disk->capacity;
+  int		    size      = capacity;
   int              *sizes    = (int *)buf;
   unsigned char    *data     = (unsigned char *)(sizes + 2);
   unsigned char    do_read[] = { READ_6, 0, 0, 0, 1, 0 };
@@ -1398,7 +1398,7 @@ int fd_mcs_biosparam( Scsi_Disk *disk, struct block_device *bdev, int *info_arra
   sizes[0] = 0;		/* zero bytes out */
   sizes[1] = 512;		/* one sector in */
   memcpy( data, do_read, sizeof( do_read ) );
-  retcode = kernel_scsi_ioctl( disk->device,
+  retcode = kernel_scsi_ioctl(sdev,
 			       SCSI_IOCTL_SEND_COMMAND,
 			       (void *)buf );
   if (!retcode				    /* SCSI command ok */

@@ -7,7 +7,8 @@ int qlogicfas_command(Scsi_Cmnd *);
 int qlogicfas_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 int qlogicfas_abort(Scsi_Cmnd *);
 int qlogicfas_reset(Scsi_Cmnd *, unsigned int);
-int qlogicfas_biosparam(Disk *, struct block_device *, int[]);
+int qlogicfas_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int[]);
 
 #ifndef NULL
 #define NULL (0)

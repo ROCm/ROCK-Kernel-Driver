@@ -55,7 +55,8 @@ int notyet_generic_proc_info (char *buffer ,char **start, off_t offset,
                      int length, int hostno, int inout);
 const char* generic_NCR5380_info(struct Scsi_Host *);
 #ifdef BIOSPARAM
-int generic_NCR5380_biosparam(Disk *, struct block_device *, int *);
+int generic_NCR5380_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 #endif
 
 int generic_NCR5380_proc_info(char* buffer, char** start, off_t offset, int length, int hostno, int inout);

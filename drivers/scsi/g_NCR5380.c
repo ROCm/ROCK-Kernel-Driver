@@ -116,7 +116,6 @@
 #include "hosts.h"
 #include "g_NCR5380.h"
 #include "NCR5380.h"
-#include "sd.h"
 #include <linux/stat.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
@@ -512,12 +511,12 @@ int generic_NCR5380_release_resources(struct Scsi_Host *instance)
  *	Locks: none
  */
 
-int generic_NCR5380_biosparam(Disk * disk, struct block_device *dev, int *ip)
+int generic_NCR5380_biosparam(struct scsi_device *sdev,
+		struct block_device *bdev, sector_t capacity, int *ip)
 {
-	int size = disk->capacity;
 	ip[0] = 64;
 	ip[1] = 32;
-	ip[2] = size >> 11;
+	ip[2] = capacity >> 11;
 	return 0;
 }
 #endif

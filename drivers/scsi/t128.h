@@ -92,7 +92,8 @@
 
 #ifndef ASM
 int t128_abort(Scsi_Cmnd *);
-int t128_biosparam(Disk *, struct block_device *, int*);
+int t128_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int*);
 int t128_detect(Scsi_Host_Template *);
 int t128_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int t128_host_reset(Scsi_Cmnd *);

@@ -232,7 +232,6 @@
 #include <linux/version.h>
 #include <linux/blk.h>
 #include "scsi.h"
-#include "sd.h"
 #include "hosts.h"
 #include <asm/system.h>
 #include <linux/errno.h>
@@ -1831,21 +1830,22 @@ int aha152x_host_reset(Scsi_Cmnd * SCpnt)
  * Return the "logical geometry"
  *
  */
-int aha152x_biosparam(Scsi_Disk * disk, struct block_device *bdev, int *info_array)
+int aha152x_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *info_array)
 {
-	struct Scsi_Host *shpnt = disk->device->host;
+	struct Scsi_Host *shpnt = sdev->host;
 
 	/* try default translation */
 	info_array[0] = 64;
 	info_array[1] = 32;
-	info_array[2] = (unsigned long)disk->capacity / (64 * 32);
+	info_array[2] = (unsigned long)capacity / (64 * 32);
 
 	/* for disks >1GB do some guessing */
 	if (info_array[2] >= 1024) {
 		int info[3];
 
 		/* try to figure out the geometry from the partition table */
-		if (scsicam_bios_param(disk, bdev, info) < 0 ||
+		if (scsicam_bios_param(bdev, capacity, info) < 0 ||
 		    !((info[0] == 64 && info[1] == 32) || (info[0] == 255 && info[1] == 63))) {
 			if (EXT_TRANS) {
 				printk(KERN_NOTICE
@@ -1853,7 +1853,7 @@ int aha152x_biosparam(Scsi_Disk * disk, struct block_device *bdev, int *info_arr
 				       "         using extended translation.\n");
 				info_array[0] = 255;
 				info_array[1] = 63;
-				info_array[2] = (unsigned long)disk->capacity / (255 * 63);
+				info_array[2] = (unsigned long)capacity / (255 * 63);
 			} else {
 				printk(KERN_NOTICE
 				       "aha152x: unable to verify geometry for disk with >1GB.\n"

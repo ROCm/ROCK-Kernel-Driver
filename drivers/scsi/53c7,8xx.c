@@ -241,7 +241,6 @@
 #include "scsi.h"
 #include "hosts.h"
 #include "53c7,8xx.h"
-#include "sd.h"
 #include <linux/stat.h>
 #include <linux/stddef.h>
 

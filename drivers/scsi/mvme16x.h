@@ -30,7 +30,6 @@ void NCR53c7x0_intr(int irq, void *dev_id, struct pt_regs * regs);
 		       queuecommand:        NCR53c7xx_queue_command, \
 		       abort:               NCR53c7xx_abort,   \
 		       reset:               NCR53c7xx_reset,   \
-		       bios_param:          scsicam_bios_param,   \
 		       can_queue:           24,       \
 		       this_id:             7,               \
 		       sg_tablesize:        63,          \

@@ -32,7 +32,6 @@
 #include <linux/spinlock.h>
 #include <asm/io.h>
 #include <linux/init.h>
-#include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
 #include "ibmmca.h"
@@ -2382,9 +2381,10 @@ int ibmmca_reset (Scsi_Cmnd * cmd, unsigned int reset_flags)
      return SCSI_RESET_SUCCESS;
 }
 
-int ibmmca_biosparam (Disk * disk, struct block_device *dev, int *info)
+int ibmmca_biosparam (struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *info)
 {
-   int size = disk->capacity;
+   int size = capacity;
    info[0] = 64;
    info[1] = 32;
    info[2] = size / (info[0] * info[1]);

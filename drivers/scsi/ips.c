@@ -169,7 +169,6 @@
 
 #include <scsi/sg.h>
 
-#include "sd.h"
 #include "scsi.h"
 #include "hosts.h"
 #include "ips.h"
@@ -432,7 +431,8 @@ int ips_release(struct Scsi_Host *);
 int ips_eh_abort(Scsi_Cmnd *);
 int ips_eh_reset(Scsi_Cmnd *);
 int ips_queue(Scsi_Cmnd *, void (*) (Scsi_Cmnd *));
-int ips_biosparam(Disk *, struct block_device *, int *);
+int ips_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 int ips_slave_attach(Scsi_Device *);
 const char * ips_info(struct Scsi_Host *);
 void do_ipsintr(int, void *, struct pt_regs *);
@@ -1777,7 +1777,8 @@ ips_queue(Scsi_Cmnd *SC, void (*done) (Scsi_Cmnd *)) {
 /*                                                                          */
 /****************************************************************************/
 int
-ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
+ips_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int geom[]) {
    ips_ha_t         *ha;
    int               heads;
    int               sectors;
@@ -1785,7 +1786,7 @@ ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
 
    METHOD_TRACE("ips_biosparam", 1);
 
-   ha = (ips_ha_t *) disk->device->host->hostdata;
+   ha = (ips_ha_t *) sdev->host->hostdata;
 
    if (!ha)
       /* ?!?! host adater info invalid */
@@ -1798,7 +1799,7 @@ ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
       /* ?!?! Enquiry command failed */
       return (0);
 
-   if ((disk->capacity > 0x400000) &&
+   if ((capacity > 0x400000) &&
        ((ha->enq->ucMiscFlag & 0x8) == 0)) {
       heads = IPS_NORM_HEADS;
       sectors = IPS_NORM_SECTORS;
@@ -1807,7 +1808,7 @@ ips_biosparam(Disk *disk, struct block_device *dev, int geom[]) {
       sectors = IPS_COMP_SECTORS;
    }
 
-   cylinders = (unsigned long)disk->capacity / (heads * sectors);
+   cylinders = (unsigned long)capacity / (heads * sectors);
 
    DEBUG_VAR(2, "Geometry: heads: %d, sectors: %d, cylinders: %d",
              heads, sectors, cylinders);

@@ -51,7 +51,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include <scsi/sg.h>
 
 #define IDESCSI_DEBUG_LOG		0
@@ -840,9 +839,10 @@ int idescsi_reset (Scsi_Cmnd *cmd, unsigned int resetflags)
 	return SCSI_RESET_SUCCESS;
 }
 
-static int idescsi_bios(Disk *disk, struct block_device *dev, int *parm)
+static int idescsi_bios(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int *parm)
 {
-	ide_drive_t *drive = idescsi_drives[disk->device->id];
+	ide_drive_t *drive = idescsi_drives[sdev->id];
 
 	if (drive->bios_cyl && drive->bios_head && drive->bios_sect) {
 		parm[0] = drive->bios_head;

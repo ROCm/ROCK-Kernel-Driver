@@ -41,9 +41,7 @@
 #include <asm/irq.h>
 #include <asm/dma.h>
 
-
-
-#include "sd.h"
+#include "scsi.h"
 #include "hosts.h"   // struct Scsi_Host definition for T handler
 #include "cpqfcTSchip.h"
 #include "cpqfcTSstructs.h"

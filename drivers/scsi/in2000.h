@@ -402,7 +402,8 @@ static int in2000_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 static int in2000_abort(Scsi_Cmnd *);
 static void in2000_setup(char *, int *) in2000__INIT;
 static int in2000_proc_info(char *, char **, off_t, int, int, int);
-static int in2000_biosparam(struct scsi_disk *, struct block_device *, int *);
+static int in2000_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 static int in2000_host_reset(Scsi_Cmnd *);
 static int in2000_bus_reset(Scsi_Cmnd *);
 static int in2000_device_reset(Scsi_Cmnd *);

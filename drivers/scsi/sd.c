@@ -181,9 +181,11 @@ sd_find_target(void *hp, int scsi_id)
 static int sd_ioctl(struct inode * inode, struct file * filp, 
 		    unsigned int cmd, unsigned long arg)
 {
-	struct gendisk *disk = inode->i_bdev->bd_disk;
+	struct block_device *bdev = inode->i_bdev;
+	struct gendisk *disk = bdev->bd_disk;
         Scsi_Disk *sdkp = disk->private_data;
 	Scsi_Device *sdp = sdkp->device;
+	sector_t capacity = sdkp->capacity;
 	struct Scsi_Host *host;
 	int diskinfo[4];
 	int error;
@@ -199,19 +201,19 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 	 * access to the device is prohibited.
 	 */
 
-	if( !scsi_block_when_processing_errors(sdp) )
+	if (!scsi_block_when_processing_errors(sdp))
 		return -ENODEV;
 
-	error = scsi_cmd_ioctl(inode->i_bdev, cmd, arg);
+	error = scsi_cmd_ioctl(bdev, cmd, arg);
 	if (error != -ENOTTY)
 		return error;
 
-	switch (cmd) 
-	{
+	switch (cmd) {
 		case HDIO_GETGEO:   /* Return BIOS disk parameters */
 		{
-			struct hd_geometry *loc = (struct hd_geometry *) arg;
-			if(!loc)
+			struct hd_geometry *loc = (struct hd_geometry *)arg;
+
+			if (!loc)
 				return -EINVAL;
 
 			host = sdp->host;
@@ -225,22 +227,25 @@ static int sd_ioctl(struct inode * inode, struct file * filp,
 			/* override with calculated, extended default, 
 			   or driver values */
 	
-			if(host->hostt->bios_param != NULL)
-				host->hostt->bios_param(sdkp, inode->i_bdev,
-							&diskinfo[0]);
-			else
-				scsicam_bios_param(sdkp, inode->i_bdev, &diskinfo[0]);
-			if (put_user(diskinfo[0], &loc->heads) ||
-				put_user(diskinfo[1], &loc->sectors) ||
-				put_user(diskinfo[2], &loc->cylinders) ||
-				put_user((unsigned) 
-					     get_start_sect(inode->i_bdev),
-					 (unsigned long *) &loc->start))
+			if (host->hostt->bios_param) {
+				host->hostt->bios_param(sdp, bdev,
+							capacity, diskinfo);
+			} else
+				scsicam_bios_param(bdev, capacity, diskinfo);
+
+			if (put_user(diskinfo[0], &loc->heads))
+				return -EFAULT;
+			if (put_user(diskinfo[1], &loc->sectors))
+				return -EFAULT;
+			if (put_user(diskinfo[2], &loc->cylinders))
+				return -EFAULT;
+			if (put_user((unsigned)get_start_sect(bdev),
+				     (unsigned long *)&loc->start))
 				return -EFAULT;
 			return 0;
 		}
 		default:
-			return scsi_ioctl(sdp, cmd, (void *) arg);
+			return scsi_ioctl(sdp, cmd, (void *)arg);
 	}
 }
 

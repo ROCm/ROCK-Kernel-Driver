@@ -1027,11 +1027,12 @@ static int i2o_scsi_device_reset(Scsi_Cmnd * SCpnt)
  *	else appears to and hope. It seems to work.
  */
  
-static int i2o_scsi_bios_param(Disk * disk, struct block_device *dev, int *ip)
+static int i2o_scsi_bios_param(struct scsi_device * sdev,
+		struct block_device *dev, sector_t capacity, int *ip)
 {
 	int size;
 
-	size = disk->capacity;
+	size = capacity;
 	ip[0] = 64;		/* heads                        */
 	ip[1] = 32;		/* sectors                      */
 	if ((ip[2] = size >> 11) > 1024) {	/* cylinders, test for big disk */

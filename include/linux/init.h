@@ -94,7 +94,7 @@ extern struct kernel_param __setup_start, __setup_end;
  * or exit time.
  */
 #define __init		__attribute__ ((__section__ (".init.text")))
-#define __exit		__attribute__ ((unused, __section__(".exit.text")))
+#define __exit		//__attribute__ ((unused, __section__(".exit.text")))
 #define __initdata	__attribute__ ((__section__ (".init.data")))
 #define __exitdata	__attribute__ ((unused, __section__ (".exit.data")))
 #define __initsetup	__attribute__ ((unused,__section__ (".init.setup")))

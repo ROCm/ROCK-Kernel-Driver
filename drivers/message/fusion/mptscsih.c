@@ -78,7 +78,6 @@
 #include <linux/reboot.h>	/* notifier code */
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "../../scsi/sd.h"
 
 #include "mptbase.h"
 #include "mptscsih.h"
@@ -3639,15 +3638,18 @@ mptscsih_taskmgmt_complete(MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *m
  *	This is anyones guess quite frankly.
  */
 int
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,28)
-mptscsih_bios_param(Disk * disk, struct block_device *dev, int *ip)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,44)
+mptscsih_bios_param(struct scsi_device * sdev, struct block_device *bdev,
+		sector_t capacity, int *ip)
+{
 #else
 mptscsih_bios_param(Disk * disk, kdev_t dev, int *ip)
-#endif
 {
+	sector_t capacity = disk->capacity;
+#endif
 	int size;
 
-	size = disk->capacity;
+	size = capacity;
 	ip[0] = 64;				/* heads			*/
 	ip[1] = 32;				/* sectors			*/
 	if ((ip[2] = size >> 11) > 1024) {	/* cylinders, test for big disk */

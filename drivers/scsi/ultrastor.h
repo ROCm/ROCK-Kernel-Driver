@@ -18,7 +18,8 @@ const char *ultrastor_info(struct Scsi_Host * shpnt);
 int ultrastor_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int ultrastor_abort(Scsi_Cmnd *);
 int ultrastor_reset(Scsi_Cmnd *, unsigned int);
-int ultrastor_biosparam(Disk *, struct block_device *, int *);
+int ultrastor_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 
 
 #define ULTRASTOR_14F_MAX_SG 16

@@ -2712,20 +2712,19 @@ stop_output:
 	return (len);
 }
 
-#include "sd.h"
-
-static int atp870u_biosparam(Scsi_Disk * disk, struct block_device *dev, int *ip)
+static int atp870u_biosparam(struct scsi_device *sdev,
+		struct block_device *dev, sector_t capacity, int *ip)
 {
 	int heads, sectors, cylinders;
 
 	heads = 64;
 	sectors = 32;
-	cylinders = (unsigned long)disk->capacity / (heads * sectors);
+	cylinders = (unsigned long)capacity / (heads * sectors);
 
 	if (cylinders > 1024) {
 		heads = 255;
 		sectors = 63;
-		cylinders = (unsigned long)disk->capacity / (heads * sectors);
+		cylinders = (unsigned long)capacity / (heads * sectors);
 	}
 	ip[0] = heads;
 	ip[1] = sectors;

@@ -30,7 +30,8 @@
 
 #ifndef ASM
 int dtc_abort(Scsi_Cmnd *);
-int dtc_biosparam(Disk *, struct block_device *, int*);
+int dtc_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int*);
 int dtc_detect(Scsi_Host_Template *);
 int dtc_queue_command(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int dtc_reset(Scsi_Cmnd *, unsigned int reset_flags);

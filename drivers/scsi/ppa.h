@@ -87,7 +87,6 @@
 #include  <linux/interrupt.h>
 
 #include  <asm/io.h>
-#include  "sd.h"
 #include  "hosts.h"
 /* batteries not included :-) */
 
@@ -169,7 +168,8 @@ int ppa_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 int ppa_abort(Scsi_Cmnd *);
 int ppa_reset(Scsi_Cmnd *);
 int ppa_proc_info(char *, char **, off_t, int, int, int);
-int ppa_biosparam(Disk *, struct block_device *, int *);
+int ppa_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 
 #define PPA {	proc_name:			"ppa",		\
 		proc_info:			ppa_proc_info,		\

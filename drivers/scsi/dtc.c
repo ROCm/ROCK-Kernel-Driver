@@ -83,7 +83,6 @@
 #include "dtc.h"
 #define AUTOPROBE_IRQ
 #include "NCR5380.h"
-#include "sd.h"
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/init.h>
@@ -314,9 +313,10 @@ int __init dtc_detect(Scsi_Host_Template * tpnt){
  * and matching the H_C_S coordinates to what DOS uses.
 */
 
-int dtc_biosparam(Disk * disk, struct block_device *dev, int * ip)
+int dtc_biosparam(struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int * ip)
 {
-   int size = disk->capacity;
+   int size = capacity;
 
    ip[0] = 64;
    ip[1] = 32;

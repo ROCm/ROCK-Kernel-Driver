@@ -1489,7 +1489,6 @@ init_driver_template(int ctlr)
 	driver_template[ctlr].queuecommand = cciss_scsi_queue_command;
 	driver_template[ctlr].eh_abort_handler = NULL;
 	driver_template[ctlr].eh_device_reset_handler = NULL;
-	driver_template[ctlr].bios_param = scsicam_bios_param;
 	driver_template[ctlr].can_queue = SCSI_CCISS_CAN_QUEUE;
 	driver_template[ctlr].this_id = 7;
 	driver_template[ctlr].sg_tablesize = MAXSGENTRIES;

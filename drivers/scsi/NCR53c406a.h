@@ -50,7 +50,8 @@ int NCR53c406a_command(Scsi_Cmnd *);
 int NCR53c406a_queue(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int NCR53c406a_abort(Scsi_Cmnd *);
 int NCR53c406a_reset(Scsi_Cmnd *, unsigned int);
-int NCR53c406a_biosparm(Disk *, struct block_device *, int []);
+int NCR53c406a_biosparm(struct scsi_device *, struct block_device *,
+		sector_t capacity, int []);
 
 #endif /* _NCR53C406A_H */
 

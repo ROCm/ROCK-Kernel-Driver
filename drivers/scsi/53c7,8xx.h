@@ -64,7 +64,6 @@ extern int NCR53c7xx_release(struct Scsi_Host *);
 	  queuecommand:   NCR53c7xx_queue_command,	\
 	  abort:          NCR53c7xx_abort,		\
 	  reset:          NCR53c7xx_reset,		\
-	  bios_param:     scsicam_bios_param,		\
 	  can_queue:      24,				\
 	  this_id:        7,				\
 	  sg_tablesize:   127,				\

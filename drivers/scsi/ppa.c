@@ -19,7 +19,7 @@
 #include <asm/io.h>
 #include <linux/parport.h>
 #include <linux/workqueue.h>
-#include "sd.h"
+#include "scsi.h"
 #include "hosts.h"
 int ppa_release(struct Scsi_Host *);
 static void ppa_reset_pulse(unsigned int base);
@@ -996,15 +996,16 @@ int ppa_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
  * be done in sd.c.  Even if it gets fixed there, this will still
  * work.
  */
-int ppa_biosparam(Disk * disk, struct block_device *dev, int ip[])
+int ppa_biosparam(struct scsi_device *sdev, struct block_device *dev,
+		sector_t capacity, int ip[])
 {
     ip[0] = 0x40;
     ip[1] = 0x20;
-    ip[2] = ((unsigned long)disk->capacity + 1) / (ip[0] * ip[1]);
+    ip[2] = ((unsigned long)capacity + 1) / (ip[0] * ip[1]);
     if (ip[2] > 1024) {
 	ip[0] = 0xff;
 	ip[1] = 0x3f;
-	ip[2] = ((unsigned long)disk->capacity + 1) / (ip[0] * ip[1]);
+	ip[2] = ((unsigned long)capacity + 1) / (ip[0] * ip[1]);
 	if (ip[2] > 1023)
 	    ip[2] = 1023;
     }

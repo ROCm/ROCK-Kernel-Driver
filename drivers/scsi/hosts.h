@@ -26,6 +26,7 @@
 
 #include <linux/config.h>
 #include <linux/proc_fs.h>
+#include <linux/types.h>
 #include <linux/pci.h>
 
 /* It is senseless to set SG_ALL any higher than this - the performance
@@ -228,7 +229,8 @@ typedef struct	SHT
      * the host adapter.  Parameters:
      * size, device, list (heads, sectors, cylinders)
      */
-    int (* bios_param)(Disk *, struct block_device *, int []);
+    int (* bios_param)(struct scsi_device *, struct block_device *,
+		    sector_t, int []);
 
     /*
      * This determines if we will use a non-interrupt driven

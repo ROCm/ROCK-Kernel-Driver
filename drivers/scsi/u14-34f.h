@@ -11,7 +11,8 @@ int u14_34f_release(struct Scsi_Host *);
 int u14_34f_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int u14_34f_abort(Scsi_Cmnd *);
 int u14_34f_reset(Scsi_Cmnd *);
-int u14_34f_biosparam(Disk *, struct block_device *, int *);
+int u14_34f_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 
 #define U14_34F_VERSION "7.22.00"
 

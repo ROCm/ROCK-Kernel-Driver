@@ -157,7 +157,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 
 #include <linux/types.h>
 

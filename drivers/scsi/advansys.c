@@ -810,7 +810,6 @@
 #endif
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 #include "advansys.h"
 #ifdef CONFIG_PCI
 #include <linux/pci.h>
@@ -6115,16 +6114,17 @@ advansys_reset(Scsi_Cmnd *scp)
  * ip[2]: cylinders
  */
 int
-advansys_biosparam(Disk *dp, struct block_device *dep, int ip[])
+advansys_biosparam(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int ip[])
 {
     asc_board_t     *boardp;
 
     ASC_DBG(1, "advansys_biosparam: begin\n");
-    ASC_STATS(dp->device->host, biosparam);
-    boardp = ASC_BOARDP(dp->device->host);
+    ASC_STATS(sdev->host, biosparam);
+    boardp = ASC_BOARDP(sdev->host);
     if (ASC_NARROW_BOARD(boardp)) {
         if ((boardp->dvc_var.asc_dvc_var.dvc_cntl &
-             ASC_CNTL_BIOS_GT_1GB) && dp->capacity > 0x200000) {
+             ASC_CNTL_BIOS_GT_1GB) && capacity > 0x200000) {
                 ip[0] = 255;
                 ip[1] = 63;
         } else {
@@ -6133,7 +6133,7 @@ advansys_biosparam(Disk *dp, struct block_device *dep, int ip[])
         }
     } else {
         if ((boardp->dvc_var.adv_dvc_var.bios_ctrl &
-             BIOS_CTRL_EXTENDED_XLAT) && dp->capacity > 0x200000) {
+             BIOS_CTRL_EXTENDED_XLAT) && capacity > 0x200000) {
                 ip[0] = 255;
                 ip[1] = 63;
         } else {
@@ -6141,7 +6141,7 @@ advansys_biosparam(Disk *dp, struct block_device *dep, int ip[])
                 ip[1] = 32;
         }
     }
-    ip[2] = (unsigned long)dp->capacity / (ip[0] * ip[1]);
+    ip[2] = (unsigned long)capacity / (ip[0] * ip[1]);
     ASC_DBG(1, "advansys_biosparam: end\n");
     return 0;
 }

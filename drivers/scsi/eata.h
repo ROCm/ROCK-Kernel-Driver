@@ -11,7 +11,8 @@ int eata2x_release(struct Scsi_Host *);
 int eata2x_queuecommand(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
 int eata2x_abort(Scsi_Cmnd *);
 int eata2x_reset(Scsi_Cmnd *);
-int eata2x_biosparam(Disk *, struct block_device *, int *);
+int eata2x_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 static int eata2x_slave_attach(Scsi_Device *);
 
 #define EATA_VERSION "7.22.00"

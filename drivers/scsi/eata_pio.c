@@ -51,7 +51,6 @@
 #include "eata_pio.h"
 #include "eata_dma_proc.h"
 #include "scsi.h"
-#include "sd.h"
 
 #include <linux/stat.h>
 #include <linux/config.h>	/* for CONFIG_PCI */

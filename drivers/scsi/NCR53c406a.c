@@ -55,8 +55,6 @@
 #include <linux/spinlock.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
-
 #include "NCR53c406a.h"
 
 /* ============================================================= */
@@ -761,12 +759,13 @@ NCR53c406a_reset(Scsi_Cmnd *SCpnt, unsigned int ignored){
 }
 
 int 
-NCR53c406a_biosparm(Scsi_Disk *disk, struct block_device *dev, int* info_array){
+NCR53c406a_biosparm(struct scsi_device *sdev, struct block_device *bdev,
+		sector_t capacity, int* info_array){
     int size;
     
     DEB(printk("NCR53c406a_biosparm called\n"));
     
-    size = disk->capacity;
+    size = capacity;
     info_array[0] = 64;         /* heads */
     info_array[1] = 32;         /* sectors */
     info_array[2] = size>>11;   /* cylinders */

@@ -72,7 +72,6 @@ info:			macscsi_info,					\
 queuecommand:		macscsi_queue_command,				\
 abort:			macscsi_abort,			 		\
 reset:			macscsi_reset,					\
-bios_param:		scsicam_bios_param,	/* biosparam */		\
 can_queue:		CAN_QUEUE,		/* can queue */		\
 this_id:		7,			/* id */		\
 sg_tablesize:		SG_ALL,			/* sg_tablesize */	\

@@ -75,7 +75,8 @@ const char * isp2x00_info(struct Scsi_Host *);
 int isp2x00_queuecommand(Scsi_Cmnd *, void (* done)(Scsi_Cmnd *));
 int isp2x00_abort(Scsi_Cmnd *);
 int isp2x00_reset(Scsi_Cmnd *, unsigned int);
-int isp2x00_biosparam(Disk *, struct block_device *, int[]);
+int isp2x00_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int[]);
 
 #ifndef NULL
 #define NULL (0)

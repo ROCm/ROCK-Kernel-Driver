@@ -51,7 +51,6 @@
 
 #include <../drivers/scsi/scsi.h>
 #include <../drivers/scsi/hosts.h>
-#include <../drivers/scsi/sd.h>
 
 #include <scsi/scsi.h>
 #include <scsi/scsi_ioctl.h>

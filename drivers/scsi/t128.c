@@ -116,7 +116,6 @@
 #include "t128.h"
 #define AUTOPROBE_IRQ
 #include "NCR5380.h"
-#include "sd.h"
 #include <linux/stat.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -298,12 +297,12 @@ int __init t128_detect(Scsi_Host_Template * tpnt){
  * and matching the H_C_S coordinates to what DOS uses.
  */
 
-int t128_biosparam(Disk * disk, struct block_device *dev, int * ip)
+int t128_biosparam(struct scsi_device *₍sdev, struct block_device *bdev,
+		sector_t capacity, int * ip)
 {
-  int size = disk->capacity;
   ip[0] = 64;
   ip[1] = 32;
-  ip[2] = size >> 11;
+  ip[2] = capacity >> 11;
   return 0;
 }
 

@@ -119,7 +119,6 @@
 #include <linux/stat.h>
 
 #include "scsi.h"
-#include "sd.h"
 #include "hosts.h"
 
 #define IN2000_VERSION    "1.33"
@@ -2161,11 +2160,13 @@ char buf[32];
  *       supposed to do...
  */
 
-static int in2000_biosparam(Disk *disk, struct block_device *dev, int *iinfo)
+static int in2000_biosparam(struct scsi_device *sdev,
+		struct block_device *bdev,
+		sector_t capacity, int *iinfo)
 {
 int size;
 
-   size  = disk->capacity;
+   size  = capacity;
    iinfo[0] = 64;
    iinfo[1] = 32;
    iinfo[2] = size >> 11;
@@ -2177,17 +2178,17 @@ int size;
    if (iinfo[2] > 1024) {
       iinfo[0] = 64;
       iinfo[1] = 63;
-      iinfo[2] = (unsigned long)disk->capacity / (iinfo[0] * iinfo[1]);
+      iinfo[2] = (unsigned long)capacity / (iinfo[0] * iinfo[1]);
       }
    if (iinfo[2] > 1024) {
       iinfo[0] = 128;
       iinfo[1] = 63;
-      iinfo[2] = (unsigned long)disk->capacity / (iinfo[0] * iinfo[1]);
+      iinfo[2] = (unsigned long)capacity / (iinfo[0] * iinfo[1]);
       }
    if (iinfo[2] > 1024) {
       iinfo[0] = 255;
       iinfo[1] = 63;
-      iinfo[2] = (unsigned long)disk->capacity / (iinfo[0] * iinfo[1]);
+      iinfo[2] = (unsigned long)capacity / (iinfo[0] * iinfo[1]);
       }
     return 0;
 }

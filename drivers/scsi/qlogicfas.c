@@ -126,7 +126,7 @@
 #include <linux/spinlock.h>
 #include <asm/io.h>
 #include <asm/irq.h>
-#include "sd.h"
+#include "scsi.h"
 #include "hosts.h"
 #include "qlogicfas.h"
 #include <linux/stat.h>
@@ -651,16 +651,18 @@ host->proc_name =  "qlogicfas";
 
 /*----------------------------------------------------------------*/
 /* return bios parameters */
-int	qlogicfas_biosparam(Disk * disk, struct block_device *dev, int ip[])
+int	qlogicfas_biosparam(struct scsi_device * sdev,
+		struct block_device *dev,
+		sector_t capacity, int ip[])
 {
 /* This should mimic the DOS Qlogic driver's behavior exactly */
 	ip[0] = 0x40;
 	ip[1] = 0x20;
-	ip[2] = (unsigned long)disk->capacity / (ip[0] * ip[1]);
+	ip[2] = (unsigned long)capacity / (ip[0] * ip[1]);
 	if (ip[2] > 1024) {
 		ip[0] = 0xff;
 		ip[1] = 0x3f;
-		ip[2] = (unsigned long)disk->capacity / (ip[0] * ip[1]);
+		ip[2] = (unsigned long)capacity / (ip[0] * ip[1]);
 #if 0
 		if (ip[2] > 1023)
 			ip[2] = 1023;

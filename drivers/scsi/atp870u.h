@@ -21,7 +21,8 @@ static int atp870u_detect(Scsi_Host_Template *);
 static int atp870u_command(Scsi_Cmnd *);
 static int atp870u_queuecommand(Scsi_Cmnd *, void (*done) (Scsi_Cmnd *));
 static int atp870u_abort(Scsi_Cmnd *);
-static int atp870u_biosparam(Disk *, struct block_device *, int *);
+static int atp870u_biosparam(struct scsi_device *, struct block_device *,
+		sector_t, int *);
 static int atp870u_release(struct Scsi_Host *);
 
 #define qcnt		32

@@ -37,11 +37,12 @@
 #include <linux/blk.h>
 #include "scsi.h"
 #include "hosts.h"
-#include "sd.h"
 
 #include "aacraid.h"
 
-/* FIXME: We share this with sd.c - wants putting in one spot only */
+#warning this is broken
+#define N_SD_MAJORS	8
+#define SD_MAJOR_MASK	(N_SD_MAJORS - 1)
 #define DEVICE_NR(device) (((major(device) & SD_MAJOR_MASK) << (8 - 4)) + (minor(device) >> 4))
 
 /*	SCSI Commands */
