@@ -21,8 +21,9 @@
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
 #include <linux/mount.h>
-
+#include <linux/uio.h>
 #include <asm/uaccess.h>
+
 
 static sector_t max_block(struct block_device *bdev)
 {

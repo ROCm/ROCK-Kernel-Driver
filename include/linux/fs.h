@@ -12,7 +12,6 @@
 #include <linux/wait.h>
 #include <linux/types.h>
 #include <linux/vfs.h>
-#include <linux/net.h>
 #include <linux/kdev_t.h>
 #include <linux/ioctl.h>
 #include <linux/list.h>
@@ -27,7 +26,9 @@
 #include <asm/atomic.h>
 
 struct poll_table_struct;
+struct iovec;
 struct nameidata;
+struct vm_area_struct;
 struct vfsmount;
 
 /*
@@ -411,21 +412,6 @@ struct inode {
 		void				*generic_ip;
 	} u;
 };
-
-struct socket_alloc {
-	struct socket socket;
-	struct inode vfs_inode;
-};
-
-static inline struct socket *SOCKET_I(struct inode *inode)
-{
-	return &container_of(inode, struct socket_alloc, vfs_inode)->socket;
-}
-
-static inline struct inode *SOCK_INODE(struct socket *socket)
-{
-	return &container_of(socket, struct socket_alloc, socket)->vfs_inode;
-}
 
 /* will die */
 #include <linux/coda_fs_i.h>

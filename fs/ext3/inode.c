@@ -34,6 +34,7 @@
 #include <linux/string.h>
 #include <linux/buffer_head.h>
 #include <linux/mpage.h>
+#include <linux/uio.h>
 #include "xattr.h"
 #include "acl.h"
 
