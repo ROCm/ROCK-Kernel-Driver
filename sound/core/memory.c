@@ -118,6 +118,17 @@ void *snd_hidden_kmalloc(size_t size, int flags)
 	return _snd_kmalloc(size, flags);
 }
 
+void *snd_hidden_kcalloc(size_t n, size_t size, int flags)
+{
+	void *ret = NULL;
+	if (n != 0 && size > INT_MAX / n)
+		return ret;
+	ret = _snd_kmalloc(n * size, flags);
+	if (ret)
+		memset(ret, 0, n * size);
+	return ret;
+}
+
 void snd_hidden_kfree(const void *obj)
 {
 	unsigned long flags;
@@ -254,25 +265,6 @@ int __exit snd_memory_info_done(void)
 #define _snd_kmalloc kmalloc
 
 #endif /* CONFIG_SND_DEBUG_MEMORY */
-
-/**
- * snd_kcalloc - memory allocation and zero-clear
- * @size: the size to allocate in bytes
- * @flags: allocation conditions, GFP_XXX
- *
- * Allocates a memory chunk via kmalloc() and initializes it to zero.
- *
- * Returns the pointer, or NULL if no enoguh memory.
- */
-void *snd_kcalloc(size_t size, int flags)
-{
-	void *ptr;
-	
-	ptr = _snd_kmalloc(size, flags);
-	if (ptr)
-		memset(ptr, 0, size);
-	return ptr;
-}
 
 /**
  * snd_kmalloc_strdup - copy the string

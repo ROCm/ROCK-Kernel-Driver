@@ -894,7 +894,7 @@ int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime, unsigned int cond,
 			old = constrs->rules;
 			constrs->rules_all += 10;
 		}
-		constrs->rules = snd_kcalloc(constrs->rules_all * sizeof(*c),
+		constrs->rules = kcalloc(constrs->rules_all, sizeof(*c),
 					     GFP_KERNEL);
 		if (!constrs->rules)
 			return -ENOMEM;

@@ -53,10 +53,7 @@ static void snd_instr_unlock_ops(snd_seq_kinstr_list_t *list)
 
 snd_seq_kcluster_t *snd_seq_cluster_new(int atomic)
 {
-	snd_seq_kcluster_t *cluster;
-	
-	cluster = (snd_seq_kcluster_t *) snd_kcalloc(sizeof(snd_seq_kcluster_t), atomic ? GFP_ATOMIC : GFP_KERNEL);
-	return cluster;
+	return kcalloc(1, sizeof(snd_seq_kcluster_t), atomic ? GFP_ATOMIC : GFP_KERNEL);
 }
 
 void snd_seq_cluster_free(snd_seq_kcluster_t *cluster, int atomic)
@@ -70,7 +67,7 @@ snd_seq_kinstr_t *snd_seq_instr_new(int add_len, int atomic)
 {
 	snd_seq_kinstr_t *instr;
 	
-	instr = (snd_seq_kinstr_t *) snd_kcalloc(sizeof(snd_seq_kinstr_t) + add_len, atomic ? GFP_ATOMIC : GFP_KERNEL);
+	instr = kcalloc(1, sizeof(snd_seq_kinstr_t) + add_len, atomic ? GFP_ATOMIC : GFP_KERNEL);
 	if (instr == NULL)
 		return NULL;
 	instr->add_len = add_len;
@@ -94,7 +91,7 @@ snd_seq_kinstr_list_t *snd_seq_instr_list_new(void)
 {
 	snd_seq_kinstr_list_t *list;
 
-	list = (snd_seq_kinstr_list_t *) snd_kcalloc(sizeof(snd_seq_kinstr_list_t), GFP_KERNEL);
+	list = kcalloc(1, sizeof(snd_seq_kinstr_list_t), GFP_KERNEL);
 	if (list == NULL)
 		return NULL;
 	spin_lock_init(&list->lock);

@@ -33,7 +33,7 @@ fifo_t *snd_seq_fifo_new(int poolsize)
 {
 	fifo_t *f;
 
-	f = snd_kcalloc(sizeof(fifo_t), GFP_KERNEL);
+	f = kcalloc(1, sizeof(*f), GFP_KERNEL);
 	if (f == NULL) {
 		snd_printd("malloc failed for snd_seq_fifo_new() \n");
 		return NULL;

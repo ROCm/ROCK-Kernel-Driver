@@ -956,9 +956,9 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	spin_lock_init(&emu->fx8010.irq_lock);
 	INIT_LIST_HEAD(&emu->fx8010.gpr_ctl);
 
-	if ((icode = snd_kcalloc(sizeof(emu10k1_fx8010_code_t), GFP_KERNEL)) == NULL)
+	if ((icode = kcalloc(1, sizeof(*icode), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
-	if ((controls = snd_kcalloc(sizeof(emu10k1_fx8010_control_gpr_t) * SND_EMU10K1_GPR_CONTROLS, GFP_KERNEL)) == NULL) {
+	if ((controls = kcalloc(SND_EMU10K1_GPR_CONTROLS, sizeof(*controls), GFP_KERNEL)) == NULL) {
 		kfree(icode);
 		return -ENOMEM;
 	}
@@ -1393,13 +1393,13 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	spin_lock_init(&emu->fx8010.irq_lock);
 	INIT_LIST_HEAD(&emu->fx8010.gpr_ctl);
 
-	if ((icode = snd_kcalloc(sizeof(emu10k1_fx8010_code_t), GFP_KERNEL)) == NULL)
+	if ((icode = kcalloc(1, sizeof(*icode), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
-	if ((controls = snd_kcalloc(sizeof(emu10k1_fx8010_control_gpr_t) * SND_EMU10K1_GPR_CONTROLS, GFP_KERNEL)) == NULL) {
+	if ((controls = kcalloc(SND_EMU10K1_GPR_CONTROLS, sizeof(emu10k1_fx8010_control_gpr_t), GFP_KERNEL)) == NULL) {
 		kfree(icode);
 		return -ENOMEM;
 	}
-	if ((ipcm = snd_kcalloc(sizeof(emu10k1_fx8010_pcm_t), GFP_KERNEL)) == NULL) {
+	if ((ipcm = kcalloc(1, sizeof(*ipcm), GFP_KERNEL)) == NULL) {
 		kfree(controls);
 		kfree(icode);
 		return -ENOMEM;
@@ -2083,7 +2083,7 @@ static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigne
 	case SNDRV_EMU10K1_IOCTL_PCM_PEEK:
 		if (emu->audigy)
 			return -EINVAL;
-		ipcm = (emu10k1_fx8010_pcm_t *)snd_kcalloc(sizeof(*ipcm), GFP_KERNEL);
+		ipcm = kcalloc(1, sizeof(*ipcm), GFP_KERNEL);
 		if (ipcm == NULL)
 			return -ENOMEM;
 		if (copy_from_user(ipcm, argp, sizeof(*ipcm))) {

@@ -783,7 +783,7 @@ int snd_pcm_open_substream(snd_pcm_t *pcm, int stream,
 	if (substream == NULL)
 		return -EAGAIN;
 
-	runtime = snd_kcalloc(sizeof(snd_pcm_runtime_t), GFP_KERNEL);
+	runtime = kcalloc(1, sizeof(*runtime), GFP_KERNEL);
 	if (runtime == NULL)
 		return -ENOMEM;
 

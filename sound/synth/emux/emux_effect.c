@@ -278,7 +278,7 @@ void
 snd_emux_create_effect(snd_emux_port_t *p)
 {
 	int i;
-	p->effect = snd_kcalloc(sizeof(snd_emux_effect_table_t) * p->chset.max_channels, GFP_KERNEL);
+	p->effect = kcalloc(p->chset.max_channels, sizeof(snd_emux_effect_table_t), GFP_KERNEL);
 	if (p->effect) {
 		for (i = 0; i < p->chset.max_channels; i++)
 			p->chset.channels[i].private = p->effect + i;

@@ -77,7 +77,7 @@ int snd_emux_register(snd_emux_t *emu, snd_card_t *card, int index, char *name)
 
 	emu->card = card;
 	emu->name = snd_kmalloc_strdup(name, GFP_KERNEL);
-	emu->voices = snd_kcalloc(sizeof(snd_emux_voice_t) * emu->max_voices, GFP_KERNEL);
+	emu->voices = kcalloc(emu->max_voices, sizeof(snd_emux_voice_t), GFP_KERNEL);
 	if (emu->voices == NULL)
 		return -ENOMEM;
 

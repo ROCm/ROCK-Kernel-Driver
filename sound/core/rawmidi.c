@@ -269,7 +269,7 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 		list2 = list2->next;
 	}
 	if (mode & SNDRV_RAWMIDI_LFLG_INPUT) {
-		input = snd_kcalloc(sizeof(snd_rawmidi_runtime_t), GFP_KERNEL);
+		input = kcalloc(1, sizeof(*input), GFP_KERNEL);
 		if (input == NULL) {
 			err = -ENOMEM;
 			goto __error;
@@ -291,7 +291,7 @@ int snd_rawmidi_kernel_open(int cardnum, int device, int subdevice,
 	if (mode & SNDRV_RAWMIDI_LFLG_OUTPUT) {
 		if (soutput->opened)
 			goto __skip_output;
-		output = snd_kcalloc(sizeof(snd_rawmidi_runtime_t), GFP_KERNEL);
+		output = kcalloc(1, sizeof(*output), GFP_KERNEL);
 		if (output == NULL) {
 			err = -ENOMEM;
 			goto __error;
@@ -1353,7 +1353,7 @@ static int snd_rawmidi_alloc_substreams(snd_rawmidi_t *rmidi,
 
 	INIT_LIST_HEAD(&stream->substreams);
 	for (idx = 0; idx < count; idx++) {
-		substream = snd_kcalloc(sizeof(snd_rawmidi_substream_t), GFP_KERNEL);
+		substream = kcalloc(1, sizeof(*substream), GFP_KERNEL);
 		if (substream == NULL)
 			return -ENOMEM;
 		substream->stream = direction;

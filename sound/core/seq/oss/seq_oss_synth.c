@@ -103,7 +103,7 @@ snd_seq_oss_synth_register(snd_seq_device_t *dev)
 	snd_seq_oss_reg_t *reg = SNDRV_SEQ_DEVICE_ARGPTR(dev);
 	unsigned long flags;
 
-	if ((rec = snd_kcalloc(sizeof(*rec), GFP_KERNEL)) == NULL) {
+	if ((rec = kcalloc(1, sizeof(*rec), GFP_KERNEL)) == NULL) {
 		snd_printk(KERN_ERR "can't malloc synth info\n");
 		return -ENOMEM;
 	}
@@ -244,7 +244,9 @@ snd_seq_oss_synth_setup(seq_oss_devinfo_t *dp)
 		}
 		info->nr_voices = rec->nr_voices;
 		if (info->nr_voices > 0) {
-			info->ch = snd_kcalloc(sizeof(seq_oss_chinfo_t) * info->nr_voices, GFP_KERNEL);
+			info->ch = kcalloc(info->nr_voices, sizeof(seq_oss_chinfo_t), GFP_KERNEL);
+			if (!info->ch)
+				BUG();
 			reset_channels(info);
 		}
 		debug_printk(("synth %d assigned\n", i));
@@ -505,7 +507,7 @@ snd_seq_oss_synth_sysex(seq_oss_devinfo_t *dp, int dev, unsigned char *buf, snd_
 
 	sysex = dp->synths[dev].sysex;
 	if (sysex == NULL) {
-		sysex = snd_kcalloc(sizeof(*sysex), GFP_KERNEL);
+		sysex = kcalloc(1, sizeof(*sysex), GFP_KERNEL);
 		if (sysex == NULL)
 			return -ENOMEM;
 		dp->synths[dev].sysex = sysex;

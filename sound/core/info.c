@@ -293,8 +293,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 	switch (entry->content) {
 	case SNDRV_INFO_CONTENT_TEXT:
 		if (mode == O_RDONLY || mode == O_RDWR) {
-			buffer = (snd_info_buffer_t *)
-				 	snd_kcalloc(sizeof(snd_info_buffer_t), GFP_KERNEL);
+			buffer = kcalloc(1, sizeof(*buffer), GFP_KERNEL);
 			if (buffer == NULL) {
 				snd_magic_kfree(data);
 				err = -ENOMEM;
@@ -313,8 +312,7 @@ static int snd_info_entry_open(struct inode *inode, struct file *file)
 			data->rbuffer = buffer;
 		}
 		if (mode == O_WRONLY || mode == O_RDWR) {
-			buffer = (snd_info_buffer_t *)
-					snd_kcalloc(sizeof(snd_info_buffer_t), GFP_KERNEL);
+			buffer = kcalloc(1, sizeof(*buffer), GFP_KERNEL);
 			if (buffer == NULL) {
 				if (mode == O_RDWR) {
 					vfree(data->rbuffer->buffer);

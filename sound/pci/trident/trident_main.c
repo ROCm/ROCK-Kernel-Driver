@@ -2968,7 +2968,7 @@ static int __devinit snd_trident_mixer(trident_t * trident, int pcm_spdif_device
 	snd_ctl_elem_value_t *uctl;
 	int idx, err, retries = 2;
 
-	uctl = (snd_ctl_elem_value_t *)snd_kcalloc(sizeof(*uctl), GFP_KERNEL);
+	uctl = kcalloc(1, sizeof(*uctl), GFP_KERNEL);
 	if (!uctl)
 		return -ENOMEM;
 

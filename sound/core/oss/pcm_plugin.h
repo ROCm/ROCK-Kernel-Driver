@@ -35,7 +35,7 @@ static inline size_t bitset_size(int nbits)
 
 static inline bitset_t *bitset_alloc(int nbits)
 {
-	return snd_kcalloc(bitset_size(nbits) * sizeof(bitset_t), GFP_KERNEL);
+	return kcalloc(bitset_size(nbits), sizeof(bitset_t), GFP_KERNEL);
 }
 	
 static inline void bitset_set(bitset_t *bitmap, unsigned int pos)

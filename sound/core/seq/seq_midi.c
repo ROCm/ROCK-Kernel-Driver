@@ -323,7 +323,7 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 	client = synths[card->number];
 	if (client == NULL) {
 		newclient = 1;
-		client = snd_kcalloc(sizeof(seq_midisynth_client_t), GFP_KERNEL);
+		client = kcalloc(1, sizeof(*client), GFP_KERNEL);
 		if (client == NULL) {
 			up(&register_mutex);
 			return -ENOMEM;
@@ -341,7 +341,7 @@ snd_seq_midisynth_register_port(snd_seq_device_t *dev)
 	} else if (device == 0)
 		set_client_name(client, card, &info); /* use the first device's name */
 
-	msynth = snd_kcalloc(sizeof(seq_midisynth_t) * ports, GFP_KERNEL);
+	msynth = kcalloc(ports, sizeof(seq_midisynth_t), GFP_KERNEL);
 	if (msynth == NULL)
 		goto __nomem;
 

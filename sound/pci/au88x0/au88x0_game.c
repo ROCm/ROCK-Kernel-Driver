@@ -96,7 +96,7 @@ static int vortex_game_open(struct gameport *gameport, int mode)
 
 static int vortex_gameport_register(vortex_t * vortex)
 {
-	if ((vortex->gameport = snd_kcalloc(sizeof(struct gameport), GFP_KERNEL)) == NULL) {
+	if ((vortex->gameport = kcalloc(1, sizeof(struct gameport), GFP_KERNEL)) == NULL) {
 		return -1;
 	};
 	

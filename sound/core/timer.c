@@ -94,7 +94,7 @@ static void snd_timer_reschedule(snd_timer_t * timer, unsigned long ticks_left);
 static snd_timer_instance_t *snd_timer_instance_new(char *owner, snd_timer_t *timer)
 {
 	snd_timer_instance_t *timeri;
-	timeri = snd_kcalloc(sizeof(snd_timer_instance_t), GFP_KERNEL);
+	timeri = kcalloc(1, sizeof(*timeri), GFP_KERNEL);
 	if (timeri == NULL)
 		return NULL;
 	timeri->owner = snd_kmalloc_strdup(owner, GFP_KERNEL);
@@ -1018,7 +1018,7 @@ static int snd_timer_register_system(void)
 		return err;
 	strcpy(timer->name, "system timer");
 	timer->hw = snd_timer_system;
-	priv = (struct snd_timer_system_private *) snd_kcalloc(sizeof(struct snd_timer_system_private), GFP_KERNEL);
+	priv = kcalloc(1, sizeof(*priv), GFP_KERNEL);
 	if (priv == NULL) {
 		snd_timer_free(timer);
 		return -ENOMEM;

@@ -334,7 +334,7 @@ int snd_pcm_lib_malloc_pages(snd_pcm_substream_t *substream, size_t size)
 	if (substream->dma_buffer.area != NULL && substream->dma_buffer.bytes >= size) {
 		dmab = &substream->dma_buffer; /* use the pre-allocated buffer */
 	} else {
-		dmab = snd_kcalloc(sizeof(*dmab), GFP_KERNEL);
+		dmab = kcalloc(1, sizeof(*dmab), GFP_KERNEL);
 		if (! dmab)
 			return -ENOMEM;
 		if (snd_dma_alloc_pages(&substream->dma_device, size, dmab) < 0) {

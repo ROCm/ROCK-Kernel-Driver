@@ -155,7 +155,7 @@ void snd_ctl_notify(snd_card_t *card, unsigned int mask, snd_ctl_elem_id_t *id)
 				goto _found;
 			}
 		}
-		ev = snd_kcalloc(sizeof(*ev), GFP_ATOMIC);
+		ev = kcalloc(1, sizeof(*ev), GFP_ATOMIC);
 		if (ev) {
 			ev->id = *id;
 			ev->mask = mask;
@@ -927,7 +927,7 @@ static int snd_ctl_elem_add(snd_ctl_file_t *file, snd_ctl_elem_info_t __user *_i
 	if (!(info.access & SNDRV_CTL_ELEM_ACCESS_DINDIRECT))
 		for (idx = 0; idx < 4 && info.dimen.d[idx]; idx++)
 			dimen_size += sizeof(unsigned short);
-	ue = snd_kcalloc(sizeof(struct user_element) + dimen_size + private_size + extra_size, GFP_KERNEL);
+	ue = kcalloc(1, sizeof(struct user_element) + dimen_size + private_size + extra_size, GFP_KERNEL);
 	if (ue == NULL)
 		return -ENOMEM;
 	ue->type = info.type;
@@ -1174,8 +1174,7 @@ int snd_ctl_register_ioctl(snd_kctl_ioctl_func_t fcn)
 {
 	snd_kctl_ioctl_t *pn;
 
-	pn = (snd_kctl_ioctl_t *)
-		snd_kcalloc(sizeof(snd_kctl_ioctl_t), GFP_KERNEL);
+	pn = kcalloc(1, sizeof(snd_kctl_ioctl_t), GFP_KERNEL);
 	if (pn == NULL)
 		return -ENOMEM;
 	pn->fioctl = fcn;

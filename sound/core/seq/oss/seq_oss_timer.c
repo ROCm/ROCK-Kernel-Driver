@@ -46,7 +46,7 @@ snd_seq_oss_timer_new(seq_oss_devinfo_t *dp)
 {
 	seq_oss_timer_t *rec;
 
-	rec = snd_kcalloc(sizeof(*rec), GFP_KERNEL);
+	rec = kcalloc(1, sizeof(*rec), GFP_KERNEL);
 	if (rec == NULL)
 		return NULL;
 

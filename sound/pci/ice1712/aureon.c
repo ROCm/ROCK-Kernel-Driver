@@ -730,7 +730,7 @@ static int __devinit aureon_init(ice1712_t *ice)
 	}
 
 	/* to remeber the register values */
-	ice->akm = snd_kcalloc(sizeof(akm4xxx_t), GFP_KERNEL);
+	ice->akm = kcalloc(1, sizeof(akm4xxx_t), GFP_KERNEL);
 	if (! ice->akm)
 		return -ENOMEM;
 	ice->akm_codecs = 1;
