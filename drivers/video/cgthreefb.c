@@ -176,7 +176,7 @@ static char idstring[60] __initdata = { 0 };
 
 char __init *cgthreefb_init(struct fb_info_sbusfb *fb)
 {
-	struct fb_fix_screeninfo *fix = &fb->fix;
+	struct fb_fix_screeninfo *fix = &fb->info.fix;
 	struct display *disp = &fb->disp;
 	struct fbtype *type = &fb->type;
 	struct sbus_dev *sdev = fb->sbdp;
@@ -216,7 +216,7 @@ char __init *cgthreefb_init(struct fb_info_sbusfb *fb)
 
 	strcpy(fb->info.modename, "CGthree");
 	strcpy(fix->id, "CGthree");
-	fix->line_length = fb->var.xres_virtual;
+	fix->line_length = fb->info.var.xres_virtual;
 	fix->accel = FB_ACCEL_SUN_CGTHREE;
 	
 	disp->scrollmode = SCROLL_YREDRAW;

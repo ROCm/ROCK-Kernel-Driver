@@ -360,7 +360,7 @@ static void ffb_setup(struct display *p)
 static void ffb_clear(struct vc_data *conp, struct display *p, int sy, int sx,
 		      int height, int width)
 {
-	struct fb_info_sbusfb *fb = (struct fb_info_sbusfb *)p->fb_info;
+	struct fb_info_sbusfb *fb = sbusfbinfo(p->fb_info);
 	register struct ffb_fbc *fbc = fb->s.ffb.fbc;
 	unsigned long flags;
 	u64 yx, hw;
@@ -417,7 +417,7 @@ static void ffb_fill(struct fb_info_sbusfb *fb, struct display *p, int s,
 
 static void ffb_putc(struct vc_data *conp, struct display *p, int c, int yy, int xx)
 {
-	struct fb_info_sbusfb *fb = (struct fb_info_sbusfb *)p->fb_info;
+	struct fb_info_sbusfb *fb = sbusfbinfo(p->fb_info);
 	register struct ffb_fbc *fbc = fb->s.ffb.fbc;
 	unsigned long flags;
 	int i, xy;
@@ -470,7 +470,7 @@ static void ffb_putc(struct vc_data *conp, struct display *p, int c, int yy, int
 static void ffb_putcs(struct vc_data *conp, struct display *p, const unsigned short *s,
 		      int count, int yy, int xx)
 {
-	struct fb_info_sbusfb *fb = (struct fb_info_sbusfb *)p->fb_info;
+	struct fb_info_sbusfb *fb = sbusfbinfo(p->fb_info);
 	register struct ffb_fbc *fbc = fb->s.ffb.fbc;
 	unsigned long flags;
 	int i, xy;
@@ -805,8 +805,8 @@ static int __init creator_apply_upa_parent_ranges(int parent, struct linux_prom6
 
 char __init *creatorfb_init(struct fb_info_sbusfb *fb)
 {
-	struct fb_fix_screeninfo *fix = &fb->fix;
-	struct fb_var_screeninfo *var = &fb->var;
+	struct fb_fix_screeninfo *fix = &fb->info.fix;
+	struct fb_var_screeninfo *var = &fb->info.var;
 	struct display *disp = &fb->disp;
 	struct fbtype *type = &fb->type;
 	struct linux_prom64_registers regs[2*PROMREG_MAX];
@@ -861,7 +861,7 @@ char __init *creatorfb_init(struct fb_info_sbusfb *fb)
 	var->accel_flags = FB_ACCELF_TEXT;
 	
 	disp->scrollmode = SCROLL_YREDRAW;
-	fb->info.screen_base = (char *)__va(regs[0].phys_addr) + FFB_DFB24_POFF + 8192 * fb->y_margin + 4 * fb->x_margin;
+	fb->info.screen_base = (char *)(regs[0].phys_addr) + FFB_DFB24_POFF + 8192 * fb->y_margin + 4 * fb->x_margin;
 	fb->s.ffb.xy_margin = (fb->y_margin << 16) + fb->x_margin;
 	fb->s.ffb.yx_margin = (((u64)fb->y_margin) << 32) + fb->x_margin;
 	fb->s.ffb.fbc = (struct ffb_fbc *)(regs[0].phys_addr + FFB_FBC_REGS_POFF);
