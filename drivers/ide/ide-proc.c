@@ -81,10 +81,10 @@ int (*aec62xx_display_info)(char *, char **, off_t, int) = NULL;
 extern byte ali_proc;
 int (*ali_display_info)(char *, char **, off_t, int) = NULL;
 #endif /* CONFIG_BLK_DEV_ALI15X3 */
-#ifdef CONFIG_BLK_DEV_AMD7409
-extern byte amd7409_proc;
-int (*amd7409_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_AMD7409 */
+#ifdef CONFIG_BLK_DEV_AMD74XX
+extern byte amd74xx_proc;
+int (*amd74xx_display_info)(char *, char **, off_t, int) = NULL;
+#endif /* CONFIG_BLK_DEV_AMD74XX */
 #ifdef CONFIG_BLK_DEV_CMD64X
 extern byte cmd64x_proc;
 int (*cmd64x_display_info)(char *, char **, off_t, int) = NULL;
@@ -101,10 +101,6 @@ int (*hpt34x_display_info)(char *, char **, off_t, int) = NULL;
 extern byte hpt366_proc;
 int (*hpt366_display_info)(char *, char **, off_t, int) = NULL;
 #endif /* CONFIG_BLK_DEV_HPT366 */
-#ifdef CONFIG_BLK_DEV_OSB4
-extern byte osb4_proc;
-int (*osb4_display_info)(char *, char **, off_t, int) = NULL;
-#endif /* CONFIG_BLK_DEV_OSB4 */
 #ifdef CONFIG_BLK_DEV_PDC202XX
 extern byte pdc202xx_proc;
 int (*pdc202xx_display_info)(char *, char **, off_t, int) = NULL;
@@ -113,6 +109,10 @@ int (*pdc202xx_display_info)(char *, char **, off_t, int) = NULL;
 extern byte piix_proc;
 int (*piix_display_info)(char *, char **, off_t, int) = NULL;
 #endif /* CONFIG_BLK_DEV_PIIX */
+#ifdef CONFIG_BLK_DEV_SVWKS
+extern byte svwks_proc;
+int (*svwks_display_info)(char *, char **, off_t, int) = NULL;
+#endif /* CONFIG_BLK_DEV_SVWKS */
 #ifdef CONFIG_BLK_DEV_SIS5513
 extern byte sis_proc;
 int (*sis_display_info)(char *, char **, off_t, int) = NULL;
@@ -817,10 +817,10 @@ void proc_ide_create(void)
 	if ((ali_display_info) && (ali_proc))
 		create_proc_info_entry("ali", 0, proc_ide_root, ali_display_info);
 #endif /* CONFIG_BLK_DEV_ALI15X3 */
-#ifdef CONFIG_BLK_DEV_AMD7409
-	if ((amd7409_display_info) && (amd7409_proc))
-		create_proc_info_entry("amd7409", 0, proc_ide_root, amd7409_display_info);
-#endif /* CONFIG_BLK_DEV_AMD7409 */
+#ifdef CONFIG_BLK_DEV_AMD74XX
+	if ((amd74xx_display_info) && (amd74xx_proc))
+		create_proc_info_entry("amd74xx", 0, proc_ide_root, amd74xx_display_info);
+#endif /* CONFIG_BLK_DEV_AMD74XX */
 #ifdef CONFIG_BLK_DEV_CMD64X
 	if ((cmd64x_display_info) && (cmd64x_proc))
 		create_proc_info_entry("cmd64x", 0, proc_ide_root, cmd64x_display_info);
@@ -837,10 +837,10 @@ void proc_ide_create(void)
 	if ((hpt366_display_info) && (hpt366_proc))
 		create_proc_info_entry("hpt366", 0, proc_ide_root, hpt366_display_info);
 #endif /* CONFIG_BLK_DEV_HPT366 */
-#ifdef CONFIG_BLK_DEV_OSB4
-	if ((osb4_display_info) && (osb4_proc))
-		create_proc_info_entry("osb4", 0, proc_ide_root, osb4_display_info);
-#endif /* CONFIG_BLK_DEV_OSB4 */
+#ifdef CONFIG_BLK_DEV_SVWKS
+	if ((svwks_display_info) && (svwks_proc))
+		create_proc_info_entry("svwks", 0, proc_ide_root, svwks_display_info);
+#endif /* CONFIG_BLK_DEV_SVWKS */
 #ifdef CONFIG_BLK_DEV_PDC202XX
 	if ((pdc202xx_display_info) && (pdc202xx_proc))
 		create_proc_info_entry("pdc202xx", 0, proc_ide_root, pdc202xx_display_info);
@@ -877,10 +877,10 @@ void proc_ide_destroy(void)
 	if ((ali_display_info) && (ali_proc))
 		remove_proc_entry("ide/ali",0);
 #endif /* CONFIG_BLK_DEV_ALI15X3 */
-#ifdef CONFIG_BLK_DEV_AMD7409
-	if ((amd7409_display_info) && (amd7409_proc))
-		remove_proc_entry("ide/amd7409",0);
-#endif /* CONFIG_BLK_DEV_AMD7409 */
+#ifdef CONFIG_BLK_DEV_AMD74XX
+	if ((amd74xx_display_info) && (amd74xx_proc))
+		remove_proc_entry("ide/amd74xx",0);
+#endif /* CONFIG_BLK_DEV_AMD74XX */
 #ifdef CONFIG_BLK_DEV_CMD64X
 	if ((cmd64x_display_info) && (cmd64x_proc))
 		remove_proc_entry("ide/cmd64x",0);
@@ -897,10 +897,6 @@ void proc_ide_destroy(void)
 	if ((hpt366_display_info) && (hpt366_proc))
 		remove_proc_entry("ide/hpt366",0);
 #endif /* CONFIG_BLK_DEV_HPT366 */
-#ifdef CONFIG_BLK_DEV_OSB4
-	if ((osb4_display_info) && (osb4_proc))
-		remove_proc_entry("ide/osb4",0);
-#endif /* CONFIG_BLK_DEV_OSB4 */
 #ifdef CONFIG_BLK_DEV_PDC202XX
 	if ((pdc202xx_display_info) && (pdc202xx_proc))
 		remove_proc_entry("ide/pdc202xx",0);
@@ -909,6 +905,10 @@ void proc_ide_destroy(void)
 	if ((piix_display_info) && (piix_proc))
 		remove_proc_entry("ide/piix",0);
 #endif /* CONFIG_BLK_DEV_PIIX */
+#ifdef CONFIG_BLK_DEV_SVWKS
+	if ((svwks_display_info) && (svwks_proc))
+		remove_proc_entry("ide/svwks",0);
+#endif /* CONFIG_BLK_DEV_SVWKS */
 #ifdef CONFIG_BLK_DEV_SIS5513
 	if ((sis_display_info) && (sis_proc))
 		remove_proc_entry("ide/sis", 0);

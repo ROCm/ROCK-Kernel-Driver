@@ -271,6 +271,18 @@ static __init int broken_apm_power(struct dmi_blacklist *d)
 	return 0;
 }		
 
+
+/*
+ * This bios swaps the APM minute reporting bytes over (Many sony laptops
+ * have this problem).
+ */
+ 
+static __init int swab_apm_power_in_minutes(struct dmi_blacklist *d)
+{
+	apm_info.get_power_status_swabinminutes = 1;
+	printk(KERN_WARNING "BIOS strings suggest APM reports battery life in minutes and wrong byte order.\n");
+	return 0;
+}
 /*
  *	Process the DMI blacklists
  */
@@ -312,6 +324,11 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_SYS_VENDOR, "IBM"),
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },
+	{ set_apm_ints, "Dell Inspiron", {	/* Allow interrupts during suspend on Dell Inspiron laptops*/
+			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
+			MATCH(DMI_PRODUCT_NAME, "Inspiron 4000"),
+			NO_MATCH, NO_MATCH
+			} },
 	{ set_apm_ints, "ASUSTeK", {   /* Allow interrupts during APM or the clock goes slow */
 			MATCH(DMI_SYS_VENDOR, "ASUSTeK Computer Inc."),
 			MATCH(DMI_PRODUCT_NAME, "L8400K series Notebook PC"),
@@ -321,6 +338,21 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_SYS_VENDOR, "TriGem Computer, Inc"),
 			MATCH(DMI_PRODUCT_NAME, "Delhi3"),
 			NO_MATCH, NO_MATCH,
+			} },
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z505LS */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0203Z3"),
+			MATCH(DMI_BIOS_DATE, "08/25/00"), NO_MATCH
+			} },
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z505LS */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0203D0"),
+			MATCH(DMI_BIOS_DATE, "05/12/00"), NO_MATCH
+			} },
+	{ swab_apm_power_in_minutes, "Sony VAIO", {	/* Handle problems with APM on Sony Vaio PCG-Z600NE */
+			MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies LTD"),
+			MATCH(DMI_BIOS_VERSION, "R0121Z1"),
+			MATCH(DMI_BIOS_DATE, "05/11/00"), NO_MATCH
 			} },
 	{ NULL, }
 };

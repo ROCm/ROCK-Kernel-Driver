@@ -1,5 +1,5 @@
 /*
- * $Id: capi.c,v 1.44.6.12 2001/06/09 15:14:15 kai Exp $
+ * $Id: capi.c,v 1.44.6.13 2001/08/13 07:46:15 kai Exp $
  *
  * CAPI 2.0 Interface for Linux
  *
@@ -43,7 +43,7 @@
 #include "capifs.h"
 #endif
 
-static char *revision = "$Revision: 1.44.6.12 $";
+static char *revision = "$Revision: 1.44.6.13 $";
 
 MODULE_AUTHOR("Carsten Paeth (calle@calle.in-berlin.de)");
 

@@ -8,7 +8,6 @@ struct ntfs_sb_info{
 	ntfs_uid_t uid;
 	ntfs_gid_t gid;
 	ntmode_t umask;
-        unsigned int nct;
 	void *nls_map;
 	unsigned int ngt;
 	/* Configuration provided by user with the ntfstools.

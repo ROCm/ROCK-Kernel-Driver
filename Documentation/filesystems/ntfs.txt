@@ -1,8 +1,8 @@
 NTFS Overview
 =============
 
-Driver development has as of recently (since June '01) been sponsored
-by Legato Systems, Inc. (http://www.legato.com)
+Legato Systems, Inc. (http://www.legato.com) have sponsored Anton Altaparmakov
+to develop NTFS on Linux since June 2001.
 
 To mount an NTFS volume, use the filesystem type 'ntfs'. The driver
 currently works only in read-only mode, with no fault-tolerance supported.
@@ -36,15 +36,17 @@ Supported mount options
 
 iocharset=name		Character set to use when returning file names.
 			Unlike VFAT, NTFS suppresses names that contain
-			unconvertible characters
+			unconvertible characters. Note that most character
+			sets contain insufficient characters to represent all
+			possible Unicode characters that can exist on NTFS. To
+			be sure you are not missing any files, you are advised
+			to use the iocharset=utf8 which should be capable of
+			representing all Unicode characters.
 
-utf8=<bool>		Use UTF-8 for converting file names
-
-uni_xlate=<bool>,2	Use the VFAT-style encoding for file names outside
-			the current character set. A boolean value will
-			enable the feature, a value of 2 will enable the
-			encoding as documented in vfat.txt:
-				':', (u & 0x3f), ((u>>6) & 0x3f), (u>>12),
+utf8=<bool>		Use UTF-8 for converting file names. - It is preferable
+			to use iocharset=utf8 instead, but if the utf8 NLS is
+			not available, you can use this utf8 option, which
+			enables the driver's builtin utf8 conversion functions.
 
 uid=
 gid=
@@ -80,6 +82,27 @@ list at sourceforge: linux-ntfs-dev@lists.sourceforge.net
 
 ChangeLog
 =========
+
+NTFS 1.1.16:
+
+	- Removed non-functional uni_xlate mount options.
+	- Clarified the semantics of the utf8 and iocharset mount options.
+	- Threw out the non-functional mount options for using hard coded
+	  character set conversion. Only kept utf8 one.
+	- Fixed handling of mount options and proper handling of faulty mount
+	  options on remount.
+	- Cleaned up character conversion which basically became simplified a
+	  lot due to the removal of the above mentioned mount options.
+	- Made character conversion to be always consistent. Previously we
+	  could output to the VFS file names which we would then not accept
+	  back from the VFS so in effect we were generating ghost entries in
+	  the directory listings which could not be accessed by any means.
+	- Simplified time conversion functions drastically without sacrificing
+	  accuracy. (-8
+	- Fixed a use of a pointer before the check for the pointer being
+	  NULL, reported by the Stanford checker.
+	- Fixed several missing error checks, reported by the Stanford
+	  checker and fixed by Rasmus Andersen.
 
 NTFS 1.1.15 (changes since kernel 2.4.4's NTFS driver):
 

@@ -1,3 +1,7 @@
+2001-08-11  Tim Waugh  <twaugh@redhat.com>
+
+	* serial.c (get_pci_port): Deal with awkward Titan cards.
+
 1998-08-26  Theodore Ts'o  <tytso@rsts-11.mit.edu>
 
 	* serial.c (rs_open): Correctly decrement the module in-use count

@@ -3886,6 +3886,22 @@ static _INLINE_ int get_pci_port(struct pci_dev *dev,
 			case 6: /* BAR 4*/
 			case 7: base_idx=idx-2; /* BAR 5*/
 		}
+
+	/* Some Titan cards are also a little weird */
+	if (dev->vendor == PCI_VENDOR_ID_TITAN &&
+	    (dev->device == PCI_DEVICE_ID_TITAN_400L ||
+	     dev->device == PCI_DEVICE_ID_TITAN_800L)) {
+		switch (idx) {
+		case 0: base_idx = 1;
+			break;
+		case 1: base_idx = 2;
+			break;
+		default:
+			base_idx = 4;
+			offset = 8 * (idx - 2);
+		}
+		
+	}
   
 	port =  pci_resource_start(dev, base_idx) + offset;
 
@@ -4656,6 +4672,19 @@ static struct pci_device_id serial_pci_tbl[] __devinitdata = {
 	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_800B,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
 		pbn_b0_4_921600 },
+	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_100L,
+		PCI_ANY_ID, PCI_ANY_ID,
+		SPCI_FL_BASE1, 1, 921600 },
+	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_200L,
+		PCI_ANY_ID, PCI_ANY_ID,
+		SPCI_FL_BASE1 | SPCI_FL_BASE_TABLE, 2, 921600 },
+	/* The 400L and 800L have a custom hack in get_pci_port */
+	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_400L,
+		PCI_ANY_ID, PCI_ANY_ID,
+		SPCI_FL_BASE_TABLE, 4, 921600 },
+	{	PCI_VENDOR_ID_TITAN, PCI_DEVICE_ID_TITAN_800L,
+		PCI_ANY_ID, PCI_ANY_ID,
+		SPCI_FL_BASE_TABLE, 8, 921600 },
 
 	{	PCI_VENDOR_ID_SIIG, PCI_DEVICE_ID_SIIG_1S_10x_550,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0,

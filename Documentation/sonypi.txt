@@ -65,6 +65,19 @@ This supposes the use of minor 250 for the sonypi device:
 Bugs:
 -----
 
+	- several users reported that this driver disables the BIOS-managed
+	  Fn-keys which put the laptop in sleeping state, or switch the
+	  external monitor on/off. There is no workaround yet, since this
+	  driver disables all APM management for those keys, by enabling the
+	  ACPI management (and the ACPI core stuff is not complete yet). If
+	  you have one of those laptops with working Fn keys and want to 
+	  continue to use them, don't use this driver.
+
+	- some users reported that the laptop speed is lower (dhrystone
+	  tested) when using the driver with the fnkeyinit parameter. I cannot
+	  reproduce it on my laptop and not all users have this problem.
+	  Still under investigation.
+	
 	- since all development was done by reverse engineering, there is
 	  _absolutely no guarantee_ that this driver will not crash your
 	  laptop. Permanently.

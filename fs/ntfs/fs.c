@@ -1,8 +1,8 @@
 /*
  * fs.c - NTFS driver for Linux 2.4.x
  *
- * Development has as of recently (since June '01) been sponsored
- * by Legato Systems, Inc. (http://www.legato.com)
+ * Legato Systems, Inc. (http://www.legato.com) have sponsored Anton
+ * Altaparmakov to develop NTFS on Linux since June 2001.
  *
  * Copyright (C) 1995-1997, 1999 Martin von Löwis
  * Copyright (C) 1996 Richard Russon
@@ -286,25 +286,25 @@ static int simple_getbool(char *s, int *setval)
 }
 
 /* Parse the (re)mount options. */
-static int parse_options(ntfs_volume* vol, char *opt)
+static int parse_options(ntfs_volume *vol, char *opt, int remount)
 {
-	char *value;
-
-	vol->uid = vol->gid = 0;
-	vol->umask = 0077;
-	vol->ngt = ngt_nt;
-	vol->nls_map = 0;
-	vol->nct = 0;
+	char *value;		/* Defaults if not specified and !remount. */
+	ntfs_uid_t uid = -1;	/* 0, root user only */
+	ntfs_gid_t gid = -1;	/* 0, root user only */
+	int umask = -1;		/* 0077, owner access only */
+	unsigned int ngt = -1;	/* ngt_nt */
+	void *nls_map = NULL;	/* Try to load the default NLS. */
+	int use_utf8 = -1;	/* If no NLS specified and loading the default
+				   NLS failed use utf8. */
 	if (!opt)
 		goto done;
-	for (opt = strtok(opt, ","); opt; opt = strtok(NULL, ","))
-	{
+	for (opt = strtok(opt, ","); opt; opt = strtok(NULL, ",")) {
 		if ((value = strchr(opt, '=')) != NULL)
 			*value ++= '\0';
 		if (strcmp(opt, "uid") == 0) {
 			if (!value || !*value)
 				goto needs_arg;
-			vol->uid = simple_strtoul(value, &value, 0);
+			uid = simple_strtoul(value, &value, 0);
 			if (*value) {
 				printk(KERN_ERR "NTFS: uid invalid argument\n");
 				return 0;
@@ -312,7 +312,7 @@ static int parse_options(ntfs_volume* vol, char *opt)
 		} else if (strcmp(opt, "gid") == 0) {
 			if (!value || !*value)
 				goto needs_arg;
-			vol->gid = simple_strtoul(value, &value, 0);
+			gid = simple_strtoul(value, &value, 0);
 			if (*value) {
 				printk(KERN_ERR "NTFS: gid invalid argument\n");
 				return 0;
@@ -320,19 +320,10 @@ static int parse_options(ntfs_volume* vol, char *opt)
 		} else if (strcmp(opt, "umask") == 0) {
 			if (!value || !*value)
 				goto needs_arg;
-			vol->umask = simple_strtoul(value, &value, 0);
+			umask = simple_strtoul(value, &value, 0);
 			if (*value) {
 				printk(KERN_ERR "NTFS: umask invalid "
 						"argument\n");
-				return 0;
-			}
-		} else if (strcmp(opt, "iocharset") == 0) {
-			if (!value || !*value)
-				goto needs_arg;
-			vol->nls_map = load_nls(value);
-			vol->nct |= nct_map;
-			if (!vol->nls_map) {
-				printk(KERN_ERR "NTFS: charset not found");
 				return 0;
 			}
 		} else if (strcmp(opt, "posix") == 0) {
@@ -341,58 +332,74 @@ static int parse_options(ntfs_volume* vol, char *opt)
 				goto needs_arg;
 			if (!simple_getbool(value, &val))
 				goto needs_bool;
-			vol->ngt = val ? ngt_posix : ngt_nt;
+			ngt = val ? ngt_posix : ngt_nt;
 		} else if (strcmp(opt, "show_sys_files") == 0) {
 			int val = 0;
 			if (!value || !*value)
 				val = 1;
 			else if (!simple_getbool(value, &val))
 				goto needs_bool;
-			vol->ngt = val ? ngt_full : ngt_nt;
+			ngt = val ? ngt_full : ngt_nt;
+		} else if (strcmp(opt, "iocharset") == 0) {
+			if (!value || !*value)
+				goto needs_arg;
+			nls_map = load_nls(value);
+			if (!nls_map) {
+				printk(KERN_ERR "NTFS: charset not found");
+				return 0;
+			}
 		} else if (strcmp(opt, "utf8") == 0) {
 			int val = 0;
 			if (!value || !*value)
 				val = 1;
 			else if (!simple_getbool(value, &val))
 				goto needs_bool;
-			if (val)
-				vol->nct |= nct_utf8;
-		} else if (strcmp(opt, "uni_xlate") == 0) {
-			int val = 0;
-			/* No argument: uni_vfat. boolean argument: uni_vfat.
-			 * "2": uni. */
-			if (!value || !*value)
-				val = 1;
-			else if (strcmp(value, "2") == 0)
-				vol->nct |= nct_uni_xlate;
-			else if (!simple_getbool(value, &val))
-				goto needs_bool;
-			if (val)
-				vol->nct |= nct_uni_xlate_vfat | nct_uni_xlate;
+			use_utf8 = val;
 		} else {
 			printk(KERN_ERR "NTFS: unkown option '%s'\n", opt);
 			return 0;
 		}
 	}
-	if (vol->nct & nct_utf8 & (nct_map | nct_uni_xlate)) {
-		printk(KERN_ERR "utf8 cannot be combined with iocharset or "
-				"uni_xlate\n");
-		return 0;
+done:
+	if (use_utf8 != -1 && use_utf8) {
+		if (nls_map) {
+			unload_nls(nls_map);
+			printk(KERN_ERR "NTFS: utf8 cannot be combined with "
+					"iocharset.\n");
+			return 0;
+		}
+		if (remount && vol->nls_map)
+			unload_nls(vol->nls_map);
+		vol->nls_map = NULL;
+	} else {
+		if (nls_map) {
+			if (remount && vol->nls_map)
+				unload_nls(vol->nls_map);
+			vol->nls_map = nls_map;
+		} else if (!remount || (remount && !use_utf8 && !vol->nls_map))
+			vol->nls_map = load_nls_default();
 	}
- done:
-	if ((vol->nct & (nct_uni_xlate | nct_map | nct_utf8)) == 0)
-		/* default to UTF-8 */
-		vol->nct = nct_utf8;
-	if (!vol->nls_map) {
-		vol->nls_map = load_nls_default();
-		if (vol->nls_map)
-			vol->nct = nct_map | (vol->nct&nct_uni_xlate);
-	}
+	if (uid != -1)
+		vol->uid = uid;
+	else if (!remount)
+		vol->uid = 0;
+	if (gid != -1)
+		vol->gid = gid;
+	else if (!remount)
+		vol->gid = 0;
+	if (umask != -1)
+		vol->umask = (ntmode_t)umask;
+	else if (!remount)
+		vol->umask = 0077;
+	if (ngt != -1)
+		vol->ngt = ngt;
+	else if (!remount)
+		vol->ngt = ngt_nt;
 	return 1;
- needs_arg:
+needs_arg:
 	printk(KERN_ERR "NTFS: %s needs an argument", opt);
 	return 0;
- needs_bool:
+needs_bool:
 	printk(KERN_ERR "NTFS: %s needs boolean argument", opt);
 	return 0;
 }
@@ -898,7 +905,7 @@ static int ntfs_statfs(struct super_block *sb, struct statfs *sf)
 /* Called when remounting a filesystem by do_remount_sb() in fs/super.c. */
 static int ntfs_remount_fs(struct super_block *sb, int *flags, char *options)
 {
-	if (!parse_options(NTFS_SB2VOL(sb), options))
+	if (!parse_options(NTFS_SB2VOL(sb), options, 1))
 		return -EINVAL;
 	return 0;
 }
@@ -1003,7 +1010,7 @@ struct super_block * ntfs_read_super(struct super_block *sb, void *options,
 
 	ntfs_debug(DEBUG_OTHER, "ntfs_read_super\n");
 	vol = NTFS_SB2VOL(sb);
-	if (!parse_options(vol, (char*)options))
+	if (!parse_options(vol, (char*)options, 0))
 		goto ntfs_read_super_vol;
 	/* Assume a 512 bytes block device for now. */
 	set_blocksize(sb->s_dev, 512);

@@ -1,4 +1,4 @@
-/* $Id: hysdn_procconf.c,v 1.8.6.2 2001/04/20 02:42:00 keil Exp $
+/* $Id: hysdn_procconf.c,v 1.8.6.3 2001/08/13 07:46:15 kai Exp $
 
  * Linux driver for HYSDN cards, /proc/net filesystem dir and conf functions.
  * written by Werner Cornelius (werner@titro.de) for Hypercope GmbH
@@ -31,7 +31,7 @@
 
 #include "hysdn_defs.h"
 
-static char *hysdn_procconf_revision = "$Revision: 1.8.6.2 $";
+static char *hysdn_procconf_revision = "$Revision: 1.8.6.3 $";
 
 #define INFO_OUT_LEN 80		/* length of info line including lf */
 

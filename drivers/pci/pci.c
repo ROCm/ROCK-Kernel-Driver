@@ -22,6 +22,7 @@
 #include <linux/pm.h>
 #include <linux/kmod.h>		/* for hotplug_path */
 #include <linux/bitops.h>
+#include <linux/delay.h>
 
 #include <asm/page.h>
 #include <asm/dma.h>	/* isa_dma_bridge_buggy */
@@ -942,8 +943,7 @@ void __init pci_read_bridge_bases(struct pci_bus *child)
 {
 	struct pci_dev *dev = child->self;
 	u8 io_base_lo, io_limit_lo;
-	u16 mem_base_lo, mem_limit_lo, io_base_hi, io_limit_hi;
-	u32 mem_base_hi, mem_limit_hi;
+	u16 mem_base_lo, mem_limit_lo;
 	unsigned long base, limit;
 	struct resource *res;
 	int i;
@@ -957,10 +957,17 @@ void __init pci_read_bridge_bases(struct pci_bus *child)
 	res = child->resource[0];
 	pci_read_config_byte(dev, PCI_IO_BASE, &io_base_lo);
 	pci_read_config_byte(dev, PCI_IO_LIMIT, &io_limit_lo);
-	pci_read_config_word(dev, PCI_IO_BASE_UPPER16, &io_base_hi);
-	pci_read_config_word(dev, PCI_IO_LIMIT_UPPER16, &io_limit_hi);
-	base = ((io_base_lo & PCI_IO_RANGE_MASK) << 8) | (io_base_hi << 16);
-	limit = ((io_limit_lo & PCI_IO_RANGE_MASK) << 8) | (io_limit_hi << 16);
+	base = (io_base_lo & PCI_IO_RANGE_MASK) << 8;
+	limit = (io_limit_lo & PCI_IO_RANGE_MASK) << 8;
+
+	if ((base & PCI_IO_RANGE_TYPE_MASK) == PCI_IO_RANGE_TYPE_32) {
+		u16 io_base_hi, io_limit_hi;
+		pci_read_config_word(dev, PCI_IO_BASE_UPPER16, &io_base_hi);
+		pci_read_config_word(dev, PCI_IO_LIMIT_UPPER16, &io_limit_hi);
+		base |= (io_base_hi << 16);
+		limit |= (io_limit_hi << 16);
+	}
+
 	if (base && base <= limit) {
 		res->flags = (io_base_lo & PCI_IO_RANGE_TYPE_MASK) | IORESOURCE_IO;
 		res->start = base;
@@ -994,19 +1001,23 @@ void __init pci_read_bridge_bases(struct pci_bus *child)
 	res = child->resource[2];
 	pci_read_config_word(dev, PCI_PREF_MEMORY_BASE, &mem_base_lo);
 	pci_read_config_word(dev, PCI_PREF_MEMORY_LIMIT, &mem_limit_lo);
-	pci_read_config_dword(dev, PCI_PREF_BASE_UPPER32, &mem_base_hi);
-	pci_read_config_dword(dev, PCI_PREF_LIMIT_UPPER32, &mem_limit_hi);
-	base = (mem_base_lo & PCI_MEMORY_RANGE_MASK) << 16;
-	limit = (mem_limit_lo & PCI_MEMORY_RANGE_MASK) << 16;
+	base = (mem_base_lo & PCI_PREF_RANGE_MASK) << 16;
+	limit = (mem_limit_lo & PCI_PREF_RANGE_MASK) << 16;
+
+	if ((mem_base_lo & PCI_PREF_RANGE_TYPE_MASK) == PCI_PREF_RANGE_TYPE_64) {
+		u32 mem_base_hi, mem_limit_hi;
+		pci_read_config_dword(dev, PCI_PREF_BASE_UPPER32, &mem_base_hi);
+		pci_read_config_dword(dev, PCI_PREF_LIMIT_UPPER32, &mem_limit_hi);
 #if BITS_PER_LONG == 64
-	base |= ((long) mem_base_hi) << 32;
-	limit |= ((long) mem_limit_hi) << 32;
+		base |= ((long) mem_base_hi) << 32;
+		limit |= ((long) mem_limit_hi) << 32;
 #else
-	if (mem_base_hi || mem_limit_hi) {
-		printk(KERN_ERR "PCI: Unable to handle 64-bit address space for %s\n", child->name);
-		return;
-	}
+		if (mem_base_hi || mem_limit_hi) {
+			printk(KERN_ERR "PCI: Unable to handle 64-bit address space for %s\n", child->name);
+			return;
+		}
 #endif
+	}
 	if (base && base <= limit) {
 		res->flags = (mem_base_lo & PCI_MEMORY_RANGE_TYPE_MASK) | IORESOURCE_MEM | IORESOURCE_PREFETCH;
 		res->start = base;

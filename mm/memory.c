@@ -460,7 +460,7 @@ int map_user_kiobuf(int rw, struct kiobuf *iobuf, unsigned long va, size_t len)
 	if (err)
 		return err;
 
-	down_write(&mm->mmap_sem);
+	down_read(&mm->mmap_sem);
 
 	err = -EFAULT;
 	iobuf->locked = 0;
@@ -518,12 +518,12 @@ int map_user_kiobuf(int rw, struct kiobuf *iobuf, unsigned long va, size_t len)
 		ptr += PAGE_SIZE;
 	}
 
-	up_write(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	dprintk ("map_user_kiobuf: end OK\n");
 	return 0;
 
  out_unlock:
-	up_write(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 	unmap_kiobuf(iobuf);
 	dprintk ("map_user_kiobuf: end %d\n", err);
 	return err;

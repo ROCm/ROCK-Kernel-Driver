@@ -1,4 +1,4 @@
-/* $Id: isdnloop.c,v 1.11.6.3 2001/06/09 15:14:19 kai Exp $
+/* $Id: isdnloop.c,v 1.11.6.4 2001/07/13 09:20:12 kai Exp $
 
  * ISDN low-level module implementing a dummy loop driver.
  *
@@ -26,7 +26,7 @@
 #include "isdnloop.h"
 
 static char
-*revision = "$Revision: 1.11.6.3 $";
+*revision = "$Revision: 1.11.6.4 $";
 
 static int isdnloop_addcard(char *);
 
@@ -1518,16 +1518,11 @@ isdnloop_initcard(char *id)
 static int
 isdnloop_addcard(char *id1)
 {
-	ulong flags;
 	isdnloop_card *card;
 
-	save_flags(flags);
-	cli();
 	if (!(card = isdnloop_initcard(id1))) {
-		restore_flags(flags);
 		return -EIO;
 	}
-	restore_flags(flags);
 	printk(KERN_INFO
 	       "isdnloop: (%s) virtual card added\n",
 	       card->interface.id);

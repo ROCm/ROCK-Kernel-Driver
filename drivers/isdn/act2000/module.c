@@ -1,4 +1,4 @@
-/* $Id: module.c,v 1.14.6.2 2000/12/18 22:14:10 kai Exp $
+/* $Id: module.c,v 1.14.6.3 2001/07/13 09:20:11 kai Exp $
  *
  * ISDN lowlevel-module for the IBM ISDN-S0 Active 2000.
  *
@@ -38,7 +38,7 @@ static act2000_card *cards = (act2000_card *) NULL;
 /* Parameters to be set by insmod */
 static int   act_bus  =  0;
 static int   act_port = -1;  /* -1 = Autoprobe  */
-static int   act_irq  = -1;  /* -1 = Autoselect */
+static int   act_irq  = -1;
 static char *act_id   = "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0";
 
 MODULE_DESCRIPTION(       "Driver for IBM Active 2000 ISDN card");
@@ -46,7 +46,7 @@ MODULE_AUTHOR(            "Fritz Elfert");
 MODULE_SUPPORTED_DEVICE(  "ISDN subsystem");
 MODULE_PARM_DESC(act_bus, "BusType of first card, 1=ISA, 2=MCA, 3=PCMCIA, currently only ISA");
 MODULE_PARM_DESC(membase, "Base port address of first card");
-MODULE_PARM_DESC(act_irq, "IRQ of first card (-1 = grab next free IRQ)");
+MODULE_PARM_DESC(act_irq, "IRQ of first card");
 MODULE_PARM_DESC(act_id,  "ID-String of first card");
 MODULE_PARM(act_bus,  "i");
 MODULE_PARM(act_port, "i");

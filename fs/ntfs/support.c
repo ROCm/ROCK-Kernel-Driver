@@ -225,147 +225,81 @@ ntfs_time64_t ntfs_now(void)
 	return ntfs_unixutc2ntutc(CURRENT_TIME);
 }
 
-/* When printing unicode characters base64, use this table. It is not strictly
- * base64, but the Linux vfat encoding. base64 has the disadvantage of using
- * the slash. */
-static char uni2esc[64] = 
-	    "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz+-";
-
-static unsigned char esc2uni(char c)
-{
-	if (c <  '0') return 255;
-	if (c <= '9') return c - '0';
-	if (c <  'A') return 255;
-	if (c <= 'Z') return c - 'A' + 10;
-	if (c <  'a') return 255;
-	if (c <= 'z') return c - 'a' + 36;
-	if (c == '+') return 62;
-	if (c == '-') return 63;
-	return 255;
-}
-
 int ntfs_dupuni2map(ntfs_volume *vol, ntfs_u16 *in, int in_len, char **out,
-		    int *out_len)
+		int *out_len)
 {
-	int i, o, val, chl, chi;
+	int i, o, chl, chi;
 	char *result, *buf, charbuf[NLS_MAX_CHARSET_SIZE];
-	struct nls_table* nls = vol->nls_map;
+	struct nls_table *nls = vol->nls_map;
 
 	result = ntfs_malloc(in_len + 1);
 	if (!result)
 		return -ENOMEM;
 	*out_len = in_len;
-	result[in_len] = '\0';
 	for (i = o = 0; i < in_len; i++) {
-		int cl, ch;
-		/* FIXME: byte order? */
-		cl = in[i] & 0xFF;
-		ch = (in[i] >> 8) & 0xFF;
-		if (!nls) {
-			if (!ch) {
-				result[o++] = cl;
-				continue;
-			}
-		} else {
-			/* FIXME: byte order? */
-			wchar_t uni = in[i];
-			if ((chl = nls->uni2char(uni, charbuf,
-						NLS_MAX_CHARSET_SIZE)) > 0) {
-				/* adjust result buffer */
-				if (chl > 1) {
-					buf = ntfs_malloc(*out_len + chl - 1);
-					if (!buf) {
-						ntfs_free(result);
-						return -ENOMEM;
-					}
-					memcpy(buf, result, o);
+		/* FIXME: Byte order? */
+		wchar_t uni = in[i];
+		if ((chl = nls->uni2char(uni, charbuf,
+				NLS_MAX_CHARSET_SIZE)) > 0) {
+			/* Adjust result buffer. */
+			if (chl > 1) {
+				buf = ntfs_malloc(*out_len + chl - 1);
+				if (!buf) {
 					ntfs_free(result);
-					result = buf;
-					*out_len += (chl - 1);
+					return -ENOMEM;
 				}
-				for (chi = 0; chi < chl; chi++)
-					result[o++] = charbuf[chi];
-			} else
-				result[o++] = '?';
-			continue;
-		}
-		if (!(vol->nct & nct_uni_xlate))
-			goto inval;
-		/* realloc */
-		buf = ntfs_malloc(*out_len + 3);
-		if (!buf) {
-			ntfs_free(result);
-			return -ENOMEM;
-		}
-		memcpy(buf, result, o);
-		ntfs_free(result);
-		result = buf;
-		*out_len += 3;
-		result[o++] = ':';
-		if (vol->nct & nct_uni_xlate_vfat) {
-			val = (cl << 8) + ch;
-			result[o+2] = uni2esc[val & 0x3f];
-			val >>= 6;
-			result[o+1] = uni2esc[val & 0x3f];
-			val >>= 6;
-			result[o] = uni2esc[val & 0x3f];
-			o += 3;
+				memcpy(buf, result, o);
+				ntfs_free(result);
+				result = buf;
+				*out_len += (chl - 1);
+			}
+			for (chi = 0; chi < chl; chi++)
+				result[o++] = charbuf[chi];
 		} else {
-			val = (ch << 8) + cl;
-			result[o++] = uni2esc[val & 0x3f];
-			val >>= 6;
-			result[o++] = uni2esc[val & 0x3f];
-			val >>= 6;
-			result[o++] = uni2esc[val & 0x3f];
+			/* Invalid character. */
+			printk(KERN_ERR "NTFS: Unicode name contains a "
+					"character that cannot be converted "
+					"to chosen character set. Remount "
+					"with utf8 encoding and this should "
+					"work.\n");
+			ntfs_free(result);
+			return -EILSEQ;
 		}
 	}
+	result[*out_len] = '\0';
 	*out = result;
 	return 0;
- inval:
-	ntfs_free(result);
-	*out = 0;
-	return -EILSEQ;
 }
 
 int ntfs_dupmap2uni(ntfs_volume *vol, char* in, int in_len, ntfs_u16 **out,
-		    int *out_len)
+		int *out_len)
 {
 	int i, o;
-	ntfs_u16* result;
-	struct nls_table* nls = vol->nls_map;
+	ntfs_u16 *result;
+	struct nls_table *nls = vol->nls_map;
 
-	*out=result = ntfs_malloc(2 * in_len);
+	*out = result = ntfs_malloc(2 * in_len);
 	if (!result)
 		return -ENOMEM;
 	*out_len = in_len;
-	for (i = o = 0; i < in_len; i++, o++){
+	for (i = o = 0; i < in_len; i++, o++) {
 		wchar_t uni;
-		if (in[i] != ':' || (vol->nct & nct_uni_xlate) == 0){
-			int charlen;
-			charlen = nls->char2uni(&in[i], in_len-i, &uni);
-			if (charlen < 0)
-				return charlen;
-			*out_len -= (charlen - 1);
-			i += (charlen - 1);
-		} else {
-			unsigned char c1, c2, c3;
-			*out_len -= 3;
-			c1 = esc2uni(in[++i]);
-			c2 = esc2uni(in[++i]);
-			c3 = esc2uni(in[++i]);
-			if (c1 == 255 || c2 == 255 || c3 == 255)
-				uni = 0;
-			else if (vol->nct & nct_uni_xlate_vfat) {
-				uni = (((c2 & 0x3) << 6) + c3) << 8 |
-				      ((c1 << 4) + (c2 >> 2));
-			} else {
-				uni = ((c3 << 4) + (c2 >> 2)) << 8 |
-				      (((c2 & 0x3) << 6) + c1);
-			}
+		int charlen;
+
+		charlen = nls->char2uni(&in[i], in_len - i, &uni);
+		if (charlen < 0) {
+			printk(KERN_ERR "NTFS: Name contains a character that "
+					"cannot be converted to Unicode.\n");
+			ntfs_free(result);
+			return charlen;
 		}
-		/* FIXME: byte order? */
+		*out_len -= charlen - 1;
+		i += charlen - 1;
+		/* FIXME: Byte order? */
 		result[o] = uni;
 		if (!result[o]) {
+			printk(KERN_ERR "NTFS: Name contains a character that "
+					"cannot be converted to Unicode.\n");
 			ntfs_free(result);
 			return -EILSEQ;
 		}

@@ -847,3 +847,18 @@ asmlinkage long sys_vhangup(void)
 	}
 	return -EPERM;
 }
+
+/*
+ * Called when an inode is about to be open.
+ * We use this to disallow opening RW large files on 32bit systems if
+ * the caller didn't specify O_LARGEFILE.  On 64bit systems we force
+ * on this flag in sys_open.
+ */
+int generic_file_open(struct inode * inode, struct file * filp)
+{
+	if (!(filp->f_flags & O_LARGEFILE) && inode->i_size > MAX_NON_LFS)
+		return -EFBIG;
+	return 0;
+}
+
+EXPORT_SYMBOL(generic_file_open);

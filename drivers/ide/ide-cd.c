@@ -978,8 +978,7 @@ static ide_startstop_t cdrom_read_intr (ide_drive_t *drive)
 
 		/* If we've filled the present buffer but there's another
 		   chained buffer after it, move on. */
-		if (rq->current_nr_sectors == 0 &&
-		    rq->nr_sectors > 0)
+		if (rq->current_nr_sectors == 0 && rq->nr_sectors)
 			cdrom_end_request (1, drive);
 
 		/* If the buffers are full, cache the rest of the data in our
@@ -1193,6 +1192,55 @@ static ide_startstop_t cdrom_start_seek (ide_drive_t *drive, unsigned int block)
 	return cdrom_start_packet_command (drive, 0, cdrom_start_seek_continuation);
 }
 
+static inline int cdrom_merge_requests(struct request *rq, struct request *nxt)
+{
+	int ret = 1;
+
+	/*
+	 * partitions not really working, but better check anyway...
+	 */
+	if (rq->cmd == nxt->cmd && rq->rq_dev == nxt->rq_dev) {
+		rq->nr_sectors += nxt->nr_sectors;
+		rq->hard_nr_sectors += nxt->nr_sectors;
+		rq->bhtail->b_reqnext = nxt->bh;
+		rq->bhtail = nxt->bhtail;
+		list_del(&nxt->queue);
+		blkdev_release_request(nxt);
+		ret = 0;
+	}
+
+	return ret;
+}
+
+/*
+ * the current request will always be the first one on the list
+ */
+static void cdrom_attempt_remerge(ide_drive_t *drive, struct request *rq)
+{
+	struct list_head *entry;
+	struct request *nxt;
+	unsigned long flags;
+
+	spin_lock_irqsave(&io_request_lock, flags);
+
+	while (1) {
+		entry = rq->queue.next;
+		if (entry == &drive->queue.queue_head)
+			break;
+
+		nxt = blkdev_entry_to_request(entry);
+		if (rq->sector + rq->nr_sectors != nxt->sector)
+			break;
+		else if (rq->nr_sectors + nxt->nr_sectors > SECTORS_MAX)
+			break;
+
+		if (cdrom_merge_requests(rq, nxt))
+			break;
+	}
+
+	spin_unlock_irqrestore(&io_request_lock, flags);
+}
+
 /* Fix up a possibly partially-processed request so that we can
    start it over entirely, or even put it back on the request queue. */
 static void restore_request (struct request *rq)
@@ -1204,6 +1252,8 @@ static void restore_request (struct request *rq)
 		rq->sector -= n;
 	}
 	rq->current_nr_sectors = rq->bh->b_size >> SECTOR_BITS;
+	rq->hard_nr_sectors = rq->nr_sectors;
+	rq->hard_sector = rq->sector;
 }
 
 /*
@@ -1217,19 +1267,21 @@ static ide_startstop_t cdrom_start_read (ide_drive_t *drive, unsigned int block)
 
 	/* If the request is relative to a partition, fix it up to refer to the
 	   absolute address.  */
-	if ((minor & PARTN_MASK) != 0) {
+	if (minor & PARTN_MASK) {
 		rq->sector = block;
 		minor &= ~PARTN_MASK;
-		rq->rq_dev = MKDEV (MAJOR(rq->rq_dev), minor);
+		rq->rq_dev = MKDEV(MAJOR(rq->rq_dev), minor);
 	}
 
 	/* We may be retrying this request after an error.  Fix up
 	   any weirdness which might be present in the request packet. */
-	restore_request (rq);
+	restore_request(rq);
 
 	/* Satisfy whatever we can of this request from our cached sector. */
 	if (cdrom_read_from_buffer(drive))
 		return ide_stopped;
+
+	cdrom_attempt_remerge(drive, rq);
 
 	/* Clear the local sector buffer. */
 	info->nsectors_buffered = 0;
@@ -1478,7 +1530,7 @@ static inline int cdrom_write_check_ireason(ide_drive_t *drive, int len, int ire
 
 static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 {
-	int stat, ireason, len, sectors_to_transfer;
+	int stat, ireason, len, sectors_to_transfer, uptodate;
 	struct cdrom_info *info = drive->driver_data;
 	int i, dma_error = 0, dma = info->dma;
 	ide_startstop_t startstop;
@@ -1499,6 +1551,9 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 		return startstop;
 	}
  
+	/*
+	 * using dma, transfer is complete now
+	 */
 	if (dma) {
 		if (dma_error)
 			return ide_error(drive, "dma error", stat);
@@ -1520,12 +1575,13 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 		/* If we're not done writing, complain.
 		 * Otherwise, complete the command normally.
 		 */
+		uptodate = 1;
 		if (rq->current_nr_sectors > 0) {
 			printk("%s: write_intr: data underrun (%ld blocks)\n",
-				drive->name, rq->current_nr_sectors);
-			cdrom_end_request(0, drive);
-		} else
-			cdrom_end_request(1, drive);
+			drive->name, rq->current_nr_sectors);
+			uptodate = 0;
+		}
+		cdrom_end_request(uptodate, drive);
 		return ide_stopped;
 	}
 
@@ -1534,26 +1590,42 @@ static ide_startstop_t cdrom_write_intr(ide_drive_t *drive)
 		if (cdrom_write_check_ireason(drive, len, ireason))
 			return ide_stopped;
 
-	/* The number of sectors we need to read from the drive. */
 	sectors_to_transfer = len / SECTOR_SIZE;
 
-	/* Now loop while we still have data to read from the drive. DMA
-	 * transfers will already have been complete
+	/*
+	 * now loop and write out the data
 	 */
 	while (sectors_to_transfer > 0) {
-		/* If we've filled the present buffer but there's another
-		   chained buffer after it, move on. */
-		if (rq->current_nr_sectors == 0 && rq->nr_sectors > 0)
-			cdrom_end_request(1, drive);
+		int this_transfer;
 
-		atapi_output_bytes(drive, rq->buffer, rq->current_nr_sectors);
-		rq->nr_sectors -= rq->current_nr_sectors;
-		rq->current_nr_sectors = 0;
-		rq->sector += rq->current_nr_sectors;
-		sectors_to_transfer -= rq->current_nr_sectors;
+		if (!rq->current_nr_sectors) {
+			printk("ide-cd: write_intr: oops\n");
+			break;
+		}
+
+		/*
+		 * Figure out how many sectors we can transfer
+		 */
+		this_transfer = MIN(sectors_to_transfer,rq->current_nr_sectors);
+
+		while (this_transfer > 0) {
+			atapi_output_bytes(drive, rq->buffer, SECTOR_SIZE);
+			rq->buffer += SECTOR_SIZE;
+			--rq->nr_sectors;
+			--rq->current_nr_sectors;
+			++rq->sector;
+			--this_transfer;
+			--sectors_to_transfer;
+		}
+
+		/*
+		 * current buffer complete, move on
+		 */
+		if (rq->current_nr_sectors == 0 && rq->nr_sectors)
+			cdrom_end_request (1, drive);
 	}
 
-	/* arm handler */
+	/* re-arm handler */
 	ide_set_handler(drive, &cdrom_write_intr, 5 * WAIT_CMD, NULL);
 	return ide_started;
 }
@@ -1584,9 +1656,25 @@ static ide_startstop_t cdrom_start_write_cont(ide_drive_t *drive)
 	return cdrom_transfer_packet_command(drive, &pc, cdrom_write_intr);
 }
 
-static ide_startstop_t cdrom_start_write(ide_drive_t *drive)
+static ide_startstop_t cdrom_start_write(ide_drive_t *drive, struct request *rq)
 {
 	struct cdrom_info *info = drive->driver_data;
+
+	/*
+	 * writes *must* be 2kB frame aligned
+	 */
+	if ((rq->nr_sectors & 3) || (rq->sector & 3)) {
+		cdrom_end_request(0, drive);
+		return ide_stopped;
+	}
+
+	/*
+	 * for dvd-ram and such media, it's a really big deal to get
+	 * big writes all the time. so scour the queue and attempt to
+	 * remerge requests, often the plugging will not have had time
+	 * to do this properly
+	 */
+	cdrom_attempt_remerge(drive, rq);
 
 	info->nsectors_buffered = 0;
 
@@ -1630,7 +1718,7 @@ ide_do_rw_cdrom (ide_drive_t *drive, struct request *rq, unsigned long block)
 				if (rq->cmd == READ)
 					action = cdrom_start_read(drive, block);
 				else
-					action = cdrom_start_write(drive);
+					action = cdrom_start_write(drive, rq);
 			}
 			info->last_block = block;
 			return action;
@@ -1833,6 +1921,7 @@ static int cdrom_read_tocentry(ide_drive_t *drive, int trackno, int msf_flag,
 
 	pc.buffer =  buf;
 	pc.buflen = buflen;
+	pc.quiet = 1;
 	pc.c[0] = GPCMD_READ_TOC_PMA_ATIP;
 	pc.c[6] = trackno;
 	pc.c[7] = (buflen >> 8);
@@ -1985,7 +2074,7 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 	/* Now try to get the total cdrom capacity. */
 	minor = (drive->select.b.unit) << PARTN_BITS;
 	dev = MKDEV(HWIF(drive)->major, minor);
-	stat = cdrom_get_last_written(dev, (long *)&toc->capacity);
+	stat = cdrom_get_last_written(dev, &toc->capacity);
 	if (stat)
 		stat = cdrom_read_capacity(drive, &toc->capacity, sense);
 	if (stat)
@@ -2786,7 +2875,7 @@ int ide_cdrom_open (struct inode *ip, struct file *fp, ide_drive_t *drive)
 	MOD_INC_USE_COUNT;
 	if (info->buffer == NULL)
 		info->buffer = (char *) kmalloc(SECTOR_BUFFER_SIZE, GFP_KERNEL);
-	if ((info->buffer == NULL) || (rc = cdrom_fops.open(ip, fp))) {
+        if ((info->buffer == NULL) || (rc = cdrom_fops.open(ip, fp))) {
 		drive->usage--;
 		MOD_DEC_USE_COUNT;
 	}
@@ -2827,7 +2916,12 @@ void ide_cdrom_revalidate (ide_drive_t *drive)
 	drive->part[0].nr_sects = toc->capacity * SECTORS_PER_FRAME;
 	HWIF(drive)->gd->sizes[minor] = toc->capacity * BLOCKS_PER_FRAME;
 
+	/*
+	 * reset block size, ide_revalidate_disk incorrectly sets it to
+	 * 1024 even for CDROM's
+	 */
 	blk_size[HWIF(drive)->major] = HWIF(drive)->gd->sizes;
+	set_blocksize(MKDEV(HWIF(drive)->major, minor), CD_FRAMESIZE);
 }
 
 static
@@ -2862,20 +2956,32 @@ int ide_cdrom_cleanup(ide_drive_t *drive)
 	return 0;
 }
 
+static
+int ide_cdrom_reinit (ide_drive_t *drive)
+{
+	return 0;
+}
+
 static ide_driver_t ide_cdrom_driver = {
 	name:			"ide-cdrom",
 	version:		IDECD_VERSION,
 	media:			ide_cdrom,
+	busy:			0,
 	supports_dma:		1,
 	supports_dsc_overlap:	1,
 	cleanup:		ide_cdrom_cleanup,
 	do_request:		ide_do_rw_cdrom,
+	end_request:		NULL,
 	ioctl:			ide_cdrom_ioctl,
 	open:			ide_cdrom_open,
 	release:		ide_cdrom_release,
 	media_change:		ide_cdrom_check_media_change,
 	revalidate:		ide_cdrom_revalidate,
+	pre_reset:		NULL,
 	capacity:		ide_cdrom_capacity,
+	special:		NULL,
+	proc:			NULL,
+	driver_reinit:		ide_cdrom_reinit,
 };
 
 int ide_cdrom_init(void);

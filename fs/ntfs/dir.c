@@ -789,7 +789,7 @@ int ntfs_getdir_unsorted(ntfs_inode *ino, ntfs_u32 *p_high, ntfs_u32* p_low,
 	int block;
 	int start;
 	ntfs_attribute *attr;
-	ntfs_volume *vol = ino->vol;
+	ntfs_volume *vol;
 	int byte, bit;
 	int error = 0;
 
@@ -797,6 +797,7 @@ int ntfs_getdir_unsorted(ntfs_inode *ino, ntfs_u32 *p_high, ntfs_u32* p_low,
 		ntfs_error("No inode passed to getdir_unsorted\n");
 		return -EINVAL;
 	}
+	vol = ino->vol;
 	if (!vol) {
 		ntfs_error("Inode %d has no volume\n", ino->i_number);
 		return -EINVAL;

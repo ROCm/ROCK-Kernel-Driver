@@ -1347,6 +1347,7 @@ extern void do_generic_file_read(struct file *, loff_t *, read_descriptor_t *, r
 extern loff_t no_llseek(struct file *file, loff_t offset, int origin);
 extern loff_t generic_file_llseek(struct file *file, loff_t offset, int origin);
 extern ssize_t generic_read_dir(struct file *, char *, size_t, loff_t *);
+extern int generic_file_open(struct inode * inode, struct file * filp);
 
 extern struct file_operations generic_ro_fops;
 

@@ -69,12 +69,7 @@ HFC-S+, HFC-SP/PCMCIA cards
 
 Note: PCF, PCF-Pro: up to now, only the ISDN part is supported
       PCC-8: not tested yet
-      Teles PCMCIA is EXPERIMENTAL
-      Teles 16.3c is EXPERIMENTAL
-      Teles PCI is EXPERIMENTAL
-      Teles S0Box is EXPERIMENTAL
       Eicon.Diehl Diva U interface not tested
-      HFC-S+, HFC-SP/PCMCIA are experimental
 
 If you know other passive cards with the Siemens chipset, please let me know.
 To use the PNP cards you need the isapnptools.

@@ -162,6 +162,9 @@
 #include <linux/kmod.h>
 #endif /* CONFIG_KMOD */
 
+/* default maximum number of failures */
+#define IDE_DEFAULT_MAX_FAILURES 	1
+
 static const byte ide_hwif_to_major[] = { IDE0_MAJOR, IDE1_MAJOR, IDE2_MAJOR, IDE3_MAJOR, IDE4_MAJOR, IDE5_MAJOR, IDE6_MAJOR, IDE7_MAJOR, IDE8_MAJOR, IDE9_MAJOR };
 
 static int	idebus_parameter; /* holds the "idebus=" parameter */
@@ -249,6 +252,7 @@ static void init_hwif_data (unsigned int index)
 	hwif->name[1]	= 'd';
 	hwif->name[2]	= 'e';
 	hwif->name[3]	= '0' + index;
+	hwif->bus_state = BUSSTATE_ON;
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
 
@@ -263,6 +267,7 @@ static void init_hwif_data (unsigned int index)
 		drive->name[0]			= 'h';
 		drive->name[1]			= 'd';
 		drive->name[2]			= 'a' + (index * MAX_DRIVES) + unit;
+		drive->max_failures		= IDE_DEFAULT_MAX_FAILURES;
 		init_waitqueue_head(&drive->wqueue);
 	}
 }
@@ -377,7 +382,19 @@ static inline void do_vlb_sync (ide_ioreg_t port) {
  */
 void ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
-	byte io_32bit = drive->io_32bit;
+	byte io_32bit;
+
+	/* first check if this controller has defined a special function
+	 * for handling polled ide transfers
+	 */
+
+	if(HWIF(drive)->ideproc) {
+		HWIF(drive)->ideproc(ideproc_ide_input_data,
+				     drive, buffer, wcount);
+		return;
+	}
+
+	io_32bit = drive->io_32bit;
 
 	if (io_32bit) {
 #if SUPPORT_VLB_SYNC
@@ -410,7 +427,15 @@ void ide_input_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
  */
 void ide_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
 {
-	byte io_32bit = drive->io_32bit;
+	byte io_32bit;
+
+	if(HWIF(drive)->ideproc) {
+		HWIF(drive)->ideproc(ideproc_ide_output_data,
+				     drive, buffer, wcount);
+		return;
+	}
+
+	io_32bit = drive->io_32bit;
 
 	if (io_32bit) {
 #if SUPPORT_VLB_SYNC
@@ -447,6 +472,12 @@ void ide_output_data (ide_drive_t *drive, void *buffer, unsigned int wcount)
  */
 void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
+	if(HWIF(drive)->ideproc) {
+		HWIF(drive)->ideproc(ideproc_atapi_input_bytes,
+				     drive, buffer, bytecount);
+		return;
+	}
+
 	++bytecount;
 #if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
 	if (MACH_IS_ATARI || MACH_IS_Q40) {
@@ -462,6 +493,12 @@ void atapi_input_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount
 
 void atapi_output_bytes (ide_drive_t *drive, void *buffer, unsigned int bytecount)
 {
+	if(HWIF(drive)->ideproc) {
+		HWIF(drive)->ideproc(ideproc_atapi_output_bytes,
+				     drive, buffer, bytecount);
+		return;
+	}
+
 	++bytecount;
 #if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
 	if (MACH_IS_ATARI || MACH_IS_Q40) {
@@ -512,9 +549,19 @@ void ide_end_request (byte uptodate, ide_hwgroup_t *hwgroup)
 {
 	struct request *rq;
 	unsigned long flags;
+	ide_drive_t *drive = hwgroup->drive;
 
 	spin_lock_irqsave(&io_request_lock, flags);
 	rq = hwgroup->rq;
+
+	/*
+	 * decide whether to reenable DMA -- 3 is a random magic for now,
+	 * if we DMA timeout more than 3 times, just stay in PIO
+	 */
+	if (drive->state == DMA_PIO_RETRY && drive->retry_pio <= 3) {
+		drive->state = 0;
+		hwgroup->hwif->dmaproc(ide_dma_on, drive);
+	}
 
 	if (!end_that_request_first(rq, uptodate, hwgroup->drive->name)) {
 		add_blkdev_randomness(MAJOR(rq->rq_dev));
@@ -637,11 +684,14 @@ static ide_startstop_t reset_pollfunc (ide_drive_t *drive)
 			return ide_started;	/* continue polling */
 		}
 		printk("%s: reset timed-out, status=0x%02x\n", hwif->name, tmp);
+		drive->failures++;
 	} else  {
 		printk("%s: reset: ", hwif->name);
-		if ((tmp = GET_ERR()) == 1)
+		if ((tmp = GET_ERR()) == 1) {
 			printk("success\n");
-		else {
+			drive->failures = 0;
+		} else {
+			drive->failures++;
 #if FANCY_STATUS_DUMPS
 			printk("master: ");
 			switch (tmp & 0x7f) {
@@ -1049,6 +1099,12 @@ int ide_wait_stat (ide_startstop_t *startstop, ide_drive_t *drive, byte good, by
 	int i;
 	unsigned long flags;
  
+	/* bail early if we've exceeded max_failures */
+	if (drive->max_failures && (drive->failures > drive->max_failures)) {
+		*startstop = ide_stopped;
+		return 1;
+	}
+
 	udelay(1);	/* spec allows drive 400ns to assert "BUSY" */
 	if ((stat = GET_STAT()) & BUSY_STAT) {
 		__save_flags(flags);	/* local CPU only */
@@ -1145,6 +1201,11 @@ static ide_startstop_t start_request (ide_drive_t *drive)
 #ifdef DEBUG
 	printk("%s: start_request: current=0x%08lx\n", hwif->name, (unsigned long) rq);
 #endif
+	/* bail early if we've exceeded max_failures */
+	if (drive->max_failures && (drive->failures > drive->max_failures)) {
+		goto kill_rq;
+	}
+
 	if (unit >= MAX_DRIVES) {
 		printk("%s: bad device number: %s\n", hwif->name, kdevname(rq->rq_dev));
 		goto kill_rq;
@@ -1198,6 +1259,19 @@ kill_rq:
 	else
 		ide_end_request(0, HWGROUP(drive));
 	return ide_stopped;
+}
+
+ide_startstop_t restart_request (ide_drive_t *drive)
+{
+	ide_hwgroup_t *hwgroup = HWGROUP(drive);
+	unsigned long flags;
+
+	spin_lock_irqsave(&io_request_lock, flags);
+	hwgroup->handler = NULL;
+	del_timer(&hwgroup->timer);
+	spin_unlock_irqrestore(&io_request_lock, flags);
+
+	return start_request(drive);
 }
 
 /*
@@ -1388,6 +1462,49 @@ void do_ide_request(request_queue_t *q)
 }
 
 /*
+ * un-busy the hwgroup etc, and clear any pending DMA status. we want to
+ * retry the current request in pio mode instead of risking tossing it
+ * all away
+ */
+void ide_dma_timeout_retry(ide_drive_t *drive)
+{
+	ide_hwif_t *hwif = HWIF(drive);
+	struct request *rq;
+
+	/*
+	 * end current dma transaction
+	 */
+	(void) hwif->dmaproc(ide_dma_end, drive);
+
+	/*
+	 * complain a little, later we might remove some of this verbosity
+	 */
+	printk("%s: timeout waiting for DMA\n", drive->name);
+	(void) hwif->dmaproc(ide_dma_timeout, drive);
+
+	/*
+	 * disable dma for now, but remember that we did so because of
+	 * a timeout -- we'll reenable after we finish this next request
+	 * (or rather the first chunk of it) in pio.
+	 */
+	drive->retry_pio++;
+	drive->state = DMA_PIO_RETRY;
+	(void) hwif->dmaproc(ide_dma_off_quietly, drive);
+
+	/*
+	 * un-busy drive etc (hwgroup->busy is cleared on return) and
+	 * make sure request is sane
+	 */
+	rq = HWGROUP(drive)->rq;
+	HWGROUP(drive)->rq = NULL;
+
+	rq->errors = 0;
+	rq->sector = rq->bh->b_rsector;
+	rq->current_nr_sectors = rq->bh->b_size >> 9;
+	rq->buffer = rq->bh->b_data;
+}
+
+/*
  * ide_timer_expiry() is our timeout function for all drive operations.
  * But note that it can also be invoked as a result of a "sleep" operation
  * triggered by the mod_timer() call in ide_do_request.
@@ -1460,11 +1577,10 @@ void ide_timer_expiry (unsigned long data)
 				startstop = handler(drive);
 			} else {
 				if (drive->waiting_for_dma) {
-					(void) hwgroup->hwif->dmaproc(ide_dma_end, drive);
-					printk("%s: timeout waiting for DMA\n", drive->name);
-					(void) hwgroup->hwif->dmaproc(ide_dma_timeout, drive);
-				}
-				startstop = ide_error(drive, "irq timeout", GET_STAT());
+					startstop = ide_stopped;
+					ide_dma_timeout_retry(drive);
+				} else
+					startstop = ide_error(drive, "irq timeout", GET_STAT());
 			}
 			set_recovery_timer(hwif);
 			drive->service_time = jiffies - drive->service_start;
@@ -2089,7 +2205,10 @@ void ide_unregister (unsigned int index)
 	hwif->maskproc		= old_hwif.maskproc;
 	hwif->quirkproc		= old_hwif.quirkproc;
 	hwif->rwproc		= old_hwif.rwproc;
+	hwif->ideproc		= old_hwif.ideproc;
 	hwif->dmaproc		= old_hwif.dmaproc;
+	hwif->busproc		= old_hwif.busproc;
+	hwif->bus_state		= old_hwif.bus_state;
 	hwif->dma_base		= old_hwif.dma_base;
 	hwif->dma_extra		= old_hwif.dma_extra;
 	hwif->config_data	= old_hwif.config_data;
@@ -2671,6 +2790,20 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 		case BLKELVSET:
 			return blk_ioctl(inode->i_rdev, cmd, arg);
 
+		case HDIO_GET_BUSSTATE:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+			if (put_user(HWIF(drive)->bus_state, (long *)arg))
+				return -EFAULT;
+			return 0;
+
+		case HDIO_SET_BUSSTATE:
+			if (!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+			if (HWIF(drive)->busproc)
+				HWIF(drive)->busproc(HWIF(drive), arg);
+			return 0;
+
 		default:
 			if (drive->driver != NULL)
 				return DRIVER(drive)->ioctl(drive, inode, file, cmd, arg);
@@ -3196,6 +3329,12 @@ static void __init probe_for_hwifs (void)
 	}
 #endif /* CONFIG_PCI */
 
+#ifdef CONFIG_ETRAX_IDE
+	{
+		extern void init_e100_ide(void);
+		init_e100_ide();
+	}
+#endif /* CONFIG_ETRAX_IDE */
 #ifdef CONFIG_BLK_DEV_CMD640
 	{
 		extern void ide_probe_for_cmd640x(void);
@@ -3373,6 +3512,13 @@ static ide_startstop_t default_special (ide_drive_t *drive)
 	return ide_stopped;
 }
 
+static int default_driver_reinit (ide_drive_t *drive)
+{
+	printk(KERN_ERR "%s: does not support hotswap of device class !\n", drive->name);
+
+	return 0;
+}
+
 static void setup_driver_defaults (ide_drive_t *drive)
 {
 	ide_driver_t *d = drive->driver;
@@ -3387,6 +3533,7 @@ static void setup_driver_defaults (ide_drive_t *drive)
 	if (d->pre_reset == NULL)	d->pre_reset = default_pre_reset;
 	if (d->capacity == NULL)	d->capacity = default_capacity;
 	if (d->special == NULL)		d->special = default_special;
+	if (d->driver_reinit == NULL)	d->driver_reinit = default_driver_reinit;
 }
 
 ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *driver, int n)
@@ -3536,6 +3683,7 @@ EXPORT_SYMBOL(ide_error);
 EXPORT_SYMBOL(ide_fixstring);
 EXPORT_SYMBOL(ide_wait_stat);
 EXPORT_SYMBOL(ide_do_reset);
+EXPORT_SYMBOL(restart_request);
 EXPORT_SYMBOL(ide_init_drive_cmd);
 EXPORT_SYMBOL(ide_do_drive_cmd);
 EXPORT_SYMBOL(ide_end_drive_cmd);

@@ -88,6 +88,34 @@ static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
 	u8  c0 = 0, c1 = 0;
 	u8  reg44 = 0, reg48 = 0, reg4a = 0, reg4b = 0, reg54 = 0, reg55 = 0;
 
+	switch(bmide_dev->device) {
+		case PCI_DEVICE_ID_INTEL_82801BA_8:
+		case PCI_DEVICE_ID_INTEL_82801BA_9:
+			p += sprintf(p, "\n                                Intel PIIX4 Ultra 100 Chipset.\n");
+			break;
+		case PCI_DEVICE_ID_INTEL_82372FB_1:
+		case PCI_DEVICE_ID_INTEL_82801AA_1:
+			p += sprintf(p, "\n                                Intel PIIX4 Ultra 66 Chipset.\n");
+			break;
+		case PCI_DEVICE_ID_INTEL_82451NX:
+		case PCI_DEVICE_ID_INTEL_82801AB_1:
+		case PCI_DEVICE_ID_INTEL_82443MX_1:
+		case PCI_DEVICE_ID_INTEL_82371AB:
+			p += sprintf(p, "\n                                Intel PIIX4 Ultra 33 Chipset.\n");
+			break;
+		case PCI_DEVICE_ID_INTEL_82371SB_1:
+			p += sprintf(p, "\n                                Intel PIIX3 Chipset.\n");
+			break;
+		case PCI_DEVICE_ID_INTEL_82371MX:
+			p += sprintf(p, "\n                                Intel MPIIX Chipset.\n");
+			return p-buffer;	/* => must be less than 4k! */
+		case PCI_DEVICE_ID_INTEL_82371FB_1:
+		case PCI_DEVICE_ID_INTEL_82371FB_0:
+		default:
+			p += sprintf(p, "\n                                Intel PIIX Chipset.\n");
+			break;
+	}
+
 	pci_read_config_word(bmide_dev, 0x40, &reg40);
 	pci_read_config_word(bmide_dev, 0x42, &reg42);
 	pci_read_config_byte(bmide_dev, 0x44, &reg44);
@@ -100,14 +128,13 @@ static int piix_get_info (char *buffer, char **addr, off_t offset, int count)
 	psitre = (reg40 & 0x4000) ? 1 : 0;
 	ssitre = (reg42 & 0x4000) ? 1 : 0;
 
-        /*
-         * at that point bibma+0x2 et bibma+0xa are byte registers
-         * to investigate:
-         */
+	/*
+	 * at that point bibma+0x2 et bibma+0xa are byte registers
+	 * to investigate:
+	 */
 	c0 = inb_p((unsigned short)bibma + 0x02);
 	c1 = inb_p((unsigned short)bibma + 0x0a);
 
-	p += sprintf(p, "\n                    %s Chipset.\n", bmide_dev->name);
 	p += sprintf(p, "--------------- Primary Channel ---------------- Secondary Channel -------------\n");
 	p += sprintf(p, "                %sabled                         %sabled\n",
 			(c0&0x80) ? "dis" : " en",
@@ -481,6 +508,11 @@ void __init ide_init_piix (ide_hwif_t *hwif)
 	if (!hwif->irq)
 		hwif->irq = hwif->channel ? 15 : 14;
 #endif /* CONFIG_IA64 */
+
+	if (hwif->pci_dev->device == PCI_DEVICE_ID_INTEL_82371MX) {
+		/* This is a painful system best to let it self tune for now */
+		return;
+	}
 
 	hwif->tuneproc = &piix_tune_drive;
 	hwif->drives[0].autotune = 1;

@@ -1,4 +1,4 @@
-/* $Id: icn.c,v 1.65.6.5 2001/06/09 15:14:19 kai Exp $
+/* $Id: icn.c,v 1.65.6.6 2001/07/13 09:20:12 kai Exp $
 
  * ISDN low-level module for the ICN active ISDN-Card.
  *
@@ -34,7 +34,7 @@
 #undef MAP_DEBUG
 
 static char
-*revision = "$Revision: 1.65.6.5 $";
+*revision = "$Revision: 1.65.6.6 $";
 
 static int icn_addcard(int, char *, char *);
 
@@ -804,8 +804,8 @@ static int
 icn_loadboot(u_char * buffer, icn_card * card)
 {
 	int ret;
-	ulong flags;
 	u_char *codebuf;
+	unsigned long flags;
 
 #ifdef BOOT_DEBUG
 	printk(KERN_DEBUG "icn_loadboot called, buffaddr=%08lx\n", (ulong) buffer);
@@ -818,8 +818,6 @@ icn_loadboot(u_char * buffer, icn_card * card)
 		kfree(codebuf);
 		return ret;
 	}
-	save_flags(flags);
-	cli();
 	if (!card->rvalid) {
 		if (check_region(card->port, ICN_PORTLEN)) {
 			printk(KERN_WARNING
@@ -827,7 +825,6 @@ icn_loadboot(u_char * buffer, icn_card * card)
 			       CID,
 			       card->port,
 			       card->port + ICN_PORTLEN);
-			restore_flags(flags);
 			kfree(codebuf);
 			return -EBUSY;
 		}
@@ -840,14 +837,12 @@ icn_loadboot(u_char * buffer, icn_card * card)
 		if (check_mem_region(dev.memaddr, 0x4000)) {
 			printk(KERN_WARNING
 			       "icn: memory at 0x%08lx in use.\n", dev.memaddr);
-			restore_flags(flags);
 			return -EBUSY;
 		}
 		request_mem_region(dev.memaddr, 0x4000, "icn-isdn (all cards)");
 		dev.shmem = ioremap(dev.memaddr, 0x4000);
 		dev.mvalid = 1;
 	}
-	restore_flags(flags);
 	OUTB_P(0, ICN_RUN);     /* Reset Controller */
 	OUTB_P(0, ICN_MAPRAM);  /* Disable RAM      */
 	icn_shiftout(ICN_CFG, 0x0f, 3, 4);	/* Windowsize= 16k  */
@@ -1051,18 +1046,19 @@ icn_writecmd(const u_char * buf, int len, int user, icn_card * card)
 	ocount = 1;
 	xcount = loop = 0;
 	while (len) {
-		save_flags(flags);
-		cli();
-		lastmap_card = dev.mcard;
-		lastmap_channel = dev.channel;
-		icn_map_channel(card, mch);
-
 		avail = cmd_free;
 		count = MIN(avail, len);
 		if (user)
 			copy_from_user(msg, buf, count);
 		else
 			memcpy(msg, buf, count);
+
+		save_flags(flags);
+		cli();
+		lastmap_card = dev.mcard;
+		lastmap_channel = dev.channel;
+		icn_map_channel(card, mch);
+
 		icn_putmsg(card, '>');
 		for (p = msg, pp = readb(&cmd_i), i = count; i > 0; i--, p++, pp
 		     ++) {
@@ -1140,10 +1136,7 @@ static void
 icn_disable_cards(void)
 {
 	icn_card *card = cards;
-	unsigned long flags;
 
-	save_flags(flags);
-	cli();
 	while (card) {
 		if (check_region(card->port, ICN_PORTLEN)) {
 			printk(KERN_WARNING
@@ -1151,14 +1144,12 @@ icn_disable_cards(void)
 			       CID,
 			       card->port,
 			       card->port + ICN_PORTLEN);
-			cli();
 		} else {
 			OUTB_P(0, ICN_RUN);	/* Reset Controller     */
 			OUTB_P(0, ICN_MAPRAM);	/* Disable RAM          */
 		}
 		card = card->next;
 	}
-	restore_flags(flags);
 }
 
 static int
@@ -1603,25 +1594,19 @@ icn_initcard(int port, char *id)
 static int
 icn_addcard(int port, char *id1, char *id2)
 {
-	ulong flags;
 	icn_card *card;
 	icn_card *card2;
 
-	save_flags(flags);
-	cli();
 	if (!(card = icn_initcard(port, id1))) {
-		restore_flags(flags);
 		return -EIO;
 	}
 	if (!strlen(id2)) {
-		restore_flags(flags);
 		printk(KERN_INFO
 		       "icn: (%s) ICN-2B, port 0x%x added\n",
 		       card->interface.id, port);
 		return 0;
 	}
 	if (!(card2 = icn_initcard(port, id2))) {
-		restore_flags(flags);
 		printk(KERN_INFO
 		       "icn: (%s) half ICN-4B, port 0x%x added\n",
 		       card2->interface.id, port);
@@ -1633,7 +1618,6 @@ icn_addcard(int port, char *id1, char *id2)
 	card2->doubleS0 = 1;
 	card2->secondhalf = 1;
 	card2->other = card;
-	restore_flags(flags);
 	printk(KERN_INFO
 	       "icn: (%s and %s) ICN-4B, port 0x%x added\n",
 	       card->interface.id, card2->interface.id, port);

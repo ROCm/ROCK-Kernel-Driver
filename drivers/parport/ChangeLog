@@ -1,3 +1,7 @@
+2001-08-11  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c: Support for Titan Electronics cards.
+
 2001-08-08  Tim Waugh  <twaugh@redhat.com>
 
 	* share.c (parport_unregister_device): Remove device from wait list

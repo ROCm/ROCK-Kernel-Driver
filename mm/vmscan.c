@@ -477,20 +477,19 @@ out:
  * This code used to be heavily inspired by the FreeBSD source code. 
  * Thanks go out to Matthew Dillon.
  */
-#define MAX_LAUNDER 		(4 * (1 << page_cluster))
 #define CAN_DO_FS		(gfp_mask & __GFP_FS)
-#define CAN_DO_IO		(gfp_mask & __GFP_IO)
 int page_launder(int gfp_mask, int sync)
 {
-	int launder_loop, maxscan, cleaned_pages, maxlaunder;
+	int maxscan, cleaned_pages;
 	struct list_head * page_lru;
 	struct page * page;
 
-	launder_loop = 0;
-	maxlaunder = 0;
 	cleaned_pages = 0;
 
-dirty_page_rescan:
+	/* Will we wait on IO? */
+	if (!sync)
+		gfp_mask &= ~__GFP_WAIT;
+
 	spin_lock(&pagemap_lru_lock);
 	maxscan = nr_inactive_dirty_pages >> DEF_PRIORITY;
 	while ((page_lru = inactive_dirty_list.prev) != &inactive_dirty_list &&
@@ -545,8 +544,8 @@ dirty_page_rescan:
 			if (!writepage)
 				goto page_active;
 
-			/* First time through? Move it to the back of the list */
-			if (!launder_loop || !CAN_DO_FS) {
+			/* Can't do it? Move it to the back of the list */
+			if (!CAN_DO_FS) {
 				list_del(page_lru);
 				list_add(page_lru, &inactive_dirty_list);
 				UnlockPage(page);
@@ -576,9 +575,9 @@ dirty_page_rescan:
 		 * buffer pages
 		 */
 		if (page->buffers) {
-			unsigned int buffer_mask;
 			int clearedbuf;
 			int freed_page = 0;
+
 			/*
 			 * Since we might be doing disk IO, we have to
 			 * drop the spinlock and take an extra reference
@@ -588,16 +587,8 @@ dirty_page_rescan:
 			page_cache_get(page);
 			spin_unlock(&pagemap_lru_lock);
 
-			/* Will we do (asynchronous) IO? */
-			if (launder_loop && maxlaunder == 0 && sync)
-				buffer_mask = gfp_mask;				/* Do as much as we can */
-			else if (launder_loop && maxlaunder-- > 0)
-				buffer_mask = gfp_mask & ~__GFP_WAIT;			/* Don't wait, async write-out */
-			else
-				buffer_mask = gfp_mask & ~(__GFP_WAIT | __GFP_IO);	/* Don't even start IO */
-
 			/* Try to free the page buffers. */
-			clearedbuf = try_to_free_buffers(page, buffer_mask);
+			clearedbuf = try_to_free_buffers(page, gfp_mask);
 
 			/*
 			 * Re-take the spinlock. Note that we cannot
@@ -659,29 +650,6 @@ page_active:
 		}
 	}
 	spin_unlock(&pagemap_lru_lock);
-
-	/*
-	 * If we don't have enough free pages, we loop back once
-	 * to queue the dirty pages for writeout. When we were called
-	 * by a user process (that /needs/ a free page) and we didn't
-	 * free anything yet, we wait synchronously on the writeout of
-	 * MAX_SYNC_LAUNDER pages.
-	 *
-	 * We also wake up bdflush, since bdflush should, under most
-	 * loads, flush out the dirty pages before we have to wait on
-	 * IO.
-	 */
-	if (CAN_DO_IO && !launder_loop && free_shortage()) {
-		launder_loop = 1;
-		/* If we cleaned pages, never do synchronous IO. */
-		if (cleaned_pages)
-			sync = 0;
-		/* We only do a few "out of order" flushes. */
-		maxlaunder = MAX_LAUNDER;
-		/* Kflushd takes care of the rest. */
-		wakeup_bdflush();
-		goto dirty_page_rescan;
-	}
 
 	/* Return the number of pages moved to the inactive_clean list. */
 	return cleaned_pages;
@@ -886,6 +854,13 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 	int ret = 0;
 
 	/*
+	 * If needed, we move pages from the active list
+	 * to the inactive list.
+	 */
+	if (inactive_shortage()) 
+		ret += refill_inactive(gfp_mask);
+
+	/*
 	 * If we're low on free pages, move pages from the
 	 * inactive_dirty list to the inactive_clean list.
 	 *
@@ -893,18 +868,10 @@ static int do_try_to_free_pages(unsigned int gfp_mask, int user)
 	 * before we get around to moving them to the other
 	 * list, so this is a relatively cheap operation.
 	 */
-
 	ret += page_launder(gfp_mask, user);
 
 	ret += shrink_dcache_memory(DEF_PRIORITY, gfp_mask);
 	ret += shrink_icache_memory(DEF_PRIORITY, gfp_mask);
-
-	/*
-	 * If needed, we move pages from the active list
-	 * to the inactive list.
-	 */
-	if (inactive_shortage()) 
-		ret += refill_inactive(gfp_mask);
 
 	/* 	
 	 * Reclaim unused slab cache if memory is low.
@@ -973,8 +940,6 @@ int kswapd(void *unused)
 			refill_inactive_scan(DEF_PRIORITY);
 		}
 
-		run_task_queue(&tq_disk);
-
 		/* 
 		 * We go to sleep if either the free page shortage
 		 * or the inactive page shortage is gone. We do this
@@ -987,6 +952,7 @@ int kswapd(void *unused)
 		 * we'll be woken up earlier...
 		 */
 		if (!free_shortage() || !inactive_shortage()) {
+			run_task_queue(&tq_disk);
 			interruptible_sleep_on_timeout(&kswapd_wait, HZ);
 		/*
 		 * If we couldn't free enough memory, we see if it was

@@ -1,4 +1,4 @@
-/* $Id: act2000_isa.c,v 1.11 2000/11/12 16:32:06 kai Exp $
+/* $Id: act2000_isa.c,v 1.11.6.2 2001/07/18 16:25:12 kai Exp $
  *
  * ISDN lowlevel-module for the IBM ISDN-S0 Active 2000 (ISA-Version).
  *
@@ -26,16 +26,7 @@
 #include "act2000_isa.h"
 #include "capi.h"
 
-static act2000_card *irq2card_map[16] =
-{
-	0, 0, 0, 0, 0, 0, 0, 0,	0, 0, 0, 0, 0, 0, 0, 0
-};
-
-static int act2000_isa_irqs[] =
-{
-        3, 5, 7, 10, 11, 12, 15
-};
-#define ISA_NRIRQS (sizeof(act2000_isa_irqs)/sizeof(int))
+static act2000_card *irq2card_map[16];
 
 static void
 act2000_isa_delay(long t)
@@ -82,13 +73,9 @@ int
 act2000_isa_detect(unsigned short portbase)
 {
         int ret = 0;
-        unsigned long flags;
 
-        save_flags(flags);
-        cli();
         if (!check_region(portbase, ISA_REGION))
                 ret = act2000_isa_reset(portbase);
-        restore_flags(flags);
         return ret;
 }
 
@@ -167,9 +154,6 @@ act2000_isa_enable_irq(act2000_card * card)
 int
 act2000_isa_config_irq(act2000_card * card, short irq)
 {
-        int i;
-        unsigned long flags;
-
         if (card->flags & ACT2000_FLAGS_IVALID) {
                 free_irq(card->irq, NULL);
                 irq2card_map[card->irq] = NULL;
@@ -178,30 +162,13 @@ act2000_isa_config_irq(act2000_card * card, short irq)
         outb(ISA_COR_IRQOFF, ISA_PORT_COR);
         if (!irq)
                 return 0;
-        save_flags(flags);
-        cli();
-        if (irq == -1) {
-                /* Auto select */
-                for (i = 0; i < ISA_NRIRQS; i++) {
-                        if (!request_irq(act2000_isa_irqs[i], &act2000_isa_interrupt, 0, card->regname, NULL)) {
-                                card->irq = act2000_isa_irqs[i];
-                                irq2card_map[card->irq] = card;
-                                card->flags |= ACT2000_FLAGS_IVALID;
-                                break;
-                        }
-                }
-        } else {
-                /* Fixed irq */
-                if (!request_irq(irq, &act2000_isa_interrupt, 0, card->regname, NULL)) {
-                        card->irq = irq;
-                        irq2card_map[card->irq] = card;
-			card->flags |= ACT2000_FLAGS_IVALID;
-                }
-        }
-        restore_flags(flags);
-        if (!card->flags & ACT2000_FLAGS_IVALID) {
+
+	if (!request_irq(irq, &act2000_isa_interrupt, 0, card->regname, NULL)) {
+		card->irq = irq;
+		irq2card_map[card->irq] = card;
+		card->flags |= ACT2000_FLAGS_IVALID;
                 printk(KERN_WARNING
-                       "act2000: Could not request irq\n");
+                       "act2000: Could not request irq %d\n",irq);
                 return -EBUSY;
         } else {
 		act2000_isa_select_irq(card);

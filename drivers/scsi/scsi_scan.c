@@ -153,6 +153,10 @@ static struct dev_info device_list[] =
 	{"DELL", "PSEUDO DEVICE .",   "*", BLIST_SPARSELUN}, // Dell PV 530F
 	{"DELL", "PV530F",    "*", BLIST_SPARSELUN}, // Dell PV 530F
 	{"EMC", "SYMMETRIX", "*", BLIST_SPARSELUN},
+	{"CMD", "CRA-7280", "*", BLIST_SPARSELUN},   // CMD RAID Controller
+	{"CNSI", "G7324", "*", BLIST_SPARSELUN},     // Chaparral G7324 RAID
+	{"Zzyzx", "RocketStor 500S", "*", BLIST_SPARSELUN},
+	{"Zzyzx", "RocketStor 2000", "*", BLIST_SPARSELUN},
 	{"SONY", "TSL",       "*", BLIST_FORCELUN},  // DDS3 & DDS4 autoloaders
 	{"DELL", "PERCRAID", "*", BLIST_FORCELUN},
 	{"HP", "NetRAID-4M", "*", BLIST_FORCELUN},
@@ -565,6 +569,19 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 	}
 
 	/*
+	 * Check for SPARSELUN before checking the peripheral qualifier,
+	 * so sparse lun devices are completely scanned.
+	 */
+
+	/*
+	 * Get any flags for this device.  
+	 */
+	bflags = get_device_flags (scsi_result);
+
+	if (bflags & BLIST_SPARSELUN) {
+	  *sparse_lun = 1;
+	}
+	/*
 	 * Check the peripheral qualifier field - this tells us whether LUNS
 	 * are supported here or not.
 	 */
@@ -572,13 +589,6 @@ static int scan_scsis_single(unsigned int channel, unsigned int dev,
 		scsi_release_request(SRpnt);
 		return 0;	/* assume no peripheral if any sort of error */
 	}
-
-	/*
-	 * Get any flags for this device.  
-	 */
-	bflags = get_device_flags (scsi_result);
-
-
 	 /*   The Toshiba ROM was "gender-changed" here as an inline hack.
 	      This is now much more generic.
 	      This is a mess: What we really want is to leave the scsi_result

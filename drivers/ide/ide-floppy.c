@@ -1,5 +1,5 @@
 /*
- * linux/drivers/ide/ide-floppy.c	Version 0.9	Jul   4, 1999
+ * linux/drivers/ide/ide-floppy.c	Version 0.9.sv	Jan 6 2001
  *
  * Copyright (C) 1996 - 1999 Gadi Oxman <gadio@netvision.net.il>
  */
@@ -29,9 +29,29 @@
  * Ver 0.9   Jul  4 99   Fix a bug which might have caused the number of
  *                        bytes requested on each interrupt to be zero.
  *                        Thanks to <shanos@es.co.nz> for pointing this out.
+ * Ver 0.9.sv Jan 6 01   Sam Varshavchik <mrsam@courier-mta.com>
+ *                       Implement low level formatting.  Reimplemented
+ *                       IDEFLOPPY_CAPABILITIES_PAGE, since we need the srfp
+ *                       bit.  My LS-120 drive barfs on
+ *                       IDEFLOPPY_CAPABILITIES_PAGE, but maybe it's just me.
+ *                       Compromise by not reporting a failure to get this
+ *                       mode page.  Implemented four IOCTLs in order to
+ *                       implement formatting.  IOCTls begin with 0x4600,
+ *                       0x46 is 'F' as in Format.
+ * Ver 0.91  Dec 11 99   Added IOMEGA Clik! drive support by 
+ *     		   <paul@paulbristow.net>
+ * Ver 0.92  Oct 22 00   Paul Bristow became official maintainer for this 
+ *           		   driver.  Included Powerbook internal zip kludge.
+ * Ver 0.93  Oct 24 00   Fixed bugs for Clik! drive
+ *                        no disk on insert and disk change now works
+ * Ver 0.94  Oct 27 00   Tidied up to remove strstr(Clik) everywhere
+ * Ver 0.95  Nov  7 00   Brought across to kernel 2.4
+ * Ver 0.96  Jan  7 01   Actually in line with release version of 2.4.0
+ *                       including set_bit patch from Rusty Russel
+ * Ver 0.97  Jul 22 01   Merge 0.91-0.96 onto 0.9.sv for ac series
  */
 
-#define IDEFLOPPY_VERSION "0.9"
+#define IDEFLOPPY_VERSION "0.97"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -62,6 +82,10 @@
 #define IDEFLOPPY_DEBUG_LOG		0
 #define IDEFLOPPY_DEBUG_INFO		0
 #define IDEFLOPPY_DEBUG_BUGS		1
+
+/* #define IDEFLOPPY_DEBUG(fmt, args...) printk(KERN_INFO fmt, ## args) */
+#define IDEFLOPPY_DEBUG( fmt, args... )
+
 
 /*
  *	Some drives require a longer irq timeout.
@@ -228,6 +252,7 @@ typedef struct {
 	 *	Last error information
 	 */
 	byte sense_key, asc, ascq;
+	int progress_indication;
 
 	/*
 	 *	Device information
@@ -236,7 +261,7 @@ typedef struct {
 	idefloppy_capacity_descriptor_t capacity;		/* Last format capacity */
 	idefloppy_flexible_disk_page_t flexible_disk_page;	/* Copy of the flexible disk page */
 	int wp;							/* Write protect */
-
+	int srfp;			/* Supports format progress report */
 	unsigned long flags;			/* Status/Action flags */
 } idefloppy_floppy_t;
 
@@ -246,6 +271,9 @@ typedef struct {
 #define IDEFLOPPY_DRQ_INTERRUPT		0	/* DRQ interrupt device */
 #define IDEFLOPPY_MEDIA_CHANGED		1	/* Media may have changed */
 #define IDEFLOPPY_USE_READ12		2	/* Use READ12/WRITE12 or READ10/WRITE10 */
+#define	IDEFLOPPY_FORMAT_IN_PROGRESS	3	/* Format in progress */
+#define IDEFLOPPY_CLIK_DRIVE	        4       /* Avoid commands not supported in Clik drive */
+
 
 /*
  *	ATAPI floppy drive packet commands
@@ -274,6 +302,15 @@ typedef struct {
 #define MODE_SENSE_CHANGEABLE		0x01
 #define MODE_SENSE_DEFAULT		0x02 
 #define MODE_SENSE_SAVED		0x03
+
+/*
+ *	IOCTLs used in low-level formatting.
+ */
+
+#define	IDEFLOPPY_IOCTL_FORMAT_SUPPORTED	0x4600
+#define	IDEFLOPPY_IOCTL_FORMAT_GET_CAPACITY	0x4601
+#define	IDEFLOPPY_IOCTL_FORMAT_START		0x4602
+#define IDEFLOPPY_IOCTL_FORMAT_GET_PROGRESS	0x4603
 
 /*
  *	Special requests for our block device strategy routine.
@@ -559,7 +596,7 @@ typedef struct {
 	u8		asc;			/* Additional Sense Code */
 	u8		ascq;			/* Additional Sense Code Qualifier */
 	u8		replaceable_unit_code;	/* Field Replaceable Unit Code */
-	u8		reserved[3];
+	u8		sksv[3];
 	u8		pad[2];			/* Padding to 20 bytes */
 } idefloppy_request_sense_result_t;
 
@@ -746,6 +783,8 @@ static void idefloppy_analyze_error (ide_drive_t *drive,idefloppy_request_sense_
 	idefloppy_floppy_t *floppy = drive->driver_data;
 
 	floppy->sense_key = result->sense_key; floppy->asc = result->asc; floppy->ascq = result->ascq;
+	floppy->progress_indication= result->sksv[0] & 0x80 ?
+		(unsigned short)get_unaligned((u16 *)(result->sksv+1)):0x10000;
 #if IDEFLOPPY_DEBUG_LOG
 	if (floppy->failed_pc)
 		printk (KERN_INFO "ide-floppy: pc = %x, sense key = %x, asc = %x, ascq = %x\n",floppy->failed_pc->c[0],result->sense_key,result->asc,result->ascq);
@@ -954,7 +993,7 @@ static ide_startstop_t idefloppy_transfer_pc (ide_drive_t *drive)
 		return ide_do_reset (drive);
 	}
 	ide_set_handler (drive, &idefloppy_pc_intr, IDEFLOPPY_WAIT_CMD, NULL);	/* Set the interrupt routine */
-	atapi_output_bytes (drive, floppy->pc->c, 12);		/* Send the actual packet */
+	atapi_output_bytes (drive, floppy->pc->c, 12); /* Send the actual packet */
 	return ide_started;
 }
 
@@ -1060,6 +1099,22 @@ static void idefloppy_create_read_capacity_cmd (idefloppy_pc_t *pc)
 	pc->c[7] = 255;
 	pc->c[8] = 255;
 	pc->request_transfer = 255;
+}
+
+static void idefloppy_create_format_unit_cmd (idefloppy_pc_t *pc, int b, int l)
+{
+	idefloppy_init_pc (pc);
+	pc->c[0] = IDEFLOPPY_FORMAT_UNIT_CMD;
+	pc->c[1] = 0x17;
+
+	memset(pc->buffer, 0, 12);
+	pc->buffer[1] = 0xA2;	/* Format list header, byte 1: FOV/DCRT/IMM */
+	pc->buffer[3] = 8;
+
+	put_unaligned(htonl(b), (unsigned int *)(&pc->buffer[4]));
+	put_unaligned(htonl(l), (unsigned int *)(&pc->buffer[8]));
+	pc->buffer_size=12;
+	set_bit(PC_WRITING, &pc->flags);
 }
 
 /*
@@ -1235,6 +1290,25 @@ static int idefloppy_get_flexible_disk_page (ide_drive_t *drive)
 	return 0;
 }
 
+static int idefloppy_get_capability_page(ide_drive_t *drive)
+{
+	idefloppy_floppy_t *floppy = drive->driver_data;
+	idefloppy_pc_t pc;
+	idefloppy_mode_parameter_header_t *header;
+	idefloppy_capabilities_page_t *page;
+
+	floppy->srfp=0;
+	idefloppy_create_mode_sense_cmd (&pc, IDEFLOPPY_CAPABILITIES_PAGE,
+						 MODE_SENSE_CURRENT);
+	if (idefloppy_queue_pc_tail (drive,&pc)) {
+		return 1;
+	}
+	header = (idefloppy_mode_parameter_header_t *) pc.buffer;
+	page= (idefloppy_capabilities_page_t *)(header+1);
+	floppy->srfp=page->srfp;
+	return (0);
+}
+
 /*
  *	Determine if a media is present in the floppy drive, and if so,
  *	its LBA capacity.
@@ -1260,34 +1334,214 @@ static int idefloppy_get_capacity (ide_drive_t *drive)
 	header = (idefloppy_capacity_header_t *) pc.buffer;
 	descriptors = header->length / sizeof (idefloppy_capacity_descriptor_t);
 	descriptor = (idefloppy_capacity_descriptor_t *) (header + 1);
+
 	for (i = 0; i < descriptors; i++, descriptor++) {
-		blocks = descriptor->blocks = ntohl (descriptor->blocks);
-		length = descriptor->length = ntohs (descriptor->length);
-		if (!i && descriptor->dc == CAPACITY_CURRENT) {
-			if (memcmp (descriptor, &floppy->capacity, sizeof (idefloppy_capacity_descriptor_t))) {
-				printk (KERN_INFO "%s: %dkB, %d blocks, %d sector size, %s \n",
-					drive->name, blocks * length / 1024, blocks, length,
-					drive->using_dma ? ", DMA":"");
-			}
-			floppy->capacity = *descriptor;
-			if (!length || length % 512)
-				printk (KERN_ERR "%s: %d bytes block size not supported\n", drive->name, length);
-			else {
-				floppy->blocks = blocks;
-				floppy->block_size = length;
-				if ((floppy->bs_factor = length / 512) != 1)
-					printk (KERN_NOTICE "%s: warning: non 512 bytes block size not fully supported\n", drive->name);
-				rc = 0;
-			}
+                blocks = descriptor->blocks = ntohl (descriptor->blocks);
+                length = descriptor->length = ntohs (descriptor->length);
+
+		if (!i) 
+		{
+          	switch (descriptor->dc) {
+                case CAPACITY_UNFORMATTED: /* Clik! drive returns this instead of CAPACITY_CURRENT */
+                        if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags))
+                                break; /* If it is not a clik drive, break out (maintains previous driver behaviour) */
+                case CAPACITY_CURRENT: /* Normal Zip/LS-120 disks */
+                        if (memcmp (descriptor, &floppy->capacity, sizeof (idefloppy_capacity_descriptor_t)))
+                                printk (KERN_INFO "%s: %dkB, %d blocks, %d sector size\n", drive->name, blocks * length / 1024, blocks, length);
+                        floppy->capacity = *descriptor;
+                        if (!length || length % 512)
+                                printk (KERN_NOTICE "%s: %d bytes block size not supported\n", drive->name, length);
+                        else {
+                                floppy->blocks = blocks;
+                                floppy->block_size = length;
+                                if ((floppy->bs_factor = length / 512) != 1)
+                                        printk (KERN_NOTICE "%s: warning: non 512 bytes block size not fully supported\n", drive->name);
+                                rc = 0;
+                        }
+                        break;
+                case CAPACITY_NO_CARTRIDGE:
+                        /* This is a KERN_ERR so it appears on screen for the user to see */
+                        printk (KERN_ERR "%s: No disk in drive\n", drive->name);
+                                        break;
+                case CAPACITY_INVALID:
+                        printk (KERN_ERR "%s: Invalid capacity for disk in drive\n", drive->name);
+                                        break;
 		}
-#if IDEFLOPPY_DEBUG_INFO
-		if (!i) printk (KERN_INFO "Descriptor 0 Code: %d\n", descriptor->dc);
-		printk (KERN_INFO "Descriptor %d: %dkB, %d blocks, %d sector size\n", i, blocks * length / 1024, blocks, length);
-#endif /* IDEFLOPPY_DEBUG_INFO */
+		}
+		if (!i) {
+		IDEFLOPPY_DEBUG( "Descriptor 0 Code: %d\n", descriptor->dc);
+		}
+		IDEFLOPPY_DEBUG( "Descriptor %d: %dkB, %d blocks, %d sector size\n", i, blocks * length / 1024, blocks, length);
 	}
-	(void) idefloppy_get_flexible_disk_page (drive);
+
+	/* Clik! disk does not support get_flexible_disk_page */
+        if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags))
+	{
+		(void) idefloppy_get_flexible_disk_page (drive);
+		(void) idefloppy_get_capability_page (drive);
+	}
+
 	drive->part[0].nr_sects = floppy->blocks * floppy->bs_factor;
 	return rc;
+}
+
+/*
+** Obtain the list of formattable capacities.
+** Very similar to idefloppy_get_capacity, except that we push the capacity
+** descriptors to userland, instead of our own structures.
+**
+** Userland gives us the following structure:
+**
+** struct idefloppy_format_capacities {
+**        int nformats;
+**        struct {
+**                int nblocks;
+**                int blocksize;
+**                } formats[];
+**        } ;
+**
+** userland initializes nformats to the number of allocated formats[]
+** records.  On exit we set nformats to the number of records we've
+** actually initialized.
+**
+*/
+
+static int idefloppy_get_format_capacities (ide_drive_t *drive,
+					    struct inode *inode,
+					    struct file *file,
+					    int *arg)	/* Cheater */
+{
+        idefloppy_pc_t pc;
+	idefloppy_capacity_header_t *header;
+        idefloppy_capacity_descriptor_t *descriptor;
+	int i, descriptors, blocks, length;
+	int u_array_size;
+	int u_index;
+	int *argp;
+
+	if (get_user(u_array_size, arg))
+		return (-EFAULT);
+
+	if (u_array_size <= 0)
+		return (-EINVAL);
+
+	idefloppy_create_read_capacity_cmd (&pc);
+	if (idefloppy_queue_pc_tail (drive, &pc)) {
+		printk (KERN_ERR "ide-floppy: Can't get floppy parameters\n");
+                return (-EIO);
+        }
+        header = (idefloppy_capacity_header_t *) pc.buffer;
+        descriptors = header->length /
+		sizeof (idefloppy_capacity_descriptor_t);
+	descriptor = (idefloppy_capacity_descriptor_t *) (header + 1);
+
+	u_index=0;
+	argp=arg+1;
+
+	/*
+	** We always skip the first capacity descriptor.  That's the
+	** current capacity.  We are interested in the remaining descriptors,
+	** the formattable capacities.
+	*/
+
+	for (i=0; i<descriptors; i++, descriptor++)
+	{
+		if (u_index >= u_array_size)
+			break;	/* User-supplied buffer too small */
+		if (i == 0)
+			continue;	/* Skip the first descriptor */
+
+		blocks = ntohl (descriptor->blocks);
+		length = ntohs (descriptor->length);
+
+		if (put_user(blocks, argp))
+			return (-EFAULT);
+		++argp;
+
+		if (put_user(length, argp))
+			return (-EFAULT);
+		++argp;
+
+		++u_index;
+	}
+
+	if (put_user(u_index, arg))
+		return (-EFAULT);
+	return (0);
+}
+
+/*
+** Send ATAPI_FORMAT_UNIT to the drive.
+**
+** Userland gives us the following structure:
+**
+** struct idefloppy_format_command {
+**        int nblocks;
+**        int blocksize;
+**        } ;
+*/
+
+static int idefloppy_begin_format(ide_drive_t *drive,
+				  struct inode *inode,
+				  struct file *file,
+				  int *arg)
+{
+	int blocks;
+	int length;
+	idefloppy_pc_t pc;
+
+	if (get_user(blocks, arg)
+	    || get_user(length, arg+1))
+	{
+		return (-EFAULT);
+	}
+
+	idefloppy_create_format_unit_cmd(&pc, blocks, length);
+	if (idefloppy_queue_pc_tail (drive, &pc))
+	{
+                return (-EIO);
+        }
+	return (0);
+}
+
+/*
+** Get ATAPI_FORMAT_UNIT progress indication.
+**
+** Userland gives a pointer to an int.  The int is set to a progresss
+** indicator 0-65536, with 65536=100%.
+**
+** If the drive does not support format progress indication, we just return
+** a 65536, screw it.
+*/
+
+static int idefloppy_get_format_progress(ide_drive_t *drive,
+					 struct inode *inode,
+					 struct file *file,
+					 int *arg)
+{
+	idefloppy_floppy_t *floppy = drive->driver_data;
+	idefloppy_pc_t pc;
+	int progress_indication=0x10000;
+
+	if (floppy->srfp)
+	{
+		idefloppy_create_request_sense_cmd(&pc);
+		if (idefloppy_queue_pc_tail (drive, &pc))
+		{
+			return (-EIO);
+		}
+
+		if (floppy->sense_key == 2 && floppy->asc == 4 &&
+		    floppy->ascq == 4)
+		{
+			progress_indication=floppy->progress_indication;
+		}
+	}
+
+	if (put_user(progress_indication, arg))
+		return (-EFAULT);
+
+	return (0);
 }
 
 /*
@@ -1299,15 +1553,72 @@ static int idefloppy_ioctl (ide_drive_t *drive, struct inode *inode, struct file
 				 unsigned int cmd, unsigned long arg)
 {
 	idefloppy_pc_t pc;
+	idefloppy_floppy_t *floppy = drive->driver_data;
+	int prevent = (arg) ? 1 : 0;
 
-	if (cmd == CDROMEJECT) {
+	switch (cmd) {
+	case CDROMEJECT:
+		prevent = 0;
+		/* fall through */
+	case CDROM_LOCKDOOR:
 		if (drive->usage > 1)
 			return -EBUSY;
-		idefloppy_create_prevent_cmd (&pc, 0);
-		(void) idefloppy_queue_pc_tail (drive, &pc);
-		idefloppy_create_start_stop_cmd (&pc, 2);
-		(void) idefloppy_queue_pc_tail (drive, &pc);
+
+		/* The IOMEGA Clik! Drive doesn't support this command - no room for an eject mechanism */
+                if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {
+			idefloppy_create_prevent_cmd (&pc, prevent);
+			(void) idefloppy_queue_pc_tail (drive, &pc);
+		}
+		if (cmd == CDROMEJECT) {
+			idefloppy_create_start_stop_cmd (&pc, 2);
+			(void) idefloppy_queue_pc_tail (drive, &pc);
+		}
 		return 0;
+	case IDEFLOPPY_IOCTL_FORMAT_SUPPORTED:
+		return (0);
+	case IDEFLOPPY_IOCTL_FORMAT_GET_CAPACITY:
+		return (idefloppy_get_format_capacities(drive, inode, file,
+							(int *)arg));
+	case IDEFLOPPY_IOCTL_FORMAT_START:
+
+		if (!(file->f_mode & 2))
+			return (-EPERM);
+
+		{
+			idefloppy_floppy_t *floppy = drive->driver_data;
+
+			set_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
+
+			if (drive->usage > 1)
+			{
+				/* Don't format if someone is using the disk */
+
+				clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS,
+					  &floppy->flags);
+				return -EBUSY;
+			}
+			else
+			{
+				int rc=idefloppy_begin_format(drive, inode,
+							      file,
+							      (int *)arg);
+
+				if (rc)
+					clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS,
+						  &floppy->flags);
+				return (rc);
+
+			/*
+			** Note, the bit will be cleared when the device is
+			** closed.  This is the cleanest way to handle the
+			** situation where the drive does not support
+			** format progress reporting.
+			*/
+			}
+		}
+	case IDEFLOPPY_IOCTL_FORMAT_GET_PROGRESS:
+		return (idefloppy_get_format_progress(drive, inode, file,
+						      (int *)arg));
 	}
  	return -EIO;
 }
@@ -1326,25 +1637,40 @@ static int idefloppy_open (struct inode *inode, struct file *filp, ide_drive_t *
 
 	MOD_INC_USE_COUNT;
 	if (drive->usage == 1) {
+
+		clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
+		/* Just in case */
+
 		idefloppy_create_test_unit_ready_cmd(&pc);
 		if (idefloppy_queue_pc_tail(drive, &pc)) {
 			idefloppy_create_start_stop_cmd (&pc, 1);
 			(void) idefloppy_queue_pc_tail (drive, &pc);
 		}
+
 		if (idefloppy_get_capacity (drive)) {
 			drive->usage--;
 			MOD_DEC_USE_COUNT;
 			return -EIO;
 		}
+
 		if (floppy->wp && (filp->f_mode & 2)) {
 			drive->usage--;
 			MOD_DEC_USE_COUNT;
 			return -EROFS;
 		}		
 		set_bit (IDEFLOPPY_MEDIA_CHANGED, &floppy->flags);
-		idefloppy_create_prevent_cmd (&pc, 1);
-		(void) idefloppy_queue_pc_tail (drive, &pc);
+		/* IOMEGA Clik! drives do not support lock/unlock commands */
+                if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {
+			idefloppy_create_prevent_cmd (&pc, 1);
+			(void) idefloppy_queue_pc_tail (drive, &pc);
+		}
 		check_disk_change(inode->i_rdev);
+	}
+	else if (test_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags))
+	{
+		drive->usage--;
+		MOD_DEC_USE_COUNT;
+		return -EBUSY;
 	}
 	return 0;
 }
@@ -1358,9 +1684,17 @@ static void idefloppy_release (struct inode *inode, struct file *filp, ide_drive
 #endif /* IDEFLOPPY_DEBUG_LOG */
 
 	if (!drive->usage) {
+		idefloppy_floppy_t *floppy = drive->driver_data;
+
 		invalidate_buffers (inode->i_rdev);
-		idefloppy_create_prevent_cmd (&pc, 0);
-		(void) idefloppy_queue_pc_tail (drive, &pc);
+
+		/* IOMEGA Clik! drives do not support lock/unlock commands */
+                if (!test_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags)) {
+			idefloppy_create_prevent_cmd (&pc, 0);
+			(void) idefloppy_queue_pc_tail (drive, &pc);
+		}
+
+		clear_bit(IDEFLOPPY_FORMAT_IN_PROGRESS, &floppy->flags);
 	}
 	MOD_DEC_USE_COUNT;
 }
@@ -1560,6 +1894,19 @@ static void idefloppy_setup (ide_drive_t *drive, idefloppy_floppy_t *floppy)
 			max_sectors[major][minor + i] = 64;
 	}
 
+	/*
+	*      Guess what?  The IOMEGA Clik! drive also needs the
+	*      above fix.  It makes nasty clicking noises without
+	*      it, so please don't remove this.
+	*/
+	if (strcmp(drive->id->model, "IOMEGA Clik! 40 CZ ATAPI") == 0) 
+	{
+		for (i = 0; i < 1 << PARTN_BITS; i++)
+			max_sectors[major][minor + i] = 64;
+		set_bit(IDEFLOPPY_CLIK_DRIVE, &floppy->flags);
+	}
+
+
 	(void) idefloppy_get_capacity (drive);
 	idefloppy_add_settings(drive);
 	for (i = 0; i < MAX_DRIVES; ++i) {
@@ -1597,28 +1944,34 @@ static ide_proc_entry_t idefloppy_proc[] = {
 
 #endif	/* CONFIG_PROC_FS */
 
+static int idefloppy_reinit (ide_drive_t *drive)
+{
+	return 0;
+}
+
 /*
  *	IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idefloppy_driver = {
-	"ide-floppy",		/* name */
-	IDEFLOPPY_VERSION,	/* version */
-	ide_floppy,		/* media */
-	0,			/* busy */
-	1,			/* supports_dma */
-	0,			/* supports_dsc_overlap */
-	idefloppy_cleanup,	/* cleanup */
-	idefloppy_do_request,	/* do_request */
-	idefloppy_end_request,	/* end_request */
-	idefloppy_ioctl,	/* ioctl */
-	idefloppy_open,		/* open */
-	idefloppy_release,	/* release */
-	idefloppy_media_change,	/* media_change */
-	idefloppy_revalidate,	/* media_change */
-	NULL,			/* pre_reset */
-	idefloppy_capacity,	/* capacity */
-	NULL,			/* special */
-	idefloppy_proc		/* proc */
+	name:			"ide-floppy",
+	version:		IDEFLOPPY_VERSION,
+	media:			ide_floppy,
+	busy:			0,
+	supports_dma:		1,
+	supports_dsc_overlap:	0,
+	cleanup:		idefloppy_cleanup,
+	do_request:		idefloppy_do_request,
+	end_request:		idefloppy_end_request,
+	ioctl:			idefloppy_ioctl,
+	open:			idefloppy_open,
+	release:		idefloppy_release,
+	media_change:		idefloppy_media_change,
+	revalidate:		idefloppy_revalidate,
+	pre_reset:		NULL,
+	capacity:		idefloppy_capacity,
+	special:		NULL,
+	proc:			idefloppy_proc,
+	driver_reinit:		idefloppy_reinit,
 };
 
 int idefloppy_init (void);
@@ -1629,6 +1982,26 @@ static ide_module_t idefloppy_module = {
 	NULL
 };
 
+MODULE_DESCRIPTION("ATAPI FLOPPY Driver");
+
+static void __exit idefloppy_exit (void)
+{
+	ide_drive_t *drive;
+	int failed = 0;
+
+	while ((drive = ide_scan_devices (ide_floppy, idefloppy_driver.name, &idefloppy_driver, failed)) != NULL) {
+		if (idefloppy_cleanup (drive)) {
+			printk ("%s: cleanup_module() called while still busy\n", drive->name);
+			failed++;
+		}
+		/* We must remove proc entries defined in this module.
+		   Otherwise we oops while accessing these entries */
+		if (drive->proc)
+			ide_remove_proc_entries(drive->proc, idefloppy_proc);
+	}
+	ide_unregister_module(&idefloppy_module);
+}
+
 /*
  *	idefloppy_init will register the driver for each floppy.
  */
@@ -1638,6 +2011,7 @@ int idefloppy_init (void)
 	idefloppy_floppy_t *floppy;
 	int failed = 0;
 
+	printk("ide-floppy driver " IDEFLOPPY_VERSION "\n");
 	MOD_INC_USE_COUNT;
 	while ((drive = ide_scan_devices (ide_floppy, idefloppy_driver.name, NULL, failed++)) != NULL) {
 		if (!idefloppy_identify_device (drive, drive->id)) {
@@ -1665,27 +2039,5 @@ int idefloppy_init (void)
 	return 0;
 }
 
-#ifdef MODULE
-int init_module (void)
-{
-	return idefloppy_init ();
-}
-
-void cleanup_module (void)
-{
-	ide_drive_t *drive;
-	int failed = 0;
-
-	while ((drive = ide_scan_devices (ide_floppy, idefloppy_driver.name, &idefloppy_driver, failed)) != NULL) {
-		if (idefloppy_cleanup (drive)) {
-			printk ("%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
-		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, idefloppy_proc);
-	}
-	ide_unregister_module(&idefloppy_module);
-}
-#endif /* MODULE */
+module_init(idefloppy_init);
+module_exit(idefloppy_exit);

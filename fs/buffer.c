@@ -2399,7 +2399,6 @@ int try_to_free_buffers(struct page * page, unsigned int gfp_mask)
 {
 	struct buffer_head * tmp, * bh = page->buffers;
 	int index = BUFSIZE_INDEX(bh->b_size);
-	int loop = 0;
 
 cleaned_buffers_try_again:
 	spin_lock(&lru_list_lock);
@@ -2449,8 +2448,8 @@ busy_buffer_page:
 	if (gfp_mask & __GFP_IO) {
 		sync_page_buffers(bh, gfp_mask);
 		/* We waited synchronously, so we can free the buffers. */
-		if ((gfp_mask & __GFP_WAIT) && !loop) {
-			loop = 1;
+		if (gfp_mask & __GFP_WAIT) {
+			gfp_mask = 0;	/* no IO or waiting this time around */
 			goto cleaned_buffers_try_again;
 		}
 		wakeup_bdflush();

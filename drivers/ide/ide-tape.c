@@ -4099,9 +4099,14 @@ static int idetape_add_chrdev_read_request (ide_drive_t *drive,int blocks)
 	}
 	if (rq_ptr->errors == IDETAPE_ERROR_EOD)
 		return 0;
-	else if (rq_ptr->errors == IDETAPE_ERROR_FILEMARK)
+	if (rq_ptr->errors == IDETAPE_ERROR_FILEMARK) {
+		idetape_switch_buffers (tape, tape->first_stage);
 		set_bit (IDETAPE_FILEMARK, &tape->flags);
-	else {
+#if USE_IOTRACE
+		IO_trace(IO_IDETAPE_FIFO, tape->pipeline_head, tape->buffer_head, tape->tape_head, tape->minor);
+#endif
+		calculate_speeds(drive);
+	} else {
 		idetape_switch_buffers (tape, tape->first_stage);
 		if (rq_ptr->errors == IDETAPE_ERROR_GENERAL) {
 #if ONSTREAM_DEBUG
@@ -6127,24 +6132,33 @@ static ide_proc_entry_t idetape_proc[] = {
 
 #endif
 
+static int idetape_reinit (ide_drive_t *drive)
+{
+	return 0;
+}
+
 /*
  *	IDE subdriver functions, registered with ide.c
  */
 static ide_driver_t idetape_driver = {
-	name:		"ide-tape",
-	version:	IDETAPE_VERSION,
-	media:		ide_tape,
-	busy:		1,
-	supports_dma:	1,
-	supports_dsc_overlap: 1,
-	cleanup:	idetape_cleanup,
-	do_request:	idetape_do_request,
-	end_request:	idetape_end_request,
-	ioctl:		idetape_blkdev_ioctl,
-	open:		idetape_blkdev_open,
-	release:	idetape_blkdev_release,
-	pre_reset:	idetape_pre_reset,
-	proc:		idetape_proc,
+	name:			"ide-tape",
+	version:		IDETAPE_VERSION,
+	media:			ide_tape,
+	busy:			1,
+	supports_dma:		1,
+	supports_dsc_overlap: 	1,
+	cleanup:		idetape_cleanup,
+	do_request:		idetape_do_request,
+	end_request:		idetape_end_request,
+	ioctl:			idetape_blkdev_ioctl,
+	open:			idetape_blkdev_open,
+	release:		idetape_blkdev_release,
+	media_change:		NULL,
+	revalidate:		NULL,
+	pre_reset:		idetape_pre_reset,
+	capacity:		NULL,
+	proc:			idetape_proc,
+	driver_reinit:		idetape_reinit,
 };
 
 int idetape_init (void);
@@ -6166,6 +6180,21 @@ static struct file_operations idetape_fops = {
 	open:		idetape_chrdev_open,
 	release:	idetape_chrdev_release,
 };
+
+MODULE_DESCRIPTION("ATAPI Streaming TAPE Driver");
+
+static void __exit idetape_exit (void)
+{
+	ide_drive_t *drive;
+	int minor;
+
+	for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++) {
+		drive = idetape_chrdevs[minor].drive;
+		if (drive != NULL && idetape_cleanup (drive))
+		printk (KERN_ERR "ide-tape: %s: cleanup_module() called while still busy\n", drive->name);
+	}
+	ide_unregister_module(&idetape_module);
+}
 
 /*
  *	idetape_init will register the driver for each tape.
@@ -6252,22 +6281,5 @@ int idetape_init (void)
 	return 0;
 }
 
-#ifdef MODULE
-int init_module (void)
-{
-	return idetape_init ();
-}
-
-void cleanup_module (void)
-{
-	ide_drive_t *drive;
-	int minor;
-
-	for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++) {
-		drive = idetape_chrdevs[minor].drive;
-		if (drive != NULL && idetape_cleanup (drive))
-			printk (KERN_ERR "ide-tape: %s: cleanup_module() called while still busy\n", drive->name);
-	}
-	ide_unregister_module(&idetape_module);
-}
-#endif /* MODULE */
+module_init(idetape_init);
+module_exit(idetape_exit);

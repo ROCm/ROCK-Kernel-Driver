@@ -369,6 +369,7 @@ static ide_startstop_t do_rw_disk (ide_drive_t *drive, struct request *rq, unsig
 {
 	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl,IDE_CONTROL_REG);
+	OUT_BYTE(0x00, IDE_FEATURE_REG);
 	OUT_BYTE(rq->nr_sectors,IDE_NSECTOR_REG);
 #ifdef CONFIG_BLK_DEV_PDC4030
 	if (drive->select.b.lba || IS_PDC4030_DRIVE) {
@@ -692,43 +693,8 @@ static void idedisk_add_settings(ide_drive_t *drive)
 	ide_add_setting(drive,	"file_readahead",	SETTING_RW,					BLKFRAGET,		BLKFRASET,		TYPE_INTA,	0,	INT_MAX,			1,	1024,	&max_readahead[major][minor],	NULL);
 	ide_add_setting(drive,	"max_kb_per_request",	SETTING_RW,					BLKSECTGET,		BLKSECTSET,		TYPE_INTA,	1,	255,				1,	2,	&max_sectors[major][minor],	NULL);
 	ide_add_setting(drive,	"lun",			SETTING_RW,					-1,			-1,			TYPE_INT,	0,	7,				1,	1,	&drive->lun,			NULL);
-}
-
-/*
- *	IDE subdriver functions, registered with ide.c
- */
-static ide_driver_t idedisk_driver = {
-	"ide-disk",		/* name */
-	IDEDISK_VERSION,	/* version */
-	ide_disk,		/* media */
-	0,			/* busy */
-	1,			/* supports_dma */
-	0,			/* supports_dsc_overlap */
-	NULL,			/* cleanup */
-	do_rw_disk,		/* do_request */
-	NULL,			/* end_request */
-	NULL,			/* ioctl */
-	idedisk_open,		/* open */
-	idedisk_release,	/* release */
-	idedisk_media_change,	/* media_change */
-	idedisk_revalidate,	/* revalidate */
-	idedisk_pre_reset,	/* pre_reset */
-	idedisk_capacity,	/* capacity */
-	idedisk_special,	/* special */
-	idedisk_proc		/* proc */
-};
-
-int idedisk_init (void);
-static ide_module_t idedisk_module = {
-	IDE_DRIVER_MODULE,
-	idedisk_init,
-	&idedisk_driver,
-	NULL
-};
-
-static int idedisk_cleanup (ide_drive_t *drive)
-{
-	return ide_unregister_subdriver(drive);
+	ide_add_setting(drive,	"failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->failures,		NULL);
+	ide_add_setting(drive,	"max_failures",		SETTING_RW,					-1,			-1,			TYPE_INT,	0,	65535,				1,	1,	&drive->max_failures,		NULL);
 }
 
 static void idedisk_setup (ide_drive_t *drive)
@@ -835,6 +801,69 @@ static void idedisk_setup (ide_drive_t *drive)
 	drive->no_io_32bit = id->dword_io ? 1 : 0;
 }
 
+static int idedisk_reinit (ide_drive_t *drive)
+{
+	return 0;
+}
+
+static int idedisk_cleanup (ide_drive_t *drive)
+{
+	return ide_unregister_subdriver(drive);
+}
+
+/*
+ *      IDE subdriver functions, registered with ide.c
+ */
+static ide_driver_t idedisk_driver = {
+	name:			"ide-disk",
+	version:		IDEDISK_VERSION,
+	media:			ide_disk,
+	busy:			0,
+	supports_dma:		1,
+	supports_dsc_overlap:	0,
+	cleanup:		idedisk_cleanup,
+	do_request:		do_rw_disk,
+	end_request:		NULL,
+	ioctl:			NULL,
+	open:			idedisk_open,
+	release:		idedisk_release,
+	media_change:		idedisk_media_change,
+	revalidate:		idedisk_revalidate,
+	pre_reset:		idedisk_pre_reset,
+	capacity:		idedisk_capacity,
+	special:		idedisk_special,
+	proc:			idedisk_proc,
+	driver_reinit:		idedisk_reinit,
+};
+
+int idedisk_init (void);
+static ide_module_t idedisk_module = {
+	IDE_DRIVER_MODULE,
+	idedisk_init,
+	&idedisk_driver,
+	NULL
+};
+
+MODULE_DESCRIPTION("ATA DISK Driver");
+
+static void __exit idedisk_exit (void)
+{
+	ide_drive_t *drive;
+	int failed = 0;
+
+	while ((drive = ide_scan_devices (ide_disk, idedisk_driver.name, &idedisk_driver, failed)) != NULL) {
+		if (idedisk_cleanup (drive)) {
+			printk (KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
+			failed++;
+		}
+		/* We must remove proc entries defined in this module.
+		   Otherwise we oops while accessing these entries */
+		if (drive->proc)
+			ide_remove_proc_entries(drive->proc, idedisk_proc);
+	}
+	ide_unregister_module(&idedisk_module);
+}
+
 int idedisk_init (void)
 {
 	ide_drive_t *drive;
@@ -859,27 +888,5 @@ int idedisk_init (void)
 	return 0;
 }
 
-#ifdef MODULE
-int init_module (void)
-{
-	return idedisk_init();
-}
-
-void cleanup_module (void)
-{
-	ide_drive_t *drive;
-	int failed = 0;
-
-	while ((drive = ide_scan_devices (ide_disk, idedisk_driver.name, &idedisk_driver, failed)) != NULL) {
-		if (idedisk_cleanup (drive)) {
-			printk (KERN_ERR "%s: cleanup_module() called while still busy\n", drive->name);
-			failed++;
-		}
-		/* We must remove proc entries defined in this module.
-		   Otherwise we oops while accessing these entries */
-		if (drive->proc)
-			ide_remove_proc_entries(drive->proc, idedisk_proc);
-	}
-	ide_unregister_module(&idedisk_module);
-}
-#endif /* MODULE */
+module_init(idedisk_init);
+module_exit(idedisk_exit);

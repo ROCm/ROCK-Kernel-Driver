@@ -43,12 +43,6 @@
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 
-#define HW_ID_EICON_PCI			0x1133
-#define HW_ID_DIVA_SERVER_P		0xE014
-#define HW_ID_DIVA_SERVER_B_ST	0xE010
-#define HW_ID_DIVA_SERVER_B_U	0xE013
-#define HW_ID_DIVA_SERVER_Q   	0xE012
-
 struct file_operations Divas_fops;
 int Divas_major;
 
@@ -73,8 +67,8 @@ int DivasCardsDiscover(void)
 	
 	while (wDeviceIndex < 10)
 	{
-		wPCIConsultation = pcibios_find_device(HW_ID_EICON_PCI, 
-				HW_ID_DIVA_SERVER_Q, 
+		wPCIConsultation = pcibios_find_device(PCI_VENDOR_ID_EICON, 
+				PCI_DEVICE_ID_EICON_MAESTRAQ, 
 				wDeviceIndex, 
 				&byBus, &byFunc);
 
@@ -174,8 +168,8 @@ int DivasCardsDiscover(void)
 
 	while (wDeviceIndex < 10)
 	{
-		wPCIConsultation = pcibios_find_device(HW_ID_EICON_PCI, 
-				HW_ID_DIVA_SERVER_B_ST, 
+		wPCIConsultation = pcibios_find_device(PCI_VENDOR_ID_EICON, 
+				PCI_DEVICE_ID_EICON_MAESTRA, 
 				wDeviceIndex, 
 				&byBus, &byFunc);
 
@@ -232,8 +226,8 @@ int DivasCardsDiscover(void)
 			wNumCards++;
 		}
 
-		wPCIConsultation = pcibios_find_device(HW_ID_EICON_PCI, 
-				HW_ID_DIVA_SERVER_B_U, 
+		wPCIConsultation = pcibios_find_device(PCI_VENDOR_ID_EICON, 
+				PCI_DEVICE_ID_EICON_MAESTRAQ_U, 
 				wDeviceIndex, 
 				&byBus, &byFunc);
 
@@ -298,8 +292,8 @@ int DivasCardsDiscover(void)
 
 	while (wDeviceIndex < 10)
 	{
-		wPCIConsultation = pcibios_find_device(HW_ID_EICON_PCI, 
-				HW_ID_DIVA_SERVER_P, 
+		wPCIConsultation = pcibios_find_device(PCI_VENDOR_ID_EICON, 
+				PCI_DEVICE_ID_EICON_MAESTRAP, 
 				wDeviceIndex, 
 				&byBus, &byFunc);
 

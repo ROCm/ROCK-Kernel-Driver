@@ -5,18 +5,6 @@
  * Copyright (C) 2001 Anton Altaparmakov (AIA)
  */
 
-/* Which character set is used for file names. */
-/*  Translate everything to UTF-8. */
-#define nct_utf8             1
-/*  Translate to 8859-1. */
-#define nct_iso8859_1        2
-/*  Quote unprintables with ":". */
-#define nct_uni_xlate        4
-/*  Do that in the vfat way instead of the documented way. */
-#define nct_uni_xlate_vfat   8
-/*  Use a mapping table to determine printables. */
-#define nct_map              16
-
 /* The first 16 inodes correspond to NTFS special files. */
 typedef enum {
 	FILE_$Mft	= 0,
@@ -42,9 +30,6 @@ void *ntfs_calloc(int size);
 
 /* String operations */
 /*  Copy Unicode <-> ASCII */
-#if 0
-void ntfs_uni2ascii(char *to, char *from, int len);
-#endif
 void ntfs_ascii2uni(short int *to, char *from, int len);
 
 /*  Comparison */

@@ -87,6 +87,11 @@ typedef unsigned char	byte;	/* used everywhere */
 #define ERROR_RECAL	1	/* Recalibrate every 2nd retry */
 
 /*
+ * state flags
+ */
+#define DMA_PIO_RETRY	1	/* retrying in PIO */
+
+/*
  * Ensure that various configuration flags have compatible settings
  */
 #ifdef REALLY_SLOW_IO
@@ -132,14 +137,6 @@ typedef unsigned char	byte;	/* used everywhere */
 #define IDE_IREASON_REG		IDE_NSECTOR_REG
 #define IDE_BCOUNTL_REG		IDE_LCYL_REG
 #define IDE_BCOUNTH_REG		IDE_HCYL_REG
-
-#ifdef REALLY_FAST_IO
-#define OUT_BYTE(b,p)		outb((b),(p))
-#define IN_BYTE(p)		(byte)inb(p)
-#else
-#define OUT_BYTE(b,p)		outb_p((b),(p))
-#define IN_BYTE(p)		(byte)inb_p(p)
-#endif /* REALLY_FAST_IO */
 
 #define GET_ERR()		IN_BYTE(IDE_ERROR_REG)
 #define GET_STAT()		IN_BYTE(IDE_STATUS_REG)
@@ -255,6 +252,27 @@ void ide_setup_ports(	hw_regs_t *hw,
 #include <asm/ide.h>
 
 /*
+ * If the arch-dependant ide.h did not declare/define any OUT_BYTE
+ * or IN_BYTE functions, we make some defaults here.
+ */
+
+#ifndef HAVE_ARCH_OUT_BYTE
+#ifdef REALLY_FAST_IO
+#define OUT_BYTE(b,p)          outb((b),(p))
+#else
+#define OUT_BYTE(b,p)          outb_p((b),(p))
+#endif
+#endif
+
+#ifndef HAVE_ARCH_IN_BYTE
+#ifdef REALLY_FAST_IO
+#define IN_BYTE(p)             (byte)inb_p(p)
+#else
+#define IN_BYTE(p)             (byte)inb(p)
+#endif
+#endif
+
+/*
  * Now for the data we need to maintain per-drive:  ide_drive_t
  */
 
@@ -286,6 +304,8 @@ typedef struct ide_drive_s {
 	special_t	special;	/* special action flags */
 	byte     keep_settings;		/* restore settings after drive reset */
 	byte     using_dma;		/* disk is using dma for read/write */
+	byte	 retry_pio;		/* retrying dma capable host in pio */
+	byte	 state;			/* retry state */
 	byte     waiting_for_dma;	/* dma currently in progress */
 	byte     unmask;		/* flag: okay to unmask other irqs */
 	byte     slow;			/* flag: slow data port */
@@ -349,6 +369,8 @@ typedef struct ide_drive_s {
 	byte		init_speed;	/* transfer rate set at boot */
 	byte		current_speed;	/* current transfer rate set */
 	byte		dn;		/* now wide spread use */
+	unsigned int	failures;	/* current failure count */
+	unsigned int	max_failures;	/* maximum allowed failure count */
 } ide_drive_t;
 
 /*
@@ -371,6 +393,23 @@ typedef enum {	ide_dma_read,	ide_dma_write,		ide_dma_begin,
 } ide_dma_action_t;
 
 typedef int (ide_dmaproc_t)(ide_dma_action_t, ide_drive_t *);
+
+/*
+ * An ide_ideproc_t() performs CPU-polled transfers to/from a drive.
+ * Arguments are: the drive, the buffer pointer, and the length (in bytes or
+ * words depending on if it's an IDE or ATAPI call).
+ *
+ * If it is not defined for a controller, standard-code is used from ide.c.
+ *
+ * Controllers which are not memory-mapped in the standard way need to 
+ * override that mechanism using this function to work.
+ *
+ */
+typedef enum { ideproc_ide_input_data,    ideproc_ide_output_data,
+	       ideproc_atapi_input_bytes, ideproc_atapi_output_bytes
+} ide_ide_action_t;
+
+typedef void (ide_ideproc_t)(ide_ide_action_t, ide_drive_t *, void *, unsigned int);
 
 /*
  * An ide_tuneproc_t() is used to set the speed of an IDE interface
@@ -397,6 +436,11 @@ typedef void (ide_maskproc_t) (ide_drive_t *, int);
 typedef void (ide_rw_proc_t) (ide_drive_t *, ide_dma_action_t);
 
 /*
+ * ide soft-power support
+ */
+typedef int (ide_busproc_t) (struct hwif_s *, int);
+
+/*
  * hwif_chipset_t is used to keep track of the specific hardware
  * chipset used by each IDE interface, if known.
  */
@@ -405,8 +449,12 @@ typedef enum {	ide_unknown,	ide_generic,	ide_pci,
 		ide_qd6580,	ide_umc8672,	ide_ht6560b,
 		ide_pdc4030,	ide_rz1000,	ide_trm290,
 		ide_cmd646,	ide_cy82c693,	ide_4drives,
-		ide_pmac
+		ide_pmac,       ide_etrax100
 } hwif_chipset_t;
+
+#define IDE_CHIPSET_PCI_MASK	\
+    ((1<<ide_pci)|(1<<ide_cmd646)|(1<<ide_ali14xx))
+#define IDE_CHIPSET_IS_PCI(c)	((IDE_CHIPSET_PCI_MASK >> (c)) & 1)
 
 #ifdef CONFIG_BLK_DEV_IDEPCI
 typedef struct ide_pci_devid_s {
@@ -433,12 +481,14 @@ typedef struct hwif_s {
 	ide_maskproc_t	*maskproc;	/* special host masking for drive selection */
 	ide_quirkproc_t	*quirkproc;	/* check host's drive quirk list */
 	ide_rw_proc_t	*rwproc;	/* adjust timing based upon rq->cmd direction */
+	ide_ideproc_t   *ideproc;       /* CPU-polled transfer routine */
 	ide_dmaproc_t	*dmaproc;	/* dma read/write/abort routine */
 	unsigned int	*dmatable_cpu;	/* dma physical region descriptor table (cpu view) */
 	dma_addr_t	dmatable_dma;	/* dma physical region descriptor table (dma view) */
 	struct scatterlist *sg_table;	/* Scatter-gather list used to build the above */
 	int sg_nents;			/* Current number of entries in it */
 	int sg_dma_direction;		/* dma transfer direction */
+	int sg_dma_active;		/* is it in use */
 	struct hwif_s	*mate;		/* other hwif from same PCI chip */
 	unsigned long	dma_base;	/* base addr for dma ports */
 	unsigned	dma_extra;	/* extra addr for dma ports */
@@ -467,6 +517,8 @@ typedef struct hwif_s {
 #endif
 	byte		straight8;	/* Alan's straight 8 check */
 	void		*hwif_data;	/* extra hwif data */
+	ide_busproc_t	*busproc;	/* driver soft-power interface */
+	byte		bus_state;	/* power state of the IDE bus */
 } ide_hwif_t;
 
 
@@ -595,6 +647,7 @@ typedef void		(ide_pre_reset_proc)(ide_drive_t *);
 typedef unsigned long	(ide_capacity_proc)(ide_drive_t *);
 typedef ide_startstop_t	(ide_special_proc)(ide_drive_t *);
 typedef void		(ide_setting_proc)(ide_drive_t *);
+typedef int		(ide_driver_reinit_proc)(ide_drive_t *);
 
 typedef struct ide_driver_s {
 	const char			*name;
@@ -615,6 +668,7 @@ typedef struct ide_driver_s {
 	ide_capacity_proc		*capacity;
 	ide_special_proc		*special;
 	ide_proc_entry_t		*proc;
+	ide_driver_reinit_proc		*driver_reinit;
 } ide_driver_t;
 
 #define DRIVER(drive)		((ide_driver_t *)((drive)->driver))
@@ -737,6 +791,12 @@ unsigned long current_capacity (ide_drive_t *drive);
  * The caller should return immediately after invoking this.
  */
 ide_startstop_t ide_do_reset (ide_drive_t *);
+
+/*
+ * Re-Start an operation for an IDE interface.
+ * The caller should return immediately after invoking this.
+ */
+ide_startstop_t restart_request (ide_drive_t *);
 
 /*
  * This function is intended to be used prior to invoking ide_do_drive_cmd().

@@ -136,26 +136,12 @@ static struct task_struct * select_bad_process(void)
 }
 
 /**
- * oom_kill - kill the "best" process when we run out of memory
- *
- * If we run out of memory, we have the choice between either
- * killing a random task (bad), letting the system crash (worse)
- * OR try to be smart about which process to kill. Note that we
- * don't have to be perfect here, we just have to be good.
- *
  * We must be careful though to never send SIGKILL a process with
  * CAP_SYS_RAW_IO set, send SIGTERM instead (but it's unlikely that
  * we select a process with CAP_SYS_RAW_IO set).
  */
-void oom_kill(void)
+void oom_kill_task(struct task_struct *p)
 {
-
-	struct task_struct *p = select_bad_process();
-
-	/* Found nothing?!?! Either we hang forever, or we panic. */
-	if (p == NULL)
-		panic("Out of memory and no killable processes...\n");
-
 	printk(KERN_ERR "Out of Memory: Killed process %d (%s).\n", p->pid, p->comm);
 
 	/*
@@ -172,6 +158,30 @@ void oom_kill(void)
 	} else {
 		force_sig(SIGKILL, p);
 	}
+}
+
+/**
+ * oom_kill - kill the "best" process when we run out of memory
+ *
+ * If we run out of memory, we have the choice between either
+ * killing a random task (bad), letting the system crash (worse)
+ * OR try to be smart about which process to kill. Note that we
+ * don't have to be perfect here, we just have to be good.
+ */
+void oom_kill(void)
+{
+	struct task_struct *p = select_bad_process(), *q;
+
+	/* Found nothing?!?! Either we hang forever, or we panic. */
+	if (p == NULL)
+		panic("Out of memory and no killable processes...\n");
+
+	/* kill all processes that share the ->mm (i.e. all threads) */
+	read_lock(&tasklist_lock);
+	for_each_task(q) {
+		if(q->mm == p->mm) oom_kill_task(q);
+	}
+	read_unlock(&tasklist_lock);
 
 	/*
 	 * Make kswapd go out of the way, so "p" has a good chance of
