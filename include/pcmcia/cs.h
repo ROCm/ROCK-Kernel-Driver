@@ -325,13 +325,6 @@ typedef struct bind_req_t {
 /* Flag to bind to all functions */
 #define BIND_FN_ALL	0xff
 
-typedef struct mtd_bind_t {
-    struct pcmcia_socket	*Socket;
-    u_int	Attributes;
-    u_int	CardOffset;
-    dev_info_t	*dev_info;
-} mtd_bind_t;
-
 /* Events */
 #define CS_EVENT_PRI_LOW		0
 #define CS_EVENT_PRI_HIGH		1

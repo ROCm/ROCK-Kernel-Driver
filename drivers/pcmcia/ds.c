@@ -171,46 +171,6 @@ static int pcmcia_bind_device(bind_req_t *req)
 	return CS_SUCCESS;
 } /* bind_device */
 
-
-/*======================================================================
-
-    Bind_mtd() associates a device driver with a particular memory
-    region.  It is normally called by Driver Services after it has
-    identified a memory device type.  An instance of the corresponding
-    driver will then be able to register to control this region.
-    
-======================================================================*/
-
-static int pcmcia_bind_mtd(mtd_bind_t *req)
-{
-	struct pcmcia_socket *s;
-	memory_handle_t region;
-
-	s = req->Socket;
-	if (!s)
-		return CS_BAD_SOCKET;
-    
-	if (req->Attributes & REGION_TYPE_AM)
-		region = s->a_region;
-	else
-		region = s->c_region;
-
-	while (region) {
-		if (region->info.CardOffset == req->CardOffset) 
-			break;
-		region = region->info.next;
-	}
-	if (!region || (region->mtd != NULL))
-		return CS_BAD_OFFSET;
-	strlcpy(region->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
-
-	ds_dbg(1, "%s: bind_mtd: attr 0x%x, offset 0x%x, dev %s\n",
-	      cs_socket_name(s), req->Attributes, req->CardOffset,
-	      (char *)req->dev_info);
-	return CS_SUCCESS;
-} /* bind_mtd */
-
-
 /* String tables for error messages */
 
 typedef struct lookup_t {
@@ -545,22 +505,25 @@ static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
 
 static int bind_mtd(struct pcmcia_bus_socket *bus_sock, mtd_info_t *mtd_info)
 {
-    mtd_bind_t bind_req;
-    int ret;
+	struct pcmcia_socket *s = bus_sock->parent;
+	memory_handle_t region;
 
-    bind_req.dev_info = &mtd_info->dev_info;
-    bind_req.Attributes = mtd_info->Attributes;
-    bind_req.Socket = bus_sock->parent;
-    bind_req.CardOffset = mtd_info->CardOffset;
-    ret = pcmcia_bind_mtd(&bind_req);
-    if (ret != CS_SUCCESS) {
-	cs_error(NULL, BindMTD, ret);
-	printk(KERN_NOTICE "ds: unable to bind MTD '%s' to socket %d"
-	       " offset 0x%x\n",
-	       (char *)bind_req.dev_info, bus_sock->parent->sock, bind_req.CardOffset);
-	return -ENODEV;
-    }
-    return 0;
+	if (mtd_info->Attributes & REGION_TYPE_AM)
+		region = s->a_region;
+	else
+		region = s->c_region;
+
+	while (region) {
+		if (region->info.CardOffset == mtd_info->CardOffset)
+			break;
+		region = region->info.next;
+	}
+	if (!region || (region->mtd != NULL))
+		return -ENODEV;
+
+	strlcpy(region->dev_info, mtd_info->dev_info, DEV_NAME_LEN);
+
+	return 0;
 } /* bind_mtd */
 
 /*======================================================================
