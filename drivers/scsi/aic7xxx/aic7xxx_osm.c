@@ -3973,11 +3973,10 @@ ahc_linux_alloc_device(struct ahc_softc *ahc,
 }
 
 static void
-ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
+__ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 {
 	struct ahc_linux_target *targ;
 
-	del_timer_sync(&dev->timer);
 	targ = dev->target;
 	targ->devices[dev->lun] = NULL;
 	free(dev, M_DEVBUF);
@@ -3985,6 +3984,13 @@ ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 	if (targ->refcount == 0
 	 && (targ->flags & AHC_DV_REQUIRED) == 0)
 		ahc_linux_free_target(ahc, targ);
+}
+
+static void
+ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
+{
+	del_timer_sync(&dev->timer);
+	__ahc_linux_free_device(ahc, dev);
 }
 
 void
@@ -4697,7 +4703,7 @@ ahc_linux_dev_timed_unfreeze(u_long arg)
 		ahc_linux_run_device_queue(ahc, dev);
 	if (TAILQ_EMPTY(&dev->busyq)
 	 && dev->active == 0)
-		ahc_linux_free_device(ahc, dev);
+		__ahc_linux_free_device(ahc, dev);
 	ahc_unlock(ahc, &s);
 }
 
