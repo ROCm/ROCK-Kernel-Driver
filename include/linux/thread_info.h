@@ -74,7 +74,7 @@ static inline void set_need_resched(void)
 
 static inline void clear_need_resched(void)
 {
-	set_thread_flag(TIF_NEED_RESCHED);
+	clear_thread_flag(TIF_NEED_RESCHED);
 }
 
 #endif

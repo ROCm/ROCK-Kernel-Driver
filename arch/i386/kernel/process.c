@@ -808,7 +808,7 @@ unsigned long get_wchan(struct task_struct *p)
 	int count = 0;
 	if (!p || p == current || p->state == TASK_RUNNING)
 		return 0;
-	stack_page = (unsigned long)p;
+	stack_page = (unsigned long)p->thread_info;
 	esp = p->thread.esp;
 	if (!stack_page || esp < stack_page || esp > 8188+stack_page)
 		return 0;
