@@ -768,25 +768,6 @@ static void sunsab_convert_to_sab(struct uart_sunsab_port *up, unsigned int cfla
 	writeb((readb(&up->regs->rw.ccr2) & ~0xc0) | ((ebrg >> 2) & 0xc0),
 	       &up->regs->rw.ccr2);
 
-	if (cflag & CRTSCTS) {
-		writeb(readb(&up->regs->rw.mode) & ~SAB82532_MODE_RTS,
-		       &up->regs->rw.mode);
-		writeb(readb(&up->regs->rw.mode) | SAB82532_MODE_FRTS,
-		       &up->regs->rw.mode);
-		writeb(readb(&up->regs->rw.mode) & ~SAB82532_MODE_FCTS,
-		       &up->regs->rw.mode);
-		up->interrupt_mask1 &= ~SAB82532_IMR1_CSC;
-		writeb(up->interrupt_mask1, &up->regs->w.imr1);
-	} else {
-		writeb(readb(&up->regs->rw.mode) | SAB82532_MODE_RTS,
-		       &up->regs->rw.mode);
-		writeb(readb(&up->regs->rw.mode) & ~SAB82532_MODE_FRTS,
-		       &up->regs->rw.mode);
-		writeb(readb(&up->regs->rw.mode) | SAB82532_MODE_FCTS,
-		       &up->regs->rw.mode);
-		up->interrupt_mask1 |= SAB82532_IMR1_CSC;
-		writeb(up->interrupt_mask1, &up->regs->w.imr1);
-	}
 	writeb(readb(&up->regs->rw.mode) | SAB82532_MODE_RAC, &up->regs->rw.mode);
 
 }
