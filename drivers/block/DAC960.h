@@ -2203,33 +2203,10 @@ static char
   DAC960_Message(DAC960_UserCriticalLevel, Format, ##Arguments)
 
 
-/*
-  Define types for some of the structures that interface with the rest
-  of the Linux Kernel and I/O Subsystem.
-*/
-
-typedef struct file File_T;
-typedef struct block_device_operations BlockDeviceOperations_T;
-typedef struct completion Completion_T;
-typedef struct hd_geometry DiskGeometry_T;
-typedef struct inode Inode_T;
-typedef struct inode_operations InodeOperations_T;
-typedef kdev_t KernelDevice_T;
-typedef struct list_head ListHead_T;
-typedef struct pci_dev PCI_Device_T;
-typedef struct proc_dir_entry PROC_DirectoryEntry_T;
-typedef unsigned long ProcessorFlags_T;
-typedef struct pt_regs Registers_T;
-typedef struct request IO_Request_T;
-typedef request_queue_t RequestQueue_T;
-typedef struct super_block SuperBlock_T;
-typedef struct timer_list Timer_T;
-typedef wait_queue_head_t WaitQueue_T;
-
 struct DAC960_privdata {
 	DAC960_HardwareType_T	HardwareType;
 	DAC960_FirmwareType_T	FirmwareType;
-	irqreturn_t (*InterruptHandler)(int, void *, Registers_T *);
+	irqreturn_t (*InterruptHandler)(int, void *, struct pt_regs *);
 	unsigned int		MemoryWindowSize;
 };
 
@@ -2295,14 +2272,14 @@ typedef struct DAC960_Command
   DAC960_CommandType_T CommandType;
   struct DAC960_Controller *Controller;
   struct DAC960_Command *Next;
-  Completion_T *Completion;
+  struct completion *Completion;
   unsigned int LogicalDriveNumber;
   unsigned int BlockNumber;
   unsigned int BlockCount;
   unsigned int SegmentCount;
   int	DmaDirection;
   struct scatterlist *cmd_sglist;
-  IO_Request_T *Request;
+  struct request *Request;
   struct pci_dev *PciDevice;
   union {
     struct {
@@ -2344,7 +2321,7 @@ typedef struct DAC960_Controller
   DAC960_HardwareType_T HardwareType;
   DAC960_IO_Address_T IO_Address;
   DAC960_PCI_Address_T PCI_Address;
-  PCI_Device_T  *PCIDevice;
+  struct pci_dev *PCIDevice;
   unsigned char ControllerNumber;
   unsigned char ControllerName[4];
   unsigned char ModelName[20];
@@ -2383,19 +2360,19 @@ typedef struct DAC960_Controller
   boolean DriveSpinUpMessageDisplayed;
   boolean MonitoringAlertMode;
   boolean SuppressEnclosureMessages;
-  Timer_T MonitoringTimer;
+  struct timer_list MonitoringTimer;
   struct gendisk *disks[DAC960_MaxLogicalDrives];
   struct pci_pool *ScatterGatherPool;
   DAC960_Command_T *FreeCommands;
   unsigned char *CombinedStatusBuffer;
   unsigned char *CurrentStatusBuffer;
-  RequestQueue_T RequestQueue;
+  struct request_queue RequestQueue;
   spinlock_t queue_lock;
-  WaitQueue_T CommandWaitQueue;
-  WaitQueue_T HealthStatusWaitQueue;
+  wait_queue_head_t CommandWaitQueue;
+  wait_queue_head_t HealthStatusWaitQueue;
   DAC960_Command_T InitialCommand;
   DAC960_Command_T *Commands[DAC960_MaxDriverQueueDepth];
-  PROC_DirectoryEntry_T *ControllerProcEntry;
+  struct proc_dir_entry *ControllerProcEntry;
   boolean LogicalDriveInitiallyAccessible[DAC960_MaxLogicalDrives];
   void (*QueueCommand)(DAC960_Command_T *Command);
   boolean (*ReadControllerConfiguration)(struct DAC960_Controller *);
@@ -2594,85 +2571,6 @@ void dma_addr_writeql(dma_addr_t addr, void *write_address)
 	writel(u.wl[0], write_address);
 	writel(u.wl[1], write_address + 4);
 }
-
-/*
-  DAC960_AcquireControllerLock acquires exclusive access to Controller.
-	Reference the queue_lock through the controller structure,
-	rather than through the request queue.  These macros are
-        used to mutex on the controller structure during initialization,
-	BEFORE the request queue is allocated and initialized in
-	DAC960_RegisterBlockDevice().
-*/
-
-static inline
-void DAC960_AcquireControllerLock(DAC960_Controller_T *Controller,
-				  ProcessorFlags_T *ProcessorFlags)
-{
-  spin_lock_irqsave(&Controller->queue_lock, *ProcessorFlags);
-}
-
-
-/*
-  DAC960_ReleaseControllerLock releases exclusive access to Controller.
-*/
-
-static inline
-void DAC960_ReleaseControllerLock(DAC960_Controller_T *Controller,
-				  ProcessorFlags_T *ProcessorFlags)
-{
-  spin_unlock_irqrestore(&Controller->queue_lock, *ProcessorFlags);
-}
-
-
-/*
-  DAC960_AcquireControllerLockRF acquires exclusive access to Controller,
-  but is only called from the request function with the queue lock held.
-*/
-
-static inline
-void DAC960_AcquireControllerLockRF(DAC960_Controller_T *Controller,
-				    ProcessorFlags_T *ProcessorFlags)
-{
-}
-
-
-/*
-  DAC960_ReleaseControllerLockRF releases exclusive access to Controller,
-  but is only called from the request function with the queue lock held.
-*/
-
-static inline
-void DAC960_ReleaseControllerLockRF(DAC960_Controller_T *Controller,
-				    ProcessorFlags_T *ProcessorFlags)
-{
-}
-
-
-/*
-  DAC960_AcquireControllerLockIH acquires exclusive access to Controller,
-  but is only called from the interrupt handler.
-*/
-
-static inline
-void DAC960_AcquireControllerLockIH(DAC960_Controller_T *Controller,
-				    ProcessorFlags_T *ProcessorFlags)
-{
-  spin_lock_irqsave(&Controller->queue_lock, *ProcessorFlags);
-}
-
-
-/*
-  DAC960_ReleaseControllerLockIH releases exclusive access to Controller,
-  but is only called from the interrupt handler.
-*/
-
-static inline
-void DAC960_ReleaseControllerLockIH(DAC960_Controller_T *Controller,
-				    ProcessorFlags_T *ProcessorFlags)
-{
-  spin_unlock_irqrestore(&Controller->queue_lock, *ProcessorFlags);
-}
-
 
 /*
   Define the DAC960 BA Series Controller Interface Register Offsets.
@@ -4230,17 +4128,18 @@ void DAC960_P_To_PD_TranslateReadWriteCommand(DAC960_V1_CommandMailbox_T
 static void DAC960_FinalizeController(DAC960_Controller_T *);
 static void DAC960_V1_QueueReadWriteCommand(DAC960_Command_T *);
 static void DAC960_V2_QueueReadWriteCommand(DAC960_Command_T *); 
-static void DAC960_RequestFunction(RequestQueue_T *);
-static irqreturn_t DAC960_BA_InterruptHandler(int, void *, Registers_T *);
-static irqreturn_t DAC960_LP_InterruptHandler(int, void *, Registers_T *);
-static irqreturn_t DAC960_LA_InterruptHandler(int, void *, Registers_T *);
-static irqreturn_t DAC960_PG_InterruptHandler(int, void *, Registers_T *);
-static irqreturn_t DAC960_PD_InterruptHandler(int, void *, Registers_T *);
-static irqreturn_t DAC960_P_InterruptHandler(int, void *, Registers_T *);
+static void DAC960_RequestFunction(struct request_queue *);
+static irqreturn_t DAC960_BA_InterruptHandler(int, void *, struct pt_regs *);
+static irqreturn_t DAC960_LP_InterruptHandler(int, void *, struct pt_regs *);
+static irqreturn_t DAC960_LA_InterruptHandler(int, void *, struct pt_regs *);
+static irqreturn_t DAC960_PG_InterruptHandler(int, void *, struct pt_regs *);
+static irqreturn_t DAC960_PD_InterruptHandler(int, void *, struct pt_regs *);
+static irqreturn_t DAC960_P_InterruptHandler(int, void *, struct pt_regs *);
 static void DAC960_V1_QueueMonitoringCommand(DAC960_Command_T *);
 static void DAC960_V2_QueueMonitoringCommand(DAC960_Command_T *);
 static void DAC960_MonitoringTimerFunction(unsigned long);
-static int DAC960_UserIOCTL(Inode_T *, File_T *, unsigned int, unsigned long);
+static int DAC960_UserIOCTL(struct inode *, struct file *,
+			    unsigned int, unsigned long);
 static void DAC960_Message(DAC960_MessageLevel_T, unsigned char *,
 			   DAC960_Controller_T *, ...);
 static void DAC960_CreateProcEntries(DAC960_Controller_T *);
