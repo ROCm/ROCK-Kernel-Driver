@@ -23,9 +23,12 @@ config ARCH_SMDK2410
            <http://www.fsforth.de>
 
 config MACH_VR1000
-	bool "Simtec VR1000"
+	bool "Thorcom VR1000"
 	help
-	  Say Y here if you are using the Simtec VR1000 board.
+	  Say Y here if you are using the Thorcom VR1000 board.
+
+	  This linux port is currently being maintained by Simtec, on behalf
+	  of Thorcom. Any queries, please contact Thorcom first.
 
 endmenu
 
