@@ -1183,7 +1183,7 @@ static int init_irq (ide_hwif_t *hwif)
 		hwif->io_ports[IDE_DATA_OFFSET]+7,
 		hwif->io_ports[IDE_CONTROL_OFFSET], __irq_itoa(hwif->irq));
 #else
-	printk("%s at %x on irq 0x%08x", hwif->name,
+	printk("%s at 0x%08lx on irq %d", hwif->name,
 		hwif->io_ports[IDE_DATA_OFFSET], hwif->irq);
 #endif /* __mc68000__ && CONFIG_APUS */
 	if (match)
