@@ -286,7 +286,7 @@ ehci_hub_descriptor (
 	if (HCS_INDICATOR (ehci->hcs_params))
 		temp |= 0x0080;		/* per-port indicators (LEDs) */
 #endif
-	desc->wHubCharacteristics = cpu_to_le16 (temp);
+	desc->wHubCharacteristics = (__force __u16)cpu_to_le16 (temp);
 }
 
 /*-------------------------------------------------------------------------*/
