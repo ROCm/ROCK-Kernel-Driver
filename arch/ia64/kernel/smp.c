@@ -75,12 +75,8 @@ struct call_data_struct {
 
 static volatile struct call_data_struct *call_data;
 
-static spinlock_t migration_lock = SPIN_LOCK_UNLOCKED;
-static task_t *migrating_task;
-
 #define IPI_CALL_FUNC		0
 #define IPI_CPU_STOP		1
-#define IPI_MIGRATE_TASK	2
 
 static void
 stop_this_cpu (void)
@@ -140,14 +136,6 @@ handle_IPI (int irq, void *dev_id, struct pt_regs *regs)
 				      mb();
 				      if (wait)
 					      atomic_inc(&data->finished);
-			      }
-			      break;
-
-			      case IPI_MIGRATE_TASK:
-			      {
-				      task_t *p = migrating_task;
-				      spin_unlock(&migration_lock);
-				      sched_task_migrated(p);
 			      }
 			      break;
 
@@ -348,15 +336,6 @@ smp_send_stop (void)
 {
 	send_IPI_allbutself(IPI_CPU_STOP);
 	smp_num_cpus = 1;
-}
-
-void
-smp_migrate_task (int cpu, task_t *p)
-{
-	/* The target CPU will unlock the migration spinlock: */
-	spin_lock(&migration_lock);
-	migrating_task = p;
-	send_IPI_single(cpu, IPI_MIGRATE_TASK);
 }
 
 int __init
