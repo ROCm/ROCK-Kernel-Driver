@@ -1653,58 +1653,39 @@ void ata_fill_sg(struct ata_queued_cmd *qc)
 {
 	struct scatterlist *sg = qc->sg;
 	struct ata_port *ap = qc->ap;
-	unsigned int i, idx;
+	unsigned int idx, nelem;
 
 	assert(sg != NULL);
 	assert(qc->n_elem > 0);
 
 	idx = 0;
-	for (i = 0; i < qc->n_elem; i++) {
+	for (nelem = qc->n_elem; nelem; nelem--,sg++) {
 		u32 addr, boundary;
-		u32 sg_len, sg1len, sg2len;
+		u32 sg_len, len;
 
 		/* determine if physical DMA addr spans 64K boundary.
 		 * Note h/w doesn't support 64-bit, so we unconditionally
 		 * truncate dma_addr_t to u32.
 		 */
-		addr = (u32) sg_dma_address(&sg[i]);
-		sg_len = sg_dma_len(&sg[i]);
-		boundary = (addr & ~0xffff) + (0xffff + 1);
+		addr = (u32) sg_dma_address(sg);
+		sg_len = sg_dma_len(sg);
 
-		if ((addr + sg_len) > boundary) {
-			/* straddles boundary, need two s/g entries */
-			sg2len = (addr + sg_len) - boundary;
-			sg1len = sg_len - sg2len;
-		} else {
-			/* no split, just one s/g entry */
-			sg2len = 0;
-			sg1len = sg_len;
-		}
-
-		/* fill first S/G list entry */
-		ap->prd[idx].addr = cpu_to_le32(addr);
-		if (sg1len == 65536)
-			ap->prd[idx].flags_len = 0;
-		else
-			ap->prd[idx].flags_len = cpu_to_le32(sg1len);
-		VPRINTK("PRD[%u] = (0x%X, 0x%X)\n", idx, addr, sg1len);
-		idx++;
-
-		/* if we had to break S/G entry across segment boundary,
-		 * due to iommu merging, fill second S/G list entry
-		 */
-		if (sg2len) {
-			addr += sg1len;
+		while (sg_len) {
+			boundary = (addr & ~0xffff) + (0xffff + 1);
+			len = sg_len;
+			if ((addr + sg_len) > boundary)
+				len = boundary - addr;
 
 			ap->prd[idx].addr = cpu_to_le32(addr);
-			if (sg2len == 65536)
-				ap->prd[idx].flags_len = 0;
-			else
-				ap->prd[idx].flags_len = cpu_to_le32(sg2len);
-			VPRINTK("PRD[%u] = (0x%X, 0x%X)\n", idx, addr, sg2len);
+			ap->prd[idx].flags_len = cpu_to_le32(len & 0xffff);
+			VPRINTK("PRD[%u] = (0x%X, 0x%X)\n", idx, addr, len);
+
 			idx++;
+			sg_len -= len;
+			addr += len;
 		}
 	}
+
 	if (idx)
 		ap->prd[idx - 1].flags_len |= cpu_to_le32(ATA_PRD_EOT);
 }
