@@ -34,6 +34,7 @@
 #include <linux/module.h>
 #include <linux/types.h>
 #include <linux/i2c-id.h>
+#include <linux/device.h>	/* for struct device */
 #include <asm/semaphore.h>
 
 /* --- General options ------------------------------------------------	*/
@@ -143,6 +144,8 @@ struct i2c_driver {
 	 */
 	int (*command)(struct i2c_client *client,unsigned int cmd, void *arg);
 };
+
+extern struct bus_type i2c_bus_type;
 
 /*
  * i2c_client identifies a single device (i.e. chip) that is connected to an 

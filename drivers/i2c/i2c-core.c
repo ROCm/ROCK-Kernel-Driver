@@ -598,10 +598,37 @@ static void __exit i2cproc_cleanup(void)
 {
 	remove_proc_entry("i2c",proc_bus);
 }
+#else
+static int __init i2cproc_init(void) { return 0; }
+static void __exit i2cproc_cleanup(void) { }
+#endif /* CONFIG_PROC_FS */
 
-module_init(i2cproc_init);
-module_exit(i2cproc_cleanup);
-#endif /* def CONFIG_PROC_FS */
+/* match always succeeds, as we want the probe() to tell if we really accept this match */
+static int i2c_device_match(struct device *dev, struct device_driver *drv)
+{
+	return 1;
+}
+
+struct bus_type i2c_bus_type = {
+	.name =		"i2c",
+	.match =	i2c_device_match,
+};
+
+
+static int __init i2c_init(void)
+{
+	bus_register(&i2c_bus_type);
+	return i2cproc_init();
+}
+
+static void __exit i2c_exit(void)
+{
+	i2cproc_cleanup();
+	bus_unregister(&i2c_bus_type);
+}
+
+module_init(i2c_init);
+module_exit(i2c_exit);
 
 /* ----------------------------------------------------
  * the functional interface to the i2c busses.
