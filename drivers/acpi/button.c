@@ -70,7 +70,6 @@ struct acpi_button {
 
 static struct proc_dir_entry	*acpi_button_dir = NULL;
 
-
 static int
 acpi_button_read_info (
 	char			*page,

@@ -354,11 +354,11 @@ void acpi_numa_arch_fixup(void);
 
 extern int acpi_mp_config;
 
-#else /*!CONFIG_ACPI_BOOT*/
+#else
 
 #define acpi_mp_config	0
 
-#endif /*CONFIG_ACPI_BOOT*/
+#endif
 
 
 #ifdef CONFIG_ACPI_PCI
