@@ -176,29 +176,24 @@ static int aio_setup_ring(struct kioctx *ctx)
 /* aio_ring_event: returns a pointer to the event at the given index from
  * kmap_atomic(, km).  Release the pointer with put_aio_ring_event();
  */
-static inline struct io_event *aio_ring_event(struct aio_ring_info *info, int nr, enum km_type km)
-{
-	struct io_event *events;
 #define AIO_EVENTS_PER_PAGE	(PAGE_SIZE / sizeof(struct io_event))
 #define AIO_EVENTS_FIRST_PAGE	((PAGE_SIZE - sizeof(struct aio_ring)) / sizeof(struct io_event))
+#define AIO_EVENTS_OFFSET	(AIO_EVENTS_PER_PAGE - AIO_EVENTS_FIRST_PAGE)
 
-	if (nr < AIO_EVENTS_FIRST_PAGE) {
-		struct aio_ring *ring;
-		ring = kmap_atomic(info->ring_pages[0], km);
-		return &ring->io_events[nr];
-	}
-	nr -= AIO_EVENTS_FIRST_PAGE;
+#define aio_ring_event(info, nr, km) ({					\
+	unsigned pos = (nr) + AIO_EVENTS_OFFSET;			\
+	struct io_event *__event;					\
+	__event = kmap_atomic(						\
+			(info)->ring_pages[pos / AIO_EVENTS_PER_PAGE], km); \
+	__event += pos % AIO_EVENTS_PER_PAGE;				\
+	__event;							\
+})
 
-	events = kmap_atomic(info->ring_pages[1 + nr / AIO_EVENTS_PER_PAGE], km);
-
-	return events + (nr % AIO_EVENTS_PER_PAGE);
-}
-
-static inline void put_aio_ring_event(struct io_event *event, enum km_type km)
-{
-	void *p = (void *)((unsigned long)event & PAGE_MASK);
-	kunmap_atomic(p, km);
-}
+#define put_aio_ring_event(event, km) do {	\
+	struct io_event *__event = (event);	\
+	(void)__event;				\
+	kunmap_atomic((void *)((unsigned long)__event & PAGE_MASK), km); \
+} while(0)
 
 /* ioctx_alloc
  *	Allocates and initializes an ioctx.  Returns an ERR_PTR if it failed.
