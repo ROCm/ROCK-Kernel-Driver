@@ -387,6 +387,7 @@ struct thread_struct {
 	struct vm86_struct	* vm86_info;
 	unsigned long		screen_bitmap;
 	unsigned long		v86flags, v86mask, saved_esp0;
+	unsigned int		saved_fs, saved_gs;
 /* IO permissions */
 	unsigned long	*ts_io_bitmap;
 };
