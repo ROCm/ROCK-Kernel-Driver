@@ -45,7 +45,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.5.7 (2002/11/18)"
+#define DRIVER_VERSION "v0.5.8 (2002/12/13)"
 #define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
@@ -118,9 +118,14 @@ static int get_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 			 void *data)
 {
 	int ret;
-	unsigned char buffer[256];
+	char *buffer;
 	DECLARE_WAITQUEUE(wait, current);
 
+	buffer = kmalloc(size, GFP_DMA);
+	if (!buffer) {
+		warn("%s: looks like we're out of memory", __FUNCTION__);
+		return -ENOMEM;
+	}
 	add_wait_queue(&pegasus->ctrl_wait, &wait);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	while (pegasus->flags & ETH_REGS_CHANGED)
@@ -153,6 +158,7 @@ static int get_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 out:
 	remove_wait_queue(&pegasus->ctrl_wait, &wait);
 	memcpy(data, buffer, size);
+	kfree(buffer);
 
 	return ret;
 }
@@ -161,9 +167,14 @@ static int set_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 			 void *data)
 {
 	int ret;
-	unsigned char buffer[256];
+	char *buffer;
 	DECLARE_WAITQUEUE(wait, current);
 
+	buffer = kmalloc(size, GFP_DMA);
+	if (!buffer) {
+		warn("%s: looks like we're out of memory", __FUNCTION__);
+		return -ENOMEM;
+	}
 	memcpy(buffer, data, size);
 
 	add_wait_queue(&pegasus->ctrl_wait, &wait);
@@ -196,6 +207,7 @@ static int set_registers(pegasus_t * pegasus, __u16 indx, __u16 size,
 	schedule();
 out:
 	remove_wait_queue(&pegasus->ctrl_wait, &wait);
+	kfree(buffer);
 
 	return ret;
 }
@@ -203,9 +215,15 @@ out:
 static int set_register(pegasus_t * pegasus, __u16 indx, __u8 data)
 {
 	int ret;
-	__u16 tmp = data;
+	char *tmp;
 	DECLARE_WAITQUEUE(wait, current);
 
+	tmp = kmalloc(1, GFP_DMA);
+	if (!tmp) {
+		warn("%s: looks like we're out of memory", __FUNCTION__);
+		return -ENOMEM;
+	}
+	memcpy(tmp, &data, 1);
 	add_wait_queue(&pegasus->ctrl_wait, &wait);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	while (pegasus->flags & ETH_REGS_CHANGED)
@@ -215,7 +233,7 @@ static int set_register(pegasus_t * pegasus, __u16 indx, __u8 data)
 
 	pegasus->dr.bRequestType = PEGASUS_REQT_WRITE;
 	pegasus->dr.bRequest = PEGASUS_REQ_SET_REG;
-	pegasus->dr.wValue = cpu_to_le16p(&tmp);
+	pegasus->dr.wValue = cpu_to_le16p(&data);
 	pegasus->dr.wIndex = cpu_to_le16p(&indx);
 	pegasus->dr.wLength = cpu_to_le16(1);
 	pegasus->ctrl_urb->transfer_buffer_length = 1;
@@ -223,7 +241,7 @@ static int set_register(pegasus_t * pegasus, __u16 indx, __u8 data)
 	usb_fill_control_urb(pegasus->ctrl_urb, pegasus->usb,
 			     usb_sndctrlpipe(pegasus->usb, 0),
 			     (char *) &pegasus->dr,
-			     &data, 1, ctrl_callback, pegasus);
+			     &tmp, 1, ctrl_callback, pegasus);
 
 	add_wait_queue(&pegasus->ctrl_wait, &wait);
 	set_current_state(TASK_UNINTERRUPTIBLE);
@@ -236,6 +254,7 @@ static int set_register(pegasus_t * pegasus, __u16 indx, __u8 data)
 	schedule();
 out:
 	remove_wait_queue(&pegasus->ctrl_wait, &wait);
+	kfree(tmp);
 
 	return ret;
 }
