@@ -34,6 +34,7 @@
 #include <linux/init.h>
 #include <linux/mca.h>
 #include <linux/eisa.h>
+#include <linux/interrupt.h>
 
 #include "scsi.h"
 #include "hosts.h"
@@ -301,7 +302,7 @@ sim710_eisa_probe(struct device *dev)
 #endif
 	} else {
 		eisa_irqs = eisa_cpq_irqs;
-		irq_index = inb(io_addr + 0xc88);
+		irq_index = inb(io_addr + 0xc88) & 0x07;
 	}
 
 	if(irq_index >= strlen(eisa_irqs)) {
