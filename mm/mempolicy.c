@@ -900,13 +900,13 @@ sp_lookup(struct shared_policy *sp, unsigned long start, unsigned long end)
 
 	while (n) {
 		struct sp_node *p = rb_entry(n, struct sp_node, nd);
-		if (start >= p->end) {
+
+		if (start >= p->end)
 			n = n->rb_right;
-		} else if (end < p->start) {
+		else if (end <= p->start)
 			n = n->rb_left;
-		} else {
+		else
 			break;
-		}
 	}
 	if (!n)
 		return NULL;
