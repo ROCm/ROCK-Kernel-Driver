@@ -90,14 +90,9 @@ _GLOBAL(_start)
  * Invalidate all entries but the one we are using.
  */
 	/* Load our current PID->MMUCR TID and MSR IS->MMUCR STS */
- 	mfspr	r3,SPRN_MMUCR			/* Get MMUCR */
-	lis	r4,PPC44x_MMUCR_STS@h
-	ori	r4,r4,PPC44x_MMUCR_TID@l	/* Create mask */
-	andc	r3,r3,r4			/* Clear out TID/STS bits */
-	mfspr	r4,SPRN_PID			/* Get PID */
-	or	r3,r3,r4			/* Set TID bits */
-	mfmsr	r5				/* Get MSR */
-	andi.	r5,r5,MSR_IS@l			/* TS=1? */
+	mfspr	r3,SPRN_PID			/* Get PID */
+	mfmsr	r4				/* Get MSR */
+	andi.	r4,r4,MSR_IS@l			/* TS=1? */
 	beq	wmmucr				/* If not, leave STS=0 */
 	oris	r3,r3,PPC44x_MMUCR_STS@h	/* Set STS=1 */
 wmmucr:	mtspr	SPRN_MMUCR,r3			/* Put MMUCR */
@@ -117,7 +112,7 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	isync					/* If so, context change */
 
 /*
- * Configure and load pinned entries into TLB slots 62 and 63.
+ * Configure and load pinned entry into TLB slot 63.
  */
 
 	lis	r3,KERNELBASE@h		/* Load the kernel virtual address */
@@ -131,17 +126,14 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	mtspr	SPRN_PID,r0
 	sync
 
-	/* Load the kernel TID  = 0 */
-	mfspr	r5,SPRN_MMUCR
-	lis	r6, PPC44x_MMUCR_TID@h
-	ori	r6,r6,PPC44x_MMUCR_TID@l
-	andc	r5,r5,r6
+	/* Initialize MMUCR */
+	li	r5,0
 	mtspr	SPRN_MMUCR,r5
 	sync
 
  	/* pageid fields */
 	clrrwi	r3,r3,10		/* Mask off the effective page number */
-	ori	r3,r3,(PPC44x_TLB_VALID | PPC44x_TLB_PAGESZ(PPC44x_PAGESZ_256M))
+	ori	r3,r3,PPC44x_TLB_VALID | PPC44x_TLB_256M
 
 	/* xlat fields */
 	clrrwi	r4,r4,10		/* Mask off the real page number */
@@ -152,7 +144,7 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	li	r5,0
 	ori	r5,r5,(PPC44x_TLB_SW | PPC44x_TLB_SR | PPC44x_TLB_SX | PPC44x_TLB_G)
 
-        li      r0,62                    /* TLB slot 62 */
+        li      r0,63                    /* TLB slot 63 */
 
 	tlbwe	r3,r0,PPC44x_TLB_PAGEID	/* Load the pageid fields */
 	tlbwe	r4,r0,PPC44x_TLB_XLAT	/* Load the translation fields */
@@ -174,14 +166,7 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	tlbwe   r6,r23,PPC44x_TLB_PAGEID
 	sync
 
-4:	ori	r3,r3,PPC44x_TLB_TS	/* TS = 1 */
-
-        li      r0,63                   /* TLB slot 63 */
-
-	tlbwe	r3,r0,PPC44x_TLB_PAGEID	/* Load the pageid fields */
-	tlbwe	r4,r0,PPC44x_TLB_XLAT	/* Load the translation fields */
-	tlbwe	r5,r0,PPC44x_TLB_ATTRIB	/* Load the attrib/access fields */
-
+4:
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
 	/*
 	 * Add temporary UART mapping for early debug.  This
@@ -191,7 +176,7 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	 */
  	/* pageid fields */
 	lis	r3,0xe000	
-	ori	r3,r3,(PPC44x_TLB_VALID | PPC44x_TLB_PAGESZ(PPC44x_PAGESZ_256M))
+	ori	r3,r3,PPC44x_TLB_VALID | PPC44x_TLB_256M
 
 	/* xlat fields */
 	lis	r4,0x4000		/* RPN is 0x40000000 */
@@ -201,7 +186,7 @@ skpinv:	addi	r4,r4,1				/* Increment */
 	li	r5,0
 	ori	r5,r5,(PPC44x_TLB_SW | PPC44x_TLB_SR | PPC44x_TLB_I | PPC44x_TLB_G)
 
-        li      r0,60                    /* TLB slot 60 */
+        li      r0,1                    /* TLB slot 1 */
 
 	tlbwe	r3,r0,PPC44x_TLB_PAGEID	/* Load the pageid fields */
 	tlbwe	r4,r0,PPC44x_TLB_XLAT	/* Load the translation fields */
@@ -209,15 +194,15 @@ skpinv:	addi	r4,r4,1				/* Increment */
 
 	ori	r3,r3,PPC44x_TLB_TS	/* Translation state 1 */
 
-        li      r0,61			/* TLB slot 61 */
+        li      r0,1			/* TLB slot 1 */
 
 	tlbwe	r3,r0,PPC44x_TLB_PAGEID	/* Load the pageid fields */
 	tlbwe	r4,r0,PPC44x_TLB_XLAT	/* Load the translation fields */
 	tlbwe	r5,r0,PPC44x_TLB_ATTRIB	/* Load the attrib/access fields */
-#endif /* CONFIG_SERIAL_TEXT_DEBUG */
 
 	/* Force context change */
 	isync
+#endif /* CONFIG_SERIAL_TEXT_DEBUG */
 
 	/* Establish the interrupt vector offsets */
 	SET_IVOR(0,  CriticalInput);
@@ -493,10 +478,8 @@ interrupt_base:
 	lis	r11, swapper_pg_dir@h
 	ori	r11, r11, swapper_pg_dir@l
 
-	mfspr   r12,SPRN_MMUCR          /* Set TID to 0 */
-	li      r13,PPC44x_MMUCR_TID@l
-	andc    r12,r12,r13
-	mtspr   SPRN_MMUCR,r12
+	mfspr   r12,SPRN_MMUCR
+	rlwinm	r12,r12,0,0,23		/* Clear TID */
 
 	b	4f
 
@@ -505,19 +488,14 @@ interrupt_base:
 	mfspr	r11,SPRG3
 	lwz	r11,PGDIR(r11)
 
-	/* Load MMUCR with our PID and STS=<current TS> */
-	mfspr	r12,SPRN_MMUCR			/* Get MMUCR */
-	lis     r13,PPC44x_MMUCR_STS@h
-	ori     r13,r13,PPC44x_MMUCR_TID@l      /* Create mask */
-	andc    r12,r12,r13                     /* Clear out TID/STS bits */
-	mfspr   r13,SPRN_PID                    /* Get PID */
-	or      r12,r12,r13			/* Set TID bits */
-	mfspr	r14,SPRN_SRR1			/* Get SRR1 */
-	andi.	r14,r14,MSR_IS@l		/* TS=1? */
-	beq	4f				/* If not, leave STS=0 */
-	oris	r12,r12,PPC44x_MMUCR_STS@h	/* Set STS=1 */
-	mtspr   SPRN_MMUCR,r12
+	/* Load PID into MMUCR TID */
+	mfspr	r12,SPRN_MMUCR		/* Get MMUCR */
+	mfspr   r13,SPRN_PID		/* Get PID */
+	rlwimi	r12,r13,0,24,31		/* Set TID */
+
 4:
+	mtspr   SPRN_MMUCR,r12
+
 	rlwinm  r12, r10, 13, 19, 29    /* Compute pgdir/pmd offset */
 	lwzx    r11, r12, r11           /* Get pgd/pmd entry */
 	rlwinm. r12, r11, 0, 0, 20      /* Extract pt base address */
@@ -534,22 +512,24 @@ interrupt_base:
 	ori	r11, r11, _PAGE_DIRTY|_PAGE_ACCESSED|_PAGE_HWWRITE
 	stw	r11, 4(r12)		/* Update Linux page table */
 
-	/* FIXME: Staticly setting some permissions */
-	li	r13, 0x003f		/* Set UX,UW,UR,SX,SW,SR */
-	andi.	r11,r11,0xffff		/* Clear MS 16 bits */
-	/* FIXME: Force attributes */
-	ori	r11,r11, 0x0100		/* Set G */
-	/* FIXME: Already set in PTE */
+	li	r13, PPC44x_TLB_SR@l	/* Set SR */
+	rlwimi	r13, r11, 29, 29, 29	/* SX = _PAGE_HWEXEC */
+	rlwimi	r13, r11, 0, 30, 30	/* SW = _PAGE_RW */
+	rlwimi	r13, r11, 29, 28, 28	/* UR = _PAGE_USER */
+	rlwimi	r12, r11, 31, 26, 26	/* (_PAGE_USER>>1)->r12 */
+	rlwimi	r12, r11, 29, 30, 30	/* (_PAGE_USER>>3)->r12 */
+	and	r12, r12, r11		/* HWEXEC/RW & USER */
+	rlwimi	r13, r12, 0, 26, 26	/* UX = HWEXEC & USER */
+	rlwimi	r13, r12, 3, 27, 27	/* UW = RW & USER */
+
 	rlwimi	r11,r13,0,26,31		/* Insert static perms */
 
-	lis	r13,0xffff
-	ori	r13,r13,0x0fff			/* Set U0-U3 mask */
-	and	r11,r11,r13			/* Clear U0-U3 */
+	rlwinm	r11,r11,0,20,15		/* Clear U0-U3 */
 
 	/* find the TLB index that caused the fault.  It has to be here. */
 	tlbsx	r14, 0, r10
 
-	tlbwe	r11, r14, PPC44x_TLB_ATTRIB		/* Write ATTRIB */
+	tlbwe	r11, r14, PPC44x_TLB_ATTRIB	/* Write ATTRIB */
 
 	/* Done...restore registers and get out of here.
 	*/
@@ -651,10 +631,8 @@ interrupt_base:
 	lis	r11, swapper_pg_dir@h
 	ori	r11, r11, swapper_pg_dir@l
 
-	mfspr	r12,SPRN_MMUCR		/* Set TID to 0 */
-	li	r13,PPC44x_MMUCR_TID@l
-	andc	r12,r12,r13
-	mtspr	SPRN_MMUCR,r12
+	mfspr	r12,SPRN_MMUCR
+	rlwinm	r12,r12,0,0,23		/* Clear TID */
 
 	b	4f
 
@@ -664,12 +642,13 @@ interrupt_base:
 	lwz	r11,PGDIR(r11)
 
 	/* Load PID into MMUCR TID */
-	li      r13,PPC44x_MMUCR_TID@l       	 /* Create mask */
-	andc    r12,r12,r13                      /* Clear out TID/STS bits */
-	mfspr   r13,SPRN_PID                     /* Get PID */
-	or      r12,r12,r13
-	mtspr	SPRN_MMUCR,r12
+	mfspr	r12,SPRN_MMUCR
+	mfspr   r13,SPRN_PID		/* Get PID */
+	rlwimi	r12,r13,0,24,31		/* Set TID */
+
 4:
+	mtspr	SPRN_MMUCR,r12
+
 	rlwinm 	r12, r10, 13, 19, 29	/* Compute pgdir/pmd offset */
 	lwzx	r11, r12, r11		/* Get pgd/pmd entry */
 	rlwinm.	r12, r11, 0, 0, 20	/* Extract pt base address */
@@ -723,10 +702,8 @@ interrupt_base:
 	lis	r11, swapper_pg_dir@h
 	ori	r11, r11, swapper_pg_dir@l
 
-	mfspr	r12,SPRN_MMUCR		/* Set TID to 0 */
-	li	r13,PPC44x_MMUCR_TID@l
-	andc	r12,r12,r13
-	mtspr	SPRN_MMUCR,r12
+	mfspr	r12,SPRN_MMUCR
+	rlwinm	r12,r12,0,0,23		/* Clear TID */
 
 	b	4f
 
@@ -736,13 +713,13 @@ interrupt_base:
 	lwz	r11,PGDIR(r11)
 
 	/* Load PID into MMUCR TID */
-	li      r13,PPC44x_MMUCR_TID@l       	 /* Create mask */
-	andc    r12,r13,r13                      /* Clear out TID/STS bits */
-	mfspr   r13,SPRN_PID                     /* Get PID */
-	or      r12,r12,r13
-	mtspr	SPRN_MMUCR,r12
+	mfspr	r12,SPRN_MMUCR
+	mfspr   r13,SPRN_PID		/* Get PID */
+	rlwimi	r12,r13,0,24,31		/* Set TID */
 
 4:
+	mtspr	SPRN_MMUCR,r12
+
 	rlwinm	r12, r10, 13, 19, 29	/* Compute pgdir/pmd offset */
 	lwzx	r11, r12, r11		/* Get pgd/pmd entry */
 	rlwinm.	r12, r11, 0, 0, 20	/* Extract pt base address */
@@ -880,60 +857,43 @@ finish_tlb_load:
 	 */
 
 	/* Load the next available TLB index */
-	lis	r13, tlb_44x_index@h
-	ori	r13, r13, tlb_44x_index@l
-	lwz	r14, 0(r13)
+	lis	r13, tlb_44x_index@ha
+	lwz	r14, tlb_44x_index@l(r13)
 	/* Load the TLB high watermark */
-	lis	r13, tlb_44x_hwater@h
-	ori	r13, r13, tlb_44x_hwater@l
-	lwz	r11, 0(r13)
-
+	lwz	r11, tlb_44x_hwater@l(r13)
 
 	/* Increment, rollover, and store TLB index */
 	addi	r14, r14, 1
-	cmpw	0, r14, r11		/* reserve entries 62-63 for kernel */
+	cmpw	0, r14, r11			/* reserve entries */
 	ble	7f
 	li	r14, 0
 7:
-	/* Load the next available TLB index */
-	lis     r13, tlb_44x_index@h
-	ori     r13, r13, tlb_44x_index@l
-	stw	r14, 0(r13)
+	/* Store the next available TLB index */
+	stw	r14, tlb_44x_index@l(r13)
 
-6:
 	lwz	r13, 0(r12)			/* Get MS word of PTE */
 	lwz	r11, 4(r12)			/* Get LS word of PTE */
 	rlwimi	r13, r11, 0, 0 , 19		/* Insert RPN */
 	tlbwe	r13, r14, PPC44x_TLB_XLAT	/* Write XLAT */
 
 	/*
-	 * Create PAGEID. This is the faulting address plus
-	 * a set of static bits. The static bits are page
-	 * size and valid. Bits 20  and 21 should be zero
-	 * for a page size of 4KB.
+	 * Create PAGEID. This is the faulting address,
+	 * page size, and valid flag.
 	 */
-	li	r12, 0x0210			/* Set size and valid */
-	mfspr	r13, SPRN_SRR1			/* Get SRR1 */
-	andi.	r13, r13, MSR_IS@l
-	beq	7f
-	ori	r12, r12, PPC44x_TLB_TS@l	/* Set TS=1 */
-7:	rlwimi	r10, r12, 0, 20, 31		/* Insert statics */
+	li	r12, PPC44x_TLB_VALID | PPC44x_TLB_4K
+	rlwimi	r10, r12, 0, 20, 31		/* Insert valid and page size */
 	tlbwe	r10, r14, PPC44x_TLB_PAGEID	/* Write PAGEID */
 
-	/* FIXME: Staticly setting some permissions */
-	li	r13, 0x002d			/* Set UX,UR,SX,SR */
-	andi.	r11, r11, 0xffff		/* Clear MS 16 bits */
-	andi.	r12, r11, 0x0002		/* _PAGE_HWWRITE? */
-	beq	8f
-	ori	r13, r13, 0x0002		/* Set SW */
-	/* FIXME: Force attributes */
-8:	ori	r11, r11, 0x0100		/* Set G */
-	/* FIXME: Already set in PTE */
-	rlwimi	r11, r13, 0, 26, 31		/* Insert static perms */
+	li	r13, PPC44x_TLB_SR@l		/* Set SR */
+	rlwimi	r13, r11, 0, 30, 30		/* Set SW = _PAGE_RW */
+	rlwimi	r13, r11, 29, 29, 29		/* SX = _PAGE_HWEXEC */
+	rlwimi	r13, r11, 29, 28, 28		/* UR = _PAGE_USER */
+	rlwimi	r12, r11, 31, 26, 26		/* (_PAGE_USER>>1)->r12 */
+	and	r12, r12, r11			/* HWEXEC & USER */
+	rlwimi	r13, r12, 0, 26, 26		/* UX = HWEXEC & USER */
 
-	lis	r13,0xffff
-	ori	r13,r13,0x0fff			/* Set U0-U3 mask */
-	and	r11,r11,r13			/* Clear U0-U3 */
+	rlwimi	r11, r13, 0, 26, 31		/* Insert static perms */
+	rlwinm	r11, r11, 0, 20, 15		/* Clear U0-U3 */
 	tlbwe	r11, r14, PPC44x_TLB_ATTRIB	/* Write ATTRIB */
 
 	/* Done...restore registers and get out of here.

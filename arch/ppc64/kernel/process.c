@@ -194,8 +194,8 @@ void show_regs(struct pt_regs * regs)
 	       regs->msr&MSR_DR ? 1 : 0);
 	if (regs->trap == 0x300 || regs->trap == 0x380 || regs->trap == 0x600)
 		printk("DAR: %016lx, DSISR: %016lx\n", regs->dar, regs->dsisr);
-	printk("TASK = %p[%d] '%s' ",
-	       current, current->pid, current->comm);
+	printk("TASK: %p[%d] '%s' THREAD: %p",
+	       current, current->pid, current->comm, current->thread_info);
 
 #ifdef CONFIG_SMP
 	printk(" CPU: %d", smp_processor_id());
@@ -217,6 +217,8 @@ void show_regs(struct pt_regs * regs)
 	 */
 	printk("NIP [%016lx] ", regs->nip);
 	print_symbol("%s\n", regs->nip);
+	printk("LR [%016lx] ", regs->link);
+	print_symbol("%s\n", regs->link);
 	show_stack(current, (unsigned long *)regs->gpr[1]);
 }
 

@@ -47,7 +47,11 @@ do {						\
 #define MSR_DS		MSR_DR	/* Data Space */
 
 /* Default MSR for kernel mode. */
+#if defined (CONFIG_40x)
 #define MSR_KERNEL	(MSR_ME|MSR_RI|MSR_IR|MSR_DR|MSR_CE|MSR_DE)
+#elif defined(CONFIG_BOOKE)
+#define MSR_KERNEL	(MSR_ME|MSR_RI|MSR_CE|MSR_DE)
+#endif
 
 /* Special Purpose Registers (SPRNs)*/
 #define SPRN_DECAR	0x036	/* Decrementer Auto Reload Register */
@@ -130,6 +134,8 @@ do {						\
 #define SPRN_DBCR0	0x3F2	/* Debug Control Register 0 */
 #define SPRN_DAC1	0x3F6	/* Data Address Compare 1 */
 #define SPRN_DAC2	0x3F7	/* Data Address Compare 2 */
+#define SPRN_CSRR0	SPRN_SRR2 /* Critical Save and Restore Register 0 */
+#define SPRN_CSRR1	SPRN_SRR3 /* Critical Save and Restore Register 1 */
 #endif
 
 /* Bit definitions for the DBSR. */
@@ -237,8 +243,13 @@ do {						\
 #define SGR_GUARDED	1		/* Speculative fetching disallowed. */
 
 /* Short-hand for various SPRs. */
+#ifdef CONFIG_BOOKE
 #define CSRR0	SPRN_CSRR0	/* Critical Save and Restore Register 0 */
 #define CSRR1	SPRN_CSRR1	/* Critical Save and Restore Register 1 */
+#else
+#define CSRR0	SPRN_SRR2	/* Logically and functionally equivalent. */
+#define CSRR1	SPRN_SRR3	/* Logically and functionally equivalent. */
+#endif
 #define DCMP	SPRN_DCMP	/* Data TLB Compare Register */
 #define SPRG4R	SPRN_SPRG4R	/* Supervisor Private Registers */
 #define SPRG5R	SPRN_SPRG5R

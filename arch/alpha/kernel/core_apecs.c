@@ -10,19 +10,17 @@
  * Code common to all APECS core logic chips.
  */
 
-#include <linux/kernel.h>
-#include <linux/types.h>
-#include <linux/pci.h>
-#include <linux/init.h>
-
-#include <asm/system.h>
-#include <asm/ptrace.h>
-#include <asm/smp.h>
-
 #define __EXTERN_INLINE inline
 #include <asm/io.h>
 #include <asm/core_apecs.h>
 #undef __EXTERN_INLINE
+
+#include <linux/types.h>
+#include <linux/pci.h>
+#include <linux/init.h>
+
+#include <asm/ptrace.h>
+#include <asm/smp.h>
 
 #include "proto.h"
 #include "pci_impl.h"

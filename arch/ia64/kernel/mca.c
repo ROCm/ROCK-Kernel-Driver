@@ -239,10 +239,9 @@ ia64_log_get(int sal_info_type, u8 **buffer, int irq_safe)
  *  and wakes up any processes waiting for error records.
  *
  *  Inputs  :   sal_info_type   (Type of error record MCA/CMC/CPE/INIT)
- *  		called_from_init (1 for boot processing)
  */
 static void
-ia64_mca_log_sal_error_record(int sal_info_type, int called_from_init)
+ia64_mca_log_sal_error_record(int sal_info_type)
 {
 	u8 *buffer;
 	u64 size;
@@ -255,7 +254,7 @@ ia64_mca_log_sal_error_record(int sal_info_type, int called_from_init)
 
 	salinfo_log_wakeup(sal_info_type, buffer, size, irq_safe);
 
-	if (irq_safe || called_from_init)
+	if (irq_safe)
 		printk(KERN_INFO "CPU %d: SAL log contains %s error record\n",
 			smp_processor_id(),
 			sal_info_type < ARRAY_SIZE(rec_name) ? rec_name[sal_info_type] : "UNKNOWN");
@@ -280,7 +279,7 @@ ia64_mca_cpe_int_handler (int cpe_irq, void *arg, struct pt_regs *ptregs)
 	local_irq_enable();
 
 	/* Get the CMC error record and log it */
-	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE, 0);
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CPE);
 	return IRQ_HANDLED;
 }
 
@@ -468,32 +467,6 @@ init_handler_platform (pal_min_state_area_t *ms,
 	printk("\nINIT dump complete.  Please reboot now.\n");
 	while (1);			/* hang city if no debugger */
 }
-
-/*
- *  ia64_mca_check_errors
- *
- *  External entry to check for error records which may have been posted by SAL
- *  for a prior failure which resulted in a machine shutdown before an the
- *  error could be logged.  This function must be called after the filesystem
- *  is initialized.
- *
- *  Inputs  :   None
- *
- *  Outputs :   None
- */
-int
-ia64_mca_check_errors (void)
-{
-	/*
-	 *  If there is an MCA error record pending, get it and log it.
-	 */
-	printk(KERN_INFO "CPU %d: checking for saved MCA error records\n", smp_processor_id());
-	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA, 1);
-
-	return 0;
-}
-
-device_initcall(ia64_mca_check_errors);
 
 #ifdef CONFIG_ACPI
 /*
@@ -831,7 +804,7 @@ ia64_mca_ucmc_handler(void)
 	int recover = psp->tc && !(psp->cc || psp->bc || psp->rc || psp->uc);
 
 	/* Get the MCA error record and log it */
-	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA, 0);
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_MCA);
 
 	/*
 	 *  Wakeup all the processors which are spinning in the rendezvous
@@ -875,7 +848,7 @@ ia64_mca_cmc_int_handler(int cmc_irq, void *arg, struct pt_regs *ptregs)
 	local_irq_enable();
 
 	/* Get the CMC error record and log it */
-	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CMC, 0);
+	ia64_mca_log_sal_error_record(SAL_INFO_TYPE_CMC);
 
 	spin_lock(&cmc_history_lock);
 	if (!cmc_polling_enabled) {

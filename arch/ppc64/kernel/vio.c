@@ -503,6 +503,8 @@ void vio_unmap_sg(struct vio_dev *vdev, struct scatterlist *sglist, int nelems,
 	}
 }
 
+EXPORT_SYMBOL(vio_unmap_sg);
+
 void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 			   dma_addr_t *dma_handle)
 {
@@ -604,6 +606,8 @@ struct bus_type vio_bus_type = {
 	.name = "vio",
 	.match = vio_bus_match,
 };
+
+EXPORT_SYMBOL(vio_bus_type);
 
 EXPORT_SYMBOL(plpar_hcall_norets);
 EXPORT_SYMBOL(plpar_hcall_8arg_2ret);

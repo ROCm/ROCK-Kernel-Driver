@@ -406,17 +406,18 @@ _GLOBAL(_tlbia)
 	tlbia
 	isync			/* Flush shadow TLB */
 #elif defined(CONFIG_44x)
-	lis	r3,0
+	li	r3,0
 	sync
-1:
-	tlbwe	r3,r3,PPC44x_TLB_PAGEID
-	addi	r3,r3,1
+
 	/* Load high watermark */
-	lis	r4,tlb_44x_hwater@h
-	ori	r4,r4,tlb_44x_hwater@l
-	lwz	r5,0(r4)
+	lis	r4,tlb_44x_hwater@ha
+	lwz	r5,tlb_44x_hwater@l(r4)
+
+1:	tlbwe	r3,r3,PPC44x_TLB_PAGEID
+	addi	r3,r3,1
 	cmpw	0,r3,r5
 	ble	1b
+
 	isync
 #else /* !(CONFIG_40x || CONFIG_44x) */
 #if defined(CONFIG_SMP)
@@ -470,17 +471,10 @@ _GLOBAL(_tlbie)
 	isync
 10:
 #elif defined(CONFIG_44x)
-	mfspr	r4,SPRN_MMUCR			/* Get MMUCR */
-	lis	r5,PPC44x_MMUCR_STS@h
-	ori	r5,r5,PPC44x_MMUCR_TID@l	/* Create mask */
-	andc	r4,r4,r5			/* Clear out TID/STS bits */
+	mfspr	r4,SPRN_MMUCR
 	mfspr	r5,SPRN_PID			/* Get PID */
-	or	r4,r4,r5			/* Set TID bits */
-	mfmsr	r6				/* Get MSR */
-	andi.	r6,r6,MSR_IS@l			/* TS=1? */
-	beq	11f				/* If not, leave STS=0 */
-	oris	r4,r4,PPC44x_MMUCR_STS@h	/* Set STS=1 */
-11:	mtspr	SPRN_MMUCR, r4			/* Put MMUCR */
+	rlwimi	r4,r5,0,24,31			/* Set TID */
+	mtspr	SPRN_MMUCR,r4
 
 	tlbsx.	r3, 0, r3
 	bne	10f

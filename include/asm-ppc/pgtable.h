@@ -320,13 +320,13 @@ extern unsigned long ioremap_bot, ioremap_base;
  * another purpose.  -- paulus.
  */
 
-#define _PAGE_BASE	(_PAGE_PRESENT | _PAGE_ACCESSED)
-#define _PAGE_WRENABLE	(_PAGE_RW | _PAGE_DIRTY | _PAGE_HWWRITE)
-#ifndef CONFIG_44x
-#define _PAGE_KERNEL	(_PAGE_BASE | _PAGE_SHARED | _PAGE_WRENABLE)
+#ifdef CONFIG_44x
+#define _PAGE_BASE	(_PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_GUARDED)
 #else
-#define _PAGE_KERNEL	(_PAGE_BASE | _PAGE_SHARED | _PAGE_WRENABLE | _PAGE_GUARDED)
+#define _PAGE_BASE	(_PAGE_PRESENT | _PAGE_ACCESSED)
 #endif
+#define _PAGE_WRENABLE	(_PAGE_RW | _PAGE_DIRTY | _PAGE_HWWRITE)
+#define _PAGE_KERNEL	(_PAGE_BASE | _PAGE_SHARED | _PAGE_WRENABLE)
 
 #ifdef CONFIG_PPC_STD_MMU
 /* On standard PPC MMU, no user access implies kernel read/write access,

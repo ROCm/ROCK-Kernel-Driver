@@ -9,6 +9,7 @@
  */
 
 #include <linux/config.h>
+#include <linux/compiler.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/hw_irq.h>
@@ -52,31 +53,41 @@
 #define smp_read_barrier_depends()  do { } while(0)
 #endif /* CONFIG_SMP */
 
-#ifdef CONFIG_DEBUG_KERNEL
-extern void (*debugger)(struct pt_regs *regs);
-extern int (*debugger_bpt)(struct pt_regs *regs);
-extern int (*debugger_sstep)(struct pt_regs *regs);
-extern int (*debugger_iabr_match)(struct pt_regs *regs);
-extern int (*debugger_dabr_match)(struct pt_regs *regs);
-extern void (*debugger_fault_handler)(struct pt_regs *regs);
+#ifdef CONFIG_DEBUGGER
+
+extern int (*__debugger)(struct pt_regs *regs);
+extern int (*__debugger_bpt)(struct pt_regs *regs);
+extern int (*__debugger_sstep)(struct pt_regs *regs);
+extern int (*__debugger_iabr_match)(struct pt_regs *regs);
+extern int (*__debugger_dabr_match)(struct pt_regs *regs);
+extern int (*__debugger_fault_handler)(struct pt_regs *regs);
+
+#define DEBUGGER_BOILERPLATE(__NAME) \
+static inline int __NAME(struct pt_regs *regs) \
+{ \
+	if (unlikely(__ ## __NAME)) \
+		return __ ## __NAME(regs); \
+	return 0; \
+}
+
+DEBUGGER_BOILERPLATE(debugger)
+DEBUGGER_BOILERPLATE(debugger_bpt)
+DEBUGGER_BOILERPLATE(debugger_sstep)
+DEBUGGER_BOILERPLATE(debugger_iabr_match)
+DEBUGGER_BOILERPLATE(debugger_dabr_match)
+DEBUGGER_BOILERPLATE(debugger_fault_handler)
+
+#ifdef CONFIG_XMON
+extern void xmon_init(void);
+#endif
+
 #else
-#define debugger(regs)			do { } while (0)
+#define debugger(regs)			0
 #define debugger_bpt(regs)		0
 #define debugger_sstep(regs)		0
 #define debugger_iabr_match(regs)	0
 #define debugger_dabr_match(regs)	0
-#define debugger_fault_handler		((void (*)(struct pt_regs *))0)
-#endif
-
-#ifdef CONFIG_XMON
-extern void xmon_irq(int, void *, struct pt_regs *);
-
-extern void xmon(struct pt_regs *regs);
-extern int xmon_bpt(struct pt_regs *regs);
-extern int xmon_sstep(struct pt_regs *regs);
-extern int xmon_iabr_match(struct pt_regs *regs);
-extern int xmon_dabr_match(struct pt_regs *regs);
-extern void (*xmon_fault_handler)(struct pt_regs *regs);
+#define debugger_fault_handler(regs)	0
 #endif
 
 extern void show_regs(struct pt_regs * regs);

@@ -841,7 +841,8 @@ add_swap_extent(struct swap_info_struct *sis, unsigned long start_page,
 	lh = sis->extent_list.next;	/* The highest-addressed block */
 	while (lh != &sis->extent_list) {
 		se = list_entry(lh, struct swap_extent, list);
-		if (se->start_block + se->nr_pages == start_block) {
+		if (se->start_block + se->nr_pages == start_block &&
+		    se->start_page  + se->nr_pages == start_page) {
 			/* Merge it */
 			se->nr_pages += nr_pages;
 			return 0;

@@ -1991,8 +1991,8 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 	if (co->index >= UART_NR)
 		co->index = 0;
 	port = &serial8250_ports[co->index].port;
-
-
+	if (port->type == PORT_UNKNOWN)
+		return -ENODEV;
 #ifdef	CONFIG_KDB
 		/*
 		 * Remember the line number of the first serial
@@ -2046,6 +2046,14 @@ static int __init serial8250_console_init(void)
 	return 0;
 }
 console_initcall(serial8250_console_init);
+
+static int __init serial8250_late_console_init(void)
+{
+	if (!(serial8250_console.flags & CON_ENABLED))
+		register_console(&serial8250_console);
+	return 0;
+}
+late_initcall(serial8250_late_console_init);
 
 #define SERIAL8250_CONSOLE	&serial8250_console
 #else

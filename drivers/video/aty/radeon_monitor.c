@@ -759,7 +759,7 @@ void __devinit radeon_check_modes(struct radeonfb_info *rinfo, const char *mode_
 			rinfo->mon1_type = MT_CRT;
 			goto pickup_default;
 		}
-		printk(KERN_WARNING "radeonfb: Asssuming panel size %dx%d\n",
+		printk(KERN_WARNING "radeonfb: Assuming panel size %dx%d\n",
 		       rinfo->panel_info.xres, rinfo->panel_info.yres);
 		modedb = rinfo->mon1_modedb;
 		dbsize = rinfo->mon1_dbsize;
