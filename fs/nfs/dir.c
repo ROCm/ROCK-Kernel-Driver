@@ -993,9 +993,9 @@ static int nfs_instantiate(struct dentry *dentry, struct nfs_fh *fhandle,
 		d_instantiate(dentry, inode);
 		nfs_renew_times(dentry);
 		nfs_set_verifier(dentry, nfs_save_change_attribute(dentry->d_parent->d_inode));
-		error = 0;
+		return 0;
 	}
-	return error;
+	error = -ENOMEM;
 out_err:
 	d_drop(dentry);
 	return error;
