@@ -421,10 +421,8 @@ e1000_probe(struct pci_dev *pdev,
 		netdev->features = NETIF_F_SG;
 	}
 
-#ifdef NETIF_F_TSO
 	if(adapter->hw.mac_type >= e1000_82544)
 		netdev->features |= NETIF_F_TSO;
-#endif
  
 	if(pci_using_dac)
 		netdev->features |= NETIF_F_HIGHDMA;
@@ -1299,7 +1297,6 @@ e1000_watchdog(unsigned long data)
 static inline boolean_t
 e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb, int tx_flags)
 {
-#ifdef NETIF_F_TSO
 	struct e1000_context_desc *context_desc;
 	int i;
 	uint8_t ipcss, ipcso, tucss, tucso, hdr_len;
@@ -1343,7 +1340,6 @@ e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb, int tx_flags)
 
 		return TRUE;
 	}
-#endif
 	
 	return FALSE;
 }
@@ -1383,6 +1379,8 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 	int len, offset, size, count, i;
+	int tso = skb_shinfo(skb)->tso_size;
+	int nr_frags = skb_shinfo(skb)->nr_frags;
 
 	int f;
 	len = skb->len - skb->data_len;
@@ -1394,6 +1392,10 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 	while(len) {
 		i = (i + 1) % tx_ring->count;
 		size = min(len, adapter->max_data_per_txd);
+		/* Workaround for premature desc write-backs
+		 * in TSO mode.  Append 4-byte sentinel desc */
+		if(tso && !nr_frags && size == len && size > 4)
+			size -= 4;
 		tx_ring->buffer_info[i].length = size;
 		tx_ring->buffer_info[i].dma =
 			pci_map_single(adapter->pdev,
@@ -1407,7 +1409,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 		count++;
 	}
 
-	for(f = 0; f < skb_shinfo(skb)->nr_frags; f++) {
+	for(f = 0; f < nr_frags; f++) {
 		struct skb_frag_struct *frag;
 
 		frag = &skb_shinfo(skb)->frags[f];
@@ -1417,6 +1419,10 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 		while(len) {
 			i = (i + 1) % tx_ring->count;
 			size = min(len, adapter->max_data_per_txd);
+			/* Workaround for premature desc write-backs
+			 * in TSO mode.  Append 4-byte sentinel desc */
+			if(tso && f == (nr_frags-1) && size == len && size > 4)
+				size -= 4;
 			tx_ring->buffer_info[i].length = size;
 			tx_ring->buffer_info[i].dma =
 				pci_map_page(adapter->pdev,
@@ -1424,6 +1430,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 					frag->page_offset + offset,
 					size,
 					PCI_DMA_TODEVICE);
+			tx_ring->buffer_info[i].time_stamp = jiffies;
 
 			len -= size;
 			offset += size;
@@ -1505,13 +1512,8 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	for(f = 0; f < skb_shinfo(skb)->nr_frags; f++)
 		count += TXD_USE_COUNT(skb_shinfo(skb)->frags[f].size,
 		                       adapter->max_data_per_txd);
-#ifdef NETIF_F_TSO
 	if((skb_shinfo(skb)->tso_size) || (skb->ip_summed == CHECKSUM_HW))
 		count++;
-#else
-	if(skb->ip_summed == CHECKSUM_HW)
-		count++;
-#endif
 
 	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count) {
 		netif_stop_queue(netdev);
