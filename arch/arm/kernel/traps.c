@@ -372,20 +372,7 @@ asmlinkage int arm_syscall(int no, struct pt_regs *regs)
 		return 0;
 
 	case NR(breakpoint): /* SWI BREAK_POINT */
-		/*
-		 * The PC is always left pointing at the next
-		 * instruction.  Fix this.
-		 */
-		regs->ARM_pc -= 4;
-		__ptrace_cancel_bpt(current);
-
-		info.si_signo = SIGTRAP;
-		info.si_errno = 0;
-		info.si_code  = TRAP_BRKPT;
-		info.si_addr  = (void *)instruction_pointer(regs) -
-				 (thumb_mode(regs) ? 2 : 4);
-
-		force_sig_info(SIGTRAP, &info, current);
+		ptrace_break(current, regs);
 		return regs->ARM_r0;
 
 #ifdef CONFIG_CPU_32

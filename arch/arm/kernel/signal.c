@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/kernel/signal.c
  *
- *  Copyright (C) 1995-2001 Russell King
+ *  Copyright (C) 1995-2002 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -17,15 +17,15 @@
 #include <linux/signal.h>
 #include <linux/wait.h>
 #include <linux/ptrace.h>
-#include <linux/stddef.h>
-#include <linux/unistd.h>
 #include <linux/personality.h>
 #include <linux/tty.h>
+#include <linux/binfmts.h>
 #include <linux/elf.h>
 
 #include <asm/pgalloc.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
+#include <asm/unistd.h>
 
 #include "ptrace.h"
 
@@ -49,7 +49,7 @@ static const unsigned long retcodes[4] = {
 	SWI_SYS_RT_SIGRETURN,	SWI_THUMB_RT_SIGRETURN
 };
 
-asmlinkage int do_signal(sigset_t *oldset, struct pt_regs * regs, int syscall);
+static int do_signal(sigset_t *oldset, struct pt_regs * regs, int syscall);
 
 /*
  * atomically swap in the new signal mask, and wait for a signal.
@@ -501,7 +501,7 @@ handle_signal(unsigned long sig, struct k_sigaction *ka,
  * the kernel can handle, and then we build all the user-level signal handling
  * stack-frames in one go after that.
  */
-int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
+static int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 {
 	struct k_sigaction *ka;
 	siginfo_t info;
@@ -515,9 +515,6 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 	 */
 	if (!user_mode(regs))
 		return 0;
-
-	if (!oldset)
-		oldset = &current->blocked;
 
 	single_stepping = ptrace_cancel_bpt(current);
 
@@ -598,6 +595,7 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs, int syscall)
 				if (sig && !(sig->action[SIGCHLD-1].sa.sa_flags & SA_NOCLDSTOP))
 					notify_parent(current, SIGCHLD);
 				schedule();
+				single_stepping |= ptrace_cancel_bpt(current);
 				continue;
 			}
 
@@ -655,5 +653,5 @@ asmlinkage void
 do_notify_resume(struct pt_regs *regs, unsigned int thread_flags, int syscall)
 {
 	if (thread_flags & _TIF_SIGPENDING)
-		do_signal(NULL, regs, syscall);
+		do_signal(&current->blocked, regs, syscall);
 }
