@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: symlink.c,v 1.10 2002/05/20 14:56:39 dwmw2 Exp $
+ * $Id: symlink.c,v 1.11 2002/07/23 17:00:45 dwmw2 Exp $
  *
  */
 
@@ -22,9 +22,9 @@ int jffs2_follow_link(struct dentry *dentry, struct nameidata *nd);
 
 struct inode_operations jffs2_symlink_inode_operations =
 {	
-	readlink:	jffs2_readlink,
-	follow_link:	jffs2_follow_link,
-	setattr:	jffs2_setattr
+	.readlink =	jffs2_readlink,
+	.follow_link =	jffs2_follow_link,
+	.setattr =	jffs2_setattr
 };
 
 int jffs2_readlink(struct dentry *dentry, char *buffer, int buflen)

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: file.c,v 1.74 2002/07/23 12:58:53 dwmw2 Exp $
+ * $Id: file.c,v 1.75 2002/07/23 17:00:45 dwmw2 Exp $
  *
  */
 
@@ -52,27 +52,27 @@ int jffs2_fsync(struct file *filp, struct dentry *dentry, int datasync)
 
 struct file_operations jffs2_file_operations =
 {
-	llseek:		generic_file_llseek,
-	open:		generic_file_open,
-	read:		generic_file_read,
-	write:		generic_file_write,
-	ioctl:		jffs2_ioctl,
-	mmap:		generic_file_mmap,
-	fsync:		jffs2_fsync
+	.llseek =	generic_file_llseek,
+	.open =		generic_file_open,
+	.read =		generic_file_read,
+	.write =	generic_file_write,
+	.ioctl =	jffs2_ioctl,
+	.mmap =		generic_file_mmap,
+	.fsync =	jffs2_fsync
 };
 
 /* jffs2_file_inode_operations */
 
 struct inode_operations jffs2_file_inode_operations =
 {
-	setattr:	jffs2_setattr
+	.setattr =	jffs2_setattr
 };
 
 struct address_space_operations jffs2_file_address_operations =
 {
-	readpage:	jffs2_readpage,
-	prepare_write:	jffs2_prepare_write,
-	commit_write:	jffs2_commit_write
+	.readpage =	jffs2_readpage,
+	.prepare_write =jffs2_prepare_write,
+	.commit_write =	jffs2_commit_write
 };
 
 int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)

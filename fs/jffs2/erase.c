@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: erase.c,v 1.38 2002/07/02 22:48:24 dwmw2 Exp $
+ * $Id: erase.c,v 1.39 2002/07/23 17:00:45 dwmw2 Exp $
  *
  */
 
@@ -346,9 +346,9 @@ void jffs2_mark_erased_blocks(struct jffs2_sb_info *c)
 			jeb->dirty_size = 0;
 		} else {
 			struct jffs2_unknown_node marker = {
-				magic:		JFFS2_MAGIC_BITMASK,
-				nodetype:	JFFS2_NODETYPE_CLEANMARKER,
-				totlen:		c->cleanmarker_size
+				.magic =	JFFS2_MAGIC_BITMASK,
+				.nodetype =	JFFS2_NODETYPE_CLEANMARKER,
+				.totlen =	c->cleanmarker_size
 			};
 
 			marker.hdr_crc = crc32(0, &marker, marker.totlen - 4);

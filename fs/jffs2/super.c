@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: super.c,v 1.72 2002/07/23 14:39:54 dwmw2 Exp $
+ * $Id: super.c,v 1.73 2002/07/23 17:00:45 dwmw2 Exp $
  *
  */
 
@@ -59,14 +59,14 @@ static void jffs2_i_init_once(void * foo, kmem_cache_t * cachep, unsigned long f
 
 static struct super_operations jffs2_super_operations =
 {
-	alloc_inode:	jffs2_alloc_inode,
-	destroy_inode:	jffs2_destroy_inode,
-	read_inode:	jffs2_read_inode,
-	put_super:	jffs2_put_super,
-	write_super:	jffs2_write_super,
-	statfs:		jffs2_statfs,
-	remount_fs:	jffs2_remount_fs,
-	clear_inode:	jffs2_clear_inode
+	.alloc_inode =	jffs2_alloc_inode,
+	.destroy_inode =jffs2_destroy_inode,
+	.read_inode =	jffs2_read_inode,
+	.put_super =	jffs2_put_super,
+	.write_super =	jffs2_write_super,
+	.statfs =	jffs2_statfs,
+	.remount_fs =	jffs2_remount_fs,
+	.clear_inode =	jffs2_clear_inode
 };
 
 static int jffs2_sb_compare(struct super_block *sb, void *data)
@@ -282,10 +282,10 @@ static void jffs2_kill_sb(struct super_block *sb)
 }
  
 static struct file_system_type jffs2_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"jffs2",
-	get_sb:		jffs2_get_sb,
-	kill_sb:	jffs2_kill_sb,
+	.owner =	THIS_MODULE,
+	.name =		"jffs2",
+	.get_sb =	jffs2_get_sb,
+	.kill_sb =	jffs2_kill_sb,
 };
 
 

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: dir.c,v 1.70 2002/06/20 23:33:12 dwmw2 Exp $
+ * $Id: dir.c,v 1.71 2002/07/23 17:00:45 dwmw2 Exp $
  *
  */
 
@@ -38,25 +38,25 @@ static int jffs2_rename (struct inode *, struct dentry *,
 
 struct file_operations jffs2_dir_operations =
 {
-	read:		generic_read_dir,
-	readdir:	jffs2_readdir,
-	ioctl:		jffs2_ioctl,
-	fsync:		jffs2_fsync
+	.read =		generic_read_dir,
+	.readdir =	jffs2_readdir,
+	.ioctl =	jffs2_ioctl,
+	.fsync =	jffs2_fsync
 };
 
 
 struct inode_operations jffs2_dir_inode_operations =
 {
-	create:		jffs2_create,
-	lookup:		jffs2_lookup,
-	link:		jffs2_link,
-	unlink:		jffs2_unlink,
-	symlink:	jffs2_symlink,
-	mkdir:		jffs2_mkdir,
-	rmdir:		jffs2_rmdir,
-	mknod:		jffs2_mknod,
-	rename:		jffs2_rename,
-	setattr:	jffs2_setattr,
+	.create =	jffs2_create,
+	.lookup =	jffs2_lookup,
+	.link =		jffs2_link,
+	.unlink =	jffs2_unlink,
+	.symlink =	jffs2_symlink,
+	.mkdir =	jffs2_mkdir,
+	.rmdir =	jffs2_rmdir,
+	.mknod =	jffs2_mknod,
+	.rename =	jffs2_rename,
+	.setattr =	jffs2_setattr,
 };
 
 /***********************************************************************/
