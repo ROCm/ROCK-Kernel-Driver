@@ -830,7 +830,14 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 			interface = dev->actconfig->interface[i];
 			dev_dbg (&dev->dev, "unregistering interface %s\n",
 				interface->dev.bus_id);
-			device_unregister (&interface->dev);
+			device_del (&interface->dev);
+		}
+
+		/* Now that the interfaces are unbound, nobody should
+		 * try to access them.
+		 */
+		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
+			put_device (&dev->actconfig->interface[i]->dev);
 			dev->actconfig->interface[i] = NULL;
 		}
 		dev->actconfig = 0;

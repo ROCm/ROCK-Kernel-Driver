@@ -198,6 +198,9 @@ void usb_deregister(struct usb_driver *driver)
  * This routine helps device drivers avoid such mistakes.
  * However, you should make sure that you do the right thing with any
  * alternate settings available for this interfaces.
+ *
+ * Don't call this function unless you are bound to one of the interfaces
+ * on this device or you own the dev->serialize semaphore!
  */
 struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
 {
@@ -228,6 +231,9 @@ struct usb_interface *usb_ifnum_to_if(struct usb_device *dev, unsigned ifnum)
  * it would be incorrect to assume that the first altsetting entry in
  * the array corresponds to altsetting zero.  This routine helps device
  * drivers avoid such mistakes.
+ *
+ * Don't call this function unless you are bound to the intf interface
+ * or you own the device's ->serialize semaphore!
  */
 struct usb_host_interface *usb_altnum_to_altsetting(struct usb_interface *intf,
 		unsigned int altnum)
