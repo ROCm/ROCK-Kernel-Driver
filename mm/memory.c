@@ -584,6 +584,7 @@ int get_user_pages(struct task_struct *tsk, struct mm_struct *mm,
 					i = -EFAULT;
 					goto out;
 				}
+				flush_dcache_page(pages[i]);
 				if (!PageReserved(pages[i]))
 					page_cache_get(pages[i]);
 			}
