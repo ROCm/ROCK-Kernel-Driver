@@ -6,10 +6,6 @@ config MMU
 	bool
 	default y
 
-config SWAP
-	bool
-	default y
-
 config UID16
 	bool
 
@@ -136,25 +132,6 @@ config SERIAL_CONSOLE
 	bool
 	depends on 8xx || 8260
 	default y
-	---help---
-	  If you say Y here, it will be possible to use a serial port as the
-	  system console (the system console is the device which receives all
-	  kernel messages and warnings and which allows logins in single user
-	  mode). This could be useful if some terminal or printer is connected
-	  to that serial port.
-
-	  Even if you say Y here, the currently visible virtual console
-	  (/dev/tty0) will still be used as the system console by default, but
-	  you can alter that using a kernel command line option such as
-	  "console=ttyS1". (Try "man bootparam" or see the documentation of
-	  your boot loader (lilo or loadlin) about how to pass options to the
-	  kernel at boot time.)
-
-	  If you don't have a graphics card installed and you say Y here, the
-	  kernel will automatically use the first serial line, /dev/ttyS0, as
-	  system console.
-
-	  If unsure, say N.
 
 choice
 	prompt "Machine Type"
@@ -211,7 +188,7 @@ endchoice
 
 config NOT_COHERENT_CACHE
 	bool
-	depends on 40x || 8xx
+	depends on 4xx || 8xx
 	default y
 
 choice
@@ -443,6 +420,10 @@ config TQM8xxL
 	depends on 8xx && (TQM823L || TQM850L || FPS850L || TQM855L || TQM860L || SM850)
 	default y
 
+config EMBEDDEDBOOT
+	bool
+	depends on 8xx || 8260
+	default y
 choice
 	prompt "Machine Type"
 	depends on 6xx && !8260
@@ -838,7 +819,7 @@ config PPC601_SYNC_FIX
 
 config PROC_DEVICETREE
 	bool "Support for Open Firmware device tree in /proc"
-	depends on ALL_PPC
+	depends on ALL_PPC && PROC_FS
 	help
 	  This option adds a device-tree directory under /proc which contains
 	  an image of the device tree that the kernel copies from Open
@@ -846,7 +827,7 @@ config PROC_DEVICETREE
 
 config PPC_RTAS
 	bool "Support for RTAS (RunTime Abstraction Services) in /proc"
-	depends on ALL_PPC
+	depends on ALL_PPC && PROC_FS
 	---help---
 	  When you use this option, you will be able to use RTAS from
 	  userspace.
@@ -891,7 +872,7 @@ config PREP_RESIDUAL
 
 config PROC_PREPRESIDUAL
 	bool "Support for reading of PReP Residual Data in /proc"
-	depends on PREP_RESIDUAL
+	depends on PREP_RESIDUAL && PROC_FS
 	help
 	  Enabling this option will create a /proc/residual file which allows
 	  you to get at the residual data on PReP systems.  You will need a tool
@@ -1151,10 +1132,6 @@ config TASK_SIZE
 	depends on !TASK_SIZE_BOOL
 	default "0x80000000"
 
-config PIN_TLB
-	bool "Pinned Kernel TLBs (860 ONLY)"
-	depends on ADVANCED_OPTIONS && 8xx
-
 config BOOT_LOAD_BOOL
 	bool "Set the boot link/load address"
 	depends on ADVANCED_OPTIONS && !ALL_PPC
@@ -1180,6 +1157,25 @@ config BOOT_LOAD
 	hex
 	depends on !BOOT_LOAD_BOOL
 	default "0x00800000"
+
+config PIN_TLB
+	bool "Pinned Kernel TLBs (860 ONLY)"
+	depends on ADVANCED_OPTIONS && 8xx
+
+config SWAP
+	bool "Enable support for swap"
+	depends on ADVANCED_OPTIONS
+	help
+	  This option allows you to turn off support for swapfiles in
+	  the kernel.  This can be useful if you know that your system
+	  will never have swap.
+
+	  Say Y here unless you know what you are doing.
+
+config SWAP
+	bool
+	depends on !ADVANCED_OPTIONS
+	default y
 
 endmenu
 
@@ -1544,10 +1540,23 @@ config DEBUG_SPINLOCK
 config DEBUG_HIGHMEM
 	bool "Highmem debugging"
 	depends on DEBUG_KERNEL && HIGHMEM
+	help
+	  This options enables additional error checking for high memory
+	  systems.  Disable for production systems.
 
 config KALLSYMS
 	bool "Load all symbols for debugging/kksymoops"
+	help
+	  Say Y here to let the kernel print out symbolic crash information and
+	  symbolic stack backtraces. This increases the size of the kernel
+	  somewhat, as all symbols have to be loaded into the kernel image.
+
+config DEBUG_SPINLOCK_SLEEP
+	bool "Sleep-inside-spinlock checking"
 	depends on DEBUG_KERNEL
+	help
+	  If you say Y here, various routines which may sleep will become very
+	  noisy if they are called with a spinlock held.	
 
 config KGDB
 	bool "Include kgdb kernel debugger"
