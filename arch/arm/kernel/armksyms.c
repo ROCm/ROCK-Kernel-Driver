@@ -69,6 +69,7 @@ extern void __udivmoddi4(void);
 extern void __udivsi3(void);
 extern void __umodsi3(void);
 extern void abort(void);
+extern void do_div64(void);
 
 extern void ret_from_exception(void);
 extern void fpundefinstr(void);
@@ -234,6 +235,7 @@ EXPORT_SYMBOL_NOVERS(__umoddi3);
 EXPORT_SYMBOL_NOVERS(__udivmoddi4);
 EXPORT_SYMBOL_NOVERS(__udivsi3);
 EXPORT_SYMBOL_NOVERS(__umodsi3);
+EXPORT_SYMBOL_NOVERS(do_div64);
 
 	/* bitops */
 EXPORT_SYMBOL(_set_bit_le);

@@ -552,8 +552,6 @@ MODULE_AUTHOR("Stephen Rothwell");
 MODULE_DESCRIPTION("Advanced Power Management");
 MODULE_LICENSE("GPL");
 
-EXPORT_NO_SYMBOLS;
-
 #ifndef MODULE
 static int __init apm_setup(char *str)
 {

@@ -55,12 +55,6 @@
 #include <asm/system.h>
 #include <asm/uaccess.h>
 
-#include <video/fbcon.h>
-#include <video/fbcon-cfb8.h>
-#include <video/fbcon-cfb16.h>
-#include <video/fbcon-cfb24.h>
-#include <video/fbcon-cfb32.h>
-
 #include "cyber2000fb.h"
 
 struct cfb_info {
@@ -147,114 +141,32 @@ cyber2000_seqw(unsigned int reg, unsigned int val, struct cfb_info *cfb)
 /*
  * Hardware Cyber2000 Acceleration
  */
-static void cyber2000_accel_wait(struct cfb_info *cfb)
-{
-	int count = 100000;
-
-	while (cyber2000fb_readb(CO_REG_CONTROL, cfb) & CO_CTRL_BUSY) {
-		if (!count--) {
-			debug_printf("accel_wait timed out\n");
-			cyber2000fb_writeb(0, CO_REG_CONTROL, cfb);
-			return;
-		}
-		udelay(1);
-	}
-}
-
-static void cyber2000_accel_setup(struct display *display)
-{
-	struct cfb_info *cfb = (struct cfb_info *)display->fb_info;
-
-	cfb->dispsw->setup(display);
-}
-
 static void
-cyber2000_accel_bmove(struct display *display, int sy, int sx, int dy, int dx,
-		      int height, int width)
+cyber2000fb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 {
-	struct cfb_info *cfb = (struct cfb_info *)display->fb_info;
-	struct fb_var_screeninfo *var = &display->var;
-	u_long src, dst;
-	u_int fh, fw, cmd = CO_CMD_L_PATTERN_FGCOL;
+	struct cfb_info *cfb = (struct cfb_info *)info;
+	unsigned long dst, col;
 
-	fw    = fontwidth(display);
-	sx    *= fw;
-	dx    *= fw;
-	width *= fw;
-	width -= 1;
-
-	if (sx < dx) {
-		sx += width;
-		dx += width;
-		cmd |= CO_CMD_L_INC_LEFT;
+	if (!(cfb->fb.var.accel_flags & FB_ACCELF_TEXT)) {
+		cfb_fillrect(info, rect);
+		return;
 	}
 
-	fh     = fontheight(display);
-	sy     *= fh;
-	dy     *= fh;
-	height *= fh;
-	height -= 1;
+	cyber2000fb_writeb(0, CO_REG_CONTROL, cfb);
+	cyber2000fb_writew(rect->width - 1, CO_REG_PIXWIDTH, cfb);
+	cyber2000fb_writew(rect->height - 1, CO_REG_PIXHEIGHT, cfb);
 
-	if (sy < dy) {
-		sy += height;
-		dy += height;
-		cmd |= CO_CMD_L_INC_UP;
-	}
+	col = rect->color;
+	if (cfb->fb.var.bits_per_pixel > 8)
+		col = ((u32 *)cfb->fb.pseudo_palette)[col];
+	cyber2000fb_writel(col, CO_REG_FGCOLOUR, cfb);
 
-	src    = sx + sy * var->xres_virtual;
-	dst    = dx + dy * var->xres_virtual;
-
-	cyber2000_accel_wait(cfb);
-	cyber2000fb_writeb(0x00, CO_REG_CONTROL, cfb);
-	cyber2000fb_writew(width, CO_REG_PIXWIDTH, cfb);
-	cyber2000fb_writew(height, CO_REG_PIXHEIGHT, cfb);
-
-	if (var->bits_per_pixel == 24) {
-		cyber2000fb_writeb(dst, CO_REG_X_PHASE, cfb);
-		dst *= 3;
-		src *= 3;
-	}
-
-	cyber2000fb_writel(src, CO_REG_SRC1_PTR, cfb);
-	cyber2000fb_writel(dst, CO_REG_DEST_PTR, cfb);
-	cyber2000fb_writeb(CO_FG_MIX_SRC, CO_REG_FGMIX, cfb);
-	cyber2000fb_writew(cmd, CO_REG_CMD_L, cfb);
-	cyber2000fb_writew(CO_CMD_H_FGSRCMAP|CO_CMD_H_BLITTER, CO_REG_CMD_H, cfb);
-}
-
-static void
-cyber2000_accel_clear(struct vc_data *conp, struct display *display, int sy,
-		      int sx, int height, int width)
-{
-	struct cfb_info *cfb = (struct cfb_info *)display->fb_info;
-	struct fb_var_screeninfo *var = &display->var;
-	u_long dst;
-	u_int fw, fh;
-	u32 bgx = attr_bgcol_ec(display, conp);
-
-	fw = fontwidth(display);
-	fh = fontheight(display);
-
-	dst    = sx * fw + sy * var->xres_virtual * fh;
-	width  = width * fw - 1;
-	height = height * fh - 1;
-
-	cyber2000_accel_wait(cfb);
-	cyber2000fb_writeb(0x00, CO_REG_CONTROL, cfb);
-	cyber2000fb_writew(width, CO_REG_PIXWIDTH, cfb);
-	cyber2000fb_writew(height, CO_REG_PIXHEIGHT, cfb);
-
-	if (var->bits_per_pixel == 24) {
+	dst = rect->dx + rect->dy * cfb->fb.var.xres_virtual;
+	if (cfb->fb.var.bits_per_pixel == 24) {
 		cyber2000fb_writeb(dst, CO_REG_X_PHASE, cfb);
 		dst *= 3;
 	}
 
-	if (var->bits_per_pixel == 16)
-		bgx = ((u16 *)display->dispsw_data)[bgx];
-	else if (var->bits_per_pixel >= 24)
-		bgx = ((u32 *)display->dispsw_data)[bgx];
-
-	cyber2000fb_writel(bgx, CO_REG_FGCOLOUR, cfb);
 	cyber2000fb_writel(dst, CO_REG_DEST_PTR, cfb);
 	cyber2000fb_writeb(CO_FG_MIX_SRC, CO_REG_FGMIX, cfb);
 	cyber2000fb_writew(CO_CMD_L_PATTERN_FGCOL, CO_REG_CMD_L, cfb);
@@ -262,52 +174,81 @@ cyber2000_accel_clear(struct vc_data *conp, struct display *display, int sy,
 }
 
 static void
-cyber2000_accel_putc(struct vc_data *conp, struct display *display, int c,
-		     int yy, int xx)
+cyber2000fb_copyarea(struct fb_info *info, struct fb_copyarea *region)
 {
-	struct cfb_info *cfb = (struct cfb_info *)display->fb_info;
+	struct cfb_info *cfb = (struct cfb_info *)info;
+	unsigned int cmd = CO_CMD_L_PATTERN_FGCOL;
+	unsigned long src, dst;
 
-	cyber2000_accel_wait(cfb);
-	cfb->dispsw->putc(conp, display, c, yy, xx);
+	if (!(cfb->fb.var.accel_flags & FB_ACCELF_TEXT)) {
+		cfb_copyarea(info, region);
+		return;
+	}
+
+	if (region->sx < region->dx) {
+		region->sx += region->width - 1;
+		region->dx += region->width - 1;
+		cmd |= CO_CMD_L_INC_LEFT;
+	}
+
+	if (region->sy < region->dy) {
+		region->sy += region->height - 1;
+		region->dy += region->height - 1;
+		cmd |= CO_CMD_L_INC_UP;
+	}
+
+	cyber2000fb_writeb(0, CO_REG_CONTROL, cfb);
+	cyber2000fb_writew(region->width - 1, CO_REG_PIXWIDTH, cfb);
+	cyber2000fb_writew(region->height - 1, CO_REG_PIXHEIGHT, cfb);
+
+	src = region->sx + region->sy * cfb->fb.var.xres_virtual;
+	dst = region->dx + region->dy * cfb->fb.var.xres_virtual;
+	if (cfb->fb.var.bits_per_pixel == 24) {
+		cyber2000fb_writeb(dst, CO_REG_X_PHASE, cfb);
+		src *= 3;
+		dst *= 3;
+	}
+	cyber2000fb_writel(src, CO_REG_SRC1_PTR, cfb);
+	cyber2000fb_writel(dst, CO_REG_DEST_PTR, cfb);
+	cyber2000fb_writew(CO_FG_MIX_SRC, CO_REG_FGMIX, cfb);
+	cyber2000fb_writew(cmd, CO_REG_CMD_L, cfb);
+	cyber2000fb_writew(CO_CMD_H_FGSRCMAP | CO_CMD_H_BLITTER,
+			   CO_REG_CMD_H, cfb);
 }
 
 static void
-cyber2000_accel_putcs(struct vc_data *conp, struct display *display,
-		      const unsigned short *s, int count, int yy, int xx)
+cyber2000fb_imageblit(struct fb_info *info, struct fb_image *image)
 {
-	struct cfb_info *cfb = (struct cfb_info *)display->fb_info;
+	struct cfb_info *cfb = (struct cfb_info *)info;
 
-	cyber2000_accel_wait(cfb);
-	cfb->dispsw->putcs(conp, display, s, count, yy, xx);
+//	if (!(cfb->fb.var.accel_flags & FB_ACCELF_TEXT)) {
+		cfb_imageblit(info, image);
+		return;
+//	}
 }
 
-static void cyber2000_accel_revc(struct display *display, int xx, int yy)
+static int cyber2000fb_sync(struct fb_info *info)
 {
-	struct cfb_info *cfb = (struct cfb_info *)display->fb_info;
+	struct cfb_info *cfb = (struct cfb_info *)info;
+	int count = 100000;
 
-	cyber2000_accel_wait(cfb);
-	cfb->dispsw->revc(display, xx, yy);
+	if (!(cfb->fb.var.accel_flags & FB_ACCELF_TEXT))
+		return 0;
+
+	while (cyber2000fb_readb(CO_REG_CONTROL, cfb) & CO_CTRL_BUSY) {
+		if (!count--) {
+			debug_printf("accel_wait timed out\n");
+			cyber2000fb_writeb(0, CO_REG_CONTROL, cfb);
+			break;
+		}
+		udelay(1);
+	}
+	return 0;
 }
 
-static void
-cyber2000_accel_clear_margins(struct vc_data *conp, struct display *display,
-			      int bottom_only)
-{
-	struct cfb_info *cfb = (struct cfb_info *)display->fb_info;
-
-	cfb->dispsw->clear_margins(conp, display, bottom_only);
-}
-
-static struct display_switch fbcon_cyber_accel = {
-	.setup		= cyber2000_accel_setup,
-	.bmove		= cyber2000_accel_bmove,
-	.clear		= cyber2000_accel_clear,
-	.putc		= cyber2000_accel_putc,
-	.putcs		= cyber2000_accel_putcs,
-	.revc		= cyber2000_accel_revc,
-	.clear_margins	= cyber2000_accel_clear_margins,
-	.fontwidthmask	= FONTWIDTH(8)|FONTWIDTH(16)
-};
+/*
+ * ===========================================================================
+ */
 
 static inline u32 convert_bitfield(u_int val, struct fb_bitfield *bf)
 {
@@ -324,7 +265,7 @@ cyber2000fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		      u_int transp, struct fb_info *info)
 {
 	struct cfb_info *cfb = (struct cfb_info *)info;
-	struct fb_var_screeninfo *var = &cfb->display->var;
+	struct fb_var_screeninfo *var = &cfb->fb.var;
 	u32 pseudo_val;
 	int ret = 1;
 
@@ -332,7 +273,6 @@ cyber2000fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	default:
 		return 1;
 
-#ifdef FBCON_HAS_CFB8
 	/*
 	 * Pseudocolour:
 	 *         8     8
@@ -359,7 +299,6 @@ cyber2000fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 		cyber2000fb_writeb(green, 0x3c9, cfb);
 		cyber2000fb_writeb(blue, 0x3c9, cfb);
 		return 0;
-#endif
 
 	/*
 	 * Direct colour:
@@ -455,13 +394,8 @@ cyber2000fb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	/*
 	 * Now set our pseudo palette for the CFB16/24/32 drivers.
 	 */
-	if (regno < 16) {
-		if (var->bits_per_pixel == 16)
-			((u16 *)cfb->fb.pseudo_palette)[regno] = pseudo_val;
-		else
-			((u32 *)cfb->fb.pseudo_palette)[regno] = pseudo_val;
-		ret = 0;
-	}
+	if (regno < 16)
+		((u32 *)cfb->fb.pseudo_palette)[regno] = pseudo_val;
 
 	return ret;
 }
@@ -800,19 +734,15 @@ cyber2000fb_decode_clock(struct par_info *hw, struct cfb_info *cfb,
 }
 
 /*
- * Decode the info required for the hardware.
- * This involves the PLL parameters for the dot clock,
- * CRTC registers, and accelerator settings.
+ *    Set the User Defined Part of the Display
  */
 static int
-cyber2000fb_decode_var(struct fb_var_screeninfo *var, struct cfb_info *cfb,
-		       struct par_info *hw)
+cyber2000fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 {
+	struct cfb_info *cfb = (struct cfb_info *)info;
+	struct par_info hw;
 	unsigned int mem;
 	int err;
-
-	hw->width = var->xres_virtual;
-	hw->ramdac = RAMDAC_VREFEN | RAMDAC_DAC8BIT;
 
 	var->transp.msb_right	= 0;
 	var->red.msb_right	= 0;
@@ -822,10 +752,6 @@ cyber2000fb_decode_var(struct fb_var_screeninfo *var, struct cfb_info *cfb,
 	switch (var->bits_per_pixel) {
 #ifdef FBCON_HAS_CFB8
 	case 8:	/* PSEUDOCOLOUR, 256 */
-		hw->co_pixfmt		= CO_PIXFMT_8BPP;
-		hw->pitch		= hw->width >> 3;
-		hw->extseqmisc		= EXT_SEQ_MISC_8;
-
 		var->transp.offset	= 0;
 		var->transp.length	= 0;
 		var->red.offset		= 0;
@@ -838,13 +764,8 @@ cyber2000fb_decode_var(struct fb_var_screeninfo *var, struct cfb_info *cfb,
 #endif
 #ifdef FBCON_HAS_CFB16
 	case 16:/* DIRECTCOLOUR, 64k or 32k */
-		hw->co_pixfmt		= CO_PIXFMT_16BPP;
-		hw->pitch		= hw->width >> 2;
-
 		switch (var->green.length) {
 		case 6: /* RGB565, 64k */
-			hw->extseqmisc		= EXT_SEQ_MISC_16_RGB565;
-
 			var->transp.offset	= 0;
 			var->transp.length	= 0;
 			var->red.offset		= 11;
@@ -857,8 +778,6 @@ cyber2000fb_decode_var(struct fb_var_screeninfo *var, struct cfb_info *cfb,
 
 		default:
 		case 5: /* RGB555, 32k */
-			hw->extseqmisc		= EXT_SEQ_MISC_16_RGB555;
-
 			var->transp.offset	= 0;
 			var->transp.length	= 0;
 			var->red.offset		= 10;
@@ -870,8 +789,6 @@ cyber2000fb_decode_var(struct fb_var_screeninfo *var, struct cfb_info *cfb,
 			break;
 
 		case 4: /* RGB444, 4k + transparency? */
-			hw->extseqmisc		= EXT_SEQ_MISC_16_RGB444;
-
 			var->transp.offset	= 12;
 			var->transp.length	= 4;
 			var->red.offset		= 8;
@@ -886,12 +803,6 @@ cyber2000fb_decode_var(struct fb_var_screeninfo *var, struct cfb_info *cfb,
 #endif
 #ifdef FBCON_HAS_CFB24
 	case 24:/* TRUECOLOUR, 16m */
-		hw->co_pixfmt		= CO_PIXFMT_24BPP;
-		hw->width		*= 3;
-		hw->pitch		= hw->width >> 3;
-		hw->ramdac		|= (RAMDAC_BYPASS | RAMDAC_RAMPWRDN);
-		hw->extseqmisc		= EXT_SEQ_MISC_24_RGB888;
-
 		var->transp.offset	= 0;
 		var->transp.length	= 0;
 		var->red.offset		= 16;
@@ -904,11 +815,6 @@ cyber2000fb_decode_var(struct fb_var_screeninfo *var, struct cfb_info *cfb,
 #endif
 #ifdef FBCON_HAS_CFB32
 	case 32:/* TRUECOLOUR, 16m */
-		hw->co_pixfmt		= CO_PIXFMT_32BPP;
-		hw->pitch		= hw->width >> 1;
-		hw->ramdac		|= (RAMDAC_BYPASS | RAMDAC_RAMPWRDN);
-		hw->extseqmisc		= EXT_SEQ_MISC_32;
-
 		var->transp.offset	= 24;
 		var->transp.length	= 8;
 		var->red.offset		= 16;
@@ -933,127 +839,107 @@ cyber2000fb_decode_var(struct fb_var_screeninfo *var, struct cfb_info *cfb,
 	if (var->xres > var->xres_virtual)
 		var->xres = var->xres_virtual;
 
-	err = cyber2000fb_decode_clock(hw, cfb, var);
+	err = cyber2000fb_decode_clock(&hw, cfb, var);
 	if (err)
 		return err;
 
-	err = cyber2000fb_decode_crtc(hw, cfb, var);
+	err = cyber2000fb_decode_crtc(&hw, cfb, var);
 	if (err)
 		return err;
-
-	hw->width -= 1;
-	hw->fetch = hw->pitch;
-	if (!(cfb->mem_ctl2 & MEM_CTL2_64BIT))
-		hw->fetch <<= 1;
-	hw->fetch += 1;
 
 	return 0;
 }
 
-/*
- *    Set the User Defined Part of the Display
- */
-static int
-cyber2000fb_set_var(struct fb_var_screeninfo *var, int con,
-		    struct fb_info *info)
+static int cyber2000fb_set_par(struct fb_info *info)
 {
 	struct cfb_info *cfb = (struct cfb_info *)info;
-	struct display *display;
+	struct fb_var_screeninfo *var = &cfb->fb.var;
 	struct par_info hw;
-	int err, chgvar;
+	unsigned int mem;
 
-	/*
-	 * CONUPDATE and SMOOTH_XPAN are equal.  However,
-	 * SMOOTH_XPAN is only used internally by fbcon.
-	 */
-	if (var->vmode & FB_VMODE_CONUPDATE) {
-		var->vmode |= FB_VMODE_YWRAP;
-		var->xoffset = cfb->display->var.xoffset;
-		var->yoffset = cfb->display->var.yoffset;
-	}
-
-	err = cyber2000fb_decode_var(var, cfb, &hw);
-	if (err)
-		return err;
-
-	if (var->activate & FB_ACTIVATE_TEST)
-		return 0;
-
-	if ((var->activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW)
-		return -EINVAL;
-
-	if (con < 0) {
-		display = cfb->fb.disp;
-	} else {
-		display = fb_display + con;
-	}
-
-	chgvar = cfb->fb.var.xres != var->xres ||
-		 cfb->fb.var.yres != var->yres ||
-		 cfb->fb.var.xres_virtual != var->xres_virtual ||
-		 cfb->fb.var.yres_virtual != var->yres_virtual ||
-		 cfb->fb.var.bits_per_pixel != var->bits_per_pixel;
-
-	if (memcmp(&cfb->fb.var.red, &var->red, sizeof(var->red)) ||
-	    memcmp(&cfb->fb.var.green, &var->green, sizeof(var->green)) ||
-	    memcmp(&cfb->fb.var.blue, &var->blue, sizeof(var->blue)))
-		chgvar = 1;
-
-	if (con >= 0 && chgvar == 0)
-		return 0;
-
-	if (con < 0)
-		chgvar = 0;
-
-	/*
-	 * If we are setting all the virtual consoles, also set the
-	 * defaults used to create new consoles.
-	 */
-	err = var->activate;
-	var->activate = FB_ACTIVATE_NOW;
-	if (err & FB_ACTIVATE_ALL)
-		cfb->fb.disp->var = *var;
-
-	cfb->fb.var = *var;
-	cfb->fb.fix.line_length	= var->xres_virtual * var->bits_per_pixel / 8;
+	hw.width = var->xres_virtual;
+	hw.ramdac = RAMDAC_VREFEN | RAMDAC_DAC8BIT;
 
 	switch (var->bits_per_pixel) {
-#ifdef FBCON_HAS_CFB8
-	case 8:	/* PSEUDOCOLOUR, 256 */
-		cfb->dispsw		= &fbcon_cfb8;
-		display->dispsw_data	= NULL;
+	case 8:
+		hw.co_pixfmt		= CO_PIXFMT_8BPP;
+		hw.pitch		= hw.width >> 3;
+		hw.extseqmisc		= EXT_SEQ_MISC_8;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB16
-	case 16:/* DIRECTCOLOUR */
-		cfb->dispsw		= &fbcon_cfb16;
-		display->dispsw_data	= cfb->fb.pseudo_palette;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB24
+
+	case 16:
+		hw.co_pixfmt		= CO_PIXFMT_16BPP;
+		hw.pitch		= hw.width >> 2;
+
+		switch (var->green.length) {
+		case 6: /* RGB565, 64k */
+			hw.extseqmisc	= EXT_SEQ_MISC_16_RGB565;
+			break;
+		case 5: /* RGB555, 32k */
+			hw.extseqmisc	= EXT_SEQ_MISC_16_RGB555;
+			break;
+		case 4: /* RGB444, 4k + transparency? */
+			hw.extseqmisc	= EXT_SEQ_MISC_16_RGB444;
+			break;
+		default:
+			BUG();
+		}
 	case 24:/* TRUECOLOUR, 16m */
-		cfb->dispsw		= &fbcon_cfb24;
-		display->dispsw_data	= cfb->fb.pseudo_palette;
+		hw.co_pixfmt		= CO_PIXFMT_24BPP;
+		hw.width		*= 3;
+		hw.pitch		= hw.width >> 3;
+		hw.ramdac		|= (RAMDAC_BYPASS | RAMDAC_RAMPWRDN);
+		hw.extseqmisc		= EXT_SEQ_MISC_24_RGB888;
 		break;
-#endif
-#ifdef FBCON_HAS_CFB32
+
 	case 32:/* TRUECOLOUR, 16m */
-		cfb->dispsw		= &fbcon_cfb32;
-		display->dispsw_data	= cfb->fb.pseudo_palette;
+		hw.co_pixfmt		= CO_PIXFMT_32BPP;
+		hw.pitch		= hw.width >> 1;
+		hw.ramdac		|= (RAMDAC_BYPASS | RAMDAC_RAMPWRDN);
+		hw.extseqmisc		= EXT_SEQ_MISC_32;
 		break;
-#endif
-	default:/* in theory this should never happen */
-		printk(KERN_WARNING "%s: no support for %dbpp\n",
-		       cfb->fb.fix.id, var->bits_per_pixel);
-		cfb->dispsw = &fbcon_dummy;
-		break;
+
+	default:
+		BUG();
 	}
 
 	/*
-	 * 8bpp displays are always pseudo colour.
-	 * 16bpp and above are direct colour or true colour, depending
-	 * on whether the RAMDAC palettes are bypassed.  (Direct colour
-	 * has palettes, true colour does not.)
+	 * Sigh, this is absolutely disgusting, but caused by
+	 * the way the fbcon developers want to separate out
+	 * the "checking" and the "setting" of the video mode.
+	 *
+	 * If the mode is not suitable for the hardware here,
+	 * we can't prevent it being set by returning an error.
+	 *
+	 * In theory, since NetWinders contain just one VGA card,
+	 * we should never end up hitting this problem.
+	 */
+	BUG_ON(cyber2000fb_decode_clock(&hw, cfb, var) != 0);
+	BUG_ON(cyber2000fb_decode_crtc(&hw, cfb, var) != 0);
+
+	hw.width -= 1;
+	hw.fetch = hw.pitch;
+	if (!(cfb->mem_ctl2 & MEM_CTL2_64BIT))
+		hw.fetch <<= 1;
+	hw.fetch += 1;
+
+	cfb->fb.fix.line_length	= var->xres_virtual * var->bits_per_pixel / 8;
+
+	/*
+	 * Same here - if the size of the video mode exceeds the
+	 * available RAM, we can't prevent this mode being set.
+	 *
+	 * In theory, since NetWinders contain just one VGA card,
+	 * we should never end up hitting this problem.
+	 */
+	mem = cfb->fb.fix.line_length * var->yres_virtual;
+	BUG_ON(mem > cfb->fb.fix.smem_len);
+
+	/*
+	 * 8bpp displays are always pseudo colour.  16bpp and above
+	 * are direct colour or true colour, depending on whether
+	 * the RAMDAC palettes are bypassed.  (Direct colour has
+	 * palettes, true colour does not.)
 	 */
 	if (var->bits_per_pixel == 8)
 		cfb->fb.fix.visual = FB_VISUAL_PSEUDOCOLOR;
@@ -1062,20 +948,8 @@ cyber2000fb_set_var(struct fb_var_screeninfo *var, int con,
 	else
 		cfb->fb.fix.visual = FB_VISUAL_DIRECTCOLOR;
 
-	if (var->accel_flags & FB_ACCELF_TEXT && cfb->dispsw != &fbcon_dummy)
-		display->dispsw = &fbcon_cyber_accel;
-	else
-		display->dispsw = cfb->dispsw;
-
-	display->can_soft_blank = 1;
-	display->inverse	= 0;
-
 	cyber2000fb_set_timing(cfb, &hw);
 	cyber2000fb_update_start(cfb, var);
-	fb_set_cmap(&cfb->fb.cmap, 1, &cfb->fb);
-
-	if (chgvar && cfb->fb.changevar)
-		cfb->fb.changevar(con);
 
 	return 0;
 }
@@ -1085,84 +959,21 @@ cyber2000fb_set_var(struct fb_var_screeninfo *var, int con,
  *    Pan or Wrap the Display
  */
 static int
-cyber2000fb_pan_display(struct fb_var_screeninfo *var, int con,
-			struct fb_info *info)
+cyber2000fb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
 	struct cfb_info *cfb = (struct cfb_info *)info;
-	u_int y_bottom;
-
-	y_bottom = var->yoffset;
-
-	if (!(var->vmode & FB_VMODE_YWRAP))
-		y_bottom += var->yres;
-
-	if (var->xoffset > (var->xres_virtual - var->xres))
-		return -EINVAL;
-	if (y_bottom > cfb->display->var.yres_virtual)
-		return -EINVAL;
 
 	if (cyber2000fb_update_start(cfb, var))
 		return -EINVAL;
 
-	cfb->display->var.xoffset = var->xoffset;
-	cfb->display->var.yoffset = var->yoffset;
+	cfb->fb.var.xoffset = var->xoffset;
+	cfb->fb.var.yoffset = var->yoffset;
+
 	if (var->vmode & FB_VMODE_YWRAP) {
-		cfb->display->var.vmode |= FB_VMODE_YWRAP;
+		cfb->fb.var.vmode |= FB_VMODE_YWRAP;
 	} else {
-		cfb->display->var.vmode &= ~FB_VMODE_YWRAP;
+		cfb->fb.var.vmode &= ~FB_VMODE_YWRAP;
 	}
-
-	return 0;
-}
-
-
-/*
- *    Update the `var' structure (called by fbcon.c)
- *
- *    This call looks only at yoffset and the FB_VMODE_YWRAP flag in `var'.
- *    Since it's called by a kernel driver, no range checking is done.
- */
-static int cyber2000fb_updatevar(int con, struct fb_info *info)
-{
-	struct cfb_info *cfb = (struct cfb_info *)info;
-
-	return cyber2000fb_update_start(cfb, &fb_display[con].var);
-}
-
-static int cyber2000fb_switch(int con, struct fb_info *info)
-{
-	struct cfb_info *cfb = (struct cfb_info *)info;
-	struct display *display = cfb->display;
-	struct fb_cmap *cmap;
-
-	if (display) {
-		/*
-		 * Save the old colormap and video mode.
-		 */
-		if (display->cmap.len)
-			fb_copy_cmap(&cfb->fb.cmap, &display->cmap, 0);
-	}
-
-	cfb->display = display = fb_display + con;
-
-	/*
-	 * Install the new colormap and change the video mode.  By default,
-	 * fbcon sets all the colormaps and video modes to the default
-	 * values at bootup.
-	 *
-	 * Really, we want to set the colourmap size depending on the
-	 * depth of the new video mode.  For now, we leave it at its
-	 * default 256 entry.
-	 */
-	if (display->cmap.len)
-		cmap = &display->cmap;
-	else
-		cmap = fb_default_cmap(1 << display->var.bits_per_pixel);
-
-	fb_copy_cmap(cmap, &cfb->fb.cmap, 0);
-
-	display->var.activate = FB_ACTIVATE_NOW;
-	cyber2000fb_set_var(&display->var, con, &cfb->fb);
 
 	return 0;
 }
@@ -1243,12 +1054,16 @@ static int cyber2000fb_blank(int blank, struct fb_info *info)
 
 static struct fb_ops cyber2000fb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= cyber2000fb_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
+	.fb_check_var	= cyber2000fb_check_var,
+	.fb_set_par	= cyber2000fb_set_par,
 	.fb_setcolreg	= cyber2000fb_setcolreg,
-	.fb_pan_display	= cyber2000fb_pan_display,
 	.fb_blank	= cyber2000fb_blank,
+	.fb_pan_display	= cyber2000fb_pan_display,
+	.fb_fillrect	= cyber2000fb_fillrect,
+	.fb_copyarea	= cyber2000fb_copyarea,
+	.fb_imageblit	= cyber2000fb_imageblit,
+	.fb_cursor	= soft_cursor,
+	.fb_sync	= cyber2000fb_sync,
 };
 
 /*
@@ -1295,7 +1110,7 @@ void cyber2000fb_disable_extregs(struct cfb_info *cfb)
 
 void cyber2000fb_get_fb_var(struct cfb_info *cfb, struct fb_var_screeninfo *var)
 {
-	memcpy(var, &cfb->display->var, sizeof(struct fb_var_screeninfo));
+	memcpy(var, &cfb->fb.var, sizeof(struct fb_var_screeninfo));
 }
 
 /*
@@ -1313,8 +1128,6 @@ int cyber2000fb_attach(struct cyberpro_info *info, int idx)
 		info->info            = int_cfb_info;
 
 		strncpy(info->dev_name, int_cfb_info->fb.fix.id, sizeof(info->dev_name));
-
-		MOD_INC_USE_COUNT;
 	}
 
 	return int_cfb_info != NULL;
@@ -1325,7 +1138,6 @@ int cyber2000fb_attach(struct cyberpro_info *info, int idx)
  */
 void cyber2000fb_detach(int idx)
 {
-	MOD_DEC_USE_COUNT;
 }
 
 EXPORT_SYMBOL(cyber2000fb_attach);
@@ -1411,13 +1223,13 @@ cyberpro_alloc_fb_info(unsigned int id, char *name)
 {
 	struct cfb_info *cfb;
 
-	cfb = kmalloc(sizeof(struct cfb_info) + sizeof(struct display) +
+	cfb = kmalloc(sizeof(struct cfb_info) +
 		       sizeof(u32) * 16, GFP_KERNEL);
 
 	if (!cfb)
 		return NULL;
 
-	memset(cfb, 0, sizeof(struct cfb_info) + sizeof(struct display));
+	memset(cfb, 0, sizeof(struct cfb_info));
 
 	cfb->id			= id;
 
@@ -1467,17 +1279,10 @@ cyberpro_alloc_fb_info(unsigned int id, char *name)
 	cfb->fb.var.width	= -1;
 	cfb->fb.var.accel_flags	= FB_ACCELF_TEXT;
 
-	strcpy(cfb->fb.modename, cfb->fb.fix.id);
-	strcpy(cfb->fb.fontname, default_font);
-
 	cfb->fb.fbops		= &cyber2000fb_ops;
-	cfb->fb.changevar	= NULL;
-	cfb->fb.switch_con	= cyber2000fb_switch;
-	cfb->fb.updatevar	= cyber2000fb_updatevar;
 	cfb->fb.flags		= FBINFO_FLAG_DEFAULT;
 	cfb->fb.node		= NODEV;
-	cfb->fb.disp		= (struct display *)(cfb + 1);
-	cfb->fb.pseudo_palette	= (void *)(cfb->fb.disp + 1);
+	cfb->fb.pseudo_palette	= (void *)(cfb + 1);
 
 	fb_alloc_cmap(&cfb->fb.cmap, NR_PALETTE, 0);
 
@@ -1575,7 +1380,7 @@ static int __devinit cyberpro_common_probe(struct cfb_info *cfb)
 	if (cfb->fb.var.yres_virtual < cfb->fb.var.yres)
 		cfb->fb.var.yres_virtual = cfb->fb.var.yres;
 
-	cyber2000fb_set_var(&cfb->fb.var, -1, &cfb->fb);
+//	fb_set_var(&cfb->fb.var, -1, &cfb->fb);
 
 	/*
 	 * Calculate the hsync and vsync frequencies.  Note that
@@ -1614,8 +1419,7 @@ static void cyberpro_common_resume(struct cfb_info *cfb)
 	 * Restore the old video mode and the palette.
 	 * We also need to tell fbcon to redraw the console.
 	 */
-	cfb->fb.var.activate = FB_ACTIVATE_NOW;
-	cyber2000fb_set_var(&cfb->fb.var, -1, &cfb->fb);
+	cyber2000fb_set_par(&cfb->fb);
 }
 
 #ifdef CONFIG_ARCH_SHARK
