@@ -61,11 +61,9 @@ static DECLARE_MUTEX(driver_lock);
 
 /**** adapter list */
 static struct i2c_adapter *adapters[I2C_ADAP_MAX];
-static int adap_count;
 
 /**** drivers list */
 static struct i2c_driver *drivers[I2C_DRIVER_MAX];
-static int driver_count;
 
 /**** debug level */
 static int i2c_debug;
@@ -116,7 +114,6 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 	}
 
 	adapters[i] = adap;
-	adap_count++;
 	ADAP_UNLOCK();
 	
 	/* init data types */
@@ -161,7 +158,6 @@ int i2c_add_adapter(struct i2c_adapter *adap)
 ERROR1:
 	ADAP_LOCK();
 	adapters[i] = NULL;
-	adap_count--;
 ERROR0:
 	ADAP_UNLOCK();
 	return res;
@@ -227,7 +223,6 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 #endif /* def CONFIG_PROC_FS */
 
 	adapters[i] = NULL;
-	adap_count--;
 	
 	ADAP_UNLOCK();	
 	DEB(printk(KERN_DEBUG "i2c-core.o: adapter unregistered: %s\n",adap->name));
@@ -265,7 +260,6 @@ int i2c_add_driver(struct i2c_driver *driver)
 	}
 
 	drivers[i] = driver;
-	driver_count++;
 	
 	DRV_UNLOCK();	/* driver was successfully added */
 	
@@ -361,7 +355,6 @@ int i2c_del_driver(struct i2c_driver *driver)
 	}
 	ADAP_UNLOCK();
 	drivers[i] = NULL;
-	driver_count--;
 	DRV_UNLOCK();
 	
 	DEB(printk(KERN_DEBUG "i2c-core.o: driver unregistered: %s\n",driver->name));
