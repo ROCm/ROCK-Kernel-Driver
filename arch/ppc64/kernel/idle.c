@@ -91,10 +91,8 @@ int idled(void)
 	paca = (struct Paca *)mfspr(SPRG3);
 
 	while(1) {
-		if (need_resched()) {
+		if (need_resched())
 			schedule();
-			check_pgt_cache();
-		}
 	}
 
 	for (;;) {
@@ -122,10 +120,8 @@ int idled(void)
 			}
 		}
 		HMT_medium();
-		if (need_resched()) {
+		if (need_resched())
 			schedule();
-			check_pgt_cache();
-		}
 	}
 	return 0;
 }

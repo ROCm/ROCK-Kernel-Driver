@@ -92,10 +92,10 @@ struct Paca
  * CACHE_LINE_2 0x0080 - 0x00FF
  *=====================================================================================
  */
-	u64 *pgd_cache;			/*					0x00 */
-	u64 *pmd_cache;			/*					0x08 */
-	u64 *pte_cache;			/*					0x10 */
-	u64 pgtable_cache_sz;		/*					0x18 */
+	u64 spare1;			/*					0x00 */
+	u64 spare2;			/*					0x08 */
+	u64 spare3;			/*					0x10 */
+	u64 spare4;		/*					0x18 */
 	u64 next_jiffy_update_tb;	/* TB value for next jiffy update	0x20 */
 	u32 lpEvent_count;		/* lpEvents processed			0x28 */
 	u32 prof_multiplier;		/*					0x2C */

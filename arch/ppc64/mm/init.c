@@ -113,23 +113,6 @@ unsigned long __max_memory;
  */
 mmu_gather_t     mmu_gathers[NR_CPUS];
 
-int do_check_pgt_cache(int low, int high)
-{
-	int freed = 0;
-
-	if (pgtable_cache_size > high) {
-		do {
-			if (pgd_quicklist)
-				free_page((unsigned long)pgd_alloc_one_fast(0)), ++freed;
-			if (pmd_quicklist)
-				free_page((unsigned long)pmd_alloc_one_fast(0, 0)), ++freed;
-			if (pte_quicklist)
-				free_page((unsigned long)pte_alloc_one_fast(0, 0)), ++freed;
-		} while (pgtable_cache_size > low);
-	}
-	return freed;	
-}
-
 void show_mem(void)
 {
 	int i,free = 0,total = 0,reserved = 0;
@@ -155,7 +138,6 @@ void show_mem(void)
 	printk("%d reserved pages\n",reserved);
 	printk("%d pages shared\n",shared);
 	printk("%d pages swap cached\n",cached);
-	printk("%d pages in page table cache\n",(int)pgtable_cache_size);
 	show_buffers();
 }
 
@@ -260,7 +242,7 @@ static void map_io_page(unsigned long ea, unsigned long pa, int flags)
 		spin_lock(&ioremap_mm.page_table_lock);
 		pgdp = pgd_offset_i(ea);
 		pmdp = pmd_alloc(&ioremap_mm, pgdp, ea);
-		ptep = pte_alloc(&ioremap_mm, pmdp, ea);
+		ptep = pte_alloc_kernel(&ioremap_mm, pmdp, ea);
 
 		pa = absolute_to_phys(pa);
 		set_pte(ptep, mk_pte_phys(pa & PAGE_MASK, __pgprot(flags)));
@@ -336,7 +318,7 @@ local_flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 	if (!pgd_none(*pgd)) {
 		pmd = pmd_offset(pgd, vmaddr);
 		if (!pmd_none(*pmd)) {
-			ptep = pte_offset(pmd, vmaddr);
+			ptep = pte_offset_kernel(pmd, vmaddr);
 			/* Check if HPTE might exist and flush it if so */
 			pte = __pte(pte_update(ptep, _PAGE_HPTEFLAGS, 0));
 			if ( pte_val(pte) & _PAGE_HASHPTE ) {
@@ -391,7 +373,7 @@ local_flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long e
 				if ( pmd_end > end )
 					pmd_end = end;
 				if ( !pmd_none( *pmd ) ) {
-					ptep = pte_offset( pmd, start );
+					ptep = pte_offset_kernel( pmd, start );
 					do {
 						if ( pte_val(*ptep) & _PAGE_HASHPTE ) {
 							pte = __pte(pte_update(ptep, _PAGE_HPTEFLAGS, 0));

@@ -202,6 +202,7 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 #define	pmd_present(pmd)	((pmd_val(pmd)) != 0)
 #define	pmd_clear(pmdp)		(pmd_val(*(pmdp)) = 0)
 #define pmd_page(pmd)		(__bpn_to_ba(pmd_val(pmd)))
+#define pmd_page_kernel(pmd)	pmd_page(pmd)
 #define pgd_set(pgdp, pmdp)	(pgd_val(*(pgdp)) = (__ba_to_bpn(pmdp)))
 #define pgd_none(pgd)		(!pgd_val(pgd))
 #define pgd_bad(pgd)		((pgd_val(pgd)) == 0)
@@ -222,8 +223,13 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
   ((pmd_t *) pgd_page(*(dir)) + (((addr) >> PMD_SHIFT) & (PTRS_PER_PMD - 1)))
 
 /* Find an entry in the third-level page table.. */
-#define pte_offset(dir,addr) \
+#define pte_offset_kernel(dir,addr) \
   ((pte_t *) pmd_page(*(dir)) + (((addr) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1)))
+
+#define pte_offset_map(dir,addr)	pte_offset_kernel((dir), (addr))
+#define pte_offset_map_nested(dir,addr)	pte_offset_kernel((dir), (addr))
+#define pte_unmap(pte)			do { } while(0)
+#define pte_unmap_nested(pte)		do { } while(0)
 
 /* to find an entry in a kernel page-table-directory */
 /* This now only contains the vmalloc pages */
@@ -231,12 +237,6 @@ extern unsigned long empty_zero_page[PAGE_SIZE/sizeof(unsigned long)];
 
 /* to find an entry in the ioremap page-table-directory */
 #define pgd_offset_i(address) (ioremap_pgd + pgd_index(address))
-
-/*
- * Given a pointer to an mem_map[] entry, return the kernel virtual
- * address corresponding to that page.
- */
-#define page_address(page) ((page)->virtual)
 
 #define pages_to_mb(x)		((x) >> (20-PAGE_SHIFT))
 

@@ -639,7 +639,7 @@ pte_t  * find_linux_pte( pgd_t * pgdir, unsigned long ea )
 
 		pm = pmd_offset( pg, ea );
 		if ( ! pmd_none( *pm ) ) { 
-			pt = pte_offset( pm, ea );
+			pt = pte_offset_kernel( pm, ea );
 			pte = *pt;
 			if ( ! pte_present( pte ) )
 				pt = NULL;
