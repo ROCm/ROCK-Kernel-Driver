@@ -96,7 +96,7 @@ int hfs_releasepage(struct page *page, int mask)
 			}
 			hfs_bnode_unhash(node);
 			hfs_bnode_free(node);
-		} while (--i);
+		} while (--i && nidx < tree->node_count);
 		spin_unlock(&tree->hash_lock);
 	}
 	//printk("releasepage: %lu,%x = %d\n", page->index, mask, res);
