@@ -586,13 +586,6 @@ barf:
  * under SunOS are nothing short of bletcherous:
  * Parent -->  %o0 == childs  pid, %o1 == 0
  * Child  -->  %o0 == parents pid, %o1 == 1
- *
- * NOTE: We have a separate fork kpsr/kwim because
- *       the parent could change these values between
- *       sys_fork invocation and when we reach here
- *       if the parent should sleep while trying to
- *       allocate the task_struct and kernel stack in
- *       do_fork().
  */
 int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 		unsigned long unused,
