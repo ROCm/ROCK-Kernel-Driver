@@ -429,7 +429,7 @@ config SUN3_82586
 
 config HPLANCE
 	bool "HP on-board LANCE support"
-	depends on NET_ETHERNET && HP300
+	depends on NET_ETHERNET && DIO
 	select CRC32
 	help
 	  If you want to use the builtin "LANCE" Ethernet controller on an
