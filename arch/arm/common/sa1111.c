@@ -929,16 +929,15 @@ static int sa1111_resume(struct device *dev, u32 level)
 static int sa1111_probe(struct device *dev)
 {
 	struct platform_device *pdev = to_platform_device(dev);
-	struct resource *mem = NULL, *irq = NULL;
-	int i;
+	struct resource *mem;
+	int irq;
 
-	for (i = 0; i < pdev->num_resources; i++) {
-		if (pdev->resource[i].flags & IORESOURCE_MEM)
-			mem = &pdev->resource[i];
-		if (pdev->resource[i].flags & IORESOURCE_IRQ)
-			irq = &pdev->resource[i];
-	}
-	return __sa1111_probe(dev, mem, irq ? irq->start : NO_IRQ);
+	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	if (!mem)
+		return -EINVAL;
+	irq = platform_get_irq(pdev, 0);
+
+	return __sa1111_probe(dev, mem, irq);
 }
 
 static int sa1111_remove(struct device *dev)
