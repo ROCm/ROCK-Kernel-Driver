@@ -134,6 +134,9 @@ static int driverfs_mknod(struct inode *dir, struct dentry *dentry, int mode, in
 	struct inode *inode = driverfs_get_inode(dir->i_sb, mode, dev);
 	int error = -EPERM;
 
+	if (dentry->d_inode)
+		return -EEXIST;
+
 	/* only allow create if ->d_fsdata is not NULL (so we can assume it 
 	 * comes from the driverfs API below. */
 	if (dentry->d_fsdata && inode) {
@@ -167,6 +170,9 @@ static int driverfs_symlink(struct inode * dir, struct dentry *dentry, const cha
 {
 	struct inode *inode;
 	int error = -ENOSPC;
+
+	if (dentry->d_inode)
+		return -EEXIST;
 
 	inode = driverfs_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
 	if (inode) {
@@ -426,7 +432,6 @@ static struct file_operations driverfs_file_operations = {
 static struct inode_operations driverfs_dir_inode_operations = {
 	.lookup		= simple_lookup,
 	.unlink		= driverfs_unlink,
-	.symlink	= driverfs_symlink,
 	.rmdir		= driverfs_rmdir,
 };
 
@@ -668,7 +673,7 @@ int driverfs_create_symlink(struct driver_dir_entry * parent,
 	dentry = lookup_hash(&qstr,parent->dentry);
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *)entry;
-		error = vfs_symlink(parent->dentry->d_inode,dentry,target);
+		error = driverfs_symlink(parent->dentry->d_inode,dentry,target);
 		if (!error) {
 			dentry->d_inode->u.generic_ip = (void *)entry;
 			entry->dentry = dentry;
