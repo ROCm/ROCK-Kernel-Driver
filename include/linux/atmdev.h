@@ -399,9 +399,9 @@ void vcc_remove_socket(struct sock *sk);
  *
  */
 
-static inline int atm_guess_pdu2truesize(int pdu_size)
+static inline int atm_guess_pdu2truesize(int size)
 {
-	return ((pdu_size+15) & ~15) + sizeof(struct sk_buff);
+	return (SKB_DATA_ALIGN(size) + sizeof(struct skb_shared_info));
 }
 
 
