@@ -291,8 +291,6 @@ void f_delown(struct file *filp)
 	f_modown(filp, 0, 0, 0, 1);
 }
 
-EXPORT_SYMBOL(f_delown);
-
 static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 		struct file *filp)
 {
