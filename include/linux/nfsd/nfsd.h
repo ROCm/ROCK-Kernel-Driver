@@ -170,6 +170,16 @@ void		nfsd_lockd_unexport(struct svc_client *);
 #define	nfserr_serverfault	__constant_htonl(NFSERR_SERVERFAULT)
 #define	nfserr_badtype		__constant_htonl(NFSERR_BADTYPE)
 #define	nfserr_jukebox		__constant_htonl(NFSERR_JUKEBOX)
+#define	nfserr_bad_cookie	__constant_htonl(NFSERR_BAD_COOKIE)
+#define	nfserr_same		__constant_htonl(NFSERR_SAME)
+#define	nfserr_clid_inuse	__constant_htonl(NFSERR_CLID_INUSE)
+#define	nfserr_resource		__constant_htonl(NFSERR_RESOURCE)
+#define	nfserr_nofilehandle	__constant_htonl(NFSERR_NOFILEHANDLE)
+#define	nfserr_minor_vers_mismatch	__constant_htonl(NFSERR_MINOR_VERS_MISMATCH)
+#define	nfserr_symlink		__constant_htonl(NFSERR_SYMLINK)
+#define	nfserr_not_same		__constant_htonl(NFSERR_NOT_SAME)
+#define	nfserr_readdir_nospc	__constant_htonl(NFSERR_READDIR_NOSPC)
+#define	nfserr_bad_xdr		__constant_htonl(NFSERR_BAD_XDR)
 
 /* error code for internal use - if a request fails due to
  * kmalloc failure, it gets dropped.  Client should resend eventually
