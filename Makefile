@@ -945,7 +945,7 @@ help:
 
 # Documentation targets
 # ---------------------------------------------------------------------------
-%docs: scripts FORCE
+%docs: scripts_basic FORCE
 	$(Q)$(MAKE) $(build)=Documentation/DocBook $@
 
 # Scripts to check various things for consistency
