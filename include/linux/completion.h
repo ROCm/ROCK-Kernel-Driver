@@ -29,6 +29,7 @@ static inline void init_completion(struct completion *x)
 
 extern void FASTCALL(wait_for_completion(struct completion *));
 extern void FASTCALL(complete(struct completion *));
+extern void FASTCALL(complete_all(struct completion *));
 
 #define INIT_COMPLETION(x)	((x).done = 0)
 

@@ -425,14 +425,13 @@ static inline void __exit_mm(struct task_struct * tsk)
 	/*
 	 * Serialize with any possible pending coredump:
 	 */
-	if (!mm->dumpable) {
-		current->core_waiter = 1;
-		atomic_inc(&mm->core_waiters);
-		if (atomic_read(&mm->core_waiters) ==atomic_read(&mm->mm_users))
-			wake_up(&mm->core_wait);
-		down(&mm->core_sem);
-		up(&mm->core_sem);
-		atomic_dec(&mm->core_waiters);
+	if (mm->core_waiters) {
+		down_write(&mm->mmap_sem);
+		if (!--mm->core_waiters)
+			complete(mm->core_startup_done);
+		up_write(&mm->mmap_sem);
+
+		wait_for_completion(&mm->core_done);
 	}
 	atomic_inc(&mm->mm_count);
 	if (mm != tsk->active_mm) BUG();

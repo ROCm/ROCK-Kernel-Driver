@@ -187,9 +187,6 @@ extern unsigned long sbus_ioremap(struct resource *res, unsigned long offset,
 extern void sbus_iounmap(unsigned long vaddr, unsigned long size);
 
 
-#define virt_to_phys(x) __pa((unsigned long)(x))
-#define phys_to_virt(x) __va((unsigned long)(x))
-
 /*
  * At the moment, we do not use CMOS_READ anywhere outside of rtc.c,
  * so rtc_port is static in it. This should not change unless a new

@@ -532,8 +532,6 @@ int usb_stor_clear_halt(struct us_data *us, unsigned int pipe)
 	if (result < 0)
 		return result;
 
-	printk(KERN_ERR "usb_stor_clear_halt() WORKED!\n");
-
 	/* reset the toggles and endpoint flags */
 	usb_endpoint_running(us->pusb_dev, usb_pipeendpoint(pipe),
 		usb_pipeout(pipe));
