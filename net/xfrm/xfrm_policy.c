@@ -33,7 +33,7 @@ struct xfrm_policy *xfrm_policy_list[XFRM_POLICY_MAX*2];
 static rwlock_t xfrm_policy_afinfo_lock = RW_LOCK_UNLOCKED;
 static struct xfrm_policy_afinfo *xfrm_policy_afinfo[NPROTO];
 
-kmem_cache_t *xfrm_dst_cache;
+static kmem_cache_t *xfrm_dst_cache;
 
 static struct work_struct xfrm_policy_gc_work;
 static struct list_head xfrm_policy_gc_list =
@@ -498,7 +498,7 @@ static void xfrm_policy_lookup(struct flowi *fl, u16 family, u8 dir,
 		*obj_refp = &pol->refcnt;
 }
 
-struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl)
+static struct xfrm_policy *xfrm_sk_policy_lookup(struct sock *sk, int dir, struct flowi *fl)
 {
 	struct xfrm_policy *pol;
 
@@ -1222,13 +1222,13 @@ static int xfrm_dev_event(struct notifier_block *this, unsigned long event, void
 	return NOTIFY_DONE;
 }
 
-struct notifier_block xfrm_dev_notifier = {
+static struct notifier_block xfrm_dev_notifier = {
 	xfrm_dev_event,
 	NULL,
 	0
 };
 
-void __init xfrm_policy_init(void)
+static void __init xfrm_policy_init(void)
 {
 	xfrm_dst_cache = kmem_cache_create("xfrm_dst_cache",
 					   sizeof(struct xfrm_dst),
