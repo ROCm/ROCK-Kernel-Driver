@@ -15,7 +15,7 @@ dc390_freetag (PDCB pDCB, PSRB pSRB)
 };
 
 
-UCHAR
+static UCHAR
 dc390_StartSCSI( PACB pACB, PDCB pDCB, PSRB pSRB )
 {
     UCHAR cmd; UCHAR  disc_allowed, try_sync_nego;
@@ -336,7 +336,7 @@ DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
     return IRQ_HANDLED;
 }
 
-irqreturn_t do_DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t do_DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
 {
     irqreturn_t ret;
     DEBUG1(printk (KERN_INFO "DC390: Irq (%i) caught: ", irq));
@@ -346,7 +346,7 @@ irqreturn_t do_DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
     return ret;
 }
 
-void
+static void
 dc390_DataOut_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 {
     UCHAR   sstatus;
@@ -400,7 +400,7 @@ dc390_DataOut_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
     }	    
 }
 
-void
+static void
 dc390_DataIn_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 {
     UCHAR   sstatus, residual, bval;
@@ -863,7 +863,7 @@ dc390_MsgIn_0( PACB pACB, PSRB pSRB, PUCHAR psstatus)
 }
 
 
-void
+static void
 dc390_DataIO_Comm( PACB pACB, PSRB pSRB, UCHAR ioDir)
 {
     PSGL   psgl;
