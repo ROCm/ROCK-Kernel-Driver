@@ -298,18 +298,10 @@ source drivers/pnp/Config.in
 
 source drivers/block/Config.in
 
-source drivers/md/Config.in
-
-if [ "$CONFIG_NET" = "y" ]; then
-   source net/Config.in
-fi
-
-source drivers/telephony/Config.in
-
 mainmenu_option next_comment
-comment 'ATA/IDE/MFM/RLL support'
+comment 'ATA/ATAPI/MFM/RLL device support'
 
-tristate 'ATA/IDE/MFM/RLL support' CONFIG_IDE
+tristate 'ATA/ATAPI/MFM/RLL device support' CONFIG_IDE
 
 if [ "$CONFIG_IDE" != "n" ]; then
    source drivers/ide/Config.in
@@ -319,14 +311,31 @@ fi
 endmenu
 
 mainmenu_option next_comment
-comment 'SCSI support'
+comment 'SCSI device support'
 
-tristate 'SCSI support' CONFIG_SCSI
+tristate 'SCSI device support' CONFIG_SCSI
 
 if [ "$CONFIG_SCSI" != "n" ]; then
    source drivers/scsi/Config.in
 fi
 endmenu
+
+mainmenu_option next_comment
+comment 'Old non-SCSI/ATAPI CD-ROM drives'
+
+bool 'Support non-SCSI/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
+if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
+   source drivers/cdrom/Config.in
+fi
+endmenu
+
+source drivers/md/Config.in
+
+if [ "$CONFIG_NET" = "y" ]; then
+   source net/Config.in
+fi
+
+source drivers/telephony/Config.in
 
 source drivers/message/fusion/Config.in
 
@@ -353,15 +362,6 @@ source net/ax25/Config.in
 source net/irda/Config.in
 
 source drivers/isdn/Config.in
-
-mainmenu_option next_comment
-comment 'Old CD-ROM drivers (not SCSI, not IDE)'
-
-bool 'Support non-SCSI/IDE/ATAPI CDROM drives' CONFIG_CD_NO_IDESCSI
-if [ "$CONFIG_CD_NO_IDESCSI" != "n" ]; then
-   source drivers/cdrom/Config.in
-fi
-endmenu
 
 #
 # input before char - char/joystick depends on it. As does USB.

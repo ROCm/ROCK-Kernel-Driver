@@ -300,7 +300,7 @@ static const struct driver_info	an2720_info = {
 	// no reset available!
 	// no check_connect available!
 
-	.in = 2, out: 2,		// direction distinguishes these
+	.in = 2, .out = 2,		// direction distinguishes these
 	.epsize =64,
 };
 
@@ -321,7 +321,7 @@ static const struct driver_info	an2720_info = {
 static const struct driver_info	belkin_info = {
 	.description =	"Belkin, eTEK, or compatible",
 
-	.in = 1, out: 1,		// direction distinguishes these
+	.in = 1, .out = 1,		// direction distinguishes these
 	.epsize =64,
 };
 
@@ -636,7 +636,7 @@ static const struct driver_info	genelink_info = {
 	.rx_fixup =	genelink_rx_fixup,
 	.tx_fixup =	genelink_tx_fixup,
 
-	.in = 1, out: 2,
+	.in = 1, .out = 2,
 	.epsize =64,
 
 #ifdef	GENELINK_ACK
@@ -674,7 +674,7 @@ static const struct driver_info	linuxdev_info = {
 	.description =	"Linux Device",
 	// no reset defined (yet?)
 	.check_connect =linuxdev_check_connect,
-	.in = 2, out: 1,
+	.in = 2, .out = 1,
 	.epsize =64,
 };
 
@@ -1125,7 +1125,7 @@ static const struct driver_info	net1080_info = {
 	.rx_fixup =	net1080_rx_fixup,
 	.tx_fixup =	net1080_tx_fixup,
 
-	.in = 1, out: 1,		// direction distinguishes these
+	.in = 1, .out = 1,		// direction distinguishes these
 	.epsize =64,
 };
 
@@ -1192,7 +1192,7 @@ static const struct driver_info	prolific_info = {
 		/* some PL-2302 versions seem to fail usb_set_interface() */
 	.reset =	pl_reset,
 
-	.in = 3, out: 2,
+	.in = 3, .out = 2,
 	.epsize =64,
 };
 

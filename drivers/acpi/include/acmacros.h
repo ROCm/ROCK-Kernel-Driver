@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acmacros.h - C macros for the entire subsystem.
- *       $Revision: 125 $
+ *       $Revision: 126 $
  *
  *****************************************************************************/
 
@@ -287,11 +287,15 @@
 /*
  * Macros for the master AML opcode table
  */
-#ifdef ACPI_DISASSEMBLER
+#if defined(ACPI_DISASSEMBLER) || defined (ACPI_DEBUG)
 #define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {name,Pargs,Iargs,flags,obj_type,class,type}
-#define ACPI_DISASM_ONLY_MEMBERS(a)      a;
 #else
 #define ACPI_OP(name,Pargs,Iargs,obj_type,class,type,flags)    {Pargs,Iargs,flags,obj_type,class,type}
+#endif
+
+#ifdef ACPI_DISASSEMBLER
+#define ACPI_DISASM_ONLY_MEMBERS(a)      a;
+#else
 #define ACPI_DISASM_ONLY_MEMBERS(a)
 #endif
 

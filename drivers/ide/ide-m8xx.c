@@ -29,8 +29,9 @@
 #include <linux/init.h>
 #include <linux/blk.h>
 #include <linux/ioport.h>
-#include <linux/ide.h>
 #include <linux/bootmem.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/mpc8xx.h>
 #include <asm/mmu.h>
@@ -43,7 +44,7 @@
 #include <asm/machdep.h>
 #include <asm/irq.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 
 static int identify  (volatile unsigned char *p);
 static void print_fixed (volatile unsigned char *p);
@@ -51,7 +52,7 @@ static void print_funcid (int func);
 static int check_ide_device (unsigned long base);
 
 static int ide_interrupt_ack(struct ata_channel *);
-static void m8xx_ide_tuneproc(struct ata_device *drive, byte pio);
+static void m8xx_ide_tuneproc(struct ata_device *drive, u8 pio);
 
 typedef	struct ide_ioport_desc {
 	unsigned long	base_off;		/* Offset to PCMCIA memory	*/
@@ -437,7 +438,7 @@ void m8xx_ide_init_hwif_ports (hw_regs_t *hw,
 
 /* Calculate PIO timings */
 static void
-m8xx_ide_tuneproc(struct ata_device *drive, byte pio)
+m8xx_ide_tuneproc(struct ata_device *drive, u8 pio)
 {
 #if defined(CONFIG_IDE_8xx_PCCARD) || defined(CONFIG_IDE_8xx_DIRECT)
 	volatile pcmconf8xx_t	*pcmp;

@@ -24,10 +24,11 @@
 #include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/init.h>
-#include <linux/ide.h>
 #include <linux/delay.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 
 #include <asm/io.h>
 #include <asm/irq.h>

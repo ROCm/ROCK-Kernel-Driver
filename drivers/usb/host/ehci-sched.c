@@ -171,15 +171,19 @@ periodic_usecs (struct ehci_hcd *ehci, unsigned frame, unsigned uframe)
 
 /*-------------------------------------------------------------------------*/
 
-static void enable_periodic (struct ehci_hcd *ehci)
+static int enable_periodic (struct ehci_hcd *ehci)
 {
 	u32	cmd;
+	int	status;
 
 	/* did clearing PSE did take effect yet?
 	 * takes effect only at frame boundaries...
 	 */
-	while (readl (&ehci->regs->status) & STS_PSS)
-		udelay (20);
+	status = handshake (&ehci->regs->status, STS_PSS, 0, 9 * 125);
+	if (status != 0) {
+		ehci->hcd.state = USB_STATE_HALT;
+		return status;
+	}
 
 	cmd = readl (&ehci->regs->command) | CMD_PSE;
 	writel (cmd, &ehci->regs->command);
@@ -189,23 +193,29 @@ static void enable_periodic (struct ehci_hcd *ehci)
 	/* make sure tasklet scans these */
 	ehci->next_uframe = readl (&ehci->regs->frame_index)
 				% (ehci->periodic_size << 3);
+	return 0;
 }
 
-static void disable_periodic (struct ehci_hcd *ehci)
+static int disable_periodic (struct ehci_hcd *ehci)
 {
 	u32	cmd;
+	int	status;
 
 	/* did setting PSE not take effect yet?
 	 * takes effect only at frame boundaries...
 	 */
-	while (!(readl (&ehci->regs->status) & STS_PSS))
-		udelay (20);
+	status = handshake (&ehci->regs->status, STS_PSS, STS_PSS, 9 * 125);
+	if (status != 0) {
+		ehci->hcd.state = USB_STATE_HALT;
+		return status;
+	}
 
 	cmd = readl (&ehci->regs->command) & ~CMD_PSE;
 	writel (cmd, &ehci->regs->command);
 	/* posted write ... */
 
 	ehci->next_uframe = -1;
+	return 0;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -217,6 +227,7 @@ static void intr_deschedule (
 	unsigned	period
 ) {
 	unsigned long	flags;
+	int		status;
 
 	period >>= 3;		// FIXME microframe periods not handled yet
 
@@ -234,9 +245,11 @@ static void intr_deschedule (
 
 	/* maybe turn off periodic schedule */
 	if (!ehci->periodic_urbs)
-		disable_periodic (ehci);
-	else
+		status = disable_periodic (ehci);
+	else {
+		status = 0;
 		vdbg ("periodic schedule still enabled");
+	}
 
 	spin_unlock_irqrestore (&ehci->lock, flags);
 
@@ -245,7 +258,7 @@ static void intr_deschedule (
 	 * (yeech!) to be sure it's done.
 	 * No other threads may be mucking with this qh.
 	 */
-	if (((ehci_get_frame (&ehci->hcd) - frame) % period) == 0)
+	if (!status && ((ehci_get_frame (&ehci->hcd) - frame) % period) == 0)
 		udelay (125);
 
 	qh->qh_state = QH_STATE_IDLE;
@@ -501,7 +514,7 @@ static int intr_submit (
 
 			/* maybe enable periodic schedule processing */
 			if (!ehci->periodic_urbs++)
-				enable_periodic (ehci);
+				status = enable_periodic (ehci);
 			break;
 
 		} while (frame);
@@ -913,8 +926,12 @@ itd_schedule (struct ehci_hcd *ehci, struct urb *urb)
 		usb_claim_bandwidth (urb->dev, urb, usecs, 1);
 
 		/* maybe enable periodic schedule processing */
-		if (!ehci->periodic_urbs++)
-			enable_periodic (ehci);
+		if (!ehci->periodic_urbs++) {
+			if ((status =  enable_periodic (ehci)) != 0) {
+				// FIXME deschedule right away
+				err ("itd_schedule, enable = %d", status);
+			}
+		}
 
 		return 0;
 
@@ -994,7 +1011,7 @@ itd_complete (
 	/* defer stopping schedule; completion can submit */
 	ehci->periodic_urbs--;
 	if (!ehci->periodic_urbs)
-		disable_periodic (ehci);
+		(void) disable_periodic (ehci);
 
 	return flags;
 }

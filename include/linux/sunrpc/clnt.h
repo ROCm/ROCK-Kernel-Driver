@@ -127,6 +127,7 @@ int		rpc_call_sync(struct rpc_clnt *clnt, struct rpc_message *msg,
 void		rpc_restart_call(struct rpc_task *);
 void		rpc_clnt_sigmask(struct rpc_clnt *clnt, sigset_t *oldset);
 void		rpc_clnt_sigunmask(struct rpc_clnt *clnt, sigset_t *oldset);
+void		rpc_setbufsize(struct rpc_clnt *, unsigned int, unsigned int);
 
 static __inline__
 int rpc_call(struct rpc_clnt *clnt, u32 proc, void *argp, void *resp, int flags)

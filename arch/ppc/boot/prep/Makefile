@@ -27,7 +27,7 @@ boot-y				:= head.o ../simple/legacy.o misc.o of1275.o \
 OBJCOPY_ARGS			= -O elf32-powerpc
 LIBS 				= ../lib/zlib.a
 
-boot-$(CONFIG_SERIAL_CONSOLE)	+= ../common/ns16550.o
+boot-$($CONFIG_SERIAL_8250_CONSOLE) += ../common/ns16550.o
 boot-$(CONFIG_VGA_CONSOLE)	+= vreset.o kbd.o
 
 EXTRA_TARGETS			:= $(boot-y)

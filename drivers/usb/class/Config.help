@@ -3,6 +3,10 @@ CONFIG_USB_ACM
   Communication Device Class Abstract Control Model interface.
   Please read <file:Documentation/usb/acm.txt> for details.
 
+  If your modem only reports "Cls=ff(vend.)" in the descriptors in
+  /proc/bus/usb/devices, then your modem will not work with this
+  driver.
+
   This code is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called acm.o. If you want to compile it as a

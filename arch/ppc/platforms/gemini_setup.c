@@ -528,6 +528,8 @@ static struct smp_ops_t gemini_smp_ops = {
 	smp_gemini_probe,
 	smp_gemini_kick_cpu,
 	smp_gemini_setup_cpu,
+	.give_timebase = smp_generic_give_timebase,
+	.take_timebase = smp_generic_take_timebase,
 };
 #endif /* CONFIG_SMP */
 

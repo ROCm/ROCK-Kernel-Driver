@@ -1336,7 +1336,7 @@ serial8250_change_speed(struct uart_port *port, unsigned int cflag,
 		fcr |= UART_FCR7_64BYTE;
 
 	up->port.read_status_mask = UART_LSR_OE | UART_LSR_THRE | UART_LSR_DR;
-	if (iflag & IGNPAR)
+	if (iflag & INPCK)
 		up->port.read_status_mask |= UART_LSR_FE | UART_LSR_PE;
 	if (iflag & (BRKINT | PARMRK))
 		up->port.read_status_mask |= UART_LSR_BI;
@@ -1672,23 +1672,23 @@ serial8250_type(struct uart_port *port)
 }
 
 static struct uart_ops serial8250_pops = {
-	tx_empty:	serial8250_tx_empty,
-	set_mctrl:	serial8250_set_mctrl,
-	get_mctrl:	serial8250_get_mctrl,
-	stop_tx:	serial8250_stop_tx,
-	start_tx:	serial8250_start_tx,
-	stop_rx:	serial8250_stop_rx,
-	enable_ms:	serial8250_enable_ms,
-	break_ctl:	serial8250_break_ctl,
-	startup:	serial8250_startup,
-	shutdown:	serial8250_shutdown,
-	change_speed:	serial8250_change_speed,
-	pm:		serial8250_pm,
-	type:		serial8250_type,
-	release_port:	serial8250_release_port,
-	request_port:	serial8250_request_port,
-	config_port:	serial8250_config_port,
-	verify_port:	serial8250_verify_port,
+	.tx_empty	= serial8250_tx_empty,
+	.set_mctrl	= serial8250_set_mctrl,
+	.get_mctrl	= serial8250_get_mctrl,
+	.stop_tx	= serial8250_stop_tx,
+	.start_tx	= serial8250_start_tx,
+	.stop_rx	= serial8250_stop_rx,
+	.enable_ms	= serial8250_enable_ms,
+	.break_ctl	= serial8250_break_ctl,
+	.startup	= serial8250_startup,
+	.shutdown	= serial8250_shutdown,
+	.change_speed	= serial8250_change_speed,
+	.pm		= serial8250_pm,
+	.type		= serial8250_type,
+	.release_port	= serial8250_release_port,
+	.request_port	= serial8250_request_port,
+	.config_port	= serial8250_config_port,
+	.verify_port	= serial8250_verify_port,
 };
 
 static struct uart_8250_port serial8250_ports[UART_NR];
@@ -1707,6 +1707,7 @@ static void __init serial8250_isa_init_ports(void)
 		serial8250_ports[i].port.irq     = irq_cannonicalize(old_serial_port[i].irq);
 		serial8250_ports[i].port.uartclk = old_serial_port[i].base_baud * 16;
 		serial8250_ports[i].port.flags   = old_serial_port[i].flags;
+		serial8250_ports[i].port.hub6    = old_serial_port[i].hub6;
 		serial8250_ports[i].port.ops     = &serial8250_pops;
 	}
 }
@@ -1836,12 +1837,12 @@ static int __init serial8250_console_setup(struct console *co, char *options)
 }
 
 static struct console serial8250_console = {
-	name:		"ttyS",
-	write:		serial8250_console_write,
-	device:		serial8250_console_device,
-	setup:		serial8250_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "ttyS",
+	.write		= serial8250_console_write,
+	.device		= serial8250_console_device,
+	.setup		= serial8250_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 void __init serial8250_console_init(void)
@@ -1856,17 +1857,17 @@ void __init serial8250_console_init(void)
 #endif
 
 static struct uart_driver serial8250_reg = {
-	owner:			THIS_MODULE,
-	driver_name:		"serial",
+	.owner			= THIS_MODULE,
+	.driver_name		= "serial",
 #ifdef CONFIG_DEVFS_FS
-	dev_name:		"tts/%d",
+	.dev_name		= "tts/%d",
 #else
-	dev_name:		"ttyS",
+	.dev_name		= "ttyS",
 #endif
-	major:			TTY_MAJOR,
-	minor:			64,
-	nr:			UART_NR,
-	cons:			SERIAL8250_CONSOLE,
+	.major			= TTY_MAJOR,
+	.minor			= 64,
+	.nr			= UART_NR,
+	.cons			= SERIAL8250_CONSOLE,
 };
 
 /*

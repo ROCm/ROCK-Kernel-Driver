@@ -8,21 +8,18 @@
 #ifndef _PPC_HW_IRQ_H
 #define _PPC_HW_IRQ_H
 
-extern unsigned long timer_interrupt_intercept;
-extern unsigned long do_IRQ_intercept;
-extern int timer_interrupt(struct pt_regs *);
+extern void timer_interrupt(struct pt_regs *);
 extern void ppc_irq_dispatch_handler(struct pt_regs *regs, int irq);
 
 #define INLINE_IRQS
-
-#ifdef INLINE_IRQS
 
 #define mfmsr()		({unsigned int rval; \
 			asm volatile("mfmsr %0" : "=r" (rval)); rval;})
 #define mtmsr(v)	asm volatile("mtmsr %0" : : "r" (v))
 
-#define local_save_flags(flags)	((flags) = mfmsr())
-#define local_irq_restore(flags)	mtmsr(flags)
+#define irqs_disabled()	((mfmsr() & MSR_EE) == 0)
+
+#ifdef INLINE_IRQS
 
 static inline void local_irq_disable(void)
 {
@@ -40,7 +37,7 @@ static inline void local_irq_enable(void)
 	mtmsr(msr | MSR_EE);
 }
 
-static inline void __do_save_and_cli(unsigned long *flags)
+static inline void local_irq_save_ptr(unsigned long *flags)
 {
 	unsigned long msr;
 	msr = mfmsr();
@@ -49,7 +46,9 @@ static inline void __do_save_and_cli(unsigned long *flags)
 	__asm__ __volatile__("": : :"memory");
 }
 
-#define local_irq_save(flags)          __do_save_and_cli(&flags)
+#define local_save_flags(flags)		((flags) = mfmsr())
+#define local_irq_save(flags)		local_irq_save_ptr(&flags)
+#define local_irq_restore(flags)	mtmsr(flags)
 
 #else
 
@@ -57,9 +56,8 @@ extern void local_irq_enable(void);
 extern void local_irq_disable(void);
 extern void local_irq_restore(unsigned long);
 extern void local_save_flags_ptr(unsigned long *);
-extern unsigned long local_irq_enable_end, local_irq_disable_end, local_irq_restore_end, local_save_flags_ptr_end;
 
-#define local_save_flags(flags) local_save_flags_ptr((unsigned long *)&flags)
+#define local_save_flags(flags) local_save_flags_ptr(&flags)
 #define local_irq_save(flags) ({local_save_flags(flags);local_irq_disable();})
 
 #endif

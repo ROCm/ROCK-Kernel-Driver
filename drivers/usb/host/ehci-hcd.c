@@ -65,6 +65,8 @@
  *
  * HISTORY:
  *
+ * 2002-07-25	Sanity check PCI reads, mostly for better cardbus support,
+ * 	clean up HC run state handshaking.
  * 2002-05-24	Preliminary FS/LS interrupts, using scheduling shortcuts
  * 2002-05-11	Clear TT errors for FS/LS ctrl/bulk.  Fill in some other
  *	missing pieces:  enabling 64bit dma, handoff from BIOS/SMM.
@@ -83,7 +85,7 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2002-May-24"
+#define DRIVER_VERSION "2002-Jul-25"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
@@ -113,42 +115,105 @@ MODULE_PARM_DESC (log2_irq_thresh, "log2 IRQ latency, 1-64 microframes");
 /*-------------------------------------------------------------------------*/
 
 /*
+ * handshake - spin reading hc until handshake completes or fails
+ * @ptr: address of hc register to be read
+ * @mask: bits to look at in result of read
+ * @done: value of those bits when handshake succeeds
+ * @usec: timeout in microseconds
+ *
+ * Returns negative errno, or zero on success
+ *
+ * Success happens when the "mask" bits have the specified value (hardware
+ * handshake done).  There are two failure modes:  "usec" have passed (major
+ * hardware flakeout), or the register reads as all-ones (hardware removed).
+ *
+ * That last failure should_only happen in cases like physical cardbus eject
+ * before driver shutdown. But it also seems to be caused by bugs in cardbus
+ * bridge shutdown:  shutting down the bridge before the devices using it.
+ */
+static int handshake (u32 *ptr, u32 mask, u32 done, int usec)
+{
+	u32	result;
+
+	do {
+		result = readl (ptr);
+		if (result == ~(u32)0)		/* card removed */
+			return -ENODEV;
+		result &= mask;
+		if (result == done)
+			return 0;
+		udelay (1);
+		usec--;
+	} while (usec > 0);
+	return -ETIMEDOUT;
+}
+
+/*
  * hc states include: unknown, halted, ready, running
  * transitional states are messy just now
  * trying to avoid "running" unless urbs are active
  * a "ready" hc can be finishing prefetched work
  */
 
-/* halt a non-running controller */
-static void ehci_reset (struct ehci_hcd *ehci)
+/* force HC to halt state from unknown (EHCI spec section 2.3) */
+static int ehci_halt (struct ehci_hcd *ehci)
+{
+	u32	temp = readl (&ehci->regs->status);
+
+	if ((temp & STS_HALT) != 0)
+		return 0;
+
+	temp = readl (&ehci->regs->command);
+	temp &= ~CMD_RUN;
+	writel (temp, &ehci->regs->command);
+	return handshake (&ehci->regs->status, STS_HALT, STS_HALT, 16 * 125);
+}
+
+/* reset a non-running (STS_HALT == 1) controller */
+static int ehci_reset (struct ehci_hcd *ehci)
 {
 	u32	command = readl (&ehci->regs->command);
 
 	command |= CMD_RESET;
 	dbg_cmd (ehci, "reset", command);
 	writel (command, &ehci->regs->command);
-	while (readl (&ehci->regs->command) & CMD_RESET)
-		continue;
 	ehci->hcd.state = USB_STATE_HALT;
+	return handshake (&ehci->regs->command, CMD_RESET, 0, 050);
 }
 
 /* idle the controller (from running) */
 static void ehci_ready (struct ehci_hcd *ehci)
 {
-	u32	command;
+	u32	temp;
 
 #ifdef DEBUG
 	if (!HCD_IS_RUNNING (ehci->hcd.state))
 		BUG ();
 #endif
 
-	while (!(readl (&ehci->regs->status) & (STS_ASS | STS_PSS)))
-		udelay (100);
-	command = readl (&ehci->regs->command);
-	command &= ~(CMD_ASE | CMD_IAAD | CMD_PSE);
-	writel (command, &ehci->regs->command);
+	/* wait for any schedule enables/disables to take effect */
+	temp = 0;
+	if (ehci->async)
+		temp = STS_ASS;
+	if (ehci->next_uframe != -1)
+		temp |= STS_PSS;
+	if (handshake (&ehci->regs->status, STS_ASS | STS_PSS,
+				temp, 16 * 125) != 0) {
+		ehci->hcd.state = USB_STATE_HALT;
+		return;
+	}
 
-	// hardware can take 16 microframes to turn off ...
+	/* then disable anything that's still active */
+	temp = readl (&ehci->regs->command);
+	temp &= ~(CMD_ASE | CMD_IAAD | CMD_PSE);
+	writel (temp, &ehci->regs->command);
+
+	/* hardware can take 16 microframes to turn off ... */
+	if (handshake (&ehci->regs->status, STS_ASS | STS_PSS,
+				0, 16 * 125) != 0) {
+		ehci->hcd.state = USB_STATE_HALT;
+		return;
+	}
 	ehci->hcd.state = USB_STATE_READY;
 }
 
@@ -236,6 +301,10 @@ static int ehci_start (struct usb_hcd *hcd)
 	/* cache this readonly data; minimize PCI reads */
 	ehci->hcs_params = readl (&ehci->caps->hcs_params);
 
+	/* force HC to halt state */
+	if ((retval = ehci_halt (ehci)) != 0)
+		return retval;
+
 	/*
 	 * hw default: 1K periodic list heads, one per frame.
 	 * periodic_size can shrink by USBCMD update if hcc_params allows.
@@ -257,8 +326,10 @@ static int ehci_start (struct usb_hcd *hcd)
 	/* controller state:  unknown --> reset */
 
 	/* EHCI spec section 4.1 */
-	// FIXME require STS_HALT before reset...
-	ehci_reset (ehci);
+	if ((retval = ehci_reset (ehci)) != 0) {
+		ehci_mem_cleanup (ehci);
+		return retval;
+	}
 	writel (INTR_MASK, &ehci->regs->intr_enable);
 	writel (ehci->periodic_dma, &ehci->regs->frame_list);
 
@@ -335,8 +406,6 @@ done2:
 	if (usb_register_root_hub (udev, &ehci->hcd.pdev->dev) != 0) {
 		if (hcd->state == USB_STATE_RUNNING)
 			ehci_ready (ehci);
-		while (readl (&ehci->regs->status) & (STS_ASS | STS_PSS))
-			udelay (100);
 		ehci_reset (ehci);
 		hcd->self.root_hub = 0;
 		usb_free_dev (udev); 
@@ -355,16 +424,14 @@ static void ehci_stop (struct usb_hcd *hcd)
 
 	dbg ("%s: stop", hcd->self.bus_name);
 
+	/* no more interrupts ... */
 	if (hcd->state == USB_STATE_RUNNING)
 		ehci_ready (ehci);
-	while (readl (&ehci->regs->status) & (STS_ASS | STS_PSS))
-		udelay (100);
 	ehci_reset (ehci);
 
-	// root hub is shut down separately (first, when possible)
-	scan_async (ehci);
-	if (ehci->next_uframe != -1)
-		scan_periodic (ehci);
+	/* root hub is shut down separately (first, when possible) */
+	tasklet_disable (&ehci->tasklet);
+	ehci_tasklet ((unsigned long) ehci);
 	ehci_mem_cleanup (ehci);
 
 	dbg_status (ehci, "ehci_stop completed", readl (&ehci->regs->status));
@@ -412,8 +479,6 @@ dbg ("%s: suspend port %d", hcd->self.bus_name, i);
 
 	if (hcd->state == USB_STATE_RUNNING)
 		ehci_ready (ehci);
-	while (readl (&ehci->regs->status) & (STS_ASS | STS_PSS))
-		udelay (100);
 	writel (readl (&ehci->regs->command) & ~CMD_RUN, &ehci->regs->command);
 
 // save pci FLADJ value
@@ -489,6 +554,12 @@ static void ehci_irq (struct usb_hcd *hcd)
 	u32			status = readl (&ehci->regs->status);
 	int			bh;
 
+	/* e.g. cardbus physical eject */
+	if (status == ~(u32) 0) {
+		dbg ("%s: device removed!", hcd->self.bus_name);
+		goto dead;
+	}
+
 	status &= INTR_MASK;
 	if (!status)			/* irq sharing? */
 		return;
@@ -517,10 +588,13 @@ static void ehci_irq (struct usb_hcd *hcd)
 
 	/* PCI errors [4.15.2.4] */
 	if (unlikely ((status & STS_FATAL) != 0)) {
-		err ("%s: fatal error, state %x", hcd->self.bus_name, hcd->state);
+		err ("%s: fatal error, state %x",
+			hcd->self.bus_name, hcd->state);
+dead:
 		ehci_reset (ehci);
-		// generic layer kills/unlinks all urbs
-		// then tasklet cleans up the rest
+		/* generic layer kills/unlinks all urbs, then
+		 * uses ehci_stop to clean up the rest
+		 */
 		bh = 1;
 	}
 

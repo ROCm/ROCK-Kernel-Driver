@@ -34,6 +34,7 @@ struct old_serial_port {
 	unsigned int port;
 	unsigned int irq;
 	unsigned int flags;
+	unsigned char hub6;
 };
 
 #undef SERIAL_DEBUG_PCI

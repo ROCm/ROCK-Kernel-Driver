@@ -335,6 +335,20 @@ rpc_call_setup(struct rpc_task *task, struct rpc_message *msg, int flags)
 		rpcproc_count(task->tk_client, task->tk_msg.rpc_proc)++;
 }
 
+void
+rpc_setbufsize(struct rpc_clnt *clnt, unsigned int sndsize, unsigned int rcvsize)
+{
+	struct rpc_xprt *xprt = clnt->cl_xprt;
+
+	xprt->sndsize = 0;
+	if (sndsize)
+		xprt->sndsize = sndsize + RPC_SLACK_SPACE;
+	xprt->rcvsize = 0;
+	if (rcvsize)
+		xprt->rcvsize = rcvsize + RPC_SLACK_SPACE;
+	xprt_sock_setbufsize(xprt);
+}
+
 /*
  * Restart an (async) RPC call. Usually called from within the
  * exit handler.

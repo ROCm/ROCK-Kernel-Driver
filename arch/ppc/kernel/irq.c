@@ -178,15 +178,6 @@ setup_irq(unsigned int irq, struct irqaction * new)
 	return 0;
 }
 
-#if (defined(CONFIG_8xx) || defined(CONFIG_8260))
-/* Name change so we can catch standard drivers that potentially mess up
- * the internal interrupt controller on 8xx and 8260.  Just bear with me,
- * I don't like this either and I am searching a better solution.  For
- * now, this is what I need. -- Dan
- */
-#define request_irq	request_8xxirq
-#endif
-
 void free_irq(unsigned int irq, void* dev_id)
 {
 	irq_desc_t *desc;
@@ -212,11 +203,7 @@ void free_irq(unsigned int irq, void* dev_id)
 			}
 			spin_unlock_irqrestore(&desc->lock,flags);
 
-#ifdef CONFIG_SMP
-			/* Wait to make sure it's not being used on another CPU */
-			while (desc->status & IRQ_INPROGRESS)
-				barrier();
-#endif
+			synchronize_irq(irq);
 			irq_kfree(action);
 			return;
 		}
@@ -289,8 +276,8 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
  *
  *	This function may be called from IRQ context.
  */
- 
- void disable_irq_nosync(unsigned int irq)
+
+void disable_irq_nosync(unsigned int irq)
 {
 	irq_desc_t *desc = irq_desc + irq;
 	unsigned long flags;
@@ -320,12 +307,7 @@ int request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *)
 void disable_irq(unsigned int irq)
 {
 	disable_irq_nosync(irq);
-
-	if (!local_irq_count(smp_processor_id())) {
-		do {
-			barrier();
-		} while (irq_desc[irq].status & IRQ_INPROGRESS);
-	}
+	synchronize_irq(irq);
 }
 
 /**
@@ -525,11 +507,10 @@ out:
 }
 
 #ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_pic.c */
-int do_IRQ(struct pt_regs *regs)
+void do_IRQ(struct pt_regs *regs)
 {
-	int cpu = smp_processor_id();
 	int irq, first = 1;
-        hardirq_enter( cpu );
+        irq_enter();
 
 	/*
 	 * Every platform is required to implement ppc_md.get_irq.
@@ -546,11 +527,7 @@ int do_IRQ(struct pt_regs *regs)
 	if (irq != -2 && first)
 		/* That's not SMP safe ... but who cares ? */
 		ppc_spurious_interrupts++;
-        hardirq_exit( cpu );
-
-	if (softirq_pending(cpu))
-		do_softirq();
-	return 1; /* lets ret_from_int know we can do checks */
+        irq_exit();
 }
 #endif /* CONFIG_PPC_ISERIES */
 
@@ -582,262 +559,14 @@ void __init init_IRQ(void)
 }
 
 #ifdef CONFIG_SMP
-unsigned char global_irq_holder = NO_PROC_ID;
-unsigned volatile long global_irq_lock; /* pendantic :long for set_bit--RR*/
-
-atomic_t global_bh_count;
-
-static void show(char * str)
+void synchronize_irq(unsigned int irq)
 {
-	int cpu = smp_processor_id();
+        /* is there anything to synchronize with? */
+	if (!irq_desc[irq].action)
+		return;
 
-	printk("\n%s, CPU %d:\n", str, cpu);
-	printk("irq:  [%d %d]\n",
-	       local_irq_count(0),
-	       local_irq_count(1));
-	printk("bh:   %d [%d %d]\n",
-	       atomic_read(&global_bh_count),
-	       local_bh_count(0),
-	       local_bh_count(1));
-}
-
-static inline void wait_on_bh(void)
-{
-	int count = MAXCOUNT;
-	do {
-		if (!--count) {
-			show("wait_on_bh");
-			count = ~0;
-		}
-		/* nothing .. wait for the other bh's to go away */
-	} while (atomic_read(&global_bh_count) != 0);
-}
-
-
-static inline void wait_on_irq(int cpu)
-{
-	int count = MAXCOUNT;
-
-	for (;;) {
-
-		/*
-		 * Wait until all interrupts are gone. Wait
-		 * for bottom half handlers unless we're
-		 * already executing in one..
-		 */
-		if (!irqs_running())
-			if (local_bh_count(cpu) || !spin_is_locked(&global_bh_lock))
-					break;
-
-		/* Duh, we have to loop. Release the lock to avoid deadlocks */
-		clear_bit(0,&global_irq_lock);
-
-		for (;;) {
-			if (!--count) {
-				show("wait_on_irq");
-				count = ~0;
-			}
-			local_irq_enable();
-			/* 
-			 * We have to allow irqs to arrive between local_irq_enable and local_irq_disable
-			 * Some cpus apparently won't cause the interrupt
-			 * for several instructions. We hope that isync will
-			 * catch this --Troy
-			 */
-			__asm__ __volatile__ ("isync");
-			local_irq_disable();
-			if (irqs_running())
-				continue;
-			if (global_irq_lock)
-				continue;
-			if (!local_bh_count(cpu) && spin_is_locked(&global_bh_lock))
-				continue;
-			if (!test_and_set_bit(0,&global_irq_lock))
-				break;
-		}
-	}
-}
-
-/*
- * This is called when we want to synchronize with
- * bottom half handlers. We need to wait until
- * no other CPU is executing any bottom half handler.
- *
- * Don't wait if we're already running in an interrupt
- * context or are inside a bh handler.
- */
-void synchronize_bh(void)
-{
-	if (atomic_read(&global_bh_count) && !in_interrupt())
-		wait_on_bh();
-}
-
-/*
- * This is called when we want to synchronize with
- * interrupts. We may for example tell a device to
- * stop sending interrupts: but to make sure there
- * are no interrupts that are executing on another
- * CPU we need to call this function.
- */
-void synchronize_irq(void)
-{
-	if (irqs_running()) {
-		/* Stupid approach */
-		cli();
-		sti();
-	}
-}
-
-static inline void get_irqlock(int cpu)
-{
-	unsigned int loops = MAXCOUNT;
-
-	if (test_and_set_bit(0,&global_irq_lock)) {
-		/* do we already hold the lock? */
-		if ((unsigned char) cpu == global_irq_holder)
-			return;
-		/* Uhhuh.. Somebody else got it. Wait.. */
-		do {
-			do {
-				if (loops-- == 0) {
-					printk("get_irqlock(%d) waiting, global_irq_holder=%d\n", cpu, global_irq_holder);
-#ifdef CONFIG_XMON
-					xmon(0);
-#endif
-				}
-			} while (test_bit(0,&global_irq_lock));
-		} while (test_and_set_bit(0,&global_irq_lock));		
-	}
-	/* 
-	 * We also need to make sure that nobody else is running
-	 * in an interrupt context. 
-	 */
-	wait_on_irq(cpu);
-
-	/*
-	 * Ok, finally..
-	 */
-	global_irq_holder = cpu;
-}
-
-/*
- * A global "cli()" while in an interrupt context
- * turns into just a local cli(). Interrupts
- * should use spinlocks for the (very unlikely)
- * case that they ever want to protect against
- * each other.
- *
- * If we already have local interrupts disabled,
- * this will not turn a local disable into a
- * global one (problems with spinlocks: this makes
- * save_flags+cli+sti usable inside a spinlock).
- */
-void __global_cli(void)
-{
-	unsigned long flags;
-	
-	local_save_flags(flags);
-	if (flags & (1 << 15)) {
-		int cpu = smp_processor_id();
-		local_irq_disable();
-		if (!local_irq_count(cpu))
-			get_irqlock(cpu);
-	}
-}
-
-void __global_sti(void)
-{
-	int cpu = smp_processor_id();
-
-	if (!local_irq_count(cpu))
-		release_irqlock(cpu);
-	local_irq_enable();
-}
-
-/*
- * SMP flags value to restore to:
- * 0 - global cli
- * 1 - global sti
- * 2 - local cli
- * 3 - local sti
- */
-unsigned long __global_save_flags(void)
-{
-	int retval;
-	int local_enabled;
-	unsigned long flags;
-
-	local_save_flags(flags);
-	local_enabled = (flags >> 15) & 1;
-	/* default to local */
-	retval = 2 + local_enabled;
-
-	/* check for global flags if we're not in an interrupt */
-	if (!local_irq_count(smp_processor_id())) {
-		if (local_enabled)
-			retval = 1;
-		if (global_irq_holder == (unsigned char) smp_processor_id())
-			retval = 0;
-	}
-	return retval;
-}
-
-int
-tb(long vals[],
-   int  max_size)
-{
-   register unsigned long *orig_sp __asm__ ("r1");
-   register unsigned long lr __asm__ ("r3");
-   unsigned long *sp;
-   int i;
-
-   asm volatile ("mflr 3");
-   vals[0] = lr;
-   sp = (unsigned long *) *orig_sp;
-   sp = (unsigned long *) *sp;
-   for (i=1; i<max_size; i++) {
-      if (sp == 0) {
-         break;
-      }
-
-      vals[i] = *(sp+1);
-      sp = (unsigned long *) *sp;
-   }
-
-   return i;
-}
-
-void __global_restore_flags(unsigned long flags)
-{
-	switch (flags) {
-	case 0:
-		__global_cli();
-		break;
-	case 1:
-		__global_sti();
-		break;
-	case 2:
-		local_irq_disable();
-		break;
-	case 3:
-		local_irq_enable();
-		break;
-	default:
-	{
-		unsigned long trace[5];
-                int           count;
-                int           i;
-
-		printk("global_restore_flags: %08lx (%08lx)\n",
-			flags, (&flags)[-1]);
-                count = tb(trace, 5);
-                printk("tb:");
-                for(i=0; i<count; i++) {
-			printk(" %8.8lx", trace[i]);
-		}
-		printk("\n");
-	}
-	}
+	while (irq_desc[irq].status & IRQ_INPROGRESS)
+		barrier();
 }
 #endif /* CONFIG_SMP */
 

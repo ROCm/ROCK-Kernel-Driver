@@ -845,6 +845,7 @@ out:
 	sys_umount("/dev", 0);
 	sys_mount(".", "/", NULL, MS_MOVE, NULL);
 	sys_chroot(".");
+	security_ops->sb_post_mountroot();
 	mount_devfs_fs ();
 }
 

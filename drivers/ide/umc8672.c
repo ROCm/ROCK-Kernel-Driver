@@ -46,13 +46,13 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
+#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
-#include <linux/init.h>
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 
 /*
  * Default speeds.  These can be changed with "auto-tune" and/or hdparm.
@@ -62,11 +62,11 @@
 #define UMC_DRIVE2      1              /* 11 = Fastest Speed */
 #define UMC_DRIVE3      1              /* In case of crash reduce speed */
 
-static byte current_speeds[4] = {UMC_DRIVE0, UMC_DRIVE1, UMC_DRIVE2, UMC_DRIVE3};
-static const byte pio_to_umc [5] = {0,3,7,10,11};	/* rough guesses */
+static u8 current_speeds[4] = {UMC_DRIVE0, UMC_DRIVE1, UMC_DRIVE2, UMC_DRIVE3};
+static const u8 pio_to_umc[5] = {0,3,7,10,11};	/* rough guesses */
 
 /*       0    1    2    3    4    5    6    7    8    9    10   11      */
-static const byte speedtab [3][12] = {
+static const u8 speedtab[3][12] = {
 	{0xf, 0xb, 0x2, 0x2, 0x2, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1 },
 	{0x3, 0x2, 0x2, 0x2, 0x2, 0x2, 0x1, 0x1, 0x1, 0x1, 0x1, 0x1 },
 	{0xff,0xcb,0xc0,0x58,0x36,0x33,0x23,0x22,0x21,0x11,0x10,0x0}};
@@ -77,13 +77,13 @@ static void out_umc (char port,char wert)
 	outb_p (wert,0x109);
 }
 
-static inline byte in_umc (char port)
+static inline u8 in_umc (char port)
 {
 	outb_p (port,0x108);
 	return inb_p (0x109);
 }
 
-static void umc_set_speeds (byte speeds[])
+static void umc_set_speeds(u8 speeds[])
 {
 	int i, tmp;
 
@@ -106,14 +106,14 @@ static void umc_set_speeds (byte speeds[])
 		speeds[0], speeds[1], speeds[2], speeds[3]);
 }
 
-static void tune_umc(struct ata_device *drive, byte pio)
+static void tune_umc(struct ata_device *drive, u8 pio)
 {
 	unsigned long flags;
 
 	if (pio == 255)
 		pio = ata_timing_mode(drive, XFER_PIO | XFER_EPIO) - XFER_PIO_0;
 	else
-		pio = min_t(byte, pio, 4);
+		pio = min_t(u8, pio, 4);
 
 	printk("%s: setting umc8672 to PIO mode%d (speed %d)\n", drive->name, pio, pio_to_umc[pio]);
 	save_flags(flags);	/* all CPUs */

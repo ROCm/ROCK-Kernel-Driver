@@ -25,7 +25,6 @@
 #include <asm/tlbflush.h>
 
 extern void mapin_ram(void);
-extern void bat_mapin_ram(void);
 extern int map_page(unsigned long va, unsigned long pa, int flags);
 extern void setbat(int index, unsigned long virt, unsigned long phys,
 		   unsigned int size, int flags);
@@ -49,14 +48,17 @@ extern unsigned long Hash_size, Hash_mask;
 #if defined(CONFIG_8xx)
 #define flush_HPTE(X, va, pg)	_tlbie(va)
 #define MMU_init_hw()		do { } while(0)
+#define mmu_mapin_ram()		(0UL)
 
 #elif defined(CONFIG_4xx)
 #define flush_HPTE(X, va, pg)	_tlbie(va)
 extern void MMU_init_hw(void);
+#define mmu_mapin_ram()		(0UL)
 
 #else
 /* anything except 4xx or 8xx */
 extern void MMU_init_hw(void);
+extern unsigned long mmu_mapin_ram(void);
 
 /* Be careful....this needs to be updated if we ever encounter 603 SMPs,
  * which includes all new 82xx processors.  We need tlbie/tlbsync here

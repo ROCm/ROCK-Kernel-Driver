@@ -117,7 +117,7 @@ static void smp_iSeries_setup_cpu(int nr)
 	set_dec( xPaca[nr].default_decr );
 }
 
-void smp_iSeries_space_timers( unsigned nr )
+static void smp_iSeries_space_timers(unsigned nr)
 {
 	unsigned offset,i;
 	
@@ -131,6 +131,9 @@ struct smp_ops_t iSeries_smp_ops = {
    smp_iSeries_message_pass,
    smp_iSeries_probe,
    smp_iSeries_kick_cpu,
-   smp_iSeries_setup_cpu
+   smp_iSeries_setup_cpu,
+   smp_iSeries_space_timers,
+   .give_timebase = smp_generic_give_timebase,
+   .take_timebase = smp_generic_take_timebase,
 };
 

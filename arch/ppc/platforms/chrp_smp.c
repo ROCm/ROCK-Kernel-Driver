@@ -50,59 +50,61 @@ smp_chrp_probe(void)
 	return smp_chrp_cpu_nr;
 }
 
-static void __init
+static void __devinit
 smp_chrp_kick_cpu(int nr)
 {
 	*(unsigned long *)KERNELBASE = nr;
 	asm volatile("dcbf 0,%0"::"r"(KERNELBASE):"memory");
 }
 
-static void __init
+static void __devinit
 smp_chrp_setup_cpu(int cpu_nr)
 {
-	static atomic_t ready = ATOMIC_INIT(1);
-	static volatile int frozen = 0;
-
-	/* FIXME: Hotplug cpu breaks all this --RR */
-	if (cpu_nr == 0) {
-		/* wait for all the others */
-		while (atomic_read(&ready) < num_online_cpus())
-			barrier();
-		atomic_set(&ready, 1);
-		/* freeze the timebase */
-		call_rtas("freeze-time-base", 0, 1, NULL);
-		mb();
-		frozen = 1;
-		/* XXX assumes this is not a 601 */
-		set_tb(0, 0);
-		last_jiffy_stamp(0) = 0;
-		while (atomic_read(&ready) < num_online_cpus())
-			barrier();
-		/* thaw the timebase again */
-		call_rtas("thaw-time-base", 0, 1, NULL);
-		mb();
-		frozen = 0;
-		smp_tb_synchronized = 1;
-	} else {
-		atomic_inc(&ready);
-		while (!frozen)
-			barrier();
-		set_tb(0, 0);
-		last_jiffy_stamp(0) = 0;
-		mb();
-		atomic_inc(&ready);
-		while (frozen)
-			barrier();
-	}
-
 	if (OpenPIC_Addr)
 		do_openpic_setup_cpu();
 }
 
+static spinlock_t timebase_lock = SPIN_LOCK_UNLOCKED;
+static unsigned int timebase_upper = 0, timebase_lower = 0;
+
+void __devinit
+smp_chrp_give_timebase(void)
+{
+	spin_lock(&timebase_lock);
+	call_rtas("freeze-time-base", 0, 1, NULL);
+	timebase_upper = get_tbu();
+	timebase_lower = get_tbl();
+	spin_unlock(&timebase_lock);
+
+	while (timebase_upper || timebase_lower)
+		rmb();
+	call_rtas("thaw-time-base", 0, 1, NULL);
+}
+
+void __devinit
+smp_chrp_take_timebase(void)
+{
+	int done = 0;
+
+	while (!done) {
+		spin_lock(&timebase_lock);
+		if (timebase_upper || timebase_lower) {
+			set_tb(timebase_upper, timebase_lower);
+			timebase_upper = 0;
+			timebase_lower = 0;
+			done = 1;
+		}
+		spin_unlock(&timebase_lock);
+	}
+	printk("CPU %i taken timebase\n", smp_processor_id());
+}
+
 /* CHRP with openpic */
 struct smp_ops_t chrp_smp_ops __chrpdata = {
-	smp_openpic_message_pass,
-	smp_chrp_probe,
-	smp_chrp_kick_cpu,
-	smp_chrp_setup_cpu,
+	.message_pass = smp_openpic_message_pass,
+	.probe = smp_chrp_probe,
+	.kick_cpu = smp_chrp_kick_cpu,
+	.setup_cpu = smp_chrp_setup_cpu,
+	.give_timebase = smp_chrp_give_timebase,
+	.take_timebase = smp_chrp_take_timebase,
 };

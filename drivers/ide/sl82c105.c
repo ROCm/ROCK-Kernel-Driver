@@ -19,14 +19,14 @@
 #include <linux/ioport.h>
 #include <linux/interrupt.h>
 #include <linux/blkdev.h>
-#include <linux/hdreg.h>
 #include <linux/pci.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/dma.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 /*
@@ -82,7 +82,7 @@ static void config_for_pio(struct ata_device *drive, int pio, int report)
 	if (pio == 255)
 		xfer_mode = ata_timing_mode(drive, XFER_PIO | XFER_EPIO);
 	else
-		xfer_mode = XFER_PIO_0 + min_t(byte, pio, 4);
+		xfer_mode = XFER_PIO_0 + min_t(u8, pio, 4);
 
 	t = ata_timing_data(xfer_mode);
 
@@ -258,7 +258,7 @@ static void sl82c105_lostirq(struct ata_device *drive)
  * We only deal with PIO mode here - DMA mode 'using_dma' is not
  * initialised at the point that this function is called.
  */
-static void tune_sl82c105(struct ata_device *drive, byte pio)
+static void tune_sl82c105(struct ata_device *drive, u8 pio)
 {
 	config_for_pio(drive, pio, 1);
 
@@ -320,7 +320,7 @@ static unsigned int __init sl82c105_init_chipset(struct pci_dev *dev)
 static void __init sl82c105_init_dma(struct ata_channel *ch, unsigned long dma_base)
 {
 	unsigned int bridge_rev;
-	byte dma_state;
+	u8 dma_state;
 
 	dma_state = inb(dma_base + 2);
 	bridge_rev = sl82c105_bridge_revision(ch->pci_dev);

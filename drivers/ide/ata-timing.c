@@ -23,7 +23,10 @@
  */
 
 #include <linux/kernel.h>
-#include "ata-timing.h"
+#include <linux/hdreg.h>
+#include <linux/ide.h>
+
+#include "timing.h"
 
 /*
  * PIO 0-5, MWDMA 0-2 and UDMA 0-6 timings (in nanoseconds).  These were taken

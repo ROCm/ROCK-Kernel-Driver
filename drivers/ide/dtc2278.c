@@ -9,13 +9,13 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
+#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
-#include <linux/init.h>
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 
 /*
  * Changing this #undef to #define may solve start up problems in some systems.
@@ -66,7 +66,7 @@ static void sub22 (char b, char c)
 	}
 }
 
-static void tune_dtc2278(struct ata_device *drive, byte pio)
+static void tune_dtc2278(struct ata_device *drive, u8 pio)
 {
 	unsigned long flags;
 

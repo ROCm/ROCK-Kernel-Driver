@@ -557,54 +557,54 @@ static int ambauart_verify_port(struct uart_port *port, struct serial_struct *se
 }
 
 static struct uart_ops amba_pops = {
-	tx_empty:	ambauart_tx_empty,
-	set_mctrl:	ambauart_set_mctrl,
-	get_mctrl:	ambauart_get_mctrl,
-	stop_tx:	ambauart_stop_tx,
-	start_tx:	ambauart_start_tx,
-	stop_rx:	ambauart_stop_rx,
-	enable_ms:	ambauart_enable_ms,
-	break_ctl:	ambauart_break_ctl,
-	startup:	ambauart_startup,
-	shutdown:	ambauart_shutdown,
-	change_speed:	ambauart_change_speed,
-	type:		ambauart_type,
-	release_port:	ambauart_release_port,
-	request_port:	ambauart_request_port,
-	config_port:	ambauart_config_port,
-	verify_port:	ambauart_verify_port,
+	.tx_empty	= ambauart_tx_empty,
+	.set_mctrl	= ambauart_set_mctrl,
+	.get_mctrl	= ambauart_get_mctrl,
+	.stop_tx	= ambauart_stop_tx,
+	.start_tx	= ambauart_start_tx,
+	.stop_rx	= ambauart_stop_rx,
+	.enable_ms	= ambauart_enable_ms,
+	.break_ctl	= ambauart_break_ctl,
+	.startup	= ambauart_startup,
+	.shutdown	= ambauart_shutdown,
+	.change_speed	= ambauart_change_speed,
+	.type		= ambauart_type,
+	.release_port	= ambauart_release_port,
+	.request_port	= ambauart_request_port,
+	.config_port	= ambauart_config_port,
+	.verify_port	= ambauart_verify_port,
 };
 
 static struct uart_amba_port amba_ports[UART_NR] = {
 	{
-		port:	{
-			membase:	(void *)IO_ADDRESS(INTEGRATOR_UART0_BASE),
-			mapbase:	INTEGRATOR_UART0_BASE,
-			iotype:		SERIAL_IO_MEM,
-			irq:		IRQ_UARTINT0,
-			uartclk:	14745600,
-			fifosize:	16,
-			ops:		&amba_pops,
-			flags:		ASYNC_BOOT_AUTOCONF,
-			line:		0,
+		.port	= {
+			.membase	= (void *)IO_ADDRESS(INTEGRATOR_UART0_BASE),
+			.mapbase	= INTEGRATOR_UART0_BASE,
+			.iotype		= SERIAL_IO_MEM,
+			.irq		= IRQ_UARTINT0,
+			.uartclk	= 14745600,
+			.fifosize	= 16,
+			.ops		= &amba_pops,
+			.flags		= ASYNC_BOOT_AUTOCONF,
+			.line		= 0,
 		},
-		dtr_mask:	1 << 5,
-		rts_mask:	1 << 4,
+		.dtr_mask	= 1 << 5,
+		.rts_mask	= 1 << 4,
 	},
 	{
-		port:	{
-			membase:	(void *)IO_ADDRESS(INTEGRATOR_UART1_BASE),
-			mapbase:	INTEGRATOR_UART1_BASE,
-			iotype:		SERIAL_IO_MEM,
-			irq:		IRQ_UARTINT1,
-			uartclk:	14745600,
-			fifosize:	16,
-			ops:		&amba_pops,
-			flags:		ASYNC_BOOT_AUTOCONF,
-			line:		1,
+		.port	= {
+			.membase	= (void *)IO_ADDRESS(INTEGRATOR_UART1_BASE),
+			.mapbase	= INTEGRATOR_UART1_BASE,
+			.iotype		= SERIAL_IO_MEM,
+			.irq		= IRQ_UARTINT1,
+			.uartclk	= 14745600,
+			.fifosize	= 16,
+			.ops		= &amba_pops,
+			.flags		= ASYNC_BOOT_AUTOCONF,
+			.line		= 1,
 		},
-		dtr_mask:	1 << 7,
-		rts_mask:	1 << 6,
+		.dtr_mask	= 1 << 7,
+		.rts_mask	= 1 << 6,
 	}
 };
 
@@ -706,12 +706,12 @@ static int __init ambauart_console_setup(struct console *co, char *options)
 }
 
 static struct console amba_console = {
-	name:		"ttyAM",
-	write:		ambauart_console_write,
-	device:		ambauart_console_device,
-	setup:		ambauart_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "ttyAM",
+	.write		= ambauart_console_write,
+	.device		= ambauart_console_device,
+	.setup		= ambauart_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 void __init ambauart_console_init(void)
@@ -725,17 +725,17 @@ void __init ambauart_console_init(void)
 #endif
 
 static struct uart_driver amba_reg = {
-	owner:			THIS_MODULE,
-	driver_name:		"ttyAM",
+	.owner			= THIS_MODULE,
+	.driver_name		= "ttyAM",
 #ifdef CONFIG_DEVFS_FS
-	dev_name:		"ttyAM%d",
+	.dev_name		= "ttyAM%d",
 #else
-	dev_name:		"ttyAM",
+	.dev_name		= "ttyAM",
 #endif
-	major:			SERIAL_AMBA_MAJOR,
-	minor:			SERIAL_AMBA_MINOR,
-	nr:			UART_NR,
-	cons:			AMBA_CONSOLE,
+	.major			= SERIAL_AMBA_MAJOR,
+	.minor			= SERIAL_AMBA_MINOR,
+	.nr			= UART_NR,
+	.cons			= AMBA_CONSOLE,
 };
 
 static int __init ambauart_init(void)

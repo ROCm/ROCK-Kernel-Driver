@@ -22,7 +22,9 @@
  */
 #define read_roothub(hc, register, mask) ({ \
 	u32 temp = readl (&hc->regs->roothub.register); \
-	if (hc->flags & OHCI_QUIRK_AMD756) \
+	if (temp == -1) \
+		disable (hc); \
+	else if (hc->flags & OHCI_QUIRK_AMD756) \
 		while (temp & mask) \
 			temp = readl (&hc->regs->roothub.register); \
 	temp; })
@@ -71,8 +73,10 @@ ohci_hub_status_data (struct usb_hcd *hcd, char *buf)
 
 	ports = roothub_a (ohci) & RH_A_NDP; 
 	if (ports > MAX_ROOT_PORTS) {
-		err ("%s: bogus NDP=%d", hcd->self.bus_name, ports);
-		err ("rereads as NDP=%d",
+		if (ohci->disabled)
+			return -ESHUTDOWN;
+		err ("%s bogus NDP=%d, rereads as NDP=%d",
+			hcd->self.bus_name, ports,
 			readl (&ohci->regs->roothub.a) & RH_A_NDP);
 		/* retry later; "should not happen" */
 		return 0;

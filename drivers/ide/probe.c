@@ -28,9 +28,10 @@
 #include <linux/genhd.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
-#include <linux/ide.h>
 #include <linux/spinlock.h>
 #include <linux/pci.h>
+#include <linux/hdreg.h>
+#include <linux/ide.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -302,18 +303,18 @@ void ide_fixstring(char *s, const int bytecount, const int byteswap)
 /*
  *  All hosts that use the 80c ribbon must use this!
  */
-byte eighty_ninty_three(struct ata_device *drive)
+int eighty_ninty_three(struct ata_device *drive)
 {
-	return ((u8) ((drive->channel->udma_four) &&
+	return ((drive->channel->udma_four) &&
 #ifndef CONFIG_IDEDMA_IVB
 		(drive->id->hw_config & 0x4000) &&
 #endif
-		(drive->id->hw_config & 0x6000)) ? 1 : 0);
+		(drive->id->hw_config & 0x6000)) ? 1 : 0;
 }
 
 /* FIXME: Channel lock should be held.
  */
-int ide_config_drive_speed(struct ata_device *drive, byte speed)
+int ide_config_drive_speed(struct ata_device *drive, u8 speed)
 {
 	struct ata_channel *ch = drive->channel;
 	int ret;

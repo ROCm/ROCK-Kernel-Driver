@@ -95,6 +95,35 @@ int rows, cols;
 
 char *execute_command;
 
+/* Setup configured maximum number of CPUs to activate */
+static unsigned int max_cpus = UINT_MAX;
+
+/*
+ * Setup routine for controlling SMP activation
+ *
+ * Command-line option of "nosmp" or "maxcpus=0" will disable SMP
+ * activation entirely (the MPS table probe still happens, though).
+ *
+ * Command-line option of "maxcpus=<NUM>", where <NUM> is an integer
+ * greater than 0, limits the maximum number of CPUs activated in
+ * SMP mode to <NUM>.
+ */
+static int __init nosmp(char *str)
+{
+	max_cpus = 0;
+	return 1;
+}
+
+__setup("nosmp", nosmp);
+
+static int __init maxcpus(char *str)
+{
+	get_option(&str, &max_cpus);
+	return 1;
+}
+
+__setup("maxcpus=", maxcpus);
+
 static char * argv_init[MAX_INIT_ARGS+2] = { "init", NULL, };
 char * envp_init[MAX_INIT_ENVS+2] = { "HOME=/", "TERM=linux", NULL, };
 
@@ -275,6 +304,7 @@ static void __init smp_init(void)
 #endif
 
 static inline void setup_per_cpu_areas(void) { }
+static inline void smp_prepare_cpus(unsigned int maxcpus) { }
 
 #else
 
@@ -305,11 +335,27 @@ static void __init setup_per_cpu_areas(void)
 /* Called by boot processor to activate the rest. */
 static void __init smp_init(void)
 {
+	unsigned int i;
+
+	/* FIXME: This should be done in userspace --RR */
+	for (i = 0; i < NR_CPUS; i++) {
+		if (num_online_cpus() >= max_cpus)
+			break;
+		if (cpu_possible(i) && !cpu_online(i)) {
+			printk("Bringing up %i\n", i);
+			cpu_up(i);
+		}
+	}
+
+	/* Any cleanup work */
+	printk("CPUS done %u\n", max_cpus);
+	smp_cpus_done(max_cpus);
+#if 0
 	/* Get other processors into their bootup holding patterns. */
-	smp_boot_cpus();
 
 	smp_threads_ready=1;
 	smp_commence();
+#endif
 }
 
 #endif
@@ -405,14 +451,12 @@ asmlinkage void __init start_kernel(void)
 	check_bugs();
 	printk("POSIX conformance testing by UNIFIX\n");
 
-	init_idle(current, smp_processor_id());
-
 	/* 
 	 *	We count on the initial thread going ok 
 	 *	Like idlers init is an unlocked kernel thread, which will
 	 *	make syscalls (and thus be locked).
 	 */
-	smp_init();
+	init_idle(current, smp_processor_id());
 
 	/* Do the rest non-__init'ed, we're now alive */
 	rest_init();
@@ -443,12 +487,6 @@ static void __init do_initcalls(void)
  */
 static void __init do_basic_setup(void)
 {
-	/*
-	 * Let the per-CPU migration threads start up:
-	 */
-#if CONFIG_SMP
-	migration_init();
-#endif
 	/*
 	 * Tell the world that we're going to be the grim
 	 * reaper of innocent orphaned children.
@@ -493,6 +531,9 @@ static int init(void * unused)
 	static char * argv_sh[] = { "sh", NULL, };
 
 	lock_kernel();
+	/* Sets up cpus_possible() */
+	smp_prepare_cpus(max_cpus);
+	smp_init();
 	do_basic_setup();
 
 	prepare_namespace();

@@ -25,6 +25,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/delay.h>

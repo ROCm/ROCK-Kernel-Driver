@@ -31,7 +31,7 @@
  *	Maciej W. Rozycki	:	Bits for genuine 82489DX APICs
  *		Martin J. Bligh	: 	Added support for multi-quad systems
  *		Dave Jones	:	Report invalid combinations of Athlon CPUs.
- */
+*		Rusty Russell	:	Hacked into shape for new "hotplug" boot process. */
 
 #include <linux/config.h>
 #include <linux/init.h>
@@ -53,9 +53,6 @@
 /* Set if we find a B stepping CPU */
 static int __initdata smp_b_stepping;
 
-/* Setup configured maximum number of CPUs to activate */
-static int __initdata max_cpus = NR_CPUS;
-
 /* Number of siblings per CPU package */
 int smp_num_siblings = 1;
 int __initdata phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
@@ -64,40 +61,14 @@ int __initdata phys_proc_id[NR_CPUS]; /* Package ID of each logical CPU */
 unsigned long cpu_online_map;
 
 static volatile unsigned long cpu_callin_map;
-static volatile unsigned long cpu_callout_map;
+volatile unsigned long cpu_callout_map;
+static unsigned long smp_commenced_mask;
 
 /* Per CPU bogomips and other parameters */
 struct cpuinfo_x86 cpu_data[NR_CPUS] __cacheline_aligned;
 
 /* Set when the idlers are all forked */
 int smp_threads_ready;
-
-/*
- * Setup routine for controlling SMP activation
- *
- * Command-line option of "nosmp" or "maxcpus=0" will disable SMP
- * activation entirely (the MPS table probe still happens, though).
- *
- * Command-line option of "maxcpus=<NUM>", where <NUM> is an integer
- * greater than 0, limits the maximum number of CPUs activated in
- * SMP mode to <NUM>.
- */
-
-static int __init nosmp(char *str)
-{
-	max_cpus = 0;
-	return 1;
-}
-
-__setup("nosmp", nosmp);
-
-static int __init maxcpus(char *str)
-{
-	get_option(&str, &max_cpus);
-	return 1;
-}
-
-__setup("maxcpus=", maxcpus);
 
 /*
  * Trampoline 80x86 program as an array.
@@ -139,7 +110,7 @@ void __init smp_alloc_memory(void)
  * a given CPU
  */
 
-void __init smp_store_cpu_info(int id)
+static void __init smp_store_cpu_info(int id)
 {
 	struct cpuinfo_x86 *c = cpu_data + id;
 
@@ -190,29 +161,6 @@ void __init smp_store_cpu_info(int id)
 
 valid_k7:
 	;
-}
-
-/*
- * Architecture specific routine called by the kernel just before init is
- * fired off. This allows the BP to have everything in order [we hope].
- * At the end of this all the APs will hit the system scheduling and off
- * we go. Each AP will load the system gdt's and jump through the kernel
- * init into idle(). At this point the scheduler will one day take over
- * and give them jobs to do. smp_callin is a standard routine
- * we use to track CPUs as they power up.
- */
-
-static atomic_t smp_commenced = ATOMIC_INIT(0);
-
-void __init smp_commence(void)
-{
-	/*
-	 * Lets the callins below out of their loop.
-	 */
-	Dprintk("Setting commenced=1, go go go\n");
-
-	wmb();
-	atomic_set(&smp_commenced,1);
 }
 
 /*
@@ -268,7 +216,7 @@ static void __init synchronize_tsc_bp (void)
 	unsigned long one_usec;
 	int buggy = 0;
 
-	printk("checking TSC synchronization across CPUs: ");
+	printk("checking TSC synchronization across %u CPUs: ", num_booting_cpus());
 
 	one_usec = ((1<<30)/fast_gettimeoffset_quotient)*(1<<2);
 
@@ -289,7 +237,7 @@ static void __init synchronize_tsc_bp (void)
 		/*
 		 * all APs synchronize but they loop on '== num_cpus'
 		 */
-		while (atomic_read(&tsc_count_start) != num_online_cpus()-1)
+		while (atomic_read(&tsc_count_start) != num_booting_cpus()-1)
 			mb();
 		atomic_set(&tsc_count_stop, 0);
 		wmb();
@@ -308,7 +256,7 @@ static void __init synchronize_tsc_bp (void)
 		/*
 		 * Wait for all APs to leave the synchronization point:
 		 */
-		while (atomic_read(&tsc_count_stop) != num_online_cpus()-1)
+		while (atomic_read(&tsc_count_stop) != num_booting_cpus()-1)
 			mb();
 		atomic_set(&tsc_count_start, 0);
 		wmb();
@@ -317,16 +265,16 @@ static void __init synchronize_tsc_bp (void)
 
 	sum = 0;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_online(i)) {
+		if (test_bit(i, &cpu_callout_map)) {
 			t0 = tsc_values[i];
 			sum += t0;
 		}
 	}
-	avg = div64(sum, num_online_cpus());
+	avg = div64(sum, num_booting_cpus());
 
 	sum = 0;
 	for (i = 0; i < NR_CPUS; i++) {
-		if (!cpu_online(i))
+		if (!test_bit(i, &cpu_callout_map))
 			continue;
 		delta = tsc_values[i] - avg;
 		if (delta < 0)
@@ -359,7 +307,7 @@ static void __init synchronize_tsc_ap (void)
 	int i;
 
 	/*
-	 * num_online_cpus is not necessarily known at the time
+	 * Not every cpu is online at the time
 	 * this gets called, so we first wait for the BP to
 	 * finish SMP initialization:
 	 */
@@ -367,7 +315,7 @@ static void __init synchronize_tsc_ap (void)
 
 	for (i = 0; i < NR_LOOPS; i++) {
 		atomic_inc(&tsc_count_start);
-		while (atomic_read(&tsc_count_start) != num_online_cpus())
+		while (atomic_read(&tsc_count_start) != num_booting_cpus())
 			mb();
 
 		rdtscll(tsc_values[smp_processor_id()]);
@@ -375,7 +323,7 @@ static void __init synchronize_tsc_ap (void)
 			write_tsc(0, 0);
 
 		atomic_inc(&tsc_count_stop);
-		while (atomic_read(&tsc_count_stop) != num_online_cpus()) mb();
+		while (atomic_read(&tsc_count_stop) != num_booting_cpus()) mb();
 	}
 }
 #undef NR_LOOPS
@@ -403,7 +351,7 @@ void __init smp_callin(void)
 	 */
 	phys_id = GET_APIC_ID(apic_read(APIC_ID));
 	cpuid = smp_processor_id();
-	if (test_and_set_bit(cpuid, &cpu_online_map)) {
+	if (test_bit(cpuid, &cpu_callin_map)) {
 		printk("huh, phys CPU#%d, CPU#%d already present??\n",
 					phys_id, cpuid);
 		BUG();
@@ -501,15 +449,17 @@ int __init start_secondary(void *unused)
 	 */
 	cpu_init();
 	smp_callin();
-	while (!atomic_read(&smp_commenced))
+	while (!test_bit(smp_processor_id(), &smp_commenced_mask))
 		rep_nop();
+	setup_secondary_APIC_clock();
 	enable_APIC_timer();
 	/*
 	 * low-memory mappings have been cleared, flush them from
 	 * the local TLBs too.
 	 */
 	local_flush_tlb();
-
+	set_bit(smp_processor_id(), &cpu_online_map);
+	wmb();
 	return cpu_idle();
 }
 
@@ -943,7 +893,6 @@ static void __init do_boot_cpu (int apicid)
 		unmap_cpu_to_boot_apicid(cpu, apicid);
 		clear_bit(cpu, &cpu_callout_map); /* was set here (do_boot_cpu()) */
 		clear_bit(cpu, &cpu_initialized); /* was set by cpu_init() */
-		clear_bit(cpu, &cpu_online_map);  /* was set in smp_callin() */
 		cpucount--;
 	}
 
@@ -1015,7 +964,7 @@ void *xquad_portio;
 
 int cpu_sibling_map[NR_CPUS] __cacheline_aligned;
 
-void __init smp_boot_cpus(void)
+static void __init smp_boot_cpus(unsigned int max_cpus)
 {
 	int apicid, cpu, bit;
 
@@ -1057,6 +1006,7 @@ void __init smp_boot_cpus(void)
 	 * We have the boot CPU online for sure.
 	 */
 	set_bit(0, &cpu_online_map);
+	set_bit(0, &cpu_callout_map);
 	boot_cpu_logical_apicid = logical_smp_processor_id();
 	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
 
@@ -1072,11 +1022,11 @@ void __init smp_boot_cpus(void)
 #ifndef CONFIG_VISWS
 		io_apic_irqs = 0;
 #endif
-		cpu_online_map = phys_cpu_present_map = 1;
+		phys_cpu_present_map = 1;
 		if (APIC_init_uniprocessor())
 			printk(KERN_NOTICE "Local APIC not detected."
 					   " Using dummy APIC emulation.\n");
-		goto smp_done;
+		return;
 	}
 
 	/*
@@ -1101,8 +1051,8 @@ void __init smp_boot_cpus(void)
 #ifndef CONFIG_VISWS
 		io_apic_irqs = 0;
 #endif
-		cpu_online_map = phys_cpu_present_map = 1;
-		goto smp_done;
+		phys_cpu_present_map = 1;
+		return;
 	}
 
 	verify_local_APIC();
@@ -1116,8 +1066,8 @@ void __init smp_boot_cpus(void)
 #ifndef CONFIG_VISWS
 		io_apic_irqs = 0;
 #endif
-		cpu_online_map = phys_cpu_present_map = 1;
-		goto smp_done;
+		phys_cpu_present_map = 1;
+		return;
 	}
 
 	connect_bsp_APIC();
@@ -1189,7 +1139,7 @@ void __init smp_boot_cpus(void)
 	} else {
 		unsigned long bogosum = 0;
 		for (cpu = 0; cpu < NR_CPUS; cpu++)
-			if (cpu_online_map & (1<<cpu))
+			if (cpu_callout_map & (1<<cpu))
 				bogosum += cpu_data[cpu].loops_per_jiffy;
 		printk(KERN_INFO "Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
 			cpucount+1,
@@ -1212,10 +1162,10 @@ void __init smp_boot_cpus(void)
 		
 		for (cpu = 0; cpu < NR_CPUS; cpu++) {
 			int 	i;
-			if (!cpu_online(cpu)) continue;
+			if (!test_bit(cpu, &cpu_callout_map)) continue;
 
 			for (i = 0; i < NR_CPUS; i++) {
-				if (i == cpu || !cpu_online(i))
+				if (i == cpu || !test_bit(i, &cpu_callout_map))
 					continue;
 				if (phys_proc_id[cpu] == phys_proc_id[i]) {
 					cpu_sibling_map[cpu] = i;
@@ -1239,17 +1189,40 @@ void __init smp_boot_cpus(void)
 		setup_IO_APIC();
 #endif
 
-	/*
-	 * Set up all local APIC timers in the system:
-	 */
-	setup_APIC_clocks();
+	setup_boot_APIC_clock();
 
 	/*
 	 * Synchronize the TSC with the AP
 	 */
 	if (cpu_has_tsc && cpucount)
 		synchronize_tsc_bp();
+}
 
-smp_done:
+/* These are wrappers to interface to the new boot process.  Someone
+   who understands all this stuff should rewrite it properly. --RR 15/Jul/02 */
+void __init smp_prepare_cpus(unsigned int max_cpus)
+{
+	smp_boot_cpus(max_cpus);
+}
+
+int __devinit __cpu_up(unsigned int cpu)
+{
+	/* This only works at boot for x86.  See "rewrite" above. */
+	if (test_bit(cpu, &smp_commenced_mask))
+		return -ENOSYS;
+
+	/* In case one didn't come up */
+	if (!test_bit(cpu, &cpu_callin_map))
+		return -EIO;
+
+	/* Unleash the CPU! */
+	set_bit(cpu, &smp_commenced_mask);
+	while (!test_bit(cpu, &cpu_online_map))
+		mb();
+	return 0;
+}
+
+void __init smp_cpus_done(unsigned int max_cpus)
+{
 	zap_low_mappings();
 }

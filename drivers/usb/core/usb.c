@@ -947,8 +947,8 @@ static void usb_find_drivers(struct usb_device *dev)
 		/* register this interface with driverfs */
 		interface->dev.parent = &dev->dev;
 		interface->dev.bus = &usb_bus_type;
-		sprintf (&interface->dev.bus_id[0], "%s:%d",
-			 dev->devpath,
+		sprintf (&interface->dev.bus_id[0], "%s-%s:%d",
+			 dev->bus->bus_name, dev->devpath,
 			 interface->altsetting->bInterfaceNumber);
 		if (!desc->iInterface
 				|| usb_string (dev, desc->iInterface,

@@ -33,16 +33,15 @@
 #include <linux/kernel.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
-#include <linux/hdreg.h>
-#include <linux/ide.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/hdreg.h>
 #include <linux/ide.h>
 
 #include <asm/io.h>
 #include <asm/it8172/it8172_int.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 

@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.rwsem.h 1.6 05/17/01 18:14:25 cort
+ * BK Id: %F% %I% %G% %U% %#%
  */
 /*
  * include/asm-ppc/rwsem.h: R/W semaphores for PPC using the stuff
@@ -55,6 +55,7 @@ struct rw_semaphore {
 extern struct rw_semaphore *rwsem_down_read_failed(struct rw_semaphore *sem);
 extern struct rw_semaphore *rwsem_down_write_failed(struct rw_semaphore *sem);
 extern struct rw_semaphore *rwsem_wake(struct rw_semaphore *sem);
+extern struct rw_semaphore *rwsem_downgrade_wake(struct rw_semaphore *sem);
 
 static inline void init_rwsem(struct rw_semaphore *sem)
 {
@@ -122,6 +123,19 @@ static inline void __up_write(struct rw_semaphore *sem)
 static inline void rwsem_atomic_add(int delta, struct rw_semaphore *sem)
 {
 	atomic_add(delta, (atomic_t *)(&sem->count));
+}
+
+/*
+ * downgrade write lock to read lock
+ */
+static inline void __downgrade_write(struct rw_semaphore *sem)
+{
+	int tmp;
+
+	smp_wmb();
+	tmp = atomic_add_return(-RWSEM_WAITING_BIAS, (atomic_t *)(&sem->count));
+	if (tmp < 0)
+		rwsem_downgrade_wake(sem);
 }
 
 /*

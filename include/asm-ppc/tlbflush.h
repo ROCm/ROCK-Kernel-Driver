@@ -22,8 +22,6 @@ extern void _tlbia(void);
 
 #if defined(CONFIG_4xx)
 
-static inline void flush_tlb_all(void)
-	{ _tlbia(); }
 static inline void flush_tlb_mm(struct mm_struct *mm)
 	{ _tlbia(); }
 static inline void flush_tlb_page(struct vm_area_struct *vma,
@@ -40,8 +38,6 @@ static inline void flush_tlb_kernel_range(unsigned long start,
 #elif defined(CONFIG_8xx)
 #define __tlbia()	asm volatile ("tlbia; sync" : : : "memory")
 
-static inline void flush_tlb_all(void)
-	{ __tlbia(); }
 static inline void flush_tlb_mm(struct mm_struct *mm)
 	{ __tlbia(); }
 static inline void flush_tlb_page(struct vm_area_struct *vma,
@@ -58,7 +54,6 @@ static inline void flush_tlb_kernel_range(unsigned long start,
 #else	/* 6xx, 7xx, 7xxx cpus */
 struct mm_struct;
 struct vm_area_struct;
-extern void flush_tlb_all(void);
 extern void flush_tlb_mm(struct mm_struct *mm);
 extern void flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr);
 extern void flush_tlb_range(struct vm_area_struct *vma, unsigned long start,

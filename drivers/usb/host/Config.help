@@ -12,7 +12,8 @@ CONFIG_USB_EHCI_HCD
   will connect to EHCI if it the device is high speed, otherwise they
   connect to a companion controller.  If you configure EHCI, you should
   probably configure the OHCI (for NEC and some other vendors) USB Host
-  Controller Driver too.
+  Controller Driver or UHCI (for Via motherboards) Host Controller
+  Driver too.
 
   You may want to read <file:Documentation/usb/ehci.txt>.
 

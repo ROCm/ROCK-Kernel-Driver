@@ -6,7 +6,7 @@
  * Authors: Johnnie Peters <jpeters@mvista.com>
  *          Matt Porter <mporter@mvista.com>
  *
- * Copyright 2001 MontaVista Software Inc.
+ * Copyright 2001-2002 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -70,7 +70,7 @@ extern char cmd_line[];
  *
  * First entry is the sensitivity (level/edge), second is the polarity.
  */
-unsigned int cpc700_irq_assigns[27][2] = {
+unsigned int cpc700_irq_assigns[32][2] = {
 	{ 1, 1 },       /* IRQ  0: ECC Correctable Error - rising edge */
 	{ 1, 1 },       /* IRQ  1: PCI Write Mem Range   - rising edge */
 	{ 0, 1 },       /* IRQ  2: PCI Write Command Reg - active high */

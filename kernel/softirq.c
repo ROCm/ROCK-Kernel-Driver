@@ -17,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/tqueue.h>
 #include <linux/percpu.h>
+#include <linux/notifier.h>
 
 /*
    - No shared variables, all the data are CPU local.
@@ -387,20 +388,32 @@ static int ksoftirqd(void * __bind_cpu)
 	}
 }
 
+static int __devinit cpu_callback(struct notifier_block *nfb,
+				  unsigned long action,
+				  void *hcpu)
+{
+	int hotcpu = (unsigned long)hcpu;
+
+	if (action == CPU_ONLINE) {
+		if (kernel_thread(ksoftirqd, hcpu,
+				  CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0) {
+			printk("ksoftirqd for %i failed\n", hotcpu);
+			return NOTIFY_BAD;
+		}
+
+		while (!ksoftirqd_task(hotcpu))
+			yield();
+		return NOTIFY_OK;
+ 	}
+	return NOTIFY_BAD;
+}
+
+static struct notifier_block cpu_nfb = { &cpu_callback, NULL, 0 };
+
 static __init int spawn_ksoftirqd(void)
 {
-	int cpu;
-
-	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
-			continue;
-		if (kernel_thread(ksoftirqd, (void *) (long) cpu,
-				  CLONE_FS | CLONE_FILES | CLONE_SIGNAL) < 0)
-			printk("spawn_ksoftirqd() failed for cpu %d\n", cpu);
-		else
-			while (!ksoftirqd_task(cpu))
-				yield();
-	}
+	cpu_callback(&cpu_nfb, CPU_ONLINE, (void *)smp_processor_id());
+	register_cpu_notifier(&cpu_nfb);
 	return 0;
 }
 

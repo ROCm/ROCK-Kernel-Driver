@@ -381,47 +381,6 @@ static ssize_t ppc_htab_write(struct file * file, const char * buffer,
 		}
 	}	
 	
-
-	return count;
-	
-#if 0 /* resizing htab is a bit difficult right now -- Cort */
-	unsigned long size;
-	extern void reset_SDR1(void);
-	
-	/* only know how to set size right now */
-	if ( strncmp( buffer, "size ", 5) )
-		return -EINVAL;
-
-	size = simple_strtoul( &buffer[5], NULL, 10 );
-	
-	/* only allow to shrink */
-	if ( size >= Hash_size>>10 )
-		return -EINVAL;
-
-	/* minimum size of htab */
-	if ( size < 64 )
-		return -EINVAL;
-	
-	/* make sure it's a multiple of 64k */
-	if ( size % 64 )
-		return -EINVAL;
-	
-	printk("Hash table resize to %luk\n", size);
-	/*
-	 * We need to rehash all kernel entries for the new htab size.
-	 * Kernel only since we do a flush_tlb_all().  Since it's kernel
-	 * we only need to bother with vsids 0-15.  To avoid problems of
-	 * clobbering un-rehashed values we put the htab at a new spot
-	 * and put everything there.
-	 * -- Cort
-	 */
-	Hash_size = size<<10;
-	Hash_mask = (Hash_size >> 6) - 1;
-        _SDR1 = __pa(Hash) | (Hash_mask >> 10);
-	flush_tlb_all();
-
-	reset_SDR1();
-#endif	
 	return count;
 #else /* CONFIG_PPC_STD_MMU */
 	return 0;

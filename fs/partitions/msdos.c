@@ -23,6 +23,7 @@
 #include <linux/buffer_head.h>		/* for invalidate_bdev() */
 
 #ifdef CONFIG_BLK_DEV_IDE
+#include <linux/hdreg.h>
 #include <linux/ide.h>	/* IDE xlate */
 #elif defined(CONFIG_BLK_DEV_IDE_MODULE)
 #include <linux/module.h>

@@ -99,7 +99,7 @@
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 #include "pcihost.h"
 
 #define OPTI621_MAX_PIO 3
@@ -137,7 +137,7 @@ int reg_base;
 
 /* there are stored pio numbers from other calls of opti621_tune_drive */
 
-static void compute_pios(struct ata_device *drive, byte pio)
+static void compute_pios(struct ata_device *drive, u8 pio)
 /* Store values into drive->drive_data
  *	second_contr - 0 for primary controller, 1 for secondary
  *	slave_drive - 0 -> pio is for master, 1 -> pio is for slave
@@ -178,7 +178,7 @@ static int cmpt_clk(int time, int bus_speed)
 	return ((time*bus_speed+999999)/1000000);
 }
 
-static void write_reg(byte value, int reg)
+static void write_reg(u8 value, int reg)
 /* Write value to register reg, base of register
  * is at reg_base (0x1f0 primary, 0x170 secondary,
  * if not changed by PCI configuration).
@@ -192,14 +192,14 @@ static void write_reg(byte value, int reg)
 	outb(0x83, reg_base+2);
 }
 
-static byte read_reg(int reg)
+static u8 read_reg(int reg)
 /* Read value from register reg, base of register
  * is at reg_base (0x1f0 primary, 0x170 secondary,
  * if not changed by PCI configuration).
  * This is from setupvic.exe program.
  */
 {
-	byte ret;
+	u8 ret;
 	inw(reg_base+1);
 	inw(reg_base+1);
 	outb(3, reg_base+2);
@@ -245,16 +245,16 @@ static void compute_clocks(int pio, pio_clocks_t *clks)
 }
 
 /* Main tune procedure, called from tuneproc. */
-static void opti621_tune_drive(struct ata_device *drive, byte pio)
+static void opti621_tune_drive(struct ata_device *drive, u8 pio)
 {
 	/* primary and secondary drives share some registers,
 	 * so we have to program both drives
 	 */
 	unsigned long flags;
-	byte pio1, pio2;
+	u8 pio1, pio2;
 	pio_clocks_t first, second;
 	int ax, drdy;
-	byte cycle1, cycle2, misc;
+	u8 cycle1, cycle2, misc;
 	struct ata_channel *hwif = drive->channel;
 
 	/* sets drive->drive_data for both drives */

@@ -32,7 +32,7 @@ endif
 obj-$(CONFIG_ALL_PPC)		+= pmac_pic.o pmac_setup.o pmac_time.o \
 					pmac_feature.o pmac_pci.o chrp_setup.o\
 					chrp_time.o chrp_pci.o prep_pci.o \
-					prep_time.o prep_nvram.o prep_setup.o
+					prep_time.o prep_setup.o
 ifeq ($(CONFIG_ALL_PPC),y)
 obj-$(CONFIG_NVRAM)		+= pmac_nvram.o
 endif
@@ -50,7 +50,7 @@ obj-$(CONFIG_MENF1)		+= menf1_setup.o menf1_pci.o
 obj-$(CONFIG_MVME5100)		+= mvme5100_setup.o mvme5100_pci.o
 obj-$(CONFIG_PCORE)		+= pcore_setup.o pcore_pci.o
 obj-$(CONFIG_POWERPMC250)	+= powerpmc250.o
-obj-$(CONFIG_PPLUS)		+= pplus_pci.o pplus_setup.o prep_nvram.o
+obj-$(CONFIG_PPLUS)		+= pplus_pci.o pplus_setup.o
 obj-$(CONFIG_PRPMC750)		+= prpmc750_setup.o prpmc750_pci.o
 obj-$(CONFIG_PRPMC800)		+= prpmc800_setup.o prpmc800_pci.o
 obj-$(CONFIG_SANDPOINT)		+= sandpoint_setup.o sandpoint_pci.o

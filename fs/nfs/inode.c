@@ -125,8 +125,12 @@ nfs_delete_inode(struct inode * inode)
 static void
 nfs_clear_inode(struct inode *inode)
 {
-	struct rpc_cred *cred = NFS_I(inode)->mm_cred;
+	struct nfs_inode *nfsi = NFS_I(inode);
+	struct rpc_cred *cred = nfsi->mm_cred;
 
+	if (cred)
+		put_rpccred(cred);
+	cred = nfsi->cache_access.cred;
 	if (cred)
 		put_rpccred(cred);
 }
@@ -425,7 +429,8 @@ int nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int sile
 		goto failure_kill_reqlist;
 	}
 
-	/* We're airborne */
+	/* We're airborne Set socket buffersize */
+	rpc_setbufsize(clnt, server->wsize + 100, server->rsize + 100);
 
 	/* Check whether to start the lockd process */
 	if (!(server->flags & NFS_MOUNT_NONLM))
@@ -721,6 +726,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		NFS_ATTRTIMEO(inode) = NFS_MINATTRTIMEO(inode);
 		NFS_ATTRTIMEO_UPDATE(inode) = jiffies;
 		memset(NFS_COOKIEVERF(inode), 0, sizeof(NFS_COOKIEVERF(inode)));
+		NFS_I(inode)->cache_access.cred = NULL;
 
 		unlock_new_inode(inode);
 	} else
@@ -854,15 +860,23 @@ int nfs_open(struct inode *inode, struct file *filp)
 {
 	struct rpc_auth *auth;
 	struct rpc_cred *cred;
+	int err = 0;
 
 	lock_kernel();
+	/* Ensure that we revalidate the data cache */
+	if (NFS_SERVER(inode)->flags & NFS_MOUNT_NOCTO) {
+		err = __nfs_revalidate_inode(NFS_SERVER(inode),inode);
+		if (err)
+			goto out;
+	}
 	auth = NFS_CLIENT(inode)->cl_auth;
 	cred = rpcauth_lookupcred(auth, 0);
 	filp->private_data = cred;
 	if (filp->f_mode & FMODE_WRITE)
 		nfs_set_mmcred(inode, cred);
+out:
 	unlock_kernel();
-	return 0;
+	return err;
 }
 
 int nfs_release(struct inode *inode, struct file *filp)
@@ -1075,6 +1089,16 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 
 	NFS_CACHE_ISIZE(inode) = new_size;
 	inode->i_size = new_isize;
+
+	if (inode->i_mode != fattr->mode ||
+	    inode->i_uid != fattr->uid ||
+	    inode->i_gid != fattr->gid) {
+		struct rpc_cred **cred = &NFS_I(inode)->cache_access.cred;
+		if (*cred) {
+			put_rpccred(*cred);
+			*cred = NULL;
+		}
+	}
 
 	inode->i_mode = fattr->mode;
 	inode->i_nlink = fattr->nlink;

@@ -12,6 +12,7 @@
 #include <linux/highuid.h>
 #include <linux/fs.h>
 #include <linux/namei.h>
+#include <linux/security.h>
 
 #include <asm/uaccess.h>
 
@@ -36,6 +37,11 @@ void generic_fillattr(struct inode *inode, struct kstat *stat)
 int vfs_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = dentry->d_inode;
+	int retval;
+
+	retval = security_ops->inode_getattr(mnt, dentry);
+	if (retval)
+		return retval;
 
 	if (inode->i_op->getattr)
 		return inode->i_op->getattr(mnt, dentry, stat);
@@ -232,8 +238,11 @@ asmlinkage long sys_readlink(const char * path, char * buf, int bufsiz)
 
 		error = -EINVAL;
 		if (inode->i_op && inode->i_op->readlink) {
-			UPDATE_ATIME(inode);
-			error = inode->i_op->readlink(nd.dentry, buf, bufsiz);
+			error = security_ops->inode_readlink(nd.dentry);
+			if (!error) {
+				UPDATE_ATIME(inode);
+				error = inode->i_op->readlink(nd.dentry, buf, bufsiz);
+			}
 		}
 		path_release(&nd);
 	}

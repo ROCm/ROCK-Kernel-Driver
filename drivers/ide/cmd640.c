@@ -106,13 +106,13 @@
 #include <linux/mm.h>
 #include <linux/ioport.h>
 #include <linux/blkdev.h>
+#include <linux/init.h>
 #include <linux/hdreg.h>
 #include <linux/ide.h>
-#include <linux/init.h>
 
 #include <asm/io.h>
 
-#include "ata-timing.h"
+#include "timing.h"
 
 /*
  * This flag is set in ide.c by the parameter:  ide0=cmd640_vlb
@@ -200,7 +200,7 @@ static struct ata_device *cmd_drives[4];
  * Interface to access cmd640x registers
  */
 static unsigned int cmd640_key;
-static void (*put_cmd640_reg)(unsigned short reg, byte val);
+static void (*put_cmd640_reg)(unsigned short reg, u8 val);
 static u8 (*get_cmd640_reg)(unsigned short reg);
 
 /*
@@ -219,7 +219,7 @@ static spinlock_t cmd640_lock = SPIN_LOCK_UNLOCKED;
 
 /* PCI method 1 access */
 
-static void put_cmd640_reg_pci1 (unsigned short reg, byte val)
+static void put_cmd640_reg_pci1 (unsigned short reg, u8 val)
 {
 	unsigned long flags;
 
@@ -641,7 +641,7 @@ static void cmd640_set_mode (unsigned int index, u8 pio_mode, unsigned int cycle
 /*
  * Drive PIO mode selection:
  */
-static void cmd640_tune_drive(struct ata_device *drive, byte mode_wanted)
+static void cmd640_tune_drive(struct ata_device *drive, u8 mode_wanted)
 {
 	u8 b;
 	struct ata_timing *t;

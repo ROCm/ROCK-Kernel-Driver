@@ -9,7 +9,7 @@
  * Cort Dougan, Johnnie Peters, Matt Porter, and
  * Troy Benjegerdes.
  *
- * Copyright 2001 MontaVista Software Inc.
+ * Copyright 2001-2002 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -76,8 +76,9 @@
 
 TODC_ALLOC();
 
-extern void pplus_setup_hose(void);
+extern char saved_command_line[];
 
+extern void pplus_setup_hose(void);
 extern void pplus_set_VIA_IDE_native(void);
 
 extern unsigned long loops_per_jiffy;
@@ -131,7 +132,8 @@ pplus_setup_arch(void)
 		ROOT_DEV = Root_SDA2;
 #endif
 
-	printk("PowerPlus port (C) 2001 MontaVista Software, Inc. (source@mvista.com)\n");
+	printk(KERN_INFO "Motorola PowerPlus Platform\n");
+	printk(KERN_INFO "Port by MontaVista Software, Inc. (source@mvista.com)\n");
 
 	if ( ppc_md.progress )
 		ppc_md.progress("pplus_setup_arch: raven_init\n", 0);
@@ -144,6 +146,21 @@ pplus_setup_arch(void)
 	conswitchp = &vga_con;
 #elif defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
+#endif
+#ifdef CONFIG_PPCBUG_NVRAM
+	/* Read in NVRAM data */ 
+	init_prep_nvram();
+
+	/* if no bootargs, look in NVRAM */
+	if ( cmd_line[0] == '\0' ) {
+		char *bootargs;
+		 bootargs = prep_nvram_get_var("bootargs");
+		 if (bootargs != NULL) {
+			 strcpy(cmd_line, bootargs);
+			 /* again.. */
+			 strcpy(saved_command_line, cmd_line);
+		}
+	}
 #endif
 	if ( ppc_md.progress )
 		ppc_md.progress("pplus_setup_arch: exit\n", 0);
@@ -309,6 +326,8 @@ static struct smp_ops_t pplus_smp_ops = {
 	smp_pplus_probe,
 	smp_pplus_kick_cpu,
 	smp_pplus_setup_cpu,
+	.give_timebase = smp_generic_give_timebase,
+	.take_timebase = smp_generic_take_timebase,
 };
 #endif /* CONFIG_SMP */
 

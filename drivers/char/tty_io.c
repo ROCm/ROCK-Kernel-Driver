@@ -545,6 +545,7 @@ void tty_vhangup(struct tty_struct * tty)
 #endif
 	do_tty_hangup((void *) tty);
 }
+EXPORT_SYMBOL(tty_vhangup);
 
 int tty_hung_up_p(struct file * filp)
 {
@@ -1458,6 +1459,10 @@ static int tty_fasync(int fd, struct file * filp, int on)
 		if (!waitqueue_active(&tty->read_wait))
 			tty->minimum_to_wake = 1;
 		if (filp->f_owner.pid == 0) {
+			retval = security_ops->file_set_fowner(filp);
+			if (retval)
+				return retval;
+
 			filp->f_owner.pid = (-tty->pgrp) ? : current->pid;
 			filp->f_owner.uid = current->uid;
 			filp->f_owner.euid = current->euid;

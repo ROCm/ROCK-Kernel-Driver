@@ -498,35 +498,35 @@ static int uart00_verify_port(struct uart_port *port, struct serial_struct *ser)
 }
 
 static struct uart_ops uart00_pops = {
-	tx_empty:	uart00_tx_empty,
-	set_mctrl:	uart00_set_mctrl_null,
-	get_mctrl:	uart00_get_mctrl,
-	stop_tx:	uart00_stop_tx,
-	start_tx:	uart00_start_tx,
-	stop_rx:	uart00_stop_rx,
-	enable_ms:	uart00_enable_ms,
-	break_ctl:	uart00_break_ctl,
-	startup:	uart00_startup,
-	shutdown:	uart00_shutdown,
-	change_speed:	uart00_change_speed,
-	type:		uart00_type,
-	release_port:	uart00_release_port,
-	request_port:	uart00_request_port,
-	config_port:	uart00_config_port,
-	verify_port:	uart00_verify_port,
+	.tx_empty	= uart00_tx_empty,
+	.set_mctrl	= uart00_set_mctrl_null,
+	.get_mctrl	= uart00_get_mctrl,
+	.stop_tx	= uart00_stop_tx,
+	.start_tx	= uart00_start_tx,
+	.stop_rx	= uart00_stop_rx,
+	.enable_ms	= uart00_enable_ms,
+	.break_ctl	= uart00_break_ctl,
+	.startup	= uart00_startup,
+	.shutdown	= uart00_shutdown,
+	.change_speed	= uart00_change_speed,
+	.type		= uart00_type,
+	.release_port	= uart00_release_port,
+	.request_port	= uart00_request_port,
+	.config_port	= uart00_config_port,
+	.verify_port	= uart00_verify_port,
 };
 
 
 #ifdef CONFIG_ARCH_CAMELOT
 static struct uart_port epxa10db_port = {
-	membase:	(void*)IO_ADDRESS(EXC_UART00_BASE),
-	mapbase:         EXC_UART00_BASE,
-	iotype:         SERIAL_IO_MEM,
-	irq:		IRQ_UART,
-	uartclk:	EXC_AHB2_CLK_FREQUENCY,
-	fifosize:	16,
-	ops:		&uart00_pops,
-	flags:          ASYNC_BOOT_AUTOCONF,
+	.membase	= (void*)IO_ADDRESS(EXC_UART00_BASE),
+	.mapbase	= EXC_UART00_BASE,
+	.iotype		= SERIAL_IO_MEM,
+	.irq		= IRQ_UART,
+	.uartclk	= EXC_AHB2_CLK_FREQUENCY,
+	.fifosize	= 16,
+	.ops		= &uart00_pops,
+	.flags		= ASYNC_BOOT_AUTOCONF,
 };
 #endif
 
@@ -633,12 +633,12 @@ static int __init uart00_console_setup(struct console *co, char *options)
 }
 
 static struct console uart00_console = {
-	name:           SERIAL_UART00_NAME,
-	write:		uart00_console_write,
-	device:		uart00_console_device,
-	setup:		uart00_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		0,
+	.name		= SERIAL_UART00_NAME,
+	.write		= uart00_console_write,
+	.device		= uart00_console_device,
+	.setup		= uart00_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= 0,
 };
 
 void __init uart00_console_init(void)
@@ -652,13 +652,13 @@ void __init uart00_console_init(void)
 #endif
 
 static struct uart_driver uart00_reg = {
-	owner:                  NULL,
-	driver_name:		SERIAL_UART00_NAME,
-	dev_name:		SERIAL_UART00_NAME,
-	major:			SERIAL_UART00_MAJOR,
-	minor:			SERIAL_UART00_MINOR,
-	nr:			UART_NR,
-	cons:			UART00_CONSOLE,
+	.owner			= NULL,
+	.driver_name		= SERIAL_UART00_NAME,
+	.dev_name		= SERIAL_UART00_NAME,
+	.major			= SERIAL_UART00_MAJOR,
+	.minor			= SERIAL_UART00_MINOR,
+	.nr			= UART_NR,
+	.cons			= UART00_CONSOLE,
 };
 
 struct dev_port_entry{

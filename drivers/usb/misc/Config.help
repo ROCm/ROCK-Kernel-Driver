@@ -7,7 +7,7 @@ CONFIG_USB_AUERSWALD
   The module will be called auerswald.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_USB_BRLVOYAGER
+CONFIG_USB_BRLVGER
   Say Y here if you want to use the Voyager USB Braille display from
   Tieman. See <file:Documentation/usb/brlvger.txt> for more
   information.

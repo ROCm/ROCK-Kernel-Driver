@@ -18,6 +18,10 @@
 
 	See the file COPYING in this distribution for more information.
 
+	Contribuitors:
+	
+		Wake-on-LAN support - Felipe Damasio <felipewd@terra.com.br>
+			
 	TODO, in rough priority order:
 	* dev->tx_timeout
 	* LinkChg interrupt
@@ -32,7 +36,6 @@
 	  h/w stats can be reset only by software reset
 	* Tx checksumming
 	* Handle netif_rx return value
-	* ETHTOOL_[GS]WOL,
 	* Investigate using skb->priority with h/w VLAN priority
 	* Investigate using High Priority Tx Queue with skb->priority
 	* Adjust Rx FIFO threshold and Max Rx DMA burst on Rx FIFO error
@@ -79,7 +82,7 @@
 
 /* These identify the driver base version and may not be removed. */
 static char version[] __devinitdata =
-KERN_INFO DRV_NAME " 10/100 PCI Ethernet driver v" DRV_VERSION " (" DRV_RELDATE ")\n";
+KERN_INFO DRV_NAME ": 10/100 PCI Ethernet driver v" DRV_VERSION " (" DRV_RELDATE ")\n";
 
 MODULE_AUTHOR("Jeff Garzik <jgarzik@mandrakesoft.com>");
 MODULE_DESCRIPTION("RealTek RTL-8139C+ series 10/100 PCI Ethernet driver");
@@ -87,13 +90,13 @@ MODULE_LICENSE("GPL");
 
 static int debug = -1;
 MODULE_PARM (debug, "i");
-MODULE_PARM_DESC (debug, "8139cp bitmapped message enable number");
+MODULE_PARM_DESC (debug, "8139cp: bitmapped message enable number");
 
 /* Maximum number of multicast addresses to filter (vs. Rx-all-multicast).
    The RTL chips use a 64 element hash table based on the Ethernet CRC.  */
 static int multicast_filter_limit = 32;
 MODULE_PARM (multicast_filter_limit, "i");
-MODULE_PARM_DESC (multicast_filter_limit, "8139cp maximum number of filtered multicast addresses");
+MODULE_PARM_DESC (multicast_filter_limit, "8139cp: maximum number of filtered multicast addresses");
 
 #define PFX			DRV_NAME ": "
 
@@ -260,12 +263,23 @@ enum {
 
 	/* Config1 register */
 	DriverLoaded	= (1 << 5),  /* Software marker, driver is loaded */
+	LWACT           = (1 << 4),  /* LWAKE active mode */
 	PMEnable	= (1 << 0),  /* Enable various PM features of chip */
 
 	/* Config3 register */
 	PARMEnable	= (1 << 6),  /* Enable auto-loading of PHY parms */
+	MagicPacket     = (1 << 5),  /* Wake up when receives a Magic Packet */
+	LinkUp          = (1 << 4),  /* Wake up when the cable connection is re-established */
+
+	/* Config4 register */
+	LWPTN           = (1 << 1),  /* LWAKE Pattern */
+	LWPME           = (1 << 4),  /* LANWAKE vs PMEB */
 
 	/* Config5 register */
+	BWF             = (1 << 6),  /* Accept Broadcast wakeup frame */
+	MWF             = (1 << 5),  /* Accept Multicast wakeup frame */
+	UWF             = (1 << 4),  /* Accept Unicast wakeup frame */
+	LANWake         = (1 << 1),  /* Enable LANWake signal */
 	PMEStatus	= (1 << 0),  /* PME status can be reset by PCI RST# */
 };
 
@@ -344,6 +358,8 @@ struct cp_private {
 	struct sk_buff		*frag_skb;
 	unsigned		dropping_frag : 1;
 	unsigned int		board_type;
+
+	unsigned int		wol_enabled : 1; /* Is Wake-on-LAN enabled? */
 
 	struct mii_if_info	mii_if;
 };
@@ -986,9 +1002,12 @@ static void cp_init_hw (struct cp_private *cp)
 	cpw32_f (TxConfig, IFG | (TX_DMA_BURST << TxDMAShift));
 
 	cpw8(Config1, cpr8(Config1) | DriverLoaded | PMEnable);
-	if (cp->board_type == RTL8139Cp)
-		cpw8(Config3, PARMEnable); /* disables magic packet and WOL */
-	cpw8(Config5, cpr8(Config5) & PMEStatus); /* disables more WOL stuff */
+	/* Disable Wake-on-LAN. Can be turned on with ETHTOOL_SWOL */
+	if (cp->board_type == RTL8139Cp) {
+		cpw8(Config3, PARMEnable);
+		cp->wol_enabled = 0;
+	}
+	cpw8(Config5, cpr8(Config5) & PMEStatus); 
 	if (cp->board_type == RTL8169)
 		cpw16(RxMaxSize, cp->rx_buf_sz);
 
@@ -1218,6 +1237,60 @@ static void mdio_write(struct net_device *dev, int phy_id, int location,
 		cpw8(Cfg9346, Cfg9346_Lock);
 	} else if (location < 8 && mii_2_8139_map[location])
 		cpw16(mii_2_8139_map[location], value);
+}
+
+/* Set the ethtool Wake-on-LAN settings */
+static void netdev_set_wol (struct cp_private *cp,
+                     const struct ethtool_wolinfo *wol)
+{
+	u8 options;
+
+	options = cpr8 (Config3) & ~(LinkUp | MagicPacket);
+	/* If WOL is being disabled, no need for complexity */
+	if (wol->wolopts) {
+		if (wol->wolopts & WAKE_PHY)	options |= LinkUp;
+		if (wol->wolopts & WAKE_MAGIC)	options |= MagicPacket;
+	}
+
+	cpw8 (Cfg9346, Cfg9346_Unlock);
+	cpw8 (Config3, options);
+	cpw8 (Cfg9346, Cfg9346_Lock);
+
+	options = 0; /* Paranoia setting */
+	options = cpr8 (Config5) & ~(UWF | MWF | BWF);
+	/* If WOL is being disabled, no need for complexity */
+	if (wol->wolopts) {
+		if (wol->wolopts & WAKE_UCAST)  options |= UWF;
+		if (wol->wolopts & WAKE_BCAST)	options |= BWF;
+		if (wol->wolopts & WAKE_MCAST)	options |= MWF;
+	}
+
+	cpw8 (Config5, options);
+
+	cp->wol_enabled = (wol->wolopts) ? 1 : 0;
+}
+
+/* Get the ethtool Wake-on-LAN settings */
+static void netdev_get_wol (struct cp_private *cp,
+	             struct ethtool_wolinfo *wol)
+{
+	u8 options;
+
+	wol->wolopts   = 0; /* Start from scratch */
+	wol->supported = WAKE_PHY   | WAKE_BCAST | WAKE_MAGIC |
+		         WAKE_MCAST | WAKE_UCAST;
+	/* We don't need to go on if WOL is disabled */
+	if (!cp->wol_enabled) return;
+	
+	options        = cpr8 (Config3);
+	if (options & LinkUp)        wol->wolopts |= WAKE_PHY;
+	if (options & MagicPacket)   wol->wolopts |= WAKE_MAGIC;
+
+	options        = 0; /* Paranoia setting */
+	options        = cpr8 (Config5);
+	if (options & UWF)           wol->wolopts |= WAKE_UCAST;
+	if (options & BWF)           wol->wolopts |= WAKE_BCAST;
+	if (options & MWF)           wol->wolopts |= WAKE_MCAST;
 }
 
 static int cp_ethtool_ioctl (struct cp_private *cp, void *useraddr)
@@ -1494,6 +1567,27 @@ err_out_gregs:
 		return 0;
 	}
 
+	/* get/set Wake-on-LAN settings */
+	case ETHTOOL_GWOL: {
+		struct ethtool_wolinfo wol = { ETHTOOL_GWOL };
+		
+		spin_lock_irq (&cp->lock);
+		netdev_get_wol (cp, &wol);
+		spin_unlock_irq (&cp->lock);
+		return ((copy_to_user (useraddr, &wol, sizeof (wol)))? -EFAULT : 0);
+	}
+	
+	case ETHTOOL_SWOL: {
+		struct ethtool_wolinfo wol;
+
+		if (copy_from_user (&wol, useraddr, sizeof (wol)))
+			return -EFAULT;
+		spin_lock_irq (&cp->lock);
+		netdev_set_wol (cp, &wol);
+		spin_unlock_irq (&cp->lock);
+		return 0;
+	}
+
 	default:
 		break;
 	}
@@ -1604,6 +1698,13 @@ static int __devinit read_eeprom (void *ioaddr, int location, int addr_len)
 	eeprom_delay ();
 
 	return retval;
+}
+
+/* Put the board into D3cold state and wait for WakeUp signal */
+static void cp_set_d3_state (struct cp_private *cp)
+{
+	pci_enable_wake (cp->pdev, 0, 1); /* Enable PME# generation */
+	pci_set_power_state (cp->pdev, 3);
 }
 
 static int __devinit cp_init_one (struct pci_dev *pdev,
@@ -1764,6 +1865,8 @@ static int __devinit cp_init_one (struct pci_dev *pdev,
 	}
 	pci_set_master(pdev);
 
+	if (cp->wol_enabled) cp_set_d3_state (cp);
+
 	return 0;
 
 err_out_iomap:
@@ -1786,6 +1889,7 @@ static void __devexit cp_remove_one (struct pci_dev *pdev)
 		BUG();
 	unregister_netdev(dev);
 	iounmap(cp->regs);
+	if (cp->wol_enabled) pci_set_power_state (pdev, 0);
 	pci_release_regions(pdev);
 	pci_disable_device(pdev);
 	pci_set_drvdata(pdev, NULL);
@@ -1793,10 +1897,10 @@ static void __devexit cp_remove_one (struct pci_dev *pdev)
 }
 
 static struct pci_driver cp_driver = {
-	name:		DRV_NAME,
-	id_table:	cp_pci_tbl,
-	probe:		cp_init_one,
-	remove:		__devexit_p(cp_remove_one),
+	.name         = DRV_NAME,
+	.id_table     = cp_pci_tbl,
+	.probe        =	cp_init_one,
+	.remove       = __devexit_p(cp_remove_one),
 };
 
 static int __init cp_init (void)
