@@ -34,4 +34,8 @@ extern unsigned long loops_per_jiffy;
 	({unsigned long msec=(n); while (msec--) udelay(1000);}))
 #endif
 
+#ifndef ndelay
+#define ndelay(x)	udelay(((x)+999)/1000)
+#endif
+
 #endif /* defined(_LINUX_DELAY_H) */
