@@ -691,10 +691,13 @@ static void sctp_inet_event_msgname(struct sctp_ulpevent *event, char *msgname,
 	struct sockaddr_in *sin, *sinfrom;
 
 	if (msgname) {
+		struct sctp_association *asoc;
+
+		asoc = event->sndrcvinfo.sinfo_assoc_id;
 		sctp_inet_msgname(msgname, addr_len);
 		sin = (struct sockaddr_in *)msgname;
-		sinfrom = &event->asoc->peer.primary_addr.v4;
-		sin->sin_port = htons(event->asoc->peer.port);
+		sinfrom = &asoc->peer.primary_addr.v4;
+		sin->sin_port = htons(asoc->peer.port);
 		sin->sin_addr.s_addr = sinfrom->sin_addr.s_addr;
 	}
 }

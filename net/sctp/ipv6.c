@@ -662,18 +662,20 @@ static void sctp_inet6_event_msgname(struct sctp_ulpevent *event,
 
 	if (msgname) {
 		union sctp_addr *addr;
+		struct sctp_association *asoc;
 
+		asoc = event->sndrcvinfo.sinfo_assoc_id;
 		sctp_inet6_msgname(msgname, addrlen);
 		sin6 = (struct sockaddr_in6 *)msgname;
-		sin6->sin6_port = htons(event->asoc->peer.port);
-		addr = &event->asoc->peer.primary_addr;
+		sin6->sin6_port = htons(asoc->peer.port);
+		addr = &asoc->peer.primary_addr;
 
 		/* Note: If we go to a common v6 format, this code
 		 * will change.
 		 */
 
 		/* Map ipv4 address into v4-mapped-on-v6 address.  */
-		if (sctp_sk(event->asoc->base.sk)->v4mapped &&
+		if (sctp_sk(asoc->base.sk)->v4mapped &&
 		    AF_INET == addr->sa.sa_family) {
 			sctp_v4_map_v6((union sctp_addr *)sin6);
 			sin6->sin6_addr.s6_addr32[3] =
@@ -681,7 +683,7 @@ static void sctp_inet6_event_msgname(struct sctp_ulpevent *event,
 			return;
 		}
 
-		sin6from = &event->asoc->peer.primary_addr.v6;
+		sin6from = &asoc->peer.primary_addr.v6;
 		ipv6_addr_copy(&sin6->sin6_addr, &sin6from->sin6_addr);
 		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL)
 			sin6->sin6_scope_id = sin6from->sin6_scope_id;

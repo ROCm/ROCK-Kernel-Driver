@@ -831,14 +831,14 @@ static inline void sctp_ulpevent_set_owner(struct sctp_ulpevent *event,
 	sctp_association_hold((struct sctp_association *)asoc);
 	skb = sctp_event2skb(event);
 	skb->sk = asoc->base.sk;
-	event->asoc = (struct sctp_association *)asoc;
+	event->sndrcvinfo.sinfo_assoc_id = sctp_assoc2id(asoc);
 	skb->destructor = sctp_stub_rfree;
 }
 
 /* A simple destructor to give up the reference to the association. */
 static inline void sctp_ulpevent_release_owner(struct sctp_ulpevent *event)
 {
-	sctp_association_put(event->asoc);
+	sctp_association_put(event->sndrcvinfo.sinfo_assoc_id);
 }
 
 /* Do accounting for bytes received and hold a reference to the association
@@ -880,7 +880,8 @@ static void sctp_ulpevent_release_data(struct sctp_ulpevent *event)
 	 */
 
 	skb = sctp_event2skb(event);
-	sctp_assoc_rwnd_increase(event->asoc, skb_headlen(skb));
+	sctp_assoc_rwnd_increase(event->sndrcvinfo.sinfo_assoc_id,
+				 skb_headlen(skb));
 
 	/* Don't forget the fragments. */
 	for (frag = skb_shinfo(skb)->frag_list; frag; frag = frag->next) {

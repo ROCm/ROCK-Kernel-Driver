@@ -54,7 +54,6 @@
  * growing this structure as it is at the maximum limit now.
  */
 struct sctp_ulpevent {
-	struct sctp_association *asoc;
 	struct sctp_sndrcvinfo sndrcvinfo;
 	int msg_flags;
 	int iif;
