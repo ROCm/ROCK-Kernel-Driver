@@ -239,18 +239,25 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		but we still give response a change to complete */
 		if(midQ->midState & MID_REQUEST_SUBMITTED) {
 			set_current_state(TASK_UNINTERRUPTIBLE);
-			timeout = schedule_timeout(HZ);
+			timeout = schedule_timeout(2 * HZ);
 		}
-	} else { /* use normal timeout */
-		timeout = wait_event_interruptible_timeout(ses->server->response_q,
+	} else { /* using normal timeout */
+		/* timeout = wait_event_interruptible_timeout(ses->server->response_q,
 			(midQ->midState & MID_RESPONSE_RECEIVED) || 
 			((ses->server->tcpStatus != CifsGood) &&
 			 (ses->server->tcpStatus != CifsNew)),
-			timeout);
+			timeout); */ 
+		/* Can not allow user interrupts- wreaks havoc with performance */
+		if(midQ->midState & MID_REQUEST_SUBMITTED) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			timeout = schedule_timeout(timeout);
+		}
 	}
 	if (signal_pending(current)) {
+		if (midQ->resp_buf == NULL)
+			rc = -EINTR; /* BB are we supposed to return -ERESTARTSYS ? */
 		DeleteMidQEntry(midQ);
-		return -EINTR; /* BB are we supposed to return -ERESTARTSYS ? */
+		return rc; /* why bother returning an error if it succeeded */
 	} else {  /* BB spinlock protect this against races with demux thread */
 		spin_lock(&GlobalMid_Lock);
 		if (midQ->resp_buf) {
