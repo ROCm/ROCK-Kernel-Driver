@@ -332,7 +332,7 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 	unsigned long sp = (unsigned long)p->thread_info + THREAD_SIZE;
 	unsigned long childframe;
 
-	p->user_tid = NULL;
+	p->set_child_tid = p->clear_child_tid = NULL;
 
 	CHECK_FULL_REGS(regs);
 	/* Copy registers */
@@ -344,8 +344,10 @@ copy_thread(int nr, unsigned long clone_flags, unsigned long usp,
 		childregs->gpr[1] = sp + sizeof(struct pt_regs);
 		childregs->gpr[2] = (unsigned long) p;
 		p->thread.regs = NULL;	/* no user register state */
-	} else
+	} else {
+		childregs->gpr[1] = usp;
 		p->thread.regs = childregs;
+	}
 	childregs->gpr[3] = 0;  /* Result from fork() */
 	sp -= STACK_FRAME_OVERHEAD;
 	childframe = sp;
@@ -449,9 +451,9 @@ int sys_clone(int p1, int p2, int p3, int p4, int p5, int p6,
  	struct task_struct *p;
 
 	CHECK_FULL_REGS(regs);
-	if ((p1 & (CLONE_SETTID | CLONE_CLEARTID)) == 0)
-		p3 = 0;
- 	p = do_fork(p1 & ~CLONE_IDLETASK, p2, regs, 0, (int *)p3);
+	if (p2 == 0)
+		p2 = regs->gpr[1];	/* stack pointer for child */
+ 	p = do_fork(p1 & ~CLONE_IDLETASK, p2, regs, 0, (int *)p3, (int *)p4);
  	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -460,7 +462,7 @@ int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,
 {
 	struct task_struct *p;
 	CHECK_FULL_REGS(regs);
-	p = do_fork(SIGCHLD, regs->gpr[1], regs, 0, NULL);
+	p = do_fork(SIGCHLD, regs->gpr[1], regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -469,7 +471,8 @@ int sys_vfork(int p1, int p2, int p3, int p4, int p5, int p6,
 {
 	struct task_struct *p;
 	CHECK_FULL_REGS(regs);
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs, 0, NULL);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->gpr[1], regs,
+		    0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
