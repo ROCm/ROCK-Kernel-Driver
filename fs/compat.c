@@ -75,36 +75,6 @@ asmlinkage long compat_sys_newfstat(unsigned int fd,
 	return error;
 }
 
-int get_compat_flock(struct flock *kfl, struct compat_flock *ufl)
-{
-	int err;
-
-	if (!access_ok(VERIFY_READ, ufl, sizeof(*ufl)))
-		return -EFAULT;
-
-	err = __get_user(kfl->l_type, &ufl->l_type);
-	err |= __get_user(kfl->l_whence, &ufl->l_whence);
-	err |= __get_user(kfl->l_start, &ufl->l_start);
-	err |= __get_user(kfl->l_len, &ufl->l_len);
-	err |= __get_user(kfl->l_pid, &ufl->l_pid);
-	return err;
-}
-
-int put_compat_flock(struct flock *kfl, struct compat_flock *ufl)
-{
-	int err;
-
-	if (!access_ok(VERIFY_WRITE, ufl, sizeof(*ufl)))
-		return -EFAULT;
-
-	err = __put_user(kfl->l_type, &ufl->l_type);
-	err |= __put_user(kfl->l_whence, &ufl->l_whence);
-	err |= __put_user(kfl->l_start, &ufl->l_start);
-	err |= __put_user(kfl->l_len, &ufl->l_len);
-	err |= __put_user(kfl->l_pid, &ufl->l_pid);
-	return err;
-}
-
 static int put_compat_statfs(struct compat_statfs *ubuf, struct statfs *kbuf)
 {
 	if (verify_area(VERIFY_WRITE, ubuf, sizeof(*ubuf)) ||
@@ -159,3 +129,120 @@ asmlinkage long compat_sys_fstatfs(unsigned int fd, struct compat_statfs *buf)
 out:
 	return error;
 }
+
+static int get_compat_flock(struct flock *kfl, struct compat_flock *ufl)
+{
+	if (!access_ok(VERIFY_READ, ufl, sizeof(*ufl)) ||
+	    __get_user(kfl->l_type, &ufl->l_type) ||
+	    __get_user(kfl->l_whence, &ufl->l_whence) ||
+	    __get_user(kfl->l_start, &ufl->l_start) ||
+	    __get_user(kfl->l_len, &ufl->l_len) ||
+	    __get_user(kfl->l_pid, &ufl->l_pid))
+		return -EFAULT;
+	return 0;
+}
+
+static int put_compat_flock(struct flock *kfl, struct compat_flock *ufl)
+{
+	if (!access_ok(VERIFY_WRITE, ufl, sizeof(*ufl)) ||
+	    __put_user(kfl->l_type, &ufl->l_type) ||
+	    __put_user(kfl->l_whence, &ufl->l_whence) ||
+	    __put_user(kfl->l_start, &ufl->l_start) ||
+	    __put_user(kfl->l_len, &ufl->l_len) ||
+	    __put_user(kfl->l_pid, &ufl->l_pid))
+		return -EFAULT;
+	return 0;
+}
+
+static int get_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
+{
+	if (!access_ok(VERIFY_READ, ufl, sizeof(*ufl)) ||
+	    __get_user(kfl->l_type, &ufl->l_type) ||
+	    __get_user(kfl->l_whence, &ufl->l_whence) ||
+	    __get_user(kfl->l_start, &ufl->l_start) ||
+	    __get_user(kfl->l_len, &ufl->l_len) ||
+	    __get_user(kfl->l_pid, &ufl->l_pid))
+		return -EFAULT;
+	return 0;
+}
+
+static int put_compat_flock64(struct flock *kfl, struct compat_flock64 *ufl)
+{
+	if (!access_ok(VERIFY_WRITE, ufl, sizeof(*ufl)) ||
+	    __put_user(kfl->l_type, &ufl->l_type) ||
+	    __put_user(kfl->l_whence, &ufl->l_whence) ||
+	    __put_user(kfl->l_start, &ufl->l_start) ||
+	    __put_user(kfl->l_len, &ufl->l_len) ||
+	    __put_user(kfl->l_pid, &ufl->l_pid))
+		return -EFAULT;
+	return 0;
+}
+
+extern asmlinkage long sys_fcntl(unsigned int, unsigned int, unsigned long);
+
+asmlinkage long compat_sys_fcntl64(unsigned int fd, unsigned int cmd,
+		unsigned long arg)
+{
+	mm_segment_t old_fs;
+	struct flock f;
+	long ret;
+
+	switch (cmd) {
+	case F_GETLK:
+	case F_SETLK:
+	case F_SETLKW:
+		ret = get_compat_flock(&f, (struct compat_flock *)arg);
+		if (ret != 0)
+			break;
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+		ret = sys_fcntl(fd, cmd, (unsigned long)&f);
+		set_fs(old_fs);
+		if ((cmd == F_GETLK) && (ret == 0)) {
+			if ((f.l_start >= COMPAT_OFF_T_MAX) ||
+			    ((f.l_start + f.l_len) >= COMPAT_OFF_T_MAX))
+				ret = -EOVERFLOW;
+			if (ret == 0)
+				ret = put_compat_flock(&f,
+						(struct compat_flock *)arg);
+		}
+		break;
+
+	case F_GETLK64:
+	case F_SETLK64:
+	case F_SETLKW64:
+		ret = get_compat_flock64(&f, (struct compat_flock64 *)arg);
+		if (ret != 0)
+			break;
+		old_fs = get_fs();
+		set_fs(KERNEL_DS);
+		ret = sys_fcntl(fd, F_GETLK, (unsigned long)&f);
+		ret = sys_fcntl(fd, (cmd == F_GETLK64) ? F_GETLK :
+				((cmd == F_SETLK64) ? F_SETLK : F_SETLKW),
+				(unsigned long)&f);
+		set_fs(old_fs);
+		if ((cmd == F_GETLK64) && (ret == 0)) {
+			if ((f.l_start >= COMPAT_LOFF_T_MAX) ||
+			    ((f.l_start + f.l_len) >= COMPAT_LOFF_T_MAX))
+				ret = -EOVERFLOW;
+			if (ret == 0)
+				ret = put_compat_flock64(&f,
+						(struct compat_flock64 *)arg);
+		}
+		break;
+
+	default:
+		ret = sys_fcntl(fd, cmd, arg);
+		break;
+	}
+	return ret;
+}
+
+asmlinkage long compat_sys_fcntl(unsigned int fd, unsigned int cmd,
+		unsigned long arg)
+{
+	if ((cmd == F_GETLK64) || (cmd == F_SETLK64) || (cmd == F_SETLKW64))
+		return -EINVAL;
+	return compat_sys_fcntl64(fd, cmd, arg);
+}
+
