@@ -95,11 +95,11 @@ void hci_send_to_sock(struct hci_dev *hdev, struct sk_buff *skb)
 	BT_DBG("hdev %p len %d", hdev, skb->len);
 
 	read_lock(&hci_sk_list.lock);
-	for (sk = hci_sk_list.head; sk; sk = sk->next) {
+	for (sk = hci_sk_list.head; sk; sk = sk->sk_next) {
 		struct hci_filter *flt;
 		struct sk_buff *nskb;
 
-		if (sk->state != BT_BOUND || hci_pi(sk)->hdev != hdev)
+		if (sk->sk_state != BT_BOUND || hci_pi(sk)->hdev != hdev)
 			continue;
 
 		/* Don't send frame to the socket it came from */
@@ -157,8 +157,8 @@ static int hci_sock_release(struct socket *sock)
 
 	sock_orphan(sk);
 
-	skb_queue_purge(&sk->receive_queue);
-	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
+	skb_queue_purge(&sk->sk_write_queue);
 
 	sock_put(sk);
 	return 0;
@@ -283,7 +283,7 @@ static int hci_sock_bind(struct socket *sock, struct sockaddr *addr, int addr_le
 	}
 
 	hci_pi(sk)->hdev = hdev;
-	sk->state = BT_BOUND;
+	sk->sk_state = BT_BOUND;
 
 done:
 	release_sock(sk);
@@ -330,7 +330,7 @@ static int hci_sock_recvmsg(struct kiocb *iocb, struct socket *sock, struct msgh
 	if (flags & (MSG_OOB))
 		return -EOPNOTSUPP;
 
-	if (sk->state == BT_CLOSED)
+	if (sk->sk_state == BT_CLOSED)
 		return 0;
 
 	if (!(skb = skb_recv_datagram(sk, flags, noblock, &err)))
@@ -587,7 +587,7 @@ static int hci_sock_create(struct socket *sock, int protocol)
 		return -ENOMEM;
 
 	sock->state = SS_UNCONNECTED;
-	sk->state   = BT_OPEN;
+	sk->sk_state   = BT_OPEN;
 
 	bt_sock_link(&hci_sk_list, sk);
 	return 0;
@@ -610,13 +610,13 @@ static int hci_sock_dev_event(struct notifier_block *this, unsigned long event, 
 
 		/* Detach sockets from device */
 		read_lock(&hci_sk_list.lock);
-		for (sk = hci_sk_list.head; sk; sk = sk->next) {
+		for (sk = hci_sk_list.head; sk; sk = sk->sk_next) {
 			bh_lock_sock(sk);
 			if (hci_pi(sk)->hdev == hdev) {
 				hci_pi(sk)->hdev = NULL;
-				sk->err = EPIPE;
-				sk->state = BT_OPEN;
-				sk->state_change(sk);
+				sk->sk_err = EPIPE;
+				sk->sk_state = BT_OPEN;
+				sk->sk_state_change(sk);
 
 				hci_dev_put(hdev);
 			}

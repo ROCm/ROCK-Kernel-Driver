@@ -35,13 +35,13 @@ static void rose_idletimer_expiry(unsigned long);
 
 void rose_start_heartbeat(struct sock *sk)
 {
-	del_timer(&sk->timer);
+	del_timer(&sk->sk_timer);
 
-	sk->timer.data     = (unsigned long)sk;
-	sk->timer.function = &rose_heartbeat_expiry;
-	sk->timer.expires  = jiffies + 5 * HZ;
+	sk->sk_timer.data     = (unsigned long)sk;
+	sk->sk_timer.function = &rose_heartbeat_expiry;
+	sk->sk_timer.expires  = jiffies + 5 * HZ;
 
-	add_timer(&sk->timer);
+	add_timer(&sk->sk_timer);
 }
 
 void rose_start_t1timer(struct sock *sk)
@@ -113,7 +113,7 @@ void rose_start_idletimer(struct sock *sk)
 
 void rose_stop_heartbeat(struct sock *sk)
 {
-	del_timer(&sk->timer);
+	del_timer(&sk->sk_timer);
 }
 
 void rose_stop_timer(struct sock *sk)
@@ -137,7 +137,7 @@ static void rose_heartbeat_expiry(unsigned long param)
 		/* Magic here: If we listen() and a new link dies before it
 		   is accepted() it isn't 'dead' so doesn't get removed. */
 		if (sock_flag(sk, SOCK_DESTROY) ||
-		    (sk->state == TCP_LISTEN && sock_flag(sk, SOCK_DEAD))) {
+		    (sk->sk_state == TCP_LISTEN && sock_flag(sk, SOCK_DEAD))) {
 			rose_destroy_socket(sk);
 			return;
 		}
@@ -147,7 +147,7 @@ static void rose_heartbeat_expiry(unsigned long param)
 		/*
 		 * Check for the state of the receive buffer.
 		 */
-		if (atomic_read(&sk->rmem_alloc) < (sk->rcvbuf / 2) &&
+		if (atomic_read(&sk->sk_rmem_alloc) < (sk->sk_rcvbuf / 2) &&
 		    (rose->condition & ROSE_COND_OWN_RX_BUSY)) {
 			rose->condition &= ~ROSE_COND_OWN_RX_BUSY;
 			rose->condition &= ~ROSE_COND_ACK_PENDING;
@@ -204,12 +204,12 @@ static void rose_idletimer_expiry(unsigned long param)
 
 	rose_start_t3timer(sk);
 
-	sk->state     = TCP_CLOSE;
-	sk->err       = 0;
-	sk->shutdown |= SEND_SHUTDOWN;
+	sk->sk_state     = TCP_CLOSE;
+	sk->sk_err       = 0;
+	sk->sk_shutdown |= SEND_SHUTDOWN;
 
 	if (!sock_flag(sk, SOCK_DEAD)) {
-		sk->state_change(sk);
+		sk->sk_state_change(sk);
 		sock_set_flag(sk, SOCK_DEAD);
 	}
 	bh_unlock_sock(sk);

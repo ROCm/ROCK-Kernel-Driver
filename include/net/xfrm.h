@@ -79,7 +79,7 @@ extern struct semaphore xfrm_cfg_sem;
       We add genid to each dst plus pointer to genid of raw IP route,
       pmtu disc will update pmtu on raw IP route and increase its genid.
       dst_check() will see this for top level and trigger resyncing
-      metrics. Plus, it will be made via sk->dst_cache. Solved.
+      metrics. Plus, it will be made via sk->sk_dst_cache. Solved.
  */
 
 /* Full description of state of transformer. */
@@ -587,7 +587,7 @@ extern int __xfrm_policy_check(struct sock *, int dir, struct sk_buff *skb, unsi
 
 static inline int xfrm_policy_check(struct sock *sk, int dir, struct sk_buff *skb, unsigned short family)
 {
-	if (sk && sk->policy[XFRM_POLICY_IN])
+	if (sk && sk->sk_policy[XFRM_POLICY_IN])
 		return __xfrm_policy_check(sk, dir, skb, family);
 		
 	return	!xfrm_policy_list[dir] ||
@@ -629,7 +629,7 @@ extern int __xfrm_sk_clone_policy(struct sock *sk);
 
 static inline int xfrm_sk_clone_policy(struct sock *sk)
 {
-	if (unlikely(sk->policy[0] || sk->policy[1]))
+	if (unlikely(sk->sk_policy[0] || sk->sk_policy[1]))
 		return __xfrm_sk_clone_policy(sk);
 	return 0;
 }
@@ -638,13 +638,13 @@ extern void __xfrm_sk_free_policy(struct xfrm_policy *, int dir);
 
 static inline void xfrm_sk_free_policy(struct sock *sk)
 {
-	if (unlikely(sk->policy[0] != NULL)) {
-		__xfrm_sk_free_policy(sk->policy[0], 0);
-		sk->policy[0] = NULL;
+	if (unlikely(sk->sk_policy[0] != NULL)) {
+		__xfrm_sk_free_policy(sk->sk_policy[0], 0);
+		sk->sk_policy[0] = NULL;
 	}
-	if (unlikely(sk->policy[1] != NULL)) {
-		__xfrm_sk_free_policy(sk->policy[1], 1);
-		sk->policy[1] = NULL;
+	if (unlikely(sk->sk_policy[1] != NULL)) {
+		__xfrm_sk_free_policy(sk->sk_policy[1], 1);
+		sk->sk_policy[1] = NULL;
 	}
 }
 

@@ -158,15 +158,15 @@ static void x25_remove_socket(struct sock *sk)
 	write_lock_bh(&x25_list_lock);
 
 	if ((s = x25_list) == sk)
-		x25_list = s->next;
-	else while (s && s->next) {
-		if (s->next == sk) {
-			s->next = sk->next;
+		x25_list = s->sk_next;
+	else while (s && s->sk_next) {
+		if (s->sk_next == sk) {
+			s->sk_next = sk->sk_next;
 			sock_put(sk);
 			break;
 		}
 
-		s = s->next;
+		s = s->sk_next;
 	}
 
 	write_unlock_bh(&x25_list_lock);
@@ -181,7 +181,7 @@ static void x25_kill_by_device(struct net_device *dev)
 
 	write_lock_bh(&x25_list_lock);
 
-	for (s = x25_list; s; s = s->next)
+	for (s = x25_list; s; s = s->sk_next)
 		if (x25_sk(s)->neighbour && x25_sk(s)->neighbour->dev == dev)
 			x25_disconnect(s, ENETUNREACH, 0, 0);
 
@@ -230,7 +230,7 @@ static int x25_device_event(struct notifier_block *this, unsigned long event,
 static void x25_insert_socket(struct sock *sk)
 {
 	write_lock_bh(&x25_list_lock);
-	sk->next = x25_list;
+	sk->sk_next = x25_list;
 	x25_list = sk;
 	sock_hold(sk);
 	write_unlock_bh(&x25_list_lock);
@@ -246,12 +246,12 @@ static struct sock *x25_find_listener(struct x25_address *addr)
 
 	read_lock_bh(&x25_list_lock);
 
-	for (s = x25_list; s; s = s->next)
+	for (s = x25_list; s; s = s->sk_next)
 		if ((!strcmp(addr->x25_addr,
 			     x25_sk(s)->source_addr.x25_addr) ||
 		     !strcmp(addr->x25_addr,
 			     null_x25_address.x25_addr)) &&
-		     s->state == TCP_LISTEN)
+		     s->sk_state == TCP_LISTEN)
 			break;
 
 	if (s)
@@ -267,7 +267,7 @@ struct sock *__x25_find_socket(unsigned int lci, struct x25_neigh *nb)
 {
 	struct sock *s;
 
-	for (s = x25_list; s; s = s->next)
+	for (s = x25_list; s; s = s->sk_next)
 		if (x25_sk(s)->lci == lci && x25_sk(s)->neighbour == nb)
 			break;
 	if (s)
@@ -339,7 +339,7 @@ void x25_destroy_socket(struct sock *sk)
 	x25_remove_socket(sk);
 	x25_clear_queues(sk);		/* Flush the queues */
 
-	while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
+	while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 		if (skb->sk != sk) {		/* A pending connection */
 			/*
 			 * Queue the unaccepted socket for death
@@ -352,13 +352,14 @@ void x25_destroy_socket(struct sock *sk)
 		kfree_skb(skb);
 	}
 
-	if (atomic_read(&sk->wmem_alloc) || atomic_read(&sk->rmem_alloc)) {
+	if (atomic_read(&sk->sk_wmem_alloc) ||
+	    atomic_read(&sk->sk_rmem_alloc)) {
 		/* Defer: outstanding buffers */
-		init_timer(&sk->timer);
-		sk->timer.expires  = jiffies + 10 * HZ;
-		sk->timer.function = x25_destroy_timer;
-		sk->timer.data     = (unsigned long)sk;
-		add_timer(&sk->timer);
+		init_timer(&sk->sk_timer);
+		sk->sk_timer.expires  = jiffies + 10 * HZ;
+		sk->sk_timer.function = x25_destroy_timer;
+		sk->sk_timer.data     = (unsigned long)sk;
+		add_timer(&sk->sk_timer);
 	} else
 		sk_free(sk);
 	release_sock(sk);
@@ -428,10 +429,10 @@ static int x25_listen(struct socket *sock, int backlog)
 	struct sock *sk = sock->sk;
 	int rc = -EOPNOTSUPP;
 
-	if (sk->state != TCP_LISTEN) {
+	if (sk->sk_state != TCP_LISTEN) {
 		memset(&x25_sk(sk)->dest_addr, 0, X25_ADDR_LEN);
-		sk->max_ack_backlog = backlog;
-		sk->state           = TCP_LISTEN;
+		sk->sk_max_ack_backlog = backlog;
+		sk->sk_state           = TCP_LISTEN;
 		rc = 0;
 	}
 
@@ -488,8 +489,8 @@ static int x25_create(struct socket *sock, int protocol)
 	init_timer(&x25->timer);
 
 	sock->ops    = &x25_proto_ops;
-	sk->protocol = protocol;
-	sk->backlog_rcv = x25_backlog_rcv;
+	sk->sk_protocol = protocol;
+	sk->sk_backlog_rcv = x25_backlog_rcv;
 
 	x25->t21   = sysctl_x25_call_request_timeout;
 	x25->t22   = sysctl_x25_reset_request_timeout;
@@ -513,7 +514,7 @@ static struct sock *x25_make_new(struct sock *osk)
 	struct sock *sk = NULL;
 	struct x25_opt *x25, *ox25;
 
-	if (osk->type != SOCK_SEQPACKET)
+	if (osk->sk_type != SOCK_SEQPACKET)
 		goto out;
 
 	if ((sk = x25_alloc_socket()) == NULL)
@@ -521,17 +522,17 @@ static struct sock *x25_make_new(struct sock *osk)
 
 	x25 = x25_sk(sk);
 
-	sk->type        = osk->type;
-	sk->socket      = osk->socket;
-	sk->priority    = osk->priority;
-	sk->protocol    = osk->protocol;
-	sk->rcvbuf      = osk->rcvbuf;
-	sk->sndbuf      = osk->sndbuf;
-	sk->debug       = osk->debug;
-	sk->state       = TCP_ESTABLISHED;
-	sk->sleep       = osk->sleep;
-	sk->zapped      = osk->zapped;
-	sk->backlog_rcv = osk->backlog_rcv;
+	sk->sk_type        = osk->sk_type;
+	sk->sk_socket      = osk->sk_socket;
+	sk->sk_priority    = osk->sk_priority;
+	sk->sk_protocol    = osk->sk_protocol;
+	sk->sk_rcvbuf      = osk->sk_rcvbuf;
+	sk->sk_sndbuf      = osk->sk_sndbuf;
+	sk->sk_debug       = osk->sk_debug;
+	sk->sk_state       = TCP_ESTABLISHED;
+	sk->sk_sleep       = osk->sk_sleep;
+	sk->sk_zapped      = osk->sk_zapped;
+	sk->sk_backlog_rcv = osk->sk_backlog_rcv;
 
 	ox25 = x25_sk(osk);
 	x25->t21        = ox25->t21;
@@ -571,16 +572,16 @@ static int x25_release(struct socket *sock)
 			x25_write_internal(sk, X25_CLEAR_REQUEST);
 			x25_start_t23timer(sk);
 			x25->state = X25_STATE_2;
-			sk->state               = TCP_CLOSE;
-			sk->shutdown           |= SEND_SHUTDOWN;
-			sk->state_change(sk);
+			sk->sk_state	= TCP_CLOSE;
+			sk->sk_shutdown	|= SEND_SHUTDOWN;
+			sk->sk_state_change(sk);
 			sock_set_flag(sk, SOCK_DEAD);
 			sock_set_flag(sk, SOCK_DESTROY);
 			break;
 	}
 
-	sock->sk   = NULL;	
-	sk->socket = NULL;	/* Not used, but we should do this */
+	sock->sk	= NULL;	
+	sk->sk_socket	= NULL;	/* Not used, but we should do this */
 out:
 	return 0;
 }
@@ -590,14 +591,14 @@ static int x25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct sock *sk = sock->sk;
 	struct sockaddr_x25 *addr = (struct sockaddr_x25 *)uaddr;
 
-	if (!sk->zapped ||
+	if (!sk->sk_zapped ||
 	    addr_len != sizeof(struct sockaddr_x25) ||
 	    addr->sx25_family != AF_X25)
 		return -EINVAL;
 
 	x25_sk(sk)->source_addr = addr->sx25_addr;
 	x25_insert_socket(sk);
-	sk->zapped = 0;
+	sk->sk_zapped = 0;
 	SOCK_DEBUG(sk, "x25_bind: socket is bound\n");
 
 	return 0;
@@ -608,7 +609,7 @@ static int x25_wait_for_connection_establishment(struct sock *sk)
 	DECLARE_WAITQUEUE(wait, current);
         int rc;
 
-	add_wait_queue_exclusive(sk->sleep, &wait);
+	add_wait_queue_exclusive(sk->sk_sleep, &wait);
 	for (;;) {
 		__set_current_state(TASK_INTERRUPTIBLE);
 		rc = -ERESTARTSYS;
@@ -616,11 +617,11 @@ static int x25_wait_for_connection_establishment(struct sock *sk)
 			break;
 		rc = sock_error(sk);
 		if (rc) {
-			sk->socket->state = SS_UNCONNECTED;
+			sk->sk_socket->state = SS_UNCONNECTED;
 			break;
 		}
 		rc = 0;
-		if (sk->state != TCP_ESTABLISHED) {
+		if (sk->sk_state != TCP_ESTABLISHED) {
 			release_sock(sk);
 			schedule();
 			lock_sock(sk);
@@ -628,7 +629,7 @@ static int x25_wait_for_connection_establishment(struct sock *sk)
 			break;
 	}
 	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(sk->sleep, &wait);
+	remove_wait_queue(sk->sk_sleep, &wait);
 	return rc;
 }
 
@@ -642,22 +643,22 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr,
 	int rc = 0;
 
 	lock_sock(sk);
-	if (sk->state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
+	if (sk->sk_state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
 		sock->state = SS_CONNECTED;
 		goto out; /* Connect completed during a ERESTARTSYS event */
 	}
 
 	rc = -ECONNREFUSED;
-	if (sk->state == TCP_CLOSE && sock->state == SS_CONNECTING) {
+	if (sk->sk_state == TCP_CLOSE && sock->state == SS_CONNECTING) {
 		sock->state = SS_UNCONNECTED;
 		goto out;
 	}
 
 	rc = -EISCONN;	/* No reconnect on a seqpacket socket */
-	if (sk->state == TCP_ESTABLISHED)
+	if (sk->sk_state == TCP_ESTABLISHED)
 		goto out;
 
-	sk->state   = TCP_CLOSE;	
+	sk->sk_state   = TCP_CLOSE;	
 	sock->state = SS_UNCONNECTED;
 
 	rc = -EINVAL;
@@ -681,7 +682,7 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr,
 		goto out_put_neigh;
 
 	rc = -EINVAL;
-	if (sk->zapped)	/* Must bind first - autobinding does not work */
+	if (sk->sk_zapped) /* Must bind first - autobinding does not work */
 		goto out_put_neigh;
 
 	if (!strcmp(x25->source_addr.x25_addr, null_x25_address.x25_addr))
@@ -691,7 +692,7 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	/* Move to connecting socket, start sending Connect Requests */
 	sock->state   = SS_CONNECTING;
-	sk->state     = TCP_SYN_SENT;
+	sk->sk_state  = TCP_SYN_SENT;
 
 	x25->state = X25_STATE_1;
 
@@ -702,7 +703,7 @@ static int x25_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	/* Now the loop */
 	rc = -EINPROGRESS;
-	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
+	if (sk->sk_state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
 		goto out_put_neigh;
 
 	rc = x25_wait_for_connection_establishment(sk);
@@ -726,10 +727,10 @@ static int x25_wait_for_data(struct sock *sk, int timeout)
 	DECLARE_WAITQUEUE(wait, current);
 	int rc = 0;
 
-	add_wait_queue_exclusive(sk->sleep, &wait);
+	add_wait_queue_exclusive(sk->sk_sleep, &wait);
 	for (;;) {
 		__set_current_state(TASK_INTERRUPTIBLE);
-		if (sk->shutdown & RCV_SHUTDOWN)
+		if (sk->sk_shutdown & RCV_SHUTDOWN)
 			break;
 		rc = -ERESTARTSYS;
 		if (signal_pending(current))
@@ -738,7 +739,7 @@ static int x25_wait_for_data(struct sock *sk, int timeout)
 		if (!timeout)
 			break;
 		rc = 0;
-		if (skb_queue_empty(&sk->receive_queue)) {
+		if (skb_queue_empty(&sk->sk_receive_queue)) {
 			release_sock(sk);
 			timeout = schedule_timeout(timeout);
 			lock_sock(sk);
@@ -746,7 +747,7 @@ static int x25_wait_for_data(struct sock *sk, int timeout)
 			break;
 	}
 	__set_current_state(TASK_RUNNING);
-	remove_wait_queue(sk->sleep, &wait);
+	remove_wait_queue(sk->sk_sleep, &wait);
 	return rc;
 }
 	
@@ -757,29 +758,29 @@ static int x25_accept(struct socket *sock, struct socket *newsock, int flags)
 	struct sk_buff *skb;
 	int rc = -EINVAL;
 
-	if (!sk || sk->state != TCP_LISTEN)
+	if (!sk || sk->sk_state != TCP_LISTEN)
 		goto out;
 
 	rc = -EOPNOTSUPP;
-	if (sk->type != SOCK_SEQPACKET)
+	if (sk->sk_type != SOCK_SEQPACKET)
 		goto out;
 
-	rc = x25_wait_for_data(sk, sk->rcvtimeo);
+	rc = x25_wait_for_data(sk, sk->sk_rcvtimeo);
 	if (rc)
 		goto out;
-	skb = skb_dequeue(&sk->receive_queue);
+	skb = skb_dequeue(&sk->sk_receive_queue);
 	rc = -EINVAL;
 	if (!skb->sk)
 		goto out;
-	newsk	      = skb->sk;
-	newsk->pair   = NULL;
-	newsk->socket = newsock;
-	newsk->sleep  = &newsock->wait;
+	newsk		 = skb->sk;
+	newsk->sk_pair   = NULL;
+	newsk->sk_socket = newsock;
+	newsk->sk_sleep  = &newsock->wait;
 
 	/* Now attach up the new socket */
 	skb->sk = NULL;
 	kfree_skb(skb);
-	sk->ack_backlog--;
+	sk->sk_ack_backlog--;
 	newsock->sk    = newsk;
 	newsock->state = SS_CONNECTED;
 	rc = 0;
@@ -795,7 +796,7 @@ static int x25_getname(struct socket *sock, struct sockaddr *uaddr,
 	struct x25_opt *x25 = x25_sk(sk);
 
 	if (peer) {
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 		sx25->sx25_addr = x25->dest_addr;
 	} else
@@ -836,7 +837,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb,
 	/*
 	 *	We can't accept the Call Request.
 	 */
-	if (!sk || sk->ack_backlog == sk->max_ack_backlog)
+	if (!sk || sk->sk_ack_backlog == sk->sk_max_ack_backlog)
 		goto out_clear_request;
 
 	/*
@@ -865,7 +866,7 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb,
 	skb_pull(skb, len);
 
 	skb->sk     = make;
-	make->state = TCP_ESTABLISHED;
+	make->sk_state = TCP_ESTABLISHED;
 
 	makex25 = x25_sk(make);
 	makex25->lci           = lci;
@@ -887,17 +888,17 @@ int x25_rx_call_request(struct sk_buff *skb, struct x25_neigh *nb,
 
 	makex25->state = X25_STATE_3;
 
-	sk->ack_backlog++;
-	make->pair = sk;
+	sk->sk_ack_backlog++;
+	make->sk_pair = sk;
 
 	x25_insert_socket(make);
 
-	skb_queue_head(&sk->receive_queue, skb);
+	skb_queue_head(&sk->sk_receive_queue, skb);
 
 	x25_start_heartbeat(make);
 
 	if (!sock_flag(sk, SOCK_DEAD))
-		sk->data_ready(sk, skb->len);
+		sk->sk_data_ready(sk, skb->len);
 	rc = 1;
 	sock_put(sk);
 out:
@@ -930,11 +931,11 @@ static int x25_sendmsg(struct kiocb *iocb, struct socket *sock,
 		goto out;
 
 	rc = -EADDRNOTAVAIL;
-	if (sk->zapped)
+	if (sk->sk_zapped)
 		goto out;
 
 	rc = -EPIPE;
-	if (sk->shutdown & SEND_SHUTDOWN) {
+	if (sk->sk_shutdown & SEND_SHUTDOWN) {
 		send_sig(SIGPIPE, current, 0);
 		goto out;
 	}
@@ -961,7 +962,7 @@ static int x25_sendmsg(struct kiocb *iocb, struct socket *sock,
 		 *	to SIGPIPE, EPIPE;
 		 */
 		rc = -ENOTCONN;
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			goto out;
 
 		sx25.sx25_family = AF_X25;
@@ -1046,7 +1047,7 @@ static int x25_sendmsg(struct kiocb *iocb, struct socket *sock,
 	SOCK_DEBUG(sk, "x25_sendmsg: Transmitting buffer\n");
 
 	rc = -ENOTCONN;
-	if (sk->state != TCP_ESTABLISHED)
+	if (sk->sk_state != TCP_ESTABLISHED)
 		goto out_kfree_skb;
 
 	if (msg->msg_flags & MSG_OOB)
@@ -1101,7 +1102,7 @@ static int x25_recvmsg(struct kiocb *iocb, struct socket *sock,
 	 * This works for seqpacket too. The receiver has ordered the queue for
 	 * us! We do one quick check first though
 	 */
-	if (sk->state != TCP_ESTABLISHED)
+	if (sk->sk_state != TCP_ESTABLISHED)
 		goto out;
 
 	if (flags & MSG_OOB) {
@@ -1183,8 +1184,8 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 		case TIOCOUTQ: {
-			int amount;
-			amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+			int amount = sk->sk_sndbuf -
+				     atomic_read(&sk->sk_wmem_alloc);
 			if (amount < 0)
 				amount = 0;
 			rc = put_user(amount, (unsigned int *)arg);
@@ -1198,7 +1199,7 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			 * These two are safe on a single CPU system as
 			 * only user tasks fiddle here
 			 */
-			if ((skb = skb_peek(&sk->receive_queue)) != NULL)
+			if ((skb = skb_peek(&sk->sk_receive_queue)) != NULL)
 				amount = skb->len;
 			rc = put_user(amount, (unsigned int *)arg);
 			break;
@@ -1207,9 +1208,9 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		case SIOCGSTAMP:
 			if (sk) {
 				rc = -ENOENT;
-				if (!sk->stamp.tv_sec)
+				if (!sk->sk_stamp.tv_sec)
 					break;
-				rc = copy_to_user((void *)arg, &sk->stamp,
+				rc = copy_to_user((void *)arg, &sk->sk_stamp,
 						  sizeof(struct timeval)) ? -EFAULT : 0;
 			}
 			rc = -EINVAL;
@@ -1256,7 +1257,8 @@ static int x25_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 					   sizeof(facilities)))
 				break;
 			rc = -EINVAL;
-			if (sk->state != TCP_LISTEN && sk->state != TCP_CLOSE)
+			if (sk->sk_state != TCP_LISTEN &&
+			    sk->sk_state != TCP_CLOSE)
 				break;
 			if (facilities.pacsize_in < X25_PS16 ||
 			    facilities.pacsize_in > X25_PS4096)
@@ -1360,7 +1362,7 @@ void x25_kill_by_neigh(struct x25_neigh *nb)
 
 	write_lock_bh(&x25_list_lock);
 
-	for (s = x25_list; s; s = s->next)
+	for (s = x25_list; s; s = s->sk_next)
 		if (x25_sk(s)->neighbour == nb)
 			x25_disconnect(s, ENETUNREACH, 0, 0);
 

@@ -206,7 +206,7 @@ int llc_sk_init(struct sock* sk)
 	llc->rw = 128; /* rx win size (opt and equal to
 		        * tx_win of remote LLC) */
 	skb_queue_head_init(&llc->pdu_unack_q);
-	sk->backlog_rcv = llc_backlog_rcv;
+	sk->sk_backlog_rcv = llc_backlog_rcv;
 	llc_sk(sk) = llc;
 out:
 	return rc;
@@ -258,15 +258,15 @@ void llc_sk_free(struct sock *sk)
 #ifdef DEBUG_LLC_CONN_ALLOC
 	printk(KERN_INFO "%s: unackq=%d, txq=%d\n", __FUNCTION__,
 		skb_queue_len(&llc->pdu_unack_q),
-		skb_queue_len(&sk->write_queue));
+		skb_queue_len(&sk->sk_write_queue));
 #endif
-	skb_queue_purge(&sk->receive_queue);
-	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
+	skb_queue_purge(&sk->sk_write_queue);
 	skb_queue_purge(&llc->pdu_unack_q);
 #ifdef LLC_REFCNT_DEBUG
-	if (atomic_read(&sk->refcnt) != 1) {
+	if (atomic_read(&sk->sk_refcnt) != 1) {
 		printk(KERN_DEBUG "Destruction of LLC sock %p delayed in %s, cnt=%d\n",
-			sk, __FUNCTION__, atomic_read(&sk->refcnt));
+			sk, __FUNCTION__, atomic_read(&sk->sk_refcnt));
 		printk(KERN_DEBUG "%d LLC sockets are still alive\n",
 			atomic_read(&llc_sock_nr));
 	} else {
@@ -290,7 +290,7 @@ void llc_sk_reset(struct sock *sk)
 	struct llc_opt *llc = llc_sk(sk);
 
 	llc_conn_ac_stop_all_timers(sk, NULL);
-	skb_queue_purge(&sk->write_queue);
+	skb_queue_purge(&sk->sk_write_queue);
 	skb_queue_purge(&llc->pdu_unack_q);
 	llc->remote_busy_flag	= 0;
 	llc->cause_flag		= 0;
@@ -323,7 +323,7 @@ static int llc_rtn_all_conns(struct llc_sap *sap)
 
 	write_lock_bh(&sap->sk_list.lock);
 
-	for (sk = sap->sk_list.list; sk; sk = sk->next) {
+	for (sk = sap->sk_list.list; sk; sk = sk->sk_next) {
 		llc_sk(sk)->state = LLC_CONN_STATE_TEMP;
 
 		if (llc_send_disc(sk))

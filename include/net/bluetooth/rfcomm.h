@@ -302,7 +302,7 @@ struct sockaddr_rc {
 	u8          rc_channel;
 };
 
-#define rfcomm_pi(sk)   ((struct rfcomm_pinfo *) sk->protinfo)
+#define rfcomm_pi(sk)   ((struct rfcomm_pinfo *)sk->sk_protinfo)
 
 struct rfcomm_pinfo {
 	struct rfcomm_dlc   *dlc;

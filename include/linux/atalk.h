@@ -196,7 +196,7 @@ extern void		 aarp_device_down(struct net_device *dev);
 extern void aarp_cleanup_module(void);
 #endif /* MODULE */
 
-#define at_sk(__sk) ((struct atalk_sock *)(__sk)->protinfo)
+#define at_sk(__sk) ((struct atalk_sock *)(__sk)->sk_protinfo)
 
 extern struct sock *atalk_sockets;
 extern rwlock_t atalk_sockets_lock;

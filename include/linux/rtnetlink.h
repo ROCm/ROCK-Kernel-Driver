@@ -603,8 +603,8 @@ extern struct semaphore rtnl_sem;
 #define rtnl_shlock_nowait()	down_trylock(&rtnl_sem)
 
 #define rtnl_shunlock()	do { up(&rtnl_sem); \
-		             if (rtnl && rtnl->receive_queue.qlen) \
-				     rtnl->data_ready(rtnl, 0); \
+		             if (rtnl && rtnl->sk_receive_queue.qlen) \
+				     rtnl->sk_data_ready(rtnl, 0); \
 		        } while(0)
 
 extern void rtnl_lock(void);

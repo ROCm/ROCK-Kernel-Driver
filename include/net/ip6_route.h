@@ -107,11 +107,11 @@ static inline void ip6_dst_store(struct sock *sk, struct dst_entry *dst,
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct rt6_info *rt = (struct rt6_info *) dst;
 
-	write_lock(&sk->dst_lock);
+	write_lock(&sk->sk_dst_lock);
 	__sk_dst_set(sk, dst);
 	np->daddr_cache = daddr;
 	np->dst_cookie = rt->rt6i_node ? rt->rt6i_node->fn_sernum : 0;
-	write_unlock(&sk->dst_lock);
+	write_unlock(&sk->sk_dst_lock);
 }
 
 #endif

@@ -56,7 +56,7 @@ struct econet_opt
   unsigned short num;
 };
 
-#define ec_sk(__sk) ((struct econet_opt *)(__sk)->protinfo)
+#define ec_sk(__sk) ((struct econet_opt *)(__sk)->sk_protinfo)
 
 struct ec_device
 {

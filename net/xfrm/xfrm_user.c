@@ -946,10 +946,11 @@ static void xfrm_netlink_rcv(struct sock *sk, int len)
 
 		down(&xfrm_cfg_sem);
 
-		while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
+		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 			if (xfrm_user_rcv_skb(skb)) {
 				if (skb->len)
-					skb_queue_head(&sk->receive_queue, skb);
+					skb_queue_head(&sk->sk_receive_queue,
+						       skb);
 				else
 					kfree_skb(skb);
 				break;
@@ -959,7 +960,7 @@ static void xfrm_netlink_rcv(struct sock *sk, int len)
 
 		up(&xfrm_cfg_sem);
 
-	} while (xfrm_nl && xfrm_nl->receive_queue.qlen);
+	} while (xfrm_nl && xfrm_nl->sk_receive_queue.qlen);
 }
 
 static int build_expire(struct sk_buff *skb, struct xfrm_state *x, int hard)
@@ -1126,7 +1127,7 @@ static int __init xfrm_user_init(void)
 static void __exit xfrm_user_exit(void)
 {
 	xfrm_unregister_km(&netlink_mgr);
-	sock_release(xfrm_nl->socket);
+	sock_release(xfrm_nl->sk_socket);
 }
 
 module_init(xfrm_user_init);

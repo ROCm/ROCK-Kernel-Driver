@@ -206,7 +206,7 @@ struct l2cap_conn {
 };
 
 /* ----- L2CAP channel and socket info ----- */
-#define l2cap_pi(sk)   ((struct l2cap_pinfo *) sk->protinfo)
+#define l2cap_pi(sk)   ((struct l2cap_pinfo *)sk->sk_protinfo)
 
 struct l2cap_pinfo {
 	__u16		psm;

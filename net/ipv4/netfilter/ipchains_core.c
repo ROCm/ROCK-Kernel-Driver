@@ -1836,7 +1836,7 @@ int ipfw_init_or_cleanup(int init)
 
  cleanup_netlink:
 #if defined(CONFIG_NETLINK_DEV) || defined(CONFIG_NETLINK_DEV_MODULE)
-	sock_release(ipfwsk->socket);
+	sock_release(ipfwsk->sk_socket);
 
  cleanup_nothing:
 #endif

@@ -120,7 +120,7 @@ static void dnrmg_receive_user_sk(struct sock *sk, int len)
 {
 	struct sk_buff *skb;
 
-	while((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
+	while((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 		dnrmg_receive_user_skb(skb);
 		kfree_skb(skb);
 	}
@@ -145,7 +145,7 @@ static int __init init(void)
 
 	rv = nf_register_hook(&dnrmg_ops);
 	if (rv) {
-		sock_release(dnrmg->socket);
+		sock_release(dnrmg->sk_socket);
 	}
 
 	return rv;
@@ -154,7 +154,7 @@ static int __init init(void)
 static void __exit fini(void)
 {
 	nf_unregister_hook(&dnrmg_ops);
-	sock_release(dnrmg->socket);
+	sock_release(dnrmg->sk_socket);
 }
 
 

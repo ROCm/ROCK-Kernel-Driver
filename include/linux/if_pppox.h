@@ -132,7 +132,7 @@ struct pppox_opt {
 #define pppoe_pa	proto.pppoe.pa
 #define pppoe_relay	proto.pppoe.relay
 
-#define pppox_sk(__sk) ((struct pppox_opt *)(__sk)->protinfo)
+#define pppox_sk(__sk) ((struct pppox_opt *)(__sk)->sk_protinfo)
 
 struct module;
 

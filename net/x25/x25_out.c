@@ -111,13 +111,13 @@ int x25_output(struct sock *sk, struct sk_buff *skb)
 					skbn->data[2] |= X25_STD_M_BIT;
 			}
 
-			skb_queue_tail(&sk->write_queue, skbn);
+			skb_queue_tail(&sk->sk_write_queue, skbn);
 			sent += len;
 		}
 		
 		kfree_skb(skb);
 	} else {
-		skb_queue_tail(&sk->write_queue, skb);
+		skb_queue_tail(&sk->sk_write_queue, skb);
 		sent = skb->len - header_len;
 	}
 	return sent;
@@ -169,7 +169,7 @@ void x25_kick(struct sock *sk)
 	if (x25->condition & X25_COND_PEER_RX_BUSY)
 		return;
 
-	if (skb_peek(&sk->write_queue) == NULL)
+	if (!skb_peek(&sk->sk_write_queue))
 		return;
 
 	modulus = x25->neighbour->extended ? X25_EMODULUS : X25_SMODULUS;
@@ -187,11 +187,11 @@ void x25_kick(struct sock *sk)
 	 * the window is full.
 	 */
 
-	skb = skb_dequeue(&sk->write_queue);
+	skb = skb_dequeue(&sk->sk_write_queue);
 
 	do {
 		if ((skbn = skb_clone(skb, GFP_ATOMIC)) == NULL) {
-			skb_queue_head(&sk->write_queue, skb);
+			skb_queue_head(&sk->sk_write_queue, skb);
 			break;
 		}
 
@@ -209,7 +209,8 @@ void x25_kick(struct sock *sk)
 		 */
 		skb_queue_tail(&x25->ack_queue, skb);
 
-	} while (x25->vs != end && (skb = skb_dequeue(&sk->write_queue)) != NULL);
+	} while (x25->vs != end &&
+		 (skb = skb_dequeue(&sk->sk_write_queue)) != NULL);
 
 	x25->vl         = x25->vr;
 	x25->condition &= ~X25_COND_ACK_PENDING;
