@@ -2076,6 +2076,8 @@ out:
 
 void smb_decode_unix_basic(struct smb_fattr *fattr, char *p)
 {
+	u64 size, disk_bytes;
+
 	/* FIXME: verify nls support. all is sent as utf8? */
 
 	fattr->f_unix = 1;
@@ -2093,8 +2095,19 @@ void smb_decode_unix_basic(struct smb_fattr *fattr, char *p)
 	/* 84 L permissions */
 	/* 92 L link count */
 
-	fattr->f_size = LVAL(p, 0);
-	fattr->f_blocks = LVAL(p, 8);
+	size = LVAL(p, 0);
+	disk_bytes = LVAL(p, 8);
+
+	/*
+	 * Some samba versions round up on-disk byte usage
+	 * to 1MB boundaries, making it useless. When seeing
+	 * that, use the size instead.
+	 */
+	if (!(disk_bytes & 0xfffff))
+		disk_bytes = size+511;
+
+	fattr->f_size = size;
+	fattr->f_blocks = disk_bytes >> 9;
 	fattr->f_ctime = smb_ntutc2unixutc(LVAL(p, 16));
 	fattr->f_atime = smb_ntutc2unixutc(LVAL(p, 24));
 	fattr->f_mtime = smb_ntutc2unixutc(LVAL(p, 32));
