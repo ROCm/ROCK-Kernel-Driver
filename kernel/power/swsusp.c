@@ -317,7 +317,8 @@ static int write_suspend_image(void)
 	for (i=0; i<nr_copy_pages; i++) {
 		if (!(i%100))
 			printk( "." );
-		if (!(entry = get_swap_page()).val)
+		entry = get_swap_page();
+		if (!entry.val)
 			panic("\nNot enough swapspace when writing data" );
 		
 		if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
@@ -334,7 +335,8 @@ static int write_suspend_image(void)
 		cur = (union diskpage *)((char *) pagedir_nosave)+i;
 		BUG_ON ((char *) cur != (((char *) pagedir_nosave) + i*PAGE_SIZE));
 		printk( "." );
-		if (!(entry = get_swap_page()).val) {
+		entry = get_swap_page();
+		if (!entry.val) {
 			printk(KERN_CRIT "Not enough swapspace when writing pgdir\n" );
 			panic("Don't know how to recover");
 			free_page((unsigned long) buffer);
@@ -356,7 +358,8 @@ static int write_suspend_image(void)
 	BUG_ON (sizeof(struct suspend_header) > PAGE_SIZE-sizeof(swp_entry_t));
 	BUG_ON (sizeof(union diskpage) != PAGE_SIZE);
 	BUG_ON (sizeof(struct link) != PAGE_SIZE);
-	if (!(entry = get_swap_page()).val)
+	entry = get_swap_page();
+	if (!entry.val)
 		panic( "\nNot enough swapspace when writing header" );
 	if (swapfile_used[swp_type(entry)] != SWAPFILE_SUSPEND)
 		panic("\nNot enough swapspace for header on suspend device" );
@@ -925,7 +928,7 @@ static int relocate_pagedir(void)
 		return 0;
 	}
 
-	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order))) {
+	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order)) != NULL) {
 		if (!does_collide_order(old_pagedir, (unsigned long)m, pagedir_order))
 			break;
 		eaten_memory = m;
