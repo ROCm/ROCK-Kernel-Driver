@@ -124,6 +124,9 @@ static int __init parse_numa_properties(void)
 			max_domain = numa_domain;
 
 		map_cpu_to_node(cpu_nr, numa_domain);
+		/* register the second thread on an SMT machine */
+		if (cur_cpu_spec->cpu_features & CPU_FTR_SMT)
+			map_cpu_to_node(cpu_nr ^ 0x1, numa_domain);
 	}
 
 	for (; memory; memory = of_find_node_by_type(memory, "memory")) {
