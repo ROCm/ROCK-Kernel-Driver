@@ -1535,17 +1535,11 @@ static void snd_via82xx_mixer_free_ac97(ac97_t *ac97)
 }
 
 static struct ac97_quirk ac97_quirks[] = {
-	{
+	{	/* FIXME: which codec? */
 		.vendor = 0x1106,
 		.device = 0x4161,
 		.name = "ASRock K7VT2",
 		.type = AC97_TUNE_HP_ONLY
-	},
-	{
-		.vendor = 0x1043,
-		.device = 0x80a1,
-		.name = "ASUS A7V8-X",
-		.type = AC97_TUNE_SWAP_SURROUND
 	},
 	{ } /* terminator */
 };

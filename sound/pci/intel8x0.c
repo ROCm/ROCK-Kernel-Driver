@@ -1579,26 +1579,14 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
 		.vendor = 0x1028,
 		.device = 0x00d8,
-		.name = "Dell Precision 530",
+		.name = "Dell Precision 530",	/* AD1885 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
 		.vendor = 0x1028,
 		.device = 0x0126,
-		.name = "Dell Optiplex GX260",
+		.name = "Dell Optiplex GX260",	/* AD1981A */
 		.type = AC97_TUNE_HP_ONLY
-	},
-	{
-		.vendor = 0x1028,
-		.device = 0x0157,
-		.name = "Dell Dimension 8300",
-		.type = AC97_TUNE_SWAP_SURROUND
-	},
-	{
-		.vendor = 0x1043,
-		.device =0x80b0,
-		.name = "ASUS P4PE Mobo",
-		.type = AC97_TUNE_SWAP_SURROUND
 	},
  	{
 		.vendor = 0x1043,
@@ -1609,41 +1597,19 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
 		.vendor = 0x10f1,
 		.device = 0x2665,
-		.name = "Fujitsu-Siemens Celcius",
+		.name = "Fujitsu-Siemens Celsius",	/* AD1981? */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
 		.vendor = 0x110a,
 		.device = 0x0056,
-		.name = "Fujitsu-Siemens Scenic",
-		.type = AC97_TUNE_HP_ONLY
-	},
-	{
-		.vendor = 0x11d4,
-		.device = 0x5375,
-		.name = "ADI AD1985 (discrete)",
+		.name = "Fujitsu-Siemens Scenic",	/* AD1981? */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
 		.vendor = 0x1734,
 		.device = 0x0088,
-		.name = "Fujitsu-Siemens D1522",
-		.type = AC97_TUNE_HP_ONLY
-	},
-#if 0
-	/* FIXME: this seems invalid */
-	{
-		.vendor = 0x4144,
-		.device = 0x5360,
-		.type = "AMD64 Motherboard",
-		.name = AC97_TUNE_HP_ONLY
-	},
-#endif
-	{
-		.vendor = 0x8086,
-		.device = 0x2000,
-		.mask = 0xfff0,
-		.name = "Intel ICH5/AD1985 (discrete)",
+		.name = "Fujitsu-Siemens D1522",	/* AD1981 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
@@ -1656,7 +1622,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 	{
 		.vendor = 0x8086,
 		.device = 0x4d44,
-		.name = "Intel D850EMV2",
+		.name = "Intel D850EMV2",	/* AD1885 */
 		.type = AC97_TUNE_HP_ONLY
 	},
 	{
@@ -1673,14 +1639,7 @@ static struct ac97_quirk ac97_quirks[] __devinitdata = {
 		.name = "Intel ICH5/AD1985",
 		.type = AC97_TUNE_AD_SHARING
 	},
-	{
-		.vendor = 0x8086,
-		.device = 0xa000,
-		.mask = 0xfff0,
-		.name = "Intel ICH5/AD1985 (discrete)",
-		.type = AC97_TUNE_HP_ONLY
-	},
-	{
+	{	/* FIXME: which codec? */
 		.vendor = 0x103c,
 		.device = 0x00c3,
 		.name = "Hewlett-Packard onboard",

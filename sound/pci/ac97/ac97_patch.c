@@ -764,8 +764,19 @@ static int patch_ad1980_post_spdif(ac97_t * ac97)
  	return patch_build_controls(ac97, &snd_ac97_ad1980_spdif_source, 1);
 }
 
+static int patch_ad1980_specific(ac97_t *ac97)
+{
+	/* rename 0x04 as "Master" and 0x02 as "Master Surround" */
+	snd_ac97_rename_ctl(ac97, "Master Playback Switch", "Master Surround Playback Switch");
+	snd_ac97_rename_ctl(ac97, "Master Playback Volume", "Master Surround Playback Volume");
+	snd_ac97_rename_ctl(ac97, "Headphone Playback Switch", "Master Playback Switch");
+	snd_ac97_rename_ctl(ac97, "Headphone Playback Volume", "Headphone Playback Volume");
+	return 0;
+}
+
 static struct snd_ac97_build_ops patch_ad1980_build_ops = {
-	.build_post_spdif = &patch_ad1980_post_spdif
+	.build_post_spdif = patch_ad1980_post_spdif,
+	.build_specific = patch_ad1980_specific
 };
 
 int patch_ad1980(ac97_t * ac97)
@@ -776,12 +787,14 @@ int patch_ad1980(ac97_t * ac97)
 	ac97->build_ops = &patch_ad1980_build_ops;
 	/* Switch FRONT/SURROUND LINE-OUT/HP-OUT default connection */
 	/* it seems that most vendors connect line-out connector to headphone out of AC'97 */
+	/* AD-compatible mode */
 	/* Stereo mutes enabled */
 	misc = snd_ac97_read(ac97, AC97_AD_MISC);
 	snd_ac97_write_cache(ac97, AC97_AD_MISC, misc |
 			     AC97_AD198X_LOSEL |
 			     AC97_AD198X_HPSEL |
-			     AC97_AD198X_MSPLT);
+			     AC97_AD198X_MSPLT |
+			     AC97_AD198X_AC97NC);
 	ac97->flags |= AC97_STEREO_MUTES;
 	return 0;
 }

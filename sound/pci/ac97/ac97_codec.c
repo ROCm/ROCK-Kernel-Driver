@@ -2234,7 +2234,7 @@ __reset_ready:
 
 /*
  */
-static int remove_ctl(ac97_t *ac97, const char *name)
+int snd_ac97_remove_ctl(ac97_t *ac97, const char *name)
 {
 	snd_ctl_elem_id_t id;
 	memset(&id, 0, sizeof(id));
@@ -2252,7 +2252,7 @@ static snd_kcontrol_t *ctl_find(ac97_t *ac97, const char *name)
 	return snd_ctl_find_id(ac97->card, &sid);
 }
 
-static int rename_ctl(ac97_t *ac97, const char *src, const char *dst)
+int snd_ac97_rename_ctl(ac97_t *ac97, const char *src, const char *dst)
 {
 	snd_kcontrol_t *kctl = ctl_find(ac97, src);
 	if (kctl) {
@@ -2262,7 +2262,7 @@ static int rename_ctl(ac97_t *ac97, const char *src, const char *dst)
 	return -ENOENT;
 }
 
-static int swap_ctl(ac97_t *ac97, const char *s1, const char *s2)
+int snd_ac97_swap_ctl(ac97_t *ac97, const char *s1, const char *s2)
 {
 	snd_kcontrol_t *kctl1, *kctl2;
 	kctl1 = ctl_find(ac97, s1);
@@ -2279,22 +2279,22 @@ static int swap_headphone(ac97_t *ac97, int remove_master)
 {
 	/* FIXME: error checks.. */
 	if (remove_master) {
-		remove_ctl(ac97, "Master Playback Switch");
-		remove_ctl(ac97, "Master Playback Volume");
+		snd_ac97_remove_ctl(ac97, "Master Playback Switch");
+		snd_ac97_remove_ctl(ac97, "Master Playback Volume");
 	} else {
-		rename_ctl(ac97, "Master Playback Switch", "Line-Out Playback Switch");
-		rename_ctl(ac97, "Master Playback Volume", "Line-Out Playback Volume");
+		snd_ac97_rename_ctl(ac97, "Master Playback Switch", "Line-Out Playback Switch");
+		snd_ac97_rename_ctl(ac97, "Master Playback Volume", "Line-Out Playback Volume");
 	}
-	rename_ctl(ac97, "Headphone Playback Switch", "Master Playback Switch");
-	rename_ctl(ac97, "Headphone Playback Volume", "Master Playback Volume");
+	snd_ac97_rename_ctl(ac97, "Headphone Playback Switch", "Master Playback Switch");
+	snd_ac97_rename_ctl(ac97, "Headphone Playback Volume", "Master Playback Volume");
 	return 0;
 }
 
 static int swap_surround(ac97_t *ac97)
 {
 	/* FIXME: error checks.. */
-	swap_ctl(ac97, "Master Playback Switch", "Surround Playback Switch");
-	swap_ctl(ac97, "Master Playback Volume", "Surround Playback Volume");
+	snd_ac97_swap_ctl(ac97, "Master Playback Switch", "Surround Playback Switch");
+	snd_ac97_swap_ctl(ac97, "Master Playback Volume", "Surround Playback Volume");
 	return 0;
 }
 
@@ -2304,7 +2304,7 @@ static int tune_ad_sharing(ac97_t *ac97)
 	/* Turn on OMS bit to route microphone to back panel */
 	scfg = snd_ac97_read(ac97, AC97_AD_SERIAL_CFG);
 	snd_ac97_write_cache(ac97, AC97_AD_SERIAL_CFG, scfg | 0x0200);
-	return swap_headphone(ac97, 1);
+	return 0;
 }
 
 /**
