@@ -161,7 +161,7 @@ EXPORT_SYMBOL(filemap_fdatawrite);
 
 /*
  * This is a mostly non-blocking flush.  Not suitable for data-integrity
- * purposes.
+ * purposes - I/O may not be started against all dirty pages.
  */
 int filemap_flush(struct address_space *mapping)
 {
