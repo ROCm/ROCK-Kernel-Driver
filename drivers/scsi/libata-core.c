@@ -1919,7 +1919,24 @@ static void ata_fill_sg(struct ata_queued_cmd *qc)
 	if (idx)
 		ap->prd[idx - 1].flags_len |= cpu_to_le32(ATA_PRD_EOT);
 }
+/**
+ *	ata_check_atapi_dma - Check whether ATAPI DMA can be supported
+ *	@qc: Metadata associated with taskfile to check
+ *
+ *	LOCKING:
+ *	RETURNS: 0 when ATAPI DMA can be used
+ *               nonzero otherwise
+ */
+int ata_check_atapi_dma(struct ata_queued_cmd *qc)
+{
+	struct ata_port *ap = qc->ap;
+	int rc = 0; /* Assume ATAPI DMA is OK by default */
 
+	if (ap->ops->check_atapi_dma)
+		rc = ap->ops->check_atapi_dma(qc);
+
+	return rc;
+}
 /**
  *	ata_qc_prep - Prepare taskfile for submission
  *	@qc: Metadata associated with taskfile to be prepared
