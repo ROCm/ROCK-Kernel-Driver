@@ -484,6 +484,7 @@ static inline void set_tb(unsigned int upper, unsigned int lower)
 #ifdef __KERNEL__
 
 extern int have_of;
+extern u64 ppc64_interrupt_controller;
 
 struct task_struct;
 void start_thread(struct pt_regs *regs, unsigned long fdptr, unsigned long sp);

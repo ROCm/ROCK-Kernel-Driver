@@ -197,7 +197,7 @@ static void __init pSeries_setup_mpic(void)
 static void __init pSeries_setup_arch(void)
 {
 	/* Fixup ppc_md depending on the type of interrupt controller */
-	if (naca->interrupt_controller == IC_OPEN_PIC) {
+	if (ppc64_interrupt_controller == IC_OPEN_PIC) {
 		ppc_md.init_IRQ       = pSeries_init_mpic; 
 		ppc_md.get_irq        = mpic_get_irq;
 		/* Allocate the mpic now, so that find_and_init_phbs() can
@@ -309,13 +309,13 @@ static  void __init pSeries_discover_pic(void)
 	 * to properly parse the OF interrupt tree & do the virtual irq mapping
 	 */
 	__irq_offset_value = NUM_ISA_INTERRUPTS;
-	naca->interrupt_controller = IC_INVALID;
+	ppc64_interrupt_controller = IC_INVALID;
 	for (np = NULL; (np = of_find_node_by_name(np, "interrupt-controller"));) {
 		typep = (char *)get_property(np, "compatible", NULL);
 		if (strstr(typep, "open-pic"))
-			naca->interrupt_controller = IC_OPEN_PIC;
+			ppc64_interrupt_controller = IC_OPEN_PIC;
 		else if (strstr(typep, "ppc-xicp"))
-			naca->interrupt_controller = IC_PPC_XIC;
+			ppc64_interrupt_controller = IC_PPC_XIC;
 		else
 			printk("initialize_naca: failed to recognize"
 			       " interrupt-controller\n");

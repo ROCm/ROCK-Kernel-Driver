@@ -44,7 +44,6 @@
 #include <asm/system.h>
 #include <asm/mmu.h>
 #include <asm/pgtable.h>
-#include <asm/naca.h>
 #include <asm/pci.h>
 #include <asm/iommu.h>
 #include <asm/bootinfo.h>
@@ -557,7 +556,7 @@ void __init finish_device_tree(void)
 
 	DBG(" -> finish_device_tree\n");
 
-	if (naca->interrupt_controller == IC_INVALID) {
+	if (ppc64_interrupt_controller == IC_INVALID) {
 		DBG("failed to configure interrupt controller type\n");
 		panic("failed to configure interrupt controller type\n");
 	}

@@ -664,7 +664,7 @@ void __init setup_system(void)
 	printk("naca                          = 0x%p\n", naca);
 	printk("ppc64_pft_size                = 0x%lx\n", ppc64_pft_size);
 	printk("naca->debug_switch            = 0x%lx\n", naca->debug_switch);
-	printk("naca->interrupt_controller    = 0x%ld\n", naca->interrupt_controller);
+	printk("ppc64_interrupt_controller    = 0x%ld\n", ppc64_interrupt_controller);
 	printk("systemcfg                     = 0x%p\n", systemcfg);
 	printk("systemcfg->platform           = 0x%x\n", systemcfg->platform);
 	printk("systemcfg->processorCount     = 0x%lx\n", systemcfg->processorCount);
