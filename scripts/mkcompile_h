@@ -5,11 +5,11 @@ CC=$4
 
 # Generate a temporary compile.h
 
-( echo /\* This file is auto generated, version `cat .version` \*/
+( echo /\* This file is auto generated, version `cat ../.version` \*/
 
   echo \#define UTS_MACHINE \"$ARCH\"
 
-  echo -n \#define UTS_VERSION \"\#`cat .version`
+  echo -n \#define UTS_VERSION \"\#`cat ../.version`
   if [ -n "$SMP" ] ; then echo -n " SMP"; fi
   echo ' '`date`'"'
 
