@@ -375,6 +375,17 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		if (pass)
 			return max;
 		busnr = (buses >> 8) & 0xFF;
+
+		/*
+		 * If we already got to this bus through a different bridge,
+		 * ignore it.  This can happen with the i450NX chipset.
+		 */
+		if (pci_find_bus(pci_domain_nr(bus), busnr)) {
+			printk(KERN_INFO "PCI: Bus %04x:%02x already known\n",
+					pci_domain_nr(bus), busnr);
+			return max;
+		}
+
 		child = pci_alloc_child_bus(bus, dev, busnr);
 		if (!child)
 			return max;
@@ -785,7 +796,7 @@ struct pci_bus * __devinit pci_scan_bus_parented(struct device *parent, int bus,
 
 	if (pci_find_bus(pci_domain_nr(b), bus)) {
 		/* If we already got to this bus through a different bridge, ignore it */
-		DBG("PCI: Bus %02x already known\n", bus);
+		DBG("PCI: Bus %04:%02x already known\n", pci_domain_nr(b), bus);
 		goto err_out;
 	}
 	list_add_tail(&b->node, &pci_root_buses);
