@@ -861,11 +861,11 @@ static void inet6_exit(void)
 	sock_unregister(PF_INET6);
 #ifdef CONFIG_PROC_FS
 	if6_proc_exit();
-	raw6_proc_exit();
-	proc_net_remove("tcp6");
-	proc_net_remove("udp6");
-	ipv6_misc_proc_exit();
-	proc_net_remove("anycast6");
+ 	proc_net_remove("anycast6");
+ 	ipv6_misc_proc_exit();
+ 	udp6_proc_exit();
+ 	tcp6_proc_exit();
+ 	raw6_proc_exit();
 #endif
 	/* Cleanup code parts. */
 	sit_cleanup();
