@@ -12,6 +12,7 @@
 #include <linux/errno.h>
 #include <linux/time.h>
 #include <linux/aio_abi.h>
+#include <linux/module.h>
 
 //#define DEBUG 1
 
