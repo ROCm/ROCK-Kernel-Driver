@@ -64,9 +64,20 @@ static inline struct user_struct *uid_hash_find(uid_t uid, struct list_head *has
 	return NULL;
 }
 
+/*
+ * Locate the user_struct for the passed UID.  If found, take a ref on it.  The
+ * caller must undo that ref with free_uid().
+ *
+ * If the user_struct could not be found, return NULL.
+ */
 struct user_struct *find_user(uid_t uid)
 {
-	return uid_hash_find(uid, uidhashentry(uid));
+	struct user_struct *ret;
+
+	spin_lock(&uidhash_lock);
+	ret = uid_hash_find(uid, uidhashentry(uid));
+	spin_unlock(&uidhash_lock);
+	return ret;
 }
 
 void free_uid(struct user_struct *up)
