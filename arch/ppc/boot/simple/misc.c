@@ -252,3 +252,10 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 
 	return (struct bi_record *)rec_loc;
 }
+
+/* Allow decompress_kernel to be hooked into.  This is the default. */
+void * __attribute__ ((weak))
+load_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
+{
+		return decompress_kernel(load_addr, num_words, cksum);
+}

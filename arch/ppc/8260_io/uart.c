@@ -2278,7 +2278,7 @@ static void my_console_write(int idx, const char *s,
 static void serial_console_write(struct console *c, const char *s,
 				unsigned count)
 {
-#if defined(CONFIG_KGDB) && !defined(CONFIG_USE_SERIAL2_KGDB)
+#if defined(CONFIG_KGDB_CONSOLE) && !defined(CONFIG_USE_SERIAL2_KGDB)
 	/* Try to let stub handle output. Returns true if it did. */ 
 	if (kgdb_output_string(s, count))
 		return;
