@@ -551,17 +551,11 @@ struct usb_ov511 {
 	int num_inputs;		/* Number of inputs */
 	int norm; 		/* NTSC / PAL / SECAM */
 	int has_decoder;	/* Device has a video decoder */
-	int has_tuner;		/* Device has a TV tuner */
-	int has_audio_proc;	/* Device has an audio processor */
-	int freq;		/* Current tuner frequency */
-	int tuner_type;		/* Specific tuner model */
 	int pal;		/* Device is designed for PAL resolution */
 
-	/* I2C interface to kernel */
+	/* I2C interface */
 	struct semaphore i2c_lock;	  /* Protect I2C controller regs */
 	unsigned char primary_i2c_slave;  /* I2C write id of sensor */
-	unsigned char tuner_i2c_slave;	  /* I2C write id of tuner */
-	unsigned char audio_i2c_slave;	  /* I2C write id of audio processor */
 
 	/* Control transaction stuff */
 	unsigned char *cbuf;		/* Buffer for payload */

@@ -9,7 +9,6 @@
  * OV7620 fixes by Charl P. Botha <cpbotha@ieee.org>
  * Changes by Claudio Matsuoka <claudio@conectiva.com>
  * Original SAA7111A code by Dave Perks <dperks@ibm.net>
- * Kernel I2C interface adapted from nt1003 driver
  * URB error messages from pwc driver by Nemosoft
  * generic_ioctl() code from videodev.c by Gerd Knorr and Alan Cox
  * Memory management (rvmalloc) code from bttv driver, by Gerd Knorr and others
@@ -61,7 +60,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.60a for Linux 2.5"
+#define DRIVER_VERSION "v1.61 for Linux 2.5"
 #define EMAIL "mmcclell@bigfoot.com"
 #define DRIVER_AUTHOR "Mark McClelland <mmcclell@bigfoot.com> & Bret Wallach \
 	& Orion Sky Lawlor <olawlor@acm.org> & Kevin Moore & Charl P. Botha \
@@ -72,7 +71,6 @@
 #define ENABLE_Y_QUANTABLE 1
 #define ENABLE_UV_QUANTABLE 1
 
-/* If you change this, you must also change the MODULE_PARM definition */
 #define OV511_MAX_UNIT_VIDEO 16
 
 /* Pixel count * bytes per YUV420 pixel (1.5) */
@@ -127,7 +125,6 @@ static int framedrop		= -1;
 
 static int fastset;
 static int force_palette;
-static int tuner		= -1;
 static int backlight;
 static int unit_video[OV511_MAX_UNIT_VIDEO];
 static int remove_zeros;
@@ -194,11 +191,9 @@ MODULE_PARM(fastset, "i");
 MODULE_PARM_DESC(fastset, "Allows picture settings to take effect immediately");
 MODULE_PARM(force_palette, "i");
 MODULE_PARM_DESC(force_palette, "Force the palette to a specific value");
-MODULE_PARM(tuner, "i");
-MODULE_PARM_DESC(tuner, "Set tuner type, if not autodetected");
 MODULE_PARM(backlight, "i");
 MODULE_PARM_DESC(backlight, "For objects that are lit from behind");
-MODULE_PARM(unit_video, "0-16i");
+MODULE_PARM(unit_video, "1-" __MODULE_STRING(OV511_MAX_UNIT_VIDEO) "i");
 MODULE_PARM_DESC(unit_video,
   "Force use of specific minor number(s). 0 is not allowed.");
 MODULE_PARM(remove_zeros, "i");
@@ -337,12 +332,14 @@ static struct symbolic_list urb_errlist[] = {
  **********************************************************************/
 
 static void ov51x_clear_snapshot(struct usb_ov511 *);
-static int ov51x_check_snapshot(struct usb_ov511 *);
-static inline int sensor_get_picture(struct usb_ov511 *, 
+static inline int sensor_get_picture(struct usb_ov511 *,
 				     struct video_picture *);
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 static int sensor_get_exposure(struct usb_ov511 *, unsigned char *);
 static int ov51x_control_ioctl(struct inode *, struct file *, unsigned int,
 			       unsigned long);
+static int ov51x_check_snapshot(struct usb_ov511 *);
+#endif
 
 /**********************************************************************
  * Memory management
@@ -351,7 +348,7 @@ static int ov51x_control_ioctl(struct inode *, struct file *, unsigned int,
 /* Here we want the physical address of the memory.
  * This is used when initializing the contents of the area.
  */
-static inline unsigned long 
+static inline unsigned long
 kvirt_to_pa(unsigned long adr)
 {
 	unsigned long kva, ret;
@@ -384,7 +381,7 @@ rvmalloc(unsigned long size)
 	return mem;
 }
 
-static void 
+static void
 rvfree(void *mem, unsigned long size)
 {
 	unsigned long adr;
@@ -418,7 +415,7 @@ static struct file_operations ov511_control_fops = {
 #define YES_NO(x) ((x) ? "yes" : "no")
 
 /* /proc/video/ov511/<minor#>/info */
-static int 
+static int
 ov511_read_proc_info(char *page, char **start, off_t off, int count, int *eof,
 		     void *data)
 {
@@ -490,13 +487,13 @@ ov511_read_proc_info(char *page, char **start, off_t off, int count, int *eof,
  * When the camera's button is pressed, the output of this will change from a
  * 0 to a 1 (ASCII). It will retain this value until it is read, after which
  * it will reset to zero.
- * 
+ *
  * SECURITY NOTE: Since reading this file can change the state of the snapshot
  * status, it is important for applications that open it to keep it locked
  * against access by other processes, using flock() or a similar mechanism. No
  * locking is provided by this driver.
  */
-static int 
+static int
 ov511_read_proc_button(char *page, char **start, off_t off, int count, int *eof,
 		       void *data)
 {
@@ -528,7 +525,7 @@ ov511_read_proc_button(char *page, char **start, off_t off, int count, int *eof,
 	return len;
 }
 
-static void 
+static void
 create_proc_ov511_cam(struct usb_ov511 *ov)
 {
 	char dirname[10];
@@ -579,11 +576,11 @@ create_proc_ov511_cam(struct usb_ov511 *ov)
 	unlock_kernel();
 }
 
-static void 
+static void
 destroy_proc_ov511_cam(struct usb_ov511 *ov)
 {
 	char dirname[10];
-	
+
 	if (!ov || !ov->proc_devdir)
 		return;
 
@@ -616,7 +613,7 @@ destroy_proc_ov511_cam(struct usb_ov511 *ov)
 	ov->proc_devdir = NULL;
 }
 
-static void 
+static void
 proc_ov511_create(void)
 {
 	/* No current standard here. Alan prefers /proc/video/ as it keeps
@@ -637,7 +634,7 @@ proc_ov511_create(void)
 		err("Unable to create /proc/video/ov511");
 }
 
-static void 
+static void
 proc_ov511_destroy(void)
 {
 	PDEBUG(3, "removing /proc/video/ov511");
@@ -656,7 +653,7 @@ proc_ov511_destroy(void)
  **********************************************************************/
 
 /* Write an OV51x register */
-static int 
+static int
 reg_w(struct usb_ov511 *ov, unsigned char reg, unsigned char value)
 {
 	int rc;
@@ -669,7 +666,7 @@ reg_w(struct usb_ov511 *ov, unsigned char reg, unsigned char value)
 			     usb_sndctrlpipe(ov->dev, 0),
 			     (ov->bclass == BCL_OV518)?1:2 /* REG_IO */,
 			     USB_TYPE_VENDOR | USB_RECIP_DEVICE,
-			     0, (__u16)reg, &ov->cbuf[0], 1, HZ);	
+			     0, (__u16)reg, &ov->cbuf[0], 1, HZ);
 	up(&ov->cbuf_lock);
 
 	if (rc < 0)
@@ -680,7 +677,7 @@ reg_w(struct usb_ov511 *ov, unsigned char reg, unsigned char value)
 
 /* Read from an OV51x register */
 /* returns: negative is error, pos or zero is data */
-static int 
+static int
 reg_r(struct usb_ov511 *ov, unsigned char reg)
 {
 	int rc;
@@ -691,13 +688,13 @@ reg_r(struct usb_ov511 *ov, unsigned char reg)
 			     (ov->bclass == BCL_OV518)?1:3 /* REG_IO */,
 			     USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 			     0, (__u16)reg, &ov->cbuf[0], 1, HZ);
-                               
-	PDEBUG(5, "0x%02X:0x%02X", reg, ov->cbuf[0]);
-	
-	if (rc < 0)
+
+	if (rc < 0) {
 		err("reg read: error %d: %s", rc, symbolic(urb_errlist, rc));
-	else
-		rc = ov->cbuf[0];	
+	} else {
+		rc = ov->cbuf[0];
+		PDEBUG(5, "0x%02X:0x%02X", reg, ov->cbuf[0]);
+	}
 
 	up(&ov->cbuf_lock);
 
@@ -707,10 +704,10 @@ reg_r(struct usb_ov511 *ov, unsigned char reg)
 /*
  * Writes bits at positions specified by mask to an OV51x reg. Bits that are in
  * the same position as 1's in "mask" are cleared and set to "value". Bits
- * that are in the same position as 0's in "mask" are preserved, regardless 
+ * that are in the same position as 0's in "mask" are preserved, regardless
  * of their respective state in "value".
  */
-static int 
+static int
 reg_w_mask(struct usb_ov511 *ov,
 	   unsigned char reg,
 	   unsigned char value,
@@ -735,7 +732,7 @@ reg_w_mask(struct usb_ov511 *ov,
  * Writes multiple (n) byte value to a single register. Only valid with certain
  * registers (0x30 and 0xc4 - 0xce).
  */
-static int 
+static int
 ov518_reg_w32(struct usb_ov511 *ov, unsigned char reg, u32 val, int n)
 {
 	int rc;
@@ -760,7 +757,7 @@ ov518_reg_w32(struct usb_ov511 *ov, unsigned char reg, u32 val, int n)
 	return rc;
 }
 
-static int 
+static int
 ov511_upload_quan_tables(struct usb_ov511 *ov)
 {
 	unsigned char *pYTable = yQuanTable511;
@@ -770,10 +767,8 @@ ov511_upload_quan_tables(struct usb_ov511 *ov)
 
 	PDEBUG(4, "Uploading quantization tables");
 
-	for (i = 0; i < OV511_QUANTABLESIZE / 2; i++)
-	{
-		if (ENABLE_Y_QUANTABLE)
-		{
+	for (i = 0; i < OV511_QUANTABLESIZE / 2; i++) {
+		if (ENABLE_Y_QUANTABLE)	{
 			val0 = *pYTable++;
 			val1 = *pYTable++;
 			val0 &= 0x0f;
@@ -784,8 +779,7 @@ ov511_upload_quan_tables(struct usb_ov511 *ov)
 				return rc;
 		}
 
-		if (ENABLE_UV_QUANTABLE)
-		{
+		if (ENABLE_UV_QUANTABLE) {
 			val0 = *pUVTable++;
 			val1 = *pUVTable++;
 			val0 &= 0x0f;
@@ -803,7 +797,7 @@ ov511_upload_quan_tables(struct usb_ov511 *ov)
 }
 
 /* OV518 quantization tables are 8x4 (instead of 8x8) */
-static int 
+static int
 ov518_upload_quan_tables(struct usb_ov511 *ov)
 {
 	unsigned char *pYTable = yQuanTable518;
@@ -813,10 +807,8 @@ ov518_upload_quan_tables(struct usb_ov511 *ov)
 
 	PDEBUG(4, "Uploading quantization tables");
 
-	for (i = 0; i < OV518_QUANTABLESIZE / 2; i++)
-	{
-		if (ENABLE_Y_QUANTABLE)
-		{
+	for (i = 0; i < OV518_QUANTABLESIZE / 2; i++) {
+		if (ENABLE_Y_QUANTABLE) {
 			val0 = *pYTable++;
 			val1 = *pYTable++;
 			val0 &= 0x0f;
@@ -827,8 +819,7 @@ ov518_upload_quan_tables(struct usb_ov511 *ov)
 				return rc;
 		}
 
-		if (ENABLE_UV_QUANTABLE)
-		{
+		if (ENABLE_UV_QUANTABLE) {
 			val0 = *pUVTable++;
 			val1 = *pUVTable++;
 			val0 &= 0x0f;
@@ -845,16 +836,16 @@ ov518_upload_quan_tables(struct usb_ov511 *ov)
 	return 0;
 }
 
-static int 
+static int
 ov51x_reset(struct usb_ov511 *ov, unsigned char reset_type)
 {
 	int rc;
-		
+
 	/* Setting bit 0 not allowed on 518/518Plus */
 	if (ov->bclass == BCL_OV518)
 		reset_type &= 0xfe;
 
-	PDEBUG(4, "Reset: type=0x%X", reset_type);
+	PDEBUG(4, "Reset: type=0x%02X", reset_type);
 
 	rc = reg_w(ov, R51x_SYS_RESET, reset_type);
 	rc = reg_w(ov, R51x_SYS_RESET, 0);
@@ -876,7 +867,7 @@ ov51x_reset(struct usb_ov511 *ov, unsigned char reset_type)
  * This is normally only called from i2c_w(). Note that this function
  * always succeeds regardless of whether the sensor is present and working.
  */
-static int 
+static int
 ov518_i2c_write_internal(struct usb_ov511 *ov,
 			 unsigned char reg,
 			 unsigned char value)
@@ -901,7 +892,7 @@ ov518_i2c_write_internal(struct usb_ov511 *ov,
 }
 
 /* NOTE: Do not call this function directly! */
-static int 
+static int
 ov511_i2c_write_internal(struct usb_ov511 *ov,
 			 unsigned char reg,
 			 unsigned char value)
@@ -917,7 +908,7 @@ ov511_i2c_write_internal(struct usb_ov511 *ov,
 		if (rc < 0) return rc;
 
 		/* Write "value" to I2C data port of OV511 */
-		rc = reg_w(ov, R51x_I2C_DATA, value);	
+		rc = reg_w(ov, R51x_I2C_DATA, value);
 		if (rc < 0) return rc;
 
 		/* Initiate 3-byte write cycle */
@@ -931,7 +922,7 @@ ov511_i2c_write_internal(struct usb_ov511 *ov,
 		if ((rc&2) == 0) /* Ack? */
 			break;
 #if 0
-		/* I2C abort */	
+		/* I2C abort */
 		reg_w(ov, R511_I2C_CTL, 0x10);
 #endif
 		if (--retries < 0) {
@@ -948,7 +939,7 @@ ov511_i2c_write_internal(struct usb_ov511 *ov,
  * This is normally only called from i2c_r(). Note that this function
  * always succeeds regardless of whether the sensor is present and working.
  */
-static int 
+static int
 ov518_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 {
 	int rc, value;
@@ -974,7 +965,7 @@ ov518_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 
 /* NOTE: Do not call this function directly!
  * returns: negative is error, pos or zero is data */
-static int 
+static int
 ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 {
 	int rc, value, retries;
@@ -996,7 +987,7 @@ ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 		if ((rc&2) == 0) /* Ack? */
 			break;
 
-		/* I2C abort */	
+		/* I2C abort */
 		reg_w(ov, R511_I2C_CTL, 0x10);
 
 		if (--retries < 0) {
@@ -1018,7 +1009,7 @@ ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 		if ((rc&2) == 0) /* Ack? */
 			break;
 
-		/* I2C abort */	
+		/* I2C abort */
 		rc = reg_w(ov, R511_I2C_CTL, 0x10);
 		if (rc < 0) return rc;
 
@@ -1031,17 +1022,17 @@ ov511_i2c_read_internal(struct usb_ov511 *ov, unsigned char reg)
 	value = reg_r(ov, R51x_I2C_DATA);
 
 	PDEBUG(5, "0x%02X:0x%02X", reg, value);
-		
+
 	/* This is needed to make i2c_w() work */
 	rc = reg_w(ov, R511_I2C_CTL, 0x05);
 	if (rc < 0)
 		return rc;
-	
+
 	return value;
 }
 
 /* returns: negative is error, pos or zero is data */
-static int 
+static int
 i2c_r(struct usb_ov511 *ov, unsigned char reg)
 {
 	int rc;
@@ -1058,7 +1049,7 @@ i2c_r(struct usb_ov511 *ov, unsigned char reg)
 	return rc;
 }
 
-static int 
+static int
 i2c_w(struct usb_ov511 *ov, unsigned char reg, unsigned char value)
 {
 	int rc;
@@ -1076,7 +1067,7 @@ i2c_w(struct usb_ov511 *ov, unsigned char reg, unsigned char value)
 }
 
 /* Do not call this function directly! */
-static int 
+static int
 ov51x_i2c_write_mask_internal(struct usb_ov511 *ov,
 			      unsigned char reg,
 			      unsigned char value,
@@ -1109,10 +1100,10 @@ ov51x_i2c_write_mask_internal(struct usb_ov511 *ov,
 
 /* Writes bits at positions specified by mask to an I2C reg. Bits that are in
  * the same position as 1's in "mask" are cleared and set to "value". Bits
- * that are in the same position as 0's in "mask" are preserved, regardless 
+ * that are in the same position as 0's in "mask" are preserved, regardless
  * of their respective state in "value".
  */
-static int 
+static int
 i2c_w_mask(struct usb_ov511 *ov,
 	   unsigned char reg,
 	   unsigned char value,
@@ -1132,7 +1123,7 @@ i2c_w_mask(struct usb_ov511 *ov,
  * when calling this. This should not be called from outside the i2c I/O
  * functions.
  */
-static inline int 
+static inline int
 i2c_set_slave_internal(struct usb_ov511 *ov, unsigned char slave)
 {
 	int rc;
@@ -1146,8 +1137,10 @@ i2c_set_slave_internal(struct usb_ov511 *ov, unsigned char slave)
 	return 0;
 }
 
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+
 /* Write to a specific I2C slave ID and register, using the specified mask */
-static int 
+static int
 i2c_w_slave(struct usb_ov511 *ov,
 	    unsigned char slave,
 	    unsigned char reg,
@@ -1166,7 +1159,7 @@ i2c_w_slave(struct usb_ov511 *ov,
 
 out:
 	/* Restore primary IDs */
-	if (i2c_set_slave_internal(ov, ov->primary_i2c_slave) < 0) 
+	if (i2c_set_slave_internal(ov, ov->primary_i2c_slave) < 0)
 		err("Couldn't restore primary I2C slave");
 
 	up(&ov->i2c_lock);
@@ -1174,7 +1167,7 @@ out:
 }
 
 /* Read from a specific I2C slave ID and register */
-static int 
+static int
 i2c_r_slave(struct usb_ov511 *ov,
 	    unsigned char slave,
 	    unsigned char reg)
@@ -1194,15 +1187,17 @@ i2c_r_slave(struct usb_ov511 *ov,
 
 out:
 	/* Restore primary IDs */
-	if (i2c_set_slave_internal(ov, ov->primary_i2c_slave) < 0) 
+	if (i2c_set_slave_internal(ov, ov->primary_i2c_slave) < 0)
 		err("Couldn't restore primary I2C slave");
 
 	up(&ov->i2c_lock);
 	return rc;
 }
 
+#endif /* defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS) */
+
 /* Sets I2C read and write slave IDs. Returns <0 for error */
-static int 
+static int
 ov51x_set_slave_ids(struct usb_ov511 *ov, unsigned char sid)
 {
 	int rc;
@@ -1221,7 +1216,7 @@ out:
 	return rc;
 }
 
-static int 
+static int
 write_regvals(struct usb_ov511 *ov, struct ov511_regvals * pRegvals)
 {
 	int rc;
@@ -1242,8 +1237,8 @@ write_regvals(struct usb_ov511 *ov, struct ov511_regvals * pRegvals)
 	return 0;
 }
 
-#ifdef OV511_DEBUG 
-static void 
+#ifdef OV511_DEBUG
+static void
 dump_i2c_range(struct usb_ov511 *ov, int reg1, int regn)
 {
 	int i;
@@ -1251,18 +1246,18 @@ dump_i2c_range(struct usb_ov511 *ov, int reg1, int regn)
 
 	for (i = reg1; i <= regn; i++) {
 		rc = i2c_r(ov, i);
-		info("Sensor[0x%X] = 0x%X", i, rc);
+		info("Sensor[0x%02X] = 0x%02X", i, rc);
 	}
 }
 
-static void 
+static void
 dump_i2c_regs(struct usb_ov511 *ov)
 {
 	info("I2C REGS");
 	dump_i2c_range(ov, 0x00, 0x7C);
 }
 
-static void 
+static void
 dump_reg_range(struct usb_ov511 *ov, int reg1, int regn)
 {
 	int i;
@@ -1270,12 +1265,12 @@ dump_reg_range(struct usb_ov511 *ov, int reg1, int regn)
 
 	for (i = reg1; i <= regn; i++) {
 		rc = reg_r(ov, i);
-		info("OV511[0x%X] = 0x%X", i, rc);
+		info("OV511[0x%02X] = 0x%02X", i, rc);
 	}
 }
 
 /* FIXME: Should there be an OV518 version of this? */
-static void 
+static void
 ov511_dump_regs(struct usb_ov511 *ov)
 {
 	info("CAMERA INTERFACE REGS");
@@ -1302,29 +1297,15 @@ ov511_dump_regs(struct usb_ov511 *ov)
 }
 #endif
 
-/**********************************************************************
- *
- * Kernel I2C Interface (not supported with OV518/OV518+)
- *
- **********************************************************************/
-
-/* For as-yet unimplemented I2C interface */
-static void 
-call_i2c_clients(struct usb_ov511 *ov, unsigned int cmd,
-		 void *arg)
-{
-	/* Do nothing */
-}
-
 /*****************************************************************************/
 
 /* Temporarily stops OV511 from functioning. Must do this before changing
  * registers while the camera is streaming */
-static inline int 
+static inline int
 ov51x_stop(struct usb_ov511 *ov)
 {
 	PDEBUG(4, "stopping");
-	ov->stopped = 1;	
+	ov->stopped = 1;
 	if (ov->bclass == BCL_OV518)
 		return (reg_w_mask(ov, R51x_SYS_RESET, 0x3a, 0x3a));
 	else
@@ -1333,12 +1314,12 @@ ov51x_stop(struct usb_ov511 *ov)
 
 /* Restarts OV511 after ov511_stop() is called. Has no effect if it is not
  * actually stopped (for performance). */
-static inline int 
+static inline int
 ov51x_restart(struct usb_ov511 *ov)
 {
 	if (ov->stopped) {
 		PDEBUG(4, "restarting");
-		ov->stopped = 0;	
+		ov->stopped = 0;
 
 		/* Reinitialize the stream */
 		if (ov->bclass == BCL_OV518)
@@ -1351,7 +1332,7 @@ ov51x_restart(struct usb_ov511 *ov)
 }
 
 /* Resets the hardware snapshot button */
-static void 
+static void
 ov51x_clear_snapshot(struct usb_ov511 *ov)
 {
 	if (ov->bclass == BCL_OV511) {
@@ -1363,12 +1344,12 @@ ov51x_clear_snapshot(struct usb_ov511 *ov)
 	} else {
 		err("clear snap: invalid bridge type");
 	}
-	
 }
 
+#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
 /* Checks the status of the snapshot button. Returns 1 if it was pressed since
  * it was last cleared, and zero in all other cases (including errors) */
-static int 
+static int
 ov51x_check_snapshot(struct usb_ov511 *ov)
 {
 	int ret, status = 0;
@@ -1388,19 +1369,20 @@ ov51x_check_snapshot(struct usb_ov511 *ov)
 
 	return status;
 }
+#endif
 
 /* This does an initial reset of an OmniVision sensor and ensures that I2C
  * is synchronized. Returns <0 for failure.
  */
-static int 
+static int
 init_ov_sensor(struct usb_ov511 *ov)
 {
 	int i, success;
 
-	/* Reset the sensor */ 
+	/* Reset the sensor */
 	if (i2c_w(ov, 0x12, 0x80) < 0) return -EIO;
 
-	/* Wait for it to initialize */ 
+	/* Wait for it to initialize */
 	schedule_timeout (1 + 150 * HZ / 1000);
 
 	for (i = 0, success = 0; i < i2c_detect_tries && !success; i++) {
@@ -1410,9 +1392,9 @@ init_ov_sensor(struct usb_ov511 *ov)
 			continue;
 		}
 
-		/* Reset the sensor */ 
+		/* Reset the sensor */
 		if (i2c_w(ov, 0x12, 0x80) < 0) return -EIO;
-		/* Wait for it to initialize */ 
+		/* Wait for it to initialize */
 		schedule_timeout(1 + 150 * HZ / 1000);
 		/* Dummy read to sync I2C */
 		if (i2c_r(ov, 0x00) < 0) return -EIO;
@@ -1420,13 +1402,13 @@ init_ov_sensor(struct usb_ov511 *ov)
 
 	if (!success)
 		return -EIO;
-	
+
 	PDEBUG(1, "I2C synced in %d attempt(s)", i);
 
 	return 0;
 }
 
-static int 
+static int
 ov511_set_packet_size(struct usb_ov511 *ov, int size)
 {
 	int alt, mult;
@@ -1468,7 +1450,7 @@ ov511_set_packet_size(struct usb_ov511 *ov, int size)
 
 	if (reg_w(ov, R51x_FIFO_PSIZE, mult) < 0)
 		return -EIO;
-	
+
 	if (usb_set_interface(ov->dev, ov->iface, alt) < 0) {
 		err("Set packet size: set interface error");
 		return -EBUSY;
@@ -1488,7 +1470,7 @@ ov511_set_packet_size(struct usb_ov511 *ov, int size)
 /* Note: Unlike the OV511/OV511+, the size argument does NOT include the
  * optional packet number byte. The actual size *is* stored in ov->packet_size,
  * though. */
-static int 
+static int
 ov518_set_packet_size(struct usb_ov511 *ov, int size)
 {
 	int alt;
@@ -1550,7 +1532,6 @@ ov511_init_compression(struct usb_ov511 *ov)
 	int rc = 0;
 
 	if (!ov->compress_inited) {
-
 		reg_w(ov, 0x70, phy);
 		reg_w(ov, 0x71, phuv);
 		reg_w(ov, 0x72, pvy);
@@ -1568,7 +1549,7 @@ ov511_init_compression(struct usb_ov511 *ov)
 	}
 
 	ov->compress_inited = 1;
-out:	
+out:
 	return rc;
 }
 
@@ -1579,7 +1560,6 @@ ov518_init_compression(struct usb_ov511 *ov)
 	int rc = 0;
 
 	if (!ov->compress_inited) {
-
 		if (ov518_upload_quan_tables(ov) < 0) {
 			err("Error uploading quantization tables");
 			rc = -EIO;
@@ -1588,7 +1568,7 @@ ov518_init_compression(struct usb_ov511 *ov)
 	}
 
 	ov->compress_inited = 1;
-out:	
+out:
 	return rc;
 }
 
@@ -2130,7 +2110,7 @@ sensor_get_exposure(struct usb_ov511 *ov, unsigned char *val)
 #endif /* CONFIG_PROC_FS && CONFIG_VIDEO_PROC_FS */
 
 /* Turns on or off the LED. Only has an effect with OV511+/OV518(+) */
-static inline void 
+static inline void
 ov51x_led_control(struct usb_ov511 *ov, int enable)
 {
 	PDEBUG(4, " (%s)", enable ? "turn on" : "turn off");
@@ -2181,7 +2161,7 @@ sensor_set_light_freq(struct usb_ov511 *ov, int freq)
 		i2c_w_mask(ov, 0x2a, sixty?0x00:0x80, 0x80);
 		i2c_w(ov, 0x2b, sixty?0x00:0xac);
 		i2c_w_mask(ov, 0x76, 0x01, 0x01);
-		break;		
+		break;
 	case SEN_OV6620:
 	case SEN_OV6630:
 		i2c_w(ov, 0x2b, sixty?0xa8:0x28);
@@ -2269,7 +2249,7 @@ sensor_set_auto_brightness(struct usb_ov511 *ov, int enable)
  */
 static inline int
 sensor_set_auto_exposure(struct usb_ov511 *ov, int enable)
-{	
+{
 	PDEBUG(4, " (%s)", enable ? "turn on" : "turn off");
 
 	switch (ov->sensor) {
@@ -2281,7 +2261,7 @@ sensor_set_auto_exposure(struct usb_ov511 *ov, int enable)
 	case SEN_OV76BE:
 	case SEN_OV8600:
 		i2c_w_mask(ov, 0x13, enable?0x01:0x00, 0x01);
-		break;		
+		break;
 	case SEN_OV6630:
 		i2c_w_mask(ov, 0x28, enable?0x00:0x10, 0x10);
 		break;
@@ -2318,7 +2298,7 @@ sensor_set_backlight(struct usb_ov511 *ov, int enable)
 		i2c_w_mask(ov, 0x68, enable?0xe0:0xc0, 0xe0);
 		i2c_w_mask(ov, 0x29, enable?0x08:0x00, 0x08);
 		i2c_w_mask(ov, 0x28, enable?0x02:0x00, 0x02);
-		break;		
+		break;
 	case SEN_OV6620:
 		i2c_w_mask(ov, 0x4e, enable?0xe0:0xc0, 0xe0);
 		i2c_w_mask(ov, 0x29, enable?0x08:0x00, 0x08);
@@ -2378,7 +2358,7 @@ sensor_set_mirror(struct usb_ov511 *ov, int enable)
 /* Returns number of bits per pixel (regardless of where they are located;
  * planar or not), or zero for unsupported format.
  */
-static inline int 
+static inline int
 get_depth(int palette)
 {
 	switch (palette) {
@@ -2390,7 +2370,7 @@ get_depth(int palette)
 }
 
 /* Bytes per frame. Used by read(). Return of 0 indicates error */
-static inline long int 
+static inline long int
 get_frame_length(struct ov511_frame *frame)
 {
 	if (!frame)
@@ -2785,12 +2765,12 @@ ov518_mode_init_regs(struct usb_ov511 *ov,
 		return -EINVAL;
 	} else {
 		hi_res = 0;
-	}	
+	}
 
 	if (ov51x_stop(ov) < 0)
 		return -EIO;
 
-	/******** Set the mode ********/		
+	/******** Set the mode ********/
 
 	reg_w(ov, 0x2b, 0);
 	reg_w(ov, 0x2c, 0);
@@ -2906,10 +2886,10 @@ mode_init_regs(struct usb_ov511 *ov,
 		rc = -EINVAL;
 		break;
 	case SEN_SAA7111A:
-//		rc = mode_init_saa_sensor_regs(ov, width, height, mode, 
+//		rc = mode_init_saa_sensor_regs(ov, width, height, mode,
 //					       sub_flag);
 
-		PDEBUG(1, "SAA status = 0X%x", i2c_r(ov, 0x1f));
+		PDEBUG(1, "SAA status = 0x%02X", i2c_r(ov, 0x1f));
 		break;
 	default:
 		err("Unknown sensor");
@@ -2952,7 +2932,7 @@ mode_init_regs(struct usb_ov511 *ov,
 /* This sets the default image parameters. This is useful for apps that use
  * read() and do not set these.
  */
-static int 
+static int
 ov51x_set_default_params(struct usb_ov511 *ov)
 {
 	int i;
@@ -2988,7 +2968,7 @@ ov51x_set_default_params(struct usb_ov511 *ov)
  **********************************************************************/
 
 /* Set analog input port of decoder */
-static int 
+static int
 decoder_set_input(struct usb_ov511 *ov, int input)
 {
 	PDEBUG(4, "port %d", input);
@@ -3010,7 +2990,7 @@ decoder_set_input(struct usb_ov511 *ov, int input)
 }
 
 /* Get ASCII name of video input */
-static int 
+static int
 decoder_get_input_name(struct usb_ov511 *ov, int input, char *name)
 {
 	switch (ov->sensor) {
@@ -3022,7 +3002,6 @@ decoder_get_input_name(struct usb_ov511 *ov, int input, char *name)
 			sprintf(name, "CVBS-%d", input);
 		else // if (input < 8)
 			sprintf(name, "S-Video-%d", input - 4);
-
 		break;
 	}
 	default:
@@ -3033,7 +3012,7 @@ decoder_get_input_name(struct usb_ov511 *ov, int input, char *name)
 }
 
 /* Set norm (NTSC, PAL, SECAM, AUTO) */
-static int 
+static int
 decoder_set_norm(struct usb_ov511 *ov, int norm)
 {
 	PDEBUG(4, "%d", norm);
@@ -3048,7 +3027,7 @@ decoder_set_norm(struct usb_ov511 *ov, int norm)
 			reg_e = 0x00;	/* NTSC M / PAL BGHI */
 		} else if (norm == VIDEO_MODE_PAL) {
 			reg_8 = 0x00;	/* 50 Hz */
-			reg_e = 0x00;	/* NTSC M / PAL BGHI */	
+			reg_e = 0x00;	/* NTSC M / PAL BGHI */
 		} else if (norm == VIDEO_MODE_AUTO) {
 			reg_8 = 0x80;	/* Auto field detect */
 			reg_e = 0x00;	/* NTSC M / PAL BGHI */
@@ -3079,7 +3058,7 @@ decoder_set_norm(struct usb_ov511 *ov, int norm)
 /* Copies a 64-byte segment at pIn to an 8x8 block at pOut. The width of the
  * image at pOut is specified by w.
  */
-static inline void 
+static inline void
 make_8x8(unsigned char *pIn, unsigned char *pOut, int w)
 {
 	unsigned char *pOut1 = pOut;
@@ -3092,7 +3071,6 @@ make_8x8(unsigned char *pIn, unsigned char *pOut, int w)
 		}
 		pOut += w;
 	}
-		
 }
 
 /*
@@ -3214,7 +3192,7 @@ yuv420raw_to_yuv420p(struct ov511_frame *frame,
  * accordingly. Returns -ENXIO if decompressor is not available, otherwise
  * returns 0 if no other error.
  */
-static int 
+static int
 request_decompressor(struct usb_ov511 *ov)
 {
 	if (!ov)
@@ -3270,7 +3248,7 @@ request_decompressor(struct usb_ov511 *ov)
 /* Unlocks decompression module and nulls ov->decomp_ops. Safe to call even
  * if ov->decomp_ops is NULL.
  */
-static void 
+static void
 release_decompressor(struct usb_ov511 *ov)
 {
 	int released = 0;	/* Did we actually do anything? */
@@ -3286,14 +3264,14 @@ release_decompressor(struct usb_ov511 *ov)
 	}
 
 	ov->decomp_ops = NULL;
-	
+
 	unlock_kernel();
 
 	if (released)
 		PDEBUG(3, "Decompressor released");
 }
 
-static void 
+static void
 decompress(struct usb_ov511 *ov, struct ov511_frame *frame,
 	   unsigned char *pIn0, unsigned char *pOut0)
 {
@@ -3303,7 +3281,7 @@ decompress(struct usb_ov511 *ov, struct ov511_frame *frame,
 
 	PDEBUG(4, "Decompressing %d bytes", frame->bytes_recvd);
 
-	if (frame->format == VIDEO_PALETTE_GREY 
+	if (frame->format == VIDEO_PALETTE_GREY
 	    && ov->decomp_ops->decomp_400) {
 		int ret = ov->decomp_ops->decomp_400(
 			pIn0,
@@ -3313,7 +3291,7 @@ decompress(struct usb_ov511 *ov, struct ov511_frame *frame,
 			frame->rawheight,
 			frame->bytes_recvd);
 		PDEBUG(4, "DEBUG: decomp_400 returned %d", ret);
-	} else if (frame->format != VIDEO_PALETTE_GREY 
+	} else if (frame->format != VIDEO_PALETTE_GREY
 		   && ov->decomp_ops->decomp_420) {
 		int ret = ov->decomp_ops->decomp_420(
 			pIn0,
@@ -3327,6 +3305,12 @@ decompress(struct usb_ov511 *ov, struct ov511_frame *frame,
 		err("Decompressor does not support this format");
 	}
 }
+
+/**********************************************************************
+ *
+ * Format conversion
+ *
+ **********************************************************************/
 
 /* Fuses even and odd fields together, and doubles width.
  * INPUT: an odd field followed by an even field at pIn0, in YUV planar format
@@ -3432,7 +3416,7 @@ ov51x_postprocess_yuv420(struct usb_ov511 *ov, struct ov511_frame *frame)
 		if (frame->compressed)
 			decompress(ov, frame, frame->rawdata, frame->tempdata);
 		else
-			yuv420raw_to_yuv420p(frame, frame->rawdata, 
+			yuv420raw_to_yuv420p(frame, frame->rawdata,
 					     frame->tempdata);
 
 		deinterlace(frame, RAWFMT_YUV420, frame->tempdata,
@@ -3452,11 +3436,11 @@ ov51x_postprocess_yuv420(struct usb_ov511 *ov, struct ov511_frame *frame)
  * 	3. Convert from YUV planar to destination format, if necessary
  * 	4. Fix the RGB offset, if necessary
  */
-static void 
+static void
 ov51x_postprocess(struct usb_ov511 *ov, struct ov511_frame *frame)
 {
 	if (dumppix) {
-		memset(frame->data, 0, 
+		memset(frame->data, 0,
 			MAX_DATA_SIZE(ov->maxwidth, ov->maxheight));
 		PDEBUG(4, "Dumping %d bytes", frame->bytes_recvd);
 		memcpy(frame->data, frame->rawdata, frame->bytes_recvd);
@@ -3482,7 +3466,7 @@ ov51x_postprocess(struct usb_ov511 *ov, struct ov511_frame *frame)
  *
  **********************************************************************/
 
-static inline void 
+static inline void
 ov511_move_data(struct usb_ov511 *ov, unsigned char *in, int n)
 {
 	int num, offset;
@@ -3518,7 +3502,7 @@ ov511_move_data(struct usb_ov511 *ov, unsigned char *in, int n)
 
 	/* Frame end */
 	if (in[8] & 0x80) {
-		ts = (struct timeval *)(frame->data 
+		ts = (struct timeval *)(frame->data
 		      + MAX_FRAME_SIZE(ov->maxwidth, ov->maxheight));
 		do_gettimeofday(ts);
 
@@ -3656,7 +3640,7 @@ check_middle:
 	}
 }
 
-static inline void 
+static inline void
 ov518_move_data(struct usb_ov511 *ov, unsigned char *in, int n)
 {
 	int max_raw = MAX_RAW_DATA_SIZE(ov->maxwidth, ov->maxheight);
@@ -3796,7 +3780,7 @@ check_middle:
 			} else {
 				if (frame->bytes_recvd + copied + 8 <= max_raw)
 				{
-					memcpy(frame->rawdata 
+					memcpy(frame->rawdata
 						+ frame->bytes_recvd + copied,
 						in + read, 8);
 					copied += 8;
@@ -3810,7 +3794,7 @@ check_middle:
 	}
 }
 
-static void 
+static void
 ov51x_isoc_irq(struct urb *urb)
 {
 	int i;
@@ -3896,7 +3880,7 @@ ov51x_isoc_irq(struct urb *urb)
  *
  ***************************************************************************/
 
-static int 
+static int
 ov51x_init_isoc(struct usb_ov511 *ov)
 {
 	struct urb *urb;
@@ -3991,7 +3975,7 @@ ov51x_init_isoc(struct usb_ov511 *ov)
 	return 0;
 }
 
-static void 
+static void
 ov51x_unlink_isoc(struct usb_ov511 *ov)
 {
 	int n;
@@ -4006,7 +3990,7 @@ ov51x_unlink_isoc(struct usb_ov511 *ov)
 	}
 }
 
-static void 
+static void
 ov51x_stop_isoc(struct usb_ov511 *ov)
 {
 	if (!ov->streaming || !ov->dev)
@@ -4024,7 +4008,7 @@ ov51x_stop_isoc(struct usb_ov511 *ov)
 	ov51x_unlink_isoc(ov);
 }
 
-static int 
+static int
 ov51x_new_frame(struct usb_ov511 *ov, int framenum)
 {
 	struct ov511_frame *frame;
@@ -4046,7 +4030,7 @@ ov51x_new_frame(struct usb_ov511 *ov, int framenum)
 
 	frame = &ov->frame[framenum];
 
-	PDEBUG(4, "framenum = %d, width = %d, height = %d", framenum, 
+	PDEBUG(4, "framenum = %d, width = %d, height = %d", framenum,
 	       frame->width, frame->height);
 
 	frame->grabstate = FRAME_GRABBING;
@@ -4075,12 +4059,12 @@ ov51x_new_frame(struct usb_ov511 *ov, int framenum)
  *
  ***************************************************************************/
 
-/* 
+/*
  * - You must acquire buf_lock before entering this function.
  * - Because this code will free any non-null pointer, you must be sure to null
  *   them if you explicitly free them somewhere else!
  */
-static void 
+static void
 ov51x_do_dealloc(struct usb_ov511 *ov)
 {
 	int i;
@@ -4124,7 +4108,7 @@ ov51x_do_dealloc(struct usb_ov511 *ov)
 	PDEBUG(4, "leaving");
 }
 
-static int 
+static int
 ov51x_alloc(struct usb_ov511 *ov)
 {
 	int i;
@@ -4171,12 +4155,12 @@ ov51x_alloc(struct usb_ov511 *ov)
 
 	for (i = 0; i < OV511_NUMFRAMES; i++) {
 		ov->frame[i].data = ov->fbuf + i * MAX_DATA_SIZE(w, h);
-		ov->frame[i].rawdata = ov->rawfbuf 
+		ov->frame[i].rawdata = ov->rawfbuf
 		 + i * MAX_RAW_DATA_SIZE(w, h);
-		ov->frame[i].tempdata = ov->tempfbuf 
+		ov->frame[i].tempdata = ov->tempfbuf
 		 + i * MAX_RAW_DATA_SIZE(w, h);
 
-		ov->frame[i].compbuf = 
+		ov->frame[i].compbuf =
 		 (unsigned char *) __get_free_page(GFP_KERNEL);
 		if (!ov->frame[i].compbuf)
 			goto error;
@@ -4196,7 +4180,7 @@ error:
 	return -ENOMEM;
 }
 
-static void 
+static void
 ov51x_dealloc(struct usb_ov511 *ov, int now)
 {
 	PDEBUG(4, "entered");
@@ -4212,7 +4196,7 @@ ov51x_dealloc(struct usb_ov511 *ov, int now)
  *
  ***************************************************************************/
 
-static int 
+static int
 ov51x_v4l1_open(struct inode *inode, struct file *file)
 {
 	struct video_device *vdev = video_devdata(file);
@@ -4224,17 +4208,18 @@ ov51x_v4l1_open(struct inode *inode, struct file *file)
 	down(&ov->lock);
 
 	err = -EBUSY;
-	if (ov->user) 
+	if (ov->user)
 		goto out;
 
-	err = -ENOMEM;
-	if (ov51x_alloc(ov))
+	err = ov51x_alloc(ov);
+	if (err < 0)
 		goto out;
 
 	ov->sub_flag = 0;
 
 	/* In case app doesn't set them... */
-	if (ov51x_set_default_params(ov) < 0)
+	err = ov51x_set_default_params(ov);
+	if (err < 0)
 		goto out;
 
 	/* Make sure frames are reset */
@@ -4243,7 +4228,7 @@ ov51x_v4l1_open(struct inode *inode, struct file *file)
 		ov->frame[i].bytes_read = 0;
 	}
 
-	/* If compression is on, make sure now that a 
+	/* If compression is on, make sure now that a
 	 * decompressor can be loaded */
 	if (ov->compress && !ov->decomp_ops) {
 		err = request_decompressor(ov);
@@ -4268,14 +4253,14 @@ out:
 	return err;
 }
 
-static int 
+static int
 ov51x_v4l1_close(struct inode *inode, struct file *file)
 {
 	struct video_device *vdev = file->private_data;
 	struct usb_ov511 *ov = vdev->priv;
 
 	PDEBUG(4, "ov511_close");
-	
+
 	down(&ov->lock);
 
 	ov->user--;
@@ -4303,6 +4288,7 @@ ov51x_v4l1_close(struct inode *inode, struct file *file)
 		kfree(ov);
 		ov = NULL;
 	}
+
 	file->private_data = NULL;
 
 	return 0;
@@ -4318,7 +4304,7 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 	PDEBUG(5, "IOCtl: 0x%X", cmd);
 
 	if (!ov->dev)
-		return -EIO;	
+		return -EIO;
 
 	switch (cmd) {
 	case VIDIOCGCAP:
@@ -4331,10 +4317,8 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 		sprintf(b->name, "%s USB Camera",
 			symbolic(brglist, ov->bridge));
 		b->type = VID_TYPE_CAPTURE | VID_TYPE_SUBCAPTURE;
-		if (ov->has_tuner)
-			b->type |= VID_TYPE_TUNER;
 		b->channels = ov->num_inputs;
-		b->audios = ov->has_audio_proc ? 1:0;
+		b->audios = 0;
 		b->maxwidth = ov->maxwidth;
 		b->maxheight = ov->maxheight;
 		b->minwidth = ov->minwidth;
@@ -4354,11 +4338,10 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 		}
 
 		v->norm = ov->norm;
-		v->type = (ov->has_tuner) ? VIDEO_TYPE_TV : VIDEO_TYPE_CAMERA;
-		v->flags = (ov->has_tuner) ? VIDEO_VC_TUNER : 0;
-		v->flags |= (ov->has_audio_proc) ? VIDEO_VC_AUDIO : 0;
+		v->type = VIDEO_TYPE_CAMERA;
+		v->flags = 0;
 //		v->flags |= (ov->has_decoder) ? VIDEO_VC_NORM : 0;
-		v->tuners = (ov->has_tuner) ? 1:0;
+		v->tuners = 0;
 		decoder_get_input_name(ov, v->channel, v->name);
 
 		return 0;
@@ -4585,7 +4568,7 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 			return -EINVAL;
 		}
 
-		if (vm->width > ov->maxwidth 
+		if (vm->width > ov->maxwidth
 		    || vm->height > ov->maxheight) {
 			err("VIDIOCMCAPTURE: requested dimensions too big");
 			return -EINVAL;
@@ -4641,7 +4624,6 @@ ov51x_v4l1_ioctl_internal(struct inode *inode, struct file *file,
 		struct ov511_frame *frame;
 		int rc;
 
-
 		if (fnum >= OV511_NUMFRAMES) {
 			err("VIDIOCSYNC: invalid frame (%d)", fnum);
 			return -EINVAL;
@@ -4676,7 +4658,7 @@ redo:
 					return ret;
 				goto redo;
 			}
-			/* Fall through */			
+			/* Fall through */
 		case FRAME_DONE:
 			if (ov->snap_enabled && !frame->snapshot) {
 				int ret;
@@ -4728,92 +4710,6 @@ redo:
 
 		return 0;
 	}
-	case VIDIOCGTUNER:
-	{
-		struct video_tuner *v = arg;
-
-		PDEBUG(4, "VIDIOCGTUNER");
-
-		if (!ov->has_tuner || v->tuner)	// Only tuner 0
-			return -EINVAL;
-
-		strcpy(v->name, "Television");
-
-		// FIXME: Need a way to get the real values
-		v->rangelow = 0;
-		v->rangehigh = ~0;
-
-		v->flags = VIDEO_TUNER_PAL | VIDEO_TUNER_NTSC
-			   | VIDEO_TUNER_SECAM;
-		v->mode = 0; 		/* FIXME:  Not sure what this is yet */
-		v->signal = 0xFFFF;	/* unknown */
-
-		call_i2c_clients(ov, cmd, v);
-
-		return 0;
-	}
-	case VIDIOCSTUNER:
-	{
-		struct video_tuner *v = arg;
-		int err;
-
-		PDEBUG(4, "VIDIOCSTUNER");
-
-		/* Only no or one tuner for now */
-		if (!ov->has_tuner || v->tuner)
-			return -EINVAL;
-
-		/* and it only has certain valid modes */
-		if (v->mode != VIDEO_MODE_PAL &&
-		    v->mode != VIDEO_MODE_NTSC &&
-		    v->mode != VIDEO_MODE_SECAM)
-			return -EOPNOTSUPP;
-
-		/* Is this right/necessary? */
-		err = decoder_set_norm(ov, v->mode);
-		if (err)
-			return err;
-
-		call_i2c_clients(ov, cmd, v);
-
-		return 0;
-	}
-	case VIDIOCGFREQ:
-	{
-		unsigned long v = *((unsigned long *) arg);
-
-		PDEBUG(4, "VIDIOCGFREQ");
-
-		if (!ov->has_tuner)
-			return -EINVAL;
-
-		v = ov->freq;
-#if 0
-		/* FIXME: this is necessary for testing */
-		v = 46*16;
-#endif
-		return 0;
-	}
-	case VIDIOCSFREQ:
-	{
-		unsigned long v = *((unsigned long *) arg);
-
-		PDEBUG(4, "VIDIOCSFREQ: %lx", v);
-
-		if (!ov->has_tuner)
-			return -EINVAL;
-
-		ov->freq = v;
-		call_i2c_clients(ov, cmd, &v);
-
-		return 0;
-	}
-	case VIDIOCGAUDIO:
-	case VIDIOCSAUDIO:
-	{
-		/* FIXME: Implement this... */
-		return 0;
-	}
 	default:
 		PDEBUG(3, "Unsupported IOCtl: 0x%X", cmd);
 		return -ENOIOCTLCMD;
@@ -4822,7 +4718,7 @@ redo:
 	return 0;
 }
 
-static int 
+static int
 ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
 		 unsigned int cmd, unsigned long arg)
 {
@@ -4839,7 +4735,7 @@ ov51x_v4l1_ioctl(struct inode *inode, struct file *file,
 	return rc;
 }
 
-static inline int 
+static inline int
 ov51x_v4l1_read(struct file *file, char *buf, size_t cnt, loff_t *ppos)
 {
 	struct video_device *vdev = file->private_data;
@@ -4904,7 +4800,7 @@ restart:
 
 	/* Wait while we're grabbing the image */
 	PDEBUG(4, "Waiting image grabbing");
-	rc = wait_event_interruptible(frame->wq, 
+	rc = wait_event_interruptible(frame->wq,
 		(frame->grabstate == FRAME_DONE)
 		|| (frame->grabstate == FRAME_ERROR));
 
@@ -4951,7 +4847,7 @@ restart:
 		get_frame_length(frame));
 
 	/* copy bytes to user space; we allow for partials reads */
-//	if ((count + frame->bytes_read) 
+//	if ((count + frame->bytes_read)
 //	    > get_frame_length((struct ov511_frame *)frame))
 //		count = frame->scanlength - frame->bytes_read;
 
@@ -5054,7 +4950,7 @@ static struct video_device vdev_template = {
 };
 
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-static int 
+static int
 ov51x_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		    unsigned long ularg)
 {
@@ -5278,7 +5174,7 @@ ov51x_control_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 /* This initializes the OV7610, OV7620, or OV76BE sensor. The OV76BE uses
  * the same register settings as the OV7610, since they are very similar.
  */
-static int 
+static int
 ov7xx0_configure(struct usb_ov511 *ov)
 {
 	int i, success;
@@ -5429,7 +5325,7 @@ ov7xx0_configure(struct usb_ov511 *ov)
 			err("this to " EMAIL);
 			err("This is only a warning. You can attempt to use");
 			err("your camera anyway");
-// Only issue a warning for now  
+// Only issue a warning for now
 //			return -1;
 		} else {
 			PDEBUG(1, "OV7xx0 initialized (method 2, %dx)", i+1);
@@ -5449,8 +5345,6 @@ ov7xx0_configure(struct usb_ov511 *ov)
 		/* I don't know what's different about the 76BE yet. */
 		if (i2c_r(ov, 0x15) & 1) {
 			info("Sensor is an OV7620AE");
-			info("PLEASE REPORT THE EXISTENCE OF THIS SENSOR TO");
-			info("THE DRIVER AUTHOR");
 		} else {
 			info("Sensor is an OV76BE");
 		}
@@ -5498,7 +5392,7 @@ ov7xx0_configure(struct usb_ov511 *ov)
 }
 
 /* This initializes the OV6620, OV6630, OV6630AE, or OV6630AF sensor. */
-static int 
+static int
 ov6xx0_configure(struct usb_ov511 *ov)
 {
 	int rc;
@@ -5513,7 +5407,7 @@ ov6xx0_configure(struct usb_ov511 *ov)
 		{ OV511_I2C_BUS, 0x0c, 0x24 },
 		{ OV511_I2C_BUS, 0x0d, 0x24 },
 		{ OV511_I2C_BUS, 0x0f, 0x15 }, /* COMS */
-		{ OV511_I2C_BUS, 0x10, 0x75 }, /* AEC Exposure time */	
+		{ OV511_I2C_BUS, 0x10, 0x75 }, /* AEC Exposure time */
 		{ OV511_I2C_BUS, 0x12, 0x24 }, /* Enable AGC */
 		{ OV511_I2C_BUS, 0x14, 0x04 },
 		/* 0x16: 0x06 helps frame stability with moving objects */
@@ -5525,11 +5419,11 @@ ov6xx0_configure(struct usb_ov511 *ov)
 		{ OV511_I2C_BUS, 0x2a, 0x04 }, /* Disable framerate adjust */
 //		{ OV511_I2C_BUS, 0x2b, 0xac }, /* Framerate; Set 2a[7] first */
 		{ OV511_I2C_BUS, 0x2d, 0x99 },
-		{ OV511_I2C_BUS, 0x33, 0xa0 }, /* Color Procesing Parameter */	
+		{ OV511_I2C_BUS, 0x33, 0xa0 }, /* Color Procesing Parameter */
 		{ OV511_I2C_BUS, 0x34, 0xd2 }, /* Max A/D range */
 		{ OV511_I2C_BUS, 0x38, 0x8b },
 		{ OV511_I2C_BUS, 0x39, 0x40 },
-		
+
 		{ OV511_I2C_BUS, 0x3c, 0x39 }, /* Enable AEC mode changing */
 		{ OV511_I2C_BUS, 0x3c, 0x3c }, /* Change AEC mode */
 		{ OV511_I2C_BUS, 0x3c, 0x24 }, /* Disable AEC mode changing */
@@ -5609,7 +5503,7 @@ ov6xx0_configure(struct usb_ov511 *ov)
 		 * control the color balance */
 //	/*OK?*/	{ OV511_I2C_BUS, 0x4a, 0x80 }, // Check these
 //	/*OK?*/	{ OV511_I2C_BUS, 0x4b, 0x80 },
-//	/*U*/	{ OV511_I2C_BUS, 0x4c, 0xd0 }, 
+//	/*U*/	{ OV511_I2C_BUS, 0x4c, 0xd0 },
 	/*d2?*/	{ OV511_I2C_BUS, 0x4d, 0x10 }, /* This reduces noise a bit */
 	/*c1?*/	{ OV511_I2C_BUS, 0x4e, 0x40 },
 	/*04?*/	{ OV511_I2C_BUS, 0x4f, 0x07 },
@@ -5627,7 +5521,7 @@ ov6xx0_configure(struct usb_ov511 *ov)
 	};
 
 	PDEBUG(4, "starting sensor configuration");
-	
+
 	if (init_ov_sensor(ov) < 0) {
 		err("Failed to read sensor ID. You might not have an OV6xx0,");
 		err("or it may be not responding. Report this to " EMAIL);
@@ -5642,7 +5536,7 @@ ov6xx0_configure(struct usb_ov511 *ov)
 	if (rc < 0) {
 		err("Error detecting sensor type");
 		return -1;
-	} 
+	}
 
 	if ((rc & 3) == 0)
 		ov->sensor = SEN_OV6630;
@@ -5676,7 +5570,7 @@ ov6xx0_configure(struct usb_ov511 *ov)
 		if (write_regvals(ov, aRegvalsNorm6x30))
 			return -1;
 	}
-	
+
 	return 0;
 }
 
@@ -5738,7 +5632,7 @@ ks0127_configure(struct usb_ov511 *ov)
 }
 
 /* This initializes the SAA7111A video decoder. */
-static int 
+static int
 saa7111a_configure(struct usb_ov511 *ov)
 {
 	int rc;
@@ -5890,12 +5784,8 @@ ov511_configure(struct usb_ov511 *ov)
 		err("Also include the output of the detection process.");
 	} 
 
-	if (ov->customid == 6) {	 /* USB Life TV (NTSC) */
-		ov->tuner_type = 8;		/* Temic 4036FY5 3X 1981 */
-	} else if (ov->customid == 70) { /* USB Life TV (PAL/SECAM) */
-		ov->tuner_type = 3;		/* Philips FI1216MF */
+	if (ov->customid == 70)		/* USB Life TV (PAL/SECAM) */
 		ov->pal = 1;
-	}
 
 	if (write_regvals(ov, aRegvalsInit511)) goto error;
 
@@ -5917,7 +5807,7 @@ ov511_configure(struct usb_ov511 *ov)
 	ov->packet_numbering = 1;
 	ov511_set_packet_size(ov, 0);
 
-	ov->snap_enabled = snapshot;	
+	ov->snap_enabled = snapshot;
 
 	/* Test for 7xx0 */
 	PDEBUG(3, "Testing for 0V7xx0");
@@ -5994,7 +5884,7 @@ error:
 }
 
 /* This initializes the OV518/OV518+ and the sensor */
-static int 
+static int
 ov518_configure(struct usb_ov511 *ov)
 {
 	/* For 518 and 518+ */
@@ -6190,7 +6080,6 @@ ov51x_probe(struct usb_device *dev, unsigned int ifnum,
 	ov->lightfreq = lightfreq;
 	ov->num_inputs = 1;	   /* Video decoder init functs. change this */
 	ov->stop_during_set = !fastset;
-	ov->tuner_type = tuner;
 	ov->backlight = backlight;
 	ov->mirror = mirror;
 	ov->auto_brt = autobright;
@@ -6221,7 +6110,7 @@ ov51x_probe(struct usb_device *dev, unsigned int ifnum,
 		ov->bclass = BCL_OV511;
 		break;
 	default:
-		err("Unknown product ID 0x%x", dev->descriptor.idProduct);
+		err("Unknown product ID 0x%04x", dev->descriptor.idProduct);
 		goto error_dealloc;
 	}
 
@@ -6388,7 +6277,7 @@ static struct usb_driver ov511_driver = {
  ***************************************************************************/
 
 /* Returns 0 for success */
-int 
+int
 ov511_register_decomp_module(int ver, struct ov51x_decomp_ops *ops, int ov518,
 			     int mmx)
 {
@@ -6445,7 +6334,7 @@ err_in_use:
 	return -EBUSY;
 }
 
-void 
+void
 ov511_deregister_decomp_module(int ov518, int mmx)
 {
 	lock_kernel();
@@ -6461,13 +6350,13 @@ ov511_deregister_decomp_module(int ov518, int mmx)
 		else
 			ov511_decomp_ops = NULL;
 	}
-	
+
 	MOD_DEC_USE_COUNT;
 
 	unlock_kernel();
 }
 
-static int __init 
+static int __init
 usb_ov511_init(void)
 {
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
@@ -6482,7 +6371,7 @@ usb_ov511_init(void)
 	return 0;
 }
 
-static void __exit 
+static void __exit
 usb_ov511_exit(void)
 {
 	usb_deregister(&ov511_driver);
