@@ -163,7 +163,7 @@ extern void rose_destroy_socket(struct sock *);
 
 /* rose_dev.c */
 extern int  rose_rx_ip(struct sk_buff *, struct net_device *);
-extern int  rose_init(struct net_device *);
+extern void  rose_setup(struct net_device *);
 
 /* rose_in.c */
 extern int  rose_process_rx_frame(struct sock *, struct sk_buff *);

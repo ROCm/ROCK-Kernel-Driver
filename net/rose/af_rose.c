@@ -43,7 +43,7 @@
 #include <net/ip.h>
 #include <net/arp.h>
 
-int rose_ndevs = 10;
+static int rose_ndevs = 10;
 
 int sysctl_rose_restart_request_timeout = ROSE_DEFAULT_T0;
 int sysctl_rose_call_request_timeout    = ROSE_DEFAULT_T1;
@@ -56,7 +56,7 @@ int sysctl_rose_link_fail_timeout       = ROSE_DEFAULT_FAIL_TIMEOUT;
 int sysctl_rose_maximum_vcs             = ROSE_DEFAULT_MAXVC;
 int sysctl_rose_window_size             = ROSE_DEFAULT_WINDOW_SIZE;
 
-HLIST_HEAD(rose_list);
+static HLIST_HEAD(rose_list);
 static spinlock_t rose_list_lock = SPIN_LOCK_UNLOCKED;
 
 static struct proto_ops rose_proto_ops;
@@ -1435,7 +1435,7 @@ static struct notifier_block rose_dev_notifier = {
 	.notifier_call	=	rose_device_event,
 };
 
-static struct net_device *dev_rose;
+static struct net_device **dev_rose;
 
 static const char banner[] = KERN_INFO "F6FBB/G4KLX ROSE for Linux. Version 0.62 for AX25.037 Linux 2.4\n";
 
@@ -1450,17 +1450,39 @@ static int __init rose_proto_init(void)
 		return -1;
 	}
 
-	if ((dev_rose = kmalloc(rose_ndevs * sizeof(struct net_device), GFP_KERNEL)) == NULL) {
+	dev_rose = kmalloc(rose_ndevs * sizeof(struct net_device *), GFP_KERNEL);
+	if (dev_rose == NULL) {
 		printk(KERN_ERR "ROSE: rose_proto_init - unable to allocate device structure\n");
 		return -1;
 	}
 
-	memset(dev_rose, 0x00, rose_ndevs * sizeof(struct net_device));
+	memset(dev_rose, 0x00, rose_ndevs * sizeof(struct net_device*));
+	for (i = 0; i < rose_ndevs; i++) {
+		struct net_device *dev;
+		char name[IFNAMSIZ];
+
+		sprintf(name, "rose%d", i);
+		dev = alloc_netdev(sizeof(struct net_device_stats), 
+				   name, rose_setup);
+		if (!dev) {
+			printk(KERN_ERR "ROSE: rose_proto_init - unable to allocate memory\n");
+			while (--i >= 0)
+				kfree(dev_rose[i]);
+			return -ENOMEM;
+		}
+		dev_rose[i] = dev;
+	}
 
 	for (i = 0; i < rose_ndevs; i++) {
-		sprintf(dev_rose[i].name, "rose%d", i);
-		dev_rose[i].init = rose_init;
-		register_netdev(&dev_rose[i]);
+		if (register_netdev(dev_rose[i])) {
+			printk(KERN_ERR "ROSE: netdevice regeistration failed\n");
+			while (--i >= 0) {
+				unregister_netdev(dev_rose[i]);
+				kfree(dev_rose[i]);
+				return -EIO;
+			}
+		}
+			
 	}
 
 	sock_register(&rose_family_ops);
@@ -1518,10 +1540,11 @@ static void __exit rose_exit(void)
 	sock_unregister(PF_ROSE);
 
 	for (i = 0; i < rose_ndevs; i++) {
-		if (dev_rose[i].priv != NULL) {
-			kfree(dev_rose[i].priv);
-			dev_rose[i].priv = NULL;
-			unregister_netdev(&dev_rose[i]);
+		struct net_device *dev = dev_rose[i];
+
+		if (dev) {
+			unregister_netdev(dev);
+			kfree(dev);
 		}
 	}
 
