@@ -20,7 +20,7 @@
 
 extern const struct exception_table_entry __start___ex_table[];
 extern const struct exception_table_entry __stop___ex_table[];
-extern char _stext[], _etext[];
+extern char _stext[], _etext[], _sinittext[], _einittext[];
 
 /* Given an address, look for it in the exception tables. */
 const struct exception_table_entry *search_exception_tables(unsigned long addr)
@@ -37,6 +37,10 @@ int kernel_text_address(unsigned long addr)
 {
 	if (addr >= (unsigned long)_stext &&
 	    addr <= (unsigned long)_etext)
+		return 1;
+
+	if (addr >= (unsigned long)_sinittext &&
+	    addr <= (unsigned long)_einittext)
 		return 1;
 
 	return module_text_address(addr) != NULL;

@@ -349,15 +349,18 @@ EXPORT_SYMBOL(radix_tree_gang_lookup);
  *	@index:		index key
  *
  *	Remove the item at @index from the radix tree rooted at @root.
+ *
+ *	Returns the address of the deleted item, or NULL if it was not present.
  */
-int radix_tree_delete(struct radix_tree_root *root, unsigned long index)
+void *radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 {
 	struct radix_tree_path path[RADIX_TREE_MAX_PATH], *pathp = path;
 	unsigned int height, shift;
+	void *ret = NULL;
 
 	height = root->height;
 	if (index > radix_tree_maxindex(height))
-		return -ENOENT;
+		goto out;
 
 	shift = (height-1) * RADIX_TREE_MAP_SHIFT;
 	pathp->node = NULL;
@@ -365,7 +368,7 @@ int radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 
 	while (height > 0) {
 		if (*pathp->slot == NULL)
-			return -ENOENT;
+			goto out;
 
 		pathp[1].node = *pathp[0].slot;
 		pathp[1].slot = (struct radix_tree_node **)
@@ -375,8 +378,9 @@ int radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 		height--;
 	}
 
-	if (*pathp[0].slot == NULL)
-		return -ENOENT;
+	ret = *pathp[0].slot;
+	if (ret == NULL)
+		goto out;
 
 	*pathp[0].slot = NULL;
 	while (pathp[0].node && --pathp[0].node->count == 0) {
@@ -387,8 +391,8 @@ int radix_tree_delete(struct radix_tree_root *root, unsigned long index)
 
 	if (root->rnode == NULL)
 		root->height = 0;  /* Empty tree, we can reset the height */
-
-	return 0;
+out:
+	return ret;
 }
 EXPORT_SYMBOL(radix_tree_delete);
 

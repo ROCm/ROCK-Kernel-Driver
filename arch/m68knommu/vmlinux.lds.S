@@ -282,7 +282,9 @@ SECTIONS {
 	.init : {
 		. = ALIGN(4096);
 		__init_begin = .;
+		_sinittext = .;
 		*(.init.text)
+		_einittext = .;
 		*(.init.data)
 		. = ALIGN(16);
 		__setup_start = .;

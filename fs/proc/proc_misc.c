@@ -43,6 +43,7 @@
 #include <linux/hugetlb.h>
 #include <linux/jiffies.h>
 #include <linux/sysrq.h>
+#include <linux/vmalloc.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
@@ -98,6 +99,41 @@ static int loadavg_read_proc(char *page, char **start, off_t off,
 	return proc_calc_metrics(page, start, off, count, eof, len);
 }
 
+struct vmalloc_info {
+	unsigned long used;
+	unsigned long largest_chunk;
+};
+
+static struct vmalloc_info get_vmalloc_info(void)
+{
+	unsigned long prev_end = VMALLOC_START;
+	struct vm_struct* vma;
+	struct vmalloc_info vmi;
+	vmi.used = 0;
+
+	read_lock(&vmlist_lock);
+
+	if(!vmlist)
+		vmi.largest_chunk = (VMALLOC_END-VMALLOC_START);
+	else
+		vmi.largest_chunk = 0;
+
+	for (vma = vmlist; vma; vma = vma->next) {
+		unsigned long free_area_size =
+			(unsigned long)vma->addr - prev_end;
+		vmi.used += vma->size;
+		if (vmi.largest_chunk < free_area_size )
+
+			vmi.largest_chunk = free_area_size;
+		prev_end = vma->size + (unsigned long)vma->addr;
+	}
+	if(VMALLOC_END-prev_end > vmi.largest_chunk)
+		vmi.largest_chunk = VMALLOC_END-prev_end;
+
+	read_unlock(&vmlist_lock);
+	return vmi;
+}
+
 static int uptime_read_proc(char *page, char **start, off_t off,
 				 int count, int *eof, void *data)
 {
@@ -143,6 +179,8 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	unsigned long inactive;
 	unsigned long active;
 	unsigned long free;
+	unsigned long vmtot;
+	struct vmalloc_info vmi;
 
 	get_page_state(&ps);
 	get_zone_counts(&active, &inactive, &free);
@@ -154,6 +192,11 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 	si_meminfo(&i);
 	si_swapinfo(&i);
 	committed = atomic_read(&vm_committed_space);
+
+	vmtot = (VMALLOC_END-VMALLOC_START)>>10;
+	vmi = get_vmalloc_info();
+	vmi.used >>= 10;
+	vmi.largest_chunk >>= 10;
 
 	/*
 	 * Tagged format, for easy grepping and expansion.
@@ -177,7 +220,10 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		"Mapped:       %8lu kB\n"
 		"Slab:         %8lu kB\n"
 		"Committed_AS: %8u kB\n"
-		"PageTables:   %8lu kB\n",
+		"PageTables:   %8lu kB\n"
+		"VmallocTotal: %8lu kB\n"
+		"VmallocUsed:  %8lu kB\n"
+		"VmallocChunk: %8lu kB\n",
 		K(i.totalram),
 		K(i.freeram),
 		K(i.bufferram),
@@ -196,7 +242,10 @@ static int meminfo_read_proc(char *page, char **start, off_t off,
 		K(ps.nr_mapped),
 		K(ps.nr_slab),
 		K(committed),
-		K(ps.nr_page_table_pages)
+		K(ps.nr_page_table_pages),
+		vmtot,
+		vmi.used,
+		vmi.largest_chunk
 		);
 
 		len += hugetlb_report_meminfo(page + len);
@@ -386,7 +435,7 @@ static int devices_read_proc(char *page, char **start, off_t off,
 extern int show_interrupts(struct seq_file *p, void *v);
 static int interrupts_open(struct inode *inode, struct file *file)
 {
-	unsigned size = PAGE_SIZE * (1 + NR_CPUS / 8);
+	unsigned size = 4096 * (1 + num_online_cpus() / 8);
 	char *buf = kmalloc(size, GFP_KERNEL);
 	struct seq_file *m;
 	int res;

@@ -43,7 +43,7 @@ do {					\
 
 extern int radix_tree_insert(struct radix_tree_root *, unsigned long, void *);
 extern void *radix_tree_lookup(struct radix_tree_root *, unsigned long);
-extern int radix_tree_delete(struct radix_tree_root *, unsigned long);
+extern void *radix_tree_delete(struct radix_tree_root *, unsigned long);
 extern unsigned int
 radix_tree_gang_lookup(struct radix_tree_root *root, void **results,
 			unsigned long first_index, unsigned int max_items);

@@ -14,6 +14,7 @@ obj-y := errno.o ctype.o string.o vsprintf.o brlock.o cmdline.o \
 
 obj-$(CONFIG_RWSEM_GENERIC_SPINLOCK) += rwsem-spinlock.o
 obj-$(CONFIG_RWSEM_XCHGADD_ALGORITHM) += rwsem.o
+obj-$(CONFIG_SMP) += percpu_counter.o
 
 ifneq ($(CONFIG_HAVE_DEC_LOCK),y) 
   obj-y += dec_and_lock.o

@@ -58,6 +58,7 @@
 #include <linux/ptrace.h>
 #include <linux/time.h>
 #include <linux/backing-dev.h>
+#include <linux/percpu_counter.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -100,6 +101,7 @@ EXPORT_SYMBOL(kfree);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(kmalloc_percpu);
 EXPORT_SYMBOL(kfree_percpu);
+EXPORT_SYMBOL(percpu_counter_mod);
 #endif
 EXPORT_SYMBOL(vfree);
 EXPORT_SYMBOL(__vmalloc);

@@ -21,7 +21,7 @@ struct sym_entry {
 
 static struct sym_entry *table;
 static int size, cnt;
-static unsigned long long _stext, _etext;
+static unsigned long long _stext, _etext, _sinittext, _einittext;
 
 static void
 usage(void)
@@ -51,10 +51,8 @@ read_symbol(FILE *in, struct sym_entry *s)
 static int
 symbol_valid(struct sym_entry *s)
 {
-	if (s->addr < _stext)
-		return 0;
-
-	if (s->addr > _etext)
+	if ((s->addr < _stext || s->addr > _etext)
+	    && (s->addr < _sinittext || s->addr > _einittext))
 		return 0;
 
 	if (strstr(s->sym, "_compiled."))
@@ -85,6 +83,10 @@ read_map(FILE *in)
 			_stext = table[i].addr;
 		if (strcmp(table[i].sym, "_etext") == 0)
 			_etext = table[i].addr;
+		if (strcmp(table[i].sym, "_sinittext") == 0)
+			_sinittext = table[i].addr;
+		if (strcmp(table[i].sym, "_einittext") == 0)
+			_einittext = table[i].addr;
 	}
 }
 

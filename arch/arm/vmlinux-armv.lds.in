@@ -18,7 +18,9 @@ SECTIONS
 	.init : {			/* Init code and data		*/
 		_stext = .;
 		__init_begin = .;
+			_sinittext = .;
 			*(.init.text)
+			_einittext = .;
 		__proc_info_begin = .;
 			*(.proc.info)
 		__proc_info_end = .;

@@ -24,7 +24,7 @@
 #define RTC_AIE 0x20		/* alarm interrupt enable */
 #define RTC_UIE 0x10		/* update-finished interrupt enable */
 
-extern void gen_rtc_interrupt(unsigned long);
+#define RTC_BATT_BAD 0x100	/* battery bad */
 
 /* some dummy definitions */
 #define RTC_SQWE 0x08		/* enable square-wave output */
@@ -44,16 +44,16 @@ static const unsigned short int __mon_yday[2][13] =
 	{ 0, 31, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335, 366 }
 };
 
-static int get_rtc_time(struct rtc_time *wtime)
+static inline unsigned int get_rtc_time(struct rtc_time *wtime)
 {
 	struct pdc_tod tod_data;
 	long int days, rem, y;
 	const unsigned short int *ip;
 
 	if(pdc_tod_read(&tod_data) < 0)
-		return -1;
+		return RTC_24H | RTC_BATT_BAD;
 
-	
+
 	// most of the remainder of this function is:
 //	Copyright (C) 1991, 1993, 1997, 1998 Free Software Foundation, Inc.
 //	This was originally a part of the GNU C Library.
@@ -69,7 +69,7 @@ static int get_rtc_time(struct rtc_time *wtime)
 	wtime->tm_sec = rem % 60;
 
 	y = 1970;
-	
+
 #define DIV(a, b) ((a) / (b) - ((a) % (b) < 0))
 #define LEAPS_THRU_END_OF(y) (DIV (y, 4) - DIV (y, 100) + DIV (y, 400))
 
@@ -92,8 +92,8 @@ static int get_rtc_time(struct rtc_time *wtime)
 	days -= ip[y];
 	wtime->tm_mon = y;
 	wtime->tm_mday = days + 1;
-	
-	return 0;
+
+	return RTC_24H;
 }
 
 static int set_rtc_time(struct rtc_time *wtime)

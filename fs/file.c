@@ -65,7 +65,7 @@ int expand_fd_array(struct files_struct *files, int nr)
 		goto out;
 
 	nfds = files->max_fds;
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 
 	/* 
 	 * Expand to the max in easy steps, and keep expanding it until
@@ -89,7 +89,7 @@ int expand_fd_array(struct files_struct *files, int nr)
 
 	error = -ENOMEM;
 	new_fds = alloc_fd_array(nfds);
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	if (!new_fds)
 		goto out;
 
@@ -110,15 +110,15 @@ int expand_fd_array(struct files_struct *files, int nr)
 			memset(&new_fds[i], 0,
 			       (nfds-i) * sizeof(struct file *)); 
 
-			write_unlock(&files->file_lock);
+			spin_unlock(&files->file_lock);
 			free_fd_array(old_fds, i);
-			write_lock(&files->file_lock);
+			spin_lock(&files->file_lock);
 		}
 	} else {
 		/* Somebody expanded the array while we slept ... */
-		write_unlock(&files->file_lock);
+		spin_unlock(&files->file_lock);
 		free_fd_array(new_fds, nfds);
-		write_lock(&files->file_lock);
+		spin_lock(&files->file_lock);
 	}
 	error = 0;
 out:
@@ -167,7 +167,7 @@ int expand_fdset(struct files_struct *files, int nr)
 		goto out;
 
 	nfds = files->max_fdset;
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 
 	/* Expand to the max in easy steps */
 	do {
@@ -183,7 +183,7 @@ int expand_fdset(struct files_struct *files, int nr)
 	error = -ENOMEM;
 	new_openset = alloc_fdset(nfds);
 	new_execset = alloc_fdset(nfds);
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	if (!new_openset || !new_execset)
 		goto out;
 
@@ -208,21 +208,21 @@ int expand_fdset(struct files_struct *files, int nr)
 		nfds = xchg(&files->max_fdset, nfds);
 		new_openset = xchg(&files->open_fds, new_openset);
 		new_execset = xchg(&files->close_on_exec, new_execset);
-		write_unlock(&files->file_lock);
+		spin_unlock(&files->file_lock);
 		free_fdset (new_openset, nfds);
 		free_fdset (new_execset, nfds);
-		write_lock(&files->file_lock);
+		spin_lock(&files->file_lock);
 		return 0;
 	} 
 	/* Somebody expanded the array while we slept ... */
 
 out:
-	write_unlock(&files->file_lock);
+	spin_unlock(&files->file_lock);
 	if (new_openset)
 		free_fdset(new_openset, nfds);
 	if (new_execset)
 		free_fdset(new_execset, nfds);
-	write_lock(&files->file_lock);
+	spin_lock(&files->file_lock);
 	return error;
 }
 

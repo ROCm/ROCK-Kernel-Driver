@@ -106,7 +106,6 @@ extern inline void flush_cache_page(struct vm_area_struct *vma,
 
 /* Push the page at kernel virtual address and clear the icache */
 /* RZ: use cpush %bc instead of cpush %dc, cinv %ic */
-#define flush_page_to_ram(page) __flush_page_to_ram(page_address(page))
 extern inline void __flush_page_to_ram(void *vaddr)
 {
 	if (CPU_IS_040_OR_060) {
@@ -125,7 +124,7 @@ extern inline void __flush_page_to_ram(void *vaddr)
 	}
 }
 
-#define flush_dcache_page(page)			do { } while (0)
+#define flush_dcache_page(page)	__flush_page_to_ram(page_address(page))
 #define flush_icache_page(vma,pg)              do { } while (0)
 #define flush_icache_user_range(vma,pg,adr,len)	do { } while (0)
 
