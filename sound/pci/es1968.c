@@ -583,9 +583,8 @@ struct snd_es1968 {
 
 	/* Maestro Stuff */
 	u16 maestro_map[32];
-	atomic_t bobclient;	/* active timer instancs */
+	int bobclient;		/* active timer instancs */
 	int bob_freq;		/* timer frequency */
-	spinlock_t bob_lock;
 	struct semaphore memory_mutex;	/* memory lock */
 
 	/* APU states */
@@ -884,13 +883,11 @@ static void snd_es1968_bob_start(es1968_t *chip)
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 }
 
+/* call with substream spinlock */
 static void snd_es1968_bob_inc(es1968_t *chip, int freq)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->bob_lock, flags);
-	atomic_inc(&chip->bobclient);
-	if (atomic_read(&chip->bobclient) == 1) {
+	chip->bobclient++;
+	if (chip->bobclient == 1) {
 		chip->bob_freq = freq;
 		snd_es1968_bob_start(chip);
 	} else if (chip->bob_freq < freq) {
@@ -898,35 +895,29 @@ static void snd_es1968_bob_inc(es1968_t *chip, int freq)
 		chip->bob_freq = freq;
 		snd_es1968_bob_start(chip);
 	}
-	spin_unlock_irqrestore(&chip->bob_lock, flags);
 }
 
+/* call with substream spinlock */
 static void snd_es1968_bob_dec(es1968_t *chip)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->bob_lock, flags);
-	atomic_dec(&chip->bobclient);
-	if (atomic_read(&chip->bobclient) <= 0)
+	chip->bobclient--;
+	if (chip->bobclient <= 0)
 		snd_es1968_bob_stop(chip);
 	else if (chip->bob_freq > ESM_BOB_FREQ) {
 		/* check reduction of timer frequency */
 		struct list_head *p;
 		int max_freq = ESM_BOB_FREQ;
-		spin_lock(&chip->substream_lock);
 		list_for_each(p, &chip->substream_list) {
 			esschan_t *es = list_entry(p, esschan_t, list);
 			if (max_freq < es->bob_freq)
 				max_freq = es->bob_freq;
 		}
-		spin_unlock(&chip->substream_lock);
 		if (max_freq != chip->bob_freq) {
 			snd_es1968_bob_stop(chip);
 			chip->bob_freq = max_freq;
 			snd_es1968_bob_start(chip);
 		}
 	}
-	spin_unlock_irqrestore(&chip->bob_lock, flags);
 }
 
 static int
@@ -992,13 +983,7 @@ inline static void snd_es1968_trigger_apu(es1968_t *esm, int apu, int mode)
 
 static void snd_es1968_pcm_start(es1968_t *chip, esschan_t *es)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->reg_lock, flags);
-	if (es->running) {
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
-		return;
-	}
+	spin_lock(&chip->reg_lock);
 	__apu_set_register(chip, es->apu[0], 5, es->base[0]);
 	snd_es1968_trigger_apu(chip, es->apu[0], es->apu_mode[0]);
 	if (es->mode == ESM_MODE_CAPTURE) {
@@ -1013,27 +998,19 @@ static void snd_es1968_pcm_start(es1968_t *chip, esschan_t *es)
 			snd_es1968_trigger_apu(chip, es->apu[3], es->apu_mode[3]);
 		}
 	}
-	es->running = 1;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 }
 
 static void snd_es1968_pcm_stop(es1968_t *chip, esschan_t *es)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&chip->reg_lock, flags);
-	if (! es->running) {
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
-		return;
-	}
+	spin_lock(&chip->reg_lock);
 	snd_es1968_trigger_apu(chip, es->apu[0], 0);
 	snd_es1968_trigger_apu(chip, es->apu[1], 0);
 	if (es->mode == ESM_MODE_CAPTURE) {
 		snd_es1968_trigger_apu(chip, es->apu[2], 0);
 		snd_es1968_trigger_apu(chip, es->apu[3], 0);
 	}
-	es->running = 0;
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock(&chip->reg_lock);
 }
 
 /* set the wavecache control reg */
@@ -1334,30 +1311,28 @@ static int snd_es1968_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 	esschan_t *es = snd_magic_cast(esschan_t, substream->runtime->private_data, return -ENXIO);
 	unsigned long flags;
 
+	spin_lock_irqsave(&chip->substream_lock, flags);
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
 	case SNDRV_PCM_TRIGGER_RESUME:
 		if (es->running)
-			return 0;
+			break;
 		snd_es1968_bob_inc(chip, es->bob_freq);
 		es->count = 0;
 		es->hwptr = 0;
 		snd_es1968_pcm_start(chip, es);
-		spin_lock_irqsave(&chip->substream_lock, flags);
-		list_add(&es->list, &chip->substream_list);
-		spin_unlock_irqrestore(&chip->substream_lock, flags);
+		es->running = 1;
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
 		if (! es->running)
-			return 0;
+			break;
 		snd_es1968_pcm_stop(chip, es);
-		spin_lock_irqsave(&chip->substream_lock, flags);
-		list_del(&es->list);
-		spin_unlock_irqrestore(&chip->substream_lock, flags);
+		es->running = 0;
 		snd_es1968_bob_dec(chip);
 		break;
 	}
+	spin_unlock_irqrestore(&chip->substream_lock, flags);
 	return 0;
 }
 
@@ -1634,6 +1609,7 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	esschan_t *es;
 	int apu1;
+	unsigned long flags;
 
 	/* search 2 APUs */
 	apu1 = snd_es1968_alloc_apu_pair(chip, ESM_APU_PCM_PLAY);
@@ -1653,12 +1629,15 @@ static int snd_es1968_playback_open(snd_pcm_substream_t *substream)
 	es->running = 0;
 	es->substream = substream;
 	es->mode = ESM_MODE_PLAY;
-	INIT_LIST_HEAD(&es->list);
 
 	runtime->private_data = es;
 	runtime->hw = snd_es1968_playback;
 	runtime->hw.buffer_bytes_max = runtime->hw.period_bytes_max =
 		calc_available_memory_size(chip);
+
+	spin_lock_irqsave(&chip->substream_lock, flags);
+	list_add(&es->list, &chip->substream_list);
+	spin_unlock_irqrestore(&chip->substream_lock, flags);
 
 	return 0;
 }
@@ -1691,6 +1670,7 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es;
 	int apu1, apu2;
+	unsigned long flags;
 
 	apu1 = snd_es1968_alloc_apu_pair(chip, ESM_APU_PCM_CAPTURE);
 	if (apu1 < 0)
@@ -1719,7 +1699,6 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 	es->running = 0;
 	es->substream = substream;
 	es->mode = ESM_MODE_CAPTURE;
-	INIT_LIST_HEAD(&es->list);
 
 	/* get mixbuffer */
 	if ((es->mixbuf = snd_es1968_new_memory(chip, ESM_MIXBUF_SIZE)) == NULL) {
@@ -1734,6 +1713,10 @@ static int snd_es1968_capture_open(snd_pcm_substream_t *substream)
 	runtime->hw.buffer_bytes_max = runtime->hw.period_bytes_max =
 		calc_available_memory_size(chip) - 1024;
 
+	spin_lock_irqsave(&chip->substream_lock, flags);
+	list_add(&es->list, &chip->substream_list);
+	spin_unlock_irqrestore(&chip->substream_lock, flags);
+
 	return 0;
 }
 
@@ -1741,9 +1724,14 @@ static int snd_es1968_playback_close(snd_pcm_substream_t * substream)
 {
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es;
+	unsigned long flags;
+
 	if (substream->runtime->private_data == NULL)
 		return 0;
 	es = snd_magic_cast(esschan_t, substream->runtime->private_data, return -ENXIO);
+	spin_lock_irqsave(&chip->substream_lock, flags);
+	list_del(&es->list);
+	spin_unlock_irqrestore(&chip->substream_lock, flags);
 	snd_es1968_free_apu_pair(chip, es->apu[0]);
 	snd_magic_kfree(es);
 
@@ -1754,9 +1742,14 @@ static int snd_es1968_capture_close(snd_pcm_substream_t * substream)
 {
 	es1968_t *chip = snd_pcm_substream_chip(substream);
 	esschan_t *es;
+	unsigned long flags;
+
 	if (substream->runtime->private_data == NULL)
 		return 0;
 	es = snd_magic_cast(esschan_t, substream->runtime->private_data, return -ENXIO);
+	spin_lock_irqsave(&chip->substream_lock, flags);
+	list_del(&es->list);
+	spin_unlock_irqrestore(&chip->substream_lock, flags);
 	snd_es1968_free_memory(chip, es->mixbuf);
 	snd_es1968_free_apu_pair(chip, es->apu[0]);
 	snd_es1968_free_apu_pair(chip, es->apu[2]);
@@ -2035,14 +2028,12 @@ static irqreturn_t snd_es1968_interrupt(int irq, void *dev_id, struct pt_regs *r
 	}
 
 	if (event & ESM_SOUND_IRQ) {
-		struct list_head *p, *n;
+		struct list_head *p;
 		spin_lock(&chip->substream_lock);
-		/* we need to use list_for_each_safe here since the substream
-		 * can be deleted in period_elapsed().
-		 */
-		list_for_each_safe(p, n, &chip->substream_list) {
+		list_for_each(p, &chip->substream_list) {
 			esschan_t *es = list_entry(p, esschan_t, list);
-			snd_es1968_update_pcm(chip, es);
+			if (es->running)
+				snd_es1968_update_pcm(chip, es);
 		}
 		spin_unlock(&chip->substream_lock);
 	}
@@ -2467,7 +2458,7 @@ static void es1968_resume(es1968_t *chip)
 	snd_ac97_resume(chip->ac97);
 
 	/* start timer again */
-	if (atomic_read(&chip->bobclient))
+	if (chip->bobclient)
 		snd_es1968_bob_start(chip);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
@@ -2612,8 +2603,6 @@ static int __devinit snd_es1968_create(snd_card_t * card,
 	/* Clear Apu Map */
 	for (i = 0; i < NR_APUS; i++)
 		chip->apu[i] = ESM_APU_FREE;
-
-	atomic_set(&chip->bobclient, 0);
 
 	/* just to be sure */
 	pci_set_master(pci);
