@@ -1841,7 +1841,6 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 
 	k = &current->sig->action[sig-1];
 
-	read_lock(&tasklist_lock);
 	spin_lock_irq(&current->sig->siglock);
 	if (signal_pending(current)) {
 		/*
@@ -1849,17 +1848,13 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 		 * threads, make sure we take it before changing the action.
 		 */
 		spin_unlock_irq(&current->sig->siglock);
-		read_unlock(&tasklist_lock);
-		return -ERESTARTSYS;
+		return -ERESTARTNOINTR;
 	}
 
 	if (oact)
 		*oact = *k;
 
 	if (act) {
-		*k = *act;
-		sigdelsetmask(&k->sa.sa_mask, sigmask(SIGKILL) | sigmask(SIGSTOP));
-
 		/*
 		 * POSIX 3.3.1.3:
 		 *  "Setting a signal action to SIG_IGN for a signal that is
@@ -1871,21 +1866,39 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 		 *   (for example, SIGCHLD), shall cause the pending signal to
 		 *   be discarded, whether or not it is blocked"
 		 */
-
-		if (k->sa.sa_handler == SIG_IGN ||
-		    (k->sa.sa_handler == SIG_DFL && sig_kernel_ignore(sig))) {
+		if (act->sa.sa_handler == SIG_IGN ||
+		    (act->sa.sa_handler == SIG_DFL &&
+		     sig_kernel_ignore(sig))) {
+			/*
+			 * This is a fairly rare case, so we only take the
+			 * tasklist_lock once we're sure we'll need it.
+			 * Now we must do this little unlock and relock
+			 * dance to maintain the lock hierarchy.
+			 */
 			struct task_struct *t = current;
+			spin_unlock_irq(&t->sig->siglock);
+			read_lock(&tasklist_lock);
+			spin_lock_irq(&t->sig->siglock);
+			*k = *act;
+			sigdelsetmask(&k->sa.sa_mask,
+				      sigmask(SIGKILL) | sigmask(SIGSTOP));
 			rm_from_queue(sigmask(sig), &t->sig->shared_pending);
 			do {
 				rm_from_queue(sigmask(sig), &t->pending);
 				recalc_sigpending_tsk(t);
 				t = next_thread(t);
 			} while (t != current);
-		}
-	}
 	spin_unlock_irq(&current->sig->siglock);
 	read_unlock(&tasklist_lock);
+			return 0;
+		}
 
+		*k = *act;
+		sigdelsetmask(&k->sa.sa_mask,
+			      sigmask(SIGKILL) | sigmask(SIGSTOP));
+	}
+
+	spin_unlock_irq(&current->sig->siglock);
 	return 0;
 }
 
