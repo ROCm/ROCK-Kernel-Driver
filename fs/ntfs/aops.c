@@ -778,9 +778,8 @@ lock_retry_remap:
  *
  * For resident attributes, OTOH, ntfs_writepage() writes the @page by copying
  * the data to the mft record (which at this stage is most likely in memory).
- * Thus, in this case, I/O is synchronous, as even if the mft record is not
- * cached at this point in time, we need to wait for it to be read in before we
- * can do the copy.
+ * The mft record is then marked dirty and written out asynchronously via the
+ * vfs inode dirty code path.
  *
  * Note the caller clears the page dirty flag before calling ntfs_writepage().
  *
@@ -875,16 +874,6 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	BUG_ON(page_has_buffers(page));
 	BUG_ON(!PageUptodate(page));
 
-	// TODO: Consider using PageWriteback() + unlock_page() in 2.5 once the
-	// "VM fiddling has ended". Note, don't forget to replace all the
-	// unlock_page() calls further below with end_page_writeback() ones.
-	// FIXME: Make sure it is ok to SetPageError() on unlocked page under
-	// writeback before doing the change!
-#if 0
-	set_page_writeback(page);
-	unlock_page(page);
-#endif
-
 	if (!NInoAttr(ni))
 		base_ni = ni;
 	else
@@ -934,6 +923,14 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 	if (unlikely(bytes > PAGE_CACHE_SIZE))
 		bytes = PAGE_CACHE_SIZE;
 
+	// TODO: Consider using PageWriteback() + unlock_page() in 2.6 once the
+	// "VM fiddling has ended". Note, don't forget to replace all the
+	// unlock_page() calls further below with end_page_writeback() ones.
+#if 0
+	set_page_writeback(page);
+	unlock_page(page);
+#endif
+
 	/*
 	 * Here, we don't need to zero the out of bounds area everytime because
 	 * the below memcpy() already takes care of the mmap-at-end-of-file
@@ -968,9 +965,8 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 
 	unlock_page(page);
 
-	// TODO: Mark mft record dirty so it gets written back.
-	ntfs_error(vi->i_sb, "Writing to resident files is not supported yet. "
-			"Wrote to memory only...");
+	/* Mark the mft record dirty, so it gets written back. */
+	mark_mft_record_dirty(ctx->ntfs_ino);
 
 	put_attr_search_ctx(ctx);
 	unmap_mft_record(base_ni);
@@ -1734,9 +1730,8 @@ static int ntfs_commit_write(struct file *file, struct page *page,
 	}
 	kunmap_atomic(kaddr, KM_USER0);
 
-	// TODO: Mark mft record dirty so it gets written back.
-	ntfs_error(vi->i_sb, "Writing to resident files is not supported yet. "
-			"Wrote to memory only...");
+	/* Mark the mft record dirty, so it gets written back. */
+	mark_mft_record_dirty(ctx->ntfs_ino);
 
 	put_attr_search_ctx(ctx);
 	unmap_mft_record(base_ni);

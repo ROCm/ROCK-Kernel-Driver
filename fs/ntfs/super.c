@@ -340,6 +340,12 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 	}
 	// TODO:  For now we enforce no atime and dir atime updates as they are
 	// not implemented.
+	if ((sb->s_flags & MS_NOATIME) && !(*flags & MS_NOATIME))
+		ntfs_warning(sb, "Atime updates are not implemented yet.  "
+				"Leaving them disabled.");
+	else if ((sb->s_flags & MS_NODIRATIME) && !(*flags & MS_NODIRATIME))
+		ntfs_warning(sb, "Directory atime updates are not implemented "
+				"yet.  Leaving them disabled.");
 	*flags |= MS_NOATIME | MS_NODIRATIME;
 #endif /* ! NTFS_RW */
 
@@ -1371,6 +1377,21 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 		iput(vol->mftmirr_ino);
 		vol->mftmirr_ino = NULL;
 	}
+	/*
+	 * Throw away all mft data page cache pages to allow a clean umount.
+	 * All inodes should by now be written out and clean so this should not
+	 * loose any data while removing all the pages which have the dirty bit
+	 * set.
+	 */
+	ntfs_commit_inode(vol->mft_ino);
+	down(&vol->mft_ino->i_sem);
+	truncate_inode_pages(vol->mft_ino->i_mapping, 0);
+	up(&vol->mft_ino->i_sem);
+	write_inode_now(vol->mft_ino, 1);
+	if (!list_empty(&vfs_sb->s_dirty) || !list_empty(&vfs_sb->s_io))
+		ntfs_error(vfs_sb, "Dirty inodes found at umount time.  "
+				"They have been thrown away and their changes "
+				"have been lost.  You should run chkdsk.");
 #endif /* NTFS_RW */
 
 	iput(vol->mft_ino);
@@ -1754,8 +1775,12 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 #ifndef NTFS_RW
 	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
 #else
-	// TODO:  For now we enforce no atime and dir atime updates as they are
-	// not implemented.
+	if (!(sb->s_flags & MS_NOATIME))
+		ntfs_warning(sb, "Atime updates are not implemented yet.  "
+				"Disabling them.");
+	else if (!(sb->s_flags & MS_NODIRATIME))
+		ntfs_warning(sb, "Directory atime updates are not implemented "
+				"yet.  Disabling them.");
 	sb->s_flags |= MS_NOATIME | MS_NODIRATIME;
 #endif
 	/* Allocate a new ntfs_volume and place it in sb->s_fs_info. */

@@ -57,6 +57,25 @@ static inline void flush_dcache_mft_record_page(ntfs_inode *ni)
 	flush_dcache_page(ni->page);
 }
 
+extern void __mark_mft_record_dirty(ntfs_inode *ni);
+
+/**
+ * mark_mft_record_dirty - set the mft record and the page containing it dirty
+ * @ni:		ntfs inode describing the mapped mft record
+ *
+ * Set the mapped (extent) mft record of the (base or extent) ntfs inode @ni,
+ * as well as the page containing the mft record, dirty.  Also, mark the base
+ * vfs inode dirty.  This ensures that any changes to the mft record are
+ * written out to disk.
+ *
+ * NOTE:  Do not do anything if the mft record is already marked dirty.
+ */
+static inline void mark_mft_record_dirty(ntfs_inode *ni)
+{
+	if (!NInoTestSetDirty(ni))
+		__mark_mft_record_dirty(ni);
+}
+
 extern int write_mft_record_nolock(ntfs_inode *ni, MFT_RECORD *m, int sync);
 
 /**

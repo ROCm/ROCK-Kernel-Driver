@@ -102,6 +102,13 @@ int format_mft_record(ntfs_inode *ni, MFT_RECORD *mft_rec)
  */
 extern int ntfs_readpage(struct file *, struct page *);
 
+#ifdef NTFS_RW
+/**
+ * ntfs_mft_writepage - forward declaration, function is further below
+ */
+static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc);
+#endif /* NTFS_RW */
+
 /**
  * ntfs_mft_aops - address space operations for access to $MFT
  *
@@ -112,6 +119,10 @@ struct address_space_operations ntfs_mft_aops = {
 	.readpage	= ntfs_readpage,	/* Fill page with data. */
 	.sync_page	= block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
+#ifdef NTFS_RW
+	.writepage	= ntfs_mft_writepage,	/* Write out the dirty mft
+						   records in a page. */
+#endif /* NTFS_RW */
 };
 
 /**
@@ -431,6 +442,52 @@ unm_err_out:
 }
 
 #ifdef NTFS_RW
+
+/**
+ * __mark_mft_record_dirty - set the mft record and the page containing it dirty
+ * @ni:		ntfs inode describing the mapped mft record
+ *
+ * Internal function.  Users should call mark_mft_record_dirty() instead.
+ *
+ * Set the mapped (extent) mft record of the (base or extent) ntfs inode @ni,
+ * as well as the page containing the mft record, dirty.  Also, mark the base
+ * vfs inode dirty.  This ensures that any changes to the mft record are
+ * written out to disk.
+ *
+ * NOTE:  We only set I_DIRTY_SYNC and I_DIRTY_DATASYNC (and not I_DIRTY_PAGES)
+ * on the base vfs inode, because even though file data may have been modified,
+ * it is dirty in the inode meta data rather than the data page cache of the
+ * inode, and thus there are no data pages that need writing out.  Therefore, a
+ * full mark_inode_dirty() is overkill.  A mark_inode_dirty_sync(), on the
+ * other hand, is not sufficient, because I_DIRTY_DATASYNC needs to be set to
+ * ensure ->write_inode is called from generic_osync_inode() and this needs to
+ * happen or the file data would not necessarily hit the device synchronously,
+ * even though the vfs inode has the O_SYNC flag set.  Also, I_DIRTY_DATASYNC
+ * simply "feels" better than just I_DIRTY_SYNC, since the file data has not
+ * actually hit the block device yet, which is not what I_DIRTY_SYNC on its own
+ * would suggest.
+ */
+void __mark_mft_record_dirty(ntfs_inode *ni)
+{
+	struct page *page = ni->page;
+	ntfs_inode *base_ni;
+
+	ntfs_debug("Entering for inode 0x%lx.", ni->mft_no);
+	BUG_ON(!page);
+	BUG_ON(NInoAttr(ni));
+
+	/* Set the page containing the mft record dirty. */
+	__set_page_dirty_nobuffers(page);
+
+	/* Determine the base vfs inode and mark it dirty, too. */
+	down(&ni->extent_lock);
+	if (likely(ni->nr_extents >= 0))
+		base_ni = ni;
+	else
+		base_ni = ni->ext.base_ntfs_ino;
+	up(&ni->extent_lock);
+	__mark_inode_dirty(VFS_I(base_ni), I_DIRTY_SYNC | I_DIRTY_DATASYNC);
+}
 
 static const char *ntfs_please_email = "Please email "
 		"linux-ntfs-dev@lists.sourceforge.net and say that you saw "
@@ -812,7 +869,27 @@ err_out:
 	 * happens.  ->clear_inode() will still be invoked so all extent inodes
 	 * and other allocated memory will be freed.
 	 */
+	if (err == -ENOMEM) {
+		ntfs_error(vol->sb, "Not enough memory to write mft record.  "
+				"Redirtying so the write is retried later.");
+		mark_mft_record_dirty(ni);
+		err = 0;
+	}
 	return err;
+}
+
+static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
+{
+	struct inode *mft_vi = page->mapping->host;
+	struct super_block *sb = mft_vi->i_sb;
+	ntfs_volume *vol = NTFS_SB(sb);
+
+	BUG_ON(mft_vi != vol->mft_ino);
+	ntfs_warning(sb, "VM writeback of $MFT is not implemented yet:  "
+			"Redirtying the page.");
+	redirty_page_for_writepage(wbc, page);
+	unlock_page(page);
+	return 0;
 }
 
 #endif /* NTFS_RW */
