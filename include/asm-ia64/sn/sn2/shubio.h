@@ -3384,7 +3384,7 @@ typedef ii_icrb0_e_u_t icrbe_t;
 
 #define IO_PERF_SETS	32
 
-#if __KERNEL__
+#ifdef __KERNEL__
 #include <asm/sn/dmamap.h>
 #include <asm/sn/driver.h>
 #include <asm/sn/xtalk/xtalk.h>
