@@ -83,13 +83,17 @@ static int (*check_part[])(struct gendisk *hd, struct block_device *bdev,
 
 /*
  *	This is ucking fugly but its probably the best thing for 2.4.x
- *	Take it as a clear reminder than we should put the device name
+ *	Take it as a clear reminder that: 1) we should put the device name
  *	generation in the object kdev_t points to in 2.5.
+ *	and 2) ioctls better work on half-opened devices.
  */
  
 #ifdef CONFIG_ARCH_S390
 int (*genhd_dasd_name)(char*,int,int,struct gendisk*) = NULL;
+int (*genhd_dasd_ioctl)(struct inode *inp, struct file *filp,
+			unsigned int no, unsigned long data);
 EXPORT_SYMBOL(genhd_dasd_name);
+EXPORT_SYMBOL(genhd_dasd_ioctl);
 #endif
 
 /*
