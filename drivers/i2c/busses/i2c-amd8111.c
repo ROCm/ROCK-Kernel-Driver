@@ -8,10 +8,8 @@
  * the Free Software Foundation version 2.
  */
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/pci.h>
-#include <asm/io.h>
 #include <linux/kernel.h>
 #include <linux/stddef.h>
 #include <linux/sched.h>
@@ -19,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/i2c.h>
 #include <linux/delay.h>
+#include <asm/io.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR ("Vojtech Pavlik <vojtech@suse.cz>");
@@ -204,8 +203,6 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 			protocol |= AMD_SMB_PRTCL_BYTE_DATA;
 			break;
 
-		case I2C_SMBUS_WORD_DATA_PEC:
-			protocol |= AMD_SMB_PRTCL_PEC;
 		case I2C_SMBUS_WORD_DATA:
 			amd_ec_write(smbus, AMD_SMB_CMD, command);
 			if (read_write == I2C_SMBUS_WRITE) {
@@ -215,8 +212,6 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 			protocol |= AMD_SMB_PRTCL_WORD_DATA | pec;
 			break;
 
-		case I2C_SMBUS_BLOCK_DATA_PEC:
-			protocol |= AMD_SMB_PRTCL_PEC;
 		case I2C_SMBUS_BLOCK_DATA:
 			amd_ec_write(smbus, AMD_SMB_CMD, command);
 			if (read_write == I2C_SMBUS_WRITE) {
@@ -238,8 +233,6 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 			protocol |= AMD_SMB_PRTCL_I2C_BLOCK_DATA;
 			break;
 
-		case I2C_SMBUS_PROC_CALL_PEC:
-			protocol |= AMD_SMB_PRTCL_PEC;
 		case I2C_SMBUS_PROC_CALL:
 			amd_ec_write(smbus, AMD_SMB_CMD, command);
 			amd_ec_write(smbus, AMD_SMB_DATA, data->word);
@@ -248,8 +241,6 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 			read_write = I2C_SMBUS_READ;
 			break;
 
-		case I2C_SMBUS_BLOCK_PROC_CALL_PEC:
-			protocol |= AMD_SMB_PRTCL_PEC;
 		case I2C_SMBUS_BLOCK_PROC_CALL:
 			protocol |= pec;
 			len = min_t(u8, data->block[0], 31);
@@ -260,6 +251,13 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 			protocol = AMD_SMB_PRTCL_BLOCK_PROC_CALL | pec;
 			read_write = I2C_SMBUS_READ;
 			break;
+
+		case I2C_SMBUS_WORD_DATA_PEC:
+		case I2C_SMBUS_BLOCK_DATA_PEC:
+		case I2C_SMBUS_PROC_CALL_PEC:
+		case I2C_SMBUS_BLOCK_PROC_CALL_PEC:
+			printk(KERN_WARNING "i2c-amd8111.c: Unexpected software PEC transaction %d\n.", size);
+			return -1;
 
 		default:
 			printk(KERN_WARNING "i2c-amd8111.c: Unsupported transaction %d\n", size);
@@ -296,18 +294,14 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 			break;
 
 		case I2C_SMBUS_WORD_DATA:
-		case I2C_SMBUS_WORD_DATA_PEC:
 		case I2C_SMBUS_PROC_CALL:
-		case I2C_SMBUS_PROC_CALL_PEC:
 			amd_ec_read(smbus, AMD_SMB_DATA, temp + 0);
 			amd_ec_read(smbus, AMD_SMB_DATA + 1, temp + 1);
 			data->word = (temp[1] << 8) | temp[0];
 			break;
 
 		case I2C_SMBUS_BLOCK_DATA:
-		case I2C_SMBUS_BLOCK_DATA_PEC:
 		case I2C_SMBUS_BLOCK_PROC_CALL:
-		case I2C_SMBUS_BLOCK_PROC_CALL_PEC:
 			amd_ec_read(smbus, AMD_SMB_BCNT, &len);
 			len = min_t(u8, len, 32);
 		case I2C_SMBUS_I2C_BLOCK_DATA:
@@ -320,13 +314,12 @@ s32 amd8111_access(struct i2c_adapter * adap, u16 addr, unsigned short flags,
 	return 0;
 }
 
+
 u32 amd8111_func(struct i2c_adapter *adapter)
 {
 	return	I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE | I2C_FUNC_SMBUS_BYTE_DATA |
-		I2C_FUNC_SMBUS_WORD_DATA | I2C_FUNC_SMBUS_WORD_DATA_PEC |
-		I2C_FUNC_SMBUS_BLOCK_DATA | I2C_FUNC_SMBUS_BLOCK_DATA_PEC |
-		I2C_FUNC_SMBUS_PROC_CALL | I2C_FUNC_SMBUS_PROC_CALL_PEC |
-		I2C_FUNC_SMBUS_BLOCK_PROC_CALL | I2C_FUNC_SMBUS_BLOCK_PROC_CALL_PEC |
+		I2C_FUNC_SMBUS_WORD_DATA | I2C_FUNC_SMBUS_BLOCK_DATA |
+		I2C_FUNC_SMBUS_PROC_CALL | I2C_FUNC_SMBUS_BLOCK_PROC_CALL |
 		I2C_FUNC_SMBUS_I2C_BLOCK | I2C_FUNC_SMBUS_HWPEC_CALC;
 }
 
@@ -337,78 +330,81 @@ static struct i2c_algorithm smbus_algorithm = {
 	.functionality = amd8111_func,
 };
 
+
+static struct pci_device_id amd8111_ids[] __devinitdata = {
+	{ 0x1022, 0x746a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ 0, }
+};
+
 static int __devinit amd8111_probe(struct pci_dev *dev, const struct pci_device_id *id)
 {
 	struct amd_smbus *smbus;
+	int error = -ENODEV;
 
 	if (~pci_resource_flags(dev, 0) & IORESOURCE_IO)
-		return -1;
+		return -ENODEV;
 
-	if (!(smbus = (void*)kmalloc(sizeof(struct amd_smbus), GFP_KERNEL)))
-		return -1;
+	smbus = kmalloc(sizeof(struct amd_smbus), GFP_KERNEL);
+	if (!smbus)
+		return -ENOMEM;
 	memset(smbus, 0, sizeof(struct amd_smbus));
 
-	pci_set_drvdata(dev, smbus);
 	smbus->dev = dev;
 	smbus->base = pci_resource_start(dev, 0);
 	smbus->size = pci_resource_len(dev, 0);
 
-	if (!request_region(smbus->base, smbus->size, "amd8111 SMBus 2.0")) {
-		kfree(smbus);
-		return -1;
-	}
+	if (!request_region(smbus->base, smbus->size, "amd8111 SMBus 2.0"))
+		goto out_kfree;
 
 	smbus->adapter.owner = THIS_MODULE;
-	sprintf(smbus->adapter.name, "SMBus2 AMD8111 adapter at %04x", smbus->base);
+	sprintf(smbus->adapter.name,
+			"SMBus2 AMD8111 adapter at %04x", smbus->base);
 	smbus->adapter.id = I2C_ALGO_SMBUS | I2C_HW_SMBUS_AMD8111;
 	smbus->adapter.algo = &smbus_algorithm;
 	smbus->adapter.algo_data = smbus;
 
-	if (i2c_add_adapter(&smbus->adapter)) {
-		printk(KERN_WARNING "i2c-amd8111.c: Failed to register adapter.\n");
-		release_region(smbus->base, smbus->size);
-		kfree(smbus);
-		return -1;
-	}
+	error = i2c_add_adapter(&smbus->adapter);
+	if (error)
+		goto out_release_region;
 
 	pci_write_config_dword(smbus->dev, AMD_PCI_MISC, 0);
-
-	printk(KERN_INFO "i2c-amd8111.c: AMD8111 SMBus 2.0 adapter at %#x\n", smbus->base);
+	pci_set_drvdata(dev, smbus);
 	return 0;
+
+ out_release_region:
+	release_region(smbus->base, smbus->size);
+ out_kfree:
+	kfree(smbus);
+	return -1;
 }
+
 
 static void __devexit amd8111_remove(struct pci_dev *dev)
 {
-	struct amd_smbus *smbus = (void*) pci_get_drvdata(dev);
-	if (i2c_del_adapter(&smbus->adapter)) {
-		printk(KERN_WARNING "i2c-amd8111.c: Failed to unregister adapter.\n");
-		return;
-	}
+	struct amd_smbus *smbus = pci_get_drvdata(dev);
+
+	i2c_del_adapter(&smbus->adapter);
 	release_region(smbus->base, smbus->size);
 	kfree(smbus);
 }
 
-static struct pci_device_id amd8111_id_table[] __devinitdata =
-{{ 0x1022, 0x746a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
- { 0 }};
-
-
 static struct pci_driver amd8111_driver = {
-	.name = "amd8111 smbus 2.0",
-	.id_table = amd8111_id_table,
-	.probe = amd8111_probe,
-	.remove = __devexit_p(amd8111_remove),
+	.name		= "amd8111 smbus 2.0",
+	.id_table	= amd8111_ids,
+	.probe		= amd8111_probe,
+	.remove		= __devexit_p(amd8111_remove),
 };
 
-int __init amd8111_init(void)
+static int __init i2c_amd8111_init(void)
 {
 	return pci_module_init(&amd8111_driver);
 }
 
-void __exit amd8111_exit(void)
+
+static void __exit i2c_amd8111_exit(void)
 {
 	pci_unregister_driver(&amd8111_driver);
 }
 
-module_init(amd8111_init);
-module_exit(amd8111_exit);
+module_init(i2c_amd8111_init);
+module_exit(i2c_amd8111_exit);
