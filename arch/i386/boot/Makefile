@@ -25,24 +25,32 @@ SVGA_MODE := -DSVGA_MODE=NORMAL_VGA
 
 #RAMDISK := -DRAMDISK=512
 
+EXTRA_TARGETS := vmlinux.bin bvmlinux.bin
+
+include $(TOPDIR)/Rules.make
+
 # ---------------------------------------------------------------------------
 
 BOOT_INCL =	$(TOPDIR)/include/linux/config.h \
 		$(TOPDIR)/include/linux/autoconf.h \
 		$(TOPDIR)/include/asm/boot.h
 
-zImage: bootsect setup compressed/vmlinux tools/build
-	$(OBJCOPY) $(OBJCOPYFLAGS) compressed/vmlinux compressed/vmlinux.out
-	tools/build bootsect setup compressed/vmlinux.out $(ROOT_DEV) > zImage
+zImage: bootsect setup vmlinux.bin tools/build
+	tools/build bootsect setup vmlinux.bin $(ROOT_DEV) > $@
 
-bzImage: bbootsect bsetup compressed/bvmlinux tools/build
-	$(OBJCOPY) $(OBJCOPYFLAGS) compressed/bvmlinux compressed/bvmlinux.out
-	tools/build -b bbootsect bsetup compressed/bvmlinux.out $(ROOT_DEV) > bzImage
+bzImage: bbootsect bsetup bvmlinux.bin tools/build
+	tools/build -b bbootsect bsetup bvmlinux.bin $(ROOT_DEV) > $@
 
-compressed/vmlinux: $(TOPDIR)/vmlinux
+vmlinux.bin: compressed/vmlinux FORCE
+	$(call if_changed,objcopy)
+
+bvmlinux.bin: compressed/bvmlinux FORCE
+	$(call if_changed,objcopy)
+
+compressed/vmlinux: FORCE
 	@$(MAKE) -C compressed vmlinux
 
-compressed/bvmlinux: $(TOPDIR)/vmlinux
+compressed/bvmlinux: FORCE
 	@$(MAKE) -C compressed bvmlinux
 
 zdisk: $(BOOTIMAGE)

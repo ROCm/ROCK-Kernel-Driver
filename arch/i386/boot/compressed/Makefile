@@ -5,7 +5,6 @@
 #
 
 HEAD = head.o
-SYSTEM = $(TOPDIR)/vmlinux
 
 OBJECTS = $(HEAD) misc.o
 
@@ -21,7 +20,9 @@ BZIMAGE_OFFSET = 0x100000
 ZLINKFLAGS = -Ttext $(ZIMAGE_OFFSET) $(ZLDFLAGS)
 BZLINKFLAGS = -Ttext $(BZIMAGE_OFFSET) $(ZLDFLAGS)
 
-all: vmlinux
+EXTRA_TARGETS := vmlinux.bin vmlinux.bin.gz
+
+include $(TOPDIR)/Rules.make
 
 vmlinux: piggy.o $(OBJECTS)
 	$(LD) $(LDFLAGS) $(ZLINKFLAGS) -o vmlinux $(OBJECTS) piggy.o
@@ -37,14 +38,14 @@ comma	:= ,
 misc.o: misc.c
 	$(CC) $(CFLAGS) -DKBUILD_BASENAME=$(subst $(comma),_,$(subst -,_,$(*F))) -c misc.c
 
-piggy.o:	$(SYSTEM)
-	tmppiggy=_tmp_$$$$piggy; \
-	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk; \
-	$(OBJCOPY) $(OBJCOPYFLAGS) $< $$tmppiggy; \
-	gzip -f -9 < $$tmppiggy > $$tmppiggy.gz; \
-	echo "SECTIONS { .data : { input_len = .; LONG(input_data_end - input_data) input_data = .; *(.data) input_data_end = .; }}" > $$tmppiggy.lnk; \
-	$(LD) $(LDFLAGS) -r -o piggy.o -b binary $$tmppiggy.gz -b elf32-i386 -T $$tmppiggy.lnk; \
-	rm -f $$tmppiggy $$tmppiggy.gz $$tmppiggy.lnk
+vmlinux.bin: $(TOPDIR)/vmlinux FORCE
+	$(call if_changed,objcopy)
+
+vmlinux.bin.gz: vmlinux.bin FORCE
+	$(call if_changed,gzip)
+
+piggy.o: vmlinux.bin.gz vmlinux.scr
+	$(LD) $(LDFLAGS) -r -o piggy.o -b binary $< -b elf32-i386 -T vmlinux.scr
 
 clean:
-	@rm -f vmlinux bvmlinux _tmp_*
+	@rm -f vmlinux bvmlinux vmlinux.bin vmlinux.bin.gz
