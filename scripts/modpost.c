@@ -15,6 +15,8 @@
 
 /* Are we using CONFIG_MODVERSIONS? */
 int modversions = 0;
+/* Do we have vmlinux? */
+int have_vmlinux = 0;
 
 void
 fatal(const char *fmt, ...)
@@ -308,6 +310,11 @@ read_symbols(char *modname)
 	struct elf_info info = { };
 	Elf_Sym *sym;
 
+	/* When there's no vmlinux, don't print warnings about
+	 * unresolved symbols (since there'll be too many ;) */
+	if (strcmp(modname, "vmlinux") == 0)
+		have_vmlinux = 1;
+
 	parse_elf(&info, modname);
 
 	mod = new_module(modname);
@@ -379,9 +386,9 @@ add_versions(struct buffer *b, struct module *mod)
 	for (s = mod->unres; s; s = s->next) {
 		exp = find_symbol(s->name);
 		if (!exp) {
-			fprintf(stderr, "*** Warning: \"%s\" [%s.ko] "
-				"undefined!\n",
-				s->name, mod->name);
+			if (have_vmlinux)
+				fprintf(stderr, "*** Warning: \"%s\" [%s.ko] "
+				"undefined!\n",	s->name, mod->name);
 			continue;
 		}
 		s->module = exp->module;
@@ -512,7 +519,7 @@ main(int argc, char **argv)
 		add_depends(&buf, mod, modules);
 		add_moddevtable(&buf, mod);
 
-		sprintf(fname, "%s.ver.c", mod->name);
+		sprintf(fname, "%s.mod.c", mod->name);
 		write_if_changed(&buf, fname);
 	}
 	return 0;

@@ -27,7 +27,7 @@ quiet_cmd_ld_ko_o = LD [M]  $@
       cmd_ld_ko_o = $(LD) $(LDFLAGS) $(LDFLAGS_MODULE) -o $@ 		\
 			  $(filter-out FORCE,$^)
 
-$(modules): %.ko :%.o %.ver.o FORCE
+$(modules): %.ko :%.o %.mod.o FORCE
 	$(call if_changed,ld_ko_o)
 
 targets += $(modules)
@@ -40,16 +40,16 @@ quiet_cmd_cc_o_c = CC      $@
 #	We have a fake dependency on compile.h to make sure that we
 #	notice if the compiler version changes under us.
 
-$(modules:.ko=.ver.o): %.ver.o: %.ver.c include/linux/compile.h FORCE
+$(modules:.ko=.mod.o): %.mod.o: %.mod.c include/linux/compile.h FORCE
 	$(call if_changed,cc_o_c)
 
-targets += $(modules:.ko=.ver.o)
+targets += $(modules:.ko=.mod.o)
 
-# All the .ver.c files are generated using the helper "modpost"
+# All the .mod.c files are generated using the helper "modpost"
 
 .PHONY: __modpost
 
-$(modules:.ko=.ver.c): __modpost ;
+$(modules:.ko=.mod.c): __modpost ;
 
 # Extract all checksums for all exported symbols
 

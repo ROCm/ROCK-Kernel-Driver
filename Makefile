@@ -508,7 +508,7 @@ all: modules
 .PHONY: modules
 modules: $(SUBDIRS) $(if $(CONFIG_MODVERSIONS),vmlinux)
 	@echo '  Building modules, stage 2.';
-	$(Q)$(MAKE) -rR -f scripts/Makefile.modver
+	$(Q)$(MAKE) -rR -f scripts/Makefile.modpost
 
 #	Install modules
 
