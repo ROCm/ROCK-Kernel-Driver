@@ -1,11 +1,10 @@
-/* $Id: io_generic.c,v 1.1.1.1.4.2.2.1 2003/01/10 17:26:56 lethal Exp $
- *
- * linux/arch/sh/kernel/io_generic.c
+/* 
+ * linux/arch/sh/boards/cat68701/io.c
  *
  * Copyright (C) 2000  Niibe Yutaka
+ *               2001  Yutaro Ebihara
  *
- * Generic I/O routine. These can be used where a machine specific version
- * is not required.
+ * I/O routines for A-ONE Corp CAT-68701 SH7708 Board
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
@@ -15,39 +14,35 @@
 
 #include <asm/io.h>
 #include <asm/machvec.h>
+#include <linux/config.h>
 #include <linux/module.h>
 
-#if defined(CONFIG_CPU_SH3)
-/* I'm not sure SH7709 has this kind of bug */
 #define SH3_PCMCIA_BUG_WORKAROUND 1
 #define DUMMY_READ_AREA6	  0xba000000
-#endif
 
-#define PORT2ADDR(x) (sh_mv.mv_isa_port2addr(x))
-
-unsigned long generic_io_base;
+#define PORT2ADDR(x) (cat68701_isa_port2addr(x))
 
 static inline void delay(void)
 {
 	ctrl_inw(0xa0000000);
 }
 
-unsigned char generic_inb(unsigned long port)
+unsigned char cat68701_inb(unsigned long port)
 {
 	return *(volatile unsigned char*)PORT2ADDR(port);
 }
 
-unsigned short generic_inw(unsigned long port)
+unsigned short cat68701_inw(unsigned long port)
 {
 	return *(volatile unsigned short*)PORT2ADDR(port);
 }
 
-unsigned int generic_inl(unsigned long port)
+unsigned int cat68701_inl(unsigned long port)
 {
 	return *(volatile unsigned long*)PORT2ADDR(port);
 }
 
-unsigned char generic_inb_p(unsigned long port)
+unsigned char cat68701_inb_p(unsigned long port)
 {
 	unsigned long v = *(volatile unsigned char*)PORT2ADDR(port);
 
@@ -55,7 +50,7 @@ unsigned char generic_inb_p(unsigned long port)
 	return v;
 }
 
-unsigned short generic_inw_p(unsigned long port)
+unsigned short cat68701_inw_p(unsigned long port)
 {
 	unsigned long v = *(volatile unsigned short*)PORT2ADDR(port);
 
@@ -63,7 +58,7 @@ unsigned short generic_inw_p(unsigned long port)
 	return v;
 }
 
-unsigned int generic_inl_p(unsigned long port)
+unsigned int cat68701_inl_p(unsigned long port)
 {
 	unsigned long v = *(volatile unsigned long*)PORT2ADDR(port);
 
@@ -71,13 +66,13 @@ unsigned int generic_inl_p(unsigned long port)
 	return v;
 }
 
-void generic_insb(unsigned long port, void *buffer, unsigned long count)
+void cat68701_insb(unsigned long port, void *buffer, unsigned long count)
 {
 	unsigned char *buf=buffer;
 	while(count--) *buf++=inb(port);
 }
 
-void generic_insw(unsigned long port, void *buffer, unsigned long count)
+void cat68701_insw(unsigned long port, void *buffer, unsigned long count)
 {
 	unsigned short *buf=buffer;
 	while(count--) *buf++=inw(port);
@@ -86,7 +81,7 @@ void generic_insw(unsigned long port, void *buffer, unsigned long count)
 #endif
 }
 
-void generic_insl(unsigned long port, void *buffer, unsigned long count)
+void cat68701_insl(unsigned long port, void *buffer, unsigned long count)
 {
 	unsigned long *buf=buffer;
 	while(count--) *buf++=inl(port);
@@ -95,46 +90,46 @@ void generic_insl(unsigned long port, void *buffer, unsigned long count)
 #endif
 }
 
-void generic_outb(unsigned char b, unsigned long port)
+void cat68701_outb(unsigned char b, unsigned long port)
 {
 	*(volatile unsigned char*)PORT2ADDR(port) = b;
 }
 
-void generic_outw(unsigned short b, unsigned long port)
+void cat68701_outw(unsigned short b, unsigned long port)
 {
 	*(volatile unsigned short*)PORT2ADDR(port) = b;
 }
 
-void generic_outl(unsigned int b, unsigned long port)
+void cat68701_outl(unsigned int b, unsigned long port)
 {
         *(volatile unsigned long*)PORT2ADDR(port) = b;
 }
 
-void generic_outb_p(unsigned char b, unsigned long port)
+void cat68701_outb_p(unsigned char b, unsigned long port)
 {
 	*(volatile unsigned char*)PORT2ADDR(port) = b;
 	delay();
 }
 
-void generic_outw_p(unsigned short b, unsigned long port)
+void cat68701_outw_p(unsigned short b, unsigned long port)
 {
 	*(volatile unsigned short*)PORT2ADDR(port) = b;
 	delay();
 }
 
-void generic_outl_p(unsigned int b, unsigned long port)
+void cat68701_outl_p(unsigned int b, unsigned long port)
 {
 	*(volatile unsigned long*)PORT2ADDR(port) = b;
 	delay();
 }
 
-void generic_outsb(unsigned long port, const void *buffer, unsigned long count)
+void cat68701_outsb(unsigned long port, const void *buffer, unsigned long count)
 {
 	const unsigned char *buf=buffer;
 	while(count--) outb(*buf++, port);
 }
 
-void generic_outsw(unsigned long port, const void *buffer, unsigned long count)
+void cat68701_outsw(unsigned long port, const void *buffer, unsigned long count)
 {
 	const unsigned short *buf=buffer;
 	while(count--) outw(*buf++, port);
@@ -143,7 +138,7 @@ void generic_outsw(unsigned long port, const void *buffer, unsigned long count)
 #endif
 }
 
-void generic_outsl(unsigned long port, const void *buffer, unsigned long count)
+void cat68701_outsl(unsigned long port, const void *buffer, unsigned long count)
 {
 	const unsigned long *buf=buffer;
 	while(count--) outl(*buf++, port);
@@ -152,48 +147,61 @@ void generic_outsl(unsigned long port, const void *buffer, unsigned long count)
 #endif
 }
 
-unsigned char generic_readb(unsigned long addr)
+unsigned char cat68701_readb(unsigned long addr)
 {
 	return *(volatile unsigned char*)addr;
 }
 
-unsigned short generic_readw(unsigned long addr)
+unsigned short cat68701_readw(unsigned long addr)
 {
 	return *(volatile unsigned short*)addr;
 }
 
-unsigned int generic_readl(unsigned long addr)
+unsigned int cat68701_readl(unsigned long addr)
 {
 	return *(volatile unsigned long*)addr;
 }
 
-void generic_writeb(unsigned char b, unsigned long addr)
+void cat68701_writeb(unsigned char b, unsigned long addr)
 {
 	*(volatile unsigned char*)addr = b;
 }
 
-void generic_writew(unsigned short b, unsigned long addr)
+void cat68701_writew(unsigned short b, unsigned long addr)
 {
 	*(volatile unsigned short*)addr = b;
 }
 
-void generic_writel(unsigned int b, unsigned long addr)
+void cat68701_writel(unsigned int b, unsigned long addr)
 {
         *(volatile unsigned long*)addr = b;
 }
 
-void * generic_ioremap(unsigned long offset, unsigned long size)
+void * cat68701_ioremap(unsigned long offset, unsigned long size)
 {
 	return (void *) P2SEGADDR(offset);
 }
-EXPORT_SYMBOL(generic_ioremap);
+EXPORT_SYMBOL(cat68701_ioremap);
 
-void generic_iounmap(void *addr)
+void cat68701_iounmap(void *addr)
 {
 }
-EXPORT_SYMBOL(generic_iounmap);
+EXPORT_SYMBOL(cat68701_iounmap);
 
-unsigned long generic_isa_port2addr(unsigned long offset)
+unsigned long cat68701_isa_port2addr(unsigned long offset)
 {
-	return offset + generic_io_base;
+  /* CompactFlash (IDE) */
+  if(((offset >= 0x1f0) && (offset <= 0x1f7)) || (offset==0x3f6))
+    return 0xba000000 + offset;
+
+  /* INPUT PORT */
+  if((offset >= 0x3fc) && (offset <= 0x3fd))
+    return 0xb4007000 + offset;
+
+  /* OUTPUT PORT */
+  if((offset >= 0x3fe) && (offset <= 0x3ff))
+    return 0xb4007400 + offset;
+
+  return offset + 0xb4000000; /* other I/O (EREA 5)*/
 }
+
