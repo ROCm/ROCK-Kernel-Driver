@@ -1,6 +1,6 @@
 /* Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001-2002 Intel Corp.
  * Copyright (c) 2001-2002 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -1091,18 +1091,25 @@ do_interrupted:
 static int sctp_skb_pull(struct sk_buff *skb, int len)
 {
 	struct sk_buff *list;
+	int skb_len = skb_headlen(skb);
+	int rlen;
 
-	if (len <= skb->len) {
+	if (len <= skb_len) {
 		__skb_pull(skb, len);
 		return 0;
 	}
-	len -= skb->len;
-	__skb_pull(skb, skb->len);
+	len -= skb_len;
+	__skb_pull(skb, skb_len);
 
 	for (list = skb_shinfo(skb)->frag_list; list; list = list->next) {
-		len = sctp_skb_pull(list, len);
-		if (!len)
+		rlen = sctp_skb_pull(list, len);
+		skb->len -= (len-rlen);
+		skb->data_len -= (len-rlen);
+
+		if (!rlen)
 			return 0;
+
+		len = rlen;
 	}
 
 	return len;
@@ -1130,7 +1137,7 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 {
 	sctp_ulpevent_t *event = NULL;
 	sctp_opt_t *sp = sctp_sk(sk);
-	struct sk_buff *skb, *list;
+	struct sk_buff *skb;
 	int copied;
 	int err = 0;
 	int skb_len;
@@ -1154,8 +1161,6 @@ SCTP_STATIC int sctp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr 
 	 * frag_list.
 	 */ 
 	skb_len = skb->len;
-	for (list = skb_shinfo(skb)->frag_list; list; list = list->next)
-		skb_len += list->len;
 
 	copied = skb_len;
 	if (copied > len)

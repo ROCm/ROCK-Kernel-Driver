@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2002 International Business Machines, Corp.
+ * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  *
  * This file is part of the SCTP kernel reference Implementation
@@ -37,6 +37,7 @@
  *    Xingang Guo           <xingang.guo@intel.com>
  *    Jon Grimm             <jgrimm@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
+ *    Sridhar Samudrala     <sri@us.ibm.com>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -147,7 +148,9 @@ extern int sctp_primitive_REQUESTHEARTBEAT(sctp_association_t *, void *arg);
 /*
  * sctp_crc32c.c
  */
-extern __u32 count_crc(__u8 *ptr, __u16 count);
+extern __u32 sctp_start_cksum(__u8 *ptr, __u16 count);
+extern __u32 sctp_update_cksum(__u8 *ptr, __u16 count, __u32 cksum);
+extern __u32 sctp_end_cksum(__u32 cksum);
 
 /*
  * sctp_input.c
