@@ -220,6 +220,9 @@ struct sndrv_ctl_elem_value32 {
 	unsigned int indirect;	/* bit-field causes misalignment */
         union {
 		s32 integer[128];	/* integer and boolean need conversion */
+#ifndef CONFIG_X86_64
+		s64 integer64[64];	/* for alignment */
+#endif
 		unsigned char data[512];	/* others should be compatible */
         } value;
         unsigned char reserved[128];	/* not used */
