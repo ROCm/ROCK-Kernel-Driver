@@ -396,8 +396,10 @@ static inline void pte_clear(pte_t * ptep)
  */
 static inline void set_pte(pte_t *ptep, pte_t pte)
 {
-	if (pte_present(*ptep))
+	if (pte_present(*ptep)) {
 		pte_clear(ptep);
+		flush_tlb_pending();
+	}
 	*ptep = __pte(pte_val(pte)) & ~_PAGE_HPTEFLAGS;
 }
 
