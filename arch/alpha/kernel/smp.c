@@ -499,7 +499,7 @@ void __init
 setup_smp(void)
 {
 	struct percpu_struct *cpubase, *cpu;
-	int i;
+	unsigned long i;
 
 	if (boot_cpuid != 0) {
 		printk(KERN_WARNING "SMP: Booting off cpu %d instead of 0?\n",
@@ -516,7 +516,7 @@ setup_smp(void)
 			((char*)hwrpb + hwrpb->processor_offset);
 		boot_cpu_palrev = cpubase->pal_revision;
 
-		for (i = 0; i < hwrpb->nr_processors; i++ ) {
+		for (i = 0; i < hwrpb->nr_processors; i++) {
 			cpu = (struct percpu_struct *)
 				((char *)cpubase + i*hwrpb->processor_size);
 			if ((cpu->flags & 0x1cc) == 0x1cc) {

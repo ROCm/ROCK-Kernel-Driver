@@ -304,7 +304,7 @@ pcibios_update_resource(struct pci_dev *dev, struct resource *root,
 	    == (PCI_BASE_ADDRESS_SPACE_MEMORY
 		| PCI_BASE_ADDRESS_MEM_TYPE_64)) {
 		pci_write_config_dword(dev, where+4, 0);
-		printk(KERN_WARNING "PCI: dev %s type 64-bit\n", dev->name);
+		printk(KERN_WARNING "PCI: dev %s type 64-bit\n", dev->dev.name);
 	}
 
 	/* ??? FIXME -- record old value for shutdown.  */
@@ -474,5 +474,5 @@ int
 pci_controller_num(struct pci_dev *pdev)
 {
         struct pci_controller *hose = pdev->sysdata;
-	return (hose ? hose->index : -ENXIO);
+	return (hose ? (int) hose->index : -ENXIO);
 }

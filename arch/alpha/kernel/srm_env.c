@@ -162,8 +162,8 @@ srm_env_write(struct file *file, const char *buffer, unsigned long count,
 		res = (int) ret1;
 	}
 
+ out:
 	free_page((unsigned long)buf);
-
 	return res;
 }
 
