@@ -345,13 +345,29 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	{ }, /* dummy final entry, always present */
 };
 
+
+/*
+ * VIA's AGP3 chipsets do magick to put the AGP bridge compliant
+ * with the same standards version as the graphics card.
+ */
+static void check_via_agp3 (struct agp_bridge_data *bridge)
+{
+	u8 reg;
+
+	pci_read_config_byte(bridge->dev, VIA_AGPSEL, &reg);
+	/* Check AGP 2.0 compatibility mode. */
+	if ((reg & (1<<1))==0)
+		bridge->driver = &via_agp3_driver;
+}
+
+
 static int __init agp_via_probe(struct pci_dev *pdev,
 				const struct pci_device_id *ent)
 {
 	struct agp_device_ids *devs = via_agp_device_ids;
 	struct agp_bridge_data *bridge;
 	int j = 0;
-	u8 cap_ptr, reg;
+	u8 cap_ptr;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
 	if (!cap_ptr)
@@ -382,40 +398,25 @@ found:
 	if (!bridge)
 		return -ENOMEM;
 
+	get_agp_version(bridge);
 	bridge->dev = pdev;
 	bridge->capndx = cap_ptr;
 	bridge->driver = &via_driver;
 
-	switch (pdev->device) {
-	case PCI_DEVICE_ID_VIA_8367_0:
-		/*
-		 * Garg, there are KT400s with KT266 IDs.
-		 */
+	/*
+	 * Garg, there are KT400s with KT266 IDs.
+	 */
+	if (pdev->device == PCI_DEVICE_ID_VIA_8367_0) {
 		/* Is there a KT400 subsystem ? */
-		if (pdev->subsystem_device != PCI_DEVICE_ID_VIA_8377_0)
-			break;
-		
-		printk(KERN_INFO PFX "Found KT400 in disguise as a KT266.\n");
-		/*FALLTHROUGH*/
-	case PCI_DEVICE_ID_VIA_8377_0:
-		/*
-		 * The KT400 does magick to put the AGP bridge compliant
-		 * with the same standards version as the graphics card.
-		 */
-		pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
-		/* Check AGP 2.0 compatibility mode. */
-		if ((reg & (1<<1))==0) {
-			bridge->driver = &via_agp3_driver;
-			break;
+		if (pdev->subsystem_device == PCI_DEVICE_ID_VIA_8377_0) {
+			printk(KERN_INFO PFX "Found KT400 in disguise as a KT266.\n");
+			check_via_agp3(bridge);
 		}
-		/*FALLTHROUGH*/
-	default:
-		break;
 	}
 
-
-	bridge->dev = pdev;
-	bridge->capndx = cap_ptr;
+	/* If this is an AGP3 bridge, check which mode its in and adjust. */
+	if (bridge->major_version >= 3)
+		check_via_agp3(bridge);
 
 	/* Fill in the mode register */
 	pci_read_config_dword(pdev,
