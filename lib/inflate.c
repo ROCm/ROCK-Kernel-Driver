@@ -685,8 +685,10 @@ DEBG("<stor");
 }
 
 
-
-STATIC int inflate_fixed(void)
+/*
+ * We use `noinline' here to prevent gcc-3.5 from using too much stack space
+ */
+STATIC int noinline inflate_fixed(void)
 /* decompress an inflated type 1 (fixed Huffman codes) block.  We should
    either replace this with a custom decoder, or at least precompute the
    Huffman tables. */
@@ -739,8 +741,10 @@ DEBG("<fix");
 }
 
 
-
-STATIC int inflate_dynamic(void)
+/*
+ * We use `noinline' here to prevent gcc-3.5 from using too much stack space
+ */
+STATIC int noinline inflate_dynamic(void)
 /* decompress an inflated type 2 (dynamic Huffman codes) block. */
 {
   int i;                /* temporary variables */
