@@ -1906,16 +1906,16 @@ pci_pool_free (struct pci_pool *pool, void *vaddr, dma_addr_t dma)
 	int			map, block;
 
 	if ((page = pool_find_page (pool, dma)) == 0) {
-		printk (KERN_ERR "pci_pool_free %s/%s, %p/%x (bad dma)\n",
+		printk (KERN_ERR "pci_pool_free %s/%s, %p/%lx (bad dma)\n",
 			pool->dev ? pool->dev->slot_name : NULL,
-			pool->name, vaddr, (int) (dma & 0xffffffff));
+			pool->name, vaddr, (unsigned long) dma);
 		return;
 	}
 #ifdef	CONFIG_PCIPOOL_DEBUG
 	if (((dma - page->dma) + (void *)page->vaddr) != vaddr) {
-		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%x\n",
+		printk (KERN_ERR "pci_pool_free %s/%s, %p (bad vaddr)/%lx\n",
 			pool->dev ? pool->dev->slot_name : NULL,
-			pool->name, vaddr, (int) (dma & 0xffffffff));
+			pool->name, vaddr, (unsigned long) dma);
 		return;
 	}
 #endif
