@@ -406,6 +406,7 @@ dump_net_release(struct dump_dev *net_dev)
 static int
 dump_net_silence(struct dump_dev *net_dev)
 {
+	netpoll_set_trap(1);
 	local_irq_save(flags_global);
         startup_handshake = 1;
 	net_dev->curr_offset = 0;
@@ -436,6 +437,7 @@ dump_net_resume(struct dump_dev *net_dev)
 	}
 	printk("NETDUMP END!\n");
 	local_irq_restore(flags_global);
+	netpoll_set_trap(0);
 	startup_handshake = 0;
 	return 0;
 }
