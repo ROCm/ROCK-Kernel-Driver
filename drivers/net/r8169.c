@@ -2382,8 +2382,7 @@ static void rtl8169_down(struct net_device *dev)
 	netif_poll_disable(dev);
 
 	/* Give a racing hard_start_xmit a few cycles to complete. */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(1);
+	synchronize_kernel();
 
 	rtl8169_tx_clear(tp);
 
@@ -2398,6 +2397,8 @@ static int rtl8169_close(struct net_device *dev)
 	rtl8169_down(dev);
 
 	free_irq(dev->irq, dev);
+
+	netif_poll_enable(dev);
 
 	pci_free_consistent(pdev, R8169_RX_RING_BYTES, tp->RxDescArray,
 			    tp->RxPhyAddr);
