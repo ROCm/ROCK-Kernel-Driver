@@ -34,8 +34,7 @@ This document describes the Linux kernel Makefiles.
   8  New-style variables
      8.1  New variables
      8.2  Converting to old-style
-  9  Compatibility with Linux Kernel 2.2
- 10  Credits
+  9  Credits
 
 
 === 1 Overview
@@ -466,7 +465,7 @@ in the top Makefile:
 
 === 6 The structure of a subdirectory Makefile
 
-A subdirectory Makefile has five sections.
+A subdirectory Makefile has four sections.
 
 
 
@@ -488,20 +487,7 @@ special compilation options, and any subdirectories to be recursively
 entered.  The declarations in these lines depend heavily on the kernel
 configuration variables (CONFIG_* symbols).
 
-In some Makefiles ("old-style Makefiles"), the second section looks
-like this:
-
-	# drivers/parport/Makefile
-	ifeq ($(CONFIG_PARPORT_PC),y)
-	  LX_OBJS += parport_pc.o
-	else
-	  ifeq ($(CONFIG_PARPORT_PC),m)
-	    MX_OBJS += parport_pc.o
-	  endif
-	endif
-
-In most Makefiles ("new-style Makefiles"), the second section looks
-like this:
+The second section looks like this:
 
 	# drivers/block/Makefile
 	obj-$(CONFIG_MAC_FLOPPY)	+= swim3.o
@@ -509,27 +495,10 @@ like this:
 	obj-$(CONFIG_AMIGA_FLOPPY)	+= amiflop.o
 	obj-$(CONFIG_ATARI_FLOPPY)	+= ataflop.o
 
-The new-style Makefiles are more compact and easier to get correct
-for certain features (such as CONFIG_* options that enable more than
-one file).  If you have a choice, please write a new-style Makefile.
-
-
-
---- 6.3 Adapter section
-
-The third section is an adapter section.  In old-style Makefiles, this
-third section is not present.  In new-style Makefiles, the third section
-contains boilerplate code which converts from new-style variables to
-old-style variables.  This is because Rules.make processes only the
-old-style variables.
-
-See section 8.2 ("Converting to old-style") for examples.
-
-
 
 --- 6.4 Rules.make section
 
-The fourth section is the single line:
+The third section is the single line:
 
 	include $(TOPDIR)/Rules.make
 
@@ -537,7 +506,7 @@ The fourth section is the single line:
 
 --- 6.5 Special rules
 
-The fifth section contains any special Makefile rules needed that are
+The fourth section contains any special Makefile rules needed that are
 not available through the common rules in Rules.make.
 
 
@@ -550,352 +519,166 @@ The public interface of Rules.make consists of the following variables:
 
 --- 7.1 Subdirectories
 
-    ALL_SUB_DIRS, SUB_DIRS, MOD_IN_SUB_DIRS, MOD_SUB_DIRS
+A Makefile is only responsible for building objects in its own
+directory. Files in subdirectories should be taken care of by
+Makefiles in the these subdirs. The build system will automatically
+invoke make recursively in subdirectories, provided you let it know of
+them.
 
-	$(ALL_SUB_DIRS) is an unconditional list of *all* the
-	subdirectories in a given directory.  This list should not depend
-	on the kernel configuration.
+To do so, use the subdir-{y,m,n,} variables:
 
-	$(SUB_DIRS) is a list of subdirectories which may contribute code
-	to vmlinux.  This list may depend on the kernel configuration.
+	subdir-$(CONFIG_ISDN)                   += i4l
+	subdir-$(CONFIG_ISDN_CAPI)              += capi
 
-	$(MOD_SUB_DIRS) and $(MOD_IN_SUB_DIRS) are lists of subdirectories
-	which may build kernel modules.  Both names have exactly the
-	same meaning.  (In version 2.2 and earlier kernels, these
-	variables had different meanings -- hence the different names).
+When building the actual kernel, i.e. vmlinux ("make
+{vmlinux,bzImage,...}"), make will recursively descend into
+directories listed in $(subdir-y).
 
-	For new code, $(MOD_SUB_DIRS) is recommended and $(MOD_IN_SUB_DIRS)
-	is deprecated.
+When building modules ("make modules"), make will recursively descend
+into directories listed in $(subdir-m).
 
-	Example:
+When building the dependencies ("make dep") make needs to visit every
+subdir, so it'll descend into every directory listed in 
+$(subdir-y), $(subdir-m), $(subdir-n), $(subdir-).
 
-		# fs/Makefile
-		ALL_SUB_DIRS = coda minix ext2 fat msdos vfat proc isofs nfs \
-			       umsdos ntfs hpfs sysv smbfs ncpfs ufs efs affs \
-			       romfs autofs hfs lockd nfsd nls devpts devfs \
-			       adfs partitions qnx4 udf bfs cramfs openpromfs \
-			       autofs4 ramfs jffs
-		SUB_DIRS :=
+You may encounter the case where a config option may be set to "y", but
+you still want to possibly build modules in that subdirectory.
 
-		...
+For example, drivers/isdn/capi/Makefile has
 
-		ifeq ($(CONFIG_EXT2_FS),y)
-		SUB_DIRS += ext2
-		else
-		  ifeq ($(CONFIG_EXT2_FS),m)
-		  MOD_SUB_DIRS += ext2
-		  endif
-		endif
+	obj-$(CONFIG_ISDN_CAPI)                 += kernelcapi.o capiutil.o
+	obj-$(CONFIG_ISDN_CAPI_CAPI20)          += capi.o
 
-		ifeq ($(CONFIG_CRAMFS),y)
-		SUB_DIRS += cramfs
-		else
-		  ifeq ($(CONFIG_CRAMFS),m)
-		  MOD_SUB_DIRS += cramfs
-		  endif
-		endif
+where it's possible that CONFIG_ISDN_CAPI=y, but
+CONFIG_ISDN_CAPI_CAPI20=m.
 
-	Example:
+This is expressed by the following construct in the parent Makefile
+drivers/isdn/Makefile:
 
-		# drivers/net/Makefile
-		SUB_DIRS     := 
-		MOD_SUB_DIRS :=
-		MOD_IN_SUB_DIRS :=
-		ALL_SUB_DIRS := $(SUB_DIRS) fc hamradio irda pcmcia tokenring \
-				wan sk98lin arcnet skfp tulip appletalk
+	mod-subdirs                             := i4l hisax capi eicon
+	subdir-$(CONFIG_ISDN_CAPI)              += capi
 
-		...
-
-		ifeq ($(CONFIG_IRDA),y)
-		SUB_DIRS += irda
-		MOD_IN_SUB_DIRS += irda
-		else
-		  ifeq ($(CONFIG_IRDA),m)
-		  MOD_IN_SUB_DIRS += irda
-		  endif
-		endif
-
-		ifeq ($(CONFIG_TR),y)
-		SUB_DIRS += tokenring
-		MOD_IN_SUB_DIRS += tokenring
-		else
-		  ifeq ($(CONFIG_TR),m)
-		  MOD_IN_SUB_DIRS += tokenring
-		  endif
-		endif
-
+Having a subdir ("capi") listed in the variable $(mod-subdirs) will
+make the build system enter the specified subdirectory during "make
+modules" also, even though the subdir ("capi") is listed only in
+$(subdir-y), not $(subdir-m).
 
 
 --- 7.2 Object file goals
 
-    O_TARGET, O_OBJS, OX_OBJS
+    O_TARGET, obj-y
 
-	The subdirectory Makefile specifies object files for vmlinux in
-	the lists $(O_OBJS) and $(OX_OBJS).  These lists depend on the
-	kernel configuration.
+	The subdirectory Makefile specifies object files for vmlinux
+	in the lists $(obj-y).  These lists depend on the kernel
+	configuration.
 
-	The "X" in "OX_OBJS" stands for "eXport".  Files in $(OX_OBJS)
-	may use the EXPORT_SYMBOL macro to define public symbols which
-	loadable kernel modules can see.  Files in $(O_OBJS) may not use
-	EXPORT_SYMBOL (and you will get a funky error message if you try).
+	Rules.make compiles all the $(obj-y) files.  It then calls
+	"$(LD) -r" to merge these files into one .o file with the name
+	$(O_TARGET).  This $(O_TARGET) is later linked into vmlinux by 
+	a parent Makefile.
 
-	[Yes, it's kludgy to do this by hand.  Yes, you can define all
-	your objects as $(OX_OBJS) whether they define symbols or not;
-	but then you will notice a lot of extra compiles when you edit
-	any source file.  Blame CONFIG_MODVERSIONS for this.]
+	The order of files in $(obj-y) is significant.  Duplicates in
+	the lists are allowed: the first instance will be linked into
+	$(O_TARGET) and succeeding instances will be ignored.
 
-	Data that is passed to other objects via registration functions
-	(e.g. pci_register_driver, pm_register) does not need to be marked
-	as EXPORT_SYMBOL.  The objects that pass data via registration
-	functions do not need to be marked as OX_OBJS, unless they also have
-	exported symbols.
-
-	Rules.make compiles all the $(O_OBJS) and $(OX_OBJS) files.
-	It then calls "$(LD) -r" to merge these files into one .o file
-	with the name $(O_TARGET).  This $(O_TARGET) name also appears
-	in the top Makefile.
-
-	The order of files in $(O_OBJS) and $(OX_OBJS) is significant.
-	All $(OX_OBJS) files come first, in the order listed, followed by
-	all $(O_OBJS) files, in the order listed.  Duplicates in the lists
-	are allowed: the first instance will be linked into $(O_TARGET)
-	and succeeding instances will be ignored.  (Note: Rules.make may
-	emit warning messages for duplicates, but this is harmless).
+	Link order is significant, because certain functions
+	(module_init() / __initcall) will be called during boot in the
+	order they appear. So keep in mind that changing the link
+	order may e.g.  change the order in which your SCSI
+	controllers are detected, and thus you disks are renumbered.
 
 	Example:
 
-		# arch/alpha/kernel/Makefile
-		O_TARGET := kernel.o
-		O_OBJS   := entry.o traps.o process.o osf_sys.o irq.o \
-			    irq_alpha.o signal.o setup.o ptrace.o time.o \
-			    semaphore.o
-		OX_OBJS  := alpha_ksyms.o
+	    # Makefile for the kernel ISDN subsystem and device drivers.
 
-		ifdef CONFIG_SMP
-		O_OBJS   += smp.o irq_smp.o
-		endif
+	    # The target object and module list name.
 
-		ifdef CONFIG_PCI
-		O_OBJS   += pci.o pci_iommu.o
-		endif
+	    O_TARGET        := vmlinux-obj.o
 
-	Even if a subdirectory Makefile has an $(O_TARGET), the .config
-	options still control whether or not its $(O_TARGET) goes into
-	vmlinux.  See the $(M_OBJS) example below.
+	    # Each configuration option enables a list of files.
 
-	Sometimes the ordering of all $(OX_OBJS) files before all
-	$(O_OBJS) files can be a problem, particularly if both
-	$(O_OBJS) files and $(OX_OBJS) files contain __initcall
-	declarations where order is important.   To avoid this imposed
-	ordering, the use of $(OX_OBJS) can be dropped altogether and
-	$(MIX_OBJS) used instead.
+	    obj-$(CONFIG_ISDN)                      += isdn.o
+	    obj-$(CONFIG_ISDN_PPP_BSDCOMP)          += isdn_bsdcomp.o
 
-	If this approach is used, then:
-	 - All objects to be linked into vmlinux should be listed in
-	   $(O_OBJS) in the desired order.
-	 - All objects to be created as modules should be listed in
-	   $(M_OBJS)
-	 - All objects that export symbols should also be listed in
-	   $(MIX_OBJS).
+	    # The global Rules.make.
 
-	This has the same effect as maintaining the
-	exported/non-exported split, except that there is more control
-	over the ordering of object files in vmlinux.
-	
-
+	    include $(TOPDIR)/Rules.make
 
 --- 7.3 Library file goals
 
-    L_TARGET, L_OBJS, LX_OBJS
+    L_TARGET
 
-	These names are similar to the O_* names.  Once again, $(L_OBJS)
-	and $(LX_OBJS) specify object files for the resident kernel;
-	once again, the lists depend on the current configuration; and
-	once again, the files that call EXPORT_SYMBOL go on the "X" list.
-
-	The difference is that "L" stands for "Library".  After making
-	$(L_OBJS) and $(LX_OBJS), Rules.make uses the "$(AR) rcs" command
-	to put these files into an archive file (a library) with the
-	name $(L_TARGET).  This name also appears in the top Makefile.
-
-	Example:
-
-		# arch/i386/lib/Makefile
-		L_TARGET = lib.a
-		L_OBJS  = checksum.o old-checksum.o delay.o \
-			usercopy.o getuser.o putuser.o iodebug.o
-
-		ifdef CONFIG_X86_USE_3DNOW
-		L_OBJS += mmx.o
-		endif
-
-		ifdef CONFIG_HAVE_DEC_LOCK
-		L_OBJS += dec_and_lock.o
-		endif
-
-	The order of files in $(L_OBJS) and $(LX_OBJS) is not significant.
-	Duplicates in the lists are allowed.  (Note: Rules.make may emit
-	warning messages for duplicates, but this is harmless).
-
-	A subdirectory Makefile can specify either an $(O_TARGET),
-	an $(L_TARGET), or both.  Here is a discussion of the differences.
-
-	All of the files in an $(O_TARGET) are guaranteed to appear in
-	the resident vmlinux image.  In an $(L_TARGET), only the files
-	that satisfy undefined symbol references from other files will
-	appear in vmlinux.
-
-	In a conventional link process, the linker processes some
-	object files and creates a list of unresolved external symbols.
-	The linker then looks in a set of libraries to resolve these
-	symbols.  Indeed, the Linux kernel used to be linked this way,
-	with the bulk of the code stored in libraries.
-
-	But vmlinux contains two types of object files that cannot be
-	fetched out of libraries this way:
-
-	    (1) object files that are purely EXPORT_SYMBOL definitions
-	    (2) object files that use module_init or __initcall initializers
-		(instead of an initialization routine called externally)
-
-	These files contain autonomous initializer sections which provide
-	code and data without being explicitly called.	If these files
-	were stored in $(L_TARGET) libraries, the linker would fail
-	to include them in vmlinux.  Thus, most subdirectory Makefiles
-	specify an $(O_TARGET) and do not use $(L_TARGET).
-
-	Other considerations: $(O_TARGET) leads to faster re-link times
-	during development activity, but $(L_TARGET) gives better error
-	messages for unresolved symbols.
-
+        Instead of building an O_TARGET object file, you may also
+	build an archive which again contains objects listed in
+	$(obj-y). This is normally not necessary and only used in
+	the lib, arch/$(ARCH)/lib directories.
 
 
 --- 7.4 Loadable module goals
 
-    M_OBJS, MX_OBJS
+    obj-m
 
-	$(M_OBJS) and $(MX_OBJS) specify object files which are built
-	as loadable kernel modules.  As usual, the "X" in $(MX_OBJS)
-	stands for "eXport"; source files that use EXPORT_SYMBOL must
-	appear on an $(MX_OBJS) list.
+	$(obj-m) specify object files which are built as loadable
+	kernel modules.
 
 	A module may be built from one source file or several source
-	files.	In the case of one source file, the subdirectory
-	Makefile simply adds the file to either $(M_OBJS) or $(MX_OBJS),
-	as appropriate.
+	files. In the case of one source file, the subdirectory
+	Makefile simply adds the file to $(obj-m)
 
 	Example:
 
-		# drivers/net/irda/Makefile
-		ifeq ($(CONFIG_IRTTY_SIR),y)
-		L_OBJS += irtty.o
-		else
-		  ifeq ($(CONFIG_IRTTY_SIR),m)
-		  M_OBJS += irtty.o
-		  endif
-		endif
+	    obj-$(CONFIG_ISDN_PPP_BSDCOMP)          += isdn_bsdcomp.o
 
-		ifeq ($(CONFIG_IRPORT_SIR),y)
-		LX_OBJS += irport.o
-		else
-		  ifeq ($(CONFIG_IRPORT_SIR),m)
-		  MX_OBJS += irport.o
-		  endif
-		endif
+	If a kernel module is built from several source files, you specify
+	that you want to build a module in the same way as above.
 
-	If a kernel module is built from several source files, there
-	are two ways to specify the set of source files.  One way is to
-	build a single module for the entire subdirectory.  This way is
-	popular in the file system and network protocol stacks.
+	However, the build system of course needs to know which the parts
+	are that you want to build your module of, so you have to tell it
+	by setting an $(<module_name>-objs) variable.
 
 	Example:
 
-		# fs/ext2/Makefile
-		O_TARGET := ext2.o
-		O_OBJS   := acl.o balloc.o bitmap.o dir.o file.o fsync.o \
-			    ialloc.o inode.o ioctl.o namei.o super.o symlink.o \
-			    truncate.o
-		M_OBJS   := $(O_TARGET)
+	    obj-$(CONFIG_ISDN)                      += isdn.o
 
-	In this example, the module name will be ext2.o.  Because this
-	file has the same name has $(O_TARGET), Rules.make will use
-	the $(O_TARGET) rule to build ext2.o: it will run "$(LD) -r"
-	on the list of $(O_OBJS) files.
+	    isdn-objs := isdn_net.o isdn_tty.o isdn_v110.o isdn_common.o
 
-	Note that this subdirectory Makefile defines both an $(O_TARGET)
-	and an $(M_OBJS).  The control code, up in fs/Makefile, will
-	select between these two.  If CONFIG_EXT2_FS=y, then fs/Makefile
-	will build $(O_TARGET); and if CONFIG_EXT_FS=m, then fs/Makefile
-	will build $(M_OBJS) instead.  (Yes, this is a little delicate
-	and a little confusing).
+	In this example, the module name will be isdn.o. Rules.make
+	will compile the objects listed in $(isdn-objs) and then run
+	"$(LD) -r" on the list of these files to generate isdn.o
+
+	Note: Of course, when you are building objects into the kernel,
+	the syntax above will also work. So, if you have CONFIG_ISDN=y,
+	the build system will build an isdn.o for you out of the individual
+	parts and then link this into the $(O_TARGET), as you'd expect.
 
 
+--- 7.5 Objects which export symbols
 
---- 7.5 Multi-part modules
+    export-objs
 
-    MI_OBJS, MIX_OBJS
+	When using loadable modules, not every global symbol in the
+	kernel / other modules is automatically available for your
+	module, only those explicitly exported are.
 
-	Some kernel modules are composed of several object files
-	linked together, but do not include every object file in their
-	subdirectory.  $(MI_OBJS) and $(MIX_OBJS) are for this case.
-
-	"M" stands for Module.
-	"I" stands for Intermediate.
-	"X", as usual, stands for "eXport symbol".
+	To make a symbol available for use in modules, to "export" it,
+	use the EXPORT_SYMBOL(<symbol>) directive in your source. In
+	addition, you need to list all object files which export symbols
+	(i.e. their source contains an EXPORT_SYMBOL() directive) in the
+	Makefile variable $(export-objs).
 
 	Example:
 
-		# drivers/sound/Makefile
-		gus-objs  := gus_card.o gus_midi.o gus_vol.o gus_wave.o ics2101.o
-		pas2-objs := pas2_card.o pas2_midi.o pas2_mixer.o pas2_pcm.o
-		sb-objs	  := sb_card.o
+	    # Objects that export symbols.
 
-		gus.o: $(gus-objs)
-			$(LD) -r -o $@ $(gus-objs)
+	    export-objs     := isdn_common.o
 
-		pas2.o: $(pas2-objs)
-			$(LD) -r -o $@ $(pas2-objs)
+        since isdn_common.c contains
 
-		sb.o: $(sb-objs)
-			$(LD) -r -o $@ $(sb-objs)
+	    EXPORT_SYMBOL(register_isdn);
 
-	The kernel modules gus.o, pas2.o, and sb.o are the *composite
-	files*.  The object files gus_card.o, gus_midi.o, gus_vol.o,
-	gus_wave.o, ics2101.o, pas2_card.o, pas2_midi.o, pas2_mixer.o,
-	pas2_pcm.o, and sb_card.o are *component files*.  The component
-	files are also called *intermediate files*.
-
-	In another part of drivers/sound/Makefile (not shown), all of
-	the component files are split out.  For the resident drivers:
-	the component object files go onto $(O_OBJS) and $(OX_OBJS)
-	lists, depending on whether they export symbols or not; and the
-	composite files are never built.  For the kernel modules: the
-	component object files go onto $(MI_OBJS) and $(MIX_OBJS);
-	the composite files go onto $(M_OBJS).
-
-	The subdirectory Makefile must also specify the linking rule
-	for a multi-object-file module:
-
-		# drivers/sound/Makefile
-
-		gus.o: $(gus-objs)
-			$(LD) -r -o $@ $(gus-objs)
-
-		pas2.o: $(pas2-objs)
-			$(LD) -r -o $@ $(pas2-objs)
-
-		sb.o: $(sb-objs)
-			$(LD) -r -o $@ $(sb-objs)
-
-
-	As is mentioned in section 7.2 ("Object file goals"),
-	$(MIX_OBJS) can also be used simply to list all objects that
-	export any symbols.  If this approach is taken, then
-	$(O_OBJS), $(L_OBJS), $(M_OBJS) and $(MI_OBJS) should simply
-	lists all of the vmlinux object files, library object files,
-	module object files and intermediate module files
-	respectively.  Duplication between $(MI_OBJS) and $(MIX_OBJS)
-	is not a problem.
+	which makes the function register_isdn available to
+	low-level ISDN drivers.
+	    
 
 --- 7.6 Compilation flags
 
@@ -1013,6 +796,10 @@ The public interface of Rules.make consists of the following variables:
 
 === 8 New-style variables
 
+[ This sections dates back from a time where the way to write Makefiles
+  described above was "new-style". I'm leaving it in as it describes the
+  same thing in other words, so it may be of some use ]
+
 The "new-style variables" are simpler and more powerful than the
 "old-style variables".  As a result, many subdirectory Makefiles shrank
 more than 60%.  This author hopes that, in time, all arch Makefiles and
@@ -1099,16 +886,14 @@ people define most variables using "new style" but then fall back to
 	$(export-objs) list in a new-style Makefile is simpler and easier
 	to audit.
 
-    list-multi
     $(foo)-objs
 
 	Some kernel modules are composed of multiple object files linked
-	together.  $(list-multi) is a list of such kernel modules.
-	This is a static list; it does not depend on the configuration.
+	together.
 
-	For each kernel module in $(list-multi) there is another list
-	of all the object files which make up that module.  For a kernel
-	module named foo.o, its object file list is foo-objs.
+	For each multi-part kernel modul there is a list of all the
+	object files which make up that module.  For a kernel module
+	named foo.o, its object file list is foo-objs.
 
 	Example:
 
@@ -1135,44 +920,16 @@ people define most variables using "new style" but then fall back to
 		obj-$(CONFIG_SCSI_INIA100)	+= a100u2w.o
 
 	Suppose that CONFIG_SCSI=y.  Then vmlinux needs to link in all
-	14 components of scsi_mod.o, so these components will go onto
-	$(O_OBJS) and $(OX_OBJS).  The composite file scsi_mod.o will
-	never be created.  The boilerplate conversion code produces this
-	result with a few lines of list processing commands.
+	14 components of scsi_mod.o.
 
 	Suppose that CONFIG_BLK_DEV_SR=m.  Then the 3 components
-	of sr_mod.o will linked together with "$(LD) -r" to make the
-	kernel module sr_mod.o, so these 3 components need to go onto
-	the $(MI_OBJS) and $(MIX_OBJS) lists; the composite file sr_mod.o
-	goes onto $(M_OBJS).  The boilerplate conversion code takes care
-	of this, too.
+	of sr_mod.o will be linked together with "$(LD) -r" to make the
+	kernel module sr_mod.o.
 
 	And suppose CONFIG_SCSI_INITIO=n.  Then initio.o goes onto the
 	$(obj-n) list and that's the end of it.  Its component files
 	are not compiled, and the composite file is not created.
 
-	Finally, the subdirectory Makefile needs to define rules to
-	build each multi-object kernel module from its component list.
-	Example:
-
-		# drivers/scsi/Makefile
-
-		scsi_mod.o: $(scsi_mod-objs)
-			$(LD) -r -o $@ $(scsi_mod-objs)
-
-		sr_mod.o: $(sr_mod-objs)
-			$(LD) -r -o $@ $(sr_mod-objs)
-
-		initio.o: $(initio-objs)
-			$(LD) -r -o $@ $(initio-objs)
-
-		a100u2w.o: $(a100u2w-objs)
-			$(LD) -r -o $@ $(a100u2w-objs)
-
-	These rules are very regular; it would be nice for the boilerplate
-	code or Rules.make to synthesize these rules automatically.
-	But until that happens, the subdirectory Makefile needs to define
-	these rules explicitly.
 
     subdir-y subdir-m subdir-n subdir-
 
@@ -1217,72 +974,7 @@ people define most variables using "new style" but then fall back to
 	This means nls should be added to (subdir-y) and $(subdir-m) if
 	CONFIG_NFS = y.
 
---- 8.2 Converting to old-style
-
-	The following example is taken from drivers/usb/Makefile.
-	Note that this uses MIX_OBJS to avoid the need for OX_OBJS and
-	MX_OBJS and thus to maintain the ordering of objects in $(obj-y)
-
-		# Translate to Rules.make lists.
-		multi-used	:= $(filter $(list-multi), $(obj-y) $(obj-m))
-		multi-objs	:= $(foreach m, $(multi-used), $($(basename $(m))-objs))
-		active-objs	:= $(sort $(multi-objs) $(obj-y) $(obj-m))
-
-		O_OBJS		:= $(obj-y)
-		M_OBJS		:= $(obj-m)
-		MIX_OBJS	:= $(filter $(export-objs), $(active-objs))
-
-	An example for libraries from drivers/acorn/scsi/Makefile:
-
-		# Translate to Rules.make lists.
-
-		L_OBJS		:= $(filter-out $(export-objs), $(obj-y))
-		LX_OBJS		:= $(filter     $(export-objs), $(obj-y))
-		M_OBJS		:= $(sort $(filter-out $(export-objs), $(obj-m)))
-		MX_OBJS		:= $(sort $(filter     $(export-objs), $(obj-m)))
-
-	As ordering is not so important in libraries, this still uses
-	LX_OBJS and MX_OBJS, though (presumably) it could be changed to
-	use MIX_OBJS as follows:
-
-		active-objs	:= $(sort $(obj-y) $(obj-m))
-		L_OBJS		:= $(obj-y)
-		M_OBJS		:= $(obj-m)
-		MIX_OBJS	:= $(filter $(export-objs), $(active-objs))
-		
-
-	which is clearly shorted and arguably clearer.
-
-=== 9 Compatibility with Linux Kernel 2.2
-
-Most of the information in this document also applies to 2.2, although
-there is no indication of which things have changed when.  Here are some
-hints for writing subdirectory Makefiles that are compatible with Linux
-kernel 2.2.
-
-You can write either an old-style Makefile or a new-style Makefile
-with a boilerplate adapter section.  See the 2.2 version of
-drivers/sound/Makefile for a copy of the boilerplate code.
-
-In 2.2, Rules.make makes a distinction between $(MOD_SUB_DIRS)
-and $(MOD_IN_SUB_DIRS).  If you have a single directory with no
-subdirectories, this will not matter to you.  If you have a whole
-tree, then you need to know the difference between $(MOD_SUB_DIRS)
-and $(MOD_IN_SUB_DIRS).  For example code: $(MOD_SUB_DIRS) is used
-extensively in fs/Makefile; $(MOD_IN_SUB_DIRS) is used extensively in
-drivers/net/Makefile.
-
-If you are already using MOD_LIST_NAME, go ahead and keep using it.
-If you don't already have a MOD_LIST_NAME, go ahead and keep not using
-one; your module will be a 'misc' module in 2.2.
-
-Assembly language rules were a mess in 2.2.  If you have assembly language
-files, this author recommends that you write your own explicit rules
-for each file by name.
-
-
-
-=== 10 Credits
+=== 9 Credits
 
 Thanks to the members of the linux-kbuild mailing list for reviewing
 drafts of this document, with particular thanks to Peter Samuelson
