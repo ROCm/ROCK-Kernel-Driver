@@ -36,6 +36,7 @@
 #include <linux/delay.h>
 #include <linux/bootmem.h>
 #include <linux/highmem.h>
+#include <linux/idr.h>
 
 #include <asm/pgalloc.h>
 #include <asm/page.h>
@@ -62,8 +63,6 @@
 #include <asm/iommu.h>
 #include <asm/abs_addr.h>
 
-
-struct mmu_context_queue_t mmu_context_queue;
 int mem_init_done;
 unsigned long ioremap_bot = IMALLOC_BASE;
 static unsigned long phbs_io_bot = PHBS_IO_BASE;
@@ -477,6 +476,59 @@ void free_initrd_mem(unsigned long start, unsigned long end)
 }
 #endif
 
+static spinlock_t mmu_context_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_IDR(mmu_context_idr);
+
+int init_new_context(struct task_struct *tsk, struct mm_struct *mm)
+{
+	int index;
+	int err;
+
+again:
+	if (!idr_pre_get(&mmu_context_idr, GFP_KERNEL))
+		return -ENOMEM;
+
+	spin_lock(&mmu_context_lock);
+	err = idr_get_new(&mmu_context_idr, NULL, &index);
+	spin_unlock(&mmu_context_lock);
+
+	if (err == -EAGAIN)
+		goto again;
+	else if (err)
+		return err;
+
+	if (index > MAX_CONTEXT) {
+		idr_remove(&mmu_context_idr, index);
+		return -ENOMEM;
+	}
+
+	mm->context.id = index;
+
+	return 0;
+}
+
+void destroy_context(struct mm_struct *mm)
+{
+	spin_lock(&mmu_context_lock);
+	idr_remove(&mmu_context_idr, mm->context.id);
+	spin_unlock(&mmu_context_lock);
+
+	mm->context.id = NO_CONTEXT;
+}
+
+static int __init mmu_context_init(void)
+{
+	int index;
+
+	/* Reserve the first (invalid) context*/
+	idr_pre_get(&mmu_context_idr, GFP_KERNEL);
+	idr_get_new(&mmu_context_idr, NULL, &index);
+	BUG_ON(0 != index);
+
+	return 0;
+}
+arch_initcall(mmu_context_init);
+
 /*
  * Do very early mm setup.
  */
@@ -485,17 +537,6 @@ void __init mm_init_ppc64(void)
 	unsigned long i;
 
 	ppc64_boot_msg(0x100, "MM Init");
-
-	/* Reserve all contexts < FIRST_USER_CONTEXT for kernel use.
-	 * The range of contexts [FIRST_USER_CONTEXT, NUM_USER_CONTEXT)
-	 * are stored on a stack/queue for easy allocation and deallocation.
-	 */
-	mmu_context_queue.lock = SPIN_LOCK_UNLOCKED;
-	mmu_context_queue.head = 0;
-	mmu_context_queue.tail = NUM_USER_CONTEXT-1;
-	mmu_context_queue.size = NUM_USER_CONTEXT;
-	for (i = 0; i < NUM_USER_CONTEXT; i++)
-		mmu_context_queue.elements[i] = i + FIRST_USER_CONTEXT;
 
 	/* This is the story of the IO hole... please, keep seated,
 	 * unfortunately, we are out of oxygen masks at the moment.
