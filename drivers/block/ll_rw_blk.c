@@ -2121,23 +2121,20 @@ get_rq:
 		goto again;
 	}
 
+	req->flags |= REQ_CMD;
+
 	/*
-	 * first three bits are identical in rq->flags and bio->bi_rw,
-	 * see bio.h and blkdev.h
+	 * inherit FAILFAST from bio and don't stack up
+	 * retries for read ahead
 	 */
-	req->flags = (bio->bi_rw & 7) | REQ_CMD;
+	if (ra || test_bit(BIO_RW_FAILFAST, &bio->bi_rw))	
+		req->flags |= REQ_FAILFAST;
 
 	/*
 	 * REQ_BARRIER implies no merging, but lets make it explicit
 	 */
 	if (barrier)
 		req->flags |= (REQ_HARDBARRIER | REQ_NOMERGE);
-
-	/*
-	 * don't stack up retries for read ahead
-	 */
-	if (ra)
-		req->flags |= REQ_FAILFAST;
 
 	req->errors = 0;
 	req->hard_sector = req->sector = sector;
