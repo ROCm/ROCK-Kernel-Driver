@@ -258,6 +258,7 @@ out_cleanup:
 	return ERR_PTR(-EAGAIN);
 
 out_freectx:
+	mmdrop(mm);
 	kmem_cache_free(kioctx_cachep, ctx);
 	ctx = ERR_PTR(-ENOMEM);
 
