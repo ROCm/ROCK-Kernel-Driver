@@ -210,12 +210,11 @@ static void __init xd_geninit (void)
 
 		printk("Detected a%s controller (type %d) at address %06x\n",
 			xd_sigs[controller].name,controller,address);
-		if (check_region(xd_iobase,4)) {
+		if (!request_region(xd_iobase,4,"xd")) {
 			printk("xd: Ports at 0x%x are not available\n",
 				xd_iobase);
 			return;
 		}
-		request_region(xd_iobase,4,"xd");
 		if (controller)
 			xd_sigs[controller].init_controller(address);
 		xd_drives = xd_initdrives(xd_sigs[controller].init_drive);
