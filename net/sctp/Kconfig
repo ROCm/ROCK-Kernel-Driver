@@ -16,7 +16,7 @@ config IP_SCTP
 	---help---
 	  Stream Control Transmission Protocol
 
-	  From RFC 2960 (http://www.ietf.org/rfc/rfc2960.txt)
+	  From RFC 2960 <http://www.ietf.org/rfc/rfc2960.txt>.
 
 	  "SCTP is a reliable transport protocol operating on top of a
 	  connectionless packet network such as IP.  It offers the following
