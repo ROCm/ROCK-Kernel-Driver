@@ -472,10 +472,6 @@ err_alloc_etherdev:
  * that it should release a PCI device.  The could be caused by a
  * Hot-Plug event, or because the driver is going to be removed from
  * memory.
- *
- * This routine is also called to clean up from a failure in
- * e1000_probe.  The Adapter struct and netdev will always exist,
- * all other pointers must be checked for NULL before freeing.
  **/
 
 static void __devexit
@@ -675,9 +671,6 @@ e1000_close(struct net_device *netdev)
  * @adapter: board private structure
  *
  * Return 0 on success, negative on failure
- *
- * e1000_setup_tx_resources allocates all software transmit resources
- * and enabled the Tx unit of the MAC.
  **/
 
 static int
@@ -783,13 +776,10 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 }
 
 /**
- * e1000_setup_rx_resources - allocate Rx resources (Descriptors, receive SKBs)
+ * e1000_setup_rx_resources - allocate Rx resources (Descriptors)
  * @adapter: board private structure
  *
  * Returns 0 on success, negative on failure
- *
- * e1000_setup_rx_resources allocates all software receive resources
- * and network buffers, and enables the Rx unit of the MAC.
  **/
 
 static int
@@ -1728,7 +1718,6 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 	while(i && (icr = E1000_READ_REG(&adapter->hw, ICR))) {
 
 		if(icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
-			/* run the watchdog ASAP */
 			adapter->hw.get_link_status = 1;
 			mod_timer(&adapter->watchdog_timer, jiffies);
 		}

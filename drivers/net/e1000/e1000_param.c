@@ -152,7 +152,7 @@ E1000_PARAM(Duplex, "Duplex setting");
 
 /* Auto-negotiation Advertisement Override
  *
- * Valid Range: 0x00-0x0F, 0x20-0x2F
+ * Valid Range: 0x01-0x0F, 0x20-0x2F
  *
  * The AutoNeg value is a bit mask describing which speed and duplex
  * combinations should be advertised during auto-negotiation.
