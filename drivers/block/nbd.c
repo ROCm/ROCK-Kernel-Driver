@@ -588,18 +588,22 @@ static int nbd_ioctl(struct inode *inode, struct file *file,
 		}
 		return error;
 	case NBD_SET_BLKSIZE:
-		if ((arg & (arg-1)) || (arg < 512) || (arg > PAGE_SIZE))
-			return -EINVAL;
 		lo->blksize = arg;
-		lo->bytesize &= ~(lo->blksize-1); 
+		lo->bytesize &= ~(lo->blksize-1);
+		inode->i_bdev->bd_inode->i_size = lo->bytesize;
+		set_blocksize(inode->i_bdev, lo->blksize);
 		set_capacity(lo->disk, lo->bytesize >> 9);
 		return 0;
 	case NBD_SET_SIZE:
-		lo->bytesize = arg & ~(lo->blksize-1); 
+		lo->bytesize = arg & ~(lo->blksize-1);
+		inode->i_bdev->bd_inode->i_size = lo->bytesize;
+		set_blocksize(inode->i_bdev, lo->blksize);
 		set_capacity(lo->disk, lo->bytesize >> 9);
 		return 0;
 	case NBD_SET_SIZE_BLOCKS:
 		lo->bytesize = ((u64) arg) * lo->blksize;
+		inode->i_bdev->bd_inode->i_size = lo->bytesize;
+		set_blocksize(inode->i_bdev, lo->blksize);
 		set_capacity(lo->disk, lo->bytesize >> 9);
 		return 0;
 	case NBD_DO_IT:
