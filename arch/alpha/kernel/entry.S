@@ -888,15 +888,6 @@ sys_pipe:
 .end sys_pipe
 
 	.align	4
-	.globl	alpha_create_module
-	.ent	alpha_create_module
-alpha_create_module:
-	.prologue 0
-	mov	$sp, $18
-	jmp	$31, do_alpha_create_module
-.end alpha_create_module
-
-	.align	4
 	.globl	sys_ptrace
 	.ent	sys_ptrace
 sys_ptrace:
