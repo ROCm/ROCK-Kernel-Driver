@@ -594,6 +594,7 @@ static inline void forget_original_parent(struct task_struct * father)
  */
 static void exit_notify(struct task_struct *tsk)
 {
+	int state;
 	struct task_struct *t;
 
 	if (signal_pending(tsk) && !tsk->signal->group_exit
@@ -687,8 +688,12 @@ static void exit_notify(struct task_struct *tsk)
 		do_notify_parent(tsk, SIGCHLD);
 	}
 
-	tsk->state = TASK_ZOMBIE;
+	state = TASK_ZOMBIE;
+	if (tsk->exit_signal == -1 && tsk->ptrace == 0)
+		state = TASK_DEAD;
+	tsk->state = state;
 	tsk->flags |= PF_DEAD;
+
 	/*
 	 * In the preemption case it must be impossible for the task
 	 * to get runnable again, so use "_raw_" unlock to keep
@@ -703,6 +708,11 @@ static void exit_notify(struct task_struct *tsk)
 	 */
 	_raw_write_unlock(&tasklist_lock);
 	local_irq_enable();
+
+	/* If the process is dead, release it - nobody will wait for it */
+	if (state == TASK_DEAD)
+		release_task(tsk);
+
 }
 
 NORET_TYPE void do_exit(long code)
@@ -751,10 +761,6 @@ NORET_TYPE void do_exit(long code)
 
 	tsk->exit_code = code;
 	exit_notify(tsk);
-
-	if (tsk->exit_signal == -1 && tsk->ptrace == 0)
-		release_task(tsk);
-
 	schedule();
 	BUG();
 	/* Avoid "noreturn function does return".  */
