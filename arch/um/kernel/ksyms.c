@@ -14,6 +14,7 @@
 #include "asm/processor.h"
 #include "asm/unistd.h"
 #include "asm/pgalloc.h"
+#include "asm/pgtable.h"
 #include "asm/page.h"
 #include "asm/tlbflush.h"
 #include "kern_util.h"
@@ -42,7 +43,11 @@ EXPORT_SYMBOL(page_to_phys);
 EXPORT_SYMBOL(phys_to_page);
 EXPORT_SYMBOL(high_physmem);
 EXPORT_SYMBOL(empty_zero_page);
+EXPORT_SYMBOL(um_virt_to_phys);
+EXPORT_SYMBOL(mode_tt);
+EXPORT_SYMBOL(handle_page_fault);
 
+EXPORT_SYMBOL(os_getpid);
 EXPORT_SYMBOL(os_open_file);
 EXPORT_SYMBOL(os_read_file);
 EXPORT_SYMBOL(os_write_file);
@@ -75,7 +80,6 @@ EXPORT_SYMBOL_NOVERS(__write_lock_failed);
 extern void FASTCALL( __read_lock_failed(rwlock_t *rw));
 EXPORT_SYMBOL_NOVERS(__read_lock_failed);
 
-EXPORT_SYMBOL(smp_num_cpus);
 #endif
 
 #ifdef CONFIG_HIGHMEM

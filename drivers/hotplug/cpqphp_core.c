@@ -488,6 +488,8 @@ static int get_slot_mapping (struct pci_bus *bus, u8 bus_num, u8 dev_num, u8 *sl
 	bridgeSlot = 0xFF;
 
 	PCIIRQRoutingInfoLength = pcibios_get_irq_routing_table();
+	if (!PCIIRQRoutingInfoLength)
+		return -1;
 
 	len = (PCIIRQRoutingInfoLength->size -
 	       sizeof(struct irq_routing_table)) / sizeof(struct irq_info);

@@ -8,7 +8,7 @@
 
 #include "uml-config.h"
 
-#ifdef CONFIG_MODE_TT
+#ifdef UML_CONFIG_MODE_TT
 #include "sysdep/sc.h"
 #endif
 

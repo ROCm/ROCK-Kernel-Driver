@@ -7,7 +7,8 @@
 #define __FRAME_I386_H
 
 struct arch_frame_data_raw {
-	unsigned long sc_end;
+	unsigned long fp_start;
+	unsigned long sr;
 };
 
 struct arch_frame_data {

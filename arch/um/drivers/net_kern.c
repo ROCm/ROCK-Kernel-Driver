@@ -368,22 +368,22 @@ static int eth_configure(int n, void *init, char *mac,
 	 */
 	save = lp->user[0];
 	*lp = ((struct uml_net_private) 
-		{ list : 		LIST_HEAD_INIT(lp->list),
-		  lock :		SPIN_LOCK_UNLOCKED,
-		  dev :			dev,
-		  fd :			-1,
-		  mac :			{ 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0},
-		  have_mac :		device->have_mac,
-		  protocol :		transport->kern->protocol,
-		  open :		transport->user->open,
-		  close :		transport->user->close,
-		  remove :		transport->user->remove,
-		  read :		transport->kern->read,
-		  write :		transport->kern->write,
-		  add_address :		transport->user->add_address,
-		  delete_address : 	transport->user->delete_address,
-		  set_mtu :		transport->user->set_mtu,
-		  user : 		{ save } });
+		{ .list  		= LIST_HEAD_INIT(lp->list),
+		  .lock 		= SPIN_LOCK_UNLOCKED,
+		  .dev 			= dev,
+		  .fd 			= -1,
+		  .mac 			= { 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0},
+		  .have_mac 		= device->have_mac,
+		  .protocol 		= transport->kern->protocol,
+		  .open 		= transport->user->open,
+		  .close 		= transport->user->close,
+		  .remove 		= transport->user->remove,
+		  .read 		= transport->kern->read,
+		  .write 		= transport->kern->write,
+		  .add_address 		= transport->user->add_address,
+		  .delete_address  	= transport->user->delete_address,
+		  .set_mtu 		= transport->user->set_mtu,
+		  .user  		= { save } });
 	init_timer(&lp->tl);
 	lp->tl.function = uml_net_user_timer_expire;
 	memset(&lp->stats, 0, sizeof(lp->stats));
@@ -542,9 +542,9 @@ static int eth_setup(char *str)
 		printk("eth_init : alloc_bootmem failed\n");
 		return(1);
 	}
-	*new = ((struct eth_init) { list : 	LIST_HEAD_INIT(new->list),
-				    index : 	n,
-				    init :	str });
+	*new = ((struct eth_init) { .list  	= LIST_HEAD_INIT(new->list),
+				    .index  	= n,
+				    .init 	= str });
 	list_add_tail(&new->list, &eth_cmd_line);
 	return(1);
 }
@@ -618,9 +618,10 @@ static int net_remove(char *str)
 }
 
 static struct mc_device net_mc = {
-	name:		"eth",
-	config:		net_config,
-	remove:		net_remove,
+	.name		= "eth",
+	.config		= net_config,
+	.get_config	= NULL,
+	.remove		= net_remove,
 };
 
 static int uml_inetaddr_event(struct notifier_block *this, unsigned long event,
@@ -662,7 +663,7 @@ static int uml_inetaddr_event(struct notifier_block *this, unsigned long event,
 }
 
 struct notifier_block uml_inetaddr_notifier = {
-	notifier_call:		uml_inetaddr_event,
+	.notifier_call		= uml_inetaddr_event,
 };
 
 static int uml_net_init(void)

@@ -435,6 +435,8 @@ static int PCI_GetBusDevHelper(struct controller *ctrl, u8 *bus_num, u8 *dev_num
 	u8 tbus, tdevice, tslot;
 
 	PCIIRQRoutingInfoLength = pcibios_get_irq_routing_table();
+	if (!PCIIRQRoutingInfoLength)
+		return -1;
 
 	len = (PCIIRQRoutingInfoLength->size -
 	       sizeof(struct irq_routing_table)) / sizeof(struct irq_info);
@@ -1191,7 +1193,7 @@ int cpqhp_configure_board(struct controller *ctrl, struct pci_func * func)
 				if (temp != func->config_space[cloop >> 2]) {
 					dbg("Config space compare failure!!! offset = %x\n", cloop);
 					dbg("bus = %x, device = %x, function = %x\n", func->bus, func->device, func->function);
-					dbg("temp = %x, config space = %x\n\n", temp, func->config_space[cloop]);
+					dbg("temp = %x, config space = %x\n\n", temp, func->config_space[cloop >> 2]);
 					return 1;
 				}
 			}

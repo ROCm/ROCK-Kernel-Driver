@@ -42,7 +42,7 @@ static int pollfds_size = 0;
 
 extern int io_count, intr_count;
 
-void sigio_handler(int sig, struct uml_pt_regs *regs)
+void sigio_handler(int sig, union uml_pt_regs *regs)
 {
 	struct irq_fd *irq_fd, *next;
 	int i, n;
@@ -128,15 +128,15 @@ int activate_fd(int irq, int fd, int type, void *dev_id)
 
 	if(type == IRQ_READ) events = POLLIN | POLLPRI;
 	else events = POLLOUT;
-	*new_fd = ((struct irq_fd) { next : 		NULL,
-				     id :		dev_id,
-				     fd :		fd,
-				     type :		type,
-				     irq :		irq,
-				     pid : 		pid,
-				     events :		events,
-				     current_events: 	0,
-				     freed :		0  } );
+	*new_fd = ((struct irq_fd) { .next  		= NULL,
+				     .id 		= dev_id,
+				     .fd 		= fd,
+				     .type 		= type,
+				     .irq 		= irq,
+				     .pid  		= pid,
+				     .events 		= events,
+				     .current_events 	= 0,
+				     .freed 		= 0  } );
 
 	/* Critical section - locked by a spinlock because this stuff can
 	 * be changed from interrupt handlers.  The stuff above is done 
@@ -191,9 +191,9 @@ int activate_fd(int irq, int fd, int type, void *dev_id)
 	if(type == IRQ_WRITE) 
 		fd = -1;
 
-	pollfds[pollfds_num] = ((struct pollfd) { fd :	fd,
-						  events :	events,
-						  revents :	0 });
+	pollfds[pollfds_num] = ((struct pollfd) { .fd 	= fd,
+						  .events 	= events,
+						  .revents 	= 0 });
 	pollfds_num++;
 
 	*last_irq_ptr = new_fd;
@@ -265,8 +265,8 @@ static int same_irq_and_dev(struct irq_fd *irq, void *d)
 
 void free_irq_by_irq_and_dev(int irq, void *dev)
 {
-	struct irq_and_dev data = ((struct irq_and_dev) { irq : irq,
-							  dev : dev });
+	struct irq_and_dev data = ((struct irq_and_dev) { .irq  = irq,
+							  .dev  = dev });
 
 	free_irq_by_cb(same_irq_and_dev, &data);
 }

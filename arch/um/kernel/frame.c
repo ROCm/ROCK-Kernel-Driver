@@ -78,7 +78,8 @@ static int capture_stack(int (*child)(void *arg), void *arg, void *sp,
 
 	/* It has outlived its usefulness, so continue it so it can exit */
 	if(ptrace(PTRACE_CONT, pid, 0, 0) < 0){
-		printf("capture_stack : mmap failed - errno = %d\n", errno);
+		printf("capture_stack : PTRACE_CONT failed - errno = %d\n", 
+		       errno);
 		exit(1);
 	}
 	if(waitpid(pid, &status, 0) < 0){
@@ -110,6 +111,7 @@ struct common_raw {
 	unsigned long sig;
 	unsigned long sr;
 	unsigned long sp;	
+	struct arch_frame_data_raw arch;
 };
 
 #define SA_RESTORER (0x04000000)
@@ -173,7 +175,6 @@ struct sc_frame_raw {
 	struct common_raw common;
 	unsigned long sc;
 	int restorer;
-	struct arch_frame_data_raw arch;
 };
 
 /* Changed only during early boot */
@@ -185,7 +186,8 @@ static void sc_handler(int sig, struct sigcontext sc)
 	raw_sc->common.sr = frame_restorer();
 	raw_sc->common.sp = frame_sp();
 	raw_sc->sc = (unsigned long) &sc;
-	setup_arch_frame_raw(&raw_sc->arch, &sc);
+	setup_arch_frame_raw(&raw_sc->common.arch, &sc + 1, raw_sc->common.sr);
+
 	os_stop_process(os_getpid());
 	kill(getpid(), SIGKILL);
 }
@@ -205,18 +207,25 @@ struct si_frame_raw {
 	struct common_raw common;
 	unsigned long sip;
 	unsigned long si;
+	unsigned long ucp;
+	unsigned long uc;
 };
 
 /* Changed only during early boot */
 static struct si_frame_raw *raw_si = NULL;
 
-static void si_handler(int sig, siginfo_t *si)
+static void si_handler(int sig, siginfo_t *si, struct ucontext *ucontext)
 {
 	raw_si->common.sig = (unsigned long) &sig;
 	raw_si->common.sr = frame_restorer();
 	raw_si->common.sp = frame_sp();
 	raw_si->sip = (unsigned long) &si;
 	raw_si->si = (unsigned long) si;
+	raw_si->ucp = (unsigned long) &ucontext;
+	raw_si->uc = (unsigned long) ucontext;
+	setup_arch_frame_raw(&raw_si->common.arch, 
+			     ucontext->uc_mcontext.fpregs, raw_si->common.sr);
+	
 	os_stop_process(os_getpid());
 	kill(getpid(), SIGKILL);
 }
@@ -292,7 +301,7 @@ void capture_signal_stack(void)
 				    &signal_frame_sc.common);
 
 	signal_frame_sc.sc_index = raw_sc.sc - base;
-	setup_arch_frame(&raw_sc.arch, &signal_frame_sc.arch);
+	setup_arch_frame(&raw_sc.common.arch, &signal_frame_sc.common.arch);
 
 	/* Ditto for the sigcontext, sigrestorer layout */
 	raw_sc.restorer = 1;
@@ -300,6 +309,7 @@ void capture_signal_stack(void)
 				    (void *) top, sigstack, PAGE_SIZE, 
 				    &signal_frame_sc_sr.common);
 	signal_frame_sc_sr.sc_index = raw_sc.sc - base;
+	setup_arch_frame(&raw_sc.common.arch, &signal_frame_sc_sr.common.arch);
 
 	/* And the siginfo layout */
 
@@ -308,6 +318,9 @@ void capture_signal_stack(void)
 				    &signal_frame_si.common);
 	signal_frame_si.sip_index = raw_si.sip - base;
 	signal_frame_si.si_index = raw_si.si - base;
+	signal_frame_si.ucp_index = raw_si.ucp - base;
+	signal_frame_si.uc_index = raw_si.uc - base;
+	setup_arch_frame(&raw_si.common.arch, &signal_frame_si.common.arch);
 
 	if((munmap(stack, PAGE_SIZE) < 0) || 
 	   (munmap(sigstack, PAGE_SIZE) < 0)){

@@ -3,7 +3,12 @@
  * Licensed under the GPL
  */
 
+#ifndef __UMID_H__
+#define __UMID_H__
+
 extern int umid_file_name(char *name, char *buf, int len);
+
+#endif
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

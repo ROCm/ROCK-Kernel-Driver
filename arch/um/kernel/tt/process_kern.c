@@ -6,6 +6,7 @@
 #include "linux/sched.h"
 #include "linux/signal.h"
 #include "linux/kernel.h"
+#include "linux/interrupt.h"
 #include "asm/system.h"
 #include "asm/pgalloc.h"
 #include "asm/ptrace.h"
@@ -111,7 +112,7 @@ void exit_thread_tt(void)
 	close(current->thread.mode.tt.switch_pipe[1]);
 }
 
-extern void schedule_tail(struct task_struct *prev);
+void schedule_tail(task_t *prev);
 
 static void new_thread_handler(int sig)
 {
@@ -120,13 +121,13 @@ static void new_thread_handler(int sig)
 
 	fn = current->thread.request.u.thread.proc;
 	arg = current->thread.request.u.thread.arg;
-	current->thread.regs.regs.mode.tt = (void *) (&sig + 1);
+	UPT_SC(&current->thread.regs.regs) = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.mode.tt.switch_pipe[0]);
 
 	block_signals();
 	init_new_thread_signals(1);
 #ifdef CONFIG_SMP
-	schedule_tail(NULL);
+	schedule_tail(current->thread.prev_sched);
 #endif
 	enable_timer();
 	free_page(current->thread.temp_stack);
@@ -160,7 +161,7 @@ static int new_thread_proc(void *stack)
 
 void finish_fork_handler(int sig)
 {
-	current->thread.regs.regs.mode.tt = (void *) (&sig + 1);
+ 	UPT_SC(&current->thread.regs.regs) = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.mode.tt.switch_pipe[0]);
 
 #ifdef CONFIG_SMP	
@@ -168,6 +169,7 @@ void finish_fork_handler(int sig)
 #endif
 	enable_timer();
 	change_sig(SIGVTALRM, 1);
+	local_irq_enable();
 	force_flush_all();
 	if(current->mm != current->parent->mm)
 		protect_memory(uml_reserved, high_physmem - uml_reserved, 1, 
@@ -187,6 +189,7 @@ int fork_tramp(void *stack)
 {
 	int sig = sigusr1;
 
+	local_irq_disable();
 	init_new_thread_stack(stack, finish_fork_handler);
 
 	kill(os_getpid(), sig);
@@ -232,10 +235,10 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 	}
 
 	if(current->thread.forking){
-		sc_to_sc(p->thread.regs.regs.mode.tt, 
-			 current->thread.regs.regs.mode.tt);
-		SC_SET_SYSCALL_RETURN(p->thread.regs.regs.mode.tt, 0);
-		if(sp != 0) SC_SP(p->thread.regs.regs.mode.tt) = sp;
+		sc_to_sc(UPT_SC(&p->thread.regs.regs), 
+			 UPT_SC(&current->thread.regs.regs));
+		SC_SET_SYSCALL_RETURN(UPT_SC(&p->thread.regs.regs), 0);
+		if(sp != 0) SC_SP(UPT_SC(&p->thread.regs.regs)) = sp;
 	}
 	p->thread.mode.tt.extern_pid = new_pid;
 
@@ -367,11 +370,14 @@ __uml_setup("jail", jail_setup,
 static void mprotect_kernel_mem(int w)
 {
 	unsigned long start, end;
+	int pages;
 
 	if(!jail || (current == &init_task)) return;
 
+	pages = (1 << CONFIG_KERNEL_STACK_ORDER);
+
 	start = (unsigned long) current->thread_info + PAGE_SIZE;
-	end = (unsigned long) current->thread_info + PAGE_SIZE * 4;
+	end = (unsigned long) current + PAGE_SIZE * pages;
 	protect_memory(uml_reserved, start - uml_reserved, 1, w, 1, 1);
 	protect_memory(end, high_physmem - end, 1, w, 1, 1);
 
@@ -470,8 +476,10 @@ void clear_singlestep(void *t)
 int start_uml_tt(void)
 {
 	void *sp;
+	int pages;
 
-	sp = (void *) init_task.thread.kernel_stack + 2 * PAGE_SIZE - 
+	pages = (1 << CONFIG_KERNEL_STACK_ORDER) - 2;
+	sp = (void *) init_task.thread.kernel_stack + pages * PAGE_SIZE - 
 		sizeof(unsigned long);
 	return(tracer(start_kernel_proc, sp));
 }

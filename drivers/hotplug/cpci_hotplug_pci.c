@@ -395,6 +395,8 @@ static int cpci_configure_bridge(struct pci_bus* bus, struct pci_dev* dev)
 	/* Scan behind bridge */
 	n = pci_scan_bridge(bus, dev, max, 2);
 	child = pci_find_bus(max + 1);
+	if (!child)
+		return -ENODEV;
 #ifdef CONFIG_PROC_FS
 	pci_proc_attach_bus(child);
 #endif

@@ -25,9 +25,11 @@ struct openflags {
 	unsigned int t : 1;	/* O_TRUNC */
 	unsigned int a : 1;	/* O_APPEND */
 	unsigned int e : 1;	/* O_EXCL */
+	unsigned int cl : 1;    /* FD_CLOEXEC */
 };
 
-#define OPENFLAGS() ((struct openflags) { r : 0, w : 0, c : 0, s : 0 })
+#define OPENFLAGS() ((struct openflags) { .r = 0, .w = 0, .s = 0, .c = 0, \
+ 					  .t = 0, .a = 0, .e = 0, .cl = 0 })
 
 static inline struct openflags of_read(struct openflags flags)
 {
@@ -83,9 +85,16 @@ static inline struct openflags of_excl(struct openflags flags)
 	return(flags); 
 }
  
+static inline struct openflags of_cloexec(struct openflags flags)
+{ 
+	flags.cl = 1; 
+	return(flags); 
+}
+  
 extern int os_seek_file(int fd, __u64 offset);
 extern int os_open_file(char *file, struct openflags flags, int mode);
-extern int os_read_file(int fd, char *buf, int len);
+extern int os_read_file(int fd, void *buf, int len);
+extern int os_write_file(int fd, void *buf, int count);
 extern int os_file_size(char *file, long long *size_out);
 extern int os_pipe(int *fd, int stream, int close_on_exec);
 extern int os_set_fd_async(int fd, int owner);
@@ -98,7 +107,6 @@ extern int create_unix_socket(char *file, int len);
 extern int os_connect_socket(char *name);
 extern int os_file_type(char *file);
 extern int os_file_mode(char *file, struct openflags *mode_out);
-extern int os_write_file(int fd, char *buf, int count);
 
 extern unsigned long os_process_pc(int pid);
 extern int os_process_parent(int pid);
