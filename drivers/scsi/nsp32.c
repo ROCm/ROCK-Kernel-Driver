@@ -283,7 +283,6 @@ static const char *nsp32_info(struct Scsi_Host *);
 static int nsp32_eh_abort(Scsi_Cmnd *);
 static int nsp32_eh_bus_reset(Scsi_Cmnd *);
 static int nsp32_eh_host_reset(Scsi_Cmnd *);
-static int nsp32_reset(Scsi_Cmnd *, unsigned int);
 static int nsp32_proc_info(struct Scsi_Host *, char *, char **, off_t, int, int);
 static int __devinit nsp32_probe(struct pci_dev *, const struct pci_device_id *);
 static void __devexit nsp32_remove(struct pci_dev *);
@@ -1853,18 +1852,6 @@ static const char *nsp32_info(struct Scsi_Host *shpnt)
 	return data->info_str;
 }
 
-
-/*
- * error handler
- */
-static int nsp32_reset(Scsi_Cmnd *SCpnt, unsigned int reset_flags)
-{
-	nsp32_dbg(NSP32_DEBUG_BUSRESET, "SCpnt=0x%p why=%d\n", SCpnt, reset_flags);
-
-	nsp32_eh_bus_reset(SCpnt);
-
-	return SCSI_RESET_SUCCESS | SCSI_RESET_BUS_RESET;
-}
 
 static int nsp32_eh_abort(Scsi_Cmnd *SCpnt)
 {
