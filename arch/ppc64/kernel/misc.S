@@ -587,7 +587,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_settimeofday
 	.llong .sys32_getgroups	        /* 80 */
 	.llong .sys32_setgroups
-	.llong .ppc32_select
+	.llong .sys_ni_syscall		/* old select syscall */
 	.llong .sys_symlink
 	.llong .sys_ni_syscall		/* old lstat syscall */
 	.llong .sys32_readlink	        /* 85 */
@@ -705,7 +705,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys_fstat64
 	.llong .sys32_pciconfig_read
 	.llong .sys32_pciconfig_write
-	.llong .sys_ni_syscall		/* 200 - reserved for sys_pciconfig_iobase */
+	.llong .sys_ni_syscall		/* 200 - old pciconfig_iobase */
 	.llong .sys_ni_syscall		/* reserved for MacOnLinux */
 	.llong .sys_getdents64
 	.llong .sys_pivot_root
@@ -830,7 +830,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_settimeofday
 	.llong .sys_getgroups		/* 80 */
 	.llong .sys_setgroups
-	.llong .sys_select
+	.llong .sys_ni_syscall		/* old select syscall */
 	.llong .sys_symlink
 	.llong .sys_ni_syscall		/* old lstat syscall */
 	.llong .sys_readlink		/* 85 */
@@ -857,7 +857,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_newstat
 	.llong .sys_newlstat
 	.llong .sys_newfstat
-	.llong .sys_uname
+	.llong .sys_ni_syscall		/* old uname syscall */
 	.llong .sys_ni_syscall		/* 110 old iopl syscall */
 	.llong .sys_vhangup
 	.llong .sys_ni_syscall		/* old idle syscall */
@@ -948,7 +948,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_ni_syscall		/* 32bit only fstat64 */
 	.llong .sys_ni_syscall		/* 32bit only pciconfig_read */
 	.llong .sys_ni_syscall		/* 32bit only pciconfig_write */
-	.llong .sys_ni_syscall		/* 200 - reserved - sys_pciconfig_iobase */
+	.llong .sys_ni_syscall		/* 200 - old pciconfig_iobase */
 	.llong .sys_ni_syscall		/* reserved for MacOnLinux */
 	.llong .sys_getdents64
 	.llong .sys_pivot_root

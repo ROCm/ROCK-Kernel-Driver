@@ -2361,10 +2361,14 @@ static long do_sys32_semctl(int first, int second, int third, void *uptr)
 			set_fs(old_fs);
 		}
 		break;
+	default:
+		err = -EINVAL;
 	}
 out:
 	return err;
 }
+
+#define MAXBUF (64*1024)
 
 static int 
 do_sys32_msgsnd(int first, int second, int third, void *uptr)
@@ -2374,14 +2378,14 @@ do_sys32_msgsnd(int first, int second, int third, void *uptr)
 	mm_segment_t old_fs;
 	int err;
 
-	if (second < 0)
+	if (second < 0 || (second >= MAXBUF-sizeof(struct msgbuf)))
 		return -EINVAL;
 
-	p = kmalloc(second + sizeof(struct msgbuf) + 4, GFP_USER);
+	p = kmalloc(second + sizeof(struct msgbuf), GFP_USER);
 	if (!p)
 		return -ENOMEM;
 	err = get_user(p->mtype, &up->mtype);
-	err |= __copy_from_user(p->mtext, &up->mtext, second);
+	err |= copy_from_user(p->mtext, &up->mtext, second);
 	if (err) {
 		err = -EFAULT;
 		goto out;
@@ -2404,35 +2408,35 @@ do_sys32_msgrcv(int first, int second, int msgtyp, int third,
 	mm_segment_t old_fs;
 	int err;
 
-	if (second < 0)
+	if (second < 0 || (second >= MAXBUF-sizeof(struct msgbuf)))
 		return -EINVAL;
 
 	if (!version) {
-		struct ipc_kludge *uipck = (struct ipc_kludge *)uptr;
-		struct ipc_kludge ipck;
+		struct ipc_kludge_32 *uipck = (struct ipc_kludge_32 *)uptr;
+		struct ipc_kludge_32 ipck;
 
 		err = -EINVAL;
 		if (!uptr)
 			goto out;
 		err = -EFAULT;
-		if (copy_from_user(&ipck, uipck, sizeof(struct ipc_kludge)))
+		if (copy_from_user(&ipck, uipck, sizeof(struct ipc_kludge_32)))
 			goto out;
 		uptr = (void *)A(ipck.msgp);
 		msgtyp = ipck.msgtyp;
 	}
 	err = -ENOMEM;
-	p = kmalloc(second + sizeof (struct msgbuf) + 4, GFP_USER);
+	p = kmalloc(second + sizeof (struct msgbuf), GFP_USER);
 	if (!p)
 		goto out;
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
-	err = sys_msgrcv(first, p, second + 4, msgtyp, third);
+	err = sys_msgrcv(first, p, second, msgtyp, third);
 	set_fs(old_fs);
 	if (err < 0)
 		goto free_then_out;
 	up = (struct msgbuf32 *)uptr;
 	if (put_user(p->mtype, &up->mtype) ||
-	    __copy_to_user(&up->mtext, p->mtext, err))
+	    copy_to_user(&up->mtext, p->mtext, err))
 		err = -EFAULT;
 free_then_out:
 	kfree(p);
@@ -2559,7 +2563,7 @@ do_sys32_shmat(int first, int second, int third, int version, void *uptr)
 static int
 do_sys32_shmctl(int first, int second, void *uptr)
 {
-	int err = -EFAULT, err2;
+	int err = -EINVAL, err2;
 	mm_segment_t old_fs;
 
 	switch (second & (~IPC_64)) {

@@ -253,14 +253,16 @@ _GLOBAL(__copy_tofrom_user)
 	addi	r4,r4,1
 	bne	1b
 	blr
-3:	srdi	r9,r5,3
+3:	cmpldi	cr1,r5,8
+	srdi	r9,r5,3
 	andi.	r5,r5,7
+	blt	cr1,93f
 	mtctr	r9
 91:	std	r0,0(r4)
 	addi	r4,r4,8
 	bdnz	91b
-	beqlr
-	mtctr	r5
+93:	beqlr
+	mtctr	r5	
 92:	stb	r0,0(r4)
 	addi	r4,r4,1
 	bdnz	92b
