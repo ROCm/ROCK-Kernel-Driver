@@ -342,6 +342,9 @@
  *    - Removed PV8630 ioctls. Use the standard ioctls instead.
  *    - Made endpoint detection more generic. Basically, only one bulk-in 
  *      endpoint is required, everything else is optional.
+ *    - New maintainer: Henning Meier-Geinitz.
+ *    - Print ids and device number when a device was detected.
+ *    - Don't print errors when the device is busy.
  *      
  * TODO
  *    - Performance
@@ -473,7 +476,7 @@ open_scanner(struct inode * inode, struct file * file)
 	}
 
 	if (scn->isopen) {
-		err("open_scanner(%d): Scanner device is already open", scn_minor);
+		dbg("open_scanner(%d): Scanner device is already open", scn_minor);
 		err = -EBUSY;
 		goto out_error;
 	}
@@ -1058,6 +1061,9 @@ probe_scanner(struct usb_interface *intf,
 				    S_IWGRP | S_IROTH | S_IWOTH, &usb_scanner_fops, NULL);
 	if (scn->devfs == NULL)
 		dbg("scanner%d: device node registration failed", scn_minor);
+
+	info ("USB scanner device (0x%04x/0x%04x) now attached to %s",
+	      dev->descriptor.idVendor, dev->descriptor.idProduct, name);
 
 	up(&scn_mutex);
 
