@@ -688,9 +688,9 @@ extern void sched_balance_exec(void);
 
 extern void sched_idle_next(void);
 extern void set_user_nice(task_t *p, long nice);
-extern int task_prio(task_t *p);
-extern int task_nice(task_t *p);
-extern int task_curr(task_t *p);
+extern int task_prio(const task_t *p);
+extern int task_nice(const task_t *p);
+extern int task_curr(const task_t *p);
 extern int idle_cpu(int cpu);
 
 void yield(void);
@@ -917,7 +917,7 @@ extern void wait_task_inactive(task_t * p);
 #define while_each_thread(g, t) \
 	while ((t = next_thread(t)) != g)
 
-extern task_t * FASTCALL(next_thread(task_t *p));
+extern task_t * FASTCALL(next_thread(const task_t *p));
 
 #define thread_group_leader(p)	(p->pid == p->tgid)
 
@@ -1058,7 +1058,7 @@ extern void signal_wake_up(struct task_struct *t, int resume_stopped);
  */
 #ifdef CONFIG_SMP
 
-static inline unsigned int task_cpu(struct task_struct *p)
+static inline unsigned int task_cpu(const struct task_struct *p)
 {
 	return p->thread_info->cpu;
 }
@@ -1070,7 +1070,7 @@ static inline void set_task_cpu(struct task_struct *p, unsigned int cpu)
 
 #else
 
-static inline unsigned int task_cpu(struct task_struct *p)
+static inline unsigned int task_cpu(const struct task_struct *p)
 {
 	return 0;
 }
