@@ -100,13 +100,16 @@ MODULE_PARM_DESC (multicast_filter_limit, "8139cp maximum number of filtered mul
 #define CP_DEF_MSG_ENABLE	(NETIF_MSG_DRV		| \
 				 NETIF_MSG_PROBE 	| \
 				 NETIF_MSG_LINK)
+#define CP_NUM_STATS		14	/* struct cp_dma_stats, plus one */
+#define CP_STATS_SIZE		64	/* size in bytes of DMA stats block */
 #define CP_REGS_SIZE		(0xff + 1)
 #define CP_REGS_VER		1		/* version 1 */
 #define CP_RX_RING_SIZE		64
 #define CP_TX_RING_SIZE		64
 #define CP_RING_BYTES		\
 		((sizeof(struct cp_desc) * CP_RX_RING_SIZE) +	\
-		(sizeof(struct cp_desc) * CP_TX_RING_SIZE))
+		 (sizeof(struct cp_desc) * CP_TX_RING_SIZE) +	\
+		 CP_STATS_SIZE)
 #define NEXT_TX(N)		(((N) + 1) & (CP_TX_RING_SIZE - 1))
 #define NEXT_RX(N)		(((N) + 1) & (CP_RX_RING_SIZE - 1))
 #define TX_BUFFS_AVAIL(CP)					\
@@ -135,6 +138,7 @@ enum {
 	/* NIC register offsets */
 	MAC0		= 0x00,	/* Ethernet hardware address. */
 	MAR0		= 0x08,	/* Multicast filter. */
+	StatsAddr	= 0x10,	/* 64-bit start addr of 64-byte DMA stats blk */
 	TxRingAddr	= 0x20, /* 64-bit start addr of Tx ring */
 	HiTxRingAddr	= 0x28, /* 64-bit start addr of high priority Tx ring */
 	Cmd		= 0x37, /* Command register */
@@ -196,6 +200,9 @@ enum {
 	RxErrRunt	= (1 << 19), /* Rx error, packet < 64 bytes */
 	RxErrLong	= (1 << 21), /* Rx error, packet > 4096 bytes */
 	RxErrFIFO	= (1 << 22), /* Rx error, FIFO overflowed, pkt bad */
+
+	/* StatsAddr register */
+	DumpStats	= (1 << 3),  /* Begin stats dump */
 
 	/* RxConfig register */
 	RxCfgFIFOShift	= 13,	     /* Shift, to get Rx FIFO thresh value */
@@ -284,6 +291,22 @@ struct ring_info {
 	unsigned		frag;
 };
 
+struct cp_dma_stats {
+	u64			tx_ok;
+	u64			rx_ok;
+	u64			tx_err;
+	u32			rx_err;
+	u16			rx_fifo;
+	u16			frame_align;
+	u32			tx_ok_1col;
+	u32			tx_ok_mcol;
+	u64			rx_ok_phys;
+	u64			rx_ok_bcast;
+	u32			rx_ok_mcast;
+	u16			tx_abort;
+	u16			tx_underrun;
+} __attribute__((packed));
+
 struct cp_extra_stats {
 	unsigned long		rx_frags;
 };
@@ -312,6 +335,8 @@ struct cp_private {
 
 	struct net_device_stats net_stats;
 	struct cp_extra_stats	cp_stats;
+	struct cp_dma_stats	*nic_stats;
+	dma_addr_t		nic_stats_dma;
 
 	struct pci_dev		*pdev;
 	u32			rx_config;
@@ -372,6 +397,26 @@ static struct pci_device_id cp_pci_tbl[] __devinitdata = {
 	{ },
 };
 MODULE_DEVICE_TABLE(pci, cp_pci_tbl);
+
+static struct {
+	const char str[ETH_GSTRING_LEN];
+} ethtool_stats_keys[] = {
+	{ "tx_ok" },
+	{ "rx_ok" },
+	{ "tx_err" },
+	{ "rx_err" },
+	{ "rx_fifo" },
+	{ "frame_align" },
+	{ "tx_ok_1col" },
+	{ "tx_ok_mcol" },
+	{ "rx_ok_phys" },
+	{ "rx_ok_bcast" },
+	{ "rx_ok_mcast" },
+	{ "tx_abort" },
+	{ "tx_underrun" },
+	{ "rx_frags" },
+};
+
 
 static inline void cp_set_rxbufsize (struct cp_private *cp)
 {
@@ -949,9 +994,9 @@ static void cp_init_hw (struct cp_private *cp)
 	cpw32_f(HiTxRingAddr + 4, 0);
 
 	cpw32_f(RxRingAddr, cp->ring_dma);
-	cpw32_f(RxRingAddr + 4, 0);
+	cpw32_f(RxRingAddr + 4, 0);		/* FIXME: 64-bit PCI */
 	cpw32_f(TxRingAddr, cp->ring_dma + (sizeof(struct cp_desc) * CP_RX_RING_SIZE));
-	cpw32_f(TxRingAddr + 4, 0);
+	cpw32_f(TxRingAddr + 4, 0);		/* FIXME: 64-bit PCI */
 
 	cpw16(MultiIntr, 0);
 
@@ -1010,10 +1055,19 @@ static int cp_init_rings (struct cp_private *cp)
 
 static int cp_alloc_rings (struct cp_private *cp)
 {
-	cp->rx_ring = pci_alloc_consistent(cp->pdev, CP_RING_BYTES, &cp->ring_dma);
-	if (!cp->rx_ring)
+	void *mem;
+
+	mem = pci_alloc_consistent(cp->pdev, CP_RING_BYTES, &cp->ring_dma);
+	if (!mem)
 		return -ENOMEM;
+
+	cp->rx_ring = mem;
 	cp->tx_ring = &cp->rx_ring[CP_RX_RING_SIZE];
+
+	mem += (CP_RING_BYTES - CP_STATS_SIZE);
+	cp->nic_stats = mem;
+	cp->nic_stats_dma = cp->ring_dma + (CP_RING_BYTES - CP_STATS_SIZE);
+
 	return cp_init_rings(cp);
 }
 
@@ -1052,6 +1106,7 @@ static void cp_free_rings (struct cp_private *cp)
 	pci_free_consistent(cp->pdev, CP_RING_BYTES, cp->rx_ring, cp->ring_dma);
 	cp->rx_ring = NULL;
 	cp->tx_ring = NULL;
+	cp->nic_stats = NULL;
 }
 
 static int cp_open (struct net_device *dev)
@@ -1181,6 +1236,7 @@ static int cp_ethtool_ioctl (struct cp_private *cp, void *useraddr)
 		strcpy (info.version, DRV_VERSION);
 		strcpy (info.bus_info, cp->pdev->slot_name);
 		info.regdump_len = CP_REGS_SIZE;
+		info.n_stats = CP_NUM_STATS;
 		if (copy_to_user (useraddr, &info, sizeof (info)))
 			return -EFAULT;
 		return 0;
@@ -1356,6 +1412,83 @@ err_out_gregs:
 		else
 			cp->dev->features &= ~NETIF_F_SG;
 
+		return 0;
+	}
+
+	/* get string list(s) */
+	case ETHTOOL_GSTRINGS: {
+		struct ethtool_gstrings estr = { ETHTOOL_GSTRINGS };
+
+		if (copy_from_user(&estr, useraddr, sizeof(estr)))
+			return -EFAULT;
+		if (estr.string_set != ETH_SS_STATS)
+			return -EINVAL;
+
+		estr.len = CP_NUM_STATS;
+		if (copy_to_user(useraddr, &estr, sizeof(estr)))
+			return -EFAULT;
+		if (copy_to_user(useraddr + sizeof(estr),
+				 &ethtool_stats_keys,
+				 sizeof(ethtool_stats_keys)))
+			return -EFAULT;
+		return 0;
+	}
+
+	/* get NIC-specific statistics */
+	case ETHTOOL_GSTATS: {
+		struct ethtool_stats estats = { ETHTOOL_GSTATS };
+		u64 *tmp_stats;
+		unsigned int work = 100;
+		const unsigned int sz = sizeof(u64) * CP_NUM_STATS;
+		int i;
+
+		/* begin NIC statistics dump */
+		cpw32(StatsAddr + 4, 0); /* FIXME: 64-bit PCI */
+		cpw32(StatsAddr, cp->nic_stats_dma | DumpStats);
+		cpr32(StatsAddr);
+
+		estats.n_stats = CP_NUM_STATS;
+		if (copy_to_user(useraddr, &estats, sizeof(estats)))
+			return -EFAULT;
+
+		while (work-- > 0) {
+			if ((cpr32(StatsAddr) & DumpStats) == 0)
+				break;
+			cpu_relax();
+		}
+
+		if (cpr32(StatsAddr) & DumpStats)
+			return -EIO;
+
+		tmp_stats = kmalloc(sz, GFP_KERNEL);
+		if (!tmp_stats)
+			return -ENOMEM;
+		memset(tmp_stats, 0, sz);
+
+		i = 0;
+		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->tx_ok);
+		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->rx_ok);
+		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->tx_err);
+		tmp_stats[i++] = le32_to_cpu(cp->nic_stats->rx_err);
+		tmp_stats[i++] = le16_to_cpu(cp->nic_stats->rx_fifo);
+		tmp_stats[i++] = le16_to_cpu(cp->nic_stats->frame_align);
+		tmp_stats[i++] = le32_to_cpu(cp->nic_stats->tx_ok_1col);
+		tmp_stats[i++] = le32_to_cpu(cp->nic_stats->tx_ok_mcol);
+		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->rx_ok_phys);
+		tmp_stats[i++] = le64_to_cpu(cp->nic_stats->rx_ok_bcast);
+		tmp_stats[i++] = le32_to_cpu(cp->nic_stats->rx_ok_mcast);
+		tmp_stats[i++] = le16_to_cpu(cp->nic_stats->tx_abort);
+		tmp_stats[i++] = le16_to_cpu(cp->nic_stats->tx_underrun);
+		tmp_stats[i++] = cp->cp_stats.rx_frags;
+		if (i != CP_NUM_STATS)
+			BUG();
+
+		i = copy_to_user(useraddr + sizeof(estats),
+				 tmp_stats, sz);
+		kfree(tmp_stats);
+
+		if (i)
+			return -EFAULT;
 		return 0;
 	}
 
