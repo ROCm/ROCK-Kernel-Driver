@@ -754,6 +754,16 @@ void scsi_request_fn(request_queue_t * q)
 		if (SHpnt->in_recovery || blk_queue_plugged(q))
 			return;
 
+		if(SHpnt->host_busy == 0 && SHpnt->host_blocked) {
+			/* unblock after host_blocked iterates to zero */
+			if(--host_blocked == 0) {
+				printk("scsi%d unblocking host at zero depth\n", SHpnt->host_no);
+			} else {
+				blk_plug_device(q);
+				break;
+			}
+		}
+				
 		/*
 		 * If the device cannot accept another request, then quit.
 		 */

@@ -210,7 +210,7 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template * tpnt, int j)
     retval->eh_notify   = NULL;    /* Who we notify when we exit. */
 
 
-    retval->host_blocked = FALSE;
+    retval->host_blocked = 0;
     retval->host_self_blocked = FALSE;
 
 #ifdef DEBUG

@@ -627,7 +627,7 @@ static int scsi_mlqueue_insert(Scsi_Cmnd * cmd, int reason)
 				return 0;
 			}
 		}
-		host->host_blocked = TRUE;
+		host->host_blocked = SCSI_START_HOST_BLOCKED;
 	} else {
 		if (cmd->device->device_busy == 0) {
 			if (scsi_retry_command(cmd) == 0) {
@@ -1396,7 +1396,7 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
          * for both the queue full condition on a device, and for a
          * host full condition on the host.
          */
-        host->host_blocked = FALSE;
+        host->host_blocked = 0;
         device->device_blocked = FALSE;
 
 	/*
