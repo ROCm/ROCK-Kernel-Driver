@@ -119,7 +119,7 @@ more details, with real examples.
 		obj-y += foo.o
 
 	This tell kbuild that there is one object in that directory named
-	foo.o. foo.o will be build from foo.c or foo.S.
+	foo.o. foo.o will be built from foo.c or foo.S.
 
 	If foo.o shall be built as a module, the variable obj-m is used.
 	Therefore the following pattern is often used:
@@ -334,7 +334,7 @@ more details, with real examples.
 
 --- 3.9 Dependency tracking
 
-	Kbuild track dependencies on the following:
+	Kbuild tracks dependencies on the following:
 	1) All prerequisite files (both *.c and *.h)
 	2) CONFIG_ options used in all prerequisite files
 	3) Command-line used to compile target
@@ -411,7 +411,7 @@ Both possibilities are described in the following.
 --- 4.2 Composite Host Programs
 
 	Host programs can be made up based on composite objects.
-	The syntax used to define composite objetcs for host programs is
+	The syntax used to define composite objects for host programs is
 	similar to the syntax used for kernel objects.
 	$(<executeable>-objs) list all objects used to link the final
 	executable.
@@ -811,7 +811,7 @@ When kbuild executes the following steps are followed (roughly):
 
     extra-y
 
-	extra-y specify additional targets created in current
+	extra-y specify additional targets created in the current
 	directory, in addition to any targets specified by obj-*.
 
 	Listing all targets in extra-y is required for two purposes:
@@ -829,7 +829,7 @@ When kbuild executes the following steps are followed (roughly):
 	
 --- 6.6 Commands useful for building a boot image
 
-	Kbuild provide a few macros that are useful when building a
+	Kbuild provides a few macros that are useful when building a
 	boot image.
 
     if_changed
@@ -872,7 +872,7 @@ When kbuild executes the following steps are followed (roughly):
 		$(obj)/setup $(obj)/bootsect: %: %.o FORCE
 			$(call if_changed,ld)
 
-	In this example there is two possible targets, requiring different
+	In this example there are two possible targets, requiring different
 	options to the linker. the linker options are specified using the
 	LDFLAGS_$@ syntax - one for each potential target.
 	$(targets) are assinged all potential targets, herby kbuild knows

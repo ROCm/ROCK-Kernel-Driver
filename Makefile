@@ -107,6 +107,16 @@ endif # ifeq ($(KBUILD_SRC),)
 # We process the rest of the Makefile if this is the final invocation of make
 ifeq ($(skip-makefile),)
 
+# Make sure we're not wasting cpu-cycles doing locale handling, yet do make
+# sure error messages appear in the user-desired language
+ifdef LC_ALL
+	LANG := $(LC_ALL)
+	LC_ALL :=
+endif
+LC_COLLATE := C
+LC_CTYPE := C
+export LANG LC_ALL LC_COLLATE LC_CTYPE
+
 srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),$(CURDIR))
 TOPDIR		:= $(srctree)
 # FIXME - TOPDIR is obsolete, use srctree/objtree
@@ -652,7 +662,7 @@ include/config/MARKER: include/linux/autoconf.h
 uts_len := 64
 
 define filechk_version.h
-	if expr length "$(KERNELRELEASE)" \> $(uts_len) >/dev/null ; then \
+	if ((`echo -n "$(KERNELRELEASE)" | wc -c ` > $(uts_len))); then \
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
 	  exit 1; \
 	fi; \
@@ -911,6 +921,7 @@ help:
 	@echo  '  dir/file.[ois]  - Build specified target only'
 	@echo  '  rpm		  - Build a kernel as an RPM package'
 	@echo  '  tags/TAGS	  - Generate tags file for editors'
+	@echo  '  cscope	  - Generate cscope index'
 	@echo  ''
 	@echo  'Documentation targets:'
 	@$(MAKE) -f $(srctree)/Documentation/DocBook/Makefile dochelp
