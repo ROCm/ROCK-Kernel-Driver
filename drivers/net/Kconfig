@@ -200,7 +200,7 @@ source "drivers/net/arm/Kconfig"
 
 config MACE
 	tristate "MACE (Power Mac ethernet) support"
-	depends on NET_ETHERNET && PPC_PMAC
+	depends on NET_ETHERNET && PPC32 && PPC_PMAC
 	select CRC32
 	help
 	  Power Macintoshes and clones with Ethernet built-in on the
@@ -223,7 +223,7 @@ config MACE_AAUI_PORT
 
 config BMAC
 	tristate "BMAC (G3 ethernet) support"
-	depends on NET_ETHERNET && PPC_PMAC
+	depends on NET_ETHERNET && PPC32 && PPC_PMAC
 	select CRC32
 	help
 	  Say Y for support of BMAC Ethernet interfaces. These are used on G3
