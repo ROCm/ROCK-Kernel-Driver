@@ -761,11 +761,6 @@ do_bindings(struct ip_conntrack *ct,
 	enum ip_conntrack_dir dir = CTINFO2DIR(ctinfo);
 	int proto = (*pskb)->nh.iph->protocol;
 
-	/* Skip everything and don't call helpers if there are no
-	 * manips for this connection */
-	if (info->num_manips == 0)
-		return NF_ACCEPT;
-
 	/* Need nat lock to protect against modification, but neither
 	   conntrack (referenced) and helper (deleted with
 	   synchronize_bh()) can vanish. */

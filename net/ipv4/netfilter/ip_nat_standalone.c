@@ -199,6 +199,7 @@ ip_nat_out(unsigned int hooknum,
 	return ip_nat_fn(hooknum, pskb, in, out, okfn);
 }
 
+#ifdef CONFIG_IP_NF_NAT_LOCAL
 static unsigned int
 ip_nat_local_fn(unsigned int hooknum,
 		struct sk_buff **pskb,
@@ -224,6 +225,7 @@ ip_nat_local_fn(unsigned int hooknum,
 		return ip_route_me_harder(pskb) == 0 ? ret : NF_DROP;
 	return ret;
 }
+#endif
 
 /* We must be after connection tracking and before packet filtering. */
 
@@ -245,6 +247,7 @@ static struct nf_hook_ops ip_nat_out_ops = {
 	.priority	= NF_IP_PRI_NAT_SRC,
 };
 
+#ifdef CONFIG_IP_NF_NAT_LOCAL
 /* Before packet filtering, change destination */
 static struct nf_hook_ops ip_nat_local_out_ops = {
 	.hook		= ip_nat_local_fn,
@@ -254,7 +257,7 @@ static struct nf_hook_ops ip_nat_local_out_ops = {
 	.priority	= NF_IP_PRI_NAT_DST,
 };
 
-#ifdef CONFIG_IP_NF_NAT_LOCAL
+/* After packet filtering, change source for reply packets of LOCAL_OUT DNAT */
 static struct nf_hook_ops ip_nat_local_in_ops = {
 	.hook		= ip_nat_fn,
 	.owner		= THIS_MODULE,
@@ -324,12 +327,12 @@ static int init_or_cleanup(int init)
 		printk("ip_nat_init: can't register out hook.\n");
 		goto cleanup_inops;
 	}
+#ifdef CONFIG_IP_NF_NAT_LOCAL
 	ret = nf_register_hook(&ip_nat_local_out_ops);
 	if (ret < 0) {
 		printk("ip_nat_init: can't register local out hook.\n");
 		goto cleanup_outops;
 	}
-#ifdef CONFIG_IP_NF_NAT_LOCAL
 	ret = nf_register_hook(&ip_nat_local_in_ops);
 	if (ret < 0) {
 		printk("ip_nat_init: can't register local in hook.\n");
@@ -342,9 +345,9 @@ static int init_or_cleanup(int init)
 #ifdef CONFIG_IP_NF_NAT_LOCAL
 	nf_unregister_hook(&ip_nat_local_in_ops);
  cleanup_localoutops:
-#endif
 	nf_unregister_hook(&ip_nat_local_out_ops);
  cleanup_outops:
+#endif
 	nf_unregister_hook(&ip_nat_out_ops);
  cleanup_inops:
 	nf_unregister_hook(&ip_nat_in_ops);
