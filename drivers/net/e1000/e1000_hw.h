@@ -99,6 +99,7 @@ typedef enum {
     e1000_bus_speed_33,
     e1000_bus_speed_66,
     e1000_bus_speed_100,
+    e1000_bus_speed_120,
     e1000_bus_speed_133,
     e1000_bus_speed_reserved
 } e1000_bus_speed;
@@ -314,10 +315,11 @@ void e1000_write_reg_io(struct e1000_hw *hw, uint32_t offset, uint32_t value);
 #define E1000_DEV_ID_82545EM_FIBER       0x1011
 #define E1000_DEV_ID_82546EB_COPPER      0x1010
 #define E1000_DEV_ID_82546EB_FIBER       0x1012
+#define E1000_DEV_ID_82546EB_QUAD_COPPER 0x101D
 #define E1000_DEV_ID_82541EI             0x1013
 #define E1000_DEV_ID_82541EP             0x1018
 #define E1000_DEV_ID_82547EI             0x1019
-#define NUM_DEV_IDS 19
+#define NUM_DEV_IDS 20
 
 #define NODE_ADDRESS_SIZE 6
 #define ETH_LENGTH_OF_ADDRESS 6
