@@ -757,14 +757,14 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
 	ratio = (unsigned long)SWAP_CLUSTER_MAX * zone->nr_active /
 				((zone->nr_inactive | 1) * 2);
 	atomic_add(ratio+1, &zone->nr_scan_active);
-	if (atomic_read(&zone->nr_scan_active) > SWAP_CLUSTER_MAX) {
+	count = atomic_read(&zone->nr_scan_active);
+	if (count >= SWAP_CLUSTER_MAX) {
 		/*
 		 * Don't try to bring down too many pages in one attempt.
 		 * If this fails, the caller will increase `priority' and
 		 * we'll try again, with an increased chance of reclaiming
 		 * mapped memory.
 		 */
-		count = atomic_read(&zone->nr_scan_active);
 		if (count > SWAP_CLUSTER_MAX * 4)
 			count = SWAP_CLUSTER_MAX * 4;
 		atomic_set(&zone->nr_scan_active, 0);
@@ -773,8 +773,8 @@ shrink_zone(struct zone *zone, int max_scan, unsigned int gfp_mask,
 
 	atomic_add(max_scan, &zone->nr_scan_inactive);
 	count = atomic_read(&zone->nr_scan_inactive);
-	if (max_scan > SWAP_CLUSTER_MAX) {
-		atomic_sub(count, &zone->nr_scan_inactive);
+	if (count >= SWAP_CLUSTER_MAX) {
+		atomic_set(&zone->nr_scan_inactive, 0);
 		return shrink_cache(zone, gfp_mask, count, total_scanned);
 	}
 	return 0;
