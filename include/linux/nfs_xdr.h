@@ -597,13 +597,15 @@ struct nfs4_rename_res {
 };
 
 struct nfs4_setclientid {
-	nfs4_verifier			sc_verifier;      /* request */
-	char *				sc_name;	  /* request */
+	const nfs4_verifier *		sc_verifier;      /* request */
+	unsigned int			sc_name_len;
+	char				sc_name[32];	  /* request */
 	u32				sc_prog;          /* request */
+	unsigned int			sc_netid_len;
 	char				sc_netid[4];	  /* request */
+	unsigned int			sc_uaddr_len;
 	char				sc_uaddr[24];     /* request */
 	u32				sc_cb_ident;      /* request */
-	struct nfs4_client *		sc_state;	  /* response */
 };
 
 struct nfs4_statfs_arg {

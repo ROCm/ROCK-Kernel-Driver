@@ -1996,13 +1996,15 @@ nfs4_request_compatible(struct nfs_page *req, struct file *filp, struct page *pa
 	return 1;
 }
 
-int
-nfs4_proc_setclientid(struct nfs4_client *clp,
-		u32 program, unsigned short port)
+int nfs4_proc_setclientid(struct nfs4_client *clp, u32 program, unsigned short port)
 {
-	u32 *p;
-	struct nfs4_setclientid setclientid;
-	struct timespec tv;
+	static nfs4_verifier sc_verifier;
+	static int initialized;
+	
+	struct nfs4_setclientid setclientid = {
+		.sc_verifier = &sc_verifier,
+		.sc_prog = program,
+	};
 	struct rpc_message msg = {
 		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_SETCLIENTID],
 		.rpc_argp = &setclientid,
@@ -2010,15 +2012,24 @@ nfs4_proc_setclientid(struct nfs4_client *clp,
 		.rpc_cred = clp->cl_cred,
 	};
 
-	tv = CURRENT_TIME;
-	p = (u32*)setclientid.sc_verifier.data;
-	*p++ = (u32)tv.tv_sec;
-	*p = (u32)tv.tv_nsec;
-	setclientid.sc_name = clp->cl_ipaddr;
-	sprintf(setclientid.sc_netid, "tcp");
-	sprintf(setclientid.sc_uaddr, "%s.%d.%d", clp->cl_ipaddr, port >> 8, port & 255);
-	setclientid.sc_prog = htonl(program);
-	setclientid.sc_cb_ident = 0;
+	if (!initialized) {
+		struct timespec boot_time;
+		u32 *p;
+
+		initialized = 1;
+		boot_time = CURRENT_TIME;
+		p = (u32*)sc_verifier.data;
+		*p++ = htonl((u32)boot_time.tv_sec);
+		*p = htonl((u32)boot_time.tv_nsec);
+	}
+	setclientid.sc_name_len = scnprintf(setclientid.sc_name,
+			sizeof(setclientid.sc_name), "%s/%u.%u.%u.%u",
+			clp->cl_ipaddr, NIPQUAD(clp->cl_addr.s_addr));
+	setclientid.sc_netid_len = scnprintf(setclientid.sc_netid,
+			sizeof(setclientid.sc_netid), "tcp");
+	setclientid.sc_uaddr_len = scnprintf(setclientid.sc_uaddr,
+			sizeof(setclientid.sc_uaddr), "%s.%d.%d",
+			clp->cl_ipaddr, port >> 8, port & 255);
 
 	return rpc_call_sync(clp->cl_rpcclient, &msg, 0);
 }
