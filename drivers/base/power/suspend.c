@@ -37,11 +37,10 @@ extern int sysdev_suspend(u32 state);
 
 int suspend_device(struct device * dev, u32 state)
 {
-	struct device_driver * drv = dev->driver;
 	int error = 0;
 
-	if (drv && drv->suspend) 
-		error = drv->suspend(dev,state,SUSPEND_SAVE_STATE);
+	if (dev->bus && dev->bus->suspend)
+		error = dev->bus->suspend(dev,state);
 
 	if (!error) {
 		list_del(&dev->power.entry);
@@ -93,23 +92,6 @@ int device_pm_suspend(u32 state)
  Error:
 	device_pm_resume();
 	goto Done;
-}
-
-
-/**
- *	dpm_power_down - Power down devices without interrupts.
- *	@state:	State to enter.
- *
- *	Walk the dpm_off_irq list (built by device_pm_suspend) and power
- *	down each device that requires the call to be made with interrupts
- *	disabled. 
- */
-
-static int dpm_power_down(u32 state)
-{
-	int error = 0;
-
-	return error;
 }
 
 

@@ -118,7 +118,7 @@ static int power_down(u32 mode)
 	int error = 0;
 
 	local_irq_save(flags);
-	device_pm_power_down();
+	device_pm_power_down(PM_SUSPEND_DISK);
 	switch(mode) {
 	case PM_DISK_PLATFORM:
 		error = pm_ops->enter(PM_SUSPEND_DISK);

@@ -22,10 +22,8 @@ extern int sysdev_resume(void);
 
 int resume_device(struct device * dev)
 {
-	struct device_driver * drv = dev->driver;
-
-	if (drv && drv->resume)
-		return drv->resume(dev,RESUME_RESTORE_STATE);
+	if (dev->bus && dev->bus->resume)
+		return dev->bus->resume(dev);
 	return 0;
 }
 
@@ -50,19 +48,6 @@ void device_pm_resume(void)
 
 
 /**
- *	power_up_device - Power one device on.
- *	@dev:	Device.
- */
-
-void power_up_device(struct device * dev)
-{
-	struct device_driver * drv = dev->driver;
-	if (drv && drv->resume)
-		drv->resume(dev,RESUME_POWER_ON);
-}
-
-
-/**
  *	device_power_up_irq - Power on some devices. 
  *
  *	Walk the dpm_off_irq list and power each device up. This 
@@ -78,7 +63,7 @@ void dpm_power_up(void)
 	while(!list_empty(&dpm_off_irq)) {
 		struct list_head * entry = dpm_off_irq.next;
 		list_del_init(entry);
-		power_up_device(to_device(entry));
+		resume_device(to_device(entry));
 		list_add_tail(entry,&dpm_active);
 	}
 }

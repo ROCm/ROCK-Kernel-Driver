@@ -58,7 +58,8 @@ struct bus_type {
 	struct device * (*add)	(struct device * parent, char * bus_id);
 	int		(*hotplug) (struct device *dev, char **envp, 
 				    int num_envp, char *buffer, int buffer_size);
-
+	int		(*suspend)(struct device * dev, u32 state);
+	int		(*resume)(struct device * dev);
 };
 
 extern int bus_register(struct bus_type * bus);
