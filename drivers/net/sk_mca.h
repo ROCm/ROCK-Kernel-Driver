@@ -53,6 +53,7 @@ typedef struct {
 	int realirq;		/* memorizes actual IRQ, even when 
 				   currently not allocated          */
 	skmca_medium medium;	/* physical cannector               */
+	spinlock_t lock;
 } skmca_priv;
 
 /* card registers: control/status register bits */
