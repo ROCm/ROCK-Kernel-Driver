@@ -202,7 +202,7 @@ static int intel_i810_insert_entries(struct agp_memory *mem, off_t pg_start,
 		return -EINVAL;
 	}
 	for (j = pg_start; j < (pg_start + mem->page_count); j++) {
-		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[j]))
+		if (!PGE_EMPTY(agp_bridge, readl(agp_bridge->gatt_table+j)))
 			return -EBUSY;
 	}
 
