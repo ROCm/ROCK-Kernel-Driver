@@ -158,6 +158,10 @@ void sysdev_driver_unregister(struct sysdev_class * cls,
 	up_write(&system_subsys.rwsem);
 }
 
+EXPORT_SYMBOL(sysdev_driver_register);
+EXPORT_SYMBOL(sysdev_driver_unregister);
+
+
 
 /**
  *	sys_device_register - add a system device to the tree
