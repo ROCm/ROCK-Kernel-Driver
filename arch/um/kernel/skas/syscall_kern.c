@@ -28,11 +28,6 @@ long execute_syscall_skas(void *r)
 		res = -ENOSYS;
 	else res = EXECUTE_SYSCALL(syscall, regs);
 
-	if(current->thread.singlestep_syscall){
-		current->thread.singlestep_syscall = 0;
-		force_sig(SIGTRAP, current);
-	}
-
 	return(res);
 }
 

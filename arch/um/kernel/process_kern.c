@@ -462,8 +462,6 @@ int singlestepping(void * t)
 	if ( ! (task->ptrace & PT_DTRACE) )
 		return(0);
 
-	task->ptrace &= ~PT_DTRACE;
-
 	if (task->thread.singlestep_syscall)
 		return(0);
 

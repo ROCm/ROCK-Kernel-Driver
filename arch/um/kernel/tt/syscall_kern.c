@@ -123,11 +123,6 @@ long execute_syscall_tt(void *r)
 
 	set_fs(USER_DS);
 
-	if(current->thread.singlestep_syscall){
-		current->thread.singlestep_syscall = 0;
-		force_sig(SIGTRAP, current);
-	}
-
 	return(res);
 }
 

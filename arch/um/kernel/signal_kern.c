@@ -152,9 +152,9 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset)
 	 * on the host.  The tracing thread will check this flag and 
 	 * PTRACE_SYSCALL if necessary.
 	 */
-	if((current->ptrace & PT_DTRACE) && 
-	   is_syscall(PT_REGS_IP(&current->thread.regs)))
-		current->thread.singlestep_syscall = 1;
+	if(current->ptrace & PT_DTRACE)
+		current->thread.singlestep_syscall =
+			is_syscall(PT_REGS_IP(&current->thread.regs));
 	return(0);
 }
 
