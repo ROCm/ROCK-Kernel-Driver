@@ -241,6 +241,10 @@
 #define __NR_io_submit		246
 #define __NR_io_cancel		247
 #define __NR_exit_group		248
+#define __NR_epoll_create	249
+#define __NR_epoll_ctl		250
+#define __NR_epoll_wait		251
+#define __NR_set_tid_address	252
 
 
 /* user-visible error numbers are in the range -1 - -122: see <asm-s390/errno.h> */

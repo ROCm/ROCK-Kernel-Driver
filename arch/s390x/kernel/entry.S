@@ -625,7 +625,11 @@ sys_call_table:
 	.long  SYSCALL(sys_io_submit,sys_ni_syscall)
 	.long  SYSCALL(sys_io_cancel,sys_ni_syscall)
 	.long  SYSCALL(sys_exit_group,sys32_exit_group_wrapper)
-        .rept  255-248
+	.long  SYSCALL(sys_epoll_create,sys_ni_syscall)
+	.long  SYSCALL(sys_epoll_ctl,sys_ni_syscall)
+	.long  SYSCALL(sys_epoll_wait,sys_ni_syscall)
+	.long  SYSCALL(sys_set_tid_address,sys_ni_syscall)
+        .rept  255-252
 	.long  SYSCALL(sys_ni_syscall,sys_ni_syscall)
 	.endr
 

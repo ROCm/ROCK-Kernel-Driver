@@ -596,7 +596,11 @@ sys_call_table:
 	.long  sys_io_submit
 	.long  sys_io_cancel
 	.long  sys_exit_group
-	.rept  255-248
+	.long  sys_epoll_create
+	.long  sys_epoll_ctl		 /* 250 */
+	.long  sys_epoll_wait
+	.long  sys_set_tid_address
+	.rept  255-252
 	.long  sys_ni_syscall
 	.endr
 
