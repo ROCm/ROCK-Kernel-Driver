@@ -23,6 +23,14 @@
 /*
  * EHCI scheduled transaction support:  interrupt, iso, split iso
  * These are called "periodic" transactions in the EHCI spec.
+ *
+ * Note that for interrupt transfers, the QH/QTD manipulation is shared
+ * with the "asynchronous" transaction support (control/bulk transfers).
+ * The only real difference is in how interrupt transfers are scheduled.
+ * We get some funky API restrictions from the current URB model, which
+ * works notably better for reading transfers than for writing.  (And
+ * which accordingly needs to change before it'll work inside devices,
+ * or with "USB On The Go" additions to USB 2.0 ...)
  */
 
 /*
@@ -430,6 +438,7 @@ static int intr_submit (
 					ehci->periodic [frame] =
 						QH_NEXT (qh->qh_dma);
 				}
+				wmb ();
 				frame += period;
 			} while (frame < ehci->periodic_size);
 
@@ -478,7 +487,7 @@ intr_complete (
 	/* call any completions, after patching for reactivation */
 	spin_unlock_irqrestore (&ehci->lock, flags);
 	/* NOTE:  currently restricted to one qtd per qh! */
-	if (qh_completions (ehci, &qh->qtd_list, 0) == 0)
+	if (qh_completions (ehci, qh, 0) == 0)
 		urb = 0;
 	spin_lock_irqsave (&ehci->lock, flags);
 
@@ -825,17 +834,26 @@ itd_schedule (struct ehci_hcd *ehci, struct urb *urb)
 			itd->hw_transaction [uframe & 0x07] = itd->transaction;
 			itd_link (ehci, (uframe >> 3) % ehci->periodic_size,
 				itd);
+			wmb ();
 			usecs += itd->usecs;
 
 			itd = list_entry (itd->itd_list.next,
 				struct ehci_itd, itd_list);
 		}
 
-		/* update bandwidth utilization records (for usbfs) */
-		/* FIXME usbcore expects per-frame average, which isn't
-		 * most accurate model... this provides the total claim,
-		 * and expects the average to be computed only display.
+		/* update bandwidth utilization records (for usbfs)
+		 *
+		 * FIXME This claims each URB queued to an endpoint, as if
+		 * transfers were concurrent, not sequential.  So bandwidth
+		 * typically gets double-billed ... comes from tying it to
+		 * URBs rather than endpoints in the schedule.  Luckily we
+		 * don't use this usbfs data for serious decision making.
 		 */
+		usecs /= urb->number_of_packets;
+		usecs /= urb->interval;
+		usecs >>= 3;
+		if (usecs < 1)
+			usecs = 1;
 		usb_claim_bandwidth (urb->dev, urb, usecs, 1);
 
 		/* maybe enable periodic schedule processing */
