@@ -255,7 +255,4 @@ void __init intel_p4_mcheck_init(struct cpuinfo_x86 *c)
 		intel_init_thermal(c);
 #endif
 	}
-#ifdef CONFIG_X86_MCE_NONFATAL
-	init_nonfatal_mce_checker();
-#endif
 }
