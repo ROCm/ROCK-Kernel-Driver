@@ -51,6 +51,9 @@ struct scsi_target {
 	unsigned int		starget_refcnt;
 };
 
+/* hosts.c */
+extern int scsi_init_hosts(void);
+extern void scsi_exit_hosts(void);
 
 /* scsi.c */
 extern int scsi_dispatch_cmd(struct scsi_cmnd *cmd);
@@ -108,18 +111,14 @@ extern void scsi_exit_procfs(void);
 /* scsi_scan.c */
 extern void scsi_forget_host(struct Scsi_Host *);
 extern void scsi_free_sdev(struct scsi_device *);
-extern void scsi_free_shost(struct Scsi_Host *);
 extern void scsi_rescan_device(struct device *);
 
 /* scsi_sysfs.c */
 extern int scsi_device_register(struct scsi_device *);
-extern void scsi_sysfs_init_host(struct Scsi_Host *);
-extern int scsi_sysfs_add_host(struct Scsi_Host *, struct device *);
-extern void scsi_sysfs_remove_host(struct Scsi_Host *);
+extern int scsi_sysfs_add_host(struct Scsi_Host *);
 extern int scsi_sysfs_register(void);
 extern void scsi_sysfs_unregister(void);
 
-extern struct class shost_class;
 extern struct class sdev_class;
 extern struct bus_type scsi_bus_type;
 

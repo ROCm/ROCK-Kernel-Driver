@@ -54,30 +54,6 @@ static struct class_device_attribute *scsi_sysfs_shost_attrs[] = {
 	NULL
 };
 
-static void scsi_host_cls_release(struct class_device *class_dev)
-{
-	struct Scsi_Host *shost;
-
-	shost = class_to_shost(class_dev);
-	put_device(&shost->shost_gendev);
-}
-
-static void scsi_host_dev_release(struct device *dev)
-{
-	struct Scsi_Host *shost;
-	struct device *parent;
-
-	parent = dev->parent;
-	shost = dev_to_shost(dev);
-	scsi_free_shost(shost);
-	put_device(parent);
-}
-
-struct class shost_class = {
-	.name		= "scsi_host",
-	.release	= scsi_host_cls_release,
-};
-
 static void scsi_device_cls_release(struct class_device *class_dev)
 {
 	struct scsi_device *sdev;
@@ -119,27 +95,18 @@ int scsi_sysfs_register(void)
 	int error;
 
 	error = bus_register(&scsi_bus_type);
-	if (error)
-		return error;
-	error = class_register(&shost_class);
-	if (error)
-		goto bus_unregister;
-	error = class_register(&sdev_class);
-	if (error)
-		goto class_unregister;
-	return 0;
+	if (!error) {
+		error = class_register(&sdev_class);
+		if (error)
+			bus_unregister(&scsi_bus_type);
+	}
 
- class_unregister:
-	class_unregister(&shost_class);
- bus_unregister:
-	bus_unregister(&scsi_bus_type);
 	return error;
 }
 
 void scsi_sysfs_unregister(void)
 {
 	class_unregister(&sdev_class);
-	class_unregister(&shost_class);
 	bus_unregister(&scsi_bus_type);
 }
 
@@ -403,22 +370,6 @@ int scsi_register_interface(struct class_interface *intf)
 }
 
 
-void scsi_sysfs_init_host(struct Scsi_Host *shost)
-{
-	device_initialize(&shost->shost_gendev);
-	snprintf(shost->shost_gendev.bus_id, BUS_ID_SIZE, "host%d",
-		shost->host_no);
-	snprintf(shost->shost_gendev.name, DEVICE_NAME_SIZE, "%s",
-		shost->hostt->proc_name);
-	shost->shost_gendev.release = scsi_host_dev_release;
-
-	class_device_initialize(&shost->shost_classdev);
-	shost->shost_classdev.dev = &shost->shost_gendev;
-	shost->shost_classdev.class = &shost_class;
-	snprintf(shost->shost_classdev.class_id, BUS_ID_SIZE, "host%d",
-		  shost->host_no);
-}
-
 static struct class_device_attribute *class_attr_overridden(
 		struct class_device_attribute **attrs,
 		struct class_device_attribute *attr)
@@ -461,31 +412,16 @@ static int class_attr_add(struct class_device *classdev,
  * @shost:     scsi host struct to add to subsystem
  * @dev:       parent struct device pointer
  **/
-int scsi_sysfs_add_host(struct Scsi_Host *shost, struct device *dev)
+int scsi_sysfs_add_host(struct Scsi_Host *shost)
 {
 	int error, i;
 
-	if (!shost->shost_gendev.parent)
-		shost->shost_gendev.parent = dev ? dev : &legacy_bus;
-
-	error = device_add(&shost->shost_gendev);
-	if (error)
-		return error;
-
-	set_bit(SHOST_ADD, &shost->shost_state);
-	get_device(shost->shost_gendev.parent);
-
-	error = class_device_add(&shost->shost_classdev);
-	if (error)
-		goto clean_device;
-
-	get_device(&shost->shost_gendev);
 	if (shost->hostt->shost_attrs) {
 		for (i = 0; shost->hostt->shost_attrs[i]; i++) {
 			error = class_attr_add(&shost->shost_classdev,
 					shost->hostt->shost_attrs[i]);
 			if (error)
-				goto clean_class;
+				return error;
 		}
 	}
 
@@ -495,31 +431,9 @@ int scsi_sysfs_add_host(struct Scsi_Host *shost, struct device *dev)
 			error = class_device_create_file(&shost->shost_classdev,
 					scsi_sysfs_shost_attrs[i]);
 			if (error)
-				goto clean_class;
+				return error;
 		}
 	}
 
-	return error;
-
-clean_class:
-	class_device_del(&shost->shost_classdev);
-clean_device:
-	device_del(&shost->shost_gendev);
-
-	return error;
-}
-
-/**
- * scsi_sysfs_remove_host - remove scsi host from subsystem
- * @shost:     scsi host to remove from subsystem
- **/
-void scsi_sysfs_remove_host(struct Scsi_Host *shost)
-{
-	unsigned long flags;
-	spin_lock_irqsave(shost->host_lock, flags);
-	set_bit(SHOST_DEL, &shost->shost_state);
-	spin_unlock_irqrestore(shost->host_lock, flags);
-
-	class_device_unregister(&shost->shost_classdev);
-	device_del(&shost->shost_gendev);
+	return 0;
 }
