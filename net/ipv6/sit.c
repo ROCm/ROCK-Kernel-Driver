@@ -423,13 +423,6 @@ out:
 	return 0;
 }
 
-/* Need this wrapper because NF_HOOK takes the function address */
-static inline int do_ip_send(struct sk_buff *skb)
-{
-	return ip_send(skb);
-}
-
-
 /* Returns the embedded IPv4 address if the IPv6 address
    comes from 6to4 (draft-ietf-ngtrans-6to4-04) addr space */
 

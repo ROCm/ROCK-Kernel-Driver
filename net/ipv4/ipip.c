@@ -521,12 +521,6 @@ out:
 	return 0;
 }
 
-/* Need this wrapper because NF_HOOK takes the function address */
-static inline int do_ip_send(struct sk_buff *skb)
-{
-	return ip_send(skb);
-}
-
 /*
  *	This function assumes it is being called from dev_queue_xmit()
  *	and that skb is filled properly by that function.

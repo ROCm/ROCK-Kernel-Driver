@@ -675,12 +675,6 @@ drop_nolock:
 	return(0);
 }
 
-/* Need this wrapper because NF_HOOK takes the function address */
-static inline int do_ip_send(struct sk_buff *skb)
-{
-	return ip_send(skb);
-}
-
 static int ipgre_tunnel_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ip_tunnel *tunnel = (struct ip_tunnel*)dev->priv;

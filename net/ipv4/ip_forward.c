@@ -47,27 +47,10 @@ static inline int ip_forward_finish(struct sk_buff *skb)
 
 	IP_INC_STATS_BH(IpForwDatagrams);
 
-	if (opt->optlen == 0) {
-#ifdef CONFIG_NET_FASTROUTE
-		struct rtable *rt = (struct rtable*)skb->dst;
+	if (unlikely(opt->optlen))
+		ip_forward_options(skb);
 
-		if (rt->rt_flags&RTCF_FAST && !netdev_fastroute_obstacles) {
-			struct dst_entry *old_dst;
-			unsigned h = ((*(u8*)&rt->fl.fl4_dst)^(*(u8*)&rt->fl.fl4_src))&NETDEV_FASTROUTE_HMASK;
-
-			write_lock_irq(&skb->dev->fastpath_lock);
-			old_dst = skb->dev->fastpath[h];
-			skb->dev->fastpath[h] = dst_clone(&rt->u.dst);
-			write_unlock_irq(&skb->dev->fastpath_lock);
-
-			dst_release(old_dst);
-		}
-#endif
-		return (ip_send(skb));
-	}
-
-	ip_forward_options(skb);
-	return (ip_send(skb));
+	return dst_output(skb);
 }
 
 int ip_forward(struct sk_buff *skb)

@@ -162,14 +162,6 @@ extern int sysctl_local_port_range[2];
 extern int sysctl_ip_default_ttl;
 
 #ifdef CONFIG_INET
-static inline int ip_send(struct sk_buff *skb)
-{
-	if (skb->len > skb->dst->pmtu)
-		return ip_fragment(skb, ip_finish_output);
-	else
-		return ip_finish_output(skb);
-}
-
 /* The function in 2.2 was invalid, producing wrong result for
  * check=0xFEFF. It was noticed by Arthur Skawina _year_ ago. --ANK(000625) */
 static inline
