@@ -20,6 +20,17 @@ struct device_node;
 struct TceTable;
 struct rtc_time;
 
+#ifdef CONFIG_SMP
+struct smp_ops_t {
+	void  (*message_pass)(int target, int msg, unsigned long data, int wait);
+	int   (*probe)(void);
+	void  (*kick_cpu)(int nr);
+	void  (*setup_cpu)(int nr);
+	void  (*take_timebase)(void);
+	void  (*give_timebase)(void);
+};
+#endif
+
 struct machdep_calls {
 	/* High use functions in the first cachelines, low use functions
 	 * follow.  DRENG collect profile data.
@@ -57,14 +68,6 @@ struct machdep_calls {
 				     int direction);
 	void		(*tce_free_one)(struct TceTable *tbl,
 				        long tcenum);    
-
-	void		(*smp_message_pass)(int target,
-					    int msg, 
-					    unsigned long data,
-					    int wait);
-	void		(*smp_probe)(void);
-	void		(*smp_kick_cpu)(int nr);
-	void		(*smp_setup_cpu)(int nr);
 
 	void		(*setup_arch)(void);
 	/* Optional, may be NULL. */
@@ -145,6 +148,11 @@ struct machdep_calls {
 
 	/* this is for modules, since _machine can be a define -- Cort */
 	int ppc_machine;
+
+#ifdef CONFIG_SMP
+	/* functions for dealing with other cpus */
+	struct smp_ops_t smp_ops;
+#endif /* CONFIG_SMP */
 };
 
 extern struct machdep_calls ppc_md;
