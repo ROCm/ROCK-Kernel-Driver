@@ -7,7 +7,7 @@
 #include <linux/ctype.h>
 #include <linux/in.h>
 #include <linux/spinlock.h>
-#include <asm/semaphore.h>
+#include <linux/sched.h>
 
 #include "flask.h"
 #include "avc.h"
