@@ -50,7 +50,8 @@
 
 /*
  * next_and_idx encodes both the address of the next pte_chain and the
- * offset of the highest-index used pte in ptes[].
+ * offset of the lowest-index used pte in ptes[] (which is equal also
+ * to the offset of the highest-index unused pte in ptes[], plus one).
  */
 struct pte_chain {
 	unsigned long next_and_idx;
