@@ -300,7 +300,7 @@ arxescsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 		goto out_region;
 	}
 
-	host = scsi_register(&arxescsi_template, sizeof(struct arxescsi_info));
+	host = scsi_host_alloc(&arxescsi_template, sizeof(struct arxescsi_info));
 	if (!host) {
 		ret = -ENOMEM;
 		goto out_unmap;
@@ -341,7 +341,7 @@ arxescsi_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	fas216_release(host);
  out_unregister:
-	scsi_unregister(host);
+	scsi_host_put(host);
  out_unmap:
 	iounmap(base);
  out_region:
@@ -366,7 +366,7 @@ static void __devexit arxescsi_remove(struct expansion_card *ec)
 	release_mem_region(resbase, reslen);
 
 	fas216_release(host);
-	scsi_unregister(host);
+	scsi_host_put(host);
 }
 
 static const struct ecard_id arxescsi_cids[] = {
