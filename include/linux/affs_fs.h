@@ -7,6 +7,7 @@
 #include <linux/types.h>
 
 #include <linux/affs_fs_i.h>
+#include <linux/affs_fs_sb.h>
 
 #define AFFS_SUPER_MAGIC 0xadff
 

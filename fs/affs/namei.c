@@ -64,7 +64,7 @@ affs_intl_toupper(int ch)
 static inline toupper_t
 affs_get_toupper(struct super_block *sb)
 {
-	return AFFS_SB->s_flags & SF_INTL ? affs_intl_toupper : affs_toupper;
+	return AFFS_SB(sb)->s_flags & SF_INTL ? affs_intl_toupper : affs_toupper;
 }
 
 /*
@@ -177,7 +177,7 @@ affs_hash_name(struct super_block *sb, const u8 *name, unsigned int len)
 	for (; len > 0; len--)
 		hash = (hash * 13 + toupper(*name++)) & 0x7ff;
 
-	return hash % AFFS_SB->s_hashsize;
+	return hash % AFFS_SB(sb)->s_hashsize;
 }
 
 static struct buffer_head *
@@ -244,7 +244,7 @@ affs_lookup(struct inode *dir, struct dentry *dentry)
 			return ERR_PTR(-EACCES);
 		}
 	}
-	dentry->d_op = AFFS_SB->s_flags & SF_INTL ? &affs_intl_dentry_operations : &affs_dentry_operations;
+	dentry->d_op = AFFS_SB(sb)->s_flags & SF_INTL ? &affs_intl_dentry_operations : &affs_dentry_operations;
 	unlock_kernel();
 	d_add(dentry, inode);
 	return NULL;
@@ -289,7 +289,7 @@ affs_create(struct inode *dir, struct dentry *dentry, int mode)
 
 	inode->i_op = &affs_file_inode_operations;
 	inode->i_fop = &affs_file_operations;
-	inode->i_mapping->a_ops = (AFFS_SB->s_flags & SF_OFS) ? &affs_aops_ofs : &affs_aops;
+	inode->i_mapping->a_ops = (AFFS_SB(sb)->s_flags & SF_OFS) ? &affs_aops_ofs : &affs_aops;
 	error = affs_add_entry(dir, inode, dentry, ST_FILE);
 	if (error) {
 		inode->i_nlink = 0;
@@ -367,7 +367,7 @@ affs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 		 (int)dentry->d_name.len,dentry->d_name.name,symname);
 
 	lock_kernel();
-	maxlen = AFFS_SB->s_hashsize * sizeof(u32) - 1;
+	maxlen = AFFS_SB(sb)->s_hashsize * sizeof(u32) - 1;
 	error = -ENOSPC;
 	inode  = affs_new_inode(dir);
 	if (!inode) {
@@ -390,8 +390,8 @@ affs_symlink(struct inode *dir, struct dentry *dentry, const char *symname)
 	if (*symname == '/') {
 		while (*symname == '/')
 			symname++;
-		while (AFFS_SB->s_volume[i])	/* Cannot overflow */
-			*p++ = AFFS_SB->s_volume[i++];
+		while (AFFS_SB(sb)->s_volume[i])	/* Cannot overflow */
+			*p++ = AFFS_SB(sb)->s_volume[i++];
 	}
 	while (i < maxlen && (c = *symname++)) {
 		if (c == '.' && lc == '/' && *symname == '.' && symname[1] == '/') {
