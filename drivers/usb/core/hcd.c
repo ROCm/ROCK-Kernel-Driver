@@ -80,7 +80,7 @@
 
 /* host controllers we manage */
 LIST_HEAD (usb_bus_list);
-EXPORT_SYMBOL (usb_bus_list);
+EXPORT_SYMBOL_GPL (usb_bus_list);
 
 /* used when allocating bus numbers */
 #define USB_MAXBUS		64
@@ -91,7 +91,7 @@ static struct usb_busmap busmap;
 
 /* used when updating list of hcds */
 DECLARE_MUTEX (usb_bus_list_lock);	/* exported only for usbfs */
-EXPORT_SYMBOL (usb_bus_list_lock);
+EXPORT_SYMBOL_GPL (usb_bus_list_lock);
 
 /* used when updating hcd data */
 static spinlock_t hcd_data_lock = SPIN_LOCK_UNLOCKED;
