@@ -41,5 +41,6 @@ void do_suspend_lowlevel(int resume)
 		return;
 	}
 acpi_sleep_done:
+	acpi_restore_register_state();
 	restore_processor_context();
 }

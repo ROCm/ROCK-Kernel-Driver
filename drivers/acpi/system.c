@@ -267,25 +267,15 @@ acpi_system_suspend(
 	switch (state)
 	{
 	case ACPI_STATE_S1:
-		/* do nothing */
+		barrier();
+		status = acpi_enter_sleep_state(state);
 		break;
 
 	case ACPI_STATE_S2:
 	case ACPI_STATE_S3:
-		save_processor_context();
-		/* TODO: this is horribly broken, fix it */
-		/* TODO: inline this function in acpi_suspend,or something. */
+		do_suspend_lowlevel(0);
 		break;
 	}
-
-	barrier();
-	status = acpi_enter_sleep_state(state);
-
-acpi_sleep_done:
-
-	restore_processor_context();
-	fix_processor_context();
-
 	restore_flags(flags);
 
 	return status;
@@ -306,6 +296,8 @@ acpi_suspend (
 	/* get out if state is invalid */
 	if (state < ACPI_STATE_S1 || state > ACPI_STATE_S5)
 		return AE_ERROR;
+
+	freeze_processes();		/* device_suspend needs processes to be stopped */
 
 	/* do we have a wakeup address for S2 and S3? */
 	if (state == ACPI_STATE_S2 || state == ACPI_STATE_S3) {
@@ -339,6 +331,7 @@ acpi_suspend (
 
 	/* reset firmware waking vector */
 	acpi_set_firmware_waking_vector((ACPI_PHYSICAL_ADDRESS) 0);
+	thaw_processes();
 
 	return status;
 }
