@@ -121,8 +121,7 @@ static int uptime_read_proc(char *page, char **start, off_t off,
 	}
 #else
 	{
-		unsigned long idle = init_task.times.tms_utime
-		                     + init_task.times.tms_stime;
+		unsigned long idle = init_task.utime + init_task.stime;
 
 		len = sprintf(page,"%lu.%02lu %lu.%02lu\n",
 			(unsigned long) uptime,
