@@ -2611,3 +2611,15 @@ config NETCONSOLE
 	If you want to log kernel messages over the network, enable this.
 	See Documentation/networking/netconsole.txt for details.
 
+config XPNET
+	tristate "SGI DMA network driver"
+	depends on NETDEVICES && IA64_SGI_SN_XPC
+	default m if NETDEVICES && IA64_SGI_SN_XPC
+	help
+	  An SGI machine can be divided into multiple Single System
+	  Images which act independently of each other and have
+	  hardware based memory protection from the others.  Enabling
+	  this feature will produce a network adapter that can be
+	  used to communicate directly between SSIs.
+
+

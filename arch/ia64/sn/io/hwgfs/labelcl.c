@@ -14,6 +14,7 @@
 #include <linux/string.h>
 #include <linux/sched.h>                /* needed for smp_lock.h :( */
 #include <linux/smp_lock.h>
+#include <linux/module.h>
 #include <asm/sn/sgi.h>
 #include <asm/sn/hwgfs.h>
 #include <asm/sn/hcl.h>
@@ -582,6 +583,7 @@ labelcl_info_replace_IDX(vertex_hdl_t de,
 	return(0);
 
 }
+EXPORT_SYMBOL(labelcl_info_replace_IDX);	/* ioc4 serial support */
 
 /*
  * labelcl_info_connectpt_set - Sets the connectpt.

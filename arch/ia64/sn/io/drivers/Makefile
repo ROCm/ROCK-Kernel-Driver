@@ -8,3 +8,4 @@
 # Makefile for the sn2 io routines.
 
 obj-y				+= ioconfig_bus.o
+obj-$(CONFIG_SGI_IOC4_SERIAL)	+= ioc4/

@@ -40,6 +40,7 @@ unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 long nr_swap_pages;
 int numnodes = 1;
+EXPORT_SYMBOL(numnodes);
 int sysctl_lower_zone_protection = 0;
 
 EXPORT_SYMBOL(totalram_pages);

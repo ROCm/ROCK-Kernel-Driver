@@ -371,12 +371,30 @@ config AU1000_UART
 	  If you have an Alchemy AU1000 processor (MIPS based) and you want
 	  to use serial ports, say Y.  Otherwise, say N.
 
+config SGI_IOC4_SERIAL
+	tristate "SGI Altix ioc4 serial support"
+	depends on SERIAL_NONSTANDARD && IA64
+	help
+	  If you have an SGI Altix and you would like to use the ioc4
+	  serial ports, say M.  Otherwise, say N.
+
+	  This driver will be built as a module called ioc4_serial.
+
 config AU1000_SERIAL_CONSOLE
 	bool "Enable Au1000 serial console"
 	depends on AU1000_UART
 	help
 	  If you have an Alchemy AU1000 processor (MIPS based) and you want
 	  to use a console on a serial port, say Y.  Otherwise, say N.
+
+config FETCHOP
+	bool "SGI Altix small TLB memory mapping support"
+	depends on IA64
+	default y if IA64
+	help
+	  Support small TLB entry memory mapping for special uncached
+	  operations that can operate without interference from
+	  kernel speculation.
 
 config QTRONIX_KEYBOARD
 	bool "Enable Qtronix 990P Keyboard Support"

@@ -498,6 +498,7 @@ u8 cpu_to_node_map[NR_CPUS] __cacheline_aligned;
 EXPORT_SYMBOL(cpu_to_node_map);
 /* which logical CPUs are on which nodes */
 cpumask_t node_to_cpu_mask[MAX_NUMNODES] __cacheline_aligned;
+EXPORT_SYMBOL(node_to_cpu_mask);
 
 /*
  * Build cpu to node mapping and initialize the per node cpu masks.

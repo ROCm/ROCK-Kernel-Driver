@@ -2814,6 +2814,7 @@ asmlinkage long sys_sched_setscheduler(pid_t pid, int policy,
 {
 	return setscheduler(pid, policy, param);
 }
+EXPORT_SYMBOL(sys_sched_setscheduler);
 
 /**
  * sys_sched_setparam - set/change the RT priority of a thread

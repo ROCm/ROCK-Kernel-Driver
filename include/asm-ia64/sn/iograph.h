@@ -37,6 +37,7 @@
 #define EDGE_LBL_HW			"hw"
 #define EDGE_LBL_INTERCONNECT		"link"
 #define EDGE_LBL_IO			"io"
+#define EDGE_LBL_IOC4			"ioc4"
 #define EDGE_LBL_LUN                    "lun"
 #define EDGE_LBL_LINUX                  "linux"
 #define EDGE_LBL_LINUX_BUS              EDGE_LBL_LINUX "/bus/pci-x"

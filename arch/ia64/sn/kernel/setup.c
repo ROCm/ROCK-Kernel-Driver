@@ -50,6 +50,7 @@
 #include <asm/sn/sn2/shub.h>
 
 DEFINE_PER_CPU(struct pda_s, pda_percpu);
+EXPORT_SYMBOL(per_cpu__pda_percpu);
 
 #define MAX_PHYS_MEMORY		(1UL << 49)     /* 1 TB */
 
@@ -65,8 +66,11 @@ extern unsigned char acpi_kbd_controller_present;
 unsigned long sn_rtc_cycles_per_second;   
 
 partid_t sn_partid = -1;
+EXPORT_SYMBOL(sn_partid);
 char sn_system_serial_number_string[128];
+EXPORT_SYMBOL(sn_system_serial_number_string);
 u64 sn_partition_serial_number;
+EXPORT_SYMBOL(sn_partition_serial_number);
 
 short physical_node_map[MAX_PHYSNODE_ID];
 

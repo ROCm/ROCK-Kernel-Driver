@@ -189,6 +189,17 @@ config IOSAPIC
 	depends on !IA64_HP_SIM
 	default y
 
+config IA64_SGI_SN_XPC
+	tristate "Support DMA Messaging between SGI machines"
+	depends on (IA64_SGI_SN2 || IA64_GENERIC)
+	default m if (IA64_SGI_SN2 || IA64_GENERIC)
+	help
+	  An SGI machine can be divided into multiple Single System
+	  Images which act independently of each other and have
+	  hardware based memory protection from the others.  Enabling
+	  this feature will allow limited communication between
+	  those System Images without allowing write access.
+
 config IA64_SGI_SN_SIM
 	bool "SGI Medusa Simulator Support"
 	depends on IA64_SGI_SN2
