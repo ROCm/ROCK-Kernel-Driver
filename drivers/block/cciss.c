@@ -2617,7 +2617,7 @@ static int __devinit cciss_init_one(struct pci_dev *pdev,
 	/* This is a limit in the driver and could be eliminated. */
 	blk_queue_max_phys_segments(q, MAXSGENTRIES);
 
-	blk_queue_max_sectors(q, 512);
+	blk_queue_max_sectors(q, 2048);
 
 		q->queuedata = hba[i];
 		sprintf(disk->disk_name, "cciss/c%dd%d", i, j);
