@@ -780,8 +780,7 @@ static int tgafb_blank(int blank, struct fb_info_gen *info)
     u32 vhcr, vvcr, vvvr;
     unsigned long flags;
     
-    save_flags(flags);
-    cli();
+    local_irq_save(flags);
 
     vhcr = TGA_READ_REG(TGA_HORIZ_REG);
     vvcr = TGA_READ_REG(TGA_VERT_REG);
@@ -821,7 +820,7 @@ static int tgafb_blank(int blank, struct fb_info_gen *info)
 	break;
     }
 
-    restore_flags(flags);
+    local_irq_restore(flags);
     return 0;
 }
 
@@ -982,7 +981,7 @@ int __init tgafb_init(void)
     if (register_framebuffer(&fb_info.gen.info) < 0)
 	return -EINVAL;
     printk(KERN_INFO "fb%d: %s frame buffer device at 0x%lx\n", 
-	    GET_FB_IDX(fb_info.gen.info.node), fb_info.gen.info.modename, 
+	    minor(fb_info.gen.info.node), fb_info.gen.info.modename, 
 	    pdev->resource[0].start);
     return 0;
 }

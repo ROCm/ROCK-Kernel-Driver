@@ -1066,7 +1066,7 @@ sizechange:
 		kfree(fb);
 		return;
 	}
-	printk(KERN_INFO "fb%d: %s\n", GET_FB_IDX(fb->info.node), p);
+	printk(KERN_INFO "fb%d: %s\n", minor(fb->info.node), p);
 }
 
 static inline int known_card(char *name)

@@ -58,14 +58,14 @@ struct fb_par_platinum {
 };
 
 struct fb_info_platinum {
-	struct fb_info			fb_info;
-	struct display			disp;
-	struct fb_par_platinum		default_par;
-	struct fb_par_platinum		current_par;
+	struct fb_info			info;
+	struct display			display; /* Will disappear */
+	struct fb_par_platinum		par;
 
 	struct {
 		__u8 red, green, blue;
 	}				palette[256];
+	u32				pseudo_palette[17];
 	
 	volatile struct cmap_regs	*cmap_regs;
 	unsigned long			cmap_regs_phys;
@@ -80,42 +80,17 @@ struct fb_info_platinum {
 	unsigned long			total_vram;
 	int				clktype;
 	int				dactype;
-
-	union {
-#ifdef FBCON_HAS_CFB16
-		u16 cfb16[16];
-#endif
-#ifdef FBCON_HAS_CFB32
-		u32 cfb32[16];
-#endif
-	} fbcon_cmap;
 };
 
 /*
  * Frame buffer device API
  */
 
-static int platinum_get_fix(struct fb_fix_screeninfo *fix, int con,
-			    struct fb_info *fb);
-static int platinum_get_var(struct fb_var_screeninfo *var, int con,
-			    struct fb_info *fb);
-static int platinum_set_var(struct fb_var_screeninfo *var, int con,
-			    struct fb_info *fb);
-static int platinum_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			     struct fb_info *info);
-static int platinum_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			     struct fb_info *info);
-static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			      u_int transp, struct fb_info *fb);
-static int platinum_blank(int blank, struct fb_info *fb);
-
-
-/*
- * Interface to the low level console driver
- */
-
-static int platinum_switch(int con, struct fb_info *fb);
-static int platinum_updatevar(int con, struct fb_info *fb);
+static int platinumfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+	u_int transp, struct fb_info *info);
+static int platinumfb_blank(int blank_mode, struct fb_info *info);
+static int platinumfb_set_par (struct fb_info *info);
+static int platinumfb_check_var (struct fb_var_screeninfo *var, struct fb_info *info);
 
 /*
  * internal functions
@@ -125,21 +100,14 @@ static void platinum_of_init(struct device_node *dp);
 static inline int platinum_vram_reqd(int video_mode, int color_mode);
 static int read_platinum_sense(struct fb_info_platinum *info);
 static void set_platinum_clock(struct fb_info_platinum *info);
-static void platinum_set_par(const struct fb_par_platinum *par, struct fb_info_platinum *info);
+static void platinum_set_hardware(struct fb_info_platinum *info,
+				  const struct fb_par_platinum *par);
 static int platinum_par_to_var(struct fb_var_screeninfo *var,
 			       const struct fb_par_platinum *par,
 			       const struct fb_info_platinum *info);
 static int platinum_var_to_par(const struct fb_var_screeninfo *var,
 			       struct fb_par_platinum *par,
 			       const struct fb_info_platinum *info);
-static int platinum_encode_fix(struct fb_fix_screeninfo *fix,
-			       const struct fb_par_platinum *par,
-			       const struct fb_info_platinum *info);
-static void platinum_set_dispsw(struct display *disp,
-				struct fb_info_platinum *info, int cmode,
-				int accel);
-static int platinum_getcolreg(u_int regno, u_int *red, u_int *green, u_int *blue,
-			      u_int *transp, struct fb_info *fb);
 
 /*
  * Interface used by the world
@@ -150,202 +118,65 @@ int platinum_setup(char*);
 
 static struct fb_ops platinumfb_ops = {
 	.owner =	THIS_MODULE,
-	.fb_get_fix =	platinum_get_fix,
-	.fb_get_var =	platinum_get_var,
-	.fb_set_var =	platinum_set_var,
-	.fb_get_cmap =	platinum_get_cmap,
-	.fb_set_cmap =	platinum_set_cmap,
-	.fb_setcolreg =	platinum_setcolreg,
-	.fb_blank =	platinum_blank,
+	.fb_set_var	= gen_set_var,
+	.fb_check_var	= platinumfb_check_var,
+	.fb_set_par	= platinumfb_set_par,
+	.fb_get_cmap	= gen_get_cmap,
+	.fb_set_cmap	= gen_set_cmap,
+	.fb_setcolreg	= platinumfb_setcolreg,
+	.fb_blank	= platinumfb_blank,
+	.fb_fillrect	= cfb_fillrect,
+	.fb_copyarea	= cfb_copyarea,
+	.fb_imageblit	= cfb_imageblit,
 };
 
-static int platinum_get_fix(struct fb_fix_screeninfo *fix, int con,
-			    struct fb_info *fb)
+/*
+ * Checks a var structure
+ */
+static int platinumfb_check_var (struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	const struct fb_info_platinum *info = (struct fb_info_platinum *)fb;
+	struct fb_info_platinum *p = (struct fb_info_platinum *) info;
 	struct fb_par_platinum par;
-
-	if (con == -1)
-		par = info->default_par;
-	else
-		platinum_var_to_par(&fb_display[con].var, &par, info);
-
-	platinum_encode_fix(fix, &par, info);
-	return 0;
-}
-
-static int platinum_get_var(struct fb_var_screeninfo *var, int con,
-			    struct fb_info *fb)
-{
-	const struct fb_info_platinum *info = (struct fb_info_platinum *)fb;
-
-	if (con == -1)
-		platinum_par_to_var(var, &info->default_par, info);
-	else
-		*var = fb_display[con].var;
+	int err;
+	
+	err = platinum_var_to_par(var, &par, p);
+	if (err)
+		return err;	
+	platinum_par_to_var(var, &par, p);
 
 	return 0;
 }
 
-static void platinum_set_dispsw(struct display *disp,
-				struct fb_info_platinum *info, int cmode,
-				int accel)
+/*
+ * Applies current var to display
+ */
+static int platinumfb_set_par (struct fb_info *info)
 {
-	switch(cmode) {
-#ifdef FBCON_HAS_CFB8
-	    case CMODE_8:
-		disp->dispsw = &fbcon_cfb8;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB16
-	    case CMODE_16:
-		disp->dispsw = &fbcon_cfb16;
-		disp->dispsw_data = info->fbcon_cmap.cfb16;
-		break;
-#endif
-#ifdef FBCON_HAS_CFB32
-	    case CMODE_32:
-		disp->dispsw = &fbcon_cfb32;
-		disp->dispsw_data = info->fbcon_cmap.cfb32;
-		break;
-#endif
-	    default:
-		disp->dispsw = &fbcon_dummy;
-		break;
-	}
-}
-
-static int platinum_set_var(struct fb_var_screeninfo *var, int con,
-			    struct fb_info *fb)
-{
-	struct fb_info_platinum *info = (struct fb_info_platinum *) fb;
-	struct fb_par_platinum par;
-	struct display *display;
-	int oldxres, oldyres, oldvxres, oldvyres, oldbpp, err;
-	int activate = var->activate;
+	struct fb_info_platinum *p = (struct fb_info_platinum *) info;
 	struct platinum_regvals *init;
+	struct fb_par_platinum par;
+	int err;
 
-	display = (con >= 0) ? &fb_display[con] : fb->disp;
-
-	if((err = platinum_var_to_par(var, &par, info))) {
-		printk(KERN_ERR "platinum_set_var: error calling platinum_var_to_par: %d.\n", err);
+	if((err = platinum_var_to_par(&info->var, &par, p))) {
+		printk (KERN_ERR "platinumfb_set_par: error calling"
+				 " platinum_var_to_par: %d.\n", err);
 		return err;
 	}
+
+	platinum_set_hardware(p, &par);
+
+	init = platinum_reg_init[p->par.vmode-1];
 	
-	platinum_par_to_var(var, &par, info);
-
-	if ((activate & FB_ACTIVATE_MASK) != FB_ACTIVATE_NOW) {
-		printk(KERN_INFO "platinum_set_var: Not activating.\n");
-		return 0;
-	}
-
-	init = platinum_reg_init[par.vmode-1];
-
-	oldxres = display->var.xres;
-	oldyres = display->var.yres;
-	oldvxres = display->var.xres_virtual;
-	oldvyres = display->var.yres_virtual;
-	oldbpp = display->var.bits_per_pixel;
-	display->var = *var;
-
-	if (oldxres != var->xres || oldyres != var->yres ||
-	    oldvxres != var->xres_virtual || oldyres != var->yres_virtual ||
-	    oldbpp != var->bits_per_pixel) {
-	    struct fb_fix_screeninfo fix;
-
-	    platinum_encode_fix(&fix, &par, info);
-	    info->fb_info.screen_base = (char *) info->frame_buffer + init->fb_offset + 0x20;
-	    display->visual = fix.visual;
-	    display->type = fix.type;
-	    display->type_aux = fix.type_aux;
-	    display->ypanstep = fix.ypanstep;
-	    display->ywrapstep = fix.ywrapstep;
-	    display->line_length = fix.line_length;
-	    display->can_soft_blank = 1;
-	    display->inverse = 0;
-	    platinum_set_dispsw(display, info, par.cmode, 0);
-	    display->scrollmode = SCROLL_YREDRAW;
-	    if (info->fb_info.changevar)
-	      (*info->fb_info.changevar)(con);
-	}
-
-	if (!info->fb_info.display_fg ||
-	    info->fb_info.display_fg->vc_num == con)
-		platinum_set_par(&par, info);
-
-	if (oldbpp != var->bits_per_pixel) {
-	    if ((err = fb_alloc_cmap(&display->cmap, 0, 0)))
-	      return err;
-	    do_install_cmap(con, &info->fb_info);
-	}
+	info->screen_base = (char *) p->frame_buffer + init->fb_offset + 0x20;
+	info->fix.smem_start = (p->frame_buffer_phys) + init->fb_offset + 0x20;
+	info->fix.visual = (p->par.cmode == CMODE_8) ?
+		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
+	info->fix.line_length = vmode_attrs[p->par.vmode-1].hres * (1<<p->par.cmode) + 0x20;
 
 	return 0;
 }
 
-static int platinum_get_cmap(struct fb_cmap *cmap, int kspc, int con,
-			     struct fb_info *info)
-{
-	if (!info->display_fg ||
-	    info->display_fg->vc_num == con)	/* current console? */
-		return fb_get_cmap(cmap, kspc, platinum_getcolreg, info);
-	if (fb_display[con].cmap.len)	/* non default colormap? */
-		fb_copy_cmap(&fb_display[con].cmap, cmap, kspc ? 0 : 2);
-	else {
-		int size = fb_display[con].var.bits_per_pixel == 16 ? 32 : 256;
-		fb_copy_cmap(fb_default_cmap(size), cmap, kspc ? 0 : 2);
-	}
-	return 0;
-}
-
-static int platinum_set_cmap(struct fb_cmap *cmap, int kspc, int con,
-			     struct fb_info *info)
-{
-	int err;
-	struct display *disp;
-
-	if (con >= 0)
-		disp = &fb_display[con];
-	else
-		disp = info->disp;
-	if (!disp->cmap.len) {     /* no colormap allocated? */
-		int size = disp->var.bits_per_pixel == 16 ? 32 : 256;
-		if ((err = fb_alloc_cmap(&disp->cmap, size, 0)))
-			return err;
-	}
-
-	if (!info->display_fg ||
-	    info->display_fg->vc_num == con)	/* current console? */
-		return fb_set_cmap(cmap, kspc, info);
-	else
-		fb_copy_cmap(cmap, &disp->cmap, kspc ? 0 : 1);
-	return 0;
-}
-
-static int platinum_switch(int con, struct fb_info *fb)
-{
-	struct fb_info_platinum *info = (struct fb_info_platinum *) fb;
-	struct fb_par_platinum par;
-
-	if (fb_display[fb->currcon].cmap.len)
-		fb_get_cmap(&fb_display[fb->currcon].cmap, 1, platinum_getcolreg,
-			    fb);
-	fb->currcon = con;
-
-	platinum_var_to_par(&fb_display[con].var, &par, info);
-	platinum_set_par(&par, info);
-	platinum_set_dispsw(&fb_display[con], info, par.cmode, 0);
-	do_install_cmap(con, fb);
-
-	return 1;
-}
-
-static int platinum_updatevar(int con, struct fb_info *fb)
-{
-	printk(KERN_ERR "platinum_updatevar is doing nothing yet.\n");
-	return 0;
-}
-
-static int platinum_blank(int blank,  struct fb_info *fb)
+static int platinumfb_blank(int blank,  struct fb_info *fb)
 {
 /*
  *  Blank the screen if blank_mode != 0, else unblank. If blank == NULL
@@ -375,26 +206,11 @@ static int platinum_blank(int blank,  struct fb_info *fb)
 	return 0;
 }
 
-static int platinum_getcolreg(u_int regno, u_int *red, u_int *green,
-			      u_int *blue, u_int *transp, struct fb_info *fb)
+static int platinumfb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
+			      u_int transp, struct fb_info *info)
 {
-	struct fb_info_platinum *info = (struct fb_info_platinum *) fb;
-
-	if (regno > 255)
-		return 1;
-
-	*red = (info->palette[regno].red<<8) | info->palette[regno].red;
-	*green = (info->palette[regno].green<<8) | info->palette[regno].green;
-	*blue = (info->palette[regno].blue<<8) | info->palette[regno].blue;
-	*transp = 0;
-	return 0;
-}
-
-static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
-			      u_int transp, struct fb_info *fb)
-{
-	struct fb_info_platinum *info = (struct fb_info_platinum *) fb;
-	volatile struct cmap_regs *cmap_regs = info->cmap_regs;
+	struct fb_info_platinum *p = (struct fb_info_platinum *) info;
+	volatile struct cmap_regs *cmap_regs = p->cmap_regs;
 
 	if (regno > 255)
 		return 1;
@@ -403,23 +219,30 @@ static int platinum_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 	green >>= 8;
 	blue >>= 8;
 
-	info->palette[regno].red = red;
-	info->palette[regno].green = green;
-	info->palette[regno].blue = blue;
+	p->palette[regno].red = red;
+	p->palette[regno].green = green;
+	p->palette[regno].blue = blue;
 
 	out_8(&cmap_regs->addr, regno);		/* tell clut what addr to fill	*/
 	out_8(&cmap_regs->lut, red);		/* send one color channel at	*/
 	out_8(&cmap_regs->lut, green);		/* a time...			*/
 	out_8(&cmap_regs->lut, blue);
 
-	if(regno < 16) {
-#ifdef FBCON_HAS_CFB16
-		info->fbcon_cmap.cfb16[regno] = (regno << 10) | (regno << 5) | (regno << 0);
-#endif
-#ifdef FBCON_HAS_CFB32
-		info->fbcon_cmap.cfb32[regno] = (regno << 24) | (regno << 16) | (regno << 8) | regno;
-#endif
+	if (regno < 16) {
+		int i;
+		switch (p->par.cmode) {
+		case CMODE_16:
+			((u16 *) (info->pseudo_palette))[regno] =
+			    (regno << 10) | (regno << 5) | regno;
+			break;
+		case CMODE_32:
+			i = (regno << 8) | regno;
+			((u32 *) (info->pseudo_palette))[regno] =
+			    (i << 16) | i;
+			break;
+		}
 	}
+	
 	return 0;
 }
 
@@ -439,7 +262,7 @@ static void set_platinum_clock(struct fb_info_platinum *info)
 	volatile struct cmap_regs *cmap_regs = info->cmap_regs;
 	struct platinum_regvals	*init;
 
-	init = platinum_reg_init[info->current_par.vmode-1];
+	init = platinum_reg_init[info->par.vmode-1];
 
 	STORE_D2(6, 0xc6);
 	out_8(&cmap_regs->addr,3+32);
@@ -461,7 +284,7 @@ static void set_platinum_clock(struct fb_info_platinum *info)
 
 /* Now how about actually saying, Make it so! */
 /* Some things in here probably don't need to be done each time. */
-static void platinum_set_par(const struct fb_par_platinum *par, struct fb_info_platinum *info)
+static void platinum_set_hardware(struct fb_info_platinum *info, const struct fb_par_platinum *par)
 {
 	volatile struct platinum_regs	*platinum_regs = info->platinum_regs;
 	volatile struct cmap_regs	*cmap_regs = info->cmap_regs;
@@ -469,7 +292,7 @@ static void platinum_set_par(const struct fb_par_platinum *par, struct fb_info_p
 	int				i;
 	int				vmode, cmode;
 	
-	info->current_par = *par;
+	info->par = *par;
 
 	vmode = par->vmode;
 	cmode = par->cmode;
@@ -509,15 +332,52 @@ static void platinum_set_par(const struct fb_par_platinum *par, struct fb_info_p
 	out_be32(&platinum_regs->reg[24].r, 0);	/* turn display on */
 }
 
+/*
+ * Set misc info vars for this driver
+ */
+static void __init platinum_init_info(struct fb_info *info, struct fb_info_platinum *p)
+{
+	/* Fill fb_info */
+	strcpy(info->modename, "platinum");
+	info->currcon = -1;
+	info->par = &p->par;
+	info->node = NODEV;
+	info->fbops = &platinumfb_ops;
+	info->disp = &p->display;
+	info->pseudo_palette = p->pseudo_palette;
+        info->flags = FBINFO_FLAG_DEFAULT;
+        strncpy (info->fontname, fontname, sizeof (info->fontname));
+        info->fontname[sizeof (info->fontname) - 1] = 0;
+	info->changevar = NULL;
+        info->display_fg = NULL;
+	info->screen_base = (char *) p->frame_buffer + 0x20;
+	info->changevar  = NULL;
+	info->switch_con = gen_switch;
+	info->updatevar  = gen_update_var;
 
-static int __init init_platinum(struct fb_info_platinum *info)
+	fb_alloc_cmap(&info->cmap, 256, 0);
+
+	/* Fill fix common fields */
+	strcpy(info->fix.id, "platinum");
+	info->fix.mmio_start = p->platinum_regs_phys;
+	info->fix.mmio_len = 0x1000;
+	info->fix.type = FB_TYPE_PACKED_PIXELS;
+	info->fix.smem_start = p->frame_buffer_phys + 0x20; /* will be updated later */
+	info->fix.smem_len = p->total_vram - 0x20;
+        info->fix.ywrapstep = 0;
+	info->fix.xpanstep = 0;
+	info->fix.ypanstep = 0;
+        info->fix.type_aux = 0;
+        info->fix.accel = FB_ACCEL_NONE;
+}
+
+
+static int __init init_platinum(struct fb_info_platinum *p)
 {
 	struct fb_var_screeninfo var;
-	struct display *disp;
-	int sense;
-	int j,k;
+	int sense, rc;
 
-	sense = read_platinum_sense(info);
+	sense = read_platinum_sense(p);
 	printk(KERN_INFO "Monitor sense value = 0x%x, ", sense);
 
 	if (default_vmode == VMODE_NVRAM) {
@@ -538,44 +398,40 @@ static int __init init_platinum(struct fb_info_platinum *info)
 	/*
 	 * Reduce the pixel size if we don't have enough VRAM.
 	 */
-	while(default_cmode > CMODE_8 && platinum_vram_reqd(default_vmode, default_cmode) > info->total_vram)
+	while(default_cmode > CMODE_8 && platinum_vram_reqd(default_vmode, default_cmode) > p->total_vram)
 		default_cmode--;
 
 	printk("using video mode %d and color mode %d.\n", default_vmode, default_cmode);
 
-	mac_vmode_to_var(default_vmode, default_cmode, &var);
-
-	if (platinum_var_to_par(&var, &info->default_par, info)) {
-		printk(KERN_ERR "platinumfb: can't set default video mode\n");
-		return 0;
+	/* Setup default var */
+	if (mac_vmode_to_var(default_vmode, default_cmode, &var) < 0) {
+		/* This shouldn't happen! */
+		printk("mac_vmode_to_var(%d, %d,) failed\n", default_vmode, default_cmode);
+try_again:
+		default_vmode = VMODE_640_480_60;
+		default_cmode = CMODE_8;
+		if (mac_vmode_to_var(default_vmode, default_cmode, &var) < 0) {
+			printk(KERN_ERR "platinumfb: mac_vmode_to_var() failed\n");
+			return -ENXIO;
+		}
 	}
 
-	disp = &info->disp;
+	/* Initialize info structure */
+	platinum_init_info(&p->info, p);
 
-	strcpy(info->fb_info.modename, "platinum");
-	info->fb_info.node = NODEV;
-	info->fb_info.fbops = &platinumfb_ops;
-	info->fb_info.disp = disp;
-	info->fb_info.currcon = -1;
-	strcpy(info->fb_info.fontname, fontname);
-	info->fb_info.changevar = NULL;
-	info->fb_info.switch_con = &platinum_switch;
-	info->fb_info.updatevar = &platinum_updatevar;
-	info->fb_info.flags = FBINFO_FLAG_DEFAULT;
+	/* Apply default var */
+	p->info.var = var;
+	var.activate = FB_ACTIVATE_NOW;
+	rc = gen_set_var(&var, -1, &p->info);
+	if (rc && (default_vmode != VMODE_640_480_60 || default_cmode != CMODE_8))
+		goto try_again;
 
-	for (j = 0; j < 16; j++) {
-		k = color_table[j];
-		info->palette[j].red = default_red[k];
-		info->palette[j].green = default_grn[k];
-		info->palette[j].blue = default_blu[k];
-	}
-	platinum_set_var(&var, -1, &info->fb_info);
-
-	if (register_framebuffer(&info->fb_info) < 0)
+	/* Register with fbdev layer */
+	if (register_framebuffer(&p->info) < 0)
 		return 0;
 
 	printk(KERN_INFO "fb%d: platinum frame buffer device\n",
-	       GET_FB_IDX(info->fb_info.node));
+	       GET_FB_IDX(p->info.node));
 
 	return 1;
 }
@@ -760,33 +616,6 @@ static int platinum_par_to_var(struct fb_var_screeninfo *var,
 {
 	return mac_vmode_to_var(par->vmode, par->cmode, var);
 }
-
-static int platinum_encode_fix(struct fb_fix_screeninfo *fix,
-			       const struct fb_par_platinum *par,
-			       const struct fb_info_platinum *info)
-{
-	struct platinum_regvals *init;
-
-	init = platinum_reg_init[par->vmode-1];
-
-	memset(fix, 0, sizeof(*fix));
-	strcpy(fix->id, "platinum");
-	fix->smem_start = (info->frame_buffer_phys) + init->fb_offset + 0x20;
-	fix->smem_len = (u32) info->total_vram;
-	fix->mmio_start = (info->platinum_regs_phys);
-	fix->mmio_len = 0x1000;
-	fix->type = FB_TYPE_PACKED_PIXELS;
-	fix->type_aux = 0;
-	fix->ywrapstep = 0;
-	fix->xpanstep = 0;
-	fix->ypanstep = 0;
-	fix->visual = (par->cmode == CMODE_8) ?
-		FB_VISUAL_PSEUDOCOLOR : FB_VISUAL_DIRECTCOLOR;
-	fix->line_length = vmode_attrs[par->vmode-1].hres * (1<<par->cmode) + 0x20;
-
-	return 0;
-}
-
 
 /* 
  * Parse user speficied options (`video=platinumfb:')
