@@ -1635,11 +1635,11 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 		ACCESS_FBINFO(devflags.text_type_aux) = FB_AUX_TEXT_MGA_STEP8;
 	}
 #ifdef CONFIG_FB_MATROX_32MB
-	ACCESS_FBINFO(devflags.support32MB) = b->flags & DEVF_SUPPORT32MB;
+	ACCESS_FBINFO(devflags.support32MB) = (b->flags & DEVF_SUPPORT32MB) != 0;
 #endif
 	ACCESS_FBINFO(devflags.precise_width) = !(b->flags & DEVF_ANY_VXRES);
-	ACCESS_FBINFO(devflags.crtc2) = b->flags & DEVF_CRTC2;
-	ACCESS_FBINFO(devflags.maven_capable) = b->flags & DEVF_MAVEN_CAPABLE;
+	ACCESS_FBINFO(devflags.crtc2) = (b->flags & DEVF_CRTC2) != 0;
+	ACCESS_FBINFO(devflags.maven_capable) = (b->flags & DEVF_MAVEN_CAPABLE) != 0;
 	ACCESS_FBINFO(devflags.dualhead) = (b->flags & DEVF_DUALHEAD) != 0;
 	if (b->flags & DEVF_PANELLINK_CAPABLE) {
 		ACCESS_FBINFO(outputs[2]).data = MINFO;
@@ -1652,7 +1652,7 @@ static int initMatrox2(WPMINFO struct display* d, struct board* b){
 		ACCESS_FBINFO(devflags.panellink) = 1;
 	}
 	ACCESS_FBINFO(devflags.dfp_type) = dfp_type;
-	ACCESS_FBINFO(devflags.g450dac) = b->flags & DEVF_G450DAC;
+	ACCESS_FBINFO(devflags.g450dac) = (b->flags & DEVF_G450DAC) != 0;
 	ACCESS_FBINFO(devflags.textstep) = ACCESS_FBINFO(devflags.vgastep) * ACCESS_FBINFO(devflags.textmode);
 	ACCESS_FBINFO(devflags.textvram) = 65536 / ACCESS_FBINFO(devflags.textmode);
 
