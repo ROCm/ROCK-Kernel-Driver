@@ -617,8 +617,8 @@ static int show_cpuinfo(struct seq_file *m, void *__unused)
 		   (long)num_possible_cpus(),
 		   (long)num_online_cpus()
 #ifndef CONFIG_SMP
-		   , loops_per_jiffy/(500000/HZ),
-		   (loops_per_jiffy/(5000/HZ)) % 100,
+		   , cpu_data(0).udelay_val/(500000/HZ),
+		   (cpu_data(0).udelay_val/(5000/HZ)) % 100,
 		   cpu_data(0).clock_tick
 #endif
 		);
