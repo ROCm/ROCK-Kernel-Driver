@@ -70,8 +70,8 @@ struct fb_info fb_info;
 
 struct fb_fix_screeninfo igafb_fix __initdata = {
         .id		= "IGA 1682",
-	.type		= FB_TYPE_PACKED_PIXELS;
-	.mmio_len 	= 1000;
+	.type		= FB_TYPE_PACKED_PIXELS,
+	.mmio_len 	= 1000
 };
 
 struct fb_var_screeninfo default_var = {
@@ -149,7 +149,7 @@ struct fb_var_screeninfo default_var_1280x1024 __initdata = {
 	.xres		= 1280,
 	.yres		= 1024,
 	.xres_virtual	= 1280,
-	.yres_virtaul	= 1024,
+	.yres_virtual	= 1024,
 	.bits_per_pixel	= 8,
 	.red		= {0, 8, 0 }, 
 	.green		= {0, 8, 0 },
@@ -300,17 +300,17 @@ static int igafb_setcolreg(unsigned regno, unsigned red, unsigned green,
 	if (regno < 16) {
 		switch (info->var.bits_per_pixel) {
 		case 16:
-			info->pseudo_palette[regno] = 
+			((u16*)(info->pseudo_palette))[regno] = 
 				(regno << 10) | (regno << 5) | regno;
 			break;
 		case 24:
-			info->pseudo_palette[regno] = 
+			((u32*)(info->pseudo_palette))[regno] = 
 				(regno << 16) | (regno << 8) | regno;
 		break;
 		case 32:
 			{ int i;
 			i = (regno << 8) | regno;
-			info->pseudo_palette[regno] = (i << 16) | i;
+			((u32*)(info->pseudo_palette))[regno] = (i << 16) | i;
 			}
 			break;
 		}
@@ -359,7 +359,7 @@ static int __init iga_init(struct fb_info *info, struct iga_par *par)
 	info->fbops = &igafb_ops;
 	info->flags = FBINFO_FLAG_DEFAULT;
 
-	fb_alloc_cmap(info->cmap, video_cmap_len, 0);
+	fb_alloc_cmap(&info->cmap, video_cmap_len, 0);
 
 	if (register_framebuffer(info) < 0)
 		return 0;
