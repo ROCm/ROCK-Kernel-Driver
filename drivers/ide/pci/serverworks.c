@@ -797,9 +797,9 @@ static struct pci_device_id svwks_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"Serverworks IDE",
-	id_table:	svwks_pci_tbl,
-	probe:		svwks_init_one,
+	.name		= "Serverworks IDE",
+	.id_table	= svwks_pci_tbl,
+	.probe		= svwks_init_one,
 #if 0	/* FIXME: implement */
 	suspend:	,
 	resume:		,

@@ -344,9 +344,9 @@ static struct pci_device_id hpt34x_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"HPT34x IDE",
-	id_table:	hpt34x_pci_tbl,
-	probe:		hpt34x_init_one,
+	.name		= "HPT34x IDE",
+	.id_table	= hpt34x_pci_tbl,
+	.probe		= hpt34x_init_one,
 };
 
 static int hpt34x_ide_init(void)

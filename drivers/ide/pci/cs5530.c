@@ -437,9 +437,9 @@ static struct pci_device_id cs5530_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"CS5530 IDE",
-	id_table:	cs5530_pci_tbl,
-	probe:		cs5530_init_one,
+	.name		= "CS5530 IDE",
+	.id_table	= cs5530_pci_tbl,
+	.probe		= cs5530_init_one,
 };
 
 static int cs5530_ide_init(void)

@@ -448,9 +448,9 @@ static struct pci_device_id cy82c693_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"Cypress IDE",
-	id_table:	cy82c693_pci_tbl,
-	probe:		cy82c693_init_one,
+	.name		= "Cypress IDE",
+	.id_table	= cy82c693_pci_tbl,
+	.probe		= cy82c693_init_one,
 };
 
 static int cy82c693_ide_init(void)

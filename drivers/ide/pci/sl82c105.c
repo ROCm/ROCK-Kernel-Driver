@@ -298,9 +298,9 @@ static struct pci_device_id sl82c105_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"W82C105 IDE",
-	id_table:	sl82c105_pci_tbl,
-	probe:		sl82c105_init_one,
+	.name		= "W82C105 IDE",
+	.id_table	= sl82c105_pci_tbl,
+	.probe		= sl82c105_init_one,
 };
 
 static int sl82c105_ide_init(void)

@@ -869,9 +869,9 @@ static struct pci_device_id alim15x3_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"ALI15x3 IDE",
-	id_table:	alim15x3_pci_tbl,
-	probe:		alim15x3_init_one,
+	.name		= "ALI15x3 IDE",
+	.id_table	= alim15x3_pci_tbl,
+	.probe		= alim15x3_init_one,
 };
 
 static int ali15x3_ide_init(void)

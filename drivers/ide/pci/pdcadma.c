@@ -143,9 +143,9 @@ static struct pci_device_id pdcadma_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"PDCADMA-IDE",
-	id_table:	pdcadma_pci_tbl,
-	probe:		pdcadma_init_one,
+	.name		= "PDCADMA-IDE",
+	.id_table	= pdcadma_pci_tbl,
+	.probe		= pdcadma_init_one,
 };
 
 static int pdcadma_ide_init(void)

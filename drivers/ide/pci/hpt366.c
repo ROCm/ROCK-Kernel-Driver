@@ -1199,9 +1199,9 @@ static struct pci_device_id hpt366_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"HPT366 IDE",
-	id_table:	hpt366_pci_tbl,
-	probe:		hpt366_init_one,
+	.name		= "HPT366 IDE",
+	.id_table	= hpt366_pci_tbl,
+	.probe		= hpt366_init_one,
 };
 
 static int hpt366_ide_init(void)

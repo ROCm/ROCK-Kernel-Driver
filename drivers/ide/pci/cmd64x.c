@@ -784,9 +784,9 @@ static struct pci_device_id cmd64x_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"CMD64x IDE",
-	id_table:	cmd64x_pci_tbl,
-	probe:		cmd64x_init_one,
+	.name		= "CMD64x IDE",
+	.id_table	= cmd64x_pci_tbl,
+	.probe		= cmd64x_init_one,
 };
 
 static int cmd64x_ide_init(void)

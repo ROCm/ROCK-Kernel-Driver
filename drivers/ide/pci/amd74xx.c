@@ -414,9 +414,9 @@ static struct pci_device_id amd74xx_pci_tbl[] __devinitdata = {
 };
 
 static struct pci_driver driver = {
-	name:		"AMD IDE",
-	id_table:	amd74xx_pci_tbl,
-	probe:		amd74xx_init_one,
+	.name		= "AMD IDE",
+	.id_table	= amd74xx_pci_tbl,
+	.probe		= amd74xx_init_one,
 };
 
 static int amd74xx_ide_init(void)
