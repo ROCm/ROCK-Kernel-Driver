@@ -240,7 +240,7 @@ extern unsigned long fast_gettimeoffset_quotient;
  *		    ^---- (this multiplication can overflow)
  */
 
-static unsigned long long div64 (unsigned long long a, unsigned long b0)
+static unsigned long long __init div64 (unsigned long long a, unsigned long b0)
 {
 	unsigned int a1, a2;
 	unsigned long long res;

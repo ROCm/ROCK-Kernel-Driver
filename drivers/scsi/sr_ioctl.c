@@ -48,7 +48,7 @@ static int sr_fake_playtrkind(struct cdrom_device_info *cdi, struct cdrom_ti *ti
 	
 	if (ti->cdti_trk1 == ntracks) 
 		ti->cdti_trk1 = CDROM_LEADOUT;
-	else 
+	else if (ti->cdti_trk1 != CDROM_LEADOUT)
 		ti->cdti_trk1 ++;
 
 	trk0_te.cdte_track = ti->cdti_trk0;
