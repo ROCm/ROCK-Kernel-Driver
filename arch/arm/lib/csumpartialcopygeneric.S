@@ -160,8 +160,7 @@ FN_ENTRY
 .done:		adc	r0, sum, #0
 		ldr	sum, [sp, #0]		@ dst
 		tst	sum, #1
-		movne	sum, r0, lsl #8
-		orrne	r0, sum, r0, lsr #24
+		movne	r0, r0, ror #8
 		load_regs	ea
 
 .src_not_aligned:
