@@ -351,18 +351,9 @@ static const struct hc_driver ohci_pci_hc_driver = {
 
 
 static const struct pci_device_id pci_ids [] = { {
-
 	/* handle any USB OHCI controller */
-	.class =	(PCI_CLASS_SERIAL_USB << 8) | 0x10,
-	.class_mask =	~0,
+	PCI_DEVICE_CLASS((PCI_CLASS_SERIAL_USB << 8) | 0x10, ~0),
 	.driver_data =	(unsigned long) &ohci_pci_hc_driver,
-
-	/* no matter who makes it */
-	.vendor =	PCI_ANY_ID,
-	.device =	PCI_ANY_ID,
-	.subvendor =	PCI_ANY_ID,
-	.subdevice =	PCI_ANY_ID,
-
 	}, { /* end: all zeroes */ }
 };
 MODULE_DEVICE_TABLE (pci, pci_ids);

@@ -979,21 +979,12 @@ static const struct hc_driver ehci_driver = {
 /* EHCI spec says PCI is required. */
 
 /* PCI driver selection metadata; PCI hotplugging uses this */
-static struct pci_device_id pci_ids [] = { {
-
+static const struct pci_device_id pci_ids [] = { {
 	/* handle any USB 2.0 EHCI controller */
-
-	.class = 		((PCI_CLASS_SERIAL_USB << 8) | 0x20),
-	.class_mask = 	~0,
+	PCI_DEVICE_CLASS(((PCI_CLASS_SERIAL_USB << 8) | 0x20), ~0),
 	.driver_data =	(unsigned long) &ehci_driver,
-
-	/* no matter who makes it */
-	.vendor =	PCI_ANY_ID,
-	.device =	PCI_ANY_ID,
-	.subvendor =	PCI_ANY_ID,
-	.subdevice =	PCI_ANY_ID,
-
-}, { /* end: all zeroes */ }
+	},
+	{ /* end: all zeroes */ }
 };
 MODULE_DEVICE_TABLE (pci, pci_ids);
 
