@@ -95,7 +95,7 @@ int snd_seq_dump_var_event(const snd_seq_event_t *event, snd_seq_dump_func_t fun
 			int size = sizeof(buf);
 			if (len < size)
 				size = len;
-			if (copy_from_user(buf, curptr, size) < 0)
+			if (copy_from_user(buf, curptr, size))
 				return -EFAULT;
 			err = func(private_data, buf, size);
 			if (err < 0)
@@ -158,7 +158,7 @@ int snd_seq_expand_var_event(const snd_seq_event_t *event, int count, char *buf,
 	if (event->data.ext.len & SNDRV_SEQ_EXT_USRPTR) {
 		if (! in_kernel)
 			return -EINVAL;
-		if (copy_from_user(buf, event->data.ext.ptr, len) < 0)
+		if (copy_from_user(buf, event->data.ext.ptr, len))
 			return -EFAULT;
 		return newlen;
 	}
