@@ -84,6 +84,16 @@ CONFIG_BLK_DEV_IDECS
   Support for outboard IDE disks, tape drives, and CD-ROM drives
   connected through a  PCMCIA card.
 
+CONFIG_ATAPI
+  If you wish to enable basic support for devices attached to the system 
+  through the ATA interface, and which are using using the ATAPI protocol
+  (CD-ROM, CD-RW, DVD, DVD-RW, LS120, ZIP, ...), say Y.
+  
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>.  The module
+  will be called atapi.o.
+  
 CONFIG_BLK_DEV_IDECD
   If you have a CD-ROM drive using the ATAPI protocol, say Y. ATAPI is
   a newer protocol used by IDE CD-ROM and TAPE drives, similar to the
