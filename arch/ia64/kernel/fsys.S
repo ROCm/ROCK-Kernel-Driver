@@ -165,7 +165,7 @@ ENTRY(fsys_gettimeofday)
 	.altrp b6
 	.body
 	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
-	movl r3=THIS_CPU(cpu_info)
+	addl r3=THIS_CPU(cpu_info),r0
 
 	mov.m r31=ar.itc		// put time stamp into r31 (ITC) == now		(35 cyc)
 #ifdef CONFIG_SMP
@@ -177,7 +177,7 @@ ENTRY(fsys_gettimeofday)
 	movl r19=xtime			// xtime is a timespec struct
 
 	ld8 r10=[r10]			// r10 <- __per_cpu_offset[0]
-	movl r21=THIS_CPU(cpu_info)
+	addl r21=THIS_CPU(cpu_info),r0
 	;;
 	add r10=r21, r10		// r10 <- &cpu_data(time_keeper_id)
 	tbit.nz p8,p0 = r2, IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT_BIT

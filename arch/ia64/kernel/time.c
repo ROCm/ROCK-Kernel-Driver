@@ -83,12 +83,11 @@ unsigned long
 itc_get_offset (void)
 {
 	unsigned long elapsed_cycles, lost = jiffies - wall_jiffies;
-	unsigned long now, last_tick;
+	unsigned long now = ia64_get_itc(), last_tick;
 
 	last_tick = (cpu_data(TIME_KEEPER_ID)->itm_next
 		     - (lost + 1)*cpu_data(TIME_KEEPER_ID)->itm_delta);
 
-	now = ia64_get_itc();
 	if (unlikely((long) (now - last_tick) < 0)) {
 		printk(KERN_ERR "CPU %d: now < last_tick (now=0x%lx,last_tick=0x%lx)!\n",
 		       smp_processor_id(), now, last_tick);

@@ -688,7 +688,7 @@ GLOBAL_ENTRY(ia64_leave_syscall)
 	mov b7=r0		// clear b7
 	;;
 (pUStk) st1 [r14]=r3
-	movl r17=THIS_CPU(ia64_phys_stacked_size_p8)
+	addl r17=THIS_CPU(ia64_phys_stacked_size_p8),r0
 	;;
 	mov r16=ar.bsp		// get existing backing store pointer
 	srlz.i			// ensure interruption collection is off
@@ -841,7 +841,7 @@ GLOBAL_ENTRY(ia64_leave_kernel)
 	shr.u r18=r19,16	// get byte size of existing "dirty" partition
 	;;
 	mov r16=ar.bsp		// get existing backing store pointer
-	movl r17=THIS_CPU(ia64_phys_stacked_size_p8)
+	addl r17=THIS_CPU(ia64_phys_stacked_size_p8),r0
 	;;
 	ld4 r17=[r17]		// r17 = cpu_data->phys_stacked_size_p8
 (pKStk)	br.cond.dpnt skip_rbs_switch
