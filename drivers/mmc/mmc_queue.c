@@ -149,6 +149,7 @@ int mmc_init_queue(struct mmc_queue *mq, struct mmc_card *card, spinlock_t *lock
 
 	init_completion(&mq->thread_complete);
 	init_waitqueue_head(&mq->thread_wq);
+	init_MUTEX(&mq->thread_sem);
 
 	ret = kernel_thread(mmc_queue_thread, mq, CLONE_KERNEL);
 	if (ret < 0) {
