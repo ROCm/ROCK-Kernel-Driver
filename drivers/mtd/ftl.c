@@ -119,7 +119,7 @@ MODULE_PARM(shuffle_freq, "i");
 /* Each memory region corresponds to a minor device */
 typedef struct partition_t {
     struct mtd_info	*mtd;
-    struct gndisk	*disk;
+    struct gendisk	*disk;
     u_int32_t		state;
     u_int32_t		*VirtualBlockMap;
     u_int32_t		*VirtualPageMap;
@@ -175,7 +175,6 @@ static int ftl_ioctl(struct inode *inode, struct file *file,
 		     u_int cmd, u_long arg);
 static int ftl_open(struct inode *inode, struct file *file);
 static release_t ftl_close(struct inode *inode, struct file *file);
-static int ftl_reread_partitions(kdev_t dev);
 static int ftl_revalidate(kdev_t dev);
 
 static void ftl_erase_callback(struct erase_info *done);
@@ -1125,7 +1124,7 @@ static int ftl_revalidate(kdev_t dev)
 	partition_t *part = myparts[unit];
 	scan_header(part);
 	set_capacity(part->disk,
-		le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE));
+		le32_to_cpu(part->header.FormattedSize)/SECTOR_SIZE);
 	return 0;
 }
 
@@ -1151,7 +1150,7 @@ static void do_ftl_request(request_arg_t)
 	if (part) {
 	  ret = 0;
 	  
-	  switch (CURRENT->cmd) {
+	  switch (rq_data_dir(CURRENT)) {
 	  case READ:
 	    ret = ftl_read(part, CURRENT->buffer, CURRENT->sector,
 			   CURRENT->current_nr_sectors);
@@ -1267,7 +1266,7 @@ static void ftl_notify_add(struct mtd_info *mtd)
 
 static void ftl_notify_remove(struct mtd_info *mtd)
 {
-        int i,j;
+        int i;
 
 	/* Q: What happens if you try to remove a device which has
 	 *    a currently-open FTL partition on it?
@@ -1287,7 +1286,7 @@ static void ftl_notify_remove(struct mtd_info *mtd)
 			
 			myparts[i]->state = 0;
 			del_gendisk(myparts[i]->disk);
-			kfree(myparts[i]->disk->name);
+			kfree(myparts[i]->disk->major_name);
 			kfree(myparts[i]->disk);
 			kfree(myparts[i]);
 			myparts[i] = NULL;
@@ -1296,7 +1295,7 @@ static void ftl_notify_remove(struct mtd_info *mtd)
 
 int init_ftl(void)
 {
-    int i;
+    static spinlock_t lock = SPIN_LOCK_UNLOCKED;
     DEBUG(0, "$Id: ftl.c,v 1.39 2001/10/02 15:05:11 dwmw2 Exp $\n");
     
     if (register_blkdev(FTL_MAJOR, "ftl", &ftl_blk_fops)) {
@@ -1304,7 +1303,7 @@ int init_ftl(void)
 	       "device number!\n");
 	return -EAGAIN;
     }
-    blk_init_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR), &do_ftl_request);
+    blk_init_queue(BLK_DEFAULT_QUEUE(FTL_MAJOR), &do_ftl_request, &lock);
     register_mtd_user(&ftl_notifier);
     
     return 0;
