@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001-2003 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -445,7 +445,10 @@ struct dst_entry *sctp_v4_get_dst(struct sctp_association *asoc,
 	memset(&fl, 0x0, sizeof(struct flowi));
 	fl.fl4_dst  = daddr->v4.sin_addr.s_addr;
 	fl.proto = IPPROTO_SCTP;
-
+	if (asoc) {
+		fl.fl4_tos = RT_CONN_FLAGS(asoc->base.sk);
+		fl.oif = asoc->base.sk->sk_bound_dev_if;
+	}
 	if (saddr)
 		fl.fl4_src = saddr->v4.sin_addr.s_addr;
 
