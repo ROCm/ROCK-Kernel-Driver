@@ -11,3 +11,5 @@ USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
+
+CFLAGS_user_syms.o += -DSUBARCH_$(SUBARCH)

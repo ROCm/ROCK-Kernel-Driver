@@ -173,6 +173,7 @@ static void init_highmem(void)
 
 static void __init fixaddr_user_init( void)
 {
+#if FIXADDR_USER_START != 0
 	long size = FIXADDR_USER_END - FIXADDR_USER_START;
 	pgd_t *pgd;
 	pmd_t *pmd;
@@ -192,6 +193,7 @@ static void __init fixaddr_user_init( void)
 		pte = pte_offset_kernel(pmd, vaddr);
 		pte_set_val( (*pte), paddr, PAGE_READONLY);
 	}
+#endif
 }
 
 void paging_init(void)
