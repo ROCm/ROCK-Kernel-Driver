@@ -164,14 +164,8 @@ static struct hd_struct mm_partitions[MM_MAXCARDS << MM_SHIFT];
 
 static int num_cards = 0;
 
-struct gendisk mm_gendisk = {
-    major:         0,			/* Major number assigned later */
-    major_name:    "umem",		/* Name of the major device */
-    minor_shift:   MM_SHIFT,		/* Shift to get device number */
-    fops:          &mm_fops,   		/* Block dev operations */
-/* everything else is dynamic */
-};
-
+static struct gendisk mm_gendisk[MM_MAXCARDS];
+static char mm_names[MM_MAXCARDS * 6];
 
 static void check_batteries(struct cardinfo *card);
 
@@ -1182,10 +1176,6 @@ int __init mm_init(void)
 
 	printk(KERN_INFO DRIVER_VERSION " : " DRIVER_DESC "\n");
 
-	memset (cards,    0, MM_MAXCARDS * sizeof(struct cardinfo));
-	memset (mm_partitions, 0,
-		(MM_MAXCARDS << MM_SHIFT) * sizeof(struct hd_struct));
-
 	retval = pci_module_init(&mm_pci_driver);
 	if (retval)
 		return -ENOMEM;
@@ -1197,23 +1187,23 @@ int __init mm_init(void)
 	}
 	devfs_handle = devfs_mk_dir(NULL, "umem", NULL);
 
-
-	/* Initialize partition size: partion 0 of each card is the entire card */
-	for (i = 0; i < num_cards; i++) {
-		spin_lock_init(&cards[i].lock);
-		mm_partitions[i << MM_SHIFT].nr_sects =
-			cards[i].mm_size * (1024 / MM_HARDSECT);
-	}
-
-	mm_gendisk.part      = mm_partitions;
-	mm_gendisk.nr_real   = num_cards;
-
 	blk_dev[MAJOR_NR].queue = mm_queue_proc;
-	add_gendisk(&mm_gendisk);
-
-        for (i = 0; i < num_cards; i++) {
-		register_disk(&mm_gendisk, mk_kdev(MAJOR_NR, i<<MM_SHIFT), MM_SHIFT,
-			      &mm_fops, cards[i].mm_size << 1);
+	for (i = 0; i < num_cards; i++) {
+		struct gendisk *disk = mm_gendisk + i;
+		sprintf(mm_names + i*6, "umem%c", 'a'+i);
+		spin_lock_init(&cards[i].lock);
+		disk->part  = mm_partitions + (i << MM_SHIFT);
+		disk->nr_real = 1;
+		disk->major = major_nr;
+		disk->first_minor  = i << MM_SHIFT;
+		disk->major_name = mm_names + i*6;
+		disk->minor_shift = MM_SHIFT;
+		disk->fops = &mm_fops;
+		add_gendisk(disk);
+		register_disk(disk, mk_kdev(disk->major, disk->first_minor),
+			      1<<disk->minor_shift,
+			      disk->fops,
+			      cards[i].mm_size << 1);
 	}
 
 	init_battery_timer();
@@ -1232,8 +1222,10 @@ void __exit mm_cleanup(void)
 
 	del_battery_timer();
 
-	for (i=0; i < num_cards ; i++)
-		devfs_register_partitions(&mm_gendisk, i<<MM_SHIFT, 1);
+	for (i=0; i < num_cards ; i++) {
+		devfs_register_partitions(mm_gendisk + i, i<<MM_SHIFT, 1);
+		del_gendisk(mm_gendisk + i);
+	}
 	if (devfs_handle)
 		devfs_unregister(devfs_handle);
 	devfs_handle = NULL;
@@ -1241,11 +1233,6 @@ void __exit mm_cleanup(void)
 	pci_unregister_driver(&mm_pci_driver);
 
 	unregister_blkdev(MAJOR_NR, "umem");
-
-	/*
-	 * Get our gendisk structure off the list.
-	 */
-	del_gendisk(&mm_gendisk);
 }
 
 module_init(mm_init);

@@ -53,39 +53,6 @@ cchhb2blk (cchhb_t *ptr, struct hd_geometry *geo) {
 }
 
 /*
- * We used to use ioctl_by_bdev in early 2.4, but it broke
- * between 2.4.9 and 2.4.18 somewhere.
- */
-extern int (*genhd_dasd_ioctl)(struct inode *inp, struct file *filp,
-			       unsigned int no, unsigned long data);
-
-static int
-ibm_ioctl_unopened(struct block_device *bdev, unsigned cmd, unsigned long arg)
-{
-	int res;
-	mm_segment_t old_fs = get_fs();
-	
-	if (genhd_dasd_ioctl == NULL)
-		return -ENODEV;
-#if 0
-	lock_kernel();
-	if (bd_ops->owner)
-		__MOD_INC_USE_COUNT(bdev->bd_op->owner);
-	unlock_kernel();
-#endif
-	set_fs(KERNEL_DS);
-	res = (*genhd_dasd_ioctl)(bdev->bd_inode, NULL, cmd, arg);
-	set_fs(old_fs);
-#if 0
-	lock_kernel();
-	if (bd_ops->owner)
-		__MOD_DEV_USE_COUNT(bd_ops->owner);
-	unlock_kernel();
-#endif
-	return res;
-}
-
-/*
  */
 int 
 ibm_partition(struct parsed_partitions *state, struct block_device *bdev)
@@ -106,8 +73,8 @@ ibm_partition(struct parsed_partitions *state, struct block_device *bdev)
 	if ((vlabel = kmalloc(sizeof(volume_label_t), GFP_KERNEL)) == NULL)
 		goto out_novlab;
 	
-	if (ibm_ioctl_unopened(bdev, BIODASDINFO, (unsigned long)info) != 0 ||
-	    ibm_ioctl_unopened(bdev, HDIO_GETGEO, (unsigned long)geo) != 0)
+	if (ioctl_by_bdev(bdev, BIODASDINFO, (unsigned long)info) != 0 ||
+	    ioctl_by_bdev(bdev, HDIO_GETGEO, (unsigned long)geo) != 0)
 		goto out_noioctl;
 	
 	if ((blocksize = bdev_hardsect_size(bdev)) <= 0)

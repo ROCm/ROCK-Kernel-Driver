@@ -173,12 +173,7 @@ dasd_devices_print(dasd_devmap_t *devmap, char *str)
 	minor = devmap->devindex % DASD_PER_MAJOR;
 	len += sprintf(str + len, " at (%3d:%3d)", gdp->major, minor);
 	/* Print device name. */
-	if (device == NULL) {
-		dasd_device_name(buffer, minor, 0, gdp);
-		substr = buffer;
-	} else
-		substr = device->name;
-	len += sprintf(str + len, " is %-7s", substr);
+	len += sprintf(str + len, " is %-7s", gdp->major_name);
 	/* Print devices features. */
 	substr = (devmap->features & DASD_FEATURE_READONLY) ? "(ro)" : " ";
 	len += sprintf(str + len, "%4s: ", substr);
