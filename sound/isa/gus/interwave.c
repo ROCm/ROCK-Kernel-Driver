@@ -626,7 +626,7 @@ static int __devinit snd_interwave_pnp(int dev, struct snd_interwave *iwcard,
 		return -ENOENT;
 	}
 	port[dev] = pnp_port_start(pdev, 0);
-	dma1[dev] = pnp_dma(pdev, 1);
+	dma1[dev] = pnp_dma(pdev, 0);
 	if (dma2[dev] >= 0)
 		dma2[dev] = pnp_dma(pdev, 1);
 	irq[dev] = pnp_irq(pdev, 0);
