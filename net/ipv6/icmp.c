@@ -369,7 +369,8 @@ static void icmpv6_echo_reply(struct sk_buff *skb)
 
 	saddr = &skb->nh.ipv6h->daddr;
 
-	if (ipv6_addr_type(saddr) & IPV6_ADDR_MULTICAST)
+	if (ipv6_addr_type(saddr) & IPV6_ADDR_MULTICAST ||
+	    ipv6_chk_acast_addr(0, saddr)) 
 		saddr = NULL;
 
 	msg.icmph.icmp6_type = ICMPV6_ECHO_REPLY;

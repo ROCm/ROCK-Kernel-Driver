@@ -172,6 +172,7 @@ struct ipv6_pinfo {
 				ipv6only:1;
 
 	struct ipv6_mc_socklist	*ipv6_mc_list;
+	struct ipv6_ac_socklist	*ipv6_ac_list;
 	struct ipv6_fl_socklist *ipv6_fl_list;
 	__u32			dst_cookie;
 

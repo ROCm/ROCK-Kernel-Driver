@@ -547,6 +547,8 @@ EXPORT_SYMBOL(register_netdevice);
 EXPORT_SYMBOL(unregister_netdevice);
 EXPORT_SYMBOL(netdev_state_change);
 EXPORT_SYMBOL(dev_new_index);
+EXPORT_SYMBOL(dev_get_by_flags);
+EXPORT_SYMBOL(__dev_get_by_flags);
 EXPORT_SYMBOL(dev_get_by_index);
 EXPORT_SYMBOL(__dev_get_by_index);
 EXPORT_SYMBOL(dev_get_by_name);

@@ -469,6 +469,10 @@ extern struct net_device    *dev_getbyhwaddr(unsigned short type, char *hwaddr);
 extern void		dev_add_pack(struct packet_type *pt);
 extern void		dev_remove_pack(struct packet_type *pt);
 extern int		dev_get(const char *name);
+extern struct net_device	*dev_get_by_flags(unsigned short flags,
+						  unsigned short mask);
+extern struct net_device	*__dev_get_by_flags(unsigned short flags,
+						    unsigned short mask);
 extern struct net_device	*dev_get_by_name(const char *name);
 extern struct net_device	*__dev_get_by_name(const char *name);
 extern struct net_device	*dev_alloc(const char *name, int *err);
