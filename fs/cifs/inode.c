@@ -426,6 +426,7 @@ cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 	rc = CIFSSMBMkDir(xid, pTcon, full_path, cifs_sb->local_nls);
 	if (rc) {
 		cFYI(1, ("cifs_mkdir returned 0x%x ", rc));
+		d_drop(direntry);
 	} else {
 		inode->i_nlink++;
 		if (pTcon->ses->capabilities & CAP_UNIX)
