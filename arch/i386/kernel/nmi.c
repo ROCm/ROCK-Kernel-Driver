@@ -462,8 +462,7 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 			/* Only P6 based Pentium M need to re-unmask
 			 * the apic vector but it doesn't hurt
 			 * other P6 variant */
-			apic_write(APIC_LVTPC,
-				   apic_read(APIC_LVTPC) & ~APIC_LVT_MASKED);
+			apic_write(APIC_LVTPC, APIC_DM_NMI);
 		}
 		wrmsr(nmi_perfctr_msr, -(cpu_khz/nmi_hz*1000), -1);
 	}
