@@ -23,7 +23,7 @@
 #include <linux/major.h>
 #include <linux/ioctl.h>
 #include <linux/types.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <linux/module.h>
 #include <linux/hdreg.h>
 #include <linux/proc_fs.h>

@@ -14,8 +14,8 @@
 #include <linux/device.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/interrupt.h>
+#include <linux/bitops.h>
 #include <asm/hdreg.h>
-#include <asm/bitops.h>
 
 /*
  * This is the multiple IDE interface driver, as evolved from hd.c.

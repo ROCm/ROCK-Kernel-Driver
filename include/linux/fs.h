@@ -22,9 +22,9 @@
 #include <linux/stddef.h>
 #include <linux/string.h>
 #include <linux/radix-tree.h>
+#include <linux/bitops.h>
 
 #include <asm/atomic.h>
-#include <asm/bitops.h>
 
 struct poll_table_struct;
 
