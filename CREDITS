@@ -1395,6 +1395,7 @@ N: Marcel Holtmann
 E: marcel@holtmann.org
 W: http://www.holtmann.org
 D: Author and maintainer of the various Bluetooth HCI drivers
+D: Author and maintainer of the CAPI message transport protocol driver
 D: Various other Bluetooth related patches, cleanups and fixes
 S: Germany
 
