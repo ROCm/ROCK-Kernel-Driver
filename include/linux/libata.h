@@ -133,15 +133,6 @@ enum {
 	BUS_IDENTIFY		= 8,
 	BUS_PACKET		= 9,
 
-	/* thread states */
-	THR_UNKNOWN		= 0,
-	THR_PORT_RESET		= (THR_UNKNOWN + 1),
-	THR_AWAIT_DEATH		= (THR_PORT_RESET + 1),
-	THR_PROBE_FAILED	= (THR_AWAIT_DEATH + 1),
-	THR_IDLE		= (THR_PROBE_FAILED + 1),
-	THR_PROBE_SUCCESS	= (THR_IDLE + 1),
-	THR_PROBE_START		= (THR_PROBE_SUCCESS + 1),
-
 	/* SATA port states */
 	PORT_UNKNOWN		= 0,
 	PORT_ENABLED		= 1,
@@ -294,17 +285,11 @@ struct ata_port {
 	struct ata_host_stats	stats;
 	struct ata_host_set	*host_set;
 
-	struct semaphore	probe_sem;
-
-	unsigned int		thr_state;
-
 	struct work_struct	packet_task;
 
 	struct work_struct	pio_task;
 	unsigned int		pio_task_state;
 	unsigned long		pio_task_timeout;
-
-	struct work_struct	probe_task;
 
 	void			*private_data;
 };
@@ -330,7 +315,7 @@ struct ata_port_operations {
 
 	void (*bmdma_setup) (struct ata_queued_cmd *qc);
 	void (*bmdma_start) (struct ata_queued_cmd *qc);
-	void (*fill_sg) (struct ata_queued_cmd *qc);
+	void (*qc_prep) (struct ata_queued_cmd *qc);
 	void (*eng_timeout) (struct ata_port *ap);
 
 	irqreturn_t (*irq_handler)(int, void *, struct pt_regs *);
@@ -390,7 +375,7 @@ extern void ata_exec_command_mmio(struct ata_port *ap, struct ata_taskfile *tf);
 extern int ata_port_start (struct ata_port *ap);
 extern void ata_port_stop (struct ata_port *ap);
 extern irqreturn_t ata_interrupt (int irq, void *dev_instance, struct pt_regs *regs);
-extern void ata_fill_sg(struct ata_queued_cmd *qc);
+extern void ata_qc_prep(struct ata_queued_cmd *qc);
 extern void ata_dev_id_string(struct ata_device *dev, unsigned char *s,
 			      unsigned int ofs, unsigned int len);
 extern void ata_bmdma_setup_mmio (struct ata_queued_cmd *qc);
@@ -554,6 +539,46 @@ static inline void scr_write(struct ata_port *ap, unsigned int reg, u32 val)
 static inline unsigned int sata_dev_present(struct ata_port *ap)
 {
 	return ((scr_read(ap, SCR_STATUS) & 0xf) == 0x3) ? 1 : 0;
+}
+
+static inline void ata_bmdma_stop(struct ata_port *ap)
+{
+	if (ap->flags & ATA_FLAG_MMIO) {
+		void *mmio = (void *) ap->ioaddr.bmdma_addr;
+
+		/* clear start/stop bit */
+		writeb(readb(mmio + ATA_DMA_CMD) & ~ATA_DMA_START,
+		      mmio + ATA_DMA_CMD);
+	} else {
+		/* clear start/stop bit */
+		outb(inb(ap->ioaddr.bmdma_addr + ATA_DMA_CMD) & ~ATA_DMA_START,
+		    ap->ioaddr.bmdma_addr + ATA_DMA_CMD);
+	}
+
+	/* one-PIO-cycle guaranteed wait, per spec, for HDMA1:0 transition */
+	ata_altstatus(ap);	      /* dummy read */
+}
+
+static inline void ata_bmdma_ack_irq(struct ata_port *ap)
+{
+	if (ap->flags & ATA_FLAG_MMIO) {
+		void *mmio = ((void *) ap->ioaddr.bmdma_addr) + ATA_DMA_STATUS;
+		writeb(readb(mmio), mmio);
+	} else {
+		unsigned long addr = ap->ioaddr.bmdma_addr + ATA_DMA_STATUS;
+		outb(inb(addr), addr);
+	}
+}
+
+static inline u8 ata_bmdma_status(struct ata_port *ap)
+{
+	u8 host_stat;
+	if (ap->flags & ATA_FLAG_MMIO) {
+		void *mmio = (void *) ap->ioaddr.bmdma_addr;
+		host_stat = readb(mmio + ATA_DMA_STATUS);
+	} else
+		host_stat = inb(ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
+	return host_stat;
 }
 
 #endif /* __LINUX_LIBATA_H__ */
