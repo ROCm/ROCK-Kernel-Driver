@@ -956,7 +956,7 @@ __nfs_revalidate_inode(struct nfs_server *server, struct inode *inode)
 		status = nfs_wait_on_inode(inode, NFS_INO_REVALIDATING);
 		if (status < 0)
 			goto out_nowait;
-		if (NFS_SERVER(inode)->flags & NFS_MOUNT_NOAC)
+		if (NFS_ATTRTIMEO(inode) == 0)
 			continue;
 		if (NFS_FLAGS(inode) & (NFS_INO_INVALID_ATTR|NFS_INO_INVALID_DATA|NFS_INO_INVALID_ATIME))
 			continue;
