@@ -32,9 +32,6 @@
 #include <linux/kref.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
-#ifdef CONFIG_KDB
-#include <linux/kdb.h>
-#endif
 
 /*
  * Literals
@@ -1083,18 +1080,6 @@ struct ipr_ucode_image_header {
 #define IPR_DBG_CMD(CMD) do { CMD; } while (0)
 #else
 #define IPR_DBG_CMD(CMD)
-#endif
-
-#define ipr_breakpoint_data KERN_ERR IPR_NAME\
-": %s: %s: Line: %d ioa_cfg: %p\n", __FILE__, \
-__FUNCTION__, __LINE__, ioa_cfg
-
-#if defined(CONFIG_KDB) && !defined(CONFIG_PPC_ISERIES)
-#define ipr_breakpoint {printk(ipr_breakpoint_data); KDB_ENTER();}
-#define ipr_breakpoint_or_die {printk(ipr_breakpoint_data); KDB_ENTER();}
-#else
-#define ipr_breakpoint
-#define ipr_breakpoint_or_die panic(ipr_breakpoint_data)
 #endif
 
 #ifdef CONFIG_SCSI_IPR_TRACE
