@@ -380,7 +380,7 @@ static int			idle_period = DEFAULT_IDLE_PERIOD;
 static int			set_pm_idle;
 static int			suspends_pending;
 static int			standbys_pending;
-static int			waiting_for_resume;
+static int			ignore_sys_suspend;
 static int			ignore_normal_resume;
 static int			bounce_interval = DEFAULT_BOUNCE_INTERVAL;
 
@@ -1200,7 +1200,7 @@ static int suspend(int vetoable)
 			if (apm_info.connection_version > 0x100)
 				apm_set_power_state(APM_STATE_REJECT);
 			err = -EBUSY;
-			waiting_for_resume = 0;
+			ignore_sys_suspend = 0;
 			printk(KERN_WARNING "apm: suspend was vetoed.\n");
 			goto out;
 		}
@@ -1308,9 +1308,9 @@ static void check_events(void)
 			 * sending a SUSPEND event until something else
 			 * happens!
 			 */
-			if (waiting_for_resume)
+			if (ignore_sys_suspend)
 				return;
-			waiting_for_resume = 1;
+			ignore_sys_suspend = 1;
 			queue_event(event, NULL);
 			if (suspends_pending <= 0)
 				(void) suspend(1);
@@ -1319,7 +1319,7 @@ static void check_events(void)
 		case APM_NORMAL_RESUME:
 		case APM_CRITICAL_RESUME:
 		case APM_STANDBY_RESUME:
-			waiting_for_resume = 0;
+			ignore_sys_suspend = 0;
 			last_resume = jiffies;
 			ignore_bounce = 1;
 			if ((event != APM_NORMAL_RESUME)
