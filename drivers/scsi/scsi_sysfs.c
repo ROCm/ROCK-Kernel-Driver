@@ -169,7 +169,10 @@ void scsi_device_dev_release(struct device *dev)
 
 	if (delete) {
 		struct scsi_target *starget = to_scsi_target(parent);
+		struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);
 		if (!starget->create) {
+			if (shost->transportt->target_destroy)
+				shost->transportt->target_destroy(starget);
 			device_del(parent);
 			if (starget->transport_classdev.class)
 				class_device_unregister(&starget->transport_classdev);
@@ -601,6 +604,8 @@ void scsi_remove_device(struct scsi_device *sdev)
 	scsi_device_set_state(sdev, SDEV_DEL);
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
+	if (sdev->host->transportt->device_destroy)
+		sdev->host->transportt->device_destroy(sdev);
 	put_device(&sdev->sdev_gendev);
 
 out:

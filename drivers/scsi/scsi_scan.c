@@ -253,6 +253,11 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	sdev->request_queue->queuedata = sdev;
 	scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
 
+	if (shost->transportt->device_setup) {
+		if (shost->transportt->device_setup(sdev))
+			goto out_free_queue;
+	}
+
 	if (shost->hostt->slave_alloc) {
 		ret = shost->hostt->slave_alloc(sdev);
 		if (ret) {
@@ -262,13 +267,8 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 			 */
 			if (ret == -ENXIO)
 				display_failure_msg = 0;
-			goto out_free_queue;
+			goto out_device_destroy;
 		}
-	}
-
-	if (shost->transportt->device_setup) {
-		if (shost->transportt->device_setup(sdev))
-			goto out_cleanup_slave;
 	}
 
 	if (scsi_sysfs_device_initialize(sdev) != 0)
@@ -290,6 +290,9 @@ out_remove_siblings:
 out_cleanup_slave:
 	if (shost->hostt->slave_destroy)
 		shost->hostt->slave_destroy(sdev);
+out_device_destroy:
+	if (shost->transportt->device_destroy)
+		shost->transportt->device_destroy(sdev);
 out_free_queue:
 	scsi_free_queue(sdev->request_queue);
 out_free_dev:
@@ -741,6 +744,8 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 	} else {
 		if (sdev->host->hostt->slave_destroy)
 			sdev->host->hostt->slave_destroy(sdev);
+		if (sdev->host->transportt->device_destroy)
+			sdev->host->transportt->device_destroy(sdev);
 		put_device(&sdev->sdev_gendev);
 	}
  out:
@@ -1299,5 +1304,7 @@ void scsi_free_host_dev(struct scsi_device *sdev)
 
 	if (sdev->host->hostt->slave_destroy)
 		sdev->host->hostt->slave_destroy(sdev);
+	if (sdev->host->transportt->device_destroy)
+		sdev->host->transportt->device_destroy(sdev);
 	put_device(&sdev->sdev_gendev);
 }

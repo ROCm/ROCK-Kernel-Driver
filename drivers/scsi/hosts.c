@@ -81,6 +81,8 @@ void scsi_remove_host(struct Scsi_Host *shost)
 
 	set_bit(SHOST_DEL, &shost->shost_state);
 
+	if (shost->transportt->host_destroy)
+		shost->transportt->host_destroy(shost);
 	class_device_unregister(&shost->shost_classdev);
 	if (shost->transport_classdev.class)
 		class_device_unregister(&shost->transport_classdev);
@@ -135,11 +137,14 @@ int scsi_add_host(struct Scsi_Host *shost, struct device *dev)
 
 	error = scsi_sysfs_add_host(shost);
 	if (error)
-		goto out_del_classdev;
+		goto out_destroy_host;
 
 	scsi_proc_host_add(shost);
 	return error;
 
+ out_destroy_host:
+	if (shost->transportt->host_destroy)
+		shost->transportt->host_destroy(shost);
  out_del_classdev:
 	class_device_del(&shost->shost_classdev);
  out_del_gendev:

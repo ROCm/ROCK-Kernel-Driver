@@ -94,6 +94,13 @@ static int fc_setup_starget_transport_attrs(struct scsi_target *starget)
 	return 0;
 }
 
+static void fc_destroy_starget(struct scsi_target *starget)
+{
+	/* Stop the target timer */
+	if (cancel_delayed_work(&fc_starget_dev_loss_work(starget)))
+		flush_scheduled_work();
+}
+
 static int fc_setup_host_transport_attrs(struct Scsi_Host *shost)
 {
 	/* 
@@ -105,6 +112,13 @@ static int fc_setup_host_transport_attrs(struct Scsi_Host *shost)
 	INIT_WORK(&fc_host_link_down_work(shost),
 		  fc_timeout_blocked_host, shost);
 	return 0;
+}
+
+static void fc_destroy_host(struct Scsi_Host *shost)
+{
+	/* Stop the host timer */
+	if (cancel_delayed_work(&fc_host_link_down_work(shost)))
+		flush_scheduled_work();
 }
 
 static void transport_class_release(struct class_device *class_dev)
@@ -281,11 +295,13 @@ fc_attach_transport(struct fc_function_template *ft)
 	i->t.target_attrs = &i->starget_attrs[0];
 	i->t.target_class = &fc_transport_class;
 	i->t.target_setup = &fc_setup_starget_transport_attrs;
+	i->t.target_destroy = &fc_destroy_starget;
 	i->t.target_size = sizeof(struct fc_starget_attrs);
 
 	i->t.host_attrs = &i->host_attrs[0];
 	i->t.host_class = &fc_host_class;
 	i->t.host_setup = &fc_setup_host_transport_attrs;
+	i->t.host_destroy = &fc_destroy_host;
 	i->t.host_size = sizeof(struct fc_host_attrs);
 	i->f = ft;
 
