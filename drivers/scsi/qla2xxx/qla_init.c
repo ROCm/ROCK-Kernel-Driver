@@ -1399,7 +1399,7 @@ qla2x00_nvram_config(scsi_qla_host_t *ha)
 		icb->firmware_options[0] &= ~BIT_3;
 		icb->add_firmware_options[0] &=
 		    ~(BIT_3 | BIT_2 | BIT_1 | BIT_0);
-		icb->add_firmware_options[0] |= (BIT_1 | BIT_0);
+		icb->add_firmware_options[0] |= BIT_2;
 		icb->response_accumulation_timer = 3;
 		icb->interrupt_delay_timer = 5;
 

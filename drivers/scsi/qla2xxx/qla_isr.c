@@ -283,10 +283,13 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 	switch (mb[0]) {
 	case MBA_SCSI_COMPLETION:
 		if (IS_QLA2100(ha) || IS_QLA2200(ha))
-			handles[0] = RD_MAILBOX_REG(ha, reg, 1);
+			handles[0] = le32_to_cpu(
+			    ((uint32_t)(RD_MAILBOX_REG(ha, reg, 2) << 16)) |
+			    RD_MAILBOX_REG(ha, reg, 1));
 		else
-			handles[0] = MSW(mbx);
-		handles[0] |= (uint32_t)(RD_MAILBOX_REG(ha, reg, 2) << 16);
+			handles[0] = le32_to_cpu(
+			    ((uint32_t)(RD_MAILBOX_REG(ha, reg, 2) << 16)) |
+			    MSW(mbx));
 		handle_cnt = 1;
 		break;
 	case MBA_CMPLT_1_16BIT:
@@ -328,9 +331,11 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		mb[0] = MBA_SCSI_COMPLETION;
 		break;
 	case MBA_CMPLT_2_32BIT:
-		handles[0] = (uint32_t)((RD_MAILBOX_REG(ha, reg, 2) << 16) |
+		handles[0] = le32_to_cpu(
+		    ((uint32_t)(RD_MAILBOX_REG(ha, reg, 2) << 16)) |
 		    RD_MAILBOX_REG(ha, reg, 1));
-		handles[1] = (uint32_t)((RD_MAILBOX_REG(ha, reg, 7) << 16) |
+		handles[1] = le32_to_cpu(
+		    ((uint32_t)(RD_MAILBOX_REG(ha, reg, 7) << 16)) |
 		    RD_MAILBOX_REG(ha, reg, 6));
 		handle_cnt = 2;
 		mb[0] = MBA_SCSI_COMPLETION;
