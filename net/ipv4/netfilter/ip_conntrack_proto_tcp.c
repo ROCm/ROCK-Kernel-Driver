@@ -906,7 +906,8 @@ static int tcp_packet(struct ip_conntrack *conntrack,
 		if (index == TCP_RST_SET
 		    && ((test_bit(IPS_SEEN_REPLY_BIT, &conntrack->status)
 		         && conntrack->proto.tcp.last_index <= TCP_SYNACK_SET)
-		        || conntrack->proto.tcp.last_index == TCP_ACK_SET)
+		        || (!test_bit(IPS_ASSURED_BIT, &conntrack->status)
+			 && conntrack->proto.tcp.last_index == TCP_ACK_SET))
 		    && after(ntohl(th->ack_seq),
 		    	     conntrack->proto.tcp.last_seq)) {
 			/* Ignore RST closing down invalid SYN or ACK
