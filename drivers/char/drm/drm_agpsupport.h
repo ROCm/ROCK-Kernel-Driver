@@ -276,6 +276,7 @@ drm_agp_head_t *DRM(agp_init)(void)
 		case INTEL_I845:	head->chipset = "Intel i845";    break;
 #endif
 		case INTEL_I850:	head->chipset = "Intel i850";	 break;
+		case INTEL_460GX:	head->chipset = "Intel 460GX";	 break;
 
 		case VIA_GENERIC:	head->chipset = "VIA";           break;
 		case VIA_VP3:		head->chipset = "VIA VP3";       break;

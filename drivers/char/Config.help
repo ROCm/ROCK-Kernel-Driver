@@ -127,6 +127,10 @@ CONFIG_AGP_I810
   815 and 830m chipset boards for their on-board integrated graphics. This
   is required to do any useful video modes with these boards.
 
+CONFIG_AGP_I460
+  This option gives you AGP GART support for the Intel 460GX chipset
+  for IA64 processors.
+
 CONFIG_AGP_VIA
   This option gives you AGP support for the GLX component of the
   XFree86 4.x on VIA MPV3/Apollo Pro chipsets.
@@ -169,6 +173,10 @@ CONFIG_AGP_ALI
 
   You should say Y here if you use XFree86 3.3.6 or 4.x and want to
   use GLX or DRI.  If unsure, say N.
+
+CONFIG_AGP_HP_ZX1
+  This option gives you AGP GART support for the HP ZX1 chipset
+  for IA64 processors.
 
 CONFIG_I810_TCO
   Hardware driver for the TCO timer built into the Intel i810 and i815

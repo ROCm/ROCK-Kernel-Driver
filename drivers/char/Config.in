@@ -220,6 +220,7 @@ if [ "$CONFIG_AGP" != "n" ]; then
    bool '  ALI chipset support' CONFIG_AGP_ALI
    bool '  Serverworks LE/HE support' CONFIG_AGP_SWORKS
    if [ "$CONFIG_IA64" = "y" ]; then
+     bool '  Intel 460GX support' CONFIG_AGP_I460
      bool '  HP ZX1 AGP support' CONFIG_AGP_HP_ZX1
    fi
 fi
