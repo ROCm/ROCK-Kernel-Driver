@@ -91,7 +91,7 @@ static inline void *kmap_atomic(struct page *page, enum km_type type)
 	BUG_ON(!pte_none(*(kmap_pte+idx)));
 #endif
 	set_pte(kmap_pte+idx, mk_pte(page, kmap_prot));
-	flush_tlb_page(0, vaddr);
+	flush_tlb_page(NULL, vaddr);
 
 	return (void*) vaddr;
 }
@@ -115,7 +115,7 @@ static inline void kunmap_atomic(void *kvaddr, enum km_type type)
 	 * this pte without first remap it
 	 */
 	pte_clear(kmap_pte+idx);
-	flush_tlb_page(0, vaddr);
+	flush_tlb_page(NULL, vaddr);
 #endif
 	dec_preempt_count();
 	preempt_check_resched();

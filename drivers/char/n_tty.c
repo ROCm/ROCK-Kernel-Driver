@@ -62,17 +62,12 @@
 
 static inline unsigned char *alloc_buf(void)
 {
-	unsigned char *p;
 	int prio = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
 
-	if (PAGE_SIZE != N_TTY_BUF_SIZE) {
-		p = kmalloc(N_TTY_BUF_SIZE, prio);
-		if (p)
-			memset(p, 0, N_TTY_BUF_SIZE);
-	} else
-		p = (unsigned char *)get_zeroed_page(prio);
-
-	return p;
+	if (PAGE_SIZE != N_TTY_BUF_SIZE)
+		return kmalloc(N_TTY_BUF_SIZE, prio);
+	else
+		return (unsigned char *)__get_free_page(prio);
 }
 
 static inline void free_buf(unsigned char *buf)

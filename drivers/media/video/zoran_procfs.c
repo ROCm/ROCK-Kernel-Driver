@@ -40,6 +40,7 @@
 #include <linux/videodev.h>
 #include <linux/spinlock.h>
 #include <linux/sem.h>
+#include <linux/seq_file.h>
 
 #include <linux/ctype.h>
 #include <asm/io.h>
@@ -93,14 +94,6 @@ static const struct procfs_params_zr36067 zr67[] = {
 	{NULL, 0, 0, 0},
 };
 
-struct procfs_io {
-	char *buffer;
-	char *end;
-	int neof;
-	int count;
-	int count_current;
-};
-
 static void
 setparam (struct zoran *zr,
 	  char         *name,
@@ -130,84 +123,33 @@ setparam (struct zoran *zr,
 	}
 }
 
-static int
-print_procfs (struct procfs_io *io,
-	      const char       *fmt,
-	      ...)
+static int zoran_show(struct seq_file *p, void *v)
 {
-	va_list args;
+	struct zoran *zr = p->private;
 	int i;
 
-	if (io->buffer >= io->end) {
-		io->neof++;
-		return 0;
-	}
-	if (io->count > io->count_current++)
-		return 0;
-	va_start(args, fmt);
-	i = vsprintf(io->buffer, fmt, args);
-	io->buffer += i;
-	va_end(args);
-	return i;
-}
-
-static void
-zoran_procfs_output (struct procfs_io *io,
-		     void             *data)
-{
-	int i;
-	struct zoran *zr;
-	zr = (struct zoran *) data;
-
-	print_procfs(io, "ZR36067 registers:");
-	for (i = 0; i < 0x130; i += 4) {
-		if (!(i % 16)) {
-			print_procfs(io, "\n%03X", i);
-		};
-		print_procfs(io, " %08X ", btread(i));
-	};
-	print_procfs(io, "\n");
-}
-
-static int
-zoran_read_proc (char  *buffer,
-		 char **start,
-		 off_t  offset,
-		 int    size,
-		 int   *eof,
-		 void  *data)
-{
-	struct procfs_io io;
-	int nbytes;
-
-	io.buffer = buffer;
-	io.end = buffer + size - 128;	// Just to make it a little bit safer
-	io.count = offset;
-	io.count_current = 0;
-	io.neof = 0;
-	zoran_procfs_output(&io, data);
-	*start = (char *) (io.count_current - io.count);
-	nbytes = (int) (io.buffer - buffer);
-	*eof = !io.neof;
-	return nbytes;
-
+	seq_printf(p, "ZR36067 registers:\n");
+	for (i = 0; i < 0x130; i += 16)
+		seq_printf(p, "%03X %08X  %08X  %08X  %08X \n", i,
+			   btread(i), btread(i+4), btread(i+8), btread(i+12));
 	return 0;
 }
 
-static int
-zoran_write_proc (struct file   *file,
-		  const char    __user *buffer,
-		  unsigned long  count,
-		  void          *data)
+static int zoran_open(struct inode *inode, struct file *file)
 {
+	struct zoran *data = PDE(inode)->data;
+	return single_open(file, zoran_show, data);
+}
+
+static ssize_t zoran_write(struct file *file, const char __user *buffer,
+			size_t count, loff_t *ppos)
+{
+	struct zoran *zr = PDE(file->f_dentry->d_inode)->data;
 	char *string, *sp;
 	char *line, *ldelim, *varname, *svar, *tdelim;
-	struct zoran *zr;
 
 	if (count > 32768)	/* Stupidity filter */
 		return -EINVAL;
-
-	zr = (struct zoran *) data;
 
 	string = sp = vmalloc(count + 1);
 	if (!string) {
@@ -222,8 +164,8 @@ zoran_write_proc (struct file   *file,
 		return -EFAULT;
 	}
 	string[count] = 0;
-	dprintk(4, KERN_INFO "%s: write_proc: name=%s count=%lu data=%x\n",
-		ZR_DEVNAME(zr), file->f_dentry->d_name.name, count, (int) data);
+	dprintk(4, KERN_INFO "%s: write_proc: name=%s count=%zu zr=%p\n",
+		ZR_DEVNAME(zr), file->f_dentry->d_name.name, count, zr);
 	ldelim = " \t\n";
 	tdelim = "=";
 	line = strpbrk(sp, ldelim);
@@ -243,6 +185,14 @@ zoran_write_proc (struct file   *file,
 
 	return count;
 }
+
+static struct file_operations zoran_operations = {
+	.open		= zoran_open,
+	.read		= seq_read,
+	.write		= zoran_write,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 #endif
 
 int
@@ -253,10 +203,9 @@ zoran_proc_init (struct zoran *zr)
 
 	snprintf(name, 7, "zoran%d", zr->id);
 	if ((zr->zoran_proc = create_proc_entry(name, 0, NULL))) {
-		zr->zoran_proc->read_proc = zoran_read_proc;
-		zr->zoran_proc->write_proc = zoran_write_proc;
 		zr->zoran_proc->data = zr;
 		zr->zoran_proc->owner = THIS_MODULE;
+		zr->zoran_proc->proc_fops = &zoran_operations;
 		dprintk(2,
 			KERN_INFO
 			"%s: procfs entry /proc/%s allocated. data=%p\n",
@@ -277,9 +226,8 @@ zoran_proc_cleanup (struct zoran *zr)
 	char name[8];
 
 	snprintf(name, 7, "zoran%d", zr->id);
-	if (zr->zoran_proc) {
+	if (zr->zoran_proc)
 		remove_proc_entry(name, NULL);
-	}
 	zr->zoran_proc = NULL;
 #endif
 }

@@ -683,7 +683,7 @@ Decrementer_Iseries_masked:
 	li	r11,1
 	stb	r11,PACALPPACA+LPPACADECRINT(r13)
 	lwz	r12,PACADEFAULTDECR(r13)
-	mtspr	DEC,r12
+	mtspr	SPRN_DEC,r12
 	/* fall through */
 
 	.globl HardwareInterrupt_Iseries_masked
@@ -1028,7 +1028,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	bl	.local_irq_restore
 	b	11f
 #else
-	beq+	fast_exception_return   /* Return from exception on success */
+	beq	fast_exception_return   /* Return from exception on success */
 	/* fall through */
 #endif
 

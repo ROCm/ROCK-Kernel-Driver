@@ -623,7 +623,7 @@ static void ph_connect(struct st5481_adapter *adapter)
 	st5481_usb_device_ctrl_msg(adapter, FFMSK_D, 0xfc, NULL, NULL);
 	st5481_in_mode(d_in, L1_MODE_HDLC);
 
-#if LOOPBACK
+#ifdef LOOPBACK
 	// Turn loopback on (data sent on B and D looped back)
 	st5481_usb_device_ctrl_msg(cs, LBB, 0x04, NULL, NULL);
 #endif

@@ -111,15 +111,15 @@ static void prom_instantiate_rtas(void);
 static void * early_get_property(unsigned long base, unsigned long node,
 				char *prop);
 
-prom_entry prom __initdata = 0;
-ihandle prom_chosen __initdata = 0;
-ihandle prom_stdout __initdata = 0;
+prom_entry prom __initdata;
+ihandle prom_chosen __initdata;
+ihandle prom_stdout __initdata;
 
-char *prom_display_paths[FB_MAX] __initdata = { 0, };
+char *prom_display_paths[FB_MAX] __initdata;
 phandle prom_display_nodes[FB_MAX] __initdata;
-unsigned int prom_num_displays __initdata = 0;
-char *of_stdout_device __initdata = 0;
-static ihandle prom_disp_node __initdata = 0;
+unsigned int prom_num_displays __initdata;
+char *of_stdout_device __initdata;
+static ihandle prom_disp_node __initdata;
 
 unsigned int rtas_data;   /* physical pointer */
 unsigned int rtas_entry;  /* physical pointer */
@@ -161,7 +161,7 @@ call_prom(const char *service, int nargs, int nret, ...)
 		prom_args.args[i] = va_arg(list, void *);
 	va_end(list);
 	for (i = 0; i < nret; ++i)
-		prom_args.args[i + nargs] = 0;
+		prom_args.args[i + nargs] = NULL;
 	prom(&prom_args);
 	return prom_args.args[nargs];
 }
@@ -181,7 +181,7 @@ call_prom_ret(const char *service, int nargs, int nret, void **rets, ...)
 		prom_args.args[i] = va_arg(list, void *);
 	va_end(list);
 	for (i = 0; i < nret; ++i)
-		prom_args.args[i + nargs] = 0;
+		prom_args.args[i + nargs] = NULL;
 	prom(&prom_args);
 	for (i = 1; i < nret; ++i)
 		rets[i-1] = prom_args.args[nargs + i];
@@ -363,9 +363,9 @@ check_display(unsigned long mem)
 	};
 	const unsigned char *clut;
 
-	prom_disp_node = 0;
+	prom_disp_node = NULL;
 
-	for (node = 0; prom_next_node(&node); ) {
+	for (node = NULL; prom_next_node(&node); ) {
 		type[0] = 0;
 		call_prom("getprop", 4, 1, node, "device_type",
 			  type, sizeof(type));
@@ -546,8 +546,8 @@ copy_device_tree(unsigned long mem_start, unsigned long mem_end)
 	}
 	allnextp = &allnodes;
 	mem_start = ALIGNUL(mem_start);
-	new_start = inspect_node(root, 0, mem_start, mem_end, &allnextp);
-	*allnextp = 0;
+	new_start = inspect_node(root, NULL, mem_start, mem_end, &allnextp);
+	*allnextp = NULL;
 	return new_start;
 }
 
@@ -695,7 +695,7 @@ prom_hold_cpus(unsigned long mem)
 	/* look for cpus */
 	*(unsigned long *)(0x0) = 0;
 	asm volatile("dcbf 0,%0": : "r" (0) : "memory");
-	for (node = 0; prom_next_node(&node); ) {
+	for (node = NULL; prom_next_node(&node); ) {
 		type[0] = 0;
 		call_prom("getprop", 4, 1, node, "device_type",
 			  type, sizeof(type));
@@ -888,7 +888,7 @@ prom_init(int r3, int r4, prom_entry pp)
 	prom_print("returning 0x");
 	prom_print_hex(phys);
 	prom_print("from prom_init\n");
-	prom_stdout = 0;
+	prom_stdout = NULL;
 
 	return phys;
 }
@@ -910,7 +910,7 @@ early_get_property(unsigned long base, unsigned long node, char *prop)
 			return (void *)((unsigned long)pp->value + base);
 		}
 	}
-	return 0;
+	return NULL;
 }
 
 /* Is boot-info compatible ? */
@@ -928,7 +928,7 @@ bootx_init(unsigned long r4, unsigned long phys)
 
 	boot_infos = PTRUNRELOC(bi);
 	if (!BOOT_INFO_IS_V2_COMPATIBLE(bi))
-		bi->logicalDisplayBase = 0;
+		bi->logicalDisplayBase = NULL;
 
 #ifdef CONFIG_BOOTX_TEXT
 	btext_init(bi);

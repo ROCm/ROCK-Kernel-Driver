@@ -242,7 +242,7 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 
 	if (me->used_math) {
 		fp = get_stack(ka, regs, sizeof(struct _fpstate)); 
-		frame = (void __user *)round_down((u64)fp - sizeof(struct rt_sigframe), 16) - 8;
+		frame = (void __user *)round_down((unsigned long)fp - sizeof(struct rt_sigframe), 16) - 8;
 
 		if (!access_ok(VERIFY_WRITE, fp, sizeof(struct _fpstate))) { 
 		goto give_sigsegv;

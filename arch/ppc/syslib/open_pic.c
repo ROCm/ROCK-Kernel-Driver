@@ -554,14 +554,16 @@ static void __init openpic_initipi(u_int ipi, u_int pri, u_int vec)
  *  Externally called, however, it takes an IPI number (0...OPENPIC_NUM_IPI)
  *  and not a system-wide interrupt number
  */
-void openpic_cause_IPI(u_int ipi, u_int cpumask)
+void openpic_cause_IPI(u_int ipi, cpumask_t cpumask)
 {
+	cpumask_t phys;
 	DECL_THIS_CPU;
 
 	CHECK_THIS_CPU;
 	check_arg_ipi(ipi);
+	phys = physmask(cpumask);
 	openpic_write(&OpenPIC->THIS_CPU.IPI_Dispatch(ipi),
-		      physmask(cpumask));
+		      cpus_addr(physmask(cpumask))[0]);
 }
 
 void openpic_request_IPIs(void)
@@ -579,16 +581,16 @@ void openpic_request_IPIs(void)
 	/* IPIs are marked SA_INTERRUPT as they must run with irqs disabled */
 	request_irq(OPENPIC_VEC_IPI+open_pic_irq_offset,
 		    openpic_ipi_action, SA_INTERRUPT,
-		    "IPI0 (call function)", 0);
+		    "IPI0 (call function)", NULL);
 	request_irq(OPENPIC_VEC_IPI+open_pic_irq_offset+1,
 		    openpic_ipi_action, SA_INTERRUPT,
-		    "IPI1 (reschedule)", 0);
+		    "IPI1 (reschedule)", NULL);
 	request_irq(OPENPIC_VEC_IPI+open_pic_irq_offset+2,
 		    openpic_ipi_action, SA_INTERRUPT,
-		    "IPI2 (invalidate tlb)", 0);
+		    "IPI2 (invalidate tlb)", NULL);
 	request_irq(OPENPIC_VEC_IPI+open_pic_irq_offset+3,
 		    openpic_ipi_action, SA_INTERRUPT,
-		    "IPI3 (xmon break)", 0);
+		    "IPI3 (xmon break)", NULL);
 
 	for ( i = 0; i < OPENPIC_NUM_IPI ; i++ )
 		openpic_enable_ipi(OPENPIC_VEC_IPI+open_pic_irq_offset+i);
@@ -610,7 +612,7 @@ void __devinit do_openpic_setup_cpu(void)
 	spin_lock(&openpic_setup_lock);
 
 #ifdef CONFIG_IRQ_ALL_CPUS
-	cpu_set(smp_hw_index[smp_processor_id()], mask);
+	cpu_set(smp_hw_index[smp_processor_id()], msk);
 
  	/* let the openpic know we want intrs. default affinity
  	 * is 0xffffffff until changed via /proc
@@ -872,6 +874,7 @@ openpic_get_irq(struct pt_regs *regs)
 void
 smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 {
+	cpumask_t mask = CPU_MASK_ALL;
 	/* make sure we're sending something that translates to an IPI */
 	if (msg > 0x3) {
 		printk("SMP %d: smp_message_pass: unknown msg %d\n",
@@ -880,14 +883,14 @@ smp_openpic_message_pass(int target, int msg, unsigned long data, int wait)
 	}
 	switch (target) {
 	case MSG_ALL:
-		openpic_cause_IPI(msg, 0xffffffff);
+		openpic_cause_IPI(msg, mask);
 		break;
 	case MSG_ALL_BUT_SELF:
-		openpic_cause_IPI(msg,
-				  0xffffffff & ~(1 << smp_processor_id()));
+		cpu_clear(smp_processor_id(), mask);
+		openpic_cause_IPI(msg, mask);
 		break;
 	default:
-		openpic_cause_IPI(msg, 1<<target);
+		openpic_cause_IPI(msg, cpumask_of_cpu(target));
 		break;
 	}
 }

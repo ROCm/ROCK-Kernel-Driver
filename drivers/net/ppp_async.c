@@ -208,7 +208,7 @@ ppp_asynctty_close(struct tty_struct *tty)
 
 	write_lock_irq(&disc_data_lock);
 	ap = tty->disc_data;
-	tty->disc_data = 0;
+	tty->disc_data = NULL;
 	write_unlock_irq(&disc_data_lock);
 	if (ap == 0)
 		return;
@@ -606,7 +606,7 @@ ppp_async_encode(struct asyncppp *ap)
 	ap->olim = buf;
 
 	kfree_skb(ap->tpkt);
-	ap->tpkt = 0;
+	ap->tpkt = NULL;
 	return 1;
 }
 
@@ -705,7 +705,7 @@ flush:
 	clear_bit(XMIT_BUSY, &ap->xmit_flags);
 	if (ap->tpkt != 0) {
 		kfree_skb(ap->tpkt);
-		ap->tpkt = 0;
+		ap->tpkt = NULL;
 		clear_bit(XMIT_FULL, &ap->xmit_flags);
 		done = 1;
 	}
@@ -727,7 +727,7 @@ ppp_async_flush_output(struct asyncppp *ap)
 	ap->optr = ap->olim;
 	if (ap->tpkt != NULL) {
 		kfree_skb(ap->tpkt);
-		ap->tpkt = 0;
+		ap->tpkt = NULL;
 		clear_bit(XMIT_FULL, &ap->xmit_flags);
 		done = 1;
 	}
@@ -805,7 +805,7 @@ process_input_packet(struct asyncppp *ap)
 	/* queue the frame to be processed */
 	skb->cb[0] = ap->state;
 	skb_queue_tail(&ap->rqueue, skb);
-	ap->rpkt = 0;
+	ap->rpkt = NULL;
 	ap->state = 0;
 	return;
 

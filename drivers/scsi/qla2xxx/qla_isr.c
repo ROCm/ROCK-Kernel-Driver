@@ -686,7 +686,7 @@ qla2x00_process_completed_request(struct scsi_qla_host *ha, uint32_t index)
 	sp = ha->outstanding_cmds[index];
 	if (sp) {
 		/* Free outstanding command slot. */
-		ha->outstanding_cmds[index] = 0;
+		ha->outstanding_cmds[index] = NULL;
 
 		if (ha->actthreads)
 			ha->actthreads--;
@@ -836,7 +836,7 @@ qla2x00_status_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 	/* Validate handle. */
 	if (pkt->handle < MAX_OUTSTANDING_COMMANDS) {
 		sp = ha->outstanding_cmds[pkt->handle];
-		ha->outstanding_cmds[pkt->handle] = 0;
+		ha->outstanding_cmds[pkt->handle] = NULL;
 	} else
 		sp = NULL;
 
@@ -1320,7 +1320,7 @@ qla2x00_error_entry(scsi_qla_host_t *ha, sts_entry_t *pkt)
 
 	if (sp) {
 		/* Free outstanding command slot. */
-		ha->outstanding_cmds[pkt->handle] = 0;
+		ha->outstanding_cmds[pkt->handle] = NULL;
 		if (ha->actthreads)
 			ha->actthreads--;
 		sp->lun_queue->out_cnt--;
@@ -1383,7 +1383,7 @@ qla2x00_ms_entry(scsi_qla_host_t *ha, ms_iocb_entry_t *pkt)
 	CMD_ENTRY_STATUS(sp->cmd) = pkt->entry_status;
 
 	/* Free outstanding command slot. */
-	ha->outstanding_cmds[pkt->handle1] = 0;
+	ha->outstanding_cmds[pkt->handle1] = NULL;
 
 	add_to_done_queue(ha, sp);
 }

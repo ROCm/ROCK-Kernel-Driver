@@ -155,7 +155,7 @@ int sis_fb_init( DRM_IOCTL_ARGS )
 	drm_sis_private_t *dev_priv = dev->dev_private;
 	drm_sis_fb_t fb;
 
-	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_fb_t *)data, sizeof(fb));
+	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_fb_t __user *)data, sizeof(fb));
 
 	if (dev_priv == NULL) {
 		dev->dev_private = DRM(calloc)(1, sizeof(drm_sis_private_t),
@@ -179,6 +179,7 @@ int sis_fb_alloc( DRM_IOCTL_ARGS )
 {
 	DRM_DEVICE;
 	drm_sis_private_t *dev_priv = dev->dev_private;
+	drm_sis_mem_t __user *argp = (void __user *)data;
 	drm_sis_mem_t fb;
 	PMemBlock block;
 	int retval = 0;
@@ -186,7 +187,7 @@ int sis_fb_alloc( DRM_IOCTL_ARGS )
 	if (dev_priv == NULL || dev_priv->FBHeap == NULL)
 		return DRM_ERR(EINVAL);
   
-	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
+	DRM_COPY_FROM_USER_IOCTL(fb, argp, sizeof(fb));
   
 	block = mmAllocMem(dev_priv->FBHeap, fb.size, 0, 0);
 	if (block) {
@@ -204,7 +205,7 @@ int sis_fb_alloc( DRM_IOCTL_ARGS )
 		fb.free = 0;
 	}
 
-	DRM_COPY_TO_USER_IOCTL((drm_sis_mem_t *)data, fb, sizeof(fb));
+	DRM_COPY_TO_USER_IOCTL(argp, fb, sizeof(fb));
 
 	DRM_DEBUG("alloc fb, size = %d, offset = %d\n", fb.size, fb.offset);
 
@@ -220,7 +221,7 @@ int sis_fb_free( DRM_IOCTL_ARGS )
 	if (dev_priv == NULL || dev_priv->FBHeap == NULL)
 		return DRM_ERR(EINVAL);
 
-	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
+	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t __user *)data, sizeof(fb));
 
 	if (!mmBlockInHeap(dev_priv->FBHeap, (PMemBlock)fb.free))
 		return DRM_ERR(EINVAL);
@@ -255,7 +256,7 @@ int sis_ioctl_agp_init( DRM_IOCTL_ARGS )
 	if (dev_priv->AGPHeap != NULL)
 		return DRM_ERR(EINVAL);
 
-	DRM_COPY_FROM_USER_IOCTL(agp, (drm_sis_agp_t *)data, sizeof(agp));
+	DRM_COPY_FROM_USER_IOCTL(agp, (drm_sis_agp_t __user *)data, sizeof(agp));
 
 	dev_priv->AGPHeap = mmInit(agp.offset, agp.size);
 
@@ -268,6 +269,7 @@ int sis_ioctl_agp_alloc( DRM_IOCTL_ARGS )
 {
 	DRM_DEVICE;
 	drm_sis_private_t *dev_priv = dev->dev_private;
+	drm_sis_mem_t __user *argp = (void __user *)data;
 	drm_sis_mem_t agp;
 	PMemBlock block;
 	int retval = 0;
@@ -275,7 +277,7 @@ int sis_ioctl_agp_alloc( DRM_IOCTL_ARGS )
 	if (dev_priv == NULL || dev_priv->AGPHeap == NULL)
 		return DRM_ERR(EINVAL);
   
-	DRM_COPY_FROM_USER_IOCTL(agp, (drm_sis_mem_t *)data, sizeof(agp));
+	DRM_COPY_FROM_USER_IOCTL(agp, argp, sizeof(agp));
   
 	block = mmAllocMem(dev_priv->AGPHeap, agp.size, 0, 0);
 	if (block) {
@@ -293,7 +295,7 @@ int sis_ioctl_agp_alloc( DRM_IOCTL_ARGS )
 		agp.free = 0;
 	}
 
-	DRM_COPY_TO_USER_IOCTL((drm_sis_mem_t *)data, agp, sizeof(agp));
+	DRM_COPY_TO_USER_IOCTL(argp, agp, sizeof(agp));
 
 	DRM_DEBUG("alloc agp, size = %d, offset = %d\n", agp.size, agp.offset);
 
@@ -309,7 +311,7 @@ int sis_ioctl_agp_free( DRM_IOCTL_ARGS )
 	if (dev_priv == NULL || dev_priv->AGPHeap == NULL)
 		return DRM_ERR(EINVAL);
 
-	DRM_COPY_FROM_USER_IOCTL(agp, (drm_sis_mem_t *)data, sizeof(agp));
+	DRM_COPY_FROM_USER_IOCTL(agp, (drm_sis_mem_t __user *)data, sizeof(agp));
 
 	if (!mmBlockInHeap(dev_priv->AGPHeap, (PMemBlock)agp.free))
 		return DRM_ERR(EINVAL);

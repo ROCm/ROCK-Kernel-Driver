@@ -907,7 +907,7 @@ ipmb_checksum(unsigned char *data, int size)
 }
 
 static inline void format_ipmb_msg(struct ipmi_smi_msg   *smi_msg,
-				   struct ipmi_msg       *msg,
+				   struct kernel_ipmi_msg *msg,
 				   struct ipmi_ipmb_addr *ipmb_addr,
 				   long                  msgid,
 				   unsigned char         ipmb_seq,
@@ -949,7 +949,7 @@ static inline void format_ipmb_msg(struct ipmi_smi_msg   *smi_msg,
 }
 
 static inline void format_lan_msg(struct ipmi_smi_msg   *smi_msg,
-				  struct ipmi_msg       *msg,
+				  struct kernel_ipmi_msg *msg,
 				  struct ipmi_lan_addr  *lan_addr,
 				  long                  msgid,
 				  unsigned char         ipmb_seq,
@@ -993,7 +993,7 @@ static inline int i_ipmi_request(ipmi_user_t          user,
 				 ipmi_smi_t           intf,
 				 struct ipmi_addr     *addr,
 				 long                 msgid,
-				 struct ipmi_msg      *msg,
+				 struct kernel_ipmi_msg *msg,
 				 void                 *user_msg_data,
 				 void                 *supplied_smi,
 				 struct ipmi_recv_msg *supplied_recv,
@@ -1335,7 +1335,7 @@ static inline int i_ipmi_request(ipmi_user_t          user,
 		goto out_err;
 	}
 
-#if DEBUG_MSGING
+#ifdef DEBUG_MSGING
 	{
 		int m;
 		for (m=0; m<smi_msg->data_size; m++)
@@ -1356,7 +1356,7 @@ static inline int i_ipmi_request(ipmi_user_t          user,
 int ipmi_request(ipmi_user_t      user,
 		 struct ipmi_addr *addr,
 		 long             msgid,
-		 struct ipmi_msg  *msg,
+		 struct kernel_ipmi_msg  *msg,
 		 void             *user_msg_data,
 		 int              priority)
 {
@@ -1376,7 +1376,7 @@ int ipmi_request(ipmi_user_t      user,
 int ipmi_request_settime(ipmi_user_t      user,
 			 struct ipmi_addr *addr,
 			 long             msgid,
-			 struct ipmi_msg  *msg,
+			 struct kernel_ipmi_msg  *msg,
 			 void             *user_msg_data,
 			 int              priority,
 			 int              retries,
@@ -1399,7 +1399,7 @@ int ipmi_request_settime(ipmi_user_t      user,
 int ipmi_request_supply_msgs(ipmi_user_t          user,
 			     struct ipmi_addr     *addr,
 			     long                 msgid,
-			     struct ipmi_msg      *msg,
+			     struct kernel_ipmi_msg *msg,
 			     void                 *user_msg_data,
 			     void                 *supplied_smi,
 			     struct ipmi_recv_msg *supplied_recv,
@@ -1422,7 +1422,7 @@ int ipmi_request_supply_msgs(ipmi_user_t          user,
 int ipmi_request_with_source(ipmi_user_t      user,
 			     struct ipmi_addr *addr,
 			     long             msgid,
-			     struct ipmi_msg  *msg,
+			     struct kernel_ipmi_msg  *msg,
 			     void             *user_msg_data,
 			     int              priority,
 			     unsigned char    source_address,
@@ -1609,7 +1609,7 @@ static void remove_proc_entries(ipmi_smi_t smi)
 static int
 send_channel_info_cmd(ipmi_smi_t intf, int chan)
 {
-	struct ipmi_msg                   msg;
+	struct kernel_ipmi_msg            msg;
 	unsigned char                     data[1];
 	struct ipmi_system_interface_addr si;
 
@@ -2033,7 +2033,7 @@ static int handle_ipmb_get_msg_cmd(ipmi_smi_t          intf,
 		msg->data[10] = ipmb_checksum(&(msg->data[6]), 4);
 		msg->data_size = 11;
 
-#if DEBUG_MSGING
+#ifdef DEBUG_MSGING
 	{
 		int m;
 		printk("Invalid command:");
@@ -2424,7 +2424,7 @@ static int handle_new_recv_msg(ipmi_smi_t          intf,
 	int requeue;
 	int chan;
 
-#if DEBUG_MSGING
+#ifdef DEBUG_MSGING
 	int m;
 	printk("Recv:");
 	for (m=0; m<msg->rsp_size; m++)
@@ -2639,7 +2639,7 @@ send_from_recv_msg(ipmi_smi_t intf, struct ipmi_recv_msg *recv_msg,
 	   MC, which don't get resent. */
 	intf->handlers->sender(intf->send_info, smi_msg, 0);
 
-#if DEBUG_MSGING
+#ifdef DEBUG_MSGING
 	{
 		int m;
 		printk("Resend: ");
@@ -2873,7 +2873,7 @@ static void device_id_fetcher(ipmi_smi_t intf, struct ipmi_smi_msg *msg)
 
 static void send_panic_events(char *str)
 {
-	struct ipmi_msg                   msg;
+	struct kernel_ipmi_msg            msg;
 	ipmi_smi_t                        intf;
 	unsigned char                     data[16];
 	int                               i;

@@ -840,7 +840,7 @@ static void find_pio_EISA(struct get_conf *buf)
 	u32 base;
 	int i;
 
-#if CHECKPAL
+#ifdef CHECKPAL
 	u8 pal1, pal2, pal3;
 #endif
 
@@ -848,7 +848,7 @@ static void find_pio_EISA(struct get_conf *buf)
 		if (EISAbases[i]) {	/* Still a possibility ?          */
 
 			base = 0x1c88 + (i * 0x1000);
-#if CHECKPAL
+#ifdef CHECKPAL
 			pal1 = inb((u16) base - 8);
 			pal2 = inb((u16) base - 7);
 			pal3 = inb((u16) base - 6);
@@ -868,7 +868,7 @@ static void find_pio_EISA(struct get_conf *buf)
 				}
 				/* Nothing found here so we take it from the list */
 				EISAbases[i] = 0;
-#if CHECKPAL
+#ifdef CHECKPAL
 			}
 #endif
 		}
@@ -929,7 +929,7 @@ static void find_pio_PCI(struct get_conf *buf)
 					EISAbases[x] = 0;
 				}
 			}
-#if CHECK_BLINK
+#ifdef CHECK_BLINK
 			else if (check_blink_state(base)) {
 				printk("eata_pio: HBA is in BLINK state.\n" "Consult your HBAs manual to correct this.\n");
 			}

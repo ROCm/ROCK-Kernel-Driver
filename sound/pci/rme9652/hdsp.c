@@ -4971,16 +4971,16 @@ static int __devinit snd_hdsp_create(snd_card_t *card,
 
 	hdsp->irq = -1;
 	hdsp->state = 0;
-	hdsp->midi[0].rmidi = 0;
-	hdsp->midi[1].rmidi = 0;
-	hdsp->midi[0].input = 0;
-	hdsp->midi[1].input = 0;
-	hdsp->midi[0].output = 0;
-	hdsp->midi[1].output = 0;
+	hdsp->midi[0].rmidi = NULL;
+	hdsp->midi[1].rmidi = NULL;
+	hdsp->midi[0].input = NULL;
+	hdsp->midi[1].input = NULL;
+	hdsp->midi[0].output = NULL;
+	hdsp->midi[1].output = NULL;
 	spin_lock_init(&hdsp->midi[0].lock);
 	spin_lock_init(&hdsp->midi[1].lock);
 	hdsp->iobase = 0;
-	hdsp->res_port = 0;
+	hdsp->res_port = NULL;
 	hdsp->control_register = 0;
 	hdsp->control2_register = 0;
 	hdsp->io_type = Undefined;

@@ -406,6 +406,9 @@ extern void			ipv6_packet_init(void);
 
 extern void			ipv6_packet_cleanup(void);
 
+extern int			ip6_datagram_connect(struct sock *sk, 
+						     struct sockaddr *addr, int addr_len);
+
 extern int 			ipv6_recv_error(struct sock *sk, struct msghdr *msg, int len);
 extern void			ipv6_icmp_error(struct sock *sk, struct sk_buff *skb, int err, u16 port,
 						u32 info, u8 *payload);

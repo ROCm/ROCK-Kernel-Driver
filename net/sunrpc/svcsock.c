@@ -450,9 +450,8 @@ svc_recv_available(struct svc_sock *svsk)
  * Generic recvfrom routine.
  */
 static int
-svc_recvfrom(struct svc_rqst *rqstp, struct iovec *iov, int nr, int buflen)
+svc_recvfrom(struct svc_rqst *rqstp, struct kvec *iov, int nr, int buflen)
 {
-	mm_segment_t	oldfs;
 	struct msghdr	msg;
 	struct socket	*sock;
 	int		len, alen;
@@ -462,16 +461,12 @@ svc_recvfrom(struct svc_rqst *rqstp, struct iovec *iov, int nr, int buflen)
 
 	msg.msg_name    = &rqstp->rq_addr;
 	msg.msg_namelen = sizeof(rqstp->rq_addr);
-	msg.msg_iov     = iov;
-	msg.msg_iovlen  = nr;
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
 
 	msg.msg_flags	= MSG_DONTWAIT;
 
-	oldfs = get_fs(); set_fs(KERNEL_DS);
-	len = sock_recvmsg(sock, &msg, buflen, MSG_DONTWAIT);
-	set_fs(oldfs);
+	len = kernel_recvmsg(sock, &msg, iov, nr, buflen, MSG_DONTWAIT);
 
 	/* sock_recvmsg doesn't fill in the name/namelen, so we must..
 	 * possibly we should cache this in the svc_sock structure
@@ -898,7 +893,7 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 	struct svc_sock	*svsk = rqstp->rq_sock;
 	struct svc_serv	*serv = svsk->sk_server;
 	int		len;
-	struct iovec vec[RPCSVC_MAXPAGES];
+	struct kvec vec[RPCSVC_MAXPAGES];
 	int pnum, vlen;
 
 	dprintk("svc: tcp_recv %p data %d conn %d close %d\n",
@@ -942,7 +937,7 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 	 */
 	if (svsk->sk_tcplen < 4) {
 		unsigned long	want = 4 - svsk->sk_tcplen;
-		struct iovec	iov;
+		struct kvec	iov;
 
 		iov.iov_base = ((char *) &svsk->sk_reclen) + svsk->sk_tcplen;
 		iov.iov_len  = want;
@@ -1056,8 +1051,8 @@ svc_tcp_sendto(struct svc_rqst *rqstp)
 	int sent;
 	u32 reclen;
 
-	/* Set up the first element of the reply iovec.
-	 * Any other iovecs that may be in use have been taken
+	/* Set up the first element of the reply kvec.
+	 * Any other kvecs that may be in use have been taken
 	 * care of by the server implementation itself.
 	 */
 	reclen = htonl(0x80000000|((xbufp->len ) - 4));

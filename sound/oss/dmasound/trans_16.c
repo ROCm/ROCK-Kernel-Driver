@@ -20,42 +20,42 @@
 static short dmasound_alaw2dma16[] ;
 static short dmasound_ulaw2dma16[] ;
 
-static ssize_t pmac_ct_law(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_law(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft);
-static ssize_t pmac_ct_s8(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_s8(const u_char __user *userPtr, size_t userCount,
 			  u_char frame[], ssize_t *frameUsed,
 			  ssize_t frameLeft);
-static ssize_t pmac_ct_u8(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_u8(const u_char __user *userPtr, size_t userCount,
 			  u_char frame[], ssize_t *frameUsed,
 			  ssize_t frameLeft);
-static ssize_t pmac_ct_s16(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_s16(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft);
-static ssize_t pmac_ct_u16(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_u16(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft);
 
-static ssize_t pmac_ctx_law(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_law(const u_char __user *userPtr, size_t userCount,
 			    u_char frame[], ssize_t *frameUsed,
 			    ssize_t frameLeft);
-static ssize_t pmac_ctx_s8(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_s8(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft);
-static ssize_t pmac_ctx_u8(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_u8(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft);
-static ssize_t pmac_ctx_s16(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_s16(const u_char __user *userPtr, size_t userCount,
 			    u_char frame[], ssize_t *frameUsed,
 			    ssize_t frameLeft);
-static ssize_t pmac_ctx_u16(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_u16(const u_char __user *userPtr, size_t userCount,
 			    u_char frame[], ssize_t *frameUsed,
 			    ssize_t frameLeft);
 
-static ssize_t pmac_ct_s16_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_s16_read(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft);
-static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_u16_read(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft);
 
@@ -63,7 +63,7 @@ static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
 
 static int expand_data;	/* Data for expanding */
 
-static ssize_t pmac_ct_law(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_law(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft)
 {
@@ -96,7 +96,7 @@ static ssize_t pmac_ct_law(const u_char *userPtr, size_t userCount,
 }
 
 
-static ssize_t pmac_ct_s8(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_s8(const u_char __user *userPtr, size_t userCount,
 			  u_char frame[], ssize_t *frameUsed,
 			  ssize_t frameLeft)
 {
@@ -127,7 +127,7 @@ static ssize_t pmac_ct_s8(const u_char *userPtr, size_t userCount,
 }
 
 
-static ssize_t pmac_ct_u8(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_u8(const u_char __user *userPtr, size_t userCount,
 			  u_char frame[], ssize_t *frameUsed,
 			  ssize_t frameLeft)
 {
@@ -158,7 +158,7 @@ static ssize_t pmac_ct_u8(const u_char *userPtr, size_t userCount,
 }
 
 
-static ssize_t pmac_ct_s16(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_s16(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft)
 {
@@ -170,7 +170,7 @@ static ssize_t pmac_ct_s16(const u_char *userPtr, size_t userCount,
 	userCount >>= (stereo? 2: 1);
 	used = count = min_t(unsigned long, userCount, frameLeft);
 	if (!stereo) {
-		short *up = (short *) userPtr;
+		short __user *up = (short __user *) userPtr;
 		while (count > 0) {
 			short data;
 			if (get_user(data, up++))
@@ -187,7 +187,7 @@ static ssize_t pmac_ct_s16(const u_char *userPtr, size_t userCount,
 	return stereo? used * 4: used * 2;
 }
 
-static ssize_t pmac_ct_u16(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_u16(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft)
 {
@@ -195,7 +195,7 @@ static ssize_t pmac_ct_u16(const u_char *userPtr, size_t userCount,
 	int mask = (dmasound.soft.format == AFMT_U16_LE? 0x0080: 0x8000);
 	int stereo = dmasound.soft.stereo;
 	short *fp = (short *) &frame[*frameUsed];
-	short *up = (short *) userPtr;
+	short __user *up = (short __user *) userPtr;
 
 	frameLeft >>= 2;
 	userCount >>= (stereo? 2: 1);
@@ -219,7 +219,7 @@ static ssize_t pmac_ct_u16(const u_char *userPtr, size_t userCount,
 }
 
 
-static ssize_t pmac_ctx_law(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_law(const u_char __user *userPtr, size_t userCount,
 			    u_char frame[], ssize_t *frameUsed,
 			    ssize_t frameLeft)
 {
@@ -266,7 +266,7 @@ static ssize_t pmac_ctx_law(const u_char *userPtr, size_t userCount,
 	return stereo? utotal * 2: utotal;
 }
 
-static ssize_t pmac_ctx_s8(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_s8(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft)
 {
@@ -311,7 +311,7 @@ static ssize_t pmac_ctx_s8(const u_char *userPtr, size_t userCount,
 }
 
 
-static ssize_t pmac_ctx_u8(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_u8(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft)
 {
@@ -356,13 +356,13 @@ static ssize_t pmac_ctx_u8(const u_char *userPtr, size_t userCount,
 }
 
 
-static ssize_t pmac_ctx_s16(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_s16(const u_char __user *userPtr, size_t userCount,
 			    u_char frame[], ssize_t *frameUsed,
 			    ssize_t frameLeft)
 {
 	unsigned int *p = (unsigned int *) &frame[*frameUsed];
 	unsigned int data = expand_data;
-	unsigned short *up = (unsigned short *) userPtr;
+	unsigned short __user *up = (unsigned short __user *) userPtr;
 	int bal = expand_bal;
 	int hSpeed = dmasound.hard.speed, sSpeed = dmasound.soft.speed;
 	int stereo = dmasound.soft.stereo;
@@ -400,14 +400,14 @@ static ssize_t pmac_ctx_s16(const u_char *userPtr, size_t userCount,
 }
 
 
-static ssize_t pmac_ctx_u16(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_u16(const u_char __user *userPtr, size_t userCount,
 			    u_char frame[], ssize_t *frameUsed,
 			    ssize_t frameLeft)
 {
 	int mask = (dmasound.soft.format == AFMT_U16_LE? 0x0080: 0x8000);
 	unsigned int *p = (unsigned int *) &frame[*frameUsed];
 	unsigned int data = expand_data;
-	unsigned short *up = (unsigned short *) userPtr;
+	unsigned short __user *up = (unsigned short __user *) userPtr;
 	int bal = expand_bal;
 	int hSpeed = dmasound.hard.speed, sSpeed = dmasound.soft.speed;
 	int stereo = dmasound.soft.stereo;
@@ -447,7 +447,7 @@ static ssize_t pmac_ctx_u16(const u_char *userPtr, size_t userCount,
 
 /* data in routines... */
 
-static ssize_t pmac_ct_s8_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_s8_read(const u_char __user *userPtr, size_t userCount,
 			  u_char frame[], ssize_t *frameUsed,
 			  ssize_t frameLeft)
 {
@@ -465,13 +465,13 @@ static ssize_t pmac_ct_s8_read(const u_char *userPtr, size_t userCount,
 		val = *p++;
 		val = (val * software_input_volume) >> 7;
 		data = val >> 8;
-		if (put_user(data, (u_char *)userPtr++))
+		if (put_user(data, (u_char __user *)userPtr++))
 			return -EFAULT;
 		if (stereo) {
 			val = *p;
 			val = (val * software_input_volume) >> 7;
 			data = val >> 8;
-			if (put_user(data, (u_char *)userPtr++))
+			if (put_user(data, (u_char __user *)userPtr++))
 				return -EFAULT;
 		}
 		p++;
@@ -482,7 +482,7 @@ static ssize_t pmac_ct_s8_read(const u_char *userPtr, size_t userCount,
 }
 
 
-static ssize_t pmac_ct_u8_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_u8_read(const u_char __user *userPtr, size_t userCount,
 			  u_char frame[], ssize_t *frameUsed,
 			  ssize_t frameLeft)
 {
@@ -500,13 +500,13 @@ static ssize_t pmac_ct_u8_read(const u_char *userPtr, size_t userCount,
 		val = *p++;
 		val = (val * software_input_volume) >> 7;
 		data = (val >> 8) ^ 0x80;
-		if (put_user(data, (u_char *)userPtr++))
+		if (put_user(data, (u_char __user *)userPtr++))
 			return -EFAULT;
 		if (stereo) {
 			val = *p;
 			val = (val * software_input_volume) >> 7;
 			data = (val >> 8) ^ 0x80;
-			if (put_user(data, (u_char *)userPtr++))
+			if (put_user(data, (u_char __user *)userPtr++))
 				return -EFAULT;
 		}
 		p++;
@@ -516,14 +516,14 @@ static ssize_t pmac_ct_u8_read(const u_char *userPtr, size_t userCount,
 	return stereo? used * 2: used;
 }
 
-static ssize_t pmac_ct_s16_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_s16_read(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft)
 {
 	ssize_t count, used;
 	int stereo = dmasound.soft.stereo;
 	short *fp = (short *) &frame[*frameUsed];
-	short *up = (short *) userPtr;
+	short __user *up = (short __user *) userPtr;
 
 	frameLeft >>= 2;
 	userCount >>= (stereo? 2: 1);
@@ -548,7 +548,7 @@ static ssize_t pmac_ct_s16_read(const u_char *userPtr, size_t userCount,
 	return stereo? used * 4: used * 2;
 }
 
-static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ct_u16_read(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft)
 {
@@ -556,7 +556,7 @@ static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
 	int mask = (dmasound.soft.format == AFMT_U16_LE? 0x0080: 0x8000);
 	int stereo = dmasound.soft.stereo;
 	short *fp = (short *) &frame[*frameUsed];
-	short *up = (short *) userPtr;
+	short __user *up = (short __user *) userPtr;
 
 	frameLeft >>= 2;
 	userCount >>= (stereo? 2: 1);
@@ -585,7 +585,7 @@ static ssize_t pmac_ct_u16_read(const u_char *userPtr, size_t userCount,
 
 /* data in routines (reducing speed)... */
 
-static ssize_t pmac_ctx_s8_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_s8_read(const u_char __user *userPtr, size_t userCount,
 			  u_char frame[], ssize_t *frameUsed,
 			  ssize_t frameLeft)
 {
@@ -614,11 +614,11 @@ static ssize_t pmac_ctx_s8_read(const u_char *userPtr, size_t userCount,
 		p++;
 		if (bal < 0) {
 			data = vall >> 8;
-			if (put_user(data, (u_char *)userPtr++))
+			if (put_user(data, (u_char __user *)userPtr++))
 				return -EFAULT;
 			if (stereo) {
 				data = valr >> 8;
-				if (put_user(data, (u_char *)userPtr++))
+				if (put_user(data, (u_char __user *)userPtr++))
 					return -EFAULT;
 			}
 			userCount--;
@@ -634,7 +634,7 @@ static ssize_t pmac_ctx_s8_read(const u_char *userPtr, size_t userCount,
 }
 
 
-static ssize_t pmac_ctx_u8_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_u8_read(const u_char __user *userPtr, size_t userCount,
 			  u_char frame[], ssize_t *frameUsed,
 			  ssize_t frameLeft)
 {
@@ -664,11 +664,11 @@ static ssize_t pmac_ctx_u8_read(const u_char *userPtr, size_t userCount,
 		p++;
 		if (bal < 0) {
 			data = (vall >> 8) ^ 0x80;
-			if (put_user(data, (u_char *)userPtr++))
+			if (put_user(data, (u_char __user *)userPtr++))
 				return -EFAULT;
 			if (stereo) {
 				data = (valr >> 8) ^ 0x80;
-				if (put_user(data, (u_char *)userPtr++))
+				if (put_user(data, (u_char __user *)userPtr++))
 					return -EFAULT;
 			}
 			userCount--;
@@ -683,13 +683,13 @@ static ssize_t pmac_ctx_u8_read(const u_char *userPtr, size_t userCount,
 	return stereo? utotal * 2: utotal;
 }
 
-static ssize_t pmac_ctx_s16_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_s16_read(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft)
 {
 	int bal = expand_read_bal;
 	short *fp = (short *) &frame[*frameUsed];
-	short *up = (short *) userPtr;
+	short __user *up = (short __user *) userPtr;
 	int stereo = dmasound.soft.stereo;
 	int hSpeed = dmasound.hard.speed, sSpeed = dmasound.soft.speed;
 	int utotal, ftotal;
@@ -730,14 +730,14 @@ static ssize_t pmac_ctx_s16_read(const u_char *userPtr, size_t userCount,
 	return stereo? utotal * 4: utotal * 2;
 }
 
-static ssize_t pmac_ctx_u16_read(const u_char *userPtr, size_t userCount,
+static ssize_t pmac_ctx_u16_read(const u_char __user *userPtr, size_t userCount,
 			   u_char frame[], ssize_t *frameUsed,
 			   ssize_t frameLeft)
 {
 	int bal = expand_read_bal;
 	int mask = (dmasound.soft.format == AFMT_U16_LE? 0x0080: 0x8000);
 	short *fp = (short *) &frame[*frameUsed];
-	short *up = (short *) userPtr;
+	short __user *up = (short __user *) userPtr;
 	int stereo = dmasound.soft.stereo;
 	int hSpeed = dmasound.hard.speed, sSpeed = dmasound.soft.speed;
 	int utotal, ftotal;

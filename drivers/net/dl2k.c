@@ -583,7 +583,7 @@ alloc_list (struct net_device *dev)
 
 	/* Initialize Tx descriptors, TFDListPtr leaves in start_xmit(). */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		np->tx_skbuff[i] = 0;
+		np->tx_skbuff[i] = NULL;
 		np->tx_ring[i].status = cpu_to_le64 (TFDDone);
 		np->tx_ring[i].next_desc = cpu_to_le64 (np->tx_ring_dma +
 					      ((i+1)%TX_RING_SIZE) *
@@ -597,7 +597,7 @@ alloc_list (struct net_device *dev)
 						sizeof (struct netdev_desc));
 		np->rx_ring[i].status = 0;
 		np->rx_ring[i].fraginfo = 0;
-		np->rx_skbuff[i] = 0;
+		np->rx_skbuff[i] = NULL;
 	}
 
 	/* Allocate the rx buffers */
@@ -770,7 +770,7 @@ rio_free_tx (struct net_device *dev, int irq)
 		else
 			dev_kfree_skb (skb);
 
-		np->tx_skbuff[entry] = 0;
+		np->tx_skbuff[entry] = NULL;
 		entry = (entry + 1) % TX_RING_SIZE;
 		tx_use++;
 	}
@@ -1818,7 +1818,7 @@ rio_close (struct net_device *dev)
 			pci_unmap_single (np->pdev, np->rx_ring[i].fraginfo,
 					  skb->len, PCI_DMA_FROMDEVICE);
 			dev_kfree_skb (skb);
-			np->rx_skbuff[i] = 0;
+			np->rx_skbuff[i] = NULL;
 		}
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
@@ -1827,7 +1827,7 @@ rio_close (struct net_device *dev)
 			pci_unmap_single (np->pdev, np->tx_ring[i].fraginfo,
 					  skb->len, PCI_DMA_TODEVICE);
 			dev_kfree_skb (skb);
-			np->tx_skbuff[i] = 0;
+			np->tx_skbuff[i] = NULL;
 		}
 	}
 

@@ -371,22 +371,6 @@ config AU1000_UART
 	  If you have an Alchemy AU1000 processor (MIPS based) and you want
 	  to use serial ports, say Y.  Otherwise, say N.
 
-config SGI_L1_SERIAL
-	bool "SGI Altix L1 serial support"
-	depends on SERIAL_NONSTANDARD && IA64
-	help
-	  If you have an SGI Altix and you want to use the serial port
-	  connected to the system controller (you want this!), say Y.
-	  Otherwise, say N.
-
-config SGI_L1_SERIAL_CONSOLE
-	bool "SGI Altix L1 serial console support"
-	depends on SGI_L1_SERIAL
-	help
-	  If you have an SGI Altix and you would like to use the system
-	  controller serial port as your console (you want this!),
-	  say Y.  Otherwise, say N.
-
 config AU1000_SERIAL_CONSOLE
 	bool "Enable Au1000 serial console"
 	depends on AU1000_UART

@@ -93,7 +93,7 @@ config FB_SA1100
 
 config FB_CYBER2000
 	tristate "CyberPro 2000/2010/5000 support"
-	depends on FB && PCI
+	depends on FB && PCI && (BROKEN || !SPARC64)
 	help
 	  This enables support for the Integraphics CyberPro 20x0 and 5000
 	  VGA chips used in the Rebel.com Netwinder and other machines.
@@ -238,7 +238,7 @@ config FB_IMSTT
 
 config FB_S3TRIO
 	bool "S3 Trio display support"
-	depends on FB && PPC
+	depends on FB && PPC && BROKEN
 	help
 	  If you have a S3 Trio say Y. Say N for S3 Virge.
 

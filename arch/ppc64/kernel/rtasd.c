@@ -455,7 +455,7 @@ static int __init rtas_init(void)
 	else
 		printk(KERN_ERR "Failed to create error_log proc entry\n");
 
-	if (kernel_thread(rtasd, 0, CLONE_FS) < 0)
+	if (kernel_thread(rtasd, NULL, CLONE_FS) < 0)
 		printk(KERN_ERR "Failed to start RTAS daemon\n");
 
 	return 0;

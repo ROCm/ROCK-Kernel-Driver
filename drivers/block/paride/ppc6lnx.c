@@ -79,7 +79,7 @@ typedef struct ppc_storage {
 	u8	org_data;				// original LPT data port contents
 	u8	org_ctrl;				// original LPT control port contents
 	u8	cur_ctrl;				// current control port contents
-} PPC;
+} Interface;
 
 //***************************************************************************
 
@@ -101,25 +101,25 @@ typedef struct ppc_storage {
 
 //***************************************************************************
 
-static int ppc6_select(PPC *ppc);
-static void ppc6_deselect(PPC *ppc);
-static void ppc6_send_cmd(PPC *ppc, u8 cmd);
-static void ppc6_wr_data_byte(PPC *ppc, u8 data);
-static u8 ppc6_rd_data_byte(PPC *ppc);
-static u8 ppc6_rd_port(PPC *ppc, u8 port);
-static void ppc6_wr_port(PPC *ppc, u8 port, u8 data);
-static void ppc6_rd_data_blk(PPC *ppc, u8 *data, long count);
-static void ppc6_wait_for_fifo(PPC *ppc);
-static void ppc6_wr_data_blk(PPC *ppc, u8 *data, long count);
-static void ppc6_rd_port16_blk(PPC *ppc, u8 port, u8 *data, long length);
-static void ppc6_wr_port16_blk(PPC *ppc, u8 port, u8 *data, long length);
-static void ppc6_wr_extout(PPC *ppc, u8 regdata);
-static int ppc6_open(PPC *ppc);
-static void ppc6_close(PPC *ppc);
+static int ppc6_select(Interface *ppc);
+static void ppc6_deselect(Interface *ppc);
+static void ppc6_send_cmd(Interface *ppc, u8 cmd);
+static void ppc6_wr_data_byte(Interface *ppc, u8 data);
+static u8 ppc6_rd_data_byte(Interface *ppc);
+static u8 ppc6_rd_port(Interface *ppc, u8 port);
+static void ppc6_wr_port(Interface *ppc, u8 port, u8 data);
+static void ppc6_rd_data_blk(Interface *ppc, u8 *data, long count);
+static void ppc6_wait_for_fifo(Interface *ppc);
+static void ppc6_wr_data_blk(Interface *ppc, u8 *data, long count);
+static void ppc6_rd_port16_blk(Interface *ppc, u8 port, u8 *data, long length);
+static void ppc6_wr_port16_blk(Interface *ppc, u8 port, u8 *data, long length);
+static void ppc6_wr_extout(Interface *ppc, u8 regdata);
+static int ppc6_open(Interface *ppc);
+static void ppc6_close(Interface *ppc);
 
 //***************************************************************************
 
-static int ppc6_select(PPC *ppc)
+static int ppc6_select(Interface *ppc)
 {
 	u8 i, j, k;
 
@@ -205,7 +205,7 @@ static int ppc6_select(PPC *ppc)
 
 //***************************************************************************
 
-static void ppc6_deselect(PPC *ppc)
+static void ppc6_deselect(Interface *ppc)
 {
 	if (ppc->mode & 4)	// EPP
 		ppc->cur_ctrl |= port_init;
@@ -223,7 +223,7 @@ static void ppc6_deselect(PPC *ppc)
 
 //***************************************************************************
 
-static void ppc6_send_cmd(PPC *ppc, u8 cmd)
+static void ppc6_send_cmd(Interface *ppc, u8 cmd)
 {
 	switch(ppc->mode)
 	{
@@ -254,7 +254,7 @@ static void ppc6_send_cmd(PPC *ppc, u8 cmd)
 
 //***************************************************************************
 
-static void ppc6_wr_data_byte(PPC *ppc, u8 data)
+static void ppc6_wr_data_byte(Interface *ppc, u8 data)
 {
 	switch(ppc->mode)
 	{
@@ -285,7 +285,7 @@ static void ppc6_wr_data_byte(PPC *ppc, u8 data)
 
 //***************************************************************************
 
-static u8 ppc6_rd_data_byte(PPC *ppc)
+static u8 ppc6_rd_data_byte(Interface *ppc)
 {
 	u8 data = 0;
 
@@ -358,7 +358,7 @@ static u8 ppc6_rd_data_byte(PPC *ppc)
 
 //***************************************************************************
 
-static u8 ppc6_rd_port(PPC *ppc, u8 port)
+static u8 ppc6_rd_port(Interface *ppc, u8 port)
 {
 	ppc6_send_cmd(ppc,(u8)(port | ACCESS_PORT | ACCESS_READ));
 
@@ -367,7 +367,7 @@ static u8 ppc6_rd_port(PPC *ppc, u8 port)
 
 //***************************************************************************
 
-static void ppc6_wr_port(PPC *ppc, u8 port, u8 data)
+static void ppc6_wr_port(Interface *ppc, u8 port, u8 data)
 {
 	ppc6_send_cmd(ppc,(u8)(port | ACCESS_PORT | ACCESS_WRITE));
 
@@ -376,7 +376,7 @@ static void ppc6_wr_port(PPC *ppc, u8 port, u8 data)
 
 //***************************************************************************
 
-static void ppc6_rd_data_blk(PPC *ppc, u8 *data, long count)
+static void ppc6_rd_data_blk(Interface *ppc, u8 *data, long count)
 {
 	switch(ppc->mode)
 	{
@@ -512,7 +512,7 @@ static void ppc6_rd_data_blk(PPC *ppc, u8 *data, long count)
 
 //***************************************************************************
 
-static void ppc6_wait_for_fifo(PPC *ppc)
+static void ppc6_wait_for_fifo(Interface *ppc)
 {
 	int i;
 
@@ -525,7 +525,7 @@ static void ppc6_wait_for_fifo(PPC *ppc)
 
 //***************************************************************************
 
-static void ppc6_wr_data_blk(PPC *ppc, u8 *data, long count)
+static void ppc6_wr_data_blk(Interface *ppc, u8 *data, long count)
 {
 	switch(ppc->mode)
 	{
@@ -644,7 +644,7 @@ static void ppc6_wr_data_blk(PPC *ppc, u8 *data, long count)
 
 //***************************************************************************
 
-static void ppc6_rd_port16_blk(PPC *ppc, u8 port, u8 *data, long length)
+static void ppc6_rd_port16_blk(Interface *ppc, u8 port, u8 *data, long length)
 {
 	length = length << 1;
 
@@ -664,7 +664,7 @@ static void ppc6_rd_port16_blk(PPC *ppc, u8 port, u8 *data, long length)
 
 //***************************************************************************
 
-static void ppc6_wr_port16_blk(PPC *ppc, u8 port, u8 *data, long length)
+static void ppc6_wr_port16_blk(Interface *ppc, u8 port, u8 *data, long length)
 {
 	length = length << 1;
 
@@ -684,7 +684,7 @@ static void ppc6_wr_port16_blk(PPC *ppc, u8 port, u8 *data, long length)
 
 //***************************************************************************
 
-static void ppc6_wr_extout(PPC *ppc, u8 regdata)
+static void ppc6_wr_extout(Interface *ppc, u8 regdata)
 {
 	ppc6_send_cmd(ppc,(REG_VERSION | ACCESS_REG | ACCESS_WRITE));
 
@@ -693,7 +693,7 @@ static void ppc6_wr_extout(PPC *ppc, u8 regdata)
 
 //***************************************************************************
 
-static int ppc6_open(PPC *ppc)
+static int ppc6_open(Interface *ppc)
 {
 	int ret;
 
@@ -717,7 +717,7 @@ static int ppc6_open(PPC *ppc)
 
 //***************************************************************************
 
-static void ppc6_close(PPC *ppc)
+static void ppc6_close(Interface *ppc)
 {
 	ppc6_deselect(ppc);
 }

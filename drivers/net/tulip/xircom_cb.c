@@ -337,7 +337,7 @@ static irqreturn_t xircom_interrupt(int irq, void *dev_instance, struct pt_regs 
 	spin_lock(&card->lock);
 	status = inl(card->io_port+CSR5);
 
-#if DEBUG	
+#ifdef DEBUG	
 	print_binary(status);
 	printk("tx status 0x%08x 0x%08x \n",card->tx_buffer[0],card->tx_buffer[4]);
 	printk("rx status 0x%08x 0x%08x \n",card->rx_buffer[0],card->rx_buffer[4]);

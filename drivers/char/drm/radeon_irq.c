@@ -187,7 +187,7 @@ int radeon_irq_emit( DRM_IOCTL_ARGS )
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_COPY_FROM_USER_IOCTL( emit, (drm_radeon_irq_emit_t *)data,
+	DRM_COPY_FROM_USER_IOCTL( emit, (drm_radeon_irq_emit_t __user *)data,
 				  sizeof(emit) );
 
 	result = radeon_emit_irq( dev );
@@ -214,7 +214,7 @@ int radeon_irq_wait( DRM_IOCTL_ARGS )
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_COPY_FROM_USER_IOCTL( irqwait, (drm_radeon_irq_wait_t *)data,
+	DRM_COPY_FROM_USER_IOCTL( irqwait, (drm_radeon_irq_wait_t __user*)data,
 				  sizeof(irqwait) );
 
 	return radeon_wait_irq( dev, irqwait.irq_seq );

@@ -937,7 +937,7 @@ static void epic_init_ring(struct net_device *dev)
 		ep->rx_ring[i].buflength = cpu_to_le32(ep->rx_buf_sz);
 		ep->rx_ring[i].next = ep->rx_ring_dma + 
 				      (i+1)*sizeof(struct epic_rx_desc);
-		ep->rx_skbuff[i] = 0;
+		ep->rx_skbuff[i] = NULL;
 	}
 	/* Mark the last entry as wrapping the ring. */
 	ep->rx_ring[i-1].next = ep->rx_ring_dma;
@@ -959,7 +959,7 @@ static void epic_init_ring(struct net_device *dev)
 	/* The Tx buffer descriptor is filled in as needed, but we
 	   do need to clear the ownership bit. */
 	for (i = 0; i < TX_RING_SIZE; i++) {
-		ep->tx_skbuff[i] = 0;
+		ep->tx_skbuff[i] = NULL;
 		ep->tx_ring[i].txstatus = 0x0000;
 		ep->tx_ring[i].next = ep->tx_ring_dma + 
 			(i+1)*sizeof(struct epic_tx_desc);
@@ -1093,7 +1093,7 @@ static irqreturn_t epic_interrupt(int irq, void *dev_instance, struct pt_regs *r
 				pci_unmap_single(ep->pci_dev, ep->tx_ring[entry].bufaddr, 
 						 skb->len, PCI_DMA_TODEVICE);
 				dev_kfree_skb_irq(skb);
-				ep->tx_skbuff[entry] = 0;
+				ep->tx_skbuff[entry] = NULL;
 			}
 
 #ifndef final_version
@@ -1274,7 +1274,7 @@ static int epic_close(struct net_device *dev)
 	/* Free all the skbuffs in the Rx queue. */
 	for (i = 0; i < RX_RING_SIZE; i++) {
 		skb = ep->rx_skbuff[i];
-		ep->rx_skbuff[i] = 0;
+		ep->rx_skbuff[i] = NULL;
 		ep->rx_ring[i].rxstatus = 0;		/* Not owned by Epic chip. */
 		ep->rx_ring[i].buflength = 0;
 		if (skb) {
@@ -1286,7 +1286,7 @@ static int epic_close(struct net_device *dev)
 	}
 	for (i = 0; i < TX_RING_SIZE; i++) {
 		skb = ep->tx_skbuff[i];
-		ep->tx_skbuff[i] = 0;
+		ep->tx_skbuff[i] = NULL;
 		if (!skb)
 			continue;
 		pci_unmap_single(ep->pci_dev, ep->tx_ring[i].bufaddr, 

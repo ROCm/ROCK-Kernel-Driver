@@ -532,7 +532,7 @@ void emu10k1_seq_midi_close(int dev)
 
 	if (card->seq_mididev) {
 		kfree(card->seq_mididev);
-		card->seq_mididev = 0;
+		card->seq_mididev = NULL;
 	}
 }
 

@@ -584,7 +584,7 @@ static void ip6_rt_update_pmtu(struct dst_entry *dst, u32 mtu)
 /* Protected by rt6_lock.  */
 static struct dst_entry *ndisc_dst_gc_list;
 static int ipv6_get_mtu(struct net_device *dev);
-static inline unsigned int ipv6_advmss(unsigned int mtu);
+static unsigned int ipv6_advmss(unsigned int mtu);
 
 struct dst_entry *ndisc_dst_alloc(struct net_device *dev, 
 				  struct neighbour *neigh,
@@ -1292,7 +1292,7 @@ int ipv6_route_ioctl(unsigned int cmd, void __user *arg)
 
 int ip6_pkt_discard(struct sk_buff *skb)
 {
-	IP6_INC_STATS(OutNoRoutes);
+	IP6_INC_STATS(IPSTATS_MIB_OUTNOROUTES);
 	icmpv6_send(skb, ICMPV6_DEST_UNREACH, ICMPV6_NOROUTE, 0, skb->dev);
 	kfree_skb(skb);
 	return 0;

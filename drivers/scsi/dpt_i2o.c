@@ -1643,13 +1643,13 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32 __user *arg)
 	u32 reply_size = 0;
 	u32 __user *user_msg = arg;
 	u32 __user * user_reply = NULL;
-	ulong sg_list[pHba->sg_tablesize];
+	void *sg_list[pHba->sg_tablesize];
 	u32 sg_offset = 0;
 	u32 sg_count = 0;
 	int sg_index = 0;
 	u32 i = 0;
 	u32 rcode = 0;
-	ulong p = 0;
+	void *p = NULL;
 	ulong flags = 0;
 
 	memset(&msg, 0, MAX_MESSAGE_SIZE*4);
@@ -1705,8 +1705,8 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32 __user *arg)
 			}
 			sg_size = sg[i].flag_count & 0xffffff;      
 			/* Allocate memory for the transfer */
-			p = (ulong)kmalloc(sg_size, GFP_KERNEL|ADDR32);
-			if(p == 0) {
+			p = kmalloc(sg_size, GFP_KERNEL|ADDR32);
+			if(!p) {
 				printk(KERN_DEBUG"%s: Could not allocate SG buffer - size = %d buffer number %d of %d\n",
 						pHba->name,sg_size,i,sg_count);
 				rcode = -ENOMEM;
@@ -1716,14 +1716,14 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32 __user *arg)
 			/* Copy in the user's SG buffer if necessary */
 			if(sg[i].flag_count & 0x04000000 /*I2O_SGL_FLAGS_DIR*/) {
 				// TODO 64bit fix
-				if (copy_from_user((void*)p,(void*)sg[i].addr_bus, sg_size)) {
+				if (copy_from_user(p,(void __user *)sg[i].addr_bus, sg_size)) {
 					printk(KERN_DEBUG"%s: Could not copy SG buf %d FROM user\n",pHba->name,i);
 					rcode = -EFAULT;
 					goto cleanup;
 				}
 			}
 			//TODO 64bit fix
-			sg[i].addr_bus = (u32)virt_to_bus((void*)p);
+			sg[i].addr_bus = (u32)virt_to_bus(p);
 		}
 	}
 
@@ -1778,8 +1778,8 @@ static int adpt_i2o_passthru(adpt_hba* pHba, u32 __user *arg)
 			if(! (sg[j].flag_count & 0x4000000 /*I2O_SGL_FLAGS_DIR*/)) {
 				sg_size = sg[j].flag_count & 0xffffff; 
 				// TODO 64bit fix
-				if (copy_to_user((void*)sg[j].addr_bus,(void*)sg_list[j], sg_size)) {
-					printk(KERN_WARNING"%s: Could not copy %lx TO user %x\n",pHba->name, sg_list[j], sg[j].addr_bus);
+				if (copy_to_user((void __user *)sg[j].addr_bus,sg_list[j], sg_size)) {
+					printk(KERN_WARNING"%s: Could not copy %p TO user %x\n",pHba->name, sg_list[j], sg[j].addr_bus);
 					rcode = -EFAULT;
 					goto cleanup;
 				}
@@ -1807,7 +1807,7 @@ cleanup:
 	while(sg_index) {
 		if(sg_list[--sg_index]) {
 			if (rcode != -ETIME && rcode != -EINTR)
-				kfree((void*)(sg_list[sg_index]));
+				kfree(sg_list[sg_index]);
 		}
 	}
 	return rcode;

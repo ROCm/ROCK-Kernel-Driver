@@ -630,8 +630,8 @@ static inline loff_t le_ih_k_type (const struct item_head * ih)
 static inline void set_le_key_k_offset (int version, struct key * key, loff_t offset)
 {
     (version == KEY_FORMAT_3_5) ?
-        (key->u.k_offset_v1.k_offset = cpu_to_le32 (offset)) : /* jdm check */
-	(set_offset_v2_k_offset( &(key->u.k_offset_v2), offset ));
+        (void)(key->u.k_offset_v1.k_offset = cpu_to_le32 (offset)) : /* jdm check */
+	(void)(set_offset_v2_k_offset( &(key->u.k_offset_v2), offset ));
 }
 
 
@@ -644,8 +644,8 @@ static inline void set_le_ih_k_offset (struct item_head * ih, loff_t offset)
 static inline void set_le_key_k_type (int version, struct key * key, int type)
 {
     (version == KEY_FORMAT_3_5) ?
-        (key->u.k_offset_v1.k_uniqueness = cpu_to_le32(type2uniqueness(type))):
-	(set_offset_v2_k_type( &(key->u.k_offset_v2), type ));
+        (void)(key->u.k_offset_v1.k_uniqueness = cpu_to_le32(type2uniqueness(type))):
+	(void)(set_offset_v2_k_type( &(key->u.k_offset_v2), type ));
 }
 static inline void set_le_ih_k_type (struct item_head * ih, int type)
 {

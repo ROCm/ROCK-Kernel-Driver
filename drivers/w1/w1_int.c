@@ -49,7 +49,7 @@ struct w1_master * w1_alloc_dev(u32 id, int slave_count,
 	dev = kmalloc(sizeof(struct w1_master) + sizeof(struct w1_bus_master), GFP_KERNEL);
 	if (!dev) {
 		printk(KERN_ERR
-			"Failed to allocate %d bytes for new w1 device.\n",
+			"Failed to allocate %zd bytes for new w1 device.\n",
 			sizeof(struct w1_master));
 		return NULL;
 	}

@@ -1132,7 +1132,7 @@ static int try_init_mem(int intf_num, struct smi_info **new_info)
 static int acpi_failure = 0;
 
 /* For GPE-type interrupts. */
-u32 ipmi_acpi_gpe(void *context)
+void ipmi_acpi_gpe(void *context)
 {
 	struct smi_info *smi_info = context;
 	unsigned long   flags;
@@ -1156,7 +1156,6 @@ u32 ipmi_acpi_gpe(void *context)
 	smi_event_handler(smi_info, 0);
  out:
 	spin_unlock_irqrestore(&(smi_info->si_lock), flags);
-	return 0;
 }
 
 static int acpi_gpe_irq_setup(struct smi_info *info)

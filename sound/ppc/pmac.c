@@ -896,7 +896,7 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		sound = sound->next;
 	if (! sound)
 		return -ENODEV;
-	prop = (unsigned int *) get_property(sound, "sub-frame", 0);
+	prop = (unsigned int *) get_property(sound, "sub-frame", NULL);
 	if (prop && *prop < 16)
 		chip->subframe = *prop;
 	/* This should be verified on older screamers */
@@ -938,7 +938,7 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		// chip->can_byte_swap = 0; /* FIXME: check this */
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
-	prop = (unsigned int *)get_property(sound, "device-id", 0);
+	prop = (unsigned int *)get_property(sound, "device-id", NULL);
 	if (prop)
 		chip->device_id = *prop;
 	chip->has_iic = (find_devices("perch") != NULL);

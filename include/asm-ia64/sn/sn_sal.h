@@ -141,8 +141,8 @@ sn_sal_rev_minor(void)
  * Specify the minimum PROM revsion required for this kernel.
  * Note that they're stored in hex format...
  */
-#define SN_SAL_MIN_MAJOR	0x1  /* SN2 kernels need at least PROM 1.0 */
-#define SN_SAL_MIN_MINOR	0x0
+#define SN_SAL_MIN_MAJOR	0x3  /* SN2 kernels need at least PROM 3.40 */
+#define SN_SAL_MIN_MINOR	0x40
 
 u64 ia64_sn_probe_io_slot(long paddr, long size, void *data_ptr);
 

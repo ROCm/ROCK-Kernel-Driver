@@ -59,7 +59,7 @@ static int store_updates_sp(struct pt_regs *regs)
 {
 	unsigned int inst;
 
-	if (get_user(inst, (unsigned int *)regs->nip))
+	if (get_user(inst, (unsigned int __user *)regs->nip))
 		return 0;
 	/* check for 1 in the rA field */
 	if (((inst >> 16) & 0x1f) != 1)
@@ -281,7 +281,7 @@ bad_area:
 		info.si_signo = SIGSEGV;
 		info.si_errno = 0;
 		info.si_code = code;
-		info.si_addr = (void *) address;
+		info.si_addr = (void __user *) address;
 		force_sig_info(SIGSEGV, &info, current);
 		return 0;
 	}
@@ -309,7 +309,7 @@ do_sigbus:
 	info.si_signo = SIGBUS;
 	info.si_errno = 0;
 	info.si_code = BUS_ADRERR;
-	info.si_addr = (void *)address;
+	info.si_addr = (void __user *)address;
 	force_sig_info (SIGBUS, &info, current);
 	if (!user_mode(regs))
 		return SIGBUS;

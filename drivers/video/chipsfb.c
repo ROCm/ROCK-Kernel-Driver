@@ -493,7 +493,7 @@ chips_sleep_notify(struct pmu_sleep_notifier *self, int when)
 	case PBOOK_SLEEP_REJECT:
 		if (save_framebuffer) {
 			vfree(save_framebuffer);
-			save_framebuffer = 0;
+			save_framebuffer = NULL;
 		}
 		break;
 	case PBOOK_SLEEP_NOW:
@@ -505,7 +505,7 @@ chips_sleep_notify(struct pmu_sleep_notifier *self, int when)
 		if (save_framebuffer) {
 			memcpy(p->screen_base, save_framebuffer, nb);
 			vfree(save_framebuffer);
-			save_framebuffer = 0;
+			save_framebuffer = NULL;
 		}
 		chipsfb_blank(0, p);
 		break;

@@ -753,7 +753,7 @@ endif
 
 config BLK_DEV_IDE_PMAC
 	bool "Builtin PowerMac IDE support"
-	depends on PPC_PMAC
+	depends on PPC_PMAC && IDE=y
 	help
 	  This driver provides support for the built-in IDE controller on
 	  most of the recent Apple Power Macintoshes and PowerBooks.
