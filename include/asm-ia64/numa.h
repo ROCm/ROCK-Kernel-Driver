@@ -61,6 +61,10 @@ extern int paddr_to_nid(unsigned long paddr);
 
 #define local_nodeid (cpu_to_node_map[smp_processor_id()])
 
+#else /* !CONFIG_NUMA */
+
+#define paddr_to_nid(addr)	0
+
 #endif /* CONFIG_NUMA */
 
 #endif /* _ASM_IA64_NUMA_H */
