@@ -1770,6 +1770,46 @@ out_serverfault:
 }
 
 static int
+nfsd4_encode_dirent_fattr(struct nfsd4_readdir *cd,
+		const char *name, int namlen, u32 *p, int *buflen)
+{
+	struct svc_export *exp = cd->rd_fhp->fh_export;
+	struct dentry *dentry;
+	int nfserr;
+
+	dentry = lookup_one_len(name, cd->rd_fhp->fh_dentry, namlen);
+	if (IS_ERR(dentry)) {
+		nfserr = nfserrno(PTR_ERR(dentry));
+		return nfserr;
+	}
+
+	exp_get(exp);
+	if (d_mountpoint(dentry)) {
+		if (nfsd_cross_mnt(cd->rd_rqstp, &dentry, &exp)) {
+		/*
+		 * -EAGAIN is the only error returned from
+		 * nfsd_cross_mnt() and it indicates that an
+		 * up-call has  been initiated to fill in the export
+		 * options on exp.  When the answer comes back,
+		 * this call will be retried.
+		 */
+			dput(dentry);
+			exp_put(exp);
+			nfserr = nfserr_dropit;
+			return nfserr;
+		}
+
+	}
+
+	nfserr = nfsd4_encode_fattr(NULL, exp,
+			dentry, p, buflen, cd->rd_bmval,
+			cd->rd_rqstp);
+	dput(dentry);
+	exp_put(exp);
+	return nfserr;
+}
+
+static int
 nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		    loff_t offset, ino_t ino, unsigned int d_type)
 {
@@ -1777,8 +1817,6 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	int buflen;
 	u32 *p = cd->buffer;
 	u32 *attrlenp;
-	struct dentry *dentry;
-	struct svc_export *exp = cd->rd_fhp->fh_export;
 	int nfserr = 0;
 
 	/* In nfsv4, "." and ".." never make it onto the wire.. */
@@ -1802,35 +1840,7 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	/*
 	 * Now we come to the ugly part: writing the fattr for this entry.
 	 */
-	dentry = lookup_one_len(name, cd->rd_fhp->fh_dentry, namlen);
-	if (IS_ERR(dentry)) {
-		nfserr = nfserrno(PTR_ERR(dentry));
-		goto error;
-	}
-
-	exp_get(exp);
-	if (d_mountpoint(dentry)) {
-		if (nfsd_cross_mnt(cd->rd_rqstp, &dentry, &exp)) {
-		/*
-		 * -EAGAIN is the only error returned from
-		 * nfsd_cross_mnt() and it indicates that an
-		 * up-call has  been initiated to fill in the export
-		 * options on exp.  When the answer comes back,
-		 * this call will be retried.
-		 */
-			dput(dentry);
-			exp_put(exp);
-			nfserr = nfserr_dropit;
-			goto error;
-		}
-
-	}
-
-	nfserr = nfsd4_encode_fattr(NULL, exp,
-			dentry, p, &buflen, cd->rd_bmval,
-			cd->rd_rqstp);
-	dput(dentry);
-	exp_put(exp);
+	nfserr = nfsd4_encode_dirent_fattr(cd, name, namlen, p, &buflen);
 	if (!nfserr) {
 		p += buflen;
 		goto out;
@@ -1838,7 +1848,6 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 	if (nfserr == nfserr_resource)
 		goto nospc;
 
-error:
 	/*
 	 * If we get here, we experienced a miscellaneous
 	 * failure while writing the attributes.  If the
