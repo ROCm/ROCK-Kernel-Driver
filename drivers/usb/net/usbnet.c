@@ -26,12 +26,7 @@
  * See the LINUXDEV support.
  *
  * 
- * TODO:
- *
- * This needs to be retested for bulk queuing problems ... earlier versions
- * seemed to find different types of problems in each HCD.  Once they're fixed,
- * re-enable queues to get higher bandwidth utilization (without needing
- * to tweak MTU for larger packets).
+ * Status:
  *
  * - AN2720 ... not widely available, but reportedly works well
  *
@@ -45,8 +40,8 @@
  *   but the Sharp Zaurus uses an incompatible protocol (extra checksums).
  *   No reason not to merge the Zaurus protocol here too (got patch? :)
  *
- * - For Netchip, use keventd to poll via control requests to detect hardware
- *   level "carrier detect". 
+ * - For Netchip, should use keventd to poll via control requests to detect
+ *   hardware level "carrier detect". 
  *
  * - PL-230x ... the initialization protocol doesn't seem to match chip data
  *   sheets, sometimes it's not needed and sometimes it hangs.  Prolific has
@@ -60,9 +55,9 @@
  *
  * There are reports that bridging gives lower-than-usual throughput.
  *
- * Craft smarter hotplug policy scripts ... ones that know how to arrange
+ * Need smarter hotplug policy scripts ... ones that know how to arrange
  * bridging with "brctl", and can handle static and dynamic ("pump") setups.
- * Use those "peer connected" events.
+ * Use those eventual "peer connected" events.
  *
  *
  * CHANGELOG:
@@ -122,7 +117,7 @@
 
 // #define	DEBUG			// error path messages, extra info
 // #define	VERBOSE			// more; success messages
-// #define	REALLY_QUEUE
+#define	REALLY_QUEUE
 
 #if !defined (DEBUG) && defined (CONFIG_USB_DEBUG)
 #   define DEBUG
@@ -139,7 +134,7 @@
 #define	CONFIG_USB_PL2301
 
 
-#define DRIVER_VERSION		"07-May-2002"
+#define DRIVER_VERSION		"17-Jul-2002"
 
 /*-------------------------------------------------------------------------*/
 
@@ -1815,20 +1810,19 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	}
 #endif	/* CONFIG_USB_NET1080 */
 
-	netif_stop_queue (net);
 	switch ((retval = usb_submit_urb (urb, GFP_ATOMIC))) {
 	case -EPIPE:
+		netif_stop_queue (net);
 		defer_kevent (dev, EVENT_TX_HALT);
 		break;
 	default:
-		netif_start_queue (net);
 		dbg ("%s tx: submit urb err %d", net->name, retval);
 		break;
 	case 0:
 		net->trans_start = jiffies;
 		__skb_queue_tail (&dev->txq, skb);
-		if (dev->txq.qlen < TX_QLEN)
-			netif_start_queue (net);
+		if (dev->txq.qlen >= TX_QLEN)
+			netif_stop_queue (net);
 	}
 	spin_unlock_irqrestore (&dev->txq.lock, flags);
 
