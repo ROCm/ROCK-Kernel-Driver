@@ -382,8 +382,9 @@ static void __devinit amd8151_init(struct pci_dev *pdev, struct agp_bridge_data 
 	case 0x11: revstring="B0"; break;
 	case 0x12: revstring="B1"; break;
 	case 0x13: revstring="B2"; break;
+	case 0x14: revstring="B3"; break;
 	default:   revstring="??"; break;
-		}
+	}
 
 	printk (KERN_INFO PFX "Detected AMD 8151 AGP Bridge rev %s\n", revstring);
 

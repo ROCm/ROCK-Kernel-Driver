@@ -454,10 +454,17 @@ static int __devinit agp_serverworks_probe(struct pci_dev *pdev,
 	}
 
 	switch (pdev->device) {
+	case 0x0006:
+		/* ServerWorks CNB20HE
+		Fail silently.*/
+		printk (KERN_ERR PFX "Detected ServerWorks CNB20HE chipset: No AGP present.\n");
+		return -ENODEV;
+
 	case PCI_DEVICE_ID_SERVERWORKS_HE:
 	case PCI_DEVICE_ID_SERVERWORKS_LE:
 	case 0x0007:
 		break;
+
 	default:
 		printk(KERN_ERR PFX "Unsupported Serverworks chipset "
 				"(device id: %04x)\n", pdev->device);
