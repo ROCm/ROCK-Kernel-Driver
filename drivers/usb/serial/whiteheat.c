@@ -1132,7 +1132,6 @@ static int firm_send_command (struct usb_serial_port *port, __u8 command, __u8 *
 	struct usb_serial_port *command_port;
 	struct whiteheat_command_private *command_info;
 	struct whiteheat_private *info;
-	int timeout;
 	__u8 *transfer_buffer;
 	int retval = 0;
 	unsigned long flags;
