@@ -78,6 +78,7 @@ struct cpuinfo_x86 {
  */
 
 extern struct cpuinfo_x86 boot_cpu_data;
+extern struct cpuinfo_x86 new_cpu_data;
 extern struct tss_struct init_tss[NR_CPUS];
 
 #ifdef CONFIG_SMP

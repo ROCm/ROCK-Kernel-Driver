@@ -23,10 +23,10 @@
 #define NEW_CL_POINTER		0x228	/* Relative to real mode data */
 
 /*
- * References to members of the boot_cpu_data structure.
+ * References to members of the new_cpu_data structure.
  */
 
-#define CPU_PARAMS	boot_cpu_data
+#define CPU_PARAMS	new_cpu_data
 #define X86		CPU_PARAMS+0
 #define X86_VENDOR	CPU_PARAMS+1
 #define X86_MODEL	CPU_PARAMS+2

@@ -50,6 +50,9 @@ static inline char * __init machine_specific_memory_setup(void);
  */
 
 char ignore_irq13;		/* set if exception 16 works */
+/* cpu data as detected by the assembly code in head.S */
+struct cpuinfo_x86 new_cpu_data __initdata = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
+/* common cpu data for all cpus */
 struct cpuinfo_x86 boot_cpu_data = { 0, 0, 0, 0, -1, 1, 0, 0, -1 };
 
 unsigned long mmu_cr4_features;
@@ -840,6 +843,7 @@ void __init setup_arch(char **cmdline_p)
 {
 	unsigned long max_low_pfn;
 
+	memcpy(&boot_cpu_data, &new_cpu_data, sizeof(new_cpu_data));
 	pre_setup_arch_hook();
 	early_cpu_init();
 
