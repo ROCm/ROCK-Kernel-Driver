@@ -736,20 +736,20 @@ static int bond_update_speed_duplex(struct slave *slave)
 	}
 
 	switch (slave->speed) {
-		case SPEED_10:
-		case SPEED_100:
-		case SPEED_1000:
-			break;
-		default:
-			goto err_out;
+	case SPEED_10:
+	case SPEED_100:
+	case SPEED_1000:
+		break;
+	default:
+		goto err_out;
 	}
 
 	switch (slave->duplex) {
-		case DUPLEX_FULL:
-		case DUPLEX_HALF:
-			break;
-		default:
-			goto err_out;
+	case DUPLEX_FULL:
+	case DUPLEX_HALF:
+		break;
+	default:
+		goto err_out;
 	}
 
 	return 0;
@@ -814,8 +814,8 @@ static int bond_check_dev_link(struct net_device *slave_dev, int reporting)
 		/* try SIOCETHTOOL ioctl, some drivers cache ETHTOOL_GLINK */
 		/* for a period of time so we attempt to get link status   */
 		/* from it last if the above MII ioctls fail...            */
-	        etool.cmd = ETHTOOL_GLINK;
-	        ifr.ifr_data = (char*)&etool;
+		etool.cmd = ETHTOOL_GLINK;
+		ifr.ifr_data = (char*)&etool;
 		if (IOCTL(slave_dev, &ifr, SIOCETHTOOL) == 0) {
 			if (etool.data == 1) {
 				return BMSR_LSTATUS;
@@ -1053,7 +1053,7 @@ static int bond_mc_list_copy(struct dev_mc_list *mc_list, struct bonding *bond, 
 {
 	struct dev_mc_list *dmi, *new_dmi;
 
-   	for (dmi = mc_list; dmi; dmi = dmi->next) {
+	for (dmi = mc_list; dmi; dmi = dmi->next) {
 		new_dmi = kmalloc(sizeof(struct dev_mc_list), gpf_flag);
 
 		if (!new_dmi) {
@@ -1145,20 +1145,20 @@ static void bond_set_multicast_list(struct net_device *bond_dev)
 	/*
 	 * Do promisc before checking multicast_mode
 	 */
-	if ( (bond_dev->flags & IFF_PROMISC) && !(bond->flags & IFF_PROMISC) ) {
+	if ((bond_dev->flags & IFF_PROMISC) && !(bond->flags & IFF_PROMISC)) {
 		bond_set_promiscuity(bond, 1);
 	}
 
-	if ( !(bond_dev->flags & IFF_PROMISC) && (bond->flags & IFF_PROMISC) ) {
+	if (!(bond_dev->flags & IFF_PROMISC) && (bond->flags & IFF_PROMISC)) {
 		bond_set_promiscuity(bond, -1);
 	}
 
 	/* set allmulti flag to slaves */
-	if ( (bond_dev->flags & IFF_ALLMULTI) && !(bond->flags & IFF_ALLMULTI) ) {
+	if ((bond_dev->flags & IFF_ALLMULTI) && !(bond->flags & IFF_ALLMULTI)) {
 		bond_set_allmulti(bond, 1);
 	}
 
-	if ( !(bond_dev->flags & IFF_ALLMULTI) && (bond->flags & IFF_ALLMULTI) ) {
+	if (!(bond_dev->flags & IFF_ALLMULTI) && (bond->flags & IFF_ALLMULTI)) {
 		bond_set_allmulti(bond, -1);
 	}
 
@@ -1324,13 +1324,13 @@ static int bond_enslave(struct net_device *bond_dev, struct net_device *slave_de
 			 * The application already set the master's
 			 * mac address to that of the first slave
 			 */
-			memcpy(addr.sa_data, bond_dev->dev_addr, bond_dev->addr_len);
-			addr.sa_family = slave_dev->type;
-			res = slave_dev->set_mac_address(slave_dev, &addr);
-			if (res) {
-				dprintk("Error %d calling set_mac_address\n", res);
-				goto err_free;
-			}
+		memcpy(addr.sa_data, bond_dev->dev_addr, bond_dev->addr_len);
+		addr.sa_family = slave_dev->type;
+		res = slave_dev->set_mac_address(slave_dev, &addr);
+		if (res) {
+			dprintk("Error %d calling set_mac_address\n", res);
+			goto err_free;
+		}
 
 		/* open the slave since the application closed it */
 		res = dev_open(slave_dev);
@@ -2274,7 +2274,7 @@ static void bond_mii_monitor(struct net_device *bond_dev)
 		default:
 			/* Should not happen */
 			printk(KERN_ERR "bonding: Error: %s  Illegal value (link=%d)\n",
-				slave->dev->name, slave->link);
+			       slave->dev->name, slave->link);
 			goto out;
 		} /* end of switch (slave->link) */
 
@@ -2350,8 +2350,8 @@ static void bond_loadbalance_arp_mon(struct net_device *bond_dev)
 	 *       so it can wait
 	 */
 	bond_for_each_slave(bond, slave, i) {
-	  	if (slave->link != BOND_LINK_UP) {
-	  		if (((jiffies - slave->dev->trans_start) <= delta_in_ticks) &&
+		if (slave->link != BOND_LINK_UP) {
+			if (((jiffies - slave->dev->trans_start) <= delta_in_ticks) &&
 			    ((jiffies - slave->dev->last_rx) <= delta_in_ticks)) {
 
 				slave->link  = BOND_LINK_UP;
@@ -2476,7 +2476,7 @@ static void bond_activebackup_arp_mon(struct net_device *bond_dev)
 	 *       so it can wait
 	 */
 	bond_for_each_slave(bond, slave, i) {
-	  	if (slave->link != BOND_LINK_UP) {
+		if (slave->link != BOND_LINK_UP) {
 			if ((jiffies - slave->dev->last_rx) <= delta_in_ticks) {
 
 				slave->link = BOND_LINK_UP;
@@ -3367,7 +3367,7 @@ static int bond_info_open(struct inode *inode, struct file *file)
 }
 
 static struct file_operations bond_info_fops = {
-	.owner	 = THIS_MODULE,
+	.owner   = THIS_MODULE,
 	.open    = bond_info_open,
 	.read    = seq_read,
 	.llseek  = seq_lseek,
@@ -3875,7 +3875,7 @@ static inline int bond_parse_parm(char *mode_arg, struct bond_parm_tbl *tbl)
 		if ((isdigit(*mode_arg) &&
 		     tbl[i].mode == simple_strtol(mode_arg, NULL, 0)) ||
 		    (strncmp(mode_arg, tbl[i].modename,
-			    strlen(tbl[i].modename)) == 0)) {
+			     strlen(tbl[i].modename)) == 0)) {
 			return tbl[i].mode;
 		}
 	}
@@ -4044,9 +4044,9 @@ static int bond_check_params(void)
 		arp_interval = BOND_LINK_ARP_INTERV;
 	}
 
-        for (arp_ip_count=0 ;
-             (arp_ip_count < MAX_ARP_IP_TARGETS) && arp_ip_target[arp_ip_count];
-              arp_ip_count++ ) {
+	for (arp_ip_count=0 ;
+	     (arp_ip_count < MAX_ARP_IP_TARGETS) && arp_ip_target[arp_ip_count];
+	     arp_ip_count++) {
 		/* not complete check, but should be good enough to
 		   catch mistakes */
 		if (!isdigit(arp_ip_target[arp_ip_count][0])) {
@@ -4059,7 +4059,7 @@ static int bond_check_params(void)
 			u32 ip = in_aton(arp_ip_target[arp_ip_count]);
 			arp_target[arp_ip_count] = ip;
 		}
-        }
+	}
 
 	if (arp_interval && !arp_ip_count) {
 		/* don't allow arping if no arp_ip_target given... */

@@ -907,8 +907,8 @@ static void alb_swap_mac_addr(struct bonding *bond, struct slave *slave1, struct
 
 	if (bond->alb_info.rlb_enabled && slaves_state_differ) {
 			/* A disabled slave was assigned an active mac addr */
-			rlb_teach_disabled_mac_on_primary(bond,
-				disabled_slave->dev->dev_addr);
+		rlb_teach_disabled_mac_on_primary(bond,
+						  disabled_slave->dev->dev_addr);
 	}
 }
 
@@ -942,8 +942,8 @@ static void alb_change_hw_addr_on_detach(struct bonding *bond, struct slave *sla
 	if (perm_curr_diff && perm_bond_diff) {
 		bond_for_each_slave(bond, tmp_slave, i) {
 			if (!memcmp(slave->perm_hwaddr,
-				   tmp_slave->dev->dev_addr,
-				   ETH_ALEN)) {
+				    tmp_slave->dev->dev_addr,
+				    ETH_ALEN)) {
 				found = 1;
 				break;
 			}
@@ -1247,8 +1247,8 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 		skb->dev = tx_slave->dev;
 		if (tx_slave != bond->curr_active_slave) {
 			memcpy(eth_data->h_source,
-				tx_slave->dev->dev_addr,
-				ETH_ALEN);
+			       tx_slave->dev->dev_addr,
+			       ETH_ALEN);
 		}
 		dev_queue_xmit(skb);
 	} else {
@@ -1495,7 +1495,7 @@ void bond_alb_handle_active_change(struct bonding *bond, struct slave *new_slave
 		/* find slave that is holding the bond's mac address */
 		bond_for_each_slave(bond, swap_slave, i) {
 			if (!memcmp(swap_slave->dev->dev_addr,
-				bond->dev->dev_addr, ETH_ALEN)) {
+				    bond->dev->dev_addr, ETH_ALEN)) {
 				found = 1;
 				break;
 			}
