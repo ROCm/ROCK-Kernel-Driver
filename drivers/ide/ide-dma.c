@@ -786,7 +786,6 @@ int __ide_dma_test_irq (ide_drive_t *drive)
 	if (!drive->waiting_for_dma)
 		printk(KERN_WARNING "%s: (%s) called while not waiting\n",
 			drive->name, __FUNCTION__);
-	drive->waiting_for_dma++;
 	return 0;
 }
 
