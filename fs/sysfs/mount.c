@@ -7,6 +7,7 @@
 #include <linux/fs.h>
 #include <linux/mount.h>
 #include <linux/pagemap.h>
+#include <linux/init.h>
 
 #include "sysfs.h"
 

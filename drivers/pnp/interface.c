@@ -13,6 +13,7 @@
 #include <linux/types.h>
 #include <linux/stat.h>
 #include <linux/ctype.h>
+#include <linux/slab.h>
 #include <asm/uaccess.h>
 
 #include "base.h"

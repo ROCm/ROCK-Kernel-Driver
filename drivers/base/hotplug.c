@@ -17,6 +17,8 @@
 #include <linux/err.h>
 #include <linux/kmod.h>
 #include <linux/interrupt.h>
+#include <linux/sched.h>
+#include <linux/string.h>
 #include "base.h"
 #include "fs/fs.h"
 
