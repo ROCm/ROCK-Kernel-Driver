@@ -80,6 +80,20 @@ static int linear_mergeable_bvec(request_queue_t *q, struct bio *bio, struct bio
 	return maxsectors << 9;
 }
 
+static void linear_unplug(request_queue_t *q)
+{
+	mddev_t *mddev = q->queuedata;
+	linear_conf_t *conf = mddev_to_conf(mddev);
+	int i;
+
+	for (i=0; i < mddev->raid_disks; i++) {
+		request_queue_t *r_queue = bdev_get_queue(conf->disks[i].rdev->bdev);
+		if (r_queue->unplug_fn)
+			r_queue->unplug_fn(r_queue);
+	}
+}
+
+
 static int linear_run (mddev_t *mddev)
 {
 	linear_conf_t *conf;
@@ -185,6 +199,7 @@ static int linear_run (mddev_t *mddev)
 		BUG();
 
 	blk_queue_merge_bvec(mddev->queue, linear_mergeable_bvec);
+	mddev->queue->unplug_fn = linear_unplug;
 	return 0;
 
 out:

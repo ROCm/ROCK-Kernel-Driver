@@ -160,30 +160,6 @@ static int md_fail_request (request_queue_t *q, struct bio *bio)
 	return 0;
 }
 
-void md_unplug_mddev(mddev_t *mddev)
-{
-	struct list_head *tmp;
-	mdk_rdev_t *rdev;
-
-	/*
-	 * this list iteration is done without any locking in md?!
-	 */
-	ITERATE_RDEV(mddev, rdev, tmp) {
-		request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
-
-		if (r_queue->unplug_fn)
-			r_queue->unplug_fn(r_queue);
-	}
-}
-EXPORT_SYMBOL(md_unplug_mddev);
-
-static void md_unplug_all(request_queue_t *q)
-{
-	mddev_t *mddev = q->queuedata;
-
-	md_unplug_mddev(mddev);
-}
-
 static inline mddev_t *mddev_get(mddev_t *mddev)
 {
 	atomic_inc(&mddev->active);
@@ -1669,7 +1645,6 @@ static int do_md_run(mddev_t * mddev)
 	 */
 	mddev->queue->queuedata = mddev;
 	mddev->queue->make_request_fn = mddev->pers->make_request;
-	mddev->queue->unplug_fn = md_unplug_all;
 
 	mddev->changed = 1;
 	return 0;
@@ -2742,10 +2717,9 @@ int md_thread(void * arg)
 		clear_bit(THREAD_WAKEUP, &thread->flags);
 
 		run = thread->run;
-		if (run) {
+		if (run)
 			run(thread->mddev);
-			md_unplug_mddev(thread->mddev);
-		}
+
 		if (signal_pending(current))
 			flush_signals(current);
 	}
@@ -3313,8 +3287,6 @@ static void md_do_sync(mddev_t *mddev)
 		    test_bit(MD_RECOVERY_ERR, &mddev->recovery))
 			break;
 
-		md_unplug_mddev(mddev);
-
 	repeat:
 		if (jiffies >= mark[last_mark] + SYNC_MARK_STEP ) {
 			/* step marks */
@@ -3347,6 +3319,7 @@ static void md_do_sync(mddev_t *mddev)
 		 * about not overloading the IO subsystem. (things like an
 		 * e2fsck being done on the RAID array should execute fast)
 		 */
+		mddev->queue->unplug_fn(mddev->queue);
 		cond_resched();
 
 		currspeed = ((unsigned long)(j-mddev->resync_mark_cnt))/2/((jiffies-mddev->resync_mark)/HZ +1) +1;
@@ -3365,6 +3338,8 @@ static void md_do_sync(mddev_t *mddev)
 	 * this also signals 'finished resyncing' to md_stop
 	 */
  out:
+	mddev->queue->unplug_fn(mddev->queue);
+
 	wait_event(mddev->recovery_wait, !atomic_read(&mddev->recovery_active));
 
 	/* tell personality that we are finished */

@@ -37,6 +37,9 @@ static mdk_personality_t raid1_personality;
 static spinlock_t retry_list_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(retry_list_head);
 
+static void unplug_slaves(mddev_t *mddev);
+
+
 static void * r1bio_pool_alloc(int gfp_flags, void *data)
 {
 	mddev_t *mddev = data;
@@ -47,6 +50,8 @@ static void * r1bio_pool_alloc(int gfp_flags, void *data)
 			 gfp_flags);
 	if (r1_bio)
 		memset(r1_bio, 0, sizeof(*r1_bio) + sizeof(struct bio*)*mddev->raid_disks);
+	else
+		unplug_slaves(mddev);
 
 	return r1_bio;
 }
@@ -71,8 +76,10 @@ static void * r1buf_pool_alloc(int gfp_flags, void *data)
 	int i, j;
 
 	r1_bio = r1bio_pool_alloc(gfp_flags, conf->mddev);
-	if (!r1_bio)
+	if (!r1_bio) {
+		unplug_slaves(conf->mddev);
 		return NULL;
+	}
 
 	/*
 	 * Allocate bios : 1 for reading, n-1 for writing
@@ -443,6 +450,29 @@ rb_out:
 	return new_disk;
 }
 
+static void unplug_slaves(mddev_t *mddev)
+{
+	conf_t *conf = mddev_to_conf(mddev);
+	int i;
+	unsigned long flags;
+
+	spin_lock_irqsave(&conf->device_lock, flags);
+	for (i=0; i<mddev->raid_disks; i++) {
+		mdk_rdev_t *rdev = conf->mirrors[i].rdev;
+		if (rdev && !rdev->faulty) {
+			request_queue_t *r_queue = bdev_get_queue(rdev->bdev);
+
+			if (r_queue->unplug_fn)
+				r_queue->unplug_fn(r_queue);
+		}
+	}
+	spin_unlock_irqrestore(&conf->device_lock, flags);
+}
+static void raid1_unplug(request_queue_t *q)
+{
+	unplug_slaves(q->queuedata);
+}
+
 /*
  * Throttle resync depth, so that we can both get proper overlapping of
  * requests, but are still able to handle normal requests quickly.
@@ -451,16 +481,18 @@ rb_out:
 
 static void device_barrier(conf_t *conf, sector_t sect)
 {
-	md_unplug_mddev(conf->mddev);
 	spin_lock_irq(&conf->resync_lock);
-	wait_event_lock_irq(conf->wait_idle, !waitqueue_active(&conf->wait_resume), conf->resync_lock);
+	wait_event_lock_irq(conf->wait_idle, !waitqueue_active(&conf->wait_resume),
+			    conf->resync_lock, unplug_slaves(conf->mddev));
 	
 	if (!conf->barrier++) {
-		wait_event_lock_irq(conf->wait_idle, !conf->nr_pending, conf->resync_lock);
+		wait_event_lock_irq(conf->wait_idle, !conf->nr_pending,
+				    conf->resync_lock, unplug_slaves(conf->mddev));
 		if (conf->nr_pending)
 			BUG();
 	}
-	wait_event_lock_irq(conf->wait_resume, conf->barrier < RESYNC_DEPTH, conf->resync_lock);
+	wait_event_lock_irq(conf->wait_resume, conf->barrier < RESYNC_DEPTH,
+			    conf->resync_lock, unplug_slaves(conf->mddev));
 	conf->next_resync = sect;
 	spin_unlock_irq(&conf->resync_lock);
 }
@@ -479,9 +511,8 @@ static int make_request(request_queue_t *q, struct bio * bio)
 	 * thread has put up a bar for new requests.
 	 * Continue immediately if no resync is active currently.
 	 */
-	md_unplug_mddev(conf->mddev);
 	spin_lock_irq(&conf->resync_lock);
-	wait_event_lock_irq(conf->wait_resume, !conf->barrier, conf->resync_lock);
+	wait_event_lock_irq(conf->wait_resume, !conf->barrier, conf->resync_lock, );
 	conf->nr_pending++;
 	spin_unlock_irq(&conf->resync_lock);
 
@@ -646,9 +677,9 @@ static void print_conf(conf_t *conf)
 
 static void close_sync(conf_t *conf)
 {
-	md_unplug_mddev(conf->mddev);
 	spin_lock_irq(&conf->resync_lock);
-	wait_event_lock_irq(conf->wait_resume, !conf->barrier, conf->resync_lock);
+	wait_event_lock_irq(conf->wait_resume, !conf->barrier,
+			    conf->resync_lock, 	unplug_slaves(conf->mddev));
 	spin_unlock_irq(&conf->resync_lock);
 
 	if (conf->barrier) BUG();
@@ -862,6 +893,7 @@ static void raid1d(mddev_t *mddev)
 	struct bio *bio;
 	unsigned long flags;
 	conf_t *conf = mddev_to_conf(mddev);
+	int unplug=0;
 	mdk_rdev_t *rdev;
 
 	md_check_recovery(mddev);
@@ -881,6 +913,7 @@ static void raid1d(mddev_t *mddev)
 		bio = r1_bio->master_bio;
 		if (test_bit(R1BIO_IsSync, &r1_bio->state)) {
 			sync_request_write(mddev, r1_bio);
+			unplug = 1;
 		} else {
 			if (map(mddev, &rdev) == -1) {
 				printk(KERN_ALERT "raid1: %s: unrecoverable I/O"
@@ -896,12 +929,14 @@ static void raid1d(mddev_t *mddev)
 				bio->bi_bdev = rdev->bdev;
 				bio->bi_sector = r1_bio->sector + rdev->data_offset;
 				bio->bi_rw = READ;
-
+				unplug = 1;
 				generic_make_request(bio);
 			}
 		}
 	}
 	spin_unlock_irqrestore(&retry_list_lock, flags);
+	if (unplug)
+		unplug_slaves(mddev);
 }
 
 
@@ -1104,6 +1139,7 @@ static int run(mddev_t *mddev)
 			mdname(mddev));
 		goto out_free_conf;
 	}
+	mddev->queue->unplug_fn = raid1_unplug;
 
 
 	ITERATE_RDEV(mddev, rdev, tmp) {
