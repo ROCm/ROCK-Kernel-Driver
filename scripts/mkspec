@@ -27,7 +27,7 @@ echo "Summary: The Linux Kernel"
 echo "Version: "$VERSION.$PATCHLEVEL.$SUBLEVEL$EXTRAVERSION | sed -e "s/-//g"
 # we need to determine the NEXT version number so that uname and
 # rpm -q will agree
-echo "Release: `. scripts/mkversion`"
+echo "Release: `. $srctree/scripts/mkversion`"
 echo "License: GPL"
 echo "Group: System Environment/Kernel"
 echo "Vendor: The Linux Community"
@@ -45,7 +45,7 @@ echo "%prep"
 echo "%setup -q"
 echo ""
 echo "%build"
-echo "make clean oldconfig all"
+echo "make clean all"
 echo ""
 echo "%install"
 echo 'mkdir -p $RPM_BUILD_ROOT/boot $RPM_BUILD_ROOT/lib $RPM_BUILD_ROOT/lib/modules'

@@ -82,12 +82,13 @@ endif
 ifneq ($(KBUILD_OUTPUT),)
 # Invoke a second make in the output directory, passing relevant variables
 	KBUILD_OUTPUT := $(shell cd $(KBUILD_OUTPUT); /bin/pwd)
-%:
-	@$(MAKE) -C $(KBUILD_OUTPUT)		\
-	KBUILD_SRC=$(CURDIR)			\
-	KBUILD_VERBOSE=$(KBUILD_VERBOSE)	\
-	KBUILD_CHECK=$(KBUILD_CHECK)		\
-	-f $(CURDIR)/Makefile $(MAKECMDGOALS)
+
+.PHONY: $(MAKECMDGOALS) all
+
+$(MAKECMDGOALS) all:
+	$(if $(KBUILD_VERBOSE:1=),@)$(MAKE) -C $(KBUILD_OUTPUT)		\
+	KBUILD_SRC=$(CURDIR)	KBUILD_VERBOSE=$(KBUILD_VERBOSE)	\
+	KBUILD_CHECK=$(KBUILD_CHECK) -f $(CURDIR)/Makefile $(MAKECMDGOALS)
 
 # Leave processing to above invocation of make
 skip-makefile := 1
@@ -97,7 +98,7 @@ endif # ifeq ($(KBUILD_SRC),)
 # We process the rest of the Makefile if this is the final invocation of make
 ifeq ($(skip-makefile),)
 
-srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),.)
+srctree		:= $(if $(KBUILD_SRC),$(KBUILD_SRC),$(CURDIR))
 TOPDIR		:= $(srctree)
 # FIXME - TOPDIR is obsolete, use srctree/objtree
 objtree		:= $(CURDIR)
@@ -119,9 +120,6 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 				  -e s/arm.*/arm/ -e s/sa110/arm/ \
 				  -e s/s390x/s390/ -e s/parisc64/parisc/ )
-
-# Remove hyphens since they have special meaning in RPM filenames
-KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
 
 # Cross compiling and selecting different set of gcc/bin-utils
 # ---------------------------------------------------------------------------
@@ -835,31 +833,32 @@ tags: FORCE
 
 .PHONY: rpm
 
+# Remove hyphens since they have special meaning in RPM filenames
+KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
+
 #	If you do a make spec before packing the tarball you can rpm -ta it
 
 spec:
-	. $(srctree)/scripts/mkspec >kernel.spec
+	$(CONFIG_SHELL) $(srctree)/scripts/mkspec > $(objtree)/kernel.spec
 
-#	Build a tar ball, generate an rpm from it and pack the result
-#	There are two bits of magic here
-#	1) The use of /. to avoid tar packing just the symlink
-#	2) Removing the .dep files as they have source paths in them that
-#	   will become invalid
+#	a) Build a tar ball
+#	b) generate an rpm from it
+#	c) and pack the result
+#	- Use /. to avoid tar packing just the symlink
 
 rpm:	clean spec
-	find . $(RCS_FIND_IGNORE) \
-		\( -size 0 -o -name .depend -o -name .hdepend \) \
-		-type f -print | xargs rm -f
 	set -e; \
-	cd $(TOPDIR)/.. ; \
-	ln -sf $(TOPDIR) $(KERNELPATH) ; \
+	cd .. ; \
+	ln -sf $(srctree) $(KERNELPATH) ; \
 	tar -cvz $(RCS_TAR_IGNORE) -f $(KERNELPATH).tar.gz $(KERNELPATH)/. ; \
-	rm $(KERNELPATH) ; \
-	cd $(TOPDIR) ; \
-	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > .tmp_version ; \
-	mv -f .tmp_version .version; \
-	$(RPM) -ta $(TOPDIR)/../$(KERNELPATH).tar.gz ; \
-	rm $(TOPDIR)/../$(KERNELPATH).tar.gz
+	rm $(KERNELPATH)
+
+	set -e; \
+	$(CONFIG_SHELL) $(srctree)/scripts/mkversion > $(objtree)/.tmp_version;\
+	mv -f $(objtree)/.tmp_version $(objtree)/.version;
+
+	$(RPM) -ta ../$(KERNELPATH).tar.gz
+	rm ../$(KERNELPATH).tar.gz
 
 # Brief documentation of the typical targets used
 # ---------------------------------------------------------------------------
