@@ -1221,7 +1221,11 @@ static int pfkey_add(struct sock *sk, struct sk_buff *skb, struct sadb_msg *hdr,
 	if (IS_ERR(x))
 		return PTR_ERR(x);
 
-	err = xfrm_state_replace(x, hdr->sadb_msg_type == SADB_ADD);
+	if (hdr->sadb_msg_type == SADB_ADD)
+		err = xfrm_state_add(x);
+	else
+		err = xfrm_state_update(x);
+
 	if (err < 0) {
 		x->km.state = XFRM_STATE_DEAD;
 		xfrm_state_put(x);
