@@ -27,7 +27,6 @@
 #include <linux/hippidevice.h>
 #endif
 #include <net/pkt_sched.h>
-#include <net/scm.h>
 #include <linux/if_bridge.h>
 #include <linux/if_vlan.h>
 #include <linux/random.h>
@@ -64,7 +63,6 @@ extern void destroy_8023_client(struct datalink_proto *);
 /* Socket layer support routines */
 EXPORT_SYMBOL(memcpy_fromiovec);
 EXPORT_SYMBOL(memcpy_tokerneliovec);
-EXPORT_SYMBOL(put_cmsg);
 
 EXPORT_SYMBOL(sk_run_filter);
 EXPORT_SYMBOL(sk_chk_filter);
@@ -80,11 +78,8 @@ EXPORT_SYMBOL(net_random);
 EXPORT_SYMBOL(net_srandom);
 
 /* Needed by smbfs.o */
-EXPORT_SYMBOL(__scm_destroy);
-EXPORT_SYMBOL(__scm_send);
 
 /* Needed by unix.o */
-EXPORT_SYMBOL(scm_fp_dup);
 EXPORT_SYMBOL(files_stat);
 EXPORT_SYMBOL(memcpy_toiovec);
 
@@ -95,7 +90,6 @@ EXPORT_SYMBOL(make_EII_client);
 EXPORT_SYMBOL(destroy_EII_client);
 #endif
 
-EXPORT_SYMBOL(scm_detach_fds);
 
 #ifdef CONFIG_NET_DIVERT
 EXPORT_SYMBOL(alloc_divert_blk);
@@ -155,7 +149,6 @@ EXPORT_SYMBOL(ipv4_config);
 EXPORT_SYMBOL(xrlim_allow);
 
 EXPORT_SYMBOL(ip_rcv);
-
 #endif  /* CONFIG_INET */
 
 #ifdef CONFIG_TR
@@ -172,9 +165,6 @@ EXPORT_SYMBOL(eth_type_trans);
 #ifdef CONFIG_FDDI
 EXPORT_SYMBOL(fddi_type_trans);
 #endif /* CONFIG_FDDI */
-#if 0
-EXPORT_SYMBOL(eth_copy_and_sum);
-#endif
 EXPORT_SYMBOL(dev_base);
 EXPORT_SYMBOL(dev_base_lock);
 EXPORT_SYMBOL(dev_mc_add);
