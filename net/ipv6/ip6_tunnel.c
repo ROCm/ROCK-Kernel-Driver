@@ -810,9 +810,9 @@ static void ip6ip6_tnl_link_config(struct ip6_tnl *t)
 	fl->fl6_flowlabel = 0;
 
 	if (!(p->flags&IP6_TNL_F_USE_ORIG_TCLASS))
-		fl->fl6_flowlabel |= IPV6_TCLASS_MASK & htonl(p->flowinfo);
+		fl->fl6_flowlabel |= IPV6_TCLASS_MASK & p->flowinfo;
 	if (!(p->flags&IP6_TNL_F_USE_ORIG_FLOWLABEL))
-		fl->fl6_flowlabel |= IPV6_FLOWLABEL_MASK & htonl(p->flowinfo);
+		fl->fl6_flowlabel |= IPV6_FLOWLABEL_MASK & p->flowinfo;
 
 	ip6_tnl_set_cap(t);
 
