@@ -42,6 +42,7 @@ sched_b_event(struct BCState *bcs, int event)
 	schedule_work(&bcs->work);
 }
 
+/* called with the card lock held */
 static inline void
 xmit_complete_b(struct BCState *bcs)
 {
@@ -50,6 +51,7 @@ xmit_complete_b(struct BCState *bcs)
 	bcs->tx_skb = NULL;
 }
 
+/* called with the card lock held */
 static inline void
 xmit_ready_b(struct BCState *bcs)
 {
@@ -63,4 +65,21 @@ xmit_ready_b(struct BCState *bcs)
 		sched_b_event(bcs, B_XMTBUFREADY);
 	}
 }
-	
+
+static inline void
+xmit_data_req_b(struct BCState *bcs, struct sk_buff *skb)
+{
+	struct IsdnCardState *cs = bcs->cs;
+	unsigned long flags;
+
+	spin_lock_irqsave(&cs->lock, flags);
+	if (bcs->tx_skb) {
+		skb_queue_tail(&bcs->squeue, skb);
+	} else {
+		bcs->tx_skb = skb;
+		set_bit(BC_FLG_BUSY, &bcs->Flag);
+		bcs->count = 0;
+		bcs->cs->BC_Send_Data(bcs);
+	}
+	spin_unlock_irqrestore(&cs->lock, flags);
+}

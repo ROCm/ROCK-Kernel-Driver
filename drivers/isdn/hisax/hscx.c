@@ -100,16 +100,7 @@ hscx_l2l1(struct PStack *st, int pr, void *arg)
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			spin_lock_irqsave(&cs->lock, flags);
-			if (st->l1.bcs->tx_skb) {
-				skb_queue_tail(&st->l1.bcs->squeue, skb);
-			} else {
-				st->l1.bcs->tx_skb = skb;
-				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-				st->l1.bcs->count = 0;
-				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-			}
-			spin_unlock_irqrestore(&cs->lock, flags);
+			xmit_data_req_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | INDICATION):
 			spin_lock_irqsave(&cs->lock, flags);

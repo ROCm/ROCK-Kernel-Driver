@@ -836,15 +836,7 @@ tiger_l2l1(struct PStack *st, int pr, void *arg)
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			spin_lock_irqsave(&netjet_lock, flags);
-			if (st->l1.bcs->tx_skb) {
-				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				spin_unlock_irqrestore(&netjet_lock, flags);
-			} else {
-				st->l1.bcs->tx_skb = skb;
-				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-				spin_unlock_irqrestore(&netjet_lock, flags);
-			}
+			xmit_data_req_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | INDICATION):
 			if (st->l1.bcs->tx_skb) {

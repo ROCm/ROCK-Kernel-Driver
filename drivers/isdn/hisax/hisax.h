@@ -374,7 +374,6 @@ struct isar_reg {
 struct isar_hw {
 	int dpath;
 	int rcvidx;
-	int txcnt;
 	int mml;
 	u_char state;
 	u_char cmd;

@@ -145,21 +145,10 @@ static void
 jade_l2l1(struct PStack *st, int pr, void *arg)
 {
     struct sk_buff *skb = arg;
-    unsigned long flags;
 
     switch (pr) {
 	case (PH_DATA | REQUEST):
-		spin_lock_irqsave(&jade_lock, flags);
-		if (st->l1.bcs->tx_skb) {
-			skb_queue_tail(&st->l1.bcs->squeue, skb);
-			spin_unlock_irqrestore(&jade_lock, flags);
-		} else {
-			st->l1.bcs->tx_skb = skb;
-			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-			st->l1.bcs->count = 0;
-			spin_unlock_irqrestore(&jade_lock, flags);
-			st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-		}
+		xmit_data_req_b(st->l1.bcs, skb);
 		break;
 	case (PH_PULL | INDICATION):
 		if (st->l1.bcs->tx_skb) {

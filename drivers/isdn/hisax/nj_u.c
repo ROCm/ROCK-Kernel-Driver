@@ -16,7 +16,6 @@
 #include "netjet.h"
 
 const char *NETjet_U_revision = "$Revision: 2.8.6.6 $";
-static spinlock_t nj_u_lock = SPIN_LOCK_UNLOCKED;
 
 static u_char dummyrr(struct IsdnCardState *cs, int chan, u_char off)
 {
@@ -32,12 +31,8 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 {
 	struct IsdnCardState *cs = dev_id;
 	u_char val, sval;
-	unsigned long flags;
 
-	if (!cs) {
-		printk(KERN_WARNING "NETspider-U: Spurious interrupt!\n");
-		return;
-	}
+	spin_lock(&cs->lock);
 	if (!((sval = bytein(cs->hw.njet.base + NETJET_IRQSTAT1)) &
 		NETJET_ISACIRQ)) {
 		val = NETjet_ReadIC(cs, ICC_ISTA);
@@ -49,7 +44,6 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			NETjet_WriteIC(cs, ICC_MASK, 0x0);
 		}
 	}
-	spin_lock_irqsave(&nj_u_lock, flags);
 	/* start new code 13/07/00 GE */
 	/* set bits in sval to indicate which page is free */
 	if (inl(cs->hw.njet.base + NETJET_DMA_WRITE_ADR) <
@@ -67,11 +61,9 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	if (sval != cs->hw.njet.last_is0) /* we have a DMA interrupt */
 	{
 		if (test_and_set_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags)) {
-			spin_unlock_irqrestore(&nj_u_lock, flags);
-			return;
+			goto unlock;
 		}
 		cs->hw.njet.irqstat0 = sval;
-		spin_unlock_irqrestore(&nj_u_lock, flags);
 		if ((cs->hw.njet.irqstat0 & NETJET_IRQM0_READ) != 
 			(cs->hw.njet.last_is0 & NETJET_IRQM0_READ))
 			/* we have a read dma int */
@@ -82,9 +74,7 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			write_tiger(cs);
 		/* end new code 13/07/00 GE */
 		test_and_clear_bit(FLG_LOCK_ATOMIC, &cs->HW_Flags);
-	} else
-		spin_unlock_irqrestore(&nj_u_lock, flags);
-
+	}
 /*	if (!testcnt--) {
 		cs->hw.njet.dmactrl = 0;
 		byteout(cs->hw.njet.base + NETJET_DMACTRL,
@@ -92,15 +82,13 @@ netjet_u_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 		byteout(cs->hw.njet.base + NETJET_IRQMASK0, 0);
 	}
 */
+ unlock:
+	spin_unlock(&cs->lock);
 }
 
 static void
 reset_netjet_u(struct IsdnCardState *cs)
 {
-	long flags;
-
-	save_flags(flags);
-	sti();
 	cs->hw.njet.ctrl_reg = 0xff;  /* Reset On */
 	byteout(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
 	set_current_state(TASK_UNINTERRUPTIBLE);
@@ -110,7 +98,7 @@ reset_netjet_u(struct IsdnCardState *cs)
 	byteout(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
 	set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout((10*HZ)/1000);	/* Timeout 10ms */
-	restore_flags(flags);
+
 	cs->hw.njet.auxd = 0xC0;
 	cs->hw.njet.dmactrl = 0;
 	byteout(cs->hw.njet.auxa, 0);
@@ -149,7 +137,6 @@ setup_netjet_u(struct IsdnCard *card)
 	int bytecnt;
 	struct IsdnCardState *cs = card->cs;
 	char tmp[64];
-	long flags;
 #if CONFIG_PCI
 #endif
 #ifdef __BIG_ENDIAN
@@ -193,8 +180,6 @@ setup_netjet_u(struct IsdnCard *card)
 		cs->hw.njet.auxa = cs->hw.njet.base + NETJET_AUXDATA;
 		cs->hw.njet.isac = cs->hw.njet.base | NETJET_ISAC_OFF;
 
-		save_flags(flags);
-		sti();
 		cs->hw.njet.ctrl_reg = 0xff;  /* Reset On */
 		byteout(cs->hw.njet.base + NETJET_CTRL, cs->hw.njet.ctrl_reg);
 
@@ -206,8 +191,6 @@ setup_netjet_u(struct IsdnCard *card)
 
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout((10*HZ)/1000);	/* Timeout 10ms */
-
-		restore_flags(flags);
 
 		cs->hw.njet.auxd = 0xC0;
 		cs->hw.njet.dmactrl = 0;

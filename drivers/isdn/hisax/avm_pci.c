@@ -375,22 +375,15 @@ hdlc_fill_fifo(struct BCState *bcs)
 	}
 }
 
-static void
-fill_hdlc(struct BCState *bcs)
-{
-	unsigned long flags;
-	spin_lock_irqsave(&avm_pci_lock, flags);
-	hdlc_fill_fifo(bcs);
-	spin_unlock_irqrestore(&avm_pci_lock, flags);
-}
-
 static inline void
-HDLC_irq(struct BCState *bcs, u_int stat) {
+HDLC_irq(struct BCState *bcs, u_int stat)
+{
 	int len;
 	struct sk_buff *skb;
 
 	if (bcs->cs->debug & L1_DEB_HSCX)
 		debugl1(bcs->cs, "ch%d stat %#x", bcs->channel, stat);
+
 	if (stat & HDLC_INT_RPR) {
 		if (stat & HDLC_STAT_RDO) {
 			if (bcs->cs->debug & L1_DEB_HSCX)
@@ -464,10 +457,9 @@ inline void
 HDLC_irq_main(struct IsdnCardState *cs)
 {
 	u_int stat;
-	long  flags;
 	struct BCState *bcs;
 
-	spin_lock_irqsave(&avm_pci_lock, flags);
+	spin_lock(&cs->lock);
 	if (cs->subtyp == AVM_FRITZ_PCI) {
 		stat = ReadHDLCPCI(cs, 0, HDLC_STATUS);
 	} else {
@@ -496,28 +488,17 @@ HDLC_irq_main(struct IsdnCardState *cs)
 		} else
 			HDLC_irq(bcs, stat);
 	}
-	spin_unlock_irqrestore(&avm_pci_lock, flags);
+	spin_unlock(&cs->lock);
 }
 
 void
 hdlc_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			spin_lock_irqsave(&avm_pci_lock, flags);
-			if (st->l1.bcs->tx_skb) {
-				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				spin_unlock_irqrestore(&avm_pci_lock, flags);
-			} else {
-				st->l1.bcs->tx_skb = skb;
-				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
-				st->l1.bcs->count = 0;
-				spin_unlock_irqrestore(&avm_pci_lock, flags);
-				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
-			}
+			xmit_data_req_b(st->l1.bcs, skb);
 			break;
 		case (PH_PULL | INDICATION):
 			if (st->l1.bcs->tx_skb) {
@@ -851,7 +832,7 @@ ready:
 	cs->writeisac = &WriteISAC;
 	cs->readisacfifo = &ReadISACfifo;
 	cs->writeisacfifo = &WriteISACfifo;
-	cs->BC_Send_Data = &fill_hdlc;
+	cs->BC_Send_Data = &hdlc_fill_fifo;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_pcipnp_interrupt;
 	ISACVersion(cs, (cs->subtyp == AVM_FRITZ_PCI) ? "AVM PCI:" : "AVM PnP:");
