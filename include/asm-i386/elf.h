@@ -100,7 +100,8 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
  * Architecture-neutral AT_ values in 0-17, leave some room
  * for more of them, start the x86-specific ones at 32.
  */
-#define AT_SYSINFO	32
+#define AT_SYSINFO		32
+#define AT_SYSINFO_EH_FRAME	33
 
 #ifdef __KERNEL__
 #define SET_PERSONALITY(ex, ibcs2) set_personality((ibcs2)?PER_SVR4:PER_LINUX)
@@ -118,9 +119,15 @@ extern void dump_smp_unlazy_fpu(void);
 #define ELF_CORE_SYNC dump_smp_unlazy_fpu
 #endif
 
-#define ARCH_DLINFO					\
-do {							\
-		NEW_AUX_ENT(AT_SYSINFO, 0xffffe000);	\
+/* Offset from the beginning of the page where the .eh_frame information
+   for the code in the vsyscall page starts.  */
+#define EH_FRAME_OFFSET 96
+
+#define ARCH_DLINFO						\
+do {								\
+		NEW_AUX_ENT(AT_SYSINFO, 0xffffe000);		\
+		NEW_AUX_ENT(AT_SYSINFO_EH_FRAME,		\
+			    0xffffe000 + EH_FRAME_OFFSET);	\
 } while (0)
 
 #endif
