@@ -64,7 +64,7 @@ static struct card_info {
     zorro_id id;
     const char *name;
     unsigned int offset;
-} cards[] __initdata = {
+} cards[] __devinitdata = {
     { ZORRO_PROD_VILLAGE_TRONIC_ARIADNE2, "Ariadne II", 0x0600 },
     { ZORRO_PROD_INDIVIDUAL_COMPUTERS_X_SURF, "X-Surf", 0x8600 },
 };
