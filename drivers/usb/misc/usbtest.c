@@ -1204,7 +1204,7 @@ static int halt_simple (struct usbtest_dev *dev)
 	struct urb	*urb;
 
 	urb = simple_alloc_urb (testdev_to_usbdev (dev), 0, 512);
-	if (urb == 0)
+	if (urb == NULL)
 		return -ENOMEM;
 
 	if (dev->in_pipe) {
@@ -1862,7 +1862,7 @@ usbtest_probe (struct usb_interface *intf, const struct usb_device_id *id)
 	dev->intf = intf;
 
 	/* cacheline-aligned scratch for i/o */
-	if ((dev->buf = kmalloc (TBUF_SIZE, SLAB_KERNEL)) == 0) {
+	if ((dev->buf = kmalloc (TBUF_SIZE, SLAB_KERNEL)) == NULL) {
 		kfree (dev);
 		return -ENOMEM;
 	}

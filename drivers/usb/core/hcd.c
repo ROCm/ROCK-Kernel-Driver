@@ -524,7 +524,7 @@ static void rh_report_status (unsigned long ptr)
 	/* do nothing if the urb's been unlinked */
 	if (!urb->dev
 			|| urb->status != -EINPROGRESS
-			|| (hcd = urb->dev->bus->hcpriv) == 0) {
+			|| (hcd = urb->dev->bus->hcpriv) == NULL) {
 		spin_unlock (&urb->lock);
 		local_irq_restore (flags);
 		return;

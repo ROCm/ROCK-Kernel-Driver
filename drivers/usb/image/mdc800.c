@@ -456,7 +456,7 @@ static int mdc800_usb_probe (struct usb_interface *intf,
 	dbg ("(mdc800_usb_probe) called.");
 
 
-	if (mdc800->dev != 0)
+	if (mdc800->dev != NULL)
 	{
 		warn ("only one Mustek MDC800 is supported.");
 		return -ENODEV;
@@ -1045,7 +1045,7 @@ static int __init usb_mdc800_init (void)
 
 cleanup_on_fail:
 
-	if (mdc800 != 0)
+	if (mdc800 != NULL)
 	{
 		err ("can't alloc memory!");
 

@@ -745,7 +745,7 @@ static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->out = usb_sndbulkpipe(dev->udev, 2);
 
 	// allocate irq urb
-	if ((data->int_urb = usb_alloc_urb (0, GFP_KERNEL)) == 0) {
+	if ((data->int_urb = usb_alloc_urb (0, GFP_KERNEL)) == NULL) {
 		dbg ("%s: cannot allocate interrupt URB",
 			dev->net->name);
 		return -ENOMEM;
@@ -2384,7 +2384,7 @@ static void rx_submit (struct usbnet *dev, struct urb *urb, int flags)
 #endif
 		size = (sizeof (struct ethhdr) + dev->net->mtu);
 
-	if ((skb = alloc_skb (size, flags)) == 0) {
+	if ((skb = alloc_skb (size, flags)) == NULL) {
 		devdbg (dev, "no rx skb");
 		defer_kevent (dev, EVENT_RX_MEMORY);
 		usb_free_urb (urb);
@@ -2769,7 +2769,7 @@ kevent (void *data)
 			urb = usb_alloc_urb (0, GFP_KERNEL);
 		else
 			clear_bit (EVENT_RX_MEMORY, &dev->flags);
-		if (urb != 0) {
+		if (urb != NULL) {
 			clear_bit (EVENT_RX_MEMORY, &dev->flags);
 			rx_submit (dev, urb, GFP_KERNEL);
 			tasklet_schedule (&dev->bh);
@@ -2996,7 +2996,8 @@ static void usbnet_bh (unsigned long param)
 
 			// don't refill the queue all at once
 			for (i = 0; i < 10 && dev->rxq.qlen < qlen; i++) {
-				if ((urb = usb_alloc_urb (0, GFP_ATOMIC)) != 0)
+				urb = usb_alloc_urb (0, GFP_ATOMIC);
+				if (urb != NULL)
 					rx_submit (dev, urb, GFP_ATOMIC);
 			}
 			if (temp != dev->rxq.qlen)

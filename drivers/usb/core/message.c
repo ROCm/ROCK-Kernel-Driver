@@ -209,7 +209,7 @@ static void sg_clean (struct usb_sg_request *io)
 		kfree (io->urbs);
 		io->urbs = NULL;
 	}
-	if (io->dev->dev.dma_mask != 0)
+	if (io->dev->dev.dma_mask != NULL)
 		usb_buffer_unmap_sg (io->dev, io->pipe, io->sg, io->nents);
 	io->dev = NULL;
 }
@@ -334,7 +334,7 @@ int usb_sg_init (
 	/* not all host controllers use DMA (like the mainstream pci ones);
 	 * they can use PIO (sl811) or be software over another transport.
 	 */
-	dma = (dev->dev.dma_mask != 0);
+	dma = (dev->dev.dma_mask != NULL);
 	if (dma)
 		io->entries = usb_buffer_map_sg (dev, pipe, sg, nents);
 	else
