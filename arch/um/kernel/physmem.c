@@ -8,6 +8,7 @@
 #include "linux/slab.h"
 #include "linux/vmalloc.h"
 #include "linux/bootmem.h"
+#include "linux/module.h"
 #include "asm/types.h"
 #include "asm/pgtable.h"
 #include "kern_util.h"
@@ -219,6 +220,10 @@ void physmem_forget_descriptor(int fd)
 	list_del(&desc->list);
 	kfree(desc);
 }
+
+EXPORT_SYMBOL(physmem_forget_descriptor);
+EXPORT_SYMBOL(physmem_remove_mapping);
+EXPORT_SYMBOL(physmem_subst_mapping);
 
 void arch_free_page(struct page *page, int order)
 {
