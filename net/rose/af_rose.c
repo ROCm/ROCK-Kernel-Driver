@@ -56,7 +56,7 @@ int sysctl_rose_link_fail_timeout       = ROSE_DEFAULT_FAIL_TIMEOUT;
 int sysctl_rose_maximum_vcs             = ROSE_DEFAULT_MAXVC;
 int sysctl_rose_window_size             = ROSE_DEFAULT_WINDOW_SIZE;
 
-static struct sock *rose_list;
+HLIST_HEAD(rose_list);
 static spinlock_t rose_list_lock = SPIN_LOCK_UNLOCKED;
 
 static struct proto_ops rose_proto_ops;
@@ -151,24 +151,8 @@ frees:
  */
 static void rose_remove_socket(struct sock *sk)
 {
-	struct sock *s;
-
 	spin_lock_bh(&rose_list_lock);
-	if ((s = rose_list) == sk) {
-		rose_list = s->sk_next;
-		spin_unlock_bh(&rose_list_lock);
-		return;
-	}
-
-	while (s && s->sk_next) {
-		if (s->sk_next == sk) {
-			s->sk_next = sk->sk_next;
-			spin_unlock_bh(&rose_list_lock);
-			return;
-		}
-
-		s = s->sk_next;
-	}
+	sk_del_node_init(sk);
 	spin_unlock_bh(&rose_list_lock);
 }
 
@@ -179,9 +163,10 @@ static void rose_remove_socket(struct sock *sk)
 void rose_kill_by_neigh(struct rose_neigh *neigh)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	spin_lock_bh(&rose_list_lock);
-	for (s = rose_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &rose_list) {
 		rose_cb *rose = rose_sk(s);
 
 		if (rose->neighbour == neigh) {
@@ -199,9 +184,10 @@ void rose_kill_by_neigh(struct rose_neigh *neigh)
 static void rose_kill_by_device(struct net_device *dev)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	spin_lock_bh(&rose_list_lock);
-	for (s = rose_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &rose_list) {
 		rose_cb *rose = rose_sk(s);
 
 		if (rose->device == dev) {
@@ -244,8 +230,7 @@ static void rose_insert_socket(struct sock *sk)
 {
 
 	spin_lock_bh(&rose_list_lock);
-	sk->sk_next  = rose_list;
-	rose_list = sk;
+	sk_add_node(sk, &rose_list);
 	spin_unlock_bh(&rose_list_lock);
 }
 
@@ -256,32 +241,30 @@ static void rose_insert_socket(struct sock *sk)
 static struct sock *rose_find_listener(rose_address *addr, ax25_address *call)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	spin_lock_bh(&rose_list_lock);
-	for (s = rose_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &rose_list) {
 		rose_cb *rose = rose_sk(s);
 
 		if (!rosecmp(&rose->source_addr, addr) &&
 		    !ax25cmp(&rose->source_call, call) &&
-		    !rose->source_ndigis && s->sk_state == TCP_LISTEN) {
-			spin_unlock_bh(&rose_list_lock);
-			return s;
-		}
+		    !rose->source_ndigis && s->sk_state == TCP_LISTEN)
+			goto found;
 	}
 
-	for (s = rose_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &rose_list) {
 		rose_cb *rose = rose_sk(s);
 
 		if (!rosecmp(&rose->source_addr, addr) &&
 		    !ax25cmp(&rose->source_call, &null_ax25_address) &&
-		    s->sk_state == TCP_LISTEN) {
-			spin_unlock_bh(&rose_list_lock);
-			return s;
-		}
+		    s->sk_state == TCP_LISTEN)
+			goto found;
 	}
+	s = NULL;
+found:
 	spin_unlock_bh(&rose_list_lock);
-
-	return NULL;
+	return s;
 }
 
 /*
@@ -290,19 +273,19 @@ static struct sock *rose_find_listener(rose_address *addr, ax25_address *call)
 struct sock *rose_find_socket(unsigned int lci, struct rose_neigh *neigh)
 {
 	struct sock *s;
+	struct hlist_node *node;
 
 	spin_lock_bh(&rose_list_lock);
-	for (s = rose_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &rose_list) {
 		rose_cb *rose = rose_sk(s);
 
-		if (rose->lci == lci && rose->neighbour == neigh) {
-			spin_unlock_bh(&rose_list_lock);
-			return s;
-		}
+		if (rose->lci == lci && rose->neighbour == neigh)
+			goto found;
 	}
+	s = NULL;
+found:
 	spin_unlock_bh(&rose_list_lock);
-
-	return NULL;
+	return s;
 }
 
 /*
@@ -1352,6 +1335,7 @@ static int rose_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 {
 	struct sock *s;
+	struct hlist_node *node;
 	struct net_device *dev;
 	const char *devname, *callsign;
 	int len = 0;
@@ -1362,7 +1346,7 @@ static int rose_get_info(char *buffer, char **start, off_t offset, int length)
 
 	len += sprintf(buffer, "dest_addr  dest_call src_addr   src_call  dev   lci neigh st vs vr va   t  t1  t2  t3  hb    idle Snd-Q Rcv-Q inode\n");
 
-	for (s = rose_list; s; s = s->sk_next) {
+	sk_for_each(s, node, &rose_list) {
 		rose_cb *rose = rose_sk(s);
 
 		if ((dev = rose->device) == NULL)

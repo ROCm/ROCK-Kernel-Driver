@@ -124,11 +124,11 @@ int sysctl_unix_max_dgram_qlen = 10;
 
 kmem_cache_t *unix_sk_cachep;
 
-unix_socket *unix_socket_table[UNIX_HASH_SIZE+1];
+struct hlist_head unix_socket_table[UNIX_HASH_SIZE + 1];
 rwlock_t unix_table_lock = RW_LOCK_UNLOCKED;
 static atomic_t unix_nr_socks = ATOMIC_INIT(0);
 
-#define unix_sockets_unbound	(unix_socket_table[UNIX_HASH_SIZE])
+#define unix_sockets_unbound	(&unix_socket_table[UNIX_HASH_SIZE])
 
 #define UNIX_ABSTRACT(sk)	(unix_sk(sk)->addr->hash != UNIX_HASH_SIZE)
 
@@ -211,34 +211,14 @@ static int unix_mkname(struct sockaddr_un * sunaddr, int len, unsigned *hashp)
 
 static void __unix_remove_socket(unix_socket *sk)
 {
-	struct unix_sock *u = unix_sk(sk);
-	unix_socket **list = u->list;
-
-	if (list) {
-		if (sk->sk_next)
-			sk->sk_next->sk_prev = sk->sk_prev;
-		if (sk->sk_prev)
-			sk->sk_prev->sk_next = sk->sk_next;
-		if (*list == sk)
-			*list = sk->sk_next;
-		u->list = NULL;
-		sk->sk_prev = NULL;
-		sk->sk_next = NULL;
+	if (sk_del_node_init(sk))
 		__sock_put(sk);
-	}
 }
 
-static void __unix_insert_socket(unix_socket **list, unix_socket *sk)
+static void __unix_insert_socket(struct hlist_head *list, unix_socket *sk)
 {
-	struct unix_sock *u = unix_sk(sk);
-	BUG_TRAP(!u->list);
-
-	u->list = list;
-	sk->sk_prev = NULL;
-	sk->sk_next = *list;
-	if (*list)
-		(*list)->sk_prev = sk;
-	*list=sk;
+	BUG_TRAP(sk_unhashed(sk));
+	sk_add_node(sk, list);
 	sock_hold(sk);
 }
 
@@ -249,7 +229,7 @@ static inline void unix_remove_socket(unix_socket *sk)
 	write_unlock(&unix_table_lock);
 }
 
-static inline void unix_insert_socket(unix_socket **list, unix_socket *sk)
+static inline void unix_insert_socket(struct hlist_head *list, unix_socket *sk)
 {
 	write_lock(&unix_table_lock);
 	__unix_insert_socket(list, sk);
@@ -260,14 +240,17 @@ static unix_socket *__unix_find_socket_byname(struct sockaddr_un *sunname,
 					      int len, int type, unsigned hash)
 {
 	unix_socket *s;
+	struct hlist_node *node;
 
-	for (s = unix_socket_table[hash ^ type]; s; s = s->sk_next) {
+	sk_for_each(s, node, &unix_socket_table[hash ^ type]) {
 		struct unix_sock *u = unix_sk(s);
 
 		if (u->addr->len == len &&
 		    !memcmp(u->addr->name, sunname, len))
-			break;
+			goto found;
 	}
+	s = NULL;
+found:
 	return s;
 }
 
@@ -288,18 +271,21 @@ unix_find_socket_byname(struct sockaddr_un *sunname,
 static unix_socket *unix_find_socket_byinode(struct inode *i)
 {
 	unix_socket *s;
+	struct hlist_node *node;
 
 	read_lock(&unix_table_lock);
-	for (s = unix_socket_table[i->i_ino & (UNIX_HASH_SIZE - 1)]; s;
-	     s = s->sk_next) {
+	sk_for_each(s, node,
+		    &unix_socket_table[i->i_ino & (UNIX_HASH_SIZE - 1)]) {
 		struct dentry *dentry = unix_sk(s)->dentry;
 
 		if(dentry && dentry->d_inode == i)
 		{
 			sock_hold(s);
-			break;
+			goto found;
 		}
 	}
+	s = NULL;
+found:
 	read_unlock(&unix_table_lock);
 	return s;
 }
@@ -348,7 +334,7 @@ static void unix_sock_destructor(struct sock *sk)
 	skb_queue_purge(&sk->sk_receive_queue);
 
 	BUG_TRAP(!atomic_read(&sk->sk_wmem_alloc));
-	BUG_TRAP(!u->list);
+	BUG_TRAP(sk_unhashed(sk));
 	BUG_TRAP(!sk->sk_socket);
 	if (!sock_flag(sk, SOCK_DEAD)) {
 		printk("Attempt to release alive unix socket: %p\n", sk);
@@ -501,12 +487,11 @@ static struct sock * unix_create1(struct socket *sock)
 	u	  = unix_sk(sk);
 	u->dentry = NULL;
 	u->mnt	  = NULL;
-	u->list	  = NULL;
 	rwlock_init(&u->lock);
 	atomic_set(&u->inflight, sock ? 0 : -1);
 	init_MUTEX(&u->readsem); /* single task reading lock */
 	init_waitqueue_head(&u->peer_wait);
-	unix_insert_socket(&unix_sockets_unbound, sk);
+	unix_insert_socket(unix_sockets_unbound, sk);
 out:
 	return sk;
 }
@@ -663,7 +648,7 @@ static int unix_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	int err;
 	unsigned hash;
 	struct unix_address *addr;
-	unix_socket **list;
+	struct hlist_head *list;
 
 	err = -EINVAL;
 	if (sunaddr->sun_family != AF_UNIX)

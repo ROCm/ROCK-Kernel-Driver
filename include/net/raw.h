@@ -28,7 +28,7 @@ extern int 	raw_rcv(struct sock *, struct sk_buff *);
  *       hashing mechanism, make sure you update icmp.c as well.
  */
 #define RAWV4_HTABLE_SIZE	MAX_INET_PROTOS
-extern struct sock *raw_v4_htable[RAWV4_HTABLE_SIZE];
+extern struct hlist_head raw_v4_htable[RAWV4_HTABLE_SIZE];
 
 extern rwlock_t raw_v4_lock;
 

@@ -680,12 +680,12 @@ static void icmp_unreach(struct sk_buff *skb)
 	/* Note: See raw.c and net/raw.h, RAWV4_HTABLE_SIZE==MAX_INET_PROTOS */
 	hash = protocol & (MAX_INET_PROTOS - 1);
 	read_lock(&raw_v4_lock);
-	if ((raw_sk = raw_v4_htable[hash]) != NULL) {
+	if ((raw_sk = sk_head(&raw_v4_htable[hash])) != NULL) {
 		while ((raw_sk = __raw_v4_lookup(raw_sk, protocol, iph->daddr,
 						 iph->saddr,
 						 skb->dev->ifindex)) != NULL) {
 			raw_err(raw_sk, skb, info);
-			raw_sk = raw_sk->sk_next;
+			raw_sk = sk_next(raw_sk);
 			iph = (struct iphdr *)skb->data;
 		}
 	}

@@ -24,6 +24,7 @@
 
 #include <linux/udp.h>
 #include <linux/ip.h>
+#include <linux/list.h>
 #include <net/sock.h>
 #include <net/snmp.h>
 #include <linux/seq_file.h>
@@ -34,16 +35,17 @@
  *        and hashing code needs to work with different AF's yet
  *        the port space is shared.
  */
-extern struct sock *udp_hash[UDP_HTABLE_SIZE];
+extern struct hlist_head udp_hash[UDP_HTABLE_SIZE];
 extern rwlock_t udp_hash_lock;
 
 extern int udp_port_rover;
 
 static inline int udp_lport_inuse(u16 num)
 {
-	struct sock *sk = udp_hash[num & (UDP_HTABLE_SIZE - 1)];
+	struct sock *sk;
+	struct hlist_node *node;
 
-	for (; sk; sk = sk->sk_next)
+	sk_for_each(sk, node, &udp_hash[num & (UDP_HTABLE_SIZE - 1)])
 		if (inet_sk(sk)->num == num)
 			return 1;
 	return 0;

@@ -225,7 +225,7 @@ static inline int ip_local_deliver_finish(struct sk_buff *skb)
 
 	resubmit:
 		hash = protocol & (MAX_INET_PROTOS - 1);
-		raw_sk = raw_v4_htable[hash];
+		raw_sk = sk_head(&raw_v4_htable[hash]);
 
 		/* If there maybe a raw socket we must check - if not we
 		 * don't care less

@@ -68,7 +68,7 @@ struct netlink_opt
 
 #define nlk_sk(__sk) ((struct netlink_opt *)(__sk)->sk_protinfo)
 
-static struct sock *nl_table[MAX_LINKS];
+static struct hlist_head nl_table[MAX_LINKS];
 static DECLARE_WAIT_QUEUE_HEAD(nl_table_wait);
 static unsigned nl_nonroot[MAX_LINKS];
 
@@ -160,18 +160,19 @@ netlink_unlock_table(void)
 static __inline__ struct sock *netlink_lookup(int protocol, u32 pid)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 
 	read_lock(&nl_table_lock);
-	for (sk = nl_table[protocol]; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &nl_table[protocol]) {
 		if (nlk_sk(sk)->pid == pid) {
 			sock_hold(sk);
-			read_unlock(&nl_table_lock);
-			return sk;
+			goto found;
 		}
 	}
-
+	sk = NULL;
+found:
 	read_unlock(&nl_table_lock);
-	return NULL;
+	return sk;
 }
 
 extern struct proto_ops netlink_ops;
@@ -180,18 +181,18 @@ static int netlink_insert(struct sock *sk, u32 pid)
 {
 	int err = -EADDRINUSE;
 	struct sock *osk;
+	struct hlist_node *node;
 
 	netlink_table_grab();
-	for (osk = nl_table[sk->sk_protocol]; osk; osk = osk->sk_next) {
+	sk_for_each(osk, node, &nl_table[sk->sk_protocol]) {
 		if (nlk_sk(osk)->pid == pid)
 			break;
 	}
-	if (osk == NULL) {
+	if (!node) {
 		err = -EBUSY;
 		if (nlk_sk(sk)->pid == 0) {
 			nlk_sk(sk)->pid = pid;
-			sk->sk_next = nl_table[sk->sk_protocol];
-			nl_table[sk->sk_protocol] = sk;
+			sk_add_node(sk, &nl_table[sk->sk_protocol]);
 			sock_hold(sk);
 			err = 0;
 		}
@@ -202,16 +203,9 @@ static int netlink_insert(struct sock *sk, u32 pid)
 
 static void netlink_remove(struct sock *sk)
 {
-	struct sock **skp;
-
 	netlink_table_grab();
-	for (skp = &nl_table[sk->sk_protocol]; *skp; skp = &((*skp)->sk_next)) {
-		if (*skp == sk) {
-			*skp = sk->sk_next;
-			__sock_put(sk);
-			break;
-		}
-	}
+	if (sk_del_node_init(sk))
+		__sock_put(sk);
 	netlink_table_ungrab();
 }
 
@@ -298,12 +292,13 @@ static int netlink_autobind(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
 	struct sock *osk;
+	struct hlist_node *node;
 	s32 pid = current->pid;
 	int err;
 
 retry:
 	netlink_table_grab();
-	for (osk = nl_table[sk->sk_protocol]; osk; osk = osk->sk_next) {
+	sk_for_each(osk, node, &nl_table[sk->sk_protocol]) {
 		if (nlk_sk(osk)->pid == pid) {
 			/* Bind collision, search negative pid values. */
 			if (pid > 0)
@@ -512,6 +507,7 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 		      u32 group, int allocation)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 	struct sk_buff *skb2 = NULL;
 	int protocol = ssk->sk_protocol;
 	int failure = 0, delivered = 0;
@@ -520,7 +516,7 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 
 	netlink_lock_table();
 
-	for (sk = nl_table[protocol]; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &nl_table[protocol]) {
 		struct netlink_opt *nlk = nlk_sk(sk);
 
 		if (ssk == sk)
@@ -572,10 +568,11 @@ int netlink_broadcast(struct sock *ssk, struct sk_buff *skb, u32 pid,
 void netlink_set_err(struct sock *ssk, u32 pid, u32 group, int code)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 	int protocol = ssk->sk_protocol;
 
 	read_lock(&nl_table_lock);
-	for (sk = nl_table[protocol]; sk; sk = sk->sk_next) {
+	sk_for_each(sk, node, &nl_table[protocol]) {
 		struct netlink_opt *nlk = nlk_sk(sk);
 		if (ssk == sk)
 			continue;
@@ -975,13 +972,14 @@ static int netlink_read_proc(char *buffer, char **start, off_t offset,
 	int len=0;
 	int i;
 	struct sock *s;
+	struct hlist_node *node;
 	
 	len+= sprintf(buffer,"sk       Eth Pid    Groups   "
 		      "Rmem     Wmem     Dump     Locks\n");
 	
 	for (i=0; i<MAX_LINKS; i++) {
 		read_lock(&nl_table_lock);
-		for (s = nl_table[i]; s; s = s->sk_next) {
+		sk_for_each(s, node, &nl_table[i]) {
 			struct netlink_opt *nlk = nlk_sk(s);
 
 			len+=sprintf(buffer+len,"%p %-3d %-6d %08x %-8d %-8d %p %d",

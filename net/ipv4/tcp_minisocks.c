@@ -63,23 +63,19 @@ static void tcp_timewait_kill(struct tcp_tw_bucket *tw)
 	/* Unlink from established hashes. */
 	ehead = &tcp_ehash[tw->tw_hashent];
 	write_lock(&ehead->lock);
-	if (!tw->tw_pprev) {
+	if (hlist_unhashed(&tw->tw_node)) {
 		write_unlock(&ehead->lock);
 		return;
 	}
-	if (tw->tw_next)
-		tw->tw_next->sk_pprev = tw->tw_pprev;
-	*(tw->tw_pprev) = tw->tw_next;
-	tw->tw_pprev = NULL;
+	__hlist_del(&tw->tw_node);
+	sk_node_init(&tw->tw_node);
 	write_unlock(&ehead->lock);
 
 	/* Disassociate with bind bucket. */
 	bhead = &tcp_bhash[tcp_bhashfn(tw->tw_num)];
 	spin_lock(&bhead->lock);
 	tb = tw->tw_tb;
-	if (tw->tw_bind_next)
-		tw->tw_bind_next->sk_bind_pprev = tw->tw_bind_pprev;
-	*(tw->tw_bind_pprev) = tw->tw_bind_next;
+	__hlist_del(&tw->tw_bind_node);
 	tw->tw_tb = NULL;
 	tcp_bucket_destroy(tb);
 	spin_unlock(&bhead->lock);
@@ -298,7 +294,6 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 {
 	struct tcp_ehash_bucket *ehead = &tcp_ehash[sk->sk_hashent];
 	struct tcp_bind_hashbucket *bhead;
-	struct sock **head, *sktw;
 
 	/* Step 1: Put TW into bind hash. Original socket stays there too.
 	   Note, that any socket with inet_sk(sk)->num != 0 MUST be bound in
@@ -308,30 +303,17 @@ static void __tcp_tw_hashdance(struct sock *sk, struct tcp_tw_bucket *tw)
 	spin_lock(&bhead->lock);
 	tw->tw_tb = (struct tcp_bind_bucket *)sk->sk_prev;
 	BUG_TRAP(sk->sk_prev);
-	if ((tw->tw_bind_next = tw->tw_tb->owners) != NULL)
-		tw->tw_tb->owners->sk_bind_pprev = &tw->tw_bind_next;
-	tw->tw_tb->owners = (struct sock *)tw;
-	tw->tw_bind_pprev = &tw->tw_tb->owners;
+	tw_add_bind_node(tw, &tw->tw_tb->owners);
 	spin_unlock(&bhead->lock);
 
 	write_lock(&ehead->lock);
 
 	/* Step 2: Remove SK from established hash. */
-	if (sk->sk_pprev) {
-		if (sk->sk_next)
-			sk->sk_next->sk_pprev = sk->sk_pprev;
-		*sk->sk_pprev = sk->sk_next;
-		sk->sk_pprev = NULL;
+	if (sk_del_node_init(sk))
 		sock_prot_dec_use(sk->sk_prot);
-	}
 
 	/* Step 3: Hash TW into TIMEWAIT half of established hash table. */
-	head = &(ehead + tcp_ehash_size)->chain;
-	sktw = (struct sock *)tw;
-	if ((sktw->sk_next = *head) != NULL)
-		(*head)->sk_pprev = &sktw->sk_next;
-	*head = sktw;
-	sktw->sk_pprev = head;
+	tw_add_node(tw, &(ehead + tcp_ehash_size)->chain);
 	atomic_inc(&tw->tw_refcnt);
 
 	write_unlock(&ehead->lock);
@@ -652,7 +634,7 @@ struct sock *tcp_create_openreq_child(struct sock *sk, struct open_request *req,
 		newsk->sk_state = TCP_SYN_RECV;
 
 		/* SANITY */
-		newsk->sk_pprev = NULL;
+		sk_node_init(&newsk->sk_node);
 		newsk->sk_prev = NULL;
 
 		/* Clone the TCP header template */

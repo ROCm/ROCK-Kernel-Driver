@@ -489,19 +489,22 @@ struct sock *llc_lookup_established(struct llc_sap *sap, struct llc_addr *daddr,
 				    struct llc_addr *laddr)
 {
 	struct sock *rc;
+	struct hlist_node *node;
 
 	read_lock_bh(&sap->sk_list.lock);
-	for (rc = sap->sk_list.list; rc; rc = rc->sk_next) {
+	sk_for_each(rc, node, &sap->sk_list.list) {
 		struct llc_opt *llc = llc_sk(rc);
 
 		if (llc->laddr.lsap == laddr->lsap &&
 		    llc->daddr.lsap == daddr->lsap &&
 		    llc_mac_match(llc->laddr.mac, laddr->mac) &&
-		    llc_mac_match(llc->daddr.mac, daddr->mac))
-			break;
+		    llc_mac_match(llc->daddr.mac, daddr->mac)) {
+			sock_hold(rc);
+			goto found;
+		}
 	}
-	if (rc)
-		sock_hold(rc);
+	rc = NULL;
+found:
 	read_unlock_bh(&sap->sk_list.lock);
 	return rc;
 }
@@ -518,18 +521,21 @@ struct sock *llc_lookup_established(struct llc_sap *sap, struct llc_addr *daddr,
 struct sock *llc_lookup_listener(struct llc_sap *sap, struct llc_addr *laddr)
 {
 	struct sock *rc;
+	struct hlist_node *node;
 
 	read_lock_bh(&sap->sk_list.lock);
-	for (rc = sap->sk_list.list; rc; rc = rc->sk_next) {
+	sk_for_each(rc, node, &sap->sk_list.list) {
 		struct llc_opt *llc = llc_sk(rc);
 
 		if (rc->sk_type == SOCK_STREAM && rc->sk_state == TCP_LISTEN &&
 		    llc->laddr.lsap == laddr->lsap &&
-		    llc_mac_match(llc->laddr.mac, laddr->mac))
-			break;
+		    llc_mac_match(llc->laddr.mac, laddr->mac)) {
+			sock_hold(rc);
+			goto found;
+		}
 	}
-	if (rc)
-		sock_hold(rc);
+	rc = NULL;
+found:
 	read_unlock_bh(&sap->sk_list.lock);
 	return rc;
 }
@@ -545,18 +551,21 @@ struct sock *llc_lookup_listener(struct llc_sap *sap, struct llc_addr *laddr)
 struct sock *llc_lookup_dgram(struct llc_sap *sap, struct llc_addr *laddr)
 {
 	struct sock *rc;
+	struct hlist_node *node;
 
 	read_lock_bh(&sap->sk_list.lock);
-	for (rc = sap->sk_list.list; rc; rc = rc->sk_next) {
+	sk_for_each(rc, node, &sap->sk_list.list) {
 		struct llc_opt *llc = llc_sk(rc);
 
 		if (rc->sk_type == SOCK_DGRAM &&
 		    llc->laddr.lsap == laddr->lsap &&
-		    llc_mac_match(llc->laddr.mac, laddr->mac))
-			break;
+		    llc_mac_match(llc->laddr.mac, laddr->mac)) {
+			sock_hold(rc);
+			goto found;
+		}
 	}
-	if (rc)
-		sock_hold(rc);
+	rc = NULL;
+found:
 	read_unlock_bh(&sap->sk_list.lock);
 	return rc;
 }

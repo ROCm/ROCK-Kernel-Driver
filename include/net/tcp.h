@@ -25,6 +25,7 @@
 #undef TCP_CLEAR_TIMERS
 
 #include <linux/config.h>
+#include <linux/list.h>
 #include <linux/tcp.h>
 #include <linux/slab.h>
 #include <linux/cache.h>
@@ -42,8 +43,8 @@
  * for the rest.  I'll experiment with dynamic table growth later.
  */
 struct tcp_ehash_bucket {
-	rwlock_t	lock;
-	struct sock	*chain;
+	rwlock_t	  lock;
+	struct hlist_head chain;
 } __attribute__((__aligned__(8)));
 
 /* This is for listening sockets, thus all sockets which possess wildcards. */
@@ -84,8 +85,8 @@ struct tcp_bind_bucket {
 	unsigned short		port;
 	signed short		fastreuse;
 	struct tcp_bind_bucket	*next;
-	struct sock		*owners;
 	struct tcp_bind_bucket	**pprev;
+	struct hlist_head	owners;
 };
 
 struct tcp_bind_hashbucket {
@@ -116,7 +117,7 @@ extern struct tcp_hashinfo {
 	 * table where wildcard'd TCP sockets can exist.  Hash function here
 	 * is just local port number.
 	 */
-	struct sock *__tcp_listening_hash[TCP_LHTABLE_SIZE];
+	struct hlist_head __tcp_listening_hash[TCP_LHTABLE_SIZE];
 
 	/* All the above members are written once at bootup and
 	 * never written again _or_ are predominantly read-access.
@@ -180,10 +181,8 @@ struct tcp_tw_bucket {
 #define tw_state		__tw_common.skc_state
 #define tw_reuse		__tw_common.skc_reuse
 #define tw_bound_dev_if		__tw_common.skc_bound_dev_if
-#define tw_next			__tw_common.skc_next
-#define tw_pprev		__tw_common.skc_pprev
-#define tw_bind_next		__tw_common.skc_bind_next
-#define tw_bind_pprev		__tw_common.skc_bind_pprev
+#define tw_node			__tw_common.skc_node
+#define tw_bind_node		__tw_common.skc_bind_node
 #define tw_refcnt		__tw_common.skc_refcnt
 	volatile unsigned char	tw_substate;
 	unsigned char		tw_rcv_wscale;
@@ -213,6 +212,21 @@ struct tcp_tw_bucket {
 	struct in6_addr		tw_v6_rcv_saddr;
 #endif
 };
+
+static __inline__ void tw_add_node(struct tcp_tw_bucket *tw,
+				   struct hlist_head *list)
+{
+	hlist_add_head(&tw->tw_node, list);
+}
+
+static __inline__ void tw_add_bind_node(struct tcp_tw_bucket *tw,
+					struct hlist_head *list)
+{
+	hlist_add_head(&tw->tw_bind_node, list);
+}
+
+#define tw_for_each(tw, node, head) \
+	hlist_for_each_entry(tw, node, head, tw_node)
 
 #define tcptw_sk(__sk)	((struct tcp_tw_bucket *)(__sk))
 

@@ -516,10 +516,10 @@ static void icmpv6_notify(struct sk_buff *skb, int type, int code, u32 info)
 	rcu_read_unlock();
 
 	read_lock(&raw_v6_lock);
-	if ((sk = raw_v6_htable[hash]) != NULL) {
+	if ((sk = sk_head(&raw_v6_htable[hash])) != NULL) {
 		while((sk = __raw_v6_lookup(sk, nexthdr, daddr, saddr))) {
 			rawv6_err(sk, skb, NULL, type, code, inner_offset, info);
-			sk = sk->sk_next;
+			sk = sk_next(sk);
 		}
 	}
 	read_unlock(&raw_v6_lock);

@@ -45,7 +45,7 @@
 #include <asm/bitops.h>
 
 static struct proto_ops econet_ops;
-static struct sock *econet_sklist;
+static struct hlist_head econet_sklist;
 static rwlock_t econet_lock = RW_LOCK_UNLOCKED;
 
 /* Since there are only 256 possible network numbers (or fewer, depends
@@ -93,29 +93,18 @@ struct ec_cb
 #endif
 };
 
-static void econet_remove_socket(struct sock **list, struct sock *sk)
+static void econet_remove_socket(struct hlist_head *list, struct sock *sk)
 {
-	struct sock *s;
-
 	write_lock_bh(&econet_lock);
-
-	while ((s = *list) != NULL) {
-		if (s == sk) {
-			*list = s->sk_next;
-			break;
-		}
-		list = &s->sk_next;
-	}
-
+	if (sk_del_node_init(sk))
+		sock_put(sk);
 	write_unlock_bh(&econet_lock);
-	if (s)
-		sock_put(s);
 }
 
-static void econet_insert_socket(struct sock **list, struct sock *sk)
+static void econet_insert_socket(struct hlist_head *list, struct sock *sk)
 {
 	write_lock_bh(&econet_lock);
-	sk->sk_next = *list;
+	sk_add_node(sk, list);
 	sock_hold(sk);
 	write_unlock_bh(&econet_lock);
 }
@@ -726,20 +715,19 @@ SOCKOPS_WRAP(econet, PF_ECONET);
 static struct sock *ec_listening_socket(unsigned char port, unsigned char
 				 station, unsigned char net)
 {
-	struct sock *sk = econet_sklist;
+	struct sock *sk;
+	struct hlist_node *node;
 
-	while (sk)
-	{
+	sk_for_each(sk, node, &econet_sklist) {
 		struct econet_opt *opt = ec_sk(sk);
 		if ((opt->port == port || opt->port == 0) && 
 		    (opt->station == station || opt->station == 0) &&
 		    (opt->net == net || opt->net == 0))
-			return sk;
-
-		sk = sk->sk_next;
+			goto found;
 	}
-
-	return NULL;
+	sk = NULL;
+found:
+	return sk;
 }
 
 /*

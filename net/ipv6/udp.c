@@ -101,6 +101,9 @@ static __inline__ int udv6_rcv_saddr_equal(struct sock *sk, struct sock *sk2)
  */
 static int udp_v6_get_port(struct sock *sk, unsigned short snum)
 {
+	struct sock *sk2;
+	struct hlist_node *node;
+
 	write_lock_bh(&udp_hash_lock);
 	if (snum == 0) {
 		int best_size_so_far, best, result, i;
@@ -111,11 +114,11 @@ static int udp_v6_get_port(struct sock *sk, unsigned short snum)
 		best_size_so_far = 32767;
 		best = result = udp_port_rover;
 		for (i = 0; i < UDP_HTABLE_SIZE; i++, result++) {
-			struct sock *sk2;
 			int size;
+			struct hlist_head *list;
 
-			sk2 = udp_hash[result & (UDP_HTABLE_SIZE - 1)];
-			if (!sk2) {
+			list = &udp_hash[result & (UDP_HTABLE_SIZE - 1)];
+			if (hlist_empty(list)) {
 				if (result > sysctl_local_port_range[1])
 					result = sysctl_local_port_range[0] +
 						((result - sysctl_local_port_range[0]) &
@@ -123,10 +126,9 @@ static int udp_v6_get_port(struct sock *sk, unsigned short snum)
 				goto gotit;
 			}
 			size = 0;
-			do {
+			sk_for_each(sk2, node, list)
 				if (++size >= best_size_so_far)
 					goto next;
-			} while ((sk2 = sk2->sk_next) != NULL);
 			best_size_so_far = size;
 			best = result;
 		next:;
@@ -143,11 +145,8 @@ static int udp_v6_get_port(struct sock *sk, unsigned short snum)
 gotit:
 		udp_port_rover = snum = result;
 	} else {
-		struct sock *sk2;
-
-		for (sk2 = udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
-		     sk2 != NULL;
-		     sk2 = sk2->sk_next) {
+		sk_for_each(sk2, node,
+			    &udp_hash[snum & (UDP_HTABLE_SIZE - 1)]) {
 			if (inet_sk(sk2)->num == snum &&
 			    sk2 != sk &&
 			    sk2->sk_bound_dev_if == sk->sk_bound_dev_if &&
@@ -158,12 +157,8 @@ gotit:
 	}
 
 	inet_sk(sk)->num = snum;
-	if (!sk->sk_pprev) {
-		struct sock **skp = &udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
-		if ((sk->sk_next = *skp) != NULL)
-			(*skp)->sk_pprev = &sk->sk_next;
-		*skp = sk;
-		sk->sk_pprev = skp;
+	if (sk_unhashed(sk)) {
+		sk_add_node(sk, &udp_hash[snum & (UDP_HTABLE_SIZE - 1)]);
 		sock_prot_inc_use(sk->sk_prot);
 		sock_hold(sk);
 	}
@@ -183,11 +178,7 @@ static void udp_v6_hash(struct sock *sk)
 static void udp_v6_unhash(struct sock *sk)
 {
  	write_lock_bh(&udp_hash_lock);
-	if (sk->sk_pprev) {
-		if (sk->sk_next)
-			sk->sk_next->sk_pprev = sk->sk_pprev;
-		*sk->sk_pprev = sk->sk_next;
-		sk->sk_pprev = NULL;
+	if (sk_del_node_init(sk)) {
 		inet_sk(sk)->num = 0;
 		sock_prot_dec_use(sk->sk_prot);
 		__sock_put(sk);
@@ -199,12 +190,12 @@ static struct sock *udp_v6_lookup(struct in6_addr *saddr, u16 sport,
 				  struct in6_addr *daddr, u16 dport, int dif)
 {
 	struct sock *sk, *result = NULL;
+	struct hlist_node *node;
 	unsigned short hnum = ntohs(dport);
 	int badness = -1;
 
  	read_lock(&udp_hash_lock);
-	for (sk = udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]; sk;
-	     sk = sk->sk_next) {
+	sk_for_each(sk, node, &udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]) {
 		struct inet_opt *inet = inet_sk(sk);
 
 		if (inet->num == hnum && sk->sk_family == PF_INET6) {
@@ -579,9 +570,11 @@ static struct sock *udp_v6_mcast_next(struct sock *sk,
 				      u16 rmt_port, struct in6_addr *rmt_addr,
 				      int dif)
 {
+	struct hlist_node *node;
 	struct sock *s = sk;
 	unsigned short num = ntohs(loc_port);
-	for (; s; s = s->sk_next) {
+
+	sk_for_each_from(s, node) {
 		struct inet_opt *inet = inet_sk(s);
 
 		if (inet->num == num && s->sk_family == PF_INET6) {
@@ -622,7 +615,7 @@ static void udpv6_mcast_deliver(struct udphdr *uh,
 	int dif;
 
 	read_lock(&udp_hash_lock);
-	sk = udp_hash[ntohs(uh->dest) & (UDP_HTABLE_SIZE - 1)];
+	sk = sk_head(&udp_hash[ntohs(uh->dest) & (UDP_HTABLE_SIZE - 1)]);
 	dif = skb->dev->ifindex;
 	sk = udp_v6_mcast_next(sk, uh->dest, daddr, uh->source, saddr, dif);
 	if (!sk)
@@ -630,7 +623,7 @@ static void udpv6_mcast_deliver(struct udphdr *uh,
 
 	buff = NULL;
 	sk2 = sk;
-	while ((sk2 = udp_v6_mcast_next(sk2->sk_next, uh->dest, daddr,
+	while ((sk2 = udp_v6_mcast_next(sk_next(sk2), uh->dest, daddr,
 					uh->source, saddr, dif))) {
 		if (!buff) {
 			buff = skb_clone(skb, GFP_ATOMIC);

@@ -1906,7 +1906,7 @@ void tcp_destroy_sock(struct sock *sk)
 	BUG_TRAP(sock_flag(sk, SOCK_DEAD));
 
 	/* It cannot be in hash table! */
-	BUG_TRAP(!sk->sk_pprev);
+	BUG_TRAP(sk_unhashed(sk));
 
 	/* If it has not 0 inet_sk(sk)->num, it must be bound */
 	BUG_TRAP(!inet_sk(sk)->num || sk->sk_prev);
@@ -2625,7 +2625,7 @@ void __init tcp_init(void)
 		panic("Failed to allocate TCP established hash table\n");
 	for (i = 0; i < (tcp_ehash_size << 1); i++) {
 		tcp_ehash[i].lock = RW_LOCK_UNLOCKED;
-		tcp_ehash[i].chain = NULL;
+		INIT_HLIST_HEAD(&tcp_ehash[i].chain);
 	}
 
 	do {

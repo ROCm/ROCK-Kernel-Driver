@@ -113,7 +113,7 @@
 
 DEFINE_SNMP_STAT(struct udp_mib, udp_statistics);
 
-struct sock *udp_hash[UDP_HTABLE_SIZE];
+struct hlist_head udp_hash[UDP_HTABLE_SIZE];
 rwlock_t udp_hash_lock = RW_LOCK_UNLOCKED;
 
 /* Shared by v4/v6 udp. */
@@ -121,6 +121,8 @@ int udp_port_rover;
 
 static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 {
+	struct hlist_node *node;
+	struct sock *sk2;
 	struct inet_opt *inet = inet_sk(sk);
 
 	write_lock_bh(&udp_hash_lock);
@@ -133,11 +135,11 @@ static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 		best_size_so_far = 32767;
 		best = result = udp_port_rover;
 		for (i = 0; i < UDP_HTABLE_SIZE; i++, result++) {
-			struct sock *sk2;
+			struct hlist_head *list;
 			int size;
 
-			sk2 = udp_hash[result & (UDP_HTABLE_SIZE - 1)];
-			if (!sk2) {
+			list = &udp_hash[result & (UDP_HTABLE_SIZE - 1)];
+			if (hlist_empty(list)) {
 				if (result > sysctl_local_port_range[1])
 					result = sysctl_local_port_range[0] +
 						((result - sysctl_local_port_range[0]) &
@@ -145,10 +147,9 @@ static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 				goto gotit;
 			}
 			size = 0;
-			do {
+			sk_for_each(sk2, node, list)
 				if (++size >= best_size_so_far)
 					goto next;
-			} while ((sk2 = sk2->sk_next) != NULL);
 			best_size_so_far = size;
 			best = result;
 		next:;
@@ -167,11 +168,8 @@ static int udp_v4_get_port(struct sock *sk, unsigned short snum)
 gotit:
 		udp_port_rover = snum = result;
 	} else {
-		struct sock *sk2;
-
-		for (sk2 = udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
-		     sk2 != NULL;
-		     sk2 = sk2->sk_next) {
+		sk_for_each(sk2, node,
+			    &udp_hash[snum & (UDP_HTABLE_SIZE - 1)]) {
 			struct inet_opt *inet2 = inet_sk(sk2);
 
 			if (inet2->num == snum &&
@@ -186,12 +184,10 @@ gotit:
 		}
 	}
 	inet->num = snum;
-	if (!sk->sk_pprev) {
-		struct sock **skp = &udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
-		if ((sk->sk_next = *skp) != NULL)
-			(*skp)->sk_pprev = &sk->sk_next;
-		*skp = sk;
-		sk->sk_pprev = skp;
+	if (sk_unhashed(sk)) {
+		struct hlist_head *h = &udp_hash[snum & (UDP_HTABLE_SIZE - 1)];
+
+		sk_add_node(sk, h);
 		sock_prot_inc_use(sk->sk_prot);
 		sock_hold(sk);
 	}
@@ -211,11 +207,7 @@ static void udp_v4_hash(struct sock *sk)
 static void udp_v4_unhash(struct sock *sk)
 {
 	write_lock_bh(&udp_hash_lock);
-	if (sk->sk_pprev) {
-		if (sk->sk_next)
-			sk->sk_next->sk_pprev = sk->sk_pprev;
-		*sk->sk_pprev = sk->sk_next;
-		sk->sk_pprev = NULL;
+	if (sk_del_node_init(sk)) {
 		inet_sk(sk)->num = 0;
 		sock_prot_dec_use(sk->sk_prot);
 		__sock_put(sk);
@@ -229,11 +221,11 @@ static void udp_v4_unhash(struct sock *sk)
 struct sock *udp_v4_lookup_longway(u32 saddr, u16 sport, u32 daddr, u16 dport, int dif)
 {
 	struct sock *sk, *result = NULL;
+	struct hlist_node *node;
 	unsigned short hnum = ntohs(dport);
 	int badness = -1;
 
-	for (sk = udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]; sk;
-	     sk = sk->sk_next) {
+	sk_for_each(sk, node, &udp_hash[hnum & (UDP_HTABLE_SIZE - 1)]) {
 		struct inet_opt *inet = inet_sk(sk);
 
 		if (inet->num == hnum && !ipv6_only_sock(sk)) {
@@ -287,10 +279,11 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 					     u16 rmt_port, u32 rmt_addr,
 					     int dif)
 {
+	struct hlist_node *node;
 	struct sock *s = sk;
 	unsigned short hnum = ntohs(loc_port);
 
-	for (; s; s = s->sk_next) {
+	sk_for_each_from(s, node) {
 		struct inet_opt *inet = inet_sk(s);
 
 		if (inet->num != hnum					||
@@ -302,8 +295,10 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 			continue;
 		if (!ip_mc_sf_allow(sk, loc_addr, rmt_addr, dif))
 			continue;
-		break;
+		goto found;
   	}
+	s = NULL;
+found:
   	return s;
 }
 
@@ -1088,7 +1083,7 @@ static int udp_v4_mcast_deliver(struct sk_buff *skb, struct udphdr *uh,
 	int dif;
 
 	read_lock(&udp_hash_lock);
-	sk = udp_hash[ntohs(uh->dest) & (UDP_HTABLE_SIZE - 1)];
+	sk = sk_head(&udp_hash[ntohs(uh->dest) & (UDP_HTABLE_SIZE - 1)]);
 	dif = skb->dev->ifindex;
 	sk = udp_v4_mcast_next(sk, uh->dest, daddr, uh->source, saddr, dif);
 	if (sk) {
@@ -1097,7 +1092,7 @@ static int udp_v4_mcast_deliver(struct sk_buff *skb, struct udphdr *uh,
 		do {
 			struct sk_buff *skb1 = skb;
 
-			sknext = udp_v4_mcast_next(sk->sk_next, uh->dest, daddr,
+			sknext = udp_v4_mcast_next(sk_next(sk), uh->dest, daddr,
 						   uh->source, saddr, dif);
 			if(sknext)
 				skb1 = skb_clone(skb, GFP_ATOMIC);
@@ -1354,20 +1349,27 @@ struct proto udp_prot = {
 static __inline__ struct sock *udp_get_bucket(struct seq_file *seq, loff_t *pos)
 {
 	int i;
-	struct sock *sk = NULL;
+	struct sock *sk;
+	struct hlist_node *node;
 	loff_t l = *pos;
 	struct udp_iter_state *state = seq->private;
 
-	for (; state->bucket < UDP_HTABLE_SIZE; ++state->bucket)
-		for (i = 0, sk = udp_hash[state->bucket]; sk;
-		     ++i, sk = sk->sk_next) {
-			if (sk->sk_family != state->family)
+	for (; state->bucket < UDP_HTABLE_SIZE; ++state->bucket) {
+		i = 0;
+		sk_for_each(sk, node, &udp_hash[state->bucket]) {
+			if (sk->sk_family != state->family) {
+				++i;
 				continue;
-			if (l--)
+			}
+			if (l--) {
+				++i;
 				continue;
+			}
 			*pos = i;
 			goto out;
 		}
+	}
+	sk = NULL;
 out:
 	return sk;
 }
@@ -1381,6 +1383,7 @@ static void *udp_seq_start(struct seq_file *seq, loff_t *pos)
 static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct sock *sk;
+	struct hlist_node *node;
 	struct udp_iter_state *state;
 
 	if (v == (void *)1) {
@@ -1391,9 +1394,7 @@ static void *udp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	state = seq->private;
 
 	sk = v;
-	sk = sk->sk_next;
-
-	for (; sk; sk = sk->sk_next)
+	sk_for_each_continue(sk, node)
 		if (sk->sk_family == state->family)
 			goto out;
 
