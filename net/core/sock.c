@@ -175,6 +175,15 @@ static void sock_warn_obsolete_bsdism(const char *name)
 	}
 }
 
+static void sock_disable_timestamp(struct sock *sk)
+{	
+	if (sock_flag(sk, SOCK_TIMESTAMP)) { 
+		sock_reset_flag(sk, SOCK_TIMESTAMP);
+		atomic_dec(&netstamp_needed);
+	}
+}
+
+
 /*
  *	This is meant for all protocols to use and covers goings on
  *	at the socket level. Everything here is generic.
@@ -972,11 +981,6 @@ EXPORT_SYMBOL(sk_wait_data);
  * function, some default processing is provided.
  */
 
-int sock_no_release(struct socket *sock)
-{
-	return 0;
-}
-
 int sock_no_bind(struct socket *sock, struct sockaddr *saddr, int len)
 {
 	return -EOPNOTSUPP;
@@ -1247,15 +1251,6 @@ void sock_enable_timestamp(struct sock *sk)
 }
 EXPORT_SYMBOL(sock_enable_timestamp); 
 
-void sock_disable_timestamp(struct sock *sk)
-{	
-	if (sock_flag(sk, SOCK_TIMESTAMP)) { 
-		sock_reset_flag(sk, SOCK_TIMESTAMP);
-		atomic_dec(&netstamp_needed);
-	}
-}
-EXPORT_SYMBOL(sock_disable_timestamp);
-
 /*
  *	Get a socket option on an socket.
  *
@@ -1371,7 +1366,6 @@ EXPORT_SYMBOL(sk_free);
 EXPORT_SYMBOL(sk_send_sigurg);
 EXPORT_SYMBOL(sock_alloc_send_pskb);
 EXPORT_SYMBOL(sock_alloc_send_skb);
-EXPORT_SYMBOL(sock_getsockopt);
 EXPORT_SYMBOL(sock_init_data);
 EXPORT_SYMBOL(sock_kfree_s);
 EXPORT_SYMBOL(sock_kmalloc);
@@ -1385,14 +1379,12 @@ EXPORT_SYMBOL(sock_no_listen);
 EXPORT_SYMBOL(sock_no_mmap);
 EXPORT_SYMBOL(sock_no_poll);
 EXPORT_SYMBOL(sock_no_recvmsg);
-EXPORT_SYMBOL(sock_no_release);
 EXPORT_SYMBOL(sock_no_sendmsg);
 EXPORT_SYMBOL(sock_no_sendpage);
 EXPORT_SYMBOL(sock_no_setsockopt);
 EXPORT_SYMBOL(sock_no_shutdown);
 EXPORT_SYMBOL(sock_no_socketpair);
 EXPORT_SYMBOL(sock_rfree);
-EXPORT_SYMBOL(sock_rmalloc);
 EXPORT_SYMBOL(sock_setsockopt);
 EXPORT_SYMBOL(sock_wfree);
 EXPORT_SYMBOL(sock_wmalloc);

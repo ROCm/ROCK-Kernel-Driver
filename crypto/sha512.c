@@ -30,6 +30,7 @@ struct sha512_ctx {
 	u64 state[8];
 	u32 count[4];
 	u8 buf[128];
+	u64 W[80];
 };
 
 static inline u64 Ch(u64 x, u64 y, u64 z)
@@ -104,34 +105,18 @@ const u64 sha512_K[80] = {
 
 static inline void LOAD_OP(int I, u64 *W, const u8 *input)
 {
-        u64 t1  = input[(8*I)  ] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+1] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+2] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+3] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+4] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+5] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+6] & 0xff;
-        t1 <<= 8;
-        t1 |= input[(8*I)+7] & 0xff;
-        W[I] = t1;
+	W[I] = __be64_to_cpu( ((u64*)(input))[I] );
 }
 
 static inline void BLEND_OP(int I, u64 *W)
 {
-        W[I] = s1(W[I-2]) + W[I-7] + s0(W[I-15]) + W[I-16];
+	W[I] = s1(W[I-2]) + W[I-7] + s0(W[I-15]) + W[I-16];
 }
 
 static void
-sha512_transform(u64 *state, const u8 *input)
+sha512_transform(u64 *state, u64 *W, const u8 *input)
 {
 	u64 a, b, c, d, e, f, g, h, t1, t2;
-	u64 W[80];
 
 	int i;
 
@@ -172,7 +157,6 @@ sha512_transform(u64 *state, const u8 *input)
 
 	/* erase our data */
 	a = b = c = d = e = f = g = h = t1 = t2 = 0;
-	memset(W, 0, 80 * sizeof(u64));
 }
 
 static void
@@ -230,10 +214,10 @@ sha512_update(void *ctx, const u8 *data, unsigned int len)
 	/* Transform as many times as possible. */
 	if (len >= part_len) {
 		memcpy(&sctx->buf[index], data, part_len);
-		sha512_transform(sctx->state, sctx->buf);
+		sha512_transform(sctx->state, sctx->W, sctx->buf);
 
 		for (i = part_len; i + 127 < len; i+=128)
-			sha512_transform(sctx->state, &data[i]);
+			sha512_transform(sctx->state, sctx->W, &data[i]);
 
 		index = 0;
 	} else {
@@ -242,6 +226,9 @@ sha512_update(void *ctx, const u8 *data, unsigned int len)
 
 	/* Buffer remaining input */
 	memcpy(&sctx->buf[index], &data[i], len - i);
+
+	/* erase our data */
+	memset(sctx->W, 0, sizeof(sctx->W));
 }
 
 static void

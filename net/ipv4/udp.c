@@ -531,7 +531,7 @@ int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 			return -EINVAL;
 		if (usin->sin_family != AF_INET) {
 			if (usin->sin_family != AF_UNSPEC)
-				return -EINVAL;
+				return -EAFNOSUPPORT;
 		}
 
 		daddr = usin->sin_addr.s_addr;

@@ -1106,34 +1106,34 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
  * Invalidate hardware checksum when packet is to be mangled, and
  * complete checksum manually on outgoing path.
  */
-int skb_checksum_help(struct sk_buff **pskb, int inward)
+int skb_checksum_help(struct sk_buff *skb, int inward)
 {
 	unsigned int csum;
-	int ret = 0, offset = (*pskb)->h.raw - (*pskb)->data;
+	int ret = 0, offset = skb->h.raw - skb->data;
 
 	if (inward) {
-		(*pskb)->ip_summed = CHECKSUM_NONE;
+		skb->ip_summed = CHECKSUM_NONE;
 		goto out;
 	}
 
-	if (skb_cloned(*pskb)) {
-		ret = pskb_expand_head(*pskb, 0, 0, GFP_ATOMIC);
+	if (skb_cloned(skb)) {
+		ret = pskb_expand_head(skb, 0, 0, GFP_ATOMIC);
 		if (ret)
 			goto out;
 	}
 
-	if (offset > (int)(*pskb)->len)
+	if (offset > (int)skb->len)
 		BUG();
-	csum = skb_checksum(*pskb, offset, (*pskb)->len-offset, 0);
+	csum = skb_checksum(skb, offset, skb->len-offset, 0);
 
-	offset = (*pskb)->tail - (*pskb)->h.raw;
+	offset = skb->tail - skb->h.raw;
 	if (offset <= 0)
 		BUG();
-	if ((*pskb)->csum + 2 > offset)
+	if (skb->csum + 2 > offset)
 		BUG();
 
-	*(u16*)((*pskb)->h.raw + (*pskb)->csum) = csum_fold(csum);
-	(*pskb)->ip_summed = CHECKSUM_NONE;
+	*(u16*)(skb->h.raw + skb->csum) = csum_fold(csum);
+	skb->ip_summed = CHECKSUM_NONE;
 out:	
 	return ret;
 }
@@ -1282,7 +1282,7 @@ int dev_queue_xmit(struct sk_buff *skb)
 	    (!(dev->features & (NETIF_F_HW_CSUM | NETIF_F_NO_CSUM)) &&
 	     (!(dev->features & NETIF_F_IP_CSUM) ||
 	      skb->protocol != htons(ETH_P_IP))))
-	      	if (skb_checksum_help(&skb, 0))
+	      	if (skb_checksum_help(skb, 0))
 	      		goto out_kfree_skb;
 
 
