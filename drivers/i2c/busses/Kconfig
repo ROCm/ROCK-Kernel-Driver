@@ -46,6 +46,16 @@ config I2C_AMD8111
 	  This driver can also be built as a module.  If so, the module
 	  will be called i2c-amd8111.
 
+config I2C_ELV
+	tristate "ELV adapter"
+	depends on I2C_ALGOBIT && ISA
+	help
+	  This supports parallel-port I2C adapters called ELV.  Say Y if you
+	  own such an adapter.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-elv.
+
 config I2C_I801
 	tristate "Intel 801"
 	depends on I2C && PCI && EXPERIMENTAL
