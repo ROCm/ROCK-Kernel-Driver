@@ -62,6 +62,10 @@
 #include <linux/pci.h>
 #include <linux/list.h>
 
+#define DC395X_NAME	"dc395x"
+#define DC395X_BANNER	"Tekram DC395(U/UW/F), DC315(U) - ASIC TRM-S1040"
+#define DC395X_VERSION	"v2.05, 2004/03/08"
+
 /*---------------------------------------------------------------------------
                                   Features
  ---------------------------------------------------------------------------*/
