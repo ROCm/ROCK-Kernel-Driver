@@ -1557,7 +1557,7 @@ err_free:
 static int bond_release(struct net_device *bond_dev, struct net_device *slave_dev)
 {
 	struct bonding *bond = bond_dev->priv;
-	struct slave *slave;
+	struct slave *slave, *oldcurrent;
 	struct sockaddr addr;
 	int mac_addr_differ;
 
@@ -1617,6 +1617,8 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
 	       ? "active" : "backup",
 	       slave_dev->name);
 
+	oldcurrent = bond->curr_active_slave;
+
 	bond->current_arp_slave = NULL;
 
 	/* release the slave from its bond */
@@ -1626,25 +1628,29 @@ static int bond_release(struct net_device *bond_dev, struct net_device *slave_de
 		bond->primary_slave = NULL;
 	}
 
-	if (bond->curr_active_slave == slave) {
+	if (oldcurrent == slave) {
 		bond_change_active_slave(bond, NULL);
-		bond_select_active_slave(bond);
 	}
 
-	if (!bond->curr_active_slave) {
-		printk(KERN_INFO DRV_NAME
-		       ": %s: now running without any active "
-		       "interface !\n",
-		       bond_dev->name);
-	}
-
-	if ((bond_mode == BOND_MODE_TLB) ||
-	    (bond_mode == BOND_MODE_ALB)) {
-		/* must be called only after the slave has been
+	if ((bond->params.mode == BOND_MODE_TLB) ||
+	    (bond->params.mode == BOND_MODE_ALB)) {
+		/* Must be called only after the slave has been
 		 * detached from the list and the curr_active_slave
-		 * has been replaced (if our_slave == old_current)
+		 * has been cleared (if our_slave == old_current),
+		 * but before a new active slave is selected.
 		 */
 		bond_alb_deinit_slave(bond, slave);
+	}
+
+	if (oldcurrent == slave) {
+		bond_select_active_slave(bond);
+
+		if (!bond->curr_active_slave) {
+			printk(KERN_INFO DRV_NAME
+			       ": %s: now running without any active "
+			       "interface !\n",
+			       bond_dev->name);
+		}
 	}
 
 	write_unlock_bh(&bond->lock);
