@@ -1,8 +1,8 @@
 /*
- * $Id: mtdblock_ro.c,v 1.9 2001/10/02 15:05:11 dwmw2 Exp $
+ * $Id: mtdblock_ro.c,v 1.13 2002/03/11 16:03:29 sioux Exp $
  *
- * Read-only version of the mtdblock device, without the 
- * read/erase/modify/writeback stuff
+ * Read-only flash, read-write RAM version of the mtdblock device,
+ * without caching.
  */
 
 #ifdef MTDBLOCK_DEBUG
@@ -21,216 +21,226 @@
 #define LOCAL_END_REQUEST
 #define MAJOR_NR MTD_BLOCK_MAJOR
 #define DEVICE_NAME "mtdblock"
-#define DEVICE_NR(device) (device)
 #include <linux/blk.h>
-
-#define RQFUNC_ARG request_queue_t *q
 
 #ifdef MTDBLOCK_DEBUG
 static int debug = MTDBLOCK_DEBUG;
 MODULE_PARM(debug, "i");
 #endif
 
-static struct gendisk *mtd_disks[MAX_MTD_DEVICES];
+struct mtdro_dev {
+	struct gendisk *disk;
+	struct mtd_info *mtd;
+	int open;
+};
+
+static struct mtdro_dev mtd_dev[MAX_MTD_DEVICES];
+static DECLARE_MUTEX(mtd_sem);
+
+static struct request_queue mtdro_queue;
+static spinlock_t mtdro_lock = SPIN_LOCK_UNLOCKED;
 
 static int mtdblock_open(struct inode *inode, struct file *file)
 {
-	struct mtd_info *mtd = NULL;
-	int dev = minor(inode->i_rdev);
-	struct gendisk *disk = mtd_disks[dev];
+	struct mtdro_dev *mdev = inode->i_bdev->bd_disk->private_data;
+	int ret = 0;
 
 	DEBUG(1,"mtdblock_open\n");
 
-	mtd = get_mtd_device(NULL, dev);
-	if (!mtd)
-		return -EINVAL;
-	if (MTD_ABSENT == mtd->type) {
-		put_mtd_device(mtd);
-		return -EINVAL;
+	down(&mtd_sem);
+	if (mdev->mtd == NULL) {
+		mdev->mtd = get_mtd_device(NULL, minor(inode->i_rdev));
+		if (!mdev->mtd || mdev->mtd->type == MTD_ABSENT) {
+			if (mdev->mtd)
+				put_mtd_device(mdev->mtd);
+			ret = -ENODEV;
+		}
 	}
 
-	set_capacity(disk, mtd->size>>9);
-	add_disk(disk);
+	if (ret == 0) {
+		set_device_ro(inode->i_rdev, !(mdev->mtd->flags & MTD_CAP_RAM));
+		mdev->open++;
+	}
+	up(&mtd_sem);
 
-	DEBUG(1, "ok\n");
+	DEBUG(1, "%s\n", ret ? "ok" : "nodev");
 
-	return 0;
+	return ret;
 }
 
 static release_t mtdblock_release(struct inode *inode, struct file *file)
 {
-	int dev;
-	struct mtd_info *mtd;
+	struct mtdro_dev *mdev = inode->i_bdev->bd_disk->private_data;
 
    	DEBUG(1, "mtdblock_release\n");
 
-	if (inode == NULL)
-		release_return(-ENODEV);
-   
-	dev = minor(inode->i_rdev);
-	mtd = __get_mtd_device(NULL, dev);
+   	down(&mtd_sem);
+   	if (mdev->open-- == 0) {
+		struct mtd_info *mtd = mdev->mtd;
 
-	if (!mtd) {
-		printk(KERN_WARNING "MTD device is absent on mtd_release!\n");
-		release_return(-ENODEV);
+		mdev->mtd = NULL;
+		if (mtd->sync)
+			mtd->sync(mtd);
+
+		put_mtd_device(mtd);
 	}
-
-	del_gendisk(mtd_disks[dev]);
-	
-	if (mtd->sync)
-		mtd->sync(mtd);
-
-	put_mtd_device(mtd);
+	up(&mtd_sem);
 
 	DEBUG(1, "ok\n");
 
 	release_return(0);
 }
 
-static inline void mtdblock_end_request(struct request *req, int uptodate)
+static void mtdblock_request(request_queue_t *q)
 {
-	if (end_that_request_first(req, uptodate, req->hard_cur_sectors))
-		return;
-	blkdev_dequeue_request(req);
-	end_that_request_last(req);
-}
+	while (!blk_queue_empty(q)) {
+		struct request *req = elv_next_request(q);
+		struct mtdro_dev *mdev = req->rq_disk->private_data;
+		struct mtd_info *mtd = mdev->mtd;
+		unsigned int res;
 
-static void mtdblock_request(RQFUNC_ARG)
-{
-   struct request *current_request;
-   unsigned int res = 0;
-   struct mtd_info *mtd;
+		if (!(req->flags & REQ_CMD)) {
+			res = 0;
+			goto end_req;
+		}
 
-   while (1)
-   {
-      /* Grab the Request and unlink it from the request list, we
-	 will execute a return if we are done. */
-	if (blk_queue_empty(QUEUE))
-		return;
-
-      current_request = CURRENT;
-
-      if (minor(current_request->rq_dev) >= MAX_MTD_DEVICES)
-      {
-	 printk("mtd: Unsupported device!\n");
-	 mtdblock_end_request(current_request, 0);
-	 continue;
-      }
+		if ((req->sector + req->current_nr_sectors) > (mtd->size >> 9)) {
+			printk("mtd: Attempt to read past end of device!\n");
+			printk("size: %x, sector: %lx, nr_sectors: %x\n",
+				mtd->size, req->sector, req->current_nr_sectors);
+			res = 0;
+			goto end_req;
+		}
       
-      // Grab our MTD structure
+		/* Now drop the lock that the ll_rw_blk functions grabbed for
+		   us and process the request. This is necessary due to the
+		   extreme time we spend processing it. */
+		spin_unlock_irq(q->queue_lock);
 
-      mtd = __get_mtd_device(NULL, minor(current_request->rq_dev));
-      if (!mtd) {
-	      printk("MTD device %s doesn't appear to exist any more\n", kdevname(DEVICE_NR(CURRENT->rq_dev)));
-	      mtdblock_end_request(current_request, 0);
-      }
+		/* Handle the request */
+		switch (rq_data_dir(req)) {
+			size_t retlen;
 
-      if (current_request->sector << 9 > mtd->size ||
-	  (current_request->sector + current_request->nr_sectors) << 9 > mtd->size)
-      {
-	 printk("mtd: Attempt to read past end of device!\n");
-	 printk("size: %x, sector: %lx, nr_sectors %lx\n", mtd->size, current_request->sector, current_request->nr_sectors);
-	 mtdblock_end_request(current_request, 0);
-	 continue;
-      }
-      
-      /* Remove the request we are handling from the request list so nobody messes
-         with it */
-      /* Now drop the lock that the ll_rw_blk functions grabbed for us
-         and process the request. This is necessary due to the extreme time
-         we spend processing it. */
-      spin_unlock_irq(&io_request_lock);
+			case READ:
+				if (MTD_READ(mtd, req->sector << 9,
+					     req->current_nr_sectors << 9, 
+					     &retlen, req->buffer) == 0)
+					res = 1;
+				else
+					res = 0;
+				break;
 
-      // Handle the request
-      switch (current_request->cmd)
-      {
-         size_t retlen;
+			case WRITE:
+				/* printk("mtdblock_request WRITE sector=%d(%d)\n",
+					req->sector, req->current_nr_sectors);
+				 */
 
-	 case READ:
-	 if (MTD_READ(mtd,current_request->sector<<9, 
-		      current_request->nr_sectors << 9, 
-		      &retlen, current_request->buffer) == 0)
-	    res = 1;
-	 else
-	    res = 0;
-	 break;
-	 
-	 case WRITE:
+				/* Read only device */
+				if ((mtd->flags & MTD_CAP_RAM) == 0) {
+					res = 0;
+					break;
+				}
 
-	 /* printk("mtdblock_request WRITE sector=%d(%d)\n",current_request->sector,
-		current_request->nr_sectors);
-	 */
+				/* Do the write */
+				if (MTD_WRITE(mtd, req->sector << 9, 
+					      req->current_nr_sectors << 9, 
+					      &retlen, req->buffer) == 0)
+					res = 1;
+				else
+					res = 0;
+				break;
 
-	 // Read only device
-	 if ((mtd->flags & MTD_CAP_RAM) == 0)
-	 {
-	    res = 0;
-	    break;
-	 }
+			/* Shouldn't happen */
+			default:
+				printk("mtd: unknown request\n");
+				res = 0;
+				break;
+		}
 
-	 // Do the write
-	 if (MTD_WRITE(mtd,current_request->sector<<9, 
-		       current_request->nr_sectors << 9, 
-		       &retlen, current_request->buffer) == 0)
-	    res = 1;
-	 else
-	    res = 0;
-	 break;
-	 
-	 // Shouldn't happen
-	 default:
-	 printk("mtd: unknown request\n");
-	 break;
-      }
-
-      // Grab the lock and re-thread the item onto the linked list
-	spin_lock_irq(&io_request_lock);
-	mtdblock_end_request(current_request, res);
-   }
+		/* Grab the lock and re-thread the item onto the linked list */
+		spin_lock_irq(q->queue_lock);
+ end_req:
+		if (!end_that_request_first(req, res, req->hard_cur_sectors)) {
+			blkdev_dequeue_request(req);
+			end_that_request_last(req);
+		}
+	}
 }
-
-
 
 static int mtdblock_ioctl(struct inode * inode, struct file * file,
 		      unsigned int cmd, unsigned long arg)
 {
-	struct mtd_info *mtd;
+	struct mtdro_dev *mdev = inode->i_bdev->bd_disk->private_data;
 
-	mtd = __get_mtd_device(NULL, minor(inode->i_rdev));
-
-	if (!mtd || cmd != BLKFLSBUF)
+	if (cmd != BLKFLSBUF)
 		return -EINVAL;
 
 	fsync_bdev(inode->i_bdev);
 	invalidate_bdev(inode->i_bdev, 0);
-	if (mtd->sync)
-		mtd->sync(mtd);
+	if (mdev->mtd->sync)
+		mdev->mtd->sync(mdev->mtd);
+
 	return 0;
 }
 
-static struct block_device_operations mtd_fops = 
-{
+static struct block_device_operations mtd_fops = {
 	.owner		= THIS_MODULE,
 	.open		= mtdblock_open,
 	.release	= mtdblock_release,
 	.ioctl		= mtdblock_ioctl
 };
 
+/* Called with mtd_table_mutex held. */
+static void mtd_notify_add(struct mtd_info* mtd)
+{
+	struct gendisk *disk;
+
+        if (!mtd || mtd->type == MTD_ABSENT || mtd->index >= MAX_MTD_DEVICES)
+                return;
+
+	disk = alloc_disk(1);
+	if (disk) {
+		disk->major = MAJOR_NR;
+		disk->first_minor = mtd->index;
+		disk->fops = &mtd_fops;
+		sprintf(disk->disk_name, "mtdblock%d", mtd->index);
+
+		mtd_dev[mtd->index].disk = disk;
+		set_capacity(disk, mtd->size / 512);
+		disk->queue = &mtdro_queue;
+		disk->private_data = &mtd_dev[mtd->index];
+		add_disk(disk);
+	}
+}
+
+/* Called with mtd_table_mutex held. */
+static void mtd_notify_remove(struct mtd_info* mtd)
+{
+	struct mtdro_dev *mdev;
+	struct gendisk *disk;
+
+        if (!mtd || mtd->type == MTD_ABSENT || mtd->index >= MAX_MTD_DEVICES)
+                return;
+
+	mdev = &mtd_dev[mtd->index];
+
+	disk = mdev->disk;
+	mdev->disk = NULL;
+
+	if (disk) {
+		del_gendisk(disk);
+        	put_disk(disk);
+        }
+}
+
+static struct mtd_notifier notifier = {
+	.add	= mtd_notify_add,
+        .remove	= mtd_notify_remove,
+};
+
 int __init init_mtdblock(void)
 {
-	int err = -ENOMEM;
-	int i;
-
-	for (i = 0; i < MAX_MTD_DEVICES; i++) {
-		struct gendisk *disk = alloc_disk(1);
-		if (!disk)
-			goto out;
-		disk->major = MAJOR_NR;
-		disk->first_minor = i;
-		sprintf(disk->disk_name, "mtdblock%d", i);
-		disk->fops = &mtd_fops;
-		mtd_disks[i] = disk;
-	}
+	int err;
 
 	if (register_blkdev(MAJOR_NR,DEVICE_NAME,&mtd_fops)) {
 		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
@@ -239,21 +249,18 @@ int __init init_mtdblock(void)
 		goto out;
 	}
 
-	blk_init_queue(BLK_DEFAULT_QUEUE(MAJOR_NR), &mtdblock_request);
-	return 0;
-out:
-	while (i--)
-		put_disk(mtd_disks[i]);
+	blk_init_queue(&mtdro_queue, &mtdblock_request, &mtdro_lock);
+	register_mtd_user(&notifier);
+	err = 0;
+ out:
 	return err;
 }
 
 static void __exit cleanup_mtdblock(void)
 {
-	int i;
+	unregister_mtd_user(&notifier);
 	unregister_blkdev(MAJOR_NR,DEVICE_NAME);
-	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-	for (i = 0; i < MAX_MTD_DEVICES; i++)
-		put_disk(mtd_disks[i]);
+	blk_cleanup_queue(&mtdro_queue);
 }
 
 module_init(init_mtdblock);
@@ -262,4 +269,4 @@ module_exit(cleanup_mtdblock);
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Erwin Authried <eauth@softsys.co.at> et al.");
-MODULE_DESCRIPTION("Simple read-only block device emulation access to MTD devices");
+MODULE_DESCRIPTION("Simple uncached block device emulation access to MTD devices");
