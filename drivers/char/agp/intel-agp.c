@@ -13,6 +13,31 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
+/* Intel 815 register */
+#define INTEL_815_APCONT	0x51
+#define INTEL_815_ATTBASE_MASK	~0x1FFFFFFF
+
+/* Intel i820 registers */
+#define INTEL_I820_RDCR		0x51
+#define INTEL_I820_ERRSTS	0xc8
+
+/* Intel i840 registers */
+#define INTEL_I840_MCHCFG	0x50
+#define INTEL_I840_ERRSTS	0xc8
+
+/* Intel i850 registers */
+#define INTEL_I850_MCHCFG	0x50
+#define INTEL_I850_ERRSTS	0xc8
+
+/* Intel 7505 registers */
+#define INTEL_I7505_APSIZE	0x74
+#define INTEL_I7505_NCAPID	0x60
+#define INTEL_I7505_NISTAT	0x6c
+#define INTEL_I7505_ATTBASE	0x78
+#define INTEL_I7505_ERRSTS	0x42
+#define INTEL_I7505_AGPCTRL	0x70
+#define INTEL_I7505_MCHCFG	0x50
+
 static struct aper_size_info_fixed intel_i810_sizes[] =
 {
 	{64, 16384, 4},
@@ -942,7 +967,7 @@ static struct aper_size_info_8 intel_830mp_sizes[4] =
 	{32, 8192, 3, 56}
 };
 
-struct agp_bridge_driver intel_generic_driver = {
+static struct agp_bridge_driver intel_generic_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_generic_sizes,
 	.size_type		= U16_APER_SIZE,
@@ -965,7 +990,7 @@ struct agp_bridge_driver intel_generic_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver intel_810_driver = {
+static struct agp_bridge_driver intel_810_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_i810_sizes,
 	.size_type		= FIXED_APER_SIZE,
@@ -989,8 +1014,7 @@ struct agp_bridge_driver intel_810_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-
-struct agp_bridge_driver intel_815_driver = {
+static struct agp_bridge_driver intel_815_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_815_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1013,7 +1037,7 @@ struct agp_bridge_driver intel_815_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver intel_830_driver = {
+static struct agp_bridge_driver intel_830_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_i830_sizes,
 	.size_type		= FIXED_APER_SIZE,
@@ -1037,8 +1061,7 @@ struct agp_bridge_driver intel_830_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-
-struct agp_bridge_driver intel_820_driver = {
+static struct agp_bridge_driver intel_820_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1061,7 +1084,7 @@ struct agp_bridge_driver intel_820_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver intel_830mp_driver = {
+static struct agp_bridge_driver intel_830mp_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_830mp_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1084,7 +1107,7 @@ struct agp_bridge_driver intel_830mp_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver intel_840_driver = {
+static struct agp_bridge_driver intel_840_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1107,7 +1130,7 @@ struct agp_bridge_driver intel_840_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver intel_845_driver = {
+static struct agp_bridge_driver intel_845_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1130,7 +1153,7 @@ struct agp_bridge_driver intel_845_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver intel_850_driver = {
+static struct agp_bridge_driver intel_850_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1153,7 +1176,7 @@ struct agp_bridge_driver intel_850_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver intel_860_driver = {
+static struct agp_bridge_driver intel_860_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,
@@ -1176,7 +1199,7 @@ struct agp_bridge_driver intel_860_driver = {
 	.agp_destroy_page	= agp_generic_destroy_page,
 };
 
-struct agp_bridge_driver intel_7505_driver = {
+static struct agp_bridge_driver intel_7505_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_8xx_sizes,
 	.size_type		= U8_APER_SIZE,

@@ -9,6 +9,15 @@
 #include <linux/agp_backend.h>
 #include "agp.h"
 
+#define VIA_GARTCTRL	0x80
+#define VIA_APSIZE	0x84
+#define VIA_ATTBASE	0x88
+
+#define VIA_AGP3_GARTCTRL	0x90
+#define VIA_AGP3_APSIZE		0x94
+#define VIA_AGP3_ATTBASE	0x98
+#define VIA_AGPSEL		0xfd
+
 static int via_fetch_size(void)
 {
 	int i;
