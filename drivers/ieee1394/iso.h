@@ -66,7 +66,7 @@ struct hpsb_iso {
 	/* wait for buffer space */
 	wait_queue_head_t waitq;
 
-	int speed; /* SPEED_100, 200, or 400 */
+	int speed; /* IEEE1394_SPEED_100, 200, or 400 */
 	int channel; /* -1 if multichannel */
 
 	/* greatest # of packets between interrupts - controls

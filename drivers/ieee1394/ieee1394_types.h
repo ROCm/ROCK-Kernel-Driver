@@ -40,7 +40,7 @@ do {						\
 	(_tp)->next = 0;			\
 	(_tp)->allocations = 0;			\
 	sema_init(&(_tp)->count, 63);		\
-} while(0)
+} while (0)
 
 
 typedef u32 quadlet_t;
