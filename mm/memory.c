@@ -1429,7 +1429,7 @@ retry:
 	 * real anonymous pages, they're "device" reserved pages instead.
 	 */
 	reserved = !!(vma->vm_flags & VM_RESERVED);
-	BUG_ON(reserved == pageable);
+	WARN_ON(reserved == pageable);
 
 	/*
 	 * Should we do an early C-O-W break?
