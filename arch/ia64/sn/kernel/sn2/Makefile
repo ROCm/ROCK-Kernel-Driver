@@ -32,8 +32,6 @@
 # http://oss.sgi.com/projects/GenInfo/NoticeExplan
 #
 
-O_TARGET := sn2.a
-
 obj-y := cache.o iomv.o sn2_smp.o
 
 EXTRA_CFLAGS    := -DLITTLE_ENDIAN

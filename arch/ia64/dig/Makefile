@@ -5,8 +5,6 @@
 # Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
 #
 
-O_TARGET := dig.a
-
 obj-y := setup.o
 obj-$(CONFIG_IA64_GENERIC) += machvec.o
 

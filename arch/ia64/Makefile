@@ -33,58 +33,20 @@ ifeq ($(CONFIG_ITANIUM_BSTEP_SPECIFIC),y)
 	CFLAGS += -mb-step
 endif
 
-ifdef CONFIG_IA64_GENERIC
-	CORE_FILES      :=      arch/$(ARCH)/hp/hp.o			\
-				arch/$(ARCH)/dig/dig.a			\
-				$(CORE_FILES)
-	SUBDIRS		:=	arch/$(ARCH)/hp		\
-				arch/$(ARCH)/dig	\
-				$(SUBDIRS)
+HEAD := arch/$(ARCH)/kernel/head.o arch/ia64/kernel/init_task.o
 
-else # !GENERIC
-
-ifdef CONFIG_IA64_HP_SIM
-        SUBDIRS         :=      arch/$(ARCH)/hp		\
-                                $(SUBDIRS)
-        CORE_FILES      :=      arch/$(ARCH)/hp/hp.o	\
-                                $(CORE_FILES)
-endif
-
-ifdef CONFIG_IA64_HP_ZX1
-        SUBDIRS         :=      arch/$(ARCH)/hp				\
-				arch/$(ARCH)/dig			\
-                                $(SUBDIRS)
-        CORE_FILES      :=      arch/$(ARCH)/hp/hp.o			\
-				arch/$(ARCH)/dig/dig.a			\
-                                $(CORE_FILES)
-endif
+core-$(CONFIG_IA64_GENERIC) 	+= arch/$(ARCH)/hp/	  arch/$(ARCH)/dig/
+core-$(CONFIG_IA64_HP_SIM)	+= arch/$(ARCH)/hp/
+core-$(CONFIG_IA64_HP_ZX1)	+= arch/$(ARCH)/hp/ 	  arch/$(ARCH)/dig/
+core-$(CONFIG_IA64_SGI_SN)	+= arch/$(ARCH)/sn/kernel arch/$(ARCH)/sn/io
+core-$(CONFIG_IA64_DIG) 	+= arch/$(ARCH)/dig/
 
 ifdef CONFIG_IA64_SGI_SN
-	CFLAGS		+= -DBRINGUP
-        SUBDIRS         :=      arch/$(ARCH)/sn/kernel	\
-				arch/$(ARCH)/sn/io	\
-				arch/$(ARCH)/sn/fakeprom	\
-				$(SUBDIRS)
-        CORE_FILES      :=      arch/$(ARCH)/sn/kernel/sn.o	\
-				arch/$(ARCH)/sn/io/sgiio.o	\
-				$(CORE_FILES)
+	CFLAGS			+= -DBRINGUP
+        SUBDIRS         	+= arch/$(ARCH)/sn/fakeprom
 endif
 
-ifdef CONFIG_IA64_DIG
-        SUBDIRS         :=      arch/$(ARCH)/dig	\
-				$(SUBDIRS)
-        CORE_FILES      :=      arch/$(ARCH)/dig/dig.a	\
-				$(CORE_FILES)
-endif
-
-endif # !GENERIC
-
-ifdef CONFIG_IA32_SUPPORT
-	SUBDIRS		:=	arch/$(ARCH)/ia32 $(SUBDIRS)
-	CORE_FILES	:=	arch/$(ARCH)/ia32/ia32.o $(CORE_FILES)
-endif
-
-HEAD := arch/$(ARCH)/kernel/head.o arch/ia64/kernel/init_task.o
+core-$(CONFIG_IA32_SUPPORT)	+= arch/$(ARCH)/ia32/
 
 libs-y				+= arch/$(ARCH)/lib/
 core-y				+= arch/$(ARCH)/kernel/ arch/$(ARCH)/mm/

@@ -7,8 +7,6 @@
 # Copyright (C) Srinivasa Thirumalachar (sprasad@engr.sgi.com)
 #
 
-O_TARGET := sim.o
-
 obj-y := hpsim_console.o hpsim_irq.o hpsim_setup.o
 obj-$(CONFIG_IA64_GENERIC) += hpsim_machvec.o
 
