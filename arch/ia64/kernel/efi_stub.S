@@ -53,23 +53,21 @@ GLOBAL_ENTRY(efi_call_phys)
 	mov loc4=ar.rsc			// save RSE configuration
 	mov ar.rsc=0			// put RSE in enforced lazy, LE mode
 	;;
-
 	ld8 gp=[in0]			// load EFI function's global pointer
-	mov out0=in1
-	mov out1=in2
 	movl r16=PSR_BITS_TO_CLEAR
-
 	mov loc3=psr			// save processor status word
 	movl r17=PSR_BITS_TO_SET
 	;;
-	mov out2=in3
 	or loc3=loc3,r17
 	mov b6=r2
 	;;
 	andcm r16=loc3,r16		// get psr with IT, DT, and RT bits cleared
-	mov out3=in4
 	br.call.sptk.many rp=ia64_switch_mode
 .ret0:	mov out4=in5
+	mov out0=in1
+	mov out1=in2
+	mov out2=in3
+	mov out3=in4
 	mov out5=in6
 	mov out6=in7
 	br.call.sptk.many rp=b6		// call the EFI function
