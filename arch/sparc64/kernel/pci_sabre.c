@@ -1067,7 +1067,14 @@ static void __init sabre_base_address_update(struct pci_dev *pdev, int resource)
 	int where, size, is_64bit;
 
 	res = &pdev->resource[resource];
-	where = PCI_BASE_ADDRESS_0 + (resource * 4);
+	if (resource < 6) {
+		where = PCI_BASE_ADDRESS_0 + (resource * 4);
+	} else if (resource == PCI_ROM_RESOURCE) {
+		where = pdev->rom_base_reg;
+	} else {
+		/* Somebody might have asked allocation of a non-standard resource */
+		return;
+	}
 
 	is_64bit = 0;
 	if (res->flags & IORESOURCE_IO)
@@ -1083,6 +1090,10 @@ static void __init sabre_base_address_update(struct pci_dev *pdev, int resource)
 	pci_read_config_dword(pdev, where, &reg);
 	reg = ((reg & size) |
 	       (((u32)(res->start - base)) & ~size));
+	if (resource == PCI_ROM_RESOURCE) {
+		reg |= PCI_ROM_ADDRESS_ENABLE;
+		res->flags |= PCI_ROM_ADDRESS_ENABLE;
+	}
 	pci_write_config_dword(pdev, where, reg);
 
 	/* This knows that the upper 32-bits of the address
