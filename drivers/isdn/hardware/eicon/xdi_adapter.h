@@ -1,4 +1,4 @@
-/* $Id: xdi_adapter.h,v 1.1.2.3 2001/02/16 08:40:36 armin Exp $ */
+/* $Id: xdi_adapter.h,v 1.5 2003/06/21 17:06:08 schindler Exp $ */
 
 #ifndef __DIVA_OS_XDI_ADAPTER_H__
 #define __DIVA_OS_XDI_ADAPTER_H__
@@ -14,7 +14,8 @@ typedef struct _divas_pci_card_resources {
 	dword bar[8];		/* contains context of appropriate BAR Register */
 	void *addr[8];		/* same bar, but mapped into memory */
 	dword length[8];	/* bar length */
-
+	int mem_type_id[10];
+	unsigned int qoffset;
 	byte irq;
 } divas_pci_card_resources_t;
 

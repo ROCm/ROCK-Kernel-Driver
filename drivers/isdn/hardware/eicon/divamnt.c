@@ -1,10 +1,10 @@
-/* $Id: divamnt.c,v 1.1.2.4 2001/05/01 15:48:05 armin Exp $
+/* $Id: divamnt.c,v 1.27 2003/09/09 06:46:29 schindler Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * Maint module
  *
- * Copyright 2000-2002 by Armin Schindler (mac@melware.de)
- * Copyright 2000-2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de)
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -19,7 +19,6 @@
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
 #include <linux/skbuff.h>
-#include <linux/vmalloc.h>
 #include <linux/devfs_fs_kernel.h>
 
 #include "platform.h"
@@ -28,16 +27,14 @@
 #include "di_defs.h"
 #include "debug_if.h"
 
-static char *main_revision = "$Revision: 1.1.2.4 $";
+static char *main_revision = "$Revision: 1.27 $";
 
-static int major = 241;
+static int major;
 
 MODULE_DESCRIPTION("Maint driver for Eicon DIVA Server cards");
 MODULE_AUTHOR("Cytronics & Melware, Eicon Networks");
 MODULE_SUPPORTED_DEVICE("DIVA card driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(major, "i");
-MODULE_PARM_DESC(major, "Major number for /dev/DivasMAINT");
 
 int buffer_length = 128;
 MODULE_PARM(buffer_length, "i");
@@ -47,7 +44,8 @@ MODULE_PARM(diva_dbg_mem, "l");
 static char *DRIVERNAME =
     "Eicon DIVA - MAINT module (http://www.melware.net)";
 static char *DRIVERLNAME = "diva_mnt";
-char *DRIVERRELEASE = "2.0";
+static char *DEVNAME = "DivasMAINT";
+char *DRIVERRELEASE_MNT = "2.0";
 
 static wait_queue_head_t msgwaitq;
 static DECLARE_MUTEX(opened_sem);
@@ -77,18 +75,8 @@ static char *getrev(const char *revision)
 }
 
 /*
- * memory alloc
+ * buffer alloc
  */
-void *diva_os_malloc(unsigned long flags, unsigned long size)
-{
-	return (vmalloc(size));
-}
-void diva_os_free(unsigned long flags, void *ptr)
-{
-	if (ptr) {
-		vfree(ptr);
-	}
-}
 void *diva_os_malloc_tbuffer(unsigned long flags, unsigned long size)
 {
 	return (kmalloc(size, GFP_KERNEL));
@@ -98,17 +86,6 @@ void diva_os_free_tbuffer(unsigned long flags, void *ptr)
 	if (ptr) {
 		kfree(ptr);
 	}
-}
-
-/*
- * sleep msec
- */
-void diva_os_sleep(dword mSec)
-{
-	unsigned long timeout = HZ * mSec / 1000 + 1;
-
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(timeout);
 }
 
 /*
@@ -158,7 +135,7 @@ void diva_os_get_time(dword * sec, dword * usec)
  * /proc entries
  */
 
-extern struct proc_dir_entry *proc_net_isdn_eicon;
+extern struct proc_dir_entry *proc_net_eicon;
 static struct proc_dir_entry *maint_proc_entry = NULL;
 
 /*
@@ -363,7 +340,7 @@ static int DIVA_INIT_FUNCTION create_maint_proc(void)
 {
 	maint_proc_entry =
 	    create_proc_entry("maint", S_IFREG | S_IRUGO | S_IWUSR,
-			      proc_net_isdn_eicon);
+			      proc_net_eicon);
 	if (!maint_proc_entry)
 		return (0);
 
@@ -376,7 +353,7 @@ static int DIVA_INIT_FUNCTION create_maint_proc(void)
 static void remove_maint_proc(void)
 {
 	if (maint_proc_entry) {
-		remove_proc_entry("maint", proc_net_isdn_eicon);
+		remove_proc_entry("maint", proc_net_eicon);
 		maint_proc_entry = NULL;
 	}
 }
@@ -408,20 +385,20 @@ static struct file_operations divas_maint_fops = {
 
 static void divas_maint_unregister_chrdev(void)
 {
-	devfs_remove("DivasMAINT");
-	unregister_chrdev(major, "DivasMAINT");
+	devfs_remove(DEVNAME);
+	unregister_chrdev(major, DEVNAME);
 }
 
 static int DIVA_INIT_FUNCTION divas_maint_register_chrdev(void)
 {
-	if (register_chrdev(major, "DivasMAINT", &divas_maint_fops))
+	if ((major = register_chrdev(0, DEVNAME, &divas_maint_fops)) < 0)
 	{
 		printk(KERN_ERR "%s: failed to create /dev entry.\n",
 		       DRIVERLNAME);
 		return (0);
 	}
+	devfs_mk_cdev(MKDEV(major, 0), S_IFCHR|S_IRUSR|S_IWUSR, DEVNAME);
 
-	devfs_mk_cdev(MKDEV(major, 0), S_IFCHR|S_IRUSR|S_IWUSR, "DivasMAINT");
 	return (1);
 }
 
@@ -446,10 +423,9 @@ static int DIVA_INIT_FUNCTION maint_init(void)
 	init_waitqueue_head(&msgwaitq);
 
 	printk(KERN_INFO "%s\n", DRIVERNAME);
-	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE);
+	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE_MNT);
 	strcpy(tmprev, main_revision);
-	printk("%s  Build: %s  Major: %d\n", getrev(tmprev), DIVA_BUILD,
-	       major);
+	printk("%s  Build: %s \n", getrev(tmprev), DIVA_BUILD);
 
 	if (!divas_maint_register_chrdev()) {
 		ret = -EIO;
@@ -472,9 +448,9 @@ static int DIVA_INIT_FUNCTION maint_init(void)
 		goto out;
 	}
 
-	printk(KERN_INFO "%s: trace buffer = %p - %d kBytes, %s \n",
-	       DRIVERLNAME, buffer, buffer_length,
-	       (diva_dbg_mem == 0) ? "internal" : "external");
+	printk(KERN_INFO "%s: trace buffer = %p - %d kBytes, %s (Major: %d)\n",
+	       DRIVERLNAME, buffer, (buffer_length / 1024),
+	       (diva_dbg_mem == 0) ? "internal" : "external", major);
 
       out:
 	return (ret);

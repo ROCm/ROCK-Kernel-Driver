@@ -1,10 +1,10 @@
-/* $Id: divasproc.c,v 1.1.2.4 2001/02/16 08:40:36 armin Exp $
+/* $Id: divasproc.c,v 1.18 2003/09/09 06:46:29 schindler Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  * /proc functions
  *
- * Copyright 2000-2002 by Armin Schindler (mac@melware.de)
- * Copyright 2000-2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de)
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -15,7 +15,6 @@
 #include <linux/kernel.h>
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
-#include <linux/interrupt.h>
 
 #include "platform.h"
 #include "debuglib.h"
@@ -23,7 +22,6 @@
 #undef ID_MASK
 #undef N_DATA
 #include "pc.h"
-#include "diva_pci.h"
 #include "di_defs.h"
 #include "divasync.h"
 #include "di.h"
@@ -31,6 +29,7 @@
 #include "xdi_msg.h"
 #include "xdi_adapter.h"
 #include "diva.h"
+#include "diva_pci.h"
 
 
 extern PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
@@ -52,7 +51,7 @@ static char *d_l1_down_proc_name = "dynamic_l1_down";
 ** "divas" entry
 */
 
-extern struct proc_dir_entry *proc_net_isdn_eicon;
+extern struct proc_dir_entry *proc_net_eicon;
 static struct proc_dir_entry *divas_proc_entry = NULL;
 
 static ssize_t
@@ -131,7 +130,7 @@ int create_divas_proc(void)
 {
 	divas_proc_entry = create_proc_entry(divas_proc_name,
 					     S_IFREG | S_IRUGO,
-					     proc_net_isdn_eicon);
+					     proc_net_eicon);
 	if (!divas_proc_entry)
 		return (0);
 
@@ -144,7 +143,7 @@ int create_divas_proc(void)
 void remove_divas_proc(void)
 {
 	if (divas_proc_entry) {
-		remove_proc_entry(divas_proc_name, proc_net_isdn_eicon);
+		remove_proc_entry(divas_proc_name, proc_net_eicon);
 		divas_proc_entry = NULL;
 	}
 }
@@ -333,7 +332,8 @@ info_read(char *page, char **start, off_t off, int count, int *eof,
 		}
 	}
 	if ((!a->xdi_adapter.port) &&
-	    ((!a->xdi_adapter.ram) || (!a->xdi_adapter.reset)
+	    ((!a->xdi_adapter.ram) ||
+	    (!a->xdi_adapter.reset)
 	     || (!a->xdi_adapter.cfg))) {
 		if (!IoAdapter->irq_info.irq_nr) {
 			p = "slave";
@@ -369,20 +369,14 @@ int create_adapter_proc(diva_os_xdi_adapter_t * a)
 	struct proc_dir_entry *de, *pe;
 	char tmp[16];
 
-	if (in_interrupt()) {
-		printk(KERN_ERR
-		       "divasproc: create_proc in_interrupt, not creating\n");
-		return (1);
-	}
-
 	sprintf(tmp, "%s%d", adapter_dir_name, a->controller);
-	if (!(de = create_proc_entry(tmp, S_IFDIR, proc_net_isdn_eicon)))
+	if (!(de = create_proc_entry(tmp, S_IFDIR, proc_net_eicon)))
 		return (0);
 	a->proc_adapter_dir = (void *) de;
 
 	if (!(pe =
-	     create_proc_entry(info_proc_name, S_IFREG | S_IRUGO | S_IWUSR,
-			       de))) return (0);
+	     create_proc_entry(info_proc_name, S_IFREG | S_IRUGO | S_IWUSR, de)))
+		return (0);
 	a->proc_info = (void *) pe;
 	pe->write_proc = info_write;
 	pe->read_proc = info_read;
@@ -429,7 +423,7 @@ void remove_adapter_proc(diva_os_xdi_adapter_t * a)
 					  (struct proc_dir_entry *) a->proc_adapter_dir);
 		}
 		sprintf(tmp, "%s%d", adapter_dir_name, a->controller);
-		remove_proc_entry(tmp, proc_net_isdn_eicon);
+		remove_proc_entry(tmp, proc_net_eicon);
 		DBG_TRC(("proc entry %s%d removed", adapter_dir_name,
 			 a->controller));
 	}

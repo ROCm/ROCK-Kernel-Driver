@@ -1,9 +1,9 @@
-/* $Id: divasfunc.c,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: divasfunc.c,v 1.22 2003/09/09 06:46:29 schindler Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
- * Copyright 2000-2002 by Armin Schindler (mac@melware.de)
- * Copyright 2000-2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de)
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -21,6 +21,8 @@
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)
 
+static int debugmask;
+
 extern void DIVA_DIDD_Read(void *, int);
 
 extern PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
@@ -28,7 +30,7 @@ extern PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
 #define MAX_DESCRIPTORS  32
 
 extern void diva_run_trap_script(PISDN_ADAPTER IoAdapter, dword ANum);
-extern char *DRIVERRELEASE;
+extern char *DRIVERRELEASE_DIVAS;
 
 static dword notify_handle;
 static DESCRIPTOR DAdapter;
@@ -41,8 +43,6 @@ static void no_printf(unsigned char *x, ...)
 {
 	/* dummy debug function */
 }
-
-DIVA_DI_PRINTF dprintf = no_printf;
 
 #include "debuglib.c"
 
@@ -117,10 +117,11 @@ void diva_xdi_didd_remove_adapter(int card)
  */
 static void start_dbg(void)
 {
-	DbgRegister("DIVAS", DRIVERRELEASE, DBG_DEFAULT);
+	DbgRegister("DIVAS", DRIVERRELEASE_DIVAS, (debugmask) ? debugmask : DBG_DEFAULT);
 	DBG_LOG(("DIVA ISDNXDI BUILD (%s[%s]-%s-%s)",
 		 DIVA_BUILD, diva_xdi_common_code_build, __DATE__,
-		 __TIME__))}
+		 __TIME__))
+}
 
 /*
  * stop debug
@@ -174,7 +175,7 @@ static int DIVA_INIT_FUNCTION connect_didd(void)
 			req.didd_notify.e.Req = 0;
 			req.didd_notify.e.Rc =
 			    IDI_SYNC_REQ_DIDD_REGISTER_ADAPTER_NOTIFY;
-			req.didd_notify.info.callback = didd_callback;
+			req.didd_notify.info.callback = (void *)didd_callback;
 			req.didd_notify.info.context = 0;
 			DAdapter.request((ENTITY *) & req);
 			if (req.didd_notify.e.Rc != 0xff) {
@@ -214,12 +215,18 @@ static void DIVA_EXIT_FUNCTION disconnect_didd(void)
 /*
  * init
  */
-int DIVA_INIT_FUNCTION divasfunc_init(void)
+int DIVA_INIT_FUNCTION divasfunc_init(int dbgmask)
 {
+	char *version;
+
+	debugmask = dbgmask;
+	
 	if (!connect_didd()) {
 		DBG_ERR(("divasfunc: failed to connect to DIDD."))
 		return (0);
 	}
+
+	version = diva_xdi_common_code_build;
 
 	divasa_xdi_driver_entry();
 

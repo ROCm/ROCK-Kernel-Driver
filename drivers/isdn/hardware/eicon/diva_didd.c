@@ -1,11 +1,11 @@
-/* $Id: diva_didd.c,v 1.1.2.6 2001/05/01 15:48:05 armin Exp $
+/* $Id: diva_didd.c,v 1.13 2003/08/27 10:11:21 schindler Exp $
  *
  * DIDD Interface module for Eicon active cards.
  * 
  * Functions are in dadapter.c 
  * 
- * Copyright 2002 by Armin Schindler (mac@melware.de) 
- * Copyright 2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2002-2003 by Armin Schindler (mac@melware.de) 
+ * Copyright 2002-2003 Cytronics & Melware (info@melware.de)
  * 
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -23,14 +23,13 @@
 #include "divasync.h"
 #include "did_vers.h"
 
-static char *main_revision = "$Revision: 1.1.2.6 $";
+static char *main_revision = "$Revision: 1.13 $";
 
 static char *DRIVERNAME =
     "Eicon DIVA - DIDD table (http://www.melware.net)";
 static char *DRIVERLNAME = "divadidd";
-char *DRIVERRELEASE = "2.0";
+char *DRIVERRELEASE_DIDD = "2.0";
 
-static char *dir_in_proc_net = "isdn";
 static char *main_proc_dir = "eicon";
 
 MODULE_DESCRIPTION("DIDD table driver for diva drivers");
@@ -48,12 +47,11 @@ extern void diddfunc_finit(void);
 
 extern void DIVA_DIDD_Read(void *, int);
 
-static struct proc_dir_entry *proc_net_isdn;
 static struct proc_dir_entry *proc_didd;
-struct proc_dir_entry *proc_net_isdn_eicon = NULL;
+struct proc_dir_entry *proc_net_eicon = NULL;
 
 EXPORT_SYMBOL_NOVERS(DIVA_DIDD_Read);
-EXPORT_SYMBOL_NOVERS(proc_net_isdn_eicon);
+EXPORT_SYMBOL_NOVERS(proc_net_eicon);
 
 static char *getrev(const char *revision)
 {
@@ -78,7 +76,7 @@ proc_read(char *page, char **start, off_t off, int count, int *eof,
 	strcpy(tmprev, main_revision);
 	len += sprintf(page + len, "%s\n", DRIVERNAME);
 	len += sprintf(page + len, "name     : %s\n", DRIVERLNAME);
-	len += sprintf(page + len, "release  : %s\n", DRIVERRELEASE);
+	len += sprintf(page + len, "release  : %s\n", DRIVERRELEASE_DIDD);
 	len += sprintf(page + len, "build    : %s(%s)\n",
 		       diva_didd_common_code_build, DIVA_BUILD);
 	len += sprintf(page + len, "revision : %s\n", getrev(tmprev));
@@ -93,26 +91,12 @@ proc_read(char *page, char **start, off_t off, int count, int *eof,
 
 static int DIVA_INIT_FUNCTION create_proc(void)
 {
-	struct proc_dir_entry *pe;
+	proc_net_eicon = create_proc_entry(main_proc_dir, S_IFDIR, proc_net);
 
-	for (pe = proc_net->subdir; pe; pe = pe->next) {
-		if (!memcmp(dir_in_proc_net, pe->name, pe->namelen)) {
-			proc_net_isdn = pe;
-			break;
-		}
-	}
-	if (!proc_net_isdn) {
-		proc_net_isdn =
-		    create_proc_entry(dir_in_proc_net, S_IFDIR, proc_net);
-	}
-	proc_net_isdn_eicon =
-	    create_proc_entry(main_proc_dir, S_IFDIR, proc_net_isdn);
-
-	if (proc_net_isdn_eicon) {
-		if (
-		    (proc_didd =
+	if (proc_net_eicon) {
+		if ((proc_didd =
 		     create_proc_entry(DRIVERLNAME, S_IFREG | S_IRUGO,
-				       proc_net_isdn_eicon))) {
+				       proc_net_eicon))) {
 			proc_didd->read_proc = proc_read;
 		}
 		return (1);
@@ -120,14 +104,10 @@ static int DIVA_INIT_FUNCTION create_proc(void)
 	return (0);
 }
 
-static void remove_proc(void)
+static void DIVA_EXIT_FUNCTION remove_proc(void)
 {
-	remove_proc_entry(DRIVERLNAME, proc_net_isdn_eicon);
-	remove_proc_entry(main_proc_dir, proc_net_isdn);
-
-	if ((proc_net_isdn) && (!proc_net_isdn->subdir)) {
-		remove_proc_entry(dir_in_proc_net, proc_net);
-	}
+	remove_proc_entry(DRIVERLNAME, proc_net_eicon);
+	remove_proc_entry(main_proc_dir, proc_net);
 }
 
 static int DIVA_INIT_FUNCTION divadidd_init(void)
@@ -136,7 +116,7 @@ static int DIVA_INIT_FUNCTION divadidd_init(void)
 	int ret = 0;
 
 	printk(KERN_INFO "%s\n", DRIVERNAME);
-	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE);
+	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE_DIDD);
 	strcpy(tmprev, main_revision);
 	printk("%s  Build:%s(%s)\n", getrev(tmprev),
 	       diva_didd_common_code_build, DIVA_BUILD);
@@ -151,7 +131,9 @@ static int DIVA_INIT_FUNCTION divadidd_init(void)
 	if (!diddfunc_init()) {
 		printk(KERN_ERR "%s: failed to connect to DIDD.\n",
 		       DRIVERLNAME);
+#ifdef MODULE
 		remove_proc();
+#endif
 		ret = -EIO;
 		goto out;
 	}
