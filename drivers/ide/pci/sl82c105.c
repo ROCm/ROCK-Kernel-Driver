@@ -291,19 +291,6 @@ static int __devinit sl82c105_init_one(struct pci_dev *dev, const struct pci_dev
 	return 0;
 }
 
-/**
- *	sl82c105_remove_one	-	called with an SLC82c105 is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an W82C105 device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void sl82c105_remove_one(struct pci_dev *dev)
-{
-	panic("W82C105 removal not yet supported");
-}
-
 static struct pci_device_id sl82c105_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_WINBOND, PCI_DEVICE_ID_WINBOND_82C105, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -313,7 +300,6 @@ static struct pci_driver driver = {
 	name:		"W82C105 IDE",
 	id_table:	sl82c105_pci_tbl,
 	probe:		sl82c105_init_one,
-	remove:		__devexit_p(sl82c105_remove_one),
 };
 
 static int sl82c105_ide_init(void)

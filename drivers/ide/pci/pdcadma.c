@@ -136,19 +136,6 @@ static int __devinit pdcadma_init_one(struct pci_dev *dev, const struct pci_devi
 	return 1;
 }
 
-/**
- *	pdcadma_remove_one	-	called when a PDCADMA is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect a PDCADMA device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void pdcadma_remove_one(struct pci_dev *dev)
-{
-	panic("PDCADMA removal not yet supported");
-}
-
 static struct pci_device_id pdcadma_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_PDC, PCI_DEVICE_ID_PDC_1841, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ 0, },
@@ -158,7 +145,6 @@ static struct pci_driver driver = {
 	name:		"PDCADMA-IDE",
 	id_table:	pdcadma_pci_tbl,
 	probe:		pdcadma_init_one,
-	remove:		__devexit_p(pdcadma_remove_one),
 };
 
 static int pdcadma_ide_init(void)

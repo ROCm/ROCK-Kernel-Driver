@@ -403,19 +403,6 @@ static int __devinit amd74xx_init_one(struct pci_dev *dev, const struct pci_devi
 	return 0;
 }
 
-/**
- *	amd74xx_remove_one	-	called with an AMD IDE is unplugged
- *	@dev: the device that was removed
- *
- *	Disconnect an AMD IDE device that has been unplugged either by hotplug
- *	or by a more civilized notification scheme. Not yet supported.
- */
- 
-static void amd74xx_remove_one(struct pci_dev *dev)
-{
-	panic("AMD IDE removal not yet supported");
-}
-
 static struct pci_device_id amd74xx_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_COBRA_7401,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_7409,	PCI_ANY_ID, PCI_ANY_ID, 0, 0, 1},
@@ -429,7 +416,6 @@ static struct pci_driver driver = {
 	name:		"AMD IDE",
 	id_table:	amd74xx_pci_tbl,
 	probe:		amd74xx_init_one,
-	remove:		__devexit_p(amd74xx_remove_one),
 };
 
 static int amd74xx_ide_init(void)
