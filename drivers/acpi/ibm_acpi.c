@@ -41,9 +41,11 @@
  *			experimental led control
  *			experimental acpi sounds
  *  2004-10-19	0.6	use acpi_bus_register_driver() to claim HKEY device
+ *  2004-10-23	0.7	fix module loading on A21e, A22p, T20, T21, X20
+ *			fix LED control on A21e
  */
 
-#define IBM_VERSION "0.6"
+#define IBM_VERSION "0.7"
 
 #include <linux/kernel.h>
 #include <linux/module.h>
@@ -61,7 +63,6 @@
 #define IBM_URL "http://ibm-acpi.sf.net/"
 
 #define IBM_DIR IBM_NAME
-#define IBM_CLASS IBM_NAME
 
 #define IBM_LOG IBM_FILE ": "
 #define IBM_ERR	   KERN_ERR    IBM_LOG
@@ -84,7 +85,7 @@ static acpi_handle root_handle = NULL;
 	static char        *object##_paths[] = { paths }
 
 IBM_HANDLE(ec, root,
-	   "\\_SB.PCI0.ISA.EC",    /* A21e, T20, T21, X20 */
+	   "\\_SB.PCI0.ISA.EC",    /* A21e, A22p, T20, T21, X20 */
 	   "\\_SB.PCI0.LPC.EC",    /* all others */
 );
 
@@ -97,24 +98,24 @@ IBM_HANDLE(cmos, root,
 	   "\\UCMS",               /* R50, R50p, R51, T4x, X31, X40 */
 	   "\\CMOS",               /* A3x, G40, R32, T23, T30, X22, X24, X30 */
 	   "\\CMS",                /* R40, R40e */
-);
+);                                 /* A21e, A22p, T20, T21, X20 */
 
 IBM_HANDLE(dock, root,
 	   "\\_SB.GDCK",           /* X30, X31, X40 */
-	   "\\_SB.PCI0.DOCK",      /* T20, T21, X20 */
+	   "\\_SB.PCI0.DOCK",      /* A22p, T20, T21, X20 */
 	   "\\_SB.PCI0.PCI1.DOCK", /* all others */
 );                                 /* A21e, G40, R32, R40, R40e */
 
 IBM_HANDLE(bay, root,
 	   "\\_SB.PCI0.IDE0.SCND.MSTR");      /* all except A21e */
 IBM_HANDLE(bayej, root,
-	   "\\_SB.PCI0.IDE0.SCND.MSTR._EJ0"); /* all except A21e, A31, A31p */
+	   "\\_SB.PCI0.IDE0.SCND.MSTR._EJ0"); /* all except A2x, A3x */
 
-IBM_HANDLE(lght, root, "\\LGHT");  /* A21e, T20, T21, X20 */
+IBM_HANDLE(lght, root, "\\LGHT");  /* A21e, A22p, T20, T21, X20 */
 IBM_HANDLE(hkey, ec,   "HKEY");    /* all */
-IBM_HANDLE(led,  ec,   "LED");     /* all except A21e, T20, T21, X20 */
-IBM_HANDLE(sysl, ec,   "SYSL");    /* A21e, T20, T21, X20 */
-IBM_HANDLE(bled, ec,   "BLED");    /* T20, T21, X20 */
+IBM_HANDLE(led,  ec,   "LED");     /* all except A21e, A22p, T20, T21, X20 */
+IBM_HANDLE(sysl, ec,   "SYSL");    /* A21e, A22p, T20, T21, X20 */
+IBM_HANDLE(bled, ec,   "BLED");    /* A22p, T20, T21, X20 */
 IBM_HANDLE(beep, ec,   "BEEP");    /* all models */
 
 struct ibm_struct {
@@ -318,7 +319,7 @@ static int hotkey_init(struct ibm_struct *ibm)
 			 &ibm->state.hotkey.status,
 			 &ibm->state.hotkey.mask);
 	if (ret < 0) {
-		/* mask not supported on A21e, T20, T21, X20, X22, X24 */
+		/* mask not supported on A21e, A22p, T20, T21, X20, X22, X24 */
 		ibm->supported = 0;
 		ret = hotkey_get(ibm,
 				 &ibm->state.hotkey.status,
@@ -691,7 +692,7 @@ static void dock_notify(struct ibm_struct *ibm, u32 event)
 
 static int bay_init(struct ibm_struct *ibm)
 {
-	/* bay not supported on A21e, G40, R32, R40e */
+	/* bay not supported on A21e, A22p, A31, A31p, G40, R32, R40e */
 	ibm->supported = bay_handle && bayej_handle &&
 		acpi_evalf(bay_handle, NULL, "_STA", "qv");
 
@@ -740,7 +741,7 @@ static int cmos_read(struct ibm_struct *ibm, char *p)
 {
 	int len = 0;
 
-	/* cmos not supported on A21e, T20, T21, X20 */
+	/* cmos not supported on A21e, A22p, T20, T21, X20 */
 	if (!cmos_handle)
 		len += sprintf(p + len, "status:\t\tnot supported\n");
 	else {
@@ -787,9 +788,6 @@ static int led_write(struct ibm_struct *ibm, char *buf)
 	char *cmd;
 	unsigned int led;
 	int led_cmd, sysl_cmd, bled_a, bled_b;
-
-	if (!led_handle && !bled_handle)
-		return -EINVAL;
 
 	while ((cmd = next_cmd(&buf))) {
 		if (sscanf(cmd, "%u", &led) != 1)
@@ -1196,7 +1194,7 @@ static int __init acpi_ibm_init(void)
 	IBM_HANDLE_INIT_REQ(ec);
 	IBM_HANDLE_INIT_REQ(hkey);
 	IBM_HANDLE_INIT_REQ(vid);
-	IBM_HANDLE_INIT_REQ(cmos);
+	IBM_HANDLE_INIT(cmos);
 	IBM_HANDLE_INIT(lght);
 	IBM_HANDLE_INIT(dock);
 	IBM_HANDLE_INIT(bay);
@@ -1205,6 +1203,11 @@ static int __init acpi_ibm_init(void)
 	IBM_HANDLE_INIT(sysl);
 	IBM_HANDLE_INIT(bled);
 	IBM_HANDLE_INIT_REQ(beep);
+
+	if (!cmos_handle && !lght_handle) {
+		printk(IBM_ERR "neither cmos nor lght object found\n");
+		return -ENODEV;
+	}
 
 	if (!led_handle && !sysl_handle) {
 		printk(IBM_ERR "neither led nor sysl object found\n");
