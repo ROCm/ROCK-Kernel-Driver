@@ -588,7 +588,6 @@ sctp_chunk_t *sctp_make_data_empty(sctp_association_t *asoc,
 				   const struct sctp_sndrcvinfo *sinfo,
 				   int data_len)
 {
-	sctp_chunk_t *retval;
 	__u16 ssn;
 	__u8 flags = SCTP_DATA_NOT_FRAG;
 
