@@ -75,6 +75,28 @@ __rpc_purge_current_upcall(struct file *filp)
 		msg->errno = 0;
 }
 
+void
+__rpc_purge_one_upcall(struct file *filp, struct rpc_pipe_msg *target)
+{
+	struct rpc_inode *rpci = RPC_I(filp->f_dentry->d_inode);
+	struct rpc_pipe_msg *msg;
+
+	msg = filp->private_data;
+	if (msg == target) {
+		filp->private_data = NULL;
+		goto found;
+	}
+	list_for_each_entry(msg, &rpci->pipe, list) {
+		if (msg == target) {
+			list_del(&msg->list);
+			goto found;
+		}
+	}
+	BUG();
+found:
+	return;
+}
+
 int
 rpc_queue_upcall(struct inode *inode, struct rpc_pipe_msg *msg)
 {
@@ -82,7 +104,7 @@ rpc_queue_upcall(struct inode *inode, struct rpc_pipe_msg *msg)
 	int res = 0;
 
 	down(&inode->i_sem);
-	if (rpci->nreaders) {
+	if (rpci->nreaders || (rpci->flags & RPC_PIPE_WAIT_FOR_OPEN)) {
 		list_add_tail(&msg->list, &rpci->pipe);
 		rpci->pipelen += msg->len;
 	} else
@@ -149,7 +171,7 @@ rpc_pipe_release(struct inode *inode, struct file *filp)
 	down(&inode->i_sem);
 	if (filp->f_mode & FMODE_READ)
 		rpci->nreaders --;
-	if (!rpci->nreaders)
+	if (!rpci->nreaders && !(rpci->flags & RPC_PIPE_WAIT_FOR_OPEN))
 		__rpc_purge_upcall(inode, -EPIPE);
 	up(&inode->i_sem);
 	return 0;
@@ -646,7 +668,7 @@ out_release:
 }
 
 struct dentry *
-rpc_mkpipe(char *path, void *private, struct rpc_pipe_ops *ops)
+rpc_mkpipe(char *path, void *private, struct rpc_pipe_ops *ops, int flags)
 {
 	struct nameidata nd;
 	struct dentry *dentry;
@@ -665,6 +687,7 @@ rpc_mkpipe(char *path, void *private, struct rpc_pipe_ops *ops)
 	d_instantiate(dentry, inode);
 	rpci = RPC_I(inode);
 	rpci->private = private;
+	rpci->flags = flags;
 	rpci->ops = ops;
 	inode_dir_notify(dir, DN_CREATE);
 out:

@@ -283,6 +283,7 @@ err:
 struct gss_upcall_msg {
 	struct rpc_pipe_msg msg;
 	struct list_head list;
+	struct gss_auth *auth;
 	struct rpc_wait_queue waitq;
 	uid_t	uid;
 	atomic_t count;
@@ -318,8 +319,6 @@ gss_release_callback(struct rpc_task *task)
 	gss_msg = gss_find_upcall(gss_auth, task->tk_msg.rpc_cred->cr_uid);
 	if (gss_msg) {
 		rpc_wake_up(&gss_msg->waitq);
-		list_del(&gss_msg->list);
-		gss_release_msg(gss_msg);
 	}
 	spin_unlock(&gss_auth->lock);
 }
@@ -350,11 +349,12 @@ retry:
 	memset(gss_new, 0, sizeof(*gss_new));
 	INIT_LIST_HEAD(&gss_new->list);
 	INIT_RPC_WAITQ(&gss_new->waitq, "RPCSEC_GSS upcall waitq");
-	atomic_set(&gss_new->count, 2);
+	atomic_set(&gss_new->count, 1);
 	msg = &gss_new->msg;
 	msg->data = &gss_new->uid;
 	msg->len = sizeof(gss_new->uid);
 	gss_new->uid = uid;
+	gss_new->auth = gss_auth;
 	list_add(&gss_new->list, &gss_auth->upcalls);
 	gss_new = NULL;
 	task->tk_timeout = 5 * HZ;
@@ -362,8 +362,11 @@ retry:
 	spin_unlock(&gss_auth->lock);
 	res = rpc_queue_upcall(dentry->d_inode, msg);
 	spin_lock(&gss_auth->lock);
-	if (res)
+	if (res) {
+		rpc_wake_up(&gss_msg->waitq);
+		list_del(&gss_msg->list);
 		gss_release_msg(gss_msg);
+	}
 	return res;
 out_sleep:
 	rpc_sleep_on(&gss_msg->waitq, task, NULL, NULL);
@@ -377,13 +380,12 @@ gss_pipe_upcall(struct file *filp, struct rpc_pipe_msg *msg,
 		char *dst, size_t buflen)
 {
 	char *data = (char *)msg->data + msg->copied;
-	ssize_t mlen = msg->len - msg->copied;
+	ssize_t mlen = msg->len;
 	ssize_t left;
 
 	if (mlen > buflen)
 		mlen = buflen;
 	left = copy_to_user(dst, data, mlen);
-	msg->copied += mlen - left;
 	return mlen - left;
 }
 
@@ -431,8 +433,12 @@ gss_pipe_downcall(struct file *filp, const char *src, size_t mlen)
 		gss_cred_set_ctx(cred, ctx);
 	spin_lock(&gss_auth->lock);
 	gss_msg = gss_find_upcall(gss_auth, acred.uid);
-	if (gss_msg)
+	if (gss_msg) {
+		list_del(&gss_msg->list);
+		__rpc_purge_one_upcall(filp, &gss_msg->msg);
 		rpc_wake_up(&gss_msg->waitq);
+		gss_release_msg(gss_msg);
+	}
 	spin_unlock(&gss_auth->lock);
 	rpc_release_client(clnt);
 	return mlen;
@@ -448,9 +454,13 @@ void
 gss_pipe_destroy_msg(struct rpc_pipe_msg *msg)
 {
 	struct gss_upcall_msg *gss_msg = container_of(msg, struct gss_upcall_msg, msg);
+	struct gss_auth *gss_auth = gss_msg->auth;
 
+	spin_lock(&gss_auth->lock);
+	list_del(&gss_msg->list);
 	rpc_wake_up(&gss_msg->waitq);
 	gss_release_msg(gss_msg);
+	spin_unlock(&gss_auth->lock);
 }
 
 /* 
@@ -486,7 +496,7 @@ gss_create(struct rpc_clnt *clnt, rpc_authflavor_t flavor)
 	snprintf(gss_auth->path, sizeof(gss_auth->path), "%s/%s",
 			clnt->cl_pathname,
 			gss_auth->mech->gm_ops->name);
-	gss_auth->dentry = rpc_mkpipe(gss_auth->path, clnt, &gss_upcall_ops);
+	gss_auth->dentry = rpc_mkpipe(gss_auth->path, clnt, &gss_upcall_ops, RPC_PIPE_WAIT_FOR_OPEN);
 	if (IS_ERR(gss_auth->dentry))
 		goto err_free;
 
