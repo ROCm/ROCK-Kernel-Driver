@@ -35,6 +35,15 @@ config MACH_VR1000
 	  This linux port is currently being maintained by Simtec, on behalf
 	  of Thorcom. Any queries, please contact Thorcom first.
 
+config MACH_RX3715
+	bool "HP iPAQ rx3715"
+	select CPU_S3C2440
+	help
+	  Say Y here if you are using the HP iPAQ rx3715.
+
+	  See http://www.handhelds.org/projects/rx3715.html for more
+	  information on this project
+
 endmenu
 
 config CPU_S3C2410
