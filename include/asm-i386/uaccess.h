@@ -144,21 +144,21 @@ extern void __put_user_bad(void);
 #define __put_user(x,ptr) \
   __put_user_nocheck((__typeof__(*(ptr)))(x),(ptr),sizeof(*(ptr)))
 
-#define __put_user_nocheck(x,ptr,size)			\
-({							\
-	long __pu_err;					\
-	__put_user_size((x),(ptr),(size),__pu_err);	\
-	__pu_err;					\
+#define __put_user_nocheck(x,ptr,size)				\
+({								\
+	long __pu_err;						\
+	__put_user_size((x),(ptr),(size),__pu_err,-EFAULT);	\
+	__pu_err;						\
 })
 
 
-#define __put_user_check(x,ptr,size)			\
-({							\
+#define __put_user_check(x,ptr,size)					\
+({									\
 	long __pu_err = -EFAULT;					\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);		\
-	if (access_ok(VERIFY_WRITE,__pu_addr,size))	\
-		__put_user_size((x),__pu_addr,(size),__pu_err);	\
-	__pu_err;					\
+	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
+	if (access_ok(VERIFY_WRITE,__pu_addr,size))			\
+		__put_user_size((x),__pu_addr,(size),__pu_err,-EFAULT);	\
+	__pu_err;							\
 })							
 
 #define __put_user_u64(x, addr, err)				\
@@ -178,14 +178,14 @@ extern void __put_user_bad(void);
 		: "=r"(err)					\
 		: "A" (x), "r" (addr), "i"(-EFAULT), "0"(err))
 
-#define __put_user_size(x,ptr,size,retval)				\
+#define __put_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
 	switch (size) {							\
-	  case 1: __put_user_asm(x,ptr,retval,"b","b","iq"); break;	\
-	  case 2: __put_user_asm(x,ptr,retval,"w","w","ir"); break;	\
-	  case 4: __put_user_asm(x,ptr,retval,"l","","ir"); break;	\
-	  case 8: __put_user_u64((__typeof__(*ptr))(x),ptr,retval); break;	\
+	case 1: __put_user_asm(x,ptr,retval,"b","b","iq",errret);break;	\
+	case 2: __put_user_asm(x,ptr,retval,"w","w","ir",errret);break; \
+	case 4: __put_user_asm(x,ptr,retval,"l","","ir",errret); break;	\
+	case 8: __put_user_u64((__typeof__(*ptr))(x),ptr,retval); break;\
 	  default: __put_user_bad();					\
 	}								\
 } while (0)
@@ -198,64 +198,126 @@ struct __large_struct { unsigned long buf[100]; };
  * we do not write to any memory gcc knows about, so there are no
  * aliasing issues.
  */
-#define __put_user_asm(x, addr, err, itype, rtype, ltype)	\
-	__asm__ __volatile__(					\
-		"1:	mov"itype" %"rtype"1,%2\n"		\
-		"2:\n"						\
-		".section .fixup,\"ax\"\n"			\
-		"3:	movl %3,%0\n"				\
-		"	jmp 2b\n"				\
-		".previous\n"					\
-		".section __ex_table,\"a\"\n"			\
-		"	.align 4\n"				\
-		"	.long 1b,3b\n"				\
-		".previous"					\
-		: "=r"(err)					\
-		: ltype (x), "m"(__m(addr)), "i"(-EFAULT), "0"(err))
+#define __put_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
+	__asm__ __volatile__(						\
+		"1:	mov"itype" %"rtype"1,%2\n"			\
+		"2:\n"							\
+		".section .fixup,\"ax\"\n"				\
+		"3:	movl %3,%0\n"					\
+		"	jmp 2b\n"					\
+		".previous\n"						\
+		".section __ex_table,\"a\"\n"				\
+		"	.align 4\n"					\
+		"	.long 1b,3b\n"					\
+		".previous"						\
+		: "=r"(err)						\
+		: ltype (x), "m"(__m(addr)), "i"(errret), "0"(err))
 
 
 #define __get_user_nocheck(x,ptr,size)				\
 ({								\
 	long __gu_err, __gu_val;				\
-	__get_user_size(__gu_val,(ptr),(size),__gu_err);	\
+	__get_user_size(__gu_val,(ptr),(size),__gu_err,-EFAULT);\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
 })
 
 extern long __get_user_bad(void);
 
-#define __get_user_size(x,ptr,size,retval)				\
+#define __get_user_size(x,ptr,size,retval,errret)			\
 do {									\
 	retval = 0;							\
 	switch (size) {							\
-	  case 1: __get_user_asm(x,ptr,retval,"b","b","=q"); break;	\
-	  case 2: __get_user_asm(x,ptr,retval,"w","w","=r"); break;	\
-	  case 4: __get_user_asm(x,ptr,retval,"l","","=r"); break;	\
-	  default: (x) = __get_user_bad();				\
+	case 1: __get_user_asm(x,ptr,retval,"b","b","=q",errret);break;	\
+	case 2: __get_user_asm(x,ptr,retval,"w","w","=r",errret);break;	\
+	case 4: __get_user_asm(x,ptr,retval,"l","","=r",errret);break;	\
+	default: (x) = __get_user_bad();				\
 	}								\
 } while (0)
 
-#define __get_user_asm(x, addr, err, itype, rtype, ltype)	\
-	__asm__ __volatile__(					\
-		"1:	mov"itype" %2,%"rtype"1\n"		\
-		"2:\n"						\
-		".section .fixup,\"ax\"\n"			\
-		"3:	movl %3,%0\n"				\
-		"	xor"itype" %"rtype"1,%"rtype"1\n"	\
-		"	jmp 2b\n"				\
-		".previous\n"					\
-		".section __ex_table,\"a\"\n"			\
-		"	.align 4\n"				\
-		"	.long 1b,3b\n"				\
-		".previous"					\
-		: "=r"(err), ltype (x)				\
-		: "m"(__m(addr)), "i"(-EFAULT), "0"(err))
+#define __get_user_asm(x, addr, err, itype, rtype, ltype, errret)	\
+	__asm__ __volatile__(						\
+		"1:	mov"itype" %2,%"rtype"1\n"			\
+		"2:\n"							\
+		".section .fixup,\"ax\"\n"				\
+		"3:	movl %3,%0\n"					\
+		"	xor"itype" %"rtype"1,%"rtype"1\n"		\
+		"	jmp 2b\n"					\
+		".previous\n"						\
+		".section __ex_table,\"a\"\n"				\
+		"	.align 4\n"					\
+		"	.long 1b,3b\n"					\
+		".previous"						\
+		: "=r"(err), ltype (x)					\
+		: "m"(__m(addr)), "i"(errret), "0"(err))
 
 
-unsigned long copy_to_user(void *to, const void *from, unsigned long n);
-unsigned long copy_from_user(void *to, const void *from, unsigned long n);
-unsigned long __copy_to_user(void *to, const void *from, unsigned long n);
-unsigned long __copy_from_user(void *to, const void *from, unsigned long n);
+unsigned long __copy_to_user_ll(void *to, const void *from, unsigned long n);
+unsigned long __copy_from_user_ll(void *to, const void *from, unsigned long n);
+
+/*
+ * Here we special-case 1, 2 and 4-byte copy_*_user invokations.  On a fault
+ * we return the initial request size (1, 2 or 4), as copy_*_user should do.
+ * If a store crosses a page boundary and gets a fault, the x86 will not write
+ * anything, so this is accurate.
+ */
+static inline unsigned long
+__copy_to_user(void *to, const void *from, unsigned long n)
+{
+	if (__builtin_constant_p(n)) {
+		unsigned long ret;
+
+		switch (n) {
+		case 1:
+			__put_user_size(*(u8 *)from, (u8 *)to, 1, ret, 1);
+			return ret;
+		case 2:
+			__put_user_size(*(u16 *)from, (u16 *)to, 2, ret, 2);
+			return ret;
+		case 4:
+			__put_user_size(*(u32 *)from, (u32 *)to, 4, ret, 4);
+			return ret;
+		}
+	}
+	return __copy_to_user_ll(to, from, n);
+}
+
+static inline unsigned long
+__copy_from_user(void *to, const void *from, unsigned long n)
+{
+	if (__builtin_constant_p(n)) {
+		unsigned long ret;
+
+		switch (n) {
+		case 1:
+			__get_user_size(*(u8 *)to, from, 1, ret, 1);
+			return ret;
+		case 2:
+			__get_user_size(*(u16 *)to, from, 2, ret, 2);
+			return ret;
+		case 4:
+			__get_user_size(*(u32 *)to, from, 4, ret, 4);
+			return ret;
+		}
+	}
+	return __copy_from_user_ll(to, from, n);
+}
+
+static inline unsigned long
+copy_to_user(void *to, const void *from, unsigned long n)
+{
+	if (access_ok(VERIFY_WRITE, to, n))
+		n = __copy_to_user(to, from, n);
+	return n;
+}
+
+static inline unsigned long
+copy_from_user(void *to, const void *from, unsigned long n)
+{
+	if (access_ok(VERIFY_READ, from, n))
+		n = __copy_from_user(to, from, n);
+	return n;
+}
 
 long strncpy_from_user(char *dst, const char *src, long count);
 long __strncpy_from_user(char *dst, const char *src, long count);
