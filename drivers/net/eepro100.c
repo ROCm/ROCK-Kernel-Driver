@@ -743,7 +743,7 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 	if (eeprom[3] & 0x0100)
 		product = "OEM i82557/i82558 10/100 Ethernet";
 	else
-		product = pdev->dev.name;
+		product = pci_name(pdev);
 
 	printk(KERN_INFO "%s: %s, ", dev->name, product);
 
