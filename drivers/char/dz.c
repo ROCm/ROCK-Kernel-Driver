@@ -1270,50 +1270,54 @@ static void show_serial_version (void)
 	printk("%s%s\n", dz_name, dz_version);
 }
 
+static struct tty_driver *serial_driver;
+
+static struct tty_operations serial_ops = {
+	.open = dz_open,
+	.close = dz_close,
+	.write = dz_write,
+	.flush_chars = dz_flush_chars,
+	.write_room = dz_write_room,
+	.chars_in_buffer = dz_chars_in_buffer,
+	.flush_buffer = dz_flush_buffer,
+	.ioctl = dz_ioctl,
+	.throttle = dz_throttle,
+	.unthrottle = dz_unthrottle,
+	.send_xchar = dz_send_xchar,
+	.set_termios = dz_set_termios,
+	.stop = dz_stop,
+	.start = dz_start,
+	.hangup = dz_hangup,
+};
 
 int __init dz_init(void)
 {
 	int i, flags;
 	struct dz_serial *info;
 
+	serial_driver = alloc_tty_driver(DZ_NB_PORT);
+	if (!serial_driver)
+		return -ENOMEM;
+
 	/* Setup base handler, and timer table. */
 	init_bh(SERIAL_BH, do_serial_bh);
 
 	show_serial_version();
 
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.owner = THIS_MODULE;
-	serial_driver.devfs_name = "tts/";
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = DZ_NB_PORT;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-
-	serial_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL |
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->devfs_name = "tts/";
+	serial_driver->name = "ttyS";
+	serial_driver->major = TTY_MAJOR;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL |
 	                                     CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	serial_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	tty_set_operations(serial_driver, &serial_ops);
 
-	serial_driver.open = dz_open;
-	serial_driver.close = dz_close;
-	serial_driver.write = dz_write;
-	serial_driver.flush_chars = dz_flush_chars;
-	serial_driver.write_room = dz_write_room;
-	serial_driver.chars_in_buffer = dz_chars_in_buffer;
-	serial_driver.flush_buffer = dz_flush_buffer;
-	serial_driver.ioctl = dz_ioctl;
-	serial_driver.throttle = dz_throttle;
-	serial_driver.unthrottle = dz_unthrottle;
-	serial_driver.send_xchar = dz_send_xchar;
-	serial_driver.set_termios = dz_set_termios;
-	serial_driver.stop = dz_stop;
-	serial_driver.start = dz_start;
-	serial_driver.hangup = dz_hangup;
-
-	if (tty_register_driver (&serial_driver))
+	if (tty_register_driver(serial_driver))
 		panic("Couldn't register serial driver\n");
 
 	save_flags(flags); cli();
@@ -1353,7 +1357,7 @@ int __init dz_init(void)
 		printk("ttyS%02d at 0x%08x (irq = %d)\n", info->line,
 		       info->port, SERIAL);
 
-		tty_register_device(&serial_driver, info->line, NULL);
+		tty_register_device(serial_driver, info->line, NULL);
 	}
 
 	/* Reset the chip */
@@ -1432,7 +1436,7 @@ static void dz_console_print (struct console *cons,
 static struct tty_driver *dz_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &serial_driver;
+	return serial_driver;
 }
 
 static int __init dz_console_setup(struct console *co, char *options)

@@ -165,7 +165,6 @@ struct dz_serial {
 
 static struct dz_serial multi[DZ_NB_PORT];    /* Four serial lines in the DZ chip */
 static struct dz_serial *dz_console;
-static struct tty_driver serial_driver;
 
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to
