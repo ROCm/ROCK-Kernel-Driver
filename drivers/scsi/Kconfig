@@ -489,9 +489,7 @@ config SCSI_BUSLOGIC
 	  Adapters. Consult the SCSI-HOWTO, available from
 	  <http://www.tldp.org/docs.html#howto>, and the files
 	  <file:Documentation/scsi/BusLogic.txt> and
-	  <file:Documentation/scsi/FlashPoint.txt> for more information. If this
-	  driver does not work correctly without modification, please contact
-	  the author, Leonard N. Zubkoff, by email to lnz@dandelion.com.
+	  <file:Documentation/scsi/FlashPoint.txt> for more information.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called BusLogic.
