@@ -1302,6 +1302,7 @@ int jfs_rename(struct inode *old_dir, struct dentry *old_dentry,
  */
 int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 {
+	struct jfs_inode_info *jfs_ip;
 	struct btstack btstack;
 	struct component_name dname;
 	ino_t ino;
@@ -1324,6 +1325,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 		rc = -ENOSPC;
 		goto out1;
 	}
+	jfs_ip = JFS_IP(ip);
 
 	tid = txBegin(dir->i_sb, 0);
 
@@ -1342,6 +1344,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 		goto out3;
 
 	ip->i_op = &jfs_file_inode_operations;
+	jfs_ip->dev = old_encode_dev(rdev);
 	init_special_inode(ip, ip->i_mode, rdev);
 
 	insert_inode_hash(ip);
