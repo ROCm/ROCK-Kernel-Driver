@@ -933,11 +933,17 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	if (vcc->qos.aal != ATM_AAL5)
 		return -EINVAL;
 
-	if (udsl_find_vcc (instance, vpi, vci))
-		return -EADDRINUSE;
+	down (&instance->serialize); /* vs self, udsl_atm_close */
 
-	if (!(new = kmalloc (sizeof (struct udsl_vcc_data), GFP_KERNEL)))
+	if (udsl_find_vcc (instance, vpi, vci)) {
+		up (&instance->serialize);
+		return -EADDRINUSE;
+	}
+
+	if (!(new = kmalloc (sizeof (struct udsl_vcc_data), GFP_KERNEL))) {
+		up (&instance->serialize);
 		return -ENOMEM;
+	}
 
 	memset (new, 0, sizeof (struct udsl_vcc_data));
 	new->vcc = vcc;
@@ -949,11 +955,15 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 	vcc->vpi = vpi;
 	vcc->vci = vci;
 
+	tasklet_disable (&instance->receive_tasklet);
 	list_add (&new->list, &instance->vcc_list);
+	tasklet_enable (&instance->receive_tasklet);
 
 	set_bit (ATM_VF_ADDR, &vcc->flags);
 	set_bit (ATM_VF_PARTIAL, &vcc->flags);
 	set_bit (ATM_VF_READY, &vcc->flags);
+
+	up (&instance->serialize);
 
 	dbg ("Allocated new SARLib vcc 0x%p with vpi %d vci %d", new, vpi, vci);
 
@@ -983,7 +993,11 @@ static void udsl_atm_close (struct atm_vcc *vcc)
 
 	udsl_cancel_send (instance, vcc);
 
+	down (&instance->serialize); /* vs self, udsl_atm_open */
+
+	tasklet_disable (&instance->receive_tasklet);
 	list_del (&vcc_data->list);
+	tasklet_enable (&instance->receive_tasklet);
 
 	if (vcc_data->reasBuffer)
 		kfree_skb (vcc_data->reasBuffer);
@@ -997,6 +1011,8 @@ static void udsl_atm_close (struct atm_vcc *vcc)
 	clear_bit (ATM_VF_READY, &vcc->flags);
 	clear_bit (ATM_VF_PARTIAL, &vcc->flags);
 	clear_bit (ATM_VF_ADDR, &vcc->flags);
+
+	up (&instance->serialize);
 
 	MOD_DEC_USE_COUNT;
 
