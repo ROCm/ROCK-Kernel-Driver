@@ -278,10 +278,9 @@ ia64_phys_addr_valid (unsigned long addr)
 #define pte_mkdirty(pte)	(__pte(pte_val(pte) | _PAGE_D))
 
 /*
- * Macro to make mark a page protection value as "uncacheable".  Note
- * that "protection" is really a misnomer here as the protection value
- * contains the memory attribute bits, dirty bits, and various other
- * bits as well.
+ * Macro to a page protection value as "uncacheable".  Note that "protection" is really a
+ * misnomer here as the protection value contains the memory attribute bits, dirty bits,
+ * and various other bits as well.
  */
 #define pgprot_noncached(prot)		__pgprot((pgprot_val(prot) & ~_PAGE_MA_MASK) | _PAGE_MA_UC)
 

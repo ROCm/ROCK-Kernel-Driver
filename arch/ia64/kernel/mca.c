@@ -356,7 +356,7 @@ init_handler_platform (sal_log_processor_info_t *proc_ptr,
 				continue;
 
 			printk("\nBacktrace of pid %d (%s)\n", t->pid, t->comm);
-			show_stack(t);
+			show_stack(t, NULL);
 		} while_each_thread (g, t);
 	}
 #ifdef CONFIG_SMP

@@ -65,11 +65,11 @@ ia64_do_show_stack (struct unw_frame_info *info, void *arg)
 void
 show_trace_task (struct task_struct *task)
 {
-	show_stack(task);
+	show_stack(task, NULL);
 }
 
 void
-show_stack (struct task_struct *task)
+show_stack (struct task_struct *task, unsigned long *sp)
 {
 	if (!task)
 		unw_init_running(ia64_do_show_stack, 0);
@@ -84,7 +84,7 @@ show_stack (struct task_struct *task)
 void
 dump_stack (void)
 {
-	show_stack(NULL);
+	show_stack(NULL, NULL);
 }
 
 void
@@ -138,7 +138,7 @@ show_regs (struct pt_regs *regs)
 			       ((i == sof - 1) || (i % 3) == 2) ? "\n" : " ");
 		}
 	} else
-		show_stack(NULL);
+		show_stack(NULL, NULL);
 }
 
 void
@@ -738,30 +738,4 @@ machine_power_off (void)
 	if (pm_power_off)
 		pm_power_off();
 	machine_halt();
-}
-
-void __init
-init_task_struct_cache (void)
-{
-}
-
-struct task_struct *
-dup_task_struct(struct task_struct *orig)
-{
-	struct task_struct *tsk;
-
-	tsk = (void *) __get_free_pages(GFP_KERNEL, KERNEL_STACK_SIZE_ORDER);
-	if (!tsk)
-		return NULL;
-
-	memcpy(tsk, orig, sizeof(struct task_struct) + sizeof(struct thread_info));
-	tsk->thread_info = (struct thread_info *) ((char *) tsk + IA64_TASK_SIZE);
-	atomic_set(&tsk->usage, 2);
-	return tsk;
-}
-
-void
-free_task_struct (struct task_struct *tsk)
-{
-	free_pages((unsigned long) tsk, KERNEL_STACK_SIZE_ORDER);
 }
