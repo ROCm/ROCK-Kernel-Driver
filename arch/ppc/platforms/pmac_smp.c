@@ -119,8 +119,7 @@ static unsigned int core99_tb_gpio;
 /* Sync flag for HW tb sync */
 static volatile int sec_tb_reset = 0;
 
-static void __init
-core99_init_caches(int cpu)
+static void __init core99_init_caches(int cpu)
 {
 	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR))
 		return;
@@ -188,8 +187,7 @@ static inline void psurge_clr_ipi(int cpu)
  */
 static unsigned long psurge_smp_message[NR_CPUS];
 
-void __pmac
-psurge_smp_message_recv(struct pt_regs *regs)
+void __pmac psurge_smp_message_recv(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 	int msg;
@@ -206,15 +204,14 @@ psurge_smp_message_recv(struct pt_regs *regs)
 			smp_message_recv(msg, regs);
 }
 
-irqreturn_t __pmac
-psurge_primary_intr(int irq, void *d, struct pt_regs *regs)
+irqreturn_t __pmac psurge_primary_intr(int irq, void *d, struct pt_regs *regs)
 {
 	psurge_smp_message_recv(regs);
 	return IRQ_HANDLED;
 }
 
-static void __pmac
-smp_psurge_message_pass(int target, int msg, unsigned long data, int wait)
+static void __pmac smp_psurge_message_pass(int target, int msg, unsigned long data,
+					   int wait)
 {
 	int i;
 
@@ -410,8 +407,7 @@ static void __init psurge_dual_sync_tb(int cpu_nr)
 	smp_tb_synchronized = 1;
 }
 
-static void __init
-smp_psurge_setup_cpu(int cpu_nr)
+static void __init smp_psurge_setup_cpu(int cpu_nr)
 {
 
 	if (cpu_nr == 0) {
@@ -435,41 +431,54 @@ smp_psurge_setup_cpu(int cpu_nr)
 		psurge_dual_sync_tb(cpu_nr);
 }
 
-void __init
-smp_psurge_take_timebase(void)
+void __init smp_psurge_take_timebase(void)
 {
 	/* Dummy implementation */
 }
 
-void __init
-smp_psurge_give_timebase(void)
+void __init smp_psurge_give_timebase(void)
 {
 	/* Dummy implementation */
 }
 
-static int __init
-smp_core99_probe(void)
+static int __init smp_core99_probe(void)
 {
+#ifdef CONFIG_6xx
 	extern int powersave_nap;
-	struct device_node *cpus;
-	int i, ncpus = 1;
+#endif
+	struct device_node *cpus, *firstcpu;
+	int i, ncpus = 0, boot_cpu = -1;
 	u32 *tbprop;
 
 	if (ppc_md.progress) ppc_md.progress("smp_core99_probe", 0x345);
-	cpus = find_type_devices("cpu");
-	if (cpus == NULL)
-		return 0;
+	cpus = firstcpu = find_type_devices("cpu");
+	while(cpus != NULL) {
+		u32 *regprop = (u32 *)get_property(cpus, "reg", NULL);
+		char *stateprop = (char *)get_property(cpus, "state", NULL);
+		if (regprop != NULL && stateprop != NULL &&
+		    !strncmp(stateprop, "running", 7))
+			boot_cpu = *regprop;
+		++ncpus;
+		cpus = cpus->next;
+	}
+	if (boot_cpu == -1)
+		printk(KERN_WARNING "Couldn't detect boot CPU !\n");
+	if (boot_cpu != 0)
+		printk(KERN_WARNING "Boot CPU is %d, unsupported setup !\n", boot_cpu);
 
-	tbprop = (u32 *)get_property(cpus, "timebase-enable", NULL);
-	if (tbprop)
-		core99_tb_gpio = *tbprop;
-	else
-		core99_tb_gpio = KL_GPIO_TB_ENABLE;
+	if (machine_is_compatible("MacRISC4")) {
+		extern struct smp_ops_t core99_smp_ops;
 
-       	while ((cpus = cpus->next) != NULL)
-	       	++ncpus;
-
-	printk("smp_core99_probe: found %d cpus\n", ncpus);
+		core99_smp_ops.take_timebase = smp_generic_take_timebase;
+		core99_smp_ops.give_timebase = smp_generic_give_timebase;
+	} else {
+		if (firstcpu != NULL)
+			tbprop = (u32 *)get_property(firstcpu, "timebase-enable", NULL);
+		if (tbprop)
+			core99_tb_gpio = *tbprop;
+		else
+			core99_tb_gpio = KL_GPIO_TB_ENABLE;
+	}
 
 	if (ncpus > 1) {
 		openpic_request_IPIs();
@@ -484,8 +493,7 @@ smp_core99_probe(void)
 	return ncpus;
 }
 
-static void __init
-smp_core99_kick_cpu(int nr)
+static void __init smp_core99_kick_cpu(int nr)
 {
 	unsigned long save_vector, new_vector;
 	unsigned long flags;
@@ -539,10 +547,9 @@ smp_core99_kick_cpu(int nr)
 	if (ppc_md.progress) ppc_md.progress("smp_core99_kick_cpu done", 0x347);
 }
 
-static void __init
-smp_core99_setup_cpu(int cpu_nr)
+static void __init smp_core99_setup_cpu(int cpu_nr)
 {
-	/* Setup some registers */
+	/* Setup L2/L3 */
 	if (cpu_nr != 0)
 		core99_init_caches(cpu_nr);
 
@@ -554,8 +561,7 @@ smp_core99_setup_cpu(int cpu_nr)
 		if (ppc_md.progress) ppc_md.progress("core99_setup_cpu 0 done", 0x349);
 }
 
-void __init
-smp_core99_take_timebase(void)
+void __init smp_core99_take_timebase(void)
 {
 	/* Secondary processor "takes" the timebase by freezing
 	 * it, resetting its local TB and telling CPU 0 to go on
@@ -572,8 +578,7 @@ smp_core99_take_timebase(void)
        	sec_tb_reset = 1;
 }
 
-void __init
-smp_core99_give_timebase(void)
+void __init smp_core99_give_timebase(void)
 {
 	unsigned int t;
 
