@@ -201,7 +201,8 @@ struct oid_t isl_oid[] = {
 	OID_U32(DOT11_OID_STATIMEOUT, 0x19000000),
 	OID_U32_C(DOT11_OID_MLMEAUTOLEVEL, 0x19000001),
 	OID_U32(DOT11_OID_BSSTIMEOUT, 0x19000002),
-	OID_UNKNOWN(DOT11_OID_ATTACHMENT, 0x19000003),
+	[DOT11_OID_ATTACHMENT] = {0x19000003, 0,
+		sizeof(struct obj_attachment), OID_TYPE_ATTACH},
 	OID_STRUCT_C(DOT11_OID_PSMBUFFER, 0x19000004, struct obj_buffer,
 		     OID_TYPE_BUFFER),
 
@@ -329,6 +330,12 @@ mgt_le_to_cpu(int type, void *data)
 			mlme->size = le16_to_cpu(mlme->size);
 			break;
 		}
+	case OID_TYPE_ATTACH:{
+			struct obj_attachment *attach = data;
+			attach->id = le16_to_cpu(attach->id);
+			attach->size = le16_to_cpu(attach->size);; 
+			break;
+	}
 	case OID_TYPE_SSID:
 	case OID_TYPE_KEY:
 	case OID_TYPE_ADDR:
@@ -392,6 +399,12 @@ mgt_cpu_to_le(int type, void *data)
 			mlme->size = cpu_to_le16(mlme->size);
 			break;
 		}
+	case OID_TYPE_ATTACH:{
+			struct obj_attachment *attach = data;
+			attach->id = cpu_to_le16(attach->id);
+			attach->size = cpu_to_le16(attach->size);; 
+			break;
+	}
 	case OID_TYPE_SSID:
 	case OID_TYPE_KEY:
 	case OID_TYPE_ADDR:
@@ -457,6 +470,42 @@ mgt_set_request(islpci_private *priv, enum oid_num_t n, int extra, void *data)
 			memcpy(cache, _data, dlen);
 		up_write(&priv->mib_sem);
 	}
+
+	/* re-set given data to what it was */
+	if (data)
+		mgt_le_to_cpu(isl_oid[n].flags & OID_FLAG_TYPE, data);
+
+	return ret;
+}
+
+/* None of these are cached */
+int
+mgt_set_varlen(islpci_private *priv, enum oid_num_t n, void *data, int extra_len)
+{
+	int ret = 0;
+	struct islpci_mgmtframe *response;
+	int response_op = PIMFOR_OP_ERROR;
+	int dlen;
+	u32 oid;
+
+	BUG_ON(OID_NUM_LAST <= n);
+
+	dlen = isl_oid[n].size;
+	oid = isl_oid[n].oid;
+
+	mgt_cpu_to_le(isl_oid[n].flags & OID_FLAG_TYPE, data);
+
+	if (islpci_get_state(priv) >= PRV_STATE_READY) {
+		ret = islpci_mgt_transaction(priv->ndev, PIMFOR_OP_SET, oid,
+					     data, dlen + extra_len, &response);
+		if (!ret) {
+			response_op = response->header->operation;
+			islpci_mgt_release(response);
+		}
+		if (ret || response_op == PIMFOR_OP_ERROR)
+			ret = -EIO;
+	} else 
+		ret = -EIO;
 
 	/* re-set given data to what it was */
 	if (data)
@@ -673,6 +722,40 @@ mgt_commit(islpci_private *priv)
 	}
 }
 
+/* The following OIDs need to be "unlatched":
+ *
+ * MEDIUMLIMIT,BEACONPERIOD,DTIMPERIOD,ATIMWINDOW,LISTENINTERVAL
+ * FREQUENCY,EXTENDEDRATES.
+ *
+ * The way to do this is to set ESSID. Note though that they may get 
+ * unlatch before though by setting another OID. */
+void
+mgt_unlatch_all(islpci_private *priv)
+{
+	u32 u;
+	int rvalue = 0;
+
+	if (islpci_get_state(priv) < PRV_STATE_INIT)
+		return;
+
+	u = DOT11_OID_SSID;
+	rvalue = mgt_commit_list(priv, &u, 1);
+	/* Necessary if in MANUAL RUN mode? */
+#if 0
+	u = OID_INL_MODE;
+	rvalue |= mgt_commit_list(priv, &u, 1);
+
+	u = DOT11_OID_MLMEAUTOLEVEL;
+	rvalue |= mgt_commit_list(priv, &u, 1);
+
+	u = OID_INL_MODE;
+	rvalue |= mgt_commit_list(priv, &u, 1);
+#endif
+
+	if (rvalue)
+		printk(KERN_DEBUG "%s: Unlatching OIDs failed\n", priv->ndev->name);
+}
+
 /* This will tell you if you are allowed to answer a mlme(ex) request .*/
 
 int
@@ -771,6 +854,14 @@ mgt_response_to_str(enum oid_num_t n, union oid_res_t *r, char *str)
 					"id=0x%X\nstate=0x%X\n"
 					"code=0x%X\nsize=0x%X\n", mlme->id,
 					mlme->state, mlme->code, mlme->size);
+		}
+		break;
+	case OID_TYPE_ATTACH:{
+			struct obj_attachment *attach = r->ptr;
+			return snprintf(str, PRIV_STR_SIZE,
+					"id=%d\nsize=%d\n",
+					attach->id,
+					attach->size);
 		}
 		break;
 	case OID_TYPE_SSID:{

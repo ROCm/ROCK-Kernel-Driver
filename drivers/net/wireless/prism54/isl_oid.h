@@ -91,6 +91,14 @@ struct obj_frequencies {
 	u16 mhz[0];
 } __attribute__ ((packed));
 
+struct obj_attachment {
+	char type;
+	char reserved;
+	short id;
+	short size;
+	char data[0];
+} __attribute__((packed));
+
 /* 
  * in case everything's ok, the inlined function below will be
  * optimized away by the compiler...
@@ -472,6 +480,7 @@ enum oid_num_t {
 #define OID_TYPE_MLMEEX		0x09
 #define OID_TYPE_ADDR		0x0A
 #define OID_TYPE_RAW		0x0B
+#define OID_TYPE_ATTACH		0x0C
 
 /* OID_TYPE_MLMEEX is special because of a variable size field when sending.
  * Not yet implemented (not used in driver anyway).

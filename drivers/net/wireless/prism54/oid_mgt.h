@@ -36,6 +36,8 @@ int channel_of_freq(int);
 void mgt_le_to_cpu(int, void *);
 
 int mgt_set_request(islpci_private *, enum oid_num_t, int, void *);
+int mgt_set_varlen(islpci_private *, enum oid_num_t, void *, int);
+
 
 int mgt_get_request(islpci_private *, enum oid_num_t, int, void *,
 		    union oid_res_t *);
@@ -47,6 +49,7 @@ void mgt_set(islpci_private *, enum oid_num_t, void *);
 void mgt_get(islpci_private *, enum oid_num_t, void *);
 
 void mgt_commit(islpci_private *);
+void mgt_unlatch_all(islpci_private *);
 
 int mgt_mlme_answer(islpci_private *);
 
