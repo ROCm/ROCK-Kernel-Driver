@@ -374,7 +374,17 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 					/* synchronous write or broken a_ops? */
 					ClearPageReclaim(page);
 				}
-				goto keep;
+				if (PageWriteback(page) || PageDirty(page))
+					goto keep;
+				/*
+				 * A synchronous write - probably a ramdisk.  Go
+				 * ahead and try to reclaim the page.
+				 */
+				if (TestSetPageLocked(page))
+					goto keep;
+				if (PageDirty(page) || PageWriteback(page))
+					goto keep_locked;
+				mapping = page_mapping(page);
 			}
 		}
 
@@ -396,7 +406,7 @@ shrink_list(struct list_head *page_list, unsigned int gfp_mask,
 		 * the pages which were not successfully invalidated in
 		 * truncate_complete_page().  We try to drop those buffers here
 		 * and if that worked, and the page is no longer mapped into
-		 * process address space (page_count == 0) it can be freed.
+		 * process address space (page_count == 1) it can be freed.
 		 * Otherwise, leave the page on the LRU so it is swappable.
 		 */
 		if (PagePrivate(page)) {
