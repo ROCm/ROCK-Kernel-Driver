@@ -172,6 +172,7 @@ void _do_read_unlock (rwlock_t *rw, char *str)
 runlock_again:
 	/* Spin trying to decrement the counter using casx.  */
 	__asm__ __volatile__(
+"	membar	#StoreLoad | #LoadLoad\n"
 "	ldx	[%0], %%g5\n"
 "	sub	%%g5, 1, %%g7\n"
 "	casx	[%0], %%g5, %%g7\n"
@@ -290,6 +291,7 @@ void _do_write_unlock(rwlock_t *rw)
 	current->thread.smp_lock_count--;
 wlock_again:
 	__asm__ __volatile__(
+"	membar	#StoreLoad | #LoadLoad\n"
 "	mov	1, %%g3\n"
 "	sllx	%%g3, 63, %%g3\n"
 "	ldx	[%0], %%g5\n"
