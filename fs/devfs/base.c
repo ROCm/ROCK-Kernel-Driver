@@ -1456,6 +1456,7 @@ devfs_handle_t devfs_register (devfs_handle_t dir, const char *name,
     /* we don't accept any flags anymore.  prototype will change soon. */
     WARN_ON(flags);
     WARN_ON(dir);
+    WARN_ON(!S_ISCHR(mode));
 
     if (name == NULL)
     {
