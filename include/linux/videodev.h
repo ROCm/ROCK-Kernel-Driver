@@ -4,10 +4,10 @@
 #include <linux/types.h>
 #include <linux/version.h>
 
-#if 0
+#if 1
 /*
  * v4l2 is still work-in-progress, integration planed for 2.5.x
- *   v4l2 project homepage:   http://www.thedirks.org/v4l2/
+ *   documentation:           http://bytesex.org/v4l/
  *   patches available from:  http://bytesex.org/patches/
  */ 
 # define HAVE_V4L2 1
@@ -32,10 +32,7 @@ struct video_device
 	int minor;
 
  	/* new interface -- we will use file_operations directly
- 	 * like soundcore does.
- 	 * kernel_ioctl() will be called by video_generic_ioctl.
- 	 * video_generic_ioctl() does the userspace copying of the
- 	 * ioctl arguments */
+ 	 * like soundcore does. */
  	struct file_operations *fops;
 	void *priv;		/* Used to be 'private' but that upsets C++ */
 
@@ -397,7 +394,7 @@ struct video_code
 #define VID_HARDWARE_PWC	31	/* Philips webcams */
 #define VID_HARDWARE_MEYE	32	/* Sony Vaio MotionEye cameras */
 #define VID_HARDWARE_CPIA2	33
-#define VID_HARDWARE_VICAM	34
+#define VID_HARDWARE_VICAM      34
 
 #endif /* __LINUX_VIDEODEV_H */
 
