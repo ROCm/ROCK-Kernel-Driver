@@ -893,6 +893,13 @@ static int cpufreq_resume(struct sys_device * sysdev)
 		return 0;
 	}
 
+	if (cpufreq_driver->resume) {
+		ret = cpufreq_driver->resume(cpu_policy);
+		printk(KERN_ERR "cpufreq: resume failed in ->resume step on CPU %u\n", cpu_policy->cpu);
+		cpufreq_cpu_put(cpu_policy);
+		return (ret);
+	}
+
 	if (!(cpufreq_driver->flags & CPUFREQ_CONST_LOOPS)) {
 		unsigned int cur_freq = 0;
 
