@@ -72,4 +72,6 @@ extern unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
 	unsigned int buflen, Scsi_Cmnd *srb, unsigned int *index,
 	unsigned int *offset, enum xfer_buf_dir dir);
 
+extern void usb_stor_set_xfer_buf(unsigned char *buffer,
+	unsigned int buflen, Scsi_Cmnd *srb);
 #endif

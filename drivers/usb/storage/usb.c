@@ -236,8 +236,6 @@ struct usb_driver usb_storage_driver = {
 void fill_inquiry_response(struct us_data *us, unsigned char *data,
 		unsigned int data_len)
 {
-	unsigned int index, offset;
-
 	if (data_len<36) // You lose.
 		return;
 
@@ -264,11 +262,7 @@ void fill_inquiry_response(struct us_data *us, unsigned char *data,
 		data[35] = 0x30 + ((us->pusb_dev->descriptor.bcdDevice) & 0x0F);
 	}
 
-	index = offset = 0;
-	usb_stor_access_xfer_buf(data, data_len, us->srb,
-			&index, &offset, TO_XFER_BUF);
-	if (data_len < us->srb->request_bufflen)
-		us->srb->resid = us->srb->request_bufflen - data_len;
+	usb_stor_set_xfer_buf(data, data_len, us->srb);
 }
 
 static int usb_stor_control_thread(void * __us)

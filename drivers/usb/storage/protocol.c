@@ -295,3 +295,16 @@ unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
 	}
 	return cnt;
 }
+
+/* Store the contents of buffer into srb's transfer buffer and set the
+ * residue. */
+void usb_stor_set_xfer_buf(unsigned char *buffer,
+	unsigned int buflen, Scsi_Cmnd *srb)
+{
+	unsigned int index = 0, offset = 0;
+
+	usb_stor_access_xfer_buf(buffer, buflen, srb, &index, &offset,
+			TO_XFER_BUF);
+	if (buflen < srb->request_bufflen)
+		srb->resid = srb->request_bufflen - buflen;
+}
