@@ -229,7 +229,6 @@ static int serverworks_configure(void)
 	struct aper_size_info_lvl2 *current_size;
 	u32 temp;
 	u8 enable_reg;
-	u8 cap_ptr;
 	u32 cap_id;
 	u16 cap_reg;
 
@@ -257,18 +256,7 @@ static int serverworks_configure(void)
 			      SVWRKS_AGP_ENABLE, enable_reg);
 	agp_bridge.tlb_flush(NULL);
 
-	pci_read_config_byte(serverworks_private.svrwrks_dev, 0x34, &cap_ptr);
-	if (cap_ptr != 0) {
-		do {
-			pci_read_config_dword(serverworks_private.svrwrks_dev,
-					      cap_ptr, &cap_id);
-
-			if ((cap_id & 0xff) != 0x02)
-				cap_ptr = (cap_id >> 8) & 0xff;
-		}
-		while (((cap_id & 0xff) != 0x02) && (cap_ptr != 0));
-	}
-	agp_bridge.capndx = cap_ptr;
+	agp_bridge.capndx = pci_find_capability(serverworks_private.svrwrks_dev, PCI_CAP_ID_AGP);
 
 	/* Fill in the mode register */
 	pci_read_config_dword(serverworks_private.svrwrks_dev,
