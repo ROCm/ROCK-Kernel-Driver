@@ -25,7 +25,7 @@ extern char __binary_start;
 /* Changed during early boot */
 unsigned long *empty_zero_page = NULL;
 unsigned long *empty_bad_page = NULL;
-pgd_t swapper_pg_dir[1024];
+pgd_t swapper_pg_dir[PTRS_PER_PGD];
 unsigned long highmem;
 int kmalloc_ok = 0;
 
@@ -242,6 +242,7 @@ struct page *arch_validate(struct page *page, int mask, int order)
 		}
 		addr += PAGE_SIZE;
 	}
+
 	if(i == (1 << order)) return(page);
 	page = alloc_pages(mask, order);
 	goto again;
@@ -336,7 +337,7 @@ struct page *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 {
 	struct page *pte;
    
-	pte = alloc_pages(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO, 0);
+	pte = alloc_page(GFP_KERNEL|__GFP_REPEAT|__GFP_ZERO);
 	return pte;
 }
 

@@ -68,6 +68,8 @@ config MODE_SKAS
 	to CONFIG_MODE_TT).  Otherwise, it is safe to say Y.  Disabling this
 	option will shrink the UML binary slightly.
 
+source "arch/um/Kconfig_arch"
+
 config NET
 	bool "Networking support"
 	help

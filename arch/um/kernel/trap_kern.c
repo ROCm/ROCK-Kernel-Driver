@@ -56,7 +56,7 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 	if(is_write && !(vma->vm_flags & VM_WRITE)) 
 		goto out;
 	page = address & PAGE_MASK;
-	pgd = pgd_offset(mm);
+	pgd = pgd_offset(mm, page);
 	pud = pud_offset(pgd, page);
 	pmd = pmd_offset(pud, page);
 	do {
@@ -77,6 +77,9 @@ int handle_page_fault(unsigned long address, unsigned long ip,
 		default:
 			BUG();
 		}
+		pgd = pgd_offset(mm, page);
+		pud = pud_offset(pgd, page);
+		pmd = pmd_offset(pud, page);
 		pte = pte_offset_kernel(pmd, page);
 	} while(!pte_present(*pte));
 	err = 0;
