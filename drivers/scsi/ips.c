@@ -449,8 +449,8 @@ static void ips_chkstatus(ips_ha_t *, IPS_STATUS *);
 static void ips_enable_int_copperhead(ips_ha_t *);
 static void ips_enable_int_copperhead_memio(ips_ha_t *);
 static void ips_enable_int_morpheus(ips_ha_t *);
-static void ips_intr_copperhead(ips_ha_t *);
-static void ips_intr_morpheus(ips_ha_t *);
+static int ips_intr_copperhead(ips_ha_t *);
+static int ips_intr_morpheus(ips_ha_t *);
 static void ips_next(ips_ha_t *, int);
 static void ipsintr_blocking(ips_ha_t *, struct ips_scb *);
 static void ipsintr_done(ips_ha_t *, struct ips_scb *);
@@ -1292,7 +1292,8 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
    ips_ha_t         *ha;
    unsigned long     cpu_flags;
    struct Scsi_Host *host;
-
+   int       irqstatus;
+   
    METHOD_TRACE("do_ipsintr", 2);
 
    ha = (ips_ha_t *) dev_id;
@@ -1312,13 +1313,13 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
       return IRQ_HANDLED;
    }
 
-   (*ha->func.intr)(ha);
+   irqstatus = (*ha->func.intr)(ha);
 
    IPS_UNLOCK_RESTORE(host->host_lock, cpu_flags);
 
    /* start the next command */
    ips_next(ha, IPS_INTR_ON);
-   return IRQ_HANDLED;
+   return IRQ_RETVAL(irqstatus);
 }
 
 /****************************************************************************/
@@ -1332,7 +1333,7 @@ do_ipsintr(int irq, void *dev_id, struct pt_regs *regs) {
 /*   ASSUMES interrupts are disabled                                        */
 /*                                                                          */
 /****************************************************************************/
-void
+int
 ips_intr_copperhead(ips_ha_t *ha) {
    ips_stat_t       *sp;
    ips_scb_t        *scb;
@@ -1342,10 +1343,10 @@ ips_intr_copperhead(ips_ha_t *ha) {
    METHOD_TRACE("ips_intr", 2);
 
    if (!ha)
-      return;
+      return 0;
 
    if (!ha->active)
-      return;
+      return 0;
 
    intrstatus = (*ha->func.isintr)(ha);
 
@@ -1354,7 +1355,7 @@ ips_intr_copperhead(ips_ha_t *ha) {
        * Unexpected/Shared interrupt
        */
 
-      return;
+      return 0;
    }
 
    while (TRUE) {
@@ -1381,6 +1382,7 @@ ips_intr_copperhead(ips_ha_t *ha) {
        */
       (*scb->callback) (ha, scb);
    } /* end while */
+   return 1;
 }
 
 /****************************************************************************/
@@ -1394,7 +1396,7 @@ ips_intr_copperhead(ips_ha_t *ha) {
 /*   ASSUMES interrupts are disabled                                        */
 /*                                                                          */
 /****************************************************************************/
-void
+int
 ips_intr_morpheus(ips_ha_t *ha) {
    ips_stat_t       *sp;
    ips_scb_t        *scb;
@@ -1404,10 +1406,10 @@ ips_intr_morpheus(ips_ha_t *ha) {
    METHOD_TRACE("ips_intr_morpheus", 2);
 
    if (!ha)
-      return;
+      return 0;
 
    if (!ha->active)
-      return;
+      return 0;
 
    intrstatus = (*ha->func.isintr)(ha);
 
@@ -1416,7 +1418,7 @@ ips_intr_morpheus(ips_ha_t *ha) {
        * Unexpected/Shared interrupt
        */
 
-      return;
+      return 0;
    }
 
    while (TRUE) {
@@ -1449,6 +1451,7 @@ ips_intr_morpheus(ips_ha_t *ha) {
        */
       (*scb->callback) (ha, scb);
    } /* end while */
+   return 1;
 }
 
 /****************************************************************************/

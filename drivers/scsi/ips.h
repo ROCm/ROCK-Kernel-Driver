@@ -96,6 +96,10 @@
    #endif
 
    #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+      typedef void irqreturn_t;
+      #define IRQ_NONE
+      #define IRQ_HANDLED
+      #define IRQ_RETVAL(x)
       #define IPS_REGISTER_HOSTS(SHT)      scsi_register_module(MODULE_SCSI_HA,SHT)
       #define IPS_UNREGISTER_HOSTS(SHT)    scsi_unregister_module(MODULE_SCSI_HA,SHT)
       #define IPS_ADD_HOST(shost,device)
@@ -1052,7 +1056,7 @@ typedef struct {
    int       (*programbios)(struct ips_ha *, char *, uint32_t, uint32_t);
    int       (*verifybios)(struct ips_ha *, char *, uint32_t, uint32_t);
    void      (*statinit)(struct ips_ha *);
-   void      (*intr)(struct ips_ha *);
+   int       (*intr)(struct ips_ha *);
    void      (*enableint)(struct ips_ha *);
    uint32_t (*statupd)(struct ips_ha *);
 } ips_hw_func_t;
