@@ -529,7 +529,7 @@ we_slept:
 	clear_dquot_dirty(dquot);
 	if (test_bit(DQ_ACTIVE_B, &dquot->dq_flags)) {
 		spin_unlock(&dq_list_lock);
-		dquot_release(dquot);
+		dquot->dq_sb->dq_op->release_dquot(dquot);
 		goto we_slept;
 	}
 	atomic_dec(&dquot->dq_count);
@@ -605,7 +605,7 @@ we_slept:
 	 * finished or it will be canceled due to dq_count > 1 test */
 	wait_on_dquot(dquot);
 	/* Read the dquot and instantiate it (everything done only if needed) */
-	if (!test_bit(DQ_ACTIVE_B, &dquot->dq_flags) && dquot_acquire(dquot) < 0) {
+	if (!test_bit(DQ_ACTIVE_B, &dquot->dq_flags) && sb->dq_op->acquire_dquot(dquot) < 0) {
 		dqput(dquot);
 		return NODQUOT;
 	}
@@ -1259,6 +1259,8 @@ struct dquot_operations dquot_operations = {
 	.free_inode	= dquot_free_inode,
 	.transfer	= dquot_transfer,
 	.write_dquot	= dquot_commit,
+	.acquire_dquot	= dquot_acquire,
+	.release_dquot	= dquot_release,
 	.mark_dirty	= dquot_mark_dquot_dirty,
 	.write_info	= dquot_commit_info
 };
@@ -1760,6 +1762,8 @@ EXPORT_SYMBOL(vfs_get_dqblk);
 EXPORT_SYMBOL(vfs_set_dqblk);
 EXPORT_SYMBOL(dquot_commit);
 EXPORT_SYMBOL(dquot_commit_info);
+EXPORT_SYMBOL(dquot_acquire);
+EXPORT_SYMBOL(dquot_release);
 EXPORT_SYMBOL(dquot_mark_dquot_dirty);
 EXPORT_SYMBOL(dquot_initialize);
 EXPORT_SYMBOL(dquot_drop);
