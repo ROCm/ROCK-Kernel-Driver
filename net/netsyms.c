@@ -199,6 +199,7 @@ EXPORT_SYMBOL(neigh_parms_alloc);
 EXPORT_SYMBOL(neigh_parms_release);
 EXPORT_SYMBOL(neigh_rand_reach_time);
 EXPORT_SYMBOL(neigh_compat_output); 
+EXPORT_SYMBOL(neigh_changeaddr); 
 
 /*	dst_entry	*/
 EXPORT_SYMBOL(dst_alloc);
