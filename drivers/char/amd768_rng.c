@@ -167,10 +167,10 @@ static ssize_t rng_dev_read (struct file *filp, char *buf, size_t size,
 
 
 static struct file_operations rng_chrdev_ops = {
-	owner:		THIS_MODULE,
-	open:		rng_dev_open,
-	release:	rng_dev_release,
-	read:		rng_dev_read,
+	.owner		= THIS_MODULE,
+	.open		= rng_dev_open,
+	.release	= rng_dev_release,
+	.read		= rng_dev_read,
 };
 
 

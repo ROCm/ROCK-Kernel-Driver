@@ -404,23 +404,23 @@ static int hung_up_tty_ioctl(struct inode * inode, struct file * file,
 }
 
 static struct file_operations tty_fops = {
-	llseek:		no_llseek,
-	read:		tty_read,
-	write:		tty_write,
-	poll:		tty_poll,
-	ioctl:		tty_ioctl,
-	open:		tty_open,
-	release:	tty_release,
-	fasync:		tty_fasync,
+	.llseek		= no_llseek,
+	.read		= tty_read,
+	.write		= tty_write,
+	.poll		= tty_poll,
+	.ioctl		= tty_ioctl,
+	.open		= tty_open,
+	.release	= tty_release,
+	.fasync		= tty_fasync,
 };
 
 static struct file_operations hung_up_tty_fops = {
-	llseek:		no_llseek,
-	read:		hung_up_tty_read,
-	write:		hung_up_tty_write,
-	poll:		hung_up_tty_poll,
-	ioctl:		hung_up_tty_ioctl,
-	release:	tty_release,
+	.llseek		= no_llseek,
+	.read		= hung_up_tty_read,
+	.write		= hung_up_tty_write,
+	.poll		= hung_up_tty_poll,
+	.ioctl		= hung_up_tty_ioctl,
+	.release	= tty_release,
 };
 
 /*

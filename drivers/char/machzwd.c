@@ -117,9 +117,9 @@ MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CON
 #define PFX "machzwd"
 
 static struct watchdog_info zf_info = {
-	options:		WDIOF_KEEPALIVEPING, 
-	firmware_version:	1, 
-	identity:		"ZF-Logic watchdog"
+	.options		= WDIOF_KEEPALIVEPING, 
+	.firmware_version	= 1, 
+	.identity		= "ZF-Logic watchdog"
 };
 
 
@@ -449,12 +449,12 @@ static int zf_notify_sys(struct notifier_block *this, unsigned long code,
 
 
 static struct file_operations zf_fops = {
-	owner:          THIS_MODULE,
-	read:           zf_read,
-	write:          zf_write,
-	ioctl:          zf_ioctl,
-	open:           zf_open,
-	release:        zf_close,
+	.owner          = THIS_MODULE,
+	.read           = zf_read,
+	.write          = zf_write,
+	.ioctl          = zf_ioctl,
+	.open           = zf_open,
+	.release        = zf_close,
 };
 
 static struct miscdevice zf_miscdev = {

@@ -82,8 +82,8 @@ static int i8k_ioctl(struct inode *, struct file *, unsigned int,
 		     unsigned long);
 
 static struct file_operations i8k_fops = {
-    read:	i8k_read,
-    ioctl:	i8k_ioctl,
+    .read	= i8k_read,
+    .ioctl	= i8k_ioctl,
 };
 
 typedef struct {

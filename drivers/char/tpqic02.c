@@ -2565,13 +2565,13 @@ static int qic02_do_tape_ioctl(struct inode *inode, struct file *filp, unsigned 
 
 /* These are (most) of the interface functions: */
 static struct file_operations qic02_tape_fops = {
-	owner:THIS_MODULE,
-	llseek:no_llseek,
-	read:qic02_do_tape_read,
-	write:qic02_do_tape_write,
-	ioctl:qic02_do_tape_ioctl,
-	open:qic02_tape_open,
-	release:qic02_tape_release,
+	.owner = THIS_MODULE,
+	.llseek = no_llseek,
+	.read = qic02_do_tape_read,
+	.write = qic02_do_tape_write,
+	.ioctl = qic02_do_tape_ioctl,
+	.open = qic02_tape_open,
+	.release = qic02_tape_release,
 };
 
 

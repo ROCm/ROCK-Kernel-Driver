@@ -91,8 +91,8 @@ static int tosh_ioctl(struct inode *, struct file *, unsigned int,
 
 
 static struct file_operations tosh_fops = {
-	owner:		THIS_MODULE,
-	ioctl:		tosh_ioctl,
+	.owner		= THIS_MODULE,
+	.ioctl		= tosh_ioctl,
 };
 
 static struct miscdevice tosh_device = {

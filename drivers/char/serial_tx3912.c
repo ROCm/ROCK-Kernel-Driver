@@ -48,16 +48,16 @@ static void rs_close (void *ptr);
  * Used by generic serial driver to access hardware
  */
 static struct real_driver rs_real_driver = { 
-	disable_tx_interrupts: rs_disable_tx_interrupts, 
-	enable_tx_interrupts:  rs_enable_tx_interrupts, 
-	disable_rx_interrupts: rs_disable_rx_interrupts, 
-	enable_rx_interrupts:  rs_enable_rx_interrupts, 
-	get_CD:                rs_get_CD, 
-	shutdown_port:         rs_shutdown_port,  
-	set_real_termios:      rs_set_real_termios,  
-	chars_in_buffer:       rs_chars_in_buffer, 
-	close:                 rs_close, 
-	hungup:                rs_hungup,
+	.disable_tx_interrupts = rs_disable_tx_interrupts, 
+	.enable_tx_interrupts  = rs_enable_tx_interrupts, 
+	.disable_rx_interrupts = rs_disable_rx_interrupts, 
+	.enable_rx_interrupts  = rs_enable_rx_interrupts, 
+	.get_CD                = rs_get_CD, 
+	.shutdown_port         = rs_shutdown_port,  
+	.set_real_termios      = rs_set_real_termios,  
+	.chars_in_buffer       = rs_chars_in_buffer, 
+	.close                 = rs_close, 
+	.hungup                = rs_hungup,
 }; 
 
 /*
@@ -1046,12 +1046,12 @@ static __init int serial_console_setup(struct console *co, char *options)
 }
 
 static struct console sercons = {
-	name:     "ttyS",
-	write:    serial_console_write,
-	device:   serial_console_device,
-	setup:    serial_console_setup,
-	flags:    CON_PRINTBUFFER,
-	index:    -1
+	.name     = "ttyS",
+	.write    = serial_console_write,
+	.device   = serial_console_device,
+	.setup    = serial_console_setup,
+	.flags    = CON_PRINTBUFFER,
+	.index    = -1
 };
 
 void __init tx3912_console_init(void)

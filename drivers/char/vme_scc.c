@@ -1094,12 +1094,12 @@ static int __init scc_console_setup(struct console *co, char *options)
 
 
 static struct console sercons = {
-	name:		"ttyS",
-	write:		scc_console_write,
-	device:		scc_console_device,
-	setup:		scc_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "ttyS",
+	.write		= scc_console_write,
+	.device		= scc_console_device,
+	.setup		= scc_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 

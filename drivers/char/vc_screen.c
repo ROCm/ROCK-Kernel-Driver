@@ -464,10 +464,10 @@ vcs_open(struct inode *inode, struct file *filp)
 }
 
 static struct file_operations vcs_fops = {
-	llseek:		vcs_lseek,
-	read:		vcs_read,
-	write:		vcs_write,
-	open:		vcs_open,
+	.llseek		= vcs_lseek,
+	.read		= vcs_read,
+	.write		= vcs_write,
+	.open		= vcs_open,
 };
 
 static devfs_handle_t devfs_handle;

@@ -1674,16 +1674,16 @@ random_ioctl(struct inode * inode, struct file * file,
 }
 
 struct file_operations random_fops = {
-	read:		random_read,
-	write:		random_write,
-	poll:		random_poll,
-	ioctl:		random_ioctl,
+	.read		= random_read,
+	.write		= random_write,
+	.poll		= random_poll,
+	.ioctl		= random_ioctl,
 };
 
 struct file_operations urandom_fops = {
-	read:		urandom_read,
-	write:		random_write,
-	ioctl:		random_ioctl,
+	.read		= urandom_read,
+	.write		= random_write,
+	.ioctl		= random_ioctl,
 };
 
 /***************************************************************

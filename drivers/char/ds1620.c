@@ -337,9 +337,9 @@ static struct proc_dir_entry *proc_therm_ds1620;
 #endif
 
 static struct file_operations ds1620_fops = {
-	owner:		THIS_MODULE,
-	read:		ds1620_read,
-	ioctl:		ds1620_ioctl,
+	.owner		= THIS_MODULE,
+	.read		= ds1620_read,
+	.ioctl		= ds1620_ioctl,
 };
 
 static struct miscdevice ds1620_miscdev = {

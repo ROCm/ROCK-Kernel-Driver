@@ -119,11 +119,11 @@ static int ac_ioctl(struct inode *, struct file *, unsigned int,
 static void ac_interrupt(int, void *, struct pt_regs *);
 
 static struct file_operations ac_fops = {
-	owner:THIS_MODULE,
-	llseek:no_llseek,
-	read:ac_read,
-	write:ac_write,
-	ioctl:ac_ioctl,
+	.owner = THIS_MODULE,
+	.llseek = no_llseek,
+	.read = ac_read,
+	.write = ac_write,
+	.ioctl = ac_ioctl,
 };
 
 static struct miscdevice ac_miscdev = {

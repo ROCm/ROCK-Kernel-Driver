@@ -170,8 +170,8 @@ static DECLARE_MUTEX(stl_tmpwritesem);
  *	at 9600, 8 data bits, 1 stop bit.
  */
 static struct termios		stl_deftermios = {
-	c_cflag:	(B9600 | CS8 | CREAD | HUPCL | CLOCAL),
-	c_cc:		INIT_C_CC,
+	.c_cflag	= (B9600 | CS8 | CREAD | HUPCL | CLOCAL),
+	.c_cc		= INIT_C_CC,
 };
 
 /*
@@ -745,8 +745,8 @@ static unsigned int	sc26198_baudtable[] = {
  *	to get at port stats - only not using the port device itself.
  */
 static struct file_operations	stl_fsiomem = {
-	owner:		THIS_MODULE,
-	ioctl:		stl_memioctl,
+	.owner		= THIS_MODULE,
+	.ioctl		= stl_memioctl,
 };
 
 /*****************************************************************************/

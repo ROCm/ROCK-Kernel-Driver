@@ -775,16 +775,16 @@ int rtc_control(rtc_task_t *task, unsigned int cmd, unsigned long arg)
  */
 
 static struct file_operations rtc_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		rtc_read,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= rtc_read,
 #if RTC_IRQ
-	poll:		rtc_poll,
+	.poll		= rtc_poll,
 #endif
-	ioctl:		rtc_ioctl,
-	open:		rtc_open,
-	release:	rtc_release,
-	fasync:		rtc_fasync,
+	.ioctl		= rtc_ioctl,
+	.open		= rtc_open,
+	.release	= rtc_release,
+	.fasync		= rtc_fasync,
 };
 
 static struct miscdevice rtc_dev=

@@ -388,12 +388,12 @@ static int eurwdt_notify_sys(struct notifier_block *this, unsigned long code,
  
  
 static struct file_operations eurwdt_fops = {
-        owner:          THIS_MODULE,
-        llseek:         no_llseek,
-        write:          eurwdt_write,
-        ioctl:          eurwdt_ioctl,
-        open:           eurwdt_open,
-        release:        eurwdt_release,
+        .owner          = THIS_MODULE,
+        .llseek         = no_llseek,
+        .write          = eurwdt_write,
+        .ioctl          = eurwdt_ioctl,
+        .open           = eurwdt_open,
+        .release        = eurwdt_release,
 };
 
 static struct miscdevice eurwdt_miscdev =

@@ -336,13 +336,13 @@ static unsigned int busmouse_poll(struct file *file, poll_table *wait)
 
 struct file_operations busmouse_fops=
 {
-	owner:		THIS_MODULE,
-	read:		busmouse_read,
-	write:		busmouse_write,
-	poll:		busmouse_poll,
-	open:		busmouse_open,
-	release:	busmouse_release,
-	fasync:		busmouse_fasync,
+	.owner		= THIS_MODULE,
+	.read		= busmouse_read,
+	.write		= busmouse_write,
+	.poll		= busmouse_poll,
+	.open		= busmouse_open,
+	.release	= busmouse_release,
+	.fasync		= busmouse_fasync,
 };
 
 /**

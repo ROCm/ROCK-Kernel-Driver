@@ -488,12 +488,12 @@ static int dsp56k_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations dsp56k_fops = {
-	owner:		THIS_MODULE,
-	read:		dsp56k_read,
-	write:		dsp56k_write,
-	ioctl:		dsp56k_ioctl,
-	open:		dsp56k_open,
-	release:	dsp56k_release,
+	.owner		= THIS_MODULE,
+	.read		= dsp56k_read,
+	.write		= dsp56k_write,
+	.ioctl		= dsp56k_ioctl,
+	.open		= dsp56k_open,
+	.release	= dsp56k_release,
 };
 
 

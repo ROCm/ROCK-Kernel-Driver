@@ -183,8 +183,8 @@ static int button_read (struct file *filp, char *buffer,
  */
 
 static struct file_operations button_fops = {
-	owner:		THIS_MODULE,
-	read:		button_read,
+	.owner		= THIS_MODULE,
+	.read		= button_read,
 };
 
 /* 

@@ -660,13 +660,13 @@ static int lp_ioctl(struct inode *inode, struct file *file,
 }
 
 static struct file_operations lp_fops = {
-	owner:		THIS_MODULE,
-	write:		lp_write,
-	ioctl:		lp_ioctl,
-	open:		lp_open,
-	release:	lp_release,
+	.owner		= THIS_MODULE,
+	.write		= lp_write,
+	.ioctl		= lp_ioctl,
+	.open		= lp_open,
+	.release	= lp_release,
 #ifdef CONFIG_PARPORT_1284
-	read:		lp_read,
+	.read		= lp_read,
 #endif
 };
 
@@ -741,10 +741,10 @@ static kdev_t lp_console_device (struct console *c)
 }
 
 static struct console lpcons = {
-	name:		"lp",
-	write:		lp_console_write,
-	device:		lp_console_device,
-	flags:		CON_PRINTBUFFER,
+	.name		= "lp",
+	.write		= lp_console_write,
+	.device		= lp_console_device,
+	.flags		= CON_PRINTBUFFER,
 };
 
 #endif /* console on line printer */

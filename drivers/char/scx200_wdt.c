@@ -128,7 +128,7 @@ static int scx200_wdt_notify_sys(struct notifier_block *this,
 
 static struct notifier_block scx200_wdt_notifier =
 {
-        notifier_call: scx200_wdt_notify_sys
+        .notifier_call = scx200_wdt_notify_sys
 };
 
 static ssize_t scx200_wdt_write(struct file *file, const char *data, 

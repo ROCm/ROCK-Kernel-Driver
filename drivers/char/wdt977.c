@@ -311,11 +311,11 @@ int temp;
 
 static struct file_operations wdt977_fops=
 {
-	owner:		THIS_MODULE,
-	write:		wdt977_write,
-	ioctl:		wdt977_ioctl,
-	open:		wdt977_open,
-	release:	wdt977_release,
+	.owner		= THIS_MODULE,
+	.write		= wdt977_write,
+	.ioctl		= wdt977_ioctl,
+	.open		= wdt977_open,
+	.release	= wdt977_release,
 };
 
 static struct miscdevice wdt977_miscdev=

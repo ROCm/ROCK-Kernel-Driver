@@ -1601,12 +1601,12 @@ static int __init dz_console_setup(struct console *co, char *options)
 }
 
 static struct console dz_sercons = {
-    name:	"ttyS",
-    write:	dz_console_print,
-    device:	dz_console_device,
-    setup:	dz_console_setup,
-    flags:	CON_CONSDEV | CON_PRINTBUFFER,
-    index:	CONSOLE_LINE,
+    .name	= "ttyS",
+    .write	= dz_console_print,
+    .device	= dz_console_device,
+    .setup	= dz_console_setup,
+    .flags	= CON_CONSDEV | CON_PRINTBUFFER,
+    .index	= CONSOLE_LINE,
 };
 
 void __init dz_serial_console_init(void)

@@ -652,11 +652,11 @@ static void kick_open(void)
 
 static struct file_operations flash_fops =
 {
-	owner:		THIS_MODULE,
-	llseek:		flash_llseek,
-	read:		flash_read,
-	write:		flash_write,
-	ioctl:		flash_ioctl,
+	.owner		= THIS_MODULE,
+	.llseek		= flash_llseek,
+	.read		= flash_read,
+	.write		= flash_write,
+	.ioctl		= flash_ioctl,
 };
 
 static struct miscdevice flash_miscdev =

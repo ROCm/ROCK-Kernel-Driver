@@ -177,11 +177,11 @@ static int mixcomwd_ioctl(struct inode *inode, struct file *file,
 
 static struct file_operations mixcomwd_fops=
 {
-	owner:		THIS_MODULE,
-	write:		mixcomwd_write,
-	ioctl:		mixcomwd_ioctl,
-	open:		mixcomwd_open,
-	release:	mixcomwd_release,
+	.owner		= THIS_MODULE,
+	.write		= mixcomwd_write,
+	.ioctl		= mixcomwd_ioctl,
+	.open		= mixcomwd_open,
+	.release	= mixcomwd_release,
 };
 
 static struct miscdevice mixcomwd_miscdev=

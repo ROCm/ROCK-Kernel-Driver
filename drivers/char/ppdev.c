@@ -739,14 +739,14 @@ static unsigned int pp_poll (struct file * file, poll_table * wait)
 }
 
 static struct file_operations pp_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		pp_read,
-	write:		pp_write,
-	poll:		pp_poll,
-	ioctl:		pp_ioctl,
-	open:		pp_open,
-	release:	pp_release,
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= pp_read,
+	.write		= pp_write,
+	.poll		= pp_poll,
+	.ioctl		= pp_ioctl,
+	.open		= pp_open,
+	.release	= pp_release,
 };
 
 static devfs_handle_t devfs_handle;

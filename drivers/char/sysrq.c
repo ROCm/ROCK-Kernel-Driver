@@ -59,9 +59,9 @@ static void sysrq_handle_loglevel(int key, struct pt_regs *pt_regs,
 	console_loglevel = i;
 }	
 static struct sysrq_key_op sysrq_loglevel_op = {
-	handler:	sysrq_handle_loglevel,
-	help_msg:	"loglevel0-8",
-	action_msg:	"Changing Loglevel",
+	.handler	= sysrq_handle_loglevel,
+	.help_msg	= "loglevel0-8",
+	.action_msg	= "Changing Loglevel",
 };
 
 
@@ -75,9 +75,9 @@ static void sysrq_handle_SAK(int key, struct pt_regs *pt_regs,
 	reset_vc(fg_console);
 }
 static struct sysrq_key_op sysrq_SAK_op = {
-	handler:	sysrq_handle_SAK,
-	help_msg:	"saK",
-	action_msg:	"SAK",
+	.handler	= sysrq_handle_SAK,
+	.help_msg	= "saK",
+	.action_msg	= "SAK",
 };
 #endif
 
@@ -92,9 +92,9 @@ static void sysrq_handle_unraw(int key, struct pt_regs *pt_regs,
 		kbd->kbdmode = VC_XLATE;
 }
 static struct sysrq_key_op sysrq_unraw_op = {
-	handler:	sysrq_handle_unraw,
-	help_msg:	"unRaw",
-	action_msg:	"Keyboard mode set to XLATE",
+	.handler	= sysrq_handle_unraw,
+	.help_msg	= "unRaw",
+	.action_msg	= "Keyboard mode set to XLATE",
 };
 #endif /* CONFIG_VT */
 
@@ -105,9 +105,9 @@ static void sysrq_handle_reboot(int key, struct pt_regs *pt_regs,
 	machine_restart(NULL);
 }
 static struct sysrq_key_op sysrq_reboot_op = {
-	handler:	sysrq_handle_reboot,
-	help_msg:	"reBoot",
-	action_msg:	"Resetting",
+	.handler	= sysrq_handle_reboot,
+	.help_msg	= "reBoot",
+	.action_msg	= "Resetting",
 };
 
 
@@ -235,9 +235,9 @@ static void sysrq_handle_sync(int key, struct pt_regs *pt_regs,
 	wakeup_bdflush(0);
 }
 static struct sysrq_key_op sysrq_sync_op = {
-	handler:	sysrq_handle_sync,
-	help_msg:	"Sync",
-	action_msg:	"Emergency Sync",
+	.handler	= sysrq_handle_sync,
+	.help_msg	= "Sync",
+	.action_msg	= "Emergency Sync",
 };
 
 static void sysrq_handle_mountro(int key, struct pt_regs *pt_regs,
@@ -247,9 +247,9 @@ static void sysrq_handle_mountro(int key, struct pt_regs *pt_regs,
 	wakeup_bdflush(0);
 }
 static struct sysrq_key_op sysrq_mountro_op = {
-	handler:	sysrq_handle_mountro,
-	help_msg:	"Unmount",
-	action_msg:	"Emergency Remount R/O",
+	.handler	= sysrq_handle_mountro,
+	.help_msg	= "Unmount",
+	.action_msg	= "Emergency Remount R/O",
 };
 
 /* END SYNC SYSRQ HANDLERS BLOCK */
@@ -264,9 +264,9 @@ static void sysrq_handle_showregs(int key, struct pt_regs *pt_regs,
 		show_regs(pt_regs);
 }
 static struct sysrq_key_op sysrq_showregs_op = {
-	handler:	sysrq_handle_showregs,
-	help_msg:	"showPc",
-	action_msg:	"Show Regs",
+	.handler	= sysrq_handle_showregs,
+	.help_msg	= "showPc",
+	.action_msg	= "Show Regs",
 };
 
 
@@ -276,9 +276,9 @@ static void sysrq_handle_showstate(int key, struct pt_regs *pt_regs,
 	show_state();
 }
 static struct sysrq_key_op sysrq_showstate_op = {
-	handler:	sysrq_handle_showstate,
-	help_msg:	"showTasks",
-	action_msg:	"Show State",
+	.handler	= sysrq_handle_showstate,
+	.help_msg	= "showTasks",
+	.action_msg	= "Show State",
 };
 
 
@@ -288,9 +288,9 @@ static void sysrq_handle_showmem(int key, struct pt_regs *pt_regs,
 	show_mem();
 }
 static struct sysrq_key_op sysrq_showmem_op = {
-	handler:	sysrq_handle_showmem,
-	help_msg:	"showMem",
-	action_msg:	"Show Memory",
+	.handler	= sysrq_handle_showmem,
+	.help_msg	= "showMem",
+	.action_msg	= "Show Memory",
 };
 
 /* SHOW SYSRQ HANDLERS BLOCK */
@@ -318,16 +318,16 @@ static void sysrq_handle_term(int key, struct pt_regs *pt_regs,
 	console_loglevel = 8;
 }
 static struct sysrq_key_op sysrq_term_op = {
-	handler:	sysrq_handle_term,
-	help_msg:	"tErm",
-	action_msg:	"Terminate All Tasks",
+	.handler	= sysrq_handle_term,
+	.help_msg	= "tErm",
+	.action_msg	= "Terminate All Tasks",
 };
 
 #ifdef CONFIG_VOYAGER
 static struct sysrq_key_op sysrq_voyager_dump_op = {
-	handler:	voyager_dump,
-	help_msg:	"voyager",
-	action_msg:	"Dump Voyager Status\n",
+	.handler	= voyager_dump,
+	.help_msg	= "voyager",
+	.action_msg	= "Dump Voyager Status\n",
 };
 #endif
 
@@ -338,9 +338,9 @@ static void sysrq_handle_kill(int key, struct pt_regs *pt_regs,
 	console_loglevel = 8;
 }
 static struct sysrq_key_op sysrq_kill_op = {
-	handler:	sysrq_handle_kill,
-	help_msg:	"kIll",
-	action_msg:	"Kill All Tasks",
+	.handler	= sysrq_handle_kill,
+	.help_msg	= "kIll",
+	.action_msg	= "Kill All Tasks",
 };
 
 /* END SIGNAL SYSRQ HANDLERS BLOCK */

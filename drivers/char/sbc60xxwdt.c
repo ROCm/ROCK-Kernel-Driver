@@ -262,13 +262,13 @@ static int fop_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 }
 
 static struct file_operations wdt_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		fop_read,
-	write:		fop_write,
-	open:		fop_open,
-	release:	fop_close,
-	ioctl:		fop_ioctl
+	.owner		= THIS_MODULE,
+	.llseek		= no_llseek,
+	.read		= fop_read,
+	.write		= fop_write,
+	.open		= fop_open,
+	.release	= fop_close,
+	.ioctl		= fop_ioctl
 };
 
 static struct miscdevice wdt_miscdev = {

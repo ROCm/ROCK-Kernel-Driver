@@ -186,12 +186,12 @@ static int acq_notify_sys(struct notifier_block *this, unsigned long code,
  
  
 static struct file_operations acq_fops = {
-	owner:		THIS_MODULE,
-	read:		acq_read,
-	write:		acq_write,
-	ioctl:		acq_ioctl,
-	open:		acq_open,
-	release:	acq_close,
+	.owner		= THIS_MODULE,
+	.read		= acq_read,
+	.write		= acq_write,
+	.ioctl		= acq_ioctl,
+	.open		= acq_open,
+	.release	= acq_close,
 };
 
 static struct miscdevice acq_miscdev=
