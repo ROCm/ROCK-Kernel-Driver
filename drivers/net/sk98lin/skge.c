@@ -4956,7 +4956,6 @@ static int __devinit skge_probe_one(struct pci_dev *pdev,
 	dev->stop =		&SkGeClose;
 	dev->hard_start_xmit =	&SkGeXmit;
 	dev->get_stats =	&SkGeStats;
-	dev->last_stats =	&SkGeStats;
 	dev->set_multicast_list = &SkGeSetRxMode;
 	dev->set_mac_address =	&SkGeSetMacAddr;
 	dev->do_ioctl =		&SkGeIoctl;

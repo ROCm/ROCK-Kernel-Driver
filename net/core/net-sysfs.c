@@ -408,7 +408,6 @@ int netdev_register_sysfs(struct net_device *net)
 
 	class_dev->class = &net_class;
 	class_dev->class_data = net;
-	net->last_stats = net->get_stats;
 
 	strlcpy(class_dev->class_id, net->name, BUS_ID_SIZE);
 	if ((ret = class_device_register(class_dev)))
