@@ -10,6 +10,7 @@ obj-$(CONFIG_CPU_SH4)		+= sh4/
 
 obj-$(CONFIG_SH_RTC)            += rtc.o
 obj-$(CONFIG_UBC_WAKEUP)	+= ubc.o
+obj-$(CONFIG_SH_ADC)            += adc.o
 
 USE_STANDARD_AS_RULE := true
 
