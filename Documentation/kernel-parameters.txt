@@ -180,7 +180,7 @@ running once the system is up.
 	                uniprocessor systems. Even when APIC on UP
 			systems is enabled, it needs this parameter
 			to really activate it (needed to avoid problems
-			with certain machines).
+			with certain machines). This enables local and IO APICs.
  
 	apm=		[APM] Advanced Power Management
 			See header of arch/i386/kernel/apm.c.

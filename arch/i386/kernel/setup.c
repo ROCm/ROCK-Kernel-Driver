@@ -50,6 +50,10 @@
 #include "setup_arch_pre.h"
 #include "mach_resources.h"
 
+#ifdef CONFIG_X86_LOCAL_APIC
+extern int enable_local_apic;
+#endif
+
 /* This value is set up by the early boot code to point to the value
    immediately after the boot time page tables.  It contains a *physical*
    address, and must not be in the .bss segment! */
@@ -917,6 +921,7 @@ static unsigned long __init setup_memory(void)
 	acpi_reserve_bootmem();
 #endif
 #ifdef CONFIG_X86_FIND_SMP_CONFIG
+	if (enable_local_apic >= 0) 
 	/*
 	 * Find and reserve possible boot-time SMP configuration:
 	 */
@@ -1232,7 +1237,7 @@ void __init setup_arch(char **cmdline_p)
 	acpi_boot_init();
 
 #ifdef CONFIG_X86_LOCAL_APIC
-	if (smp_found_config)
+	if (smp_found_config && enable_local_apic >= 0)
 		get_smp_config();
 #endif
 

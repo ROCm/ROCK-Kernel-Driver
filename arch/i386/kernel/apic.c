@@ -41,6 +41,8 @@
 
 #include "io_ports.h"
 
+extern int enable_local_apic;
+
 static void apic_pm_activate(void);
 
 void __init apic_intr_init(void)
@@ -189,6 +191,9 @@ void disconnect_bsp_APIC(void)
 void disable_local_APIC(void)
 {
 	unsigned long value;
+
+	if (enable_local_apic < 0) 
+		return;
 
 	clear_local_APIC();
 
@@ -631,9 +636,12 @@ static int __init lapic_enable(char *str)
 }
 __setup("lapic", lapic_enable);
 
-/* Alias for compatibility with old SuSE kernels */
 static int __init apic_enable(char *str)
 {
+#ifdef CONFIG_X86_IO_APIC
+	extern int skip_ioapic_setup;
+	skip_ioapic_setup = 0;
+#endif
 	enable_local_apic = 1;
 	return 0;
 }
@@ -1185,8 +1193,6 @@ int __init APIC_init_uniprocessor (void)
 	 * Complain if the BIOS pretends there is one.
 	 */
 	if (!cpu_has_apic && APIC_INTEGRATED(apic_version[boot_cpu_physical_apicid])) {
-		printk(KERN_ERR "BIOS bug, local APIC #%d not detected!...\n",
-			boot_cpu_physical_apicid);
 		return -1;
 	}
 
