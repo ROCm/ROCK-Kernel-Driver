@@ -4511,6 +4511,8 @@ int init_module(void)
 
 	while(fc[i] != NULL) {
 		struct net_device *dev = alloc_fcdev(0);
+		int err;
+
 		if (!dev) {
 			printk("iph5526.c: init_fcdev failed for card #%d\n", i+1);
 			break;
