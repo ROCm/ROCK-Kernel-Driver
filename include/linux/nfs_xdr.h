@@ -657,6 +657,8 @@ struct nfs_write_data {
 	void (*complete) (struct nfs_write_data *, int);
 };
 
+struct nfs_access_entry;
+
 /*
  * RPC procedure vector for NFSv2/NFSv3 demuxing
  */
@@ -672,7 +674,7 @@ struct nfs_rpc_ops {
 			    struct iattr *);
 	int	(*lookup)  (struct inode *, struct qstr *,
 			    struct nfs_fh *, struct nfs_fattr *);
-	int	(*access)  (struct inode *, struct rpc_cred *, int);
+	int	(*access)  (struct inode *, struct nfs_access_entry *);
 	int	(*readlink)(struct inode *, struct page *);
 	int	(*read)    (struct nfs_read_data *, struct file *);
 	int	(*write)   (struct nfs_write_data *, struct file *);

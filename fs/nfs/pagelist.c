@@ -21,11 +21,6 @@
 
 #define NFS_PARANOIA 1
 
-/*
- * Spinlock
- */
-spinlock_t nfs_wreq_lock = SPIN_LOCK_UNLOCKED;
-
 static kmem_cache_t *nfs_page_cachep;
 
 static inline struct nfs_page *
@@ -95,7 +90,7 @@ nfs_create_request(struct file *file, struct inode *inode,
 	req->wb_pgbase	= offset;
 	req->wb_bytes   = count;
 	req->wb_inode   = inode;
-	req->wb_count   = 1;
+	atomic_set(&req->wb_count, 1);
 	server->rpc_ops->request_init(req, file);
 
 	return req;
@@ -137,12 +132,8 @@ void nfs_clear_request(struct nfs_page *req)
 void
 nfs_release_request(struct nfs_page *req)
 {
-	spin_lock(&nfs_wreq_lock);
-	if (--req->wb_count) {
-		spin_unlock(&nfs_wreq_lock);
+	if (!atomic_dec_and_test(&req->wb_count))
 		return;
-	}
-	spin_unlock(&nfs_wreq_lock);
 
 #ifdef NFS_PARANOIA
 	BUG_ON (!list_empty(&req->wb_list));
@@ -254,7 +245,7 @@ nfs_coalesce_requests(struct list_head *head, struct list_head *dst,
  * If the number of requests is set to 0, the entire address_space
  * starting at index idx_start, is scanned.
  * The requests are *not* checked to ensure that they form a contiguous set.
- * You must be holding the nfs_wreq_lock when calling this function
+ * You must be holding the inode's req_lock when calling this function
  */
 int
 nfs_scan_list(struct list_head *head, struct list_head *dst,

@@ -179,7 +179,7 @@ EXPORT_SYMBOL(g_make_token_header);
  */
 u32
 g_verify_token_header(struct xdr_netobj *mech, int *body_size,
-		      unsigned char **buf_in, int tok_type, int toksize)
+		      unsigned char **buf_in, int toksize)
 {
 	unsigned char *buf = *buf_in;
 	int seqsize;
