@@ -242,6 +242,7 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	int ret;
 	elf_gregset_t32 saved_regs;  /* an array of ELF_NGREG unsigned ints (32 bits) */
 	sigset_t set;
+	int i;
 
 	sc = (struct sigcontext32_struct *)(regs->gpr[1] + __SIGNAL_FRAMESIZE32);
 	if (copy_from_user(&sigctx, sc, sizeof(sigctx)))
@@ -284,46 +285,16 @@ long sys32_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	 */
 	saved_regs[PT_MSR] = (regs->msr & ~MSR_USERCHANGE)
 		| (saved_regs[PT_MSR] & MSR_USERCHANGE);
-	regs->gpr[0] = (u64)(saved_regs[0]) & 0xFFFFFFFF;
-	regs->gpr[1] = (u64)(saved_regs[1]) & 0xFFFFFFFF;
-	/**********************************************************************/
-	/* Register 2 is the kernel toc - should be reset on any calls into   */
-	/*  the kernel                                                        */
-	/**********************************************************************/
-	regs->gpr[2] = (u64)(saved_regs[2]) & 0xFFFFFFFF;
+	/*
+	 * Register 2 is the kernel toc - should be reset on
+	 * any calls into the kernel 
+	 */
+	for (i = 0; i < 32; i++)
+		regs->gpr[i] = (u64)(saved_regs[i]) & 0xFFFFFFFF;
 
-	regs->gpr[3] = (u64)(saved_regs[3]) & 0xFFFFFFFF;
-	regs->gpr[4] = (u64)(saved_regs[4]) & 0xFFFFFFFF;
-	regs->gpr[5] = (u64)(saved_regs[5]) & 0xFFFFFFFF;
-	regs->gpr[6] = (u64)(saved_regs[6]) & 0xFFFFFFFF;
-	regs->gpr[7] = (u64)(saved_regs[7]) & 0xFFFFFFFF;
-	regs->gpr[8] = (u64)(saved_regs[8]) & 0xFFFFFFFF;
-	regs->gpr[9] = (u64)(saved_regs[9]) & 0xFFFFFFFF;
-	regs->gpr[10] = (u64)(saved_regs[10]) & 0xFFFFFFFF;
-	regs->gpr[11] = (u64)(saved_regs[11]) & 0xFFFFFFFF;
-	regs->gpr[12] = (u64)(saved_regs[12]) & 0xFFFFFFFF;
-	regs->gpr[13] = (u64)(saved_regs[13]) & 0xFFFFFFFF;
-	regs->gpr[14] = (u64)(saved_regs[14]) & 0xFFFFFFFF;
-	regs->gpr[15] = (u64)(saved_regs[15]) & 0xFFFFFFFF;
-	regs->gpr[16] = (u64)(saved_regs[16]) & 0xFFFFFFFF;
-	regs->gpr[17] = (u64)(saved_regs[17]) & 0xFFFFFFFF;
-	regs->gpr[18] = (u64)(saved_regs[18]) & 0xFFFFFFFF;
-	regs->gpr[19] = (u64)(saved_regs[19]) & 0xFFFFFFFF;
-	regs->gpr[20] = (u64)(saved_regs[20]) & 0xFFFFFFFF;
-	regs->gpr[21] = (u64)(saved_regs[21]) & 0xFFFFFFFF;
-	regs->gpr[22] = (u64)(saved_regs[22]) & 0xFFFFFFFF;
-	regs->gpr[23] = (u64)(saved_regs[23]) & 0xFFFFFFFF;
-	regs->gpr[24] = (u64)(saved_regs[24]) & 0xFFFFFFFF;
-	regs->gpr[25] = (u64)(saved_regs[25]) & 0xFFFFFFFF;
-	regs->gpr[26] = (u64)(saved_regs[26]) & 0xFFFFFFFF;
-	regs->gpr[27] = (u64)(saved_regs[27]) & 0xFFFFFFFF;
-	regs->gpr[28] = (u64)(saved_regs[28]) & 0xFFFFFFFF;
-	regs->gpr[29] = (u64)(saved_regs[29]) & 0xFFFFFFFF;
-	regs->gpr[30] = (u64)(saved_regs[30]) & 0xFFFFFFFF;
-	regs->gpr[31] = (u64)(saved_regs[31]) & 0xFFFFFFFF;
-	/****************************************************/
-	/*  restore the non gpr registers                   */
-	/****************************************************/
+	/*
+	 *  restore the non gpr registers 
+	 */
 	regs->msr = (u64)(saved_regs[PT_MSR]) & 0xFFFFFFFF;
 	/*
 	 * Insure that the interrupt mode is 64 bit, during 32 bit
@@ -522,6 +493,7 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	elf_gregset_t32 saved_regs;   /* an array of 32 bit register values */
 	sigset_t signal_set; 
 	stack_t stack;
+	int i;
 
 	ret = 0;
 	/* Adjust the inputted reg1 to point to the first rt signal frame */
@@ -573,46 +545,15 @@ long sys32_rt_sigreturn(unsigned long r3, unsigned long r4, unsigned long r5,
 	 */
 	saved_regs[PT_MSR] = (regs->msr & ~MSR_USERCHANGE)
 		| (saved_regs[PT_MSR] & MSR_USERCHANGE);
-	regs->gpr[0] = (u64)(saved_regs[0]) & 0xFFFFFFFF;
-	regs->gpr[1] = (u64)(saved_regs[1]) & 0xFFFFFFFF;
-	/**********************************************************************/
-	/* Register 2 is the kernel toc - should be reset on any calls into   */
-	/*  the kernel                                                        */
-	/**********************************************************************/
-	regs->gpr[2] = (u64)(saved_regs[2]) & 0xFFFFFFFF;
- 
-	regs->gpr[3] = (u64)(saved_regs[3]) & 0xFFFFFFFF;
-	regs->gpr[4] = (u64)(saved_regs[4]) & 0xFFFFFFFF;
-	regs->gpr[5] = (u64)(saved_regs[5]) & 0xFFFFFFFF;
-	regs->gpr[6] = (u64)(saved_regs[6]) & 0xFFFFFFFF;
-	regs->gpr[7] = (u64)(saved_regs[7]) & 0xFFFFFFFF;
-	regs->gpr[8] = (u64)(saved_regs[8]) & 0xFFFFFFFF;
-	regs->gpr[9] = (u64)(saved_regs[9]) & 0xFFFFFFFF;
-	regs->gpr[10] = (u64)(saved_regs[10]) & 0xFFFFFFFF;
-	regs->gpr[11] = (u64)(saved_regs[11]) & 0xFFFFFFFF;
-	regs->gpr[12] = (u64)(saved_regs[12]) & 0xFFFFFFFF;
-	regs->gpr[13] = (u64)(saved_regs[13]) & 0xFFFFFFFF;
-	regs->gpr[14] = (u64)(saved_regs[14]) & 0xFFFFFFFF;
-	regs->gpr[15] = (u64)(saved_regs[15]) & 0xFFFFFFFF;
-	regs->gpr[16] = (u64)(saved_regs[16]) & 0xFFFFFFFF;
-	regs->gpr[17] = (u64)(saved_regs[17]) & 0xFFFFFFFF;
-	regs->gpr[18] = (u64)(saved_regs[18]) & 0xFFFFFFFF;
-	regs->gpr[19] = (u64)(saved_regs[19]) & 0xFFFFFFFF;
-	regs->gpr[20] = (u64)(saved_regs[20]) & 0xFFFFFFFF;
-	regs->gpr[21] = (u64)(saved_regs[21]) & 0xFFFFFFFF;
-	regs->gpr[22] = (u64)(saved_regs[22]) & 0xFFFFFFFF;
-	regs->gpr[23] = (u64)(saved_regs[23]) & 0xFFFFFFFF;
-	regs->gpr[24] = (u64)(saved_regs[24]) & 0xFFFFFFFF;
-	regs->gpr[25] = (u64)(saved_regs[25]) & 0xFFFFFFFF;
-	regs->gpr[26] = (u64)(saved_regs[26]) & 0xFFFFFFFF;
-	regs->gpr[27] = (u64)(saved_regs[27]) & 0xFFFFFFFF;
-	regs->gpr[28] = (u64)(saved_regs[28]) & 0xFFFFFFFF;
-	regs->gpr[29] = (u64)(saved_regs[29]) & 0xFFFFFFFF;
-	regs->gpr[30] = (u64)(saved_regs[30]) & 0xFFFFFFFF;
-	regs->gpr[31] = (u64)(saved_regs[31]) & 0xFFFFFFFF;
-	/****************************************************/
-	/*  restore the non gpr registers                   */
-	/****************************************************/
+	/*
+	 * Register 2 is the kernel toc - should be reset on any
+	 * calls into the kernel
+	 */
+	for (i = 0; i < 32; i++)
+		regs->gpr[i] = (u64)(saved_regs[i]) & 0xFFFFFFFF;
+	/*
+	 * restore the non gpr registers
+	 */
 	regs->msr = (u64)(saved_regs[PT_MSR]) & 0xFFFFFFFF;
 	regs->nip = (u64)(saved_regs[PT_NIP]) & 0xFFFFFFFF;
 	regs->orig_gpr3 = (u64)(saved_regs[PT_ORIG_R3]) & 0xFFFFFFFF; 
