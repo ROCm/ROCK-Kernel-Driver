@@ -126,6 +126,7 @@ static int usb_stor_msg_common(struct us_data *us)
 	us->current_urb->actual_length = 0;
 	us->current_urb->error_count = 0;
 	us->current_urb->transfer_flags = URB_ASYNC_UNLINK;
+	us->current_urb->status = 0;
 
 	/* submit the URB */
 	status = usb_submit_urb(us->current_urb, GFP_NOIO);
