@@ -2130,7 +2130,7 @@ sym_attach (Scsi_Host_Template *tpnt, int unit, sym_device *dev)
 
 	SYM_UNLOCK_HCB(np, flags);
 
-	scsi_set_pci_device(instance, dev->pdev);
+	scsi_set_device(instance, &dev->pdev->dev);
 
 	/*
 	 *  Now let the generic SCSI driver

@@ -2206,7 +2206,7 @@ static int __init DC390_init (PSHT psht, ULONG io_port, UCHAR Irq, PDEVDECL, UCH
     psh = scsi_register( psht, sizeof(DC390_ACB) );
     if( !psh ) return( -1 );
 	
-    scsi_set_pci_device(psh, pdev);
+    scsi_set_device(psh, &pdev->dev);
     pACB = (PACB) psh->hostdata;
     DC390_LOCKA_INIT;
     DC390_LOCK_ACB;

@@ -8450,7 +8450,7 @@ aic7xxx_alloc(Scsi_Host_Template *sht, struct aic7xxx_host *temp)
     }
     p->host_no = host->host_no;
   }
-  scsi_set_pci_device(host, p->pdev);
+  scsi_set_device(host, &p->pdev->dev);
   return (p);
 }
 
