@@ -384,5 +384,3 @@ config KEYS_COMPAT
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
-
-source "rpmify/Kconfig"

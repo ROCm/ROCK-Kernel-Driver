@@ -69,6 +69,10 @@ config LOCALVERSION
 	  object and source tree, in that order.  Your total string can
 	  be a maximum of 64 characters.
 
+config SUSE_KERNEL
+	bool
+	default y
+
 config SWAP
 	bool "Support for paging of anonymous memory (swap)"
 	depends on MMU

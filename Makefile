@@ -2,8 +2,7 @@ VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 10
 EXTRAVERSION =
-EXTRAVERSION = -$(shell echo $(CONFIG_RELEASE)-$(CONFIG_CFGNAME))
-NAME=
+NAME=Woozy Numbat
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
@@ -159,8 +158,11 @@ endif
 LOCALVERSION = $(subst $(space),, \
 	       $(shell cat /dev/null $(localversion-files:%~=)) \
 	       $(patsubst "%",%,$(CONFIG_LOCALVERSION)))
+ifneq ($(wildcard $(srctree)/rpm-release),)
+RPM_RELEASE := -$(shell cat $(srctree)/rpm-release)
+endif
 
-KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(LOCALVERSION)
+KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)$(LOCALVERSION)$(RPM_RELEASE)
 
 # SUBARCH tells the usermode build what the underlying arch is.  That is set
 # first, and if a usermode build is happening, the "ARCH=um" on the command
@@ -1097,7 +1099,7 @@ $(objtree)/Module.symvers:
 	@test -e $(objtree)/Module.symvers || ( \
 	echo; \
 	echo "WARNING: Symbol version dump $(objtree)/Module.symvers is " \
-	     "missing, modules will have CONFIG_MODVERSIONS disabled."; \
+	     "missing; modules will have no modversions."; \
 	echo )
 
 module-dirs := $(addprefix _module_,$(KBUILD_EXTMOD))
