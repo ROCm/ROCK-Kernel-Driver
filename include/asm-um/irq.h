@@ -23,8 +23,9 @@ struct task_struct;
 #define WINCH_IRQ		10
 #define SIGIO_WRITE_IRQ 	11
 #define TELNETD_IRQ 		12
+#define XTERM_IRQ 		13
 
-#define LAST_IRQ TELNETD_IRQ
+#define LAST_IRQ XTERM_IRQ
 #define NR_IRQS (LAST_IRQ + 1)
 
 extern int um_request_irq(unsigned int irq, int fd, int type,

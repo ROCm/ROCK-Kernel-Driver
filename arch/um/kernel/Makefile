@@ -1,4 +1,3 @@
-
 EXTRA_TARGETS	:= unmap_fin.o
 
 obj-y = config.o exec_kern.o exec_user.o exitcode.o frame_kern.o frame.o \
@@ -50,6 +49,9 @@ arch/um/kernel/unmap.o: arch/um/kernel/unmap.c
 
 arch/um/kernel/unmap_fin.o : arch/um/kernel/unmap.o
 	ld -r -o $@ $< -lc -L/usr/lib
+
+# This has to be separate because it needs be compiled with frame pointers
+# regardless of how the rest of the kernel is built.
 
 arch/um/kernel/frame.o: arch/um/kernel/frame.c
 	$(CC) $(CFLAGS_$(notdir $@)) -c -o $@ $<

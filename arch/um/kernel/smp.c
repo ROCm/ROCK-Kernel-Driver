@@ -47,6 +47,9 @@ int num_reschedules_sent = 0;
 /* Small, random number, never changed */
 unsigned long cache_decay_ticks = 5;
 
+/* Not changed after boot */
+struct task_struct *idle_threads[NR_CPUS];
+
 void smp_send_reschedule(int cpu)
 {
 	write(cpu_data[cpu].ipi_pipe[1], "R", 1);
@@ -142,6 +145,7 @@ static struct task_struct *idle_thread(int cpu)
 	cpu_tasks[cpu] = ((struct cpu_task) 
 		          { .pid = 	new_task->thread.extern_pid,
 			    .task = 	new_task } );
+	idle_threads[cpu] = new_task;
 	write(new_task->thread.switch_pipe[1], &c, sizeof(c));
 	return(new_task);
 }

@@ -8,6 +8,9 @@ CFLAGS += -U__$(SUBARCH)__ -U$(SUBARCH)
 ELF_ARCH = $(SUBARCH)
 ELF_FORMAT = elf32-$(SUBARCH)
 
+OBJCOPYFLAGS  := -O binary -R .note -R .comment -S
+LDFLAGS_BLOB	:= --format binary --oformat elf32-i386
+
 SYS_DIR		:= $(ARCH_DIR)/include/sysdep-i386
 SYS_UTIL_DIR	:= $(ARCH_DIR)/sys-i386/util
 
@@ -21,11 +24,14 @@ $(SYS_DIR)/sc.h: $(SYS_UTIL_DIR)/mk_sc
 $(SYS_DIR)/thread.h: $(SYS_UTIL_DIR)/mk_thread
 	$< > $@
 
-$(SYS_UTIL_DIR)/mk_sc $(SYS_UTIL_DIR)/mk_thread: $(SYS_UTIL_DIR) FORCE ; 
+$(SYS_UTIL_DIR)/mk_sc: FORCE ; 
+	@$(call descend,$(SYS_UTIL_DIR),$@)
+
+$(SYS_UTIL_DIR)/mk_thread: $(ARCH_SYMLINKS) FORCE ; 
+	@$(call descend,$(SYS_UTIL_DIR),$@)
 
 $(SYS_UTIL_DIR): include/asm FORCE
 	@$(call descend,$@,)
 
 sysclean :
 	rm -f $(SYS_HEADERS)
-	@$(call descend,$(SYS_DIR),clean)

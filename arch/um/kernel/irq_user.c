@@ -209,7 +209,6 @@ int activate_fd(int irq, int fd, int type, void *dev_id)
 
  out_unlock:
 	irq_unlock(flags);
- out_free:
 	kfree(new_fd);
  out:
 	return(err);

@@ -13,6 +13,7 @@ struct chan_opts {
 	char *xterm_title;
 	int raw;
 	unsigned long tramp_stack;
+	int in_kernel;
 };
 
 enum chan_init_pri { INIT_STATIC, INIT_ALL, INIT_ONE };
