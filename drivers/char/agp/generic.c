@@ -404,7 +404,7 @@ static void agp_v2_parse_one(u32 *mode, u32 *cmd, u32 *tmp)
 		*cmd &= ~(AGPSTAT2_1X | AGPSTAT2_4X);	/* 2X */
 
 	if (*cmd & AGPSTAT2_1X)
-		*cmd &= ~(AGPSTAT2_2X | AGPSTAT2_4X);	/* 1Xf */
+		*cmd &= ~(AGPSTAT2_2X | AGPSTAT2_4X);	/* 1X */
 }
 
 /*
