@@ -2175,15 +2175,15 @@ static void ata_pio_task(void *_data)
 		break;
 	}
 
-	if (timeout) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(timeout);
-	}
-
 	if ((ap->pio_task_state != PIO_ST_IDLE) &&
 	    (ap->pio_task_state != PIO_ST_TMOUT) &&
-	    (ap->pio_task_state != PIO_ST_ERR))
-		queue_work(ata_wq, &ap->pio_task);
+	    (ap->pio_task_state != PIO_ST_ERR)) {
+		if (timeout)
+			queue_delayed_work(ata_wq, &ap->pio_task,
+					   timeout);
+		else
+			queue_work(ata_wq, &ap->pio_task);
+	}
 }
 
 /**
@@ -2450,6 +2450,7 @@ static int ata_qc_issue_prot(struct ata_queued_cmd *qc)
 		qc->flags |= ATA_QCFLAG_POLL;
 		qc->tf.ctl |= ATA_NIEN;	/* disable interrupts */
 		ata_tf_to_host_nolock(ap, &qc->tf);
+		ap->pio_task_state = PIO_ST;
 		queue_work(ata_wq, &ap->pio_task);
 		break;
 
@@ -2810,6 +2811,7 @@ static void atapi_packet_task(void *_data)
 	if (qc->tf.protocol == ATA_PROT_ATAPI_DMA) {
 		/* FIXME: start DMA here */
 	} else {
+		ap->pio_task_state = PIO_ST;
 		queue_work(ata_wq, &ap->pio_task);
 	}
 
@@ -2848,12 +2850,10 @@ static void ata_probe_task(void *_data)
 	if (timeout < 0)
 		return;
 
-	if (timeout > 0) {
-		set_current_state(TASK_UNINTERRUPTIBLE);
-		schedule_timeout(timeout);
-	}
-
-	queue_work(ata_wq, &ap->probe_task);
+	if (timeout > 0)
+		queue_delayed_work(ata_wq, &ap->probe_task, timeout);
+	else
+		queue_work(ata_wq, &ap->probe_task);
 }
 
 /**
