@@ -69,7 +69,7 @@ acpi_system_write_sleep (
 	state = simple_strtoul(str, NULL, 0);
 #ifdef CONFIG_SOFTWARE_SUSPEND
 	if (state == 4) {
-		error = software_suspend();
+		software_suspend();
 		goto Done;
 	}
 #endif
