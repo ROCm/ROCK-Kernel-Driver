@@ -199,12 +199,10 @@ S: Notre Dame, Indiana
 S: USA
 
 N: Greg Banks
-E: gnb@linuxfan.com
+E: gnb@alphalink.com.au
 D: IDT77105 ATM network driver
-S: NEC Australia
-S: 649-655 Springvale Rd
-S: Mulgrave, Victoria 3170
-S: Australia
+D: some SuperH port work
+D: some trivial futzing with kconfig
 
 N: James Banks
 E: james@sovereign.org
