@@ -38,9 +38,8 @@ The API currently supports three types of transforms: Ciphers, Digests and
 Compressors.  The compression algorithms especially seem to be performing
 very well so far.
 
-An asynchronous scheduling interface is in planning but not yet
-implemented, as we need to further analyze the requirements of all of
-the possible hardware scenarios (e.g. IPsec NIC offload).
+Support for hardware crypto devices via an asynchronous interface is
+under development.
 
 Here's an example of how to use the API:
 
@@ -87,8 +86,8 @@ also need:
 
 DEVELOPER NOTES
 
-None of this code should be called from hardirq context, only softirq and
-user contexts.
+Transforms may only be allocated in user context, and cryptographic
+methods may only be called from softirq and user contexts.
 
 When using the API for ciphers, performance will be optimal if each
 scatterlist contains data which is a multiple of the cipher's block
@@ -137,16 +136,11 @@ For further patches and various updates, including the current TODO
 list, see:
 http://samba.org/~jamesm/crypto/
 
-Ongoing development discussion may also be found on
-kerneli cryptoapi-devel, 
-see http://www.kerneli.org/mailman/listinfo/cryptoapi-devel
-
 
 AUTHORS
 
 James Morris
 David S. Miller
-Jean-Francois Dive (SHA1 algorithm module)
 
 
 CREDITS
@@ -191,6 +185,10 @@ Original developers of the crypto algorithms:
   Matthew Skala (Twofish)
   Dag Arne Osvik (Serpent)
   Brian Gladman (AES)
+
+
+SHA1 algorithm contributors:
+  Jean-Francois Dive
   
 DES algorithm contributors:
   Raimar Falke
@@ -215,6 +213,8 @@ AES algorithm contributors:
   Herbert Valerio Riedel
   Kyle McMartin
   Adam J. Richter
+
+Generic scatterwalk code by Adam J. Richter <adam@yggdrasil.com>
 
 Please send any credits updates or corrections to:
 James Morris <jmorris@intercode.com.au>
