@@ -424,10 +424,10 @@ static int config_chipset_for_dma (ide_drive_t *drive)
 	} else {
 		if (ultra_66) {
 			/*
-			 * check to make sure drive on same channel
-			 * is u66 capable
+			 * Check to make sure drive on the same channel
+			 * is UDMA3 or higher capable.  Ignore empty slots.
 			 */
-			if (hwif->drives[!(drive->dn%2)].id) {
+			if (hwif->drives[!(drive->dn%2)].present) {
 				if (hwif->drives[!(drive->dn%2)].id->dma_ultra & 0x0078) {
 					hwif->OUTB(CLKSPD | mask, (hwif->dma_master + 0x11));
 				} else {
