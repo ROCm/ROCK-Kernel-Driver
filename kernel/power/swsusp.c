@@ -181,17 +181,6 @@ static __inline__ int fill_suspend_header(struct suspend_header *sh)
 	return 0;
 }
 
-/*
- * This is our sync function. With this solution we probably won't sleep
- * but that should not be a problem since tasks are stopped..
- */
-
-static inline void do_suspend_sync(void)
-{
-	blk_run_queues();
-#warning This might be broken. We need to somehow wait for data to reach the disk
-}
-
 /* We memorize in swapfile_used what swap devices are used for suspension */
 #define SWAPFILE_UNUSED    0
 #define SWAPFILE_SUSPEND   1	/* This is the suspending device */
@@ -764,13 +753,10 @@ static void do_software_suspend(void)
 
 		free_some_memory();
 		
-		/* No need to invalidate any vfsmnt list -- they will be valid after resume, anyway.
-		 *
-		 * We sync here -- so you have consistent filesystem state when things go wrong.
-		 * -- so that noone writes to disk after we do atomic copy of data.
+		/* No need to invalidate any vfsmnt list -- 
+		 * they will be valid after resume, anyway.
 		 */
-		PRINTK("Syncing disks before copy\n");
-		do_suspend_sync();
+		blk_run_queues();
 
 		/* Save state of all device drivers, and stop them. */		   
 		if(drivers_suspend()==0)
@@ -801,7 +787,7 @@ void software_suspend(void)
 		return;
 
 	software_suspend_enabled = 0;
-	BUG_ON(in_interrupt());
+	might_sleep();
 	do_software_suspend();
 }
 
