@@ -1462,7 +1462,9 @@ static int cm_open_mixdev(struct inode *inode, struct file *file)
 
 static int cm_release_mixdev(struct inode *inode, struct file *file)
 {
-	struct cm_state *s = (struct cm_state *)file->private_data;
+	struct cm_state *s;
+
+	s = file->private_data;
 	
 	VALIDATE_STATE(s);
 	return 0;
