@@ -707,29 +707,36 @@ static int snd_via82xx_pcm_trigger(snd_pcm_substream_t * substream, int cmd)
 /*
  * calculate the linear position at the given sg-buffer index and the rest count
  */
+
+#define check_invalid_pos(viadev,pos) \
+	((pos) < viadev->lastpos && ((pos) >= viadev->bufsize2 || viadev->lastpos < viadev->bufsize2))
+
 static inline unsigned int calc_linear_pos(viadev_t *viadev, unsigned int idx, unsigned int count)
 {
 	unsigned int size, res;
 
 	size = viadev->idx_table[idx].size;
-	/* FIXME: is this always true? */
-	if (count)
-		res = viadev->idx_table[idx].offset + size - count;
-	else
-		res = viadev->idx_table[idx].offset;
+	res = viadev->idx_table[idx].offset + size - count;
 
 	/* check the validity of the calculated position */
-	if (size < count || (res < viadev->lastpos && (res >= viadev->bufsize2 || viadev->lastpos < viadev->bufsize2))) {
+	if (size < count) {
+		snd_printd(KERN_ERR "invalid via82xx_cur_ptr (size = %d, count = %d)\n", (int)size, (int)count);
+		res = viadev->lastpos;
+	} else if (check_invalid_pos(viadev, res)) {
 #ifdef POINTER_DEBUG
 		printk("fail: idx = %i/%i, lastpos = 0x%x, bufsize2 = 0x%x, offsize = 0x%x, size = 0x%x, count = 0x%x\n", idx, viadev->tbl_entries, viadev->lastpos, viadev->bufsize2, viadev->idx_table[idx].offset, viadev->idx_table[idx].size, count);
 #endif
-		/* count register returns full size when end of buffer is reached */
-		if (size != count) {
+		if (count && size < count) {
 			snd_printd(KERN_ERR "invalid via82xx_cur_ptr, using last valid pointer\n");
 			res = viadev->lastpos;
 		} else {
-			res = viadev->idx_table[idx].offset + size;
-			if (res < viadev->lastpos && (res >= viadev->bufsize2 || viadev->lastpos < viadev->bufsize2)) {
+			if (! count)
+				/* bogus count 0 on the DMA boundary? */
+				res = viadev->idx_table[idx].offset;
+			else
+				/* count register returns full size when end of buffer is reached */
+				res = viadev->idx_table[idx].offset + size;
+			if (check_invalid_pos(viadev, res)) {
 				snd_printd(KERN_ERR "invalid via82xx_cur_ptr (2), using last valid pointer\n");
 				res = viadev->lastpos;
 			}
