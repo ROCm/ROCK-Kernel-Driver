@@ -812,20 +812,23 @@ unsigned int ata_scsiop_read_cap(struct ata_scsi_args *args, u8 *rbuf,
 
 	VPRINTK("ENTER\n");
 
-	n_sectors--;		/* one off */
+	n_sectors--;		/* ATA TotalUserSectors - 1 */
 
 	tmp = n_sectors;	/* note: truncates, if lba48 */
 	if (args->cmd->cmnd[0] == READ_CAPACITY) {
+		/* sector count, 32-bit */
 		rbuf[0] = tmp >> (8 * 3);
 		rbuf[1] = tmp >> (8 * 2);
 		rbuf[2] = tmp >> (8 * 1);
 		rbuf[3] = tmp;
 
+		/* sector size */
 		tmp = ATA_SECT_SIZE;
 		rbuf[6] = tmp >> 8;
 		rbuf[7] = tmp;
 
 	} else {
+		/* sector count, 64-bit */
 		rbuf[2] = n_sectors >> (8 * 7);
 		rbuf[3] = n_sectors >> (8 * 6);
 		rbuf[4] = n_sectors >> (8 * 5);
@@ -835,6 +838,7 @@ unsigned int ata_scsiop_read_cap(struct ata_scsi_args *args, u8 *rbuf,
 		rbuf[8] = tmp >> (8 * 1);
 		rbuf[9] = tmp;
 
+		/* sector size */
 		tmp = ATA_SECT_SIZE;
 		rbuf[12] = tmp >> 8;
 		rbuf[13] = tmp;
@@ -1114,7 +1118,7 @@ static void ata_scsi_simulate(struct ata_port *ap, struct ata_device *dev,
 	args.done = done;
 
 	switch(scsicmd[0]) {
-		case TEST_UNIT_READY:		/* FIXME: correct? */
+		case TEST_UNIT_READY:
 		case FORMAT_UNIT:		/* FIXME: correct? */
 		case SEND_DIAGNOSTIC:		/* FIXME: correct? */
 			ata_scsi_rbuf_fill(&args, ata_scsiop_noop);

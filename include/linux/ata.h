@@ -104,6 +104,7 @@ enum {
 	ATA_REG_IRQ		= ATA_REG_NSECT,
 
 	/* ATA device commands */
+	ATA_CMD_CHK_POWER	= 0xE5, /* check power mode */
 	ATA_CMD_EDD		= 0x90,	/* execute device diagnostic */
 	ATA_CMD_FLUSH		= 0xE7,
 	ATA_CMD_FLUSH_EXT	= 0xEA,
@@ -204,6 +205,7 @@ struct ata_taskfile {
 #define ata_id_wcache_enabled(dev) ((dev)->id[85] & (1 << 5))
 #define ata_id_has_lba48(dev)	((dev)->id[83] & (1 << 10))
 #define ata_id_has_wcache(dev)	((dev)->id[82] & (1 << 5))
+#define ata_id_has_pm(dev)	((dev)->id[82] & (1 << 3))
 #define ata_id_has_lba(dev)	((dev)->id[49] & (1 << 8))
 #define ata_id_has_dma(dev)	((dev)->id[49] & (1 << 9))
 #define ata_id_removeable(dev)	((dev)->id[0] & (1 << 7))

@@ -2634,6 +2634,8 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 	unsigned int handled = 0;
 
 	switch (qc->tf.protocol) {
+
+	/* BMDMA completion */
 	case ATA_PROT_DMA:
 	case ATA_PROT_ATAPI_DMA:
 		if (ap->flags & ATA_FLAG_MMIO) {
@@ -2652,8 +2654,16 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 		handled = 1;
 		break;
 
+	/* command completion, but no data xfer */
+	/* FIXME: a shared interrupt _will_ cause a non-data command
+	 * to be completed prematurely, with an error.
+	 *
+	 * This doesn't matter right now, since we aren't sending
+	 * non-data commands down this pipe except in development
+	 * situations.
+	 */
 	case ATA_PROT_ATAPI:
-	case ATA_PROT_NODATA:	/* command completion, but no data xfer */
+	case ATA_PROT_NODATA:
 		status = ata_busy_wait(ap, ATA_BUSY | ATA_DRQ, 1000);
 		DPRINTK("BUS_NODATA (drv_stat 0x%X)\n", status);
 		ata_qc_complete(qc, status);
