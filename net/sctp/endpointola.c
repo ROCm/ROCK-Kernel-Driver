@@ -1,7 +1,7 @@
 /* SCTP kernel reference Implementation
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
- * Copyright (c) 2001 International Business Machines, Corp.
+ * Copyright (c) 2001-2002 International Business Machines, Corp.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
@@ -316,13 +316,13 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 	int error = 0;
 
 	if (ep->base.dead)
-		goto out;
+		return;
 
 	asoc = NULL;
 	inqueue = &ep->base.inqueue;
 	sk = ep->base.sk;
 
-	while (NULL != (chunk = sctp_pop_inqueue(inqueue))) {
+	while (NULL != (chunk = sctp_pop_inqueue(inqueue))) {		
 		subtype.chunk = chunk->chunk_hdr->type;
 
 		/* We might have grown an association since last we
@@ -350,25 +350,16 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 		if (chunk->transport)
 			chunk->transport->last_time_heard = jiffies;
 
-		/* FIX ME We really would rather NOT have to use
-		 * GFP_ATOMIC.
-		 */
 		error = sctp_do_sm(SCTP_EVENT_T_CHUNK, subtype, state,
                                    ep, asoc, chunk, GFP_ATOMIC);
 
-		if (error != 0)
-			goto err_out;
+		if (error && chunk)
+			chunk->pdiscard = 1;
 
 		/* Check to see if the endpoint is freed in response to
 		 * the incoming chunk. If so, get out of the while loop.
 		 */
 		if (!sctp_sk(sk)->ep)
-			goto out;
+			break;
 	}
-
-err_out:
-	/* Is this the right way to pass errors up to the ULP?  */
-	if (error)
-		ep->base.sk->err = -error;
-out:
 }
