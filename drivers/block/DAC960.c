@@ -2944,6 +2944,10 @@ static inline void DAC960_ProcessCompletedBuffer(BufferHeader_T *BufferHeader,
   BufferHeader->bi_end_io(BufferHeader);
 }
 
+static inline int DAC960_PartitionByCommand(DAC960_Command_T *Command)
+{
+	return DAC960_PartitionNumber(to_kdev_t(Command->BufferHeader->bi_bdev->bd_dev)); 
+}
 
 /*
   DAC960_V1_ReadWriteError prints an appropriate error message for Command
@@ -2995,11 +2999,11 @@ static void DAC960_V1_ReadWriteError(DAC960_Command_T *Command)
 	       Controller, Controller->ControllerNumber,
 	       Command->LogicalDriveNumber, Command->BlockNumber,
 	       Command->BlockNumber + Command->BlockCount - 1);
-  if (DAC960_PartitionNumber(Command->BufferHeader->bi_dev) > 0)
+  if (DAC960_PartitionByCommand(Command) > 0)
     DAC960_Error("  /dev/rd/c%dd%dp%d: relative blocks %u..%u\n",
 		 Controller, Controller->ControllerNumber,
 		 Command->LogicalDriveNumber,
-		 DAC960_PartitionNumber(Command->BufferHeader->bi_dev),
+		 DAC960_PartitionByCommand(Command),
 		 Command->BufferHeader->bi_sector,
 		 Command->BufferHeader->bi_sector + Command->BlockCount - 1);
 }
@@ -3859,11 +3863,11 @@ static void DAC960_V2_ReadWriteError(DAC960_Command_T *Command)
 	       Controller, Controller->ControllerNumber,
 	       Command->LogicalDriveNumber, Command->BlockNumber,
 	       Command->BlockNumber + Command->BlockCount - 1);
-  if (DAC960_PartitionNumber(Command->BufferHeader->bi_dev) > 0)
+  if (DAC960_PartitionByCommand(Command) > 0)
     DAC960_Error("  /dev/rd/c%dd%dp%d: relative blocks %u..%u\n",
 		 Controller, Controller->ControllerNumber,
 		 Command->LogicalDriveNumber,
-		 DAC960_PartitionNumber(Command->BufferHeader->bi_dev),
+		 DAC960_PartitionByCommand(Command),
 		 Command->BufferHeader->bi_sector,
 		 Command->BufferHeader->bi_sector + Command->BlockCount - 1);
 }

@@ -5,6 +5,7 @@
 
 struct dev_info {
 	kdev_t		dev;
+	struct block_device *bdev;
 	unsigned long	size;
 	unsigned long	offset;
 };

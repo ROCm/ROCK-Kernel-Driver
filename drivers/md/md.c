@@ -172,7 +172,7 @@ void del_mddev_mapping(mddev_t * mddev, kdev_t dev)
 
 static int md_make_request (request_queue_t *q, struct bio *bio)
 {
-	mddev_t *mddev = kdev_to_mddev(bio->bi_dev);
+	mddev_t *mddev = kdev_to_mddev(to_kdev_t(bio->bi_bdev->bd_dev));
 
 	if (mddev && mddev->pers)
 		return mddev->pers->make_request(mddev, bio_rw(bio), bio);
@@ -1577,7 +1577,7 @@ static int device_size_calculation(mddev_t * mddev)
 	if (!md_size[mdidx(mddev)])
 		md_size[mdidx(mddev)] = sb->size * data_disks;
 
-	readahead = (blk_get_readahead(rdev->dev) * 512) / PAGE_SIZE;
+	readahead = (blk_get_readahead(rdev->bdev) * 512) / PAGE_SIZE;
 	if (!sb->level || (sb->level == 4) || (sb->level == 5)) {
 		readahead = (mddev->sb->chunk_size>>PAGE_SHIFT) * 4 * data_disks;
 		if (readahead < data_disks * (MAX_SECTORS>>(PAGE_SHIFT-9))*2)
@@ -1711,8 +1711,8 @@ static int do_md_run(mddev_t * mddev)
 			continue;
 		invalidate_device(rdev->dev, 1);
 		md_blocksizes[mdidx(mddev)] = 1024;
-		if (get_hardsect_size(rdev->dev) > md_blocksizes[mdidx(mddev)])
-			md_blocksizes[mdidx(mddev)] = get_hardsect_size(rdev->dev);
+		if (bdev_hardsect_size(rdev->bdev) > md_blocksizes[mdidx(mddev)])
+			md_blocksizes[mdidx(mddev)] = bdev_hardsect_size(rdev->bdev);
 	}
 	mddev->pers = pers[pnum];
 
@@ -2556,9 +2556,14 @@ static int unprotect_array(mddev_t * mddev)
 
 static int set_disk_faulty(mddev_t *mddev, kdev_t dev)
 {
+	mdk_rdev_t *rdev;
 	int ret;
 
-	ret = md_error(mddev, dev);
+	rdev = find_rdev(mddev, dev);
+	if (!rdev)
+		return 0;
+
+	ret = md_error(mddev, rdev->bdev);
 	return ret;
 }
 
@@ -3035,9 +3040,10 @@ void md_recover_arrays(void)
 }
 
 
-int md_error(mddev_t *mddev, kdev_t rdev)
+int md_error(mddev_t *mddev, struct block_device *bdev)
 {
 	mdk_rdev_t * rrdev;
+	kdev_t rdev = to_kdev_t(bdev->bd_dev);
 
 	dprintk("md_error dev:(%d:%d), rdev:(%d:%d), (caller: %p,%p,%p,%p).\n",
 		major(dev),minor(dev),major(rdev),minor(rdev),

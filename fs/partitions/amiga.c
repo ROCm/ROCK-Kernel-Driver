@@ -39,7 +39,6 @@ amiga_partition(struct gendisk *hd, struct block_device *bdev,
 	struct RigidDiskBlock *rdb;
 	struct PartitionBlock *pb;
 	int start_sect, nr_sects, blk, part, res = 0;
-	kdev_t dev = to_kdev_t(bdev->bd_dev);
 
 	for (blk = 0; ; blk++, put_dev_sector(sect)) {
 		if (blk == RDB_ALLOCATION_LIMIT)
@@ -48,7 +47,7 @@ amiga_partition(struct gendisk *hd, struct block_device *bdev,
 		if (!data) {
 			if (warn_no_part)
 				printk("Dev %s: unable to read RDB block %d\n",
-				       bdevname(dev), blk);
+				       bdevname(bdev), blk);
 			goto rdb_done;
 		}
 		if (*(u32 *)data != cpu_to_be32(IDNAME_RIGIDDISK))
@@ -69,7 +68,7 @@ amiga_partition(struct gendisk *hd, struct block_device *bdev,
 		}
 
 		printk("Dev %s: RDB in block %d has bad checksum\n",
-			       bdevname(dev),blk);
+			       bdevname(bdev),blk);
 	}
 
 	printk(" RDSK");
@@ -80,7 +79,7 @@ amiga_partition(struct gendisk *hd, struct block_device *bdev,
 		if (!data) {
 			if (warn_no_part)
 				printk("Dev %s: unable to read partition block %d\n",
-				       bdevname(dev),blk);
+				       bdevname(bdev),blk);
 			goto rdb_done;
 		}
 		pb  = (struct PartitionBlock *)data;

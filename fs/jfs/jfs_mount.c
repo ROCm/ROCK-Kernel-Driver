@@ -444,7 +444,7 @@ int updateSuper(struct super_block *sb, uint state)
 	if (state == FM_MOUNT) {
 		/* record log's dev_t and mount serial number */
 		j_sb->s_logdev =
-			cpu_to_le32(kdev_t_to_nr(JFS_SBI(sb)->log->dev));
+			cpu_to_le32(JFS_SBI(sb)->log->bdev->bd_dev);
 		j_sb->s_logserial = cpu_to_le32(JFS_SBI(sb)->log->serial);
 		/* record our own device number in case the location
 		 * changes after a reboot

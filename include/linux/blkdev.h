@@ -76,17 +76,16 @@ enum rq_flag_bits {
 	__REQ_STARTED,	/* drive already may have started this one */
 	__REQ_DONTPREP,	/* don't call prep for this one */
 	/*
-	 * for IDE
- 	*/
+	 * for ATA/ATAPI devices
+	 */
 	__REQ_DRIVE_CMD,
-	__REQ_DRIVE_TASK,
 	__REQ_DRIVE_ACB,
 
 	__REQ_PC,	/* packet command (special) */
 	__REQ_BLOCK_PC,	/* queued down pc from block layer */
 	__REQ_SENSE,	/* sense retrival */
 
-	__REQ_SPECIAL,	/* driver special command */
+	__REQ_SPECIAL,	/* driver special command (currently reset) */
 
 	__REQ_NR_BITS,	/* stops here */
 };
@@ -99,14 +98,11 @@ enum rq_flag_bits {
 #define REQ_STARTED	(1 << __REQ_STARTED)
 #define REQ_DONTPREP	(1 << __REQ_DONTPREP)
 #define REQ_DRIVE_CMD	(1 << __REQ_DRIVE_CMD)
-#define REQ_DRIVE_TASK	(1 << __REQ_DRIVE_TASK)
 #define REQ_DRIVE_ACB	(1 << __REQ_DRIVE_ACB)
 #define REQ_PC		(1 << __REQ_PC)
-#define REQ_SENSE	(1 << __REQ_SENSE)
 #define REQ_BLOCK_PC	(1 << __REQ_BLOCK_PC)
+#define REQ_SENSE	(1 << __REQ_SENSE)
 #define REQ_SPECIAL	(1 << __REQ_SPECIAL)
-
-#define REQ_DRIVE_TASKFILE	REQ_DRIVE_ACB
 
 #include <linux/elevator.h>
 
@@ -291,7 +287,7 @@ extern void blk_plug_device(request_queue_t *);
 extern void blk_recount_segments(request_queue_t *, struct bio *);
 extern inline int blk_phys_contig_segment(request_queue_t *q, struct bio *, struct bio *);
 extern inline int blk_hw_contig_segment(request_queue_t *q, struct bio *, struct bio *);
-extern int block_ioctl(kdev_t, unsigned int, unsigned long);
+extern int block_ioctl(struct block_device *, unsigned int, unsigned long);
 extern int ll_10byte_cmd_build(request_queue_t *, struct request *);
 
 /*
@@ -314,8 +310,8 @@ extern void blk_queue_hardsect_size(request_queue_t *q, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *q, unsigned long);
 extern void blk_queue_assign_lock(request_queue_t *q, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *q, prep_rq_fn *pfn);
-extern int blk_set_readahead(kdev_t dev, unsigned sectors);
-extern unsigned blk_get_readahead(kdev_t dev);
+extern int blk_set_readahead(struct block_device *bdev, unsigned sectors);
+extern unsigned blk_get_readahead(struct block_device *bdev);
 
 extern int blk_rq_map_sg(request_queue_t *, struct request *, struct scatterlist *);
 extern void blk_dump_rq_flags(struct request *, char *);
@@ -343,15 +339,24 @@ extern inline void blk_clear(int major)
 	blksize_size[major] = NULL;
 }
 
-extern inline int get_hardsect_size(kdev_t dev)
+extern inline int queue_hardsect_size(request_queue_t *q)
 {
-	request_queue_t *q = blk_get_queue(dev);
 	int retval = 512;
 
 	if (q && q->hardsect_size)
 		retval = q->hardsect_size;
 
 	return retval;
+}
+
+extern inline int get_hardsect_size(kdev_t dev)
+{
+	return queue_hardsect_size(blk_get_queue(dev));
+}
+
+extern inline int bdev_hardsect_size(struct block_device *bdev)
+{
+	return queue_hardsect_size(blk_get_queue(to_kdev_t(bdev->bd_dev)));
 }
 
 #define blk_finished_io(nsects)	do { } while (0)

@@ -261,7 +261,7 @@ adfspart_check_ADFS(struct gendisk *hd, struct block_device *bdev,
 	/*
 	 * Work out start of non-adfs partition.
 	 */
-	nr_sects = hd->part[minor(to_kdev_t(bdev->bd_dev))].nr_sects - start_sect;
+	nr_sects = (bdev->bd_inode->i_size >> 9) - start_sect;
 
 	if (start_sect) {
 		first_sector += start_sect;

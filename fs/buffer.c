@@ -507,7 +507,7 @@ out:
 
 static inline void __insert_into_hash_list(struct buffer_head *bh)
 {
-	struct buffer_head **head = &hash(bh->b_dev, bh->b_blocknr);
+	struct buffer_head **head = &hash(to_kdev_t(bh->b_bdev->bd_dev), bh->b_blocknr);
 	struct buffer_head *next = *head;
 
 	*head = bh;
@@ -1142,7 +1142,6 @@ static void __put_unused_buffer_head(struct buffer_head * bh)
 	if (nr_unused_buffer_heads >= MAX_UNUSED_BUFFERS) {
 		kmem_cache_free(bh_cachep, bh);
 	} else {
-		bh->b_dev = B_FREE;
 		bh->b_bdev = NULL;
 		bh->b_blocknr = -1;
 		bh->b_this_page = NULL;
@@ -1246,7 +1245,6 @@ try_again:
 		if (!bh)
 			goto no_grow;
 
-		bh->b_dev = NODEV;
 		bh->b_bdev = NULL;
 		bh->b_this_page = head;
 		head = bh;
@@ -2092,7 +2090,6 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
 		struct buffer_head bh;
 
 		bh.b_state = 0;
-		bh.b_dev = inode->i_dev;
 		bh.b_size = blocksize;
 
 		retval = get_block(inode, blocknr, &bh, rw & 1);
@@ -2210,7 +2207,6 @@ int brw_page(int rw, struct page *page, struct block_device *bdev, sector_t b[],
 		lock_buffer(bh);
 		bh->b_blocknr = *(b++);
 		bh->b_bdev = bdev;
-		bh->b_dev = to_kdev_t(bdev->bd_dev);
 		set_bit(BH_Mapped, &bh->b_state);
 		set_buffer_async_io(bh);
 		bh = bh->b_this_page;
@@ -2325,7 +2321,6 @@ static void hash_page_buffers(struct page *page, struct block_device *bdev, int 
 		if (!(bh->b_state & (1 << BH_Mapped))) {
 			init_buffer(bh, NULL, NULL);
 			bh->b_bdev = bdev;
-			bh->b_dev = to_kdev_t(bdev->bd_dev);
 			bh->b_blocknr = block;
 			bh->b_state = uptodate;
 		}
@@ -2351,7 +2346,7 @@ static int grow_buffers(struct block_device *bdev, unsigned long block, int size
 	int sizebits;
 
 	/* Size must be multiple of hard sectorsize */
-	if (size & (get_hardsect_size(to_kdev_t(bdev->bd_dev))-1))
+	if (size & (bdev_hardsect_size(bdev)-1))
 		BUG();
 	/* Size must be within 512 bytes and PAGE_SIZE */
 	if (size < 512 || size > PAGE_SIZE)
@@ -2462,9 +2457,6 @@ cleaned_buffers_try_again:
 	do {
 		struct buffer_head * p = tmp;
 		tmp = tmp->b_this_page;
-
-		if (kdev_same(p->b_dev, B_FREE)) BUG();
-
 		remove_inode_queue(p);
 		__remove_from_queues(p);
 		__put_unused_buffer_head(p);
