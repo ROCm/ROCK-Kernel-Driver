@@ -1313,8 +1313,6 @@ fst_open ( struct net_device *dev )
         if ( err )
                 return err;
 
-        MOD_INC_USE_COUNT;
-
         fst_openport ( dev_to_port ( dev ));
         netif_wake_queue ( dev );
         return 0;
@@ -1326,7 +1324,6 @@ fst_close ( struct net_device *dev )
         netif_stop_queue ( dev );
         fst_closeport ( dev_to_port ( dev ));
         hdlc_close ( dev_to_hdlc  ( dev ));
-        MOD_DEC_USE_COUNT;
         return 0;
 }
 
