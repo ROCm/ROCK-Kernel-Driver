@@ -139,7 +139,8 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		goto out;
 	}
 
-	if (psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/2)) {
+	if (psmouse->state == PSMOUSE_ACTIVATED &&
+	    psmouse->pktcnt && time_after(jiffies, psmouse->last + HZ/2)) {
 		printk(KERN_WARNING "psmouse.c: %s at %s lost synchronization, throwing %d bytes away.\n",
 		       psmouse->name, psmouse->phys, psmouse->pktcnt);
 		psmouse->pktcnt = 0;
@@ -274,24 +275,18 @@ static int psmouse_extensions(struct psmouse *psmouse)
 		return PSMOUSE_PS2;
 
 /*
- * Try Synaptics TouchPad magic ID
+ * Try Synaptics TouchPad
  */
-
-       param[0] = 0;
-       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-       psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-       psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
-
-       if (param[1] == 0x47) {
+	if (synaptics_detect(psmouse) == 0) {
 		psmouse->vendor = "Synaptics";
 		psmouse->name = "TouchPad";
-		if (!synaptics_init(psmouse))
+
+#if CONFIG_MOUSE_PS2_SYNAPTICS
+		if (synaptics_init(psmouse) == 0)
 			return PSMOUSE_SYNAPTICS;
-		else
-			return PSMOUSE_PS2;
-       }
+#endif
+		return PSMOUSE_PS2;
+	}
 
 /*
  * Try Genius NetMouse magic init.
@@ -513,7 +508,18 @@ static void psmouse_disconnect(struct serio *serio)
 	struct psmouse *psmouse = serio->private;
 
 	psmouse->state = PSMOUSE_IGNORE;
-	synaptics_disconnect(psmouse);
+
+	if (psmouse->ptport) {
+		if (psmouse->ptport->deactivate)
+			psmouse->ptport->deactivate(psmouse);
+		__serio_unregister_port(&psmouse->ptport->serio); /* we have serio_sem */
+		kfree(psmouse->ptport);
+		psmouse->ptport = NULL;
+	}
+
+	if (psmouse->disconnect)
+		psmouse->disconnect(psmouse);
+
 	input_unregister_device(&psmouse->dev);
 	serio_close(serio);
 	kfree(psmouse);
@@ -526,19 +532,9 @@ static void psmouse_disconnect(struct serio *serio)
 static int psmouse_pm_callback(struct pm_dev *dev, pm_request_t request, void *data)
 {
 	struct psmouse *psmouse = dev->data;
-	struct serio_dev *ser_dev = psmouse->serio->dev;
 
-	synaptics_disconnect(psmouse);
-
-	/* We need to reopen the serio port to reinitialize the i8042 controller */
-	serio_close(psmouse->serio);
-	serio_open(psmouse->serio, ser_dev);
-
-	/* Probe and re-initialize the mouse */
-	psmouse_probe(psmouse);
-	psmouse_initialize(psmouse);
-	synaptics_pt_init(psmouse);
-	psmouse_activate(psmouse);
+	psmouse->state = PSMOUSE_IGNORE;
+	serio_reconnect(psmouse->serio);
 
 	return 0;
 }
@@ -547,7 +543,6 @@ static int psmouse_pm_callback(struct pm_dev *dev, pm_request_t request, void *d
  * psmouse_connect() is a callback from the serio module when
  * an unhandled serio port is found.
  */
-
 static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 {
 	struct psmouse *psmouse;
@@ -572,7 +567,6 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.private = psmouse;
 
 	serio->private = psmouse;
-
 	if (serio_open(serio, dev)) {
 		kfree(psmouse);
 		return;
@@ -584,10 +578,12 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 		return;
 	}
 	
-	pmdev = pm_register(PM_SYS_DEV, PM_SYS_UNKNOWN, psmouse_pm_callback);
-	if (pmdev) {
-		psmouse->dev.pm_dev = pmdev;
-		pmdev->data = psmouse;
+	if (serio->type != SERIO_PS_PSTHRU) {
+		pmdev = pm_register(PM_SYS_DEV, PM_SYS_UNKNOWN, psmouse_pm_callback);
+		if (pmdev) {
+			psmouse->dev.pm_dev = pmdev;
+			pmdev->data = psmouse;
+		}
 	}
 
 	sprintf(psmouse->devname, "%s %s %s",
@@ -608,14 +604,70 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 
 	psmouse_initialize(psmouse);
 
-	synaptics_pt_init(psmouse);
+	if (psmouse->ptport) {
+		printk(KERN_INFO "serio: %s port at %s\n", psmouse->ptport->serio.name, psmouse->phys);
+		__serio_register_port(&psmouse->ptport->serio); /* we have serio_sem */
+		if (psmouse->ptport->activate)
+			psmouse->ptport->activate(psmouse);
+	}
 
 	psmouse_activate(psmouse);
 }
 
+
+static int psmouse_reconnect(struct serio *serio)
+{
+	struct psmouse *psmouse = serio->private;
+	struct serio_dev *dev = serio->dev;
+	int old_type = psmouse->type;
+
+	if (!dev) {
+		printk(KERN_DEBUG "psmouse: reconnect request, but serio is disconnected, ignoring...\n");
+		return -1;
+	}
+
+	/* We need to reopen the serio port to reinitialize the i8042 controller */
+	serio_close(serio);
+	if (serio_open(serio, dev)) {
+		/* do a disconnect here as serio_open leaves dev as NULL so disconnect
+		 * will not be called automatically later
+		 */
+		psmouse_disconnect(serio);
+		return -1;
+	}
+
+	psmouse->state = PSMOUSE_NEW_DEVICE;
+	psmouse->type = psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = 0;
+	if (psmouse->reconnect) {
+	       if (psmouse->reconnect(psmouse))
+			return -1;
+	} else if (psmouse_probe(psmouse) != old_type)
+		return -1;
+
+	/* ok, the device type (and capabilities) match the old one,
+	 * we can continue using it, complete intialization
+	 */
+	psmouse->type = old_type;
+	psmouse_initialize(psmouse);
+
+	if (psmouse->ptport) {
+       		if (psmouse_reconnect(&psmouse->ptport->serio)) {
+			__serio_unregister_port(&psmouse->ptport->serio);
+			__serio_register_port(&psmouse->ptport->serio);
+			if (psmouse->ptport->activate)
+				psmouse->ptport->activate(psmouse);
+		}
+	}
+
+	psmouse_activate(psmouse);
+	return 0;
+}
+
+
 static struct serio_dev psmouse_dev = {
 	.interrupt =	psmouse_interrupt,
 	.connect =	psmouse_connect,
+	.reconnect =	psmouse_reconnect,
 	.disconnect =	psmouse_disconnect,
 	.cleanup =	psmouse_cleanup,
 };

@@ -10,6 +10,7 @@
  */
 
 #include <linux/input.h>
+#include <linux/serio.h>
 #include "psmouse.h"
 #include "logips2pp.h"
 
