@@ -1,6 +1,6 @@
 /*
- * Copyright (c) 2001 by David Brownell
- * 
+ * Copyright (c) 2001-2002 by David Brownell
+ *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
  * Free Software Foundation; either version 2 of the License, or (at your
@@ -16,6 +16,8 @@
  * Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+
+#ifdef __KERNEL__
 
 /*-------------------------------------------------------------------------*/
 
@@ -33,8 +35,8 @@ struct usb_hcd {	/* usb_bus.hcpriv points to this */
 	/*
 	 * housekeeping
 	 */
-	struct usb_bus		*bus;		/* hcd is-a bus */
-	struct list_head	hcd_list;
+	struct usb_bus		*bus;		/* FIXME only use "self" */
+	struct usb_bus		self;		/* hcd is-a bus */
 
 	const char		*bus_name;
 
@@ -98,6 +100,19 @@ struct hcd_timeout {	/* timeouts we allocate */
 
 /*-------------------------------------------------------------------------*/
 
+/*
+ * FIXME usb_operations should vanish or become hc_driver,
+ * when usb_bus and usb_hcd become the same thing.
+ */
+
+struct usb_operations {
+	int (*allocate)(struct usb_device *);
+	int (*deallocate)(struct usb_device *);
+	int (*get_frame_number) (struct usb_device *usb_dev);
+	int (*submit_urb) (struct urb *urb, int mem_flags);
+	int (*unlink_urb) (struct urb *urb);
+};
+
 /* each driver provides one of these, and hardware init support */
 
 struct hc_driver {
@@ -126,8 +141,6 @@ struct hc_driver {
 	/* return current frame number */
 	int	(*get_frame_number) (struct usb_hcd *hcd);
 
-// FIXME: rework generic-to-specific HCD linkage (specific contains generic)
-
 	/* memory lifecycle */
 	struct usb_hcd	*(*hcd_alloc) (void);
 	void		(*hcd_free) (struct usb_hcd *hcd);
@@ -152,7 +165,8 @@ struct hc_driver {
 extern void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb);
 
 #ifdef CONFIG_PCI
-
+struct pci_dev;
+struct pci_device_id;
 extern int usb_hcd_pci_probe (struct pci_dev *dev,
 				const struct pci_device_id *id);
 extern void usb_hcd_pci_remove (struct pci_dev *dev);
@@ -206,6 +220,59 @@ extern int usb_hcd_pci_resume (struct pci_dev *dev);
 
 /*-------------------------------------------------------------------------*/
 
+/*
+ * Generic bandwidth allocation constants/support
+ */
+#define FRAME_TIME_USECS	1000L
+#define BitTime(bytecount)  (7 * 8 * bytecount / 6)  /* with integer truncation */
+		/* Trying not to use worst-case bit-stuffing
+                   of (7/6 * 8 * bytecount) = 9.33 * bytecount */
+		/* bytecount = data payload byte count */
+
+#define NS_TO_US(ns)	((ns + 500L) / 1000L)
+			/* convert & round nanoseconds to microseconds */
+
+extern void usb_claim_bandwidth (struct usb_device *dev, struct urb *urb,
+		int bustime, int isoc);
+extern void usb_release_bandwidth (struct usb_device *dev, struct urb *urb,
+		int isoc);
+
+/*
+ * Full/low speed bandwidth allocation constants/support.
+ */
+#define BW_HOST_DELAY	1000L		/* nanoseconds */
+#define BW_HUB_LS_SETUP	333L		/* nanoseconds */
+                        /* 4 full-speed bit times (est.) */
+
+#define FRAME_TIME_BITS         12000L		/* frame = 1 millisecond */
+#define FRAME_TIME_MAX_BITS_ALLOC	(90L * FRAME_TIME_BITS / 100L)
+#define FRAME_TIME_MAX_USECS_ALLOC	(90L * FRAME_TIME_USECS / 100L)
+
+extern int usb_check_bandwidth (struct usb_device *dev, struct urb *urb);
+
+/*-------------------------------------------------------------------------*/
+
+extern struct usb_bus *usb_alloc_bus (struct usb_operations *);
+extern void usb_free_bus (struct usb_bus *);
+
+extern void usb_register_bus (struct usb_bus *);
+extern void usb_deregister_bus (struct usb_bus *);
+
+extern int usb_register_root_hub (struct usb_device *usb_dev,
+		struct device *parent_dev);
+
+/*-------------------------------------------------------------------------*/
+
+/* exported only within usbcore */
+
+extern struct list_head usb_bus_list;
+extern struct semaphore usb_bus_list_lock;
+
+extern void usb_bus_get (struct usb_bus *bus);
+extern void usb_bus_put (struct usb_bus *bus);
+
+/*-------------------------------------------------------------------------*/
+
 /* hub.h ... DeviceRemovable in 2.4.2-ac11, gone in 2.4.10 */
 // bleech -- resurfaced in 2.4.11 or 2.4.12
 #define bitmap 	DeviceRemovable
@@ -217,3 +284,7 @@ extern int usb_hcd_pci_resume (struct pci_dev *dev);
 
 #define	RUN_CONTEXT (in_irq () ? "in_irq" \
 		: (in_interrupt () ? "in_interrupt" : "can sleep"))
+
+
+#endif /* __KERNEL__ */
+

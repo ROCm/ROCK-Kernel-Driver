@@ -73,6 +73,7 @@
 #define OHCI_USE_NPS		// force NoPowerSwitching mode
 // #define OHCI_VERBOSE_DEBUG	/* not always helpful */
 
+#include "hcd.h"
 #include "usb-ohci.h"
 
 

@@ -1,5 +1,11 @@
 /*
- * Copyright (c) 2001 by David Brownell
+ * (C) Copyright Linus Torvalds 1999
+ * (C) Copyright Johannes Erdfelt 1999-2001
+ * (C) Copyright Andreas Gal 1999
+ * (C) Copyright Gregory P. Smith 1999
+ * (C) Copyright Deti Fliegl 1999
+ * (C) Copyright Randy Dunlap 2000
+ * (C) Copyright David Brownell 2000-2002
  * 
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -33,9 +39,6 @@
 #include <linux/interrupt.h>
 #include <linux/uts.h>			/* for UTS_SYSNAME */
 
-#ifndef CONFIG_USB_DEBUG
-	#define CONFIG_USB_DEBUG	/* this is experimental! */
-#endif
 
 #ifdef CONFIG_USB_DEBUG
 	#define DEBUG
@@ -52,6 +55,8 @@
 #include <asm/unaligned.h>
 #include <asm/byteorder.h>
 
+
+// #define USB_BANDWIDTH_MESSAGES
 
 /*-------------------------------------------------------------------------*/
 
@@ -78,19 +83,28 @@
  * usb client device drivers.
  *
  * Contributors of ideas or unattributed patches include: David Brownell,
- * Roman Weissgaerber, Rory Bolt, ...
+ * Roman Weissgaerber, Rory Bolt, Greg Kroah-Hartman, ...
  *
  * HISTORY:
+ * 2002-02-21	Pull in most of the usb_bus support from usb.c; some
+ *		associated cleanup.  "usb_hcd" still != "usb_bus".
  * 2001-12-12	Initial patch version for Linux 2.5.1 kernel.
  */
 
 /*-------------------------------------------------------------------------*/
 
 /* host controllers we manage */
-static LIST_HEAD (hcd_list);
+LIST_HEAD (usb_bus_list);
+
+/* used when allocating bus numbers */
+#define USB_MAXBUS		64
+struct usb_busmap {
+	unsigned long busmap [USB_MAXBUS / (8*sizeof (unsigned long))];
+};
+static struct usb_busmap busmap;
 
 /* used when updating list of hcds */
-static DECLARE_MUTEX (hcd_list_lock);
+DECLARE_MUTEX (usb_bus_list_lock);	/* exported only for usbfs */
 
 /* used when updating hcd data */
 static spinlock_t hcd_data_lock = SPIN_LOCK_UNLOCKED;
@@ -105,6 +119,9 @@ static struct usb_operations hcd_operations;
 
 /*-------------------------------------------------------------------------*/
 
+#define KERNEL_REL	((LINUX_VERSION_CODE >> 16) & 0x0ff)
+#define KERNEL_VER	((LINUX_VERSION_CODE >> 8) & 0x0ff)
+
 /* usb 2.0 root hub device descriptor */
 static const u8 usb2_rh_dev_descriptor [18] = {
 	0x12,       /*  __u8  bLength; */
@@ -118,7 +135,7 @@ static const u8 usb2_rh_dev_descriptor [18] = {
 
 	0x00, 0x00, /*  __u16 idVendor; */
  	0x00, 0x00, /*  __u16 idProduct; */
- 	0x40, 0x02, /*  __u16 bcdDevice; (v2.4) */
+	KERNEL_VER, KERNEL_REL, /*  __u16 bcdDevice */
 
 	0x03,       /*  __u8  iManufacturer; */
 	0x02,       /*  __u8  iProduct; */
@@ -141,7 +158,7 @@ static const u8 usb11_rh_dev_descriptor [18] = {
 
 	0x00, 0x00, /*  __u16 idVendor; */
  	0x00, 0x00, /*  __u16 idProduct; */
- 	0x40, 0x02, /*  __u16 bcdDevice; (v2.4) */
+	KERNEL_VER, KERNEL_REL, /*  __u16 bcdDevice */
 
 	0x03,       /*  __u8  iManufacturer; */
 	0x02,       /*  __u8  iProduct; */
@@ -506,6 +523,346 @@ static void rh_status_dequeue (struct usb_hcd *hcd, struct urb *urb)
 
 /*-------------------------------------------------------------------------*/
 
+/* exported only within usbcore */
+void usb_bus_get (struct usb_bus *bus)
+{
+	atomic_inc (&bus->refcnt);
+}
+
+/* exported only within usbcore */
+void usb_bus_put (struct usb_bus *bus)
+{
+	if (atomic_dec_and_test (&bus->refcnt))
+		kfree (bus);
+}
+
+/*-------------------------------------------------------------------------*/
+
+/* shared initialization code */
+static void usb_init_bus (struct usb_bus *bus)
+{
+	memset (&bus->devmap, 0, sizeof(struct usb_devmap));
+
+#ifdef DEVNUM_ROUND_ROBIN
+	bus->devnum_next = 1;
+#endif /* DEVNUM_ROUND_ROBIN */
+
+	bus->root_hub = NULL;
+	bus->hcpriv = NULL;
+	bus->busnum = -1;
+	bus->bandwidth_allocated = 0;
+	bus->bandwidth_int_reqs  = 0;
+	bus->bandwidth_isoc_reqs = 0;
+
+	INIT_LIST_HEAD (&bus->bus_list);
+
+	atomic_set (&bus->refcnt, 1);
+}
+
+/**
+ * usb_alloc_bus - creates a new USB host controller structure
+ * @op: pointer to a struct usb_operations that this bus structure should use
+ * Context: !in_interrupt()
+ *
+ * Creates a USB host controller bus structure with the specified 
+ * usb_operations and initializes all the necessary internal objects.
+ *
+ * If no memory is available, NULL is returned.
+ *
+ * The caller should call usb_free_bus() when it is finished with the structure.
+ */
+struct usb_bus *usb_alloc_bus (struct usb_operations *op)
+{
+	struct usb_bus *bus;
+
+	bus = kmalloc (sizeof *bus, GFP_KERNEL);
+	if (!bus)
+		return NULL;
+	usb_init_bus (bus);
+	bus->op = op;
+	return bus;
+}
+EXPORT_SYMBOL (usb_alloc_bus);
+
+/**
+ * usb_free_bus - frees the memory used by a bus structure
+ * @bus: pointer to the bus to free
+ *
+ * To be invoked by a HCD, only as the last step of decoupling from
+ * hardware.  It is an error to call this if the reference count is
+ * anything but one.  That would indicate that some system component
+ * did not correctly shut down, and thought the hardware was still
+ * accessible.
+ */
+void usb_free_bus (struct usb_bus *bus)
+{
+	if (!bus)
+		return;
+	if (atomic_read (&bus->refcnt) != 1)
+		err ("usb_free_bus #%d, count != 1", bus->busnum);
+	usb_bus_put (bus);
+}
+EXPORT_SYMBOL (usb_free_bus);
+
+/*-------------------------------------------------------------------------*/
+
+/**
+ * usb_register_bus - registers the USB host controller with the usb core
+ * @bus: pointer to the bus to register
+ * Context: !in_interrupt()
+ *
+ * Assigns a bus number, and links the controller into usbcore data
+ * structures so that it can be seen by scanning the bus list.
+ */
+void usb_register_bus(struct usb_bus *bus)
+{
+	int busnum;
+
+	down (&usb_bus_list_lock);
+	busnum = find_next_zero_bit (busmap.busmap, USB_MAXBUS, 1);
+	if (busnum < USB_MAXBUS) {
+		set_bit (busnum, busmap.busmap);
+		bus->busnum = busnum;
+	} else
+		warn ("too many buses");
+
+	usb_bus_get (bus);
+
+	/* Add it to the list of buses */
+	list_add (&bus->bus_list, &usb_bus_list);
+	up (&usb_bus_list_lock);
+
+	usbfs_add_bus (bus);
+
+	info ("new USB bus registered, assigned bus number %d", bus->busnum);
+}
+EXPORT_SYMBOL (usb_register_bus);
+
+/**
+ * usb_deregister_bus - deregisters the USB host controller
+ * @bus: pointer to the bus to deregister
+ * Context: !in_interrupt()
+ *
+ * Recycles the bus number, and unlinks the controller from usbcore data
+ * structures so that it won't be seen by scanning the bus list.
+ */
+void usb_deregister_bus (struct usb_bus *bus)
+{
+	info ("USB bus %d deregistered", bus->busnum);
+
+	/*
+	 * NOTE: make sure that all the devices are removed by the
+	 * controller code, as well as having it call this when cleaning
+	 * itself up
+	 */
+	down (&usb_bus_list_lock);
+	list_del (&bus->bus_list);
+	up (&usb_bus_list_lock);
+
+	usbfs_remove_bus (bus);
+
+	clear_bit (bus->busnum, busmap.busmap);
+
+	usb_bus_put (bus);
+}
+EXPORT_SYMBOL (usb_deregister_bus);
+
+/**
+ * usb_register_root_hub - called by HCD to register its root hub 
+ * @usb_dev: the usb root hub device to be registered.
+ * @parent_dev: the parent device of this root hub.
+ *
+ * The USB host controller calls this function to register the root hub
+ * properly with the USB subsystem.  It sets up the device properly in
+ * the driverfs tree, and then calls usb_new_device() to register the
+ * usb device.
+ */
+int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev)
+{
+	int retval;
+
+	usb_dev->dev.parent = parent_dev;
+	strcpy (&usb_dev->dev.name[0], "usb_name");
+	strcpy (&usb_dev->dev.bus_id[0], "usb_bus");
+	retval = usb_new_device (usb_dev);
+	if (retval)
+		put_device (&usb_dev->dev);
+	return retval;
+}
+EXPORT_SYMBOL (usb_register_root_hub);
+
+
+/*-------------------------------------------------------------------------*/
+
+/*
+ * usb_calc_bus_time:
+ * Returns approximate bus time in nanoseconds for a periodic transaction.
+ * See USB 2.0 spec section 5.11.3
+ */
+static long usb_calc_bus_time (int speed, int is_input, int isoc, int bytecount)
+{
+	unsigned long	tmp;
+
+	switch (speed) {
+	case USB_SPEED_LOW: 	/* INTR only */
+		if (is_input) {
+			tmp = (67667L * (31L + 10L * BitTime (bytecount))) / 1000L;
+			return (64060L + (2 * BW_HUB_LS_SETUP) + BW_HOST_DELAY + tmp);
+		} else {
+			tmp = (66700L * (31L + 10L * BitTime (bytecount))) / 1000L;
+			return (64107L + (2 * BW_HUB_LS_SETUP) + BW_HOST_DELAY + tmp);
+		}
+	case USB_SPEED_FULL:	/* ISOC or INTR */
+		if (isoc) {
+			tmp = (8354L * (31L + 10L * BitTime (bytecount))) / 1000L;
+			return (((is_input) ? 7268L : 6265L) + BW_HOST_DELAY + tmp);
+		} else {
+			tmp = (8354L * (31L + 10L * BitTime (bytecount))) / 1000L;
+			return (9107L + BW_HOST_DELAY + tmp);
+		}
+	case USB_SPEED_HIGH:	/* ISOC or INTR */
+		// FIXME merge from EHCI code; caller will need to handle
+		// each part of a split separately.
+		return 0;
+	default:
+		dbg ("bogus device speed!");
+		return -1;
+	}
+}
+
+/*
+ * usb_check_bandwidth():
+ *
+ * old_alloc is from host_controller->bandwidth_allocated in microseconds;
+ * bustime is from calc_bus_time(), but converted to microseconds.
+ *
+ * returns <bustime in us> if successful,
+ * or -ENOSPC if bandwidth request fails.
+ *
+ * FIXME:
+ * This initial implementation does not use Endpoint.bInterval
+ * in managing bandwidth allocation.
+ * It probably needs to be expanded to use Endpoint.bInterval.
+ * This can be done as a later enhancement (correction).
+ *
+ * This will also probably require some kind of
+ * frame allocation tracking...meaning, for example,
+ * that if multiple drivers request interrupts every 10 USB frames,
+ * they don't all have to be allocated at
+ * frame numbers N, N+10, N+20, etc.  Some of them could be at
+ * N+11, N+21, N+31, etc., and others at
+ * N+12, N+22, N+32, etc.
+ *
+ * Similarly for isochronous transfers...
+ *
+ * Individual HCDs can schedule more directly ... this logic
+ * is not correct for high speed transfers.
+ */
+int usb_check_bandwidth (struct usb_device *dev, struct urb *urb)
+{
+	unsigned int	pipe = urb->pipe;
+	long		bustime;
+	int		is_in = usb_pipein (pipe);
+	int		is_iso = usb_pipeisoc (pipe);
+	int		old_alloc = dev->bus->bandwidth_allocated;
+	int		new_alloc;
+
+
+	bustime = NS_TO_US (usb_calc_bus_time (dev->speed, is_in, is_iso,
+			usb_maxpacket (dev, pipe, !is_in)));
+	if (is_iso)
+		bustime /= urb->number_of_packets;
+
+	new_alloc = old_alloc + (int) bustime;
+	if (new_alloc > FRAME_TIME_MAX_USECS_ALLOC) {
+#ifdef	DEBUG
+		char	*mode = 
+#ifdef CONFIG_USB_BANDWIDTH
+			"";
+#else
+			"would have ";
+#endif
+		dbg ("usb_check_bandwidth %sFAILED: %d + %ld = %d usec",
+			mode, old_alloc, bustime, new_alloc);
+#endif
+#ifdef CONFIG_USB_BANDWIDTH
+		bustime = -ENOSPC;	/* report error */
+#endif
+	}
+
+	return bustime;
+}
+EXPORT_SYMBOL (usb_check_bandwidth);
+
+
+/**
+ * usb_claim_bandwidth - records bandwidth for a periodic transfer
+ * @dev: source/target of request
+ * @urb: request (urb->dev == dev)
+ * @bustime: bandwidth consumed, in (average) microseconds per frame
+ * @isoc: true iff the request is isochronous
+ *
+ * Bus bandwidth reservations are recorded purely for diagnostic purposes.
+ * HCDs are expected not to overcommit periodic bandwidth, and to record such
+ * reservations whenever endpoints are added to the periodic schedule.
+ *
+ * FIXME averaging per-frame is suboptimal.  Better to sum over the HCD's
+ * entire periodic schedule ... 32 frames for OHCI, 1024 for UHCI, settable
+ * for EHCI (256/512/1024 frames, default 1024) and have the bus expose how
+ * large its periodic schedule is.
+ */
+void usb_claim_bandwidth (struct usb_device *dev, struct urb *urb, int bustime, int isoc)
+{
+	dev->bus->bandwidth_allocated += bustime;
+	if (isoc)
+		dev->bus->bandwidth_isoc_reqs++;
+	else
+		dev->bus->bandwidth_int_reqs++;
+	urb->bandwidth = bustime;
+
+#ifdef USB_BANDWIDTH_MESSAGES
+	dbg ("bandwidth alloc increased by %d (%s) to %d for %d requesters",
+		bustime,
+		isoc ? "ISOC" : "INTR",
+		dev->bus->bandwidth_allocated,
+		dev->bus->bandwidth_int_reqs + dev->bus->bandwidth_isoc_reqs);
+#endif
+}
+EXPORT_SYMBOL (usb_claim_bandwidth);
+
+
+/**
+ * usb_release_bandwidth - reverses effect of usb_claim_bandwidth()
+ * @dev: source/target of request
+ * @urb: request (urb->dev == dev)
+ * @isoc: true iff the request is isochronous
+ *
+ * This records that previously allocated bandwidth has been released.
+ * Bandwidth is released when endpoints are removed from the host controller's
+ * periodic schedule.
+ */
+void usb_release_bandwidth (struct usb_device *dev, struct urb *urb, int isoc)
+{
+	dev->bus->bandwidth_allocated -= urb->bandwidth;
+	if (isoc)
+		dev->bus->bandwidth_isoc_reqs--;
+	else
+		dev->bus->bandwidth_int_reqs--;
+
+#ifdef USB_BANDWIDTH_MESSAGES
+	dbg ("bandwidth alloc reduced by %d (%s) to %d for %d requesters",
+		urb->bandwidth,
+		isoc ? "ISOC" : "INTR",
+		dev->bus->bandwidth_allocated,
+		dev->bus->bandwidth_int_reqs + dev->bus->bandwidth_isoc_reqs);
+#endif
+	urb->bandwidth = 0;
+}
+EXPORT_SYMBOL (usb_release_bandwidth);
+
+
+/*-------------------------------------------------------------------------*/
+
 #ifdef CONFIG_PCI
 
 /* PCI-based HCs are normal, but custom bus glue should be ok */
@@ -522,6 +879,7 @@ static void hc_died (struct usb_hcd *hcd);
  * usb_hcd_pci_probe - initialize PCI-based HCDs
  * @dev: USB Host Controller being probed
  * @id: pci hotplug id connecting controller to HCD framework
+ * Context: !in_interrupt()
  *
  * Allocates basic PCI resources for this USB host controller, and
  * then invokes the start() method for the HCD associated with it
@@ -535,7 +893,6 @@ int usb_hcd_pci_probe (struct pci_dev *dev, const struct pci_device_id *id)
 	unsigned long		resource, len;
 	void			*base;
 	u8			latency, limit;
-	struct usb_bus		*bus;
 	struct usb_hcd		*hcd;
 	int			retval, region;
 	char			buf [8], *bufp = buf;
@@ -631,7 +988,6 @@ clean_2:
 			!= 0) {
 		err ("request interrupt %s failed", bufp);
 		retval = -EBUSY;
-clean_3:
 		driver->hcd_free (hcd);
 		goto clean_2;
 	}
@@ -643,26 +999,15 @@ clean_3:
 		(driver->flags & HCD_MEMORY) ? "pci mem" : "io base",
 		base);
 
-// FIXME simpler: make "bus" be that data, not pointer to it.
-	bus = usb_alloc_bus (&hcd_operations);
-	if (bus == NULL) {
-		dbg ("usb_alloc_bus fail");
-		retval = -ENOMEM;
-		free_irq (dev->irq, hcd);
-		goto clean_3;
-	}
-	hcd->bus = bus;
+	usb_init_bus (&hcd->self);
+	hcd->self.op = &hcd_operations;
+	hcd->self.hcpriv = (void *) hcd;
+	hcd->bus = &hcd->self;
 	hcd->bus_name = dev->slot_name;
-	bus->hcpriv = (void *) hcd;
 
 	INIT_LIST_HEAD (&hcd->dev_list);
-	INIT_LIST_HEAD (&hcd->hcd_list);
 
-	down (&hcd_list_lock);
-	list_add (&hcd->hcd_list, &hcd_list);
-	up (&hcd_list_lock);
-
-	usb_register_bus (bus);
+	usb_register_bus (&hcd->self);
 
 	if ((retval = driver->start (hcd)) < 0)
 		usb_hcd_pci_remove (dev);
@@ -678,6 +1023,7 @@ EXPORT_SYMBOL (usb_hcd_pci_probe);
 /**
  * usb_hcd_pci_remove - shutdown processing for PCI-based HCDs
  * @dev: USB Host Controller being removed
+ * Context: !in_interrupt()
  *
  * Reverses the effect of usb_hcd_pci_probe(), first invoking
  * the HCD's stop() method.  It is always called from a thread
@@ -717,12 +1063,9 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 			pci_resource_len (dev, hcd->region));
 	}
 
-	down (&hcd_list_lock);
-	list_del (&hcd->hcd_list);
-	up (&hcd_list_lock);
-
 	usb_deregister_bus (hcd->bus);
-	usb_free_bus (hcd->bus);
+	if (atomic_read (&hcd->self.refcnt) != 1)
+		err ("usb_hcd_pci_remove %s, count != 1", hcd->bus_name);
 	hcd->bus = NULL;
 
 	hcd->driver->hcd_free (hcd);
@@ -1257,6 +1600,7 @@ static void hcd_irq (int irq, void *__hcd, struct pt_regs * r)
  * usb_hcd_giveback_urb - return URB from HCD to device driver
  * @hcd: host controller returning the URB
  * @urb: urb being returned to the USB device driver.
+ * Context: in_interrupt()
  *
  * This hands the URB from HCD to its USB device driver, using its
  * completion function.  The HCD has freed all per-urb resources
@@ -1279,16 +1623,9 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 	struct usb_device	*dev;
 
 	/* Release periodic transfer bandwidth */
-	if (urb->bandwidth) {
-		switch (usb_pipetype (urb->pipe)) {
-		case PIPE_INTERRUPT:
-			usb_release_bandwidth (urb->dev, urb, 0);
-			break;
-		case PIPE_ISOCHRONOUS:
-			usb_release_bandwidth (urb->dev, urb, 1);
-			break;
-		}
-	}
+	if (urb->bandwidth)
+		usb_release_bandwidth (urb->dev, urb,
+			usb_pipeisoc (urb->pipe));
 
 	/* clear all state linking urb to this dev (and hcd) */
 
