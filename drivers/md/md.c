@@ -1669,13 +1669,12 @@ static int do_md_stop(mddev_t * mddev, int ro)
 	int err = 0;
 	struct gendisk *disk = disks[mdidx(mddev)];
 
-	if (atomic_read(&mddev->active)>2) {
-		printk("md: md%d still in use.\n",mdidx(mddev));
-		err = -EBUSY;
-		goto out;
-	}
-
 	if (mddev->pers) {
+		if (atomic_read(&mddev->active)>2) {
+			printk("md: md%d still in use.\n",mdidx(mddev));
+			return -EBUSY;
+		}
+
 		if (mddev->sync_thread) {
 			set_bit(MD_RECOVERY_INTR, &mddev->recovery);
 			md_unregister_thread(mddev->sync_thread);
