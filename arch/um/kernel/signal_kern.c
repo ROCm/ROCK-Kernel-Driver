@@ -44,44 +44,36 @@ static void handle_signal(struct pt_regs *regs, unsigned long signr,
 {
 	void (*restorer)(void);
 	unsigned long sp;
-	int err, error, ret;
+	int err;
 
-	error = PT_REGS_SYSCALL_RET(&current->thread.regs);
-	ret = 0;
 	/* Always make any pending restarted system calls return -EINTR */
 	current_thread_info()->restart_block.fn = do_no_restart_syscall;
-	switch(error){
-	case -ERESTART_RESTARTBLOCK:
-	case -ERESTARTNOHAND:
-		ret = -EINTR;
-		break;
 
-	case -ERESTARTSYS:
-		if (!(ka->sa.sa_flags & SA_RESTART)) {
-			ret = -EINTR;
+	/* Did we come from a system call? */
+	if(PT_REGS_SYSCALL_NR(regs) >= 0){
+		/* If so, check system call restarting.. */
+		switch(PT_REGS_SYSCALL_RET(regs)){
+		case -ERESTART_RESTARTBLOCK:
+		case -ERESTARTNOHAND:
+			PT_REGS_SYSCALL_RET(regs) = -EINTR;
+			break;
+
+		case -ERESTARTSYS:
+			if (!(ka->sa.sa_flags & SA_RESTART)) {
+				PT_REGS_SYSCALL_RET(regs) = -EINTR;
+				break;
+			}
+		/* fallthrough */
+		case -ERESTARTNOINTR:
+			PT_REGS_RESTART_SYSCALL(regs);
+			PT_REGS_ORIG_SYSCALL(regs) = PT_REGS_SYSCALL_NR(regs);
 			break;
 		}
-		/* fallthrough */
-	case -ERESTARTNOINTR:
-		PT_REGS_RESTART_SYSCALL(regs);
-		PT_REGS_ORIG_SYSCALL(regs) = PT_REGS_SYSCALL_NR(regs);
-
-		/* This is because of the UM_SET_SYSCALL_RETURN and the fact
-		 * that on i386 the system call number and return value are
-		 * in the same register.  When the system call restarts, %eax
-		 * had better have the system call number in it.  Since the
-		 * return value doesn't matter (except that it shouldn't be
-		 * -ERESTART*), we'll stick the system call number there.
-		 */
-		ret = PT_REGS_SYSCALL_NR(regs);
-		break;
 	}
 
 	sp = PT_REGS_SP(regs);
 	if((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags(sp) == 0))
 		sp = current->sas_ss_sp + current->sas_ss_size;
-
-	if(error != 0) PT_REGS_SET_SYSCALL_RETURN(regs, ret);
 
 	if (ka->sa.sa_flags & SA_RESTORER)
 		restorer = ka->sa.sa_restorer;
