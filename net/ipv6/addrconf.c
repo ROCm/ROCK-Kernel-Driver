@@ -1877,10 +1877,12 @@ int addrconf_notify(struct notifier_block *this, unsigned long event,
 		break;
 	case NETDEV_CHANGENAME:
 #ifdef CONFIG_SYSCTL
-		addrconf_sysctl_unregister(&idev->cnf);
-		neigh_sysctl_unregister(idev->nd_parms);
-		neigh_sysctl_register(dev, idev->nd_parms, NET_IPV6, NET_IPV6_NEIGH, "ipv6");
-		addrconf_sysctl_register(idev, &idev->cnf);
+		if (idev) {
+			addrconf_sysctl_unregister(&idev->cnf);
+			neigh_sysctl_unregister(idev->nd_parms);
+			neigh_sysctl_register(dev, idev->nd_parms, NET_IPV6, NET_IPV6_NEIGH, "ipv6");
+			addrconf_sysctl_register(idev, &idev->cnf);
+		}
 #endif
 		break;
 	};
