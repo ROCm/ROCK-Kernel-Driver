@@ -32,6 +32,7 @@ int main(void)
 	DEFINE(__TI_cpu, offsetof(struct thread_info, cpu),);
 	DEFINE(__TI_precount, offsetof(struct thread_info, preempt_count),);
 	BLANK();
+	DEFINE(__PT_ARGS, offsetof(struct pt_regs, args),);
 	DEFINE(__PT_PSW, offsetof(struct pt_regs, psw),);
 	DEFINE(__PT_GPRS, offsetof(struct pt_regs, gprs),);
 	DEFINE(__PT_ORIG_GPR2, offsetof(struct pt_regs, orig_gpr2),);

@@ -24,7 +24,8 @@
  * Stack layout for the system_call stack entry.
  * The first few entries are identical to the user_regs_struct.
  */
-SP_PTREGS    =  STACK_FRAME_OVERHEAD 
+SP_PTREGS    =  STACK_FRAME_OVERHEAD
+SP_ARGS      =  STACK_FRAME_OVERHEAD + __PT_ARGS
 SP_PSW       =  STACK_FRAME_OVERHEAD + __PT_PSW
 SP_R0        =  STACK_FRAME_OVERHEAD + __PT_GPRS
 SP_R1        =  STACK_FRAME_OVERHEAD + __PT_GPRS + 8
@@ -214,13 +215,15 @@ system_call:
 sysc_enter:
         GET_THREAD_INFO           # load pointer to task_struct to R9
         slag    %r7,%r7,2         # *4 and test for svc 0
-	jnz	sysc_do_restart
+	jnz	sysc_nr_ok
 	# svc 0: system call number in %r1
 	lghi	%r0,NR_syscalls
 	clr	%r1,%r0
-	jnl	sysc_do_restart
+	jnl	sysc_nr_ok
 	lgfr	%r7,%r1           # clear high word in r1
 	slag    %r7,%r7,2         # svc 0: system call number in %r1
+sysc_nr_ok:
+	mvc	SP_ARGS(8,%r15),SP_R7(%r15)
 sysc_do_restart:
 	larl    %r10,sys_call_table
 #ifdef CONFIG_S390_SUPPORT
@@ -542,6 +545,7 @@ pgm_svcper:
 	clr	%r1,%r0
 	slag	%r7,%r1,2
 pgm_svcstd:
+	mvc	SP_ARGS(8,%r15),SP_R7(%r15)
 	larl    %r10,sys_call_table
 #ifdef CONFIG_S390_SUPPORT
         tm      SP_PSW+3(%r15),0x01  # are we running in 31 bit mode ?

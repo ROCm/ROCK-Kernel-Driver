@@ -383,8 +383,11 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 			 smb_buffer_response, &length, 0);
 	if (ses->server) {
 		atomic_dec(&ses->server->socketUseCount);
-		if (atomic_read(&ses->server->socketUseCount) == 0)
+		if (atomic_read(&ses->server->socketUseCount) == 0) {
+			spin_lock(&GlobalMid_Lock);
 			ses->server->tcpStatus = CifsExiting;
+			spin_unlock(&GlobalMid_Lock);
+		}
 	}
 	if (pSMB)
 		cifs_buf_release(pSMB);
@@ -1464,9 +1467,9 @@ CIFSSMBQueryReparseLinkInfo(const int xid, struct cifsTconInfo *tcon,
 
 	pSMB->TotalParameterCount = 0 ;
 	pSMB->TotalDataCount = 0;
-	pSMB->MaxParameterCount = cpu_to_le16(2);
+	pSMB->MaxParameterCount = cpu_to_le32(2);
 	/* BB find exact data count max from sess structure BB */
-	pSMB->MaxDataCount = cpu_to_le16(4000);
+	pSMB->MaxDataCount = cpu_to_le32(4000);
 	pSMB->MaxSetupCount = 4;
 	pSMB->Reserved = 0;
 	pSMB->ParameterOffset = 0;
@@ -2827,4 +2830,52 @@ setPermsRetry:
 	if (rc == -EAGAIN)
 		goto setPermsRetry;
 	return rc;
+}
+
+int CIFSSMBNotify(const int xid, struct cifsTconInfo *tcon, 
+			const int notify_subdirs, const __u16 netfid,
+			__u32 filter, const struct nls_table *nls_codepage)
+{
+	int rc = 0;
+	struct smb_com_transaction_change_notify_req * pSMB = NULL;
+	struct smb_com_transaction_change_notify_rsp * pSMBr = NULL;
+	int bytes_returned;
+
+	cFYI(1, ("In CIFSSMBNotify for file handle %d",(int)netfid));
+	rc = smb_init(SMB_COM_NT_TRANSACT, 23, tcon, (void **) &pSMB,
+                      (void **) &pSMBr);
+	if (rc)
+		return rc;
+
+	pSMB->TotalParameterCount = 0 ;
+	pSMB->TotalDataCount = 0;
+	pSMB->MaxParameterCount = cpu_to_le32(2);
+	/* BB find exact data count max from sess structure BB */
+	pSMB->MaxDataCount = 0; /* same in little endian or be */
+	pSMB->MaxSetupCount = 4;
+	pSMB->Reserved = 0;
+	pSMB->ParameterOffset = 0;
+	pSMB->DataCount = 0;
+	pSMB->DataOffset = 0;
+	pSMB->SetupCount = 4; /* single byte does not need le conversion */
+	pSMB->SubCommand = cpu_to_le16(NT_TRANSACT_NOTIFY_CHANGE);
+	pSMB->ParameterCount = pSMB->TotalParameterCount;
+	if(notify_subdirs)
+		pSMB->WatchTree = 1; /* one byte - no le conversion needed */
+	pSMB->Reserved2 = 0;
+	pSMB->CompletionFilter = cpu_to_le32(filter);
+	pSMB->Fid = netfid; /* file handle always le */
+	pSMB->ByteCount = 0;
+
+	pSMB->hdr.smb_buf_length += pSMB->ByteCount;
+	rc = SendReceive(xid, tcon->ses, (struct smb_hdr *) pSMB,
+			(struct smb_hdr *) pSMBr, &bytes_returned, 0);
+	if (rc) {
+		cFYI(1, ("Error in Notify = %d", rc));
+	}
+	if (pSMB)
+		cifs_buf_release(pSMB);
+/*		if (rc == -EAGAIN)
+			goto NotifyRetry; */
+	return rc;	
 }

@@ -2477,7 +2477,7 @@ out:
 }
 #endif /* __ARCH_WANT_SYS_SIGPROCMASK */
 
-#ifndef __sparc__
+#ifdef __ARCH_WANT_SYS_RT_SIGACTION
 asmlinkage long
 sys_rt_sigaction(int sig,
 		 const struct sigaction __user *act,
@@ -2505,7 +2505,7 @@ sys_rt_sigaction(int sig,
 out:
 	return ret;
 }
-#endif /* __sparc__ */
+#endif /* __ARCH_WANT_SYS_RT_SIGACTION */
 
 #ifdef __ARCH_WANT_SYS_SGETMASK
 

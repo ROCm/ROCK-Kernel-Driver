@@ -126,7 +126,6 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 
 	if(ssocket == NULL)
 		return -ENOTSOCK; /* BB eventually add reconnect code here */
-/*  ssocket->sk->allocation = GFP_BUFFER; *//* BB is this spurious? */
 	iov.iov_base = smb_buffer;
 	iov.iov_len = smb_buf_length + 4;
 

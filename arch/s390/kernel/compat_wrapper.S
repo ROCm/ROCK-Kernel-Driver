@@ -1097,6 +1097,8 @@ compat_sys_futex_wrapper:
 	lgfr	%r4,%r4			# int
 	llgtr	%r5,%r5			# struct compat_timespec *
 	llgtr	%r6,%r6			# u32 *
+	lgf	%r0,164(%r15)		# int
+	stg	%r0,160(%r15)
 	jg	compat_sys_futex	# branch to system call
 
 	.globl	sys32_setxattr_wrapper

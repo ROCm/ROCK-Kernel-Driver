@@ -607,6 +607,7 @@ static int PeekIMQEntry( PTACHYON fcChip, ULONG type)
         if( (fcChip->IMQ->QEntry[CI].type & 0x1FF) == 0x104 )
         { 
           TachFCHDR_GCMND* fchs;
+#error This is too much stack
           ULONG ulFibreFrame[2048/4];  // max DWORDS in incoming FC Frame
 	  USHORT SFQpi = (USHORT)(fcChip->IMQ->QEntry[CI].word[0] & 0x0fffL);
 
@@ -718,6 +719,7 @@ int CpqTsProcessIMQEntry(void *host)
   ULONG x_ID;
   ULONG ulBuff, dwStatus;
   TachFCHDR_GCMND* fchs;
+#error This is too much stack
   ULONG ulFibreFrame[2048/4];  // max number of DWORDS in incoming Fibre Frame
   UCHAR ucInboundMessageType;  // Inbound CM, dword 3 "type" field
 
