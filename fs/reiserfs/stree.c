@@ -1105,6 +1105,7 @@ static char  prepare_for_delete_or_cut(
 	    for (n_counter = *p_n_removed;
 		 n_counter < n_unfm_number; n_counter++, p_n_unfm_pointer-- ) {
 
+		cond_resched();
 		if (item_moved (&s_ih, p_s_path)) {
 		    need_research = 1 ;
 		    break;
