@@ -24,8 +24,8 @@ static inline void *kmap(struct page *page) { return page_address(page); }
 
 #define kunmap(page) do { (void) (page); } while (0)
 
-#define kmap_atomic(page,idx)		kmap(page)
-#define kunmap_atomic(page,idx)		kunmap(page)
+#define kmap_atomic(page, idx)		page_address(page)
+#define kunmap_atomic(addr, idx)	do { } while (0)
 
 #endif /* CONFIG_HIGHMEM */
 
