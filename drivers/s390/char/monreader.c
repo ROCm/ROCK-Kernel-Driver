@@ -116,7 +116,7 @@ dcss_mkname(char *ascii_name, char *ebcdic_name)
 }
 
 /*
- * print appropriate error message for segment_load()/segment_info()
+ * print appropriate error message for segment_load()/segment_type()
  * return code
  */
 static void
@@ -154,6 +154,10 @@ mon_segment_warn(int rc, char* seg_name)
 	case -ENOMEM:
 		P_WARNING("cannot load/query segment %s, out of memory\n",
 			  seg_name);
+		break;
+	case -ERANGE:
+		P_WARNING("cannot load/query segment %s, exceeds kernel "
+			  "mapping range\n", seg_name);
 		break;
 	default:
 		P_WARNING("cannot load/query segment %s, return value %i\n",
@@ -581,7 +585,7 @@ mon_init(void)
 		return -ENODEV;
 	}
 
-	rc = segment_info(mon_dcss_name);
+	rc = segment_type(mon_dcss_name);
 	if (rc < 0) {
 		mon_segment_warn(rc, mon_dcss_name);
 		return rc;
