@@ -701,9 +701,9 @@ static void __init prom_instantiate_rtas(void)
 {
 	unsigned long offset = reloc_offset();
 	struct prom_t *_prom = PTRRELOC(&prom);
-	phandle prom_rtas;
-	u64 base, entry = 0;
-        u32 size = 0;
+	phandle prom_rtas, rtas_node;
+	u32 base, entry = 0;
+	u32 size = 0;
 
 	prom_debug("prom_instantiate_rtas: start...\n");
 
@@ -723,12 +723,12 @@ static void __init prom_instantiate_rtas(void)
 	}
 	prom_printf("instantiating rtas at 0x%x", base);
 
-	prom_rtas = call_prom("open", 1, 1, ADDR("/rtas"));
+	rtas_node = call_prom("open", 1, 1, ADDR("/rtas"));
 	prom_printf("...");
 
 	if (call_prom("call-method", 3, 2,
 		      ADDR("instantiate-rtas"),
-		      prom_rtas, base) != PROM_ERROR) {
+		      rtas_node, base) != PROM_ERROR) {
 		entry = (long)_prom->args.rets[1];
 	}
 	if (entry == 0) {
@@ -739,9 +739,8 @@ static void __init prom_instantiate_rtas(void)
 
 	reserve_mem(base, size);
 
-	prom_setprop(_prom->chosen, "linux,rtas-base", &base, sizeof(base));
-	prom_setprop(_prom->chosen, "linux,rtas-entry", &entry, sizeof(entry));
-	prom_setprop(_prom->chosen, "linux,rtas-size", &size, sizeof(size));
+	prom_setprop(prom_rtas, "linux,rtas-base", &base, sizeof(base));
+	prom_setprop(prom_rtas, "linux,rtas-entry", &entry, sizeof(entry));
 
 	prom_debug("rtas base     = 0x%x\n", base);
 	prom_debug("rtas entry    = 0x%x\n", entry);
