@@ -1592,9 +1592,12 @@ config CODA_FS_OLD_API
 	  
 	  For most cases you probably want to say N.
 
+#
+# Intermezzo broke when we added the expanded NGROUPS patches
+#
 config INTERMEZZO_FS
 	tristate "InterMezzo file system support (replicating fs) (EXPERIMENTAL)"
-	depends on INET && EXPERIMENTAL
+	depends on INET && EXPERIMENTAL && BROKEN
 	help
 	  InterMezzo is a networked file system with disconnected operation
 	  and kernel level write back caching.  It is most often used for
