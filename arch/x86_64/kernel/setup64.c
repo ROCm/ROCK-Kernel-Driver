@@ -28,7 +28,7 @@
 
 char x86_boot_params[2048] __initdata = {0,};
 
-unsigned long cpu_initialized __initdata = 0;
+cpumask_t cpu_initialized __initdata = CPU_MASK_NONE;
 
 struct x8664_pda cpu_pda[NR_CPUS] __cacheline_aligned; 
 
@@ -187,7 +187,7 @@ void __init cpu_init (void)
 
 	me = current;
 
-	if (test_and_set_bit(cpu, &cpu_initialized))
+	if (cpu_test_and_set(cpu, cpu_initialized))
 		panic("CPU#%d already initialized!\n", cpu);
 
 	printk("Initializing CPU#%d\n", cpu);
