@@ -1151,6 +1151,7 @@ config JFFS2_FS_NAND
 
 config JFFS2_COMPRESSION_OPTIONS
 	bool "Advanced compression options for JFFS2"
+	depends on JFFS2_FS
 	default n
 	help
 	  Enabling this option allows you to explicitly choose which
