@@ -665,4 +665,6 @@ extern int esp_abort(Scsi_Cmnd *);
 extern int esp_reset(Scsi_Cmnd *);
 extern int esp_proc_info(struct Scsi_Host *shost, char *buffer, char **start, off_t offset, int length,
 			 int inout);
+extern int esp_slave_alloc(Scsi_Device *);
+extern void esp_slave_destroy(Scsi_Device *);
 #endif /* !(NCR53C9X_H) */

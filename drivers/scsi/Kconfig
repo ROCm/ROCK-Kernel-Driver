@@ -23,7 +23,7 @@ config SCSI
 
 config SCSI_PROC_FS
 	bool "legacy /proc/scsi/ support"
-	depends on SCSI
+	depends on SCSI && PROC_FS
 	default y
 	---help---
 	  This option enables support for the various files in
@@ -1267,28 +1267,9 @@ config SCSI_DC390T
 
 	  Note that this driver does NOT support Tekram DC390W/U/F, which are
 	  based on NCR/Symbios chips. Use "NCR53C8XX SCSI support" for those.
-	  Also note that there is another generic Am53C974 driver,
-	  "AM53/79C974 PCI SCSI support" below.  You can pick either one.
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called tmscsim.
-
-config SCSI_DC390T_NOGENSUPP
-	bool "_omit_ support for non-DC390 adapters"
-	depends on SCSI_DC390T
-	---help---
-	  If you say N here, the DC390(T) SCSI driver relies on the DC390
-	  EEPROM to get initial values for its settings, such as speed,
-	  termination, etc.  If it can't find this EEPROM, it will use
-	  defaults or the user supplied boot/module parameters.  For details
-	  on driver configuration see <file:Documentation/scsi/tmscsim.txt>.
-
-	  If you say Y here and if no EEPROM is found, the driver gives up and
-	  thus only supports Tekram DC390(T) adapters.  This can be useful if
-	  you have a DC390(T) and another Am53C974 based adapter, which, for
-	  some reason, you want to drive with the other AM53C974 driver.
-
-	  If unsure, say N.
 
 config SCSI_T128
 	tristate "Trantor T128/T128F/T228 SCSI support"

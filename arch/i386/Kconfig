@@ -828,7 +828,7 @@ config EFI
 
 config IRQBALANCE
  	bool "Enable kernel irq balancing"
-	depends on SMP
+	depends on SMP && X86_IO_APIC
 	default y
 	help
  	  The defalut yes will allow the kernel to do irq load balancing.

@@ -197,8 +197,8 @@ static void	mptscsih_fillbuf(char *buffer, int size, int index, int width);
 static int	mptscsih_setup(char *str);
 
 /* module entry point */
-static int  __init    mptscsih_init  (void);
-static void    mptscsih_exit  (void);
+static int  __init   mptscsih_init  (void);
+static void __exit   mptscsih_exit  (void);
 
 static int  __devinit mptscsih_probe (struct pci_dev *, const struct pci_device_id *);
 static void __devexit mptscsih_remove(struct pci_dev *);
@@ -1418,6 +1418,7 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	int			 numSGE = 0;
 	int			 scale;
 	u8			*mem;
+	int			error=0;
 
 	for (portnum=0; portnum < ioc->facts.NumberOfPorts; portnum++) {
 
@@ -1542,8 +1543,10 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			 */
 			sz = hd->ioc->req_depth * sizeof(void *);
 			mem = kmalloc(sz, GFP_ATOMIC);
-			if (mem == NULL)
+			if (mem == NULL) {
+				error = -ENOMEM;
 				goto mptscsih_probe_failed;
+			}
 
 			memset(mem, 0, sz);
 			hd->ScsiLookup = (struct scsi_cmnd **) mem;
@@ -1551,15 +1554,19 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			dprintk((MYIOC_s_INFO_FMT "ScsiLookup @ %p, sz=%d\n",
 				 ioc->name, hd->ScsiLookup, sz));
 
-			if (mptscsih_initChainBuffers(hd, 1) < 0)
+			if (mptscsih_initChainBuffers(hd, 1) < 0) {
+				error = -EINVAL;
 				goto mptscsih_probe_failed;
+			}
 
 			/* Allocate memory for free and doneQ's
 			 */
 			sz = sh->can_queue * sizeof(MPT_DONE_Q);
 			mem = kmalloc(sz, GFP_ATOMIC);
-			if (mem == NULL)
+			if (mem == NULL) {
+				error = -ENOMEM;
 				goto mptscsih_probe_failed;
+			}
 
 			memset(mem, 0xFF, sz);
 			hd->memQ = mem;
@@ -1591,8 +1598,10 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			 */
 			sz = sh->max_id * sizeof(void *);
 			mem = kmalloc(sz, GFP_ATOMIC);
-			if (mem == NULL)
+			if (mem == NULL) {
+				error = -ENOMEM;
 				goto mptscsih_probe_failed;
+			}
 
 			memset(mem, 0, sz);
 			hd->Targets = (VirtDevice **) mem;
@@ -1683,7 +1692,8 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 			mpt_scsi_hosts++;
 
-			if(scsi_add_host (sh, &ioc->pcidev->dev)) {
+			error = scsi_add_host (sh, &ioc->pcidev->dev);
+			if(error) {
 				dprintk((KERN_ERR MYNAM,
 				  "scsi_add_host failed\n"));
 				goto mptscsih_probe_failed;
@@ -1691,7 +1701,6 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 
 			scsi_scan_host(sh);
 			return 0;
-
 		} /* scsi_host_alloc */
 
 	} /* for each adapter port */
@@ -1699,8 +1708,7 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 mptscsih_probe_failed:
 
 	mptscsih_remove(pdev);
-	return -ENODEV;
-
+	return error;
 }
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -1828,6 +1836,7 @@ mptscsih_remove(struct pci_dev *pdev)
 	}
 
 	scsi_host_put(host);
+	mpt_scsi_hosts--;
 
 }
 
@@ -1928,22 +1937,15 @@ static struct mpt_pci_driver mptscsih_driver = {
  *
  *	Returns 0 for success, non-zero for failure.
  */
-static int
-__init mptscsih_init(void)
+static int __init
+mptscsih_init(void)
 {
-	MPT_ADAPTER		*ioc;
 
 	show_mptmod_ver(my_NAME, my_VERSION);
 
 	ScsiDoneCtx = mpt_register(mptscsih_io_done, MPTSCSIH_DRIVER);
 	ScsiTaskCtx = mpt_register(mptscsih_taskmgmt_complete, MPTSCSIH_DRIVER);
 	ScsiScanDvCtx = mpt_register(mptscsih_scandv_complete, MPTSCSIH_DRIVER);
-
-	if(mpt_device_driver_register(&mptscsih_driver,
-	  MPTSCSIH_DRIVER) != 0 ) {
-		dprintk((KERN_INFO MYNAM
-		": failed to register dd callbacks\n"));
-	}
 
 	if (mpt_event_register(ScsiDoneCtx, mptscsih_event_process) == 0) {
 		dprintk((KERN_INFO MYNAM
@@ -1961,20 +1963,13 @@ __init mptscsih_init(void)
 		mptscsih_setup(mptscsih);
 #endif
 
-	/* probing for devices */
-	for(ioc = mpt_adapter_find_first(); ioc != NULL;
-	  ioc = mpt_adapter_find_next(ioc)) {
-		if(mptscsih_probe(ioc->pcidev, ioc->pcidev->driver->id_table)) {
-			dprintk((KERN_INFO MYNAM ": probe failed\n"));
-			return -ENODEV;
-		}
+	if(mpt_device_driver_register(&mptscsih_driver,
+	  MPTSCSIH_DRIVER) != 0 ) {
+		dprintk((KERN_INFO MYNAM
+		": failed to register dd callbacks\n"));
 	}
 
-	if (mpt_scsi_hosts > 0)
-		return 0;
-
-	mptscsih_exit();
-	return -ENODEV;
+	return 0;
 
 }
 
@@ -1984,7 +1979,7 @@ __init mptscsih_init(void)
  *	mptscsih_exit - Unregisters MPT adapter(s)
  *
  */
-static void
+static void __exit
 mptscsih_exit(void)
 {
 	MPT_ADAPTER	*ioc;

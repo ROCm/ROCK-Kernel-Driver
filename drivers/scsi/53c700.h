@@ -35,9 +35,10 @@
 /* The maximum number of luns (make this of the form 2^n) */
 #define NCR_700_MAX_LUNS		32
 #define NCR_700_LUN_MASK		(NCR_700_MAX_LUNS - 1)
-/* Alter this with care: too many tags won't give the elevator a chance to
- * work; too few will cause the device to operate less efficiently */
+/* Maximum number of tags the driver ever allows per device */
 #define NCR_700_MAX_TAGS		16
+/* Tag depth the driver starts out with (can be altered in sysfs) */
+#define NCR_700_DEFAULT_TAGS		4
 /* This is the default number of commands per LUN in the untagged case.
  * two is a good value because it means we can have one command active and
  * one command fully prepared and waiting
