@@ -179,6 +179,18 @@ config USB_POWERMATE
 	  To compile this driver as a module, choose M here: the
 	  module will be called powermate.
 
+config USB_MTOUCH
+	tristate "MicroTouch USB Touchscreen Driver"
+	depends on USB && INPUT
+	---help---
+	  Say Y here if you want to use a MicroTouch (Now 3M) USB 
+	  Touchscreen controller.
+
+	  See <file:Documentation/usb/mtouch.txt> for additional information.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called mtouchusb.
+
 config USB_XPAD
 	tristate "X-Box gamepad support"
 	depends on USB && INPUT

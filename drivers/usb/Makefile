@@ -23,6 +23,7 @@ obj-$(CONFIG_USB_AIPTEK)	+= input/
 obj-$(CONFIG_USB_HID)		+= input/
 obj-$(CONFIG_USB_KBD)		+= input/
 obj-$(CONFIG_USB_MOUSE)		+= input/
+obj-$(CONFIG_USB_MTOUCH)	+= input/
 obj-$(CONFIG_USB_WACOM)		+= input/
 
 obj-$(CONFIG_USB_DABUSB)	+= media/
