@@ -894,7 +894,8 @@ struct airo_info {
 #define FLAG_PROMISC   IFF_PROMISC
 #define FLAG_RADIO_OFF 0x02
 #define FLAG_LOCKED    2
-#define FLAG_802_11	   0x10
+#define FLAG_FLASHING  0x10
+#define FLAG_802_11    0x200
 	int (*bap_read)(struct airo_info*, u16 *pu16Dst, int bytelen,
 			int whichbap);
 	unsigned short *flash;
@@ -1121,6 +1122,10 @@ static int readStatsRid(struct airo_info*ai, StatsRid *sr, int rid) {
 
 static int airo_open(struct net_device *dev) {
 	struct airo_info *info = dev->priv;
+	Resp rsp;
+
+	if (info->flags & FLAG_FLASHING)
+		return -EIO;
 
 	/* Make sure the card is configured.
 	 * Wireless Extensions may postpone config changes until the card
@@ -3714,7 +3719,7 @@ static void timer_func( u_long data ) {
 	u16 linkstat = IN4500(apriv, LINKSTAT);
 	Resp rsp;
 
-	if (linkstat != 0x400 ) {
+	if (!(apriv->flags & FLAG_FLASHING) && (linkstat != 0x400)) {
 /* We don't have a link so try changing the authtype */
 		if (down_trylock(&apriv->sem) != 0) {
 			apriv->timer.expires = RUN_AT(1);
@@ -5685,6 +5690,10 @@ struct iw_statistics *airo_get_wireless_stats(struct net_device *dev)
 static int readrids(struct net_device *dev, aironet_ioctl *comp) {
 	unsigned short ridcode;
 	unsigned char iobuf[2048];
+	struct airo_info *ai = dev->priv;
+
+	if (ai->flags & FLAG_FLASHING)
+		return -EIO;
 
 	switch(comp->command)
 	{
@@ -5739,6 +5748,9 @@ static int writerids(struct net_device *dev, aironet_ioctl *comp) {
 	/* Only super-user can write RIDs */
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
+
+	if (ai->flags & FLAG_FLASHING)
+		return -EIO;
 
 	ridcode = 0;
 	writer = do_writerid;
@@ -5899,6 +5911,8 @@ int cmdreset(struct airo_info *ai) {
  */
 
 int setflashmode (struct airo_info *ai) {
+	ai->flags |= FLAG_FLASHING;
+
 	OUT4500(ai, SWS0, FLASH_COMMAND);
 	OUT4500(ai, SWS1, FLASH_COMMAND);
 	if (probe) {
@@ -5913,6 +5927,7 @@ int setflashmode (struct airo_info *ai) {
 	schedule_timeout (HZ/2); /* 500ms delay */
 
 	if(!waitbusy(ai)) {
+		ai->flags &= ~FLAG_FLASHING;
 		printk(KERN_INFO "Waitbusy hang after setflash mode\n");
 		return -EIO;
 	}
@@ -6018,6 +6033,7 @@ int flashrestart(struct airo_info *ai,struct net_device *dev){
 
 	set_current_state (TASK_UNINTERRUPTIBLE);
 	schedule_timeout (HZ);          /* Added 12/7/00 */
+	ai->flags &= ~FLAG_FLASHING;
 	status = setup_card(ai, dev->dev_addr);
 
 	for( i = 0; i < MAX_FIDS; i++ ) {
