@@ -1556,7 +1556,10 @@ int radeon_do_cleanup_cp( drm_device_t *dev )
 		if ( dev_priv->ring_rptr != NULL )
 			drm_core_ioremapfree( dev_priv->ring_rptr, dev );
 		if ( dev->agp_buffer_map != NULL )
+		{
 			drm_core_ioremapfree( dev->agp_buffer_map, dev );
+			dev->agp_buffer_map = NULL;
+		}
 	} else
 #endif
 	{
@@ -1723,7 +1726,8 @@ void radeon_do_release( drm_device_t *dev )
 		}
 
 		/* Disable *all* interrupts */
-		RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );
+		if (dev_priv->mmio)	/* remove this after permanent addmaps */
+			RADEON_WRITE( RADEON_GEN_INT_CNTL, 0 );
 
 		/* Free memory heap structures */
 		radeon_mem_takedown( &(dev_priv->gart_heap) );
