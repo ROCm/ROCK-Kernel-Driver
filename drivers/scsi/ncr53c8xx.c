@@ -9466,7 +9466,7 @@ static Scsi_Host_Template driver_template =  {
 	.release		= ncr53c8xx_release,
 #endif
 #ifdef SCSI_NCR_PROC_INFO_SUPPORT
-	.proc_info		= ncr53c8xx_proc_info;
+	.proc_info		= ncr53c8xx_proc_info,
 #endif
 	.info			= ncr53c8xx_info,
 	.queuecommand		= ncr53c8xx_queue_command,
