@@ -23,6 +23,7 @@
 #include <asm/mach/irq.h>
 #include <asm/mach/time.h>
 #include <linux/device.h>
+#include <linux/serial_8250.h>
 
 static struct resource h7202ps2_resources[] = {
 	[0] = {
@@ -44,8 +45,53 @@ static struct platform_device h7202ps2_device = {
 	.resource	= h7202ps2_resources,
 };
 
+static struct plat_serial8250_port serial_platform_data[] = {
+	{
+		.membase	= SERIAL0_BASE,
+		.irq		= IRQ_UART0,
+		.uartclk	= 2*1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{
+		.membase	= SERIAL1_BASE,
+		.irq		= IRQ_UART1,
+		.uartclk	= 2*1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{
+		.membase	= SERIAL2_BASE,
+		.irq		= IRQ_UART2,
+		.uartclk	= 2*1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{
+		.membase	= SERIAL3_BASE,
+		.irq		= IRQ_UART3,
+		.uartclk	= 2*1843200,
+		.regshift	= 2,
+		.iotype		= UPIO_MEM,
+		.flags		= UPF_BOOT_AUTOCONF | UPF_SKIP_TEST,
+	},
+	{ },
+};
+
+static struct platform_device serial_device = {
+	.name			= "serial8250",
+	.id			= 0,
+	.dev			= {
+		.platform_data	= serial_platform_data,
+	},
+};
+
 static struct platform_device *devices[] __initdata = {
 	&h7202ps2_device,
+	&serial_device,
 };
 
 extern unsigned long h720x_gettimeoffset(void);
