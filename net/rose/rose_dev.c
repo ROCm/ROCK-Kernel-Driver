@@ -37,38 +37,6 @@
 #include <net/ax25.h>
 #include <net/rose.h>
 
-/*
- *	Only allow IP over ROSE frames through if the netrom device is up.
- */
-
-int rose_rx_ip(struct sk_buff *skb, struct net_device *dev)
-{
-	struct net_device_stats *stats = (struct net_device_stats *)dev->priv;
-
-#ifdef CONFIG_INET
-	if (!netif_running(dev)) {
-		stats->rx_errors++;
-		return 0;
-	}
-
-	stats->rx_packets++;
-	stats->rx_bytes += skb->len;
-
-	skb->protocol = htons(ETH_P_IP);
-
-	/* Spoof incoming device */
-	skb->dev      = dev;
-	skb->h.raw    = skb->data;
-	skb->nh.raw   = skb->data;
-	skb->pkt_type = PACKET_HOST;
-
-	ip_rcv(skb, skb->dev, NULL);
-#else
-	kfree_skb(skb);
-#endif
-	return 1;
-}
-
 static int rose_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
 	void *daddr, void *saddr, unsigned len)
 {
