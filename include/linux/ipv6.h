@@ -143,6 +143,7 @@ struct ipv6_devconf {
 	__s32		regen_max_retry;
 	__s32		max_desync_factor;
 #endif
+	__s32		max_addresses;
 	void		*sysctl;
 };
 
@@ -165,6 +166,7 @@ enum {
 	DEVCONF_REGEN_MAX_RETRY,
 	DEVCONF_MAX_DESYNC_FACTOR,
 #endif
+	DEVCONF_MAX_ADDRESSES,
 	DEVCONF_MAX
 };
 

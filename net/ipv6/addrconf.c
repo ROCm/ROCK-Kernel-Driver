@@ -81,8 +81,6 @@
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 
-#define IPV6_MAX_ADDRESSES 16
-
 /* Set to 3 to get tracing... */
 #define ACONF_DEBUG 2
 
@@ -162,6 +160,7 @@ struct ipv6_devconf ipv6_devconf = {
 	.regen_max_retry	= REGEN_MAX_RETRY,
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
+	.max_addresses		= IPV6_MAX_ADDRESSES,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt = {
@@ -182,6 +181,7 @@ static struct ipv6_devconf ipv6_devconf_dflt = {
 	.regen_max_retry	= REGEN_MAX_RETRY,
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
+	.max_addresses		= IPV6_MAX_ADDRESSES,
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -633,6 +633,7 @@ static int ipv6_create_tempaddr(struct inet6_ifaddr *ifp, struct inet6_ifaddr *i
 	unsigned long tmp_prefered_lft, tmp_valid_lft;
 	int tmp_plen;
 	int ret = 0;
+	int max_addresses;
 
 	if (ift) {
 		spin_lock_bh(&ift->lock);
@@ -688,9 +689,11 @@ retry:
 				 ifp->prefered_lft, 
 				 idev->cnf.temp_prefered_lft - desync_factor / HZ);
 	tmp_plen = ifp->prefix_len;
+	max_addresses = idev->cnf.max_addresses;
 	write_unlock(&idev->lock);
 	spin_unlock_bh(&ifp->lock);
-	ift = ipv6_count_addresses(idev) < IPV6_MAX_ADDRESSES ?
+	ift = !max_addresses ||
+	      ipv6_count_addresses(idev) < max_addresses ? 
 		ipv6_add_addr(idev, &addr, tmp_plen,
 			      ipv6_addr_type(&addr)&IPV6_ADDR_SCOPE_MASK, IFA_F_TEMPORARY) : 0;
 	if (!ift || IS_ERR(ift)) {
@@ -1393,10 +1396,13 @@ ok:
 		ifp = ipv6_get_ifaddr(&addr, dev);
 
 		if (ifp == NULL && valid_lft) {
+			int max_addresses = in6_dev->cnf.max_addresses;
+
 			/* Do not allow to create too much of autoconfigured
 			 * addresses; this would be too easy way to crash kernel.
 			 */
-			if (ipv6_count_addresses(in6_dev) < IPV6_MAX_ADDRESSES)
+			if (!max_addresses ||
+			    ipv6_count_addresses(in6_dev) < max_addresses)
 				ifp = ipv6_add_addr(in6_dev, &addr, pinfo->prefix_len,
 						    addr_type&IPV6_ADDR_SCOPE_MASK, 0);
 
@@ -2740,6 +2746,7 @@ static void inline ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_REGEN_MAX_RETRY] = cnf->regen_max_retry;
 	array[DEVCONF_MAX_DESYNC_FACTOR] = cnf->max_desync_factor;
 #endif
+	array[DEVCONF_MAX_ADDRESSES] = cnf->max_addresses;
 }
 
 static int inet6_fill_ifinfo(struct sk_buff *skb, struct inet6_dev *idev, 
@@ -3165,6 +3172,14 @@ static struct addrconf_sysctl_table
 	 		.proc_handler	=	&proc_dointvec,
 		},
 #endif
+		{
+			.ctl_name	=	NET_IPV6_MAX_ADDRESSES,
+			.procname	=	"max_addresses",
+			.data		=	&ipv6_devconf.max_addresses,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+			.proc_handler	=	&proc_dointvec,
+		},
 	},
 	.addrconf_dev = {
 		{

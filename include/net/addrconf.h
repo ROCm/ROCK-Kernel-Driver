@@ -15,6 +15,8 @@
 
 #define ADDR_CHECK_FREQUENCY		(120*HZ)
 
+#define IPV6_MAX_ADDRESSES		16
+
 struct prefix_info {
 	__u8			type;
 	__u8			length;
