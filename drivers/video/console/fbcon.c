@@ -267,12 +267,6 @@ void gen_set_disp(int con, struct fb_info *info)
 {
 	struct display *display = fb_display + con;
 
-	if (info->fix.visual == FB_VISUAL_PSEUDOCOLOR ||
-	    info->fix.visual == FB_VISUAL_DIRECTCOLOR)
-		display->dispsw_data = NULL;
-	else
-		display->dispsw_data = info->pseudo_palette;
-
 	/*
 	 * If we are setting all the virtual consoles, also set
 	 * the defaults used to create new consoles.
@@ -591,7 +585,8 @@ static void fbcon_set_display(int con, int init, int logo)
 	fbcon_free_font(p);
 	if (i < MAX_NR_CONSOLES) {
 		struct display *q = &fb_display[i];
-
+		struct vc_data *tmp = vc_cons[i].d;
+		
 		if (fontwidthvalid(p, fontwidth(q))) {
 			/* If we are not the first console on this
 			   fb, copy the font from that console */
