@@ -106,13 +106,17 @@ static void fill_devpath(struct device * dev, char * path, int length)
 static int create_symlink(struct driver_dir_entry * parent, char * name, char * path)
 {
 	struct driver_file_entry * entry;
+	int error;
 
 	entry = kmalloc(sizeof(struct driver_file_entry),GFP_KERNEL);
 	if (!entry)
 		return -ENOMEM;
 	entry->name = name;
 	entry->mode = S_IRUGO;
-	return driverfs_create_symlink(parent,entry,path);
+	error = driverfs_create_symlink(parent,entry,path);
+	if (error)
+		kfree(entry);
+	return error;
 }
 
 int device_bus_link(struct device * dev)
