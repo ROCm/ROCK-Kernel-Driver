@@ -72,7 +72,6 @@
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 
-#undef CONFIG_SERIAL_TEXT_DEBUG
 #undef DUMP_DBATS
 
 TODC_ALLOC();
@@ -500,9 +499,7 @@ platform_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 #ifdef CONFIG_SERIAL_TEXT_DEBUG
 	ppc_md.progress = pplus_progress;
-#else /* !CONFIG_SERIAL_TEXT_DEBUG */
-	ppc_md.progress = NULL;
-#endif /* CONFIG_SERIAL_TEXT_DEBUG */
+#endif
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 	ppc_ide_md.default_irq = pplus_ide_default_irq;

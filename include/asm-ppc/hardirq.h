@@ -59,7 +59,7 @@ static inline int irqs_running (void)
 	for (i = 0; i < smp_num_cpus; i++)
 		if (local_irq_count(i))
 			return 1;
-		return 0;
+	return 0;
 }
 
 static inline void release_irqlock(int cpu)

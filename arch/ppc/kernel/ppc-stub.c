@@ -514,7 +514,7 @@ static struct hard_trap_info
 	unsigned int tt;		/* Trap type code for powerpc */
 	unsigned char signo;		/* Signal that we map this trap into */
 } hard_trap_info[] = {
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_40x)
 	{ 0x100, SIGINT  },		/* critical input interrupt */
 	{ 0x200, SIGSEGV },		/* machine check */
 	{ 0x300, SIGSEGV },		/* data storage */
@@ -613,7 +613,7 @@ handle_exception (struct pt_regs *regs)
 	sigval = computeSignal(regs->trap);
 	ptr = remcomOutBuffer;
 
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_40x)
 	*ptr++ = 'S';
 	*ptr++ = hexchars[sigval >> 4];
 	*ptr++ = hexchars[sigval & 0xf];
@@ -785,7 +785,7 @@ handle_exception (struct pt_regs *regs)
  * some location may have changed something that is in the instruction cache.
  */
 			kgdb_flush_cache_all();
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_40x)
 			strcpy(remcomOutBuffer, "OK");
 			putpacket(remcomOutBuffer);
 #endif
@@ -802,7 +802,7 @@ handle_exception (struct pt_regs *regs)
 
 		case 's':
 			kgdb_flush_cache_all();
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_40x)
 			regs->msr |= MSR_DE;
 			regs->dbcr0 |= (DBCR0_IDM | DBCR0_IC);
 			set_msr(msr);

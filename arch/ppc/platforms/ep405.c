@@ -32,42 +32,51 @@
 #define DBG(x...)
 #endif
 
-void *ep405_bcsr;
-void *ep405_nvram;
+u8 *ep405_bcsr;
+u8 *ep405_nvram;
+
+static struct {
+	u8 cpld_xirq_select;
+	int pci_idsel;
+	int irq;
+} ep405_devtable[] = {
+#ifdef CONFIG_EP405PC
+	{0x07, 0x0E, 25},		/* EP405PC: USB */
+#endif
+};
+#define EP405_DEVTABLE_SIZE (sizeof(ep405_devtable)/sizeof(ep405_devtable[0]))
 
 int __init
 ppc405_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 {
-	static char pci_irq_table[][4] =
-	    /*
-	     *      PCI IDSEL/INTPIN->INTLINE
-	     *      A       B       C       D
-	     */
-	{
-		{28, 28, 28, 28},	/* IDSEL 1 - PCI slot 1 */
-		{29, 29, 29, 29},	/* IDSEL 2 - PCI slot 2 */
-		{30, 30, 30, 30},	/* IDSEL 3 - PCI slot 3 */
-		{31, 31, 31, 31},	/* IDSEL 4 - PCI slot 4 */
-	};
-	const long min_idsel = 1, max_idsel = 4, irqs_per_slot = 4;
-	return PCI_IRQ_TABLE_LOOKUP;
+	int i;
+
+	/* AFAICT this is only called a few times during PCI setup, so
+	   performance is not critical */
+	for (i = 0; i < EP405_DEVTABLE_SIZE; i++) {
+		if (idsel == ep405_devtable[i].pci_idsel)
+			return ep405_devtable[i].irq;
+	}
+	return -1;
 };
 
 void __init
 board_setup_arch(void)
 {
+	bd_t *bip = (bd_t *) __res;
+
 #ifdef CONFIG_PPC_RTC
-	/* FIXME: what if NVRAM size is not 512k */
-	TODC_INIT(TODC_TYPE_DS1557, ep405_nvram, ep405_nvram, ep405_nvram, 8);
-#endif				/* CONFIG_PPC_RTC */
+	if (bip->bi_nvramsize == 512*1024) {
+		/* FIXME: we should properly handle NVRTCs of different sizes */
+		TODC_INIT(TODC_TYPE_DS1557, ep405_nvram, ep405_nvram, ep405_nvram, 8);
+	}
+#endif
 }
 
 void __init
-bios_fixup(struct pci_controller *hose, void *pcil0_base)
+bios_fixup(struct pci_controller *hose, struct pcil0_regs *pcip)
 {
-
 	unsigned int bar_response, bar;
-	struct pcil0_regs *pcip;
 	/*
 	 * Expected PCI mapping:
 	 *
@@ -82,29 +91,7 @@ bios_fixup(struct pci_controller *hose, void *pcil0_base)
 	 *
 	 */
 
-#ifdef DEBUG
-	int i;
-	pcip = (struct pcil0_regs *) pcil0_base;
-
-	printk("ioremap PCLIO_BASE = 0x%x\n", pcip);
-	printk("PCI bridge regs before fixup \n");
-	for (i = 0; i <= 3; i++) {
-		printk(" pmm%dma\t0x%x\n", i, in_le32(&(pcip->pmm[i].ma)));
-		printk(" pmm%dma\t0x%x\n", i, in_le32(&(pcip->pmm[i].la)));
-		printk(" pmm%dma\t0x%x\n", i, in_le32(&(pcip->pmm[i].pcila)));
-		printk(" pmm%dma\t0x%x\n", i, in_le32(&(pcip->pmm[i].pciha)));
-	}
-	printk(" ptm1ms\t0x%x\n", in_le32(&(pcip->ptm1ms)));
-	printk(" ptm1la\t0x%x\n", in_le32(&(pcip->ptm1la)));
-	printk(" ptm2ms\t0x%x\n", in_le32(&(pcip->ptm2ms)));
-	printk(" ptm2la\t0x%x\n", in_le32(&(pcip->ptm2la)));
-
-#else
-	pcip = (struct pcil0_regs *) pcil0_base;
-#endif
-	/* added for IBM boot rom version 1.15 bios bar changes  -AK */
-
-	/* Disable region first */
+	/* Disable region zero first */
 	out_le32((void *) &(pcip->pmm[0].ma), 0x00000000);
 	/* PLB starting addr, PCI: 0x80000000 */
 	out_le32((void *) &(pcip->pmm[0].la), 0x80000000);
@@ -133,6 +120,11 @@ bios_fixup(struct pci_controller *hose, void *pcil0_base)
 	out_le32((void *) &(pcip->pmm[2].ma), 0x00000000);
 	out_le32((void *) &(pcip->ptm2ms), 0x00000000);
 
+	/* Configure PTM (PCI->PLB) region 1 */
+	out_le32((void *) &(pcip->ptm1la), 0x00000000); /* PLB base address */
+	/* Disable PTM region 2 */
+	out_le32((void *) &(pcip->ptm2ms), 0x00000000);
+
 	/* Zero config bars */
 	for (bar = PCI_BASE_ADDRESS_1; bar <= PCI_BASE_ADDRESS_2; bar += 4) {
 		early_write_config_dword(hose, hose->first_busno,
@@ -146,42 +138,60 @@ bios_fixup(struct pci_controller *hose, void *pcil0_base)
 		    PCI_FUNC(hose->first_busno), bar, bar_response);
 	}
 	/* end work arround */
-
-#ifdef DEBUG
-	printk("PCI bridge regs after fixup \n");
-	for (i = 0; i <= 3; i++) {
-		printk(" pmm%dma\t0x%x\n", i, in_le32(&(pcip->pmm[i].ma)));
-		printk(" pmm%dma\t0x%x\n", i, in_le32(&(pcip->pmm[i].la)));
-		printk(" pmm%dma\t0x%x\n", i, in_le32(&(pcip->pmm[i].pcila)));
-		printk(" pmm%dma\t0x%x\n", i, in_le32(&(pcip->pmm[i].pciha)));
-	}
-	printk(" ptm1ms\t0x%x\n", in_le32(&(pcip->ptm1ms)));
-	printk(" ptm1la\t0x%x\n", in_le32(&(pcip->ptm1la)));
-	printk(" ptm2ms\t0x%x\n", in_le32(&(pcip->ptm2ms)));
-	printk(" ptm2la\t0x%x\n", in_le32(&(pcip->ptm2la)));
-#endif
 }
 
 void __init
 board_io_mapping(void)
 {
+	bd_t *bip = (bd_t *) __res;
+
 	ep405_bcsr = ioremap(EP405_BCSR_PADDR, EP405_BCSR_SIZE);
-	ep405_nvram = ioremap(EP405_NVRAM_PADDR, EP405_NVRAM_SIZE);
+
+	if (bip->bi_nvramsize > 0) {
+		ep405_nvram = ioremap(EP405_NVRAM_PADDR, bip->bi_nvramsize);
+	}
 }
 
 void __init
 board_setup_irq(void)
 {
+	int i;
+
+	/* Workaround for a bug in the firmware it incorrectly sets
+	   the IRQ polarities for XIRQ0 and XIRQ1 */
+	mtdcr(DCRN_UIC_PR(DCRN_UIC0_BASE), 0xffffff80); /* set the polarity */
+	mtdcr(DCRN_UIC_SR(DCRN_UIC0_BASE), 0x00000060); /* clear bogus interrupts */
+
+	/* Activate the XIRQs from the CPLD */
+	writeb(0xf0, ep405_bcsr+10);
+
+	/* Set up IRQ routing */
+	for (i = 0; i < EP405_DEVTABLE_SIZE; i++) {
+		if ( (ep405_devtable[i].irq >= 25)
+		     && (ep405_devtable[i].irq) <= 31) {
+			writeb(ep405_devtable[i].cpld_xirq_select, ep405_bcsr+5);
+			writeb(ep405_devtable[i].irq - 25, ep405_bcsr+6);
+		}
+	}
 }
 
 void __init
 board_init(void)
 {
+	bd_t *bip = (bd_t *) __res;
+
 #ifdef CONFIG_PPC_RTC
-	ppc_md.time_init = todc_time_init;
-	ppc_md.set_rtc_time = todc_set_rtc_time;
-	ppc_md.get_rtc_time = todc_get_rtc_time;
+	/* FIXME: we should be able to access the NVRAM even if PPC_RTC is not configured */
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
+
+	if (bip->bi_nvramsize == 512*1024) {
+		ppc_md.time_init = todc_time_init;
+		ppc_md.set_rtc_time = todc_set_rtc_time;
+		ppc_md.get_rtc_time = todc_get_rtc_time;
+	} else {
+		printk("EP405: NVRTC size is not 512k (not a DS1557).  Not sure what to do with it\n");
+	}
+
 #endif
 }

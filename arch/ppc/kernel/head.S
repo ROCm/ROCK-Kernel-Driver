@@ -507,7 +507,6 @@ InstructionTLBMiss:
 	lwz	r2,0(r2)		/* get pmd entry */
 	rlwinm.	r2,r2,0,0,19		/* extract address of pte page */
 	beq-	InstructionAddressInvalid	/* return if no mapping */
-	tophys(r2,r2)
 	rlwimi	r2,r3,22,20,29		/* insert next 10 bits of address */
 	lwz	r3,0(r2)		/* get linux-style pte */
 	andc.	r1,r1,r3		/* check access & ~permission */
@@ -582,7 +581,6 @@ DataLoadTLBMiss:
 	lwz	r2,0(r2)		/* get pmd entry */
 	rlwinm.	r2,r2,0,0,19		/* extract address of pte page */
 	beq-	DataAddressInvalid	/* return if no mapping */
-	tophys(r2,r2)
 	rlwimi	r2,r3,22,20,29		/* insert next 10 bits of address */
 	lwz	r3,0(r2)		/* get linux-style pte */
 	andc.	r1,r1,r3		/* check access & ~permission */
@@ -655,7 +653,6 @@ DataStoreTLBMiss:
 	lwz	r2,0(r2)		/* get pmd entry */
 	rlwinm.	r2,r2,0,0,19		/* extract address of pte page */
 	beq-	DataAddressInvalid	/* return if no mapping */
-	tophys(r2,r2)
 	rlwimi	r2,r3,22,20,29		/* insert next 10 bits of address */
 	lwz	r3,0(r2)		/* get linux-style pte */
 	andc.	r1,r1,r3		/* check access & ~permission */
