@@ -527,7 +527,7 @@ static int verify_newpolicy_info(struct xfrm_userpolicy_info *p)
 		return -EINVAL;
 	};
 
-	switch (p->family) {
+	switch (p->sel.family) {
 	case AF_INET:
 		break;
 
@@ -594,7 +594,7 @@ static void copy_from_user_policy(struct xfrm_policy *xp, struct xfrm_userpolicy
 	memcpy(&xp->lft, &p->lft, sizeof(xp->lft));
 	xp->action = p->action;
 	xp->flags = p->flags;
-	xp->family = p->family;
+	xp->family = p->sel.family;
 	/* XXX xp->share = p->share; */
 }
 
@@ -605,7 +605,7 @@ static void copy_to_user_policy(struct xfrm_policy *xp, struct xfrm_userpolicy_i
 	memcpy(&p->curlft, &xp->curlft, sizeof(p->curlft));
 	p->priority = xp->priority;
 	p->index = xp->index;
-	p->family = xp->family;
+	p->sel.family = xp->family;
 	p->dir = dir;
 	p->action = xp->action;
 	p->flags = xp->flags;
