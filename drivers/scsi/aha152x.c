@@ -221,11 +221,6 @@
  **************************************************************************/
 
 #include <linux/module.h>
-
-#if defined(PCMCIA)
-#undef MODULE
-#endif
-
 #include <linux/sched.h>
 #include <asm/irq.h>
 #include <asm/io.h>
@@ -244,14 +239,16 @@
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/isapnp.h>
-#include <asm/semaphore.h>
 #include <linux/spinlock.h>
-
-#include "aha152x.h"
-#include <linux/stat.h>
 #include <linux/workqueue.h>
-
+#include <linux/blk.h>
+#include <asm/semaphore.h>
+#include <asm/io.h>
 #include <scsi/scsicam.h>
+
+#include "scsi.h"
+#include "aha152x.h"
+
 
 /* DEFINES */
 
@@ -338,11 +335,11 @@ enum {
 	resetting	= 0x0400,	/* BUS DEVICE RESET is pending */
 };
 
-#if defined(MODULE)
 MODULE_AUTHOR("Jürgen Fischer");
 MODULE_DESCRIPTION(AHA152X_REVID);
 MODULE_LICENSE("GPL");
 
+#if defined(MODULE) && !defined(PCMCIA)
 MODULE_PARM(io, "1-2i");
 MODULE_PARM_DESC(io,"base io address of controller");
 static int io[] = {0, 0};
@@ -396,6 +393,7 @@ MODULE_PARM(aha152x1, "1-9i");
 MODULE_PARM_DESC(aha152x1, "parameters for second controller");
 static int aha152x1[]  = {0, 11, 7, 1, 1, 1, DELAY_DEFAULT, 0, DEBUG_DEFAULT};
 #endif /* !defined(AHA152X_DEBUG) */
+#endif /* MODULE && !PCMCIA */
 
 #ifdef __ISAPNP__
 static struct isapnp_device_id id_table[] __devinitdata = {
@@ -404,7 +402,6 @@ static struct isapnp_device_id id_table[] __devinitdata = {
 };
 MODULE_DEVICE_TABLE(isapnp, id_table);
 #endif /* ISAPNP */
-#endif /* MODULE */
 
 /* set by aha152x_setup according to the command line */
 static int setup_count = 0;
@@ -1040,7 +1037,7 @@ int aha152x_detect(Scsi_Host_Template * tpnt)
 	}
 #endif
 
-#if defined(MODULE)
+#if defined(MODULE) && !defined(PCMCIA)
 	if (setup_count<ARRAY_SIZE(setup) && (aha152x[0]!=0 || io[0]!=0 || irq[0]!=0)) {
 		if(aha152x[0]!=0) {
 			setup[setup_count].conf        = "";
@@ -2651,7 +2648,7 @@ static void datai_init(struct Scsi_Host *shpnt)
 
 static void datai_run(struct Scsi_Host *shpnt)
 {
-	unsigned int the_time;
+	unsigned long the_time;
 	int fifodata, data_count;
 
 	/*
@@ -2793,7 +2790,7 @@ static void datao_init(struct Scsi_Host *shpnt)
 
 static void datao_run(struct Scsi_Host *shpnt)
 {
-	unsigned int the_time;
+	unsigned long the_time;
 	int data_count;
 
 	/* until phase changes or all data sent */
@@ -3935,7 +3932,28 @@ int aha152x_proc_info(char *buffer, char **start,
 	return thislength < length ? thislength : length;
 }
 
-/* Eventually this will go into an include file, but this will be later */
-static Scsi_Host_Template driver_template = AHA152X;
+Scsi_Host_Template aha152x_driver_template = {
+	.module			= THIS_MODULE,
+	.name			= AHA152X_REVID,
+	.proc_name		= "aha152x",
+	.proc_info		= aha152x_proc_info,
+	.detect			= aha152x_detect,
+	.command		= aha152x_command,
+	.queuecommand		= aha152x_queue,
+	.eh_abort_handler	= aha152x_abort,
+	.eh_device_reset_handler = aha152x_device_reset,
+	.eh_bus_reset_handler	= aha152x_bus_reset,
+	.eh_host_reset_handler	= aha152x_host_reset,
+	.release		= aha152x_release,
+	.bios_param		= aha152x_biosparam,
+	.can_queue		= 1,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= 1,
+	.use_clustering		= DISABLE_CLUSTERING,
+};
 
+#ifndef PCMCIA
+#define driver_templace aha152x_driver_template
 #include "scsi_module.c"
+#endif
