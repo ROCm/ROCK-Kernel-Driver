@@ -791,7 +791,8 @@ static int init_or_cleanup(int init)
 	ip_ct_sysctl_header = register_sysctl_table(ip_ct_net_table, 0);
 	if (ip_ct_sysctl_header == NULL) {
 		printk("ip_conntrack: can't register to sysctl.\n");
-		goto cleanup;
+		ret = -ENOMEM;
+		goto cleanup_localinops;
 	}
 #endif
 
@@ -800,6 +801,7 @@ static int init_or_cleanup(int init)
  cleanup:
 #ifdef CONFIG_SYSCTL
  	unregister_sysctl_table(ip_ct_sysctl_header);
+ cleanup_localinops:
 #endif
 	nf_unregister_hook(&ip_conntrack_local_in_ops);
  cleanup_inoutandlocalops:
