@@ -921,12 +921,15 @@ void __init free_area_init_core(pg_data_t *pgdat,
 			set_page_count(page, 0);
 			SetPageReserved(page);
 			INIT_LIST_HEAD(&page->list);
+#ifdef WANT_PAGE_VIRTUAL
 			if (j != ZONE_HIGHMEM)
 				/*
 				 * The shift left won't overflow because the
 				 * ZONE_NORMAL is below 4G.
 				 */
-				set_page_address(page, __va(zone_start_pfn << PAGE_SHIFT));
+				set_page_address(page,
+					__va(zone_start_pfn << PAGE_SHIFT));
+#endif
 			zone_start_pfn++;
 		}
 
