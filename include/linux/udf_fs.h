@@ -40,7 +40,7 @@
 #define UDFFS_DATE			"2004/29/09"
 #define UDFFS_VERSION			"0.9.8.1"
 
-#define UDFFS_DEBUG
+#undef UDFFS_DEBUG
 
 #ifdef UDFFS_DEBUG
 #define udf_debug(f, a...) \
