@@ -50,6 +50,12 @@
  *                         improve quality. Got rid of green line around 
  *                         frame. Fix brightness reset when changing size 
  *                         bug. Adjusted gamma filters slightly.
+ *
+ * ver 0.25 Jan, 2002 (kjs)
+ *			   Fixed a bug in which the driver sometimes attempted
+ *			   to set to a non-supported size. This allowed
+ *			   gnomemeeting to work.
+ *			   Fixed proc entry removal bug.
  */
 
 #include <linux/config.h>
@@ -87,7 +93,7 @@ static unsigned int debug = 0;
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.24"
+#define DRIVER_VERSION "v0.25"
 #define DRIVER_AUTHOR "Kevin Sisson <kjsisson@bellsouth.net>"
 #define DRIVER_DESC "STV0680 USB Camera Driver"
 
@@ -659,7 +665,7 @@ static void proc_stv680_destroy (void)
 	if (stv680_proc_entry == NULL)
 		return;
 
-	remove_proc_entry ("stv", video_proc_entry);
+	remove_proc_entry ("stv680", video_proc_entry);
 }
 #endif				/* CONFIG_PROC_FS && CONFIG_VIDEO_PROC_FS */
 
@@ -862,20 +868,23 @@ static int stv680_set_size (struct usb_stv *stv680, int width, int height)
 	if ((width < (stv680->maxwidth / 2)) || (height < (stv680->maxheight / 2))) {
 		width = stv680->maxwidth / 2;
 		height = stv680->maxheight / 2;
-	} else if ((width >= 158) && (width <= 166)) {
+	} else if ((width >= 158) && (width <= 166) && (stv680->QVGA == 1)) {
 		width = 160;
 		height = 120;
-	} else if ((width >= 172) && (width <= 180)) {
+	} else if ((width >= 172) && (width <= 180) && (stv680->CIF == 1)) {
 		width = 176;
 		height = 144;
-	} else if ((width >= 318) && (width <= 350)) {
+	} else if ((width >= 318) && (width <= 350) && (stv680->QVGA == 1)) {
 		width = 320;
 		height = 240;
-	} else if ((width >= 350) && (width <= 358)) {
+	} else if ((width >= 350) && (width <= 358) && (stv680->CIF == 1)) {
 		width = 352;
 		height = 288;
+	} else {
+		PDEBUG (1, "STV(e): request for non-supported size: request: v.width = %i, v.height = %i  actual: stv.width = %i, stv.height = %i", width, height, stv680->vwidth, stv680->vheight);
+		return 1;
 	}
-
+	
 	/* Stop a current stream and start it again at the new size */
 	if (wasstreaming)
 		stv680_stop_stream (stv680);
