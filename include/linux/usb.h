@@ -70,6 +70,7 @@ struct usb_host_interface {
 	 */
 	struct usb_host_endpoint *endpoint;
 
+	char *string;		/* iInterface string, if present */
 	unsigned char *extra;   /* Extra descriptors */
 	int extralen;
 };
@@ -189,6 +190,8 @@ struct usb_interface_cache {
 /**
  * struct usb_host_config - representation of a device's configuration
  * @desc: the device's configuration descriptor.
+ * @string: pointer to the cached version of the iConfiguration string, if
+ *	present for this configuration.
  * @interface: array of pointers to usb_interface structures, one for each
  *	interface in the configuration.  The number of interfaces is stored
  *	in desc.bNumInterfaces.  These pointers are valid only while the
@@ -225,6 +228,7 @@ struct usb_interface_cache {
 struct usb_host_config {
 	struct usb_config_descriptor	desc;
 
+	char *string;
 	/* the interfaces associated with this configuration,
 	 * stored in no particular order */
 	struct usb_interface *interface[USB_MAXINTERFACES];
