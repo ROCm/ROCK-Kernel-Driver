@@ -30,6 +30,8 @@ ENTRY(do_div64)
 	moveq	lr, #1			@ only divide low bits
 	moveq	nh, onl
 
+	tst	dh, #0x80000000
+	bne	2f
 1:	cmp	nh, dh
 	bls	2f
 	add	lr, lr, #1
