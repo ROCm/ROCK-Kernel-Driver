@@ -59,6 +59,12 @@ static struct files_struct init_files = INIT_FILES;
 static struct signal_struct init_signals = INIT_SIGNALS;
 struct mm_struct init_mm = INIT_MM(init_mm);
 
+/* this is 8kB-aligned so we can get to the thread_info struct
+   at the base of it from the stack pointer with 1 integer instruction. */
+union thread_union init_thread_union
+	__attribute__((__section__(".data.init_task"))) =
+{ INIT_THREAD_INFO(init_task) };
+
 /* initial task structure */
 struct task_struct init_task = INIT_TASK(init_task);
 
