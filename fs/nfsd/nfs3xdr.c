@@ -820,9 +820,7 @@ encode_entry(struct readdir_cd *ccd, const char *name,
 		fh_init(&fh, NFS3_FHSIZE);
 		if (isdotent(name, namlen)) {
 			if (namlen == 2) {
-				read_lock(&dparent_lock);
-				dchild = dget(dparent->d_parent);
-				read_unlock(&dparent_lock);
+				dchild = dget_parent(dparent);
 			} else
 				dchild = dget(dparent);
 		} else

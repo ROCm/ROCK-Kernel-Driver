@@ -4097,7 +4097,7 @@ ahc_linux_free_device(struct ahc_softc *ahc, struct ahc_linux_device *dev)
 {
 	struct ahc_linux_target *targ;
 
-	del_timer(&dev->timer);
+	del_timer_sync(&dev->timer);
 	targ = dev->target;
 	targ->devices[dev->lun] = NULL;
 	free(dev, M_DEVBUF);

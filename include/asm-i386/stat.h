@@ -16,15 +16,13 @@ struct __old_kernel_stat {
 };
 
 struct stat {
-	unsigned short st_dev;
-	unsigned short __pad1;
-	unsigned long st_ino;
+	unsigned long  st_dev;
+	unsigned long  st_ino;
 	unsigned short st_mode;
 	unsigned short st_nlink;
 	unsigned short st_uid;
 	unsigned short st_gid;
-	unsigned short st_rdev;
-	unsigned short __pad2;
+	unsigned long  st_rdev;
 	unsigned long  st_size;
 	unsigned long  st_blksize;
 	unsigned long  st_blocks;
@@ -42,8 +40,8 @@ struct stat {
  * insane amounts of padding around dev_t's.
  */
 struct stat64 {
-	unsigned short	st_dev;
-	unsigned char	__pad0[10];
+	unsigned long long	st_dev;
+	unsigned char	__pad0[4];
 
 #define STAT64_HAS_BROKEN_ST_INO	1
 	unsigned long	__st_ino;
@@ -54,8 +52,8 @@ struct stat64 {
 	unsigned long	st_uid;
 	unsigned long	st_gid;
 
-	unsigned short	st_rdev;
-	unsigned char	__pad3[10];
+	unsigned long long	st_rdev;
+	unsigned char	__pad3[4];
 
 	long long	st_size;
 	unsigned long	st_blksize;

@@ -2561,13 +2561,13 @@ struct proto_ops wanpipe_ops = {
 	.family = 	PF_WANPIPE,
 
 	.release = 	wanpipe_release,
-	.bind = 		wanpipe_bind,
+	.bind = 	wanpipe_bind,
 	.connect = 	wanpipe_connect,
 	.socketpair = 	sock_no_socketpair,
 	.accept = 	wanpipe_accept,
 	.getname = 	wanpipe_getname, 
-	.poll = 		wanpipe_poll,
-	.ioctl = 		wanpipe_ioctl,
+	.poll = 	wanpipe_poll,
+	.ioctl = 	wanpipe_ioctl,
 	.listen = 	wanpipe_listen, 
 	.shutdown = 	sock_no_shutdown,
 	.setsockopt = 	sock_no_setsockopt,
@@ -2577,12 +2577,12 @@ struct proto_ops wanpipe_ops = {
 };
 
 static struct net_proto_family wanpipe_family_ops = {
-	.family =PF_WANPIPE,
-	.create =wanpipe_create,
+	.family = PF_WANPIPE,
+	.create = wanpipe_create,
 };
 
 struct notifier_block wanpipe_netdev_notifier = {
-	.notifier_call =wanpipe_notifier,
+	.notifier_call = wanpipe_notifier,
 };
 
 

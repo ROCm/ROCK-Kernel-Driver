@@ -24,6 +24,38 @@ static int use_tsc;
 static int delay_at_last_interrupt;
 
 static unsigned long last_tsc_low; /* lsb 32 bits of Time Stamp Counter */
+static unsigned long last_tsc_high; /* msb 32 bits of Time Stamp Counter */
+static unsigned long long monotonic_base;
+static rwlock_t monotonic_lock = RW_LOCK_UNLOCKED;
+
+/* convert from cycles(64bits) => nanoseconds (64bits)
+ *  basic equation:
+ *		ns = cycles / (freq / ns_per_sec)
+ *		ns = cycles * (ns_per_sec / freq)
+ *		ns = cycles * (10^9 / (cpu_mhz * 10^6))
+ *		ns = cycles * (10^3 / cpu_mhz)
+ *
+ *	Then we use scaling math (suggested by george@mvista.com) to get:
+ *		ns = cycles * (10^3 * SC / cpu_mhz) / SC
+ *		ns = cycles * cyc2ns_scale / SC
+ *
+ *	And since SC is a constant power of two, we can convert the div
+ *  into a shift.   
+ *			-johnstul@us.ibm.com "math is hard, lets go shopping!"
+ */
+static unsigned long cyc2ns_scale; 
+#define CYC2NS_SCALE_FACTOR 10 /* 2^10, carefully chosen */
+
+static inline void set_cyc2ns_scale(unsigned long cpu_mhz)
+{
+	cyc2ns_scale = (1000 << CYC2NS_SCALE_FACTOR)/cpu_mhz;
+}
+
+static inline unsigned long long cycles_2_ns(unsigned long long cyc)
+{
+	return (cyc * cyc2ns_scale) >> CYC2NS_SCALE_FACTOR;
+}
+
 
 /* Cached *multiplier* to convert TSC counts to microseconds.
  * (see the equation below).
@@ -61,11 +93,32 @@ static unsigned long get_offset_tsc(void)
 	return delay_at_last_interrupt + edx;
 }
 
+static unsigned long long monotonic_clock_tsc(void)
+{
+	unsigned long long last_offset, this_offset, base;
+	
+	/* atomically read monotonic base & last_offset */
+	read_lock_irq(&monotonic_lock);
+	last_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
+	base = monotonic_base;
+	read_unlock_irq(&monotonic_lock);
+
+	/* Read the Time Stamp Counter */
+	rdtscll(this_offset);
+
+	/* return the value in ns */
+	return base + cycles_2_ns(this_offset - last_offset);
+}
+
 static void mark_offset_tsc(void)
 {
 	int count;
 	int countmp;
 	static int count1=0, count2=LATCH;
+	unsigned long long this_offset, last_offset;
+	
+	write_lock(&monotonic_lock);
+	last_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
 	/*
 	 * It is important that these two operations happen almost at
 	 * the same time. We do the RDTSC stuff first, since it's
@@ -80,7 +133,7 @@ static void mark_offset_tsc(void)
 	
 	/* read Pentium cycle counter */
 
-	rdtscl(last_tsc_low);
+	rdtsc(last_tsc_low, last_tsc_high);
 
 	spin_lock(&i8253_lock);
 	outb_p(0x00, 0x43);     /* latch the count ASAP */
@@ -103,6 +156,12 @@ static void mark_offset_tsc(void)
 		}
 	}
 
+	/* update the monotonic base value */
+	this_offset = ((unsigned long long)last_tsc_high<<32)|last_tsc_low;
+	monotonic_base += cycles_2_ns(this_offset - last_offset);
+	write_unlock(&monotonic_lock);
+
+	/* calculate delay_at_last_interrupt */
 	count = ((LATCH-1) - count) * TICK_SIZE;
 	delay_at_last_interrupt = (count + LATCH/2) / LATCH;
 }
@@ -301,6 +360,7 @@ static int __init init_tsc(char* override)
 	                	"0" (eax), "1" (edx));
 				printk("Detected %lu.%03lu MHz processor.\n", cpu_khz / 1000, cpu_khz % 1000);
 			}
+			set_cyc2ns_scale(cpu_khz/1000);
 			return 0;
 		}
 	}
@@ -334,5 +394,6 @@ struct timer_opts timer_tsc = {
 	.init =		init_tsc,
 	.mark_offset =	mark_offset_tsc, 
 	.get_offset =	get_offset_tsc,
+	.monotonic_clock =	monotonic_clock_tsc,
 	.delay = delay_tsc,
 };

@@ -31,6 +31,11 @@ static void mark_offset_pit(void)
 	/* nothing needed */
 }
 
+static unsigned long long monotonic_clock_pit(void)
+{
+	return 0;
+}
+
 static void delay_pit(unsigned long loops)
 {
 	int d0;
@@ -145,5 +150,6 @@ struct timer_opts timer_pit = {
 	.init =		init_pit, 
 	.mark_offset =	mark_offset_pit, 
 	.get_offset =	get_offset_pit,
+	.monotonic_clock = monotonic_clock_pit,
 	.delay = delay_pit,
 };

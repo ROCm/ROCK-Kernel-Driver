@@ -580,8 +580,10 @@ out:
  * Wait for a specified commit to complete.
  * The caller may not hold the journal lock.
  */
-void log_wait_commit (journal_t *journal, tid_t tid)
+int log_wait_commit (journal_t *journal, tid_t tid)
 {
+	int err = 0;
+
 	lock_kernel();
 #ifdef CONFIG_JBD_DEBUG
 	lock_journal(journal);
@@ -598,7 +600,14 @@ void log_wait_commit (journal_t *journal, tid_t tid)
 		wake_up(&journal->j_wait_commit);
 		sleep_on(&journal->j_wait_done_commit);
 	}
+
+	if (unlikely(is_journal_aborted(journal))) {
+		printk(KERN_EMERG "journal commit I/O error\n");
+		err = -EIO;
+	}
+
 	unlock_kernel();
+	return err;
 }
 
 /*
@@ -1907,6 +1916,29 @@ static void __exit remove_jbd_proc_entry(void)
 
 #endif
 
+kmem_cache_t *jbd_handle_cache;
+
+static int __init journal_init_handle_cache(void)
+{
+	jbd_handle_cache = kmem_cache_create("journal_handle",
+				sizeof(handle_t),
+				0,		/* offset */
+				0,		/* flags */
+				NULL,		/* ctor */
+				NULL);		/* dtor */
+	if (jbd_handle_cache == NULL) {
+		printk(KERN_EMERG "JBD: failed to create handle cache\n");
+		return -ENOMEM;
+	}
+	return 0;
+}
+
+static void journal_destroy_handle_cache(void)
+{
+	if (jbd_handle_cache)
+		kmem_cache_destroy(jbd_handle_cache);
+}
+
 /*
  * Module startup and shutdown
  */
@@ -1918,6 +1950,8 @@ static int __init journal_init_caches(void)
 	ret = journal_init_revoke_caches();
 	if (ret == 0)
 		ret = journal_init_journal_head_cache();
+	if (ret == 0)
+		ret = journal_init_handle_cache();
 	return ret;
 }
 
@@ -1925,6 +1959,7 @@ static void journal_destroy_caches(void)
 {
 	journal_destroy_revoke_caches();
 	journal_destroy_journal_head_cache();
+	journal_destroy_handle_cache();
 }
 
 static int __init journal_init(void)

@@ -35,6 +35,7 @@
 #include <linux/vfs.h>
 #include <linux/blkdev.h>
 #include <asm/uaccess.h>
+#include <asm/div64.h>
 
 /* This magic number is used in glibc for posix shared memory */
 #define TMPFS_MAGIC	0x01021994
@@ -750,9 +751,9 @@ static int shmem_getpage(struct inode *inode, unsigned long idx, struct page **p
 	 * Normally, filepage is NULL on entry, and either found
 	 * uptodate immediately, or allocated and zeroed, or read
 	 * in under swappage, which is then assigned to filepage.
-	 * But shmem_readpage and shmem_prepare_write pass in a locked
-	 * filepage, which may be found not uptodate by other callers
-	 * too, and may need to be copied from the swappage read in.
+	 * But shmem_prepare_write passes in a locked filepage,
+	 * which may be found not uptodate by other callers too,
+	 * and may need to be copied from the swappage read in.
 	 */
 repeat:
 	if (!filepage)
@@ -839,7 +840,8 @@ repeat:
 			SetPageUptodate(filepage);
 			set_page_dirty(filepage);
 			swap_free(swap);
-		} else if (move_from_swap_cache(swappage, idx, mapping) == 0) {
+		} else if (!(error = move_from_swap_cache(
+				swappage, idx, mapping))) {
 			shmem_swp_set(info, entry, 0);
 			shmem_swp_unmap(entry);
 			spin_unlock(&info->lock);
@@ -850,8 +852,10 @@ repeat:
 			spin_unlock(&info->lock);
 			unlock_page(swappage);
 			page_cache_release(swappage);
-			/* let kswapd refresh zone for GFP_ATOMICs */
-			blk_congestion_wait(WRITE, HZ/50);
+			if (error == -ENOMEM) {
+				/* let kswapd refresh zone for GFP_ATOMICs */
+				blk_congestion_wait(WRITE, HZ/50);
+			}
 			goto repeat;
 		}
 	} else if (sgp == SGP_READ && !filepage) {
@@ -905,8 +909,6 @@ repeat:
 				filepage = NULL;
 				if (error)
 					goto failed;
-				/* let kswapd refresh zone for GFP_ATOMICs */
-				blk_congestion_wait(WRITE, HZ / 50);
 				goto repeat;
 			}
 		}
@@ -950,6 +952,7 @@ struct page *shmem_nopage(struct vm_area_struct *vma, unsigned long address, int
 	if (error)
 		return (error == -ENOMEM)? NOPAGE_OOM: NOPAGE_SIGBUS;
 
+	mark_page_accessed(page);
 	flush_page_to_ram(page);
 	return page;
 }
@@ -977,6 +980,8 @@ static int shmem_populate(struct vm_area_struct *vma,
 		if (err)
 			return err;
 		if (page) {
+			mark_page_accessed(page);
+			flush_page_to_ram(page);
 			err = install_page(mm, vma, addr, page, prot);
 			if (err) {
 				page_cache_release(page);
@@ -1101,19 +1106,9 @@ static struct inode_operations shmem_symlink_inode_operations;
 static struct inode_operations shmem_symlink_inline_operations;
 
 /*
- * tmpfs itself makes no use of generic_file_read, generic_file_mmap
- * or generic_file_write; but shmem_readpage, shmem_prepare_write and
- * simple_commit_write let a tmpfs file be used below the loop driver.
+ * Normally tmpfs makes no use of shmem_prepare_write, but it
+ * lets a tmpfs file be used read-write below the loop driver.
  */
-static int
-shmem_readpage(struct file *file, struct page *page)
-{
-	struct inode *inode = page->mapping->host;
-	int error = shmem_getpage(inode, page->index, &page, SGP_CACHE);
-	unlock_page(page);
-	return error;
-}
-
 static int
 shmem_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
 {
@@ -1125,10 +1120,8 @@ static ssize_t
 shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 {
 	struct inode	*inode = file->f_dentry->d_inode;
-	unsigned long	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
 	loff_t		pos;
 	unsigned long	written;
-	long		status;
 	int		err;
 	loff_t		maxpos;
 
@@ -1141,88 +1134,25 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	down(&inode->i_sem);
 
 	pos = *ppos;
-	err = -EINVAL;
-	if (pos < 0)
-		goto out_nc;
-
-	err = file->f_error;
-	if (err) {
-		file->f_error = 0;
-		goto out_nc;
-	}
-
 	written = 0;
 
-	if (file->f_flags & O_APPEND)
-		pos = inode->i_size;
+	err = generic_write_checks(inode, file, &pos, &count, 0);
+	if (err || !count)
+		goto out;
 
 	maxpos = inode->i_size;
-	if (pos + count > inode->i_size) {
+	if (maxpos < pos + count) {
 		maxpos = pos + count;
-		if (maxpos > SHMEM_MAX_BYTES)
-			maxpos = SHMEM_MAX_BYTES;
 		if (!vm_enough_memory(VM_ACCT(maxpos) - VM_ACCT(inode->i_size))) {
 			err = -ENOMEM;
-			goto out_nc;
-		}
-	}
-
-	/*
-	 * Check whether we've reached the file size limit.
-	 */
-	err = -EFBIG;
-	if (limit != RLIM_INFINITY) {
-		if (pos >= limit) {
-			send_sig(SIGXFSZ, current, 0);
 			goto out;
 		}
-		if (pos > 0xFFFFFFFFULL || count > limit - (u32)pos) {
-			/* send_sig(SIGXFSZ, current, 0); */
-			count = limit - (u32)pos;
-		}
 	}
 
-	/*
-	 *	LFS rule
-	 */
-	if (pos + count > MAX_NON_LFS && !(file->f_flags&O_LARGEFILE)) {
-		if (pos >= MAX_NON_LFS) {
-			send_sig(SIGXFSZ, current, 0);
-			goto out;
-		}
-		if (count > MAX_NON_LFS - (u32)pos) {
-			/* send_sig(SIGXFSZ, current, 0); */
-			count = MAX_NON_LFS - (u32)pos;
-		}
-	}
+	remove_suid(file->f_dentry);
+	inode->i_ctime = inode->i_mtime = CURRENT_TIME;
 
-	/*
-	 *	Are we about to exceed the fs block limit ?
-	 *
-	 *	If we have written data it becomes a short write
-	 *	If we have exceeded without writing data we send
-	 *	a signal and give them an EFBIG.
-	 *
-	 *	Linus frestrict idea will clean these up nicely..
-	 */
-	if (pos >= SHMEM_MAX_BYTES) {
-		if (count || pos > SHMEM_MAX_BYTES) {
-			send_sig(SIGXFSZ, current, 0);
-			err = -EFBIG;
-			goto out;
-		}
-		/* zero-length writes at ->s_maxbytes are OK */
-	}
-	if (pos + count > SHMEM_MAX_BYTES)
-		count = SHMEM_MAX_BYTES - pos;
-
-	status	= 0;
-	if (count) {
-		remove_suid(file->f_dentry);
-		inode->i_ctime = inode->i_mtime = CURRENT_TIME;
-	}
-
-	while (count) {
+	do {
 		struct page *page = NULL;
 		unsigned long bytes, index, offset;
 		char *kaddr;
@@ -1240,8 +1170,8 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		 * But it still may be a good idea to prefault below.
 		 */
 
-		status = shmem_getpage(inode, index, &page, SGP_WRITE);
-		if (status)
+		err = shmem_getpage(inode, index, &page, SGP_WRITE);
+		if (err)
 			break;
 
 		left = bytes;
@@ -1262,15 +1192,18 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		flush_dcache_page(page);
 		if (left) {
 			page_cache_release(page);
-			status = -EFAULT;
+			err = -EFAULT;
 			break;
 		}
 
+		if (!PageReferenced(page))
+			SetPageReferenced(page);
 		set_page_dirty(page);
 		page_cache_release(page);
 
 		/*
-		 * Balance dirty pages??
+		 * Our dirty pages are not counted in nr_dirty,
+		 * and we do not attempt to balance dirty pages.
 		 */
 
 		written += bytes;
@@ -1279,15 +1212,18 @@ shmem_file_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 		buf += bytes;
 		if (pos > inode->i_size)
 			inode->i_size = pos;
-	}
+
+		cond_resched();
+	} while (count);
 
 	*ppos = pos;
-	err = written ? written : status;
-out:
+	if (written)
+		err = written;
+
 	/* Short writes give back address space */
 	if (inode->i_size != maxpos)
 		vm_unacct_memory(VM_ACCT(maxpos) - VM_ACCT(inode->i_size));
-out_nc:
+out:
 	up(&inode->i_sem);
 	return err;
 }
@@ -1336,13 +1272,20 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		}
 		nr -= offset;
 
-		/* If users can be writing to this page using arbitrary
-		 * virtual addresses, take care about potential aliasing
-		 * before reading the page on the kernel side.
-		 */
-		if (!list_empty(&mapping->i_mmap_shared) &&
-		    page != ZERO_PAGE(0))
-			flush_dcache_page(page);
+		if (page != ZERO_PAGE(0)) {
+			/*
+			 * If users can be writing to this page using arbitrary
+			 * virtual addresses, take care about potential aliasing
+			 * before reading the page on the kernel side.
+			 */
+			if (!list_empty(&mapping->i_mmap_shared))
+				flush_dcache_page(page);
+			/*
+			 * Mark the page accessed if we read the beginning.
+			 */
+			if (!offset)
+				mark_page_accessed(page);
+		}
 
 		/*
 		 * Ok, we have the page, and it's up-to-date, so
@@ -1362,6 +1305,8 @@ static void do_shmem_file_read(struct file *filp, loff_t *ppos, read_descriptor_
 		page_cache_release(page);
 		if (ret != nr || !desc->count)
 			break;
+
+		cond_resched();
 	}
 
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
@@ -1595,6 +1540,7 @@ static int shmem_readlink(struct dentry *dentry, char *buffer, int buflen)
 		return res;
 	res = vfs_readlink(dentry, buffer, buflen, kmap(page));
 	kunmap(page);
+	mark_page_accessed(page);
 	page_cache_release(page);
 	return res;
 }
@@ -1607,6 +1553,7 @@ static int shmem_follow_link(struct dentry *dentry, struct nameidata *nd)
 		return res;
 	res = vfs_follow_link(nd, kmap(page));
 	kunmap(page);
+	mark_page_accessed(page);
 	page_cache_release(page);
 	return res;
 }
@@ -1641,6 +1588,12 @@ static int shmem_parse_options(char *options, int *mode, uid_t *uid, gid_t *gid,
 		if (!strcmp(this_char,"size")) {
 			unsigned long long size;
 			size = memparse(value,&rest);
+			if (*rest == '%') {
+				size <<= PAGE_SHIFT;
+				size *= totalram_pages;
+				do_div(size, 100);
+				rest++;
+			}
 			if (*rest)
 				goto bad_val;
 			*blocks = size >> PAGE_CACHE_SHIFT;
@@ -1706,7 +1659,6 @@ static int shmem_fill_super(struct super_block *sb, void *data, int silent)
 	uid_t uid = current->fsuid;
 	gid_t gid = current->fsgid;
 	struct shmem_sb_info *sbinfo;
-	struct sysinfo si;
 	int err = -ENOMEM;
 
 	sbinfo = kmalloc(sizeof(struct shmem_sb_info), GFP_KERNEL);
@@ -1719,8 +1671,7 @@ static int shmem_fill_super(struct super_block *sb, void *data, int silent)
 	 * Per default we only allow half of the physical ram per
 	 * tmpfs instance
 	 */
-	si_meminfo(&si);
-	blocks = inodes = si.totalram / 2;
+	blocks = inodes = totalram_pages / 2;
 
 #ifdef CONFIG_TMPFS
 	if (shmem_parse_options(data, &mode, &uid, &gid, &blocks, &inodes)) {
@@ -1813,7 +1764,6 @@ static struct address_space_operations shmem_aops = {
 	.writepage	= shmem_writepage,
 	.set_page_dirty	= __set_page_dirty_nobuffers,
 #ifdef CONFIG_TMPFS
-	.readpage	= shmem_readpage,
 	.prepare_write	= shmem_prepare_write,
 	.commit_write	= simple_commit_write,
 #endif
@@ -1822,6 +1772,7 @@ static struct address_space_operations shmem_aops = {
 static struct file_operations shmem_file_operations = {
 	.mmap		= shmem_mmap,
 #ifdef CONFIG_TMPFS
+	.llseek		= generic_file_llseek,
 	.read		= shmem_file_read,
 	.write		= shmem_file_write,
 	.fsync		= simple_sync_file,

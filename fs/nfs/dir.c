@@ -503,9 +503,7 @@ static int nfs_lookup_revalidate(struct dentry * dentry, int flags)
 	struct nfs_fh fhandle;
 	struct nfs_fattr fattr;
 
-	read_lock(&dparent_lock);
-	parent = dget(dentry->d_parent);
-	read_unlock(&dparent_lock);
+	parent = dget_parent(dentry);
 	lock_kernel();
 	dir = parent->d_inode;
 	inode = dentry->d_inode;

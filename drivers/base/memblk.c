@@ -50,9 +50,13 @@ int __init register_memblk(struct memblk *memblk, int num, struct node *root)
 int __init register_memblk_type(void)
 {
 	int error;
-	if (!(error = devclass_register(&memblk_devclass)))
-		if (error = driver_register(&memblk_driver))
+
+	error = devclass_register(&memblk_devclass);
+	if (!error) {
+		error = driver_register(&memblk_driver);
+		if (error)
 			devclass_unregister(&memblk_devclass);
+	}
 	return error;
 }
 postcore_initcall(register_memblk_type);

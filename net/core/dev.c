@@ -2646,6 +2646,13 @@ int netdev_finish_unregister(struct net_device *dev)
 	return 0;
 }
 
+/* Synchronize with packet receive processing. */
+void synchronize_net(void) 
+{
+	br_write_lock_bh(BR_NETPROTO_LOCK);
+	br_write_unlock_bh(BR_NETPROTO_LOCK);
+}
+
 /**
  *	unregister_netdevice - remove device from the kernel
  *	@dev: device
@@ -2688,10 +2695,7 @@ int unregister_netdevice(struct net_device *dev)
 		return -ENODEV;
 	}
 
-	/* Synchronize to net_rx_action. */
-	br_write_lock_bh(BR_NETPROTO_LOCK);
-	br_write_unlock_bh(BR_NETPROTO_LOCK);
-
+	synchronize_net();
 
 #ifdef CONFIG_NET_FASTROUTE
 	dev_clear_fastroute(dev);

@@ -8,12 +8,15 @@
  * 		IPv6 support
  * 	YOSHIFUJI Hideaki @USAGI
  * 		Split up af-specific functions
+ *	Derek Atkins <derek@ihtfp.com>
+ *		Add UDP Encapsulation
  * 	
  */
 
 #include <net/xfrm.h>
 #include <linux/pfkeyv2.h>
 #include <linux/ipsec.h>
+#include <asm/uaccess.h>
 
 /* Each xfrm_state may be linked to two tables:
 
@@ -154,6 +157,8 @@ void __xfrm_state_destroy(struct xfrm_state *x)
 		kfree(x->ealg);
 	if (x->calg)
 		kfree(x->calg);
+	if (x->encap)
+		kfree(x->encap);
 	if (x->type)
 		xfrm_put_type(x->type);
 	kfree(x);
@@ -176,9 +181,26 @@ static void __xfrm_state_delete(struct xfrm_state *x)
 		spin_unlock(&xfrm_state_lock);
 		if (del_timer(&x->timer))
 			atomic_dec(&x->refcnt);
-		if (atomic_read(&x->refcnt) != 1)
+
+		/* The number two in this test is the reference
+		 * mentioned in the comment below plus the reference
+		 * our caller holds.  A larger value means that
+		 * there are DSTs attached to this xfrm_state.
+		 */
+		if (atomic_read(&x->refcnt) > 2)
 			xfrm_flush_bundles(x);
 	}
+
+	/* All xfrm_state objects are created by one of two possible
+	 * paths:
+	 *
+	 * 1) xfrm_state_alloc --> xfrm_state_insert
+	 * 2) xfrm_state_lookup --> xfrm_state_insert
+	 *
+	 * The xfrm_state_lookup or xfrm_state_alloc call gives a
+	 * reference, and that is what we are dropping here.
+	 */
+	atomic_dec(&x->refcnt);
 
 	if (kill && x->type)
 		x->type->destructor(x);
@@ -607,6 +629,22 @@ int km_query(struct xfrm_state *x, struct xfrm_tmpl *t, struct xfrm_policy *pol)
 	read_lock(&xfrm_km_lock);
 	list_for_each_entry(km, &xfrm_km_list, list) {
 		err = km->acquire(x, t, pol, XFRM_POLICY_OUT);
+		if (!err)
+			break;
+	}
+	read_unlock(&xfrm_km_lock);
+	return err;
+}
+
+int km_new_mapping(struct xfrm_state *x, xfrm_address_t *ipaddr, u16 sport)
+{
+	int err = -EINVAL;
+	struct xfrm_mgr *km;
+
+	read_lock(&xfrm_km_lock);
+	list_for_each_entry(km, &xfrm_km_list, list) {
+		if (km->new_mapping)
+			err = km->new_mapping(x, ipaddr, sport);
 		if (!err)
 			break;
 	}

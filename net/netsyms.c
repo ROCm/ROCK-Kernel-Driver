@@ -292,6 +292,7 @@ EXPORT_SYMBOL(dlci_ioctl_hook);
 
 EXPORT_SYMBOL(xfrm_user_policy);
 EXPORT_SYMBOL(km_waitq);
+EXPORT_SYMBOL(km_new_mapping);
 EXPORT_SYMBOL(xfrm_cfg_sem);
 EXPORT_SYMBOL(xfrm_policy_alloc);
 EXPORT_SYMBOL(__xfrm_policy_destroy);
@@ -544,6 +545,7 @@ EXPORT_SYMBOL(call_netdevice_notifiers);
 EXPORT_SYMBOL(loopback_dev);
 EXPORT_SYMBOL(register_netdevice);
 EXPORT_SYMBOL(unregister_netdevice);
+EXPORT_SYMBOL(synchronize_net);
 EXPORT_SYMBOL(netdev_state_change);
 EXPORT_SYMBOL(dev_new_index);
 EXPORT_SYMBOL(dev_get_by_flags);

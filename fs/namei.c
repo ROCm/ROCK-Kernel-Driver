@@ -275,8 +275,14 @@ void path_release(struct nameidata *nd)
  */
 static struct dentry * cached_lookup(struct dentry * parent, struct qstr * name, int flags)
 {
-	struct dentry * dentry = d_lookup(parent, name);
-	
+	struct dentry * dentry = __d_lookup(parent, name);
+
+	/* lockess __d_lookup may fail due to concurrent d_move() 
+	 * in some unrelated directory, so try with d_lookup
+	 */
+	if (!dentry)
+		dentry = d_lookup(parent, name);
+
 	if (dentry && dentry->d_op && dentry->d_op->d_revalidate) {
 		if (!dentry->d_op->d_revalidate(dentry, flags) && !d_invalidate(dentry)) {
 			dput(dentry);
@@ -348,12 +354,9 @@ static struct dentry * real_lookup(struct dentry * parent, struct qstr * name, i
 	 * negatives from the RCU list walk here, unlike the optimistic
 	 * fast walk).
 	 *
-	 * We really should do a sequence number thing to avoid this
-	 * all.
+	 * so doing d_lookup() (with seqlock), instead of lockfree __d_lookup
 	 */
-	spin_lock(&dcache_lock);
 	result = d_lookup(parent, name);
-	spin_unlock(&dcache_lock);
 	if (!result) {
 		struct dentry * dentry = d_alloc(parent, name);
 		result = ERR_PTR(-ENOMEM);
@@ -524,7 +527,7 @@ static int do_lookup(struct nameidata *nd, struct qstr *name,
 		     struct path *path, int flags)
 {
 	struct vfsmount *mnt = nd->mnt;
-	struct dentry *dentry = d_lookup(nd->dentry, name);
+	struct dentry *dentry = __d_lookup(nd->dentry, name);
 
 	if (!dentry)
 		goto need_lookup;

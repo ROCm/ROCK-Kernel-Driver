@@ -4,6 +4,8 @@
  * Changes:
  *	YOSHIFUJI Hideaki @USAGI
  *		Split up af-specific portion
+ *	Derek Atkins <derek@ihtfp.com>
+ *		Add Encapsulation support
  * 	
  */
 
@@ -14,9 +16,14 @@ static kmem_cache_t *secpath_cachep;
 
 int xfrm4_rcv(struct sk_buff *skb)
 {
+	return xfrm4_rcv_encap(skb, 0);
+}
+
+int xfrm4_rcv_encap(struct sk_buff *skb, __u16 encap_type)
+{
 	int err;
 	u32 spi, seq;
-	struct xfrm_state *xfrm_vec[XFRM_MAX_DEPTH];
+	struct sec_decap_state xfrm_vec[XFRM_MAX_DEPTH];
 	struct xfrm_state *x;
 	int xfrm_nr = 0;
 	int decaps = 0;
@@ -41,8 +48,12 @@ int xfrm4_rcv(struct sk_buff *skb)
 		if (x->props.replay_window && xfrm_replay_check(x, seq))
 			goto drop_unlock;
 
-		if (x->type->input(x, skb))
+		xfrm_vec[xfrm_nr].decap.decap_type = encap_type;
+		if (x->type->input(x, &(xfrm_vec[xfrm_nr].decap), skb))
 			goto drop_unlock;
+
+		/* only the first xfrm gets the encap type */
+		encap_type = 0;
 
 		if (x->props.replay_window)
 			xfrm_replay_advance(x, seq);
@@ -52,7 +63,7 @@ int xfrm4_rcv(struct sk_buff *skb)
 
 		spin_unlock(&x->lock);
 
-		xfrm_vec[xfrm_nr++] = x;
+		xfrm_vec[xfrm_nr++].xvec = x;
 
 		iph = skb->nh.iph;
 
@@ -91,7 +102,7 @@ int xfrm4_rcv(struct sk_buff *skb)
 	if (xfrm_nr + skb->sp->len > XFRM_MAX_DEPTH)
 		goto drop;
 
-	memcpy(skb->sp->xvec+skb->sp->len, xfrm_vec, xfrm_nr*sizeof(void*));
+	memcpy(skb->sp->x+skb->sp->len, xfrm_vec, xfrm_nr*sizeof(struct sec_decap_state));
 	skb->sp->len += xfrm_nr;
 
 	if (decaps) {
@@ -110,7 +121,8 @@ drop_unlock:
 	xfrm_state_put(x);
 drop:
 	while (--xfrm_nr >= 0)
-		xfrm_state_put(xfrm_vec[xfrm_nr]);
+		xfrm_state_put(xfrm_vec[xfrm_nr].xvec);
+
 	kfree_skb(skb);
 	return 0;
 }

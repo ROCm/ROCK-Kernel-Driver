@@ -2407,8 +2407,8 @@ bed:
 }
 
 static struct net_proto_family irda_family_ops = {
-	.family =PF_IRDA,
-	.create =irda_create,
+	.family = PF_IRDA,
+	.create = irda_create,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(irda_stream_ops) = {
