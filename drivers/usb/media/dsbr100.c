@@ -236,7 +236,6 @@ static int usb_dsbr100_probe(struct usb_interface *intf,
 			 const struct usb_device_id *id)
 {
 	dsbr100_device *radio;
-	struct video_device *videodev;
 
 	if (!(radio = kmalloc(sizeof(dsbr100_device), GFP_KERNEL)))
 		return -ENOMEM;
