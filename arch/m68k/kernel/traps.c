@@ -990,7 +990,7 @@ void show_registers(struct pt_regs *regs)
 	printk ("\n");
 }
 
-extern void show_stack(struct task_struct *task, unsigned long *stack)
+void show_stack(struct task_struct *task, unsigned long *stack)
 {
 	unsigned long *endstack;
 	int i;
