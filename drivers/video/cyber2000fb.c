@@ -1729,9 +1729,8 @@ static int cyberpro_pci_resume(struct pci_dev *dev)
 }
 
 static struct pci_device_id cyberpro_pci_table[] __devinitdata = {
-// Not yet
-//	{ PCI_VENDOR_ID_INTERG, PCI_DEVICE_ID_INTERG_1682,
-//		PCI_ANY_ID, PCI_ANY_ID, 0, 0, ID_IGA_1682 },
+	{ PCI_VENDOR_ID_INTERG, PCI_DEVICE_ID_INTERG_1682,
+		PCI_ANY_ID, PCI_ANY_ID, 0, 0, ID_IGA_1682 },
 	{ PCI_VENDOR_ID_INTERG, PCI_DEVICE_ID_INTERG_2000,
 		PCI_ANY_ID, PCI_ANY_ID, 0, 0, ID_CYBERPRO_2000 },
 	{ PCI_VENDOR_ID_INTERG, PCI_DEVICE_ID_INTERG_2010,
