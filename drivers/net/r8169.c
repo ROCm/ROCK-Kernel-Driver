@@ -280,6 +280,8 @@ enum _DescStatusBit {
 	LSbit = 0x10000000,
 };
 
+#define RsvdMask	0x3fffc000
+
 struct TxDesc {
 	u32 status;
 	u32 vlan_tag;
@@ -1114,7 +1116,7 @@ rtl8169_hw_start(struct net_device *dev)
 static inline void rtl8169_make_unusable_by_asic(struct RxDesc *desc)
 {
 	desc->buf_addr = 0xdeadbeef;
-	desc->status = EORbit; 
+	desc->status &= ~(OWNbit | RsvdMask);
 }
 
 static void rtl8169_free_rx_skb(struct pci_dev *pdev, struct sk_buff **sk_buff,
@@ -1134,7 +1136,7 @@ static inline void rtl8169_return_to_asic(struct RxDesc *desc)
 static inline void rtl8169_give_to_asic(struct RxDesc *desc, dma_addr_t mapping)
 {
 	desc->buf_addr = mapping;
-	desc->status = OWNbit + RX_BUF_SIZE;
+	desc->status |= OWNbit + RX_BUF_SIZE;
 }
 
 static int rtl8169_alloc_rx_skb(struct pci_dev *pdev, struct net_device *dev,
@@ -1200,11 +1202,6 @@ static u32 rtl8169_rx_fill(struct rtl8169_private *tp, struct net_device *dev,
 static inline void rtl8169_mark_as_last_descriptor(struct RxDesc *desc)
 {
 	desc->status |= EORbit;
-}
-
-static inline void rtl8169_unmark_as_last_descriptor(struct RxDesc *desc)
-{
-	desc->status &= ~EORbit;
 }
 
 static int rtl8169_init_ring(struct net_device *dev)
@@ -1453,14 +1450,9 @@ rtl8169_rx_interrupt(struct net_device *dev, struct rtl8169_private *tp,
 	}
 
 	delta = rtl8169_rx_fill(tp, dev, tp->dirty_rx, tp->cur_rx);
-	if (delta > 0) {
-		u32 old_last = (tp->dirty_rx - 1) % NUM_RX_DESC;
-
+	if (delta > 0)
 		tp->dirty_rx += delta;
-		rtl8169_mark_as_last_descriptor(tp->RxDescArray +
-						(tp->dirty_rx - 1)%NUM_RX_DESC);
-		rtl8169_unmark_as_last_descriptor(tp->RxDescArray + old_last);
-	} else if (delta < 0)
+	else if (delta < 0)
 		printk(KERN_INFO "%s: no Rx buffer allocated\n", dev->name);
 
 	/*
