@@ -826,13 +826,15 @@ CONFIG_USB=y
 # CONFIG_USB_OHCI_HCD is not set
 CONFIG_USB_UHCI_ALT=y
 # CONFIG_USB_OHCI is not set
+CONFIG_USB_HOST=y
 
 #
 # USB Device Class drivers
 #
 # CONFIG_USB_AUDIO is not set
-# CONFIG_USB_EMI26 is not set
-# CONFIG_USB_BLUETOOTH is not set
+# CONFIG_USB_BLUETOOTH_TTY is not set
+# CONFIG_USB_ACM is not set
+# CONFIG_USB_PRINTER is not set
 CONFIG_USB_STORAGE=y
 # CONFIG_USB_STORAGE_DEBUG is not set
 # CONFIG_USB_STORAGE_DATAFAB is not set
@@ -842,8 +844,6 @@ CONFIG_USB_STORAGE=y
 # CONFIG_USB_STORAGE_HP8200e is not set
 # CONFIG_USB_STORAGE_SDDR09 is not set
 # CONFIG_USB_STORAGE_JUMPSHOT is not set
-# CONFIG_USB_ACM is not set
-# CONFIG_USB_PRINTER is not set
 
 #
 # USB Human Interface Devices (HID)
@@ -871,19 +871,28 @@ CONFIG_USB_STORAGE=y
 #
 # USB Multimedia devices
 #
+# CONFIG_USB_DABUSB is not set
 
 #
 #   Video4Linux support is needed for USB Multimedia device support
 #
+# CONFIG_USB_VICAM is not set
+# CONFIG_USB_DSBR is not set
+# CONFIG_USB_IBMCAM is not set
+# CONFIG_USB_KONICAWC is not set
+# CONFIG_USB_OV511 is not set
+# CONFIG_USB_PWC is not set
+# CONFIG_USB_SE401 is not set
+# CONFIG_USB_STV680 is not set
 
 #
 # USB Network adaptors
 #
-# CONFIG_USB_PEGASUS is not set
-# CONFIG_USB_RTL8150 is not set
-# CONFIG_USB_KAWETH is not set
 # CONFIG_USB_CATC is not set
 # CONFIG_USB_CDCETHER is not set
+# CONFIG_USB_KAWETH is not set
+# CONFIG_USB_PEGASUS is not set
+# CONFIG_USB_RTL8150 is not set
 # CONFIG_USB_USBNET is not set
 
 #
@@ -927,9 +936,10 @@ CONFIG_USB_STORAGE=y
 #
 # USB Miscellaneous drivers
 #
-# CONFIG_USB_RIO500 is not set
-# CONFIG_USB_AUERSWALD is not set
+# CONFIG_USB_EMI26 is not set
 # CONFIG_USB_TIGL is not set
+# CONFIG_USB_AUERSWALD is not set
+# CONFIG_USB_RIO500 is not set
 
 #
 # Kernel hacking
