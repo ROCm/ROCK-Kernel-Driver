@@ -394,9 +394,22 @@ inline struct sock *tcp_v6_lookup(struct in6_addr *saddr, u16 sport,
 
 static u32 tcp_v6_synq_hash(struct in6_addr *raddr, u16 rport, u32 rnd)
 {
-	return (jhash_3words(raddr->s6_addr32[0] ^ raddr->s6_addr32[1],
-	                     raddr->s6_addr32[2] ^ raddr->s6_addr32[3],
-	                     (u32) rport, rnd) & (TCP_SYNQ_HSIZE - 1));
+	u32 a, b, c;
+
+	a = raddr->s6_addr32[0];
+	b = raddr->s6_addr32[1];
+	c = raddr->s6_addr32[2];
+
+	a += JHASH_GOLDEN_RATIO;
+	b += JHASH_GOLDEN_RATIO;
+	c += rnd;
+	__jhash_mix(a, b, c);
+
+	a += raddr->s6_addr32[3];
+	b += (u32) rport;
+	__jhash_mix(a, b, c);
+
+	return c & (TCP_SYNQ_HSIZE - 1);
 }
 
 static struct open_request *tcp_v6_search_req(struct tcp_opt *tp,
