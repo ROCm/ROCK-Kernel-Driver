@@ -240,7 +240,6 @@ m82xx_board_init(void)
 	/* Anything special for this platform */
 	callback_init_IRQ	= ppc_md.init_IRQ;
 
-	ppc_md.setup_arch	= sbc82xx_setup_arch;
 	ppc_md.init_IRQ		= sbc82xx_init_IRQ;
 	ppc_md.pci_map_irq	= sbc82xx_pci_map_irq;
 #ifdef CONFIG_GEN_RTC
