@@ -1277,16 +1277,11 @@ config MAC_FLOPPY
 	  floppy controller, say Y here. Most commonly found in PowerMacs.
 
 config MAC_SERIAL
-	tristate "Support for PowerMac serial ports"
+	tristate "Support for PowerMac serial ports (OBSOLETE DRIVER)"
 	depends on PPC_PMAC
 	help
-	  If you have Macintosh style serial ports (8 pin mini-DIN), say Y
-	  here. If you also have regular serial ports and enable the driver
-	  for them, you can't currently use the serial console feature.
-
-config SERIAL_CONSOLE
-	bool "Support for console on serial port"
-	depends on PPC_PMAC && MAC_SERIAL=y
+	  This driver is obsolete. Use CONFIG_SERIAL_PMACZILOG in
+	  "Character devices --> Serial drivers --> PowerMac z85c30" option.
 
 config ADB
 	bool "Apple Desktop Bus (ADB) support"
