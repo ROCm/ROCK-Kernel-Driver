@@ -558,6 +558,9 @@ struct nfs4_state {
 };
 
 
+extern struct dentry_operations nfs4_dentry_operations;
+extern struct inode_operations nfs4_dir_inode_operations;
+
 /* nfs4proc.c */
 extern int nfs4_proc_setclientid(struct nfs4_client *, u32, unsigned short);
 extern int nfs4_proc_setclientid_confirm(struct nfs4_client *);
@@ -566,6 +569,8 @@ extern int nfs4_proc_async_renew(struct nfs4_client *);
 extern int nfs4_proc_renew(struct nfs4_client *);
 extern int nfs4_do_close(struct inode *, struct nfs4_state *);
 extern int nfs4_wait_clnt_recover(struct rpc_clnt *, struct nfs4_client *);
+extern struct inode *nfs4_atomic_open(struct inode *, struct dentry *, struct nameidata *);
+extern int nfs4_open_revalidate(struct inode *, struct dentry *, int);
 
 /* nfs4renewd.c */
 extern void nfs4_schedule_state_renewal(struct nfs4_client *);
@@ -581,6 +586,7 @@ extern struct nfs4_state_owner * nfs4_get_state_owner(struct nfs_server *, struc
 extern void nfs4_put_state_owner(struct nfs4_state_owner *);
 extern struct nfs4_state * nfs4_get_open_state(struct inode *, struct nfs4_state_owner *);
 extern void nfs4_put_open_state(struct nfs4_state *);
+extern struct nfs4_state *nfs4_find_state_bypid(struct inode *, pid_t);
 extern void nfs4_increment_seqid(int status, struct nfs4_state_owner *sp);
 extern int nfs4_handle_error(struct nfs_server *, int);
 extern void nfs4_schedule_state_recovery(struct nfs4_client *);

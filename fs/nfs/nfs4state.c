@@ -349,7 +349,6 @@ nfs4_get_open_state(struct inode *inode, struct nfs4_state_owner *owner)
 		atomic_inc(&owner->so_count);
 		list_add(&state->inode_states, &nfsi->open_states);
 		state->inode = inode;
-		atomic_inc(&inode->i_count);
 		spin_unlock(&inode->i_lock);
 	} else {
 		spin_unlock(&inode->i_lock);
@@ -384,7 +383,6 @@ nfs4_put_open_state(struct nfs4_state *state)
 		} while (!status);
 	}
 	up(&owner->so_sema);
-	iput(inode);
 	nfs4_free_open_state(state);
 	nfs4_put_state_owner(owner);
 }

@@ -303,7 +303,6 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	server = NFS_SB(sb);
 
 	sb->s_magic      = NFS_SUPER_MAGIC;
-	sb->s_op         = &nfs_sops;
 
 	/* Did getting the root inode fail? */
 	if (nfs_get_root(&root_inode, authflavor, sb, &server->fh) < 0)
@@ -312,7 +311,7 @@ nfs_sb_init(struct super_block *sb, rpc_authflavor_t authflavor)
 	if (!sb->s_root)
 		goto out_no_root;
 
-	sb->s_root->d_op = &nfs_dentry_operations;
+	sb->s_root->d_op = server->rpc_ops->dentry_ops;
 
 	/* Get some general file system info */
         if (server->rpc_ops->fsinfo(server, &server->fh, &fsinfo) < 0) {
@@ -513,6 +512,7 @@ nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int silent)
 		goto out_shutdown;
 	}
 
+	sb->s_op = &nfs_sops;
 	err = nfs_sb_init(sb, authflavor);
 	if (err != 0)
 		goto out_noinit;
@@ -745,7 +745,7 @@ nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 			inode->i_data.a_ops = &nfs_file_aops;
 			inode->i_data.backing_dev_info = &NFS_SB(sb)->backing_dev_info;
 		} else if (S_ISDIR(inode->i_mode)) {
-			inode->i_op = &nfs_dir_inode_operations;
+			inode->i_op = NFS_SB(sb)->rpc_ops->dir_inode_ops;
 			inode->i_fop = &nfs_dir_operations;
 			if (nfs_server_capable(inode, NFS_CAP_READDIRPLUS)
 			    && fattr->size <= NFS_LIMIT_READDIRPLUS)
@@ -837,7 +837,12 @@ printk("nfs_setattr: revalidate failed, error=%d\n", error);
 		filemap_fdatawait(inode->i_mapping);
 		if (error)
 			goto out;
+		/* Optimize away unnecessary truncates */
+		if ((attr->ia_valid & ATTR_SIZE) && i_size_read(inode) == attr->ia_size)
+			attr->ia_valid &= ~ATTR_SIZE;
 	}
+	if (!attr->ia_valid)
+		goto out;
 
 	error = NFS_PROTO(inode)->setattr(dentry, &fattr, attr);
 	if (error)
@@ -1357,6 +1362,48 @@ static struct file_system_type nfs_fs_type = {
 
 #ifdef CONFIG_NFS_V4
 
+static void nfs4_clear_inode(struct inode *);
+
+static struct super_operations nfs4_sops = { 
+	.alloc_inode	= nfs_alloc_inode,
+	.destroy_inode	= nfs_destroy_inode,
+	.write_inode	= nfs_write_inode,
+	.delete_inode	= nfs_delete_inode,
+	.put_super	= nfs_put_super,
+	.statfs		= nfs_statfs,
+	.clear_inode	= nfs4_clear_inode,
+	.umount_begin	= nfs_umount_begin,
+	.show_options	= nfs_show_options,
+};
+
+/*
+ * Clean out any remaining NFSv4 state that might be left over due
+ * to open() calls that passed nfs_atomic_lookup, but failed to call
+ * nfs_open().
+ */
+static void nfs4_clear_inode(struct inode *inode)
+{
+	struct nfs_inode *nfsi = NFS_I(inode);
+
+	while (!list_empty(&nfsi->open_states)) {
+		struct nfs4_state *state;
+		
+		state = list_entry(nfsi->open_states.next,
+				struct nfs4_state,
+				inode_states);
+		dprintk("%s(%s/%Ld): found unclaimed NFSv4 state %p\n",
+				__FUNCTION__,
+				inode->i_sb->s_id,
+				(long long)NFS_FILEID(inode),
+				state);
+		list_del(&state->inode_states);
+		nfs4_put_open_state(state);
+	}
+	/* Now call standard NFS clear_inode() code */
+	nfs_clear_inode(inode);
+}
+
+
 static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data, int silent)
 {
 	struct nfs_server *server;
@@ -1481,6 +1528,7 @@ static int nfs4_fill_super(struct super_block *sb, struct nfs4_mount_data *data,
 	if ((server->idmap = nfs_idmap_new(server)) == NULL)
 		printk(KERN_WARNING "NFS: couldn't start IDmap\n");
 
+	sb->s_op = &nfs4_sops;
 	err = nfs_sb_init(sb, authflavour);
 	if (err == 0)
 		return 0;

@@ -45,6 +45,7 @@
 #include <linux/nfs_fs.h>
 #include <linux/nfs_page.h>
 #include <linux/smp_lock.h>
+#include <linux/namei.h>
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
 
@@ -509,6 +510,9 @@ nfs4_open_reclaim(struct nfs4_state_owner *sp, struct nfs4_state *state)
 	return status;
 }
 
+/*
+ * Returns an nfs4_state + an referenced inode
+ */
 struct nfs4_state *
 nfs4_do_open(struct inode *dir, struct qstr *name, int flags, struct iattr *sattr, struct rpc_cred *cred)
 {
@@ -617,19 +621,23 @@ retry:
 
 	up(&sp->so_sema);
 	nfs4_put_state_owner(sp);
-	iput(inode);
 	return state;
 
 out_up:
 	up(&sp->so_sema);
 	nfs4_put_state_owner(sp);
-	if (state)
+	if (state) {
 		nfs4_put_open_state(state);
-	if (inode)
+		state = NULL;
+	}
+	if (inode) {
 		iput(inode);
+		inode = NULL;
+	}
 	status = nfs4_handle_error(server, status);
 	if (!status)
 		goto retry;
+	BUG_ON(status < -1000 || status > 0);
 out:
 	return ERR_PTR(status);
 }
@@ -716,6 +724,56 @@ nfs4_do_close(struct inode *inode, struct nfs4_state *state)
 	nfs4_increment_seqid(status, sp);
 
 	return status;
+}
+
+struct inode *
+nfs4_atomic_open(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
+{
+	struct iattr attr;
+	struct rpc_cred *cred;
+	struct nfs4_state *state;
+
+	if (nd->flags & LOOKUP_CREATE) {
+		attr.ia_mode = nd->intent.open.create_mode;
+		attr.ia_valid = ATTR_MODE;
+		if (!IS_POSIXACL(dir))
+			attr.ia_mode &= ~current->fs->umask;
+	} else {
+		attr.ia_valid = 0;
+		BUG_ON(nd->intent.open.flags & O_CREAT);
+	}
+
+	cred = rpcauth_lookupcred(NFS_SERVER(dir)->client->cl_auth, 0);
+	state = nfs4_do_open(dir, &dentry->d_name, nd->intent.open.flags, &attr, cred);
+	put_rpccred(cred);
+	if (IS_ERR(state))
+		return (struct inode *)state;
+	return state->inode;
+}
+
+int
+nfs4_open_revalidate(struct inode *dir, struct dentry *dentry, int openflags)
+{
+	struct rpc_cred *cred;
+	struct nfs4_state *state;
+	struct inode *inode;
+
+	cred = rpcauth_lookupcred(NFS_SERVER(dir)->client->cl_auth, 0);
+	state = nfs4_do_open(dir, &dentry->d_name, openflags, NULL, cred);
+	put_rpccred(cred);
+	if (state == ERR_PTR(-ENOENT) && dentry->d_inode == 0)
+		return 1;
+	if (IS_ERR(state))
+		return 0;
+	inode = state->inode;
+	if (inode == dentry->d_inode) {
+		iput(inode);
+		return 1;
+	}
+	d_drop(dentry);
+	nfs4_put_open_state(state);
+	iput(inode);
+	return 0;
 }
 
 static int
@@ -808,28 +866,39 @@ nfs4_proc_setattr(struct dentry *dentry, struct nfs_fattr *fattr,
 	struct inode *		inode = dentry->d_inode;
 	int			size_change = sattr->ia_valid & ATTR_SIZE;
 	struct nfs4_state	*state = NULL;
-	int			status;
+	int need_iput = 0;
+	int status;
 
 	fattr->valid = 0;
 	
 	if (size_change) {
-		struct rpc_cred *cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
-		state = nfs4_do_open(dentry->d_parent->d_inode, 
+		state = nfs4_find_state_bypid(inode, current->pid);
+
+		if (!state) {
+			struct rpc_cred *cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
+			state = nfs4_do_open(dentry->d_parent->d_inode, 
 				&dentry->d_name, FMODE_WRITE, NULL, cred);
-		put_rpccred(cred);
+			put_rpccred(cred);
+			need_iput = 1;
+		}
 		if (IS_ERR(state))
 			return PTR_ERR(state);
 
 		if (state->inode != inode) {
-			printk(KERN_WARNING "nfs: raced in setattr, returning -EIO\n");
-			nfs4_put_open_state(state);
-			return -EIO;
+			printk(KERN_WARNING "nfs: raced in setattr (%p != %p), returning -EIO\n", inode, state->inode);
+			status = -EIO;
+			goto out;
 		}
 	}
 	status = nfs4_do_setattr(NFS_SERVER(inode), fattr,
 			NFS_FH(inode), sattr, state);
-	if (state)
+out:
+	if (state) {
+		inode = state->inode;
 		nfs4_put_open_state(state);
+		if (need_iput)
+			iput(inode);
+	}
 	return status;
 }
 
@@ -1085,18 +1154,18 @@ nfs4_proc_create(struct inode *dir, struct qstr *name, struct iattr *sattr,
 	state = nfs4_do_open(dir, name, flags, sattr, cred);
 	put_rpccred(cred);
 	if (!IS_ERR(state)) {
-		inode = igrab(state->inode);
+		inode = state->inode;
 		if (flags & O_EXCL) {
 			struct nfs_fattr fattr;
 			int status;
 			status = nfs4_do_setattr(NFS_SERVER(dir), &fattr,
 			                     NFS_FH(inode), sattr, state);
 			if (status != 0) {
+				nfs4_put_open_state(state);
 				iput(inode);
 				inode = ERR_PTR(status);
 			}
 		}
-		nfs4_put_open_state(state);
 	} else
 		inode = (struct inode *)state;
 	return inode;
@@ -1672,43 +1741,28 @@ static int
 nfs4_proc_file_open(struct inode *inode, struct file *filp)
 {
 	struct dentry *dentry = filp->f_dentry;
-	struct inode *dir = dentry->d_parent->d_inode;
-	struct rpc_cred *cred;
 	struct nfs4_state *state;
-	int flags = filp->f_flags;
-	int status = 0;
 
 	dprintk("nfs4_proc_file_open: starting on (%.*s/%.*s)\n",
 	                       (int)dentry->d_parent->d_name.len,
 	                       dentry->d_parent->d_name.name,
 	                       (int)dentry->d_name.len, dentry->d_name.name);
 
-	if ((flags + 1) & O_ACCMODE)
-		flags++;
 
-	lock_kernel();
-
-/*
-* We have already opened the file "O_EXCL" in nfs4_proc_create!!
-* This ugliness will go away with lookup-intent...
-*/
-	cred = rpcauth_lookupcred(NFS_SERVER(inode)->client->cl_auth, 0);
-	state = nfs4_do_open(dir, &dentry->d_name, flags, NULL, cred);
-	if (IS_ERR(state)) {
-		status = PTR_ERR(state);
-		state = NULL;
-	} else if (filp->f_mode & FMODE_WRITE)
-		nfs_set_mmcred(inode, cred);
-	if (inode != filp->f_dentry->d_inode) {
+	/* Find our open stateid */
+	state = nfs4_find_state_bypid(inode, current->pid);
+	if (state == NULL) {
 		printk(KERN_WARNING "NFS: v4 raced in function %s\n", __FUNCTION__);
-		status = -EIO; /* ERACE actually */
-		nfs4_put_open_state(state);
-		state = NULL;
+		return -EIO; /* ERACE actually */
+	}
+	nfs4_put_open_state(state);
+	if (filp->f_mode & FMODE_WRITE) {
+		lock_kernel();
+		nfs_set_mmcred(inode, state->owner->so_cred);
+		unlock_kernel();
 	}
 	filp->private_data = state;
-	put_rpccred(cred);
-	unlock_kernel();
-	return status;
+	return 0;
 }
 
 /*
@@ -1922,6 +1976,8 @@ nfs4_proc_setclientid_confirm(struct nfs4_client *clp)
 
 struct nfs_rpc_ops	nfs_v4_clientops = {
 	.version	= 4,			/* protocol version */
+	.dentry_ops	= &nfs4_dentry_operations,
+	.dir_inode_ops	= &nfs4_dir_inode_operations,
 	.getroot	= nfs4_proc_get_root,
 	.getattr	= nfs4_proc_getattr,
 	.setattr	= nfs4_proc_setattr,
