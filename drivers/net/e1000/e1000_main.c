@@ -347,7 +347,8 @@ e1000_reset(struct e1000_adapter *adapter)
 	e1000_reset_hw(&adapter->hw);
 	if(adapter->hw.mac_type >= e1000_82544)
 		E1000_WRITE_REG(&adapter->hw, WUC, 0);
-	e1000_init_hw(&adapter->hw);
+	if(e1000_init_hw(&adapter->hw))
+		DPRINTK(PROBE, ERR, "Hardware Error\n");
 
 	/* Enable h/w to recognize an 802.1Q VLAN Ethernet packet */
 	E1000_WRITE_REG(&adapter->hw, VET, ETHERNET_IEEE_VLAN_TYPE);
@@ -517,10 +518,12 @@ e1000_probe(struct pci_dev *pdev,
 
 	/* copy the MAC address out of the EEPROM */
 
-	e1000_read_mac_addr(&adapter->hw);
+	if (e1000_read_mac_addr(&adapter->hw))
+		DPRINTK(PROBE, ERR, "EEPROM Read Error\n");
 	memcpy(netdev->dev_addr, adapter->hw.mac_addr, netdev->addr_len);
 
 	if(!is_valid_ether_addr(netdev->dev_addr)) {
+		DPRINTK(PROBE, ERR, "Invalid MAC Address\n");
 		err = -EIO;
 		goto err_eeprom;
 	}
@@ -801,6 +804,8 @@ e1000_setup_tx_resources(struct e1000_adapter *adapter)
 	size = sizeof(struct e1000_buffer) * txdr->count;
 	txdr->buffer_info = vmalloc(size);
 	if(!txdr->buffer_info) {
+		DPRINTK(PROBE, ERR, 
+		"Unble to Allocate Memory for the Transmit descriptor ring\n");
 		return -ENOMEM;
 	}
 	memset(txdr->buffer_info, 0, size);
@@ -812,6 +817,8 @@ e1000_setup_tx_resources(struct e1000_adapter *adapter)
 
 	txdr->desc = pci_alloc_consistent(pdev, txdr->size, &txdr->dma);
 	if(!txdr->desc) {
+		DPRINTK(PROBE, ERR, 
+		"Unble to Allocate Memory for the Transmit descriptor ring\n");
 		vfree(txdr->buffer_info);
 		return -ENOMEM;
 	}
@@ -918,6 +925,8 @@ e1000_setup_rx_resources(struct e1000_adapter *adapter)
 	size = sizeof(struct e1000_buffer) * rxdr->count;
 	rxdr->buffer_info = vmalloc(size);
 	if(!rxdr->buffer_info) {
+		DPRINTK(PROBE, ERR, 
+		"Unble to Allocate Memory for the Recieve descriptor ring\n");
 		return -ENOMEM;
 	}
 	memset(rxdr->buffer_info, 0, size);
@@ -930,6 +939,8 @@ e1000_setup_rx_resources(struct e1000_adapter *adapter)
 	rxdr->desc = pci_alloc_consistent(pdev, rxdr->size, &rxdr->dma);
 
 	if(!rxdr->desc) {
+		DPRINTK(PROBE, ERR, 
+		"Unble to Allocate Memory for the Recieve descriptor ring\n");
 		vfree(rxdr->buffer_info);
 		return -ENOMEM;
 	}
@@ -2795,6 +2806,8 @@ e1000_set_spd_dplx(struct e1000_adapter *adapter, uint16_t spddplx)
 		break;
 	case SPEED_1000 + DUPLEX_HALF: /* not supported */
 	default:
+		DPRINTK(PROBE, ERR, 
+			"Unsupported Speed/Duplexity configuration\n");
 		return -EINVAL;
 	}
 	return 0;
