@@ -260,6 +260,7 @@ struct cifsFileInfo {
 	__u32    resume_key;              /* BB removeme BB */
 	loff_t   index_of_last_entry_in_buf;
 	int 	entries_in_buffer;
+	unsigned   info_level;
 };
 
 /*

@@ -177,15 +177,15 @@ smb_send(struct socket *ssocket, struct smb_hdr *smb_buffer,
 }
 
 #ifdef CIFS_EXPERIMENTAL
-
+/* BB finish off this function, adding support for writing set of pages as iovec */
+/* and also adding support for operations that need to parse the response smb    */
 int
 CIFSSendRcv(const unsigned int xid, struct cifsSesInfo *ses,
-	    struct smb_hdr *in_buf, struct kvec * /* page list */, int *pbytes_returned, const int long_op)
+	    struct smb_hdr *in_buf, struct kvec * write_vector /* page list */, int *pbytes_returned, const int long_op)
 {
 	int rc = 0;
-	unsigned int receive_len;
-	unsigned long timeout;
-	struct mid_q_entry *midQ;
+	unsigned long timeout = 15 * HZ;
+	struct mid_q_entry *midQ = NULL;
 
 	if (ses == NULL) {
 		cERROR(1,("Null smb session"));
@@ -195,6 +195,12 @@ CIFSSendRcv(const unsigned int xid, struct cifsSesInfo *ses,
 		cERROR(1,("Null tcp session"));
 		return -EIO;
 	}
+	if(pbytes_returned == NULL)
+		return -EIO;
+	else
+		*pbytes_returned = 0;
+
+  
 
 	/* Ensure that we do not send more than 50 overlapping requests 
 	   to the same server. We may make this configurable later or
@@ -279,8 +285,8 @@ CIFSSendRcv(const unsigned int xid, struct cifsSesInfo *ses,
 	rc = cifs_sign_smb(in_buf, ses, &midQ->sequence_number);
 
 	midQ->midState = MID_REQUEST_SUBMITTED;
-	rc = smb_send2(ses->server->ssocket, in_buf, in_buf->smb_buf_length, piovec,
-		      (struct sockaddr *) &(ses->server->addr.sockAddr));
+/*	rc = smb_send2(ses->server->ssocket, in_buf, in_buf->smb_buf_length, piovec,
+		      (struct sockaddr *) &(ses->server->addr.sockAddr));*/
 	if(rc < 0) {
 		DeleteMidQEntry(midQ);
 		up(&ses->server->tcpSem);
@@ -292,6 +298,14 @@ CIFSSendRcv(const unsigned int xid, struct cifsSesInfo *ses,
 		return rc;
 	} else
 		up(&ses->server->tcpSem);
+cifs_out_label:
+	if(midQ)
+	        DeleteMidQEntry(midQ);
+                                                                                                                           
+	if(long_op < 3) {
+		atomic_dec(&ses->server->inFlight);
+		wake_up(&ses->server->request_q);
+	}
 
 	return rc;
 }
@@ -430,7 +444,6 @@ SendReceive(const unsigned int xid, struct cifsSesInfo *ses,
 		/* if signal pending do not hold up user for full smb timeout
 		but we still give response a change to complete */
 		timeout = 2 * HZ;
-		
 	}   
 
 	/* No user interrupts in wait - wreaks havoc with performance */

@@ -41,14 +41,13 @@ extern int CIFSFindFirst2(const int xid, struct cifsTconInfo *tcon,
 static int initiate_cifs_search(const int xid, struct file * file, char * full_path)
 {
 	int rc = 0;
-    struct cifsFileInfo * cifsFile;
+	struct cifsFileInfo * cifsFile;
 	struct cifs_sb_info *cifs_sb;
 	struct cifsTconInfo *pTcon;
 	char * pfindData;
 	char * pbuf;
 	int Unicode;
 	int EndOfSearch;
-	int level;
 
 	if(file->private_data == NULL) {
 		file->private_data = 
@@ -76,7 +75,7 @@ static int initiate_cifs_search(const int xid, struct file * file, char * full_p
               &pfindData /* first search entries */,
               &pbuf /* beginning of smb response */,
               &cifsFile->entries_in_buffer, &cifsFile->netfid,
-              &EndOfSearch,&Unicode,&level);
+              &EndOfSearch,&Unicode,&cifsFile->info_level);
  
 	if(EndOfSearch)
 		cifsFile->endOfSearch = TRUE;
@@ -85,12 +84,20 @@ static int initiate_cifs_search(const int xid, struct file * file, char * full_p
 }
 
 /* find the corresponding entry in the search */
-static int find_cifs_entry(loff_t index_to_find /* BB add missing parm */) 
+static int find_cifs_entry(loff_t index_to_find, struct cifsFileInfo * cifsFile /* BB add missing parm */) 
 {
 	int rc = 0;
 
 	return rc;
 }
+
+static int cifs_filldir_with_entries(loff_t index_to_find, struct cifsFileInfo * cifsFile)
+{
+	int rc = 0;
+
+	return rc;
+}
+
 
 int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 {
@@ -162,7 +169,7 @@ int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 
 		if(file->private_data == NULL) {
 			rc = initiate_cifs_search(xid,file,full_path);
-			if(rc) {
+			if(rc || (file->private_data == NULL)) {
 				FreeXid(xid);
 				if(full_path)
 					kfree(full_path);
@@ -170,25 +177,24 @@ int cifs_readdir2(struct file *file, void *direntry, filldir_t filldir)
 			}
 		}
 
-		find_cifs_entry(file->f_pos);
-		/*close search or seek to right position */
-		if (file->private_data) {
-			cifsFile = (struct cifsFileInfo *) file->private_data;
-			if (cifsFile->endOfSearch) {
-				if(cifsFile->emptyDir) {
-					cFYI(1, ("End of search, empty dir"));
-					rc = 0;
-					break;
-				}
-			} else {
-				cifsFile->invalidHandle = TRUE;
-				CIFSFindClose(xid, pTcon, cifsFile->netfid);
+		cifsFile = (struct cifsFileInfo *) file->private_data;
+		if (cifsFile->endOfSearch) {
+			if(cifsFile->emptyDir) {
+				cFYI(1, ("End of search, empty dir"));
+				rc = 0;
+				break;
 			}
-			if(cifsFile->search_resume_name) {
-				kfree(cifsFile->search_resume_name);
-				cifsFile->search_resume_name = NULL;
-			}
-		}
+		} /* else {
+			cifsFile->invalidHandle = TRUE;
+			CIFSFindClose(xid, pTcon, cifsFile->netfid);
+		} 
+		if(cifsFile->search_resume_name) {
+			kfree(cifsFile->search_resume_name);
+			cifsFile->search_resume_name = NULL;
+		} */
+
+		find_cifs_entry(file->f_pos, cifsFile);
+		cifs_filldir_with_entries(file->f_pos, cifsFile);
 		/* 2) initiate search, */
 		/* 3) seek into search buffer */
 		/* 4) if not found && later - FindNext */
