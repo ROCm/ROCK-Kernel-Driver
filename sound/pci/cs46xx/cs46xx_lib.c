@@ -79,6 +79,8 @@ static unsigned short snd_cs46xx_codec_read(cs46xx_t *chip,
 		     (codec_index == CS46XX_SECONDARY_CODEC_INDEX),
 		     return -EINVAL);
 
+	chip->active_ctrl(chip, 1);
+
 	if (codec_index == CS46XX_SECONDARY_CODEC_INDEX)
 		offset = CS46XX_SECONDARY_CODEC_OFFSET;
 
@@ -184,6 +186,7 @@ static unsigned short snd_cs46xx_codec_read(cs46xx_t *chip,
 	//snd_cs46xx_peekBA0(chip, BA0_ACCAD);
 	result = snd_cs46xx_peekBA0(chip, BA0_ACSDA + offset);
  end:
+	chip->active_ctrl(chip, -1);
 	return result;
 }
 
@@ -192,19 +195,13 @@ static unsigned short snd_cs46xx_ac97_read(ac97_t * ac97,
 {
 	cs46xx_t *chip = ac97->private_data;
 	unsigned short val;
-	int codec_index = -1;
+	int codec_index = ac97->num;
 
-	/* UGGLY: nr_ac97_codecs == 0 primery codec detection is in progress */
-	if (ac97 == chip->ac97[CS46XX_PRIMARY_CODEC_INDEX] || chip->nr_ac97_codecs == 0)
-		codec_index = CS46XX_PRIMARY_CODEC_INDEX;
-	/* UGGLY: nr_ac97_codecs == 1 secondary codec detection is in progress */
-	else if (ac97 == chip->ac97[CS46XX_SECONDARY_CODEC_INDEX] || chip->nr_ac97_codecs == 1)
-		codec_index = CS46XX_SECONDARY_CODEC_INDEX;
-	else
-		snd_assert(0, return 0xffff);
-	chip->active_ctrl(chip, 1);
+	snd_assert(codec_index == CS46XX_PRIMARY_CODEC_INDEX ||
+		   codec_index == CS46XX_SECONDARY_CODEC_INDEX,
+		   return 0xffff);
+
 	val = snd_cs46xx_codec_read(chip, reg, codec_index);
-	chip->active_ctrl(chip, -1);
 
 	/* HACK: voyetra uses EAPD bit in the reverse way.
 	 * we flip the bit to show the mixer status correctly
@@ -226,6 +223,8 @@ static void snd_cs46xx_codec_write(cs46xx_t *chip,
 	snd_assert ((codec_index == CS46XX_PRIMARY_CODEC_INDEX) ||
 		    (codec_index == CS46XX_SECONDARY_CODEC_INDEX),
 		    return);
+
+	chip->active_ctrl(chip, 1);
 
 	/*
 	 *  1. Write ACCAD = Command Address Register = 46Ch for AC97 register address
@@ -271,10 +270,12 @@ static void snd_cs46xx_codec_write(cs46xx_t *chip,
 		 *  ACCTL = 460h, DCV should be reset by now and 460h = 07h
 		 */
 		if (!(snd_cs46xx_peekBA0(chip, BA0_ACCTL) & ACCTL_DCV)) {
-			return;
+			goto end;
 		}
 	}
 	snd_printk("AC'97 write problem, codec_index = %d, reg = 0x%x, val = 0x%x\n", codec_index, reg, val);
+ end:
+	chip->active_ctrl(chip, -1);
 }
 
 static void snd_cs46xx_ac97_write(ac97_t *ac97,
@@ -282,16 +283,11 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 				   unsigned short val)
 {
 	cs46xx_t *chip = ac97->private_data;
-	int codec_index = -1;
+	int codec_index = ac97->num;
 
-	/* UGGLY: nr_ac97_codecs == 0 primery codec detection is in progress */
-	if (ac97 == chip->ac97[CS46XX_PRIMARY_CODEC_INDEX] || chip->nr_ac97_codecs == 0)
-		codec_index = CS46XX_PRIMARY_CODEC_INDEX;
-	/* UGGLY: nr_ac97_codecs == 1 secondary codec detection is in progress */
-	else  if (ac97 == chip->ac97[CS46XX_SECONDARY_CODEC_INDEX] || chip->nr_ac97_codecs == 1)
-		codec_index = CS46XX_SECONDARY_CODEC_INDEX;
-	else
-		snd_assert(0,return);
+	snd_assert(codec_index == CS46XX_PRIMARY_CODEC_INDEX ||
+		   codec_index == CS46XX_SECONDARY_CODEC_INDEX,
+		   return 0xffff);
 
 	/* HACK: voyetra uses EAPD bit in the reverse way.
 	 * we flip the bit to show the mixer status correctly
@@ -299,9 +295,7 @@ static void snd_cs46xx_ac97_write(ac97_t *ac97,
 	if (reg == AC97_POWERDOWN && chip->amplifier_ctrl == amp_voyetra)
 		val ^= 0x8000;
 
-	chip->active_ctrl(chip, 1);
 	snd_cs46xx_codec_write(chip, reg, val, codec_index);
-	chip->active_ctrl(chip, -1);
 }
 
 
@@ -2393,7 +2387,7 @@ static void snd_cs46xx_codec_reset (ac97_t * ac97)
 int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 {
 	snd_card_t *card = chip->card;
-	ac97_t ac97;
+	ac97_template_t ac97;
 	snd_ctl_elem_id_t id;
 	int err;
 	unsigned int idx;
@@ -2415,16 +2409,16 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	memset(&ac97, 0, sizeof(ac97));
 	ac97.private_data = chip;
 	ac97.private_free = snd_cs46xx_mixer_free_ac97;
-	chip->ac97[CS46XX_PRIMARY_CODEC_INDEX] = &ac97;
 
-	snd_cs46xx_ac97_write(&ac97, AC97_MASTER, 0x8000);
+	snd_cs46xx_codec_write(chip, AC97_MASTER, 0x8000,
+			       CS46XX_PRIMARY_CODEC_INDEX);
 	for (idx = 0; idx < 100; ++idx) {
-		if (snd_cs46xx_ac97_read(&ac97, AC97_MASTER) == 0x8000)
+		if (snd_cs46xx_codec_read(chip, AC97_MASTER,
+					  CS46XX_PRIMARY_CODEC_INDEX) == 0x8000)
 			goto _ok;
 		set_current_state(TASK_INTERRUPTIBLE);
 		schedule_timeout(HZ/100);
 	}
-	chip->ac97[CS46XX_PRIMARY_CODEC_INDEX] = NULL;
 	return -ENXIO;
 
  _ok:
@@ -2441,18 +2435,21 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
 	ac97.private_free = snd_cs46xx_mixer_free_ac97;
 	ac97.num = CS46XX_SECONDARY_CODEC_INDEX;
 
-	snd_cs46xx_ac97_write(&ac97, AC97_RESET, 0);
+	snd_cs46xx_codec_write(chip, AC97_RESET, 0,
+			       CS46XX_SECONDARY_CODEC_INDEX);
 	udelay(10);
 
-	if (snd_cs46xx_ac97_read(&ac97, AC97_RESET) & 0x8000) {
+	if (snd_cs46xx_codec_read(chip, AC97_RESET,
+				  CS46XX_SECONDARY_CODEC_INDEX) & 0x8000) {
 		snd_printdd("snd_cs46xx: seconadry codec not present\n");
 		goto _no_sec_codec;
 	}
 
-	chip->ac97[CS46XX_SECONDARY_CODEC_INDEX] = &ac97;
-	snd_cs46xx_ac97_write(&ac97, AC97_MASTER, 0x8000);
+	snd_cs46xx_codec_write(chip, AC97_MASTER, 0x8000,
+			       CS46XX_SECONDARY_CODEC_INDEX);
 	for (idx = 0; idx < 100; ++idx) {
-		if (snd_cs46xx_ac97_read(&ac97, AC97_MASTER) == 0x8000) {
+		if (snd_cs46xx_codec_read(chip, AC97_MASTER,
+					  CS46XX_SECONDARY_CODEC_INDEX) == 0x8000) {
 			goto _ok2;
 		}
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -2462,7 +2459,6 @@ int __devinit snd_cs46xx_mixer(cs46xx_t *chip)
  _no_sec_codec:
 	snd_printdd("snd_cs46xx: secondary codec did not respond ...\n");
 
-	chip->ac97[CS46XX_SECONDARY_CODEC_INDEX] = NULL;
 	chip->nr_ac97_codecs = 1;
     
 	/* well, one codec only ... */
