@@ -106,7 +106,7 @@ typedef struct sg_io_hdr
     unsigned int dxfer_len;     /* [i] byte count of data transfer */
     void * dxferp;              /* [i], [*io] points to data transfer memory
 					      or scatter gather list */
-    unsigned char * cmdp;       /* [i], [*i] points to command to perform */
+    unsigned char __user *cmdp; /* [i], [*i] points to command to perform */
     unsigned char * sbp;        /* [i], [*o] points to sense_buffer memory */
     unsigned int timeout;       /* [i] MAX_UINT->no timeout (unit: millisec) */
     unsigned int flags;         /* [i] 0 -> default, see SG_FLAG... */

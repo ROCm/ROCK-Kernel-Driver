@@ -113,11 +113,14 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	struct request *rq;
 	struct bio *bio;
 	char sense[SCSI_SENSE_BUFFERSIZE];
+	unsigned char cmd[BLK_MAX_CDB];
 
 	if (hdr->interface_id != 'S')
 		return -EINVAL;
-	if (hdr->cmd_len > sizeof(rq->cmd))
+	if (hdr->cmd_len > BLK_MAX_CDB)
 		return -EINVAL;
+	if (copy_from_user(cmd, hdr->cmdp, hdr->cmd_len))
+		return -EFAULT;
 
 	/*
 	 * we'll do that later
@@ -156,7 +159,7 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	 * fill in request structure
 	 */
 	rq->cmd_len = hdr->cmd_len;
-	memcpy(rq->cmd, hdr->cmdp, hdr->cmd_len);
+	memcpy(rq->cmd, cmd, hdr->cmd_len);
 	if (sizeof(rq->cmd) != hdr->cmd_len)
 		memset(rq->cmd + hdr->cmd_len, 0, sizeof(rq->cmd) - hdr->cmd_len);
 
@@ -352,26 +355,15 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			break;
 		case SG_IO: {
 			struct sg_io_hdr hdr;
-			unsigned char cdb[BLK_MAX_CDB], *old_cdb;
 
 			err = -EFAULT;
-			if (copy_from_user(&hdr, (struct sg_io_hdr *) arg, sizeof(hdr)))
+			if (copy_from_user(&hdr, (struct sg_io_hdr __user *) arg, sizeof(hdr)))
 				break;
-			err = -EINVAL;
-			if (hdr.cmd_len > sizeof(rq->cmd))
-				break;
-			err = -EFAULT;
-			if (copy_from_user(cdb, hdr.cmdp, hdr.cmd_len))
-				break;
-
-			old_cdb = hdr.cmdp;
-			hdr.cmdp = cdb;
 			err = sg_io(q, bd_disk, &hdr);
 			if (err == -EFAULT)
 				break;
 
-			hdr.cmdp = old_cdb;
-			if (copy_to_user((struct sg_io_hdr *) arg, &hdr, sizeof(hdr)))
+			if (copy_to_user((struct sg_io_hdr __user *) arg, &hdr, sizeof(hdr)))
 				err = -EFAULT;
 			break;
 		}
@@ -380,7 +372,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			struct sg_io_hdr hdr;
 
 			err = -EFAULT;
-			if (copy_from_user(&cgc, (struct cdrom_generic_command *) arg, sizeof(cgc)))
+			if (copy_from_user(&cgc, (struct cdrom_generic_command __user *) arg, sizeof(cgc)))
 				break;
 			cgc.timeout = clock_t_to_jiffies(cgc.timeout);
 			memset(&hdr, 0, sizeof(hdr));
@@ -412,7 +404,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 			if (hdr.sbp)
 				hdr.mx_sb_len = sizeof(struct request_sense);
 			hdr.timeout = cgc.timeout;
-			hdr.cmdp = cgc.cmd;
+			hdr.cmdp = &((struct cdrom_generic_command __user*) arg)->cmd;
 			hdr.cmd_len = sizeof(cgc.cmd);
 
 			err = sg_io(q, bd_disk, &hdr);
@@ -424,7 +416,7 @@ int scsi_cmd_ioctl(struct gendisk *bd_disk, unsigned int cmd, unsigned long arg)
 
 			cgc.stat = err;
 			cgc.buflen = hdr.resid;
-			if (copy_to_user((struct cdrom_generic_command *) arg, &cgc, sizeof(cgc)))
+			if (copy_to_user((struct cdrom_generic_command __user *) arg, &cgc, sizeof(cgc)))
 				err = -EFAULT;
 
 			break;
