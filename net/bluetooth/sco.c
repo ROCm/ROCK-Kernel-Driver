@@ -353,8 +353,10 @@ static void sco_sock_cleanup_listen(struct sock *parent)
 	BT_DBG("parent %p", parent);
 
 	/* Close not yet accepted channels */
-	while ((sk = bt_accept_dequeue(parent, NULL)))
+	while ((sk = bt_accept_dequeue(parent, NULL))) {
 		sco_sock_close(sk);
+		sco_sock_kill(sk);
+	}
 
 	parent->sk_state  = BT_CLOSED;
 	parent->sk_zapped = 1;
@@ -523,7 +525,8 @@ static int sco_sock_connect(struct socket *sock, struct sockaddr *addr, int alen
 	if ((err = sco_connect(sk)))
 		goto done;
 
-	err = bt_sock_w4_connect(sk, flags);
+	err = bt_sock_wait_state(sk, BT_CONNECTED, 
+			sock_sndtimeo(sk, flags & O_NONBLOCK));
 
 done:
 	release_sock(sk);
@@ -727,16 +730,24 @@ int sco_sock_getsockopt(struct socket *sock, int level, int optname, char *optva
 static int sco_sock_release(struct socket *sock)
 {
 	struct sock *sk = sock->sk;
+	int err = 0;
 
 	BT_DBG("sock %p, sk %p", sock, sk);
 
 	if (!sk)
 		return 0;
-
-	sock_orphan(sk);
+	
 	sco_sock_close(sk);
 
-	return 0;
+	if (sock_flag(sk, SOCK_LINGER) && sk->sk_lingertime) {
+		lock_sock(sk);
+		err = bt_sock_wait_state(sk, BT_CLOSED, sk->sk_lingertime);
+		release_sock(sk);
+	}
+
+	sock_orphan(sk);
+	sco_sock_kill(sk);
+	return err;
 }
 
 static void __sco_chan_add(struct sco_conn *conn, struct sock *sk, struct sock *parent)

@@ -668,40 +668,8 @@ static int rfcomm_tty_write_room(struct tty_struct *tty)
 	return room;
 }
 
-static int rfcomm_tty_set_modem_status(uint cmd, struct rfcomm_dlc *dlc, uint status)
-{
-	u8 v24_sig, mask;
-
-	BT_DBG("dlc %p cmd 0x%02x", dlc, cmd);
-
-	if (cmd == TIOCMSET)
-		v24_sig = 0;
-	else
-		rfcomm_dlc_get_modem_status(dlc, &v24_sig);
-
-	mask =  ((status & TIOCM_DSR) ? RFCOMM_V24_RTC : 0) |
-		((status & TIOCM_DTR) ? RFCOMM_V24_RTC : 0) |
-		((status & TIOCM_RTS) ? RFCOMM_V24_RTR : 0) |
-		((status & TIOCM_CTS) ? RFCOMM_V24_RTR : 0) |
-		((status & TIOCM_RI)  ? RFCOMM_V24_IC  : 0) |
-		((status & TIOCM_CD)  ? RFCOMM_V24_DV  : 0);
-
-	if (cmd == TIOCMBIC)
-		v24_sig &= ~mask;
-	else
-		v24_sig |= mask;
-
-	rfcomm_dlc_set_modem_status(dlc, v24_sig);
-	return 0;
-}
-
 static int rfcomm_tty_ioctl(struct tty_struct *tty, struct file *filp, unsigned int cmd, unsigned long arg)
 {
-	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
-	struct rfcomm_dlc *dlc = dev->dlc;
-	uint status;
-	int err;
-
 	BT_DBG("tty %p cmd 0x%02x", tty, cmd);
 
 	switch (cmd) {
@@ -712,18 +680,6 @@ static int rfcomm_tty_ioctl(struct tty_struct *tty, struct file *filp, unsigned 
 	case TCSETS:
 		BT_DBG("TCSETS is not supported");
 		return -ENOIOCTLCMD;
-
-	case TIOCMGET:
-		BT_DBG("TIOCMGET");
-
-		return put_user(dev->modem_status, (unsigned int *)arg);
-
-	case TIOCMSET: /* Turns on and off the lines as specified by the mask */
-	case TIOCMBIS: /* Turns on the lines as specified by the mask */
-	case TIOCMBIC: /* Turns off the lines as specified by the mask */
-		if ((err = get_user(status, (unsigned int *)arg)))
-			return err;
-		return rfcomm_tty_set_modem_status(cmd, dlc, status);
 
 	case TIOCMIWAIT:
 		BT_DBG("TIOCMIWAIT");
@@ -851,6 +807,48 @@ static int rfcomm_tty_read_proc(char *buf, char **start, off_t offset, int len, 
 	return 0;
 }
 
+static int rfcomm_tty_tiocmget(struct tty_struct *tty, struct file *filp)
+{
+ 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
+
+	BT_DBG("tty %p dev %p", tty, dev);
+
+ 	return dev->modem_status;
+}
+
+static int rfcomm_tty_tiocmset(struct tty_struct *tty, struct file *filp, unsigned int set, unsigned int clear)
+{
+ 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
+ 	struct rfcomm_dlc *dlc = dev->dlc;
+ 	u8 v24_sig;
+
+	BT_DBG("tty %p dev %p set 0x%02x clear 0x%02x", tty, dev, set, clear);
+
+ 	rfcomm_dlc_get_modem_status(dlc, &v24_sig);
+
+ 	if (set & TIOCM_DSR || set & TIOCM_DTR)
+ 		v24_sig |= RFCOMM_V24_RTC;
+ 	if (set & TIOCM_RTS || set & TIOCM_CTS)
+ 		v24_sig |= RFCOMM_V24_RTR;
+ 	if (set & TIOCM_RI)
+ 		v24_sig |= RFCOMM_V24_IC;
+ 	if (set & TIOCM_CD)
+ 		v24_sig |= RFCOMM_V24_DV;
+
+ 	if (clear & TIOCM_DSR || clear & TIOCM_DTR)
+ 		v24_sig &= ~RFCOMM_V24_RTC;
+ 	if (clear & TIOCM_RTS || clear & TIOCM_CTS)
+ 		v24_sig &= ~RFCOMM_V24_RTR;
+ 	if (clear & TIOCM_RI)
+ 		v24_sig &= ~RFCOMM_V24_IC;
+ 	if (clear & TIOCM_CD)
+ 		v24_sig &= ~RFCOMM_V24_DV;
+
+ 	rfcomm_dlc_set_modem_status(dlc, v24_sig);
+
+ 	return 0;
+}
+
 /* ---- TTY structure ---- */
 
 static struct tty_driver *rfcomm_tty_driver;
@@ -870,6 +868,8 @@ static struct tty_operations rfcomm_ops = {
 	.hangup			= rfcomm_tty_hangup,
 	.wait_until_sent	= rfcomm_tty_wait_until_sent,
 	.read_proc		= rfcomm_tty_read_proc,
+	.tiocmget		= rfcomm_tty_tiocmget,
+	.tiocmset		= rfcomm_tty_tiocmset,
 };
 
 int rfcomm_init_ttys(void)
@@ -878,18 +878,17 @@ int rfcomm_init_ttys(void)
 	if (!rfcomm_tty_driver)
 		return -1;
 
-	rfcomm_tty_driver->owner	= THIS_MODULE,
-	rfcomm_tty_driver->driver_name	= "rfcomm",
-	rfcomm_tty_driver->devfs_name	= "bluetooth/rfcomm/",
-	rfcomm_tty_driver->name		= "rfcomm",
-	rfcomm_tty_driver->major	= RFCOMM_TTY_MAJOR,
-	rfcomm_tty_driver->minor_start	= RFCOMM_TTY_MINOR,
-	rfcomm_tty_driver->type		= TTY_DRIVER_TYPE_SERIAL,
-	rfcomm_tty_driver->subtype	= SERIAL_TYPE_NORMAL,
-	rfcomm_tty_driver->flags	= TTY_DRIVER_REAL_RAW,
-	rfcomm_tty_driver->init_termios = tty_std_termios;
-	rfcomm_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	rfcomm_tty_driver->flags = TTY_DRIVER_REAL_RAW;
+	rfcomm_tty_driver->owner	= THIS_MODULE;
+	rfcomm_tty_driver->driver_name	= "rfcomm";
+	rfcomm_tty_driver->devfs_name	= "bluetooth/rfcomm/";
+	rfcomm_tty_driver->name		= "rfcomm";
+	rfcomm_tty_driver->major	= RFCOMM_TTY_MAJOR;
+	rfcomm_tty_driver->minor_start	= RFCOMM_TTY_MINOR;
+	rfcomm_tty_driver->type		= TTY_DRIVER_TYPE_SERIAL;
+	rfcomm_tty_driver->subtype	= SERIAL_TYPE_NORMAL;
+	rfcomm_tty_driver->flags	= TTY_DRIVER_REAL_RAW;
+	rfcomm_tty_driver->init_termios	= tty_std_termios;
+	rfcomm_tty_driver->init_termios.c_cflag	= B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	tty_set_operations(rfcomm_tty_driver, &rfcomm_ops);
 
 	if (tty_register_driver(rfcomm_tty_driver)) {
