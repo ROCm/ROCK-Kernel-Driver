@@ -356,6 +356,7 @@ static unsigned int br_nf_local_in(unsigned int hook, struct sk_buff **pskb,
 	return NF_ACCEPT;
 }
 
+
 /* PF_BRIDGE/FORWARD *************************************************/
 static int br_nf_forward_finish(struct sk_buff *skb)
 {
@@ -466,6 +467,7 @@ static unsigned int br_nf_forward_arp(unsigned int hook, struct sk_buff **pskb,
 	return NF_STOLEN;
 }
 
+
 /* PF_BRIDGE/LOCAL_OUT ***********************************************/
 static int br_nf_local_out_finish(struct sk_buff *skb)
 {
@@ -531,9 +533,7 @@ static unsigned int br_nf_local_out(unsigned int hook, struct sk_buff **pskb,
 		return NF_ACCEPT;
 
 	nf_bridge = skb->nf_bridge;
-
 	nf_bridge->physoutdev = skb->dev;
-
 	realindev = nf_bridge->physindev;
 
 	/* Bridged, take PF_BRIDGE/FORWARD.
@@ -601,18 +601,15 @@ static unsigned int br_nf_post_routing(unsigned int hook, struct sk_buff **pskb,
 	struct vlan_ethhdr *hdr = (struct vlan_ethhdr *)(skb->mac.ethernet);
 	struct net_device *realoutdev = bridge_parent(skb->dev);
 
-	/* Be very paranoid. Must be a device driver bug. */
+#ifdef CONFIG_NETFILTER_DEBUG
+	/* Be very paranoid. This probably won't happen anymore, but let's
+	 * keep the check just to be sure... */
 	if (skb->mac.raw < skb->head || skb->mac.raw + ETH_HLEN > skb->data) {
 		printk(KERN_CRIT "br_netfilter: Argh!! br_nf_post_routing: "
 				 "bad mac.raw pointer.");
-		if (skb->dev != NULL) {
-			printk("[%s]", skb->dev->name);
-			if (has_bridge_parent(skb->dev))
-				printk("[%s]", bridge_parent(skb->dev)->name);
-		}
-		printk(" head:%p, raw:%p\n", skb->head, skb->mac.raw);
-		return NF_ACCEPT;
+		goto print_error;
 	}
+#endif
 
 #ifdef CONFIG_SYSCTL
 	if (!nf_bridge)
@@ -622,13 +619,16 @@ static unsigned int br_nf_post_routing(unsigned int hook, struct sk_buff **pskb,
 	if (skb->protocol != __constant_htons(ETH_P_IP) && !IS_VLAN_IP)
 		return NF_ACCEPT;
 
-	/* Sometimes we get packets with NULL ->dst here (for example,
-	 * running a dhcp client daemon triggers this).
-	 */
-	if (skb->dst == NULL)
-		return NF_ACCEPT;
-
 #ifdef CONFIG_NETFILTER_DEBUG
+	/* Sometimes we get packets with NULL ->dst here (for example,
+	 * running a dhcp client daemon triggers this). This should now
+	 * be fixed, but let's keep the check around.
+	 */
+	if (skb->dst == NULL) {
+		printk(KERN_CRIT "br_netfilter: skb->dst == NULL.");
+		goto print_error;
+	}
+
 	skb->nf_debug ^= (1 << NF_IP_POST_ROUTING);
 #endif
 
@@ -655,6 +655,18 @@ static unsigned int br_nf_post_routing(unsigned int hook, struct sk_buff **pskb,
 		realoutdev, br_dev_queue_push_xmit);
 
 	return NF_STOLEN;
+
+#ifdef CONFIG_NETFILTER_DEBUG
+print_error:
+	if (skb->dev != NULL) {
+		printk("[%s]", skb->dev->name);
+		if (has_bridge_parent(skb->dev))
+			printk("[%s]", bridge_parent(skb->dev)->name);
+	}
+	printk(" head:%p, raw:%p, data:%p\n", skb->head, skb->mac.raw,
+					      skb->data);
+	return NF_ACCEPT;
+#endif
 }
 
 
