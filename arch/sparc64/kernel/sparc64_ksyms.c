@@ -320,7 +320,6 @@ EXPORT_SYMBOL(sys_getegid);
 EXPORT_SYMBOL(sys_getgid);
 EXPORT_SYMBOL(svr4_getcontext);
 EXPORT_SYMBOL(svr4_setcontext);
-EXPORT_SYMBOL(prom_cpu_nodes);
 EXPORT_SYMBOL(sys_ioctl);
 EXPORT_SYMBOL(compat_sys_ioctl);
 EXPORT_SYMBOL(sparc32_open);
