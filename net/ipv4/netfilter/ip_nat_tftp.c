@@ -32,6 +32,7 @@
 #include <linux/netfilter_ipv4/ip_conntrack_tftp.h>
 #include <linux/netfilter_ipv4/ip_nat_helper.h>
 #include <linux/netfilter_ipv4/ip_nat_rule.h>
+#include <linux/moduleparam.h>
 
 MODULE_AUTHOR("Magnus Boden <mb@ozaba.mine.nu>");
 MODULE_DESCRIPTION("tftp NAT helper");
@@ -41,7 +42,7 @@ MODULE_LICENSE("GPL");
 
 static int ports[MAX_PORTS];
 static int ports_c = 0;
-MODULE_PARM(ports,"1-" __MODULE_STRING(MAX_PORTS) "i");
+module_param_array(ports, int, ports_c, 0400);
 MODULE_PARM_DESC(ports, "port numbers of tftp servers");
 
 #if 0
@@ -162,10 +163,10 @@ static int __init init(void)
 	int i, ret = 0;
 	char *tmpname;
 
-	if (!ports[0])
-		ports[0] = TFTP_PORT;
+	if (ports_c == 0)
+		ports[ports_c++] = TFTP_PORT;
 
-	for (i = 0 ; (i < MAX_PORTS) && ports[i] ; i++) {
+	for (i = 0; i < ports_c; i++) {
 		memset(&tftp[i], 0, sizeof(struct ip_nat_helper));
 
 		tftp[i].tuple.dst.protonum = IPPROTO_UDP;
@@ -194,7 +195,6 @@ static int __init init(void)
 			fini();
 			return ret;
 		}
-		ports_c++;
 	}
 	return ret;
 }

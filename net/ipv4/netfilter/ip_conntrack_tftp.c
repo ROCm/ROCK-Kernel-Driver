@@ -19,6 +19,7 @@
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
 #include <linux/netfilter_ipv4/ip_conntrack_tftp.h>
+#include <linux/moduleparam.h>
 
 MODULE_AUTHOR("Magnus Boden <mb@ozaba.mine.nu>");
 MODULE_DESCRIPTION("tftp connection tracking helper");
@@ -27,7 +28,7 @@ MODULE_LICENSE("GPL");
 #define MAX_PORTS 8
 static int ports[MAX_PORTS];
 static int ports_c;
-MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
+module_param_array(ports, int, ports_c, 0400);
 MODULE_PARM_DESC(ports, "port numbers of tftp servers");
 
 #if 0
@@ -104,10 +105,10 @@ static int __init init(void)
 	int i, ret;
 	char *tmpname;
 
-	if (!ports[0])
-		ports[0]=TFTP_PORT;
+	if (ports_c == 0)
+		ports[ports_c++] = TFTP_PORT;
 
-	for (i = 0 ; (i < MAX_PORTS) && ports[i] ; i++) {
+	for (i = 0; i < ports_c; i++) {
 		/* Create helper structure */
 		memset(&tftp[i], 0, sizeof(struct ip_conntrack_helper));
 
@@ -137,7 +138,6 @@ static int __init init(void)
 			fini();
 			return(ret);
 		}
-		ports_c++;
 	}
 	return(0);
 }

@@ -50,9 +50,9 @@ static unsigned int generic_print_conntrack(char *buffer,
 /* Returns verdict for packet, or -1 for invalid. */
 static int packet(struct ip_conntrack *conntrack,
 		  const struct sk_buff *skb,
-		  enum ip_conntrack_info conntrackinfo)
+		  enum ip_conntrack_info ctinfo)
 {
-	ip_ct_refresh(conntrack, ip_ct_generic_timeout);
+	ip_ct_refresh_acct(conntrack, ctinfo, skb, ip_ct_generic_timeout);
 	return NF_ACCEPT;
 }
 
@@ -62,8 +62,14 @@ static int new(struct ip_conntrack *conntrack, const struct sk_buff *skb)
 	return 1;
 }
 
-struct ip_conntrack_protocol ip_conntrack_generic_protocol
-= { { NULL, NULL }, 0, "unknown",
-    generic_pkt_to_tuple, generic_invert_tuple, generic_print_tuple,
-    generic_print_conntrack, packet, new, NULL, NULL, NULL };
-
+struct ip_conntrack_protocol ip_conntrack_generic_protocol =
+{
+	.proto			= 0,
+	.name			= "unknown",
+	.pkt_to_tuple		= generic_pkt_to_tuple,
+	.invert_tuple		= generic_invert_tuple,
+	.print_tuple		= generic_print_tuple,
+	.print_conntrack	= generic_print_conntrack,
+	.packet			= packet,
+	.new			= new,
+};

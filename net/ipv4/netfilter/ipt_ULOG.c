@@ -34,8 +34,8 @@
  * by that factor.
  *
  * flushtimeout:
- *   Specify, after how many clock ticks (intel: 100 per second) the queue
- * should be flushed even if it is not full yet.
+ *   Specify, after how many hundredths of a second the queue should be
+ *   flushed even if it is not full yet.
  *
  * ipt_ULOG.c,v 1.22 2002/10/30 09:07:31 laforge Exp
  */
@@ -50,6 +50,7 @@
 #include <linux/netlink.h>
 #include <linux/netdevice.h>
 #include <linux/mm.h>
+#include <linux/moduleparam.h>
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/netfilter_ipv4/ipt_ULOG.h>
@@ -74,15 +75,15 @@ MODULE_DESCRIPTION("iptables userspace logging module");
 #define PRINTR(format, args...) do { if (net_ratelimit()) printk(format , ## args); } while (0)
 
 static unsigned int nlbufsiz = 4096;
-MODULE_PARM(nlbufsiz, "i");
+module_param(nlbufsiz, uint, 0600); /* FIXME: Check size < 128k --RR */
 MODULE_PARM_DESC(nlbufsiz, "netlink buffer size");
 
-static unsigned int flushtimeout = 10 * HZ;
-MODULE_PARM(flushtimeout, "i");
-MODULE_PARM_DESC(flushtimeout, "buffer flush timeout");
+static unsigned int flushtimeout = 10;
+module_param(flushtimeout, int, 0600);
+MODULE_PARM_DESC(flushtimeout, "buffer flush timeout (hundredths of a second)");
 
 static unsigned int nflog = 1;
-MODULE_PARM(nflog, "i");
+module_param(nflog, int, 0400);
 MODULE_PARM_DESC(nflog, "register as internal netfilter logging module");
 
 /* global data structures */
@@ -97,7 +98,6 @@ typedef struct {
 static ulog_buff_t ulog_buffers[ULOG_MAXNLGROUPS];	/* array of buffers */
 
 static struct sock *nflognl;	/* our socket */
-static size_t qlen;		/* current length of multipart-nlmsg */
 DECLARE_LOCK(ulog_lock);	/* spinlock */
 
 /* send one ulog_buff_t to userspace */
@@ -116,7 +116,7 @@ static void ulog_send(unsigned int nlgroupnum)
 
 	NETLINK_CB(ub->skb).dst_groups = (1 << nlgroupnum);
 	DEBUGP("ipt_ULOG: throwing %d packets to netlink mask %u\n",
-		ub->qlen, nlgroup);
+		ub->qlen, nlgroupnum);
 	netlink_broadcast(nflognl, ub->skb, 0, (1 << nlgroupnum), GFP_ATOMIC);
 
 	ub->qlen = 0;
@@ -126,7 +126,7 @@ static void ulog_send(unsigned int nlgroupnum)
 }
 
 
-/* timer function to flush queue in ULOG_FLUSH_INTERVAL time */
+/* timer function to flush queue in flushtimeout time */
 static void ulog_timer(unsigned long data)
 {
 	DEBUGP("ipt_ULOG: timer function called, calling ulog_send\n");
@@ -261,18 +261,19 @@ static void ipt_ulog_packet(unsigned int hooknum,
 		ub->lastnlh->nlmsg_flags |= NLM_F_MULTI;
 	}
 
-	/* if threshold is reached, send message to userspace */
-	if (qlen >= loginfo->qthreshold) {
-		if (loginfo->qthreshold > 1)
-			nlh->nlmsg_type = NLMSG_DONE;
-	}
-
 	ub->lastnlh = nlh;
 
 	/* if timer isn't already running, start it */
 	if (!timer_pending(&ub->timer)) {
-		ub->timer.expires = jiffies + flushtimeout;
+		ub->timer.expires = jiffies + flushtimeout * HZ / 100;
 		add_timer(&ub->timer);
+	}
+
+	/* if threshold is reached, send message to userspace */
+	if (ub->qlen >= loginfo->qthreshold) {
+		if (loginfo->qthreshold > 1)
+			nlh->nlmsg_type = NLMSG_DONE;
+		ulog_send(groupnum);
 	}
 
 	UNLOCK_BH(&ulog_lock);

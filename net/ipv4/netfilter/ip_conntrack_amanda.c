@@ -22,6 +22,7 @@
 #include <linux/module.h>
 #include <linux/netfilter.h>
 #include <linux/ip.h>
+#include <linux/moduleparam.h>
 #include <net/checksum.h>
 #include <net/udp.h>
 
@@ -34,7 +35,7 @@ static unsigned int master_timeout = 300;
 MODULE_AUTHOR("Brian J. Murrell <netfilter@interlinx.bc.ca>");
 MODULE_DESCRIPTION("Amanda connection tracking module");
 MODULE_LICENSE("GPL");
-MODULE_PARM(master_timeout, "i");
+module_param(master_timeout, int, 0600);
 MODULE_PARM_DESC(master_timeout, "timeout for the master connection");
 
 static char *conns[] = { "DATA ", "MESG ", "INDEX " };
@@ -58,7 +59,7 @@ static int help(struct sk_buff *skb,
 
 	/* increase the UDP timeout of the master connection as replies from
 	 * Amanda clients to the server can be quite delayed */
-	ip_ct_refresh(ct, master_timeout * HZ);
+	ip_ct_refresh_acct(ct, ctinfo, NULL, master_timeout * HZ);
 
 	/* No data? */
 	dataoff = skb->nh.iph->ihl*4 + sizeof(struct udphdr);

@@ -92,8 +92,8 @@ masquerade_target(struct sk_buff **pskb,
 		return NF_ACCEPT;
 
 	ct = ip_conntrack_get(*pskb, &ctinfo);
-	IP_NF_ASSERT(ct && (ctinfo == IP_CT_NEW
-				  || ctinfo == IP_CT_RELATED));
+	IP_NF_ASSERT(ct && (ctinfo == IP_CT_NEW || ctinfo == IP_CT_RELATED
+	                    || ctinfo == IP_CT_RELATED + IP_CT_IS_REPLY));
 
 	mr = targinfo;
 

@@ -21,15 +21,17 @@ extern struct ip_conntrack_protocol *ip_ct_find_proto(u_int8_t protocol);
 extern struct ip_conntrack_protocol *__ip_ct_find_proto(u_int8_t protocol);
 extern struct list_head protocol_list;
 
-/* Returns conntrack if it dealt with ICMP, and filled in skb->nfct */
-extern struct ip_conntrack *icmp_error_track(struct sk_buff *skb,
-					     enum ip_conntrack_info *ctinfo,
-					     unsigned int hooknum);
-extern int get_tuple(const struct iphdr *iph,
-		     const struct sk_buff *skb,
-		     unsigned int dataoff,
-		     struct ip_conntrack_tuple *tuple,
-		     const struct ip_conntrack_protocol *protocol);
+extern int
+ip_ct_get_tuple(const struct iphdr *iph,
+		const struct sk_buff *skb,
+		unsigned int dataoff,
+		struct ip_conntrack_tuple *tuple,
+		const struct ip_conntrack_protocol *protocol);
+
+extern int
+ip_ct_invert_tuple(struct ip_conntrack_tuple *inverse,
+		   const struct ip_conntrack_tuple *orig,
+		   const struct ip_conntrack_protocol *protocol);
 
 /* Find a connection corresponding to a tuple. */
 struct ip_conntrack_tuple_hash *

@@ -12,6 +12,7 @@
 #include <linux/netfilter_ipv4.h>
 #include <linux/ip.h>
 #include <linux/tcp.h>
+#include <linux/moduleparam.h>
 #include <net/tcp.h>
 #include <linux/netfilter_ipv4/ip_nat.h>
 #include <linux/netfilter_ipv4/ip_nat_helper.h>
@@ -33,7 +34,7 @@ MODULE_DESCRIPTION("ftp NAT helper");
 static int ports[MAX_PORTS];
 static int ports_c;
 
-MODULE_PARM(ports, "1-" __MODULE_STRING(MAX_PORTS) "i");
+module_param_array(ports, int, ports_c, 0400);
 
 DECLARE_LOCK_EXTERN(ip_ftp_lock);
 
@@ -313,10 +314,10 @@ static int __init init(void)
 	int i, ret = 0;
 	char *tmpname;
 
-	if (ports[0] == 0)
-		ports[0] = FTP_PORT;
+	if (ports_c == 0)
+		ports[ports_c] = FTP_PORT;
 
-	for (i = 0; (i < MAX_PORTS) && ports[i]; i++) {
+	for (i = 0; i < ports_c; i++) {
 		ftp[i].tuple.dst.protonum = IPPROTO_TCP;
 		ftp[i].tuple.src.u.tcp.port = htons(ports[i]);
 		ftp[i].mask.dst.protonum = 0xFFFF;
@@ -343,7 +344,6 @@ static int __init init(void)
 			fini();
 			return ret;
 		}
-		ports_c++;
 	}
 
 	return ret;
