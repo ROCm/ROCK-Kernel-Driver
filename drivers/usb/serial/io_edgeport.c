@@ -274,7 +274,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v2.2"
+#define DRIVER_VERSION "v2.3"
 #define DRIVER_AUTHOR "Greg Kroah-Hartman <greg@kroah.com> and David Iacovelli"
 #define DRIVER_DESC "Edgeport USB Serial Driver"
 
@@ -811,7 +811,8 @@ static void edge_interrupt_callback (struct urb *urb)
 						dbg(__FUNCTION__" - txcredits for port%d = %d", portNumber, edge_port->txCredits);
 
 						/* tell the tty driver that something has changed */
-						wake_up_interruptible(&edge_port->port->tty->write_wait);
+						if (edge_port->port->tty)
+							wake_up_interruptible(&edge_port->port->tty->write_wait);
 
 						// Since we have more credit, check if more data can be sent
 						send_more_port_data(edge_serial, edge_port);
@@ -898,13 +899,15 @@ static void edge_bulk_out_data_callback (struct urb *urb)
 
 	tty = edge_port->port->tty;
 
-	/* let the tty driver wakeup if it has a special write_wakeup function */
-	if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup) {
-		(tty->ldisc.write_wakeup)(tty);
-	}
+	if (tty) {
+		/* let the tty driver wakeup if it has a special write_wakeup function */
+		if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP)) && tty->ldisc.write_wakeup) {
+			(tty->ldisc.write_wakeup)(tty);
+		}
 
-	/* tell the tty driver that something has changed */
-	wake_up_interruptible(&tty->write_wait);
+		/* tell the tty driver that something has changed */
+		wake_up_interruptible(&tty->write_wait);
+	}
 
 	// Release the Write URB
 	edge_port->write_in_progress = FALSE;
@@ -953,7 +956,8 @@ static void edge_bulk_out_cmd_callback (struct urb *urb)
 	tty = edge_port->port->tty;
 
 	/* tell the tty driver that something has changed */
-	wake_up_interruptible(&tty->write_wait);
+	if (tty)
+		wake_up_interruptible(&tty->write_wait);
 
 	/* we have completed the command */
 	edge_port->commandPending = FALSE;
@@ -990,7 +994,8 @@ static int edge_open (struct usb_serial_port *port, struct file * filp)
 	/* force low_latency on so that our tty_push actually forces the data through, 
 	   otherwise it is scheduled, and with high data rates (like with OHCI) data
 	   can get lost. */
-	port->tty->low_latency = 1;
+	if (port->tty)
+		port->tty->low_latency = 1;
 
 	/* see if we've set up our endpoint info yet (can't set it up in edge_startup
 	   as the structures were not set up at that time.) */
@@ -1568,6 +1573,10 @@ static void edge_throttle (struct usb_serial_port *port)
 	}
 
 	tty = port->tty;
+	if (!tty) {
+		dbg ("%s - no tty available", __FUNCTION__);
+		return;
+	}
 
 	/* if we are implementing XON/XOFF, send the stop character */
 	if (I_IXOFF(tty)) {
@@ -1613,6 +1622,10 @@ static void edge_unthrottle (struct usb_serial_port *port)
 	}
 
 	tty = port->tty;
+	if (!tty) {
+		dbg ("%s - no tty available", __FUNCTION__);
+		return;
+	}
 
 	/* if we are implementing XON/XOFF, send the start character */
 	if (I_IXOFF(tty)) {
@@ -1644,15 +1657,14 @@ static void edge_set_termios (struct usb_serial_port *port, struct termios *old_
 {
 	struct edgeport_port *edge_port = (struct edgeport_port *)(port->private);
 	struct tty_struct *tty = port->tty;
-	unsigned int cflag = tty->termios->c_cflag;
+	unsigned int cflag;
 
-	dbg(__FUNCTION__" - clfag %08x %08x iflag %08x %08x", 
-	    tty->termios->c_cflag,
-	    old_termios->c_cflag,
-	    RELEVANT_IFLAG(tty->termios->c_iflag),
-	    RELEVANT_IFLAG(old_termios->c_iflag)
-	   );
+	if (!port->tty || !port->tty->termios) {
+		dbg ("%s - no tty or termios", __FUNCTION__);
+		return;
+	}
 
+	cflag = tty->termios->c_cflag;
 	/* check that they really want us to change something */
 	if (old_termios) {
 		if ((cflag == old_termios->c_cflag) &&
@@ -1660,6 +1672,15 @@ static void edge_set_termios (struct usb_serial_port *port, struct termios *old_
 			dbg(__FUNCTION__" - nothing to change");
 			return;
 		}
+	}
+
+	dbg("%s - clfag %08x iflag %08x", __FUNCTION__, 
+	    tty->termios->c_cflag,
+	    RELEVANT_IFLAG(tty->termios->c_iflag));
+	if (old_termios) {
+		dbg("%s - old clfag %08x old iflag %08x", __FUNCTION__,
+		    old_termios->c_cflag,
+		    RELEVANT_IFLAG(old_termios->c_iflag));
 	}
 
 	dbg(__FUNCTION__" - port %d", port->number);
@@ -1708,6 +1729,9 @@ static int get_number_bytes_avail(struct edgeport_port *edge_port, unsigned int 
 {
 	unsigned int result = 0;
 	struct tty_struct *tty = edge_port->port->tty;
+
+	if (!tty)
+		return -ENOIOCTLCMD;
 
 	result = tty->read_cnt;
 
@@ -2136,7 +2160,8 @@ static void process_rcvd_status (struct edgeport_serial *edge_serial, __u8 byte2
 		handle_new_msr (edge_port, byte2);
 
 		/* send the current line settings to the port so we are in sync with any further termios calls */
-		change_port_settings (edge_port, edge_port->port->tty->termios);
+		if (edge_port->port->tty)
+			change_port_settings (edge_port, edge_port->port->tty->termios);
 
 		/* we have completed the open */
 		edge_port->openPending = FALSE;
@@ -2247,7 +2272,7 @@ static void handle_new_lsr(struct edgeport_port *edge_port, __u8 lsrData, __u8 l
 	}
 
 	/* Place LSR data byte into Rx buffer */
-	if (lsrData) {
+	if (lsrData && edge_port->port->tty) {
 		tty_insert_flip_char(edge_port->port->tty, data, 0);
 		tty_flip_buffer_push(edge_port->port->tty);
 	}
