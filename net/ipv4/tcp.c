@@ -1792,7 +1792,7 @@ void tcp_destroy_sock(struct sock *sk)
 
 #ifdef TCP_DEBUG
 	if (sk->zapped) {
-		printk("TCP: double destroy sk=%p\n", sk);
+		printk(KERN_DEBUG "TCP: double destroy sk=%p\n", sk);
 		sock_hold(sk);
 	}
 	sk->zapped = 1;
@@ -2558,7 +2558,7 @@ void __init tcp_init(void)
 		sysctl_tcp_rmem[2] = 2*43689;
 	}
 
-	printk("TCP: Hash tables configured (established %d bind %d)\n",
+	printk(KERN_INFO "TCP: Hash tables configured (established %d bind %d)\n",
 	       tcp_ehash_size<<1, tcp_bhash_size);
 
 	tcpdiag_init();
