@@ -12,6 +12,7 @@
 #include <linux/syscalls.h>
 #include <linux/reboot.h>
 #include <linux/string.h>
+#include <linux/device.h>
 #include <linux/delay.h>
 #include <linux/fs.h>
 #include "power.h"
@@ -46,16 +47,18 @@ static int power_down(u32 mode)
 	int error = 0;
 
 	local_irq_save(flags);
-	device_power_down(PM_SUSPEND_DISK);
 	switch(mode) {
 	case PM_DISK_PLATFORM:
+		device_power_down(PM_SUSPEND_DISK);
 		error = pm_ops->enter(PM_SUSPEND_DISK);
 		break;
 	case PM_DISK_SHUTDOWN:
 		printk("Powering off system\n");
+		device_shutdown();
 		machine_power_off();
 		break;
 	case PM_DISK_REBOOT:
+		device_shutdown();
 		machine_restart(NULL);
 		break;
 	}
