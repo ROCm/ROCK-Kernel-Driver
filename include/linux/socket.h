@@ -245,10 +245,6 @@ struct ucred {
 #define MSG_CMSG_COMPAT	0		/* We never have 32 bit fixups */
 #endif
 
-extern asmlinkage long sys_sendmsg(int fd, struct msghdr __user *msg, unsigned flags);
-extern asmlinkage long sys_recvmsg(int fd, struct msghdr __user *msg, unsigned flags);
-
-
 
 /* Setsockoptions(2) level. Thanks to BSD these must match IPPROTO_xxx */
 #define SOL_IP		0

@@ -249,7 +249,11 @@ int av7110_bootarm(struct av7110 *av7110)
 	mwdebi(av7110, DEBISWAB, DPRAM_BASE, bootcode, sizeof(bootcode));
 	iwdebi(av7110, DEBINOSWAP, BOOT_STATE, BOOTSTATE_BUFFER_FULL, 2);
 
-	saa7146_wait_for_debi_done(av7110->dev);
+	if (saa7146_wait_for_debi_done(av7110->dev)) {
+		printk(KERN_ERR "dvb: av7110_bootarm(): "
+		       "saa7146_wait_for_debi_done() timed out\n");
+		return -1;
+	}
 	saa7146_setgpio(dev, RESET_LINE, SAA7146_GPIO_OUTHI);
 	//FIXME: necessary?
 	set_current_state(TASK_INTERRUPTIBLE);
@@ -265,7 +269,11 @@ int av7110_bootarm(struct av7110 *av7110)
 	DEB_D(("av7110_bootarm: load dpram code\n"));
 	mwdebi(av7110, DEBISWAB, DPRAM_BASE, av7110->bin_dpram, av7110->size_dpram);
 
-	saa7146_wait_for_debi_done(av7110->dev);
+	if (saa7146_wait_for_debi_done(av7110->dev)) {
+		printk(KERN_ERR "dvb: av7110_bootarm(): "
+		       "saa7146_wait_for_debi_done() timed out after loading DRAM\n");
+		return -1;
+	}
 	saa7146_setgpio(dev, RESET_LINE, SAA7146_GPIO_OUTHI);
 	//FIXME: necessary?
 	mdelay(800);
@@ -515,14 +523,18 @@ int av7110_fw_query(struct av7110 *av7110, u16 tag, u16* buf, s16 length)
  ****************************************************************************/
 
 /* get version of the firmware ROM, RTSL, video ucode and ARM application  */
-void av7110_firmversion(struct av7110 *av7110)
+int av7110_firmversion(struct av7110 *av7110)
 {
 	u16 buf[20];
 	u16 tag = ((COMTYPE_REQUEST << 8) + ReqVersion);
 
 	DEB_EE(("av7110: %p\n", av7110));
 
-	av7110_fw_query(av7110, tag, buf, 16);
+	if (av7110_fw_query(av7110, tag, buf, 16)) {
+		printk("DVB: AV7110-%d: ERROR: Failed to boot firmware\n",
+		       av7110->dvb_adapter->num);
+		return -EIO;
+	}
 
 	av7110->arm_fw = (buf[0] << 16) + buf[1];
 	av7110->arm_rtsl = (buf[2] << 16) + buf[3];
@@ -542,7 +554,7 @@ void av7110_firmversion(struct av7110 *av7110)
 		printk("DVB: AV711%d(%d) - no firmware support for CI link layer interface\n",
 		       av7110->avtype, av7110->dvb_adapter->num);
 
-	return;
+	return 0;
 }
 
 

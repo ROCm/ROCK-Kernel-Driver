@@ -1118,10 +1118,7 @@ static inline int break_lease(struct inode *inode, unsigned int mode)
 
 /* fs/open.c */
 
-asmlinkage long sys_open(const char __user *, int, int);
-asmlinkage long sys_close(unsigned int);	/* yes, it's really unsigned */
 extern int do_truncate(struct dentry *, loff_t start);
-
 extern struct file *filp_open(const char *, int, int);
 extern struct file * dentry_open(struct dentry *, struct vfsmount *, int);
 extern int filp_close(struct file *, fl_owner_t id);

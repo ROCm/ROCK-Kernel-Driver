@@ -302,8 +302,6 @@ static int __init nsc_ircc_open(int i, chipio_t *info)
 	self->qos.min_turn_time.bits = qos_mtt_bits;
 	irda_qos_bits_to_value(&self->qos);
 	
-	self->flags = IFF_FIR|IFF_MIR|IFF_SIR|IFF_DMA|IFF_PIO|IFF_DONGLE;
-
 	/* Max DMA buffer size needed = (data_size + 6) * (window_size) + 6; */
 	self->rx_buff.truesize = 14384; 
 	self->tx_buff.truesize = 14384;
@@ -1410,10 +1408,10 @@ static void nsc_ircc_dma_xmit(struct nsc_ircc_cb *self, int iobase)
 	switch_bank(iobase, BANK2);
 	outb(ECR1_DMASWP|ECR1_DMANF|ECR1_EXT_SL, iobase+ECR1);
 	
-	setup_dma(self->io.dma, 
-		  self->tx_fifo.queue[self->tx_fifo.ptr].start, 
-		  self->tx_fifo.queue[self->tx_fifo.ptr].len, 
-		  DMA_TX_MODE);
+	irda_setup_dma(self->io.dma, 
+		       self->tx_fifo.queue[self->tx_fifo.ptr].start, 
+		       self->tx_fifo.queue[self->tx_fifo.ptr].len, 
+		       DMA_TX_MODE);
 
 	/* Enable DMA and SIR interaction pulse */
  	switch_bank(iobase, BANK0);	
@@ -1568,8 +1566,8 @@ static int nsc_ircc_dma_receive(struct nsc_ircc_cb *self)
 	self->st_fifo.len = self->st_fifo.pending_bytes = 0;
 	self->st_fifo.tail = self->st_fifo.head = 0;
 	
-	setup_dma(self->io.dma, self->rx_buff.data, self->rx_buff.truesize, 
-		  DMA_RX_MODE);
+	irda_setup_dma(self->io.dma, self->rx_buff.data, 
+		       self->rx_buff.truesize, DMA_RX_MODE);
 
 	/* Enable DMA */
 	switch_bank(iobase, BANK0);

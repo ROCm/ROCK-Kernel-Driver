@@ -46,6 +46,7 @@
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/kernel.h>
+#include <linux/init.h>
 #include <linux/module.h>	/* support for loadable modules */
 #include <linux/slab.h>	/* kmalloc(), kfree() */
 #include <linux/mm.h>		/* verify_area(), etc. */
@@ -164,13 +165,9 @@ static unsigned char wanrouter_oui_ether[] = { 0x00, 0x00, 0x00 };
 static unsigned char wanrouter_oui_802_2[] = { 0x00, 0x80, 0xC2 };
 #endif
 
-#ifndef MODULE
-
-int wanrouter_init(void)
+static int __init wanrouter_init(void)
 {
 	int err;
-	extern int wanpipe_init(void);
-	extern int sdladrv_init(void);
 
 	printk(KERN_INFO "%s v%u.%u %s\n",
 	       wanrouter_fullname, ROUTER_VERSION, ROUTER_RELEASE,
@@ -180,15 +177,6 @@ int wanrouter_init(void)
 	if (err)
 		printk(KERN_INFO "%s: can't create entry in proc filesystem!\n",
 		       wanrouter_modname);
-
-        /*
-         *      Initialise compiled in boards
-         */
-
-#ifdef CONFIG_VENDOR_SANGOMA
-	sdladrv_init();
-	wanpipe_init();
-#endif
 
 	return err;
 }
@@ -198,50 +186,13 @@ static void __exit wanrouter_cleanup (void)
 	wanrouter_proc_cleanup();
 }
 
-#else
-
 /*
- *	Kernel Loadable Module Entry Points
+ * This is just plain dumb.  We should move the bugger to drivers/net/wan,
+ * slap it first in directory and make it module_init().  The only reason
+ * for subsys_initcall() here is that net goes after drivers (why, BTW?)
  */
-
-/*
- * 	Module 'insert' entry point.
- * 	o print announcement
- * 	o initialize static data
- * 	o create /proc/net/router directory and static entries
- *
- * 	Return:	0	Ok
- *		< 0	error.
- * 	Context:	process
- */
-
-int init_module	(void)
-{
-	int err;
-
-	printk(KERN_INFO "%s v%u.%u %s\n",
-	       wanrouter_fullname, ROUTER_VERSION, ROUTER_RELEASE,
-	       wanrouter_copyright);
-
-	err = wanrouter_proc_init();
-
-	if (err)
-		printk(KERN_INFO "%s: can't create entry in proc filesystem!\n",
-		       wanrouter_modname);
-	return err;
-}
-
-/*
- * 	Module 'remove' entry point.
- * 	o delete /proc/net/router directory and static entries.
- */
-
-void cleanup_module (void)
-{
-	wanrouter_proc_cleanup();
-}
-
-#endif
+subsys_initcall(wanrouter_init);
+module_exit(wanrouter_cleanup);
 
 /*
  * 	Kernel APIs

@@ -280,7 +280,8 @@ acpi_ds_resolve_operands (
 
 	/*
 	 * Attempt to resolve each of the valid operands
-	 * Method arguments are passed by value, not by reference
+	 * Method arguments are passed by reference, not by value.  This means
+	 * that the actual objects are passed, not copies of the objects.
 	 */
 	for (i = 0; i < walk_state->num_operands; i++) {
 		status = acpi_ex_resolve_to_value (&walk_state->operands[i], walk_state);

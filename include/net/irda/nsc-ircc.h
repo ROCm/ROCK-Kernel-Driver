@@ -263,7 +263,6 @@ struct nsc_ircc_cb {
 
 	spinlock_t lock;           /* For serializing operations */
 	
-	__u32 flags;               /* Interface flags */
 	__u32 new_speed;
 	int index;                 /* Instance index */
 

@@ -6,13 +6,11 @@
  * Copyright (C) 1995, 1996 Olaf Kirch <okir@monad.swb.de>
  */
 
-#define __KERNEL_SYSCALLS__
 #include <linux/linkage.h>
 #include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/net.h>
 #include <linux/in.h>
-#include <linux/unistd.h>
 #include <linux/mm.h>
 
 #include <linux/sunrpc/types.h>
@@ -200,6 +198,8 @@ svc_exit_thread(struct svc_rqst *rqstp)
 		kfree(rqstp->rq_resp);
 	if (rqstp->rq_argp)
 		kfree(rqstp->rq_argp);
+	if (rqstp->rq_auth_data)
+		kfree(rqstp->rq_auth_data);
 	kfree(rqstp);
 
 	/* Release the server */
@@ -322,6 +322,8 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 		goto err_bad_auth;
 	case SVC_DROP:
 		goto dropit;
+	case SVC_COMPLETE:
+		goto sendit;
 	}
 		
 	progp = serv->sv_program;

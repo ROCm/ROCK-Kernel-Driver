@@ -6,13 +6,17 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.52 $
+ * $Revision: 1.54 $
  */
 
 #ifndef DASD_INT_H
 #define DASD_INT_H
 
 #ifdef __KERNEL__
+
+/* erp debugging in dasd.c and dasd_3990_erp.c */
+#define ERP_DEBUG
+
 
 /* we keep old device allocation scheme; IOW, minors are still in 0..255 */
 #define DASD_PER_MAJOR (1U << (MINORBITS - DASD_PARTN_BITS))
@@ -157,6 +161,7 @@ struct dasd_ccw_req {
 	short retries;			/* A retry counter */
 
 	/* ... and how */
+	unsigned long starttime;	/* jiffies time of request start */
 	int expires;			/* expiration period in jiffies */
 	char lpm;               	/* logical path mask */
 	void *data;			/* pointer to data area */
@@ -166,6 +171,7 @@ struct dasd_ccw_req {
 	struct dasd_ccw_req *refers;	/* ERP-chain queueing. */
 	void *function; 		/* originating ERP action */
 
+	/* these are for statistics only */
 	unsigned long long buildclk;	/* TOD-clock of request generation */
 	unsigned long long startclk;	/* TOD-clock of request start */
 	unsigned long long stopclk;	/* TOD-clock of request interrupt */

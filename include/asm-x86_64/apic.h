@@ -84,9 +84,12 @@ extern int APIC_init_uniprocessor (void);
 extern void disable_APIC_timer(void);
 extern void enable_APIC_timer(void);
 
-extern int check_nmi_watchdog (void);
+extern int check_nmi_watchdog(void);
+extern void nmi_watchdog_default(void);
+extern int setup_nmi_watchdog(char *);
 
 extern unsigned int nmi_watchdog;
+#define NMI_DEFAULT	-1
 #define NMI_NONE	0
 #define NMI_IO_APIC	1
 #define NMI_LOCAL_APIC	2

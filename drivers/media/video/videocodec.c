@@ -108,13 +108,17 @@ videocodec_attach (struct videocodec_master *master)
 		if ((master->flags & h->codec->flags) == master->flags) {
 			dprintk(4, "videocodec_attach: try '%s'\n",
 				h->codec->name);
+
+			if (!try_module_get(h->codec->owner))
+				return NULL;
+
 			codec =
 			    kmalloc(sizeof(struct videocodec), GFP_KERNEL);
 			if (!codec) {
 				dprintk(1,
 					KERN_ERR
 					"videocodec_attach: no mem\n");
-				return NULL;
+				goto out_module_put;
 			}
 			memcpy(codec, h->codec, sizeof(struct videocodec));
 
@@ -132,25 +136,11 @@ videocodec_attach (struct videocodec_master *master)
 					dprintk(1,
 						KERN_ERR
 						"videocodec_attach: no memory\n");
-					kfree(codec);
-					return NULL;
+					goto out_kfree;
 				}
 				memset(ptr, 0,
 				       sizeof(struct attached_list));
 				ptr->codec = codec;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-				MOD_INC_USE_COUNT;
-#else
-				if (!try_module_get(THIS_MODULE)) {
-					dprintk(1,
-						KERN_ERR
-						"videocodec: failed to increment usecount\n");
-					kfree(codec);
-					kfree(ptr);
-					return NULL;
-				}
-#endif
 
 				a = h->list;
 				if (!a) {
@@ -176,6 +166,12 @@ videocodec_attach (struct videocodec_master *master)
 	}
 
 	dprintk(1, KERN_ERR "videocodec_attach: no codec found!\n");
+	return NULL;
+
+ out_module_put:
+	module_put(h->codec->owner);
+ out_kfree:
+	kfree(codec);
 	return NULL;
 }
 
@@ -228,16 +224,10 @@ videocodec_detach (struct videocodec *codec)
 					dprintk(4,
 						"videocodec: delete middle\n");
 				}
+				module_put(a->codec->owner);
 				kfree(a->codec);
 				kfree(a);
 				h->attached -= 1;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-				MOD_DEC_USE_COUNT;
-#else
-				module_put(THIS_MODULE);
-#endif
-
 				return 0;
 			}
 			prev = a;
@@ -273,18 +263,6 @@ videocodec_register (const struct videocodec *codec)
 	}
 	memset(ptr, 0, sizeof(struct codec_list));
 	ptr->codec = codec;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	MOD_INC_USE_COUNT;
-#else
-	if (!try_module_get(THIS_MODULE)) {
-		dprintk(1,
-			KERN_ERR
-			"videocodec: failed to increment module count\n");
-		kfree(ptr);
-		return -ENODEV;
-	}
-#endif
 
 	if (!h) {
 		codeclist_top = ptr;
@@ -342,13 +320,6 @@ videocodec_unregister (const struct videocodec *codec)
 					"videocodec: delete middle element\n");
 			}
 			kfree(h);
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-			MOD_DEC_USE_COUNT;
-#else
-			module_put(THIS_MODULE);
-#endif
-
 			return 0;
 		}
 		prev = h;

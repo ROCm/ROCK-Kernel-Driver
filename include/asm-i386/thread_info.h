@@ -115,6 +115,10 @@ static inline struct thread_info *current_thread_info(void)
 	movl $-THREAD_SIZE, reg; \
 	andl %esp, reg
 
+/* use this one if reg already contains %esp */
+#define GET_THREAD_INFO_WITH_ESP(reg) \
+	andl $-THREAD_SIZE, reg
+
 #endif
 
 /*

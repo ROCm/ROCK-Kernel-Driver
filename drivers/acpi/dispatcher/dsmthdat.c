@@ -206,8 +206,7 @@ acpi_ds_method_data_init_args (
 		 * Store the argument in the method/walk descriptor.
 		 * Do not copy the arg in order to implement call by reference
 		 */
-		status = acpi_ds_method_data_set_value (AML_ARG_OP, index, params[index],
-				 walk_state);
+		status = acpi_ds_method_data_set_value (AML_ARG_OP, index, params[index], walk_state);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -465,6 +464,7 @@ acpi_ds_method_data_get_value (
 			return_ACPI_STATUS (AE_AML_UNINITIALIZED_LOCAL);
 
 		default:
+			ACPI_REPORT_ERROR (("Not Arg/Local opcode: %X\n", opcode));
 			return_ACPI_STATUS (AE_AML_INTERNAL);
 		}
 	}
@@ -597,7 +597,10 @@ acpi_ds_store_object_to_local (
 
 	/*
 	 * If the reference count on the object is more than one, we must
-	 * take a copy of the object before we store.
+	 * take a copy of the object before we store.  A reference count
+	 * of exactly 1 means that the object was just created during the
+	 * evaluation of an expression, and we can safely use it since it
+	 * is not used anywhere else.
 	 */
 	new_obj_desc = obj_desc;
 	if (obj_desc->common.reference_count > 1) {

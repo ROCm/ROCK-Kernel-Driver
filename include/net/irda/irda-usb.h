@@ -159,6 +159,5 @@ struct irda_usb_cb {
 	__s16 new_xbofs;		/* xbofs we need to set */
 	__u32 speed;			/* Current speed */
 	__s32 new_speed;		/* speed we need to set */
-	__u32 flags;			/* Interface flags */
 };
 

@@ -26,6 +26,7 @@
 #include <asm/irq.h>
 #include <asm/hardirq.h>
 #include <asm/traps.h>
+#include <asm/unistd.h>
 
 #include <asm/q40_master.h>
 #include <asm/q40ints.h>

@@ -47,7 +47,7 @@
 #include <asm/bitops.h>
 #include <asm/naca.h>
 #include <asm/pci.h>
-#include <asm/pci_dma.h>
+#include <asm/iommu.h>
 #include <asm/bootinfo.h>
 #include <asm/ppcdebug.h>
 #include <asm/btext.h>
@@ -151,11 +151,6 @@ struct device_node *allnodes = 0;
  * or parent members of struct device_node.
  */
 static rwlock_t devtree_lock = RW_LOCK_UNLOCKED;
-
-#define UNDEFINED_IRQ 0xffff
-unsigned short real_irq_to_virt_map[NR_HW_IRQS];
-unsigned short virt_irq_to_real_map[NR_IRQS];
-int last_virt_irq = 2;	/* index of last virt_irq.  Skip through IPI */
 
 static unsigned long call_prom(const char *service, int nargs, int nret, ...);
 static void prom_panic(const char *reason);
@@ -533,6 +528,28 @@ prom_initialize_lmb(unsigned long mem)
 	union lmb_reg_property reg;
 	unsigned long lmb_base, lmb_size;
 	unsigned long num_regs, bytes_per_reg = (_prom->encode_phys_size*2)/8;
+	int nodart = 0;
+
+#ifdef CONFIG_PMAC_DART
+	char *opt;
+
+	opt = strstr(RELOC(cmd_line), RELOC("iommu="));
+	if (opt) {
+		prom_print(RELOC("opt is:"));
+		prom_print(opt);
+		prom_print(RELOC("\n"));
+		opt += 6;
+		while(*opt && *opt == ' ')
+			opt++;
+		if (!strncmp(opt, RELOC("off"), 3))
+			nodart = 1;
+	}
+#else
+	nodart = 1;
+#endif /* CONFIG_PMAC_DART */
+
+	if (nodart)
+		prom_print(RELOC("DART disabled on PowerMac !\n"));
 
 	lmb_init();
 
@@ -558,8 +575,9 @@ prom_initialize_lmb(unsigned long mem)
 				lmb_base = ((unsigned long)reg.addrPM[i].address_hi) << 32;
 				lmb_base |= (unsigned long)reg.addrPM[i].address_lo;
 				lmb_size = reg.addrPM[i].size;
-				if (lmb_base > 0x80000000ull) {
-					prom_print(RELOC("Skipping memory above 2Gb for now, not yet supported\n"));
+				if (nodart && lmb_base > 0x80000000ull) {
+					prom_print(RELOC("Skipping memory above 2Gb for "
+							 "now, DART support disabled\n"));
 					continue;
 				}
 			} else if (_prom->encode_phys_size == 32) {
@@ -736,6 +754,32 @@ prom_dump_lmb(void)
         }
 }
 #endif /* DEBUG_PROM */
+
+
+#ifdef CONFIG_PMAC_DART
+void prom_initialize_dart_table(void)
+{
+	unsigned long offset = reloc_offset();
+	extern unsigned long dart_tablebase;
+	extern unsigned long dart_tablesize;
+
+	/* Only reserve DART space if machine has more than 2Gb of RAM */
+	if (lmb_end_of_DRAM() <= 0x80000000ull)
+		return;
+
+	/* 512 pages is max DART tablesize. */
+	RELOC(dart_tablesize) = 1UL << 19;
+	/* 16MB (1 << 24) alignment. We allocate a full 16Mb chuck since we
+	 * will blow up an entire large page anyway in the kernel mapping
+	 */
+	RELOC(dart_tablebase) =
+		absolute_to_virt(lmb_alloc_base(1UL<<24, 1UL<<24, 0x80000000L));
+
+	prom_print(RELOC("Dart at: "));
+	prom_print_hex(RELOC(dart_tablebase));
+	prom_print(RELOC("\n"));
+}
+#endif /* CONFIG_PMAC_DART */
 
 
 void
@@ -1547,6 +1591,11 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	if (_systemcfg->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
 
+#ifdef CONFIG_PMAC_DART
+	if (_systemcfg->platform == PLATFORM_POWERMAC)
+		prom_initialize_dart_table();
+#endif
+
 #ifdef CONFIG_BOOTX_TEXT
 	if(_prom->disp_node) {
 		prom_print(RELOC("Setting up bi display...\n"));
@@ -1676,45 +1725,6 @@ check_display(unsigned long mem)
 		break;
 	}
 	return DOUBLEWORD_ALIGN(mem);
-}
-
-void
-virt_irq_init(void)
-{
-	int i;
-	for (i = 0; i < NR_IRQS; i++)
-		virt_irq_to_real_map[i] = UNDEFINED_IRQ;
-	for (i = 0; i < NR_HW_IRQS; i++)
-		real_irq_to_virt_map[i] = UNDEFINED_IRQ;
-}
-
-/* Create a mapping for a real_irq if it doesn't already exist.
- * Return the virtual irq as a convenience.
- */
-unsigned long
-virt_irq_create_mapping(unsigned long real_irq)
-{
-	unsigned long virq;
-	if (naca->interrupt_controller == IC_OPEN_PIC)
-		return real_irq;	/* no mapping for openpic (for now) */
-	virq = real_irq_to_virt(real_irq);
-	if (virq == UNDEFINED_IRQ) {
-		/* Assign a virtual IRQ number */
-		if (real_irq < NR_IRQS && virt_irq_to_real(real_irq) == UNDEFINED_IRQ) {
-			/* A 1-1 mapping will work. */
-			virq = real_irq;
-		} else {
-			while (last_virt_irq < NR_IRQS &&
-			       virt_irq_to_real(++last_virt_irq) != UNDEFINED_IRQ)
-				/* skip irq's in use */;
-			if (last_virt_irq >= NR_IRQS)
-				panic("Too many IRQs are required on this system.  NR_IRQS=%d\n", NR_IRQS);
-			virq = last_virt_irq;
-		}
-		virt_irq_to_real_map[virq] = real_irq;
-		real_irq_to_virt_map[real_irq] = virq;
-	}
-	return virq;
 }
 
 
@@ -2082,7 +2092,7 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 	unsigned int *ints;
 	int intlen, intrcells;
 	int i, j, n;
-	unsigned int *irq;
+	unsigned int *irq, virq;
 	struct device_node *ic;
 
 	ints = (unsigned int *) get_property(np, "interrupts", &intlen);
@@ -2100,7 +2110,13 @@ finish_node_interrupts(struct device_node *np, unsigned long mem_start)
 		n = map_interrupt(&irq, &ic, np, ints, intrcells);
 		if (n <= 0)
 			continue;
-		np->intrs[i].line = openpic_to_irq(virt_irq_create_mapping(irq[0]));
+		virq = virt_irq_create_mapping(irq[0]);
+		if (virq == NO_IRQ) {
+			printk(KERN_CRIT "Could not allocate interrupt "
+			       "number for %s\n", np->full_name);
+		} else
+			np->intrs[i].line = openpic_to_irq(virq);
+
 		/* We offset irq numbers for the u3 MPIC by 128 in PowerMac */
 		if (systemcfg->platform == PLATFORM_POWERMAC && ic && ic->parent) {
 			char *name = get_property(ic->parent, "name", NULL);
@@ -2941,7 +2957,7 @@ static int of_finish_dynamic_node(struct device_node *node)
 	unsigned int *ints;
 	int intlen, intrcells;
 	int i, j, n, err = 0;
-	unsigned int *irq;
+	unsigned int *irq, virq;
 	struct device_node *ic;
  
 	node->name = get_property(node, "name", 0);
@@ -3010,7 +3026,12 @@ static int of_finish_dynamic_node(struct device_node *node)
 		n = map_interrupt(&irq, &ic, node, ints, intrcells);
 		if (n <= 0)
 			continue;
-		node->intrs[i].line = openpic_to_irq(virt_irq_create_mapping(irq[0]));
+		virq = virt_irq_create_mapping(irq[0]);
+		if (virq == NO_IRQ) {
+			printk(KERN_CRIT "Could not allocate interrupt "
+			       "number for %s\n", node->full_name);
+		} else
+			node->intrs[i].line = openpic_to_irq(virq);
 		if (n > 1)
 			node->intrs[i].sense = irq[1];
 		if (n > 2) {
@@ -3036,15 +3057,15 @@ static int of_finish_dynamic_node(struct device_node *node)
                node->devfn = (regs[0] >> 8) & 0xff;
        }
 
-	/* fixing up tce_table */
+	/* fixing up iommu_table */
 
 	if(strcmp(node->name, "pci") == 0 &&
                 get_property(node, "ibm,dma-window", NULL)) {
                 node->bussubno = node->busno;
-                create_pci_bus_tce_table((unsigned long)node);
+                iommu_devnode_init(node);
         }
 	else
-		node->tce_table = parent->tce_table;
+		node->iommu_table = parent->iommu_table;
 
 out:
 	of_node_put(parent);

@@ -4,6 +4,7 @@
 #include <linux/config.h>
 #include <linux/compat.h>
 #include <linux/socket.h>
+#include <linux/syscalls.h>
 #include <linux/nfs_fs.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>

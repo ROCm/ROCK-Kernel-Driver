@@ -23,6 +23,9 @@ struct scatterlist {
 	u32 dma_length;
 };
 
+#define sg_dma_address(sg)	((sg)->dma_address)
+#define sg_dma_len(sg)		((sg)->dma_length)
+
 #define ISA_DMA_THRESHOLD	(~0UL)
 
 #endif /* !(_PPC64_SCATTERLIST_H) */

@@ -20,7 +20,7 @@
 #include <asm/uaccess.h>
 #include <asm/rtas.h>
 
-#define MODULE_VERSION "1.0"
+#define MODULE_VERS "1.0"
 #define MODULE_NAME "rtas_flash"
 
 #define FIRMWARE_FLASH_NAME "firmware_flash"   

@@ -113,7 +113,7 @@ struct e1000_adapter;
 #define E1000_SMARTSPEED_MAX       15
 
 /* Packet Buffer allocations */
-#define E1000_TX_FIFO_SIZE_SHIFT 0xA
+#define E1000_PBA_BYTES_SHIFT 0xA
 #define E1000_TX_HEAD_ADDR_SHIFT 7
 #define E1000_PBA_TX_MASK 0xFFFF0000
 

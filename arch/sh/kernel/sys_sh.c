@@ -17,6 +17,7 @@
 #include <linux/msg.h>
 #include <linux/shm.h>
 #include <linux/stat.h>
+#include <linux/syscalls.h>
 #include <linux/mman.h>
 #include <linux/file.h>
 #include <linux/utsname.h>
@@ -240,16 +241,12 @@ asmlinkage int sys_uname(struct old_utsname * name)
 asmlinkage ssize_t sys_pread_wrapper(unsigned int fd, char * buf,
 			     size_t count, long dummy, loff_t pos)
 {
-	extern asmlinkage ssize_t sys_pread64(unsigned int fd, char * buf,
-					size_t count, loff_t pos);
 	return sys_pread64(fd, buf, count, pos);
 }
 
 asmlinkage ssize_t sys_pwrite_wrapper(unsigned int fd, const char * buf,
 			      size_t count, long dummy, loff_t pos)
 {
-	extern asmlinkage ssize_t sys_pwrite64(unsigned int fd, const char * buf,
-					size_t count, loff_t pos);
 	return sys_pwrite64(fd, buf, count, pos);
 }
 

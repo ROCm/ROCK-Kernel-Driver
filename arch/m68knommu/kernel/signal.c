@@ -32,6 +32,7 @@
 #include <linux/mm.h>
 #include <linux/kernel.h>
 #include <linux/signal.h>
+#include <linux/syscalls.h>
 #include <linux/errno.h>
 #include <linux/wait.h>
 #include <linux/ptrace.h>
@@ -50,8 +51,6 @@
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-asmlinkage long sys_wait4(pid_t pid, unsigned int * stat_addr, int options,
-			struct rusage * ru);
 asmlinkage int do_signal(sigset_t *oldset, struct pt_regs *regs);
 
 /*
@@ -605,7 +604,7 @@ adjust_stack:
 		struct pt_regs *tregs =
 			(struct pt_regs *)((ulong)regs + regs->stkadj);
 #if DEBUG
-		printk("Performing stackadjust=%04x\n", regs->stkadj);
+		printk(KERN_DEBUG "Performing stackadjust=%04x\n", regs->stkadj);
 #endif
 		/* This must be copied with decreasing addresses to
                    handle overlaps.  */
@@ -674,7 +673,7 @@ adjust_stack:
 		struct pt_regs *tregs =
 			(struct pt_regs *)((ulong)regs + regs->stkadj);
 #if DEBUG
-		printk("Performing stackadjust=%04x\n", regs->stkadj);
+		printk(KERN_DEBUG "Performing stackadjust=%04x\n", regs->stkadj);
 #endif
 		/* This must be copied with decreasing addresses to
                    handle overlaps.  */

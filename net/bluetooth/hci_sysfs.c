@@ -96,6 +96,9 @@ static int bt_hotplug(struct class_device *cdev, char **envp, int num_envp, char
 
 static void bt_release(struct class_device *cdev)
 {
+	struct hci_dev *hdev = class_get_devdata(cdev);
+
+	kfree(hdev);
 }
 
 static struct class bt_class = {

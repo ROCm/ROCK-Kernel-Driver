@@ -48,6 +48,7 @@
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/auth.h>
 #include <linux/sunrpc/auth_gss.h>
+#include <linux/sunrpc/svcauth_gss.h>
 #include <linux/sunrpc/gss_err.h>
 #include <linux/workqueue.h>
 #include <linux/sunrpc/rpc_pipe_fs.h>
@@ -972,6 +973,15 @@ static int __init init_rpcsec_gss(void)
 	int err = 0;
 
 	err = rpcauth_register(&authgss_ops);
+	if (err)
+		goto out;
+	err = gss_svc_init();
+	if (err)
+		goto out_unregister;
+	return 0;
+out_unregister:
+	rpcauth_unregister(&authgss_ops);
+out:
 	return err;
 }
 

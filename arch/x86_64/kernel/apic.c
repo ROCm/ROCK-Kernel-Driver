@@ -435,6 +435,7 @@ void __init setup_local_APIC (void)
 			printk("No ESR for 82489DX.\n");
 	}
 
+	nmi_watchdog_default();
 	if (nmi_watchdog == NMI_LOCAL_APIC)
 		setup_apic_nmi_watchdog();
 	apic_pm_activate();
@@ -579,9 +580,6 @@ static int __init detect_init_APIC (void)
 
 	mp_lapic_addr = APIC_DEFAULT_PHYS_BASE;
 	boot_cpu_id = 0;
-	if (nmi_watchdog != NMI_NONE)
-		nmi_watchdog = NMI_LOCAL_APIC;
-
 	return 0;
 }
 
@@ -646,11 +644,13 @@ void __init init_apic_mappings(void)
 
 void __setup_APIC_LVTT(unsigned int clocks)
 {
-	unsigned int lvtt1_value, tmp_value;
+	unsigned int lvtt_value, tmp_value, ver;
 
-	lvtt1_value = SET_APIC_TIMER_BASE(APIC_TIMER_BASE_DIV) |
-			APIC_LVT_TIMER_PERIODIC | LOCAL_TIMER_VECTOR;
-	apic_write_around(APIC_LVTT, lvtt1_value);
+	ver = GET_APIC_VERSION(apic_read(APIC_LVR));
+	lvtt_value = APIC_LVT_TIMER_PERIODIC | LOCAL_TIMER_VECTOR;
+	if (!APIC_INTEGRATED(ver))
+		lvtt_value |= SET_APIC_TIMER_BASE(APIC_TIMER_BASE_DIV);
+	apic_write_around(APIC_LVTT, lvtt_value);
 
 	/*
 	 * Divide PICLK by 16
@@ -994,8 +994,6 @@ int __init APIC_init_uniprocessor (void)
 
 	setup_local_APIC();
 
-	if (nmi_watchdog == NMI_LOCAL_APIC)
-		check_nmi_watchdog();
 #ifdef CONFIG_X86_IO_APIC
 	if (smp_found_config && !skip_ioapic_setup && nr_ioapics)
 			setup_IO_APIC();

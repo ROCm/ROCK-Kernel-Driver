@@ -299,8 +299,6 @@ static int ali_ircc_open(int i, chipio_t *info)
 			
 	irda_qos_bits_to_value(&self->qos);
 	
-	self->flags = IFF_FIR|IFF_MIR|IFF_SIR|IFF_DMA|IFF_PIO; 	// benjamin 2000/11/8 05:27PM	
-
 	/* Max DMA buffer size needed = (data_size + 6) * (window_size) + 6; */
 	self->rx_buff.truesize = 14384; 
 	self->tx_buff.truesize = 14384;
@@ -1573,10 +1571,10 @@ static void ali_ircc_dma_xmit(struct ali_ircc_cb *self)
 	
 	self->io.direction = IO_XMIT;
 	
-	setup_dma(self->io.dma, 
-		  self->tx_fifo.queue[self->tx_fifo.ptr].start, 
-		  self->tx_fifo.queue[self->tx_fifo.ptr].len, 
-		  DMA_TX_MODE);
+	irda_setup_dma(self->io.dma, 
+		       self->tx_fifo.queue[self->tx_fifo.ptr].start, 
+		       self->tx_fifo.queue[self->tx_fifo.ptr].len, 
+		       DMA_TX_MODE);
 		
 	/* Reset Tx FIFO */
 	switch_bank(iobase, BANK0);
@@ -1726,8 +1724,8 @@ static int ali_ircc_dma_receive(struct ali_ircc_cb *self)
 	self->st_fifo.len = self->st_fifo.pending_bytes = 0;
 	self->st_fifo.tail = self->st_fifo.head = 0;
 		
-	setup_dma(self->io.dma, self->rx_buff.data, self->rx_buff.truesize, 
-		  DMA_RX_MODE);	
+	irda_setup_dma(self->io.dma, self->rx_buff.data, 
+		       self->rx_buff.truesize, DMA_RX_MODE);	
 	 
 	/* Set Receive Mode,Brick Wall */
 	//switch_bank(iobase, BANK0);

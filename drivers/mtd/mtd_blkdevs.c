@@ -131,6 +131,8 @@ static int mtd_blktrans_thread(void *arg)
 
 		end_request(req, res);
 	}
+	spin_unlock_irq(rq->queue_lock);
+
 	complete_and_exit(&tr->blkcore_priv->thread_dead, 0);
 }
 

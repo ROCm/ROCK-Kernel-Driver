@@ -489,8 +489,24 @@ extern unsigned long thread_saved_pc(struct task_struct *tsk);
 void show_trace(struct task_struct *task, unsigned long *stack);
 
 unsigned long get_wchan(struct task_struct *p);
-#define KSTK_EIP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)->thread_info))[1019])
-#define KSTK_ESP(tsk)	(((unsigned long *)(4096+(unsigned long)(tsk)->thread_info))[1022])
+
+#define THREAD_SIZE_LONGS      (THREAD_SIZE/sizeof(unsigned long))
+#define KSTK_TOP(info)                                                 \
+({                                                                     \
+       unsigned long *__ptr = (unsigned long *)(info);                 \
+       (unsigned long)(&__ptr[THREAD_SIZE_LONGS]);                     \
+})
+
+#define task_pt_regs(task)                                             \
+({                                                                     \
+       struct pt_regs *__regs__;                                       \
+       __regs__ = (struct pt_regs *)KSTK_TOP((task)->thread_info);     \
+       __regs__ - 1;                                                   \
+})
+
+#define KSTK_EIP(task) (task_pt_regs(task)->eip)
+#define KSTK_ESP(task) (task_pt_regs(task)->esp)
+
 
 struct microcode_header {
 	unsigned int hdrver;

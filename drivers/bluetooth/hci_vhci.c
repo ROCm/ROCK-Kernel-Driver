@@ -142,7 +142,7 @@ static inline ssize_t hci_vhci_get_user(struct hci_vhci_struct *hci_vhci, const 
 		return -EFAULT;
 	}
 
-	skb->dev = (void *) &hci_vhci->hdev;
+	skb->dev = (void *) hci_vhci->hdev;
 	skb->pkt_type = *((__u8 *) skb->data);
 	skb_pull(skb, 1);
 
@@ -175,18 +175,18 @@ static inline ssize_t hci_vhci_put_user(struct hci_vhci_struct *hci_vhci,
 		return -EFAULT;
 	total += len;
 
-	hci_vhci->hdev.stat.byte_tx += len;
+	hci_vhci->hdev->stat.byte_tx += len;
 	switch (skb->pkt_type) {
 		case HCI_COMMAND_PKT:
-			hci_vhci->hdev.stat.cmd_tx++;
+			hci_vhci->hdev->stat.cmd_tx++;
 			break;
 
 		case HCI_ACLDATA_PKT:
-			hci_vhci->hdev.stat.acl_tx++;
+			hci_vhci->hdev->stat.acl_tx++;
 			break;
 
 		case HCI_SCODATA_PKT:
-			hci_vhci->hdev.stat.cmd_tx++;
+			hci_vhci->hdev->stat.cmd_tx++;
 			break;
 	};
 
@@ -275,7 +275,13 @@ static int hci_vhci_chr_open(struct inode *inode, struct file * file)
 	init_waitqueue_head(&hci_vhci->read_wait);
 
 	/* Initialize and register HCI device */
-	hdev = &hci_vhci->hdev;
+	hdev = hci_alloc_dev();
+	if (!hdev) {
+		kfree(hci_vhci);
+		return -ENOMEM;
+	}
+
+	hci_vhci->hdev = hdev;
 
 	hdev->type = HCI_VHCI;
 	hdev->driver_data = hci_vhci;
@@ -290,6 +296,7 @@ static int hci_vhci_chr_open(struct inode *inode, struct file * file)
 	
 	if (hci_register_dev(hdev) < 0) {
 		kfree(hci_vhci);
+		hci_free_dev(hdev);
 		return -EBUSY;
 	}
 
@@ -301,9 +308,11 @@ static int hci_vhci_chr_close(struct inode *inode, struct file *file)
 {
 	struct hci_vhci_struct *hci_vhci = (struct hci_vhci_struct *) file->private_data;
 
-	if (hci_unregister_dev(&hci_vhci->hdev) < 0) {
-		BT_ERR("Can't unregister HCI device %s", hci_vhci->hdev.name);
+	if (hci_unregister_dev(hci_vhci->hdev) < 0) {
+		BT_ERR("Can't unregister HCI device %s", hci_vhci->hdev->name);
 	}
+
+	hci_free_dev(hci_vhci->hdev);
 
 	file->private_data = NULL;
 	return 0;

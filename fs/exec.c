@@ -44,6 +44,7 @@
 #include <linux/ptrace.h>
 #include <linux/mount.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/rmap-locking.h>
 
 #include <asm/uaccess.h>

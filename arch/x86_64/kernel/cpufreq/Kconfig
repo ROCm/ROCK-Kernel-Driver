@@ -11,8 +11,8 @@ config CPU_FREQ
 	  fly. This is a nice method to save battery power on notebooks,
 	  because the lower the clock speed, the less power the CPU consumes.
 
-	  For more information, take a look at linux/Documentation/cpu-freq or
-	  at <http://www.brodo.de/cpufreq/>
+	  For more information, take a look at <file:Documentation/cpu-freq/>
+	  or at <http://www.codemonkey.org.uk/projects/cpufreq/>
 
 	  If in doubt, say N.
 
@@ -37,7 +37,7 @@ config X86_POWERNOW_K8
 	help
 	  This adds the CPUFreq driver for mobile AMD Opteron/Athlon64 processors.
 
-	  For details, take a look at linux/Documentation/cpu-freq. 
+	  For details, take a look at <file:Documentation/cpu-freq/>. 
 
 	  If in doubt, say N.
 

@@ -130,6 +130,7 @@ enum
 	KERN_PRINTK_RATELIMIT=60, /* int: tune printk ratelimiting */
 	KERN_PRINTK_RATELIMIT_BURST=61,	/* int: tune printk ratelimiting */
 	KERN_PTY=62,		/* dir: pty driver */
+	KERN_NGROUPS_MAX=63,	/* int: NGROUPS_MAX */
 };
 
 
@@ -733,7 +734,6 @@ enum
 
 #ifdef __KERNEL__
 
-extern asmlinkage long sys_sysctl(struct __sysctl_args __user *);
 extern void sysctl_init(void);
 
 typedef struct ctl_table ctl_table;

@@ -199,6 +199,7 @@ static int elanfreq_cpu_init(struct cpufreq_policy *policy)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 	unsigned int i;
+	int result;
 
 	/* capability check */
 	if ((c->x86_vendor != X86_VENDOR_AMD) ||
@@ -220,7 +221,20 @@ static int elanfreq_cpu_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	policy->cur = elanfreq_get_cpu_frequency();
 
-	return cpufreq_frequency_table_cpuinfo(policy, &elanfreq_table[0]);;
+	result = cpufreq_frequency_table_cpuinfo(policy, elanfreq_table);
+	if (result)
+		return (result);
+
+        cpufreq_frequency_table_get_attr(elanfreq_table, policy->cpu);
+
+	return 0;
+}
+
+
+static int elanfreq_cpu_exit(struct cpufreq_policy *policy)
+{
+	cpufreq_frequency_table_put_attr(policy->cpu);
+	return 0;
 }
 
 
@@ -245,12 +259,20 @@ __setup("elanfreq=", elanfreq_setup);
 #endif
 
 
+static struct freq_attr* elanfreq_attr[] = {
+	&cpufreq_freq_attr_scaling_available_freqs,
+	NULL,
+};
+
+
 static struct cpufreq_driver elanfreq_driver = {
 	.verify 	= elanfreq_verify,
 	.target 	= elanfreq_target,
 	.init		= elanfreq_cpu_init,
+	.exit		= elanfreq_cpu_exit,
 	.name		= "elanfreq",
 	.owner		= THIS_MODULE,
+	.attr		= elanfreq_attr,
 };
 
 

@@ -12,6 +12,7 @@
 
 
 #include <linux/suspend.h>
+#include <linux/syscalls.h>
 #include <linux/reboot.h>
 #include <linux/string.h>
 #include <linux/delay.h>
@@ -27,8 +28,6 @@ extern int pmdisk_write(void);
 extern int pmdisk_read(void);
 extern int pmdisk_restore(void);
 extern int pmdisk_free(void);
-
-extern long sys_sync(void);
 
 
 /**

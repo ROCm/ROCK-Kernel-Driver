@@ -264,7 +264,7 @@ void __init smp_callin(void)
 	 */
 	phys_id = GET_APIC_ID(apic_read(APIC_ID));
 	cpuid = smp_processor_id();
-	if (cpu_test_and_set(cpuid, cpu_callin_map)) {
+	if (cpu_isset(cpuid, cpu_callin_map)) {
 		panic("smp_callin: phys CPU#%d, CPU#%d already present??\n",
 					phys_id, cpuid);
 	}
@@ -651,7 +651,6 @@ static void __init do_boot_cpu (int apicid)
 		if (cpu_isset(cpu, cpu_callin_map)) {
 			/* number CPUs logically, starting from 1 (BSP is 0) */
 			Dprintk("OK.\n");
-			printk(KERN_INFO "CPU%d: ", cpu);
 			print_cpu_info(&cpu_data[cpu]);
 			Dprintk("CPU has booted.\n");
 		} else {
@@ -729,6 +728,8 @@ static void smp_tune_scheduling (void)
 static void __init smp_boot_cpus(unsigned int max_cpus)
 {
 	unsigned apicid, cpu;
+
+	nmi_watchdog_default();
 
 	/*
 	 * Setup boot CPU information

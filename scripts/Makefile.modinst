@@ -9,7 +9,7 @@ include scripts/Makefile.lib
 
 #
 
-__modules := $(shell cat /dev/null $(wildcard $(MODVERDIR)/*.mod))
+__modules := $(shell head -q -n1 /dev/null $(wildcard $(MODVERDIR)/*.mod))
 modules := $(patsubst %.o,%.ko,$(wildcard $(__modules:.ko=.o)))
 
 ifneq ($(filter-out $(modules),$(__modules)),)

@@ -885,7 +885,7 @@ static void *arp_get_idx(struct arp_state *state, loff_t l)
 			if (v)
 				goto done;
   		}
-		state->n = clip_tbl_hook->hash_buckets[state->bucket + 1];
+		state->n = clip_tbl.hash_buckets[state->bucket + 1];
 	}
 done:
 	return v;
@@ -896,18 +896,12 @@ static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
 	struct arp_state *state = seq->private;
 	void *ret = (void *)1;
 
-	if (!clip_tbl_hook) {
-		state->bucket = -1;
-		goto out;
-	}
-
-	read_lock_bh(&clip_tbl_hook->lock);
+	read_lock_bh(&clip_tbl.lock);
 	state->bucket = 0;
-	state->n = clip_tbl_hook->hash_buckets[0];
+	state->n = clip_tbl.hash_buckets[0];
 	state->vcc = (void *)1;
 	if (*pos)
 		ret = arp_get_idx(state, *pos);
-out:
 	return ret;
 }
 
@@ -916,7 +910,7 @@ static void arp_seq_stop(struct seq_file *seq, void *v)
 	struct arp_state *state = seq->private;
 
 	if (state->bucket != -1)
-		read_unlock_bh(&clip_tbl_hook->lock);
+		read_unlock_bh(&clip_tbl.lock);
 }
 
 static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)

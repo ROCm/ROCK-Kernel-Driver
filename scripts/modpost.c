@@ -65,14 +65,14 @@ new_module(char *modname)
 	struct module *mod;
 	char *p;
 	
-	/* strip trailing .o */
-	p = strstr(modname, ".o");
-	if (p)
-		*p = 0;
-
 	mod = NOFAIL(malloc(sizeof(*mod)));
 	memset(mod, 0, sizeof(*mod));
-	mod->name = modname;
+	mod->name = NOFAIL(strdup(modname));
+
+	/* strip trailing .o */
+	p = strstr(mod->name, ".o");
+	if (p)
+		*p = 0;
 
 	/* add to list */
 	mod->next = modules;
@@ -194,23 +194,22 @@ grab_file(const char *filename, unsigned long *size)
 	int fd;
 
 	fd = open(filename, O_RDONLY);
-	if (fd < 0) {
-		perror(filename);
-		abort();
-	}
-	if (fstat(fd, &st) != 0) {
-		perror(filename);
-		abort();
-	}
+	if (fstat(fd, &st) != 0)
+		return NULL;
 
 	*size = st.st_size;
 	map = mmap(NULL, *size, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
-	if (map == MAP_FAILED) {
-		perror(filename);
-		abort();
-	}
 	close(fd);
+
+	if (map == MAP_FAILED)
+		return NULL;
 	return map;
+}
+
+void
+release_file(void *file, unsigned long size)
+{
+	munmap(file, size);
 }
 
 void
@@ -222,6 +221,10 @@ parse_elf(struct elf_info *info, const char *filename)
 	Elf_Sym  *sym;
 
 	hdr = grab_file(filename, &info->size);
+	if (!hdr) {
+		perror(filename);
+		abort();
+	}
 	info->hdr = hdr;
 	if (info->size < sizeof(*hdr))
 		goto truncated;
@@ -239,11 +242,19 @@ parse_elf(struct elf_info *info, const char *filename)
 		sechdrs[i].sh_offset = TO_NATIVE(sechdrs[i].sh_offset);
 		sechdrs[i].sh_size   = TO_NATIVE(sechdrs[i].sh_size);
 		sechdrs[i].sh_link   = TO_NATIVE(sechdrs[i].sh_link);
+		sechdrs[i].sh_name   = TO_NATIVE(sechdrs[i].sh_name);
 	}
 	/* Find symbol table. */
 	for (i = 1; i < hdr->e_shnum; i++) {
+		const char *secstrings
+			= (void *)hdr + sechdrs[hdr->e_shstrndx].sh_offset;
+
 		if (sechdrs[i].sh_offset > info->size)
 			goto truncated;
+		if (strcmp(secstrings+sechdrs[i].sh_name, ".modinfo") == 0) {
+			info->modinfo = (void *)hdr + sechdrs[i].sh_offset;
+			info->modinfo_len = sechdrs[i].sh_size;
+		}
 		if (sechdrs[i].sh_type != SHT_SYMTAB)
 			continue;
 
@@ -274,7 +285,7 @@ parse_elf(struct elf_info *info, const char *filename)
 void
 parse_elf_finish(struct elf_info *info)
 {
-	munmap(info->hdr, info->size);
+	release_file(info->hdr, info->size);
 }
 
 #define CRC_PFX     MODULE_SYMBOL_PREFIX "__crc_"
@@ -372,6 +383,8 @@ read_symbols(char *modname)
 		handle_modversions(mod, &info, sym, symname);
 		handle_moddevtable(mod, &info, sym, symname);
 	}
+	maybe_frob_version(modname, info.modinfo, info.modinfo_len,
+			   (void *)info.modinfo - (void *)info.hdr);
 	parse_elf_finish(&info);
 
 	/* Our trick to get versioning for struct_module - it's

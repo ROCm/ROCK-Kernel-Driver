@@ -402,6 +402,10 @@ __syscall_return(type,__sc0); \
 
 #ifdef __KERNEL_SYSCALLS__
 
+#include <linux/compiler.h>
+#include <linux/types.h>
+#include <asm/ptrace.h>
+
 /*
  * we need this inline - forking from kernel space will result
  * in NO COPY ON WRITE (!!!), until an execve is executed. This
@@ -433,6 +437,38 @@ static __inline__ pid_t wait(int * wait_stat)
 {
 	return waitpid(-1,wait_stat,0);
 }
+
+asmlinkage long sys_mmap2(
+			unsigned long addr, unsigned long len,
+			unsigned long prot, unsigned long flags,
+			unsigned long fd, unsigned long pgoff);
+asmlinkage int sys_execve(char *ufilename, char **uargv,
+			char **uenvp, unsigned long r7,
+			struct pt_regs regs);
+asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
+			unsigned long parent_tidptr,
+			unsigned long child_tidptr,
+			struct pt_regs regs);
+asmlinkage int sys_fork(unsigned long r4, unsigned long r5,
+			unsigned long r6, unsigned long r7,
+			struct pt_regs regs);
+asmlinkage int sys_vfork(unsigned long r4, unsigned long r5,
+			unsigned long r6, unsigned long r7,
+			struct pt_regs regs);
+asmlinkage int sys_pipe(unsigned long r4, unsigned long r5,
+			unsigned long r6, unsigned long r7,
+			struct pt_regs regs);
+asmlinkage int sys_ptrace(long request, long pid, long addr, long data);
+asmlinkage ssize_t sys_pread_wrapper(unsigned int fd, char *buf,
+				size_t count, long dummy, loff_t pos);
+asmlinkage ssize_t sys_pwrite_wrapper(unsigned int fd, const char *buf,
+				size_t count, long dummy, loff_t pos);
+struct sigaction;
+asmlinkage long sys_rt_sigaction(int sig,
+				const struct sigaction __user *act,
+				struct sigaction __user *oact,
+				size_t sigsetsize);
+
 #endif
 
 /*

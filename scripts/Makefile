@@ -12,7 +12,7 @@ host-progs	:= fixdep split-include conmakehash docproc kallsyms modpost \
 		   mk_elfconfig pnmtologo bin2c
 always		:= $(host-progs) empty.o
 
-modpost-objs	:= modpost.o file2alias.o
+modpost-objs	:= modpost.o file2alias.o sumversion.o
 
 subdir-$(CONFIG_MODVERSIONS)	+= genksyms
 
@@ -24,7 +24,7 @@ $(addprefix $(obj)/,$(filter-out fixdep,$(always)) $(subdir-y)): $(obj)/fixdep
 
 # dependencies on generated files need to be listed explicitly
 
-$(obj)/modpost.o $(obj)/file2alias.o: $(obj)/elfconfig.h
+$(obj)/modpost.o $(obj)/file2alias.o $(obj)/sumversion.o: $(obj)/elfconfig.h
 
 quiet_cmd_elfconfig = MKELF   $@
       cmd_elfconfig = $(obj)/mk_elfconfig $(ARCH) < $< > $@

@@ -381,41 +381,41 @@ static int s_fmt(struct saa7146_fh *fh, struct v4l2_format *f)
 
 static struct v4l2_queryctrl controls[] = {
 	{
-		id:            V4L2_CID_BRIGHTNESS,
-		name:          "Brightness",
-		minimum:       0,
-		maximum:       255,
-		step:          1,
-		default_value: 128,
-		type:          V4L2_CTRL_TYPE_INTEGER,
+		.id		= V4L2_CID_BRIGHTNESS,
+		.name		= "Brightness",
+		.minimum	= 0,
+		.maximum	= 255,
+		.step		= 1,
+		.default_value	= 128,
+		.type		= V4L2_CTRL_TYPE_INTEGER,
 	},{
-		id:            V4L2_CID_CONTRAST,
-		name:          "Contrast",
-		minimum:       0,
-		maximum:       127,
-		step:          1,
-		default_value: 64,
-		type:          V4L2_CTRL_TYPE_INTEGER,
+		.id		= V4L2_CID_CONTRAST,
+		.name		= "Contrast",
+		.minimum	= 0,
+		.maximum	= 127,
+		.step		= 1,
+		.default_value	= 64,
+		.type		= V4L2_CTRL_TYPE_INTEGER,
 	},{
-		id:            V4L2_CID_SATURATION,
-		name:          "Saturation",
-		minimum:       0,
-		maximum:       127,
-		step:          1,
-		default_value: 64,
-		type:          V4L2_CTRL_TYPE_INTEGER,
+		.id		= V4L2_CID_SATURATION,
+		.name		= "Saturation",
+		.minimum	= 0,
+		.maximum	= 127,
+		.step		= 1,
+		.default_value	= 64,
+		.type		= V4L2_CTRL_TYPE_INTEGER,
 	},{
-		id:            V4L2_CID_VFLIP,
-		name:          "Vertical flip",
-		minimum:       0,
-		maximum:       1,
-		type:          V4L2_CTRL_TYPE_BOOLEAN,
+		.id		= V4L2_CID_VFLIP,
+		.name		= "Vertical flip",
+		.minimum	= 0,
+		.maximum	= 1,
+		.type		= V4L2_CTRL_TYPE_BOOLEAN,
 	},{
-		id:            V4L2_CID_HFLIP,
-		name:          "Horizontal flip",
-		minimum:       0,
-		maximum:       1,
-		type:          V4L2_CTRL_TYPE_BOOLEAN,
+		.id		= V4L2_CID_HFLIP,
+		.name		= "Horizontal flip",
+		.minimum	= 0,
+		.maximum	= 1,
+		.type		= V4L2_CTRL_TYPE_BOOLEAN,
 	},
 };
 static int NUM_CONTROLS = sizeof(controls)/sizeof(struct v4l2_queryctrl);
@@ -1413,6 +1413,7 @@ static void video_close(struct saa7146_dev *dev, struct file *file)
 			spin_lock_irqsave(&dev->slock,flags);
 			saa7146_stop_preview(fh);
 			spin_unlock_irqrestore(&dev->slock,flags);
+			saa7146_res_free(fh, RESOURCE_DMA1_HPS|RESOURCE_DMA2_CLP);
 		}
 	}
 	

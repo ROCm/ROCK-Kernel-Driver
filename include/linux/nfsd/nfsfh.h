@@ -209,14 +209,6 @@ fh_copy(struct svc_fh *dst, struct svc_fh *src)
 	return dst;
 }
 
-static __inline__ void
-fh_dup2(struct svc_fh *dst, struct svc_fh *src)
-{
-	fh_put(dst);
-	dget(src->fh_dentry);
-	*dst = *src;
-}
-
 static __inline__ struct svc_fh *
 fh_init(struct svc_fh *fhp, int maxsize)
 {

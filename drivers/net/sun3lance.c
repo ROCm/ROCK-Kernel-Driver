@@ -342,7 +342,7 @@ static int __init lance_probe( struct net_device *dev)
 
 	REGA(CSR0) = CSR0_STOP; 
 
-	request_irq(LANCE_IRQ, lance_interrupt, 0, "SUN3 Lance", dev);
+	request_irq(LANCE_IRQ, lance_interrupt, SA_INTERRUPT, "SUN3 Lance", dev);
 	dev->irq = (unsigned short)LANCE_IRQ;
 
 
@@ -430,7 +430,6 @@ static int lance_open( struct net_device *dev )
 	netif_start_queue(dev);
 	
 	DPRINTK( 2, ( "%s: LANCE is open, csr0 %04x\n", dev->name, DREG ));
-	MOD_INC_USE_COUNT;
 
 	return( 0 );
 }
@@ -504,6 +503,9 @@ static int lance_start_xmit( struct sk_buff *skb, struct net_device *dev )
 	int entry, len;
 	struct lance_tx_head *head;
 	unsigned long flags;
+
+	DPRINTK( 1, ( "%s: transmit start.\n",
+		      dev->name));
 
 	/* Transmitter timeout, serious problems. */
 	if (netif_queue_stopped(dev)) {
@@ -880,8 +882,6 @@ static int lance_close( struct net_device *dev )
 	/* We stop the LANCE here -- it occasionally polls
 	   memory if we don't. */
 	DREG = CSR0_STOP;
-
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 

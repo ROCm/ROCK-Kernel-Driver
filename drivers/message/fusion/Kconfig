@@ -3,7 +3,7 @@ menu "Fusion MPT device support"
 
 config FUSION
 	tristate "Fusion MPT (base + ScsiHost) drivers"
-	depends on BLK_DEV_SD
+	depends on BLK_DEV_SD && PCI
 	---help---
 	  LSI Logic Fusion(TM) Message Passing Technology (MPT) device support
 	  provides high performance SCSI host initiator, and LAN [1] interface

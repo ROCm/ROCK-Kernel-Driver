@@ -441,8 +441,6 @@ static int __init smsc_ircc_open(unsigned int fir_base, unsigned int sir_base, u
 
 	smsc_ircc_setup_qos(self);
 
-	self->flags = IFF_FIR|IFF_MIR|IFF_SIR|IFF_DMA|IFF_PIO;
-		
 	smsc_ircc_init_chip(self);
 	
 	if(ircc_transceiver > 0  && 
@@ -1161,8 +1159,8 @@ static void smsc_ircc_dma_xmit(struct smsc_ircc_cb *self, int iobase, int bofs)
 	     IRCC_CFGB_DMA_BURST, iobase+IRCC_SCE_CFGB);
 
 	/* Setup DMA controller (must be done after enabling chip DMA) */
-	setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
-		  DMA_TX_MODE);
+	irda_setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len, 
+		       DMA_TX_MODE);
 
 	/* Enable interrupt */
 
@@ -1251,8 +1249,8 @@ static int smsc_ircc_dma_receive(struct smsc_ircc_cb *self, int iobase)
 	outb(2050 & 0xff, iobase+IRCC_RX_SIZE_LO);
 
 	/* Setup DMA controller */
-	setup_dma(self->io.dma, self->rx_buff.data, self->rx_buff.truesize, 
-		  DMA_RX_MODE);
+	irda_setup_dma(self->io.dma, self->rx_buff.data,
+		       self->rx_buff.truesize, DMA_RX_MODE);
 
 	/* Enable burst mode chip Rx DMA */
 	register_bank(iobase, 1);
@@ -1387,11 +1385,12 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
 	struct net_device *dev = (struct net_device *) dev_id;
 	struct smsc_ircc_cb *self;
 	int iobase, iir, lcra, lsr;
+	irqreturn_t ret = IRQ_NONE;
 
 	if (dev == NULL) {
 		printk(KERN_WARNING "%s: irq %d for unknown device.\n", 
 		       driver_name, irq);
-		return IRQ_NONE;
+		goto irq_ret;
 	}
 	self = (struct smsc_ircc_cb *) dev->priv;
 	ASSERT(self != NULL, return IRQ_NONE;);
@@ -1401,14 +1400,18 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
 
 	/* Check if we should use the SIR interrupt handler */
 	if (self->io.speed <=  SMSC_IRCC2_MAX_SIR_SPEED) {
-		irqreturn_t ret = smsc_ircc_interrupt_sir(dev);
-		spin_unlock(&self->lock);	
-		return ret;
+		ret = smsc_ircc_interrupt_sir(dev);
+		goto irq_ret_unlock;
 	}
+
 	iobase = self->io.fir_base;
 
 	register_bank(iobase, 0);
 	iir = inb(iobase+IRCC_IIR);
+	if (iir == 0) 
+		goto irq_ret_unlock;
+	ret = IRQ_HANDLED;
+
 	/* Disable interrupts */
 	outb(0, iobase+IRCC_IER);
 	lcra = inb(iobase+IRCC_LCR_A);
@@ -1434,8 +1437,10 @@ static irqreturn_t smsc_ircc_interrupt(int irq, void *dev_id, struct pt_regs *re
 	register_bank(iobase, 0);
 	outb(IRCC_IER_ACTIVE_FRAME|IRCC_IER_EOM, iobase+IRCC_IER);
 
+ irq_ret_unlock:
 	spin_unlock(&self->lock);
-	return IRQ_RETVAL(iir);
+ irq_ret:
+	return ret;
 }
 
 /*
@@ -1456,6 +1461,8 @@ static irqreturn_t smsc_ircc_interrupt_sir(struct net_device *dev)
 	iobase = self->io.sir_base;
 
 	iir = inb(iobase+UART_IIR) & UART_IIR_ID;
+	if (iir == 0)
+		return IRQ_NONE;
 	while (iir) {
 		/* Clear interrupt */
 		lsr = inb(iobase+UART_LSR);
@@ -1489,7 +1496,7 @@ static irqreturn_t smsc_ircc_interrupt_sir(struct net_device *dev)
  	        iir = inb(iobase + UART_IIR) & UART_IIR_ID;
 	}
 	/*spin_unlock(&self->lock);*/
-	return IRQ_RETVAL(iir);
+	return IRQ_HANDLED;
 }
 
 

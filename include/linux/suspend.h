@@ -81,4 +81,10 @@ static inline void thaw_processes(void)
 }
 #endif	/* CONFIG_PM */
 
+asmlinkage void do_magic(int is_resume);
+asmlinkage void do_magic_resume_1(void);
+asmlinkage void do_magic_resume_2(void);
+asmlinkage void do_magic_suspend_1(void);
+asmlinkage void do_magic_suspend_2(void);
+
 #endif /* _LINUX_SWSUSP_H */

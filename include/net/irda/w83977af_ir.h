@@ -185,7 +185,6 @@ struct w83977af_ir {
 	 * locking strategy. - Jean II */
 	spinlock_t lock;           /* For serializing operations */
 	
-	__u32 flags;               /* Interface flags */
 	__u32 new_speed;
 };
 

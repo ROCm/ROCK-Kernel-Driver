@@ -474,9 +474,9 @@
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
 #include <asm/uaccess.h>
-#ifdef CONFIG_PPC
+#ifdef CONFIG_PPC_MULTIPLATFORM
 #include <asm/machdep.h>
-#endif /* CONFIG_PPC */
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 
 #include "de4x5.h"
 
@@ -4146,12 +4146,12 @@ get_hw_addr(struct net_device *dev)
     /* If possible, try to fix a broken card - SMC only so far */
     srom_repair(dev, broken);
 
-#ifdef CONFIG_PPC
+#ifdef CONFIG_PPC_MULTIPLATFORM
     /* 
     ** If the address starts with 00 a0, we have to bit-reverse
     ** each byte of the address.
     */
-    if ( (ppc_md.ppc_machine & _MACH_Pmac) &&
+    if ( (_machine & _MACH_Pmac) &&
 	 (dev->dev_addr[0] == 0) &&
 	 (dev->dev_addr[1] == 0xa0) )
     {
@@ -4163,7 +4163,7 @@ get_hw_addr(struct net_device *dev)
 		    dev->dev_addr[i] = ((x & 0x55) << 1) + ((x & 0xaa) >> 1);
 	    }
     }
-#endif /* CONFIG_PPC */
+#endif /* CONFIG_PPC_MULTIPLATFORM */
 
     /* Test for a bad enet address */
     status = test_bad_enet(dev, status);

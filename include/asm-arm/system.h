@@ -12,7 +12,8 @@
 #define CPU_ARCH_ARMv5		4
 #define CPU_ARCH_ARMv5T		5
 #define CPU_ARCH_ARMv5TE	6
-#define CPU_ARCH_ARMv6		7
+#define CPU_ARCH_ARMv5TEJ	7
+#define CPU_ARCH_ARMv6		8
 
 /*
  * CR1 bits (CP#15 CR1)
@@ -124,6 +125,26 @@ extern struct task_struct *__switch_to(struct task_struct *, struct thread_info 
 	} while (0)
 
 /*
+ * CPU interrupt mask handling.
+ */
+#if __LINUX_ARM_ARCH__ >= 6
+
+#define local_irq_save(x)					\
+	({							\
+	__asm__ __volatile__(					\
+	"mrs	%0, cpsr		@ local_irq_save\n"	\
+	"cpsid	i"						\
+	: "=r" (x) : : "memory", "cc");				\
+	})
+
+#define local_irq_enable()  __asm__("cpsie i	@ __sti" : : : "memory", "cc")
+#define local_irq_disable() __asm__("cpsid i	@ __cli" : : : "memory", "cc")
+#define local_fiq_enable()  __asm__("cpsie f	@ __stf" : : : "memory", "cc")
+#define local_fiq_disable() __asm__("cpsid f	@ __clf" : : : "memory", "cc")
+
+#else
+
+/*
  * Save the current interrupt enable state & disable IRQs
  */
 #define local_irq_save(x)					\
@@ -198,6 +219,8 @@ extern struct task_struct *__switch_to(struct task_struct *, struct thread_info 
 	:							\
 	: "memory", "cc");					\
 	})
+
+#endif
 
 /*
  * Save the current interrupt enable state.

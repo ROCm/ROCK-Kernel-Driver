@@ -2456,8 +2456,6 @@ static int sbmac_open(struct net_device *dev)
 {
 	struct sbmac_softc *sc = (struct sbmac_softc *)dev->priv;
 	
-	MOD_INC_USE_COUNT;
-
 	if (debug > 1) {
 		printk(KERN_DEBUG "%s: sbmac_open() irq %d.\n", dev->name, dev->irq);
 	}
@@ -2466,10 +2464,8 @@ static int sbmac_open(struct net_device *dev)
 	 * map/route interrupt 
 	 */
 	
-	if (request_irq(dev->irq, &sbmac_intr, SA_SHIRQ, dev->name, dev)) {
-		MOD_DEC_USE_COUNT;
+	if (request_irq(dev->irq, &sbmac_intr, SA_SHIRQ, dev->name, dev))
 		return -EBUSY;
-	}
 	
 	/*
 	 * Configure default speed 
@@ -2791,8 +2787,6 @@ static int sbmac_close(struct net_device *dev)
 	sbdma_emptyring(&(sc->sbm_txdma));
 	sbdma_emptyring(&(sc->sbm_rxdma));
 	
-	MOD_DEC_USE_COUNT;
-
 	return 0;
 }
 

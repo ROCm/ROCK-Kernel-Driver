@@ -3,24 +3,12 @@
 #include <linux/kernel.h>
 #include <linux/devfs_fs_kernel.h>
 #include <linux/init.h>
+#include <linux/syscalls.h>
 #include <linux/unistd.h>
 #include <linux/slab.h>
 #include <linux/mount.h>
 #include <linux/major.h>
 #include <linux/root_dev.h>
-
-asmlinkage long sys_unlink(const char *name);
-asmlinkage long sys_mknod(const char *name, int mode, unsigned dev);
-asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
-asmlinkage long sys_ioctl(int fd, int cmd, unsigned long arg);
-asmlinkage long sys_mkdir(const char *name, int mode);
-asmlinkage long sys_rmdir(const char *name);
-asmlinkage long sys_chdir(const char *name);
-asmlinkage long sys_fchdir(int fd);
-asmlinkage long sys_chroot(const char *name);
-asmlinkage long sys_mount(char *dev_name, char *dir_name, char *type,
-				 unsigned long flags, void *data);
-asmlinkage long sys_umount(char *name, int flags);
 
 dev_t name_to_dev_t(char *name);
 void  change_floppy(char *fmt, ...);
@@ -49,7 +37,6 @@ static inline int create_dev(char *name, dev_t dev, char *devfs_name)
 #endif
 
 #if BITS_PER_LONG == 32
-asmlinkage long sys_stat64(char *name, struct stat64 *stat);
 static inline u32 bstat(char *name)
 {
 	struct stat64 stat;

@@ -1231,11 +1231,9 @@ struct r_port {
 #define ROCKET_INITIALIZED	0x80000000	/* Port is active */
 #define ROCKET_CLOSING		0x40000000	/* Serial port is closing */
 #define ROCKET_NORMAL_ACTIVE	0x20000000	/* Normal port is active */
-#define ROCKET_CALLOUT_ACTIVE	0x10000000	/* Callout port is active */
 
 /* tty subtypes */
 #define SERIAL_TYPE_NORMAL 1
-#define SERIAL_TYPE_CALLOUT 2
 
 /*
  * Assigned major numbers for the Comtrol Rocketport

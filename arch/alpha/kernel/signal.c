@@ -114,7 +114,7 @@ osf_sigaction(int sig, const struct osf_sigaction *act,
 	return ret;
 }
 
-asmlinkage int 
+asmlinkage long
 sys_rt_sigaction(int sig, const struct sigaction *act, struct sigaction *oact,
 		 size_t sigsetsize, void *restorer)
 {

@@ -1646,21 +1646,17 @@ toshoboe_open (struct pci_dev *pci_dev, const struct pci_device_id *pdid)
   if (max_baud >= 1152000)
     {
       self->qos.baud_rate.bits |= IR_1152000;
-      self->flags |= IFF_MIR;
     }
 #endif
   if (max_baud >= 4000000)
     {
       self->qos.baud_rate.bits |= (IR_4000000 << 8);
-      self->flags |= IFF_FIR;
     }
 
   /*FIXME: work this out... */
   self->qos.min_turn_time.bits = 0xff;
 
   irda_qos_bits_to_value (&self->qos);
-
-  self->flags = IFF_SIR | IFF_DMA | IFF_PIO;
 
   /* Allocate twice the size to guarantee alignment */
   self->ringbuf = (void *) kmalloc (OBOE_RING_LEN << 1, GFP_KERNEL);

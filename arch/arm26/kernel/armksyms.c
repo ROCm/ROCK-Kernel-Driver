@@ -21,6 +21,7 @@
 #include <linux/tty.h>
 #include <linux/vt_kern.h>
 #include <linux/smp_lock.h>
+#include <linux/syscalls.h>
 
 #include <asm/byteorder.h>
 #include <asm/elf.h>
@@ -41,14 +42,6 @@ extern void inswb(unsigned int port, void *to, int len);
 extern void outswb(unsigned int port, const void *to, int len);
 
 extern void __bad_xchg(volatile void *ptr, int size);
-
-/*
- * syscalls
- */
-extern int sys_write(int, const char *, int);
-extern int sys_read(int, char *, int);
-extern int sys_lseek(int, off_t, int);
-extern int sys_exit(int);
 
 /*
  * libgcc functions - functions that are used internally by the

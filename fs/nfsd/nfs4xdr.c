@@ -51,10 +51,10 @@
 #include <linux/sunrpc/xdr.h>
 #include <linux/sunrpc/svc.h>
 #include <linux/sunrpc/clnt.h>
-#include <linux/sunrpc/name_lookup.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/state.h>
 #include <linux/nfsd/xdr4.h>
+#include <linux/nfsd_idmap.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
 
@@ -344,7 +344,7 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 	 * read-only attributes return ERR_INVAL.
 	 */
 	if ((bmval[0] & ~NFSD_SUPPORTED_ATTRS_WORD0) || (bmval[1] & ~NFSD_SUPPORTED_ATTRS_WORD1))
-		return nfserr_notsupp;
+		return nfserr_attrnotsupp;
 	if ((bmval[0] & ~NFSD_WRITEABLE_ATTRS_WORD0) || (bmval[1] & ~NFSD_WRITEABLE_ATTRS_WORD1))
 		return nfserr_inval;
 
@@ -373,7 +373,7 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		READMEM(buf, dummy32);
 		if (check_utf8(buf, dummy32))
 			return nfserr_inval;
-		if ((status = name_get_uid(buf, dummy32, &iattr->ia_uid)))
+		if ((status = nfsd_map_name_to_uid(argp->rqstp, buf, dummy32, &iattr->ia_uid)))
 			goto out_nfserr;
 		iattr->ia_valid |= ATTR_UID;
 	}
@@ -386,7 +386,7 @@ nfsd4_decode_fattr(struct nfsd4_compoundargs *argp, u32 *bmval, struct iattr *ia
 		READMEM(buf, dummy32);
 		if (check_utf8(buf, dummy32))
 			return nfserr_inval;
-		if ((status = name_get_gid(buf, dummy32, &iattr->ia_gid)))
+		if ((status = nfsd_map_name_to_gid(argp->rqstp, buf, dummy32, &iattr->ia_gid)))
 			goto out_nfserr;
 		iattr->ia_valid |= ATTR_GID;
 	}
@@ -908,10 +908,31 @@ nfsd4_decode_setclientid_confirm(struct nfsd4_compoundargs *argp, struct nfsd4_s
 static int
 nfsd4_decode_verify(struct nfsd4_compoundargs *argp, struct nfsd4_verify *verify)
 {
+#if 0
+	struct nfsd4_compoundargs save = {
+		.p = argp->p,
+		.end = argp->end,
+		.rqstp = argp->rqstp,
+	};
+	u32             ve_bmval[2];
+	struct iattr    ve_iattr;           /* request */
+	struct nfs4_acl *ve_acl;            /* request */
+#endif
 	DECODE_HEAD;
 
 	if ((status = nfsd4_decode_bitmap(argp, verify->ve_bmval)))
 		goto out;
+
+	/* For convenience's sake, we compare raw xdr'd attributes in
+	 * nfsd4_proc_verify; however we still decode here just to return
+	 * correct error in case of bad xdr. */
+#if 0
+	status = nfsd4_decode_fattr(ve_bmval, &ve_iattr, &ve_acl);
+	if (status == nfserr_inval) {
+		status = nfserrno(status);
+		goto out;
+	}
+#endif
 	READ_BUF(4);
 	READ32(verify->ve_attrlen);
 	READ_BUF(verify->ve_attrlen);
@@ -928,7 +949,7 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 	int len;
 	DECODE_HEAD;
 
-	READ_BUF(sizeof(stateid_t) + 16);
+	READ_BUF(sizeof(stateid_opaque_t) + 20);
 	READ32(write->wr_stateid.si_generation);
 	COPYMEM(&write->wr_stateid.si_opaque, sizeof(stateid_opaque_t));
 	READ64(write->wr_offset);
@@ -967,6 +988,20 @@ nfsd4_decode_write(struct nfsd4_compoundargs *argp, struct nfsd4_write *write)
 	argp->p = (u32*)  (write->wr_vec[v].iov_base + (XDR_QUADLEN(len) << 2));
 	write->wr_vec[v].iov_len = len;
 	write->wr_vlen = v+1;
+
+	DECODE_TAIL;
+}
+
+static int
+nfsd4_decode_release_lockowner(struct nfsd4_compoundargs *argp, struct nfsd4_release_lockowner *rlockowner)
+{
+	DECODE_HEAD;
+
+	READ_BUF(12);
+	COPYMEM(&rlockowner->rl_clientid, sizeof(clientid_t));
+	READ32(rlockowner->rl_owner.len);
+	READ_BUF(rlockowner->rl_owner.len);
+	READMEM(rlockowner->rl_owner.data, rlockowner->rl_owner.len);
 
 	DECODE_TAIL;
 }
@@ -1043,6 +1078,13 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 		op->opnum = ntohl(*argp->p++);
 
 		switch (op->opnum) {
+		case 2: /* Reserved operation */
+			op->opnum = OP_ILLEGAL;
+			if (argp->minorversion == 0)
+				op->status = nfserr_op_illegal;
+			else
+				op->status = nfserr_minor_vers_mismatch;
+			break;
 		case OP_ACCESS:
 			op->status = nfsd4_decode_access(argp, &op->u.access);
 			break;
@@ -1136,14 +1178,12 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 		case OP_WRITE:
 			op->status = nfsd4_decode_write(argp, &op->u.write);
 			break;
+		case OP_RELEASE_LOCKOWNER:
+			op->status = nfsd4_decode_release_lockowner(argp, &op->u.release_lockowner);
+			break;
 		default:
-			/*
-			 * According to spec, anything greater than OP_WRITE
-			 * is treated as OP_WRITE+1 in the response.
-			 */
-			if (op->opnum > OP_WRITE)
-			op->opnum = OP_WRITE + 1;
-			op->status = nfserr_notsupp;
+			op->opnum = OP_ILLEGAL;
+			op->status = nfserr_op_illegal;
 			break;
 		}
 
@@ -1183,10 +1223,10 @@ nfsd4_decode_compound(struct nfsd4_compoundargs *argp)
 } while (0)
 #define WRITECINFO(c)		do {				\
 	*p++ = htonl(c.atomic);					\
-	*p++ = htonl(c.before_size);				\
-	*p++ = htonl(c.before_ctime);				\
-	*p++ = htonl(c.after_size);				\
-	*p++ = htonl(c.after_ctime);				\
+	*p++ = htonl(c.before_ctime_sec);				\
+	*p++ = htonl(c.before_ctime_nsec);				\
+	*p++ = htonl(c.after_ctime_sec);				\
+	*p++ = htonl(c.after_ctime_nsec);				\
 } while (0)
 
 #define RESERVE_SPACE(nbytes)	do {				\
@@ -1239,13 +1279,16 @@ static u32 nfs4_ftypes[16] = {
  */
 int
 nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
-		   struct dentry *dentry, u32 *buffer, int *countp, u32 *bmval)
+		struct dentry *dentry, u32 *buffer, int *countp, u32 *bmval,
+		struct svc_rqst *rqstp)
 {
 	u32 bmval0 = bmval[0];
 	u32 bmval1 = bmval[1];
 	struct kstat stat;
-	struct name_ent *owner = NULL;
-	struct name_ent *group = NULL;
+	char owner[IDMAP_NAMESZ];
+	u32 ownerlen = 0;
+	char group[IDMAP_NAMESZ];
+	u32 grouplen = 0;
 	struct svc_fh tempfh;
 	struct kstatfs statfs;
 	int buflen = *countp << 2;
@@ -1277,14 +1320,20 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		fhp = &tempfh;
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER) {
-		status = name_get_user(stat.uid, &owner);
-		if (status)
+		int temp = nfsd_map_uid_to_name(rqstp, stat.uid, owner);
+		if (temp < 0) {
+			status = temp;
 			goto out_nfserr;
+		}
+		ownerlen = (unsigned) temp;
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER_GROUP) {
-		status = name_get_group(stat.gid, &group);
-		if (status)
+		int temp = nfsd_map_gid_to_name(rqstp, stat.gid, group);
+		if (temp < 0) {
+			status = temp;
 			goto out_nfserr;
+		}
+		grouplen = (unsigned) temp;
 	}
 
 	if ((buflen -= 16) < 0)
@@ -1317,32 +1366,15 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 	}
 	if (bmval0 & FATTR4_WORD0_CHANGE) {
 		/*
-		 * XXX: We currently use the inode ctime as the nfsv4 "changeid"
-		 * attribute.  This violates the spec, which says
-		 *
-		 *    The server may return the object's time_modify attribute
-		 *    for this attribute, but only if the file system object
-		 *    can not be updated more frequently than the resolution
-		 *    of time_modify.
-		 *
-		 * Since we only have 1-second ctime resolution, this is a pretty
-		 * serious violation.  Indeed, 1-second ctime resolution is known
-		 * to be a problem in practice in the NFSv3 world.
-		 *
-		 * The real solution to this problem is probably to work on
-		 * adding high-resolution mtimes to the VFS layer.
-		 *
-		 * Note: Started using i_size for the high 32 bits of the changeid.
-		 *
-		 * Note 2: This _must_ be consistent with the scheme for writing
+		 * Note: This _must_ be consistent with the scheme for writing
 		 * change_info, so any changes made here must be reflected there
 		 * as well.  (See xdr4.h:set_change_info() and the WRITECINFO()
 		 * macro above.)
 		 */
 		if ((buflen -= 8) < 0)
 			goto out_resource;
-		WRITE32(stat.size);
-		WRITE32(stat.mtime.tv_sec); /* AK: nsec dropped? */
+		WRITE32(stat.ctime.tv_sec);
+		WRITE32(stat.ctime.tv_nsec);
 	}
 	if (bmval0 & FATTR4_WORD0_SIZE) {
 		if ((buflen -= 8) < 0)
@@ -1485,20 +1517,18 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 		WRITE32(stat.nlink);
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER) {
-		int namelen  = strlen(owner->name);
-		buflen -= (XDR_QUADLEN(namelen) << 2) + 4;
+		buflen -= (XDR_QUADLEN(ownerlen) << 2) + 4;
 		if (buflen < 0)
 			goto out_resource;
-		WRITE32(namelen);
-		WRITEMEM(owner->name, namelen);
+		WRITE32(ownerlen);
+		WRITEMEM(owner, ownerlen);
 	}
 	if (bmval1 & FATTR4_WORD1_OWNER_GROUP) {
-		int namelen = strlen(group->name);
-		buflen -= (XDR_QUADLEN(namelen) << 2) + 4;
+		buflen -= (XDR_QUADLEN(grouplen) << 2) + 4;
 		if (buflen < 0)
 			goto out_resource;
-		WRITE32(namelen);
-		WRITEMEM(group->name, namelen);
+		WRITE32(grouplen);
+		WRITEMEM(group, grouplen);
 	}
 	if (bmval1 & FATTR4_WORD1_RAWDEV) {
 		if ((buflen -= 8) < 0)
@@ -1566,10 +1596,6 @@ nfsd4_encode_fattr(struct svc_fh *fhp, struct svc_export *exp,
 out:
 	if (fhp == &tempfh)
 		fh_put(&tempfh);
-	if (owner)
-		name_put(owner);
-	if (group)
-		name_put(group);
 	return status;
 out_nfserr:
 	status = nfserrno(status);
@@ -1648,7 +1674,8 @@ nfsd4_encode_dirent(struct readdir_cd *ccd, const char *name, int namlen,
 		}
 
 		nfserr = nfsd4_encode_fattr(NULL, exp,
-				dentry, p, &buflen, cd->rd_bmval);
+				dentry, p, &buflen, cd->rd_bmval,
+				cd->rd_rqstp);
 		if (!nfserr) {
 			p += buflen;
 			goto out;
@@ -1701,7 +1728,7 @@ out:
 	return 0;
 
 nospc:
-	cd->common.err = nfserr_readdir_nospc;
+	cd->common.err = nfserr_toosmall;
 	return -EINVAL;
 }
 
@@ -1771,7 +1798,8 @@ nfsd4_encode_getattr(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_ge
 
 	buflen = resp->end - resp->p - (COMPOUND_ERR_SLACK_SPACE >> 2);
 	nfserr = nfsd4_encode_fattr(fhp, fhp->fh_export, fhp->fh_dentry,
-				    resp->p, &buflen, getattr->ga_bmval);
+				    resp->p, &buflen, getattr->ga_bmval,
+				    resp->rqstp);
 
 	if (!nfserr)
 		resp->p += buflen;
@@ -1925,6 +1953,7 @@ nfsd4_encode_open(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_open 
 	default:
 		BUG();
 	}
+	/* XXX save filehandle here */
 
 	ENCODE_SEQID_OP_TAIL(open->op_stateowner);
 }
@@ -1995,6 +2024,8 @@ nfsd4_encode_read(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_read 
 			   read->rd_offset,
 			   read->rd_iov, read->rd_vlen,
 			   &maxcount);
+	if (nfserr == nfserr_symlink)
+		nfserr = nfserr_inval;
 	if (nfserr)
 		return nfserr;
 	eof = (read->rd_offset + maxcount >= read->rd_fhp->fh_dentry->d_inode->i_size);
@@ -2052,6 +2083,8 @@ nfsd4_encode_readlink(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_r
 	 * assume that truncation occurred, and return NFS4ERR_RESOURCE.
 	 */
 	nfserr = nfsd_readlink(readlink->rl_rqstp, readlink->rl_fhp, page, &maxcount);
+	if (nfserr == nfserr_isdir)
+		return nfserr_inval;
 	if (nfserr)
 		return nfserr;
 
@@ -2081,7 +2114,7 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 {
 	int maxcount;
 	loff_t offset;
-	u32 *page;
+	u32 *page, *savep;
 	ENCODE_HEAD;
 
 	if (nfserr)
@@ -2090,6 +2123,7 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 		return nfserr_resource;
 
 	RESERVE_SPACE(8);  /* verifier */
+	savep = p;
 
 	/* XXX: Following NFSv3, we ignore the READDIR verifier for now. */
 	WRITE32(0);
@@ -2107,8 +2141,10 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	 * pointer and eof field.
 	 */
 	maxcount = (maxcount >> 2) - 4;
-	if (maxcount < 0)
-		return nfserr_readdir_nospc;
+	if (maxcount < 0) {
+		nfserr =  nfserr_toosmall;
+		goto err_no_verf;
+	}
 
 	svc_take_page(resp->rqstp);
 	page = page_address(resp->rqstp->rq_respages[resp->rqstp->rq_resused-1]);
@@ -2122,11 +2158,11 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 			      &offset,
 			      &readdir->common, nfsd4_encode_dirent);
 	if (nfserr == nfs_ok &&
-	    readdir->common.err == nfserr_readdir_nospc &&
+	    readdir->common.err == nfserr_toosmall &&
 	    readdir->buffer == page) 
-		nfserr = nfserr_readdir_nospc;
+		nfserr = nfserr_toosmall;
 	if (nfserr)
-		return nfserr;
+		goto err_no_verf;
 
 	if (readdir->offset)
 		xdr_encode_hyper(readdir->offset, offset);
@@ -2146,6 +2182,10 @@ nfsd4_encode_readdir(struct nfsd4_compoundres *resp, int nfserr, struct nfsd4_re
 	resp->end = resp->p + PAGE_SIZE/4;
 
 	return 0;
+err_no_verf:
+	p = savep;
+	ADJUST_ARGS();
+	return nfserr;
 }
 
 static void
@@ -2237,8 +2277,14 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 
 	RESERVE_SPACE(8);
 	WRITE32(op->opnum);
-	statp = p++;                  /* to be backfilled at the end */
-	ADJUST_ARGS();
+	if ((op->opnum != OP_SETATTR) && (op->opnum != OP_LOCK) && (op->opnum != OP_LOCKT) && (op->opnum != OP_SETCLIENTID) && (op->status)) {
+		*p++ = op->status;
+		ADJUST_ARGS();
+		return;
+	} else {
+		statp = p++;        /* to be backfilled at the end */
+		ADJUST_ARGS();
+	}
 
 	switch (op->opnum) {
 	case OP_ACCESS:
@@ -2324,6 +2370,8 @@ nfsd4_encode_operation(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 	case OP_WRITE:
 		nfsd4_encode_write(resp, op->status, &op->u.write);
 		break;
+	case OP_RELEASE_LOCKOWNER:
+		break;
 	default:
 		break;
 	}
@@ -2351,7 +2399,7 @@ nfsd4_encode_replay(struct nfsd4_compoundres *resp, struct nfsd4_op *op)
 
 	RESERVE_SPACE(8);
 	WRITE32(op->opnum);
-	WRITE32(NFS_OK);
+	*p++ = rp->rp_status;  /* already xdr'ed */
 	ADJUST_ARGS();
 
 	RESERVE_SPACE(rp->rp_buflen);
@@ -2381,6 +2429,7 @@ nfs4svc_decode_compoundargs(struct svc_rqst *rqstp, u32 *p, struct nfsd4_compoun
 	args->tmpp = NULL;
 	args->to_free = NULL;
 	args->ops = args->iops;
+	args->rqstp = rqstp;
 
 	status = nfsd4_decode_compound(args);
 	if (status) {

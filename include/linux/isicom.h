@@ -73,7 +73,6 @@ typedef	struct	{
 #define		PORT_COUNT	(BOARD_COUNT*16)
 
 #define		SERIAL_TYPE_NORMAL	1
-#define		SERIAL_TYPE_CALLOUT	2
 
 /*   character sizes  */
 

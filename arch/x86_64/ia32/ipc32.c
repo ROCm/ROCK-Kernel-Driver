@@ -2,6 +2,7 @@
 #include <linux/sched.h>
 #include <linux/fs.h> 
 #include <linux/file.h> 
+#include <linux/syscalls.h>
 #include <linux/sem.h>
 #include <linux/msg.h>
 #include <linux/mm.h>

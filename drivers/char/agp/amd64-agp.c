@@ -16,11 +16,7 @@
 #include "agp.h"
 
 /* Will need to be increased if AMD64 ever goes >8-way. */
-#ifdef CONFIG_SMP
 #define MAX_HAMMER_GARTS   8
-#else
-#define MAX_HAMMER_GARTS   1
-#endif
 
 /* PTE bits. */
 #define GPTE_VALID	1
@@ -34,6 +30,14 @@
 /* GART cache control register bits. */
 #define INVGART		(1<<0)
 #define GARTPTEERR	(1<<1)
+
+/* NVIDIA K8 registers */
+#define NVIDIA_X86_64_0_APBASE		0x10
+#define NVIDIA_X86_64_1_APBASE1		0x50
+#define NVIDIA_X86_64_1_APLIMIT1	0x54
+#define NVIDIA_X86_64_1_APSIZE		0xa8
+#define NVIDIA_X86_64_1_APBASE2		0xd8
+#define NVIDIA_X86_64_1_APLIMIT2	0xdc
 
 static int nr_garts;
 static struct pci_dev * hammers[MAX_HAMMER_GARTS];
@@ -346,6 +350,10 @@ static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 	/* cache pci_devs of northbridges. */
 	while ((loop_dev = pci_find_device(PCI_VENDOR_ID_AMD, 0x1103, loop_dev)) 
 			!= NULL) {
+		if (i == MAX_HAMMER_GARTS) { 
+			printk(KERN_ERR PFX "Too many northbridges for AGP\n");
+			return -1;
+		}
 		if (fix_northbridge(loop_dev, pdev, cap_ptr) < 0) { 
 			printk(KERN_ERR PFX "No usable aperture found.\n");
 #ifdef __x86_64__ 
@@ -355,29 +363,111 @@ static __devinit int cache_nbs (struct pci_dev *pdev, u32 cap_ptr)
 			return -1;  
 		}
 		hammers[i++] = loop_dev;
-		nr_garts = i;
-#ifdef CONFIG_SMP
-		if (i > MAX_HAMMER_GARTS) { 
-			printk(KERN_ERR PFX "Too many northbridges for AGP\n");
-			return -1;
-		}
-#else
-		/* Uniprocessor case, return after finding first bridge.
-		   (There may be more, but in UP, we don't care). */
-		return 0;
-#endif
 	}
-
+		nr_garts = i;
 	return i == 0 ? -1 : 0;
+}
+
+/* Handle AMD 8151 quirks */
+static void __devinit amd8151_init(struct pci_dev *pdev, struct agp_bridge_data *bridge)
+
+{		
+	char *revstring;
+	u8 rev_id;
+
+	pci_read_config_byte(pdev, PCI_REVISION_ID, &rev_id);
+	switch (rev_id) {
+	case 0x01: revstring="A0"; break;
+	case 0x02: revstring="A1"; break;
+	case 0x11: revstring="B0"; break;
+	case 0x12: revstring="B1"; break;
+	case 0x13: revstring="B2"; break;
+	default:   revstring="??"; break;
+		}
+
+	printk (KERN_INFO PFX "Detected AMD 8151 AGP Bridge rev %s\n", revstring);
+
+	/*
+	 * Work around errata.
+	 * Chips before B2 stepping incorrectly reporting v3.5
+	 */
+	if (rev_id < 0x13) {
+		printk (KERN_INFO PFX "Correcting AGP revision (reports 3.5, is really 3.0)\n");
+		bridge->major_version = 3;
+		bridge->minor_version = 0;
+	}
+}
+
+static struct aper_size_info_32 nforce3_sizes[5] =
+{
+	{512,  131072, 7, 0x00000000 },
+	{256,  65536,  6, 0x00000008 },
+	{128,  32768,  5, 0x0000000C },
+	{64,   16384,  4, 0x0000000E },
+	{32,   8192,   3, 0x0000000F }
+};
+
+/* Handle shadow device of the Nvidia NForce3 */
+/* CHECK-ME original 2.4 version set up some IORRs. Check if that is needed. */
+static int __devinit nforce3_agp_init(struct pci_dev *pdev) 
+{ 
+	u32 tmp, apbase, apbar, aplimit;
+	struct pci_dev *dev1; 
+	int i;
+	unsigned size = amd64_fetch_size(); 
+
+	printk(KERN_INFO PFX "Setting up Nforce3 AGP.\n");
+
+	dev1 = pci_find_slot((unsigned int)pdev->bus->number, PCI_DEVFN(11, 0));
+	if (dev1 == NULL) {
+		printk(KERN_INFO PFX "agpgart: Detected an NVIDIA "
+			"nForce3 chipset, but could not find "
+			"the secondary device.\n");
+		return -ENODEV;
+	}	
+
+	for (i = 0; i < ARRAY_SIZE(nforce3_sizes); i++) 
+		if (nforce3_sizes[i].size == size)
+			break; 
+
+	if (i == ARRAY_SIZE(nforce3_sizes)) {
+		printk(KERN_INFO PFX "No NForce3 size found for %d\n", size); 
+		return -ENODEV; 
+	}
+	
+	pci_read_config_dword(dev1, NVIDIA_X86_64_1_APSIZE, &tmp);
+	tmp &= ~(0xf);
+	tmp |= nforce3_sizes[i].size_value;
+	pci_write_config_dword(dev1, NVIDIA_X86_64_1_APSIZE, tmp);
+
+	/* shadow x86-64 registers into NVIDIA registers */
+	pci_read_config_dword (hammers[0], AMD64_GARTAPERTUREBASE, &apbase);
+
+	/* if x86-64 aperture base is beyond 4G, exit here */
+	if ( (apbase & 0x7fff) >> (32 - 25) )
+		 return -ENODEV;
+
+	apbase = (apbase & 0x7fff) << 25;
+
+	pci_read_config_dword(pdev, NVIDIA_X86_64_0_APBASE, &apbar);
+	apbar &= ~PCI_BASE_ADDRESS_MEM_MASK;
+	apbar |= apbase;
+	pci_write_config_dword(pdev, NVIDIA_X86_64_0_APBASE, apbar);
+
+	aplimit = apbase + (size * 1024 * 1024) - 1;
+	pci_write_config_dword(dev1, NVIDIA_X86_64_1_APBASE1, apbase);
+	pci_write_config_dword(dev1, NVIDIA_X86_64_1_APLIMIT1, aplimit);
+	pci_write_config_dword(dev1, NVIDIA_X86_64_1_APBASE2, apbase);
+	pci_write_config_dword(dev1, NVIDIA_X86_64_1_APLIMIT2, aplimit);
+
+	return 0;
 }
 
 static int __devinit agp_amd64_probe(struct pci_dev *pdev,
 				     const struct pci_device_id *ent)
 {
 	struct agp_bridge_data *bridge;
-	u8 rev_id;
 	u8 cap_ptr;
-	char *revstring=NULL;
 
 	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
 	if (!cap_ptr)
@@ -391,32 +481,7 @@ static int __devinit agp_amd64_probe(struct pci_dev *pdev,
 
 	if (pdev->vendor == PCI_VENDOR_ID_AMD &&
 	    pdev->device == PCI_DEVICE_ID_AMD_8151_0) {
-
-		pci_read_config_byte(pdev, PCI_REVISION_ID, &rev_id);
-		switch (rev_id) {
-		case 0x01:	revstring="A0";
-				break;
-		case 0x02:	revstring="A1";
-				break;
-		case 0x11:	revstring="B0";
-				break;
-		case 0x12:	revstring="B1";
-				break;
-		case 0x13:	revstring="B2";
-				break;
-		default:	revstring="??";
-				break;
-		}
-		printk (KERN_INFO PFX "Detected AMD 8151 AGP Bridge rev %s\n", revstring);
-		/*
-		 * Work around errata.
-		 * Chips before B2 stepping incorrectly reporting v3.5
-		 */
-		if (rev_id < 0x13) {
-			printk (KERN_INFO PFX "Correcting AGP revision (reports 3.5, is really 3.0)\n");
-			bridge->major_version = 3;
-			bridge->minor_version = 0;
-		}
+		amd8151_init(pdev, bridge);
 	} else {
 		printk(KERN_INFO PFX "Detected AGP bridge %x\n",
 			pdev->devfn);
@@ -432,6 +497,14 @@ static int __devinit agp_amd64_probe(struct pci_dev *pdev,
 	if (cache_nbs(pdev, cap_ptr) == -1) {
 		agp_put_bridge(bridge);
 		return -ENODEV;
+	}
+
+	if (pdev->vendor == PCI_VENDOR_ID_NVIDIA) { 
+		int ret = nforce3_agp_init(pdev);
+		if (ret) { 
+			agp_put_bridge(bridge); 
+			return ret;
+		}
 	}
 
 	pci_set_drvdata(pdev, bridge);
@@ -478,8 +551,25 @@ static struct pci_device_id agp_amd64_pci_table[] = {
 	{
 	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
 	.class_mask	= ~0,
-	.vendor		= PCI_VENDOR_ID_SI,
-	.device		= PCI_DEVICE_ID_SI_755,
+	.vendor		= PCI_VENDOR_ID_VIA,
+	.device		= PCI_DEVICE_ID_VIA_8380_0,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	/* NForce3 */
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_NVIDIA,
+	.device		= PCI_DEVICE_ID_NVIDIA_NFORCE3,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
+	},
+	{
+	.class		= (PCI_CLASS_BRIDGE_HOST << 8),
+	.class_mask	= ~0,
+	.vendor		= PCI_VENDOR_ID_NVIDIA,
+	.device		= PCI_DEVICE_ID_NVIDIA_NFORCE3S,
 	.subvendor	= PCI_ANY_ID,
 	.subdevice	= PCI_ANY_ID,
 	},

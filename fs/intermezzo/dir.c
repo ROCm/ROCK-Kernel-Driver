@@ -864,7 +864,7 @@ int presto_permission(struct inode *inode, int mask, struct nameidata *nd)
         /* The cache filesystem doesn't have its own permission function,
          * so we call the default one.
          */
-        rc = vfs_permission(inode, mask, nd);
+        rc = vfs_permission(inode, mask);
 
         EXIT;
         return rc;

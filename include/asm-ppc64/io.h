@@ -181,9 +181,12 @@ static inline void * phys_to_virt(unsigned long address)
  */
 #define page_to_phys(page)	(page_to_pfn(page) << PAGE_SHIFT)
 
-#if 0
-#define BIO_VMERGE_BOUNDARY	4096
-#endif
+/* We do NOT want virtual merging, it would put too much pressure on
+ * our iommu allocator. Instead, we want drivers to be smart enough
+ * to coalesce sglists that happen to have been mapped in a contiguous
+ * way by the iommu
+ */
+#define BIO_VMERGE_BOUNDARY	0
 
 #endif /* __KERNEL__ */
 

@@ -381,6 +381,7 @@ static int udpv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 	if (flags & MSG_ERRQUEUE)
 		return ipv6_recv_error(sk, msg, len);
 
+try_again:
 	skb = skb_recv_datagram(sk, flags, noblock, &err);
 	if (!skb)
 		goto out;
@@ -458,12 +459,13 @@ csum_copy_err:
 			kfree_skb(skb);
 	}
 
-	/* Error for blocking case is chosen to masquerade
-	   as some normal condition.
-	 */
-	err = (flags&MSG_DONTWAIT) ? -EAGAIN : -EHOSTUNREACH;
-	UDP6_INC_STATS_USER(UdpInErrors);
-	goto out_free;
+	skb_free_datagram(sk, skb);
+
+	if (flags & MSG_DONTWAIT) {
+		UDP6_INC_STATS_USER(UdpInErrors);
+		return -EAGAIN;
+	}
+	goto try_again;
 }
 
 static void udpv6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,

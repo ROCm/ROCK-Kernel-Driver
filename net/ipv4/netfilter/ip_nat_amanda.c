@@ -11,69 +11,45 @@
  * 	insmod ip_nat_amanda.o
  */
 
+#include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/netfilter_ipv4.h>
+#include <linux/netfilter.h>
+#include <linux/skbuff.h>
 #include <linux/ip.h>
 #include <linux/udp.h>
-#include <linux/kernel.h>
 #include <net/tcp.h>
 #include <net/udp.h>
 
+#include <linux/netfilter_ipv4.h>
 #include <linux/netfilter_ipv4/ip_nat.h>
 #include <linux/netfilter_ipv4/ip_nat_helper.h>
-#include <linux/netfilter_ipv4/ip_nat_rule.h>
 #include <linux/netfilter_ipv4/ip_conntrack_helper.h>
 #include <linux/netfilter_ipv4/ip_conntrack_amanda.h>
 
-
-#if 0
-#define DEBUGP printk
-#define DUMP_OFFSET(x)	printk("offset_before=%d, offset_after=%d, correction_pos=%u\n", x->offset_before, x->offset_after, x->correction_pos);
-#else
-#define DEBUGP(format, args...)
-#define DUMP_OFFSET(x)
-#endif
 
 MODULE_AUTHOR("Brian J. Murrell <netfilter@interlinx.bc.ca>");
 MODULE_DESCRIPTION("Amanda NAT helper");
 MODULE_LICENSE("GPL");
 
-/* protects amanda part of conntracks */
-DECLARE_LOCK_EXTERN(ip_amanda_lock);
-
 static unsigned int
 amanda_nat_expected(struct sk_buff **pskb,
-		 unsigned int hooknum,
-		 struct ip_conntrack *ct,
-		 struct ip_nat_info *info)
+                    unsigned int hooknum,
+                    struct ip_conntrack *ct,
+                    struct ip_nat_info *info)
 {
-	struct ip_nat_multi_range mr;
-	u_int32_t newdstip, newsrcip, newip;
-	u_int16_t port;
-	struct ip_ct_amanda_expect *exp_info;
 	struct ip_conntrack *master = master_ct(ct);
+	struct ip_ct_amanda_expect *exp_amanda_info;
+	struct ip_nat_multi_range mr;
+	u_int32_t newip;
 
 	IP_NF_ASSERT(info);
 	IP_NF_ASSERT(master);
-
 	IP_NF_ASSERT(!(info->initialized & (1 << HOOK2MANIP(hooknum))));
 
-	DEBUGP("nat_expected: We have a connection!\n");
-	exp_info = &ct->master->help.exp_amanda_info;
-
-	newdstip = ct->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip;
-	newsrcip = master->tuplehash[IP_CT_DIR_ORIGINAL].tuple.src.ip;
-	DEBUGP("nat_expected: %u.%u.%u.%u->%u.%u.%u.%u\n",
-	       NIPQUAD(newsrcip), NIPQUAD(newdstip));
-
-	port = exp_info->port;
-
 	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_SRC)
-		newip = newsrcip;
+		newip = master->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip;
 	else
-		newip = newdstip;
-
-	DEBUGP("nat_expected: IP to %u.%u.%u.%u\n", NIPQUAD(newip));
+		newip = master->tuplehash[IP_CT_DIR_REPLY].tuple.src.ip;
 
 	mr.rangesize = 1;
 	/* We don't want to manip the per-protocol, just the IPs. */
@@ -81,121 +57,79 @@ amanda_nat_expected(struct sk_buff **pskb,
 	mr.range[0].min_ip = mr.range[0].max_ip = newip;
 
 	if (HOOK2MANIP(hooknum) == IP_NAT_MANIP_DST) {
+		exp_amanda_info = &ct->master->help.exp_amanda_info;
 		mr.range[0].flags |= IP_NAT_RANGE_PROTO_SPECIFIED;
 		mr.range[0].min = mr.range[0].max
 			= ((union ip_conntrack_manip_proto)
-				{ .udp = { htons(port) } });
+				{ .udp = { htons(exp_amanda_info->port) } });
 	}
 
 	return ip_nat_setup_info(ct, &mr, hooknum);
 }
 
 static int amanda_data_fixup(struct ip_conntrack *ct,
-			  struct sk_buff **pskb,
-			  enum ip_conntrack_info ctinfo,
-			  struct ip_conntrack_expect *expect)
+                             struct sk_buff **pskb,
+                             enum ip_conntrack_info ctinfo,
+                             struct ip_conntrack_expect *exp)
 {
-	u_int32_t newip;
-	/* DATA 99999 MESG 99999 INDEX 99999 */
-	char buffer[6];
-	struct ip_conntrack_expect *exp = expect;
-	struct ip_ct_amanda_expect *ct_amanda_info = &exp->help.exp_amanda_info;
+	struct ip_ct_amanda_expect *exp_amanda_info;
 	struct ip_conntrack_tuple t = exp->tuple;
+	char buffer[sizeof("65535")];
 	u_int16_t port;
 
-	MUST_BE_LOCKED(&ip_amanda_lock);
-
-	newip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
-	DEBUGP ("ip_nat_amanda_help: newip = %u.%u.%u.%u\n", NIPQUAD(newip));
-
 	/* Alter conntrack's expectations. */
-
-	/* We can read expect here without conntrack lock, since it's
-	   only set in ip_conntrack_amanda, with ip_amanda_lock held
-	   writable */
-
-	t.dst.ip = newip;
-	for (port = ct_amanda_info->port; port != 0; port++) {
+	exp_amanda_info = &exp->help.exp_amanda_info;
+	t.dst.ip = ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple.dst.ip;
+	for (port = exp_amanda_info->port; port != 0; port++) {
 		t.dst.u.tcp.port = htons(port);
 		if (ip_conntrack_change_expect(exp, &t) == 0)
 			break;
 	}
-
 	if (port == 0)
 		return 0;
 
 	sprintf(buffer, "%u", port);
-
-	return ip_nat_mangle_udp_packet(pskb, ct, ctinfo, /* XXX exp->seq */ ct_amanda_info->offset, 
-					ct_amanda_info->len, buffer, strlen(buffer));
+	return ip_nat_mangle_udp_packet(pskb, ct, ctinfo,
+	                                exp_amanda_info->offset,
+	                                exp_amanda_info->len,
+	                                buffer, strlen(buffer));
 }
 
 static unsigned int help(struct ip_conntrack *ct,
-			 struct ip_conntrack_expect *exp,
-			 struct ip_nat_info *info,
-			 enum ip_conntrack_info ctinfo,
-			 unsigned int hooknum,
-			 struct sk_buff **pskb)
+                         struct ip_conntrack_expect *exp,
+                         struct ip_nat_info *info,
+                         enum ip_conntrack_info ctinfo,
+                         unsigned int hooknum,
+                         struct sk_buff **pskb)
 {
-	int dir;
+	int dir = CTINFO2DIR(ctinfo);
+	int ret = NF_ACCEPT;
 
-	if (!exp)
-		DEBUGP("ip_nat_amanda: no exp!!");
-		
 	/* Only mangle things once: original direction in POST_ROUTING
 	   and reply direction on PRE_ROUTING. */
-	dir = CTINFO2DIR(ctinfo);
 	if (!((hooknum == NF_IP_POST_ROUTING && dir == IP_CT_DIR_ORIGINAL)
-	      || (hooknum == NF_IP_PRE_ROUTING && dir == IP_CT_DIR_REPLY))) {
-		DEBUGP("ip_nat_amanda_help: Not touching dir %s at hook %s\n",
-		       dir == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY",
-		       hooknum == NF_IP_POST_ROUTING ? "POSTROUTING"
-		       : hooknum == NF_IP_PRE_ROUTING ? "PREROUTING"
-		       : hooknum == NF_IP_LOCAL_OUT ? "OUTPUT"
-		       : hooknum == NF_IP_LOCAL_IN ? "INPUT" : "???");
+	      || (hooknum == NF_IP_PRE_ROUTING && dir == IP_CT_DIR_REPLY)))
 		return NF_ACCEPT;
-	}
-	DEBUGP("ip_nat_amanda_help: got beyond not touching: dir %s at hook %s for expect: ",
-		   dir == IP_CT_DIR_ORIGINAL ? "ORIG" : "REPLY",
-		   hooknum == NF_IP_POST_ROUTING ? "POSTROUTING"
-		   : hooknum == NF_IP_PRE_ROUTING ? "PREROUTING"
-		     : hooknum == NF_IP_LOCAL_OUT ? "OUTPUT"
-		       : hooknum == NF_IP_LOCAL_IN ? "INPUT" : "???");
-	DUMP_TUPLE(&exp->tuple);
 
-	LOCK_BH(&ip_amanda_lock);
-// XXX	if (exp->seq != 0)
+	/* if this exectation has a "offset" the packet needs to be mangled */
 	if (exp->help.exp_amanda_info.offset != 0)
-		/*  if this packet has a "seq" it needs to have it's content mangled */
-		if (!amanda_data_fixup(ct, pskb, ctinfo, exp)) {
-			UNLOCK_BH(&ip_amanda_lock);
-			DEBUGP("ip_nat_amanda: NF_DROP\n");
-			return NF_DROP;
-		}
+		if (!amanda_data_fixup(ct, pskb, ctinfo, exp))
+			ret = NF_DROP;
 	exp->help.exp_amanda_info.offset = 0;
-	UNLOCK_BH(&ip_amanda_lock);
 
-	DEBUGP("ip_nat_amanda: NF_ACCEPT\n");
-	return NF_ACCEPT;
+	return ret;
 }
 
 static struct ip_nat_helper ip_nat_amanda_helper;
 
-/* This function is intentionally _NOT_ defined as  __exit, because
- * it is needed by init() */
-static void fini(void)
+static void __exit fini(void)
 {
-	DEBUGP("ip_nat_amanda: unregistering nat helper\n");
 	ip_nat_helper_unregister(&ip_nat_amanda_helper);
 }
 
 static int __init init(void)
 {
-	int ret = 0;
-	struct ip_nat_helper *hlpr;
-
-	hlpr = &ip_nat_amanda_helper;
-	memset(hlpr, 0, sizeof(struct ip_nat_helper));
+	struct ip_nat_helper *hlpr = &ip_nat_amanda_helper;
 
 	hlpr->tuple.dst.protonum = IPPROTO_UDP;
 	hlpr->tuple.src.u.udp.port = htons(10080);
@@ -205,20 +139,9 @@ static int __init init(void)
 	hlpr->flags = 0;
 	hlpr->me = THIS_MODULE;
 	hlpr->expect = amanda_nat_expected;
-
 	hlpr->name = "amanda";
 
-	DEBUGP
-	    ("ip_nat_amanda: Trying to register nat helper\n");
-	ret = ip_nat_helper_register(hlpr);
-
-	if (ret) {
-		printk
-		    ("ip_nat_amanda: error registering nat helper\n");
-		fini();
-		return 1;
-	}
-	return ret;
+	return ip_nat_helper_register(hlpr);
 }
 
 NEEDS_CONNTRACK(amanda);

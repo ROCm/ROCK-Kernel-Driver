@@ -62,8 +62,8 @@ ccw_device_path_notoper(struct ccw_device *cdev)
 	sch = to_subchannel(cdev->dev.parent);
 	stsch (sch->irq, &sch->schib);
 
-	CIO_MSG_EVENT(0, "%s(%s) - path(s) %02x are "
-		      "not operational \n", __FUNCTION__, sch->dev.bus_id,
+	CIO_MSG_EVENT(0, "%s(%04x) - path(s) %02x are "
+		      "not operational \n", __FUNCTION__, sch->irq,
 		      sch->schib.pmcw.pnom);
 
 	sch->lpm &= ~sch->schib.pmcw.pnom;
@@ -228,8 +228,8 @@ ccw_device_accumulate_irb(struct ccw_device *cdev, struct irb *irb)
 		cdev_irb->scsw.key = irb->scsw.key;
 		/* Copy suspend control bit. */
 		cdev_irb->scsw.sctl = irb->scsw.sctl;
-		/* Copy deferred condition code. */
-		cdev_irb->scsw.cc = irb->scsw.cc;
+		/* Accumulate deferred condition code. */
+		cdev_irb->scsw.cc |= irb->scsw.cc;
 		/* Copy ccw format bit. */
 		cdev_irb->scsw.fmt = irb->scsw.fmt;
 		/* Copy prefetch bit. */

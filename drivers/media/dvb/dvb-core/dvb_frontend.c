@@ -426,6 +426,7 @@ static int dvb_frontend_is_exiting (struct dvb_frontend_data *fe)
 static int dvb_frontend_thread (void *data)
 {
 	struct dvb_frontend_data *fe = (struct dvb_frontend_data *) data;
+	unsigned long timeout;
 	char name [15];
 	int quality = 0, delay = 3*HZ;
 	fe_status_t s;
@@ -442,21 +443,20 @@ static int dvb_frontend_thread (void *data)
 	dvb_call_frontend_notifiers (fe, 0);
 	dvb_frontend_init (fe);
 
-	while (!dvb_frontend_is_exiting (fe)) {
+	while (1) {
 		up (&fe->sem);      /* is locked when we enter the thread... */
 
-		interruptible_sleep_on_timeout (&fe->wait_queue, delay);
-		if (signal_pending(current))
+		timeout = wait_event_interruptible_timeout(fe->wait_queue,0 != dvb_frontend_is_exiting (fe), delay);
+		if (-ERESTARTSYS == timeout || 0 != dvb_frontend_is_exiting (fe)) {
+			/* got signal or quitting */
 			break;
+		}
 
 		if (down_interruptible (&fe->sem))
 			break;
 
 		if (fe->lost_sync_count == -1)
 			continue;
-
-		if (dvb_frontend_is_exiting (fe))
-			break;
 
 		dvb_frontend_internal_ioctl (&fe->frontend, FE_READ_STATUS, &s);
 
@@ -509,6 +509,8 @@ static int dvb_frontend_thread (void *data)
 
 static void dvb_frontend_stop (struct dvb_frontend_data *fe)
 {
+	unsigned long ret;
+
 	dprintk ("%s\n", __FUNCTION__);
 
 		fe->exit = 1;
@@ -526,10 +528,16 @@ static void dvb_frontend_stop (struct dvb_frontend_data *fe)
 		return;
 	}
 
+	/* wake up the frontend thread, so it notices that fe->exit == 1 */
 		wake_up_interruptible (&fe->wait_queue);
-	interruptible_sleep_on(&fe->wait_queue);
 
-	/* paranoia check */
+	/* wait until the frontend thread has exited */
+	ret = wait_event_interruptible(fe->wait_queue,0 == fe->thread_pid);
+	if (-ERESTARTSYS != ret) {
+		return;
+	}
+
+	/* paranoia check in case a signal arrived */
 	if (fe->thread_pid)
 		printk("dvb_frontend_stop: warning: thread PID %d won't exit\n",
 				fe->thread_pid);

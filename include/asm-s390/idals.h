@@ -228,7 +228,7 @@ idal_buffer_to_user(struct idal_buffer *ib, void *to, size_t count)
 		left = copy_to_user(to, ib->data[i], IDA_BLOCK_SIZE);
 		if (left)
 			return left + count - IDA_BLOCK_SIZE;
-		(addr_t) to += IDA_BLOCK_SIZE;
+		to = (void *) to + IDA_BLOCK_SIZE;
 		count -= IDA_BLOCK_SIZE;
 	}
 	return copy_to_user(to, ib->data[i], count);
@@ -248,7 +248,7 @@ idal_buffer_from_user(struct idal_buffer *ib, const void *from, size_t count)
 		left = copy_from_user(ib->data[i], from, IDA_BLOCK_SIZE);
 		if (left)
 			return left + count - IDA_BLOCK_SIZE;
-		(addr_t) from += IDA_BLOCK_SIZE;
+		from = (void *) from + IDA_BLOCK_SIZE;
 		count -= IDA_BLOCK_SIZE;
 	}
 	return copy_from_user(ib->data[i], from, count);
