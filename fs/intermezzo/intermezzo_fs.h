@@ -49,8 +49,6 @@ struct lento_vfs_context {
         struct presto_version remote_version;
 };
 
-static inline int izo_ioctl_is_invalid(struct izo_ioctl_data *data);
-
 #ifdef __KERNEL__
 # include <linux/smp.h>
 # include <linux/fsfilter.h>
@@ -335,7 +333,7 @@ int izo_psdev_get_free_channel(void);
 int presto_psdev_init(void);
 int izo_psdev_setpid(int minor);
 extern void presto_psdev_cleanup(void);
-inline int presto_lento_up(int minor);
+int presto_lento_up(int minor);
 int izo_psdev_setchannel(struct file *file, int fd);
 
 /* inode.c */
@@ -346,7 +344,7 @@ void presto_set_ops(struct inode *inode, struct  filter_fs *filter);
 void presto_frob_dop(struct dentry *de);
 char *presto_path(struct dentry *dentry, struct dentry *root,
                   char *buffer, int buflen);
-inline struct presto_dentry_data *izo_alloc_ddata(void);
+struct presto_dentry_data *izo_alloc_ddata(void);
 int presto_set_dd(struct dentry *);
 int presto_init_ddata_cache(void);
 void presto_cleanup_ddata_cache(void);
@@ -411,7 +409,7 @@ int presto_set_fsetroot(struct dentry *dentry, char *fsetname,
                        unsigned int flags);
 int presto_set_fsetroot_from_ioc(struct dentry *dentry, char *fsetname,
                                  unsigned int flags);
-inline int presto_is_read_only(struct presto_file_set *);
+int presto_is_read_only(struct presto_file_set *);
 int presto_truncate_lml(struct presto_file_set *fset);
 int lento_write_lml(char *path,
                      __u64 remote_ino,
@@ -419,13 +417,13 @@ int lento_write_lml(char *path,
                      __u32 remote_version,
                     struct presto_version *remote_file_version);
 int lento_complete_closes(char *path);
-inline int presto_f2m(struct presto_file_set *fset);
+int presto_f2m(struct presto_file_set *fset);
 int presto_prep(struct dentry *, struct presto_cache **,
                        struct presto_file_set **);
 /* cache.c */
 extern struct presto_cache *presto_cache_init(void);
-extern inline void presto_cache_add(struct presto_cache *cache);
-extern inline void presto_cache_init_hash(void);
+extern void presto_cache_add(struct presto_cache *cache);
+extern void presto_cache_init_hash(void);
 
 struct presto_cache *presto_cache_find(struct super_block *sb);
 
@@ -552,7 +550,7 @@ int lento_iopen(const char *name, ino_t ino, unsigned int generation,int flags);
 
 #define JOURNAL_PAGE_SZ  PAGE_SIZE
 
-__inline__ int presto_no_journal(struct presto_file_set *fset);
+int presto_no_journal(struct presto_file_set *fset);
 int journal_fetch(int minor);
 int presto_log(struct presto_file_set *fset, struct rec_info *rec,
                const char *buf, size_t size,
@@ -657,6 +655,8 @@ loff_t izo_rcvd_write(struct presto_file_set *, struct izo_rcvd_rec *);
 loff_t izo_rcvd_upd_remote(struct presto_file_set *fset, char * uuid,  __u64 remote_recno,
                            __u64 remote_offset);
 
+int izo_ioctl_packlen(struct izo_ioctl_data *data);
+
 /* sysctl.c */
 int init_intermezzo_sysctl(void);
 void cleanup_intermezzo_sysctl(void);
@@ -712,6 +712,54 @@ static inline char *strdup(char *str)
                 memcpy(tmp, str, strlen(str) + 1);
                
         return tmp;
+}
+
+static inline int izo_ioctl_is_invalid(struct izo_ioctl_data *data)
+{
+        if (data->ioc_len > (1<<30)) {
+                CERROR("IZO ioctl: ioc_len larger than 1<<30\n");
+                return 1;
+        }
+        if (data->ioc_inllen1 > (1<<30)) {
+                CERROR("IZO ioctl: ioc_inllen1 larger than 1<<30\n");
+                return 1;
+        }
+        if (data->ioc_inllen2 > (1<<30)) {
+                CERROR("IZO ioctl: ioc_inllen2 larger than 1<<30\n");
+                return 1;
+        }
+        if (data->ioc_inlbuf1 && !data->ioc_inllen1) {
+                CERROR("IZO ioctl: inlbuf1 pointer but 0 length\n");
+                return 1;
+        }
+        if (data->ioc_inlbuf2 && !data->ioc_inllen2) {
+                CERROR("IZO ioctl: inlbuf2 pointer but 0 length\n");
+                return 1;
+        }
+        if (data->ioc_pbuf1 && !data->ioc_plen1) {
+                CERROR("IZO ioctl: pbuf1 pointer but 0 length\n");
+                return 1;
+        }
+        if (data->ioc_pbuf2 && !data->ioc_plen2) {
+                CERROR("IZO ioctl: pbuf2 pointer but 0 length\n");
+                return 1;
+        }
+        if (izo_ioctl_packlen(data) != data->ioc_len ) {
+                CERROR("IZO ioctl: packlen exceeds ioc_len\n");
+                return 1;
+        }
+        if (data->ioc_inllen1 &&
+            data->ioc_bulk[data->ioc_inllen1 - 1] != '\0') {
+                CERROR("IZO ioctl: inlbuf1 not 0 terminated\n");
+                return 1;
+        }
+        if (data->ioc_inllen2 &&
+            data->ioc_bulk[size_round(data->ioc_inllen1) + data->ioc_inllen2
+                           - 1] != '\0') {
+                CERROR("IZO ioctl: inlbuf2 not 0 terminated\n");
+                return 1;
+        }
+        return 0;
 }
 
 /* buffer MUST be at least the size of izo_ioctl_hdr */
@@ -797,8 +845,6 @@ int kml_fsreint(struct kml_rec *rec, char *basedir);
 int kml_iocreint(__u32 size, char *ptr, __u32 offset, int dird,
                  uuid_t uuid, __u32 generate_kml);
 
-static inline int izo_ioctl_packlen(struct izo_ioctl_data *data);
-
 static inline void izo_ioctl_init(struct izo_ioctl_data *data)
 {
         memset(data, 0, sizeof(*data));
@@ -858,62 +904,6 @@ static inline char *izo_error(int err)
                 return "InterMezzo rename/rename conflict";
         }
         return "Unknown InterMezzo error";
-}
-
-static inline int izo_ioctl_packlen(struct izo_ioctl_data *data)
-{
-        int len = sizeof(struct izo_ioctl_data);
-        len += size_round(data->ioc_inllen1);
-        len += size_round(data->ioc_inllen2);
-        return len;
-}
-
-static inline int izo_ioctl_is_invalid(struct izo_ioctl_data *data)
-{
-        if (data->ioc_len > (1<<30)) {
-                CERROR("IZO ioctl: ioc_len larger than 1<<30\n");
-                return 1;
-        }
-        if (data->ioc_inllen1 > (1<<30)) {
-                CERROR("IZO ioctl: ioc_inllen1 larger than 1<<30\n");
-                return 1;
-        }
-        if (data->ioc_inllen2 > (1<<30)) {
-                CERROR("IZO ioctl: ioc_inllen2 larger than 1<<30\n");
-                return 1;
-        }
-        if (data->ioc_inlbuf1 && !data->ioc_inllen1) {
-                CERROR("IZO ioctl: inlbuf1 pointer but 0 length\n");
-                return 1;
-        }
-        if (data->ioc_inlbuf2 && !data->ioc_inllen2) {
-                CERROR("IZO ioctl: inlbuf2 pointer but 0 length\n");
-                return 1;
-        }
-        if (data->ioc_pbuf1 && !data->ioc_plen1) {
-                CERROR("IZO ioctl: pbuf1 pointer but 0 length\n");
-                return 1;
-        }
-        if (data->ioc_pbuf2 && !data->ioc_plen2) {
-                CERROR("IZO ioctl: pbuf2 pointer but 0 length\n");
-                return 1;
-        }
-        if (izo_ioctl_packlen(data) != data->ioc_len ) {
-                CERROR("IZO ioctl: packlen exceeds ioc_len\n");
-                return 1;
-        }
-        if (data->ioc_inllen1 &&
-            data->ioc_bulk[data->ioc_inllen1 - 1] != '\0') {
-                CERROR("IZO ioctl: inlbuf1 not 0 terminated\n");
-                return 1;
-        }
-        if (data->ioc_inllen2 &&
-            data->ioc_bulk[size_round(data->ioc_inllen1) + data->ioc_inllen2
-                           - 1] != '\0') {
-                CERROR("IZO ioctl: inlbuf2 not 0 terminated\n");
-                return 1;
-        }
-        return 0;
 }
 
 /* kml_unpack.c */
