@@ -216,7 +216,7 @@ EXPORT_SYMBOL(idetape);
 EXPORT_SYMBOL(idescsi);
 
 extern ide_driver_t idedefault_driver;
-static void setup_driver_defaults (ide_drive_t *drive);
+static void setup_driver_defaults(ide_driver_t *driver);
 
 /*
  * Do not even *think* about calling this!
@@ -275,7 +275,6 @@ static void init_hwif_data (unsigned int index)
 		drive->using_dma		= 0;
 		drive->is_flash			= 0;
 		drive->driver			= &idedefault_driver;
-		setup_driver_defaults(drive);
 		drive->vdma			= 0;
 		INIT_LIST_HEAD(&drive->list);
 	}
@@ -307,6 +306,8 @@ static void __init init_ide_data (void)
 	if (magic_cookie != MAGIC_COOKIE)
 		return;		/* already initialized */
 	magic_cookie = 0;
+
+	setup_driver_defaults(&idedefault_driver);
 
 	/* Initialise all interface structures */
 	for (index = 0; index < MAX_HWIFS; ++index)
@@ -2344,10 +2345,8 @@ static ide_startstop_t default_abort (ide_drive_t *drive, const char *msg)
 	return ide_abort(drive, msg);
 }
 
-static void setup_driver_defaults (ide_drive_t *drive)
+static void setup_driver_defaults (ide_driver_t *d)
 {
-	ide_driver_t *d = drive->driver;
-
 	if (d->cleanup == NULL)		d->cleanup = default_cleanup;
 	if (d->shutdown == NULL)	d->shutdown = default_shutdown;
 	if (d->flushcache == NULL)	d->flushcache = default_flushcache;
@@ -2375,7 +2374,6 @@ int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver, int versio
 		return 1;
 	}
 	drive->driver = driver;
-	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
 	spin_lock(&drives_lock);
 	list_add_tail(&drive->list, &driver->drives);
@@ -2422,7 +2420,6 @@ int ide_unregister_subdriver (ide_drive_t *drive)
 #endif
 	auto_remove_settings(drive);
 	drive->driver = &idedefault_driver;
-	setup_driver_defaults(drive);
 	spin_unlock_irqrestore(&ide_lock, flags);
 	up(&ide_setting_sem);
 	spin_lock(&drives_lock);
@@ -2446,6 +2443,8 @@ int ide_register_driver(ide_driver_t *driver)
 	struct list_head list;
 	struct list_head *list_loop;
 	struct list_head *tmp_storage;
+
+	setup_driver_defaults(driver);
 
 	spin_lock(&drivers_lock);
 	list_add(&driver->drivers, &drivers);
