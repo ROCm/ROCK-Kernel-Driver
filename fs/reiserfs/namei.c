@@ -895,7 +895,7 @@ static int reiserfs_symlink (struct inode * dir, struct dentry * dentry, const c
 	return -ENAMETOOLONG;
     }
   
-    name = kmalloc (item_len, GFP_NOFS);
+    name = reiserfs_kmalloc (item_len, GFP_NOFS, dir->i_sb);
     if (!name) {
 	iput(inode) ;
 	return -ENOMEM;
@@ -908,7 +908,7 @@ static int reiserfs_symlink (struct inode * dir, struct dentry * dentry, const c
 
     inode = reiserfs_new_inode (&th, dir, S_IFLNK | S_IRWXUGO, name, strlen (symname), dentry,
 				inode, &retval);
-    kfree (name);
+    reiserfs_kfree (name, item_len, dir->i_sb);
     if (inode == 0) { /* reiserfs_new_inode iputs for us */
 	pop_journal_writer(windex) ;
 	journal_end(&th, dir->i_sb, jbegin_count) ;

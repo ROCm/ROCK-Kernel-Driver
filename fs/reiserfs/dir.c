@@ -115,13 +115,13 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		if (d_reclen <= 32) {
 		  local_buf = small_buf ;
 		} else {
-		    local_buf = kmalloc(d_reclen, GFP_NOFS) ;
+		    local_buf = reiserfs_kmalloc(d_reclen, GFP_NOFS, inode->i_sb) ;
 		    if (!local_buf) {
 			pathrelse (&path_to_entry);
 			return -ENOMEM ;
 		    }
 		    if (item_moved (&tmp_ih, &path_to_entry)) {
-			kfree(local_buf) ;
+			reiserfs_kfree(local_buf, d_reclen, inode->i_sb) ;
 			goto research;
 		    }
 		}
@@ -133,12 +133,12 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		if (filldir (dirent, local_buf, d_reclen, d_off, d_ino, 
 		             DT_UNKNOWN) < 0) {
 		    if (local_buf != small_buf) {
-			kfree(local_buf) ;
+			reiserfs_kfree(local_buf, d_reclen, inode->i_sb) ;
 		    }
 		    goto end;
 		}
 		if (local_buf != small_buf) {
-		    kfree(local_buf) ;
+		    reiserfs_kfree(local_buf, d_reclen, inode->i_sb) ;
 		}
 
 		// next entry should be looked for with such offset

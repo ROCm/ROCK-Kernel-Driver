@@ -1927,8 +1927,14 @@ void wait_buffer_until_released (const struct buffer_head * bh);
 struct buffer_head * reiserfs_bread (struct super_block *super, int n_block);
 
 /* fix_nodes.c */
+#ifdef CONFIG_REISERFS_CHECK
 void * reiserfs_kmalloc (size_t size, int flags, struct super_block * s);
 void reiserfs_kfree (const void * vp, size_t size, struct super_block * s);
+#else
+#define reiserfs_kmalloc(x, y, z) kmalloc(x, y)
+#define reiserfs_kfree(x, y, z) kfree(x)
+#endif
+
 int fix_nodes (int n_op_mode, struct tree_balance * p_s_tb, 
 	       struct item_head * p_s_ins_ih, const void *);
 void unfix_nodes (struct tree_balance *);

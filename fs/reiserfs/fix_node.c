@@ -1979,7 +1979,7 @@ static int  get_neighbors(
     return CARRY_ON;
 }
 
-
+#ifdef CONFIG_REISERFS_CHECK
 void * reiserfs_kmalloc (size_t size, int flags, struct super_block * s)
 {
     void * vp;
@@ -2007,6 +2007,7 @@ void reiserfs_kfree (const void * vp, size_t size, struct super_block * s)
 	reiserfs_warning ("vs-8302: reiserfs_kfree: allocated memory %d\n", s->u.reiserfs_sb.s_kmallocs);
 
 }
+#endif
 
 
 static int get_virtual_node_size (struct super_block * sb, struct buffer_head * bh)
