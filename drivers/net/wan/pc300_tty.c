@@ -119,7 +119,6 @@ static struct tty_driver serial_drv;
 st_cpc_tty_area	cpc_tty_area[CPC_TTY_NPORTS];
 
 int cpc_tty_cnt=0;	/* number of intrfaces configured with MLPPP */
-int cpc_tty_refcount;
 int cpc_tty_unreg_flag = 0;
 
 /* TTY functions prototype */
@@ -227,7 +226,6 @@ void cpc_tty_init(pc300dev_t *pc300dev)
 		serial_drv.init_termios = tty_std_termios;
 		serial_drv.init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
 		serial_drv.flags = TTY_DRIVER_REAL_RAW;
-		serial_drv.refcount = &cpc_tty_refcount;
 
 		/* tty data structures */
 		serial_drv.table = cpc_tty_serial_table;
@@ -415,7 +413,7 @@ static void cpc_tty_close(struct tty_struct *tty, struct file *flip)
 
 	CPC_TTY_DBG("%s: TTY closed\n",cpc_tty->name);
 	
-	if (!cpc_tty_refcount && cpc_tty_unreg_flag) {
+	if (!serial_drv.refcount && cpc_tty_unreg_flag) {
 		cpc_tty_unreg_flag = 0;
 		CPC_TTY_DBG("%s: unregister the tty driver\n", cpc_tty->name);
 		if ((res=tty_unregister_driver(&serial_drv))) { 
@@ -663,7 +661,7 @@ static void cpc_tty_hangup(struct tty_struct *tty)
 		CPC_TTY_DBG("%s: TTY is not opened\n",cpc_tty->name);
 		return ;
 	}
-	if (!cpc_tty_refcount && cpc_tty_unreg_flag) {
+	if (!serial_drv.refcount && cpc_tty_unreg_flag) {
 		cpc_tty_unreg_flag = 0;
 		CPC_TTY_DBG("%s: unregister the tty driver\n", cpc_tty->name);
 		if ((res=tty_unregister_driver(&serial_drv))) { 
@@ -1058,9 +1056,9 @@ void cpc_tty_unregister_service(pc300dev_t *pc300dev)
 	}
 
 	if (--cpc_tty_cnt == 0) { 
-		if (cpc_tty_refcount) {
+		if (serial_drv.refcount) {
 			CPC_TTY_DBG("%s: unregister is not possible, refcount=%d",
-							cpc_tty->name, cpc_tty_refcount);
+							cpc_tty->name, serial_drv.refcount);
 			cpc_tty_cnt++;
 			cpc_tty_unreg_flag = 1;
 			return;

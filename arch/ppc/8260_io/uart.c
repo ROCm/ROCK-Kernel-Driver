@@ -75,7 +75,6 @@ static char *serial_name = "CPM UART driver";
 static char *serial_version = "0.02";
 
 static struct tty_driver serial_driver;
-static int serial_refcount;
 static int serial_console_setup(struct console *co, char *options);
 
 /*
@@ -2478,7 +2477,6 @@ int __init rs_8xx_init(void)
 	serial_driver.init_termios.c_cflag =
 		baud_idx | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
 	serial_driver.table = serial_table;
 	serial_driver.termios = serial_termios;
 	serial_driver.termios_locked = serial_termios_locked;

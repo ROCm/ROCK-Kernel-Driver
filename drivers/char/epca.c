@@ -82,7 +82,7 @@
 /* ----------------- Begin global definitions ------------------- */
 
 static char mesg[100];
-static int pc_refcount, nbdevs, num_cards, liloconfig;
+static int nbdevs, num_cards, liloconfig;
 static int digi_poller_inhibited = 1 ;
 
 static int setup_error_code;
@@ -1663,7 +1663,6 @@ int __init pc_init(void)
 	pc_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
 	pc_driver.init_termios.c_lflag = 0;
 	pc_driver.flags = TTY_DRIVER_REAL_RAW;
-	pc_driver.refcount = &pc_refcount;
 	pc_driver.table = pc_table;
 	
 	/* pc_termios is an array of pointers pointing at termios structs */

@@ -84,7 +84,6 @@ extern wait_queue_head_t keypress_wait;
 #endif
 
 struct tty_driver serial_driver;
-static int serial_refcount;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
@@ -1460,7 +1459,6 @@ rs68328_init(void)
 	serial_driver.init_termios.c_cflag = 
 			m68328_console_cbaud | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
 	serial_driver.table = serial_table;
 	serial_driver.termios = serial_termios;
 	serial_driver.termios_locked = serial_termios_locked;

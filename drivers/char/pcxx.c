@@ -144,7 +144,6 @@ int pcxx_nbios=sizeof(pcxx_bios);
 #define PCXE_EVENT_HANGUP   1
 
 struct tty_driver pcxe_driver;
-static int pcxe_refcount;
 
 static struct timer_list pcxx_timer;
 
@@ -1193,7 +1192,6 @@ int __init pcxe_init(void)
 	pcxe_driver.init_termios = tty_std_termios;
 	pcxe_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL;
 	pcxe_driver.flags = TTY_DRIVER_REAL_RAW;
-	pcxe_driver.refcount = &pcxe_refcount;
 
 	pcxe_driver.table = pcxe_table;
 	pcxe_driver.termios = pcxe_termios;

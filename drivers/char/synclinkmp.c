@@ -522,7 +522,6 @@ static struct pci_driver synclinkmp_pci_driver = {
 
 
 static struct tty_driver serial_driver;
-static int serial_refcount;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
@@ -3807,7 +3806,6 @@ static int __init synclinkmp_init(void)
 	serial_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
 	serial_driver.table = serial_table;
 	serial_driver.termios = serial_termios;
 	serial_driver.termios_locked = serial_termios_locked;

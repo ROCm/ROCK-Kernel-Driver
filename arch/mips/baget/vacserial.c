@@ -29,7 +29,7 @@
   
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
 #define DBG_CNT(s) baget_printk("(%s):[%x] refc=%d, serc=%d, ttyc=%d-> %s\n", \
-  tty->name,(info->flags),serial_refcount,info->count,tty->count,s)
+  tty->name,(info->flags),serial_driver.refcount,info->count,tty->count,s)
 #else
 #define DBG_CNT(s)
 #endif
@@ -96,7 +96,6 @@ static char *serial_version = "4.26";
 static DECLARE_TASK_QUEUE(tq_serial);
 
 static struct tty_driver serial_driver;
-static int serial_refcount;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
@@ -2333,7 +2332,6 @@ int __init rs_init(void)
 	serial_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
 	serial_driver.table = serial_table;
 	serial_driver.termios = serial_termios;
 	serial_driver.termios_locked = serial_termios_locked;

@@ -172,8 +172,6 @@ static struct tty_struct *serial_table[DZ_NB_PORT];
 static struct termios *serial_termios[DZ_NB_PORT];
 static struct termios *serial_termios_locked[DZ_NB_PORT];
 
-static int serial_refcount;
-
 /*
  * tmp_buf is used as a temporary buffer by serial_write.  We need to
  * lock it in case the copy_from_user blocks while swapping in a page,

@@ -181,7 +181,6 @@ static unsigned char zs_init_regs[16] __initdata = {
 DECLARE_TASK_QUEUE(tq_zs_serial);
 
 struct tty_driver serial_driver;
-static int serial_refcount;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
@@ -1852,7 +1851,6 @@ int __init zs_init(void)
 	serial_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	serial_driver.refcount = &serial_refcount;
 	serial_driver.table = serial_table;
 	serial_driver.termios = serial_termios;
 	serial_driver.termios_locked = serial_termios_locked;

@@ -174,7 +174,6 @@ static struct tty_struct *rocket_table[MAX_RP_PORTS];	/*  TTY required variables
 static struct termios *rocket_termios[MAX_RP_PORTS];
 static struct termios *rocket_termios_locked[MAX_RP_PORTS];
 static struct tty_driver rocket_driver;
-static int rocket_refcount;
 
 static struct rocket_version driver_version = {	
 	ROCKET_VERSION, ROCKET_DATE
@@ -2661,7 +2660,6 @@ int __init rp_init(void)
 #ifdef ROCKET_SOFT_FLOW
 	rocket_driver.flags |= TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
 #endif
-	rocket_driver.refcount = &rocket_refcount;
 	rocket_driver.table = rocket_table;
 	rocket_driver.termios = rocket_termios;
 	rocket_driver.termios_locked = rocket_termios_locked;

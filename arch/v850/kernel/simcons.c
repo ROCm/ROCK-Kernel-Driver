@@ -58,7 +58,6 @@ static struct tty_struct *tty_table[1] = { 0 };
 static struct termios *tty_termios[1] = { 0 };
 static struct termios *tty_termios_locked[1] = { 0 };
 static struct tty_driver tty_driver = { 0 };
-static int tty_refcount = 0;
 
 int simcons_tty_open (struct tty_struct *tty, struct file *filp)
 {
@@ -90,8 +89,6 @@ int __init simcons_tty_init (void)
 	tty_driver.minor_start = 64;
 	tty_driver.num = 1;
 	tty_driver.type = TTY_DRIVER_TYPE_SYSCONS;
-
-	tty_driver.refcount = &tty_refcount;
 
 	tty_driver.table = tty_table;
 	tty_driver.termios = tty_termios;

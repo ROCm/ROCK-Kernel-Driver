@@ -38,8 +38,6 @@
 
 static struct tty_driver console_driver;
 
-static int console_refcount = 0;
-
 static struct chan_ops init_console_ops = {
 	.type		= "you shouldn't see this",
 	.init  		= NULL,
@@ -191,7 +189,6 @@ static void console_write(struct console *console, const char *string,
 }
 
 static struct tty_driver console_driver = {
-	.refcount 		= &console_refcount,
 	.open 	 		= con_open,
 	.close 	 		= con_close,
 	.write 	 		= con_write,

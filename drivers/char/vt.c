@@ -2473,8 +2473,6 @@ static void vc_init(unsigned int currcons, unsigned int rows, unsigned int cols,
  * the appropriate escape-sequence.
  */
 
-static int console_refcount;
-
 static int __init con_init(void)
 {
 	const char *display_desc = NULL;
@@ -2541,7 +2539,6 @@ int __init vty_init(void)
 	console_driver.type = TTY_DRIVER_TYPE_CONSOLE;
 	console_driver.init_termios = tty_std_termios;
 	console_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
-	console_driver.refcount = &console_refcount;
 	console_driver.table = console_table;
 	console_driver.termios = console_termios;
 	console_driver.termios_locked = console_termios_locked;

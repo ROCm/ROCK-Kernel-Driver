@@ -336,7 +336,6 @@ static char *serial_version = "$Revision: 1.3 $";
 static DECLARE_TASK_QUEUE(tq_serial);
 
 struct tty_driver serial_driver;
-static int serial_refcount;
 
 /* serial subtype definitions */
 #ifndef SERIAL_TYPE_NORMAL
@@ -3470,7 +3469,6 @@ rs_init(void)
 	serial_driver.init_termios.c_cflag =
 		B115200 | CS8 | CREAD | HUPCL | CLOCAL; /* is normally B9600 default... */
 	serial_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	serial_driver.refcount = &serial_refcount;
 	serial_driver.table = serial_table;
 	serial_driver.termios = serial_termios;
 	serial_driver.termios_locked = serial_termios_locked;

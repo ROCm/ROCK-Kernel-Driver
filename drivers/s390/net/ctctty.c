@@ -71,7 +71,6 @@ typedef struct {
 
 /* Description of one CTC-tty */
 typedef struct {
-  int                refcount;			   /* Number of opens        */
   struct tty_driver  ctc_tty_device;		   /* tty-device             */
   struct tty_struct  *modem_table[CTC_TTY_MAX_DEVICES];
   struct termios     *modem_termios[CTC_TTY_MAX_DEVICES];
@@ -1172,7 +1171,6 @@ ctc_tty_init(void)
 	device->init_termios = tty_std_termios;
 	device->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	device->flags = TTY_DRIVER_REAL_RAW;
-	device->refcount = &driver->refcount;
 	device->table = driver->modem_table;
 	device->termios = driver->modem_termios;
 	device->termios_locked = driver->modem_termios_locked;

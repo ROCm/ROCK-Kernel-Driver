@@ -316,7 +316,6 @@ static struct termios ** sx_termios_locked;
 
 static struct sx_board boards[SX_NBOARDS];
 static struct sx_port *sx_ports;
-static int sx_refcount;
 static int sx_initialized;
 static int sx_nports;
 static int sx_debug;
@@ -2240,7 +2239,6 @@ static int sx_init_drivers(void)
 	sx_driver.init_termios.c_cflag =
 	  B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	sx_driver.flags = TTY_DRIVER_REAL_RAW;
-	sx_driver.refcount = &sx_refcount;
 	sx_driver.table = sx_table;
 	sx_driver.termios = sx_termios;
 	sx_driver.termios_locked = sx_termios_locked;

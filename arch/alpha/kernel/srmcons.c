@@ -30,7 +30,6 @@ static int srm_is_registered_console = 0;
  */
 #define MAX_SRM_CONSOLE_DEVICES 1	/* only support 1 console device */
 
-static int srmcons_refcount;
 static struct tty_struct *srmcons_table[MAX_SRM_CONSOLE_DEVICES];
 static struct termios *srmcons_termios[MAX_SRM_CONSOLE_DEVICES];
 static struct termios *srmcons_termios_locked[MAX_SRM_CONSOLE_DEVICES];
@@ -282,7 +281,6 @@ static struct tty_driver srmcons_driver = {
 	.table		= srmcons_table,
 	.termios	= srmcons_termios,
 	.termios_locked	= srmcons_termios_locked,
-	.refcount	= &srmcons_refcount,
 
 	.open		= srmcons_open,
 	.close		= srmcons_close,

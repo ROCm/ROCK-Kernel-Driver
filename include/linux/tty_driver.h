@@ -134,7 +134,7 @@ struct tty_driver {
 	short	subtype;	/* subtype of tty driver */
 	struct termios init_termios; /* Initial termios */
 	int	flags;		/* tty driver flags */
-	int	*refcount;	/* for loadable tty drivers */
+	int	refcount;	/* for loadable tty drivers */
 	struct proc_dir_entry *proc_entry; /* /proc fs entry */
 	struct tty_driver *other; /* only used for the PTY driver */
 

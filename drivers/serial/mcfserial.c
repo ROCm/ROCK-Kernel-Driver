@@ -77,7 +77,6 @@ int mcfrs_console_cbaud = DEFAULT_CBAUD;
  *	Driver data structures.
  */
 struct tty_driver	mcfrs_serial_driver;
-static int		mcfrs_serial_refcount;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
@@ -1596,7 +1595,6 @@ mcfrs_init(void)
 	mcfrs_serial_driver.init_termios.c_cflag =
 		mcfrs_console_cbaud | CS8 | CREAD | HUPCL | CLOCAL;
 	mcfrs_serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	mcfrs_serial_driver.refcount = &mcfrs_serial_refcount;
 	mcfrs_serial_driver.table = mcfrs_serial_table;
 	mcfrs_serial_driver.termios = mcfrs_serial_termios;
 	mcfrs_serial_driver.termios_locked = mcfrs_serial_termios_locked;

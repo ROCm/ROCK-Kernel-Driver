@@ -127,7 +127,6 @@ static char *serial_name = "Serial driver";
 static DECLARE_TASK_QUEUE(tq_serial);
 
 static struct tty_driver serial_driver;
-static int serial_refcount;
 
 static struct timer_list serial_timer;
 
@@ -193,8 +192,8 @@ static struct termios *serial_termios_locked[NR_PORTS];
 
 
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
-#define DBG_CNT(s) printk("(%s): [%x] refc=%d, serc=%d, ttyc=%d -> %s\n", \
- tty->name, (info->flags), serial_refcount,info->count,tty->count,s)
+#define DBG_CNT(s) printk("(%s): [%x], refc=%d, serc=%d, ttyc=%d -> %s\n", \
+ tty->name, (info->flags), serial_driver.refcount, info->count,tty->count,s)
 #else
 #define DBG_CNT(s)
 #endif
@@ -2560,7 +2559,6 @@ static int __init rs_init(void)
 	serial_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	serial_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	serial_driver.refcount = &serial_refcount;
 	serial_driver.table = serial_table;
 	serial_driver.termios = serial_termios;
 	serial_driver.termios_locked = serial_termios_locked;

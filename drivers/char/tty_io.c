@@ -896,7 +896,7 @@ static int init_dev(struct tty_driver *driver, int idx,
 			*o_ltp_loc = o_ltp;
 		o_tty->termios = *o_tp_loc;
 		o_tty->termios_locked = *o_ltp_loc;
-		(*driver->other->refcount)++;
+		driver->other->refcount++;
 		if (driver->subtype == PTY_TYPE_MASTER)
 			o_tty->count++;
 
@@ -918,7 +918,7 @@ static int init_dev(struct tty_driver *driver, int idx,
 		*ltp_loc = ltp;
 	tty->termios = *tp_loc;
 	tty->termios_locked = *ltp_loc;
-	(*driver->refcount)++;
+	driver->refcount++;
 	tty->count++;
 
 	/* 
@@ -1017,7 +1017,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 			kfree(tp);
 		}
 		o_tty->magic = 0;
-		(*o_tty->driver->refcount)--;
+		o_tty->driver->refcount--;
 		file_list_lock();
 		list_del(&o_tty->tty_files);
 		file_list_unlock();
@@ -1031,7 +1031,7 @@ static void release_mem(struct tty_struct *tty, int idx)
 		kfree(tp);
 	}
 	tty->magic = 0;
-	(*tty->driver->refcount)--;
+	tty->driver->refcount--;
 	file_list_lock();
 	list_del(&tty->tty_files);
 	file_list_unlock();
@@ -2275,7 +2275,7 @@ int tty_unregister_driver(struct tty_driver *driver)
 	int i;
 	struct termios *tp;
 
-	if (*driver->refcount)
+	if (driver->refcount)
 		return -EBUSY;
 
 	cdev_unmap(MKDEV(driver->major, driver->minor_start), driver->num);

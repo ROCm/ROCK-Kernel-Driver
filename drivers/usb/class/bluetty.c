@@ -241,7 +241,6 @@ static struct usb_driver usb_bluetooth_driver = {
 	.id_table =	usb_bluetooth_ids,
 };
 
-static int			bluetooth_refcount;
 static struct tty_driver	bluetooth_tty_driver;
 static struct tty_struct *	bluetooth_tty[BLUETOOTH_TTY_MINORS];
 static struct termios *		bluetooth_termios[BLUETOOTH_TTY_MINORS];
@@ -1307,7 +1306,6 @@ static struct tty_driver bluetooth_tty_driver = {
 	.subtype =		SERIAL_TYPE_NORMAL,
 	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
 
-	.refcount =		&bluetooth_refcount,
 	.table =		bluetooth_tty,
 	.termios =		bluetooth_termios,
 	.termios_locked =	bluetooth_termios_locked,

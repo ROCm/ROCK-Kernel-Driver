@@ -39,7 +39,6 @@ struct pty_struct {
 #define PTY_MAGIC 0x5001
 
 static struct tty_driver pty_driver, pty_slave_driver;
-static int pty_refcount;
 
 /* Note: one set of tables for BSD and one for Unix98 */
 static struct tty_struct *pty_table[NR_PTYS];
@@ -360,7 +359,6 @@ int __init pty_init(void)
 	pty_driver.init_termios.c_cflag = B38400 | CS8 | CREAD;
 	pty_driver.init_termios.c_lflag = 0;
 	pty_driver.flags = TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_REAL_RAW;
-	pty_driver.refcount = &pty_refcount;
 	pty_driver.table = pty_table;
 	pty_driver.termios = pty_termios;
 	pty_driver.termios_locked = pty_termios_locked;

@@ -2084,17 +2084,14 @@ int uart_register_driver(struct uart_driver *drv)
 
 	/*
 	 * Maybe we should be using a slab cache for this, especially if
-	 * we have a large number of ports to handle.  Note that we also
-	 * allocate space for an integer for reference counting.
+	 * we have a large number of ports to handle.
 	 */
-	drv->state = kmalloc(sizeof(struct uart_state) * drv->nr +
-			     sizeof(int), GFP_KERNEL);
+	drv->state = kmalloc(sizeof(struct uart_state) * drv->nr, GFP_KERNEL);
 	retval = -ENOMEM;
 	if (!drv->state)
 		goto out;
 
-	memset(drv->state, 0, sizeof(struct uart_state) * drv->nr +
-			sizeof(int));
+	memset(drv->state, 0, sizeof(struct uart_state) * drv->nr);
 
 	termios = kmalloc(sizeof(struct termios *) * drv->nr * 2 +
 			  sizeof(struct tty_struct *) * drv->nr, GFP_KERNEL);
@@ -2125,7 +2122,6 @@ int uart_register_driver(struct uart_driver *drv)
 	normal->init_termios	= tty_std_termios;
 	normal->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	normal->flags		= TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	normal->refcount	= (int *)(drv->state + drv->nr);
 	normal->termios		= termios;
 	normal->termios_locked	= termios + drv->nr;
 	normal->table		= (struct tty_struct **)(termios + drv->nr * 2);

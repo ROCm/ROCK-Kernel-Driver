@@ -110,7 +110,6 @@ static char serial_version[] __initdata = "2.2";
 static DECLARE_TASK_QUEUE(tq_esp);
 
 static struct tty_driver esp_driver;
-static int serial_refcount;
 
 /* serial subtype definitions */
 #define SERIAL_TYPE_NORMAL	1
@@ -134,7 +133,7 @@ static int serial_refcount;
   
 #if defined(MODULE) && defined(SERIAL_DEBUG_MCOUNT)
 #define DBG_CNT(s) printk("(%s): [%x] refc=%d, serc=%d, ttyc=%d -> %s\n", \
- tty->name, (info->flags), serial_refcount,info->count,tty->count,s)
+ tty->name, (info->flags), serial_driver.refcount,info->count,tty->count,s)
 #else
 #define DBG_CNT(s)
 #endif
@@ -2519,7 +2518,6 @@ int __init espserial_init(void)
 	esp_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	esp_driver.flags = TTY_DRIVER_REAL_RAW;
-	esp_driver.refcount = &serial_refcount;
 	esp_driver.table = serial_table;
 	esp_driver.termios = serial_termios;
 	esp_driver.termios_locked = serial_termios_locked;

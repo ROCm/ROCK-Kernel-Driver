@@ -49,7 +49,6 @@ static int tty3270_show_tube(int, char *, int);
 
 static int tty3270_major = -1;
 struct tty_driver tty3270_driver;
-static int tty3270_refcount;
 static struct tty_struct *tty3270_table[TUBMAXMINS];
 static struct termios *tty3270_termios[TUBMAXMINS];
 static struct termios *tty3270_termios_locked[TUBMAXMINS];
@@ -57,7 +56,6 @@ static struct termios *tty3270_termios_locked[TUBMAXMINS];
 static int con3270_major = -1;
 static struct tty_driver con3270_driver;
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-static int con3270_refcount;
 static struct tty_struct *con3270_table[1];
 static struct termios *con3270_termios[1];
 static struct termios *con3270_termios_locked[1];
@@ -91,7 +89,6 @@ tty3270_init(void)
 	td->init_termios = tty_std_termios;
 	td->flags = TTY_DRIVER_RESET_TERMIOS;
 	td->flags |= TTY_DRIVER_NO_DEVFS;
-	td->refcount = &tty3270_refcount;
 	td->table = tty3270_table;
 	td->termios = tty3270_termios;
 	td->termios_locked = tty3270_termios_locked;
@@ -137,7 +134,6 @@ tty3270_init(void)
 		td->major = MAJOR(S390_CONSOLE_DEV);
 		td->minor_start = MINOR(S390_CONSOLE_DEV);
 		td->num = 1;
-		td->refcount = &con3270_refcount;
 		td->table = con3270_table;
 		td->termios = con3270_termios;
 		td->termios_locked = con3270_termios_locked;

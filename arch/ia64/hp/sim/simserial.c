@@ -104,7 +104,6 @@ static struct serial_uart_config uart_config[] = {
 };
 
 struct tty_driver hp_simserial_driver;
-static int serial_refcount;
 
 static struct async_struct *IRQ_ports[NR_IRQS];
 static struct tty_struct *serial_table[NR_PORTS];
@@ -1035,7 +1034,6 @@ simrs_init (void)
 	hp_simserial_driver.init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	hp_simserial_driver.flags = TTY_DRIVER_REAL_RAW;
-	hp_simserial_driver.refcount = &serial_refcount;
 	hp_simserial_driver.table = serial_table;
 	hp_simserial_driver.termios = serial_termios;
 	hp_simserial_driver.termios_locked = serial_termios_locked;

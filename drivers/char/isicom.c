@@ -73,7 +73,6 @@ static struct pci_device_id isicom_pci_tbl[] = {
 };
 MODULE_DEVICE_TABLE(pci, isicom_pci_tbl);
 
-static int isicom_refcount;
 static int prev_card = 3;	/*	start servicing isi_card[0]	*/
 static struct isi_board * irq_to_board[16];
 static struct tty_driver isicom_normal;
@@ -1676,7 +1675,6 @@ static int register_drivers(void)
 	isicom_normal.init_termios.c_cflag	= 
 				B9600 | CS8 | CREAD | HUPCL |CLOCAL;
 	isicom_normal.flags	= TTY_DRIVER_REAL_RAW;
-	isicom_normal.refcount	= &isicom_refcount;
 	
 	isicom_normal.table	= isicom_table;
 	isicom_normal.termios	= isicom_termios;

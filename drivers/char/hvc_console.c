@@ -42,7 +42,6 @@ extern int hvc_put_chars(int index, const char *buf, int count);
 #define TIMEOUT		((HZ + 99) / 100)
 
 struct tty_driver hvc_driver;
-static int hvc_refcount;
 static struct tty_struct *hvc_table[MAX_NR_HVC_CONSOLES];
 static struct termios *hvc_termios[MAX_NR_HVC_CONSOLES];
 static struct termios *hvc_termios_locked[MAX_NR_HVC_CONSOLES];
@@ -268,7 +267,6 @@ int __init hvc_init(void)
 	hvc_driver.type = TTY_DRIVER_TYPE_SYSTEM;
 	hvc_driver.init_termios = tty_std_termios;
 	hvc_driver.flags = TTY_DRIVER_REAL_RAW;
-	hvc_driver.refcount = &hvc_refcount;
 	hvc_driver.table = hvc_table;
 	hvc_driver.termios = hvc_termios;
 	hvc_driver.termios_locked = hvc_termios_locked;

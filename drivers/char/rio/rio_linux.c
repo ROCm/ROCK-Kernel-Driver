@@ -214,7 +214,6 @@ struct rio_info *p;
 /* struct rio_board boards[RIO_HOSTS]; */
 struct rio_port *rio_ports;
 
-int rio_refcount;
 int rio_initialized;
 int rio_nports;
 int rio_debug;
@@ -886,7 +885,6 @@ static int rio_init_drivers(void)
   rio_driver.init_termios.c_cflag =
     B9600 | CS8 | CREAD | HUPCL | CLOCAL;
   rio_driver.flags = TTY_DRIVER_REAL_RAW;
-  rio_driver.refcount = &rio_refcount;
   rio_driver.table = rio_table;
   rio_driver.termios = rio_termios;
   rio_driver.termios_locked = rio_termios_locked;

@@ -713,7 +713,6 @@ cy_get_user(unsigned long *addr)
 #define	JIFFIES_DIFF(n, j)	((j) - (n))
 
 static struct tty_driver cy_serial_driver;
-static int serial_refcount;
 
 #ifdef CONFIG_ISA
 /* This is the address lookup table. The driver will probe for
@@ -5456,7 +5455,6 @@ cy_init(void)
     cy_serial_driver.init_termios.c_cflag =
             B9600 | CS8 | CREAD | HUPCL | CLOCAL;
     cy_serial_driver.flags = TTY_DRIVER_REAL_RAW;
-    cy_serial_driver.refcount = &serial_refcount;
     cy_serial_driver.table = serial_table;
     cy_serial_driver.termios = serial_termios;
     cy_serial_driver.termios_locked = serial_termios_locked;

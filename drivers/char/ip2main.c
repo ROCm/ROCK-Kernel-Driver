@@ -297,8 +297,6 @@ static unsigned short find_eisa_board(int);
 
 static struct tty_driver ip2_tty_driver;
 
-static int ref_count;
-
 /* Here, then is a table of board pointers which the interrupt routine should
  * scan through to determine who it must service.
  */
@@ -354,7 +352,7 @@ static int tracewrap;
 
 #if defined(MODULE) && defined(IP2DEBUG_OPEN)
 #define DBG_CNT(s) printk(KERN_DEBUG "(%s): [%x] refc=%d, ttyc=%d, modc=%x -> %s\n", \
-		    tty->name,(pCh->flags),ref_count, \
+		    tty->name,(pCh->flags),ip2_tty_driver.refcount, \
 		    tty->count,/*GET_USE_COUNT(module)*/0,s)
 #else
 #define DBG_CNT(s)
@@ -788,7 +786,6 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 	ip2_tty_driver.init_termios         = tty_std_termios;
 	ip2_tty_driver.init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
 	ip2_tty_driver.flags                = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	ip2_tty_driver.refcount             = &ref_count;
 	ip2_tty_driver.table                = TtyTable;
 	ip2_tty_driver.termios              = Termios;
 	ip2_tty_driver.termios_locked       = TermiosLocked;
@@ -3039,7 +3036,7 @@ ip2_ipl_ioctl ( struct inode *pInode, struct file *pFile, UINT cmd, ULONG arg )
 	case 13:
 		switch ( cmd ) {
 		case 64:	/* Driver - ip2stat */
-			PUT_USER(rc, ref_count, pIndex++ );
+			PUT_USER(rc, ip2_tty_driver.refcount, pIndex++ );
 			PUT_USER(rc, irq_counter, pIndex++  );
 			PUT_USER(rc, bh_counter, pIndex++  );
 			break;

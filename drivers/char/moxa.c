@@ -211,7 +211,6 @@ static struct tty_struct *moxaTable[MAX_PORTS + 1];
 static struct termios *moxaTermios[MAX_PORTS + 1];
 static struct termios *moxaTermiosLocked[MAX_PORTS + 1];
 static struct moxa_str moxaChannels[MAX_PORTS];
-static int moxaRefcount;
 static unsigned char *moxaXmitBuff;
 static int moxaTimer_on;
 static struct timer_list moxaTimer;
@@ -344,7 +343,6 @@ int moxa_init(void)
 	moxaDriver.init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
 	moxaDriver.init_termios.c_lflag = 0;
 	moxaDriver.flags = TTY_DRIVER_REAL_RAW;
-	moxaDriver.refcount = &moxaRefcount;
 	moxaDriver.table = moxaTable;
 	moxaDriver.termios = moxaTermios;
 	moxaDriver.termios_locked = moxaTermiosLocked;

@@ -285,7 +285,6 @@ static void wanpipe_tty_receive(sdla_t *, unsigned, unsigned int);
 static void wanpipe_tty_trigger_poll(sdla_t *card);
 
 static struct tty_driver serial_driver;
-static int serial_refcount=1;
 static int tty_init_cnt=0;
 
 static struct serial_state rs_table[NR_PORTS];
@@ -1057,7 +1056,7 @@ static void disable_comm (sdla_t *card)
 		struct serial_state * state;
 		if (!(--tty_init_cnt)){
 			int e1;
-			*serial_driver.refcount=0;
+			serial_driver.refcount=0;
 			
 			if ((e1 = tty_unregister_driver(&serial_driver)))
 				printk("SERIAL: failed to unregister serial driver (%d)\n",
@@ -4415,7 +4414,7 @@ int wanpipe_tty_init(sdla_t *card)
 			B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 		serial_driver.flags = TTY_DRIVER_REAL_RAW;
 		
-		serial_driver.refcount = &serial_refcount;
+		serial_driver.refcount = 1;	/* !@!@^#^&!! */
 		serial_driver.table = serial_table;
 		serial_driver.termios = serial_termios;
 		serial_driver.termios_locked = serial_termios_locked;

@@ -28,7 +28,6 @@ static int ssl_version = 1;
 /* Referenced only by tty_driver below - presumably it's locked correctly
  * by the tty driver.
  */
-static int ssl_refcount = 0;
 
 static struct tty_driver ssl_driver;
 
@@ -191,7 +190,6 @@ void ssl_hangup(struct tty_struct *tty)
 }
 
 static struct tty_driver ssl_driver = {
-	.refcount 		= &ssl_refcount,
 	.open 	 		= ssl_open,
 	.close 	 		= ssl_close,
 	.write 	 		= ssl_write,

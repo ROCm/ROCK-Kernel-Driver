@@ -174,7 +174,6 @@ static struct tty_driver	stli_serial;
 static struct tty_struct	*stli_ttys[STL_MAXDEVS];
 static struct termios		*stli_termios[STL_MAXDEVS];
 static struct termios		*stli_termioslocked[STL_MAXDEVS];
-static int			stli_refcount;
 
 /*
  *	We will need to allocate a temporary write buffer for chars that
@@ -5301,7 +5300,6 @@ int __init stli_init(void)
 	stli_serial.subtype = SERIAL_TYPE_NORMAL;
 	stli_serial.init_termios = stli_deftermios;
 	stli_serial.flags = TTY_DRIVER_REAL_RAW;
-	stli_serial.refcount = &stli_refcount;
 	stli_serial.table = stli_ttys;
 	stli_serial.termios = stli_termios;
 	stli_serial.termios_locked = stli_termioslocked;

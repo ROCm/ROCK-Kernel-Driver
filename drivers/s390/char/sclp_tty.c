@@ -61,7 +61,6 @@ struct tty_driver sclp_tty_driver;
 static struct tty_struct * sclp_tty_table[1];
 static struct termios * sclp_tty_termios[1];
 static struct termios * sclp_tty_termios_locked[1];
-static int sclp_tty_refcount = 0;
 
 extern struct termios  tty_std_termios;
 
@@ -774,7 +773,6 @@ sclp_tty_init(void)
 	sclp_tty_driver.init_termios.c_oflag = ONLCR | XTABS;
 	sclp_tty_driver.init_termios.c_lflag = ISIG | ECHO;
 	sclp_tty_driver.flags = TTY_DRIVER_REAL_RAW;
-	sclp_tty_driver.refcount = &sclp_tty_refcount;
 	/* sclp_tty_driver.proc_entry ?	 */
 	sclp_tty_driver.table = sclp_tty_table;
 	sclp_tty_driver.termios = sclp_tty_termios;

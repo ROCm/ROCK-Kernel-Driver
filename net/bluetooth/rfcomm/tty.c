@@ -852,8 +852,6 @@ static int rfcomm_tty_read_proc(char *buf, char **start, off_t offset, int len, 
 }
 
 /* ---- TTY structure ---- */
-static int    rfcomm_tty_refcount;       /* If we manage several devices */
-
 static struct tty_struct *rfcomm_tty_table[RFCOMM_TTY_PORTS];
 static struct termios *rfcomm_tty_termios[RFCOMM_TTY_PORTS];
 static struct termios *rfcomm_tty_termios_locked[RFCOMM_TTY_PORTS];
@@ -872,7 +870,6 @@ static struct tty_driver rfcomm_tty_driver = {
 	.subtype		= SERIAL_TYPE_NORMAL,
 	.flags			= TTY_DRIVER_REAL_RAW,
 
-	.refcount		= &rfcomm_tty_refcount,
 	.table			= rfcomm_tty_table,
 	.termios		= rfcomm_tty_termios,
 	.termios_locked		= rfcomm_tty_termios_locked,

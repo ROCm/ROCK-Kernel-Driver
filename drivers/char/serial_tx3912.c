@@ -64,7 +64,6 @@ static struct tty_struct * rs_table[TX3912_UART_NPORTS] = { NULL, };
 static struct termios ** rs_termios;
 static struct termios ** rs_termios_locked;
 struct rs_port *rs_ports;
-int rs_refcount;
 int rs_initialized = 0;
 
 /*
@@ -810,7 +809,6 @@ static int rs_init_drivers(void)
 	rs_driver.init_termios = tty_std_termios;
 	rs_driver.init_termios.c_cflag =
 		B115200 | CS8 | CREAD | HUPCL | CLOCAL;
-	rs_driver.refcount = &rs_refcount;
 	rs_driver.table = rs_table;
 	rs_driver.termios = rs_termios;
 	rs_driver.termios_locked = rs_termios_locked;

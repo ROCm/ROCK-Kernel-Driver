@@ -127,7 +127,6 @@ struct cyclades_port cy_port[] = {
 };
 #define NR_PORTS        (sizeof(cy_port)/sizeof(struct cyclades_port))
 
-static int serial_refcount;
 
 static struct tty_struct *serial_table[NR_PORTS];
 static struct termios *serial_termios[NR_PORTS];
@@ -2370,7 +2369,6 @@ scrn[1] = '\0';
     cy_serial_driver.init_termios.c_cflag =
 	    B9600 | CS8 | CREAD | HUPCL | CLOCAL;
     cy_serial_driver.flags = TTY_DRIVER_REAL_RAW;
-    cy_serial_driver.refcount = &serial_refcount;
     cy_serial_driver.table = serial_table;
     cy_serial_driver.termios = serial_termios;
     cy_serial_driver.termios_locked = serial_termios_locked;
