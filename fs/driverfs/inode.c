@@ -158,8 +158,9 @@ static int driverfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 static int driverfs_create(struct inode *dir, struct dentry *dentry, int mode)
 {
 	int res;
+	mode = (mode & S_IALLUGO) | S_IFREG;
 	dentry->d_op = &driverfs_dentry_file_ops;
- 	res = driverfs_mknod(dir, dentry, mode | S_IFREG, 0);
+ 	res = driverfs_mknod(dir, dentry, mode, 0);
 	return res;
 }
 
@@ -424,7 +425,6 @@ static struct file_operations driverfs_file_operations = {
 };
 
 static struct inode_operations driverfs_dir_inode_operations = {
-	.create		= driverfs_create,
 	.lookup		= simple_lookup,
 	.unlink		= driverfs_unlink,
 	.symlink	= driverfs_symlink,
@@ -622,7 +622,7 @@ driverfs_create_file(struct driver_file_entry * entry,
 	dentry = lookup_hash(&qstr,parent->dentry);
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *)entry;
-		error = vfs_create(parent->dentry->d_inode,dentry,entry->mode);
+		error = driverfs_create(parent->dentry->d_inode,dentry,entry->mode);
 
 		/* Still good? Ok, then fill in the blanks: */
 		if (!error) {
