@@ -579,8 +579,6 @@ static inline void syscall_restart(unsigned long orig_i0, struct pt_regs *regs,
 {
 	switch (regs->u_regs[UREG_I0]) {
 	case ERESTART_RESTARTBLOCK:
-		current_thread_info()->restart_block.fn = do_no_restart_syscall;
-		/* fallthrough */
 	case ERESTARTNOHAND:
 	no_system_call_restart:
 		regs->u_regs[UREG_I0] = EINTR;
@@ -628,6 +626,13 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 		struct k_sigaction *ka;
 
 		ka = &current->sighand->action[signr-1];
+
+		/* Always make any pending restarted system
+		 * calls return -EINTR.
+		 */
+		current_thread_info()->restart_block.fn =
+			do_no_restart_syscall;
+
 		if (cookie.restart_syscall)
 			syscall_restart(orig_i0, regs, &ka->sa);
 		handle_signal(signr, ka, &info, oldset, regs);
