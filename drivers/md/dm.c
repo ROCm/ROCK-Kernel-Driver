@@ -294,6 +294,9 @@ static int clone_endio(struct bio *bio, unsigned int done, int error)
 	if (bio->bi_size)
 		return 1;
 
+	if (!bio_flagged(bio, BIO_UPTODATE) && !error)
+		error = -EIO;
+
 	if (endio) {
 		r = endio(tio->ti, bio, error, &tio->info);
 		if (r < 0)
