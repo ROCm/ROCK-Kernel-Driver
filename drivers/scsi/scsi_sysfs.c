@@ -502,18 +502,19 @@ int scsi_sysfs_add_sdev(struct scsi_device *sdev)
  **/
 void scsi_remove_device(struct scsi_device *sdev)
 {
-	if (sdev->sdev_state == SDEV_RUNNING || sdev->sdev_state == SDEV_CANCEL) {
-		scsi_device_set_state(sdev, SDEV_DEL);
-		class_device_unregister(&sdev->sdev_classdev);
-		if (sdev->transport_classdev.class)
-			class_device_unregister(&sdev->transport_classdev);
-		device_del(&sdev->sdev_gendev);
-		if (sdev->host->hostt->slave_destroy)
-			sdev->host->hostt->slave_destroy(sdev);
-		if (sdev->host->transportt->cleanup)
-			sdev->host->transportt->cleanup(sdev);
-		put_device(&sdev->sdev_gendev);
-	}
+	if (scsi_device_set_state(sdev, SDEV_CANCEL) != 0)
+		return;
+
+	class_device_unregister(&sdev->sdev_classdev);
+	if (sdev->transport_classdev.class)
+		class_device_unregister(&sdev->transport_classdev);
+	device_del(&sdev->sdev_gendev);
+	scsi_device_set_state(sdev, SDEV_DEL);
+	if (sdev->host->hostt->slave_destroy)
+		sdev->host->hostt->slave_destroy(sdev);
+	if (sdev->host->transportt->cleanup)
+		sdev->host->transportt->cleanup(sdev);
+	put_device(&sdev->sdev_gendev);
 }
 
 int scsi_register_driver(struct device_driver *drv)
