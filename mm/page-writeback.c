@@ -580,6 +580,18 @@ int __set_page_dirty_nobuffers(struct page *page)
 EXPORT_SYMBOL(__set_page_dirty_nobuffers);
 
 /*
+ * When a writepage implementation decides that it doesn't want to write this
+ * page for some reason, it should redirty the locked page via
+ * redirty_page_for_writepage() and it should then unlock the page and return 0
+ */
+int redirty_page_for_writepage(struct writeback_control *wbc, struct page *page)
+{
+	wbc->pages_skipped++;
+	return __set_page_dirty_nobuffers(page);
+}
+EXPORT_SYMBOL(redirty_page_for_writepage);
+
+/*
  * If the mapping doesn't provide a set_page_dirty a_op, then
  * just fall through and assume that it wants buffer_heads.
  */
