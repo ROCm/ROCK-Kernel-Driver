@@ -18,4 +18,4 @@ $(obj)/names.o: $(obj)/devlist.h
 # And that's how to generate them
 
 $(obj)/devlist.h: $(src)/zorro.ids $(obj)/gen-devlist
-	$(obj)/gen-devlist < $<
+	( cd $(obj); ./gen-devlist ) < $<

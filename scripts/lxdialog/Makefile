@@ -20,9 +20,13 @@ host-progs := lxdialog
 lxdialog-objs := checklist.o menubox.o textbox.o yesno.o inputbox.o \
 		 util.o lxdialog.o msgbox.o
 
-all: ncurses lxdialog
+EXTRA_TARGETS := lxdialog
+
+first_rule: ncurses
 
 include $(TOPDIR)/Rules.make
+
+.PHONY: ncurses
 
 ncurses:
 	@echo "main() {}" > lxtemp.c

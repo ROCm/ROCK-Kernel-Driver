@@ -9,17 +9,12 @@
 # conmakehash:	 Create arrays for initializing the kernel console tables
 # tkparse: 	 Used by xconfig
 
-all: fixdep split-include docproc conmakehash __chmod
+EXTRA_TARGETS := fixdep split-include docproc conmakehash
 
 # The following temporary rule will make sure that people's
 # trees get updated to the right permissions, since patch(1)
 # can't do it
 # ---------------------------------------------------------------------------
-
-.PHONY: __chmod
-
-__chmod: kernel-doc mkcompile_h makelst
-	@chmod a+x $^
 
 host-progs := fixdep split-include conmakehash docproc tkparse
 tkparse-objs := tkparse.o tkcond.o tkgen.o
@@ -30,7 +25,7 @@ include $(TOPDIR)/Rules.make
 # but it is not worth the effort to generate the dependencies.
 # The alternative solution to always generate it is fairly fast.
 # FORCE it to remake
-$(obj)/kconfig.tk: $(srctree)/arch/$(ARCH)/config.in tkparse FORCE
+$(obj)/kconfig.tk: $(srctree)/arch/$(ARCH)/config.in $(obj)/tkparse FORCE
 	@echo '  Generating $@'
 	@(                                                      \
 	if [ -f /usr/local/bin/wish ];        then              \
@@ -51,7 +46,7 @@ $(obj)/kconfig.tk: $(srctree)/arch/$(ARCH)/config.in tkparse FORCE
 # Targets hardcoded and wellknow in top-level makefile
 .PHONY: lxdialog
 lxdialog:
-	$(MAKE) -C lxdialog all
+	$(call descend,lxdialog,)
 
 # fixdep is needed to compile other host programs
 $(obj)/split-include $(obj)/docproc $(addprefix $(obj)/,$(tkparse-objs)) \
