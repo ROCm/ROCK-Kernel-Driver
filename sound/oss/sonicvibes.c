@@ -1235,7 +1235,7 @@ static int mixer_ioctl(struct sv_state *s, unsigned int cmd, unsigned long arg)
 
 static int sv_open_mixdev(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	struct list_head *list;
 	struct sv_state *s;
 
@@ -1893,7 +1893,7 @@ static int sv_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 
 static int sv_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned char fmtm = ~0, fmts = 0;
 	struct list_head *list;
@@ -2142,7 +2142,7 @@ static unsigned int sv_midi_poll(struct file *file, struct poll_table_struct *wa
 
 static int sv_midi_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	unsigned long flags;
 	struct list_head *list;
@@ -2364,7 +2364,7 @@ static int sv_dmfm_ioctl(struct inode *inode, struct file *file, unsigned int cm
 
 static int sv_dmfm_open(struct inode *inode, struct file *file)
 {
-	int minor = MINOR(inode->i_rdev);
+	int minor = minor(inode->i_rdev);
 	DECLARE_WAITQUEUE(wait, current);
 	struct list_head *list;
 	struct sv_state *s;

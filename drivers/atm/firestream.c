@@ -1530,7 +1530,7 @@ static void top_off_fp (struct fs_dev *dev, struct freepool *fp, int gfp_flags)
 	fs_dprintk (FS_DEBUG_QUEUE, "Added %d entries. \n", n);
 }
 
-static void __exit free_queue (struct fs_dev *dev, struct queue *txq)
+static void __devexit free_queue (struct fs_dev *dev, struct queue *txq)
 {
 	func_enter ();
 
@@ -1546,7 +1546,7 @@ static void __exit free_queue (struct fs_dev *dev, struct queue *txq)
 	func_exit ();
 }
 
-static void __exit free_freepool (struct fs_dev *dev, struct freepool *fp)
+static void __devexit free_freepool (struct fs_dev *dev, struct freepool *fp)
 {
 	func_enter ();
 
@@ -2088,7 +2088,7 @@ int __init init_PCI (void)
 #endif 
 */
 
-const static struct pci_device_id firestream_pci_tbl[] __devinitdata = {
+static struct pci_device_id firestream_pci_tbl[] __devinitdata = {
 	{ PCI_VENDOR_ID_FUJITSU_ME, PCI_DEVICE_ID_FUJITSU_FS50, 
 	  PCI_ANY_ID, PCI_ANY_ID, 0, 0, FS_IS50},
 	{ PCI_VENDOR_ID_FUJITSU_ME, PCI_DEVICE_ID_FUJITSU_FS155, 

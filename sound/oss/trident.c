@@ -4149,7 +4149,7 @@ out_release_region:
 	goto out;
 }
 
-static void __exit trident_remove(struct pci_dev *pci_dev)
+static void __devexit trident_remove(struct pci_dev *pci_dev)
 {
 	int i;
 	struct trident_card *card = pci_get_drvdata(pci_dev);
@@ -4202,7 +4202,7 @@ static struct pci_driver trident_pci_driver = {
 	name:		TRIDENT_MODULE_NAME,
 	id_table:	trident_pci_tbl,
 	probe:		trident_probe,
-	remove:		trident_remove,
+	remove:		__devexit_p(trident_remove),
 	suspend:	trident_suspend,
 	resume:		trident_resume
 };

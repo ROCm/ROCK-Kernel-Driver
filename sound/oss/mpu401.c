@@ -1227,7 +1227,7 @@ int probe_mpu401(struct address_info *hw_config)
 	return ok;
 }
 
-void __exit unload_mpu401(struct address_info *hw_config)
+void unload_mpu401(struct address_info *hw_config)
 {
 	void *p;
 	int n=hw_config->slots[1];

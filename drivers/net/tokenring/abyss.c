@@ -433,7 +433,7 @@ static int abyss_close(struct net_device *dev)
 	return 0;
 }
 
-static void __exit abyss_detach (struct pci_dev *pdev)
+static void __devexit abyss_detach (struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	
@@ -451,7 +451,7 @@ static struct pci_driver abyss_driver = {
 	name:		"abyss",
 	id_table:	abyss_pci_tbl,
 	probe:		abyss_attach,
-	remove:		abyss_detach,
+	remove:		__devexit_p(abyss_detach),
 };
 
 static int __init abyss_init (void)

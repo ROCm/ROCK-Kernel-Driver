@@ -311,7 +311,7 @@ static unsigned via_num_cards = 0;
  */
 
 static int via_init_one (struct pci_dev *dev, const struct pci_device_id *id);
-static void via_remove_one (struct pci_dev *pdev);
+static void __devexit via_remove_one (struct pci_dev *pdev);
 
 static ssize_t via_dsp_read(struct file *file, char *buffer, size_t count, loff_t *ppos);
 static ssize_t via_dsp_write(struct file *file, const char *buffer, size_t count, loff_t *ppos);
@@ -365,7 +365,7 @@ static struct pci_driver via_driver = {
 	name:		VIA_MODULE_NAME,
 	id_table:	via_pci_tbl,
 	probe:		via_init_one,
-	remove:		via_remove_one,
+	remove:		__devexit_p(via_remove_one),
 };
 
 
@@ -3271,7 +3271,7 @@ err_out:
 }
 
 
-static void __exit via_remove_one (struct pci_dev *pdev)
+static void __devexit via_remove_one (struct pci_dev *pdev)
 {
 	struct via_info *card;
 
