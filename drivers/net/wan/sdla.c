@@ -1636,9 +1636,10 @@ int __init sdla_init(struct net_device *dev)
 	dev->change_mtu		= sdla_change_mtu;
 
 	dev->type		= 0xFFFF;
-	dev->hard_header_len = 0;
+	dev->hard_header_len	= 0;
 	dev->addr_len		= 0;
 	dev->mtu		= SDLA_MAX_MTU;
+	SET_MODULE_OWNER(dev);
 
 	flp->activate		= sdla_activate;
 	flp->deactivate		= sdla_deactivate;

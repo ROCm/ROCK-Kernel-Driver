@@ -4,7 +4,7 @@
 *		This module is completely hardware-independent and provides
 *		access to the router using Linux /proc filesystem.
 *
-* Author: 	Gideon Hack	
+* Author: 	Gideon Hack
 *
 * Copyright:	(c) 1995-1999 Sangoma Technologies Inc.
 *
@@ -20,22 +20,17 @@
 * Dec 13, 1996	Gene Kozin	Initial version (based on Sangoma's WANPIPE)
 *****************************************************************************/
 
-#include <linux/version.h>
 #include <linux/config.h>
+#include <linux/init.h>		/* __initfunc et al. */
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
 #include <linux/kernel.h>
 #include <linux/module.h>
-#include <linux/slab.h>	/* kmalloc(), kfree() */
-#include <linux/mm.h>		/* verify_area(), etc. */
-#include <linux/string.h>	/* inline mem*, str* functions */
-#include <asm/byteorder.h>	/* htons(), etc. */
-#include <asm/io.h>
 #include <linux/wanrouter.h>	/* WAN router API definitions */
 #include <linux/seq_file.h>
 #include <linux/smp_lock.h>
-#include <linux/init.h>	/* __initfunc et al. */
-#include <asm/uaccess.h>       /* copy_to_user */
+
+#include <asm/io.h>
 
 #define PROC_STATS_FORMAT "%30s: %12lu\n"
 
@@ -47,16 +42,6 @@
 				    (prot == WANCONFIG_CHDLC) ? " CHDLC": \
 				       (prot == WANCONFIG_MPPP) ? " MPPP" : \
 				           " Unknown" )
-	
-/****** Data Types **********************************************************/
-
-typedef struct wan_stat_entry
-{
-	struct wan_stat_entry *next;
-	char *description;		/* description string */
-	void *data;			/* -> data */
-	unsigned data_type;		/* data type */
-} wan_stat_entry_t;
 
 /****** Function Prototypes *************************************************/
 
@@ -74,11 +59,11 @@ typedef struct wan_stat_entry
  */
 
 /*
- *	Generic /proc/net/router/<file> file and inode operations 
+ *	Generic /proc/net/router/<file> file and inode operations
  */
 
 /*
- *	/proc/net/router 
+ *	/proc/net/router
  */
 
 static struct proc_dir_entry *proc_router;
@@ -106,12 +91,14 @@ static void *r_start(struct seq_file *m, loff_t *pos)
 		;
 	return wandev;
 }
+
 static void *r_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct wan_device *wandev = v;
 	(*pos)++;
 	return (v == (void *)1) ? router_devlist : wandev->next;
 }
+
 static void r_stop(struct seq_file *m, void *v)
 {
 	unlock_kernel();
@@ -121,8 +108,8 @@ static int config_show(struct seq_file *m, void *v)
 {
 	struct wan_device *p = v;
 	if (v == (void *)1) {
-		seq_puts(m, "Device name    | port |IRQ|DMA|  mem.addr  |");
-		seq_puts(m, "mem.size|option1|option2|option3|option4\n");
+		seq_puts(m, "Device name    | port |IRQ|DMA|  mem.addr  |"
+			    "mem.size|option1|option2|option3|option4\n");
 		return 0;
 	}
 	if (!p->state)
@@ -137,21 +124,21 @@ static int status_show(struct seq_file *m, void *v)
 {
 	struct wan_device *p = v;
 	if (v == (void *)1) {
-		seq_puts(m, "Device name    |protocol|station|interface|");
-		seq_puts(m, "clocking|baud rate| MTU |ndev|link state\n");
+		seq_puts(m, "Device name    |protocol|station|interface|"
+			    "clocking|baud rate| MTU |ndev|link state\n");
 		return 0;
 	}
 	if (!p->state)
 		return 0;
-	seq_printf(m, "%-15s|%-8s|%-7s|%-9s|%-8s|%9u|%5u|%3u |",
+	seq_printf(m, "%-15s|%-8s| %-7s| %-9s|%-8s|%9u|%5u|%3u |",
 		p->name,
 		PROT_DECODE(p->config_id),
-		p->config_id == WANCONFIG_FR ? 
-			(p->station ? " Node" : " CPE") :
+		p->config_id == WANCONFIG_FR ?
+			(p->station ? "Node" : "CPE") :
 			(p->config_id == WANCONFIG_X25 ?
-			(p->station ? " DCE" : " DTE") :
-			(" N/A")),
-		p->interface ? " V.35" : " RS-232",
+			(p->station ? "DCE" : "DTE") :
+			("N/A")),
+		p->interface ? "V.35" : "RS-232",
 		p->clocking ? "internal" : "external",
 		p->bps,
 		p->mtu,
@@ -178,17 +165,17 @@ static int status_show(struct seq_file *m, void *v)
 }
 
 static struct seq_operations config_op = {
-	.start =r_start,
-	.next =	r_next,
-	.stop =	r_stop,
-	.show =	config_show
+	.start	= r_start,
+	.next	= r_next,
+	.stop	= r_stop,
+	.show	= config_show,
 };
 
 static struct seq_operations status_op = {
-	.start =r_start,
-	.next =	r_next,
-	.stop =	r_stop,
-	.show =	status_show
+	.start	= r_start,
+	.next	= r_next,
+	.stop	= r_stop,
+	.show	= status_show,
 };
 
 static int config_open(struct inode *inode, struct file *file)
@@ -201,22 +188,20 @@ static int status_open(struct inode *inode, struct file *file)
 	return seq_open(file, &status_op);
 }
 
-static struct file_operations config_fops =
-{
-	.owner =	THIS_MODULE,
-	.open =		config_open,
-	.read =		seq_read,
-	.llseek =	seq_lseek,
-	.release =	seq_release,
+static struct file_operations config_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = config_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = seq_release,
 };
 
-static struct file_operations status_fops =
-{
-	.owner =	THIS_MODULE,
-	.open =		status_open,
-	.read =		seq_read,
-	.llseek =	seq_lseek,
-	.release =	seq_release,
+static struct file_operations status_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = status_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = seq_release,
 };
 
 static int wandev_show(struct seq_file *m, void *v)
@@ -235,11 +220,11 @@ static int wandev_show(struct seq_file *m, void *v)
 	if (wandev->update) {
 		int err = wandev->update(wandev);
 		if (err == -EAGAIN) {
-			seq_printf(m, "Device is busy!\n");
+			seq_puts(m, "Device is busy!\n");
 			return 0;
 		}
 		if (err) {
-			seq_printf(m, "Device is not configured!\n");
+			seq_puts(m, "Device is not configured!\n");
 			return 0;
 		}
 	}
@@ -286,21 +271,20 @@ static int wandev_open(struct inode *inode, struct file *file)
 	return single_open(file, wandev_show, PDE(inode)->data);
 }
 
-static struct file_operations wandev_fops =
-{
-	.owner =	THIS_MODULE,
-	.open =		wandev_open,
-	.read =		seq_read,
-	.llseek =	seq_lseek,
-	.release =	single_release,
-	.ioctl =	wanrouter_ioctl,
+static struct file_operations wandev_fops = {
+	.owner	 = THIS_MODULE,
+	.open	 = wandev_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = single_release,
+	.ioctl	 = wanrouter_ioctl,
 };
 
 /*
  *	Initialize router proc interface.
  */
 
-int __init wanrouter_proc_init (void)
+int __init wanrouter_proc_init(void)
 {
 	struct proc_dir_entry *p;
 	proc_router = proc_mkdir(ROUTER_NAME, proc_net);
@@ -328,11 +312,11 @@ fail:
  *	Clean up router proc interface.
  */
 
-void wanrouter_proc_cleanup (void)
+void wanrouter_proc_cleanup(void)
 {
 	remove_proc_entry("config", proc_router);
 	remove_proc_entry("status", proc_router);
-	remove_proc_entry(ROUTER_NAME,proc_net);
+	remove_proc_entry(ROUTER_NAME, proc_net);
 }
 
 /*
@@ -343,7 +327,7 @@ int wanrouter_proc_add(struct wan_device* wandev)
 {
 	if (wandev->magic != ROUTER_MAGIC)
 		return -EINVAL;
-		
+
 	wandev->dent = create_proc_entry(wandev->name, S_IRUGO, proc_router);
 	if (!wandev->dent)
 		return -ENOMEM;
@@ -355,7 +339,6 @@ int wanrouter_proc_add(struct wan_device* wandev)
 /*
  *	Delete directory entry for WAN device.
  */
- 
 int wanrouter_proc_delete(struct wan_device* wandev)
 {
 	if (wandev->magic != ROUTER_MAGIC)

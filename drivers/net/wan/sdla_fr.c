@@ -1187,6 +1187,7 @@ static int if_init(struct net_device* dev)
 	dev->base_addr	= wandev->ioport;
 	dev->mem_start	= wandev->maddr;
 	dev->mem_end	= wandev->maddr + wandev->msize - 1;
+	SET_MODULE_OWNER(dev);
 
 	return 0;
 }
