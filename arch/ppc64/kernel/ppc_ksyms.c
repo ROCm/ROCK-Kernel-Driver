@@ -55,9 +55,6 @@ EXPORT_SYMBOL(sys_ioctl);
 EXPORT_SYMBOL(isa_io_base);
 EXPORT_SYMBOL(pci_io_base);
 
-EXPORT_SYMBOL(find_next_zero_bit);
-EXPORT_SYMBOL(find_next_zero_le_bit);
-
 EXPORT_SYMBOL(strcpy);
 EXPORT_SYMBOL(strncpy);
 EXPORT_SYMBOL(strcat);

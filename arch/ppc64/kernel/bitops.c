@@ -3,6 +3,7 @@
  */
 
 #include <linux/kernel.h>
+#include <linux/module.h>
 #include <asm/bitops.h>
 #include <asm/byteorder.h>
 
@@ -44,8 +45,10 @@ found_first:
 found_middle:
 	return result + ffz(tmp);
 }
+EXPORT_SYMBOL(find_next_zero_bit);
 
-unsigned long find_next_bit(unsigned long *addr, unsigned long size, unsigned long offset)
+unsigned long find_next_bit(unsigned long *addr, unsigned long size,
+			    unsigned long offset)
 {
 	unsigned long *p = addr + (offset >> 6);
 	unsigned long result = offset & ~63UL;
@@ -82,8 +85,9 @@ found_first:
 found_middle:
 	return result + __ffs(tmp);
 }
+EXPORT_SYMBOL(find_next_bit);
 
-static __inline__ unsigned int ext2_ilog2(unsigned int x) 
+static inline unsigned int ext2_ilog2(unsigned int x)
 {
 	int lz;
 
@@ -91,16 +95,17 @@ static __inline__ unsigned int ext2_ilog2(unsigned int x)
 	return 31 - lz;
 }
 
-static __inline__ unsigned int ext2_ffz(unsigned int x)
+static inline unsigned int ext2_ffz(unsigned int x)
 {
-	u32  tempRC;
+	u32 rc;
 	if ((x = ~x) == 0)
 		return 32;
-	tempRC = ext2_ilog2(x & -x);
-	return tempRC;
+	rc = ext2_ilog2(x & -x);
+	return rc;
 }
 
-unsigned long find_next_zero_le_bit(unsigned long *addr, unsigned long size, unsigned long offset)
+unsigned long find_next_zero_le_bit(unsigned long *addr, unsigned long size,
+				    unsigned long offset)
 {
         unsigned int *p = ((unsigned int *) addr) + (offset >> 5);
         unsigned int result = offset & ~31;
@@ -136,3 +141,4 @@ found_first:
 found_middle:
         return result + ext2_ffz(tmp);
 }
+EXPORT_SYMBOL(find_next_zero_le_bit);
