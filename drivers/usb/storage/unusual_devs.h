@@ -268,6 +268,13 @@ UNUSUAL_DEV(  0x0525, 0xa140, 0x0100, 0x0100,
 		US_SC_8070, US_PR_BULK, NULL,
 		US_FL_FIX_INQUIRY ),
 
+/* Reported by Iacopo Spalletti <avvisi@spalletti.it> */
+UNUSUAL_DEV(  0x052b, 0x1807, 0x0100, 0x0100,
+		"Tekom Technologies, Inc",
+		"300_CAMERA",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* This entry is needed because the device reports Sub=ff */
 UNUSUAL_DEV(  0x054c, 0x0010, 0x0106, 0x0450, 
 		"Sony",
@@ -811,7 +818,14 @@ UNUSUAL_DEV( 0x0ed1, 0x6660, 0x0100, 0x0300,
 		"Solid state disk",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
-		
+
+/* Reported by Rastislav Stanik <rs_kernel@yahoo.com> */
+UNUSUAL_DEV(  0x0ea0, 0x6828, 0x0110, 0x0110,
+		"USB",
+		"Flash Disk",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
+
 /* Reported by Kevin Cernekee <kpc-usbdev@gelato.uiuc.edu>
  * Tested on hardware version 1.10.
  * Entry is needed only for the initializer function override.
@@ -832,6 +846,13 @@ UNUSUAL_DEV(  0x1065, 0x2136, 0x0000, 0x9999,
 		"EasyDisk Portable Device",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MODE_XLATE ),
+
+/* Reported by Kotrla Vitezslav <kotrla@ceb.cz> */
+UNUSUAL_DEV(  0x1370, 0x6828, 0x0110, 0x0110,
+		"SWISSBIT",
+		"Black Silver",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_RESIDUE ),
 
 #ifdef CONFIG_USB_STORAGE_SDDR55
 UNUSUAL_DEV(  0x55aa, 0xa103, 0x0000, 0x9999, 

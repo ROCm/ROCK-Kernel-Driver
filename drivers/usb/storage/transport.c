@@ -1055,8 +1055,13 @@ int usb_stor_Bulk_transport(struct scsi_cmnd *srb, struct us_data *us)
 
 	/* try to compute the actual residue, based on how much data
 	 * was really transferred and what the device tells us */
-	residue = min(residue, transfer_length);
-	srb->resid = max(srb->resid, (int) residue);
+	if (residue) {
+		if (!(us->flags & US_FL_IGNORE_RESIDUE) ||
+				srb->sc_data_direction == DMA_TO_DEVICE) {
+			residue = min(residue, transfer_length);
+			srb->resid = max(srb->resid, (int) residue);
+		}
+	}
 
 	/* based on the status code, we report good or bad */
 	switch (bcs->Status) {
