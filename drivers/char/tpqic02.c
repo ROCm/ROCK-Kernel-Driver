@@ -898,7 +898,7 @@ static int ll_do_qic_cmd(int cmd, time_t timeout)
 		printk(TPQIC02_NAME ": ll_do_qic_cmd(%x, %ld) failed\n", cmd, (long) timeout);
 		return -EIO;
 	}
-#if OBSOLETE
+#ifdef OBSOLETE
 	/* wait for ready since it may not be active immediately after reading status */
 	while ((inb_p(QIC02_STAT_PORT) & QIC02_STAT_READY) != 0)
 		cpu_relax();
@@ -1419,7 +1419,7 @@ static int start_dma(short mode, unsigned long bytes_todo)
 		if (stat != TE_OK)
 			return stat;
 
-#if OBSOLETE
+#ifdef OBSOLETE
 		/************* not needed iff rd_status() would wait for ready!!!!!! **********/
 		if (wait_for_ready(TIM_S) != TE_OK) {	/*** not sure this is needed ***/
 			tpqputs(TPQD_ALWAYS, "wait_for_ready failed in start_dma");

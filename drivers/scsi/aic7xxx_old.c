@@ -4881,7 +4881,7 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
     }
     break;
 
-#if AIC7XXX_NOT_YET 
+#ifdef AIC7XXX_NOT_YET 
     case TRACEPOINT2:
       {
         printk(INFO_LEAD "Tracepoint #2 reached.\n", p->host_no,
