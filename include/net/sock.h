@@ -70,7 +70,6 @@ enum {
 	SOCK_LINGER,
 	SOCK_DESTROY,
 	SOCK_BROADCAST,
-	SOCK_BSDISM,
 };
 
 /* Define this to get the sk->debug debugging facility. */

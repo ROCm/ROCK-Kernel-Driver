@@ -110,7 +110,7 @@ sunos_sys_table:
 	.long sys_getitimer, sys_gethostname, sys_sethostname
 	.long sunos_getdtablesize, sys_dup2, sunos_nop
 	.long sys_fcntl, sunos_select, sunos_nop
-	.long sys_fsync, sys_setpriority, sunos_socket
+	.long sys_fsync, sys_setpriority, sys_socket
 	.long sys_connect, sunos_accept
 /*100*/	.long sys_getpriority, sunos_send, sunos_recv
 	.long sunos_nosys, sys_bind, sunos_setsockopt

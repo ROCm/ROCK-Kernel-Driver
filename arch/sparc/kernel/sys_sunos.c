@@ -1107,38 +1107,16 @@ asmlinkage int sunos_send(int fd, void * buff, int len, unsigned flags)
 	return ret;
 }
 
-extern asmlinkage int sys_setsockopt(int fd, int level, int optname,
-				     char *optval, int optlen);
-
-asmlinkage int sunos_socket(int family, int type, int protocol)
-{
-	int ret, one = 1;
-
-	ret = sys_socket(family, type, protocol);
-	if (ret < 0)
-		goto out;
-
-	sys_setsockopt(ret, SOL_SOCKET, SO_BSDCOMPAT,
-		       (char *)&one, sizeof(one));
-out:
-	return ret;
-}
-
 asmlinkage int sunos_accept(int fd, struct sockaddr *sa, int *addrlen)
 {
-	int ret, one = 1;
+	int ret;
 
 	while (1) {
 		ret = check_nonblock(sys_accept(fd,sa,addrlen),fd);	
 		if (ret != -ENETUNREACH && ret != -EHOSTUNREACH)
 			break;
 	}
-	if (ret < 0)
-		goto out;
 
-	sys_setsockopt(ret, SOL_SOCKET, SO_BSDCOMPAT,
-		       (char *)&one, sizeof(one));
-out:
 	return ret;
 }
 

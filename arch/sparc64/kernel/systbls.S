@@ -173,7 +173,7 @@ sunos_sys_table:
 	.word compat_sys_getitimer, sys_gethostname, sys_sethostname
 	.word sunos_getdtablesize, sys_dup2, sunos_nop
 	.word sys32_fcntl, sunos_select, sunos_nop
-	.word sys_fsync, sys_setpriority32, sunos_socket
+	.word sys_fsync, sys_setpriority32, sys_socket
 	.word sys_connect, sunos_accept
 /*100*/	.word sys_getpriority, sunos_send, sunos_recv
 	.word sunos_nosys, sys_bind, sunos_setsockopt
