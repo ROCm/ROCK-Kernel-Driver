@@ -1338,6 +1338,7 @@ static void zap_threads (struct mm_struct *mm)
 	struct task_struct *g, *p;
 	struct task_struct *tsk = current;
 	struct completion *vfork_done = tsk->vfork_done;
+	int traced = 0;
 
 	/*
 	 * Make sure nobody is waiting for us to release the VM,
@@ -1353,10 +1354,30 @@ static void zap_threads (struct mm_struct *mm)
 		if (mm == p->mm && p != tsk) {
 			force_sig_specific(SIGKILL, p);
 			mm->core_waiters++;
+			if (unlikely(p->ptrace) &&
+			    unlikely(p->parent->mm == mm))
+				traced = 1;
 		}
 	while_each_thread(g,p);
 
 	read_unlock(&tasklist_lock);
+
+	if (unlikely(traced)) {
+		/*
+		 * We are zapping a thread and the thread it ptraces.
+		 * If the tracee went into a ptrace stop for exit tracing,
+		 * we could deadlock since the tracer is waiting for this
+		 * coredump to finish.  Detach them so they can both die.
+		 */
+		write_lock_irq(&tasklist_lock);
+		do_each_thread(g,p) {
+			if (mm == p->mm && p != tsk &&
+			    p->ptrace && p->parent->mm == mm) {
+				__ptrace_unlink(p);
+			}
+		} while_each_thread(g,p);
+		write_unlock_irq(&tasklist_lock);
+	}
 }
 
 static void coredump_wait(struct mm_struct *mm)
