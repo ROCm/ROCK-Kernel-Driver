@@ -17,6 +17,7 @@
 #include <linux/errno.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
+#include <asm/smp.h>
 #include <linux/interrupt.h>
 #include <linux/proc_fs.h>
 #include <linux/page-flags.h>

@@ -19,6 +19,7 @@
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
+#include <asm/smp.h>
 
 #include "../../../drivers/s390/net/smsgiucv.h"
 
