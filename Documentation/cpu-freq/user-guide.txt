@@ -53,6 +53,8 @@ The following processors for the x86 architecture are supported by cpufreq:
 AMD Elan - SC400, SC410
 AMD mobile K6-2+
 AMD mobile K6-3+
+AMD mobile Duron
+AMD mobile Athlon
 Cyrix Media GXm
 Intel mobile PIII [*] and Intel mobile PIII-M on certain chipsets
 Intel Pentium 4, Intel Xeon
