@@ -44,6 +44,14 @@
 static DECLARE_MUTEX(module_mutex);
 LIST_HEAD(modules); /* FIXME: Accessed w/o lock on oops by some archs */
 
+/* We require a truly strong try_module_get() */
+static inline int strong_try_module_get(struct module *mod)
+{
+	if (mod && mod->state == MODULE_STATE_COMING)
+		return 0;
+	return try_module_get(mod);
+}
+
 /* Convenient structure for holding init and core sizes */
 struct sizes
 {
@@ -378,12 +386,22 @@ sys_delete_module(const char *name_user, unsigned int flags)
 	}
 
 	/* Already dying? */
-	if (!mod->live) {
+	if (mod->state == MODULE_STATE_GOING) {
 		/* FIXME: if (force), slam module count and wake up
                    waiter --RR */
 		DEBUGP("%s already dying\n", mod->name);
 		ret = -EBUSY;
 		goto out;
+	}
+
+	/* Coming up?  Allow force on stuck modules. */
+	if (mod->state == MODULE_STATE_COMING) {
+		forced = try_force(flags);
+		if (!forced) {
+			/* This module can't be removed */
+			ret = -EBUSY;
+			goto out;
+		}
 	}
 
 	if (!mod->exit || mod->unsafe) {
@@ -407,7 +425,7 @@ sys_delete_module(const char *name_user, unsigned int flags)
 			ret = -EWOULDBLOCK;
 	} else {
 		mod->waiter = current;
-		mod->live = 0;
+		mod->state = MODULE_STATE_GOING;
 	}
 	restart_refcounts();
 
@@ -507,7 +525,7 @@ static inline void module_unload_free(struct module *mod)
 
 static inline int use_module(struct module *a, struct module *b)
 {
-	return try_module_get(b);
+	return strong_try_module_get(b);
 }
 
 static inline void module_unload_init(struct module *mod)
@@ -578,7 +596,7 @@ void *__symbol_get(const char *symbol)
 
 	spin_lock_irqsave(&modlist_lock, flags);
 	value = __find_symbol(symbol, &ksg);
-	if (value && !try_module_get(ksg->owner))
+	if (value && !strong_try_module_get(ksg->owner))
 		value = 0;
 	spin_unlock_irqrestore(&modlist_lock, flags);
 
@@ -935,12 +953,8 @@ static struct module *load_module(void *umod,
 		goto free_mod;
 	}
 
-	/* Initialize the lists, since they will be list_del'd if init fails */
-	INIT_LIST_HEAD(&mod->extable.list);
-	INIT_LIST_HEAD(&mod->list);
-	INIT_LIST_HEAD(&mod->symbols.list);
 	mod->symbols.owner = mod;
-	mod->live = 0;
+	mod->state = MODULE_STATE_COMING;
 	module_unload_init(mod);
 
 	/* How much space will we need?  (Common area in first) */
@@ -1097,51 +1111,40 @@ sys_init_module(void *umod,
 	flush_icache_range((unsigned long)mod->module_core,
 			   (unsigned long)mod->module_core + mod->core_size);
 
-	/* Now sew it into exception list (just in case...). */
+	/* Now sew it into the lists.  They won't access us, since
+           strong_try_module_get() will fail. */
 	spin_lock_irq(&modlist_lock);
 	list_add(&mod->extable.list, &extables);
+	list_add_tail(&mod->symbols.list, &symbols);
 	spin_unlock_irq(&modlist_lock);
+	list_add(&mod->list, &modules);
 
-	/* Note, setting the mod->live to 1 here is safe because we haven't
-	 * linked the module into the system's kernel symbol table yet,
-	 * which means that the only way any other kernel code can call
-	 * into this module right now is if this module hands out entry
-	 * pointers to the other code.  We assume that no module hands out
-	 * entry pointers to the rest of the kernel unless it is ready to
-	 * have them used.
-	 */
-	mod->live = 1;
+	/* Drop lock so they can recurse */
+	up(&module_mutex);
+
 	/* Start the module */
 	ret = mod->init ? mod->init() : 0;
 	if (ret < 0) {
 		/* Init routine failed: abort.  Try to protect us from
                    buggy refcounters. */
+		mod->state = MODULE_STATE_GOING;
 		synchronize_kernel();
-		if (mod->unsafe) {
+		if (mod->unsafe)
 			printk(KERN_ERR "%s: module is now stuck!\n",
 			       mod->name);
-			/* Mark it "live" so that they can force
-			   deletion later, and we don't keep getting
-			   woken on every decrement. */
-		} else {
-			mod->live = 0;
+		else {
+			down(&module_mutex);
 			free_module(mod);
+			up(&module_mutex);
 		}
-		up(&module_mutex);
 		return ret;
 	}
 
 	/* Now it's a first class citizen! */
-	spin_lock_irq(&modlist_lock);
-	list_add_tail(&mod->symbols.list, &symbols);
-	spin_unlock_irq(&modlist_lock);
-	list_add(&mod->list, &modules);
-
+	mod->state = MODULE_STATE_LIVE;
 	module_free(mod, mod->module_init);
 	mod->module_init = NULL;
 
-	/* All ok! */
-	up(&module_mutex);
 	return 0;
 }
 
