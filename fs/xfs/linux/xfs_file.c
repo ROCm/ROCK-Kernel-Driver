@@ -477,7 +477,6 @@ linvfs_ioctl_invis(
 	return error;
 }
 
-#ifdef HAVE_VMOP_MPROTECT
 STATIC int
 linvfs_mprotect(
 	struct vm_area_struct *vma,
@@ -488,7 +487,7 @@ linvfs_mprotect(
 
 	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {
 		if ((vma->vm_flags & VM_MAYSHARE) &&
-		    (newflags & PROT_WRITE) && !(vma->vm_flags & PROT_WRITE)) {
+		    (newflags & VM_WRITE) && !(vma->vm_flags & VM_WRITE)) {
 			xfs_mount_t	*mp = XFS_VFSTOM(vp->v_vfsp);
 
 			error = XFS_SEND_MMAP(mp, vma, VM_WRITE);
@@ -496,7 +495,6 @@ linvfs_mprotect(
 	}
 	return error;
 }
-#endif /* HAVE_VMOP_MPROTECT */
 
 
 struct file_operations linvfs_file_operations = {
@@ -541,7 +539,5 @@ struct file_operations linvfs_dir_operations = {
 
 static struct vm_operations_struct linvfs_file_vm_ops = {
 	.nopage		= filemap_nopage,
-#ifdef HAVE_VMOP_MPROTECT
 	.mprotect	= linvfs_mprotect,
-#endif
 };

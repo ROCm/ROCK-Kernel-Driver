@@ -354,6 +354,7 @@ struct vm_operations_struct {
 	int (*populate)(struct vm_area_struct * area, unsigned long address, unsigned long len, pgprot_t prot, unsigned long pgoff, int nonblock);
 	int (*set_policy)(struct vm_area_struct *vma, struct mempolicy *new);
 	struct mempolicy *(*get_policy)(struct vm_area_struct *vma, unsigned long addr);
+	int (*mprotect)(struct vm_area_struct * area, unsigned int newflags);
 };
 
 /* forward declaration; pte_chain is meant to be internal to rmap.c */
