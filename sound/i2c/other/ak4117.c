@@ -33,8 +33,6 @@ MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("AK4117 IEC958 (S/PDIF) receiver by Asahi Kasei");
 MODULE_LICENSE("GPL");
 
-#define chip_t ak4117_t
-
 #define AK4117_ADDR			0x00 /* fixed address */
 
 static void snd_ak4117_timer(unsigned long data);
@@ -65,12 +63,12 @@ static void reg_dump(ak4117_t *ak4117)
 static void snd_ak4117_free(ak4117_t *chip)
 {
 	del_timer(&chip->timer);
-	snd_magic_kfree(chip);
+	kfree(chip);
 }
 
 static int snd_ak4117_dev_free(snd_device_t *device)
 {
-	ak4117_t *chip = snd_magic_cast(ak4117_t, device->device_data, return -ENXIO);
+	ak4117_t *chip = device->device_data;
 	snd_ak4117_free(chip);
 	return 0;
 }
@@ -85,7 +83,7 @@ int snd_ak4117_create(snd_card_t *card, ak4117_read_t *read, ak4117_write_t *wri
 		.dev_free =     snd_ak4117_dev_free,
 	};
 
-	chip = (ak4117_t *)snd_magic_kcalloc(ak4117_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->lock);
@@ -544,7 +542,7 @@ int snd_ak4117_check_rate_and_errors(ak4117_t *ak4117, unsigned int flags)
 
 static void snd_ak4117_timer(unsigned long data)
 {
-	ak4117_t *chip = snd_magic_cast(ak4117_t, (void *)data, return);
+	ak4117_t *chip = (ak4117_t *)data;
 
 	if (chip->init)
 		return;

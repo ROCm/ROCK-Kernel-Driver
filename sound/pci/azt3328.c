@@ -111,8 +111,7 @@
 MODULE_AUTHOR("Andreas Mohr <hw7oshyuv3001@sneakemail.com>");
 MODULE_DESCRIPTION("Aztech AZF3328 (PCI168)");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Aztech,AZF3328}}");
+MODULE_SUPPORTED_DEVICE("{{Aztech,AZF3328}}");
 
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 #define SUPPORT_JOYSTICK 1
@@ -170,21 +169,16 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for AZF3328 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for AZF3328 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable AZF3328 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick, bool, boot_devs, 0444);
 MODULE_PARM_DESC(joystick, "Enable joystick for AZF3328 soundcard.");
-MODULE_PARM_SYNTAX(joystick, SNDRV_BOOLEAN_FALSE_DESC);
 #endif
 
 typedef struct _snd_azf3328 azf3328_t;
-#define chip_t azf3328_t
 
 struct _snd_azf3328 {
 	int irq;
@@ -1032,7 +1026,7 @@ static snd_pcm_uframes_t snd_azf3328_capture_pointer(snd_pcm_substream_t * subst
 
 static irqreturn_t snd_azf3328_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	azf3328_t *chip = snd_magic_cast(azf3328_t, dev_id, return IRQ_NONE);
+	azf3328_t *chip = dev_id;
 	unsigned int status, which;
 	static unsigned long count;
 
@@ -1232,7 +1226,7 @@ static snd_pcm_ops_t snd_azf3328_capture_ops = {
 
 static void snd_azf3328_pcm_free(snd_pcm_t *pcm)
 {
-	azf3328_t *chip = snd_magic_cast(azf3328_t, pcm->private_data, return);
+	azf3328_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1310,13 +1304,13 @@ static int snd_azf3328_free(azf3328_t *chip)
         if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 
-        snd_magic_kfree(chip);
+        kfree(chip);
         return 0;
 }
 
 static int snd_azf3328_dev_free(snd_device_t *device)
 {
-	azf3328_t *chip = snd_magic_cast(azf3328_t, device->device_data, return -ENXIO);
+	azf3328_t *chip = device->device_data;
 	return snd_azf3328_free(chip);
 }
 
@@ -1358,7 +1352,7 @@ static int __devinit snd_azf3328_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	chip = snd_magic_kcalloc(azf3328_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);

@@ -304,13 +304,25 @@ int snd_pcm_hw_refine(snd_pcm_substream_t *substream,
 
 static int snd_pcm_hw_refine_user(snd_pcm_substream_t * substream, snd_pcm_hw_params_t __user * _params)
 {
-	snd_pcm_hw_params_t params;
+	snd_pcm_hw_params_t *params;
 	int err;
-	if (copy_from_user(&params, _params, sizeof(params)))
-		return -EFAULT;
-	err = snd_pcm_hw_refine(substream, &params);
-	if (copy_to_user(_params, &params, sizeof(params)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (copy_from_user(params, _params, sizeof(*params))) {
+		err = -EFAULT;
+		goto out;
+	}
+	err = snd_pcm_hw_refine(substream, params);
+	if (copy_to_user(_params, params, sizeof(*params))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
 	return err;
 }
 
@@ -408,13 +420,25 @@ static int snd_pcm_hw_params(snd_pcm_substream_t *substream,
 
 static int snd_pcm_hw_params_user(snd_pcm_substream_t * substream, snd_pcm_hw_params_t __user * _params)
 {
-	snd_pcm_hw_params_t params;
+	snd_pcm_hw_params_t *params;
 	int err;
-	if (copy_from_user(&params, _params, sizeof(params)))
-		return -EFAULT;
-	err = snd_pcm_hw_params(substream, &params);
-	if (copy_to_user(_params, &params, sizeof(params)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (copy_from_user(params, _params, sizeof(*params))) {
+		err = -EFAULT;
+		goto out;
+	}
+	err = snd_pcm_hw_params(substream, params);
+	if (copy_to_user(_params, params, sizeof(*params))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
 	return err;
 }
 
@@ -1503,7 +1527,7 @@ static int snd_pcm_link(snd_pcm_substream_t *substream, int fd)
 	file = snd_pcm_file_fd(fd);
 	if (!file)
 		return -EBADFD;
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream1 = pcm_file->substream;
 	write_lock_irq(&snd_pcm_link_rwlock);
 	if (substream->runtime->status->state != substream1->runtime->status->state) {
@@ -1923,7 +1947,7 @@ static int snd_pcm_release_file(snd_pcm_file_t * pcm_file)
 	substream->ffile = NULL;
 	snd_pcm_remove_file(str, pcm_file);
 	snd_pcm_release_substream(substream);
-	snd_magic_kfree(pcm_file);
+	kfree(pcm_file);
 	return 0;
 }
 
@@ -1940,13 +1964,13 @@ static int snd_pcm_open_file(struct file *file,
 	snd_assert(rpcm_file != NULL, return -EINVAL);
 	*rpcm_file = NULL;
 
-	pcm_file = snd_magic_kcalloc(snd_pcm_file_t, 0, GFP_KERNEL);
+	pcm_file = kcalloc(1, sizeof(*pcm_file), GFP_KERNEL);
 	if (pcm_file == NULL) {
 		return -ENOMEM;
 	}
 
 	if ((err = snd_pcm_open_substream(pcm, stream, &substream)) < 0) {
-		snd_magic_kfree(pcm_file);
+		kfree(pcm_file);
 		return err;
 	}
 
@@ -2050,7 +2074,7 @@ int snd_pcm_release(struct inode *inode, struct file *file)
 	snd_pcm_substream_t *substream;
 	snd_pcm_file_t *pcm_file;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 	snd_assert(!atomic_read(&substream->runtime->mmap_count), );
@@ -2617,7 +2641,7 @@ static int snd_pcm_playback_ioctl(struct inode *inode, struct file *file,
 {
 	snd_pcm_file_t *pcm_file;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 
 	if (((cmd >> 8) & 0xff) != 'A')
 		return -ENOTTY;
@@ -2630,7 +2654,7 @@ static int snd_pcm_capture_ioctl(struct inode *inode, struct file *file,
 {
 	snd_pcm_file_t *pcm_file;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 
 	if (((cmd >> 8) & 0xff) != 'A')
 		return -ENOTTY;
@@ -2682,7 +2706,7 @@ static ssize_t snd_pcm_read(struct file *file, char __user *buf, size_t count, l
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;
@@ -2704,7 +2728,7 @@ static ssize_t snd_pcm_write(struct file *file, const char __user *buf, size_t c
 	snd_pcm_runtime_t *runtime;
 	snd_pcm_sframes_t result;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, result = -ENXIO; goto end);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, result = -ENXIO; goto end);
 	runtime = substream->runtime;
@@ -2736,7 +2760,7 @@ static ssize_t snd_pcm_readv(struct file *file, const struct iovec *_vector,
 	void __user **bufs;
 	snd_pcm_uframes_t frames;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;
@@ -2770,7 +2794,7 @@ static ssize_t snd_pcm_writev(struct file *file, const struct iovec *_vector,
 	void __user **bufs;
 	snd_pcm_uframes_t frames;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, result = -ENXIO; goto end);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, result = -ENXIO; goto end);
 	runtime = substream->runtime;
@@ -2805,7 +2829,7 @@ unsigned int snd_pcm_playback_poll(struct file *file, poll_table * wait)
         unsigned int mask;
 	snd_pcm_uframes_t avail;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return 0);
+	pcm_file = file->private_data;
 
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
@@ -2843,7 +2867,7 @@ unsigned int snd_pcm_capture_poll(struct file *file, poll_table * wait)
         unsigned int mask;
 	snd_pcm_uframes_t avail;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return 0);
+	pcm_file = file->private_data;
 
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
@@ -3009,6 +3033,12 @@ static struct vm_operations_struct snd_pcm_vm_ops_data =
 	.nopage =	snd_pcm_mmap_data_nopage,
 };
 
+static struct vm_operations_struct snd_pcm_vm_ops_data_mmio =
+{
+	.open =		snd_pcm_mmap_data_open,
+	.close =	snd_pcm_mmap_data_close,
+};
+
 int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 		      struct vm_area_struct *area)
 {
@@ -3044,6 +3074,14 @@ int snd_pcm_mmap_data(snd_pcm_substream_t *substream, struct file *file,
 	area->vm_ops = &snd_pcm_vm_ops_data;
 	area->vm_private_data = substream;
 	area->vm_flags |= VM_RESERVED;
+	if (runtime->hw.info & SNDRV_PCM_INFO_MMAP_IOMEM) {
+		area->vm_ops = &snd_pcm_vm_ops_data_mmio;
+		area->vm_flags |= VM_IO;
+		if (io_remap_page_range(area, area->vm_start,
+					runtime->dma_addr + offset,
+					size, area->vm_page_prot))
+			return -EAGAIN;
+	}
 	atomic_inc(&runtime->mmap_count);
 	return 0;
 }
@@ -3054,7 +3092,7 @@ static int snd_pcm_mmap(struct file *file, struct vm_area_struct *area)
 	snd_pcm_substream_t *substream;	
 	unsigned long offset;
 	
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 
@@ -3077,7 +3115,7 @@ static int snd_pcm_fasync(int fd, struct file * file, int on)
 	snd_pcm_runtime_t *runtime;
 	int err;
 
-	pcm_file = snd_magic_cast(snd_pcm_file_t, file->private_data, return -ENXIO);
+	pcm_file = file->private_data;
 	substream = pcm_file->substream;
 	snd_assert(substream != NULL, return -ENXIO);
 	runtime = substream->runtime;
@@ -3133,31 +3171,68 @@ static void snd_pcm_hw_convert_to_old_params(struct sndrv_pcm_hw_params_old *opa
 
 static int snd_pcm_hw_refine_old_user(snd_pcm_substream_t * substream, struct sndrv_pcm_hw_params_old __user * _oparams)
 {
-	snd_pcm_hw_params_t params;
-	struct sndrv_pcm_hw_params_old oparams;
+	snd_pcm_hw_params_t *params;
+	struct sndrv_pcm_hw_params_old *oparams = NULL;
 	int err;
-	if (copy_from_user(&oparams, _oparams, sizeof(oparams)))
-		return -EFAULT;
-	snd_pcm_hw_convert_from_old_params(&params, &oparams);
-	err = snd_pcm_hw_refine(substream, &params);
-	snd_pcm_hw_convert_to_old_params(&oparams, &params);
-	if (copy_to_user(_oparams, &oparams, sizeof(oparams)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	oparams = kmalloc(sizeof(*oparams), GFP_KERNEL);
+	if (!oparams) {
+		err = -ENOMEM;
+		goto out;
+	}
+
+	if (copy_from_user(oparams, _oparams, sizeof(*oparams))) {
+		err = -EFAULT;
+		goto out;
+	}
+	snd_pcm_hw_convert_from_old_params(params, oparams);
+	err = snd_pcm_hw_refine(substream, params);
+	snd_pcm_hw_convert_to_old_params(oparams, params);
+	if (copy_to_user(_oparams, oparams, sizeof(*oparams))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
+	kfree(oparams);
 	return err;
 }
 
 static int snd_pcm_hw_params_old_user(snd_pcm_substream_t * substream, struct sndrv_pcm_hw_params_old __user * _oparams)
 {
-	snd_pcm_hw_params_t params;
-	struct sndrv_pcm_hw_params_old oparams;
+	snd_pcm_hw_params_t *params;
+	struct sndrv_pcm_hw_params_old *oparams = NULL;
 	int err;
-	if (copy_from_user(&oparams, _oparams, sizeof(oparams)))
-		return -EFAULT;
-	snd_pcm_hw_convert_from_old_params(&params, &oparams);
-	err = snd_pcm_hw_params(substream, &params);
-	snd_pcm_hw_convert_to_old_params(&oparams, &params);
-	if (copy_to_user(_oparams, &oparams, sizeof(oparams)))
-		return -EFAULT;
+
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params) {
+		err = -ENOMEM;
+		goto out;
+	}
+	oparams = kmalloc(sizeof(*oparams), GFP_KERNEL);
+	if (!oparams) {
+		err = -ENOMEM;
+		goto out;
+	}
+	if (copy_from_user(oparams, _oparams, sizeof(*oparams))) {
+		err = -EFAULT;
+		goto out;
+	}
+	snd_pcm_hw_convert_from_old_params(params, oparams);
+	err = snd_pcm_hw_params(substream, params);
+	snd_pcm_hw_convert_to_old_params(oparams, params);
+	if (copy_to_user(_oparams, oparams, sizeof(*oparams))) {
+		if (!err)
+			err = -EFAULT;
+	}
+out:
+	kfree(params);
+	kfree(oparams);
 	return err;
 }
 

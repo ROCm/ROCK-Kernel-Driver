@@ -34,8 +34,6 @@ MODULE_AUTHOR("Massimo Piccioni <dafastidio@libero.it>");
 MODULE_DESCRIPTION("lowlevel code for Analog Devices AD1816A chip");
 MODULE_LICENSE("GPL");
 
-#define chip_t ad1816a_t
-
 static inline int snd_ad1816a_busy_wait(ad1816a_t *chip)
 {
 	int timeout;
@@ -313,7 +311,7 @@ static snd_pcm_uframes_t snd_ad1816a_capture_pointer(snd_pcm_substream_t *substr
 
 static irqreturn_t snd_ad1816a_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ad1816a_t *chip = snd_magic_cast(ad1816a_t, dev_id, return IRQ_NONE);
+	ad1816a_t *chip = dev_id;
 	unsigned char status;
 
 	spin_lock(&chip->lock);
@@ -550,13 +548,13 @@ static int snd_ad1816a_free(ad1816a_t *chip)
 		snd_dma_disable(chip->dma2);
 		free_dma(chip->dma2);
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_ad1816a_dev_free(snd_device_t *device)
 {
-	ad1816a_t *chip = snd_magic_cast(ad1816a_t, device->device_data, return -ENXIO);
+	ad1816a_t *chip = device->device_data;
 	return snd_ad1816a_free(chip);
 }
 
@@ -585,7 +583,7 @@ int snd_ad1816a_create(snd_card_t *card,
 
 	*rchip = NULL;
 
-	chip = snd_magic_kcalloc(ad1816a_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	chip->irq = -1;
@@ -661,7 +659,7 @@ static snd_pcm_ops_t snd_ad1816a_capture_ops = {
 
 static void snd_ad1816a_pcm_free(snd_pcm_t *pcm)
 {
-	ad1816a_t *chip = snd_magic_cast(ad1816a_t, pcm->private_data, return);
+	ad1816a_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -696,7 +694,7 @@ int snd_ad1816a_pcm(ad1816a_t *chip, int device, snd_pcm_t **rpcm)
 
 static void snd_ad1816a_timer_free(snd_timer_t *timer)
 {
-	ad1816a_t *chip = snd_magic_cast(ad1816a_t, timer->private_data, return);
+	ad1816a_t *chip = timer->private_data;
 	chip->timer = NULL;
 }
 

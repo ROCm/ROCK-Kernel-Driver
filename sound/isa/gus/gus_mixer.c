@@ -26,8 +26,6 @@
 #include <sound/control.h>
 #include <sound/gus.h>
 
-#define chip_t snd_gus_card_t
-
 /*
  *
  */

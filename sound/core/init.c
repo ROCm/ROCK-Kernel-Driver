@@ -73,7 +73,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 
 	if (extra_size < 0)
 		extra_size = 0;
-	card = (snd_card_t *) snd_kcalloc(sizeof(snd_card_t) + extra_size, GFP_KERNEL);
+	card = kcalloc(1, sizeof(*card) + extra_size, GFP_KERNEL);
 	if (card == NULL)
 		return NULL;
 	if (xid) {

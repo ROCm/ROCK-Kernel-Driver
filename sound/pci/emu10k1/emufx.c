@@ -33,8 +33,6 @@
 #include <sound/core.h>
 #include <sound/emu10k1.h>
 
-#define chip_t emu10k1_t
-
 #if 0		/* for testing purposes - digital out -> capture */
 #define EMU10K1_CAPTURE_DIGITAL_OUT
 #endif
@@ -405,7 +403,7 @@ static void snd_emu10k1_fx8010_interrupt(emu10k1_t *emu)
 	}
 }
 
-static int snd_emu10k1_fx8010_register_irq_handler(emu10k1_t *emu,
+int snd_emu10k1_fx8010_register_irq_handler(emu10k1_t *emu,
 						   snd_fx8010_irq_handler_t *handler,
 						   unsigned char gpr_running,
 						   void *private_data,
@@ -438,7 +436,7 @@ static int snd_emu10k1_fx8010_register_irq_handler(emu10k1_t *emu,
 	return 0;
 }
 
-static int snd_emu10k1_fx8010_unregister_irq_handler(emu10k1_t *emu,
+int snd_emu10k1_fx8010_unregister_irq_handler(emu10k1_t *emu,
 						     snd_emu10k1_fx8010_irq_t *irq)
 {
 	snd_emu10k1_fx8010_irq_t *tmp;
@@ -460,312 +458,6 @@ static int snd_emu10k1_fx8010_unregister_irq_handler(emu10k1_t *emu,
 	}
 	spin_unlock_irqrestore(&emu->fx8010.irq_lock, flags);
 	kfree(irq);
-	return 0;
-}
-
-/*
- *   PCM streams
- */
-
-#define INITIAL_TRAM_SHIFT     14
-#define INITIAL_TRAM_POS(size) ((((size) / 2) - INITIAL_TRAM_SHIFT) - 1)
-
-static void snd_emu10k1_fx8010_playback_irq(emu10k1_t *emu, void *private_data)
-{
-	snd_pcm_substream_t *substream = snd_magic_cast(snd_pcm_substream_t, private_data, return);
-	snd_pcm_period_elapsed(substream);
-}
-
-static void snd_emu10k1_fx8010_playback_tram_poke1(unsigned short *dst_left,
-						   unsigned short *dst_right,
-						   unsigned short *src,
-						   unsigned int count,
-						   unsigned int tram_shift)
-{
-	// printk("tram_poke1: dst_left = 0x%p, dst_right = 0x%p, src = 0x%p, count = 0x%x\n", dst_left, dst_right, src, count);
-	if ((tram_shift & 1) == 0) {
-		while (count--) {
-			*dst_left-- = *src++;
-			*dst_right-- = *src++;
-		}
-	} else {
-		while (count--) {
-			*dst_right-- = *src++;
-			*dst_left-- = *src++;
-		}
-	}
-}
-
-static void snd_emu10k1_fx8010_playback_tram_poke(emu10k1_t *emu,
-						  unsigned int *tram_pos,
-						  unsigned int *tram_shift,
-						  unsigned int tram_size,
-						  unsigned short *src,
-						  unsigned int frames)
-{
-	unsigned int count;
-
-	while (frames > *tram_pos) {
-		count = *tram_pos + 1;
-		snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + *tram_pos,
-						       (unsigned short *)emu->fx8010.etram_pages.area + *tram_pos + tram_size / 2,
-						       src, count, *tram_shift);
-		src += count * 2;
-		frames -= count;
-		*tram_pos = (tram_size / 2) - 1;
-		(*tram_shift)++;
-	}
-	snd_emu10k1_fx8010_playback_tram_poke1((unsigned short *)emu->fx8010.etram_pages.area + *tram_pos,
-					       (unsigned short *)emu->fx8010.etram_pages.area + *tram_pos + tram_size / 2,
-					       src, frames, *tram_shift++);
-	*tram_pos -= frames;
-}
-
-static int snd_emu10k1_fx8010_playback_transfer(snd_pcm_substream_t *substream)
-{
-	emu10k1_t *emu = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	snd_pcm_uframes_t appl_ptr = runtime->control->appl_ptr;
-	snd_pcm_sframes_t diff = appl_ptr - pcm->appl_ptr;
-	snd_pcm_uframes_t buffer_size = pcm->buffer_size / 2;
-
-	if (diff) {
-		if (diff < -(snd_pcm_sframes_t) (runtime->boundary / 2))
-			diff += runtime->boundary;
-		pcm->sw_ready += diff;
-		pcm->appl_ptr = appl_ptr;
-	}
-	while (pcm->hw_ready < buffer_size &&
-	       pcm->sw_ready > 0) {
-	       	size_t hw_to_end = buffer_size - pcm->hw_data;
-	       	size_t sw_to_end = (runtime->buffer_size << 2) - pcm->sw_data;
-	       	size_t tframes = buffer_size - pcm->hw_ready;
-	       	if (pcm->sw_ready < tframes)
-	       		tframes = pcm->sw_ready;
-	       	if (hw_to_end < tframes)
-	       		tframes = hw_to_end;
-	       	if (sw_to_end < tframes)
-	       		tframes = sw_to_end;
-	       	snd_emu10k1_fx8010_playback_tram_poke(emu, &pcm->tram_pos, &pcm->tram_shift,
-	       					      pcm->buffer_size,
-	       					      (unsigned short *)(runtime->dma_area + (pcm->sw_data << 2)),
-	       					      tframes);
-		pcm->hw_data += tframes;
-		if (pcm->hw_data == buffer_size)
-			pcm->hw_data = 0;
-		pcm->sw_data += tframes;
-		if (pcm->sw_data == runtime->buffer_size)
-			pcm->sw_data = 0;
-		pcm->hw_ready += tframes;
-		pcm->sw_ready -= tframes;
-	}
-	return 0;
-}
-
-static int snd_emu10k1_fx8010_playback_hw_params(snd_pcm_substream_t * substream,
-						 snd_pcm_hw_params_t * hw_params)
-{
-	return snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params));
-}
-
-static int snd_emu10k1_fx8010_playback_hw_free(snd_pcm_substream_t * substream)
-{
-	emu10k1_t *emu = snd_pcm_substream_chip(substream);
-	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	unsigned int i;
-
-	for (i = 0; i < pcm->channels; i++)
-		snd_emu10k1_ptr_write(emu, TANKMEMADDRREGBASE + 0x80 + pcm->etram[i], 0, 0);
-	snd_pcm_lib_free_pages(substream);
-	return 0;
-}
-
-static int snd_emu10k1_fx8010_playback_prepare(snd_pcm_substream_t * substream)
-{
-	emu10k1_t *emu = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	unsigned int i;
-	
-	// printk("prepare: etram_pages = 0x%p, dma_area = 0x%x, buffer_size = 0x%x (0x%x)\n", emu->fx8010.etram_pages, runtime->dma_area, runtime->buffer_size, runtime->buffer_size << 2);
-	pcm->sw_data = pcm->sw_io = pcm->sw_ready = 0;
-	pcm->hw_data = pcm->hw_io = pcm->hw_ready = 0;
-	pcm->tram_pos = INITIAL_TRAM_POS(pcm->buffer_size);
-	pcm->tram_shift = 0;
-	pcm->appl_ptr = 0;
-	snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_running, 0, 0);	/* reset */
-	snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_trigger, 0, 0);	/* reset */
-	snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_size, 0, runtime->buffer_size);
-	snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_ptr, 0, 0);		/* reset ptr number */
-	snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_count, 0, runtime->period_size);
-	snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_tmpcount, 0, runtime->period_size);
-	for (i = 0; i < pcm->channels; i++)
-		snd_emu10k1_ptr_write(emu, TANKMEMADDRREGBASE + 0x80 + pcm->etram[i], 0, (TANKMEMADDRREG_READ|TANKMEMADDRREG_ALIGN) + i * (runtime->buffer_size / pcm->channels));
-	return 0;
-}
-
-static int snd_emu10k1_fx8010_playback_trigger(snd_pcm_substream_t * substream, int cmd)
-{
-	emu10k1_t *emu = snd_pcm_substream_chip(substream);
-	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	unsigned long flags;
-	int result = 0;
-
-	spin_lock_irqsave(&emu->reg_lock, flags);
-	switch (cmd) {
-	case SNDRV_PCM_TRIGGER_START:
-		/* follow thru */
-	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
-#ifdef EMU10K1_SET_AC3_IEC958
-	{
-		int i;
-		for (i = 0; i < 3; i++) {
-			unsigned int bits;
-			bits = SPCS_CLKACCY_1000PPM | SPCS_SAMPLERATE_48 |
-			       SPCS_CHANNELNUM_LEFT | SPCS_SOURCENUM_UNSPEC | SPCS_GENERATIONSTATUS |
-			       0x00001200 | SPCS_EMPHASIS_NONE | SPCS_COPYRIGHT | SPCS_NOTAUDIODATA;
-			snd_emu10k1_ptr_write(emu, SPCS0 + i, 0, bits);
-		}
-	}
-#endif
-		result = snd_emu10k1_fx8010_register_irq_handler(emu, snd_emu10k1_fx8010_playback_irq, pcm->gpr_running, substream, &pcm->irq);
-		if (result < 0)
-			goto __err;
-		snd_emu10k1_fx8010_playback_transfer(substream);	/* roll the ball */
-		snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_trigger, 0, 1);
-		break;
-	case SNDRV_PCM_TRIGGER_STOP:
-	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
-		snd_emu10k1_fx8010_unregister_irq_handler(emu, pcm->irq); pcm->irq = NULL;
-		snd_emu10k1_ptr_write(emu, emu->gpr_base + pcm->gpr_trigger, 0, 0);
-		pcm->tram_pos = INITIAL_TRAM_POS(pcm->buffer_size);
-		pcm->tram_shift = 0;
-		break;
-	default:
-		result = -EINVAL;
-		break;
-	}
-      __err:
-	spin_unlock_irqrestore(&emu->reg_lock, flags);
-	return result;
-}
-
-static snd_pcm_uframes_t snd_emu10k1_fx8010_playback_pointer(snd_pcm_substream_t * substream)
-{
-	emu10k1_t *emu = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-	size_t ptr;
-	snd_pcm_sframes_t frames;
-
-	if (!snd_emu10k1_ptr_read(emu, emu->gpr_base + pcm->gpr_trigger, 0))
-		return 0;
-	ptr = snd_emu10k1_ptr_read(emu, emu->gpr_base + pcm->gpr_ptr, 0);
-	frames = ptr - pcm->hw_io;
-	if (frames < 0)
-		frames += runtime->buffer_size;
-	pcm->hw_io = ptr;
-	pcm->hw_ready -= frames;
-	pcm->sw_io += frames;
-	if (pcm->sw_io >= runtime->buffer_size)
-		pcm->sw_io -= runtime->buffer_size;
-	snd_emu10k1_fx8010_playback_transfer(substream);
-	return pcm->sw_io;
-}
-
-static snd_pcm_hardware_t snd_emu10k1_fx8010_playback =
-{
-	.info =			(SNDRV_PCM_INFO_MMAP | SNDRV_PCM_INFO_INTERLEAVED |
-				 /* SNDRV_PCM_INFO_MMAP_VALID | */ SNDRV_PCM_INFO_PAUSE),
-	.formats =		SNDRV_PCM_FMTBIT_U8 | SNDRV_PCM_FMTBIT_S16_LE,
-	.rates =		SNDRV_PCM_RATE_48000,
-	.rate_min =		48000,
-	.rate_max =		48000,
-	.channels_min =		1,
-	.channels_max =		1,
-	.buffer_bytes_max =	(128*1024),
-	.period_bytes_min =	1024,
-	.period_bytes_max =	(128*1024),
-	.periods_min =		1,
-	.periods_max =		1024,
-	.fifo_size =		0,
-};
-
-static int snd_emu10k1_fx8010_playback_open(snd_pcm_substream_t * substream)
-{
-	emu10k1_t *emu = snd_pcm_substream_chip(substream);
-	snd_pcm_runtime_t *runtime = substream->runtime;
-	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-
-	runtime->hw = snd_emu10k1_fx8010_playback;
-	runtime->hw.channels_min = runtime->hw.channels_max = pcm->channels;
-	runtime->hw.period_bytes_max = (pcm->buffer_size * 2) / 2;
-	spin_lock(&emu->reg_lock);
-	if (pcm->valid == 0) {
-		spin_unlock(&emu->reg_lock);
-		return -ENODEV;
-	}
-	pcm->opened = 1;
-	spin_unlock(&emu->reg_lock);
-	return 0;
-}
-
-static int snd_emu10k1_fx8010_playback_close(snd_pcm_substream_t * substream)
-{
-	emu10k1_t *emu = snd_pcm_substream_chip(substream);
-	snd_emu10k1_fx8010_pcm_t *pcm = &emu->fx8010.pcm[substream->number];
-
-	spin_lock(&emu->reg_lock);
-	pcm->opened = 0;
-	spin_unlock(&emu->reg_lock);
-	return 0;
-}
-
-static snd_pcm_ops_t snd_emu10k1_fx8010_playback_ops = {
-	.open =			snd_emu10k1_fx8010_playback_open,
-	.close =		snd_emu10k1_fx8010_playback_close,
-	.ioctl =		snd_pcm_lib_ioctl,
-	.hw_params =		snd_emu10k1_fx8010_playback_hw_params,
-	.hw_free =		snd_emu10k1_fx8010_playback_hw_free,
-	.prepare =		snd_emu10k1_fx8010_playback_prepare,
-	.trigger =		snd_emu10k1_fx8010_playback_trigger,
-	.pointer =		snd_emu10k1_fx8010_playback_pointer,
-	.ack =			snd_emu10k1_fx8010_playback_transfer,
-};
-
-static void snd_emu10k1_fx8010_pcm_free(snd_pcm_t *pcm)
-{
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, pcm->private_data, return);
-	emu->pcm_fx8010 = NULL;
-	snd_pcm_lib_preallocate_free_for_all(pcm);
-}
-
-int snd_emu10k1_fx8010_pcm(emu10k1_t * emu, int device, snd_pcm_t ** rpcm)
-{
-	snd_pcm_t *pcm;
-	int err;
-
-	if (rpcm)
-		*rpcm = NULL;
-
-	if ((err = snd_pcm_new(emu->card, "emu10k1", device, 8, 0, &pcm)) < 0)
-		return err;
-
-	pcm->private_data = emu;
-	pcm->private_free = snd_emu10k1_fx8010_pcm_free;
-
-	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_emu10k1_fx8010_playback_ops);
-
-	pcm->info_flags = 0;
-	strcpy(pcm->name, "EMU10K1 FX8010");
-	emu->pcm_fx8010 = pcm;
-	
-	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV, snd_dma_pci_data(emu->pci), 64*1024, 0);
-
-	if (rpcm)
-		*rpcm = pcm;
-
 	return 0;
 }
 
@@ -1193,7 +885,7 @@ static int snd_emu10k1_ipcm_peek(emu10k1_t *emu, emu10k1_fx8010_pcm_t *ipcm)
 
 #define SND_EMU10K1_GPR_CONTROLS	41
 #define SND_EMU10K1_INPUTS		10
-#define SND_EMU10K1_PLAYBACK_CHANNELS	6
+#define SND_EMU10K1_PLAYBACK_CHANNELS	8
 #define SND_EMU10K1_CAPTURE_CHANNELS	4
 
 static void __devinit snd_emu10k1_init_mono_control(emu10k1_fx8010_control_gpr_t *ctl, const char *name, int gpr, int defval)
@@ -1262,9 +954,9 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	spin_lock_init(&emu->fx8010.irq_lock);
 	INIT_LIST_HEAD(&emu->fx8010.gpr_ctl);
 
-	if ((icode = snd_kcalloc(sizeof(emu10k1_fx8010_code_t), GFP_KERNEL)) == NULL)
+	if ((icode = kcalloc(1, sizeof(*icode), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
-	if ((controls = snd_kcalloc(sizeof(emu10k1_fx8010_control_gpr_t) * SND_EMU10K1_GPR_CONTROLS, GFP_KERNEL)) == NULL) {
+	if ((controls = kcalloc(SND_EMU10K1_GPR_CONTROLS, sizeof(*controls), GFP_KERNEL)) == NULL) {
 		kfree(icode);
 		return -ENOMEM;
 	}
@@ -1292,6 +984,14 @@ static int __devinit _snd_emu10k1_audigy_init_efx(emu10k1_t *emu)
 	A_OP(icode, &ptr, iMAC0, A_GPR(playback+3), A_C_00000000, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT_REAR));
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "PCM Surround Playback Volume", gpr, 100);
 	gpr += 2;
+	
+	/* PCM Side Playback (independent from stereo mix) */
+	if (emu->spk71) {
+		A_OP(icode, &ptr, iMAC0, A_GPR(playback+6), A_C_00000000, A_GPR(gpr), A_FXBUS(FXBUS_PCM_LEFT_SIDE));
+		A_OP(icode, &ptr, iMAC0, A_GPR(playback+7), A_C_00000000, A_GPR(gpr+1), A_FXBUS(FXBUS_PCM_RIGHT_SIDE));
+		snd_emu10k1_init_stereo_control(&controls[nctl++], "PCM Side Playback Volume", gpr, 100);
+		gpr += 2;
+	}
 
 	/* PCM Center Playback (independent from stereo mix) */
 	A_OP(icode, &ptr, iMAC0, A_GPR(playback+4), A_C_00000000, A_GPR(gpr), A_FXBUS(FXBUS_PCM_CENTER));
@@ -1440,6 +1140,14 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_OP(icode, &ptr, iMAC0, A_GPR(playback+5), A_GPR(playback+5), A_GPR(gpr), A_GPR(tmp));
 	snd_emu10k1_init_mono_control(&controls[nctl++], "LFE Playback Volume", gpr, 0);
 	gpr++;
+	
+	if (emu->spk71) {
+		/* Stereo Mix Side Playback */
+		A_OP(icode, &ptr, iMAC0, A_GPR(playback+6), A_GPR(playback+6), A_GPR(gpr), A_GPR(stereo_mix));
+		A_OP(icode, &ptr, iMAC0, A_GPR(playback+7), A_GPR(playback+7), A_GPR(gpr+1), A_GPR(stereo_mix+1));
+		snd_emu10k1_init_stereo_control(&controls[nctl++], "Side Playback Volume", gpr, 0);
+		gpr += 2;
+	}
 
 	/*
 	 * outputs
@@ -1467,6 +1175,11 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 3), A_GPR(playback + 3), A_C_00000000, A_C_00000000); /* rear right */
 	A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 4), A_GPR(playback + 4), A_C_00000000, A_C_00000000); /* center */
 	A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 5), A_GPR(playback + 5), A_C_00000000, A_C_00000000); /* LFE */
+	if (emu->spk71) {
+		A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 6), A_GPR(playback + 6), A_C_00000000, A_C_00000000); /* side left */
+		A_OP(icode, &ptr, iACC3, A_GPR(playback + SND_EMU10K1_PLAYBACK_CHANNELS + 7), A_GPR(playback + 7), A_C_00000000, A_C_00000000); /* side right */
+	}
+	
 
 	ctl = &controls[nctl + 0];
 	ctl->id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
@@ -1497,7 +1210,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 			controls[nctl + 1].gpr[z * 2 + j] = TREBLE_GPR + z * 2 + j;
 		}
 	}
-	for (z = 0; z < 3; z++) {		/* front/rear/center-lfe */
+	for (z = 0; z < 4; z++) {		/* front/rear/center-lfe/side */
 		int j, k, l, d;
 		for (j = 0; j < 2; j++) {	/* left/right */
 			k = 0xb0 + (z * 8) + (j * 4);
@@ -1529,7 +1242,7 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 #undef BASS_GPR
 #undef TREBLE_GPR
 
-	for (z = 0; z < 6; z++) {
+	for (z = 0; z < 8; z++) {
 		A_SWITCH(icode, &ptr, tmp + 0, playback + SND_EMU10K1_PLAYBACK_CHANNELS + z, gpr + 0);
 		A_SWITCH_NEG(icode, &ptr, tmp + 1, gpr + 0);
 		A_SWITCH(icode, &ptr, tmp + 1, playback + z, tmp + 1);
@@ -1540,12 +1253,14 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 
 	/* Master volume (will be renamed later) */
 	A_OP(icode, &ptr, iMAC0, A_GPR(playback+0+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr), A_GPR(playback+0+SND_EMU10K1_PLAYBACK_CHANNELS));
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+1+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr+1), A_GPR(playback+1+SND_EMU10K1_PLAYBACK_CHANNELS));
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+2+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr+1), A_GPR(playback+2+SND_EMU10K1_PLAYBACK_CHANNELS));
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+3+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr+1), A_GPR(playback+3+SND_EMU10K1_PLAYBACK_CHANNELS));
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+4+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr+1), A_GPR(playback+4+SND_EMU10K1_PLAYBACK_CHANNELS));
-	A_OP(icode, &ptr, iMAC0, A_GPR(playback+5+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr+1), A_GPR(playback+5+SND_EMU10K1_PLAYBACK_CHANNELS));
-	snd_emu10k1_init_stereo_control(&controls[nctl++], "Wave Master Playback Volume", gpr, 0);
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+1+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr), A_GPR(playback+1+SND_EMU10K1_PLAYBACK_CHANNELS));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+2+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr), A_GPR(playback+2+SND_EMU10K1_PLAYBACK_CHANNELS));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+3+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr), A_GPR(playback+3+SND_EMU10K1_PLAYBACK_CHANNELS));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+4+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr), A_GPR(playback+4+SND_EMU10K1_PLAYBACK_CHANNELS));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+5+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr), A_GPR(playback+5+SND_EMU10K1_PLAYBACK_CHANNELS));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+6+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr), A_GPR(playback+6+SND_EMU10K1_PLAYBACK_CHANNELS));
+	A_OP(icode, &ptr, iMAC0, A_GPR(playback+7+SND_EMU10K1_PLAYBACK_CHANNELS), A_C_00000000, A_GPR(gpr), A_GPR(playback+7+SND_EMU10K1_PLAYBACK_CHANNELS));
+	snd_emu10k1_init_mono_control(&controls[nctl++], "Wave Master Playback Volume", gpr, 0);
 	gpr += 2;
 
 	/* analog speakers */
@@ -1553,6 +1268,8 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_PUT_STEREO_OUTPUT(A_EXTOUT_AREAR_L, A_EXTOUT_AREAR_R, playback+2 + SND_EMU10K1_PLAYBACK_CHANNELS);
 	A_PUT_OUTPUT(A_EXTOUT_ACENTER, playback+4 + SND_EMU10K1_PLAYBACK_CHANNELS);
 	A_PUT_OUTPUT(A_EXTOUT_ALFE, playback+5 + SND_EMU10K1_PLAYBACK_CHANNELS);
+	if (emu->spk71)
+		A_PUT_STEREO_OUTPUT(A_EXTOUT_ASIDE_L, A_EXTOUT_ASIDE_R, playback+6 + SND_EMU10K1_PLAYBACK_CHANNELS);
 
 	/* headphone */
 	A_PUT_STEREO_OUTPUT(A_EXTOUT_HEADPHONE_L, A_EXTOUT_HEADPHONE_R, playback + SND_EMU10K1_PLAYBACK_CHANNELS);
@@ -1674,13 +1391,13 @@ static int __devinit _snd_emu10k1_init_efx(emu10k1_t *emu)
 	spin_lock_init(&emu->fx8010.irq_lock);
 	INIT_LIST_HEAD(&emu->fx8010.gpr_ctl);
 
-	if ((icode = snd_kcalloc(sizeof(emu10k1_fx8010_code_t), GFP_KERNEL)) == NULL)
+	if ((icode = kcalloc(1, sizeof(*icode), GFP_KERNEL)) == NULL)
 		return -ENOMEM;
-	if ((controls = snd_kcalloc(sizeof(emu10k1_fx8010_control_gpr_t) * SND_EMU10K1_GPR_CONTROLS, GFP_KERNEL)) == NULL) {
+	if ((controls = kcalloc(SND_EMU10K1_GPR_CONTROLS, sizeof(emu10k1_fx8010_control_gpr_t), GFP_KERNEL)) == NULL) {
 		kfree(icode);
 		return -ENOMEM;
 	}
-	if ((ipcm = snd_kcalloc(sizeof(emu10k1_fx8010_pcm_t), GFP_KERNEL)) == NULL) {
+	if ((ipcm = kcalloc(1, sizeof(*ipcm), GFP_KERNEL)) == NULL) {
 		kfree(controls);
 		kfree(icode);
 		return -ENOMEM;
@@ -2297,7 +2014,7 @@ static int snd_emu10k1_fx8010_info(emu10k1_t *emu, emu10k1_fx8010_info_t *info)
 
 static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigned int cmd, unsigned long arg)
 {
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, hw->private_data, return -ENXIO);
+	emu10k1_t *emu = hw->private_data;
 	emu10k1_fx8010_info_t *info;
 	emu10k1_fx8010_code_t *icode;
 	emu10k1_fx8010_pcm_t *ipcm;
@@ -2364,7 +2081,7 @@ static int snd_emu10k1_fx8010_ioctl(snd_hwdep_t * hw, struct file *file, unsigne
 	case SNDRV_EMU10K1_IOCTL_PCM_PEEK:
 		if (emu->audigy)
 			return -EINVAL;
-		ipcm = (emu10k1_fx8010_pcm_t *)snd_kcalloc(sizeof(*ipcm), GFP_KERNEL);
+		ipcm = kcalloc(1, sizeof(*ipcm), GFP_KERNEL);
 		if (ipcm == NULL)
 			return -ENOMEM;
 		if (copy_from_user(ipcm, argp, sizeof(*ipcm))) {

@@ -118,6 +118,17 @@ void *snd_hidden_kmalloc(size_t size, int flags)
 	return _snd_kmalloc(size, flags);
 }
 
+void *snd_hidden_kcalloc(size_t n, size_t size, int flags)
+{
+	void *ret = NULL;
+	if (n != 0 && size > INT_MAX / n)
+		return ret;
+	ret = _snd_kmalloc(n * size, flags);
+	if (ret)
+		memset(ret, 0, n * size);
+	return ret;
+}
+
 void snd_hidden_kfree(const void *obj)
 {
 	unsigned long flags;
@@ -138,46 +149,6 @@ void snd_hidden_kfree(const void *obj)
 	snd_alloc_kmalloc -= t->size;
 	obj = t;
 	snd_wrapper_kfree(obj);
-}
-
-void *_snd_magic_kcalloc(unsigned long magic, size_t size, int flags)
-{
-	unsigned long *ptr;
-	ptr = _snd_kmalloc(size + sizeof(unsigned long), flags);
-	if (ptr) {
-		*ptr++ = magic;
-		memset(ptr, 0, size);
-	}
-	return ptr;
-}
-
-void *_snd_magic_kmalloc(unsigned long magic, size_t size, int flags)
-{
-	unsigned long *ptr;
-	ptr = _snd_kmalloc(size + sizeof(unsigned long), flags);
-	if (ptr)
-		*ptr++ = magic;
-	return ptr;
-}
-
-void snd_magic_kfree(void *_ptr)
-{
-	unsigned long *ptr = _ptr;
-	if (ptr == NULL) {
-		snd_printk(KERN_WARNING "null snd_magic_kfree (called from %p)\n", __builtin_return_address(0));
-		return;
-	}
-	*--ptr = 0;
-	{
-		struct snd_alloc_track *t;
-		t = snd_alloc_track_entry(ptr);
-		if (t->magic != KMALLOC_MAGIC) {
-			snd_printk(KERN_ERR "bad snd_magic_kfree (called from %p)\n", __builtin_return_address(0));
-			return;
-		}
-	}
-	snd_hidden_kfree(ptr);
-	return;
 }
 
 void *snd_hidden_vmalloc(unsigned long size)
@@ -254,25 +225,6 @@ int __exit snd_memory_info_done(void)
 #define _snd_kmalloc kmalloc
 
 #endif /* CONFIG_SND_DEBUG_MEMORY */
-
-/**
- * snd_kcalloc - memory allocation and zero-clear
- * @size: the size to allocate in bytes
- * @flags: allocation conditions, GFP_XXX
- *
- * Allocates a memory chunk via kmalloc() and initializes it to zero.
- *
- * Returns the pointer, or NULL if no enoguh memory.
- */
-void *snd_kcalloc(size_t size, int flags)
-{
-	void *ptr;
-	
-	ptr = _snd_kmalloc(size, flags);
-	if (ptr)
-		memset(ptr, 0, size);
-	return ptr;
-}
 
 /**
  * snd_kmalloc_strdup - copy the string

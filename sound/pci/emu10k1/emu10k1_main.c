@@ -561,13 +561,13 @@ static int snd_emu10k1_free(emu10k1_t *emu)
 	}
 	if (emu->irq >= 0)
 		free_irq(emu->irq, (void *)emu);
-	snd_magic_kfree(emu);
+	kfree(emu);
 	return 0;
 }
 
 static int snd_emu10k1_dev_free(snd_device_t *device)
 {
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, device->device_data, return -ENXIO);
+	emu10k1_t *emu = device->device_data;
 	return snd_emu10k1_free(emu);
 }
 
@@ -595,7 +595,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	emu = snd_magic_kcalloc(emu10k1_t, 0, GFP_KERNEL);
+	emu = kcalloc(1, sizeof(*emu), GFP_KERNEL);
 	if (emu == NULL)
 		return -ENOMEM;
 	/* set the DMA transfer mask */
@@ -603,7 +603,7 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 	if (pci_set_dma_mask(pci, emu->dma_mask) < 0 ||
 	    pci_set_consistent_dma_mask(pci, emu->dma_mask) < 0) {
 		snd_printk(KERN_ERR "architecture does not support PCI busmaster DMA with mask 0x%lx\n", emu->dma_mask);
-		snd_magic_kfree(emu);
+		kfree(emu);
 		return -ENXIO;
 	}
 	emu->card = card;
@@ -683,8 +683,14 @@ int __devinit snd_emu10k1_create(snd_card_t * card,
 		 * (for both input and output), so we skip the AC97 detections
 		 */
 		snd_printdd(KERN_INFO "Audigy2 EX is detected. skpping ac97.\n");
-		emu->no_ac97 = 1;
+		emu->no_ac97 = 1;	
 	}
+	
+	if (emu->revision == 4) {
+		/*  FIXME - Audigy 2 ZS detection */
+		emu->spk71 = 1;
+	}
+	
 	
 	emu->fx8010.fxbus_mask = 0x303f;
 	if (extin_mask == 0)

@@ -76,8 +76,7 @@
 MODULE_AUTHOR("Bart Hartgers <bart@etpmod.phys.tue.nl>");
 MODULE_DESCRIPTION("Avance Logic ALS4000");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Avance Logic,ALS4000}}");
+MODULE_SUPPORTED_DEVICE("{{Avance Logic,ALS4000}}");
 
 #if defined(CONFIG_GAMEPORT) || (defined(MODULE) && defined(CONFIG_GAMEPORT_MODULE))
 #define SUPPORT_JOYSTICK 1
@@ -93,20 +92,14 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ALS4000 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ALS4000 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ALS4000 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_INDEX_DESC);
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address for ALS4000 soundcard. (0 = disabled)");
-MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED);
 #endif
-
-#define chip_t sb_t
 
 typedef struct {
 	unsigned long gcr;
@@ -368,7 +361,7 @@ static snd_pcm_uframes_t snd_als4000_playback_pointer(snd_pcm_substream_t * subs
 
 static irqreturn_t snd_als4000_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	sb_t *chip = snd_magic_cast(sb_t, dev_id, return IRQ_NONE);
+	sb_t *chip = dev_id;
 	unsigned long flags;
 	unsigned gcr_status;
 	unsigned sb_status;
@@ -506,7 +499,7 @@ static snd_pcm_ops_t snd_als4000_capture_ops = {
 
 static void snd_als4000_pcm_free(snd_pcm_t *pcm)
 {
-	sb_t *chip = snd_magic_cast(sb_t, pcm->private_data, return);
+	sb_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }

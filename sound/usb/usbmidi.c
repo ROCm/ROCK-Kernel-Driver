@@ -175,7 +175,7 @@ static void snd_usbmidi_input_packet(snd_usb_midi_in_endpoint_t* ep,
  */
 static void snd_usbmidi_in_urb_complete(struct urb* urb, struct pt_regs *regs)
 {
-	snd_usb_midi_in_endpoint_t* ep = snd_magic_cast(snd_usb_midi_in_endpoint_t, urb->context, return);
+	snd_usb_midi_in_endpoint_t* ep = urb->context;
 
 	if (urb->status == 0) {
 		uint8_t* buffer = (uint8_t*)ep->urb->transfer_buffer;
@@ -229,7 +229,7 @@ static void snd_usbmidi_in_midiman_complete(struct urb* urb, struct pt_regs *reg
 
 static void snd_usbmidi_out_urb_complete(struct urb* urb, struct pt_regs *regs)
 {
-	snd_usb_midi_out_endpoint_t* ep = snd_magic_cast(snd_usb_midi_out_endpoint_t, urb->context, return);
+	snd_usb_midi_out_endpoint_t* ep = urb->context;
 
 	if (urb->status < 0) {
 		if (snd_usbmidi_urb_error(urb->status) < 0)
@@ -417,14 +417,14 @@ static void snd_usbmidi_do_output(snd_usb_midi_out_endpoint_t* ep)
 
 static void snd_usbmidi_out_tasklet(unsigned long data)
 {
-	snd_usb_midi_out_endpoint_t* ep = snd_magic_cast(snd_usb_midi_out_endpoint_t, (void*)data, return);
+	snd_usb_midi_out_endpoint_t* ep = (snd_usb_midi_out_endpoint_t *) data;
 	
 	snd_usbmidi_do_output(ep);
 }
 
 static int snd_usbmidi_output_open(snd_rawmidi_substream_t* substream)
 {
-	snd_usb_midi_t* umidi = snd_magic_cast(snd_usb_midi_t, substream->rmidi->private_data, return -ENXIO);
+	snd_usb_midi_t* umidi = substream->rmidi->private_data;
 	usbmidi_out_port_t* port = NULL;
 	int i, j;
 
@@ -503,7 +503,7 @@ static void snd_usbmidi_in_endpoint_delete(snd_usb_midi_in_endpoint_t* ep)
 			kfree(ep->urb->transfer_buffer);
 		usb_free_urb(ep->urb);
 	}
-	snd_magic_kfree(ep);
+	kfree(ep);
 }
 
 /*
@@ -571,7 +571,7 @@ static int snd_usbmidi_in_endpoint_create(snd_usb_midi_t* umidi,
 	int length;
 
 	rep->in = NULL;
-	ep = snd_magic_kcalloc(snd_usb_midi_in_endpoint_t, 0, GFP_KERNEL);
+	ep = kcalloc(1, sizeof(*ep), GFP_KERNEL);
 	if (!ep)
 		return -ENOMEM;
 	ep->umidi = umidi;
@@ -631,7 +631,7 @@ static void snd_usbmidi_out_endpoint_delete(snd_usb_midi_out_endpoint_t* ep)
 			kfree(ep->urb->transfer_buffer);
 		usb_free_urb(ep->urb);
 	}
-	snd_magic_kfree(ep);
+	kfree(ep);
 }
 
 /*
@@ -647,7 +647,7 @@ static int snd_usbmidi_out_endpoint_create(snd_usb_midi_t* umidi,
 	void* buffer;
 
 	rep->out = NULL;
-	ep = snd_magic_kcalloc(snd_usb_midi_out_endpoint_t, 0, GFP_KERNEL);
+	ep = kcalloc(1, sizeof(*ep), GFP_KERNEL);
 	if (!ep)
 		return -ENOMEM;
 	ep->umidi = umidi;
@@ -695,7 +695,7 @@ static void snd_usbmidi_free(snd_usb_midi_t* umidi)
 		if (ep->in)
 			snd_usbmidi_in_endpoint_delete(ep->in);
 	}
-	snd_magic_kfree(umidi);
+	kfree(umidi);
 }
 
 /*
@@ -718,7 +718,7 @@ void snd_usbmidi_disconnect(struct list_head* p, struct usb_driver *driver)
 
 static void snd_usbmidi_rawmidi_free(snd_rawmidi_t* rmidi)
 {
-	snd_usb_midi_t* umidi = snd_magic_cast(snd_usb_midi_t, rmidi->private_data, return);
+	snd_usb_midi_t* umidi = rmidi->private_data;
 	snd_usbmidi_free(umidi);
 }
 
@@ -1145,6 +1145,44 @@ static int snd_usbmidi_create_rawmidi(snd_usb_midi_t* umidi,
 }
 
 /*
+ * Temporarily stop input. 
+ */
+void snd_usbmidi_input_stop(struct list_head* p)
+{
+	snd_usb_midi_t* umidi;
+	int i;
+
+	umidi = list_entry(p, snd_usb_midi_t, list);
+	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i) {
+		snd_usb_midi_endpoint_t* ep = &umidi->endpoints[i];
+		if (ep->in)
+			usb_unlink_urb(ep->in->urb);
+	}
+}
+
+static void snd_usbmidi_input_start_ep(snd_usb_midi_in_endpoint_t* ep)
+{
+	if (ep) {
+		struct urb* urb = ep->urb; 
+		urb->dev = ep->umidi->chip->dev;
+		snd_usbmidi_submit_urb(urb, GFP_KERNEL);
+	}
+}
+
+/*
+ * Resume input after a call to snd_usbmidi_input_stop().
+ */
+void snd_usbmidi_input_start(struct list_head* p)
+{
+	snd_usb_midi_t* umidi;
+	int i;
+
+	umidi = list_entry(p, snd_usb_midi_t, list);
+	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i)
+		snd_usbmidi_input_start_ep(umidi->endpoints[i].in);
+}
+
+/*
  * Creates and registers everything needed for a MIDI streaming interface.
  */
 int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
@@ -1156,7 +1194,7 @@ int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
 	int out_ports, in_ports;
 	int i, err;
 
-	umidi = snd_magic_kcalloc(snd_usb_midi_t, 0, GFP_KERNEL);
+	umidi = kcalloc(1, sizeof(*umidi), GFP_KERNEL);
 	if (!umidi)
 		return -ENOMEM;
 	umidi->chip = chip;
@@ -1189,7 +1227,7 @@ int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
 		}
 	}
 	if (err < 0) {
-		snd_magic_kfree(umidi);
+		kfree(umidi);
 		return err;
 	}
 
@@ -1202,7 +1240,7 @@ int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
 	}
 	err = snd_usbmidi_create_rawmidi(umidi, out_ports, in_ports);
 	if (err < 0) {
-		snd_magic_kfree(umidi);
+		kfree(umidi);
 		return err;
 	}
 
@@ -1219,8 +1257,6 @@ int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
 	list_add(&umidi->list, &umidi->chip->midi_list);
 
 	for (i = 0; i < MIDI_MAX_ENDPOINTS; ++i)
-		if (umidi->endpoints[i].in)
-			snd_usbmidi_submit_urb(umidi->endpoints[i].in->urb,
-					       GFP_KERNEL);
+		snd_usbmidi_input_start_ep(umidi->endpoints[i].in);
 	return 0;
 }

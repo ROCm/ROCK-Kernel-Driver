@@ -42,8 +42,6 @@
 
 #include <asm/io.h>
 
-#define chip_t ymfpci_t
-
 /*
  *  constants
  */
@@ -102,7 +100,7 @@ static int snd_ymfpci_codec_ready(ymfpci_t *chip, int secondary)
 
 static void snd_ymfpci_codec_write(ac97_t *ac97, u16 reg, u16 val)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, ac97->private_data, return);
+	ymfpci_t *chip = ac97->private_data;
 	u32 cmd;
 	
 	snd_ymfpci_codec_ready(chip, 0);
@@ -112,7 +110,7 @@ static void snd_ymfpci_codec_write(ac97_t *ac97, u16 reg, u16 val)
 
 static u16 snd_ymfpci_codec_read(ac97_t *ac97, u16 reg)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, ac97->private_data, return -ENXIO);
+	ymfpci_t *chip = ac97->private_data;
 
 	if (snd_ymfpci_codec_ready(chip, 0))
 		return ~0;
@@ -330,7 +328,7 @@ static void snd_ymfpci_pcm_interrupt(ymfpci_t *chip, ymfpci_voice_t *voice)
 static void snd_ymfpci_pcm_capture_interrupt(snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return);
+	ymfpci_pcm_t *ypcm = runtime->private_data;
 	ymfpci_t *chip = ypcm->chip;
 	u32 pos, delta;
 	
@@ -358,7 +356,7 @@ static int snd_ymfpci_playback_trigger(snd_pcm_substream_t * substream,
 				       int cmd)
 {
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, substream->runtime->private_data, return -ENXIO);
+	ymfpci_pcm_t *ypcm = substream->runtime->private_data;
 	int result = 0;
 
 	spin_lock(&chip->reg_lock);
@@ -395,7 +393,7 @@ static int snd_ymfpci_capture_trigger(snd_pcm_substream_t * substream,
 				      int cmd)
 {
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, substream->runtime->private_data, return -ENXIO);
+	ymfpci_pcm_t *ypcm = substream->runtime->private_data;
 	int result = 0;
 	u32 tmp;
 
@@ -578,7 +576,7 @@ static int snd_ymfpci_playback_hw_params(snd_pcm_substream_t * substream,
 					 snd_pcm_hw_params_t * hw_params)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
+	ymfpci_pcm_t *ypcm = runtime->private_data;
 	int err;
 
 	if ((err = snd_pcm_lib_malloc_pages(substream, params_buffer_bytes(hw_params))) < 0)
@@ -596,7 +594,7 @@ static int snd_ymfpci_playback_hw_free(snd_pcm_substream_t * substream)
 	
 	if (runtime->private_data == NULL)
 		return 0;
-	ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
+	ypcm = runtime->private_data;
 
 	/* wait, until the PCI operations are not finished */
 	snd_ymfpci_irq_wait(chip);
@@ -616,7 +614,7 @@ static int snd_ymfpci_playback_prepare(snd_pcm_substream_t * substream)
 {
 	// ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
+	ymfpci_pcm_t *ypcm = runtime->private_data;
 	unsigned int nvoice;
 
 	ypcm->period_size = runtime->period_size;
@@ -654,7 +652,7 @@ static int snd_ymfpci_capture_prepare(snd_pcm_substream_t * substream)
 {
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
+	ymfpci_pcm_t *ypcm = runtime->private_data;
 	snd_ymfpci_capture_bank_t * bank;
 	int nbank;
 	u32 rate, format;
@@ -698,7 +696,7 @@ static snd_pcm_uframes_t snd_ymfpci_playback_pointer(snd_pcm_substream_t * subst
 {
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
+	ymfpci_pcm_t *ypcm = runtime->private_data;
 	ymfpci_voice_t *voice = ypcm->voices[0];
 
 	if (!(ypcm->running && voice))
@@ -710,7 +708,7 @@ static snd_pcm_uframes_t snd_ymfpci_capture_pointer(snd_pcm_substream_t * substr
 {
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
+	ymfpci_pcm_t *ypcm = runtime->private_data;
 
 	if (!ypcm->running)
 		return 0;
@@ -736,7 +734,7 @@ static void snd_ymfpci_irq_wait(ymfpci_t *chip)
 
 static irqreturn_t snd_ymfpci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, dev_id, return IRQ_NONE);
+	ymfpci_t *chip = dev_id;
 	u32 status, nvoice, mode;
 	ymfpci_voice_t *voice;
 
@@ -830,10 +828,10 @@ static snd_pcm_hardware_t snd_ymfpci_capture =
 
 static void snd_ymfpci_pcm_free_substream(snd_pcm_runtime_t *runtime)
 {
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return);
+	ymfpci_pcm_t *ypcm = runtime->private_data;
 	
 	if (ypcm)
-		snd_magic_kfree(ypcm);
+		kfree(ypcm);
 }
 
 static int snd_ymfpci_playback_open_1(snd_pcm_substream_t * substream)
@@ -842,7 +840,7 @@ static int snd_ymfpci_playback_open_1(snd_pcm_substream_t * substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	ymfpci_pcm_t *ypcm;
 
-	ypcm = snd_magic_kcalloc(ymfpci_pcm_t, 0, GFP_KERNEL);
+	ypcm = kcalloc(1, sizeof(*ypcm), GFP_KERNEL);
 	if (ypcm == NULL)
 		return -ENOMEM;
 	ypcm->chip = chip;
@@ -891,7 +889,7 @@ static int snd_ymfpci_playback_open(snd_pcm_substream_t * substream)
 	
 	if ((err = snd_ymfpci_playback_open_1(substream)) < 0)
 		return err;
-	ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return 0);
+	ypcm = runtime->private_data;
 	ypcm->output_front = 1;
 	ypcm->output_rear = chip->mode_dup4ch ? 1 : 0;
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -913,7 +911,7 @@ static int snd_ymfpci_playback_spdif_open(snd_pcm_substream_t * substream)
 	
 	if ((err = snd_ymfpci_playback_open_1(substream)) < 0)
 		return err;
-	ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return 0);
+	ypcm = runtime->private_data;
 	ypcm->output_front = 0;
 	ypcm->output_rear = 1;
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -941,7 +939,7 @@ static int snd_ymfpci_playback_4ch_open(snd_pcm_substream_t * substream)
 	
 	if ((err = snd_ymfpci_playback_open_1(substream)) < 0)
 		return err;
-	ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return 0);
+	ypcm = runtime->private_data;
 	ypcm->output_front = 0;
 	ypcm->output_rear = 1;
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -958,7 +956,7 @@ static int snd_ymfpci_capture_open(snd_pcm_substream_t * substream,
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	ymfpci_pcm_t *ypcm;
 
-	ypcm = snd_magic_kcalloc(ymfpci_pcm_t, 0, GFP_KERNEL);
+	ypcm = kcalloc(1, sizeof(*ypcm), GFP_KERNEL);
 	if (ypcm == NULL)
 		return -ENOMEM;
 	ypcm->chip = chip;
@@ -993,7 +991,7 @@ static int snd_ymfpci_playback_close_1(snd_pcm_substream_t * substream)
 static int snd_ymfpci_playback_close(snd_pcm_substream_t * substream)
 {
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, substream->runtime->private_data, return -ENXIO);
+	ymfpci_pcm_t *ypcm = substream->runtime->private_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -1041,7 +1039,7 @@ static int snd_ymfpci_capture_close(snd_pcm_substream_t * substream)
 {
 	ymfpci_t *chip = snd_pcm_substream_chip(substream);
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	ymfpci_pcm_t *ypcm = snd_magic_cast(ymfpci_pcm_t, runtime->private_data, return -ENXIO);
+	ymfpci_pcm_t *ypcm = runtime->private_data;
 
 	if (ypcm != NULL) {
 		chip->capture_substream[ypcm->capture_bank_number] = NULL;
@@ -1074,7 +1072,7 @@ static snd_pcm_ops_t snd_ymfpci_capture_rec_ops = {
 
 static void snd_ymfpci_pcm_free(snd_pcm_t *pcm)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pcm->private_data, return);
+	ymfpci_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1120,7 +1118,7 @@ static snd_pcm_ops_t snd_ymfpci_capture_ac97_ops = {
 
 static void snd_ymfpci_pcm2_free(snd_pcm_t *pcm)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pcm->private_data, return);
+	ymfpci_t *chip = pcm->private_data;
 	chip->pcm2 = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1166,7 +1164,7 @@ static snd_pcm_ops_t snd_ymfpci_playback_spdif_ops = {
 
 static void snd_ymfpci_pcm_spdif_free(snd_pcm_t *pcm)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pcm->private_data, return);
+	ymfpci_t *chip = pcm->private_data;
 	chip->pcm_spdif = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1211,7 +1209,7 @@ static snd_pcm_ops_t snd_ymfpci_playback_4ch_ops = {
 
 static void snd_ymfpci_pcm_4ch_free(snd_pcm_t *pcm)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pcm->private_data, return);
+	ymfpci_t *chip = pcm->private_data;
 	chip->pcm_4ch = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1709,13 +1707,13 @@ static snd_kcontrol_new_t snd_ymfpci_rear_shared __devinitdata = {
 
 static void snd_ymfpci_mixer_free_ac97_bus(ac97_bus_t *bus)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, bus->private_data, return);
+	ymfpci_t *chip = bus->private_data;
 	chip->ac97_bus = NULL;
 }
 
 static void snd_ymfpci_mixer_free_ac97(ac97_t *ac97)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, ac97->private_data, return);
+	ymfpci_t *chip = ac97->private_data;
 	chip->ac97 = NULL;
 }
 
@@ -1854,7 +1852,7 @@ int __devinit snd_ymfpci_timer(ymfpci_t *chip, int device)
 static void snd_ymfpci_proc_read(snd_info_entry_t *entry, 
 				 snd_info_buffer_t * buffer)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, entry->private_data, return);
+	ymfpci_t *chip = entry->private_data;
 	int i;
 	
 	snd_iprintf(buffer, "YMFPCI\n\n");
@@ -2117,13 +2115,13 @@ static int snd_ymfpci_free(ymfpci_t *chip)
 
 	pci_write_config_word(chip->pci, 0x40, chip->old_legacy_ctrl);
 	
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_ymfpci_dev_free(snd_device_t *device)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, device->device_data, return -ENXIO);
+	ymfpci_t *chip = device->device_data;
 	return snd_ymfpci_free(chip);
 }
 
@@ -2159,7 +2157,7 @@ static int saved_regs_index[] = {
 
 static int snd_ymfpci_suspend(snd_card_t *card, unsigned int state)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, card->pm_private_data, return -EINVAL);
+	ymfpci_t *chip = card->pm_private_data;
 	unsigned int i;
 	
 	snd_pcm_suspend_all(chip->pcm);
@@ -2178,7 +2176,7 @@ static int snd_ymfpci_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_ymfpci_resume(snd_card_t *card, unsigned int state)
 {
-	ymfpci_t *chip = snd_magic_cast(ymfpci_t, card->pm_private_data, return -EINVAL);
+	ymfpci_t *chip = card->pm_private_data;
 	unsigned int i;
 
 	pci_enable_device(chip->pci);
@@ -2223,7 +2221,7 @@ int __devinit snd_ymfpci_create(snd_card_t * card,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	chip = snd_magic_kcalloc(ymfpci_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	chip->old_legacy_ctrl = old_legacy_ctrl;

@@ -43,8 +43,7 @@
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("C-Media CMI8x38 PCI");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{C-Media,CMI8738},"
+MODULE_SUPPORTED_DEVICE("{{C-Media,CMI8738},"
 		"{C-Media,CMI8738B},"
 		"{C-Media,CMI8338A},"
 		"{C-Media,CMI8338B}}");
@@ -66,25 +65,19 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for C-Media PCI soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for C-Media PCI soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable C-Media PCI soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_ENABLED ",allows:{{0},{0x330},{0x320},{0x310},{0x300}},dialog:list");
 module_param_array(fm_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(fm_port, "FM port.");
-MODULE_PARM_SYNTAX(fm_port, SNDRV_ENABLED ",allows:{{0},{0x388},{0x3c8},{0x3e0},{0x3e8}},dialog:list");
 module_param_array(soft_ac3, bool, boot_devs, 0444);
 MODULE_PARM_DESC(soft_ac3, "Sofware-conversion of raw SPDIF packets (model 033 only).");
 #ifdef SUPPORT_JOYSTICK
 module_param_array(joystick_port, int, boot_devs, 0444);
 MODULE_PARM_DESC(joystick_port, "Joystick port address.");
-MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{1},{0x200},{0x201}},dialog:list");
 #endif
 
 #ifndef PCI_DEVICE_ID_CMEDIA_CM8738
@@ -404,8 +397,6 @@ MODULE_PARM_SYNTAX(joystick_port, SNDRV_ENABLED ",allows:{{0},{1},{0x200},{0x201
 
 typedef struct snd_stru_cmipci cmipci_t;
 typedef struct snd_stru_cmipci_pcm cmipci_pcm_t;
-
-#define chip_t cmipci_t
 
 struct snd_stru_cmipci_pcm {
 	snd_pcm_substream_t *substream;
@@ -1072,30 +1063,36 @@ static snd_kcontrol_new_t snd_cmipci_spdif_stream __devinitdata =
  */
 
 /* save mixer setting and mute for AC3 playback */
-static void save_mixer_state(cmipci_t *cm)
+static int save_mixer_state(cmipci_t *cm)
 {
 	if (! cm->mixer_insensitive) {
+		snd_ctl_elem_value_t *val;
 		unsigned int i;
+
+		val = kmalloc(sizeof(*val), GFP_ATOMIC);
+		if (!val)
+			return -ENOMEM;
 		for (i = 0; i < CM_SAVED_MIXERS; i++) {
 			snd_kcontrol_t *ctl = cm->mixer_res_ctl[i];
 			if (ctl) {
-				snd_ctl_elem_value_t val;
 				int event;
-				memset(&val, 0, sizeof(val));
-				ctl->get(ctl, &val);
-				cm->mixer_res_status[i] = val.value.integer.value[0];
-				val.value.integer.value[0] = cm_saved_mixer[i].toggle_on;
+				memset(val, 0, sizeof(*val));
+				ctl->get(ctl, val);
+				cm->mixer_res_status[i] = val->value.integer.value[0];
+				val->value.integer.value[0] = cm_saved_mixer[i].toggle_on;
 				event = SNDRV_CTL_EVENT_MASK_INFO;
-				if (cm->mixer_res_status[i] != val.value.integer.value[0]) {
-					ctl->put(ctl, &val); /* toggle */
+				if (cm->mixer_res_status[i] != val->value.integer.value[0]) {
+					ctl->put(ctl, val); /* toggle */
 					event |= SNDRV_CTL_EVENT_MASK_VALUE;
 				}
 				ctl->vd[0].access |= SNDRV_CTL_ELEM_ACCESS_INACTIVE;
 				snd_ctl_notify(cm->card, event, &ctl->id);
 			}
 		}
+		kfree(val);
 		cm->mixer_insensitive = 1;
 	}
+	return 0;
 }
 
 
@@ -1103,27 +1100,32 @@ static void save_mixer_state(cmipci_t *cm)
 static void restore_mixer_state(cmipci_t *cm)
 {
 	if (cm->mixer_insensitive) {
+		snd_ctl_elem_value_t *val;
 		unsigned int i;
+
+		val = kmalloc(sizeof(*val), GFP_KERNEL);
+		if (!val)
+			return;
 		cm->mixer_insensitive = 0; /* at first clear this;
 					      otherwise the changes will be ignored */
 		for (i = 0; i < CM_SAVED_MIXERS; i++) {
 			snd_kcontrol_t *ctl = cm->mixer_res_ctl[i];
 			if (ctl) {
-				snd_ctl_elem_value_t val;
 				int event;
 
-				memset(&val, 0, sizeof(val));
+				memset(val, 0, sizeof(*val));
 				ctl->vd[0].access &= ~SNDRV_CTL_ELEM_ACCESS_INACTIVE;
-				ctl->get(ctl, &val);
+				ctl->get(ctl, val);
 				event = SNDRV_CTL_EVENT_MASK_INFO;
-				if (val.value.integer.value[0] != cm->mixer_res_status[i]) {
-					val.value.integer.value[0] = cm->mixer_res_status[i];
-					ctl->put(ctl, &val);
+				if (val->value.integer.value[0] != cm->mixer_res_status[i]) {
+					val->value.integer.value[0] = cm->mixer_res_status[i];
+					ctl->put(ctl, val);
 					event |= SNDRV_CTL_EVENT_MASK_VALUE;
 				}
 				snd_ctl_notify(cm->card, event, &ctl->id);
 			}
 		}
+		kfree(val);
 	}
 }
 
@@ -1175,15 +1177,16 @@ static void setup_ac3(cmipci_t *cm, snd_pcm_substream_t *subs, int do_ac3, int r
 	}
 }
 
-static void setup_spdif_playback(cmipci_t *cm, snd_pcm_substream_t *subs, int up, int do_ac3)
+static int setup_spdif_playback(cmipci_t *cm, snd_pcm_substream_t *subs, int up, int do_ac3)
 {
-	int rate;
+	int rate, err;
 	unsigned long flags;
 
 	rate = subs->runtime->rate;
 
 	if (up && do_ac3)
-		save_mixer_state(cm);
+		if ((err = save_mixer_state(cm)) < 0)
+			return err;
 
 	spin_lock_irqsave(&cm->reg_lock, flags);
 	cm->spdif_playback_avail = up;
@@ -1208,6 +1211,7 @@ static void setup_spdif_playback(cmipci_t *cm, snd_pcm_substream_t *subs, int up
 		setup_ac3(cm, subs, 0, 0);
 	}
 	spin_unlock_irqrestore(&cm->reg_lock, flags);
+	return 0;
 }
 
 
@@ -1220,13 +1224,15 @@ static int snd_cmipci_playback_prepare(snd_pcm_substream_t *substream)
 {
 	cmipci_t *cm = snd_pcm_substream_chip(substream);
 	int rate = substream->runtime->rate;
-	int do_spdif, do_ac3 = 0;
+	int err, do_spdif, do_ac3 = 0;
+
 	do_spdif = ((rate == 44100 || rate == 48000) &&
 		    substream->runtime->format == SNDRV_PCM_FORMAT_S16_LE &&
 		    substream->runtime->channels == 2);
 	if (do_spdif && cm->can_ac3_hw) 
 		do_ac3 = cm->dig_pcm_status & IEC958_AES0_NONAUDIO;
-	setup_spdif_playback(cm, substream, do_spdif, do_ac3);
+	if ((err = setup_spdif_playback(cm, substream, do_spdif, do_ac3)) < 0)
+		return err;
 	return snd_cmipci_pcm_prepare(cm, &cm->channel[CM_CH_PLAY], substream);
 }
 
@@ -1234,12 +1240,14 @@ static int snd_cmipci_playback_prepare(snd_pcm_substream_t *substream)
 static int snd_cmipci_playback_spdif_prepare(snd_pcm_substream_t *substream)
 {
 	cmipci_t *cm = snd_pcm_substream_chip(substream);
-	int do_ac3;
+	int err, do_ac3;
+
 	if (cm->can_ac3_hw) 
 		do_ac3 = cm->dig_pcm_status & IEC958_AES0_NONAUDIO;
 	else
 		do_ac3 = 1; /* doesn't matter */
-	setup_spdif_playback(cm, substream, 1, do_ac3);
+	if ((err = setup_spdif_playback(cm, substream, 1, do_ac3)) < 0)
+		return err;
 	return snd_cmipci_pcm_prepare(cm, &cm->channel[CM_CH_PLAY], substream);
 }
 
@@ -1289,7 +1297,7 @@ static int snd_cmipci_capture_spdif_hw_free(snd_pcm_substream_t *subs)
  */
 static irqreturn_t snd_cmipci_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cmipci_t *cm = snd_magic_cast(cmipci_t, dev_id, return IRQ_NONE);
+	cmipci_t *cm = dev_id;
 	unsigned int status, mask = 0;
 	
 	/* fastpath out, to ease interrupt sharing */
@@ -2446,7 +2454,7 @@ static int __devinit snd_cmipci_mixer_new(cmipci_t *cm, int pcm_spdif_device)
 static void snd_cmipci_proc_read(snd_info_entry_t *entry, 
 				 snd_info_buffer_t *buffer)
 {
-	cmipci_t *cm = snd_magic_cast(cmipci_t, entry->private_data, return);
+	cmipci_t *cm = entry->private_data;
 	int i;
 	
 	snd_iprintf(buffer, "%s\n\n", cm->card->longname);
@@ -2570,13 +2578,13 @@ static int snd_cmipci_free(cmipci_t *cm)
 		release_resource(cm->res_iobase);
 		kfree_nocheck(cm->res_iobase);
 	}
-	snd_magic_kfree(cm);
+	kfree(cm);
 	return 0;
 }
 
 static int snd_cmipci_dev_free(snd_device_t *device)
 {
-	cmipci_t *cm = snd_magic_cast(cmipci_t, device->device_data, return -ENXIO);
+	cmipci_t *cm = device->device_data;
 	return snd_cmipci_free(cm);
 }
 
@@ -2598,7 +2606,7 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
 
-	cm = snd_magic_kcalloc(cmipci_t, 0, GFP_KERNEL);
+	cm = kcalloc(1, sizeof(*cm), GFP_KERNEL);
 	if (cm == NULL)
 		return -ENOMEM;
 
@@ -2776,12 +2784,12 @@ static int __devinit snd_cmipci_create(snd_card_t *card, struct pci_dev *pci,
 			int i;
 			for (i = 0; ports[i]; i++) {
 				joystick_port[dev] = ports[i];
-				cm->res_joystick = request_region(ports[i], 8, "CMIPCI gameport");
+				cm->res_joystick = request_region(ports[i], 1, "CMIPCI gameport");
 				if (cm->res_joystick)
 					break;
 			}
 		} else {
-			cm->res_joystick = request_region(joystick_port[dev], 8, "CMIPCI gameport");
+			cm->res_joystick = request_region(joystick_port[dev], 1, "CMIPCI gameport");
 		}
 	}
 	if (cm->res_joystick) {

@@ -189,7 +189,7 @@ snd_trident_alloc_sg_pages(trident_t *trident, snd_pcm_substream_t *substream)
 	snd_util_memblk_t *blk;
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	int idx, page;
-	struct snd_sg_buf *sgbuf = runtime->dma_private;
+	struct snd_sg_buf *sgbuf = snd_pcm_substream_sgbuf(substream);
 
 	snd_assert(runtime->dma_bytes > 0 && runtime->dma_bytes <= SNDRV_TRIDENT_MAX_PAGES * SNDRV_TRIDENT_PAGE_SIZE, return NULL);
 	hdr = trident->tlb.memhdr;

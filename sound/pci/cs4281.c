@@ -40,8 +40,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Cirrus Logic CS4281");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Cirrus Logic,CS4281}}");
+MODULE_SUPPORTED_DEVICE("{{Cirrus Logic,CS4281}}");
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
@@ -51,16 +50,12 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for CS4281 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for CS4281 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable CS4281 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(dual_codec, bool, boot_devs, 0444);
 MODULE_PARM_DESC(dual_codec, "Secondary Codec ID (0 = disabled).");
-MODULE_PARM_SYNTAX(dual_codec, SNDRV_ENABLED ",allows:{{0,3}}");
 
 /*
  *
@@ -441,8 +436,6 @@ MODULE_PARM_SYNTAX(dual_codec, SNDRV_ENABLED ",allows:{{0,3}}");
  *
  */
 
-#define chip_t cs4281_t
-
 typedef struct snd_cs4281 cs4281_t;
 typedef struct snd_cs4281_dma cs4281_dma_t;
 
@@ -575,7 +568,7 @@ static void snd_cs4281_ac97_write(ac97_t *ac97,
 	 *  4. Read ACCTL = 460h, DCV should be reset by now and 460h = 07h
 	 *  5. if DCV not cleared, break and return error
 	 */
-	cs4281_t *chip = snd_magic_cast(cs4281_t, ac97->private_data, return);
+	cs4281_t *chip = ac97->private_data;
 	int count;
 
 	/*
@@ -613,7 +606,7 @@ static void snd_cs4281_ac97_write(ac97_t *ac97,
 static unsigned short snd_cs4281_ac97_read(ac97_t *ac97,
 					   unsigned short reg)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, ac97->private_data, return -ENXIO);
+	cs4281_t *chip = ac97->private_data;
 	int count;
 	unsigned short result;
 	// FIXME: volatile is necessary in the following due to a bug of
@@ -1015,7 +1008,7 @@ static snd_pcm_ops_t snd_cs4281_capture_ops = {
 
 static void snd_cs4281_pcm_free(snd_pcm_t *pcm)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, pcm->private_data, return);
+	cs4281_t *chip = pcm->private_data;
 	chip->pcm = NULL;
 	snd_pcm_lib_preallocate_free_for_all(pcm);
 }
@@ -1124,13 +1117,13 @@ static snd_kcontrol_new_t snd_cs4281_pcm_vol =
 
 static void snd_cs4281_mixer_free_ac97_bus(ac97_bus_t *bus)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, bus->private_data, return);
+	cs4281_t *chip = bus->private_data;
 	chip->ac97_bus = NULL;
 }
 
 static void snd_cs4281_mixer_free_ac97(ac97_t *ac97)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, ac97->private_data, return);
+	cs4281_t *chip = ac97->private_data;
 	if (ac97->num)
 		chip->ac97_secondary = NULL;
 	else
@@ -1177,7 +1170,7 @@ static int __devinit snd_cs4281_mixer(cs4281_t * chip)
 static void snd_cs4281_proc_read(snd_info_entry_t *entry, 
 				  snd_info_buffer_t * buffer)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, entry->private_data, return);
+	cs4281_t *chip = entry->private_data;
 
 	snd_iprintf(buffer, "Cirrus Logic CS4281\n\n");
 	snd_iprintf(buffer, "Spurious half IRQs   : %u\n", chip->spurious_dhtc_irq);
@@ -1188,7 +1181,7 @@ static long snd_cs4281_BA0_read(snd_info_entry_t *entry, void *file_private_data
 				struct file *file, char __user *buf, long count)
 {
 	long size;
-	cs4281_t *chip = snd_magic_cast(cs4281_t, entry->private_data, return -ENXIO);
+	cs4281_t *chip = entry->private_data;
 	
 	size = count;
 	if (file->f_pos + size > CS4281_BA0_SIZE)
@@ -1205,7 +1198,7 @@ static long snd_cs4281_BA1_read(snd_info_entry_t *entry, void *file_private_data
 				struct file *file, char __user *buf, long count)
 {
 	long size;
-	cs4281_t *chip = snd_magic_cast(cs4281_t, entry->private_data, return -ENXIO);
+	cs4281_t *chip = entry->private_data;
 	
 	size = count;
 	if (file->f_pos + size > CS4281_BA1_SIZE)
@@ -1262,7 +1255,7 @@ static void snd_cs4281_gameport_trigger(struct gameport *gameport)
 	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
 	cs4281_t *chip;
 	snd_assert(gp, return);
-	chip = snd_magic_cast(cs4281_t, gp->chip, return);
+	chip = gp->chip;
 	snd_cs4281_pokeBA0(chip, BA0_JSPT, 0xff);
 }
 
@@ -1271,7 +1264,7 @@ static unsigned char snd_cs4281_gameport_read(struct gameport *gameport)
 	cs4281_gameport_t *gp = (cs4281_gameport_t *)gameport;
 	cs4281_t *chip;
 	snd_assert(gp, return 0);
-	chip = snd_magic_cast(cs4281_t, gp->chip, return 0);
+	chip = gp->chip;
 	return snd_cs4281_peekBA0(chip, BA0_JSPT);
 }
 
@@ -1283,7 +1276,7 @@ static int snd_cs4281_gameport_cooked_read(struct gameport *gameport, int *axes,
 	unsigned js1, js2, jst;
 	
 	snd_assert(gp, return 0);
-	chip = snd_magic_cast(cs4281_t, gp->chip, return 0);
+	chip = gp->chip;
 
 	js1 = snd_cs4281_peekBA0(chip, BA0_JSC1);
 	js2 = snd_cs4281_peekBA0(chip, BA0_JSC2);
@@ -1384,13 +1377,13 @@ static int snd_cs4281_free(cs4281_t *chip)
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);
 
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_cs4281_dev_free(snd_device_t *device)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, device->device_data, return -ENXIO);
+	cs4281_t *chip = device->device_data;
 	return snd_cs4281_free(chip);
 }
 
@@ -1415,7 +1408,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 	*rchip = NULL;
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
-	chip = snd_magic_kcalloc(cs4281_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	spin_lock_init(&chip->reg_lock);
@@ -1714,7 +1707,7 @@ static void snd_cs4281_midi_reset(cs4281_t *chip)
 static int snd_cs4281_midi_input_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	cs4281_t *chip = snd_magic_cast(cs4281_t, substream->rmidi->private_data, return -ENXIO);
+	cs4281_t *chip = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
  	chip->midcr |= BA0_MIDCR_RXE;
@@ -1731,7 +1724,7 @@ static int snd_cs4281_midi_input_open(snd_rawmidi_substream_t * substream)
 static int snd_cs4281_midi_input_close(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	cs4281_t *chip = snd_magic_cast(cs4281_t, substream->rmidi->private_data, return -ENXIO);
+	cs4281_t *chip = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->midcr &= ~(BA0_MIDCR_RXE | BA0_MIDCR_RIE);
@@ -1749,7 +1742,7 @@ static int snd_cs4281_midi_input_close(snd_rawmidi_substream_t * substream)
 static int snd_cs4281_midi_output_open(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	cs4281_t *chip = snd_magic_cast(cs4281_t, substream->rmidi->private_data, return -ENXIO);
+	cs4281_t *chip = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->uartm |= CS4281_MODE_OUTPUT;
@@ -1767,7 +1760,7 @@ static int snd_cs4281_midi_output_open(snd_rawmidi_substream_t * substream)
 static int snd_cs4281_midi_output_close(snd_rawmidi_substream_t * substream)
 {
 	unsigned long flags;
-	cs4281_t *chip = snd_magic_cast(cs4281_t, substream->rmidi->private_data, return -ENXIO);
+	cs4281_t *chip = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	chip->midcr &= ~(BA0_MIDCR_TXE | BA0_MIDCR_TIE);
@@ -1785,7 +1778,7 @@ static int snd_cs4281_midi_output_close(snd_rawmidi_substream_t * substream)
 static void snd_cs4281_midi_input_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	cs4281_t *chip = snd_magic_cast(cs4281_t, substream->rmidi->private_data, return);
+	cs4281_t *chip = substream->rmidi->private_data;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	if (up) {
@@ -1805,7 +1798,7 @@ static void snd_cs4281_midi_input_trigger(snd_rawmidi_substream_t * substream, i
 static void snd_cs4281_midi_output_trigger(snd_rawmidi_substream_t * substream, int up)
 {
 	unsigned long flags;
-	cs4281_t *chip = snd_magic_cast(cs4281_t, substream->rmidi->private_data, return);
+	cs4281_t *chip = substream->rmidi->private_data;
 	unsigned char byte;
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
@@ -1872,7 +1865,7 @@ static int __devinit snd_cs4281_midi(cs4281_t * chip, int device, snd_rawmidi_t 
 
 static irqreturn_t snd_cs4281_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, dev_id, return IRQ_NONE);
+	cs4281_t *chip = dev_id;
 	unsigned int status, dma, val;
 	cs4281_dma_t *cdma;
 
@@ -2040,7 +2033,7 @@ static int saved_regs[SUSPEND_REGISTERS] = {
 
 static int cs4281_suspend(snd_card_t *card, unsigned int state)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, card->pm_private_data, return -EINVAL);
+	cs4281_t *chip = card->pm_private_data;
 	u32 ulCLK;
 	unsigned int i;
 
@@ -2085,7 +2078,7 @@ static int cs4281_suspend(snd_card_t *card, unsigned int state)
 
 static int cs4281_resume(snd_card_t *card, unsigned int state)
 {
-	cs4281_t *chip = snd_magic_cast(cs4281_t, card->pm_private_data, return -EINVAL);
+	cs4281_t *chip = card->pm_private_data;
 	unsigned int i;
 	u32 ulCLK;
 

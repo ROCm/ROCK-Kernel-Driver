@@ -472,7 +472,7 @@ static void snd_opl4_wait_for_wave_headers(opl4_t *opl4)
 
 void snd_opl4_note_on(void *private_data, int note, int vel, snd_midi_channel_t *chan)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, private_data, return);
+	opl4_t *opl4 = private_data;
 	const opl4_region_ptr_t *regions;
 	opl4_voice_t *voice[2];
 	const opl4_sound_t *sound[2];
@@ -553,7 +553,7 @@ static void snd_opl4_voice_off(opl4_t *opl4, opl4_voice_t *voice)
 
 void snd_opl4_note_off(void *private_data, int note, int vel, snd_midi_channel_t *chan)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, private_data, return);
+	opl4_t *opl4 = private_data;
 
 	snd_opl4_do_for_note(opl4, note, chan, snd_opl4_voice_off);
 }
@@ -569,14 +569,14 @@ static void snd_opl4_terminate_voice(opl4_t *opl4, opl4_voice_t *voice)
 
 void snd_opl4_terminate_note(void *private_data, int note, snd_midi_channel_t *chan)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, private_data, return);
+	opl4_t *opl4 = private_data;
 
 	snd_opl4_do_for_note(opl4, note, chan, snd_opl4_terminate_voice);
 }
 
 void snd_opl4_control(void *private_data, int type, snd_midi_channel_t *chan)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, private_data, return);
+	opl4_t *opl4 = private_data;
 
 	switch (type) {
 	case MIDI_CTL_MSB_MODWHEEL:
@@ -616,7 +616,7 @@ void snd_opl4_control(void *private_data, int type, snd_midi_channel_t *chan)
 void snd_opl4_sysex(void *private_data, unsigned char *buf, int len,
 		    int parsed, snd_midi_channel_set_t *chset)
 {
-	opl4_t *opl4 = snd_magic_cast(opl4_t, private_data, return);
+	opl4_t *opl4 = private_data;
 
 	if (parsed == SNDRV_MIDI_SYSEX_GS_MASTER_VOLUME)
 		snd_opl4_do_for_all(opl4, snd_opl4_update_volume);

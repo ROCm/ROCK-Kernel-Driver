@@ -231,7 +231,7 @@ void snd_emu10k1_wait(emu10k1_t *emu, unsigned int wait)
 
 unsigned short snd_emu10k1_ac97_read(ac97_t *ac97, unsigned short reg)
 {
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, ac97->private_data, return -ENXIO);
+	emu10k1_t *emu = ac97->private_data;
 	unsigned long flags;
 	unsigned short val;
 
@@ -244,7 +244,7 @@ unsigned short snd_emu10k1_ac97_read(ac97_t *ac97, unsigned short reg)
 
 void snd_emu10k1_ac97_write(ac97_t *ac97, unsigned short reg, unsigned short data)
 {
-	emu10k1_t *emu = snd_magic_cast(emu10k1_t, ac97->private_data, return);
+	emu10k1_t *emu = ac97->private_data;
 	unsigned long flags;
 
 	spin_lock_irqsave(&emu->emu_lock, flags);

@@ -36,7 +36,7 @@ static long snd_gf1_mem_proc_dump(snd_info_entry_t *entry, void *file_private_da
 			          struct file *file, char __user *buf, long count)
 {
 	long size;
-	gus_proc_private_t *priv = snd_magic_cast(gus_proc_private_t, entry->private_data, return -ENXIO);
+	gus_proc_private_t *priv = entry->private_data;
 	snd_gus_card_t *gus = priv->gus;
 	int err;
 
@@ -58,7 +58,7 @@ static long long snd_gf1_mem_proc_llseek(snd_info_entry_t *entry,
 					long long offset,
 					int orig)
 {
-	gus_proc_private_t *priv = snd_magic_cast(gus_proc_private_t, entry->private_data, return -ENXIO);
+	gus_proc_private_t *priv = entry->private_data;
 
 	switch (orig) {
 	case 0:	/* SEEK_SET */
@@ -80,8 +80,8 @@ static long long snd_gf1_mem_proc_llseek(snd_info_entry_t *entry,
 
 static void snd_gf1_mem_proc_free(snd_info_entry_t *entry)
 {
-	gus_proc_private_t *priv = snd_magic_cast(gus_proc_private_t, entry->private_data, return);
-	snd_magic_kfree(priv);
+	gus_proc_private_t *priv = entry->private_data;
+	kfree(priv);
 }
 
 static struct snd_info_entry_ops snd_gf1_mem_proc_ops = {
@@ -98,7 +98,7 @@ int snd_gf1_mem_proc_init(snd_gus_card_t * gus)
 
 	for (idx = 0; idx < 4; idx++) {
 		if (gus->gf1.mem_alloc.banks_8[idx].size > 0) {
-			priv = snd_magic_kcalloc(gus_proc_private_t, 0, GFP_KERNEL);
+			priv = kcalloc(1, sizeof(*priv), GFP_KERNEL);
 			if (priv == NULL)
 				return -ENOMEM;
 			priv->gus = gus;
@@ -115,7 +115,7 @@ int snd_gf1_mem_proc_init(snd_gus_card_t * gus)
 	}
 	for (idx = 0; idx < 4; idx++) {
 		if (gus->gf1.rom_present & (1 << idx)) {
-			priv = snd_magic_kcalloc(gus_proc_private_t, 0, GFP_KERNEL);
+			priv = kcalloc(1, sizeof(*priv), GFP_KERNEL);
 			if (priv == NULL)
 				return -ENOMEM;
 			priv->rom = 1;

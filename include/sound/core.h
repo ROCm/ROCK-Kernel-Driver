@@ -211,11 +211,13 @@ int snd_card_set_dev_pm_callback(snd_card_t *card, int type,
 				 void *private_data);
 #define snd_card_set_isa_pm_callback(card,suspend,resume,data) \
 	snd_card_set_dev_pm_callback(card, PM_ISA_DEV, suspend, resume, data)
+#ifdef CONFIG_PCI
 #ifndef SND_PCI_PM_CALLBACKS
 int snd_card_pci_suspend(struct pci_dev *dev, u32 state);
 int snd_card_pci_resume(struct pci_dev *dev);
 #define SND_PCI_PM_CALLBACKS \
 	.suspend = snd_card_pci_suspend,  .resume = snd_card_pci_resume
+#endif
 #endif
 #else
 #define snd_power_lock(card)		do { (void)(card); } while (0)
@@ -226,7 +228,9 @@ static inline int snd_power_wait(snd_card_t *card, unsigned int state, struct fi
 #define snd_card_set_pm_callback(card,suspend,resume,data) -EINVAL
 #define snd_card_set_dev_pm_callback(card,suspend,resume,data) -EINVAL
 #define snd_card_set_isa_pm_callback(card,suspend,resume,data) -EINVAL
+#ifdef CONFIG_PCI
 #define SND_PCI_PM_CALLBACKS
+#endif
 #endif
 
 /* device.c */
@@ -279,10 +283,12 @@ void snd_memory_done(void);
 int snd_memory_info_init(void);
 int snd_memory_info_done(void);
 void *snd_hidden_kmalloc(size_t size, int flags);
+void *snd_hidden_kcalloc(size_t n, size_t size, int flags);
 void snd_hidden_kfree(const void *obj);
 void *snd_hidden_vmalloc(unsigned long size);
 void snd_hidden_vfree(void *obj);
 #define kmalloc(size, flags) snd_hidden_kmalloc(size, flags)
+#define kcalloc(n, size, flags) snd_hidden_kcalloc(n, size, flags)
 #define kfree(obj) snd_hidden_kfree(obj)
 #define vmalloc(size) snd_hidden_vmalloc(size)
 #define vfree(obj) snd_hidden_vfree(obj)
@@ -300,7 +306,6 @@ void snd_hidden_vfree(void *obj);
 #define kfree_nocheck(obj) kfree(obj)
 #define vfree_nocheck(obj) vfree(obj)
 #endif
-void *snd_kcalloc(size_t size, int flags);
 char *snd_kmalloc_strdup(const char *string, int flags);
 int copy_to_user_fromio(void __user *dst, unsigned long src, size_t count);
 int copy_from_user_toio(unsigned long dst, const void __user *src, size_t count);

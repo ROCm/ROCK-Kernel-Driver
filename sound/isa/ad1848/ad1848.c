@@ -30,13 +30,10 @@
 #include <sound/ad1848.h>
 #include <sound/initval.h>
 
-#define chip_t ad1848_t
-
 MODULE_AUTHOR("Tugrul Galatali <galatalt@stuy.edu>, Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("AD1848/AD1847/CS4248");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Analog Devices,AD1848},"
+MODULE_SUPPORTED_DEVICE("{{Analog Devices,AD1848},"
 	        "{Analog Devices,AD1847},"
 		"{Crystal Semiconductors,CS4248}}");
 
@@ -51,25 +48,18 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for AD1848 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for AD1848 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable AD1848 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for AD1848 driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for AD1848 driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param_array(dma1, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma1, "DMA1 # for AD1848 driver.");
-MODULE_PARM_SYNTAX(dma1, SNDRV_DMA_DESC);
 module_param_array(thinkpad, bool, boot_devs, 0444);
 MODULE_PARM_DESC(thinkpad, "Enable only for the onboard CS4248 of IBM Thinkpad 360/750/755 series.");
-MODULE_PARM_SYNTAX(thinkpad,  SNDRV_ENABLED "," SNDRV_BOOLEAN_FALSE_DESC);
 
 static snd_card_t *snd_ad1848_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 

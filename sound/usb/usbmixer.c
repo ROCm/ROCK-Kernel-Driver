@@ -573,7 +573,7 @@ static struct usb_feature_control_info audio_feature_info[] = {
 static void usb_mixer_elem_free(snd_kcontrol_t *kctl)
 {
 	if (kctl->private_data) {
-		snd_magic_kfree((void *)kctl->private_data);
+		kfree((void *)kctl->private_data);
 		kctl->private_data = NULL;
 	}
 }
@@ -635,7 +635,7 @@ static int get_min_max(usb_mixer_elem_info_t *cval, int default_min)
 /* get a feature/mixer unit info */
 static int mixer_ctl_feature_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {	
-	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
+	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 
 	if (cval->val_type == USB_MIXER_BOOLEAN ||
 	    cval->val_type == USB_MIXER_INV_BOOLEAN)
@@ -659,7 +659,7 @@ static int mixer_ctl_feature_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 /* get the current value from feature/mixer unit */
 static int mixer_ctl_feature_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
+	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 	int c, cnt, val, err;
 
 	if (cval->cmask) {
@@ -700,7 +700,7 @@ static int mixer_ctl_feature_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 /* put the current value to feature/mixer unit */
 static int mixer_ctl_feature_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
+	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 	int c, cnt, val, oval, err;
 	int changed = 0;
 
@@ -774,7 +774,7 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 	if (check_ignored_ctl(state, unitid, control))
 		return;
 
-	cval = snd_magic_kcalloc(usb_mixer_elem_info_t, 0, GFP_KERNEL);
+	cval = kcalloc(1, sizeof(*cval), GFP_KERNEL);
 	if (! cval) {
 		snd_printk(KERN_ERR "cannot malloc kcontrol\n");
 		return;
@@ -801,7 +801,7 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 	kctl = snd_ctl_new1(&usb_feature_unit_ctl, cval);
 	if (! kctl) {
 		snd_printk(KERN_ERR "cannot malloc kcontrol\n");
-		snd_magic_kfree(cval);
+		kfree(cval);
 		return;
 	}
 	kctl->private_free = usb_mixer_elem_free;
@@ -943,7 +943,7 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 	if (check_ignored_ctl(state, unitid, 0))
 		return;
 
-	cval = snd_magic_kcalloc(usb_mixer_elem_info_t, 0, GFP_KERNEL);
+	cval = kcalloc(1, sizeof(*cval), GFP_KERNEL);
 	if (! cval)
 		return;
 
@@ -968,7 +968,7 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 	kctl = snd_ctl_new1(&usb_feature_unit_ctl, cval);
 	if (! kctl) {
 		snd_printk(KERN_ERR "cannot malloc kcontrol\n");
-		snd_magic_kfree(cval);
+		kfree(cval);
 		return;
 	}
 	kctl->private_free = usb_mixer_elem_free;
@@ -1014,7 +1014,7 @@ static int parse_audio_mixer_unit(mixer_build_t *state, int unitid, unsigned cha
 /* get callback for processing/extension unit */
 static int mixer_ctl_procunit_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
+	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 	int err, val;
 
 	err = get_cur_ctl_value(cval, cval->control << 8, &val);
@@ -1032,7 +1032,7 @@ static int mixer_ctl_procunit_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 /* put callback for processing/extension unit */
 static int mixer_ctl_procunit_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
+	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 	int val, oval, err;
 
 	err = get_cur_ctl_value(cval, cval->control << 8, &oval);
@@ -1170,7 +1170,7 @@ static int build_audio_procunit(mixer_build_t *state, int unitid, unsigned char 
 			continue;
 		if (check_ignored_ctl(state, unitid, valinfo->control))
 			continue;
-		cval = snd_magic_kcalloc(usb_mixer_elem_info_t, 0, GFP_KERNEL);
+		cval = kcalloc(1, sizeof(*cval), GFP_KERNEL);
 		if (! cval) {
 			snd_printk(KERN_ERR "cannot malloc kcontrol\n");
 			return -ENOMEM;
@@ -1195,7 +1195,7 @@ static int build_audio_procunit(mixer_build_t *state, int unitid, unsigned char 
 		kctl = snd_ctl_new1(&mixer_procunit_ctl, cval);
 		if (! kctl) {
 			snd_printk(KERN_ERR "cannot malloc kcontrol\n");
-			snd_magic_kfree(cval);
+			kfree(cval);
 			return -ENOMEM;
 		}
 		kctl->private_free = usb_mixer_elem_free;
@@ -1244,7 +1244,7 @@ static int parse_audio_extension_unit(mixer_build_t *state, int unitid, unsigned
  */
 static int mixer_ctl_selector_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {	
-	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
+	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 	char **itemlist = (char **)kcontrol->private_value;
 
 	snd_assert(itemlist, return -EINVAL);
@@ -1260,7 +1260,7 @@ static int mixer_ctl_selector_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t
 /* get callback for selector unit */
 static int mixer_ctl_selector_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
+	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 	int val, err;
 
 	err = get_cur_ctl_value(cval, 0, &val);
@@ -1279,7 +1279,7 @@ static int mixer_ctl_selector_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 /* put callback for selector unit */
 static int mixer_ctl_selector_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
-	usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kcontrol->private_data, return -EINVAL);
+	usb_mixer_elem_info_t *cval = kcontrol->private_data;
 	int val, oval, err;
 
 	err = get_cur_ctl_value(cval, 0, &oval);
@@ -1315,9 +1315,9 @@ static void usb_mixer_selector_elem_free(snd_kcontrol_t *kctl)
 	int i, num_ins = 0;
 
 	if (kctl->private_data) {
-		usb_mixer_elem_info_t *cval = snd_magic_cast(usb_mixer_elem_info_t, kctl->private_data,);
+		usb_mixer_elem_info_t *cval = kctl->private_data;
 		num_ins = cval->max;
-		snd_magic_kfree(cval);
+		kfree(cval);
 		kctl->private_data = NULL;
 	}
 	if (kctl->private_value) {
@@ -1357,7 +1357,7 @@ static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned 
 	if (check_ignored_ctl(state, unitid, 0))
 		return 0;
 
-	cval = snd_magic_kcalloc(usb_mixer_elem_info_t, 0, GFP_KERNEL);
+	cval = kcalloc(1, sizeof(*cval), GFP_KERNEL);
 	if (! cval) {
 		snd_printk(KERN_ERR "cannot malloc kcontrol\n");
 		return -ENOMEM;
@@ -1375,7 +1375,7 @@ static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned 
 	namelist = kmalloc(sizeof(char *) * num_ins, GFP_KERNEL);
 	if (! namelist) {
 		snd_printk(KERN_ERR "cannot malloc\n");
-		snd_magic_kfree(cval);
+		kfree(cval);
 		return -ENOMEM;
 	}
 #define MAX_ITEM_NAME_LEN	64
@@ -1388,7 +1388,7 @@ static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned 
 			while (--i > 0)
 				kfree(namelist[i]);
 			kfree(namelist);
-			snd_magic_kfree(cval);
+			kfree(cval);
 			return -ENOMEM;
 		}
 		if (check_input_term(state, desc[5 + i], &iterm) >= 0)
@@ -1400,7 +1400,7 @@ static int parse_audio_selector_unit(mixer_build_t *state, int unitid, unsigned 
 	kctl = snd_ctl_new1(&mixer_selectunit_ctl, cval);
 	if (! kctl) {
 		snd_printk(KERN_ERR "cannot malloc kcontrol\n");
-		snd_magic_kfree(cval);
+		kfree(cval);
 		return -ENOMEM;
 	}
 	kctl->private_value = (unsigned long)namelist;

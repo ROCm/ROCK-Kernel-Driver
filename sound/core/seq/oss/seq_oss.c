@@ -35,7 +35,6 @@
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("OSS-compatible sequencer module");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
 /* Takashi says this is really only for sound-service-0-, but this is OK. */
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_SEQUENCER);
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_MUSIC);

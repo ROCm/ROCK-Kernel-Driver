@@ -276,6 +276,7 @@ enum sndrv_pcm_subformat {
 #define SNDRV_PCM_INFO_JOINT_DUPLEX	0x00200000	/* playback and capture stream are somewhat correlated */
 #define SNDRV_PCM_INFO_SYNC_START	0x00400000	/* pcm support some kind of sync go */
 #define SNDRV_PCM_INFO_NONATOMIC_OPS	0x00800000	/* non-atomic prepare callback */
+#define SNDRV_PCM_INFO_MMAP_IOMEM	0x01000000	/* mmap on IO memory */
 
 enum sndrv_pcm_state {
 	SNDRV_PCM_STATE_OPEN = 0,	/* stream is open */

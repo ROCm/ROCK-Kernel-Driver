@@ -27,14 +27,10 @@ sequencer = $(if $(subst y,,$(CONFIG_SND_SEQUENCER)),$(if $(1),m),$(if $(CONFIG_
 
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_GUSCLASSIC) += snd-gusclassic.o snd-gus-lib.o
-obj-$(call sequencer,$(CONFIG_SND_GUSCLASSIC)) += snd-gus-synth.o
 obj-$(CONFIG_SND_GUSMAX) += snd-gusmax.o snd-gus-lib.o
-obj-$(call sequencer,$(CONFIG_SND_GUSMAX)) += snd-gus-synth.o
 obj-$(CONFIG_SND_GUSEXTREME) += snd-gusextreme.o snd-gus-lib.o
-obj-$(call sequencer,$(CONFIG_SND_GUSEXTREME)) += snd-gus-synth.o
 obj-$(CONFIG_SND_INTERWAVE) += snd-interwave.o snd-gus-lib.o
-obj-$(call sequencer,$(CONFIG_SND_INTERWAVE)) += snd-gus-synth.o
 obj-$(CONFIG_SND_INTERWAVE_STB) += snd-interwave-stb.o snd-gus-lib.o
-obj-$(call sequencer,$(CONFIG_SND_INTERWAVE_STB)) += snd-gus-synth.o
+obj-$(call sequencer,$(CONFIG_SND_GUS_SYNTH)) += snd-gus-synth.o
 
 obj-m := $(sort $(obj-m))

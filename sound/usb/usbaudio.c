@@ -58,8 +58,7 @@
 MODULE_AUTHOR("Takashi Iwai <tiwai@suse.de>");
 MODULE_DESCRIPTION("USB Audio");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{Generic,USB Audio}}");
+MODULE_SUPPORTED_DEVICE("{{Generic,USB Audio}}");
 
 
 static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
@@ -73,25 +72,18 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for the USB audio adapter.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for the USB audio adapter.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable USB audio adapter.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(vid, int, boot_devs, 0444);
 MODULE_PARM_DESC(vid, "Vendor ID for the USB audio device.");
-MODULE_PARM_SYNTAX(vid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
 module_param_array(pid, int, boot_devs, 0444);
 MODULE_PARM_DESC(pid, "Product ID for the USB audio device.");
-MODULE_PARM_SYNTAX(pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
 module_param(nrpacks, int, 0444);
 MODULE_PARM_DESC(nrpacks, "Max. number of packets per URB.");
-MODULE_PARM_SYNTAX(nrpacks, SNDRV_ENABLED ",allows:{{1,10}}");
 module_param(async_unlink, bool, 0444);
 MODULE_PARM_DESC(async_unlink, "Use async unlink mode.");
-MODULE_PARM_SYNTAX(async_unlink, SNDRV_BOOLEAN_TRUE_DESC);
 
 
 /*
@@ -206,8 +198,6 @@ struct snd_usb_stream {
 	snd_usb_substream_t substream[2];
 	struct list_head list;
 };
-
-#define chip_t snd_usb_stream_t
 
 
 /*
@@ -1183,9 +1173,9 @@ static int init_usb_sample_rate(struct usb_device *dev, int iface,
 		if ((err = snd_usb_ctl_msg(dev, usb_rcvctrlpipe(dev, 0), GET_CUR,
 					   USB_TYPE_CLASS|USB_RECIP_ENDPOINT|USB_DIR_IN,
 					   SAMPLING_FREQ_CONTROL << 8, ep, data, 3, HZ)) < 0) {
-			snd_printk(KERN_ERR "%d:%d:%d: cannot get freq at ep 0x%x\n",
+			snd_printk(KERN_WARNING "%d:%d:%d: cannot get freq at ep 0x%x\n",
 				   dev->devnum, iface, fmt->altsetting, ep);
-			return err;
+			return 0; /* some devices don't support reading */
 		}
 		crate = data[0] | (data[1] << 8) | (data[2] << 16);
 		if (crate != rate) {
@@ -2001,7 +1991,7 @@ static void proc_dump_substream_status(snd_usb_substream_t *subs, snd_info_buffe
 
 static void proc_pcm_format_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	snd_usb_stream_t *stream = snd_magic_cast(snd_usb_stream_t, entry->private_data, return);
+	snd_usb_stream_t *stream = entry->private_data;
 	
 	snd_iprintf(buffer, "%s : %s\n", stream->chip->card->longname, stream->pcm->name);
 
@@ -2089,7 +2079,7 @@ static void snd_usb_audio_stream_free(snd_usb_stream_t *stream)
 	free_substream(&stream->substream[0]);
 	free_substream(&stream->substream[1]);
 	list_del(&stream->list);
-	snd_magic_kfree(stream);
+	kfree(stream);
 }
 
 static void snd_usb_audio_pcm_free(snd_pcm_t *pcm)
@@ -2146,7 +2136,7 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 	}
 
 	/* create a new pcm */
-	as = snd_magic_kmalloc(snd_usb_stream_t, 0, GFP_KERNEL);
+	as = kmalloc(sizeof(*as), GFP_KERNEL);
 	if (! as)
 		return -ENOMEM;
 	memset(as, 0, sizeof(*as));
@@ -2158,7 +2148,7 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 			  stream == SNDRV_PCM_STREAM_PLAYBACK ? 0 : 1,
 			  &pcm);
 	if (err < 0) {
-		snd_magic_kfree(as);
+		kfree(as);
 		return err;
 	}
 	as->pcm = pcm;
@@ -2180,6 +2170,24 @@ static int add_audio_endpoint(snd_usb_audio_t *chip, int stream, struct audiofor
 	return 0;
 }
 
+
+/*
+ * check if the device uses big-endian samples
+ */
+static int is_big_endian_format(struct usb_device *dev, struct audioformat *fp)
+{
+	/* M-Audio */
+	if (dev->descriptor.idVendor == 0x0763) {
+		/* Quattro: captured data only */
+		if (dev->descriptor.idProduct == 0x2001 &&
+		    fp->endpoint & USB_DIR_IN)
+			return 1;
+		/* Audiophile USB */
+		if (dev->descriptor.idProduct == 0x2003)
+			return 1;
+	}
+	return 0;
+}
 
 /*
  * parse the audio format type I descriptor
@@ -2217,17 +2225,13 @@ static int parse_audio_format_i_type(struct usb_device *dev, struct audioformat 
 			pcm_format = SNDRV_PCM_FORMAT_S8;
 			break;
 		case 2:
-			/* M-Audio audiophile USB workaround */
-			if (dev->descriptor.idVendor == 0x0763 &&
-			    dev->descriptor.idProduct == 0x2003)
+			if (is_big_endian_format(dev, fp))
 				pcm_format = SNDRV_PCM_FORMAT_S16_BE; /* grrr, big endian!! */
 			else
 				pcm_format = SNDRV_PCM_FORMAT_S16_LE;
 			break;
 		case 3:
-			/* M-Audio audiophile USB workaround */
-			if (dev->descriptor.idVendor == 0x0763 &&
-			    dev->descriptor.idProduct == 0x2003)
+			if (is_big_endian_format(dev, fp))
 				pcm_format = SNDRV_PCM_FORMAT_S24_3BE; /* grrr, big endian!! */
 			else
 				pcm_format = SNDRV_PCM_FORMAT_S24_3LE;
@@ -2920,14 +2924,14 @@ static int snd_usb_create_quirk(snd_usb_audio_t *chip,
  */
 static void proc_audio_usbbus_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	snd_usb_audio_t *chip = snd_magic_cast(snd_usb_audio_t, entry->private_data, return);
+	snd_usb_audio_t *chip = entry->private_data;
 	if (! chip->shutdown)
 		snd_iprintf(buffer, "%03d/%03d\n", chip->dev->bus->busnum, chip->dev->devnum);
 }
 
 static void proc_audio_usbid_read(snd_info_entry_t *entry, snd_info_buffer_t *buffer)
 {
-	snd_usb_audio_t *chip = snd_magic_cast(snd_usb_audio_t, entry->private_data, return);
+	snd_usb_audio_t *chip = entry->private_data;
 	if (! chip->shutdown)
 		snd_iprintf(buffer, "%04x:%04x\n", chip->dev->descriptor.idVendor, chip->dev->descriptor.idProduct);
 }
@@ -2950,13 +2954,13 @@ static void snd_usb_audio_create_proc(snd_usb_audio_t *chip)
 
 static int snd_usb_audio_free(snd_usb_audio_t *chip)
 {
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
 static int snd_usb_audio_dev_free(snd_device_t *device)
 {
-	snd_usb_audio_t *chip = snd_magic_cast(snd_usb_audio_t, device->device_data, return -ENXIO);
+	snd_usb_audio_t *chip = device->device_data;
 	return snd_usb_audio_free(chip);
 }
 
@@ -2990,7 +2994,7 @@ static int snd_usb_audio_create(struct usb_device *dev, int idx,
 		return -ENOMEM;
 	}
 
-	chip = snd_magic_kcalloc(snd_usb_audio_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (! chip) {
 		snd_card_free(card);
 		return -ENOMEM;
@@ -3182,7 +3186,7 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 	if (ptr == (void *)-1L)
 		return;
 
-	chip = snd_magic_cast(snd_usb_audio_t, ptr, return);
+	chip = ptr;
 	card = chip->card;
 	down(&register_mutex);
 	chip->shutdown = 1;

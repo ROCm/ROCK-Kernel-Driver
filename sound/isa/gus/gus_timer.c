@@ -26,8 +26,6 @@
 #include <sound/core.h>
 #include <sound/gus.h>
 
-#define chip_t snd_gus_card_t
-
 /*
  *  Timer 1 - 80us
  */
@@ -146,13 +144,13 @@ static struct _snd_timer_hardware snd_gf1_timer2 =
 
 static void snd_gf1_timer1_free(snd_timer_t *timer)
 {
-	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, timer->private_data, return);
+	snd_gus_card_t *gus = timer->private_data;
 	gus->gf1.timer1 = NULL;
 }
 
 static void snd_gf1_timer2_free(snd_timer_t *timer)
 {
-	snd_gus_card_t *gus = snd_magic_cast(snd_gus_card_t, timer->private_data, return);
+	snd_gus_card_t *gus = timer->private_data;
 	gus->gf1.timer2 = NULL;
 }
 

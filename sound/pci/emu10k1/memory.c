@@ -291,7 +291,7 @@ snd_util_memblk_t *
 snd_emu10k1_alloc_pages(emu10k1_t *emu, snd_pcm_substream_t *substream)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	struct snd_sg_buf *sgbuf = runtime->dma_private;
+	struct snd_sg_buf *sgbuf = snd_pcm_substream_sgbuf(substream);
 	snd_util_memhdr_t *hdr;
 	emu10k1_memblk_t *blk;
 	int page, err, idx;

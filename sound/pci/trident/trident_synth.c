@@ -506,7 +506,7 @@ static void sample_private1(trident_t * trident, snd_trident_voice_t * voice, un
 static int snd_trident_simple_put_sample(void *private_data, simple_instrument_t * instr,
 					 char __user *data, long len, int atomic)
 {
-	trident_t *trident = snd_magic_cast(trident_t, private_data, return -ENXIO);
+	trident_t *trident = private_data;
 	int size = instr->size;
 	int shift = 0;
 
@@ -559,7 +559,7 @@ static int snd_trident_simple_put_sample(void *private_data, simple_instrument_t
 static int snd_trident_simple_get_sample(void *private_data, simple_instrument_t * instr,
 					 char __user *data, long len, int atomic)
 {
-	//trident_t *trident = snd_magic_cast(trident_t, private_data, return -ENXIO);
+	//trident_t *trident = private_data;
 	int size = instr->size;
 	int shift = 0;
 
@@ -580,7 +580,7 @@ static int snd_trident_simple_get_sample(void *private_data, simple_instrument_t
 static int snd_trident_simple_remove_sample(void *private_data, simple_instrument_t * instr,
 					    int atomic)
 {
-	trident_t *trident = snd_magic_cast(trident_t, private_data, return -ENXIO);
+	trident_t *trident = private_data;
 	int size = instr->size;
 
 	if (trident->tlb.entries) {
@@ -838,7 +838,7 @@ static void snd_trident_synth_instr_notify(void *private_data,
 					   int what)
 {
 	int idx;
-	trident_t *trident = snd_magic_cast(trident_t, private_data, return);
+	trident_t *trident = private_data;
 	snd_trident_voice_t *pvoice;
 	unsigned long flags;
 
