@@ -108,7 +108,7 @@ static int gt96100_open(struct net_device *dev);
 static int gt96100_close(struct net_device *dev);
 static int gt96100_tx(struct sk_buff *skb, struct net_device *dev);
 static int gt96100_rx(struct net_device *dev, u32 status);
-static void gt96100_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t gt96100_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static void gt96100_tx_timeout(struct net_device *dev);
 static void gt96100_set_rx_mode(struct net_device *dev);
 static struct net_device_stats* gt96100_get_stats(struct net_device *dev);
@@ -1392,16 +1392,17 @@ gt96100_tx_complete(struct net_device *dev, u32 status)
 }
 
 
-static void
+static irqreturn_t
 gt96100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = (struct net_device *)dev_id;
 	struct gt96100_private *gp = (struct gt96100_private *)dev->priv;
 	u32 status;
-    
+    	int handled = 0;
+
 	if (dev == NULL) {
 		err("%s: null dev ptr\n", __FUNCTION__);
-		return;
+		return IRQ_NONE;
 	}
 
 	dbg(3, "%s: entry, icr=%x\n", __FUNCTION__,
@@ -1420,7 +1421,9 @@ gt96100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 		if ((status & icrEtherIntSum) == 0 &&
 		    !(status & (icrTxBufferLow|icrTxBufferHigh|icrRxBuffer)))
 			break;
-	
+
+		handled = 1;
+
 		if (status & icrMIIPhySTC) {
 			u32 psr = GT96100ETH_READ(gp, GT96100_ETH_PORT_STATUS);
 			if (gp->last_psr != psr) {
@@ -1487,6 +1490,7 @@ gt96100_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	    GT96100ETH_READ(gp, GT96100_ETH_INT_CAUSE));
 
 	spin_unlock(&gp->lock);
+	return IRQ_RETVAL(handled);
 }
 
 

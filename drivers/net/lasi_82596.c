@@ -405,7 +405,7 @@ static char init_setup[] =
 
 static int i596_open(struct net_device *dev);
 static int i596_start_xmit(struct sk_buff *skb, struct net_device *dev);
-static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs);
+static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 static int i596_close(struct net_device *dev);
 static struct net_device_stats *i596_get_stats(struct net_device *dev);
 static void i596_add_cmd(struct net_device *dev, struct i596_cmd *cmd);
@@ -1244,7 +1244,7 @@ static int __devinit i82596_probe(struct net_device *dev)
 }
 
 
-static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	struct net_device *dev = dev_id;
 	struct i596_private *lp;
@@ -1252,7 +1252,7 @@ static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 
 	if (dev == NULL) {
 		printk("i596_interrupt(): irq %d for unknown device.\n", irq);
-		return;
+		return IRQ_NONE;
 	}
 
 	lp = (struct i596_private *) dev->priv;
@@ -1270,7 +1270,7 @@ static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	if (!ack_cmd) {
 		DEB(DEB_ERRORS, printk("%s: interrupt with no events\n", dev->name));
 		spin_unlock (&lp->lock);
-		return;
+		return IRQ_NONE;
 	}
 
 	if ((status & 0x8000) || (status & 0x2000)) {
@@ -1396,7 +1396,7 @@ static void i596_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	DEB(DEB_INTS,printk("%s: exiting interrupt.\n", dev->name));
 
 	spin_unlock (&lp->lock);
-	return;
+	return IRQ_HANDLED;
 }
 
 static int i596_close(struct net_device *dev)

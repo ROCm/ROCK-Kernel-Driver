@@ -943,6 +943,13 @@ M:	scott.feldman@intel.com
 W:	http://sourceforge.net/projects/e1000/
 S:	Supported
 
+INTEL PRO/10GbE SUPPORT
+P:	Ganesh Venkatesan
+M:	Ganesh.Venkatesan@intel.com
+P:	Scott Feldman
+M:	scott.feldman@intel.com
+S:	Supported
+
 INTERMEZZO FILE SYSTEM
 P:	Chen Yang
 M:	intermezzo-devel@lists.sf.net

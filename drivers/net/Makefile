@@ -10,6 +10,7 @@ endif
 
 obj-$(CONFIG_E100) += e100/
 obj-$(CONFIG_E1000) += e1000/
+obj-$(CONFIG_IXGB) += ixgb/
 
 #
 # link order important here
