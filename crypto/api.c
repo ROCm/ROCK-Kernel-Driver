@@ -187,13 +187,6 @@ void crypto_free_tfm(struct crypto_tfm *tfm)
 	kfree(tfm);
 }
 
-static inline int crypto_alg_blocksize_check(struct crypto_alg *alg)
-{
-	return ((alg->cra_flags & CRYPTO_ALG_TYPE_MASK)
-			== CRYPTO_ALG_TYPE_CIPHER &&
-	         alg->cra_blocksize > CRYPTO_MAX_CIPHER_BLOCK_SIZE);
-}
-
 int crypto_register_alg(struct crypto_alg *alg)
 {
 	int ret = 0;
@@ -208,14 +201,7 @@ int crypto_register_alg(struct crypto_alg *alg)
 		}
 	}
 	
-	if (crypto_alg_blocksize_check(alg)) {
-		printk(KERN_WARNING "%s: blocksize %u exceeds max. "
-		       "size %u\n", __FUNCTION__, alg->cra_blocksize,
-		       CRYPTO_MAX_CIPHER_BLOCK_SIZE);
-		ret = -EINVAL;
-	}
-	else
-		list_add_tail(&alg->cra_list, &crypto_alg_list);
+	list_add_tail(&alg->cra_list, &crypto_alg_list);
 out:	
 	up_write(&crypto_alg_sem);
 	return ret;

@@ -29,6 +29,14 @@ static inline void xor_64(u8 *a, const u8 *b)
 	((u32 *)a)[1] ^= ((u32 *)b)[1];
 }
 
+static inline void xor_128(u8 *a, const u8 *b)
+{
+	((u32 *)a)[0] ^= ((u32 *)b)[0];
+	((u32 *)a)[1] ^= ((u32 *)b)[1];
+	((u32 *)a)[2] ^= ((u32 *)b)[2];
+	((u32 *)a)[3] ^= ((u32 *)b)[3];
+}
+
 static inline unsigned int sglen(struct scatterlist *sg, unsigned int nsg)
 {
 	unsigned int i, n;
@@ -116,7 +124,7 @@ static int crypt(struct crypto_tfm *tfm, struct scatterlist *sg,
 {
 	unsigned int i, coff;
 	unsigned int bsize = crypto_tfm_alg_blocksize(tfm);
-	u8 tmp[CRYPTO_MAX_CIPHER_BLOCK_SIZE];
+	u8 tmp[bsize];
 
 	if (sglen(sg, nsg) % bsize) {
 		tfm->crt_flags |= CRYPTO_TFM_RES_BAD_BLOCK_LEN;
@@ -164,16 +172,20 @@ unmapped:
 static void cbc_process(struct crypto_tfm *tfm,
                         u8 *block, cryptfn_t fn, int enc)
 {
+	/* Null encryption */
+	if (!tfm->crt_cipher.cit_iv)
+		return;
+		
 	if (enc) {
-		xor_64(tfm->crt_cipher.cit_iv, block);
+		tfm->crt_u.cipher.cit_xor_block(tfm->crt_cipher.cit_iv, block);
 		fn(tfm->crt_ctx, block, tfm->crt_cipher.cit_iv);
 		memcpy(tfm->crt_cipher.cit_iv, block,
 		       crypto_tfm_alg_blocksize(tfm));
 	} else {
-		u8 buf[CRYPTO_MAX_CIPHER_BLOCK_SIZE];
+		u8 buf[crypto_tfm_alg_blocksize(tfm)];
 		
 		fn(tfm->crt_ctx, buf, block);
-		xor_64(buf, tfm->crt_cipher.cit_iv);
+		tfm->crt_u.cipher.cit_xor_block(buf, tfm->crt_cipher.cit_iv);
 		memcpy(tfm->crt_cipher.cit_iv, block,
 		       crypto_tfm_alg_blocksize(tfm));
 		memcpy(block, buf, crypto_tfm_alg_blocksize(tfm));
@@ -279,11 +291,29 @@ int crypto_init_cipher_ops(struct crypto_tfm *tfm)
 	if (alg->cra_cipher.cia_ivsize &&
 	    ops->cit_mode != CRYPTO_TFM_MODE_ECB) {
 	    	
+	    	switch (crypto_tfm_alg_blocksize(tfm)) {
+	    	case 8:
+	    		ops->cit_xor_block = xor_64;
+	    		break;
+	    		
+	    	case 16:
+	    		ops->cit_xor_block = xor_128;
+	    		break;
+	    		
+	    	default:
+	    		printk(KERN_WARNING "%s: block size %u not supported\n",
+	    		       crypto_tfm_alg_name(tfm),
+	    		       crypto_tfm_alg_blocksize(tfm));
+	    		ret = -EINVAL;
+	    		goto out;
+	    	}
+	    	
 	    	ops->cit_iv = kmalloc(alg->cra_cipher.cia_ivsize, GFP_KERNEL);
 		if (ops->cit_iv == NULL)
 			ret = -ENOMEM;
 	}
-	
+
+out:	
 	return ret;
 }
 

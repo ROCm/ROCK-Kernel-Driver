@@ -48,6 +48,7 @@ static char *tvmem;
 
 static char *check[] = {
 	"des", "md5", "des3_ede", "rot13", "sha1", "sha256", "blowfish",
+	"twofish",
 	 NULL
 };
 
@@ -333,15 +334,8 @@ test_hmac_sha256(void)
 
 		klen = strlen(hmac_sha256_tv[i].key);
 	
-		//printk("DS=%u\n", crypto_tfm_alg_digestsize(tfm));
-		
-		//printk("K=");
 		hexdump(hmac_sha256_tv[i].key, strlen(hmac_sha256_tv[i].key));
-		//printk("P=%s\n", hmac_sha256_tv[i].plaintext);
-		
 		crypto_hmac(tfm, hmac_sha256_tv[i].key, &klen, sg, 1, result);
-
-		//printk("H=");
 		hexdump(result, crypto_tfm_alg_digestsize(tfm));
 		printk("%s\n",
 		       memcmp(result, hmac_sha256_tv[i].digest,
@@ -1616,7 +1610,7 @@ test_blowfish(void)
 
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
-		sg[0].length =  bf_tv[i].plen;;
+		sg[0].length =  bf_tv[i].plen;
 
 		crypto_cipher_set_iv(tfm, bf_tv[i].iv,
 				     crypto_tfm_alg_ivsize(tfm));
@@ -1661,7 +1655,7 @@ test_blowfish(void)
 
 		sg[0].page = virt_to_page(p);
 		sg[0].offset = ((long) p & ~PAGE_MASK);
-		sg[0].length =  bf_tv[i].plen;;
+		sg[0].length =  bf_tv[i].plen;
 
 		crypto_cipher_set_iv(tfm, bf_tv[i].iv,
 				     crypto_tfm_alg_ivsize(tfm));
@@ -1681,6 +1675,212 @@ test_blowfish(void)
 	}
 
 out:
+	crypto_free_tfm(tfm);
+}
+
+
+void
+test_twofish(void)
+{
+	unsigned int ret, i;
+	unsigned int tsize;
+	char *p, *q;
+	struct crypto_tfm *tfm;
+	char *key;
+	struct tf_tv *tf_tv;
+	struct scatterlist sg[1];
+
+	printk("\ntesting twofish encryption\n");
+
+	tsize = sizeof (tf_enc_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, tf_enc_tv_template, tsize);
+	tf_tv = (void *) tvmem;
+
+	tfm = crypto_alloc_tfm("twofish", 0);
+	if (tfm == NULL) {
+		printk("failed to load transform for blowfish (default ecb)\n");
+		return;
+	}
+
+	for (i = 0; i < TF_ENC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n",
+			i + 1, tf_tv[i].keylen * 8);
+		key = tf_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, tf_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+
+			if (!tf_tv[i].fail)
+				goto out;
+		}
+
+		p = tf_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = tf_tv[i].plen;
+		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		if (ret) {
+			printk("encrypt() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, tf_tv[i].rlen);
+
+		printk("%s\n", memcmp(q, tf_tv[i].result, tf_tv[i].rlen) ?
+			"fail" : "pass");
+	}
+
+	printk("\ntesting twofish decryption\n");
+
+	tsize = sizeof (tf_dec_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		return;
+	}
+
+	memcpy(tvmem, tf_dec_tv_template, tsize);
+	tf_tv = (void *) tvmem;
+
+	for (i = 0; i < TF_DEC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n",
+			i + 1, tf_tv[i].keylen * 8);
+		key = tf_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, tf_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+
+			if (!tf_tv[i].fail)
+				goto out;
+		}
+
+		p = tf_tv[i].plaintext;
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length = tf_tv[i].plen;
+		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		if (ret) {
+			printk("decrypt() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, tf_tv[i].rlen);
+
+		printk("%s\n", memcmp(q, tf_tv[i].result, tf_tv[i].rlen) ?
+			"fail" : "pass");
+	}
+
+	crypto_free_tfm(tfm);
+	
+	tfm = crypto_alloc_tfm("twofish", CRYPTO_TFM_MODE_CBC);
+	if (tfm == NULL) {
+		printk("failed to load transform for twofish cbc\n");
+		return;
+	}
+
+	printk("\ntesting twofish cbc encryption\n");
+
+	tsize = sizeof (tf_cbc_enc_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		goto out;
+	}
+	memcpy(tvmem, tf_cbc_enc_tv_template, tsize);
+	tf_tv = (void *) tvmem;
+
+	for (i = 0; i < TF_CBC_ENC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n",
+			i + 1, tf_tv[i].keylen * 8);
+
+		key = tf_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, tf_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		p = tf_tv[i].plaintext;
+
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length =  tf_tv[i].plen;
+
+		crypto_cipher_set_iv(tfm, tf_tv[i].iv,
+				     crypto_tfm_alg_ivsize(tfm));
+
+		ret = crypto_cipher_encrypt(tfm, sg, 1);
+		if (ret) {
+			printk("blowfish_cbc_encrypt() failed flags=%x\n",
+			       tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, tf_tv[i].rlen);
+
+		printk("%s\n", memcmp(q, tf_tv[i].result, tf_tv[i].rlen)
+			? "fail" : "pass");
+	}
+
+	printk("\ntesting twofish cbc decryption\n");
+
+	tsize = sizeof (tf_cbc_dec_tv_template);
+	if (tsize > TVMEMSIZE) {
+		printk("template (%u) too big for tvmem (%u)\n", tsize,
+		       TVMEMSIZE);
+		goto out;
+	}
+	memcpy(tvmem, tf_cbc_dec_tv_template, tsize);
+	tf_tv = (void *) tvmem;
+
+	for (i = 0; i < TF_CBC_DEC_TEST_VECTORS; i++) {
+		printk("test %u (%d bit key):\n",
+			i + 1, tf_tv[i].keylen * 8);
+
+		key = tf_tv[i].key;
+
+		ret = crypto_cipher_setkey(tfm, key, tf_tv[i].keylen);
+		if (ret) {
+			printk("setkey() failed flags=%x\n", tfm->crt_flags);
+			goto out;
+		}
+
+		p = tf_tv[i].plaintext;
+
+		sg[0].page = virt_to_page(p);
+		sg[0].offset = ((long) p & ~PAGE_MASK);
+		sg[0].length =  tf_tv[i].plen;
+
+		crypto_cipher_set_iv(tfm, tf_tv[i].iv,
+				     crypto_tfm_alg_ivsize(tfm));
+
+		ret = crypto_cipher_decrypt(tfm, sg, 1);
+		if (ret) {
+			printk("blowfish_cbc_decrypt() failed flags=%x\n",
+			       tfm->crt_flags);
+			goto out;
+		}
+
+		q = kmap(sg[0].page) + sg[0].offset;
+		hexdump(q, tf_tv[i].rlen);
+
+		printk("%s\n", memcmp(q, tf_tv[i].result, tf_tv[i].rlen)
+			? "fail" : "pass");
+	}
+
+out:	
 	crypto_free_tfm(tfm);
 }
 
@@ -1710,6 +1910,7 @@ do_test(void)
 		test_md4();
 		test_sha256();
 		test_blowfish();
+		test_twofish();
 #ifdef CONFIG_CRYPTO_HMAC
 		test_hmac_md5();
 		test_hmac_sha1();
@@ -1743,6 +1944,10 @@ do_test(void)
 	
 	case 7:
 		test_blowfish();
+		break;
+
+	case 8:
+		test_twofish();
 		break;
 
 #ifdef CONFIG_CRYPTO_HMAC
