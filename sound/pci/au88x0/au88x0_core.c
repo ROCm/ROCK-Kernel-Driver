@@ -21,7 +21,7 @@
  These functions are mainly the result of translations made
  from the original disassembly of the au88x0 binary drivers,
  written by Aureal before they went down.
- Many thanks to the Jeff Muizelar, Kester Maddock, and whoever
+ Many thanks to the Jeff Muizelaar, Kester Maddock, and whoever
  contributed to the OpenVortex project.
  The author of this file, put the few available pieces together
  and translated the rest of the riddle (Mix, Src and connection stuff).

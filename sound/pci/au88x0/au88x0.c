@@ -4,7 +4,7 @@
  *
  *   This driver is the result of the OpenVortex Project from Savannah
  * (savannah.nongnu.org/projects/openvortex). I would like to thank
- * the developers of OpenVortex, Jeff Muizelar and Kester Maddock, from
+ * the developers of OpenVortex, Jeff Muizelaar and Kester Maddock, from
  * whom i got plenty of help, and their codebase was invaluable.
  *   Thanks to the ALSA developers, they helped a lot working out
  * the ALSA part.
