@@ -4520,7 +4520,7 @@ void ncr_complete (struct ncb *np, struct ccb *cp)
 	*/
 
 	if (cp == tp->nego_cp)
-		tp->nego_cp = 0;
+		tp->nego_cp = NULL;
 
 	/*
 	**	If auto-sense performed, change scsi status.
@@ -4538,7 +4538,7 @@ void ncr_complete (struct ncb *np, struct ccb *cp)
 		if (cp == lp->held_ccb) {
 			xpt_que_splice(&lp->skip_ccbq, &lp->wait_ccbq);
 			xpt_que_init(&lp->skip_ccbq);
-			lp->held_ccb = 0;
+			lp->held_ccb = NULL;
 		}
 	}
 
@@ -5646,7 +5646,7 @@ static void ncr_log_hard_error(struct ncb *np, u16 sist, u_char dstat)
 	} else {
 		script_ofs	= dsp;
 		script_size	= 0;
-		script_base	= 0;
+		script_base	= NULL;
 		script_name	= "mem";
 	}
 
@@ -6125,7 +6125,7 @@ static void ncr_int_ma (struct ncb *np)
 	if (!(cmd & 6)) {
 		cp = np->header.cp;
 		if (CCB_PHYS(cp, phys) != dsa)
-			cp = 0;
+			cp = NULL;
 	} else {
 		cp  = np->ccb;
 		while (cp && (CCB_PHYS (cp, phys) != dsa))
@@ -6136,7 +6136,7 @@ static void ncr_int_ma (struct ncb *np)
 	**	try to find the interrupted script command,
 	**	and the address at which to continue.
 	*/
-	vdsp	= 0;
+	vdsp	= NULL;
 	nxtdsp	= 0;
 	if	(dsp >  np->p_script &&
 		 dsp <= np->p_script + sizeof(struct script)) {
@@ -6533,7 +6533,7 @@ void ncr_int_sir (struct ncb *np)
 	u_char scntl3;
 	u_char chg, ofs, per, fak, wide;
 	u_char num = INB (nc_dsps);
-	struct ccb *cp=0;
+	struct ccb *cp=NULL;
 	u_long	dsa    = INL (nc_dsa);
 	u_char	target = INB (nc_sdid) & 0x0f;
 	struct tcb *tp     = &np->target[target];
@@ -7046,7 +7046,7 @@ static	struct ccb *ncr_get_ccb (struct ncb *np, u_char tn, u_char ln)
 			if (cp->magic) {
 				PRINT_LUN(np, tn, ln);
 				printk ("ccb free list corrupted (@%p)\n", cp);
-				cp = 0;
+				cp = NULL;
 			}
 			else {
 				xpt_insque_tail(qp, &lp->wait_ccbq);
@@ -7232,7 +7232,7 @@ static void ncr_alloc_ccb(struct ncb *np, u_char tn, u_char ln)
 {
 	struct tcb *tp = &np->target[tn];
 	struct lcb *lp = tp->lp[ln];
-	struct ccb *cp = 0;
+	struct ccb *cp = NULL;
 
 	/*
 	**	Allocate memory for this CCB.
@@ -8095,7 +8095,7 @@ irqreturn_t ncr53c8xx_intr(int irq, void *dev_id, struct pt_regs * regs)
      NCR_LOCK_NCB(np, flags);
      ncr_exception(np);
      done_list     = np->done_list;
-     np->done_list = 0;
+     np->done_list = NULL;
      NCR_UNLOCK_NCB(np, flags);
 
      if (DEBUG_FLAGS & DEBUG_TINY) printk ("]\n");
@@ -8121,7 +8121,7 @@ static void ncr53c8xx_timeout(unsigned long npref)
      NCR_LOCK_NCB(np, flags);
      ncr_timeout(np);
      done_list     = np->done_list;
-     np->done_list = 0;
+     np->done_list = NULL;
      NCR_UNLOCK_NCB(np, flags);
 
      if (done_list) {
@@ -8154,7 +8154,7 @@ int ncr53c8xx_bus_reset(struct scsi_cmnd *cmd)
 	sts = ncr_reset_bus(np, cmd, 1);
 
 	done_list     = np->done_list;
-	np->done_list = 0;
+	np->done_list = NULL;
 	NCR_UNLOCK_NCB(np, flags);
 
 	ncr_flush_done_cmds(done_list);
@@ -8195,7 +8195,7 @@ int ncr53c8xx_abort(struct scsi_cmnd *cmd)
 	sts = ncr_abort_command(np, cmd);
 out:
 	done_list     = np->done_list;
-	np->done_list = 0;
+	np->done_list = NULL;
 	NCR_UNLOCK_NCB(np, flags);
 
 	ncr_flush_done_cmds(done_list);
@@ -8226,7 +8226,7 @@ static void insert_into_waiting_list(struct ncb *np, struct scsi_cmnd *cmd)
 #ifdef DEBUG_WAITING_LIST
 	printk("%s: cmd %lx inserted into waiting list\n", ncr_name(np), (u_long) cmd);
 #endif
-	cmd->next_wcmd = 0;
+	cmd->next_wcmd = NULL;
 	if (!(wcmd = np->waiting_list)) np->waiting_list = cmd;
 	else {
 		while ((wcmd->next_wcmd) != 0)
@@ -8243,7 +8243,7 @@ static struct scsi_cmnd *retrieve_from_waiting_list(int to_remove, struct ncb *n
 		if (cmd == *pcmd) {
 			if (to_remove) {
 				*pcmd = (struct scsi_cmnd *) cmd->next_wcmd;
-				cmd->next_wcmd = 0;
+				cmd->next_wcmd = NULL;
 			}
 #ifdef DEBUG_WAITING_LIST
 	printk("%s: cmd %lx retrieved from waiting list\n", ncr_name(np), (u_long) cmd);
@@ -8252,7 +8252,7 @@ static struct scsi_cmnd *retrieve_from_waiting_list(int to_remove, struct ncb *n
 		}
 		pcmd = (struct scsi_cmnd **) &(*pcmd)->next_wcmd;
 	}
-	return 0;
+	return NULL;
 }
 
 static void process_waiting_list(struct ncb *np, int sts)
@@ -8260,14 +8260,14 @@ static void process_waiting_list(struct ncb *np, int sts)
 	struct scsi_cmnd *waiting_list, *wcmd;
 
 	waiting_list = np->waiting_list;
-	np->waiting_list = 0;
+	np->waiting_list = NULL;
 
 #ifdef DEBUG_WAITING_LIST
 	if (waiting_list) printk("%s: waiting_list=%lx processing sts=%d\n", ncr_name(np), (u_long) waiting_list, sts);
 #endif
 	while ((wcmd = waiting_list) != 0) {
 		waiting_list = (struct scsi_cmnd *) wcmd->next_wcmd;
-		wcmd->next_wcmd = 0;
+		wcmd->next_wcmd = NULL;
 		if (sts == DID_OK) {
 #ifdef DEBUG_WAITING_LIST
 	printk("%s: cmd %lx trying to requeue\n", ncr_name(np), (u_long) wcmd);
@@ -8535,7 +8535,7 @@ static int ncr53c8xx_proc_info(struct Scsi_Host *host, char *buffer, char **star
 			int length, int func)
 {
 	struct host_data *host_data;
-	struct ncb *ncb = 0;
+	struct ncb *ncb = NULL;
 	int retv;
 
 #ifdef DEBUG_PROC_INFO
@@ -8579,7 +8579,7 @@ printk("ncr53c8xx_proc_info: hostno=%d, func=%d\n", host->host_no, func);
 **==========================================================
 */
 #ifdef	MODULE
-char *ncr53c8xx = 0;	/* command line passed by insmod */
+char *ncr53c8xx;	/* command line passed by insmod */
 MODULE_PARM(ncr53c8xx, "s");
 #endif
 
@@ -8617,8 +8617,8 @@ struct Scsi_Host * __init ncr_attach(struct scsi_host_template *tpnt,
 					int unit, struct ncr_device *device)
 {
 	struct host_data *host_data;
-	struct ncb *np = 0;
-	struct Scsi_Host *instance = 0;
+	struct ncb *np = NULL;
+	struct Scsi_Host *instance = NULL;
 	u_long flags = 0;
 	int i;
 

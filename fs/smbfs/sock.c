@@ -38,27 +38,10 @@
 static int
 _recvfrom(struct socket *socket, unsigned char *ubuf, int size, unsigned flags)
 {
-	struct iovec iov;
-	struct msghdr msg;
-	mm_segment_t fs;
-
-	fs = get_fs();
-	set_fs(get_ds());
-	flags |= MSG_DONTWAIT | MSG_NOSIGNAL;
-
-	msg.msg_flags = flags;
-	msg.msg_name = NULL;
-	msg.msg_namelen = 0;
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
-	msg.msg_control = NULL;
-	iov.iov_base = ubuf;
-	iov.iov_len = size;
-
-	size = sock_recvmsg(socket, &msg, size, flags);
-
-	set_fs(fs);
-	return size;
+	struct kvec iov = {ubuf, size};
+	struct msghdr msg = {.msg_flags = flags};
+	msg.msg_flags |= MSG_DONTWAIT | MSG_NOSIGNAL;
+	return kernel_recvmsg(socket, &msg, &iov, 1, size, msg.msg_flags);
 }
 
 /*
@@ -171,42 +154,42 @@ smb_recv_available(struct smb_sb_info *server)
 }
 
 /*
- * Adjust the iovec to move on 'n' bytes (from nfs/sunrpc)
+ * Adjust the kvec to move on 'n' bytes (from nfs/sunrpc)
  */
 static int
-smb_move_iov(struct msghdr *msg, struct iovec *niv, unsigned amount)
+smb_move_iov(struct kvec **data, size_t *num, struct kvec *vec, unsigned amount)
 {
-	struct iovec *iv = msg->msg_iov;
+	struct kvec *iv = *data;
 	int i;
 	int len;
 
 	/*
-	 *	Eat any sent iovecs
+	 *	Eat any sent kvecs
 	 */
 	while (iv->iov_len <= amount) {
 		amount -= iv->iov_len;
 		iv++;
-		msg->msg_iovlen--;
+		(*num)--;
 	}
 
 	/*
 	 *	And chew down the partial one
 	 */
-	niv[0].iov_len = iv->iov_len-amount;
-	niv[0].iov_base =((unsigned char *)iv->iov_base)+amount;
+	vec[0].iov_len = iv->iov_len-amount;
+	vec[0].iov_base =((unsigned char *)iv->iov_base)+amount;
 	iv++;
 
-	len = niv[0].iov_len;
+	len = vec[0].iov_len;
 
 	/*
 	 *	And copy any others
 	 */
-	for (i = 1; i < msg->msg_iovlen; i++) {
-		niv[i] = *iv++;
-		len += niv[i].iov_len;
+	for (i = 1; i < *num; i++) {
+		vec[i] = *iv++;
+		len += vec[i].iov_len;
 	}
 
-	msg->msg_iov = niv;
+	*data = vec;
 	return len;
 }
 
@@ -280,11 +263,13 @@ smb_receive_drop(struct smb_sb_info *server)
 {
 	struct socket *sock;
 	unsigned int flags;
-	struct iovec iov;
+	struct kvec iov;
 	struct msghdr msg;
-	mm_segment_t fs;
 	int rlen = smb_len(server->header) - server->smb_read + 4;
 	int result = -EIO;
+
+	if (rlen > PAGE_SIZE)
+		rlen = PAGE_SIZE;
 
 	sock = server_sock(server);
 	if (!sock)
@@ -292,25 +277,15 @@ smb_receive_drop(struct smb_sb_info *server)
 	if (sock->sk->sk_state != TCP_ESTABLISHED)
 		goto out;
 
-	fs = get_fs();
-	set_fs(get_ds());
-
 	flags = MSG_DONTWAIT | MSG_NOSIGNAL;
 	iov.iov_base = drop_buffer;
 	iov.iov_len = PAGE_SIZE;
 	msg.msg_flags = flags;
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
-	msg.msg_iov = &iov;
-	msg.msg_iovlen = 1;
 	msg.msg_control = NULL;
 
-	if (rlen > PAGE_SIZE)
-		rlen = PAGE_SIZE;
-
-	result = sock_recvmsg(sock, &msg, rlen, flags);
-
-	set_fs(fs);
+	result = kernel_recvmsg(sock, &msg, &iov, 1, rlen, flags);
 
 	VERBOSE("read: %d\n", result);
 	if (result < 0) {
@@ -335,9 +310,10 @@ smb_receive(struct smb_sb_info *server, struct smb_request *req)
 {
 	struct socket *sock;
 	unsigned int flags;
-	struct iovec iov[4];
+	struct kvec iov[4];
+	struct kvec *p = req->rq_iov;
+	size_t num = req->rq_iovlen;
 	struct msghdr msg;
-	mm_segment_t fs;
 	int rlen;
 	int result = -EIO;
 
@@ -347,25 +323,18 @@ smb_receive(struct smb_sb_info *server, struct smb_request *req)
 	if (sock->sk->sk_state != TCP_ESTABLISHED)
 		goto out;
 
-	fs = get_fs();
-	set_fs(get_ds());
-
 	flags = MSG_DONTWAIT | MSG_NOSIGNAL;
 	msg.msg_flags = flags;
 	msg.msg_name = NULL;
 	msg.msg_namelen = 0;
-	msg.msg_iov = req->rq_iov;
-	msg.msg_iovlen = req->rq_iovlen;
 	msg.msg_control = NULL;
 
 	/* Dont repeat bytes and count available bufferspace */
-	rlen = smb_move_iov(&msg, iov, req->rq_bytes_recvd);
+	rlen = smb_move_iov(&p, &num, iov, req->rq_bytes_recvd);
 	if (req->rq_rlen < rlen)
 		rlen = req->rq_rlen;
 
-	result = sock_recvmsg(sock, &msg, rlen, flags);
-
-	set_fs(fs);
+	result = kernel_recvmsg(sock, &msg, p, num, rlen, flags);
 
 	VERBOSE("read: %d\n", result);
 	if (result < 0) {
@@ -388,13 +357,14 @@ out:
 int
 smb_send_request(struct smb_request *req)
 {
-	mm_segment_t fs;
 	struct smb_sb_info *server = req->rq_server;
 	struct socket *sock;
-	struct msghdr msg;
+	struct msghdr msg = {.msg_flags = MSG_NOSIGNAL | MSG_DONTWAIT};
         int slen = req->rq_slen - req->rq_bytes_sent;
 	int result = -EIO;
-	struct iovec iov[4];
+	struct kvec iov[4];
+	struct kvec *p = req->rq_iov;
+	size_t num = req->rq_iovlen;
 
 	sock = server_sock(server);
 	if (!sock)
@@ -402,22 +372,11 @@ smb_send_request(struct smb_request *req)
 	if (sock->sk->sk_state != TCP_ESTABLISHED)
 		goto out;
 
-	msg.msg_name = NULL;
-	msg.msg_namelen = 0;
-	msg.msg_control = NULL;
-	msg.msg_controllen = 0;
-	msg.msg_iov = req->rq_iov;
-	msg.msg_iovlen = req->rq_iovlen;
-	msg.msg_flags = MSG_NOSIGNAL | MSG_DONTWAIT;
-
 	/* Dont repeat bytes */
 	if (req->rq_bytes_sent)
-		smb_move_iov(&msg, iov, req->rq_bytes_sent);
+		smb_move_iov(&p, &num, iov, req->rq_bytes_sent);
 
-	fs = get_fs();
-	set_fs(get_ds());
-	result = sock_sendmsg(sock, &msg, slen);
-	set_fs(fs);
+	result = kernel_sendmsg(sock, &msg, p, num, slen);
 
 	if (result >= 0) {
 		req->rq_bytes_sent += result;

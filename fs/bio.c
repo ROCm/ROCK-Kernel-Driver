@@ -446,7 +446,6 @@ static struct bio *__bio_map_user(request_queue_t *q, struct block_device *bdev,
 	if (!write_to_vm)
 		bio->bi_rw |= (1 << BIO_RW);
 
-	blk_queue_bounce(q, &bio);
 	return bio;
 out:
 	kfree(pages);

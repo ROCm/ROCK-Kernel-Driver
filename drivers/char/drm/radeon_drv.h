@@ -887,7 +887,7 @@ do {									\
 
 #define OUT_RING_USER_TABLE( tab, sz ) do {			\
 	int _size = (sz);					\
-	int *_tab = (tab);					\
+	int __user *_tab = (tab);					\
 								\
 	if (write + _size > mask) {				\
 		int i = (mask+1) - write;			\

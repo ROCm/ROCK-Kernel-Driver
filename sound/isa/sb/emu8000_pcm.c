@@ -264,7 +264,7 @@ static int emu8k_pcm_close(snd_pcm_substream_t *subs)
 	emu8k_pcm_t *rec = subs->runtime->private_data;
 	if (rec)
 		kfree(rec);
-	subs->runtime->private_data = 0;
+	subs->runtime->private_data = NULL;
 	return 0;
 }
 

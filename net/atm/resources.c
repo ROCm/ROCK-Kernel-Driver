@@ -356,9 +356,9 @@ int atm_dev_ioctl(unsigned int cmd, void __user *arg)
 				? -EFAULT : 0;
 			goto done;
 		case ATM_SETLOOP:
-			if (__ATM_LM_XTRMT((int) (long) buf) &&
-			    __ATM_LM_XTLOC((int) (long) buf) >
-			    __ATM_LM_XTRMT((int) (long) buf)) {
+			if (__ATM_LM_XTRMT((int) (unsigned long) buf) &&
+			    __ATM_LM_XTLOC((int) (unsigned long) buf) >
+			    __ATM_LM_XTRMT((int) (unsigned long) buf)) {
 				error = -EINVAL;
 				goto done;
 			}

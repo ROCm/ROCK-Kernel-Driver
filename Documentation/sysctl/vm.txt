@@ -24,11 +24,14 @@ Currently, these files are in /proc/sys/vm:
 - dirty_writeback_centisecs
 - max_map_count
 - min_free_kbytes
+- laptop_mode
+- block_dump
 
 ==============================================================
 
 dirty_ratio, dirty_background_ratio, dirty_expire_centisecs,
-dirty_writeback_centisecs, vfs_cache_pressure:
+dirty_writeback_centisecs, vfs_cache_pressure, laptop_mode,
+block_dump:
 
 See Documentation/filesystems/proc.txt
 

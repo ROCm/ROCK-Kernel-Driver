@@ -257,8 +257,8 @@ svc_process(struct svc_serv *serv, struct svc_rqst *rqstp)
 	struct svc_program	*progp;
 	struct svc_version	*versp = NULL;	/* compiler food */
 	struct svc_procedure	*procp = NULL;
-	struct iovec *		argv = &rqstp->rq_arg.head[0];
-	struct iovec *		resv = &rqstp->rq_res.head[0];
+	struct kvec *		argv = &rqstp->rq_arg.head[0];
+	struct kvec *		resv = &rqstp->rq_res.head[0];
 	kxdrproc_t		xdr;
 	u32			*statp;
 	u32			dir, prog, vers, proc,

@@ -146,12 +146,12 @@ struct snd_vortex {
 #endif
 
 	/* Global resources */
-	char mixcapt[2];
-	char mixplayb[4];
+	s8 mixcapt[2];
+	s8 mixplayb[4];
 #ifndef CHIP_AU8820
-	char mixspdif[2];
-	char mixa3d[2];		/* mixers which collect all a3d streams. */
-	char mixxtlk[2];	/* crosstalk canceler mixer inputs. */
+	s8 mixspdif[2];
+	s8 mixa3d[2];	/* mixers which collect all a3d streams. */
+	s8 mixxtlk[2];	/* crosstalk canceler mixer inputs. */
 #endif
 	u32 fixed_res[5];
 

@@ -349,7 +349,6 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 			struct file *filp, unsigned long offset)
 {
 	unsigned max;
-	unsigned min;
 	unsigned orig_next_size;
 	unsigned actual;
 	int first_access=0;
@@ -374,7 +373,6 @@ page_cache_readahead(struct address_space *mapping, struct file_ra_state *ra,
 	if (max == 0)
 		goto out;	/* No readahead */
 
-	min = get_min_readahead(ra);
 	orig_next_size = ra->next_size;
 
 	if (ra->next_size == 0) {
@@ -470,7 +468,11 @@ do_io:
 			  * pages shall be accessed in the next
 			  * current window.
 			  */
-			ra->next_size = min(ra->average , (unsigned long)max);
+			average = ra->average;
+			if (ra->serial_cnt > average)
+				average = (ra->serial_cnt + ra->average + 1) / 2;
+
+			ra->next_size = min(average , (unsigned long)max);
 		}
 		ra->start = offset;
 		ra->size = ra->next_size;
@@ -552,6 +554,7 @@ void handle_ra_miss(struct address_space *mapping,
 				ra->size = max;
 				ra->ahead_start = 0;
 				ra->ahead_size = 0;
+				ra->average = max / 2;
 			}
 		}
 		ra->prev_page = offset;

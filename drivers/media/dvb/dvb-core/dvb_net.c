@@ -43,7 +43,7 @@
 #include "dvb_functions.h"
 
 
-static inline __u32 iov_crc32( __u32 c, struct iovec *iov, unsigned int cnt )
+static inline __u32 iov_crc32( __u32 c, struct kvec *iov, unsigned int cnt )
 {
 	unsigned int j;
 	for (j = 0; j < cnt; j++)
@@ -481,7 +481,7 @@ static void dvb_net_ule( struct net_device *dev, const u8 *buf, size_t buf_len )
 			/* Check CRC32, we've got it in our skb already. */
 			unsigned short ulen = htons(priv->ule_sndu_len);
 			unsigned short utype = htons(priv->ule_sndu_type);
-			struct iovec iov[4] = {
+			struct kvec iov[4] = {
 				{ &ulen, sizeof ulen },
 				{ &utype, sizeof utype },
 				{ NULL, 0 },

@@ -933,7 +933,7 @@ static int encode_readdir(struct xdr_stream *xdr, const struct nfs4_readdir_arg 
 	WRITE32(FATTR4_WORD0_FILEID);
 	WRITE32(0);
 
-	/* set up reply iovec
+	/* set up reply kvec
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READDIR + status + verifer(2)  = 9
 	 */
@@ -954,7 +954,7 @@ static int encode_readlink(struct xdr_stream *xdr, const struct nfs4_readlink *r
 	RESERVE_SPACE(4);
 	WRITE32(OP_READLINK);
 
-	/* set up reply iovec
+	/* set up reply kvec
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
 	 *      + OP_READLINK + status  = 7
 	 */
@@ -1501,7 +1501,7 @@ static int nfs4_xdr_enc_read(struct rpc_rqst *req, uint32_t *p, struct nfs_reada
 	if (status)
 		goto out;
 
-	/* set up reply iovec
+	/* set up reply kvec
 	 *    toplevel status + taglen=0 + rescount + OP_PUTFH + status
 	 *       + OP_READ + status + eof + datalen = 9
 	 */
@@ -2785,7 +2785,7 @@ static int decode_putrootfh(struct xdr_stream *xdr)
 
 static int decode_read(struct xdr_stream *xdr, struct rpc_rqst *req, struct nfs_readres *res)
 {
-	struct iovec *iov = req->rq_rcv_buf.head;
+	struct kvec *iov = req->rq_rcv_buf.head;
 	uint32_t *p;
 	uint32_t count, eof, recvd, hdrlen;
 	int status;
@@ -2814,7 +2814,7 @@ static int decode_readdir(struct xdr_stream *xdr, struct rpc_rqst *req, struct n
 {
 	struct xdr_buf	*rcvbuf = &req->rq_rcv_buf;
 	struct page	*page = *rcvbuf->pages;
-	struct iovec	*iov = rcvbuf->head;
+	struct kvec	*iov = rcvbuf->head;
 	unsigned int	nr, pglen = rcvbuf->page_len;
 	uint32_t	*end, *entry, *p, *kaddr;
 	uint32_t	len, attrlen, word;
@@ -2897,7 +2897,7 @@ err_unmap:
 static int decode_readlink(struct xdr_stream *xdr, struct rpc_rqst *req)
 {
 	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
-	struct iovec *iov = rcvbuf->head;
+	struct kvec *iov = rcvbuf->head;
 	uint32_t *strlen;
 	unsigned int hdrlen, len;
 	char *string;

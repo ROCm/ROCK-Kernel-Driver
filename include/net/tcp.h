@@ -1543,7 +1543,7 @@ static __inline__ int tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 
 			while ((skb1 = __skb_dequeue(&tp->ucopy.prequeue)) != NULL) {
 				sk->sk_backlog_rcv(sk, skb1);
-				NET_INC_STATS_BH(TCPPrequeueDropped);
+				NET_INC_STATS_BH(LINUX_MIB_TCPPREQUEUEDROPPED);
 			}
 
 			tp->ucopy.memory = 0;
@@ -1575,12 +1575,12 @@ static __inline__ void tcp_set_state(struct sock *sk, int state)
 	switch (state) {
 	case TCP_ESTABLISHED:
 		if (oldstate != TCP_ESTABLISHED)
-			TCP_INC_STATS(TcpCurrEstab);
+			TCP_INC_STATS(TCP_MIB_CURRESTAB);
 		break;
 
 	case TCP_CLOSE:
 		if (oldstate == TCP_CLOSE_WAIT || oldstate == TCP_ESTABLISHED)
-			TCP_INC_STATS(TcpEstabResets);
+			TCP_INC_STATS(TCP_MIB_ESTABRESETS);
 
 		sk->sk_prot->unhash(sk);
 		if (tcp_sk(sk)->bind_hash &&
@@ -1589,7 +1589,7 @@ static __inline__ void tcp_set_state(struct sock *sk, int state)
 		/* fall through */
 	default:
 		if (oldstate==TCP_ESTABLISHED)
-			TCP_DEC_STATS(TcpCurrEstab);
+			TCP_DEC_STATS(TCP_MIB_CURRESTAB);
 	}
 
 	/* Change state AFTER socket is unhashed to avoid closed
@@ -1961,10 +1961,10 @@ static inline int tcp_use_frto(const struct sock *sk)
 static inline void tcp_mib_init(void)
 {
 	/* See RFC 2012 */
-	TCP_ADD_STATS_USER(TcpRtoAlgorithm, 1);
-	TCP_ADD_STATS_USER(TcpRtoMin, TCP_RTO_MIN*1000/HZ);
-	TCP_ADD_STATS_USER(TcpRtoMax, TCP_RTO_MAX*1000/HZ);
-	TCP_ADD_STATS_USER(TcpMaxConn, -1);
+	TCP_ADD_STATS_USER(TCP_MIB_RTOALGORITHM, 1);
+	TCP_ADD_STATS_USER(TCP_MIB_RTOMIN, TCP_RTO_MIN*1000/HZ);
+	TCP_ADD_STATS_USER(TCP_MIB_RTOMAX, TCP_RTO_MAX*1000/HZ);
+	TCP_ADD_STATS_USER(TCP_MIB_MAXCONN, -1);
 }
 
 /* /proc */

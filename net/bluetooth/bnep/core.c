@@ -99,11 +99,9 @@ static void __bnep_unlink_session(struct bnep_session *s)
 static int bnep_send(struct bnep_session *s, void *data, size_t len)
 {
 	struct socket *sock = s->sock;
-	struct iovec iv = { data, len };
+	struct kvec iv = { data, len };
 
-	s->msg.msg_iov    = &iv;
-	s->msg.msg_iovlen = 1;
-	return sock_sendmsg(sock, &s->msg, len);
+	return kernel_sendmsg(sock, &s->msg, &iv, 1, len);
 }
 
 static int bnep_send_rsp(struct bnep_session *s, u8 ctrl, u16 resp)
@@ -389,7 +387,7 @@ static inline int bnep_tx_frame(struct bnep_session *s, struct sk_buff *skb)
 {
 	struct ethhdr *eh = (void *) skb->data;
 	struct socket *sock = s->sock;
-	struct iovec iv[3];
+	struct kvec iv[3];
 	int len = 0, il = 0;
 	u8 type = 0;
 
@@ -400,7 +398,7 @@ static inline int bnep_tx_frame(struct bnep_session *s, struct sk_buff *skb)
 		goto send;
 	}
 
-	iv[il++] = (struct iovec) { &type, 1 };
+	iv[il++] = (struct kvec) { &type, 1 };
 	len++;
 
 	if (!memcmp(eh->h_dest, s->eh.h_source, ETH_ALEN))
@@ -415,25 +413,23 @@ static inline int bnep_tx_frame(struct bnep_session *s, struct sk_buff *skb)
 	type = __bnep_tx_types[type];
 	switch (type) {
 	case BNEP_COMPRESSED_SRC_ONLY:
-		iv[il++] = (struct iovec) { eh->h_source, ETH_ALEN };
+		iv[il++] = (struct kvec) { eh->h_source, ETH_ALEN };
 		len += ETH_ALEN;
 		break;
 		
 	case BNEP_COMPRESSED_DST_ONLY:
-		iv[il++] = (struct iovec) { eh->h_dest, ETH_ALEN };
+		iv[il++] = (struct kvec) { eh->h_dest, ETH_ALEN };
 		len += ETH_ALEN;
 		break;
 	}
 
 send:
-	iv[il++] = (struct iovec) { skb->data, skb->len };
+	iv[il++] = (struct kvec) { skb->data, skb->len };
 	len += skb->len;
 	
 	/* FIXME: linearize skb */
 	{
-		s->msg.msg_iov    = iv;
-		s->msg.msg_iovlen = il;
-		len = sock_sendmsg(sock, &s->msg, len);
+		len = kernel_sendmsg(sock, &s->msg, iv, il, len);
 	}
 	kfree_skb(skb);
 
@@ -459,8 +455,6 @@ static int bnep_session(void *arg)
         daemonize("kbnepd %s", dev->name);
 	set_user_nice(current, -15);
 	current->flags |= PF_NOFREEZE;
-
-        set_fs(KERNEL_DS);
 
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(sk->sk_sleep, &wait);

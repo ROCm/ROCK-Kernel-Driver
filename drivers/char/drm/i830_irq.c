@@ -121,7 +121,7 @@ int i830_wait_irq(drm_device_t *dev, int irq_nr)
 /* Needs the lock as it touches the ring.
  */
 int i830_irq_emit( struct inode *inode, struct file *filp, unsigned int cmd,
-		   unsigned long __user arg )
+		   unsigned long arg )
 {
 	drm_file_t	  *priv	    = filp->private_data;
 	drm_device_t	  *dev	    = priv->dev;
@@ -139,7 +139,7 @@ int i830_irq_emit( struct inode *inode, struct file *filp, unsigned int cmd,
 		return -EINVAL;
 	}
 
-	if (copy_from_user( &emit, (drm_i830_irq_emit_t *)arg, sizeof(emit) ))
+	if (copy_from_user( &emit, (drm_i830_irq_emit_t __user *)arg, sizeof(emit) ))
 		return -EFAULT;
 
 	result = i830_emit_irq( dev );
@@ -168,7 +168,7 @@ int i830_irq_wait( struct inode *inode, struct file *filp, unsigned int cmd,
 		return -EINVAL;
 	}
 
-	if (copy_from_user( &irqwait, (drm_i830_irq_wait_t *)arg, 
+	if (copy_from_user( &irqwait, (drm_i830_irq_wait_t __user *)arg, 
 			    sizeof(irqwait) ))
 		return -EFAULT;
 

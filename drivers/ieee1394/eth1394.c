@@ -290,6 +290,20 @@ static int ether1394_change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
+static inline void purge_partial_datagram(struct list_head *old)
+{
+	struct partial_datagram *pd = list_entry(old, struct partial_datagram, list);
+	struct list_head *lh, *n;
+
+	list_for_each_safe(lh, n, &pd->frag_info) {
+		struct fragment_info *fi = list_entry(lh, struct fragment_info, list);
+		list_del(lh);
+		kfree(fi);
+	}
+	list_del(old);
+	kfree_skb(pd->skb);
+	kfree(pd);
+}
 
 /******************************************
  * 1394 bus activity functions
@@ -1079,21 +1093,6 @@ static inline int update_partial_datagram(struct list_head *pdgl, struct list_he
 	list_add(lh, pdgl);
 
 	return 0;
-}
-
-static inline void purge_partial_datagram(struct list_head *old)
-{
-	struct partial_datagram *pd = list_entry(old, struct partial_datagram, list);
-	struct list_head *lh, *n;
-
-	list_for_each_safe(lh, n, &pd->frag_info) {
-		struct fragment_info *fi = list_entry(lh, struct fragment_info, list);
-		list_del(lh);
-		kfree(fi);
-	}
-	list_del(old);
-	kfree_skb(pd->skb);
-	kfree(pd);
 }
 
 static inline int is_datagram_complete(struct list_head *lh, int dg_size)

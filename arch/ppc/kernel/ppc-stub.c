@@ -234,7 +234,7 @@ mem2hex(const char *mem, char *buf, int count)
 	} else {
 		/* error condition */
 	}
-	debugger_fault_handler = 0;
+	debugger_fault_handler = NULL;
 	*buf = 0;
 	return buf;
 }
@@ -300,7 +300,7 @@ hex2mem(char *buf, char *mem, int count)
 	} else {
 		/* error condition */
 	}
-	debugger_fault_handler = 0;
+	debugger_fault_handler = NULL;
 	return mem;
 }
 
@@ -331,7 +331,7 @@ hexToInt(char **ptr, int *intValue)
 	} else {
 		/* error condition */
 	}
-	debugger_fault_handler = 0;
+	debugger_fault_handler = NULL;
 
 	return (numChars);
 }

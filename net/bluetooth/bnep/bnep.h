@@ -139,7 +139,7 @@ struct bnep_conninfo {
 
 struct bnep_connlist_req {
 	__u32  cnum;
-	struct bnep_conninfo *ci;
+	struct bnep_conninfo __user *ci;
 };
 
 struct bnep_proto_filter {

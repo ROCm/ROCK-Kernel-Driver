@@ -63,6 +63,7 @@
 #include <net/ipv6.h>
 #include <linux/hugetlb.h>
 #include <linux/major.h>
+#include <linux/personality.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -1683,6 +1684,9 @@ static int selinux_bprm_set_security(struct linux_binprm *bprm)
 				  &isec->avcr, &ad);
 		if (rc)
 			return rc;
+
+		/* Clear any possibly unsafe personality bits on exec: */
+		current->personality &= ~PER_CLEAR_ON_SETID;
 
 		/* Set the security field to the new SID. */
 		bsec->sid = newsid;

@@ -1313,7 +1313,7 @@ extern struct aac_common aac_config;
  *	only used for debugging.
  */
  
-#if DBG
+#ifdef DBG
 #define	FIB_COUNTER_INCREMENT(counter)		(counter)++
 #else
 #define	FIB_COUNTER_INCREMENT(counter)		

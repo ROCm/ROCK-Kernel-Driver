@@ -342,8 +342,6 @@ static void fd_select_drive( int drive );
 static void fd_deselect( void );
 static void fd_motor_off_timer( unsigned long dummy );
 static void check_change( unsigned long dummy );
-static __inline__ void set_head_settle_flag( void );
-static __inline__ int get_head_settle_flag( void );
 static irqreturn_t floppy_irq (int irq, void *dummy, struct pt_regs *fp);
 static void fd_error( void );
 static int do_format(int drive, int type, struct atari_format_descr *desc);
@@ -361,7 +359,6 @@ static void fd_writetrack_done( int status );
 static void fd_times_out( unsigned long dummy );
 static void finish_fdc( void );
 static void finish_fdc_done( int dummy );
-static __inline__ void copy_buffer( void *from, void *to);
 static void setup_req_params( int drive );
 static void redo_fd_request( void);
 static int fd_ioctl( struct inode *inode, struct file *filp, unsigned int
@@ -385,27 +382,23 @@ static struct timer_list timeout_timer =
 static struct timer_list fd_timer =
 	TIMER_INITIALIZER(check_change, 0, 0);
 	
-static inline void
-start_motor_off_timer(void)
+static inline void start_motor_off_timer(void)
 {
 	mod_timer(&motor_off_timer, jiffies + FD_MOTOR_OFF_DELAY);
 	MotorOffTrys = 0;
 }
 
-static inline void
-start_check_change_timer( void )
+static inline void start_check_change_timer( void )
 {
 	mod_timer(&fd_timer, jiffies + CHECK_CHANGE_DELAY);
 }
 
-static inline void
-start_timeout(void)
+static inline void start_timeout(void)
 {
 	mod_timer(&timeout_timer, jiffies + FLOPPY_TIMEOUT);
 }
 
-static inline void
-stop_timeout(void)
+static inline void stop_timeout(void)
 {
 	del_timer(&timeout_timer);
 }
@@ -558,16 +551,25 @@ static void check_change( unsigned long dummy )
  * seek operation, because we don't use seeks with verify.
  */
 
-static __inline__ void set_head_settle_flag( void )
+static inline void set_head_settle_flag(void)
 {
 	HeadSettleFlag = FDCCMDADD_E;
 }
 
-static __inline__ int get_head_settle_flag( void )
+static inline int get_head_settle_flag(void)
 {
 	int	tmp = HeadSettleFlag;
 	HeadSettleFlag = 0;
 	return( tmp );
+}
+
+static inline void copy_buffer(void *from, void *to)
+{
+	ulong *p1 = (ulong *)from, *p2 = (ulong *)to;
+	int cnt;
+
+	for (cnt = 512/4; cnt; cnt--)
+		*p2++ = *p1++;
 }
 
   
@@ -1370,15 +1372,6 @@ static int floppy_revalidate(struct gendisk *disk)
 			UDT = &default_params[drive];
 	}
 	return 0;
-}
-
-static __inline__ void copy_buffer(void *from, void *to)
-{
-	ulong	*p1 = (ulong *)from, *p2 = (ulong *)to;
-	int		cnt;
-
-	for( cnt = 512/4; cnt; cnt-- )
-		*p2++ = *p1++;
 }
 
 

@@ -2,7 +2,7 @@
  * 
  * ATM Lan Emulation Daemon vs. driver interface
  *
- * carnil@cs.tut.fi
+ * mkiiskila@yahoo.com
  *
  */
 

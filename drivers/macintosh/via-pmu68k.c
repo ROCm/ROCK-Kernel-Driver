@@ -177,7 +177,7 @@ static s8 pmu_data_len[256][2] = {
 /*f8*/	{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},{-1,-1},
 };
 
-int pmu_probe()
+int pmu_probe(void)
 {
 	if (macintosh_config->adb_type == MAC_ADB_PB1) {
 		pmu_kind = PMU_68K_V1;
@@ -521,7 +521,7 @@ send_byte(int x)
 }
 
 static void 
-recv_byte()
+recv_byte(void)
 {
 	char c;
 
@@ -531,7 +531,7 @@ recv_byte()
 }
 
 static void 
-pmu_start()
+pmu_start(void)
 {
 	unsigned long flags;
 	struct adb_request *req;
@@ -556,7 +556,7 @@ out:
 }
 
 void 
-pmu_poll()
+pmu_poll(void)
 {
 	unsigned long flags;
 

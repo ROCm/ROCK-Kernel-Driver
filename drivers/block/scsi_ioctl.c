@@ -170,6 +170,13 @@ static int sg_io(request_queue_t *q, struct gendisk *bd_disk,
 	rq->flags |= REQ_BLOCK_PC;
 	bio = rq->bio;
 
+	/*
+	 * bounce this after holding a reference to the original bio, it's
+	 * needed for proper unmapping
+	 */
+	if (rq->bio)
+		blk_queue_bounce(q, &rq->bio);
+
 	rq->timeout = (hdr->timeout * HZ) / 1000;
 	if (!rq->timeout)
 		rq->timeout = q->sg_timeout;

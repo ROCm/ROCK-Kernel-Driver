@@ -1,7 +1,12 @@
 /*
- * HP AGPGART routines.
- *	Copyright (C) 2002-2003 Hewlett-Packard Co
- *		Bjorn Helgaas <bjorn_helgaas@hp.com>
+ * HP zx1 AGPGART routines.
+ *
+ * (c) Copyright 2002, 2003 Hewlett-Packard Development Company, L.P.
+ *	Bjorn Helgaas <bjorn.helgaas@hp.com>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
  */
 
 #include <linux/acpi.h>

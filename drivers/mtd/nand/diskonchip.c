@@ -651,10 +651,11 @@ static int __init find_media_headers(struct mtd_info *mtd, u_char *buf,
 {
 	struct nand_chip *this = mtd->priv;
 	struct doc_priv *doc = (void *)this->priv;
-	int offs, end = (MAX_MEDIAHEADER_SCAN << this->phys_erase_shift);
-	int ret, retlen;
+	unsigned offs, end = (MAX_MEDIAHEADER_SCAN << this->phys_erase_shift);
+	int ret;
+	size_t retlen;
 
-	end = min(end, (int)mtd->size); // paranoia
+	end = min(end, mtd->size); // paranoia
 	for (offs = 0; offs < end; offs += mtd->erasesize) {
 		ret = mtd->read(mtd, offs, mtd->oobblock, &retlen, buf);
 		if (retlen != mtd->oobblock) continue;
@@ -695,8 +696,8 @@ static inline int __init nftl_partscan(struct mtd_info *mtd,
 	struct doc_priv *doc = (void *)this->priv;
 	u_char *buf = this->data_buf;
 	struct NFTLMediaHeader *mh = (struct NFTLMediaHeader *) buf;
-	const int psize = 1 << this->page_shift;
-	int blocks, maxblocks;
+	const unsigned psize = 1 << this->page_shift;
+	unsigned blocks, maxblocks;
 	int offs, numheaders;
 
 	if (!(numheaders=find_media_headers(mtd, buf, "ANAND", 1))) return 0;
@@ -714,7 +715,7 @@ static inline int __init nftl_partscan(struct mtd_info *mtd,
 //#endif
 
 	blocks = mtd->size >> this->phys_erase_shift;
-	maxblocks = min(32768, (int)mtd->erasesize - psize);
+	maxblocks = min(32768U, mtd->erasesize - psize);
 
 	if (mh->UnitSizeFactor == 0x00) {
 		/* Auto-determine UnitSizeFactor.  The constraints are:
@@ -725,7 +726,7 @@ static inline int __init nftl_partscan(struct mtd_info *mtd,
 		mh->UnitSizeFactor = 0xff;
 		while (blocks > maxblocks) {
 			blocks >>= 1;
-			maxblocks = min(32768, (maxblocks << 1) + psize);
+			maxblocks = min(32768U, (maxblocks << 1) + psize);
 			mh->UnitSizeFactor--;
 		}
 		printk(KERN_WARNING "UnitSizeFactor=0x00 detected.  Correct value is assumed to be 0x%02x.\n", mh->UnitSizeFactor);
@@ -741,7 +742,7 @@ static inline int __init nftl_partscan(struct mtd_info *mtd,
 		mtd->erasesize <<= (0xff - mh->UnitSizeFactor);
 		printk(KERN_INFO "Setting virtual erase size to %d\n", mtd->erasesize);
 		blocks = mtd->size >> this->bbt_erase_shift;
-		maxblocks = min(32768, (int)mtd->erasesize - psize);
+		maxblocks = min(32768U, mtd->erasesize - psize);
 	}
 
 	if (blocks > maxblocks) {

@@ -897,9 +897,9 @@ int cdrom_open(struct cdrom_device_info *cdi, struct inode *ip, struct file *fp)
 			goto err;
 		if (fp->f_mode & FMODE_WRITE) {
 			ret = -EROFS;
-			if (!CDROM_CAN(CDC_RAM))
-				goto err;
 			if (cdrom_open_write(cdi))
+				goto err;
+			if (!CDROM_CAN(CDC_RAM))
 				goto err;
 			ret = 0;
 		}
@@ -2001,6 +2001,9 @@ static int cdrom_read_cdda_bpc(struct cdrom_device_info *cdi, __u8 __user *ubuf,
 		rq->flags |= REQ_BLOCK_PC;
 		rq->timeout = 60 * HZ;
 		bio = rq->bio;
+
+		if (rq->bio)
+			blk_queue_bounce(q, &rq->bio);
 
 		if (blk_execute_rq(q, cdi->disk, rq)) {
 			struct request_sense *s = rq->sense;

@@ -953,7 +953,7 @@ static const char * __init sanity_check(void)
 		return "machine";
 	if(pmdisk_info.cpus != num_online_cpus())
 		return "number of cpus";
-	return 0;
+	return NULL;
 }
 
 

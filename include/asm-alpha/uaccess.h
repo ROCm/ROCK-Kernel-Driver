@@ -107,7 +107,7 @@ extern void __get_user_unknown(void);
 #define __get_user_check(x,ptr,size,segment)				\
 ({									\
 	long __gu_err = -EFAULT, __gu_val = 0;				\
-	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
+	const __typeof__(*(ptr)) __user *__gu_addr = (ptr);		\
 	__chk_user_ptr(ptr);						\
 	if (__access_ok((unsigned long)__gu_addr,size,segment)) {	\
 		__gu_err = 0;						\
@@ -222,7 +222,7 @@ extern void __put_user_unknown(void);
 #define __put_user_check(x,ptr,size,segment)				\
 ({									\
 	long __pu_err = -EFAULT;					\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
+	__typeof__(*(ptr)) __user *__pu_addr = (ptr);			\
 	__chk_user_ptr(ptr);						\
 	if (__access_ok((unsigned long)__pu_addr,size,segment)) {	\
 		__pu_err = 0;						\

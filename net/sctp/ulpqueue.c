@@ -334,7 +334,7 @@ static struct sctp_ulpevent *sctp_make_reassembled_event(struct sk_buff *f_frag,
 	};
 
 	event = sctp_skb2event(f_frag);
-	SCTP_INC_STATS(SctpReasmUsrMsgs);
+	SCTP_INC_STATS(SCTP_MIB_REASMUSRMSGS);
 
 	return event;
 }

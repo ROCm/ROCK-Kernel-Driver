@@ -1697,6 +1697,32 @@ static int sctp_setsockopt_peer_addr_params(struct sock *sk,
 	if (copy_from_user(&params, optval, optlen))
 		return -EFAULT;
 
+	/*
+	 * API 7. Socket Options (setting the default value for the endpoint)
+	 * All options that support specific settings on an association by
+	 * filling in either an association id variable or a sockaddr_storage
+	 * SHOULD also support setting of the same value for the entire endpoint
+	 * (i.e. future associations). To accomplish this the following logic is
+	 * used when setting one of these options:
+
+	 * c) If neither the sockaddr_storage or association identification is
+	 *    set i.e. the sockaddr_storage is set to all 0's (INADDR_ANY) and
+	 *    the association identification is 0, the settings are a default
+	 *    and to be applied to the endpoint (all future associations).
+	 */
+
+	/* update default value for endpoint (all future associations) */
+	if (!params.spp_assoc_id && 
+	    sctp_is_any(( union sctp_addr *)&params.spp_address)) {
+		if (params.spp_hbinterval)
+			sctp_sk(sk)->paddrparam.spp_hbinterval =
+						params.spp_hbinterval;
+		if (sctp_max_retrans_path)
+			sctp_sk(sk)->paddrparam.spp_pathmaxrxt =
+						params.spp_pathmaxrxt;
+		return 0;
+	}
+
 	trans = sctp_addr_id2transport(sk, &params.spp_address,
 				       params.spp_assoc_id);
 	if (!trans)
@@ -2864,6 +2890,17 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 	if (copy_from_user(&params, optval, len))
 		return -EFAULT;
 
+	/* If no association id is specified retrieve the default value
+	 * for the endpoint that will be used for all future associations
+	 */
+	if (!params.spp_assoc_id &&
+	    sctp_is_any(( union sctp_addr *)&params.spp_address)) {
+		params.spp_hbinterval = sctp_sk(sk)->paddrparam.spp_hbinterval;
+		params.spp_pathmaxrxt = sctp_sk(sk)->paddrparam.spp_pathmaxrxt;
+
+		goto done;
+	}
+
 	trans = sctp_addr_id2transport(sk, &params.spp_address,
 				       params.spp_assoc_id);
 	if (!trans)
@@ -2883,6 +2920,7 @@ static int sctp_getsockopt_peer_addr_params(struct sock *sk, int len,
 	 */
 	params.spp_pathmaxrxt = trans->error_threshold;
 
+done:
 	if (copy_to_user(optval, &params, len))
 		return -EFAULT;
 

@@ -410,6 +410,10 @@ struct task_struct {
 	unsigned int time_slice, first_time_slice;
 
 	struct list_head tasks;
+	/*
+	 * ptrace_list/ptrace_children forms the list of my children
+	 * that were stolen by a ptracer.
+	 */
 	struct list_head ptrace_children;
 	struct list_head ptrace_list;
 
@@ -431,6 +435,10 @@ struct task_struct {
 	 */
 	struct task_struct *real_parent; /* real parent process (when being debugged) */
 	struct task_struct *parent;	/* parent process */
+	/*
+	 * children/sibling forms the list of my children plus the
+	 * tasks I'm ptracing.
+	 */
 	struct list_head children;	/* list of my children */
 	struct list_head sibling;	/* linkage in my parent's children list */
 	struct task_struct *group_leader;	/* threadgroup leader */

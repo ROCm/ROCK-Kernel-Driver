@@ -1274,7 +1274,7 @@ static int __init bigmac_match(struct sbus_dev *sdev)
 static int __init bigmac_probe(void)
 {
 	struct sbus_bus *sbus;
-	struct sbus_dev *sdev = 0;
+	struct sbus_dev *sdev = NULL;
 	static int called;
 	int cards = 0, v;
 

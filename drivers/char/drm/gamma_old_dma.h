@@ -122,6 +122,8 @@ int DRM(dma_enqueue)(struct file *filp, drm_dma_t *d)
 	int		  idx;
 	int		  while_locked = 0;
 	drm_device_dma_t  *dma = dev->dma;
+	int		  *ind;
+	int		  err;
 	DECLARE_WAITQUEUE(entry, current);
 
 	DRM_DEBUG("%d\n", d->send_count);
@@ -168,45 +170,51 @@ int DRM(dma_enqueue)(struct file *filp, drm_dma_t *d)
 		remove_wait_queue(&q->write_queue, &entry);
 	}
 
+	ind = DRM(alloc)(d->send_count * sizeof(int), DRM_MEM_DRIVER);
+	if (!ind)
+		return -ENOMEM;
+
+	if (copy_from_user(ind, d->send_indices, d->send_count * sizeof(int))) {
+		err = -EFAULT;
+                goto out;
+	}
+
+	err = -EINVAL;
 	for (i = 0; i < d->send_count; i++) {
-		idx = d->send_indices[i];
+		idx = ind[i];
 		if (idx < 0 || idx >= dma->buf_count) {
-			atomic_dec(&q->use_count);
 			DRM_ERROR("Index %d (of %d max)\n",
-				  d->send_indices[i], dma->buf_count - 1);
-			return -EINVAL;
+				  ind[i], dma->buf_count - 1);
+			goto out;
 		}
 		buf = dma->buflist[ idx ];
 		if (buf->filp != filp) {
-			atomic_dec(&q->use_count);
 			DRM_ERROR("Process %d using buffer not owned\n",
 				  current->pid);
-			return -EINVAL;
+			goto out;
 		}
 		if (buf->list != DRM_LIST_NONE) {
-			atomic_dec(&q->use_count);
 			DRM_ERROR("Process %d using buffer %d on list %d\n",
 				  current->pid, buf->idx, buf->list);
+			goto out;
 		}
-		buf->used	  = d->send_sizes[i];
+		buf->used	  = ind[i];
 		buf->while_locked = while_locked;
 		buf->context	  = d->context;
 		if (!buf->used) {
 			DRM_ERROR("Queueing 0 length buffer\n");
 		}
 		if (buf->pending) {
-			atomic_dec(&q->use_count);
 			DRM_ERROR("Queueing pending buffer:"
 				  " buffer %d, offset %d\n",
-				  d->send_indices[i], i);
-			return -EINVAL;
+				  ind[i], i);
+			goto out;
 		}
 		if (buf->waiting) {
-			atomic_dec(&q->use_count);
 			DRM_ERROR("Queueing waiting buffer:"
 				  " buffer %d, offset %d\n",
-				  d->send_indices[i], i);
-			return -EINVAL;
+				  ind[i], i);
+			goto out;
 		}
 		buf->waiting = 1;
 		if (atomic_read(&q->use_count) == 1
@@ -220,6 +228,11 @@ int DRM(dma_enqueue)(struct file *filp, drm_dma_t *d)
 	atomic_dec(&q->use_count);
 
 	return 0;
+
+out:
+	DRM(free)(ind, d->send_count * sizeof(int), DRM_MEM_DRIVER);
+	atomic_dec(&q->use_count);
+	return err;
 }
 
 static int DRM(dma_get_buffers_of_order)(struct file *filp, drm_dma_t *d,

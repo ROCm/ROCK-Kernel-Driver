@@ -358,7 +358,7 @@ int DRM(context_switch)(drm_device_t *dev, int old, int new)
 {
 	ffb_dev_priv_t *fpriv = (ffb_dev_priv_t *) dev->dev_private;
 
-#if DRM_DMA_HISTOGRAM
+#ifdef DRM_DMA_HISTOGRAM
         dev->ctx_start = get_cycles();
 #endif
         
@@ -388,7 +388,7 @@ int DRM(resctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	int		i;
 
 	DRM_DEBUG("%d\n", DRM_RESERVED_CONTEXTS);
-	if (copy_from_user(&res, (drm_ctx_res_t *)arg, sizeof(res)))
+	if (copy_from_user(&res, (drm_ctx_res_t __user *)arg, sizeof(res)))
 		return -EFAULT;
 	if (res.count >= DRM_RESERVED_CONTEXTS) {
 		memset(&ctx, 0, sizeof(ctx));
@@ -401,7 +401,7 @@ int DRM(resctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 		}
 	}
 	res.count = DRM_RESERVED_CONTEXTS;
-	if (copy_to_user((drm_ctx_res_t *)arg, &res, sizeof(res)))
+	if (copy_to_user((drm_ctx_res_t __user *)arg, &res, sizeof(res)))
 		return -EFAULT;
 	return 0;
 }
@@ -415,7 +415,7 @@ int DRM(addctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_ctx_t	ctx;
 	int idx;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
+	if (copy_from_user(&ctx, (drm_ctx_t __user *)arg, sizeof(ctx)))
 		return -EFAULT;
 	idx = DRM(alloc_queue)(dev, (ctx.flags & _DRM_CONTEXT_2DONLY));
 	if (idx < 0)
@@ -423,7 +423,7 @@ int DRM(addctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 
 	DRM_DEBUG("%d\n", ctx.handle);
 	ctx.handle = idx;
-	if (copy_to_user((drm_ctx_t *)arg, &ctx, sizeof(ctx)))
+	if (copy_to_user((drm_ctx_t __user *)arg, &ctx, sizeof(ctx)))
 		return -EFAULT;
 	return 0;
 }
@@ -438,7 +438,7 @@ int DRM(modctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_ctx_t ctx;
 	int idx;
 
-	if (copy_from_user(&ctx, (drm_ctx_t*)arg, sizeof(ctx)))
+	if (copy_from_user(&ctx, (drm_ctx_t __user *)arg, sizeof(ctx)))
 		return -EFAULT;
 
 	idx = ctx.handle;
@@ -467,7 +467,7 @@ int DRM(getctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_ctx_t ctx;
 	int idx;
 
-	if (copy_from_user(&ctx, (drm_ctx_t*)arg, sizeof(ctx)))
+	if (copy_from_user(&ctx, (drm_ctx_t __user *)arg, sizeof(ctx)))
 		return -EFAULT;
 
 	idx = ctx.handle;
@@ -483,7 +483,7 @@ int DRM(getctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	else
 		ctx.flags = 0;
 
-	if (copy_to_user((drm_ctx_t*)arg, &ctx, sizeof(ctx)))
+	if (copy_to_user((drm_ctx_t __user *)arg, &ctx, sizeof(ctx)))
 		return -EFAULT;
 
 	return 0;
@@ -496,7 +496,7 @@ int DRM(switchctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	drm_device_t	*dev	= priv->dev;
 	drm_ctx_t	ctx;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
+	if (copy_from_user(&ctx, (drm_ctx_t  __user *)arg, sizeof(ctx)))
 		return -EFAULT;
 	DRM_DEBUG("%d\n", ctx.handle);
 	return DRM(context_switch)(dev, dev->last_context, ctx.handle);
@@ -507,7 +507,7 @@ int DRM(newctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 {
 	drm_ctx_t	ctx;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
+	if (copy_from_user(&ctx, (drm_ctx_t  __user *)arg, sizeof(ctx)))
 		return -EFAULT;
 	DRM_DEBUG("%d\n", ctx.handle);
 
@@ -523,7 +523,7 @@ int DRM(rmctx)(struct inode *inode, struct file *filp, unsigned int cmd,
 	ffb_dev_priv_t	*fpriv	= (ffb_dev_priv_t *) dev->dev_private;
 	int idx;
 
-	if (copy_from_user(&ctx, (drm_ctx_t *)arg, sizeof(ctx)))
+	if (copy_from_user(&ctx, (drm_ctx_t __user *)arg, sizeof(ctx)))
 		return -EFAULT;
 	DRM_DEBUG("%d\n", ctx.handle);
 

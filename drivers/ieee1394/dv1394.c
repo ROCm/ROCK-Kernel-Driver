@@ -2518,7 +2518,7 @@ static int handle_dv1394_init(unsigned int fd, unsigned int cmd, unsigned long a
 	if (file->f_op->ioctl != dv1394_ioctl)
 		return -EFAULT;
 
-	if (copy_from_user(&dv32, (void *)arg, sizeof(dv32)))
+	if (copy_from_user(&dv32, (void __user *)arg, sizeof(dv32)))
 		return -EFAULT;
 
 	dv.api_version = dv32.api_version;
@@ -2568,7 +2568,7 @@ static int handle_dv1394_get_status(unsigned int fd, unsigned int cmd, unsigned 
 		dv32.n_clear_frames = dv.n_clear_frames;
 		dv32.dropped_frames = dv.dropped_frames;
 
-		if (copy_to_user((struct dv1394_status32 *)arg, &dv32, sizeof(dv32)))
+		if (copy_to_user((struct dv1394_status32 __user *)arg, &dv32, sizeof(dv32)))
 			ret = -EFAULT;
 	}
 

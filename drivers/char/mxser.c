@@ -198,6 +198,7 @@ static int mxser_numports[] =
 #define         MOXA_GET_CUMAJOR      (MOXA + 64)
 #define         MOXA_GETMSTATUS       (MOXA + 65)
 
+#ifdef CONFIG_PCI
 static struct pci_device_id mxser_pcibrds[] = {
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C168, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 
 	  MXSER_BOARD_C168_PCI },
@@ -214,6 +215,7 @@ static struct pci_device_id mxser_pcibrds[] = {
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, mxser_pcibrds);
+#endif /* CONFIG_PCI */
 
 static int ioaddr[MXSER_BOARDS];
 static int ttymajor = MXSERMAJOR;
@@ -330,7 +332,6 @@ struct mxser_hwconf mxsercfg[MXSER_BOARDS];
 
 static void mxser_getcfg(int board, struct mxser_hwconf *hwconf);
 static int mxser_get_ISA_conf(int, struct mxser_hwconf *);
-static int mxser_get_PCI_conf(struct pci_dev *, int, struct mxser_hwconf *);
 static void mxser_do_softint(void *);
 static int mxser_open(struct tty_struct *, struct file *);
 static void mxser_close(struct tty_struct *, struct file *);
@@ -461,6 +462,7 @@ static void mxser_getcfg(int board, struct mxser_hwconf *hwconf)
 	mxsercfg[board] = *hwconf;
 }
 
+#ifdef CONFIG_PCI
 static int mxser_get_PCI_conf(struct pci_dev *pdev, int board_type, struct mxser_hwconf *hwconf)
 {
 	int i;
@@ -485,6 +487,7 @@ static int mxser_get_PCI_conf(struct pci_dev *pdev, int board_type, struct mxser
 	}
 	return (0);
 }
+#endif /* CONFIG_PCI */
 
 static struct tty_operations mxser_ops = {
 	.open = mxser_open,

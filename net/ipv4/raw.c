@@ -319,7 +319,7 @@ error_fault:
 	err = -EFAULT;
 	kfree_skb(skb);
 error:
-	IP_INC_STATS(OutDiscards);
+	IP_INC_STATS(IPSTATS_MIB_OUTDISCARDS);
 	return err; 
 }
 
@@ -555,9 +555,11 @@ int raw_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	}
 	if (inet->cmsg_flags)
 		ip_cmsg_recv(msg, skb);
+	if (flags & MSG_TRUNC)
+		copied = skb->len;
 done:
 	skb_free_datagram(sk, skb);
-out:	return err ? : copied;
+out:	return err ? err : copied;
 }
 
 static int raw_init(struct sock *sk)
@@ -657,7 +659,7 @@ static int raw_ioctl(struct sock *sk, int cmd, unsigned long arg)
 struct proto raw_prot = {
 	.name =		"RAW",
 	.close =	raw_close,
-	.connect =	udp_connect,
+	.connect =	ip4_datagram_connect,
 	.disconnect =	udp_disconnect,
 	.ioctl =	raw_ioctl,
 	.init =		raw_init,

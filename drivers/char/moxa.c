@@ -104,6 +104,7 @@ static char *moxa_brdname[] =
 	"CP-204J series",
 };
 
+#ifdef CONFIG_PCI
 static struct pci_device_id moxa_pcibrds[] = {
 	{ PCI_VENDOR_ID_MOXA, PCI_DEVICE_ID_C218, PCI_ANY_ID, PCI_ANY_ID, 
 	  0, 0, MOXA_BOARD_C218_PCI },
@@ -114,6 +115,7 @@ static struct pci_device_id moxa_pcibrds[] = {
 	{ 0 }
 };
 MODULE_DEVICE_TABLE(pci, moxa_pcibrds);
+#endif /* CONFIG_PCI */
 
 typedef struct _moxa_isa_board_conf {
 	int boardType;
@@ -190,9 +192,11 @@ static struct mxser_mstatus GMStatus[MAX_PORTS];
 static int verbose = 0;
 static int ttymajor = MOXAMAJOR;
 /* Variables for insmod */
+#ifdef MODULE
 static int baseaddr[] 	= 	{0, 0, 0, 0};
 static int type[]	=	{0, 0, 0, 0};
 static int numports[] 	=	{0, 0, 0, 0};
+#endif
 
 MODULE_AUTHOR("William Chen");
 MODULE_DESCRIPTION("MOXA Intellio Family Multiport Board Device Driver");
@@ -215,7 +219,6 @@ static struct semaphore moxaBuffSem;
 /*
  * static functions:
  */
-static int moxa_get_PCI_conf(struct pci_dev *, int, moxa_board_conf *);
 static void do_moxa_softint(void *);
 static int moxa_open(struct tty_struct *, struct file *);
 static void moxa_close(struct tty_struct *, struct file *);
@@ -295,6 +298,32 @@ static struct tty_operations moxa_ops = {
 	.tiocmget = moxa_tiocmget,
 	.tiocmset = moxa_tiocmset,
 };
+
+#ifdef CONFIG_PCI
+static int moxa_get_PCI_conf(struct pci_dev *p, int board_type, moxa_board_conf * board)
+{
+	board->baseAddr = pci_resource_start (p, 2);
+	board->boardType = board_type;
+	switch (board_type) {
+	case MOXA_BOARD_C218_ISA:
+	case MOXA_BOARD_C218_PCI:
+		board->numPorts = 8;
+		break;
+
+	case MOXA_BOARD_CP204J:
+		board->numPorts = 4;
+		break;
+	default:
+		board->numPorts = 0;
+		break;
+	}
+	board->busType = MOXA_BUS_TYPE_PCI;
+	board->pciInfo.busNum = p->bus->number;
+	board->pciInfo.devNum = p->devfn >> 3;
+
+	return (0);
+}
+#endif /* CONFIG_PCI */
 
 static int __init moxa_init(void)
 {
@@ -468,30 +497,6 @@ static void __exit moxa_exit(void)
 
 module_init(moxa_init);
 module_exit(moxa_exit);
-
-static int moxa_get_PCI_conf(struct pci_dev *p, int board_type, moxa_board_conf * board)
-{
-	board->baseAddr = pci_resource_start (p, 2);
-	board->boardType = board_type;
-	switch (board_type) {
-	case MOXA_BOARD_C218_ISA:
-	case MOXA_BOARD_C218_PCI:
-		board->numPorts = 8;
-		break;
-
-	case MOXA_BOARD_CP204J:
-		board->numPorts = 4;
-		break;
-	default:
-		board->numPorts = 0;
-		break;
-	}
-	board->busType = MOXA_BUS_TYPE_PCI;
-	board->pciInfo.busNum = p->bus->number;
-	board->pciInfo.devNum = p->devfn >> 3;
-
-	return (0);
-}
 
 static void do_moxa_softint(void *private_)
 {

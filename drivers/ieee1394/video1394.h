@@ -53,7 +53,7 @@ struct video1394_mmap {
 struct video1394_queue_variable {
 	unsigned int channel;
 	unsigned int buffer;
-	unsigned int* packet_sizes; /* Buffer of size:
+	unsigned int __user * packet_sizes; /* Buffer of size:
 				       buf_size / packet_size  */
 };
 

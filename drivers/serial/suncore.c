@@ -90,13 +90,13 @@ no_options:
 	cflag = CREAD | HUPCL | CLOCAL;
 
 	s = mode;
-	baud = simple_strtoul(s, 0, 0);
+	baud = simple_strtoul(s, NULL, 0);
 	s = strchr(s, ',');
-	bits = simple_strtoul(++s, 0, 0);
+	bits = simple_strtoul(++s, NULL, 0);
 	s = strchr(s, ',');
 	parity = *(++s);
 	s = strchr(s, ',');
-	stop = simple_strtoul(++s, 0, 0);
+	stop = simple_strtoul(++s, NULL, 0);
 	s = strchr(s, ',');
 	/* XXX handshake is not handled here. */
 

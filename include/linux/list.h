@@ -620,13 +620,12 @@ static inline void hlist_add_after(struct hlist_node *n,
 
 #define hlist_entry(ptr, type, member) container_of(ptr,type,member)
 
-/* Cannot easily do prefetch unfortunately */
 #define hlist_for_each(pos, head) \
 	for (pos = (head)->first; pos && ({ prefetch(pos->next); 1; }); \
 	     pos = pos->next)
 
 #define hlist_for_each_safe(pos, n, head) \
-	for (pos = (head)->first; n = pos ? pos->next : 0, pos; \
+	for (pos = (head)->first; pos && ({ n = pos->next; 1; }); \
 	     pos = n)
 
 /**

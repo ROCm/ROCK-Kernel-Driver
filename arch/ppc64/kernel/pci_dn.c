@@ -49,13 +49,13 @@ update_dn_pci_info(struct device_node *dn, void *data)
 #ifdef CONFIG_PPC_PSERIES
 	struct pci_controller *phb = (struct pci_controller *)data;
 	u32 *regs;
-	char *device_type = get_property(dn, "device_type", 0);
+	char *device_type = get_property(dn, "device_type", NULL);
 	char *model;
 
 	dn->phb = phb;
-	if (device_type && strcmp(device_type, "pci") == 0 && get_property(dn, "class-code", 0) == 0) {
+	if (device_type && strcmp(device_type, "pci") == 0 && get_property(dn, "class-code", NULL) == 0) {
 		/* special case for PHB's.  Sigh. */
-		regs = (u32 *)get_property(dn, "bus-range", 0);
+		regs = (u32 *)get_property(dn, "bus-range", NULL);
 		dn->busno = regs[0];
 
 		model = (char *)get_property(dn, "model", NULL);
@@ -65,7 +65,7 @@ update_dn_pci_info(struct device_node *dn, void *data)
 		else
 			dn->devfn = 0;	/* assumption */
 	} else {
-		regs = (u32 *)get_property(dn, "reg", 0);
+		regs = (u32 *)get_property(dn, "reg", NULL);
 		if (regs) {
 			/* First register entry is addr (00BBSS00)  */
 			dn->busno = (regs[0] >> 16) & 0xff;
@@ -107,7 +107,7 @@ void *traverse_pci_devices(struct device_node *start, traverse_func pre, travers
 	for (dn = start->child; dn; dn = nextdn) {
 		nextdn = NULL;
 #ifdef CONFIG_PPC_PSERIES
-		if (get_property(dn, "class-code", 0)) {
+		if (get_property(dn, "class-code", NULL)) {
 			if (pre && (ret = pre(dn, data)) != NULL)
 				return ret;
 			if (dn->child) {

@@ -545,6 +545,8 @@ void __init do_init_bootmem(void)
 
 	boot_mapsize = init_bootmem(start >> PAGE_SHIFT, total_pages);
 
+	max_pfn = max_low_pfn;
+
 	/* add all physical memory to the bootmem map. Also find the first */
 	for (i=0; i < lmb.memory.cnt; i++) {
 		unsigned long physbase, size;
@@ -629,7 +631,6 @@ void __init mem_init(void)
 
 	num_physpages = max_low_pfn;	/* RAM is assumed contiguous */
 	high_memory = (void *) __va(max_low_pfn * PAGE_SIZE);
-	max_pfn = max_low_pfn;
 
 #ifdef CONFIG_DISCONTIGMEM
 {

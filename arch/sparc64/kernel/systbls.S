@@ -15,6 +15,7 @@
 	.text
 	.align	4
 
+#ifdef CONFIG_COMPAT
 	/* First, the 32-bit Linux native syscall table. */
 
 	.globl sys_call_table32
@@ -77,6 +78,8 @@ sys_call_table32:
 	.word sys_mq_timedsend, sys_mq_timedreceive, compat_sys_mq_notify, compat_sys_mq_getsetattr, sys_ni_syscall
 /*280*/	.word sys_ni_syscall, sys_ni_syscall, sys_ni_syscall
 
+#endif /* CONFIG_COMPAT */
+
 	/* Now the 64-bit native Linux syscall table. */
 
 	.align	4
@@ -85,7 +88,7 @@ sys_call_table64:
 sys_call_table:
 /*0*/	.word sys_restart_syscall, sparc_exit, sys_fork, sys_read, sys_write
 /*5*/	.word sys_open, sys_close, sys_wait4, sys_creat, sys_link
-/*10*/  .word sys_unlink, sunos_execv, sys_chdir, sys_chown, sys_mknod
+/*10*/  .word sys_unlink, sys_nis_syscall, sys_chdir, sys_chown, sys_mknod
 /*15*/	.word sys_chmod, sys_lchown, sparc_brk, sys_perfctr, sys_lseek
 /*20*/	.word sys_getpid, sys_capget, sys_capset, sys_setuid, sys_getuid
 /*25*/	.word sys_nis_syscall, sys_ptrace, sys_alarm, sys_sigaltstack, sys_nis_syscall

@@ -42,6 +42,7 @@
 #define OCP_FUNC_16550		0x0031
 #define OCP_FUNC_IIC		0x0032
 #define OCP_FUNC_USB		0x0033
+#define OCP_FUNC_PSC_UART	0x0034
 
 /* Memory devices 0x0090 - 0x009F */
 #define OCP_FUNC_MAL		0x0090

@@ -1150,7 +1150,7 @@ static ssize_t pwc_video_read(struct file *file, char __user *buf,
 	DECLARE_WAITQUEUE(wait, current);
         int bytes_to_read;
 
-	Trace(TRACE_READ, "video_read(0x%p, %p, %d) called.\n", vdev, buf, count);
+	Trace(TRACE_READ, "video_read(0x%p, %p, %zd) called.\n", vdev, buf, count);
 	if (vdev == NULL)
 		return -EFAULT;
 	pdev = vdev->priv;

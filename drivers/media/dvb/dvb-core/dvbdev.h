@@ -29,7 +29,7 @@
 #include <linux/list.h>
 #include <linux/devfs_fs_kernel.h>
 
-#define DVB_MAJOR 250
+#define DVB_MAJOR 212
 
 #define DVB_DEVICE_VIDEO      0
 #define DVB_DEVICE_AUDIO      1

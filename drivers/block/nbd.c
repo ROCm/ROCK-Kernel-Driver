@@ -158,15 +158,12 @@ static void nbd_end_request(struct request *req)
 static int sock_xmit(struct socket *sock, int send, void *buf, int size,
 		int msg_flags)
 {
-	mm_segment_t oldfs;
 	int result;
 	struct msghdr msg;
-	struct iovec iov;
+	struct kvec iov;
 	unsigned long flags;
 	sigset_t oldset;
 
-	oldfs = get_fs();
-	set_fs(get_ds());
 	/* Allow interception of SIGKILL only
 	 * Don't allow other signals to interrupt the transmission */
 	spin_lock_irqsave(&current->sighand->siglock, flags);
@@ -182,17 +179,15 @@ static int sock_xmit(struct socket *sock, int send, void *buf, int size,
 		iov.iov_len = size;
 		msg.msg_name = NULL;
 		msg.msg_namelen = 0;
-		msg.msg_iov = &iov;
-		msg.msg_iovlen = 1;
 		msg.msg_control = NULL;
 		msg.msg_controllen = 0;
 		msg.msg_namelen = 0;
 		msg.msg_flags = msg_flags | MSG_NOSIGNAL;
 
 		if (send)
-			result = sock_sendmsg(sock, &msg, size);
+			result = kernel_sendmsg(sock, &msg, &iov, 1, size);
 		else
-			result = sock_recvmsg(sock, &msg, size, 0);
+			result = kernel_recvmsg(sock, &msg, &iov, 1, size, 0);
 
 		if (signal_pending(current)) {
 			siginfo_t info;
@@ -219,7 +214,6 @@ static int sock_xmit(struct socket *sock, int send, void *buf, int size,
 	recalc_sigpending();
 	spin_unlock_irqrestore(&current->sighand->siglock, flags);
 
-	set_fs(oldfs);
 	return result;
 }
 
