@@ -2701,7 +2701,11 @@ static int ide_ioctl (struct inode *inode, struct file *file,
 
 void ide_teardown_commandlist(ide_drive_t *drive)
 {
-	struct pci_dev *pdev= drive->channel->pci_dev;
+#ifdef CONFIG_BLK_DEV_IDEPCI
+	struct pci_dev *pdev = drive->channel->pci_dev;
+#else
+	struct pci_dev *pdev = NULL;
+#endif
 	struct list_head *entry;
 
 	list_for_each(entry, &drive->free_req) {
@@ -2716,7 +2720,11 @@ void ide_teardown_commandlist(ide_drive_t *drive)
 
 int ide_build_commandlist(ide_drive_t *drive)
 {
-	struct pci_dev *pdev= drive->channel->pci_dev;
+#ifdef CONFIG_BLK_DEV_IDEPCI
+	struct pci_dev *pdev = drive->channel->pci_dev;
+#else
+	struct pci_dev *pdev = NULL;
+#endif
 	struct ata_request *ar;
 	ide_tag_info_t *tcq;
 	int i, err;
@@ -2764,9 +2772,9 @@ int ide_build_commandlist(ide_drive_t *drive)
 	if (i) {
 		drive->queue_depth = i;
 		if (i >= 1) {
-			drive->using_tcq = 1;
 			drive->tcq->queued = 0;
 			drive->tcq->active_tag = -1;
+
 			return 0;
 		}
 
