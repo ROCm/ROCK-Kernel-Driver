@@ -1663,9 +1663,10 @@ static inline void rfcomm_accept_connection(struct rfcomm_session *s)
 	nsock->sk->sk_state_change = rfcomm_l2state_change;
 
 	s = rfcomm_session_add(nsock, BT_OPEN);
-	if (s)
+	if (s) {
 		rfcomm_session_hold(s);
-	else
+		rfcomm_schedule(RFCOMM_SCHED_RX);
+	} else
 		sock_release(nsock);
 }
 
