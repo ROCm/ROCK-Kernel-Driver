@@ -341,11 +341,11 @@ vm_info(char *page)
 		return 0;
 	}
 
-	p += sprintf(p, "\nTLB walker                     : %s implemented\n" \
+	p += sprintf(p, "\nTLB walker                     : %simplemented\n" \
 			"Number of DTR                  : %d\n" \
 			"Number of ITR                  : %d\n" \
 			"TLB insertable page sizes      : ",
-			vm_info_1.pal_vm_info_1_s.vw ? "\b":"not",
+			vm_info_1.pal_vm_info_1_s.vw ? "" : "not ",
 			vm_info_1.pal_vm_info_1_s.max_dtr_entry+1,
 			vm_info_1.pal_vm_info_1_s.max_itr_entry+1);
 
@@ -894,10 +894,12 @@ palinfo_read_entry(char *page, char **start, off_t off, int count, int *eof, voi
 	 * in SMP mode, we may need to call another CPU to get correct
 	 * information. PAL, by definition, is processor specific
 	 */
-	if (f->req_cpu == smp_processor_id())
+	if (f->req_cpu == get_cpu())
 		len = (*palinfo_entries[f->func_id].proc_read)(page);
 	else
 		len = palinfo_handle_smp(f, page);
+
+	put_cpu();
 
 	if (len <= off+count) *eof = 1;
 

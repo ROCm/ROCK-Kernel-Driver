@@ -2,8 +2,6 @@
 #define _ASM_IA64_MACHVEC_HPZX1_h
 
 extern ia64_mv_setup_t dig_setup;
-extern ia64_mv_pci_fixup_t hpzx1_pci_fixup;
-extern ia64_mv_map_nr_t map_nr_dense;
 extern ia64_mv_pci_alloc_consistent sba_alloc_consistent;
 extern ia64_mv_pci_free_consistent sba_free_consistent;
 extern ia64_mv_pci_map_single sba_map_single;

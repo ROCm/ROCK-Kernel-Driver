@@ -486,19 +486,23 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 
 	      case 26: /* NaT Consumption */
 		if (user_mode(regs)) {
+			void *addr;
+
 			if (((isr >> 4) & 0xf) == 2) {
 				/* NaT page consumption */
 				sig = SIGSEGV;
 				code = SEGV_ACCERR;
+				addr = (void *) ifa;
 			} else {
 				/* register NaT consumption */
 				sig = SIGILL;
 				code = ILL_ILLOPN;
+				addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
 			}
 			siginfo.si_signo = sig;
 			siginfo.si_code = code;
 			siginfo.si_errno = 0;
-			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+			siginfo.si_addr = addr;
 			siginfo.si_imm = vector;
 			siginfo.si_flags = __ISR_VALID;
 			siginfo.si_isr = isr;

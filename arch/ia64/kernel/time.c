@@ -25,7 +25,7 @@
 #include <asm/system.h>
 
 extern unsigned long wall_jiffies;
-extern unsigned long last_time_offset;
+extern unsigned long last_nsec_offset;
 
 u64 jiffies_64 = INITIAL_JIFFIES;
 
@@ -74,13 +74,13 @@ gettimeoffset (void)
 		     - (lost + 1)*cpu_data(time_keeper_id)->itm_delta);
 
 	now = ia64_get_itc();
-	if ((long) (now - last_tick) < 0) {
+	if (unlikely((long) (now - last_tick) < 0)) {
 		printk(KERN_ERR "CPU %d: now < last_tick (now=0x%lx,last_tick=0x%lx)!\n",
 		       smp_processor_id(), now, last_tick);
-		return last_time_offset;
+		return last_nsec_offset;
 	}
 	elapsed_cycles = now - last_tick;
-	return (elapsed_cycles*local_cpu_data->usec_per_cyc) >> IA64_USEC_PER_CYC_SHIFT;
+	return (elapsed_cycles*local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
 }
 
 void
@@ -115,30 +115,55 @@ do_settimeofday (struct timeval *tv)
 void
 do_gettimeofday (struct timeval *tv)
 {
-	unsigned long seq, usec, sec, old;
+	unsigned long seq, nsec, usec, sec, old, offset;
 
-	do {
+	while (1) {
 		seq = read_seqbegin(&xtime_lock);
-		usec = gettimeoffset();
-
+		{
+			old = last_nsec_offset;
+			offset = gettimeoffset();
+			sec = xtime.tv_sec;
+			nsec = xtime.tv_nsec;
+		}
+		if (unlikely(read_seqretry(&xtime_lock, seq)))
+			continue;
 		/*
-		 * Ensure time never goes backwards, even when ITC on 
-		 * different CPUs are not perfectly synchronized.
+		 * Ensure that for any pair of causally ordered gettimeofday() calls, time
+		 * never goes backwards (even when ITC on different CPUs are not perfectly
+		 * synchronized).  (A pair of concurrent calls to gettimeofday() is by
+		 * definition non-causal and hence it makes no sense to talk about
+		 * time-continuity for such calls.)
+		 *
+		 * Doing this in a lock-free and race-free manner is tricky.  Here is why
+		 * it works (most of the time): read_seqretry() just succeeded, which
+		 * implies we calculated a consistent (valid) value for "offset".  If the
+		 * cmpxchg() below succeeds, we further know that last_nsec_offset still
+		 * has the same value as at the beginning of the loop, so there was
+		 * presumably no timer-tick or other updates to last_nsec_offset in the
+		 * meantime.  This isn't 100% true though: there _is_ a possibility of a
+		 * timer-tick occurring right right after read_seqretry() and then getting
+		 * zero or more other readers which will set last_nsec_offset to the same
+		 * value as the one we read at the beginning of the loop.  If this
+		 * happens, we'll end up returning a slightly newer time than we ought to
+		 * (the jump forward is at most "offset" nano-seconds).  There is no
+		 * danger of causing time to go backwards, though, so we are safe in that
+		 * sense.  We could make the probability of this unlucky case occurring
+		 * arbitrarily small by encoding a version number in last_nsec_offset, but
+		 * even without versioning, the probability of this unlucky case should be
+		 * so small that we won't worry about it.
 		 */
-		do {
-			old = last_time_offset;
-			if (usec <= old) {
-				usec = old;
-				break;
-			}
-		} while (cmpxchg(&last_time_offset, old, usec) != old);
+		if (offset <= old) {
+			offset = old;
+			break;
+		} else if (likely(cmpxchg(&last_nsec_offset, old, offset) == old))
+			break;
 
-		sec = xtime.tv_sec;
-		usec += xtime.tv_nsec / 1000;
-	} while (read_seqend(&xtime_lock, seq));
+		/* someone else beat us to updating last_nsec_offset; try again */
+	}
 
+	usec = (nsec + offset) / 1000;
 
-	while (usec >= 1000000) {
+	while (unlikely(usec >= 1000000)) {
 		usec -= 1000000;
 		++sec;
 	}
@@ -278,7 +303,7 @@ ia64_init_itm (void)
 	local_cpu_data->proc_freq = (platform_base_freq*proc_ratio.num)/proc_ratio.den;
 	local_cpu_data->itc_freq = itc_freq;
 	local_cpu_data->cyc_per_usec = (itc_freq + 500000) / 1000000;
-	local_cpu_data->usec_per_cyc = ((1000000UL<<IA64_USEC_PER_CYC_SHIFT)
+	local_cpu_data->nsec_per_cyc = ((1000000000UL<<IA64_NSEC_PER_CYC_SHIFT)
 					+ itc_freq/2)/itc_freq;
 
 	/* Setup the CPU local timer tick */

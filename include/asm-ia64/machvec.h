@@ -23,8 +23,6 @@ struct page;
 typedef void ia64_mv_setup_t (char **);
 typedef void ia64_mv_cpu_init_t(void);
 typedef void ia64_mv_irq_init_t (void);
-typedef void ia64_mv_pci_fixup_t (int);
-typedef unsigned long ia64_mv_map_nr_t (unsigned long);
 typedef void ia64_mv_mca_init_t (void);
 typedef void ia64_mv_mca_handler_t (void);
 typedef void ia64_mv_cmci_handler_t (int, void *, struct pt_regs *);
@@ -115,13 +113,16 @@ extern void machvec_noop (void);
 #  define platofrm_mmiob        ia64_mv.mmiob
 # endif
 
+/* __attribute__((__aligned__(16))) is required to make size of the
+ * structure multiple of 16 bytes.
+ * This will fillup the holes created because of section 3.3.1 in 
+ * Software Conventions guide.
+ */
 struct ia64_machine_vector {
 	const char *name;
 	ia64_mv_setup_t *setup;
 	ia64_mv_cpu_init_t *cpu_init;
 	ia64_mv_irq_init_t *irq_init;
-	ia64_mv_pci_fixup_t *pci_fixup;
-	ia64_mv_map_nr_t *map_nr;
 	ia64_mv_mca_init_t *mca_init;
 	ia64_mv_mca_handler_t *mca_handler;
 	ia64_mv_cmci_handler_t *cmci_handler;
@@ -149,7 +150,7 @@ struct ia64_machine_vector {
 	ia64_mv_outw_t *outw;
 	ia64_mv_outl_t *outl;
 	ia64_mv_mmiob_t *mmiob;
-};
+} __attribute__((__aligned__(16)));
 
 #define MACHVEC_INIT(name)			\
 {						\

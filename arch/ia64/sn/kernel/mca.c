@@ -40,7 +40,10 @@
 #include <linux/interrupt.h>
 #include <linux/irq.h>
 #include <linux/smp_lock.h>
+#include <linux/acpi.h>
+#ifdef CONFIG_KDB
 #include <linux/kdb.h>
+#endif
 
 #include <asm/machvec.h>
 #include <asm/page.h>
@@ -53,7 +56,6 @@
 
 #include <asm/irq.h>
 #include <asm/hw_irq.h>
-#include <asm/acpi-ext.h>
 #include <asm/smp.h>
 #include <asm/sn/sn_cpuid.h>
 

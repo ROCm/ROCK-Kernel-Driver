@@ -57,16 +57,7 @@
 # define REGION_SHIFT	61
 # define HPAGE_SIZE	(__IA64_UL_CONST(1) << HPAGE_SHIFT)
 # define HPAGE_MASK	(~(HPAGE_SIZE - 1))
-static inline int
-check_valid_hugepage_range(unsigned long addr, unsigned long len)
-{
-	if (REGION_NUMBER(addr) == REGION_HPAGE)
-		return -EINVAL;
-	if (REGION_NUMBER(addr+len) == REGION_HPAGE)
-		return -EINVAL;
-	return 0;
-}
-#define ARCH_HAS_VALID_HUGEPAGE_RANGE
+# define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
 #endif /* CONFIG_HUGETLB_PAGE */
 
 #ifdef __ASSEMBLY__
@@ -133,6 +124,9 @@ typedef union ia64_va {
 # define htlbpage_to_page(x)	((REGION_NUMBER(x) << 61)				\
 				 | (REGION_OFFSET(x) >> (HPAGE_SHIFT-PAGE_SHIFT)))
 # define HUGETLB_PAGE_ORDER	(HPAGE_SHIFT - PAGE_SHIFT)
+extern int  is_invalid_hugepage_range(unsigned long addr, unsigned long len);
+#else
+#define is_invalid_hugepage_range(addr, len) 0
 #endif
 
 static __inline__ int

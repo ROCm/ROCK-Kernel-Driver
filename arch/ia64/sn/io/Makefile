@@ -17,6 +17,6 @@ obj-$(CONFIG_IA64_SGI_SN) += stubs.o sgi_if.o xswitch.o klgraph_hack.o \
 		hcl.o labelcl.o invent.o sgi_io_sim.o \
 		klgraph_hack.o hcl_util.o cdl.o hubdev.o hubspc.o \
 		alenlist.o pci.o pci_dma.o ate_utils.o \
-		ifconfig_net.o io.o ifconfig_bus.o
+		ifconfig_net.o io.o ioconfig_bus.o
 
 obj-$(CONFIG_PCIBA)		+= pciba.o

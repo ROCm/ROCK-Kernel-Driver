@@ -183,6 +183,19 @@ do {										\
 		:: "r"(rw) : "ar.ccv", "p7", "r2", "r29", "memory");		\
 } while(0)
 
+#define _raw_write_trylock(rw)							\
+({										\
+	register long result;							\
+										\
+	__asm__ __volatile__ (							\
+		"mov ar.ccv = r0\n"						\
+		"dep r29 = -1, r0, 31, 1\n"					\
+		";;\n"								\
+		"cmpxchg4.acq %0 = [%1], r29, ar.ccv\n"				\
+		: "=r"(result) : "r"(rw) : "ar.ccv", "r29", "memory");		\
+	(result == 0);								\
+})
+
 #define _raw_write_unlock(x)								\
 ({											\
 	smp_mb__before_clear_bit();	/* need barrier before releasing lock... */	\

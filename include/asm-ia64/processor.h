@@ -68,11 +68,11 @@
 
 
 /*
- * This shift should be large enough to be able to represent
- * 1000000/itc_freq with good accuracy while being small enough to fit
- * 1000000<<IA64_USEC_PER_CYC_SHIFT in 64 bits.
+ * This shift should be large enough to be able to represent 1000000000/itc_freq with good
+ * accuracy while being small enough to fit 10*1000000000<<IA64_NSEC_PER_CYC_SHIFT in 64 bits
+ * (this will give enough slack to represent 10 seconds worth of time as a scaled number).
  */
-#define IA64_USEC_PER_CYC_SHIFT	41
+#define IA64_NSEC_PER_CYC_SHIFT	30
 
 #ifndef __ASSEMBLY__
 
@@ -161,7 +161,7 @@ struct cpuinfo_ia64 {
 	__u64 itc_freq;		/* frequency of ITC counter */
 	__u64 proc_freq;	/* frequency of processor */
 	__u64 cyc_per_usec;	/* itc_freq/1000000 */
-	__u64 usec_per_cyc;	/* 2^IA64_USEC_PER_CYC_SHIFT*1000000/itc_freq */
+	__u64 nsec_per_cyc;	/* (1000000000<<IA64_NSEC_PER_CYC_SHIFT)/itc_freq */
 	__u64 unimpl_va_mask;	/* mask of unimplemented virtual address bits (from PAL) */
 	__u64 unimpl_pa_mask;	/* mask of unimplemented physical address bits (from PAL) */
 	__u64 ptce_base;
@@ -220,8 +220,6 @@ typedef struct {
 		 (int *) (addr));								\
 })
 
-struct siginfo;
-
 struct thread_struct {
 	__u32 flags;			/* various thread flags (see IA64_THREAD_*) */
 	/* writing on_ustack is performance-critical, so it's worth spending 8 bits on it... */
@@ -230,7 +228,6 @@ struct thread_struct {
 	__u64 ksp;			/* kernel stack pointer */
 	__u64 map_base;			/* base address for get_unmapped_area() */
 	__u64 task_size;		/* limit for task size */
-	struct siginfo *siginfo;	/* current siginfo struct for ptrace() */
 	int last_fph_cpu;		/* CPU that may hold the contents of f32-f127 */
 
 #ifdef CONFIG_IA32_SUPPORT
@@ -284,7 +281,6 @@ struct thread_struct {
 	.ksp =		0,			\
 	.map_base =	DEFAULT_MAP_BASE,	\
 	.task_size =	DEFAULT_TASK_SIZE,	\
-	.siginfo =	0,			\
 	.last_fph_cpu =  0,			\
 	INIT_THREAD_IA32			\
 	INIT_THREAD_PM				\

@@ -44,6 +44,9 @@ pcibios_penalize_isa_irq (int irq)
 	/* We don't do dynamic PCI IRQ allocation */
 }
 
+#define HAVE_ARCH_PCI_MWI 1
+extern int pcibios_prep_mwi (struct pci_dev *);
+
 /*
  * Dynamic DMA mapping API.  See Documentation/DMA-mapping.txt for details.
  */
