@@ -16,18 +16,11 @@ struct attribute {
 	mode_t			mode;
 };
 
-struct sysfs_bin_buffer {
-	u8 * 	data;
-	size_t	size;
-	size_t	count;
-	loff_t	offset;
-};
-
 struct bin_attribute {
 	struct attribute	attr;
 	size_t			size;
-	ssize_t (*read)(struct kobject *, struct sysfs_bin_buffer *);
-	ssize_t (*write)(struct kobject *, struct sysfs_bin_buffer *);
+	ssize_t (*read)(struct kobject *, char *, loff_t, size_t);
+	ssize_t (*write)(struct kobject *, char *, loff_t, size_t);
 };
 
 struct sysfs_ops {

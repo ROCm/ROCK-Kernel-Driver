@@ -9,7 +9,7 @@ Overview
 ~~~~~~~~
 
 This driver model is a unification of all the current, disparate driver models
-that are currently in the kernel. It is intended is to augment the
+that are currently in the kernel. It is intended to augment the
 bus-specific drivers for bridges and devices by consolidating a set of data
 and operations into globally accessible data structures.
 
@@ -23,7 +23,7 @@ tree as well as its local tree. In fact, the local tree becomes just a subset
 of the global tree.
 
 Common data fields can also be moved out of the local bus models into the
-global model. Some of the manipulation of these fields can also be
+global model. Some of the manipulations of these fields can also be
 consolidated. Most likely, manipulation functions will become a set
 of helper functions, which the bus drivers wrap around to include any
 bus-specific items.
@@ -71,7 +71,7 @@ fields of struct device unless there is a strong compelling reason to do so.
 This abstraction is prevention of unnecessary pain during transitional phases.
 If the name of the field changes or is removed, then every downstream driver
 will break. On the other hand, if only the bus layer (and not the device
-layer) accesses struct device, it is only those that need to change.
+layer) accesses struct device, it is only that layer that needs to change.
 
 
 User Interface
@@ -96,9 +96,9 @@ Whenever a device is inserted into the tree, a directory is created for it.
 This directory may be populated at each layer of discovery - the global layer,
 the bus layer, or the device layer.
 
-The global layer currently creates two files - name and 'power'. The
+The global layer currently creates two files - 'name' and 'power'. The
 former only reports the name of the device. The latter reports the
-current power state of the device. It also be used to set the current
+current power state of the device. It will also be used to set the current
 power state. 
 
 The bus layer may also create files for the devices it finds while probing the

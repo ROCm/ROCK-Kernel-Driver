@@ -63,9 +63,9 @@ Most drivers will not be able to be converted completely to the new
 model because the bus they belong to has a bus-specific structure with
 bus-specific fields that cannot be generalized. 
 
-The most common example this are device ID structures. A driver
+The most common example of this are device ID structures. A driver
 typically defines an array of device IDs that it supports. The format
-of this structure and the semantics for comparing device IDs is
+of these structures and the semantics for comparing device IDs are
 completely bus-specific. Defining them as bus-specific entities would
 sacrifice type-safety, so we keep bus-specific structures around. 
 
@@ -77,8 +77,8 @@ struct pci_driver {
        struct device_driver	  driver;
 };
 
-A definition that included bus-specific fields would look something
-like (using the eepro100 driver again):
+A definition that included bus-specific fields would look like
+(using the eepro100 driver again):
 
 static struct pci_driver eepro100_driver = {
        .id_table       = eepro100_pci_tbl,
@@ -109,7 +109,7 @@ struct device_driver object.
 Most drivers, however, will have a bus-specific structure and will
 need to register with the bus using something like pci_driver_register.
 
-It is important that drivers register their drivers as early as
+It is important that drivers register their driver structure as early as
 possible. Registration with the core initializes several fields in the
 struct device_driver object, including the reference count and the
 lock. These fields are assumed to be valid at all times and may be
@@ -148,7 +148,7 @@ accesses it.
 
 
 sysfs
-~~~~~~~~
+~~~~~
 
 When a driver is registered, a sysfs directory is created in its
 bus's directory. In this directory, the driver can export an interface
@@ -205,7 +205,7 @@ management based on the requirements of the system and the
 user-defined policy.
 
 SUSPEND_NOTIFY notifies the device that a suspend transition is about
-to happen. This happens on system power state transition to verify
+to happen. This happens on system power state transitions to verify
 that all devices can successfully suspend.
 
 A driver may choose to fail on this call, which should cause the

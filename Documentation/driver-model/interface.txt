@@ -82,7 +82,7 @@ Devices are enumerated within the interface. This happens in interface_add_data(
 and the enumerated value is stored in the struct intf_data for that device. 
 
 sysfs
-~~~~~~~~
+~~~~~
 Each interface is given a directory in the directory of the device
 class it belongs to:
 
@@ -120,10 +120,10 @@ device interface.
 
 Many interfaces have a major number associated with them and each
 device gets a minor number. Or, multiple interfaces might share one
-major number, and each get receive a range of minor numbers (like in
+major number, and each will receive a range of minor numbers (like in
 the case of input devices).
 
 These major and minor numbers could be stored in the interface
-structure. Major and minor allocation could happen when the interface
+structure. Major and minor allocations could happen when the interface
 is registered with the class, or via a helper function. 
 

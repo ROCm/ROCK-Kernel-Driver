@@ -11,11 +11,11 @@ structures, most of the binding can take place using common code.
 Bus
 ~~~
 
-The bus type structure contains a list of all devices that on that bus
+The bus type structure contains a list of all devices that are on that bus
 type in the system. When device_register is called for a device, it is
 inserted into the end of this list. The bus object also contains a
 list of all drivers of that bus type. When driver_register is called
-for a driver, it is inserted into the end of this list. These are the
+for a driver, it is inserted at the end of this list. These are the
 two events which trigger driver binding.
 
 
@@ -42,7 +42,7 @@ Device Class
 ~~~~~~~~~~~~
 
 Upon the successful completion of probe, the device is registered with
-the class to which it belongs. Device drivers belong to one and only
+the class to which it belongs. Device drivers belong to one and only one
 class, and that is set in the driver's devclass field. 
 devclass_add_device is called to enumerate the device within the class
 and actually register it with the class, which happens with the
@@ -61,7 +61,7 @@ driver's list of devices.
 
 
 sysfs
-~~~~~~~~
+~~~~~
 
 A symlink is created in the bus's 'devices' directory that points to
 the device's directory in the physical hierarchy.
