@@ -452,17 +452,17 @@ MODULE_AUTHOR("Al Borchers");
 MODULE_LICENSE("GPL");
 
 #if G_SERIAL_DEBUG
-MODULE_PARM(debug, "i");
-MODULE_PARM_DESC(debug, "Enable debugging, 0=off, 1=on");
+module_param(debug, int, S_IRUGO | S_IWUSR);
+MODULE_PARM_DESC(debug, "Enable debugging, 0=off, 1=on, larger values for more messages");
 #endif
 
-MODULE_PARM(read_q_size, "i");
+module_param(read_q_size, int, 0);
 MODULE_PARM_DESC(read_q_size, "Read request queue size, default=32");
 
-MODULE_PARM(write_q_size, "i");
+module_param(write_q_size, int, 0);
 MODULE_PARM_DESC(write_q_size, "Write request queue size, default=32");
 
-MODULE_PARM(write_buf_size, "i");
+module_param(write_buf_size, int, 0);
 MODULE_PARM_DESC(write_buf_size, "Write buffer size, default=8192");
 
 module_init(gs_module_init);
