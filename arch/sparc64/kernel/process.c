@@ -573,7 +573,7 @@ asmlinkage int sparc_do_fork(unsigned long clone_flags,
 
 	clone_flags &= ~CLONE_IDLETASK;
 
-	if (clone_flags & (CLONE_SETTID | CLONE_CLEARTID)) {
+	if (clone_flags & (CLONE_CHILD_SETTID | CLONE_CHILD_CLEARTID)) {
 		parent_tid_ptr = regs->u_regs[UREG_G2];
 		child_tid_ptr = regs->u_regs[UREG_G3];
 		if (test_thread_flag(TIF_32BIT)) {
