@@ -2,6 +2,10 @@
 # Makefile for the Dallas's 1-wire bus.
 #
 
+ifneq ($(CONFIG_NET), y)
+EXTRA_CFLAGS	+= -DNETLINK_DISABLED
+endif
+
 obj-$(CONFIG_W1)	+= wire.o
 wire-objs		:= w1.o w1_int.o w1_family.o w1_netlink.o w1_io.o
 
