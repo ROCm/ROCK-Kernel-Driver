@@ -7,4 +7,4 @@
 # Copyright 2001,2002 MontaVista Software Inc.
 #
 
-obj-y			+= init.o irq.o setup.o
+obj-y			+= irq.o setup.o

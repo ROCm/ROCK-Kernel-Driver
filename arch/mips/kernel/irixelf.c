@@ -31,7 +31,6 @@
 #include <linux/smp_lock.h>
 
 #include <asm/uaccess.h>
-#include <asm/pgalloc.h>
 #include <asm/mipsregs.h>
 #include <asm/prctl.h>
 

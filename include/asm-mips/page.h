@@ -10,13 +10,7 @@
 #define _ASM_PAGE_H
 
 #include <linux/config.h>
-
-#ifdef CONFIG_MIPS32
-#include <asm/page-32.h>
-#endif
-#ifdef CONFIG_MIPS64
-#include <asm/page-64.h>
-#endif
+#include <spaces.h>
 
 #ifdef __KERNEL__
 
@@ -134,5 +128,9 @@ static __inline__ int get_order(unsigned long size)
 #define CAC_ADDR(addr)		((addr) - UNCAC_BASE + PAGE_OFFSET)
 
 #endif /* defined (__KERNEL__) */
+
+#ifdef CONFIG_LIMITED_DMA
+#define WANT_PAGE_VIRTUAL
+#endif
 
 #endif /* _ASM_PAGE_H */

@@ -33,7 +33,6 @@
 
 #include <asm/ptrace.h>
 #include <asm/page.h>
-#include <asm/pgalloc.h>
 #include <asm/uaccess.h>
 #include <asm/inventory.h>
 

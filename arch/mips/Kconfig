@@ -29,6 +29,7 @@ menu "Machine selection"
 
 config MACH_JAZZ
 	bool "Support for the Jazz family of machines"
+	select ISA
 	help
 	 This a family of machines based on the MIPS R4030 chipset which was
 	 used by several vendors to build RISC/os and Windows NT workstations.
@@ -76,18 +77,24 @@ config MACH_VR41XX
 config CASIO_E55
 	bool "Support for CASIO CASSIOPEIA E-10/15/55/65"
 	depends on MACH_VR41XX
+	select IRQ_CPU
+	select ISA
 
 config IBM_WORKPAD
 	bool "Support for IBM WorkPad z50"
 	depends on MACH_VR41XX
+	select IRQ_CPU
+	select ISA
 
 config NEC_EAGLE
 	bool "Support for NEC Eagle/Hawk board"
+	select IRQ_CPU
 	depends on MACH_VR41XX
 
 config TANBAC_TB0226
 	bool "Support for TANBAC TB0226 (Mbase)"
 	depends on MACH_VR41XX
+	select IRQ_CPU
 	help
 	  The TANBAC TB0226 (Mbase) is a MIPS-based platform manufactured by TANBAC.
 	  Please refer to <http://www.tanbac.co.jp/> about Mbase.
@@ -95,17 +102,20 @@ config TANBAC_TB0226
 config TANBAC_TB0229
 	bool "Support for TANBAC TB0229 (VR4131DIMM)"
 	depends on MACH_VR41XX
+	select IRQ_CPU
 	help
 	  The TANBAC TB0229 (VR4131DIMM) is a MIPS-based platform manufactured by TANBAC.
 	  Please refer to <http://www.tanbac.co.jp/> about VR4131DIMM.
 
 config VICTOR_MPC30X
 	bool "Support for Victor MP-C303/304"
+	select IRQ_CPU
 	depends on MACH_VR41XX
 
 config ZAO_CAPCELLA
 	bool "Support for ZAO Networks Capcella"
 	depends on MACH_VR41XX
+	select IRQ_CPU
 
 config TOSHIBA_JMR3927
 	bool "Support for Toshiba JMR-TX3927 board"
@@ -114,9 +124,11 @@ config TOSHIBA_JMR3927
 config MIPS_COBALT
 	bool "Support for Cobalt Server (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
+	select IRQ_CPU
 
 config MACH_DECSTATION
 	bool "Support for DECstations"
+	select IRQ_CPU
 	depends on MIPS32 || EXPERIMENTAL
 	---help---
 	  This enables support for DEC's MIPS based workstations.  For details
@@ -150,7 +162,9 @@ config EVB_PCI1
 config MIPS_EV96100
 	bool "Support for Galileo EV96100 Evaluation board (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
+	select IRQ_CPU
 	select MIPS_GT96100
+	select RM7000_CPU_SCACHE
 	help
 	  This is an evaluation board based on the Galileo GT-96100 LAN/WAN
 	  communications controllers containing a MIPS R5000 compatible core
@@ -168,6 +182,7 @@ config MIPS_IVR
 
 config LASAT
 	bool "Support for LASAT Networks platforms"
+	select R5000_CPU_SCACHE
 
 config PICVUE
 	tristate "PICVUE LCD display driver"
@@ -187,6 +202,8 @@ config LASAT_SYSCTL
 
 config HP_LASERJET
 	bool "Support for Hewlett Packard LaserJet board"
+	depends on BROKEN
+	select IRQ_CPU
 
 config MIPS_ITE8172
 	bool "Support for ITE 8172G board"
@@ -214,40 +231,61 @@ config MIPS_ATLAS
 
 config MIPS_MALTA
 	bool "Support for MIPS Malta board"
+	select HAVE_STD_PC_SERIAL_PORT
 	help
 	  This enables support for the VR5000-based MIPS Malta evaluation
 	  board.
 
 config MIPS_SEAD
 	bool "Support for MIPS SEAD board (EXPERIMENTAL)"
+	select IRQ_CPU
 	depends on EXPERIMENTAL
 
 config MOMENCO_OCELOT
 	bool "Support for Momentum Ocelot board"
+	select IRQ_CPU
+	select IRQ_CPU_RM7K
+	select RM7000_CPU_SCACHE
 	help
 	  The Ocelot is a MIPS-based Single Board Computer (SBC) made by
 	  Momentum Computer <http://www.momenco.com/>.
 
 config MOMENCO_OCELOT_G
 	bool "Support for Momentum Ocelot-G board"
+	select IRQ_CPU
+	select IRQ_CPU_RM7K
+	select RM7000_CPU_SCACHE
 	help
 	  The Ocelot is a MIPS-based Single Board Computer (SBC) made by
 	  Momentum Computer <http://www.momenco.com/>.
 
 config MOMENCO_OCELOT_C
 	bool "Support for Momentum Ocelot-C board"
+	select IRQ_CPU
+	select RM7000_CPU_SCACHE
 	help
 	  The Ocelot is a MIPS-based Single Board Computer (SBC) made by
 	  Momentum Computer <http://www.momenco.com/>.
 
 config MOMENCO_JAGUAR_ATX
 	bool "Support for Momentum Jaguar board"
+	select IRQ_CPU
+	select IRQ_CPU_RM7K
+	select LIMITED_DMA
+	select RM7000_CPU_SCACHE
 	help
 	  The Jaguar ATX is a MIPS-based Single Board Computer (SBC) made by
 	  Momentum Computer <http://www.momenco.com/>.
 
+config JAGUAR_DMALOW
+	bool "Low DMA Mode"
+	depends on MOMENCO_JAGUAR_ATX
+	help
+	  Select to Y if jump JP5 is set on your board, N otherwise.  Normally
+	  the jumper is set, so if you feel unsafe, just say Y.
+
 config PMC_YOSEMITE
-	bool "Support for PMC-Siera Yosemite eval board"
+	bool "Support for PMC-Sierra Yosemite eval board"
 	help
 	  Yosemite is an evaluation board for the RM9000x2 processor
 	  manufactured by PMC-Sierra
@@ -259,12 +297,18 @@ config HYPERTRANSPORT
 config DDB5074
 	bool "Support for NEC DDB Vrc-5074 (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
+	select HAVE_STD_PC_SERIAL_PORT
+	select IRQ_CPU
+	select ISA
 	help
 	  This enables support for the VR5000-based NEC DDB Vrc-5074
 	  evaluation board.
 
 config DDB5476
 	bool "Support for NEC DDB Vrc-5476"
+	select HAVE_STD_PC_SERIAL_PORT
+	select IRQ_CPU
+	select ISA
 	help
 	  This enables support for the R5432-based NEC DDB Vrc-5476
 	  evaluation board.
@@ -275,6 +319,7 @@ config DDB5476
 
 config DDB5477
 	bool "Support for NEC DDB Vrc-5477"
+	select IRQ_CPU
 	help
 	  This enables support for the R5432-based NEC DDB Vrc-5477,
 	  or Rockhopper/SolutionGear boards with R5432/R5500 CPUs.
@@ -289,9 +334,12 @@ config DDB5477_BUS_FREQUENCY
 	
 config NEC_OSPREY
 	bool "Support for NEC Osprey board"
+	select IRQ_CPU
 
 config SGI_IP22
 	bool "Support for SGI IP22 (Indy/Indigo2)"
+	select IP22_CPU_SCACHE
+	select IRQ_CPU
 	help
 	  This are the SGI Indy, Challenge S and Indigo2, as well as certain
 	  OEM variants like the Tandem CMN B006S. To compile a Linux kernel
@@ -363,6 +411,8 @@ config REPLICATE_EXHANDLERS
 config SGI_IP32
 	bool "Support for SGI IP32 (O2) (EXPERIMENTAL)"
 	depends on EXPERIMENTAL
+	select R5000_CPU_SCACHE
+	select RM7000_CPU_SCACHE
 	help
 	  If you want this kernel to run on SGI O2 workstation, say Y here.
 
@@ -383,6 +433,8 @@ config SOC_AU1100
         bool "SOC_AU1100"
 config SOC_AU1500
         bool "SOC_AU1500"
+config SOC_AU1550
+        bool "SOC_AU1550"
 
 endchoice
 
@@ -409,6 +461,10 @@ config MIPS_PB1500
 	bool "PB1500 board"
 	depends on SOC_AU1500
 
+config MIPS_PB1550
+	bool "PB1550 board"
+	depends on SOC_AU1550
+
 config MIPS_DB1000
 	bool "DB1000 board"
 	depends on SOC_AU1000
@@ -420,6 +476,10 @@ config MIPS_DB1100
 config MIPS_DB1500
 	bool "DB1500 board"
 	depends on SOC_AU1500
+
+config MIPS_DB1550
+	bool "DB1550 board"
+	depends on SOC_AU1550
 
 config MIPS_BOSPORUS
 	bool "Bosporus board"
@@ -650,6 +710,8 @@ config SIBYTE_TBPROF
 
 config SNI_RM200_PCI
 	bool "Support for SNI RM200 PCI"
+	select HAVE_STD_PC_SERIAL_PORT
+	select ISA
 	help
 	  The SNI RM200 PCI was a MIPS-based platform manufactured by Siemens
 	  Nixdorf Informationssysteme (SNI), parent company of Pyramid
@@ -658,6 +720,7 @@ config SNI_RM200_PCI
 
 config TOSHIBA_RBTX4927
 	bool "Support for Toshiba TBTX49[23]7 board"
+	select ISA
 	depends on MIPS32
 
 config RWSEM_GENERIC_SPINLOCK
@@ -691,7 +754,7 @@ config	DMA_IP27
 
 config	DMA_NONCOHERENT
 	bool
-	depends on ZAO_CAPCELLA || VICTOR_MPC30X || TOSHIBA_JMR3927 || TOSHIBA_RBTX4927 || SNI_RM200_PCI || SGI_IP32 || SGI_IP22 || NEC_EAGLE || NEC_OSPREY || DDB5477 || DDB5476 || DDB5074 || MOMENCO_OCELOT || MOMENCO_OCELOT_C || MOMENCO_OCELOT_G || MOMENCO_JAGUAR_ATX || MIPS_BOSPORUS || MIPS_DB1000 || MIPS_DB1100 || MIPS_DB1500 || MIPS_SEAD || MIPS_MALTA || MIPS_MAGNUM_4000 || MIPS_MIRAGE || MIPS_MTX1 || MIPS_XXS1500 || OLIVETTI_M700 || MIPS_ATLAS || LASAT || MIPS_ITE8172 || IBM_WORKPAD || HP_LASERJET || MIPS_IVR || MIPS_EV96100 || MIPS_EV64120 || MACH_DECSTATION || MIPS_COBALT || MIPS_PB1500 || MIPS_PB1100 || MIPS_PB1000 || CASIO_E55 || ACER_PICA_61 || TANBAC_TB0226 || TANBAC_TB0229
+	depends on ZAO_CAPCELLA || VICTOR_MPC30X || TOSHIBA_JMR3927 || TOSHIBA_RBTX4927 || SNI_RM200_PCI || SGI_IP32 || SGI_IP22 || NEC_EAGLE || NEC_OSPREY || DDB5477 || DDB5476 || DDB5074 || MOMENCO_OCELOT || MOMENCO_OCELOT_C || MOMENCO_OCELOT_G || MOMENCO_JAGUAR_ATX || MIPS_BOSPORUS || MIPS_DB1000 || MIPS_DB1100 || MIPS_DB1500 || MIPS_SEAD || MIPS_MALTA || MIPS_MAGNUM_4000 || MIPS_MIRAGE || MIPS_MTX1 || MIPS_XXS1500 || OLIVETTI_M700 || MIPS_ATLAS || LASAT || MIPS_ITE8172 || IBM_WORKPAD || HP_LASERJET || MIPS_IVR || MIPS_EV96100 || MIPS_EV64120 || MACH_DECSTATION || MIPS_COBALT || MIPS_PB1500 || MIPS_PB1100 || MIPS_PB1000 || MIPS_PB1550 || CASIO_E55 || ACER_PICA_61 || TANBAC_TB0226 || TANBAC_TB0229
 	default y
 
 config EARLY_PRINTK
@@ -708,6 +771,10 @@ config I8259
 	bool
 	depends on SNI_RM200_PCI || DDB5477 || DDB5476 || DDB5074 || MACH_JAZZ || MIPS_MALTA || MIPS_COBALT
 	default y
+
+config LIMITED_DMA
+	bool
+	select HIGHMEM
 
 config MIPS_BONITO64
 	bool
@@ -726,7 +793,7 @@ config MIPS_NILE4
 
 config CPU_LITTLE_ENDIAN
 	bool "Generate little endian code"
-	default y if ACER_PICA_61 || CASIO_E55 || DDB5074 || DDB5476 || DDB5477 || MACH_DECSTATION || HP_LASERJET || IBM_WORKPAD || LASAT || MIPS_COBALT || MIPS_ITE8172 || MIPS_IVR || MIPS_PB1000 || MIPS_PB1100 || MIPS_PB1500 || NEC_OSPREY || NEC_EAGLE || OLIVETTI_M700 || SNI_RM200_PCI || VICTOR_MPC30X || ZAO_CAPCELLA
+	default y if ACER_PICA_61 || CASIO_E55 || DDB5074 || DDB5476 || DDB5477 || MACH_DECSTATION || HP_LASERJET || IBM_WORKPAD || LASAT || MIPS_COBALT || MIPS_ITE8172 || MIPS_IVR || SOC_AU1X00 || NEC_OSPREY || NEC_EAGLE || OLIVETTI_M700 || SNI_RM200_PCI || VICTOR_MPC30X || ZAO_CAPCELLA
 	default n if BAGET_MIPS || MIPS_EV64120 || MIPS_EV96100 || MOMENCO_OCELOT || MOMENCO_OCELOT_G || SGI_IP22 || SGI_IP27 || SGI_IP32 || TOSHIBA_JMR3927
 	help
 	  Some MIPS machines can be configured for either little or big endian
@@ -735,13 +802,9 @@ config CPU_LITTLE_ENDIAN
 
 config IRQ_CPU
 	bool
-	depends on CASIO_E55 || DDB5074 || DDB5476 || DDB5477 || MACH_DECSTATION || HP_LASERJET || IBM_WORKPAD || MIPS_COBALT || MIPS_EV96100 || MOMENCO_OCELOT || MIPS_SEAD || MOMENCO_OCELOT_G || NEC_EAGLE || NEC_OSPREY || SGI_IP22 || VICTOR_MPC30X || TANBAC_TB0226 || TANBAC_TB0229 || ZAO_CAPCELLA
-	default y
 
 config IRQ_CPU_RM7K
 	bool
-	depends on MOMENCO_JAGUAR_ATX || MOMENCO_OCELOT || MOMENCO_OCELOT_G
-	default y
 
 config DUMMY_KEYB
 	bool
@@ -904,8 +967,6 @@ config FB_G364
 
 config HAVE_STD_PC_SERIAL_PORT
 	bool
-	depends on DDB5476 || DDB5074 || MIPS_MALTA
-	default y
 
 config VR4181
 	bool
@@ -924,11 +985,6 @@ config ARC_MEMORY
 config ARC_PROMLIB
 	bool
 	depends on MACH_JAZZ || SNI_RM200_PCI || SGI_IP22 || SGI_IP32
-	default y
-
-config BOARD_SCACHE
-	bool
-	depends on CPU_RM9000 || MIPS_EV96100 || MOMENCO_OCELOT || SGI_IP22
 	default y
 
 config ARC64
@@ -1089,15 +1145,20 @@ config PAGE_SIZE_64KB
 
 endchoice
 
-config R5000_CPU_SCACHE
-	bool
-	depends on CPU_NEVADA || CPU_R5000
-	default y if SGI_IP22 || SGI_IP32 || LASAT
-
 config BOARD_SCACHE
 	bool
-	depends on CPU_NEVADA || CPU_R4X00 || CPU_R5000
-	default y if SGI_IP22 || (SGI_IP32 && CPU_R5000) || R5000_CPU_SCACHE
+
+config IP22_CPU_SCACHE
+	bool
+	select BOARD_SCACHE
+
+config R5000_CPU_SCACHE
+	bool
+	select BOARD_SCACHE
+
+config RM7000_CPU_SCACHE
+	bool
+	select BOARD_SCACHE
 
 config SIBYTE_DMA_PAGEOPS
 	bool "Use DMA to clear/copy pages"
@@ -1190,7 +1251,7 @@ config CPU_HAS_SYNC
 #
 config HIGHMEM
 	bool "High Memory Support"
-	depends on MIPS32 && (CPU_R3000 || CPU_SB1 || CPU_R7000 || CPU_R10000) && !(BAGET_MIPS || MACH_DECSTATION)
+	depends on MIPS32 && (CPU_R3000 || CPU_SB1 || CPU_R7000 || CPU_RM9000 || CPU_R10000) && !(BAGET_MIPS || MACH_DECSTATION || MOMENCO_JAGUAR_ATX)
 
 config SMP
 	bool "Multi-Processing support"
@@ -1277,7 +1338,7 @@ menu "Bus options (PCI, PCMCIA, EISA, ISA, TC)"
 
 config PCI
 	bool "Support for PCI controller"
-	depends on MIPS_DB1000 || DDB5074 || DDB5476 || DDB5477 || HP_LASERJET || LASAT || MIPS_IVR || MIPS_ATLAS || MIPS_COBALT || MIPS_EV64120 || MIPS_EV96100 || MIPS_ITE8172 || MIPS_MALTA || MOMENCO_OCELOT || MOMENCO_OCELOT_C || MOMENCO_OCELOT_G || MOMENCO_JAGUAR_ATX || MIPS_PB1000 || MIPS_PB1100 || SOC_AU1500 || NEC_EAGLE || SGI_IP27 || SGI_IP32 || SIBYTE_HAS_PCI || SNI_RM200_PCI || TANBAC_TB0226 || TANBAC_TB0229 || TOSHIBA_JMR3927 || TOSHIBA_RBTX4927 || VICTOR_MPC30X || ZAO_CAPCELLA
+	depends on MIPS_DB1000 || DDB5074 || DDB5476 || DDB5477 || HP_LASERJET || LASAT || MIPS_IVR || MIPS_ATLAS || MIPS_COBALT || MIPS_EV64120 || MIPS_EV96100 || MIPS_ITE8172 || MIPS_MALTA || MOMENCO_OCELOT || MOMENCO_OCELOT_C || MOMENCO_OCELOT_G || MOMENCO_JAGUAR_ATX || MIPS_PB1000 || MIPS_PB1100 || SOC_AU1500 || SOC_AU1550 || NEC_EAGLE || SGI_IP27 || SGI_IP32 || SIBYTE_HAS_PCI || SNI_RM200_PCI || TANBAC_TB0226 || TANBAC_TB0229 || TOSHIBA_JMR3927 || TOSHIBA_RBTX4927 || VICTOR_MPC30X || ZAO_CAPCELLA
 	help
 	  Find out whether you have a PCI motherboard. PCI is the name of a
 	  bus system, i.e. the way the CPU talks to the other stuff inside
@@ -1291,20 +1352,18 @@ config PCI
 
 source "drivers/pci/Kconfig"
 
+#
+# ISA support is now enabled via select.  Too many systems still have the one
+# or other ISA chip on the board that users don't know about so don't expect
+# users to choose the right thing ...
+#
 config ISA
-	bool "ISA bus support"
-	depends on ACER_PICA_61 || SGI_IP22 || MIPS_MAGNUM_4000 || OLIVETTI_M700 || SNI_RM200_PCI
-	default y if TOSHIBA_RBTX4927 || DDB5476 || DDB5074 || IBM_WORKPAD || CASIO_E55
-	help
-	  Find out whether you have ISA slots on your motherboard.  ISA is the
-	  name of a bus system, i.e. the way the CPU talks to the other stuff
-	  inside your box.  Other bus systems are PCI, EISA, or VESA.  ISA is
-	  an older system, now being displaced by PCI; newer boards don't
-	  support it.  If you have ISA, say Y, otherwise N.
+	bool
 
 config EISA
 	bool "EISA support"
-	depends on ISA && (SGI_IP22 || SNI_RM200_PCI)
+	depends on SGI_IP22 || SNI_RM200_PCI
+	select ISA
 	---help---
 	  The Extended Industry Standard Architecture (EISA) bus was
 	  developed as an open alternative to the IBM MicroChannel bus.
@@ -1448,7 +1507,7 @@ config CMDLINE
 config DEBUG_KERNEL
 	bool "Kernel debugging"
 
-	config DEBUG_STACK_USAGE
+config DEBUG_STACK_USAGE
 	bool "Enable stack utilization instrumentation"
 	depends on DEBUG_KERNEL
 	help
@@ -1456,6 +1515,14 @@ config DEBUG_KERNEL
 	  task has ever had available in the sysrq-T and sysrq-P debug output.
 
 	  This option will slow down process creation somewhat.
+
+config DEBUG_SLAB
+	bool "Debug memory allocations"
+	depends on DEBUG_KERNEL && !CPU_HAS_LLDSCD
+	help
+	  Say Y here to have the kernel do limited verification on memory
+	  allocation as well as poisoning memory on free to catch use of freed
+	  memory.
 
 config KGDB
 	bool "Remote GDB kernel debugging"
@@ -1478,8 +1545,7 @@ config GDB_CONSOLE
 
 config DEBUG_INFO
 	bool "Compile the kernel with debug info"
-	depends on DEBUG_KERNEL && !KGDB
-	default y if KGDB
+	depends on DEBUG_KERNEL
 	help
 	  If you say Y here the resulting kernel image will include
 	  debugging info resulting in a larger kernel image.
@@ -1488,7 +1554,8 @@ config DEBUG_INFO
 
 config SB1XXX_CORELIS
 	bool "Corelis Debugger"
-	depends on SIBYTE_SB1xxx_SOC && DEBUG_INFO
+	depends on SIBYTE_SB1xxx_SOC
+	select DEBUG_INFO
 	help
 	  Select compile flags that produce code that can be processed by the
 	  Corelis mksym utility and UDB Emulator.

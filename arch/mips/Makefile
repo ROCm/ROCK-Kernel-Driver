@@ -57,7 +57,7 @@ endif
 cflags-y			:= -I $(TOPDIR)/include/asm/gcc
 cflags-y			+= -G 0 -mno-abicalls -fno-pic -pipe
 cflags-y			+= $(call check_gcc, -finline-limit=100000,)
-LDFLAGS_vmlinux			+= -G 0 -static # -N
+LDFLAGS_vmlinux			+= -G 0 -static -n
 MODFLAGS			+= -mlong-calls
 
 cflags-$(CONFIG_SB1XXX_CORELIS)	+= -mno-sched-prolog -fno-omit-frame-pointer
@@ -108,8 +108,13 @@ while :; do \
 	gas_abi=; gas_opt=; gas_cpu=; gas_isa=; \
 	break; \
 done; \
-if test x$(gcc-abi) != x$(gas-abi); then \
+if test "$(gcc-abi)" != "$(gas-abi)"; then \
 	gas_abi="-Wa,-$(gas-abi) -Wa,-mgp$(gcc-abi)"; \
+fi; \
+if test "$$gcc_opt" = -march= && test -n "$$gcc_abi"; then \
+	$(CC) $$gcc_abi $$gcc_opt$$gcc_cpu -S -o /dev/null \
+		-xc /dev/null > /dev/null 2>&1 && \
+		gcc_isa=; \
 fi; \
 echo $$gcc_abi $$gcc_opt$$gcc_cpu $$gcc_isa $$gas_abi $$gas_opt$$gas_cpu $$gas_isa)
 
@@ -236,6 +241,13 @@ load-$(CONFIG_MIPS_PB1100)	+= 0x80100000
 libs-$(CONFIG_MIPS_PB1500)	+= arch/mips/au1000/pb1500/
 cflags-$(CONFIG_MIPS_PB1500)	+= -Iinclude/asm-mips/mach-pb1x00
 load-$(CONFIG_MIPS_PB1500)	+= 0x80100000
+
+#
+# AMD Alchemy Pb1550 eval board
+#
+libs-$(CONFIG_MIPS_PB1550)	+= arch/mips/au1000/pb1550/
+cflags-$(CONFIG_MIPS_PB1550)	+= -Iinclude/asm-mips/mach-pb1x00
+load-$(CONFIG_MIPS_PB1550)	+= 0x80100000
 
 #
 # AMD Alchemy Db1000 eval board
@@ -397,11 +409,12 @@ load-$(CONFIG_MOMENCO_OCELOT_C)	+= 0x80100000
 # Momentum Jaguar ATX
 #
 core-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= arch/mips/momentum/jaguar_atx/
-ifdef CONFIG_JAGUAR_DMALOW
-load-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= 0x88000000
-else
+cflags-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= -Iinclude/asm-mips/mach-ja
+#ifdef CONFIG_JAGUAR_DMALOW
+#load-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= 0x88000000
+#else
 load-$(CONFIG_MOMENCO_JAGUAR_ATX)	+= 0x80100000
-endif
+#endif
 
 #
 # NEC DDB
@@ -523,7 +536,7 @@ endif
 #
 # SGI-IP32 (O2)
 #
-# Set the load address to >= 0x????????? if you want to leave space for symmon,
+# Set the load address to >= 80069000 if you want to leave space for symmon,
 # 0x80002000 for production kernels.  Note that the value must be aligned to
 # a multiple of the kernel stack size or the handling of the current variable
 # will break so for 64-bit kernels we have to raise the start address by 8kb.

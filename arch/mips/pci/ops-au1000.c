@@ -35,55 +35,15 @@
 #include <linux/init.h>
 
 #include <asm/mach-au1x00/au1000.h>
-#ifdef CONFIG_MIPS_PB1000
-#include <asm/mac-pb1x00/pb1000.h>
-#endif
 
 #define PCI_ACCESS_READ  0
 #define PCI_ACCESS_WRITE 1
 
-#ifdef CONFIG_MIPS_PB1000
-/*
- * "Bus 2" is really the first and only external slot on the pb1000.
- * We'll call that bus 0, and limit the accesses to that single
- * external slot only. The SDRAM is already initialized in setup.c.
- */
-static int config_access(unsigned char access_type, struct pci_dev *dev,
-			 unsigned char where, u32 * data)
-{
-	unsigned char bus = dev->bus->number;
-	unsigned char dev_fn = dev->devfn;
-	unsigned long config;
-
-	if (((dev_fn >> 3) != 0) || (bus != 0)) {
-		*data = 0xffffffff;
-		return -1;
-	}
-
-	config = PCI_CONFIG_BASE | (where & ~0x3);
-
-	if (access_type == PCI_ACCESS_WRITE) {
-		au_writel(*data, config);
-	} else {
-		*data = au_readl(config);
-	}
-	au_sync_udelay(1);
-
-	if (au_readl(PCI_BRIDGE_CONFIG) & (1 << 16)) {
-		*data = 0xffffffff;
-		return -1;
-	} else {
-		return PCIBIOS_SUCCESSFUL;
-	}
-}
-
-#else
 
 static int config_access(unsigned char access_type, struct pci_bus *bus,
 			 unsigned int devfn, unsigned char where,
 			 u32 * data)
 {
-#ifdef CONFIG_SOC_AU1500
 	unsigned int device = PCI_SLOT(devfn);
 	unsigned int function = PCI_FUNC(devfn);
 	unsigned long config, status;
@@ -120,7 +80,7 @@ static int config_access(unsigned char access_type, struct pci_bus *bus,
 	/* setup the lower bits of the 36 bit address */
 	config = cfg_addr | (function << 8) | (where & ~0x3);
 
-#if 0
+#if 1
 	if (access_type == PCI_ACCESS_WRITE) {
 		printk("cfg write:  ");
 	} else {
@@ -145,6 +105,7 @@ static int config_access(unsigned char access_type, struct pci_bus *bus,
 	/* check master abort */
 	status = au_readl(Au1500_PCI_STATCMD);
 	if (status & (1 << 29)) {
+		printk("master abort\n");
 		*data = 0xffffffff;
 		return -1;
 	} else if ((status >> 28) & 0xf) {
@@ -152,11 +113,10 @@ static int config_access(unsigned char access_type, struct pci_bus *bus,
 		*data = 0xffffffff;
 		return -1;
 	} else {
+		printk("bios_successful: %x\n", *data);
 		return PCIBIOS_SUCCESSFUL;
 	}
-#endif
 }
-#endif
 
 static int read_config_byte(struct pci_bus *bus, unsigned int devfn,
 			    int where, u8 * val)

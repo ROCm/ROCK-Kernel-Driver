@@ -6,13 +6,4 @@
 # Makefile for the Alchemy Semiconductor PB1000 board.
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
-
-O_TARGET := pb1550.o
-
-obj-y := init.o board_setup.o irqmap.o
-
-include $(TOPDIR)/Rules.make
+lib-y := init.o board_setup.o irqmap.o

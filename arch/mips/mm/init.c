@@ -29,9 +29,10 @@
 #include <asm/cachectl.h>
 #include <asm/cpu.h>
 #include <asm/dma.h>
-#include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
 #include <asm/sections.h>
+#include <asm/pgtable.h>
+#include <asm/pgalloc.h>
 #include <asm/tlb.h>
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
@@ -163,7 +164,7 @@ void __init paging_init(void)
 	if (cpu_has_dc_aliases) {
 		printk(KERN_WARNING "This processor doesn't support highmem.");
 		if (high - low)
-			printk(" %dk highmem ignored", high - low);
+			printk(" %ldk highmem ignored", high - low);
 		printk("\n");
 	} else
 		zones_size[ZONE_HIGHMEM] = high - low;
@@ -203,7 +204,6 @@ void __init mem_init(void)
 	unsigned long tmp, ram;
 
 #ifdef CONFIG_HIGHMEM
-	highstart_pfn = (KSEG1 - KSEG0) >> PAGE_SHIFT;
 	highmem_start_page = mem_map + highstart_pfn;
 #ifdef CONFIG_DISCONTIGMEM
 #error "CONFIG_HIGHMEM and CONFIG_DISCONTIGMEM dont work together yet"
@@ -234,6 +234,9 @@ void __init mem_init(void)
 			continue;
 		}
 		ClearPageReserved(page);
+#ifdef CONFIG_LIMITED_DMA
+		set_page_address(page, lowmem_page_address(page));
+#endif
 		set_bit(PG_highmem, &page->flags);
 		atomic_set(&page->count, 1);
 		__free_page(page);

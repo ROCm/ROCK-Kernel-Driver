@@ -34,6 +34,7 @@
 #include <asm/reboot.h>
 #include <asm/time.h>
 #include <asm/traps.h>
+#include <asm/pci_channel.h>
 #include <asm/sibyte/sb1250.h>
 #include <asm/sibyte/sb1250_regs.h>
 #include <asm/sibyte/sb1250_genbus.h>
@@ -80,7 +81,7 @@ int swarm_be_handler(struct pt_regs *regs, int is_fixup)
 	return (is_fixup ? MIPS_BE_FIXUP : MIPS_BE_FATAL);
 }
 
-static void __init swarm_setup(void)
+static int __init swarm_setup(void)
 {
 	extern int panic_timeout;
 
@@ -131,6 +132,8 @@ static void __init swarm_setup(void)
        };
        /* XXXKW for CFE, get lines/cols from environment */
 #endif
+
+	return 0;
 }
 
 early_initcall(swarm_setup);

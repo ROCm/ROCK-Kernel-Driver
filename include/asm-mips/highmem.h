@@ -19,6 +19,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>
 #include <asm/kmap_types.h>
@@ -47,13 +48,55 @@ extern pte_t *pkmap_page_table;
 extern void * kmap_high(struct page *page);
 extern void kunmap_high(struct page *page);
 
-extern void *kmap(struct page *page);
-extern void kunmap(struct page *page);
-extern void *kmap_atomic(struct page *page, enum km_type type);
-extern void kunmap_atomic(void *kvaddr, enum km_type type);
-extern struct page *kmap_atomic_to_page(void *ptr);
+/*
+ * CONFIG_LIMITED_DMA is for systems with DMA limitations such as Momentum's
+ * Jaguar ATX.  This option exploits the highmem code in the kernel so is
+ * always enabled together with CONFIG_HIGHMEM but at this time doesn't
+ * actually add highmem functionality.
+ */
+
+#ifdef CONFIG_LIMITED_DMA
+
+/*
+ * These are the default functions for the no-highmem case from
+ * <linux/highmem.h>
+ */
+static inline void *kmap(struct page *page)
+{
+	might_sleep();
+	return page_address(page);
+}
+
+#define kunmap(page) do { (void) (page); } while (0)
+
+static inline void *kmap_atomic(struct page *page, enum km_type type)
+{
+	return page_address(page);
+}
+
+static inline void kunmap_atomic(void *kvaddr, enum km_type type) { }
+
+#define kmap_atomic_to_page(ptr) virt_to_page(ptr)
+
+#define flush_cache_kmaps()	do { } while (0)
+
+#else /* LIMITED_DMA */
+
+extern void *__kmap(struct page *page);
+extern void __kunmap(struct page *page);
+extern void *__kmap_atomic(struct page *page, enum km_type type);
+extern void __kunmap_atomic(void *kvaddr, enum km_type type);
+extern struct page *__kmap_atomic_to_page(void *ptr);
+
+#define kmap			__kmap
+#define kunmap			__kunmap
+#define kmap_atomic		__kmap_atomic
+#define kunmap_atomic		__kunmap_atomic
+#define kmap_atomic_to_page	__kmap_atomic_to_page
 
 #define flush_cache_kmaps()	flush_cache_all()
+
+#endif /* LIMITED_DMA */
 
 #endif /* __KERNEL__ */
 

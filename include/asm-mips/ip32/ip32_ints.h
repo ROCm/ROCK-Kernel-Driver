@@ -16,7 +16,7 @@
  */
 
 /* CPU */
-#define CLOCK_IRQ			0
+#define IP32_R4K_TIMER_IRQ		0
 
 /* MACE */
 #define MACE_VID_IN1_IRQ		1

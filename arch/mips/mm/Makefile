@@ -25,9 +25,9 @@ obj-$(CONFIG_CPU_TX39XX)	+= c-tx39.o pg-r4k.o tlb-r3k.o tlbex-r3k.o
 obj-$(CONFIG_CPU_TX49XX)	+= c-r4k.o cex-gen.o pg-r4k.o tlb-r4k.o
 obj-$(CONFIG_CPU_VR41XX)	+= c-r4k.o cex-gen.o pg-r4k.o tlb-r4k.o
 
-obj-$(CONFIG_CPU_RM7000)	+= sc-rm7k.o
+obj-$(CONFIG_IP22_CPU_SCACHE)	+= sc-ip22.o
 obj-$(CONFIG_R5000_CPU_SCACHE)  += sc-r5k.o
-obj-$(CONFIG_SGI_IP22)		+= sc-ip22.o
+obj-$(CONFIG_RM7000_CPU_SCACHE)	+= sc-rm7k.o
 
 #
 # Choose one DMA coherency model

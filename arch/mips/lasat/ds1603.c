@@ -51,14 +51,14 @@ static void rtc_cycle_clock(unsigned long data)
 {
 	data |= ds1603->clk;
 	rtc_reg_write(data);
-	ndelay(250);
+	lasat_ndelay(250);
 	if (ds1603->data_reversed)
 		data &= ~ds1603->data;
 	else
 		data |= ds1603->data;
 	data &= ~ds1603->clk;
 	rtc_reg_write(data);
-	ndelay(250 + ds1603->huge_delay);
+	lasat_ndelay(250 + ds1603->huge_delay);
 }
 
 static void rtc_write_databit(unsigned int bit)
@@ -72,7 +72,7 @@ static void rtc_write_databit(unsigned int bit)
 		data &= ~ds1603->data;
 
 	rtc_reg_write(data);
-	ndelay(50 + ds1603->huge_delay);
+	lasat_ndelay(50 + ds1603->huge_delay);
 	rtc_cycle_clock(data);
 }
 
@@ -125,13 +125,13 @@ static void rtc_init_op(void)
 
 	rtc_reg_write(rtc_reg_read() & ~ds1603->clk);
 
-	ndelay(50);
+	lasat_ndelay(50);
 }
 
 static void rtc_end_op(void)
 {
 	rtc_nrst_low();
-	ndelay(1000);
+	lasat_ndelay(1000);
 }
 
 /* interface */

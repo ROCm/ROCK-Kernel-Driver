@@ -977,8 +977,7 @@ void __init trap_init(void)
 		memcpy((void *)(CAC_BASE + 0x300), &except_vec_ejtag_debug, 0x80);
 
 	/*
-	 * Only some CPUs have the watch exceptions or a dedicated
-	 * interrupt vector.
+	 * Only some CPUs have the watch exceptions.
 	 */
 	if (cpu_has_watch)
 		set_except_vector(23, handle_watch);

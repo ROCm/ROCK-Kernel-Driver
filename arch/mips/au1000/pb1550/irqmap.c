@@ -45,49 +45,11 @@
 #include <asm/io.h>
 #include <asm/mipsregs.h>
 #include <asm/system.h>
-#include <asm/au1000.h>
+#include <asm/mach-au1x00/au1000.h>
 
 au1xxx_irq_map_t au1xxx_irq_map[] = {
-	{ AU1550_UART0_INT, 	INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_PCI_INTA, 		INTC_INT_LOW_LEVEL, 0 },
-	{ AU1550_PCI_INTB, 		INTC_INT_LOW_LEVEL, 0 },
-	{ AU1550_DDMA_INT, 		INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_CRYPTO_INT, 	INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_PCI_INTC, 		INTC_INT_LOW_LEVEL, 0 },
-	{ AU1550_PCI_INTD, 		INTC_INT_LOW_LEVEL, 0 },
-	{ AU1550_PCI_RST_INT, 	INTC_INT_LOW_LEVEL, 0 },
-	{ AU1550_UART1_INT, 	INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_UART3_INT, 	INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_PSC0_INT, 		INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_PSC1_INT, 		INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_PSC2_INT, 		INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_PSC3_INT, 		INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_TOY_INT, 		INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_TOY_MATCH0_INT,INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_TOY_MATCH1_INT,INTC_INT_RISE_EDGE, 0 },
-	/* Careful if you change match 2 request!
-	 * The interrupt handler is called directly
-	 * from the low level dispatch code.
-	 */
-	{ AU1550_TOY_MATCH2_INT,INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_RTC_INT, 		INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_RTC_MATCH0_INT,INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_RTC_MATCH1_INT,INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_RTC_MATCH2_INT,INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_RTC_MATCH2_INT,INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_NAND_INT, 		INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_USB_DEV_REQ_INT, INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_USB_DEV_SUS_INT, INTC_INT_RISE_EDGE, 0 },
-	{ AU1550_USB_HOST_INT,  INTC_INT_LOW_LEVEL, 0 },
-	{ AU1550_MAC0_DMA_INT,  INTC_INT_HIGH_LEVEL, 0},
-	{ AU1550_MAC1_DMA_INT,  INTC_INT_HIGH_LEVEL, 0},
-
-
-	/*
-	 *  Need to define platform dependant GPIO ints here
-	 */
-	#warning PbAu1550 needs GPIO Interrupts defined
-
+	{ AU1000_GPIO_0, INTC_INT_LOW_LEVEL, 0 },
+	{ AU1000_GPIO_1, INTC_INT_LOW_LEVEL, 0 },
 };
 
 int au1xxx_nr_irqs = sizeof(au1xxx_irq_map)/sizeof(au1xxx_irq_map_t);

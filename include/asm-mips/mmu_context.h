@@ -45,6 +45,11 @@ extern unsigned long pgd_current[];
 #define ASID_INC	0x40
 #define ASID_MASK	0xfc0
 
+#elif defined(CONFIG_CPU_RM9000)
+
+#define ASID_INC	0x1
+#define ASID_MASK	0xfff
+
 #else /* FIXME: not correct for R6000, R8000 */
 
 #define ASID_INC	0x1

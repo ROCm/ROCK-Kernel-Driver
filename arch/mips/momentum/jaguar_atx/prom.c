@@ -13,6 +13,8 @@
  * under  the terms of  the GNU General  Public License as published by the
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
+ *
+ * Added changes for SMP - Manish Lachwani (lachwani@pmc-sierra.com)
  */
 #include <linux/config.h>
 #include <linux/init.h>
@@ -26,26 +28,23 @@
 
 #include "jaguar_atx_fpga.h"
 
+extern void ja_setup_console(void);
 
 struct callvectors {
-	int	(*open) (char*, int, int);
-	int	(*close) (int);
-	int	(*read) (int, void*, int);
-	int	(*write) (int, void*, int);
-	off_t	(*lseek) (int, off_t, int);
-	int	(*printf) (const char*, ...);
-	void	(*cacheflush) (void);
-	char*	(*gets) (char*);
+	int	(*open) (char*, int, int);		/*	 0 */
+	int	(*close) (int);				/*	 4 */
+	int	(*read) (int, void*, int);		/*	 8 */
+	int	(*write) (int, void*, int);		/*	12 */
+	off_t	(*lseek) (int, off_t, int);		/*	16 */
+	int	(*printf) (const char*, ...);		/*	20 */
+	void	(*cacheflush) (void);			/*	24 */
+	char*	(*gets) (char*);			/*	28 */
 };
 
-struct callvectors* debug_vectors;
+struct callvectors *debug_vectors;
 
 extern unsigned long mv64340_base;
 extern unsigned long cpu_clock;
-
-#ifdef CONFIG_MV64340_ETH
-extern unsigned char prom_mac_addr_base[6];
-#endif
 
 const char *get_system_type(void)
 {
@@ -53,6 +52,8 @@ const char *get_system_type(void)
 }
 
 #ifdef CONFIG_MV64340_ETH
+extern unsigned char prom_mac_addr_base[6];
+
 static void burn_clocks(void)
 {
 	int i;
@@ -100,56 +101,58 @@ void get_mac(char dest[6])
 }
 #endif
 
-
 #ifdef CONFIG_MIPS64
 
 unsigned long signext(unsigned long addr)
 {
-  addr &= 0xffffffff;
-  return (unsigned long)((int)addr);
+	addr &= 0xffffffff;
+	return (unsigned long)((int)addr);
 }
 
 void *get_arg(unsigned long args, int arc)
 {
-  unsigned long ul;
-  unsigned char *puc, uc;
+	unsigned long ul;
+	unsigned char *puc, uc;
 
-  args += (arc * 4);
-  ul = (unsigned long)signext(args);
-  puc = (unsigned char *)ul;
-  if (puc == 0)
-    return (void *)0;
+	args += (arc * 4);
+	ul = (unsigned long)signext(args);
+	puc = (unsigned char *)ul;
+	if (puc == 0)
+		return (void *)0;
 
 #ifdef CONFIG_CPU_LITTLE_ENDIAN
-  uc = *puc++;
-  ul = (unsigned long)uc;
-  uc = *puc++;
-  ul |= (((unsigned long)uc) << 8);
-  uc = *puc++;
-  ul |= (((unsigned long)uc) << 16);
-  uc = *puc++;
-  ul |= (((unsigned long)uc) << 24);
+	uc = *puc++;
+	l = (unsigned long)uc;
+	uc = *puc++;
+	ul |= (((unsigned long)uc) << 8);
+	uc = *puc++;
+	ul |= (((unsigned long)uc) << 16);
+	uc = *puc++;
+	ul |= (((unsigned long)uc) << 24);
 #else
-  uc = *puc++;
-  ul = ((unsigned long)uc) << 24;
-  uc = *puc++;
-  ul |= (((unsigned long)uc) << 16);
-  uc = *puc++;
-  ul |= (((unsigned long)uc) << 8);
-  uc = *puc++;
-  ul |= ((unsigned long)uc);
+	uc = *puc++;
+	ul = ((unsigned long)uc) << 24;
+	uc = *puc++;
+	ul |= (((unsigned long)uc) << 16);
+	uc = *puc++;
+	ul |= (((unsigned long)uc) << 8);
+	uc = *puc++;
+	ul |= ((unsigned long)uc);
 #endif
-  ul = signext(ul);
-  return (void *)ul;
+	ul = signext(ul);
+
+	return (void *)ul;
 }
 
 char *arg64(unsigned long addrin, int arg_index)
 {
-  unsigned long args;
-  char *p;
-  args = signext(addrin);
-  p = (char *)get_arg(args, arg_index);
-  return p;
+	unsigned long args;
+	char *p;
+
+	args = signext(addrin);
+	p = (char *)get_arg(args, arg_index);
+
+	return p;
 }
 #endif  /* CONFIG_MIPS64 */
 
@@ -159,7 +162,13 @@ void __init prom_init(void)
 	int argc = fw_arg0;
 	char **arg = (char **) fw_arg1;
 	char **env = (char **) fw_arg2;
+	struct callvectors *cv = (struct callvectors *) fw_arg3;
 	int i;
+
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+//	ja_setup_console();	/* The very first thing.  */
+#endif
+
 #ifdef CONFIG_MIPS64
 	char *ptr;
 
@@ -236,13 +245,47 @@ void __init prom_init(void)
 	/* get the base MAC address for on-board ethernet ports */
 	get_mac(prom_mac_addr_base);
 #endif
-
-#ifndef CONFIG_MIPS64
-	debug_vectors->printf("Booting Linux kernel...\n");
-#endif
 }
 
-unsigned long __init prom_free_prom_memory(void)
+void __init prom_free_prom_memory(void)
 {
-	return 0;
+}
+
+void __init prom_fixup_mem_map(unsigned long start, unsigned long end)
+{
+}
+
+/*
+ * SMP support
+ */
+int prom_setup_smp(void)
+{
+	int	num_cpus = 2;
+
+	/*
+	 * We know that the RM9000 on the Jaguar ATX board has 2 cores.
+	 * Hence, this can be hardcoded for now.
+	 */
+	return num_cpus;
+}
+
+int prom_boot_secondary(int cpu, unsigned long sp, unsigned long gp)
+{
+	/* Clear the semaphore */
+	*(volatile uint32_t *)(0xbb000a68) = 0x80000000;
+
+	return 1;
+}
+
+void prom_init_secondary(void)
+{
+        clear_c0_config(CONF_CM_CMASK);
+        set_c0_config(0x2);
+
+	clear_c0_status(ST0_IM);
+	set_c0_status(0x1ffff);
+}
+
+void prom_smp_finish(void)
+{
 }

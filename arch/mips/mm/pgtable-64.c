@@ -9,7 +9,6 @@
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <asm/pgtable.h>
-#include <asm/pgalloc.h>
 
 void pgd_init(unsigned long page)
 {

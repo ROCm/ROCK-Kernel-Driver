@@ -220,7 +220,22 @@ extern void lasat_write_eeprom_info(void);
 #define N_MACHTYPES		2
 /* for calibration of delays */
 
+/* the lasat_ndelay function is necessary because it is used at an
+ * early stage of the boot process where ndelay is not calibrated.
+ * It is used for the bit-banging rtc and eeprom drivers */
+
 #include <asm/delay.h>
+/* calculating with the slowest board with 100 MHz clock */
+#define LASAT_100_DIVIDER 20
+/* All 200's run at 250 MHz clock */
+#define LASAT_200_DIVIDER 8
+
+extern unsigned int lasat_ndelay_divider;
+
+static inline void lasat_ndelay(unsigned int ns)
+{
+            __delay(ns / lasat_ndelay_divider);
+}
 
 extern void (* prom_printf)(const char *fmt, ...);
 

@@ -24,6 +24,7 @@
 #include <asm/mipsregs.h>
 #include <asm/signal.h>
 #include <asm/system.h>
+#include <asm/time.h>
 #include <asm/ip32/crime.h>
 #include <asm/ip32/mace.h>
 #include <asm/ip32/ip32_ints.h>
@@ -548,7 +549,7 @@ void ip32_irq4(struct pt_regs *regs)
 
 void ip32_irq5(struct pt_regs *regs)
 {
-	do_IRQ(CLOCK_IRQ, regs);
+	ll_timer_interrupt(IP32_R4K_TIMER_IRQ, regs);
 }
 
 void __init init_IRQ(void)
@@ -568,7 +569,7 @@ void __init init_IRQ(void)
 	for (irq = 0; irq <= IP32_IRQ_MAX; irq++) {
 		hw_irq_controller *controller;
 
-		if (irq == CLOCK_IRQ)
+		if (irq == IP32_R4K_TIMER_IRQ)
 			controller = &ip32_cpu_interrupt;
 		else if (irq <= MACE_PCI_BRIDGE_IRQ && irq >= MACE_VID_IN1_IRQ)
 			controller = &ip32_mace_interrupt;
@@ -586,4 +587,7 @@ void __init init_IRQ(void)
 	}
 	setup_irq(CRIME_MEMERR_IRQ, &memerr_irq);
 	setup_irq(CRIME_CPUERR_IRQ, &cpuerr_irq);
+
+#define ALLINTS (IE_IRQ0 | IE_IRQ1 | IE_IRQ2 | IE_IRQ3 | IE_IRQ4 | IE_IRQ5)
+	change_c0_status(ST0_IM, ALLINTS);
 }

@@ -76,9 +76,6 @@ void core_send_ipi(int cpu, unsigned int action)
 	__raw_writeq((((u64)action)<< 48), mailbox_set_regs[cpu]);
 }
 
-extern irqreturn_t smp_call_function_interrupt(int irq, void *dev,
-	struct pt_regs *regs);
-
 void sb1250_mailbox_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
@@ -96,7 +93,6 @@ void sb1250_mailbox_interrupt(struct pt_regs *regs)
 	 * interrupt will do the reschedule for us
 	 */
 
-	if (action & SMP_CALL_FUNCTION) {
-		smp_call_function_interrupt(0, NULL, regs);
-	}
+	if (action & SMP_CALL_FUNCTION)
+		smp_call_function_interrupt();
 }

@@ -5,55 +5,52 @@
  *
  * Copyright (C) 2000 by Ralf Baechle
  * Copyright (C) 2000 by Silicon Graphics, Inc.
+ * Copyright (C) 2004 by Christoph Hellwig
  *
  * On SGI IP27 the ARC memory configuration data is completly bogus but
  * alternate easier to use mechanisms are available.
  */
 #include <linux/init.h>
-#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/bootmem.h>
+#include <linux/mmzone.h>
 #include <linux/swap.h>
-
+#include <linux/bootmem.h>
 #include <asm/page.h>
-#include <asm/bootinfo.h>
-#include <asm/addrspace.h>
-#include <asm/pgtable.h>
-#include <asm/pgalloc.h>
-#include <asm/sn/types.h>
-#include <asm/sn/addrs.h>
-#include <asm/sn/hub.h>
-#include <asm/sn/klconfig.h>
-#include <asm/sn/arch.h>
-#include <asm/mmzone.h>
 #include <asm/sections.h>
 
-/* ip27-klnuma.c   */
-extern pfn_t node_getfirstfree(cnodeid_t cnode);
+#include <asm/sn/arch.h>
+#include <asm/sn/hub.h>
+#include <asm/sn/klconfig.h>
+#include <asm/sn/sn_private.h>
 
-#define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
-#define SLOT_IGNORED	0xffff
 
-short slot_lastfilled_cache[MAX_COMPACT_NODES];
-unsigned short slot_psize_cache[MAX_COMPACT_NODES][MAX_MEM_SLOTS];
+#define PFN_UP(x)		(((x) + PAGE_SIZE-1) >> PAGE_SHIFT)
 
-struct bootmem_data plat_node_bdata[MAX_COMPACT_NODES];
+#define SLOT_PFNSHIFT           (SLOT_SHIFT - PAGE_SHIFT)
+#define PFN_NASIDSHFT           (NASID_SHFT - PAGE_SHIFT)
+
+#define SLOT_IGNORED		0xffff
+
+static short __initdata slot_lastfilled_cache[MAX_COMPACT_NODES];
+static unsigned short __initdata slot_psize_cache[MAX_COMPACT_NODES][MAX_MEM_SLOTS];
+static struct bootmem_data __initdata plat_node_bdata[MAX_COMPACT_NODES];
+
 struct pglist_data *node_data[MAX_COMPACT_NODES];
 struct hub_data *hub_data[MAX_COMPACT_NODES];
 
-int numa_debug(void)
+static pfn_t __init slot_getbasepfn(cnodeid_t cnode, int slot)
 {
-	printk("NUMA debug\n");
-	*(int *)0 = 0;
-	return(0);
+	nasid_t nasid = COMPACT_TO_NASID_NODEID(cnode);
+
+	return ((pfn_t)nasid << PFN_NASIDSHFT) | (slot << SLOT_PFNSHIFT);
 }
 
 /*
  * Return the number of pages of memory provided by the given slot
  * on the specified node.
  */
-static pfn_t slot_getsize(cnodeid_t node, int slot)
+static pfn_t __init slot_getsize(cnodeid_t node, int slot)
 {
 	return (pfn_t) slot_psize_cache[node][slot];
 }
@@ -61,7 +58,7 @@ static pfn_t slot_getsize(cnodeid_t node, int slot)
 /*
  * Return highest slot filled
  */
-static int node_getlastslot(cnodeid_t node)
+static int __init node_getlastslot(cnodeid_t node)
 {
 	return (int) slot_lastfilled_cache[node];
 }
@@ -69,7 +66,7 @@ static int node_getlastslot(cnodeid_t node)
 /*
  * Return the pfn of the last free page of memory on a node.
  */
-static pfn_t node_getmaxclick(cnodeid_t node)
+static pfn_t __init node_getmaxclick(cnodeid_t node)
 {
 	pfn_t	slot_psize;
 	int	slot;
@@ -78,7 +75,7 @@ static pfn_t node_getmaxclick(cnodeid_t node)
 	 * Start at the top slot. When we find a slot with memory in it,
 	 * that's the winner.
 	 */
-	for (slot = (node_getnumslots(node) - 1); slot >= 0; slot--) {
+	for (slot = (MAX_MEM_SLOTS - 1); slot >= 0; slot--) {
 		if ((slot_psize = slot_getsize(node, slot))) {
 			if (slot_psize == SLOT_IGNORED)
 				continue;
@@ -94,7 +91,7 @@ static pfn_t node_getmaxclick(cnodeid_t node)
 	return 0;
 }
 
-static pfn_t slot_psize_compute(cnodeid_t node, int slot)
+static pfn_t __init slot_psize_compute(cnodeid_t node, int slot)
 {
 	nasid_t nasid;
 	lboard_t *brd;
@@ -129,25 +126,25 @@ static pfn_t slot_psize_compute(cnodeid_t node, int slot)
 	}
 }
 
-static pfn_t szmem(void)
+static void __init szmem(void)
 {
+	pfn_t slot_psize, slot0sz = 0, nodebytes;	/* Hack to detect problem configs */
+	int slot, ignore;
 	cnodeid_t node;
-	int slot, numslots;
-	pfn_t num_pages = 0, slot_psize;
-	pfn_t slot0sz = 0, nodebytes;	/* Hack to detect problem configs */
-	int ignore;
+
+	num_physpages = 0;
 
 	for (node = 0; node < numnodes; node++) {
-		numslots = node_getnumslots(node);
 		ignore = nodebytes = 0;
-		for (slot = 0; slot < numslots; slot++) {
+		for (slot = 0; slot < MAX_MEM_SLOTS; slot++) {
 			slot_psize = slot_psize_compute(node, slot);
-			if (slot == 0) slot0sz = slot_psize;
+			if (slot == 0)
+				slot0sz = slot_psize;
 			/*
 			 * We need to refine the hack when we have replicated
 			 * kernel text.
 			 */
-			nodebytes += SLOT_SIZE;
+			nodebytes += (1LL << SLOT_SHIFT);
 			if ((nodebytes >> PAGE_SHIFT) * (sizeof(struct page)) >
 						(slot0sz << PAGE_SHIFT))
 				ignore = 1;
@@ -155,18 +152,16 @@ static pfn_t szmem(void)
 				printk("Ignoring slot %d onwards on node %d\n",
 								slot, node);
 				slot_psize_cache[node][slot] = SLOT_IGNORED;
-				slot = numslots;
+				slot = MAX_MEM_SLOTS;
 				continue;
 			}
-			num_pages += slot_psize;
+			num_physpages += slot_psize;
 			slot_psize_cache[node][slot] =
 					(unsigned short) slot_psize;
 			if (slot_psize)
 				slot_lastfilled_cache[node] = slot;
 		}
 	}
-
-	return num_pages;
 }
 
 /*
@@ -174,14 +169,12 @@ static pfn_t szmem(void)
  * contains at least 32 MBytes of memory. We assume all bootmem data
  * fits on the first slot.
  */
-extern void mlreset(void);
 void __init prom_meminit(void)
 {
 	cnodeid_t node;
 
 	mlreset();
-
-	num_physpages = szmem();
+	szmem();
 
 	for (node = 0; node < numnodes; node++) {
 		pfn_t slot_firstpfn = slot_getbasepfn(node, 0);
@@ -195,7 +188,9 @@ void __init prom_meminit(void)
 		node_data[node] = __va(slot_freepfn << PAGE_SHIFT);
 		node_data[node]->bdata = &plat_node_bdata[node];
 
-		hub_data[node] = node_data[node] + 1;
+		hub_data[node] = (struct hub_data *)(node_data[node] + 1);
+
+		cpus_clear(hub_data[node]->h_cpus);
 
 		slot_freepfn += PFN_UP(sizeof(struct pglist_data) +
 				       sizeof(struct hub_data));

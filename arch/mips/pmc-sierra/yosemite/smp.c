@@ -25,7 +25,6 @@
 #include <asm/mmu_context.h>
 #include <asm/trace.h>
 
-extern void smp_call_function_interrupt(void);
 extern void asmlinkage smp_bootstrap(void);
 
 /*
@@ -43,9 +42,9 @@ void core_send_ipi(int cpu, unsigned int action)
                         break;
                 case SMP_CALL_FUNCTION:
                         if (cpu == 1)
-                                *(volatile u_int32_t *)(0xbb000a00) = 0x00610002;
+                                *(volatile uint32_t *)(0xbb000a00) = 0x00610002;
                         else
-                                *(volatile u_int32_t *)(0xbb000a00) = 0x00610001;
+                                *(volatile uint32_t *)(0xbb000a00) = 0x00610001;
                         break;
 
                 default:
@@ -96,10 +95,10 @@ void __init start_secondary(void)
         __flush_cache_all();
 
         printk("Slave cpu booted successfully  \n");
-        *(volatile u_int32_t *)(0xbb000a68) = 0x00000000;
-        *(volatile u_int32_t *)(0xbb000a68) = 0x80000000;
+        *(volatile uint32_t *)(0xbb000a68) = 0x00000000;
+        *(volatile uint32_t *)(0xbb000a68) = 0x80000000;
 
-        while (*(volatile u_int32_t *)(0xbb000a68) != 0x00000000);
+        while (*(volatile uint32_t *)(0xbb000a68) != 0x00000000);
 
         return cpu_idle();
 }
@@ -172,8 +171,8 @@ void __init smp_boot_cpus(void)
 
         /* Local semaphore to both the CPUs */
 
-        *(volatile u_int32_t *)(0xbb000a68) = 0x80000000;
-        while (*(volatile u_int32_t *)(0xbb000a68) != 0x00000000);
+        *(volatile uint32_t *)(0xbb000a68) = 0x80000000;
+        while (*(volatile uint32_t *)(0xbb000a68) != 0x00000000);
 
         smp_threads_ready = 1;
 }

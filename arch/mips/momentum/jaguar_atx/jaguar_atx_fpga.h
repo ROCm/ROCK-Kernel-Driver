@@ -26,14 +26,6 @@
 #ifndef __JAGUAR_ATX_FPGA_H__
 #define __JAGUAR_ATX_FPGA_H__
 
-#include <linux/config.h>
-
-#ifdef CONFIG_MIPS64
-#define JAGUAR_ATX_CS0_ADDR (0xfffffffffc000000)
-#else
-#define JAGUAR_ATX_CS0_ADDR (0xfc000000)
-#endif
-
 #define JAGUAR_ATX_REG_BOARDREV		0x0
 #define JAGUAR_ATX_REG_FPGA_REV		0x1
 #define JAGUAR_ATX_REG_FPGA_TYPE	0x2
@@ -50,7 +42,11 @@
 #define JAGUAR_ATX_REG_RESERVED5	0xe
 #define JAGUAR_ATX_REG_RESERVED6	0xf
 
-#define JAGUAR_FPGA_WRITE(x,y) writeb(x,JAGUAR_ATX_CS0_ADDR+JAGUAR_ATX_REG_##y)
-#define JAGUAR_FPGA_READ(x) readb(JAGUAR_ATX_CS0_ADDR + JAGUAR_ATX_REG_##x)
+#define JAGUAR_ATX_CS0_ADDR		0xfc000000L
+
+extern unsigned long ja_fpga_base;
+
+#define JAGUAR_FPGA_WRITE(x,y) writeb(x, ja_fpga_base + JAGUAR_ATX_REG_##y)
+#define JAGUAR_FPGA_READ(x) readb(ja_fpga_base + JAGUAR_ATX_REG_##x)
 
 #endif

@@ -22,7 +22,6 @@
 
 #include <asm/branch.h>
 #include <asm/hardirq.h>
-#include <asm/pgalloc.h>
 #include <asm/mmu_context.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>

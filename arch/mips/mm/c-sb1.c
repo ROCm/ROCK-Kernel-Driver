@@ -2,6 +2,7 @@
  * Copyright (C) 1996 David S. Miller (dm@engr.sgi.com)
  * Copyright (C) 1997, 2001 Ralf Baechle (ralf@gnu.org)
  * Copyright (C) 2000, 2001, 2002, 2003 Broadcom Corporation
+ * Copyright (C) 2004  Maciej W. Rozycki
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -202,8 +203,8 @@ static void sb1_flush_cache_page(struct vm_area_struct *vma, unsigned long addr)
 	on_each_cpu(sb1_flush_cache_page_ipi, (void *) &args, 1, 1);
 }
 #else
-void sb1_flush_cache_page(struct vm_area_struct *vma, unsigned long addr);
-asm("sb1_flush_cache_page = local_sb1_flush_cache_page");
+void sb1_flush_cache_page(struct vm_area_struct *vma, unsigned long addr)
+	__attribute__((alias("local_sb1_flush_cache_page")));
 #endif
 
 /*
@@ -237,16 +238,16 @@ static void local_sb1___flush_cache_all(void)
 }
 
 #ifdef CONFIG_SMP
-extern void sb1___flush_cache_all_ipi(void *ignored);
-asm("sb1___flush_cache_all_ipi = local_sb1___flush_cache_all");
+void sb1___flush_cache_all_ipi(void *ignored)
+	__attribute__((alias("local_sb1___flush_cache_all")));
 
 static void sb1___flush_cache_all(void)
 {
 	on_each_cpu(sb1___flush_cache_all_ipi, 0, 1, 1);
 }
 #else
-extern void sb1___flush_cache_all(void);
-asm("sb1___flush_cache_all = local_sb1___flush_cache_all");
+void sb1___flush_cache_all(void)
+	__attribute__((alias("local_sb1___flush_cache_all")));
 #endif
 
 /*
@@ -295,8 +296,8 @@ void sb1_flush_icache_range(unsigned long start, unsigned long end)
 	on_each_cpu(sb1_flush_icache_range_ipi, &args, 1, 1);
 }
 #else
-void sb1_flush_icache_range(unsigned long start, unsigned long end);
-asm("sb1_flush_icache_range = local_sb1_flush_icache_range");
+void sb1_flush_icache_range(unsigned long start, unsigned long end)
+	__attribute__((alias("local_sb1_flush_icache_range")));
 #endif
 
 /*
@@ -352,8 +353,8 @@ static void sb1_flush_icache_page(struct vm_area_struct *vma,
 	on_each_cpu(sb1_flush_icache_page_ipi, (void *) &args, 1, 1);
 }
 #else
-void sb1_flush_icache_page(struct vm_area_struct *vma, struct page *page);
-asm("sb1_flush_icache_page = local_sb1_flush_icache_page");
+void sb1_flush_icache_page(struct vm_area_struct *vma, struct page *page)
+	__attribute__((alias("local_sb1_flush_icache_page")));
 #endif
 
 /*
@@ -379,8 +380,8 @@ static void sb1_flush_cache_sigtramp(unsigned long addr)
 	on_each_cpu(sb1_flush_cache_sigtramp_ipi, (void *) addr, 1, 1);
 }
 #else
-void sb1_flush_cache_sigtramp(unsigned long addr);
-asm("sb1_flush_cache_sigtramp = local_sb1_flush_cache_sigtramp");
+void sb1_flush_cache_sigtramp(unsigned long addr)
+	__attribute__((alias("local_sb1_flush_cache_sigtramp")));
 #endif
 
 

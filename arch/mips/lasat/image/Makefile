@@ -18,14 +18,15 @@ KERNEL_ENTRY = $(shell $(NM) $(KERNEL_IMAGE) | grep kernel_entry | cut -f1 -d\ )
 
 LDSCRIPT= -L$(obj) -Tromscript.normal
 
-AFLAGS_head.o += -D_kernel_start=0x$(KERNEL_START) \
+HEAD_DEFINES := -D_kernel_start=0x$(KERNEL_START) \
 		-D_kernel_entry=0x$(KERNEL_ENTRY) \
 		-D VERSION="\"$(Version)\"" \
 		-D TIMESTAMP=$(shell date +%s) 
 
-head.o: $(KERNEL_IMAGE)
+$(obj)/head.o: $(obj)/head.S $(KERNEL_IMAGE)
+	$(CC) -fno-pic $(HEAD_DEFINES) -I$(TOPDIR)/include -c -o $@ $<
 
-obj-y = head.o kImage.o
+OBJECTS = head.o kImage.o
 
 rom.sw:	$(obj)/rom.sw
 
@@ -36,7 +37,7 @@ $(obj)/rom.bin: $(obj)/rom
 	$(OBJCOPY) -O binary -S $^ $@
 
 # Rule to make the bootloader
-$(obj)/rom: $(addprefix $(obj)/,$(obj-y))
+$(obj)/rom: $(addprefix $(obj)/,$(OBJECTS))
 	$(LD) $(LDFLAGS) $(LDSCRIPT) -o $@ $^
 
 $(obj)/%.o: $(obj)/%.gz

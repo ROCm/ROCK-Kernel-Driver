@@ -37,6 +37,7 @@ obj-$(CONFIG_SMP)		+= smp.o
 obj-$(CONFIG_I8259)		+= i8259.o
 obj-$(CONFIG_IRQ_CPU)		+= irq_cpu.o
 obj-$(CONFIG_IRQ_CPU_RM7K)	+= irq-rm7000.o
+obj-$(CONFIG_MIPS_MV64340)	+= irq-mv6434x.o
 
 obj-$(CONFIG_MIPS32)		+= scall32-o32.o
 obj-$(CONFIG_MIPS64)		+= scall64-64.o
@@ -54,5 +55,6 @@ obj-$(CONFIG_MIPS64)		+= cpu-bugs64.o
 obj-$(CONFIG_GEN_RTC)		+= genrtc.o
 
 CFLAGS_cpu-bugs64.o	= $(shell if $(CC) $(CFLAGS) -Wa,-mdaddi -c -o /dev/null -xc /dev/null >/dev/null 2>&1; then echo "-DHAVE_AS_SET_DADDI"; fi)
+CFLAGS_ioctl32.o	+= -Ifs/
 
 EXTRA_AFLAGS := $(CFLAGS)

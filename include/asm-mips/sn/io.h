@@ -10,8 +10,10 @@
 #define _ASM_SN_IO_H
 
 #include <linux/config.h>
+#if defined (CONFIG_SGI_IP27)
+#include <asm/sn/sn0/hubio.h>
+#endif
 
-#ifdef CONFIG_SGI_IO
 
 #define IIO_ITTE_BASE		0x400160 /* base of translation table entries */
 #define IIO_ITTE(bigwin)	(IIO_ITTE_BASE + 8*(bigwin))
@@ -54,15 +56,5 @@
 #define	IIO_IOPRB(_x)	(IIO_IOPRB_0 + ( ( (_x) < HUB_WIDGET_ID_MIN ? \
 			(_x) : \
 			(_x) - (HUB_WIDGET_ID_MIN-1)) << 3) )
-
-#if defined (CONFIG_SGI_IP27)
-#include <asm/sn/sn0/hubio.h>
-#endif
-
-#else /* CONFIG_SGI_IO */
-
-#include <asm/sn/sn0/addrs.h>
-
-#endif	/* CONFIG_SGI_IO */
 
 #endif /* _ASM_SN_IO_H */

@@ -32,27 +32,17 @@
  *  with this program; if not, write  to the Free Software Foundation, Inc.,
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#include <linux/config.h>
-#include <linux/errno.h>
 #include <linux/init.h>
-#include <linux/sched.h>
-#include <linux/types.h>
 #include <linux/interrupt.h>
-#include <linux/ioport.h>
-#include <linux/timex.h>
-#include <linux/slab.h>
-#include <asm/bootinfo.h>
+#include <linux/signal.h>
+#include <linux/types.h>
+#include <asm/irq_cpu.h>
 #include <asm/mipsregs.h>
 
 extern asmlinkage void jaguar_handle_int(void);
-extern void mv64340_irq_init(void);
 
 static struct irqaction cascade_mv64340 = {
-	no_action, SA_INTERRUPT, 0, "cascade via MV64340", NULL, NULL
-};
-
-static struct irqaction unused_irq = {
-	no_action, SA_INTERRUPT, 0, "unused", NULL, NULL
+	no_action, SA_INTERRUPT, 0, "MV64340-Cascade", NULL, NULL
 };
 
 void __init init_IRQ(void)
@@ -72,19 +62,7 @@ void __init init_IRQ(void)
 	/* set up the cascading interrupts */
 	setup_irq(8, &cascade_mv64340);
 
-	/* mark unconnected IRQs as unconnected */
-	setup_irq(9, &unused_irq);
+	mv64340_irq_init(16);
 
-	/* mark un-used IRQ numbers as unconnected */
-	setup_irq(10, &unused_irq);
-	setup_irq(13, &unused_irq);
-	setup_irq(14, &unused_irq);
-
-	mv64340_irq_init();
-
-#ifdef CONFIG_REMOTE_DEBUG
-	printk("start kgdb ...\n");
-	set_debug_traps();
-	breakpoint();	/* you may move this line to whereever you want :-) */
-#endif
+	set_c0_status(ST0_IM);
 }

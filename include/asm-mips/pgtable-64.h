@@ -216,4 +216,10 @@ static inline pte_t mk_swap_pte(unsigned long type, unsigned long offset)
 
 typedef pte_t *pte_addr_t;
 
+/*
+ * Used for the b0rked handling of kernel pagetables on the 64-bit kernel.
+ */
+extern pte_t kptbl[(PAGE_SIZE << PGD_ORDER)/sizeof(pte_t)];
+extern pmd_t kpmdtbl[PTRS_PER_PMD];
+
 #endif /* _ASM_PGTABLE_64_H */

@@ -2,7 +2,7 @@
  * Copyright 2002 Momentum Computer
  * Author: Matthew Dharm <mdharm@momenco.com>
  *
- * Copyright (C) 2003 Ralf Baechle (ralf@linux-mips.org)
+ * Copyright (C) 2003, 2004 Ralf Baechle (ralf@linux-mips.org)
  *
  *  This program is free software; you can redistribute  it and/or modify it
  *  under  the terms of  the GNU General  Public License as published by the
@@ -60,23 +60,23 @@ static int mv64340_read_config(struct pci_bus *bus, unsigned int devfn, int reg,
 	if (PCI_SLOT(devfn) > 5)
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
-	address = (bus->number << 16) | (dev << 11) | (func << 8) |
-		  (offset & 0xfc) | 0x80000000;
+	address = (bus->number << 16) | (devfn << 8) |
+		  (reg & 0xfc) | 0x80000000;
 
 	/* start the configuration cycle */
 	MV_WRITE(address_reg, address);
 
 	switch (size) {
 	case 1:
-		MV_READ_8(data_reg + (offset & 0x3), val);
+		*val = MV_READ_8(data_reg + (reg & 0x3));
 		break;
 
 	case 2:
-		MV_READ_16(data_reg + (offset & 0x3), val);
+		*val = MV_READ_16(data_reg + (reg & 0x3));
 		break;
 
 	case 4:
-		MV_READ(data_reg, val);
+		*val = MV_READ(data_reg);
 		break;
 	}
 
@@ -93,7 +93,7 @@ static int mv64340_write_config(struct pci_bus *bus, unsigned int devfn,
 		return PCIBIOS_DEVICE_NOT_FOUND;
 
 	address = (bus->number << 16) | (devfn << 8) |
-		  (offset & 0xfc) | 0x80000000;
+		  (reg & 0xfc) | 0x80000000;
 
 	/* start the configuration cycle */
 	MV_WRITE(address_reg, address);
@@ -101,12 +101,12 @@ static int mv64340_write_config(struct pci_bus *bus, unsigned int devfn,
 	switch (size) {
 	case 1:
 		/* write the data */
-		MV_WRITE_8(data_reg + (offset & 0x3), val);
+		MV_WRITE_8(data_reg + (reg & 0x3), val);
 		break;
 
 	case 2:
 		/* write the data */
-		MV_WRITE_16(data_reg + (offset & 0x3), val);
+		MV_WRITE_16(data_reg + (reg & 0x3), val);
 		break;
 
 	case 4:
@@ -124,7 +124,7 @@ static int mv64340_bus ## host ## _read_config(struct pci_bus *bus,	\
 	unsigned int devfn, int reg, int size, u32 * val)		\
 {									\
 	return mv64340_read_config(bus, devfn, reg, size, val,		\
-	           MV64340_PCI_ ## host ## _CONFIG_ADDR;		\
+	           MV64340_PCI_ ## host ## _CONFIG_ADDR,		\
 	           MV64340_PCI_ ## host ## _CONFIG_DATA_VIRTUAL_REG);	\
 }									\
 									\
@@ -132,7 +132,7 @@ static int mv64340_bus ## host ## _write_config(struct pci_bus *bus,	\
 	unsigned int devfn, int reg, int size, u32 val)			\
 {									\
 	return mv64340_write_config(bus, devfn, reg, size, val,		\
-	           MV64340_PCI_ ## host ## _CONFIG_ADDR;		\
+	           MV64340_PCI_ ## host ## _CONFIG_ADDR,		\
 	           MV64340_PCI_ ## host ## _CONFIG_DATA_VIRTUAL_REG);	\
 }									\
 									\

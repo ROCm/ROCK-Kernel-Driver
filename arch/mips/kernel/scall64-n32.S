@@ -139,7 +139,7 @@ EXPORT(sysn32_call_table)
 	PTR	sys_mincore
 	PTR	sys_madvise
 	PTR	sys_shmget
-	PTR	sys_shmat
+	PTR	sys32_shmat
 	PTR	sys_shmctl			/* 6030 */
 	PTR	sys_dup
 	PTR	sys_dup2

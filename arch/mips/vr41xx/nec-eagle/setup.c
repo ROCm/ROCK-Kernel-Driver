@@ -11,22 +11,11 @@
  * or implied.
  */
 #include <linux/config.h>
-#include <linux/init.h>
 #include <linux/ioport.h>
-#include <linux/major.h>
-#include <linux/kdev_t.h>
-#include <linux/root_dev.h>
 
+#include <asm/io.h>
 #include <asm/pci_channel.h>
-#include <asm/time.h>
 #include <asm/vr41xx/eagle.h>
-
-#ifdef CONFIG_BLK_DEV_INITRD
-extern unsigned long initrd_start, initrd_end;
-extern void * __rd_start, * __rd_end;
-#endif
-
-extern void eagle_irq_init(void);
 
 #ifdef CONFIG_PCI
 
@@ -79,30 +68,16 @@ static struct vr41xx_pci_address_map pci_address_map = {
 };
 #endif
 
+const char *get_system_type(void)
+{
+	return "NEC SDB-VR4122/VR4131(Eagle/Hawk)";
+}
+
 static int nec_eagle_setup(void)
 {
 	set_io_port_base(IO_PORT_BASE);
 	ioport_resource.start = IO_PORT_RESOURCE_START;
 	ioport_resource.end = IO_PORT_RESOURCE_END;
-	iomem_resource.start = IO_MEM1_RESOURCE_START;
-	iomem_resource.end = IO_MEM2_RESOURCE_END;
-
-#ifdef CONFIG_BLK_DEV_INITRD
-	ROOT_DEV = Root_RAM0;
-	initrd_start = (unsigned long)&__rd_start;
-	initrd_end = (unsigned long)&__rd_end;
-#endif
-
-	board_time_init = vr41xx_time_init;
-	board_timer_setup = vr41xx_timer_setup;
-
-	board_irq_init = eagle_irq_init;
-
-	vr41xx_bcu_init();
-
-	vr41xx_cmu_init();
-
-	vr41xx_pmu_init();
 
 #ifdef CONFIG_SERIAL_8250
 	vr41xx_dsiu_init();

@@ -1,10 +1,7 @@
 /*
  * Copyright 2002 Momentum Computer
  * Author: mdharm@momenco.com
- *
- * arch/mips/momentum/jaguar_atx/mv-irq.c
- *     Interrupt routines for mv64340.  Interrupt numbers are assigned from
- *     MV64340_IRQ_BASE to MV64340_IRQ_BASE + 63.
+ * Copyright (C) 2004 Ralf Baechle <ralf@linux-mips.org>
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -21,7 +18,7 @@
 #include <asm/irq.h>
 #include <asm/mv64340.h>
 
-#define MV64340_IRQ_BASE	16
+static unsigned int irq_base;
 
 static inline int ls1bit32(unsigned int x)
 {
@@ -41,13 +38,13 @@ static inline void mask_mv64340_irq(unsigned int irq)
 {
 	uint32_t value;
 
-	if (irq < (MV64340_IRQ_BASE + 32)) {
-		MV_READ(MV64340_INTERRUPT0_MASK_0_LOW, &value);
-		value &= ~(1 << (irq - MV64340_IRQ_BASE));
+	if (irq < (irq_base + 32)) {
+		value = MV_READ(MV64340_INTERRUPT0_MASK_0_LOW);
+		value &= ~(1 << (irq - irq_base));
 		MV_WRITE(MV64340_INTERRUPT0_MASK_0_LOW, value);
 	} else {
-		MV_READ(MV64340_INTERRUPT0_MASK_0_HIGH, &value);
-		value &= ~(1 << (irq - (MV64340_IRQ_BASE - 32)));
+		value = MV_READ(MV64340_INTERRUPT0_MASK_0_HIGH);
+		value &= ~(1 << (irq - (irq_base - 32)));
 		MV_WRITE(MV64340_INTERRUPT0_MASK_0_HIGH, value);
 	}
 }
@@ -57,13 +54,13 @@ static inline void unmask_mv64340_irq(unsigned int irq)
 {
 	uint32_t value;
 
-	if (irq < (MV64340_IRQ_BASE + 32)) {
-		MV_READ(MV64340_INTERRUPT0_MASK_0_LOW, &value);
-		value |= 1 << (irq - MV64340_IRQ_BASE);
+	if (irq < (irq_base + 32)) {
+		value = MV_READ(MV64340_INTERRUPT0_MASK_0_LOW);
+		value |= 1 << (irq - irq_base);
 		MV_WRITE(MV64340_INTERRUPT0_MASK_0_LOW, value);
 	} else {
-		MV_READ(MV64340_INTERRUPT0_MASK_0_HIGH, &value);
-		value |= 1 << (irq - (MV64340_IRQ_BASE - 32));
+		value = MV_READ(MV64340_INTERRUPT0_MASK_0_HIGH);
+		value |= 1 << (irq - (irq_base - 32));
 		MV_WRITE(MV64340_INTERRUPT0_MASK_0_HIGH, value);
 	}
 }
@@ -120,19 +117,19 @@ void ll_mv64340_irq(struct pt_regs *regs)
  	unsigned int irq_mask_low, irq_mask_high;
 
 	/* read the interrupt status registers */
-	MV_READ(MV64340_INTERRUPT0_MASK_0_LOW, &irq_mask_low);
-	MV_READ(MV64340_INTERRUPT0_MASK_0_HIGH, &irq_mask_high);
-	MV_READ(MV64340_MAIN_INTERRUPT_CAUSE_LOW, &irq_src_low);
-	MV_READ(MV64340_MAIN_INTERRUPT_CAUSE_HIGH, &irq_src_high);
+	irq_mask_low = MV_READ(MV64340_INTERRUPT0_MASK_0_LOW);
+	irq_mask_high = MV_READ(MV64340_INTERRUPT0_MASK_0_HIGH);
+	irq_src_low = MV_READ(MV64340_MAIN_INTERRUPT_CAUSE_LOW);
+	irq_src_high = MV_READ(MV64340_MAIN_INTERRUPT_CAUSE_HIGH);
 
 	/* mask for just the interrupts we want */
 	irq_src_low &= irq_mask_low;
 	irq_src_high &= irq_mask_high;
 
-	if (irq_src_low) 
-		do_IRQ(ls1bit32(irq_src_low) + MV64340_IRQ_BASE, regs);
+	if (irq_src_low)
+		do_IRQ(ls1bit32(irq_src_low) + irq_base, regs);
 	else
-		do_IRQ(ls1bit32(irq_src_high) + MV64340_IRQ_BASE + 32, regs);
+		do_IRQ(ls1bit32(irq_src_high) + irq_base + 32, regs);
 }
 
 #define shutdown_mv64340_irq	disable_mv64340_irq
@@ -148,15 +145,17 @@ struct hw_interrupt_type mv64340_irq_type = {
 	NULL
 };
 
-void mv64340_irq_init(void)
+void __init mv64340_irq_init(unsigned int base)
 {
 	int i;
 
 	/* Reset irq handlers pointers to NULL */
-	for (i = MV64340_IRQ_BASE; i < (MV64340_IRQ_BASE + 64); i++) {
+	for (i = base; i < base + 64; i++) {
 		irq_desc[i].status = IRQ_DISABLED;
 		irq_desc[i].action = 0;
 		irq_desc[i].depth = 2;
 		irq_desc[i].handler = &mv64340_irq_type;
 	}
+
+	irq_base = base;
 }

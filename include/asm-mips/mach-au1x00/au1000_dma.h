@@ -50,6 +50,7 @@
 #define DMA_DAH_MASK		(0x0f << 20)
 #define DMA_DID_BIT		16
 #define DMA_DID_MASK		(0x0f << DMA_DID_BIT)
+#define DMA_DS			(1<<15)
 #define DMA_BE			(1<<13)
 #define DMA_DR			(1<<12)
 #define DMA_TS8			(1<<11)
@@ -99,6 +100,15 @@ enum {
 	DMA_NUM_DEV
 };
 
+/* DMA Device ID's for 2nd bank (AU1100) follow */
+enum {
+	DMA_ID_SD0_TX = 0,
+	DMA_ID_SD0_RX,
+	DMA_ID_SD1_TX,
+	DMA_ID_SD1_RX,
+	DMA_NUM_DEV_BANK2
+};
+
 struct dma_chan {
 	int dev_id;		// this channel is allocated if >=0, free otherwise
 	unsigned int io;
@@ -126,7 +136,7 @@ extern spinlock_t au1000_dma_spin_lock;
 
 static __inline__ struct dma_chan *get_dma_chan(unsigned int dmanr)
 {
-	if (dmanr > NUM_AU1000_DMA_CHANNELS
+	if (dmanr >= NUM_AU1000_DMA_CHANNELS
 	    || au1000_dma_table[dmanr].dev_id < 0)
 		return NULL;
 	return &au1000_dma_table[dmanr];
@@ -205,8 +215,8 @@ static __inline__ void disable_dma(unsigned int dmanr)
 
 	halt_dma(dmanr);
 
-		// now we can disable the buffers
-		au_writel(~DMA_GO, chan->io + DMA_MODE_CLEAR);
+	// now we can disable the buffers
+	au_writel(~DMA_GO, chan->io + DMA_MODE_CLEAR);
 }
 
 static __inline__ int dma_halted(unsigned int dmanr)
@@ -284,6 +294,9 @@ static __inline__ void set_dma_fifo_addr(unsigned int dmanr,
 {
 	struct dma_chan *chan = get_dma_chan(dmanr);
 	if (!chan)
+		return;
+
+	if (chan->mode & DMA_DS)	/* second bank of device ids */
 		return;
 
 	if (chan->dev_id != DMA_ID_GP04 && chan->dev_id != DMA_ID_GP05)
@@ -430,3 +443,4 @@ static __inline__ int get_dma_residue(unsigned int dmanr)
 }
 
 #endif /* __ASM_AU1000_DMA_H */
+

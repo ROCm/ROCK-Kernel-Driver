@@ -135,11 +135,9 @@ LEAF(handle_vec1_r4k)
 	ld	k0, 0(k1)			# get even pte
 	ld	k1, 8(k1)			# get odd pte
 	PTE_RELOAD k0 k1
-	rm9000_tlb_hazard
-	b	1f
-	 tlbwr
-1:	nop
-	rm9000_tlb_hazard
+	mtc0_tlbw_hazard
+	tlbwr
+	tlbw_eret_hazard
 	eret
 
 9:						# handle the vmalloc range
@@ -147,11 +145,9 @@ LEAF(handle_vec1_r4k)
 	ld	k0, 0(k1)			# get even pte
 	ld	k1, 8(k1)			# get odd pte
 	PTE_RELOAD k0 k1
-	rm9000_tlb_hazard
-	b	1f
+	mtc0_tlbw_hazard
 	 tlbwr
-1:	nop
-	rm9000_tlb_hazard
+	tlbw_eret_hazard
 	eret
 END(handle_vec1_r4k)
 
@@ -179,10 +175,8 @@ LEAF(handle_vec1_r10k)
 	ld	k0, 0(k1)			# get even pte
 	ld	k1, 8(k1)			# get odd pte
 	PTE_RELOAD k0 k1
-	rm9000_tlb_hazard
 	nop
 	tlbwr
-	rm9000_tlb_hazard
 	eret
 
 9:						# handle the vmalloc range
@@ -190,10 +184,8 @@ LEAF(handle_vec1_r10k)
 	ld	k0, 0(k1)			# get even pte
 	ld	k1, 8(k1)			# get odd pte
 	PTE_RELOAD k0 k1
-	rm9000_tlb_hazard
 	nop
 	tlbwr
-	rm9000_tlb_hazard
 	eret
 END(handle_vec1_r10k)
 

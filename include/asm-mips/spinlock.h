@@ -167,4 +167,28 @@ static inline void _raw_write_unlock(rwlock_t *rw)
 	: "memory");
 }
 
+static inline int _raw_write_trylock(rwlock_t *rw)
+{
+	unsigned int tmp;
+	int ret;
+
+	__asm__ __volatile__(
+	".set\tnoreorder\t\t\t# _raw_write_trylock\n"
+	"li\t%2, 0\n\t"
+	"1:\tll\t%1, %3\n\t"
+	"bnez\t%1, 2f\n\t"
+	"lui\t%1, 0x8000\n\t"
+	"sc\t%1, %0\n\t"
+	"beqz\t%1, 1b\n\t"
+	"sync\n\t"
+	"li\t%2, 1\n\t"
+	".set\treorder\n"
+	"2:"
+	: "=m" (rw->lock), "=&r" (tmp), "=&r" (ret)
+	: "m" (rw->lock)
+	: "memory");
+
+	return ret;
+}
+
 #endif /* _ASM_SPINLOCK_H */

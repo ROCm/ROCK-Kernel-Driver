@@ -7,7 +7,7 @@
  * Copyright (C) 2001, 2002 Paul Mundt
  * Copyright (C) 2002 MontaVista Software, Inc.
  * Copyright (C) 2002 TimeSys Corp.
- * Copyright (C) 2003 Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ * Copyright (C) 2003-2004 Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the
@@ -43,20 +43,21 @@
 #define PRID_VR4133		0x00000c84
 
 /*
+ * Memory resource
+ */
+#define IO_MEM_RESOURCE_START	0UL
+#define IO_MEM_RESOURCE_END	0x1fffffffUL
+
+/*
  * Bus Control Uint
  */
-extern void vr41xx_bcu_init(void);
 extern unsigned long vr41xx_get_vtclock_frequency(void);
 extern unsigned long vr41xx_get_tclock_frequency(void);
 
 /*
  * Clock Mask Unit
  */
-extern void vr41xx_cmu_init(void);
-extern void vr41xx_clock_supply(unsigned int clock);
-extern void vr41xx_clock_mask(unsigned int clock);
-
-enum {
+typedef enum {
 	PIU_CLOCK,
 	SIU_CLOCK,
 	AIU_CLOCK,
@@ -70,7 +71,10 @@ enum {
 	CEU_CLOCK,
 	ETHER0_CLOCK,
 	ETHER1_CLOCK
-};
+} vr41xx_clock_t;
+
+extern void vr41xx_supply_clock(vr41xx_clock_t clock);
+extern void vr41xx_mask_clock(vr41xx_clock_t clock);
 
 /*
  * Interrupt Control Unit
@@ -129,14 +133,12 @@ enum {
 #define GIU_IRQ_LAST		GIU_IRQ(31)
 #define GIU_IRQ_TO_PIN(x)	((x) - GIU_IRQ_BASE)	/* Pin 0-31 */
 
-extern void (*board_irq_init)(void);
 extern int vr41xx_set_intassign(unsigned int irq, unsigned char intassign);
 extern int vr41xx_cascade_irq(unsigned int irq, int (*get_irq_number)(int irq));
 
 /*
  * Power Management Unit
  */
-extern void vr41xx_pmu_init(void);
 
 /*
  * RTC
@@ -225,11 +227,5 @@ struct vr41xx_pci_address_map {
 };
 
 extern void vr41xx_pciu_init(struct vr41xx_pci_address_map *map);
-
-/*
- * MISC
- */
-extern void vr41xx_time_init(void);
-extern void vr41xx_timer_setup(struct irqaction *irq);
 
 #endif /* __NEC_VR41XX_H */
