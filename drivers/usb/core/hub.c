@@ -941,8 +941,7 @@ static void usb_hub_events(void)
 		hub = list_entry(tmp, struct usb_hub, event_list);
 		dev = interface_to_usbdev(hub->intf);
 
-		list_del(tmp);
-		INIT_LIST_HEAD(tmp);
+		list_del_init(tmp);
 
 		down(&hub->khubd_sem); /* never blocks, we were on list */
 		spin_unlock_irqrestore(&hub_event_lock, flags);

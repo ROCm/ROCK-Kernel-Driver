@@ -156,8 +156,7 @@ extern rwlock_t dparent_lock;
 static __inline__ void d_drop(struct dentry * dentry)
 {
 	spin_lock(&dcache_lock);
-	list_del(&dentry->d_hash);
-	INIT_LIST_HEAD(&dentry->d_hash);
+	list_del_init(&dentry->d_hash);
 	spin_unlock(&dcache_lock);
 }
 

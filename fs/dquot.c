@@ -190,8 +190,7 @@ static inline void insert_dquot_hash(struct dquot *dquot)
 
 static inline void remove_dquot_hash(struct dquot *dquot)
 {
-	list_del(&dquot->dq_hash);
-	INIT_LIST_HEAD(&dquot->dq_hash);
+	list_del_init(&dquot->dq_hash);
 }
 
 static inline struct dquot *find_dquot(unsigned int hashent, struct super_block *sb, unsigned int id, int type)
@@ -232,8 +231,7 @@ static inline void remove_free_dquot(struct dquot *dquot)
 {
 	if (list_empty(&dquot->dq_free))
 		return;
-	list_del(&dquot->dq_free);
-	INIT_LIST_HEAD(&dquot->dq_free);
+	list_del_init(&dquot->dq_free);
 	dqstats.free_dquots--;
 }
 
@@ -729,8 +727,7 @@ void put_dquot_list(struct list_head *tofree_head)
 	while (act_head != tofree_head) {
 		dquot = list_entry(act_head, struct dquot, dq_free);
 		act_head = act_head->next;
-		list_del(&dquot->dq_free);	/* Remove dquot from the list so we won't have problems... */
-		INIT_LIST_HEAD(&dquot->dq_free);
+		list_del_init(&dquot->dq_free);	/* Remove dquot from the list so we won't have problems... */
 		dqput(dquot);
 	}
 	unlock_kernel();

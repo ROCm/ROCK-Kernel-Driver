@@ -1207,8 +1207,7 @@ static void hc_release_hci (hci_t * hci)
 	usb_deregister_bus (hci->bus);
 	usb_free_bus (hci->bus);
 
-	list_del (&hci->hci_hcd_list);
-	INIT_LIST_HEAD (&hci->hci_hcd_list);
+	list_del_init (&hci->hci_hcd_list);
 
 	kfree (hci);
 }

@@ -755,8 +755,7 @@ void usbfs_remove_device(struct usb_device *dev)
 	}
 	while (!list_empty(&dev->filelist)) {
 		ds = list_entry(dev->filelist.next, struct dev_state, list);
-		list_del(&ds->list);
-		INIT_LIST_HEAD(&ds->list);
+		list_del_init(&ds->list);
 		down_write(&ds->devsem);
 		ds->dev = NULL;
 		up_write(&ds->devsem);
