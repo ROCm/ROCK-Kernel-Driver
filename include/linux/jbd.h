@@ -814,6 +814,21 @@ extern void	journal_remove_journal_head(struct buffer_head *bh);
 extern void	__journal_remove_journal_head(struct buffer_head *bh);
 extern void	journal_unlock_journal_head(struct journal_head *jh);
 
+/*
+ * handle management
+ */
+extern kmem_cache_t *jbd_handle_cache;
+
+static inline handle_t *jbd_alloc_handle(int gfp_flags)
+{
+	return kmem_cache_alloc(jbd_handle_cache, gfp_flags);
+}
+
+static inline void jbd_free_handle(handle_t *handle)
+{
+	kmem_cache_free(jbd_handle_cache, handle);
+}
+
 /* Primary revoke support */
 #define JOURNAL_REVOKE_DEFAULT_HASH 256
 extern int	   journal_init_revoke(journal_t *, int);

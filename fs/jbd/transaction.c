@@ -211,10 +211,10 @@ repeat_locked:
 /* Allocate a new handle.  This should probably be in a slab... */
 static handle_t *new_handle(int nblocks)
 {
-	handle_t *handle = jbd_kmalloc(sizeof (handle_t), GFP_NOFS);
+	handle_t *handle = jbd_alloc_handle(GFP_NOFS);
 	if (!handle)
 		return NULL;
-	memset(handle, 0, sizeof (handle_t));
+	memset(handle, 0, sizeof(*handle));
 	handle->h_buffer_credits = nblocks;
 	handle->h_ref = 1;
 	INIT_LIST_HEAD(&handle->h_jcb);
@@ -258,7 +258,7 @@ handle_t *journal_start(journal_t *journal, int nblocks)
 
 	err = start_this_handle(journal, handle);
 	if (err < 0) {
-		kfree(handle);
+		jbd_free_handle(handle);
 		current->journal_info = NULL;
 		return ERR_PTR(err);
 	}
@@ -1404,7 +1404,7 @@ int journal_stop(handle_t *handle)
 		if (handle->h_sync && !(current->flags & PF_MEMALLOC))
 			log_wait_commit(journal, tid);
 	}
-	kfree(handle);
+	jbd_free_handle(handle);
 	return err;
 }
 
