@@ -1220,7 +1220,7 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 	else
 		karg->adapterType = MPT_IOCTL_INTERFACE_SCSI;
 
-	if (karg.hdr.port > 1)
+	if (karg->hdr.port > 1)
 		return -EINVAL;
 	port = karg->hdr.port;
 
