@@ -549,6 +549,15 @@ int ext3_htree_fill_tree(struct file *dir_file, __u32 start_hash,
 	if (!frame)
 		return err;
 
+	/* Add '.' and '..' from the htree header */
+	if (!start_hash && !start_minor_hash) {
+		de = (struct ext3_dir_entry_2 *) frames[0].bh->b_data;
+		ext3_htree_store_dirent(dir_file, 0, 0, de);
+		de = ext3_next_entry(de);
+		ext3_htree_store_dirent(dir_file, 0, 0, de);
+		count += 2;
+	}
+
 	while (1) {
 		block = dx_get_block(frame->at);
 		dxtrace(printk("Reading block %d\n", block));
