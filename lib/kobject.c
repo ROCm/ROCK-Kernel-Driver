@@ -61,6 +61,12 @@ static int create_dir(struct kobject * kobj)
 }
 
 
+static inline struct kobject * to_kobj(struct list_head * entry)
+{
+	return container_of(entry,struct kobject,entry);
+}
+
+
 /**
  *	kobject_init - initialize object.
  *	@kobj:	object in question.
@@ -261,6 +267,33 @@ int kset_register(struct kset * k)
 void kset_unregister(struct kset * k)
 {
 	kobject_unregister(&k->kobj);
+}
+
+
+/**
+ *	kset_find_obj - search for object in kset.
+ *	@kset:	kset we're looking in.
+ *	@name:	object's name.
+ *
+ *	Lock kset via @kset->subsys, and iterate over @kset->list,
+ *	looking for a matching kobject. Return object if found.
+ */
+
+struct kobject * kset_find_obj(struct kset * kset, char * name)
+{
+	struct list_head * entry;
+	struct kobject * ret = NULL;
+
+	down_read(&kset->subsys->rwsem);
+	list_for_each(entry,&kset->list) {
+		struct kobject * k = to_kobj(entry);
+		if (!strcmp(k->name,name)) {
+			ret = k;
+			break;
+		}
+	}
+	up_read(&kset->subsys->rwsem);
+	return ret;
 }
 
 
