@@ -346,10 +346,23 @@ static void start_request(struct floppy_state *fs)
 			}
 		}
 
+		asm (" #foobar1 \n");
+#if 0
 		fs->req_cyl = req->sector / fs->secpercyl;
+#else
+		fs->req_cyl = do_div(req->sector , fs->secpercyl);
+#endif
+		asm (" #foobar2 \n");
+#if 0
 		x = req->sector % fs->secpercyl;
+#else
+		x = do_div(req->sector , fs->secpercyl);
+#endif
+		asm (" #foobar3 \n");
 		fs->head = x / fs->secpertrack;
+		asm (" #foobar4\n");
 		fs->req_sector = x % fs->secpertrack + 1;
+		asm (" #foobar5 \n");
 		fd_req = req;
 		fs->state = do_transfer;
 		fs->retries = 0;
