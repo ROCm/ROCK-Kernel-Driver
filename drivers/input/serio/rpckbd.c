@@ -47,8 +47,10 @@ MODULE_LICENSE("GPL");
 
 static inline void rpckbd_write(unsigned char val)
 {
-	while(!(inb(IOMD_KCTRL) & (1 << 7)));
-	outb(val, IOMD_KARTTX);
+	while (!(iomd_readb(IOMD_KCTRL) & (1 << 7)))
+		cpu_relax();
+
+	iomd_writeb(val, IOMD_KARTTX);
 }
 
 static struct serio rpckbd_port =
@@ -61,11 +63,14 @@ static struct serio rpckbd_port =
 
 static void rpckbd_rx(int irq, void *dev_id, struct pt_regs *regs)
 {
+	unsigned int byte;
 	kbd_pt_regs = regs;
 
-	while (inb(IOMD_KCTRL) & (1 << 5))
-		serio_interrupt(&rpckbd_port, inb(IOMD_KARTRX), 0);
+	while (iomd_readb(IOMD_KCTRL) & (1 << 5)) {
+		byte = iomd_readb(IOMD_KARTRX);
 
+		serio_interrupt(&rpckbd_port, byte, 0);
+	}
 }
 
 static void rpckbd_tx(int irq, void *dev_id, struct pt_regs *regs)
@@ -74,13 +79,10 @@ static void rpckbd_tx(int irq, void *dev_id, struct pt_regs *regs)
 
 static int __init rpckbd_init(void)
 {
-	unsigned long flags;
-
 	/* Reset the keyboard state machine. */
-	outb(0, IOMD_KCTRL);
-	outb(8, IOMD_KCTRL);
-
-	save_flags_cli(flags);
+	iomd_writeb(0, IOMD_KCTRL);
+	iomd_writeb(8, IOMD_KCTRL);
+	iomd_readb(IOMD_KARTRX);
 
 	if (request_irq(IRQ_KEYBOARDRX, rpckbd_rx, 0, "rpckbd", NULL) != 0) {
 		printk(KERN_ERR "rpckbd.c: Could not allocate keyboard receive IRQ!\n")
@@ -93,14 +95,7 @@ static int __init rpckbd_init(void)
 		return -EBUSY;
 	}
 
-	disable_irq(IRQ_KEYBOARDTX);
-	(void)IOMD_KARTRX;
-
-	restore_flags(flags);
-
 	register_serio_port(&rpckbd_port);
-	printk(KERN_INFO "serio: RiscPC PS/2 kbd port irq %d %d\n", IRQ_KEYBOARDRX, IRQ_KEYBOARDTX);
-
 	return 0;
 }
 

@@ -22,6 +22,7 @@
 #include <linux/ptrace.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/input.h>
 
 #include <asm/hardware.h>
 #include <asm/irq.h>
@@ -59,9 +60,9 @@ static void rpcmouse_irq(int irq, void *dev_id, struct pt_regs *regs)
 	input_report_rel(&rpcmouse_dev, REL_X, dx);
 	input_report_rel(&rpcmouse_dev, REL_Y, dy);
 
-	input_report_key(&rpcmouse_dev, BTN_LEFT,   buttons & 0x10);
-	input_report_key(&rpcmouse_dev, BTN_MIDDLE, buttons & 0x20);
-	input_report_key(&rpcmouse_dev, BTN_RIGHT,  buttons & 0x40);
+	input_report_key(&rpcmouse_dev, BTN_LEFT,   b & 0x10);
+	input_report_key(&rpcmouse_dev, BTN_MIDDLE, b & 0x20);
+	input_report_key(&rpcmouse_dev, BTN_RIGHT,  b & 0x40);
 }
 
 static int __init rpcmouse_init(void)
