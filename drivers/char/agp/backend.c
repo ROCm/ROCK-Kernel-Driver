@@ -48,13 +48,11 @@ struct agp_bridge_data agp_bridge_dummy = { .type = NOT_SUPPORTED };
 struct agp_bridge_data *agp_bridge = &agp_bridge_dummy;
 EXPORT_SYMBOL(agp_bridge);
 
-/*
- * agp_backend_acquire :
- * 
- * This Function attempts to acquire the agp backend.
- * 
- * returns -EBUSY if agp is in use,
- * returns 0 if the caller owns the agp backend
+/**
+ *	agp_backend_acquire  -  attempt to acquire the agp backend.
+ *
+ *	returns -EBUSY if agp is in use,
+ *	returns 0 if the caller owns the agp backend
  */
 int agp_backend_acquire(void)
 {
@@ -68,13 +66,11 @@ int agp_backend_acquire(void)
 	return 0;
 }
 
-/*
- * agp_backend_release :
- * 
- * This Function releases the lock on the agp backend.
- * 
- * The caller must insure that the graphics aperture translation table is read for use
- * by another entity.  (Ensure that all memory it bound is unbound.)
+/**
+ *	agp_backend_release  -  release the lock on the agp backend.
+ *
+ *	The caller must insure that the graphics aperture translation table is read for use
+ *	by another entity.  (Ensure that all memory it bound is unbound.)
  */
 void agp_backend_release(void)
 {
@@ -213,8 +209,7 @@ static void agp_backend_cleanup(void)
 
 static int agp_power(struct pm_dev *dev, pm_request_t rq, void *data)
 {
-	switch(rq)
-	{
+	switch(rq) {
 		case PM_SUSPEND:
 			return agp_bridge->suspend();
 		case PM_RESUME:

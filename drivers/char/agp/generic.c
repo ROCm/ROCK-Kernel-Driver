@@ -42,8 +42,7 @@ int agp_memory_reserved;
 
 /* 
  * Generic routines for handling agp_memory structures -
- * They use the basic page allocation routines to do the
- * brunt of the work.
+ * They use the basic page allocation routines to do the brunt of the work.
  */
 
 void agp_free_key(int key)
@@ -98,14 +97,13 @@ agp_memory *agp_create_memory(int scratch_pages)
 }
 EXPORT_SYMBOL(agp_create_memory);
 
-/*
- * agp_free_memory :
- * 
- * This function frees memory associated with an agp_memory pointer.
- * It is the only function that can be called when the backend is not owned
- * by the caller.  (So it can free memory on client death.)
- * 
- * It takes an agp_memory pointer as an argument.
+/**
+ *	agp_free_memory - free memory associated with an agp_memory pointer.
+ *
+ *	@curr:		agp_memory pointer to be freed.
+ *
+ *	It is the only function that can be called when the backend is not owned
+ *	by the caller.  (So it can free memory on client death.)
  */
 void agp_free_memory(agp_memory * curr)
 {
@@ -134,17 +132,16 @@ EXPORT_SYMBOL(agp_free_memory);
 
 #define ENTRIES_PER_PAGE		(PAGE_SIZE / sizeof(unsigned long))
 
-/*
- * agp_allocate_memory :
- * 
- * This function allocates a group of pages of a certain type.
- * 
- * It takes a size_t argument of the number of pages, and an u32 argument of
- * the type of memory to be allocated.  
- * Every agp bridge device will allow you to allocate AGP_NORMAL_MEMORY which
- * maps to physical ram.  Any other type is device dependent.
- * 
- * It returns NULL whenever memory is unavailable. 
+/**
+ *	agp_allocate_memory  -  allocate a group of pages of a certain type.
+ *
+ *	@page_count:	size_t argument of the number of pages
+ *	@type:	u32 argument of the type of memory to be allocated.  
+ *
+ *	Every agp bridge device will allow you to allocate AGP_NORMAL_MEMORY which
+ *	maps to physical ram.  Any other type is device dependent.
+ *
+ *	It returns NULL whenever memory is unavailable. 
  */
 agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 {
@@ -262,14 +259,13 @@ int agp_num_entries(void)
 EXPORT_SYMBOL_GPL(agp_num_entries);
 
 
-/*
- * agp_copy_info :
- * 
- * This function copies information about the agp bridge device and the state of
- * the agp backend into an agp_kern_info pointer.
- * 
- * It takes an agp_kern_info pointer as an argument.  The caller should insure
- * that this pointer is valid. 
+/**
+ *	agp_copy_info  -  copy bridge state information
+ *
+ *	@info:		agp_kern_info pointer.  The caller should insure that this pointer is valid. 
+ *
+ *	This function copies information about the agp bridge device and the state of
+ *	the agp backend into an agp_kern_info pointer.
  */
 int agp_copy_info(agp_kern_info * info)
 {
@@ -304,17 +300,14 @@ EXPORT_SYMBOL(agp_copy_info);
  * They call device specific routines to actually write to the GATT.
  */
 
-/*
- * agp_bind_memory :
+/**
+ *	agp_bind_memory  -  Bind an agp_memory structure into the GATT.
  * 
- * This function binds an agp_memory structure into the graphics aperture
- * translation table (GATT).
- * 
- * It takes an agp_memory pointer and an offset into the graphics aperture
- * translation table as arguments
- * 
- * It returns -EINVAL if the pointer == NULL.
- * It returns -EBUSY if the area of the table requested is already in use.
+ *	@curr:		agp_memory pointer
+ *	@pg_start:	an offset into the graphics aperture translation table
+ *
+ *	It returns -EINVAL if the pointer == NULL.
+ *	It returns -EBUSY if the area of the table requested is already in use.
  */
 int agp_bind_memory(agp_memory * curr, off_t pg_start)
 {
@@ -340,13 +333,10 @@ int agp_bind_memory(agp_memory * curr, off_t pg_start)
 EXPORT_SYMBOL(agp_bind_memory);
 
 
-/* 
- * agp_unbind_memory :
+/**
+ *	agp_unbind_memory  -  Removes an agp_memory structure from the GATT
  * 
- * This function removes an agp_memory structure from the graphics aperture
- * translation table.
- * 
- * It takes an agp_memory pointer as an argument.
+ * @curr:	agp_memory pointer to be removed from the GATT.
  * 
  * It returns -EINVAL if this piece of agp_memory is not currently bound to
  * the graphics aperture translation table or if the agp_memory pointer == NULL
@@ -823,12 +813,10 @@ EXPORT_SYMBOL(agp_generic_destroy_page);
 /* End Basic Page Allocation Routines */
 
 
-/* 
- * agp_enable :
+/** 
+ * agp_enable  -  initialise the agp point-to-point connection.
  * 
- * This function initializes the agp point-to-point connection.
- * 
- * It takes an agp mode register as an argument
+ * @mode:	agp mode register value to configure with.
  */
 void agp_enable(u32 mode)
 {
