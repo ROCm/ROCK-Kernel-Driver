@@ -5,7 +5,7 @@
  * NUMA memory policies for Linux.
  * Copyright 2003,2004 Andi Kleen SuSE Labs
  */
-
+#include <linux/errno.h>
 /* Policies */
 #define MPOL_DEFAULT     0
 #define MPOL_PREFERRED    1
