@@ -30,7 +30,7 @@ config NET_SCH_HTB
 	---help---
 	  Say Y here if you want to use the Hierarchical Token Buckets (HTB)
 	  packet scheduling algorithm for some of your network devices. See
-	  URL http://luxik.cdi.cz/~devik/qos/htb/ for complete manual and
+	  <http://luxik.cdi.cz/~devik/qos/htb/> for complete manual and
 	  in-depth articles.
 
 	  HTB is very similar to the CBQ regarding its goals however is has 
