@@ -704,8 +704,7 @@ found:
  *	are in memory.	The buffer may have unallocated holes, if
  *	some, but not all, of the blocks are in memory.	 Even where
  *	pages are present in the buffer, not all of every page may be
- *	valid.	The file system may use pagebuf_segment to visit the
- *	various segments of the buffer.
+ *	valid.
  */
 page_buf_t *
 pagebuf_find(				/* find buffer for block	*/
@@ -722,11 +721,10 @@ pagebuf_find(				/* find buffer for block	*/
  *	pagebuf_get
  *
  *	pagebuf_get assembles a buffer covering the specified range.
- *	Some or all of the blocks in the range may be valid.  The file
- *	system may use pagebuf_segment to visit the various segments
- *	of the buffer.	Storage in memory for all portions of the
- *	buffer will be allocated, although backing storage may not be.
- *	If PBF_READ is set in flags, pagebuf_read
+ *	Some or all of the blocks in the range may be valid.  Storage
+ *	in memory for all portions of the buffer will be allocated,
+ *	although backing storage may not be.  If PBF_READ is set in
+ *	flags, pagebuf_iostart is called also.
  */
 page_buf_t *
 pagebuf_get(				/* allocate a buffer		*/
@@ -1201,8 +1199,10 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 		return status;
 	}
 
-	pb->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
-	pb->pb_flags |= flags & (PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
+	pb->pb_flags &=
+		~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
+	pb->pb_flags |= flags &
+		(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
 
 	BUG_ON(pb->pb_bn == PAGE_BUF_DADDR_NULL);
 
@@ -1299,7 +1299,6 @@ int
 pagebuf_iorequest(			/* start real I/O		*/
 	page_buf_t		*pb)	/* buffer to convey to device	*/
 {
-	int			status = 0;
 	int			i, map_i, total_nr_pages, nr_pages;
 	struct bio		*bio;
 	int			offset = pb->pb_offset;
@@ -1314,7 +1313,7 @@ pagebuf_iorequest(			/* start real I/O		*/
 
 	if (pb->pb_flags & PBF_DELWRI) {
 		pagebuf_delwri_queue(pb, 1);
-		return status;
+		return 0;
 	}
 
 	/* Set the count to 1 initially, this will stop an I/O
@@ -1414,10 +1413,11 @@ next_chunk:
 io_submitted:
 
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
+		pb->pb_locked = 0;
 		pagebuf_iodone(pb, 0);
 	}
 
-	return status < 0 ? status : 0;
+	return 0;
 }
 
 /*
