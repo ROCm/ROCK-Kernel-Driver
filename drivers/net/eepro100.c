@@ -1552,82 +1552,39 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		if ((status & 0xfc00) == 0)
 			break;
 
-		/* Always check if all rx buffers are allocated.  --SAW */
-		speedo_refill_rx_buffers(dev, 0);
 
 		if ((status & 0x5000) ||	/* Packet received, or Rx error. */
 			(sp->rx_ring_state&(RrNoMem|RrPostponed)) == RrPostponed)
 									/* Need to gather the postponed packet. */
 			speedo_rx(dev);
 
-		if (status & 0x1000) {
-			spin_lock(&sp->lock);
-			if ((status & 0x003c) == 0x0028) {		/* No more Rx buffers. */
-				struct RxFD *rxf;
-				printk(KERN_WARNING "%s: card reports no RX buffers.\n",
-						dev->name);
-				rxf = sp->rx_ringp[sp->cur_rx % RX_RING_SIZE];
-				if (rxf == NULL) {
-					if (speedo_debug > 2)
-						printk(KERN_DEBUG
-								"%s: NULL cur_rx in speedo_interrupt().\n",
-								dev->name);
-					sp->rx_ring_state |= RrNoMem|RrNoResources;
-				} else if (rxf == sp->last_rxf) {
-					if (speedo_debug > 2)
-						printk(KERN_DEBUG
-								"%s: cur_rx is last in speedo_interrupt().\n",
-								dev->name);
-					sp->rx_ring_state |= RrNoMem|RrNoResources;
-				} else
-					outb(RxResumeNoResources, ioaddr + SCBCmd);
-			} else if ((status & 0x003c) == 0x0008) { /* No resources. */
-				struct RxFD *rxf;
-				printk(KERN_WARNING "%s: card reports no resources.\n",
-						dev->name);
-				rxf = sp->rx_ringp[sp->cur_rx % RX_RING_SIZE];
-				if (rxf == NULL) {
-					if (speedo_debug > 2)
-						printk(KERN_DEBUG
-								"%s: NULL cur_rx in speedo_interrupt().\n",
-								dev->name);
-					sp->rx_ring_state |= RrNoMem|RrNoResources;
-				} else if (rxf == sp->last_rxf) {
-					if (speedo_debug > 2)
-						printk(KERN_DEBUG
-								"%s: cur_rx is last in speedo_interrupt().\n",
-								dev->name);
-					sp->rx_ring_state |= RrNoMem|RrNoResources;
-				} else {
-					/* Restart the receiver. */
-					outl(sp->rx_ring_dma[sp->cur_rx % RX_RING_SIZE],
-						 ioaddr + SCBPointer);
-					outb(RxStart, ioaddr + SCBCmd);
-				}
-			}
-			sp->stats.rx_errors++;
-			spin_unlock(&sp->lock);
+		/* Always check if all rx buffers are allocated.  --SAW */
+		speedo_refill_rx_buffers(dev, 0);
+		
+		spin_lock(&sp->lock);
+		/*
+		 * The chip may have suspended reception for various reasons.
+		 * Check for that, and re-prime it should this be the case.
+		 */
+		switch ((status >> 2) & 0xf) {
+		case 0: /* Idle */
+			break;
+		case 1:	/* Suspended */
+		case 2:	/* No resources (RxFDs) */
+		case 9:	/* Suspended with no more RBDs */
+		case 10: /* No resources due to no RBDs */
+		case 12: /* Ready with no RBDs */
+			speedo_rx_soft_reset(dev);
+			break;
+		case 3:  case 5:  case 6:  case 7:  case 8:
+		case 11:  case 13:  case 14:  case 15:
+			/* these are all reserved values */
+			break;
 		}
-
-		if ((sp->rx_ring_state&(RrNoMem|RrNoResources)) == RrNoResources) {
-			printk(KERN_WARNING
-					"%s: restart the receiver after a possible hang.\n",
-					dev->name);
-			spin_lock(&sp->lock);
-			/* Restart the receiver.
-			   I'm not sure if it's always right to restart the receiver
-			   here but I don't know another way to prevent receiver hangs.
-			   1999/12/25 SAW */
-			outl(sp->rx_ring_dma[sp->cur_rx % RX_RING_SIZE],
-				 ioaddr + SCBPointer);
-			outb(RxStart, ioaddr + SCBCmd);
-			sp->rx_ring_state &= ~RrNoResources;
-			spin_unlock(&sp->lock);
-		}
-
+		
+		
 		/* User interrupt, Command/Tx unit interrupt or CU not active. */
 		if (status & 0xA400) {
-			spin_lock(&sp->lock);
 			speedo_tx_buffer_gc(dev);
 			if (sp->tx_full
 				&& (int)(sp->cur_tx - sp->dirty_tx) < TX_QUEUE_UNFULL) {
@@ -1635,8 +1592,9 @@ static void speedo_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 				sp->tx_full = 0;
 				netif_wake_queue(dev); /* Attention: under a spinlock.  --SAW */
 			}
-			spin_unlock(&sp->lock);
 		}
+		
+		spin_unlock(&sp->lock);
 
 		if (--boguscnt < 0) {
 			printk(KERN_ERR "%s: Too much work at interrupt, status=0x%4.4x.\n",
