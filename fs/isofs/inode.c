@@ -7,7 +7,7 @@
  *      1995  Mark Dobie - allow mounting of some weird VideoCDs and PhotoCDs.
  *	1997  Gordon Chaffee - Joliet CDs
  *	1998  Eric Lammerts - ISO 9660 Level 3
- *	2004  Paul Serice - Comprehensive Inode Scheme
+ *	2004  Paul Serice - Inode Support pushed out from 4GB to 128GB
  *	2004  Paul Serice - NFS Export Operations
  */
 
@@ -1228,7 +1228,9 @@ static void isofs_read_inode(struct inode * inode)
 		de = tmpde;
 	}
 
-	inode->i_ino = isofs_get_ino(de);
+	inode->i_ino = isofs_get_ino(ei->i_iget5_block,
+				     ei->i_iget5_offset,
+				     ISOFS_BUFFER_BITS(inode));
 
 	/* Assume it is a normal-format file unless told otherwise */
 	ei->i_file_format = isofs_file_normal;

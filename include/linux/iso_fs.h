@@ -237,19 +237,13 @@ extern struct inode *isofs_iget(struct super_block *sb,
 
 /* Because the inode number is no longer relevant to finding the
  * underlying meta-data for an inode, we are free to choose a more
- * convenient 32-bit number as the inode number.  Because directories
- * and files are block aligned (except in a few very unusual cases)
- * and because blocks are limited to 32-bits, I've chosen the starting
- * block that holds the file or directory data as the inode number.
- *
- * One nice side effect of this is that you can use "ls -i" to get the
- * inode number which will tell you exactly where you need to start a
- * hex dump if you want to see the contents of the directory or
- * file. */
-static inline unsigned long isofs_get_ino(struct iso_directory_record *d)
+ * convenient 32-bit number as the inode number.  The inode numbering
+ * scheme was recommended by Sergey Vlasov and Eric Lammerts. */
+static inline unsigned long isofs_get_ino(unsigned long block,
+					  unsigned long offset,
+					  unsigned long bufbits)
 {
-	return (unsigned long)isonum_733(d->extent)
-		+ (unsigned long)isonum_711(d->ext_attr_length);
+	return (block << (bufbits - 5)) | (offset >> 5);
 }
 
 /* Every directory can have many redundant directory entries scattered
