@@ -68,7 +68,7 @@ extern struct smp_ops_t *smp_ops;
 
 static void (*pmac_tb_freeze)(int freeze);
 static struct device_node *pmac_tb_clock_chip_host;
-static spinlock_t timebase_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(timebase_lock);
 static unsigned long timebase;
 
 static void smp_core99_cypress_tb_freeze(int freeze)

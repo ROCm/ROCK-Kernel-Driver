@@ -42,7 +42,7 @@
 
 static struct mpic *mpics;
 static struct mpic *mpic_primary;
-static spinlock_t mpic_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mpic_lock);
 
 
 /*

@@ -53,7 +53,7 @@
 #include <asm/ppcdebug.h>
 
 static unsigned char ras_log_buf[RTAS_ERROR_LOG_MAX];
-static spinlock_t ras_log_buf_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ras_log_buf_lock);
 
 char mce_data_buf[RTAS_ERROR_LOG_MAX]
 ;

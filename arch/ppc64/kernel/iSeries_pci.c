@@ -96,7 +96,7 @@ static u8 *iobar_table;
  * Static and Global variables
  */
 static char *pci_io_text = "iSeries PCI I/O";
-static spinlock_t iomm_table_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(iomm_table_lock);
 
 /*
  * iomm_table_initialize

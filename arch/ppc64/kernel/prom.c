@@ -95,7 +95,7 @@ static struct device_node *allnodes = NULL;
 /* use when traversing tree through the allnext, child, sibling,
  * or parent members of struct device_node.
  */
-static rwlock_t devtree_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(devtree_lock);
 
 /* export that to outside world */
 struct device_node *of_chosen;

@@ -335,7 +335,7 @@ long pSeries_lpar_hpte_insert(unsigned long hpte_group,
 	return (slot & 7) | (secondary << 3);
 }
 
-static spinlock_t pSeries_lpar_tlbie_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(pSeries_lpar_tlbie_lock);
 
 static long pSeries_lpar_hpte_remove(unsigned long hpte_group)
 {

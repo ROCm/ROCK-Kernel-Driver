@@ -34,7 +34,7 @@
 #define DEBUG(A...)
 #endif
 
-static spinlock_t rtasd_log_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rtasd_log_lock);
 
 DECLARE_WAIT_QUEUE_HEAD(rtas_log_wait);
 

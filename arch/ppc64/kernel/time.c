@@ -91,7 +91,7 @@ unsigned long xtime_sync_interval;
 unsigned long tb_to_xs;
 unsigned      tb_to_us;
 unsigned long processor_freq;
-spinlock_t rtc_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(rtc_lock);
 
 unsigned long tb_to_ns_scale;
 unsigned long tb_to_ns_shift;

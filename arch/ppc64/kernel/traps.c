@@ -60,7 +60,7 @@ EXPORT_SYMBOL(__debugger_fault_handler);
 #endif
 
 struct notifier_block *ppc64_die_chain;
-static spinlock_t die_notifier_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(die_notifier_lock);
 
 int register_die_notifier(struct notifier_block *nb)
 {
@@ -77,7 +77,7 @@ int register_die_notifier(struct notifier_block *nb)
  * Trap & Exception support
  */
 
-static spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(die_lock);
 
 int die(const char *str, struct pt_regs *regs, long err)
 {

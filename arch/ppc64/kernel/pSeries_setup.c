@@ -394,7 +394,7 @@ static void pSeries_progress(char *s, unsigned short hex)
 	char *os;
 	static int display_character, set_indicator;
 	static int max_width;
-	static spinlock_t progress_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(progress_lock);
 	static int pending_newline = 0;  /* did last write end with unprinted newline? */
 
 	if (!rtas.base)
