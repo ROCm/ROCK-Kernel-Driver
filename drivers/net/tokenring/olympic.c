@@ -433,8 +433,6 @@ static int olympic_open(struct net_device *dev)
 	do {
 		int i;
 
-		save_flags(flags);
-		cli();
 		for(i=0;i<SRB_COMMAND_SIZE;i+=4)
 			writel(0,init_srb+i);
 		if(SRB_COMMAND_SIZE & 2)
@@ -465,10 +463,12 @@ static int olympic_open(struct net_device *dev)
 			memcpy(dev->dev_addr,olympic_priv->olympic_laa,dev->addr_len) ;  
 		} 	
 		writeb(1,init_srb+30);
-	
+
+		spin_lock_irqsave(&olympic_priv->olympic_lock,flags);	
 		olympic_priv->srb_queued=1;
 
 		writel(LISR_SRB_CMD,olympic_mmio+LISR_SUM);
+		spin_unlock_irqrestore(&olympic_priv->olympic_lock,flags);
 
 		t = jiffies ; 
 	
@@ -496,7 +496,6 @@ static int olympic_open(struct net_device *dev)
 		remove_wait_queue(&olympic_priv->srb_wait,&wait) ; 
 		set_current_state(TASK_RUNNING) ; 
 
-		restore_flags(flags);
 #if OLYMPIC_DEBUG
 		printk("init_srb(%p): ",init_srb);
 		for(i=0;i<20;i++)
@@ -1058,12 +1057,11 @@ static int olympic_close(struct net_device *dev)
 	writeb(0,srb+1);
 	writeb(OLYMPIC_CLEAR_RET_CODE,srb+2);
 
-	save_flags(flags);
-	cli();	
-
+	spin_lock_irqsave(&olympic_priv->olympic_lock,flags);
 	olympic_priv->srb_queued=1;
 
 	writel(LISR_SRB_CMD,olympic_mmio+LISR_SUM);
+	spin_unlock_irqrestore(&olympic_priv->olympic_lock,flags);
 	
 	t = jiffies ; 
 
@@ -1088,7 +1086,6 @@ static int olympic_close(struct net_device *dev)
 	remove_wait_queue(&olympic_priv->srb_wait,&wait) ; 
 	set_current_state(TASK_RUNNING) ; 
 
-	restore_flags(flags) ; 
 	olympic_priv->rx_status_last_received++;
 	olympic_priv->rx_status_last_received&=OLYMPIC_RX_RING_SIZE-1;
 
