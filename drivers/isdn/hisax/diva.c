@@ -456,46 +456,19 @@ static void
 Memhscx_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int more, count, cnt;
+	int more, count;
 	int fifo_size = test_bit(HW_IPAC, &cs->HW_Flags)? 64: 32;
-	u_char *ptr,*p;
-	unsigned long flags;
+	unsigned char *p;
 
-
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hscx_fill_fifo");
-
-	if (!bcs->tx_skb)
-		return;
-	if (bcs->tx_skb->len <= 0)
+	p = xmit_fill_fifo_b(bcs, fifo_size, &count, &more);
+	if (!p)
 		return;
 
-	more = (bcs->mode == L1_MODE_TRANS) ? 1 : 0;
-	if (bcs->tx_skb->len > fifo_size) {
-		more = !0;
-		count = fifo_size;
-	} else
-		count = bcs->tx_skb->len;
-	cnt = count;
 	MemwaitforXFW(cs, bcs->hw.hscx.hscx);
-	spin_lock_irqsave(&diva_lock, flags);
-	p = ptr = bcs->tx_skb->data;
-	skb_pull(bcs->tx_skb, count);
-	bcs->tx_cnt -= count;
-	bcs->count += count;
-	while(cnt--)
+	while (count--)
 		memwritereg(cs->hw.diva.cfg_reg, bcs->hw.hscx.hscx ? 0x40 : 0,
 			*p++);
 	MemWriteHSCXCMDR(cs, bcs->hw.hscx.hscx, more ? 0x8 : 0xa);
-	spin_unlock_irqrestore(&diva_lock, flags);
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "hscx_fill_fifo %c cnt %d",
-			     bcs->hw.hscx.hscx ? 'B' : 'A', count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, bcs->blog);
-	}
 }
 
 static inline void

@@ -176,3 +176,38 @@ xmit_xdu_b(struct BCState *bcs, void (*reset_xmit)(struct BCState *bcs))
 		reset_xmit(bcs);
 	}
 }
+
+static inline unsigned char *
+xmit_fill_fifo_b(struct BCState *bcs, int fifo_size, int *count, int *more)
+{
+	struct IsdnCardState *cs = bcs->cs;
+
+	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
+		debugl1(cs, __FUNCTION__);
+
+	if (!bcs->tx_skb || bcs->tx_skb->len <= 0) {
+		WARN_ON(1);
+		return NULL;
+	}
+
+	*more = (bcs->mode == L1_MODE_TRANS);
+	if (bcs->tx_skb->len > fifo_size) {
+		*more = 1;
+		*count = fifo_size;
+	} else {
+		*count = bcs->tx_skb->len;
+	}
+	skb_pull(bcs->tx_skb, *count);
+	bcs->tx_cnt -= *count;
+	bcs->count += *count;
+
+	if (cs->debug & L1_DEB_HSCX_FIFO) {
+		char *t = bcs->blog;
+
+		t += sprintf(t, "%s %c cnt %d", __FUNCTION__,
+			     bcs->hw.hscx.hscx ? 'B' : 'A', *count);
+		QuickHex(t, bcs->tx_skb->data, *count);
+		debugl1(cs, bcs->blog);
+	}
+	return bcs->tx_skb->data;
+}

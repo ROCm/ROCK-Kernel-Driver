@@ -316,35 +316,24 @@ static inline void
 hdlc_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
-	int count, cnt =0;
+	int count, more, cnt =0;
 	int fifo_size = 32;
-	u_char *p;
-	u_int *ptr;
+	unsigned char *p;
+	unsigned int *ptr;
 
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hdlc_fill_fifo");
-	if (!bcs->tx_skb)
-		return;
-	if (bcs->tx_skb->len <= 0)
+	p = xmit_fill_fifo_b(bcs, fifo_size, &count, &more);
+	if (!p)
 		return;
 
-	bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_XME;
-	if (bcs->tx_skb->len > fifo_size) {
-		count = fifo_size;
-	} else {
-		count = bcs->tx_skb->len;
-		if (bcs->mode != L1_MODE_TRANS)
-			bcs->hw.hdlc.ctrl.sr.cmd |= HDLC_CMD_XME;
-	}
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "hdlc_fill_fifo %d/%ld", count, bcs->tx_skb->len);
-	ptr = (u_int *) p = bcs->tx_skb->data;
-	skb_pull(bcs->tx_skb, count);
-	bcs->tx_cnt -= count;
-	bcs->count += count;
+	if (more)
+		bcs->hw.hdlc.ctrl.sr.cmd &= ~HDLC_CMD_XME;
+	else
+		bcs->hw.hdlc.ctrl.sr.cmd |= HDLC_CMD_XME;
+
 	bcs->hw.hdlc.ctrl.sr.xml = ((count == fifo_size) ? 0 : count);
 	write_ctrl(bcs, 3);  /* sets the correct index too */
 	if (cs->subtyp == AVM_FRITZ_PCI) {
+		ptr = (unsigned int *) p;
 		while (cnt<count) {
 #ifdef __powerpc__
 #ifdef CONFIG_APUS
@@ -362,16 +351,6 @@ hdlc_fill_fifo(struct BCState *bcs)
 			outb(*p++, cs->hw.avm.isac);
 			cnt++;
 		}
-	}
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		if (cs->subtyp == AVM_FRITZ_PNP)
-			p = (u_char *) ptr;
-		t += sprintf(t, "hdlc_fill_fifo %c cnt %d",
-			     bcs->channel ? 'B' : 'A', count);
-		QuickHex(t, p, count);
-		debugl1(cs, bcs->blog);
 	}
 }
 

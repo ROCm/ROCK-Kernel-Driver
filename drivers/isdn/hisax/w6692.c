@@ -245,37 +245,14 @@ W6692B_fill_fifo(struct BCState *bcs)
 {
 	struct IsdnCardState *cs = bcs->cs;
 	int more, count;
-	u_char *ptr;
+	unsigned char *p;
 
-	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
-		debugl1(cs, "W6692B_fill_fifo");
-
-	if (!bcs->tx_skb)
-		return;
-	if (bcs->tx_skb->len <= 0)
+	p = xmit_fill_fifo_b(bcs, W_B_FIFO_THRESH, &count, &more);
+	if (!p)
 		return;
 
-	more = (bcs->mode == L1_MODE_TRANS) ? 1 : 0;
-	if (bcs->tx_skb->len > W_B_FIFO_THRESH) {
-		more = !0;
-		count = W_B_FIFO_THRESH;
-	} else
-		count = bcs->tx_skb->len;
-
-	ptr = bcs->tx_skb->data;
-	skb_pull(bcs->tx_skb, count);
-	bcs->tx_cnt -= count;
-	bcs->count += count;
-	WRITEW6692BFIFO(cs, bcs->channel, ptr, count);
+	WRITEW6692BFIFO(cs, bcs->channel, p, count);
 	cs->BC_Write_Reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACT | W_B_CMDR_XMS | (more ? 0 : W_B_CMDR_XME));
-	if (cs->debug & L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "W6692B_fill_fifo %c cnt %d",
-			     bcs->channel + '1', count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, bcs->blog);
-	}
 }
 
 static void

@@ -597,41 +597,19 @@ bch_empty_fifo(struct BCState *bcs, int count)
 void
 ipacx_fill_fifo(struct BCState *bcs)
 {
-	struct IsdnCardState *cs;
-	int more, count, cnt;
-	u_char *ptr, *p, hscx;
+	struct IsdnCardState *cs = bcs->cs;
+	int more, count;
+	unsigned char hscx = bcs->hw.hscx.hscx;
+	unsigned char *p;
 
-	cs = bcs->cs;
-	if ((cs->debug &L1_DEB_HSCX) && !(cs->debug &L1_DEB_HSCX_FIFO))
-		debugl1(cs, "ipacx_fill_fifo()");
+	p = xmit_fill_fifo_b(bcs, B_FIFO_SIZE, &count, &more);
+	if (!p)
+		return;
 
-	if (!bcs->tx_skb)           return;
-	if (bcs->tx_skb->len <= 0)  return;
+	while (count--)
+		cs->BC_Write_Reg(cs, hscx, IPACX_XFIFOB, *p++); 
 
-	hscx = bcs->hw.hscx.hscx;
-	more = (bcs->mode == L1_MODE_TRANS) ? 1 : 0;
-	if (bcs->tx_skb->len > B_FIFO_SIZE) {
-		more  = 1;
-		count = B_FIFO_SIZE;
-	} else {
-		count = bcs->tx_skb->len;
-	}  
-	cnt = count;
-    
-	p = ptr = bcs->tx_skb->data;
-	skb_pull(bcs->tx_skb, count);
-	bcs->tx_cnt -= count;
-	bcs->count += count;
-	while (cnt--) cs->BC_Write_Reg(cs, hscx, IPACX_XFIFOB, *p++); 
 	cs->BC_Write_Reg(cs, hscx, IPACX_CMDRB, (more ? 0x08 : 0x0a));
-  
-	if (cs->debug &L1_DEB_HSCX_FIFO) {
-		char *t = bcs->blog;
-
-		t += sprintf(t, "chb_fill_fifo() B-%d cnt %d", hscx, count);
-		QuickHex(t, ptr, count);
-		debugl1(cs, bcs->blog);
-	}
 }
 
 //----------------------------------------------------------
