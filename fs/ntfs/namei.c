@@ -98,7 +98,7 @@ static struct dentry *ntfs_lookup(struct inode *dir_ino, struct dentry *dent,
 {
 	ntfs_volume *vol = NTFS_SB(dir_ino->i_sb);
 	struct inode *dent_inode;
-	uchar_t *uname;
+	ntfschar *uname;
 	ntfs_name *name = NULL;
 	MFT_REF mref;
 	unsigned long dent_ino;
@@ -177,7 +177,7 @@ handle_name:
 	nls_name.name = NULL;
 	if (name->type != FILE_NAME_DOS) {			/* Case 2. */
 		nls_name.len = (unsigned)ntfs_ucstonls(vol,
-				(uchar_t*)&name->name, name->len,
+				(ntfschar*)&name->name, name->len,
 				(unsigned char**)&nls_name.name, 0);
 		kfree(name);
 	} else /* if (name->type == FILE_NAME_DOS) */ {		/* Case 3. */
@@ -221,14 +221,14 @@ handle_name:
 				goto eio_err_out;
 			fn = (FILE_NAME_ATTR*)((u8*)ctx->attr + le16_to_cpu(
 					ctx->attr->data.resident.value_offset));
-			if ((u32)(fn->file_name_length * sizeof(uchar_t) +
+			if ((u32)(fn->file_name_length * sizeof(ntfschar) +
 					sizeof(FILE_NAME_ATTR)) > val_len)
 				goto eio_err_out;
 		} while (fn->file_name_type != FILE_NAME_WIN32);
 
 		/* Convert the found WIN32 name to current NLS code page. */
 		nls_name.len = (unsigned)ntfs_ucstonls(vol,
-				(uchar_t*)&fn->file_name, fn->file_name_length,
+				(ntfschar*)&fn->file_name, fn->file_name_length,
 				(unsigned char**)&nls_name.name, 0);
 
 		put_attr_search_ctx(ctx);

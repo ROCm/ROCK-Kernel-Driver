@@ -31,6 +31,8 @@ ToDo:
 	- Really final white space cleanups.
 	- Use generic_ffs() instead of ffs() in logfile.c which allows the
 	  log_page_size variable to be optimized by gcc into a constant.
+	- Rename uchar_t to ntfschar everywhere as uchar_t is unsigned 1-byte
+	  char as defined by POSIX and as found on some systems.
 
 2.1.10 - Force read-only (re)mounting of volumes with unsupported volume flags.
 

@@ -944,12 +944,12 @@ static BOOL load_and_init_upcase(ntfs_volume *vol)
 	}
 	/*
 	 * The upcase size must not be above 64k Unicode characters, must not
-	 * be zero and must be a multiple of sizeof(uchar_t).
+	 * be zero and must be a multiple of sizeof(ntfschar).
 	 */
-	if (!ino->i_size || ino->i_size & (sizeof(uchar_t) - 1) ||
-			ino->i_size > 64ULL * 1024 * sizeof(uchar_t))
+	if (!ino->i_size || ino->i_size & (sizeof(ntfschar) - 1) ||
+			ino->i_size > 64ULL * 1024 * sizeof(ntfschar))
 		goto iput_upcase_failed;
-	vol->upcase = (uchar_t*)ntfs_malloc_nofs(ino->i_size);
+	vol->upcase = (ntfschar*)ntfs_malloc_nofs(ino->i_size);
 	if (!vol->upcase)
 		goto iput_upcase_failed;
 	index = 0;
@@ -972,7 +972,7 @@ read_partial_upcase_page:
 	}
 	vol->upcase_len = ino->i_size >> UCHAR_T_SIZE_BITS;
 	ntfs_debug("Read %llu bytes from $UpCase (expected %u bytes).",
-			ino->i_size, 64 * 1024 * sizeof(uchar_t));
+			ino->i_size, 64 * 1024 * sizeof(ntfschar));
 	iput(ino);
 	down(&ntfs_lock);
 	if (!default_upcase) {
@@ -2059,7 +2059,7 @@ static int __init init_ntfs_fs(void)
 	}
 
 	ntfs_name_cache = kmem_cache_create(ntfs_name_cache_name,
-			(NTFS_MAX_NAME_LEN+1) * sizeof(uchar_t), 0,
+			(NTFS_MAX_NAME_LEN+1) * sizeof(ntfschar), 0,
 			SLAB_HWCACHE_ALIGN, NULL, NULL);
 	if (!ntfs_name_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",

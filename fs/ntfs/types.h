@@ -24,7 +24,7 @@
 #define _LINUX_NTFS_TYPES_H
 
 /* 2-byte Unicode character type. */
-typedef u16 uchar_t;
+typedef u16 ntfschar;
 #define UCHAR_T_SIZE_BITS 1
 
 /*

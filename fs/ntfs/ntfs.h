@@ -174,31 +174,31 @@ extern int pre_write_mst_fixup(NTFS_RECORD *b, const u32 size);
 extern void post_write_mst_fixup(NTFS_RECORD *b);
 
 /* From fs/ntfs/unistr.c */
-extern BOOL ntfs_are_names_equal(const uchar_t *s1, size_t s1_len,
-		const uchar_t *s2, size_t s2_len,
+extern BOOL ntfs_are_names_equal(const ntfschar *s1, size_t s1_len,
+		const ntfschar *s2, size_t s2_len,
 		const IGNORE_CASE_BOOL ic,
-		const uchar_t *upcase, const u32 upcase_size);
-extern int ntfs_collate_names(const uchar_t *name1, const u32 name1_len,
-		const uchar_t *name2, const u32 name2_len,
+		const ntfschar *upcase, const u32 upcase_size);
+extern int ntfs_collate_names(const ntfschar *name1, const u32 name1_len,
+		const ntfschar *name2, const u32 name2_len,
 		const int err_val, const IGNORE_CASE_BOOL ic,
-		const uchar_t *upcase, const u32 upcase_len);
-extern int ntfs_ucsncmp(const uchar_t *s1, const uchar_t *s2, size_t n);
-extern int ntfs_ucsncasecmp(const uchar_t *s1, const uchar_t *s2, size_t n,
-		const uchar_t *upcase, const u32 upcase_size);
-extern void ntfs_upcase_name(uchar_t *name, u32 name_len,
-		const uchar_t *upcase, const u32 upcase_len);
+		const ntfschar *upcase, const u32 upcase_len);
+extern int ntfs_ucsncmp(const ntfschar *s1, const ntfschar *s2, size_t n);
+extern int ntfs_ucsncasecmp(const ntfschar *s1, const ntfschar *s2, size_t n,
+		const ntfschar *upcase, const u32 upcase_size);
+extern void ntfs_upcase_name(ntfschar *name, u32 name_len,
+		const ntfschar *upcase, const u32 upcase_len);
 extern void ntfs_file_upcase_value(FILE_NAME_ATTR *file_name_attr,
-		const uchar_t *upcase, const u32 upcase_len);
+		const ntfschar *upcase, const u32 upcase_len);
 extern int ntfs_file_compare_values(FILE_NAME_ATTR *file_name_attr1,
 		FILE_NAME_ATTR *file_name_attr2,
 		const int err_val, const IGNORE_CASE_BOOL ic,
-		const uchar_t *upcase, const u32 upcase_len);
+		const ntfschar *upcase, const u32 upcase_len);
 extern int ntfs_nlstoucs(const ntfs_volume *vol, const char *ins,
-		const int ins_len, uchar_t **outs);
-extern int ntfs_ucstonls(const ntfs_volume *vol, const uchar_t *ins,
+		const int ins_len, ntfschar **outs);
+extern int ntfs_ucstonls(const ntfs_volume *vol, const ntfschar *ins,
 		const int ins_len, unsigned char **outs, int outs_len);
 
 /* From fs/ntfs/upcase.c */
-extern uchar_t *generate_default_upcase(void);
+extern ntfschar *generate_default_upcase(void);
 
 #endif /* _LINUX_NTFS_H */

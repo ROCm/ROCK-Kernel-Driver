@@ -288,7 +288,7 @@ typedef struct {
 /* 22*/	u8 reserved[6];		/* Reserved/alignment. */
 /* 28*/	u32 client_name_length; /* Length of client name in bytes.  Should
 				   always be 8. */
-/* 32*/	uchar_t client_name[64];/* Name of the client in Unicode.  Should
+/* 32*/	ntfschar client_name[64];/* Name of the client in Unicode.  Should
 				   always be "NTFS" with the remaining bytes
 				   set to 0. */
 /* sizeof() = 160 (0xa0) bytes */

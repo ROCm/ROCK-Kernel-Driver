@@ -72,7 +72,7 @@ typedef struct {
 	u64 serial_no;			/* The volume serial number. */
 	/* Mount specific NTFS information. */
 	u32 upcase_len;			/* Number of entries in upcase[]. */
-	uchar_t *upcase;		/* The upcase table. */
+	ntfschar *upcase;		/* The upcase table. */
 	LCN mft_zone_start;		/* First cluster of the mft zone. */
 	LCN mft_zone_end;		/* First cluster beyond the mft zone. */
 	struct inode *mft_ino;		/* The VFS inode of $MFT. */

@@ -79,13 +79,14 @@ extern int map_run_list(ntfs_inode *ni, VCN vcn);
 
 extern LCN vcn_to_lcn(const run_list_element *rl, const VCN vcn);
 
-extern BOOL find_attr(const ATTR_TYPES type, const uchar_t *name,
+extern BOOL find_attr(const ATTR_TYPES type, const ntfschar *name,
 		const u32 name_len, const IGNORE_CASE_BOOL ic, const u8 *val,
 		const u32 val_len, attr_search_context *ctx);
 
-BOOL lookup_attr(const ATTR_TYPES type, const uchar_t *name, const u32 name_len,
-		const IGNORE_CASE_BOOL ic, const VCN lowest_vcn, const u8 *val,
-		const u32 val_len, attr_search_context *ctx);
+BOOL lookup_attr(const ATTR_TYPES type, const ntfschar *name,
+		const u32 name_len, const IGNORE_CASE_BOOL ic,
+		const VCN lowest_vcn, const u8 *val, const u32 val_len,
+		attr_search_context *ctx);
 
 extern int load_attribute_list(ntfs_volume *vol, run_list *rl, u8 *al_start,
 		const s64 size, const s64 initialized_size);

@@ -54,7 +54,7 @@ struct _ntfs_inode {
 	 * name_len = 4 for directories.
 	 */
 	ATTR_TYPES type;	/* Attribute type of this fake inode. */
-	uchar_t *name;		/* Attribute name of this fake inode. */
+	ntfschar *name;		/* Attribute name of this fake inode. */
 	u32 name_len;		/* Attribute name length of this fake inode. */
 	run_list run_list;	/* If state has the NI_NonResident bit set,
 				   the run list of the unnamed data attribute
@@ -248,7 +248,7 @@ static inline struct inode *VFS_I(ntfs_inode *ni)
  */
 typedef struct {
 	unsigned long mft_no;
-	uchar_t *name;
+	ntfschar *name;
 	u32 name_len;
 	ATTR_TYPES type;
 } ntfs_attr;
@@ -259,7 +259,7 @@ extern int ntfs_test_inode(struct inode *vi, ntfs_attr *na);
 
 extern struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no);
 extern struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
-		uchar_t *name, u32 name_len);
+		ntfschar *name, u32 name_len);
 
 extern struct inode *ntfs_alloc_big_inode(struct super_block *sb);
 extern void ntfs_destroy_big_inode(struct inode *inode);

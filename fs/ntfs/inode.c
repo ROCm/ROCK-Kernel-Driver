@@ -66,7 +66,7 @@ int ntfs_test_inode(struct inode *vi, ntfs_attr *na)
 		if (ni->name_len != na->name_len)
 			return 0;
 		if (na->name_len && memcmp(ni->name, na->name,
-				na->name_len * sizeof(uchar_t)))
+				na->name_len * sizeof(ntfschar)))
 			return 0;
 	}
 	/* Match! */
@@ -121,8 +121,8 @@ static int ntfs_init_locked_inode(struct inode *vi, ntfs_attr *na)
 	if (na->name && na->name_len && na->name != I30) {
 		unsigned int i;
 
-		i = na->name_len * sizeof(uchar_t);
-		ni->name = (uchar_t*)kmalloc(i + sizeof(uchar_t), GFP_ATOMIC);
+		i = na->name_len * sizeof(ntfschar);
+		ni->name = (ntfschar*)kmalloc(i + sizeof(ntfschar), GFP_ATOMIC);
 		if (!ni->name)
 			return -ENOMEM;
 		memcpy(ni->name, na->name, i);
@@ -206,7 +206,7 @@ struct inode *ntfs_iget(struct super_block *sb, unsigned long mft_no)
  * obtained from PTR_ERR().
  */
 struct inode *ntfs_attr_iget(struct inode *base_vi, ATTR_TYPES type,
-		uchar_t *name, u32 name_len)
+		ntfschar *name, u32 name_len)
 {
 	struct inode *vi;
 	ntfs_attr na;

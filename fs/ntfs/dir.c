@@ -27,7 +27,7 @@
 /**
  * The little endian Unicode string $I30 as a global constant.
  */
-uchar_t I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
+ntfschar I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
 		const_cpu_to_le16('3'),	const_cpu_to_le16('0'),
 		const_cpu_to_le16(0) };
 
@@ -64,7 +64,7 @@ uchar_t I30[5] = { const_cpu_to_le16('$'), const_cpu_to_le16('I'),
  * work but we don't care for how quickly one can access them. This also fixes
  * the dcache aliasing issues.
  */
-MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
+MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		const int uname_len, ntfs_name **res)
 {
 	ntfs_volume *vol = dir_ni->vol;
@@ -135,7 +135,7 @@ MFT_REF ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 		 * returning.
 		 */
 		if (ntfs_are_names_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len)) {
 found_it:
@@ -186,7 +186,7 @@ found_it:
 		if (!NVolCaseSensitive(vol) &&
 				ie->key.file_name.file_name_type &&
 				ntfs_are_names_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
 			int name_size = sizeof(ntfs_name);
@@ -206,7 +206,7 @@ found_it:
 			}
 
 			if (type != FILE_NAME_DOS)
-				name_size += len * sizeof(uchar_t);
+				name_size += len * sizeof(ntfschar);
 			name = kmalloc(name_size, GFP_NOFS);
 			if (!name) {
 				err = -ENOMEM;
@@ -217,7 +217,7 @@ found_it:
 			if (type != FILE_NAME_DOS) {
 				name->len = len;
 				memcpy(name->name, ie->key.file_name.file_name,
-						len * sizeof(uchar_t));
+						len * sizeof(ntfschar));
 			} else
 				name->len = 0;
 			*res = name;
@@ -227,7 +227,7 @@ found_it:
 		 * know which way in the B+tree we have to go.
 		 */
 		rc = ntfs_collate_names(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
 		/*
@@ -246,7 +246,7 @@ found_it:
 		 * collation.
 		 */
 		rc = ntfs_collate_names(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 		if (rc == -1)
@@ -395,7 +395,7 @@ fast_descend_into_child_node:
 		 * returning.
 		 */
 		if (ntfs_are_names_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len)) {
 found_it2:
@@ -445,7 +445,7 @@ found_it2:
 		if (!NVolCaseSensitive(vol) &&
 				ie->key.file_name.file_name_type &&
 				ntfs_are_names_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length,
 				IGNORE_CASE, vol->upcase, vol->upcase_len)) {
 			int name_size = sizeof(ntfs_name);
@@ -466,7 +466,7 @@ found_it2:
 			}
 
 			if (type != FILE_NAME_DOS)
-				name_size += len * sizeof(uchar_t);
+				name_size += len * sizeof(ntfschar);
 			name = kmalloc(name_size, GFP_NOFS);
 			if (!name) {
 				err = -ENOMEM;
@@ -477,7 +477,7 @@ found_it2:
 			if (type != FILE_NAME_DOS) {
 				name->len = len;
 				memcpy(name->name, ie->key.file_name.file_name,
-						len * sizeof(uchar_t));
+						len * sizeof(ntfschar));
 			} else
 				name->len = 0;
 			*res = name;
@@ -487,7 +487,7 @@ found_it2:
 		 * know which way in the B+tree we have to go.
 		 */
 		rc = ntfs_collate_names(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
 		/*
@@ -506,7 +506,7 @@ found_it2:
 		 * collation.
 		 */
 		rc = ntfs_collate_names(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 		if (rc == -1)
@@ -607,7 +607,7 @@ dir_err_out:
  *
  * Note, @uname_len does not include the (optional) terminating NULL character.
  */
-u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
+u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const ntfschar *uname,
 		const int uname_len)
 {
 	ntfs_volume *vol = dir_ni->vol;
@@ -689,7 +689,7 @@ u64 ntfs_lookup_inode_by_name(ntfs_inode *dir_ni, const uchar_t *uname,
 		 * convert it to cpu format before returning.
 		 */
 		if (ntfs_are_names_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, ic,
 				vol->upcase, vol->upcase_len)) {
 found_it:
@@ -703,7 +703,7 @@ found_it:
 		 * know which way in the B+tree we have to go.
 		 */
 		rc = ntfs_collate_names(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
 		/*
@@ -722,7 +722,7 @@ found_it:
 		 * collation.
 		 */
 		rc = ntfs_collate_names(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 		if (rc == -1)
@@ -875,7 +875,7 @@ fast_descend_into_child_node:
 		 * convert it to cpu format before returning.
 		 */
 		if (ntfs_are_names_equal(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, ic,
 				vol->upcase, vol->upcase_len)) {
 found_it2:
@@ -888,7 +888,7 @@ found_it2:
 		 * know which way in the B+tree we have to go.
 		 */
 		rc = ntfs_collate_names(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				IGNORE_CASE, vol->upcase, vol->upcase_len);
 		/*
@@ -907,7 +907,7 @@ found_it2:
 		 * collation.
 		 */
 		rc = ntfs_collate_names(uname, uname_len,
-				(uchar_t*)&ie->key.file_name.file_name,
+				(ntfschar*)&ie->key.file_name.file_name,
 				ie->key.file_name.file_name_length, 1,
 				CASE_SENSITIVE, vol->upcase, vol->upcase_len);
 		if (rc == -1)
@@ -1027,7 +1027,7 @@ static inline int ntfs_filldir(ntfs_volume *vol, loff_t *fpos,
 		ntfs_debug("Skipping system file.");
 		return 0;
 	}
-	name_len = ntfs_ucstonls(vol, (uchar_t*)&ie->key.file_name.file_name,
+	name_len = ntfs_ucstonls(vol, (ntfschar*)&ie->key.file_name.file_name,
 			ie->key.file_name.file_name_length, &name,
 			NTFS_MAX_NAME_LEN * NLS_MAX_CHARSET_SIZE + 1);
 	if (name_len <= 0) {
