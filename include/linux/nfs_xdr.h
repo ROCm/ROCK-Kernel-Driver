@@ -87,8 +87,8 @@ struct nfs_writeargs {
 	__u64			offset;
 	__u32			count;
 	enum nfs3_stable_how	stable;
-	unsigned int		nriov;
-	struct iovec		iov[NFS_WRITE_MAXIOV];
+	unsigned int		pgbase;
+	struct page **		pages;
 };
 
 struct nfs_writeverf {
@@ -329,8 +329,8 @@ struct nfs_rpc_ops {
 			    void *buffer, int *eofp);
 	int	(*write)   (struct inode *, struct rpc_cred *,
 			    struct nfs_fattr *,
-			    int, loff_t, unsigned int,
-			    void *buffer, struct nfs_writeverf *verfp);
+			    int, unsigned int, unsigned int,
+			    struct page *, struct nfs_writeverf *verfp);
 	int	(*commit)  (struct inode *, struct nfs_fattr *,
 			    unsigned long, unsigned int);
 	int	(*create)  (struct inode *, struct qstr *, struct iattr *,

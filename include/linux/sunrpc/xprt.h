@@ -13,6 +13,7 @@
 #include <linux/socket.h>
 #include <linux/in.h>
 #include <linux/sunrpc/sched.h>
+#include <linux/sunrpc/xdr.h>
 
 /*
  * Maximum number of iov's we use.
@@ -87,7 +88,7 @@ struct rpc_rqst {
 	 */
 	struct rpc_xprt *	rq_xprt;		/* RPC client */
 	struct rpc_timeout	rq_timeout;		/* timeout parms */
-	struct rpc_iov		rq_snd_buf;		/* send buffer */
+	struct xdr_buf		rq_snd_buf;		/* send buffer */
 	struct rpc_iov		rq_rcv_buf;		/* recv buffer */
 
 	/*
@@ -113,9 +114,8 @@ struct rpc_rqst {
 	unsigned long		rq_xtime;	/* when transmitted */
 #endif
 };
-#define rq_svec			rq_snd_buf.io_vec
-#define rq_snr			rq_snd_buf.io_nr
-#define rq_slen			rq_snd_buf.io_len
+#define rq_svec			rq_snd_buf.head
+#define rq_slen			rq_snd_buf.len
 #define rq_rvec			rq_rcv_buf.io_vec
 #define rq_rnr			rq_rcv_buf.io_nr
 #define rq_rlen			rq_rcv_buf.io_len

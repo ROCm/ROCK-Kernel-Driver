@@ -22,9 +22,6 @@
 #include <linux/nfs3.h>
 #include <linux/nfs_fs.h>
 
-/* Uncomment this to support servers requiring longword lengths */
-#define NFS_PAD_WRITES		1
-
 #define NFSDBG_FACILITY		NFSDBG_XDR
 
 /* Mapping from NFS error code to "errno" error code. */
@@ -388,7 +385,7 @@ nfs3_xdr_readargs(struct rpc_rqst *req, u32 *p, struct nfs_readargs *args)
 static int
 nfs3_xdr_writeargs(struct rpc_rqst *req, u32 *p, struct nfs_writeargs *args)
 {
-	unsigned int	nr;
+	struct xdr_buf *sndbuf = &req->rq_snd_buf;
 	u32 count = args->count;
 
 	p = xdr_encode_fhandle(p, args->fh);
@@ -396,37 +393,10 @@ nfs3_xdr_writeargs(struct rpc_rqst *req, u32 *p, struct nfs_writeargs *args)
 	*p++ = htonl(count);
 	*p++ = htonl(args->stable);
 	*p++ = htonl(count);
-	req->rq_slen = xdr_adjust_iovec(req->rq_svec, p);
+	sndbuf->len = xdr_adjust_iovec(sndbuf->head, p);
 
-	/* Get the number of buffers in the send iovec */
-	nr = args->nriov;
-
-	if (nr+2 > MAX_IOVEC) {
-		printk(KERN_ERR "NFS: Bad number of iov's in xdr_writeargs\n");
-		return -EINVAL;
-	}
-
-	/* Copy the iovec */
-	memcpy(req->rq_svec + 1, args->iov, nr * sizeof(struct iovec));
-
-#ifdef NFS_PAD_WRITES
-	/*
-	 * Some old servers require that the message length
-	 * be a multiple of 4, so we pad it here if needed.
-	 */
-	if (count & 3) {
-		struct iovec	*iov = req->rq_svec + nr + 1;
-		int		pad = 4 - (count & 3);
-
-		iov->iov_base = (void *) "\0\0\0";
-		iov->iov_len  = pad;
-		count += pad;
-		nr++;
-	}
-#endif
-	req->rq_slen += count;
-	req->rq_snr  += nr;
-
+	/* Copy the page array */
+	xdr_encode_pages(sndbuf, args->pages, args->pgbase, count);
 	return 0;
 }
 

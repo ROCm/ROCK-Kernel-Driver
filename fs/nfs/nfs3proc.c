@@ -230,16 +230,17 @@ nfs3_proc_read(struct inode *inode, struct rpc_cred *cred,
 static int
 nfs3_proc_write(struct inode *inode, struct rpc_cred *cred,
 		struct nfs_fattr *fattr, int flags,
-		loff_t offset, unsigned int count,
-		void *buffer, struct nfs_writeverf *verf)
+		unsigned int base, unsigned int count,
+		struct page *page, struct nfs_writeverf *verf)
 {
+	u64			offset = page_offset(page) + base;
 	struct nfs_writeargs	arg = {
 		fh:		NFS_FH(inode),
 		offset:		offset,
 		count:		count,
 		stable:		NFS_FILE_SYNC,
-		nriov:		1,
-		iov:		{{buffer, count}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}, {0,0}}
+		pgbase:		base,
+		pages:		&page
 	};
 	struct nfs_writeres	res = {
 		fattr:		fattr,

@@ -211,13 +211,11 @@ xprt_sendmsg(struct rpc_xprt *xprt, struct rpc_rqst *req)
 {
 	struct socket	*sock = xprt->sock;
 	struct msghdr	msg;
+	struct xdr_buf	*xdr = &req->rq_snd_buf;
+	struct iovec	niv[MAX_IOVEC];
+	unsigned int	niov, slen, skip;
 	mm_segment_t	oldfs;
 	int		result;
-	int		slen = req->rq_slen - req->rq_bytes_sent;
-	struct iovec	niv[MAX_IOVEC];
-
-	if (slen <= 0)
-		return 0;
 
 	if (!sock)
 		return -ENOTCONN;
@@ -226,21 +224,24 @@ xprt_sendmsg(struct rpc_xprt *xprt, struct rpc_rqst *req)
 				req->rq_svec->iov_base,
 				req->rq_svec->iov_len);
 
+	/* Dont repeat bytes */
+	skip = req->rq_bytes_sent;
+	slen = xdr->len - skip;
+	niov = xdr_kmap(niv, xdr, skip);
+
 	msg.msg_flags   = MSG_DONTWAIT|MSG_NOSIGNAL;
-	msg.msg_iov	= req->rq_svec;
-	msg.msg_iovlen	= req->rq_snr;
+	msg.msg_iov	= niv;
+	msg.msg_iovlen	= niov;
 	msg.msg_name	= (struct sockaddr *) &xprt->addr;
 	msg.msg_namelen = sizeof(xprt->addr);
 	msg.msg_control = NULL;
 	msg.msg_controllen = 0;
 
-	/* Dont repeat bytes */
-	if (req->rq_bytes_sent)
-		xprt_move_iov(&msg, niv, req->rq_bytes_sent);
-
 	oldfs = get_fs(); set_fs(get_ds());
 	result = sock_sendmsg(sock, &msg, slen);
 	set_fs(oldfs);
+
+	xdr_kunmap(xdr, skip);
 
 	dprintk("RPC:      xprt_sendmsg(%d) = %d\n", slen, result);
 
