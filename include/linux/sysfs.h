@@ -41,7 +41,7 @@ extern void
 sysfs_remove_file(struct kobject *, struct attribute *);
 
 extern int 
-sysfs_create_link(struct kobject * kobj, char * name, char * target);
+sysfs_create_link(struct kobject * kobj, struct kobject * target, char * name);
 
 extern void
 sysfs_remove_link(struct kobject *, char * name);

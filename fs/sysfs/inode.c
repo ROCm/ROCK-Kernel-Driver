@@ -457,33 +457,83 @@ int sysfs_create_file(struct kobject * kobj, struct attribute * attr)
 }
 
 
-/**
- *	sysfs_create_symlink - make a symlink
- *	@kobj:	object who's directory we're creating in. 
- *	@name:	name of the symlink.
- *	@target:	path we're pointing to.
- */
-
-int sysfs_create_link(struct kobject * kobj, char * name, char * target)
+static int object_depth(struct kobject * kobj)
 {
-	struct dentry * dentry;
-	int error;
-
-	if (kobj) {
-		struct dentry * parent = kobj->dir.dentry;
-
-		down(&parent->d_inode->i_sem);
-		dentry = get_dentry(parent,name);
-		if (!IS_ERR(dentry))
-			error = sysfs_symlink(parent->d_inode,dentry,target);
-		else
-			error = PTR_ERR(dentry);
-		up(&parent->d_inode->i_sem);
-	} else
-		error = -EINVAL;
-	return error;
+	struct kobject * p = kobj;
+	int depth = 0;
+	do { depth++; } while ((p = p->parent));
+	return depth;
 }
 
+static int object_path_length(struct kobject * kobj)
+{
+	struct kobject * p = kobj;
+	int length = 1;
+	do {
+		length += strlen(p->name) + 1;
+		p = p->parent;
+	} while (p);
+	return length;
+}
+
+static void fill_object_path(struct kobject * kobj, char * buffer, int length)
+{
+	struct kobject * p;
+
+	--length;
+	for (p = kobj; p; p = p->parent) {
+		int cur = strlen(p->name);
+
+		/* back up enough to print this bus id with '/' */
+		length -= cur;
+		strncpy(buffer + length,p->name,cur);
+		*(buffer + --length) = '/';
+	}
+}
+
+/**
+ *	sysfs_create_link - create symlink between two objects.
+ *	@kobj:	object whose directory we're creating the link in.
+ *	@target:	object we're pointing to.
+ *	@name:		name of the symlink.
+ */
+int sysfs_create_link(struct kobject * kobj, struct kobject * target, char * name)
+{
+	struct dentry * dentry = kobj->dir.dentry;
+	struct dentry * d;
+	int error = 0;
+	int size;
+	int depth;
+	char * path;
+	char * s;
+
+	depth = object_depth(kobj);
+	size = object_path_length(target) + depth * 3 - 1;
+	if (size > PATH_MAX)
+		return -ENAMETOOLONG;
+	pr_debug("%s: depth = %d, size = %d\n",__FUNCTION__,depth,size);
+
+	path = kmalloc(size,GFP_KERNEL);
+	if (!path)
+		return -ENOMEM;
+	memset(path,0,size);
+
+	for (s = path; depth--; s += 3)
+		strcpy(s,"../");
+
+	fill_object_path(target,path,size);
+	pr_debug("%s: path = '%s'\n",__FUNCTION__,path);
+
+	down(&dentry->d_inode->i_sem);
+	d = get_dentry(dentry,name);
+	if (!IS_ERR(d))
+		error = sysfs_symlink(dentry->d_inode,d,path);
+	else
+		error = PTR_ERR(d);
+	up(&dentry->d_inode->i_sem);
+	kfree(path);
+	return error;
+}
 
 static void hash_and_remove(struct dentry * dir, const char * name)
 {
