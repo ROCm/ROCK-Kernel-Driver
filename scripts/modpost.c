@@ -267,6 +267,7 @@ parse_elf(struct elf_info *info, const char *filename)
 	hdr->e_shoff    = TO_NATIVE(hdr->e_shoff);
 	hdr->e_shstrndx = TO_NATIVE(hdr->e_shstrndx);
 	hdr->e_shnum    = TO_NATIVE(hdr->e_shnum);
+	hdr->e_machine  = TO_NATIVE(hdr->e_machine);
 	sechdrs = (void *)hdr + hdr->e_shoff;
 	info->sechdrs = sechdrs;
 
