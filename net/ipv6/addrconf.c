@@ -1221,7 +1221,7 @@ void addrconf_leave_solict(struct net_device *dev, struct in6_addr *addr)
 }
 
 
-static int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
+int ipv6_generate_eui64(u8 *eui, struct net_device *dev)
 {
 	switch (dev->type) {
 	case ARPHRD_ETHER:
@@ -1279,7 +1279,7 @@ static int __ipv6_regen_rndid(struct inet6_dev *idev)
 
 	dev = idev->dev;
 
-	if (ipv6_generate_eui64(idev->work_eui64, dev)) {
+	if (dev->generate_eui64(idev->work_eui64, dev)) {
 		printk(KERN_INFO
 			"__ipv6_regen_rndid(idev=%p): cannot get EUI64 identifier; use random bytes.\n",
 			idev);
@@ -1543,7 +1543,7 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len)
 
 		if (pinfo->prefix_len == 64) {
 			memcpy(&addr, &pinfo->prefix, 8);
-			if (ipv6_generate_eui64(addr.s6_addr + 8, dev) &&
+			if (dev->generate_eui64(addr.s6_addr + 8, dev) &&
 			    ipv6_inherit_eui64(addr.s6_addr + 8, in6_dev)) {
 				in6_dev_put(in6_dev);
 				return;
@@ -1947,14 +1947,16 @@ static void addrconf_dev_config(struct net_device *dev)
 		return;
 	}
 
+	if (!dev->generate_eui64) 
+		dev->generate_eui64 = ipv6_generate_eui64;
+
 	idev = addrconf_add_dev(dev);
 	if (idev == NULL)
 		return;
 
 	memset(&addr, 0, sizeof(struct in6_addr));
 	addr.s6_addr32[0] = htonl(0xFE800000);
-
-	if (ipv6_generate_eui64(addr.s6_addr + 8, dev) == 0)
+	if (dev->generate_eui64(addr.s6_addr + 8, dev) == 0)
 		addrconf_add_linklocal(idev, &addr);
 }
 

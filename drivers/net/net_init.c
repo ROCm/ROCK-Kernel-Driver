@@ -279,7 +279,8 @@ void ether_setup(struct net_device *dev)
 	dev->hard_header_cache	= eth_header_cache;
 	dev->header_cache_update= eth_header_cache_update;
 	dev->hard_header_parse	= eth_header_parse;
-
+	dev->generate_eui64     = NULL;
+	dev->dev_id             = 0;
 	dev->type		= ARPHRD_ETHER;
 	dev->hard_header_len 	= ETH_HLEN;
 	dev->mtu		= 1500; /* eth_mtu */
@@ -305,6 +306,8 @@ void fddi_setup(struct net_device *dev)
 	dev->change_mtu			= fddi_change_mtu;
 	dev->hard_header		= fddi_header;
 	dev->rebuild_header		= fddi_rebuild_header;
+	dev->generate_eui64             = NULL;
+	dev->dev_id                     = 0;
 
 	dev->type				= ARPHRD_FDDI;
 	dev->hard_header_len	= FDDI_K_SNAP_HLEN+3;	/* Assume 802.2 SNAP hdr len + 3 pad bytes */
@@ -415,6 +418,8 @@ void tr_setup(struct net_device *dev)
 	
 	dev->hard_header	= tr_header;
 	dev->rebuild_header	= tr_rebuild_header;
+	dev->generate_eui64     = NULL;
+	dev->dev_id             = 0;
 
 	dev->type		= ARPHRD_IEEE802_TR;
 	dev->hard_header_len	= TR_HLEN;
