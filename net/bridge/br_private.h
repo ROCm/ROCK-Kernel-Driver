@@ -206,7 +206,7 @@ extern void br_stp_set_path_cost(struct net_bridge_port *p,
 			  int path_cost);
 
 /* br_stp_bpdu.c */
-extern void br_stp_handle_bpdu(struct sk_buff *skb);
+extern int br_stp_handle_bpdu(struct sk_buff *skb);
 
 /* br_stp_timer.c */
 extern void br_stp_timer_init(struct net_bridge *br);
