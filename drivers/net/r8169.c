@@ -1768,15 +1768,16 @@ static int rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	dma_addr_t mapping;
 	u32 status, len;
 	u32 opts1;
+	int ret = 0;
 	
 	if (unlikely(TX_BUFFS_AVAIL(tp) < skb_shinfo(skb)->nr_frags)) {
 		printk(KERN_ERR PFX "%s: BUG! Tx Ring full when queue awake!\n",
 		       dev->name);
-		return 1;
+		goto err_stop;
 	}
 
 	if (unlikely(le32_to_cpu(txd->opts1) & DescOwn))
-		goto err_drop;
+		goto err_stop;
 
 	opts1 = DescOwn | rtl8169_tx_csum(skb);
 
@@ -1826,10 +1827,11 @@ static int rtl8169_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 out:
-	return 0;
+	return ret;
 
-err_drop:
-	dev_kfree_skb(skb);
+err_stop:
+	netif_stop_queue(dev);
+	ret = 1;
 err_update_stats:
 	tp->stats.tx_dropped++;
 	goto out;
