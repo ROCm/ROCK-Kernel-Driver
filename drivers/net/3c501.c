@@ -955,7 +955,7 @@ MODULE_PARM_DESC(irq, "EtherLink IRQ number");
  * init_module:
  *
  * When the driver is loaded as a module this function is called. We fake up
- * a device structure with the base I/O and interrupt set as if it was being
+ * a device structure with the base I/O and interrupt set as if it were being
  * called from Space.c. This minimises the extra code that would otherwise
  * be required.
  *
