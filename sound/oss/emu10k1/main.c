@@ -84,6 +84,8 @@
  *	    Use unsigned long for variables in bit ops.
  *    0.20a Fixed recording startup
  *	    Fixed timer rate setting (it's a 16-bit register)
+ *	0.21 Converted code to use pci_name() instead of accessing slot_name
+ *	    directly (Eugene Teo)
  *********************************************************************/
 
 /* These are only included once per module */
@@ -345,20 +347,20 @@ static int __devinit emu10k1_proc_init(struct emu10k1_card *card)
 		goto err_out;
 	}
 
-	sprintf(s, "driver/emu10k1/%s", card->pci_dev->slot_name);
+	sprintf(s, "driver/emu10k1/%s", pci_name(card->pci_dev));
 	if (!proc_mkdir (s, 0)) {
 		printk(KERN_ERR "emu10k1: unable to create proc directory %s\n", s);
 		goto err_emu10k1_proc;
 	}
 
-	sprintf(s, "driver/emu10k1/%s/info", card->pci_dev->slot_name);
+	sprintf(s, "driver/emu10k1/%s/info", pci_name(card->pci_dev));
 	if (!create_proc_read_entry (s, 0, 0, emu10k1_info_proc, card)) {
 		printk(KERN_ERR "emu10k1: unable to create proc entry %s\n", s);
 		goto err_dev_proc;
 	}
 
 	if (!card->is_aps) {
-		sprintf(s, "driver/emu10k1/%s/ac97", card->pci_dev->slot_name);
+		sprintf(s, "driver/emu10k1/%s/ac97", pci_name(card->pci_dev));
 		if (!create_proc_read_entry (s, 0, 0, ac97_read_proc, card->ac97)) {
 			printk(KERN_ERR "emu10k1: unable to create proc entry %s\n", s);
 			goto err_proc_ac97;
@@ -368,11 +370,11 @@ static int __devinit emu10k1_proc_init(struct emu10k1_card *card)
 	return 0;
 
 err_proc_ac97:
-	sprintf(s, "driver/emu10k1/%s/info", card->pci_dev->slot_name);
+	sprintf(s, "driver/emu10k1/%s/info", pci_name(card->pci_dev));
 	remove_proc_entry(s, NULL);
 
 err_dev_proc:
-	sprintf(s, "driver/emu10k1/%s", card->pci_dev->slot_name);
+	sprintf(s, "driver/emu10k1/%s", pci_name(card->pci_dev));
 	remove_proc_entry(s, NULL);
 
 err_emu10k1_proc:
@@ -387,14 +389,14 @@ static void emu10k1_proc_cleanup(struct emu10k1_card *card)
 	char s[48];
 
 	if (!card->is_aps) {
-		sprintf(s, "driver/emu10k1/%s/ac97", card->pci_dev->slot_name);
+		sprintf(s, "driver/emu10k1/%s/ac97", pci_name(card->pci_dev));
 		remove_proc_entry(s, NULL);
 	}
 
-	sprintf(s, "driver/emu10k1/%s/info", card->pci_dev->slot_name);
+	sprintf(s, "driver/emu10k1/%s/info", pci_name(card->pci_dev));
 	remove_proc_entry(s, NULL);
 
-	sprintf(s, "driver/emu10k1/%s", card->pci_dev->slot_name);
+	sprintf(s, "driver/emu10k1/%s", pci_name(card->pci_dev));
 	remove_proc_entry(s, NULL);
 		
 	remove_proc_entry("driver/emu10k1", NULL);
