@@ -5,7 +5,7 @@
  *
  * Matt Porter <mporter@kernel.crashing.org>
  *
- * Copyright 2003-2004 MontaVista Software Inc.
+ * Copyright 2003-2005 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -163,7 +163,7 @@ ocotea_setup_pcix(void)
 {
 	void *pcix_reg_base;
 
-	pcix_reg_base = ioremap64(PCIX0_REG_BASE, PCIX0_REG_SIZE);
+	pcix_reg_base = ioremap64(PCIX0_REG_BASE, PCIX_REG_SIZE);
 
 	/* Enable PCIX0 I/O, Mem, and Busmaster cycles */
 	PCIX_WRITEW(PCIX_READW(PCIX0_COMMAND) | PCI_COMMAND_IO | PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER, PCIX0_COMMAND);

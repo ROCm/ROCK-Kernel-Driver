@@ -1,5 +1,5 @@
 /*
- * 2004 (c) MontaVista, Software, Inc.  This file is licensed under
+ * 2004-2005 (c) MontaVista, Software, Inc.  This file is licensed under
  * the terms of the GNU General Public License version 2.  This program
  * is licensed "as is" without any warranty of any kind, whether express
  * or implied.
@@ -10,7 +10,7 @@
 #include <linux/string.h>
 #include <linux/ctype.h>
 #include <asm/ppcboot.h>
-#include <platforms/4xx/ocotea.h>
+#include <asm/ibm4xx.h>
 
 extern unsigned long decompress_kernel(unsigned long load_addr, int num_words,
 				       unsigned long cksum);
@@ -89,13 +89,15 @@ load_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 
 	decompress_kernel(load_addr, num_words, cksum);
 
-	mac64 = simple_strtoull((char *)OCOTEA_PIBS_MAC_BASE, 0, 16);
+	mac64 = simple_strtoull((char *)PIBS_MAC_BASE, 0, 16);
 	memcpy(hold_residual->bi_enetaddr, (char *)&mac64+2, 6);
-	mac64 = simple_strtoull((char *)(OCOTEA_PIBS_MAC_BASE+OCOTEA_PIBS_MAC_OFFSET), 0, 16);
+#ifdef CONFIG_440GX
+	mac64 = simple_strtoull((char *)(PIBS_MAC_BASE+PIBS_MAC_OFFSET), 0, 16);
 	memcpy(hold_residual->bi_enet1addr, (char *)&mac64+2, 6);
-	mac64 = simple_strtoull((char *)(OCOTEA_PIBS_MAC_BASE+OCOTEA_PIBS_MAC_OFFSET*2), 0, 16);
+	mac64 = simple_strtoull((char *)(PIBS_MAC_BASE+PIBS_MAC_OFFSET*2), 0, 16);
 	memcpy(hold_residual->bi_enet2addr, (char *)&mac64+2, 6);
-	mac64 = simple_strtoull((char *)(OCOTEA_PIBS_MAC_BASE+OCOTEA_PIBS_MAC_OFFSET*3), 0, 16);
+	mac64 = simple_strtoull((char *)(PIBS_MAC_BASE+PIBS_MAC_OFFSET*3), 0, 16);
 	memcpy(hold_residual->bi_enet3addr, (char *)&mac64+2, 6);
+#endif
 	return (void *)hold_residual;
 }

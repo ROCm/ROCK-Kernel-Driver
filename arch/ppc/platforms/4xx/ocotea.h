@@ -3,9 +3,9 @@
  *
  * Ocotea board definitions
  *
- * Matt Porter <mporter@mvista.com>
+ * Matt Porter <mporter@kernel.crashing.org>
  *
- * Copyright 2003 MontaVista Software Inc.
+ * Copyright 2003-2005 MontaVista Software Inc.
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -22,13 +22,13 @@
 #include <platforms/4xx/ibm440gx.h>
 
 /* F/W TLB mapping used in bootloader glue to reset EMAC */
-#define PPC44x_EMAC0_MR0	0xE0000800
+#define PPC44x_EMAC0_MR0	0xe0000800
 
 /* Location of MAC addresses in PIBS image */
-#define OCOTEA_PIBS_FLASH	0xfff00000
-#define OCOTEA_PIBS_MAC_BASE	(OCOTEA_PIBS_FLASH+0xb0500)
-#define OCOTEA_PIBS_MAC_SIZE	0x200
-#define OCOTEA_PIBS_MAC_OFFSET	0x100
+#define PIBS_FLASH_BASE		0xfff00000
+#define PIBS_MAC_BASE		(PIBS_FLASH_BASE+0xb0500)
+#define PIBS_MAC_SIZE		0x200
+#define PIBS_MAC_OFFSET		0x100
 
 /* External timer clock frequency */
 #define OCOTEA_TMR_CLK	25000000
