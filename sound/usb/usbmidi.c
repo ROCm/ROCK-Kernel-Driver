@@ -453,8 +453,16 @@ static void snd_usbmidi_output_trigger(snd_rawmidi_substream_t* substream, int u
 	usbmidi_out_port_t* port = (usbmidi_out_port_t*)substream->runtime->private_data;
 
 	port->active = up;
-	if (up)
+	if (up) {
+		if (port->ep->umidi->chip->shutdown) {
+			/* gobble up remaining bytes to prevent wait in
+			 * snd_rawmidi_drain_output */
+			while (!snd_rawmidi_transmit_empty(substream))
+				snd_rawmidi_transmit_ack(substream, 1);
+			return;
+		}
 		tasklet_hi_schedule(&port->ep->tasklet);
+	}
 }
 
 static int snd_usbmidi_input_open(snd_rawmidi_substream_t* substream)
