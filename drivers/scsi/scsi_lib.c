@@ -1426,14 +1426,14 @@ __scsi_mode_sense(struct scsi_request *sreq, int dbd, int modepage,
 	if(scsi_status_is_good(sreq->sr_result)) {
 		data->header_length = header_length;
 		if(use_10_for_ms) {
-			data->length = buffer[0]*256 + buffer[1];
+			data->length = buffer[0]*256 + buffer[1] + 2;
 			data->medium_type = buffer[2];
 			data->device_specific = buffer[3];
 			data->longlba = buffer[4] & 0x01;
 			data->block_descriptor_length = buffer[6]*256
 				+ buffer[7];
 		} else {
-			data->length = buffer[0];
+			data->length = buffer[0] + 1;
 			data->medium_type = buffer[1];
 			data->device_specific = buffer[3];
 			data->block_descriptor_length = buffer[4];
