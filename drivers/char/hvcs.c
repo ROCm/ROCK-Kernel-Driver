@@ -190,7 +190,15 @@ struct hvcs_struct {
 	int enabled; /* there are tty's open against this device */
 	struct kobject kobj; /* ref count & hvcs_struct lifetime */
 	int todo_mask;
-	char buffered_char;
+
+	/* This buffer is required so that when hvcs_write_room() reports that
+	 * it can send HVCS_BUFF_LEN characters that it will buffer the full
+	 * HVCS_BUFF_LEN characters if need be.  This is essential for opost
+	 * writes since they do not do high level buffering and expect to be
+	 * able to send what the driver commits to sending buffering
+	 * [e.g. tab to space conversions in n_tty.c opost()]. */
+	char buffer[HVCS_BUFF_LEN];
+	int chars_in_buffer;
 	spinlock_t lock;
 };
 
@@ -294,8 +302,12 @@ static void hvcs_try_write(struct hvcs_struct *hvcsd)
 
 	if(hvcsd->todo_mask & HVCS_TRY_WRITE) {
 		/* won't send partial writes */
-		sent = hvterm_put_chars(unit_address, &hvcsd->buffered_char, 1);
+		sent = hvterm_put_chars(unit_address,
+				&hvcsd->buffer[0],
+				hvcsd->chars_in_buffer );
 		if(sent > 0) {
+			hvcsd->chars_in_buffer = 0;
+			wmb();
 			hvcsd->todo_mask &= ~HVCS_TRY_WRITE;
 			wmb();
 			if ((tty->flags & (1 << TTY_DO_WRITE_WAKEUP))
@@ -452,10 +464,9 @@ static int __devinit hvcs_probe(
 	sprintf(hvcsd->name,"%X",dev->unit_address);
 
 	hvcsd->index = ++hvcs_struct_count;
-
+	hvcsd->chars_in_buffer = 0;
 	hvcsd->enabled = 0;
 	hvcsd->todo_mask = 0;
-	hvcsd->buffered_char = '\0';
 
 	/* This will populate the hvcs_struct's partner info fields
 	 * for the first time. */
@@ -704,6 +715,7 @@ static void hvcs_disable_device(struct hvcs_struct *hvcsd)
 	}
 
 	hvcsd->enabled = 0;
+	hvcsd->chars_in_buffer = 0;
 
 	/* Any one of these might fail at any time due to the
 	 * vty-server's availability during the call.
@@ -772,7 +784,6 @@ static int hvcs_open(struct tty_struct *tty, struct file *filp)
 		goto error_release;
 
 	hvcsd->open_count = 1;
-	hvcsd->enabled = 1;
 	hvcsd->tty = tty;
 	tty->driver_data = hvcsd;
 
@@ -782,6 +793,8 @@ static int hvcs_open(struct tty_struct *tty, struct file *filp)
 	 * yielded and resumed the next flip_buffer_push resulting in data
 	 * loss.*/
 	tty->low_latency = 1;
+
+	hvcsd->enabled = 1;
 
 	goto open_success;
 
@@ -834,9 +847,6 @@ static void hvcs_close(struct tty_struct *tty, struct file *filp)
 
 	spin_lock_irqsave(&hvcsd->lock, flags);
 	if (--hvcsd->open_count == 0) {
-		/* Try to stop scheduled tasks from continuing */
-		hvcsd->todo_mask = 0;
-
 		hvcs_disable_device(hvcsd);
 
 		/* This line is important because it tells hvcs_open
@@ -848,7 +858,7 @@ static void hvcs_close(struct tty_struct *tty, struct file *filp)
 		hvcsd->p_partition_ID = 0;
 		hvcsd->p_unit_address = 0;
 		memset(&hvcsd->p_location_code[0], 0x00, CLC_LENGTH);
-		hvcsd->buffered_char = '\0';
+		memset(&hvcsd->buffer[0], 0x00, HVCS_BUFF_LEN);
 	} else if (hvcsd->open_count < 0) {
 		printk(KERN_ERR "HVCS: vty-server@%X open_count: %d"
 				" is missmanaged.\n",
@@ -904,33 +914,12 @@ static int hvcs_write(struct tty_struct *tty, int from_user, const unsigned char
 	unsigned long flags;
 	int total_sent = 0;
 	int tosend = 0;
-	int sent = 0;
-	int count_saved = count;
+	int result = 0;
 
 	/* If they don't check the return code off of their open they
 	 * may attempt this even if there is no connected device. */
 	if (!hvcsd)
 		return -ENODEV;
-
-	spin_lock_irqsave(&hvcsd->lock, flags);
-	if (hvcsd->todo_mask & HVCS_TRY_WRITE) {
-		spin_unlock_irqrestore(&hvcsd->lock, flags);
-		return 0;
-	}
-	unit_address = hvcsd->vdev->unit_address;
-
-	/* Somehow an open succeded but the device was removed or the
-	 * connection terminated between the vty-server and
-	 * partner vty during the middle of a write
-	 * operation? */
-	if (!hvcsd->enabled) {
-		spin_unlock_irqrestore(&hvcsd->lock, flags);
-		return -ENODEV;
-	}
-
-	spin_unlock_irqrestore(&hvcsd->lock, flags);
-
-	count_saved = count;
 
 	/* Reasonable size to prevent user level flooding */
 	if (count > HVCS_MAX_FROM_USER)
@@ -939,89 +928,110 @@ static int hvcs_write(struct tty_struct *tty, int from_user, const unsigned char
 	if (!from_user)
 		charbuf = (unsigned char *)buf;
 	else {
-		/* This isn't so important to do if we don't spinlock
-		 * around the copy_from_user but we'll leave it here
-		 * anyway because there may be locking issues in the
-		 * future. */
 		charbuf = kmalloc(count, GFP_KERNEL);
 		if(!charbuf) {
 			return -ENOMEM;
 		}
 
-		if(copy_from_user(charbuf,buf,count))
+		if(copy_from_user(charbuf,buf,count)) {
+			kfree(charbuf);
 			return -EFAULT;
+		}
 	}
 
 	spin_lock_irqsave(&hvcsd->lock, flags);
+
+	/* Somehow an open succeded but the device was removed or the
+	 * connection terminated between the vty-server and partner vty during
+	 * the middle of a write operation?  This is a crummy place to do this
+	 * bud we want to keep it all in the spinlock. */
+	if (!hvcsd->enabled) {
+		spin_unlock_irqrestore(&hvcsd->lock, flags);
+		if (from_user)
+			kfree(charbuf);
+		return -ENODEV;
+	}
+
+	unit_address = hvcsd->vdev->unit_address;
+
 	while (count > 0) {
-		tosend = min(count, HVCS_BUFF_LEN);
+		tosend = min(count, (HVCS_BUFF_LEN - hvcsd->chars_in_buffer));
+		/* no more space, this probably means that the last call to
+		 * hvcs_write() didn't succeed and the buffer was filled up. */
+		if (!tosend)
+			break;
 
-		/* won't return partial writes */
-		sent = hvterm_put_chars(unit_address,
-				&charbuf[total_sent], tosend);
+		memcpy(&hvcsd->buffer[hvcsd->chars_in_buffer],
+				&charbuf[total_sent],
+				tosend);
 
-		/* if sent == 0 the tty->write_wait will go tosleep until told
-		 * to wake up (when the firmware is ready for more chars).
-		 * There is a possible data loss hole right here.  Since we
-		 * don't know when firmware will become available we should
-		 * continue to attempt to send a character until firmware
-		 * accepts it and then wake the tty.
-		 */
-		if (sent == 0) {
-			hvcsd->buffered_char = charbuf[total_sent];
-			total_sent+=1;
-			sent = 1;
-			count-=sent;
+		hvcsd->chars_in_buffer += tosend;
+
+		result = 0;
+		/* if this is true then we don't want to try writing to the
+		 * hypervisor because that is the kernel_threads job now.  We'll
+		 * just add to the buffer.*/
+		if(!(hvcsd->todo_mask & HVCS_TRY_WRITE))
+			/* won't send partial writes */
+			result = hvterm_put_chars(unit_address,
+					&hvcsd->buffer[0],
+					hvcsd->chars_in_buffer);
+
+		/* since we know we have enough room in hvcsd->buffer for
+		 * tosend we record that it was sent regardless of whether the
+		 * hypervisor actually took it because we have it buffered.*/
+		total_sent+=tosend;
+		count-=tosend;
+		if (result == 0) {
 			hvcsd->todo_mask |= HVCS_TRY_WRITE;
 			hvcs_kick();
 			break;
-		} else if (sent < 0)
+		}
+
+		hvcsd->chars_in_buffer = 0;
+		/* test after the chars_in_buffer reset otherwise this
+		 * could deadlock our writes if hvterm_put_chars fails. */
+		if (result < 0)
 			break;
-
-		total_sent+=sent;
-		count-=sent;
 	}
-	spin_unlock_irqrestore(&hvcsd->lock, flags);
 
+	spin_unlock_irqrestore(&hvcsd->lock, flags);
 	if (from_user)
 		kfree(charbuf);
 
-	if (sent == -1)
+	if (result == -1)
 		return -EIO;
 	else
 		return total_sent;
 }
 
+/* this is really asking how much can we guarentee that we can send or that we
+ * absolutely WILL BUFFER if we can't send it.*/
 static int hvcs_write_room(struct tty_struct *tty)
 {
 	struct hvcs_struct *hvcsd = (struct hvcs_struct *)tty->driver_data;
 	unsigned long flags;
+	int retval;
 
 	if (!hvcsd || !hvcsd->enabled)
 		return 0;
 
 	spin_lock_irqsave(&hvcsd->lock, flags);
-	if(hvcsd->todo_mask & HVCS_TRY_WRITE) {
-		spin_unlock_irqrestore(&hvcsd->lock, flags);
-		return 0;
-	} else
-		spin_unlock_irqrestore(&hvcsd->lock, flags);
-		return HVCS_MAX_FROM_USER;
+	retval = HVCS_BUFF_LEN - hvcsd->chars_in_buffer;
+	spin_unlock_irqrestore(&hvcsd->lock, flags);
+	return retval;
 }
 
 static int hvcs_chars_in_buffer(struct tty_struct *tty)
 {
 	struct hvcs_struct *hvcsd = (struct hvcs_struct *)tty->driver_data;
 	unsigned long flags;
+	int retval;
 
 	spin_lock_irqsave(&hvcsd->lock, flags);
-	if (hvcsd->todo_mask & HVCS_TRY_WRITE) {
-		spin_unlock_irqrestore(&hvcsd->lock, flags);
-		return 1;
-	}
-
+	retval = hvcsd->chars_in_buffer;
 	spin_unlock_irqrestore(&hvcsd->lock, flags);
-	return 0;
+	return retval;
 }
 
 static struct tty_operations hvcs_ops = {
