@@ -484,7 +484,6 @@ extern void paging_init(void);
 
 void __init setup_arch(char **cmdline_p)
 {
-	extern int serial_console;  /* in console.c, of course */
 	unsigned long highest_paddr;
 	int i;
 
