@@ -196,7 +196,7 @@ struct ata_probe_ent {
 	unsigned long		irq;
 	unsigned int		irq_flags;
 	unsigned long		host_flags;
-	void			*mmio_base;
+	void __iomem		*mmio_base;
 	void			*private_data;
 };
 
@@ -204,7 +204,7 @@ struct ata_host_set {
 	spinlock_t		lock;
 	struct pci_dev		*pdev;
 	unsigned long		irq;
-	void			*mmio_base;
+	void __iomem		*mmio_base;
 	unsigned int		n_ports;
 	void			*private_data;
 	struct ata_port_operations *ops;
@@ -428,7 +428,7 @@ static inline unsigned int ata_dev_present(struct ata_device *dev)
 static inline u8 ata_chk_err(struct ata_port *ap)
 {
 	if (ap->flags & ATA_FLAG_MMIO) {
-		return readb((void *) ap->ioaddr.error_addr);
+		return readb((void __iomem *) ap->ioaddr.error_addr);
 	}
 	return inb(ap->ioaddr.error_addr);
 }
@@ -441,7 +441,7 @@ static inline u8 ata_chk_status(struct ata_port *ap)
 static inline u8 ata_altstatus(struct ata_port *ap)
 {
 	if (ap->flags & ATA_FLAG_MMIO)
-		return readb(ap->ioaddr.altstatus_addr);
+		return readb((void __iomem *)ap->ioaddr.altstatus_addr);
 	return inb(ap->ioaddr.altstatus_addr);
 }
 
@@ -512,7 +512,7 @@ static inline u8 ata_irq_on(struct ata_port *ap)
 	ap->last_ctl = ap->ctl;
 
 	if (ap->flags & ATA_FLAG_MMIO)
-		writeb(ap->ctl, ioaddr->ctl_addr);
+		writeb(ap->ctl, (void __iomem *) ioaddr->ctl_addr);
 	else
 		outb(ap->ctl, ioaddr->ctl_addr);
 	tmp = ata_wait_idle(ap);
@@ -533,7 +533,7 @@ static inline u8 ata_irq_ack(struct ata_port *ap, unsigned int chk_drq)
 
 	/* get controller status; clear intr, err bits */
 	if (ap->flags & ATA_FLAG_MMIO) {
-		void *mmio = (void *) ap->ioaddr.bmdma_addr;
+		void __iomem *mmio = (void __iomem *) ap->ioaddr.bmdma_addr;
 		host_stat = readb(mmio + ATA_DMA_STATUS);
 		writeb(host_stat | ATA_DMA_INTR | ATA_DMA_ERR,
 		       mmio + ATA_DMA_STATUS);
@@ -571,7 +571,7 @@ static inline unsigned int sata_dev_present(struct ata_port *ap)
 static inline void ata_bmdma_stop(struct ata_port *ap)
 {
 	if (ap->flags & ATA_FLAG_MMIO) {
-		void *mmio = (void *) ap->ioaddr.bmdma_addr;
+		void __iomem *mmio = (void __iomem *) ap->ioaddr.bmdma_addr;
 
 		/* clear start/stop bit */
 		writeb(readb(mmio + ATA_DMA_CMD) & ~ATA_DMA_START,
@@ -589,7 +589,7 @@ static inline void ata_bmdma_stop(struct ata_port *ap)
 static inline void ata_bmdma_ack_irq(struct ata_port *ap)
 {
 	if (ap->flags & ATA_FLAG_MMIO) {
-		void *mmio = ((void *) ap->ioaddr.bmdma_addr) + ATA_DMA_STATUS;
+		void __iomem *mmio = ((void __iomem *) ap->ioaddr.bmdma_addr) + ATA_DMA_STATUS;
 		writeb(readb(mmio), mmio);
 	} else {
 		unsigned long addr = ap->ioaddr.bmdma_addr + ATA_DMA_STATUS;
@@ -601,7 +601,7 @@ static inline u8 ata_bmdma_status(struct ata_port *ap)
 {
 	u8 host_stat;
 	if (ap->flags & ATA_FLAG_MMIO) {
-		void *mmio = (void *) ap->ioaddr.bmdma_addr;
+		void __iomem *mmio = (void __iomem *) ap->ioaddr.bmdma_addr;
 		host_stat = readb(mmio + ATA_DMA_STATUS);
 	} else
 		host_stat = inb(ap->ioaddr.bmdma_addr + ATA_DMA_STATUS);
