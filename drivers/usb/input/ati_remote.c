@@ -727,7 +727,6 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 	struct usb_host_interface *iface_host;
 	int retval = -ENOMEM;
 	char path[64];
-	char *buf = NULL;
 
 	/* Allocate and clear an ati_remote struct */
 	if (!(ati_remote = kmalloc(sizeof (struct ati_remote), GFP_KERNEL)))
@@ -761,8 +760,6 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 		retval = -ENODEV;
 		goto error;
 	}
-	if (!(buf = kmalloc(NAME_BUFSIZE, GFP_KERNEL)))
-		goto error;
 
 	/* Allocate URB buffers, URBs */
 	ati_remote->inbuf = usb_buffer_alloc(udev, DATA_BUFSIZE, SLAB_ATOMIC,
@@ -785,14 +782,11 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 
 	usb_make_path(udev, path, NAME_BUFSIZE);
 	sprintf(ati_remote->phys, "%s/input%d", path, ATI_INPUTNUM);
-	if (udev->descriptor.iManufacturer && 
-	    (usb_string(udev, udev->descriptor.iManufacturer, buf, 
-			NAME_BUFSIZE) > 0))
-		strcat(ati_remote->name, buf);
+	if (udev->manufacturer)
+		strcat(ati_remote->name, udev->manufacturer);
 
-	if (udev->descriptor.iProduct && 
-	    (usb_string(udev, udev->descriptor.iProduct, buf, NAME_BUFSIZE) > 0))
-		sprintf(ati_remote->name, "%s %s", ati_remote->name, buf);
+	if (udev->product)
+		sprintf(ati_remote->name, "%s %s", ati_remote->name, udev->product);
 
 	if (!strlen(ati_remote->name))
 		sprintf(ati_remote->name, DRIVER_DESC "(%04x,%04x)",
@@ -815,9 +809,6 @@ static int ati_remote_probe(struct usb_interface *interface, const struct usb_de
 	ati_remote->present = 1;	
 	
 error:
-	if (buf)
-		kfree(buf);
-
 	if (retval)
 		ati_remote_delete(ati_remote);
 

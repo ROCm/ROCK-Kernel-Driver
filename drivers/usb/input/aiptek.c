@@ -297,8 +297,6 @@ struct aiptek_features {
 	int firmwareCode;	/* prom/eeprom version            */
 	char usbPath[64 + 1];	/* device's physical usb path     */
 	char inputPath[64 + 1];	/* input device path              */
-	char manuName[64 + 1];	/* manufacturer name              */
-	char prodName[64 + 1];	/* product name                   */
 };
 
 struct aiptek_settings {
@@ -1089,7 +1087,7 @@ static ssize_t show_tabletManufacturer(struct device *dev, char *buf)
 	if (aiptek == NULL)
 		return 0;
 
-	retval = snprintf(buf, PAGE_SIZE, "%s\n", aiptek->features.manuName);
+	retval = snprintf(buf, PAGE_SIZE, "%s\n", aiptek->usbdev->manufacturer);
 	return retval;
 }
 
@@ -1106,7 +1104,7 @@ static ssize_t show_tabletProduct(struct device *dev, char *buf)
 	if (aiptek == NULL)
 		return 0;
 
-	retval = snprintf(buf, PAGE_SIZE, "%s\n", aiptek->features.prodName);
+	retval = snprintf(buf, PAGE_SIZE, "%s\n", aiptek->usbdev->product);
 	return retval;
 }
 
@@ -2165,19 +2163,6 @@ aiptek_probe(struct usb_interface *intf, const struct usb_device_id *id)
 	/* Register the tablet as an Input Device
 	 */
 	input_register_device(&aiptek->inputdev);
-
-	/* Go and decode the USB representation of the tablet's manufacturer
-	 * name and product name. They only change once every hotplug event,
-	 * which is why we put it here instead of in the sysfs interface.
-	 */
-	usb_string(usbdev,
-		   usbdev->descriptor.iManufacturer,
-		   aiptek->features.manuName,
-		   sizeof(aiptek->features.manuName));
-	usb_string(usbdev,
-		   usbdev->descriptor.iProduct,
-		   aiptek->features.prodName,
-		   sizeof(aiptek->features.prodName));
 
 	/* We now will look for the evdev device which is mapped to
 	 * the tablet. The partial name is kept in the link list of

@@ -238,7 +238,6 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	struct usb_kbd *kbd;
 	int i, pipe, maxp;
 	char path[64];
-	char *buf;
 
 	interface = iface->cur_altsetting;
 
@@ -301,25 +300,14 @@ static int usb_kbd_probe(struct usb_interface *iface,
 	kbd->dev.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 	kbd->dev.dev = &iface->dev;
 
-	if (!(buf = kmalloc(63, GFP_KERNEL))) {
-		usb_free_urb(kbd->irq);
-		usb_kbd_free_mem(dev, kbd);
-		kfree(kbd);
-		return -ENOMEM;
-	}
-
-	if (dev->descriptor.iManufacturer &&
-		usb_string(dev, dev->descriptor.iManufacturer, buf, 63) > 0)
-			strcat(kbd->name, buf);
-	if (dev->descriptor.iProduct &&
-		usb_string(dev, dev->descriptor.iProduct, buf, 63) > 0)
-			sprintf(kbd->name, "%s %s", kbd->name, buf);
+	if (dev->manufacturer)
+		strcat(kbd->name, dev->manufacturer);
+	if (dev->product)
+		sprintf(kbd->name, "%s %s", kbd->name, dev->product);
 
 	if (!strlen(kbd->name))
 		sprintf(kbd->name, "USB HIDBP Keyboard %04x:%04x",
 			kbd->dev.id.vendor, kbd->dev.id.product);
-
-	kfree(buf);
 
 	usb_fill_control_urb(kbd->led, dev, usb_sndctrlpipe(dev, 0),
 			     (void *) kbd->cr, kbd->leds, 1,

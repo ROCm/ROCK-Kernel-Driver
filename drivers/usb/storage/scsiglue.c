@@ -342,9 +342,22 @@ static int proc_info (struct Scsi_Host *host, char *buffer,
 	SPRINTF("   Host scsi%d: usb-storage\n", host->host_no);
 
 	/* print product, vendor, and serial number strings */
-	SPRINTF("       Vendor: %s\n", us->vendor);
-	SPRINTF("      Product: %s\n", us->product);
-	SPRINTF("Serial Number: %s\n", us->serial);
+	if (us->pusb_dev->manufacturer)
+		SPRINTF("       Vendor: %s\n", us->pusb_dev->manufacturer);
+	else if (us->unusual_dev->vendorName)
+		SPRINTF("       Vendor: %s\n", us->unusual_dev->vendorName);
+	else
+		SPRINTF("       Vendor: Unknown\n");
+	if (us->pusb_dev->product)
+		SPRINTF("      Product: %s\n", us->pusb_dev->product);
+	else if (us->unusual_dev->productName)
+		SPRINTF("      Product: %s\n", us->unusual_dev->productName);
+	else
+		SPRINTF("      Product: Unknown\n");
+	if (us->pusb_dev->serial)
+		SPRINTF("Serial Number: %s\n", us->pusb_dev->serial);
+	else
+		SPRINTF("Serial Number: None\n");
 
 	/* show the protocol and transport */
 	SPRINTF("     Protocol: %s\n", us->protocol_name);

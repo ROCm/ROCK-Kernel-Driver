@@ -184,7 +184,6 @@ static int touchkit_probe(struct usb_interface *intf,
 	struct usb_endpoint_descriptor *endpoint;
 	struct usb_device *udev = interface_to_usbdev(intf);
 	char path[64];
-	char *buf;
 
 	interface = intf->cur_altsetting;
 	endpoint = &interface->endpoint[0].desc;
@@ -230,24 +229,14 @@ static int touchkit_probe(struct usb_interface *intf,
 	touchkit->input.absfuzz[ABS_Y] = TOUCHKIT_YC_FUZZ;
 	touchkit->input.absflat[ABS_Y] = TOUCHKIT_YC_FLAT;
 
-	buf = kmalloc(63, GFP_KERNEL);
-	if (!buf) {
-		ret = -ENOMEM;
-		goto out_free_buffers;
-	}
-
-	if (udev->descriptor.iManufacturer &&
-	    usb_string(udev, udev->descriptor.iManufacturer, buf, 63) > 0)
-		strcat(touchkit->name, buf);
-	if (udev->descriptor.iProduct &&
-	    usb_string(udev, udev->descriptor.iProduct, buf, 63) > 0)
-		sprintf(touchkit->name, "%s %s", touchkit->name, buf);
+	if (udev->manufacturer)
+		strcat(touchkit->name, udev->manufacturer);
+	if (udev->product)
+		sprintf(touchkit->name, "%s %s", touchkit->name, udev->product);
 
 	if (!strlen(touchkit->name))
 		sprintf(touchkit->name, "USB Touchscreen %04x:%04x",
 		        touchkit->input.id.vendor, touchkit->input.id.product);
-
-	kfree(buf);
 
 	touchkit->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!touchkit->irq) {

@@ -122,9 +122,6 @@ struct us_data {
 	unsigned int		recv_intr_pipe;
 
 	/* information about the device */
-	char			vendor[USB_STOR_STRING_LEN];
-	char			product[USB_STOR_STRING_LEN];
-	char			serial[USB_STOR_STRING_LEN];
 	char			*transport_name;
 	char			*protocol_name;
 	u8			subclass;

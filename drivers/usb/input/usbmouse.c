@@ -129,7 +129,6 @@ static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_
 	struct usb_mouse *mouse;
 	int pipe, maxp;
 	char path[64];
-	char *buf;
 
 	interface = intf->cur_altsetting;
 
@@ -185,24 +184,14 @@ static int usb_mouse_probe(struct usb_interface * intf, const struct usb_device_
 	mouse->dev.id.version = le16_to_cpu(dev->descriptor.bcdDevice);
 	mouse->dev.dev = &intf->dev;
 
-	if (!(buf = kmalloc(63, GFP_KERNEL))) {
-		usb_buffer_free(dev, 8, mouse->data, mouse->data_dma);
-		kfree(mouse);
-		return -ENOMEM;
-	}
-
-	if (dev->descriptor.iManufacturer &&
-		usb_string(dev, dev->descriptor.iManufacturer, buf, 63) > 0)
-			strcat(mouse->name, buf);
-	if (dev->descriptor.iProduct &&
-		usb_string(dev, dev->descriptor.iProduct, buf, 63) > 0)
-			sprintf(mouse->name, "%s %s", mouse->name, buf);
+	if (dev->manufacturer)
+		strcat(mouse->name, dev->manufacturer);
+	if (dev->product)
+		sprintf(mouse->name, "%s %s", mouse->name, dev->product);
 
 	if (!strlen(mouse->name))
 		sprintf(mouse->name, "USB HIDBP Mouse %04x:%04x",
 			mouse->dev.id.vendor, mouse->dev.id.product);
-
-	kfree(buf);
 
 	usb_fill_int_urb(mouse->irq, dev, pipe, mouse->data,
 			 (maxp > 8 ? 8 : maxp),

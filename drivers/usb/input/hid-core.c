@@ -1742,12 +1742,12 @@ static struct hid_device *usb_hid_configure(struct usb_interface *intf)
 	if (!(buf = kmalloc(64, GFP_KERNEL)))
 		goto fail;
 
-	if (usb_string(dev, dev->descriptor.iManufacturer, buf, 64) > 0) {
-		strcat(hid->name, buf);
-		if (usb_string(dev, dev->descriptor.iProduct, buf, 64) > 0)
-			snprintf(hid->name, 64, "%s %s", hid->name, buf);
-	} else if (usb_string(dev, dev->descriptor.iProduct, buf, 64) > 0) {
-			snprintf(hid->name, 128, "%s", buf);
+	if (dev->manufacturer) {
+		strcat(hid->name, dev->manufacturer);
+		if (dev->product)
+			snprintf(hid->name, 64, "%s %s", hid->name, dev->product);
+	} else if (dev->product) {
+			snprintf(hid->name, 128, "%s", dev->product);
 	} else
 		snprintf(hid->name, 128, "%04x:%04x", 
 			 le16_to_cpu(dev->descriptor.idVendor),

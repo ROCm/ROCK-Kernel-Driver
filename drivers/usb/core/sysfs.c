@@ -89,16 +89,14 @@ static DEVICE_ATTR(bConfigurationValue, S_IRUGO | S_IWUSR,
 		show_bConfigurationValue, set_bConfigurationValue);
 
 /* String fields */
-#define usb_string_attr(name, field)		\
+#define usb_string_attr(name)						\
 static ssize_t  show_##name(struct device *dev, char *buf)		\
 {									\
 	struct usb_device *udev;					\
 	int len;							\
 									\
 	udev = to_usb_device (dev);					\
-	if (!udev->field)						\
-		return 0;						\
-	len = snprintf(buf, 256, "%s", udev->field);			\
+	len = snprintf(buf, 256, "%s", udev->name);			\
 	if (len < 0)							\
 		return 0;						\
 	buf[len] = '\n';						\
@@ -107,9 +105,9 @@ static ssize_t  show_##name(struct device *dev, char *buf)		\
 }									\
 static DEVICE_ATTR(name, S_IRUGO, show_##name, NULL);
 
-usb_string_attr(product, static_product);     /* iProduct */
-usb_string_attr(manufacturer, static_vendor); /* iManufacturer */
-usb_string_attr(serial, static_serial);       /* iSerialNumber */
+usb_string_attr(product);
+usb_string_attr(manufacturer);
+usb_string_attr(serial);
 
 static ssize_t
 show_speed (struct device *dev, char *buf)
@@ -232,11 +230,11 @@ void usb_create_sysfs_dev_files (struct usb_device *udev)
 
 	sysfs_create_group(&dev->kobj, &dev_attr_grp);
 
-	if (udev->descriptor.iManufacturer)
+	if (udev->manufacturer)
 		device_create_file (dev, &dev_attr_manufacturer);
-	if (udev->descriptor.iProduct)
+	if (udev->product)
 		device_create_file (dev, &dev_attr_product);
-	if (udev->descriptor.iSerialNumber)
+	if (udev->serial)
 		device_create_file (dev, &dev_attr_serial);
 	device_create_file (dev, &dev_attr_configuration);
 }

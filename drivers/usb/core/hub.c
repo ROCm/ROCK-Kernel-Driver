@@ -1052,10 +1052,6 @@ void usb_disconnect(struct usb_device **pdev)
 	*pdev = NULL;
 	spin_unlock_irq(&device_state_lock);
 
-	kfree(udev->static_vendor);
-	kfree(udev->static_product);
-	kfree(udev->static_serial);
-
 	if (!udev->parent) {
 		usb_unlock_device(udev);
 		up(&usb_bus_list_lock);
@@ -1106,17 +1102,32 @@ static int choose_configuration(struct usb_device *udev)
 	return c;
 }
 
-static void show_string(struct usb_device *udev, char *id, char **info, int index)
+#ifdef DEBUG
+static void show_string(struct usb_device *udev, char *id, char *string)
+{
+	if (!string)
+		return;
+	dev_printk(KERN_INFO, &udev->dev, "%s: %s\n", id, string);
+}
+
+#else
+static inline void show_string(struct usb_device *udev, char *id, int index)
+{}
+#endif
+
+static void get_string(struct usb_device *udev, char **string, int index)
 {
 	char *buf;
 
 	if (!index)
 		return;
-	if (!(buf = kmalloc(256, GFP_KERNEL)))
+	buf = kmalloc(256, GFP_KERNEL);
+	if (!buf)
 		return;
 	if (usb_string(udev, index, buf, 256) > 0)
-		dev_printk(KERN_INFO, &udev->dev, "%s: %s\n", id, *info = buf);
+		*string = buf;
 }
+
 
 #ifdef	CONFIG_USB_OTG
 #include "otg_whitelist.h"
@@ -1154,25 +1165,20 @@ int usb_new_device(struct usb_device *udev)
 		goto fail;
 	}
 
+	/* read the standard strings and cache them if present */
+	get_string(udev, &udev->product, udev->descriptor.iProduct);
+	get_string(udev, &udev->manufacturer, udev->descriptor.iManufacturer);
+	get_string(udev, &udev->serial, udev->descriptor.iSerialNumber);
+
 	/* Tell the world! */
 	dev_dbg(&udev->dev, "new device strings: Mfr=%d, Product=%d, "
 			"SerialNumber=%d\n",
 			udev->descriptor.iManufacturer,
 			udev->descriptor.iProduct,
 			udev->descriptor.iSerialNumber);
-
-	if (udev->descriptor.iProduct)
-		show_string(udev, "Product",
-				&udev->static_product,
-				udev->descriptor.iProduct);
-	if (udev->descriptor.iManufacturer)
-		show_string(udev, "Manufacturer",
-				&udev->static_vendor,
-				udev->descriptor.iManufacturer);
-	if (udev->descriptor.iSerialNumber)
-		show_string(udev, "SerialNumber",
-				&udev->static_serial,
-				udev->descriptor.iSerialNumber);
+	show_string(udev, "Product", udev->product);
+	show_string(udev, "Manufacturer", udev->manufacturer);
+	show_string(udev, "SerialNumber", udev->serial);
 
 #ifdef	CONFIG_USB_OTG
 	/*

@@ -647,7 +647,10 @@ static void usb_release_dev(struct device *dev)
 
 	usb_destroy_configuration(udev);
 	usb_bus_put(udev->bus);
-	kfree (udev);
+	kfree(udev->product);
+	kfree(udev->manufacturer);
+	kfree(udev->serial);
+	kfree(udev);
 }
 
 /**

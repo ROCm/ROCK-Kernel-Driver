@@ -517,37 +517,6 @@ static void get_device_info(struct us_data *us, int id_index)
 				idesc->bInterfaceProtocol,
 				msgs[msg]);
 	}
-
-	/* Read the device's string descriptors */
-	if (dev->descriptor.iManufacturer)
-		usb_string(dev, dev->descriptor.iManufacturer, 
-			   us->vendor, sizeof(us->vendor));
-	if (dev->descriptor.iProduct)
-		usb_string(dev, dev->descriptor.iProduct, 
-			   us->product, sizeof(us->product));
-	if (dev->descriptor.iSerialNumber)
-		usb_string(dev, dev->descriptor.iSerialNumber, 
-			   us->serial, sizeof(us->serial));
-
-	/* Use the unusual_dev strings if the device didn't provide them */
-	if (strlen(us->vendor) == 0) {
-		if (unusual_dev->vendorName)
-			strlcpy(us->vendor, unusual_dev->vendorName,
-				sizeof(us->vendor));
-		else
-			strcpy(us->vendor, "Unknown");
-	}
-	if (strlen(us->product) == 0) {
-		if (unusual_dev->productName)
-			strlcpy(us->product, unusual_dev->productName,
-				sizeof(us->product));
-		else
-			strcpy(us->product, "Unknown");
-	}
-	if (strlen(us->serial) == 0)
-		strcpy(us->serial, "None");
-
-	US_DEBUGP("Vendor: %s,  Product: %s\n", us->vendor, us->product);
 }
 
 /* Get the transport settings */

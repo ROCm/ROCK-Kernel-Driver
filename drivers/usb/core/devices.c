@@ -362,33 +362,21 @@ static char *usb_dump_device_descriptor(char *start, char *end, const struct usb
  */
 static char *usb_dump_device_strings (char *start, char *end, struct usb_device *dev)
 {
-	char *buf;
-
 	if (start > end)
 		return start;
-	buf = kmalloc(128, GFP_KERNEL);
-	if (!buf)
-		return start;
-	if (dev->descriptor.iManufacturer) {
-		if (usb_string(dev, dev->descriptor.iManufacturer, buf, 128) > 0)
-			start += sprintf(start, format_string_manufacturer, buf);
-	}				
+	if (dev->manufacturer)
+		start += sprintf(start, format_string_manufacturer, dev->manufacturer);
 	if (start > end)
 		goto out;
-	if (dev->descriptor.iProduct) {
-		if (usb_string(dev, dev->descriptor.iProduct, buf, 128) > 0)
-			start += sprintf(start, format_string_product, buf);
-	}
+	if (dev->product)
+		start += sprintf(start, format_string_product, dev->product);
 	if (start > end)
 		goto out;
 #ifdef ALLOW_SERIAL_NUMBER
-	if (dev->descriptor.iSerialNumber) {
-		if (usb_string(dev, dev->descriptor.iSerialNumber, buf, 128) > 0)
-			start += sprintf(start, format_string_serialnumber, buf);
-	}
+	if (dev->serial)
+		start += sprintf(start, format_string_serialnumber, dev->serial);
 #endif
  out:
-	kfree(buf);
 	return start;
 }
 

@@ -338,6 +338,9 @@ struct usb_device {
 	int have_langid;		/* whether string_langid is valid yet */
 	int string_langid;		/* language ID for strings */
 
+	char *product;
+	char *manufacturer;
+	char *serial;			/* static strings from the device */
 	struct list_head filelist;
 	struct dentry *usbfs_dentry;	/* usbfs dentry entry for the device */
 
@@ -351,9 +354,6 @@ struct usb_device {
 
 	int maxchild;			/* Number of ports if hub */
 	struct usb_device *children[USB_MAXCHILDREN];
-	char *static_vendor;
-	char *static_product;
-	char *static_serial;
 };
 #define	to_usb_device(d) container_of(d, struct usb_device, dev)
 
