@@ -186,6 +186,17 @@ config DSCC4
 	  The module will be called dscc4. For general information about
 	  modules read <file:Documentation/modules.txt>.
 
+config DSCC4_PCISYNC
+	bool "Etinc PCISYNC features"
+	depends on DSCC4
+	help
+	  Due to Etinc's design choice for its PCISYNC cards, some operations
+	  are only allowed on specific ports of the DSCC4. This option is the
+	  only way for the driver to know that it shouldn't return a success
+	  code for these operations.
+
+	  Please say Y if your card is an Etinc's PCISYNC.
+
 config DSCC4_PCI_RST
 	bool "Hard reset support"
 	depends on DSCC4

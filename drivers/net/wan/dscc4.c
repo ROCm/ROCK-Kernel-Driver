@@ -514,9 +514,9 @@ inline int try_get_rx_skb(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	skb = dev_alloc_skb(len);
 	dpriv->rx_skbuff[dirty] = skb;
 	if (skb) {
-	skb->dev = dev;
-	skb->protocol = hdlc_type_trans(skb, dev);
-	skb->mac.raw = skb->data;
+		skb->dev = dev;
+		skb->protocol = hdlc_type_trans(skb, dev);
+		skb->mac.raw = skb->data;
 		rx_fd->data = pci_map_single(dpriv->pci_priv->pdev, skb->data,
 					     len, PCI_DMA_FROMDEVICE);
 	} else {
@@ -1171,7 +1171,7 @@ static inline int dscc4_check_clock_ability(int port)
 {
 	int ret = 0;
 
-#ifdef CONFIG_DSCC4_CLOCK_ON_TWO_PORTS_ONLY
+#ifdef CONFIG_DSCC4_PCISYNC
 	if (port >= 2)
 		ret = -1;
 #endif
@@ -1304,7 +1304,7 @@ static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 
 		if (dpriv->flags & FakeReset) {
 			printk(KERN_INFO "%s: please reset the device"
-			       "before this command\n", dev->name);
+			       " before this command\n", dev->name);
 			return -EPERM;
 		}
 		if (copy_from_user(&dpriv->settings, line, size))
