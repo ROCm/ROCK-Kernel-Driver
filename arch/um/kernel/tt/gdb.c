@@ -74,16 +74,16 @@ static void *xterm_data;
 static int xterm_fd;
 
 extern void *xterm_init(char *, int, struct chan_opts *);
-extern int xterm_open(int, int, int, void *);
+extern int xterm_open(int, int, int, void *, char **);
 extern void xterm_close(int, void *);
 
 int open_gdb_chan(void)
 {
-	char stack[UM_KERN_PAGE_SIZE];
+	char stack[UM_KERN_PAGE_SIZE], *dummy;
 
 	opts.tramp_stack = (unsigned long) stack;
 	xterm_data = xterm_init("", 0, &opts);
-	xterm_fd = xterm_open(1, 1, 1, xterm_data);
+	xterm_fd = xterm_open(1, 1, 1, xterm_data, &dummy);
 	return(xterm_fd);
 }
 

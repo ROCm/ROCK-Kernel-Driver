@@ -6,6 +6,7 @@
 #include "linux/sched.h"
 #include "linux/signal.h"
 #include "linux/kernel.h"
+#include "linux/interrupt.h"
 #include "asm/system.h"
 #include "asm/pgalloc.h"
 #include "asm/ptrace.h"
@@ -111,8 +112,6 @@ void exit_thread_tt(void)
 	close(current->thread.mode.tt.switch_pipe[1]);
 }
 
-extern void schedule_tail(struct task_struct *prev);
-
 static void new_thread_handler(int sig)
 {
 	int (*fn)(void *);
@@ -120,7 +119,7 @@ static void new_thread_handler(int sig)
 
 	fn = current->thread.request.u.thread.proc;
 	arg = current->thread.request.u.thread.arg;
-	current->thread.regs.regs.mode.tt = (void *) (&sig + 1);
+	UPT_SC(&current->thread.regs.regs) = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.mode.tt.switch_pipe[0]);
 
 	block_signals();
@@ -160,7 +159,7 @@ static int new_thread_proc(void *stack)
 
 void finish_fork_handler(int sig)
 {
-	current->thread.regs.regs.mode.tt = (void *) (&sig + 1);
+ 	UPT_SC(&current->thread.regs.regs) = (void *) (&sig + 1);
 	suspend_new_thread(current->thread.mode.tt.switch_pipe[0]);
 
 #ifdef CONFIG_SMP	
@@ -168,6 +167,7 @@ void finish_fork_handler(int sig)
 #endif
 	enable_timer();
 	change_sig(SIGVTALRM, 1);
+ 	sti();
 	force_flush_all();
 	if(current->mm != current->parent->mm)
 		protect_memory(uml_reserved, high_physmem - uml_reserved, 1, 
@@ -187,6 +187,7 @@ int fork_tramp(void *stack)
 {
 	int sig = sigusr1;
 
+	cli();
 	init_new_thread_stack(stack, finish_fork_handler);
 
 	kill(os_getpid(), sig);
@@ -232,10 +233,10 @@ int copy_thread_tt(int nr, unsigned long clone_flags, unsigned long sp,
 	}
 
 	if(current->thread.forking){
-		sc_to_sc(p->thread.regs.regs.mode.tt, 
-			 current->thread.regs.regs.mode.tt);
-		SC_SET_SYSCALL_RETURN(p->thread.regs.regs.mode.tt, 0);
-		if(sp != 0) SC_SP(p->thread.regs.regs.mode.tt) = sp;
+		sc_to_sc(UPT_SC(&p->thread.regs.regs), 
+			 UPT_SC(&current->thread.regs.regs));
+		SC_SET_SYSCALL_RETURN(UPT_SC(&p->thread.regs.regs), 0);
+		if(sp != 0) SC_SP(UPT_SC(&p->thread.regs.regs)) = sp;
 	}
 	p->thread.mode.tt.extern_pid = new_pid;
 

@@ -18,26 +18,35 @@
  * setup_arch_frame uses that data to figure out what 
  * arch_frame_data.fpstate_size should be.  It really has no idea, since it's
  * not allowed to do sizeof(struct fpstate) but it's safe to consider that it's
- * everything from the end of the sgcontext up to the top of the stack.  So,
+ * everything from the end of the sigcontext up to the top of the stack.  So,
  * it masks off the page number to get the offset within the page and subtracts
  * that from the page size, and that's how big the fpstate struct will be
  * considered to be.
  */
 
 static inline void setup_arch_frame_raw(struct arch_frame_data_raw *data,
-					struct sigcontext *sc)
+					void *end, unsigned long srp)
 {
-	data->sc_end = (unsigned long) sc;
-	data->sc_end += sizeof(*sc);
+	unsigned long sr = *((unsigned long *) srp);
+
+	data->fp_start = (unsigned long) end;
+	if((sr & PAGE_MASK) == ((unsigned long) end & PAGE_MASK))
+		data->sr = sr;
+	else data->sr = 0;
 }
 
 static inline void setup_arch_frame(struct arch_frame_data_raw *in, 
 				    struct arch_frame_data *out)
 {
-	unsigned long fpstate_start = in->sc_end;
+	unsigned long fpstate_start = in->fp_start;
 
-	fpstate_start &= ~PAGE_MASK;
-	out->fpstate_size = PAGE_SIZE - fpstate_start;
+	if(in->sr == 0){
+		fpstate_start &= ~PAGE_MASK;
+		out->fpstate_size = PAGE_SIZE - fpstate_start;
+	}
+	else {
+		out->fpstate_size = in->sr - fpstate_start;
+	}
 }
 
 /* This figures out where on the stack the SA_RESTORER function address

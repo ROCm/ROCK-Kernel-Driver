@@ -20,10 +20,10 @@
 #include "user_util.h"
 #include "kern_util.h"
 #include "skas.h"
-#include "skas_ptrace.h"
 #include "sysdep/sigcontext.h"
 #include "os.h"
 #include "proc_mm.h"
+#include "skas_ptrace.h"
 
 unsigned long exec_regs[FRAME_SIZE];
 unsigned long exec_fp_regs[HOST_FP_SIZE];
@@ -42,11 +42,11 @@ static void handle_segv(int pid)
 	segv(fault.addr, 0, FAULT_WRITE(fault.is_write), 1, NULL);
 }
 
-static void handle_trap(int pid, struct uml_pt_regs *regs)
+static void handle_trap(int pid, union uml_pt_regs *regs)
 {
 	int err, syscall_nr, status;
 
-	syscall_nr = PT_SYSCALL_NR(regs->mode.skas.regs);
+	syscall_nr = PT_SYSCALL_NR(regs->skas.regs);
 	if(syscall_nr < 1){
 		relay_signal(SIGTRAP, regs);
 		return;
@@ -115,7 +115,7 @@ void start_userspace(void)
 	userspace_pid = pid;
 }
 
-void userspace(struct uml_pt_regs *regs)
+void userspace(union uml_pt_regs *regs)
 {
 	int err, status, op;
 
@@ -131,7 +131,7 @@ void userspace(struct uml_pt_regs *regs)
 			panic("userspace - waitpid failed, errno = %d\n", 
 			      errno);
 
-		regs->is_user = 1;
+		regs->skas.is_user = 1;
 		save_registers(regs);
 
 		if(WIFSTOPPED(status)){
@@ -191,28 +191,28 @@ void thread_wait(void *sw, void *fb)
 		longjmp(*fork_buf, 1);
 }
 
-static int move_registers(int int_op, int fp_op, struct uml_pt_regs *regs,
+static int move_registers(int int_op, int fp_op, union uml_pt_regs *regs,
 			  unsigned long *fp_regs)
 {
-	if(ptrace(int_op, userspace_pid, 0, regs->mode.skas.regs) < 0)
+	if(ptrace(int_op, userspace_pid, 0, regs->skas.regs) < 0)
 		return(-errno);
 	if(ptrace(fp_op, userspace_pid, 0, fp_regs) < 0)
 		return(-errno);
 	return(0);
 }
 
-void save_registers(struct uml_pt_regs *regs)
+void save_registers(union uml_pt_regs *regs)
 {
 	unsigned long *fp_regs;
 	int err, fp_op;
 
 	if(have_fpx_regs){
 		fp_op = PTRACE_GETFPXREGS;
-		fp_regs = regs->mode.skas.xfp;
+		fp_regs = regs->skas.xfp;
 	}
 	else {
 		fp_op = PTRACE_GETFPREGS;
-		fp_regs = regs->mode.skas.fp;
+		fp_regs = regs->skas.fp;
 	}
 
 	err = move_registers(PTRACE_GETREGS, fp_op, regs, fp_regs);
@@ -221,18 +221,18 @@ void save_registers(struct uml_pt_regs *regs)
 		      err);
 }
 
-void restore_registers(struct uml_pt_regs *regs)
+void restore_registers(union uml_pt_regs *regs)
 {
 	unsigned long *fp_regs;
 	int err, fp_op;
 
 	if(have_fpx_regs){
 		fp_op = PTRACE_SETFPXREGS;
-		fp_regs = regs->mode.skas.xfp;
+		fp_regs = regs->skas.xfp;
 	}
 	else {
 		fp_op = PTRACE_SETFPREGS;
-		fp_regs = regs->mode.skas.fp;
+		fp_regs = regs->skas.fp;
 	}
 
 	err = move_registers(PTRACE_SETREGS, fp_op, regs, fp_regs);
@@ -272,10 +272,14 @@ int start_idle_thread(void *stack, void *switch_buf_ptr, void **fork_buf_ptr)
 		(*cb_proc)(cb_arg);
 		longjmp(*cb_back, 1);
 	}
-	else if(n == 3)
+	else if(n == 3){
+		kmalloc_ok = 0;
 		return(0);
-	else if(n == 4)
+	}
+	else if(n == 4){
+		kmalloc_ok = 0;
 		return(1);
+	}
 	longjmp(**switch_buf, 1);
 }
 
@@ -296,8 +300,11 @@ void initial_thread_cb_skas(void (*proc)(void *), void *arg)
 	cb_proc = proc;
 	cb_arg = arg;
 	cb_back = &here;
+
+	block_signals();
 	if(setjmp(here) == 0)
 		longjmp(initial_jmpbuf, 2);
+	unblock_signals();
 
 	cb_proc = NULL;
 	cb_arg = NULL;
