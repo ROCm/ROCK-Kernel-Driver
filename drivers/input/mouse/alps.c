@@ -115,20 +115,14 @@ static void alps_process_packet(struct psmouse *psmouse, struct pt_regs *regs)
 	ges = packet[2] & 1;
 	fin = packet[2] & 2;
 
-	/* Dualpoint has stick buttons in byte 0 */
-	if (priv->i->flags & ALPS_DUALPOINT) {
-	
-		input_report_key(dev2, BTN_LEFT,    packet[0]       & 1);    
-		input_report_key(dev2, BTN_MIDDLE, (packet[0] >> 2) & 1);
-		input_report_key(dev2, BTN_RIGHT,  (packet[0] >> 1) & 1);
-
-		/* Relative movement packet */
- 		if (z == 127) {
-			input_report_rel(dev2, REL_X,  (x > 383 ? x : (x - 768)));
-			input_report_rel(dev2, REL_Y, -(y > 255 ? y : (x - 512)));
-			input_sync(dev2);
-			return;
-		}
+	if ((priv->i->flags & ALPS_DUALPOINT) && z == 127) {
+		input_report_key(dev2, BTN_LEFT,   left);    
+		input_report_key(dev2, BTN_RIGHT,  right);
+		input_report_key(dev2, BTN_MIDDLE, middle);
+		input_report_rel(dev2, REL_X,  (x > 383 ? (x - 768) : x));
+		input_report_rel(dev2, REL_Y, -(y > 255 ? (x - 512) : y));
+		input_sync(dev2);
+		return;
 	}
 
 	/* Convert hardware tap to a reasonable Z value */
