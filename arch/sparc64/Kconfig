@@ -489,6 +489,22 @@ config WATCHDOG_RIO
 	  machines.  The watchdog timeout period is normally one minute but
 	  can be changed with a boot-time parameter.
 
+config CMDLINE_BOOL
+	bool "Default bootloader kernel arguments"
+
+config CMDLINE
+	string "Initial kernel command string"
+	depends on CMDLINE_BOOL
+	default "console=ttyS0,9600 root=/dev/sda1"
+	help
+	  Say Y here if you want to be able to pass default arguments to
+	  the kernel. This will be overridden by the bootloader, if you
+	  use one (such as SILO). This is most useful if you want to boot
+	  a kernel from TFTP, and want default options to be available
+	  with having them passed on the command line.
+
+	  NOTE: This option WILL override the PROM bootargs setting!
+
 endmenu
 
 source "drivers/base/Kconfig"
