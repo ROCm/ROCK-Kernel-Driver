@@ -201,7 +201,7 @@ static int pci_probe(sdlahw_t *hw);
  * Note: All data must be explicitly initialized!!!
  */
 
-static struct pci_device_id sdladrv_pci_tbl[] __initdata = {
+static struct pci_device_id sdladrv_pci_tbl[] = {
 	{ V3_VENDOR_ID, V3_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, },
 	{ }			/* Terminating entry */
 };

@@ -121,7 +121,7 @@ void iodelay(int udelay)
 	}
 }
 
-static struct pci_device_id via_pci_tbl[] __initdata = {
+static struct pci_device_id via_pci_tbl[] = {
 	{ PCI_VENDOR_ID_VIA, DeviceID1, PCI_ANY_ID, PCI_ANY_ID,0,0,0 },
 	{ PCI_VENDOR_ID_VIA, DeviceID2, PCI_ANY_ID, PCI_ANY_ID,0,0,1 },
 	{ PCI_VENDOR_ID_VIA, DeviceID3, PCI_ANY_ID, PCI_ANY_ID,0,0,2 },

@@ -294,7 +294,7 @@ static struct miscdevice amdtco_miscdev =
 	.fops	= &amdtco_fops
 };
 
-static struct pci_device_id amdtco_pci_tbl[] __initdata = {
+static struct pci_device_id amdtco_pci_tbl[] = {
 	/* AMD 766 PCI_IDs here */
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_OPUS_7443, PCI_ANY_ID, PCI_ANY_ID, },
 	{ 0, }
