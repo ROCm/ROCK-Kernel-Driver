@@ -11,14 +11,13 @@
  * as published by the Free Software Foundation; either version
  * 2 of the License, or (at your option) any later version.
  */
-#include <linux/config.h>
 #include <linux/sys.h>
 #include <asm/unistd.h>
 #include <asm/errno.h>
 #include <asm/processor.h>
 #include <asm/page.h>
 #include <asm/cache.h>
-#include "ppc_asm.h"
+#include <asm/ppc_asm.h>
 	
 /*
  * hcall interface to pSeries LPAR

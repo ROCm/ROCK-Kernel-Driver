@@ -9,7 +9,7 @@
  * 2 of the License, or (at your option) any later version.
  */
 #include <asm/processor.h>
-#include "../kernel/ppc_asm.h"
+#include <asm/ppc_asm.h>
 
 	.align	7
 _GLOBAL(__copy_tofrom_user)
