@@ -331,6 +331,7 @@ static void prep_new_page(struct page *page, int order)
 	page->flags &= ~(1 << PG_uptodate | 1 << PG_error |
 			1 << PG_referenced | 1 << PG_arch_1 |
 			1 << PG_checked | 1 << PG_mappedtodisk);
+	page->private = 0;
 	set_page_refs(page, order);
 }
 
