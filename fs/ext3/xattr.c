@@ -1162,6 +1162,7 @@ ext3_xattr_cmp(struct ext3_xattr_header *header1,
 		if (IS_LAST_ENTRY(entry2))
 			return 1;
 		if (entry1->e_hash != entry2->e_hash ||
+		    entry1->e_name_index != entry2->e_name_index ||
 		    entry1->e_name_len != entry2->e_name_len ||
 		    entry1->e_value_size != entry2->e_value_size ||
 		    memcmp(entry1->e_name, entry2->e_name, entry1->e_name_len))
