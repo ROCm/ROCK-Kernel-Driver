@@ -219,9 +219,9 @@ static void rcu_check_quiescent_state(struct rcu_ctrlblk *rcp,
 			struct rcu_state *rsp, struct rcu_data *rdp)
 {
 	if (rdp->quiescbatch != rcp->cur) {
-		/* new grace period: record qsctr value. */
+		/* start new grace period: */
 		rdp->qs_pending = 1;
-		rdp->last_qsctr = rdp->qsctr;
+		rdp->passed_quiesc = 0;
 		rdp->quiescbatch = rcp->cur;
 		return;
 	}
@@ -234,11 +234,10 @@ static void rcu_check_quiescent_state(struct rcu_ctrlblk *rcp,
 		return;
 
 	/* 
-	 * Races with local timer interrupt - in the worst case
-	 * we may miss one quiescent state of that CPU. That is
-	 * tolerable. So no need to disable interrupts.
+	 * Was there a quiescent state since the beginning of the grace
+	 * period? If no, then exit and wait for the next call.
 	 */
-	if (rdp->qsctr == rdp->last_qsctr)
+	if (!rdp->passed_quiesc)
 		return;
 	rdp->qs_pending = 0;
 
