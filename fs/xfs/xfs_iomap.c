@@ -868,7 +868,8 @@ xfs_iomap_write_unwritten(
 				&ip->i_iocore, offset, count);
 
 	offset_fsb = XFS_B_TO_FSBT(mp, offset);
-	count_fsb = XFS_B_TO_FSB(mp, count);
+	count_fsb = XFS_B_TO_FSB(mp, (xfs_ufsize_t)offset + count);
+	count_fsb = (xfs_filblks_t)(count_fsb - offset_fsb);
 
 	do {
 		nres = XFS_DIOSTRAT_SPACE_RES(mp, 0);
