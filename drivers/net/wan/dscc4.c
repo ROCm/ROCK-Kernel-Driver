@@ -115,7 +115,6 @@ static int quartz;
 #define	DRV_NAME	"dscc4"
 
 #undef DSCC4_POLLING
-#define DEBUG
 
 /* Module parameters */
 
@@ -151,8 +150,6 @@ struct RxFD {
 	u32 state2;
 	u32 end;
 };
-
-#define CONFIG_DSCC4_DEBUG
 
 #define DUMMY_SKB_SIZE		64
 #define TX_LOW			8
@@ -307,10 +304,12 @@ struct dscc4_dev_priv {
 #define TxEvt		0x0f000000
 #define Alls		0x00040000
 #define Xdu		0x00010000
+#define Cts		0x00004000
 #define Xmr		0x00002000
 #define Xpr		0x00001000
 #define Rdo		0x00000080
 #define Rfs		0x00000040
+#define Cd		0x00000004
 #define Rfo		0x00000002
 #define Flex		0x00000001
 
@@ -806,7 +805,8 @@ static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
 	scc_writel(0xfffeef7f, dpriv, dev, IMR); /* Interrupt mask */
 #else
 	//scc_writel(0xfffaef7f, dpriv, dev, IMR); /* Interrupt mask */
-	scc_writel(0xfffaef7e, dpriv, dev, IMR); /* Interrupt mask */
+	//scc_writel(0xfffaef7e, dpriv, dev, IMR); /* Interrupt mask */
+	scc_writel(0xfffa8f7a, dpriv, dev, IMR); /* Interrupt mask */
 #endif
 }
 
@@ -1346,10 +1346,8 @@ try:
 	cur = dpriv->iqtx_current%IRQ_RING_SIZE;
 	state = dpriv->iqtx[cur];
 	if (!state) {
-#ifdef DEBUG
-		if (loop > 1)
+		if ((debug > 1) && (loop > 1))
 			printk(KERN_DEBUG "%s: Tx irq loop=%d\n", dev->name, loop);
-#endif
 		if (loop && netif_queue_stopped(dev))
 			if ((dpriv->tx_current - dpriv->tx_dirty) <= TX_LOW)
 				netif_wake_queue(dev);
@@ -1421,6 +1419,11 @@ try:
 			writel(Action, dev->base_addr + GCMDR);
 			return;
 		}
+		if (state & Cts) {
+			printk(KERN_INFO "%s: CTS transition\n", dev->name);
+			if (!(state &= ~Cts)) /* DEBUG */
+				goto try;
+		}
 		if (state & Xmr) {
 			/* Frame needs to be sent again - FIXME */
 			printk(KERN_ERR "%s: Xmr. Ask maintainer\n", DRV_NAME);
@@ -1461,6 +1464,11 @@ try:
 			}
 		err_xpr:
 			if (!(state &= ~Xpr))
+				goto try;
+		}
+		if (state & Cd) {
+			printk(KERN_INFO "%s: CD transition\n", dev->name);
+			if (!(state &= ~Cd)) /* DEBUG */
 				goto try;
 		}
 	} else { /* ! SccEvt */
@@ -1543,7 +1551,7 @@ try:
 			state &= ~Hi;
 			goto try;
 		}
-	} else { /* ! SccEvt */
+	} else { /* SccEvt */
 		if (debug > 1) {
 			//FIXME: verifier la presence de tous les evenements
 		static struct {
@@ -1551,11 +1559,9 @@ try:
 			const char *irq_name;
 		} evts[] = {
 			{ 0x00008000, "TIN"},
-			{ 0x00004000, "CSC"},
 			{ 0x00000020, "RSC"},
 			{ 0x00000010, "PCE"},
 			{ 0x00000008, "PLLA"},
-			{ 0x00000004, "CDSC"},
 			{ 0, NULL}
 		}, *evt;
 
@@ -1569,6 +1575,11 @@ try:
 		}
 		} else {
 			if (!(state &= ~0x0000c03c))
+				goto try;
+		}
+		if (state & Cts) {
+			printk(KERN_INFO "%s: CTS transition\n", dev->name);
+			if (!(state &= ~Cts)) /* DEBUG */
 				goto try;
 		}
 		/*
@@ -1641,13 +1652,9 @@ try:
 			scc_patchl(0, RxActivate, dpriv, dev, CCR2);
 			goto try;
 		}
-		/* These will be used later */
-		if (state & Rfs) {
-			if (!(state &= ~Rfs))
-				goto try;
-		}
-		if (state & Rfo) {
-			if (!(state &= ~Rfo))
+		if (state & Cd) {
+			printk(KERN_INFO "%s: CD transition\n", dev->name);
+			if (!(state &= ~Cd)) /* DEBUG */
 				goto try;
 		}
 		if (state & Flex) {
