@@ -5532,7 +5532,7 @@ static int idetape_cleanup(struct ata_device *drive)
 	for (minor = 0; minor < MAX_HWIFS * MAX_DRIVES; minor++)
 		if (idetape_chrdevs[minor].drive != NULL)
 			return 0;
-	devfs_unregister_chrdev (IDETAPE_MAJOR, "ht");
+	unregister_chrdev (IDETAPE_MAJOR, "ht");
 	idetape_chrdev_present = 0;
 	return 0;
 }
@@ -5594,7 +5594,7 @@ static void idetape_attach(struct ata_device *drive)
 			idetape_chrdevs[minor].drive = NULL;
 
 	if (!idetape_chrdev_present &&
-	    devfs_register_chrdev (IDETAPE_MAJOR, "ht", &idetape_fops)) {
+	    register_chrdev (IDETAPE_MAJOR, "ht", &idetape_fops)) {
 		printk(KERN_ERR "ide-tape: Failed to register character device interface\n");
 		return;
 	}
@@ -5638,7 +5638,7 @@ static void idetape_attach(struct ata_device *drive)
 	supported++;
 
 	if (!idetape_chrdev_present && !supported) {
-		devfs_unregister_chrdev (IDETAPE_MAJOR, "ht");
+		unregister_chrdev (IDETAPE_MAJOR, "ht");
 	} else
 		idetape_chrdev_present = 1;
 

@@ -281,7 +281,7 @@ int __init misc_init(void)
 #ifdef CONFIG_I8K
 	i8k_init();
 #endif
-	if (devfs_register_chrdev(MISC_MAJOR,"misc",&misc_fops)) {
+	if (register_chrdev(MISC_MAJOR,"misc",&misc_fops)) {
 		printk("unable to get major %d for misc devices\n",
 		       MISC_MAJOR);
 		return -EIO;

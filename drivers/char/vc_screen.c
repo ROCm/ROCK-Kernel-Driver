@@ -501,7 +501,7 @@ int __init vcs_init(void)
 {
 	int error;
 
-	error = devfs_register_chrdev(VCS_MAJOR, "vcs", &vcs_fops);
+	error = register_chrdev(VCS_MAJOR, "vcs", &vcs_fops);
 
 	if (error)
 		printk("unable to get major %d for vcs device", VCS_MAJOR);

@@ -651,7 +651,7 @@ static struct file_operations memory_fops = {
 
 int __init chr_dev_init(void)
 {
-	if (devfs_register_chrdev(MEM_MAJOR,"mem",&memory_fops))
+	if (register_chrdev(MEM_MAJOR,"mem",&memory_fops))
 		printk("unable to get major %d for memory devs\n", MEM_MAJOR);
 	memory_devfs_register();
 	rand_initialize();

@@ -1931,7 +1931,7 @@ int __init aztcd_init(void)
 	}
 	devfs_register(NULL, "aztcd", DEVFS_FL_DEFAULT, MAJOR_NR, 0,
 		       S_IFBLK | S_IRUGO | S_IWUGO, &azt_fops, NULL);
-	if (devfs_register_blkdev(MAJOR_NR, "aztcd", &azt_fops) != 0) {
+	if (register_blkdev(MAJOR_NR, "aztcd", &azt_fops) != 0) {
 		printk(KERN_WARNING "aztcd: Unable to get major %d for Aztech"
 		       " CD-ROM\n", MAJOR_NR);
 		ret = -EIO;
@@ -1958,7 +1958,7 @@ int __init aztcd_init(void)
 void __exit aztcd_exit(void)
 {
 	devfs_find_and_unregister(NULL, "aztcd", 0, 0, DEVFS_SPECIAL_BLK, 0);
-	if ((devfs_unregister_blkdev(MAJOR_NR, "aztcd") == -EINVAL)) {
+	if ((unregister_blkdev(MAJOR_NR, "aztcd") == -EINVAL)) {
 		printk("What's that: can't unregister aztcd\n");
 		return;
 	}

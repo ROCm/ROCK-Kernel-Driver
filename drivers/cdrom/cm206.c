@@ -1367,7 +1367,7 @@ static void cleanup(int level)
 			printk("Can't unregister cdrom cm206\n");
 			return;
 		}
-		if (devfs_unregister_blkdev(MAJOR_NR, "cm206")) {
+		if (unregister_blkdev(MAJOR_NR, "cm206")) {
 			printk("Can't unregister major cm206\n");
 			return;
 		}
@@ -1490,7 +1490,7 @@ int __init cm206_init(void)
 		return -EIO;
 	}
 	printk(".\n");
-	if (devfs_register_blkdev(MAJOR_NR, "cm206", &cm206_bdops) != 0) {
+	if (register_blkdev(MAJOR_NR, "cm206", &cm206_bdops) != 0) {
 		printk(KERN_INFO "Cannot register for major %d!\n",
 		       MAJOR_NR);
 		cleanup(3);

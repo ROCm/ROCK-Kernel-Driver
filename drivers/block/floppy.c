@@ -4233,7 +4233,7 @@ int __init floppy_init(void)
 	raw_cmd = NULL;
 
 	devfs_handle = devfs_mk_dir (NULL, "floppy", NULL);
-	if (devfs_register_blkdev(MAJOR_NR,"fd",&floppy_fops)) {
+	if (register_blkdev(MAJOR_NR,"fd",&floppy_fops)) {
 		printk("Unable to get major %d for floppy\n",MAJOR_NR);
 		return -EBUSY;
 	}
@@ -4266,7 +4266,7 @@ int __init floppy_init(void)
 	use_virtual_dma = can_use_virtual_dma & 1;
 	fdc_state[0].address = FDC1;
 	if (fdc_state[0].address == -1) {
-		devfs_unregister_blkdev(MAJOR_NR,"fd");
+		unregister_blkdev(MAJOR_NR,"fd");
 		del_timer(&fd_timeout);
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 		return -ENODEV;
@@ -4279,7 +4279,7 @@ int __init floppy_init(void)
 	if (floppy_grab_irq_and_dma()){
 		del_timer(&fd_timeout);
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		devfs_unregister_blkdev(MAJOR_NR,"fd");
+		unregister_blkdev(MAJOR_NR,"fd");
 		return -EBUSY;
 	}
 
@@ -4342,7 +4342,7 @@ int __init floppy_init(void)
 		if (usage_count)
 			floppy_release_irq_and_dma();
 		blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
-		devfs_unregister_blkdev(MAJOR_NR,"fd");
+		unregister_blkdev(MAJOR_NR,"fd");
 	}
 	
 	for (drive = 0; drive < N_DRIVE; drive++) {
@@ -4539,7 +4539,7 @@ void cleanup_module(void)
 	int dummy;
 		
 	devfs_unregister (devfs_handle);
-	devfs_unregister_blkdev(MAJOR_NR, "fd");
+	unregister_blkdev(MAJOR_NR, "fd");
 
 	blk_cleanup_queue(BLK_DEFAULT_QUEUE(MAJOR_NR));
 	/* eject disk, if any */

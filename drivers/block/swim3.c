@@ -1034,7 +1034,7 @@ int swim3_init(void)
 
 	if (floppy_count > 0)
 	{
-		if (devfs_register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
+		if (register_blkdev(MAJOR_NR, "fd", &floppy_fops)) {
 			printk(KERN_ERR "Unable to get major %d for floppy\n",
 			       MAJOR_NR);
 			return -EBUSY;
