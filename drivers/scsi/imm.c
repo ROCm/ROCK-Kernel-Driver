@@ -1118,6 +1118,12 @@ static int device_check(imm_struct *dev)
 	return -ENODEV;
 }
 
+static int imm_adjust_queue(struct scsi_device *device)
+{
+	blk_queue_bounce_limit(device->request_queue, BLK_BOUNCE_HIGH);
+	return 0;
+}
+
 static struct scsi_host_template imm_template = {
 	.module			= THIS_MODULE,
 	.proc_name		= "imm",
@@ -1133,6 +1139,7 @@ static struct scsi_host_template imm_template = {
 	.cmd_per_lun		= 1,
 	.use_clustering		= ENABLE_CLUSTERING,
 	.can_queue		= 1,
+	.slave_alloc		= imm_adjust_queue,
 };
 
 /***************************************************************************
