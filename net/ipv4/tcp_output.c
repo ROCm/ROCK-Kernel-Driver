@@ -168,6 +168,14 @@ static __inline__ u16 tcp_select_window(struct sock *sk)
 	tp->rcv_wnd = new_win;
 	tp->rcv_wup = tp->rcv_nxt;
 
+	/* Make sure we do not exceed the maximum possible
+	 * scaled window.
+	 */
+	if (!tp->rcv_wscale)
+		new_win = min(new_win, MAX_TCP_WINDOW);
+	else
+		new_win = min(new_win, (65535U << tp->rcv_wscale));
+
 	/* RFC1323 scaling applied */
 	new_win >>= tp->rcv_wscale;
 
