@@ -737,7 +737,7 @@ static int __init nbd_init(void)
 		INIT_LIST_HEAD(&nbd_dev[i].queue_head);
 		init_MUTEX(&nbd_dev[i].tx_lock);
 		nbd_dev[i].blksize = 1024;
-		nbd_dev[i].bytesize = ((u64)0x7ffffc00) << 10; /* 2TB */
+		nbd_dev[i].bytesize = 0x7ffffc00ULL << 10; /* 2TB */
 		disk->major = NBD_MAJOR;
 		disk->first_minor = i;
 		disk->fops = &nbd_fops;
@@ -745,7 +745,7 @@ static int __init nbd_init(void)
 		disk->flags |= GENHD_FL_SUPPRESS_PARTITION_INFO;
 		sprintf(disk->disk_name, "nbd%d", i);
 		sprintf(disk->devfs_name, "nbd/%d", i);
-		set_capacity(disk, 0x3ffffe);
+		set_capacity(disk, 0x7ffffc00ULL << 1); /* 2 TB */
 		add_disk(disk);
 	}
 
