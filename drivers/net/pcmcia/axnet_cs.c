@@ -1216,7 +1216,8 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	struct ei_device *ei_local = (struct ei_device *) dev->priv;
 	int length, send_length, output_page;
 	unsigned long flags;
-
+	u8 packet[ETH_ZLEN];
+	
 	netif_stop_queue(dev);
 
 	length = skb->len;
@@ -1241,7 +1242,7 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	ei_local->irqlock = 1;
 
 	send_length = ETH_ZLEN < length ? length : ETH_ZLEN;
-    
+	
 	/*
 	 * We have two Tx slots available for use. Find the first free
 	 * slot, and then perform some sanity checks. With two Tx bufs,
@@ -1286,7 +1287,14 @@ static int ei_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	 * trigger the send later, upon receiving a Tx done interrupt.
 	 */
 
-	ei_block_output(dev, length, skb->data, output_page);
+	if (length == skb->len)
+		ei_block_output(dev, length, skb->data, output_page);
+	else {
+		memset(packet, 0, ETH_ZLEN);
+		memcpy(packet, skb->data, skb->len);
+		ei_block_output(dev, length, packet, output_page);
+	}
+	
 	if (! ei_local->txing) 
 	{
 		ei_local->txing = 1;
