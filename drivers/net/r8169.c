@@ -7,7 +7,7 @@
  Feb  4 2002	- created initially by ShuChen <shuchen@realtek.com.tw>.
  May 20 2002	- Add link status force-mode and TBI mode support.
 =========================================================================
-  1. The media can be forced in 5 modes.
+  1. [DEPRECATED: use ethtool instead] The media can be forced in 5 modes.
 	 Command: 'insmod r8169 media = SET_MEDIA'
 	 Ex:	  'insmod r8169 media = 0x04' will force PHY to operate in 100Mpbs Half-duplex.
 	
@@ -466,6 +466,38 @@ static void rtl8169_check_link_status(struct net_device *dev,
 	spin_unlock_irqrestore(&tp->lock, flags);
 }
 
+static void rtl8169_link_option(int idx, u8 *autoneg, u16 *speed, u8 *duplex)
+{
+	struct {
+		u16 speed;
+		u8 duplex;
+		u8 autoneg;
+		u8 media;
+	} link_settings[] = {
+		{ SPEED_10,	DUPLEX_HALF, AUTONEG_DISABLE,	_10_Half },
+		{ SPEED_10,	DUPLEX_FULL, AUTONEG_DISABLE,	_10_Full },
+		{ SPEED_100,	DUPLEX_HALF, AUTONEG_DISABLE,	_100_Half },
+		{ SPEED_100,	DUPLEX_FULL, AUTONEG_DISABLE,	_100_Full },
+		{ SPEED_1000,	DUPLEX_FULL, AUTONEG_DISABLE,	_1000_Full },
+		/* Make TBI happy */
+		{ SPEED_1000,	DUPLEX_FULL, AUTONEG_ENABLE,	0xff }
+	}, *p;
+	unsigned char option;
+	
+	option = ((idx < MAX_UNITS) && (idx >= 0)) ? media[idx] : 0xff;
+
+	if ((option != 0xff) && !idx)
+		printk(KERN_WARNING PFX "media option is deprecated.\n");
+
+	for (p = link_settings; p->media != 0xff; p++) {
+		if (p->media == option)
+			break;
+	}
+	*autoneg = p->autoneg;
+	*speed = p->speed;
+	*duplex = p->duplex;
+}
+
 static void rtl8169_get_drvinfo(struct net_device *dev,
 				struct ethtool_drvinfo *info)
 {
@@ -547,7 +579,7 @@ static int rtl8169_set_speed(struct net_device *dev,
 
 	ret = tp->set_speed(dev, autoneg, speed, duplex);
 
-	if (tp->phy_1000_ctrl_reg & PHY_Cap_1000_Full)
+	if (netif_running(dev) && (tp->phy_1000_ctrl_reg & PHY_Cap_1000_Full))
 		mod_timer(&tp->timer, jiffies + RTL8169_PHY_TIMEOUT);
 
 	return ret;
@@ -1027,8 +1059,9 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	void *ioaddr = NULL;
 	static int board_idx = -1;
 	static int printed_version = 0;
+	u8 autoneg, duplex;
+	u16 speed;
 	int i, rc;
-	int option = -1, Cap10_100 = 0, Cap1000 = 0;
 
 	assert(pdev != NULL);
 	assert(ent != NULL);
@@ -1131,97 +1164,12 @@ rtl8169_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		mdio_write(ioaddr, 0x0b, 0x0000); //w 0x0b 15 0 0
 	}
 
-	// if TBI is not endbled
-	if (!(RTL_R8(PHYstatus) & TBI_Enable)) {
-		int val = mdio_read(ioaddr, PHY_AUTO_NEGO_REG);
+	rtl8169_link_option(board_idx, &autoneg, &speed, &duplex);
 
-		option = (board_idx >= MAX_UNITS) ? 0 : media[board_idx];
-		// Force RTL8169 in 10/100/1000 Full/Half mode.
-		if (option > 0) {
-			printk(KERN_INFO "%s: Force-mode Enabled.\n",
-			       dev->name);
-			Cap10_100 = 0, Cap1000 = 0;
-			switch (option) {
-			case _10_Half:
-				Cap10_100 = PHY_Cap_10_Half_Or_Less;
-				Cap1000 = PHY_Cap_Null;
-				break;
-			case _10_Full:
-				Cap10_100 = PHY_Cap_10_Full_Or_Less;
-				Cap1000 = PHY_Cap_Null;
-				break;
-			case _100_Half:
-				Cap10_100 = PHY_Cap_100_Half_Or_Less;
-				Cap1000 = PHY_Cap_Null;
-				break;
-			case _100_Full:
-				Cap10_100 = PHY_Cap_100_Full_Or_Less;
-				Cap1000 = PHY_Cap_Null;
-				break;
-			case _1000_Full:
-				Cap10_100 = PHY_Cap_100_Full_Or_Less;
-				Cap1000 = PHY_Cap_1000_Full;
-				break;
-			default:
-				break;
-			}
-			// leave PHY_AUTO_NEGO_REG bit4:0 unchanged
-			mdio_write(ioaddr, PHY_AUTO_NEGO_REG,
-				   Cap10_100 | (val & 0x1F));
-			mdio_write(ioaddr, PHY_1000_CTRL_REG, Cap1000);
-		} else {
-			printk(KERN_INFO "%s: Auto-negotiation Enabled.\n",
-			       dev->name);
-
-			// enable 10/100 Full/Half Mode
-			// leave PHY_AUTO_NEGO_REG bit4:0 unchanged
-			mdio_write(ioaddr, PHY_AUTO_NEGO_REG,
-				   PHY_Cap_100_Full_Or_Less | (val & 0x1f));
-
-			// enable 1000 Full Mode
-			mdio_write(ioaddr, PHY_1000_CTRL_REG,
-				   PHY_Cap_1000_Full);
-
-		}
-
-		// Enable auto-negotiation and restart auto-nigotiation
-		mdio_write(ioaddr, PHY_CTRL_REG,
-			   PHY_Enable_Auto_Nego | PHY_Restart_Auto_Nego);
-		udelay(100);
-
-		// wait for auto-negotiation process
-		for (i = 10000; i > 0; i--) {
-			//check if auto-negotiation complete
-			if (mdio_read(ioaddr, PHY_STAT_REG) &
-			    PHY_Auto_Neco_Comp) {
-				udelay(100);
-				option = RTL_R8(PHYstatus);
-				if (option & _1000bpsF) {
-					printk(KERN_INFO
-					       "%s: 1000Mbps Full-duplex operation.\n",
-					       dev->name);
-				} else {
-					printk(KERN_INFO
-					       "%s: %sMbps %s-duplex operation.\n",
-					       dev->name,
-					       (option & _100bps) ? "100" :
-					       "10",
-					       (option & FullDup) ? "Full" :
-					       "Half");
-				}
-				break;
-			} else {
-				udelay(100);
-			}
-		}	// end for-loop to wait for auto-negotiation process
-
-	} else {
-		udelay(100);
-		printk(KERN_INFO
-		       "%s: 1000Mbps Full-duplex operation, TBI Link %s!\n",
-		       dev->name,
-		       (RTL_R32(TBICSR) & TBILinkOK) ? "OK" : "Failed");
-	}
+	rtl8169_set_speed(dev, autoneg, speed, duplex);
+	
+	if (RTL_R8(PHYstatus) & TBI_Enable)
+		printk(KERN_INFO PFX "%s: TBI auto-negotiating\n", dev->name);
 
 	return 0;
 }
@@ -1322,6 +1270,8 @@ rtl8169_open(struct net_device *dev)
 	rtl8169_hw_start(dev);
 
 	rtl8169_request_timer(dev);
+
+	rtl8169_check_link_status(dev, tp, tp->mmio_addr);
 out:
 	return retval;
 
