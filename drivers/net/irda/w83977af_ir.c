@@ -58,8 +58,8 @@
 #include <net/irda/irda.h>
 #include <net/irda/wrapper.h>
 #include <net/irda/irda_device.h>
-#include <net/irda/w83977af.h>
-#include <net/irda/w83977af_ir.h>
+#include "w83977af.h"
+#include "w83977af_ir.h"
 
 #ifdef  CONFIG_ARCH_NETWINDER            /* Adjust to NetWinder differences */
 #undef  CONFIG_NETWINDER_TX_DMA_PROBLEMS /* Not needed */
