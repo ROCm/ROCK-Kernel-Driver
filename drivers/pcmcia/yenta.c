@@ -751,6 +751,9 @@ static void yenta_close(struct pci_dev *dev)
 {
 	struct yenta_socket *sock = pci_get_drvdata(dev);
 
+	/* we don't want a dying socket registered */
+	pcmcia_unregister_socket(&sock->socket);
+	
 	/* Disable all events so we don't die in an IRQ storm */
 	cb_writel(sock, CB_SOCKET_MASK, 0x0);
 	exca_writeb(sock, I365_CSCINT, 0);
@@ -764,7 +767,6 @@ static void yenta_close(struct pci_dev *dev)
 		iounmap(sock->base);
 	yenta_free_resources(sock);
 
-	pcmcia_unregister_socket(&sock->socket);
 	pci_set_drvdata(dev, NULL);
 }
 
