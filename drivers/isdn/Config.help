@@ -161,6 +161,10 @@ CONFIG_HISAX_NI1
   Enable this if you like to use ISDN in US on a NI1 basic rate
   interface.
 
+CONFIG_HISAX_MAX_CARDS
+  This option allows you to specify the maximum number of cards which
+  the HiSax driver will be able to handle.  
+
 CONFIG_HISAX_16_0
   This enables HiSax support for the Teles ISDN-cards S0-16.0, S0-8
   and many compatibles.

@@ -416,7 +416,7 @@ st5481_setup_isocpipes(struct urb* urb[2], struct usb_device *dev,
 
 	for (j = 0; j < 2; j++) {
 		retval = -ENOMEM;
-		urb[j] = usb_alloc_urb(num_packet, GFP_KERNEL);
+		urb[j] = usb_alloc_urb(num_packets, GFP_KERNEL);
 		if (!urb[j])
 			goto err;
 
