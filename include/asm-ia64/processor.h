@@ -134,7 +134,7 @@ struct ia64_psr {
  * CPU type, hardware bug flags, and per-CPU state.  Frequently used
  * state comes earlier:
  */
-extern struct cpuinfo_ia64 {
+struct cpuinfo_ia64 {
 	/* irq_stat must be 64-bit aligned */
 	union {
 		struct {
@@ -175,13 +175,15 @@ extern struct cpuinfo_ia64 {
 	__u64 prof_counter;
 	__u64 prof_multiplier;
 #endif
-} cpu_info __per_cpu_data;
+};
+
+DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
 
 /*
  * The "local" data pointer.  It points to the per-CPU data of the currently executing
  * CPU, much like "current" points to the per-task data of the currently executing task.
  */
-#define local_cpu_data		(&this_cpu(cpu_info))
+#define local_cpu_data		(&__get_cpu_var(cpu_info))
 #define cpu_data(cpu)		(&per_cpu(cpu_info, cpu))
 
 extern void identify_cpu (struct cpuinfo_ia64 *);

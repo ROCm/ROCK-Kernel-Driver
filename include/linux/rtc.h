@@ -39,10 +39,32 @@ struct rtc_wkalrm {
 	struct rtc_time time;	/* time the alarm is set to */
 };
 
+/*
+ * Data structure to control PLL correction some better RTC feature
+ * pll_value is used to get or set current value of correction,
+ * the rest of the struct is used to query HW capabilities.
+ * This is modeled after the RTC used in Q40/Q60 computers but
+ * should be sufficiently flexible for other devices
+ *
+ * +ve pll_value means clock will run faster by
+ *   pll_value*pll_posmult/pll_clock
+ * -ve pll_value means clock will run slower by
+ *   pll_value*pll_negmult/pll_clock
+ */ 
+
+struct rtc_pll_info {
+	int pll_ctrl;       /* placeholder for fancier control */
+	int pll_value;      /* get/set correction value */
+	int pll_max;        /* max +ve (faster) adjustment value */
+	int pll_min;        /* max -ve (slower) adjustment value */
+	int pll_posmult;    /* factor for +ve corection */
+	int pll_negmult;    /* factor for -ve corection */
+	long pll_clock;     /* base PLL frequency */
+};
 
 /*
  * ioctl calls that are permitted to the /dev/rtc interface, if 
- * CONFIG_RTC/CONFIG_EFI_RTC was enabled.
+ * any of the RTC drivers are enabled.
  */
 
 #define RTC_AIE_ON	_IO('p', 0x01)	/* Alarm int. enable on		*/
@@ -65,6 +87,8 @@ struct rtc_wkalrm {
 
 #define RTC_WKALM_SET	_IOW('p', 0x0f, struct rtc_wkalrm)/* Set wakeup alarm*/
 #define RTC_WKALM_RD	_IOR('p', 0x10, struct rtc_wkalrm)/* Get wakeup alarm*/
+#define RTC_PLL_GET	_IOR('p', 0x11, struct rtc_pll_info)  /* Get PLL correction */
+#define RTC_PLL_SET	_IOW('p', 0x12, struct rtc_pll_info)  /* Set PLL correction */
 
 #ifdef __KERNEL__
 

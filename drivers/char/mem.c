@@ -210,6 +210,9 @@ static int mmap_mem(struct file * file, struct vm_area_struct * vma)
 	return 0;
 }
 
+extern long vread(char *buf, char *addr, unsigned long count);
+extern long vwrite(char *buf, char *addr, unsigned long count);
+
 /*
  * This function reads the *virtual* memory as seen by the kernel.
  */
@@ -272,8 +275,6 @@ static ssize_t read_kmem(struct file *file, char *buf,
  	*ppos = p;
  	return virtr + read;
 }
-
-extern long vwrite(char *buf, char *addr, unsigned long count);
 
 /*
  * This function writes to the *virtual* memory as seen by the kernel.

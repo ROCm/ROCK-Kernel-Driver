@@ -419,10 +419,6 @@ source drivers/pnp/Config.in
 source drivers/block/Config.in
 source drivers/md/Config.in
 
-if [ "$CONFIG_NET" = "y" ]; then
-   source net/Config.in
-fi
-
 mainmenu_option next_comment
 comment 'ATA/IDE/MFM/RLL support'
 
@@ -449,6 +445,8 @@ source drivers/ieee1394/Config.in
 source drivers/message/i2o/Config.in
 
 if [ "$CONFIG_NET" = "y" ]; then
+   source net/Config.in
+
    mainmenu_option next_comment
    comment 'Network device support'
 

@@ -1176,16 +1176,16 @@ acornfb_mmap(struct fb_info *info, struct file *file, struct vm_area_struct *vma
 }
 
 static struct fb_ops acornfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	acornfb_get_fix,
-	fb_get_var:	acornfb_get_var,
-	fb_set_var:	acornfb_set_var,
-	fb_get_cmap:	acornfb_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	acornfb_setcolreg,
-	fb_pan_display:	acornfb_pan_display,
-	fb_blank:	acornfb_blank,
-	fb_mmap:	acornfb_mmap,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	acornfb_get_fix,
+	.fb_get_var =	acornfb_get_var,
+	.fb_set_var =	acornfb_set_var,
+	.fb_get_cmap =	acornfb_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	acornfb_setcolreg,
+	.fb_pan_display =acornfb_pan_display,
+	.fb_blank =	acornfb_blank,
+	.fb_mmap =	acornfb_mmap,
 };
 
 static int
@@ -1275,19 +1275,19 @@ static struct fb_videomode modedb[] __initdata = {
 
 static struct fb_videomode __initdata
 acornfb_default_mode = {
-	name:		NULL,
-	refresh:	60,
-	xres:		640,
-	yres:		480,
-	pixclock:	39722,
-	left_margin:	56,
-	right_margin:	16,
-	upper_margin:	34,
-	lower_margin:	9,
-	hsync_len:	88,
-	vsync_len:	2,
-	sync:		0,
-	vmode:		FB_VMODE_NONINTERLACED
+	.name =		NULL,
+	.refresh =	60,
+	.xres =		640,
+	.yres =		480,
+	.pixclock =	39722,
+	.left_margin =	56,
+	.right_margin =	16,
+	.upper_margin =	34,
+	.lower_margin =	9,
+	.hsync_len =	88,
+	.vsync_len =	2,
+	.sync =		0,
+	.vmode =	FB_VMODE_NONINTERLACED
 };
 
 static void __init

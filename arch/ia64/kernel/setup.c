@@ -58,7 +58,7 @@ extern char _end;
 unsigned long __per_cpu_offset[NR_CPUS];
 #endif
 
-struct cpuinfo_ia64 cpu_info __per_cpu_data;
+DECLARE_PER_CPU(struct cpuinfo_ia64, cpu_info);
 
 unsigned long ia64_phys_stacked_size_p8;
 unsigned long ia64_cycles_per_usec;

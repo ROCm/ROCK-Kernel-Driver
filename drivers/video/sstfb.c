@@ -205,16 +205,16 @@ static int sst_init(struct sstfb_info *sst_info);
 static void sst_shutdown(struct sstfb_info *sst_info);
 
 static struct fb_ops sstfb_ops = {
-	owner : THIS_MODULE,
-	fb_open:	sstfb_open,
-	fb_release:	sstfb_release,
-	fb_get_fix:	sstfb_get_fix,
-	fb_get_var:	sstfb_get_var,
-	fb_set_var:	sstfb_set_var,
-	fb_get_cmap:	sstfb_get_cmap,
-	fb_set_cmap:	sstfb_set_cmap,
-	fb_pan_display:	sstfb_pan_display,
-	fb_ioctl:	sstfb_ioctl,
+	.owner		= THIS_MODULE,
+	.fb_open	= sstfb_open,
+	.fb_release	= sstfb_release,
+	.fb_get_fix	= sstfb_get_fix,
+	.fb_get_var	= sstfb_get_var,
+	.fb_set_var	= sstfb_set_var,
+	.fb_get_cmap	= sstfb_get_cmap,
+	.fb_set_cmap	= sstfb_set_cmap,
+	.fb_pan_display	= sstfb_pan_display,
+	.fb_ioctl	= sstfb_ioctl,
 };
 
 enum {
@@ -225,12 +225,12 @@ enum {
 #define IS_VOODOO2(info) ((info)->type == ID_VOODOO2 )
 
 static struct sst_spec voodoo_spec[] __devinitdata = {
-	{ name : "Voodoo Graphics",
-	default_gfx_clock : 50000,
-	max_gfxclk : 60, },
-	{ name : "Voodoo2",
-	default_gfx_clock : 75000,
-	max_gfxclk : 85, },
+	{ .name = "Voodoo Graphics",
+	.default_gfx_clock = 50000,
+	.max_gfxclk = 60, },
+	{ .name = "Voodoo2",
+	.default_gfx_clock = 75000,
+	.max_gfxclk = 85, },
 };
 
 static struct pci_device_id sstfb_id_tbl[] __devinitdata = {
@@ -242,10 +242,10 @@ static struct pci_device_id sstfb_id_tbl[] __devinitdata = {
 };
 
 static struct pci_driver sstfb_driver = {
-	name:		"sstfb",
-	id_table:	sstfb_id_tbl,
-	probe:          sstfb_probe,
-	remove:		__devexit_p(sstfb_remove),
+	.name		= "sstfb",
+	.id_table	= sstfb_id_tbl,
+	.probe		= sstfb_probe,
+	.remove		= __devexit_p(sstfb_remove),
 };
 
 static struct fb_var_screeninfo	sstfb_default =
@@ -283,19 +283,19 @@ static struct fb_var_screeninfo	sstfb_default =
 #endif
 
 static struct dac_switch dacs[] __devinitdata = {
-	{	name:		"TI TVP3409",
-		detect:		sst_detect_ti,
-		set_pll:	sst_set_pll_att_ti,
-		set_vidmod:	sst_set_vidmod_att_ti },
+	{	.name		= "TI TVP3409",
+		.detect		= sst_detect_ti,
+		.set_pll	= sst_set_pll_att_ti,
+		.set_vidmod	= sst_set_vidmod_att_ti },
 
-	{	name:		"AT&T ATT20C409",
-		detect:		sst_detect_att,
-		set_pll:	sst_set_pll_att_ti,
-		set_vidmod:	sst_set_vidmod_att_ti },
-	{	name:		"ICS ICS5342",
-		detect:		sst_detect_ics,
-		set_pll:	sst_set_pll_ics,
-		set_vidmod:	sst_set_vidmod_ics },
+	{	.name		= "AT&T ATT20C409",
+		.detect		= sst_detect_att,
+		.set_pll	= sst_set_pll_att_ti,
+		.set_vidmod	= sst_set_vidmod_att_ti },
+	{	.name		= "ICS ICS5342",
+		.detect		= sst_detect_ics,
+		.set_pll	= sst_set_pll_ics,
+		.set_vidmod	= sst_set_vidmod_ics },
 };
 
 

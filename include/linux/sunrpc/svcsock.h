@@ -30,6 +30,7 @@ struct svc_sock {
 #define	SK_TEMP		4			/* temp (TCP) socket */
 #define	SK_QUED		5			/* on serv->sk_sockets */
 #define	SK_DEAD		6			/* socket closed */
+#define	SK_CHNGBUF	7			/* need to change snd/rcv buffer sizes */
 
 	int			sk_reserved;	/* space on outq that is reserved */
 

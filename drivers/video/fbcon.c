@@ -518,13 +518,15 @@ static int fbcon_changevar(int con)
 
 static __inline__ void updatescrollmode(struct display *p)
 {
+    struct fb_info *info = p->fb_info;	
+
     int m;
     if (p->scrollmode & __SCROLL_YFIXED)
     	return;
-    if (divides(p->ywrapstep, fontheight(p)) &&
-	divides(fontheight(p), p->var.yres_virtual))
+    if (divides(info->fix.ywrapstep, fontheight(p)) &&
+	divides(fontheight(p), info->var.yres_virtual))
 	m = __SCROLL_YWRAP;
-    else if (divides(p->ypanstep, fontheight(p)) &&
+    else if (divides(info->fix.ypanstep, fontheight(p)) &&
 	     p->var.yres_virtual >= p->var.yres+fontheight(p))
 	m = __SCROLL_YPAN;
     else if (p->scrollmode & __SCROLL_YNOMOVE)
@@ -553,6 +555,7 @@ static void fbcon_font_widths(struct display *p)
 static void fbcon_setup(int con, int init, int logo)
 {
     struct display *p = &fb_display[con];
+    struct fb_info *info = p->fb_info;
     struct vc_data *conp = p->conp;
     int nr_rows, nr_cols;
     int old_rows, old_cols;
@@ -560,13 +563,13 @@ static void fbcon_setup(int con, int init, int logo)
     int i, charcnt = 256;
     struct fbcon_font_desc *font;
     
-    if (con != fg_console || (p->fb_info->flags & FBINFO_FLAG_MODULE) ||
-        p->type == FB_TYPE_TEXT)
+    if (con != fg_console || (info->flags & FBINFO_FLAG_MODULE) ||
+        info->fix.type == FB_TYPE_TEXT)
     	logo = 0;
 
     p->var.xoffset = p->var.yoffset = p->yscroll = 0;  /* reset wrap/pan */
 
-    if (con == fg_console && p->type != FB_TYPE_TEXT) {   
+    if (con == fg_console && info->fix.type != FB_TYPE_TEXT) {   
 	if (fbcon_softback_size) {
 	    if (!softback_buf) {
 		softback_buf = (unsigned long)kmalloc(fbcon_softback_size, GFP_KERNEL);
@@ -716,7 +719,8 @@ static void fbcon_setup(int con, int init, int logo)
 
     if (p->dispsw == &fbcon_dummy)
 	printk(KERN_WARNING "fbcon_setup: type %d (aux %d, depth %d) not "
-	       "supported\n", p->type, p->type_aux, p->var.bits_per_pixel);
+	       "supported\n", info->fix.type, info->fix.type_aux, 
+		p->var.bits_per_pixel);
     p->dispsw->setup(p);
 
     p->fgcol = p->var.bits_per_pixel > 2 ? 7 : (1<<p->var.bits_per_pixel)-1;
@@ -1563,9 +1567,9 @@ static int fbcon_blank(struct vc_data *conp, int blank)
 
     if (!p->can_soft_blank) {
 	if (blank) {
-	    if (p->visual == FB_VISUAL_MONO01) {
-		if (p->fb_info->screen_base)
-		    fb_memset255(p->fb_info->screen_base,
+	    if (info->fix.visual == FB_VISUAL_MONO01) {
+		if (info->screen_base)
+		    fb_memset255(info->screen_base,
 				 p->var.xres_virtual*p->var.yres_virtual*
 				 p->var.bits_per_pixel>>3);
 	    } else {
@@ -2122,9 +2126,10 @@ static inline unsigned safe_shift(unsigned d,int n)
 static int __init fbcon_show_logo( void )
 {
     struct display *p = &fb_display[fg_console]; /* draw to vt in foreground */
+    struct fb_info *info = p->fb_info;
     int depth = p->var.bits_per_pixel;
     int line = p->next_line;
-    unsigned char *fb = p->fb_info->screen_base;
+    unsigned char *fb = info->screen_base;
     unsigned char *logo;
     unsigned char *dst, *src;
     int i, j, n, x1, y1, x;
@@ -2140,8 +2145,8 @@ static int __init fbcon_show_logo( void )
      * We don't have to set the colors for the 16-color logo, since that logo
      * uses the standard VGA text console palette
      */
-    if ((p->visual == FB_VISUAL_PSEUDOCOLOR && depth >= 8) ||
-	(p->visual == FB_VISUAL_DIRECTCOLOR && depth >= 24))
+    if ((info->fix.visual == FB_VISUAL_PSEUDOCOLOR && depth >= 8) ||
+	(info->fix.visual == FB_VISUAL_DIRECTCOLOR && depth >= 24))
 	for (i = 0; i < LINUX_LOGO_COLORS; i += n) {
 	    n = LINUX_LOGO_COLORS - i;
 	    if (n > 16)
@@ -2157,8 +2162,7 @@ static int __init fbcon_show_logo( void )
 		palette_cmap.blue[j]  = (linux_logo_blue[i+j] << 8) |
 					linux_logo_blue[i+j];
 	    }
-	    p->fb_info->fbops->fb_set_cmap(&palette_cmap, 1, fg_console,
-					   p->fb_info);
+	    info->fbops->fb_set_cmap(&palette_cmap, 1, fg_console, info);
 	}
 	
     if (depth >= 8) {
@@ -2174,15 +2178,15 @@ static int __init fbcon_show_logo( void )
 	logo_depth = 1;
     }
     
-    if (p->fb_info->fbops->fb_rasterimg)
-    	p->fb_info->fbops->fb_rasterimg(p->fb_info, 1);
+    if (info->fbops->fb_rasterimg)
+    	info->fbops->fb_rasterimg(info, 1);
 
     for (x = 0; x < num_online_cpus() * (LOGO_W + 8) &&
     	 x < p->var.xres - (LOGO_W + 8); x += (LOGO_W + 8)) {
     	 
 #if defined(CONFIG_FBCON_CFB16) || defined(CONFIG_FBCON_CFB24) || \
     defined(CONFIG_FBCON_CFB32) || defined(CONFIG_FB_SBUS)
-        if (p->visual == FB_VISUAL_DIRECTCOLOR) {
+        if (info->fix.visual == FB_VISUAL_DIRECTCOLOR) {
 	    unsigned int val;		/* max. depth 32! */
 	    int bdepth;
 	    int redshift, greenshift, blueshift;
@@ -2257,7 +2261,7 @@ static int __init fbcon_show_logo( void )
 #endif
 #if defined(CONFIG_FBCON_CFB16) || defined(CONFIG_FBCON_CFB24) || \
     defined(CONFIG_FBCON_CFB32) || defined(CONFIG_FB_SBUS)
-	if ((depth % 8 == 0) && (p->visual == FB_VISUAL_TRUECOLOR)) {
+	if ((depth % 8 == 0) && (info->fix.visual == FB_VISUAL_TRUECOLOR)) {
 	    /* Modes without color mapping, needs special data transformation... */
 	    unsigned int val;		/* max. depth 32! */
 	    int bdepth = depth/8;
@@ -2453,24 +2457,24 @@ static int __init fbcon_show_logo( void )
  */
  
 const struct consw fb_con = {
-    con_startup: 	fbcon_startup, 
-    con_init: 		fbcon_init,
-    con_deinit: 	fbcon_deinit,
-    con_clear: 		fbcon_clear,
-    con_putc: 		fbcon_putc,
-    con_putcs: 		fbcon_putcs,
-    con_cursor: 	fbcon_cursor,
-    con_scroll: 	fbcon_scroll,
-    con_bmove: 		fbcon_bmove,
-    con_switch: 	fbcon_switch,
-    con_blank: 		fbcon_blank,
-    con_font_op:	fbcon_font_op,
-    con_set_palette: 	fbcon_set_palette,
-    con_scrolldelta: 	fbcon_scrolldelta,
-    con_set_origin: 	fbcon_set_origin,
-    con_invert_region:	fbcon_invert_region,
-    con_screen_pos:	fbcon_screen_pos,
-    con_getxy:		fbcon_getxy,
+    .con_startup = 	fbcon_startup, 
+    .con_init = 	fbcon_init,
+    .con_deinit = 	fbcon_deinit,
+    .con_clear = 	fbcon_clear,
+    .con_putc = 	fbcon_putc,
+    .con_putcs = 	fbcon_putcs,
+    .con_cursor = 	fbcon_cursor,
+    .con_scroll = 	fbcon_scroll,
+    .con_bmove = 	fbcon_bmove,
+    .con_switch = 	fbcon_switch,
+    .con_blank = 	fbcon_blank,
+    .con_font_op =	fbcon_font_op,
+    .con_set_palette = 	fbcon_set_palette,
+    .con_scrolldelta = 	fbcon_scrolldelta,
+    .con_set_origin = 	fbcon_set_origin,
+    .con_invert_region = fbcon_invert_region,
+    .con_screen_pos =	fbcon_screen_pos,
+    .con_getxy =	fbcon_getxy,
 };
 
 
@@ -2483,12 +2487,12 @@ static void fbcon_dummy_op(void) {}
 #define DUMMY	(void *)fbcon_dummy_op
 
 struct display_switch fbcon_dummy = {
-    setup:	DUMMY,
-    bmove:	DUMMY,
-    clear:	DUMMY,
-    putc:	DUMMY,
-    putcs:	DUMMY,
-    revc:	DUMMY,
+    .setup =	DUMMY,
+    .bmove =	DUMMY,
+    .clear =	DUMMY,
+    .putc =	DUMMY,
+    .putcs =	DUMMY,
+    .revc =	DUMMY,
 };
 
 

@@ -938,7 +938,7 @@ rescan_this:
 		/* ED's now officially unlinked, hc doesn't see */
 		ed->state = ED_IDLE;
 		ed->hwINFO &= ~ED_SKIP;
-		ed->hwHeadP &= ~cpu_to_le32 (ED_H);
+		ed->hwHeadP &= ~ED_H;
 		ed->hwNextED = 0;
 
 		/* but if there's work queued, reschedule */

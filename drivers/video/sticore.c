@@ -75,9 +75,9 @@ void
 sti_inq_conf(struct sti_struct *sti)
 {
 	struct sti_conf_inptr inptr = { NULL };
-	struct sti_conf_outptr_ext outptr_ext = { future_ptr: NULL };
+	struct sti_conf_outptr_ext outptr_ext = { .future_ptr = NULL };
 	struct sti_conf_outptr outptr = {
-		ext_ptr: STI_PTR(&outptr_ext)
+		.ext_ptr = STI_PTR(&outptr_ext)
 	};
 	unsigned long flags;
 	s32 ret;

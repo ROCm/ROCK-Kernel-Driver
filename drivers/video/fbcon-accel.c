@@ -151,14 +151,14 @@ void fbcon_accel_clear_margins(struct vc_data *vc, struct display *p,
      */
 
 struct display_switch fbcon_accel = {
-	setup:		fbcon_accel_setup,
-	bmove:		fbcon_accel_bmove,
-	clear:		fbcon_accel_clear,
-	putc:		fbcon_accel_putc,
-	putcs:		fbcon_accel_putcs,
-	revc:		fbcon_accel_revc,
-	clear_margins:	fbcon_accel_clear_margins,
-	fontwidthmask:	FONTWIDTHRANGE(1, 16)	
+	.setup =	fbcon_accel_setup,
+	.bmove =	fbcon_accel_bmove,
+	.clear =	fbcon_accel_clear,
+	.putc =		fbcon_accel_putc,
+	.putcs =	fbcon_accel_putcs,
+	.revc =		fbcon_accel_revc,
+	.clear_margins =fbcon_accel_clear_margins,
+	.fontwidthmask =FONTWIDTHRANGE(1, 16)	
 };
 
 #ifdef MODULE

@@ -147,7 +147,8 @@ static int queuecommand( Scsi_Cmnd *srb , void (*done)(Scsi_Cmnd *))
 	srb->host_scribble = (unsigned char *)us;
 
 	/* enqueue the command */
-	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE || us->srb != NULL);
+	BUG_ON(atomic_read(&us->sm_state) != US_STATE_IDLE);
+	BUG_ON(us->srb != NULL);
 	srb->scsi_done = done;
 	us->srb = srb;
 

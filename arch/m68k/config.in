@@ -152,10 +152,6 @@ source drivers/block/Config.in
 
 source drivers/md/Config.in
 
-if [ "$CONFIG_NET" = "y" ]; then
-   source net/Config.in
-fi
-
 if [ "$CONFIG_MAC" = "y" ]; then
    source drivers/input/Config.in
 fi
@@ -271,6 +267,7 @@ fi
 endmenu
 
 if [ "$CONFIG_NET" = "y" ]; then
+   source net/Config.in
 
    mainmenu_option next_comment
    comment 'Network device support'

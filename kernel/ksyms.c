@@ -50,6 +50,7 @@
 #include <linux/namei.h>
 #include <linux/buffer_head.h>
 #include <linux/root_dev.h>
+#include <linux/percpu.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -109,6 +110,8 @@ EXPORT_SYMBOL(vfree);
 EXPORT_SYMBOL(__vmalloc);
 EXPORT_SYMBOL(vmalloc);
 EXPORT_SYMBOL(vmalloc_32);
+EXPORT_SYMBOL(vmap);
+EXPORT_SYMBOL(vunmap);
 EXPORT_SYMBOL(vmalloc_to_page);
 EXPORT_SYMBOL(mem_map);
 EXPORT_SYMBOL(remap_page_range);
@@ -220,6 +223,7 @@ EXPORT_SYMBOL(generic_file_read);
 EXPORT_SYMBOL(generic_file_sendfile);
 EXPORT_SYMBOL(do_generic_file_read);
 EXPORT_SYMBOL(generic_file_write);
+EXPORT_SYMBOL(generic_file_write_nolock);
 EXPORT_SYMBOL(generic_file_mmap);
 EXPORT_SYMBOL(generic_ro_fops);
 EXPORT_SYMBOL(file_lock_list);
@@ -595,3 +599,6 @@ EXPORT_SYMBOL(init_thread_union);
 
 EXPORT_SYMBOL(tasklist_lock);
 EXPORT_SYMBOL(pidhash);
+#if defined(CONFIG_SMP) && defined(__GENERIC_PER_CPU)
+EXPORT_SYMBOL(__per_cpu_offset);
+#endif

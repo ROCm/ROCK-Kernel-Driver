@@ -109,17 +109,17 @@ static unsigned int mc_fsize;       /* file size of /dev/cpu/microcode */
 
 /* we share file_operations between misc and devfs mechanisms */
 static struct file_operations microcode_fops = {
-	owner:		THIS_MODULE,
-	read:		microcode_read,
-	write:		microcode_write,
-	ioctl:		microcode_ioctl,
-	open:		microcode_open,
+	.owner		= THIS_MODULE,
+	.read		= microcode_read,
+	.write		= microcode_write,
+	.ioctl		= microcode_ioctl,
+	.open		= microcode_open,
 };
 
 static struct miscdevice microcode_dev = {
-	minor: MICROCODE_MINOR,
-	name:	"microcode",
-	fops:	&microcode_fops,
+	.minor = MICROCODE_MINOR,
+	.name	= "microcode",
+	.fops	= &microcode_fops,
 };
 
 static devfs_handle_t devfs_handle;

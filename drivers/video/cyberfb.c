@@ -948,14 +948,14 @@ static int cyberfb_get_cmap(struct fb_cmap *cmap, int kspc, int con,
 }
 
 static struct fb_ops cyberfb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	cyberfb_get_fix,
-	fb_get_var:	cyberfb_get_var,
-	fb_set_var:	cyberfb_set_var,
-	fb_get_cmap:	cyberfb_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	cyberfb_setcolreg,
-	fb_blank:	cyberfb_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	cyberfb_get_fix,
+	.fb_get_var =	cyberfb_get_var,
+	.fb_set_var =	cyberfb_set_var,
+	.fb_get_cmap =	cyberfb_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	cyberfb_setcolreg,
+	.fb_blank =	cyberfb_blank,
 };
 
 int __init cyberfb_setup(char *options)
@@ -1188,14 +1188,14 @@ static void fbcon_cyber8_revc(struct display *p, int xx, int yy)
 }
 
 static struct display_switch fbcon_cyber8 = {
-	setup:		fbcon_cfb8_setup,
-	bmove:		fbcon_cyber8_bmove,
-	clear:		fbcon_cyber8_clear,
-	putc:		fbcon_cyber8_putc,
-	putcs:		fbcon_cyber8_putcs,
-	revc:		fbcon_cyber8_revc,
-	clear_margins:	fbcon_cfb8_clear_margins,
-	fontwidthmask:	FONTWIDTH(8)
+	.setup =	fbcon_cfb8_setup,
+	.bmove =	fbcon_cyber8_bmove,
+	.clear =	fbcon_cyber8_clear,
+	.putc =		fbcon_cyber8_putc,
+	.putcs =	fbcon_cyber8_putcs,
+	.revc =		fbcon_cyber8_revc,
+	.clear_margins =fbcon_cfb8_clear_margins,
+	.fontwidthmask =FONTWIDTH(8)
 };
 #endif
 

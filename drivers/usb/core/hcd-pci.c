@@ -130,10 +130,19 @@ clean_2:
 			return retval;
 		}
 	}
-	pci_set_drvdata(dev, hcd);
+	pci_set_drvdata (dev, hcd);
 	hcd->driver = driver;
 	hcd->description = driver->description;
 	hcd->pdev = dev;
+	hcd->self.bus_name = dev->slot_name;
+	hcd->product_desc = dev->name;
+
+	if ((retval = hcd_buffer_create (hcd)) != 0) {
+clean_3:
+		driver->hcd_free (hcd);
+		goto clean_2;
+	}
+
 	info ("%s @ %s, %s", hcd->description,  dev->slot_name, dev->name);
 
 	pci_read_config_byte (dev, PCI_LATENCY_TIMER, &latency);
@@ -154,8 +163,7 @@ clean_2:
 			!= 0) {
 		err ("request interrupt %s failed", bufp);
 		retval = -EBUSY;
-		driver->hcd_free (hcd);
-		goto clean_2;
+		goto clean_3;
 	}
 	hcd->irq = dev->irq;
 
@@ -168,8 +176,6 @@ clean_2:
 	usb_bus_init (&hcd->self);
 	hcd->self.op = &usb_hcd_operations;
 	hcd->self.hcpriv = (void *) hcd;
-	hcd->self.bus_name = dev->slot_name;
-	hcd->product_desc = dev->name;
 
 	INIT_LIST_HEAD (&hcd->dev_list);
 
@@ -216,6 +222,7 @@ void usb_hcd_pci_remove (struct pci_dev *dev)
 	usb_disconnect (&hub);
 
 	hcd->driver->stop (hcd);
+	hcd_buffer_destroy (hcd);
 	hcd->state = USB_STATE_HALT;
 
 	free_irq (hcd->irq, hcd);

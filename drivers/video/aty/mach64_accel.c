@@ -6,25 +6,8 @@
 #include <linux/sched.h>
 #include <linux/delay.h>
 #include <linux/fb.h>
-
-#include <video/fbcon.h>
-#include <video/fbcon-cfb8.h>
-#include <video/fbcon-cfb16.h>
-#include <video/fbcon-cfb24.h>
-#include <video/fbcon-cfb32.h>
-
 #include <video/mach64.h>
 #include "atyfb.h"
-
-    /*
-     *  Text console acceleration
-     */
-
-static void fbcon_aty_bmove(struct display *p, int sy, int sx, int dy,
-			    int dx, int height, int width);
-static void fbcon_aty_clear(struct vc_data *conp, struct display *p,
-			    int sy, int sx, int height, int width);
-
 
     /*
      *  Generic Mach64 routines
@@ -63,9 +46,9 @@ void aty_init_engine(struct atyfb_par *par, struct fb_info *info)
 	u32 pitch_value;
 
 	/* determine modal information from global mode structure */
-	pitch_value = par->crtc.vxres;
+	pitch_value = info->var.xres_virtual;
 
-	if (par->crtc.bpp == 24) {
+	if (info->var.bits_per_pixel == 24) {
 		/* In 24 bpp, the engine is in 8 bpp - this requires that all */
 		/* horizontal coordinates and widths must be adjusted */
 		pitch_value = pitch_value * 3;
@@ -187,7 +170,7 @@ static inline void draw_rect(s16 x, s16 y, u16 width, u16 height,
 	par->blitter_may_be_busy = 1;
 }
 
-static void atyfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+void atyfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	
@@ -197,8 +180,8 @@ static void atyfb_copyarea(struct fb_info *info, struct fb_copyarea *area)
 	if (!area->width || !area->height)
 		return;
 
-	pitch_value = par->crtc.vxres;
-	if (par->crtc.bpp == 24) {
+	pitch_value = info->var.xres_virtual;
+	if (info->var.bits_per_pixel == 24) {
 		/* In 24 bpp, the engine is in 8 bpp - this requires that all */
 		/* horizontal coordinates and widths must be adjusted */
 		pitch_value *= 3;
@@ -237,7 +220,7 @@ void atyfb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 	rect->color |= (rect->color << 8);
 	rect->color |= (rect->color << 16);
 
-	if (par->crtc.bpp == 24) {
+	if (info->var.bits_per_pixel == 24) {
 		/* In 24 bpp, the engine is in 8 bpp - this requires that all */
 		/* horizontal coordinates and widths must be adjusted */
 		rect->dx *= 3;
@@ -255,111 +238,11 @@ void atyfb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
 	draw_rect(rect->dx, rect->dy, rect->width, rect->height, par);
 }
 
-    /*
-     *  Text console acceleration
-     */
-
-static void fbcon_aty_bmove(struct display *p, int sy, int sx, int dy,
-			    int dx, int height, int width)
+void atyfb_imageblit(struct fb_info *info, struct fb_image *image)
 {
-	struct fb_info *info = p->fb_info;
-	struct fb_copyarea area;
-#ifdef __sparc__
-	struct atyfb_par *par = (struct atyfb_par *) (info->par);
-
-	if (par->mmaped && (!info->display_fg
-			   || info->display_fg->vc_num ==
-			   par->vtconsole))
-		return;
-#endif
-
-	area.sx = sx * fontwidth(p);
-	area.sy = sy * fontheight(p);
-	area.dx = dx * fontwidth(p);
-	area.dy = dy * fontheight(p);
-	area.width  = width * fontwidth(p);
-	area.height = height * fontheight(p);
-
-	atyfb_copyarea(info, &area); 
+	struct atyfb_par *par = (struct atyfb_par *) info->par;
+    
+	if (par->blitter_may_be_busy)
+		wait_for_idle(par);
+	cfb_imageblit(info, image);
 }
-
-static void fbcon_aty_clear(struct vc_data *conp, struct display *p,
-			    int sy, int sx, int height, int width)
-{
-	struct fb_info *info = p->fb_info;
-	struct fb_fillrect region;
-#ifdef __sparc__
-	struct atyfb_par *par = (struct atyfb_par *) (info->par);
-
-	if (par->mmaped && (!info->display_fg
-			   || info->display_fg->vc_num ==
-			   par->vtconsole))
-		return;
-#endif
-	region.color = attr_bgcol_ec(p, conp);
-	region.color |= (region.color << 8);
-	region.color |= (region.color << 16);
-
-	region.dx = sx * fontwidth(p);
-	region.dy = sy * fontheight(p);
-	region.width = width * fontwidth(p);
-	region.height = height * fontheight(p);
-	region.rop = ROP_COPY;
-
-	atyfb_fillrect(info, &region);
-}
-
-#ifdef __sparc__
-#define check_access \
-    if (par->mmaped && (!info->display_fg \
-	|| info->display_fg->vc_num == par->vtconsole)) \
-	return;
-#else
-#define check_access do { } while (0)
-#endif
-
-#define DEF_FBCON_ATY_OP(name, call, args...) \
-static void name(struct vc_data *conp, struct display *p, args) \
-{ \
-    struct fb_info *info = p->fb_info; \
-    struct atyfb_par *par = (struct atyfb_par *) info->par; \
-    check_access; \
-    if (par->blitter_may_be_busy) \
-	wait_for_idle(par); \
-    call; \
-}
-
-#define DEF_FBCON_ATY(width) \
-    DEF_FBCON_ATY_OP(fbcon_aty##width##_putc, \
-		     fbcon_cfb##width##_putc(conp, p, c, yy, xx), \
-		     int c, int yy, int xx) \
-    DEF_FBCON_ATY_OP(fbcon_aty##width##_putcs, \
-		     fbcon_cfb##width##_putcs(conp, p, s, count, yy, xx), \
-		     const unsigned short *s, int count, int yy, int xx) \
-    DEF_FBCON_ATY_OP(fbcon_aty##width##_clear_margins, \
-		     fbcon_cfb##width##_clear_margins(conp, p, bottom_only), \
-		     int bottom_only) \
- \
-const struct display_switch fbcon_aty##width = { \
-    setup:		fbcon_cfb##width##_setup, \
-    bmove:		fbcon_aty_bmove, \
-    clear:		fbcon_aty_clear, \
-    putc:		fbcon_aty##width##_putc, \
-    putcs:		fbcon_aty##width##_putcs, \
-    revc:		fbcon_cfb##width##_revc, \
-    clear_margins:	fbcon_aty##width##_clear_margins, \
-    fontwidthmask:	FONTWIDTH(4)|FONTWIDTH(8)|FONTWIDTH(12)|FONTWIDTH(16) \
-};
-
-#ifdef FBCON_HAS_CFB8
-DEF_FBCON_ATY(8)
-#endif
-#ifdef FBCON_HAS_CFB16
-    DEF_FBCON_ATY(16)
-#endif
-#ifdef FBCON_HAS_CFB24
-    DEF_FBCON_ATY(24)
-#endif
-#ifdef FBCON_HAS_CFB32
-    DEF_FBCON_ATY(32)
-#endif

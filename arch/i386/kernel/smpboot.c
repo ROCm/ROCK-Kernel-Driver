@@ -968,16 +968,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 {
 	int apicid, cpu, bit;
 
-        if (clustered_apic_mode && (numnodes > 1)) {
-                printk("Remapping cross-quad port I/O for %d quads\n",
-			numnodes);
-                printk("xquad_portio vaddr 0x%08lx, len %08lx\n",
-                        (u_long) xquad_portio, 
-			(u_long) numnodes * XQUAD_PORTIO_LEN);
-                xquad_portio = ioremap (XQUAD_PORTIO_BASE, 
-			numnodes * XQUAD_PORTIO_LEN);
-        }
-
 #ifdef CONFIG_MTRR
 	/*  Must be done before other processors booted  */
 	mtrr_init_boot_cpu ();
@@ -1075,6 +1065,16 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 
 	if (GET_APIC_ID(apic_read(APIC_ID)) != boot_cpu_physical_apicid)
 		BUG();
+
+        if (clustered_apic_mode && (numnodes > 1)) {
+                printk("Remapping cross-quad port I/O for %d quads\n",
+			numnodes);
+                printk("xquad_portio vaddr 0x%08lx, len %08lx\n",
+                        (u_long) xquad_portio, 
+			(u_long) numnodes * XQUAD_PORTIO_LEN);
+                xquad_portio = ioremap (XQUAD_PORTIO_BASE, 
+			numnodes * XQUAD_PORTIO_LEN);
+        }
 
 	/*
 	 * Scan the CPU present map and fire up the other CPUs via do_boot_cpu

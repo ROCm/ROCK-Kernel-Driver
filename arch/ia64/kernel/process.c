@@ -194,7 +194,7 @@ ia64_save_extra (struct task_struct *task)
 		pfm_save_regs(task);
 
 # ifdef CONFIG_SMP
-	if (this_cpu(pfm_syst_wide))
+	if (__get_cpu_var(pfm_syst_wide))
 		pfm_syst_wide_update_task(task, 0);
 # endif
 #endif
@@ -216,7 +216,7 @@ ia64_load_extra (struct task_struct *task)
 		pfm_load_regs(task);
 
 # ifdef CONFIG_SMP
-	if (this_cpu(pfm_syst_wide)) pfm_syst_wide_update_task(task, 1);
+	if (__get_cpu_var(pfm_syst_wide)) pfm_syst_wide_update_task(task, 1);
 # endif
 #endif
 

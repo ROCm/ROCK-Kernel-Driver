@@ -203,16 +203,9 @@ extern void fill_inquiry_response(struct us_data *us,
 
 /* The scsi_lock() and scsi_unlock() macros protect the sm_state and the
  * single queue element srb for write access */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,3)
 #define scsi_unlock(host)	spin_unlock_irq(host->host_lock)
 #define scsi_lock(host)		spin_lock_irq(host->host_lock)
 
 #define sg_address(psg)		(page_address((psg)->page) + (psg)->offset)
-#else
-#define scsi_unlock(host)	spin_unlock_irq(&io_request_lock)
-#define scsi_lock(host)		spin_lock_irq(&io_request_lock)
-
-#define sg_address(psg)		((psg)->address)
-#endif
 
 #endif

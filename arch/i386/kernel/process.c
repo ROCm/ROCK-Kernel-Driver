@@ -566,6 +566,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	struct_cpy(childregs, regs);
 	childregs->eax = 0;
 	childregs->esp = esp;
+	p->user_vm_lock = NULL;
 
 	p->thread.esp = (unsigned long) childregs;
 	p->thread.esp0 = (unsigned long) (childregs+1);
@@ -587,6 +588,47 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 			IO_BITMAP_BYTES);
 	}
 
+	/*
+	 * The common fastpath:
+	 */
+	if (!(clone_flags & (CLONE_SETTLS | CLONE_SETTID | CLONE_RELEASE_VM)))
+		return 0;
+	/*
+	 * Set a new TLS for the child thread?
+	 */
+	if (clone_flags & CLONE_SETTLS) {
+		struct desc_struct *desc;
+		struct user_desc info;
+		int idx;
+
+		if (copy_from_user(&info, (void *)childregs->esi, sizeof(info)))
+			return -EFAULT;
+		if (LDT_empty(&info))
+			return -EINVAL;
+
+		idx = info.entry_number;
+		if (idx < GDT_ENTRY_TLS_MIN || idx > GDT_ENTRY_TLS_MAX)
+			return -EINVAL;
+
+		desc = p->thread.tls_array + idx - GDT_ENTRY_TLS_MIN;
+		desc->a = LDT_entry_a(&info);
+		desc->b = LDT_entry_b(&info);
+	}
+
+	/*
+	 * Notify the child of the TID?
+	 */
+	if (clone_flags & CLONE_SETTID)
+		if (put_user(p->pid, (pid_t *)childregs->edx))
+			return -EFAULT;
+
+	/*
+	 * Does the userspace VM want any unlock on mm_release()?
+	 */
+	if (clone_flags & CLONE_RELEASE_VM) {
+		childregs->esp -= sizeof(0UL);
+		p->user_vm_lock = (long *) esp;
+	}
 	return 0;
 }
 

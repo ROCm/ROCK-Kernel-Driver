@@ -459,16 +459,16 @@ static void e1355_set_disp(const void *unused, struct display *disp,
 
 
 struct fbgen_hwswitch e1355_switch = {
-	detect:		e1355_detect,
-	encode_fix:	e1355_encode_fix,
-	decode_var:	e1355_decode_var,
-	encode_var:	e1355_encode_var,
-	get_par:	e1355_get_par,
-	set_par:	e1355_set_par,
-	getcolreg:	e1355_getcolreg,
-	pan_display:	e1355_pan_display,
-	blank:		e1355_blank,
-	set_disp:	e1355_set_disp,
+	.detect =	e1355_detect,
+	.encode_fix =	e1355_encode_fix,
+	.decode_var =	e1355_decode_var,
+	.encode_var =	e1355_encode_var,
+	.get_par =	e1355_get_par,
+	.set_par =	e1355_set_par,
+	.getcolreg =	e1355_getcolreg,
+	.pan_display =	e1355_pan_display,
+	.blank =	e1355_blank,
+	.set_disp =	e1355_set_disp,
 };
 
 
@@ -476,15 +476,15 @@ struct fbgen_hwswitch e1355_switch = {
 
 
 static struct fb_ops e1355fb_ops = {
-	owner:		THIS_MODULE,
-	fb_get_fix:	fbgen_get_fix,
-	fb_get_var:	fbgen_get_var,
-	fb_set_var:	fbgen_set_var,
-	fb_get_cmap:	fbgen_get_cmap,
-	fb_set_cmap:	gen_set_cmap,
-	fb_setcolreg:	e1355fb_setcolreg,
-	fb_pan_display:	fbgen_pan_display,
-	fb_blank:	fbgen_blank,
+	.owner =	THIS_MODULE,
+	.fb_get_fix =	fbgen_get_fix,
+	.fb_get_var =	fbgen_get_var,
+	.fb_set_var =	fbgen_set_var,
+	.fb_get_cmap =	fbgen_get_cmap,
+	.fb_set_cmap =	gen_set_cmap,
+	.fb_setcolreg =	e1355fb_setcolreg,
+	.fb_pan_display =fbgen_pan_display,
+	.fb_blank =	fbgen_blank,
 };
 
 static struct e1355fb_info fb_info;

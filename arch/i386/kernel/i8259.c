@@ -247,13 +247,13 @@ static int i8259A_resume(struct device *dev, u32 level)
 }
 
 static struct device_driver driver_i8259A = {
-	resume:		i8259A_resume,
+	.resume		= i8259A_resume,
 };
 
 static struct device device_i8259A = {
-	name:	       	"i8259A",
-	bus_id:		"0020",
-	driver:		&driver_i8259A,
+	.name	       	= "i8259A",
+	.bus_id		= "0020",
+	.driver		= &driver_i8259A,
 };
 
 static int __init init_8259A_devicefs(void)

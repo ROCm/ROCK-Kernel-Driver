@@ -22,6 +22,14 @@
 #include <asm/types.h>
 #include <video/fbcon.h>
 
+#if BITS_PER_LONG == 32
+#define FB_READ		fb_readl
+#define FB_WRITE	fb_writel
+#else
+#define FB_READ		fb_readq
+#define FB_WRITE	fb_writeq
+#endif
+
 void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 {
 	unsigned long start_index, end_index, start_mask = 0, end_mask = 0;
@@ -93,33 +101,19 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 				dst = (unsigned long *) (dst1 - start_index);
 
 				if (start_mask) {
-#if BITS_PER_LONG == 32
-					fb_writel(fb_readl(dst) |
+					FB_WRITE(FB_READ(dst) |
 						  start_mask, dst);
-#else
-					fb_writeq(fb_readq(dst) |
-						  start_mask, dst);
-#endif
 					dst++;
 				}
 
 				for (i = 0; i < n; i++) {
-#if BITS_PER_LONG == 32
-					fb_writel(fg, dst);
-#else
-					fb_writeq(fg, dst);
-#endif
+					FB_WRITE(fg, dst);
 					dst++;
 				}
 
 				if (end_mask)
-#if BITS_PER_LONG == 32
-					fb_writel(fb_readl(dst) | end_mask,
+					FB_WRITE(FB_READ(dst) | end_mask,
 						  dst);
-#else
-					fb_writeq(fb_readq(dst) | end_mask,
-						  dst);
-#endif
 				dst1 += linesize;
 			} while (--height);
 			break;
@@ -128,33 +122,19 @@ void cfb_fillrect(struct fb_info *p, struct fb_fillrect *rect)
 				dst = (unsigned long *) (dst1 - start_index);
 
 				if (start_mask) {
-#if BITS_PER_LONG == 32
-					fb_writel(fb_readl(dst) ^
+					FB_WRITE(FB_READ(dst) ^
 						  start_mask, dst);
-#else
-					fb_writeq(fb_readq(dst) ^
-						  start_mask, dst);
-#endif
 					dst++;
 				}
 
 				for (i = 0; i < n; i++) {
-#if BITS_PER_LONG == 32
-					fb_writel(fb_readl(dst) ^ fg, dst);
-#else
-					fb_writeq(fb_readq(dst) ^ fg, dst);
-#endif
+					FB_WRITE(FB_READ(dst) ^ fg, dst);
 					dst++;
 				}
 
 				if (end_mask) {
-#if BITS_PER_LONG == 32
-					fb_writel(fb_readl(dst) ^ end_mask,
+					FB_WRITE(FB_READ(dst) ^ end_mask,
 						  dst);
-#else
-					fb_writeq(fb_readq(dst) ^ end_mask,
-						  dst);
-#endif
 				}
 				dst1 += linesize;
 			} while (--height);
