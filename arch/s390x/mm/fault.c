@@ -166,7 +166,7 @@ extern inline void do_exception(struct pt_regs *regs, unsigned long error_code)
 
 		/* Low-address protection hit in kernel mode means 
 		   NULL pointer write access in kernel mode.  */
- 		if (!(regs->psw.mask & PSW_PROBLEM_STATE)) {
+ 		if (!(regs->psw.mask & PSW_MASK_PSTATE)) {
 			address = 0;
 			user_address = 0;
 			goto no_context;
@@ -258,7 +258,7 @@ bad_area:
         up_read(&mm->mmap_sem);
 
         /* User mode accesses just cause a SIGSEGV */
-        if (regs->psw.mask & PSW_PROBLEM_STATE) {
+        if (regs->psw.mask & PSW_MASK_PSTATE) {
                 tsk->thread.prot_addr = address;
                 tsk->thread.trap_no = error_code;
 		force_sigsegv(regs, error_code, si_code, address);
@@ -298,7 +298,7 @@ out_of_memory:
 		goto survive;
 	}
 	printk("VM: killing process %s\n", tsk->comm);
-	if (regs->psw.mask & PSW_PROBLEM_STATE)
+	if (regs->psw.mask & PSW_MASK_PSTATE)
 		do_exit(SIGKILL);
 	goto no_context;
 
@@ -314,7 +314,7 @@ do_sigbus:
 	force_sig(SIGBUS, tsk);
 
 	/* Kernel mode? Handle exceptions or die */
-	if (!(regs->psw.mask & PSW_PROBLEM_STATE))
+	if (!(regs->psw.mask & PSW_MASK_PSTATE))
 		goto no_context;
 }
 
@@ -440,7 +440,7 @@ pfault_interrupt(struct pt_regs *regs, __u16 error_code)
 	 * We got all needed information from the lowcore and can
 	 * now safely switch on interrupts.
 	 */
-	if (regs->psw.mask & PSW_PROBLEM_STATE)
+	if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
 
 	if (subcode & 0x0080) {

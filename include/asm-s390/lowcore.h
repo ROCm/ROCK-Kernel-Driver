@@ -52,41 +52,12 @@
 
 #define __LC_PFAULT_INTPARM             0x080
 
-/* interrupt handler start with all io, external and mcck interrupt disabled */
-
-#define _RESTART_PSW_MASK    0x00080000
-#define _EXT_PSW_MASK        0x04080000
-#define _PGM_PSW_MASK        0x04080000
-#define _SVC_PSW_MASK        0x04080000
-#define _MCCK_PSW_MASK       0x04080000
-#define _IO_PSW_MASK         0x04080000
-#define _USER_PSW_MASK       0x070DC000/* DAT, IO, EXT, Home-space         */
-#define _WAIT_PSW_MASK       0x070E0000/* DAT, IO, EXT, Wait, Home-space   */
-#define _DW_PSW_MASK         0x000A0000/* disabled wait PSW mask           */
-
-#define _PRIMARY_MASK        0x0000    /* MASK for SACF                    */
-#define _SECONDARY_MASK      0x0100    /* MASK for SACF                    */
-#define _ACCESS_MASK         0x0200    /* MASK for SACF                    */
-#define _HOME_MASK           0x0300    /* MASK for SACF                    */
-
-#define _PSW_PRIM_SPACE_MODE 0x00000000
-#define _PSW_SEC_SPACE_MODE  0x00008000
-#define _PSW_ACC_REG_MODE    0x00004000
-#define _PSW_HOME_SPACE_MODE 0x0000C000
-
-#define _PSW_WAIT_MASK_BIT   0x00020000 /* Wait bit */
-#define _PSW_IO_MASK_BIT     0x02000000 /* IO bit */
-#define _PSW_IO_WAIT         0x02020000 /* IO & Wait bit */
-
-/* we run in 31 Bit mode */
-#define _ADDR_31             0x80000000
-
 #ifndef __ASSEMBLY__
 
 #include <linux/config.h>
-#include <asm/processor.h>
 #include <linux/types.h>
 #include <asm/atomic.h>
+#include <asm/processor.h>
 #include <asm/sigp.h>
 
 void restart_int_handler(void);

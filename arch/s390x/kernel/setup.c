@@ -304,7 +304,7 @@ void __init setup_arch(char **cmdline_p)
 	unsigned long start_pfn, end_pfn;
         static unsigned int smptrap=0;
         unsigned long delay = 0;
-	struct _lowcore *lowcore;
+	struct _lowcore *lc;
 	int i;
 
         if (smptrap)
@@ -441,27 +441,30 @@ void __init setup_arch(char **cmdline_p)
         /*
          * Setup lowcore for boot cpu
          */
-	lowcore = (struct _lowcore *) 
-		__alloc_bootmem(2*PAGE_SIZE, 2*PAGE_SIZE, 0);
-	memset(lowcore, 0, 2*PAGE_SIZE);
-	lowcore->restart_psw.mask = _RESTART_PSW_MASK;
-	lowcore->restart_psw.addr = (addr_t) &restart_int_handler;
-	lowcore->external_new_psw.mask = _EXT_PSW_MASK;
-	lowcore->external_new_psw.addr = (addr_t) &ext_int_handler;
-	lowcore->svc_new_psw.mask = _SVC_PSW_MASK;
-	lowcore->svc_new_psw.addr = (addr_t) &system_call;
-	lowcore->program_new_psw.mask = _PGM_PSW_MASK;
-	lowcore->program_new_psw.addr = (addr_t) &pgm_check_handler;
-	lowcore->mcck_new_psw.mask = _MCCK_PSW_MASK;
-	lowcore->mcck_new_psw.addr = (addr_t) &mcck_int_handler;
-	lowcore->io_new_psw.mask = _IO_PSW_MASK;
-	lowcore->io_new_psw.addr = (addr_t) &io_int_handler;
-	lowcore->ipl_device = S390_lowcore.ipl_device;
-	lowcore->kernel_stack = ((__u64) &init_thread_union) + 16384;
-	lowcore->async_stack = (__u64)
+	lc = (struct _lowcore *) __alloc_bootmem(2*PAGE_SIZE, 2*PAGE_SIZE, 0);
+	memset(lc, 0, 2*PAGE_SIZE);
+	lc->restart_psw.mask = PSW_BASE_BITS;
+	lc->restart_psw.addr = (addr_t) &restart_int_handler;
+	lc->external_new_psw.mask = PSW_KERNEL_BITS;
+	lc->external_new_psw.addr = (addr_t) &ext_int_handler;
+	lc->svc_new_psw.mask = PSW_KERNEL_BITS;
+	lc->svc_new_psw.addr = (addr_t) &system_call;
+	lc->program_new_psw.mask = PSW_KERNEL_BITS;
+	lc->program_new_psw.addr = (addr_t) &pgm_check_handler;
+	lc->mcck_new_psw.mask = PSW_KERNEL_BITS;
+	lc->mcck_new_psw.addr = (addr_t) &mcck_int_handler;
+	lc->io_new_psw.mask = PSW_KERNEL_BITS;
+	lc->io_new_psw.addr = (addr_t) &io_int_handler;
+	lc->ipl_device = S390_lowcore.ipl_device;
+	lc->kernel_stack = ((__u64) &init_thread_union) + 16384;
+	lc->async_stack = (__u64)
 		__alloc_bootmem(4*PAGE_SIZE, 4*PAGE_SIZE, 0) + 16384;
-	lowcore->jiffy_timer = -1LL;
-	set_prefix((__u32)(__u64) lowcore);
+	lc->jiffy_timer = -1LL;
+	if (MACHINE_HAS_DIAG44)
+		lc->diag44_opcode = 0x83000044;
+	else
+		lc->diag44_opcode = 0x07000700;
+	set_prefix((__u32)(__u64) lc);
         cpu_init();
         __cpu_logical_map[0] = S390_lowcore.cpu_data.cpu_addr;
 

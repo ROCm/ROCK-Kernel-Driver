@@ -116,22 +116,22 @@ void show_trace(unsigned long * stack)
 		stack = (unsigned long*)&stack;
 
 	printk("Call Trace: ");
-	low_addr = ((unsigned long) stack) & PSW_ADDR_MASK;
+	low_addr = ((unsigned long) stack) & PSW_ADDR_INSN;
 	high_addr = (low_addr & (-THREAD_SIZE)) + THREAD_SIZE;
 	/* Skip the first frame (biased stack) */
-	backchain = *((unsigned long *) low_addr) & PSW_ADDR_MASK;
+	backchain = *((unsigned long *) low_addr) & PSW_ADDR_INSN;
 	/* Print up to 8 lines */
 	for (i = 0; i < 8; i++) {
 		if (backchain < low_addr || backchain >= high_addr)
 			break;
-		ret_addr = *((unsigned long *) (backchain+56)) & PSW_ADDR_MASK;
+		ret_addr = *((unsigned long *) (backchain+56)) & PSW_ADDR_INSN;
 		if (!kernel_text_address(ret_addr))
 			break;
 		if (i && ((i % 6) == 0))
 			printk("\n   ");
 		printk("[<%08lx>] ", ret_addr);
 		low_addr = backchain;
-		backchain = *((unsigned long *) backchain) & PSW_ADDR_MASK;
+		backchain = *((unsigned long *) backchain) & PSW_ADDR_INSN;
 	}
 	printk("\n");
 }
@@ -184,7 +184,7 @@ void show_registers(struct pt_regs *regs)
 	char *mode;
 	int i;
 
-	mode = (regs->psw.mask & PSW_PROBLEM_STATE) ? "User" : "Krnl";
+	mode = (regs->psw.mask & PSW_MASK_PSTATE) ? "User" : "Krnl";
 	printk("%s PSW : %08lx %08lx\n",
 	       mode, (unsigned long) regs->psw.mask,
 	       (unsigned long) regs->psw.addr);
@@ -210,7 +210,7 @@ void show_registers(struct pt_regs *regs)
 	 * time of the fault.
 	 */
 	old_fs = get_fs();
-	if (regs->psw.mask & PSW_PROBLEM_STATE)
+	if (regs->psw.mask & PSW_MASK_PSTATE)
 		set_fs(USER_DS);
 	else
 		set_fs(KERNEL_DS);
@@ -287,10 +287,10 @@ static void inline do_trap(long interruption_code, int signr, char *str,
 	 * We got all needed information from the lowcore and can
 	 * now safely switch on interrupts.
 	 */
-        if (regs->psw.mask & PSW_PROBLEM_STATE)
+        if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
 
-        if (regs->psw.mask & PSW_PROBLEM_STATE) {
+        if (regs->psw.mask & PSW_MASK_PSTATE) {
                 struct task_struct *tsk = current;
 
                 tsk->thread.trap_no = interruption_code & 0xffff;
@@ -322,12 +322,12 @@ static void inline do_trap(long interruption_code, int signr, char *str,
 
 static inline void *get_check_address(struct pt_regs *regs)
 {
-	return (void *) ADDR_BITS_REMOVE(regs->psw.addr-S390_lowcore.pgm_ilc);
+	return (void *)((regs->psw.addr-S390_lowcore.pgm_ilc) & PSW_ADDR_INSN);
 }
 
 int do_debugger_trap(struct pt_regs *regs,int signal)
 {
-	if(regs->psw.mask&PSW_PROBLEM_STATE)
+	if(regs->psw.mask&PSW_MASK_PSTATE)
 	{
 		if(current->ptrace & PT_PTRACED)
 			force_sig(signal,current);
@@ -423,10 +423,10 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 	 * We got all needed information from the lowcore and can
 	 * now safely switch on interrupts.
 	 */
-	if (regs->psw.mask & PSW_PROBLEM_STATE)
+	if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
 
-	if (regs->psw.mask & PSW_PROBLEM_STATE)
+	if (regs->psw.mask & PSW_MASK_PSTATE)
 		get_user(*((__u16 *) opcode), location);
 	else
 		*((__u16 *)opcode)=*((__u16 *)location);
@@ -436,7 +436,7 @@ asmlinkage void illegal_op(struct pt_regs * regs, long interruption_code)
 			signal = SIGILL;
 	}
 #ifdef CONFIG_MATHEMU
-        else if (regs->psw.mask & PSW_PROBLEM_STATE)
+        else if (regs->psw.mask & PSW_MASK_PSTATE)
 	{
 		if (opcode[0] == 0xb3) {
 			get_user(*((__u16 *) (opcode+2)), location+1);
@@ -484,10 +484,10 @@ specification_exception(struct pt_regs * regs, long interruption_code)
 	 * We got all needed information from the lowcore and can
 	 * now safely switch on interrupts.
 	 */
-	if (regs->psw.mask & PSW_PROBLEM_STATE)
+	if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
 		
-        if (regs->psw.mask & PSW_PROBLEM_STATE) {
+        if (regs->psw.mask & PSW_MASK_PSTATE) {
 		get_user(*((__u16 *) opcode), location);
 		switch (opcode[0]) {
 		case 0x28: /* LDR Rx,Ry   */
@@ -547,7 +547,7 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 	 * We got all needed information from the lowcore and can
 	 * now safely switch on interrupts.
 	 */
-	if (regs->psw.mask & PSW_PROBLEM_STATE)
+	if (regs->psw.mask & PSW_MASK_PSTATE)
 		local_irq_enable();
 
 	if (MACHINE_HAS_IEEE)
@@ -555,7 +555,7 @@ asmlinkage void data_exception(struct pt_regs * regs, long interruption_code)
 				  : "=m" (current->thread.fp_regs.fpc));
 
 #ifdef CONFIG_MATHEMU
-        else if (regs->psw.mask & PSW_PROBLEM_STATE) {
+        else if (regs->psw.mask & PSW_MASK_PSTATE) {
         	__u8 opcode[6];
 		get_user(*((__u16 *) opcode), location);
 		switch (opcode[0]) {
@@ -679,21 +679,19 @@ void __init trap_init(void)
 
 void handle_per_exception(struct pt_regs *regs)
 {
-	if(regs->psw.mask&PSW_PROBLEM_STATE)
-	{
+	if (regs->psw.mask & PSW_MASK_PSTATE) {
 		per_struct *per_info=&current->thread.per_info;
 		per_info->lowcore.words.perc_atmid=S390_lowcore.per_perc_atmid;
 		per_info->lowcore.words.address=S390_lowcore.per_address;
 		per_info->lowcore.words.access_id=S390_lowcore.per_access_id;
 	}
-	if(do_debugger_trap(regs,SIGTRAP))
-	{
+	if (do_debugger_trap(regs,SIGTRAP)) {
 		/* I've seen this possibly a task structure being reused ? */
 		printk("Spurious per exception detected\n");
 		printk("switching off per tracing for this task.\n");
 		show_regs(regs);
 		/* Hopefully switching off per tracing will help us survive */
-		regs->psw.mask &= ~PSW_PER_MASK;
+		regs->psw.mask &= ~PSW_MASK_PER;
 	}
 }
 

@@ -29,14 +29,9 @@
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include "linux32.h"
+#include "ptrace32.h"
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
-
-#define _ADDR_31 0x80000000
-#define _USER_PSW_MASK_EMU32 0x070DC000
-#define _USER_PSW_MASK32 0x0705C00080000000
-#define PSW_MASK_DEBUGCHANGE32 0x00003000UL
-#define PSW_ADDR_DEBUGCHANGE32 0x7FFFFFFFUL
 
 typedef struct 
 {
@@ -297,9 +292,9 @@ static int save_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 	_s390_regs_common32 regs32;
 	int err, i;
 
-	regs32.psw.mask = _USER_PSW_MASK_EMU32 |
-		(__u32)((regs->psw.mask & PSW_MASK_DEBUGCHANGE) >> 32);
-	regs32.psw.addr = _ADDR_31 | (__u32) regs->psw.addr;
+	regs32.psw.mask = PSW32_USER_BITS |
+		((__u32)(regs->psw.mask >> 32) & PSW32_MASK_CC);
+	regs32.psw.addr = PSW32_ADDR_AMODE31 | (__u32) regs->psw.addr;
 	for (i = 0; i < NUM_GPRS; i++)
 		regs32.gprs[i] = (__u32) regs->gprs[i];
 	memcpy(regs32.acrs, regs->acrs, sizeof(regs32.acrs));
@@ -320,9 +315,9 @@ static int restore_sigregs32(struct pt_regs *regs,_sigregs32 *sregs)
 	err = __copy_from_user(&regs32, &sregs->regs, sizeof(regs32));
 	if (err)
 		return err;
-	regs->psw.mask = _USER_PSW_MASK32 |
-		(__u64)(regs32.psw.mask & PSW_MASK_DEBUGCHANGE32) << 32;
-	regs->psw.addr = (__u64)(regs32.psw.addr & PSW_ADDR_DEBUGCHANGE32);
+	regs->psw.mask = PSW_USER32_BITS |
+		(__u64)(regs32.psw.mask & PSW32_MASK_CC) << 32;
+	regs->psw.addr = (__u64)(regs32.psw.addr & PSW32_ADDR_INSN);
 	for (i = 0; i < NUM_GPRS; i++)
 		regs->gprs[i] = (__u64) regs32.gprs[i];
 	memcpy(regs->acrs, regs32.acrs, sizeof(regs32.acrs));
@@ -467,9 +462,9 @@ static void setup_frame32(int sig, struct k_sigaction *ka,
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
 	if (ka->sa.sa_flags & SA_RESTORER) {
-		regs->gprs[14] = FIX_PSW(ka->sa.sa_restorer);
+		regs->gprs[14] = (__u64) ka->sa.sa_restorer;
 	} else {
-		regs->gprs[14] = FIX_PSW(frame->retcode);
+		regs->gprs[14] = (__u64) frame->retcode;
 		if (__put_user(S390_SYSCALL_OPCODE | __NR_sigreturn,
 		               (u16 *)(frame->retcode)))
 			goto give_sigsegv;
@@ -480,12 +475,12 @@ static void setup_frame32(int sig, struct k_sigaction *ka,
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
-	regs->gprs[15] = (addr_t)frame;
-	regs->psw.addr = FIX_PSW(ka->sa.sa_handler);
-	regs->psw.mask = _USER_PSW_MASK32;
+	regs->gprs[15] = (__u64) frame;
+	regs->psw.addr = (__u64) ka->sa.sa_handler;
+	regs->psw.mask = PSW_USER32_BITS;
 
 	regs->gprs[2] = map_signal(sig);
-	regs->gprs[3] = (addr_t)&frame->sc;
+	regs->gprs[3] = (__u64) &frame->sc;
 
 	/* We forgot to include these in the sigcontext.
 	   To avoid breaking binary compatibility, they are passed as args. */
@@ -525,9 +520,9 @@ static void setup_rt_frame32(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
 	if (ka->sa.sa_flags & SA_RESTORER) {
-		regs->gprs[14] = FIX_PSW(ka->sa.sa_restorer);
+		regs->gprs[14] = (__u64) ka->sa.sa_restorer;
 	} else {
-		regs->gprs[14] = FIX_PSW(frame->retcode);
+		regs->gprs[14] = (__u64) frame->retcode;
 		err |= __put_user(S390_SYSCALL_OPCODE | __NR_rt_sigreturn,
 		                  (u16 *)(frame->retcode));
 	}
@@ -537,13 +532,13 @@ static void setup_rt_frame32(int sig, struct k_sigaction *ka, siginfo_t *info,
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
-	regs->gprs[15] = (addr_t)frame;
-	regs->psw.addr = FIX_PSW(ka->sa.sa_handler);
-	regs->psw.mask = _USER_PSW_MASK32;
+	regs->gprs[15] = (__u64) frame;
+	regs->psw.addr = (__u64) ka->sa.sa_handler;
+	regs->psw.mask = PSW_USER32_BITS;
 
 	regs->gprs[2] = map_signal(sig);
-	regs->gprs[3] = (addr_t)&frame->info;
-	regs->gprs[4] = (addr_t)&frame->uc;
+	regs->gprs[3] = (__u64) &frame->info;
+	regs->gprs[4] = (__u64) &frame->uc;
 	return;
 
 give_sigsegv:

@@ -56,32 +56,6 @@
 
 #define __LC_PFAULT_INTPARM             0x11B8
 
-/* interrupt handler start with all io, external and mcck interrupt disabled */
-
-#define _RESTART_PSW_MASK    0x0000000180000000
-#define _EXT_PSW_MASK        0x0400000180000000
-#define _PGM_PSW_MASK        0x0400000180000000
-#define _SVC_PSW_MASK        0x0400000180000000
-#define _MCCK_PSW_MASK       0x0400000180000000
-#define _IO_PSW_MASK         0x0400000180000000
-#define _USER_PSW_MASK       0x0705C00180000000
-#define _WAIT_PSW_MASK       0x0706000180000000
-#define _DW_PSW_MASK         0x0002000180000000
-
-#define _PRIMARY_MASK        0x0000    /* MASK for SACF                    */
-#define _SECONDARY_MASK      0x0100    /* MASK for SACF                    */
-#define _ACCESS_MASK         0x0200    /* MASK for SACF                    */
-#define _HOME_MASK           0x0300    /* MASK for SACF                    */
-
-#define _PSW_PRIM_SPACE_MODE 0x0000000000000000
-#define _PSW_SEC_SPACE_MODE  0x0000800000000000
-#define _PSW_ACC_REG_MODE    0x0000400000000000
-#define _PSW_HOME_SPACE_MODE 0x0000C00000000000
-
-#define _PSW_WAIT_MASK_BIT   0x0002000000000000
-#define _PSW_IO_MASK_BIT     0x0200000000000000
-#define _PSW_IO_WAIT         0x0202000000000000
-
 #ifndef __ASSEMBLY__
 
 #include <linux/config.h>

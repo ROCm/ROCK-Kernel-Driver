@@ -75,9 +75,10 @@ void default_idle(void)
 
 	/* 
 	 * Wait for external, I/O or machine check interrupt and
-	 * switch of machine check bit after the wait has ended.
+	 * switch off machine check bit after the wait has ended.
 	 */
-	wait_psw.mask = _WAIT_PSW_MASK;
+	wait_psw.mask = PSW_KERNEL_BITS | PSW_MASK_MCHECK | PSW_MASK_WAIT |
+		PSW_MASK_IO | PSW_MASK_EXT;
 	asm volatile (
 		"    larl  %0,0f\n"
 		"    stg   %0,8(%1)\n"
@@ -111,7 +112,7 @@ void show_regs(struct pt_regs *regs)
 
 	show_registers(regs);
 	/* Show stack backtrace if pt_regs is from kernel mode */
-	if (!(regs->psw.mask & PSW_PROBLEM_STATE))
+	if (!(regs->psw.mask & PSW_MASK_PSTATE))
 		show_trace((unsigned long *) regs->gprs[15]);
 }
 
@@ -132,7 +133,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	struct pt_regs regs;
 
 	memset(&regs, 0, sizeof(regs));
-	regs.psw.mask = _SVC_PSW_MASK;
+	regs.psw.mask = PSW_KERNEL_BITS;
 	regs.psw.addr = (__u64) kernel_thread_starter;
 	regs.gprs[7] = STACK_FRAME_OVERHEAD;
 	regs.gprs[8] = __LC_KERNEL_STACK;

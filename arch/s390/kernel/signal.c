@@ -167,8 +167,8 @@ static int restore_sigregs(struct pt_regs *regs,_sigregs *sregs)
 	int err;
 
 	err = __copy_from_user(regs, &sregs->regs, sizeof(_s390_regs_common));
-	regs->psw.mask = _USER_PSW_MASK | (regs->psw.mask & PSW_MASK_DEBUGCHANGE);
-	regs->psw.addr |= _ADDR_31;
+	regs->psw.mask = PSW_USER_BITS | (regs->psw.mask & PSW_MASK_CC);
+	regs->psw.addr |= PSW_ADDR_AMODE31;
 	if (err)
 		return err;
 
@@ -298,9 +298,9 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
 	if (ka->sa.sa_flags & SA_RESTORER) {
-                regs->gprs[14] = FIX_PSW(ka->sa.sa_restorer);
+                regs->gprs[14] = (__u32) ka->sa.sa_restorer | PSW_ADDR_AMODE31;
 	} else {
-                regs->gprs[14] = FIX_PSW(frame->retcode);
+                regs->gprs[14] = (__u32) frame->retcode | PSW_ADDR_AMODE31;
 		if (__put_user(S390_SYSCALL_OPCODE | __NR_sigreturn, 
 	                       (u16 *)(frame->retcode)))
 			goto give_sigsegv;
@@ -311,12 +311,12 @@ static void setup_frame(int sig, struct k_sigaction *ka,
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
-	regs->gprs[15] = (addr_t)frame;
-	regs->psw.addr = FIX_PSW(ka->sa.sa_handler);
-	regs->psw.mask = _USER_PSW_MASK;
+	regs->gprs[15] = (__u32) frame;
+	regs->psw.addr = (__u32) ka->sa.sa_handler | PSW_ADDR_AMODE31;
+	regs->psw.mask = PSW_USER_BITS;
 
 	regs->gprs[2] = map_signal(sig);
-	regs->gprs[3] = (addr_t)&frame->sc;
+	regs->gprs[3] = (__u32) &frame->sc;
 
 	/* We forgot to include these in the sigcontext.
 	   To avoid breaking binary compatibility, they are passed as args. */
@@ -356,9 +356,9 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	/* Set up to return from userspace.  If provided, use a stub
 	   already in userspace.  */
 	if (ka->sa.sa_flags & SA_RESTORER) {
-                regs->gprs[14] = FIX_PSW(ka->sa.sa_restorer);
+                regs->gprs[14] = (__u32) ka->sa.sa_restorer | PSW_ADDR_AMODE31;
 	} else {
-                regs->gprs[14] = FIX_PSW(frame->retcode);
+                regs->gprs[14] = (__u32) frame->retcode | PSW_ADDR_AMODE31;
 		err |= __put_user(S390_SYSCALL_OPCODE | __NR_rt_sigreturn, 
 	                          (u16 *)(frame->retcode));
 	}
@@ -368,13 +368,13 @@ static void setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
-	regs->gprs[15] = (addr_t)frame;
-	regs->psw.addr = FIX_PSW(ka->sa.sa_handler);
-	regs->psw.mask = _USER_PSW_MASK;
+	regs->gprs[15] = (__u32) frame;
+	regs->psw.addr = (__u32) ka->sa.sa_handler | PSW_ADDR_AMODE31;
+	regs->psw.mask = PSW_USER_BITS;
 
 	regs->gprs[2] = map_signal(sig);
-	regs->gprs[3] = (addr_t)&frame->info;
-	regs->gprs[4] = (addr_t)&frame->uc;
+	regs->gprs[3] = (__u32) &frame->info;
+	regs->gprs[4] = (__u32) &frame->uc;
 	return;
 
 give_sigsegv:

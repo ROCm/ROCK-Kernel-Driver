@@ -98,7 +98,6 @@ static inline int
 s390_do_sync_wait(int irq, int do_tpi)
 {
 	unsigned long psw_mask;
-	int ccode;
 	uint64_t time_start;
 	uint64_t time_curr;
 	
@@ -116,31 +115,7 @@ s390_do_sync_wait(int irq, int do_tpi)
 	 *  sync. interrupt arrived we reset the I/O old PSW to
 	 *  its original value.
 	 */
-	
-	ccode = iac ();
-	
-	switch (ccode) {
-	case 0:	/* primary-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_PRIM_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	case 1:	/* secondary-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_SEC_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	case 2:	/* access-register */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_ACC_REG_MODE | _PSW_IO_WAIT;
-		break;
-	case 3:	/* home-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_HOME_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	default:
-		panic ("start_IO() : unexpected "
-		       "address-space-control %d\n", ccode);
-		break;
-	}
+	psw_mask = PSW_KERNEL_BITS | PSW_MASK_IO | PSW_MASK_WAIT;
 	
 	/*
 	 * Martin didn't like modifying the new PSW, now we take
@@ -201,7 +176,6 @@ s390_do_sync_wait_haltclear(int irq, int halt)
 	int io_sub;
 	__u32 io_parm;
 	unsigned long psw_mask;
-	int ccode;
 	
 	int ready = 0;
 	
@@ -212,32 +186,7 @@ s390_do_sync_wait_haltclear(int irq, int halt)
 	 * FIXME: Are there case where we can't rely on an interrupt
 	 *        to occurr? Need to check...
 	 */
-
-	ccode = iac ();
-	
-	switch (ccode) {
-	case 0:	/* primary-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_PRIM_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	case 1:	/* secondary-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_SEC_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	case 2:	/* access-register */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_ACC_REG_MODE | _PSW_IO_WAIT;
-		break;
-	case 3:	/* home-space */
-		psw_mask = _IO_PSW_MASK
-			| _PSW_HOME_SPACE_MODE | _PSW_IO_WAIT;
-		break;
-	default: /* FIXME: isn't ccode only 2 bits anyway? */
-		panic (halt?"halt":"clear"
-		       "_IO() : unexpected address-space-control %d\n", 
-		       ccode);
-		break;
-	}
+	psw_mask = PSW_KERNEL_BITS | PSW_MASK_IO | PSW_MASK_WAIT;
 	
 	/*
 	 * Martin didn't like modifying the new PSW, now we take
@@ -960,7 +909,7 @@ do_IRQ (struct pt_regs regs)
 	 *       entry condition to synchronous I/O.
 	 */
 	if (*(__u32 *) __LC_SYNC_IO_WORD) {
-		regs.psw.mask &= ~(_PSW_WAIT_MASK_BIT | _PSW_IO_MASK_BIT);
+		regs.psw.mask &= ~(PSW_MASK_WAIT | PSW_MASK_IO);
 		return;
 	}
 	/* endif */
