@@ -30,6 +30,7 @@
 #include <linux/errno.h>
 #include <linux/ptrace.h>
 #include <linux/user.h>
+#include <linux/security.h>
 
 #include <asm/segment.h>
 #include <asm/page.h>
