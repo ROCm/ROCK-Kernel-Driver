@@ -382,7 +382,7 @@ static int __init agp_via_probe(struct pci_dev *pdev,
 		}
 	}
 
-	if (agp_try_unsupported) {
+	if (!agp_try_unsupported) {
 		printk(KERN_ERR PFX 
 		    "Unsupported VIA chipset (device id: %04x),"
 		    " you might want to try agp_try_unsupported=1.\n",
