@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  *  linux/include/asm-ppc/ide.h
  *
  *  Copyright (C) 1994-1996 Linus Torvalds & authors */
