@@ -353,10 +353,10 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
        return pte; 
 }
 
-#define __pte_offset(address) \
+#define pte_index(address) \
 		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 #define pte_offset_kernel(dir, address) ((pte_t *) pmd_page_kernel(*(dir)) + \
-			__pte_offset(address))
+			pte_index(address))
 
 /* x86-64 always has all page tables mapped. */
 #define pte_offset_map(dir,address) pte_offset_kernel(dir,address)
