@@ -53,6 +53,8 @@ Revision History:
 	 2. Bug fix: Fixed VLAN support failure.
 	 3. Bug fix: Fixed receive interrupt coalescing bug.
 	 4. Dynamic IPG support is disabled by default.
+	3.0.3 06/05/2003
+	 1. Bug fix: Fixed failure to close the interface if SMP is enabled.
 
 */
 
@@ -89,9 +91,9 @@ Revision History:
 
 #include "amd8111e.h"
 #define MODULE_NAME	"amd8111e"
-#define MODULE_VERSION	"3.0.2"
+#define MODULE_VERSION	"3.0.3"
 MODULE_AUTHOR("Advanced Micro Devices, Inc.");
-MODULE_DESCRIPTION ("AMD8111 based 10/100 Ethernet Controller. Driver Version 3.0.2");
+MODULE_DESCRIPTION ("AMD8111 based 10/100 Ethernet Controller. Driver Version 3.0.3");
 MODULE_LICENSE("GPL");
 MODULE_PARM(speed_duplex, "1-" __MODULE_STRING (MAX_UNITS) "i");
 MODULE_PARM_DESC(speed_duplex, "Set device speed and duplex modes, 0: Auto Negotitate, 1: 10Mbps Half Duplex, 2: 10Mbps Full Duplex, 3: 100Mbps Half Duplex, 4: 100Mbps Full Duplex");
@@ -1171,11 +1173,11 @@ static int amd8111e_close(struct net_device * dev)
 	if(lp->options & OPTION_DYN_IPG_ENABLE)	        
 		del_timer_sync(&lp->ipg_data.ipg_timer);
 
+	spin_unlock_irq(&lp->lock);
+	free_irq(dev->irq, dev);
+
 	/* Update the statistics before closing */
 	amd8111e_get_stats(dev);
-	spin_unlock_irq(&lp->lock);
-
-	free_irq(dev->irq, dev);
 	lp->opened = 0;
 	return 0;
 }
