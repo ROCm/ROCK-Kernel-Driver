@@ -22,8 +22,8 @@
  *************************************************************************/
 
 #define DRV_NAME	"pcnet32"
-#define DRV_VERSION	"1.30c"
-#define DRV_RELDATE	"05.25.2004"
+#define DRV_VERSION	"1.30d"
+#define DRV_RELDATE	"06.01.2004"
 #define PFX		DRV_NAME ": "
 
 static const char *version =
@@ -245,6 +245,7 @@ static int full_duplex[MAX_UNITS];
  * v1.30b  24 May 2004 Don Fry fix bogus tx carrier errors with 79c973,
  *	   assisted by Bruce Penrod <bmpenrod@endruntechnologies.com>.
  * v1.30c  25 May 2004 Don Fry added netif_wake_queue after pcnet32_restart.
+ * v1.30d  01 Jun 2004 Don Fry discard oversize rx packets.
  */
 
 
@@ -1907,7 +1908,13 @@ pcnet32_rx(struct net_device *dev)
 	    short pkt_len = (le32_to_cpu(lp->rx_ring[entry].msg_length) & 0xfff)-4;
 	    struct sk_buff *skb;
 
-	    if (pkt_len < 60) {
+	    /* Discard oversize frames. */
+	    if (unlikely(pkt_len > PKT_BUF_SZ - 2)) {
+		if (netif_msg_drv(lp))
+		    printk(KERN_ERR "%s: Impossible packet size %d!\n",
+			    dev->name, pkt_len);
+		lp->stats.rx_errors++;
+	    } else if (pkt_len < 60) {
 		if (netif_msg_rx_err(lp))
 		    printk(KERN_ERR "%s: Runt packet!\n", dev->name);
 		lp->stats.rx_errors++;
