@@ -427,6 +427,7 @@ static inline int mapping_writably_mapped(struct address_space *mapping)
 struct inode {
 	struct hlist_node	i_hash;
 	struct list_head	i_list;
+	struct list_head	i_sb_list;
 	struct list_head	i_dentry;
 	unsigned long		i_ino;
 	atomic_t		i_count;
@@ -775,6 +776,7 @@ struct super_block {
 	void                    *s_security;
 	struct xattr_handler	**s_xattr;
 
+	struct list_head	s_inodes;	/* all inodes */
 	struct list_head	s_dirty;	/* dirty inodes */
 	struct list_head	s_io;		/* parked for writeback */
 	struct hlist_head	s_anon;		/* anonymous dentries for (nfs) exporting */
