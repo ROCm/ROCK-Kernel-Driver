@@ -1213,7 +1213,7 @@ static int __initdata dma2 = -1;
 #ifdef __ISAPNP__
 /* use isapnp for configuration */
 static int isapnp	= 1;
-static int isapnpjump	= 0;
+static int isapnpjump;
 MODULE_PARM(isapnp, "i");
 MODULE_PARM(isapnpjump, "i");
 #endif
