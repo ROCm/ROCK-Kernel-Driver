@@ -530,7 +530,7 @@ err_out_free_res:
 #endif
 	pci_release_regions(pdev);
 err_out_netdev:
-	kfree (dev);
+	free_netdev (dev);
 	return -ENODEV;
 }
 

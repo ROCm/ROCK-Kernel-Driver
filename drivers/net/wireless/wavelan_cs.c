@@ -131,7 +131,7 @@ hacr_write_slow(u_long	base,
  * Read the Parameter Storage Area from the WaveLAN card's memory
  */
 static void
-psa_read(device *	dev,
+psa_read(struct net_device *	dev,
 	 int		o,	/* offset in PSA */
 	 u_char *	b,	/* buffer to fill */
 	 int		n)	/* size to read */
@@ -155,7 +155,7 @@ psa_read(device *	dev,
  * Write the Paramter Storage Area to the WaveLAN card's memory
  */
 static void
-psa_write(device *	dev,
+psa_write(struct net_device *	dev,
 	  int		o,	/* Offset in psa */
 	  u_char *	b,	/* Buffer in memory */
 	  int		n)	/* Length of buffer */
@@ -229,7 +229,7 @@ psa_crc(unsigned char *	psa,	/* The PSA */
  * update the checksum field in the Wavelan's PSA
  */
 static void
-update_psa_checksum(device *	dev)
+update_psa_checksum(struct net_device *	dev)
 {
 #ifdef SET_PSA_CRC
   psa_t		psa;
@@ -753,7 +753,7 @@ void wv_roam_handover(wavepoint_history *wavepoint, net_local *lp)
 }
 
 /* Called when a WavePoint beacon is received */
-static inline void wl_roam_gather(device *  dev,
+static inline void wl_roam_gather(struct net_device *  dev,
 				  u_char *  hdr,   /* Beacon header */
 				  u_char *  stats) /* SNR, Signal quality 
 						      of packet */
@@ -831,7 +831,7 @@ static inline int WAVELAN_BEACON(unsigned char *data)
  *  wv_82593_config() & wv_diag())
  */
 static int
-wv_82593_cmd(device *	dev,
+wv_82593_cmd(struct net_device *	dev,
 	     char *	str,
 	     int	cmd,
 	     int	result)
@@ -942,7 +942,7 @@ wv_82593_cmd(device *	dev,
  * status for the WaveLAN.
  */
 static inline int
-wv_diag(device *	dev)
+wv_diag(struct net_device *	dev)
 {
   int		ret = FALSE;
 
@@ -963,7 +963,7 @@ wv_diag(device *	dev)
  * The return value is the address to use for next the call.
  */
 static int
-read_ringbuf(device *	dev,
+read_ringbuf(struct net_device *	dev,
 	     int	addr,
 	     char *	buf,
 	     int	len)
@@ -1004,10 +1004,10 @@ read_ringbuf(device *	dev,
  * some delay sometime...
  */
 static inline void
-wv_82593_reconfig(device *	dev)
+wv_82593_reconfig(struct net_device *	dev)
 {
   net_local *		lp = (net_local *)dev->priv;
-  dev_link_t *		link = ((net_local *) dev->priv)->link;
+  dev_link_t *		link = lp->link;
   unsigned long		flags;
 
   /* Arm the flag, will be cleard in wv_82593_config() */
@@ -1132,7 +1132,7 @@ wv_psa_show(psa_t *	p)
  * This function need to be completed...
  */
 static void
-wv_mmc_show(device *	dev)
+wv_mmc_show(struct net_device *	dev)
 {
   ioaddr_t	base = dev->base_addr;
   net_local *	lp = (net_local *)dev->priv;
@@ -1222,7 +1222,7 @@ wv_mmc_show(device *	dev)
  * Print the formatted status of the i82593's receive unit.
  */
 static void
-wv_ru_show(device *	dev)
+wv_ru_show(struct net_device *	dev)
 {
   net_local *lp = (net_local *) dev->priv;
 
@@ -1241,7 +1241,7 @@ wv_ru_show(device *	dev)
  * Print the formatted status of the WaveLAN PCMCIA device driver.
  */
 static void
-wv_dev_show(device *	dev)
+wv_dev_show(struct net_device *	dev)
 {
   printk(KERN_DEBUG "dev:");
   printk(" state=%lX,", dev->state);
@@ -1256,7 +1256,7 @@ wv_dev_show(device *	dev)
  * private information.
  */
 static void
-wv_local_show(device *	dev)
+wv_local_show(struct net_device *	dev)
 {
   net_local *lp;
 
@@ -1314,7 +1314,7 @@ wv_packet_info(u_char *		p,		/* Packet to dump */
  * There  is a lot of flag to configure it at your will...
  */
 static inline void
-wv_init_info(device *	dev)
+wv_init_info(struct net_device *	dev)
 {
   ioaddr_t	base = dev->base_addr;
   psa_t		psa;
@@ -1412,7 +1412,7 @@ wv_init_info(device *	dev)
  * Used when the user read /proc/net/dev
  */
 static en_stats	*
-wavelan_get_stats(device *	dev)
+wavelan_get_stats(struct net_device *	dev)
 {
 #ifdef DEBUG_IOCTL_TRACE
   printk(KERN_DEBUG "%s: <>wavelan_get_stats()\n", dev->name);
@@ -1431,7 +1431,7 @@ wavelan_get_stats(device *	dev)
  */
 
 static void
-wavelan_set_multicast_list(device *	dev)
+wavelan_set_multicast_list(struct net_device *	dev)
 {
   net_local *	lp = (net_local *) dev->priv;
 
@@ -1529,7 +1529,7 @@ wavelan_set_multicast_list(device *	dev)
  */
 #ifdef SET_MAC_ADDRESS
 static int
-wavelan_set_mac_address(device *	dev,
+wavelan_set_mac_address(struct net_device *	dev,
 			void *		addr)
 {
   struct sockaddr *	mac = addr;
@@ -1796,7 +1796,7 @@ wv_frequency_list(u_long	base,	/* i/o port of the card */
  * Sorry, but this function really need wireless extensions...
  */
 static inline void
-wl_spy_gather(device *	dev,
+wl_spy_gather(struct net_device *	dev,
 	      u_char *	mac,		/* MAC address */
 	      u_char *	stats)		/* Statistics to gather */
 {
@@ -1823,7 +1823,7 @@ wl_spy_gather(device *	dev,
  * or you may also calculate the mean and standard deviation of the level...
  */
 static inline void
-wl_his_gather(device *	dev,
+wl_his_gather(struct net_device *	dev,
 	      u_char *	stats)		/* Statistics to gather */
 {
   net_local *	lp = (net_local *) dev->priv;
@@ -2785,7 +2785,7 @@ wavelan_ioctl(struct net_device *	dev,	/* Device on wich the ioctl apply */
  * Called by /proc/net/wireless...
  */
 static iw_stats *
-wavelan_get_wireless_stats(device *	dev)
+wavelan_get_wireless_stats(struct net_device *	dev)
 {
   ioaddr_t		base = dev->base_addr;
   net_local *		lp = (net_local *) dev->priv;
@@ -2847,7 +2847,7 @@ wavelan_get_wireless_stats(device *	dev)
  * (called by wv_packet_rcv())
  */
 static inline int
-wv_start_of_frame(device *	dev,
+wv_start_of_frame(struct net_device *	dev,
 		  int		rfp,	/* end of frame */
 		  int		wrap)	/* start of buffer */
 {
@@ -2909,7 +2909,7 @@ wv_start_of_frame(device *	dev,
  * (called by wv_packet_rcv())
  */
 static inline void
-wv_packet_read(device *		dev,
+wv_packet_read(struct net_device *		dev,
 	       int		fd_p,
 	       int		sksize)
 {
@@ -3012,7 +3012,7 @@ wv_packet_read(device *		dev,
  * Note : the spinlock is already grabbed for us and irq are disabled.
  */
 static inline void
-wv_packet_rcv(device *	dev)
+wv_packet_rcv(struct net_device *	dev)
 {
   ioaddr_t	base = dev->base_addr;
   net_local *	lp = (net_local *) dev->priv;
@@ -3146,7 +3146,7 @@ wv_packet_rcv(device *	dev)
  * (called in wavelan_packet_xmit())
  */
 static inline void
-wv_packet_write(device *	dev,
+wv_packet_write(struct net_device *	dev,
 		void *		buf,
 		short		length)
 {
@@ -3209,7 +3209,7 @@ wv_packet_write(device *	dev,
  */
 static int
 wavelan_packet_xmit(struct sk_buff *	skb,
-		    device *		dev)
+		    struct net_device *		dev)
 {
   net_local *		lp = (net_local *)dev->priv;
   unsigned long		flags;
@@ -3273,7 +3273,7 @@ wavelan_packet_xmit(struct sk_buff *	skb,
  * (called by wv_hw_config())
  */
 static inline int
-wv_mmc_init(device *	dev)
+wv_mmc_init(struct net_device *	dev)
 {
   ioaddr_t	base = dev->base_addr;
   psa_t		psa;
@@ -3467,7 +3467,7 @@ wv_mmc_init(device *	dev)
  * (called in wv_ru_start() and wavelan_close() and wavelan_event())
  */
 static int
-wv_ru_stop(device *	dev)
+wv_ru_stop(struct net_device *	dev)
 {
   ioaddr_t	base = dev->base_addr;
   net_local *	lp = (net_local *) dev->priv;
@@ -3530,7 +3530,7 @@ wv_ru_stop(device *	dev)
  * (called in wv_hw_reset() & wavelan_open())
  */
 static int
-wv_ru_start(device *	dev)
+wv_ru_start(struct net_device *	dev)
 {
   ioaddr_t	base = dev->base_addr;
   net_local *	lp = (net_local *) dev->priv;
@@ -3618,7 +3618,7 @@ wv_ru_start(device *	dev)
  * (called by wv_hw_config(), wv_82593_reconfig() & wavelan_packet_xmit())
  */
 static int
-wv_82593_config(device *	dev)
+wv_82593_config(struct net_device *	dev)
 {
   ioaddr_t			base = dev->base_addr;
   net_local *			lp = (net_local *) dev->priv;
@@ -3792,7 +3792,7 @@ wv_82593_config(device *	dev)
  * (called by wv_config())
  */
 static inline int
-wv_pcmcia_reset(device *	dev)
+wv_pcmcia_reset(struct net_device *	dev)
 {
   int		i;
   conf_reg_t	reg = { 0, CS_READ, CISREG_COR, 0 };
@@ -3854,7 +3854,7 @@ wv_pcmcia_reset(device *	dev)
  * (called by wavelan_event() & wv_hw_reset())
  */
 static int
-wv_hw_config(device *	dev)
+wv_hw_config(struct net_device *	dev)
 {
   net_local *		lp = (net_local *) dev->priv;
   ioaddr_t		base = dev->base_addr;
@@ -3961,7 +3961,7 @@ wv_hw_config(device *	dev)
  * (called by wavelan_event(), wavelan_watchdog() and wavelan_open())
  */
 static inline void
-wv_hw_reset(device *	dev)
+wv_hw_reset(struct net_device *	dev)
 {
   net_local *	lp = (net_local *) dev->priv;
 
@@ -4004,7 +4004,7 @@ wv_pcmcia_config(dev_link_t *	link)
   memreq_t		mem;
 
   handle = link->handle;
-  dev = (device *) link->priv;
+  dev = (struct net_device *) link->priv;
 
 #ifdef DEBUG_CONFIG_TRACE
   printk(KERN_DEBUG "->wv_pcmcia_config(0x%p)\n", link);
@@ -4149,7 +4149,7 @@ wv_pcmcia_config(dev_link_t *	link)
 static void
 wv_pcmcia_release(dev_link_t *link)
 {
-  device *	dev = (device *) link->priv;
+  struct net_device *	dev = (struct net_device *) link->priv;
 
 #ifdef DEBUG_CONFIG_TRACE
   printk(KERN_DEBUG "%s: -> wv_pcmcia_release(0x%p)\n", dev->name, link);
@@ -4199,13 +4199,13 @@ wavelan_interrupt(int		irq,
 		  void *	dev_id,
 		  struct pt_regs * regs)
 {
-  device *	dev;
+  struct net_device *	dev;
   net_local *	lp;
   ioaddr_t	base;
   int		status0;
   u_int		tx_status;
 
-  if((dev = (device *)dev_id) == (device *) NULL)
+  if ((dev = dev_id) == NULL)
     {
 #ifdef DEBUG_INTERRUPT_ERROR
       printk(KERN_WARNING "wavelan_interrupt(): irq %d for unknown device.\n",
@@ -4466,7 +4466,7 @@ wavelan_interrupt(int		irq,
  * deal with the multiple Tx buffers...
  */
 static void
-wavelan_watchdog(device *	dev)
+wavelan_watchdog(struct net_device *	dev)
 {
   net_local *		lp = (net_local *) dev->priv;
   ioaddr_t		base = dev->base_addr;
@@ -4541,7 +4541,7 @@ wavelan_watchdog(device *	dev)
  * Called by NET3 when it "open" the device.
  */
 static int
-wavelan_open(device *	dev)
+wavelan_open(struct net_device *	dev)
 {
   dev_link_t *	link = ((net_local *) dev->priv)->link;
   net_local *	lp = (net_local *)dev->priv;
@@ -4596,7 +4596,7 @@ wavelan_open(device *	dev)
  * Called by NET3 when it "close" the device.
  */
 static int
-wavelan_close(device *	dev)
+wavelan_close(struct net_device *	dev)
 {
   dev_link_t *	link = ((net_local *) dev->priv)->link;
   ioaddr_t	base = dev->base_addr;
@@ -4660,7 +4660,7 @@ wavelan_attach(void)
 {
   client_reg_t	client_reg;	/* Register with cardmgr */
   dev_link_t *	link;		/* Info for cardmgr */
-  device *	dev;		/* Interface generic data */
+  struct net_device *	dev;		/* Interface generic data */
   net_local *	lp;		/* Interface specific data */
   int		i, ret;
 
@@ -4698,22 +4698,14 @@ wavelan_attach(void)
   dev_list = link;
 
   /* Allocate the generic data structure */
-  dev = kmalloc(sizeof(struct net_device), GFP_KERNEL);
+  dev = alloc_etherdev(sizeof(net_local));
   if (!dev) {
       kfree(link);
       return NULL;
   }
-  memset(dev, 0x00, sizeof(struct net_device));
   link->priv = link->irq.Instance = dev;
 
-  /* Allocate the wavelan-specific data structure. */
-  dev->priv = lp = (net_local *) kmalloc(sizeof(net_local), GFP_KERNEL);
-  if (!lp) {
-      kfree(link);
-      kfree(dev);
-      return NULL;
-  }
-  memset(lp, 0x00, sizeof(net_local));
+  lp = dev->priv;
 
   /* Init specific data */
   lp->configured = 0;
@@ -4730,9 +4722,6 @@ wavelan_attach(void)
   /* back links */
   lp->link = link;
   lp->dev = dev;
-
-  /* Standard setup for generic data */
-  ether_setup(dev);
 
   /* wavelan NET3 callbacks */
   SET_MODULE_OWNER(dev);
@@ -4851,22 +4840,16 @@ wavelan_detach(dev_link_t *	link)
   /* Free pieces */
   if(link->priv)
     {
-      device *	dev = (device *) link->priv;
+      struct net_device *	dev = (struct net_device *) link->priv;
 
       /* Remove ourselves from the kernel list of ethernet devices */
       /* Warning : can't be called from interrupt, timer or wavelan_close() */
-      if(link->dev != NULL)
+      if (link->dev)
 	unregister_netdev(dev);
       link->dev = NULL;
-
-      if(dev->priv)
-	{
-	  /* Sound strange, but safe... */
-	  ((net_local *) dev->priv)->link = (dev_link_t *) NULL;
-	  ((net_local *) dev->priv)->dev = (device *) NULL;
-	  kfree(dev->priv);
-	}
-      kfree(link->priv);
+      ((net_local *) dev->priv)->link = NULL;
+      ((net_local *) dev->priv)->dev = NULL;
+      free_netdev(dev);
     }
   kfree(link);
 
@@ -4888,7 +4871,7 @@ wavelan_event(event_t		event,		/* The event received */
 	      event_callback_args_t *	args)
 {
   dev_link_t *	link = (dev_link_t *) args->client_data;
-  device *	dev = (device *) link->priv;
+  struct net_device *	dev = (struct net_device *) link->priv;
 
 #ifdef DEBUG_CALLBACK_TRACE
   printk(KERN_DEBUG "->wavelan_event(): %s\n",

@@ -1282,13 +1282,13 @@ static void plip_attach (struct parport *port)
 		}
 
 		sprintf(name, "plip%d", unit);
-		dev = alloc_netdev(sizeof(struct net_local), name, 
-				   ether_setup);
+		dev = alloc_etherdev(sizeof(struct net_local));
 		if (!dev) {
 			printk(KERN_ERR "plip: memory squeeze\n");
 			return;
 		}
 		
+		strcpy(dev->name, name);
 		dev->init = plip_init_netdev;
 
 		SET_MODULE_OWNER(dev);

@@ -72,8 +72,7 @@ static int  __init ethertap_probe(int unit)
 	struct net_device *dev;
 	int err = -ENOMEM;
 
-	dev = alloc_netdev(sizeof(struct net_local), "tap%d",
-			   ether_setup);
+	dev = alloc_etherdev(sizeof(struct net_local));
 
 	if (!dev)
 		goto out;

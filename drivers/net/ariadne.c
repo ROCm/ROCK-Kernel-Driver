@@ -168,7 +168,7 @@ static int __init ariadne_probe(void)
 	    continue;
 	}
 
-	dev = init_etherdev(NULL, sizeof(struct ariadne_private));
+	dev = alloc_etherdev(sizeof(struct ariadne_private));
 
 	if (dev == NULL) {
 	    release_resource(r1);
@@ -205,11 +205,17 @@ static int __init ariadne_probe(void)
 	dev->get_stats = &ariadne_get_stats;
 	dev->set_multicast_list = &set_multicast_list;
 
+	res = register_netdev(dev);
+	if (res) {
+	    release_resource(r1);
+	    release_resource(r2);
+	    free_netdev(dev);
+	    break;
+	}
 #ifdef MODULE
 	priv->next_module = root_ariadne_dev;
 	root_ariadne_dev = priv;
 #endif
-	res = 0;
     }
     return res;
 }

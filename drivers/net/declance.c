@@ -1039,13 +1039,13 @@ static int __init dec_lance_init(const int type, const int slot)
 	if (dec_lance_debug && version_printed++ == 0)
 		printk(version);
 
-	dev = init_etherdev(NULL, sizeof(struct lance_private));
+	dev = alloc_etherdev(sizeof(struct lance_private));
 	if (!dev)
 		return -ENOMEM;
 	SET_MODULE_OWNER(dev);
 
 	/*
-	 * init_etherdev ensures the data structures used by the LANCE
+	 * alloc_etherdev ensures the data structures used by the LANCE
 	 * are aligned.
 	 */
 	lp = (struct lance_private *) dev->priv;
@@ -1188,9 +1188,6 @@ static int __init dec_lance_init(const int type, const int slot)
 		}
 	}
 
-	lp->next = root_lance_dev;
-	root_lance_dev = dev;
-
 	/* Copy the ethernet address to the device structure, later to the
 	 * lance initialization block so the lance gets it every time it's
 	 * (re)initialized.
@@ -1239,11 +1236,14 @@ static int __init dec_lance_init(const int type, const int slot)
 	init_timer(&lp->multicast_timer);
 	lp->multicast_timer.data = (unsigned long) dev;
 	lp->multicast_timer.function = &lance_set_multicast_retry;
-
+	ret = register_netdev(dev);
+	if (ret)
+		goto err_out;
+	lp->next = root_lance_dev;
+	root_lance_dev = dev;
 	return 0;
 
 err_out:
-	unregister_netdev(dev);
 	free_netdev(dev);
 	return ret;
 }
@@ -1288,13 +1288,12 @@ static void __exit dec_lance_cleanup(void)
 	while (root_lance_dev) {
 		struct net_device *dev = root_lance_dev;
 		struct lance_private *lp = (struct lance_private *)dev->priv;
-
+		unregister_netdev(dev);
 #ifdef CONFIG_TC
 		if (lp->slot >= 0)
 			release_tc_card(lp->slot);
 #endif
 		root_lance_dev = lp->next;
-		unregister_netdev(dev);
 		free_netdev(dev);
 	}
 }

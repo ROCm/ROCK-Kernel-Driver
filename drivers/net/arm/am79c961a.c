@@ -722,7 +722,7 @@ static int __init am79c961_init(void)
 release:
 	release_region(dev->base_addr, 0x18);
 nodev:
-	kfree(dev);
+	free_netdev(dev);
 out:
 	return ret;
 }
