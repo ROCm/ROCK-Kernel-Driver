@@ -186,12 +186,12 @@ shift1_data_saved (struct salinfo_data *data, int shift)
  * changes.
  */
 void
-salinfo_log_wakeup(int type, u8 *buffer, u64 size)
+salinfo_log_wakeup(int type, u8 *buffer, u64 size, int irqsafe)
 {
 	struct salinfo_data *data = salinfo_data + type;
 	struct salinfo_data_saved *data_saved;
 	unsigned long flags = 0;
-	int i, irqsafe = type != SAL_INFO_TYPE_MCA && type != SAL_INFO_TYPE_INIT;
+	int i;
 	int saved_size = ARRAY_SIZE(data->data_saved);
 
 	BUG_ON(type >= ARRAY_SIZE(salinfo_log_name));

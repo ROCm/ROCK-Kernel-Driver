@@ -129,7 +129,7 @@ static int cmc_polling_enabled = 1;
  */
 static int cpe_poll_enabled = 1;
 
-extern void salinfo_log_wakeup(int type, u8 *buffer, u64 size);
+extern void salinfo_log_wakeup(int type, u8 *buffer, u64 size, int irqsafe);
 
 /*
  * IA64_MCA log support
@@ -198,17 +198,17 @@ ia64_log_init(int sal_info_type)
  *	Get the current MCA log from SAL and copy it into the OS log buffer.
  *
  *  Inputs  :   info_type   (SAL_INFO_TYPE_{MCA,INIT,CMC,CPE})
+ *              irq_safe    whether you can use printk at this point
  *  Outputs :   size        (total record length)
  *              *buffer     (ptr to error record)
  *
  */
 static u64
-ia64_log_get(int sal_info_type, u8 **buffer)
+ia64_log_get(int sal_info_type, u8 **buffer, int irq_safe)
 {
 	sal_log_record_header_t     *log_buffer;
 	u64                         total_len = 0;
 	int                         s;
-	int irq_safe = sal_info_type != SAL_INFO_TYPE_MCA && sal_info_type != SAL_INFO_TYPE_INIT;
 
 	IA64_LOG_LOCK(sal_info_type);
 
@@ -249,11 +249,11 @@ ia64_mca_log_sal_error_record(int sal_info_type, int called_from_init)
 	int irq_safe = sal_info_type != SAL_INFO_TYPE_MCA && sal_info_type != SAL_INFO_TYPE_INIT;
 	static const char * const rec_name[] = { "MCA", "INIT", "CMC", "CPE" };
 
-	size = ia64_log_get(sal_info_type, &buffer);
+	size = ia64_log_get(sal_info_type, &buffer, irq_safe);
 	if (!size)
 		return;
 
-	salinfo_log_wakeup(sal_info_type, buffer, size);
+	salinfo_log_wakeup(sal_info_type, buffer, size, irq_safe);
 
 	if (irq_safe || called_from_init)
 		printk(KERN_INFO "CPU %d: SAL log contains %s error record\n",
