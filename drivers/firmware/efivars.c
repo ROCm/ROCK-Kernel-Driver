@@ -664,6 +664,9 @@ efivars_init(void)
 	unsigned long variable_name_size = 1024;
 	int i, rc = 0, error = 0;
 
+	if (!efi_enabled)
+		return -ENODEV;
+
 	printk(KERN_INFO "EFI Variables Facility v%s\n", EFIVARS_VERSION);
 
 	/*
@@ -732,6 +735,9 @@ static void __exit
 efivars_exit(void)
 {
 	struct list_head *pos, *n;
+
+	if (!efi_enabled)
+		return;
 
 	list_for_each_safe(pos, n, &efivar_list)
 		efivar_unregister(get_efivar_entry(pos));

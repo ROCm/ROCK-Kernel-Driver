@@ -65,6 +65,7 @@ static inline char * __init machine_specific_memory_setup(void);
 
 #ifdef CONFIG_EFI
 int efi_enabled = 0;
+EXPORT_SYMBOL(efi_enabled);
 #endif
 
 /* cpu data as detected by the assembly code in head.S */
