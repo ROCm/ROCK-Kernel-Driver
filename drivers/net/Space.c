@@ -98,6 +98,9 @@ extern int macsonic_probe(struct net_device *dev);
 extern int mac8390_probe(struct net_device *dev);
 extern int mac89x0_probe(struct net_device *dev);
 extern int mc32_probe(struct net_device *dev);
+#ifdef CONFIG_SDLA
+extern struct net_device *sdla_init(void);
+#endif
   
 /* Detachable devices ("pocket adaptors") */
 extern int de620_probe(struct net_device *);
@@ -385,19 +388,11 @@ static int __init ethif_probe(struct net_device *dev)
 /*  Statically configured drivers -- order matters here. */
 void probe_old_netdevs(void)
 {
+#ifdef CONFIG_SDLA
+	sdla_init();
+#endif
 
 }
-
-#ifdef CONFIG_SDLA
-extern int sdla_init(struct net_device *);
-static struct net_device sdla0_dev = {
-	.name		=  "sdla0",
-	.next		=  NEXT_DEV,
-	.init		=  sdla_init,
-};
-#undef NEXT_DEV
-#define NEXT_DEV	(&sdla0_dev)
-#endif
 
 #if defined(CONFIG_LTPC)
 extern int ltpc_probe(struct net_device *);
