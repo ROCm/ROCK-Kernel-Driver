@@ -20,7 +20,6 @@
 #include <linux/notifier.h>
 #include <linux/netdevice.h>
 #include <linux/rcupdate.h>
-#include <linux/init.h>
 
 #include "security.h"
 #include "objsec.h"
@@ -238,3 +237,4 @@ out:
 }
 
 __initcall(sel_netif_init);
+
