@@ -199,7 +199,8 @@ acpi_ex_opcode_2A_2T_1R (
 	acpi_status                     status;
 
 
-	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_2T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_2T_1R",
+		acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/*
@@ -222,8 +223,10 @@ acpi_ex_opcode_2A_2T_1R (
 
 		/* Quotient to return_desc1, remainder to return_desc2 */
 
-		status = acpi_ut_divide (&operand[0]->integer.value, &operand[1]->integer.value,
-				   &return_desc1->integer.value, &return_desc2->integer.value);
+		status = acpi_ut_divide (operand[0]->integer.value,
+				   operand[1]->integer.value,
+				   &return_desc1->integer.value,
+				   &return_desc2->integer.value);
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
@@ -297,7 +300,8 @@ acpi_ex_opcode_2A_1T_1R (
 	acpi_size                       length;
 
 
-	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_1T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_1T_1R",
+		acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/*
@@ -330,15 +334,17 @@ acpi_ex_opcode_2A_1T_1R (
 
 		/* return_desc will contain the remainder */
 
-		status = acpi_ut_divide (&operand[0]->integer.value,
-				  &operand[1]->integer.value,
-				  NULL, &return_desc->integer.value);
+		status = acpi_ut_divide (operand[0]->integer.value,
+				   operand[1]->integer.value,
+				   NULL,
+				   &return_desc->integer.value);
 		break;
 
 
 	case AML_CONCAT_OP:             /* Concatenate (Data1, Data2, Result) */
 
-		status = acpi_ex_do_concatenate (operand[0], operand[1], &return_desc, walk_state);
+		status = acpi_ex_do_concatenate (operand[0], operand[1],
+				 &return_desc, walk_state);
 		break;
 
 
@@ -349,24 +355,24 @@ acpi_ex_opcode_2A_1T_1R (
 		 * been converted.)  Copy the raw buffer data to a new object of type String.
 		 */
 
-		/* Get the length of the new string */
-
+		/*
+		 * Get the length of the new string. It is the smallest of:
+		 * 1) Length of the input buffer
+		 * 2) Max length as specified in the to_string operator
+		 * 3) Length of input buffer up to a zero byte (null terminator)
+		 *
+		 * NOTE: A length of zero is ok, and will create a zero-length, null
+		 *       terminated string.
+		 */
 		length = 0;
-		if (operand[1]->integer.value == 0) {
-			/* Handle optional length value */
-
-			operand[1]->integer.value = ACPI_INTEGER_MAX;
-		}
-
 		while ((length < operand[0]->buffer.length) &&
 			   (length < operand[1]->integer.value) &&
 			   (operand[0]->buffer.pointer[length])) {
 			length++;
-		}
-
-		if (length > ACPI_MAX_STRING_CONVERSION) {
-			status = AE_AML_STRING_LIMIT;
-			goto cleanup;
+			if (length > ACPI_MAX_STRING_CONVERSION) {
+				status = AE_AML_STRING_LIMIT;
+				goto cleanup;
+			}
 		}
 
 		/* Allocate a new string (Length + 1 for null terminator) */
@@ -512,7 +518,8 @@ acpi_ex_opcode_2A_0T_1R (
 	u8                              logical_result = FALSE;
 
 
-	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+	ACPI_FUNCTION_TRACE_STR ("ex_opcode_2A_0T_1R",
+		acpi_ps_get_opcode_name (walk_state->opcode));
 
 
 	/* Create the internal return object */

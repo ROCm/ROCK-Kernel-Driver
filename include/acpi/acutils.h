@@ -694,14 +694,14 @@ acpi_ut_print_string (
 
 acpi_status
 acpi_ut_divide (
-	acpi_integer                    *in_dividend,
-	acpi_integer                    *in_divisor,
+	acpi_integer                    in_dividend,
+	acpi_integer                    in_divisor,
 	acpi_integer                    *out_quotient,
 	acpi_integer                    *out_remainder);
 
 acpi_status
 acpi_ut_short_divide (
-	acpi_integer                    *in_dividend,
+	acpi_integer                    in_dividend,
 	u32                             divisor,
 	acpi_integer                    *out_quotient,
 	u32                             *out_remainder);
@@ -719,6 +719,10 @@ acpi_ut_strtoul64 (
 	char                            *string,
 	u32                             base,
 	acpi_integer                    *ret_integer);
+
+/* Values for Base above (16=Hex, 10=Decimal) */
+
+#define ACPI_ANY_BASE        0
 
 char *
 acpi_ut_strupr (

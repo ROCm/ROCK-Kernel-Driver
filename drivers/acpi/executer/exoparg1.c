@@ -67,7 +67,7 @@
  * Where:
  *
  * xA - ARGUMENTS:    The number of arguments (input operands) that are
- *                    required for this opcode type (1 through 6 args).
+ *                    required for this opcode type (0 through 6 args).
  * yT - TARGETS:      The number of targets (output operands) that are required
  *                    for this opcode type (0, 1, or 2 targets).
  * zR - RETURN VALUE: Indicates whether this opcode type returns a value
@@ -85,8 +85,7 @@
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Execute Type 1 monadic operator with numeric operand on
- *              object stack
+ * DESCRIPTION: Execute operator with no operands, one return value
  *
  ******************************************************************************/
 
@@ -99,6 +98,7 @@ acpi_ex_opcode_0A_0T_1R (
 
 
 	ACPI_FUNCTION_TRACE_STR ("ex_opcode_0A_0T_1R", acpi_ps_get_opcode_name (walk_state->opcode));
+
 
 	/* Examine the AML opcode */
 
@@ -403,7 +403,7 @@ acpi_ex_opcode_1A_1T_1R (
 			/* Each BCD digit is one nybble wide */
 
 			for (i = 0; (i < acpi_gbl_integer_nybble_width) && (digit > 0); i++) {
-				(void) acpi_ut_short_divide (&digit, 10, &digit, &temp32);
+				(void) acpi_ut_short_divide (digit, 10, &digit, &temp32);
 
 				/* Insert the BCD digit that resides in the remainder from above */
 
@@ -500,28 +500,27 @@ acpi_ex_opcode_1A_1T_1R (
 	case AML_TO_DECSTRING_OP:       /* to_decimal_string (Data, Result) */
 
 		status = acpi_ex_convert_to_string (operand[0], &return_desc,
-				 ACPI_EXPLICIT_CONVERT_DECIMAL, walk_state->opcode);
+				 ACPI_EXPLICIT_CONVERT_DECIMAL);
 		break;
 
 
 	case AML_TO_HEXSTRING_OP:       /* to_hex_string (Data, Result) */
 
 		status = acpi_ex_convert_to_string (operand[0], &return_desc,
-				 ACPI_EXPLICIT_CONVERT_HEX, walk_state->opcode);
+				 ACPI_EXPLICIT_CONVERT_HEX);
 		break;
 
 
 	case AML_TO_BUFFER_OP:          /* to_buffer (Data, Result) */
 
-		status = acpi_ex_convert_to_buffer (operand[0], &return_desc,
-				 walk_state->opcode);
+		status = acpi_ex_convert_to_buffer (operand[0], &return_desc);
 		break;
 
 
 	case AML_TO_INTEGER_OP:         /* to_integer (Data, Result) */
 
 		status = acpi_ex_convert_to_integer (operand[0], &return_desc,
-				 walk_state->opcode);
+				 ACPI_ANY_BASE);
 		break;
 
 

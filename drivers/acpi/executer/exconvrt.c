@@ -58,7 +58,7 @@
  * PARAMETERS:  obj_desc        - Object to be converted.  Must be an
  *                                Integer, Buffer, or String
  *              result_desc     - Where the new Integer object is returned
- *              Opcode          - AML opcode
+ *              Flags           - Used for string conversion
  *
  * RETURN:      Status
  *
@@ -70,7 +70,7 @@ acpi_status
 acpi_ex_convert_to_integer (
 	union acpi_operand_object       *obj_desc,
 	union acpi_operand_object       **result_desc,
-	u16                             opcode)
+	u32                             flags)
 {
 	union acpi_operand_object       *return_desc;
 	u8                              *pointer;
@@ -128,10 +128,12 @@ acpi_ex_convert_to_integer (
 	case ACPI_TYPE_STRING:
 
 		/*
-		 * Convert string to an integer - the string must be hexadecimal
-		 * as per the ACPI specification
+		 * Convert string to an integer - for most cases, the string must be
+		 * hexadecimal as per the ACPI specification.  The only exception (as
+		 * of ACPI 3.0) is that the to_integer() operator allows both decimal
+		 * and hexadecimal strings (hex prefixed with "0x").
 		 */
-		status = acpi_ut_strtoul64 ((char *) pointer, 16, &result);
+		status = acpi_ut_strtoul64 ((char *) pointer, flags, &result);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
@@ -171,18 +173,6 @@ acpi_ex_convert_to_integer (
 	/* Save the Result */
 
 	return_desc->integer.value = result;
-
-	/*
-	 * If we are about to overwrite the original object on the operand stack,
-	 * we must remove a reference on the original object because we are
-	 * essentially removing it from the stack.
-	 */
-	if (*result_desc == obj_desc) {
-		if (opcode != AML_STORE_OP) {
-			acpi_ut_remove_reference (obj_desc);
-		}
-	}
-
 	*result_desc = return_desc;
 	return_ACPI_STATUS (AE_OK);
 }
@@ -195,7 +185,6 @@ acpi_ex_convert_to_integer (
  * PARAMETERS:  obj_desc        - Object to be converted.  Must be an
  *                                Integer, Buffer, or String
  *              result_desc     - Where the new buffer object is returned
- *              Opcode          - AML opcode
  *
  * RETURN:      Status
  *
@@ -206,8 +195,7 @@ acpi_ex_convert_to_integer (
 acpi_status
 acpi_ex_convert_to_buffer (
 	union acpi_operand_object       *obj_desc,
-	union acpi_operand_object       **result_desc,
-	u16                             opcode)
+	union acpi_operand_object       **result_desc)
 {
 	union acpi_operand_object       *return_desc;
 	u8                              *new_buf;
@@ -271,18 +259,6 @@ acpi_ex_convert_to_buffer (
 	/* Mark buffer initialized */
 
 	return_desc->common.flags |= AOPOBJ_DATA_VALID;
-
-	/*
-	 * If we are about to overwrite the original object on the operand stack,
-	 * we must remove a reference on the original object because we are
-	 * essentially removing it from the stack.
-	 */
-	if (*result_desc == obj_desc) {
-		if (opcode != AML_STORE_OP) {
-			acpi_ut_remove_reference (obj_desc);
-		}
-	}
-
 	*result_desc = return_desc;
 	return_ACPI_STATUS (AE_OK);
 }
@@ -351,7 +327,7 @@ acpi_ex_convert_to_ascii (
 
 			digit = integer;
 			for (j = 0; j < i; j++) {
-				(void) acpi_ut_short_divide (&digit, 10, &digit, &remainder);
+				(void) acpi_ut_short_divide (digit, 10, &digit, &remainder);
 			}
 
 			/* Handle leading zeros */
@@ -407,7 +383,6 @@ acpi_ex_convert_to_ascii (
  *                                Integer, Buffer, or String
  *              result_desc     - Where the string object is returned
  *              Type            - String flags (base and conversion type)
- *              Opcode          - AML opcode
  *
  * RETURN:      Status
  *
@@ -419,8 +394,7 @@ acpi_status
 acpi_ex_convert_to_string (
 	union acpi_operand_object       *obj_desc,
 	union acpi_operand_object       **result_desc,
-	u32                             type,
-	u16                             opcode)
+	u32                             type)
 {
 	union acpi_operand_object       *return_desc;
 	u8                              *new_buf;
@@ -479,6 +453,7 @@ acpi_ex_convert_to_string (
 
 		/* Null terminate at the correct place */
 
+		return_desc->string.length = string_length;
 		new_buf [string_length] = 0;
 		break;
 
@@ -527,8 +502,10 @@ acpi_ex_convert_to_string (
 
 			new_buf = return_desc->buffer.pointer;
 
-			/* Convert buffer bytes to hex or decimal values (separated by commas) */
-
+			/*
+			 * Convert buffer bytes to hex or decimal values
+			 * (separated by commas)
+			 */
 			for (i = 0; i < obj_desc->buffer.length; i++) {
 				new_buf += acpi_ex_convert_to_ascii (
 						 (acpi_integer) obj_desc->buffer.pointer[i], base,
@@ -549,17 +526,6 @@ acpi_ex_convert_to_string (
 
 	default:
 		return_ACPI_STATUS (AE_TYPE);
-	}
-
-	/*
-	 * If we are about to overwrite the original object on the operand stack,
-	 * we must remove a reference on the original object because we are
-	 * essentially removing it from the stack.
-	 */
-	if (*result_desc == obj_desc) {
-		if (opcode != AML_STORE_OP) {
-			acpi_ut_remove_reference (obj_desc);
-		}
 	}
 
 	*result_desc = return_desc;
@@ -641,7 +607,7 @@ acpi_ex_convert_to_target_type (
 			 * a Buffer or a String to an Integer if necessary.
 			 */
 			status = acpi_ex_convert_to_integer (source_desc, result_desc,
-					 walk_state->opcode);
+					 16);
 			break;
 
 
@@ -652,7 +618,7 @@ acpi_ex_convert_to_target_type (
 			 * Integer or Buffer if necessary
 			 */
 			status = acpi_ex_convert_to_string (source_desc, result_desc,
-					 ACPI_IMPLICIT_CONVERT_HEX, walk_state->opcode);
+					 ACPI_IMPLICIT_CONVERT_HEX);
 			break;
 
 
@@ -662,8 +628,7 @@ acpi_ex_convert_to_target_type (
 			 * The operand must be a Buffer.  We can convert an
 			 * Integer or String if necessary
 			 */
-			status = acpi_ex_convert_to_buffer (source_desc, result_desc,
-					 walk_state->opcode);
+			status = acpi_ex_convert_to_buffer (source_desc, result_desc);
 			break;
 
 

@@ -83,22 +83,20 @@ acpi_status
 acpi_ex_convert_to_integer (
 	union acpi_operand_object       *obj_desc,
 	union acpi_operand_object       **result_desc,
-	u16                             opcode);
+	u32                             flags);
 
 acpi_status
 acpi_ex_convert_to_buffer (
 	union acpi_operand_object       *obj_desc,
-	union acpi_operand_object       **result_desc,
-	u16                             opcode);
+	union acpi_operand_object       **result_desc);
 
 acpi_status
 acpi_ex_convert_to_string (
 	union acpi_operand_object       *obj_desc,
 	union acpi_operand_object       **result_desc,
-	u32                             type,
-	u16                             opcode);
+	u32                             type);
 
-/* Types for String conversion */
+/* Types for ->String conversion */
 
 #define ACPI_EXPLICIT_BYTE_COPY         0x00000000
 #define ACPI_EXPLICIT_CONVERT_HEX       0x00000001

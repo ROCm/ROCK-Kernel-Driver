@@ -658,7 +658,9 @@ cleanup:
 		acpi_gbl_exception_handler &&
 		!(status & AE_CODE_CONTROL)) {
 		acpi_ex_exit_interpreter ();
-		status = acpi_gbl_exception_handler (status);
+		status = acpi_gbl_exception_handler (status,
+				 walk_state->method_node->name.integer, walk_state->opcode,
+				 walk_state->aml_offset, NULL);
 		acpi_ex_enter_interpreter ();
 	}
 

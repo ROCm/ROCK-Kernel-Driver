@@ -838,7 +838,11 @@ acpi_status (*acpi_init_handler) (
 
 typedef
 acpi_status (*acpi_exception_handler) (
-	acpi_status                         status);
+	acpi_status                     aml_status,
+	acpi_name                       name,
+	u16                             opcode,
+	u32                             aml_offset,
+	void                            *context);
 
 
 /* Address Spaces (For Operation Regions) */

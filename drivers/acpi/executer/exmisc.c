@@ -258,18 +258,16 @@ acpi_ex_do_concatenate (
 	 */
 	switch (ACPI_GET_OBJECT_TYPE (operand0)) {
 	case ACPI_TYPE_INTEGER:
-		status = acpi_ex_convert_to_integer (operand1, &local_operand1,
-				 walk_state->opcode);
+		status = acpi_ex_convert_to_integer (operand1, &local_operand1, 16);
 		break;
 
 	case ACPI_TYPE_STRING:
 		status = acpi_ex_convert_to_string (operand1, &local_operand1,
-				 ACPI_IMPLICIT_CONVERT_HEX, walk_state->opcode);
+				 ACPI_IMPLICIT_CONVERT_HEX);
 		break;
 
 	case ACPI_TYPE_BUFFER:
-		status = acpi_ex_convert_to_buffer (operand1, &local_operand1,
-				 walk_state->opcode);
+		status = acpi_ex_convert_to_buffer (operand1, &local_operand1);
 		break;
 
 	default:
@@ -588,16 +586,16 @@ acpi_ex_do_logical_op (
 	 */
 	switch (ACPI_GET_OBJECT_TYPE (operand0)) {
 	case ACPI_TYPE_INTEGER:
-		status = acpi_ex_convert_to_integer (operand1, &local_operand1, opcode);
+		status = acpi_ex_convert_to_integer (operand1, &local_operand1, 16);
 		break;
 
 	case ACPI_TYPE_STRING:
 		status = acpi_ex_convert_to_string (operand1, &local_operand1,
-				 ACPI_IMPLICIT_CONVERT_HEX, opcode);
+				 ACPI_IMPLICIT_CONVERT_HEX);
 		break;
 
 	case ACPI_TYPE_BUFFER:
-		status = acpi_ex_convert_to_buffer (operand1, &local_operand1, opcode);
+		status = acpi_ex_convert_to_buffer (operand1, &local_operand1);
 		break;
 
 	default:
