@@ -204,6 +204,11 @@ aiptek_close(struct input_dev *dev)
 		usb_unlink_urb(aiptek->irq);
 }
 
+/* 
+ * FIXME, either remove this call, or talk the maintainer into 
+ * adding usb_set_report back into the core.
+ */
+#if 0
 static void
 aiptek_command(struct usb_device *dev, unsigned int ifnum,
 	       unsigned char command, unsigned char data)
@@ -214,47 +219,43 @@ aiptek_command(struct usb_device *dev, unsigned int ifnum,
 	buf[1] = command;
 	buf[2] = data;
 
-	/* 
-	 * FIXME, either remove this call, or talk the maintainer into 
-	 * adding it back into the core.
-	 */
-#if 0
 	if (usb_set_report(dev, ifnum, 3, 2, buf, 3) != 3) {
 		dbg("aiptek_command: 0x%x 0x%x\n", command, data);
 	}
-#endif
 }
+#endif
 
-static void*
-aiptek_probe(struct usb_device *dev, unsigned int ifnum,
+static int 
+aiptek_probe(struct usb_interface *intf,
 	     const struct usb_device_id *id)
 {
+	struct usb_device *dev = interface_to_usbdev (intf);
 	struct usb_endpoint_descriptor *endpoint;
 	struct aiptek *aiptek;
 
 	if (!(aiptek = kmalloc(sizeof (struct aiptek), GFP_KERNEL)))
-		return NULL;
+		return -ENOMEM;
 
 	memset(aiptek, 0, sizeof (struct aiptek));
 
 	aiptek->data = usb_buffer_alloc(dev, 10, SLAB_ATOMIC, &aiptek->data_dma);
 	if (!aiptek->data) {
 		kfree(aiptek);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	aiptek->irq = usb_alloc_urb(0, GFP_KERNEL);
 	if (!aiptek->irq) {
 		usb_buffer_free(dev, 10, aiptek->data, aiptek->data_dma);
 		kfree(aiptek);
-		return NULL;
+		return -ENOMEM;
 	}
 
 	// Resolution500LPI
-	aiptek_command(dev, ifnum, 0x18, 0x04);
+//	aiptek_command(dev, ifnum, 0x18, 0x04);
 
 	// SwitchToTablet
-	aiptek_command(dev, ifnum, 0x10, 0x01);
+//	aiptek_command(dev, ifnum, 0x10, 0x01);
 
 	aiptek->features = aiptek_features + id->driver_info;
 
@@ -294,7 +295,7 @@ aiptek_probe(struct usb_device *dev, unsigned int ifnum,
 	aiptek->dev.id.version = dev->descriptor.bcdDevice;
 	aiptek->usbdev = dev;
 
-	endpoint = dev->config[0].interface[ifnum].altsetting[0].endpoint + 0;
+	endpoint = intf->altsetting[0].endpoint + 0;
 
 	if (aiptek->features->pktlen > 10)
 		BUG();
@@ -308,28 +309,33 @@ aiptek_probe(struct usb_device *dev, unsigned int ifnum,
 
 	input_register_device(&aiptek->dev);
 
-	printk(KERN_INFO "input: %s on usb%d:%d.%d\n",
-	       aiptek->features->name, dev->bus->busnum, dev->devnum, ifnum);
+	printk(KERN_INFO "input: %s on usb%d:%d\n",
+	       aiptek->features->name, dev->bus->busnum, dev->devnum);
 
-	return aiptek;
+	dev_set_drvdata(&intf->dev, aiptek);
+	return 0;
 }
 
 static void
-aiptek_disconnect(struct usb_device *dev, void *ptr)
+aiptek_disconnect(struct usb_interface *intf)
 {
-	struct aiptek *aiptek = ptr;
-	usb_unlink_urb(aiptek->irq);
-	input_unregister_device(&aiptek->dev);
-	usb_free_urb(aiptek->irq);
-	usb_buffer_free(dev, 10, aiptek->data, aiptek->data_dma);
-	kfree(aiptek);
+	struct aiptek *aiptek  = dev_get_drvdata(&intf->dev);
+
+	dev_set_drvdata(&intf->dev, NULL);
+	if (aiptek) {
+		usb_unlink_urb(aiptek->irq);
+		input_unregister_device(&aiptek->dev);
+		usb_free_urb(aiptek->irq);
+		usb_buffer_free(interface_to_usbdev(intf), 10, aiptek->data, aiptek->data_dma);
+		kfree(aiptek);
+	}
 }
 
 static struct usb_driver aiptek_driver = {
-	.name ="aiptek",
-	.probe =aiptek_probe,
-	.disconnect =aiptek_disconnect,
-	.id_table =aiptek_ids,
+	.name =		"aiptek",
+	.probe =	aiptek_probe,
+	.disconnect =	aiptek_disconnect,
+	.id_table =	aiptek_ids,
 };
 
 static int __init
