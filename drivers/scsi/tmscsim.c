@@ -1075,7 +1075,7 @@ static struct scsi_host_template driver_template = {
 	.use_clustering		= DISABLE_CLUSTERING,
 };
 
-static void __devinit dc390_eeprom_prepare_read(struct pci_dev *pdev, u8 cd)
+static void __devinit dc390_eeprom_prepare_read(struct pci_dev *pdev, u8 cmd)
 {
 	u8 carryFlag = 1, j = 0x80, i, bval, regval;
 
