@@ -461,6 +461,8 @@ endmenu
 
 source "security/Kconfig"
 
+source "drivers/ibmcrypto/Kconfig"
+
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
