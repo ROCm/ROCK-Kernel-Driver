@@ -943,7 +943,8 @@ void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 		 * they originated from - MvS (miquels@drinkel.ow.org)
 		 */
 		if ((ptype->dev == dev || !ptype->dev) &&
-		    (struct sock *)ptype->af_packet_priv != skb->sk) {
+		    (ptype->af_packet_priv == NULL ||
+		     (struct sock *)ptype->af_packet_priv != skb->sk)) {
 			struct sk_buff *skb2= skb_clone(skb, GFP_ATOMIC);
 			if (!skb2)
 				break;
