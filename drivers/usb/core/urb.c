@@ -381,7 +381,16 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
  */
 int usb_unlink_urb(struct urb *urb)
 {
-	if (urb && urb->dev && urb->dev->bus && urb->dev->bus->op)
+	/* FIXME
+	 * We should not care about the state here, but the host controllers
+	 * die a horrible death if we submit a urb for a device that has been
+	 * physically removed.
+	 */
+	if (urb &&
+	    urb->dev &&
+	    (urb->dev->state >= USB_STATE_DEFAULT) &&
+	    urb->dev->bus &&
+	    urb->dev->bus->op)
 		return urb->dev->bus->op->unlink_urb(urb);
 	else
 		return -ENODEV;
