@@ -315,30 +315,23 @@ EXPORT_SYMBOL(del_timer);
  * the timer it also makes sure the handler has finished executing on other
  * CPUs.
  *
- * Synchronization rules: callers must prevent restarting of the timer
- * (except restarting the timer from the timer function itself), otherwise
- * this function is meaningless. It must not be called from interrupt
- * contexts. Upon exit the timer is not queued and the handler is not
- * running on any CPU.
+ * Synchronization rules: callers must prevent restarting of the timer,
+ * otherwise this function is meaningless. It must not be called from
+ * interrupt contexts. Upon exit the timer is not queued and the handler
+ * is not running on any CPU.
  *
- * The function returns the number of times it has deactivated a pending
- * timer.
+ * The function returns whether it has deactivated a pending timer or not.
  */
 int del_timer_sync(struct timer_list *timer)
 {
-	int i, ret = 0, again;
-	unsigned long flags;
 	tvec_base_t *base;
+	int i, ret = 0;
 
 	check_timer(timer);
 
 del_again:
 	ret += del_timer(timer);
 
-	/*
-	 * First do a lighter but racy check, whether the
-	 * timer is running on any other CPU:
-	 */
 	for (i = 0; i < NR_CPUS; i++) {
 		if (!cpu_online(i))
 			continue;
@@ -352,33 +345,8 @@ del_again:
 			break;
 		}
 	}
-
-	/*
-	 * Do a heavy but race-free re-check to make sure both that
-	 * the timer is neither running nor pending:
-	 */
-	again = 0;
-	local_irq_save(flags);
-
-	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_online(i))
-			spin_lock(&per_cpu(tvec_bases, i).lock);
-
+	smp_rmb();
 	if (timer_pending(timer))
-		again = 1;
-	else
-		for (i = 0; i < NR_CPUS; i++)
-			if (cpu_online(i) &&
-				(per_cpu(tvec_bases, i).running_timer == timer))
-					again = 1;
-
-	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_online(i))
-			spin_unlock(&per_cpu(tvec_bases, i).lock);
-
-	local_irq_restore(flags);
-
-	if (again)
 		goto del_again;
 
 	return ret;
