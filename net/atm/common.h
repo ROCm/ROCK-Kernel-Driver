@@ -26,6 +26,8 @@ int vcc_getsockopt(struct socket *sock, int level, int optname, char *optval,
 
 void atm_shutdown_dev(struct atm_dev *dev);
 
+void pppoatm_ioctl_set(int (*hook)(struct atm_vcc *, unsigned int, unsigned long));
+
 int atmpvc_init(void);
 void atmpvc_exit(void);
 int atmsvc_init(void);

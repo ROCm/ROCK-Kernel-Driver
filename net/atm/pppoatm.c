@@ -44,6 +44,8 @@
 #include <linux/ppp_channel.h>
 #include <linux/atmppp.h>
 
+#include "common.h"
+
 #if 0
 #define DPRINTK(format, args...) \
 	printk(KERN_DEBUG "pppoatm: " format, ##args)
@@ -344,17 +346,15 @@ static int pppoatm_ioctl(struct atm_vcc *atmvcc, unsigned int cmd,
 /* the following avoids some spurious warnings from the compiler */
 #define UNUSED __attribute__((unused))
 
-extern int (*pppoatm_ioctl_hook)(struct atm_vcc *, unsigned int, unsigned long);
-
 static int __init UNUSED pppoatm_init(void)
 {
-	pppoatm_ioctl_hook = pppoatm_ioctl;
+	pppoatm_ioctl_set(pppoatm_ioctl);
 	return 0;
 }
 
 static void __exit UNUSED pppoatm_exit(void)
 {
-	pppoatm_ioctl_hook = NULL;
+	pppoatm_ioctl_set(NULL);
 }
 
 module_init(pppoatm_init);
