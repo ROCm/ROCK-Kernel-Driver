@@ -167,15 +167,15 @@ copy_user_page:		/* %o0=dest, %o1=src, %o2=vaddr */
 	 nop
 
 9:
+	VISEntry
 	ldx		[%g6 + TI_FLAGS], %g3
+	mov		%o0, %g1
 	andcc		%g3, _TIF_BLKCOMMIT, %g0
 	rd		%asi, %g3
 	be,a,pt		%icc, 1f
 	 wr		%g0, ASI_BLK_P, %asi
 	wr		%g0, ASI_BLK_COMMIT_P, %asi
-1:	VISEntry
-	mov		%o0, %g1
-	ldda		[%o1] ASI_BLK_P, %f0
+1:	ldda		[%o1] ASI_BLK_P, %f0
 	add		%o1, 0x40, %o1
 	ldda		[%o1] ASI_BLK_P, %f16
 	add		%o1, 0x40, %o1

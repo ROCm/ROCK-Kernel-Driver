@@ -59,14 +59,15 @@ __flush_tlb_pending:
 1:	sub		%o1, (1 << 3), %o1
 	ldx		[%o2 + %o1], %o3
 	andcc		%o3, 1, %g0
+	andn		%o3, 1, %o3
 	be,pn		%icc, 2f
-	 andn		%o3, 1, %o3
+	 or		%o3, 0x10, %o3
 	stxa		%g0, [%o3] ASI_IMMU_DEMAP
 2:	stxa		%g0, [%o3] ASI_DMMU_DEMAP
+	membar		#Sync
 	brnz,pt		%o1, 1b
 	 nop
-	flush		%g6
-	stxa		%g2, [%o2] ASI_DMMU
+	stxa		%g2, [%o4] ASI_DMMU
 	flush		%g6
 	retl
 	 wrpr		%g5, 0x0, %pstate
@@ -395,8 +396,9 @@ xcall_flush_tlb_pending:
 	 andn		%g5, 0x1, %g5
 	stxa		%g0, [%g5] ASI_IMMU_DEMAP
 2:	stxa		%g0, [%g5] ASI_DMMU_DEMAP
+	membar		#Sync
 	brnz,pt		%g1, 1b
-	 membar		#Sync
+	 nop
 	stxa		%g2, [%g4] ASI_DMMU
 	retry
 
