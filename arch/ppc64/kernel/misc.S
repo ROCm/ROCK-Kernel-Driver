@@ -666,7 +666,7 @@ _GLOBAL(sys_call_table32)
 	.llong .sys32_sched_get_priority_min  /* 160 */
 	.llong .sys32_sched_rr_get_interval
 	.llong .compat_sys_nanosleep
-	.llong .sys32_mremap
+	.llong .sys_mremap
 	.llong .sys_setresuid
 	.llong .sys_getresuid	        /* 165 */
 	.llong .sys_ni_syscall		/* old query_module syscall */
