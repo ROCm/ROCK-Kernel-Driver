@@ -100,7 +100,7 @@ static void blk_queue_congestion_threshold(struct request_queue *q)
 		nr = q->nr_requests;
 	q->nr_congestion_on = nr;
 
-	nr = q->nr_requests - (q->nr_requests / 8) - 1;
+	nr = q->nr_requests - (q->nr_requests / 8) - (q->nr_requests / 16) - 1;
 	if (nr < 1)
 		nr = 1;
 	q->nr_congestion_off = nr;
