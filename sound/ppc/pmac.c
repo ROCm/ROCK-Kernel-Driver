@@ -42,7 +42,6 @@
 #if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
 static int snd_pmac_register_sleep_notifier(pmac_t *chip);
 static int snd_pmac_unregister_sleep_notifier(pmac_t *chip);
-static int snd_pmac_set_power_state(snd_card_t *card, unsigned int power_state);
 #endif
 
 
@@ -1197,13 +1196,10 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
  * Save state when going to sleep, restore it afterwards.
  */
 
-static void snd_pmac_suspend(pmac_t *chip)
+static int snd_pmac_suspend(snd_card_t *card, unsigned int state)
 {
+	pmac_t *chip = snd_magic_cast(pmac_t, card->pm_private_data, return -EINVAL);
 	unsigned long flags;
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D3hot)
-		return;
 
 	if (chip->suspend)
 		chip->suspend(chip);
@@ -1219,14 +1215,12 @@ static void snd_pmac_suspend(pmac_t *chip)
 		disable_irq(chip->rx_irq);
 	snd_pmac_sound_feature(chip, 0);
 	snd_power_change_state(card, SNDRV_CTL_POWER_D3hot);
+	return 0;
 }
 
-static void snd_pmac_resume(pmac_t *chip)
+static int snd_pmac_resume(snd_card_t *card, unsigned int state)
 {
-	snd_card_t *card = chip->card;
-
-	if (card->power_state == SNDRV_CTL_POWER_D0)
-		return;
+	pmac_t *chip = snd_magic_cast(pmac_t, card->pm_private_data, return -EINVAL);
 
 	snd_pmac_sound_feature(chip, 1);
 	if (chip->resume)
@@ -1248,6 +1242,7 @@ static void snd_pmac_resume(pmac_t *chip)
 		enable_irq(chip->rx_irq);
 
 	snd_power_change_state(card, SNDRV_CTL_POWER_D0);
+	return 0;
 }
 
 /* the chip is stored statically by snd_pmac_register_sleep_notifier
@@ -1264,10 +1259,10 @@ static int snd_pmac_sleep_notify(struct pmu_sleep_notifier *self, int when)
 
 	switch (when) {
 	case PBOOK_SLEEP_NOW:
-		snd_pmac_suspend(chip);
+		snd_pmac_suspend(chip->card, 0);
 		break;
 	case PBOOK_WAKE:
-		snd_pmac_resume(chip);
+		snd_pmac_resume(chip->card, 0);
 		break;
 	}
 	return PBOOK_SLEEP_OK;
@@ -1286,39 +1281,17 @@ static int __init snd_pmac_register_sleep_notifier(pmac_t *chip)
 	}
 	sleeping_pmac = chip;
 	pmu_register_sleep_notifier(&snd_pmac_sleep_notifier);
-	chip->sleep_registered = 1;
+	snd_card_set_pm_callback(chip->card, snd_pmac_suspend, snd_pmac_resume, chip);
 	return 0;
 }
 						    
 static int snd_pmac_unregister_sleep_notifier(pmac_t *chip)
 {
-	if (! chip->sleep_registered)
-		return 0;
 	/* should be protected here.. */
 	if (sleeping_pmac != chip)
 		return -ENODEV;
 	pmu_unregister_sleep_notifier(&snd_pmac_sleep_notifier);
 	sleeping_pmac = NULL;
-	return 0;
-}
-
-/* callback */
-static int snd_pmac_set_power_state(snd_card_t *card, unsigned int power_state)
-{
-	pmac_t *chip = snd_magic_cast(pmac_t, card->power_state_private_data, return -ENXIO);
-	switch (power_state) {
-	case SNDRV_CTL_POWER_D0:
-	case SNDRV_CTL_POWER_D1:
-	case SNDRV_CTL_POWER_D2:
-		snd_pmac_resume(chip);
-		break;
-	case SNDRV_CTL_POWER_D3hot:
-	case SNDRV_CTL_POWER_D3cold:
-		snd_pmac_suspend(chip);
-		break;
-	default:
-		return -EINVAL;
-	}
 	return 0;
 }
 
