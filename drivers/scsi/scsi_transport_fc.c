@@ -27,6 +27,159 @@
 
 #define FC_PRINTK(x, l, f, a...)	printk(l "scsi(%d:%d:%d:%d): " f, (x)->host->host_no, (x)->channel, (x)->id, (x)->lun , ##a)
 
+/*
+ * Redefine so that we can have same named attributes in the
+ * sdev/starget/host objects.
+ */
+#define FC_CLASS_DEVICE_ATTR(_prefix,_name,_mode,_show,_store)		\
+struct class_device_attribute class_device_attr_##_prefix##_##_name = 	\
+	__ATTR(_name,_mode,_show,_store)
+
+#define fc_enum_name_search(title, table_type, table)			\
+static const char *get_fc_##title##_name(enum table_type table_key)	\
+{									\
+	int i;								\
+	char *name = NULL;						\
+									\
+	for (i = 0; i < sizeof(table)/sizeof(table[0]); i++) {		\
+		if (table[i].value == table_key) {			\
+			name = table[i].name;				\
+			break;						\
+		}							\
+	}								\
+	return name;							\
+}
+
+#define fc_enum_name_match(title, table_type, table)			\
+static int get_fc_##title##_match(const char *table_key,		\
+		enum table_type *value)					\
+{									\
+	int i;								\
+									\
+	for (i = 0; i < sizeof(table)/sizeof(table[0]); i++) {		\
+		if (strncmp(table_key, table[i].name,			\
+				table[i].matchlen) == 0) {		\
+			*value = table[i].value;			\
+			return 0; /* success */				\
+		}							\
+	}								\
+	return 1; /* failure */						\
+}
+
+
+/* Convert fc_port_type values to ascii string name */
+static struct {
+	enum fc_port_type	value;
+	char			*name;
+} fc_port_type_names[] = {
+	{ FC_PORTTYPE_UNKNOWN,		"Unknown" },
+	{ FC_PORTTYPE_OTHER,		"Other" },
+	{ FC_PORTTYPE_NOTPRESENT,	"Not Present" },
+	{ FC_PORTTYPE_NPORT,	"NPort (fabric via point-to-point)" },
+	{ FC_PORTTYPE_NLPORT,	"NLPort (fabric via loop)" },
+	{ FC_PORTTYPE_LPORT,	"LPort (private loop)" },
+	{ FC_PORTTYPE_PTP,	"Point-To-Point (direct nport connection" },
+};
+fc_enum_name_search(port_type, fc_port_type, fc_port_type_names)
+#define FC_PORTTYPE_MAX_NAMELEN		50
+
+
+/* Convert fc_port_state values to ascii string name */
+static struct {
+	enum fc_port_state	value;
+	char			*name;
+} fc_port_state_names[] = {
+	{ FC_PORTSTATE_UNKNOWN,		"Unknown" },
+	{ FC_PORTSTATE_ONLINE,		"Online" },
+	{ FC_PORTSTATE_OFFLINE,		"Offline" },
+	{ FC_PORTSTATE_BYPASSED,	"Bypassed" },
+	{ FC_PORTSTATE_DIAGNOSTICS,	"Diagnostics" },
+	{ FC_PORTSTATE_LINKDOWN,	"Linkdown" },
+	{ FC_PORTSTATE_ERROR,		"Error" },
+	{ FC_PORTSTATE_LOOPBACK,	"Loopback" },
+};
+fc_enum_name_search(port_state, fc_port_state, fc_port_state_names)
+#define FC_PORTSTATE_MAX_NAMELEN	20
+
+
+/* Convert fc_tgtid_binding_type values to ascii string name */
+static struct {
+	enum fc_tgtid_binding_type	value;
+	char				*name;
+	int				matchlen;
+} fc_tgtid_binding_type_names[] = {
+	{ FC_TGTID_BIND_BY_WWPN, "wwpn (World Wide Port Name)", 4 },
+	{ FC_TGTID_BIND_BY_WWNN, "wwnn (World Wide Node Name)", 4 },
+	{ FC_TGTID_BIND_BY_ID, "fcportid (FC Address)", 8 },
+};
+fc_enum_name_search(tgtid_bind_type, fc_tgtid_binding_type,
+		fc_tgtid_binding_type_names)
+fc_enum_name_match(tgtid_bind_type, fc_tgtid_binding_type,
+		fc_tgtid_binding_type_names)
+#define FC_BINDTYPE_MAX_NAMELEN	30
+
+
+#define fc_bitfield_name_search(title, table)			\
+static ssize_t							\
+get_fc_##title##_names(u32 table_key, char *buf)		\
+{								\
+	char *prefix = "";					\
+	ssize_t len = 0;					\
+	int i;							\
+								\
+	for (i = 0; i < sizeof(table)/sizeof(table[0]); i++) {	\
+		if (table[i].value & table_key) {		\
+			len += sprintf(buf + len, "%s%s",	\
+				prefix, table[i].name);		\
+			prefix = ", ";				\
+		}						\
+	}							\
+	len += sprintf(buf + len, "\n");			\
+	return len;						\
+}
+
+
+/* Convert fc_cos bit values to ascii string name */
+static struct {
+	u32 			value;
+	char			*name;
+} fc_cos_names[] = {
+	{ FC_COS_CLASS1,	"Class 1" },
+	{ FC_COS_CLASS2,	"Class 2" },
+	{ FC_COS_CLASS3,	"Class 3" },
+	{ FC_COS_CLASS4,	"Class 4" },
+	{ FC_COS_CLASS6,	"Class 6" },
+};
+fc_bitfield_name_search(cos, fc_cos_names)
+
+
+/* Convert fc_port_speed bit values to ascii string name */
+static struct {
+	u32 			value;
+	char			*name;
+} fc_port_speed_names[] = {
+	{ FC_PORTSPEED_1GBIT,		"1 Gbit" },
+	{ FC_PORTSPEED_2GBIT,		"2 Gbit" },
+	{ FC_PORTSPEED_4GBIT,		"4 Gbit" },
+	{ FC_PORTSPEED_10GBIT,		"10 Gbit" },
+	{ FC_PORTSPEED_NOT_NEGOTIATED,	"Not Negotiated" },
+};
+fc_bitfield_name_search(port_speed, fc_port_speed_names)
+
+
+static int
+show_fc_fc4s (char *buf, u8 *fc4_list)
+{
+	int i, len=0;
+
+	for (i = 0; i < FC_FC4_LIST_SIZE; i++, fc4_list++)
+		len += sprintf(buf + len , "0x%02x ", *fc4_list);
+	len += sprintf(buf + len, "\n");
+	return len;
+}
+
+
+
 static void transport_class_release(struct class_device *class_dev);
 static void host_class_release(struct class_device *class_dev);
 static void fc_timeout_blocked_host(void *data);
@@ -35,7 +188,7 @@ static void fc_timeout_blocked_tgt(void *data);
 #define FC_STARGET_NUM_ATTRS 	4	/* increase this if you add attributes */
 #define FC_STARGET_OTHER_ATTRS 	0	/* increase this if you add "always on"
 					 * attributes */
-#define FC_HOST_NUM_ATTRS	1
+#define FC_HOST_NUM_ATTRS	15
 
 struct fc_internal {
 	struct scsi_transport_template t;
@@ -108,7 +261,27 @@ static int fc_setup_host_transport_attrs(struct Scsi_Host *shost)
 	 * failure cases.  The scsi lldd is responsible for initializing
 	 * all transport attributes to valid values per host.
 	 */
-	fc_host_link_down_tmo(shost) = -1;
+	fc_host_node_name(shost) = -1;
+	fc_host_port_name(shost) = -1;
+	fc_host_supported_classes(shost) = FC_COS_UNSPECIFIED;
+	memset(fc_host_supported_fc4s(shost), 0,
+		sizeof(fc_host_supported_fc4s(shost)));
+	memset(fc_host_symbolic_name(shost), 0,
+		sizeof(fc_host_symbolic_name(shost)));
+	fc_host_supported_speeds(shost) = FC_PORTSPEED_UNKNOWN;
+	fc_host_maxframe_size(shost) = -1;
+
+	fc_host_port_id(shost) = -1;
+	fc_host_port_type(shost) = FC_PORTTYPE_UNKNOWN;
+	fc_host_port_state(shost) = FC_PORTSTATE_UNKNOWN;
+	memset(fc_host_active_fc4s(shost), 0,
+		sizeof(fc_host_active_fc4s(shost)));
+	fc_host_speed(shost) = FC_PORTSPEED_UNKNOWN;
+	fc_host_fabric_name(shost) = -1;
+ 	fc_host_link_down_tmo(shost) = -1;
+
+	fc_host_tgtid_bind_type(shost) = FC_TGTID_BIND_BY_WWPN;
+
 	INIT_WORK(&fc_host_link_down_work(shost),
 		  fc_timeout_blocked_host, shost);
 	return 0;
@@ -135,7 +308,7 @@ static void host_class_release(struct class_device *class_dev)
 
 
 /*
- * Remote Port Attribute Management
+ * Remote Port (Target) Attribute Management
  */
 
 #define fc_starget_show_function(field, format_string, cast)		\
@@ -144,12 +317,11 @@ show_fc_starget_##field (struct class_device *cdev, char *buf)		\
 {									\
 	struct scsi_target *starget = transport_class_to_starget(cdev);	\
 	struct Scsi_Host *shost = dev_to_shost(starget->dev.parent);	\
-	struct fc_starget_attrs *tp;					\
 	struct fc_internal *i = to_fc_internal(shost->transportt);	\
-	tp = (struct fc_starget_attrs *)&starget->starget_data;		\
 	if (i->f->get_starget_##field)					\
 		i->f->get_starget_##field(starget);			\
-	return snprintf(buf, 20, format_string, cast tp->field);	\
+	return snprintf(buf, 20, format_string, 			\
+		cast fc_starget_##field(starget)); 			\
 }
 
 #define fc_starget_store_function(field, format_string)			\
@@ -169,23 +341,23 @@ store_fc_starget_##field(struct class_device *cdev, const char *buf,	\
 
 #define fc_starget_rd_attr(field, format_string)			\
 	fc_starget_show_function(field, format_string, )		\
-static CLASS_DEVICE_ATTR(field, S_IRUGO,				\
+static FC_CLASS_DEVICE_ATTR(starget, field, S_IRUGO,			\
 			 show_fc_starget_##field, NULL)
 
 #define fc_starget_rd_attr_cast(field, format_string, cast)		\
 	fc_starget_show_function(field, format_string, (cast))		\
-static CLASS_DEVICE_ATTR(field, S_IRUGO,				\
+static FC_CLASS_DEVICE_ATTR(starget, field, S_IRUGO,			\
 			  show_fc_starget_##field, NULL)
 
 #define fc_starget_rw_attr(field, format_string)			\
 	fc_starget_show_function(field, format_string, )		\
 	fc_starget_store_function(field, format_string)			\
-static CLASS_DEVICE_ATTR(field, S_IRUGO | S_IWUSR,			\
+static FC_CLASS_DEVICE_ATTR(starget, field, S_IRUGO | S_IWUSR,		\
 			show_fc_starget_##field,			\
 			store_fc_starget_##field)
 
 #define SETUP_STARGET_ATTRIBUTE_RD(field)				\
-	i->private_starget_attrs[count] = class_device_attr_##field;	\
+	i->private_starget_attrs[count] = class_device_attr_starget_##field; \
 	i->private_starget_attrs[count].attr.mode = S_IRUGO;		\
 	i->private_starget_attrs[count].store = NULL;			\
 	i->starget_attrs[count] = &i->private_starget_attrs[count];	\
@@ -193,7 +365,7 @@ static CLASS_DEVICE_ATTR(field, S_IRUGO | S_IWUSR,			\
 		count++
 
 #define SETUP_STARGET_ATTRIBUTE_RW(field)				\
-	i->private_starget_attrs[count] = class_device_attr_##field;	\
+	i->private_starget_attrs[count] = class_device_attr_starget_##field; \
 	if (!i->f->set_starget_##field) {				\
 		i->private_starget_attrs[count].attr.mode = S_IRUGO;	\
 		i->private_starget_attrs[count].store = NULL;		\
@@ -209,21 +381,20 @@ fc_starget_rd_attr(port_id, "0x%06x\n");
 fc_starget_rw_attr(dev_loss_tmo, "%d\n");
 
 
+
 /*
  * Host Attribute Management
  */
 
-#define fc_host_show_function(field, format_string, cast)		\
+#define fc_host_show_function(field, format_string, sz, cast)		\
 static ssize_t								\
 show_fc_host_##field (struct class_device *cdev, char *buf)		\
 {									\
 	struct Scsi_Host *shost = transport_class_to_shost(cdev);	\
-	struct fc_host_attrs *tp;					\
 	struct fc_internal *i = to_fc_internal(shost->transportt);	\
-	tp = (struct fc_host_attrs *)shost->shost_data;		\
 	if (i->f->get_host_##field)					\
 		i->f->get_host_##field(shost);				\
-	return snprintf(buf, 20, format_string, cast tp->field);	\
+	return snprintf(buf, sz, format_string, cast fc_host_##field(shost)); \
 }
 
 #define fc_host_store_function(field, format_string)			\
@@ -240,22 +411,38 @@ store_fc_host_##field(struct class_device *cdev, const char *buf,	\
 	return count;							\
 }
 
-#define fc_host_rd_attr(field, format_string)				\
-	fc_host_show_function(field, format_string, )			\
-static CLASS_DEVICE_ATTR(host_##field, S_IRUGO,				\
+#define fc_host_rd_attr(field, format_string, sz)			\
+	fc_host_show_function(field, format_string, sz, )		\
+static FC_CLASS_DEVICE_ATTR(host, field, S_IRUGO,			\
 			 show_fc_host_##field, NULL)
 
-#define fc_host_rd_attr_cast(field, format_string, cast)		\
-	fc_host_show_function(field, format_string, (cast))		\
-static CLASS_DEVICE_ATTR(host_##field, S_IRUGO,				\
+#define fc_host_rd_attr_cast(field, format_string, sz, cast)		\
+	fc_host_show_function(field, format_string, sz, (cast))		\
+static FC_CLASS_DEVICE_ATTR(host, field, S_IRUGO,			\
 			  show_fc_host_##field, NULL)
 
-#define fc_host_rw_attr(field, format_string)				\
-	fc_host_show_function(field, format_string, )			\
+#define fc_host_rw_attr(field, format_string, sz)			\
+	fc_host_show_function(field, format_string, sz, )		\
 	fc_host_store_function(field, format_string)			\
-static CLASS_DEVICE_ATTR(host_##field, S_IRUGO | S_IWUSR,		\
+static FC_CLASS_DEVICE_ATTR(host, field, S_IRUGO | S_IWUSR,		\
 			show_fc_host_##field,				\
 			store_fc_host_##field)
+
+#define fc_host_rd_enum_attr(title, maxlen)				\
+static ssize_t								\
+show_fc_host_##title (struct class_device *cdev, char *buf)		\
+{									\
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);	\
+	struct fc_internal *i = to_fc_internal(shost->transportt);	\
+	const char *name;						\
+	if (i->f->get_host_##title)					\
+		i->f->get_host_##title(shost);				\
+	name = get_fc_##title##_name(fc_host_##title(shost));		\
+	if (!name)							\
+		return -EINVAL;						\
+	return snprintf(buf, maxlen, "%s\n", name);			\
+}									\
+static FC_CLASS_DEVICE_ATTR(host, title, S_IRUGO, show_fc_host_##title, NULL)
 
 #define SETUP_HOST_ATTRIBUTE_RD(field)					\
 	i->private_host_attrs[count] = class_device_attr_host_##field;	\
@@ -275,9 +462,153 @@ static CLASS_DEVICE_ATTR(host_##field, S_IRUGO | S_IWUSR,		\
 	if (i->f->show_host_##field)					\
 		count++
 
-/* The FC Tranport Host Attributes: */
-fc_host_rw_attr(link_down_tmo, "%d\n");
 
+#define fc_private_host_show_function(field, format_string, sz, cast)	\
+static ssize_t								\
+show_fc_host_##field (struct class_device *cdev, char *buf)		\
+{									\
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);	\
+	return snprintf(buf, sz, format_string, cast fc_host_##field(shost)); \
+}
+
+#define fc_private_host_rd_attr(field, format_string, sz)		\
+	fc_private_host_show_function(field, format_string, sz, )	\
+static FC_CLASS_DEVICE_ATTR(host, field, S_IRUGO,			\
+			 show_fc_host_##field, NULL)
+
+#define fc_private_host_rd_attr_cast(field, format_string, sz, cast)	\
+	fc_private_host_show_function(field, format_string, sz, (cast)) \
+static FC_CLASS_DEVICE_ATTR(host, field, S_IRUGO,			\
+			  show_fc_host_##field, NULL)
+
+#define SETUP_PRIVATE_HOST_ATTRIBUTE_RD(field)			\
+	i->private_host_attrs[count] = class_device_attr_host_##field;	\
+	i->private_host_attrs[count].attr.mode = S_IRUGO;		\
+	i->private_host_attrs[count].store = NULL;			\
+	i->host_attrs[count] = &i->private_host_attrs[count];		\
+	count++
+
+#define SETUP_PRIVATE_HOST_ATTRIBUTE_RW(field)			\
+	i->private_host_attrs[count] = class_device_attr_host_##field;	\
+	i->host_attrs[count] = &i->private_host_attrs[count];		\
+	count++
+
+
+/* Fixed Host Attributes */
+
+static ssize_t
+show_fc_host_supported_classes (struct class_device *cdev, char *buf)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+
+	if (fc_host_supported_classes(shost) == FC_COS_UNSPECIFIED)
+		return snprintf(buf, 20, "unspecified\n");
+
+	return get_fc_cos_names(fc_host_supported_classes(shost), buf);
+}
+static FC_CLASS_DEVICE_ATTR(host, supported_classes, S_IRUGO,
+		show_fc_host_supported_classes, NULL);
+
+static ssize_t
+show_fc_host_supported_fc4s (struct class_device *cdev, char *buf)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+	return (ssize_t)show_fc_fc4s(buf, fc_host_supported_fc4s(shost));
+}
+static FC_CLASS_DEVICE_ATTR(host, supported_fc4s, S_IRUGO,
+		show_fc_host_supported_fc4s, NULL);
+
+static ssize_t
+show_fc_host_supported_speeds (struct class_device *cdev, char *buf)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+
+	if (fc_host_supported_speeds(shost) == FC_PORTSPEED_UNKNOWN)
+		return snprintf(buf, 20, "unknown\n");
+
+	return get_fc_port_speed_names(fc_host_supported_speeds(shost), buf);
+}
+static FC_CLASS_DEVICE_ATTR(host, supported_speeds, S_IRUGO,
+		show_fc_host_supported_speeds, NULL);
+
+
+fc_private_host_rd_attr_cast(node_name, "0x%llx\n", 20, unsigned long long);
+fc_private_host_rd_attr_cast(port_name, "0x%llx\n", 20, unsigned long long);
+fc_private_host_rd_attr(symbolic_name, "%s\n", (FC_SYMBOLIC_NAME_SIZE +1));
+fc_private_host_rd_attr(maxframe_size, "%u bytes\n", 20);
+
+
+/* Dynamic Host Attributes */
+
+static ssize_t
+show_fc_host_active_fc4s (struct class_device *cdev, char *buf)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+	struct fc_internal *i = to_fc_internal(shost->transportt);
+
+	if (i->f->get_host_active_fc4s)
+		i->f->get_host_active_fc4s(shost);
+
+	return (ssize_t)show_fc_fc4s(buf, fc_host_active_fc4s(shost));
+}
+static FC_CLASS_DEVICE_ATTR(host, active_fc4s, S_IRUGO,
+		show_fc_host_active_fc4s, NULL);
+
+static ssize_t
+show_fc_host_speed (struct class_device *cdev, char *buf)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+	struct fc_internal *i = to_fc_internal(shost->transportt);
+
+	if (i->f->get_host_speed)
+		i->f->get_host_speed(shost);
+
+	if (fc_host_speed(shost) == FC_PORTSPEED_UNKNOWN)
+		return snprintf(buf, 20, "unknown\n");
+
+	return get_fc_port_speed_names(fc_host_speed(shost), buf);
+}
+static FC_CLASS_DEVICE_ATTR(host, speed, S_IRUGO,
+		show_fc_host_speed, NULL);
+
+
+fc_host_rd_attr(port_id, "0x%06x\n", 20);
+fc_host_rd_enum_attr(port_type, FC_PORTTYPE_MAX_NAMELEN);
+fc_host_rd_enum_attr(port_state, FC_PORTSTATE_MAX_NAMELEN);
+fc_host_rd_attr_cast(fabric_name, "0x%llx\n", 20, unsigned long long);
+fc_host_rw_attr(link_down_tmo, "%d\n", 20);
+
+
+/* Private Host Attributes */
+
+static ssize_t
+show_fc_private_host_tgtid_bind_type(struct class_device *cdev, char *buf)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+	const char *name;
+
+	name = get_fc_tgtid_bind_type_name(fc_host_tgtid_bind_type(shost));
+	if (!name)
+		return -EINVAL;
+	return snprintf(buf, FC_BINDTYPE_MAX_NAMELEN, "%s\n", name);
+}
+
+static ssize_t
+store_fc_private_host_tgtid_bind_type(struct class_device *cdev,
+	const char *buf, size_t count)
+{
+	struct Scsi_Host *shost = transport_class_to_shost(cdev);
+	enum fc_tgtid_binding_type val;
+
+	if (get_fc_tgtid_bind_type_match(buf, &val))
+		return -EINVAL;
+	fc_host_tgtid_bind_type(shost) = val;
+	return count;
+}
+
+static FC_CLASS_DEVICE_ATTR(host, tgtid_bind_type, S_IRUGO | S_IWUSR,
+			show_fc_private_host_tgtid_bind_type,
+			store_fc_private_host_tgtid_bind_type);
 
 /*
  * Host Statistics Management
@@ -293,14 +624,14 @@ fc_stat_show(const struct class_device *cdev, char *buf, unsigned long offset)
 	ssize_t ret = -ENOENT;
 
 	if (offset > sizeof(struct fc_host_statistics) ||
-	    offset % sizeof(uint64_t) != 0)
+	    offset % sizeof(u64) != 0)
 		WARN_ON(1);
 
 	if (i->f->get_fc_host_stats) {
 		stats = (i->f->get_fc_host_stats)(shost);
 		if (stats)
 			ret = snprintf(buf, 20, "0x%llx\n",
-			      *(uint64_t *)(((u8 *) stats) + offset));
+			      *(u64 *)(((u8 *) stats) + offset));
 	}
 	return ret;
 }
@@ -313,7 +644,7 @@ static ssize_t show_fcstat_##name(struct class_device *cd, char *buf) 	\
 	return fc_stat_show(cd, buf, 					\
 			    offsetof(struct fc_host_statistics, name));	\
 }									\
-static CLASS_DEVICE_ATTR(name, S_IRUGO, show_fcstat_##name, NULL)
+static FC_CLASS_DEVICE_ATTR(host, name, S_IRUGO, show_fcstat_##name, NULL)
 
 fc_host_statistic(seconds_since_last_reset);
 fc_host_statistic(tx_frames);
@@ -351,31 +682,32 @@ fc_reset_statistics(struct class_device *cdev, const char *buf,
 
 	return -ENOENT;
 }
-static CLASS_DEVICE_ATTR(reset_statistics, S_IWUSR, NULL, fc_reset_statistics);
+static FC_CLASS_DEVICE_ATTR(host, reset_statistics, S_IWUSR, NULL,
+				fc_reset_statistics);
 
 
 static struct attribute *fc_statistics_attrs[] = {
-	&class_device_attr_seconds_since_last_reset.attr,
-	&class_device_attr_tx_frames.attr,
-	&class_device_attr_tx_words.attr,
-	&class_device_attr_rx_frames.attr,
-	&class_device_attr_rx_words.attr,
-	&class_device_attr_lip_count.attr,
-	&class_device_attr_nos_count.attr,
-	&class_device_attr_error_frames.attr,
-	&class_device_attr_dumped_frames.attr,
-	&class_device_attr_link_failure_count.attr,
-	&class_device_attr_loss_of_sync_count.attr,
-	&class_device_attr_loss_of_signal_count.attr,
-	&class_device_attr_prim_seq_protocol_err_count.attr,
-	&class_device_attr_invalid_tx_word_count.attr,
-	&class_device_attr_invalid_crc_count.attr,
-	&class_device_attr_fcp_input_requests.attr,
-	&class_device_attr_fcp_output_requests.attr,
-	&class_device_attr_fcp_control_requests.attr,
-	&class_device_attr_fcp_input_megabytes.attr,
-	&class_device_attr_fcp_output_megabytes.attr,
-	&class_device_attr_reset_statistics.attr,
+	&class_device_attr_host_seconds_since_last_reset.attr,
+	&class_device_attr_host_tx_frames.attr,
+	&class_device_attr_host_tx_words.attr,
+	&class_device_attr_host_rx_frames.attr,
+	&class_device_attr_host_rx_words.attr,
+	&class_device_attr_host_lip_count.attr,
+	&class_device_attr_host_nos_count.attr,
+	&class_device_attr_host_error_frames.attr,
+	&class_device_attr_host_dumped_frames.attr,
+	&class_device_attr_host_link_failure_count.attr,
+	&class_device_attr_host_loss_of_sync_count.attr,
+	&class_device_attr_host_loss_of_signal_count.attr,
+	&class_device_attr_host_prim_seq_protocol_err_count.attr,
+	&class_device_attr_host_invalid_tx_word_count.attr,
+	&class_device_attr_host_invalid_crc_count.attr,
+	&class_device_attr_host_fcp_input_requests.attr,
+	&class_device_attr_host_fcp_output_requests.attr,
+	&class_device_attr_host_fcp_control_requests.attr,
+	&class_device_attr_host_fcp_input_megabytes.attr,
+	&class_device_attr_host_fcp_output_megabytes.attr,
+	&class_device_attr_host_reset_statistics.attr,
 	NULL
 };
 
@@ -433,11 +765,26 @@ fc_attach_transport(struct fc_function_template *ft)
 
 	/* setup host attributes */
 	count=0;
+	SETUP_HOST_ATTRIBUTE_RD(node_name);
+	SETUP_HOST_ATTRIBUTE_RD(port_name);
+	SETUP_HOST_ATTRIBUTE_RD(supported_classes);
+	SETUP_HOST_ATTRIBUTE_RD(supported_fc4s);
+	SETUP_HOST_ATTRIBUTE_RD(symbolic_name);
+	SETUP_HOST_ATTRIBUTE_RD(supported_speeds);
+	SETUP_HOST_ATTRIBUTE_RD(maxframe_size);
+
+	SETUP_HOST_ATTRIBUTE_RD(port_id);
+	SETUP_HOST_ATTRIBUTE_RD(port_type);
+	SETUP_HOST_ATTRIBUTE_RD(port_state);
+	SETUP_HOST_ATTRIBUTE_RD(active_fc4s);
+	SETUP_HOST_ATTRIBUTE_RD(speed);
+	SETUP_HOST_ATTRIBUTE_RD(fabric_name);
 	SETUP_HOST_ATTRIBUTE_RW(link_down_tmo);
 
-	BUG_ON(count > FC_HOST_NUM_ATTRS);
+	/* Transport-managed attributes */
+	SETUP_PRIVATE_HOST_ATTRIBUTE_RW(tgtid_bind_type);
 
-	/* Setup the always-on attributes here */
+	BUG_ON(count > FC_HOST_NUM_ATTRS);
 
 	i->host_attrs[count] = NULL;
 
