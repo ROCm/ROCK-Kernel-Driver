@@ -100,35 +100,27 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 	PBF_MAPPABLE = (1 << 9),/* use directly-addressable pages	   */
 	PBF_STALE = (1 << 10),	/* buffer has been staled, do not find it  */
 	PBF_FS_MANAGED = (1 << 11), /* filesystem controls freeing memory  */
-	PBF_RELEASE = (1 << 12),/* buffer to be released after I/O is done */
 
 	/* flags used only as arguments to access routines */
 	PBF_LOCK = (1 << 13),	/* lock requested			   */
 	PBF_TRYLOCK = (1 << 14), /* lock requested, but do not wait	   */
-	PBF_ALLOCATE = (1 << 15), /* allocate all pages		  (UNUSED) */
-	PBF_FILE_ALLOCATE = (1 << 16), /* allocate all file space	   */
-	PBF_DONT_BLOCK = (1 << 17), /* do not block in current thread	   */
-	PBF_DIRECT = (1 << 18),	  /* direct I/O desired			   */
-	PBF_ENTER_PAGES = (1 << 21), /* create invalid pages for all	   */
-				/* pages in the range of the buffer	   */
-				/* not already associated with buffer	   */
+	PBF_FILE_ALLOCATE = (1 << 15), /* allocate all file space	   */
+	PBF_DONT_BLOCK = (1 << 16), /* do not block in current thread	   */
+	PBF_DIRECT = (1 << 17),	  /* direct I/O desired			   */
 
 	/* flags used only internally */
 	_PBF_LOCKABLE = (1 << 19), /* page_buf_t may be locked		   */
 	_PBF_PRIVATE_BH = (1 << 20), /* do not use public buffer heads	   */
-	_PBF_ALL_PAGES_MAPPED = (1 << 22),
+	_PBF_ALL_PAGES_MAPPED = (1 << 21),
 				/* all pages in rage are mapped		   */
-	_PBF_SOME_INVALID_PAGES = (1 << 23),
-				/* some mapped pages are not valid	   */
-	_PBF_ADDR_ALLOCATED = (1 << 24),
+	_PBF_ADDR_ALLOCATED = (1 << 22),
 				/* pb_addr space was allocated		   */
-	_PBF_MEM_ALLOCATED = (1 << 25),
+	_PBF_MEM_ALLOCATED = (1 << 23),
 				/* pb_mem and underlying pages allocated   */
 
-	PBF_FORCEIO = (1 << 27),
-	PBF_FLUSH = (1 << 28),	/* flush disk write cache */
-	PBF_READ_AHEAD = (1 << 29),
-	PBF_FS_RESERVED_3 = (1 << 31)	/* reserved (XFS use: XFS_B_STALE) */
+	PBF_FORCEIO = (1 << 24),
+	PBF_FLUSH = (1 << 25),	/* flush disk write cache */
+	PBF_READ_AHEAD = (1 << 26),
 
 } page_buf_flags_t;
 

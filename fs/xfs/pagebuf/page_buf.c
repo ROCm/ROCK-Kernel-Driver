@@ -305,8 +305,7 @@ _pagebuf_initialize(
 	/*
 	 * We don't want certain flags to appear in pb->pb_flags.
 	 */
-	flags &= ~(PBF_LOCK|PBF_ENTER_PAGES|PBF_MAPPED);
-	flags &= ~(PBF_DONT_BLOCK|PBF_READ_AHEAD);
+	flags &= ~(PBF_LOCK|PBF_MAPPED|PBF_DONT_BLOCK|PBF_READ_AHEAD);
 
 	pb_tracking_get(pb);
 
@@ -717,7 +716,6 @@ found:
 				PBF_MAPPED | \
 				_PBF_LOCKABLE | \
 				_PBF_ALL_PAGES_MAPPED | \
-				_PBF_SOME_INVALID_PAGES | \
 				_PBF_ADDR_ALLOCATED | \
 				_PBF_MEM_ALLOCATED;
 	PB_TRACE(pb, PB_TRACE_REC(got_lk), 0);
@@ -832,19 +830,11 @@ pagebuf_lookup(
 	int			flags)
 {
 	page_buf_t		*pb = NULL;
-	int			status;
 
 	flags |= _PBF_PRIVATE_BH;
 	pb = pagebuf_allocate(flags);
 	if (pb) {
 		_pagebuf_initialize(pb, target, ioff, isize, flags);
-		if (flags & PBF_ENTER_PAGES) {
-			status = _pagebuf_lookup_pages(pb, &inode->i_data, 0);
-			if (status != 0) {
-				pagebuf_free(pb);
-				return (NULL);
-			}
-		}
 	}
 	return pb;
 }
