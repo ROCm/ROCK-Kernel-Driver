@@ -195,11 +195,10 @@ static void refill_pool(struct atm_dev *dev,int pool)
 		    sizeof(struct rx_buffer_head);
 	}
 	size += align;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	free = zpeekl(zatm_dev,zatm_dev->pool_base+2*pool) &
 	    uPD98401_RXFP_REMAIN;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	if (free >= zatm_dev->pool_info[pool].low_water) return;
 	EVENT("starting ... POOL: 0x%x, 0x%x\n",
 	    zpeekl(zatm_dev,zatm_dev->pool_base+2*pool),
@@ -228,22 +227,22 @@ static void refill_pool(struct atm_dev *dev,int pool)
 		head->skb = skb;
 		EVENT("enq skb 0x%08lx/0x%08lx\n",(unsigned long) skb,
 		    (unsigned long) head);
-		cli();
+		spin_lock_irqsave(&zatm_dev->lock, flags);
 		if (zatm_dev->last_free[pool])
 			((struct rx_buffer_head *) (zatm_dev->last_free[pool]->
 			    data))[-1].link = virt_to_bus(head);
 		zatm_dev->last_free[pool] = skb;
 		skb_queue_tail(&zatm_dev->pool[pool],skb);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&zatm_dev->lock, flags);
 		free++;
 	}
 	if (first) {
-		cli();
+		spin_lock_irqsave(&zatm_dev->lock, flags);
 		zwait;
 		zout(virt_to_bus(first),CER);
 		zout(uPD98401_ADD_BAT | (pool << uPD98401_POOL_SHIFT) | count,
 		    CMR);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&zatm_dev->lock, flags);
 		EVENT ("POOL: 0x%x, 0x%x\n",
 		    zpeekl(zatm_dev,zatm_dev->pool_base+2*pool),
 		    zpeekl(zatm_dev,zatm_dev->pool_base+2*pool+1));
@@ -286,8 +285,7 @@ static void use_pool(struct atm_dev *dev,int pool)
 		size = pool-ZATM_AAL5_POOL_BASE;
 		if (size < 0) size = 0; /* 64B... */
 		else if (size > 10) size = 10; /* ... 64kB */
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&zatm_dev->lock, flags);
 		zpokel(zatm_dev,((zatm_dev->pool_info[pool].low_water/4) <<
 		    uPD98401_RXFP_ALERT_SHIFT) |
 		    (1 << uPD98401_RXFP_BTSZ_SHIFT) |
@@ -295,7 +293,7 @@ static void use_pool(struct atm_dev *dev,int pool)
 		    zatm_dev->pool_base+pool*2);
 		zpokel(zatm_dev,(unsigned long) dummy,zatm_dev->pool_base+
 		    pool*2+1);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&zatm_dev->lock, flags);
 		zatm_dev->last_free[pool] = NULL;
 		refill_pool(dev,pool);
 	}
@@ -315,29 +313,29 @@ static void zatm_feedback(struct atm_vcc *vcc,struct sk_buff *skb,
 {
 	struct zatm_pool_info *pool;
 	unsigned long offset,flags;
+	struct zatm_dev *zatm_dev = ZATM_DEV(vcc->dev);
 
 	DPRINTK("start 0x%08lx dest 0x%08lx len %d\n",start,dest,len);
 	if (len < PAGE_SIZE) return;
-	pool = &ZATM_DEV(vcc->dev)->pool_info[ZATM_VCC(vcc)->pool];
+	pool = &zatm_dev->pool_info[ZATM_VCC(vcc)->pool];
 	offset = (dest-start) & (PAGE_SIZE-1);
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	if (!offset || pool->offset == offset) {
 		pool->next_cnt = 0;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&zatm_dev->lock, flags);
 		return;
 	}
 	if (offset != pool->next_off) {
 		pool->next_off = offset;
 		pool->next_cnt = 0;
-		restore_flags(flags);
+		spin_unlock_irqrestore(&zatm_dev->lock, flags);
 		return;
 	}
 	if (++pool->next_cnt >= pool->next_thres) {
 		pool->offset = pool->next_off;
 		pool->next_cnt = 0;
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 }
 
 /*----------------------------------- RX ------------------------------------*/
@@ -535,20 +533,19 @@ static int open_rx_first(struct atm_vcc *vcc)
 		zatm_vcc->pool = ZATM_AAL0_POOL;
 	}
 	if (zatm_vcc->pool < 0) return -EMSGSIZE;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	zwait;
 	zout(uPD98401_OPEN_CHAN,CMR);
 	zwait;
 	DPRINTK("0x%x 0x%x\n",zin(CMR),zin(CER));
 	chan = (zin(CMR) & uPD98401_CHAN_ADDR) >> uPD98401_CHAN_ADDR_SHIFT;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	DPRINTK("chan is %d\n",chan);
 	if (!chan) return -EAGAIN;
 	use_pool(vcc->dev,zatm_vcc->pool);
 	DPRINTK("pool %d\n",zatm_vcc->pool);
 	/* set up VC descriptor */
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	zpokel(zatm_dev,zatm_vcc->pool << uPD98401_RXVC_POOL_SHIFT,
 	    chan*VC_SIZE/4);
 	zpokel(zatm_dev,uPD98401_RXVC_OD | (vcc->qos.aal == ATM_AAL5 ?
@@ -556,7 +553,7 @@ static int open_rx_first(struct atm_vcc *vcc)
 	zpokel(zatm_dev,0,chan*VC_SIZE/4+2);
 	zatm_vcc->rx_chan = chan;
 	zatm_dev->rx_map[chan] = vcc;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	return 0;
 }
 
@@ -572,14 +569,13 @@ static int open_rx_second(struct atm_vcc *vcc)
 	zatm_dev = ZATM_DEV(vcc->dev);
 	zatm_vcc = ZATM_VCC(vcc);
 	if (!zatm_vcc->rx_chan) return 0;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	/* should also handle VPI @@@ */
 	pos = vcc->vci >> 1;
 	shift = (1-(vcc->vci & 1)) << 4;
 	zpokel(zatm_dev,(zpeekl(zatm_dev,pos) & ~(0xffff << shift)) |
 	    ((zatm_vcc->rx_chan | uPD98401_RXLT_ENBL) << shift),pos);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	return 0;
 }
 
@@ -596,9 +592,8 @@ static void close_rx(struct atm_vcc *vcc)
 	if (!zatm_vcc->rx_chan) return;
 	DPRINTK("close_rx\n");
 	/* disable receiver */
-	save_flags(flags);
 	if (vcc->vpi != ATM_VPI_UNSPEC && vcc->vci != ATM_VCI_UNSPEC) {
-		cli();
+		spin_lock_irqsave(&zatm_dev->lock, flags);
 		pos = vcc->vci >> 1;
 		shift = (1-(vcc->vci & 1)) << 4;
 		zpokel(zatm_dev,zpeekl(zatm_dev,pos) & ~(0xffff << shift),pos);
@@ -606,9 +601,9 @@ static void close_rx(struct atm_vcc *vcc)
 		zout(uPD98401_NOP,CMR);
 		zwait;
 		zout(uPD98401_NOP,CMR);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	}
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	zwait;
 	zout(uPD98401_DEACT_CHAN | uPD98401_CHAN_RT | (zatm_vcc->rx_chan <<
 	    uPD98401_CHAN_ADDR_SHIFT),CMR);
@@ -620,7 +615,7 @@ static void close_rx(struct atm_vcc *vcc)
 	if (!(zin(CMR) & uPD98401_CHAN_ADDR))
 		printk(KERN_CRIT DEV_LABEL "(itf %d): can't close RX channel "
 		    "%d\n",vcc->dev->number,zatm_vcc->rx_chan);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	zatm_dev->rx_map[zatm_vcc->rx_chan] = NULL;
 	zatm_vcc->rx_chan = 0;
 	unuse_pool(vcc->dev,zatm_vcc->pool);
@@ -673,11 +668,10 @@ static int do_tx(struct sk_buff *skb)
 	zatm_dev = ZATM_DEV(vcc->dev);
 	zatm_vcc = ZATM_VCC(vcc);
 	EVENT("iovcnt=%d\n",skb_shinfo(skb)->nr_frags,0);
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	if (!skb_shinfo(skb)->nr_frags) {
 		if (zatm_vcc->txing == RING_ENTRIES-1) {
-			restore_flags(flags);
+			spin_unlock_irqrestore(&zatm_dev->lock, flags);
 			return RING_BUSY;
 		}
 		zatm_vcc->txing++;
@@ -732,7 +726,7 @@ printk("NONONONOO!!!!\n");
 	zwait;
 	zout(uPD98401_TX_READY | (zatm_vcc->tx_chan <<
 	    uPD98401_CHAN_ADDR_SHIFT),CMR);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	EVENT("done\n",0,0);
 	return 0;
 }
@@ -866,15 +860,14 @@ static int alloc_shaper(struct atm_dev *dev,int *pcr,int min,int max,int ubr)
 		if (zatm_dev->tx_bw < *pcr) return -EAGAIN;
 		zatm_dev->tx_bw -= *pcr;
 	}
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	DPRINTK("i = %d, m = %d, PCR = %d\n",i,m,*pcr);
 	zpokel(zatm_dev,(i << uPD98401_IM_I_SHIFT) | m,uPD98401_IM(shaper));
 	zpokel(zatm_dev,c << uPD98401_PC_C_SHIFT,uPD98401_PC(shaper));
 	zpokel(zatm_dev,0,uPD98401_X(shaper));
 	zpokel(zatm_dev,0,uPD98401_Y(shaper));
 	zpokel(zatm_dev,uPD98401_PS_E,uPD98401_PS(shaper));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	return shaper;
 }
 
@@ -889,11 +882,10 @@ static void dealloc_shaper(struct atm_dev *dev,int shaper)
 		if (--zatm_dev->ubr_ref_cnt) return;
 		zatm_dev->ubr = -1;
 	}
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	zpokel(zatm_dev,zpeekl(zatm_dev,uPD98401_PS(shaper)) & ~uPD98401_PS_E,
 	    uPD98401_PS(shaper));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	zatm_dev->free_shapers |= 1 << shaper;
 }
 
@@ -912,8 +904,6 @@ int once = 1;
 	chan = zatm_vcc->tx_chan;
 	if (!chan) return;
 	DPRINTK("close_tx\n");
-	save_flags(flags);
-	cli();
 	while (skb_peek(&zatm_vcc->backlog)) {
 if (once) {
 printk("waiting for backlog to drain ...\n");
@@ -932,6 +922,7 @@ once = 0;
 		DPRINTK("waiting for TX queue to drain ... %p\n",skb);
 		sleep_on(&zatm_vcc->tx_wait);
 	}
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 #if 0
 	zwait;
 	zout(uPD98401_DEACT_CHAN | (chan << uPD98401_CHAN_ADDR_SHIFT),CMR);
@@ -942,7 +933,7 @@ once = 0;
 	if (!(zin(CMR) & uPD98401_CHAN_ADDR))
 		printk(KERN_CRIT DEV_LABEL "(itf %d): can't close TX channel "
 		    "%d\n",vcc->dev->number,chan);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	zatm_vcc->tx_chan = 0;
 	zatm_dev->tx_map[chan] = NULL;
 	if (zatm_vcc->shaper != zatm_dev->ubr) {
@@ -967,14 +958,13 @@ static int open_tx_first(struct atm_vcc *vcc)
 	zatm_vcc = ZATM_VCC(vcc);
 	zatm_vcc->tx_chan = 0;
 	if (vcc->qos.txtp.traffic_class == ATM_NONE) return 0;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	zwait;
 	zout(uPD98401_OPEN_CHAN,CMR);
 	zwait;
 	DPRINTK("0x%x 0x%x\n",zin(CMR),zin(CER));
 	chan = (zin(CMR) & uPD98401_CHAN_ADDR) >> uPD98401_CHAN_ADDR_SHIFT;
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	DPRINTK("chan is %d\n",chan);
 	if (!chan) return -EAGAIN;
 	unlimited = vcc->qos.txtp.traffic_class == ATM_UBR &&
@@ -1022,15 +1012,14 @@ static int open_tx_second(struct atm_vcc *vcc)
 	zatm_dev = ZATM_DEV(vcc->dev);
 	zatm_vcc = ZATM_VCC(vcc);
 	if (!zatm_vcc->tx_chan) return 0;
-	save_flags(flags);
 	/* set up VC descriptor */
-	cli();
+	spin_lock_irqsave(&zatm_dev->lock, flags);
 	zpokel(zatm_dev,0,zatm_vcc->tx_chan*VC_SIZE/4);
 	zpokel(zatm_dev,uPD98401_TXVC_L | (zatm_vcc->shaper <<
 	    uPD98401_TXVC_SHP_SHIFT) | (vcc->vpi << uPD98401_TXVC_VPI_SHIFT) |
 	    vcc->vci,zatm_vcc->tx_chan*VC_SIZE/4+1);
 	zpokel(zatm_dev,0,zatm_vcc->tx_chan*VC_SIZE/4+2);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	zatm_dev->tx_map[zatm_vcc->tx_chan] = vcc;
 	return 0;
 }
@@ -1236,6 +1225,7 @@ static int __init zatm_init(struct atm_dev *dev)
 
 	DPRINTK(">zatm_init\n");
 	zatm_dev = ZATM_DEV(dev);
+	spin_lock_init(&zatm_dev->lock);
 	pci_dev = zatm_dev->pci_dev;
 	zatm_dev->base = pci_resource_start(pci_dev, 0);
 	zatm_dev->irq = pci_dev->irq;
@@ -1285,14 +1275,13 @@ static int __init zatm_init(struct atm_dev *dev)
 	do {
 		unsigned long flags;
 
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&zatm_dev->lock, flags);
 		t0 = zpeekl(zatm_dev,uPD98401_TSR);
 		udelay(10);
 		t1 = zpeekl(zatm_dev,uPD98401_TSR);
 		udelay(1010);
 		t2 = zpeekl(zatm_dev,uPD98401_TSR);
-		restore_flags(flags);
+		spin_unlock_irqrestore(&zatm_dev->lock, flags);
 	}
 	while (t0 > t1 || t1 > t2); /* loop if wrapping ... */
 	zatm_dev->khz = t2-2*t1+t0;
@@ -1492,14 +1481,13 @@ static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 					return -EFAULT;
 				if (pool < 0 || pool > ZATM_LAST_POOL)
 					return -EINVAL;
-				save_flags(flags);
-				cli();
+				spin_lock_irqsave(&zatm_dev->lock, flags);
 				info = zatm_dev->pool_info[pool];
 				if (cmd == ZATM_GETPOOLZ) {
 					zatm_dev->pool_info[pool].rqa_count = 0;
 					zatm_dev->pool_info[pool].rqu_count = 0;
 				}
-				restore_flags(flags);
+				spin_unlock_irqrestore(&zatm_dev->lock, flags);
 				return copy_to_user(
 				    &((struct zatm_pool_req *) arg)->info,
 				    &info,sizeof(info)) ? -EFAULT : 0;
@@ -1530,15 +1518,14 @@ static int zatm_ioctl(struct atm_dev *dev,unsigned int cmd,void *arg)
 				if (info.low_water >= info.high_water ||
 				    info.low_water < 0)
 					return -EINVAL;
-				save_flags(flags);
-				cli();
+				spin_lock_irqsave(&zatm_dev->lock, flags);
 				zatm_dev->pool_info[pool].low_water =
 				    info.low_water;
 				zatm_dev->pool_info[pool].high_water =
 				    info.high_water;
 				zatm_dev->pool_info[pool].next_thres =
 				    info.next_thres;
-				restore_flags(flags);
+				spin_unlock_irqrestore(&zatm_dev->lock, flags);
 				return 0;
 			}
 		default:

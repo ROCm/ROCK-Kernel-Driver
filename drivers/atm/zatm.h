@@ -85,6 +85,7 @@ struct zatm_dev {
 	unsigned char irq;		/* IRQ */
 	unsigned int base;		/* IO base address */
 	struct pci_dev *pci_dev;	/* PCI stuff */
+	spinlock_t lock;
 };
 
 
