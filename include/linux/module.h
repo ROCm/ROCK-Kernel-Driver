@@ -21,7 +21,6 @@
 #include <asm/uaccess.h> /* For struct exception_table_entry */
 
 /* Not Yet Implemented */
-#define MODULE_LICENSE(name)
 #define MODULE_AUTHOR(name)
 #define MODULE_DESCRIPTION(desc)
 #define MODULE_SUPPORTED_DEVICE(name)
@@ -57,11 +56,41 @@ extern const struct gtype##_id __mod_##gtype##_table		\
 
 #define THIS_MODULE (&__this_module)
 
+/*
+ * The following license idents are currently accepted as indicating free
+ * software modules
+ *
+ *	"GPL"				[GNU Public License v2 or later]
+ *	"GPL v2"			[GNU Public License v2]
+ *	"GPL and additional rights"	[GNU Public License v2 rights and more]
+ *	"Dual BSD/GPL"			[GNU Public License v2
+ *					 or BSD license choice]
+ *	"Dual MPL/GPL"			[GNU Public License v2
+ *					 or Mozilla license choice]
+ *
+ * The following other idents are available
+ *
+ *	"Proprietary"			[Non free products]
+ *
+ * There are dual licensed components, but when running with Linux it is the
+ * GPL that is relevant so this is a non issue. Similarly LGPL linked with GPL
+ * is a GPL combined work.
+ *
+ * This exists for several reasons
+ * 1.	So modinfo can show license info for users wanting to vet their setup 
+ *	is free
+ * 2.	So the community can ignore bug reports including proprietary modules
+ * 3.	So vendors can do likewise based on their own policies
+ */
+#define MODULE_LICENSE(license)					\
+	static const char __module_license[]			\
+		__attribute__((section(".init.license"))) = license
+
 #else  /* !MODULE */
 
 #define MODULE_GENERIC_TABLE(gtype,name)
 #define THIS_MODULE ((struct module *)0)
-
+#define MODULE_LICENSE(license)
 #endif
 
 #define MODULE_DEVICE_TABLE(type,name)		\
@@ -74,6 +103,9 @@ struct kernel_symbol_group
 
 	/* Module which owns it (if any) */
 	struct module *owner;
+
+	/* Are we internal use only? */
+	int gplonly;
 
 	unsigned int num_syms;
 	const struct kernel_symbol *syms;
@@ -101,7 +133,11 @@ void *__symbol_get_gpl(const char *symbol);
 	= { (unsigned long)&sym, MODULE_SYMBOL_PREFIX #sym }
 
 #define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
-#define EXPORT_SYMBOL_GPL(sym) EXPORT_SYMBOL(sym)
+
+#define EXPORT_SYMBOL_GPL(sym)				\
+	const struct kernel_symbol __ksymtab_##sym	\
+	__attribute__((section("__gpl_ksymtab")))	\
+	= { (unsigned long)&sym, #sym }
 
 struct module_ref
 {
@@ -128,6 +164,9 @@ struct module
 	/* Exported symbols */
 	struct kernel_symbol_group symbols;
 
+	/* GPL-only exported symbols. */
+	struct kernel_symbol_group gpl_symbols;
+
 	/* Exception tables */
 	struct exception_table extable;
 
@@ -148,6 +187,9 @@ struct module
 
 	/* Am I unsafe to unload? */
 	int unsafe;
+
+	/* Am I GPL-compatible */
+	int license_gplok;
 
 #ifdef CONFIG_MODULE_UNLOAD
 	/* Reference counts */
@@ -293,6 +335,7 @@ struct module __this_module
 __attribute__((section(".gnu.linkonce.this_module"))) = {
 	.name = __stringify(KBUILD_MODNAME),
 	.symbols = { .owner = &__this_module },
+	.gpl_symbols = { .owner = &__this_module, .gplonly = 1 },
 	.init = init_module,
 #ifdef CONFIG_MODULE_UNLOAD
 	.exit = cleanup_module,

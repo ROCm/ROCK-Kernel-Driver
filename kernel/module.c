@@ -72,13 +72,16 @@ EXPORT_SYMBOL(init_module);
 
 /* Find a symbol, return value and the symbol group */
 static unsigned long __find_symbol(const char *name,
-				   struct kernel_symbol_group **group)
+				   struct kernel_symbol_group **group,
+				   int gplok)
 {
 	struct kernel_symbol_group *ks;
  
 	list_for_each_entry(ks, &symbols, list) {
  		unsigned int i;
 
+		if (ks->gplonly && !gplok)
+			continue;
 		for (i = 0; i < ks->num_syms; i++) {
 			if (strcmp(ks->syms[i].name, name) == 0) {
 				*group = ks;
@@ -502,7 +505,7 @@ void __symbol_put(const char *symbol)
 	unsigned long flags;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	if (!__find_symbol(symbol, &ksg))
+	if (!__find_symbol(symbol, &ksg, 1))
 		BUG();
 	module_put(ksg->owner);
 	spin_unlock_irqrestore(&modlist_lock, flags);
@@ -721,7 +724,7 @@ unsigned long find_symbol_internal(Elf_Shdr *sechdrs,
 	}
 	/* Look in other modules... */
 	spin_lock_irq(&modlist_lock);
-	ret = __find_symbol(name, ksg);
+	ret = __find_symbol(name, ksg, mod->license_gplok);
 	if (ret) {
 		/* This can fail due to OOM, or module unloading */
 		if (!use_module(mod, (*ksg)->owner))
@@ -738,6 +741,7 @@ static void free_module(struct module *mod)
 	list_del(&mod->list);
 	spin_lock_irq(&modlist_lock);
 	list_del(&mod->symbols.list);
+	list_del(&mod->gpl_symbols.list);
 	list_del(&mod->extable.list);
 	spin_unlock_irq(&modlist_lock);
 
@@ -758,7 +762,7 @@ void *__symbol_get(const char *symbol)
 	unsigned long value, flags;
 
 	spin_lock_irqsave(&modlist_lock, flags);
-	value = __find_symbol(symbol, &ksg);
+	value = __find_symbol(symbol, &ksg, 1);
 	if (value && !strong_try_module_get(ksg->owner))
 		value = 0;
 	spin_unlock_irqrestore(&modlist_lock, flags);
@@ -930,7 +934,34 @@ static void layout_sections(struct module *mod,
 	}
 }
 
-/* Allocate and load the module */
+static inline int license_is_gpl_compatible(const char *license)
+{
+	return (strcmp(license, "GPL") == 0
+		|| strcmp(license, "GPL v2") == 0
+		|| strcmp(license, "GPL and additional rights") == 0
+		|| strcmp(license, "Dual BSD/GPL") == 0
+		|| strcmp(license, "Dual MPL/GPL") == 0);
+}
+
+static void set_license(struct module *mod, Elf_Shdr *sechdrs, int licenseidx)
+{
+	char *license;
+
+	if (licenseidx) 
+		license = (char *)sechdrs[licenseidx].sh_addr;
+	else
+		license = "unspecified";
+
+	mod->license_gplok = license_is_gpl_compatible(license);
+	if (!mod->license_gplok) {
+		printk(KERN_WARNING "%s: module license '%s' taints kernel.\n",
+		       mod->name, license);
+		tainted |= TAINT_PROPRIETARY_MODULE;
+	}
+}
+
+/* Allocate and load the module: note that size of section 0 is always
+   zero, and we rely on this for optional sections. */
 static struct module *load_module(void *umod,
 				  unsigned long len,
 				  const char *uargs)
@@ -939,7 +970,7 @@ static struct module *load_module(void *umod,
 	Elf_Shdr *sechdrs;
 	char *secstrings, *args;
 	unsigned int i, symindex, exportindex, strindex, setupindex, exindex,
-		modindex, obsparmindex;
+		modindex, obsparmindex, licenseindex, gplindex;
 	long arglen;
 	struct module *mod;
 	long err = 0;
@@ -975,7 +1006,7 @@ static struct module *load_module(void *umod,
 
 	/* May not export symbols, or have setup params, so these may
            not exist */
-	exportindex = setupindex = obsparmindex = 0;
+	exportindex = setupindex = obsparmindex = gplindex = licenseindex = 0;
 
 	/* And these should exist, but gcc whinges if we don't init them */
 	symindex = strindex = exindex = modindex = 0;
@@ -1018,6 +1049,16 @@ static struct module *load_module(void *umod,
 			/* Obsolete MODULE_PARM() table */
 			DEBUGP("Obsolete param found in section %u\n", i);
 			obsparmindex = i;
+		} else if (strcmp(secstrings+sechdrs[i].sh_name,".init.license")
+			   == 0) {
+			/* MODULE_LICENSE() */
+			DEBUGP("Licence found in section %u\n", i);
+			licenseindex = i;
+		} else if (strcmp(secstrings+sechdrs[i].sh_name,
+				  "__gpl_ksymtab") == 0) {
+			/* EXPORT_SYMBOL_GPL() */
+			DEBUGP("GPL symbols found in section %u\n", i);
+			gplindex = i;
 		}
 #ifdef CONFIG_KALLSYMS
 		/* symbol and string tables for decoding later. */
@@ -1113,17 +1154,21 @@ static struct module *load_module(void *umod,
 	/* Now we've moved module, initialize linked lists, etc. */
 	module_unload_init(mod);
 
+	/* Set up license info based on contents of section */
+	set_license(mod, sechdrs, licenseindex);
+
 	/* Fix up syms, so that st_value is a pointer to location. */
 	err = simplify_symbols(sechdrs, symindex, strindex, mod);
 	if (err < 0)
 		goto cleanup;
 
-	/* Set up EXPORTed symbols */
-	if (exportindex) {
-		mod->symbols.num_syms = (sechdrs[exportindex].sh_size
-					/ sizeof(*mod->symbols.syms));
-		mod->symbols.syms = (void *)sechdrs[exportindex].sh_addr;
-	}
+	/* Set up EXPORTed & EXPORT_GPLed symbols (section 0 is 0 length) */
+	mod->symbols.num_syms = (sechdrs[exportindex].sh_size
+				 / sizeof(*mod->symbols.syms));
+	mod->symbols.syms = (void *)sechdrs[exportindex].sh_addr;
+	mod->gpl_symbols.num_syms = (sechdrs[gplindex].sh_size
+				 / sizeof(*mod->symbols.syms));
+	mod->gpl_symbols.syms = (void *)sechdrs[gplindex].sh_addr;
 
 	/* Set up exception table */
 	if (exindex) {
@@ -1228,6 +1273,7 @@ sys_init_module(void *umod,
 	spin_lock_irq(&modlist_lock);
 	list_add(&mod->extable.list, &extables);
 	list_add_tail(&mod->symbols.list, &symbols);
+	list_add_tail(&mod->gpl_symbols.list, &symbols);
 	spin_unlock_irq(&modlist_lock);
 	list_add(&mod->list, &modules);
 

@@ -103,7 +103,7 @@ NORET_TYPE void panic(const char * fmt, ...)
 /**
  *	print_tainted - return a string to represent the kernel taint state.
  *
- *  'P' - Proprietory module has been loaded.
+ *  'P' - Proprietary module has been loaded.
  *  'F' - Module has been forcibly loaded.
  *  'S' - SMP with CPUs not designed for SMP.
  *
@@ -115,7 +115,7 @@ const char *print_tainted()
 	static char buf[20];
 	if (tainted) {
 		snprintf(buf, sizeof(buf), "Tainted: %c%c%c",
-			tainted & TAINT_PROPRIETORY_MODULE ? 'P' : 'G',
+			tainted & TAINT_PROPRIETARY_MODULE ? 'P' : 'G',
 			tainted & TAINT_FORCED_MODULE ? 'F' : ' ',
 			tainted & TAINT_UNSAFE_SMP ? 'S' : ' ');
 	}
