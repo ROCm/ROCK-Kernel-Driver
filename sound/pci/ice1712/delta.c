@@ -257,6 +257,26 @@ static void delta1010lt_ak4524_lock(akm4xxx_t *ak, int chip)
 }
 
 /*
+ * change the DFS bit according rate for Delta1010
+ */
+static void delta_1010_set_rate_val(ice1712_t *ice, unsigned int rate)
+{
+	unsigned char tmp, tmp2;
+
+	if (rate == 0)	/* no hint - S/PDIF input is master, simply return */
+		return;
+
+	down(&ice->gpio_mutex);
+	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
+	tmp2 = tmp & ~ICE1712_DELTA_DFS;
+	if (rate > 48000)
+		tmp2 |= ICE1712_DELTA_DFS;
+	if (tmp != tmp2)
+		snd_ice1712_write(ice, ICE1712_IREG_GPIO_DATA, tmp2);
+	up(&ice->gpio_mutex);
+}
+
+/*
  * change the rate of AK4524 on Delta 44/66, AP, 1010LT
  */
 static void delta_ak4524_set_rate_val(akm4xxx_t *ak, unsigned int rate)
@@ -271,8 +291,7 @@ static void delta_ak4524_set_rate_val(akm4xxx_t *ak, unsigned int rate)
 	down(&ice->gpio_mutex);
 	tmp = snd_ice1712_read(ice, ICE1712_IREG_GPIO_DATA);
 	up(&ice->gpio_mutex);
-	tmp2 = tmp;
-	tmp2 &= ~ICE1712_DELTA_DFS; 
+	tmp2 = tmp & ~ICE1712_DELTA_DFS; 
 	if (rate > 48000)
 		tmp2 |= ICE1712_DELTA_DFS;
 	if (tmp == tmp2)
@@ -454,7 +473,11 @@ static int __devinit snd_ice1712_delta_init(ice1712_t *ice)
 			return err;
 		break;
 	case ICE1712_SUBDEVICE_DELTA1010:
+		ice->gpio.set_pro_rate = delta_1010_set_rate_val;
+		break;
 	case ICE1712_SUBDEVICE_DELTADIO2496:
+		ice->gpio.set_pro_rate = delta_1010_set_rate_val;
+		/* fall thru */
 	case ICE1712_SUBDEVICE_DELTA66:
 		ice->spdif.ops.open = delta_open_spdif;
 		ice->spdif.ops.setup_rate = delta_setup_spdif;

@@ -81,6 +81,9 @@
 #define SNDRV_OSS_DEVICE_TYPE_SNDSTAT	5
 #define SNDRV_OSS_DEVICE_TYPE_MUSIC	6
 
+#define MODULE_ALIAS_SNDRV_MINOR(type) \
+	MODULE_ALIAS("sound-service-?-" __stringify(type))
+
 #endif
 
 #endif /* __SOUND_MINORS_H */

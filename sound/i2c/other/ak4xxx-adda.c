@@ -445,6 +445,18 @@ int snd_akm4xxx_build_controls(akm4xxx_t *ak)
 	return 0;
 }
 
+static int __init alsa_akm4xxx_module_init(void)
+{
+	return 0;
+}
+        
+static void __exit alsa_akm4xxx_module_exit(void)
+{
+}
+        
+module_init(alsa_akm4xxx_module_init)
+module_exit(alsa_akm4xxx_module_exit)
+
 EXPORT_SYMBOL(snd_akm4xxx_write);
 EXPORT_SYMBOL(snd_akm4xxx_reset);
 EXPORT_SYMBOL(snd_akm4xxx_init);

@@ -23,6 +23,7 @@
 #include <sound/driver.h>
 #include <linux/slab.h>
 #include <linux/delay.h>
+#include <linux/init.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -557,6 +558,18 @@ int snd_cs8427_iec958_pcm(snd_i2c_device_t *cs8427, unsigned int rate)
 		snd_cs8427_reset(cs8427);
 	return err < 0 ? err : 0;
 }
+
+static int __init alsa_cs8427_module_init(void)
+{
+	return 0;
+}
+
+static void __exit alsa_cs8427_module_exit(void)
+{
+}
+
+module_init(alsa_cs8427_module_init)
+module_exit(alsa_cs8427_module_exit)
 
 EXPORT_SYMBOL(snd_cs8427_detect);
 EXPORT_SYMBOL(snd_cs8427_create);

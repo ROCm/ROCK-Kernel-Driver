@@ -341,10 +341,6 @@
       drivers will be on pci directory, because its API is identical
       with the standard PCI cards. 
       </para>
-
-      <para>
-        At this moment, only VX-pocket driver exists.
-      </para>
     </section>
 
     <section id="file-tree-oss-directory">
@@ -1299,7 +1295,7 @@
                   printk(KERN_ERR "error to set 28bit mask DMA\n");
                   return -ENXIO;
           }
-          pci_set_dma_mask(pci, 0x0fffffff);
+          pci_set_consistent_dma_mask(pci, 0x0fffffff);
 
           chip = snd_magic_kcalloc(mychip_t, 0, GFP_KERNEL);
           if (chip == NULL)
@@ -1417,7 +1413,7 @@
           printk(KERN_ERR "error to set 28bit mask DMA\n");
           return -ENXIO;
   }
-  pci_set_dma_mask(pci, 0x0fffffff);
+  pci_set_consistent_dma_mask(pci, 0x0fffffff);
 ]]>
           </programlisting>
         </informalexample>
@@ -1914,8 +1910,27 @@
           .periods_max =      1024,
   };
 
+  /* hardware definition */
+  static snd_pcm_hardware_t snd_mychip_capture_hw = {
+          .info = (SNDRV_PCM_INFO_MMAP |
+                   SNDRV_PCM_INFO_INTERLEAVED |
+                   SNDRV_PCM_INFO_BLOCK_TRANSFER |
+                   SNDRV_PCM_INFO_MMAP_VALID),
+          .formats =          SNDRV_PCM_FMTBIT_S16_LE,
+          .rates =            SNDRV_PCM_RATE_8000_48000,
+          .rate_min =         8000,
+          .rate_max =         48000,
+          .channels_min =     2,
+          .channels_max =     2,
+          .buffer_bytes_max = 32768,
+          .period_bytes_min = 4096,
+          .period_bytes_max = 32768,
+          .periods_min =      1,
+          .periods_max =      1024,
+  };
+
   /* open callback */
-  static int snd_mychip_pcm_open(snd_pcm_substream_t *substream)
+  static int snd_mychip_playback_open(snd_pcm_substream_t *substream)
   {
           mychip_t *chip = snd_pcm_substream_chip(substream);
           snd_pcm_runtime_t *runtime = substream->runtime;
@@ -1926,7 +1941,27 @@
   }
 
   /* close callback */
-  static int snd_mychip_pcm_close(snd_pcm_substream_t *substream)
+  static int snd_mychip_playback_close(snd_pcm_substream_t *substream)
+  {
+          mychip_t *chip = snd_pcm_substream_chip(substream);
+          // the hardware-specific codes will be here
+          return 0;
+
+  }
+
+  /* open callback */
+  static int snd_mychip_capture_open(snd_pcm_substream_t *substream)
+  {
+          mychip_t *chip = snd_pcm_substream_chip(substream);
+          snd_pcm_runtime_t *runtime = substream->runtime;
+
+          runtime->hw = snd_mychip_capture_hw;
+          // more hardware-initialization will be done here
+          return 0;
+  }
+
+  /* close callback */
+  static int snd_mychip_capture_close(snd_pcm_substream_t *substream)
   {
           mychip_t *chip = snd_pcm_substream_chip(substream);
           // the hardware-specific codes will be here
@@ -1997,6 +2032,18 @@
   static snd_pcm_ops_t snd_mychip_playback_ops = {
           .open =        snd_mychip_playback_open,
           .close =       snd_mychip_playback_close,
+          .ioctl =       snd_pcm_lib_ioctl,
+          .hw_params =   snd_mychip_pcm_hw_params,
+          .hw_free =     snd_mychip_pcm_hw_free,
+          .prepare =     snd_mychip_pcm_prepare,
+          .trigger =     snd_mychip_pcm_trigger,
+          .pointer =     snd_mychip_pcm_pointer,
+  };
+
+  /* operators */
+  static snd_pcm_ops_t snd_mychip_capture_ops = {
+          .open =        snd_mychip_capture_open,
+          .close =       snd_mychip_capture_close,
           .ioctl =       snd_pcm_lib_ioctl,
           .hw_params =   snd_mychip_pcm_hw_params,
           .hw_free =     snd_mychip_pcm_hw_free,
@@ -3982,13 +4029,18 @@ struct _snd_pcm_runtime {
 
   static int snd_mychip_ac97(mychip_t *chip)
   {
+          ac97_bus_t bus, *pbus;
           ac97_t ac97;
+          int err;
 
+          memset(&bus, 0, sizeof(bus));
+          bus.write = snd_mychip_ac97_write;
+          bus.read = snd_mychip_ac97_read;
+          if ((err = snd_ac97_bus(chip->card, &bus, &pbus)) < 0)
+                  return err;
           memset(&ac97, 0, sizeof(ac97));
-          ac97.write = snd_mychip_ac97_write;
-          ac97.read = snd_mychip_ac97_read;
           ac97.private_data = chip;
-          return snd_ac97_mixer(card, &ac97, &chip->ac97);
+          return snd_ac97_mixer(pbus, &ac97, &chip->ac97);
   }
 
 ]]>
@@ -4000,9 +4052,29 @@ struct _snd_pcm_runtime {
     <section id="api-ac97-constructor">
       <title>Constructor</title>
       <para>
-        For creating an ac97 instance, call
-      <function>snd_ac97_mixer()</function> with an <type>ac97_t</type>
-      record, in which the callbacks and the private_data is set.
+        For creating an ac97 instance, first call <function>snd_ac97_bus</function>
+      with <type>ac97_bus_t</type> record including callback functions.
+
+        <informalexample>
+          <programlisting>
+<![CDATA[
+  ac97_bus_t bus, *pbus;
+  int err;
+
+  memset(&bus, 0, sizeof(bus));
+  bus.write = snd_mychip_ac97_write;
+  bus.read = snd_mychip_ac97_read;
+  snd_ac97_bus(card, &bus, &pbus);
+]]>
+          </programlisting>
+        </informalexample>
+
+      The bus record is shared among all belonging ac97 instances.
+      </para>
+
+      <para>
+      And then call <function>snd_ac97_mixer()</function> with an <type>ac97_t</type>
+      record together with the bus pointer created above.
 
         <informalexample>
           <programlisting>
@@ -4011,16 +4083,16 @@ struct _snd_pcm_runtime {
   int err;
 
   memset(&ac97, 0, sizeof(ac97));
-  ac97.write = snd_mychip_ac97_write;
-  ac97.read = snd_mychip_ac97_read;
   ac97.private_data = chip;
-  snd_ac97_mixer(card, &ac97, &chip->ac97);
+  snd_ac97_mixer(bus, &ac97, &chip->ac97);
 ]]>
           </programlisting>
         </informalexample>
 
         where chip-&gt;ac97 is the pointer of a newly created
         <type>ac97_t</type> instance.
+        In this case, the chip pointer is set as the private data, so that
+        the read/write callback functions can refer to this chip instance.
         This instance is not necessarily stored in the chip
 	record.  When you need to change the register values from the
         driver, or need the suspend/resume of ac97 codecs, keep this
@@ -4094,14 +4166,11 @@ struct _snd_pcm_runtime {
         The <structfield>wait</structfield> callback is used for a
       certain wait at the standard initialization of the codec. If the
       chip requires the extra wait-time, define this callback. 
-      This callback is always non-atomic, because it's never called
-      in the resume mode.
       </para>
 
       <para>
         The <structfield>init</structfield> callback is used for
-      additional initialization of the codec.  This callback is called
-      after the reset, and should be atomic in the resume mode.
+      additional initialization of the codec.
       </para>
     </section>
 
@@ -4674,10 +4743,7 @@ struct _snd_pcm_runtime {
           </programlisting>
         </informalexample>
 
-        Note that you have to pre-allocate to use this function
-        (i.e. you cannot use this function for
-        <link linkend="buffer-and-memory-non-contiguous"><citetitle>
-        a scatter-gather buffer</citetitle></link>).
+        Note that you have to pre-allocate to use this function.
       </para>
     </section>
 
@@ -4905,6 +4971,8 @@ struct _snd_pcm_runtime {
         When a SG-handler is used, you need to set
       <function>snd_pcm_sgbuf_ops_page</function> as
       the <structfield>page</structfield> callback.
+      (See <link linkend="pcm-interface-operators-page-callback">
+      <citetitle>page callback section</citetitle></link>.)
       </para>
 
       <para>
@@ -4999,13 +5067,14 @@ struct _snd_pcm_runtime {
       <informalexample>
         <programlisting>
 <![CDATA[
-  snd_info_set_text_ops(entry, chip, my_proc_read);
+  snd_info_set_text_ops(entry, chip, read_size, my_proc_read);
 ]]>
         </programlisting>
       </informalexample>
     
     where the second argument (<parameter>chip</parameter>) is the
-    private data to be used in the callbacks and the third
+    private data to be used in the callbacks. The third parameter
+    specifies the read buffer size and the fourth
     (<parameter>my_proc_read</parameter>) is the callback function, which
     is defined like
 
