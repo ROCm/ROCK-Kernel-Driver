@@ -161,7 +161,7 @@ int pm_suspend_disk(void)
 
 	pr_debug("PM: snapshotting memory.\n");
 	in_suspend = 1;
-	if ((error = swsusp_save()))
+	if ((error = swsusp_suspend()))
 		goto Done;
 
 	if (in_suspend) {
