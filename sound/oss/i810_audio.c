@@ -103,6 +103,8 @@
 #include <asm/uaccess.h>
 #include <asm/hardirq.h>
 
+#define DRIVER_VERSION "1.00"
+
 #ifndef PCI_DEVICE_ID_INTEL_82801
 #define PCI_DEVICE_ID_INTEL_82801	0x2415
 #endif
@@ -260,8 +262,6 @@ enum {
 #define INT_NI		(1<<1)
 #define INT_GPI		(1<<0)
 #define INT_MASK (INT_SEC|INT_PRI|INT_MC|INT_PO|INT_PI|INT_MO|INT_NI|INT_GPI)
-
-#define DRIVER_VERSION "0.24"
 
 /* magic numbers to protect our data structures */
 #define I810_CARD_MAGIC		0x5072696E /* "Prin" */
