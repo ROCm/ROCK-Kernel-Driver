@@ -503,8 +503,8 @@ static void __init versatile_init(void)
 {
 	int i;
 
-	platform_add_device(&versatile_flash_device);
-	platform_add_device(&smc91x_device);
+	platform_device_register(&versatile_flash_device);
+	platform_device_register(&smc91x_device);
 
 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
 		struct amba_device *d = amba_devs[i];

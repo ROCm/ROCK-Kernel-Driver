@@ -171,19 +171,19 @@ static inline int __cpus_subset(cpumask_t *src1p,
 }
 
 #define cpus_empty(src) __cpus_empty(&(src), NR_CPUS)
-static inline int __cpus_empty(cpumask_t *srcp, int nbits)
+static inline int __cpus_empty(const cpumask_t *srcp, int nbits)
 {
 	return bitmap_empty(srcp->bits, nbits);
 }
 
 #define cpus_full(cpumask) __cpus_full(&(cpumask), NR_CPUS)
-static inline int __cpus_full(cpumask_t *srcp, int nbits)
+static inline int __cpus_full(const cpumask_t *srcp, int nbits)
 {
 	return bitmap_full(srcp->bits, nbits);
 }
 
 #define cpus_weight(cpumask) __cpus_weight(&(cpumask), NR_CPUS)
-static inline int __cpus_weight(cpumask_t *srcp, int nbits)
+static inline int __cpus_weight(const cpumask_t *srcp, int nbits)
 {
 	return bitmap_weight(srcp->bits, nbits);
 }
@@ -191,7 +191,7 @@ static inline int __cpus_weight(cpumask_t *srcp, int nbits)
 #define cpus_shift_right(dst, src, n) \
 			__cpus_shift_right(&(dst), &(src), (n), NR_CPUS)
 static inline void __cpus_shift_right(cpumask_t *dstp,
-					cpumask_t *srcp, int n, int nbits)
+					const cpumask_t *srcp, int n, int nbits)
 {
 	bitmap_shift_right(dstp->bits, srcp->bits, n, nbits);
 }
@@ -199,19 +199,19 @@ static inline void __cpus_shift_right(cpumask_t *dstp,
 #define cpus_shift_left(dst, src, n) \
 			__cpus_shift_left(&(dst), &(src), (n), NR_CPUS)
 static inline void __cpus_shift_left(cpumask_t *dstp,
-					cpumask_t *srcp, int n, int nbits)
+					const cpumask_t *srcp, int n, int nbits)
 {
 	bitmap_shift_left(dstp->bits, srcp->bits, n, nbits);
 }
 
 #define first_cpu(src) __first_cpu(&(src), NR_CPUS)
-static inline int __first_cpu(cpumask_t *srcp, int nbits)
+static inline int __first_cpu(const cpumask_t *srcp, int nbits)
 {
 	return find_first_bit(srcp->bits, nbits);
 }
 
 #define next_cpu(n, src) __next_cpu((n), &(src), NR_CPUS)
-static inline int __next_cpu(int n, cpumask_t *srcp, int nbits)
+static inline int __next_cpu(int n, const cpumask_t *srcp, int nbits)
 {
 	return find_next_bit(srcp->bits, nbits, n+1);
 }

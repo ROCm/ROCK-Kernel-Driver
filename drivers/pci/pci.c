@@ -442,7 +442,7 @@ int pci_enable_wake(struct pci_dev *dev, u32 state, int enable)
 	pci_read_config_word(dev,pm+PCI_PM_PMC,&value);
 
 	value &= PCI_PM_CAP_PME_MASK;
-	value >>= ffs(value);   /* First bit of mask */
+	value >>= ffs(PCI_PM_CAP_PME_MASK) - 1;   /* First bit of mask */
 
 	/* Check if it can generate PME# from requested state. */
 	if (!value || !(value & (1 << state))) 
