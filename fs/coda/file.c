@@ -69,6 +69,7 @@ coda_file_write(struct file *file,const char *buf,size_t count,loff_t *ppos)
 
 	cfile->f_flags = flags;
 	inode->i_size = cinode->i_size;
+	inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 	up(&inode->i_sem);
 
 	return ret;
@@ -103,12 +104,8 @@ int coda_open(struct inode *i, struct file *f)
 	lock_kernel();
 	coda_vfs_stat.open++;
 
-	CDEBUG(D_SPECIAL, "OPEN inode number: %ld, count %d, flags %o.\n", 
-	       f->f_dentry->d_inode->i_ino, atomic_read(&f->f_dentry->d_count), flags);
-
 	error = venus_open(i->i_sb, coda_i2f(i), coda_flags, &fh); 
 	if (error || !fh) {
-	        CDEBUG(D_FILE, "coda_open: venus_open result %d\n", error);
 		unlock_kernel();
 		return error;
 	}
@@ -132,12 +129,6 @@ int coda_open(struct inode *i, struct file *f)
 		f->private_data = cred;
 	}
 
-	CDEBUG(D_FILE, "result %d, coda i->i_count is %d, cii->contcount is %d for ino %ld\n", 
-	       error, atomic_read(&i->i_count), cii->c_contcount, i->i_ino);
-	CDEBUG(D_FILE, "cache ino: %ld, count %d, ops %p\n", 
-	       fh->f_dentry->d_inode->i_ino,
-	       atomic_read(&fh->f_dentry->d_inode->i_count),
-               fh->f_dentry->d_inode->i_op);
 	unlock_kernel();
 	return 0;
 }
@@ -174,8 +165,6 @@ int coda_flush(struct file *file)
 
 	cinode = cfile->f_dentry->d_inode;
 
-	CDEBUG(D_FILE, "FLUSH coda (file %p ct %d)\n", file, fcnt);
-
 	err = venus_store(inode->i_sb, coda_i2f(inode), cflags,
                           (struct coda_cred *)file->private_data);
 	if (err == -EOPNOTSUPP) {
@@ -183,7 +172,6 @@ int coda_flush(struct file *file)
 		err = 0;
 	}
 
-	CDEBUG(D_FILE, "coda_flush: result: %d\n", err);
 	return err;
 }
 

@@ -1,7 +1,7 @@
 /*
 **	Pegasus: USB 10/100Mbps/HomePNA (1Mbps) Controller
 **
-**	Copyright (c) 1999-2001 Petko Manolov (pmanolov@lnxw.com)
+**	Copyright (c) 1999-2002 Petko Manolov (petkan@users.sourceforge.net)
 **	
 **
 **	ChangeLog:
@@ -21,6 +21,8 @@
 **			TODO: suppressing HCD warnings spewage on disconnect.
 **		v0.4.13	Ethernet address is now set at probe(), not at open()
 **			time as this seems to break dhcpd. 
+**		v0.5.0	branch to 2.5.x kernels
+**		v0.5.1	ethtool support added
 */
 
 /*
@@ -46,20 +48,25 @@
 #include <linux/delay.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
+#include <linux/ethtool.h>
+#include <linux/mii.h>
 #include <linux/usb.h>
 #include <linux/module.h>
 #include <asm/byteorder.h>
+#include <asm/uaccess.h>
 #include "pegasus.h"
 
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v0.4.23 (2002/02/01)"
-#define DRIVER_AUTHOR "Petko Manolov <pmanolov@lnxw.com>"
+#define DRIVER_VERSION "v0.5.1 (2002/03/06)"
+#define DRIVER_AUTHOR "Petko Manolov <petkan@users.sourceforge.net>"
 #define DRIVER_DESC "Pegasus/Pegasus II USB Ethernet driver"
 
 #define	PEGASUS_USE_INTR
 #define	PEGASUS_WRITE_EEPROM
+#define	BMSR_MEDIA	(BMSR_10HALF | BMSR_10FULL | BMSR_100HALF | \
+			BMSR_100FULL | BMSR_ANEGCAPABLE)
 
 static int loopback = 0;
 static int mii_mode = 0;
@@ -461,8 +468,8 @@ static inline int reset_mac( pegasus_t *pegasus )
 	     usb_dev_id[pegasus->dev_index].vendor == VENDOR_DLINK ) {
 		__u16	auxmode;
 
-		read_mii_word( pegasus, 0, 0x1b, &auxmode );
-		write_mii_word( pegasus, 0, 0x1b, auxmode | 4 );
+		read_mii_word( pegasus, 0, MII_TPISTATUS, &auxmode );
+		write_mii_word( pegasus, 0, MII_TPISTATUS, auxmode | 4 );
 	}
 
 	return	0;
@@ -481,16 +488,16 @@ static int enable_net_traffic( struct net_device *dev, struct usb_device *usb )
 	if ( !(bmsr & 0x20) && !loopback ) 
 		warn( "%s: link NOT established (0x%x) - check the cable.",
 			dev->name, bmsr );
-	if ( read_mii_word(pegasus, pegasus->phy, MII_ANLPA, &linkpart) )
+	if ( read_mii_word(pegasus, pegasus->phy, MII_LPA, &linkpart) )
 		return 2;
 	if ( !(linkpart & 1) )
 		warn( "link partner stat %x", linkpart );
 
 	data[0] = 0xc9;
 	data[1] = 0;
-	if ( linkpart & (ANLPA_100TX_FD | ANLPA_10T_FD) )
+	if ( linkpart & (ADVERTISE_100FULL | ADVERTISE_10FULL) )
 		data[1] |= 0x20; /* set full duplex */
-	if ( linkpart & (ANLPA_100TX_FD | ANLPA_100TX_HD) )
+	if ( linkpart & (ADVERTISE_100FULL | ADVERTISE_100HALF) )
 		data[1] |= 0x10; /* set 100 Mbps */
 	if ( mii_mode )
 		data[1] = 0;
@@ -710,15 +717,26 @@ static inline void get_interrupt_interval( pegasus_t *pegasus )
 }
 
 
+static void set_carrier(struct net_device *net)
+{
+	pegasus_t	*pegasus;
+	short		tmp;
+
+	pegasus = net->priv;
+	read_mii_word(pegasus, pegasus->phy, MII_BMSR, &tmp);
+	if (tmp & BMSR_LSTATUS)
+		netif_carrier_on(net);
+	else
+		netif_carrier_off(net);
+	
+}
+
+
 static int pegasus_open(struct net_device *net)
 {
 	pegasus_t *pegasus = (pegasus_t *)net->priv;
 	int	res;
 
-	if ( (res = enable_net_traffic(net, pegasus->usb)) ) {
-		err("can't enable_net_traffic() - %d", res);
-		return -EIO;
-	}
 	FILL_BULK_URB( pegasus->rx_urb, pegasus->usb,
 			usb_rcvbulkpipe(pegasus->usb, 1),
 			pegasus->rx_buff, PEGASUS_MAX_MTU, 
@@ -735,6 +753,11 @@ static int pegasus_open(struct net_device *net)
 #endif
 	netif_start_queue( net );
 	pegasus->flags |= PEGASUS_RUNNING;
+	if ( (res = enable_net_traffic(net, pegasus->usb)) ) {
+		err("can't enable_net_traffic() - %d", res);
+		return -EIO;
+	}
+	set_carrier(net);
 
 	return 0;
 }
@@ -760,24 +783,103 @@ static int pegasus_close( struct net_device *net )
 }
 
 
+static int pegasus_ethtool_ioctl(struct net_device *net, void *uaddr)
+{
+	pegasus_t	*pegasus;
+	int		cmd;
+	char		tmp[128];
+
+	pegasus = net->priv;
+	if (get_user(cmd, (int *)uaddr))
+		return -EFAULT;
+	switch (cmd) {
+	case ETHTOOL_GDRVINFO: {
+		struct ethtool_drvinfo info = {ETHTOOL_GDRVINFO};
+		strncpy(info.driver, DRIVER_DESC, ETHTOOL_BUSINFO_LEN);
+		strncpy(info.version, DRIVER_VERSION, ETHTOOL_BUSINFO_LEN);
+		sprintf(tmp, "usb%d:%d", pegasus->usb->bus->busnum,
+		        pegasus->usb->devnum);
+		strncpy(info.bus_info, tmp, ETHTOOL_BUSINFO_LEN);
+		if (copy_to_user(uaddr, &info, sizeof(info)))
+			return -EFAULT;
+		return 0;
+	}
+	case ETHTOOL_GSET: {
+		struct ethtool_cmd ecmd;
+		short	lpa, bmcr;
+
+		if (copy_from_user(&ecmd, uaddr, sizeof(ecmd)))
+			return -EFAULT;
+		ecmd.supported = (SUPPORTED_10baseT_Half |
+		                 SUPPORTED_10baseT_Full |
+		                 SUPPORTED_100baseT_Half |
+		                 SUPPORTED_100baseT_Full |
+		                 SUPPORTED_Autoneg |
+		                 SUPPORTED_TP |
+		                 SUPPORTED_MII);
+		ecmd.port = PORT_TP;
+		ecmd.transceiver = XCVR_INTERNAL;
+		ecmd.phy_address = pegasus->phy;
+		read_mii_word(pegasus, pegasus->phy, MII_BMCR, &bmcr);
+		read_mii_word(pegasus, pegasus->phy, MII_LPA, &lpa);
+		if (bmcr & BMCR_ANENABLE) {
+			ecmd.autoneg = AUTONEG_ENABLE;
+			ecmd.speed = lpa & (LPA_100HALF|LPA_100FULL) ?
+		                     SPEED_100 : SPEED_10;
+			if (ecmd.speed == SPEED_100)
+				ecmd.duplex = lpa & LPA_100FULL ?
+				              DUPLEX_FULL : DUPLEX_HALF;
+			else
+				ecmd.duplex = lpa & LPA_10FULL ?
+				              DUPLEX_FULL : DUPLEX_HALF;
+		} else {
+			ecmd.autoneg = AUTONEG_DISABLE;
+			ecmd.speed = bmcr & BMCR_SPEED100 ? 
+			             SPEED_100 : SPEED_10;
+			ecmd.duplex = bmcr & BMCR_FULLDPLX ?
+			              DUPLEX_FULL : DUPLEX_HALF;
+		}
+		if (copy_to_user(uaddr, &ecmd, sizeof(ecmd)))
+			return -EFAULT;
+		
+		return 0;
+	}
+	case ETHTOOL_SSET: {
+		return -EOPNOTSUPP;
+	}
+	case ETHTOOL_GLINK: {
+		struct ethtool_value edata = {ETHTOOL_GLINK};
+		edata.data = netif_carrier_ok(net);
+		if (copy_to_user(uaddr, &edata, sizeof(edata)))
+			return -EFAULT;
+		return 0;
+	}
+	default:
+		return -EOPNOTSUPP;
+	}
+}
+
+
 static int pegasus_ioctl( struct net_device *net, struct ifreq *rq, int cmd )
 {
 	__u16 *data = (__u16 *)&rq->ifr_data;
 	pegasus_t	*pegasus = net->priv;
 
 	switch(cmd) {
-		case SIOCDEVPRIVATE:
-			data[0] = pegasus->phy;
-		case SIOCDEVPRIVATE+1:
-			read_mii_word(pegasus, data[0], data[1]&0x1f, &data[3]);
-			return 0;
-		case SIOCDEVPRIVATE+2:
-			if ( !capable(CAP_NET_ADMIN) )
-				return -EPERM;
-			write_mii_word(pegasus, pegasus->phy, data[1] & 0x1f, data[2]);
-			return 0;
-		default:
-			return -EOPNOTSUPP;
+	case SIOCETHTOOL:
+		return pegasus_ethtool_ioctl(net, rq->ifr_data);
+	case SIOCDEVPRIVATE:
+		data[0] = pegasus->phy;
+	case SIOCDEVPRIVATE+1:
+		read_mii_word(pegasus, data[0], data[1]&0x1f, &data[3]);
+		return 0;
+	case SIOCDEVPRIVATE+2:
+		if ( !capable(CAP_NET_ADMIN) )
+			return -EPERM;
+		write_mii_word(pegasus, pegasus->phy, data[1] & 0x1f, data[2]);
+		return 0;
+	default:
+		return -EOPNOTSUPP;
 	}
 }
 

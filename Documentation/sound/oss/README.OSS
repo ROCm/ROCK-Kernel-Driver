@@ -542,7 +542,7 @@ Yamaha OPL3-SA1
 
 	SoftOSS keeps the samples loaded on the system's RAM so much RAM is
 	required. SoftOSS should never be used on machines with less than 16 MB
-	of RAM since this is potentially dangerous (you may accidently run out
+	of RAM since this is potentially dangerous (you may accidentally run out
 	of memory which probably crashes the machine). 
 
 	SoftOSS implements the wave table API originally designed for GUS. For

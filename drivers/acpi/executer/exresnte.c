@@ -44,7 +44,7 @@
  * FUNCTION:    Acpi_ex_resolve_node_to_value
  *
  * PARAMETERS:  Object_ptr      - Pointer to a location that contains
- *                                a pointer to a NS node, and will recieve a
+ *                                a pointer to a NS node, and will receive a
  *                                pointer to the resolved object.
  *              Walk_state      - Current state.  Valid only if executing AML
  *                                code.  NULL if simply resolving an object

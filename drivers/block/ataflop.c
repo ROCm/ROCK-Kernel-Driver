@@ -1574,7 +1574,7 @@ static int fd_ioctl(struct inode *inode, struct file *filp,
 		case BLKROSET:
 		case BLKROGET:
 		case BLKFLSBUF:
-			return blk_ioctl(device, cmd, param);
+			return blk_ioctl(inode->i_bdev, cmd, param);
 	}
 	drive = minor (device);
 	type  = drive >> 2;

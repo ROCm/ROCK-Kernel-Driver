@@ -2584,7 +2584,7 @@ reswitch:
 
 		/*
 		 * Read the latched byte, but turn off SPIOEN first
-		 * so that we don't inadvertantly cause a REQ for the
+		 * so that we don't inadvertently cause a REQ for the
 		 * next byte.
 		 */
 		ahc_outb(ahc, SXFRCTL0, ahc_inb(ahc, SXFRCTL0) & ~SPIOEN);

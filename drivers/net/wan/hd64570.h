@@ -152,7 +152,7 @@ typedef struct {
 	u32 bp;			/* Buffer Pointer (24 bits) */
 	u16 len;		/* Data Length */
 	u8 stat;		/* Status */
-	u8 unused2;
+	u8 unused;		/* pads to 2-byte boundary */
 }__attribute__ ((packed)) pkt_desc;
 
 
@@ -202,7 +202,11 @@ typedef struct {
 #define MD0_CRC_ITU_0 0x06
 #define MD0_CRC_ITU   0x07
 
-#define MD2_NRZI      0x20	/* NRZI mode */
+#define MD2_NRZ	      0x00
+#define MD2_NRZI      0x20
+#define MD2_MANCHESTER 0x80
+#define MD2_FM_MARK   0xA0
+#define MD2_FM_SPACE  0xC0
 #define MD2_LOOPBACK  0x03      /* Local data Loopback */
 
 #define CTL_NORTS     0x01

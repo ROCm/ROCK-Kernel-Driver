@@ -212,7 +212,7 @@ int __init snd_minor_info_oss_init(void)
 {
 	snd_info_entry_t *entry;
 
-	entry = snd_info_create_module_entry(THIS_MODULE, "oss-devices", NULL);
+	entry = snd_info_create_module_entry(THIS_MODULE, "devices", snd_oss_root);
 	if (entry) {
 		entry->content = SNDRV_INFO_CONTENT_TEXT;
 		entry->c.text.read_size = PAGE_SIZE;

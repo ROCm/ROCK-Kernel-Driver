@@ -224,12 +224,12 @@ static const u8 rh_config_descriptor [] = {
  * helper routine for returning string descriptors in UTF-16LE
  * input can actually be ISO-8859-1; ASCII is its 7-bit subset
  */
-static int ascii2utf (char *ascii, u8 *utf, int utfmax)
+static int ascii2utf (char *s, u8 *utf, int utfmax)
 {
 	int retval;
 
-	for (retval = 0; *ascii && utfmax > 1; utfmax -= 2, retval += 2) {
-		*utf++ = *ascii++ & 0x7f;
+	for (retval = 0; *s && utfmax > 1; utfmax -= 2, retval += 2) {
+		*utf++ = *s++;
 		*utf++ = 0;
 	}
 	return retval;
@@ -248,8 +248,7 @@ static int ascii2utf (char *ascii, u8 *utf, int utfmax)
  */
 static int rh_string (
 	int		id,
-	struct pci_dev	*pci_desc,
-	char		*type,
+	struct usb_hcd	*hcd,
 	u8		*data,
 	int		len
 ) {
@@ -263,15 +262,16 @@ static int rh_string (
 
 	// serial number
 	} else if (id == 1) {
-		strcpy (buf, pci_desc->slot_name);
+		strcpy (buf, hcd->bus_name);
 
 	// product description
 	} else if (id == 2) {
-                strcpy (buf, pci_desc->name);
+                strcpy (buf, hcd->product_desc);
 
  	// id 3 == vendor description
 	} else if (id == 3) {
-                sprintf (buf, "%s %s %s", UTS_SYSNAME, UTS_RELEASE, type);
+                sprintf (buf, "%s %s %s", UTS_SYSNAME, UTS_RELEASE,
+			hcd->description);
 
 	// unsupported IDs --> "protocol stall"
 	} else
@@ -338,9 +338,7 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 			break;
 		case USB_DT_STRING << 8:
 			urb->actual_length = rh_string (
-				wValue & 0xff,
-				 hcd->pdev,
-				(char *) hcd->description,
+				wValue & 0xff, hcd,
 				ubuf, wLength);
 			break;
 		default:
@@ -1004,6 +1002,7 @@ clean_2:
 	hcd->self.hcpriv = (void *) hcd;
 	hcd->bus = &hcd->self;
 	hcd->bus_name = dev->slot_name;
+	hcd->product_desc = dev->name;
 
 	INIT_LIST_HEAD (&hcd->dev_list);
 
@@ -1266,7 +1265,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	struct usb_hcd		*hcd;
 	struct hcd_dev		*dev;
 	unsigned long		flags;
-	int			pipe;
+	int			pipe, temp;
 
 	if (!urb || urb->hcpriv || !urb->complete)
 		return -EINVAL;
@@ -1286,6 +1285,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	if (hcd->state == USB_STATE_QUIESCING || !HCD_IS_RUNNING (hcd->state))
 		return -ESHUTDOWN;
 	pipe = urb->pipe;
+	temp = usb_pipetype (urb->pipe);
 	if (usb_endpoint_halted (urb->dev, usb_pipeendpoint (pipe),
 			usb_pipeout (pipe)))
 		return -EPIPE;
@@ -1298,7 +1298,7 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 	/* enforce simple/standard policy */
 	allowed = USB_ASYNC_UNLINK;	// affects later unlinks
 	allowed |= USB_NO_FSBR;		// only affects UHCI
-	switch (usb_pipetype (pipe)) {
+	switch (temp) {
 	case PIPE_CONTROL:
 		allowed |= USB_DISABLE_SPD;
 		break;
@@ -1317,15 +1317,55 @@ static int hcd_submit_urb (struct urb *urb, int mem_flags)
 
 	/* warn if submitter gave bogus flags */
 	if (urb->transfer_flags != orig_flags)
-		warn ("BOGUS urb flags, %x --> %x",
+		err ("BOGUS urb flags, %x --> %x",
 			orig_flags, urb->transfer_flags);
 	}
 #endif
 	/*
-	 * FIXME:  alloc periodic bandwidth here, for interrupt and iso?
-	 * Need to look at the ring submit mechanism for iso tds ... they
-	 * aren't actually "periodic" in 2.4 kernels.
+	 * Force periodic transfer intervals to be legal values that are
+	 * a power of two (so HCDs don't need to).
 	 *
+	 * FIXME want bus->{intr,iso}_sched_horizon values here.  Each HC
+	 * supports different values... this uses EHCI/UHCI defaults (and
+	 * EHCI can use smaller non-default values).
+	 */
+	switch (temp) {
+	case PIPE_ISOCHRONOUS:
+	case PIPE_INTERRUPT:
+		/* too small? */
+		if (urb->interval <= 0)
+			return -EINVAL;
+		/* too big? */
+		switch (urb->dev->speed) {
+		case USB_SPEED_HIGH:	/* units are microframes */
+			// NOTE usb handles 2^15
+			if (urb->interval > (1024 * 8))
+				urb->interval = 1024 * 8;
+			temp = 1024 * 8;
+			break;
+		case USB_SPEED_FULL:	/* units are frames/msec */
+		case USB_SPEED_LOW:
+			if (temp == PIPE_INTERRUPT) {
+				if (urb->interval > 255)
+					return -EINVAL;
+				// NOTE ohci only handles up to 32
+				temp = 128;
+			} else {
+				if (urb->interval > 1024)
+					urb->interval = 1024;
+				// NOTE usb and ohci handle up to 2^15
+				temp = 1024;
+			}
+		default:
+			return -EINVAL;
+		}
+		/* power of two? */
+		while (temp > urb->interval)
+			temp >>= 1;
+		urb->interval = temp;
+	}
+
+	/*
 	 * FIXME:  make urb timeouts be generic, keeping the HCD cores
 	 * as simple as possible.
 	 */
@@ -1589,6 +1629,9 @@ static void hcd_irq (int irq, void *__hcd, struct pt_regs * r)
 	struct usb_hcd		*hcd = __hcd;
 	int			start = hcd->state;
 
+	if (unlikely (hcd->state == USB_STATE_HALT))	/* irq sharing? */
+		return;
+
 	hcd->driver->irq (hcd);
 	if (hcd->state != start && hcd->state == USB_STATE_HALT)
 		hc_died (hcd);
@@ -1642,7 +1685,8 @@ void usb_hcd_giveback_urb (struct usb_hcd *hcd, struct urb *urb)
 	// hcd_monitor_hook(MONITOR_URB_UPDATE, urb, dev)
 
 	if (urb->status)
-		dbg ("giveback urb %p status %d", urb, urb->status);
+		dbg ("giveback urb %p status %d len %d",
+			urb, urb->status, urb->actual_length);
 
 	/* if no error, make sure urb->next progresses */
 	else if (urb->next) {

@@ -187,7 +187,7 @@ init_cache:
 	ctl.filled = 0;
 	ctl.valid  = 1;
 read_really:
-	result = smb_proc_readdir(filp, dirent, filldir, &ctl);
+	result = server->ops->readdir(filp, dirent, filldir, &ctl);
 	if (ctl.idx == -1)
 		goto invalid_cache;	/* retry */
 	ctl.head.end = ctl.fpos - 1;

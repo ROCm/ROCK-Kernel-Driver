@@ -59,7 +59,9 @@ char netroot_string[] = "root=/dev/nfs rw ip=auto";
 /* Serial port to use. */
 unsigned long com_port;
 
-bd_t hold_resid_buf;
+/* We need to make sure that this is before the images to ensure
+ * that it's in a mapped location. - Tom */
+bd_t hold_resid_buf __attribute__ ((__section__ (".data.boot")));
 bd_t *hold_residual = &hold_resid_buf;
 
 extern unsigned long serial_init(int chan, bd_t *bp);

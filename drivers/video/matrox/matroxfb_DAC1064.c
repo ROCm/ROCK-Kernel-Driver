@@ -473,9 +473,12 @@ static void DAC1064_restore_2(WPMINFO struct display* p) {
 
 static int m1064_compute(void* outdev, struct my_timming* m) {
 #define minfo ((struct matrox_fb_info*)outdev)
+#ifdef CONFIG_FB_MATROX_G450
 	if (ACCESS_FBINFO(devflags.g450dac)) {
 		matroxfb_g450_setclk(PMINFO m->pixclock, M_PIXEL_PLL_C);
-	} else {
+	} else 
+#endif
+	{
 		int i;
 		int tmout;
 		CRITFLAGS

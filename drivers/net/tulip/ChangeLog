@@ -1,3 +1,10 @@
+2002-03-07  Jeff Garzik  <jgarzik@mandrakesoft.com>
+
+	* tulip_core (tulip_mwi_config): Use new PCI API functions
+	for enabling and disabled Memory-Write-Invalidate
+	PCI transaction.
+	Fix bugs in tulip MWI config also.
+
 2002-01-28  Stefan Rompf  <srompf@isg.de>,
             Jeff Garzik  <jgarzik@mandrakesoft.com>
 

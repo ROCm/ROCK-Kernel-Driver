@@ -20,11 +20,6 @@ if [ "$CONFIG_NET_PCMCIA" = "y" ]; then
       dep_tristate '  IBM PCMCIA tokenring adapter support' CONFIG_PCMCIA_IBMTR $CONFIG_TR $CONFIG_PCMCIA
    fi
 
-   if [ "$CONFIG_CARDBUS" = "y" ]; then
-      tristate '  Xircom CardBus support (new driver)' CONFIG_PCMCIA_XIRCOM
-      tristate '  Xircom Tulip-like CardBus support (old driver)' CONFIG_PCMCIA_XIRTULIP
-   fi
-
    bool '  Pcmcia Wireless LAN' CONFIG_NET_PCMCIA_RADIO
    if [ "$CONFIG_NET_PCMCIA_RADIO" = "y" ]; then
       dep_tristate '    Aviator/Raytheon 2.4MHz wireless support' CONFIG_PCMCIA_RAYCS $CONFIG_PCMCIA

@@ -1,10 +1,6 @@
 /*
- *  linux/drivers/ide/opti621.c		Version 0.6	Jan 02, 1999
- *
  *  Copyright (C) 1996-1998  Linus Torvalds & authors (see below)
- */
-
-/*
+ *
  * Authors:
  * Jaromir Koutek <miri@punknet.cz>,
  * Jan Harkes <jaharkes@cwi.nl>,
@@ -62,9 +58,9 @@
  * by hdparm.
  *
  * Version 0.1, Nov 8, 1996
- * by Jaromir Koutek, for 2.1.8. 
+ * by Jaromir Koutek, for 2.1.8.
  * Initial version of driver.
- * 
+ *
  * Version 0.2
  * Number 0.2 skipped.
  *
@@ -80,14 +76,13 @@
  * by Jaromir Koutek
  * Updates for use with (again) new IDE block driver.
  * Update of documentation.
- * 
+ *
  * Version 0.6, Jan 2, 1999
  * by Jaromir Koutek
  * Reversed to version 0.3 of the driver, because
  * 0.5 doesn't work.
  */
 
-#undef REALLY_SLOW_IO	/* most systems can safely undef this */
 #define OPTI621_DEBUG		/* define for debug messages */
 
 #include <linux/types.h>

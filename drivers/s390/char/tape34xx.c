@@ -2152,7 +2152,7 @@ tape34xx_error_recovery (tape_info_t* ti)
       	    tape34xx_error_recovery_HWBUG(ti,21);
 	    return;
 	case 0x3490:
-	    // Resetting event recieved. Since the driver does not support resetting event recovery
+	    // Resetting event received. Since the driver does not support resetting event recovery
 	    // (which has to be handled by the I/O Layer), we'll report and retry our command.
 	    tape34xx_error_recovery_do_retry(ti);
 	    return;
@@ -2219,7 +2219,7 @@ tape34xx_error_recovery (tape_info_t* ti)
 	    return;
 	case 0x3490:
 	    // Global status intercept. We have to reissue the command.
-	    PRINT_WARN("An global status intercept was recieved, which will be recovered.\n");
+	    PRINT_WARN("An global status intercept was received, which will be recovered.\n");
 	    tape34xx_error_recovery_do_retry(ti);
 	    return;
 	}

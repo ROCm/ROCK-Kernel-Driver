@@ -271,7 +271,8 @@ int __init psaux_init(void)
 	iomd_writeb(0, IOMD_MSECTL);
 	iomd_writeb(8, IOMD_MSECTL);
   
-	misc_register(&psaux_mouse);
+	if (misc_register(&psaux_mouse))
+		return -ENODEV;
 	queue = (struct aux_queue *) kmalloc(sizeof(*queue), GFP_KERNEL);
 	memset(queue, 0, sizeof(*queue));
 	queue->head = queue->tail = 0;

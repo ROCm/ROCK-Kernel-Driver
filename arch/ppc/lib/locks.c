@@ -28,7 +28,7 @@
  * since they may inhibit forward progress by other CPUs in getting
  * a lock.
  */
-static unsigned long __spin_trylock(volatile unsigned long *lock)
+unsigned long __spin_trylock(volatile unsigned long *lock)
 {
 	unsigned long ret;
 

@@ -5398,7 +5398,7 @@ static int DAC960_IOCTL(Inode_T *Inode, File_T *File,
     case BLKFLSBUF:
     case BLKBSZGET:
     case BLKBSZSET:
-      return blk_ioctl(Inode->i_rdev, Request, Argument);
+      return blk_ioctl(Inode->i_bdev, Request, Argument);
 
     case BLKRRPART:
       /* Re-Read Partition Table. */

@@ -1,7 +1,7 @@
 /*
  * JFFS2 -- Journalling Flash File System, Version 2.
  *
- * Copyright (C) 2001 Red Hat, Inc.
+ * Copyright (C) 2001, 2002 Red Hat, Inc.
  *
  * Created by David Woodhouse <dwmw2@cambridge.redhat.com>
  *
@@ -31,35 +31,21 @@
  * provisions above, a recipient may use your version of this file
  * under either the RHEPL or the GPL.
  *
- * $Id: compr_zlib.c,v 1.8 2001/09/20 15:28:31 dwmw2 Exp $
+ * $Id: compr_zlib.c,v 1.15 2002/03/04 09:35:48 dwmw2 Exp $
  *
  */
 
-#ifdef __KERNEL__
-#include <linux/zlib.h>
-#else
-#include "zlib.h"
+#ifndef __KERNEL__
+#error "The userspace support got too messy and was removed. Update your mkfs.jffs2"
 #endif
 
-#ifdef __KERNEL__
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/mtd/compatmac.h> /* for min() */
 #include <linux/slab.h>
 #include <linux/jffs2.h>
+#include <linux/zlib.h>
 #include "nodelist.h"
-
-#else
-#define min(x,y) ((x)<(y)?(x):(y))
-#ifndef D1
-#define D1(x)
-#endif
-#define KERN_DEBUG
-#define KERN_NOTICE
-#define KERN_WARNING
-#define printk printf
-#include <stdio.h>
-#include <asm/types.h>
-#endif
 
 	/* Plan: call deflate() with avail_in == *sourcelen, 
 		avail_out = *dstlen - 12 and flush == Z_FINISH. 
@@ -70,8 +56,37 @@
 	*/
 #define STREAM_END_SPACE 12
 
+static DECLARE_MUTEX(deflate_sem);
+static DECLARE_MUTEX(inflate_sem);
+static void *deflate_workspace;
+static void *inflate_workspace;
+
+int __init jffs2_zlib_init(void)
+{
+	deflate_workspace = vmalloc(zlib_deflate_workspacesize());
+	if (!deflate_workspace) {
+		printk("Failed to allocate %d bytes for deflate workspace\n", zlib_deflate_workspacesize());
+		return -ENOMEM;
+	}
+	D1(printk("Allocated %d bytes for deflate workspace\n", zlib_deflate_workspacesize()));
+	inflate_workspace = vmalloc(zlib_inflate_workspacesize());
+	if (!inflate_workspace) {
+		printk("Failed to allocate %d bytes for inflate workspace\n", zlib_inflate_workspacesize());
+		vfree(deflate_workspace);
+		return -ENOMEM;
+	}
+	D1(printk("Allocated %d bytes for inflate workspace\n", zlib_inflate_workspacesize()));
+	return 0;
+}
+
+void __exit jffs2_zlib_exit(void)
+{
+	vfree(deflate_workspace);
+	vfree(inflate_workspace);
+}
+
 int zlib_compress(unsigned char *data_in, unsigned char *cpage_out, 
-		   __u32 *sourcelen, __u32 *dstlen)
+		   uint32_t *sourcelen, uint32_t *dstlen)
 {
 	z_stream strm;
 	int ret;
@@ -79,22 +94,15 @@ int zlib_compress(unsigned char *data_in, unsigned char *cpage_out,
 	if (*dstlen <= STREAM_END_SPACE)
 		return -1;
 
-#ifdef __KERNEL__
-	strm.workspace = kmalloc(zlib_deflate_workspacesize(),
-				 GFP_KERNEL);
-	if (strm.workspace == NULL) {
-		printk(KERN_WARNING "deflateInit alloc of workspace failed\n");
-		return -1;
-	}
-#else
-	strm.zalloc = (void *)0;
-	strm.zfree = (void *)0;
-#endif
+	down(&deflate_sem);
+	strm.workspace = deflate_workspace;
 
 	if (Z_OK != zlib_deflateInit(&strm, 3)) {
 		printk(KERN_WARNING "deflateInit failed\n");
+		up(&deflate_sem);
 		return -1;
 	}
+
 	strm.next_in = data_in;
 	strm.total_in = 0;
 	
@@ -111,56 +119,44 @@ int zlib_compress(unsigned char *data_in, unsigned char *cpage_out,
 			  strm.avail_in, strm.avail_out, strm.total_in, strm.total_out));
 		if (ret != Z_OK) {
 			D1(printk(KERN_DEBUG "deflate in loop returned %d\n", ret));
-			goto out_err;
+			zlib_deflateEnd(&strm);
+			up(&deflate_sem);
+			return -1;
 		}
 	}
 	strm.avail_out += STREAM_END_SPACE;
 	strm.avail_in = 0;
 	ret = zlib_deflate(&strm, Z_FINISH);
+	zlib_deflateEnd(&strm);
+	up(&deflate_sem);
 	if (ret != Z_STREAM_END) {
 		D1(printk(KERN_DEBUG "final deflate returned %d\n", ret));
-		goto out_err;
-
+		return -1;
 	}
-	zlib_deflateEnd(&strm);
-	kfree(strm.workspace);
 
-	D1(printk(KERN_DEBUG "zlib compressed %ld bytes into %ld\n", strm.total_in, strm.total_out));
+	D1(printk(KERN_DEBUG "zlib compressed %ld bytes into %ld\n",
+		  strm.total_in, strm.total_out));
 
 	if (strm.total_out >= strm.total_in)
 		return -1;
 
-
 	*dstlen = strm.total_out;
 	*sourcelen = strm.total_in;
 	return 0;
-
- out_err:
-	zlib_deflateEnd(&strm);
-	kfree(strm.workspace);
-	return -1;
 }
 
 void zlib_decompress(unsigned char *data_in, unsigned char *cpage_out,
-		      __u32 srclen, __u32 destlen)
+		      uint32_t srclen, uint32_t destlen)
 {
 	z_stream strm;
 	int ret;
 
-#ifdef __KERNEL__
-	strm.workspace = kmalloc(zlib_inflate_workspacesize(),
-				 GFP_KERNEL);
-	if (strm.workspace == NULL) {
-		printk(KERN_WARNING "inflateInit alloc of workspace failed\n");
-		return;
-	}
-#else
-	strm.zalloc = (void *)0;
-	strm.zfree = (void *)0;
-#endif
+	down(&inflate_sem);
+	strm.workspace = inflate_workspace;
 
 	if (Z_OK != zlib_inflateInit(&strm)) {
 		printk(KERN_WARNING "inflateInit failed\n");
+		up(&inflate_sem);
 		return;
 	}
 	strm.next_in = data_in;
@@ -177,5 +173,5 @@ void zlib_decompress(unsigned char *data_in, unsigned char *cpage_out,
 		printk(KERN_NOTICE "inflate returned %d\n", ret);
 	}
 	zlib_inflateEnd(&strm);
-	kfree(strm.workspace);
+	up(&inflate_sem);
 }

@@ -24,14 +24,12 @@ void coda_upcall_stats(int opcode, unsigned long jiffies);
  *
  *	/proc/fs/coda/vfs_stats
  *		      upcall_stats
- *		      permission_stats
  *		      cache_inv_stats
  *
  * these four files are presented to reset the statistics to 0:
  *
  *	/proc/sys/coda/vfs_stats
  *		       upcall_stats
- *		       permission_stats
  *		       cache_inv_stats
  */
 
@@ -70,15 +68,6 @@ struct coda_upcall_stats_entry
   unsigned long time_squared_sum;
 };
 
-
-
-/* cache hits for permissions statistics */
-struct coda_permission_stats 
-{
-	int count;
-	int hit_count;
-};
-
 /* cache invalidation statistics */
 struct coda_cache_inv_stats
 {
@@ -93,14 +82,12 @@ struct coda_cache_inv_stats
 
 /* these global variables hold the actual statistics data */
 extern struct coda_vfs_stats		coda_vfs_stat;
-extern struct coda_permission_stats	coda_permission_stat;
 extern struct coda_cache_inv_stats	coda_cache_inv_stat;
 extern int				coda_upcall_timestamping;
 
 /* reset statistics to 0 */
 void reset_coda_vfs_stats( void );
 void reset_coda_upcall_stats( void );
-void reset_coda_permission_stats( void );
 void reset_coda_cache_inv_stats( void );
 
 /* some utitlities to make it easier for you to do statistics for time */
@@ -121,9 +108,6 @@ int do_reset_coda_vfs_stats( ctl_table * table, int write, struct file * filp,
 int do_reset_coda_upcall_stats( ctl_table * table, int write, 
 				struct file * filp, void * buffer, 
 				size_t * lenp );
-int do_reset_coda_permission_stats( ctl_table * table, int write, 
-				    struct file * filp, void * buffer, 
-				    size_t * lenp );
 int do_reset_coda_cache_inv_stats( ctl_table * table, int write, 
 				   struct file * filp, void * buffer, 
 				   size_t * lenp );
@@ -133,8 +117,6 @@ int coda_vfs_stats_get_info( char * buffer, char ** start, off_t offset,
 			     int length);
 int coda_upcall_stats_get_info( char * buffer, char ** start, off_t offset,
 				int length);
-int coda_permission_stats_get_info( char * buffer, char ** start, off_t offset,
-				    int length);
 int coda_cache_inv_stats_get_info( char * buffer, char ** start, off_t offset,
 				   int length);
 

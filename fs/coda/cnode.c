@@ -11,9 +11,6 @@
 #include <linux/coda_fs_i.h>
 #include <linux/coda_psdev.h>
 
-extern int coda_debug;
-extern int coda_print_entry;
-
 inline int coda_fideq(ViceFid *fid1, ViceFid *fid2)
 {
 	if (fid1->Vnode != fid2->Vnode)   return 0;
@@ -42,11 +39,6 @@ static struct inode_operations coda_symlink_inode_operations = {
 /* cnode.c */
 static void coda_fill_inode(struct inode *inode, struct coda_vattr *attr)
 {
-        CDEBUG(D_SUPER, "ino: %ld\n", inode->i_ino);
-
-        if (coda_debug & D_SUPER ) 
-		print_vattr(attr);
-
         coda_vattr_to_iattr(inode, attr);
 
         if (S_ISREG(inode->i_mode)) {
@@ -72,10 +64,8 @@ struct inode * coda_iget(struct super_block * sb, ViceFid * fid,
 
 	inode = iget4(sb, ino, coda_inocmp, fid);
 
-	if ( !inode ) { 
-		CDEBUG(D_CNODE, "coda_iget: no inode\n");
+	if (!inode)
 		return ERR_PTR(-ENOMEM);
-	}
 
 	/* check if the inode is already initialized */
 	cii = ITOC(inode);
@@ -105,9 +95,6 @@ int coda_cnode_make(struct inode **inode, ViceFid *fid, struct super_block *sb)
 	/* We get inode numbers from Venus -- see venus source */
 	error = venus_getattr(sb, fid, &attr);
 	if ( error ) {
-	    CDEBUG(D_CNODE, 
-		   "coda_cnode_make: coda_getvattr returned %d for %s.\n", 
-		   error, coda_f2s(fid));
 	    *inode = NULL;
 	    return error;
 	} 
@@ -117,10 +104,6 @@ int coda_cnode_make(struct inode **inode, ViceFid *fid, struct super_block *sb)
 		printk("coda_cnode_make: coda_iget failed\n");
                 return PTR_ERR(*inode);
         }
-
-	CDEBUG(D_DOWNCALL, "Done making inode: ino %ld, count %d with %s\n",
-		(*inode)->i_ino, atomic_read(&(*inode)->i_count), 
-		coda_f2s(&ITOC(*inode)->c_fid));
 	return 0;
 }
 
@@ -155,8 +138,6 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 		return NULL;
 	}
 
-	CDEBUG(D_INODE, "%s\n", coda_f2s(fid));
-
 	nr = coda_f2i(fid);
 	inode = iget4(sb, nr, coda_inocmp, fid);
 	if ( !inode ) {
@@ -177,7 +158,6 @@ struct inode *coda_fid_to_inode(ViceFid *fid, struct super_block *sb)
 	/* we shouldn't see inode collisions anymore */
 	if ( !coda_fideq(fid, &cii->c_fid) ) BUG();
 
-        CDEBUG(D_INODE, "found %ld\n", inode->i_ino);
         return inode;
 }
 

@@ -102,8 +102,6 @@
  * A newly forked process directly context switches into this.
  */ 	
 ENTRY(ret_from_fork)
-	movq %rbx, %rdi
-	call schedule_tail
 	GET_THREAD_INFO(%rcx)
 	bt $TIF_SYSCALL_TRACE,threadinfo_flags(%rcx)
 	jc rff_trace

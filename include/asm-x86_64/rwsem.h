@@ -157,9 +157,9 @@ LOCK_PREFIX	"  xadd      %%edx,(%%rax)\n\t" /* subtracts 1, returns the old valu
 		"  jmp       1b\n"
 		".previous\n"
 		"# ending __up_read\n"
-		: "+m"(sem->count), "+d"(tmp)
+		: "+d"(tmp)
 		: "a"(sem)
-		: "memory", "cc");
+		: "memory");
 }
 
 /*
@@ -169,7 +169,7 @@ static inline void __up_write(struct rw_semaphore *sem)
 {
 	__asm__ __volatile__(
 		"# beginning __up_write\n\t"
-		"  movl      %2,%%edx\n\t"
+		"  movl      %1,%%edx\n\t"
 LOCK_PREFIX	"  xaddl     %%edx,(%%rax)\n\t" /* tries to transition 0xffff0001 -> 0x00000000 */
 		"  jnz       2f\n\t" /* jump if the lock is being waited upon */
 		"1:\n\t"
@@ -181,7 +181,7 @@ LOCK_PREFIX	"  xaddl     %%edx,(%%rax)\n\t" /* tries to transition 0xffff0001 ->
 		"  jmp       1b\n"
 		".previous\n"
 		"# ending __up_write\n"
-		: "+m"(sem->count)
+		: 
 		: "a"(sem), "i"(-RWSEM_ACTIVE_WRITE_BIAS)
 		: "memory", "cc", "edx");
 }

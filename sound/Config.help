@@ -1,0 +1,7 @@
+CONFIG_SOUND_PRIME
+  Say 'Y' or 'M' to enable Open Sound System drivers.
+
+CONFIG_SOUND_SND
+  Say 'Y' or 'M' to enable Advanced Linux Sound Architecture (ALSA) drivers.
+  You need to install also alsa-lib and alsa-utils packages available on
+  the ALSA website at <http://www.alsa-project.org>.

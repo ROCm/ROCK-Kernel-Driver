@@ -581,13 +581,6 @@ CONFIG_IDE_CHIPSETS
 
   People with SCSI-only systems can say N here.
 
-CONFIG_BLK_DEV_4DRIVES
-  Certain older chipsets, including the Tekram 690CD, use a single set
-  of I/O ports at 0x1f0 to control up to four drives, instead of the
-  customary two drives per port. Support for this can be enabled at
-  runtime using the "ide0=four" kernel boot parameter if you say Y
-  here.
-
 CONFIG_BLK_DEV_ALI14XX
   This driver is enabled at runtime using the "ide0=ali14xx" kernel
   boot parameter.  It enables support for the secondary IDE interface
@@ -806,19 +799,6 @@ CONFIG_IDEDISK_STROKE
   <http://www.storage.ibm.com/hdd/support/download.htm>.
 
   If you are unsure, say N here.
-
-CONFIG_IDE_TASK_IOCTL
-  This is a direct raw access to the media.  It is a complex but
-  elegant solution to test and validate the domain of the hardware and
-  perform below the driver data recovery if needed.  This is the most
-  basic form of media-forensics.
-
-  If you are unsure, say N here.
-
-CONFIG_BLK_DEV_IDEDMA_FORCED
-  This is an old piece of lost code from Linux 2.0 Kernels.
-
-  Generally say N here.
 
 CONFIG_IDEDMA_ONLYDISK
   This is used if you know your ATAPI Devices are going to fail DMA

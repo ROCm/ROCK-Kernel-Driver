@@ -110,7 +110,7 @@
  *         passes the packet to the driver. Before each send(), a poll
  *         routine checks the sock resources The maximum value of
  *         packet sent counter is 1, thus if one packet is queued, the
- *         application will block untill that packet is passed to the
+ *         application will block until that packet is passed to the
  *         driver.
  *
  *   RECEIVE:
@@ -121,7 +121,7 @@
  *      return code, the driver knows whether the packet was
  *      sucessfully queued.  If the socket queue is full, 
  *      protocol flow control is used by the driver, if any, 
- *      to slow down the traffic untill the sock queue is free.
+ *      to slow down the traffic until the sock queue is free.
  *
  *      Every time a packet arrives into a socket queue the 
  *      socket wakes up processes which are waiting to receive
@@ -2396,7 +2396,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 
 
 			/* Check if data buffers are pending for transmission,
-                         * if so, check wheter user wants to wait untill data
+                         * if so, check whether user wants to wait until data
                          * is transmitted, or clear a call and drop packets */
                           
 			if (atomic_read(&sk->wmem_alloc) || check_driver_busy(sk)){
@@ -2432,7 +2432,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 
 
 			/* Check if data buffers are pending for transmission,
-                         * if so, check wheter user wants to wait untill data
+                         * if so, check whether user wants to wait until data
                          * is transmitted, or reset a call and drop packets */
                           
 			if (atomic_read(&sk->wmem_alloc) || check_driver_busy(sk)){

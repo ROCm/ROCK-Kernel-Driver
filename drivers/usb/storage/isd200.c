@@ -821,7 +821,7 @@ int isd200_read_regs( struct us_data *us )
  * Invoke the transport and basic error-handling/recovery methods
  *
  * This is used by the protocol layers to actually send the message to
- * the device and recieve the response.
+ * the device and receive the response.
  */
 void isd200_invoke_transport( struct us_data *us, 
 			      Scsi_Cmnd *srb, 

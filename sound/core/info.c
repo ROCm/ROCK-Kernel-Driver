@@ -24,12 +24,12 @@
 #include <linux/init.h>
 #include <linux/vmalloc.h>
 #include <linux/time.h>
+#include <linux/smp_lock.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/info.h>
 #include <sound/version.h>
 #include <linux/proc_fs.h>
-#include <linux/smp_lock.h>
 #ifdef CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
 #endif
@@ -55,7 +55,7 @@ int snd_info_check_reserved_words(const char *str)
 		"memdebug",
 		"detect",
 		"devices",
-		"oss-devices",
+		"oss",
 		"cards",
 		"timers",
 		"synth",
@@ -124,6 +124,9 @@ int snd_iprintf(snd_info_buffer_t * buffer, char *fmt,...)
 struct proc_dir_entry *snd_proc_root = NULL;
 struct proc_dir_entry *snd_proc_dev = NULL;
 snd_info_entry_t *snd_seq_root = NULL;
+#ifdef CONFIG_SND_OSSEMUL
+snd_info_entry_t *snd_oss_root = NULL;
+#endif
 
 #ifdef LINUX_2_2
 static void snd_info_fill_inode(struct inode *inode, int fill)
@@ -163,11 +166,13 @@ static loff_t snd_info_entry_llseek(struct file *file, loff_t offset, int orig)
 {
 	snd_info_private_data_t *data;
 	struct snd_info_entry *entry;
-	int ret = -EINVAL;
+	loff_t ret;
 
 	data = snd_magic_cast(snd_info_private_data_t, file->private_data, return -ENXIO);
 	entry = data->entry;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 3)
 	lock_kernel();
+#endif
 	switch (entry->content) {
 	case SNDRV_INFO_CONTENT_TEXT:
 		switch (orig) {
@@ -181,6 +186,7 @@ static loff_t snd_info_entry_llseek(struct file *file, loff_t offset, int orig)
 			goto out;
 		case 2:	/* SEEK_END */
 		default:
+			ret = -EINVAL;
 			goto out;
 		}
 		break;
@@ -195,7 +201,9 @@ static loff_t snd_info_entry_llseek(struct file *file, loff_t offset, int orig)
 	}
 	ret = -ENXIO;
 out:
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 5, 3)
 	unlock_kernel();
+#endif
 	return ret;
 }
 
@@ -623,6 +631,19 @@ int __init snd_info_init(void)
 	if (p == NULL)
 		return -ENOMEM;
 	snd_proc_dev = p;
+#ifdef CONFIG_SND_OSSEMUL
+	{
+		snd_info_entry_t *entry;
+		if ((entry = snd_info_create_module_entry(THIS_MODULE, "oss", NULL)) == NULL)
+			return -ENOMEM;
+		entry->mode = S_IFDIR | S_IRUGO | S_IXUGO;
+		if (snd_info_register(entry) < 0) {
+			snd_info_free_entry(entry);
+			return -ENOMEM;
+		}
+		snd_oss_root = entry;
+	}
+#endif
 #if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
 	{
 		snd_info_entry_t *entry;
@@ -663,6 +684,10 @@ int __exit snd_info_done(void)
 #if defined(CONFIG_SND_SEQUENCER) || defined(CONFIG_SND_SEQUENCER_MODULE)
 		if (snd_seq_root)
 			snd_info_unregister(snd_seq_root);
+#endif
+#ifdef CONFIG_SND_OSSEMUL
+		if (snd_oss_root)
+			snd_info_unregister(snd_oss_root);
 #endif
 		snd_remove_proc_entry(snd_proc_root, snd_proc_dev);
 		snd_remove_proc_entry(&proc_root, snd_proc_root);

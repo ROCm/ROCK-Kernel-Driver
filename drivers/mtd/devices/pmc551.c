@@ -715,7 +715,7 @@ int __init init_pmc551(void)
                 }
 
 		/*
-		 * This is needed untill the driver is capable of reading the
+		 * This is needed until the driver is capable of reading the
 		 * onboard I2C SROM to discover the "real" memory size.
 		 */
 		if(msize) {

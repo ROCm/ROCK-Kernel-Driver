@@ -495,7 +495,7 @@ alpha_switch_to:
 	ret	$31,($26),1
 .end alpha_switch_to
 
-#ifdef CONFIG_SMP
+#if CONFIG_SMP || CONFIG_PREEMPT
 .globl  ret_from_fork
 .align 3
 .ent ret_from_fork

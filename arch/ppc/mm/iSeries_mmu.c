@@ -175,12 +175,13 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long address,
 	pte_t *ptep;
 	static int nopreload;
 
-	if (nopreload)
+	if (nopreload || address >= TASK_SIZE)
 		return;
-	mm = (address < TASK_SIZE)? vma->vm_mm: &init_mm;
+	mm = vma->vm_mm;
 	pmd = pmd_offset(pgd_offset(mm, address), address);
 	if (!pmd_none(*pmd)) {
-		ptep = pte_offset(pmd, address);
+		ptep = pte_offset_map(pmd, address);
 		add_hash_page(mm->context, address, ptep);
+		pte_unmap(ptep);
 	}
 }

@@ -113,7 +113,7 @@ int __init spia_init (void)
 	this->ALE = 0x02;
 	this->NCE = 0x04;
 
-	/* Scan to find existance of the device */
+	/* Scan to find existence of the device */
 	if (nand_scan (spia_mtd)) {
 		kfree (spia_mtd);
 		return -ENXIO;

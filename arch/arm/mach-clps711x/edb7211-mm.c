@@ -56,12 +56,12 @@ static struct map_desc edb7211_io_desc[] __initdata = {
  /* virtual, physical, length, domain, r, w, c, b */
 
  /* memory-mapped extra keyboard row and CS8900A Ethernet chip */
- { EP7211_VIRT_EXTKBD, EP7211_PHYS_EXTKBD, MB1, DOMAIN_IO, 1, 1, 0, 0 }, 
- { EP7211_VIRT_CS8900A, EP7211_PHYS_CS8900A, MB1, DOMAIN_IO, 1, 1, 0, 0 },
+ { EP7211_VIRT_EXTKBD, EP7211_PHYS_EXTKBD, MB1, DOMAIN_IO, 0, 1, 0, 0 }, 
+ { EP7211_VIRT_CS8900A, EP7211_PHYS_CS8900A, MB1, DOMAIN_IO, 0, 1, 0, 0 },
 
  /* flash banks */
- { EP7211_VIRT_FLASH1, EP7211_PHYS_FLASH1, MB1 * 8, DOMAIN_KERNEL, 1, 1, 0, 0 },
- { EP7211_VIRT_FLASH2, EP7211_PHYS_FLASH2, MB1 * 8, DOMAIN_KERNEL, 1, 1, 0, 0 },
+ { EP7211_VIRT_FLASH1, EP7211_PHYS_FLASH1, MB1 * 8, DOMAIN_KERNEL, 0, 1, 0, 0 },
+ { EP7211_VIRT_FLASH2, EP7211_PHYS_FLASH2, MB1 * 8, DOMAIN_KERNEL, 0, 1, 0, 0 },
 
  LAST_DESC
 };

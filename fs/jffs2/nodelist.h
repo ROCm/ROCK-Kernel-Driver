@@ -32,6 +32,7 @@
  * under either the RHEPL or the GPL.
  *
  * $Id: nodelist.h,v 1.46.2.1 2002/02/23 14:04:44 dwmw2 Exp $
+ * + zlib_init calls from v1.65
  *
  */
 
@@ -349,3 +350,7 @@ void jffs2_erase_block(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb);
 void jffs2_erase_pending_blocks(struct jffs2_sb_info *c);
 void jffs2_mark_erased_blocks(struct jffs2_sb_info *c);
 void jffs2_erase_pending_trigger(struct jffs2_sb_info *c);
+
+/* compr_zlib.c */
+int jffs2_zlib_init(void);
+void jffs2_zlib_exit(void);

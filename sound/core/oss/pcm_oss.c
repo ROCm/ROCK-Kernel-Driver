@@ -516,7 +516,6 @@ static int snd_pcm_oss_make_ready(snd_pcm_substream_t *substream)
 snd_pcm_sframes_t snd_pcm_oss_write3(snd_pcm_substream_t *substream, const char *ptr, snd_pcm_uframes_t frames, int in_kernel)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	mm_segment_t fs;
 	int ret;
 	while (1) {
 		if (runtime->status->state == SNDRV_PCM_STATE_XRUN ||
@@ -525,11 +524,14 @@ snd_pcm_sframes_t snd_pcm_oss_write3(snd_pcm_substream_t *substream, const char 
 			if (ret < 0)
 				break;
 		}
-		if (in_kernel)
+		if (in_kernel) {
+			mm_segment_t fs;
 			fs = snd_enter_user();
-		ret = snd_pcm_lib_write(substream, ptr, frames);
-		if (in_kernel)
+			ret = snd_pcm_lib_write(substream, ptr, frames);
 			snd_leave_user(fs);
+		} else {
+			ret = snd_pcm_lib_write(substream, ptr, frames);
+		}
 		if (ret != -EPIPE && ret != -ESTRPIPE)
 			break;
 		/* test, if we can't store new data, because the stream */
@@ -543,7 +545,6 @@ snd_pcm_sframes_t snd_pcm_oss_write3(snd_pcm_substream_t *substream, const char 
 snd_pcm_sframes_t snd_pcm_oss_read3(snd_pcm_substream_t *substream, char *ptr, snd_pcm_uframes_t frames, int in_kernel)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	mm_segment_t fs;
 	int ret;
 	while (1) {
 		if (runtime->status->state == SNDRV_PCM_STATE_XRUN ||
@@ -556,11 +557,15 @@ snd_pcm_sframes_t snd_pcm_oss_read3(snd_pcm_substream_t *substream, char *ptr, s
 			if (ret < 0)
 				break;
 		}
-		if (in_kernel)
-			fs = snd_enter_user();
 		ret = snd_pcm_lib_read(substream, ptr, frames);
-		if (in_kernel)
+		if (in_kernel) {
+			mm_segment_t fs;
+			fs = snd_enter_user();
+			ret = snd_pcm_lib_read(substream, ptr, frames);
 			snd_leave_user(fs);
+		} else {
+			ret = snd_pcm_lib_read(substream, ptr, frames);
+		}
 		if (ret != -EPIPE && ret != -ESTRPIPE)
 			break;
 	}
@@ -570,7 +575,6 @@ snd_pcm_sframes_t snd_pcm_oss_read3(snd_pcm_substream_t *substream, char *ptr, s
 snd_pcm_sframes_t snd_pcm_oss_writev3(snd_pcm_substream_t *substream, void **bufs, snd_pcm_uframes_t frames, int in_kernel)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	mm_segment_t fs;
 	int ret;
 	while (1) {
 		if (runtime->status->state == SNDRV_PCM_STATE_XRUN ||
@@ -579,13 +583,17 @@ snd_pcm_sframes_t snd_pcm_oss_writev3(snd_pcm_substream_t *substream, void **buf
 			if (ret < 0)
 				break;
 		}
-		if (in_kernel)
+		if (in_kernel) {
+			mm_segment_t fs;
 			fs = snd_enter_user();
-		ret = snd_pcm_lib_writev(substream, bufs, frames);
-		if (in_kernel)
+			ret = snd_pcm_lib_writev(substream, bufs, frames);
 			snd_leave_user(fs);
+		} else {
+			ret = snd_pcm_lib_writev(substream, bufs, frames);
+		}
 		if (ret != -EPIPE && ret != -ESTRPIPE)
 			break;
+
 		/* test, if we can't store new data, because the stream */
 		/* has not been started */
 		if (runtime->status->state == SNDRV_PCM_STATE_PREPARED)
@@ -597,7 +605,6 @@ snd_pcm_sframes_t snd_pcm_oss_writev3(snd_pcm_substream_t *substream, void **buf
 snd_pcm_sframes_t snd_pcm_oss_readv3(snd_pcm_substream_t *substream, void **bufs, snd_pcm_uframes_t frames, int in_kernel)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
-	mm_segment_t fs;
 	int ret;
 	while (1) {
 		if (runtime->status->state == SNDRV_PCM_STATE_XRUN ||
@@ -610,11 +617,14 @@ snd_pcm_sframes_t snd_pcm_oss_readv3(snd_pcm_substream_t *substream, void **bufs
 			if (ret < 0)
 				break;
 		}
-		if (in_kernel)
+		if (in_kernel) {
+			mm_segment_t fs;
 			fs = snd_enter_user();
-		ret = snd_pcm_lib_readv(substream, bufs, frames);
-		if (in_kernel)
+			ret = snd_pcm_lib_readv(substream, bufs, frames);
 			snd_leave_user(fs);
+		} else {
+			ret = snd_pcm_lib_readv(substream, bufs, frames);
+		}
 		if (ret != -EPIPE && ret != -ESTRPIPE)
 			break;
 	}

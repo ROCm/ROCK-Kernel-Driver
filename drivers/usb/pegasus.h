@@ -1,5 +1,5 @@
 /*
- *  Copyright (c) 1999,2000 Petko Manolov - Petkan (pmanolov@lnxw.com)
+ * Copyright (c) 1999-2002 Petko Manolov - Petkan (petkan@users.sourceforge.net)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,14 +31,6 @@
 #define	EPROM_WR_ENABLE		0x10
 #define	EPROM_LOAD		0x20
 
-#define	MII_BMCR		0x00
-#define	MII_BMSR		0x01
-#define	BMSR_MEDIA		0x7808
-#define	MII_ANLPA		0x05
-#define	ANLPA_100TX_FD		0x0100
-#define	ANLPA_100TX_HD		0x0080
-#define	ANLPA_10T_FD		0x0040
-#define	ANLPA_10T_HD		0x0020
 #define	PHY_DONE		0x80
 #define	PHY_READ		0x40
 #define	PHY_WRITE		0x20
@@ -184,6 +176,8 @@ PEGASUS_DEV( "ADMtek ADM8511 \"Pegasus II\" USB Ethernet",
 PEGASUS_DEV( "ADMtek AN986 \"Pegasus\" USB Ethernet (eval. board)",
 		VENDOR_ADMTEK, 0x0986,
 		DEFAULT_GPIO_RESET | HAS_HOME_PNA )
+PEGASUS_DEV( "AN986A USB MAC", VENDOR_ADMTEK, 1986,
+		DEFAULT_GPIO_RESET | PEGASUS_II )
 PEGASUS_DEV( "Allied Telesyn Int. AT-USB100", VENDOR_ALLIEDTEL, 0xb100,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
 PEGASUS_DEV( "Belkin F5D5050 USB Ethernet", VENDOR_BELKIN, 0x0121,
@@ -254,6 +248,8 @@ PEGASUS_DEV( "smartNIC 2 PnP Adapter", VENDOR_SMARTBRIDGES, 0x0003,
 		DEFAULT_GPIO_RESET | PEGASUS_II )
 PEGASUS_DEV( "SMC 202 USB Ethernet", VENDOR_SMC, 0x0200,
 		DEFAULT_GPIO_RESET )
+PEGASUS_DEV( "SMC 2206 USB Ethernet", VENDOR_SMC, 0x0201,
+		DEFAULT_GPIO_RESET | PEGASUS_II)
 PEGASUS_DEV( "SOHOware NUB100 Ethernet", VENDOR_SOHOWARE, 0x9100,
 		DEFAULT_GPIO_RESET )
 PEGASUS_DEV( "SpeedStream USB 10/100 Ethernet", VENDOR_SIEMENS, 0x1001,

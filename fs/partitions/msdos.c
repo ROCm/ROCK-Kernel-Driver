@@ -261,50 +261,6 @@ solaris_x86_partition(struct gendisk *hd, struct block_device *bdev,
 }
 
 #ifdef CONFIG_BSD_DISKLABEL
-static void
-check_and_add_bsd_partition(struct gendisk *hd, struct bsd_partition *bsd_p,
-	int minor, int *current_minor)
-{
-	struct hd_struct *lin_p;
-		/* check relative position of partitions.  */
-	for (lin_p = hd->part + 1 + minor;
-	     lin_p - hd->part - minor < *current_minor; lin_p++) {
-			/* no relationship -> try again */
-		if (lin_p->start_sect + lin_p->nr_sects <= le32_to_cpu(bsd_p->p_offset) ||
-		    lin_p->start_sect >= le32_to_cpu(bsd_p->p_offset) + le32_to_cpu(bsd_p->p_size))
-			continue;	
-			/* equal -> no need to add */
-		if (lin_p->start_sect == le32_to_cpu(bsd_p->p_offset) && 
-			lin_p->nr_sects == le32_to_cpu(bsd_p->p_size)) 
-			return;
-			/* bsd living within dos partition */
-		if (lin_p->start_sect <= le32_to_cpu(bsd_p->p_offset) && lin_p->start_sect 
-			+ lin_p->nr_sects >= le32_to_cpu(bsd_p->p_offset) + le32_to_cpu(bsd_p->p_size)) {
-#ifdef DEBUG_BSD_DISKLABEL
-			printk("w: %d %ld+%ld,%d+%d", 
-				lin_p - hd->part, 
-				lin_p->start_sect, lin_p->nr_sects, 
-				le32_to_cpu(bsd_p->p_offset),
-				le32_to_cpu(bsd_p->p_size));
-#endif
-			break;
-		}
-	 /* ouch: bsd and linux overlap. Don't even try for that partition */
-#ifdef DEBUG_BSD_DISKLABEL
-		printk("???: %d %ld+%ld,%d+%d",
-			lin_p - hd->part, lin_p->start_sect, lin_p->nr_sects,
-			le32_to_cpu(bsd_p->p_offset), le32_to_cpu(bsd_p->p_size));
-#endif
-		printk("???");
-		return;
-	} /* if the bsd partition is not currently known to linux, we end
-	   * up here 
-	   */
-	add_gd_partition(hd, *current_minor, le32_to_cpu(bsd_p->p_offset),
-			 le32_to_cpu(bsd_p->p_size));
-	(*current_minor)++;
-}
-
 /* 
  * Create devices for BSD partitions listed in a disklabel, under a
  * dos-like partition. See extended_partition() for more information.
@@ -326,16 +282,22 @@ static void do_bsd_partition(struct gendisk *hd, struct block_device *bdev,
 		put_dev_sector(sect);
 		return;
 	}
-	printk(" %s: <%s", partition_name(hd, minor, buf), name);
+	printk(" %s: <%s:", partition_name(hd, minor, buf), name);
 
 	if (le16_to_cpu(l->d_npartitions) < max_partitions)
 		max_partitions = le16_to_cpu(l->d_npartitions);
-	for (p = l->d_partitions; p - l->d_partitions <  max_partitions; p++) {
+	for (p = l->d_partitions; p - l->d_partitions < max_partitions; p++) {
+		int bsd_start, bsd_size;
+
 		if ((*current_minor & mask) == 0)
 			break;
 		if (p->p_fstype == BSD_FS_UNUSED) 
 			continue;
-		check_and_add_bsd_partition(hd, p, minor, current_minor);
+		bsd_start = le32_to_cpu(p->p_offset);
+		bsd_size = le32_to_cpu(p->p_size);
+		if (check_and_add_subpartition(hd, minor, *current_minor,
+					       bsd_start, bsd_size))
+			(*current_minor)++;
 	}
 	put_dev_sector(sect);
 	printk(" >\n");

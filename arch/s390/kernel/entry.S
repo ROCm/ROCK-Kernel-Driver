@@ -295,7 +295,7 @@ ret_from_fork:
         stosm   24(%r15),0x03     # reenable interrupts
         sr      %r0,%r0           # child returns 0
         st      %r0,SP_R2(%r15)   # store return value (change R2 on stack)
-#ifdef CONFIG_SMP
+#if CONFIG_SMP || CONFIG_PREEMPT
         l       %r1,BASED(.Lschedtail)
 	la      %r14,BASED(sysc_return)
         br      %r1               # call schedule_tail, return to sysc_return
@@ -896,7 +896,7 @@ restart_go:
 #error .Ltrace:       .long  syscall_trace
 .Lvfork:       .long  sys_vfork
 
-#ifdef CONFIG_SMP
+#if CONFIG_SMP || CONFIG_PREEMPT
 .Lschedtail:   .long  schedule_tail
 #endif
 

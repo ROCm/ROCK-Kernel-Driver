@@ -6,8 +6,8 @@ a bit looser, e.g. it doesn't care if the <file_data> items are
 swapped around (though it does care that directory entries (inodes) in
 a given directory are contiguous, as this is used by readdir).
 
-All data is in host-endian format; neither mkcramfs nor the kernel
-ever do swabbing.  (See section `Block Size' below.)
+All data is currently in host-endian format; neither mkcramfs nor the
+kernel ever do swabbing.  (See section `Block Size' below.)
 
 <filesystem>:
 	<superblock>
@@ -28,6 +28,10 @@ a directory's entries before recursing down its subdirectories: the
 same order as `ls -AUR' (but without the /^\..*:$/ directory header
 lines); put another way, the same order as `find -type d -exec
 ls -AU1 {} \;'.
+
+Beginning in 2.4.7, directory entries are sorted.  This optimization
+allows cramfs_lookup to return more quickly when a filename does not
+exist, speeds up user-space directory sorts, etc.
 
 <data>:
 	One <file_data> for each file that's either a symlink or a
@@ -63,17 +67,15 @@ Holes
 This kernel supports cramfs holes (i.e. [efficient representation of]
 blocks in uncompressed data consisting entirely of NUL bytes), but by
 default mkcramfs doesn't test for & create holes, since cramfs in
-kernels up to at least 2.3.39 didn't support holes.  Compile mkcramfs
-with -DDO_HOLES if you want it to create files that can have holes in
-them.
+kernels up to at least 2.3.39 didn't support holes.  Run mkcramfs
+with -z if you want it to create files that can have holes in them.
 
 
 Tools
 -----
 
-If you're hacking on cramfs, you might find useful some tools for
-testing cramfs at <http://cvs.bofh.asn.au/cramfs/>, including a
-rudimentary fsck for cramfs.
+The cramfs user-space tools, including mkcramfs and cramfsck, are
+located at <http://sourceforge.net/projects/cramfs/>.
 
 
 Future Development
@@ -103,8 +105,8 @@ require the least amount of change: just change `#define
 PAGE_CACHE_SIZE (4096)' to `#include <asm/page.h>'.  The disadvantage
 is that the generated cramfs cannot always be shared between different
 kernels, not even necessarily kernels of the same architecture if
-PAGE_CACHE_SIZE is subject to change between kernel versions.
-
+PAGE_CACHE_SIZE is subject to change between kernel versions
+(currently possible with arm and ia64).
 
 The remaining options try to make cramfs more sharable.
 

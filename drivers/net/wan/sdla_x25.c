@@ -1272,7 +1272,7 @@ static int if_open (netdevice_t* dev)
 			add_timer(&card->u.x.x25_timer);
 		}
 	}
-	/* Device is not up untill the we are in connected state */
+	/* Device is not up until the we are in connected state */
 	do_gettimeofday( &tv );
 	chan->router_start_time = tv.tv_sec;
 
@@ -4756,7 +4756,7 @@ static int api_incoming_call (sdla_t* card, TX25Mbox *mbox, int lcn)
  * send_delayed_cmd_result
  *
  *	Wait commands like PLEACE CALL or CLEAR CALL must wait
- *      untill the result arrivers. This function passes
+ *      until the result arrives. This function passes
  *      the result to a waiting sock. 
  *
  *===============================================================*/

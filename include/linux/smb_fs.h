@@ -117,6 +117,7 @@ smb_kfree(void *obj)
 #define SMB_CAP_NT_FIND          0x0200
 #define SMB_CAP_DFS              0x1000
 #define SMB_CAP_LARGE_READX      0x4000
+#define SMB_CAP_LARGE_WRITEX     0x8000
 
 
 /*
@@ -157,6 +158,30 @@ struct smb_cache_control {
 	union   smb_dir_cache		*cache;
 	unsigned long			fpos, ofs;
 	int				filled, valid, idx;
+};
+
+#define SMB_OPS_NUM_STATIC	5
+struct smb_ops {
+	int (*read)(struct inode *inode, loff_t offset, int count,
+		    char *data);
+	int (*write)(struct inode *inode, loff_t offset, int count, const
+		     char *data);
+	int (*readdir)(struct file *filp, void *dirent, filldir_t filldir,
+		       struct smb_cache_control *ctl);
+
+	int (*getattr)(struct smb_sb_info *server, struct dentry *dir,
+		       struct smb_fattr *fattr);
+	/* int (*setattr)(...); */      /* setattr is really icky! */
+
+	int (*truncate)(struct inode *inode, loff_t length);
+
+
+	/* --- --- --- end of "static" entries --- --- --- */
+
+	int (*convert)(unsigned char *output, int olen,
+		       const unsigned char *input, int ilen,
+		       struct nls_table *nls_from,
+		       struct nls_table *nls_to);
 };
 
 static inline int

@@ -71,7 +71,6 @@ int coda_cache_check(struct inode *inode, int mask)
         hit = ((mask & cii->c_cached_perm) == mask) &&
                 coda_cred_ok(&cii->c_cached_cred);
 
-        CDEBUG(D_CACHE, "%s for ino %ld\n", hit ? "HIT" : "MISS", inode->i_ino);
         return hit;
 }
 
@@ -102,9 +101,6 @@ static void coda_flag_children(struct dentry *parent, int flag)
 		/* don't know what to do with negative dentries */
 		if ( ! de->d_inode ) 
 			continue;
-		CDEBUG(D_DOWNCALL, "%d for %*s/%*s\n", flag, 
-		       de->d_name.len, de->d_name.name, 
-		       de->d_parent->d_name.len, de->d_parent->d_name.name);
 		coda_flag_inode(de->d_inode, flag);
 	}
 	spin_unlock(&dcache_lock);

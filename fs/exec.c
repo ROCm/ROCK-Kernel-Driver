@@ -343,15 +343,11 @@ int setup_arg_pages(struct linux_binprm *bprm)
 struct file *open_exec(const char *name)
 {
 	struct nameidata nd;
-	struct inode *inode;
-	struct file *file;
-	int err = 0;
+	int err = path_lookup(name, LOOKUP_FOLLOW, &nd);
+	struct file *file = ERR_PTR(err);
 
-	if (path_init(name, LOOKUP_FOLLOW|LOOKUP_POSITIVE, &nd))
-		err = path_walk(name, &nd);
-	file = ERR_PTR(err);
 	if (!err) {
-		inode = nd.dentry->d_inode;
+		struct inode *inode = nd.dentry->d_inode;
 		file = ERR_PTR(-EACCES);
 		if (!(nd.mnt->mnt_flags & MNT_NOEXEC) &&
 		    S_ISREG(inode->i_mode)) {
@@ -513,23 +509,49 @@ static inline void flush_old_files(struct files_struct * files)
 
 /*
  * An execve() will automatically "de-thread" the process.
- * Note: we don't have to hold the tasklist_lock to test
- * whether we migth need to do this. If we're not part of
- * a thread group, there is no way we can become one
- * dynamically. And if we are, we only need to protect the
- * unlink - even if we race with the last other thread exit,
- * at worst the list_del_init() might end up being a no-op.
+ * - if a master thread (PID==TGID) is doing this, then all subsidiary threads
+ *   will be killed (otherwise there will end up being two independent thread
+ *   groups with the same TGID).
+ * - if a subsidary thread is doing this, then it just leaves the thread group
  */
-static inline void de_thread(struct task_struct *tsk)
+static void de_thread(struct task_struct *tsk)
 {
-	if (!list_empty(&tsk->thread_group)) {
-		write_lock_irq(&tasklist_lock);
+	struct task_struct *sub;
+	struct list_head *head, *ptr;
+	struct siginfo info;
+	int pause;
+
+	write_lock_irq(&tasklist_lock);
+
+	if (tsk->tgid != tsk->pid) {
+		/* subsidiary thread - just escapes the group */
 		list_del_init(&tsk->thread_group);
-		write_unlock_irq(&tasklist_lock);
+		tsk->tgid = tsk->pid;
+		pause = 0;
+	}
+	else {
+		/* master thread - kill all subsidiary threads */
+		info.si_signo = SIGKILL;
+		info.si_errno = 0;
+		info.si_code = SI_DETHREAD;
+		info.si_pid = current->pid;
+		info.si_uid = current->uid;
+
+		head = tsk->thread_group.next;
+		list_del_init(&tsk->thread_group);
+
+		list_for_each(ptr,head) {
+			sub = list_entry(ptr,struct task_struct,thread_group);
+			send_sig_info(SIGKILL,&info,sub);
+		}
+
+		pause = 1;
 	}
 
-	/* Minor oddity: this might stay the same. */
-	tsk->tgid = tsk->pid;
+	write_unlock_irq(&tasklist_lock);
+
+	/* give the subsidiary threads a chance to clean themselves up */
+	if (pause) yield();
 }
 
 int flush_old_exec(struct linux_binprm * bprm)
@@ -570,7 +592,8 @@ int flush_old_exec(struct linux_binprm * bprm)
 
 	flush_thread();
 
-	de_thread(current);
+	if (!list_empty(&current->thread_group))
+		de_thread(current);
 
 	if (bprm->e_uid != current->euid || bprm->e_gid != current->egid || 
 	    permission(bprm->file->f_dentry->d_inode,MAY_READ))

@@ -18,7 +18,8 @@ extern kmem_cache_t *pte_cache;
  * from the Linux copy.  The processor copies are offset by -PTRS_PER_PTE
  * words from the Linux copy.
  */
-static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+static inline pte_t *
+pte_alloc_one_kernel(struct mm_struct *mm, unsigned long addr)
 {
 	pte_t *pte;
 
@@ -28,14 +29,34 @@ static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
 	return pte;
 }
 
+static inline struct page *
+pte_alloc_one(struct mm_struct *mm, unsigned long addr)
+{
+	pte_t *pte;
+
+	pte = kmem_cache_alloc(pte_cache, GFP_KERNEL);
+	if (pte)
+		pte += PTRS_PER_PTE;
+	return (struct page *)pte;
+}
+
 /*
  * Free one PTE table.
  */
-static inline void pte_free_slow(pte_t *pte)
+static inline void pte_free_kernel(pte_t *pte)
 {
 	if (pte) {
 		pte -= PTRS_PER_PTE;
 		kmem_cache_free(pte_cache, pte);
+	}
+}
+
+static inline void pte_free(struct page *pte)
+{
+	pte_t *_pte = (pte_t *)pte;
+	if (pte) {
+		_pte -= PTRS_PER_PTE;
+		kmem_cache_free(pte_cache, _pte);
 	}
 }
 
@@ -46,12 +67,14 @@ static inline void pte_free_slow(pte_t *pte)
  * If 'mm' is the init tasks mm, then we are doing a vmalloc, and we
  * need to set stuff up correctly for it.
  */
+#define pmd_populate_kernel(mm,pmdp,pte)			\
+	do {							\
+		BUG_ON(mm != &init_mm);				\
+		set_pmd(pmdp, __mk_pmd(pte, _PAGE_KERNEL_TABLE));\
+	} while (0)
+
 #define pmd_populate(mm,pmdp,pte)				\
 	do {							\
-		unsigned long __prot;				\
-		if (mm == &init_mm)				\
-			__prot = _PAGE_KERNEL_TABLE;		\
-		else						\
-			__prot = _PAGE_USER_TABLE;		\
-		set_pmd(pmdp, __mk_pmd(pte, __prot));		\
+		BUG_ON(mm == &init_mm);				\
+		set_pmd(pmdp, __mk_pmd(pte, _PAGE_USER_TABLE));	\
 	} while (0)

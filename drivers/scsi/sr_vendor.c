@@ -58,27 +58,25 @@
 #define VENDOR_TOSHIBA         3
 #define VENDOR_WRITER          4	/* pre-scsi3 writers */
 
-#define VENDOR_ID (scsi_CDs[minor].vendor)
-
-void sr_vendor_init(int minor)
+void sr_vendor_init(Scsi_CD *SCp)
 {
 #ifndef CONFIG_BLK_DEV_SR_VENDOR
-	VENDOR_ID = VENDOR_SCSI3;
+	SCp->vendor = VENDOR_SCSI3;
 #else
-	char *vendor = scsi_CDs[minor].device->vendor;
-	char *model = scsi_CDs[minor].device->model;
-
+	char *vendor = SCp->device->vendor;
+	char *model = SCp->device->model;
+	
 	/* default */
-	VENDOR_ID = VENDOR_SCSI3;
-	if (scsi_CDs[minor].readcd_known)
+	SCp->vendor = VENDOR_SCSI3;
+	if (SCp->readcd_known)
 		/* this is true for scsi3/mmc drives - no more checks */
 		return;
 
-	if (scsi_CDs[minor].device->type == TYPE_WORM) {
-		VENDOR_ID = VENDOR_WRITER;
+	if (SCp->device->type == TYPE_WORM) {
+		SCp->vendor = VENDOR_WRITER;
 
 	} else if (!strncmp(vendor, "NEC", 3)) {
-		VENDOR_ID = VENDOR_NEC;
+		SCp->vendor = VENDOR_NEC;
 		if (!strncmp(model, "CD-ROM DRIVE:25", 15) ||
 		    !strncmp(model, "CD-ROM DRIVE:36", 15) ||
 		    !strncmp(model, "CD-ROM DRIVE:83", 15) ||
@@ -90,10 +88,10 @@ void sr_vendor_init(int minor)
 #endif
 		    )
 			/* these can't handle multisession, may hang */
-			scsi_CDs[minor].cdi.mask |= CDC_MULTI_SESSION;
+			SCp->cdi.mask |= CDC_MULTI_SESSION;
 
 	} else if (!strncmp(vendor, "TOSHIBA", 7)) {
-		VENDOR_ID = VENDOR_TOSHIBA;
+		SCp->vendor = VENDOR_TOSHIBA;
 
 	}
 #endif
@@ -108,10 +106,11 @@ int sr_set_blocklength(int minor, int blocklength)
 	unsigned char *buffer;	/* the buffer for the ioctl */
 	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
 	struct ccs_modesel_head *modesel;
+	Scsi_CD *SCp = &scsi_CDs[minor];
 	int rc, density = 0;
 
 #ifdef CONFIG_BLK_DEV_SR_VENDOR
-	if (VENDOR_ID == VENDOR_TOSHIBA)
+	if (SCp->vendor == VENDOR_TOSHIBA)
 		density = (blocklength > 2048) ? 0x81 : 0x83;
 #endif
 
@@ -124,8 +123,8 @@ int sr_set_blocklength(int minor, int blocklength)
 #endif
 	memset(cmd, 0, MAX_COMMAND_SIZE);
 	cmd[0] = MODE_SELECT;
-	cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
-	         (scsi_CDs[minor].device->lun << 5) : 0;
+	cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
+	         (SCp->device->lun << 5) : 0;
 	cmd[1] |= (1 << 4);
 	cmd[4] = 12;
 	modesel = (struct ccs_modesel_head *) buffer;
@@ -135,7 +134,7 @@ int sr_set_blocklength(int minor, int blocklength)
 	modesel->block_length_med = (blocklength >> 8) & 0xff;
 	modesel->block_length_lo = blocklength & 0xff;
 	if (0 == (rc = sr_do_ioctl(minor, cmd, buffer, sizeof(*modesel), 0, SCSI_DATA_WRITE, NULL))) {
-		scsi_CDs[minor].device->sector_size = blocklength;
+		SCp->device->sector_size = blocklength;
 	}
 #ifdef DEBUG
 	else
@@ -153,13 +152,14 @@ int sr_set_blocklength(int minor, int blocklength)
 
 int sr_cd_check(struct cdrom_device_info *cdi)
 {
+	Scsi_CD *SCp = cdi->handle;
 	unsigned long sector;
 	unsigned char *buffer;	/* the buffer for the ioctl */
 	unsigned char cmd[MAX_COMMAND_SIZE];	/* the scsi-command */
 	int rc, no_multi, minor;
 
 	minor = minor(cdi->dev);
-	if (scsi_CDs[minor].cdi.mask & CDC_MULTI_SESSION)
+	if (SCp->cdi.mask & CDC_MULTI_SESSION)
 		return 0;
 
 	buffer = (unsigned char *) kmalloc(512, GFP_KERNEL | GFP_DMA);
@@ -170,13 +170,13 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	no_multi = 0;		/* flag: the drive can't handle multisession */
 	rc = 0;
 
-	switch (VENDOR_ID) {
+	switch (SCp->vendor) {
 
 	case VENDOR_SCSI3:
 		memset(cmd, 0, MAX_COMMAND_SIZE);
 		cmd[0] = READ_TOC;
-		cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
-		         (scsi_CDs[minor].device->lun << 5) : 0;
+		cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
+		         (SCp->device->lun << 5) : 0;
 		cmd[8] = 12;
 		cmd[9] = 0x40;
 		rc = sr_do_ioctl(minor, cmd, buffer, 12, 1, SCSI_DATA_READ, NULL);
@@ -201,8 +201,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			unsigned long min, sec, frame;
 			memset(cmd, 0, MAX_COMMAND_SIZE);
 			cmd[0] = 0xde;
-			cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
-			         (scsi_CDs[minor].device->lun << 5) : 0;
+			cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
+			         (SCp->device->lun << 5) : 0;
 			cmd[1] |= 0x03;
 			cmd[2] = 0xb0;
 			rc = sr_do_ioctl(minor, cmd, buffer, 0x16, 1, SCSI_DATA_READ, NULL);
@@ -228,8 +228,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			 * where starts the last session ?) */
 			memset(cmd, 0, MAX_COMMAND_SIZE);
 			cmd[0] = 0xc7;
-			cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
-			         (scsi_CDs[minor].device->lun << 5) : 0;
+			cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
+			         (SCp->device->lun << 5) : 0;
 			cmd[1] |= 0x03;
 			rc = sr_do_ioctl(minor, cmd, buffer, 4, 1, SCSI_DATA_READ, NULL);
 			if (rc == -EINVAL) {
@@ -253,8 +253,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 	case VENDOR_WRITER:
 		memset(cmd, 0, MAX_COMMAND_SIZE);
 		cmd[0] = READ_TOC;
-		cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
-		         (scsi_CDs[minor].device->lun << 5) : 0;
+		cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
+		         (SCp->device->lun << 5) : 0;
 		cmd[8] = 0x04;
 		cmd[9] = 0x40;
 		rc = sr_do_ioctl(minor, cmd, buffer, 0x04, 1, SCSI_DATA_READ, NULL);
@@ -267,8 +267,8 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 			break;
 		}
 		cmd[0] = READ_TOC;	/* Read TOC */
-		cmd[1] = (scsi_CDs[minor].device->scsi_level <= SCSI_2) ?
-		         (scsi_CDs[minor].device->lun << 5) : 0;
+		cmd[1] = (SCp->device->scsi_level <= SCSI_2) ?
+		         (SCp->device->lun << 5) : 0;
 		cmd[6] = rc & 0x7f;	/* number of last session */
 		cmd[8] = 0x0c;
 		cmd[9] = 0x40;
@@ -285,17 +285,17 @@ int sr_cd_check(struct cdrom_device_info *cdi)
 		/* should not happen */
 		printk(KERN_WARNING
 		   "sr%d: unknown vendor code (%i), not initialized ?\n",
-		       minor, VENDOR_ID);
+		       minor, SCp->vendor);
 		sector = 0;
 		no_multi = 1;
 		break;
 	}
-	scsi_CDs[minor].ms_offset = sector;
-	scsi_CDs[minor].xa_flag = 0;
+	SCp->ms_offset = sector;
+	SCp->xa_flag = 0;
 	if (CDS_AUDIO != sr_disk_status(cdi) && 1 == sr_is_xa(minor))
-		scsi_CDs[minor].xa_flag = 1;
+		SCp->xa_flag = 1;
 
-	if (2048 != scsi_CDs[minor].device->sector_size) {
+	if (2048 != SCp->device->sector_size) {
 		sr_set_blocklength(minor, 2048);
 	}
 	if (no_multi)

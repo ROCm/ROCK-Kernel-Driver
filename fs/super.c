@@ -444,9 +444,10 @@ static void shutdown_super(struct super_block *sb)
 	if (fs->fs_flags & FS_LITTER && sb->s_root)
 		d_genocide(sb->s_root);
 	generic_shutdown_super(sb);
-	if (bdev)
+	if (bdev) {
+		bd_release(bdev);
 		blkdev_put(bdev, BDEV_FS);
-	else
+	} else
 		put_anon_dev(dev);
 }
 
@@ -700,8 +701,7 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	/* What device it is? */
 	if (!dev_name || !*dev_name)
 		return ERR_PTR(-EINVAL);
-	if (path_init(dev_name, LOOKUP_FOLLOW|LOOKUP_POSITIVE, &nd))
-		error = path_walk(dev_name, &nd);
+	error = path_lookup(dev_name, LOOKUP_FOLLOW, &nd);
 	if (error)
 		return ERR_PTR(error);
 	inode = nd.dentry->d_inode;
@@ -728,37 +728,40 @@ struct super_block *get_sb_bdev(struct file_system_type *fs_type,
 	error = -EACCES;
 	if (!(flags & MS_RDONLY) && is_read_only(dev))
 		goto out1;
+	error = bd_claim(bdev, fs_type);
+	if (error)
+		goto out1;
 
 	error = -ENOMEM;
 	s = alloc_super();
 	if (!s)
-		goto out1;
+		goto out2;
 
 	error = -EBUSY;
 restart:
 	spin_lock(&sb_lock);
 
-	list_for_each(p, &super_blocks) {
+	list_for_each(p, &fs_type->fs_supers) {
 		struct super_block *old = sb_entry(p);
 		if (old->s_bdev != bdev)
 			continue;
-		if (old->s_type != fs_type ||
-		    ((flags ^ old->s_flags) & MS_RDONLY)) {
-			spin_unlock(&sb_lock);
-			destroy_super(s);
-			goto out1;
-		}
 		if (!grab_super(old))
 			goto restart;
 		destroy_super(s);
+		if ((flags ^ old->s_flags) & MS_RDONLY) {
+			up_write(&old->s_umount);
+			kill_super(old);
+			old = ERR_PTR(-EBUSY);
+		}
+		bd_release(bdev);
 		blkdev_put(bdev, BDEV_FS);
 		path_release(&nd);
 		return old;
 	}
-	s->s_dev = dev;
 	s->s_bdev = bdev;
-	s->s_flags = flags;
+	s->s_dev = dev;
 	insert_super(s, fs_type);
+	s->s_flags = flags;
 	strncpy(s->s_id, bdevname(dev), sizeof(s->s_id));
 	error = fill_super(s, data, flags & MS_VERBOSE ? 1 : 0);
 	if (error)
@@ -771,6 +774,8 @@ failed:
 	up_write(&s->s_umount);
 	kill_super(s);
 	goto out;
+out2:
+	bd_release(bdev);
 out1:
 	blkdev_put(bdev, BDEV_FS);
 out:

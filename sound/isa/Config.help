@@ -1,0 +1,99 @@
+CONFIG_SND_AD1816A
+  Say 'Y' or 'M' to include support for Analog Devices SoundPort AD1816A or
+  compatible sound chips.
+
+CONFIG_SND_AD1848
+  Say 'Y' or 'M' to include support for AD1848 (Analog Devices) or CS4248 
+  (Cirrus Logic - Crystal Semiconductors) chips. Please, for newer chips
+  from Cirrus Logic, use CS4231, CS4232 or CS4236+ driver.
+
+CONFIG_SND_CS4231
+  Say 'Y' or 'M' to include support for CS4231 chips from Cirrus Logic -
+  Crystal Semiconductors.
+
+CONFIG_SND_CS4232
+  Say 'Y' or 'M' to include support for CS4232 chips from Cirrus Logic -
+  Crystal Semiconductors.
+
+CONFIG_SND_CS4236
+  Say 'Y' or 'M' to include support for CS4235,CS4236,CS4237B,CS4238B,CS4239
+  chips from Cirrus Logic - Crystal Semiconductors.
+
+CONFIG_SND_ES968
+  Say 'Y' or 'M' to include support for ESS AudioDrive ES968 chip.
+
+CONFIG_SND_ES1688
+  Say 'Y' or 'M' to include support for ESS AudioDrive ES688 or ES1688 chips.
+
+CONFIG_SND_ES18XX
+  Say 'Y' or 'M' to include support for ESS AudioDrive ES18xx chips.
+
+CONFIG_SND_GUSCLASSIC
+  Say 'Y' or 'M' to include support for Gravis UltraSound Classic soundcard.
+
+CONFIG_SND_GUSEXTREME
+  Say 'Y' or 'M' to include support for Gravis UltraSound Extreme soundcard.
+
+CONFIG_SND_GUSMAX
+  Say 'Y' or 'M' to include support for Gravis UltraSound MAX soundcard.
+
+CONFIG_SND_INTERWAVE
+  Say 'Y' or 'M' to include support for AMD InterWave based soundcards
+  (Gravis UltraSound Plug & Play, STB SoundRage32, MED3210, Dynasonic Pro,
+  Panasonic PCA761AW).
+
+CONFIG_SND_INTERWAVE_STB
+  Say 'Y' or 'M' to include support for AMD InterWave based soundcards
+  with TEA6330T bass and treble regulator (UltraSound 32-Pro).
+
+CONFIG_SND_OPTI92X_AD1848
+  Say 'Y' or 'M' to include support for Opti92x soundcards equiped with
+  AD1848 codec.
+
+CONFIG_SND_OPTI92X_CS4231
+  Say 'Y' or 'M' to include support for Opti92x soundcards equiped with
+  CS4231 codec.
+
+CONFIG_SND_OPTI93X
+  Say 'Y' or 'M' to include support for Opti93x soundcards.
+
+CONFIG_SND_SB8
+  Say 'Y' or 'M' to include support for Sound Blaster 1.0/2.0/Pro (8-bit)
+  soundcards or 100% compatible from Creative.
+
+CONFIG_SND_SB16
+  Say 'Y' or 'M' to include support for Sound Blaster 16 (including
+  Plug and Play version).
+
+CONFIG_SND_SBAWE
+  Say 'Y' or 'M' to include support for Sound Blaster AWE (including
+  Plug and Play version).
+
+CONFIG_SND_SB16_CSP
+  Say 'Y' to include support for CSP core. This special coprocessor
+  can do variable tasks like various compression and decompression
+  algorithms.
+
+CONFIG_SND_WAVEFRONT
+  Say 'Y' or 'M' to include support for Turtle Beach Maui, Tropez
+  and Tropez+ soundcards based on Wavefront chip.
+
+CONFIG_SND_ALS100
+  Say 'Y' or 'M' to include support for Avance Logic ALS100, ALS110,
+  ALS120 and ALS200 soundcards.
+
+CONFIG_SND_AZT2320
+  Say 'Y' or 'M' to include support for Aztech Systems AZT2320 soundcard.
+
+CONFIG_SND_CMI8330
+  Say 'Y' or 'M' to include support for C-Media CMI8330 based soundcards.
+
+CONFIG_SND_DT0197H
+  Say 'Y' or 'M' to include support for Diamond Technologies DT-0197H
+  soundcards.
+
+CONFIG_SND_OPL3SA2
+  Say 'Y' or 'M' to include support for Yamaha OPL3SA2 or OPL3SA3 chips.
+
+CONFIG_SND_SGALAXY
+  Say 'Y' or 'M' to include support for Aztech Sound Galaxy.

@@ -63,7 +63,7 @@ Upon entering a suspend state, the PM layer iterates through all of its register
 callbacks. This currently takes place only during APM state transitions.
 
 Upon going to sleep, the PCI subsystem walks its device tree twice. Both times, it does
-a depth first walk of the device tree. The first walk saves  each of the device's state 
+a depth first walk of the device tree. The first walk saves each of the device's state 
 and checks for devices that will prevent the system from entering a global power state. 
 The next walk then places the devices in a low power state.
 
@@ -104,7 +104,7 @@ pci_restore_state
 -----------------
 
 Usage:
-	pci_restore_state(dev,buffer);
+	pci_restore_state(dev, buffer);
 
 Description:
 	Restore previously saved config space. (First 64 bytes only);
@@ -117,7 +117,7 @@ pci_set_power_state
 -------------------
 
 Usage:
-	pci_set_power_state(dev,state);
+	pci_set_power_state(dev, state);
 
 Description:
 	Transition device to low power state using PCI PM Capabilities registers.
@@ -132,7 +132,7 @@ pci_enable_wake
 ---------------
 
 Usage:
-	pci_enable_wake(dev,state,enable);
+	pci_enable_wake(dev, state, enable);
 
 Description:
 	Enable device to generate PME# during low power state using PCI PM 
@@ -155,7 +155,7 @@ These functions are intended for use by individual drivers, and are defined in
 struct pci_driver:
 
         int  (*save_state) (struct pci_dev *dev, u32 state);
-        int  (*suspend)(struct pci_dev *dev, u32 state);
+        int  (*suspend) (struct pci_dev *dev, u32 state);
         int  (*resume) (struct pci_dev *dev);
         int  (*enable_wake) (struct pci_dev *dev, u32 state, int enable);
 
@@ -178,7 +178,7 @@ is preserved when entering D1, but the screen is placed into a low power state
 
 The driver can also interpret this function as a notification that it may be entering
 a sleep state in the near future. If it knows that the device cannot enter the 
-requested state, either because of lack of support for it, or because the devices is 
+requested state, either because of lack of support for it, or because the device is 
 middle of some critical operation, then it should fail.
 
 This function should not be used to set any state in the device or the driver because

@@ -26,3 +26,8 @@ CONFIG_PHONE_IXJ
   If you do not have any Quicknet telephony cards, you can safely
   say N here.
 
+CONFIG_PHONE_IXJ_PCMCIA
+  Say Y here to configure in PCMCIA service support for the Quicknet
+  cards manufactured by Quicknet Technologies, Inc.  This changes the
+  card initialization code to work with the card manager daemon.
+

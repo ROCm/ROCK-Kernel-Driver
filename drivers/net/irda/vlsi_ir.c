@@ -637,6 +637,7 @@ static int vlsi_rx_interrupt(struct net_device *ndev)
 				skb->mac.raw = skb->data;
 				skb->protocol = htons(ETH_P_IRDA);
 				netif_rx(skb);				
+				ndev->last_rx = jiffies;
 			}
 			else {
 				idev->stats.rx_dropped++;

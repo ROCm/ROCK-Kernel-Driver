@@ -557,6 +557,8 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 		 * allowing programs to debug themselves without the ptrace()
 		 * interface.
 		 */
+		if ((regs->xcs & 3) == 0)
+			goto clear_TF;
 		if ((tsk->ptrace & (PT_DTRACE|PT_PTRACED)) == PT_DTRACE)
 			goto clear_TF;
 	}

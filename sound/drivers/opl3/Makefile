@@ -29,7 +29,7 @@ obj-$(CONFIG_SND_GUSEXTREME) += snd-opl3-lib.o
 obj-$(CONFIG_SND_OPTI92X_AD1848) += snd-opl3-lib.o
 obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-opl3-lib.o
 obj-$(CONFIG_SND_OPTI93X) += snd-opl3-lib.o
-obj-$(CONFIG_SND_SB) += snd-opl3-lib.o
+obj-$(CONFIG_SND_SB8) += snd-opl3-lib.o
 obj-$(CONFIG_SND_SB16) += snd-opl3-lib.o
 obj-$(CONFIG_SND_SBAWE) += snd-opl3-lib.o
 obj-$(CONFIG_SND_WAVEFRONT) += snd-opl3-lib.o
@@ -54,7 +54,7 @@ ifeq ($(subst m,y,$(CONFIG_SND_SEQUENCER)),y)
   obj-$(CONFIG_SND_OPTI92X_AD1848) += snd-opl3-synth.o
   obj-$(CONFIG_SND_OPTI92X_CS4231) += snd-opl3-synth.o
   obj-$(CONFIG_SND_OPTI93X) += snd-opl3-synth.o
-  obj-$(CONFIG_SND_SB) += snd-opl3-synth.o
+  obj-$(CONFIG_SND_SB8) += snd-opl3-synth.o
   obj-$(CONFIG_SND_SB16) += snd-opl3-synth.o
   obj-$(CONFIG_SND_SBAWE) += snd-opl3-synth.o
   obj-$(CONFIG_SND_WAVEFRONT) += snd-opl3-synth.o

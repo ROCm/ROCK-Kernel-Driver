@@ -581,11 +581,6 @@ static int parse_options (char * options, unsigned long * mount_options, unsigne
 }
 
 
-int reiserfs_is_super(struct super_block *s) {
-   return (!kdev_same(s->s_dev, NODEV) && s->s_op == &reiserfs_sops) ;
-}
-
-
 //
 // a portion of this function, particularly the VFS interface portion,
 // was derived from minix or ext2's analog and evolved as the
@@ -1200,6 +1195,11 @@ static struct file_system_type reiserfs_fs_type = {
 	get_sb:		reiserfs_get_sb,
 	fs_flags:	FS_REQUIRES_DEV,
 };
+
+int reiserfs_is_super(struct super_block *s)
+{
+	return s->s_type == &reiserfs_fs_type;
+}
 
 //
 // this is exactly what 2.3.99-pre9's init_ext2_fs is

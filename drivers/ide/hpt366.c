@@ -374,7 +374,8 @@ static int hpt366_get_info (char *buffer, char **addr, off_t offset, int count)
 		class_rev &= 0xff;
 
 		p += sprintf(p, "\nController: %d\n", i);
-		p += sprintf(p, "Chipset: HPT%s\n", chipset_nums[class_rev]);
+		p += sprintf(p, "Chipset: HPT%s\n",
+			class_rev < sizeof(chipset_nums) / sizeof(char *) ? chipset_nums[class_rev] : "???");
 		p += sprintf(p, "--------------- Primary Channel "
 				"--------------- Secondary Channel "
 				"--------------\n");
@@ -1119,12 +1120,11 @@ unsigned int __init pci_init_hpt366(struct pci_dev *dev)
 	if (test != 0x08)
 		pci_write_config_byte(dev, PCI_MAX_LAT, 0x08);
 
-	if (pci_rev_check_hpt3xx(dev)) {
+	if (pci_rev_check_hpt3xx(dev))
 		init_hpt370(dev);
+
+	if (n_hpt_devs < HPT366_MAX_DEVS)
 		hpt_devs[n_hpt_devs++] = dev;
-	} else {
-		hpt_devs[n_hpt_devs++] = dev;
-	}
 	
 #if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!hpt366_proc) {

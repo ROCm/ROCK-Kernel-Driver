@@ -1,6 +1,4 @@
 /*
- *  linux/drivers/ide/ide-dma.c		Version 4.10	June 9, 2000
- *
  *  Copyright (c) 1999-2000	Andre Hedrick <andre@linux-ide.org>
  *  May be copied or modified under the terms of the GNU General Public License
  */
@@ -15,7 +13,7 @@
 /*
  * This module provides support for the bus-master IDE DMA functions
  * of various PCI chipsets, including the Intel PIIX (i82371FB for
- * the 430 FX chipset), the PIIX3 (i82371SB for the 430 HX/VX and 
+ * the 430 FX chipset), the PIIX3 (i82371SB for the 430 HX/VX and
  * 440 chipsets), and the PIIX4 (i82371AB for the 430 TX chipset)
  * ("PIIX" stands for "PCI ISA IDE Xcellerator").
  *
@@ -73,8 +71,6 @@
  * check_drive_lists(ide_drive_t *drive, int good_bad)
  *
  * ATA-66/100 and recovery functions, I forgot the rest......
- * SELECT_READ_WRITE(hwif,drive,func) for active tuning based on IO direction.
- *
  */
 
 #include <linux/config.h>
@@ -426,7 +422,7 @@ int check_drive_lists (ide_drive_t *drive, int good_bad)
 	return 0;
 }
 
-int report_drive_dmaing (ide_drive_t *drive)
+static int report_drive_dmaing (ide_drive_t *drive)
 {
 	struct hd_driveid *id = drive->id;
 
@@ -606,7 +602,10 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_read:
 			reading = 1 << 3;
 		case ide_dma_write:
-			SELECT_READ_WRITE(hwif,drive,func);
+			/* active tuning based on IO direction */
+			if (hwif->rwproc)
+				hwif->rwproc(drive, func);
+
 			if (!(count = ide_build_dmatable(drive, func)))
 				return 1;	/* try PIO instead of DMA */
 			outl(hwif->dmatable_dma, dma_base + 4); /* PRD table */
@@ -617,9 +616,9 @@ int ide_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 				return 0;
 #ifdef CONFIG_BLK_DEV_IDEDMA_TIMEOUT
 			ide_set_handler(drive, &ide_dma_intr, 2*WAIT_CMD, NULL);	/* issue cmd to drive */
-#else /* !CONFIG_BLK_DEV_IDEDMA_TIMEOUT */
+#else
 			ide_set_handler(drive, &ide_dma_intr, WAIT_CMD, dma_timer_expiry);	/* issue cmd to drive */
-#endif /* CONFIG_BLK_DEV_IDEDMA_TIMEOUT */
+#endif
 			if ((HWGROUP(drive)->rq->flags & REQ_DRIVE_TASKFILE) &&
 			    (drive->addressing == 1)) {
 				ide_task_t *args = HWGROUP(drive)->rq->special;
@@ -728,9 +727,8 @@ int ide_release_dma (ide_hwif_t *hwif)
 }
 
 /*
- *	This can be called for a dynamically installed interface. Don't __init it
+ * This can be called for a dynamically installed interface. Don't __init it
  */
- 
 void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_ports)
 {
 	printk("    %s: BM-DMA at 0x%04lx-0x%04lx", hwif->name, dma_base, dma_base + num_ports - 1);
@@ -767,82 +765,4 @@ void ide_setup_dma (ide_hwif_t *hwif, unsigned long dma_base, unsigned int num_p
 
 dma_alloc_failure:
 	printk(" -- ERROR, UNABLE TO ALLOCATE DMA TABLES\n");
-}
-
-/*
- * Fetch the DMA Bus-Master-I/O-Base-Address (BMIBA) from PCI space:
- */
-unsigned long __init ide_get_or_set_dma_base (ide_hwif_t *hwif, int extra, const char *name)
-{
-	unsigned long	dma_base = 0;
-	struct pci_dev	*dev = hwif->pci_dev;
-
-#ifdef CONFIG_BLK_DEV_IDEDMA_FORCED
-	int second_chance = 0;
-
-second_chance_to_dma:
-#endif /* CONFIG_BLK_DEV_IDEDMA_FORCED */
-
-	if (hwif->mate && hwif->mate->dma_base) {
-		dma_base = hwif->mate->dma_base - (hwif->channel ? 0 : 8);
-	} else {
-		dma_base = pci_resource_start(dev, 4);
-		if (!dma_base) {
-			printk("%s: dma_base is invalid (0x%04lx)\n", name, dma_base);
-			dma_base = 0;
-		}
-	}
-
-#ifdef CONFIG_BLK_DEV_IDEDMA_FORCED
-	if ((!dma_base) && (!second_chance)) {
-		unsigned long set_bmiba = 0;
-		second_chance++;
-		switch(dev->vendor) {
-			case PCI_VENDOR_ID_AL:
-				set_bmiba = DEFAULT_BMALIBA; break;
-			case PCI_VENDOR_ID_VIA:
-				set_bmiba = DEFAULT_BMCRBA; break;
-			case PCI_VENDOR_ID_INTEL:
-				set_bmiba = DEFAULT_BMIBA; break;
-			default:
-				return dma_base;
-		}
-		pci_write_config_dword(dev, 0x20, set_bmiba|1);
-		goto second_chance_to_dma;
-	}
-#endif /* CONFIG_BLK_DEV_IDEDMA_FORCED */
-
-	if (dma_base) {
-		if (extra) /* PDC20246, PDC20262, HPT343, & HPT366 */
-			request_region(dma_base+16, extra, name);
-		dma_base += hwif->channel ? 8 : 0;
-		hwif->dma_extra = extra;
-
-		switch(dev->device) {
-			case PCI_DEVICE_ID_AL_M5219:
-			case PCI_DEVICE_ID_AMD_VIPER_7409:
-			case PCI_DEVICE_ID_CMD_643:
-				outb(inb(dma_base+2) & 0x60, dma_base+2);
-				if (inb(dma_base+2) & 0x80) {
-					printk("%s: simplex device: DMA forced\n", name);
-				}
-				break;
-			default:
-				/*
-				 * If the device claims "simplex" DMA,
-				 * this means only one of the two interfaces
-				 * can be trusted with DMA at any point in time.
-				 * So we should enable DMA only on one of the
-				 * two interfaces.
-				 */
-				if ((inb(dma_base+2) & 0x80)) {	/* simplex device? */
-					if ((!hwif->drives[0].present && !hwif->drives[1].present) ||
-					    (hwif->mate && hwif->mate->dma_base)) {
-						printk("%s: simplex device:  DMA disabled\n", name);
-						dma_base = 0;
-					}
-				}
-		}
-	}
-	return dma_base;
 }

@@ -41,14 +41,15 @@ CONFIG_FARSYNC
   This driver supports the FarSync T-Series X.21 (and V.35/V.24) cards
   from FarSite Communications Ltd.
   Synchronous communication is supported on all ports at speeds up to
-  8Mb/s (128K on V.24) using synchronous PPP or Cisco HDLC.
+  8Mb/s (128K on V.24) using synchronous PPP, Cisco HDLC, raw HDLC,
+  Frame Relay or X.25/LAPB.
 
   If you want to compile this driver as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want)
   say M here and read <file:Documentation/modules.txt>.
   The module will be called farsync.o and if you want the module to be
   automatically loaded when the interface is referenced then you
-  should add "alias syncX farsync" to /etc/modules.conf for each
+  should add "alias hdlcX farsync" to /etc/modules.conf for each
   interface, where X is 0, 1, 2, ...
 
 CONFIG_DLCI
