@@ -957,7 +957,6 @@ int kswapd(void *p)
 		finish_wait(&pgdat->kswapd_wait, &wait);
 		get_page_state(&ps);
 		balance_pgdat(pgdat, 0, &ps);
-		blk_run_queues();
 	}
 }
 

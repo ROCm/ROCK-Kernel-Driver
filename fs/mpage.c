@@ -618,7 +618,6 @@ mpage_writepages(struct address_space *mapping,
 	int (*writepage)(struct page *page, struct writeback_control *wbc);
 
 	if (wbc->nonblocking && bdi_write_congested(bdi)) {
-		blk_run_queues();
 		wbc->encountered_congestion = 1;
 		return 0;
 	}
@@ -673,7 +672,6 @@ mpage_writepages(struct address_space *mapping,
 			if (ret || (--(wbc->nr_to_write) <= 0))
 				done = 1;
 			if (wbc->nonblocking && bdi_write_congested(bdi)) {
-				blk_run_queues();
 				wbc->encountered_congestion = 1;
 				done = 1;
 			}
