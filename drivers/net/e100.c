@@ -158,7 +158,7 @@
 
 
 #define DRV_NAME		"e100"
-#define DRV_VERSION		"3.0.16"
+#define DRV_VERSION		"3.0.17"
 #define DRV_DESCRIPTION		"Intel(R) PRO/100 Network Driver"
 #define DRV_COPYRIGHT		"Copyright(c) 1999-2004 Intel Corporation"
 #define PFX			DRV_NAME ": "
@@ -1285,6 +1285,7 @@ static inline int e100_tx_clean(struct nic *nic)
 				le16_to_cpu(cb->u.tcb.tbd.size),
 				PCI_DMA_TODEVICE);
 			dev_kfree_skb_any(cb->skb);
+			cb->skb = NULL;
 			tx_cleaned = 1;
 		}
 		cb->status = 0;
@@ -1347,6 +1348,7 @@ static int e100_alloc_cbs(struct nic *nic)
 		cb->dma_addr = nic->cbs_dma_addr + i * sizeof(struct cb);
 		cb->link = cpu_to_le32(nic->cbs_dma_addr +
 			((i+1) % count) * sizeof(struct cb));
+		cb->skb = NULL;
 	}
 
 	nic->cb_to_use = nic->cb_to_send = nic->cb_to_clean = nic->cbs;
