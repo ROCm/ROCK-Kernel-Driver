@@ -316,17 +316,17 @@ static int tcp_invert_tuple(struct ip_conntrack_tuple *tuple,
 }
 
 /* Print out the per-protocol part of the tuple. */
-static unsigned int tcp_print_tuple(char *buffer,
-				    const struct ip_conntrack_tuple *tuple)
+static int tcp_print_tuple(struct seq_file *s,
+			   const struct ip_conntrack_tuple *tuple)
 {
-	return sprintf(buffer, "sport=%hu dport=%hu ",
-		       ntohs(tuple->src.u.tcp.port),
-		       ntohs(tuple->dst.u.tcp.port));
+	return seq_printf(s, "sport=%hu dport=%hu ",
+			  ntohs(tuple->src.u.tcp.port),
+			  ntohs(tuple->dst.u.tcp.port));
 }
 
 /* Print out the private part of the conntrack. */
-static unsigned int tcp_print_conntrack(char *buffer,
-					const struct ip_conntrack *conntrack)
+static int tcp_print_conntrack(struct seq_file *s,
+			       const struct ip_conntrack *conntrack)
 {
 	enum tcp_conntrack state;
 
@@ -334,7 +334,7 @@ static unsigned int tcp_print_conntrack(char *buffer,
 	state = conntrack->proto.tcp.state;
 	READ_UNLOCK(&tcp_lock);
 
-	return sprintf(buffer, "%s ", tcp_conntrack_names[state]);
+	return seq_printf(s, "%s ", tcp_conntrack_names[state]);
 }
 
 static unsigned int get_conntrack_index(const struct tcphdr *tcph)

@@ -1778,7 +1778,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 
 	if(unlikely(skb->len <= 0)) {
 		dev_kfree_skb_any(skb);
-		return 0;
+		return NETDEV_TX_OK;
 	}
 
 #ifdef NETIF_F_TSO
@@ -1817,7 +1817,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
  	if (!spin_trylock(&adapter->tx_lock)) { 
  		/* Collision - tell upper layer to requeue */ 
  		local_irq_restore(flags); 
- 		return -1; 
+ 		return NETDEV_TX_LOCKED; 
  	} 
 
 	/* need: count + 2 desc gap to keep tail from touching
@@ -1825,7 +1825,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	if(E1000_DESC_UNUSED(&adapter->tx_ring) < count + 2) {
 		netif_stop_queue(netdev);
 		spin_unlock_irqrestore(&adapter->tx_lock, flags);
-		return 1;
+		return NETDEV_TX_BUSY;
 	}
 
 	if(unlikely(adapter->hw.mac_type == e1000_82547)) {
@@ -1833,7 +1833,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 			netif_stop_queue(netdev);
 			mod_timer(&adapter->tx_fifo_stall_timer, jiffies);
 			spin_unlock_irqrestore(&adapter->tx_lock, flags);
-			return 1;
+			return NETDEV_TX_BUSY;
 		}
 	}
 
@@ -1856,7 +1856,7 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 	netdev->trans_start = jiffies;
 
 	spin_unlock_irqrestore(&adapter->tx_lock, flags);
-	return 0;
+	return NETDEV_TX_OK;
 }
 
 /**

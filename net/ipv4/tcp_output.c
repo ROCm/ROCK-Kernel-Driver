@@ -495,9 +495,19 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	 */
 	TCP_SKB_CB(buff)->when = TCP_SKB_CB(skb)->when;
 
+	if (TCP_SKB_CB(skb)->sacked & TCPCB_LOST) {
+		tcp_dec_pcount(&tp->lost_out, skb);
+		tcp_dec_pcount(&tp->left_out, skb);
+	}
+
 	/* Fix up tso_factor for both original and new SKB.  */
 	tcp_set_skb_tso_factor(skb, tp->mss_cache_std);
 	tcp_set_skb_tso_factor(buff, tp->mss_cache_std);
+
+	if (TCP_SKB_CB(skb)->sacked & TCPCB_LOST) {
+		tcp_inc_pcount(&tp->lost_out, skb);
+		tcp_inc_pcount(&tp->left_out, skb);
+	}
 
 	if (TCP_SKB_CB(buff)->sacked&TCPCB_LOST) {
 		tcp_inc_pcount(&tp->lost_out, buff);

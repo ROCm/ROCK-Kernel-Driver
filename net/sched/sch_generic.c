@@ -139,13 +139,8 @@ int qdisc_restart(struct net_device *dev)
 				if (netdev_nit)
 					dev_queue_xmit_nit(skb, dev);
 
-				/* hard_start_xmit returns: 
-				   0  device not ready
-				   1  everything ok
-				   -1 didn't get device lock (for LLTX)
-				*/ 
 				ret = dev->hard_start_xmit(skb, dev);
-				if (ret == 0) { 
+				if (ret == NETDEV_TX_OK) { 
 					if (!nolock) {
 						dev->xmit_lock_owner = -1;
 						spin_unlock(&dev->xmit_lock);
@@ -153,10 +148,11 @@ int qdisc_restart(struct net_device *dev)
 					spin_lock(&dev->queue_lock);
 					return -1;
 				}
-				if (ret == -1 && nolock)
+				if (ret == NETDEV_TX_LOCKED && nolock)
 					goto collision; 
 			}
 
+			/* NETDEV_TX_BUSY - we need to requeue */
 			/* Release the driver */
 			if (!nolock) { 
 				dev->xmit_lock_owner = -1;
@@ -176,7 +172,7 @@ int qdisc_restart(struct net_device *dev)
 		   3. device is buggy (ppp)
 		 */
 
-	requeue:
+requeue:
 		q->ops->requeue(skb, q);
 		netif_schedule(dev);
 		return 1;

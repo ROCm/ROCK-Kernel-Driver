@@ -265,7 +265,7 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	struct ifinfomsg  *ifm = NLMSG_DATA(nlh);
 	struct rtattr    **ida = arg;
 	struct net_device *dev;
-	int err;
+	int err, send_addr_notify = 0;
 
 	dev = dev_get_by_index(ifm->ifi_index);
 	if (!dev)
@@ -312,6 +312,7 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 		err = dev->set_mac_address(dev, RTA_DATA(ida[IFLA_ADDRESS - 1]));
 		if (err)
 			goto out;
+		send_addr_notify = 1;
 	}
 
 	if (ida[IFLA_BROADCAST - 1]) {
@@ -319,6 +320,7 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 			goto out;
 		memcpy(dev->broadcast, RTA_DATA(ida[IFLA_BROADCAST - 1]),
 		       dev->addr_len);
+		send_addr_notify = 1;
 	}
 
 	if (ida[IFLA_MTU - 1]) {
@@ -365,7 +367,7 @@ static int do_setlink(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	err = 0;
 
 out:
-	if (!err)
+	if (send_addr_notify)
 		call_netdevice_notifiers(NETDEV_CHANGEADDR, dev);
 
 	dev_put(dev);

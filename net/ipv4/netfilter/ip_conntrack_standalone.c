@@ -57,18 +57,13 @@ static int kill_proto(const struct ip_conntrack *i, void *data)
 }
 
 #ifdef CONFIG_PROC_FS
-static unsigned int
-print_tuple(char *buffer, const struct ip_conntrack_tuple *tuple,
+static int
+print_tuple(struct seq_file *s, const struct ip_conntrack_tuple *tuple,
 	    struct ip_conntrack_protocol *proto)
 {
-	int len;
-
-	len = sprintf(buffer, "src=%u.%u.%u.%u dst=%u.%u.%u.%u ",
-		      NIPQUAD(tuple->src.ip), NIPQUAD(tuple->dst.ip));
-
-	len += proto->print_tuple(buffer + len, tuple);
-
-	return len;
+	seq_printf(s, "src=%u.%u.%u.%u dst=%u.%u.%u.%u ",
+		   NIPQUAD(tuple->src.ip), NIPQUAD(tuple->dst.ip));
+	return proto->print_tuple(s, tuple);
 }
 
 #ifdef CONFIG_IP_NF_CT_ACCT
@@ -85,48 +80,29 @@ seq_print_counters(struct seq_file *s, struct ip_conntrack_counter *counter)
 
 static void *ct_seq_start(struct seq_file *s, loff_t *pos)
 {
-	unsigned int *bucket;
-
-	/* strange seq_file api calls stop even if we fail,
-	 * thus we need to grab lock since stop unlocks */
-	READ_LOCK(&ip_conntrack_lock);
-  
 	if (*pos >= ip_conntrack_htable_size)
 		return NULL;
-
-	bucket = kmalloc(sizeof(unsigned int), GFP_KERNEL);
-	if (!bucket) {
-		return ERR_PTR(-ENOMEM);
-	}
-  
-	*bucket = *pos;
-	return bucket;
-}
-  
-static void *ct_seq_next(struct seq_file *s, void *v, loff_t *pos)
-{
-	unsigned int *bucket = (unsigned int *) v;
-
-	*pos = ++(*bucket);
-	if (*pos >= ip_conntrack_htable_size) {
-		kfree(v);
-		return NULL;
-	}
-	return bucket;
+	return &ip_conntrack_hash[*pos];
 }
   
 static void ct_seq_stop(struct seq_file *s, void *v)
 {
-	READ_UNLOCK(&ip_conntrack_lock);
 }
 
+static void *ct_seq_next(struct seq_file *s, void *v, loff_t *pos)
+{
+	(*pos)++;
+	if (*pos >= ip_conntrack_htable_size)
+		return NULL;
+	return &ip_conntrack_hash[*pos];
+}
+  
 /* return 0 on success, 1 in case of error */
 static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 			    struct seq_file *s)
 {
 	struct ip_conntrack *conntrack = hash->ctrack;
 	struct ip_conntrack_protocol *proto;
-	char buffer[IP_CT_PRINT_BUFLEN];
 
 	MUST_BE_READ_LOCKED(&ip_conntrack_lock);
 
@@ -147,12 +123,12 @@ static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 		      ? (conntrack->timeout.expires - jiffies)/HZ : 0) != 0)
 		return 1;
 
-	proto->print_conntrack(buffer, conntrack);
-	if (seq_puts(s, buffer))
+	if (proto->print_conntrack(s, conntrack))
 		return 1;
   
-	print_tuple(buffer, &conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
-		    proto);
+	if (print_tuple(s, &conntrack->tuplehash[IP_CT_DIR_ORIGINAL].tuple,
+			proto))
+		return 1;
 
  	if (seq_print_counters(s, &conntrack->counters[IP_CT_DIR_ORIGINAL]))
 		return 1;
@@ -161,9 +137,8 @@ static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 		if (seq_printf(s, "[UNREPLIED] "))
 			return 1;
 
-	print_tuple(buffer, &conntrack->tuplehash[IP_CT_DIR_REPLY].tuple,
-		    proto);
-	if (seq_puts(s, buffer))
+	if (print_tuple(s, &conntrack->tuplehash[IP_CT_DIR_REPLY].tuple,
+			proto))
 		return 1;
 
  	if (seq_print_counters(s, &conntrack->counters[IP_CT_DIR_REPLY]))
@@ -179,17 +154,18 @@ static int ct_seq_real_show(const struct ip_conntrack_tuple_hash *hash,
 	return 0;
 }
 
-
 static int ct_seq_show(struct seq_file *s, void *v)
 {
-	unsigned int *bucket = (unsigned int *) v;
+	struct list_head *list = v;
+	int ret = 0;
 
-	if (LIST_FIND(&ip_conntrack_hash[*bucket], ct_seq_real_show,
-		      struct ip_conntrack_tuple_hash *, s)) {
-		/* buffer was filled and unable to print that tuple */
-		return 1;
-	}
-	return 0;
+	/* FIXME: Simply truncates if hash chain too long. */
+	READ_LOCK(&ip_conntrack_lock);
+	if (LIST_FIND(list, ct_seq_real_show,
+		      struct ip_conntrack_tuple_hash *, s))
+		ret = -ENOSPC;
+	READ_UNLOCK(&ip_conntrack_lock);
+	return ret;
 }
 	
 static struct seq_operations ct_seq_ops = {
@@ -255,7 +231,6 @@ static void exp_seq_stop(struct seq_file *s, void *v)
 static int exp_seq_show(struct seq_file *s, void *v)
 {
 	struct ip_conntrack_expect *expect = v;
-	char buffer[IP_CT_PRINT_BUFLEN];
 
 	if (expect->expectant->helper->timeout)
 		seq_printf(s, "%lu ", timer_pending(&expect->timeout)
@@ -266,9 +241,8 @@ static int exp_seq_show(struct seq_file *s, void *v)
 	seq_printf(s, "use=%u proto=%u ", atomic_read(&expect->use),
 		   expect->tuple.dst.protonum);
 
-	print_tuple(buffer, &expect->tuple,
-		    __ip_ct_find_proto(expect->tuple.dst.protonum));
-	return seq_printf(s, "%s\n", buffer);
+	return print_tuple(s, &expect->tuple,
+			   __ip_ct_find_proto(expect->tuple.dst.protonum));
 }
 
 static struct seq_operations exp_seq_ops = {

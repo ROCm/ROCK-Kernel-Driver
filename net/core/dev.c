@@ -861,18 +861,6 @@ static int default_rebuild_header(struct sk_buff *skb)
 }
 
 
-/*
- * Some old buggy device drivers change get_stats after registering
- * the device.  Try and trap them here.
- * This can be elimnated when all devices are known fixed.
- */
-static inline int get_stats_changed(struct net_device *dev)
-{
-	int changed = dev->last_stats != dev->get_stats;
-	dev->last_stats = dev->get_stats;
-	return changed;
-}
-
 /**
  *	dev_open	- prepare an interface for use.
  *	@dev:	device to open
@@ -897,14 +885,6 @@ int dev_open(struct net_device *dev)
 		return 0;
 
 	/*
-	 *	 Check for broken device drivers.
-	 */
-	if (get_stats_changed(dev) && net_ratelimit()) {
-		printk(KERN_ERR "%s: driver changed get_stats after register\n",
-		       dev->name);
-	}
-
-	/*
 	 *	Is it even present?
 	 */
 	if (!netif_device_present(dev))
@@ -918,14 +898,6 @@ int dev_open(struct net_device *dev)
 		ret = dev->open(dev);
 		if (ret)
 			clear_bit(__LINK_STATE_START, &dev->state);
-	}
-
-	/*
-	 * 	Check for more broken device drivers.
-	 */
-	if (get_stats_changed(dev) && net_ratelimit()) {
-		printk(KERN_ERR "%s: driver changed get_stats in open\n",
-		       dev->name);
 	}
 
  	/*

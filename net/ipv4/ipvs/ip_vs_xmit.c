@@ -124,11 +124,11 @@ ip_vs_dst_reset(struct ip_vs_dest *dest)
 	dst_release(old_dst);
 }
 
-
 #define IP_VS_XMIT(skb, rt)				\
 do {							\
-	nf_reset(skb);					\
+	nf_reset_debug(skb);				\
 	(skb)->nfcache |= NFC_IPVS_PROPERTY;		\
+	(skb)->ip_summed = CHECKSUM_NONE;		\
 	NF_HOOK(PF_INET, NF_IP_LOCAL_OUT, (skb), NULL,	\
 		(rt)->u.dst.dev, dst_output);		\
 } while (0)
@@ -407,8 +407,6 @@ ip_vs_tunnel_xmit(struct sk_buff *skb, struct ip_vs_conn *cp,
 	iph->tot_len		=	htons(skb->len);
 	ip_select_ident(iph, &rt->u.dst, NULL);
 	ip_send_check(iph);
-
-	skb->ip_summed = CHECKSUM_NONE;
 
 	/* Another hack: avoid icmp_send in ip_fragment */
 	skb->local_df = 1;

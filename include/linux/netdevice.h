@@ -73,6 +73,11 @@ struct ethtool_ops;
 
 #define MAX_ADDR_LEN	32		/* Largest hardware address length */
 
+/* Driver transmit return codes */
+#define NETDEV_TX_OK 0		/* driver took care of packet */
+#define NETDEV_TX_BUSY 1	/* driver tx path was busy*/
+#define NETDEV_TX_LOCKED -1	/* driver tx lock was already taken */
+
 /*
  *	Compute the worst case header length according to the protocols
  *	used.
@@ -479,7 +484,6 @@ struct net_device
 
 	/* class/net/name entry */
 	struct class_device	class_dev;
-	struct net_device_stats* (*last_stats)(struct net_device *);
 	/* how much padding had been added by alloc_netdev() */
 	int padded;
 };
