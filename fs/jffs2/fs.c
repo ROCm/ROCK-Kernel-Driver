@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: fs.c,v 1.46 2004/07/13 08:56:54 dwmw2 Exp $
+ * $Id: fs.c,v 1.47 2004/11/03 12:57:39 jwboyer Exp $
  *
  */
 
@@ -649,6 +649,11 @@ int jffs2_flash_setup(struct jffs2_sb_info *c) {
 	}
 
 	/* add setups for other bizarre flashes here... */
+	if (jffs2_nor_ecc(c)) {
+		ret = jffs2_nor_ecc_flash_setup(c);
+		if (ret)
+			return ret;
+	}
 	return ret;
 }
 
@@ -659,4 +664,7 @@ void jffs2_flash_cleanup(struct jffs2_sb_info *c) {
 	}
 
 	/* add cleanups for other bizarre flashes here... */
+	if (jffs2_nor_ecc(c)) {
+		jffs2_nor_ecc_flash_cleanup(c);
+	}
 }

@@ -9,7 +9,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: wbuf.c,v 1.72 2004/09/11 19:22:43 gleixner Exp $
+ * $Id: wbuf.c,v 1.76 2004/11/05 12:41:10 jwboyer Exp $
  *
  */
 
@@ -224,7 +224,11 @@ static void jffs2_wbuf_recover(struct jffs2_sb_info *c)
 		}
 
 		/* Do the read... */
-		ret = c->mtd->read_ecc(c->mtd, start, c->wbuf_ofs - start, &retlen, buf, NULL, c->oobinfo);
+		if (jffs2_cleanmarker_oob(c))
+			ret = c->mtd->read_ecc(c->mtd, start, c->wbuf_ofs - start, &retlen, buf, NULL, c->oobinfo);
+		else
+			ret = c->mtd->read(c->mtd, start, c->wbuf_ofs - start, &retlen, buf);
+		
 		if (ret == -EBADMSG && retlen == c->wbuf_ofs - start) {
 			/* ECC recovered */
 			ret = 0;
@@ -281,8 +285,11 @@ static void jffs2_wbuf_recover(struct jffs2_sb_info *c)
 			ret = -EIO;
 		} else
 #endif
+		if (jffs2_cleanmarker_oob(c))
 			ret = c->mtd->write_ecc(c->mtd, ofs, towrite, &retlen,
 						buf, NULL, c->oobinfo);
+		else
+			ret = c->mtd->write(c->mtd, ofs, towrite, &retlen, buf);
 
 		if (ret || retlen != towrite) {
 			/* Argh. We tried. Really we did. */
@@ -419,6 +426,10 @@ static int __jffs2_flush_wbuf(struct jffs2_sb_info *c, int pad)
 	*/
 	if (pad) {
 		c->wbuf_len = PAD(c->wbuf_len);
+
+		/* Pad with JFFS2_DIRTY_BITMASK initially.  this helps out ECC'd NOR
+		   with 8 byte page size */
+		memset(c->wbuf + c->wbuf_len, 0, c->wbuf_pagesize - c->wbuf_len);
 		
 		if ( c->wbuf_len + sizeof(struct jffs2_unknown_node) < c->wbuf_pagesize) {
 			struct jffs2_unknown_node *padnode = (void *)(c->wbuf + c->wbuf_len);
@@ -426,9 +437,6 @@ static int __jffs2_flush_wbuf(struct jffs2_sb_info *c, int pad)
 			padnode->nodetype = cpu_to_je16(JFFS2_NODETYPE_PADDING);
 			padnode->totlen = cpu_to_je32(c->wbuf_pagesize - c->wbuf_len);
 			padnode->hdr_crc = cpu_to_je32(crc32(0, padnode, sizeof(*padnode)-4));
-		} else {
-			/* Pad with JFFS2_DIRTY_BITMASK */
-			memset(c->wbuf + c->wbuf_len, 0, c->wbuf_pagesize - c->wbuf_len);
 		}
 	}
 	/* else jffs2_flash_writev has actually filled in the rest of the
@@ -444,8 +452,11 @@ static int __jffs2_flush_wbuf(struct jffs2_sb_info *c, int pad)
 		ret = -EIO;
 	} else 
 #endif
-	ret = c->mtd->write_ecc(c->mtd, c->wbuf_ofs, c->wbuf_pagesize, &retlen, c->wbuf, NULL, c->oobinfo);
-
+	
+	if (jffs2_cleanmarker_oob(c))
+		ret = c->mtd->write_ecc(c->mtd, c->wbuf_ofs, c->wbuf_pagesize, &retlen, c->wbuf, NULL, c->oobinfo);
+	else
+		ret = c->mtd->write(c->mtd, c->wbuf_ofs, c->wbuf_pagesize, &retlen, c->wbuf);
 
 	if (ret || retlen != c->wbuf_pagesize) {
 		if (ret)
@@ -582,6 +593,17 @@ int jffs2_flash_writev(struct jffs2_sb_info *c, const struct kvec *invecs, unsig
 		memset(c->wbuf,0xff,c->wbuf_pagesize);
 	}
 
+	/* Fixup the wbuf if we are moving to a new eraseblock.  The checks below
+	   fail for ECC'd NOR because cleanmarker == 16, so a block starts at
+	   xxx0010.  */
+	if (jffs2_nor_ecc(c)) {
+		if (((c->wbuf_ofs % c->sector_size) == 0) && !c->wbuf_len) {
+			c->wbuf_ofs = PAGE_DIV(to);
+			c->wbuf_len = PAGE_MOD(to);
+			memset(c->wbuf,0xff,c->wbuf_pagesize);
+		}
+	}
+	
 	/* Sanity checks on target address. 
 	   It's permitted to write at PAD(c->wbuf_len+c->wbuf_ofs), 
 	   and it's permitted to write at the beginning of a new 
@@ -715,7 +737,11 @@ int jffs2_flash_writev(struct jffs2_sb_info *c, const struct kvec *invecs, unsig
 		outvecs[splitvec].iov_len = split_ofs;
 
 		/* We did cross a page boundary, so we write some now */
-		ret = c->mtd->writev_ecc(c->mtd, outvecs, splitvec+1, outvec_to, &wbuf_retlen, NULL, c->oobinfo); 
+		if (jffs2_cleanmarker_oob(c))
+			ret = c->mtd->writev_ecc(c->mtd, outvecs, splitvec+1, outvec_to, &wbuf_retlen, NULL, c->oobinfo); 
+		else
+			ret = jffs2_flash_direct_writev(c, outvecs, splitvec+1, outvec_to, &wbuf_retlen);
+		
 		if (ret < 0 || wbuf_retlen != PAGE_DIV(totlen)) {
 			/* At this point we have no problem,
 			   c->wbuf is empty. 
@@ -789,7 +815,10 @@ int jffs2_flash_read(struct jffs2_sb_info *c, loff_t ofs, size_t len, size_t *re
 
 	/* Read flash */
 	if (!jffs2_can_mark_obsolete(c)) {
-		ret = c->mtd->read_ecc(c->mtd, ofs, len, retlen, buf, NULL, c->oobinfo);
+		if (jffs2_cleanmarker_oob(c))
+			ret = c->mtd->read_ecc(c->mtd, ofs, len, retlen, buf, NULL, c->oobinfo);
+		else
+			ret = c->mtd->read(c->mtd, ofs, len, retlen, buf);
 
 		if ( (ret == -EBADMSG) && (*retlen == len) ) {
 			printk(KERN_WARNING "mtd->read(0x%zx bytes from 0x%llx) returned ECC error\n",
@@ -1105,3 +1134,24 @@ void jffs2_nand_flash_cleanup(struct jffs2_sb_info *c)
 {
 	kfree(c->wbuf);
 }
+
+#ifdef CONFIG_JFFS2_FS_NOR_ECC
+int jffs2_nor_ecc_flash_setup(struct jffs2_sb_info *c) {
+	/* Cleanmarker is actually larger on the flashes */
+	c->cleanmarker_size = 16;
+
+	/* Initialize write buffer */
+	c->wbuf_pagesize = c->mtd->eccsize;
+	c->wbuf_ofs = 0xFFFFFFFF;
+
+	c->wbuf = kmalloc(c->wbuf_pagesize, GFP_KERNEL);
+	if (!c->wbuf)
+		return -ENOMEM;
+
+	return 0;
+}
+
+void jffs2_nor_ecc_flash_cleanup(struct jffs2_sb_info *c) {
+	kfree(c->wbuf);
+}
+#endif
