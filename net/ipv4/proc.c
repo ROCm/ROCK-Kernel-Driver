@@ -23,7 +23,7 @@
  *		Alan Cox	:	Handle dead sockets properly.
  *	Gerhard Koerting	:	Show both timers
  *		Alan Cox	:	Allow inode to be NULL (kernel socket)
- *	Andi Kleen		:	Add support for open_requests and 
+ *	Andi Kleen		:	Add support for open_requests and
  *					split functions for more readibility.
  *	Andi Kleen		:	Add support for /proc/net/netstat
  *	Arnaldo C. Melo		:	Convert to seq_file
@@ -33,21 +33,11 @@
  *		as published by the Free Software Foundation; either version
  *		2 of the License, or (at your option) any later version.
  */
-#include <asm/system.h>
-#include <linux/sched.h>
-#include <linux/socket.h>
-#include <linux/net.h>
-#include <linux/un.h>
-#include <linux/in.h>
-#include <linux/param.h>
-#include <linux/inet.h>
-#include <linux/netdevice.h>
-#include <net/ip.h>
+#include <linux/types.h>
 #include <net/icmp.h>
 #include <net/protocol.h>
 #include <net/tcp.h>
 #include <net/udp.h>
-#include <linux/skbuff.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <net/sock.h>
@@ -58,7 +48,7 @@ static int fold_prot_inuse(struct proto *proto)
 	int res = 0;
 	int cpu;
 
-	for (cpu=0; cpu<NR_CPUS; cpu++)
+	for (cpu = 0; cpu < NR_CPUS; cpu++)
 		res += proto->stats[cpu].inuse;
 
 	return res;
@@ -67,37 +57,34 @@ static int fold_prot_inuse(struct proto *proto)
 /*
  *	Report socket allocation statistics [mea@utu.fi]
  */
-int afinet_get_info(char *buffer, char **start, off_t offset, int length)
+static int sockstat_seq_show(struct seq_file *seq, void *v)
 {
-	/* From  net/socket.c  */
-	extern int socket_get_info(char *, char **, off_t, int);
+	/* From net/socket.c */
+	extern void socket_seq_show(struct seq_file *seq);
 
-	int len  = socket_get_info(buffer,start,offset,length);
-
-	len += sprintf(buffer+len,"TCP: inuse %d orphan %d tw %d alloc %d mem %d\n",
-		       fold_prot_inuse(&tcp_prot),
-		       atomic_read(&tcp_orphan_count), tcp_tw_count,
-		       atomic_read(&tcp_sockets_allocated),
-		       atomic_read(&tcp_memory_allocated));
-	len += sprintf(buffer+len,"UDP: inuse %d\n",
-		       fold_prot_inuse(&udp_prot));
-	len += sprintf(buffer+len,"RAW: inuse %d\n",
-		       fold_prot_inuse(&raw_prot));
-	len += sprintf(buffer+len, "FRAG: inuse %d memory %d\n",
-		       ip_frag_nqueues, atomic_read(&ip_frag_mem));
-	if (offset >= len)
-	{
-		*start = buffer;
-		return 0;
-	}
-	*start = buffer + offset;
-	len -= offset;
-	if (len > length)
-		len = length;
-	if (len < 0)
-		len = 0;
-	return len;
+	socket_seq_show(seq);
+	seq_printf(seq, "TCP: inuse %d orphan %d tw %d alloc %d mem %d\n",
+		   fold_prot_inuse(&tcp_prot), atomic_read(&tcp_orphan_count),
+		   tcp_tw_count, atomic_read(&tcp_sockets_allocated),
+		   atomic_read(&tcp_memory_allocated));
+	seq_printf(seq, "UDP: inuse %d\n", fold_prot_inuse(&udp_prot));
+	seq_printf(seq, "RAW: inuse %d\n", fold_prot_inuse(&raw_prot));
+	seq_printf(seq,  "FRAG: inuse %d memory %d\n", ip_frag_nqueues,
+		   atomic_read(&ip_frag_mem));
+	return 0;
 }
+
+static int sockstat_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, sockstat_seq_show, NULL);
+}
+
+static struct file_operations sockstat_seq_fops = {
+	.open	 = sockstat_seq_open,
+	.read	 = seq_read,
+	.llseek	 = seq_lseek,
+	.release = single_release,
+};
 
 static unsigned long fold_field(unsigned long *begin, int sz, int nr)
 {
@@ -106,14 +93,14 @@ static unsigned long fold_field(unsigned long *begin, int sz, int nr)
 
 	sz /= sizeof(unsigned long);
 
-	for (i=0; i<NR_CPUS; i++) {
-		res += begin[2*i*sz + nr];
-		res += begin[(2*i+1)*sz + nr];
+	for (i = 0; i < NR_CPUS; i++) {
+		res += begin[2 * i * sz + nr];
+		res += begin[(2 * i + 1) * sz + nr];
 	}
 	return res;
 }
 
-/* 
+/*
  *	Called from the PROCfs module. This outputs /proc/net/snmp.
  */
 static int snmp_seq_show(struct seq_file *seq, void *v)
@@ -160,7 +147,7 @@ static int snmp_seq_show(struct seq_file *seq, void *v)
 
 	seq_printf(seq, "\nUdp: InDatagrams NoPorts InErrors OutDatagrams\n"
 			"Udp:");
-	
+
 	for (i = 0;
 	     i < offsetof(struct udp_mib, __pad) / sizeof(unsigned long); i++)
 		seq_printf(seq, " %lu",
@@ -183,7 +170,7 @@ static struct file_operations snmp_seq_fops = {
 	.release = single_release,
 };
 
-/* 
+/*
  *	Output /proc/net/netstat
  */
 static int netstat_seq_show(struct seq_file *seq, void *v)
@@ -243,7 +230,7 @@ int __init ip_misc_proc_init(void)
 {
 	int rc = 0;
 	struct proc_dir_entry *p;
-		
+
 	p = create_proc_entry("netstat", S_IRUGO, proc_net);
 	if (!p)
 		goto out_netstat;
@@ -254,8 +241,10 @@ int __init ip_misc_proc_init(void)
 		goto out_snmp;
 	p->proc_fops = &snmp_seq_fops;
 
-	if (!proc_net_create("sockstat", 0, afinet_get_info))
+	p = create_proc_entry("sockstat", S_IRUGO, proc_net);
+	if (!p)
 		goto out_sockstat;
+	p->proc_fops = &sockstat_seq_fops;
 out:
 	return rc;
 out_sockstat:

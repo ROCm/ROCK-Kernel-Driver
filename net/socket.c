@@ -1839,29 +1839,19 @@ void __init sock_init(void)
 #endif
 }
 
-int socket_get_info(char *buffer, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+void socket_seq_show(struct seq_file *seq)
 {
-	int len, cpu;
+	int cpu;
 	int counter = 0;
 
-	for (cpu=0; cpu<NR_CPUS; cpu++)
+	for (cpu = 0; cpu < NR_CPUS; cpu++)
 		counter += sockets_in_use[cpu].counter;
 
 	/* It can be negative, by the way. 8) */
 	if (counter < 0)
 		counter = 0;
 
-	len = sprintf(buffer, "sockets: used %d\n", counter);
-	if (offset >= len)
-	{
-		*start = buffer;
-		return 0;
-	}
-	*start = buffer + offset;
-	len -= offset;
-	if (len > length)
-		len = length;
-	if (len < 0)
-		len = 0;
-	return len;
+	seq_printf(seq, "sockets: used %d\n", counter);
 }
+#endif /* CONFIG_PROC_FS */
