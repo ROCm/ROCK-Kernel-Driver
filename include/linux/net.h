@@ -144,6 +144,9 @@ extern int	sock_readv_writev(int type, struct inode * inode, struct file * file,
 				  const struct iovec * iov, long count, long size);
 extern int 	sock_map_fd(struct socket *sock);
 
+extern struct socket *sockfd_lookup(int fd, int *err);
+#define         sockfd_put(sock) fput(sock->file)
+
 extern int	net_ratelimit(void);
 extern unsigned long net_random(void);
 extern void net_srandom(unsigned long);
