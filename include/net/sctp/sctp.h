@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001-2003 Intel Corp.
@@ -78,6 +78,7 @@
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
 #include <linux/jiffies.h>
+#include <linux/idr.h>
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 #include <net/ipv6.h>
@@ -223,24 +224,6 @@ DECLARE_SNMP_STAT(struct sctp_mib, sctp_statistics);
 #define SCTP_INC_STATS_USER(field) SNMP_INC_STATS_USER(sctp_statistics, field)
 #define SCTP_DEC_STATS(field)      SNMP_DEC_STATS(sctp_statistics, field)
 
-/* Determine if this is a valid kernel address.  */
-static inline int sctp_is_valid_kaddr(unsigned long addr)
-{
-	struct page *page;
-
-	/* Make sure the address is not in the user address space. */
-	if (addr < PAGE_OFFSET)
-		return 0;
-
-	page = virt_to_page(addr);
-
-	/* Is this page valid? */
-	if (!virt_addr_valid(addr) || PageReserved(page))
-		return 0;
-
-	return 1;
-}
-
 #endif /* !TEST_FRAME */
 
 
@@ -357,7 +340,7 @@ static inline void sctp_v6_exit(void) { return; }
 /* Map an association to an assoc_id. */
 static inline sctp_assoc_t sctp_assoc2id(const struct sctp_association *asoc)
 {
-	return (sctp_assoc_t) asoc;
+	return (asoc?asoc->assoc_id:NULL);
 }
 
 /* Look up the association by its id.  */
@@ -518,6 +501,9 @@ for (err = (sctp_errhdr_t *)((void *)chunk_hdr + \
 extern struct proto sctp_prot;
 extern struct proc_dir_entry *proc_net_sctp;
 void sctp_put_port(struct sock *sk);
+
+extern struct idr sctp_assocs_id;
+extern spinlock_t sctp_assocs_id_lock;
 
 /* Static inline functions. */
 

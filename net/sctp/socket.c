@@ -135,8 +135,14 @@ struct sctp_association *sctp_id2assoc(struct sock *sk, sctp_assoc_t id)
 	}
 
 	/* Otherwise this is a UDP-style socket. */
-	asoc = (struct sctp_association *)id;
-	if (!sctp_assoc_valid(sk, asoc))
+	if (!id || (id == (sctp_assoc_t)-1))
+		return NULL;
+
+	spin_lock_bh(&sctp_assocs_id_lock);
+	asoc = (struct sctp_association *)idr_find(&sctp_assocs_id, (int)id);
+	spin_unlock_bh(&sctp_assocs_id_lock);
+
+	if (!asoc || (asoc->base.sk != sk) || asoc->base.dead)
 		return NULL;
 
 	return asoc;

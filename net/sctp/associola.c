@@ -1,5 +1,5 @@
 /* SCTP kernel reference Implementation
- * (C) Copyright IBM Corp. 2001, 2003
+ * (C) Copyright IBM Corp. 2001, 2004
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 Intel Corp.
@@ -276,7 +276,7 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	asoc->need_ecne = 0;
 
-	asoc->eyecatcher = SCTP_ASSOC_EYECATCHER;
+	asoc->assoc_id = (sctp_assoc_t)-1;
 
 	/* Assume that peer would support both address types unless we are
 	 * told otherwise.
@@ -360,8 +360,6 @@ void sctp_association_free(struct sctp_association *asoc)
 		sctp_transport_free(transport);
 	}
 
-	asoc->eyecatcher = 0;
-
 	/* Free any cached ASCONF_ACK chunk. */
 	if (asoc->addip_last_asconf_ack)
 		sctp_chunk_free(asoc->addip_last_asconf_ack);
@@ -380,6 +378,12 @@ static void sctp_association_destroy(struct sctp_association *asoc)
 
 	sctp_endpoint_put(asoc->ep);
 	sock_put(asoc->base.sk);
+
+	if ((int)asoc->assoc_id != -1) {
+		spin_lock_bh(&sctp_assocs_id_lock);
+		idr_remove(&sctp_assocs_id, (int)asoc->assoc_id);
+		spin_unlock_bh(&sctp_assocs_id_lock);
+	}
 
 	if (asoc->base.malloced) {
 		kfree(asoc);
@@ -856,26 +860,6 @@ out:
 	return transport;
 }
 
-/*  Is this a live association structure. */
-int sctp_assoc_valid(struct sock *sk, struct sctp_association *asoc)
-{
-
-	/* First, verify that this is a kernel address. */
-	if (!sctp_is_valid_kaddr((unsigned long) asoc))
-		return 0;
-
-	/* Verify that this _is_ an sctp_association
-	 * data structure and if so, that the socket matches.
-	 */
-	if (SCTP_ASSOC_EYECATCHER != asoc->eyecatcher)
-		return 0;
-	if (asoc->base.sk != sk)
-		return 0;
-
-	/* The association is valid. */
-	return 1;
-}
-
 /* Do delayed input processing.  This is scheduled by sctp_rcv(). */
 static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 {
@@ -891,6 +875,7 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 	sk = asoc->base.sk;
 
 	inqueue = &asoc->base.inqueue;
+	sctp_association_hold(asoc);
 	while (NULL != (chunk = sctp_inq_pop(inqueue))) {
 		state = asoc->state;
 		subtype = chunk->chunk_hdr->type;
@@ -913,14 +898,14 @@ static void sctp_assoc_bh_rcv(struct sctp_association *asoc)
 		/* Check to see if the association is freed in response to
 		 * the incoming chunk.  If so, get out of the while loop.
 		 */
-		if (!sctp_assoc_valid(sk, asoc))
+		if (asoc->base.dead)
 			break;
 
 		/* If there is an error on chunk, discard this packet. */
 		if (error && chunk)
 			chunk->pdiscard = 1;
 	}
-
+	sctp_association_put(asoc);
 }
 
 /* This routine moves an association from its old sk to a new sk.  */
