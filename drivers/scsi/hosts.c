@@ -553,8 +553,8 @@ void scsi_host_get(struct Scsi_Host *shost)
 void scsi_host_put(struct Scsi_Host *shost)
 {
 
-	put_device(&shost->host_gendev);
 	class_device_put(&shost->class_dev);
+	put_device(&shost->host_gendev);
 	return;
 }
 
