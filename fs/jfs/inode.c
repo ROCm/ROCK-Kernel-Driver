@@ -31,6 +31,7 @@
 extern struct inode_operations jfs_dir_inode_operations;
 extern struct inode_operations jfs_file_inode_operations;
 extern struct inode_operations jfs_symlink_inode_operations;
+extern struct inode_operations jfs_special_inode_operations;
 extern struct file_operations jfs_dir_operations;
 extern struct file_operations jfs_file_operations;
 struct address_space_operations jfs_aops;
@@ -65,6 +66,7 @@ struct inode *jfs_iget(struct super_block *sb, ino_t ino)
 		} else
 			inode->i_op = &jfs_symlink_inode_operations;
 	} else {
+		inode->i_op = &jfs_special_inode_operations;
 		init_special_inode(inode, inode->i_mode,
 				   kdev_t_to_nr(inode->i_rdev));
 	}
