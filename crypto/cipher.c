@@ -52,8 +52,8 @@ static int crypt(struct crypto_tfm *tfm,
 {
 	struct scatter_walk walk_in, walk_out;
 	const unsigned int bsize = crypto_tfm_alg_blocksize(tfm);
-	u8 tmp_src[nbytes > src->length ? bsize : 0];
-	u8 tmp_dst[nbytes > dst->length ? bsize : 0];
+	u8 tmp_src[bsize];
+	u8 tmp_dst[bsize];
 
 	if (!nbytes)
 		return 0;
