@@ -56,7 +56,6 @@
 #include <asm/delay.h>
 #include <asm/irq.h>
 
-extern cpumask_t    __cacheline_aligned pending_irq_cpumask[NR_IRQS];
 
 /*
  * Linux has a controller-independent x86 interrupt architecture.
@@ -84,6 +83,11 @@ irq_desc_t _irq_desc[NR_IRQS] __cacheline_aligned = {
 		.lock = SPIN_LOCK_UNLOCKED
 	}
 };
+
+/*
+ * This is updated when the user sets irq affinity via /proc
+ */
+cpumask_t    __cacheline_aligned pending_irq_cpumask[NR_IRQS];
 
 #ifdef CONFIG_IA64_GENERIC
 irq_desc_t * __ia64_irq_desc (unsigned int irq)

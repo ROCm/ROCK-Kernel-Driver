@@ -45,14 +45,6 @@ EXPORT_SYMBOL(last_cli_ip);
 
 #endif
 
-unsigned long long
-sched_clock (void)
-{
-	unsigned long offset = ia64_get_itc();
-
-	return (offset * local_cpu_data->nsec_per_cyc) >> IA64_NSEC_PER_CYC_SHIFT;
-}
-
 static void
 itc_reset (void)
 {

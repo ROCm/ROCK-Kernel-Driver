@@ -202,7 +202,6 @@ ia64_sync_itc (unsigned int master)
 {
 	long i, delta, adj, adjust_latency = 0, done = 0;
 	unsigned long flags, rt, master_time_stamp, bound;
-	extern void ia64_cpu_local_tick (void);
 #if DEBUG_ITC_SYNC
 	struct {
 		long rt;	/* roundtrip time */
