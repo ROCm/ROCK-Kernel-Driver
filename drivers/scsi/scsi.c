@@ -537,7 +537,6 @@ void scsi_init_cmd_from_req(struct scsi_cmnd *cmd, struct scsi_request *sreq)
 
 	cmd->request = sreq->sr_request;
 	memcpy(cmd->data_cmnd, sreq->sr_cmnd, sizeof(cmd->data_cmnd));
-	cmd->reset_chain = NULL;
 	cmd->serial_number = 0;
 	cmd->serial_number_at_timeout = 0;
 	cmd->bufflen = sreq->sr_bufflen;

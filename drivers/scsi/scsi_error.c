@@ -1661,13 +1661,10 @@ scsi_reset_provider(struct scsi_device *dev, int flag)
     
 	scmd->scsi_done		= scsi_reset_provider_done_command;
 	scmd->done			= NULL;
-	scmd->reset_chain		= NULL;
-        
 	scmd->buffer			= NULL;
 	scmd->bufflen			= 0;
 	scmd->request_buffer		= NULL;
 	scmd->request_bufflen		= 0;
-
 	scmd->internal_timeout		= NORMAL_TIMEOUT;
 	scmd->abort_reason		= DID_ABORT;
 

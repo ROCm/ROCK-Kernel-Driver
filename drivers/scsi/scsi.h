@@ -476,7 +476,6 @@ struct scsi_cmnd {
 	unsigned short state;
 	unsigned short owner;
 	Scsi_Request *sc_request;
-	struct scsi_cmnd *reset_chain;
 
 	struct list_head list;  /* scsi_cmnd participates in queue lists */
 
@@ -560,14 +559,6 @@ struct scsi_cmnd {
 						 * (auto-sense) */
 
 	unsigned flags;
-
-	/*
-	 * Used to indicate that a command which has timed out also
-	 * completed normally.  Typically the completion function will
-	 * do nothing but set this flag in this instance because the
-	 * timeout handler is already running.
-	 */
-	unsigned done_late:1;
 
 	/* Low-level done function - can be used by low-level driver to point
 	 *        to completion function.  Not used by mid/upper level code. */
