@@ -230,6 +230,22 @@ typedef struct {
 		 (int *) (addr));								\
 })
 
+#ifdef CONFIG_IA32_SUPPORT
+struct desc_struct {
+	unsigned int a, b;
+};
+
+#define desc_empty(desc)		(!((desc)->a + (desc)->b))
+#define desc_equal(desc1, desc2)	(((desc1)->a == (desc2)->a) && ((desc1)->b == (desc2)->b))
+
+#define GDT_ENTRY_TLS_ENTRIES	3
+#define GDT_ENTRY_TLS_MIN	6
+#define GDT_ENTRY_TLS_MAX 	(GDT_ENTRY_TLS_MIN + GDT_ENTRY_TLS_ENTRIES - 1)
+
+#define TLS_SIZE (GDT_ENTRY_TLS_ENTRIES * 8)
+
+#endif
+
 struct thread_struct {
 	__u32 flags;			/* various thread flags (see IA64_THREAD_*) */
 	/* writing on_ustack is performance-critical, so it's worth spending 8 bits on it... */
@@ -249,6 +265,9 @@ struct thread_struct {
 	__u64 fdr;			/* IA32 fp except. data reg */
 	__u64 old_k1;			/* old value of ar.k1 */
 	__u64 old_iob;			/* old IOBase value */
+        /* cached TLS descriptors. */
+	struct desc_struct tls_array[GDT_ENTRY_TLS_ENTRIES];
+
 # define INIT_THREAD_IA32	.eflag =	0,			\
 				.fsr =		0,			\
 				.fcr =		0x17800000037fULL,	\

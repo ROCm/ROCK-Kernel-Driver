@@ -685,8 +685,7 @@ efi_mem_type (unsigned long phys_addr)
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		md = p;
 
-		if ((md->phys_addr <= phys_addr) && (phys_addr <=
-		    (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - 1)))
+		if (phys_addr - md->phys_addr < (md->num_pages << EFI_PAGE_SHIFT))
 			 return md->type;
 	}
 	return 0;
@@ -706,8 +705,7 @@ efi_mem_attributes (unsigned long phys_addr)
 	for (p = efi_map_start; p < efi_map_end; p += efi_desc_size) {
 		md = p;
 
-		if ((md->phys_addr <= phys_addr) && (phys_addr <=
-		    (md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT) - 1)))
+		if (phys_addr - md->phys_addr < (md->num_pages << EFI_PAGE_SHIFT))
 			return md->attribute;
 	}
 	return 0;

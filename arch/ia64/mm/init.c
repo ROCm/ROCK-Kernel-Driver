@@ -558,6 +558,6 @@ mem_init (void)
 	setup_gate();	/* setup gate pages before we free up boot memory... */
 
 #ifdef CONFIG_IA32_SUPPORT
-	ia32_gdt_init();
+	ia32_boot_gdt_init();
 #endif
 }

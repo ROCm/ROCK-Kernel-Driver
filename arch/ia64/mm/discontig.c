@@ -186,7 +186,7 @@ static int __init find_pernode_space(unsigned long start, unsigned long len,
 			 */
 			for (cpu = 0; cpu < NR_CPUS; cpu++) {
 				if (node == node_cpuid[cpu].nid) {
-					memcpy(cpu_data, __phys_per_cpu_start,
+					memcpy(__va(cpu_data), __phys_per_cpu_start,
 					       __per_cpu_end-__per_cpu_start);
 					__per_cpu_offset[cpu] =
 						(char*)__va(cpu_data) -
