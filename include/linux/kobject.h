@@ -24,6 +24,7 @@
 #define KOBJ_NAME_LEN	20
 
 struct kobject {
+	char			* k_name;
 	char			name[KOBJ_NAME_LEN];
 	atomic_t		refcount;
 	struct list_head	entry;
@@ -32,6 +33,14 @@ struct kobject {
 	struct kobj_type	* ktype;
 	struct dentry		* dentry;
 };
+
+extern int kobject_set_name(struct kobject *, const char *, ...)
+	__attribute__((format(printf,2,3)));
+
+static inline char * kobject_name(struct kobject * kobj)
+{
+	return kobj->k_name;
+}
 
 extern void kobject_init(struct kobject *);
 extern void kobject_cleanup(struct kobject *);
