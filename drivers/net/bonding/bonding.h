@@ -103,6 +103,7 @@ typedef struct bonding {
 #ifdef CONFIG_PROC_FS
 	struct proc_dir_entry *bond_proc_dir;
 	struct proc_dir_entry *bond_proc_info_file;
+	char procdir_name[IFNAMSIZ];
 #endif /* CONFIG_PROC_FS */
 	struct list_head bond_list;
 	struct net_device *device;
