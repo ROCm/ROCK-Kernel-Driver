@@ -77,6 +77,7 @@ static struct file_operations i2cdev_fops = {
 static struct i2c_adapter *i2cdev_adaps[I2CDEV_ADAPS_MAX];
 
 static struct i2c_driver i2cdev_driver = {
+	.owner		= THIS_MODULE,
 	.name		= "i2c-dev dummy driver",
 	.id		= I2C_DRIVERID_I2CDEV,
 	.flags		= I2C_DF_DUMMY,
@@ -340,47 +341,42 @@ int i2cdev_ioctl (struct inode *inode, struct file *file, unsigned int cmd,
 	return 0;
 }
 
-int i2cdev_open (struct inode *inode, struct file *file)
+static int i2cdev_open(struct inode *inode, struct file *file)
 {
 	unsigned int minor = minor(inode->i_rdev);
 	struct i2c_client *client;
 
-	if ((minor >= I2CDEV_ADAPS_MAX) || ! (i2cdev_adaps[minor])) {
-#ifdef DEBUG
-		printk(KERN_DEBUG "i2c-dev.o: Trying to open unattached adapter i2c-%d\n",
-		       minor);
-#endif
+	if ((minor >= I2CDEV_ADAPS_MAX) || !(i2cdev_adaps[minor]))
 		return -ENODEV;
-	}
 
-	/* Note that we here allocate a client for later use, but we will *not*
-	   register this client! Yes, this is safe. No, it is not very clean. */
-	if(! (client = kmalloc(sizeof(struct i2c_client),GFP_KERNEL)))
+	client = kmalloc(sizeof(*client), GFP_KERNEL);
+	if (!client)
 		return -ENOMEM;
-	memcpy(client,&i2cdev_client_template,sizeof(struct i2c_client));
+	memcpy(client, &i2cdev_client_template, sizeof(*client));
+
+	/* registered with adapter, passed as client to user */
 	client->adapter = i2cdev_adaps[minor];
 	file->private_data = client;
 
-	if (!try_module_get(i2cdev_adaps[minor]->owner)) {
-		kfree(client);
-		return -ENODEV;
-	}
+	/* use adapter module, i2c-dev handled with fops */
+	if (!try_module_get(client->adapter->owner))
+		goto out_kfree;
 
-#ifdef DEBUG
-	printk(KERN_DEBUG "i2c-dev.o: opened i2c-%d\n",minor);
-#endif
 	return 0;
+
+ out_kfree:
+	kfree(client);
+	return -ENODEV;
 }
 
-static int i2cdev_release (struct inode *inode, struct file *file)
+static int i2cdev_release(struct inode *inode, struct file *file)
 {
-	unsigned int minor = minor(inode->i_rdev);
-	kfree(file->private_data);
-	file->private_data=NULL;
-#ifdef DEBUG
-	printk(KERN_DEBUG "i2c-dev.o: Closed: i2c-%d\n", minor);
-#endif
-	module_put(i2cdev_adaps[minor]->owner);
+	struct i2c_client *client = file->private_data;
+
+	module_put(client->adapter->owner);
+	kfree(client);
+	file->private_data = NULL;
+
 	return 0;
 }
 
