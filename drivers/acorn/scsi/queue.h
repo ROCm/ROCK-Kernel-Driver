@@ -74,6 +74,15 @@ extern int __queue_add(Queue_t *queue, Scsi_Cmnd *SCpnt, int head);
 extern Scsi_Cmnd *queue_remove_tgtluntag (Queue_t *queue, int target, int lun, int tag);
 
 /*
+ * Function: queue_remove_all_target(queue, target)
+ * Purpose : remove all SCSI commands from the queue for a specified target
+ * Params  : queue  - queue to remove command from
+ *           target - target device id
+ * Returns : nothing
+ */
+extern void queue_remove_all_target(Queue_t *queue, int target);
+
+/*
  * Function: int queue_probetgtlun (queue, target, lun)
  * Purpose : check to see if we have a command in the queue for the specified
  *	     target/lun.

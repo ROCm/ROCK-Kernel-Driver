@@ -1,56 +1,13 @@
-#define AUTOSENSE
-#define PSEUDO_DMA
-
 /*
  * Generic Generic NCR5380 driver
  *
- * Copyright 1995, Russell King
- *
- * ALPHA RELEASE 1.
- *
- * For more information, please consult
- *
- * NCR 5380 Family
- * SCSI Protocol Controller
- * Databook
- *
- * NCR Microelectronics
- * 1635 Aeroplaza Drive
- * Colorado Springs, CO 80916
- * 1+ (719) 578-3400
- * 1+ (800) 334-5454
+ * Copyright 1995-2002, Russell King
  */
-
-
-/*
- * Options :
- *
- * PARITY - enable parity checking.  Not supported.
- *
- * SCSI2 - enable support for SCSI-II tagged queueing.  Untested.
- *
- * USLEEP - enable support for devices that don't disconnect.  Untested.
- */
-
-/*
- * $Log: cumana_1.c,v $
- * Revision 1.3  1998/05/03 20:45:32  alan
- * ARM SCSI update. This adds the eesox driver and massively updates the
- * Cumana driver. The folks who bought cumana arent anal retentive all
- * docs are secret weenies so now there are docs ..
- *
- * Revision 1.2  1998/03/08 05:49:46  davem
- * Merge to 2.1.89
- *
- * Revision 1.1  1998/02/23 02:45:22  davem
- * Merge to 2.1.88
- *
- */
-
 #include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
 #include <linux/ioport.h>
+#include <linux/delay.h>
 #include <linux/blk.h>
 #include <linux/init.h>
 
@@ -64,28 +21,19 @@
 
 #include <scsi/scsicam.h>
 
+#define AUTOSENSE
+#define PSEUDO_DMA
+
 #define CUMANASCSI_PUBLIC_RELEASE 1
 
-static const card_ids cumanascsi_cids[] = {
-	{ MANU_CUMANA, PROD_CUMANA_SCSI_1 },
-	{ 0xffff, 0xffff }
-};
-
-#define NCR5380_implementation_fields \
-    int port, ctrl
-
-#define NCR5380_local_declare() \
-        struct Scsi_Host *_instance
-
-#define NCR5380_setup(instance) \
-        _instance = instance
-
-#define NCR5380_read(reg) cumanascsi_read(_instance, reg)
-#define NCR5380_write(reg, value) cumanascsi_write(_instance, reg, value)
-
-#define NCR5380_intr		cumanascsi_intr
-#define NCR5380_queue_command	cumanascsi_queue_command
-#define NCR5380_proc_info	cumanascsi_proc_info
+#define NCR5380_implementation_fields	int port, ctrl
+#define NCR5380_local_declare()		struct Scsi_Host *_instance
+#define NCR5380_setup(instance)		_instance = instance
+#define NCR5380_read(reg)		cumanascsi_read(_instance, reg)
+#define NCR5380_write(reg, value)	cumanascsi_write(_instance, reg, value)
+#define NCR5380_intr			cumanascsi_intr
+#define NCR5380_queue_command		cumanascsi_queue_command
+#define NCR5380_proc_info		cumanascsi_proc_info
 
 int NCR5380_proc_info(char *buffer, char **start, off_t offset,
 		      int length, int hostno, int inout);
@@ -95,112 +43,13 @@ int NCR5380_proc_info(char *buffer, char **start, off_t offset,
 
 #include "../../scsi/NCR5380.h"
 
-/*
- * Function : cumanascsi_setup(char *str, int *ints)
- *
- * Purpose : LILO command line initialization of the overrides array,
- *
- * Inputs : str - unused, ints - array of integer parameters with ints[0]
- *	equal to the number of ints.
- *
- */
-
 void cumanascsi_setup(char *str, int *ints)
 {
 }
 
-#define CUMANA_ADDRESS(card) (ecard_address((card), ECARD_IOC, ECARD_SLOW) + 0x800)
-#define CUMANA_IRQ(card)     ((card)->irq)
-/*
- * Function : int cumanascsi_detect(Scsi_Host_Template * tpnt)
- *
- * Purpose : initializes cumana NCR5380 driver based on the
- *	command line / compile time port and irq definitions.
- *
- * Inputs : tpnt - template for this SCSI adapter.
- *
- * Returns : 1 if a host adapter was found, 0 if not.
- *
- */
-static struct expansion_card *ecs[4];
- 
-int cumanascsi_detect(Scsi_Host_Template * tpnt)
+const char *cumanascsi_info(struct Scsi_Host *spnt)
 {
-    int count = 0;
-    struct Scsi_Host *instance;
-
-    tpnt->proc_name = "CumanaSCSI-1";
-
-    memset (ecs, 0, sizeof (ecs));
-
-    while(1) {
-    	if((ecs[count] = ecard_find(0, cumanascsi_cids)) == NULL)
-    		break;
-
-        instance = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
-	if (!instance)
-		break;
-        instance->io_port = CUMANA_ADDRESS(ecs[count]);
-	instance->irq = CUMANA_IRQ(ecs[count]);
-
-	NCR5380_init(instance, 0);
-	ecard_claim(ecs[count]);
-
-	instance->n_io_port = 255;
-	if ( !(request_region (instance->io_port, instance->n_io_port, "CumanaSCSI-1")) ) {
-		ecard_release(ecs[count]);
-		scsi_unregister(instance);
-		break;
-	}
-
-        ((struct NCR5380_hostdata *)instance->hostdata)->ctrl = 0;
-        outb(0x00, instance->io_port - 577);
-
-	if (instance->irq != IRQ_NONE)
-	    if (request_irq(instance->irq, cumanascsi_intr, SA_INTERRUPT, "CumanaSCSI-1", NULL)) {
-		printk("scsi%d: IRQ%d not free, interrupts disabled\n",
-		    instance->host_no, instance->irq);
-		instance->irq = IRQ_NONE;
-	    }
-
-	if (instance->irq == IRQ_NONE) {
-	    printk("scsi%d: interrupts not enabled. for better interactive performance,\n", instance->host_no);
-	    printk("scsi%d: please jumper the board for a free IRQ.\n", instance->host_no);
-	}
-
-	printk("scsi%d: at port %lX irq", instance->host_no, instance->io_port);
-	if (instance->irq == IRQ_NONE)
-	    printk ("s disabled");
-	else
-	    printk (" %d", instance->irq);
-	printk(" options CAN_QUEUE=%d CMD_PER_LUN=%d release=%d",
-	    tpnt->can_queue, tpnt->cmd_per_lun, CUMANASCSI_PUBLIC_RELEASE);
-	printk("\nscsi%d:", instance->host_no);
-	NCR5380_print_options(instance);
-	printk("\n");
-
-	++count;
-    }
-    return count;
-}
-
-int cumanascsi_release (struct Scsi_Host *shpnt)
-{
-	int i;
-
-	if (shpnt->irq != IRQ_NONE)
-		free_irq (shpnt->irq, NULL);
-	if (shpnt->io_port)
-		release_region (shpnt->io_port, shpnt->n_io_port);
-
-	for (i = 0; i < 4; i++)
-		if (shpnt->io_port == CUMANA_ADDRESS(ecs[i]))
-			ecard_release (ecs[i]);
-	return 0;
-}
-
-const char * cumanascsi_info (struct Scsi_Host *spnt) {
-    return "";
+	return "";
 }
 
 #ifdef NOT_EFFICIENT
@@ -219,8 +68,8 @@ const char * cumanascsi_info (struct Scsi_Host *spnt) {
 #define L(v)		(((v)<<16)|((v) & 0x0000ffff))
 #define H(v)		(((v)>>16)|((v) & 0xffff0000))
 
-static inline int NCR5380_pwrite(struct Scsi_Host *instance, unsigned char *addr,
-              int len)
+static inline int
+NCR5380_pwrite(struct Scsi_Host *instance, unsigned char *addr, int len)
 {
   int *ctrl = &((struct NCR5380_hostdata *)instance->hostdata)->ctrl;
   int oldctrl = *ctrl;
@@ -289,8 +138,8 @@ end:
   return len;
 }
 
-static inline int NCR5380_pread(struct Scsi_Host *instance, unsigned char *addr,
-              int len)
+static inline int
+NCR5380_pread(struct Scsi_Host *instance, unsigned char *addr, int len)
 {
   int *ctrl = &((struct NCR5380_hostdata *)instance->hostdata)->ctrl;
   int oldctrl = *ctrl;
@@ -367,25 +216,25 @@ end:
 
 static char cumanascsi_read(struct Scsi_Host *instance, int reg)
 {
-  int iobase = instance->io_port;
-  int i;
-  int *ctrl = &((struct NCR5380_hostdata *)instance->hostdata)->ctrl;
+	unsigned int iobase = instance->io_port;
+	int i;
+	int *ctrl = &((struct NCR5380_hostdata *)instance->hostdata)->ctrl;
 
-  CTRL(iobase, 0);
-  i = inb(iobase + 64 + reg);
-  CTRL(iobase, 0x40);
+	CTRL(iobase, 0);
+	i = inb(iobase + 64 + reg);
+	CTRL(iobase, 0x40);
 
-  return i;
+	return i;
 }
 
 static void cumanascsi_write(struct Scsi_Host *instance, int reg, int value)
 {
-  int iobase = instance->io_port;
-  int *ctrl = &((struct NCR5380_hostdata *)instance->hostdata)->ctrl;
+	int iobase = instance->io_port;
+	int *ctrl = &((struct NCR5380_hostdata *)instance->hostdata)->ctrl;
 
-  CTRL(iobase, 0);
-  outb(value, iobase + 64 + reg);
-  CTRL(iobase, 0x40);
+	CTRL(iobase, 0);
+	outb(value, iobase + 64 + reg);
+	CTRL(iobase, 0x40);
 }
 
 #undef CTRL
@@ -395,8 +244,6 @@ static void cumanascsi_write(struct Scsi_Host *instance, int reg, int value)
 static Scsi_Host_Template cumanascsi_template = {
 	.module			= THIS_MODULE,
 	.name			= "Cumana 16-bit SCSI",
-	.detect			= cumanascsi_detect,
-	.release		= cumanascsi_release,
 	.info			= cumanascsi_info,
 	.queuecommand		= cumanascsi_queue_command,
 	.eh_abort_handler	= NCR5380_abort,
@@ -408,26 +255,101 @@ static Scsi_Host_Template cumanascsi_template = {
 	.sg_tablesize		= SG_ALL,
 	.cmd_per_lun		= 2,
 	.unchecked_isa_dma	= 0,
-	.use_clustering		= DISABLE_CLUSTERING
+	.use_clustering		= DISABLE_CLUSTERING,
+	.proc_name		= "CumanaSCSI-1",
+};
+
+static int __devinit
+cumanascsi1_probe(struct expansion_card *ec, struct ecard_ids *id)
+{
+	struct Scsi_Host *host;
+	int ret = -ENOMEM;
+
+	host = scsi_register (tpnt, sizeof(struct NCR5380_hostdata));
+	if (!host)
+		goto out;
+
+        host->io_port = ecard_address(ec, ECARD_IOC, ECARD_SLOW) + 0x800;
+	host->irq = ec->irq;
+
+	NCR5380_init(host, 0);
+
+	host->n_io_port = 255;
+	if (!(request_region(host->io_port, host->n_io_port, "CumanaSCSI-1"))) {
+		ret = -EBUSY;
+		goto out_free;
+	}
+
+        ((struct NCR5380_hostdata *)host->hostdata)->ctrl = 0;
+        outb(0x00, host->io_port - 577);
+
+	ret = request_irq(host->irq, cumanascsi_intr, SA_INTERRUPT,
+			  "CumanaSCSI-1", host);
+	if (ret) {
+		printk("scsi%d: IRQ%d not free: %d\n",
+		    host->host_no, host->irq, ret);
+		goto out_release;
+	}
+
+	printk("scsi%d: at port 0x%08lx irq %d",
+		host->host_no, host->io_port, host->irq);
+	printk(" options CAN_QUEUE=%d CMD_PER_LUN=%d release=%d",
+	    tpnt->can_queue, tpnt->cmd_per_lun, CUMANASCSI_PUBLIC_RELEASE);
+	printk("\nscsi%d:", host->host_no);
+	NCR5380_print_options(host);
+	printk("\n");
+
+	ret = scsi_add_host(host);
+	if (ret == 0)
+		goto out;
+
+	free_irq(host->irq, host);
+ out_release:
+	release_region(host->io_port, host->n_io_port);
+ out_free:
+	scsi_unregister(host);
+ out:
+	return ret;
+}
+
+static void __devexit cumanascsi1_remove(struct expansion_card *ec)
+{
+	struct Scsi_Host *host = ecard_get_drvdata(ec);
+
+	ecard_set_drvdata(ec, NULL);
+
+	scsi_remove_host(host);
+	free_irq(host->irq, host);
+	release_region(host->io_port, host->n_io_port);
+	scsi_remove(host);
+}
+
+static const struct ecard_ids cumanascsi1_cids[] = {
+	{ MANU_CUMANA, PROD_CUMANA_SCSI_1 },
+	{ 0xffff, 0xffff }
+};
+
+static struct ecard_driver cumanascsi1_driver = {
+	.probe		= cumanascsi1_probe,
+	.remove		= __devexit_p(cumanascsi1_remove),
+	.id_table	= cumanascsi1_cids,
+	.drv = {
+		.name	= "cumanascsi1",
+	},
 };
 
 static int __init cumanascsi_init(void)
 {
-	scsi_register_host(&cumanascsi_template);
-	if (cumanascsi_template.present)
-		return 0;
-
-	scsi_unregister_host(&cumanascsi_template);
-	return -ENODEV;
+	return ecard_register_driver(&cumanascsi1_driver);
 }
 
 static void __exit cumanascsi_exit(void)
 {
-	scsi_unregister_host(&cumanascsi_template);
+	ecard_remove_driver(&cumanascsi1_driver);
 }
 
 module_init(cumanascsi_init);
 module_exit(cumanascsi_exit);
 
+MODULE_DESCRIPTION("Cumana SCSI-1 driver for Acorn machines");
 MODULE_LICENSE("GPL");
-

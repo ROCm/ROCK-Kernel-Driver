@@ -1021,8 +1021,6 @@ ether1_probe(struct expansion_card *ec, const struct ecard_id *id)
 
 	ether1_banner();
 
-	ecard_claim(ec);
-
 	dev = init_etherdev(NULL, sizeof(struct ether1_priv));
 	if (!dev) {
 		ret = -ENOMEM;
@@ -1077,7 +1075,6 @@ release:
 	unregister_netdev(dev);
 	kfree(dev);
 out:
-	ecard_release(ec);
 	return ret;
 }
 
@@ -1092,8 +1089,6 @@ static void __devexit ether1_remove(struct expansion_card *ec)
 	release_region(dev->base_addr, 16);
 	release_region(dev->base_addr + 0x800, 4096);
 	kfree(dev);
-
-	ecard_release(ec);
 }
 
 static const struct ecard_id ether1_ids[] = {

@@ -37,21 +37,29 @@
 
 #include "../../scsi/scsi.h"
 #include "../../scsi/hosts.h"
-#include "arxescsi.h"
 #include "fas216.h"
+
+struct arxescsi_info {
+    FAS216_Info info;
+
+    /* other info... */
+    unsigned int	cstatus;	/* card status register	*/
+    unsigned int	dmaarea;	/* Pseudo DMA area	*/
+};
+
+#define CSTATUS_IRQ	(1 << 0)
+#define CSTATUS_DRQ	(1 << 0)
+
+#ifndef CAN_QUEUE
+#define CAN_QUEUE	1
+#endif
+
+#ifndef CMD_PER_LUN
+#define CMD_PER_LUN	1
+#endif
 
 /* Hmm - this should go somewhere else */
 #define BUS_ADDR(x) ((((unsigned long)(x)) << 2) + IO_BASE)
-
-/* Configuration */
-#define ARXESCSI_XTALFREQ		24
-#define ARXESCSI_ASYNC_PERIOD		200
-#define ARXESCSI_SYNC_DEPTH		0
-
-/*
- * List of devices that the driver will recognise
- */
-#define ARXESCSI_LIST		{ MANU_ARXE, PROD_ARXE_SCSI }
 
 /*
  * Version
@@ -59,8 +67,6 @@
 #define VER_MAJOR	0
 #define VER_MINOR	1
 #define VER_PATCH	1
-
-static struct expansion_card *ecs[MAX_ECARDS];
 
 /*
  * Function: int arxescsi_dma_setup(host, SCpnt, direction, min_type)
@@ -85,7 +91,7 @@ arxescsi_dma_setup(struct Scsi_Host *host, Scsi_Pointer *SCp,
 
 /* Faster transfer routines, written by SH to speed up the loops */
 
-static __inline__ unsigned char getb(unsigned int address, unsigned int reg)
+static inline unsigned char getb(unsigned int address, unsigned int reg)
 {
 	unsigned char value;
 
@@ -96,7 +102,7 @@ static __inline__ unsigned char getb(unsigned int address, unsigned int reg)
 	return value;
 }
 
-static __inline__ unsigned int getw(unsigned int address, unsigned int reg)
+static inline unsigned int getw(unsigned int address, unsigned int reg)
 {
 	unsigned int value;
 	
@@ -109,7 +115,7 @@ static __inline__ unsigned int getw(unsigned int address, unsigned int reg)
 	return value;
 }
 
-static __inline__ void putw(unsigned int address, unsigned int reg, unsigned long value)
+static inline void putw(unsigned int address, unsigned int reg, unsigned long value)
 {
 	__asm__ __volatile__(
 	"mov	%0, %0, lsl #16\n\t"
@@ -157,7 +163,7 @@ void arxescsi_pseudo_dma_write(unsigned char *addr, unsigned int io)
 void arxescsi_dma_pseudo(struct Scsi_Host *host, Scsi_Pointer *SCp,
 			fasdmadir_t direction, int transfer)
 {
-	ARXEScsi_Info *info = (ARXEScsi_Info *)host->hostdata;
+	struct arxescsi_info *info = (struct arxescsi_info *)host->hostdata;
 	unsigned int length, io, error=0;
 	unsigned char *addr;
 
@@ -248,106 +254,6 @@ static void arxescsi_dma_stop(struct Scsi_Host *host, Scsi_Pointer *SCp)
 }
 
 /*
- * Function: int arxescsi_detect(Scsi_Host_Template * tpnt)
- * Purpose : initialises ARXE SCSI driver
- * Params  : tpnt - template for this SCSI adapter
- * Returns : >0 if host found, 0 otherwise.
- */
-int arxescsi_detect(Scsi_Host_Template *tpnt)
-{
-	static const card_ids arxescsi_cids[] = { ARXESCSI_LIST, { 0xffff, 0xffff} };
-	int count = 0;
-	struct Scsi_Host *host;
-  
-	tpnt->proc_name = "arxescsi";
-	memset(ecs, 0, sizeof (ecs));
-
-	ecard_startfind();
-
-	while (1) {
-	    	ARXEScsi_Info *info;
-
-		ecs[count] = ecard_find(0, arxescsi_cids);
-		if (!ecs[count])
-			break;
-
-		ecard_claim(ecs[count]);
-		
-		host = scsi_register(tpnt, sizeof (ARXEScsi_Info));
-		if (!host) {
-			ecard_release(ecs[count]);
-			break;
-		}
-
-		host->io_port = ecard_address(ecs[count], ECARD_MEMC, 0) + 0x0800;
-		host->irq = NO_IRQ;
-		host->dma_channel = NO_DMA;
-		host->can_queue = 0; /* no command queueing */
-		info = (ARXEScsi_Info *)host->hostdata;
-
-		info->info.scsi.io_port		= host->io_port;
-		info->info.scsi.irq		= host->irq;
-		info->info.scsi.io_shift	= 3;
-		info->info.ifcfg.clockrate	= ARXESCSI_XTALFREQ;
-		info->info.ifcfg.select_timeout = 255;
-		info->info.ifcfg.asyncperiod	= ARXESCSI_ASYNC_PERIOD;
-		info->info.ifcfg.sync_max_depth	= ARXESCSI_SYNC_DEPTH;
-		info->info.ifcfg.cntl3		= CNTL3_FASTSCSI | CNTL3_FASTCLK;
-		info->info.ifcfg.disconnect_ok	= 0;
-		info->info.ifcfg.wide_max_size	= 0;
-		info->info.dma.setup		= arxescsi_dma_setup;
-		info->info.dma.pseudo		= arxescsi_dma_pseudo;
-		info->info.dma.stop		= arxescsi_dma_stop;
-		info->dmaarea			= host->io_port + 128;
-		info->cstatus			= host->io_port + 384;
-		
-		ecs[count]->irqaddr = (unsigned char *)BUS_ADDR(host->io_port);
-		ecs[count]->irqmask = CSTATUS_IRQ;
-
-		if (!request_region(host->io_port, 120, "arxescsi-fas")) {
-			ecard_release(ecs[count]);
-			scsi_unregister(host);
-			break;
-		}
-			
-		if (!request_region(host->io_port + 128, 384, "arxescsi-dma")) {
-			ecard_release(ecs[count]);
-			release_region(host->io_port, 120);
-			scsi_unregister(host);
-			break;
-		}
-
-		printk("scsi%d: Has no interrupts - using polling mode\n",
-		       host->host_no);
-
-		fas216_init(host);
-		++count;
-	}
-	return count;
-}
-
-/*
- * Function: int arxescsi_release(struct Scsi_Host * host)
- * Purpose : releases all resources used by this adapter
- * Params  : host - driver host structure to return info for.
- * Returns : nothing
- */
-int arxescsi_release(struct Scsi_Host *host)
-{
-	int i;
-
-	fas216_release(host);
-
-	release_region(host->io_port, 120);
-	release_region(host->io_port + 128, 384);
-
-	for (i = 0; i < MAX_ECARDS; i++)
-		if (ecs[i] && host->io_port == (ecard_address(ecs[i], ECARD_MEMC, 0) + 0x0800))
-			ecard_release(ecs[i]);
-	return 0;
-}
-
-/*
  * Function: const char *arxescsi_info(struct Scsi_Host * host)
  * Purpose : returns a descriptive string about this interface,
  * Params  : host - driver host structure to return info for.
@@ -355,7 +261,7 @@ int arxescsi_release(struct Scsi_Host *host)
  */
 const char *arxescsi_info(struct Scsi_Host *host)
 {
-	ARXEScsi_Info *info = (ARXEScsi_Info *)host->hostdata;
+	struct arxescsi_info *info = (struct arxescsi_info *)host->hostdata;
 	static char string[100], *p;
 
 	p = string;
@@ -385,14 +291,14 @@ int arxescsi_proc_info(char *buffer, char **start, off_t offset,
 {
 	int pos, begin;
 	struct Scsi_Host *host;
-	ARXEScsi_Info *info;
+	struct arxescsi_info *info;
 	Scsi_Device *scd;
 
 	host = scsi_host_hn_get(host_no);
 	if (!host)
 		return 0;
 
-	info = (ARXEScsi_Info *)host->hostdata;
+	info = (struct arxescsi_info *)host->hostdata;
 	if (inout == 1)
 		return -EINVAL;
 
@@ -424,22 +330,122 @@ int arxescsi_proc_info(char *buffer, char **start, off_t offset,
 	return pos;
 }
 
-static Scsi_Host_Template arxescsi_template = ARXEScsi;
+static Scsi_Host_Template arxescsi_template = {
+	.proc_info			= arxescsi_proc_info,
+	.name				= "ARXE SCSI card",
+	.info				= arxescsi_info,
+	.command			= fas216_command,
+	.queuecommand			= fas216_queue_command,
+	.eh_host_reset_handler		= fas216_eh_host_reset,
+	.eh_bus_reset_handler		= fas216_eh_bus_reset,
+	.eh_device_reset_handler	= fas216_eh_device_reset,
+	.eh_abort_handler		= fas216_eh_abort,
+	.can_queue			= 0,
+	.this_id			= 7,
+	.sg_tablesize			= SG_ALL,
+	.cmd_per_lun			= CMD_PER_LUN,
+	.use_clustering			= DISABLE_CLUSTERING,
+	.proc_name			= "arxescsi",
+};
+
+static int __devinit
+arxescsi_probe(struct expansion_card *ec, const struct ecard_id *id)
+{
+	struct Scsi_Host *host;
+      	struct arxescsi_info *info;
+      	int ret = -ENOMEM;
+
+	host = scsi_register(&arxescsi_template, sizeof(struct arxescsi_info));
+	if (!host)
+		goto out;
+
+	host->io_port = ecard_address(ec, ECARD_MEMC, 0) + 0x0800;
+	host->irq = NO_IRQ;
+	host->dma_channel = NO_DMA;
+
+	info = (struct arxescsi_info *)host->hostdata;
+	info->info.scsi.io_port		= host->io_port;
+	info->info.scsi.irq		= host->irq;
+	info->info.scsi.io_shift	= 3;
+	info->info.ifcfg.clockrate	= 24; /* MHz */
+	info->info.ifcfg.select_timeout = 255;
+	info->info.ifcfg.asyncperiod	= 200; /* ns */
+	info->info.ifcfg.sync_max_depth	= 0;
+	info->info.ifcfg.cntl3		= CNTL3_FASTSCSI | CNTL3_FASTCLK;
+	info->info.ifcfg.disconnect_ok	= 0;
+	info->info.ifcfg.wide_max_size	= 0;
+	info->info.dma.setup		= arxescsi_dma_setup;
+	info->info.dma.pseudo		= arxescsi_dma_pseudo;
+	info->info.dma.stop		= arxescsi_dma_stop;
+	info->dmaarea			= host->io_port + 128;
+	info->cstatus			= host->io_port + 384;
+		
+	ec->irqaddr = (unsigned char *)BUS_ADDR(host->io_port);
+	ec->irqmask = CSTATUS_IRQ;
+
+	if (!request_region(host->io_port, 120, "arxescsi-fas")) {
+		ret = -EBUSY;
+		goto out_free;
+	}
+			
+	if (!request_region(host->io_port + 128, 384, "arxescsi-dma")) {
+		ret = -EBUSY;
+		goto out_release;
+	}
+
+	printk("scsi%d: Has no interrupts - using polling mode\n",
+	       host->host_no);
+
+	fas216_init(host);
+
+	ret = scsi_add_host(host);
+	if (ret == 0)
+		goto out;
+
+	release_region(host->io_port + 128, 384);
+ out_release:
+	release_region(host->io_port, 120);
+ out_free:
+	scsi_unregister(host);
+ out:
+	return ret;
+}
+
+static void __devexit arxescsi_release(struct expansion_card *ec)
+{
+	struct Scsi_Host *host = ecard_get_drvdata(ec);
+
+	ecard_set_drvdata(ec, NULL);
+	scsi_remove_host(host);
+	fas216_release(host);
+
+	release_region(host->io_port + 128, 384);
+	release_region(host->io_port, 120);
+	scsi_unregister(host);
+}
+
+static const struct ecard_id arxescsi_cids[] = {
+	{ MANU_ARXE, PROD_ARXE_SCSI },
+	{ 0xffff, 0xffff },
+};
+
+static struct ecard_driver arxescsi_driver = {
+	.probe		= arxescsi_probe,
+	.remove		= __devexit_p(arxescsi_remove),
+	.id_table	= arxescsi_cids,
+	.drv = {
+		.name	= "arxescsi",
+	},
+};
 
 static int __init init_arxe_scsi_driver(void)
 {
-        arxescsi_template.module = THIS_MODULE;
-	scsi_register_host(&arxescsi_template);
-	if (arxescsi_template.present)
-		return 0;
-
-	scsi_unregister_host(&arxescsi_template);
-	return -ENODEV;
+	return ecard_register_driver(&arxescsi_driver);
 }
 
 static void __exit exit_arxe_scsi_driver(void)
 {
-	scsi_unregister_host(&arxescsi_template);
+	ecard_remove_driver(&arxescsi_driver);
 }
 
 module_init(init_arxe_scsi_driver);
