@@ -1036,3 +1036,50 @@ CONFIG_NCPFS_NLS
 
   To select codepages and I/O charsets use ncpfs-2.2.0.13 or newer.
 
+CONFIG_XFS_FS
+  XFS is a high performance journaling filesystem which originated
+  on the SGI IRIX platform.  It is completely multi-threaded, can
+  support large files and large filesystems, extended attributes,
+  variable block sizes, is extent based, and makes extensive use of
+  Btrees (directories, extents, free space) to aid both performance
+  and scalability.
+
+  Refer to the documentation at <http://oss.sgi.com/projects/xfs/>
+  for complete details.  This implementation is on-disk compatible
+  with the IRIX version of XFS.
+
+  If you want to compile this file system as a module ( = code which
+  can be inserted in and removed from the running kernel whenever you
+  want), say M here and read <file:Documentation/modules.txt>. The
+  module will be called xfs.o.  Be aware, however, that if the file
+  system of your root partition is compiled as a module, you'll need
+  to use an initial ramdisk (initrd) to boot.
+
+CONFIG_XFS_QUOTA
+  If you say Y here, you will be able to set limits for disk usage on
+  a per user and/or a per group basis under XFS.  XFS considers quota
+  information as filesystem metadata and uses journaling to provide a
+  higher level guarantee of consistency.  The on-disk data format for
+  quota is also compatible with the IRIX version of XFS, allowing a
+  filesystem to be migrated between Linux and IRIX without any need
+  for conversion.
+
+  If unsure, say N.  More comprehensive documentation can be found in
+  README.quota in the xfsprogs package.  XFS quota can be used either
+  with or without the generic quota support enabled (CONFIG_QUOTA) -
+  they are completely independent subsystems.
+
+CONFIG_XFS_RT
+  If you say Y here you will be able to mount and use XFS filesystems
+  which contain a realtime subvolume. The realtime subvolume is a
+  separate area of disk space where only file data is stored. The
+  realtime subvolume is designed to provide very deterministic
+  data rates suitable for media streaming applications.
+
+  See the xfs man page in section 5 for a bit more information.
+
+  This feature is unsupported at this time, is not yet fully
+  functional, and may cause serious problems.
+
+  If unsure, say N.
+

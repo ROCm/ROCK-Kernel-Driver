@@ -46,3 +46,5 @@ vfat.txt
 	- info on using the VFAT filesystem used in Windows NT and Windows 95
 vfs.txt
 	- Overview of the Virtual File System
+xfs.txt
+	- info and mount options for the XFS filesystem.
