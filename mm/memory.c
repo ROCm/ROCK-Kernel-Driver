@@ -612,7 +612,7 @@ void mark_dirty_kiobuf(struct kiobuf *iobuf, int bytes)
 		page = iobuf->maplist[index];
 		
 		if (!PageReserved(page))
-			SetPageDirty(page);
+			set_page_dirty(page);
 
 		remaining -= (PAGE_SIZE - offset);
 		offset = 0;
