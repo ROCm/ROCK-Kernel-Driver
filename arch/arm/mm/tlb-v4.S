@@ -55,14 +55,13 @@ ENTRY(v4_flush_user_tlb_range)
 	eors	r3, ip, r3				@ == mm ?
 	movne	pc, lr				@ no, we dont do anything
 	vma_vm_flags ip, r2
+.v4_flush_kern_tlb_range:
 	bic	r0, r0, #0x0ff
 	bic	r0, r0, #0xf00
-1:	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
+1:	mcr	p15, 0, r0, c8, c7, 1		@ invalidate TLB entry
 	add	r0, r0, #PAGE_SZ
 	cmp	r0, r1
 	blo	1b
-	tst	ip, #VM_EXEC
-	mcrne	p15, 0, r3, c8, c5, 0		@ invalidate I TLB
 	mov	pc, lr
 
 /*
@@ -80,9 +79,8 @@ ENTRY(v4_flush_user_tlb_page)
 	teq	r2, r3				@ equal
 	movne	pc, lr				@ no
 	vma_vm_flags r2, r1
-	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
-	tst	r2, #VM_EXEC
-	mcrne	p15, 0, r3, c8, c5, 0		@ invalidate I TLB
+.v4_flush_kern_tlb_page:
+	mcr	p15, 0, r0, c8, c7, 1		@ invalidate TLB entry
 	mov	pc, lr
 
 /*
@@ -94,16 +92,8 @@ ENTRY(v4_flush_user_tlb_page)
  *	- start - virtual address (may not be aligned)
  *	- end   - virtual address (may not be aligned)
  */
-	.align	5
-ENTRY(v4_flush_kern_tlb_range)
-	bic	r0, r0, #0x0ff
-	bic	r0, r0, #0xf00
-1:	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
-	add	r0, r0, #PAGE_SZ
-	cmp	r0, r1
-	blo	1b
-	mcr	p15, 0, r3, c8, c5, 0		@ invalidate I TLB
-	mov	pc, lr
+.globl v4_flush_kern_tlb_range
+.equ v4_flush_kern_tlb_range, .v4_flush_kern_tlb_range
 
 
 /*
@@ -115,9 +105,8 @@ ENTRY(v4_flush_kern_tlb_range)
  *
  *	- kaddr - Kernel virtual memory address
  */
-ENTRY(v4_flush_kern_tlb_page)
-	mcr	p15, 0, r0, c8, c6, 1		@ invalidate D TLB entry
-	mov	pc, lr
+.globl v4_flush_kern_tlb_page
+.equ v4_flush_kern_tlb_page, .v4_flush_kern_tlb_page
 
 	.section ".text.init", #alloc, #execinstr
 

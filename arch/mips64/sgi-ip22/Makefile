@@ -3,10 +3,9 @@
 # under Linux.
 #
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
+USE_STANDARD_AS_RULE := true
+
+EXTRA_AFLAGS := $(CFLAGS)
 
 L_TARGET = ip22.a
 

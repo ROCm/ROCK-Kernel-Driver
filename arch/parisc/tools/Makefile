@@ -7,11 +7,6 @@
 #
 TARGET	:= $(TOPDIR)/include/asm-$(ARCH)/offset.h
 
-.S.s:
-	$(CPP) $(CFLAGS) $< -o $*.s
-.S.o:
-	$(CC) $(CFLAGS) -c $< -o $*.o
-
 all: $(TARGET)
 
 $(TARGET): offset.h

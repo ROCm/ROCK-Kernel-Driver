@@ -6,12 +6,9 @@
 # unless it's something special (ie not a .c file).
 #
 
-.S.s:
-	$(CPP) $(AFLAGS) $< -o $@
-.S.o:
-	$(CC) $(AFLAGS) -c $< -o $@
+USE_STANDARD_AS_RULE := true
 
-EXTRA_AFLAGS = -mips3 -mcpu=r4000
+# EXTRA_AFLAGS = -mips3 -mcpu=r4000 # not used?
 
 all:	kernel.o head.o init_task.o
 

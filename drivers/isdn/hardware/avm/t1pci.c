@@ -47,13 +47,11 @@ MODULE_LICENSE("GPL");
 
 static int t1pci_add_card(struct capi_driver *driver,
                           struct capicardparams *p,
-	                  struct pci_dev *dev)
+	                  struct pci_dev *pdev)
 {
 	avmcard *card;
 	avmctrl_info *cinfo;
 	int retval;
-
-	MOD_INC_USE_COUNT;
 
 	card = b1_alloc_card(1);
 	if (!card) {
@@ -62,7 +60,7 @@ static int t1pci_add_card(struct capi_driver *driver,
 		goto err;
 	}
 
-        card->dma = avmcard_dma_alloc(driver->name, dev, 2048+128, 2048+128);
+        card->dma = avmcard_dma_alloc(driver->name, pdev, 2048+128, 2048+128);
 	if (!card->dma) {
 		printk(KERN_WARNING "%s: no memory.\n", driver->name);
 		retval = -ENOMEM;
@@ -127,6 +125,7 @@ static int t1pci_add_card(struct capi_driver *driver,
 		"%s: AVM T1 PCI at i/o %#x, irq %d, mem %#lx\n",
 		driver->name, card->port, card->irq, card->membase);
 
+	pci_set_drvdata(pdev, card);
 	return 0;
 
  err_free_irq:
@@ -140,28 +139,24 @@ static int t1pci_add_card(struct capi_driver *driver,
  err_free:
 	b1_free_card(card);
  err:
-	MOD_DEC_USE_COUNT;
 	return retval;
 }
 
 /* ------------------------------------------------------------- */
 
-static void t1pci_remove_ctr(struct capi_ctr *ctrl)
+static void t1pci_remove(struct pci_dev *pdev)
 {
-	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
-	avmcard *card = cinfo->card;
+	avmcard *card = pci_get_drvdata(pdev);
+	avmctrl_info *cinfo = card->ctrlinfo;
 
  	b1dma_reset(card);
 
-	detach_capi_ctr(ctrl);
+	detach_capi_ctr(cinfo->capi_ctrl);
 	free_irq(card->irq, card);
 	iounmap(card->mbase);
 	release_region(card->port, AVMB1_PORTLEN);
-	ctrl->driverdata = 0;
 	avmcard_dma_free(card->dma);
 	b1_free_card(card);
-
-	MOD_DEC_USE_COUNT;
 }
 
 /* ------------------------------------------------------------- */
@@ -190,7 +185,6 @@ static struct capi_driver t1pci_driver = {
 	revision: "0.0",
 	load_firmware: b1dma_load_firmware,
 	reset_ctr: b1dma_reset_ctr,
-	remove_ctr: t1pci_remove_ctr,
 	register_appl: b1dma_register_appl,
 	release_appl: b1dma_release_appl,
 	send_message: b1dma_send_message,
@@ -198,8 +192,6 @@ static struct capi_driver t1pci_driver = {
 	procinfo: t1pci_procinfo,
 	ctr_read_proc: b1dmactl_read_proc,
 	driver_read_proc: 0,	/* use standard driver_read_proc */
-	
-	add_card: 0, /* no add_card function */
 };
 
 /* ------------------------------------------------------------- */
@@ -240,38 +232,32 @@ static struct pci_driver t1pci_pci_driver = {
        name:           "t1pci",
        id_table:       t1pci_pci_tbl,
        probe:          t1pci_probe,
+       remove:         t1pci_remove,
 };
 
 static int __init t1pci_init(void)
 {
-	struct capi_driver *driver = &t1pci_driver;
-	char *p;
-	int ncards;
+	int retval;
 
 	MOD_INC_USE_COUNT;
 
-	if ((p = strchr(revision, ':')) != 0 && p[1]) {
-		strncpy(driver->revision, p + 2, sizeof(driver->revision) - 1);
-		if ((p = strchr(driver->revision, '$')) != 0 && p > driver->revision)
-			*(p-1) = 0;
-	}
-
-	printk(KERN_INFO "%s: revision %s\n", driver->name, driver->revision);
-
+	b1_set_revision(&t1pci_driver, revision);
         attach_capi_driver(&t1pci_driver);
 
-	ncards = pci_register_driver(&t1pci_pci_driver);
-	if (ncards) {
-		printk(KERN_INFO "%s: %d T1-PCI card(s) detected\n",
-				driver->name, ncards);
-		MOD_DEC_USE_COUNT;
-		return 0;
-	}
-	printk(KERN_ERR "%s: NO T1-PCI card detected\n", driver->name);
-	pci_unregister_driver(&t1pci_pci_driver);
+	retval = pci_register_driver(&t1pci_pci_driver);
+	if (retval < 0)
+		goto err;
+
+	printk(KERN_INFO "%s: %d T1-PCI card(s) detected\n",
+	       t1pci_driver.name, retval);
+	retval = 0;
+	goto out;
+
+ err:
 	detach_capi_driver(&t1pci_driver);
+ out:
 	MOD_DEC_USE_COUNT;
-	return -ENODEV;
+	return retval;
 }
 
 static void __exit t1pci_exit(void)

@@ -488,6 +488,11 @@ static void b1dma_handle_rx(avmcard *card)
 					card->name);
 		} else {
 			memcpy(skb_put(skb, MsgLen), card->msgbuf, MsgLen);
+			if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_CONF)
+				capilib_data_b3_conf(&cinfo->ncci_head, ApplId,
+						     CAPIMSG_NCCI(skb->data),
+						     CAPIMSG_MSGID(skb->data));
+
 			ctrl->handle_capimsg(ctrl, ApplId, skb);
 		}
 		break;
@@ -498,7 +503,7 @@ static void b1dma_handle_rx(avmcard *card)
 		NCCI = _get_word(&p);
 		WindowSize = _get_word(&p);
 
-		ctrl->new_ncci(ctrl, ApplId, NCCI, WindowSize);
+		capilib_new_ncci(&cinfo->ncci_head, ApplId, NCCI, WindowSize);
 
 		break;
 
@@ -508,7 +513,7 @@ static void b1dma_handle_rx(avmcard *card)
 		NCCI = _get_word(&p);
 
 		if (NCCI != 0xffffffff)
-			ctrl->free_ncci(ctrl, ApplId, NCCI);
+			capilib_free_ncci(&cinfo->ncci_head, ApplId, NCCI);
 
 		break;
 
@@ -734,6 +739,7 @@ void b1dma_reset_ctr(struct capi_ctr *ctrl)
  	b1dma_reset(card);
 
 	memset(cinfo->version, 0, sizeof(cinfo->version));
+	capilib_release(&cinfo->ncci_head);
 	ctrl->reseted(ctrl);
 }
 
@@ -785,6 +791,8 @@ void b1dma_release_appl(struct capi_ctr *ctrl, u16 appl)
 	struct sk_buff *skb;
 	void *p;
 
+	capilib_release_appl(&cinfo->ncci_head, appl);
+
 	skb = alloc_skb(7, GFP_ATOMIC);
 	if (!skb) {
 		printk(KERN_CRIT "%s: no memory, lost release appl.\n",
@@ -804,12 +812,24 @@ void b1dma_release_appl(struct capi_ctr *ctrl, u16 appl)
 
 /* ------------------------------------------------------------- */
 
-void b1dma_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
+u16 b1dma_send_message(struct capi_ctr *ctrl, struct sk_buff *skb)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
+	u16 retval = CAPI_NOERROR;
 
-	b1dma_queue_tx(card, skb);
+ 	if (CAPIMSG_CMD(skb->data) == CAPI_DATA_B3_REQ) {
+		retval = capilib_data_b3_req(&cinfo->ncci_head,
+					     CAPIMSG_APPID(skb->data),
+					     CAPIMSG_NCCI(skb->data),
+					     CAPIMSG_MSGID(skb->data));
+	}
+	if (retval == CAPI_NOERROR) 
+		b1dma_queue_tx(card, skb);
+	else
+		dev_kfree_skb_any(skb);
+
+	return retval;
 }
 
 /* ------------------------------------------------------------- */
