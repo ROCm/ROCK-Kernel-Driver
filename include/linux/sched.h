@@ -590,10 +590,18 @@ do { if (atomic_dec_and_test(&(tsk)->usage)) __put_task_struct(tsk); } while(0)
 
 #define SD_BALANCE_NEWIDLE	1	/* Balance when about to become idle */
 #define SD_BALANCE_EXEC		2	/* Balance on exec */
-#define SD_WAKE_IDLE		4	/* Wake to idle CPU on task wakeup */
-#define SD_WAKE_AFFINE		8	/* Wake task to waking CPU */
-#define SD_WAKE_BALANCE		16	/* Perform balancing at task wakeup */
-#define SD_SHARE_CPUPOWER	32	/* Domain members share cpu power */
+#ifdef __ia64__
+/* Disable clone balance on ia64 for now, since it is questionable it will scale
+   to the big machines. This should be done in IA64 specific domain setup instead
+   of here. */
+#define SD_BALANCE_CLONE	0
+#else
+#define SD_BALANCE_CLONE	4	/* Balance on clone */
+#endif
+#define SD_WAKE_IDLE		8	/* Wake to idle CPU on task wakeup */
+#define SD_WAKE_AFFINE		16	/* Wake task to waking CPU */
+#define SD_WAKE_BALANCE		32	/* Perform balancing at task wakeup */
+#define SD_SHARE_CPUPOWER	64	/* Domain members share cpu power */
 
 struct sched_group {
 	struct sched_group *next;	/* Must be a circular list */
@@ -641,6 +649,8 @@ struct sched_domain {
 	.cache_nice_tries	= 0,			\
 	.per_cpu_gain		= 15,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
+				| SD_BALANCE_EXEC	\
+				| SD_BALANCE_CLONE	\
 				| SD_WAKE_AFFINE	\
 				| SD_WAKE_IDLE		\
 				| SD_SHARE_CPUPOWER,	\
@@ -662,6 +672,8 @@ struct sched_domain {
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_BALANCE_NEWIDLE	\
+				| SD_BALANCE_EXEC	\
+				| SD_BALANCE_CLONE	\
 				| SD_WAKE_AFFINE	\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
@@ -683,6 +695,7 @@ struct sched_domain {
 	.cache_nice_tries	= 1,			\
 	.per_cpu_gain		= 100,			\
 	.flags			= SD_BALANCE_EXEC	\
+				| SD_BALANCE_CLONE	\
 				| SD_WAKE_BALANCE,	\
 	.last_balance		= jiffies,		\
 	.balance_interval	= 1,			\
@@ -702,7 +715,7 @@ static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 
 extern unsigned long long sched_clock(void);
 
-#ifdef CONFIG_NUMA_SCHED
+#ifdef CONFIG_SMP
 extern void sched_balance_exec(void);
 #else
 #define sched_balance_exec()   {}

@@ -1234,8 +1234,8 @@ long do_fork(unsigned long clone_flags,
 		}
 
 #if defined(CONFIG_AUDIT) || defined(CONFIG_AUDIT_MODULE)
-	        if (AUDITING(current))
-        	      audit_fork(current, p);
+ 	        if (AUDITING(current))
+         	      audit_fork(current, p);
 #endif
 
 		/* Trace the event  */
