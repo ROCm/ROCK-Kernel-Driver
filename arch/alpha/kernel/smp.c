@@ -865,11 +865,36 @@ smp_call_function_on_cpu (void (*func) (void *info), void *info, int retry,
 	       && time_before (jiffies, timeout))
 		barrier();
 
-	/* We either got one or timed out -- clear the lock.  */
+	/* If there's no response yet, log a message but allow a longer
+	 * timeout period -- if we get a response this time, log
+	 * a message saying when we got it.. 
+	 */
+	if (atomic_read(&data.unstarted_count) > 0) {
+		long start_time = jiffies;
+		printk(KERN_ERR "%s: initial timeout -- trying long wait\n",
+		       __FUNCTION__);
+		timeout = jiffies + 30 * HZ;
+		while (atomic_read(&data.unstarted_count) > 0
+		       && time_before(jiffies, timeout))
+			barrier();
+		if (atomic_read(&data.unstarted_count) <= 0) {
+			long delta = jiffies - start_time;
+			printk(KERN_ERR 
+			       "%s: response %ld.%ld seconds into long wait\n",
+			       __FUNCTION__, delta / HZ,
+			       (100 * (delta - ((delta / HZ) * HZ))) / HZ);
+		}
+	}
+
+	/* We either got one or timed out -- clear the lock. */
 	mb();
 	smp_call_function_data = 0;
-	if (atomic_read (&data.unstarted_count) > 0)
-		return -ETIMEDOUT;
+
+	/* 
+	 * If after both the initial and long timeout periods we still don't
+	 * have a response, something is very wrong...
+	 */
+	BUG_ON(atomic_read (&data.unstarted_count) > 0);
 
 	/* Wait for a complete response, if needed.  */
 	if (wait) {
