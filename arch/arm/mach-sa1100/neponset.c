@@ -11,6 +11,7 @@
 #include <linux/ioport.h>
 #include <linux/serial_core.h>
 #include <linux/device.h>
+#include <linux/slab.h>
 
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
@@ -22,13 +23,6 @@
 #include <asm/arch/neponset.h>
 #include <asm/hardware/sa1111.h>
 #include <asm/sizes.h>
-
-#include "sa1111.h"
-
-static struct device neponset_device = {
-	.name	= "Neponset",
-	.bus_id	= "nep_bus",
-};
 
 /*
  * Install handler for Neponset IRQ.  Note that we have to loop here
@@ -163,6 +157,52 @@ static struct sa1100_port_fns neponset_port_fns __initdata = {
 	.get_mctrl	= neponset_get_mctrl,
 };
 
+/*
+ * LDM power management.
+ */
+static int neponset_suspend(struct device *dev, u32 state, u32 level)
+{
+	/*
+	 * Save state.
+	 */
+	if (level == SUSPEND_SAVE_STATE ||
+	    level == SUSPEND_DISABLE ||
+	    level == SUSPEND_POWER_DOWN) {
+		if (!dev->saved_state)
+			dev->saved_state = kmalloc(sizeof(unsigned int), GFP_KERNEL);
+		if (!dev->saved_state)
+			return -ENOMEM;
+
+		*(unsigned int *)dev->saved_state = NCR_0;
+	}
+
+	return 0;
+}
+
+static int neponset_resume(struct device *dev, u32 level)
+{
+	if (level == RESUME_RESTORE_STATE || level == RESUME_ENABLE) {
+		if (dev->saved_state) {
+			NCR_0 = *(unsigned int *)dev->saved_state;
+			kfree(dev->saved_state);
+			dev->saved_state = NULL;
+		}
+	}
+
+	return 0;
+}
+
+static struct device_driver neponset_device_driver = {
+	.suspend = neponset_suspend,
+	.resume  = neponset_resume,
+};
+
+static struct device neponset_device = {
+	.name	= "Neponset",
+	.bus_id	= "neponset",
+	.driver = &neponset_device_driver,
+};
+
 static int __init neponset_init(void)
 {
 	int ret;
@@ -191,7 +231,7 @@ static int __init neponset_init(void)
 		return -ENODEV;
 	}
 
-	ret = device_register(&neponset_device);
+	ret = register_sys_device(&neponset_device);
 	if (ret)
 		return ret;
 
@@ -213,7 +253,7 @@ static int __init neponset_init(void)
 	/*
 	 * Probe and initialise the SA1111.
 	 */
-	return sa1111_init(&neponset_device, 0x40000000, IRQ_NEPONSET_SA1111);
+	return sa1111_init(0x40000000, IRQ_NEPONSET_SA1111);
 }
 
 arch_initcall(neponset_init);

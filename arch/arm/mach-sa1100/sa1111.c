@@ -650,7 +650,7 @@ int sa1111_check_dma_bug(dma_addr_t addr)
 	return 0;
 }
 
-int sa1111_init(struct device *parent, unsigned long phys, unsigned int irq)
+int sa1111_init(unsigned long phys, unsigned int irq)
 {
 	unsigned int val;
 	int ret;

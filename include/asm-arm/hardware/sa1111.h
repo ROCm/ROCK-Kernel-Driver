@@ -581,6 +581,11 @@ struct sa1111_driver {
 #define SA1111_DRIVER_NAME(_sadev) ((_sadev)->dev.driver->name)
 
 /*
+ * Probe for a SA1111 chip.
+ */
+extern int sa1111_init(unsigned long phys, unsigned int irq);
+
+/*
  * These frob the SKPCR register.
  */
 void sa1111_enable_device(struct sa1111_dev *);
