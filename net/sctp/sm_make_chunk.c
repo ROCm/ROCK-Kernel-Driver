@@ -987,7 +987,7 @@ struct sctp_chunk *sctp_chunkify(struct sk_buff *skb,
 	retval->has_tsn		= 0;
 	retval->has_ssn         = 0;
 	retval->rtt_in_progress	= 0;
-	retval->sent_at	= jiffies;
+	retval->sent_at		= 0;
 	retval->singleton	= 1;
 	retval->end_of_packet	= 0;
 	retval->ecn_ce_done	= 0;

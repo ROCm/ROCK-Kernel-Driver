@@ -425,6 +425,9 @@ struct sctp_ulpevent *sctp_ulpevent_make_send_failed(
 	struct sctp_send_failed *ssf;
 	struct sk_buff *skb;
 
+	/* Pull off any padding. */
+	int len = ntohs(chunk->chunk_hdr->length);
+
 	/* Make skb with more room so we can prepend notification.  */
 	skb = skb_copy_expand(chunk->skb,
 			      sizeof(struct sctp_send_failed), /* headroom */
@@ -434,7 +437,8 @@ struct sctp_ulpevent *sctp_ulpevent_make_send_failed(
 		goto fail;
 
 	/* Pull off the common chunk header and DATA header.  */
-	skb_pull(skb, sizeof(sctp_data_chunk_t));
+	skb_pull(skb, sizeof(struct sctp_data_chunk));
+	len -= sizeof(struct sctp_data_chunk);
 
 	/* Embed the event fields inside the cloned skb.  */
 	event = sctp_skb2event(skb);
@@ -475,7 +479,8 @@ struct sctp_ulpevent *sctp_ulpevent_make_send_failed(
 	 * This field is the total length of the notification data, including
 	 * the notification header.
 	 */
-	ssf->ssf_length = skb->len;
+	ssf->ssf_length = sizeof(struct sctp_send_failed) + len;
+	skb_trim(skb, ssf->ssf_length);
 
 	/* Socket Extensions for SCTP
 	 * 5.3.1.4 SCTP_SEND_FAILED
@@ -495,6 +500,11 @@ struct sctp_ulpevent *sctp_ulpevent_make_send_failed(
 	 * message.
 	 */
 	memcpy(&ssf->ssf_info, &chunk->sinfo, sizeof(struct sctp_sndrcvinfo));
+
+	/* Per TSVWG discussion with Randy. Allow the application to
+	 * ressemble a fragmented message. 
+	 */
+	ssf->ssf_info.sinfo_flags = chunk->chunk_hdr->flags;
 
 	/* Socket Extensions for SCTP
 	 * 5.3.1.4 SCTP_SEND_FAILED

@@ -2372,7 +2372,8 @@ sctp_disposition_t sctp_sf_eat_data_6_2(const struct sctp_endpoint *ep,
 	 * PMTU.  In cases, such as loopback, this might be a rather
 	 * large spill over.
 	 */
-	if (asoc->rwnd_over || (datalen > asoc->rwnd + asoc->frag_point)) {
+	if (!asoc->rwnd || asoc->rwnd_over || 
+	    (datalen > asoc->rwnd + asoc->frag_point)) {
 
 		/* If this is the next TSN, consider reneging to make
 		 * room.   Note: Playing nice with a confused sender.  A
