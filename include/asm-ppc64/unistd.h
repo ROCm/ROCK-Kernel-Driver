@@ -230,6 +230,9 @@
 #define __NR_lremovexattr	219
 #define __NR_fremovexattr	220
 #define __NR_futex		221
+#define __NR_tux		222
+#define __NR_sched_setaffinity	223     
+#define __NR_sched_getaffinity	224
 
 #if 0
 /* Remind paulus to add these into ppc32 */

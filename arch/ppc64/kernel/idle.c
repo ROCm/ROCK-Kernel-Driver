@@ -84,6 +84,8 @@ int cpu_idle(void)
 	lpaca = get_paca();
 
 	while (1) {
+		irq_stat[smp_processor_id()].idle_timestamp = jiffies;
+
 		if (lpaca->xLpPaca.xSharedProc) {
 			if (ItLpQueue_isLpIntPending(lpaca->lpQueuePtr))
 				process_iSeries_events();
@@ -123,6 +125,7 @@ int cpu_idle(void)
 	long oldval;
 
 	while (1) {
+		irq_stat[smp_processor_id()].idle_timestamp = jiffies;
 		oldval = test_and_clear_thread_flag(TIF_NEED_RESCHED);
 
 		if (!oldval) {
@@ -146,3 +149,8 @@ int cpu_idle(void)
 }
 
 #endif /* CONFIG_PPC_ISERIES */
+
+void default_idle(void)
+{
+	barrier();
+}

@@ -257,7 +257,7 @@ EXPORT_SYMBOL(console_drivers);
 EXPORT_SYMBOL(xmon);
 #endif
 
-#if defined(CONFIG_KGDB) || defined(CONFIG_XMON)
+#ifdef CONFIG_DEBUG_KERNEL
 extern void (*debugger)(struct pt_regs *regs);
 extern int (*debugger_bpt)(struct pt_regs *regs);
 extern int (*debugger_sstep)(struct pt_regs *regs);

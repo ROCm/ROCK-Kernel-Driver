@@ -50,7 +50,7 @@ static inline void isync(void)
 
 #define HMT_LOW		"\tor	1,1,1		# low priority\n"
 #define HMT_MEDIUM	"\tor	2,2,2		# medium priority\n"
-#define HMT_MEDIUM	"\tor	3,3,3		# high priority\n"
+#define HMT_HIGH	"\tor	3,3,3		# high priority\n"
 #else
 #define HMT_low()	do { } while(0)
 #define HMT_medium()	do { } while(0)
