@@ -25,9 +25,7 @@ typedef struct kmem_cache_s kmem_cache_t;
 #define	SLAB_KERNEL		GFP_KERNEL
 #define	SLAB_DMA		GFP_DMA
 
-#define SLAB_LEVEL_MASK		(__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS|\
-				__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT|\
-				__GFP_NOFAIL|__GFP_NORETRY)
+#define SLAB_LEVEL_MASK		GFP_LEVEL_MASK
 
 #define	SLAB_NO_GROW		__GFP_NO_GROW	/* don't grow a cache */
 

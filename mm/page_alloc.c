@@ -130,6 +130,9 @@ static void destroy_compound_page(struct page *page, unsigned long order)
 	int i;
 	int nr_pages = 1 << order;
 
+	if (!PageCompound(page))
+		return;
+
 	if (page[1].index != order)
 		bad_page(__FUNCTION__, page);
 
@@ -487,10 +490,12 @@ void fastcall free_cold_page(struct page *page)
  * or two.
  */
 
-static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
+static struct page *
+buffered_rmqueue(struct zone *zone, int order, int gfp_flags)
 {
 	unsigned long flags;
 	struct page *page = NULL;
+	int cold = !!(gfp_flags & __GFP_COLD);
 
 	if (order == 0) {
 		struct per_cpu_pages *pcp;
@@ -519,7 +524,7 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
 		BUG_ON(bad_range(zone, page));
 		mod_page_state_zone(zone, pgalloc, 1 << order);
 		prep_new_page(page, order);
-		if (order)
+		if (order && (gfp_flags & __GFP_COMP))
 			prep_compound_page(page, order);
 	}
 	return page;
@@ -552,15 +557,10 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	struct reclaim_state reclaim_state;
 	struct task_struct *p = current;
 	int i;
-	int cold;
 	int alloc_type;
 	int do_retry;
 
 	might_sleep_if(wait);
-
-	cold = 0;
-	if (gfp_mask & __GFP_COLD)
-		cold = 1;
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
 	if (zones[0] == NULL)     /* no zones in the zonelist */
@@ -583,7 +583,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
-			page = buffered_rmqueue(z, order, cold);
+			page = buffered_rmqueue(z, order, gfp_mask);
 			if (page)
 				goto got_pg;
 		}
@@ -606,7 +606,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
-			page = buffered_rmqueue(z, order, cold);
+			page = buffered_rmqueue(z, order, gfp_mask);
 			if (page)
 				goto got_pg;
 		}
@@ -620,7 +620,7 @@ rebalance:
 		for (i = 0; zones[i] != NULL; i++) {
 			struct zone *z = zones[i];
 
-			page = buffered_rmqueue(z, order, cold);
+			page = buffered_rmqueue(z, order, gfp_mask);
 			if (page)
 				goto got_pg;
 		}
@@ -648,7 +648,7 @@ rebalance:
 
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
-			page = buffered_rmqueue(z, order, cold);
+			page = buffered_rmqueue(z, order, gfp_mask);
 			if (page)
 				goto got_pg;
 		}

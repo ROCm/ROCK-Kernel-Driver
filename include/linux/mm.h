@@ -247,14 +247,14 @@ static inline int page_count(struct page *p)
 
 static inline void get_page(struct page *page)
 {
-	if (PageCompound(page))
+	if (unlikely(PageCompound(page)))
 		page = (struct page *)page->private;
 	atomic_inc(&page->count);
 }
 
 static inline void put_page(struct page *page)
 {
-	if (PageCompound(page)) {
+	if (unlikely(PageCompound(page))) {
 		page = (struct page *)page->private;
 		if (put_page_testzero(page)) {
 			if (page[1].mapping) {	/* destructor? */

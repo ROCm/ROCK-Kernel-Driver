@@ -56,7 +56,8 @@ static struct page *alloc_fresh_huge_page(void)
 {
 	static int nid = 0;
 	struct page *page;
-	page = alloc_pages_node(nid, GFP_HIGHUSER, HUGETLB_PAGE_ORDER);
+	page = alloc_pages_node(nid, GFP_HIGHUSER|__GFP_COMP,
+					HUGETLB_PAGE_ORDER);
 	nid = (nid + 1) % numnodes;
 	return page;
 }
