@@ -394,7 +394,7 @@ __audit_get_target(unsigned int n,
 				task_unlock(current);
 				goto invalid;
 			}
-			tgt->at_intval = ((struct aud_process *) current->audit)->audit_uid;
+			tgt->at_intval = ((const struct aud_process *) current->audit)->audit_uid;
 			task_unlock(current);
 			break;
 		default:
@@ -429,8 +429,8 @@ __audit_get_target(unsigned int n,
 
 	/* File attributes */
 	if (AUD_FILT_TGT_FILE_ATTR(n)) {
-		struct dentry	*dentry, *up;
-		struct inode	*inode;
+		const struct dentry *dentry, *up;
+		const struct inode *inode;
 
 		if (parent_target == NULL
 		 || parent_target->at_type != AUDIT_ARG_PATH)
@@ -446,7 +446,7 @@ __audit_get_target(unsigned int n,
 
 		switch (n) {
 		case AUD_FILT_TGT_FILE_DEV:
-			tgt->at_intval = inode->i_sb->s_dev;
+			tgt->at_intval = huge_encode_dev(inode->i_sb->s_dev);
 			break;
 		case AUD_FILT_TGT_FILE_INO:
 			tgt->at_intval = inode->i_ino;
@@ -478,9 +478,9 @@ __audit_get_target(unsigned int n,
 
 	/* Socket attributes */
 	if (AUD_FILT_TGT_SOCK_ATTR(n)) {
-		struct dentry	*dentry;
-		struct inode	*inode;
-		struct socket	*sock;
+		const struct dentry *dentry;
+		/*const*/ struct inode *inode;
+		const struct socket *sock;
 
 		if (parent_target) {
 			dentry = parent_target->at_path.dentry;
@@ -515,14 +515,14 @@ __audit_get_target(unsigned int n,
 
 	/* rtnetlink attributes */
 	if (AUD_FILT_TGT_NETLINK_ATTR(n)) {
-		struct sk_buff	*skb;
-		struct nlmsghdr	*nlh;
+		const struct sk_buff *skb;
+		const struct nlmsghdr *nlh;
 
 		if ((skb = ev->netconf) == NULL
 		 || (skb->len < NLMSG_LENGTH(sizeof(struct rtgenmsg))))
 			goto invalid;
 
-		nlh = (struct nlmsghdr *) skb->data;
+		nlh = (const struct nlmsghdr *) skb->data;
 		switch (n) {
 		case AUD_FILT_TGT_NETLINK_TYPE:
 			tgt->at_intval = nlh->nlmsg_type;
@@ -531,7 +531,7 @@ __audit_get_target(unsigned int n,
 			tgt->at_intval = nlh->nlmsg_flags;
 			break;
 		case AUD_FILT_TGT_NETLINK_FAMILY:
-			tgt->at_intval = ((struct rtgenmsg *)NLMSG_DATA(nlh))->rtgen_family;
+			tgt->at_intval = ((const struct rtgenmsg *)NLMSG_DATA(nlh))->rtgen_family;
 			break;
 		default:
 			goto invalid;
