@@ -739,18 +739,22 @@ static int vfat_add_entry(struct inode *dir,struct qstr* qname,
 {
 	struct msdos_dir_slot *dir_slots;
 	loff_t offset;
-	int slots, slot;
-	int res;
+	int res, slots, slot;
+	unsigned int len;
 	struct msdos_dir_entry *dummy_de;
 	struct buffer_head *dummy_bh;
 	loff_t dummy_i_pos;
 
-	dir_slots = (struct msdos_dir_slot *)
+	len = vfat_striptail_len(qname);
+	if (len == 0)
+		return -ENOENT;
+
+	dir_slots =
 	       kmalloc(sizeof(struct msdos_dir_slot) * MSDOS_SLOTS, GFP_KERNEL);
 	if (dir_slots == NULL)
 		return -ENOMEM;
 
-	res = vfat_build_slots(dir, qname->name, vfat_striptail_len(qname),
+	res = vfat_build_slots(dir, qname->name, len,
 			       dir_slots, &slots, is_dir);
 	if (res < 0)
 		goto cleanup;
@@ -801,11 +805,16 @@ static int vfat_find(struct inode *dir,struct qstr* qname,
 {
 	struct super_block *sb = dir->i_sb;
 	loff_t offset;
+	unsigned int len;
 	int res;
 
-	res = fat_search_long(dir, qname->name, vfat_striptail_len(qname),
-			(MSDOS_SB(sb)->options.name_check != 's'),
-			&offset,&sinfo->longname_offset);
+	len = vfat_striptail_len(qname);
+	if (len == 0)
+		return -ENOENT;
+
+	res = fat_search_long(dir, qname->name, len,
+			      (MSDOS_SB(sb)->options.name_check != 's'),
+			      &offset, &sinfo->longname_offset);
 	if (res>0) {
 		sinfo->long_slots = res-1;
 		if (fat_get_entry(dir,&offset,last_bh,last_de,&sinfo->i_pos)>=0)
