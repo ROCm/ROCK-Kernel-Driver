@@ -1590,7 +1590,7 @@ static int agp_probe (struct pci_dev *dev, const struct pci_device_id *ent)
 	int ret_val;
 
 	if (agp_bridge.type != NOT_SUPPORTED) {
-		printk (KERN_DEBUG "Oops, don't init a 2nd agpgart device.\n");
+		printk (KERN_DEBUG PFX "Oops, don't init more than one agpgart device.\n");
 		return -ENODEV;
 	}
 
