@@ -1,9 +1,21 @@
+Version 1.19
+------------
+Fix /proc/fs/cifs/Stats and DebugData display to handle larger
+amounts of return data. Properly limit requests to MAX_REQ (50
+is the usual maximum active multiplex SMB/CIFS requests per server).
+Do not kill cifsd (and thus hurt the other SMB session) when more than one
+session to the same server (but with different userids) exists and one
+of the two user's smb sessions is being removed while leaving the other.
+
+
 Version 1.18
 ------------
 Do not rename hardlinked files (since that should be a noop). Flush
 cached write behind data when reopening a file after session abend,
 except when already in write. Grab per socket sem during reconnect 
-to avoid oops in sendmsg if overlapping with reconnect.
+to avoid oops in sendmsg if overlapping with reconnect. Do not
+reset cached inode file size on readdir for files open for write on 
+client.
 
 
 Version 1.17

@@ -588,9 +588,10 @@ cifs_write(struct file * file, const char *write_data,
 	if(file->f_dentry == NULL)
 		return -EBADF;
 
-	xid = GetXid();
-
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);
+	if(cifs_sb == NULL) {
+		return -EBADF;
+	}
 	pTcon = cifs_sb->tcon;
 
 	/*cFYI(1,
@@ -598,11 +599,12 @@ cifs_write(struct file * file, const char *write_data,
 	   *poffset, file->f_dentry->d_name.name)); */
 
 	if (file->private_data == NULL) {
-		FreeXid(xid);
 		return -EBADF;
+	} else {
+		open_file = (struct cifsFileInfo *) file->private_data;
 	}
-	open_file = (struct cifsFileInfo *) file->private_data;
-
+	
+	xid = GetXid();
 	if(file->f_dentry->d_inode == NULL) {
 		FreeXid(xid);
 		return -EBADF;
@@ -620,10 +622,22 @@ cifs_write(struct file * file, const char *write_data,
 			if(file->private_data == NULL) {
 				/* file has been closed on us */
 				FreeXid(xid);
+			/* if we have gotten here we have written some data
+			and blocked, and the file has been freed on us
+			while we blocked so return what we managed to write */
 				return total_written;
+			} 
+                        open_file = (struct cifsFileInfo *) file->private_data;
+			if(open_file->closePend) {
+				FreeXid(xid);
+				if(total_written)
+					return total_written;
+				else
+					return -EBADF;
 			}
-			if ((open_file->invalidHandle) && (!open_file->closePend)) {
-				if((file->f_dentry == NULL) || (file->f_dentry->d_inode == NULL)) {
+			if (open_file->invalidHandle) {
+				if((file->f_dentry == NULL) ||
+				   (file->f_dentry->d_inode == NULL)) {
 					FreeXid(xid);
 					return total_written;
 				}
