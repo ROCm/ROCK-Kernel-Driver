@@ -307,7 +307,7 @@ void __init paging_init(void)
 {
 	pagetable_init();
 
-	__asm__( "movl %0,%%cr3\n" ::"r"(__pa(swapper_pg_dir)));
+	load_cr3(swapper_pg_dir);
 
 #if CONFIG_X86_PAE
 	/*
