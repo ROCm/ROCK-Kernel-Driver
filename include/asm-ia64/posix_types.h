@@ -8,8 +8,8 @@
  *
  * Based on <asm-alpha/posix_types.h>.
  *
- * Modified 1998-2000, 2003 Hewlett-Packard Co
- *	David Mosberger-Tang <davidm@hpl.hp.com>
+ * Modified 1998-2000, 2003
+ *	David Mosberger-Tang <davidm@hpl.hp.com>, Hewlett-Packard Co
  */
 
 typedef unsigned long	__kernel_ino_t;
