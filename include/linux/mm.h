@@ -524,6 +524,7 @@ extern struct vm_area_struct *find_extend_vma(struct mm_struct *mm, unsigned lon
 
 extern struct page * vmalloc_to_page(void *addr);
 extern unsigned long get_page_cache_size(void);
+extern unsigned int nr_used_zone_pages(void);
 
 #endif /* __KERNEL__ */
 

@@ -386,10 +386,11 @@ void prune_icache(int goal)
 
 	count = 0;
 	entry = inode_unused.prev;
-	while (entry != &inode_unused)
-	{
+	for(; goal; goal--) {
 		struct list_head *tmp = entry;
 
+		if (entry == &inode_unused)
+			break;
 		entry = entry->prev;
 		inode = INODE(tmp);
 		if (inode->i_state & (I_FREEING|I_CLEAR|I_LOCK))
@@ -403,8 +404,6 @@ void prune_icache(int goal)
 		list_add(tmp, freeable);
 		inode->i_state |= I_FREEING;
 		count++;
-		if (!--goal)
-			break;
 	}
 	inodes_stat.nr_unused -= count;
 	spin_unlock(&inode_lock);
@@ -414,19 +413,11 @@ void prune_icache(int goal)
 
 /*
  * This is called from kswapd when we think we need some
- * more memory, but aren't really sure how much. So we
- * carefully try to free a _bit_ of our icache, but not
- * too much.
- *
- * Priority:
- *   1 - very urgent: shrink everything
- *  ...
- *   6 - base-level: try to shrink a bit.
+ * more memory. 
  */
-int shrink_icache_memory(int priority, int gfp_mask)
+int shrink_icache_memory(int ratio, unsigned int gfp_mask)
 {
-	int count = 0;
-
+	int entries = inodes_stat.nr_inodes / ratio + 1;
 	/*
 	 * Nasty deadlock avoidance..
 	 *
@@ -437,12 +428,10 @@ int shrink_icache_memory(int priority, int gfp_mask)
 	if (!(gfp_mask & __GFP_FS))
 		return 0;
 
-	count = inodes_stat.nr_unused / priority;
-
-	prune_icache(count);
-	kmem_cache_shrink(inode_cachep);
-	return 0;
+	prune_icache(entries);
+	return entries;
 }
+EXPORT_SYMBOL(shrink_icache_memory);
 
 /*
  * Called with the inode lock held.
