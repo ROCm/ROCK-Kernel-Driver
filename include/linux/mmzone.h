@@ -8,6 +8,7 @@
 #include <linux/spinlock.h>
 #include <linux/list.h>
 #include <linux/wait.h>
+#include <linux/cache.h>
 #include <asm/atomic.h>
 
 /*
@@ -28,6 +29,21 @@ typedef struct free_area_struct {
 struct pglist_data;
 
 /*
+ * zone->lock and zone->lru_lock are two of the hottest locks in the kernel.
+ * So add a wild amount of padding here to ensure that they fall into separate
+ * cachelines.  There are very few zone structures in the machine, so space
+ * consumption is not a concern here.
+ */
+#if defined(CONFIG_SMP)
+struct zone_padding {
+	int x;
+} ____cacheline_maxaligned_in_smp;
+#define ZONE_PADDING(name)	struct zone_padding name;
+#else
+#define ZONE_PADDING(name)
+#endif
+
+/*
  * On machines where it is needed (eg PCs) we divide physical memory
  * into multiple physical zones. On a PC we have 3 zones:
  *
@@ -35,6 +51,7 @@ struct pglist_data;
  * ZONE_NORMAL	16-896 MB	direct mapped by the kernel
  * ZONE_HIGHMEM	 > 896 MB	only page cache and user processes
  */
+
 struct zone {
 	/*
 	 * Commonly accessed fields:
@@ -44,12 +61,16 @@ struct zone {
 	unsigned long		pages_min, pages_low, pages_high;
 	int			need_balance;
 
+	ZONE_PADDING(_pad1_)
+
 	spinlock_t		lru_lock;	
 	struct list_head	active_list;
 	struct list_head	inactive_list;
 	atomic_t		refill_counter;
 	unsigned long		nr_active;
 	unsigned long		nr_inactive;
+
+	ZONE_PADDING(_pad2_)
 
 	/*
 	 * free areas of different sizes
@@ -97,7 +118,7 @@ struct zone {
 	 */
 	char			*name;
 	unsigned long		size;
-};
+} ____cacheline_maxaligned_in_smp;
 
 #define ZONE_DMA		0
 #define ZONE_NORMAL		1
