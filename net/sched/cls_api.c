@@ -52,7 +52,7 @@ static rwlock_t cls_mod_lock = RW_LOCK_UNLOCKED;
 
 /* Find classifier type by string name */
 
-struct tcf_proto_ops * tcf_proto_lookup_ops(struct rtattr *kind)
+static struct tcf_proto_ops * tcf_proto_lookup_ops(struct rtattr *kind)
 {
 	struct tcf_proto_ops *t = NULL;
 
