@@ -92,6 +92,7 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 	struct usb_device	*root = hcd_to_bus (&ehci->hcd)->root_hub;
 	u32			temp;
 	int			i;
+	int			intr_enable;
 
 	if (!root->dev.power.power_state)
 		return 0;
@@ -100,16 +101,17 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 
 	/* re-init operational registers in case we lost power */
 	if (readl (&ehci->regs->intr_enable) == 0) {
-		temp = 1;
-		writel (INTR_MASK, &ehci->regs->intr_enable);
+ 		/* at least some APM implementations will try to deliver
+		 * IRQs right away, so delay them until we're ready.
+ 		 */
+ 		intr_enable = 1;
 		writel (0, &ehci->regs->segment);
 		writel (ehci->periodic_dma, &ehci->regs->frame_list);
 		writel ((u32)ehci->async->qh_dma, &ehci->regs->async_next);
-		/* FIXME will this work even if (pci) vAUX was lost? */
 	} else
-		temp = 0;
+		intr_enable = 0;
 	ehci_dbg(ehci, "resume root hub%s\n",
-			temp ? " after power loss" : "");
+			intr_enable ? " after power loss" : "");
 
 	/* restore CMD_RUN, framelist size, and irq threshold */
 	writel (ehci->command, &ehci->regs->command);
@@ -151,6 +153,11 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 	root->dev.power.power_state = 0;
 	ehci->next_statechange = jiffies + msecs_to_jiffies(5);
 	ehci->hcd.state = USB_STATE_RUNNING;
+
+	/* Now we can safely re-enable irqs */
+	if (intr_enable)
+		writel (INTR_MASK, &ehci->regs->intr_enable);
+
 	return 0;
 }
 
