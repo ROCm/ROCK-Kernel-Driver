@@ -423,7 +423,8 @@ static int udp_getfrag_nosum(const void *p, char * to, unsigned int offset, unsi
 				   fraglen);
 }
 
-int udp_sendmsg(struct sock *sk, struct msghdr *msg, int len)
+int udp_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+		int len)
 {
 	struct inet_opt *inet = inet_sk(sk);
 	int ulen = len + sizeof(struct udphdr);
@@ -635,8 +636,8 @@ static __inline__ int udp_checksum_complete(struct sk_buff *skb)
  * 	return it, otherwise we block.
  */
 
-int udp_recvmsg(struct sock *sk, struct msghdr *msg, int len,
-		int noblock, int flags, int *addr_len)
+int udp_recvmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
+		int len, int noblock, int flags, int *addr_len)
 {
 	struct inet_opt *inet = inet_sk(sk);
   	struct sockaddr_in *sin = (struct sockaddr_in *)msg->msg_name;

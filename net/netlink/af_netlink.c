@@ -570,7 +570,8 @@ void netlink_set_err(struct sock *ssk, u32 pid, u32 group, int code)
 	read_unlock(&nl_table_lock);
 }
 
-static int netlink_sendmsg(struct socket *sock, struct msghdr *msg, int len,
+static int netlink_sendmsg(struct kiocb *iocb, struct socket *sock,
+			   struct msghdr *msg, int len,
 			   struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
@@ -639,7 +640,8 @@ out:
 	return err;
 }
 
-static int netlink_recvmsg(struct socket *sock, struct msghdr *msg, int len,
+static int netlink_recvmsg(struct kiocb *iocb, struct socket *sock,
+			   struct msghdr *msg, int len,
 			   int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;

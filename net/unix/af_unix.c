@@ -1175,7 +1175,8 @@ static void unix_attach_fds(struct scm_cookie *scm, struct sk_buff *skb)
  *	Send AF_UNIX data.
  */
 
-static int unix_dgram_sendmsg(struct socket *sock, struct msghdr *msg, int len,
+static int unix_dgram_sendmsg(struct kiocb *iocb, struct socket *sock,
+			      struct msghdr *msg, int len,
 			      struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
@@ -1307,7 +1308,8 @@ out:
 }
 
 		
-static int unix_stream_sendmsg(struct socket *sock, struct msghdr *msg, int len,
+static int unix_stream_sendmsg(struct kiocb *iocb, struct socket *sock,
+			       struct msghdr *msg, int len,
 			       struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
@@ -1415,7 +1417,8 @@ static void unix_copy_addr(struct msghdr *msg, struct sock *sk)
 	}
 }
 
-static int unix_dgram_recvmsg(struct socket *sock, struct msghdr *msg, int size,
+static int unix_dgram_recvmsg(struct kiocb *iocb, struct socket *sock,
+			      struct msghdr *msg, int size,
 			      int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
@@ -1517,7 +1520,8 @@ static long unix_stream_data_wait(unix_socket * sk, long timeo)
 
 
 
-static int unix_stream_recvmsg(struct socket *sock, struct msghdr *msg, int size,
+static int unix_stream_recvmsg(struct kiocb *iocb, struct socket *sock,
+			       struct msghdr *msg, int size,
 			       int flags, struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;

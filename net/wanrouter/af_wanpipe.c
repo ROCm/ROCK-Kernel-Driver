@@ -540,8 +540,8 @@ static struct sock *wanpipe_alloc_socket(void)
  *      a packet is queued into sk->write_queue.
  *===========================================================*/
 
-static int wanpipe_sendmsg(struct socket *sock, struct msghdr *msg, int len,
-			  struct scm_cookie *scm)
+static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
+			   struct msghdr *msg, int len, struct scm_cookie *scm)
 {
 	wanpipe_opt *wp;
 	struct sock *sk = sock->sk;
@@ -1647,8 +1647,9 @@ static int wanpipe_create(struct socket *sock, int protocol)
  *      to the user. If necessary we block.
  *===========================================================*/
 
-static int wanpipe_recvmsg(struct socket *sock, struct msghdr *msg, int len,
-			  int flags, struct scm_cookie *scm)
+static int wanpipe_recvmsg(struct kiocb *iocb, struct socket *sock,
+			   struct msghdr *msg, int len, int flags,
+			   struct scm_cookie *scm)
 {
 	struct sock *sk = sock->sk;
 	struct sk_buff *skb;
