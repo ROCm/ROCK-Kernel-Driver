@@ -43,8 +43,9 @@
 #define BYTES_PER_LONG 8
 #endif
 
-static void bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
-		   int src_idx, unsigned long n)
+static void bitcpy(unsigned long __iomem *dst, int dst_idx,
+		   const unsigned long __iomem *src, int src_idx,
+		   unsigned long n)
 {
 	unsigned long first, last;
 	int shift = dst_idx-src_idx, left, right;
@@ -185,8 +186,8 @@ static void bitcpy(unsigned long *dst, int dst_idx, const unsigned long *src,
 	}
 }
 
-static void bitcpy_rev(unsigned long *dst, int dst_idx,
-		       const unsigned long *src, int src_idx, unsigned long n)
+static void bitcpy_rev(unsigned long __iomem *dst, int dst_idx,
+		       const unsigned long __iomem *src, int src_idx, unsigned long n)
 {
 	unsigned long first, last;
 	int shift = dst_idx-src_idx, left, right;
@@ -344,7 +345,7 @@ void cfb_copyarea(struct fb_info *p, const struct fb_copyarea *area)
 	int x2, y2, old_dx, old_dy, vxres, vyres;
 	unsigned long next_line = p->fix.line_length;
 	int dst_idx = 0, src_idx = 0, rev_copy = 0;
-	unsigned long *dst = NULL, *src = NULL;
+	unsigned long __iomem *dst = NULL, *src = NULL;
 
 	if (p->state != FBINFO_STATE_RUNNING)
 		return;
@@ -394,7 +395,7 @@ void cfb_copyarea(struct fb_info *p, const struct fb_copyarea *area)
 		rev_copy = 1;
 	}
 
-	dst = src = (unsigned long *)((unsigned long)p->screen_base & 
+	dst = src = (unsigned long __iomem *)((unsigned long)p->screen_base & 
 				      ~(BYTES_PER_LONG-1));
 	dst_idx = src_idx = (unsigned long)p->screen_base & (BYTES_PER_LONG-1);
 	dst_idx += dy*next_line*8 + dx*p->var.bits_per_pixel;
