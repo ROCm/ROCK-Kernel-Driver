@@ -24,7 +24,6 @@ static void __init isa_dev_get_resource(struct sparc_isa_device *isa_dev,
 					struct linux_prom_registers *pregs,
 					int pregs_size)
 {
-	struct linux_prom_registers regs[PROMREG_MAX];
 	unsigned long base, len;
 	int prop_len;
 
