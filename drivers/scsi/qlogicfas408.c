@@ -538,7 +538,7 @@ int qlogicfas408_device_reset(Scsi_Cmnd * cmd)
  *	Return info string
  */
 
-char *qlogicfas408_info(struct Scsi_Host *host)
+const char *qlogicfas408_info(struct Scsi_Host *host)
 {
 	struct qlogicfas408_priv *priv = get_priv_by_host(host);
 	return priv->qinfo;
