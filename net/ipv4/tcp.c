@@ -737,17 +737,6 @@ do_interrupted:
 	goto out;
 }
 
-static inline int can_coalesce(struct sk_buff *skb, int i, struct page *page,
-			       int off)
-{
-	if (i) {
-		skb_frag_t *frag = &skb_shinfo(skb)->frags[i - 1];
-		return page == frag->page &&
-		       off == frag->page_offset + frag->size;
-	}
-	return 0;
-}
-
 static inline void fill_page_desc(struct sk_buff *skb, int i,
 				  struct page *page, int off, int size)
 {
@@ -865,7 +854,7 @@ new_segment:
 			copy = size;
 
 		i = skb_shinfo(skb)->nr_frags;
-		if (can_coalesce(skb, i, page, offset)) {
+		if (skb_can_coalesce(skb, i, page, offset)) {
 			skb_shinfo(skb)->frags[i - 1].size += copy;
 		} else if (i < MAX_SKB_FRAGS) {
 			get_page(page);
@@ -947,53 +936,6 @@ ssize_t tcp_sendpage(struct socket *sock, struct page *page, int offset,
 
 #define TCP_PAGE(sk)	(inet_sk(sk)->sndmsg_page)
 #define TCP_OFF(sk)	(inet_sk(sk)->sndmsg_off)
-
-static inline int tcp_copy_to_page(struct sock *sk, char __user *from,
-				   struct sk_buff *skb, struct page *page,
-				   int off, int copy)
-{
-	int err = 0;
-	unsigned int csum;
-
-	if (skb->ip_summed == CHECKSUM_NONE) {
-		csum = csum_and_copy_from_user(from, page_address(page) + off,
-				       copy, 0, &err);
-		if (err) return err;
-		skb->csum = csum_block_add(skb->csum, csum, skb->len);
-	} else {
-		if (copy_from_user(page_address(page) + off, from, copy))
-			return -EFAULT;
-	}
-
-	skb->len += copy;
-	skb->data_len += copy;
-	skb->truesize += copy;
-	sk->sk_wmem_queued += copy;
-	sk->sk_forward_alloc -= copy;
-	return 0;
-}
-
-static inline int skb_add_data(struct sk_buff *skb, char __user *from, int copy)
-{
-	int err = 0;
-	unsigned int csum;
-	int off = skb->len;
-
-	if (skb->ip_summed == CHECKSUM_NONE) {
-		csum = csum_and_copy_from_user(from, skb_put(skb, copy),
-				       copy, 0, &err);
-		if (!err) {
-			skb->csum = csum_block_add(skb->csum, csum, off);
-			return 0;
-		}
-	} else {
-		if (!copy_from_user(skb_put(skb, copy), from, copy))
-			return 0;
-	}
-
-	__skb_trim(skb, off);
-	return -EFAULT;
-}
 
 static inline int select_size(struct sock *sk, struct tcp_opt *tp)
 {
@@ -1100,7 +1042,7 @@ new_segment:
 				struct page *page = TCP_PAGE(sk);
 				int off = TCP_OFF(sk);
 
-				if (can_coalesce(skb, i, page, off) &&
+				if (skb_can_coalesce(skb, i, page, off) &&
 				    off != PAGE_SIZE) {
 					/* We can extend the last page
 					 * fragment. */
@@ -1138,7 +1080,7 @@ new_segment:
 
 				/* Time to copy data. We are close to
 				 * the end! */
-				err = tcp_copy_to_page(sk, from, skb, page,
+				err = skb_copy_to_page(sk, from, skb, page,
 						       off, copy);
 				if (err) {
 					/* If this page was new, give it to the

@@ -27,6 +27,7 @@
 #include <linux/highmem.h>
 #include <linux/poll.h>
 #include <linux/net.h>
+#include <net/checksum.h>
 
 #define HAVE_ALLOC_SKB		/* For the drivers to know */
 #define HAVE_ALIGNABLE_SKB	/* Ditto 8)		   */
@@ -995,6 +996,39 @@ static inline struct sk_buff *skb_padto(struct sk_buff *skb, unsigned int len)
 	return skb_pad(skb, len-size);
 }
 
+static inline int skb_add_data(struct sk_buff *skb,
+			       char __user *from, int copy)
+{
+	const int off = skb->len;
+
+	if (skb->ip_summed == CHECKSUM_NONE) {
+		int err = 0;
+		unsigned int csum = csum_and_copy_from_user(from,
+							    skb_put(skb, copy),
+							    copy, 0, &err);
+		if (!err) {
+			skb->csum = csum_block_add(skb->csum, csum, off);
+			return 0;
+		}
+	} else if (!copy_from_user(skb_put(skb, copy), from, copy))
+		return 0;
+
+	__skb_trim(skb, off);
+	return -EFAULT;
+}
+
+static inline int skb_can_coalesce(struct sk_buff *skb, int i,
+				   struct page *page, int off)
+{
+	if (i) {
+		struct skb_frag_struct *frag = &skb_shinfo(skb)->frags[i - 1];
+
+		return page == frag->page &&
+		       off == frag->page_offset + frag->size;
+	}
+	return 0;
+}
+
 /**
  *	skb_linearize - convert paged skb to linear one
  *	@skb: buffer to linarize
@@ -1058,6 +1092,8 @@ extern unsigned int    skb_copy_and_csum_bits(const struct sk_buff *skb,
 					      int offset, u8 *to, int len,
 					      unsigned int csum);
 extern void	       skb_copy_and_csum_dev(const struct sk_buff *skb, u8 *to);
+extern void	       skb_split(struct sk_buff *skb,
+				 struct sk_buff *skb1, const u32 len);
 
 extern void skb_init(void);
 extern void skb_add_mtu(int mtu);
