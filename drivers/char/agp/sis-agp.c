@@ -13,6 +13,8 @@
 #define SIS_TLBCNTRL	0x97
 #define SIS_TLBFLUSH	0x98
 
+static int __devinitdata agp_sis_force_delay = 0;
+static int __devinitdata agp_sis_agp_spec = -1;
 
 static int sis_fetch_size(void)
 {
@@ -67,7 +69,7 @@ static void sis_cleanup(void)
 			      (previous_size->size_value & ~(0x03)));
 }
 
-static void sis_648_enable(u32 mode)
+static void sis_delayed_enable(u32 mode)
 {
 	struct pci_dev *device = NULL;
 	u32 command;
@@ -94,13 +96,12 @@ static void sis_648_enable(u32 mode)
 		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
 
 		/*
-		 * Weird: on 648(fx) and 746(fx) chipsets any rate change in the target
+		 * Weird: on some sis chipsets any rate change in the target
 		 * command register triggers a 5ms screwup during which the master
 		 * cannot be configured		 
 		 */
-		if (device->device == PCI_DEVICE_ID_SI_648 ||
-		    device->device == PCI_DEVICE_ID_SI_746) {
-			printk(KERN_INFO PFX "SiS chipset with AGP problems detected. Giving bridge time to recover.\n");
+		if (device->device == agp_bridge->dev->device) {
+			printk(KERN_INFO PFX "SiS delay workaround: giving bridge time to recover.\n");
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout (1+(HZ*10)/1000);
 		}
@@ -223,28 +224,35 @@ static struct agp_device_ids sis_agp_device_ids[] __devinitdata =
 };
 
 
+// chipsets that require the 'delay hack'
+static int sis_broken_chipsets[] __devinitdata = {
+	PCI_DEVICE_ID_SI_648,
+	PCI_DEVICE_ID_SI_746,
+	0 // terminator
+};
+
 static void __devinit sis_get_driver(struct agp_bridge_data *bridge)
 {
-	if (bridge->dev->device == PCI_DEVICE_ID_SI_648) { 
-		sis_driver.agp_enable=sis_648_enable;
-		if (agp_bridge->major_version == 3) {
-			sis_driver.aperture_sizes = agp3_generic_sizes;
-			sis_driver.size_type = U16_APER_SIZE;
-			sis_driver.num_aperture_sizes = AGP_GENERIC_SIZES_ENTRIES;
-			sis_driver.configure = agp3_generic_configure;
-			sis_driver.fetch_size = agp3_generic_fetch_size;
-			sis_driver.cleanup = agp3_generic_cleanup;
-			sis_driver.tlb_flush = agp3_generic_tlbflush;
-		}
-	}
+	int i;
 
-	if (bridge->dev->device == PCI_DEVICE_ID_SI_746) {
-		/*
-		 * We don't know enough about the 746 to enable it properly.
-		 * Though we do know that it needs the 'delay' hack to settle
-		 * after changing modes.
-		 */
-		sis_driver.agp_enable=sis_648_enable;
+	for(i=0; sis_broken_chipsets[i]!=0; ++i)
+		if(bridge->dev->device==sis_broken_chipsets[i])
+			break;
+
+	if(sis_broken_chipsets[i] || agp_sis_force_delay)
+		sis_driver.agp_enable=sis_delayed_enable;
+
+	// sis chipsets that indicate less than agp3.5
+	// are not actually fully agp3 compliant
+	if ((agp_bridge->major_version == 3 && agp_bridge->minor_version >= 5
+	     && agp_sis_agp_spec!=0) || agp_sis_agp_spec==1) {
+		sis_driver.aperture_sizes = agp3_generic_sizes;
+		sis_driver.size_type = U16_APER_SIZE;
+		sis_driver.num_aperture_sizes = AGP_GENERIC_SIZES_ENTRIES;
+		sis_driver.configure = agp3_generic_configure;
+		sis_driver.fetch_size = agp3_generic_fetch_size;
+		sis_driver.cleanup = agp3_generic_cleanup;
+		sis_driver.tlb_flush = agp3_generic_tlbflush;
 	}
 }
 
@@ -335,4 +343,8 @@ static void __exit agp_sis_cleanup(void)
 module_init(agp_sis_init);
 module_exit(agp_sis_cleanup);
 
+MODULE_PARM(agp_sis_force_delay,"i");
+MODULE_PARM_DESC(agp_sis_force_delay,"forces sis delay hack");
+MODULE_PARM(agp_sis_agp_spec,"i");
+MODULE_PARM_DESC(agp_sis_agp_spec,"0=force sis init, 1=force generic agp3 init, default: autodetect");
 MODULE_LICENSE("GPL and additional rights");
