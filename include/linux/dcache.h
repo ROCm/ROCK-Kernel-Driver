@@ -234,6 +234,7 @@ extern int have_submounts(struct dentry *);
  * This adds the entry to the hash queues.
  */
 extern void d_rehash(struct dentry *);
+extern void __d_rehash(struct dentry *, int lock);
 
 /**
  * d_add - add dentry to hash queues
@@ -252,6 +253,7 @@ static inline void d_add(struct dentry *entry, struct inode *inode)
 
 /* used for rename() and baskets */
 extern void d_move(struct dentry *, struct dentry *);
+extern void __d_move(struct dentry *, struct dentry *);
 
 /* appendix may either be NULL or be used for transname suffixes */
 extern struct dentry * d_lookup(struct dentry *, struct qstr *);

@@ -1196,12 +1196,11 @@ static inline void switch_names(struct dentry * dentry, struct dentry * target)
  * dcache entries should not be moved in this way.
  */
 
-void d_move(struct dentry * dentry, struct dentry * target)
+void __d_move(struct dentry * dentry, struct dentry * target)
 {
 	if (!dentry->d_inode)
 		printk(KERN_WARNING "VFS: moving negative dcache entry\n");
 
-	spin_lock(&dcache_lock);
 	write_seqlock(&rename_lock);
 	/*
 	 * XXXX: do we really need to take target->d_lock?
@@ -1254,6 +1253,14 @@ already_unhashed:
 	spin_unlock(&target->d_lock);
 	spin_unlock(&dentry->d_lock);
 	write_sequnlock(&rename_lock);
+}
+
+EXPORT_SYMBOL(__d_move);
+
+void d_move(struct dentry *dentry, struct dentry *target)
+{
+	spin_lock(&dcache_lock);
+	__d_move(dentry, target);
 	spin_unlock(&dcache_lock);
 }
 
