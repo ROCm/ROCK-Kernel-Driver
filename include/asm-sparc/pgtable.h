@@ -181,6 +181,7 @@ extern int num_contexts;
  * hit for all __pa()/__va() operations.
  */
 extern unsigned long phys_base;
+extern unsigned long pfn_base;
 
 /*
  * BAD_PAGETABLE is used when we need a bogus page-table, while

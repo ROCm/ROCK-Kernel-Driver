@@ -156,17 +156,22 @@ extern __inline__ int get_order(unsigned long size)
 #define PAGE_ALIGN(addr)  (((addr)+PAGE_SIZE-1)&PAGE_MASK)
 
 #define PAGE_OFFSET	0xf0000000
-#define __pa(x)                 ((unsigned long)(x) - PAGE_OFFSET)
-#define __va(x)                 ((void *)((unsigned long) (x) + PAGE_OFFSET))
+#ifndef __ASSEMBLY__
+extern unsigned long phys_base;
+extern unsigned long pfn_base;
+#endif
+#define __pa(x)			((unsigned long)(x) - PAGE_OFFSET + phys_base)
+#define __va(x)			((void *)((unsigned long) (x) - phys_base + PAGE_OFFSET))
 
-#define virt_to_phys(x)		__pa((unsigned long)(x))
-#define phys_to_virt(x)		__va((unsigned long)(x))
+#define virt_to_phys		__pa
+#define phys_to_virt		__va
 
-#define pfn_to_page(pfn)        (mem_map + (pfn))
-#define page_to_pfn(page)       ((unsigned long)((page) - mem_map))
-#define virt_to_page(kaddr)	(mem_map + (__pa(kaddr) >> PAGE_SHIFT))
-#define pfn_valid(pfn)		((pfn) < max_mapnr)
-#define virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+#define pfn_to_page(pfn)	(mem_map + ((pfn)-(pfn_base)))
+#define page_to_pfn(page)	((unsigned long)(((page) - mem_map) + pfn_base))
+#define virt_to_page(kaddr)	(mem_map + ((((unsigned long)(kaddr)-PAGE_OFFSET)>>PAGE_SHIFT)))
+
+#define pfn_valid(pfn)		(((pfn) >= (pfn_base)) && (((pfn)-(pfn_base)) < max_mapnr))
+#define virt_addr_valid(kaddr)	((((unsigned long)(kaddr)-PAGE_OFFSET)>>PAGE_SHIFT) < max_mapnr)
 
 #define VM_DATA_DEFAULT_FLAGS	(VM_READ | VM_WRITE | VM_EXEC | \
 				 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)

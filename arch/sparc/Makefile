@@ -67,7 +67,8 @@ include/asm-$(ARCH)/asm_offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
 CLEAN_FILES +=	include/asm-$(ARCH)/asm_offsets.h	\
-		arch/$(ARCH)/kernel/asm-offsets.s
+		arch/$(ARCH)/kernel/asm-offsets.s	\
+		arch/$(ARCH)/boot/System.map
 
 # Don't use tabs in echo arguments.
 define archhelp
