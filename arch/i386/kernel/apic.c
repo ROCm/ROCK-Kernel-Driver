@@ -894,7 +894,7 @@ static void __init wait_8254_wraparound(void)
  * Default initialization for 8254 timers. If we use other timers like HPET,
  * we override this later
  */
-void (*wait_timer_tick)(void) = wait_8254_wraparound;
+void (*wait_timer_tick)(void) __initdata = wait_8254_wraparound;
 
 /*
  * This function sets up the local APIC timer, with a timeout of
