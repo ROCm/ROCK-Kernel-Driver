@@ -5,6 +5,7 @@
 #include <asm/irq.h>
 #include <linux/smp.h>
 #include <linux/threads.h>
+#include <linux/percpu.h>
 
 /*
  * 'kernel_stat.h' contains the definitions needed for doing
@@ -12,26 +13,25 @@
  * used by rstatd/perfmeter
  */
 
-#define DK_MAX_MAJOR 16
-#define DK_MAX_DISK 16
+struct cpu_usage_stat {
+	unsigned int user;
+	unsigned int nice;
+	unsigned int system;
+	unsigned int idle;
+	unsigned int iowait;
+};
 
 struct kernel_stat {
-	unsigned int per_cpu_user[NR_CPUS],
-	             per_cpu_nice[NR_CPUS],
-	             per_cpu_system[NR_CPUS],
-	             per_cpu_idle[NR_CPUS],
-	             per_cpu_iowait[NR_CPUS];
-	unsigned int dk_drive[DK_MAX_MAJOR][DK_MAX_DISK];
-	unsigned int dk_drive_rio[DK_MAX_MAJOR][DK_MAX_DISK];
-	unsigned int dk_drive_wio[DK_MAX_MAJOR][DK_MAX_DISK];
-	unsigned int dk_drive_rblk[DK_MAX_MAJOR][DK_MAX_DISK];
-	unsigned int dk_drive_wblk[DK_MAX_MAJOR][DK_MAX_DISK];
+	struct cpu_usage_stat	cpustat;
 #if !defined(CONFIG_ARCH_S390)
-	unsigned int irqs[NR_CPUS][NR_IRQS];
+	unsigned int irqs[NR_IRQS];
 #endif
 };
 
-extern struct kernel_stat kstat;
+DECLARE_PER_CPU(struct kernel_stat, kstat);
+
+#define kstat_cpu(cpu)	per_cpu(kstat, cpu)
+#define kstat_this_cpu	kstat_cpu(smp_processor_id())
 
 extern unsigned long nr_context_switches(void);
 
@@ -50,8 +50,9 @@ static inline int kstat_irqs (int irq)
 {
 	int i, sum=0;
 
-	for (i = 0 ; i < NR_CPUS ; i++)
-		sum += kstat.irqs[i][irq];
+	for (i = 0 ; i < NR_CPUS ; i++) 
+		if (cpu_possible(i)) 
+			sum += kstat_cpu(i).irqs[irq];
 
 	return sum;
 }

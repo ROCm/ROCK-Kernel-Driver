@@ -493,7 +493,6 @@ EXPORT_SYMBOL(__might_sleep);
 EXPORT_SYMBOL(loops_per_jiffy);
 #endif
 
-EXPORT_SYMBOL(kstat);
 
 /* misc */
 EXPORT_SYMBOL(panic);
