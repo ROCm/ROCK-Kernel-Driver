@@ -101,6 +101,34 @@
  * with _KERNEL_DBG_PRINT_
  */
 #define DL_TO_KERNEL    0x40000000
+
+#ifdef DIVA_NO_DEBUGLIB
+#define myDbgPrint_LOG(x,...) do { } while(0);
+#define myDbgPrint_FTL(x,...) do { } while(0);
+#define myDbgPrint_ERR(x,...) do { } while(0);
+#define myDbgPrint_TRC(x,...) do { } while(0);
+#define myDbgPrint_MXLOG(x,...) do { } while(0);
+#define myDbgPrint_EVL(x,...) do { } while(0);
+#define myDbgPrint_REG(x,...) do { } while(0);
+#define myDbgPrint_MEM(x,...) do { } while(0);
+#define myDbgPrint_SPL(x,...) do { } while(0);
+#define myDbgPrint_IRP(x,...) do { } while(0);
+#define myDbgPrint_TIM(x,...) do { } while(0);
+#define myDbgPrint_BLK(x,...) do { } while(0);
+#define myDbgPrint_TAPI(x,...) do { } while(0);
+#define myDbgPrint_NDIS(x,...) do { } while(0);
+#define myDbgPrint_CONN(x,...) do { } while(0);
+#define myDbgPrint_STAT(x,...) do { } while(0);
+#define myDbgPrint_SEND(x,...) do { } while(0);
+#define myDbgPrint_RECV(x,...) do { } while(0);
+#define myDbgPrint_PRV0(x,...) do { } while(0);
+#define myDbgPrint_PRV1(x,...) do { } while(0);
+#define myDbgPrint_PRV2(x,...) do { } while(0);
+#define myDbgPrint_PRV3(x,...) do { } while(0);
+#define DBG_TEST(func,args) do { } while(0);
+#define DBG_EVL_ID(args) do { } while(0);
+
+#else /* DIVA_NO_DEBUGLIB */
 /*
  * define low level macros for formatted & raw debugging
  */
@@ -156,6 +184,9 @@ DBG_DECL(PRV3)
 { if ( (myDriverDebugHandle.dbgMask) & (unsigned long)DL_EVL ) \
  { myDbgPrint_EVL args ; \
 } }
+
+#endif /* DIVA_NO_DEBUGLIB */
+
 #define DBG_LOG(args)  DBG_TEST(LOG, args)
 #define DBG_FTL(args)  DBG_TEST(FTL, args)
 #define DBG_ERR(args)  DBG_TEST(ERR, args)
@@ -182,9 +213,16 @@ DBG_DECL(PRV3)
 /*
  * prototypes for debug register/deregister functions in "debuglib.c"
  */
+#ifdef DIVA_NO_DEBUGLIB
+#define DbgRegister(name,tag, mask) do { } while(0)
+#define DbgDeregister() do { } while(0)
+#define DbgSetLevel(mask) do { } while(0)
+#else
+extern DIVA_DI_PRINTF dprintf;
 extern int  DbgRegister (char *drvName, char *drvTag, unsigned long dbgMask) ;
 extern void DbgDeregister (void) ;
 extern void DbgSetLevel (unsigned long dbgMask) ;
+#endif
 /*
  * driver internal structure for debug handling;
  * in client drivers this structure is maintained in "debuglib.c",
@@ -274,9 +312,11 @@ typedef struct
         } CardTrace;
     } u1;     
 } _DbgExtendedInfo_;
+#ifndef DIVA_NO_DEBUGLIB
 /* -------------------------------------------------------------
     Function used for xlog-style debug
    ------------------------------------------------------------- */
 #define XDI_USE_XLOG 1
 void  xdi_dbg_xlog (char* x, ...);
+#endif /* DIVA_NO_DEBUGLIB */
 #endif /* __DEBUGLIB_H__ */

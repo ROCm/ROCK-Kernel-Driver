@@ -55,7 +55,7 @@ static inline void rxrpc_discard_my_signals(void)
 		siginfo_t sinfo;
 
 		spin_lock_irq(&current->sighand->siglock);
-		dequeue_signal(current,&current->blocked,&sinfo);
+		dequeue_signal(current, &current->blocked, &sinfo);
 		spin_unlock_irq(&current->sighand->siglock);
 	}
 }
@@ -71,6 +71,7 @@ extern struct rw_semaphore rxrpc_calls_sem;
  */
 extern struct list_head rxrpc_conns;
 extern struct rw_semaphore rxrpc_conns_sem;
+extern unsigned long rxrpc_conn_timeout;
 
 extern void rxrpc_conn_do_timeout(struct rxrpc_connection *conn);
 extern void rxrpc_conn_clearall(struct rxrpc_peer *peer);
@@ -80,6 +81,7 @@ extern void rxrpc_conn_clearall(struct rxrpc_peer *peer);
  */
 extern struct list_head rxrpc_peers;
 extern struct rw_semaphore rxrpc_peers_sem;
+extern unsigned long rxrpc_peer_timeout;
 
 extern void rxrpc_peer_calculate_rtt(struct rxrpc_peer *peer,
 				     struct rxrpc_message *msg,

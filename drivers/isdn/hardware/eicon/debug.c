@@ -2,7 +2,6 @@
 #include "pc.h"
 #include "di_defs.h"
 #include "debug_if.h"
-#include "linux/kernel.h"
 #include "divasync.h"
 #include "kst_ifc.h"
 #include "maintidi.h"
@@ -96,9 +95,9 @@ static void queueInit (MSG_QUEUE *Q, byte *Buffer, dword sizeBuffer) {
 
 static byte *queueAllocMsg (MSG_QUEUE *Q, word size) {
 	/* Allocate 'size' bytes at tail of queue which will be filled later
-   * directly whith callers own message header info and/or message.
+   * directly with callers own message header info and/or message.
    * An 'alloced' message is marked incomplete by oring the 'Size' field
-   * whith MSG_INCOMPLETE.
+   * with MSG_INCOMPLETE.
    * This must be reset via queueCompleteMsg() after the message is filled.
    * As long as a message is marked incomplete queuePeekMsg() will return
    * a 'queue empty' condition when it reaches such a message.  */
@@ -160,7 +159,7 @@ static void queueFreeMsg (MSG_QUEUE *Q) {
 }
 
 static byte *queuePeekMsg (MSG_QUEUE *Q, word *size) {
-	/* Show the first valid message in queue BUT DONT free the message.
+	/* Show the first valid message in queue BUT DON'T free the message.
    * After looking on the message contents it can be freed queueFreeMsg()
    * or simply remain in message queue.  */
 
@@ -195,7 +194,7 @@ static dword               start_usec;
     length:  length of the message queue
     do_init: perfor queue reset
 
-    return:  zero on sucess, -1 on error
+    return:  zero on success, -1 on error
   */
 int diva_maint_init (byte* base, unsigned long length, int do_init) {
   if (dbg_queue || (!base) || (length < (4096*4))) {
@@ -296,7 +295,7 @@ dword diva_dbg_q_length (void) {
 
 /*
   INTERFACE:
-    Lock messafe queue and return the pointer to the first
+    Lock message queue and return the pointer to the first
     entry.
   */
 diva_dbg_entry_head_t* diva_maint_get_message (word* size,
@@ -725,12 +724,12 @@ int diva_get_driver_info (dword id, byte* data, int data_length) {
 
   if (clients[id].hDbg) {
     *p++ = 1;
-    *p++ = (byte)clients[id].sec; /* save secounds */
+    *p++ = (byte)clients[id].sec; /* save seconds */
     *p++ = (byte)(clients[id].sec >>  8);
     *p++ = (byte)(clients[id].sec >> 16);
     *p++ = (byte)(clients[id].sec >> 24);
 
-    *p++ = (byte)(clients[id].usec/1000); /* save msecounds */
+    *p++ = (byte)(clients[id].usec/1000); /* save mseconds */
     *p++ = (byte)((clients[id].usec/1000) >>  8);
     *p++ = (byte)((clients[id].usec/1000) >> 16);
     *p++ = (byte)((clients[id].usec/1000) >> 24);
@@ -1079,7 +1078,7 @@ void diva_mnt_remove_xdi_adapter (const DESCRIPTOR* d) {
 }
 
 /* ----------------------------------------------------------------
-     Low level interface for management interace client
+     Low level interface for management interface client
    ---------------------------------------------------------------- */
 /*
   Return handle to client structure
@@ -1462,7 +1461,7 @@ static void diva_maint_state_change_notify (void* user_context,
     case DIVA_SUPER_TRACE_NOTIFY_STAT_CHANGE:
       if (pC->hDbg->dbgMask & DIVA_MGT_DBG_IFC_STATISTICS) {
         /*
-          Incoming Statistices
+          Incoming Statistics
           */
         if (channel->pInterfaceStat->inc.Calls) {
           diva_mnt_internal_dprintf (pC->hDbg->id, DLI_LOG,
@@ -1498,7 +1497,7 @@ static void diva_maint_state_change_notify (void* user_context,
         }
         
         /*
-          Outgoing Statistices
+          Outgoing Statistics
           */
         if (channel->pInterfaceStat->outg.Calls) {
           diva_mnt_internal_dprintf (pC->hDbg->id, DLI_LOG,

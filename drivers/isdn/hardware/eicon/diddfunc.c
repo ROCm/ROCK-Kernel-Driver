@@ -1,11 +1,11 @@
-/* $Id: diddfunc.c,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: diddfunc.c,v 1.14 2003/08/25 10:06:37 schindler Exp $
  *
  * DIDD Interface module for Eicon active cards.
  * 
  * Functions are in dadapter.c 
  * 
- * Copyright 2002 by Armin Schindler (mac@melware.de) 
- * Copyright 2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2002-2003 by Armin Schindler (mac@melware.de) 
+ * Copyright 2002-2003 Cytronics & Melware (info@melware.de)
  * 
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -23,7 +23,7 @@
 
 
 extern void DIVA_DIDD_Read(void *, int);
-extern char *DRIVERRELEASE;
+extern char *DRIVERRELEASE_DIDD;
 static dword notify_handle;
 static DESCRIPTOR _DAdapter;
 
@@ -40,7 +40,7 @@ static void *didd_callback(void *context, DESCRIPTOR * adapter,
 		if (removal) {
 			DbgDeregister();
 		} else {
-			DbgRegister("DIDD", DRIVERRELEASE, DBG_DEFAULT);
+			DbgRegister("DIDD", DRIVERRELEASE_DIDD, DBG_DEFAULT);
 		}
 	}
 	return (NULL);
@@ -65,14 +65,14 @@ static int DIVA_INIT_FUNCTION connect_didd(void)
 			req.didd_notify.e.Req = 0;
 			req.didd_notify.e.Rc =
 			    IDI_SYNC_REQ_DIDD_REGISTER_ADAPTER_NOTIFY;
-			req.didd_notify.info.callback = didd_callback;
+			req.didd_notify.info.callback = (void *)didd_callback;
 			req.didd_notify.info.context = 0;
 			_DAdapter.request((ENTITY *) & req);
 			if (req.didd_notify.e.Rc != 0xff)
 				return (0);
 			notify_handle = req.didd_notify.info.handle;
 		} else if (DIDD_Table[x].type == IDI_DIMAINT) {	/* MAINT found */
-			DbgRegister("DIDD", DRIVERRELEASE, DBG_DEFAULT);
+			DbgRegister("DIDD", DRIVERRELEASE_DIDD, DBG_DEFAULT);
 		}
 	}
 	return (dadapter);

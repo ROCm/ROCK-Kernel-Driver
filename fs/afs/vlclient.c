@@ -176,8 +176,8 @@ int afs_rxvl_probe(afs_server_t *server, int alloc_flags)
 /*
  * look up a volume location database entry by name
  */
-int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname,
-			       afsc_vldb_record_t *entry)
+int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname, unsigned volnamesz,
+			       struct afs_cache_vlocation *entry)
 {
 	DECLARE_WAITQUEUE(myself,current);
 
@@ -189,29 +189,29 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname,
 	int ret, loop;
 	u32 *bp, param[2], zero;
 
-	_enter(",%s,",volname);
+	_enter(",%*.*s,%u,", volnamesz, volnamesz, volname, volnamesz);
 
-	memset(entry,0,sizeof(*entry));
+	memset(entry, 0, sizeof(*entry));
 
 	/* get hold of the vlserver connection */
-	ret = afs_server_get_vlconn(server,&conn);
+	ret = afs_server_get_vlconn(server, &conn);
 	if (ret<0)
 		goto out;
 
 	/* create a call through that connection */
-	ret = rxrpc_create_call(conn,NULL,NULL,afs_rxvl_aemap,&call);
-	if (ret<0) {
-		printk("kAFS: Unable to create call: %d\n",ret);
+	ret = rxrpc_create_call(conn, NULL, NULL, afs_rxvl_aemap, &call);
+	if (ret < 0) {
+		printk("kAFS: Unable to create call: %d\n", ret);
 		goto out_put_conn;
 	}
 	call->app_opcode = VLGETENTRYBYNAME;
 
 	/* we want to get event notifications from the call */
-	add_wait_queue(&call->waitq,&myself);
+	add_wait_queue(&call->waitq, &myself);
 
 	/* marshall the parameters */
-	piov[1].iov_len = strlen(volname);
-	piov[1].iov_base = (char*)volname;
+	piov[1].iov_len = volnamesz;
+	piov[1].iov_base = (char*) volname;
 
 	zero = 0;
 	piov[2].iov_len = (4 - (piov[1].iov_len & 3)) & 3;
@@ -224,16 +224,16 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname,
 	piov[0].iov_base = param;
 
 	/* send the parameters to the server */
-	ret = rxrpc_call_write_data(call,3,piov,RXRPC_LAST_PACKET,GFP_NOFS,0,&sent);
+	ret = rxrpc_call_write_data(call, 3, piov, RXRPC_LAST_PACKET, GFP_NOFS, 0, &sent);
 	if (ret<0)
 		goto abort;
 
 	/* wait for the reply to completely arrive */
-	bp = rxrpc_call_alloc_scratch(call,384);
+	bp = rxrpc_call_alloc_scratch(call, 384);
 
-	ret = rxrpc_call_read_data(call,bp,384,RXRPC_CALL_READ_BLOCK|RXRPC_CALL_READ_ALL);
-	if (ret<0) {
-		if (ret==-ECONNABORTED) {
+	ret = rxrpc_call_read_data(call, bp, 384, RXRPC_CALL_READ_BLOCK|RXRPC_CALL_READ_ALL);
+	if (ret < 0) {
+		if (ret == -ECONNABORTED) {
 			ret = call->app_errno;
 			goto out_unwait;
 		}
@@ -255,9 +255,9 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname,
 
 	for (loop=0; loop<8; loop++) {
 		tmp = ntohl(*bp++);
-		if (tmp & AFS_VLSF_RWVOL  ) entry->srvtmask[loop] |= AFSC_VOL_STM_RW;
-		if (tmp & AFS_VLSF_ROVOL  ) entry->srvtmask[loop] |= AFSC_VOL_STM_RO;
-		if (tmp & AFS_VLSF_BACKVOL) entry->srvtmask[loop] |= AFSC_VOL_STM_BAK;
+		if (tmp & AFS_VLSF_RWVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RW;
+		if (tmp & AFS_VLSF_ROVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RO;
+		if (tmp & AFS_VLSF_BACKVOL) entry->srvtmask[loop] |= AFS_VOL_VTM_BAK;
 	}
 
 	entry->vid[0] = ntohl(*bp++);
@@ -267,26 +267,26 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname,
 	bp++; /* clone ID */
 
 	tmp = ntohl(*bp++); /* flags */
-	if (tmp & AFS_VLF_RWEXISTS  ) entry->vidmask |= AFSC_VOL_STM_RW;
-	if (tmp & AFS_VLF_ROEXISTS  ) entry->vidmask |= AFSC_VOL_STM_RO;
-	if (tmp & AFS_VLF_BACKEXISTS) entry->vidmask |= AFSC_VOL_STM_BAK;
+	if (tmp & AFS_VLF_RWEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RW;
+	if (tmp & AFS_VLF_ROEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RO;
+	if (tmp & AFS_VLF_BACKEXISTS) entry->vidmask |= AFS_VOL_VTM_BAK;
 
 	ret = -ENOMEDIUM;
 	if (!entry->vidmask)
 		goto abort;
 
 	/* success */
-	entry->ctime = get_seconds();
+	entry->rtime = get_seconds();
 	ret = 0;
 
  out_unwait:
 	set_current_state(TASK_RUNNING);
-	remove_wait_queue(&call->waitq,&myself);
+	remove_wait_queue(&call->waitq, &myself);
 	rxrpc_put_call(call);
  out_put_conn:
 	rxrpc_put_connection(conn);
  out:
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 	return ret;
 
  abort:
@@ -303,7 +303,7 @@ int afs_rxvl_get_entry_by_name(afs_server_t *server, const char *volname,
 int afs_rxvl_get_entry_by_id(afs_server_t *server,
 			     afs_volid_t volid,
 			     afs_voltype_t voltype,
-			     afsc_vldb_record_t *entry)
+			     struct afs_cache_vlocation *entry)
 {
 	DECLARE_WAITQUEUE(myself,current);
 
@@ -375,9 +375,9 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 
 	for (loop=0; loop<8; loop++) {
 		tmp = ntohl(*bp++);
-		if (tmp & AFS_VLSF_RWVOL  ) entry->srvtmask[loop] |= AFSC_VOL_STM_RW;
-		if (tmp & AFS_VLSF_ROVOL  ) entry->srvtmask[loop] |= AFSC_VOL_STM_RO;
-		if (tmp & AFS_VLSF_BACKVOL) entry->srvtmask[loop] |= AFSC_VOL_STM_BAK;
+		if (tmp & AFS_VLSF_RWVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RW;
+		if (tmp & AFS_VLSF_ROVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RO;
+		if (tmp & AFS_VLSF_BACKVOL) entry->srvtmask[loop] |= AFS_VOL_VTM_BAK;
 	}
 
 	entry->vid[0] = ntohl(*bp++);
@@ -387,9 +387,9 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 	bp++; /* clone ID */
 
 	tmp = ntohl(*bp++); /* flags */
-	if (tmp & AFS_VLF_RWEXISTS  ) entry->vidmask |= AFSC_VOL_STM_RW;
-	if (tmp & AFS_VLF_ROEXISTS  ) entry->vidmask |= AFSC_VOL_STM_RO;
-	if (tmp & AFS_VLF_BACKEXISTS) entry->vidmask |= AFSC_VOL_STM_BAK;
+	if (tmp & AFS_VLF_RWEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RW;
+	if (tmp & AFS_VLF_ROEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RO;
+	if (tmp & AFS_VLF_BACKEXISTS) entry->vidmask |= AFS_VOL_VTM_BAK;
 
 	ret = -ENOMEDIUM;
 	if (!entry->vidmask)
@@ -401,13 +401,13 @@ int afs_rxvl_get_entry_by_id(afs_server_t *server,
 	entry->servers[1].s_addr = htonl(0xac101243);
 	entry->servers[2].s_addr = htonl(0xac10125b /*0xac10125b*/);
 
-	entry->srvtmask[0] = AFSC_VOL_STM_RO;
-	entry->srvtmask[1] = AFSC_VOL_STM_RO;
-	entry->srvtmask[2] = AFSC_VOL_STM_RO | AFSC_VOL_STM_RW;
+	entry->srvtmask[0] = AFS_VOL_VTM_RO;
+	entry->srvtmask[1] = AFS_VOL_VTM_RO;
+	entry->srvtmask[2] = AFS_VOL_VTM_RO | AFS_VOL_VTM_RW;
 #endif
 
 	/* success */
-	entry->ctime = get_seconds();
+	entry->rtime = get_seconds();
 	ret = 0;
 
  out_unwait:
@@ -520,7 +520,7 @@ int afs_rxvl_get_entry_by_id_async(afs_async_op_t *op,
  * attend to the asynchronous get VLDB entry by ID
  */
 int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
-				    afsc_vldb_record_t *entry)
+				    struct afs_cache_vlocation *entry)
 {
 	unsigned *bp, tmp;
 	int loop, ret;
@@ -550,9 +550,9 @@ int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
 
 		for (loop=0; loop<8; loop++) {
 			tmp = ntohl(*bp++);
-			if (tmp & AFS_VLSF_RWVOL  ) entry->srvtmask[loop] |= AFSC_VOL_STM_RW;
-			if (tmp & AFS_VLSF_ROVOL  ) entry->srvtmask[loop] |= AFSC_VOL_STM_RO;
-			if (tmp & AFS_VLSF_BACKVOL) entry->srvtmask[loop] |= AFSC_VOL_STM_BAK;
+			if (tmp & AFS_VLSF_RWVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RW;
+			if (tmp & AFS_VLSF_ROVOL  ) entry->srvtmask[loop] |= AFS_VOL_VTM_RO;
+			if (tmp & AFS_VLSF_BACKVOL) entry->srvtmask[loop] |= AFS_VOL_VTM_BAK;
 		}
 
 		entry->vid[0] = ntohl(*bp++);
@@ -562,9 +562,9 @@ int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
 		bp++; /* clone ID */
 
 		tmp = ntohl(*bp++); /* flags */
-		if (tmp & AFS_VLF_RWEXISTS  ) entry->vidmask |= AFSC_VOL_STM_RW;
-		if (tmp & AFS_VLF_ROEXISTS  ) entry->vidmask |= AFSC_VOL_STM_RO;
-		if (tmp & AFS_VLF_BACKEXISTS) entry->vidmask |= AFSC_VOL_STM_BAK;
+		if (tmp & AFS_VLF_RWEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RW;
+		if (tmp & AFS_VLF_ROEXISTS  ) entry->vidmask |= AFS_VOL_VTM_RO;
+		if (tmp & AFS_VLF_BACKEXISTS) entry->vidmask |= AFS_VOL_VTM_BAK;
 
 		ret = -ENOMEDIUM;
 		if (!entry->vidmask) {
@@ -578,13 +578,13 @@ int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
 		entry->servers[1].s_addr = htonl(0xac101243);
 		entry->servers[2].s_addr = htonl(0xac10125b /*0xac10125b*/);
 
-		entry->srvtmask[0] = AFSC_VOL_STM_RO;
-		entry->srvtmask[1] = AFSC_VOL_STM_RO;
-		entry->srvtmask[2] = AFSC_VOL_STM_RO | AFSC_VOL_STM_RW;
+		entry->srvtmask[0] = AFS_VOL_VTM_RO;
+		entry->srvtmask[1] = AFS_VOL_VTM_RO;
+		entry->srvtmask[2] = AFS_VOL_VTM_RO | AFS_VOL_VTM_RW;
 #endif
 
 		/* success */
-		entry->ctime = get_seconds();
+		entry->rtime = get_seconds();
 		ret = 0;
 		goto done;
 	}
@@ -626,7 +626,8 @@ static void afs_rxvl_get_entry_by_id_attn(struct rxrpc_call *call)
 	case RXRPC_CSTATE_CLNT_GOT_REPLY:
 		if (call->app_read_count==0)
 			break;
-		printk("kAFS: Reply bigger than expected {cst=%u asyn=%d mark=%Zu rdy=%Zu pr=%u%s}",
+		printk("kAFS: Reply bigger than expected"
+		       " {cst=%u asyn=%d mark=%Zu rdy=%Zu pr=%u%s}",
 		       call->app_call_state,
 		       call->app_async_read,
 		       call->app_mark,

@@ -1,10 +1,10 @@
-/* $Id: capimain.c,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: capimain.c,v 1.24 2003/09/09 06:51:05 schindler Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface
  * 
- * Copyright 2000-2002 by Armin Schindler (mac@melware.de) 
- * Copyright 2000-2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de) 
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  * 
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -15,10 +15,7 @@
 #include <linux/init.h>
 #include <asm/uaccess.h>
 #include <linux/smp_lock.h>
-#include <linux/vmalloc.h>
-#include <linux/sched.h>
 #include <linux/skbuff.h>
-#include <linux/delay.h>
 
 #include "os_capi.h"
 
@@ -29,7 +26,7 @@
 #include "cp_vers.h"
 #include "capifunc.h"
 
-static char *main_revision = "$Revision: 1.1.2.11 $";
+static char *main_revision = "$Revision: 1.24 $";
 static char *DRIVERNAME =
     "Eicon DIVA - CAPI Interface driver (http://www.melware.net)";
 static char *DRIVERLNAME = "divacapi";
@@ -54,47 +51,6 @@ static char *getrev(const char *revision)
 		rev = "1.0";
 	return rev;
 
-}
-
-/*
- * sleep for some milliseconds
- */
-void diva_os_sleep(dword mSec)
-{
-	unsigned long timeout = HZ * mSec / 1000 + 1;
-
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(timeout);
-}
-
-/*
- * wait for some milliseconds
- */
-void diva_os_wait(dword mSec)
-{
-	mdelay(mSec);
-}
-
-/*
- * alloc memory
- */
-void *diva_os_malloc(unsigned long flags, unsigned long size)
-{
-	void *ret = NULL;
-	if (size) {
-		ret = (void *) vmalloc((unsigned int) size);
-	}
-	return (ret);
-}
-
-/*
- * free memory
- */
-void diva_os_free(unsigned long unused, void *ptr)
-{
-	if (ptr) {
-		vfree(ptr);
-	}
 }
 
 /*
@@ -160,11 +116,11 @@ static int DIVA_INIT_FUNCTION divacapi_init(void)
 	char tmprev[32];
 	int ret = 0;
 
-	sprintf(DRIVERRELEASE, "%d.%d%s", DRRELMAJOR, DRRELMINOR,
+	sprintf(DRIVERRELEASE_CAPI, "%d.%d%s", DRRELMAJOR, DRRELMINOR,
 		DRRELEXTRA);
 
 	printk(KERN_INFO "%s\n", DRIVERNAME);
-	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE);
+	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE_CAPI);
 	strcpy(tmprev, main_revision);
 	printk("%s  Build: %s(%s)\n", getrev(tmprev),
 	       diva_capi_common_code_build, DIVA_BUILD);

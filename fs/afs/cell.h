@@ -13,8 +13,21 @@
 #define _LINUX_AFS_CELL_H
 
 #include "types.h"
+#include "cache.h"
+
+#define AFS_CELL_MAX_ADDRS 15
 
 extern volatile int afs_cells_being_purged; /* T when cells are being purged by rmmod */
+
+/*****************************************************************************/
+/*
+ * entry in the cached cell catalogue
+ */
+struct afs_cache_cell
+{
+	char			name[64];	/* cell name (padded with NULs) */
+	struct in_addr		vl_servers[15];	/* cached cell VL servers */
+};
 
 /*****************************************************************************/
 /*
@@ -26,7 +39,9 @@ struct afs_cell
 	struct list_head	link;		/* main cell list link */
 	struct list_head	proc_link;	/* /proc cell list link */
 	struct proc_dir_entry	*proc_dir;	/* /proc dir for this cell */
-	struct list_head	caches;		/* list of caches currently backing this cell */
+#ifdef AFS_CACHING_SUPPORT
+	struct cachefs_cookie	*cache;		/* caching cookie */
+#endif
 
 	/* server record management */
 	rwlock_t		sv_lock;	/* active server list lock */
@@ -41,22 +56,22 @@ struct afs_cell
 	spinlock_t		vl_gylock;	/* graveyard lock */
 	unsigned short		vl_naddrs;	/* number of VL servers in addr list */
 	unsigned short		vl_curr_svix;	/* current server index */
-	struct in_addr		vl_addrs[16];	/* cell VL server addresses */
+	struct in_addr		vl_addrs[AFS_CELL_MAX_ADDRS];	/* cell VL server addresses */
 
 	char			name[0];	/* cell name - must go last */
 };
 
 extern int afs_cell_init(void);
 
-extern int afs_cell_create(const char *name, char *vllist, afs_cell_t **_cell);
+extern int afs_cell_create(const char *name, char *vllist, struct afs_cell **_cell);
 
-extern int afs_cell_lookup(const char *name, afs_cell_t **_cell);
+extern int afs_cell_lookup(const char *name, unsigned nmsize, struct afs_cell **_cell);
 
 #define afs_get_cell(C) do { atomic_inc(&(C)->usage); } while(0)
 
-extern afs_cell_t *afs_get_cell_maybe(afs_cell_t **_cell);
+extern struct afs_cell *afs_get_cell_maybe(struct afs_cell **_cell);
 
-extern void afs_put_cell(afs_cell_t *cell);
+extern void afs_put_cell(struct afs_cell *cell);
 
 extern void afs_cell_purge(void);
 

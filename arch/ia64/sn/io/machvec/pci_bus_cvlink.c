@@ -544,7 +544,7 @@ sn_pci_fixup(int arg)
 		pci_read_config_byte(device_dev, PCI_INTERRUPT_PIN,
 				     (unsigned char *)&lines);
 	 
-		irqpdaindr->current = device_dev;
+		irqpdaindr->curr = device_dev;
 		intr_handle = pciio_intr_alloc(device_vertex, NULL, lines, device_vertex);
 
 		irq = intr_handle->pi_irq;

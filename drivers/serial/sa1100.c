@@ -862,8 +862,8 @@ static int sa1100_serial_suspend(struct device *_dev, u32 state, u32 level)
 {
 	struct sa1100_port *sport = dev_get_drvdata(_dev);
 
-	if (sport)
-		uart_suspend_port(&sa1100_reg, &sport->port, level);
+	if (sport && level == SUSPEND_DISABLE)
+		uart_suspend_port(&sa1100_reg, &sport->port);
 
 	return 0;
 }
@@ -872,8 +872,8 @@ static int sa1100_serial_resume(struct device *_dev, u32 level)
 {
 	struct sa1100_port *sport = dev_get_drvdata(_dev);
 
-	if (sport)
-		uart_resume_port(&sa1100_reg, &sport->port, level);
+	if (sport && level == RESUME_ENABLE)
+		uart_resume_port(&sa1100_reg, &sport->port);
 
 	return 0;
 }

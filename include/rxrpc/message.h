@@ -9,8 +9,8 @@
  * 2 of the License, or (at your option) any later version.
  */
 
-#ifndef _H_3AD3363A_3A9C_11D6_83D8_0002B3163499
-#define _H_3AD3363A_3A9C_11D6_83D8_0002B3163499
+#ifndef _LINUX_RXRPC_MESSAGE_H
+#define _LINUX_RXRPC_MESSAGE_H
 
 #include <rxrpc/packet.h>
 
@@ -61,7 +61,7 @@ static inline void rxrpc_put_message(struct rxrpc_message *msg)
 
 extern int rxrpc_conn_newmsg(struct rxrpc_connection *conn,
 			     struct rxrpc_call *call,
-			     u8 type,
+			     uint8_t type,
 			     int count,
 			     struct iovec diov[],
 			     int alloc_flags,
@@ -69,4 +69,4 @@ extern int rxrpc_conn_newmsg(struct rxrpc_connection *conn,
 
 extern int rxrpc_conn_sendmsg(struct rxrpc_connection *conn, struct rxrpc_message *msg);
 
-#endif /* _H_3AD3363A_3A9C_11D6_83D8_0002B3163499 */
+#endif /* _LINUX_RXRPC_MESSAGE_H */

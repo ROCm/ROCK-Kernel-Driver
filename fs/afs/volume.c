@@ -16,13 +16,29 @@
 #include <linux/fs.h>
 #include <linux/pagemap.h>
 #include "volume.h"
+#include "vnode.h"
 #include "cell.h"
+#include "cache.h"
 #include "cmservice.h"
 #include "fsclient.h"
 #include "vlclient.h"
 #include "internal.h"
 
 const char *afs_voltypes[] = { "R/W", "R/O", "BAK" };
+
+#ifdef AFS_CACHING_SUPPORT
+static cachefs_match_val_t afs_volume_cache_match(void *target, const void *entry);
+static void afs_volume_cache_update(void *source, void *entry);
+
+struct cachefs_index_def afs_volume_cache_index_def = {
+	.name		= "volume",
+	.data_size	= sizeof(struct afs_cache_vhash),
+	.keys[0]	= { CACHEFS_INDEX_KEYS_BIN, 1 },
+	.keys[1]	= { CACHEFS_INDEX_KEYS_BIN, 1 },
+	.match		= afs_volume_cache_match,
+	.update		= afs_volume_cache_update,
+};
+#endif
 
 /*****************************************************************************/
 /*
@@ -43,19 +59,19 @@ const char *afs_voltypes[] = { "R/W", "R/O", "BAK" };
  * - Rule 2: If parent volume is R/O, then mount R/O volume by preference, R/W if not available
  * - Rule 3: If parent volume is R/W, then only mount R/W volume unless explicitly told otherwise
  */
-int afs_volume_lookup(const char *name, int rwparent, afs_volume_t **_volume)
+int afs_volume_lookup(const char *name, struct afs_cell *cell, int rwpath,
+		      afs_volume_t **_volume)
 {
-	afs_vlocation_t *vlocation = NULL;
+	struct afs_vlocation *vlocation = NULL;
+	struct afs_volume *volume = NULL;
 	afs_voltype_t type;
-	afs_volume_t *volume = NULL;
-	afs_cell_t *cell = NULL;
-	char *cellname, *volname, *suffix;
+	const char *cellname, *volname, *suffix;
 	char srvtmask;
-	int force, ret, loop;
+	int force, ret, loop, cellnamesz, volnamesz;
 
-	_enter(",%s,",name);
+	_enter("%s,,%d,", name, rwpath);
 
-	if (!name || (name[0]!='%' && name[0]!='#') || !name[1]) {
+	if (!name || (name[0] != '%' && name[0] != '#') || !name[1]) {
 		printk("kAFS: unparsable volume name\n");
 		return -EINVAL;
 	}
@@ -64,24 +80,22 @@ int afs_volume_lookup(const char *name, int rwparent, afs_volume_t **_volume)
 	force = 0;
 	type = AFSVL_ROVOL;
 
-	if (rwparent || name[0]=='%') {
+	if (rwpath || name[0] == '%') {
 		type = AFSVL_RWVOL;
 		force = 1;
 	}
 
-	suffix = strrchr(name,'.');
+	suffix = strrchr(name, '.');
 	if (suffix) {
-		if (strcmp(suffix,".readonly")==0) {
+		if (strcmp(suffix, ".readonly") == 0) {
 			type = AFSVL_ROVOL;
 			force = 1;
 		}
-		else if (strcmp(suffix,".backup")==0) {
+		else if (strcmp(suffix, ".backup") == 0) {
 			type = AFSVL_BACKVOL;
 			force = 1;
 		}
-		else if (suffix[1]==0) {
-			*suffix = 0;
-			suffix = NULL;
+		else if (suffix[1] == 0) {
 		}
 		else {
 			suffix = NULL;
@@ -90,38 +104,45 @@ int afs_volume_lookup(const char *name, int rwparent, afs_volume_t **_volume)
 
 	/* split the cell and volume names */
 	name++;
-	volname = strchr(name,':');
+	volname = strchr(name, ':');
 	if (volname) {
-		*volname++ = 0;
 		cellname = name;
+		cellnamesz = volname - name;
 	}
 	else {
 		volname = name;
 		cellname = NULL;
+		cellnamesz = 0;
 	}
 
-	_debug("CELL:%s VOLUME:%s SUFFIX:%s TYPE:%d%s",
-	       cellname,volname,suffix?:"-",type,force?" FORCE":"");
+	volnamesz = suffix ? suffix - volname : strlen(volname);
+
+	_debug("CELL:%*.*s [%p] VOLUME:%*.*s SUFFIX:%s TYPE:%d%s",
+	       cellnamesz, cellnamesz, cellname ?: "", cell,
+	       volnamesz, volnamesz, volname, suffix ?: "-",
+	       type,
+	       force ? " FORCE" : "");
 
 	/* lookup the cell record */
-	ret = afs_cell_lookup(cellname,&cell);
-	if (ret<0)
-		printk("kAFS: unable to lookup cell '%s'\n",cellname?:"");
-
-	if (cellname) volname[-1] = ':';
-	if (ret<0)
-		goto error;
+	if (cellname || !cell) {
+		ret = afs_cell_lookup(cellname, cellnamesz, &cell);
+		if (ret<0) {
+			printk("kAFS: unable to lookup cell '%s'\n", cellname ?: "");
+			goto error;
+		}
+	}
+	else {
+		afs_get_cell(cell);
+	}
 
 	/* lookup the volume location record */
-	if (suffix) *suffix = 0;
-	ret = afs_vlocation_lookup(cell,volname,&vlocation);
-	if (suffix) *suffix = '.';
-	if (ret<0)
+	ret = afs_vlocation_lookup(cell, volname, volnamesz, &vlocation);
+	if (ret < 0)
 		goto error;
 
 	/* make the final decision on the type we want */
 	ret = -ENOMEDIUM;
-	if (force && !(vlocation->vldb.vidmask & (1<<type)))
+	if (force && !(vlocation->vldb.vidmask & (1 << type)))
 		goto error;
 
 	srvtmask = 0;
@@ -129,13 +150,13 @@ int afs_volume_lookup(const char *name, int rwparent, afs_volume_t **_volume)
 		srvtmask |= vlocation->vldb.srvtmask[loop];
 
 	if (force) {
-		if (!(srvtmask & (1 <<type)))
+		if (!(srvtmask & (1 << type)))
 			goto error;
 	}
-	else if (srvtmask & AFSC_VOL_STM_RO) {
+	else if (srvtmask & AFS_VOL_VTM_RO) {
 		type = AFSVL_ROVOL;
 	}
-	else if (srvtmask & AFSC_VOL_STM_RW) {
+	else if (srvtmask & AFS_VOL_VTM_RW) {
 		type = AFSVL_RWVOL;
 	}
 	else {
@@ -156,16 +177,16 @@ int afs_volume_lookup(const char *name, int rwparent, afs_volume_t **_volume)
 	_debug("creating new volume record");
 
 	ret = -ENOMEM;
-	volume = kmalloc(sizeof(afs_volume_t),GFP_KERNEL);
+	volume = kmalloc(sizeof(afs_volume_t), GFP_KERNEL);
 	if (!volume)
 		goto error_up;
 
-	memset(volume,0,sizeof(afs_volume_t));
-	atomic_set(&volume->usage,1);
-	volume->type = type;
-	volume->type_force = force;
-	volume->cell = cell;
-	volume->vid = vlocation->vldb.vid[type];
+	memset(volume, 0, sizeof(afs_volume_t));
+	atomic_set(&volume->usage, 1);
+	volume->type		= type;
+	volume->type_force	= force;
+	volume->cell		= cell;
+	volume->vid		= vlocation->vldb.vid[type];
 
 	init_rwsem(&volume->server_sem);
 
@@ -183,15 +204,20 @@ int afs_volume_lookup(const char *name, int rwparent, afs_volume_t **_volume)
 	}
 
 	/* attach the cache and volume location */
-#if 0
-	afs_get_cache(cache);		volume->cache = cache;
+#ifdef AFS_CACHING_SUPPORT
+	cachefs_acquire_cookie(vlocation->cache,
+			       &afs_vnode_cache_index_def,
+			       volume,
+			       &volume->cache);
 #endif
-	afs_get_vlocation(vlocation);	volume->vlocation = vlocation;
+
+	afs_get_vlocation(vlocation);
+	volume->vlocation = vlocation;
 
 	vlocation->vols[type] = volume;
 
  success:
-	_debug("kAFS selected %s volume %08x",afs_voltypes[volume->type],volume->vid);
+	_debug("kAFS selected %s volume %08x", afs_voltypes[volume->type], volume->vid);
 	*_volume = volume;
 	ret = 0;
 
@@ -199,18 +225,17 @@ int afs_volume_lookup(const char *name, int rwparent, afs_volume_t **_volume)
  error_up:
 	up_write(&cell->vl_sem);
  error:
-	if (vlocation)	afs_put_vlocation(vlocation);
-	if (cell)	afs_put_cell(cell);
+	afs_put_vlocation(vlocation);
+	afs_put_cell(cell);
 
-	_leave(" = %d (%p)",ret,volume);
+	_leave(" = %d (%p)", ret, volume);
 	return ret;
 
  error_discard:
 	up_write(&cell->vl_sem);
 
 	for (loop=volume->nservers-1; loop>=0; loop--)
-		if (volume->servers[loop])
-			afs_put_server(volume->servers[loop]);
+		afs_put_server(volume->servers[loop]);
 
 	kfree(volume);
 	goto error;
@@ -224,6 +249,9 @@ void afs_put_volume(afs_volume_t *volume)
 {
 	afs_vlocation_t *vlocation;
 	int loop;
+
+	if (!volume)
+		return;
 
 	_enter("%p",volume);
 
@@ -246,16 +274,14 @@ void afs_put_volume(afs_volume_t *volume)
 
 	up_write(&vlocation->cell->vl_sem);
 
+	/* finish cleaning up the volume */
+#ifdef AFS_CACHING_SUPPORT
+	cachefs_relinquish_cookie(volume->cache,0);
+#endif
 	afs_put_vlocation(vlocation);
 
-	/* finish cleaning up the volume */
-#if 0
-	if (volume->cache)	afs_put_cache(volume->cache);
-#endif
-
 	for (loop=volume->nservers-1; loop>=0; loop--)
-		if (volume->servers[loop])
-			afs_put_server(volume->servers[loop]);
+		afs_put_server(volume->servers[loop]);
 
 	kfree(volume);
 
@@ -428,3 +454,42 @@ int afs_volume_release_fileserver(afs_volume_t *volume, afs_server_t *server, in
 	return 0;
 
 } /* end afs_volume_release_fileserver() */
+
+/*****************************************************************************/
+/*
+ * match a volume hash record stored in the cache
+ */
+#ifdef AFS_CACHING_SUPPORT
+static cachefs_match_val_t afs_volume_cache_match(void *target, const void *entry)
+{
+	const struct afs_cache_vhash *vhash = entry;
+	struct afs_volume *volume = target;
+
+	_enter("{%u},{%u}", volume->type, vhash->vtype);
+
+	if (volume->type == vhash->vtype) {
+		_leave(" = SUCCESS");
+		return CACHEFS_MATCH_SUCCESS;
+	}
+
+	_leave(" = FAILED");
+	return CACHEFS_MATCH_FAILED;
+} /* end afs_volume_cache_match() */
+#endif
+
+/*****************************************************************************/
+/*
+ * update a volume hash record stored in the cache
+ */
+#ifdef AFS_CACHING_SUPPORT
+static void afs_volume_cache_update(void *source, void *entry)
+{
+	struct afs_cache_vhash *vhash = entry;
+	struct afs_volume *volume = source;
+
+	_enter("");
+
+	vhash->vtype = volume->type;
+
+} /* end afs_volume_cache_update() */
+#endif

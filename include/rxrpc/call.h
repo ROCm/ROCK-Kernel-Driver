@@ -67,8 +67,8 @@ struct rxrpc_call
 	wait_queue_head_t	waitq;		/* wait queue for events to happen */
 	struct list_head	link;		/* general internal list link */
 	struct list_head	call_link;	/* master call list link */
-	u32			chan_ix;	/* connection channel index (net order) */
-	u32			call_id;	/* call ID on connection (net order) */
+	uint32_t		chan_ix;	/* connection channel index (net order) */
+	uint32_t		call_id;	/* call ID on connection (net order) */
 	unsigned long		cjif;		/* jiffies at call creation */
 	unsigned long		flags;		/* control flags */
 #define RXRPC_CALL_ACKS_TIMO	0x00000001	/* ACKS timeout reached */
@@ -103,7 +103,7 @@ struct rxrpc_call
 	char			ackr_dfr_perm;	/* request for deferred ACKs permitted */
 	rxrpc_seq_t		ackr_dfr_seq;	/* seqno for deferred ACK */
 	struct rxrpc_ackpacket	ackr;		/* pending normal ACK packet */
-	u8			ackr_array[RXRPC_CALL_ACK_WINDOW_SIZE];	/* ACK records */
+	uint8_t			ackr_array[RXRPC_CALL_ACK_WINDOW_SIZE];	/* ACK records */
 
 	/* presentation layer */
 	char			app_last_rcv;	/* T if received last packet from remote end */
@@ -131,14 +131,14 @@ struct rxrpc_call
 	struct list_head	app_attn_link;	/* application attention list linkage */
 	size_t			app_mark;	/* trigger callback when app_ready_qty>=app_mark */
 	char			app_async_read;	/* T if in async-read mode */
-	u8			*app_read_buf;	/* application async read buffer (app_mark size) */
-	u8			*app_scr_alloc;	/* application scratch allocation pointer */
+	uint8_t			*app_read_buf;	/* application async read buffer (app_mark size) */
+	uint8_t			*app_scr_alloc;	/* application scratch allocation pointer */
 	void			*app_scr_ptr;	/* application pointer into scratch buffer */
 
 #define RXRPC_APP_MARK_EOF 0xFFFFFFFFU	/* mark at end of input */
 
 	/* application scratch buffer */
-	u8		app_scratch[0] __attribute__((aligned(sizeof(long))));
+	uint8_t			app_scratch[0] __attribute__((aligned(sizeof(long))));
 };
 
 #define RXRPC_CALL_SCRATCH_SIZE (PAGE_SIZE - sizeof(struct rxrpc_call))
@@ -206,7 +206,7 @@ extern int rxrpc_call_read_data(struct rxrpc_call *call, void *buffer, size_t si
 extern int rxrpc_call_write_data(struct rxrpc_call *call,
 				 size_t sioc,
 				 struct iovec siov[],
-				 u8 rxhdr_flags,
+				 uint8_t rxhdr_flags,
 				 int alloc_flags,
 				 int dup_data,
 				 size_t *size_sent);

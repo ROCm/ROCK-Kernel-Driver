@@ -153,8 +153,7 @@ static int kafsasyncd(void *arg)
 	spin_lock(&kafsasyncd_async_lock);
 
 	/* fold the busy and attention queues together */
-	list_splice(&kafsasyncd_async_busyq,&kafsasyncd_async_attnq);
-	list_del_init(&kafsasyncd_async_busyq);
+	list_splice_init(&kafsasyncd_async_busyq,&kafsasyncd_async_attnq);
 
 	/* dequeue kafsasyncd from all their wait queues */
 	list_for_each(_p,&kafsasyncd_async_attnq) {
@@ -197,6 +196,7 @@ void afs_kafsasyncd_begin_op(afs_async_op_t *op)
 	spin_lock(&kafsasyncd_async_lock);
 
 	init_waitqueue_entry(&op->waiter,kafsasyncd_task);
+	add_wait_queue(&op->call->waitq,&op->waiter);
 
 	list_del(&op->link);
 	list_add_tail(&op->link,&kafsasyncd_async_busyq);
@@ -238,7 +238,10 @@ void afs_kafsasyncd_terminate_op(afs_async_op_t *op)
 
 	spin_lock(&kafsasyncd_async_lock);
 
-	list_del_init(&op->link);
+	if (!list_empty(&op->link)) {
+		list_del_init(&op->link);
+		remove_wait_queue(&op->call->waitq,&op->waiter);
+	}
 
 	spin_unlock(&kafsasyncd_async_lock);
 

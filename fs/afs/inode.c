@@ -69,17 +69,16 @@ static int afs_inode_map_status(afs_vnode_t *vnode)
 	inode->i_uid		= vnode->status.owner;
 	inode->i_gid		= 0;
 	inode->i_size		= vnode->status.size;
-	inode->i_atime.tv_sec		= inode->i_mtime.tv_sec = inode->i_ctime.tv_sec = vnode->status.mtime_server;
-	inode->i_atime.tv_nsec = 
-	inode->i_mtime.tv_nsec = 
-		inode->i_ctime.tv_nsec = 0;
+	inode->i_ctime.tv_sec	= vnode->status.mtime_server;
+	inode->i_ctime.tv_nsec	= 0;
+	inode->i_atime		= inode->i_mtime = inode->i_ctime;
 	inode->i_blksize	= PAGE_CACHE_SIZE;
 	inode->i_blocks		= 0;
 	inode->i_version	= vnode->fid.unique;
 	inode->i_mapping->a_ops	= &afs_fs_aops;
 
 	/* check to see whether a symbolic link is really a mountpoint */
-	if (vnode->status.type==AFS_FTYPE_SYMLINK) {
+	if (vnode->status.type == AFS_FTYPE_SYMLINK) {
 		afs_mntpt_check_symlink(vnode);
 
 		if (vnode->flags & AFS_VNODE_MOUNTPOINT) {
@@ -105,7 +104,7 @@ int afs_inode_fetch_status(struct inode *inode)
 
 	ret = afs_vnode_fetch_status(vnode);
 
-	if (ret==0)
+	if (ret == 0)
 		ret = afs_inode_map_status(vnode);
 
 	return ret;
@@ -120,8 +119,8 @@ static int afs_iget5_test(struct inode *inode, void *opaque)
 {
 	struct afs_iget_data *data = opaque;
 
-	/* only match inodes with the same version number */
-	return inode->i_ino==data->fid.vnode && inode->i_version==data->fid.unique;
+	return inode->i_ino == data->fid.vnode &&
+		inode->i_version == data->fid.unique;
 } /* end afs_iget5_test() */
 
 /*****************************************************************************/
@@ -145,20 +144,22 @@ static int afs_iget5_set(struct inode *inode, void *opaque)
 /*
  * inode retrieval
  */
-inline int afs_iget(struct super_block *sb, afs_fid_t *fid, struct inode **_inode)
+inline int afs_iget(struct super_block *sb, afs_fid_t *fid,
+		    struct inode **_inode)
 {
-	struct afs_iget_data data = { .fid = *fid };
+	struct afs_iget_data data = { fid: *fid };
 	struct afs_super_info *as;
+	struct afs_vnode *vnode;
 	struct inode *inode;
-	afs_vnode_t *vnode;
 	int ret;
 
-	_enter(",{%u,%u,%u},,",fid->vid,fid->vnode,fid->unique);
+	_enter(",{%u,%u,%u},,", fid->vid, fid->vnode, fid->unique);
 
 	as = sb->s_fs_info;
 	data.volume = as->volume;
 
-	inode = iget5_locked(sb,fid->vnode,afs_iget5_test,afs_iget5_set,&data);
+	inode = iget5_locked(sb, fid->vnode, afs_iget5_test, afs_iget5_set,
+			     &data);
 	if (!inode) {
 		_leave(" = -ENOMEM");
 		return -ENOMEM;
@@ -173,9 +174,18 @@ inline int afs_iget(struct super_block *sb, afs_fid_t *fid, struct inode **_inod
 			*_inode = inode;
 		else
 			iput(inode);
-		_leave(" = %d",ret);
+		_leave(" = %d", ret);
 		return ret;
 	}
+
+#ifdef AFS_CACHING_SUPPORT
+	/* set up caching before reading the status, as fetch-status reads the
+	 * first page of symlinks to see if they're really mntpts */
+	cachefs_acquire_cookie(vnode->volume->cache,
+			       NULL,
+			       vnode,
+			       &vnode->cache);
+#endif
 
 	/* okay... it's a new inode */
 	vnode->flags |= AFS_VNODE_CHANGED;
@@ -187,11 +197,11 @@ inline int afs_iget(struct super_block *sb, afs_fid_t *fid, struct inode **_inod
 	unlock_new_inode(inode);
 
 	*_inode = inode;
-	_leave(" = 0 [CB { v=%u x=%lu t=%u nix=%u }]",
+	_leave(" = 0 [CB { v=%u x=%lu t=%u } c=%p]",
 	       vnode->cb_version,
 	       vnode->cb_timeout.timo_jif,
 	       vnode->cb_type,
-	       vnode->nix
+	       vnode->cache
 	       );
 	return 0;
 
@@ -201,7 +211,7 @@ inline int afs_iget(struct super_block *sb, afs_fid_t *fid, struct inode **_inod
 	unlock_new_inode(inode);
 	iput(inode);
 
-	_leave(" = %d [bad]",ret);
+	_leave(" = %d [bad]", ret);
 	return ret;
 } /* end afs_iget() */
 
@@ -209,7 +219,8 @@ inline int afs_iget(struct super_block *sb, afs_fid_t *fid, struct inode **_inod
 /*
  * read the attributes of an inode
  */
-int afs_inode_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
+int afs_inode_getattr(struct vfsmount *mnt, struct dentry *dentry,
+		      struct kstat *stat)
 {
 	struct inode *inode;
 	afs_vnode_t *vnode;
@@ -217,23 +228,25 @@ int afs_inode_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat 
 
 	inode = dentry->d_inode;
 
-	_enter("{ ino=%lu v=%lu }",inode->i_ino,inode->i_version);
+	_enter("{ ino=%lu v=%lu }", inode->i_ino, inode->i_version);
 
 	vnode = AFS_FS_I(inode);
 
 	ret = afs_inode_fetch_status(inode);
-	if (ret==-ENOENT) {
-		_leave(" = %d [%d %p]",ret,atomic_read(&dentry->d_count),dentry->d_inode);
+	if (ret == -ENOENT) {
+		_leave(" = %d [%d %p]",
+		       ret, atomic_read(&dentry->d_count), dentry->d_inode);
 		return ret;
 	}
-	else if (ret<0) {
+	else if (ret < 0) {
 		make_bad_inode(inode);
-		_leave(" = %d",ret);
+		_leave(" = %d", ret);
 		return ret;
 	}
 
-	/* transfer attributes from the inode structure to the stat structure */
-	generic_fillattr(inode,stat);
+	/* transfer attributes from the inode structure to the stat
+	 * structure */
+	generic_fillattr(inode, stat);
 
 	_leave(" = 0 CB { v=%u x=%u t=%u }",
 	       vnode->cb_version,
@@ -261,9 +274,14 @@ void afs_clear_inode(struct inode *inode)
 	       vnode->cb_type
 	       );
 
-	if (inode->i_ino!=vnode->fid.vnode) BUG();
+	BUG_ON(inode->i_ino != vnode->fid.vnode);
 
 	afs_vnode_give_up_callback(vnode);
+
+#ifdef AFS_CACHING_SUPPORT
+	cachefs_relinquish_cookie(vnode->cache, 0);
+	vnode->cache = NULL;
+#endif
 
 	_leave("");
 } /* end afs_clear_inode() */

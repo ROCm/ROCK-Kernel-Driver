@@ -54,7 +54,7 @@ static void pri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 /*
  * check for trapped MIPS 46xx CPU, dump exception frame
  */
- base   = IoAdapter->ram - MP_SHARED_RAM_OFFSET ;
+ base   = DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
  TrapID = READ_DWORD(&base[0x80]) ;
  if ( (TrapID == 0x99999999) || (TrapID == 0x99999901) )
  {
@@ -68,8 +68,10 @@ static void pri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
  regs[0] &= IoAdapter->MemorySize - 1 ;
  if ( (regs[0] < IoAdapter->MemorySize - 1) )
  {
-  if ( !(Xlog = (word *)diva_os_malloc (0, MAX_XLOG_SIZE)) )
+  if ( !(Xlog = (word *)diva_os_malloc (0, MAX_XLOG_SIZE)) ) {
+   DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, base);
    return ;
+  }
   size = IoAdapter->MemorySize - regs[0] ;
   if ( size > MAX_XLOG_SIZE )
    size = MAX_XLOG_SIZE ;
@@ -81,24 +83,29 @@ static void pri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
   diva_os_free (0, Xlog) ;
   IoAdapter->trapped = 2 ;
  }
+ DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, base);
 }
 /* -------------------------------------------------------------------------
   Hardware reset of PRI card
   ------------------------------------------------------------------------- */
 static void reset_pri_hardware (PISDN_ADAPTER IoAdapter) {
- *IoAdapter->reset = _MP_RISC_RESET | _MP_LED1 | _MP_LED2 ;
+ byte *p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+ *p = _MP_RISC_RESET | _MP_LED1 | _MP_LED2 ;
  diva_os_wait (50) ;
- *IoAdapter->reset = 0x00 ;
+ *p = 0x00 ;
  diva_os_wait (50) ;
+ DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 }
 /* -------------------------------------------------------------------------
   Stop Card Hardware
   ------------------------------------------------------------------------- */
 static void stop_pri_hardware (PISDN_ADAPTER IoAdapter) {
  dword i;
- dword volatile *cfgReg = (dword volatile *)IoAdapter->cfg ;
+ byte *p;
+ dword volatile *cfgReg = (dword volatile *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
  cfgReg[3] = 0x00000000 ;
  cfgReg[1] = 0x00000000 ;
+ DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfgReg);
  IoAdapter->a.ram_out (&IoAdapter->a, &RAM->SWReg, SWREG_HALT_CPU) ;
  i = 0 ;
  while ( (i < 100) && (IoAdapter->a.ram_in (&IoAdapter->a, &RAM->SWReg) != 0) )
@@ -107,21 +114,25 @@ static void stop_pri_hardware (PISDN_ADAPTER IoAdapter) {
   i++ ;
  }
  DBG_TRC(("%s: PRI stopped (%d)", IoAdapter->Name, i))
+ cfgReg = (dword volatile *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
  WRITE_DWORD(&cfgReg[0],((dword)(~0x03E00000)));
+ DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfgReg);
  diva_os_wait (1) ;
- *IoAdapter->reset = _MP_RISC_RESET | _MP_LED1 | _MP_LED2 ;
+ p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+ *p = _MP_RISC_RESET | _MP_LED1 | _MP_LED2 ;
+ DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 }
 #if !defined(DIVA_USER_MODE_CARD_CONFIG) /* { */
 /* -------------------------------------------------------------------------
   Load protocol code to the PRI Card
   ------------------------------------------------------------------------- */
-#define DOWNLOAD_ADDR(IoAdapter) \
- (&IoAdapter->ram[IoAdapter->downloadAddr & (IoAdapter->MemorySize - 1)])
+#define DOWNLOAD_ADDR(IoAdapter) (IoAdapter->downloadAddr & (IoAdapter->MemorySize - 1))
 static int pri_protocol_load (PISDN_ADAPTER IoAdapter) {
  dword  FileLength ;
  dword *File ;
  dword *sharedRam ;
  dword  Addr ;
+ byte *p;
  if (!(File = (dword *)xdiLoadArchive (IoAdapter, &FileLength, 0))) {
   return (0) ;
  }
@@ -172,14 +183,17 @@ static int pri_protocol_load (PISDN_ADAPTER IoAdapter) {
   return (0) ;
  }
  IoAdapter->downloadAddr = MP_UNCACHED_ADDR (MP_PROTOCOL_OFFSET) ;
- sharedRam = (dword *)DOWNLOAD_ADDR(IoAdapter) ;
+ p = DIVA_OS_MEM_ATTACH_RAM(IoAdapter);
+ sharedRam = (dword *)(&p[DOWNLOAD_ADDR(IoAdapter)]);
  memcpy (sharedRam, File, FileLength) ;
  if ( memcmp (sharedRam, File, FileLength) )
  {
+  DIVA_OS_MEM_DETACH_RAM(IoAdapter, p);
   DBG_FTL(("%s: Memory test failed!", IoAdapter->Properties.Name))
   xdiFreeFile (File);
   return (0) ;
  }
+ DIVA_OS_MEM_DETACH_RAM(IoAdapter, p);
  xdiFreeFile (File);
  return (1) ;
 }
@@ -228,8 +242,8 @@ dsp_check_presence (volatile byte* addr, volatile byte* data, int dsp)
 static dword
 diva_pri_detect_dsps (PISDN_ADAPTER IoAdapter)
 {
-  /* byte* base = a->resources.pci.addr[2]; */
-  byte* base = IoAdapter->reset - MP_RESET ;
+  byte* base;
+  byte* p;
   dword ret = 0, DspCount = 0 ;
   dword row_offset[] = {
     0x00000000,
@@ -242,14 +256,18 @@ diva_pri_detect_dsps (PISDN_ADAPTER IoAdapter)
   byte *dsp_addr_port, *dsp_data_port, row_state;
   int dsp_row = 0, dsp_index, dsp_num;
  IoAdapter->InitialDspInfo &= 0xffff ;
- /* if (!base || !a->xdi_adapter.reset) */
-  if (!base || !IoAdapter->reset)
+ p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+  if (!p)
   {
+    DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
     return (0);
   }
-  /* *(volatile byte*)(a->xdi_adapter.reset) = _MP_RISC_RESET | _MP_DSP_RESET; */
-  *(volatile byte*)(IoAdapter->reset) = _MP_RISC_RESET | _MP_DSP_RESET;
+  *(volatile byte*)(p) = _MP_RISC_RESET | _MP_DSP_RESET;
+  DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
   diva_os_wait (5) ;
+
+  base = DIVA_OS_MEM_ATTACH_CONTROL(IoAdapter);
+  
   for (dsp_num = 0; dsp_num < 30; dsp_num++) {
     dsp_row   = dsp_num / 7 + 1;
     dsp_index = dsp_num % 7;
@@ -264,8 +282,10 @@ diva_pri_detect_dsps (PISDN_ADAPTER IoAdapter)
    DspCount++ ;
     }
   }
-  /* *(volatile byte*)(a->xdi_adapter.reset) = _MP_RISC_RESET | _MP_LED1 | _MP_LED2; */
-  *(volatile byte*)(IoAdapter->reset) = _MP_RISC_RESET | _MP_LED1 | _MP_LED2;
+  DIVA_OS_MEM_DETACH_CONTROL(IoAdapter, base);
+
+  p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+  *(volatile byte*)(p) = _MP_RISC_RESET | _MP_LED1 | _MP_LED2;
   diva_os_wait (50) ;
   /*
     Verify modules
@@ -301,7 +321,8 @@ diva_pri_detect_dsps (PISDN_ADAPTER IoAdapter)
     ((ret >> (3*7)) & 0x7F) ? "Y" : "N"))
   DBG_LOG(("+-----------------------+"))
   DBG_LOG(("DSP's(present-absent):%08x-%08x", ret, ~ret & 0x3fffffff))
-  *(volatile byte*)(IoAdapter->reset) = 0 ;
+  *(volatile byte*)(p) = 0 ;
+  DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
   diva_os_wait (50) ;
  IoAdapter->InitialDspInfo |= DspCount << 16 ;
   return (ret);
@@ -312,6 +333,7 @@ diva_pri_detect_dsps (PISDN_ADAPTER IoAdapter)
 static long pri_download_buffer (OsFileHandle *fp, long length, void **addr) {
  PISDN_ADAPTER IoAdapter = (PISDN_ADAPTER)fp->sysLoadDesc ;
  dword        *sharedRam ;
+ byte *p;
  *addr = (void *)IoAdapter->downloadAddr ;
  if ( ((dword) length) > IoAdapter->DspCodeBaseAddr +
                          IoAdapter->MaxDspCodeSize - IoAdapter->downloadAddr )
@@ -321,11 +343,15 @@ static long pri_download_buffer (OsFileHandle *fp, long length, void **addr) {
            IoAdapter->downloadAddr + length))
   return (-1) ;
  }
- sharedRam = (dword *)DOWNLOAD_ADDR(IoAdapter) ;
- if ( fp->sysFileRead (fp, sharedRam, length) != length )
+ p = DIVA_OS_MEM_ATTACH_RAM(IoAdapter);
+ sharedRam = (dword *)(&p[DOWNLOAD_ADDR(IoAdapter)]);
+ if ( fp->sysFileRead (fp, sharedRam, length) != length ) {
+  DIVA_OS_MEM_DETACH_RAM(IoAdapter, p);
   return (-1) ;
+ }
  IoAdapter->downloadAddr += length ;
  IoAdapter->downloadAddr  = (IoAdapter->downloadAddr + 3) & (~3) ;
+ DIVA_OS_MEM_DETACH_RAM(IoAdapter, p);
  return (0) ;
 }
 /* -------------------------------------------------------------------------
@@ -338,6 +364,7 @@ static dword pri_telindus_load (PISDN_ADAPTER IoAdapter) {
  word                 download_count ;
  dword               *sharedRam ;
  dword                FileLength ;
+ byte *p;
  if ( !(fp = OsOpenFile (DSP_TELINDUS_FILE)) )
   return (0) ;
  IoAdapter->downloadAddr = (IoAdapter->DspCodeBaseAddr
@@ -363,9 +390,11 @@ static dword pri_telindus_load (PISDN_ADAPTER IoAdapter) {
  * store # of separate download files extracted from archive
  */
  IoAdapter->downloadAddr = IoAdapter->DspCodeBaseAddr ;
- sharedRam    = (dword *)DOWNLOAD_ADDR(IoAdapter) ;
+ p = DIVA_OS_MEM_ATTACH_RAM(IoAdapter);
+ sharedRam = (dword *)(&p[DOWNLOAD_ADDR(IoAdapter)]);
  WRITE_DWORD(&(sharedRam[0]), (dword)download_count);
  memcpy (&sharedRam[1], &download_table[0], sizeof(download_table)) ;
+ DIVA_OS_MEM_DETACH_RAM(IoAdapter, p);
  return (FileLength) ;
 }
 /* -------------------------------------------------------------------------
@@ -374,14 +403,17 @@ static dword pri_telindus_load (PISDN_ADAPTER IoAdapter) {
 #define MIN_DSPS 0x30000000
 static int load_pri_hardware (PISDN_ADAPTER IoAdapter) {
  dword           i ;
- struct mp_load *boot = (struct mp_load *)IoAdapter->ram ;
- if ( IoAdapter->Properties.Card != CARD_MAEP )
+ struct mp_load *boot = (struct mp_load *)DIVA_OS_MEM_ATTACH_RAM(IoAdapter);
+ if ( IoAdapter->Properties.Card != CARD_MAEP ) {
+  DIVA_OS_MEM_DETACH_RAM(IoAdapter, boot);
   return (0) ;
+ }
  boot->err = 0 ;
 #if 0
  IoAdapter->rstFnc (IoAdapter) ;
 #else
  if ( MIN_DSPS != (MIN_DSPS & diva_pri_detect_dsps(IoAdapter)) ) { /* makes reset */
+  DIVA_OS_MEM_DETACH_RAM(IoAdapter, boot);
   DBG_FTL(("%s: DSP error!", IoAdapter->Properties.Name))
   return (0) ;
  }
@@ -394,28 +426,36 @@ static int load_pri_hardware (PISDN_ADAPTER IoAdapter) {
  diva_os_wait (10) ;
  if ( i == boot->live )
  {
+  DIVA_OS_MEM_DETACH_RAM(IoAdapter, boot);
   DBG_FTL(("%s: CPU is not alive!", IoAdapter->Properties.Name))
   return (0) ;
  }
  if ( boot->err )
  {
+  DIVA_OS_MEM_DETACH_RAM(IoAdapter, boot);
   DBG_FTL(("%s: Board Selftest failed!", IoAdapter->Properties.Name))
   return (0) ;
  }
 /*
  * download protocol and dsp files
  */
- if ( !xdiSetProtocol (IoAdapter, IoAdapter->ProtocolSuffix) )
+ if ( !xdiSetProtocol (IoAdapter, IoAdapter->ProtocolSuffix) ) {
+  DIVA_OS_MEM_DETACH_RAM(IoAdapter, boot);
   return (0) ;
- if ( !pri_protocol_load (IoAdapter) )
+ }
+ if ( !pri_protocol_load (IoAdapter) ) {
+  DIVA_OS_MEM_DETACH_RAM(IoAdapter, boot);
   return (0) ;
- if ( !pri_telindus_load (IoAdapter) )
+ }
+ if ( !pri_telindus_load (IoAdapter) ) {
+  DIVA_OS_MEM_DETACH_RAM(IoAdapter, boot);
   return (0) ;
+ }
 /*
  * copy configuration parameters
  */
  IoAdapter->ram += MP_SHARED_RAM_OFFSET ;
- memset (IoAdapter->ram, '\0', 256) ;
+ memset (boot + MP_SHARED_RAM_OFFSET, '\0', 256) ;
  diva_configure_protocol (IoAdapter);
 /*
  * start adapter
@@ -430,11 +470,13 @@ static int load_pri_hardware (PISDN_ADAPTER IoAdapter) {
   diva_os_wait (10) ;
   if ( (boot->signature >> 16) == 0x4447 )
   {
+   DIVA_OS_MEM_DETACH_RAM(IoAdapter, boot);
    DBG_TRC(("Protocol startup time %d.%02d seconds",
             (i / 100), (i % 100) ))
    return (1) ;
   }
  }
+ DIVA_OS_MEM_DETACH_RAM(IoAdapter, boot);
  DBG_FTL(("%s: Adapter selftest failed (0x%04X)!",
           IoAdapter->Properties.Name, boot->signature >> 16))
  pri_cpu_trapped (IoAdapter) ;
@@ -449,12 +491,16 @@ static int load_pri_hardware (PISDN_ADAPTER IoAdapter) {
   PRI Adapter interrupt Service Routine
    -------------------------------------------------------------------------- */
 static int pri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
- if ( !((READ_DWORD((dword *)IoAdapter->cfg)) & 0x80000000) )
+ byte *cfg = DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
+ if ( !((READ_DWORD((dword *)cfg)) & 0x80000000) ) {
+  DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfg);
   return (0) ;
+ }
  /*
   clear interrupt line
   */
- WRITE_DWORD(((dword *)IoAdapter->cfg), (dword)~0x03E00000) ;
+ WRITE_DWORD(((dword *)cfg), (dword)~0x03E00000) ;
+ DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfg);
  IoAdapter->IrqCount++ ;
  if ( IoAdapter->Initialized )
  {
@@ -466,10 +512,11 @@ static int pri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
   Disable interrupt in the card hardware
   ------------------------------------------------------------------------- */
 static void disable_pri_interrupt (PISDN_ADAPTER IoAdapter) {
- dword volatile *cfgReg = (dword volatile *)IoAdapter->cfg ;
+ dword volatile *cfgReg = (dword volatile *)DIVA_OS_MEM_ATTACH_CFG(IoAdapter) ;
  cfgReg[3] = 0x00000000 ;
  cfgReg[1] = 0x00000000 ;
  WRITE_DWORD(&cfgReg[0], (dword)(~0x03E00000)) ;
+ DIVA_OS_MEM_DETACH_CFG(IoAdapter, cfgReg);
 }
 /* -------------------------------------------------------------------------
   Install entry points for PRI Adapter

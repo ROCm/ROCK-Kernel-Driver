@@ -46,7 +46,7 @@ enum AFSVL_Errors {
 };
 
 /* maps to "struct vldbentry" in vvl-spec.pdf */
-struct  afsvl_dbentry {
+struct afs_vldbentry {
 	char		name[65];		/* name of volume (including NUL char) */
 	afs_voltype_t	type;			/* volume type */
 	unsigned	num_servers;		/* num servers that hold instances of this vol */
@@ -77,19 +77,20 @@ extern int afs_rxvl_probe(afs_server_t *server, int alloc_flags);
 /* look up a volume location database entry by name */
 extern int afs_rxvl_get_entry_by_name(afs_server_t *server,
 				      const char *volname,
-				      afsc_vldb_record_t *entry);
+				      unsigned volnamesz,
+				      struct afs_cache_vlocation *entry);
 
 /* look up a volume location database entry by ID */
 extern int afs_rxvl_get_entry_by_id(afs_server_t *server,
 				    afs_volid_t	volid,
 				    afs_voltype_t voltype,
-				    afsc_vldb_record_t *entry);
+				    struct afs_cache_vlocation *entry);
 
 extern int afs_rxvl_get_entry_by_id_async(afs_async_op_t *op,
 					  afs_volid_t volid,
 					  afs_voltype_t voltype);
 
 extern int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
-					   afsc_vldb_record_t *entry);
+					   struct afs_cache_vlocation *entry);
 
 #endif /* _LINUX_AFS_VLCLIENT_H */

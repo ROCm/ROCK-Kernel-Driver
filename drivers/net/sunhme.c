@@ -179,7 +179,7 @@ static __inline__ void tx_dump_ring(struct happy_meal *hp)
    where it could be referenced at any time due to hot plugging,
    the __initdata reference should be removed. */
 
-struct pci_device_id happymeal_pci_ids[] __initdata = {
+struct pci_device_id happymeal_pci_ids[] = {
 	{
 	  .vendor	= PCI_VENDOR_ID_SUN,
 	  .device	= PCI_DEVICE_ID_SUN_HAPPYMEAL,

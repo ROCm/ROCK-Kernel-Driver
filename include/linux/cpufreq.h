@@ -290,7 +290,7 @@ enum {
 #ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE
 extern struct cpufreq_governor cpufreq_gov_performance;
 #define CPUFREQ_DEFAULT_GOVERNOR	&cpufreq_gov_performance
-#elif CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE)
 extern struct cpufreq_governor cpufreq_gov_userspace;
 #define CPUFREQ_DEFAULT_GOVERNOR	&cpufreq_gov_userspace
 #endif

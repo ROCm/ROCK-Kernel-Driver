@@ -695,5 +695,39 @@ extern int		pciio_info_type1_get(pciio_info_t);
 extern int              pciio_error_handler(vertex_hdl_t, int, ioerror_mode_t, ioerror_t *);
 extern int		pciio_dma_enabled(vertex_hdl_t);
 
+/**
+ * sn_pci_set_vchan - Set the requested Virtual Channel bits into the mapped DMA
+ *                    address.
+ * @pci_dev: pci device pointer
+ * @addr: mapped dma address
+ * @vchan: Virtual Channel to use 0 or 1.
+ *
+ * Set the Virtual Channel bit in the mapped dma address.
+ */
+
+static inline int
+sn_pci_set_vchan(struct pci_dev *pci_dev,
+		 dma_addr_t *addr,
+		 int vchan)
+{
+	if (vchan > 1) {
+		return -1;
+	}
+
+	if (!(*addr >> 32))     /* Using a mask here would be cleaner */
+		return 0;       /* but this generates better code */
+
+	if (vchan == 1) {
+		/* Set Bit 57 */
+		*addr |= (1UL << 57);
+	}
+	else {
+		/* Clear Bit 57 */
+		*addr &= ~(1UL << 57);
+	}
+
+	return 0;
+}
+
 #endif				/* C or C++ */
 #endif				/* _ASM_SN_PCI_PCIIO_H */

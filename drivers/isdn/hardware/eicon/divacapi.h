@@ -643,7 +643,7 @@ struct async_s {
   unsigned parity:2;
   unsigned spare: 2;
   unsigned stp:   1;
-  unsigned ch_len:2;   // 3th octett in CAI
+  unsigned ch_len:2;   /* 3th octett in CAI */
 };
 
 

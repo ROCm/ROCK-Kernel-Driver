@@ -80,8 +80,8 @@ extern int dirty_expire_centisecs;
 
 struct ctl_table;
 struct file;
-int dirty_writeback_centisecs_handler(struct ctl_table *, int, struct file *, 
-					  void *, size_t *);
+int dirty_writeback_centisecs_handler(struct ctl_table *, int, struct file *,
+				      void __user *, size_t *);
 
 void page_writeback_init(void);
 void balance_dirty_pages(struct address_space *mapping);
