@@ -295,8 +295,8 @@ struct isd200_info {
  */
 
 struct read_capacity_data {
-	unsigned long LogicalBlockAddress;
-	unsigned long BytesPerBlock;
+	__be32 LogicalBlockAddress;
+	__be32 BytesPerBlock;
 };
 
 /*
@@ -1016,7 +1016,8 @@ static int isd200_get_inquiry_data( struct us_data *us )
 			} else {
 				/* ATA Command Identify successful */
 				int i;
-				__u16 *src, *dest;
+				__be16 *src;
+				__u16 *dest;
 				ide_fix_driveid(id);
 
 				US_DEBUGP("   Identify Data Structure:\n");
@@ -1068,17 +1069,17 @@ static int isd200_get_inquiry_data( struct us_data *us )
 				}
 
 				/* Fill in vendor identification fields */
-				src = (__u16*)id->model;
+				src = (__be16*)id->model;
 				dest = (__u16*)info->InquiryData.VendorId;
 				for (i=0;i<4;i++)
 					dest[i] = be16_to_cpu(src[i]);
 
-				src = (__u16*)(id->model+8);
+				src = (__be16*)(id->model+8);
 				dest = (__u16*)info->InquiryData.ProductId;
 				for (i=0;i<8;i++)
 					dest[i] = be16_to_cpu(src[i]);
 
-				src = (__u16*)id->fw_rev;
+				src = (__be16*)id->fw_rev;
 				dest = (__u16*)info->InquiryData.ProductRevisionLevel;
 				for (i=0;i<2;i++)
 					dest[i] = be16_to_cpu(src[i]);
@@ -1221,8 +1222,7 @@ static int isd200_scsi_to_ata(struct scsi_cmnd *srb, struct us_data *us,
 	case READ_10:
 		US_DEBUGP("   ATA OUT - SCSIOP_READ\n");
 
-		lba = *(unsigned long *)&srb->cmnd[2]; 
-		lba = cpu_to_be32(lba);
+		lba = be32_to_cpu(*(__be32 *)&srb->cmnd[2]);
 		blockCount = (unsigned long)srb->cmnd[7]<<8 | (unsigned long)srb->cmnd[8];
 
 		if (id->capability & CAPABILITY_LBA) {
@@ -1254,8 +1254,7 @@ static int isd200_scsi_to_ata(struct scsi_cmnd *srb, struct us_data *us,
 	case WRITE_10:
 		US_DEBUGP("   ATA OUT - SCSIOP_WRITE\n");
 
-		lba = *(unsigned long *)&srb->cmnd[2]; 
-		lba = cpu_to_be32(lba);
+		lba = be32_to_cpu(*(__be32 *)&srb->cmnd[2]);
 		blockCount = (unsigned long)srb->cmnd[7]<<8 | (unsigned long)srb->cmnd[8];
 
 		if (id->capability & CAPABILITY_LBA) {

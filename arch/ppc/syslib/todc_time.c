@@ -277,9 +277,9 @@ todc_time_init(void)
 ulong
 todc_get_rtc_time(void)
 {
-	uint	year, mon, day, hour, min, sec;
+	uint	year = 0, mon = 0, day = 0, hour = 0, min = 0, sec = 0;
 	uint	limit, i;
-	u_char	save_control, uip;
+	u_char	save_control, uip = 0;
 
 	spin_lock(&rtc_lock);
 	save_control = todc_read_val(todc_info->control_a);
@@ -361,7 +361,7 @@ int
 todc_set_rtc_time(unsigned long nowtime)
 {
 	struct rtc_time	tm;
-	u_char		save_control, save_freq_select;
+	u_char		save_control, save_freq_select = 0;
 
 	spin_lock(&rtc_lock);
 	to_tm(nowtime, &tm);
@@ -416,7 +416,7 @@ todc_set_rtc_time(unsigned long nowtime)
  */
 static unsigned char __init todc_read_timereg(int addr)
 {
-	unsigned char save_control, val;
+	unsigned char save_control = 0, val;
 
 	switch (todc_info->rtc_type) {
 		case TODC_TYPE_DS1557:

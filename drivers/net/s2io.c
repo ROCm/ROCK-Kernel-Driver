@@ -235,10 +235,10 @@ static struct pci_device_id s2io_tbl[] __devinitdata = {
 MODULE_DEVICE_TABLE(pci, s2io_tbl);
 
 static struct pci_driver s2io_driver = {
-      name:"S2IO",
-      id_table:s2io_tbl,
-      probe:s2io_init_nic,
-      remove:__devexit_p(s2io_rem_nic),
+      .name = "S2IO",
+      .id_table = s2io_tbl,
+      .probe = s2io_init_nic,
+      .remove = __devexit_p(s2io_rem_nic),
 };
 
 /*  

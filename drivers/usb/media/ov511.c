@@ -473,7 +473,7 @@ ov518_reg_w32(struct usb_ov511 *ov, unsigned char reg, u32 val, int n)
 
 	down(&ov->cbuf_lock);
 
-	*((u32 *)ov->cbuf) = __cpu_to_le32(val);
+	*((__le32 *)ov->cbuf) = __cpu_to_le32(val);
 
 	rc = usb_control_msg(ov->dev,
 			     usb_sndctrlpipe(ov->dev, 0),

@@ -61,9 +61,9 @@ security_list (struct inode *inode, const char *name, int namelen, char *out)
 
 
 struct reiserfs_xattr_handler security_handler = {
-    prefix: XATTR_SECURITY_PREFIX,
-    get: security_get,
-    set: security_set,
-    del: security_del,
-    list: security_list,
+	.prefix = XATTR_SECURITY_PREFIX,
+	.get = security_get,
+	.set = security_set,
+	.del = security_del,
+	.list = security_list,
 };

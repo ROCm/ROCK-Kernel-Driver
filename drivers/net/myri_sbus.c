@@ -376,7 +376,7 @@ static unsigned short myri_type_trans(struct sk_buff *skb, struct net_device *de
 	
 	skb->mac.raw = (((unsigned char *)skb->data) + MYRI_PAD_LEN);
 	skb_pull(skb, dev->hard_header_len);
-	eth = skb->mac.ethernet;
+	eth = eth_hdr(skb);
 	
 #ifdef DEBUG_HEADER
 	DHDR(("myri_type_trans: "));

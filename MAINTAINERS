@@ -632,9 +632,9 @@ M:	g.liakhovetski@gmx.de
 S:	Maintained
 
 DECnet NETWORK LAYER
-P:	Steven Whitehouse
-M:	SteveW@ACM.org
-W:	http://www.sucs.swan.ac.uk/~rohan/DECnet/index.html
+P:	Patrick Caulfield
+M:	patrick@tykepenguin.com
+W:	http://linux-decnet.sourceforge.net
 L:	linux-decnet-user@lists.sourceforge.net
 S:	Maintained
 
@@ -1299,6 +1299,15 @@ P:	Benjamin Herrenschmidt
 M:	benh@kernel.crashing.org
 W:	http://www.penguinppc.org/
 L:	linuxppc-dev@lists.linuxppc.org
+S:	Maintained
+
+LINUX FOR POWERPC EMBEDDED MPC52XX
+P:	Sylvain Munaut
+M:	tnt@246tNt.com
+W:	http://www.246tNt.com/mpc52xx/
+W:	http://www.penguinppc.org/
+L:	linuxppc-dev@ozlabs.org
+L:	linuxppc-embedded@ozlabs.org
 S:	Maintained
 
 LINUX FOR POWERPC EMBEDDED PPC4XX

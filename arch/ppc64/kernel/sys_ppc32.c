@@ -621,8 +621,11 @@ long sys32_execve(unsigned long a0, unsigned long a1, unsigned long a2,
 
 	error = compat_do_execve(filename, compat_ptr(a1), compat_ptr(a2), regs);
 
-	if (error == 0)
+	if (error == 0) {
+		task_lock(current);
 		current->ptrace &= ~PT_DTRACE;
+		task_unlock(current);
+	}
 	putname(filename);
 
 out:
@@ -642,7 +645,7 @@ void start_thread32(struct pt_regs* regs, unsigned long nip, unsigned long sp)
 		unsigned long childregs = (unsigned long)current->thread_info +
 						THREAD_SIZE;
 		childregs -= sizeof(struct pt_regs);
-		current->thread.regs = childregs;
+		current->thread.regs = (struct pt_regs *)childregs;
 	}
 
 	/*

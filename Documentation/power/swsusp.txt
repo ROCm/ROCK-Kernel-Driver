@@ -15,10 +15,18 @@ From kernel/suspend.c:
  * If you change kernel command line between suspend and resume...
  *			        ...prepare for nasty fsck or worse.
  *
- * (*) pm interface support is needed to make it safe.
+ * (*) suspend/resume support is needed to make it safe.
 
 You need to append resume=/dev/your_swap_partition to kernel command
-line. Then you suspend by echo 4 > /proc/acpi/sleep.
+line. Then you suspend by
+
+echo shutdown > /sys/power/disk; echo disk > /sys/power/state
+
+. If you feel ACPI works pretty well on your system, you might try
+
+echo platform > /sys/power/disk; echo disk > /sys/power/state
+
+
 
 Article about goals and implementation of Software Suspend for Linux
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -32,42 +40,24 @@ saves the state of the machine to a filesystem or to a partition and switches
 to standby mode. Later resuming the machine the saved state is loaded back to
 ram and the machine can continue its work. It has two real benefits. First we
 save ourselves the time machine goes down and later boots up, energy costs
-real high when running from batteries. The other gain is that we don't have to
+are real high when running from batteries. The other gain is that we don't have to
 interrupt our programs so processes that are calculating something for a long
 time shouldn't need to be written interruptible.
 
-Using the code
-
-You have two ways to use this code. The first one is is with a patched
-SysVinit (my patch is against 2.76 and available at my home page). You
-might call 'swsusp' or 'shutdown -z <time>'. Next way is to echo 4 >
-/proc/acpi/sleep.
-
-Either way it saves the state of the machine into active swaps and then
-reboots.  You must explicitly specify the swap partition to resume from with
+swsusp saves the state of the machine into active swaps and then reboots or
+powerdowns.  You must explicitly specify the swap partition to resume from with
 ``resume='' kernel option. If signature is found it loads and restores saved
 state. If the option ``noresume'' is specified as a boot parameter, it skips
 the resuming.
 
-In the meantime while the system is suspended you should not touch any of the
-hardware!
+In the meantime while the system is suspended you should not add/remove any
+of the hardware, write to the filesystems, etc.
 
-About the code
+Sleep states summary
+====================
 
-Things to implement
-- We should only make a copy of data related to kernel segment, since any
-  process data won't be changed.
-- Should make more sanity checks. Or are these enough?
-
-Not so important ideas for implementing
-
-- If a real time process is running then don't suspend the machine.
-- Support for adding/removing hardware while suspended?
-- We should not free pages at the beginning so aggressively, most of them
-  go there anyway..
-
-Sleep states summary (thanx, Ducrot)
-====================================
+There are three different interfaces you can use, /proc/acpi should
+work like this:
 
 In a really perfect world:
 echo 1 > /proc/acpi/sleep       # for standby
@@ -78,7 +68,6 @@ echo 5 > /proc/acpi/sleep       # for shutdown unfriendly the system
 
 and perhaps
 echo 4b > /proc/acpi/sleep      # for suspend to disk via s4bios
-
 
 Frequently Asked Questions
 ==========================
@@ -123,21 +112,7 @@ advance. That means that the limitation goes away in practice.
 
 Q: Does linux support ACPI S4?
 
-A: No.
-
-When swsusp was created, ACPI was not too widespread, so we tried to
-avoid using ACPI-specific stuff. ACPI also is/was notoriously
-buggy. These days swsusp works on APM-only i386 machines and even
-without any power managment at all. Some versions also work on PPC.
-
-That means that machine does not enter S4 on suspend-to-disk, but
-simply enters S5. That has few advantages, you can for example boot
-windows on next boot, and return to your Linux session later. You
-could even have few different Linuxes on your box (not sharing any
-partitions), and switch between them.
-
-It also has disadvantages. On HP nx5000, if you unplug power cord
-while machine is suspended-to-disk, Linux will fail to notice that.
+A: Yes. That's what echo platform > /sys/power/disk does.
 
 Q: My machine doesn't work with ACPI. How can I use swsusp than ?
 
@@ -162,6 +137,8 @@ int main()
     return 0;
 }
 
+Also /sys/ interface should be still present.
+
 Q: What is 'suspend2'?
 
 A: suspend2 is 'Software Suspend 2', a forked implementation of
@@ -175,16 +152,21 @@ should be sent to the mailing list available through the suspend2
 website, and not to the Linux Kernel Mailing List. We are working
 toward merging suspend2 into the mainline kernel.
 
-Q: Kernel thread must voluntarily freeze itself (call 'refrigerator'). But
-I found some kernel threads don't do it, and they don't freeze, and
+Q: A kernel thread must voluntarily freeze itself (call 'refrigerator').
+I found some kernel threads that don't do it, and they don't freeze
 so the system can't sleep. Is this a known behavior?
 
-A: All such kernel threads need to be fixed, one by one. Select place
-where it is safe to be frozen (no kernel semaphores should be held at
-that point and it must be safe to sleep there), and add:
+A: All such kernel threads need to be fixed, one by one. Select the
+place where the thread is safe to be frozen (no kernel semaphores
+should be held at that point and it must be safe to sleep there), and
+add:
 
             if (current->flags & PF_FREEZE)
                     refrigerator(PF_FREEZE);
+
+If the thread is needed for writing the image to storage, you should
+instead set the PF_NOFREEZE process flag when creating the thread.
+
 
 Q: What is the difference between between "platform", "shutdown" and
 "firmware" in /sys/power/disk?

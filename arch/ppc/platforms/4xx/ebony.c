@@ -1,11 +1,13 @@
 /*
- * arch/ppc/platforms/ebony.c
+ * arch/ppc/platforms/4xx/ebony.c
  *
  * Ebony board specific routines
  *
- * Matt Porter <mporter@mvista.com>
+ * Matt Porter <mporter@kernel.crashing.org>
+ * Copyright 2002-2004 MontaVista Software Inc.
  *
- * Copyright 2002 MontaVista Software Inc.
+ * Eugene Surovegin <eugene.surovegin@zultys.com> or <ebs@ebshome.net>
+ * Copyright (c) 2003, 2004 Zultys Technologies
  *
  * This program is free software; you can redistribute  it and/or modify it
  * under  the terms of  the GNU General  Public License as published by the
@@ -47,6 +49,10 @@
 #include <asm/todc.h>
 #include <asm/bootinfo.h>
 #include <asm/ppc4xx_pic.h>
+
+#include <syslib/gen550.h>
+
+static struct ibm44x_clocks clocks __initdata;
 
 /*
  * Ebony IRQ triggering/polarity settings
@@ -118,8 +124,6 @@ static u_char ebony_IRQ_initsenses[] __initdata = {
 	(IRQ_SENSE_LEVEL | IRQ_POLARITY_POSITIVE),	/* 63: EMAC 1 WOL */
 };
 
-extern void abort(void);
-
 static void __init
 ebony_calibrate_decr(void)
 {
@@ -143,18 +147,7 @@ ebony_calibrate_decr(void)
 			break;
 	}
 
-	tb_ticks_per_jiffy = freq / HZ;
-	tb_to_us = mulhwu_scale_factor(freq, 1000000);
-
-	/* Set the time base to zero */
-	mtspr(SPRN_TBWL, 0);
-	mtspr(SPRN_TBWU, 0);
-
-	/* Clear any pending timer interrupts */
-	mtspr(SPRN_TSR, TSR_ENW | TSR_WIS | TSR_DIS | TSR_FIS);
-
-	/* Enable decrementer interrupt */
-	mtspr(SPRN_TCR, TCR_DIE);
+	ibm44x_calibrate_decr(freq);
 }
 
 static int
@@ -283,7 +276,7 @@ ebony_early_serial_map(void)
 	memset(&port, 0, sizeof(port));
 	port.membase = ioremap64(PPC440GP_UART0_ADDR, 8);
 	port.irq = 0;
-	port.uartclk = BASE_BAUD * 16;
+	port.uartclk = clocks.uart0;
 	port.regshift = 0;
 	port.iotype = SERIAL_IO_MEM;
 	port.flags = ASYNC_BOOT_AUTOCONF | ASYNC_SKIP_TEST;
@@ -293,20 +286,30 @@ ebony_early_serial_map(void)
 		printk("Early serial init of port 0 failed\n");
 	}
 
+#if defined(CONFIG_SERIAL_TEXT_DEBUG) || defined(CONFIG_KGDB)
+	/* Configure debug serial access */
+	gen550_init(0, &port);
+#endif
+
 	port.membase = ioremap64(PPC440GP_UART1_ADDR, 8);
 	port.irq = 1;
+	port.uartclk = clocks.uart1;
 	port.line = 1;
 
 	if (early_serial_setup(&port) != 0) {
 		printk("Early serial init of port 1 failed\n");
 	}
+
+#if defined(CONFIG_SERIAL_TEXT_DEBUG) || defined(CONFIG_KGDB)
+	/* Configure debug serial access */
+	gen550_init(1, &port);
+#endif
 }
 
 static void __init
 ebony_setup_arch(void)
 {
 	unsigned char * vpd_base;
-	struct ibm44x_clocks clocks;
 	struct ocp_def *def;
 	struct ocp_func_emac_data *emacdata;
 
@@ -370,151 +373,16 @@ ebony_setup_arch(void)
 	printk("IBM Ebony port (MontaVista Software, Inc. (source@mvista.com))\n");
 }
 
-static void
-ebony_restart(char *cmd)
-{
-	local_irq_disable();
-	abort();
-}
-
-static void
-ebony_power_off(void)
-{
-	local_irq_disable();
-	for(;;);
-}
-
-static void
-ebony_halt(void)
-{
-	local_irq_disable();
-	for(;;);
-}
-
-/*
- * Read the 440GP memory controller to get size of system memory.
- */
-static unsigned long __init
-ebony_find_end_of_memory(void)
-{
-	u32 i, bank_config;
-	u32 mem_size = 0;
-
-	for (i=0; i<4; i++)
-	{
-		switch (i)
-		{
-			case 0:
-				mtdcr(DCRN_SDRAM0_CFGADDR, SDRAM0_B0CR);
-				break;
-			case 1:
-				mtdcr(DCRN_SDRAM0_CFGADDR, SDRAM0_B1CR);
-				break;
-			case 2:
-				mtdcr(DCRN_SDRAM0_CFGADDR, SDRAM0_B2CR);
-				break;
-			case 3:
-				mtdcr(DCRN_SDRAM0_CFGADDR, SDRAM0_B3CR);
-				break;
-		}
-
-		bank_config = mfdcr(DCRN_SDRAM0_CFGDATA);
-
-		if (!(bank_config & SDRAM_CONFIG_BANK_ENABLE))
-			continue;
-		switch (SDRAM_CONFIG_BANK_SIZE(bank_config))
-		{
-			case SDRAM_CONFIG_SIZE_8M:
-				mem_size += PPC44x_MEM_SIZE_8M;
-				break;
-			case SDRAM_CONFIG_SIZE_16M:
-				mem_size += PPC44x_MEM_SIZE_16M;
-				break;
-			case SDRAM_CONFIG_SIZE_32M:
-				mem_size += PPC44x_MEM_SIZE_32M;
-				break;
-			case SDRAM_CONFIG_SIZE_64M:
-				mem_size += PPC44x_MEM_SIZE_64M;
-				break;
-			case SDRAM_CONFIG_SIZE_128M:
-				mem_size += PPC44x_MEM_SIZE_128M;
-				break;
-			case SDRAM_CONFIG_SIZE_256M:
-				mem_size += PPC44x_MEM_SIZE_256M;
-				break;
-			case SDRAM_CONFIG_SIZE_512M:
-				mem_size += PPC44x_MEM_SIZE_512M;
-				break;
-		}
-	}
-	return mem_size;
-}
-
-static void __init
-ebony_init_irq(void)
-{
-	int i;
-
-	ppc4xx_pic_init();
-
-	for (i = 0; i < NR_IRQS; i++)
-		irq_desc[i].handler = ppc4xx_pic;
-}
-
-#ifdef CONFIG_SERIAL_TEXT_DEBUG
-#include <linux/serialP.h>
-#include <linux/serial_reg.h>
-#include <asm/serial.h>
-
-static struct serial_state rs_table[RS_TABLE_SIZE] = {
-	SERIAL_PORT_DFNS	/* Defined in <asm/serial.h> */
-};
-
-static void
-ebony_progress(char *s, unsigned short hex)
-{
-	volatile char c;
-	volatile unsigned long com_port;
-	u16 shift;
-
-	com_port = (unsigned long)rs_table[0].iomem_base;
-	shift = rs_table[0].iomem_reg_shift;
-
-	while ((c = *s++) != 0) {
-		while ((*((volatile unsigned char *)com_port +
-				(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-			;
-		*(volatile unsigned char *)com_port = c;
-
-	}
-
-	/* Send LF/CR to pretty up output */
-	while ((*((volatile unsigned char *)com_port +
-		(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-		;
-	*(volatile unsigned char *)com_port = '\r';
-	while ((*((volatile unsigned char *)com_port +
-		(UART_LSR << shift)) & UART_LSR_THRE) == 0)
-		;
-	*(volatile unsigned char *)com_port = '\n';
-}
-#endif /* CONFIG_SERIAL_TEXT_DEBUG */
-
 void __init platform_init(unsigned long r3, unsigned long r4,
 		unsigned long r5, unsigned long r6, unsigned long r7)
 {
 	parse_bootinfo((struct bi_record *) (r3 + KERNELBASE));
 
+	ibm44x_platform_init();
+
 	ppc_md.setup_arch = ebony_setup_arch;
 	ppc_md.show_cpuinfo = ebony_show_cpuinfo;
-	ppc_md.init_IRQ = ebony_init_irq;
 	ppc_md.get_irq = NULL;		/* Set in ppc4xx_pic_init() */
-
-	ppc_md.find_end_of_memory = ebony_find_end_of_memory;
-
-	ppc_md.restart = ebony_restart;
-	ppc_md.power_off = ebony_power_off;
-	ppc_md.halt = ebony_halt;
 
 	ppc_md.calibrate_decr = ebony_calibrate_decr;
 	ppc_md.time_init = todc_time_init;
@@ -523,10 +391,6 @@ void __init platform_init(unsigned long r3, unsigned long r4,
 
 	ppc_md.nvram_read_val = todc_direct_read_val;
 	ppc_md.nvram_write_val = todc_direct_write_val;
-
-#ifdef CONFIG_SERIAL_TEXT_DEBUG
-	ppc_md.progress = ebony_progress;
-#endif /* CONFIG_SERIAL_TEXT_DEBUG */
 #ifdef CONFIG_KGDB
 	ppc_md.early_serial_map = ebony_early_serial_map;
 #endif

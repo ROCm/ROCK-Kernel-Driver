@@ -31,11 +31,13 @@
 #include <linux/time.h>
 #include <linux/jiffies.h>
 #include <linux/cpu.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
 #include <asm/div64.h>
 #include <asm/timex.h>
+#include <asm/io.h>
 
 #ifdef CONFIG_TIME_INTERPOLATION
 static void time_interpolator_update(long delta_nsec);
@@ -788,13 +790,12 @@ static void update_wall_time(unsigned long ticks)
 	do {
 		ticks--;
 		update_wall_time_one_tick();
+		if (xtime.tv_nsec >= 1000000000) {
+			xtime.tv_nsec -= 1000000000;
+			xtime.tv_sec++;
+			second_overflow();
+		}
 	} while (ticks);
-
-	if (xtime.tv_nsec >= 1000000000) {
-	    xtime.tv_nsec -= 1000000000;
-	    xtime.tv_sec++;
-	    second_overflow();
-	}
 }
 
 static inline void do_process_times(struct task_struct *p,
@@ -804,12 +805,13 @@ static inline void do_process_times(struct task_struct *p,
 
 	psecs = (p->utime += user);
 	psecs += (p->stime += system);
-	if (psecs / HZ >= p->rlim[RLIMIT_CPU].rlim_cur) {
+	if (p->signal && !unlikely(p->state & (EXIT_DEAD|EXIT_ZOMBIE)) &&
+	    psecs / HZ >= p->signal->rlim[RLIMIT_CPU].rlim_cur) {
 		/* Send SIGXCPU every second.. */
 		if (!(psecs % HZ))
 			send_sig(SIGXCPU, p, 1);
 		/* and SIGKILL when we go over max.. */
-		if (psecs / HZ >= p->rlim[RLIMIT_CPU].rlim_max)
+		if (psecs / HZ >= p->signal->rlim[RLIMIT_CPU].rlim_max)
 			send_sig(SIGKILL, p, 1);
 	}
 }
@@ -1624,13 +1626,13 @@ EXPORT_SYMBOL(msleep);
  */
 unsigned long msleep_interruptible(unsigned int msecs)
 {
-       unsigned long timeout = msecs_to_jiffies(msecs);
+	unsigned long timeout = msecs_to_jiffies(msecs);
 
-       while (timeout && !signal_pending(current)) {
-               set_current_state(TASK_INTERRUPTIBLE);
-               timeout = schedule_timeout(timeout);
-       }
-       return jiffies_to_msecs(timeout);
+	while (timeout && !signal_pending(current)) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		timeout = schedule_timeout(timeout);
+	}
+	return jiffies_to_msecs(timeout);
 }
 
 EXPORT_SYMBOL(msleep_interruptible);

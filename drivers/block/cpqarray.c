@@ -138,7 +138,7 @@ static struct gendisk *ida_gendisk[MAX_CTLR][NWD];
 
 int cpqarray_init_step2(void);
 static int cpqarray_pci_init(ctlr_info_t *c, struct pci_dev *pdev);
-static void *remap_pci_mem(ulong base, ulong size);
+static void __iomem *remap_pci_mem(ulong base, ulong size);
 static int cpqarray_eisa_detect(void);
 static int pollcomplete(int ctlr);
 static void getgeometry(int ctlr);
@@ -551,10 +551,10 @@ static int __init cpqarray_init_one( struct pci_dev *pdev,
 }
 
 static struct pci_driver cpqarray_pci_driver = {
-	name:   "cpqarray",
-	probe:  cpqarray_init_one,
-	remove:  __devexit_p(cpqarray_remove_one_pci),
-	id_table:  cpqarray_pci_device_id,
+	.name = "cpqarray",
+	.probe = cpqarray_init_one,
+	.remove = __devexit_p(cpqarray_remove_one_pci),
+	.id_table = cpqarray_pci_device_id,
 };
 
 /*
@@ -722,11 +722,11 @@ DBGINFO(
 /*
  * Map (physical) PCI mem into (virtual) kernel space
  */
-static void *remap_pci_mem(ulong base, ulong size)
+static void __iomem *remap_pci_mem(ulong base, ulong size)
 {
         ulong page_base        = ((ulong) base) & PAGE_MASK;
         ulong page_offs        = ((ulong) base) - page_base;
-        void *page_remapped    = ioremap(page_base, page_offs+size);
+        void __iomem *page_remapped    = ioremap(page_base, page_offs+size);
 
         return (page_remapped ? (page_remapped + page_offs) : NULL);
 }

@@ -66,14 +66,10 @@
 
    * Minimal interval is HZ/4=250msec (it is the greatest common divisor
      for HZ=100 and HZ=1024 8)), maximal interval
-     is (HZ/4)*2^EST_MAX_INTERVAL = 8sec. Shorter intervals
+     is (HZ*2^EST_MAX_INTERVAL)/4 = 8sec. Shorter intervals
      are too expensive, longer ones can be implemented
      at user level painlessly.
  */
-
-#if (HZ%4) != 0
-#error Bad HZ value.
-#endif
 
 #define EST_MAX_INTERVAL	5
 
@@ -128,7 +124,7 @@ static void est_timer(unsigned long arg)
 		spin_unlock(e->stats_lock);
 	}
 
-	mod_timer(&elist[idx].timer, jiffies + ((HZ/4)<<idx));
+	mod_timer(&elist[idx].timer, jiffies + ((HZ<<idx)/4));
 	read_unlock(&est_lock);
 }
 
@@ -161,7 +157,7 @@ int qdisc_new_estimator(struct tc_stats *stats, spinlock_t *stats_lock, struct r
 	if (est->next == NULL) {
 		init_timer(&elist[est->interval].timer);
 		elist[est->interval].timer.data = est->interval;
-		elist[est->interval].timer.expires = jiffies + ((HZ/4)<<est->interval);
+		elist[est->interval].timer.expires = jiffies + ((HZ<<est->interval)/4);
 		elist[est->interval].timer.function = est_timer;
 		add_timer(&elist[est->interval].timer);
 	}

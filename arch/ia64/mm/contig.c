@@ -277,7 +277,7 @@ paging_init (void)
 		map_size = PAGE_ALIGN(max_low_pfn * sizeof(struct page));
 		vmalloc_end -= map_size;
 		vmem_map = (struct page *) vmalloc_end;
-		efi_memmap_walk(create_mem_map_page_table, 0);
+		efi_memmap_walk(create_mem_map_page_table, NULL);
 
 		mem_map = contig_page_data.node_mem_map = vmem_map;
 		free_area_init_node(0, &contig_page_data, zones_size,

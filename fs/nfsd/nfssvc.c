@@ -180,7 +180,6 @@ nfsd(struct svc_rqst *rqstp)
 	/* Lock module and set up kernel thread */
 	lock_kernel();
 	daemonize("nfsd");
-	current->rlim[RLIMIT_FSIZE].rlim_cur = RLIM_INFINITY;
 
 	/* After daemonize() this kernel thread shares current->fs
 	 * with the init process. We need to create files with a

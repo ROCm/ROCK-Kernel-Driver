@@ -16,6 +16,8 @@
 #include <asm/assembler.h>
 #include <asm/hardware.h>
 
+#include <asm/arch/pxa-regs.h>
+
 		.text
 
 /*
@@ -64,6 +66,37 @@ ENTRY(pxa_cpu_suspend)
 	@ prepare pointer to physical address 0 (virtual mapping in generic.c)
 	mov	r2, #UNCACHED_PHYS_0
 
+	@ Intel PXA255 Specification Update notes problems
+	@ about suspending with PXBus operating above 133MHz
+	@ (see Errata 31, GPIO output signals, ... unpredictable in sleep
+	@
+	@ We keep the change-down close to the actual suspend on SDRAM
+	@ as possible to eliminate messing about with the refresh clock
+	@ as the system will restore with the original speed settings
+	@
+	@ Ben Dooks, 13-Sep-2004
+
+	ldr	r6, =CCCR
+	ldr	r8, [r6]		@ keep original value for resume
+
+	@ ensure x1 for run and turbo mode with memory clock
+	bic	r7, r8, #CCCR_M_MASK | CCCR_N_MASK
+	orr	r7, r7, #(1<<5) | (2<<7)
+
+	@ check that the memory frequency is within limits
+	and	r14, r7, #CCCR_L_MASK
+	teq	r14, #1
+	bicne	r7, r7, #CCCR_L_MASK
+	orrne	r7, r7, #1			@@ 99.53MHz
+
+	@ get ready for the change
+	@ note, since we are making turbo=run, do not remove the turbo
+	@ as this may cause non-turbo mode on resume
+	mrc	p14, 0, r0, c6, c0, 0
+	bic	r0, r0, #2			@ clear change bit
+	mcr	p14, 0, r0, c6, c0, 0
+	orr	r0, r0, #2			@ initiate change bit
+
 	@ align execution to a cache line
 	b	1f
 
@@ -74,6 +107,13 @@ ENTRY(pxa_cpu_suspend)
 	@ All needed values are now in registers.
 	@ These last instructions should be in cache
 
+	@ initiate the frequency change...
+	str	r7, [r6]
+	mcr	p14, 0, r0, c6, c0, 0
+
+	@ restore the original cpu speed value for resume
+	str	r8, [r6]
+
 	@ put SDRAM into self-refresh
 	str	r5, [r4]
 
@@ -83,8 +123,7 @@ ENTRY(pxa_cpu_suspend)
 	@ enter sleep mode
 	mcr	p14, 0, r1, c7, c0, 0
 
-20:	nop
-	b	20b				@ loop waiting for sleep
+20:	b	20b				@ loop waiting for sleep
 
 /*
  * cpu_pxa_resume()

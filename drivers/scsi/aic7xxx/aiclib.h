@@ -1043,4 +1043,43 @@ scsi_4btoul(uint8_t *bytes)
 	return (rv);
 }
 
+/* Macros for generating the elements of the PCI ID tables. */
+
+#define GETID(v, s) (unsigned)(((v) >> (s)) & 0xFFFF ?: PCI_ANY_ID)
+
+#define ID_C(x, c)						\
+{								\
+	GETID(x,32), GETID(x,48), GETID(x,0), GETID(x,16),	\
+	(c) << 8, 0xFFFF00, 0					\
+}
+
+#define ID2C(x)                          \
+	ID_C(x, PCI_CLASS_STORAGE_SCSI), \
+	ID_C(x, PCI_CLASS_STORAGE_RAID)
+
+#define IDIROC(x)  ((x) | ~ID_ALL_IROC_MASK)
+
+/* Generate IDs for all 16 possibilites.
+ * The argument has already masked out
+ * the 4 least significant bits of the device id.
+ * (e.g., mask: ID_9005_GENERIC_MASK).
+ */
+#define ID16(x)                          \
+	ID(x),                           \
+	ID((x) | 0x0001000000000000ull), \
+	ID((x) | 0x0002000000000000ull), \
+	ID((x) | 0x0003000000000000ull), \
+	ID((x) | 0x0004000000000000ull), \
+	ID((x) | 0x0005000000000000ull), \
+	ID((x) | 0x0006000000000000ull), \
+	ID((x) | 0x0007000000000000ull), \
+	ID((x) | 0x0008000000000000ull), \
+	ID((x) | 0x0009000000000000ull), \
+	ID((x) | 0x000A000000000000ull), \
+	ID((x) | 0x000B000000000000ull), \
+	ID((x) | 0x000C000000000000ull), \
+	ID((x) | 0x000D000000000000ull), \
+	ID((x) | 0x000E000000000000ull), \
+	ID((x) | 0x000F000000000000ull)
+
 #endif /*_AICLIB_H */

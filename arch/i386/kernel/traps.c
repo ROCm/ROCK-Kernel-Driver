@@ -57,8 +57,6 @@
 #include "mach_traps.h"
 
 asmlinkage int system_call(void);
-asmlinkage void lcall7(void);
-asmlinkage void lcall27(void);
 
 struct desc_struct default_ldt[] = { { 0, 0 }, { 0, 0 }, { 0, 0 },
 		{ 0, 0 }, { 0, 0 } };
@@ -107,36 +105,27 @@ int register_die_notifier(struct notifier_block *nb)
 	return err;
 }
 
-static int valid_stack_ptr(struct task_struct *task, void *p)
+static inline int valid_stack_ptr(struct thread_info *tinfo, void *p)
 {
-	if (p <= (void *)task->thread_info)
-		return 0;
-	if (kstack_end(p))
-		return 0;
-	return 1;
+	return	p > (void *)tinfo &&
+		p < (void *)tinfo + THREAD_SIZE - 3;
 }
 
-#ifdef CONFIG_FRAME_POINTER
-static void print_context_stack(struct task_struct *task, unsigned long *stack,
-			 unsigned long ebp)
+static inline unsigned long print_context_stack(struct thread_info *tinfo,
+				unsigned long *stack, unsigned long ebp)
 {
 	unsigned long addr;
 
-	while (valid_stack_ptr(task, (void *)ebp)) {
+#ifdef	CONFIG_FRAME_POINTER
+	while (valid_stack_ptr(tinfo, (void *)ebp)) {
 		addr = *(unsigned long *)(ebp + 4);
 		printk(" [<%08lx>] ", addr);
 		print_symbol("%s", addr);
 		printk("\n");
 		ebp = *(unsigned long *)ebp;
 	}
-}
 #else
-static void print_context_stack(struct task_struct *task, unsigned long *stack,
-			 unsigned long ebp)
-{
-	unsigned long addr;
-
-	while (!kstack_end(stack)) {
+	while (valid_stack_ptr(tinfo, stack)) {
 		addr = *stack++;
 		if (__kernel_text_address(addr)) {
 			printk(" [<%08lx>]", addr);
@@ -144,8 +133,9 @@ static void print_context_stack(struct task_struct *task, unsigned long *stack,
 			printk("\n");
 		}
 	}
-}
 #endif
+	return ebp;
+}
 
 void show_trace(struct task_struct *task, unsigned long * stack)
 {
@@ -153,11 +143,6 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 
 	if (!task)
 		task = current;
-
-	if (!valid_stack_ptr(task, stack)) {
-		printk("Stack pointer is garbage, not printing trace\n");
-		return;
-	}
 
 	if (task == current) {
 		/* Grab ebp right from our regs */
@@ -171,7 +156,7 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 		struct thread_info *context;
 		context = (struct thread_info *)
 			((unsigned long)stack & (~(THREAD_SIZE - 1)));
-		print_context_stack(task, stack, ebp);
+		ebp = print_context_stack(context, stack, ebp);
 		stack = (unsigned long*)context->previous_esp;
 		if (!stack)
 			break;
@@ -422,7 +407,7 @@ static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 { \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-						== NOTIFY_OK) \
+						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 0, regs, error_code, NULL); \
 }
@@ -436,7 +421,7 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_code = sicode; \
 	info.si_addr = (void __user *)siaddr; \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-						== NOTIFY_BAD) \
+						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 0, regs, error_code, &info); \
 }
@@ -445,7 +430,7 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 { \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-						== NOTIFY_OK) \
+						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 1, regs, error_code, NULL); \
 }
@@ -459,7 +444,7 @@ asmlinkage void do_##name(struct pt_regs * regs, long error_code) \
 	info.si_code = sicode; \
 	info.si_addr = (void __user *)siaddr; \
 	if (notify_die(DIE_TRAP, str, regs, error_code, trapnr, signr) \
-						== NOTIFY_OK) \
+						== NOTIFY_STOP) \
 		return; \
 	do_trap(trapnr, signr, str, 1, regs, error_code, &info); \
 }
@@ -528,7 +513,7 @@ gp_in_vm86:
 gp_in_kernel:
 	if (!fixup_exception(regs)) {
 		if (notify_die(DIE_GPF, "general protection fault", regs,
-				error_code, 13, SIGSEGV) == NOTIFY_OK);
+				error_code, 13, SIGSEGV) == NOTIFY_STOP);
 			return;
 		die("general protection fault", regs, error_code);
 	}
@@ -602,7 +587,7 @@ static void default_do_nmi(struct pt_regs * regs)
  
 	if (!(reason & 0xc0)) {
 		if (notify_die(DIE_NMI_IPI, "nmi_ipi", regs, reason, 0, SIGINT)
-							== NOTIFY_BAD)
+							== NOTIFY_STOP)
 			return;
 #ifdef CONFIG_X86_LOCAL_APIC
 		/*
@@ -617,7 +602,7 @@ static void default_do_nmi(struct pt_regs * regs)
 		unknown_nmi_error(reason, regs);
 		return;
 	}
-	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_BAD)
+	if (notify_die(DIE_NMI, "nmi", regs, reason, 0, SIGINT) == NOTIFY_STOP)
 		return;
 	if (reason & 0x80)
 		mem_parity_error(reason, regs);
@@ -666,7 +651,7 @@ void unset_nmi_callback(void)
 asmlinkage int do_int3(struct pt_regs *regs, long error_code)
 {
 	if (notify_die(DIE_INT3, "int3", regs, error_code, 3, SIGTRAP)
-			== NOTIFY_OK)
+			== NOTIFY_STOP)
 		return 1;
 	/* This is an interrupt gate, because kprobes wants interrupts
 	disabled.  Normal trap handlers don't. */
@@ -707,7 +692,7 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 	__asm__ __volatile__("movl %%db6,%0" : "=r" (condition));
 
 	if (notify_die(DIE_DEBUG, "debug", regs, condition, error_code,
-					SIGTRAP) == NOTIFY_OK)
+					SIGTRAP) == NOTIFY_STOP)
 		return;
 	/* It's safe to allow irq's after DR6 has been saved */
 	if (regs->eflags & X86_EFLAGS_IF)
@@ -1015,11 +1000,6 @@ static void __init set_system_gate(unsigned int n, void *addr)
 	_set_gate(idt_table+n,15,3,addr,__KERNEL_CS);
 }
 
-static void __init set_call_gate(void *a, void *addr)
-{
-	_set_gate(a,12,3,addr,__KERNEL_CS);
-}
-
 static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
 {
 	_set_gate(idt_table+n,5,0,0,(gdt_entry<<3));
@@ -1062,13 +1042,6 @@ void __init trap_init(void)
 	set_trap_gate(19,&simd_coprocessor_error);
 
 	set_system_gate(SYSCALL_VECTOR,&system_call);
-
-	/*
-	 * default LDT is a single-entry callgate to lcall7 for iBCS
-	 * and a callgate to lcall27 for Solaris/x86 binaries
-	 */
-	set_call_gate(&default_ldt[0],lcall7);
-	set_call_gate(&default_ldt[4],lcall27);
 
 	/*
 	 * Should be a barrier for any external CPU state.

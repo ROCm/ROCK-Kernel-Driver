@@ -28,7 +28,7 @@
 
 struct tridentfb_par {
 	int vclk;		//in MHz
-	unsigned long io_virt;	//iospace virtual memory address
+	void __iomem * io_virt;	//iospace virtual memory address
 };
 
 unsigned char eng_oper;		//engine operation...
@@ -1107,7 +1107,7 @@ static int __devinit trident_pci_probe(struct pci_dev * dev, const struct pci_de
 		return -1;
 	}
 
-	default_par.io_virt = (unsigned long)ioremap_nocache(tridentfb_fix.mmio_start, tridentfb_fix.mmio_len);
+	default_par.io_virt = ioremap_nocache(tridentfb_fix.mmio_start, tridentfb_fix.mmio_len);
 
 	if (!default_par.io_virt) {
 		release_region(tridentfb_fix.mmio_start, tridentfb_fix.mmio_len);
@@ -1178,8 +1178,8 @@ static void __devexit trident_pci_remove(struct pci_dev * dev)
 {
 	struct tridentfb_par *par = (struct tridentfb_par*)fb_info.par;
 	unregister_framebuffer(&fb_info);
-	iounmap((void *)par->io_virt);
-	iounmap((void*)fb_info.screen_base);
+	iounmap(par->io_virt);
+	iounmap(fb_info.screen_base);
 	release_mem_region(tridentfb_fix.smem_start, tridentfb_fix.smem_len);
 	release_region(tridentfb_fix.mmio_start, tridentfb_fix.mmio_len);
 }

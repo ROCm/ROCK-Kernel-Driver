@@ -1314,7 +1314,7 @@ static int elf_core_dump(long signr, struct pt_regs * regs, struct file * file)
 	struct vm_area_struct *vma;
 	struct elfhdr *elf = NULL;
 	off_t offset = 0, dataoff;
-	unsigned long limit = current->rlim[RLIMIT_CORE].rlim_cur;
+	unsigned long limit = current->signal->rlim[RLIMIT_CORE].rlim_cur;
 	int numnote;
 	struct memelfnote *notes = NULL;
 	struct elf_prstatus *prstatus = NULL;	/* NT_PRSTATUS */

@@ -40,6 +40,7 @@
  */
 
 #include "aic7xxx_osm.h"
+#include "aic7xxx_pci.h"
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)
 struct pci_device_id
@@ -57,16 +58,80 @@ static int	ahc_linux_pci_reserve_mem_region(struct ahc_softc *ahc,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 static void	ahc_linux_pci_dev_remove(struct pci_dev *pdev);
 
-/* We do our own ID filtering.  So, grab all SCSI storage class devices. */
+/* Define the macro locally since it's different for different class of chips.
+*/
+#define ID(x)	ID_C(x, PCI_CLASS_STORAGE_SCSI)
+
 static struct pci_device_id ahc_linux_pci_id_table[] = {
-	{
-		0x9004, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
-		PCI_CLASS_STORAGE_SCSI << 8, 0xFFFF00, 0
-	},
-	{
-		0x9005, PCI_ANY_ID, PCI_ANY_ID, PCI_ANY_ID,
-		PCI_CLASS_STORAGE_SCSI << 8, 0xFFFF00, 0
-	},
+	/* aic7850 based controllers */
+	ID(ID_AHA_2902_04_10_15_20C_30C),
+	/* aic7860 based controllers */
+	ID(ID_AHA_2930CU),
+	ID(ID_AHA_1480A & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_2940AU_0 & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_2940AU_CN & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_2930C_VAR & ID_DEV_VENDOR_MASK),
+	/* aic7870 based controllers */
+	ID(ID_AHA_2940),
+	ID(ID_AHA_3940),
+	ID(ID_AHA_398X),
+	ID(ID_AHA_2944),
+	ID(ID_AHA_3944),
+	ID(ID_AHA_4944),
+	/* aic7880 based controllers */
+	ID(ID_AHA_2940U & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_3940U & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_2944U & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_3944U & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_398XU & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_4944U & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_2930U & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_2940U_PRO & ID_DEV_VENDOR_MASK),
+	ID(ID_AHA_2940U_CN & ID_DEV_VENDOR_MASK),
+	/* aic7890 based controllers */
+	ID(ID_AHA_2930U2),
+	ID(ID_AHA_2940U2B),
+	ID(ID_AHA_2940U2_OEM),
+	ID(ID_AHA_2940U2),
+	ID(ID_AHA_2950U2B),
+	ID16(ID_AIC7890_ARO & ID_AIC7895_ARO_MASK),
+	ID(ID_AAA_131U2),
+	/* aic7890 based controllers */
+	ID(ID_AHA_29160),
+	ID(ID_AHA_29160_CPQ),
+	ID(ID_AHA_29160N),
+	ID(ID_AHA_29160C),
+	ID(ID_AHA_29160B),
+	ID(ID_AHA_19160B),
+	ID(ID_AIC7892_ARO),
+	/* aic7892 based controllers */
+	ID(ID_AHA_2940U_DUAL),
+	ID(ID_AHA_3940AU),
+	ID(ID_AHA_3944AU),
+	ID(ID_AIC7895_ARO),
+	ID(ID_AHA_3950U2B_0),
+	ID(ID_AHA_3950U2B_1),
+	ID(ID_AHA_3950U2D_0),
+	ID(ID_AHA_3950U2D_1),
+	ID(ID_AIC7896_ARO),
+	/* aic7899 based controllers */
+	ID(ID_AHA_3960D),
+	ID(ID_AHA_3960D_CPQ),
+	ID(ID_AIC7899_ARO),
+	/* Generic chip probes for devices we don't know exactly. */
+	ID(ID_AIC7850 & ID_DEV_VENDOR_MASK),
+	ID(ID_AIC7855 & ID_DEV_VENDOR_MASK),
+	ID(ID_AIC7859 & ID_DEV_VENDOR_MASK),
+	ID(ID_AIC7860 & ID_DEV_VENDOR_MASK),
+	ID(ID_AIC7870 & ID_DEV_VENDOR_MASK),
+	ID(ID_AIC7880 & ID_DEV_VENDOR_MASK),
+ 	ID16(ID_AIC7890 & ID_9005_GENERIC_MASK),
+ 	ID16(ID_AIC7892 & ID_9005_GENERIC_MASK),
+	ID(ID_AIC7895 & ID_DEV_VENDOR_MASK),
+	ID16(ID_AIC7896 & ID_9005_GENERIC_MASK),
+	ID16(ID_AIC7899 & ID_9005_GENERIC_MASK),
+	ID(ID_AIC7810 & ID_DEV_VENDOR_MASK),
+	ID(ID_AIC7815 & ID_DEV_VENDOR_MASK),
 	{ 0 }
 };
 
@@ -95,12 +160,14 @@ ahc_linux_pci_dev_remove(struct pci_dev *pdev)
 	if (ahc != NULL) {
 		u_long s;
 
+		TAILQ_REMOVE(&ahc_tailq, ahc, links);
+		ahc_list_unlock(&l);
 		ahc_lock(ahc, &s);
 		ahc_intr_enable(ahc, FALSE);
 		ahc_unlock(ahc, &s);
 		ahc_free(ahc);
-	}
-	ahc_list_unlock(&l);
+	} else
+		ahc_list_unlock(&l);
 }
 #endif /* !LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0) */
 
@@ -108,7 +175,7 @@ static int
 ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 {
 	char		 buf[80];
-	bus_addr_t	 mask_39bit;
+	dma_addr_t	 mask_39bit;
 	struct		 ahc_softc *ahc;
 	ahc_dev_softc_t	 pci;
 	struct		 ahc_pci_identity *entry;
@@ -159,14 +226,14 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 	pci_set_master(pdev);
 
-	mask_39bit = (bus_addr_t)0x7FFFFFFFFFULL;
-	if (sizeof(bus_addr_t) > 4
+	mask_39bit = 0x7FFFFFFFFFULL;
+	if (sizeof(dma_addr_t) > 4
 	 && ahc_linux_get_memsize() > 0x80000000
-	 && ahc_pci_set_dma_mask(pdev, mask_39bit) == 0) {
+	 && pci_set_dma_mask(pdev, mask_39bit) == 0) {
 		ahc->flags |= AHC_39BIT_ADDRESSING;
 		ahc->platform_data->hw_dma_mask = mask_39bit;
 	} else {
-		if (ahc_pci_set_dma_mask(pdev, 0xFFFFFFFF)) {
+		if (pci_set_dma_mask(pdev, 0xFFFFFFFF)) {
 			printk(KERN_WARNING "aic7xxx: No suitable DMA available.\n");
                 	return (-ENODEV);
 		}

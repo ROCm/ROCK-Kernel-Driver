@@ -19,7 +19,7 @@ pci-obj-$(CONFIG_PPC_ISERIES)	+= iSeries_pci.o iSeries_pci_reset.o \
 				     iSeries_IoMmTable.o
 pci-obj-$(CONFIG_PPC_MULTIPLATFORM)	+= pci_dn.o pci_dma_direct.o
 
-obj-$(CONFIG_PCI)	+= pci.o pci_iommu.o $(pci-obj-y)
+obj-$(CONFIG_PCI)	+= pci.o pci_iommu.o iomap.o $(pci-obj-y)
 
 obj-$(CONFIG_PPC_ISERIES) += iSeries_irq.o \
 			     iSeries_VpdInfo.o XmPciLpEvent.o \

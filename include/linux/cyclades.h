@@ -511,8 +511,8 @@ struct resource;
 struct cyclades_card {
     unsigned long base_phys;
     unsigned long ctl_phys;
-    unsigned long base_addr;
-    unsigned long ctl_addr;
+    void __iomem *base_addr;
+    void __iomem *ctl_addr;
     int irq;
     int num_chips;	/* 0 if card absent, -1 if Z/PCI, else Y */
     int first_line;	/* minor number of first channel on card */
@@ -539,9 +539,9 @@ struct cyclades_chip {
  * (required to support Alpha systems) *
  ***************************************/
 
-#define cy_writeb(port,val)     {writeb((ucchar)(val),(ulong)(port)); mb();}
-#define cy_writew(port,val)     {writew((ushort)(val),(ulong)(port)); mb();}
-#define cy_writel(port,val)     {writel((uclong)(val),(ulong)(port)); mb();}
+#define cy_writeb(port,val)     {writeb((val),(port)); mb();}
+#define cy_writew(port,val)     {writew((val),(port)); mb();}
+#define cy_writel(port,val)     {writel((val),(port)); mb();}
 
 #define cy_readb(port)  readb(port)
 #define cy_readw(port)  readw(port)

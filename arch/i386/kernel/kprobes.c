@@ -267,26 +267,26 @@ int kprobe_exceptions_notify(struct notifier_block *self, unsigned long val,
 	switch (val) {
 	case DIE_INT3:
 		if (kprobe_handler(args->regs))
-			return NOTIFY_OK;
+			return NOTIFY_STOP;
 		break;
 	case DIE_DEBUG:
 		if (post_kprobe_handler(args->regs))
-			return NOTIFY_OK;
+			return NOTIFY_STOP;
 		break;
 	case DIE_GPF:
 		if (kprobe_running() &&
 		    kprobe_fault_handler(args->regs, args->trapnr))
-			return NOTIFY_OK;
+			return NOTIFY_STOP;
 		break;
 	case DIE_PAGE_FAULT:
 		if (kprobe_running() &&
 		    kprobe_fault_handler(args->regs, args->trapnr))
-			return NOTIFY_OK;
+			return NOTIFY_STOP;
 		break;
 	default:
 		break;
 	}
-	return NOTIFY_BAD;
+	return NOTIFY_DONE;
 }
 
 int setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)

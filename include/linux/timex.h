@@ -55,10 +55,8 @@
 
 #include <linux/config.h>
 #include <linux/compiler.h>
-#include <linux/jiffies.h>
 
 #include <asm/param.h>
-#include <asm/io.h>
 
 /*
  * The following defines establish the engineering parameters of the PLL

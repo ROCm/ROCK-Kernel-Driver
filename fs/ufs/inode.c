@@ -99,8 +99,8 @@ u64  ufs_frag_map(struct inode *inode, sector_t frag)
 	sector_t offsets[4], *p;
 	int depth = ufs_block_to_path(inode, frag >> uspi->s_fpbshift, offsets);
 	u64  ret = 0L;
-	u32 block;
-	u64 u2_block = 0L;
+	__fs32 block;
+	__fs64 u2_block = 0L;
 	unsigned flags = UFS_SB(sb)->s_flags;
 	u64 temp = 0L;
 
@@ -126,7 +126,7 @@ u64  ufs_frag_map(struct inode *inode, sector_t frag)
 		bh = sb_bread(sb, uspi->s_sbbase + fs32_to_cpu(sb, block)+(n>>shift));
 		if (!bh)
 			goto out;
-		block = ((u32*) bh->b_data)[n & mask];
+		block = ((__fs32 *) bh->b_data)[n & mask];
 		brelse (bh);
 		if (!block)
 			goto out;
@@ -148,7 +148,7 @@ ufs2:
 		bh = sb_bread(sb, temp +(u64) (n>>shift));
 		if (!bh)
 			goto out;
-		u2_block = ((u64*)bh->b_data)[n & mask];
+		u2_block = ((__fs64 *)bh->b_data)[n & mask];
 		brelse(bh);
 		if (!u2_block)
 			goto out;
@@ -171,7 +171,7 @@ static struct buffer_head * ufs_inode_getfrag (struct inode *inode,
 	struct buffer_head * result;
 	unsigned block, blockoff, lastfrag, lastblock, lastblockoff;
 	unsigned tmp, goal;
-	u32 * p, * p2;
+	__fs32 * p, * p2;
 	unsigned flags = 0;
 
 	UFSD(("ENTER, ino %lu, fragment %u, new_fragment %u, required %u\n",
@@ -303,7 +303,7 @@ static struct buffer_head * ufs_block_getfrag (struct inode *inode,
 	struct ufs_sb_private_info * uspi;
 	struct buffer_head * result;
 	unsigned tmp, goal, block, blockoff;
-	u32 * p;
+	__fs32 * p;
 
 	sb = inode->i_sb;
 	uspi = UFS_SB(sb)->s_uspi;
@@ -322,7 +322,7 @@ static struct buffer_head * ufs_block_getfrag (struct inode *inode,
 			goto out;
 	}
 
-	p = (u32 *) bh->b_data + block;
+	p = (__fs32 *) bh->b_data + block;
 repeat:
 	tmp = fs32_to_cpu(sb, *p);
 	if (tmp) {
@@ -338,7 +338,7 @@ repeat:
 		}
 	}
 
-	if (block && (tmp = fs32_to_cpu(sb, ((u32*)bh->b_data)[block-1]) + uspi->s_fpb))
+	if (block && (tmp = fs32_to_cpu(sb, ((__fs32*)bh->b_data)[block-1]) + uspi->s_fpb))
 		goal = tmp + uspi->s_fpb;
 	else
 		goal = bh->b_blocknr + uspi->s_fpb;

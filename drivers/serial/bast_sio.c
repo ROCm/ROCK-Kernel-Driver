@@ -1,3 +1,19 @@
+/* linux/drivers/serial/bast_sio.c
+ *
+ * Copyright (c) 2004 Simtec Electronics
+ *   Ben Dooks <ben@simtec.co.uk>
+ *
+ * http://www.simtec.co.uk/products/EB2410ITX/
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * Modifications:
+ *	23-Sep-2004  BJD  Added copyright header
+ *	23-Sep-2004  BJD  Added serial port remove code
+*/
+
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -20,10 +36,6 @@ static int __init serial_bast_register(unsigned long port, unsigned int irq)
 {
 	struct serial_struct serial_req;
 
-#if 0
-	printk("BAST: SuperIO serial (%08lx,%d)\n", port, irq);
-#endif
-
 	serial_req.flags      = UPF_AUTOPROBE | UPF_SHARE_IRQ;
 	serial_req.baud_base  = BASE_BAUD;
 	serial_req.irq        = irq;
@@ -37,11 +49,13 @@ static int __init serial_bast_register(unsigned long port, unsigned int irq)
 
 #define SERIAL_BASE (S3C2410_CS2 + BAST_PA_SUPERIO)
 
+static int port[2] = { -1, -1 };
+
 static int __init serial_bast_init(void)
 {
 	if (machine_is_bast()) {
-		serial_bast_register(SERIAL_BASE + 0x2f8, IRQ_PCSERIAL1);
-		serial_bast_register(SERIAL_BASE + 0x3f8, IRQ_PCSERIAL2);
+		port[0] = serial_bast_register(SERIAL_BASE + 0x2f8, IRQ_PCSERIAL1);
+		port[1] = serial_bast_register(SERIAL_BASE + 0x3f8, IRQ_PCSERIAL2);
 	}
 
 	return 0;
@@ -49,7 +63,10 @@ static int __init serial_bast_init(void)
 
 static void __exit serial_bast_exit(void)
 {
-	/* todo -> remove both our ports */
+	if (port[0] != -1)
+		unregister_serial(port[0]);
+	if (port[1] != -1)
+		unregister_serial(port[1]);
 }
 
 

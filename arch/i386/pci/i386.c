@@ -142,7 +142,7 @@ static void __init pcibios_allocate_resources(int pass)
 				DBG("PCI: Resource %08lx-%08lx (f=%lx, d=%d, p=%d)\n",
 				    r->start, r->end, r->flags, disabled, pass);
 				pr = pci_find_parent_resource(dev, r);
-				if (!pr || insert_resource(pr, r) < 0) {
+				if (!pr || request_resource(pr, r) < 0) {
 					printk(KERN_ERR "PCI: Cannot allocate resource region %d of device %s\n", idx, pci_name(dev));
 					/* We'll assign a new address later */
 					r->end -= r->start;
@@ -164,7 +164,7 @@ static void __init pcibios_allocate_resources(int pass)
 	}
 }
 
-static void __init pcibios_assign_resources(void)
+static int __init pcibios_assign_resources(void)
 {
 	struct pci_dev *dev = NULL;
 	int idx;
@@ -204,6 +204,7 @@ static void __init pcibios_assign_resources(void)
 				pci_assign_resource(dev, PCI_ROM_RESOURCE);
 		}
 	}
+	return 0;
 }
 
 void __init pcibios_resource_survey(void)
@@ -212,8 +213,13 @@ void __init pcibios_resource_survey(void)
 	pcibios_allocate_bus_resources(&pci_root_buses);
 	pcibios_allocate_resources(0);
 	pcibios_allocate_resources(1);
-	pcibios_assign_resources();
 }
+
+/**
+ * called in fs_initcall (one below subsys_initcall),
+ * give a chance for motherboard reserve resources
+ */
+fs_initcall(pcibios_assign_resources);
 
 int pcibios_enable_resources(struct pci_dev *dev, int mask)
 {

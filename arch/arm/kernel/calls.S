@@ -1,7 +1,7 @@
 /*
  *  linux/arch/arm/kernel/calls.S
  *
- *  Copyright (C) 1995-2003 Russell King
+ *  Copyright (C) 1995-2004 Russell King
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -288,6 +288,13 @@ __syscall_start:
 		.long	sys_pciconfig_iobase
 		.long	sys_pciconfig_read
 		.long	sys_pciconfig_write
+		.long	sys_mq_open
+/* 275 */	.long	sys_mq_unlink
+		.long	sys_mq_timedsend
+		.long	sys_mq_timedreceive
+		.long	sys_mq_notify
+		.long	sys_mq_getsetattr
+/* 280 */	.long	sys_waitid
 __syscall_end:
 
 		.rept	NR_syscalls - (__syscall_end - __syscall_start) / 4

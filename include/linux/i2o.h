@@ -28,7 +28,7 @@
 #include <asm/io.h>
 #include <asm/semaphore.h>	/* Needed for MUTEX init macros */
 #include <linux/pci.h>
-#include <asm/dma-mapping.h>
+#include <linux/dma-mapping.h>
 
 /* message queue empty */
 #define I2O_QUEUE_EMPTY		0xffffffff

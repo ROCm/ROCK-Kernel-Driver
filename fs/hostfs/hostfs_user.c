@@ -54,14 +54,18 @@ int stat_file(const char *path, unsigned long long *inode_out, int *mode_out,
 	return(0);
 }
 
-int file_type(const char *path, int *rdev)
+int file_type(const char *path, int *maj, int *min)
 {
  	struct stat64 buf;
 
 	if(lstat64(path, &buf) < 0)
 		return(-errno);
-	if(rdev != NULL)
-		*rdev = buf.st_rdev;
+	/*We cannot pass rdev as is because glibc and the kernel disagree
+	 *about its definition.*/
+	if(maj != NULL)
+		*maj = major(buf.st_rdev);
+	if(min != NULL)
+		*min = minor(buf.st_rdev);
 
 	if(S_ISDIR(buf.st_mode)) return(OS_TYPE_DIR);
 	else if(S_ISLNK(buf.st_mode)) return(OS_TYPE_SYMLINK);

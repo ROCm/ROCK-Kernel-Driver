@@ -259,6 +259,7 @@
 #define __NR_mq_getsetattr		1267
 #define __NR_kexec_load			1268
 #define __NR_vserver			1269
+#define __NR_setaltroot			1270
 
 #ifdef __KERNEL__
 
@@ -369,8 +370,8 @@ asmlinkage unsigned long sys_mmap2(
 				int fd, long pgoff);
 struct pt_regs;
 struct sigaction;
-asmlinkage long sys_execve(char *filename, char **argv, char **envp,
-				struct pt_regs *regs);
+asmlinkage long sys_execve(char __user *filename, char __user * __user *argv,
+			   char __user * __user *envp, struct pt_regs *regs);
 asmlinkage long sys_pipe(long arg0, long arg1, long arg2, long arg3,
 			long arg4, long arg5, long arg6, long arg7, long stack);
 asmlinkage long sys_ptrace(long request, pid_t pid,

@@ -160,7 +160,7 @@ struct rtl8150 {
 	spinlock_t rx_pool_lock;
 	struct usb_ctrlrequest dr;
 	int intr_interval;
-	u16 rx_creg;
+	__le16 rx_creg;
 	u8 *intr_buff;
 	u8 phy;
 };
@@ -450,7 +450,7 @@ static void read_bulk_callback(struct urb *urb, struct pt_regs *regs)
 		goto goon;
 
 	res = urb->actual_length;
-	rx_stat = le16_to_cpu(*(short *)(urb->transfer_buffer + res - 4));
+	rx_stat = le16_to_cpu(*(__le16 *)(urb->transfer_buffer + res - 4));
 	pkt_len = res - 4;
 
 	skb_put(dev->rx_skb, pkt_len);

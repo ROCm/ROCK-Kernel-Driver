@@ -167,7 +167,7 @@ ia64_init_itm (void)
 	if (status != 0) {
 		printk(KERN_ERR "SAL_FREQ_BASE_PLATFORM failed: %s\n", ia64_sal_strerror(status));
 	} else {
-		status = ia64_pal_freq_ratios(&proc_ratio, 0, &itc_ratio);
+		status = ia64_pal_freq_ratios(&proc_ratio, NULL, &itc_ratio);
 		if (status != 0)
 			printk(KERN_ERR "PAL_FREQ_RATIOS failed with status=%ld\n", status);
 	}

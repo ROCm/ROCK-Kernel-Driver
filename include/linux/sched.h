@@ -29,6 +29,7 @@
 #include <linux/completion.h>
 #include <linux/pid.h>
 #include <linux/percpu.h>
+#include <linux/topology.h>
 
 struct exec_domain;
 
@@ -107,8 +108,8 @@ extern unsigned long nr_iowait(void);
 #define TASK_UNINTERRUPTIBLE	2
 #define TASK_STOPPED		4
 #define TASK_TRACED		8
-#define TASK_ZOMBIE		16
-#define TASK_DEAD		32
+#define EXIT_ZOMBIE		16
+#define EXIT_DEAD		32
 
 #define __set_task_state(tsk, state_value)		\
 	do { (tsk)->state = (state_value); } while (0)
@@ -312,6 +313,17 @@ struct signal_struct {
 	unsigned long utime, stime, cutime, cstime;
 	unsigned long nvcsw, nivcsw, cnvcsw, cnivcsw;
 	unsigned long min_flt, maj_flt, cmin_flt, cmaj_flt;
+
+	/*
+	 * We don't bother to synchronize most readers of this at all,
+	 * because there is no reader checking a limit that actually needs
+	 * to get both rlim_cur and rlim_max atomically, and either one
+	 * alone is a single word that can safely be read normally.
+	 * getrlimit/setrlimit use task_lock(current->group_leader) to
+	 * protect this instead of the siglock, because they really
+	 * have no need to disable irqs.
+	 */
+	struct rlimit rlim[RLIM_NLIMITS];
 };
 
 /*
@@ -395,6 +407,86 @@ struct sched_info {
 extern struct file_operations proc_schedstat_operations;
 #endif
 
+enum idle_type
+{
+	SCHED_IDLE,
+	NOT_IDLE,
+	NEWLY_IDLE,
+	MAX_IDLE_TYPES
+};
+
+/*
+ * sched-domains (multiprocessor balancing) declarations:
+ */
+#ifdef CONFIG_SMP
+#define SCHED_LOAD_SCALE	128UL	/* increase resolution of load */
+
+#define SD_LOAD_BALANCE		1	/* Do load balancing on this domain. */
+#define SD_BALANCE_NEWIDLE	2	/* Balance when about to become idle */
+#define SD_BALANCE_EXEC		4	/* Balance on exec */
+#define SD_WAKE_IDLE		8	/* Wake to idle CPU on task wakeup */
+#define SD_WAKE_AFFINE		16	/* Wake task to waking CPU */
+#define SD_WAKE_BALANCE		32	/* Perform balancing at task wakeup */
+#define SD_SHARE_CPUPOWER	64	/* Domain members share cpu power */
+
+struct sched_group {
+	struct sched_group *next;	/* Must be a circular list */
+	cpumask_t cpumask;
+
+	/*
+	 * CPU power of this group, SCHED_LOAD_SCALE being max power for a
+	 * single CPU. This is read only (except for setup, hotplug CPU).
+	 */
+	unsigned long cpu_power;
+};
+
+struct sched_domain {
+	/* These fields must be setup */
+	struct sched_domain *parent;	/* top domain must be null terminated */
+	struct sched_group *groups;	/* the balancing groups of the domain */
+	cpumask_t span;			/* span of all CPUs in this domain */
+	unsigned long min_interval;	/* Minimum balance interval ms */
+	unsigned long max_interval;	/* Maximum balance interval ms */
+	unsigned int busy_factor;	/* less balancing by factor if busy */
+	unsigned int imbalance_pct;	/* No balance until over watermark */
+	unsigned long long cache_hot_time; /* Task considered cache hot (ns) */
+	unsigned int cache_nice_tries;	/* Leave cache hot tasks for # tries */
+	unsigned int per_cpu_gain;	/* CPU % gained by adding domain cpus */
+	int flags;			/* See SD_* */
+
+	/* Runtime fields. */
+	unsigned long last_balance;	/* init to jiffies. units in jiffies */
+	unsigned int balance_interval;	/* initialise to 1. units in ms. */
+	unsigned int nr_balance_failed; /* initialise to 0 */
+
+#ifdef CONFIG_SCHEDSTATS
+	/* load_balance() stats */
+	unsigned long lb_cnt[MAX_IDLE_TYPES];
+	unsigned long lb_failed[MAX_IDLE_TYPES];
+	unsigned long lb_imbalance[MAX_IDLE_TYPES];
+	unsigned long lb_nobusyg[MAX_IDLE_TYPES];
+	unsigned long lb_nobusyq[MAX_IDLE_TYPES];
+
+	/* sched_balance_exec() stats */
+	unsigned long sbe_attempts;
+	unsigned long sbe_pushed;
+
+	/* try_to_wake_up() stats */
+	unsigned long ttwu_wake_affine;
+	unsigned long ttwu_wake_balance;
+#endif
+};
+
+#ifdef ARCH_HAS_SCHED_DOMAIN
+/* Useful helpers that arch setup code may use. Defined in kernel/sched.c */
+extern cpumask_t cpu_isolated_map;
+extern void init_sched_build_groups(struct sched_group groups[],
+	                        cpumask_t span, int (*group_fn)(int cpu));
+extern void cpu_attach_domain(struct sched_domain *sd, int cpu);
+#endif /* ARCH_HAS_SCHED_DOMAIN */
+#endif /* CONFIG_SMP */
+
+
 struct io_context;			/* See blkdev.h */
 void exit_io_context(void);
 
@@ -449,7 +541,7 @@ struct task_struct {
 
 	unsigned long sleep_avg;
 	long interactive_credit;
-	unsigned long long timestamp;
+	unsigned long long timestamp, last_ran;
 	int activated;
 
 	unsigned long policy;
@@ -472,6 +564,7 @@ struct task_struct {
 
 /* task state */
 	struct linux_binfmt *binfmt;
+	long exit_state;
 	int exit_code, exit_signal;
 	int pdeath_signal;  /*  The signal sent when the parent dies  */
 	/* ??? */
@@ -508,7 +601,7 @@ struct task_struct {
 	struct timer_list real_timer;
 	unsigned long utime, stime;
 	unsigned long nvcsw, nivcsw; /* context switch counts */
-	u64 start_time;
+	struct timespec start_time;
 /* mm fault and swap info: this can arguably be seen as either mm-specific or thread-specific */
 	unsigned long min_flt, maj_flt;
 /* process credentials */
@@ -518,8 +611,6 @@ struct task_struct {
 	kernel_cap_t   cap_effective, cap_inheritable, cap_permitted;
 	unsigned keep_capabilities:1;
 	struct user_struct *user;
-/* limits */
-	struct rlimit rlim[RLIM_NLIMITS];
 	unsigned short used_math;
 	char comm[16];
 /* file system info */

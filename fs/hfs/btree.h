@@ -125,11 +125,11 @@ extern int hfs_brec_goto(struct hfs_find_data *, int);
 
 
 struct hfs_bnode_desc {
-	u32 next;		/* (V) Number of the next node at this level */
-	u32 prev;		/* (V) Number of the prev node at this level */
+	__be32 next;		/* (V) Number of the next node at this level */
+	__be32 prev;		/* (V) Number of the prev node at this level */
 	u8 type;		/* (F) The type of node */
 	u8 height;		/* (F) The level of this node (leaves=1) */
-	u16 num_recs;		/* (V) The number of records in this node */
+	__be16 num_recs;	/* (V) The number of records in this node */
 	u16 reserved;
 } __packed;
 
@@ -139,20 +139,20 @@ struct hfs_bnode_desc {
 #define HFS_NODE_LEAF	0xFF	/* A leaf (ndNHeight==1) node */
 
 struct hfs_btree_header_rec {
-	u16 depth;		/* (V) The number of levels in this B-tree */
-	u32 root;		/* (V) The node number of the root node */
-	u32 leaf_count;		/* (V) The number of leaf records */
-	u32 leaf_head;		/* (V) The number of the first leaf node */
-	u32 leaf_tail;		/* (V) The number of the last leaf node */
-	u16 node_size;		/* (F) The number of bytes in a node (=512) */
-	u16 max_key_len;	/* (F) The length of a key in an index node */
-	u32 node_count;		/* (V) The total number of nodes */
-	u32 free_nodes;		/* (V) The number of unused nodes */
+	__be16 depth;		/* (V) The number of levels in this B-tree */
+	__be32 root;		/* (V) The node number of the root node */
+	__be32 leaf_count;	/* (V) The number of leaf records */
+	__be32 leaf_head;	/* (V) The number of the first leaf node */
+	__be32 leaf_tail;	/* (V) The number of the last leaf node */
+	__be16 node_size;	/* (F) The number of bytes in a node (=512) */
+	__be16 max_key_len;	/* (F) The length of a key in an index node */
+	__be32 node_count;	/* (V) The total number of nodes */
+	__be32 free_nodes;	/* (V) The number of unused nodes */
 	u16 reserved1;
-	u32 clump_size;		/* (F) clump size. not usually used. */
+	__be32 clump_size;	/* (F) clump size. not usually used. */
 	u8 btree_type;		/* (F) BTree type */
 	u8 reserved2;
-	u32 attributes;		/* (F) attributes */
+	__be32 attributes;	/* (F) attributes */
 	u32 reserved3[16];
 } __packed;
 

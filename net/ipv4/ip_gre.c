@@ -1250,7 +1250,7 @@ static struct net_protocol ipgre_protocol = {
 
 static int __init ipgre_init(void)
 {
-	int err = -EINVAL;
+	int err;
 
 	printk(KERN_INFO "GRE over IPv4 tunneling driver\n");
 
@@ -1263,18 +1263,19 @@ static int __init ipgre_init(void)
 					   ipgre_tunnel_setup);
 	if (!ipgre_fb_tunnel_dev) {
 		err = -ENOMEM;
-		goto fail;
+		goto err1;
 	}
 
 	ipgre_fb_tunnel_dev->init = ipgre_fb_tunnel_init;
 
 	if ((err = register_netdev(ipgre_fb_tunnel_dev)))
-		goto fail;
+		goto err2;
 out:
 	return err;
-fail:
-	inet_del_protocol(&ipgre_protocol, IPPROTO_GRE);
+err2:
 	free_netdev(ipgre_fb_tunnel_dev);
+err1:
+	inet_del_protocol(&ipgre_protocol, IPPROTO_GRE);
 	goto out;
 }
 

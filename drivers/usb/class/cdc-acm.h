@@ -70,7 +70,7 @@
  */
 
 struct acm_line {
-	__u32 speed;
+	__le32 speed;
 	__u8 stopbits;
 	__u8 parity;
 	__u8 databits;

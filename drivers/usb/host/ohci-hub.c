@@ -586,14 +586,14 @@ static int ohci_hub_control (
 		break;
 	case GetHubStatus:
 		temp = roothub_status (ohci) & ~(RH_HS_CRWE | RH_HS_DRWE);
-		*(u32 *) buf = cpu_to_le32 (temp);
+		*(__le32 *) buf = cpu_to_le32 (temp);
 		break;
 	case GetPortStatus:
 		if (!wIndex || wIndex > ports)
 			goto error;
 		wIndex--;
 		temp = roothub_portstatus (ohci, wIndex);
-		*(u32 *) buf = cpu_to_le32 (temp);
+		*(__le32 *) buf = cpu_to_le32 (temp);
 
 #ifndef	OHCI_VERBOSE_DEBUG
 	if (*(u16*)(buf+2))	/* only if wPortChange is interesting */

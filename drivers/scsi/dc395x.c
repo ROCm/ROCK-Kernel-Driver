@@ -989,7 +989,7 @@ static void build_srb(struct scsi_cmnd *cmd, struct DeviceCtlBlk *dcb,
 	srb->sg_count = 0;
 	srb->total_xfer_length = 0;
 	srb->sg_bus_addr = 0;
-	srb->virt_addr = 0;
+	srb->virt_addr = NULL;
 	srb->sg_index = 0;
 	srb->adapter_status = 0;
 	srb->target_status = 0;
@@ -2016,7 +2016,7 @@ static void sg_update_list(struct ScsiReqBlk *srb, u32 left)
 	}
 
 	dprintkl(KERN_ERR, "sg_update_list: sg_to_virt failed\n");
-	srb->virt_addr = 0;
+	srb->virt_addr = NULL;
 }
 
 
@@ -3656,7 +3656,7 @@ static void scsi_reset_detect(struct AdapterCtlBlk *acb)
 	} else {
 		acb->acb_flag |= RESET_DETECT;
 		reset_dev_param(acb);
-		doing_srb_done(acb, DID_RESET, 0, 1);
+		doing_srb_done(acb, DID_RESET, NULL, 1);
 		/*DC395x_RecoverSRB( acb ); */
 		acb->active_dcb = NULL;
 		acb->acb_flag = 0;

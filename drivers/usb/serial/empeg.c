@@ -516,13 +516,7 @@ static void empeg_set_termios (struct usb_serial_port *port, struct termios *old
 	 */
 	port->tty->low_latency = 1;
 
-	/* Notify the tty driver that the termios have changed.
-	   FIXME: Why - the ldisc will do this anyway and NULL is not
-	   a valid previous state */
-	port->tty->ldisc.set_termios(port->tty, NULL);
-
 	return;
-
 }
 
 

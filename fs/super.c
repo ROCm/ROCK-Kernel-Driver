@@ -32,6 +32,7 @@
 #include <linux/buffer_head.h>		/* for fsync_super() */
 #include <linux/mount.h>
 #include <linux/security.h>
+#include <linux/syscalls.h>
 #include <linux/vfs.h>
 #include <linux/writeback.h>		/* for the emergency remount stuff */
 #include <linux/idr.h>

@@ -12,6 +12,7 @@
  *            Wolfgang Taphorn
  *            Stefan Bader <stefan.bader@de.ibm.com>
  *            Heiko Carstens <heiko.carstens@de.ibm.com>
+ *            Andreas Herrmann <aherrman@de.ibm.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -29,7 +30,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.129 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.135 $"
 
 #include "zfcp_ext.h"
 
@@ -80,6 +81,7 @@ static struct miscdevice zfcp_cfdc_misc = {
 module_init(zfcp_module_init);
 
 MODULE_AUTHOR("Heiko Carstens <heiko.carstens@de.ibm.com>, "
+	      "Andreas Herrman <aherrman@de.ibm.com>, "
 	      "Martin Peschke <mpeschke@de.ibm.com>, "
 	      "Raimund Schroeder <raimund.schroeder@de.ibm.com>, "
 	      "Wolfgang Taphorn <taphorn@de.ibm.com>, "
@@ -379,13 +381,19 @@ static int
 zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
                     unsigned int command, unsigned long buffer)
 {
-	struct zfcp_cfdc_sense_data sense_data, __user *sense_data_user;
+	struct zfcp_cfdc_sense_data *sense_data, __user *sense_data_user;
 	struct zfcp_adapter *adapter = NULL;
 	struct zfcp_fsf_req *fsf_req = NULL;
 	struct zfcp_sg_list *sg_list = NULL;
 	u32 fsf_command, option;
 	char *bus_id = NULL;
 	int retval = 0;
+
+	sense_data = kmalloc(sizeof(struct zfcp_cfdc_sense_data), GFP_KERNEL);
+	if (sense_data == NULL) {
+		retval = -ENOMEM;
+		goto out;
+	}
 
 	sg_list = kmalloc(sizeof(struct zfcp_sg_list), GFP_KERNEL);
 	if (sg_list == NULL) {
@@ -406,21 +414,21 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		goto out;
 	}
 
-	retval = copy_from_user(&sense_data, sense_data_user,
+	retval = copy_from_user(sense_data, sense_data_user,
 				sizeof(struct zfcp_cfdc_sense_data));
 	if (retval) {
 		retval = -EFAULT;
 		goto out;
 	}
 
-	if (sense_data.signature != ZFCP_CFDC_SIGNATURE) {
+	if (sense_data->signature != ZFCP_CFDC_SIGNATURE) {
 		ZFCP_LOG_INFO("invalid sense data request signature 0x%08x\n",
 			      ZFCP_CFDC_SIGNATURE);
 		retval = -EINVAL;
 		goto out;
 	}
 
-	switch (sense_data.command) {
+	switch (sense_data->command) {
 
 	case ZFCP_CFDC_CMND_DOWNLOAD_NORMAL:
 		fsf_command = FSF_QTCB_DOWNLOAD_CONTROL_FILE;
@@ -449,7 +457,7 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 
 	default:
 		ZFCP_LOG_INFO("invalid command code 0x%08x\n",
-			      sense_data.command);
+			      sense_data->command);
 		retval = -EINVAL;
 		goto out;
 	}
@@ -460,9 +468,9 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		goto out;
 	}
 	snprintf(bus_id, BUS_ID_SIZE, "%d.%d.%04x",
-		(sense_data.devno >> 24),
-		(sense_data.devno >> 16) & 0xFF,
-		(sense_data.devno & 0xFFFF));
+		(sense_data->devno >> 24),
+		(sense_data->devno >> 16) & 0xFF,
+		(sense_data->devno & 0xFFFF));
 
 	read_lock_irq(&zfcp_data.config_lock);
 	adapter = zfcp_get_adapter_by_busid(bus_id);
@@ -478,7 +486,7 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		goto out;
 	}
 
-	if (sense_data.command & ZFCP_CFDC_WITH_CONTROL_FILE) {
+	if (sense_data->command & ZFCP_CFDC_WITH_CONTROL_FILE) {
 		retval = zfcp_sg_list_alloc(sg_list,
 					    ZFCP_CFDC_MAX_CONTROL_FILE_SIZE);
 		if (retval) {
@@ -487,8 +495,8 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		}
 	}
 
-	if ((sense_data.command & ZFCP_CFDC_DOWNLOAD) &&
-	    (sense_data.command & ZFCP_CFDC_WITH_CONTROL_FILE)) {
+	if ((sense_data->command & ZFCP_CFDC_DOWNLOAD) &&
+	    (sense_data->command & ZFCP_CFDC_WITH_CONTROL_FILE)) {
 		retval = zfcp_sg_list_copy_from_user(
 			sg_list, &sense_data_user->control_file,
 			ZFCP_CFDC_MAX_CONTROL_FILE_SIZE);
@@ -498,19 +506,10 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		}
 	}
 
-	retval = zfcp_fsf_control_file(
-		adapter, &fsf_req, fsf_command, option, sg_list);
-	if (retval == -EOPNOTSUPP) {
-		ZFCP_LOG_INFO("adapter does not support cfdc\n");
+	retval = zfcp_fsf_control_file(adapter, &fsf_req, fsf_command,
+				       option, sg_list);
+	if (retval)
 		goto out;
-	} else if (retval != 0) {
-		ZFCP_LOG_INFO("initiation of cfdc up/download failed\n");
-		retval = -EPERM;
-		goto out;
-	}
-
-	wait_event(fsf_req->completion_wq,
-	           fsf_req->status & ZFCP_STATUS_FSFREQ_COMPLETED);
 
 	if ((fsf_req->qtcb->prefix.prot_status != FSF_PROT_GOOD) &&
 	    (fsf_req->qtcb->prefix.prot_status != FSF_PROT_FSF_STATUS_PRESENTED)) {
@@ -518,20 +517,20 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		goto out;
 	}
 
-	sense_data.fsf_status = fsf_req->qtcb->header.fsf_status;
-	memcpy(&sense_data.fsf_status_qual,
+	sense_data->fsf_status = fsf_req->qtcb->header.fsf_status;
+	memcpy(&sense_data->fsf_status_qual,
 	       &fsf_req->qtcb->header.fsf_status_qual,
 	       sizeof(union fsf_status_qual));
-	memcpy(&sense_data.payloads, &fsf_req->qtcb->bottom.support.els, 256);
+	memcpy(&sense_data->payloads, &fsf_req->qtcb->bottom.support.els, 256);
 
-	retval = copy_to_user(sense_data_user, &sense_data,
+	retval = copy_to_user(sense_data_user, sense_data,
 		sizeof(struct zfcp_cfdc_sense_data));
 	if (retval) {
 		retval = -EFAULT;
 		goto out;
 	}
 
-	if (sense_data.command & ZFCP_CFDC_UPLOAD) {
+	if (sense_data->command & ZFCP_CFDC_UPLOAD) {
 		retval = zfcp_sg_list_copy_to_user(
 			&sense_data_user->control_file, sg_list,
 			ZFCP_CFDC_MAX_CONTROL_FILE_SIZE);
@@ -552,6 +551,9 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		zfcp_sg_list_free(sg_list);
 		kfree(sg_list);
 	}
+
+	if (sense_data != NULL)
+		kfree(sense_data);
 
 	return retval;
 }
@@ -588,18 +590,19 @@ zfcp_sg_list_alloc(struct zfcp_sg_list *sg_list, size_t size)
 		retval = -ENOMEM;
 		goto out;
 	}
+	memset(sg_list->sg, sg_list->count * sizeof(struct scatterlist), 0);
 
 	for (i = 0, sg = sg_list->sg; i < sg_list->count; i++, sg++) {
 		sg->length = min(size, PAGE_SIZE);
 		sg->offset = 0;
 		address = (void *) get_zeroed_page(GFP_KERNEL);
-		zfcp_address_to_sg(address, sg);
-		if (sg->page == NULL) {
+		if (address == NULL) {
 			sg_list->count = i;
 			zfcp_sg_list_free(sg_list);
 			retval = -ENOMEM;
 			goto out;
 		}
+		zfcp_address_to_sg(address, sg);
 		size -= sg->length;
 	}
 
@@ -624,7 +627,7 @@ zfcp_sg_list_free(struct zfcp_sg_list *sg_list)
 	BUG_ON(sg_list == NULL);
 
 	for (i = 0, sg = sg_list->sg; i < sg_list->count; i++, sg++)
-		__free_pages(sg->page, 0);
+		free_page((unsigned long) zfcp_sg_to_address(sg));
 
 	sg_list->count = 0;
 	kfree(sg_list->sg);

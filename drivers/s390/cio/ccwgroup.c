@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/ccwgroup.c
  *  bus driver for ccwgroup
- *   $Revision: 1.28 $
+ *   $Revision: 1.29 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *                       IBM Corporation
@@ -191,14 +191,12 @@ ccwgroup_create(struct device *root,
 		gdev->cdev[i]->dev.driver_data = gdev;
 	del_drvdata = 1;
 
-	*gdev = (struct ccwgroup_device) {
-		.creator_id = creator_id,
-		.count = argc,
-		.dev = {
-			.bus = &ccwgroup_bus_type,
-			.parent = root,
-			.release = ccwgroup_release,
-		},
+	gdev->creator_id = creator_id;
+	gdev->count = argc;
+	gdev->dev = (struct device ) {
+		.bus = &ccwgroup_bus_type,
+		.parent = root,
+		.release = ccwgroup_release,
 	};
 
 	snprintf (gdev->dev.bus_id, BUS_ID_SIZE, "%s",

@@ -72,7 +72,7 @@ unsigned int tlb_44x_hwater = 62;
 static void __init
 ppc44x_pin_tlb(int slot, unsigned int virt, unsigned int phys)
 {
-	unsigned long attrib;
+	unsigned long attrib = 0;
 
 	__asm__ __volatile__("\
 	clrrwi	%2,%2,10\n\

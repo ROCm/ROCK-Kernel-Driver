@@ -10,7 +10,7 @@
  *	   2 of the License, or (at your option) any later version.
  *
  * FILE		: megaraid_mbox.c
- * Version	: v2.20.3.1 (August 24 2004)
+ * Version	: v2.20.4 (September 27 2004)
  *
  * Authors:
  * 	Atul Mukker		<Atul.Mukker@lsil.com>
@@ -197,7 +197,7 @@ MODULE_PARM_DESC(debug_level, "Debug level for driver (default=0)");
  * ### global data ###
  */
 static uint8_t megaraid_mbox_version[8] =
-	{ 0x02, 0x20, 0x02, 0x00, 7, 22, 20, 4 };
+	{ 0x02, 0x20, 0x04, 0x00, 9, 27, 20, 4 };
 
 
 /*
@@ -3562,7 +3562,7 @@ megaraid_cmm_register(adapter_t *adapter)
 	for (i = 0; i < MBOX_MAX_USER_CMDS; i++) {
 
 		scb			= adapter->uscb_list + i;
-		ccb			= raid_dev->ccb_list + i;
+		ccb			= raid_dev->uccb_list + i;
 
 		scb->ccb		= (caddr_t)ccb;
 		ccb->mbox64		= raid_dev->umbox64 + i;

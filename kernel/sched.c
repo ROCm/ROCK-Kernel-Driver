@@ -42,6 +42,7 @@
 #include <linux/percpu.h>
 #include <linux/kthread.h>
 #include <linux/seq_file.h>
+#include <linux/syscalls.h>
 #include <linux/times.h>
 #include <asm/tlb.h>
 
@@ -180,17 +181,8 @@ static unsigned int task_timeslice(task_t *p)
 	else
 		return SCALE_PRIO(DEF_TIMESLICE, p->static_prio);
 }
-#define task_hot(p, now, sd) ((now) - (p)->timestamp < (sd)->cache_hot_time)
-
-enum idle_type
-{
-	IDLE,
-	NOT_IDLE,
-	NEWLY_IDLE,
-	MAX_IDLE_TYPES
-};
-
-struct sched_domain;
+#define task_hot(p, now, sd) ((long long) ((now) - (p)->last_ran)	\
+				< (long long) (sd)->cache_hot_time)
 
 /*
  * These are the runqueue data structures:
@@ -289,140 +281,6 @@ struct runqueue {
 
 static DEFINE_PER_CPU(struct runqueue, runqueues);
 
-/*
- * sched-domains (multiprocessor balancing) declarations:
- */
-#ifdef CONFIG_SMP
-#define SCHED_LOAD_SCALE	128UL	/* increase resolution of load */
-
-#define SD_BALANCE_NEWIDLE	1	/* Balance when about to become idle */
-#define SD_BALANCE_EXEC		2	/* Balance on exec */
-#define SD_WAKE_IDLE		4	/* Wake to idle CPU on task wakeup */
-#define SD_WAKE_AFFINE		8	/* Wake task to waking CPU */
-#define SD_WAKE_BALANCE		16	/* Perform balancing at task wakeup */
-#define SD_SHARE_CPUPOWER	32	/* Domain members share cpu power */
-
-struct sched_group {
-	struct sched_group *next;	/* Must be a circular list */
-	cpumask_t cpumask;
-
-	/*
-	 * CPU power of this group, SCHED_LOAD_SCALE being max power for a
-	 * single CPU. This should be read only (except for setup). Although
-	 * it will need to be written to at cpu hot(un)plug time, perhaps the
-	 * cpucontrol semaphore will provide enough exclusion?
-	 */
-	unsigned long cpu_power;
-};
-
-struct sched_domain {
-	/* These fields must be setup */
-	struct sched_domain *parent;	/* top domain must be null terminated */
-	struct sched_group *groups;	/* the balancing groups of the domain */
-	cpumask_t span;			/* span of all CPUs in this domain */
-	unsigned long min_interval;	/* Minimum balance interval ms */
-	unsigned long max_interval;	/* Maximum balance interval ms */
-	unsigned int busy_factor;	/* less balancing by factor if busy */
-	unsigned int imbalance_pct;	/* No balance until over watermark */
-	unsigned long long cache_hot_time; /* Task considered cache hot (ns) */
-	unsigned int cache_nice_tries;	/* Leave cache hot tasks for # tries */
-	unsigned int per_cpu_gain;	/* CPU % gained by adding domain cpus */
-	int flags;			/* See SD_* */
-
-	/* Runtime fields. */
-	unsigned long last_balance;	/* init to jiffies. units in jiffies */
-	unsigned int balance_interval;	/* initialise to 1. units in ms. */
-	unsigned int nr_balance_failed; /* initialise to 0 */
-
-#ifdef CONFIG_SCHEDSTATS
-	/* load_balance() stats */
-	unsigned long lb_cnt[MAX_IDLE_TYPES];
-	unsigned long lb_failed[MAX_IDLE_TYPES];
-	unsigned long lb_imbalance[MAX_IDLE_TYPES];
-	unsigned long lb_nobusyg[MAX_IDLE_TYPES];
-	unsigned long lb_nobusyq[MAX_IDLE_TYPES];
-
-	/* sched_balance_exec() stats */
-	unsigned long sbe_attempts;
-	unsigned long sbe_pushed;
-
-	/* try_to_wake_up() stats */
-	unsigned long ttwu_wake_affine;
-	unsigned long ttwu_wake_balance;
-#endif
-};
-
-#ifndef ARCH_HAS_SCHED_TUNE
-#ifdef CONFIG_SCHED_SMT
-#define ARCH_HAS_SCHED_WAKE_IDLE
-/* Common values for SMT siblings */
-#define SD_SIBLING_INIT (struct sched_domain) {		\
-	.span			= CPU_MASK_NONE,	\
-	.parent			= NULL,			\
-	.groups			= NULL,			\
-	.min_interval		= 1,			\
-	.max_interval		= 2,			\
-	.busy_factor		= 8,			\
-	.imbalance_pct		= 110,			\
-	.cache_hot_time		= 0,			\
-	.cache_nice_tries	= 0,			\
-	.per_cpu_gain		= 25,			\
-	.flags			= SD_BALANCE_NEWIDLE	\
-				| SD_BALANCE_EXEC	\
-				| SD_WAKE_AFFINE	\
-				| SD_WAKE_IDLE		\
-				| SD_SHARE_CPUPOWER,	\
-	.last_balance		= jiffies,		\
-	.balance_interval	= 1,			\
-	.nr_balance_failed	= 0,			\
-}
-#endif
-
-/* Common values for CPUs */
-#define SD_CPU_INIT (struct sched_domain) {		\
-	.span			= CPU_MASK_NONE,	\
-	.parent			= NULL,			\
-	.groups			= NULL,			\
-	.min_interval		= 1,			\
-	.max_interval		= 4,			\
-	.busy_factor		= 64,			\
-	.imbalance_pct		= 125,			\
-	.cache_hot_time		= (5*1000000/2),	\
-	.cache_nice_tries	= 1,			\
-	.per_cpu_gain		= 100,			\
-	.flags			= SD_BALANCE_NEWIDLE	\
-				| SD_BALANCE_EXEC	\
-				| SD_WAKE_AFFINE	\
-				| SD_WAKE_BALANCE,	\
-	.last_balance		= jiffies,		\
-	.balance_interval	= 1,			\
-	.nr_balance_failed	= 0,			\
-}
-
-/* Arch can override this macro in processor.h */
-#if defined(CONFIG_NUMA) && !defined(SD_NODE_INIT)
-#define SD_NODE_INIT (struct sched_domain) {		\
-	.span			= CPU_MASK_NONE,	\
-	.parent			= NULL,			\
-	.groups			= NULL,			\
-	.min_interval		= 8,			\
-	.max_interval		= 32,			\
-	.busy_factor		= 32,			\
-	.imbalance_pct		= 125,			\
-	.cache_hot_time		= (10*1000000),		\
-	.cache_nice_tries	= 1,			\
-	.per_cpu_gain		= 100,			\
-	.flags			= SD_BALANCE_EXEC	\
-				| SD_WAKE_BALANCE,	\
-	.last_balance		= jiffies,		\
-	.balance_interval	= 1,			\
-	.nr_balance_failed	= 0,			\
-}
-#endif
-#endif /* ARCH_HAS_SCHED_TUNE */
-#endif
-
-
 #define for_each_domain(cpu, domain) \
 	for (domain = cpu_rq(cpu)->sd; domain; domain = domain->parent)
 
@@ -501,7 +359,7 @@ static int show_schedstat(struct seq_file *seq, void *v)
 		    rq->smt_cnt, rq->sbe_cnt, rq->rq_sched_info.cpu_time,
 		    rq->rq_sched_info.run_delay, rq->rq_sched_info.pcnt);
 
-		for (itype = IDLE; itype < MAX_IDLE_TYPES; itype++)
+		for (itype = SCHED_IDLE; itype < MAX_IDLE_TYPES; itype++)
 			seq_printf(seq, " %lu %lu", rq->pt_gained[itype],
 						    rq->pt_lost[itype]);
 		seq_printf(seq, "\n");
@@ -513,7 +371,8 @@ static int show_schedstat(struct seq_file *seq, void *v)
 
 			cpumask_scnprintf(mask_str, NR_CPUS, sd->span);
 			seq_printf(seq, "domain%d %s", dcnt++, mask_str);
-			for (itype = IDLE; itype < MAX_IDLE_TYPES; itype++) {
+			for (itype = SCHED_IDLE; itype < MAX_IDLE_TYPES;
+						itype++) {
 				seq_printf(seq, " %lu %lu %lu %lu %lu",
 				    sd->lb_cnt[itype],
 				    sd->lb_failed[itype],
@@ -1087,8 +946,7 @@ static int wake_idle(int cpu, task_t *p)
 	if (!(sd->flags & SD_WAKE_IDLE))
 		return cpu;
 
-	cpus_and(tmp, sd->span, cpu_online_map);
-	cpus_and(tmp, tmp, p->cpus_allowed);
+	cpus_and(tmp, sd->span, p->cpus_allowed);
 
 	for_each_cpu_mask(i, tmp) {
 		if (idle_cpu(i))
@@ -1123,14 +981,14 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	int cpu, this_cpu, success = 0;
 	unsigned long flags;
 	long old_state;
-	runqueue_t *rq;
+	runqueue_t *rq, *old_rq;
 #ifdef CONFIG_SMP
 	unsigned long load, this_load;
 	struct sched_domain *sd;
 	int new_cpu;
 #endif
 
-	rq = task_rq_lock(p, &flags);
+	old_rq = rq = task_rq_lock(p, &flags);
 	schedstat_inc(rq, ttwu_cnt);
 	old_state = p->state;
 	if (!(old_state & state))
@@ -1225,7 +1083,7 @@ out_set_cpu:
 out_activate:
 #endif /* CONFIG_SMP */
 	if (old_state == TASK_UNINTERRUPTIBLE) {
-		rq->nr_uninterruptible--;
+		old_rq->nr_uninterruptible--;
 		/*
 		 * Tasks on involuntary sleep don't earn
 		 * sleep_avg beyond just interactive state.
@@ -1471,10 +1329,10 @@ static void finish_task_switch(task_t *prev)
 
 	/*
 	 * A task struct has one reference for the use as "current".
-	 * If a task dies, then it sets TASK_ZOMBIE in tsk->state and calls
-	 * schedule one last time. The schedule call will never return,
+	 * If a task dies, then it sets EXIT_ZOMBIE in tsk->exit_state and
+	 * calls schedule one last time. The schedule call will never return,
 	 * and the scheduled task must drop that reference.
-	 * The test for TASK_ZOMBIE must occur while the runqueue locks are
+	 * The test for EXIT_ZOMBIE must occur while the runqueue locks are
 	 * still held, otherwise prev could be scheduled on another cpu, die
 	 * there before we look at prev->state, and then the reference would
 	 * be dropped twice.
@@ -1640,8 +1498,7 @@ static int find_idlest_cpu(struct task_struct *p, int this_cpu,
 	min_cpu = UINT_MAX;
 	min_load = ULONG_MAX;
 
-	cpus_and(mask, sd->span, cpu_online_map);
-	cpus_and(mask, mask, p->cpus_allowed);
+	cpus_and(mask, sd->span, p->cpus_allowed);
 
 	for_each_cpu_mask(i, mask) {
 		load = target_load(i);
@@ -1893,7 +1750,6 @@ find_busiest_group(struct sched_domain *sd, int this_cpu,
 	max_load = this_load = total_load = total_pwr = 0;
 
 	do {
-		cpumask_t tmp;
 		unsigned long load;
 		int local_group;
 		int i, nr_cpus = 0;
@@ -1902,11 +1758,8 @@ find_busiest_group(struct sched_domain *sd, int this_cpu,
 
 		/* Tally up the load of all CPUs in the group */
 		avg_load = 0;
-		cpus_and(tmp, group->cpumask, cpu_online_map);
-		if (unlikely(cpus_empty(tmp)))
-			goto nextgroup;
 
-		for_each_cpu_mask(i, tmp) {
+		for_each_cpu_mask(i, group->cpumask) {
 			/* Bias balancing toward cpus of our domain */
 			if (local_group)
 				load = target_load(i);
@@ -2011,7 +1864,7 @@ nextgroup:
 
 out_balanced:
 	if (busiest && (idle == NEWLY_IDLE ||
-			(idle == IDLE && max_load > SCHED_LOAD_SCALE)) ) {
+			(idle == SCHED_IDLE && max_load > SCHED_LOAD_SCALE)) ) {
 		*imbalance = 1;
 		return busiest;
 	}
@@ -2025,13 +1878,11 @@ out_balanced:
  */
 static runqueue_t *find_busiest_queue(struct sched_group *group)
 {
-	cpumask_t tmp;
 	unsigned long load, max_load = 0;
 	runqueue_t *busiest = NULL;
 	int i;
 
-	cpus_and(tmp, group->cpumask, cpu_online_map);
-	for_each_cpu_mask(i, tmp) {
+	for_each_cpu_mask(i, group->cpumask) {
 		load = source_load(i);
 
 		if (load > max_load) {
@@ -2232,18 +2083,13 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 
 	group = sd->groups;
 	do {
-		cpumask_t tmp;
 		runqueue_t *rq;
 		int push_cpu = 0;
 
 		if (group == busy_group)
 			goto next_group;
 
-		cpus_and(tmp, group->cpumask, cpu_online_map);
-		if (!cpus_weight(tmp))
-			goto next_group;
-
-		for_each_cpu_mask(i, tmp) {
+		for_each_cpu_mask(i, group->cpumask) {
 			if (!idle_cpu(i))
 				goto next_group;
 			push_cpu = i;
@@ -2260,7 +2106,7 @@ static void active_load_balance(runqueue_t *busiest, int busiest_cpu)
 		if (unlikely(busiest == rq))
 			goto next_group;
 		double_lock_balance(busiest, rq);
-		if (move_tasks(rq, push_cpu, busiest, 1, sd, IDLE)) {
+		if (move_tasks(rq, push_cpu, busiest, 1, sd, SCHED_IDLE)) {
 			schedstat_inc(busiest, alb_lost);
 			schedstat_inc(rq, alb_gained);
 		} else {
@@ -2304,9 +2150,13 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 	this_rq->cpu_load = (old_load + this_load) / 2;
 
 	for_each_domain(this_cpu, sd) {
-		unsigned long interval = sd->balance_interval;
+		unsigned long interval;
 
-		if (idle != IDLE)
+		if (!(sd->flags & SD_LOAD_BALANCE))
+			continue;
+
+		interval = sd->balance_interval;
+		if (idle != SCHED_IDLE)
 			interval *= sd->busy_factor;
 
 		/* scale ms to jiffies */
@@ -2408,7 +2258,7 @@ void scheduler_tick(int user_ticks, int sys_ticks)
 			cpustat->idle += sys_ticks;
 		if (wake_priority_sleeper(rq))
 			goto out;
-		rebalance_tick(cpu, rq, IDLE);
+		rebalance_tick(cpu, rq, SCHED_IDLE);
 		return;
 	}
 	if (TASK_NICE(p) > 0)
@@ -2512,7 +2362,7 @@ static inline void wake_sleeping_dependent(int this_cpu, runqueue_t *this_rq)
 	 */
 	spin_unlock(&this_rq->lock);
 
-	cpus_and(sibling_map, sd->span, cpu_online_map);
+	sibling_map = sd->span;
 
 	for_each_cpu_mask(i, sibling_map)
 		spin_lock(&cpu_rq(i)->lock);
@@ -2557,7 +2407,7 @@ static inline int dependent_sleeper(int this_cpu, runqueue_t *this_rq)
 	 * wake_sleeping_dependent():
 	 */
 	spin_unlock(&this_rq->lock);
-	cpus_and(sibling_map, sd->span, cpu_online_map);
+	sibling_map = sd->span;
 	for_each_cpu_mask(i, sibling_map)
 		spin_lock(&cpu_rq(i)->lock);
 	cpu_clear(this_cpu, sibling_map);
@@ -2639,12 +2489,15 @@ asmlinkage void __sched schedule(void)
 	 * schedule() atomically, we ignore that path for now.
 	 * Otherwise, whine if we are scheduling when we should not be.
 	 */
-	if (likely(!(current->state & (TASK_DEAD | TASK_ZOMBIE)))) {
+	if (likely(!(current->exit_state & (EXIT_DEAD | EXIT_ZOMBIE)))) {
 		if (unlikely(in_atomic())) {
-			printk(KERN_ERR "bad: scheduling while atomic!\n");
+			printk(KERN_ERR "scheduling while atomic: "
+				"%s/0x%08x/%d\n",
+				current->comm, preempt_count(), current->pid);
 			dump_stack();
 		}
 	}
+	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
 
 need_resched:
 	preempt_disable();
@@ -2678,6 +2531,8 @@ need_resched:
 
 	spin_lock_irq(&rq->lock);
 
+	if (unlikely(current->flags & PF_DEAD))
+		current->state = EXIT_DEAD;
 	/*
 	 * if entering off of a kernel preemption go straight
 	 * to picking the next task.
@@ -2764,7 +2619,7 @@ switch_tasks:
 		if (!(HIGH_CREDIT(prev) || LOW_CREDIT(prev)))
 			prev->interactive_credit--;
 	}
-	prev->timestamp = now;
+	prev->timestamp = prev->last_ran = now;
 
 	sched_info_switch(prev, next);
 	if (likely(prev != next)) {
@@ -3221,7 +3076,6 @@ static int setscheduler(pid_t pid, int policy, struct sched_param __user *param)
 				policy != SCHED_NORMAL)
 			goto out_unlock;
 	}
-	profile_hit(SCHED_PROFILING, __builtin_return_address(0));
 
 	/*
 	 * Valid priorities for SCHED_FIFO and SCHED_RR are
@@ -4068,7 +3922,7 @@ static void migrate_dead(unsigned int dead_cpu, task_t *tsk)
 	struct runqueue *rq = cpu_rq(dead_cpu);
 
 	/* Must be exiting, otherwise would be on tasklist. */
-	BUG_ON(tsk->state != TASK_ZOMBIE && tsk->state != TASK_DEAD);
+	BUG_ON(tsk->exit_state != EXIT_ZOMBIE && tsk->exit_state != EXIT_DEAD);
 
 	/* Cannot have done final schedule yet: would have vanished. */
 	BUG_ON(tsk->flags & PF_DEAD);
@@ -4209,15 +4063,16 @@ spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(kernel_flag);
 
 #ifdef CONFIG_SMP
-/* Attach the domain 'sd' to 'cpu' as its base domain */
-static void cpu_attach_domain(struct sched_domain *sd, int cpu)
+/*
+ * Attach the domain 'sd' to 'cpu' as its base domain.  Callers must
+ * hold the hotplug lock.
+ */
+void __devinit cpu_attach_domain(struct sched_domain *sd, int cpu)
 {
 	migration_req_t req;
 	unsigned long flags;
 	runqueue_t *rq = cpu_rq(cpu);
 	int local = 1;
-
-	lock_cpu_hotplug();
 
 	spin_lock_irqsave(&rq->lock, flags);
 
@@ -4237,128 +4092,10 @@ static void cpu_attach_domain(struct sched_domain *sd, int cpu)
 		wake_up_process(rq->migration_thread);
 		wait_for_completion(&req.done);
 	}
-
-	unlock_cpu_hotplug();
 }
-
-/*
- * To enable disjoint top-level NUMA domains, define SD_NODES_PER_DOMAIN
- * in arch code. That defines the number of nearby nodes in a node's top
- * level scheduling domain.
- */
-#if defined(CONFIG_NUMA) && defined(SD_NODES_PER_DOMAIN)
-/**
- * find_next_best_node - find the next node to include in a sched_domain
- * @node: node whose sched_domain we're building
- * @used_nodes: nodes already in the sched_domain
- *
- * Find the next node to include in a given scheduling domain.  Simply
- * finds the closest node not already in the @used_nodes map.
- *
- * Should use nodemask_t.
- */
-static int __init find_next_best_node(int node, unsigned long *used_nodes)
-{
-	int i, n, val, min_val, best_node = 0;
-
-	min_val = INT_MAX;
-
-	for (i = 0; i < numnodes; i++) {
-		/* Start at @node */
-		n = (node + i) % numnodes;
-
-		/* Skip already used nodes */
-		if (test_bit(n, used_nodes))
-			continue;
-
-		/* Simple min distance search */
-		val = node_distance(node, i);
-
-		if (val < min_val) {
-			min_val = val;
-			best_node = n;
-		}
-	}
-
-	set_bit(best_node, used_nodes);
-	return best_node;
-}
-
-/**
- * sched_domain_node_span - get a cpumask for a node's sched_domain
- * @node: node whose cpumask we're constructing
- * @size: number of nodes to include in this span
- *
- * Given a node, construct a good cpumask for its sched_domain to span.  It
- * should be one that prevents unnecessary balancing, but also spreads tasks
- * out optimally.
- */
-cpumask_t __init sched_domain_node_span(int node)
-{
-	int i;
-	cpumask_t span;
-	DECLARE_BITMAP(used_nodes, MAX_NUMNODES);
-
-	cpus_clear(span);
-	bitmap_zero(used_nodes, MAX_NUMNODES);
-
-	for (i = 0; i < SD_NODES_PER_DOMAIN; i++) {
-		int next_node = find_next_best_node(node, used_nodes);
-		cpumask_t  nodemask;
-
-		nodemask = node_to_cpumask(next_node);
-		cpus_or(span, span, nodemask);
-	}
-
-	return span;
-}
-#else /* CONFIG_NUMA && SD_NODES_PER_DOMAIN */
-cpumask_t __init sched_domain_node_span(int node)
-{
-	return cpu_possible_map;
-}
-#endif /* CONFIG_NUMA && SD_NODES_PER_DOMAIN */
-
-#ifdef CONFIG_SCHED_SMT
-static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
-static struct sched_group sched_group_cpus[NR_CPUS];
-__init static int cpu_to_cpu_group(int cpu)
-{
-	return cpu;
-}
-#endif
-
-static DEFINE_PER_CPU(struct sched_domain, phys_domains);
-static struct sched_group sched_group_phys[NR_CPUS];
-__init static int cpu_to_phys_group(int cpu)
-{
-#ifdef CONFIG_SCHED_SMT
-	return first_cpu(cpu_sibling_map[cpu]);
-#else
-	return cpu;
-#endif
-}
-
-#ifdef CONFIG_NUMA
-
-static DEFINE_PER_CPU(struct sched_domain, node_domains);
-static struct sched_group sched_group_nodes[MAX_NUMNODES];
-__init static int cpu_to_node_group(int cpu)
-{
-	return cpu_to_node(cpu);
-}
-#endif
-
-/* Groups for isolated scheduling domains */
-static struct sched_group sched_group_isolated[NR_CPUS];
 
 /* cpus with isolated domains */
-cpumask_t __initdata cpu_isolated_map = CPU_MASK_NONE;
-
-__init static int cpu_to_isolated_group(int cpu)
-{
-	return cpu;
-}
+cpumask_t __devinitdata cpu_isolated_map = CPU_MASK_NONE;
 
 /* Setup the mask of cpus configured for isolated domains */
 static int __init isolated_cpu_setup(char *str)
@@ -4385,7 +4122,7 @@ __setup ("isolcpus=", isolated_cpu_setup);
  * covered by the given span, and will set each group's ->cpumask correctly,
  * and ->cpu_power to 0.
  */
-__init static void init_sched_build_groups(struct sched_group groups[],
+void __devinit init_sched_build_groups(struct sched_group groups[],
 			cpumask_t span, int (*group_fn)(int cpu))
 {
 	struct sched_group *first = NULL, *last = NULL;
@@ -4419,56 +4156,99 @@ __init static void init_sched_build_groups(struct sched_group groups[],
 	last->next = first;
 }
 
-__init static void arch_init_sched_domains(void)
+
+#ifdef ARCH_HAS_SCHED_DOMAIN
+extern void __devinit arch_init_sched_domains(void);
+extern void __devinit arch_destroy_sched_domains(void);
+#else
+#ifdef CONFIG_SCHED_SMT
+static DEFINE_PER_CPU(struct sched_domain, cpu_domains);
+static struct sched_group sched_group_cpus[NR_CPUS];
+static int __devinit cpu_to_cpu_group(int cpu)
+{
+	return cpu;
+}
+#endif
+
+static DEFINE_PER_CPU(struct sched_domain, phys_domains);
+static struct sched_group sched_group_phys[NR_CPUS];
+static int __devinit cpu_to_phys_group(int cpu)
+{
+#ifdef CONFIG_SCHED_SMT
+	return first_cpu(cpu_sibling_map[cpu]);
+#else
+	return cpu;
+#endif
+}
+
+#ifdef CONFIG_NUMA
+
+static DEFINE_PER_CPU(struct sched_domain, node_domains);
+static struct sched_group sched_group_nodes[MAX_NUMNODES];
+static int __devinit cpu_to_node_group(int cpu)
+{
+	return cpu_to_node(cpu);
+}
+#endif
+
+#if defined(CONFIG_SCHED_SMT) && defined(CONFIG_NUMA)
+/*
+ * The domains setup code relies on siblings not spanning
+ * multiple nodes. Make sure the architecture has a proper
+ * siblings map:
+ */
+static void check_sibling_maps(void)
+{
+	int i, j;
+
+	for_each_online_cpu(i) {
+		for_each_cpu_mask(j, cpu_sibling_map[i]) {
+			if (cpu_to_node(i) != cpu_to_node(j)) {
+				printk(KERN_INFO "warning: CPU %d siblings map "
+					"to different node - isolating "
+					"them.\n", i);
+				cpu_sibling_map[i] = cpumask_of_cpu(i);
+				break;
+			}
+		}
+	}
+}
+#endif
+
+/*
+ * Set up scheduler domains and groups.  Callers must hold the hotplug lock.
+ */
+static void __devinit arch_init_sched_domains(void)
 {
 	int i;
 	cpumask_t cpu_default_map;
 
+#if defined(CONFIG_SCHED_SMT) && defined(CONFIG_NUMA)
+	check_sibling_maps();
+#endif
 	/*
 	 * Setup mask for cpus without special case scheduling requirements.
 	 * For now this just excludes isolated cpus, but could be used to
 	 * exclude other special cases in the future.
 	 */
 	cpus_complement(cpu_default_map, cpu_isolated_map);
-	cpus_and(cpu_default_map, cpu_default_map, cpu_possible_map);
+	cpus_and(cpu_default_map, cpu_default_map, cpu_online_map);
 
-	/* Set up domains */
-	for_each_cpu(i) {
+	/*
+	 * Set up domains. Isolated domains just stay on the dummy domain.
+	 */
+	for_each_cpu_mask(i, cpu_default_map) {
 		int group;
 		struct sched_domain *sd = NULL, *p;
 		cpumask_t nodemask = node_to_cpumask(cpu_to_node(i));
 
 		cpus_and(nodemask, nodemask, cpu_default_map);
 
-		/*
-		 * Set up isolated domains.
-		 * Unlike those of other cpus, the domains and groups are
-		 * single level, and span a single cpu.
-		 */
-		if (cpu_isset(i, cpu_isolated_map)) {
-#ifdef CONFIG_SCHED_SMT
-			sd = &per_cpu(cpu_domains, i);
-#else
-			sd = &per_cpu(phys_domains, i);
-#endif
-			group = cpu_to_isolated_group(i);
-			*sd = SD_CPU_INIT;
-			cpu_set(i, sd->span);
-			sd->balance_interval = INT_MAX;	/* Don't balance */
-			sd->flags = 0;			/* Avoid WAKE_ */
-			sd->groups = &sched_group_isolated[group];
-			printk(KERN_INFO "Setting up cpu %d isolated.\n", i);
-			/* Single level, so continue with next cpu */
-			continue;
-		}
-
 #ifdef CONFIG_NUMA
 		sd = &per_cpu(node_domains, i);
 		group = cpu_to_node_group(i);
 		*sd = SD_NODE_INIT;
-		/* FIXME: should be multilevel, in arch code */
-		sd->span = sched_domain_node_span(i);
-		cpus_and(sd->span, sd->span, cpu_default_map);
+		sd->span = cpu_default_map;
 		sd->groups = &sched_group_nodes[group];
 #endif
 
@@ -4476,11 +4256,7 @@ __init static void arch_init_sched_domains(void)
 		sd = &per_cpu(phys_domains, i);
 		group = cpu_to_phys_group(i);
 		*sd = SD_CPU_INIT;
-#ifdef CONFIG_NUMA
 		sd->span = nodemask;
-#else
-		sd->span = cpu_possible_map;
-#endif
 		sd->parent = p;
 		sd->groups = &sched_group_phys[group];
 
@@ -4498,7 +4274,7 @@ __init static void arch_init_sched_domains(void)
 
 #ifdef CONFIG_SCHED_SMT
 	/* Set up CPU (sibling) groups */
-	for_each_cpu(i) {
+	for_each_online_cpu(i) {
 		cpumask_t this_sibling_map = cpu_sibling_map[i];
 		cpus_and(this_sibling_map, this_sibling_map, cpu_default_map);
 		if (i != first_cpu(this_sibling_map))
@@ -4509,16 +4285,6 @@ __init static void arch_init_sched_domains(void)
 	}
 #endif
 
-	/* Set up isolated groups */
-	for_each_cpu_mask(i, cpu_isolated_map) {
-		cpumask_t mask;
-		cpus_clear(mask);
-		cpu_set(i, mask);
-		init_sched_build_groups(sched_group_isolated, mask,
-						&cpu_to_isolated_group);
-	}
-
-#ifdef CONFIG_NUMA
 	/* Set up physical groups */
 	for (i = 0; i < MAX_NUMNODES; i++) {
 		cpumask_t nodemask = node_to_cpumask(i);
@@ -4530,10 +4296,6 @@ __init static void arch_init_sched_domains(void)
 		init_sched_build_groups(sched_group_phys, nodemask,
 						&cpu_to_phys_group);
 	}
-#else
-	init_sched_build_groups(sched_group_phys, cpu_possible_map,
-							&cpu_to_phys_group);
-#endif
 
 #ifdef CONFIG_NUMA
 	/* Set up node groups */
@@ -4566,7 +4328,7 @@ __init static void arch_init_sched_domains(void)
 	}
 
 	/* Attach the domains */
-	for_each_cpu(i) {
+	for_each_online_cpu(i) {
 		struct sched_domain *sd;
 #ifdef CONFIG_SCHED_SMT
 		sd = &per_cpu(cpu_domains, i);
@@ -4577,21 +4339,29 @@ __init static void arch_init_sched_domains(void)
 	}
 }
 
-#undef SCHED_DOMAIN_DEBUG
+#ifdef CONFIG_HOTPLUG_CPU
+static void __devinit arch_destroy_sched_domains(void)
+{
+	/* Do nothing: everything is statically allocated. */
+}
+#endif
+
+#endif /* ARCH_HAS_SCHED_DOMAIN */
+
+#define SCHED_DOMAIN_DEBUG
 #ifdef SCHED_DOMAIN_DEBUG
-void sched_domain_debug(void)
+static void sched_domain_debug(void)
 {
 	int i;
 
-	for_each_cpu(i) {
+	for_each_online_cpu(i) {
 		runqueue_t *rq = cpu_rq(i);
 		struct sched_domain *sd;
 		int level = 0;
 
 		sd = rq->sd;
 
-		printk(KERN_DEBUG "CPU%d: %s\n",
-				i, (cpu_online(i) ? " online" : "offline"));
+		printk(KERN_DEBUG "CPU%d:\n", i);
 
 		do {
 			int j;
@@ -4605,7 +4375,17 @@ void sched_domain_debug(void)
 			printk(KERN_DEBUG);
 			for (j = 0; j < level + 1; j++)
 				printk(" ");
-			printk("domain %d: span %s\n", level, str);
+			printk("domain %d: ", level);
+
+			if (!(sd->flags & SD_LOAD_BALANCE)) {
+				printk("does not balance");
+				if (sd->parent)
+					printk(" ERROR !SD_LOAD_BALANCE domain has parent");
+				printk("\n");
+				break;
+			}
+
+			printk("span %s\n", str);
 
 			if (!cpu_isset(i, sd->span))
 				printk(KERN_DEBUG "ERROR domain->span does not contain CPU%d\n", i);
@@ -4657,10 +4437,64 @@ void sched_domain_debug(void)
 #define sched_domain_debug() {}
 #endif
 
+#ifdef CONFIG_SMP
+/*
+ * Initial dummy domain for early boot and for hotplug cpu. Being static,
+ * it is initialized to zero, so all balancing flags are cleared which is
+ * what we want.
+ */
+static struct sched_domain sched_domain_dummy;
+#endif
+
+#ifdef CONFIG_HOTPLUG_CPU
+/*
+ * Force a reinitialization of the sched domains hierarchy.  The domains
+ * and groups cannot be updated in place without racing with the balancing
+ * code, so we temporarily attach all running cpus to a "dummy" domain
+ * which will prevent rebalancing while the sched domains are recalculated.
+ */
+static int update_sched_domains(struct notifier_block *nfb,
+				unsigned long action, void *hcpu)
+{
+	int i;
+
+	switch (action) {
+	case CPU_UP_PREPARE:
+	case CPU_DOWN_PREPARE:
+		for_each_online_cpu(i)
+			cpu_attach_domain(&sched_domain_dummy, i);
+		arch_destroy_sched_domains();
+		return NOTIFY_OK;
+
+	case CPU_UP_CANCELED:
+	case CPU_DOWN_FAILED:
+	case CPU_ONLINE:
+	case CPU_DEAD:
+		/*
+		 * Fall through and re-initialise the domains.
+		 */
+		break;
+	default:
+		return NOTIFY_DONE;
+	}
+
+	/* The hotplug lock is already held by cpu_up/cpu_down */
+	arch_init_sched_domains();
+
+	sched_domain_debug();
+
+	return NOTIFY_OK;
+}
+#endif
+
 void __init sched_init_smp(void)
 {
+	lock_cpu_hotplug();
 	arch_init_sched_domains();
 	sched_domain_debug();
+	unlock_cpu_hotplug();
+	/* XXX: Theoretical race here - CPU may be hotplugged now */
+	hotcpu_notifier(update_sched_domains, 0);
 }
 #else
 void __init sched_init_smp(void)
@@ -4682,24 +4516,6 @@ void __init sched_init(void)
 	runqueue_t *rq;
 	int i, j, k;
 
-#ifdef CONFIG_SMP
-	/* Set up an initial dummy domain for early boot */
-	static struct sched_domain sched_domain_init;
-	static struct sched_group sched_group_init;
-
-	memset(&sched_domain_init, 0, sizeof(struct sched_domain));
-	sched_domain_init.span = CPU_MASK_ALL;
-	sched_domain_init.groups = &sched_group_init;
-	sched_domain_init.last_balance = jiffies;
-	sched_domain_init.balance_interval = INT_MAX; /* Don't balance */
-	sched_domain_init.busy_factor = 1;
-
-	memset(&sched_group_init, 0, sizeof(struct sched_group));
-	sched_group_init.cpumask = CPU_MASK_ALL;
-	sched_group_init.next = &sched_group_init;
-	sched_group_init.cpu_power = SCHED_LOAD_SCALE;
-#endif
-
 	for (i = 0; i < NR_CPUS; i++) {
 		prio_array_t *array;
 
@@ -4710,7 +4526,7 @@ void __init sched_init(void)
 		rq->best_expired_prio = MAX_PRIO;
 
 #ifdef CONFIG_SMP
-		rq->sd = &sched_domain_init;
+		rq->sd = &sched_domain_dummy;
 		rq->cpu_load = 0;
 		rq->active_balance = 0;
 		rq->push_cpu = 0;

@@ -412,12 +412,6 @@ void ide_release(dev_link_t *link)
 	/* FIXME: if this fails we need to queue the cleanup somehow
 	   -- need to investigate the required PCMCIA magic */
 	ide_unregister(info->hd);
-	/* deal with brain dead IDE resource management */
-	request_region(link->io.BasePort1, link->io.NumPorts1,
-		       info->node.dev_name);
-	if (link->io.NumPorts2)
-	    request_region(link->io.BasePort2, link->io.NumPorts2,
-			   info->node.dev_name);
     }
     info->ndev = 0;
     link->dev = NULL;

@@ -85,12 +85,6 @@ typedef enum {
 	CAM_STATUS_MASK		= 0x3F
 } cam_status;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0)
-#define	SCSI_DATA_READ	1
-#define	SCSI_DATA_WRITE 2
-#define SCSI_DATA_NONE  3
-#endif
-
 /*
  * Definitions for the asynchronous callback CCB fields.
  */

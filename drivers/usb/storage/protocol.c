@@ -96,7 +96,7 @@ static void fix_inquiry_data(struct scsi_cmnd *srb)
 static void fix_read_capacity(struct scsi_cmnd *srb)
 {
 	unsigned int index, offset;
-	u32 c;
+	__be32 c;
 	unsigned long capacity;
 
 	/* verify that it's a READ CAPACITY command */

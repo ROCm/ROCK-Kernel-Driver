@@ -64,6 +64,7 @@ zimageinitrd-$(CONFIG_EBONY)		:= zImage.initrd-TREE
 zimageinitrd-$(CONFIG_OCOTEA)		:= zImage.initrd-TREE
          end-$(CONFIG_OCOTEA)		:= ocotea
   entrypoint-$(CONFIG_OCOTEA)		:= 0x01000000
+     extra.o-$(CONFIG_OCOTEA)		:= pibs.o
 
      extra.o-$(CONFIG_EV64260)		:= direct.o misc-ev64260.o
          end-$(CONFIG_EV64260)		:= ev64260

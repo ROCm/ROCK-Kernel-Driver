@@ -18,6 +18,9 @@ Configuration
   default by `make s3c2410_defconfig`. This configuration has support
   for all the machines, and the commonly used features on them.
 
+  Certain machines may have their own default configurations as well,
+  please check the machine specific documentation.
+
 
 Machines
 --------
@@ -42,10 +45,53 @@ Machines
     Handheld (IPAQ), available in several varieties
 
 
-Contributors
-------------
+NAND
+----
+
+  The current kernels do not have direct support for the NAND
+  controller, the latest linux-mtd CVS has support for this.
+  See http://www.linux-mtd.infradead.org/
+
+
+Serial
+------
+
+  The s3c2410 serial driver provides support for the internal
+  serial ports. These devices appear as /dev/ttySAC0 through 3.
+
+  To create device nodes for these, use the following commands
+
+    mknod ttySAC0 c 204 64
+    mknod ttySAC1 c 204 65
+    mknod ttySAC2 c 204 66
+
+
+GPIO
+----
+
+  The core contains support for manipulating the GPIO, see the
+  documentation in GPIO.txt in the same directory as this file.
+
+
+Clock Management
+----------------
+
+  The core provides the interface defined in the header file
+  include/asm-arm/hardware/clock.h, to allow control over the
+  various clock units
+
+
+Port Contributors
+-----------------
 
   Ben Dooks
   Vincent Sanders
   Herbert Potzl
   Arnaud Patard
+  Roc Wu
+
+
+Document Author
+---------------
+
+Ben Dooks, (c) 2004 Simtec Electronics

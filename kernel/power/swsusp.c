@@ -294,15 +294,19 @@ static int data_write(void)
 {
 	int error = 0;
 	int i;
+	unsigned int mod = nr_copy_pages / 100;
 
-	printk( "Writing data to swap (%d pages): ", nr_copy_pages );
+	if (!mod)
+		mod = 1;
+
+	printk( "Writing data to swap (%d pages)...     ", nr_copy_pages );
 	for (i = 0; i < nr_copy_pages && !error; i++) {
-		if (!(i%100))
-			printk( "." );
+		if (!(i%mod))
+			printk( "\b\b\b\b%3d%%", i / mod );
 		error = write_page((pagedir_nosave+i)->address,
 					  &((pagedir_nosave+i)->swap_address));
 	}
-	printk(" %d Pages done.\n",i);
+	printk("\b\b\b\bdone\n");
 	return error;
 }
 
@@ -856,7 +860,9 @@ int swsusp_suspend(void)
 	local_irq_disable();
 	save_processor_state();
 	error = swsusp_arch_suspend();
+	/* Restore control flow magically appears here */
 	restore_processor_state();
+	restore_highmem();
 	local_irq_enable();
 	return error;
 }
@@ -876,8 +882,13 @@ int swsusp_resume(void)
 {
 	int error;
 	local_irq_disable();
+	/* We'll ignore saved state, but this gets preempt count (etc) right */
 	save_processor_state();
 	error = swsusp_arch_resume();
+	/* Code below is only ever reached in case of failure. Otherwise
+	 * execution continues at place where swsusp_arch_suspend was called
+         */
+	BUG_ON(!error);
 	restore_processor_state();
 	restore_highmem();
 	local_irq_enable();
@@ -1134,14 +1145,18 @@ static int __init data_read(void)
 	struct pbe * p;
 	int error;
 	int i;
+	int mod = nr_copy_pages / 100;
+
+	if (!mod)
+		mod = 1;
 
 	if ((error = swsusp_pagedir_relocate()))
 		return error;
 
-	printk( "Reading image data (%d pages): ", nr_copy_pages );
+	printk( "Reading image data (%d pages):     ", nr_copy_pages );
 	for(i = 0, p = pagedir_nosave; i < nr_copy_pages && !error; i++, p++) {
-		if (!(i%100))
-			printk( "." );
+		if (!(i%mod))
+			printk( "\b\b\b\b%3d%%", i / mod );
 		error = bio_read_page(swp_offset(p->swap_address),
 				  (void *)p->address);
 	}

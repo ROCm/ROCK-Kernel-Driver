@@ -54,7 +54,7 @@ pgprot_t protection_map[16] = {
 	__S000, __S001, __S010, __S011, __S100, __S101, __S110, __S111
 };
 
-int sysctl_overcommit_memory = 0;	/* default is heuristic overcommit */
+int sysctl_overcommit_memory = OVERCOMMIT_GUESS;  /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50;	/* default is 50% */
 int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
@@ -136,7 +136,7 @@ asmlinkage unsigned long sys_brk(unsigned long brk)
 	}
 
 	/* Check against rlimit.. */
-	rlim = current->rlim[RLIMIT_DATA].rlim_cur;
+	rlim = current->signal->rlim[RLIMIT_DATA].rlim_cur;
 	if (rlim < RLIM_INFINITY && brk - mm->start_data > rlim)
 		goto out;
 
@@ -773,13 +773,6 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	int accountable = 1;
 	unsigned long charged = 0;
 
-	/*
-	 * Does the application expect PROT_READ to imply PROT_EXEC:
-	 */
-	if (unlikely((prot & PROT_READ) &&
-			(current->personality & READ_IMPLIES_EXEC)))
-		prot |= PROT_EXEC;
-
 	if (file) {
 		if (is_file_hugepages(file))
 			accountable = 0;
@@ -791,6 +784,15 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 		    (file->f_vfsmnt->mnt_flags & MNT_NOEXEC))
 			return -EPERM;
 	}
+	/*
+	 * Does the application expect PROT_READ to imply PROT_EXEC?
+	 *
+	 * (the exception is when the underlying filesystem is noexec
+	 *  mounted, in which case we dont add PROT_EXEC.)
+	 */
+	if ((prot & PROT_READ) && (current->personality & READ_IMPLIES_EXEC))
+		if (!(file && (file->f_vfsmnt->mnt_flags & MNT_NOEXEC)))
+			prot |= PROT_EXEC;
 
 	if (!len)
 		return addr;
@@ -831,7 +833,7 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 	if (vm_flags & VM_LOCKED) {
 		unsigned long locked, lock_limit;
 		locked = mm->locked_vm << PAGE_SHIFT;
-		lock_limit = current->rlim[RLIMIT_MEMLOCK].rlim_cur;
+		lock_limit = current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur;
 		locked += len;
 		if (locked > lock_limit && !capable(CAP_IPC_LOCK))
 			return -EAGAIN;
@@ -903,11 +905,11 @@ munmap_back:
 
 	/* Check against address space limit. */
 	if ((mm->total_vm << PAGE_SHIFT) + len
-	    > current->rlim[RLIMIT_AS].rlim_cur)
+	    > current->signal->rlim[RLIMIT_AS].rlim_cur)
 		return -ENOMEM;
 
 	if (accountable && (!(flags & MAP_NORESERVE) ||
-			sysctl_overcommit_memory > 1)) {
+			    sysctl_overcommit_memory == OVERCOMMIT_NEVER)) {
 		if (vm_flags & VM_SHARED) {
 			/* Check memory availability in shmem_file_setup? */
 			vm_flags |= VM_ACCOUNT;
@@ -1348,9 +1350,9 @@ int expand_stack(struct vm_area_struct * vma, unsigned long address)
 		return -ENOMEM;
 	}
 	
-	if (address - vma->vm_start > current->rlim[RLIMIT_STACK].rlim_cur ||
+	if (address - vma->vm_start > current->signal->rlim[RLIMIT_STACK].rlim_cur ||
 			((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
-			current->rlim[RLIMIT_AS].rlim_cur) {
+			current->signal->rlim[RLIMIT_AS].rlim_cur) {
 		anon_vma_unlock(vma);
 		vm_unacct_memory(grow);
 		return -ENOMEM;
@@ -1410,9 +1412,9 @@ int expand_stack(struct vm_area_struct *vma, unsigned long address)
 		return -ENOMEM;
 	}
 	
-	if (vma->vm_end - address > current->rlim[RLIMIT_STACK].rlim_cur ||
+	if (vma->vm_end - address > current->signal->rlim[RLIMIT_STACK].rlim_cur ||
 			((vma->vm_mm->total_vm + grow) << PAGE_SHIFT) >
-			current->rlim[RLIMIT_AS].rlim_cur) {
+			current->signal->rlim[RLIMIT_AS].rlim_cur) {
 		anon_vma_unlock(vma);
 		vm_unacct_memory(grow);
 		return -ENOMEM;
@@ -1758,7 +1760,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	if (mm->def_flags & VM_LOCKED) {
 		unsigned long locked, lock_limit;
 		locked = mm->locked_vm << PAGE_SHIFT;
-		lock_limit = current->rlim[RLIMIT_MEMLOCK].rlim_cur;
+		lock_limit = current->signal->rlim[RLIMIT_MEMLOCK].rlim_cur;
 		locked += len;
 		if (locked > lock_limit && !capable(CAP_IPC_LOCK))
 			return -EAGAIN;
@@ -1777,7 +1779,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 
 	/* Check against address space limits *after* clearing old maps... */
 	if ((mm->total_vm << PAGE_SHIFT) + len
-	    > current->rlim[RLIMIT_AS].rlim_cur)
+	    > current->signal->rlim[RLIMIT_AS].rlim_cur)
 		return -ENOMEM;
 
 	if (mm->map_count > sysctl_max_map_count)

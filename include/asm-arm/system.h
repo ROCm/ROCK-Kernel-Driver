@@ -50,8 +50,10 @@
 #define read_cpuid(reg)							\
 	({								\
 		unsigned int __val;					\
-		asm("mrc%? p15, 0, %0, c0, c0, " __stringify(reg)	\
-		    : "=r" (__val));					\
+		asm("mrc	p15, 0, %0, c0, c0, " __stringify(reg)	\
+		    : "=r" (__val)					\
+		    :							\
+		    : "cc");						\
 		__val;							\
 	})
 

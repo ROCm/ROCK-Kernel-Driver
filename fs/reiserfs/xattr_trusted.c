@@ -73,9 +73,9 @@ trusted_list (struct inode *inode, const char *name, int namelen, char *out)
 
 
 struct reiserfs_xattr_handler trusted_handler = {
-    prefix: XATTR_TRUSTED_PREFIX,
-    get: trusted_get,
-    set: trusted_set,
-    del: trusted_del,
-    list: trusted_list,
+	.prefix = XATTR_TRUSTED_PREFIX,
+	.get = trusted_get,
+	.set = trusted_set,
+	.del = trusted_del,
+	.list = trusted_list,
 };

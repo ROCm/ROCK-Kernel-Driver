@@ -389,15 +389,6 @@ static int try_to_identify (ide_drive_t *drive, u8 cmd)
 				 */
 				printk("%s: IRQ probe failed (0x%lx)\n",
 					drive->name, cookie);
-#ifdef CONFIG_BLK_DEV_CMD640
-#ifdef CMD640_DUMP_REGS
-				if (hwif->chipset == ide_cmd640) {
-					printk("%s: Hmmm.. probably a driver "
-						"problem.\n", drive->name);
-					CMD640_DUMP_REGS;
-				}
-#endif /* CMD640_DUMP_REGS */
-#endif /* CONFIG_BLK_DEV_CMD640 */
 			}
 		}
 	}

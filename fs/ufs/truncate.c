@@ -74,7 +74,7 @@ static int ufs_trunc_direct (struct inode * inode)
 	struct super_block * sb;
 	struct ufs_sb_private_info * uspi;
 	struct buffer_head * bh;
-	u32 * p;
+	__fs32 * p;
 	unsigned frag1, frag2, frag3, frag4, block1, block2;
 	unsigned frag_to_free, free_count;
 	unsigned i, j, tmp;
@@ -199,13 +199,13 @@ next2:;
 }
 
 
-static int ufs_trunc_indirect (struct inode * inode, unsigned offset, u32 * p)
+static int ufs_trunc_indirect (struct inode * inode, unsigned offset, __fs32 *p)
 {
 	struct super_block * sb;
 	struct ufs_sb_private_info * uspi;
 	struct ufs_buffer_head * ind_ubh;
 	struct buffer_head * bh;
-	u32 * ind;
+	__fs32 * ind;
 	unsigned indirect_block, i, j, tmp;
 	unsigned frag_to_free, free_count;
 	int retry;
@@ -296,13 +296,13 @@ next:;
 	return retry;
 }
 
-static int ufs_trunc_dindirect (struct inode * inode, unsigned offset, u32 * p)
+static int ufs_trunc_dindirect (struct inode *inode, unsigned offset, __fs32 *p)
 {
 	struct super_block * sb;
 	struct ufs_sb_private_info * uspi;
 	struct ufs_buffer_head * dind_bh;
 	unsigned i, tmp, dindirect_block;
-	u32 * dind;
+	__fs32 * dind;
 	int retry = 0;
 	
 	UFSD(("ENTER\n"))
@@ -371,7 +371,7 @@ static int ufs_trunc_tindirect (struct inode * inode)
 	struct ufs_sb_private_info * uspi;
 	struct ufs_buffer_head * tind_bh;
 	unsigned tindirect_block, tmp, i;
-	u32 * tind, * p;
+	__fs32 * tind, * p;
 	int retry;
 	
 	UFSD(("ENTER\n"))
@@ -449,9 +449,9 @@ void ufs_truncate (struct inode * inode)
 	while (1) {
 		retry = ufs_trunc_direct(inode);
 		retry |= ufs_trunc_indirect (inode, UFS_IND_BLOCK,
-			(u32 *) &ufsi->i_u1.i_data[UFS_IND_BLOCK]);
+			(__fs32 *) &ufsi->i_u1.i_data[UFS_IND_BLOCK]);
 		retry |= ufs_trunc_dindirect (inode, UFS_IND_BLOCK + uspi->s_apb,
-			(u32 *) &ufsi->i_u1.i_data[UFS_DIND_BLOCK]);
+			(__fs32 *) &ufsi->i_u1.i_data[UFS_DIND_BLOCK]);
 		retry |= ufs_trunc_tindirect (inode);
 		if (!retry)
 			break;

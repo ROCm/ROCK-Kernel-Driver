@@ -329,6 +329,12 @@ config X86_MCE
 
 endmenu
 
+#
+# Use the generic interrupt handling code in kernel/irq/:
+#
+config GENERIC_HARDIRQS
+	bool
+	default y
 
 menu "Power management options"
 
@@ -359,7 +365,6 @@ config PCI_MMCONFIG
 config UNORDERED_IO
        bool "Unordered IO mapping access"
        depends on EXPERIMENTAL
-       select UNORDERED_IO
        help
          Use unordered stores to access IO memory mappings in device drivers.
 	 Still very experimental. When a driver works on IA64/ppc64/pa-risc it should

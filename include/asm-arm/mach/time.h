@@ -13,8 +13,11 @@
 extern void (*init_arch_time)(void);
 
 extern int (*set_rtc)(void);
-extern unsigned long(*gettimeoffset)(void);
+extern unsigned long (*gettimeoffset)(void);
 
-void timer_tick(struct pt_regs *);
+extern void timer_tick(struct pt_regs *);
+
+extern void save_time_delta(struct timespec *delta, struct timespec *rtc);
+extern void restore_time_delta(struct timespec *delta, struct timespec *rtc);
 
 #endif

@@ -15,17 +15,14 @@
  *  03-Sep-2003 BJD  Linux v2.6 support
  *  12-Mar-2004 BJD  Fixed include protection, fixed type of clock vars
  *  14-Sep-2004 BJD  Added misccr and getpin to gpio
+ *  01-Oct-2004 BJD  Added the new gpio functions
+ *  16-Oct-2004 BJD  Removed the clock variables
 */
 
 #ifndef __ASM_ARCH_HARDWARE_H
 #define __ASM_ARCH_HARDWARE_H
 
 #ifndef __ASSEMBLY__
-
-/* processor clock settings, in Hz */
-extern unsigned long s3c2410_pclk;
-extern unsigned long s3c2410_hclk;
-extern unsigned long s3c2410_fclk;
 
 /* external functions for GPIO support
  *
@@ -44,6 +41,35 @@ extern unsigned long s3c2410_fclk;
 */
 
 extern void s3c2410_gpio_cfgpin(unsigned int pin, unsigned int function);
+
+extern unsigned int s3c2410_gpio_getcfg(unsigned int pin);
+
+/* s3c2410_gpio_getirq
+ *
+ * turn the given pin number into the corresponding IRQ number
+ *
+ * returns:
+ *	< 0 = no interrupt for this pin
+ *	>=0 = interrupt number for the pin
+*/
+
+extern int s3c2410_gpio_getirq(unsigned int pin);
+
+/* s3c2410_gpio_irqfilter
+ *
+ * set the irq filtering on the given pin
+ *
+ * on = 0 => disable filtering
+ *      1 => enable filtering
+ *
+ * config = S3C2410_EINTFLT_PCLK or S3C2410_EINTFLT_EXTCLK orred with
+ *          width of filter (0 through 63)
+ *
+ *
+*/
+
+extern int s3c2410_gpio_irqfilter(unsigned int pin, unsigned int on,
+				  unsigned int config);
 
 /* s3c2410_gpio_pullup
  *

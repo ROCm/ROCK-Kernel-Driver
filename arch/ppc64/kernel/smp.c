@@ -390,7 +390,8 @@ out:
 static inline int __devinit smp_startup_cpu(unsigned int lcpu)
 {
 	int status;
-	unsigned long start_here = __pa(pseries_secondary_smp_init);
+	unsigned long start_here = __pa((u32)*((unsigned long *)
+					       pseries_secondary_smp_init));
 	unsigned int pcpu;
 
 	/* At boot time the cpus are already spinning in hold

@@ -24,13 +24,14 @@
 /* F/W TLB mapping used in bootloader glue to reset EMAC */
 #define PPC44x_EMAC0_MR0	0xE0000800
 
-/* Location of MAC addresses in firmware */
-#define OCOTEA_MAC_BASE		(OCOTEA_SMALL_FLASH_HIGH+0xb0500)
-#define OCOTEA_MAC_SIZE		0x200
-#define OCOTEA_MAC_OFFSET	0x100
+/* Location of MAC addresses in PIBS image */
+#define OCOTEA_PIBS_FLASH	0xfff00000
+#define OCOTEA_PIBS_MAC_BASE	(OCOTEA_PIBS_FLASH+0xb0500)
+#define OCOTEA_PIBS_MAC_SIZE	0x200
+#define OCOTEA_PIBS_MAC_OFFSET	0x100
 
-/* Default clock rate */
-#define OCOTEA_SYSCLK		25000000
+/* External timer clock frequency */
+#define OCOTEA_TMR_CLK	25000000
 
 /* RTC/NVRAM location */
 #define OCOTEA_RTC_ADDR		0x0000000148000000ULL

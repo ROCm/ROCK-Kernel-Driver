@@ -25,7 +25,7 @@ aflags-$(CONFIG_ISA_M32R)	+= -DNO_FPU -Wa,-no-bitinst
 CFLAGS += $(cflags-y)
 AFLAGS += $(aflags-y)
 
-CHECKFLAGS	:= $(CHECK) -D__m32r__=1
+CHECKFLAGS	:= $(CHECK) -D__m32r__
 
 head-y	:= arch/m32r/kernel/head.o arch/m32r/kernel/init_task.o
 
@@ -36,7 +36,6 @@ core-y	+= arch/m32r/kernel/	\
 	   arch/m32r/mm/	\
 	   arch/m32r/boot/
 
-drivers-y			+= arch/m32r/drivers/
 drivers-$(CONFIG_OPROFILE)	+= arch/m32r/oprofile/
 
 boot := arch/m32r/boot

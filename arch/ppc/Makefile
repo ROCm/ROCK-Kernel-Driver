@@ -27,7 +27,7 @@ CFLAGS		+= -Iarch/$(ARCH) -msoft-float -pipe \
 		-ffixed-r2 -mmultiple
 CPP		= $(CC) -E $(CFLAGS)
 
-CHECKFLAGS	+= -D__powerpc__=1
+CHECKFLAGS	+= -D__powerpc__
 
 ifndef CONFIG_E500
 CFLAGS		+= -mstring

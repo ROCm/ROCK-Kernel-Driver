@@ -925,7 +925,7 @@ static int __init hpet_acpi_remove(struct acpi_device *device, int type)
 	return 0;
 }
 
-static struct acpi_driver hpet_acpi_driver __initdata = {
+static struct acpi_driver hpet_acpi_driver = {
 	.name = "hpet",
 	.ids = "PNP0103",
 	.ops = {

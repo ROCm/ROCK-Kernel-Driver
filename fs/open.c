@@ -22,6 +22,7 @@
 #include <asm/uaccess.h>
 #include <linux/fs.h>
 #include <linux/pagemap.h>
+#include <linux/syscalls.h>
 
 #include <asm/unistd.h>
 
@@ -852,7 +853,7 @@ repeat:
 	 * N.B. For clone tasks sharing a files structure, this test
 	 * will limit the total number of files that can be opened.
 	 */
-	if (fd >= current->rlim[RLIMIT_NOFILE].rlim_cur)
+	if (fd >= current->signal->rlim[RLIMIT_NOFILE].rlim_cur)
 		goto out;
 
 	/* Do we need to expand the fdset array? */

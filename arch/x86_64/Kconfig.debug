@@ -30,15 +30,6 @@ config SCHEDSTATS
 	  application, you can say N to avoid the very slight overhead
 	  this adds.
 
-config FRAME_POINTER
-       bool "Compile the kernel with frame pointers"
-       help
-	 Compile the kernel with frame pointers. This may help for some
-	 debugging with external debuggers. Note the standard oops backtracer
-	 doesn't make use of this and the x86-64 kernel doesn't ensure a
-	 consistent frame pointer through inline assembly (semaphores etc.)
-	 Normally you should say N.
-
 config IOMMU_DEBUG
        depends on GART_IOMMU && DEBUG_KERNEL
        bool "Enable IOMMU debugging"

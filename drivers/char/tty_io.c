@@ -130,8 +130,6 @@ LIST_HEAD(tty_drivers);			/* linked list of tty drivers */
 /* Semaphore to protect creating and releasing a tty. This is shared with
    vt.c for deeply disgusting hack reasons */
 DECLARE_MUTEX(tty_sem);
-/* Lock for tty_termios changes - private to tty_io/tty_ioctl */
-spinlock_t tty_termios_lock = SPIN_LOCK_UNLOCKED;
 
 #ifdef CONFIG_UNIX98_PTYS
 extern struct tty_driver *ptm_driver;	/* Unix98 pty masters; for /dev/ptmx */
@@ -239,10 +237,9 @@ static int check_tty_count(struct tty_struct *tty, const char *routine)
  
 static void tty_set_termios_ldisc(struct tty_struct *tty, int num)
 {
-	unsigned long flags;
-	spin_lock_irqsave(&tty_termios_lock, flags);
+	down(&tty->termios_sem);
 	tty->termios->c_line = num;
-	spin_unlock_irqrestore(&tty_termios_lock, flags);
+	up(&tty->termios_sem);
 }
 
 /*
@@ -811,10 +808,9 @@ void do_tty_hangup(void *data)
 	 */
 	if (tty->driver->flags & TTY_DRIVER_RESET_TERMIOS)
 	{
-		unsigned long flags;
-		spin_lock_irqsave(&tty_termios_lock, flags);
+		down(&tty->termios_sem);
 		*tty->termios = tty->driver->init_termios;
-		spin_unlock_irqrestore(&tty_termios_lock, flags);
+		up(&tty->termios_sem);
 	}
 	
 	/* Defer ldisc switch */
@@ -2606,6 +2602,7 @@ static void initialize_tty_struct(struct tty_struct *tty)
 	tty->flip.flag_buf_ptr = tty->flip.flag_buf;
 	INIT_WORK(&tty->flip.work, flush_to_ldisc, tty);
 	init_MUTEX(&tty->flip.pty_sem);
+	init_MUTEX(&tty->termios_sem);
 	init_waitqueue_head(&tty->write_wait);
 	init_waitqueue_head(&tty->read_wait);
 	INIT_WORK(&tty->hangup_work, do_tty_hangup, tty);

@@ -115,12 +115,12 @@ _GLOBAL(call_do_softirq)
 	mtlr	r0
 	blr
 
-_GLOBAL(call_handle_irq_event)
+_GLOBAL(call_handle_IRQ_event)
 	mflr	r0
 	std	r0,16(r1)
 	stdu	r1,THREAD_SIZE-112(r6)
 	mr	r1,r6
-	bl	.handle_irq_event
+	bl	.handle_IRQ_event
 	ld	r1,0(r1)
 	ld	r0,16(r1)
 	mtlr	r0
@@ -670,7 +670,7 @@ _GLOBAL(kernel_thread)
 	li	r4,0		/* new sp (unused) */
 	li	r0,__NR_clone
 	sc
-	cmpi	0,r3,0		/* parent or child? */
+	cmpdi	0,r3,0		/* parent or child? */
 	bne	1f		/* return if parent */
 	li	r0,0
 	stdu	r0,-STACK_FRAME_OVERHEAD(r1)

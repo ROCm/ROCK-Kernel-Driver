@@ -19,6 +19,7 @@
 #include <linux/vmalloc.h>
 #include <linux/blkdev.h>
 #include <linux/backing-dev.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/tlb.h>
@@ -30,7 +31,7 @@ unsigned long max_mapnr;
 unsigned long num_physpages;
 unsigned long askedalloc, realalloc;
 atomic_t vm_committed_space = ATOMIC_INIT(0);
-int sysctl_overcommit_memory; /* default is heuristic overcommit */
+int sysctl_overcommit_memory = OVERCOMMIT_GUESS; /* heuristic overcommit */
 int sysctl_overcommit_ratio = 50; /* default is 50% */
 
 int sysctl_max_map_count = DEFAULT_MAX_MAP_COUNT;
@@ -57,7 +58,7 @@ int vmtruncate(struct inode *inode, loff_t offset)
 	goto out_truncate;
 
 do_expand:
-	limit = current->rlim[RLIMIT_FSIZE].rlim_cur;
+	limit = current->signal->rlim[RLIMIT_FSIZE].rlim_cur;
 	if (limit != RLIM_INFINITY && offset > limit)
 		goto out_sig;
 	if (offset > inode->i_sb->s_maxbytes)

@@ -708,6 +708,7 @@ int usb_register_bus(struct usb_bus *bus)
 		bus->busnum = busnum;
 	} else {
 		printk (KERN_ERR "%s: too many buses\n", usbcore_name);
+		up(&usb_bus_list_lock);
 		return -E2BIG;
 	}
 

@@ -270,7 +270,7 @@ static int TIReadDownloadMemory(struct usb_device *dev, int start_address,
 {
 	int status = 0;
 	__u8 read_length;
-	__u16 be_start_address;
+	__be16 be_start_address;
 	
 	dbg ("%s - @ %x for %d", __FUNCTION__, start_address, length);
 
@@ -387,7 +387,7 @@ static int TIWriteDownloadI2C (struct edgeport_serial *serial, int start_address
 {
 	int status = 0;
 	int write_length;
-	__u16 be_start_address;
+	__be16 be_start_address;
 
 	/* We can only send a maximum of 1 aligned byte page at a time */
 	

@@ -18,6 +18,7 @@
 #include <linux/security.h>
 #include <linux/mempolicy.h>
 #include <linux/personality.h>
+#include <linux/syscalls.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>

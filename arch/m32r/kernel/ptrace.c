@@ -713,7 +713,7 @@ do_ptrace(long request, struct task_struct *child, long addr, long data)
 		ret = 0;
 		unregister_all_debug_traps(child);
 		invalidate_cache();
-		if (child->state == TASK_ZOMBIE)	/* already dead */
+		if (child->exit_state == EXIT_ZOMBIE)	/* already dead */
 			break;
 		child->exit_code = SIGKILL;
 		wake_up_process(child);

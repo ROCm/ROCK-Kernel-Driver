@@ -71,6 +71,7 @@ params_phys-$(CONFIG_ARCH_S3C2410)	:= 0x30000100
    zreladdr-$(CONFIG_ARCH_VERSATILE_PB)	:= 0x00008000
 params_phys-$(CONFIG_ARCH_VERSATILE_PB)	:= 0x00000100
 initrd_phys-$(CONFIG_ARCH_VERSATILE_PB)	:= 0x00800000
+   zreladdr-$(CONFIG_ARCH_H720X)	:= 0x40008000
 
 ZRELADDR    := $(zreladdr-y)
 PARAMS_PHYS := $(params_phys-y)

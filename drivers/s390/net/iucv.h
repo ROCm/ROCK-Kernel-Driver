@@ -231,7 +231,10 @@ typedef struct {
 	uchar iptype;
 	u32 ipmsgid;
 	u32 iptrgcls;
-	uchar iprmmsg1[4];
+	union u2 {
+		u32 iprmmsg1_u32;
+		uchar iprmmsg1[4];
+	} ln1msg1;
 	union u1 {
 		u32 ipbfln1f;
 		uchar iprmmsg2[4];

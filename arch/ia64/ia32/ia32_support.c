@@ -76,7 +76,7 @@ ia32_clone_tls (struct task_struct *child, struct pt_regs *childregs)
 	struct ia32_user_desc info;
 	int idx;
 
-	if (copy_from_user(&info, (void *)(childregs->r14 & 0xffffffff), sizeof(info)))
+	if (copy_from_user(&info, (void __user *)(childregs->r14 & 0xffffffff), sizeof(info)))
 		return -EFAULT;
 	if (LDT_empty(&info))
 		return -EINVAL;
@@ -223,7 +223,7 @@ ia32_bad_interrupt (unsigned long int_num, struct pt_regs *regs)
 	siginfo.si_errno = int_num;	/* XXX is it OK to abuse si_errno like this? */
 	siginfo.si_flags = 0;
 	siginfo.si_isr = 0;
-	siginfo.si_addr = 0;
+	siginfo.si_addr = NULL;
 	siginfo.si_imm = 0;
 	siginfo.si_code = TRAP_BRKPT;
 	force_sig_info(SIGTRAP, &siginfo, current);

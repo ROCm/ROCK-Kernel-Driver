@@ -235,9 +235,9 @@ static int ehci_mem_init (struct ehci_hcd *ehci, int flags)
 	}
 
 	/* Hardware periodic table */
-	ehci->periodic = (u32 *)
+	ehci->periodic = (__le32 *)
 		dma_alloc_coherent (ehci->hcd.self.controller,
-			ehci->periodic_size * sizeof (u32),
+			ehci->periodic_size * sizeof(__le32),
 			&ehci->periodic_dma, 0);
 	if (ehci->periodic == 0) {
 		goto fail;

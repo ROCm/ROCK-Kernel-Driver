@@ -696,7 +696,6 @@ static int __init pl011_console_setup(struct console *co, char *options)
 	int bits = 8;
 	int parity = 'n';
 	int flow = 'n';
-	int ret;
 
 	/*
 	 * Check whether an invalid uart number has been specified, and

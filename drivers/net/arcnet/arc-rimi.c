@@ -231,7 +231,7 @@ err_free_irq:
 static int arcrimi_reset(struct net_device *dev, int really_reset)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	void *ioaddr = lp->mem_start + 0x800;
+	void __iomem *ioaddr = lp->mem_start + 0x800;
 
 	BUGMSG(D_INIT, "Resetting %s (status=%02Xh)\n", dev->name, ASTATUS());
 
@@ -252,7 +252,7 @@ static int arcrimi_reset(struct net_device *dev, int really_reset)
 static void arcrimi_setmask(struct net_device *dev, int mask)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	void *ioaddr = lp->mem_start + 0x800;
+	void __iomem *ioaddr = lp->mem_start + 0x800;
 
 	AINTMASK(mask);
 }
@@ -260,7 +260,7 @@ static void arcrimi_setmask(struct net_device *dev, int mask)
 static int arcrimi_status(struct net_device *dev)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	void *ioaddr = lp->mem_start + 0x800;
+	void __iomem *ioaddr = lp->mem_start + 0x800;
 
 	return ASTATUS();
 }
@@ -268,7 +268,7 @@ static int arcrimi_status(struct net_device *dev)
 static void arcrimi_command(struct net_device *dev, int cmd)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	void *ioaddr = lp->mem_start + 0x800;
+	void __iomem *ioaddr = lp->mem_start + 0x800;
 
 	ACOMMAND(cmd);
 }
@@ -277,7 +277,7 @@ static void arcrimi_copy_to_card(struct net_device *dev, int bufnum, int offset,
 				 void *buf, int count)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	void *memaddr = lp->mem_start + 0x800 + bufnum * 512 + offset;
+	void __iomem *memaddr = lp->mem_start + 0x800 + bufnum * 512 + offset;
 	TIME("memcpy_toio", count, memcpy_toio(memaddr, buf, count));
 }
 
@@ -286,7 +286,7 @@ static void arcrimi_copy_from_card(struct net_device *dev, int bufnum, int offse
 				   void *buf, int count)
 {
 	struct arcnet_local *lp = (struct arcnet_local *) dev->priv;
-	void *memaddr = lp->mem_start + 0x800 + bufnum * 512 + offset;
+	void __iomem *memaddr = lp->mem_start + 0x800 + bufnum * 512 + offset;
 	TIME("memcpy_fromio", count, memcpy_fromio(buf, memaddr, count));
 }
 

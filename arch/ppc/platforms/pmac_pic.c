@@ -214,7 +214,7 @@ static irqreturn_t gatwick_action(int cpl, void *dev_id, struct pt_regs *regs)
 		if (bits == 0)
 			continue;
 		irq += __ilog2(bits);
-		ppc_irq_dispatch_handler(regs, irq);
+		__do_IRQ(irq, regs);
 		return IRQ_HANDLED;
 	}
 	printk("gatwick irq not from gatwick pic\n");
@@ -383,10 +383,33 @@ static irqreturn_t k2u3_action(int cpl, void *dev_id, struct pt_regs *regs)
 
 	irq = openpic2_get_irq(regs);
 	if (irq != -1)
-		ppc_irq_dispatch_handler(regs, irq);
+		__do_IRQ(irq, regs);
 	return IRQ_HANDLED;
 }
+
+static struct irqaction k2u3_cascade_action = {
+	.handler	= k2u3_action,
+	.flags		= 0,
+	.mask		= CPU_MASK_NONE,
+	.name		= "U3->K2 Cascade",
+};
 #endif /* CONFIG_POWER4 */
+
+#ifdef CONFIG_XMON
+static struct irqaction xmon_action = {
+	.handler	= xmon_irq,
+	.flags		= 0,
+	.mask		= CPU_MASK_NONE,
+	.name		= "NMI - XMON"
+};
+#endif
+
+static struct irqaction gatwick_cascade_action = {
+	.handler	= gatwick_action,
+	.flags		= SA_INTERRUPT,
+	.mask		= CPU_MASK_NONE,
+	.name		= "cascade",
+};
 
 void __init pmac_pic_init(void)
 {
@@ -440,8 +463,9 @@ void __init pmac_pic_init(void)
 				OpenPIC_InitSenses = senses;
 				OpenPIC_NumInitSenses = 128;
 				openpic2_init(PMAC_OPENPIC2_OFFSET);
-				if (request_irq(irqctrler2->intrs[0].line, k2u3_action, 0,
-						"U3->K2 Cascade", NULL))
+
+				if (setup_irq(irqctrler2->intrs[0].line,
+					      &k2u3_cascade_action))
 					printk("Unable to get OpenPIC IRQ for cascade\n");
 			}
 #endif /* CONFIG_POWER4 */
@@ -455,8 +479,7 @@ void __init pmac_pic_init(void)
 				if (pswitch && pswitch->n_intrs) {
 					nmi_irq = pswitch->intrs[0].line;
 					openpic_init_nmi_irq(nmi_irq);
-					request_irq(nmi_irq, xmon_irq, 0,
-						    "NMI - XMON", NULL);
+					setup_irq(nmi_irq, &xmon_action);
 				}
 			}
 #endif	/* CONFIG_XMON */
@@ -553,8 +576,7 @@ void __init pmac_pic_init(void)
 			(int)irq_cascade);
 		for ( i = max_real_irqs ; i < max_irqs ; i++ )
 			irq_desc[i].handler = &gatwick_pic;
-		request_irq( irq_cascade, gatwick_action, SA_INTERRUPT,
-			     "cascade", NULL );
+		setup_irq(irq_cascade, &gatwick_cascade_action);
 	}
 	printk("System has %d possible interrupts\n", max_irqs);
 	if (max_irqs != max_real_irqs)
@@ -562,7 +584,7 @@ void __init pmac_pic_init(void)
 			max_real_irqs);
 
 #ifdef CONFIG_XMON
-	request_irq(20, xmon_irq, 0, "NMI - XMON", NULL);
+	setup_irq(20, &xmon_action);
 #endif	/* CONFIG_XMON */
 }
 

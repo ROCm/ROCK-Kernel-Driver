@@ -305,7 +305,6 @@ int ip_queue_xmit(struct sk_buff *skb, int ipfragok)
 	struct ip_options *opt = inet->opt;
 	struct rtable *rt;
 	struct iphdr *iph;
-	u32 mtu;
 
 	/* Skip all of this if the packet is already routed,
 	 * f.e. by something like SCTP.
@@ -366,21 +365,9 @@ packet_routed:
 	skb->nh.iph   = iph;
 	/* Transport layer set skb->h.foo itself. */
 
-	if(opt && opt->optlen) {
+	if (opt && opt->optlen) {
 		iph->ihl += opt->optlen >> 2;
 		ip_options_build(skb, opt, inet->daddr, rt, 0);
-	}
-
-	mtu = dst_pmtu(&rt->u.dst);
-	if (skb->len > mtu && (sk->sk_route_caps & NETIF_F_TSO)) {
-		unsigned int hlen;
-
-		/* Hack zone: all this must be done by TCP. */
-		hlen = ((skb->h.raw - skb->data) + (skb->h.th->doff << 2));
-		skb_shinfo(skb)->tso_size = mtu - hlen;
-		skb_shinfo(skb)->tso_segs =
-			(skb->len - hlen + skb_shinfo(skb)->tso_size - 1)/
-				skb_shinfo(skb)->tso_size - 1;
 	}
 
 	ip_select_ident_more(iph, &rt->u.dst, sk, skb_shinfo(skb)->tso_segs);

@@ -41,7 +41,7 @@ disable_6xx_mmu:
 	/* Test for a 601 */
 	mfpvr	r10
 	srwi	r10,r10,16
-	cmpi	0,r10,1		/* 601 ? */
+	cmpwi	0,r10,1		/* 601 ? */
 	beq	.clearbats_601
 
 	/* Clear BATs */
@@ -117,9 +117,9 @@ _setup_L2CR:
 	/* Wait for the invalidation to complete */
 	mfspr   r8,PVR
 	srwi    r8,r8,16
-	cmpli	cr0,r8,0x8000			/* 7450 */
-	cmpli	cr1,r8,0x8001			/* 7455 */
-	cmpli	cr2,r8,0x8002			/* 7457 */
+	cmplwi	cr0,r8,0x8000			/* 7450 */
+	cmplwi	cr1,r8,0x8001			/* 7455 */
+	cmplwi	cr2,r8,0x8002			/* 7457 */
 	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq	/* Now test if any are true. */
 	cror	4*cr0+eq,4*cr0+eq,4*cr2+eq
 	bne     2f
@@ -190,7 +190,7 @@ timebase_period_ns:
 udelay:
 	mfspr	r4,PVR
 	srwi	r4,r4,16
-	cmpi	0,r4,1		/* 601 ? */
+	cmpwi	0,r4,1		/* 601 ? */
 	bne	.udelay_not_601
 00:	li	r0,86	/* Instructions / microsecond? */
 	mtctr	r0
@@ -213,16 +213,16 @@ udelay:
 1:	mftbu	r5
 	mftb	r6
 	mftbu	r7
-	cmp	0,r5,r7
+	cmpw	0,r5,r7
 	bne	1b		/* Get [synced] base time */
 	addc	r9,r6,r4	/* Compute end time */
 	addze	r8,r5
 2:	mftbu	r5
-	cmp	0,r5,r8
+	cmpw	0,r5,r8
 	blt	2b
 	bgt	3f
 	mftb	r6
-	cmp	0,r6,r9
+	cmpw	0,r6,r9
 	blt	2b
 3:	blr
 

@@ -37,7 +37,7 @@
 
 static inline unsigned long mmap_base(struct mm_struct *mm)
 {
-	unsigned long gap = current->rlim[RLIMIT_STACK].rlim_cur;
+	unsigned long gap = current->signal->rlim[RLIMIT_STACK].rlim_cur;
 
 	if (gap < MIN_GAP)
 		gap = MIN_GAP;
@@ -59,7 +59,7 @@ void arch_pick_mmap_layout(struct mm_struct *mm)
 	 */
 	if (sysctl_legacy_va_layout ||
 			(current->personality & ADDR_COMPAT_LAYOUT) ||
-			current->rlim[RLIMIT_STACK].rlim_cur == RLIM_INFINITY) {
+			current->signal->rlim[RLIMIT_STACK].rlim_cur == RLIM_INFINITY) {
 		mm->mmap_base = TASK_UNMAPPED_BASE;
 		mm->get_unmapped_area = arch_get_unmapped_area;
 		mm->unmap_area = arch_unmap_area;

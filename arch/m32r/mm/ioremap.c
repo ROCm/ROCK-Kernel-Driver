@@ -1,5 +1,5 @@
 /*
- *  linux/arch/m32r/mm/io_remap.c
+ *  linux/arch/m32r/mm/ioremap.c
  *
  *  Copyright (c) 2001, 2002  Hiroyuki Kondo
  *
@@ -25,8 +25,9 @@
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
-static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
-	unsigned long phys_addr, unsigned long flags)
+static inline void
+remap_area_pte(pte_t * pte, unsigned long address, unsigned long size,
+	       unsigned long phys_addr, unsigned long flags)
 {
 	unsigned long end;
 	unsigned long pfn;
@@ -52,8 +53,9 @@ static inline void remap_area_pte(pte_t * pte, unsigned long address, unsigned l
 	} while (address && (address < end));
 }
 
-static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned long size,
-	unsigned long phys_addr, unsigned long flags)
+static inline int
+remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned long size,
+	       unsigned long phys_addr, unsigned long flags)
 {
 	unsigned long end;
 
@@ -75,8 +77,9 @@ static inline int remap_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 	return 0;
 }
 
-static int remap_area_pages(unsigned long address, unsigned long phys_addr,
-				 unsigned long size, unsigned long flags)
+static int
+remap_area_pages(unsigned long address, unsigned long phys_addr,
+		 unsigned long size, unsigned long flags)
 {
 	int error;
 	pgd_t * dir;
@@ -122,7 +125,8 @@ static int remap_area_pages(unsigned long address, unsigned long phys_addr,
 
 #define IS_LOW512(addr) (!((unsigned long)(addr) & ~0x1fffffffUL))
 
-void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
+void __iomem *
+__ioremap(unsigned long phys_addr, unsigned long size, unsigned long flags)
 {
 	void __iomem * addr;
 	struct vm_struct * area;
@@ -180,7 +184,7 @@ void __iomem * __ioremap(unsigned long phys_addr, unsigned long size, unsigned l
 
 #define IS_KSEG1(addr) (((unsigned long)(addr) & ~0x1fffffffUL) == KSEG1)
 
-void iounmap(void *addr)
+void iounmap(volatile void __iomem *addr)
 {
 	if (!IS_KSEG1(addr))
 		vfree((void *) (PAGE_MASK & (unsigned long) addr));

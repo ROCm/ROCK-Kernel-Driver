@@ -27,15 +27,15 @@
  * to blocks of these structures.
  */
 struct v2_disk_dqblk {
-	__u32 dqb_id;		/* id this quota applies to */
-	__u32 dqb_ihardlimit;	/* absolute limit on allocated inodes */
-	__u32 dqb_isoftlimit;	/* preferred inode limit */
-	__u32 dqb_curinodes;	/* current # allocated inodes */
-	__u32 dqb_bhardlimit;	/* absolute limit on disk space (in QUOTABLOCK_SIZE) */
-	__u32 dqb_bsoftlimit;	/* preferred limit on disk space (in QUOTABLOCK_SIZE) */
-	__u64 dqb_curspace;	/* current space occupied (in bytes) */
-	__u64 dqb_btime;	/* time limit for excessive disk use */
-	__u64 dqb_itime;	/* time limit for excessive inode use */
+	__le32 dqb_id;		/* id this quota applies to */
+	__le32 dqb_ihardlimit;	/* absolute limit on allocated inodes */
+	__le32 dqb_isoftlimit;	/* preferred inode limit */
+	__le32 dqb_curinodes;	/* current # allocated inodes */
+	__le32 dqb_bhardlimit;	/* absolute limit on disk space (in QUOTABLOCK_SIZE) */
+	__le32 dqb_bsoftlimit;	/* preferred limit on disk space (in QUOTABLOCK_SIZE) */
+	__le64 dqb_curspace;	/* current space occupied (in bytes) */
+	__le64 dqb_btime;	/* time limit for excessive disk use */
+	__le64 dqb_itime;	/* time limit for excessive inode use */
 };
 
 /*
@@ -43,18 +43,18 @@ struct v2_disk_dqblk {
  */
 /* First generic header */
 struct v2_disk_dqheader {
-	__u32 dqh_magic;	/* Magic number identifying file */
-	__u32 dqh_version;	/* File version */
+	__le32 dqh_magic;	/* Magic number identifying file */
+	__le32 dqh_version;	/* File version */
 };
 
 /* Header with type and version specific information */
 struct v2_disk_dqinfo {
-	__u32 dqi_bgrace;	/* Time before block soft limit becomes hard limit */
-	__u32 dqi_igrace;	/* Time before inode soft limit becomes hard limit */
-	__u32 dqi_flags;	/* Flags for quotafile (DQF_*) */
-	__u32 dqi_blocks;	/* Number of blocks in file */
-	__u32 dqi_free_blk;	/* Number of first free block in the list */
-	__u32 dqi_free_entry;	/* Number of block with at least one free entry */
+	__le32 dqi_bgrace;	/* Time before block soft limit becomes hard limit */
+	__le32 dqi_igrace;	/* Time before inode soft limit becomes hard limit */
+	__le32 dqi_flags;	/* Flags for quotafile (DQF_*) */
+	__le32 dqi_blocks;	/* Number of blocks in file */
+	__le32 dqi_free_blk;	/* Number of first free block in the list */
+	__le32 dqi_free_entry;	/* Number of block with at least one free entry */
 };
 
 /*
@@ -62,11 +62,11 @@ struct v2_disk_dqinfo {
  *  there will be space for exactly 21 quota-entries in a block
  */
 struct v2_disk_dqdbheader {
-	__u32 dqdh_next_free;	/* Number of next block with free entry */
-	__u32 dqdh_prev_free;	/* Number of previous block with free entry */
-	__u16 dqdh_entries;	/* Number of valid entries in block */
-	__u16 dqdh_pad1;
-	__u32 dqdh_pad2;
+	__le32 dqdh_next_free;	/* Number of next block with free entry */
+	__le32 dqdh_prev_free;	/* Number of previous block with free entry */
+	__le16 dqdh_entries;	/* Number of valid entries in block */
+	__le16 dqdh_pad1;
+	__le32 dqdh_pad2;
 };
 
 #define V2_DQINFOOFF	sizeof(struct v2_disk_dqheader)	/* Offset of info header in file */

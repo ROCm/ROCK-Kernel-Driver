@@ -102,10 +102,10 @@ struct aes_ctx {
 #define E_KEY ctx->E
 #define D_KEY ctx->D
 
-static u8 pow_tab[256];
-static u8 log_tab[256];
-static u8 sbx_tab[256];
-static u8 isb_tab[256];
+static u8 pow_tab[256] __initdata;
+static u8 log_tab[256] __initdata;
+static u8 sbx_tab[256] __initdata;
+static u8 isb_tab[256] __initdata;
 static u32 rco_tab[10];
 static u32 ft_tab[4][256];
 static u32 it_tab[4][256];
@@ -113,7 +113,7 @@ static u32 it_tab[4][256];
 static u32 fl_tab[4][256];
 static u32 il_tab[4][256];
 
-static inline u8
+static inline u8 __init
 f_mult (u8 a, u8 b)
 {
 	u8 aa = log_tab[a], cc = aa + log_tab[b];
@@ -153,7 +153,7 @@ f_mult (u8 a, u8 b)
              il_tab[2][byte(bi[(n + 2) & 3],2)] ^		\
              il_tab[3][byte(bi[(n + 1) & 3],3)] ^ *(k + n)
 
-static void
+static void __init
 gen_tabs (void)
 {
 	u32 i, t;

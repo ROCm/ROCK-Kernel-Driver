@@ -336,7 +336,7 @@ static void __attribute__((unused))
 ohci_dump_ed (const struct ohci_hcd *ohci, const char *label,
 		const struct ed *ed, int verbose)
 {
-	u32	tmp = ed->hwINFO;
+	__le32	tmp = ed->hwINFO;
 	char	*type = "";
 
 	ohci_dbg (ohci, "%s, ed %p state 0x%x type %s; next ed %08x\n",
@@ -359,7 +359,7 @@ ohci_dump_ed (const struct ohci_hcd *ohci, const char *label,
 		type,
 		0x007f & le32_to_cpu (tmp));
 	ohci_dbg (ohci, "  tds: head %08x %s%s tail %08x%s\n",
-		tmp = le32_to_cpup (&ed->hwHeadP),
+		le32_to_cpup (&ed->hwHeadP),
 		(ed->hwHeadP & ED_C) ? data1 : data0,
 		(ed->hwHeadP & ED_H) ? " HALT" : "",
 		le32_to_cpup (&ed->hwTailP),
@@ -415,8 +415,8 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 
 	/* dump a snapshot of the bulk or control schedule */
 	while (ed) {
-		u32			info = ed->hwINFO;
-		u32			scratch = cpu_to_le32p (&ed->hwINFO);
+		__le32			info = ed->hwINFO;
+		u32			scratch = le32_to_cpup (&ed->hwINFO);
 		struct list_head	*entry;
 		struct td		*td;
 
@@ -439,7 +439,7 @@ show_list (struct ohci_hcd *ohci, char *buf, size_t count, struct ed *ed)
 			u32		cbp, be;
 
 			td = list_entry (entry, struct td, td_list);
-			scratch = cpu_to_le32p (&td->hwINFO);
+			scratch = le32_to_cpup (&td->hwINFO);
 			cbp = le32_to_cpup (&td->hwCBP);
 			be = le32_to_cpup (&td->hwBE);
 			temp = scnprintf (buf, size,
@@ -541,8 +541,8 @@ show_periodic (struct class_device *class_dev, char *buf)
 
 			/* show more info the first time around */
 			if (temp == seen_count) {
-				u32	info = ed->hwINFO;
-				u32	scratch = cpu_to_le32p (&ed->hwINFO);
+				__le32	info = ed->hwINFO;
+				u32	scratch = le32_to_cpup (&ed->hwINFO);
 				struct list_head	*entry;
 				unsigned		qlen = 0;
 

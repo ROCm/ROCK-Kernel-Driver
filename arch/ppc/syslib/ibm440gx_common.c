@@ -171,6 +171,19 @@ void __init ibm440gx_l2c_disable(void){
 	asm volatile ("sync; isync" ::: "memory");
 }
 
+void __init ibm440gx_l2c_setup(struct ibm44x_clocks* p)
+{
+	/* Disable L2C on rev.A, rev.B and 800MHz version of rev.C,
+	   enable it on all other revisions
+	 */
+	u32 pvr = mfspr(PVR);
+	if (pvr == PVR_440GX_RA || pvr == PVR_440GX_RB ||
+	    (pvr == PVR_440GX_RC && p->cpu > 667000000))
+		ibm440gx_l2c_disable();
+	else
+		ibm440gx_l2c_enable();
+}
+
 int __init ibm440gx_get_eth_grp(void)
 {
 	return (SDR_READ(DCRN_SDR_PFC1) & DCRN_SDR_PFC1_EPS) >> DCRN_SDR_PFC1_EPS_SHIFT;

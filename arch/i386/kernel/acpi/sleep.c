@@ -56,7 +56,7 @@ int acpi_save_state_disk (void)
 }
 
 /*
- * acpi_restore_state
+ * acpi_restore_state - undo effects of acpi_save_state_mem
  */
 void acpi_restore_state_mem (void)
 {

@@ -11,7 +11,7 @@
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/pci.h>
-#include <linux/irq.h>
+#include <linux/interrupt.h>
 
 #include <asm/io.h>
 #include <asm/i8259.h>
@@ -19,11 +19,6 @@
 
 static void adir_onboard_pic_enable(unsigned int irq);
 static void adir_onboard_pic_disable(unsigned int irq);
-
-static void
-no_action(int cpl, void *dev_id, struct pt_regs *regs)
-{
-}
 
 __init static void
 adir_onboard_pic_init(void)
@@ -88,6 +83,13 @@ static struct hw_interrupt_type adir_onboard_pic = {
 	NULL
 };
 
+static struct irqaction noop_action = {
+	.handler	= no_action,
+	.flags          = SA_INTERRUPT,
+	.mask           = CPU_MASK_NONE,
+	.name           = "82c59 primary cascade",
+};
+
 /*
  * Linux interrupt values are assigned as follows:
  *
@@ -110,11 +112,7 @@ adir_init_IRQ(void)
 	adir_onboard_pic_init();
 
 	/* Enable 8259 interrupt cascade */
-	request_irq(ADIR_IRQ_VT82C686_INTR,
-			no_action,
-			SA_INTERRUPT,
-			"82c59 primary cascade",
-			NULL);
+	setup_irq(ADIR_IRQ_VT82C686_INTR, &noop_action);
 }
 
 int
