@@ -1043,96 +1043,94 @@ isdn_net_start_xmit(struct sk_buff *skb, struct net_device *ndev)
 		return isdn_x25_start_xmit(skb, ndev);
 		
 	/* auto-dialing xmit function */
-	{
-		isdn_net_adjust_hdr(skb, ndev);
-		isdn_dumppkt("S:", skb->data, skb->len, 40);
+	isdn_net_adjust_hdr(skb, ndev);
+	isdn_dumppkt("S:", skb->data, skb->len, 40);
+	
+	if (!isdn_net_bound(lp)) {
+		int chi;
+		/* only do autodial if allowed by config */
+		if (!(ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_AUTO)) {
+			isdn_net_unreachable(ndev, skb, "dial rejected: interface not in dialmode `auto'");
+			dev_kfree_skb(skb);
+			return 0;
+		}
+		
+		save_flags(flags);
+		cli();
 
-		if (!isdn_net_bound(lp)) {
-			int chi;
-			/* only do autodial if allowed by config */
-			if (!(ISDN_NET_DIALMODE(*lp) == ISDN_NET_DM_AUTO)) {
-				isdn_net_unreachable(ndev, skb, "dial rejected: interface not in dialmode `auto'");
+		if(lp->dialwait_timer <= 0)
+			if(lp->dialstarted > 0 && lp->dialtimeout > 0 && time_before(jiffies, lp->dialstarted + lp->dialtimeout + lp->dialwait))
+				lp->dialwait_timer = lp->dialstarted + lp->dialtimeout + lp->dialwait;
+		
+		if(lp->dialwait_timer > 0) {
+			if(time_before(jiffies, lp->dialwait_timer)) {
+				isdn_net_unreachable(ndev, skb, "dial rejected: retry-time not reached");
 				dev_kfree_skb(skb);
-				return 0;
-			}
-
-			save_flags(flags);
-			cli();
-
-			if(lp->dialwait_timer <= 0)
-				if(lp->dialstarted > 0 && lp->dialtimeout > 0 && time_before(jiffies, lp->dialstarted + lp->dialtimeout + lp->dialwait))
-					lp->dialwait_timer = lp->dialstarted + lp->dialtimeout + lp->dialwait;
-			
-			if(lp->dialwait_timer > 0) {
-				if(time_before(jiffies, lp->dialwait_timer)) {
-					isdn_net_unreachable(ndev, skb, "dial rejected: retry-time not reached");
-					dev_kfree_skb(skb);
-					restore_flags(flags);
-					return 0;
-				} else
-					lp->dialwait_timer = 0;
-			}
-			/* Grab a free ISDN-Channel */
-			if (((chi =
-			      isdn_get_free_slot(
-				      ISDN_USAGE_NET,
-				      lp->l2_proto,
-				      lp->l3_proto,
-				      lp->pre_device,
-				      lp->pre_channel,
-				      lp->msn)
-				     ) < 0) &&
-			    ((chi =
-			      isdn_get_free_slot(
-				      ISDN_USAGE_NET,
-				      lp->l2_proto,
-				      lp->l3_proto,
-				      lp->pre_device,
-				      lp->pre_channel^1,
-				      lp->msn)
-				    ) < 0)) {
 				restore_flags(flags);
-				isdn_net_unreachable(ndev, skb,
-						     "No channel");
+				return 0;
+			} else
+				lp->dialwait_timer = 0;
+		}
+		/* Grab a free ISDN-Channel */
+		if (((chi =
+		      isdn_get_free_slot(
+			      ISDN_USAGE_NET,
+			      lp->l2_proto,
+			      lp->l3_proto,
+			      lp->pre_device,
+			      lp->pre_channel,
+			      lp->msn)
+			     ) < 0) &&
+		    ((chi =
+		      isdn_get_free_slot(
+			      ISDN_USAGE_NET,
+			      lp->l2_proto,
+			      lp->l3_proto,
+			      lp->pre_device,
+			      lp->pre_channel^1,
+			      lp->msn)
+			    ) < 0)) {
+			restore_flags(flags);
+			isdn_net_unreachable(ndev, skb,
+					     "No channel");
+			dev_kfree_skb(skb);
+			return 0;
+		}
+		/* Log packet, which triggered dialing */
+		if (dev->net_verbose)
+			isdn_net_log_skb(skb, lp);
+		/* Connect interface with channel */
+		isdn_net_bind_channel(lp, chi);
+		
+		if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP) {
+			/* no 'first_skb' handling for syncPPP */
+			if (isdn_ppp_bind(lp) < 0) {
 				dev_kfree_skb(skb);
-				return 0;
-			}
-			/* Log packet, which triggered dialing */
-			if (dev->net_verbose)
-				isdn_net_log_skb(skb, lp);
-			/* Connect interface with channel */
-			isdn_net_bind_channel(lp, chi);
-
-			if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP) {
-				/* no 'first_skb' handling for syncPPP */
-				if (isdn_ppp_bind(lp) < 0) {
-					dev_kfree_skb(skb);
-					isdn_net_unbind_channel(lp);
-					restore_flags(flags);
-					return 0;	/* STN (skb to nirvana) ;) */
-				}
+				isdn_net_unbind_channel(lp);
 				restore_flags(flags);
-				init_dialout(lp);
-				netif_stop_queue(ndev);
-				return 1;	/* let upper layer requeue skb packet */
+				return 0;	/* STN (skb to nirvana) ;) */
 			}
-			/* Initiate dialing */
 			restore_flags(flags);
 			init_dialout(lp);
-			isdn_net_device_stop_queue(lp);
-			return 1;
-		} else {
-			/* Device is connected to an ISDN channel */ 
-			ndev->trans_start = jiffies;
-			if (lp->dialstate == ST_ACTIVE) {
-				/* ISDN connection is established, try sending */
-				int ret;
-				ret = (isdn_net_xmit(ndev, skb));
-				if(ret) netif_stop_queue(ndev);
-				return ret;
-			} else
-				netif_stop_queue(ndev);
+			netif_stop_queue(ndev);
+			return 1;	/* let upper layer requeue skb packet */
 		}
+		/* Initiate dialing */
+		restore_flags(flags);
+		init_dialout(lp);
+		isdn_net_device_stop_queue(lp);
+		return 1;
+	} else {
+		/* Device is connected to an ISDN channel */ 
+		ndev->trans_start = jiffies;
+		if (lp->dialstate == ST_ACTIVE) {
+			/* ISDN connection is established, try sending */
+			int ret;
+			ret = (isdn_net_xmit(ndev, skb));
+			if(ret) netif_stop_queue(ndev);
+			return ret;
+		} else
+			netif_stop_queue(ndev);
 	}
 	return 1;
 }
@@ -1695,28 +1693,33 @@ isdn_net_force_dial_lp(isdn_net_local * lp)
 
 	save_flags(flags);
 	cli();
-	
-	/* Grab a free ISDN-Channel */
-	chi = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto, lp->l3_proto,
-				 lp->pre_device, lp->pre_channel, lp->msn);
+
+	if (lp->exclusive >= 0) {
+		chi = lp->exclusive;
+	} else {
+		chi = isdn_get_free_slot(ISDN_USAGE_NET, lp->l2_proto, lp->l3_proto,
+					 lp->pre_device, lp->pre_channel, lp->msn);
+	}
 	if (chi < 0) {
 		printk(KERN_WARNING "isdn_net_force_dial: No channel for %s\n", lp->name);
-		restore_flags(flags);
-		return -EAGAIN;
+		goto err;
 	}
 	/* Connect interface with channel */
 	isdn_net_bind_channel(lp, chi);
 	if (lp->p_encap == ISDN_NET_ENCAP_SYNCPPP)
 		if (isdn_ppp_bind(lp) < 0) {
 			isdn_net_unbind_channel(lp);
-			restore_flags(flags);
-			return -EAGAIN;
+			goto err;
 		}
 	/* Initiate dialing */
 	restore_flags(flags);
 	init_dialout(lp);
 
 	return 0;
+
+ err:
+	restore_flags(flags);
+	return -EAGAIN;
 }
 
 /*
