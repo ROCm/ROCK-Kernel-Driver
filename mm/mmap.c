@@ -131,13 +131,6 @@ int vm_enough_memory(long pages)
 	return 0;
 }
 
-void vm_unacct_vma(struct vm_area_struct *vma)
-{
-	int len = vma->vm_end - vma->vm_start;
-	if (vma->vm_flags & VM_ACCOUNT)
-		vm_unacct_memory(len >> PAGE_SHIFT);
-}
-
 /* Remove one vm structure from the inode's i_mapping address space. */
 static inline void __remove_shared_vm_struct(struct vm_area_struct *vma)
 {
@@ -204,7 +197,7 @@ asmlinkage unsigned long sys_brk(unsigned long brk)
 
 	/* Always allow shrinking brk. */
 	if (brk <= mm->brk) {
-		if (!do_munmap(mm, newbrk, oldbrk-newbrk, 1))
+		if (!do_munmap(mm, newbrk, oldbrk-newbrk))
 			goto set_brk;
 		goto out;
 	}
@@ -524,7 +517,7 @@ unsigned long do_mmap_pgoff(struct file * file, unsigned long addr,
 munmap_back:
 	vma = find_vma_prepare(mm, addr, &prev, &rb_link, &rb_parent);
 	if (vma && vma->vm_start < addr + len) {
-		if (do_munmap(mm, addr, len, 1))
+		if (do_munmap(mm, addr, len))
 			return -ENOMEM;
 		goto munmap_back;
 	}
@@ -534,16 +527,17 @@ munmap_back:
 	    > current->rlim[RLIMIT_AS].rlim_cur)
 		return -ENOMEM;
 
-	if (sysctl_overcommit_memory > 1)
-		vm_flags &= ~MAP_NORESERVE;
-
-	/* Private writable mapping? Check memory availability.. */
-	if ((((vm_flags & (VM_SHARED | VM_WRITE)) == VM_WRITE) ||
-			(file == NULL)) && !(flags & MAP_NORESERVE)) {
-		charged = len >> PAGE_SHIFT;
-		if (!vm_enough_memory(charged))
-			return -ENOMEM;
-		vm_flags |= VM_ACCOUNT;
+	if (!(flags & MAP_NORESERVE) || sysctl_overcommit_memory > 1) {
+		if (vm_flags & VM_SHARED) {
+			/* Check memory availability in shmem_file_setup? */
+			vm_flags |= VM_ACCOUNT;
+		} else if (vm_flags & VM_WRITE) {
+			/* Private writable mapping: check memory availability */
+			charged = len >> PAGE_SHIFT;
+			if (!vm_enough_memory(charged))
+				return -ENOMEM;
+			vm_flags |= VM_ACCOUNT;
+		}
 	}
 
 	/* Can we just expand an old anonymous mapping? */
@@ -586,11 +580,19 @@ munmap_back:
 		error = file->f_op->mmap(file, vma);
 		if (error)
 			goto unmap_and_free_vma;
-	} else if (flags & MAP_SHARED) {
+	} else if (vm_flags & VM_SHARED) {
 		error = shmem_zero_setup(vma);
 		if (error)
 			goto free_vma;
 	}
+
+	/* We set VM_ACCOUNT in a shared mapping's vm_flags, to inform
+	 * shmem_zero_setup (perhaps called through /dev/zero's ->mmap)
+	 * that memory reservation must be checked; but that reservation
+	 * belongs to shared memory object, not to vma: so now clear it.
+	 */
+	if ((vm_flags & (VM_SHARED|VM_ACCOUNT)) == (VM_SHARED|VM_ACCOUNT))
+		vma->vm_flags &= ~VM_ACCOUNT;
 
 	/* Can addr have changed??
 	 *
@@ -943,8 +945,7 @@ static void unmap_region(struct mm_struct *mm,
 	struct vm_area_struct *mpnt,
 	struct vm_area_struct *prev,
 	unsigned long start,
-	unsigned long end,
-	int acct)
+	unsigned long end)
 {
 	mmu_gather_t *tlb;
 
@@ -958,7 +959,7 @@ static void unmap_region(struct mm_struct *mm,
 
 		unmap_page_range(tlb, mpnt, from, to);
 
-		if (acct && (mpnt->vm_flags & VM_ACCOUNT)) {
+		if (mpnt->vm_flags & VM_ACCOUNT) {
 			len = to - from;
 			vm_unacct_memory(len >> PAGE_SHIFT);
 		}
@@ -1039,7 +1040,7 @@ static int splitvma(struct mm_struct *mm, struct vm_area_struct *mpnt, unsigned 
  * work.  This now handles partial unmappings.
  * Jeremy Fitzhardine <jeremy@sw.oz.au>
  */
-int do_munmap(struct mm_struct *mm, unsigned long start, size_t len, int acct)
+int do_munmap(struct mm_struct *mm, unsigned long start, size_t len)
 {
 	unsigned long end;
 	struct vm_area_struct *mpnt, *prev, *last;
@@ -1083,7 +1084,7 @@ int do_munmap(struct mm_struct *mm, unsigned long start, size_t len, int acct)
 	 */
 	spin_lock(&mm->page_table_lock);
 	mpnt = touched_by_munmap(mm, mpnt, prev, end);
-	unmap_region(mm, mpnt, prev, start, end, acct);
+	unmap_region(mm, mpnt, prev, start, end);
 	spin_unlock(&mm->page_table_lock);
 
 	/* Fix up all other VM information */
@@ -1098,7 +1099,7 @@ asmlinkage long sys_munmap(unsigned long addr, size_t len)
 	struct mm_struct *mm = current->mm;
 
 	down_write(&mm->mmap_sem);
-	ret = do_munmap(mm, addr, len, 1);
+	ret = do_munmap(mm, addr, len);
 	up_write(&mm->mmap_sem);
 	return ret;
 }
@@ -1135,7 +1136,7 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
  munmap_back:
 	vma = find_vma_prepare(mm, addr, &prev, &rb_link, &rb_parent);
 	if (vma && vma->vm_start < addr + len) {
-		if (do_munmap(mm, addr, len, 1))
+		if (do_munmap(mm, addr, len))
 			return -ENOMEM;
 		goto munmap_back;
 	}
@@ -1225,7 +1226,7 @@ void exit_mmap(struct mm_struct * mm)
 		 * removal
 		 */
 		if (mpnt->vm_flags & VM_ACCOUNT)
-			vm_unacct_vma(mpnt);
+			vm_unacct_memory((end - start) >> PAGE_SHIFT);
 
 		mm->map_count--;
 		unmap_page_range(tlb, mpnt, start, end);

@@ -210,17 +210,12 @@ static inline int dup_mmap(struct mm_struct * mm)
 		retval = -ENOMEM;
 		if(mpnt->vm_flags & VM_DONTCOPY)
 			continue;
-
-		/*
-		 * FIXME: shared writable map accounting should be one off
-		 */
 		if (mpnt->vm_flags & VM_ACCOUNT) {
 			unsigned int len = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 			if (!vm_enough_memory(len))
 				goto fail_nomem;
 			charge += len;
 		}
-
 		tmp = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
 		if (!tmp)
 			goto fail_nomem;

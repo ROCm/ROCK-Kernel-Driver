@@ -194,8 +194,8 @@ __syscall_start:
 		.long	sys_rt_sigtimedwait
 		.long	sys_rt_sigqueueinfo
 		.long	sys_rt_sigsuspend_wrapper
-/* 180 */	.long	sys_pread
-		.long	sys_pwrite
+/* 180 */	.long	sys_pread64
+		.long	sys_pwrite64
 		.long	sys_chown16
 		.long	sys_getcwd
 		.long	sys_capget

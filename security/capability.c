@@ -464,7 +464,7 @@ static int cap_file_mprotect (struct vm_area_struct *vma, unsigned long prot)
 	return 0;
 }
 
-static int cap_file_lock (struct file *file, unsigned int cmd, int blocking)
+static int cap_file_lock (struct file *file, unsigned int cmd)
 {
 	return 0;
 }
