@@ -1269,6 +1269,8 @@ static struct usb_driver vicam_driver = {
 
 /**
  *	vicam_probe
+ *	@intf: the interface
+ *	@id: the device id
  *
  *	Called by the usb core when a new device is connected that it thinks
  *	this driver might be interested in.
