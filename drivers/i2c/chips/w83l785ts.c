@@ -137,8 +137,8 @@ static ssize_t show_temp_over(struct device *dev, char *buf)
 	return sprintf(buf, "%d\n", TEMP_FROM_REG(data->temp_over));
 }
 
-static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL)
-static DEVICE_ATTR(temp1_max, S_IRUGO, show_temp_over, NULL)
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp, NULL);
+static DEVICE_ATTR(temp1_max, S_IRUGO, show_temp_over, NULL);
 
 /*
  * Real code

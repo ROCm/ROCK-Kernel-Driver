@@ -689,6 +689,12 @@ M:	jrv@vanzandt.mv.com
 L:	blinux-list@redhat.com
 S:	Maintained
 
+DRIVER CORE, KOBJECTS, AND SYSFS
+P:	Greg Kroah-Hartman
+M:	greg@kroah.com
+L:	linux-kernel@vger.kernel.org
+S:	Supported
+
 DRM DRIVERS
 L:	dri-devel@lists.sourceforge.net
 S:	Supported

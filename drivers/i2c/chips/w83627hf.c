@@ -371,7 +371,7 @@ show_regs_in_##offset (struct device *dev, char *buf) \
 { \
         return show_in(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_regs_in_##offset, NULL)
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_regs_in_##offset, NULL);
 
 #define sysfs_in_reg_offset(reg, offset) \
 static ssize_t show_regs_in_##reg##offset (struct device *dev, char *buf) \
@@ -385,21 +385,21 @@ store_regs_in_##reg##offset (struct device *dev, \
 	return store_in_##reg (dev, buf, count, 0x##offset); \
 } \
 static DEVICE_ATTR(in##offset##_##reg, S_IRUGO| S_IWUSR, \
-		  show_regs_in_##reg##offset, store_regs_in_##reg##offset)
+		  show_regs_in_##reg##offset, store_regs_in_##reg##offset);
 
 #define sysfs_in_offsets(offset) \
 sysfs_in_offset(offset) \
 sysfs_in_reg_offset(min, offset) \
 sysfs_in_reg_offset(max, offset)
 
-sysfs_in_offsets(1)
-sysfs_in_offsets(2)
-sysfs_in_offsets(3)
-sysfs_in_offsets(4)
-sysfs_in_offsets(5)
-sysfs_in_offsets(6)
-sysfs_in_offsets(7)
-sysfs_in_offsets(8)
+sysfs_in_offsets(1);
+sysfs_in_offsets(2);
+sysfs_in_offsets(3);
+sysfs_in_offsets(4);
+sysfs_in_offsets(5);
+sysfs_in_offsets(6);
+sysfs_in_offsets(7);
+sysfs_in_offsets(8);
 
 /* use a different set of functions for in0 */
 static ssize_t show_in_0(struct w83627hf_data *data, char *buf, u8 reg)
@@ -499,8 +499,8 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 		FAN_FROM_REG(data->reg[nr-1], \
 			    (long)DIV_FROM_REG(data->fan_div[nr-1]))); \
 }
-show_fan_reg(fan)
-show_fan_reg(fan_min)
+show_fan_reg(fan);
+show_fan_reg(fan_min);
 
 static ssize_t
 store_fan_min(struct device *dev, const char *buf, size_t count, int nr)
@@ -523,7 +523,7 @@ static ssize_t show_regs_fan_##offset (struct device *dev, char *buf) \
 { \
 	return show_fan(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_regs_fan_##offset, NULL)
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_regs_fan_##offset, NULL);
 
 #define sysfs_fan_min_offset(offset) \
 static ssize_t show_regs_fan_min##offset (struct device *dev, char *buf) \
@@ -536,14 +536,14 @@ store_regs_fan_min##offset (struct device *dev, const char *buf, size_t count) \
 	return store_fan_min(dev, buf, count, 0x##offset); \
 } \
 static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, \
-		  show_regs_fan_min##offset, store_regs_fan_min##offset)
+		  show_regs_fan_min##offset, store_regs_fan_min##offset);
 
-sysfs_fan_offset(1)
-sysfs_fan_min_offset(1)
-sysfs_fan_offset(2)
-sysfs_fan_min_offset(2)
-sysfs_fan_offset(3)
-sysfs_fan_min_offset(3)
+sysfs_fan_offset(1);
+sysfs_fan_min_offset(1);
+sysfs_fan_offset(2);
+sysfs_fan_min_offset(2);
+sysfs_fan_offset(3);
+sysfs_fan_min_offset(3);
 
 #define device_create_file_fan(client, offset) \
 do { \
@@ -562,9 +562,9 @@ static ssize_t show_##reg (struct device *dev, char *buf, int nr) \
 		return sprintf(buf,"%ld\n", (long)TEMP_FROM_REG(data->reg)); \
 	} \
 }
-show_temp_reg(temp)
-show_temp_reg(temp_max)
-show_temp_reg(temp_max_hyst)
+show_temp_reg(temp);
+show_temp_reg(temp_max);
+show_temp_reg(temp_max_hyst);
 
 #define store_temp_reg(REG, reg) \
 static ssize_t \
@@ -588,8 +588,8 @@ store_temp_##reg (struct device *dev, const char *buf, size_t count, int nr) \
 	 \
 	return count; \
 }
-store_temp_reg(OVER, max)
-store_temp_reg(HYST, max_hyst)
+store_temp_reg(OVER, max);
+store_temp_reg(HYST, max_hyst);
 
 #define sysfs_temp_offset(offset) \
 static ssize_t \
@@ -597,7 +597,7 @@ show_regs_temp_##offset (struct device *dev, char *buf) \
 { \
 	return show_temp(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_regs_temp_##offset, NULL)
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_regs_temp_##offset, NULL);
 
 #define sysfs_temp_reg_offset(reg, offset) \
 static ssize_t show_regs_temp_##reg##offset (struct device *dev, char *buf) \
@@ -611,16 +611,16 @@ store_regs_temp_##reg##offset (struct device *dev, \
 	return store_temp_##reg (dev, buf, count, 0x##offset); \
 } \
 static DEVICE_ATTR(temp##offset##_##reg, S_IRUGO| S_IWUSR, \
-		  show_regs_temp_##reg##offset, store_regs_temp_##reg##offset)
+		  show_regs_temp_##reg##offset, store_regs_temp_##reg##offset);
 
 #define sysfs_temp_offsets(offset) \
 sysfs_temp_offset(offset) \
 sysfs_temp_reg_offset(max, offset) \
 sysfs_temp_reg_offset(max_hyst, offset)
 
-sysfs_temp_offsets(1)
-sysfs_temp_offsets(2)
-sysfs_temp_offsets(3)
+sysfs_temp_offsets(1);
+sysfs_temp_offsets(2);
+sysfs_temp_offsets(3);
 
 #define device_create_file_temp(client, offset) \
 do { \
@@ -635,7 +635,7 @@ show_vid_reg(struct device *dev, char *buf)
 	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) vid_from_reg(data->vid, data->vrm));
 }
-static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL)
+static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL);
 #define device_create_file_vid(client) \
 device_create_file(&client->dev, &dev_attr_in0_ref)
 
@@ -657,7 +657,7 @@ store_vrm_reg(struct device *dev, const char *buf, size_t count)
 
 	return count;
 }
-static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg)
+static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg);
 #define device_create_file_vrm(client) \
 device_create_file(&client->dev, &dev_attr_vrm)
 
@@ -667,7 +667,7 @@ show_alarms_reg(struct device *dev, char *buf)
 	struct w83627hf_data *data = w83627hf_update_device(dev);
 	return sprintf(buf, "%ld\n", (long) data->alarms);
 }
-static DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL)
+static DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL);
 #define device_create_file_alarms(client) \
 device_create_file(&client->dev, &dev_attr_alarms)
 
@@ -724,10 +724,10 @@ store_regs_beep_##reg (struct device *dev, const char *buf, size_t count) \
 	return store_beep_reg(dev, buf, count, BEEP_##REG); \
 } \
 static DEVICE_ATTR(beep_##reg, S_IRUGO | S_IWUSR, \
-		  show_regs_beep_##reg, store_regs_beep_##reg)
+		  show_regs_beep_##reg, store_regs_beep_##reg);
 
-sysfs_beep(ENABLE, enable)
-sysfs_beep(MASK, mask)
+sysfs_beep(ENABLE, enable);
+sysfs_beep(MASK, mask);
 
 #define device_create_file_beep(client) \
 do { \
@@ -790,11 +790,11 @@ store_regs_fan_div_##offset (struct device *dev, \
 	return store_fan_div_reg(dev, buf, count, offset - 1); \
 } \
 static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, \
-		  show_regs_fan_div_##offset, store_regs_fan_div_##offset)
+		  show_regs_fan_div_##offset, store_regs_fan_div_##offset);
 
-sysfs_fan_div(1)
-sysfs_fan_div(2)
-sysfs_fan_div(3)
+sysfs_fan_div(1);
+sysfs_fan_div(2);
+sysfs_fan_div(3);
 
 #define device_create_file_fan_div(client, offset) \
 do { \
@@ -846,11 +846,11 @@ store_regs_pwm_##offset (struct device *dev, const char *buf, size_t count) \
 	return store_pwm_reg(dev, buf, count, offset); \
 } \
 static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR, \
-		  show_regs_pwm_##offset, store_regs_pwm_##offset)
+		  show_regs_pwm_##offset, store_regs_pwm_##offset);
 
-sysfs_pwm(1)
-sysfs_pwm(2)
-sysfs_pwm(3)
+sysfs_pwm(1);
+sysfs_pwm(2);
+sysfs_pwm(3);
 
 #define device_create_file_pwm(client, offset) \
 do { \
@@ -919,11 +919,11 @@ store_regs_sensor_##offset (struct device *dev, const char *buf, size_t count) \
     return store_sensor_reg(dev, buf, count, offset); \
 } \
 static DEVICE_ATTR(temp##offset##_type, S_IRUGO | S_IWUSR, \
-		  show_regs_sensor_##offset, store_regs_sensor_##offset)
+		  show_regs_sensor_##offset, store_regs_sensor_##offset);
 
-sysfs_sensor(1)
-sysfs_sensor(2)
-sysfs_sensor(3)
+sysfs_sensor(1);
+sysfs_sensor(2);
+sysfs_sensor(3);
 
 #define device_create_file_sensor(client, offset) \
 do { \

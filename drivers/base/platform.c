@@ -19,6 +19,90 @@ struct device platform_bus = {
 };
 
 /**
+ *	platform_get_resource - get a resource for a device
+ *	@dev: platform device
+ *	@type: resource type
+ *	@num: resource index
+ */
+struct resource *
+platform_get_resource(struct platform_device *dev, unsigned int type,
+		      unsigned int num)
+{
+	int i;
+
+	for (i = 0; i < dev->num_resources; i++) {
+		struct resource *r = &dev->resource[i];
+
+		if ((r->flags & (IORESOURCE_IO|IORESOURCE_MEM|
+				 IORESOURCE_IRQ|IORESOURCE_DMA))
+		    == type)
+			if (num-- == 0)
+				return r;
+	}
+	return NULL;
+}
+
+/**
+ *	platform_get_irq - get an IRQ for a device
+ *	@dev: platform device
+ *	@num: IRQ number index
+ */
+int platform_get_irq(struct platform_device *dev, unsigned int num)
+{
+	struct resource *r = platform_get_resource(dev, IORESOURCE_IRQ, num);
+
+	return r ? r->start : 0;
+}
+
+/**
+ *	platform_add_device - add one platform device
+ *	@dev: platform device
+ *
+ *	Adds one platform device, claiming the memory resources
+ */
+int platform_add_device(struct platform_device *dev)
+{
+	int i;
+
+	for (i = 0; i < dev->num_resources; i++) {
+		struct resource *p, *r = &dev->resource[i];
+
+		r->name = dev->dev.bus_id;
+
+		p = NULL;
+		if (r->flags & IORESOURCE_MEM)
+			p = &iomem_resource;
+		else if (r->flags & IORESOURCE_IO)
+			p = &ioport_resource;
+
+		if (p && request_resource(p, r)) {
+			printk(KERN_ERR
+			       "%s%d: failed to claim resource %d\n",
+			       dev->name, dev->id, i);
+			break;
+		}
+	}
+	if (i == dev->num_resources)
+		platform_device_register(dev);
+	return 0;
+}
+
+/**
+ *	platform_add_devices - add a numbers of platform devices
+ *	@devs: array of platform devices to add
+ *	@num: number of platform devices in array
+ */
+int platform_add_devices(struct platform_device **devs, int num)
+{
+	int i;
+
+	for (i = 0; i < num; i++)
+		platform_add_device(devs[i]);
+
+	return 0;
+}
+
+/**
  *	platform_device_register - add a platform-level device
  *	@dev:	platform device we're adding
  *
@@ -114,3 +198,5 @@ EXPORT_SYMBOL(platform_bus);
 EXPORT_SYMBOL(platform_bus_type);
 EXPORT_SYMBOL(platform_device_register);
 EXPORT_SYMBOL(platform_device_unregister);
+EXPORT_SYMBOL(platform_get_irq);
+EXPORT_SYMBOL(platform_get_resource);

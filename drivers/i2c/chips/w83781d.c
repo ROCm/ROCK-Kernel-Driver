@@ -320,7 +320,7 @@ show_regs_in_##offset (struct device *dev, char *buf) \
 { \
         return show_in(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_regs_in_##offset, NULL)
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_regs_in_##offset, NULL);
 
 #define sysfs_in_reg_offset(reg, offset) \
 static ssize_t show_regs_in_##reg##offset (struct device *dev, char *buf) \
@@ -331,7 +331,7 @@ static ssize_t store_regs_in_##reg##offset (struct device *dev, const char *buf,
 { \
 	return store_in_##reg (dev, buf, count, 0x##offset); \
 } \
-static DEVICE_ATTR(in##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_in_##reg##offset, store_regs_in_##reg##offset)
+static DEVICE_ATTR(in##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_in_##reg##offset, store_regs_in_##reg##offset);
 
 #define sysfs_in_offsets(offset) \
 sysfs_in_offset(offset); \
@@ -386,7 +386,7 @@ static ssize_t show_regs_fan_##offset (struct device *dev, char *buf) \
 { \
 	return show_fan(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_regs_fan_##offset, NULL)
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_regs_fan_##offset, NULL);
 
 #define sysfs_fan_min_offset(offset) \
 static ssize_t show_regs_fan_min##offset (struct device *dev, char *buf) \
@@ -397,7 +397,7 @@ static ssize_t store_regs_fan_min##offset (struct device *dev, const char *buf, 
 { \
 	return store_fan_min(dev, buf, count, 0x##offset); \
 } \
-static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, show_regs_fan_min##offset, store_regs_fan_min##offset)
+static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, show_regs_fan_min##offset, store_regs_fan_min##offset);
 
 sysfs_fan_offset(1);
 sysfs_fan_min_offset(1);
@@ -466,7 +466,7 @@ show_regs_temp_##offset (struct device *dev, char *buf) \
 { \
 	return show_temp(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_regs_temp_##offset, NULL)
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_regs_temp_##offset, NULL);
 
 #define sysfs_temp_reg_offset(reg, offset) \
 static ssize_t show_regs_temp_##reg##offset (struct device *dev, char *buf) \
@@ -477,7 +477,7 @@ static ssize_t store_regs_temp_##reg##offset (struct device *dev, const char *bu
 { \
 	return store_temp_##reg (dev, buf, count, 0x##offset); \
 } \
-static DEVICE_ATTR(temp##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_temp_##reg##offset, store_regs_temp_##reg##offset)
+static DEVICE_ATTR(temp##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_temp_##reg##offset, store_regs_temp_##reg##offset);
 
 #define sysfs_temp_offsets(offset) \
 sysfs_temp_offset(offset); \
@@ -503,7 +503,7 @@ show_vid_reg(struct device *dev, char *buf)
 }
 
 static
-DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL)
+DEVICE_ATTR(in0_ref, S_IRUGO, show_vid_reg, NULL);
 #define device_create_file_vid(client) \
 device_create_file(&client->dev, &dev_attr_in0_ref);
 static ssize_t
@@ -527,7 +527,7 @@ store_vrm_reg(struct device *dev, const char *buf, size_t count)
 }
 
 static
-DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg)
+DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm_reg, store_vrm_reg);
 #define device_create_file_vrm(client) \
 device_create_file(&client->dev, &dev_attr_vrm);
 static ssize_t
@@ -538,7 +538,7 @@ show_alarms_reg(struct device *dev, char *buf)
 }
 
 static
-DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL)
+DEVICE_ATTR(alarms, S_IRUGO, show_alarms_reg, NULL);
 #define device_create_file_alarms(client) \
 device_create_file(&client->dev, &dev_attr_alarms);
 static ssize_t show_beep_mask (struct device *dev, char *buf)
@@ -598,7 +598,7 @@ static ssize_t store_regs_beep_##reg (struct device *dev, const char *buf, size_
 { \
 	return store_beep_reg(dev, buf, count, BEEP_##REG); \
 } \
-static DEVICE_ATTR(beep_##reg, S_IRUGO | S_IWUSR, show_regs_beep_##reg, store_regs_beep_##reg)
+static DEVICE_ATTR(beep_##reg, S_IRUGO | S_IWUSR, show_regs_beep_##reg, store_regs_beep_##reg);
 
 sysfs_beep(ENABLE, enable);
 sysfs_beep(MASK, mask);
@@ -665,7 +665,7 @@ static ssize_t store_regs_fan_div_##offset (struct device *dev, const char *buf,
 { \
 	return store_fan_div_reg(dev, buf, count, offset - 1); \
 } \
-static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, show_regs_fan_div_##offset, store_regs_fan_div_##offset)
+static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, show_regs_fan_div_##offset, store_regs_fan_div_##offset);
 
 sysfs_fan_div(1);
 sysfs_fan_div(2);
@@ -744,7 +744,7 @@ static ssize_t store_regs_pwm_##offset (struct device *dev, const char *buf, siz
 { \
 	return store_pwm_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR, show_regs_pwm_##offset, store_regs_pwm_##offset)
+static DEVICE_ATTR(fan##offset##_pwm, S_IRUGO | S_IWUSR, show_regs_pwm_##offset, store_regs_pwm_##offset);
 
 #define sysfs_pwmenable(offset) \
 static ssize_t show_regs_pwmenable_##offset (struct device *dev, char *buf) \
@@ -755,7 +755,7 @@ static ssize_t store_regs_pwmenable_##offset (struct device *dev, const char *bu
 { \
 	return store_pwmenable_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(fan##offset##_pwm_enable, S_IRUGO | S_IWUSR, show_regs_pwmenable_##offset, store_regs_pwmenable_##offset)
+static DEVICE_ATTR(fan##offset##_pwm_enable, S_IRUGO | S_IWUSR, show_regs_pwmenable_##offset, store_regs_pwmenable_##offset);
 
 sysfs_pwm(1);
 sysfs_pwm(2);
@@ -833,7 +833,7 @@ static ssize_t store_regs_sensor_##offset (struct device *dev, const char *buf, 
 { \
     return store_sensor_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(temp##offset##_type, S_IRUGO | S_IWUSR, show_regs_sensor_##offset, store_regs_sensor_##offset)
+static DEVICE_ATTR(temp##offset##_type, S_IRUGO | S_IWUSR, show_regs_sensor_##offset, store_regs_sensor_##offset);
 
 sysfs_sensor(1);
 sysfs_sensor(2);
@@ -891,7 +891,7 @@ static ssize_t store_regs_rt_##offset (struct device *dev, const char *buf, size
 { \
     return store_rt_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(rt##offset, S_IRUGO | S_IWUSR, show_regs_rt_##offset, store_regs_rt_##offset)
+static DEVICE_ATTR(rt##offset, S_IRUGO | S_IWUSR, show_regs_rt_##offset, store_regs_rt_##offset);
 
 sysfs_rt(1);
 sysfs_rt(2);

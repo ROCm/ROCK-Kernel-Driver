@@ -54,6 +54,9 @@ struct bus_type {
 	struct kset		drivers;
 	struct kset		devices;
 
+	struct bus_attribute	* bus_attrs;
+	struct device_attribute	* dev_attrs;
+
 	int		(*match)(struct device * dev, struct device_driver * drv);
 	struct device * (*add)	(struct device * parent, char * bus_id);
 	int		(*hotplug) (struct device *dev, char **envp, 
@@ -90,11 +93,7 @@ struct bus_attribute {
 };
 
 #define BUS_ATTR(_name,_mode,_show,_store)	\
-struct bus_attribute bus_attr_##_name = { 		\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,				\
-	.store	= _store,				\
-};
+struct bus_attribute bus_attr_##_name = __ATTR(_name,_mode,_show,_store)
 
 extern int bus_create_file(struct bus_type *, struct bus_attribute *);
 extern void bus_remove_file(struct bus_type *, struct bus_attribute *);
@@ -131,11 +130,7 @@ struct driver_attribute {
 };
 
 #define DRIVER_ATTR(_name,_mode,_show,_store)	\
-struct driver_attribute driver_attr_##_name = { 		\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,				\
-	.store	= _store,				\
-};
+struct driver_attribute driver_attr_##_name = __ATTR(_name,_mode,_show,_store)
 
 extern int driver_create_file(struct device_driver *, struct driver_attribute *);
 extern void driver_remove_file(struct device_driver *, struct driver_attribute *);
@@ -150,6 +145,9 @@ struct class {
 	struct subsystem	subsys;
 	struct list_head	children;
 	struct list_head	interfaces;
+
+	struct class_attribute		* class_attrs;
+	struct class_device_attribute	* class_dev_attrs;
 
 	int	(*hotplug)(struct class_device *dev, char **envp, 
 			   int num_envp, char *buffer, int buffer_size);
@@ -172,11 +170,7 @@ struct class_attribute {
 };
 
 #define CLASS_ATTR(_name,_mode,_show,_store)			\
-struct class_attribute class_attr_##_name = { 			\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,					\
-	.store	= _store,					\
-};
+struct class_attribute class_attr_##_name = __ATTR(_name,_mode,_show,_store) 
 
 extern int class_create_file(struct class *, const struct class_attribute *);
 extern void class_remove_file(struct class *, const struct class_attribute *);
@@ -224,11 +218,8 @@ struct class_device_attribute {
 };
 
 #define CLASS_DEVICE_ATTR(_name,_mode,_show,_store)		\
-struct class_device_attribute class_device_attr_##_name = { 	\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,					\
-	.store	= _store,					\
-};
+struct class_device_attribute class_device_attr_##_name = 	\
+	__ATTR(_name,_mode,_show,_store)
 
 extern int class_device_create_file(struct class_device *, 
 				    const struct class_device_attribute *);
@@ -342,11 +333,7 @@ struct device_attribute {
 };
 
 #define DEVICE_ATTR(_name,_mode,_show,_store) \
-struct device_attribute dev_attr_##_name = { 		\
-	.attr = {.name = __stringify(_name), .mode = _mode, .owner = THIS_MODULE },	\
-	.show	= _show,				\
-	.store	= _store,				\
-};
+struct device_attribute dev_attr_##_name = __ATTR(_name,_mode,_show,_store)
 
 
 extern int device_create_file(struct device *device, struct device_attribute * entry);
@@ -389,6 +376,11 @@ extern void platform_device_unregister(struct platform_device *);
 
 extern struct bus_type platform_bus_type;
 extern struct device platform_bus;
+
+extern struct resource *platform_get_resource(struct platform_device *, unsigned int, unsigned int);
+extern int platform_get_irq(struct platform_device *, unsigned int);
+extern int platform_add_device(struct platform_device *);
+extern int platform_add_devices(struct platform_device **, int);
 
 /* drivers/base/power.c */
 extern void device_shutdown(void);

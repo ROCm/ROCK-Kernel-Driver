@@ -152,7 +152,7 @@ store_spi_transport_##field(struct class_device *cdev, const char *buf, \
 	spi_transport_store_function(field, format_string)		\
 static CLASS_DEVICE_ATTR(field, S_IRUGO | S_IWUSR,			\
 			 show_spi_transport_##field,			\
-			 store_spi_transport_##field)
+			 store_spi_transport_##field);
 
 /* The Parallel SCSI Tranport Attributes: */
 spi_transport_rd_attr(offset, "%d\n");
@@ -173,7 +173,7 @@ store_spi_revalidate(struct class_device *cdev, const char *buf, size_t count)
 	spi_dv_device(sdev);
 	return count;
 }
-static CLASS_DEVICE_ATTR(revalidate, S_IWUSR, NULL, store_spi_revalidate)
+static CLASS_DEVICE_ATTR(revalidate, S_IWUSR, NULL, store_spi_revalidate);
 
 /* Translate the period into ns according to the current spec
  * for SDTR/PPR messages */

@@ -225,6 +225,22 @@ struct module_kobject
 	struct module_attribute attr[0];
 };
 
+/* Similar stuff for section attributes. */
+#define MODULE_SECT_NAME_LEN 32
+struct module_sect_attr
+{
+	struct attribute attr;
+	char name[MODULE_SECT_NAME_LEN];
+	unsigned long address;
+};
+
+struct module_sections
+{
+	struct kobject kobj;
+	struct module_sect_attr attrs[0];
+};
+
+
 struct module
 {
 	enum module_state state;
@@ -298,6 +314,9 @@ struct module
 	Elf_Sym *symtab;
 	unsigned long num_symtab;
 	char *strtab;
+
+	/* Section attributes */
+	struct module_sections *sect_attrs;
 #endif
 
 	/* Per-cpu data. */
