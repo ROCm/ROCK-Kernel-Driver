@@ -64,10 +64,10 @@ struct ip_conntrack_tuple
 		} u;
 
 		/* The protocol. */
-		u8 protonum;
+		u_int8_t protonum;
 
 		/* The direction (for tuplehash) */
-		u8 dir;
+		u_int8_t dir;
 	} dst;
 };
 
