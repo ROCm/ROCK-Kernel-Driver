@@ -161,6 +161,7 @@ void blk_queue_make_request(request_queue_t * q, make_request_fn * mfn)
 	blk_queue_bounce_limit(q, BLK_BOUNCE_HIGH);
 
 	init_waitqueue_head(&q->queue_wait);
+	INIT_LIST_HEAD(&q->plug_list);
 }
 
 /**
