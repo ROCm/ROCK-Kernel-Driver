@@ -106,6 +106,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 
+#include <asm/cacheflush.h>
 #include <asm/system.h>
 #include <asm/signal.h>
 #include <asm/kgdb.h>
@@ -186,7 +187,7 @@ hex(unsigned char ch)
  * return 0.
  */
 static unsigned char *
-mem2hex(char *mem, char *buf, int count)
+mem2hex(const char *mem, char *buf, int count)
 {
 	unsigned char ch;
 	unsigned short tmp_s;
@@ -828,11 +829,11 @@ breakpoint(void)
 		return;
 	}
 
-	asm("	.globl breakinst
-	     breakinst: .long 0x7d821008
-	    ");
+	asm("	.globl breakinst	\n\
+	     breakinst: .long 0x7d821008");
 }
 
+#ifdef CONFIG_KGDB_CONSOLE
 /* Output string in GDB O-packet format if GDB has connected. If nothing
    output, returns 0 (caller must then handle output). */
 int
@@ -852,3 +853,4 @@ kgdb_output_string (const char* s, unsigned int count)
 
 	return 1;
 }
+#endif
