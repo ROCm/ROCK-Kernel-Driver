@@ -561,7 +561,21 @@ static int sun3scsi_dma_finish(int write_flag)
 
 #include "sun3_NCR5380.c"
 
-static Scsi_Host_Template driver_template = SUN3_NCR5380;
+static Scsi_Host_Template driver_template = {
+	.name			= SUN3_SCSI_NAME,
+	.detect			= sun3scsi_detect,
+	.release		= sun3scsi_release,
+	.info			= sun3scsi_info,
+	.queuecommand		= sun3scsi_queue_command,
+	.abort			= sun3scsi_abort,
+	.reset			= sun3scsi_reset,
+	.can_queue		= CAN_QUEUE,
+	.this_id		= 7,
+	.sg_tablesize		= SG_TABLESIZE,
+	.cmd_per_lun		= CMD_PER_LUN,
+	.use_clustering		= DISABLE_CLUSTERING
+};
+
 
 #include "scsi_module.c"
 

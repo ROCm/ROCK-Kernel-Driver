@@ -3128,7 +3128,21 @@ static int NCR5380_reset( Scsi_Cmnd *cmd, unsigned int reset_flags)
 #endif /* 1 */
 }
 
-static Scsi_Host_Template driver_template = MAC_NCR5380;
+static Scsi_Host_Template driver_template = {
+	.name			= "Macintosh NCR5380 SCSI",
+	.detect			= macscsi_detect,
+	.release		= macscsi_release,
+	.info			= macscsi_info,
+	.queuecommand		= macscsi_queue_command,
+	.abort			= macscsi_abort,
+	.reset			= macscsi_reset,
+	.can_queue		= CAN_QUEUE,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= CMD_PER_LUN,
+	.use_clustering		= DISABLE_CLUSTERING
+};
+
 
 #include "scsi_module.c"
 

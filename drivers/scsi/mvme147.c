@@ -116,7 +116,21 @@ int mvme147_detect(Scsi_Host_Template *tpnt)
 
 #include "mvme147.h"
 
-static Scsi_Host_Template driver_template = MVME147_SCSI;
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "MVME147",
+	.name			= "MVME147 built-in SCSI",
+	.detect			= mvme147_detect,
+	.release		= mvme147_release,
+	.queuecommand		= wd33c93_queuecommand,
+	.abort			= wd33c93_abort,
+	.reset			= wd33c93_reset,
+	.can_queue		= CAN_QUEUE,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= CMD_PER_LUN,
+	.use_clustering		= ENABLE_CLUSTERING
+};
+
 
 #include "scsi_module.c"
 

@@ -1141,7 +1141,23 @@ static void atari_scsi_falcon_reg_write( unsigned char reg, unsigned char value 
 
 #include "atari_NCR5380.c"
 
-static Scsi_Host_Template driver_template = ATARI_SCSI;
+static Scsi_Host_Template driver_template = {
+	.proc_info		= atari_scsi_proc_info,
+	.name			= "Atari native SCSI",
+	.detect			= atari_scsi_detect,
+	.release		= atari_scsi_release,
+	.info			= atari_scsi_info,
+	.queuecommand		= atari_scsi_queue_command,
+	.abort			= atari_scsi_abort,
+	.reset			= atari_scsi_reset,
+	.can_queue		= 0, /* initialized at run-time */
+	.this_id		= 0, /* initialized at run-time */
+	.sg_tablesize		= 0, /* initialized at run-time */
+	.cmd_per_lun		= 0, /* initialized at run-time */
+	.use_clustering		= DISABLE_CLUSTERING
+};
+
+
 #include "scsi_module.c"
 
 MODULE_LICENSE("GPL");

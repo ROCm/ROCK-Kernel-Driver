@@ -207,7 +207,21 @@ fail_register:
 
 #define HOSTS_C
 
-static Scsi_Host_Template driver_template = _A3000_SCSI;
+static Scsi_Host_Template driver_template = {
+	.proc_name		= "A3000",
+	.name			= "Amiga 3000 built-in SCSI",
+	.detect			= a3000_detect,
+	.release		= a3000_release,
+	.queuecommand		= wd33c93_queuecommand,
+	.abort			= wd33c93_abort,
+	.reset			= wd33c93_reset,
+	.can_queue		= CAN_QUEUE,
+	.this_id		= 7,
+	.sg_tablesize		= SG_ALL,
+	.cmd_per_lun		= CMD_PER_LUN,
+	.use_clustering		= ENABLE_CLUSTERING
+};
+
 
 #include "scsi_module.c"
 
