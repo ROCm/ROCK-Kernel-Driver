@@ -870,11 +870,13 @@ static int pccardd(void *__skt)
 
 void pcmcia_parse_events(struct pcmcia_socket *s, u_int events)
 {
-	spin_lock(&s->thread_lock);
-	s->thread_events |= events;
-	spin_unlock(&s->thread_lock);
+	if (s->thread) {
+		spin_lock(&s->thread_lock);
+		s->thread_events |= events;
+		spin_unlock(&s->thread_lock);
 
-	wake_up(&s->thread_wait);
+		wake_up(&s->thread_wait);
+	}
 } /* pcmcia_parse_events */
 
 
