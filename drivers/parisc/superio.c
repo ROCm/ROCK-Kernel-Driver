@@ -8,7 +8,7 @@
  *	(C) Copyright 2000 Linuxcare, Inc.
  * 	(C) Copyright 2000 Linuxcare Canada, Inc.
  *	(C) Copyright 2000 Martin K. Petersen <mkp@linuxcare.com>
- * 	(C) Copyright 2000 Alex deVries <alex@linuxcare.com>
+ * 	(C) Copyright 2000 Alex deVries <alex@onefishtwo.ca>
  *      (C) Copyright 2001 John Marvin <jsm fc hp com>
  *      (C) Copyright 2003 Grant Grundler <grundler parisc-linux org>
  *

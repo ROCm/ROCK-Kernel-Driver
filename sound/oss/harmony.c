@@ -8,7 +8,7 @@
 	On older 715 machines you'll find the technically identical chip 
 	called 'Vivace'. Both Harmony and Vicace are supported by this driver.
 
-	Copyright 2000 (c) Linuxcare Canada, Alex deVries <alex@linuxcare.com>
+	Copyright 2000 (c) Linuxcare Canada, Alex deVries <alex@onefishtwo.ca>
 	Copyright 2000-2003 (c) Helge Deller <deller@gmx.de>
 	Copyright 2001 (c) Matthieu Delahaye <delahaym@esiee.fr>
 	Copyright 2001 (c) Jean-Christophe Vaugeois <vaugeoij@esiee.fr>
@@ -1321,7 +1321,7 @@ static void __exit cleanup_harmony(void)
 }
 
 
-MODULE_AUTHOR("Alex DeVries <alex@linuxcare.com>");
+MODULE_AUTHOR("Alex DeVries <alex@onefishtwo.ca>");
 MODULE_DESCRIPTION("Harmony sound driver");
 MODULE_LICENSE("GPL");
 

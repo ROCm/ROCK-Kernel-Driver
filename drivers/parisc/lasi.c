@@ -11,7 +11,7 @@
  *      (at your option) any later version.
  *
  *	by Alan Cox <alan@redhat.com> and 
- * 	   Alex deVries <adevries@thepuffingroup.com> 
+ * 	   Alex deVries <alex@onefishtwo.ca>
  */
 
 #include <linux/errno.h>

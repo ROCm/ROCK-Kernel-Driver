@@ -7,7 +7,7 @@
  *    Reference Specification", March 7, 1999, version 0.96.  This
  *    is available at http://parisc-linux.org/documentation/
  *
- *    Copyright 1999 by Alex deVries <adevries@thepuffingroup.com>
+ *    Copyright 1999 by Alex deVries <alex@onefishtwo.ca>
  *    and copyright 1999 The Puffin Group Inc.
  *
  *    This program is free software; you can redistribute it and/or modify
