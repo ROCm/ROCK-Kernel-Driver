@@ -56,8 +56,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"2.1"
-#define DRV_MODULE_RELDATE	"August 23, 2003"
+#define DRV_MODULE_VERSION	"2.2"
+#define DRV_MODULE_RELDATE	"August 24, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -6032,11 +6032,6 @@ static void tg3_set_msglevel(struct net_device *dev, u32 value)
 	tp->msg_enable = value;
 }
   
-static u32 tg3_get_tso(struct net_device *dev)
-{
-	return (dev->features & NETIF_F_TSO) != 0;
-}
-  
 static int tg3_set_tso(struct net_device *dev, u32 value)
 {
 	struct tg3 *tp = dev->priv;
@@ -6045,13 +6040,8 @@ static int tg3_set_tso(struct net_device *dev, u32 value)
 		if (value)
 			return -EINVAL;
 		return 0;
-	} else {
-		if (!value)
-			dev->features &= ~NETIF_F_TSO;
-		else
-			dev->features |= NETIF_F_TSO;
-		return 0;
 	}
+	return ethtool_op_set_tso(dev, value);
 }
   
 static int tg3_nway_reset(struct net_device *dev)
@@ -6293,7 +6283,7 @@ static struct ethtool_ops tg3_ethtool_ops = {
 	.set_tx_csum		= tg3_set_tx_csum,
 	.get_sg			= ethtool_op_get_sg,
 	.set_sg			= ethtool_op_set_sg,
-	.get_tso		= tg3_get_tso,
+	.get_tso		= ethtool_op_get_tso,
 	.set_tso		= tg3_set_tso,
 };
 
@@ -7371,6 +7361,8 @@ static int __devinit tg3_test_dma(struct tg3 *tp)
 		/* Remove this if it causes problems for some boards. */
 		tp->dma_rwctrl |= DMA_RWCTRL_USE_MEM_READ_MULT;
 	}
+
+	tp->dma_rwctrl |= DMA_RWCTRL_ASSERT_ALL_BE;
 
 	tw32(TG3PCI_DMA_RW_CTRL, tp->dma_rwctrl);
 
