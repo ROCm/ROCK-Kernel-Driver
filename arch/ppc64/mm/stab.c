@@ -152,42 +152,18 @@ int ste_allocate(unsigned long ea)
 }
 
 /*
- * preload some userspace segments into the segment table.
+ * Do the segment table work for a context switch: flush all user
+ * entries from the table, then preload some probably useful entries
+ * for the new task
  */
-static void preload_stab(struct task_struct *tsk, struct mm_struct *mm)
-{
-	unsigned long pc = KSTK_EIP(tsk);
-	unsigned long stack = KSTK_ESP(tsk);
-	unsigned long unmapped_base;
-
-	if (test_tsk_thread_flag(tsk, TIF_32BIT))
-		unmapped_base = TASK_UNMAPPED_BASE_USER32;
-	else
-		unmapped_base = TASK_UNMAPPED_BASE_USER64;
-
-	__ste_allocate(pc, mm);
-
-	if (GET_ESID(pc) == GET_ESID(stack))
-		return;
-
-	__ste_allocate(stack, mm);
-
-	if ((GET_ESID(pc) == GET_ESID(unmapped_base))
-	    || (GET_ESID(stack) == GET_ESID(unmapped_base)))
-		return;
-
-	__ste_allocate(unmapped_base, mm);
-
-	/* Order update */
-	asm volatile("sync" : : : "memory");
-}
-
-/* Flush all user entries from the segment table of the current processor. */
-void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
+void switch_stab(struct task_struct *tsk, struct mm_struct *mm)
 {
 	struct stab_entry *stab = (struct stab_entry *) get_paca()->stab_addr;
 	struct stab_entry *ste;
 	unsigned long offset = __get_cpu_var(stab_cache_ptr);
+	unsigned long pc = KSTK_EIP(tsk);
+	unsigned long stack = KSTK_ESP(tsk);
+	unsigned long unmapped_base;
 
 	/* Force previous translations to complete. DRENG */
 	asm volatile("isync" : : : "memory");
@@ -222,7 +198,27 @@ void flush_stab(struct task_struct *tsk, struct mm_struct *mm)
 
 	__get_cpu_var(stab_cache_ptr) = 0;
 
-	preload_stab(tsk, mm);
+	/* Now preload some entries for the new task */
+	if (test_tsk_thread_flag(tsk, TIF_32BIT))
+		unmapped_base = TASK_UNMAPPED_BASE_USER32;
+	else
+		unmapped_base = TASK_UNMAPPED_BASE_USER64;
+
+	__ste_allocate(pc, mm);
+
+	if (GET_ESID(pc) == GET_ESID(stack))
+		return;
+
+	__ste_allocate(stack, mm);
+
+	if ((GET_ESID(pc) == GET_ESID(unmapped_base))
+	    || (GET_ESID(stack) == GET_ESID(unmapped_base)))
+		return;
+
+	__ste_allocate(unmapped_base, mm);
+
+	/* Order update */
+	asm volatile("sync" : : : "memory");
 }
 
 extern void slb_initialize(void);
