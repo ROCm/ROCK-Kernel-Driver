@@ -2100,6 +2100,12 @@ static void cfq_idle_class_timer(unsigned long data)
 	spin_unlock_irqrestore(cfqd->queue->queue_lock, flags);
 }
 
+static void cfq_shutdown_timer_wq(struct cfq_data *cfqd)
+{
+	del_timer_sync(&cfqd->idle_slice_timer);
+	del_timer_sync(&cfqd->idle_class_timer);
+	blk_sync_queue(cfqd->queue);
+}
 
 static void cfq_put_cfqd(struct cfq_data *cfqd)
 {
@@ -2108,7 +2114,7 @@ static void cfq_put_cfqd(struct cfq_data *cfqd)
 	if (!atomic_dec_and_test(&cfqd->ref))
 		return;
 
-	blk_sync_queue(q);
+	cfq_shutdown_timer_wq(cfqd);
 
 	blk_put_queue(q);
 
@@ -2122,8 +2128,7 @@ static void cfq_exit_queue(elevator_t *e)
 {
 	struct cfq_data *cfqd = e->elevator_data;
 
-	del_timer_sync(&cfqd->idle_slice_timer);
-	del_timer_sync(&cfqd->idle_class_timer);
+	cfq_shutdown_timer_wq(cfqd);
 	cfq_put_cfqd(cfqd);
 }
 
