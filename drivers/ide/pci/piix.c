@@ -711,8 +711,6 @@ static void __init init_hwif_piix (ide_hwif_t *hwif)
 	hwif->drives[0].autodma = hwif->autodma;
 }
 
-extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
-
 /**
  *	init_setup_piix		-	callback for IDE initialize
  *	@dev: PIIX PCI device

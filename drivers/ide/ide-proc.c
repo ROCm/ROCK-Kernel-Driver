@@ -74,10 +74,6 @@
 
 #include <asm/io.h>
 
-#ifndef MIN
-#define MIN(a,b) (((a) < (b)) ? (a) : (b))
-#endif
-
 static int ide_getxdigit(char c)
 {
 	int digit;
