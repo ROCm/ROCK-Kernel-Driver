@@ -20,6 +20,14 @@
  *
  * aha1740_makecode may still need even more work
  * if it doesn't work for your devices, take a look.
+ *
+ * Reworked for new_eh and new locking by Alan Cox <alan@redhat.com>
+ *
+ * For the avoidance of doubt the "preferred form" of this code is one which
+ * is in an open non patent encumbered format. Where cryptographic key signing
+ * forms part of the process of creating an executable the information
+ * including keys needed to generate an equivalently functional executable
+ * are deemed to be part of the source code.
  */
 
 #include <linux/module.h>
@@ -68,7 +76,7 @@ static spinlock_t aha1740_lock = SPIN_LOCK_UNLOCKED;
 /* One for each IRQ level (9-15) */
 static struct Scsi_Host * aha_host[8] = {NULL, };
 
-int aha1740_proc_info(char *buffer, char **start, off_t offset,
+static int aha1740_proc_info(char *buffer, char **start, off_t offset,
 		      int length, int hostno, int inout)
 {
     int len;
@@ -76,7 +84,7 @@ int aha1740_proc_info(char *buffer, char **start, off_t offset,
     struct aha1740_hostdata *host;
 
     if (inout)
-	return(-ENOSYS);
+	return-ENOSYS;
 
     for (len = 0; len < 8; len++) {
 	shpnt = aha_host[len];
@@ -103,7 +111,7 @@ int aha1740_proc_info(char *buffer, char **start, off_t offset,
 }
 
 
-int aha1740_makecode(unchar *sense, unchar *status)
+static int aha1740_makecode(unchar *sense, unchar *status)
 {
     struct statusword
     {
@@ -179,7 +187,7 @@ int aha1740_makecode(unchar *sense, unchar *status)
     return status[3] | retval << 16;
 }
 
-int aha1740_test_port(unsigned int base)
+static int aha1740_test_port(unsigned int base)
 {
     char name[4], tmp;
 
@@ -212,7 +220,7 @@ int aha1740_test_port(unsigned int base)
 }
 
 /* A "high" level interrupt handler */
-void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
+static void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
 {
     struct Scsi_Host *host = aha_host[irq - 9];
     void (*my_done)(Scsi_Cmnd *);
@@ -303,7 +311,7 @@ void aha1740_intr_handle(int irq, void *dev_id, struct pt_regs * regs)
     spin_unlock_irqrestore(host->host_lock, flags);
 }
 
-int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
+static int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 {
     unchar direction;
     unchar *cmd = (unchar *) SCpnt->cmnd;
@@ -317,16 +325,6 @@ int aha1740_queuecommand(Scsi_Cmnd * SCpnt, void (*done)(Scsi_Cmnd *))
 
     if(*cmd == REQUEST_SENSE)
     {
-#if 0
-	/* scsi_request_sense() provides a buffer of size 256,
-	   so there is no reason to expect equality */
-
-	if (bufflen != sizeof(SCpnt->sense_buffer))
-	{
-	    printk("Wrong buffer length supplied for request sense (%d)\n",
-		   bufflen);
-	}
-#endif	
 	SCpnt->result = 0;
 	done(SCpnt); 
 	return 0;
@@ -486,7 +484,7 @@ static void internal_done(Scsi_Cmnd * SCpnt)
     SCpnt->SCp.Status++;
 }
 
-int aha1740_command(Scsi_Cmnd * SCpnt)
+static int aha1740_command(Scsi_Cmnd * SCpnt)
 {
     aha1740_queuecommand(SCpnt, internal_done);
     SCpnt->SCp.Status = 0;
@@ -501,7 +499,7 @@ int aha1740_command(Scsi_Cmnd * SCpnt)
 /* Query the board for its irq_level.  Nothing else matters
    in enhanced mode on an EISA bus. */
 
-void aha1740_getconfig(unsigned int base, unsigned int *irq_level,
+static void aha1740_getconfig(unsigned int base, unsigned int *irq_level,
 		       unsigned int *translation)
 {
     static int intab[] = { 9, 10, 11, 12, 0, 14, 15, 0 };
@@ -511,7 +509,7 @@ void aha1740_getconfig(unsigned int base, unsigned int *irq_level,
     outb(inb(INTDEF(base)) | 0x10, INTDEF(base));
 }
 
-int aha1740_detect(Scsi_Host_Template * tpnt)
+static int aha1740_detect(Scsi_Host_Template * tpnt)
 {
     int count = 0, slot;
 
@@ -540,8 +538,8 @@ int aha1740_detect(Scsi_Host_Template * tpnt)
 	    outb(G2CNTRL_HRST, G2CNTRL(slotbase));
 	    outb(0, G2CNTRL(slotbase));
 	}
-	printk("Configuring aha174x at IO:%x, IRQ %d\n", slotbase, irq_level);
-	printk("aha174x: Extended translation %sabled.\n",
+	printk(KERN_INFO "Configuring aha174x at IO:%x, IRQ %d\n", slotbase, irq_level);
+	printk(KERN_INFO "aha174x: Extended translation %sabled.\n",
 	       translation ? "en" : "dis");
 	DEB(printk("aha1740_detect: enable interrupt channel %d\n",irq_level));
 	if (request_irq(irq_level,aha1740_intr_handle,0,"aha1740",NULL)) {
@@ -572,31 +570,7 @@ int aha1740_detect(Scsi_Host_Template * tpnt)
     return count;
 }
 
-/* Note:  They following two functions do not apply very well to the Adaptec,
-   which basically manages its own affairs quite well without our interference,
-   so I haven't put anything into them.  I can faintly imagine someone with a
-   *very* badly behaved SCSI target (perhaps an old tape?) wanting the abort(),
-   but it hasn't happened yet, and doing aborts brings the Adaptec to its
-   knees.  I cannot (at this moment in time) think of any reason to reset the
-   card once it's running.  So there. */
-
-int aha1740_abort(Scsi_Cmnd * SCpnt)
-{
-    DEB(printk("aha1740_abort called\n"));
-    return SCSI_ABORT_SNOOZE;
-}
-
-/* We do not implement a reset function here, but the upper level code assumes
-   that it will get some kind of response for the command in SCpnt.  We must
-   oblige, or the command will hang the scsi system */
-
-int aha1740_reset(Scsi_Cmnd * SCpnt, unsigned int ignored)
-{
-    DEB(printk("aha1740_reset called\n"));
-    return SCSI_RESET_PUNT;
-}
-
-int aha1740_biosparam(struct scsi_device *sdev, struct block_device *dev,
+static int aha1740_biosparam(struct scsi_device *sdev, struct block_device *dev,
 		sector_t capacity, int* ip)
 {
     int size = capacity;
