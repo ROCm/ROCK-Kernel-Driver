@@ -134,6 +134,7 @@ struct e1000_buffer {
 	uint64_t dma;
 	unsigned long length;
 	unsigned long time_stamp;
+	unsigned int next_to_watch;
 };
 
 struct e1000_desc_ring {

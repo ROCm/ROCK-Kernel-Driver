@@ -831,8 +831,9 @@ e1000_configure_tx(struct e1000_adapter *adapter)
 
 	e1000_config_collision_dist(&adapter->hw);
 
-	/* Setup Transmit Descriptor Settings for this adapter */
-	adapter->txd_cmd = E1000_TXD_CMD_IFCS | E1000_TXD_CMD_IDE;
+	/* Setup Transmit Descriptor Settings for eop descriptor */
+	adapter->txd_cmd = E1000_TXD_CMD_IDE | E1000_TXD_CMD_EOP |
+		E1000_TXD_CMD_IFCS;
 
 	if(adapter->hw.report_tx_early == 1)
 		adapter->txd_cmd |= E1000_TXD_CMD_RS;
@@ -1435,7 +1436,7 @@ e1000_watchdog(unsigned long data)
 #define E1000_TX_FLAGS_VLAN_SHIFT	16
 
 static inline boolean_t
-e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb, int tx_flags)
+e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb)
 {
 #ifdef NETIF_F_TSO
 	struct e1000_context_desc *context_desc;
@@ -1471,7 +1472,7 @@ e1000_tso(struct e1000_adapter *adapter, struct sk_buff *skb, int tx_flags)
 		context_desc->upper_setup.tcp_fields.tucse = cpu_to_le16(tucse);
 		context_desc->tcp_seg_setup.fields.mss     = cpu_to_le16(mss);
 		context_desc->tcp_seg_setup.fields.hdr_len = hdr_len;
-		context_desc->cmd_and_length = cpu_to_le32(adapter->txd_cmd |
+		context_desc->cmd_and_length = cpu_to_le32(
 			E1000_TXD_CMD_DEXT | E1000_TXD_CMD_TSE |
 			E1000_TXD_CMD_IP | E1000_TXD_CMD_TCP |
 			(skb->len - (hdr_len)));
@@ -1504,8 +1505,7 @@ e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
 		context_desc->upper_setup.tcp_fields.tucso = cso;
 		context_desc->upper_setup.tcp_fields.tucse = 0;
 		context_desc->tcp_seg_setup.data = 0;
-		context_desc->cmd_and_length =
-			cpu_to_le32(adapter->txd_cmd | E1000_TXD_CMD_DEXT);
+		context_desc->cmd_and_length = cpu_to_le32(E1000_TXD_CMD_DEXT);
 
 		if(++i == adapter->tx_ring.count) i = 0;
 		adapter->tx_ring.next_to_use = i;
@@ -1520,7 +1520,8 @@ e1000_tx_csum(struct e1000_adapter *adapter, struct sk_buff *skb)
 #define E1000_MAX_DATA_PER_TXD	(1<<E1000_MAX_TXD_PWR)
 
 static inline int
-e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
+e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb,
+	unsigned int first)
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 	int len = skb->len, offset = 0, size, count = 0, i;
@@ -1588,6 +1589,7 @@ e1000_tx_map(struct e1000_adapter *adapter, struct sk_buff *skb)
 	}
 	if(--i < 0) i = tx_ring->count - 1;
 	tx_ring->buffer_info[i].skb = skb;
+	tx_ring->buffer_info[first].next_to_watch = i;
 
 	return count;
 }
@@ -1597,11 +1599,8 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 {
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 	struct e1000_tx_desc *tx_desc = NULL;
-	uint32_t txd_upper, txd_lower;
+	uint32_t txd_upper = 0, txd_lower = E1000_TXD_CMD_IFCS;
 	int i;
-
-	txd_upper = 0;
-	txd_lower = adapter->txd_cmd;
 
 	if(tx_flags & E1000_TX_FLAGS_TSO) {
 		txd_lower |= E1000_TXD_CMD_DEXT | E1000_TXD_DTYP_D |
@@ -1630,7 +1629,7 @@ e1000_tx_queue(struct e1000_adapter *adapter, int count, int tx_flags)
 		if(++i == tx_ring->count) i = 0;
 	}
 
-	tx_desc->lower.data |= cpu_to_le32(E1000_TXD_CMD_EOP);
+	tx_desc->lower.data |= cpu_to_le32(adapter->txd_cmd);
 
 	/* Force memory writes to complete before letting h/w
 	 * know there are new descriptors to fetch.  (Only
@@ -1690,6 +1689,7 @@ static int
 e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 {
 	struct e1000_adapter *adapter = netdev->priv;
+	unsigned int first;
 	int tx_flags = 0;
 
 	if(skb->len <= 0) {
@@ -1715,12 +1715,14 @@ e1000_xmit_frame(struct sk_buff *skb, struct net_device *netdev)
 		tx_flags |= (vlan_tx_tag_get(skb) << E1000_TX_FLAGS_VLAN_SHIFT);
 	}
 
-	if(e1000_tso(adapter, skb, tx_flags))
+	first = adapter->tx_ring.next_to_use;
+	
+	if(e1000_tso(adapter, skb))
 		tx_flags |= E1000_TX_FLAGS_TSO;
 	else if(e1000_tx_csum(adapter, skb))
 		tx_flags |= E1000_TX_FLAGS_CSUM;
 
-	e1000_tx_queue(adapter, e1000_tx_map(adapter, skb), tx_flags);
+	e1000_tx_queue(adapter, e1000_tx_map(adapter, skb, first), tx_flags);
 
 	netdev->trans_start = jiffies;
 
@@ -2069,39 +2071,47 @@ e1000_clean_tx_irq(struct e1000_adapter *adapter)
 	struct e1000_desc_ring *tx_ring = &adapter->tx_ring;
 	struct net_device *netdev = adapter->netdev;
 	struct pci_dev *pdev = adapter->pdev;
-	struct e1000_tx_desc *tx_desc;
-	int i, cleaned = FALSE;
+	struct e1000_tx_desc *tx_desc, *eop_desc;
+	struct e1000_buffer *buffer_info;
+	int i, eop, cleaned = FALSE;
 
 	i = tx_ring->next_to_clean;
-	tx_desc = E1000_TX_DESC(*tx_ring, i);
+	eop = tx_ring->buffer_info[i].next_to_watch;
+	eop_desc = E1000_TX_DESC(*tx_ring, eop);
 
-	while(tx_desc->upper.data & cpu_to_le32(E1000_TXD_STAT_DD)) {
+	while(eop_desc->upper.data & cpu_to_le32(E1000_TXD_STAT_DD)) {
 
-		cleaned = TRUE;
+		for(cleaned = FALSE; !cleaned; ) {
+			tx_desc = E1000_TX_DESC(*tx_ring, i);
+			buffer_info = &tx_ring->buffer_info[i];
 
-		if(tx_ring->buffer_info[i].dma) {
+			if(buffer_info->dma) {
 
-			pci_unmap_page(pdev,
-			               tx_ring->buffer_info[i].dma,
-			               tx_ring->buffer_info[i].length,
-			               PCI_DMA_TODEVICE);
+				pci_unmap_page(pdev,
+					       buffer_info->dma,
+					       buffer_info->length,
+					       PCI_DMA_TODEVICE);
 
-			tx_ring->buffer_info[i].dma = 0;
+				buffer_info->dma = 0;
+			}
+
+			if(buffer_info->skb) {
+
+				dev_kfree_skb_any(buffer_info->skb);
+
+				buffer_info->skb = NULL;
+			}
+
+			tx_desc->buffer_addr = 0;
+			tx_desc->lower.data = 0;
+			tx_desc->upper.data = 0;
+
+			cleaned = (i == eop);
+			if(++i == tx_ring->count) i = 0;
 		}
-
-		if(tx_ring->buffer_info[i].skb) {
-
-			dev_kfree_skb_any(tx_ring->buffer_info[i].skb);
-
-			tx_ring->buffer_info[i].skb = NULL;
-		}
-
-		tx_desc->buffer_addr = 0;
-		tx_desc->lower.data = 0;
-		tx_desc->upper.data = 0;
-
-		if(++i == tx_ring->count) i = 0;
-		tx_desc = E1000_TX_DESC(*tx_ring, i);
+		
+		eop = tx_ring->buffer_info[i].next_to_watch;
+		eop_desc = E1000_TX_DESC(*tx_ring, eop);
 	}
 
 	tx_ring->next_to_clean = i;
