@@ -27,7 +27,6 @@
 #include <linux/skbuff.h>
 #include <linux/rtnetlink.h>
 #include <linux/init.h>
-#include <linux/proc_fs.h>
 #include <net/sock.h>
 #include <net/pkt_sched.h>
 

@@ -505,7 +505,7 @@ static struct ifacaddr6 *ac6_get_idx(struct seq_file *seq, loff_t pos)
 static void *ac6_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? ac6_get_idx(seq, *pos) : ac6_get_first(seq);
+	return ac6_get_idx(seq, *pos);
 }
 
 static void *ac6_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -581,11 +581,9 @@ static struct file_operations ac6_seq_fops = {
 
 int __init ac6_proc_init(void)
 {
-	struct proc_dir_entry *p;
+	if (!proc_net_fops_create("anycast6", S_IRUGO, &ac6_seq_fops))
+		return -ENOMEM;
 
-	p = create_proc_entry("anycast6", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &ac6_seq_fops;
 	return 0;
 }
 

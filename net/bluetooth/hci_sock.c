@@ -587,6 +587,8 @@ static int hci_sock_create(struct socket *sock, int protocol)
 	if (!sk)
 		return -ENOMEM;
 
+	sk_set_owner(sk, THIS_MODULE);
+
 	sock->state = SS_UNCONNECTED;
 	sk->sk_state   = BT_OPEN;
 

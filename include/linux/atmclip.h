@@ -18,8 +18,4 @@
 
 #define	SIOCMKCLIP	_IO('a',ATMIOC_CLIP)	/* create IP interface */
 
-#ifdef __KERNEL__
-extern const unsigned char llc_oui[6];
-#endif
-
 #endif

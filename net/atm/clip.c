@@ -189,6 +189,13 @@ static int clip_arp_rcv(struct sk_buff *skb)
 	return 0;
 }
 
+static const unsigned char llc_oui[] = {
+	0xaa,	/* DSAP: non-ISO */
+	0xaa,	/* SSAP: non-ISO */
+	0x03,	/* Ctrl: Unnumbered Information Command PDU */
+	0x00,	/* OUI: EtherType */
+	0x00,
+	0x00 };
 
 static void clip_push(struct atm_vcc *vcc,struct sk_buff *skb)
 {

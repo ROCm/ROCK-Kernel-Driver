@@ -1416,14 +1416,9 @@ static struct file_operations arp_seq_fops = {
 
 static int __init arp_proc_init(void)
 {
-	int rc = 0;
-	struct proc_dir_entry *p = create_proc_entry("arp", S_IRUGO, proc_net);
-
-        if (p)
-		p->proc_fops = &arp_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	if (!proc_net_fops_create("arp", S_IRUGO, &arp_seq_fops))
+		return -ENOMEM;
+	return 0;
 }
 
 #else /* CONFIG_PROC_FS */

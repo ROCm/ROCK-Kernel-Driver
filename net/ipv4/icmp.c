@@ -669,7 +669,7 @@ static void icmp_unreach(struct sk_buff *skb)
 			printk(KERN_WARNING "%u.%u.%u.%u sent an invalid ICMP "
 					    "type %u, code %u "
 					    "error to a broadcast: %u.%u.%u.%u on %s\n",
-			       NIPQUAD(iph->saddr),
+			       NIPQUAD(skb->nh.iph->saddr),
 			       icmph->type, icmph->code,
 			       NIPQUAD(iph->daddr),
 			       skb->dev->name);
