@@ -213,7 +213,7 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
 
 	do {
 		status |= action->flags;
-		retval |= action->handler(irq, action->dev_id, regs).val;
+		retval |= action->handler(irq, action->dev_id, regs);
 		action = action->next;
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)

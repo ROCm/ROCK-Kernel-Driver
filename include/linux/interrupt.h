@@ -25,13 +25,11 @@
  * IRQ_HANDLED means that we did have a valid interrupt and handled it.
  * IRQ_RETVAL(x) selects on the two depending on x being non-zero (for handled)
  */
-typedef struct irqreturn {
-	unsigned int val;
-} irqreturn_t;
+typedef int irqreturn_t;
 
-#define IRQ_NONE	((struct irqreturn) { 0 })
-#define IRQ_HANDLED	((struct irqreturn) { 1 })
-#define IRQ_RETVAL(x)	((struct irqreturn) { (x) != 0 })
+#define IRQ_NONE	(0)
+#define IRQ_HANDLED	(1)
+#define IRQ_RETVAL(x)	((x) != 0)
 
 struct irqaction {
 	irqreturn_t (*handler)(int, void *, struct pt_regs *);
