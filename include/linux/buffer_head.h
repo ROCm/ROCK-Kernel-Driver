@@ -49,12 +49,12 @@ typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
 struct buffer_head {
 	/* First cache line: */
 	unsigned long b_state;		/* buffer state bitmap (see above) */
-	atomic_t b_count;		/* users using this block */
 	struct buffer_head *b_this_page;/* circular list of page's buffers */
 	struct page *b_page;		/* the page this bh is mapped to */
+	atomic_t b_count;		/* users using this block */
+	u32 b_size;			/* block size */
 
 	sector_t b_blocknr;		/* block number */
-	u32 b_size;			/* block size */
 	char *b_data;			/* pointer to data block */
 
 	struct block_device *b_bdev;
