@@ -1,7 +1,7 @@
 /* 
  * Sony Programmable I/O Control Device driver for VAIO
  *
- * Copyright (C) 2001-2002 Stelian Pop <stelian@popies.net>
+ * Copyright (C) 2001-2003 Stelian Pop <stelian@popies.net>
  *
  * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
@@ -37,7 +37,7 @@
 #ifdef __KERNEL__
 
 #define SONYPI_DRIVER_MAJORVERSION	 1
-#define SONYPI_DRIVER_MINORVERSION	17
+#define SONYPI_DRIVER_MINORVERSION	18
 
 #define SONYPI_DEVICE_MODEL_TYPE1	1
 #define SONYPI_DEVICE_MODEL_TYPE2	2
@@ -45,6 +45,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/pci.h>
+#include <linux/input.h>
 #include <linux/pm.h>
 #include <linux/acpi.h>
 #include "linux/sonypi.h"
@@ -334,6 +335,9 @@ struct sonypi_queue {
 	unsigned char buf[SONYPI_BUF_SIZE];
 };
 
+/* The name of the Jog Dial for the input device drivers */
+#define SONYPI_INPUTNAME	"Sony VAIO Jog Dial"
+
 struct sonypi_device {
 	struct pci_dev *dev;
 	u16 irq;
@@ -347,7 +351,10 @@ struct sonypi_device {
 	struct sonypi_queue queue;
 	int open_count;
 	int model;
-#if CONFIG_PM
+#if defined(CONFIG_INPUT) || defined(CONFIG_INPUT_MODULE)
+	struct input_dev jog_dev;
+#endif
+#ifdef CONFIG_PM
 	struct pm_dev *pm;
 #endif
 };
@@ -363,7 +370,7 @@ struct sonypi_device {
 		printk(KERN_WARNING "sonypi command failed at %s : %s (line %d)\n", __FILE__, __FUNCTION__, __LINE__); \
 }
 
-#if !defined(CONFIG_ACPI)
+#ifndef CONFIG_ACPI
 extern int verbose;
 
 static inline int ec_write(u8 addr, u8 value) {
