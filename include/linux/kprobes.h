@@ -18,11 +18,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- * Copyright (C) IBM Corporation, 2002
+ * Copyright (C) IBM Corporation, 2002, 2004
  *
  * 2002-Oct	Created by Vamsi Krishna S <vamsi_krishna@in.ibm.com> Kernel
  *		Probes initial implementation ( includes suggestions from
  *		Rusty Russell).
+ * 2004-July	Suparna Bhattacharya <suparna@in.ibm.com> added jumper probes
+ *		interface to access function arguments.
  */
 #include <linux/config.h>
 #include <linux/list.h>
@@ -32,7 +34,8 @@
 
 struct kprobe;
 struct pt_regs;
-typedef void (*kprobe_pre_handler_t) (struct kprobe *, struct pt_regs *);
+typedef int (*kprobe_pre_handler_t) (struct kprobe *, struct pt_regs *);
+typedef int (*kprobe_break_handler_t) (struct kprobe *, struct pt_regs *);
 typedef void (*kprobe_post_handler_t) (struct kprobe *, struct pt_regs *,
 				       unsigned long flags);
 typedef int (*kprobe_fault_handler_t) (struct kprobe *, struct pt_regs *,
@@ -53,11 +56,30 @@ struct kprobe {
 	 * Return 1 if it handled fault, otherwise kernel will see it. */
 	kprobe_fault_handler_t fault_handler;
 
+	/* ... called if breakpoint trap occurs in probe handler.
+	 * Return 1 if it handled break, otherwise kernel will see it. */
+	kprobe_break_handler_t break_handler;
+
 	/* Saved opcode (which has been replaced with breakpoint) */
 	kprobe_opcode_t opcode;
 
 	/* copy of the original instruction */
 	kprobe_opcode_t insn[MAX_INSN_SIZE];
+};
+
+/*
+ * Special probe type that uses setjmp-longjmp type tricks to resume
+ * execution at a specified entry with a matching prototype corresponding
+ * to the probed function - a trick to enable arguments to become
+ * accessible seamlessly by probe handling logic.
+ * Note:
+ * Because of the way compilers allocate stack space for local variables
+ * etc upfront, regardless of sub-scopes within a function, this mirroring
+ * principle currently works only for probes placed on function entry points.
+ */
+struct jprobe {
+	struct kprobe kp;
+	kprobe_opcode_t *entry;	/* probe handling code to jump to */
 };
 
 #ifdef CONFIG_KPROBES
@@ -73,12 +95,19 @@ static inline int kprobe_running(void)
 }
 
 extern void arch_prepare_kprobe(struct kprobe *p);
+extern void show_registers(struct pt_regs *regs);
 
 /* Get the kprobe at this addr (if any).  Must have called lock_kprobes */
 struct kprobe *get_kprobe(void *addr);
 
 int register_kprobe(struct kprobe *p);
 void unregister_kprobe(struct kprobe *p);
+int setjmp_pre_handler(struct kprobe *, struct pt_regs *);
+int longjmp_break_handler(struct kprobe *, struct pt_regs *);
+int register_jprobe(struct jprobe *p);
+void unregister_jprobe(struct jprobe *p);
+void jprobe_return(void);
+
 #else
 static inline int kprobe_running(void)
 {
@@ -89,6 +118,16 @@ static inline int register_kprobe(struct kprobe *p)
 	return -ENOSYS;
 }
 static inline void unregister_kprobe(struct kprobe *p)
+{
+}
+static inline int register_jprobe(struct jprobe *p)
+{
+	return -ENOSYS;
+}
+static inline void unregister_jprobe(struct jprobe *p)
+{
+}
+static inline void jprobe_return(void)
 {
 }
 #endif

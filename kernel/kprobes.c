@@ -23,6 +23,8 @@
  *		Rusty Russell).
  * 2004-Aug	Updated by Prasanna S Panchamukhi <prasanna@in.ibm.com> with
  *		hlists and exceptions notifier as suggested by Andi Kleen.
+ * 2004-July	Suparna Bhattacharya <suparna@in.ibm.com> added jumper probes
+ *		interface to access function arguments.
  */
 #include <linux/kprobes.h>
 #include <linux/spinlock.h>
@@ -106,6 +108,20 @@ static struct notifier_block kprobe_exceptions_nb = {
 	.notifier_call = kprobe_exceptions_notify,
 };
 
+int register_jprobe(struct jprobe *jp)
+{
+	/* Todo: Verify probepoint is a function entry point */
+	jp->kp.pre_handler = setjmp_pre_handler;
+	jp->kp.break_handler = longjmp_break_handler;
+
+	return register_kprobe(&jp->kp);
+}
+
+void unregister_jprobe(struct jprobe *jp)
+{
+	unregister_kprobe(&jp->kp);
+}
+
 static int __init init_kprobes(void)
 {
 	int i, err = 0;
@@ -123,3 +139,6 @@ __initcall(init_kprobes);
 
 EXPORT_SYMBOL_GPL(register_kprobe);
 EXPORT_SYMBOL_GPL(unregister_kprobe);
+EXPORT_SYMBOL_GPL(register_jprobe);
+EXPORT_SYMBOL_GPL(unregister_jprobe);
+EXPORT_SYMBOL_GPL(jprobe_return);

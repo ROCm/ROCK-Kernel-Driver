@@ -32,6 +32,11 @@ struct pt_regs;
 typedef u8 kprobe_opcode_t;
 #define BREAKPOINT_INSTRUCTION	0xcc
 #define MAX_INSN_SIZE 16
+#define MAX_STACK_SIZE 64
+#define MIN_STACK_SIZE(ADDR) (((MAX_STACK_SIZE) < \
+	(((unsigned long)current_thread_info()) + THREAD_SIZE - (ADDR))) \
+	? (MAX_STACK_SIZE) \
+	: (((unsigned long)current_thread_info()) + THREAD_SIZE - (ADDR)))
 
 /* trap3/1 are intr gates for kprobes.  So, restore the status of IF,
  * if necessary, before executing the original int3/1 (trap) handler.

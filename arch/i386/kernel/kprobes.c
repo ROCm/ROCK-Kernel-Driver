@@ -16,11 +16,13 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  *
- * Copyright (C) IBM Corporation, 2002
+ * Copyright (C) IBM Corporation, 2002, 2004
  *
  * 2002-Oct	Created by Vamsi Krishna S <vamsi_krishna@in.ibm.com> Kernel
  *		Probes initial implementation ( includes contributions from
  *		Rusty Russell).
+ * 2004-July	Suparna Bhattacharya <suparna@in.ibm.com> added jumper probes
+ *		interface to access function arguments.
  */
 
 #include <linux/config.h>
@@ -36,6 +38,10 @@
 
 static struct kprobe *current_kprobe;
 static unsigned long kprobe_status, kprobe_old_eflags, kprobe_saved_eflags;
+static struct pt_regs jprobe_saved_regs;
+static long *jprobe_saved_esp;
+/* copy of the kernel stack at the probe fire time */
+static kprobe_opcode_t jprobes_stack[MAX_STACK_SIZE];
 
 /*
  * returns non-zero if opcode modifies the interrupt flag.
@@ -91,6 +97,11 @@ static inline int kprobe_handler(struct pt_regs *regs)
 		if (p) {
 			disarm_kprobe(p, regs);
 			ret = 1;
+		} else {
+			p = current_kprobe;
+			if (p->break_handler && p->break_handler(p, regs)) {
+				goto ss_probe;
+			}
 		}
 		/* If it's not ours, can't be delete race, (we hold lock). */
 		goto no_kprobe;
@@ -121,8 +132,12 @@ static inline int kprobe_handler(struct pt_regs *regs)
 	if (is_IF_modifier(p->opcode))
 		kprobe_saved_eflags &= ~IF_MASK;
 
-	p->pre_handler(p, regs);
+	if (p->pre_handler(p, regs)) {
+		/* handler has already set things up, so skip ss setup */
+		return 1;
+	}
 
+      ss_probe:
 	prepare_singlestep(p, regs);
 	kprobe_status = KPROBE_HIT_SS;
 	return 1;
@@ -272,4 +287,63 @@ int kprobe_exceptions_notify(struct notifier_block *self, unsigned long val,
 		break;
 	}
 	return NOTIFY_BAD;
+}
+
+int setjmp_pre_handler(struct kprobe *p, struct pt_regs *regs)
+{
+	struct jprobe *jp = container_of(p, struct jprobe, kp);
+	unsigned long addr;
+
+	jprobe_saved_regs = *regs;
+	jprobe_saved_esp = &regs->esp;
+	addr = (unsigned long)jprobe_saved_esp;
+
+	/*
+	 * TBD: As Linus pointed out, gcc assumes that the callee
+	 * owns the argument space and could overwrite it, e.g.
+	 * tailcall optimization. So, to be absolutely safe
+	 * we also save and restore enough stack bytes to cover
+	 * the argument area.
+	 */
+	memcpy(jprobes_stack, (kprobe_opcode_t *) addr, MIN_STACK_SIZE(addr));
+	regs->eflags &= ~IF_MASK;
+	regs->eip = (unsigned long)(jp->entry);
+	return 1;
+}
+
+void jprobe_return(void)
+{
+	preempt_enable_no_resched();
+	asm volatile ("       xchgl   %%ebx,%%esp     \n"
+		      "       int3			\n"::"b"
+		      (jprobe_saved_esp):"memory");
+}
+void jprobe_return_end(void)
+{
+};
+
+int longjmp_break_handler(struct kprobe *p, struct pt_regs *regs)
+{
+	u8 *addr = (u8 *) (regs->eip - 1);
+	unsigned long stack_addr = (unsigned long)jprobe_saved_esp;
+	struct jprobe *jp = container_of(p, struct jprobe, kp);
+
+	if ((addr > (u8 *) jprobe_return) && (addr < (u8 *) jprobe_return_end)) {
+		if (&regs->esp != jprobe_saved_esp) {
+			struct pt_regs *saved_regs =
+			    container_of(jprobe_saved_esp, struct pt_regs, esp);
+			printk("current esp %p does not match saved esp %p\n",
+			       &regs->esp, jprobe_saved_esp);
+			printk("Saved registers for jprobe %p\n", jp);
+			show_registers(saved_regs);
+			printk("Current registers\n");
+			show_registers(regs);
+			BUG();
+		}
+		*regs = jprobe_saved_regs;
+		memcpy((kprobe_opcode_t *) stack_addr, jprobes_stack,
+		       MIN_STACK_SIZE(stack_addr));
+		return 1;
+	}
+	return 0;
 }
