@@ -51,7 +51,8 @@ static unsigned long iop321_gettimeoffset(void)
 	return usec;
 }
 
-static void iop321_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t
+iop321_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u32 tisr;
 
@@ -62,6 +63,8 @@ static void iop321_timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	asm volatile("mcr p6, 0, %0, c6, c1, 0" : : "r" (tisr));
 
 	do_timer(regs);
+
+	return IRQ_HANDLED;
 }
 
 extern unsigned long (*gettimeoffset)(void);
