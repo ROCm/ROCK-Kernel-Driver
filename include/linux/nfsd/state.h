@@ -132,6 +132,9 @@ struct nfs4_replay {
 *         release a stateowner.
 *    so_perlockowner: (open) nfs4_stateid->st_perlockowner entry - used when
 *         close is called to reap associated byte-range locks
+*    so_close_lru: (open) stateowner is placed on this list instead of being
+*         reaped (when so_perfilestate is empty) to hold the last close replay.
+*         reaped by laundramat thread after lease period.
 */
 struct nfs4_stateowner {
 	struct list_head        so_idhash;   /* hash by so_id */
@@ -139,6 +142,8 @@ struct nfs4_stateowner {
 	struct list_head        so_perclient; /* nfs4_client->cl_perclient */
 	struct list_head        so_perfilestate; /* list: nfs4_stateid */
 	struct list_head        so_perlockowner; /* nfs4_stateid->st_perlockowner */
+	struct list_head	so_close_lru; /* tail queue */
+	time_t			so_time; /* time of placement on so_close_lru */
 	int			so_is_open_owner; /* 1=openowner,0=lockowner */
 	u32                     so_id;
 	struct nfs4_client *    so_client;
@@ -194,6 +199,7 @@ struct nfs4_stateid {
 #define OPEN_STATE              0x00000004
 #define LOCK_STATE              0x00000008
 #define RDWR_STATE              0x00000010
+#define CLOSE_STATE             0x00000020
 
 #define seqid_mutating_err(err)                       \
 	(((err) != nfserr_stale_clientid) &&    \
