@@ -42,24 +42,18 @@
  */
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/types.h>
-#include <linux/errno.h>
-#include <linux/kernel.h>
 #include <linux/timer.h>
 #include <linux/jiffies.h>
 #include <linux/miscdevice.h>
 #include <linux/watchdog.h>
-#include <linux/slab.h>
 #include <linux/ioport.h>
-#include <linux/fcntl.h>
-#include <linux/smp_lock.h>
-#include <asm/io.h>
-#include <asm/uaccess.h>
-#include <asm/system.h>
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
+#include <asm/io.h>
+#include <asm/uaccess.h>
+#include <asm/system.h>
 
 #define OUR_NAME "w83877f_wdt"
 
