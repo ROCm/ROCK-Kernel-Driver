@@ -53,7 +53,7 @@ static u64 s3c_device_usb_dmamask = 0xffffffffUL;
 
 struct platform_device s3c_device_usb = {
 	.name		  = "s3c2410-ohci",
-	.id		  = 0,
+	.id		  = -1,
 	.num_resources	  = ARRAY_SIZE(s3c_usb_resource),
 	.resource	  = s3c_usb_resource,
 	.dev              = {
