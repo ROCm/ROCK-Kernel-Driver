@@ -234,7 +234,7 @@ ibwdt_close(struct inode *inode, struct file *file)
 {
 	spin_lock(&ibwdt_lock);
 	if (expect_close == 42)
-		outb_p(wd_times[wd_margin], WDT_STOP);
+		outb_p(0, WDT_STOP);
 	else
 		printk(KERN_CRIT PFX "WDT device closed unexpectedly.  WDT will not stop!\n");
 
@@ -254,7 +254,7 @@ ibwdt_notify_sys(struct notifier_block *this, unsigned long code,
 {
 	if (code == SYS_DOWN || code == SYS_HALT) {
 		/* Turn the WDT off */
-		outb_p(wd_times[wd_margin], WDT_STOP);
+		outb_p(0, WDT_STOP);
 	}
 	return NOTIFY_DONE;
 }
