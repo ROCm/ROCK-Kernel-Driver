@@ -131,9 +131,14 @@ int session_of_pgrp(int pgrp)
 	for_each_task_pid(pgrp, PIDTYPE_PGID, p, l, pid)
 		if (p->session > 0) {
 			sid = p->session;
-			break;
+			goto out;
 		}
+	p = find_task_by_pid(pgrp);
+	if (p)
+		sid = p->session;
+out:
 	read_unlock(&tasklist_lock);
+	
 	return sid;
 }
 

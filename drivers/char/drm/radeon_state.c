@@ -719,7 +719,6 @@ static void radeon_cp_dispatch_swap( drm_device_t *dev )
 	RING_LOCALS;
 	DRM_DEBUG( "\n" );
 
-
 	/* Do some trivial performance monitoring...
 	 */
 	if (dev_priv->do_boxes)
@@ -1088,6 +1087,8 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 	case RADEON_TXFORMAT_ARGB1555:
 	case RADEON_TXFORMAT_RGB565:
 	case RADEON_TXFORMAT_ARGB4444:
+	case RADEON_TXFORMAT_VYUY422:
+	case RADEON_TXFORMAT_YVYU422:
 		format = RADEON_COLOR_FORMAT_RGB565;
 		tex_width = tex->width * 2;
 		blit_width = image->width * 2;
@@ -1226,6 +1227,7 @@ static int radeon_cp_dispatch_texture( drm_device_t *dev,
 	return ret;
 }
 
+
 static void radeon_cp_dispatch_stipple( drm_device_t *dev, u32 *stipple )
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
@@ -1306,6 +1308,9 @@ static int radeon_do_init_pageflip( drm_device_t *dev )
 	return 0;
 }
 
+/* Called whenever a client dies, from DRM(release).
+ * NOTE:  Lock isn't necessarily held when this is called!
+ */
 int radeon_do_cleanup_pageflip( drm_device_t *dev )
 {
 	drm_radeon_private_t *dev_priv = dev->dev_private;
@@ -1936,14 +1941,18 @@ static int radeon_emit_packet3_cliprect( drm_device_t *dev,
 		if ( i < cmdbuf->nbox ) {
 			if (DRM_COPY_FROM_USER_UNCHECKED( &box, &boxes[i], sizeof(box) ))
 				return DRM_ERR(EFAULT);
-			/* FIXME The second and subsequent times round this loop, send a
-			 * WAIT_UNTIL_3D_IDLE before calling emit_clip_rect(). This
-			 * fixes a lockup on fast machines when sending several
-			 * cliprects with a cmdbuf, as when waving a 2D window over
-			 * a 3D window. Something in the commands from user space
-			 * seems to hang the card when they're sent several times
-			 * in a row. That would be the correct place to fix it but
-			 * this works around it until I can figure that out - Tim Smith */
+			/* FIXME The second and subsequent times round
+			 * this loop, send a WAIT_UNTIL_3D_IDLE before
+			 * calling emit_clip_rect(). This fixes a
+			 * lockup on fast machines when sending
+			 * several cliprects with a cmdbuf, as when
+			 * waving a 2D window over a 3D
+			 * window. Something in the commands from user
+			 * space seems to hang the card when they're
+			 * sent several times in a row. That would be
+			 * the correct place to fix it but this works
+			 * around it until I can figure that out - Tim
+			 * Smith */
 			if ( i ) {
 				BEGIN_RING( 2 );
 				RADEON_WAIT_UNTIL_3D_IDLE();
@@ -1967,6 +1976,34 @@ static int radeon_emit_packet3_cliprect( drm_device_t *dev,
 }
 
 
+static int radeon_emit_wait( drm_device_t *dev, int flags )
+{
+	drm_radeon_private_t *dev_priv = dev->dev_private;
+	RING_LOCALS;
+
+	DRM_DEBUG("%s: %x\n", __FUNCTION__, flags);
+	switch (flags) {
+	case RADEON_WAIT_2D:
+		BEGIN_RING( 2 );
+		RADEON_WAIT_UNTIL_2D_IDLE(); 
+		ADVANCE_RING();
+		break;
+	case RADEON_WAIT_3D:
+		BEGIN_RING( 2 );
+		RADEON_WAIT_UNTIL_3D_IDLE(); 
+		ADVANCE_RING();
+		break;
+	case RADEON_WAIT_2D|RADEON_WAIT_3D:
+		BEGIN_RING( 2 );
+		RADEON_WAIT_UNTIL_IDLE(); 
+		ADVANCE_RING();
+		break;
+	default:
+		return DRM_ERR(EINVAL);
+	}
+
+	return 0;
+}
 
 int radeon_cp_cmdbuf( DRM_IOCTL_ARGS )
 {
@@ -1989,7 +2026,6 @@ int radeon_cp_cmdbuf( DRM_IOCTL_ARGS )
 	DRM_COPY_FROM_USER_IOCTL( cmdbuf, (drm_radeon_cmd_buffer_t *)data,
 			     sizeof(cmdbuf) );
 
-	DRM_DEBUG( "pid=%d\n", DRM_CURRENTPID );
 	RING_SPACE_TEST_WITH_RETURN( dev_priv );
 	VB_AGE_TEST_WITH_RETURN( dev_priv );
 
@@ -2080,6 +2116,14 @@ int radeon_cp_cmdbuf( DRM_IOCTL_ARGS )
 				return DRM_ERR(EINVAL);
 			}
 			break;
+
+		case RADEON_CMD_WAIT:
+			DRM_DEBUG("RADEON_CMD_WAIT\n");
+			if (radeon_emit_wait( dev, header.wait.flags )) {
+				DRM_ERROR("radeon_emit_wait failed\n");
+				return DRM_ERR(EINVAL);
+			}
+			break;
 		default:
 			DRM_ERROR("bad cmd_type %d at %p\n", 
 				  header.header.cmd_type,
@@ -2127,6 +2171,12 @@ int radeon_cp_getparam( DRM_IOCTL_ARGS )
 	case RADEON_PARAM_LAST_CLEAR:
 		dev_priv->stats.last_clear_reads++;
 		value = GET_SCRATCH( 2 );
+		break;
+	case RADEON_PARAM_IRQ_ACTIVE:
+		value = dev->irq ? 1 : 0;
+		break;
+	case RADEON_PARAM_AGP_BASE:
+		value = dev_priv->agp_vm_start;
 		break;
 	default:
 		return DRM_ERR(EINVAL);
