@@ -90,9 +90,9 @@ void jffs2_read_inode (struct inode *inode)
 	inode->i_uid = je16_to_cpu(latest_node.uid);
 	inode->i_gid = je16_to_cpu(latest_node.gid);
 	inode->i_size = je32_to_cpu(latest_node.isize);
-	inode->i_atime = je32_to_cpu(latest_node.atime);
-	inode->i_mtime = je32_to_cpu(latest_node.mtime);
-	inode->i_ctime = je32_to_cpu(latest_node.ctime);
+	inode->i_atime.tv_sec = je32_to_cpu(latest_node.atime);
+	inode->i_mtime.tv_sec = je32_to_cpu(latest_node.mtime);
+	inode->i_ctime.tv_sec = je32_to_cpu(latest_node.ctime);
 	inode->i_atime.tv_nsec =
 	inode->i_mtime.tv_nsec =
 	inode->i_ctime.tv_nsec = 0;

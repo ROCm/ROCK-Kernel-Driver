@@ -188,9 +188,9 @@ int jffs2_setattr (struct dentry *dentry, struct iattr *iattr)
 		return PTR_ERR(new_metadata);
 	}
 	/* It worked. Update the inode */
-	inode->i_atime = je32_to_cpu(ri->atime.tv_sec);
-	inode->i_ctime = je32_to_cpu(ri->ctime.tv_sec);
-	inode->i_mtime = je32_to_cpu(ri->mtime.tv_sec);
+	inode->i_atime.tv_sec = je32_to_cpu(ri->atime);
+	inode->i_ctime.tv_sec = je32_to_cpu(ri->ctime);
+	inode->i_mtime.tv_sec = je32_to_cpu(ri->mtime);
 	inode->i_atime.tv_nsec =
 	inode->i_ctime.tv_nsec =
 	inode->i_mtime.tv_nsec = 0;
