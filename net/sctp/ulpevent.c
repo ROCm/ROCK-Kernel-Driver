@@ -46,9 +46,10 @@
 #include <net/sctp/sctp.h>
 #include <net/sctp/sm.h>
 
-static void sctp_rcvmsg_rfree(struct sk_buff *skb);
 static void sctp_ulpevent_set_owner_r(struct sk_buff *skb,
 				      sctp_association_t *asoc);
+static void
+sctp_ulpevent_set_owner(struct sk_buff *skb, const sctp_association_t *asoc);
 
 /* Create a new sctp_ulpevent.  */
 sctp_ulpevent_t *sctp_ulpevent_new(int size, int msg_flags, int priority)
@@ -123,14 +124,12 @@ sctp_ulpevent_t *sctp_ulpevent_make_assoc_change(const sctp_association_t *asoc,
 	struct sctp_assoc_change *sac;
 
 	event = sctp_ulpevent_new(sizeof(struct sctp_assoc_change),
-				  MSG_NOTIFICATION,
-				  priority);
+				  MSG_NOTIFICATION, priority);
 	if (!event)
 		goto fail;
 
 	sac = (struct sctp_assoc_change *)
-		skb_put(event->parent,
-			sizeof(struct sctp_assoc_change));
+		skb_put(event->parent, sizeof(struct sctp_assoc_change));
 
 	/* Socket Extensions for SCTP
 	 * 5.3.1.1 SCTP_ASSOC_CHANGE
@@ -199,6 +198,7 @@ sctp_ulpevent_t *sctp_ulpevent_make_assoc_change(const sctp_association_t *asoc,
 	 * All notifications for a given association have the same association
 	 * identifier.  For TCP style socket, this field is ignored.
 	 */
+	sctp_ulpevent_set_owner(event->parent, asoc);
 	sac->sac_assoc_id = sctp_assoc2id(asoc);
 
 	return event;
@@ -227,14 +227,12 @@ sctp_ulpevent_t *sctp_ulpevent_make_peer_addr_change(
 	struct sctp_paddr_change  *spc;
 
 	event = sctp_ulpevent_new(sizeof(struct sctp_paddr_change),
-				  MSG_NOTIFICATION,
-				  priority);
+				  MSG_NOTIFICATION, priority);
 	if (!event)
 		goto fail;
 
 	spc = (struct sctp_paddr_change *)
-		skb_put(event->parent,
-			sizeof(struct sctp_paddr_change));
+		skb_put(event->parent, sizeof(struct sctp_paddr_change));
 
 	/* Sockets API Extensions for SCTP
 	 * Section 5.3.1.2 SCTP_PEER_ADDR_CHANGE
@@ -287,12 +285,13 @@ sctp_ulpevent_t *sctp_ulpevent_make_peer_addr_change(
 	/* Socket Extensions for SCTP
 	 * 5.3.1.1 SCTP_ASSOC_CHANGE
 	 *
-	 * sac_assoc_id: sizeof (sctp_assoc_t)
+	 * spc_assoc_id: sizeof (sctp_assoc_t)
 	 *
 	 * The association id field, holds the identifier for the association.
 	 * All notifications for a given association have the same association
 	 * identifier.  For TCP style socket, this field is ignored.
 	 */
+	sctp_ulpevent_set_owner(event->parent, asoc);
 	spc->spc_assoc_id = sctp_assoc2id(asoc);
 
 	/* Sockets API Extensions for SCTP
@@ -360,9 +359,8 @@ sctp_ulpevent_t *sctp_ulpevent_make_remote_error(const sctp_association_t *asoc,
 
 	/* Embed the event fields inside the cloned skb.  */
 	event = (sctp_ulpevent_t *) skb->cb;
-	event = sctp_ulpevent_init(event,
-				   skb,
-				   MSG_NOTIFICATION);
+	event = sctp_ulpevent_init(event, skb, MSG_NOTIFICATION);
+
 	if (!event)
 		goto fail;
 
@@ -418,6 +416,7 @@ sctp_ulpevent_t *sctp_ulpevent_make_remote_error(const sctp_association_t *asoc,
 	 * All notifications for a given association have the same association
 	 * identifier.  For TCP style socket, this field is ignored.
 	 */
+	sctp_ulpevent_set_owner(event->parent, asoc);
 	sre->sre_assoc_id = sctp_assoc2id(asoc);
 
 	return event;
@@ -515,9 +514,7 @@ sctp_ulpevent_t *sctp_ulpevent_make_send_failed(const sctp_association_t *asoc,
 	 * The original send information associated with the undelivered
 	 * message.
 	 */
-	memcpy(&ssf->ssf_info,
-	       &chunk->sinfo,
-	       sizeof(struct sctp_sndrcvinfo));
+	memcpy(&ssf->ssf_info, &chunk->sinfo, sizeof(struct sctp_sndrcvinfo));
 
 	/* Socket Extensions for SCTP
 	 * 5.3.1.4 SCTP_SEND_FAILED
@@ -528,8 +525,8 @@ sctp_ulpevent_t *sctp_ulpevent_make_send_failed(const sctp_association_t *asoc,
 	 * same association identifier.  For TCP style socket, this field is
 	 * ignored.
 	 */
+	sctp_ulpevent_set_owner(event->parent, asoc);
 	ssf->ssf_assoc_id = sctp_assoc2id(asoc);
-
 	return event;
 
 fail:
@@ -541,22 +538,21 @@ fail:
  * Socket Extensions for SCTP - draft-01
  * 5.3.1.5 SCTP_SHUTDOWN_EVENT
  */
-sctp_ulpevent_t *sctp_ulpevent_make_shutdown_event(const sctp_association_t *asoc,
-						   __u16 flags,
-						   int priority)
+sctp_ulpevent_t *sctp_ulpevent_make_shutdown_event(
+	const sctp_association_t *asoc,
+	__u16 flags,
+	int priority)
 {
 	sctp_ulpevent_t *event;
 	struct sctp_shutdown_event *sse;
 
 	event = sctp_ulpevent_new(sizeof(struct sctp_assoc_change),
-				  MSG_NOTIFICATION,
-				  priority);
+				  MSG_NOTIFICATION, priority);
 	if (!event)
 		goto fail;
 
 	sse = (struct sctp_shutdown_event *)
-		skb_put(event->parent,
-			sizeof(struct sctp_shutdown_event));
+		skb_put(event->parent, sizeof(struct sctp_shutdown_event));
 
 	/* Socket Extensions for SCTP
 	 * 5.3.1.5 SCTP_SHUTDOWN_EVENT
@@ -591,6 +587,7 @@ sctp_ulpevent_t *sctp_ulpevent_make_shutdown_event(const sctp_association_t *aso
 	 * All notifications for a given association have the same association
 	 * identifier.  For TCP style socket, this field is ignored.
 	 */
+	sctp_ulpevent_set_owner(event->parent, asoc);
 	sse->sse_assoc_id = sctp_assoc2id(asoc);
 
 	return event;
@@ -607,8 +604,7 @@ fail:
  * 5.2.2 SCTP Header Information Structure (SCTP_SNDRCV)
  */
 sctp_ulpevent_t *sctp_ulpevent_make_rcvmsg(sctp_association_t *asoc,
-					   sctp_chunk_t *chunk,
-					   int priority)
+					   sctp_chunk_t *chunk, int priority)
 {
 	sctp_ulpevent_t *event;
 	struct sctp_sndrcvinfo *info;
@@ -619,7 +615,7 @@ sctp_ulpevent_t *sctp_ulpevent_make_rcvmsg(sctp_association_t *asoc,
 	skb = skb_clone(chunk->skb, priority);
 	if (!skb)
 		goto fail;
-		
+
 	/* First calculate the padding, so we don't inadvertently
 	 * pass up the wrong length to the user.
 	 *
@@ -645,7 +641,7 @@ sctp_ulpevent_t *sctp_ulpevent_make_rcvmsg(sctp_association_t *asoc,
 	event = (sctp_ulpevent_t *) skb->cb;
 
 	/* Initialize event with flags 0.  */
-	event = sctp_ulpevent_init(event, skb, 0); 
+	event = sctp_ulpevent_init(event, skb, 0);
 	if (!event)
 		goto fail_init;
 
@@ -818,23 +814,33 @@ static void sctp_ulpevent_set_owner_r(struct sk_buff *skb, sctp_association_t *a
 		asoc->rwnd_over = skb->len - asoc->rwnd;
 		asoc->rwnd = 0;
 	}
-
 	SCTP_DEBUG_PRINTK("rwnd decreased by %d to (%u, %u)\n",
 			  skb->len, asoc->rwnd, asoc->rwnd_over);
 }
 
+/* A simple destructor to give up the reference to the association. */
+static void sctp_ulpevent_rfree(struct sk_buff *skb)
+{
+	sctp_ulpevent_t *event;	
+	
+	event = (sctp_ulpevent_t *)skb->cb;
+	sctp_association_put(event->asoc);
+}
 
+/* Hold the association in case the msg_name needs read out of 
+ * the association. 
+ */
+static void sctp_ulpevent_set_owner(struct sk_buff *skb,
+				    const sctp_association_t *asoc)
+{
+	sctp_ulpevent_t *event;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+	/* Cast away the const, as we are just wanting to
+	 * bump the reference count.
+	 */
+	sctp_association_hold((sctp_association_t *)asoc);
+	skb->sk = asoc->base.sk;
+	event = (sctp_ulpevent_t *)skb->cb;
+	event->asoc = (sctp_association_t *)asoc;
+	skb->destructor = sctp_ulpevent_rfree;
+}

@@ -5,46 +5,46 @@
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Nokia, Inc.
  * Copyright (c) 2001 La Monte H.P. Yarroll
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
- * This abstraction represents an SCTP endpoint.   
+ *
+ * This abstraction represents an SCTP endpoint.
  *
  * This file is part of the implementation of the add-IP extension,
  * based on <draft-ietf-tsvwg-addip-sctp-02.txt> June 29, 2001,
  * for the SCTP kernel reference Implementation.
- * 
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Karl Knutson <karl@athena.chicago.il.us>
  *    Jon Grimm <jgrimm@austin.ibm.com>
  *    Daisy Chang <daisyc@us.ibm.com>
  *    Dajiang Zhang <dajiang.zhang@nokia.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -92,15 +92,16 @@ fail:
 sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
 				    struct sock *sk, int priority)
 {
+	sctp_opt_t *sp = sctp_sk(sk);
 	memset(ep, 0, sizeof(sctp_endpoint_t));
 
 	/* Initialize the base structure. */
 	/* What type of endpoint are we?  */
 	ep->base.type = SCTP_EP_TYPE_SOCKET;
 
-        /* Initialize the basic object fields. */
+	/* Initialize the basic object fields. */
 	atomic_set(&ep->base.refcnt, 1);
-	ep->base.dead     = 0;
+	ep->base.dead = 0;
 	ep->base.malloced = 1;
 
 	/* Create an input queue.  */
@@ -129,22 +130,30 @@ sctp_endpoint_t *sctp_endpoint_init(sctp_endpoint_t *ep, sctp_protocol_t *proto,
 
 	/* Set up the base timeout information.  */
 	ep->timeouts[SCTP_EVENT_TIMEOUT_NONE] = 0;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_COOKIE]
-		= SCTP_DEFAULT_TIMEOUT_T1_COOKIE;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_INIT]
-		= SCTP_DEFAULT_TIMEOUT_T1_INIT;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN]
-		= sctp_sk(sk)->rtoinfo.srto_initial;
+	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_COOKIE] = 
+		SCTP_DEFAULT_TIMEOUT_T1_COOKIE;
+	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_INIT] = 
+		SCTP_DEFAULT_TIMEOUT_T1_INIT;
+	ep->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN] = 
+		sp->rtoinfo.srto_initial;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T3_RTX] = 0;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T4_RTO] = 0;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_HEARTBEAT]
-		= SCTP_DEFAULT_TIMEOUT_HEARTBEAT;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_SACK]
-		= SCTP_DEFAULT_TIMEOUT_SACK;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_AUTOCLOSE]
-		= sctp_sk(sk)->autoclose * HZ;
-	ep->timeouts[SCTP_EVENT_TIMEOUT_PMTU_RAISE]
-		= SCTP_DEFAULT_TIMEOUT_PMTU_RAISE;
+
+	/* sctpimpguide-05 Section 2.12.2
+	 * If the 'T5-shutdown-guard' timer is used, it SHOULD be set to the
+	 * recommended value of 5 times 'RTO.Max'.
+	 */
+        ep->timeouts[SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD]
+		= 5 * sp->rtoinfo.srto_max;
+
+	ep->timeouts[SCTP_EVENT_TIMEOUT_HEARTBEAT] = 
+		SCTP_DEFAULT_TIMEOUT_HEARTBEAT;
+	ep->timeouts[SCTP_EVENT_TIMEOUT_SACK] = 
+		SCTP_DEFAULT_TIMEOUT_SACK;
+	ep->timeouts[SCTP_EVENT_TIMEOUT_AUTOCLOSE] = 
+		sp->autoclose * HZ;
+	ep->timeouts[SCTP_EVENT_TIMEOUT_PMTU_RAISE] = 
+		SCTP_DEFAULT_TIMEOUT_PMTU_RAISE;
 
 	/* Set up the default send/receive buffer space.  */
 
@@ -251,9 +260,10 @@ out:
  * We do a linear search of the associations for this endpoint.
  * We return the matching transport address too.
  */
-sctp_association_t *__sctp_endpoint_lookup_assoc(const sctp_endpoint_t *endpoint,
-						 const sockaddr_storage_t *paddr,
-						 sctp_transport_t **transport)
+sctp_association_t *__sctp_endpoint_lookup_assoc(
+	const sctp_endpoint_t *endpoint,
+	const sockaddr_storage_t *paddr,
+	sctp_transport_t **transport)
 {
 	int rport;
 	sctp_association_t *asoc;
@@ -310,7 +320,7 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 
 	asoc = NULL;
 	inqueue = &ep->base.inqueue;
-	sk      = ep->base.sk;
+	sk = ep->base.sk;
 
 	while (NULL != (chunk = sctp_pop_inqueue(inqueue))) {
 		subtype.chunk = chunk->chunk_hdr->type;
@@ -343,15 +353,15 @@ static void sctp_endpoint_bh_rcv(sctp_endpoint_t *ep)
 		/* FIX ME We really would rather NOT have to use
 		 * GFP_ATOMIC.
 		 */
-                error = sctp_do_sm(SCTP_EVENT_T_CHUNK, subtype, state,
+		error = sctp_do_sm(SCTP_EVENT_T_CHUNK, subtype, state,
                                    ep, asoc, chunk, GFP_ATOMIC);
 
 		if (error != 0)
 			goto err_out;
 
-		/* Check to see if the endpoint is freed in response to 
+		/* Check to see if the endpoint is freed in response to
 		 * the incoming chunk. If so, get out of the while loop.
-		 */ 
+		 */
 		if (!sctp_sk(sk)->ep)
 			goto out;
 	}
@@ -360,10 +370,5 @@ err_out:
 	/* Is this the right way to pass errors up to the ULP?  */
 	if (error)
 		ep->base.sk->err = -error;
-
 out:
 }
-
-
-
-

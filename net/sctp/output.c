@@ -2,41 +2,41 @@
  * Copyright (c) 1999-2000 Cisco, Inc.
  * Copyright (c) 1999-2001 Motorola, Inc.
  * Copyright (c) 2001 International Business Machines, Corp.
- * 
+ *
  * This file is part of the SCTP kernel reference Implementation
- * 
+ *
  * These functions handle output processing.
- *  
- * The SCTP reference implementation is free software; 
- * you can redistribute it and/or modify it under the terms of 
+ *
+ * The SCTP reference implementation is free software;
+ * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
- * 
- * The SCTP reference implementation is distributed in the hope that it 
+ *
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  * See the GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with GNU CC; see the file COPYING.  If not, write to
  * the Free Software Foundation, 59 Temple Place - Suite 330,
- * Boston, MA 02111-1307, USA.  
- * 
+ * Boston, MA 02111-1307, USA.
+ *
  * Please send any bug reports or fixes you make to the
  * email address(es):
  *    lksctp developers <lksctp-developers@lists.sourceforge.net>
- * 
+ *
  * Or submit a bug report through the following website:
  *    http://www.sf.net/projects/lksctp
  *
- * Written or modified by: 
+ * Written or modified by:
  *    La Monte H.P. Yarroll <piggy@acm.org>
  *    Karl Knutson          <karl@athena.chicago.il.us>
  *    Jon Grimm             <jgrimm@austin.ibm.com>
  *    Sridhar Samudrala     <sri@us.ibm.com>
- * 
+ *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
  */
@@ -48,7 +48,7 @@
 #include <linux/ip.h>
 #include <linux/ipv6.h>
 #include <linux/init.h>
-#include <net/inet_ecn.h> 
+#include <net/inet_ecn.h>
 #include <net/icmp.h>
 
 #ifndef TEST_FRAME
@@ -113,7 +113,7 @@ void sctp_packet_free(sctp_packet_t *packet)
 {
 	sctp_chunk_t *chunk;
 
-        while (NULL !=
+        while (NULL != 
 	       (chunk = (sctp_chunk_t *)skb_dequeue(&packet->chunks))) {
 		sctp_free_chunk(chunk);
 	}
@@ -129,7 +129,8 @@ void sctp_packet_free(sctp_packet_t *packet)
  * as it can fit in the packet, but any more data that does not fit in this
  * packet can be sent only after receiving the COOKIE_ACK.
  */
-sctp_xmit_t sctp_packet_transmit_chunk(sctp_packet_t *packet, sctp_chunk_t *chunk)
+sctp_xmit_t sctp_packet_transmit_chunk(sctp_packet_t *packet,
+				       sctp_chunk_t *chunk)
 {
 	sctp_xmit_t retval;
 	int error = 0;
@@ -181,8 +182,8 @@ sctp_xmit_t sctp_packet_append_chunk(sctp_packet_t *packet, sctp_chunk_t *chunk)
 		/* Both control chunks and data chunks with TSNs are
 		 * non-fragmentable.
 		 */
-		int fragmentable = sctp_chunk_is_data(chunk) 
-			&& (!chunk->has_tsn);
+		int fragmentable = sctp_chunk_is_data(chunk) && 
+			(!chunk->has_tsn);
 		if (packet_empty) {
 			if (fragmentable) {
 				retval = SCTP_XMIT_MUST_FRAG;
@@ -221,10 +222,8 @@ append:
 	}
 
 	/* It is OK to send this chunk.  */
-	skb_queue_tail(&packet->chunks,
-		       (struct sk_buff *)chunk);
+	skb_queue_tail(&packet->chunks, (struct sk_buff *)chunk);
 	packet->size += chunk_len;
-
 finish:
 	return retval;
 }
@@ -305,7 +304,7 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 			 */
 			if ((1 == chunk->num_times_sent) &&
 			    (!transport->rto_pending)) {
-				chunk->rtt_in_progress = 1;	
+				chunk->rtt_in_progress = 1;
 				transport->rto_pending = 1;
 			}
 			packet_has_data = 1;
@@ -337,9 +336,9 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	}
 
 	/* Build the SCTP header.  */
-	sh = (struct sctphdr *) skb_push(nskb, sizeof(struct sctphdr));
-	sh->source		= htons(packet->source_port);
-	sh->dest		= htons(packet->destination_port);
+	sh = (struct sctphdr *)skb_push(nskb, sizeof(struct sctphdr));
+	sh->source = htons(packet->source_port);
+	sh->dest   = htons(packet->destination_port);
 
 	/* From 6.8 Adler-32 Checksum Calculation:
 	 * After the packet is constructed (containing the SCTP common
@@ -349,8 +348,8 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	 * 1) Fill in the proper Verification Tag in the SCTP common
 	 *    header and initialize the checksum field to 0's.
 	 */
-	sh->vtag	= htonl(packet->vtag);
-	sh->checksum	= 0;
+	sh->vtag     = htonl(packet->vtag);
+	sh->checksum = 0;
 
 	/* 2) Calculate the Adler-32 checksum of the whole packet,
 	 *    including the SCTP common header and all the
@@ -467,7 +466,8 @@ static void sctp_packet_reset(sctp_packet_t *packet)
 }
 
 /* This private function handles the specifics of appending DATA chunks.  */
-static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet, sctp_chunk_t *chunk)
+static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet, 
+					   sctp_chunk_t *chunk)
 {
 	sctp_xmit_t retval = SCTP_XMIT_OK;
 	size_t datasize, rwnd, inflight;
@@ -502,12 +502,13 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet, sctp_chunk_t *
 		}
 	}
 
-	/* sctpimpguide-05 2.14.2 D) When the time comes for the sender to
+	/* sctpimpguide-05 2.14.2
+	 * D) When the time comes for the sender to
 	 * transmit new DATA chunks, the protocol parameter Max.Burst MUST
 	 * first be applied to limit how many new DATA chunks may be sent.
 	 * The limit is applied by adjusting cwnd as follows:
-	 * 	if((flightsize + Max.Burst*MTU) < cwnd)
-	 *		cwnd = flightsize + Max.Burst*MTU
+	 * 	if ((flightsize + Max.Burst * MTU) < cwnd)
+	 *		cwnd = flightsize + Max.Burst * MTU
 	 */
 	max_burst_bytes = transport->asoc->max_burst * transport->asoc->pmtu;
 	if ((transport->flight_size + max_burst_bytes) < transport->cwnd) {
@@ -516,11 +517,11 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet, sctp_chunk_t *
 				  "transport: %p, cwnd: %d, "
 				  "ssthresh: %d, flight_size: %d, "
 				  "pba: %d\n",
-				   __FUNCTION__, transport,
-				   transport->cwnd,
-				   transport->ssthresh,
-				   transport->flight_size,
-				   transport->partial_bytes_acked);
+				  __FUNCTION__, transport,
+				  transport->cwnd,
+				  transport->ssthresh,
+				  transport->flight_size,
+				  transport->partial_bytes_acked);
 	}
 
 	/* RFC 2960 6.1  Transmission of DATA Chunks
@@ -552,7 +553,3 @@ static sctp_xmit_t sctp_packet_append_data(sctp_packet_t *packet, sctp_chunk_t *
 finish:
 	return retval;
 }
-
-
-
-
