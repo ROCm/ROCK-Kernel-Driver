@@ -19,12 +19,12 @@
  * Called with mm->page_table_lock held to protect against other
  * threads/the swapper from ripping pte's out from under us.
  */
-static inline int filemap_sync_pte(pte_t *ptep, pmd_t *pmdp, struct vm_area_struct *vma,
+static int filemap_sync_pte(pte_t *ptep, struct vm_area_struct *vma,
 	unsigned long address, unsigned int flags)
 {
 	pte_t pte = *ptep;
 
-	if (pte_present(pte)) {
+	if (pte_present(pte) && pte_dirty(pte)) {
 		struct page *page = pte_page(pte);
 		if (VALID_PAGE(page) && !PageReserved(page) && ptep_test_and_clear_dirty(ptep)) {
 			flush_tlb_page(vma, address);
@@ -53,7 +53,7 @@ static inline int filemap_sync_pte_range(pmd_t * pmd,
 		end = (address & PMD_MASK) + PMD_SIZE;
 	error = 0;
 	do {
-		error |= filemap_sync_pte(pte, pmd, vma, address, flags);
+		error |= filemap_sync_pte(pte, vma, address, flags);
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
