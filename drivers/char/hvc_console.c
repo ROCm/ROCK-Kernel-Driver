@@ -268,8 +268,9 @@ int __init hvc_init(void)
 		return -ENOMEM;
 
 	hvc_driver->owner = THIS_MODULE;
+	hvc_driver->devfs_name = "hvc/";
 	hvc_driver->driver_name = "hvc";
-	hvc_driver->name = "hvc/";
+	hvc_driver->name = "hvc";
 	hvc_driver->major = HVC_MAJOR;
 	hvc_driver->minor_start = HVC_MINOR;
 	hvc_driver->type = TTY_DRIVER_TYPE_SYSTEM;
