@@ -484,6 +484,10 @@ static inline int ac97_can_amap(ac97_t * ac97)
 {
 	return (ac97->ext_id & AC97_EI_AMAP) != 0;
 }
+static inline int ac97_can_spdif(ac97_t * ac97)
+{
+	return (ac97->ext_id & AC97_EI_SPDIF) != 0;
+}
 
 /* functions */
 int snd_ac97_bus(snd_card_t * card, ac97_bus_t * _bus, ac97_bus_t ** rbus); /* create new AC97 bus */
