@@ -94,7 +94,7 @@ VM_MASK		= 0x00020000
 	movl %edx, %ds; \
 	movl %edx, %es;
 
-#define RESTORE_ALL	\
+#define RESTORE_REGS	\
 	popl %ebx;	\
 	popl %ecx;	\
 	popl %edx;	\
@@ -104,14 +104,25 @@ VM_MASK		= 0x00020000
 	popl %eax;	\
 1:	popl %ds;	\
 2:	popl %es;	\
-	addl $4, %esp;	\
-3:	iret;		\
 .section .fixup,"ax";	\
-4:	movl $0,(%esp);	\
+3:	movl $0,(%esp);	\
 	jmp 1b;		\
-5:	movl $0,(%esp);	\
+4:	movl $0,(%esp);	\
 	jmp 2b;		\
-6:	pushl %ss;	\
+.previous;		\
+.section __ex_table,"a";\
+	.align 4;	\
+	.long 1b,3b;	\
+	.long 2b,4b;	\
+.previous
+
+
+#define RESTORE_ALL	\
+	RESTORE_REGS	\
+	addl $4, %esp;	\
+1:	iret;		\
+.section .fixup,"ax";   \
+2:	pushl %ss;	\
 	popl %ds;	\
 	pushl %ss;	\
 	popl %es;	\
@@ -120,10 +131,10 @@ VM_MASK		= 0x00020000
 .previous;		\
 .section __ex_table,"a";\
 	.align 4;	\
-	.long 1b,4b;	\
-	.long 2b,5b;	\
-	.long 3b,6b;	\
+	.long 1b,2b;	\
 .previous
+
+
 
 ENTRY(lcall7)
 	pushfl			# We get a different stack layout with call
@@ -219,6 +230,40 @@ need_resched:
 	cli
 	jmp need_resched
 #endif
+
+/* Points to after the "sysenter" instruction in the vsyscall page */
+#define SYSENTER_RETURN 0xffffe007
+
+	# sysenter call handler stub
+	ALIGN
+ENTRY(sysenter_entry)
+	sti
+	pushl $(__USER_DS)
+	pushl %ebp
+	pushfl
+	pushl $(__USER_CS)
+	pushl $SYSENTER_RETURN
+
+	pushl %eax
+	SAVE_ALL
+	GET_THREAD_INFO(%ebx)
+	cmpl $(NR_syscalls), %eax
+	jae syscall_badsys
+
+	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebx)
+	jnz syscall_trace_entry
+	call *sys_call_table(,%eax,4)
+	movl %eax,EAX(%esp)
+	cli
+	movl TI_FLAGS(%ebx), %ecx
+	testw $_TIF_ALLWORK_MASK, %cx
+	jne syscall_exit_work
+	RESTORE_REGS
+	movl 4(%esp),%edx
+	movl 16(%esp),%ecx
+	sti
+	sysexit
+
 
 	# system call handler stub
 	ALIGN

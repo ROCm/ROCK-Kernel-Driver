@@ -24,7 +24,7 @@
 #if 0
 #define DEBUGP printk
 #else
-#define DEBUGP(fmt , ...)
+#define DEBUGP(fmt, a...)
 #endif
 
 static int parse_one(char *param,
