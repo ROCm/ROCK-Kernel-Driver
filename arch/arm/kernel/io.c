@@ -7,12 +7,13 @@
  * Copy data from IO memory space to "real" memory space.
  * This needs to be optimized.
  */
-void _memcpy_fromio(void * to, unsigned long from, size_t count)
+void _memcpy_fromio(void *to, unsigned long from, size_t count)
 {
+	unsigned char *t = to;
 	while (count) {
 		count--;
-		*(char *) to = readb(from);
-		((char *) to)++;
+		*t = readb(from);
+		t++;
 		from++;
 	}
 }
@@ -21,12 +22,13 @@ void _memcpy_fromio(void * to, unsigned long from, size_t count)
  * Copy data from "real" memory space to IO memory space.
  * This needs to be optimized.
  */
-void _memcpy_toio(unsigned long to, const void * from, size_t count)
+void _memcpy_toio(unsigned long to, const void *from, size_t count)
 {
+	const unsigned char *f = from;
 	while (count) {
 		count--;
-		writeb(*(char *) from, to);
-		((char *) from)++;
+		writeb(*f, to);
+		f++;
 		to++;
 	}
 }
