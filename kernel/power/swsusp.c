@@ -1041,7 +1041,7 @@ static int __init check_pagedir(void)
 	return 0;
 }
 
-int __init swsusp_pagedir_relocate(void)
+static int __init swsusp_pagedir_relocate(void)
 {
 	/*
 	 * We have to avoid recursion (not to overflow kernel stack),
@@ -1198,6 +1198,34 @@ int bio_write_page(pgoff_t page_off, void * page)
 }
 
 
+/**
+ *	swsusp_read_data - Read image pages from swap.
+ *
+ *	You do not need to check for overlaps, check_pagedir()
+ *	already did that.
+ */
+
+int __init swsusp_data_read(void)
+{
+	struct pbe * p;
+	int error;
+	int i;
+
+	if ((error = swsusp_pagedir_relocate()))
+		return error;
+
+	printk( "Reading image data (%d pages): ", nr_copy_pages );
+	for(i = 0, p = pagedir_nosave; i < nr_copy_pages && !error; i++, p++) {
+		if (!(i%100))
+			printk( "." );
+		error = bio_read_page(swp_offset(p->swap_address),
+				  (void *)p->address);
+	}
+	printk(" %d done.\n",i);
+	return error;
+
+}
+
 extern dev_t __init name_to_dev_t(const char *line);
 
 static int __init __read_suspend_image(int noresume)
@@ -1205,6 +1233,7 @@ static int __init __read_suspend_image(int noresume)
 	union diskpage *cur;
 	swp_entry_t next;
 	int i, nr_pgdir_pages;
+	int error;
 
 	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
 	if (!cur)
@@ -1272,20 +1301,9 @@ static int __init __read_suspend_image(int noresume)
 	}
 	BUG_ON (next.val);
 
-	if (swsusp_pagedir_relocate())
-		return -ENOMEM;
-
-	printk( "Reading image data (%d pages): ", nr_copy_pages );
-	for(i=0; i < nr_copy_pages; i++) {
-		swp_entry_t swap_address = (pagedir_nosave+i)->swap_address;
-		if (!(i%100))
-			printk( "." );
-		/* You do not need to check for overlaps...
-		   ... check_pagedir already did this work */
-		if (bio_read_page(swp_offset(swap_address) * PAGE_SIZE, (char *)((pagedir_nosave+i)->address)))
-			return -EIO;
-	}
-	printk( "|\n" );
+	error = swsusp_data_read();
+	if (!error)
+		printk( "|\n" );
 	return 0;
 }
 

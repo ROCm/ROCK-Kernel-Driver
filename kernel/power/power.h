@@ -18,9 +18,6 @@ static inline int pm_suspend_disk(void)
 	return -EPERM;
 }
 #endif
-
-extern int swsusp_pagedir_relocate(void);
-
 extern struct semaphore pm_sem;
 #define power_attr(_name) \
 static struct subsys_attribute _name##_attr = {	\
