@@ -773,8 +773,7 @@ void probe_hwif (ide_hwif_t *hwif)
 	 */
 	for (unit = 0; unit < MAX_DRIVES; ++unit) {
 		ide_drive_t *drive = &hwif->drives[unit];
-		drive->dn = ((hwif->channel ? 2 : 0) + unit);
-		hwif->drives[unit].dn = ((hwif->channel ? 2 : 0) + unit);
+		drive->dn = (hwif->channel ? 2 : 0) + unit;
 		(void) probe_for_drive(drive);
 		if (drive->present && !hwif->present) {
 			hwif->present = 1;
