@@ -113,22 +113,10 @@ static int hcl_ioctl(struct inode * inode, struct file * file,
 }
 
 struct file_operations hcl_fops = {
-	(struct module *)0,
-	NULL,		/* lseek - default */
-	NULL,		/* read - general block-dev read */
-	NULL,		/* write - general block-dev write */
-	NULL,		/* readdir - bad */
-	NULL,		/* poll */
-	hcl_ioctl,      /* ioctl */
-	NULL,		/* mmap */
-	hcl_open,	/* open */
-	NULL,		/* flush */
-	hcl_close,	/* release */
-	NULL,		/* fsync */
-	NULL,		/* fasync */
-	NULL,		/* lock */
-	NULL,		/* readv */
-	NULL,		/* writev */
+	.owner = (struct module *)0,
+	.ioctl = hcl_ioctl,
+	.open = hcl_open,
+	.release = hcl_close,
 };
 
 
@@ -258,6 +246,7 @@ hwgraph_fastinfo_get(vertex_hdl_t de)
 
 	if (!de) {
 		printk(KERN_WARNING "HCL: hwgraph_fastinfo_get handle given is NULL.\n");
+		dump_stack();
 		return(-1);
 	}
 
