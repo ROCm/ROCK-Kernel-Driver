@@ -2770,8 +2770,7 @@ static int migration_thread(void * data)
 	runqueue_t *rq;
 	int cpu = (long)data;
 
-	BUG_ON(smp_processor_id() != cpu);
-	rq = this_rq();
+	rq = cpu_rq(cpu);
 	BUG_ON(rq->migration_thread != current);
 
 	while (!kthread_should_stop()) {
@@ -2886,17 +2885,22 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 		/* Strictly unneccessary, as first user will wake it. */
 		wake_up_process(cpu_rq(cpu)->migration_thread);
 		break;
+#ifdef CONFIG_HOTPLUG_CPU
+	case CPU_UP_CANCELED:
+		/* Unbind it from offline cpu so it can run.  Fall thru. */
+		kthread_bind(cpu_rq(cpu)->migration_thread,smp_processor_id());
+	case CPU_DEAD:
+		kthread_stop(cpu_rq(cpu)->migration_thread);
+		cpu_rq(cpu)->migration_thread = NULL;
+ 		BUG_ON(cpu_rq(cpu)->nr_running != 0);
+ 		break;
+#endif
 	}
 	return NOTIFY_OK;
 }
 
-/*
- * We want this after the other threads, so they can use set_cpus_allowed
- * from their CPU_OFFLINE callback
- */
 static struct notifier_block __devinitdata migration_notifier = {
 	.notifier_call = migration_call,
-	.priority = -10,
 };
 
 int __init migration_init(void)
