@@ -100,23 +100,24 @@ static int longhaul_get_cpu_mult(void)
 }
 
 
-static void do_powersaver(int version)
+static void do_powersaver(union msr_longhaul *longhaul,
+			unsigned int clock_ratio_index, int version)
 {
-	rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-	longhaul.bits.SoftBusRatio = clock_ratio_index & 0xf;
-	longhaul.bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
-	longhaul.bits.EnableSoftBusRatio = 1;
-	longhaul.bits.RevisionKey = 0;
+	rdmsrl(MSR_VIA_LONGHAUL, longhaul->val);
+	longhaul->bits.SoftBusRatio = clock_ratio_index & 0xf;
+	longhaul->bits.SoftBusRatio4 = (clock_ratio_index & 0x10) >> 4;
+	longhaul->bits.EnableSoftBusRatio = 1;
+	longhaul->bits.RevisionKey = 0;
 	local_irq_disable();
-	wrmsrl(MSR_VIA_LONGHAUL, longhaul.val);
+	wrmsrl(MSR_VIA_LONGHAUL, longhaul->val);
 	local_irq_enable();
 	__hlt();
 
-	rdmsrl (MSR_VIA_LONGHAUL, longhaul.val);
-	longhaul.bits.EnableSoftBusRatio = 0;
-	longhaul.bits.RevisionKey = version;
+	rdmsrl(MSR_VIA_LONGHAUL, longhaul->val);
+	longhaul->bits.EnableSoftBusRatio = 0;
+	longhaul->bits.RevisionKey = version;
 	local_irq_disable();
-	wrmsrl (MSR_VIA_LONGHAUL, longhaul.val);
+	wrmsrl(MSR_VIA_LONGHAUL, longhaul->val);
 	local_irq_enable();
 }
 
@@ -188,7 +189,7 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 	 * of scaling (like we do in powernow-k7.c)
 	 */
 	case 2:
-		do_powersaver(3);
+		do_powersaver(&longhaul, clock_ratio_index, 3);
 		break;
 
 	/*
@@ -198,7 +199,7 @@ static void longhaul_setstate(unsigned int clock_ratio_index)
 	 * to work in practice.
 	 */
 	case 3:
-		do_powersaver(0xf);
+		do_powersaver(&longhaul, clock_ratio_index, 0xf);
 		break;
 	}
 
