@@ -1073,7 +1073,7 @@ static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
         if (dev->flags & IFF_UP)
                 return -EBUSY;
 
-	if (cmd != SIOCDEVICE)
+	if (cmd != SIOCWANDEV)
 		return -EOPNOTSUPP;
 
 	switch(ifr->ifr_settings.type) {

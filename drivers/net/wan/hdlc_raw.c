@@ -49,7 +49,7 @@ int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if (ifr->ifr_settings.data_length < size)
 			return -ENOMEM;	/* buffer too small */
 		if (copy_to_user(ifr->ifr_settings.data,
-				 &hdlc->state.hdlc.settings, size))
+				 &hdlc->state.raw_hdlc.settings, size))
 			return -EFAULT;
 		ifr->ifr_settings.data_length = size;
 		return 0;
@@ -64,15 +64,15 @@ int hdlc_raw_ioctl(hdlc_device *hdlc, struct ifreq *ifr)
 		if (ifr->ifr_settings.data_length != size)
 			return -ENOMEM;	/* incorrect data length */
 
-		if (copy_from_user(&hdlc->state.hdlc.settings,
+		if (copy_from_user(&hdlc->state.raw_hdlc.settings,
 				   ifr->ifr_settings.data, size))
 			return -EFAULT;
 
 		/* FIXME - put sanity checks here */
 		hdlc_detach(hdlc);
 
-		result=hdlc->attach(hdlc, hdlc->state.hdlc.settings.encoding,
-				    hdlc->state.hdlc.settings.parity);
+		result=hdlc->attach(hdlc, hdlc->state.raw_hdlc.settings.encoding,
+				    hdlc->state.raw_hdlc.settings.parity);
 		if (result) {
 			hdlc->proto = -1;
 			return result;

@@ -53,7 +53,7 @@ typedef struct {
 typedef struct {
 	unsigned short encoding;
 	unsigned short parity;
-}hdlc_proto;
+}raw_hdlc_proto;
 
 
 #define LMI_DEFAULT		0 /* Default (current) setting */
@@ -251,8 +251,8 @@ typedef struct hdlc_device_struct {
 		}cisco;
 
 		struct {
-			hdlc_proto settings;
-		}hdlc;
+			raw_hdlc_proto settings;
+		}raw_hdlc;
 
 		struct {
 			struct ppp_device pppdev;

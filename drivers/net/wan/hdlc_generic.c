@@ -72,7 +72,7 @@ int hdlc_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	hdlc_device *hdlc = dev_to_hdlc(dev);
 	unsigned int proto;
 
-	if (cmd != SIOCDEVICE)
+	if (cmd != SIOCWANDEV)
 		return -EINVAL;
 
 	switch(ifr->ifr_settings.type) {

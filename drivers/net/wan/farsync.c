@@ -1240,7 +1240,7 @@ fst_ioctl ( struct net_device *dev, struct ifreq *ifr, int cmd )
 
                 return set_conf_from_info ( card, port, &info );
 
-        case SIOCDEVICE:
+        case SIOCWANDEV:
                 switch ( ifr->ifr_settings.type )
                 {
                 case IF_GET_IFACE:

@@ -260,7 +260,7 @@ static int n2_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		return 0;
 	}
 #endif
-	if (cmd != SIOCDEVICE)
+	if (cmd != SIOCWANDEV)
 		return hdlc_ioctl(dev, ifr, cmd);
 
 	switch(ifr->ifr_settings.type) {
