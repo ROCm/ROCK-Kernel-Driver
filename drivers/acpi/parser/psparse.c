@@ -426,7 +426,7 @@ acpi_ps_parse_loop (
 	acpi_status                     status = AE_OK;
 	union acpi_parse_object         *op = NULL;     /* current op */
 	union acpi_parse_object         *arg = NULL;
-	union acpi_parse_object         pre_op;
+	union acpi_parse_object         *pre_op = NULL;
 	struct acpi_parse_state         *parser_state;
 	u8                              *aml_op_start = NULL;
 
@@ -547,8 +547,17 @@ acpi_ps_parse_loop (
 			/* Create Op structure and append to parent's argument list */
 
 			if (walk_state->op_info->flags & AML_NAMED) {
-				pre_op.common.value.arg = NULL;
-				pre_op.common.aml_opcode = walk_state->opcode;
+				/* Allocate a new pre_op if necessary */
+
+				if (!pre_op) {
+					pre_op = acpi_ps_alloc_op (walk_state->opcode);
+					if (!pre_op) {
+						return_ACPI_STATUS (AE_NO_MEMORY);
+					}
+				}
+
+				pre_op->common.value.arg = NULL;
+				pre_op->common.aml_opcode = walk_state->opcode;
 
 				/*
 				 * Get and append arguments until we find the node that contains
@@ -562,7 +571,7 @@ acpi_ps_parse_loop (
 						goto close_this_op;
 					}
 
-					acpi_ps_append_arg (&pre_op, arg);
+					acpi_ps_append_arg (pre_op, arg);
 					INCREMENT_ARG_LIST (walk_state->arg_types);
 				}
 
@@ -603,7 +612,7 @@ acpi_ps_parse_loop (
 					goto close_this_op;
 				}
 
-				acpi_ps_append_arg (op, pre_op.common.value.arg);
+				acpi_ps_append_arg (op, pre_op->common.value.arg);
 				acpi_gbl_depth++;
 
 				if (op->common.aml_opcode == AML_REGION_OP) {
@@ -854,6 +863,10 @@ close_this_op:
 
 		acpi_ps_complete_this_op (walk_state, op);
 		op = NULL;
+		if (pre_op) {
+			acpi_ps_free_op (pre_op);
+			pre_op = NULL;
+		}
 
 		switch (status) {
 		case AE_OK:
@@ -1118,6 +1131,27 @@ acpi_ps_parse_aml (
 		else if (status != AE_OK) {
 			ACPI_REPORT_METHOD_ERROR ("Method execution failed",
 				walk_state->method_node, NULL, status);
+
+			/* Check for possible multi-thread reentrancy problem */
+
+			if ((status == AE_ALREADY_EXISTS) &&
+				(!walk_state->method_desc->method.semaphore)) {
+				/*
+				 * This method is marked not_serialized, but it tried to create a named
+				 * object, causing the second thread entrance to fail.  We will workaround
+				 * this by marking the method permanently as Serialized.
+				 */
+				walk_state->method_desc->method.method_flags |= AML_METHOD_SERIALIZED;
+				walk_state->method_desc->method.concurrency = 1;
+			}
+		}
+
+		if (walk_state->method_desc) {
+			/* Decrement the thread count on the method parse tree */
+
+			if (walk_state->method_desc->method.thread_count) {
+				walk_state->method_desc->method.thread_count--;
+			}
 		}
 
 		/* We are done with this walk, move on to the parent if any */
