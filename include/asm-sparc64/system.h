@@ -84,6 +84,7 @@ enum sparc_cpu {
 	membar("#LoadLoad | #LoadStore | #StoreStore | #StoreLoad");
 #define rmb()		membar("#LoadLoad")
 #define wmb()		membar("#StoreStore")
+#define read_barrier_depends()		do { } while(0)
 #define set_mb(__var, __value) \
 	do { __var = __value; membar("#StoreLoad | #StoreStore"); } while(0)
 #define set_wmb(__var, __value) \
@@ -93,10 +94,12 @@ enum sparc_cpu {
 #define smp_mb()	mb()
 #define smp_rmb()	rmb()
 #define smp_wmb()	wmb()
+#define smp_read_barrier_depends()	read_barrier_depends()
 #else
 #define smp_mb()	__asm__ __volatile__("":::"memory");
 #define smp_rmb()	__asm__ __volatile__("":::"memory");
 #define smp_wmb()	__asm__ __volatile__("":::"memory");
+#define smp_read_barrier_depends()	do { } while(0)
 #endif
 
 #define flushi(addr)	__asm__ __volatile__ ("flush %0" : : "r" (addr) : "memory")
