@@ -1,6 +1,7 @@
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/binfmts.h>
+#include <linux/elf.h>
 #include <asm/param.h>
 #include <asm/signal.h>
 
@@ -17,11 +18,14 @@ extern void put_dirty_page(struct task_struct *tsk, struct page *page, unsigned 
 
 #undef	ELF_PLAT_INIT
 #define ELF_PLAT_INIT(_r,d) ilp32_init_addr_space()
+void ilp32_init_addr_space(void);
 
 #define setup_arg_pages(bprm)	ilp32_elf_setup_arg_pages(bprm)
+static int ilp32_elf_setup_arg_pages(struct linux_binprm *bprm);
 
 #undef SET_PERSONALITY
-#define SET_PERSONALITY(ex, ibcs2)	ilp32_elf_set_personality(&ex)
+#define SET_PERSONALITY(ex, ibcs2)	ilp32_elf_set_personality(&ex, ibcs2)
+static void ilp32_elf_set_personality(struct elfhdr *elf_ex, int exec_stack);
 
 #include "../../../fs/binfmt_elf.c"
 
