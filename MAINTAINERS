@@ -637,8 +637,8 @@ W:	http://www.sistina.com/lvm
 S:	Maintained
 
 DEVICE NUMBER REGISTRY
-P:	H. Peter Anvin
-M:	hpa@zytor.com
+P:	John Cagle
+M:	device@lanana.org
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
@@ -1164,7 +1164,7 @@ KERNEL AUTOMOUNTER (AUTOFS)
 P:	H. Peter Anvin
 M:	hpa@zytor.com
 L:	autofs@linux.kernel.org
-S:	Maintained
+S:	Odd Fixes
 
 KERNEL AUTOMOUNTER v4 (AUTOFS4)
 P:	Jeremy Fitzhardinge
