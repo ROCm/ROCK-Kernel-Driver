@@ -1070,7 +1070,7 @@ static int video_release(struct inode *inode, struct file *file)
 		res_free(dev,fh,RESOURCE_VIDEO);
 	}
 	if (fh->vidq.read_buf) {
-		buffer_release(file->private_data,fh->vidq.read_buf);
+		buffer_release(&fh->vidq,fh->vidq.read_buf);
 		kfree(fh->vidq.read_buf);
 	}
 

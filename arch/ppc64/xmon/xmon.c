@@ -40,7 +40,7 @@
 #define skipbl	xmon_skipbl
 
 #ifdef CONFIG_SMP
-volatile cpumask_t cpus_in_xmon = CPU_MASK_NONE;
+cpumask_t cpus_in_xmon = CPU_MASK_NONE;
 static unsigned long xmon_taken = 1;
 static int xmon_owner;
 static int xmon_gate;
@@ -397,9 +397,11 @@ int xmon_core(struct pt_regs *regs, int fromipi)
 		if (ncpus > 1) {
 			smp_send_debugger_break(MSG_ALL_BUT_SELF);
 			/* wait for other cpus to come in */
-			for (timeout = 100000000; timeout != 0; --timeout)
+			for (timeout = 100000000; timeout != 0; --timeout) {
 				if (cpus_weight(cpus_in_xmon) >= ncpus)
 					break;
+				barrier();
+			}
 		}
 		remove_bpts();
 		disable_surveillance();

@@ -393,7 +393,7 @@ source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_SA1100
 	bool
-	depends on CPU_FREQ && SA1100_LART
+	depends on CPU_FREQ && (SA1100_LART || SA1100_PLEB)
 	default y
 
 config CPU_FREQ_SA1110

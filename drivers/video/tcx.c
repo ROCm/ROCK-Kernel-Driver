@@ -106,10 +106,10 @@ struct bt_regs {
 
 struct tcx_par {
 	spinlock_t		lock;
-	struct bt_regs		*bt;
-	struct tcx_thc		*thc;
-	struct tcx_tec		*tec;
-	volatile u32		*cplane;
+	struct bt_regs		__iomem *bt;
+	struct tcx_thc		__iomem *thc;
+	struct tcx_tec		__iomem *tec;
+	volatile u32		__iomem *cplane;
 
 	u32			flags;
 #define TCX_FLAG_BLANKED	0x00000001
@@ -127,7 +127,7 @@ struct tcx_par {
 /* Reset control plane so that WID is 8-bit plane. */
 static void __tcx_set_control_plane (struct tcx_par *par)
 {
-	volatile u32 *p, *pend;
+	volatile u32 __iomem *p, *pend;
         
 	if (par->lowdepth)
 		return;
@@ -167,7 +167,7 @@ static int tcx_setcolreg(unsigned regno,
 			 unsigned transp, struct fb_info *info)
 {
 	struct tcx_par *par = (struct tcx_par *) info->par;
-	struct bt_regs *bt = par->bt;
+	struct bt_regs __iomem *bt = par->bt;
 	unsigned long flags;
 
 	if (regno >= 256)
@@ -198,7 +198,7 @@ static int
 tcx_blank(int blank, struct fb_info *info)
 {
 	struct tcx_par *par = (struct tcx_par *) info->par;
-	struct tcx_thc *thc = par->thc;
+	struct tcx_thc __iomem *thc = par->thc;
 	unsigned long flags;
 	u32 val;
 
@@ -371,19 +371,15 @@ static void tcx_init_one(struct sbus_dev *sdev)
 				       all->info.var.xres);
 	all->par.fbsize = PAGE_ALIGN(linebytes * all->info.var.yres);
 
-	all->par.tec = (struct tcx_tec *)
-		sbus_ioremap(&sdev->resource[7], 0,
+	all->par.tec = sbus_ioremap(&sdev->resource[7], 0,
 			     sizeof(struct tcx_tec), "tcx tec");
-	all->par.thc = (struct tcx_thc *)
-		sbus_ioremap(&sdev->resource[9], 0,
+	all->par.thc = sbus_ioremap(&sdev->resource[9], 0,
 			     sizeof(struct tcx_thc), "tcx thc");
-	all->par.bt = (struct bt_regs *)
-		sbus_ioremap(&sdev->resource[8], 0,
+	all->par.bt = sbus_ioremap(&sdev->resource[8], 0,
 			     sizeof(struct bt_regs), "tcx dac");
 	memcpy(&all->par.mmap_map, &__tcx_mmap_map, sizeof(all->par.mmap_map));
 	if (!all->par.lowdepth) {
-		all->par.cplane = (volatile u32 *)
-			sbus_ioremap(&sdev->resource[4], 0,
+		all->par.cplane = sbus_ioremap(&sdev->resource[4], 0,
 				     all->par.fbsize * sizeof(u32), "tcx cplane");
 	} else {
 		all->par.mmap_map[1].size = SBUS_MMAP_EMPTY;
@@ -415,12 +411,11 @@ static void tcx_init_one(struct sbus_dev *sdev)
 	all->info.flags = FBINFO_DEFAULT;
 	all->info.fbops = &tcx_ops;
 #ifdef CONFIG_SPARC32
-	all->info.screen_base = (char *)
+	all->info.screen_base = (char __iomem *)
 		prom_getintdefault(sdev->prom_node, "address", 0);
 #endif
 	if (!all->info.screen_base)
-		all->info.screen_base = (char *)
-			sbus_ioremap(&sdev->resource[0], 0,
+		all->info.screen_base = sbus_ioremap(&sdev->resource[0], 0,
 				     all->par.fbsize, "tcx ram");
 	all->info.par = &all->par;
 

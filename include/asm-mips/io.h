@@ -388,20 +388,6 @@ out:
 	return retval;
 }
 
-/*
- *     isa_check_signature             -       find BIOS signatures
- *     @io_addr: mmio address to check
- *     @signature:  signature block
- *     @length: length of signature
- *
- *     Perform a signature comparison with the ISA mmio address io_addr.
- *     Returns 1 on a match.
- *
- *     This function is deprecated. New drivers should use ioremap and
- *     check_signature.
- */
-#define isa_check_signature(io, s, l)	check_signature(i,s,l)
-
 static inline void __outb(unsigned char val, unsigned long port)
 {
 	port = __swizzle_addr_b(port);

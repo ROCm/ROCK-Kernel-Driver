@@ -149,7 +149,7 @@ struct board_info
 	ushort numports;
 	unchar *port;
 	unchar *membase;
-	unchar *re_map_port;
+	unchar __iomem *re_map_port;
 	unchar *re_map_membase;
 	ulong  memory_seg;
 	void ( * memwinon )	(struct board_info *, unsigned int) ;

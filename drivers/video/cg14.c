@@ -188,9 +188,9 @@ struct cg14_clut {
 
 struct cg14_par {
 	spinlock_t		lock;
-	struct cg14_regs	*regs;
-	struct cg14_clut	*clut;
-	struct cg14_cursor	*cursor;
+	struct cg14_regs	__iomem *regs;
+	struct cg14_clut	__iomem *clut;
+	struct cg14_cursor	__iomem *cursor;
 
 	u32			flags;
 #define CG14_FLAG_BLANKED	0x00000001
@@ -209,7 +209,7 @@ struct cg14_par {
 
 static void __cg14_reset(struct cg14_par *par)
 {
-	struct cg14_regs *regs = par->regs;
+	struct cg14_regs __iomem *regs = par->regs;
 	u8 val;
 
 	val = sbus_readb(&regs->mcr);
@@ -248,7 +248,7 @@ static int cg14_setcolreg(unsigned regno,
 			  unsigned transp, struct fb_info *info)
 {
 	struct cg14_par *par = (struct cg14_par *) info->par;
-	struct cg14_clut *clut = par->clut;
+	struct cg14_clut __iomem *clut = par->clut;
 	unsigned long flags;
 	u32 val;
 
@@ -280,7 +280,7 @@ static int cg14_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		      unsigned long arg, struct fb_info *info)
 {
 	struct cg14_par *par = (struct cg14_par *) info->par;
-	struct cg14_regs *regs = par->regs;
+	struct cg14_regs __iomem *regs = par->regs;
 	struct mdi_cfginfo kmdi, __user *mdii;
 	unsigned long flags;
 	int cur_mode, mode, ret = 0;
@@ -507,33 +507,29 @@ static void cg14_init_one(struct sbus_dev *sdev, int node, int parent_node)
 		all->par.physbase = phys = sdev->reg_addrs[1].phys_addr;
 		all->par.iospace = sdev->reg_addrs[0].which_io;
 
-		all->par.regs = (struct cg14_regs *)
-			sbus_ioremap(&sdev->resource[0], 0,
+		all->par.regs = sbus_ioremap(&sdev->resource[0], 0,
 				     sizeof(struct cg14_regs),
 				     "cg14 regs");
-		all->par.clut = (struct cg14_clut *)
-			sbus_ioremap(&sdev->resource[0], CG14_CLUT1,
+		all->par.clut = sbus_ioremap(&sdev->resource[0], CG14_CLUT1,
 				     sizeof(struct cg14_clut),
 				     "cg14 clut");
-		all->par.cursor = (struct cg14_cursor *)
-			sbus_ioremap(&sdev->resource[0], CG14_CURSORREGS,
+		all->par.cursor = sbus_ioremap(&sdev->resource[0], CG14_CURSORREGS,
 				     sizeof(struct cg14_cursor),
 				     "cg14 cursor");
-		all->info.screen_base = (char *)
-			sbus_ioremap(&sdev->resource[1], 0,
+		all->info.screen_base = sbus_ioremap(&sdev->resource[1], 0,
 				     all->par.fbsize, "cg14 ram");
 	} else {
 		rphys = __get_phys(bases[0]);
 		all->par.physbase = phys = __get_phys(bases[1]);
 		all->par.iospace = __get_iospace(bases[0]);
-		all->par.regs = (struct cg14_regs *)(unsigned long)bases[0];
-		all->par.clut = (struct cg14_clut *)((unsigned long)bases[0] +
+		all->par.regs = (struct cg14_regs __iomem *)(unsigned long)bases[0];
+		all->par.clut = (struct cg14_clut __iomem *)((unsigned long)bases[0] +
 						     CG14_CLUT1);
 		all->par.cursor =
-			(struct cg14_cursor *)((unsigned long)bases[0] +
+			(struct cg14_cursor __iomem *)((unsigned long)bases[0] +
 					       CG14_CURSORREGS);
 
-		all->info.screen_base = (char *)(unsigned long)bases[1];
+		all->info.screen_base = (char __iomem *)(unsigned long)bases[1];
 	}
 
 	prom_getproperty(node, "reg", (char *) &bases[0], sizeof(bases));

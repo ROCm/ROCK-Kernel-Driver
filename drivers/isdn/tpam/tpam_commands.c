@@ -21,8 +21,8 @@
 #include "tpam.h"
 
 /* Local functions prototypes */
-static int tpam_command_ioctl_dspload(tpam_card *, u32);
-static int tpam_command_ioctl_dspsave(tpam_card *, u32);
+static int tpam_command_ioctl_dspload(tpam_card *, unsigned long);
+static int tpam_command_ioctl_dspsave(tpam_card *, unsigned long);
 static int tpam_command_ioctl_dsprun(tpam_card *);
 static int tpam_command_ioctl_loopmode(tpam_card *, u8);
 static int tpam_command_dial(tpam_card *, u32, u8 *);
@@ -114,7 +114,7 @@ int tpam_command(isdn_ctrl *c) {
  *
  * Return: 0 if OK, <0 on errors.
  */
-static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
+static int tpam_command_ioctl_dspload(tpam_card *card, unsigned long arg) {
 	tpam_dsp_ioctl tdl;
 
 	pr_debug("TurboPAM(tpam_command_ioctl_dspload): card=%d\n", card->id);
@@ -130,7 +130,7 @@ static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
 		return -EPERM;
 
 	/* write the data in the board's memory */
-	return copy_from_user_to_pam(card, (void *)tdl.address, 
+	return copy_from_user_to_pam(card, tdl.address, 
 				     (void __user *)arg + sizeof(tpam_dsp_ioctl), 
 				     tdl.data_len);
 }
@@ -144,7 +144,7 @@ static int tpam_command_ioctl_dspload(tpam_card *card, u32 arg) {
  *
  * Return: 0 if OK, <0 on errors.
  */
-static int tpam_command_ioctl_dspsave(tpam_card *card, u32 arg) {
+static int tpam_command_ioctl_dspsave(tpam_card *card, unsigned long arg) {
 	tpam_dsp_ioctl tdl;
 
 	pr_debug("TurboPAM(tpam_command_ioctl_dspsave): card=%d\n", card->id);
@@ -159,7 +159,7 @@ static int tpam_command_ioctl_dspsave(tpam_card *card, u32 arg) {
 
 	/* read the data from the board's memory */
 	return copy_from_pam_to_user(card, (void __user *)arg + sizeof(tpam_dsp_ioctl),
-				     (void *)tdl.address, tdl.data_len);
+				     tdl.address, tdl.data_len);
 }
 
 /*
@@ -186,7 +186,7 @@ static int tpam_command_ioctl_dsprun(tpam_card *card) {
 
 	/* reset the board */
 	spin_lock_irq(&card->lock);
-	copy_to_pam_dword(card, (void *)TPAM_MAGICNUMBER_REGISTER, 0xdeadface);
+	copy_to_pam_dword(card, TPAM_MAGICNUMBER_REGISTER, 0xdeadface);
 	readl(card->bar0 + TPAM_DSPINT_REGISTER);
 	readl(card->bar0 + TPAM_HINTACK_REGISTER);
 	spin_unlock_irq(&card->lock);
@@ -196,7 +196,7 @@ static int tpam_command_ioctl_dsprun(tpam_card *card) {
 	while (time_before(jiffies, timeout)) {
 		spin_lock_irq(&card->lock);
 		signature = copy_from_pam_dword(card, 
-						(void *)TPAM_MAGICNUMBER_REGISTER);
+						TPAM_MAGICNUMBER_REGISTER);
 		spin_unlock_irq(&card->lock);
 		if (signature == TPAM_MAGICNUMBER)
 			break;
@@ -531,14 +531,14 @@ int tpam_writebuf_skb(int driverId, int channel, int ack, struct sk_buff *skb) {
 		if (!(tempdata = (void *)__get_free_page(GFP_ATOMIC))) {
 			printk(KERN_ERR "TurboPAM(tpam_writebuf_skb): "
 			       "get_free_page failed\n");
-			free_page((u32)finaldata);
+			free_page((unsigned long)finaldata);
 			return -ENOMEM;
 		}
 		hdlc_no_accm_encode(skb->data, skb->len, tempdata, &templen);
 		finallen = tpam_hdlc_encode(tempdata, finaldata, 
 				       &card->channels[channel].hdlcshift, 
 				       templen);
-		free_page((u32)tempdata);
+		free_page((unsigned long)tempdata);
 	}
 
 	/* free the old sk_buff */
@@ -548,13 +548,13 @@ int tpam_writebuf_skb(int driverId, int channel, int ack, struct sk_buff *skb) {
 	skb = build_U3DataReq(card->channels[channel].ncoid, finaldata, 
 			      finallen, ack, orig_size);
 	if (!skb) {
-		free_page((u32)finaldata);
+		free_page((unsigned long)finaldata);
 		return -ENOMEM;
 	}
 	tpam_enqueue_data(&card->channels[channel], skb);
 
 	/* free the temporary memory */
-	free_page((u32)finaldata);
+	free_page((unsigned long)finaldata);
 	return orig_size;
 }
 
@@ -865,11 +865,11 @@ void tpam_recv_U3DataInd(tpam_card *card, struct sk_buff *skb) {
 		if (!(result = alloc_skb(templen, GFP_ATOMIC))) {
 			printk(KERN_ERR "TurboPAM(tpam_recv_U3DataInd): "
 			       "alloc_skb failed\n");
-			free_page((u32)tempdata);
+			free_page((unsigned long)tempdata);
 			return;
 		}
 		memcpy(skb_put(result, templen), tempdata, templen);
-		free_page((u32)tempdata);
+		free_page((unsigned long)tempdata);
 	}
 	else {
 		/* modem mode */
