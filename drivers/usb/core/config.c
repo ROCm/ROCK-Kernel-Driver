@@ -99,108 +99,114 @@ static void usb_release_intf(struct device *dev)
 	kfree(intf);
 }
 
-static int usb_parse_interface(struct usb_interface *interface, unsigned char *buffer, int size)
+static int usb_parse_interface(struct usb_host_config *config, unsigned char *buffer, int size)
 {
 	unsigned char *buffer0 = buffer;
-	int i, len, numskipped, retval;
-	struct usb_descriptor_header *header;
+	struct usb_interface_descriptor	*d;
+	int inum, asnum;
+	struct usb_interface *interface;
 	struct usb_host_interface *ifp;
+	int len, numskipped;
+	struct usb_descriptor_header *header;
 	unsigned char *begin;
+	int i, retval;
 
-	ifp = interface->altsetting;
-	while (size >= sizeof(struct usb_descriptor_header)) {
-		struct usb_interface_descriptor	*d;
+	d = (struct usb_interface_descriptor *) buffer;
+	if (d->bDescriptorType != USB_DT_INTERFACE) {
+		warn("unexpected descriptor 0x%X, expecting interface, 0x%X",
+			d->bDescriptorType, USB_DT_INTERFACE);
+		return -EINVAL;
+	}
 
-		d = (struct usb_interface_descriptor *) buffer;
-		if (d->bAlternateSetting >= interface->num_altsetting) {
+	inum = d->bInterfaceNumber;
+	if (inum >= config->desc.bNumInterfaces) {
 
-			/* Skip to the next interface descriptor */
-			buffer += d->bLength;
-			size -= d->bLength;
-			while (size >= sizeof(struct usb_descriptor_header)) {
-				header = (struct usb_descriptor_header *) buffer;
-
-				if (header->bDescriptorType == USB_DT_INTERFACE)
-					break;
-				buffer += header->bLength;
-				size -= header->bLength;
-			}
-			continue;
-		}
-
-		memcpy(&ifp->desc, buffer, USB_DT_INTERFACE_SIZE);
-
-		buffer += ifp->desc.bLength;
-		size -= ifp->desc.bLength;
-
-		/* Skip over any Class Specific or Vendor Specific descriptors */
-		begin = buffer;
-		numskipped = 0;
+		/* Skip to the next interface descriptor */
+		buffer += d->bLength;
+		size -= d->bLength;
 		while (size >= sizeof(struct usb_descriptor_header)) {
-			header = (struct usb_descriptor_header *)buffer;
+			header = (struct usb_descriptor_header *) buffer;
 
-			/* If we find another "proper" descriptor then we're done  */
-			if ((header->bDescriptorType == USB_DT_INTERFACE) ||
-			    (header->bDescriptorType == USB_DT_ENDPOINT))
+			if (header->bDescriptorType == USB_DT_INTERFACE)
 				break;
-
-			dbg("skipping descriptor 0x%X", header->bDescriptorType);
-			numskipped++;
-
 			buffer += header->bLength;
 			size -= header->bLength;
 		}
-		if (numskipped) {
-			dbg("skipped %d class/vendor specific interface descriptors", numskipped);
+		return buffer - buffer0;
+	}
 
-			/* Copy any unknown descriptors into a storage area for */
-			/*  drivers to later parse */
-			len = buffer - begin;
-			ifp->extra = kmalloc(len, GFP_KERNEL);
+	interface = config->interface[inum];
+	asnum = d->bAlternateSetting;
+	if (asnum >= interface->num_altsetting) {
+		warn("invalid alternate setting %d for interface %d",
+		    asnum, inum);
+		return -EINVAL;
+	}
 
-			if (!ifp->extra) {
-				err("couldn't allocate memory for interface extra descriptors");
-				return -ENOMEM;
-			}
-			memcpy(ifp->extra, begin, len);
-			ifp->extralen = len;
+	ifp = &interface->altsetting[asnum];
+	memcpy(&ifp->desc, buffer, USB_DT_INTERFACE_SIZE);
+
+	buffer += d->bLength;
+	size -= d->bLength;
+
+	/* Skip over any Class Specific or Vendor Specific descriptors */
+	begin = buffer;
+	numskipped = 0;
+	while (size >= sizeof(struct usb_descriptor_header)) {
+		header = (struct usb_descriptor_header *)buffer;
+
+		/* If we find another "proper" descriptor then we're done  */
+		if ((header->bDescriptorType == USB_DT_INTERFACE) ||
+		    (header->bDescriptorType == USB_DT_ENDPOINT))
+			break;
+
+		dbg("skipping descriptor 0x%X", header->bDescriptorType);
+		numskipped++;
+
+		buffer += header->bLength;
+		size -= header->bLength;
+	}
+	if (numskipped) {
+		dbg("skipped %d class/vendor specific interface descriptors", numskipped);
+
+		/* Copy any unknown descriptors into a storage area for */
+		/*  drivers to later parse */
+		len = buffer - begin;
+		ifp->extra = kmalloc(len, GFP_KERNEL);
+
+		if (!ifp->extra) {
+			err("couldn't allocate memory for interface extra descriptors");
+			return -ENOMEM;
 		}
+		memcpy(ifp->extra, begin, len);
+		ifp->extralen = len;
+	}
 
-		if (ifp->desc.bNumEndpoints > USB_MAXENDPOINTS) {
-			warn("too many endpoints");
+	if (ifp->desc.bNumEndpoints > USB_MAXENDPOINTS) {
+		warn("too many endpoints");
+		return -EINVAL;
+	}
+
+	len = ifp->desc.bNumEndpoints * sizeof(struct usb_host_endpoint);
+	ifp->endpoint = kmalloc(len, GFP_KERNEL);
+	if (!ifp->endpoint) {
+		err("out of memory");
+		return -ENOMEM;
+	}
+	memset(ifp->endpoint, 0, len);
+
+	for (i = 0; i < ifp->desc.bNumEndpoints; i++) {
+		if (size < USB_DT_ENDPOINT_SIZE) {
+			err("ran out of descriptors parsing");
 			return -EINVAL;
 		}
 
-		len = ifp->desc.bNumEndpoints * sizeof(struct usb_host_endpoint);
-		ifp->endpoint = kmalloc(len, GFP_KERNEL);
-		if (!ifp->endpoint) {
-			err("out of memory");
-			return -ENOMEM;
-		}
-		memset(ifp->endpoint, 0, len);
+		retval = usb_parse_endpoint(ifp->endpoint + i, buffer, size);
+		if (retval < 0)
+			return retval;
 
-		for (i = 0; i < ifp->desc.bNumEndpoints; i++) {
-			if (size < USB_DT_ENDPOINT_SIZE) {
-				err("ran out of descriptors parsing");
-				return -EINVAL;
-			}
-
-			retval = usb_parse_endpoint(ifp->endpoint + i, buffer, size);
-			if (retval < 0)
-				return retval;
-
-			buffer += retval;
-			size -= retval;
-		}
-
-		/* We check to see if it's an alternate to this one */
-		d = (struct usb_interface_descriptor *)buffer;
-		if (size < USB_DT_INTERFACE_SIZE
-				|| d->bDescriptorType != USB_DT_INTERFACE
-				|| !d->bAlternateSetting)
-			break;
-
-		++ifp;
+		buffer += retval;
+		size -= retval;
 	}
 
 	return buffer - buffer0;
@@ -344,8 +350,8 @@ int usb_parse_configuration(struct usb_host_config *config, char *buffer)
 	}
 
 	/* Parse all the interface/altsetting descriptors */
-	for (i = 0; i < nintf_orig; i++) {
-		retval = usb_parse_interface(config->interface[i], buffer, size);
+	while (size >= sizeof(struct usb_descriptor_header)) {
+		retval = usb_parse_interface(config, buffer, size);
 		if (retval < 0)
 			return retval;
 
