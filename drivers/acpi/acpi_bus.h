@@ -29,7 +29,7 @@
 #include <linux/version.h>
 #include <linux/kobject.h>
 
-#include "include/acpi.h"
+#include <acpi/acpi.h>
 
 #define PREFIX			"ACPI: "
 

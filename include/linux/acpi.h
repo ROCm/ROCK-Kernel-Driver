@@ -31,11 +31,7 @@
 
 #include <linux/list.h>
 
-/*
- * Yes this is ugly, but moving all of ACPI's private headers to include/acpi 
- * isn't the right answer either.  Please just ignore it for now.
- */
-#include "../../drivers/acpi/include/acpi.h"
+#include <acpi/acpi.h>
 #include <asm/acpi.h>
 
 
