@@ -591,7 +591,6 @@ alpha_switch_to:
  */
 
 	.globl	ret_from_fork
-#if CONFIG_SMP || CONFIG_PREEMPT
 	.align	4
 	.ent	ret_from_fork
 ret_from_fork:
@@ -599,9 +598,6 @@ ret_from_fork:
 	mov	$17, $16
 	jmp	$31, schedule_tail
 .end ret_from_fork
-#else
-ret_from_fork = ret_from_sys_call
-#endif
 
 /*
  * kernel_thread(fn, arg, clone_flags)

@@ -288,7 +288,7 @@ static inline unsigned long __ffs(unsigned long word)
 #else
 	unsigned long bits, qofs, bofs;
 
-	bits = __kernel_cmpbge(word, 0);
+	bits = __kernel_cmpbge(0, word);
 	qofs = ffz_b(bits);
 	bits = __kernel_extbl(word, qofs);
 	bofs = ffz_b(~bits);
