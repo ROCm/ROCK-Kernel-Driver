@@ -577,13 +577,13 @@ unlock:
 static struct packet_type llc_packet_type = {
 	.type = __constant_htons(ETH_P_802_2),
 	.func = mac_indicate,
-	.data = (void *)1;
+	.data = (void *)1,
 };
 
 static struct packet_type llc_tr_packet_type = {
 	.type = __constant_htons(ETH_P_TR_802_2),
 	.func = mac_indicate,
-	.data = (void *)1;
+	.data = (void *)1,
 };
 
 static char llc_banner[] __initdata =
