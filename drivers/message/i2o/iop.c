@@ -1121,13 +1121,13 @@ struct i2o_controller *i2o_iop_alloc(void)
 	memset(c, 0, sizeof(*c));
 
 	INIT_LIST_HEAD(&c->devices);
-	c->lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&c->lock);
 	init_MUTEX(&c->lct_lock);
 	c->unit = unit++;
 	sprintf(c->name, "iop%d", c->unit);
 
 #if BITS_PER_LONG == 64
-	c->context_list_lock = SPIN_LOCK_UNLOCKED;
+	spin_lock_init(&c->context_list_lock);
 	atomic_set(&c->context_list_counter, 0);
 	INIT_LIST_HEAD(&c->context_list);
 #endif

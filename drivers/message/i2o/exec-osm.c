@@ -202,9 +202,11 @@ static int i2o_msg_post_wait_complete(struct i2o_controller *c, u32 m,
 				      struct i2o_message *msg)
 {
 	struct i2o_exec_wait *wait, *tmp;
-	static spinlock_t lock = SPIN_LOCK_UNLOCKED;
+	static spinlock_t lock;
 	int rc = 1;
 	u32 context;
+
+	spin_lock_init(&lock);
 
 	context = readl(&msg->u.s.tcntxt);
 
