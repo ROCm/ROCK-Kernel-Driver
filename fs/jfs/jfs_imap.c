@@ -2819,8 +2819,7 @@ diUpdatePMap(struct inode *ipimap,
 			mp->lsn = lsn;
 			/* move mp after tblock in logsync list */
 			LOGSYNC_LOCK(log);
-			list_del(&mp->synclist);
-			list_add(&mp->synclist, &tblk->synclist);
+			list_move(&mp->synclist, &tblk->synclist);
 			LOGSYNC_UNLOCK(log);
 		}
 		/* inherit younger/larger clsn */

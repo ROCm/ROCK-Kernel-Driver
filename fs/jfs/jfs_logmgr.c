@@ -291,8 +291,7 @@ int lmLog(log_t * log, tblock_t * tblk, lrd_t * lrd, tlock_t * tlck)
 			tblk->lsn = mp->lsn;
 
 			/* move tblock after page on logsynclist */
-			list_del(&tblk->synclist);
-			list_add(&tblk->synclist, &mp->synclist);
+			list_move(&tblk->synclist, &mp->synclist);
 		}
 	}
 
