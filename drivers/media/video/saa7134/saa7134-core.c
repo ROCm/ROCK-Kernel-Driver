@@ -21,6 +21,7 @@
  *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/list.h>
 #include <linux/module.h>
@@ -225,6 +226,8 @@ static void dump_statusregs(struct saa7134_dev *dev)
 /* ----------------------------------------------------------- */
 /* delayed request_module                                      */
 
+#ifdef CONFIG_MODULES
+
 static int need_empress;
 static int need_dvb;
 
@@ -264,6 +267,12 @@ static void request_module_depend(char *name, int *flag)
 		break;
 	}
 }
+
+#else
+
+#define request_module_depend(name,flag)
+
+#endif /* CONFIG_MODULES */
 
 /* ------------------------------------------------------------------ */
 
