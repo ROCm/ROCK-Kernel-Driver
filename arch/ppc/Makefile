@@ -81,13 +81,21 @@ $(BOOT_TARGETS): vmlinux
 	cp -f arch/ppc/configs/$(@:config=defconfig) .config
 
 archclean:
-	rm -f arch/ppc/kernel/{mk_defs,asm-offsets.h,find_name}
-	rm -f arch/ppc/iSeries/ReleaseData.h
 	@$(MAKEBOOT) clean
 
 archmrproper:
 
-prepare: checkbin
+prepare: include/asm-$(ARCH)/offsets.h checkbin
+
+arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
+				   include/config/MARKER
+
+include/asm-$(ARCH)/offsets.h.tmp: arch/$(ARCH)/kernel/asm-offsets.s
+	@$(generate-asm-offsets.h) < $< > $@
+
+include/asm-$(ARCH)/offsets.h: include/asm-$(ARCH)/offsets.h.tmp
+	@echo -n '  Generating $@'
+	@$(update-if-changed)
 
 ifdef CONFIG_6xx
 # Ensure this is binutils 2.12.1 (or 2.12.90.0.7) or later
@@ -107,3 +115,8 @@ else
 checkbin:
 	@true
 endif
+
+CLEAN_FILES +=	include/asm-$(ARCH)/offsets.h.tmp \
+		include/asm-$(ARCH)/offsets.h \
+		arch/$(ARCH)/kernel/asm-offsets.s \
+		arch/$(ARCH)/iSeries/ReleaseData.h

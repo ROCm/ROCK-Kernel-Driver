@@ -23,7 +23,7 @@
 #include <asm/mmu.h>
 #include <asm/ppc_asm.h>
 #include <asm/thread_info.h>
-#include "asm-offsets.h"
+#include <asm/offsets.h>
 
 	.text
 
