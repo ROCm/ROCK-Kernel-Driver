@@ -49,17 +49,11 @@ map_blocks(
 	int			error, nmaps = 1;
 
 retry:
-	if (flags & PBF_FILE_ALLOCATE) {
-		VOP_STRATEGY(vp, offset, count, flags, NULL,
-				pbmapp, &nmaps, error);
-	} else {
-		VOP_BMAP(vp, offset, count, flags, NULL,
-				pbmapp, &nmaps, error);
-	}
+	VOP_BMAP(vp, offset, count, flags, pbmapp, &nmaps, error);
 	if (flags & PBF_WRITE) {
 		if (unlikely((flags & PBF_DIRECT) && nmaps &&
 		    (pbmapp->pbm_flags & PBMF_DELAY))) {
-			flags = PBF_WRITE | PBF_FILE_ALLOCATE;
+			flags = PBF_FILE_ALLOCATE;
 			goto retry;
 		}
 		VMODIFY(vp);
@@ -404,7 +398,7 @@ delalloc_convert(
 		if (buffer_delay(bh)) {
 			if (!mp) {
 				err = map_blocks(inode, offset, len, &map,
-						PBF_WRITE|PBF_FILE_ALLOCATE);
+						PBF_FILE_ALLOCATE);
 				if (err) {
 					goto error;
 				}
@@ -517,7 +511,7 @@ linvfs_get_block_core(
 	}
 
 	VOP_BMAP(vp, offset, size,
-		create ? flags : PBF_READ, NULL,
+		create ? flags : PBF_READ,
 		(struct page_buf_bmap_s *)&pbmap, &retpbbm, error);
 	if (error)
 		return -error;

@@ -39,8 +39,7 @@
  */
 #define XFS_MAX_RW_NBMAPS	4
 
-extern int xfs_bmap (bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, pb_bmap_t *, int *);
-extern int xfs_strategy (bhv_desc_t *, xfs_off_t, ssize_t, int, struct cred *, pb_bmap_t *, int *);
+extern int xfs_bmap (bhv_desc_t *, xfs_off_t, ssize_t, int, page_buf_bmap_t *, int *);
 extern int xfsbdstrat (struct xfs_mount *, struct xfs_buf *);
 extern int xfs_bdstrat_cb (struct xfs_buf *);
 
