@@ -38,5 +38,7 @@ obj-$(CONFIG_MODULES)		+= module.o ppc_ksyms.o
 obj-$(CONFIG_PPC_RTAS)		+= rtas-proc.o
 obj-$(CONFIG_SCANLOG)		+= scanlog.o
 obj-$(CONFIG_VIOPATH)		+= viopath.o
+obj-$(CONFIG_LPARCFG)		+= lparcfg.o
+
 
 CFLAGS_ioctl32.o += -Ifs/

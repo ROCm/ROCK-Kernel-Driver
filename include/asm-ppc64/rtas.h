@@ -205,8 +205,6 @@ extern void pSeries_log_error(char *buf, unsigned int err_type, int fatal);
 /* Event Scan Parameters */
 #define EVENT_SCAN_ALL_EVENTS	0xf0000000
 #define SURVEILLANCE_TOKEN	9000
-#define SURVEILLANCE_TIMEOUT	1
-#define SURVEILLANCE_SCANRATE	1
 #define LOG_NUMBER		64		/* must be a power of two */
 #define LOG_NUMBER_MASK		(LOG_NUMBER-1)
 

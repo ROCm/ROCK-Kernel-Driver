@@ -399,6 +399,7 @@ static ssize_t manage_flash_write(struct file *file, const char *buf,
 	struct rtas_manage_flash_t *args_buf;
 	const char reject_str[] = "0";
 	const char commit_str[] = "1";
+	char stkbuf[10];
 	int op;
 
 	args_buf = (struct rtas_manage_flash_t *) dp->data;
@@ -407,9 +408,13 @@ static ssize_t manage_flash_write(struct file *file, const char *buf,
 		
 	op = -1;
 	if (buf) {
-		if (strncmp(buf, reject_str, strlen(reject_str)) == 0) 
+		if (count > 9) count = 9;
+		if (copy_from_user (stkbuf, buf, count)) {
+			return -EFAULT;
+		}
+		if (strncmp(stkbuf, reject_str, strlen(reject_str)) == 0) 
 			op = RTAS_REJECT_TMP_IMG;
-		else if (strncmp(buf, commit_str, strlen(commit_str)) == 0) 
+		else if (strncmp(stkbuf, commit_str, strlen(commit_str)) == 0) 
 			op = RTAS_COMMIT_TMP_IMG;
 	}
 	

@@ -150,6 +150,13 @@ config RTAS_FLASH
 config SCANLOG
 	tristate "Scanlog dump interface"
 	depends on PPC_RTAS
+
+config LPARCFG
+	bool "LPAR Configuration Data"
+	help
+	Provide system capacity information via human readable 
+	<key word>=<value> pairs through a /proc/ppc64/lparcfg interface.
+
 endmenu
 
 

@@ -103,3 +103,41 @@ _GLOBAL(plpar_hcall_8arg_2ret)
 	ld	r0,-8(r1)
 	mtcrf	0xff,r0
 	blr                     /* return r3 = status */
+
+
+/* long plpar_hcall_4out(unsigned long opcode,	 R3 
+		 unsigned long arg1,		 R4 
+		 unsigned long arg2,		 R5 
+		 unsigned long arg3,		 R6 
+		 unsigned long arg4,		 R7 
+		 unsigned long *out1,	(r4)	 R8 
+		 unsigned long *out2,	(r5)	 R9
+		 unsigned long *out3,   (r6)     R10
+		 unsigned long *out4);	(r7)	 112(R1). From Parameter save area. 
+ */
+_GLOBAL(plpar_hcall_4out)
+	mfcr	r0
+	std	r0,-8(r1)
+	ld      r14,112(r1)
+	stdu	r1,-48(r1) 
+
+	std     r8,32(r1)       /* Save out ptrs. */
+	std     r9,24(r1)
+	std     r10,16(r1)
+	std     r14,8(r1)
+	
+	HVSC                    /* invoke the hypervisor */
+
+	ld      r14,32(r1)      /* Fetch r4-r7 ret args. */
+	std     r4,0(r14)
+	ld      r14,24(r1)
+	std     r5,0(r14)
+	ld      r14,16(r1)
+	std     r6,0(r14)
+	ld      r14,8(r1)
+	std     r7,0(r14)
+
+	ld	r1,0(r1) 
+	ld	r0,-8(r1)
+	mtcrf	0xff,r0
+	blr                     /* return r3 = status */

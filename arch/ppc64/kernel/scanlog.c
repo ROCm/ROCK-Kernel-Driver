@@ -133,17 +133,24 @@ static ssize_t scanlog_read(struct file *file, char *buf,
 static ssize_t scanlog_write(struct file * file, const char * buf,
 			     size_t count, loff_t *ppos)
 {
+	char stkbuf[20];
 	unsigned long status;
 
+	if (count > 19) count = 19;
+	if (copy_from_user (stkbuf, buf, count)) {
+		return -EFAULT;
+	}
+	stkbuf[count] = 0;
+
 	if (buf) {
-		if (strncmp(buf, "reset", 5) == 0) {
+		if (strncmp(stkbuf, "reset", 5) == 0) {
 			DEBUG("reset scanlog\n");
 			status = rtas_call(ibm_scan_log_dump, 2, 1, NULL, NULL, 0);
 			DEBUG("rtas returns %ld\n", status);
-		} else if (strncmp(buf, "debugon", 7) == 0) {
+		} else if (strncmp(stkbuf, "debugon", 7) == 0) {
 			printk(KERN_ERR "scanlog: debug on\n");
 			scanlog_debug = 1;
-		} else if (strncmp(buf, "debugoff", 8) == 0) {
+		} else if (strncmp(stkbuf, "debugoff", 8) == 0) {
 			printk(KERN_ERR "scanlog: debug off\n");
 			scanlog_debug = 0;
 		}

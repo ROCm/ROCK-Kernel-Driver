@@ -252,12 +252,18 @@ void proc_rtas_init(void)
 static ssize_t ppc_rtas_poweron_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos)
 {
+	char stkbuf[40];  /* its small, its on stack */
 	struct rtc_time tm;
 	unsigned long nowtime;
 	char *dest;
 	int error;
 
-	nowtime = simple_strtoul(buf, &dest, 10);
+	if (39 < count) count = 39;
+	if (copy_from_user (stkbuf, buf, count)) {
+		return -EFAULT;
+	}
+	stkbuf[count] = 0;
+	nowtime = simple_strtoul(stkbuf, &dest, 10);
 	if (*dest != '\0' && *dest != '\n') {
 		printk("ppc_rtas_poweron_write: Invalid time\n");
 		return count;
@@ -278,18 +284,23 @@ static ssize_t ppc_rtas_poweron_write(struct file * file, const char * buf,
 static ssize_t ppc_rtas_poweron_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
+	char stkbuf[40];  /* its small, its on stack */
 	int n;
 	if (power_on_time == 0)
-		n = sprintf(buf, "Power on time not set\n");
+		n = snprintf(stkbuf, 40, "Power on time not set\n");
 	else
-		n = sprintf(buf, "%lu\n", power_on_time);
+		n = snprintf(stkbuf, 40, "%lu\n", power_on_time);
 
-	if (*ppos >= strlen(buf))
+	int sn = strlen (stkbuf) +1;
+	if (*ppos >= sn)
 		return 0;
-	if (n > strlen(buf) - *ppos)
-		n = strlen(buf) - *ppos;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
+	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
+		return -EFAULT;
+	}
 	*ppos += n;
 	return n;
 }
@@ -302,11 +313,16 @@ static ssize_t ppc_rtas_progress_write(struct file * file, const char * buf,
 {
 	unsigned long hex;
 
-	strcpy(progress_led, buf); /* save the string */
+	if (count >= MAX_LINELENGTH) count = MAX_LINELENGTH -1;
+	if (copy_from_user (progress_led, buf, count)) { /* save the string */
+		return -EFAULT;
+	}
+	progress_led[count] = 0;
+
 	/* Lets see if the user passed hexdigits */
-	hex = simple_strtoul(buf, NULL, 10);
-	
-	ppc_md.progress ((char *)buf, hex);
+	hex = simple_strtoul(progress_led, NULL, 10);
+
+	ppc_md.progress ((char *)progress_led, hex);
 	return count;
 
 	/* clear the line */ /* ppc_md.progress("                   ", 0xffff);*/
@@ -316,14 +332,30 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	int n = 0;
-	if (progress_led != NULL)
-		n = sprintf (buf, "%s\n", progress_led);
-	if (*ppos >= strlen(buf))
+	
+	if (progress_led == NULL) return 0;
+
+	char * tmpbuf = kmalloc (MAX_LINELENGTH, GFP_KERNEL);
+	if (!tmpbuf) {
+		printk(KERN_ERR "error: kmalloc failed\n");
+		return -ENOMEM;
+	}
+	n = sprintf (tmpbuf, "%s\n", progress_led);
+
+	int sn = strlen (tmpbuf) +1;
+	if (*ppos >= sn) {
+		kfree (tmpbuf);
 		return 0;
-	if (n > strlen(buf) - *ppos)
-		n = strlen(buf) - *ppos;
+	}
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
+	if (copy_to_user (buf, tmpbuf + (*ppos), n)) {
+		kfree (tmpbuf);
+		return -EFAULT;
+	}
+	kfree (tmpbuf);
 	*ppos += n;
 	return n;
 }
@@ -334,12 +366,18 @@ static ssize_t ppc_rtas_progress_read(struct file * file, char * buf,
 static ssize_t ppc_rtas_clock_write(struct file * file, const char * buf, 
 		size_t count, loff_t *ppos)
 {
+	char stkbuf[40];  /* its small, its on stack */
 	struct rtc_time tm;
 	unsigned long nowtime;
 	char *dest;
 	int error;
 
-	nowtime = simple_strtoul(buf, &dest, 10);
+	if (39 < count) count = 39;
+	if (copy_from_user (stkbuf, buf, count)) {
+		return -EFAULT;
+	}
+	stkbuf[count] = 0;
+	nowtime = simple_strtoul(stkbuf, &dest, 10);
 	if (*dest != '\0' && *dest != '\n') {
 		printk("ppc_rtas_clock_write: Invalid time\n");
 		return count;
@@ -367,21 +405,27 @@ static ssize_t ppc_rtas_clock_read(struct file * file, char * buf,
 	year = ret[0]; mon  = ret[1]; day  = ret[2];
 	hour = ret[3]; min  = ret[4]; sec  = ret[5];
 
+	char stkbuf[40];  /* its small, its on stack */
+
 	if (error != 0){
 		printk(KERN_WARNING "error: reading the clock returned: %s\n", 
 				ppc_rtas_process_error(error));
-		n = sprintf (buf, "0");
+		n = snprintf (stkbuf, 40, "0");
 	} else { 
-		n = sprintf (buf, "%lu\n", mktime(year, mon, day, hour, min, sec));
+		n = snprintf (stkbuf, 40, "%lu\n", mktime(year, mon, day, hour, min, sec));
 	}
 	kfree(ret);
 
-	if (*ppos >= strlen(buf))
+	int sn = strlen (stkbuf) +1;
+	if (*ppos >= sn)
 		return 0;
-	if (n > strlen(buf) - *ppos)
-		n = strlen(buf) - *ppos;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
+	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
+		return -EFAULT;
+	}
 	*ppos += n;
 	return n;
 }
@@ -775,7 +819,7 @@ int get_location_code(struct individual_sensor s, char * buffer)
 		n += check_location_string(ret, buffer + n);
 		n += sprintf ( buffer+n, " ");
 		/* see how many characters we have printed */
-		sprintf ( t, "%s ", ret);
+		snprintf ( t, 50, "%s ", ret);
 
 		pos += strlen(t);
 		if (pos >= llen) pos=0;
@@ -788,10 +832,17 @@ int get_location_code(struct individual_sensor s, char * buffer)
 static ssize_t ppc_rtas_tone_freq_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos)
 {
+	char stkbuf[40];  /* its small, its on stack */
 	unsigned long freq;
 	char *dest;
 	int error;
-	freq = simple_strtoul(buf, &dest, 10);
+
+	if (39 < count) count = 39;
+	if (copy_from_user (stkbuf, buf, count)) {
+		return -EFAULT;
+	}
+	stkbuf[count] = 0;
+	freq = simple_strtoul(stkbuf, &dest, 10);
 	if (*dest != '\0' && *dest != '\n') {
 		printk("ppc_rtas_tone_freq_write: Invalid tone freqency\n");
 		return count;
@@ -810,14 +861,19 @@ static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	int n;
-	n = sprintf(buf, "%lu\n", rtas_tone_frequency);
+	char stkbuf[40];  /* its small, its on stack */
+	n = snprintf(stkbuf, 40, "%lu\n", rtas_tone_frequency);
 
-	if (*ppos >= strlen(buf))
+	int sn = strlen (stkbuf) +1;
+	if (*ppos >= sn)
 		return 0;
-	if (n > strlen(buf) - *ppos)
-		n = strlen(buf) - *ppos;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
+	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
+		return -EFAULT;
+	}
 	*ppos += n;
 	return n;
 }
@@ -827,10 +883,17 @@ static ssize_t ppc_rtas_tone_freq_read(struct file * file, char * buf,
 static ssize_t ppc_rtas_tone_volume_write(struct file * file, const char * buf,
 		size_t count, loff_t *ppos)
 {
+	char stkbuf[40];  /* its small, its on stack */
 	unsigned long volume;
 	char *dest;
 	int error;
-	volume = simple_strtoul(buf, &dest, 10);
+
+	if (39 < count) count = 39;
+	if (copy_from_user (stkbuf, buf, count)) {
+		return -EFAULT;
+	}
+	stkbuf[count] = 0;
+	volume = simple_strtoul(stkbuf, &dest, 10);
 	if (*dest != '\0' && *dest != '\n') {
 		printk("ppc_rtas_tone_volume_write: Invalid tone volume\n");
 		return count;
@@ -851,14 +914,19 @@ static ssize_t ppc_rtas_tone_volume_read(struct file * file, char * buf,
 		size_t count, loff_t *ppos)
 {
 	int n;
-	n = sprintf(buf, "%lu\n", rtas_tone_volume);
+	char stkbuf[40];  /* its small, its on stack */
+	n = snprintf(stkbuf, 40, "%lu\n", rtas_tone_volume);
 
-	if (*ppos >= strlen(buf))
+	int sn = strlen (stkbuf) +1;
+	if (*ppos >= sn)
 		return 0;
-	if (n > strlen(buf) - *ppos)
-		n = strlen(buf) - *ppos;
+	if (n > sn - *ppos)
+		n = sn - *ppos;
 	if (n > count)
 		n = count;
+	if (copy_to_user (buf, stkbuf + (*ppos), n)) {
+		return -EFAULT;
+	}
 	*ppos += n;
 	return n;
 }

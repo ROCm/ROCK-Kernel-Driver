@@ -123,3 +123,20 @@ long plpar_hcall_8arg_2ret(unsigned long opcode,
 			   unsigned long *out1);
 
 
+ 
+ 
+/* plpar_hcall_4out()
+ *
+ * same as plpar_hcall except with 4 output arguments.  
+ * 
+ */
+long plpar_hcall_4out(unsigned long opcode,
+		      unsigned long arg1,
+		      unsigned long arg2,
+		      unsigned long arg3,
+		      unsigned long arg4,
+		      unsigned long *out1,
+		      unsigned long *out2,
+		      unsigned long *out3,
+		      unsigned long *out4);
+
