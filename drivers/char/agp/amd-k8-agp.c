@@ -15,7 +15,6 @@
 #include "agp.h"
 
 extern int agp_memory_reserved;
-extern __u32 *agp_gatt_table; 
 
 static u_int64_t pci_read64 (struct pci_dev *dev, int reg)
 {
@@ -520,6 +519,8 @@ static int __init agp_amdk8_init(void)
 	ret_val = pci_module_init(&agp_amdk8_pci_driver);
 	if (ret_val)
 		agp_bridge.type = NOT_SUPPORTED;
+
+	agp_bridge.type = AMD_8151;
 
 	return ret_val;
 }

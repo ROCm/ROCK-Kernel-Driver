@@ -61,7 +61,7 @@ static int snd_ctl_open(struct inode *inode, struct file *file)
 		err = -ENODEV;
 		goto __error1;
 	}
-	if (!try_inc_mod_count(card->module)) {
+	if (!try_module_get(card->module)) {
 		err = -EFAULT;
 		goto __error2;
 	}

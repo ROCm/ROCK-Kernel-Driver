@@ -78,7 +78,7 @@ static int usb_serial_device_probe (struct device *dev)
 
 	minor = port->number;
 
-	tty_register_devfs (&usb_serial_tty_driver, 0, minor);
+	tty_register_device (&usb_serial_tty_driver, minor);
 	dev_info(*dev, "%s converter now attached to ttyUSB%d (or usb/tts/%d for devfs)\n",
 		 driver->name, minor, minor);
 
@@ -110,7 +110,7 @@ static int usb_serial_device_remove (struct device *dev)
 	}
 exit:
 	minor = port->number;
-	tty_unregister_devfs (&usb_serial_tty_driver, minor);
+	tty_unregister_device (&usb_serial_tty_driver, minor);
 	dev_info(*dev, "%s converter now disconnected from ttyUSB%d\n",
 		 driver->name, minor);
 
@@ -128,6 +128,7 @@ int usb_serial_bus_register(struct usb_serial_device_type *device)
 	device->driver.bus = &usb_serial_bus_type;
 	device->driver.probe = usb_serial_device_probe;
 	device->driver.remove = usb_serial_device_remove;
+	device->driver.devclass = &tty_devclass;
 
 	retval = driver_register(&device->driver);
 

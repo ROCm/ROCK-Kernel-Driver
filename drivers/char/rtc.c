@@ -72,6 +72,7 @@
 #include <linux/spinlock.h>
 #include <linux/sysctl.h>
 #include <linux/wait.h>
+#include <linux/bcd.h>
 
 #include <asm/current.h>
 #include <asm/uaccess.h>

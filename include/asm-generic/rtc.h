@@ -16,6 +16,7 @@
 
 #include <linux/mc146818rtc.h>
 #include <linux/rtc.h>
+#include <linux/bcd.h>
 
 #define RTC_PIE 0x40		/* periodic interrupt enable */
 #define RTC_AIE 0x20		/* alarm interrupt enable */

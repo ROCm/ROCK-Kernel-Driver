@@ -1332,7 +1332,7 @@ int ata_attach(ide_drive_t *drive)
 	spin_lock(&drivers_lock);
 	list_for_each(p, &drivers) {
 		ide_driver_t *driver = list_entry(p, ide_driver_t, drivers);
-		if (!try_inc_mod_count(driver->owner))
+		if (!try_module_get(driver->owner))
 			continue;
 		spin_unlock(&drivers_lock);
 		if (driver->attach(drive) == 0) {

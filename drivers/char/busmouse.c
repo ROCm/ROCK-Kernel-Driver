@@ -200,7 +200,7 @@ static int busmouse_open(struct inode *inode, struct file *file)
 	if (!mse || !mse->ops)	/* shouldn't happen, but... */
 		goto end;
 
-	if (mse->ops->owner && !try_inc_mod_count(mse->ops->owner))
+	if (!try_module_get(mse->ops->owner))
 		goto end;
 
 	ret = 0;

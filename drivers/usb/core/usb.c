@@ -84,19 +84,19 @@ int usb_device_probe(struct device *dev)
 	const struct usb_device_id *id;
 	int error = -ENODEV;
 
-	dbg("%s", __FUNCTION__);
+	dev_dbg(*dev, "%s\n", __FUNCTION__);
 
 	if (!driver->probe)
 		return error;
 
 	if (!try_module_get(driver->owner)) {
-		err ("Can't get a module reference for %s", driver->name);
+		dev_err (*dev, "Can't get a module reference for %s\n", driver->name);
 		return error;
 	}
 
 	id = usb_match_id (intf, driver->id_table);
 	if (id) {
-		dbg ("%s - got id", __FUNCTION__);
+		dev_dbg (*dev, "%s - got id\n", __FUNCTION__);
 		down (&driver->serialize);
 		error = driver->probe (intf, id);
 		up (&driver->serialize);
@@ -118,7 +118,7 @@ int usb_device_remove(struct device *dev)
 	driver = to_usb_driver(dev->driver);
 
 	if (!driver) {
-		err("%s does not have a valid driver to work with!",
+		dev_err(*dev, "%s does not have a valid driver to work with!",
 		    __FUNCTION__);
 		return -ENODEV;
 	}
@@ -126,7 +126,7 @@ int usb_device_remove(struct device *dev)
 	if (!try_module_get(driver->owner)) {
 		// FIXME this happens even when we just rmmod
 		// drivers that aren't in active use...
-		err("Dieing driver still bound to device.\n");
+		dev_err(*dev, "Dieing driver still bound to device.\n");
 		return -EIO;
 	}
 
@@ -1042,7 +1042,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 			wait_ms(200);
 		}
 		if (err < 0) {
-			err("USB device not accepting new address=%d (error=%d)",
+			dev_err(dev->dev, "USB device not accepting new address=%d (error=%d)\n",
 				dev->devnum, err);
 			clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 			dev->devnum = -1;
@@ -1060,9 +1060,9 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	if (err < 8) {
 		if (err < 0)
-			err("USB device not responding, giving up (error=%d)", err);
+			dev_err(dev->dev, "USB device not responding, giving up (error=%d)\n", err);
 		else
-			err("USB device descriptor short read (expected %i, got %i)", 8, err);
+			dev_err(dev->dev, "USB device descriptor short read (expected %i, got %i)\n", 8, err);
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
 		return 1;
@@ -1077,9 +1077,9 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	err = usb_get_device_descriptor(dev);
 	if (err < (signed)sizeof(dev->descriptor)) {
 		if (err < 0)
-			err("unable to get device descriptor (error=%d)", err);
+			dev_err(dev->dev, "unable to get device descriptor (error=%d)\n", err);
 		else
-			err("USB device descriptor short read (expected %Zi, got %i)",
+			dev_err(dev->dev, "USB device descriptor short read (expected %Zi, got %i)\n",
 				sizeof(dev->descriptor), err);
 	
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
@@ -1089,7 +1089,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 
 	err = usb_get_configuration(dev);
 	if (err < 0) {
-		err("unable to get device %d configuration (error=%d)",
+		dev_err(dev->dev, "unable to get device %d configuration (error=%d)\n",
 			dev->devnum, err);
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
@@ -1099,7 +1099,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 	/* we set the default configuration here */
 	err = usb_set_configuration(dev, dev->config[0].desc.bConfigurationValue);
 	if (err) {
-		err("failed to set device %d default configuration (error=%d)",
+		dev_err(dev->dev, "failed to set device %d default configuration (error=%d)\n",
 			dev->devnum, err);
 		clear_bit(dev->devnum, dev->bus->devmap.devicemap);
 		dev->devnum = -1;
@@ -1151,7 +1151,7 @@ int usb_new_device(struct usb_device *dev, struct device *parent)
 				dev->bus->bus_name, dev->devpath,
 				desc->bInterfaceNumber);
 		}
-		dbg ("%s - registering %s", __FUNCTION__, interface->dev.bus_id);
+		dev_dbg (dev->dev, "%s - registering interface %s\n", __FUNCTION__, interface->dev.bus_id);
 		device_add (&interface->dev);
 		usb_create_driverfs_intf_files (interface);
 	}

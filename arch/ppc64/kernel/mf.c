@@ -40,6 +40,7 @@
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/uaccess.h>
 #include <linux/pci.h>
+#include <linux/bcd.h>
 
 extern struct pci_dev * iSeries_vio_dev;
 

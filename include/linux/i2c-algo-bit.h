@@ -42,9 +42,10 @@ struct i2c_algo_bit_data {
 	int  (*getscl) (void *data);
 
 	/* local settings */
-	int udelay;
-	int mdelay;
-	int timeout;
+	int udelay;		/* half-clock-cycle time in microsecs */
+				/* i.e. clock is (500 / udelay) KHz */
+	int mdelay;		/* in millisecs, unused */
+	int timeout;		/* in jiffies */
 };
 
 #define I2C_BIT_ADAP_MAX	16

@@ -26,21 +26,20 @@ static void pnp_convert_id(char *buf, unsigned short vendor, unsigned short devi
 }
 
 struct pnp_card *pnp_find_card(unsigned short vendor,
-				 unsigned short device,
-				 struct pnp_card *from)
+			       unsigned short device,
+			       struct pnp_card *from)
 {
 	char id[7];
 	char any[7];
 	struct list_head *list;
 	pnp_convert_id(id, vendor, device);
 	pnp_convert_id(any, ISAPNP_ANY_ID, ISAPNP_ANY_ID);
-	list = isapnp_cards.next;
-	if (from)
-		list = from->node.next;
 
-	while (list != &isapnp_cards) {
-		struct pnp_card *card = to_pnp_card(list);
-		if (compare_pnp_id(&card->ids,id) || (memcmp(id,any,7)==0))
+	list = from ? from->global_list.next : pnp_cards.next;
+
+	while (list != &pnp_cards) {
+		struct pnp_card *card = global_to_pnp_card(list);
+		if (compare_pnp_id(card->id,id) || (memcmp(id,any,7)==0))
 			return card;
 		list = list->next;
 	}
@@ -48,9 +47,9 @@ struct pnp_card *pnp_find_card(unsigned short vendor,
 }
 
 struct pnp_dev *pnp_find_dev(struct pnp_card *card,
-				unsigned short vendor,
-				unsigned short function,
-				struct pnp_dev *from)
+			     unsigned short vendor,
+			     unsigned short function,
+			     struct pnp_dev *from)
 {
 	char id[7];
 	char any[7];
@@ -65,7 +64,7 @@ struct pnp_dev *pnp_find_dev(struct pnp_card *card,
 
 		while (list != &pnp_global) {
 			struct pnp_dev *dev = global_to_pnp_dev(list);
-			if (compare_pnp_id(&dev->ids,id) || (memcmp(id,any,7)==0))
+			if (compare_pnp_id(dev->id,id) || (memcmp(id,any,7)==0))
 				return dev;
 			list = list->next;
 		}
@@ -80,7 +79,7 @@ struct pnp_dev *pnp_find_dev(struct pnp_card *card,
 		}
 		while (list != &card->devices) {
 			struct pnp_dev *dev = card_to_pnp_dev(list);
-			if (compare_pnp_id(&dev->ids,id))
+			if (compare_pnp_id(dev->id,id))
 				return dev;
 			list = list->next;
 		}

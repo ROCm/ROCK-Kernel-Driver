@@ -476,7 +476,7 @@ sysdesc_ok:
 	movsb
 	popw	%ds
 no_mca:
-#ifdef CONFIG_VOYAGER
+#ifdef CONFIG_X86_VOYAGER
 	movb	$0xff, 0x40	# flag on config found
 	movb	$0xc0, %al
 	mov	$0xff, %ah
@@ -758,7 +758,7 @@ A20_TEST_LOOPS		=  32		# Iterations per wait
 A20_ENABLE_LOOPS	= 255		# Total loops to try		
 
 
-#ifndef CONFIG_VOYAGER
+#ifndef CONFIG_X86_VOYAGER
 a20_try_loop:
 
 	# First, see if we are on a system with no A20 gate.
@@ -777,11 +777,11 @@ a20_bios:
 	jnz	a20_done
 
 	# Try enabling A20 through the keyboard controller
-#endif /* CONFIG_VOYAGER */
+#endif /* CONFIG_X86_VOYAGER */
 a20_kbc:
 	call	empty_8042
 
-#ifndef CONFIG_VOYAGER
+#ifndef CONFIG_X86_VOYAGER
 	call	a20_test			# Just in case the BIOS worked
 	jnz	a20_done			# but had a delayed reaction.
 #endif
@@ -794,7 +794,7 @@ a20_kbc:
 	outb	%al, $0x60
 	call	empty_8042
 
-#ifndef CONFIG_VOYAGER
+#ifndef CONFIG_X86_VOYAGER
 	# Wait until a20 really *is* enabled; it can take a fair amount of
 	# time on certain systems; Toshiba Tecras are known to have this
 	# problem.
@@ -842,7 +842,7 @@ a20_err_msg:
 	# If we get here, all is good
 a20_done:
 
-#endif /* CONFIG_VOYAGER */
+#endif /* CONFIG_X86_VOYAGER */
 # set up gdt and idt
 	lidt	idt_48				# load idt with 0,0
 	xorl	%eax, %eax			# Compute gdt_base
@@ -1009,7 +1009,7 @@ bootsect_panic_mess:
 	.string	"INT15 refuses to access high mem, giving up."
 
 
-#ifndef CONFIG_VOYAGER
+#ifndef CONFIG_X86_VOYAGER
 # This routine tests whether or not A20 is enabled.  If so, it
 # exits with zf = 0.
 #
@@ -1040,7 +1040,7 @@ a20_test_wait:
 	popw	%cx
 	ret	
 
-#endif /* CONFIG_VOYAGER */
+#endif /* CONFIG_X86_VOYAGER */
 
 # This routine checks that the keyboard command queue is empty
 # (after emptying the output buffers)

@@ -827,12 +827,16 @@ extern const char *scsi_sense_key_text[];
 
 /************************* Large Disk Handling ********************************/
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
+static __inline int aic_sector_div(u_long capacity, int heads, int sectors);
+
 static __inline int
 aic_sector_div(u_long capacity, int heads, int sectors)
 {
 	return (capacity / (heads * sectors));
 }
 #else
+static __inline int aic_sector_div(sector_t capacity, int heads, int sectors);
+
 static __inline int
 aic_sector_div(sector_t capacity, int heads, int sectors)
 {

@@ -2646,7 +2646,7 @@ static void __init con_init_devfs (void)
 	int i;
 
 	for (i = 0; i < console_driver.num; i++)
-		tty_register_devfs (&console_driver, DEVFS_FL_DEFAULT,
+		tty_register_device (&console_driver,
 				    console_driver.minor_start + i);
 }
 

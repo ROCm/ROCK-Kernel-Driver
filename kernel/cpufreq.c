@@ -365,7 +365,7 @@ int cpufreq_set(unsigned int freq, unsigned int cpu)
 {
 	struct cpufreq_policy policy;
 	down(&cpufreq_driver_sem);
-	if (!cpufreq_driver || !cpu_max_freq) {
+	if (!cpufreq_driver || !freq || (cpu > NR_CPUS)) {
 		up(&cpufreq_driver_sem);
 		return -EINVAL;
 	}
@@ -377,7 +377,20 @@ int cpufreq_set(unsigned int freq, unsigned int cpu)
 	
 	up(&cpufreq_driver_sem);
 
-	return cpufreq_set_policy(&policy);
+	if (policy.cpu == CPUFREQ_ALL_CPUS)
+	{
+		unsigned int i;
+		unsigned int ret = 0;
+		for (i=0; i<NR_CPUS; i++) 
+		{
+			policy.cpu = i;
+			if (cpu_online(i))
+				ret |= cpufreq_set_policy(&policy);
+		}
+		return ret;
+	} 
+	else
+		return cpufreq_set_policy(&policy);
 }
 EXPORT_SYMBOL_GPL(cpufreq_set);
 
@@ -842,7 +855,6 @@ EXPORT_SYMBOL(cpufreq_get_policy);
  */
 int cpufreq_set_policy(struct cpufreq_policy *policy)
 {
-	unsigned int i;
 	int ret;
 
 	down(&cpufreq_driver_sem);
@@ -889,24 +901,12 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 
 	up(&cpufreq_notifier_sem);
 
-	if (policy->cpu == CPUFREQ_ALL_CPUS) {
-		for (i=0;i<NR_CPUS;i++) {
-			cpufreq_driver->policy[i].min    = policy->min;
-			cpufreq_driver->policy[i].max    = policy->max;
-			cpufreq_driver->policy[i].policy = policy->policy;
-		} 
-	} else {
-		cpufreq_driver->policy[policy->cpu].min    = policy->min;
-		cpufreq_driver->policy[policy->cpu].max    = policy->max;
-		cpufreq_driver->policy[policy->cpu].policy = policy->policy;
-	}
+	cpufreq_driver->policy[policy->cpu].min    = policy->min;
+	cpufreq_driver->policy[policy->cpu].max    = policy->max;
+	cpufreq_driver->policy[policy->cpu].policy = policy->policy;
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	if (policy->cpu == CPUFREQ_ALL_CPUS) {
-		for (i=0;i<NR_CPUS;i++)
-			cpu_cur_freq[i] = policy->max;
-	} else
-		cpu_cur_freq[policy->cpu] = policy->max;
+	cpu_cur_freq[policy->cpu] = policy->max;
 #endif
 
 	ret = cpufreq_driver->setpolicy(policy);
@@ -916,15 +916,6 @@ int cpufreq_set_policy(struct cpufreq_policy *policy)
 	return ret;
 }
 EXPORT_SYMBOL(cpufreq_set_policy);
-
-
-
-/*********************************************************************
- *                    DYNAMIC CPUFREQ SWITCHING                      *
- *********************************************************************/
-#ifdef CONFIG_CPU_FREQ_DYNAMIC
-/* TBD */
-#endif /* CONFIG_CPU_FREQ_DYNAMIC */
 
 
 
@@ -967,12 +958,7 @@ void cpufreq_notify_transition(struct cpufreq_freqs *freqs, unsigned int state)
 		adjust_jiffies(CPUFREQ_POSTCHANGE, freqs);
 		notifier_call_chain(&cpufreq_transition_notifier_list, CPUFREQ_POSTCHANGE, freqs);
 #ifdef CONFIG_CPU_FREQ_24_API
-		if (freqs->cpu == CPUFREQ_ALL_CPUS) {
-			int i;
-			for (i=0;i<NR_CPUS;i++)
-				cpu_cur_freq[i] = freqs->new;
-		} else
-			cpu_cur_freq[freqs->cpu] = freqs->new;
+		cpu_cur_freq[freqs->cpu] = freqs->new;
 #endif
 		break;
 	}

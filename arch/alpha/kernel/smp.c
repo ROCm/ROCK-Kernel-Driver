@@ -607,6 +607,12 @@ smp_prepare_cpus(unsigned int max_cpus)
 	smp_boot_cpus();
 }
 
+void __devinit
+smp_prepare_boot_cpu(void)
+{
+	set_bit(smp_processor_id(), &cpu_present_mask);
+}
+
 int __devinit
 __cpu_up(unsigned int cpu)
 {

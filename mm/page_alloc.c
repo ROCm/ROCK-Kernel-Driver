@@ -350,6 +350,31 @@ int is_head_of_free_region(struct page *page)
 	spin_unlock_irqrestore(&zone->lock, flags);
         return 0;
 }
+
+/*
+ * Spill all of this CPU's per-cpu pages back into the buddy allocator.
+ */
+void drain_local_pages(void)
+{
+	unsigned long flags;
+	struct zone *zone;
+	int i;
+
+	local_irq_save(flags);	
+	for_each_zone(zone) {
+		struct per_cpu_pageset *pset;
+
+		pset = &zone->pageset[smp_processor_id()];
+		for (i = 0; i < ARRAY_SIZE(pset->pcp); i++) {
+			struct per_cpu_pages *pcp;
+
+			pcp = &pset->pcp[i];
+			pcp->count -= free_pages_bulk(zone, pcp->count,
+						&pcp->list, 0);
+		}
+	}
+	local_irq_restore(flags);	
+}
 #endif /* CONFIG_SOFTWARE_SUSPEND */
 
 /*

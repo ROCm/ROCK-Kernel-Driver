@@ -71,6 +71,13 @@
  */
  
 #include <linux/config.h>
+
+#ifdef CONFIG_USB_DEBUG
+#	define DEBUG
+#else
+#	undef DEBUG
+#endif
+
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/kernel.h>
@@ -84,13 +91,6 @@
 #include <linux/timer.h>
 #include <linux/list.h>
 #include <linux/interrupt.h>  /* for in_interrupt () */
-
-#ifdef CONFIG_USB_DEBUG
-#	define DEBUG
-#else
-#	undef DEBUG
-#endif
-
 #include <linux/usb.h>
 #include <linux/version.h>
 #include "../core/hcd.h"
@@ -383,7 +383,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 
 	/* SMM owns the HC?  not for long! */
 	if (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
-		dbg ("USB HC TakeOver from BIOS/SMM");
+		dev_dbg (*ohci->hcd.controller, "USB HC TakeOver from BIOS/SMM\n");
 
 		/* this timeout is arbitrary.  we make it long, so systems
 		 * depending on usb keyboards may be usable even if the
@@ -396,7 +396,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 		while (readl (&ohci->regs->control) & OHCI_CTRL_IR) {
 			wait_ms (10);
 			if (--temp == 0) {
-				err ("USB HC TakeOver failed!");
+				dev_err (*ohci->hcd.controller, "USB HC TakeOver failed!\n");
 				return -1;
 			}
 		}
@@ -405,7 +405,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 	/* Disable HC interrupts */
 	writel (OHCI_INTR_MIE, &ohci->regs->intrdisable);
 
-	dbg ("USB HC reset_hc %s: ctrl = 0x%x ;",
+	dev_dbg (*ohci->hcd.controller, "USB HC reset_hc %s: ctrl = 0x%x ;\n",
 		ohci->hcd.self.bus_name,
 		readl (&ohci->regs->control));
 
@@ -422,7 +422,7 @@ static int hc_reset (struct ohci_hcd *ohci)
 	temp = 30;	/* ... allow extra time */
 	while ((readl (&ohci->regs->cmdstatus) & OHCI_HCR) != 0) {
 		if (--temp == 0) {
-			err ("USB HC reset timed out!");
+			dev_err (*ohci->hcd.controller, "USB HC reset timed out!");
 			return -1;
 		}
 		udelay (1);
@@ -562,9 +562,7 @@ static void ohci_irq (struct usb_hcd *hcd, struct pt_regs *ptregs)
 				hcd->self.bus_name);
 		// e.g. due to PCI Master/Target Abort
 
-#ifdef	DEBUG
 		ohci_dump (ohci, 1);
-#endif
 		hc_reset (ohci);
 	}
   
@@ -596,14 +594,11 @@ static void ohci_stop (struct usb_hcd *hcd)
 {	
 	struct ohci_hcd		*ohci = hcd_to_ohci (hcd);
 
-	dbg ("%s: stop %s controller%s",
-		hcd->self.bus_name,
+	dev_dbg (*hcd->controller, "stop %s controller%s\n",
 		hcfs2string (ohci->hc_control & OHCI_CTRL_HCFS),
 		ohci->disabled ? " (disabled)" : ""
 		);
-#ifdef	DEBUG
 	ohci_dump (ohci, 1);
-#endif
 
 	if (!ohci->disabled)
 		hc_reset (ohci);

@@ -759,18 +759,20 @@ static int agpioc_info_wrap(agp_file_private * priv, unsigned long arg)
 
 static int agpioc_acquire_wrap(agp_file_private * priv, unsigned long arg)
 {
+	int ret;
+
 	agp_controller *controller;
-	if (!(test_bit(AGP_FF_ALLOW_CONTROLLER, &priv->access_flags))) {
+	if (!(test_bit(AGP_FF_ALLOW_CONTROLLER, &priv->access_flags)))
 		return -EPERM;
-	}
-	if (agp_fe.current_controller != NULL) {
+
+	if (agp_fe.current_controller != NULL)
 		return -EBUSY;
-	}
-	if ((agp_backend_acquire()) == 0) {
+
+	ret = agp_backend_acquire();
+	if (ret == 0)
 		agp_fe.backend_acquired = TRUE;
-	} else {
-		return -EBUSY;
-	}
+	else
+		return ret;
 
 	controller = agp_find_controller_by_pid(priv->my_pid);
 

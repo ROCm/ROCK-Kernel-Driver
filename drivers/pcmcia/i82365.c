@@ -814,7 +814,7 @@ static void __init add_pcic(int ns, int type)
 
 #ifdef CONFIG_ISA
 
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
 static struct isapnp_device_id id_table[] __initdata = {
 	{ 	ISAPNP_ANY_ID, ISAPNP_ANY_ID, ISAPNP_VENDOR('P', 'N', 'P'),
 		ISAPNP_FUNCTION(0x0e00), (unsigned long) "Intel 82365-Compatible" },
@@ -826,32 +826,28 @@ static struct isapnp_device_id id_table[] __initdata = {
 };
 MODULE_DEVICE_TABLE(isapnp, id_table);
 
-static struct pci_dev *i82365_pnpdev;
+static struct pnp_dev *i82365_pnpdev;
 #endif
 
 static void __init isa_probe(void)
 {
     int i, j, sock, k, ns, id;
     ioaddr_t port;
-#ifdef __ISAPNP__
+#ifdef CONFIG_PNP
     struct isapnp_device_id *devid;
-    struct pci_dev *dev;
+    struct pnp_dev *dev;
 
     for (devid = id_table; devid->vendor; devid++) {
-	if ((dev = isapnp_find_dev(NULL, devid->vendor, devid->function, NULL))) {
-	    printk("ISAPNP ");
+	if ((dev = pnp_find_dev(NULL, devid->vendor, devid->function, NULL))) {
+	    printk("PNP ");
 
-	    if (dev->prepare && dev->prepare(dev) < 0) {
-		printk("prepare failed\n");
-		break;
-	    }
-
-	    if (dev->activate && dev->activate(dev) < 0) {
+	    if (pnp_activate_dev(dev, NULL) < 0) {
 		printk("activate failed\n");
 		break;
 	    }
 
-	    if ((i365_base = pci_resource_start(dev, 0))) {
+	    i365_base = pnp_port_start(dev, 0);
+	    if (i365_base) {
 		printk("no resources ?\n");
 		break;
 	    }
@@ -1644,8 +1640,8 @@ static void __exit exit_i82365(void)
 	release_region(socket[i].ioaddr, 2);
     }
 #if defined(CONFIG_ISA) && defined(__ISAPNP__)
-    if (i82365_pnpdev && i82365_pnpdev->deactivate)
-		i82365_pnpdev->deactivate(i82365_pnpdev);
+    if (i82365_pnpdev)
+    		pnp_disable_dev(i82365_pnpdev);
 #endif
 } /* exit_i82365 */
 

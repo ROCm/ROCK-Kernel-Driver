@@ -19,6 +19,7 @@
 #include <linux/timex.h>
 #include <linux/kernel_stat.h>
 #include <linux/init.h>
+#include <linux/bcd.h>
 
 #include <asm/sections.h>
 #include <asm/segment.h>
