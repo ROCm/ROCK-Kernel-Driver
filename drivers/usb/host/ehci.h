@@ -492,16 +492,16 @@ struct ehci_itd {
 /*
  * EHCI Specification 0.95 Section 3.4 
  * siTD, aka split-transaction isochronous Transfer Descriptor
- *       ... describe low/full speed iso xfers through TT in hubs
+ *       ... describe full speed iso xfers through TT in hubs
  * see Figure 3-5 "Split-transaction Isochronous Transaction Descriptor (siTD)
  */
 struct ehci_sitd {
 	/* first part defined by EHCI spec */
 	u32			hw_next;
 /* uses bit field macros above - see EHCI 0.95 Table 3-8 */
-	u32			hw_fullspeed_ep;	/* see EHCI table 3-9 */
-	u32			hw_uframe;		/* see EHCI table 3-10 */
-	u32			hw_results;		/* see EHCI table 3-11 */
+	u32			hw_fullspeed_ep;	/* EHCI table 3-9 */
+	u32			hw_uframe;		/* EHCI table 3-10 */
+	u32			hw_results;		/* EHCI table 3-11 */
 #define	SITD_IOC	(1 << 31)	/* interrupt on completion */
 #define	SITD_PAGE	(1 << 30)	/* buffer 0/1 */
 #define	SITD_LENGTH(x)	(0x3ff & ((x)>>16))
@@ -515,8 +515,8 @@ struct ehci_sitd {
 
 #define SITD_ACTIVE	__constant_cpu_to_le32(SITD_STS_ACTIVE)
 
-	u32			hw_buf [2];		/* see EHCI table 3-12 */
-	u32			hw_backpointer;		/* see EHCI table 3-13 */
+	u32			hw_buf [2];		/* EHCI table 3-12 */
+	u32			hw_backpointer;		/* EHCI table 3-13 */
 	u32			hw_buf_hi [2];		/* Appendix B */
 
 	/* the rest is HCD-private */
@@ -551,8 +551,6 @@ struct ehci_fstn {
 } __attribute__ ((aligned (32)));
 
 /*-------------------------------------------------------------------------*/
-
-#define SUBMIT_URB(urb,mem_flags) usb_submit_urb(urb,mem_flags)
 
 #ifndef DEBUG
 #define STUB_DEBUG_FILES
