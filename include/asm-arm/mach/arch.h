@@ -46,7 +46,6 @@ struct machine_desc {
 	void			(*map_io)(void);/* IO mapping function	*/
 	void			(*init_irq)(void);
 	void			(*init_time)(void);
-	void			(*gettimeoffset)(void);
 	void			(*init_machine)(void);
 };
 
