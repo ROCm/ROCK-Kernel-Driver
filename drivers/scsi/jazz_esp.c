@@ -123,7 +123,7 @@ int jazz_esp_detect(Scsi_Host_Template *tpnt)
 	            esp->ehost);
 
 	/*
-	 * FIXME, look if the scsi id is availabe from NVRAM
+	 * FIXME, look if the scsi id is available from NVRAM
 	 */
 	esp->scsi_id = 7;
 		
