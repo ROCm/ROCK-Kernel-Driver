@@ -264,7 +264,7 @@ static irqreturn_t mmci_irq(int irq, void *dev_id, struct pt_regs *regs)
 
 		data = host->data;
 		if (status & (MCI_DATACRCFAIL|MCI_DATATIMEOUT|MCI_TXUNDERRUN|
-			      MCI_RXOVERRUN|MCI_DATAEND|MCI_DATABLOCKEND))
+			      MCI_RXOVERRUN|MCI_DATAEND|MCI_DATABLOCKEND) && data)
 			mmci_data_irq(host, data, status);
 
 		cmd = host->cmd;
