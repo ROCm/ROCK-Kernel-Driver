@@ -86,7 +86,7 @@
  *      Shall we try to damage output packets if routing dev changes?
  */
 
-int sysctl_ip_dynaddr = 0;
+int sysctl_ip_dynaddr;
 int sysctl_ip_default_ttl = IPDEFTTL;
 
 /* Generate a checksum for an outgoing IP datagram. */

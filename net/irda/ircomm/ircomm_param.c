@@ -176,7 +176,7 @@ int ircomm_param_request(struct ircomm_tty_cb *self, __u8 pi, int flush)
  * Function ircomm_param_service_type (self, buf, len)
  *
  *    Handle service type, this function will both be called after the LM-IAS
- *    query and then the remote device sends its initial paramters
+ *    query and then the remote device sends its initial parameters
  *
  */
 static int ircomm_param_service_type(void *instance, irda_param_t *param, 

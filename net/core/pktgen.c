@@ -198,8 +198,8 @@ static int debug;
 
 /* Module parameters, defaults. */
 static int count_d = 100000;
-static int ipg_d = 0;
-static int clone_skb_d = 0;
+static int ipg_d;
+static int clone_skb_d;
 
 
 #define MAX_PKTGEN 8
@@ -220,7 +220,7 @@ static inline __u64 getCurMs(void) {
 }
 
 #define PG_PROC_DIR "pktgen"
-static struct proc_dir_entry *proc_dir = 0;
+static struct proc_dir_entry *proc_dir;
 
 static struct net_device *setup_inject(struct pktgen_info* info)
 {

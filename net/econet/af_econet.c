@@ -502,7 +502,6 @@ static void econet_destroy_timer(unsigned long data)
 
 	if (!atomic_read(&sk->wmem_alloc) && !atomic_read(&sk->rmem_alloc)) {
 		sk_free(sk);
-		MOD_DEC_USE_COUNT;
 		return;
 	}
 
@@ -547,7 +546,6 @@ static int econet_release(struct socket *sock)
 	}
 
 	sk_free(sk);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -566,7 +564,6 @@ static int econet_create(struct socket *sock, int protocol)
 		return -ESOCKTNOSUPPORT;
 
 	sock->state = SS_UNCONNECTED;
-	MOD_INC_USE_COUNT;
 
 	err = -ENOBUFS;
 	sk = sk_alloc(PF_ECONET, GFP_KERNEL, 1, NULL);
@@ -591,7 +588,6 @@ static int econet_create(struct socket *sock, int protocol)
 out_free:
 	sk_free(sk);
 out:
-	MOD_DEC_USE_COUNT;
 	return err;
 }
 
@@ -693,6 +689,7 @@ static int econet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg
 static struct net_proto_family econet_family_ops = {
 	.family =	PF_ECONET,
 	.create =	econet_create,
+	.owner	=	THIS_MODULE,
 };
 
 static struct proto_ops SOCKOPS_WRAPPED(econet_ops) = {

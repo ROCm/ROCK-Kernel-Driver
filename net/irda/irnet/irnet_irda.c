@@ -13,7 +13,7 @@
 /************************* CONTROL CHANNEL *************************/
 /*
  * When ppp is not active, /dev/irnet act as a control channel.
- * Writting allow to set up the IrDA destination of the IrNET channel,
+ * Writing allow to set up the IrDA destination of the IrNET channel,
  * and any application may be read events happening on IrNET...
  */
 
@@ -859,7 +859,7 @@ irnet_connect_socket(irnet_socket *	server,
   /* As currently we don't block packets in ppp_irnet_send() while passive,
    * this is not really needed...
    * Also, not doing it give IrDA a chance to finish the setup properly
-   * before beeing swamped with packets... */
+   * before being swamped with packets... */
   ppp_output_wakeup(&new->chan);
 #endif /* CONNECT_INDIC_KICK */
 

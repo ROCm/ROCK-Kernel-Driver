@@ -160,7 +160,9 @@ static struct timer_list whitehole_timer =
 		TIMER_INITIALIZER(whitehole_inject, 0, 0);
 
 static struct net_device whitehole_dev = {
-	"whitehole", 0x0, 0x0, 0x0, 0x0, 0, 0, 0, 0, 0, NULL, whitehole_init, };
+	.name	= "whitehole",
+	.init	= whitehole_init,
+};
 
 static int whitehole_open(struct net_device *dev)
 {

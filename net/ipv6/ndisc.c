@@ -807,7 +807,7 @@ void ndisc_recv_ns(struct sk_buff *skb)
 
 			/* 
 			 *	update / create cache entry
-			 *	for the source adddress
+			 *	for the source address
 			 */
 
 			neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, dev);
@@ -852,7 +852,7 @@ void ndisc_recv_ns(struct sk_buff *skb)
 	
 			/*
 			 *   update / create cache entry
-			 *   for the source adddress
+			 *   for the source address
 			 */
 
 			neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, skb->dev);

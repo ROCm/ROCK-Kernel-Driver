@@ -520,7 +520,7 @@ static inline void hci_conn_complete_evt(struct hci_dev *hdev, struct sk_buff *s
 			hci_send_cmd(hdev, OGF_LINK_POLICY, OCF_WRITE_LINK_POLICY, sizeof(cp), &cp);
 		}
 
-		/* Set packet type for incomming connection */
+		/* Set packet type for incoming connection */
 		if (!conn->out) {
 			struct hci_cp_change_conn_ptype cp;
 			cp.handle = ev->handle;

@@ -193,9 +193,9 @@ out:
 }
 
 /**
- *	llc_ui_autoport - provide dynamicly allocate SAP number
+ *	llc_ui_autoport - provide dynamically allocate SAP number
  *
- *	Provide the caller with a dynamicly allocated SAP number according
+ *	Provide the caller with a dynamically allocated SAP number according
  *	to the rules that are set in this function. Returns: 0, upon failure,
  *	SAP number otherwise.
  */

@@ -445,7 +445,7 @@ sctp_disposition_t sctp_sf_do_5_1C_ack(const sctp_endpoint_t *ep,
 		}
 	}
 
-	/* Tag the variable length paramters.  Note that we never
+	/* Tag the variable length parameters.  Note that we never
 	 * convert the parameters in an INIT chunk.
 	 */
 	chunk->param_hdr.v = skb_pull(chunk->skb, sizeof(sctp_inithdr_t));
@@ -1345,7 +1345,7 @@ sctp_disposition_t sctp_sf_do_5_2_1_siminit(const sctp_endpoint_t *ep,
  * set to 0 (indicating that no previous TCB existed).  The INIT ACK and
  * State Cookie are populated as specified in section 5.2.1.
  *
- * Verification Tag: Not specifed, but an INIT has no way of knowing
+ * Verification Tag: Not specified, but an INIT has no way of knowing
  * what the verification tag could be, so we ignore it.
  *
  * Inputs
@@ -1505,7 +1505,7 @@ nomem:
  *     INIT-ACK and finally sent a COOKIE ECHO with the peer's same tag
  *     but a new tag of its own.
  */
-/* This case represents an intialization collision.  */
+/* This case represents an initialization collision.  */
 static sctp_disposition_t sctp_sf_do_dupcook_c(const sctp_endpoint_t *ep,
 					       const sctp_association_t *asoc,
 					       sctp_chunk_t *chunk,
@@ -1526,7 +1526,7 @@ static sctp_disposition_t sctp_sf_do_dupcook_c(const sctp_endpoint_t *ep,
  * D) When both local and remote tags match the endpoint should always
  *    enter the ESTABLISHED state, if it has not already done so.
  */
-/* This case represents an intialization collision.  */
+/* This case represents an initialization collision.  */
 static sctp_disposition_t sctp_sf_do_dupcook_d(const sctp_endpoint_t *ep,
 					       const sctp_association_t *asoc,
 					       sctp_chunk_t *chunk,

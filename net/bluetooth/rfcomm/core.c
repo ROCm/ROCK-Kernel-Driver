@@ -1067,7 +1067,7 @@ static int rfcomm_recv_sabm(struct rfcomm_session *s, u8 dlci)
 		return 0;
 	}
 
-	/* Notify socket layer about incomming connection */
+	/* Notify socket layer about incoming connection */
 	channel = __srv_channel(dlci);
 	if (rfcomm_connect_ind(s, channel, &d)) {
 		d->dlci = dlci;
@@ -1150,7 +1150,7 @@ static int rfcomm_recv_pn(struct rfcomm_session *s, int cr, struct sk_buff *skb)
 			return 0;
 		
 		/* PN request for non existing DLC.
-		 * Assume incomming connection. */
+		 * Assume incoming connection. */
 		if (rfcomm_connect_ind(s, channel, &d)) {
 			d->dlci = dlci;
 			d->addr = __addr(s->initiator, dlci);
@@ -1653,7 +1653,7 @@ static void rfcomm_worker(void)
 	while (!atomic_read(&terminate)) {
 		if (!test_bit(RFCOMM_SCHED_WAKEUP, &rfcomm_event)) {
 			/* No pending events. Let's sleep.
-			 * Incomming connections and data will wake us up. */
+			 * Incoming connections and data will wake us up. */
 			set_current_state(TASK_INTERRUPTIBLE);
 			schedule();
 		}

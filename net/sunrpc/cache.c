@@ -477,7 +477,7 @@ void cache_revisit_request(struct cache_head *item)
  *
  * Implemented by linked list of requests.  Each open file has 
  * a ->private that also exists in this list.  New request are added
- * to the end and may wakeup and preceeding readers.
+ * to the end and may wakeup and preceding readers.
  * New readers are added to the head.  If, on read, an item is found with
  * CACHE_UPCALLING clear, we free it from the list.
  *

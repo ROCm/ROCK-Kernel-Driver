@@ -36,22 +36,22 @@
 
 #include <asm/uaccess.h>
 
-static struct pppox_proto *proto[PX_MAX_PROTO+1];
+static struct pppox_proto *pppox_protos[PX_MAX_PROTO + 1];
 
 int register_pppox_proto(int proto_num, struct pppox_proto *pp)
 {
 	if (proto_num < 0 || proto_num > PX_MAX_PROTO)
 		return -EINVAL;
-	if (proto[proto_num])
+	if (pppox_protos[proto_num])
 		return -EALREADY;
-	proto[proto_num] = pp;
+	pppox_protos[proto_num] = pp;
 	return 0;
 }
 
 void unregister_pppox_proto(int proto_num)
 {
 	if (proto_num >= 0 && proto_num <= PX_MAX_PROTO)
-		proto[proto_num] = NULL;
+		pppox_protos[proto_num] = NULL;
 }
 
 void pppox_unbind_sock(struct sock *sk)
@@ -64,71 +64,112 @@ void pppox_unbind_sock(struct sock *sk)
 	}
 }
 
+static int pppox_release(struct socket *sock)
+{
+	struct sock *sk = sock->sk;
+	int rc = pppox_protos[sk->protocol]->release(sock);
+
+	module_put(pppox_protos[sk->protocol]->owner);
+	return rc;
+}
+
+static void pppox_sk_free(struct sock *sk)
+{
+	pppox_protos[sk->protocol]->sk_free(sk);
+	module_put(pppox_protos[sk->protocol]->owner);
+}
+
+struct sock *pppox_sk_alloc(struct socket *sock, int protocol, int priority,
+			    int zero_it, kmem_cache_t *slab)
+{
+	struct sock *sk = NULL;
+
+	if (!try_module_get(pppox_protos[protocol]->owner))
+		goto out;
+
+	sk = sk_alloc(PF_PPPOX, priority, zero_it, slab);
+	if (sk) {
+		sock_init_data(sock, sk);
+		sk->family   = PF_PPPOX;
+		sk->protocol = protocol;
+		sk->destruct = pppox_sk_free;
+	} else
+		module_put(pppox_protos[protocol]->owner);
+out:
+	return sk;
+}
+
 EXPORT_SYMBOL(register_pppox_proto);
 EXPORT_SYMBOL(unregister_pppox_proto);
 EXPORT_SYMBOL(pppox_unbind_sock);
+EXPORT_SYMBOL(pppox_sk_alloc);
 
 static int pppox_ioctl(struct socket* sock, unsigned int cmd, 
 		       unsigned long arg)
 {
 	struct sock *sk = sock->sk;
 	struct pppox_opt *po = pppox_sk(sk);
-	int err = 0;
+	int rc = 0;
 
 	lock_sock(sk);
 
 	switch (cmd) {
-	case PPPIOCGCHAN:{
+	case PPPIOCGCHAN: {
 		int index;
-		err = -ENOTCONN;
+		rc = -ENOTCONN;
 		if (!(sk->state & PPPOX_CONNECTED))
 			break;
 
-		err = -EINVAL;
+		rc = -EINVAL;
 		index = ppp_channel_index(&po->chan);
 		if (put_user(index , (int *) arg))
 			break;
 
-		err = 0;
+		rc = 0;
 		sk->state |= PPPOX_BOUND;
 		break;
 	}
 	default:
-		if (proto[sk->protocol]->ioctl)
-			err = (*proto[sk->protocol]->ioctl)(sock, cmd, arg);
+		if (pppox_protos[sk->protocol]->ioctl)
+			rc = pppox_protos[sk->protocol]->ioctl(sock, cmd, arg);
 
 		break;
 	};
 
 	release_sock(sk);
-	return err;
+	return rc;
 }
 
 
 static int pppox_create(struct socket *sock, int protocol)
 {
-	int err = 0;
+	int rc = -EPROTOTYPE;
 
 	if (protocol < 0 || protocol > PX_MAX_PROTO)
-		return -EPROTOTYPE;
+		goto out;
 
-	if (proto[protocol] == NULL)
-		return -EPROTONOSUPPORT;
+	rc = -EPROTONOSUPPORT;
+	if (!pppox_protos[protocol] ||
+	    !try_module_get(pppox_protos[protocol]->owner))
+		goto out;
 
-	err = (*proto[protocol]->create)(sock);
-
-	if (err == 0) {
+	rc = pppox_protos[protocol]->create(sock);
+	if (!rc) {
 		/* We get to set the ioctl handler. */
+		/* And the release handler, for module refcounting */
 		/* For everything else, pppox is just a shell. */
 		sock->ops->ioctl = pppox_ioctl;
-	}
-
-	return err;
+		sock->ops->release = pppox_release;
+	} else
+		module_put(pppox_protos[protocol]->owner);
+out:
+	return rc;
 }
 
 static struct net_proto_family pppox_proto_family = {
 	.family	= PF_PPPOX,
 	.create	= pppox_create,
+	.owner	= THIS_MODULE,
 };
 
 static int __init pppox_init(void)

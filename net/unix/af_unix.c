@@ -1512,7 +1512,7 @@ static int unix_dgram_recvmsg(struct kiocb *iocb, struct socket *sock,
 		   - do not return fds - good, but too simple 8)
 		   - return fds, and do not return them on read (old strategy,
 		     apparently wrong)
-		   - clone fds (I choosed it for now, it is the most universal
+		   - clone fds (I chose it for now, it is the most universal
 		     solution)
 		
 	           POSIX 1003.1g does not actually define this clearly

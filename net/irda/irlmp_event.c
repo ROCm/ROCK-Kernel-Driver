@@ -395,7 +395,7 @@ static void irlmp_state_active(struct lap_cb *self, IRLMP_EVENT event,
 		IRDA_DEBUG(4, "%s(), LS_CONNECT_REQUEST\n", __FUNCTION__);
 
 		/*
-		 *  LAP connection allready active, just bounce back! Since we
+		 *  LAP connection already active, just bounce back! Since we
 		 *  don't know which LSAP that tried to do this, we have to
 		 *  notify all LSAPs using this LAP, but that should be safe to
 		 *  do anyway.
