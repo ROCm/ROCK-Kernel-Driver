@@ -92,17 +92,6 @@ static int synaptics_mode_cmd(struct psmouse *psmouse, unsigned char mode)
 	return 0;
 }
 
-static int synaptics_reset(struct psmouse *psmouse)
-{
-	unsigned char r[2];
-
-	if (psmouse_command(psmouse, r, PSMOUSE_CMD_RESET_BAT))
-		return -1;
-	if (r[0] == PSMOUSE_RET_BAT && r[1] == PSMOUSE_RET_ID)
-		return 0;
-	return -1;
-}
-
 /*
  * Read the model-id bytes from the touchpad
  * see also SYN_MODEL_* macros
@@ -197,7 +186,7 @@ static int synaptics_query_hardware(struct psmouse *psmouse)
 {
 	int retries = 0;
 
-	while ((retries++ < 3) && synaptics_reset(psmouse))
+	while ((retries++ < 3) && psmouse_reset(psmouse))
 		printk(KERN_ERR "synaptics reset failed\n");
 
 	if (synaptics_identify(psmouse))
@@ -368,9 +357,15 @@ static void set_input_params(struct input_dev *dev, struct synaptics_data *priv)
 	clear_bit(REL_Y, dev->relbit);
 }
 
+void synaptics_reset(struct psmouse *psmouse)
+{
+	/* reset touchpad back to relative mode, gestures enabled */
+	synaptics_mode_cmd(psmouse, 0);
+}
+
 static void synaptics_disconnect(struct psmouse *psmouse)
 {
-	synaptics_mode_cmd(psmouse, 0);
+	synaptics_reset(psmouse);
 	kfree(psmouse->private);
 }
 

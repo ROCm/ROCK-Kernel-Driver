@@ -287,6 +287,24 @@ int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command)
 	return 0;
 }
 
+
+/*
+ * psmouse_reset() resets the mouse into power-on state.
+ */
+int psmouse_reset(struct psmouse *psmouse)
+{
+	unsigned char param[2];
+
+	if (psmouse_command(psmouse, param, PSMOUSE_CMD_RESET_BAT))
+		return -1;
+
+	if (param[0] != PSMOUSE_RET_BAT && param[1] != PSMOUSE_RET_ID)
+		return -1;
+
+	return 0;
+}
+
+
 /*
  * Genius NetMouse magic init.
  */
@@ -371,6 +389,10 @@ static int psmouse_extensions(struct psmouse *psmouse)
  */
 			psmouse_max_proto = PSMOUSE_IMEX;
 		}
+/*
+ * Make sure that touchpad is in relative mode, gestures (taps) are enabled
+ */
+		synaptics_reset(psmouse);
 	}
 
 	if (psmouse_max_proto > PSMOUSE_IMEX && genius_detect(psmouse)) {
@@ -416,6 +438,7 @@ static int psmouse_extensions(struct psmouse *psmouse)
  * pass through port it could get disabled while probing for protocol
  * extensions.
  */
+		psmouse_reset(psmouse);
 		psmouse_command(psmouse, NULL, PSMOUSE_CMD_RESET_DIS);
 	}
 
@@ -540,8 +563,8 @@ static void psmouse_activate(struct psmouse *psmouse)
 static void psmouse_cleanup(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
-	unsigned char param[2];
-	psmouse_command(psmouse, param, PSMOUSE_CMD_RESET_BAT);
+
+	psmouse_reset(psmouse);
 }
 
 /*
@@ -552,7 +575,7 @@ static void psmouse_disconnect(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
 
-	psmouse->state = PSMOUSE_IGNORE;
+	psmouse->state = PSMOUSE_CMD_MODE;
 
 	if (psmouse->ptport) {
 		if (psmouse->ptport->deactivate)
@@ -564,6 +587,8 @@ static void psmouse_disconnect(struct serio *serio)
 
 	if (psmouse->disconnect)
 		psmouse->disconnect(psmouse);
+
+	psmouse->state = PSMOUSE_IGNORE;
 
 	input_unregister_device(&psmouse->dev);
 	serio_close(serio);
@@ -592,7 +617,7 @@ static void psmouse_connect(struct serio *serio, struct serio_dev *dev)
 	psmouse->dev.keybit[LONG(BTN_MOUSE)] = BIT(BTN_LEFT) | BIT(BTN_MIDDLE) | BIT(BTN_RIGHT);
 	psmouse->dev.relbit[0] = BIT(REL_X) | BIT(REL_Y);
 
-	psmouse->state = PSMOUSE_NEW_DEVICE;
+	psmouse->state = PSMOUSE_CMD_MODE;
 	psmouse->serio = serio;
 	psmouse->dev.private = psmouse;
 
@@ -652,7 +677,7 @@ static int psmouse_reconnect(struct serio *serio)
 
 	old_type = psmouse->type;
 
-	psmouse->state = PSMOUSE_NEW_DEVICE;
+	psmouse->state = PSMOUSE_CMD_MODE;
 	psmouse->type = psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = 0;
 	if (psmouse->reconnect) {
 	       if (psmouse->reconnect(psmouse))
