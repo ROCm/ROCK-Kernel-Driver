@@ -242,7 +242,7 @@ static int inet6_create(struct socket *sock, int protocol)
 	atomic_inc(&inet6_sock_nr);
 	atomic_inc(&inet_sock_nr);
 #endif
-	if (!try_get_module(THIS_MODULE)) {
+	if (!try_module_get(THIS_MODULE)) {
 		inet_sock_release(sk);
 		return -EBUSY;
 	}
