@@ -209,11 +209,12 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 	pgd_t * src_pgd, * dst_pgd;
 	unsigned long address = vma->vm_start;
 	unsigned long end = vma->vm_end;
-	unsigned long cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
+	unsigned long cow;
 
 	if (is_vm_hugetlb_page(vma))
 		return copy_hugetlb_page_range(dst, src, vma);
 
+	cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
 	src_pgd = pgd_offset(src, address)-1;
 	dst_pgd = pgd_offset(dst, address)-1;
 
@@ -250,7 +251,8 @@ skip_copy_pmd_range:	address = (address + PGDIR_SIZE) & PGDIR_MASK;
 			if (pmd_bad(*src_pmd)) {
 				pmd_ERROR(*src_pmd);
 				pmd_clear(src_pmd);
-skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
+skip_copy_pte_range:
+				address = (address + PMD_SIZE) & PMD_MASK;
 				if (address >= end)
 					goto out;
 				goto cont_copy_pmd_range;
@@ -259,13 +261,13 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 			dst_pte = pte_alloc_map(dst, dst_pmd, address);
 			if (!dst_pte)
 				goto nomem;
-			spin_lock(&src->page_table_lock);			
+			spin_lock(&src->page_table_lock);	
 			src_pte = pte_offset_map_nested(src_pmd, address);
 			do {
 				pte_t pte = *src_pte;
-				struct page *ptepage;
+				struct page *page;
 				unsigned long pfn;
-				
+
 				/* copy_one_pte */
 
 				if (pte_none(pte))
@@ -276,30 +278,37 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 					set_pte(dst_pte, pte);
 					goto cont_copy_pte_range_noset;
 				}
-				ptepage = pte_page(pte);
 				pfn = pte_pfn(pte);
+				page = pfn_to_page(pfn);
 				if (!pfn_valid(pfn))
 					goto cont_copy_pte_range;
-				ptepage = pfn_to_page(pfn);
-				if (PageReserved(ptepage))
+				if (PageReserved(page))
 					goto cont_copy_pte_range;
 
-				/* If it's a COW mapping, write protect it both in the parent and the child */
+				/*
+				 * If it's a COW mapping, write protect it both
+				 * in the parent and the child
+				 */
 				if (cow) {
 					ptep_set_wrprotect(src_pte);
 					pte = *src_pte;
 				}
 
-				/* If it's a shared mapping, mark it clean in the child */
+				/*
+				 * If it's a shared mapping, mark it clean in
+				 * the child
+				 */
 				if (vma->vm_flags & VM_SHARED)
 					pte = pte_mkclean(pte);
 				pte = pte_mkold(pte);
-				get_page(ptepage);
+				get_page(page);
 				dst->rss++;
 
-cont_copy_pte_range:		set_pte(dst_pte, pte);
-				page_add_rmap(ptepage, dst_pte);
-cont_copy_pte_range_noset:	address += PAGE_SIZE;
+cont_copy_pte_range:
+				set_pte(dst_pte, pte);
+				page_add_rmap(page, dst_pte);
+cont_copy_pte_range_noset:
+				address += PAGE_SIZE;
 				if (address >= end) {
 					pte_unmap_nested(src_pte);
 					pte_unmap(dst_pte);
@@ -312,7 +321,8 @@ cont_copy_pte_range_noset:	address += PAGE_SIZE;
 			pte_unmap(dst_pte-1);
 			spin_unlock(&src->page_table_lock);
 		
-cont_copy_pmd_range:	src_pmd++;
+cont_copy_pmd_range:
+			src_pmd++;
 			dst_pmd++;
 		} while ((unsigned long)src_pmd & PMD_TABLE_MASK);
 	}
