@@ -176,7 +176,7 @@ static void queue_event(apm_event_t event, struct apm_user *sender)
 	wake_up_interruptible(&apm_waitqueue);
 }
 
-static int apm_suspend(void)
+static void apm_suspend(void)
 {
 	struct apm_user *as;
 	int err = pm_suspend(PM_SUSPEND_MEM);
@@ -198,7 +198,6 @@ static int apm_suspend(void)
 	up_read(&user_list_lock);
 
 	wake_up_interruptible(&apm_suspend_waitqueue);
-	return err;
 }
 
 static ssize_t apm_read(struct file *fp, char __user *buf, size_t count, loff_t *ppos)
@@ -257,6 +256,7 @@ static int
 apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 {
 	struct apm_user *as = filp->private_data;
+	unsigned long flags;
 	int err = -EINVAL;
 
 	if (!as->suser || !as->writer)
@@ -285,18 +285,27 @@ apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 		}
 
 		/*
-		 * If there are outstanding suspend requests for other
-		 * people on /dev/apm_bios, we must sleep for them.
-		 * Last one to bed turns the lights out.
+		 * If there are no further acknowledges required, suspend
+		 * the system.
 		 */
-		if (suspends_pending > 0) {
-			err = wait_event_interruptible(apm_suspend_waitqueue,
-						 as->suspend_state == SUSPEND_DONE);
-			if (err == 0)
-				err = as->suspend_result;
-		} else {			
-			err = apm_suspend();
-		}
+		if (suspends_pending == 0)
+			apm_suspend();
+
+		/*
+		 * Wait for the suspend/resume to complete.  If there are
+		 * pending acknowledges, we wait here for them.
+		 *
+		 * Note that we need to ensure that the PM subsystem does
+		 * not kick us out of the wait when it suspends the threads.
+		 */
+		flags = current->flags;
+		current->flags |= PF_NOFREEZE;
+
+		wait_event_interruptible(apm_suspend_waitqueue,
+					 as->suspend_state == SUSPEND_DONE);
+
+		current->flags = flags;
+		err = as->suspend_result;
 		as->suspend_state = SUSPEND_NONE;
 		break;
 	}
