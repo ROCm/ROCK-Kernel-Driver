@@ -21,7 +21,7 @@ ToDo/Notes:
 	- Enable the code for setting the NT4 compatibility flag when we start
 	  making NTFS 1.2 specific modifications.
 
-2.1.21-WIP
+2.1.21 - Fix some races and bugs, rewrite mft write code, add mft allocator.
 
 	- Implement extent mft record deallocation
 	  fs/ntfs/mft.c::ntfs_extent_mft_record_free().
@@ -115,7 +115,7 @@ ToDo/Notes:
 	  fs/ntfs/inode.c::ntfs_clear_big_inode().  (Thanks to Christoph
 	  Hellwig for spotting this.)
 	- Fix race condition in fs/ntfs/inode.c::ntfs_put_inode() by taking the
-	  inode semaphore around the code thst sets ni->itype.index.bmp_ino to
+	  inode semaphore around the code that sets ni->itype.index.bmp_ino to
 	  NULL and reorganize the code to optimize it a bit.  (Thanks to
 	  Christoph Hellwig for spotting this.)
 	- Modify fs/ntfs/aops.c::mark_ntfs_record_dirty() to no longer take the

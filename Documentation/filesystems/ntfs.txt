@@ -277,6 +277,10 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.1.21:
+	- Fix several race conditions and various other bugs.
+	- Many internal cleanups, code reorganization, optimizations, and mft
+	  and index record writing code rewritten to fit in with the changes.
 2.1.20:
 	- Fix two stupid bugs introduced in 2.1.18 release.
 2.1.19:
