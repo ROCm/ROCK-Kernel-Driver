@@ -33,16 +33,18 @@
  * Written or modified by:
  *    Randall Stewart       <randall@sctp.chicago.il.us>
  *    Ken Morneau           <kmorneau@cisco.com>
- *    Qiaobing Xie          <qxie1@email.mot.com>
+ *    Qiaobing Xie	    <qxie1@email.mot.com>
  *    La Monte H.P. Yarroll <piggy@acm.org>
- *    Karl Knutson          <karl@athena.chicago.il.us>
- *    Jon Grimm             <jgrimm@us.ibm.com>
- *    Xingang Guo           <xingang.guo@intel.com>
- *    Hui Huang             <hui.huang@nokia.com>
- *    Sridhar Samudrala     <sri@us.ibm.com>
+ *    Karl Knutson	    <karl@athena.chicago.il.us>
+ *    Jon Grimm		    <jgrimm@us.ibm.com>
+ *    Xingang Guo	    <xingang.guo@intel.com>
+ *    Hui Huang		    <hui.huang@nokia.com>
+ *    Sridhar Samudrala	    <sri@us.ibm.com>
  *    Daisy Chang	    <daisyc@us.ibm.com>
- *    Dajiang Zhang         <dajiang.zhang@nokia.com>
- *    Ardelle Fan           <ardelle.fan@intel.com>
+ *    Dajiang Zhang	    <dajiang.zhang@nokia.com>
+ *    Ardelle Fan	    <ardelle.fan@intel.com>
+ *    Ryan Layer	    <rmlayer@us.ibm.com>
+ *    Anup Pemmaiah         <pemmaiah@cc.usu.edu>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -324,6 +326,7 @@ struct sctp_opt {
 	struct sctp_rtoinfo rtoinfo;
 	struct sctp_paddrparams paddrparam;
 	struct sctp_event_subscribe subscribe;
+	struct sctp_assocparams assocparams;
 	int user_frag;
 	__u32 autoclose;
 	__u8 nodelay;
@@ -1409,12 +1412,6 @@ struct sctp_association {
 	 * Error Count : [Clear this any time I get something.]
 	 */
 	int overall_error_count;
-
-	/* Overall     : The threshold for this association that if
-	 * Error       : the Overall Error Count reaches will cause
-	 * Threshold   : this association to be torn down.
-	 */
-	int overall_error_threshold;
 
 	/* These are the association's initial, max, and min RTO values.
 	 * These values will be initialized by system defaults, but can

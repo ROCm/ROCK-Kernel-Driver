@@ -129,7 +129,7 @@ struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T1_INIT] =
 		SCTP_DEFAULT_TIMEOUT_T1_INIT;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T2_SHUTDOWN] =
-		sp->rtoinfo.srto_initial;
+		sp->rtoinfo.srto_initial * HZ / 1000;
 	ep->timeouts[SCTP_EVENT_TIMEOUT_T3_RTX] = 0;
 
 	/* sctpimpguide-05 Section 2.12.2
@@ -137,7 +137,7 @@ struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	 * recommended value of 5 times 'RTO.Max'.
 	 */
         ep->timeouts[SCTP_EVENT_TIMEOUT_T5_SHUTDOWN_GUARD]
-		= 5 * sp->rtoinfo.srto_max;
+		= 5 * (sp->rtoinfo.srto_max * HZ / 1000);
 
 	ep->timeouts[SCTP_EVENT_TIMEOUT_HEARTBEAT] =
 		SCTP_DEFAULT_TIMEOUT_HEARTBEAT;

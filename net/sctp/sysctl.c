@@ -128,19 +128,23 @@ static ctl_table sctp_table[] = {
 		.ctl_name	= NET_SCTP_HB_INTERVAL,
 		.procname	= "hb_interval",
 		.data		= &sctp_hb_interval,
-		.maxlen		= sizeof(int),
+		.maxlen		= sizeof(long),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_jiffies,
-		.strategy	= &sysctl_jiffies
+		.proc_handler	= &proc_doulongvec_ms_jiffies_minmax,
+		.strategy	= &sctp_sysctl_jiffies_ms,
+		.extra1         = &rto_timer_min,
+		.extra2         = &rto_timer_max
 	},
 	{
 		.ctl_name	= NET_SCTP_PRESERVE_ENABLE,
 		.procname	= "cookie_preserve_enable",
 		.data		= &sctp_cookie_preserve_enable,
-		.maxlen		= sizeof(int),
+		.maxlen		= sizeof(long),
 		.mode		= 0644,
-		.proc_handler	= &proc_dointvec_jiffies,
-		.strategy	= &sysctl_jiffies
+		.proc_handler	= &proc_doulongvec_ms_jiffies_minmax,
+		.strategy	= &sctp_sysctl_jiffies_ms,
+		.extra1         = &rto_timer_min,
+		.extra2         = &rto_timer_max
 	},
 	{
 		.ctl_name	= NET_SCTP_RTO_ALPHA,

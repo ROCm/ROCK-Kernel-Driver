@@ -48,6 +48,8 @@
  *    Sridhar Samudrala     <samudrala@us.ibm.com>
  *    Inaky Perez-Gonzalez  <inaky.gonzalez@intel.com>
  *    Ardelle Fan	    <ardelle.fan@intel.com>
+ *    Ryan Layer	    <rmlayer@us.ibm.com>
+ *    Anup Pemmaiah         <pemmaiah@cc.usu.edu>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -1618,6 +1620,110 @@ static int sctp_setsockopt_nodelay(struct sock *sk, char *optval,
 	sctp_sk(sk)->nodelay = (val == 0) ? 0 : 1;
 	return 0;
 }
+		
+/*
+ *
+ * 7.1.1 SCTP_RTOINFO
+ *
+ * The protocol parameters used to initialize and bound retransmission
+ * timeout (RTO) are tunable. sctp_rtoinfo structure is used to access
+ * and modify these parameters.
+ * All parameters are time values, in milliseconds.  A value of 0, when
+ * modifying the parameters, indicates that the current value should not
+ * be changed.
+ *
+ */
+static int sctp_setsockopt_rtoinfo(struct sock *sk, char *optval, int optlen) {
+	struct sctp_rtoinfo rtoinfo;
+	struct sctp_association *asoc;
+
+	if (optlen != sizeof (struct sctp_rtoinfo))
+		return -EINVAL;
+
+	if (copy_from_user(&rtoinfo, optval, optlen))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, rtoinfo.srto_assoc_id);
+
+	/* Set the values to the specific association */
+	if (!asoc && rtoinfo.srto_assoc_id && sctp_style(sk, UDP))
+		return -EINVAL;
+
+	if (asoc) {
+		if (rtoinfo.srto_initial != 0)
+			asoc->rto_initial = rtoinfo.srto_initial * HZ / 1000;
+		if (rtoinfo.srto_max != 0)
+			asoc->rto_max = rtoinfo.srto_max * HZ / 1000;
+		if (rtoinfo.srto_min != 0)
+			asoc->rto_min = rtoinfo.srto_min * HZ / 1000;
+	} else {
+		/* If there is no association or the association-id = 0
+		 * set the values to the endpoint.
+		 */
+		struct sctp_opt *sp = sctp_sk(sk);
+
+		if (rtoinfo.srto_initial != 0)
+			sp->rtoinfo.srto_initial = rtoinfo.srto_initial;
+		if (rtoinfo.srto_max != 0)
+			sp->rtoinfo.srto_max = rtoinfo.srto_max;
+		if (rtoinfo.srto_min != 0)
+			sp->rtoinfo.srto_min = rtoinfo.srto_min;
+	}
+
+	return 0;
+}
+
+/*
+ *
+ * 7.1.2 SCTP_ASSOCINFO
+ *
+ * This option is used to tune the the maximum retransmission attempts
+ * of the association.
+ * Returns an error if the new association retransmission value is
+ * greater than the sum of the retransmission value  of the peer.
+ * See [SCTP] for more information.
+ *
+ */
+static int sctp_setsockopt_assocrtx(struct sock *sk, char *optval,
+				int optlen) {
+
+	struct sctp_assocparams assocparams;
+	struct sctp_association *asoc;
+
+	if (optlen != sizeof(struct sctp_assocparams))
+		return -EINVAL;
+	if (copy_from_user(&assocparams, optval, optlen))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, assocparams.sasoc_assoc_id);
+
+	if (!asoc && assocparams.sasoc_assoc_id && sctp_style(sk, UDP))
+		return -EINVAL;
+
+	/* Set the values to the specific association */
+	if (asoc) {
+		if (assocparams.sasoc_asocmaxrxt != 0)
+			asoc->max_retrans = assocparams.sasoc_asocmaxrxt;
+		if (assocparams.sasoc_cookie_life != 0) {
+			asoc->cookie_life.tv_sec = 
+					assocparams.sasoc_cookie_life / 1000;
+			asoc->cookie_life.tv_usec = 
+					(assocparams.sasoc_cookie_life % 1000) 
+					* 1000;
+		}
+	} else {
+		/* Set the values to the endpoint */
+		struct sctp_opt *sp = sctp_sk(sk);
+
+		if (assocparams.sasoc_asocmaxrxt != 0)
+			sp->assocparams.sasoc_asocmaxrxt = 
+						assocparams.sasoc_asocmaxrxt;
+		if (assocparams.sasoc_cookie_life != 0) 
+			sp->assocparams.sasoc_cookie_life =
+						assocparams.sasoc_cookie_life;
+	}
+	return 0;
+}
 
 /*
  * 7.1.16 Set/clear IPv4 mapped addresses (SCTP_I_WANT_MAPPED_V4_ADDR)
@@ -1765,6 +1871,12 @@ SCTP_STATIC int sctp_setsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_NODELAY:
 		retval = sctp_setsockopt_nodelay(sk, optval, optlen);
+		break;
+	case SCTP_RTOINFO:
+		retval = sctp_setsockopt_rtoinfo(sk, optval, optlen);
+		break;
+	case SCTP_ASSOCRTXINFO:
+		retval = sctp_setsockopt_assocrtx(sk, optval, optlen);
 		break;
 	case SCTP_I_WANT_MAPPED_V4_ADDR:
 		retval = sctp_setsockopt_mappedv4(sk, optval, optlen);
@@ -2022,15 +2134,25 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	sp->initmsg.sinit_num_ostreams   = sctp_max_outstreams;
 	sp->initmsg.sinit_max_instreams  = sctp_max_instreams;
 	sp->initmsg.sinit_max_attempts   = sctp_max_retrans_init;
-	sp->initmsg.sinit_max_init_timeo = sctp_rto_max / HZ;
+	sp->initmsg.sinit_max_init_timeo = (sctp_rto_max / HZ) * 1000;
 
 	/* Initialize default RTO related parameters.  These parameters can
 	 * be modified for with the SCTP_RTOINFO socket option.
 	 * FIXME: These are not used yet.
 	 */
-	sp->rtoinfo.srto_initial = sctp_rto_initial;
-	sp->rtoinfo.srto_max     = sctp_rto_max;
-	sp->rtoinfo.srto_min     = sctp_rto_min;
+	sp->rtoinfo.srto_initial = (sctp_rto_initial / HZ) * 1000;
+	sp->rtoinfo.srto_max     = (sctp_rto_max / HZ) * 1000;
+	sp->rtoinfo.srto_min     = (sctp_rto_min / HZ) * 1000;
+
+	/* Initialize default association related parameters. These parameters
+	 * can be modified with the SCTP_ASSOCINFO socket option.
+	 */
+	sp->assocparams.sasoc_asocmaxrxt = sctp_max_retrans_association;
+	sp->assocparams.sasoc_number_peer_destinations = 0;
+	sp->assocparams.sasoc_peer_rwnd = 0;
+	sp->assocparams.sasoc_local_rwnd = 0;
+	sp->assocparams.sasoc_cookie_life = (sctp_valid_cookie_life / HZ) 
+					* 1000;
 
 	/* Initialize default event subscriptions.
 	 * the struct sock is initialized to zero, so only
@@ -2045,7 +2167,7 @@ SCTP_STATIC int sctp_init_sock(struct sock *sk)
 	/* Default Peer Address Parameters.  These defaults can
 	 * be modified via SCTP_SET_PEER_ADDR_PARAMS
 	 */
-	sp->paddrparam.spp_hbinterval = sctp_hb_interval / HZ;
+	sp->paddrparam.spp_hbinterval = (sctp_hb_interval / HZ) * 1000;
 	sp->paddrparam.spp_pathmaxrxt = sctp_max_retrans_path;
 
 	/* If enabled no SCTP message fragmentation will be performed.
@@ -2191,7 +2313,7 @@ static int sctp_getsockopt_sctp_status(struct sock *sk, int len, char *optval,
 	status.sstat_primary.spinfo_state = transport->active;
 	status.sstat_primary.spinfo_cwnd = transport->cwnd;
 	status.sstat_primary.spinfo_srtt = transport->srtt;
-	status.sstat_primary.spinfo_rto = transport->rto;
+	status.sstat_primary.spinfo_rto = (transport->rto / HZ) * 1000;
 	status.sstat_primary.spinfo_mtu = transport->pmtu;
 
 	if (put_user(len, optlen)) {
@@ -2246,7 +2368,7 @@ static int sctp_getsockopt_peer_addr_info(struct sock *sk, int len,
 	pinfo.spinfo_state = transport->active;
 	pinfo.spinfo_cwnd = transport->cwnd;
 	pinfo.spinfo_srtt = transport->srtt;
-	pinfo.spinfo_rto = transport->rto;
+	pinfo.spinfo_rto = (transport->rto / HZ) * 1000;
 	pinfo.spinfo_mtu = transport->pmtu;
 
 	if (put_user(len, optlen)) {
@@ -2758,6 +2880,127 @@ static int sctp_getsockopt_nodelay(struct sock *sk, int len,
 		return -EFAULT;
 	return 0;
 }
+
+/*
+ *
+ * 7.1.1 SCTP_RTOINFO
+ *
+ * The protocol parameters used to initialize and bound retransmission
+ * timeout (RTO) are tunable. sctp_rtoinfo structure is used to access
+ * and modify these parameters.
+ * All parameters are time values, in milliseconds.  A value of 0, when
+ * modifying the parameters, indicates that the current value should not
+ * be changed.
+ *
+ */
+static int sctp_getsockopt_rtoinfo(struct sock *sk, int len, char *optval,
+				int *optlen) {
+	struct sctp_rtoinfo rtoinfo;
+	struct sctp_association *asoc;
+
+	if (len != sizeof (struct sctp_rtoinfo))
+		return -EINVAL;
+
+	if (copy_from_user(&rtoinfo, optval, sizeof (struct sctp_rtoinfo)))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, rtoinfo.srto_assoc_id);
+
+	if (!asoc && rtoinfo.srto_assoc_id && sctp_style(sk, UDP))
+		return -EINVAL;
+
+	/* Values corresponding to the specific association. */
+	if (asoc) {
+		rtoinfo.srto_initial = (asoc->rto_initial / HZ) * 1000;
+		rtoinfo.srto_max = (asoc->rto_max / HZ) * 1000;
+		rtoinfo.srto_min = (asoc->rto_min / HZ) * 1000;
+	} else {
+		/* Values corresponding to the endpoint. */
+		struct sctp_opt *sp = sctp_sk(sk);
+
+		rtoinfo.srto_initial = sp->rtoinfo.srto_initial;
+		rtoinfo.srto_max = sp->rtoinfo.srto_max;
+		rtoinfo.srto_min = sp->rtoinfo.srto_min;
+	}
+
+	if (put_user(len, optlen))
+		return -EFAULT;
+
+	if (copy_to_user(optval, &rtoinfo, len))
+		return -EFAULT;
+
+	return 0;
+}
+
+/*
+ *
+ * 7.1.2 SCTP_ASSOCINFO
+ *
+ * This option is used to tune the the maximum retransmission attempts
+ * of the association.
+ * Returns an error if the new association retransmission value is
+ * greater than the sum of the retransmission value  of the peer.
+ * See [SCTP] for more information.
+ *
+ */
+static int sctp_getsockopt_assocrtx(struct sock *sk, int len, char *optval,
+				int *optlen) {
+
+	struct sctp_assocparams assocparams;
+	struct sctp_association *asoc;
+	struct list_head *pos;
+	int cnt = 0;
+
+	if (len != sizeof (struct sctp_assocparams))
+		return -EINVAL;
+
+	if (copy_from_user(&assocparams, optval,
+			sizeof (struct sctp_assocparams)))
+		return -EFAULT;
+
+	asoc = sctp_id2assoc(sk, assocparams.sasoc_assoc_id);
+
+	if (!asoc && assocparams.sasoc_assoc_id && sctp_style(sk, UDP))
+		return -EINVAL;
+
+	/* Values correspoinding to the specific association */
+	if (assocparams.sasoc_assoc_id != 0) {
+		assocparams.sasoc_asocmaxrxt = asoc->max_retrans;
+		assocparams.sasoc_peer_rwnd = asoc->peer.rwnd;
+		assocparams.sasoc_local_rwnd = asoc->a_rwnd;
+		assocparams.sasoc_cookie_life = (asoc->cookie_life.tv_sec
+						* 1000) +
+						(asoc->cookie_life.tv_usec
+						/ 1000);
+
+		list_for_each(pos, &asoc->peer.transport_addr_list) {
+			cnt ++;
+		}
+
+		assocparams.sasoc_number_peer_destinations = cnt;
+	} else {
+		/* Values corresponding to the endpoint */
+		struct sctp_opt *sp = sctp_sk(sk);
+
+		assocparams.sasoc_asocmaxrxt = sp->assocparams.sasoc_asocmaxrxt;
+		assocparams.sasoc_peer_rwnd = sp->assocparams.sasoc_peer_rwnd;
+		assocparams.sasoc_local_rwnd = sp->assocparams.sasoc_local_rwnd;
+		assocparams.sasoc_cookie_life =
+					sp->assocparams.sasoc_cookie_life;
+		assocparams.sasoc_number_peer_destinations =
+					sp->assocparams.
+					sasoc_number_peer_destinations;
+	}
+
+	if (put_user(len, optlen))
+		return -EFAULT;
+
+	if (copy_to_user(optval, &assocparams, len))
+		return -EFAULT;
+
+	return 0;
+}
+
 /*
  * 7.1.16 Set/clear IPv4 mapped addresses (SCTP_I_WANT_MAPPED_V4_ADDR)
  *
@@ -2890,6 +3133,12 @@ SCTP_STATIC int sctp_getsockopt(struct sock *sk, int level, int optname,
 		break;
 	case SCTP_NODELAY:
 		retval = sctp_getsockopt_nodelay(sk, len, optval, optlen);
+		break;
+	case SCTP_RTOINFO:
+		retval = sctp_getsockopt_rtoinfo(sk, len, optval, optlen);
+		break;
+	case SCTP_ASSOCRTXINFO:
+		retval = sctp_getsockopt_assocrtx(sk, len, optval, optlen);
 		break;
 	case SCTP_I_WANT_MAPPED_V4_ADDR:
 		retval = sctp_getsockopt_mappedv4(sk, len, optval, optlen);
