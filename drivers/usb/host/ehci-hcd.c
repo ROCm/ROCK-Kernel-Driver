@@ -300,9 +300,11 @@ static int bios_handoff (struct ehci_hcd *ehci, int where, u32 cap)
 			pci_read_config_dword (to_pci_dev(ehci->hcd.self.controller), where, &cap);
 		} while ((cap & (1 << 16)) && msec);
 		if (cap & (1 << 16)) {
-			ehci_err (ehci, "BIOS handoff failed (%d, %04x)\n",
+			ehci_err (ehci, "BIOS handoff failed (%d, %04x)\n"
+				" Devices connected to this controller will not work correctly.\n"
+				" Complain to your BIOS vendor.\n", /* Really! */
 				where, cap);
-			return 1;
+			return 0;
 		} 
 		ehci_dbg (ehci, "BIOS handoff succeeded\n");
 	}
