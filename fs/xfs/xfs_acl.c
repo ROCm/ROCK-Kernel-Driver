@@ -340,7 +340,6 @@ xfs_acl_vset(
 		xfs_acl_vremove(vp, _ACL_TYPE_ACCESS);
 	}
 
-
 out:
 	VN_RELE(vp);
 	_ACL_FREE(xfs_acl);
@@ -354,13 +353,15 @@ xfs_acl_iaccess(
 	cred_t		*cr)
 {
 	xfs_acl_t	*acl;
-	int		error;
+	int		rval;
 
 	if (!(_ACL_ALLOC(acl)))
 		return -1;
 
 	/* If the file has no ACL return -1. */
-	if (xfs_attr_fetch(ip, SGI_ACL_FILE, (char *)acl, sizeof(xfs_acl_t))) {
+	rval = sizeof(xfs_acl_t);
+	if (xfs_attr_fetch(ip, SGI_ACL_FILE, SGI_ACL_FILE_SIZE,
+			(char *)acl, &rval, ATTR_ROOT | ATTR_KERNACCESS, cr)) {
 		_ACL_FREE(acl);
 		return -1;
 	}
@@ -375,9 +376,9 @@ xfs_acl_iaccess(
 	/* Synchronize ACL with mode bits */
 	xfs_acl_sync_mode(ip->i_d.di_mode, acl);
 
-	error = xfs_acl_access(ip->i_d.di_uid, ip->i_d.di_gid, acl, mode, cr);
+	rval = xfs_acl_access(ip->i_d.di_uid, ip->i_d.di_gid, acl, mode, cr);
 	_ACL_FREE(acl);
-	return error;
+	return rval;
 }
 
 STATIC int
