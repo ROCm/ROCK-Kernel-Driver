@@ -683,6 +683,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	if (!(file->f_mode & FMODE_WRITE))
 		lo_flags |= LO_FLAGS_READ_ONLY;
 
+	error = -EINVAL;
 	if (S_ISBLK(inode->i_mode)) {
 		lo_device = I_BDEV(inode);
 		if (lo_device == bdev) {
@@ -698,7 +699,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		 * If we can't read - sorry. If we only can't write - well,
 		 * it's going to be read-only.
 		 */
-		error = -EINVAL;
 		if (!inode->i_fop->sendfile)
 			goto out_putf;
 
@@ -707,7 +707,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 		lo_blocksize = inode->i_blksize;
 		lo_flags |= LO_FLAGS_DO_BMAP;
-		error = 0;
 	} else
 		goto out_putf;
 
