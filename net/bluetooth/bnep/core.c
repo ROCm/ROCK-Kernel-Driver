@@ -452,7 +452,7 @@ static int bnep_session(void *arg)
 	BT_DBG("");
 
         daemonize();
-	set_user_nice(current, 19);
+	set_user_nice(current, -15);
 	current->flags |= PF_IOTHREAD;
         sigfillset(&current->blocked);
 	flush_signals(current);
