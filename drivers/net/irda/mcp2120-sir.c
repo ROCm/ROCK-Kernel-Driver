@@ -49,12 +49,12 @@ static struct dongle_driver mcp2120 = {
 	.set_speed	= mcp2120_change_speed,
 };
 
-static int __init mcp2120_init(void)
+static int __init mcp2120_sir_init(void)
 {
 	return irda_register_dongle(&mcp2120);
 }
 
-static void __exit mcp2120_cleanup(void)
+static void __exit mcp2120_sir_cleanup(void)
 {
 	irda_unregister_dongle(&mcp2120);
 }
@@ -226,5 +226,5 @@ MODULE_DESCRIPTION("Microchip MCP2120");
 MODULE_LICENSE("GPL");
 MODULE_ALIAS("irda-dongle-9"); /* IRDA_MCP2120_DONGLE */
 
-module_init(mcp2120_init);
-module_exit(mcp2120_cleanup);
+module_init(mcp2120_sir_init);
+module_exit(mcp2120_sir_cleanup);

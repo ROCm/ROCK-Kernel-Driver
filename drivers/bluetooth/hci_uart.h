@@ -56,7 +56,7 @@ struct hci_uart_proto {
 
 struct hci_uart {
 	struct tty_struct  *tty;
-	struct hci_dev     hdev;
+	struct hci_dev     *hdev;
 	unsigned long      flags;
 
 	struct hci_uart_proto *proto;

@@ -77,7 +77,7 @@ typedef struct btuart_info_t {
 	dev_link_t link;
 	dev_node_t node;
 
-	struct hci_dev hdev;
+	struct hci_dev *hdev;
 
 	spinlock_t lock;	/* For serializing operations */
 
@@ -181,7 +181,7 @@ static void btuart_write_wakeup(btuart_info_t *info)
 			skb_queue_head(&(info->txq), skb);
 		}
 
-		info->hdev.stat.byte_tx += len;
+		info->hdev->stat.byte_tx += len;
 
 	} while (test_bit(XMIT_WAKEUP, &(info->tx_state)));
 
@@ -202,7 +202,7 @@ static void btuart_receive(btuart_info_t *info)
 	iobase = info->link.io.BasePort1;
 
 	do {
-		info->hdev.stat.byte_rx++;
+		info->hdev->stat.byte_rx++;
 
 		/* Allocate packet */
 		if (info->rx_skb == NULL) {
@@ -216,7 +216,7 @@ static void btuart_receive(btuart_info_t *info)
 
 		if (info->rx_state == RECV_WAIT_PACKET_TYPE) {
 
-			info->rx_skb->dev = (void *)&(info->hdev);
+			info->rx_skb->dev = (void *) info->hdev;
 			info->rx_skb->pkt_type = inb(iobase + UART_RX);
 
 			switch (info->rx_skb->pkt_type) {
@@ -239,8 +239,8 @@ static void btuart_receive(btuart_info_t *info)
 			default:
 				/* Unknown packet */
 				printk(KERN_WARNING "btuart_cs: Unknown HCI packet with type 0x%02x received.\n", info->rx_skb->pkt_type);
-				info->hdev.stat.err_rx++;
-				clear_bit(HCI_RUNNING, &(info->hdev.flags));
+				info->hdev->stat.err_rx++;
+				clear_bit(HCI_RUNNING, &(info->hdev->flags));
 
 				kfree_skb(info->rx_skb);
 				info->rx_skb = NULL;
@@ -529,8 +529,13 @@ int btuart_open(btuart_info_t *info)
 
 
 	/* Initialize and register HCI device */
+	hdev = hci_alloc_dev();
+	if (!hdev) {
+		printk(KERN_WARNING "btuart_cs: Can't allocate HCI device.\n");
+		return -ENOMEM;
+	}
 
-	hdev = &(info->hdev);
+	info->hdev = hdev;
 
 	hdev->type = HCI_PCCARD;
 	hdev->driver_data = info;
@@ -545,7 +550,8 @@ int btuart_open(btuart_info_t *info)
 	hdev->owner = THIS_MODULE;
 	
 	if (hci_register_dev(hdev) < 0) {
-		printk(KERN_WARNING "btuart_cs: Can't register HCI device %s.\n", hdev->name);
+		printk(KERN_WARNING "btuart_cs: Can't register HCI device.\n");
+		hci_free_dev(hdev);
 		return -ENODEV;
 	}
 
@@ -557,7 +563,7 @@ int btuart_close(btuart_info_t *info)
 {
 	unsigned long flags;
 	unsigned int iobase = info->link.io.BasePort1;
-	struct hci_dev *hdev = &(info->hdev);
+	struct hci_dev *hdev = info->hdev;
 
 	btuart_hci_close(hdev);
 
@@ -573,6 +579,8 @@ int btuart_close(btuart_info_t *info)
 
 	if (hci_unregister_dev(hdev) < 0)
 		printk(KERN_WARNING "btuart_cs: Can't unregister HCI device %s.\n", hdev->name);
+
+	hci_free_dev(hdev);
 
 	return 0;
 }
@@ -789,7 +797,7 @@ found_port:
 	if (btuart_open(info) != 0)
 		goto failed;
 
-	strcpy(info->node.dev_name, info->hdev.name);
+	strcpy(info->node.dev_name, info->hdev->name);
 	link->dev = &info->node;
 	link->state &= ~DEV_CONFIG_PENDING;
 

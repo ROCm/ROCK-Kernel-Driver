@@ -103,14 +103,14 @@ static struct net_device_stats *via_ircc_net_get_stats(struct net_device
 static void via_ircc_change_dongle_speed(int iobase, int speed,
 					 int dongle_id);
 static int RxTimerHandler(struct via_ircc_cb *self, int iobase);
-void hwreset(struct via_ircc_cb *self);
+static void hwreset(struct via_ircc_cb *self);
 static int via_ircc_dma_xmit(struct via_ircc_cb *self, u16 iobase);
 static int upload_rxdata(struct via_ircc_cb *self, int iobase);
 static int __devinit via_init_one (struct pci_dev *pcidev, const struct pci_device_id *id);
 static void __exit via_remove_one (struct pci_dev *pdev);
 
 /* Should use udelay() instead, even if we are x86 only - Jean II */
-void iodelay(int udelay)
+static void iodelay(int udelay)
 {
 	u8 data;
 	int i;
@@ -376,9 +376,6 @@ static __devinit int via_ircc_open(int i, chipio_t * info, unsigned int id)
 
 	self->qos.min_turn_time.bits = qos_mtt_bits;
 	irda_qos_bits_to_value(&self->qos);
-
-	self->flags =
-	    IFF_FIR | IFF_MIR | IFF_SIR | IFF_DMA | IFF_PIO | IFF_DONGLE;
 
 	/* Max DMA buffer size needed = (data_size + 6) * (window_size) + 6; */
 	self->rx_buff.truesize = 14384 + 2048;
@@ -819,8 +816,8 @@ static int via_ircc_hard_xmit_sir(struct sk_buff *skb,
 	EnTXDMA(iobase, ON);
 	EnRXDMA(iobase, OFF);
 
-	setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len,
-		  DMA_TX_MODE);
+	irda_setup_dma(self->io.dma, self->tx_buff.data, self->tx_buff.len,
+		       DMA_TX_MODE);
 
 	SetSendByte(iobase, self->tx_buff.len);
 	RXStart(iobase, OFF);
@@ -899,9 +896,9 @@ static int via_ircc_dma_xmit(struct via_ircc_cb *self, u16 iobase)
 	EnAllInt(iobase, ON);
 	EnTXDMA(iobase, ON);
 	EnRXDMA(iobase, OFF);
-	setup_dma(self->io.dma,
-		  self->tx_fifo.queue[self->tx_fifo.ptr].start,
-		  self->tx_fifo.queue[self->tx_fifo.ptr].len, DMA_TX_MODE);
+	irda_setup_dma(self->io.dma,
+		       self->tx_fifo.queue[self->tx_fifo.ptr].start,
+		       self->tx_fifo.queue[self->tx_fifo.ptr].len, DMA_TX_MODE);
 #ifdef	DBGMSG
 	DBG(printk
 	    (KERN_INFO "dma_xmit:tx_fifo.ptr=%x,len=%x,tx_fifo.len=%x..\n",
@@ -1025,8 +1022,8 @@ static int via_ircc_dma_receive(struct via_ircc_cb *self)
 	EnAllInt(iobase, ON);
 	EnTXDMA(iobase, OFF);
 	EnRXDMA(iobase, ON);
-	setup_dma(self->io.dma2, self->rx_buff.data,
-		  self->rx_buff.truesize, DMA_RX_MODE);
+	irda_setup_dma(self->io.dma2, self->rx_buff.data,
+		       self->rx_buff.truesize, DMA_RX_MODE);
 	TXStart(iobase, OFF);
 	RXStart(iobase, ON);
 
@@ -1397,7 +1394,7 @@ static irqreturn_t via_ircc_interrupt(int irq, void *dev_id,
 	return IRQ_RETVAL(iHostIntType);
 }
 
-void hwreset(struct via_ircc_cb *self)
+static void hwreset(struct via_ircc_cb *self)
 {
 	int iobase;
 	iobase = self->io.fir_base;
