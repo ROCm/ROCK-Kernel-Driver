@@ -358,8 +358,8 @@ static struct task_struct * __init
 fork_by_hand (void)
 {
 	/*
-	 * don't care about the eip and regs settings since
-	 * we'll never reschedule the forked task.
+	 * don't care about the eip and regs settings since we'll never reschedule the
+	 * forked task.
 	 */
 	return do_fork(CLONE_VM|CLONE_IDLETASK, 0, 0, 0);
 }
@@ -371,8 +371,7 @@ do_boot_cpu (int sapicid, int cpu)
 	int timeout;
 
 	/*
-	 * We can't use kernel_thread since we must avoid to
-	 * reschedule the child.
+	 * We can't use kernel_thread since we must avoid to reschedule the child.
 	 */
 	idle = fork_by_hand();
 	if (IS_ERR(idle))
@@ -432,7 +431,7 @@ smp_tune_scheduling (void)
  * Initialize the logical CPU number to SAPICID mapping
  */
 void __init
-smp_build_cpu_map(void)
+smp_build_cpu_map (void)
 {
 	int sapicid, cpu, i;
 	int boot_cpu_id = hard_smp_processor_id();
@@ -492,7 +491,7 @@ smp_prepare_cpus (unsigned int max_cpus)
 }
 
 void
-smp_cpus_done(unsigned int dummy)
+smp_cpus_done (unsigned int dummy)
 {
 	int cpu;
 	unsigned long bogosum = 0;
