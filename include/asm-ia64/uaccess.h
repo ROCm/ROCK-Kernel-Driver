@@ -26,7 +26,7 @@
  * associated and, if so, sets r8 to -EFAULT and clears r9 to 0 and
  * then resumes execution at the continuation point.
  *
- * Copyright (C) 1998, 1999, 2001-2002 Hewlett-Packard Co
+ * Copyright (C) 1998, 1999, 2001-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -128,38 +128,28 @@ struct __large_struct { unsigned long buf[100]; };
 /* We need to declare the __ex_table section before we can use it in .xdata.  */
 asm (".section \"__ex_table\", \"a\"\n\t.previous");
 
-#if __GNUC__ >= 3
-#  define GAS_HAS_LOCAL_TAGS	/* define if gas supports local tags a la [1:] */
-#endif
-
-#ifdef GAS_HAS_LOCAL_TAGS
-# define _LL	"[1:]"
-#else
-# define _LL	"1:"
-#endif
-
 #define __get_user_64(addr)									\
-	asm ("\n"_LL"\tld8 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-	     "\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)+4\n"				\
-	     _LL										\
+	asm ("\n[1:]\tld8 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
+	     "\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"						\
+	     "[1:]"										\
 	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 #define __get_user_32(addr)									\
-	asm ("\n"_LL"\tld4 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-	     "\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)+4\n"				\
-	     _LL										\
+	asm ("\n[1:]\tld4 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
+	     "\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"						\
+	     "[1:]"										\
 	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 #define __get_user_16(addr)									\
-	asm ("\n"_LL"\tld2 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-	     "\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)+4\n"				\
-	     _LL										\
+	asm ("\n[1:]\tld2 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
+	     "\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"						\
+	     "[1:]"										\
 	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 #define __get_user_8(addr)									\
-	asm ("\n"_LL"\tld1 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
-	     "\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)+4\n"				\
-	     _LL										\
+	asm ("\n[1:]\tld1 %0=%2%P2\t// %0 and %1 get overwritten by exception handler\n"	\
+	     "\t.xdata4 \"__ex_table\", 1b-., 1f-.+4\n"						\
+	     "[1:]"										\
 	     : "=r"(__gu_val), "=r"(__gu_err) : "m"(__m(addr)), "1"(__gu_err));
 
 extern void __put_user_unknown (void);
@@ -201,30 +191,30 @@ extern void __put_user_unknown (void);
  */
 #define __put_user_64(x,addr)								\
 	asm volatile (									\
-		"\n"_LL"\tst8 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		"\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)\n"			\
-		_LL									\
+		"\n[1:]\tst8 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"				\
+		"[1:]"									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 #define __put_user_32(x,addr)								\
 	asm volatile (									\
-		"\n"_LL"\tst4 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		"\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)\n"			\
-		_LL									\
+		"\n[1:]\tst4 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"				\
+		"[1:]"									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 #define __put_user_16(x,addr)								\
 	asm volatile (									\
-		"\n"_LL"\tst2 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		"\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)\n"			\
-		_LL									\
+		"\n[1:]\tst2 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"				\
+		"[1:]"									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 #define __put_user_8(x,addr)								\
 	asm volatile (									\
-		"\n"_LL"\tst1 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
-		"\t.xdata4 \"__ex_table\", @gprel(1b), @gprel(1f)\n"			\
-		_LL									\
+		"\n[1:]\tst1 %1=%r2%P1\t// %0 gets overwritten by exception handler\n"	\
+		"\t.xdata4 \"__ex_table\", 1b-., 1f-.\n"				\
+		"[1:]"									\
 		: "=r"(__pu_err) : "m"(__m(addr)), "rO"(x), "0"(__pu_err))
 
 /*
@@ -314,26 +304,22 @@ struct exception_table_entry {
 	int cont;	/* gp-relative continuation address; if bit 2 is set, r9 is set to 0 */
 };
 
-struct exception_fixup {
-	unsigned long cont;	/* continuation point (bit 2: clear r9 if set) */
-};
-
-extern struct exception_fixup search_exception_table (unsigned long addr);
-extern void handle_exception (struct pt_regs *regs, struct exception_fixup fixup);
+extern void handle_exception (struct pt_regs *regs, const struct exception_table_entry *e);
+extern const struct exception_table_entry *search_exception_tables (unsigned long addr);
 
 #ifdef GAS_HAS_LOCAL_TAGS
-#define SEARCH_EXCEPTION_TABLE(regs) search_exception_table(regs->cr_iip + ia64_psr(regs)->ri);
+# define SEARCH_EXCEPTION_TABLE(regs) search_exception_tables(regs->cr_iip + ia64_psr(regs)->ri)
 #else
-#define SEARCH_EXCEPTION_TABLE(regs) search_exception_table(regs->cr_iip);
+# define SEARCH_EXCEPTION_TABLE(regs) search_exception_tables(regs->cr_iip)
 #endif
 
 static inline int
 done_with_exception (struct pt_regs *regs)
 {
-	struct exception_fixup fix;
-	fix = SEARCH_EXCEPTION_TABLE(regs);
-	if (fix.cont) {
-		handle_exception(regs, fix);
+	const struct exception_table_entry *e;
+	e = SEARCH_EXCEPTION_TABLE(regs);
+	if (e) {
+		handle_exception(regs, e);
 		return 1;
 	}
 	return 0;

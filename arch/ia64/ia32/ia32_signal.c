@@ -56,7 +56,7 @@ struct sigframe_ia32
        int sig;
        struct sigcontext_ia32 sc;
        struct _fpstate_ia32 fpstate;
-       unsigned int extramask[_IA32_NSIG_WORDS-1];
+       unsigned int extramask[_COMPAT_NSIG_WORDS-1];
        char retcode[8];
 };
 
@@ -463,7 +463,7 @@ sigact_set_handler (struct k_sigaction *sa, unsigned int handler, unsigned int r
 }
 
 asmlinkage long
-ia32_rt_sigsuspend (sigset32_t *uset, unsigned int sigsetsize, struct sigscratch *scr)
+ia32_rt_sigsuspend (compat_sigset_t *uset, unsigned int sigsetsize, struct sigscratch *scr)
 {
 	extern long ia64_do_signal (sigset_t *oldset, struct sigscratch *scr, long in_syscall);
 	sigset_t oldset, set;
@@ -504,7 +504,7 @@ ia32_rt_sigsuspend (sigset32_t *uset, unsigned int sigsetsize, struct sigscratch
 asmlinkage long
 ia32_sigsuspend (unsigned int mask, struct sigscratch *scr)
 {
-	return ia32_rt_sigsuspend((sigset32_t *)&mask, sizeof(mask), scr);
+	return ia32_rt_sigsuspend((compat_sigset_t *)&mask, sizeof(mask), scr);
 }
 
 asmlinkage long
@@ -530,14 +530,14 @@ sys32_rt_sigaction (int sig, struct sigaction32 *act,
 	int ret;
 
 	/* XXX: Don't preclude handling different sized sigset_t's.  */
-	if (sigsetsize != sizeof(sigset32_t))
+	if (sigsetsize != sizeof(compat_sigset_t))
 		return -EINVAL;
 
 	if (act) {
 		ret = get_user(handler, &act->sa_handler);
 		ret |= get_user(new_ka.sa.sa_flags, &act->sa_flags);
 		ret |= get_user(restorer, &act->sa_restorer);
-		ret |= copy_from_user(&new_ka.sa.sa_mask, &act->sa_mask, sizeof(sigset32_t));
+		ret |= copy_from_user(&new_ka.sa.sa_mask, &act->sa_mask, sizeof(compat_sigset_t));
 		if (ret)
 			return -EFAULT;
 
@@ -550,7 +550,7 @@ sys32_rt_sigaction (int sig, struct sigaction32 *act,
 		ret = put_user(IA32_SA_HANDLER(&old_ka), &oact->sa_handler);
 		ret |= put_user(old_ka.sa.sa_flags, &oact->sa_flags);
 		ret |= put_user(IA32_SA_RESTORER(&old_ka), &oact->sa_restorer);
-		ret |= copy_to_user(&oact->sa_mask, &old_ka.sa.sa_mask, sizeof(sigset32_t));
+		ret |= copy_to_user(&oact->sa_mask, &old_ka.sa.sa_mask, sizeof(compat_sigset_t));
 	}
 	return ret;
 }
@@ -560,7 +560,7 @@ extern asmlinkage long sys_rt_sigprocmask (int how, sigset_t *set, sigset_t *ose
 					   size_t sigsetsize);
 
 asmlinkage long
-sys32_rt_sigprocmask (int how, sigset32_t *set, sigset32_t *oset, unsigned int sigsetsize)
+sys32_rt_sigprocmask (int how, compat_sigset_t *set, compat_sigset_t *oset, unsigned int sigsetsize)
 {
 	mm_segment_t old_fs = get_fs();
 	sigset_t s;
@@ -587,13 +587,7 @@ sys32_rt_sigprocmask (int how, sigset32_t *set, sigset32_t *oset, unsigned int s
 }
 
 asmlinkage long
-sys32_sigprocmask (int how, unsigned int *set, unsigned int *oset)
-{
-	return sys32_rt_sigprocmask(how, (sigset32_t *) set, (sigset32_t *) oset, sizeof(*set));
-}
-
-asmlinkage long
-sys32_rt_sigtimedwait (sigset32_t *uthese, siginfo_t32 *uinfo,
+sys32_rt_sigtimedwait (compat_sigset_t *uthese, siginfo_t32 *uinfo,
 		struct compat_timespec *uts, unsigned int sigsetsize)
 {
 	extern asmlinkage long sys_rt_sigtimedwait (const sigset_t *, siginfo_t *,
@@ -605,16 +599,13 @@ sys32_rt_sigtimedwait (sigset32_t *uthese, siginfo_t32 *uinfo,
 	sigset_t s;
 	int ret;
 
-	if (copy_from_user(&s.sig, uthese, sizeof(sigset32_t)))
+	if (copy_from_user(&s.sig, uthese, sizeof(compat_sigset_t)))
 		return -EFAULT;
-	if (uts) {
-		ret = get_user(t.tv_sec, &uts->tv_sec);
-		ret |= get_user(t.tv_nsec, &uts->tv_nsec);
-		if (ret)
-			return -EFAULT;
-	}
+	if (uts && get_compat_timespec(&t, uts))
+		return -EFAULT;
 	set_fs(KERNEL_DS);
-	ret = sys_rt_sigtimedwait(&s, &info, &t, sigsetsize);
+	ret = sys_rt_sigtimedwait(&s, uinfo ? &info : NULL, uts ? &t : NULL,
+			sigsetsize);
 	set_fs(old_fs);
 	if (ret >= 0 && uinfo) {
 		if (copy_siginfo_to_user32(uinfo, &info))
@@ -648,7 +639,7 @@ sys32_sigaction (int sig, struct old_sigaction32 *act, struct old_sigaction32 *o
 	int ret;
 
 	if (act) {
-		old_sigset32_t mask;
+		compat_old_sigset_t mask;
 
 		ret = get_user(handler, &act->sa_handler);
 		ret |= get_user(new_ka.sa.sa_flags, &act->sa_flags);
@@ -866,7 +857,7 @@ setup_frame_ia32 (int sig, struct k_sigaction *ka, sigset_t *set, struct pt_regs
 
 	err |= setup_sigcontext_ia32(&frame->sc, &frame->fpstate, regs, set->sig[0]);
 
-	if (_IA32_NSIG_WORDS > 1)
+	if (_COMPAT_NSIG_WORDS > 1)
 		err |= __copy_to_user(frame->extramask, (char *) &set->sig + 4,
 				      sizeof(frame->extramask));
 
@@ -1011,7 +1002,7 @@ sys32_sigreturn (int arg0, int arg1, int arg2, int arg3, int arg4, int arg5, int
 		goto badframe;
 
 	if (__get_user(set.sig[0], &frame->sc.oldmask)
-	    || (_IA32_NSIG_WORDS > 1 && __copy_from_user((char *) &set.sig + 4, &frame->extramask,
+	    || (_COMPAT_NSIG_WORDS > 1 && __copy_from_user((char *) &set.sig + 4, &frame->extramask,
 							 sizeof(frame->extramask))))
 		goto badframe;
 

@@ -4,7 +4,7 @@
 /*
  * IA-64 Linux syscall numbers and inline-functions.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
@@ -223,8 +223,8 @@
 #define __NR_sched_setaffinity		1231
 #define __NR_sched_getaffinity		1232
 #define __NR_set_tid_address		1233
-/* #define __NR_alloc_hugepages		1234 reusable */
-/* #define __NR_free_hugepages		1235 reusable */
+/* 1234 available for reuse */
+/* 1235 available for reuse */
 #define __NR_exit_group			1236
 #define __NR_lookup_dcookie		1237
 #define __NR_io_setup			1238

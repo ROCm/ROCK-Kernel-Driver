@@ -1,7 +1,7 @@
 /*
  * Architecture-specific trap handling.
  *
- * Copyright (C) 1998-2002 Hewlett-Packard Co
+ * Copyright (C) 1998-2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
  * 05/12/00 grao <goutham.rao@intel.com> : added isr in siginfo for SIGFPE
@@ -57,7 +57,8 @@ trap_init (void)
 		major = fpswa_interface->revision >> 16;
 		minor = fpswa_interface->revision & 0xffff;
 	}
-	printk("fpswa interface at %lx (rev %d.%d)\n", ia64_boot_param->fpswa, major, minor);
+	printk(KERN_INFO "fpswa interface at %lx (rev %d.%d)\n",
+	       ia64_boot_param->fpswa, major, minor);
 }
 
 /*
@@ -142,7 +143,7 @@ ia64_bad_break (unsigned long break_num, struct pt_regs *regs)
 
 	switch (break_num) {
 	      case 0: /* unknown error (used by GCC for __builtin_abort()) */
-		die_if_kernel("bad break", regs, break_num);
+		die_if_kernel("bugcheck!", regs, break_num);
 		sig = SIGILL; code = ILL_ILLOPC;
 		break;
 
@@ -222,7 +223,7 @@ ia64_ni_syscall (unsigned long arg0, unsigned long arg1, unsigned long arg2, uns
 {
 	struct pt_regs *regs = (struct pt_regs *) &stack;
 
-	printk("%s(%d): <sc%ld(%lx,%lx,%lx,%lx)>\n", current->comm, current->pid,
+	printk(KERN_DEBUG "%s(%d): <sc%ld(%lx,%lx,%lx,%lx)>\n", current->comm, current->pid,
 	       regs->r15, arg0, arg1, arg2, arg3);
 	return -ENOSYS;
 }
@@ -346,7 +347,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 			/* emulation was successful */
 			ia64_increment_ip(regs);
 		} else if (exception == -1) {
-			printk("handle_fpu_swa: fp_emulate() returned -1\n");
+			printk(KERN_ERR "handle_fpu_swa: fp_emulate() returned -1\n");
 			return -1;
 		} else {
 			/* is next instruction a trap? */
@@ -369,7 +370,7 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 		}
 	} else {
 		if (exception == -1) {
-			printk("handle_fpu_swa: fp_emulate() returned -1\n");
+			printk(KERN_ERR "handle_fpu_swa: fp_emulate() returned -1\n");
 			return -1;
 		} else if (exception != 0) {
 			/* raise exception */
@@ -467,7 +468,9 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 				       ? " (RSE access)" : " (data access)") : "");
 		if (code == 8) {
 # ifdef CONFIG_IA64_PRINT_HAZARDS
-			printk("%016lx:possible hazard, pr = %016lx\n", regs->cr_iip, regs->pr);
+			printk("%s[%d]: possible hazard @ ip=%016lx (pr = %016lx)\n",
+			       current->comm, current->pid, regs->cr_iip + ia64_psr(regs)->ri,
+			       regs->pr);
 # endif
 			return;
 		}
@@ -524,6 +527,25 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 	      case 29: /* Debug */
 	      case 35: /* Taken Branch Trap */
 	      case 36: /* Single Step Trap */
+#ifdef CONFIG_FSYS
+		if (fsys_mode(current, regs)) {
+			extern char syscall_via_break[], __start_gate_section[];
+			/*
+			 * Got a trap in fsys-mode: Taken Branch Trap and Single Step trap
+			 * need special handling; Debug trap is not supposed to happen.
+			 */
+			if (unlikely(vector == 29)) {
+				die("Got debug trap in fsys-mode---not supposed to happen!",
+				    regs, 0);
+				return;
+			}
+			/* re-do the system call via break 0x100000: */
+			regs->cr_iip = GATE_ADDR + (syscall_via_break - __start_gate_section);
+			ia64_psr(regs)->ri = 0;
+			ia64_psr(regs)->cpl = 3;
+			return;
+		}
+#endif
 		switch (vector) {
 		      case 29:
 			siginfo.si_code = TRAP_HWBKPT;
@@ -563,19 +585,31 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		}
 		return;
 
-	      case 34:		/* Unimplemented Instruction Address Trap */
-		if (user_mode(regs)) {
-			siginfo.si_signo = SIGILL;
-			siginfo.si_code = ILL_BADIADDR;
-			siginfo.si_errno = 0;
-			siginfo.si_flags = 0;
-			siginfo.si_isr = 0;
-			siginfo.si_imm = 0;
-			siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
-			force_sig_info(SIGILL, &siginfo, current);
+	      case 34:
+		if (isr & 0x2) {
+			/* Lower-Privilege Transfer Trap */
+			/*
+			 * Just clear PSR.lp and then return immediately: all the
+			 * interesting work (e.g., signal delivery is done in the kernel
+			 * exit path).
+			 */
+			ia64_psr(regs)->lp = 0;
 			return;
+		} else {
+			/* Unimplemented Instr. Address Trap */
+			if (user_mode(regs)) {
+				siginfo.si_signo = SIGILL;
+				siginfo.si_code = ILL_BADIADDR;
+				siginfo.si_errno = 0;
+				siginfo.si_flags = 0;
+				siginfo.si_isr = 0;
+				siginfo.si_imm = 0;
+				siginfo.si_addr = (void *) (regs->cr_iip + ia64_psr(regs)->ri);
+				force_sig_info(SIGILL, &siginfo, current);
+				return;
+			}
+			sprintf(buf, "Unimplemented Instruction Address fault");
 		}
-		sprintf(buf, "Unimplemented Instruction Address fault");
 		break;
 
 	      case 45:
@@ -583,8 +617,9 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		if (ia32_exception(regs, isr) == 0)
 			return;
 #endif
-		printk("Unexpected IA-32 exception (Trap 45)\n");
-		printk("  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx\n", regs->cr_iip, ifa, isr);
+		printk(KERN_ERR "Unexpected IA-32 exception (Trap 45)\n");
+		printk(KERN_ERR "  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx\n",
+		       regs->cr_iip, ifa, isr);
 		force_sig(SIGSEGV, current);
 		break;
 
@@ -593,8 +628,8 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		if (ia32_intercept(regs, isr) == 0)
 			return;
 #endif
-		printk("Unexpected IA-32 intercept trap (Trap 46)\n");
-		printk("  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx, iim - 0x%lx\n",
+		printk(KERN_ERR "Unexpected IA-32 intercept trap (Trap 46)\n");
+		printk(KERN_ERR "  iip - 0x%lx, ifa - 0x%lx, isr - 0x%lx, iim - 0x%lx\n",
 		       regs->cr_iip, ifa, isr, iim);
 		force_sig(SIGSEGV, current);
 		return;

@@ -5,7 +5,7 @@
  * to set up the kernel's global pointer and jump to the kernel
  * entry point.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2001, 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *	Stephane Eranian <eranian@hpl.hp.com>
  * Copyright (C) 1999 VA Linux Systems
@@ -143,17 +143,14 @@ start_ap:
 	movl r2=init_thread_union
 	cmp.eq isBP,isAP=r0,r0
 #endif
-	;;
-	extr r3=r2,0,61		// r3 == phys addr of task struct
 	mov r16=KERNEL_TR_PAGE_NUM
 	;;
 
 	// load the "current" pointer (r13) and ar.k6 with the current task
-	mov r13=r2
-	mov IA64_KR(CURRENT)=r3		// Physical address
-
+	mov IA64_KR(CURRENT)=r2		// virtual address
 	// initialize k4 to a safe value (64-128MB is mapped by TR_KERNEL)
 	mov IA64_KR(CURRENT_STACK)=r16
+	mov r13=r2
 	/*
 	 * Reserve space at the top of the stack for "struct pt_regs".  Kernel threads
 	 * don't store interesting values in that structure, but the space still needs

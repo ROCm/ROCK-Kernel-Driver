@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 1999 VA Linux Systems
  *  Copyright (C) 1999,2000 Walt Drummond <drummond@valinux.com>
- *  Copyright (C) 2000, 2002 Hewlett-Packard Co.
+ *  Copyright (C) 2000, 2002-2003 Hewlett-Packard Co.
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *  Copyright (C) 2000 Intel Corp.
  *  Copyright (C) 2000,2001 J.I. Lee <jung-ik.lee@intel.com>
@@ -75,20 +75,20 @@ acpi_get_sysname (void)
 
 	rsdp_phys = acpi_find_rsdp();
 	if (!rsdp_phys) {
-		printk("ACPI 2.0 RSDP not found, default to \"dig\"\n");
+		printk(KERN_ERR "ACPI 2.0 RSDP not found, default to \"dig\"\n");
 		return "dig";
 	}
 
 	rsdp = (struct acpi20_table_rsdp *) __va(rsdp_phys);
 	if (strncmp(rsdp->signature, RSDP_SIG, sizeof(RSDP_SIG) - 1)) {
-		printk("ACPI 2.0 RSDP signature incorrect, default to \"dig\"\n");
+		printk(KERN_ERR "ACPI 2.0 RSDP signature incorrect, default to \"dig\"\n");
 		return "dig";
 	}
 
 	xsdt = (struct acpi_table_xsdt *) __va(rsdp->xsdt_address);
 	hdr = &xsdt->header;
 	if (strncmp(hdr->signature, XSDT_SIG, sizeof(XSDT_SIG) - 1)) {
-		printk("ACPI 2.0 XSDT signature incorrect, default to \"dig\"\n");
+		printk(KERN_ERR "ACPI 2.0 XSDT signature incorrect, default to \"dig\"\n");
 		return "dig";
 	}
 
@@ -128,7 +128,7 @@ acpi_get_sysname (void)
  * with a list of acpi_resource structures.
  */
 acpi_status
-acpi_get_crs (acpi_handle obj, acpi_buffer *buf)
+acpi_get_crs (acpi_handle obj, struct acpi_buffer *buf)
 {
 	acpi_status result;
 	buf->length = 0;
@@ -144,10 +144,10 @@ acpi_get_crs (acpi_handle obj, acpi_buffer *buf)
 	return acpi_get_current_resources(obj, buf);
 }
 
-acpi_resource *
-acpi_get_crs_next (acpi_buffer *buf, int *offset)
+struct acpi_resource *
+acpi_get_crs_next (struct acpi_buffer *buf, int *offset)
 {
-	acpi_resource *res;
+	struct acpi_resource *res;
 
 	if (*offset >= buf->length)
 		return NULL;
@@ -157,11 +157,11 @@ acpi_get_crs_next (acpi_buffer *buf, int *offset)
 	return res;
 }
 
-acpi_resource_data *
-acpi_get_crs_type (acpi_buffer *buf, int *offset, int type)
+union acpi_resource_data *
+acpi_get_crs_type (struct acpi_buffer *buf, int *offset, int type)
 {
 	for (;;) {
-		acpi_resource *res = acpi_get_crs_next(buf, offset);
+		struct acpi_resource *res = acpi_get_crs_next(buf, offset);
 		if (!res)
 			return NULL;
 		if (res->id == type)
@@ -170,7 +170,7 @@ acpi_get_crs_type (acpi_buffer *buf, int *offset, int type)
 }
 
 void
-acpi_dispose_crs (acpi_buffer *buf)
+acpi_dispose_crs (struct acpi_buffer *buf)
 {
 	kfree(buf->pointer);
 }
@@ -199,7 +199,7 @@ acpi_request_vector (u32 int_type)
 		/* correctable platform error interrupt */
 		vector = platform_intr_list[int_type];
 	} else
-		printk("acpi_request_vector(): invalid interrupt type\n");
+		printk(KERN_ERR "acpi_request_vector(): invalid interrupt type\n");
 	return vector;
 }
 
@@ -249,7 +249,7 @@ acpi_parse_lsapic (acpi_table_entry_header *header)
 
 	acpi_table_print_madt_entry(header);
 
-	printk("CPU %d (0x%04x)", total_cpus, (lsapic->id << 8) | lsapic->eid);
+	printk(KERN_INFO "CPU %d (0x%04x)", total_cpus, (lsapic->id << 8) | lsapic->eid);
 
 	if (lsapic->flags.enabled) {
 		available_cpus++;
@@ -478,8 +478,8 @@ acpi_numa_slit_init (struct acpi_table_slit *slit)
 	len = sizeof(struct acpi_table_header) + 8
 		+ slit->localities * slit->localities;
 	if (slit->header.length != len) {
-		printk("ACPI 2.0 SLIT: size mismatch: %d expected, %d actual\n",
-		      len, slit->header.length);
+		printk(KERN_ERR "ACPI 2.0 SLIT: size mismatch: %d expected, %d actual\n",
+		       len, slit->header.length);
 		memset(numa_slit, 10, sizeof(numa_slit));
 		return;
 	}
@@ -514,8 +514,8 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 	size = (size << 32) | ma->length_lo;
 
 	if (num_memblks >= NR_MEMBLKS) {
-		printk("Too many mem chunks in SRAT. Ignoring %ld MBytes at %lx\n",
-			size/(1024*1024), paddr);
+		printk(KERN_ERR "Too many mem chunks in SRAT. Ignoring %ld MBytes at %lx\n",
+		       size/(1024*1024), paddr);
 		return;
 	}
 
@@ -545,8 +545,8 @@ acpi_numa_memory_affinity_init (struct acpi_table_memory_affinity *ma)
 
 	if (min_hole_size) {
 		if (min_hole_size > size) {
-			printk("Too huge memory hole. Ignoring %ld MBytes at %lx\n",
-				size/(1024*1024), paddr);
+			printk(KERN_ERR "Too huge memory hole. Ignoring %ld MBytes at %lx\n",
+			       size/(1024*1024), paddr);
 			return;
 		}
 	}
@@ -605,8 +605,8 @@ acpi_numa_arch_fixup(void)
 	for (i = 0; i < srat_num_cpus; i++)
 		node_cpuid[i].nid = pxm_to_nid_map[node_cpuid[i].nid];
 
-	printk("Number of logical nodes in system = %d\n", numnodes);
-	printk("Number of memory chunks in system = %d\n", num_memblks);
+	printk(KERN_INFO "Number of logical nodes in system = %d\n", numnodes);
+	printk(KERN_INFO "Number of memory chunks in system = %d\n", num_memblks);
 
 	if (!slit_table) return;
 	memset(numa_slit, -1, sizeof(numa_slit));
@@ -638,7 +638,7 @@ static int __init
 acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 {
 	struct acpi_table_header *fadt_header;
-	fadt_descriptor_rev2 *fadt;
+	struct fadt_descriptor_rev2 *fadt;
 	u32 sci_irq, gsi_base;
 	char *iosapic_address;
 
@@ -649,7 +649,7 @@ acpi_parse_fadt (unsigned long phys_addr, unsigned long size)
 	if (fadt_header->revision != 3)
 		return -ENODEV;		/* Only deal with ACPI 2.0 FADT */
 
-	fadt = (fadt_descriptor_rev2 *) fadt_header;
+	fadt = (struct fadt_descriptor_rev2 *) fadt_header;
 
 	if (!(fadt->iapc_boot_arch & BAF_8042_KEYBOARD_CONTROLLER))
 		acpi_kbd_controller_present = 0;
@@ -806,7 +806,7 @@ acpi_boot_init (char *cmdline)
 
 #ifdef CONFIG_SMP
 	if (available_cpus == 0) {
-		printk("ACPI: Found 0 CPUS; assuming 1\n");
+		printk(KERN_INFO "ACPI: Found 0 CPUS; assuming 1\n");
 		available_cpus = 1; /* We've got at least one of these, no? */
 	}
 	smp_boot_data.cpu_count = total_cpus;
@@ -817,7 +817,7 @@ acpi_boot_init (char *cmdline)
 #endif
 #endif
 	/* Make boot-up look pretty */
-	printk("%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
+	printk(KERN_INFO "%d CPUs available, %d CPUs total\n", available_cpus, total_cpus);
 	return 0;
 }
 
@@ -886,6 +886,28 @@ acpi_irq_to_vector (u32 irq)
 		return isa_irq_to_vector(irq);
 
 	return gsi_to_vector(irq);
+}
+
+int __init
+acpi_register_irq (u32 gsi, u32 polarity, u32 trigger)
+{
+	int vector = 0;
+	u32 irq_base;
+	char *iosapic_address;
+
+	if (acpi_madt->flags.pcat_compat && (gsi < 16))
+		return isa_irq_to_vector(gsi);
+
+	if (!iosapic_register_intr)
+		return 0;
+
+	/* Find the IOSAPIC */
+	if (!acpi_find_iosapic(gsi, &irq_base, &iosapic_address)) {
+		/* Turn it on */
+		vector = iosapic_register_intr (gsi, polarity, trigger,
+						irq_base, iosapic_address);
+	}
+	return vector;
 }
 
 #endif /* CONFIG_ACPI_BOOT */
