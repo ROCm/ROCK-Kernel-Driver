@@ -507,6 +507,24 @@ linvfs_write_super(
 }
 
 STATIC int
+linvfs_sync_super(
+	struct super_block	*sb,
+	int			wait)
+{
+	vfs_t		*vfsp = LINVFS_GET_VFS(sb);
+	int		error;
+	int		flags = SYNC_FSDATA;
+
+	if (wait)
+		flags |= SYNC_WAIT;
+
+	VFS_SYNC(vfsp, flags, NULL, error);
+	sb->s_dirt = 0;
+
+	return -error;
+}
+
+STATIC int
 linvfs_statfs(
 	struct super_block	*sb,
 	struct kstatfs		*statp)
@@ -798,6 +816,7 @@ STATIC struct super_operations linvfs_sops = {
 	.clear_inode		= linvfs_clear_inode,
 	.put_super		= linvfs_put_super,
 	.write_super		= linvfs_write_super,
+	.sync_fs		= linvfs_sync_super,
 	.write_super_lockfs	= linvfs_freeze_fs,
 	.unlockfs		= linvfs_unfreeze_fs,
 	.statfs			= linvfs_statfs,

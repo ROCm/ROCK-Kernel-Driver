@@ -2326,6 +2326,26 @@ xlog_recover_do_inode_trans(
 				 XFS_ERRLEVEL_LOW, mp);
 		return XFS_ERROR(EFSCORRUPTED);
 	}
+
+	/* Skip replay when the on disk inode is newer than the log one */
+	if (dicp->di_flushiter <
+	    INT_GET(dip->di_core.di_flushiter, ARCH_CONVERT)) {
+		/*
+		 * Deal with the wrap case, DI_MAX_FLUSH is less
+		 * than smaller numbers
+		 */
+		if ((INT_GET(dip->di_core.di_flushiter, ARCH_CONVERT)
+							== DI_MAX_FLUSH) &&
+		    (dicp->di_flushiter < (DI_MAX_FLUSH>>1))) {
+			/* do nothing */
+		} else {
+			xfs_buf_relse(bp);
+			return 0;
+		}
+	}
+	/* Take the opportunity to reset the flush iteration count */
+	dicp->di_flushiter = 0;
+
 	if (unlikely((dicp->di_mode & IFMT) == IFREG)) {
 		if ((dicp->di_format != XFS_DINODE_FMT_EXTENTS) &&
 		    (dicp->di_format != XFS_DINODE_FMT_BTREE)) {

@@ -3730,9 +3730,7 @@ xfs_inode_flush(
 	int		flags)
 {
 	xfs_inode_t	*ip;
-	xfs_dinode_t	*dip;
 	xfs_mount_t	*mp;
-	xfs_buf_t	*bp;
 	int		error = 0;
 
 	ip = XFS_BHVTOI(bdp);
@@ -3778,44 +3776,30 @@ xfs_inode_flush(
 	 * now, they get caught later by xfs_sync.
 	 */
 	if (flags & FLUSH_INODE) {
-		if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED)) {
-			if ((xfs_ipincount(ip) == 0) && xfs_iflock_nowait(ip)) {
-				int	flush_flags;
+		int	flush_flags;
 
-#if 0
-				/* not turning this on until some
-				 * performance analysis is done
-				 */
-				if (flags & FLUSH_SYNC)
-					flush_flags = XFS_IFLUSH_SYNC;
-				else
-#endif
-				flush_flags = XFS_IFLUSH_DELWRI_ELSE_ASYNC;
+		if (xfs_ipincount(ip))
+			return EAGAIN;
 
-				xfs_ifunlock(ip);
+		if (flags & FLUSH_SYNC) {
+			xfs_ilock(ip, XFS_ILOCK_SHARED);
+			xfs_iflock(ip);
+		} else if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED)) {
+			if (xfs_ipincount(ip) || !xfs_iflock_nowait(ip)) {
 				xfs_iunlock(ip, XFS_ILOCK_SHARED);
-				error = xfs_itobp(mp, NULL, ip, &dip, &bp, 0);
-				if (error)
-					return error;
-				xfs_buf_relse(bp);
-
-				if (xfs_ilock_nowait(ip, XFS_ILOCK_SHARED) == 0)
-					return EAGAIN;
-
-				if (xfs_ipincount(ip) ||
-				    !xfs_iflock_nowait(ip)) {
-					xfs_iunlock(ip, XFS_ILOCK_SHARED);
-					return EAGAIN;
-				}
-
-				error = xfs_iflush(ip, flush_flags);
-			} else {
-				error = EAGAIN;
+				return EAGAIN;
 			}
-			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		} else {
-			error = EAGAIN;
+			return EAGAIN;
 		}
+
+		if (flags & FLUSH_SYNC)
+			flush_flags = XFS_IFLUSH_SYNC;
+		else
+			flush_flags = XFS_IFLUSH_ASYNC;
+
+		error = xfs_iflush(ip, flush_flags);
+		xfs_iunlock(ip, XFS_ILOCK_SHARED);
 	}
 
 	return error;
