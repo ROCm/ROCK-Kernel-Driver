@@ -217,6 +217,8 @@ static struct ata_port_operations nv_ops = {
 	.phy_reset		= sata_phy_reset,
 	.bmdma_setup		= ata_bmdma_setup,
 	.bmdma_start		= ata_bmdma_start,
+	.bmdma_stop		= ata_bmdma_stop,
+	.bmdma_status		= ata_bmdma_status,
 	.qc_prep		= ata_qc_prep,
 	.qc_issue		= ata_qc_issue_prot,
 	.eng_timeout		= ata_eng_timeout,
@@ -332,6 +334,7 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	struct nv_host *host;
 	struct ata_port_info *ppi;
 	struct ata_probe_ent *probe_ent;
+	int pci_dev_busy = 0;
 	int rc;
 	u32 bar;
 
@@ -350,8 +353,10 @@ static int nv_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		goto err_out;
 
 	rc = pci_request_regions(pdev, DRV_NAME);
-	if (rc)
+	if (rc) {
+		pci_dev_busy = 1;
 		goto err_out_disable;
+	}
 
 	rc = pci_set_dma_mask(pdev, ATA_DMA_MASK);
 	if (rc)
@@ -427,7 +432,8 @@ err_out_free_ent:
 err_out_regions:
 	pci_release_regions(pdev);
 err_out_disable:
-	pci_disable_device(pdev);
+	if (!pci_dev_busy)
+		pci_disable_device(pdev);
 err_out:
 	return rc;
 }

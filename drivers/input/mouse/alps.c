@@ -34,7 +34,7 @@ struct alps_model_info {
 	unsigned char signature[3];
 	unsigned char model;
 } alps_model_data[] = {
-	{ { 0x33, 0x02, 0x0a },	ALPS_MODEL_GLIDEPOINT },
+/*	{ { 0x33, 0x02, 0x0a },	ALPS_MODEL_GLIDEPOINT },	*/
 	{ { 0x53, 0x02, 0x0a },	ALPS_MODEL_GLIDEPOINT },
 	{ { 0x53, 0x02, 0x14 },	ALPS_MODEL_GLIDEPOINT },
 	{ { 0x63, 0x02, 0x0a },	ALPS_MODEL_GLIDEPOINT },
@@ -42,8 +42,8 @@ struct alps_model_info {
 	{ { 0x73, 0x02, 0x0a },	ALPS_MODEL_GLIDEPOINT },
 	{ { 0x73, 0x02, 0x14 },	ALPS_MODEL_GLIDEPOINT },
 	{ { 0x63, 0x02, 0x28 },	ALPS_MODEL_GLIDEPOINT },
-	{ { 0x63, 0x02, 0x3c },	ALPS_MODEL_GLIDEPOINT },
-	{ { 0x63, 0x02, 0x50 },	ALPS_MODEL_GLIDEPOINT },
+/*	{ { 0x63, 0x02, 0x3c },	ALPS_MODEL_GLIDEPOINT },	*/
+/*	{ { 0x63, 0x02, 0x50 },	ALPS_MODEL_GLIDEPOINT },	*/
 	{ { 0x63, 0x02, 0x64 },	ALPS_MODEL_GLIDEPOINT },
 	{ { 0x20, 0x02, 0x0e },	ALPS_MODEL_DUALPOINT },
 	{ { 0x22, 0x02, 0x0a },	ALPS_MODEL_DUALPOINT },

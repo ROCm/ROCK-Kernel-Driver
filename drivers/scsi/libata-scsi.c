@@ -701,6 +701,7 @@ static void ata_scsi_translate(struct ata_port *ap, struct ata_device *dev,
 	return;
 
 err_out:
+	ata_qc_free(qc);
 	ata_bad_cdb(cmd, done);
 	DPRINTK("EXIT - badcmd\n");
 }
