@@ -373,7 +373,7 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ip_mc_list *pmc,
 	struct net_device *dev = pmc->interface->dev;
 	struct igmpv3_report *pih;
 	struct igmpv3_grec *pgr = 0;
-	struct ip_sf_list *psf, *psf_next, *psf_prev, *psf_list;
+	struct ip_sf_list *psf, *psf_next, *psf_prev, **psf_list;
 	int scount, first, isquery, truncate;
 
 	if (pmc->multiaddr == IGMP_ALL_HOSTS)
@@ -384,9 +384,9 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ip_mc_list *pmc,
 	truncate = type == IGMPV3_MODE_IS_EXCLUDE ||
 		    type == IGMPV3_CHANGE_TO_EXCLUDE;
 
-	psf_list = sdeleted ? pmc->tomb : pmc->sources;
+	psf_list = sdeleted ? &pmc->tomb : &pmc->sources;
 
-	if (!psf_list) {
+	if (!*psf_list) {
 		if (type == IGMPV3_ALLOW_NEW_SOURCES ||
 		    type == IGMPV3_BLOCK_OLD_SOURCES)
 			return skb;
@@ -417,7 +417,7 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ip_mc_list *pmc,
 	first = 1;
 	scount = 0;
 	psf_prev = 0;
-	for (psf=psf_list; psf; psf=psf_next) {
+	for (psf=*psf_list; psf; psf=psf_next) {
 		u32 *psrc;
 
 		psf_next = psf->sf_next;
@@ -457,7 +457,7 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ip_mc_list *pmc,
 				if (psf_prev)
 					psf_prev->sf_next = psf->sf_next;
 				else
-					pmc->tomb = psf->sf_next;
+					*psf_list = psf->sf_next;
 				kfree(psf);
 				continue;
 			}
