@@ -686,13 +686,19 @@ acpi_ex_opcode_1A_0T_1R (
 
 	case AML_TYPE_OP:               /* object_type (source_object) */
 
+		/*
+		 * Note: The operand is not resolved at this point because we want to
+		 * get the associated object, not its value.  For example, we don't want
+		 * to resolve a field_unit to its value, we want the actual field_unit
+		 * object.
+		 */
+
 		/* Get the type of the base object */
 
 		status = acpi_ex_resolve_multiple (walk_state, operand[0], &type, NULL);
 		if (ACPI_FAILURE (status)) {
 			goto cleanup;
 		}
-
 		/* Allocate a descriptor to hold the type. */
 
 		return_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
@@ -707,6 +713,11 @@ acpi_ex_opcode_1A_0T_1R (
 
 	case AML_SIZE_OF_OP:            /* size_of (source_object) */
 
+		/*
+		 * Note: The operand is not resolved at this point because we want to
+		 * get the associated object, not its value.
+		 */
+
 		/* Get the base object */
 
 		status = acpi_ex_resolve_multiple (walk_state, operand[0], &type, &temp_desc);
@@ -715,11 +726,19 @@ acpi_ex_opcode_1A_0T_1R (
 		}
 
 		/*
-		 * Type is guaranteed to be a buffer, string, or package at this
-		 * point (even if the original operand was an object reference, it
-		 * will be resolved and typechecked during operand resolution.)
+		 * The type of the base object must be integer, buffer, string, or
+		 * package.  All others are not supported.
+		 *
+		 * NOTE: Integer is not specifically supported by the ACPI spec,
+		 * but is supported implicitly via implicit operand conversion.
+		 * rather than bother with conversion, we just use the byte width
+		 * global (4 or 8 bytes).
 		 */
 		switch (type) {
+		case ACPI_TYPE_INTEGER:
+			value = acpi_gbl_integer_byte_width;
+			break;
+
 		case ACPI_TYPE_BUFFER:
 			value = temp_desc->buffer.length;
 			break;
@@ -734,7 +753,7 @@ acpi_ex_opcode_1A_0T_1R (
 
 		default:
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
-				"size_of, Not Buf/Str/Pkg - found type %s\n",
+				"size_of - Operand is not Buf/Int/Str/Pkg - found type %s\n",
 				acpi_ut_get_type_name (type)));
 			status = AE_AML_OPERAND_TYPE;
 			goto cleanup;
