@@ -6,7 +6,7 @@
  *      (C) Copyright 2000-2001, Greg Ungerer (gerg@snapgear.com)
  *      (C) Copyright 2001-2002, SnapGear (www.snapgear.com)
  *
- *	$Id: nettel.c,v 1.8 2004/11/04 13:24:15 gleixner Exp $
+ *	$Id: nettel.c,v 1.9 2004/11/28 09:40:40 dwmw2 Exp $
  */
 
 /****************************************************************************/
@@ -471,8 +471,8 @@ void __exit nettel_cleanup(void)
 		map_destroy(amd_mtd);
 	}
 	if (nettel_amd_map.virt) {
-		iounmap((void *)nettel_amd_map.virt);
-		nettel_amd_map.virt = 0;
+		iounmap(nettel_amd_map.virt);
+		nettel_amd_map.virt = NULL;
 	}
 #ifdef CONFIG_MTD_CFI_INTELEXT
 	if (intel_mtd) {

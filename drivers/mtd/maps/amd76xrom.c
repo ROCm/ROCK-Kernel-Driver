@@ -2,7 +2,7 @@
  * amd76xrom.c
  *
  * Normal mappings of chips in physical memory
- * $Id: amd76xrom.c,v 1.18 2004/11/16 18:29:02 dwmw2 Exp $
+ * $Id: amd76xrom.c,v 1.19 2004/11/28 09:40:39 dwmw2 Exp $
  */
 
 #include <linux/module.h>
@@ -89,7 +89,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 	static char *rom_probe_types[] = { "cfi_probe", "jedec_probe", NULL };
 	u8 byte;
 	struct amd76xrom_window *window = &amd76xrom_window;
-	struct amd76xrom_map_info *map = 0;
+	struct amd76xrom_map_info *map = NULL;
 	unsigned long map_top;
 
 	/* Remember the pci dev I find the window in */
@@ -244,7 +244,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 		map->mtd->owner = THIS_MODULE;
 		if (add_mtd_device(map->mtd)) {
 			map_destroy(map->mtd);
-			map->mtd = 0;
+			map->mtd = NULL;
 			goto out;
 		}
 
@@ -254,7 +254,7 @@ static int __devinit amd76xrom_init_one (struct pci_dev *pdev,
 
 		/* File away the map structure */
 		list_add(&map->list, &window->maps);
-		map = 0;
+		map = NULL;
 	}
 
  out:
