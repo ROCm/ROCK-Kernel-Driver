@@ -304,16 +304,8 @@ asmlinkage int sys_ptrace(long request, long pid, long addr, long data)
 		res = ptrace_detach(child, data);
 		break;
 
-	case PTRACE_SETOPTIONS:
-		if (data & PTRACE_O_TRACESYSGOOD)
-			child->ptrace |= PT_TRACESYSGOOD;
-		else
-			child->ptrace &= ~PT_TRACESYSGOOD;
-		res = 0;
-		break;
-
 	default:
-		res = -EIO;
+		res = ptrace_request(child, request, addr, data);
 		goto out;
 	}
 out_tsk:

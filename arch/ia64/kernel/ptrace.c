@@ -1268,16 +1268,8 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		ret = ptrace_setregs(child, (struct pt_all_user_regs*) data);
 		goto out_tsk;
 
-	      case PTRACE_SETOPTIONS:
-		if (data & PTRACE_O_TRACESYSGOOD)
-			child->ptrace |= PT_TRACESYSGOOD;
-		else
-			child->ptrace &= ~PT_TRACESYSGOOD;
-		ret = 0;
-		break;
-
 	      default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		goto out_tsk;
 	}
   out_tsk:

@@ -629,16 +629,8 @@ static int do_ptrace(int request, struct task_struct *child, long addr, long dat
 			ret = ptrace_setfpregs(child, (void *)data);
 			break;
 
-		case PTRACE_SETOPTIONS:
-			if (data & PTRACE_O_TRACESYSGOOD)
-				child->ptrace |= PT_TRACESYSGOOD;
-			else
-				child->ptrace &= ~PT_TRACESYSGOOD;
-			ret = 0;
-			break;
-
 		default:
-			ret = -EIO;
+			ret = ptrace_request(child, request, addr, data);
 			break;
 	}
 

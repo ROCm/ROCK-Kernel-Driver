@@ -64,10 +64,7 @@ struct pt_regs {
 /* #define PTRACE_GETFPXREGS		18 */
 /* #define PTRACE_SETFPXREGS		19 */
 
-#define PTRACE_SETOPTIONS	21
-
-/* options set using PTRACE_SETOPTIONS */
-#define PTRACE_O_TRACESYSGOOD	0x00000001
+#define PTRACE_OLDSETOPTIONS	21
 
 #ifdef _LANGUAGE_ASSEMBLY
 #include <asm/offset.h>

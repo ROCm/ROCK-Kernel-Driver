@@ -6,10 +6,7 @@
 #define PTRACE_GETFPREGS	14
 #define PTRACE_SETFPREGS	15
 
-#define PTRACE_SETOPTIONS	21
-
-/* options set using PTRACE_SETOPTIONS */
-#define PTRACE_O_TRACESYSGOOD	0x00000001
+#define PTRACE_OLDSETOPTIONS	21
 
 #include <asm/proc/ptrace.h>
 

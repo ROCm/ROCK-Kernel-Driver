@@ -396,17 +396,8 @@ asmlinkage long sys_ptrace(long request, long pid, long addr, long data)
 		break;
 	}
 
-	case PTRACE_SETOPTIONS: {
-		if (data & PTRACE_O_TRACESYSGOOD)
-			child->ptrace |= PT_TRACESYSGOOD;
-		else
-			child->ptrace &= ~PT_TRACESYSGOOD;
-		ret = 0;
-		break;
-	}
-
 	default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		break;
 	}
 out_tsk:

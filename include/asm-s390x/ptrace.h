@@ -85,10 +85,7 @@
 
 #define STACK_FRAME_OVERHEAD    160      /* size of minimum stack frame */
 
-#define PTRACE_SETOPTIONS         21
-
-/* options set using PTRACE_SETOPTIONS */
-#define PTRACE_O_TRACESYSGOOD     0x00000001
+#define PTRACE_OLDSETOPTIONS         21
 
 #ifndef __ASSEMBLY__
 #include <linux/config.h>

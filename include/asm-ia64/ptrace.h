@@ -287,9 +287,6 @@ struct pt_all_user_regs {
 #define PTRACE_GETREGS		18	/* get all registers (pt_all_user_regs) in one shot */
 #define PTRACE_SETREGS		19	/* set all registers (pt_all_user_regs) in one shot */
 
-#define PTRACE_SETOPTIONS	21
-
-/* options set using PTRACE_SETOPTIONS */
-#define PTRACE_O_TRACESYSGOOD	0x00000001
+#define PTRACE_OLDSETOPTIONS	21
 
 #endif /* _ASM_IA64_PTRACE_H */

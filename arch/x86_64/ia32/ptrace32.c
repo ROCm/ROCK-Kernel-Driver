@@ -172,17 +172,6 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 	__u32 val;
 
 	switch (request) { 
-	case PTRACE_TRACEME:
-	case PTRACE_ATTACH:
-	case PTRACE_SYSCALL:
-	case PTRACE_CONT:
-	case PTRACE_KILL:
-	case PTRACE_SINGLESTEP:
-	case PTRACE_DETACH:
-	case PTRACE_SETOPTIONS:
-		ret = sys_ptrace(request, pid, addr, data); 
-		return ret;
-
 	case PTRACE_PEEKTEXT:
 	case PTRACE_PEEKDATA:
 	case PTRACE_POKEDATA:
@@ -198,7 +187,8 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 		break;
 		
 	default:
-		return -EIO;
+		ret = sys_ptrace(request, pid, addr, data); 
+		return ret;
 	} 
 
 	child = find_target(request, pid, &ret);

@@ -345,7 +345,7 @@ int sys32_ptrace(long request, long pid, unsigned long addr, unsigned long data)
 		break;
 
 	default:
-		ret = -EIO;
+		ret = ptrace_request(child, request, addr, data);
 		break;
 	}
 out_tsk:

@@ -248,3 +248,35 @@ int ptrace_writedata(struct task_struct *tsk, char * src, unsigned long dst, int
 	}
 	return copied;
 }
+
+int ptrace_setoptions(struct task_struct *child, long data)
+{
+	if (data & PTRACE_O_TRACESYSGOOD)
+		child->ptrace |= PT_TRACESYSGOOD;
+	else
+		child->ptrace &= ~PT_TRACESYSGOOD;
+
+	if ((data & PTRACE_O_TRACESYSGOOD) != data)
+		return -EINVAL;
+
+	return 0;
+}
+
+int ptrace_request(struct task_struct *child, long request,
+		   long addr, long data)
+{
+	int ret = -EIO;
+
+	switch (request) {
+#ifdef PTRACE_OLDSETOPTIONS
+	case PTRACE_OLDSETOPTIONS:
+#endif
+	case PTRACE_SETOPTIONS:
+		ret = ptrace_setoptions(child, data);
+		break;
+	default:
+		break;
+	}
+
+	return ret;
+}
