@@ -199,4 +199,23 @@ int acpi_processor_get_power_info (struct acpi_processor *pr);
 extern struct file_operations acpi_processor_power_fops;
 int no_c2c3(struct dmi_system_id *id);
 
+/* in processor_thermal.c */
+int acpi_processor_get_limit_info (struct acpi_processor *pr);
+int acpi_processor_limit_open_fs(struct inode *inode, struct file *file);
+ssize_t acpi_processor_write_limit (
+	struct file		*file,
+	const char		__user *buffer,
+	size_t			count,
+	loff_t			*data);
+extern struct file_operations acpi_processor_limit_fops;
+
+#ifdef CONFIG_CPU_FREQ
+void acpi_thermal_cpufreq_init(void);
+void acpi_thermal_cpufreq_exit(void);
+#else
+static inline void acpi_thermal_cpufreq_init(void) { return; }
+static inline void acpi_thermal_cpufreq_exit(void) { return; }
+#endif
+
+
 #endif
