@@ -28,7 +28,7 @@ void autofs4_catatonic_mode(struct autofs_sb_info *sbi)
 {
 	struct autofs_wait_queue *wq, *nwq;
 
-	DPRINTK(("autofs: entering catatonic mode\n"));
+	DPRINTK("entering catatonic mode");
 
 	sbi->catatonic = 1;
 	wq = sbi->queues;
@@ -91,8 +91,8 @@ static void autofs4_notify_daemon(struct autofs_sb_info *sbi,
 	union autofs_packet_union pkt;
 	size_t pktsz;
 
-	DPRINTK(("autofs4_notify_daemon: wait id = 0x%08lx, name = %.*s, type=%d\n",
-		 wq->wait_queue_token, wq->len, wq->name, type));
+	DPRINTK("wait id = 0x%08lx, name = %.*s, type=%d",
+		wq->wait_queue_token, wq->len, wq->name, type);
 
 	memset(&pkt,0,sizeof pkt); /* For security reasons */
 
@@ -212,8 +212,8 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct dentry *dentry,
 		atomic_set(&wq->wait_ctr, 2);
 		up(&sbi->wq_sem);
 
-		DPRINTK(("autofs4_wait: new wait id = 0x%08lx, name = %.*s, nfy=%d\n",
-			 (unsigned long) wq->wait_queue_token, wq->len, wq->name, notify));
+		DPRINTK("new wait id = 0x%08lx, name = %.*s, nfy=%d",
+			(unsigned long) wq->wait_queue_token, wq->len, wq->name, notify);
 		/* autofs4_notify_daemon() may block */
 		if (notify != NFY_NONE) {
 			autofs4_notify_daemon(sbi,wq, 
@@ -224,8 +224,8 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct dentry *dentry,
 	} else {
 		atomic_inc(&wq->wait_ctr);
 		up(&sbi->wq_sem);
-		DPRINTK(("autofs4_wait: existing wait id = 0x%08lx, name = %.*s, nfy=%d\n",
-			 (unsigned long) wq->wait_queue_token, wq->len, wq->name, notify));
+		DPRINTK("existing wait id = 0x%08lx, name = %.*s, nfy=%d",
+			(unsigned long) wq->wait_queue_token, wq->len, wq->name, notify);
 	}
 
 	/* wq->name is NULL if and only if the lock is already released */
@@ -257,7 +257,7 @@ int autofs4_wait(struct autofs_sb_info *sbi, struct dentry *dentry,
 		recalc_sigpending();
 		spin_unlock_irqrestore(&current->sighand->siglock, irqflags);
 	} else {
-		DPRINTK(("autofs4_wait: skipped sleeping\n"));
+		DPRINTK("skipped sleeping");
 	}
 
 	status = wq->status;

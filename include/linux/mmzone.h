@@ -52,6 +52,14 @@ struct per_cpu_pages {
 
 struct per_cpu_pageset {
 	struct per_cpu_pages pcp[2];	/* 0: hot.  1: cold */
+#ifdef CONFIG_NUMA
+	unsigned long numa_hit;		/* allocated in intended node */
+	unsigned long numa_miss;	/* allocated in non intended node */
+	unsigned long numa_foreign;	/* was intended here, hit elsewhere */
+	unsigned long interleave_hit; 	/* interleaver prefered this zone */
+	unsigned long local_node;	/* allocation from local node */
+	unsigned long other_node;	/* allocation from other node */
+#endif
 } ____cacheline_aligned_in_smp;
 
 #define ZONE_DMA		0

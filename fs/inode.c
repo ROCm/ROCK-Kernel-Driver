@@ -196,12 +196,12 @@ void inode_init_once(struct inode *inode)
 	init_rwsem(&inode->i_alloc_sem);
 	INIT_RADIX_TREE(&inode->i_data.page_tree, GFP_ATOMIC);
 	spin_lock_init(&inode->i_data.tree_lock);
-	init_MUTEX(&inode->i_data.i_shared_sem);
+	spin_lock_init(&inode->i_data.i_mmap_lock);
 	atomic_set(&inode->i_data.truncate_count, 0);
 	INIT_LIST_HEAD(&inode->i_data.private_list);
 	spin_lock_init(&inode->i_data.private_lock);
-	INIT_LIST_HEAD(&inode->i_data.i_mmap);
-	INIT_LIST_HEAD(&inode->i_data.i_mmap_shared);
+	INIT_PRIO_TREE_ROOT(&inode->i_data.i_mmap);
+	INIT_LIST_HEAD(&inode->i_data.i_mmap_nonlinear);
 	spin_lock_init(&inode->i_lock);
 	i_size_ordered_init(inode);
 }
@@ -1396,11 +1396,8 @@ void __init inode_init(unsigned long mempages)
 
 	/* inode slab cache */
 	inode_cachep = kmem_cache_create("inode_cache", sizeof(struct inode),
-					 0, SLAB_HWCACHE_ALIGN, init_once,
-					 NULL);
-	if (!inode_cachep)
-		panic("cannot create inode slab cache");
-
+				0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, init_once,
+				NULL);
 	set_shrinker(DEFAULT_SEEKS, shrink_icache_memory);
 }
 
@@ -1421,5 +1418,4 @@ void init_special_inode(struct inode *inode, umode_t mode, dev_t rdev)
 		printk(KERN_DEBUG "init_special_inode: bogus i_mode (%o)\n",
 		       mode);
 }
-
 EXPORT_SYMBOL(init_special_inode);

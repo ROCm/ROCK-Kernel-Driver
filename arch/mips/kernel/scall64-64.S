@@ -250,7 +250,7 @@ sys_call_table:
 	PTR	sys_setitimer
 	PTR	sys_alarm
 	PTR	sys_getpid
-	PTR	sys_sendfile
+	PTR	sys_sendfile64
 	PTR	sys_socket			/* 5040 */
 	PTR	sys_connect
 	PTR	sys_accept

@@ -1994,15 +1994,13 @@ void steal_locks(fl_owner_t from)
 	}
 	unlock_kernel();
 }
-
 EXPORT_SYMBOL(steal_locks);
 
 static int __init filelock_init(void)
 {
 	filelock_cache = kmem_cache_create("file_lock_cache",
-			sizeof(struct file_lock), 0, 0, init_once, NULL);
-	if (!filelock_cache)
-		panic("cannot create file lock slab cache");
+			sizeof(struct file_lock), 0, SLAB_PANIC,
+			init_once, NULL);
 	return 0;
 }
 

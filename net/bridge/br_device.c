@@ -19,21 +19,6 @@
 #include <asm/uaccess.h>
 #include "br_private.h"
 
-static int br_dev_do_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
-{
-	unsigned long args[4];
-	unsigned long *data;
-
-	if (cmd != SIOCDEVPRIVATE)
-		return -EOPNOTSUPP;
-
-	data = (unsigned long *)rq->ifr_data;
-	if (copy_from_user(args, data, 4*sizeof(unsigned long)))
-		return -EFAULT;
-
-	return br_ioctl_device(dev->priv, args[0], args[1], args[2], args[3]);
-}
-
 static struct net_device_stats *br_dev_get_stats(struct net_device *dev)
 {
 	struct net_bridge *br;
@@ -115,7 +100,7 @@ void br_dev_setup(struct net_device *dev)
 
 	ether_setup(dev);
 
-	dev->do_ioctl = br_dev_do_ioctl;
+	dev->do_ioctl = br_dev_ioctl;
 	dev->get_stats = br_dev_get_stats;
 	dev->hard_start_xmit = br_dev_xmit;
 	dev->open = br_dev_open;

@@ -64,14 +64,9 @@ static void aio_kick_handler(void *);
 static int __init aio_setup(void)
 {
 	kiocb_cachep = kmem_cache_create("kiocb", sizeof(struct kiocb),
-				0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!kiocb_cachep)
-		panic("unable to create kiocb cache\n");
-
+				0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	kioctx_cachep = kmem_cache_create("kioctx", sizeof(struct kioctx),
-				0, SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!kioctx_cachep)
-		panic("unable to create kioctx cache");
+				0, SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 
 	aio_wq = create_workqueue("aio");
 

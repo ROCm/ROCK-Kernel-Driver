@@ -12,6 +12,7 @@
 #include <linux/swap.h>
 #include <linux/init.h>
 #include <linux/pagemap.h>
+#include <linux/buffer_head.h>
 #include <linux/backing-dev.h>
 
 #include <asm/pgtable.h>
@@ -22,6 +23,8 @@
  */
 static struct address_space_operations swap_aops = {
 	.writepage	= swap_writepage,
+	.sync_page	= block_sync_page,
+	.set_page_dirty	= __set_page_dirty_nobuffers,
 };
 
 static struct backing_dev_info swap_backing_dev_info = {
@@ -68,19 +71,18 @@ static int __add_to_swap_cache(struct page *page,
 	BUG_ON(PagePrivate(page));
 	error = radix_tree_preload(gfp_mask);
 	if (!error) {
-		page_cache_get(page);
-		spin_lock(&swapper_space.tree_lock);
+		spin_lock_irq(&swapper_space.tree_lock);
 		error = radix_tree_insert(&swapper_space.page_tree,
 						entry.val, page);
 		if (!error) {
+			page_cache_get(page);
 			SetPageLocked(page);
 			SetPageSwapCache(page);
 			page->private = entry.val;
 			total_swapcache_pages++;
 			pagecache_acct(1);
-		} else
-			page_cache_release(page);
-		spin_unlock(&swapper_space.tree_lock);
+		}
+		spin_unlock_irq(&swapper_space.tree_lock);
 		radix_tree_preload_end();
 	}
 	return error;
@@ -207,9 +209,9 @@ void delete_from_swap_cache(struct page *page)
   
 	entry.val = page->private;
 
-	spin_lock(&swapper_space.tree_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
 	__delete_from_swap_cache(page);
-	spin_unlock(&swapper_space.tree_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 
 	swap_free(entry);
 	page_cache_release(page);
@@ -308,13 +310,13 @@ struct page * lookup_swap_cache(swp_entry_t entry)
 {
 	struct page *page;
 
-	spin_lock(&swapper_space.tree_lock);
+	spin_lock_irq(&swapper_space.tree_lock);
 	page = radix_tree_lookup(&swapper_space.page_tree, entry.val);
 	if (page) {
 		page_cache_get(page);
 		INC_CACHE_INFO(find_success);
 	}
-	spin_unlock(&swapper_space.tree_lock);
+	spin_unlock_irq(&swapper_space.tree_lock);
 	INC_CACHE_INFO(find_total);
 	return page;
 }
@@ -325,7 +327,8 @@ struct page * lookup_swap_cache(swp_entry_t entry)
  * A failure return means that either the page allocation failed or that
  * the swap entry is no longer in use.
  */
-struct page * read_swap_cache_async(swp_entry_t entry)
+struct page *read_swap_cache_async(swp_entry_t entry,
+			struct vm_area_struct *vma, unsigned long addr)
 {
 	struct page *found_page, *new_page = NULL;
 	int err;
@@ -336,12 +339,12 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 		 * called after lookup_swap_cache() failed, re-calling
 		 * that would confuse statistics.
 		 */
-		spin_lock(&swapper_space.tree_lock);
+		spin_lock_irq(&swapper_space.tree_lock);
 		found_page = radix_tree_lookup(&swapper_space.page_tree,
 						entry.val);
 		if (found_page)
 			page_cache_get(found_page);
-		spin_unlock(&swapper_space.tree_lock);
+		spin_unlock_irq(&swapper_space.tree_lock);
 		if (found_page)
 			break;
 
@@ -349,7 +352,7 @@ struct page * read_swap_cache_async(swp_entry_t entry)
 		 * Get a new page to read into from swap.
 		 */
 		if (!new_page) {
-			new_page = alloc_page(GFP_HIGHUSER);
+			new_page = alloc_page_vma(GFP_HIGHUSER, vma, addr);
 			if (!new_page)
 				break;		/* Out of memory */
 		}

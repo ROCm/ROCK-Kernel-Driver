@@ -253,8 +253,6 @@ struct signal_deliver_cookie {
 struct pt_regs;
 extern void ptrace_signal_deliver(struct pt_regs *regs, void *cookie);
 
-#define HAVE_ARCH_SYS_PAUSE
-
 #endif /* !(__KERNEL__) */
 
 #endif /* !(__ASSEMBLY__) */

@@ -38,7 +38,6 @@
 #include <linux/ioport.h>
 #include <linux/delay.h>
 #include <linux/interrupt.h>
-#include <linux/module.h>
 #include <linux/major.h>
 #include <linux/blkdev.h>
 #include <linux/stat.h>

@@ -390,8 +390,6 @@ extern inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
-typedef pte_t *pte_addr_t;
-
 #endif /* !__ASSEMBLY__ */
 
 extern int kern_addr_valid(unsigned long addr); 

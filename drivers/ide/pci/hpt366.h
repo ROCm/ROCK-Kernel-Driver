@@ -430,12 +430,10 @@ static ide_pci_device_t hpt366_chipsets[] __devinitdata = {
 		.name		= "HPT366",
 		.init_setup	= init_setup_hpt366,
 		.init_chipset	= init_chipset_hpt366,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_hpt366,
 		.init_dma	= init_dma_hpt366,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= OFF_BOARD,
 		.extra		= 240
 	},{	/* 1 */
@@ -444,61 +442,44 @@ static ide_pci_device_t hpt366_chipsets[] __devinitdata = {
 		.name		= "HPT372A",
 		.init_setup	= init_setup_hpt37x,
 		.init_chipset	= init_chipset_hpt366,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_hpt366,
 		.init_dma	= init_dma_hpt366,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= OFF_BOARD,
-		.extra		= 0
 	},{	/* 2 */
 		.vendor		= PCI_VENDOR_ID_TTI,
 		.device		= PCI_DEVICE_ID_TTI_HPT302,
 		.name		= "HPT302",
 		.init_setup	= init_setup_hpt37x,
 		.init_chipset	= init_chipset_hpt366,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_hpt366,
 		.init_dma	= init_dma_hpt366,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= OFF_BOARD,
-		.extra		= 0
 	},{	/* 3 */
 		.vendor		= PCI_VENDOR_ID_TTI,
 		.device		= PCI_DEVICE_ID_TTI_HPT371,
 		.name		= "HPT371",
 		.init_setup	= init_setup_hpt37x,
 		.init_chipset	= init_chipset_hpt366,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_hpt366,
 		.init_dma	= init_dma_hpt366,
 		.channels	= 2,
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= OFF_BOARD,
-		.extra		= 0
 	},{	/* 4 */
 		.vendor		= PCI_VENDOR_ID_TTI,
 		.device		= PCI_DEVICE_ID_TTI_HPT374,
 		.name		= "HPT374",
 		.init_setup	= init_setup_hpt374,
 		.init_chipset	= init_chipset_hpt366,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_hpt366,
 		.init_dma	= init_dma_hpt366,
 		.channels	= 2,	/* 4 */
 		.autodma	= AUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= OFF_BOARD,
-		.extra		= 0
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

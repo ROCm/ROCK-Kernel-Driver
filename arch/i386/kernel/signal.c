@@ -231,7 +231,6 @@ asmlinkage int sys_rt_sigreturn(unsigned long __unused)
 	struct pt_regs *regs = (struct pt_regs *) &__unused;
 	struct rt_sigframe __user *frame = (struct rt_sigframe __user *)(regs->esp - 4);
 	sigset_t set;
-	stack_t st;
 	int eax;
 
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
@@ -248,16 +247,8 @@ asmlinkage int sys_rt_sigreturn(unsigned long __unused)
 	if (restore_sigcontext(regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
 
-	if (__copy_from_user(&st, &frame->uc.uc_stack, sizeof(st)))
+	if (do_sigaltstack(&frame->uc.uc_stack, NULL, regs->esp) == -EFAULT)
 		goto badframe;
-	/* It is more difficult to avoid calling this function than to
-	   call it and ignore errors.  */
-	/*
-	 * THIS CANNOT WORK! "&st" is a kernel address, and "do_sigaltstack()"
-	 * takes a user address (and verifies that it is a user address). End
-	 * result: it does exactly _nothing_.
-	 */
-	do_sigaltstack(&st, NULL, regs->esp);
 
 	return eax;
 

@@ -222,15 +222,25 @@ static struct gss_api_ops gss_kerberos_ops = {
 	.gss_delete_sec_context	= gss_delete_sec_context_kerberos,
 };
 
+static struct pf_desc gss_kerberos_pfs[] = {
+	[0] = {
+		.pseudoflavor = RPC_AUTH_GSS_KRB5,
+		.service = RPC_GSS_SVC_NONE,
+		.name = "krb5",
+	},
+	[1] = {
+		.pseudoflavor = RPC_AUTH_GSS_KRB5I,
+		.service = RPC_GSS_SVC_INTEGRITY,
+		.name = "krb5i",
+	},
+};
+
 static struct gss_api_mech gss_kerberos_mech = {
 	.gm_name	= "krb5",
 	.gm_owner	= THIS_MODULE,
 	.gm_ops		= &gss_kerberos_ops,
-	.gm_pf_num	= 2,
-	.gm_pfs		= {
-		{RPC_AUTH_GSS_KRB5, 0, RPC_GSS_SVC_NONE, "krb5"},
-		{RPC_AUTH_GSS_KRB5I, 0, RPC_GSS_SVC_INTEGRITY, "krb5i"},
-	},
+	.gm_pf_num	= ARRAY_SIZE(gss_kerberos_pfs),
+	.gm_pfs		= gss_kerberos_pfs,
 };
 
 static int __init init_kerberos_module(void)

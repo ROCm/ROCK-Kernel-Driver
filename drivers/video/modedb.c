@@ -391,7 +391,7 @@ static int my_atoi(const char *name)
 }
 
 /**
- *	__fb_try_mode - test a video mode
+ *	fb_try_mode - test a video mode
  *	@var: frame buffer user defined part of display
  *	@info: frame buffer info structure
  *	@mode: frame buffer video mode structure
@@ -403,10 +403,10 @@ static int my_atoi(const char *name)
  *
  */
 
-int __fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
+int fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
 		  const struct fb_videomode *mode, unsigned int bpp)
 {
-    int err = 1;
+    int err = 0;
 
     DPRINTK("Trying mode %s %dx%d-%d@%d\n", mode->name ? mode->name : "noname",
 	    mode->xres, mode->yres, bpp, mode->refresh);
@@ -430,9 +430,8 @@ int __fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
     if (info->fbops->fb_check_var)
     	err = info->fbops->fb_check_var(var, info);
     var->activate &= ~FB_ACTIVATE_TEST;
-    return !err;
+    return err;
 }
-
 
 /**
  *	fb_find_mode - finds a valid video mode
@@ -536,18 +535,18 @@ done:
 		if ((name_matches(db[j], name, namelen) ||
 		     (res_specified && res_matches(db[j], xres, yres))) &&
 		    (!i || db[j].refresh == refresh) &&
-		    __fb_try_mode(var, info, &db[j], bpp))
+		    !fb_try_mode(var, info, &db[j], bpp))
 		    return 2-i;
 	}
     }
 
     DPRINTK("Trying default video mode\n");
-    if (__fb_try_mode(var, info, default_mode, default_bpp))
+    if (!fb_try_mode(var, info, default_mode, default_bpp))
 	return 3;
 
     DPRINTK("Trying all modes\n");
     for (i = 0; i < dbsize; i++)
-	if (__fb_try_mode(var, info, &db[i], default_bpp))
+	if (!fb_try_mode(var, info, &db[i], default_bpp))
 	    return 4;
 
     DPRINTK("No valid mode found\n");

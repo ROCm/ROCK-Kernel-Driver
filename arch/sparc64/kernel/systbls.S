@@ -90,7 +90,7 @@ sys_call_table:
 /*20*/	.word sys_getpid, sys_capget, sys_capset, sys_setuid, sys_getuid
 /*25*/	.word sys_nis_syscall, sys_ptrace, sys_alarm, sys_sigaltstack, sys_nis_syscall
 /*30*/	.word sys_utime, sys_nis_syscall, sys_nis_syscall, sys_access, sys_nice
-	.word sys_nis_syscall, sys_sync, sys_kill, sys_newstat, sys_sendfile
+	.word sys_nis_syscall, sys_sync, sys_kill, sys_newstat, sys_sendfile64
 /*40*/	.word sys_newlstat, sys_dup, sys_pipe, sys_times, sys_nis_syscall
 	.word sys_umount, sys_setgid, sys_getgid, sys_signal, sys_geteuid
 /*50*/	.word sys_getegid, sys_acct, sys_memory_ordering, sys_nis_syscall, sys_ioctl

@@ -149,19 +149,8 @@ config SCSI_MULTI_LUN
 	  can say Y here to force the SCSI driver to probe for multiple LUNs.
 	  A SCSI device with multiple LUNs acts logically like multiple SCSI
 	  devices. The vast majority of SCSI devices have only one LUN, and
-	  so most people can say N here and should in fact do so, because it
-	  is safer.
-
-config SCSI_REPORT_LUNS
-	bool "Build with SCSI REPORT LUNS support"
-	depends on SCSI
-	default y
-	help
-	  If you want support for SCSI REPORT LUNS, say Y here.
-	  The REPORT LUNS command is useful for devices (such as disk arrays)
-	  with large numbers of LUNs where the LUN values are not contiguous
-	  (sparse LUN).  REPORT LUNS scanning is done only for SCSI-3 devices.
-	  Most users can safely answer N here.
+	  so most people can say N here. The max_luns boot/module parameter 
+	  allows to override this setting.
 
 config SCSI_CONSTANTS
 	bool "Verbose SCSI error reporting (kernel size +=12K)"
@@ -363,7 +352,7 @@ source "drivers/scsi/aic7xxx/Kconfig.aic79xx"
 # All the I2O code and drivers do not seem to be 64bit safe.
 config SCSI_DPT_I2O
 	tristate "Adaptec I2O RAID support "
-	depends on !64BIT && SCSI && BROKEN
+	depends on !64BIT && SCSI
 	help
 	  This driver supports all of Adaptec's I2O based RAID controllers as 
 	  well as the DPT SmartRaid V cards.  This is an Adaptec maintained

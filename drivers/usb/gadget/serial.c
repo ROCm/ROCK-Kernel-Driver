@@ -33,7 +33,6 @@
 #include <linux/uts.h>
 #include <linux/version.h>
 #include <linux/wait.h>
-#include <linux/list.h>
 #include <linux/proc_fs.h>
 #include <linux/device.h>
 #include <linux/tty.h>

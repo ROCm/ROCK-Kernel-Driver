@@ -271,6 +271,9 @@ cond_syscall(compat_sys_mq_timedsend)
 cond_syscall(compat_sys_mq_timedreceive)
 cond_syscall(compat_sys_mq_notify)
 cond_syscall(compat_sys_mq_getsetattr)
+cond_syscall(sys_mbind)
+cond_syscall(sys_get_mempolicy)
+cond_syscall(sys_set_mempolicy)
 
 /* arch-specific weak syscall entries */
 cond_syscall(sys_pciconfig_read)
@@ -1060,11 +1063,15 @@ asmlinkage long sys_getpgid(pid_t pid)
 	}
 }
 
+#ifdef __ARCH_WANT_SYS_GETPGRP
+
 asmlinkage long sys_getpgrp(void)
 {
 	/* SMP - assuming writes are word atomic this is fine */
 	return process_group(current);
 }
+
+#endif
 
 asmlinkage long sys_getsid(pid_t pid)
 {
@@ -1406,6 +1413,8 @@ asmlinkage long sys_sethostname(char __user *name, int len)
 	return errno;
 }
 
+#ifdef __ARCH_WANT_SYS_GETHOSTNAME
+
 asmlinkage long sys_gethostname(char __user *name, int len)
 {
 	int i, errno;
@@ -1422,6 +1431,8 @@ asmlinkage long sys_gethostname(char __user *name, int len)
 	up_read(&uts_sem);
 	return errno;
 }
+
+#endif
 
 /*
  * Only setdomainname; getdomainname can be implemented by calling
@@ -1457,7 +1468,7 @@ asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
 			? -EFAULT : 0;
 }
 
-#if defined(COMPAT_RLIM_OLD_INFINITY) || !(defined(CONFIG_IA64) || defined(CONFIG_V850))
+#ifdef __ARCH_WANT_SYS_OLD_GETRLIMIT
 
 /*
  *	Back compatibility for getrlimit. Needed for some apps.

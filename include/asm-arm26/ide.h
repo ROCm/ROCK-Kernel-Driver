@@ -36,7 +36,7 @@
 #define ide_default_irq(b)		(0)
 
 #define IDE_ARCH_OBSOLETE_INIT
-#define ide_default_io_ctl(base)	((base) + 0x206) /* obsolete */
+#define ide_default_io_ctl(base)	(0)
 
 #endif /* __KERNEL__ */
 

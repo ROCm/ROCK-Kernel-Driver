@@ -42,6 +42,7 @@
 #include <linux/cpu.h>
 #include <linux/efi.h>
 #include <linux/unistd.h>
+#include <linux/rmap.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -84,7 +85,7 @@ extern void signals_init(void);
 extern void buffer_init(void);
 extern void pidhash_init(void);
 extern void pidmap_init(void);
-extern void pte_chain_init(void);
+extern void prio_tree_init(void);
 extern void radix_tree_init(void);
 extern void free_initmem(void);
 extern void populate_rootfs(void);
@@ -460,7 +461,8 @@ asmlinkage void __init start_kernel(void)
 	calibrate_delay();
 	pidmap_init();
 	pgtable_cache_init();
-	pte_chain_init();
+	prio_tree_init();
+	anon_vma_init();
 #ifdef CONFIG_X86
 	if (efi_enabled)
 		efi_enter_virtual_mode();

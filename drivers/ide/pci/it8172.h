@@ -25,18 +25,11 @@ static ide_pci_device_t it8172_chipsets[] __devinitdata = {
 		.name		= "IT8172G",
 		.init_setup	= init_setup_it8172,
 		.init_chipset	= init_chipset_it8172,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_it8172,
 		.channels	= 2,
 		.autodma	= AUTODMA,
 		.enablebits	= {{0x00,0x00,0x00}, {0x40,0x00,0x01}},
 		.bootable	= ON_BOARD,
-		.extra		= 0,
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

@@ -306,14 +306,9 @@ struct super_block *blockdev_superblock;
 void __init bdev_cache_init(void)
 {
 	int err;
-	bdev_cachep = kmem_cache_create("bdev_cache",
-					sizeof(struct bdev_inode),
-					0,
-					SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
-					init_once,
-					NULL);
-	if (!bdev_cachep)
-		panic("Cannot create bdev_cache SLAB cache");
+	bdev_cachep = kmem_cache_create("bdev_cache", sizeof(struct bdev_inode),
+			0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT|SLAB_PANIC,
+			init_once, NULL);
 	err = register_filesystem(&bd_type);
 	if (err)
 		panic("Cannot register bdev pseudo-fs");

@@ -752,7 +752,7 @@ static int unswap_by_read(unsigned short *map, unsigned long max,
 			/* Get a page for the entry, using the existing
 			   swap cache page if there is one.  Otherwise,
 			   get a clean page and read the swap into it. */
-			page = read_swap_cache_async(entry);
+			page = read_swap_cache_async(entry, NULL, 0);
 			if (!page) {
 				swap_free(entry);
 				return -ENOMEM;

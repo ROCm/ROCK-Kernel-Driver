@@ -2519,6 +2519,8 @@ static int dev_ifsioc(struct ifreq *ifr, unsigned int cmd)
 			    cmd == SIOCGMIIPHY ||
 			    cmd == SIOCGMIIREG ||
 			    cmd == SIOCSMIIREG ||
+			    cmd == SIOCBRADDIF ||
+			    cmd == SIOCBRDELIF ||
 			    cmd == SIOCWANDEV) {
 				err = -EOPNOTSUPP;
 				if (dev->do_ioctl) {
@@ -2673,6 +2675,8 @@ int dev_ioctl(unsigned int cmd, void __user *arg)
 		case SIOCBONDSLAVEINFOQUERY:
 		case SIOCBONDINFOQUERY:
 		case SIOCBONDCHANGEACTIVE:
+		case SIOCBRADDIF:
+		case SIOCBRDELIF:
 			if (!capable(CAP_NET_ADMIN))
 				return -EPERM;
 			dev_load(ifr.ifr_name);

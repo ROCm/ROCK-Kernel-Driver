@@ -36,8 +36,8 @@
 /*
  * Literals
  */
-#define IPR_DRIVER_VERSION "2.0.6"
-#define IPR_DRIVER_DATE "(May 3, 2004)"
+#define IPR_DRIVER_VERSION "2.0.7"
+#define IPR_DRIVER_DATE "(May 21, 2004)"
 
 /*
  * IPR_DBG_TRACE: Setting this to 1 will turn on some general function tracing
@@ -413,8 +413,8 @@ struct ipr_ioasa_af_dasd {
 }__attribute__((packed, aligned (4)));
 
 struct ipr_ioasa_gpdd {
-	u8 device_end_state;
-	u8 device_bus_phase;
+	u8 end_state;
+	u8 bus_phase;
 	u16 reserved;
 	u32 ioa_data[23];
 }__attribute__((packed, aligned (4)));
@@ -457,7 +457,7 @@ struct ipr_ioasa {
 		struct ipr_ioasa_af_dasd dasd;
 		struct ipr_ioasa_gpdd gpdd;
 		struct ipr_ioasa_raw raw;
-	};
+	} u;
 }__attribute__((packed, aligned (4)));
 
 struct ipr_mode_parm_hdr {
@@ -617,14 +617,14 @@ struct ipr_hostrcb_error {
 		struct ipr_hostrcb_type_02_error type_02_error;
 		struct ipr_hostrcb_type_03_error type_03_error;
 		struct ipr_hostrcb_type_04_error type_04_error;
-	};
+	} u;
 }__attribute__((packed, aligned (4)));
 
 struct ipr_hostrcb_raw {
 	u32 data[sizeof(struct ipr_hostrcb_error)/sizeof(u32)];
 }__attribute__((packed, aligned (4)));
 
-struct ipr_hostrcb {
+struct ipr_hcam {
 	u8 op_code;
 #define IPR_HOST_RCB_OP_CODE_CONFIG_CHANGE			0xE1
 #define IPR_HOST_RCB_OP_CODE_LOG_DATA				0xE2
@@ -662,14 +662,14 @@ struct ipr_hostrcb {
 		struct ipr_hostrcb_error error;
 		struct ipr_hostrcb_cfg_ch_not ccn;
 		struct ipr_hostrcb_raw raw;
-	};
-
-	/* Driver added data */
-	u32 hostrcb_dma;
-	struct list_head queue;
+	} u;
 }__attribute__((packed, aligned (4)));
 
-#define IPR_HOSTRCB_SZ offsetof(struct ipr_hostrcb, hostrcb_dma)
+struct ipr_hostrcb {
+	struct ipr_hcam hcam;
+	u32 hostrcb_dma;
+	struct list_head queue;
+};
 
 /* IPR smart dump table structures */
 struct ipr_sdt_entry {
@@ -785,7 +785,7 @@ struct ipr_trace_entry {
 		u32 ioasc;
 		u32 add_data;
 		u32 res_addr;
-	};
+	} u;
 };
 
 struct ipr_sglist {
@@ -939,7 +939,8 @@ struct ipr_cmnd {
 		unsigned long scratch;
 		struct ipr_resource_entry *res;
 		struct ipr_cmnd *sibling;
-	};
+		struct scsi_device *sdev;
+	} u;
 
 	struct ipr_ioa_cfg *ioa_cfg;
 };

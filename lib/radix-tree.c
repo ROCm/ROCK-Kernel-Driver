@@ -799,9 +799,7 @@ void __init radix_tree_init(void)
 {
 	radix_tree_node_cachep = kmem_cache_create("radix_tree_node",
 			sizeof(struct radix_tree_node), 0,
-			0, radix_tree_node_ctor, NULL);
-	if (!radix_tree_node_cachep)
-		panic ("Failed to create radix_tree_node cache\n");
+			SLAB_PANIC, radix_tree_node_ctor, NULL);
 	radix_tree_init_maxindex();
 	hotcpu_notifier(radix_tree_callback, 0);
 }

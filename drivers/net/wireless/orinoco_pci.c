@@ -102,7 +102,6 @@
 #include <linux/wireless.h>
 #include <linux/list.h>
 #include <linux/pci.h>
-#include <linux/wireless.h>
 #include <linux/fcntl.h>
 
 #include <asm/uaccess.h>

@@ -2,7 +2,7 @@
 #define _GDTH_IOCTL_H
 
 /* gdth_ioctl.h
- * $Id: gdth_ioctl.h,v 1.11 2003/02/27 14:59:03 achim Exp $
+ * $Id: gdth_ioctl.h,v 1.14 2004/02/19 15:43:15 achim Exp $
  */
 
 /* IOCTLs */
@@ -21,8 +21,8 @@
 #define GDTIOCTL_RESCAN     (GDTIOCTL_MASK |11) /* rescan host drives */
 #define GDTIOCTL_RESET_DRV  (GDTIOCTL_MASK |12) /* reset (remote) drv. res. */
 
-#define GDTIOCTL_MAGIC      0xaffe0004
-#define EVENT_SIZE          294 
+#define GDTIOCTL_MAGIC  0xaffe0004
+#define EVENT_SIZE      294 
 #define GDTH_MAXSG      32                      /* max. s/g elements */
 
 #define MAX_LDRIVES     255                     /* max. log. drive count */
@@ -35,7 +35,9 @@
 /* typedefs */
 #ifdef __KERNEL__
 typedef u32     ulong32;
+typedef u64     ulong64;
 #endif
+
 #define PACKED  __attribute__((packed))
 
 /* scatter/gather element */
@@ -43,6 +45,12 @@ typedef struct {
     ulong32     sg_ptr;                         /* address */
     ulong32     sg_len;                         /* length */
 } PACKED gdth_sg_str;
+
+/* scatter/gather element - 64bit addresses */
+typedef struct {
+    ulong64     sg_ptr;                         /* address */
+    ulong32     sg_len;                         /* length */
+} PACKED gdth_sg64_str;
 
 /* command structure */
 typedef struct {
@@ -59,17 +67,25 @@ typedef struct {
             gdth_sg_str sg_lst[GDTH_MAXSG];     /* s/g list */
         } PACKED cache;                         /* cache service cmd. str. */
         struct {
+            ushort      DeviceNo;               /* number of cache drive */
+            ulong64     BlockNo;                /* block number */
+            ulong32     BlockCnt;               /* block count */
+            ulong64     DestAddr;               /* dest. addr. (if s/g: -1) */
+            ulong32     sg_canz;                /* s/g element count */
+            gdth_sg64_str sg_lst[GDTH_MAXSG];   /* s/g list */
+        } PACKED cache64;                       /* cache service cmd. str. */
+        struct {
             ushort      param_size;             /* size of p_param buffer */
             ulong32     subfunc;                /* IOCTL function */
             ulong32     channel;                /* device */
-            ulong32     p_param;                /* buffer */
+            ulong64     p_param;                /* buffer */
         } PACKED ioctl;                         /* IOCTL command structure */
         struct {
             ushort      reserved;
             union {
                 struct {
                     ulong32  msg_handle;        /* message handle */
-                    ulong32  msg_addr;          /* message buffer address */
+                    ulong64  msg_addr;          /* message buffer address */
                 } PACKED msg;
                 unchar       data[12];          /* buffer for rtc data, ... */
             } su;
@@ -93,6 +109,24 @@ typedef struct {
             ulong32     sg_ranz;                /* s/g element count */
             gdth_sg_str sg_lst[GDTH_MAXSG];     /* s/g list */
         } PACKED raw;                           /* raw service cmd. struct. */
+        struct {
+            ushort      reserved;
+            ulong32     direction;              /* data direction */
+            ulong32     mdisc_time;             /* disc. time (0: no timeout)*/
+            ulong32     mcon_time;              /* connect time(0: no to.) */
+            ulong64     sdata;                  /* dest. addr. (if s/g: -1) */
+            ulong32     sdlen;                  /* data length (bytes) */
+            ulong32     clen;                   /* SCSI cmd. length(6,..,16) */
+            unchar      cmd[16];                /* SCSI command */
+            unchar      target;                 /* target ID */
+            unchar      lun;                    /* LUN */
+            unchar      bus;                    /* SCSI bus number */
+            unchar      priority;               /* only 0 used */
+            ulong32     sense_len;              /* sense data length */
+            ulong64     sense_data;             /* sense data addr. */
+            ulong32     sg_ranz;                /* s/g element count */
+            gdth_sg64_str sg_lst[GDTH_MAXSG];   /* s/g list */
+        } PACKED raw64;                         /* raw service cmd. struct. */
     } u;
     /* additional variables */
     unchar      Service;                        /* controller service */
@@ -236,7 +270,6 @@ typedef struct {
 } gdth_iord_str;
 #endif
 
-#ifdef GDTH_IOCTL_CHRDEV
 /* GDTIOCTL_GENERAL */
 typedef struct {
     ushort ionode;                              /* controller number */
@@ -244,8 +277,8 @@ typedef struct {
     ulong32 info;                               /* error info */ 
     ushort status;                              /* status */
     ulong data_len;                             /* data buffer size */
-    ulong sense_len;	                        /* sense buffer size */
-    gdth_cmd_str command;                       /* command */			
+    ulong sense_len;                            /* sense buffer size */
+    gdth_cmd_str command;                       /* command */                   
 } gdth_ioctl_general;
 
 /* GDTIOCTL_LOCKDRV */
@@ -310,6 +343,5 @@ typedef struct {
     ushort number;                              /* bus/host drive number */
     ushort status;                              /* status */
 } gdth_ioctl_reset;
-#endif
 
 #endif

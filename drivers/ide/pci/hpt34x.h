@@ -22,18 +22,11 @@ static ide_pci_device_t hpt34x_chipsets[] __devinitdata = {
 		.device		= PCI_DEVICE_ID_TTI_HPT343,
 		.name		= "HPT34X",
 		.init_chipset	= init_chipset_hpt34x,
-		.init_iops	= NULL,
 		.init_hwif	= init_hwif_hpt34x,
 		.channels	= 2,
 		.autodma	= NOAUTODMA,
-		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= NEVER_BOARD,
 		.extra		= 16
-	},{
-		.vendor		= 0,
-		.device		= 0,
-		.channels	= 0,
-		.bootable	= EOL,
 	}
 };
 

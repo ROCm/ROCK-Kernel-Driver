@@ -21,6 +21,7 @@
 #include <linux/completion.h>
 #include <linux/namespace.h>
 #include <linux/personality.h>
+#include <linux/mempolicy.h>
 #include <linux/sem.h>
 #include <linux/file.h>
 #include <linux/binfmts.h>
@@ -34,6 +35,7 @@
 #include <linux/ptrace.h>
 #include <linux/mount.h>
 #include <linux/audit.h>
+#include <linux/rmap.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
@@ -216,11 +218,8 @@ void __init fork_init(unsigned long mempages)
 #endif
 	/* create a slab on which task_structs can be allocated */
 	task_struct_cachep =
-		kmem_cache_create("task_struct",
-				  sizeof(struct task_struct),ARCH_MIN_TASKALIGN,
-				  0, NULL, NULL);
-	if (!task_struct_cachep)
-		panic("fork_init(): cannot create task_struct SLAB cache");
+		kmem_cache_create("task_struct", sizeof(struct task_struct),
+			ARCH_MIN_TASKALIGN, SLAB_PANIC, NULL, NULL);
 #endif
 
 	/*
@@ -273,6 +272,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	struct rb_node **rb_link, *rb_parent;
 	int retval;
 	unsigned long charge = 0;
+	struct mempolicy *pol;
 
 	down_write(&oldmm->mmap_sem);
 	flush_cache_mm(current->mm);
@@ -314,11 +314,17 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 		if (!tmp)
 			goto fail_nomem;
 		*tmp = *mpnt;
+		pol = mpol_copy(vma_policy(mpnt));
+		retval = PTR_ERR(pol);
+		if (IS_ERR(pol))
+			goto fail_nomem_policy;
+		vma_set_policy(tmp, pol);
 		tmp->vm_flags &= ~VM_LOCKED;
 		tmp->vm_mm = mm;
 		tmp->vm_next = NULL;
+		anon_vma_link(tmp);
+		vma_prio_tree_init(tmp);
 		file = tmp->vm_file;
-		INIT_LIST_HEAD(&tmp->shared);
 		if (file) {
 			struct inode *inode = file->f_dentry->d_inode;
 			get_file(file);
@@ -326,9 +332,11 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 				atomic_dec(&inode->i_writecount);
       
 			/* insert tmp into the share list, just after mpnt */
-			down(&file->f_mapping->i_shared_sem);
-			list_add(&tmp->shared, &mpnt->shared);
-			up(&file->f_mapping->i_shared_sem);
+			spin_lock(&file->f_mapping->i_mmap_lock);
+			flush_dcache_mmap_lock(file->f_mapping);
+			vma_prio_tree_add(tmp, mpnt);
+			flush_dcache_mmap_unlock(file->f_mapping);
+			spin_unlock(&file->f_mapping->i_mmap_lock);
 		}
 
 		/*
@@ -360,6 +368,8 @@ out:
 	flush_tlb_mm(current->mm);
 	up_write(&oldmm->mmap_sem);
 	return retval;
+fail_nomem_policy:
+	kmem_cache_free(vm_area_cachep, tmp);
 fail_nomem:
 	retval = -ENOMEM;
 fail:
@@ -422,9 +432,9 @@ struct mm_struct * mm_alloc(void)
 	mm = allocate_mm();
 	if (mm) {
 		memset(mm, 0, sizeof(*mm));
-		return mm_init(mm);
+		mm = mm_init(mm);
 	}
-	return NULL;
+	return mm;
 }
 
 /*
@@ -954,10 +964,18 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->security = NULL;
 	p->io_context = NULL;
 	p->audit_context = NULL;
+#ifdef CONFIG_NUMA
+ 	p->mempolicy = mpol_copy(p->mempolicy);
+ 	if (IS_ERR(p->mempolicy)) {
+ 		retval = PTR_ERR(p->mempolicy);
+ 		p->mempolicy = NULL;
+ 		goto bad_fork_cleanup;
+ 	}
+#endif
 
 	retval = -ENOMEM;
 	if ((retval = security_task_alloc(p)))
-		goto bad_fork_cleanup;
+		goto bad_fork_cleanup_policy;
 	if ((retval = audit_alloc(p)))
 		goto bad_fork_cleanup_security;
 	/* copy all the process information */
@@ -1103,6 +1121,10 @@ bad_fork_cleanup_audit:
 	audit_free(p);
 bad_fork_cleanup_security:
 	security_task_free(p);
+bad_fork_cleanup_policy:
+#ifdef CONFIG_NUMA
+	mpol_free(p->mempolicy);
+#endif
 bad_fork_cleanup:
 	if (p->pid > 0)
 		free_pidmap(p->pid);
@@ -1249,37 +1271,20 @@ void __init proc_caches_init(void)
 {
 	sighand_cachep = kmem_cache_create("sighand_cache",
 			sizeof(struct sighand_struct), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!sighand_cachep)
-		panic("Cannot create sighand SLAB cache");
-
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	signal_cachep = kmem_cache_create("signal_cache",
 			sizeof(struct signal_struct), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!signal_cachep)
-		panic("Cannot create signal SLAB cache");
-
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	files_cachep = kmem_cache_create("files_cache", 
-			 sizeof(struct files_struct), 0, 
-			 SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!files_cachep) 
-		panic("Cannot create files SLAB cache");
-
+			sizeof(struct files_struct), 0,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	fs_cachep = kmem_cache_create("fs_cache", 
-			 sizeof(struct fs_struct), 0, 
-			 SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if (!fs_cachep) 
-		panic("Cannot create fs_struct SLAB cache");
- 
+			sizeof(struct fs_struct), 0,
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 	vm_area_cachep = kmem_cache_create("vm_area_struct",
 			sizeof(struct vm_area_struct), 0,
-			0, NULL, NULL);
-	if(!vm_area_cachep)
-		panic("vma_init: Cannot alloc vm_area_struct SLAB cache");
-
+			SLAB_PANIC, NULL, NULL);
 	mm_cachep = kmem_cache_create("mm_struct",
 			sizeof(struct mm_struct), 0,
-			SLAB_HWCACHE_ALIGN, NULL, NULL);
-	if(!mm_cachep)
-		panic("vma_init: Cannot alloc mm_struct SLAB cache");
+			SLAB_HWCACHE_ALIGN|SLAB_PANIC, NULL, NULL);
 }

@@ -386,8 +386,6 @@ extern unsigned long get_fb_unmapped_area(struct file *filp, unsigned long, unsi
 
 extern void check_pgt_cache(void);
 
-typedef pte_t *pte_addr_t;
-
 #endif /* !(__ASSEMBLY__) */
 
 #endif /* !(_SPARC64_PGTABLE_H) */

@@ -41,6 +41,8 @@
 #include <linux/percpu.h>
 #include <linux/kthread.h>
 
+#include <asm/unistd.h>
+
 #ifdef CONFIG_NUMA
 #define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
 #else
@@ -2587,7 +2589,7 @@ out_unlock:
 
 EXPORT_SYMBOL(set_user_nice);
 
-#ifndef __alpha__
+#ifdef __ARCH_WANT_SYS_NICE
 
 /*
  * sys_nice - change the priority of the current process.
