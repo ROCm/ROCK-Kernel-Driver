@@ -521,7 +521,6 @@ struct wl3501_card {
 	unsigned char			card_name[32];
 	unsigned char			firmware_date[32];
 	u8				chan;
-	u8				def_chan;
 	u8				cap_info;
 	u16				start_seg;
 	u16				bss_cnt;

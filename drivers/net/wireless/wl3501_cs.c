@@ -491,7 +491,7 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 		.sig_id	  = WL3501_SIG_JOIN_REQ,
 		.timeout  = 10,
 		.phy_pset = {
-			[2] = this->def_chan,
+			[2] = this->chan,
 		},
 	};
 
@@ -1479,7 +1479,7 @@ static int wl3501_set_freq(struct net_device *dev, struct iw_request_info *info,
 	else {
 		struct wl3501_card *this = (struct wl3501_card *)dev->priv;
 
-		this->def_chan = channel;
+		this->chan = channel;
 		rc = wl3501_reset(dev);
 	}
 
@@ -2026,16 +2026,16 @@ static void wl3501_config(dev_link_t *link)
 	switch (this->reg_domain) {
 	case WL3501_REG_DOMAIN_SPAIN:
 	case WL3501_REG_DOMAIN_FRANCE:
-		this->def_chan = 10;
+		this->chan = 10;
 		break;
 	case WL3501_REG_DOMAIN_MKK:
-		this->def_chan = 14;
+		this->chan = 14;
 		break;
 	case WL3501_REG_DOMAIN_FCC:
 	case WL3501_REG_DOMAIN_IC:
 	case WL3501_REG_DOMAIN_ETSI:
 	default:
-		this->def_chan = 1;
+		this->chan = 1;
 		break;
 	}
 	netif_start_queue(dev);
