@@ -27,10 +27,6 @@
 /* How many pages do we try to swap or page in/out together? */
 int page_cluster;
 
-/* We track the number of pages currently being asynchronously swapped
-   out, so that we don't try to swap TOO many pages out at once */
-atomic_t nr_async_pages = ATOMIC_INIT(0);
-
 pager_daemon_t pager_daemon = {
 	512,	/* base number for calculating the number of tries */
 	SWAP_CLUSTER_MAX,	/* minimum number of tries */

@@ -569,7 +569,7 @@ static void add_entropy_words(struct entropy_store *r, const __u32 *in,
 	__u32 w;
 
 	while (nwords--) {
-		w = rotate_left(r->input_rotate, *in);
+		w = rotate_left(r->input_rotate, *in++);
 		i = r->add_ptr = (r->add_ptr - 1) & wordmask;
 		/*
 		 * Normally, we add 7 bits of rotation to the pool.

@@ -588,6 +588,7 @@ static int __init detect_init_APIC (void)
 		goto no_apic;
 	case X86_VENDOR_INTEL:
 		if (boot_cpu_data.x86 == 6 ||
+		    (boot_cpu_data.x86 == 15 && cpu_has_apic) ||
 		    (boot_cpu_data.x86 == 5 && cpu_has_apic))
 			break;
 		goto no_apic;

@@ -446,12 +446,15 @@ static struct request *__get_request_wait(request_queue_t *q, int rw)
 	DECLARE_WAITQUEUE(wait, current);
 
 	generic_unplug_device(q);
-	add_wait_queue_exclusive(&q->wait_for_request, &wait);
+	add_wait_queue(&q->wait_for_request, &wait);
 	do {
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		if (q->rq[rw].count < batch_requests)
 			schedule();
-	} while ((rq = get_request(q,rw)) == NULL);
+		spin_lock_irq(&io_request_lock);
+		rq = get_request(q,rw);
+		spin_unlock_irq(&io_request_lock);
+	} while (rq == NULL);
 	remove_wait_queue(&q->wait_for_request, &wait);
 	current->state = TASK_RUNNING;
 	return rq;

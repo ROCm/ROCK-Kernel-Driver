@@ -125,7 +125,7 @@ extern pgprot_t protection_map[16];
 struct vm_operations_struct {
 	void (*open)(struct vm_area_struct * area);
 	void (*close)(struct vm_area_struct * area);
-	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address, int write_access);
+	struct page * (*nopage)(struct vm_area_struct * area, unsigned long address);
 };
 
 /*
@@ -270,7 +270,7 @@ typedef struct page {
 #define PG_referenced		 2
 #define PG_uptodate		 3
 #define PG_dirty		 4
-#define PG_decr_after		 5
+#define PG_unused		 5
 #define PG_active		 6
 #define PG_inactive		 7
 #define PG_slab			 8
@@ -325,9 +325,6 @@ static inline void set_page_dirty(struct page * page)
 #define SetPageReferenced(page)	set_bit(PG_referenced, &(page)->flags)
 #define ClearPageReferenced(page)	clear_bit(PG_referenced, &(page)->flags)
 #define PageTestandClearReferenced(page)	test_and_clear_bit(PG_referenced, &(page)->flags)
-#define PageDecrAfter(page)	test_bit(PG_decr_after, &(page)->flags)
-#define SetPageDecrAfter(page)	set_bit(PG_decr_after, &(page)->flags)
-#define PageTestandClearDecrAfter(page)	test_and_clear_bit(PG_decr_after, &(page)->flags)
 #define PageSlab(page)		test_bit(PG_slab, &(page)->flags)
 #define PageSetSlab(page)	set_bit(PG_slab, &(page)->flags)
 #define PageClearSlab(page)	clear_bit(PG_slab, &(page)->flags)
@@ -415,7 +412,7 @@ extern void show_free_areas_node(pg_data_t *pgdat);
 extern void clear_page_tables(struct mm_struct *, unsigned long, int);
 
 extern int fail_writepage(struct page *);
-struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int no_share);
+struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address);
 struct file *shmem_file_setup(char * name, loff_t size);
 extern void shmem_lock(struct file * file, int lock);
 extern int shmem_zero_setup(struct vm_area_struct *);
@@ -541,7 +538,7 @@ extern void truncate_inode_pages(struct address_space *, loff_t);
 
 /* generic vm_area_ops exported for stackable file systems */
 extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned int);
-extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
+extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long);
 
 /*
  * GFP bitmasks..

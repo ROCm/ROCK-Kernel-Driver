@@ -242,7 +242,7 @@ void free_swap_and_cache(swp_entry_t entry)
 		page_cache_get(page);
 		delete_from_swap_cache(page);
 		UnlockPage(page);
-		page_cache_release(page);
+		free_lru_page(page);
 	}
 }
 
@@ -582,7 +582,7 @@ static int try_to_unuse(unsigned int type)
 		 */
 		SetPageDirty(page);
 		UnlockPage(page);
-		page_cache_release(page);
+		free_lru_page(page);
 
 		/*
 		 * Make sure that we aren't completely killing

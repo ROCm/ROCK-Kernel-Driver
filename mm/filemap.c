@@ -49,8 +49,13 @@ struct page **page_hash_table;
 
 spinlock_t pagecache_lock ____cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 /*
- * NOTE: to avoid deadlocking you must never acquire the pagecache_lock with
- *       the pagemap_lru_lock held.
+ * NOTE: to avoid deadlocking you must never acquire the pagemap_lru_lock 
+ *	with the pagecache_lock held.
+ *
+ * Ordering:
+ *	swap_lock ->
+ *		pagemap_lru_lock ->
+ *			pagecache_lock
  */
 spinlock_t pagemap_lru_lock ____cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 
@@ -164,8 +169,8 @@ void invalidate_inode_pages(struct inode * inode)
 
 	head = &inode->i_mapping->clean_pages;
 
-	spin_lock(&pagecache_lock);
 	spin_lock(&pagemap_lru_lock);
+	spin_lock(&pagecache_lock);
 	curr = head->next;
 
 	while (curr != head) {
@@ -196,8 +201,8 @@ unlock:
 		continue;
 	}
 
-	spin_unlock(&pagemap_lru_lock);
 	spin_unlock(&pagecache_lock);
+	spin_unlock(&pagemap_lru_lock);
 }
 
 static inline void truncate_partial_page(struct page *page, unsigned partial)
@@ -633,8 +638,9 @@ void add_to_page_cache_locked(struct page * page, struct address_space *mapping,
 	spin_lock(&pagecache_lock);
 	add_page_to_inode_queue(mapping, page);
 	add_page_to_hash_queue(page, page_hash(mapping, index));
-	lru_cache_add(page);
 	spin_unlock(&pagecache_lock);
+
+	lru_cache_add(page);
 }
 
 /*
@@ -653,7 +659,6 @@ static inline void __add_to_page_cache(struct page * page,
 	page->index = offset;
 	add_page_to_inode_queue(mapping, page);
 	add_page_to_hash_queue(page, hash);
-	lru_cache_add(page);
 }
 
 void add_to_page_cache(struct page * page, struct address_space * mapping, unsigned long offset)
@@ -661,6 +666,7 @@ void add_to_page_cache(struct page * page, struct address_space * mapping, unsig
 	spin_lock(&pagecache_lock);
 	__add_to_page_cache(page, mapping, offset, page_hash(mapping, offset));
 	spin_unlock(&pagecache_lock);
+	lru_cache_add(page);
 }
 
 int add_to_page_cache_unique(struct page * page,
@@ -680,6 +686,8 @@ int add_to_page_cache_unique(struct page * page,
 	}
 
 	spin_unlock(&pagecache_lock);
+	if (!err)
+		lru_cache_add(page);
 	return err;
 }
 
@@ -909,7 +917,9 @@ struct page * find_or_create_page(struct address_space *mapping, unsigned long i
 				newpage = NULL;
 			}
 			spin_unlock(&pagecache_lock);
-			if (unlikely(newpage != NULL))
+			if (newpage == NULL)
+				lru_cache_add(page);
+			else 
 				page_cache_release(newpage);
 		}
 	}
@@ -1385,6 +1395,7 @@ no_cached_page:
 		page = cached_page;
 		__add_to_page_cache(page, mapping, index, hash);
 		spin_unlock(&pagecache_lock);
+		lru_cache_add(page);		
 		cached_page = NULL;
 
 		goto readpage;
@@ -1671,14 +1682,13 @@ static void nopage_sequential_readahead(struct vm_area_struct * vma,
  * it in the page cache, and handles the special cases reasonably without
  * having a lot of duplicated code.
  */
-struct page * filemap_nopage(struct vm_area_struct * area,
-	unsigned long address, int no_share)
+struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address)
 {
 	int error;
 	struct file *file = area->vm_file;
 	struct address_space *mapping = file->f_dentry->d_inode->i_mapping;
 	struct inode *inode = mapping->host;
-	struct page *page, **hash, *old_page;
+	struct page *page, **hash;
 	unsigned long size, pgoff, endoff;
 
 	pgoff = ((address - area->vm_start) >> PAGE_CACHE_SHIFT) + area->vm_pgoff;
@@ -1724,22 +1734,9 @@ success:
 	 * Found the page and have a reference on it, need to check sharing
 	 * and possibly copy it over to another page..
 	 */
-	old_page = page;
 	mark_page_accessed(page);
-	if (no_share) {
-		struct page *new_page = alloc_page(GFP_HIGHUSER);
-
-		if (new_page) {
-			copy_user_highpage(new_page, old_page, address);
-			flush_page_to_ram(new_page);
-		} else
-			new_page = NOPAGE_OOM;
-		page_cache_release(page);
-		return new_page;
-	}
-
-	flush_page_to_ram(old_page);
-	return old_page;
+	flush_page_to_ram(page);
+	return page;
 
 no_cached_page:
 	/*

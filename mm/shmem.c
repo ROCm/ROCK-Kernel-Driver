@@ -449,7 +449,6 @@ getswap:
 		BUG();
 
 	/* Remove it from the page cache */
-	lru_cache_del(page);
 	remove_inode_page(page);
 	page_cache_release(page);
 
@@ -468,6 +467,7 @@ getswap:
 	*entry = swap;
 	info->swapped++;
 	spin_unlock(&info->lock);
+	SetPageUptodate(page);
 	set_page_dirty(page);
 	UnlockPage(page);
 	return 0;
@@ -621,7 +621,7 @@ failed:
 	return error;
 }
 
-struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, int no_share)
+struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address)
 {
 	struct page * page;
 	unsigned int idx;
@@ -633,19 +633,7 @@ struct page * shmem_nopage(struct vm_area_struct * vma, unsigned long address, i
 	if (shmem_getpage(inode, idx, &page))
 		return page;
 
-	if (no_share) {
-		struct page *new_page = page_cache_alloc(inode->i_mapping);
-
-		if (new_page) {
-			copy_user_highpage(new_page, page, address);
-			flush_page_to_ram(new_page);
-		} else
-			new_page = NOPAGE_OOM;
-		page_cache_release(page);
-		return new_page;
-	}
-
-	flush_page_to_ram (page);
+	flush_page_to_ram(page);
 	return(page);
 }
 
@@ -1150,7 +1138,7 @@ static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char *
 		
 	inode = dentry->d_inode;
 	info = SHMEM_I(inode);
-	inode->i_size = len;
+	inode->i_size = len-1;
 	if (len <= sizeof(struct shmem_inode_info)) {
 		/* do it inline */
 		memcpy(info, symname, len);

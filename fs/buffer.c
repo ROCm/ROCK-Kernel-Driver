@@ -770,12 +770,6 @@ static void end_buffer_io_async(struct buffer_head * bh, int uptodate)
 	if (!PageError(page))
 		SetPageUptodate(page);
 
-	/*
-	 * Run the hooks that have to be done when a page I/O has completed.
-	 */
-	if (PageTestandClearDecrAfter(page))
-		atomic_dec(&nr_async_pages);
-
 	UnlockPage(page);
 
 	return;

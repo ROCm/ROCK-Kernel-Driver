@@ -271,7 +271,7 @@ static struct block_device_operations pcd_bdops = {
 	release:		cdrom_release,
 	ioctl:			cdrom_ioctl,
 	check_media_change:	cdrom_media_changed,
-}
+};
 
 static struct cdrom_device_ops pcd_dops = {
 	pcd_open,

@@ -80,8 +80,6 @@ static void __free_pages_ok (struct page *page, unsigned int order)
 		BUG();
 	if (PageLocked(page))
 		BUG();
-	if (PageDecrAfter(page))
-		BUG();
 	if (PageActive(page))
 		BUG();
 	if (PageInactive(page))
@@ -273,8 +271,6 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 					if (PageSwapCache(page))
 						BUG();
 					if (PageLocked(page))
-						BUG();
-					if (PageDecrAfter(page))
 						BUG();
 					if (PageActive(page))
 						BUG();

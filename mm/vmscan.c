@@ -134,6 +134,7 @@ drop_pte:
 			break;
 		/* Add it to the swap cache and mark it dirty */
 		if (add_to_swap_cache(page, entry) == 0) {
+			SetPageUptodate(page);
 			set_page_dirty(page);
 			goto set_swap_pte;
 		}
@@ -459,13 +460,7 @@ static int shrink_cache(int nr_pages, zone_t * classzone, unsigned int gfp_mask,
 			}
 		}
 
-		if (unlikely(!spin_trylock(&pagecache_lock))) {
-			/* we hold the page lock so the page cannot go away from under us */
-			spin_unlock(&pagemap_lru_lock);
-
-			spin_lock(&pagecache_lock);
-			spin_lock(&pagemap_lru_lock);
-		}
+		spin_lock(&pagecache_lock);
 
 		/*
 		 * this is the non-racy check for busy page.
@@ -520,6 +515,20 @@ page_mapped:
 	}
 	spin_unlock(&pagemap_lru_lock);
 
+	if (nr_pages <= 0)
+		return 0;
+
+	/*
+	 * If swapping out isn't appropriate, and 
+	 * we still fail, try the other (usually smaller)
+	 * caches instead.
+	 */
+	shrink_dcache_memory(priority, gfp_mask);
+	shrink_icache_memory(priority, gfp_mask);
+#ifdef CONFIG_QUOTA
+	shrink_dqcache_memory(DEF_PRIORITY, gfp_mask);
+#endif
+
 	return nr_pages;
 }
 
@@ -568,17 +577,7 @@ static int shrink_caches(zone_t * classzone, int priority, unsigned int gfp_mask
 	ratio = (unsigned long) nr_pages * nr_active_pages / ((nr_inactive_pages + 1) * 2);
 	refill_inactive(ratio);
 
-	nr_pages = shrink_cache(nr_pages, classzone, gfp_mask, priority);
-	if (nr_pages <= 0)
-		return 0;
-
-	shrink_dcache_memory(priority, gfp_mask);
-	shrink_icache_memory(priority, gfp_mask);
-#ifdef CONFIG_QUOTA
-	shrink_dqcache_memory(DEF_PRIORITY, gfp_mask);
-#endif
-
-	return nr_pages;
+	return shrink_cache(nr_pages, classzone, gfp_mask, priority);
 }
 
 int try_to_free_pages(zone_t *classzone, unsigned int gfp_mask, unsigned int order)
