@@ -47,6 +47,7 @@
 #include <asm/sal.h>
 #include <asm/sections.h>
 #include <asm/serial.h>
+#include <asm/setup.h>
 #include <asm/smp.h>
 #include <asm/system.h>
 #include <asm/unistd.h>
@@ -284,7 +285,7 @@ setup_arch (char **cmdline_p)
 	ia64_patch_vtop((u64) __start___vtop_patchlist, (u64) __end___vtop_patchlist);
 
 	*cmdline_p = __va(ia64_boot_param->command_line);
-	strlcpy(saved_command_line, *cmdline_p, sizeof(saved_command_line));
+	strlcpy(saved_command_line, *cmdline_p, COMMAND_LINE_SIZE);
 
 	efi_init();
 	io_port_init();
