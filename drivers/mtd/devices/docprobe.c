@@ -4,7 +4,7 @@
 /* (C) 1999 Machine Vision Holdings, Inc.			*/
 /* (C) 1999-2003 David Woodhouse <dwmw2@infradead.org>		*/
 
-/* $Id: docprobe.c,v 1.42 2004/09/16 23:51:57 gleixner Exp $	*/
+/* $Id: docprobe.c,v 1.43 2004/11/16 18:29:01 dwmw2 Exp $	*/
 
 
 
@@ -328,7 +328,7 @@ static void __init DoC_Probe(unsigned long physadr)
  *
  ****************************************************************************/
 
-int __init init_doc(void)
+static int __init init_doc(void)
 {
 	int i;
 	

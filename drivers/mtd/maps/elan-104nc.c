@@ -16,7 +16,7 @@
    along with this program; if not, write to the Free Software
    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
 
-   $Id: elan-104nc.c,v 1.23 2004/11/04 13:24:14 gleixner Exp $
+   $Id: elan-104nc.c,v 1.24 2004/11/16 18:29:02 dwmw2 Exp $
 
 The ELAN-104NC has up to 8 Mibyte of Intel StrataFlash (28F320/28F640) in x16
 mode.  This drivers uses the CFI probe and Intel Extended Command Set drivers.
@@ -185,7 +185,7 @@ static void cleanup_elan_104nc(void)
 	iounmap((void *)iomapadr);
 }
 
-int __init init_elan_104nc(void)
+static int __init init_elan_104nc(void)
 {
 	/* Urg! We use I/O port 0x22 without request_region()ing it,
 	   because it's already allocated to the PIC. */

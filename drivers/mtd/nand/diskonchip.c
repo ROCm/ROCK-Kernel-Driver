@@ -16,7 +16,7 @@
  *  
  * Interface to generic NAND code for M-Systems DiskOnChip devices
  *
- * $Id: diskonchip.c,v 1.41 2004/11/05 16:07:16 kalev Exp $
+ * $Id: diskonchip.c,v 1.42 2004/11/16 18:29:03 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -1720,7 +1720,7 @@ static void release_nanddoc(void)
 	}
 }
 
-int __init init_nanddoc(void)
+static int __init init_nanddoc(void)
 {
 	int i, ret = 0;
 
@@ -1762,7 +1762,7 @@ outerr:
 	return ret;
 }
 
-void __exit cleanup_nanddoc(void)
+static void __exit cleanup_nanddoc(void)
 {
 	/* Cleanup the nand/DoC resources */
 	release_nanddoc();

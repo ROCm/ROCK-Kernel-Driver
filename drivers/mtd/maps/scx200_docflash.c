@@ -2,7 +2,7 @@
 
    Copyright (c) 2001,2002 Christer Weinigel <wingel@nano-system.com>
 
-   $Id: scx200_docflash.c,v 1.8 2004/11/04 13:24:15 gleixner Exp $ 
+   $Id: scx200_docflash.c,v 1.9 2004/11/16 18:29:02 dwmw2 Exp $ 
 
    National Semiconductor SCx200 flash mapped with DOCCS
 */
@@ -81,7 +81,7 @@ static struct map_info scx200_docflash_map = {
 	.name      = "NatSemi SCx200 DOCCS Flash",
 };
 
-int __init init_scx200_docflash(void)
+static int __init init_scx200_docflash(void)
 {
 	unsigned u;
 	unsigned base;

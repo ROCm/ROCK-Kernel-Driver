@@ -4,7 +4,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2000.c,v 1.63 2004/09/16 23:51:56 gleixner Exp $
+ * $Id: doc2000.c,v 1.64 2004/11/16 18:29:01 dwmw2 Exp $
  */
 
 #include <linux/kernel.h>
@@ -1276,7 +1276,7 @@ static int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
  *
  ****************************************************************************/
 
-int __init init_doc2000(void)
+static int __init init_doc2000(void)
 {
        inter_module_register(im_name, THIS_MODULE, &DoC2k_init);
        return 0;

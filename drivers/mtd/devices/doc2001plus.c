@@ -6,7 +6,7 @@
  * (c) 1999 Machine Vision Holdings, Inc.
  * (c) 1999, 2000 David Woodhouse <dwmw2@infradead.org>
  *
- * $Id: doc2001plus.c,v 1.10 2004/09/16 23:51:57 gleixner Exp $
+ * $Id: doc2001plus.c,v 1.11 2004/11/16 18:29:01 dwmw2 Exp $
  *
  * Released under GPL
  */
@@ -1122,7 +1122,7 @@ int doc_erase(struct mtd_info *mtd, struct erase_info *instr)
  *
  ****************************************************************************/
 
-int __init init_doc2001plus(void)
+static int __init init_doc2001plus(void)
 {
 	inter_module_register(im_name, THIS_MODULE, &DoCMilPlus_init);
 	return 0;
