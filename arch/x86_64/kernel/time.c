@@ -788,7 +788,7 @@ static int time_init_device(void)
 {
 	int error = sysdev_class_register(&pit_sysclass);
 	if (!error)
-		error = sys_device_register(&device_i8253);
+		error = sysdev_register(&device_i8253);
 	return error;
 }
 
