@@ -1041,7 +1041,8 @@ static inline int zeromap_pud_range(struct mm_struct *mm, pud_t * pud,
 		error = -ENOMEM;
 		if (!pmd)
 			break;
-		error = zeromap_pmd_range(mm, pmd, address, end - address, prot);
+		error = zeromap_pmd_range(mm, pmd, base + address,
+					  end - address, prot);
 		if (error)
 			break;
 		address = (address + PUD_SIZE) & PUD_MASK;
