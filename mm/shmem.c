@@ -44,6 +44,9 @@
 
 #define VM_ACCT(size)    (((size) + PAGE_CACHE_SIZE - 1) >> PAGE_SHIFT)
 
+/* Pretend that each entry is of this size in directory's i_size */
+#define BOGO_DIRENT_SIZE 20
+
 static inline struct shmem_sb_info *SHMEM_SB(struct super_block *sb)
 {
 	return sb->u.generic_sbp;
@@ -802,6 +805,8 @@ struct inode *shmem_get_inode(struct super_block *sb, int mode, int dev)
 			break;
 		case S_IFDIR:
 			inode->i_nlink++;
+			/* Some things misbehave if size == 0 on a directory */
+			inode->i_size = 2 * BOGO_DIRENT_SIZE;
 			inode->i_op = &shmem_dir_inode_operations;
 			inode->i_fop = &simple_dir_operations;
 			break;
@@ -1094,6 +1099,7 @@ static int shmem_mknod(struct inode *dir, struct dentry *dentry, int mode, int d
 	int error = -ENOSPC;
 
 	if (inode) {
+		dir->i_size += BOGO_DIRENT_SIZE;
 		dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 		d_instantiate(dentry, inode);
 		dget(dentry); /* Extra count - pin the dentry in core */
@@ -1124,6 +1130,7 @@ static int shmem_link(struct dentry *old_dentry, struct inode * dir, struct dent
 {
 	struct inode *inode = old_dentry->d_inode;
 
+	dir->i_size += BOGO_DIRENT_SIZE;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	inode->i_nlink++;
 	atomic_inc(&inode->i_count);	/* New dentry reference */
@@ -1168,6 +1175,8 @@ static int shmem_empty(struct dentry *dentry)
 static int shmem_unlink(struct inode * dir, struct dentry *dentry)
 {
 	struct inode *inode = dentry->d_inode;
+
+	dir->i_size -= BOGO_DIRENT_SIZE;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	inode->i_nlink--;
 	dput(dentry);	/* Undo the count from "create" - this does all the work */
@@ -1206,6 +1215,8 @@ static int shmem_rename(struct inode * old_dir, struct dentry *old_dentry, struc
 		new_dir->i_nlink++;
 	}
 
+	old_dir->i_size -= BOGO_DIRENT_SIZE;
+	new_dir->i_size += BOGO_DIRENT_SIZE;
 	old_dir->i_ctime = old_dir->i_mtime =
 	new_dir->i_ctime = new_dir->i_mtime =
 	inode->i_ctime = CURRENT_TIME;
@@ -1259,6 +1270,7 @@ static int shmem_symlink(struct inode * dir, struct dentry *dentry, const char *
 		page_cache_release(page);
 		up(&info->sem);
 	}
+	dir->i_size += BOGO_DIRENT_SIZE;
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
 	d_instantiate(dentry, inode);
 	dget(dentry);
