@@ -452,6 +452,7 @@ qla2x00_async_event(scsi_qla_host_t *ha, uint32_t mbx)
 		if (atomic_read(&ha->loop_state) != LOOP_DOWN) {
 			atomic_set(&ha->loop_state, LOOP_DOWN);
 			atomic_set(&ha->loop_down_timer, LOOP_DOWN_TIME);
+			ha->device_flags |= DFLG_NO_CABLE;
 			qla2x00_mark_all_devices_lost(ha);
 		}
 

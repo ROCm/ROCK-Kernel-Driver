@@ -1497,7 +1497,7 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 {
 	int  rval;
 	uint8_t  rval1 = 0;
-	static unsigned long  flags, save_flags;
+	unsigned long flags, save_flags;
 
 	rval = QLA_SUCCESS;
 
@@ -1595,6 +1595,14 @@ qla2x00_configure_loop(scsi_qla_host_t *ha)
 		    __func__, ha->host_no));
 	} else {
 		DEBUG3(printk("%s: exiting normally\n", __func__));
+	}
+
+	/* Restore state if a resync event occured during processing */
+	if (test_bit(LOOP_RESYNC_NEEDED, &ha->dpc_flags)) {
+		if (test_bit(LOCAL_LOOP_UPDATE, &save_flags))
+			set_bit(LOCAL_LOOP_UPDATE, &ha->dpc_flags);
+		if (test_bit(RSCN_UPDATE, &save_flags))
+			set_bit(RSCN_UPDATE, &ha->dpc_flags);
 	}
 
 	return (rval);
@@ -1803,6 +1811,20 @@ cleanup_allocation:
 	}
 
 	return (rval);
+}
+
+static void
+qla2x00_probe_for_all_luns(scsi_qla_host_t *ha) 
+{
+	fc_port_t	*fcport;
+
+	qla2x00_mark_all_devices_lost(ha); 
+ 	list_for_each_entry(fcport, &ha->fcports, list) {
+		if (fcport->port_type != FCT_TARGET)
+			continue;
+
+		qla2x00_update_fcport(ha, fcport); 
+	}
 }
 
 /*
@@ -3194,6 +3216,7 @@ qla2x00_rescan_fcports(scsi_qla_host_t *ha)
 
 		rescan_done = 1;
 	}
+	qla2x00_probe_for_all_luns(ha); 
 
 	/* Update OS target and lun structures if necessary. */
 	if (rescan_done) {
