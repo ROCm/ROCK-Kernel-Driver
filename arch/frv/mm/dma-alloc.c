@@ -50,6 +50,7 @@
 static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
 {
 	pgd_t *pge;
+	pud_t *pue;
 	pmd_t *pme;
 	pte_t *pte;
 	int err = -ENOMEM;
@@ -57,8 +58,9 @@ static int map_page(unsigned long va, unsigned long pa, pgprot_t prot)
 	spin_lock(&init_mm.page_table_lock);
 
 	/* Use upper 10 bits of VA to index the first level map */
-	pge = pml4_pgd_offset_k(pml4_offset_k(va), va);
-	pme = pmd_offset(pge, va);
+	pge = pgd_offset_k(va);
+	pue = pud_offset(pge, va);
+	pme = pmd_offset(pue, va);
 
 	/* Use middle 10 bits of VA to index the second-level map */
 	pte = pte_alloc_kernel(&init_mm, pme, va);

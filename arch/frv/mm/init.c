@@ -111,6 +111,7 @@ void __init paging_init(void)
 #if CONFIG_HIGHMEM
 	if (num_physpages - num_mappedpages) {
 		pgd_t *pge;
+		pud_t *pue;
 		pmd_t *pme;
 
 		pkmap_page_table = alloc_bootmem_pages(PAGE_SIZE);
@@ -118,7 +119,8 @@ void __init paging_init(void)
 		memset(pkmap_page_table, 0, PAGE_SIZE);
 
 		pge = swapper_pg_dir + pgd_index_k(PKMAP_BASE);
-		pme = pmd_offset(pge, PKMAP_BASE);
+		pue = pud_offset(pge, PKMAP_BASE);
+		pme = pmd_offset(pue, PKMAP_BASE);
 		__set_pmd(pme, virt_to_phys(pkmap_page_table) | _PAGE_TABLE);
 	}
 #endif

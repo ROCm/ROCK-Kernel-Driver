@@ -36,8 +36,8 @@ asmlinkage void do_page_fault(int datammu, unsigned long esr0, unsigned long ear
 	struct mm_struct *mm;
 	unsigned long _pme, lrai, lrad, fixup;
 	siginfo_t info;
-	pml4_t *pml4e;
 	pgd_t *pge;
+	pud_t *pue;
 	pte_t *pte;
 	int write;
 
@@ -230,9 +230,9 @@ asmlinkage void do_page_fault(int datammu, unsigned long esr0, unsigned long ear
 
 	__break_hijack_kernel_event();
 
-	pml4e = pml4_offset(current->mm, ear0);
-	pge = pml4_pgd_offset(pml4e, ear0);
-	_pme = pge->pge[0].ste[0];
+	pge = pgd_offset(current->mm, ear0);
+	pue = pud_offset(pge, ear0);
+	_pme = pue->pue[0].ste[0];
 
 	printk(KERN_ALERT "  PGE : %8p { PME %08lx }\n", pge, _pme);
 
@@ -298,21 +298,28 @@ asmlinkage void do_page_fault(int datammu, unsigned long esr0, unsigned long ear
 		 */
 		int index = pgd_index(ear0);
 		pgd_t *pgd, *pgd_k;
+		pud_t *pud, *pud_k;
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
 		pgd = (pgd_t *) __get_TTBR();
 		pgd = (pgd_t *)__va(pgd) + index;
-		pgd_k = ((pgd_t *)(init_mm.pml4)) + index;
+		pgd_k = ((pgd_t *)(init_mm.pgd)) + index;
 
 		if (!pgd_present(*pgd_k))
 			goto no_context;
-		set_pgd(pgd, *pgd_k);
+		//set_pgd(pgd, *pgd_k); /////// gcc ICE's on this line
 
-		pmd = pmd_offset(pgd, ear0);
-		pmd_k = pmd_offset(pgd_k, ear0);
+		pud_k = pud_offset(pgd_k, ear0);
+		if (!pud_present(*pud_k))
+			goto no_context;
+
+		pmd_k = pmd_offset(pud_k, ear0);
 		if (!pmd_present(*pmd_k))
 			goto no_context;
+
+		pud = pud_offset(pgd, ear0);
+		pmd = pmd_offset(pud, ear0);
 		set_pmd(pmd, *pmd_k);
 
 		pte_k = pte_offset_kernel(pmd_k, ear0);

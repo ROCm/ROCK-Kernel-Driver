@@ -87,12 +87,10 @@ static unsigned get_cxn(mm_context_t *ctx)
  * restore the current TLB miss handler mapped page tables into the MMU context and set up a
  * mapping for the page directory
  */
-void change_mm_context(mm_context_t *old, mm_context_t *ctx, pml4_t *pml4)
+void change_mm_context(mm_context_t *old, mm_context_t *ctx, pgd_t *pgd)
 {
 	unsigned long _pgd;
-	pgd_t *pgd;
 
-	pgd = pml4_pgd_offset(pml4, 0);
 	_pgd = virt_to_phys(pgd);
 
 	/* save the state of the outgoing MMU context */

@@ -90,21 +90,21 @@ extern unsigned long empty_zero_page;
  * we use 2-level page tables, folding the PMD (mid-level table) into the PGE (top-level entry)
  * [see Documentation/fujitsu/frv/mmu-layout.txt]
  *
- * 4th-Level Page Directory:
- *  - Size: 16KB
- *  - 1 PML4Es per PML4
- *  - Each PML4E holds 1 PGD and covers 4GB
- *
  * Page Directory:
  *  - Size: 16KB
  *  - 64 PGEs per PGD
- *  - Each PGE holds 1 PMD and covers 64MB
+ *  - Each PGE holds 1 PUD and covers 64MB
+ *
+ * Page Upper Directory:
+ *  - Size: 256B
+ *  - 1 PUE per PUD
+ *  - Each PUE holds 1 PMD and covers 64MB
  *
  * Page Mid-Level Directory
+ *  - Size: 256B
  *  - 1 PME per PMD
  *  - Each PME holds 64 STEs, all of which point to separate chunks of the same Page Table
  *  - All STEs are instantiated at the same time
- *  - Size: 256B
  *
  * Page Table
  *  - Size: 16KB
@@ -115,7 +115,7 @@ extern unsigned long empty_zero_page;
  *  - Size: 4KB
  *
  * total PTEs
- *	= 1 PML4E * 64 PGEs * 1 PMEs * 4096 PTEs
+ *	= 1 PML4E * 64 PGEs * 1 PUEs * 1 PMEs * 4096 PTEs
  *	= 1 PML4E * 64 PGEs * 64 STEs * 64 PTEs/FR451-PT
  *	= 262144 (or 256 * 1024)
  */
@@ -123,6 +123,12 @@ extern unsigned long empty_zero_page;
 #define PGDIR_SIZE		(1UL << PGDIR_SHIFT)
 #define PGDIR_MASK		(~(PGDIR_SIZE - 1))
 #define PTRS_PER_PGD		64
+
+#define PUD_SHIFT		26
+#define PTRS_PER_PUD		1
+#define PUD_SIZE		(1UL << PUD_SHIFT)
+#define PUD_MASK		(~(PUD_SIZE - 1))
+#define PUE_SIZE		256
 
 #define PMD_SHIFT		26
 #define PMD_SIZE		(1UL << PMD_SHIFT)
@@ -152,18 +158,10 @@ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 	printk("%s:%d: bad pte %08lx.\n", __FILE__, __LINE__, (e).pte)
 #define pmd_ERROR(e) \
 	printk("%s:%d: bad pmd %08lx.\n", __FILE__, __LINE__, pmd_val(e))
+#define pud_ERROR(e) \
+	printk("%s:%d: bad pud %08lx.\n", __FILE__, __LINE__, pmd_val(pud_val(e)))
 #define pgd_ERROR(e) \
-	printk("%s:%d: bad pgd %08lx.\n", __FILE__, __LINE__, pmd_val(pgd_val(e)))
-
-/*
- * The "pgd_xxx()" functions here are trivial for a folded two-level
- * setup: the pgd is never bad, and a pmd always exists (as it's folded
- * into the pgd entry)
- */
-static inline int pgd_none(pgd_t pgd)		{ return 0; }
-static inline int pgd_bad(pgd_t pgd)		{ return 0; }
-static inline int pgd_present(pgd_t pgd)	{ return 1; }
-#define pgd_clear(xp)				do { } while (0)
+	printk("%s:%d: bad pgd %08lx.\n", __FILE__, __LINE__, pmd_val(pud_val(pgd_val(e))))
 
 /*
  * Certain architectures need to do special things when PTEs
@@ -179,11 +177,79 @@ do {							\
 #define set_pte_atomic(pteptr, pteval)		set_pte((pteptr), (pteval))
 
 /*
+ * pgd_offset() returns a (pgd_t *)
+ * pgd_index() is used get the offset into the pgd page's array of pgd_t's;
+ */
+#define pgd_offset(mm, address) ((mm)->pgd + pgd_index(address))
+
+/*
+ * a shortcut which implies the use of the kernel's pgd, instead
+ * of a process's
+ */
+#define pgd_offset_k(address) pgd_offset(&init_mm, address)
+
+/*
+ * The "pgd_xxx()" functions here are trivial for a folded two-level
+ * setup: the pud is never bad, and a pud always exists (as it's folded
+ * into the pgd entry)
+ */
+static inline int pgd_none(pgd_t pgd)		{ return 0; }
+static inline int pgd_bad(pgd_t pgd)		{ return 0; }
+static inline int pgd_present(pgd_t pgd)	{ return 1; }
+static inline void pgd_clear(pgd_t *pgd)	{ }
+
+#define pgd_populate(mm, pgd, pud)		do { } while (0)
+/*
+ * (puds are folded into pgds so this doesn't get actually called,
+ * but the define is needed for a generic inline function.)
+ */
+#define set_pgd(pgdptr, pgdval)				\
+do {							\
+	memcpy((pgdptr), &(pgdval), sizeof(pgd_t));	\
+	asm volatile("dcf %M0" :: "U"(*(pgdptr)));	\
+} while(0)
+
+static inline pud_t *pud_offset(pgd_t *pgd, unsigned long address)
+{
+	return (pud_t *) pgd;
+}
+
+#define pgd_page(pgd)				(pud_page((pud_t){ pgd }))
+#define pgd_page_kernel(pgd)			(pud_page_kernel((pud_t){ pgd }))
+
+/*
+ * allocating and freeing a pud is trivial: the 1-entry pud is
+ * inside the pgd, so has no extra memory associated with it.
+ */
+#define pud_alloc_one(mm, address)		NULL
+#define pud_free(x)				do { } while (0)
+#define __pud_free_tlb(tlb, x)			do { } while (0)
+
+/*
+ * The "pud_xxx()" functions here are trivial for a folded two-level
+ * setup: the pmd is never bad, and a pmd always exists (as it's folded
+ * into the pud entry)
+ */
+static inline int pud_none(pud_t pud)		{ return 0; }
+static inline int pud_bad(pud_t pud)		{ return 0; }
+static inline int pud_present(pud_t pud)	{ return 1; }
+static inline void pud_clear(pud_t *pud)	{ }
+
+#define pud_populate(mm, pmd, pte)		do { } while (0)
+
+/*
+ * (pmds are folded into puds so this doesn't get actually called,
+ * but the define is needed for a generic inline function.)
+ */
+#define set_pud(pudptr, pudval)			set_pmd((pmd_t *)(pudptr), (pmd_t) { pudval })
+
+#define pud_page(pud)				(pmd_page((pmd_t){ pud }))
+#define pud_page_kernel(pud)			(pmd_page_kernel((pmd_t){ pud }))
+
+/*
  * (pmds are folded into pgds so this doesn't get actually called,
  * but the define is needed for a generic inline function.)
  */
-#define set_pgd(pgdptr, pgdval)			(*(pgdptr) = pgdval)
-
 extern void __set_pmd(pmd_t *pmdptr, unsigned long __pmd);
 
 #define set_pmd(pmdptr, pmdval)			\
@@ -191,11 +257,9 @@ do {						\
 	__set_pmd((pmdptr), (pmdval).ste[0]);	\
 } while(0)
 
-#define pgd_page(pgd)				((unsigned long) __va(pgd_val(pgd) & PAGE_MASK))
-
 #define __pmd_index(address)			0
 
-static inline pmd_t *pmd_offset(pgd_t *dir, unsigned long address)
+static inline pmd_t *pmd_offset(pud_t *dir, unsigned long address)
 {
 	return (pmd_t *) dir + __pmd_index(address);
 }
@@ -377,14 +441,14 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 	return pte;
 }
 
-#define page_pte(page)	page_pte_prot(page, __pgprot(0))
+#define page_pte(page)	page_pte_prot((page), __pgprot(0))
 
 /* to find an entry in a page-table-directory. */
-#define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
+#define pgd_index(address) (((address) >> PGDIR_SHIFT) & (PTRS_PER_PGD - 1))
 #define pgd_index_k(addr) pgd_index(addr)
 
-/* Find an entry in the third-level page table.. */
-#define __pte_index(address) ((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
+/* Find an entry in the bottom-level page table.. */
+#define __pte_index(address) (((address) >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
 
 /*
  * the pte page can be thought of an array like this: pte_t[PTRS_PER_PTE]
@@ -403,11 +467,11 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 #define pte_offset_map_nested(dir, address) \
 	((pte_t *)kmap_atomic(pmd_page(*(dir)),KM_PTE1) + pte_index(address))
 #define pte_unmap(pte) kunmap_atomic(pte, KM_PTE0)
-#define pte_unmap_nested(pte) kunmap_atomic(pte, KM_PTE1)
+#define pte_unmap_nested(pte) kunmap_atomic((pte), KM_PTE1)
 #else
 #define pte_offset_map(dir, address) \
 	((pte_t *)page_address(pmd_page(*(dir))) + pte_index(address))
-#define pte_offset_map_nested(dir, address) pte_offset_map(dir, address)
+#define pte_offset_map_nested(dir, address) pte_offset_map((dir), (address))
 #define pte_unmap(pte) do { } while (0)
 #define pte_unmap_nested(pte) do { } while (0)
 #endif
@@ -451,7 +515,6 @@ static inline int pte_file(pte_t pte)
 #define __HAVE_ARCH_PTEP_MKDIRTY
 #define __HAVE_ARCH_PTE_SAME
 #include <asm-generic/pgtable.h>
-#include <asm-generic/nopml4-pgtable.h>
 
 /*
  * preload information about a newly instantiated PTE into the SCR0/SCR1 PGE cache
@@ -459,9 +522,9 @@ static inline int pte_file(pte_t pte)
 static inline void update_mmu_cache(struct vm_area_struct *vma, unsigned long address, pte_t pte)
 {
 	unsigned long ampr;
-	pml4_t *pml4e = pml4_offset(current->mm, address);
-	pgd_t *pge = pml4_pgd_offset(pml4e, address);
-	pmd_t *pme = pmd_offset(pge, address);
+	pgd_t *pge = pgd_offset(current->mm, address);
+	pud_t *pue = pud_offset(pge, address);
+	pmd_t *pme = pmd_offset(pue, address);
 
 	ampr = pme->ste[0] & 0xffffff00;
 	ampr |= xAMPRx_L | xAMPRx_SS_16Kb | xAMPRx_S | xAMPRx_C | xAMPRx_V;

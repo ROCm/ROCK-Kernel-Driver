@@ -23,18 +23,21 @@
 /*
  * These are used to make use of C type-checking..
  */
-typedef struct { unsigned long pte;	} pte_t;
-typedef struct { unsigned long ste[64];	} pmd_t;
-typedef struct { pmd_t         pge[1];	} pgd_t;
-typedef struct { unsigned long pgprot;	} pgprot_t;
+typedef struct { unsigned long	pte;	} pte_t;
+typedef struct { unsigned long	ste[64];} pmd_t;
+typedef struct { pmd_t		pue[1]; } pud_t;
+typedef struct { pud_t		pge[1];	} pgd_t;
+typedef struct { unsigned long	pgprot;	} pgprot_t;
 
 #define pte_val(x)	((x).pte)
 #define pmd_val(x)	((x).ste[0])
+#define pud_val(x)	((x).pue[0])
 #define pgd_val(x)	((x).pge[0])
 #define pgprot_val(x)	((x).pgprot)
 
 #define __pte(x)	((pte_t) { (x) } )
 #define __pmd(x)	((pmd_t) { (x) } )
+#define __pud(x)	((pud_t) { (x) } )
 #define __pgd(x)	((pgd_t) { (x) } )
 #define __pgprot(x)	((pgprot_t) { (x) } )
 #define PTE_MASK	PAGE_MASK
@@ -90,8 +93,6 @@ extern unsigned long max_pfn;
 	((current->personality & READ_IMPLIES_EXEC) ? VM_EXEC : 0 ) | \
 		 VM_MAYREAD | VM_MAYWRITE | VM_MAYEXEC)
 #endif
-
-#include <asm-generic/nopml4-page.h>
 
 #endif /* __ASSEMBLY__ */
 

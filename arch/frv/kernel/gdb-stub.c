@@ -449,12 +449,14 @@ static unsigned long __saved_dampr, __saved_damlr;
 static inline unsigned long gdbstub_virt_to_pte(unsigned long vaddr)
 {
 	pgd_t *pgd;
+	pud_t *pud;
 	pmd_t *pmd;
 	pte_t *pte;
 	unsigned long val, dampr5;
 
 	pgd = (pgd_t *) __get_DAMLR(3) + pgd_index(vaddr);
-	pmd = pmd_offset(pgd, vaddr);
+	pud = pud_offset(pgd, vaddr);
+	pmd = pmd_offset(pud, vaddr);
 
 	if (pmd_bad(*pmd) || !pmd_present(*pmd))
 		return 0;

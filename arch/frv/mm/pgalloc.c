@@ -129,7 +129,7 @@ void pgd_dtor(void *pgd, kmem_cache_t *cache, unsigned long unused)
 	spin_unlock_irqrestore(&pgd_lock, flags);
 }
 
-pgd_t *__pgd_alloc(struct mm_struct *mm, pml4_t *pml4, unsigned long address)
+pgd_t *pgd_alloc(struct mm_struct *mm)
 {
 	pgd_t *pgd;
 

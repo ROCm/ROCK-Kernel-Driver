@@ -23,7 +23,7 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
 
 #ifdef CONFIG_MMU
 extern int init_new_context(struct task_struct *tsk, struct mm_struct *mm);
-extern void change_mm_context(mm_context_t *old, mm_context_t *ctx, pml4_t *_pml4);
+extern void change_mm_context(mm_context_t *old, mm_context_t *ctx, pgd_t *_pgd);
 extern void destroy_context(struct mm_struct *mm);
 
 #else
@@ -35,12 +35,12 @@ extern void destroy_context(struct mm_struct *mm);
 #define switch_mm(prev, next, tsk)						\
 do {										\
 	if (prev != next)							\
-		change_mm_context(&prev->context, &next->context, next->pml4);	\
+		change_mm_context(&prev->context, &next->context, next->pgd);	\
 } while(0)
 
 #define activate_mm(prev, next)						\
 do {									\
-	change_mm_context(&prev->context, &next->context, next->pml4);	\
+	change_mm_context(&prev->context, &next->context, next->pgd);	\
 } while(0)
 
 #define deactivate_mm(tsk, mm)			\

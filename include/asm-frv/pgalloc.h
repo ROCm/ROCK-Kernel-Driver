@@ -31,6 +31,7 @@ do {										\
  * Allocate and free page tables.
  */
 
+extern pgd_t *pgd_alloc(struct mm_struct *);
 extern void pgd_free(pgd_t *);
 
 extern pte_t *pte_alloc_one_kernel(struct mm_struct *, unsigned long);
@@ -57,9 +58,6 @@ static inline void pte_free(struct page *pte)
 #define pmd_alloc_one(mm, addr)		({ BUG(); ((pmd_t *) 2); })
 #define pmd_free(x)			do { } while (0)
 #define __pmd_free_tlb(tlb,x)		do { } while (0)
-#define pgd_populate(mm, pmd, pte)	BUG()
-
-#include <asm-generic/nopml4-pgalloc.h>
 
 #endif /* CONFIG_MMU */
 
