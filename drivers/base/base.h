@@ -15,19 +15,3 @@ struct class_device_attribute *to_class_dev_attr(struct attribute *_attr)
 }
 
 
-#ifdef CONFIG_PM
-
-extern int device_pm_add(struct device *);
-extern void device_pm_remove(struct device *);
-
-#else
-
-static inline int device_pm_add(struct device * dev)
-{
-	return 0;
-}
-static inline void device_pm_remove(struct device * dev)
-{
-
-}
-#endif

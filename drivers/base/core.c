@@ -20,6 +20,7 @@
 #include <asm/semaphore.h>
 
 #include "base.h"
+#include "power/power.h"
 
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;

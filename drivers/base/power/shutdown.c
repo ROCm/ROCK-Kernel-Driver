@@ -13,9 +13,26 @@
 #include <linux/device.h>
 #include <asm/semaphore.h>
 
+#include "power.h"
+
 #define to_dev(node) container_of(node,struct device,kobj.entry)
 
 extern struct subsystem devices_subsys;
+
+
+int device_detach_shutdown(struct device * dev)
+{
+	if (!dev->detach_state)
+		return 0;
+
+	if (dev->detach_state == DEVICE_PM_OFF) {
+		if (dev->driver && dev->driver->shutdown)
+			dev->driver->shutdown(dev);
+		return 0;
+	}
+	return dpm_runtime_suspend(dev,dev->detach_state);
+}
+
 
 /**
  * We handle system devices differently - we suspend and shut them 

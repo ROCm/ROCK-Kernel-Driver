@@ -270,6 +270,9 @@ struct device {
 					   being off. */
 
 	unsigned char *saved_state;	/* saved device state */
+	u32		detach_state;	/* State to enter when device is
+					   detached from its driver. */
+
 	u64		*dma_mask;	/* dma mask (if dma'able device) */
 
 	void	(*release)(struct device * dev);
