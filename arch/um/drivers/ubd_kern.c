@@ -776,10 +776,10 @@ int ubd_driver_init(void){
 	io_pid = start_io_thread(stack + PAGE_SIZE - sizeof(void *), 
 				 &thread_fd);
 	if(io_pid < 0){
-		io_pid = -1;
 		printk(KERN_ERR 
 		       "ubd : Failed to start I/O thread (errno = %d) - "
 		       "falling back to synchronous I/O\n", -io_pid);
+		io_pid = -1;
 		return(0);
 	}
 	err = um_request_irq(UBD_IRQ, thread_fd, IRQ_READ, ubd_intr, 
