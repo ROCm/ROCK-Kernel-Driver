@@ -245,23 +245,23 @@ static ssize_t show_alarms(struct device *dev, char *buf)
 	return sprintf(buf, "%d\n", data->alarms);
 }
 
-static DEVICE_ATTR(temp_input1, S_IRUGO, show_temp_input1, NULL);
-static DEVICE_ATTR(temp_input2, S_IRUGO, show_temp_input2, NULL);
-static DEVICE_ATTR(temp_min1, S_IWUSR | S_IRUGO, show_temp_low1,
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp_input1, NULL);
+static DEVICE_ATTR(temp2_input, S_IRUGO, show_temp_input2, NULL);
+static DEVICE_ATTR(temp1_min, S_IWUSR | S_IRUGO, show_temp_low1,
 	set_temp_low1);
-static DEVICE_ATTR(temp_min2, S_IWUSR | S_IRUGO, show_temp_low2,
+static DEVICE_ATTR(temp2_min, S_IWUSR | S_IRUGO, show_temp_low2,
 	set_temp_low2);
-static DEVICE_ATTR(temp_max1, S_IWUSR | S_IRUGO, show_temp_high1,
+static DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp_high1,
 	set_temp_high1);
-static DEVICE_ATTR(temp_max2, S_IWUSR | S_IRUGO, show_temp_high2,
+static DEVICE_ATTR(temp2_max, S_IWUSR | S_IRUGO, show_temp_high2,
 	set_temp_high2);
-static DEVICE_ATTR(temp_crit1, S_IWUSR | S_IRUGO, show_temp_crit1,
+static DEVICE_ATTR(temp1_crit, S_IWUSR | S_IRUGO, show_temp_crit1,
 	set_temp_crit1);
-static DEVICE_ATTR(temp_crit2, S_IWUSR | S_IRUGO, show_temp_crit2,
+static DEVICE_ATTR(temp2_crit, S_IWUSR | S_IRUGO, show_temp_crit2,
 	set_temp_crit2);
-static DEVICE_ATTR(temp_hyst1, S_IWUSR | S_IRUGO, show_temp_hyst1,
+static DEVICE_ATTR(temp1_hyst, S_IWUSR | S_IRUGO, show_temp_hyst1,
 	set_temp_hyst1);
-static DEVICE_ATTR(temp_hyst2, S_IRUGO, show_temp_hyst2, NULL);
+static DEVICE_ATTR(temp2_hyst, S_IRUGO, show_temp_hyst2, NULL);
 static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 
 /*
@@ -381,16 +381,16 @@ static int lm90_detect(struct i2c_adapter *adapter, int address, int kind)
 	lm90_init_client(new_client);
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_input2);
-	device_create_file(&new_client->dev, &dev_attr_temp_min1);
-	device_create_file(&new_client->dev, &dev_attr_temp_min2);
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max2);
-	device_create_file(&new_client->dev, &dev_attr_temp_crit1);
-	device_create_file(&new_client->dev, &dev_attr_temp_crit2);
-	device_create_file(&new_client->dev, &dev_attr_temp_hyst1);
-	device_create_file(&new_client->dev, &dev_attr_temp_hyst2);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp2_input);
+	device_create_file(&new_client->dev, &dev_attr_temp1_min);
+	device_create_file(&new_client->dev, &dev_attr_temp2_min);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_crit);
+	device_create_file(&new_client->dev, &dev_attr_temp2_crit);
+	device_create_file(&new_client->dev, &dev_attr_temp1_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp2_hyst);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 
 	return 0;

@@ -308,43 +308,43 @@ static ssize_t show_alarms(struct device *dev, char *buf)
 	return sprintf(buf, "%d\n", ALARMS_FROM_REG(data->alarms));
 }
 
-static DEVICE_ATTR(in_min0, S_IWUSR | S_IRUGO, show_in_min0, set_in_min0);
-static DEVICE_ATTR(in_min1, S_IWUSR | S_IRUGO, show_in_min1, set_in_min1);
-static DEVICE_ATTR(in_min2, S_IWUSR | S_IRUGO, show_in_min2, set_in_min2);
-static DEVICE_ATTR(in_min3, S_IWUSR | S_IRUGO, show_in_min3, set_in_min3);
-static DEVICE_ATTR(in_min4, S_IWUSR | S_IRUGO, show_in_min4, set_in_min4);
-static DEVICE_ATTR(in_min5, S_IWUSR | S_IRUGO, show_in_min5, set_in_min5);
-static DEVICE_ATTR(in_min6, S_IWUSR | S_IRUGO, show_in_min6, set_in_min6);
-static DEVICE_ATTR(in_max0, S_IWUSR | S_IRUGO, show_in_max0, set_in_max0);
-static DEVICE_ATTR(in_max1, S_IWUSR | S_IRUGO, show_in_max1, set_in_max1);
-static DEVICE_ATTR(in_max2, S_IWUSR | S_IRUGO, show_in_max2, set_in_max2);
-static DEVICE_ATTR(in_max3, S_IWUSR | S_IRUGO, show_in_max3, set_in_max3);
-static DEVICE_ATTR(in_max4, S_IWUSR | S_IRUGO, show_in_max4, set_in_max4);
-static DEVICE_ATTR(in_max5, S_IWUSR | S_IRUGO, show_in_max5, set_in_max5);
-static DEVICE_ATTR(in_max6, S_IWUSR | S_IRUGO, show_in_max6, set_in_max6);
-static DEVICE_ATTR(in_input0, S_IRUGO, show_in_input0, NULL);
-static DEVICE_ATTR(in_input1, S_IRUGO, show_in_input1, NULL);
-static DEVICE_ATTR(in_input2, S_IRUGO, show_in_input2, NULL);
-static DEVICE_ATTR(in_input3, S_IRUGO, show_in_input3, NULL);
-static DEVICE_ATTR(in_input4, S_IRUGO, show_in_input4, NULL);
-static DEVICE_ATTR(in_input5, S_IRUGO, show_in_input5, NULL);
-static DEVICE_ATTR(in_input6, S_IRUGO, show_in_input6, NULL);
-static DEVICE_ATTR(fan_min1, S_IWUSR | S_IRUGO, show_fan_min1,
+static DEVICE_ATTR(in0_min, S_IWUSR | S_IRUGO, show_in_min0, set_in_min0);
+static DEVICE_ATTR(in1_min, S_IWUSR | S_IRUGO, show_in_min1, set_in_min1);
+static DEVICE_ATTR(in2_min, S_IWUSR | S_IRUGO, show_in_min2, set_in_min2);
+static DEVICE_ATTR(in3_min, S_IWUSR | S_IRUGO, show_in_min3, set_in_min3);
+static DEVICE_ATTR(in4_min, S_IWUSR | S_IRUGO, show_in_min4, set_in_min4);
+static DEVICE_ATTR(in5_min, S_IWUSR | S_IRUGO, show_in_min5, set_in_min5);
+static DEVICE_ATTR(in6_min, S_IWUSR | S_IRUGO, show_in_min6, set_in_min6);
+static DEVICE_ATTR(in0_max, S_IWUSR | S_IRUGO, show_in_max0, set_in_max0);
+static DEVICE_ATTR(in1_max, S_IWUSR | S_IRUGO, show_in_max1, set_in_max1);
+static DEVICE_ATTR(in2_max, S_IWUSR | S_IRUGO, show_in_max2, set_in_max2);
+static DEVICE_ATTR(in3_max, S_IWUSR | S_IRUGO, show_in_max3, set_in_max3);
+static DEVICE_ATTR(in4_max, S_IWUSR | S_IRUGO, show_in_max4, set_in_max4);
+static DEVICE_ATTR(in5_max, S_IWUSR | S_IRUGO, show_in_max5, set_in_max5);
+static DEVICE_ATTR(in6_max, S_IWUSR | S_IRUGO, show_in_max6, set_in_max6);
+static DEVICE_ATTR(in0_input, S_IRUGO, show_in_input0, NULL);
+static DEVICE_ATTR(in1_input, S_IRUGO, show_in_input1, NULL);
+static DEVICE_ATTR(in2_input, S_IRUGO, show_in_input2, NULL);
+static DEVICE_ATTR(in3_input, S_IRUGO, show_in_input3, NULL);
+static DEVICE_ATTR(in4_input, S_IRUGO, show_in_input4, NULL);
+static DEVICE_ATTR(in5_input, S_IRUGO, show_in_input5, NULL);
+static DEVICE_ATTR(in6_input, S_IRUGO, show_in_input6, NULL);
+static DEVICE_ATTR(fan1_min, S_IWUSR | S_IRUGO, show_fan_min1,
     set_fan_min1);
-static DEVICE_ATTR(fan_min2, S_IWUSR | S_IRUGO, show_fan_min2,
+static DEVICE_ATTR(fan2_min, S_IWUSR | S_IRUGO, show_fan_min2,
     set_fan_min2);
-static DEVICE_ATTR(fan_input1, S_IRUGO, show_fan_input1, NULL);
-static DEVICE_ATTR(fan_input2, S_IRUGO, show_fan_input2, NULL);
-static DEVICE_ATTR(fan_div1, S_IRUGO, show_fan_div1, NULL);
-static DEVICE_ATTR(fan_div2, S_IRUGO, show_fan_div2, NULL);
-static DEVICE_ATTR(temp_input1, S_IRUGO, show_temp_input1, NULL);
-static DEVICE_ATTR(temp_max1, S_IWUSR | S_IRUGO, show_temp_hot_max,
+static DEVICE_ATTR(fan1_input, S_IRUGO, show_fan_input1, NULL);
+static DEVICE_ATTR(fan2_input, S_IRUGO, show_fan_input2, NULL);
+static DEVICE_ATTR(fan1_div, S_IRUGO, show_fan_div1, NULL);
+static DEVICE_ATTR(fan2_div, S_IRUGO, show_fan_div2, NULL);
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp_input1, NULL);
+static DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp_hot_max,
     set_temp_hot_max);
-static DEVICE_ATTR(temp_max1_hyst, S_IWUSR | S_IRUGO, show_temp_hot_hyst,
+static DEVICE_ATTR(temp1_max_hyst, S_IWUSR | S_IRUGO, show_temp_hot_hyst,
     set_temp_hot_hyst);
-static DEVICE_ATTR(temp_crit1, S_IWUSR | S_IRUGO, show_temp_os_max,
+static DEVICE_ATTR(temp1_crit, S_IWUSR | S_IRUGO, show_temp_os_max,
     set_temp_os_max);
-static DEVICE_ATTR(temp_crit1_hyst, S_IWUSR | S_IRUGO, show_temp_os_hyst,
+static DEVICE_ATTR(temp1_crit_hyst, S_IWUSR | S_IRUGO, show_temp_os_hyst,
     set_temp_os_hyst);
 static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 
@@ -418,38 +418,38 @@ int lm80_detect(struct i2c_adapter *adapter, int address, int kind)
 	lm80_init_client(new_client);
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_in_min0);
-	device_create_file(&new_client->dev, &dev_attr_in_min1);
-	device_create_file(&new_client->dev, &dev_attr_in_min2);
-	device_create_file(&new_client->dev, &dev_attr_in_min3);
-	device_create_file(&new_client->dev, &dev_attr_in_min4);
-	device_create_file(&new_client->dev, &dev_attr_in_min5);
-	device_create_file(&new_client->dev, &dev_attr_in_min6);
-	device_create_file(&new_client->dev, &dev_attr_in_max0);
-	device_create_file(&new_client->dev, &dev_attr_in_max1);
-	device_create_file(&new_client->dev, &dev_attr_in_max2);
-	device_create_file(&new_client->dev, &dev_attr_in_max3);
-	device_create_file(&new_client->dev, &dev_attr_in_max4);
-	device_create_file(&new_client->dev, &dev_attr_in_max5);
-	device_create_file(&new_client->dev, &dev_attr_in_max6);
-	device_create_file(&new_client->dev, &dev_attr_in_input0);
-	device_create_file(&new_client->dev, &dev_attr_in_input1);
-	device_create_file(&new_client->dev, &dev_attr_in_input2);
-	device_create_file(&new_client->dev, &dev_attr_in_input3);
-	device_create_file(&new_client->dev, &dev_attr_in_input4);
-	device_create_file(&new_client->dev, &dev_attr_in_input5);
-	device_create_file(&new_client->dev, &dev_attr_in_input6);
-	device_create_file(&new_client->dev, &dev_attr_fan_min1);
-	device_create_file(&new_client->dev, &dev_attr_fan_min2);
-	device_create_file(&new_client->dev, &dev_attr_fan_input1);
-	device_create_file(&new_client->dev, &dev_attr_fan_input2);
-	device_create_file(&new_client->dev, &dev_attr_fan_div1);
-	device_create_file(&new_client->dev, &dev_attr_fan_div2);
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max1_hyst);
-	device_create_file(&new_client->dev, &dev_attr_temp_crit1);
-	device_create_file(&new_client->dev, &dev_attr_temp_crit1_hyst);
+	device_create_file(&new_client->dev, &dev_attr_in0_min);
+	device_create_file(&new_client->dev, &dev_attr_in1_min);
+	device_create_file(&new_client->dev, &dev_attr_in2_min);
+	device_create_file(&new_client->dev, &dev_attr_in3_min);
+	device_create_file(&new_client->dev, &dev_attr_in4_min);
+	device_create_file(&new_client->dev, &dev_attr_in5_min);
+	device_create_file(&new_client->dev, &dev_attr_in6_min);
+	device_create_file(&new_client->dev, &dev_attr_in0_max);
+	device_create_file(&new_client->dev, &dev_attr_in1_max);
+	device_create_file(&new_client->dev, &dev_attr_in2_max);
+	device_create_file(&new_client->dev, &dev_attr_in3_max);
+	device_create_file(&new_client->dev, &dev_attr_in4_max);
+	device_create_file(&new_client->dev, &dev_attr_in5_max);
+	device_create_file(&new_client->dev, &dev_attr_in6_max);
+	device_create_file(&new_client->dev, &dev_attr_in0_input);
+	device_create_file(&new_client->dev, &dev_attr_in1_input);
+	device_create_file(&new_client->dev, &dev_attr_in2_input);
+	device_create_file(&new_client->dev, &dev_attr_in3_input);
+	device_create_file(&new_client->dev, &dev_attr_in4_input);
+	device_create_file(&new_client->dev, &dev_attr_in5_input);
+	device_create_file(&new_client->dev, &dev_attr_in6_input);
+	device_create_file(&new_client->dev, &dev_attr_fan1_min);
+	device_create_file(&new_client->dev, &dev_attr_fan2_min);
+	device_create_file(&new_client->dev, &dev_attr_fan1_input);
+	device_create_file(&new_client->dev, &dev_attr_fan2_input);
+	device_create_file(&new_client->dev, &dev_attr_fan1_div);
+	device_create_file(&new_client->dev, &dev_attr_fan2_div);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max_hyst);
+	device_create_file(&new_client->dev, &dev_attr_temp1_crit);
+	device_create_file(&new_client->dev, &dev_attr_temp1_crit_hyst);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 
 	return 0;

@@ -206,12 +206,12 @@ set(temp_hyst, ADM1021_REG_THYST_W);
 set(remote_temp_max, ADM1021_REG_REMOTE_TOS_W);
 set(remote_temp_hyst, ADM1021_REG_REMOTE_THYST_W);
 
-static DEVICE_ATTR(temp_max1, S_IWUSR | S_IRUGO, show_temp_max, set_temp_max);
-static DEVICE_ATTR(temp_min1, S_IWUSR | S_IRUGO, show_temp_hyst, set_temp_hyst);
-static DEVICE_ATTR(temp_input1, S_IRUGO, show_temp_input, NULL);
-static DEVICE_ATTR(temp_max2, S_IWUSR | S_IRUGO, show_remote_temp_max, set_remote_temp_max);
-static DEVICE_ATTR(temp_min2, S_IWUSR | S_IRUGO, show_remote_temp_hyst, set_remote_temp_hyst);
-static DEVICE_ATTR(temp_input2, S_IRUGO, show_remote_temp_input, NULL);
+static DEVICE_ATTR(temp1_max, S_IWUSR | S_IRUGO, show_temp_max, set_temp_max);
+static DEVICE_ATTR(temp1_min, S_IWUSR | S_IRUGO, show_temp_hyst, set_temp_hyst);
+static DEVICE_ATTR(temp1_input, S_IRUGO, show_temp_input, NULL);
+static DEVICE_ATTR(temp2_max, S_IWUSR | S_IRUGO, show_remote_temp_max, set_remote_temp_max);
+static DEVICE_ATTR(temp2_min, S_IWUSR | S_IRUGO, show_remote_temp_hyst, set_remote_temp_hyst);
+static DEVICE_ATTR(temp2_input, S_IRUGO, show_remote_temp_input, NULL);
 static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 static DEVICE_ATTR(die_code, S_IRUGO, show_die_code, NULL);
 
@@ -331,12 +331,12 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 	adm1021_init_client(new_client);
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_min1);
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max2);
-	device_create_file(&new_client->dev, &dev_attr_temp_min2);
-	device_create_file(&new_client->dev, &dev_attr_temp_input2);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_min);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max);
+	device_create_file(&new_client->dev, &dev_attr_temp2_min);
+	device_create_file(&new_client->dev, &dev_attr_temp2_input);
 	device_create_file(&new_client->dev, &dev_attr_alarms);
 	if (data->type == adm1021)
 		device_create_file(&new_client->dev, &dev_attr_die_code);

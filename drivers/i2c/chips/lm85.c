@@ -460,8 +460,8 @@ static ssize_t set_fan_##offset##_min (struct device *dev, 		\
 {									\
 	return set_fan_min(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(fan_input##offset, S_IRUGO, show_fan_##offset, NULL) \
-static DEVICE_ATTR(fan_min##offset, S_IRUGO | S_IWUSR, 			\
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_fan_##offset, NULL) \
+static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, 		\
 		show_fan_##offset##_min, set_fan_##offset##_min)
 
 show_fan_offset(1);
@@ -566,7 +566,7 @@ static ssize_t show_pwm_enable##offset (struct device *dev, char *buf)	\
 }									\
 static DEVICE_ATTR(pwm##offset, S_IRUGO | S_IWUSR, 			\
 		show_pwm_##offset, set_pwm_##offset)			\
-static DEVICE_ATTR(pwm_enable##offset, S_IRUGO, show_pwm_enable##offset, NULL)
+static DEVICE_ATTR(pwm##offset##_enable, S_IRUGO, show_pwm_enable##offset, NULL)
 
 show_pwm_reg(1);
 show_pwm_reg(2);
@@ -649,10 +649,10 @@ static ssize_t set_in_##offset##_max (struct device *dev, 		\
 {									\
 	return set_in_max(dev, buf, count, 0x##offset);			\
 }									\
-static DEVICE_ATTR(in_input##offset, S_IRUGO, show_in_##offset, NULL)	\
-static DEVICE_ATTR(in_min##offset, S_IRUGO | S_IWUSR, 			\
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_in_##offset, NULL)	\
+static DEVICE_ATTR(in##offset##_min, S_IRUGO | S_IWUSR, 		\
 		show_in_##offset##_min, set_in_##offset##_min)		\
-static DEVICE_ATTR(in_max##offset, S_IRUGO | S_IWUSR, 			\
+static DEVICE_ATTR(in##offset##_max, S_IRUGO | S_IWUSR, 		\
 		show_in_##offset##_max, set_in_##offset##_max)
 
 show_in_reg(0);
@@ -738,10 +738,10 @@ static ssize_t set_temp_##offset##_max (struct device *dev, 		\
 {									\
 	return set_temp_max(dev, buf, count, 0x##offset - 1);		\
 }									\
-static DEVICE_ATTR(temp_input##offset, S_IRUGO, show_temp_##offset, NULL)	\
-static DEVICE_ATTR(temp_min##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_temp_##offset, NULL)	\
+static DEVICE_ATTR(temp##offset##_min, S_IRUGO | S_IWUSR, 		\
 		show_temp_##offset##_min, set_temp_##offset##_min)	\
-static DEVICE_ATTR(temp_max##offset, S_IRUGO | S_IWUSR, 		\
+static DEVICE_ATTR(temp##offset##_max, S_IRUGO | S_IWUSR, 		\
 		show_temp_##offset##_max, set_temp_##offset##_max)
 
 show_temp_reg(1);
@@ -886,44 +886,44 @@ int lm85_detect(struct i2c_adapter *adapter, int address,
 	lm85_init_client(new_client);
 
 	/* Register sysfs hooks */
-	device_create_file(&new_client->dev, &dev_attr_fan_input1);
-	device_create_file(&new_client->dev, &dev_attr_fan_input2);
-	device_create_file(&new_client->dev, &dev_attr_fan_input3);
-	device_create_file(&new_client->dev, &dev_attr_fan_input4);
-	device_create_file(&new_client->dev, &dev_attr_fan_min1);
-	device_create_file(&new_client->dev, &dev_attr_fan_min2);
-	device_create_file(&new_client->dev, &dev_attr_fan_min3);
-	device_create_file(&new_client->dev, &dev_attr_fan_min4);
+	device_create_file(&new_client->dev, &dev_attr_fan1_input);
+	device_create_file(&new_client->dev, &dev_attr_fan2_input);
+	device_create_file(&new_client->dev, &dev_attr_fan3_input);
+	device_create_file(&new_client->dev, &dev_attr_fan4_input);
+	device_create_file(&new_client->dev, &dev_attr_fan1_min);
+	device_create_file(&new_client->dev, &dev_attr_fan2_min);
+	device_create_file(&new_client->dev, &dev_attr_fan3_min);
+	device_create_file(&new_client->dev, &dev_attr_fan4_min);
 	device_create_file(&new_client->dev, &dev_attr_pwm1);
 	device_create_file(&new_client->dev, &dev_attr_pwm2);
 	device_create_file(&new_client->dev, &dev_attr_pwm3);
-	device_create_file(&new_client->dev, &dev_attr_pwm_enable1);
-	device_create_file(&new_client->dev, &dev_attr_pwm_enable2);
-	device_create_file(&new_client->dev, &dev_attr_pwm_enable3);
-	device_create_file(&new_client->dev, &dev_attr_in_input0);
-	device_create_file(&new_client->dev, &dev_attr_in_input1);
-	device_create_file(&new_client->dev, &dev_attr_in_input2);
-	device_create_file(&new_client->dev, &dev_attr_in_input3);
-	device_create_file(&new_client->dev, &dev_attr_in_input4);
-	device_create_file(&new_client->dev, &dev_attr_in_min0);
-	device_create_file(&new_client->dev, &dev_attr_in_min1);
-	device_create_file(&new_client->dev, &dev_attr_in_min2);
-	device_create_file(&new_client->dev, &dev_attr_in_min3);
-	device_create_file(&new_client->dev, &dev_attr_in_min4);
-	device_create_file(&new_client->dev, &dev_attr_in_max0);
-	device_create_file(&new_client->dev, &dev_attr_in_max1);
-	device_create_file(&new_client->dev, &dev_attr_in_max2);
-	device_create_file(&new_client->dev, &dev_attr_in_max3);
-	device_create_file(&new_client->dev, &dev_attr_in_max4);
-	device_create_file(&new_client->dev, &dev_attr_temp_input1);
-	device_create_file(&new_client->dev, &dev_attr_temp_input2);
-	device_create_file(&new_client->dev, &dev_attr_temp_input3);
-	device_create_file(&new_client->dev, &dev_attr_temp_min1);
-	device_create_file(&new_client->dev, &dev_attr_temp_min2);
-	device_create_file(&new_client->dev, &dev_attr_temp_min3);
-	device_create_file(&new_client->dev, &dev_attr_temp_max1);
-	device_create_file(&new_client->dev, &dev_attr_temp_max2);
-	device_create_file(&new_client->dev, &dev_attr_temp_max3);
+	device_create_file(&new_client->dev, &dev_attr_pwm1_enable);
+	device_create_file(&new_client->dev, &dev_attr_pwm2_enable);
+	device_create_file(&new_client->dev, &dev_attr_pwm3_enable);
+	device_create_file(&new_client->dev, &dev_attr_in0_input);
+	device_create_file(&new_client->dev, &dev_attr_in1_input);
+	device_create_file(&new_client->dev, &dev_attr_in2_input);
+	device_create_file(&new_client->dev, &dev_attr_in3_input);
+	device_create_file(&new_client->dev, &dev_attr_in4_input);
+	device_create_file(&new_client->dev, &dev_attr_in0_min);
+	device_create_file(&new_client->dev, &dev_attr_in1_min);
+	device_create_file(&new_client->dev, &dev_attr_in2_min);
+	device_create_file(&new_client->dev, &dev_attr_in3_min);
+	device_create_file(&new_client->dev, &dev_attr_in4_min);
+	device_create_file(&new_client->dev, &dev_attr_in0_max);
+	device_create_file(&new_client->dev, &dev_attr_in1_max);
+	device_create_file(&new_client->dev, &dev_attr_in2_max);
+	device_create_file(&new_client->dev, &dev_attr_in3_max);
+	device_create_file(&new_client->dev, &dev_attr_in4_max);
+	device_create_file(&new_client->dev, &dev_attr_temp1_input);
+	device_create_file(&new_client->dev, &dev_attr_temp2_input);
+	device_create_file(&new_client->dev, &dev_attr_temp3_input);
+	device_create_file(&new_client->dev, &dev_attr_temp1_min);
+	device_create_file(&new_client->dev, &dev_attr_temp2_min);
+	device_create_file(&new_client->dev, &dev_attr_temp3_min);
+	device_create_file(&new_client->dev, &dev_attr_temp1_max);
+	device_create_file(&new_client->dev, &dev_attr_temp2_max);
+	device_create_file(&new_client->dev, &dev_attr_temp3_max);
 	device_create_file(&new_client->dev, &dev_attr_vrm);
 	device_create_file(&new_client->dev, &dev_attr_vid);
 	device_create_file(&new_client->dev, &dev_attr_alarms);

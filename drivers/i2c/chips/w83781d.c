@@ -330,7 +330,7 @@ show_regs_in_##offset (struct device *dev, char *buf) \
 { \
         return show_in(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(in_input##offset, S_IRUGO, show_regs_in_##offset, NULL)
+static DEVICE_ATTR(in##offset##_input, S_IRUGO, show_regs_in_##offset, NULL)
 
 #define sysfs_in_reg_offset(reg, offset) \
 static ssize_t show_regs_in_##reg##offset (struct device *dev, char *buf) \
@@ -341,7 +341,7 @@ static ssize_t store_regs_in_##reg##offset (struct device *dev, const char *buf,
 { \
 	return store_in_##reg (dev, buf, count, 0x##offset); \
 } \
-static DEVICE_ATTR(in_##reg##offset, S_IRUGO| S_IWUSR, show_regs_in_##reg##offset, store_regs_in_##reg##offset)
+static DEVICE_ATTR(in##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_in_##reg##offset, store_regs_in_##reg##offset)
 
 #define sysfs_in_offsets(offset) \
 sysfs_in_offset(offset); \
@@ -360,9 +360,9 @@ sysfs_in_offsets(8);
 
 #define device_create_file_in(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_in_input##offset); \
-device_create_file(&client->dev, &dev_attr_in_min##offset); \
-device_create_file(&client->dev, &dev_attr_in_max##offset); \
+device_create_file(&client->dev, &dev_attr_in##offset##_input); \
+device_create_file(&client->dev, &dev_attr_in##offset##_min); \
+device_create_file(&client->dev, &dev_attr_in##offset##_max); \
 } while (0)
 
 #define show_fan_reg(reg) \
@@ -400,7 +400,7 @@ static ssize_t show_regs_fan_##offset (struct device *dev, char *buf) \
 { \
 	return show_fan(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(fan_input##offset, S_IRUGO, show_regs_fan_##offset, NULL)
+static DEVICE_ATTR(fan##offset##_input, S_IRUGO, show_regs_fan_##offset, NULL)
 
 #define sysfs_fan_min_offset(offset) \
 static ssize_t show_regs_fan_min##offset (struct device *dev, char *buf) \
@@ -411,7 +411,7 @@ static ssize_t store_regs_fan_min##offset (struct device *dev, const char *buf, 
 { \
 	return store_fan_min(dev, buf, count, 0x##offset); \
 } \
-static DEVICE_ATTR(fan_min##offset, S_IRUGO | S_IWUSR, show_regs_fan_min##offset, store_regs_fan_min##offset)
+static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, show_regs_fan_min##offset, store_regs_fan_min##offset)
 
 sysfs_fan_offset(1);
 sysfs_fan_min_offset(1);
@@ -422,8 +422,8 @@ sysfs_fan_min_offset(3);
 
 #define device_create_file_fan(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_fan_input##offset); \
-device_create_file(&client->dev, &dev_attr_fan_min##offset); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_input); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_min); \
 } while (0)
 
 #define show_temp_reg(reg) \
@@ -484,7 +484,7 @@ show_regs_temp_##offset (struct device *dev, char *buf) \
 { \
 	return show_temp(dev, buf, 0x##offset); \
 } \
-static DEVICE_ATTR(temp_input##offset, S_IRUGO, show_regs_temp_##offset, NULL)
+static DEVICE_ATTR(temp##offset##_input, S_IRUGO, show_regs_temp_##offset, NULL)
 
 #define sysfs_temp_reg_offset(reg, offset) \
 static ssize_t show_regs_temp_##reg##offset (struct device *dev, char *buf) \
@@ -495,7 +495,7 @@ static ssize_t store_regs_temp_##reg##offset (struct device *dev, const char *bu
 { \
 	return store_temp_##reg (dev, buf, count, 0x##offset); \
 } \
-static DEVICE_ATTR(temp_##reg##offset, S_IRUGO| S_IWUSR, show_regs_temp_##reg##offset, store_regs_temp_##reg##offset)
+static DEVICE_ATTR(temp##offset##_##reg, S_IRUGO| S_IWUSR, show_regs_temp_##reg##offset, store_regs_temp_##reg##offset)
 
 #define sysfs_temp_offsets(offset) \
 sysfs_temp_offset(offset); \
@@ -508,9 +508,9 @@ sysfs_temp_offsets(3);
 
 #define device_create_file_temp(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_temp_input##offset); \
-device_create_file(&client->dev, &dev_attr_temp_max##offset); \
-device_create_file(&client->dev, &dev_attr_temp_hyst##offset); \
+device_create_file(&client->dev, &dev_attr_temp##offset##_input); \
+device_create_file(&client->dev, &dev_attr_temp##offset##_max); \
+device_create_file(&client->dev, &dev_attr_temp##offset##_hyst); \
 } while (0)
 
 static ssize_t
@@ -707,7 +707,7 @@ static ssize_t store_regs_fan_div_##offset (struct device *dev, const char *buf,
 { \
 	return store_fan_div_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(fan_div##offset, S_IRUGO | S_IWUSR, show_regs_fan_div_##offset, store_regs_fan_div_##offset)
+static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, show_regs_fan_div_##offset, store_regs_fan_div_##offset)
 
 sysfs_fan_div(1);
 sysfs_fan_div(2);
@@ -715,7 +715,7 @@ sysfs_fan_div(3);
 
 #define device_create_file_fan_div(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_fan_div##offset); \
+device_create_file(&client->dev, &dev_attr_fan##offset##_div); \
 } while (0)
 
 /* w83697hf only has two fans */
@@ -819,7 +819,7 @@ static ssize_t store_regs_pwmenable_##offset (struct device *dev, const char *bu
 { \
 	return store_pwmenable_reg(dev, buf, count, offset); \
 } \
-static DEVICE_ATTR(pwm_enable##offset, S_IRUGO | S_IWUSR, show_regs_pwmenable_##offset, store_regs_pwmenable_##offset)
+static DEVICE_ATTR(pwm##offset##_enable, S_IRUGO | S_IWUSR, show_regs_pwmenable_##offset, store_regs_pwmenable_##offset)
 
 sysfs_pwm(1);
 sysfs_pwm(2);
@@ -834,7 +834,7 @@ device_create_file(&client->dev, &dev_attr_pwm##offset); \
 
 #define device_create_file_pwmenable(client, offset) \
 do { \
-device_create_file(&client->dev, &dev_attr_pwm_enable##offset); \
+device_create_file(&client->dev, &dev_attr_pwm##offset##_enable); \
 } while (0)
 
 static ssize_t

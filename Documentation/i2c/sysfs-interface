@@ -50,7 +50,7 @@ All sysfs values are fixed point numbers.  To get the true value of some
 of the values, you should divide by the specified value.
 
 There is only one value per file, unlike the older /proc specification.
-The common scheme for files naming is: <type>_<item><number>. Usual
+The common scheme for files naming is: <type><number>_<item>. Usual
 types for sensor chips are "in" (voltage), "temp" (temperature) and
 "fan" (fan). Usual items are "input" (measured value), "max" (high
 threshold, "min" (low threshold). Numbering usually starts from 1,
@@ -73,17 +73,17 @@ to cause an alarm) is chip-dependent.
 * Voltages *
 ************
 
-in_min[0-8]	Voltage min value.
+in[0-8]_min	Voltage min value.
 		Fixed point value in form XXXX.  Divide by 1000 to get
 		Volts.
 		Read/Write
 		
-in_max[0-8]	Voltage max value.
+in[0-8]_max	Voltage max value.
 		Fixed point value in form XXXX.  Divide by 1000 to get
 		Volts.
 		Read/Write
 		
-in_input[0-8]	Voltage input value.
+in[0-8]_input	Voltage input value.
 		Fixed point value in form XXXX.  Divide by 1000 to get
 		Volts.
 		Read only
@@ -97,15 +97,15 @@ in_input[0-8]	Voltage input value.
 		These drivers will output the actual voltage.
 		First two values are read/write and third is read only.
 		Typical usage:
-			in_*0	CPU #1 voltage (not scaled)
-			in_*1	CPU #1 voltage (not scaled)
-			in_*2	3.3V nominal (not scaled)
-			in_*3	5.0V nominal (scaled)
-			in_*4	12.0V nominal (scaled)
-			in_*5	-12.0V nominal (scaled)
-			in_*6	-5.0V nominal (scaled)
-			in_*7	varies
-			in_*8	varies
+			in0_*	CPU #1 voltage (not scaled)
+			in1_*	CPU #1 voltage (not scaled)
+			in2_*	3.3V nominal (not scaled)
+			in3_*	5.0V nominal (scaled)
+			in4_*	12.0V nominal (scaled)
+			in5_*	-12.0V nominal (scaled)
+			in6_*	-5.0V nominal (scaled)
+			in7_*	varies
+			in8_*	varies
 
 vid		CPU core voltage.
 		Read only.
@@ -125,15 +125,15 @@ vrm		Voltage Regulator Module version number.
 * Fans *
 ********
 
-fan_min[1-3]	Fan minimum value
+fan[1-3]_min	Fan minimum value
 		Integer value indicating RPM
 		Read/Write.
 
-fan_input[1-3]	Fan input value.
+fan[1-3]_input	Fan input value.
 		Integer value indicating RPM
 		Read only.
 
-fan_div[1-3]	Fan divisor.
+fan[1-3]_div	Fan divisor.
 		Integers in powers of two (1,2,4,8,16,32,64,128).
 		Some chips only support values 1,2,4,8.
 		See doc/fan-divisors for details.
@@ -144,7 +144,7 @@ pwm[1-3]	Pulse width modulation fan control.
 		255 is max or 100%.
 		Corresponds to the fans 1-3.
 
-pwm_enable[1-3] pwm enable
+pwm[1-3]_enable pwm enable
 		not always present even if pwm* is.
 		0 to turn off
 		1 to turn on
@@ -159,23 +159,23 @@ sensor[1-3]	Sensor type selection.
 		Integers 1,2,3, or thermistor Beta value (3435)
 		Read/Write.
 
-temp_max[1-4]	Temperature max value.
+temp[1-4]_max	Temperature max value.
 		Fixed point value in form XXXXX and should be divided by
 		1000 to get degrees Celsius.
 		Read/Write value.
 
-temp_min[1-3]	Temperature min value.
+temp[1-3]_min	Temperature min value.
 		Fixed point value in form XXXXX and should be divided by
 		1000 to get degrees Celsius.
 		Read/Write value.
 
-temp_hyst[1-3]	Temperature hysteresis value.
+temp[1-3]_hyst	Temperature hysteresis value.
 		Fixed point value in form XXXXX and should be divided by
 		1000 to get degrees Celsius.  Must be reported as an
 		absolute temperature, NOT a delta from the max value.
 		Read/Write value.
 
-temp_input[1-4] Temperature input value.
+temp[1-4]_input Temperature input value.
 		Fixed point value in form XXXXX and should be divided by
 		1000 to get degrees Celsius.
 		Read only value.
@@ -187,10 +187,10 @@ temp_crit	Temperature critical value, typically greater than all
 		Common to all temperature channels.
 		Read/Write value.
 
-		If there are multiple temperature sensors, temp_*1 is
+		If there are multiple temperature sensors, temp1_* is
 		generally the sensor inside the chip itself, generally
-		reported as "motherboard temperature".  temp_*2 to
-		temp_*4 are generally sensors external to the chip
+		reported as "motherboard temperature".  temp2_* to
+		temp4_* are generally sensors external to the chip
 		itself, for example the thermal diode inside the CPU or
 		a thermistor nearby.
 
@@ -202,15 +202,15 @@ temp_crit	Temperature critical value, typically greater than all
 Note that no known chip provides current measurements as of writing,
 so this part is theoretical, so to say.
 
-curr_max[1-n]	Current max value
+curr[1-n]_max	Current max value
 		Fixed point XXXXX, divide by 1000 to get Amps.
 		Read/Write.
 
-curr_min[1-n]	Current min value.
+curr[1-n]_min	Current min value.
 		Fixed point XXXXX, divide by 1000 to get Amps.
 		Read/Write.
 
-curr_input[1-n]	Current input value
+curr[1-n]_input	Current input value
 		Fixed point XXXXX, divide by 1000 to get Amps.
 		Read only.
 
