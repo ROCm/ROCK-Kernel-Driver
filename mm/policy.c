@@ -76,7 +76,7 @@ static kmem_cache_t *policy_cache;
 static kmem_cache_t *sn_cache;
 
 #define round_up(x,y) (((x) + (y) - 1) & ~((y)-1))
-#define PDprintk(fmt...) printk(fmt)
+#define PDprintk(fmt...)
 
 /* Highest zone. An specific allocation for a zone below that is not
    policied. */

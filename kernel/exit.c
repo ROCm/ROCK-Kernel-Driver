@@ -25,9 +25,9 @@
 #ifdef	CONFIG_KDB
 #include <linux/kdb.h>
 #endif
+#include <linux/ckrm.h>
 #include <linux/trigevent_hooks.h>
 #include <linux/ltt.h>
-#include <linux/ckrm.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>

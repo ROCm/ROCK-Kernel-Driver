@@ -46,8 +46,8 @@
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/objrmap.h>
-#include <linux/trigevent_hooks.h>
 #include <linux/ckrm.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>

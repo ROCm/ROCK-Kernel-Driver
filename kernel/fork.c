@@ -33,8 +33,8 @@
 #include <linux/mount.h>
 #include <linux/objrmap.h>
 
-#include <linux/trigevent_hooks.h>
 #include <linux/ckrm.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
