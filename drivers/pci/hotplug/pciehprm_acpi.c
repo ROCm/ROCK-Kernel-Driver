@@ -1268,7 +1268,8 @@ static int print_acpi_resources (struct acpi_bridge	*ab)
 int pciehprm_print_pirt(void)
 {
 	dbg("PCIEHPRM ACPI Slots\n");
-	print_acpi_resources (acpi_bridges_head);
+	if (acpi_bridges_head)
+		print_acpi_resources (acpi_bridges_head);
 
 	return 0;
 }
