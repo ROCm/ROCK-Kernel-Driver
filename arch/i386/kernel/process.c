@@ -19,6 +19,7 @@
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/elfcore.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/stddef.h>
@@ -371,6 +372,25 @@ void dump_thread(struct pt_regs * regs, struct user * dump)
 	dump->regs.ss = regs->xss;
 
 	dump->u_fpvalid = dump_fpu (regs, &dump->i387);
+}
+
+/* 
+ * Capture the user space registers if the task is not running (in user space)
+ */
+int dump_task_regs(struct task_struct *tsk, elf_gregset_t *regs)
+{
+	struct pt_regs ptregs;
+	
+	ptregs = *(struct pt_regs *)
+		((unsigned long)tsk->thread_info+THREAD_SIZE - sizeof(ptregs));
+	ptregs.xcs &= 0xffff;
+	ptregs.xds &= 0xffff;
+	ptregs.xes &= 0xffff;
+	ptregs.xss &= 0xffff;
+
+	elf_core_copy_regs(regs, &ptregs);
+
+	return 1;
 }
 
 /*

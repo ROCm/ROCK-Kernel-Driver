@@ -208,6 +208,11 @@ struct mm_struct {
 	/* Architecture-specific MM context */
 	mm_context_t context;
 
+	/* coredumping support */
+	struct semaphore core_sem;
+	atomic_t core_waiters;
+	wait_queue_head_t core_wait;
+
 	/* aio bits */
 	rwlock_t		ioctx_list_lock;
 	struct kioctx		*ioctx_list;
@@ -401,6 +406,8 @@ struct task_struct {
 	void *journal_info;
 	struct dentry *proc_dentry;
 	struct backing_dev_info *backing_dev_info;
+/* threaded coredumping support */
+	int core_waiter;
 };
 
 extern void __put_task_struct(struct task_struct *tsk);
@@ -540,6 +547,7 @@ extern int kill_proc_info(int, struct siginfo *, pid_t);
 extern void notify_parent(struct task_struct *, int);
 extern void do_notify_parent(struct task_struct *, int);
 extern void force_sig(int, struct task_struct *);
+extern void force_sig_specific(int, struct task_struct *);
 extern int send_sig(int, struct task_struct *, int);
 extern int __broadcast_thread_group(struct task_struct *p, int sig);
 extern int kill_pg(pid_t, int, int);
