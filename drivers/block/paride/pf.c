@@ -264,7 +264,7 @@ struct pf_unit {
 	int access;		/* count of active opens ... */
 	int present;		/* device present ? */
 	char name[PF_NAMELEN];	/* pf0, pf1, ... */
-	struct gendisk disk;
+	struct gendisk *disk;
 };
 
 struct pf_unit units[PF_UNITS];
@@ -308,7 +308,10 @@ void pf_init_units(void)
 
 	pf_drive_count = 0;
 	for (unit = 0, pf = units; unit < PF_UNITS; unit++, pf++) {
-		struct gendisk *disk = &pf->disk;
+		struct gendisk *disk = alloc_disk();
+		if (!disk)
+			continue;
+		pf->disk = disk;
 		pf->pi = &pf->pia;
 		pf->media_status = PF_NM;
 		pf->drive = (*drives[unit])[D_SLV];
@@ -355,11 +358,6 @@ static int pf_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	struct pf_unit *pf = units + unit;
 	sector_t capacity;
 
-	if (unit >= PF_UNITS)
-		return -EINVAL;
-	if (!pf->present)
-		return -ENODEV;
-
 	if (cmd == CDROMEJECT) {
 		if (pf->access == 1) {
 			pf_eject(pf);
@@ -369,7 +367,7 @@ static int pf_ioctl(struct inode *inode, struct file *file, unsigned int cmd, un
 	}
 	if (cmd != HDIO_GETGEO)
 		return -EINVAL;
-	capacity = get_capacity(&pf->disk);
+	capacity = get_capacity(pf->disk);
 	if (capacity < PF_FD_MAX) {
 		g.cylinders = capacity / (PF_FD_HDS * PF_FD_SPT);
 		g.heads = PF_FD_HDS;
@@ -635,10 +633,10 @@ static void pf_get_capacity(struct pf_unit *pf)
 		pf->media_status = PF_NM;
 		return;
 	}
-	set_capacity(&pf->disk, xl(buf, 0) + 1);
+	set_capacity(pf->disk, xl(buf, 0) + 1);
 	bs = xl(buf, 4);
 	if (bs != 512) {
-		set_capacity(&pf->disk, 0);
+		set_capacity(pf->disk, 0);
 		if (verbose)
 			printk("%s: Drive %d, LUN %d,"
 			       " unsupported block size %d\n",
@@ -687,7 +685,7 @@ static int pf_identify(struct pf_unit *pf)
 	else {
 		if (pf->media_status == PF_RO)
 			printk(", RO");
-		printk(", %ld blocks\n", get_capacity(&pf->disk));
+		printk(", %ld blocks\n", get_capacity(pf->disk));
 	}
 	return 0;
 }
@@ -731,7 +729,7 @@ static int pf_detect(void)
 	if (pf_drive_count == 0) {
 		if (pi_init(pf->pi, 1, -1, -1, -1, -1, -1, pf_scratch, PI_PF,
 			    verbose, pf->name)) {
-			if (!pf_probe(pf)) {
+			if (!pf_probe(pf) && pf->disk) {
 				pf->present = 1;
 				k++;
 			} else
@@ -746,7 +744,7 @@ static int pf_detect(void)
 			if (pi_init(pf->pi, 0, conf[D_PRT], conf[D_MOD],
 				    conf[D_UNI], conf[D_PRO], conf[D_DLY],
 				    pf_scratch, PI_PF, verbose, pf->name)) {
-				if (!pf_probe(pf)) {
+				if (!pf_probe(pf) && pf->disk) {
 					pf->present = 1;
 					k++;
 				} else
@@ -757,6 +755,8 @@ static int pf_detect(void)
 		return 0;
 
 	printk("%s: No ATAPI disk detected\n", name);
+	for (pf = units, unit = 0; unit < PF_UNITS; pf++, unit++)
+		put_disk(pf->disk);
 	return -1;
 }
 
@@ -805,7 +805,7 @@ static void do_pf_request(request_queue_t * q)
 	pf_count = pf_req->current_nr_sectors;
 
 	if ((unit >= PF_UNITS) ||
-	    (pf_block + pf_count > get_capacity(&pf_current->disk))) {
+	    (pf_block + pf_count > get_capacity(pf_current->disk))) {
 		end_request(pf_req, 0);
 		goto repeat;
 	}
@@ -976,6 +976,8 @@ static int __init pf_init(void)
 
 	if (register_blkdev(MAJOR_NR, name, &pf_fops)) {
 		printk("pf_init: unable to get major number %d\n", major);
+		for (pf = units, unit = 0; unit < PF_UNITS; pf++, unit++)
+			put_disk(pf->disk);
 		return -1;
 	}
 	q = BLK_DEFAULT_QUEUE(MAJOR_NR);
@@ -984,7 +986,7 @@ static int __init pf_init(void)
 	blk_queue_max_hw_segments(q, cluster);
 
 	for (pf = units, unit = 0; unit < PF_UNITS; pf++, unit++) {
-		struct gendisk *disk = &pf->disk;
+		struct gendisk *disk = pf->disk;
 		if (!pf->present)
 			continue;
 		add_disk(disk);
@@ -1000,7 +1002,8 @@ static void __exit pf_exit(void)
 	for (pf = units, unit = 0; unit < PF_UNITS; pf++, unit++) {
 		if (!pf->present)
 			continue;
-		del_gendisk(&pf->disk);
+		del_gendisk(pf->disk);
+		put_disk(pf->disk);
 		pi_release(pf->pi);
 	}
 }
