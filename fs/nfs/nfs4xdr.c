@@ -319,6 +319,12 @@ static int nfs_stat_to_errno(int);
 				decode_create_maxsz + \
 				decode_getattr_maxsz + \
 				decode_getfh_maxsz)
+#define NFS4_enc_pathconf_sz	(compound_encode_hdr_maxsz + \
+				encode_putfh_maxsz + \
+				encode_getattr_maxsz)
+#define NFS4_dec_pathconf_sz	(compound_decode_hdr_maxsz + \
+				decode_putfh_maxsz + \
+				decode_getattr_maxsz)
 
 
 
@@ -1659,6 +1665,27 @@ nfs4_xdr_enc_fsinfo(struct rpc_rqst *req, uint32_t *p, void *fhandle)
 }
 
 /*
+ * a PATHCONF request
+ */
+static int nfs4_xdr_enc_pathconf(struct rpc_rqst *req, uint32_t *p, const struct nfs4_pathconf_arg *args)
+{
+	extern u32 nfs4_pathconf_bitmap[2];
+	struct xdr_stream xdr;
+	struct compound_hdr hdr = {
+		.nops = 2,
+	};
+	int status;
+
+	xdr_init_encode(&xdr, &req->rq_snd_buf, p);
+	encode_compound_hdr(&xdr, &hdr);
+	status = encode_putfh(&xdr, args->fh);
+	if (!status)
+		status = encode_getattr_one(&xdr,
+				args->bitmask[0] & nfs4_pathconf_bitmap[0]);
+	return status;
+}
+
+/*
  * a RENEW request
  */
 static int
@@ -1909,6 +1936,40 @@ static int decode_attr_fileid(struct xdr_stream *xdr, uint32_t *bitmap, uint64_t
 	}
 	dprintk("%s: fileid=%Lu\n", __FUNCTION__, (unsigned long long)*fileid);
 	return 0;
+}
+
+static int decode_attr_maxlink(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *maxlink)
+{
+	uint32_t *p;
+	int status = 0;
+
+	*maxlink = 1;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_MAXLINK - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_MAXLINK)) {
+		READ_BUF(4);
+		READ32(*maxlink);
+		bitmap[0] &= ~FATTR4_WORD0_MAXLINK;
+	}
+	dprintk("%s: maxlink=%u\n", __FUNCTION__, *maxlink);
+	return status;
+}
+
+static int decode_attr_maxname(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *maxname)
+{
+	uint32_t *p;
+	int status = 0;
+
+	*maxname = 1024;
+	if (unlikely(bitmap[0] & (FATTR4_WORD0_MAXNAME - 1U)))
+		return -EIO;
+	if (likely(bitmap[0] & FATTR4_WORD0_MAXNAME)) {
+		READ_BUF(4);
+		READ32(*maxname);
+		bitmap[0] &= ~FATTR4_WORD0_MAXNAME;
+	}
+	dprintk("%s: maxname=%u\n", __FUNCTION__, *maxname);
+	return status;
 }
 
 static int decode_attr_mode(struct xdr_stream *xdr, uint32_t *bitmap, uint32_t *mode)
@@ -2184,7 +2245,6 @@ static int decode_create(struct xdr_stream *xdr, struct nfs4_change_info *cinfo)
 }
 
 extern uint32_t nfs4_fsstat_bitmap[2];
-extern uint32_t nfs4_pathconf_bitmap[2];
 
 static int
 decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
@@ -2192,7 +2252,6 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
 {
 	struct nfs_fattr *nfp = getattr->gt_attrs;
 	struct nfs_fsstat *fsstat = getattr->gt_fsstat;
-	struct nfs_pathconf *pathconf = getattr->gt_pathconf;
 	uint32_t attrlen, dummy32, bmlen,
 		 bmval0 = 0,
 		 bmval1 = 0,
@@ -2293,18 +2352,6 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
                 len += 8;
                 READ64(fsstat->tfiles);
                 dprintk("read_attrs: files_tot=0x%Lx\n", (long long) fsstat->tfiles);
-        }
-	if (bmval0 & FATTR4_WORD0_MAXLINK) {
-		READ_BUF(4);
-		len += 4;
-		READ32(pathconf->max_link);
-		dprintk("read_attrs: maxlink=%d\n", pathconf->max_link);
-	}
-        if (bmval0 & FATTR4_WORD0_MAXNAME) {
-                READ_BUF(4);
-                len += 4;
-                READ32(pathconf->max_namelen);
-                dprintk("read_attrs: maxname=%d\n", pathconf->max_namelen);
         }
 	
         if (bmval1 & FATTR4_WORD1_MODE) {
@@ -2412,6 +2459,32 @@ decode_getattr(struct xdr_stream *xdr, struct nfs4_getattr *getattr,
                 goto xdr_error;
 	
         DECODE_TAIL;
+}
+
+static int decode_pathconf(struct xdr_stream *xdr, struct nfs_pathconf *pathconf)
+{
+	uint32_t *savep;
+	uint32_t attrlen, 
+		 bitmap[2] = {0};
+	int status;
+	
+	if ((status = decode_op_hdr(xdr, OP_GETATTR)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_bitmap(xdr, bitmap)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_length(xdr, &attrlen, &savep)) != 0)
+		goto xdr_error;
+
+	if ((status = decode_attr_maxlink(xdr, bitmap, &pathconf->max_link)) != 0)
+		goto xdr_error;
+	if ((status = decode_attr_maxname(xdr, bitmap, &pathconf->max_namelen)) != 0)
+		goto xdr_error;
+
+	status = verify_attr_len(xdr, savep, attrlen);
+xdr_error:
+	if (status != 0)
+		printk(KERN_NOTICE "%s: xdr error %d!\n", __FUNCTION__, -status);
+	return status;
 }
 
 static int decode_getfattr(struct xdr_stream *xdr, struct nfs_fattr *fattr, const struct nfs_server *server)
@@ -3557,6 +3630,24 @@ nfs4_xdr_dec_fsinfo(struct rpc_rqst *req, uint32_t *p, struct nfs_fsinfo *fsinfo
 }
 
 /*
+ * PATHCONF request
+ */
+static int nfs4_xdr_dec_pathconf(struct rpc_rqst *req, uint32_t *p, struct nfs_pathconf *pathconf)
+{
+	struct xdr_stream xdr;
+	struct compound_hdr hdr;
+	int status;
+
+	xdr_init_decode(&xdr, &req->rq_rcv_buf, p);
+	status = decode_compound_hdr(&xdr, &hdr);
+	if (!status)
+		status = decode_putfh(&xdr);
+	if (!status)
+		status = decode_pathconf(&xdr, pathconf);
+	return status;
+}
+
+/*
  * Decode RENEW response
  */
 static int
@@ -3758,6 +3849,7 @@ struct rpc_procinfo	nfs4_procedures[] = {
   PROC(RENAME,		enc_rename,	dec_rename),
   PROC(LINK,		enc_link,	dec_link),
   PROC(CREATE,		enc_create,	dec_create),
+  PROC(PATHCONF,	enc_pathconf,	dec_pathconf),
 };
 
 struct rpc_version		nfs_version4 = {

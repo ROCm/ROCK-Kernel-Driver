@@ -534,7 +534,6 @@ struct nfs4_getattr {
         u32 *				gt_bmval;          /* request */
         struct nfs_fattr *		gt_attrs;          /* response */
 	struct nfs_fsstat *		gt_fsstat;         /* response */
-	struct nfs_pathconf *		gt_pathconf;       /* response */
 };
 
 struct nfs4_getattr_arg {
@@ -588,6 +587,11 @@ struct nfs4_open {
 
 struct nfs4_open_confirm {
 	char *				oc_stateid;       /* request */
+};
+
+struct nfs4_pathconf_arg {
+	const struct nfs_fh *		fh;
+	const u32 *			bitmask;
 };
 
 struct nfs4_putfh {

@@ -119,15 +119,13 @@ u32 nfs4_pathconf_bitmap[2] = {
 static inline void
 __nfs4_setup_getattr(struct nfs4_compound *cp, u32 *bitmap,
 		     struct nfs_fattr *fattr,
-		     struct nfs_fsstat *fsstat,
-		     struct nfs_pathconf *pathconf)
+		     struct nfs_fsstat *fsstat)
 {
         struct nfs4_getattr *getattr = GET_OP(cp, getattr);
 
-        getattr->gt_bmval = bitmap;
-        getattr->gt_attrs = fattr;
+	getattr->gt_bmval = bitmap;
+	getattr->gt_attrs = fattr;
 	getattr->gt_fsstat = fsstat;
-	getattr->gt_pathconf = pathconf;
 
         OPNUM(cp) = OP_GETATTR;
         cp->req_nops++;
@@ -137,8 +135,7 @@ static void
 nfs4_setup_getattr(struct nfs4_compound *cp,
 		struct nfs_fattr *fattr)
 {
-	__nfs4_setup_getattr(cp, nfs4_fattr_bitmap, fattr,
-			NULL, NULL);
+	__nfs4_setup_getattr(cp, nfs4_fattr_bitmap, fattr, NULL);
 }
 
 static void
@@ -146,15 +143,7 @@ nfs4_setup_statfs(struct nfs4_compound *cp,
 		struct nfs_fsstat *fsstat)
 {
 	__nfs4_setup_getattr(cp, nfs4_statfs_bitmap,
-			NULL, fsstat, NULL);
-}
-
-static void
-nfs4_setup_pathconf(struct nfs4_compound *cp,
-		struct nfs_pathconf *pathconf)
-{
-	__nfs4_setup_getattr(cp, nfs4_pathconf_bitmap,
-			NULL, NULL, pathconf);
+			NULL, fsstat);
 }
 
 static void
@@ -1380,17 +1369,21 @@ static int nfs4_proc_fsinfo(struct nfs_server *server, struct nfs_fh *fhandle, s
 	return nfs4_map_errors(nfs4_do_fsinfo(server, fhandle, fsinfo));
 }
 
-static int
-nfs4_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
-		   struct nfs_pathconf *pathconf)
+static int nfs4_proc_pathconf(struct nfs_server *server, struct nfs_fh *fhandle,
+		struct nfs_pathconf *pathconf)
 {
-	struct nfs4_compound compound;
-	struct nfs4_op ops[2];
+	struct nfs4_pathconf_arg args = {
+		.fh = fhandle,
+		.bitmask = nfs4_pathconf_bitmap,
+	};
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_PATHCONF],
+		.rpc_argp = &args,
+		.rpc_resp = pathconf,
+	};
 
-	nfs4_setup_compound(&compound, ops, server, "statfs");
-	nfs4_setup_putfh(&compound, fhandle);
-	nfs4_setup_pathconf(&compound, pathconf);
-	return nfs4_map_errors(nfs4_call_compound(&compound, NULL, 0));
+	pathconf->fattr->valid = 0;
+	return nfs4_map_errors(rpc_call_sync(server->client, &msg, 0));
 }
 
 static void
