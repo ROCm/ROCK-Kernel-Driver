@@ -4,10 +4,10 @@
 
 void *memcpy_toio(void *dst,const void*src,unsigned len)
 {
-	return __inline_memcpy(__io_virt(dst),src,len);
+	return __inline_memcpy(dst,src,len);
 }
 
 void *memcpy_fromio(void *dst,const void*src,unsigned len)
 {
-	return __inline_memcpy(dst,__io_virt(src),len);
+	return __inline_memcpy(dst,src,len);
 }

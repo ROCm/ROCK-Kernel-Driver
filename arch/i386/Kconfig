@@ -1241,17 +1241,6 @@ config DEBUG_SLAB
 	  allocation as well as poisoning memory on free to catch use of freed
 	  memory.
 
-config DEBUG_IOVIRT
-	bool "Memory mapped I/O debugging"
-	depends on DEBUG_KERNEL
-	help
-	  Say Y here to get warned whenever an attempt is made to do I/O on
-	  obviously invalid addresses such as those generated when ioremap()
-	  calls are forgotten.  Memory mapped I/O will go through an extra
-	  check to catch access to unmapped ISA addresses, an access method
-	  that can still be used by old drivers that are being ported from
-	  2.0/2.2.
-
 config MAGIC_SYSRQ
 	bool "Magic SysRq key"
 	depends on DEBUG_KERNEL
