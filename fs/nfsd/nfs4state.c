@@ -1262,6 +1262,30 @@ out:
 }
 
 static int
+nfs4_new_open(struct svc_rqst *rqstp, struct nfs4_stateid **stpp,
+		struct svc_fh *cur_fh, int flags)
+{
+	struct nfs4_stateid *stp;
+	int status;
+
+	stp = kmalloc(sizeof(struct nfs4_stateid), GFP_KERNEL);
+	if (stp == NULL)
+		return nfserr_resource;
+
+	status = nfsd_open(rqstp, cur_fh, S_IFREG, flags, &stp->st_vfs_file);
+	if (status) {
+		if (status == nfserr_dropit)
+			status = nfserr_jukebox;
+		kfree(stp);
+		return status;
+	}
+	vfsopen++;
+	stp->st_vfs_set = 1;
+	*stpp = stp;
+	return 0;
+}
+
+static int
 nfs4_upgrade_open(struct svc_rqst *rqstp, struct svc_fh *cur_fh, struct nfs4_stateid *stp, struct nfsd4_open *open)
 {
 	struct file *filp = stp->st_vfs_file;
@@ -1346,26 +1370,15 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 		if (status)
 			goto out;
 	} else {
+		/* Stateid was not found, this is a new OPEN */
 		int flags = 0;
-
-		status = nfserr_resource;
-		if ((stp = kmalloc(sizeof(struct nfs4_stateid),
-						GFP_KERNEL)) == NULL)
-			goto out;
-
 		if (open->op_share_access & NFS4_SHARE_ACCESS_WRITE)
 			flags = MAY_WRITE;
 		else
 			flags = MAY_READ;
-		if ((status = nfsd_open(rqstp, current_fh,  S_IFREG,
-			                      flags,
-			                      &stp->st_vfs_file)) != 0)
-			goto out_free;
-
-		vfsopen++;
-
+		if ((status = nfs4_new_open(rqstp, &stp, current_fh, flags)))
+			goto out;
 		init_stateid(stp, fp, sop, open);
-		stp->st_vfs_set = 1;
 	}
 	dprintk("nfs4_process_open2: stateid=(%08x/%08x/%08x/%08x)\n\n",
 	            stp->st_stateid.si_boot, stp->st_stateid.si_stateownerid,
@@ -1396,9 +1409,6 @@ out:
 		open->op_rflags |= NFS4_OPEN_RESULT_CONFIRM;
 
 	return status;
-out_free:
-	kfree(stp);
-	goto out;
 }
 
 static struct work_struct laundromat_work;
