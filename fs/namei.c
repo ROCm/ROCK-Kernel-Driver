@@ -767,13 +767,10 @@ last_component:
 				if (!nd->dentry->d_inode)
 					err = -ENOENT;
 				if (err)
- 					break;
+ 					goto return_err;
 				goto return_reval;
 		}
 
-		if (err)
-			goto return_err;			
-		
 		if (nd->dentry->d_op && nd->dentry->d_op->d_hash) {
 			err = nd->dentry->d_op->d_hash(nd->dentry, &this);
 			if (err < 0)
