@@ -38,7 +38,7 @@
  *
  * The idea above dates, by the way, back to Michael E Chastain, AFAIK.
  *
- * So to get dependencies right, there two issues:
+ * So to get dependencies right, there are two issues:
  * o if any of the files the compiler read changed, we need to rebuild
  * o if the command line given to the compile the file changed, we
  *   better rebuild as well.
