@@ -162,27 +162,36 @@ int kjournald(void *arg)
 		jbd_debug(1, "commit_sequence=%d, commit_request=%d\n",
 			journal->j_commit_sequence, journal->j_commit_request);
 
+		spin_lock(&journal->j_state_lock);
 		if (journal->j_commit_sequence != journal->j_commit_request) {
 			jbd_debug(1, "OK, requests differ\n");
 			if (journal->j_commit_timer_active) {
 				journal->j_commit_timer_active = 0;
 				del_timer(journal->j_commit_timer);
 			}
-
+			spin_unlock(&journal->j_state_lock);
 			journal_commit_transaction(journal);
 			continue;
 		}
+		spin_unlock(&journal->j_state_lock);
 
 		wake_up(&journal->j_wait_done_commit);
-		if (current->flags & PF_FREEZE) { /* The simpler the better. Flushing journal isn't a
-						     good idea, because that depends on threads that
-						     may be already stopped. */
+		if (current->flags & PF_FREEZE) {
+			/*
+			 * The simpler the better. Flushing journal isn't a
+			 * good idea, because that depends on threads that may
+			 * be already stopped.
+			 */
 			jbd_debug(1, "Now suspending kjournald\n");
 			refrigerator(PF_IOTHREAD);
 			jbd_debug(1, "Resuming kjournald\n");						
-		} else		/* we assume on resume that commits are already there,
-				   so we don't sleep */
+		} else {
+			/*
+			 * We assume on resume that commits are already there,
+			 * so we don't sleep
+			 */
 			interruptible_sleep_on(&journal->j_wait_commit);
+		}
 
 		jbd_debug(1, "kjournald wakes\n");
 
@@ -475,7 +484,7 @@ tid_t log_start_commit(journal_t *journal, transaction_t *transaction)
  * Wait for a specified commit to complete.
  * The caller may not hold the journal lock.
  */
-int log_wait_commit (journal_t *journal, tid_t tid)
+int log_wait_commit(journal_t *journal, tid_t tid)
 {
 	int err = 0;
 
@@ -489,12 +498,17 @@ int log_wait_commit (journal_t *journal, tid_t tid)
 	}
 	unlock_journal(journal);
 #endif
+	spin_lock(&journal->j_state_lock);
 	while (tid_gt(tid, journal->j_commit_sequence)) {
 		jbd_debug(1, "JBD: want %d, j_commit_sequence=%d\n",
 				  tid, journal->j_commit_sequence);
 		wake_up(&journal->j_wait_commit);
-		sleep_on(&journal->j_wait_done_commit);
+		spin_unlock(&journal->j_state_lock);
+		wait_event(journal->j_wait_done_commit,
+				!tid_gt(tid, journal->j_commit_sequence));
+		spin_lock(&journal->j_state_lock);
 	}
+	spin_unlock(&journal->j_state_lock);
 
 	if (unlikely(is_journal_aborted(journal))) {
 		printk(KERN_EMERG "journal commit I/O error\n");
