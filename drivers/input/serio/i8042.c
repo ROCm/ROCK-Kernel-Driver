@@ -1,7 +1,7 @@
 /*
  *  i8042 keyboard and mouse controller driver for Linux
  *
- *  Copyright (c) 1999-2002 Vojtech Pavlik
+ *  Copyright (c) 1999-2004 Vojtech Pavlik
  */
 
 /*
@@ -52,6 +52,9 @@ static unsigned int i8042_dumbkbd;
 module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
 MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
 
+extern unsigned int i8042_dmi_noloop;
+static unsigned int i8042_noloop;
+
 __obsolete_setup("i8042_noaux");
 __obsolete_setup("i8042_nomux");
 __obsolete_setup("i8042_unlock");
@@ -95,6 +98,7 @@ static irqreturn_t i8042_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 /*
  * The i8042_wait_read() and i8042_wait_write functions wait for the i8042 to
  * be ready for reading values from it / writing values to it.
+ * Called always with i8042_lock held.
  */
 
 static int i8042_wait_read(void)
@@ -153,6 +157,9 @@ static int i8042_command(unsigned char *param, int command)
 {
 	unsigned long flags;
 	int retval = 0, i = 0;
+
+	if (i8042_noloop && command == I8042_CMD_AUX_LOOP)
+		return -1;
 
 	spin_lock_irqsave(&i8042_lock, flags);
 
@@ -474,17 +481,8 @@ static int i8042_enable_mux_mode(struct i8042_values *values, unsigned char *mux
 	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param != 0xa9)
 		return -1;
 	param = 0xa4;
-	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b) {
-
-/*
- * Do another loop test with the 0x5a value. Doing anything else upsets
- * Profusion/ServerWorks OSB4 chipsets.
- */
-
-		param = 0x5a;
-		i8042_command(&param, I8042_CMD_AUX_LOOP);
+	if (i8042_command(&param, I8042_CMD_AUX_LOOP) || param == 0x5b)
 		return -1;
-	}
 
 	if (mux_version)
 		*mux_version = ~param;
@@ -677,6 +675,7 @@ static void i8042_timer_func(unsigned long data)
 
 static int i8042_controller_init(void)
 {
+	unsigned long flags;
 
 /*
  * Test the i8042. We need to know if it thinks it's working correctly
@@ -723,12 +722,14 @@ static int i8042_controller_init(void)
  * Handle keylock.
  */
 
+	spin_lock_irqsave(&i8042_lock, flags);
 	if (~i8042_read_status() & I8042_STR_KEYLOCK) {
 		if (i8042_unlock)
 			i8042_ctr |= I8042_CTR_IGNKEYLOCK;
 		 else
 			printk(KERN_WARNING "i8042.c: Warning: Keylock active.\n");
 	}
+	spin_unlock_irqrestore(&i8042_lock, flags);
 
 /*
  * If the chip is configured into nontranslated mode by the BIOS, don't
@@ -963,6 +964,13 @@ int __init i8042_init(void)
 
 	if (i8042_dumbkbd)
 		i8042_kbd_port.write = NULL;
+
+#ifdef __i386__
+	if (i8042_dmi_noloop) {
+		printk(KERN_INFO "i8042.c: AUX LoopBack command disabled by DMI.\n");
+		i8042_noloop = 1;
+	}
+#endif
 
 	if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values)) {
 		if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
