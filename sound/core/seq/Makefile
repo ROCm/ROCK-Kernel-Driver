@@ -3,14 +3,18 @@
 # Copyright (c) 1999 by Jaroslav Kysela <perex@suse.cz>
 #
 
-O_TARGET     := sq.o
+O_TARGET     := _seq.o
 
-subdir-y     := instr
-subdir-m     := $(subdir-y)
-obj-y        += instr/instr.o
+mod-subdirs  := instr
+
+subdir-$(CONFIG_SND) += instr
+ifeq ($(CONFIG_SND),y)
+  obj-y        += instr/_instr.o
+endif
+
 subdir-$(CONFIG_SND_SEQUENCER_OSS) += oss
 ifeq ($(CONFIG_SND_SEQUENCER_OSS),y)
-  obj-y	     += oss/oss.o
+  obj-y	     += oss/_oss.o
 endif
 
 export-objs  := seq_device.o seq.o seq_ports.o seq_instr.o seq_midi_emul.o \
