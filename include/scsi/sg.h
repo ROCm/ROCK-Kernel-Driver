@@ -9,89 +9,43 @@
 Original driver (sg.h):
 *       Copyright (C) 1992 Lawrence Foard
 Version 2 and 3 extensions to driver:
-*       Copyright (C) 1998 - 2000 Douglas Gilbert
+*       Copyright (C) 1998 - 2001 Douglas Gilbert
 
-    Version: 3.1.17 (20000921)
+    Version: 3.1.19 (20010623)
     This version is for 2.4 series kernels.
 
-    Changes since 3.1.16 (20000716)
-    	- changes for new scsi subsystem initialization
-    	- change Scsi_Cmnd usage to Scsi_Request
-    	- cleanup for no procfs
-    Changes since 3.1.15 (20000528)
-    	- further (scatter gather) buffer length changes
-    Changes since 3.1.14 (20000503)
-        - fix aha1542 odd length buffer problem
-        - make multiple readers on same fd safe
-    Changes since 3.1.13 (20000324)
-        - revert change so sg_header interface doesn't send _UNKNOWN
-        - "discon" and "tq" in /proc/scsi/sg/devices replaced with
-          "bopens" and "busy"; correct duration output in procfs
-        - provision for SG_RESET
-        - lock file descriptor and request lists
-    Changes since 3.1.12 (20000222)
-    	- make sg_header interface use SCSI_DATA_UNKNOWN
-    	- add SG_DXFER_UNKNOWN define to sg interface
-    	- stop allocating data buffers to non data transfer commands
-    Changes since 3.1.10 (20000123)
-    	- make device allocation dynamic (get rid of SG_EXTRA_DEVS)
-	- move to sg0,sg1,sg2 rather than sga,sgb,sgc
-	- make sg_io_hdr_t safer across architectures
-    Changes since 2.1.34 (990603) and 2.3.35 (990708)
-	- add new interface structure: sg_io_hdr_t
-	  - supports larger sense buffer, DMA residual count + direct IO
-	- add SG_IO ioctl (combines function of write() + read() )
-	- remove SG_SET_MERGE_FD, UNDERRUN_FLAG + _GET_ ioctls + logic
-	- add proc_fs support in /proc/scsi/sg/ directory
-        - add queuing info into struct sg_scsi_id
-	- def_reserved_size can be given at driver or module load time
-    Changes since 2.1.33 (990521)
-        - implement SG_SET_RESERVED_SIZE and associated memory re-org.
-        - add SG_NEXT_CMD_LEN to override SCSI command lengths
-        - add SG_GET_VERSION_NUM to get version expressed as an integer
-    Changes since 2.1.32 (990501)
-        - fix race condition in sg_read() and sg_open()
-    Changes since 2.1.31 (990327)
-        - add ioctls SG_GET_UNDERRUN_FLAG and _SET_. Change the default
-          to _not_ flag underruns (affects aic7xxx driver)
-        - clean up logging of pointers to use %p (for 64 bit architectures)
-        - rework usage of get_user/copy_to_user family of kernel calls
-        - "disown" scsi_command blocks before releasing them
+    Changes since 3.1.18 (20010505)
+	- fix bug that caused long wait when large buffer requested
+	- fix leak in error case of sg_new_read() [report: Eric Barton]
+	- add 'online' column to /proc/scsi/sg/devices
+    Changes since 3.1.17 (20000921)
+    	- add CAP_SYS_RAWIO capability for sensitive stuff
+    	- compile in dio stuff, procfs 'allow_dio' defaulted off (0)
+	- make premature close and detach more robust
+	- lun masked into commands <= SCSI_2
+	- poll() and async notification now yield POLL_HUP on detach
+	- various 3rd party tweaks tracking lk 2.4 internal changes
 
 Map of SG verions to the Linux kernels in which they appear:
        ----------        ----------------------------------
        original          all kernels < 2.2.6
-       2.1.31            2.2.6 and 2.2.7
-       2.1.32            2.2.8 and 2.2.9
-       2.1.34            2.2.10 to 2.2.13
-       2.1.36            2.2.14 and 2.2.15
+       2.1.38            2.2.16
+       2.1.39            2.2.17 - 2.2.19
        3.0.x             optional version 3 sg driver for 2.2 series
-       3.1.x             first appeared in lk 2.3.43
+       3.1.17            2.4.0 ++
 
 Major new features in SG 3.x driver (cf SG 2.x drivers)
 	- SG_IO ioctl() combines function if write() and read()
 	- new interface (sg_io_hdr_t) but still supports old interface
 	- scatter/gather in user space and direct IO supported
 
-Major features in SG 2.x driver (cf original SG driver)
-	- per file descriptor (fd) write-read sequencing
-	- command queuing supported
-	- scatter-gather supported at kernel level allowing potentially
-	  large transfers
-	- more SCSI status information returned
-	- asynchronous notification support added (SIGPOLL, SIGIO)
-	- read() can fetch by given pack_id
-	- uses kernel memory as appropriate for SCSI adapter being used
-	- single SG_BIG_BUFF replaced by per file descriptor "reserve
-	  buffer" whose size can be manipulated by ioctls()
-
  The term "indirect IO" refers a method by which data is DMAed into kernel
  buffers from the hardware and afterwards is transferred into the user
  space (or vice versa if you are writing). Transfer speeds of up to 20 to
  30MBytes/sec have been measured using indirect IO. For faster throughputs
  "direct IO" which cuts out the double handling of data is required.
- Direct IO is supported by the SG 3.x drivers on 2.3 series Linux kernels
- (or later) and requires the use of the new interface.
+ Direct IO is supported by the SG 3.x drivers on 2.4 series Linux kernels
+ and requires the use of the new interface.
 
  Requests for direct IO with the new interface will automatically fall back
  to indirect IO mode if they cannot be fulfilled. An example of such a case
@@ -107,6 +61,9 @@ Major features in SG 2.x driver (cf original SG driver)
  kernel memory that is suitable for DMA may be constrained by the
  architecture of the SCSI adapter (e.g. ISA adapters).
 
+ ** N.B. To use direct IO 'echo 1 > /proc/scsi/sg/allow_dio' may be
+         needed. That pseudo file's content is defaulted to 0. **
+
  Documentation
  =============
  A web site for SG device drivers can be found at:
@@ -116,9 +73,10 @@ Major features in SG 2.x driver (cf original SG driver)
 	http://www.torque.net/sg/p/scsi-generic_long.txt
  Documentation on the changes and additions in 3.x version of the sg driver
  can be found at: http://www.torque.net/sg/p/scsi-generic_v3.txt
- This document can also be found in the kernel source tree, probably at:
+ A version of this document (potentially out of date) may also be found in
+ the kernel source tree, probably at:
         /usr/src/linux/Documentation/scsi-generic.txt .
- Utility and test programs are also available at that web site.
+ Utility and test programs are available at the sg web site.
 */
 
 /* New interface introduced in the 3.x SG drivers follows */

@@ -838,6 +838,7 @@ void usb_show_string(struct usb_device *dev, char *id, int index);
 
 extern struct list_head usb_driver_list;
 extern struct list_head usb_bus_list;
+extern rwlock_t usb_bus_list_lock;
 
 /*
  * USB device fs stuff

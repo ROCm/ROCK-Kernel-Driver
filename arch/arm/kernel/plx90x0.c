@@ -129,8 +129,6 @@ plx90x0_init(struct arm_sysdata *sysdata)
 	static const unsigned long int base = PLX_BASE;
 	char *what;
 	unsigned long bar = (unsigned long)virt_to_bus((void *)PAGE_OFFSET);
-	unsigned int pci_cmd = PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
-				PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
 
 	/* Have a sniff around and see which PLX device is present. */
 	unsigned long id = __raw_readl(base + 0xf0);
@@ -189,10 +187,4 @@ plx90x0_init(struct arm_sysdata *sysdata)
 		    "system error", NULL);
 
 	pci_scan_bus(0, &plx90x0_ops, sysdata);
-
-	pci_cmd |= sysdata->bus[0].features;
-
-	printk("PCI: Fast back to back transfers %sabled\n",
-	       (sysdata->bus[0].features & PCI_COMMAND_FAST_BACK) ?
-	       "en" : "dis");
 }

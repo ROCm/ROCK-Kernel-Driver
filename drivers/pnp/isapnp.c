@@ -22,6 +22,9 @@
  *		Peter Denison <peterd@pnd-pc.demon.co.uk>
  *  2000-06-14	Added isapnp_probe_devs() and isapnp_activate_dev()
  *		Christoph Hellwig <hch@caldera.de>
+ *  2001-06-03  Added release_region calls to correspond with
+ *		request_region calls when a failure occurs.  Also
+ *		added KERN_* constants to printk() calls.
  */
 
 #include <linux/config.h>
@@ -407,7 +410,7 @@ static int __init isapnp_read_tag(unsigned char *type, unsigned short *size)
 		*size = tag & 0x07;
 	}
 #if 0
-	printk("tag = 0x%x, type = 0x%x, size = %i\n", tag, *type, *size);
+	printk(KERN_DEBUG "tag = 0x%x, type = 0x%x, size = %i\n", tag, *type, *size);
 #endif
 	if (type == 0)				/* wrong type */
 		return -1;
@@ -887,7 +890,7 @@ static int __init isapnp_create_device(struct pci_bus *card,
 				isapnp_skip_bytes(size);
 			return 1;
 		default:
-			printk("isapnp: unexpected or unknown tag type 0x%x for logical device %i (device %i), ignored\n", type, dev->devfn, card->number);
+			printk(KERN_ERR "isapnp: unexpected or unknown tag type 0x%x for logical device %i (device %i), ignored\n", type, dev->devfn, card->number);
 		}
 	      __skip:
 	      	if (size > 0)
@@ -941,7 +944,7 @@ static void __init isapnp_parse_resource_map(struct pci_bus *card)
 				isapnp_skip_bytes(size);
 			return;
 		default:
-			printk("isapnp: unexpected or unknown tag type 0x%x for device %i, ignored\n", type, card->number);
+			printk(KERN_ERR "isapnp: unexpected or unknown tag type 0x%x for device %i, ignored\n", type, card->number);
 		}
 	      __skip:
 	      	if (size > 0)
@@ -988,10 +991,10 @@ static int __init isapnp_build_device_list(void)
 		isapnp_peek(header, 9);
 		checksum = isapnp_checksum(header);
 #if 0
-		printk("vendor: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+		printk(KERN_DEBUG "vendor: %02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
 			header[0], header[1], header[2], header[3],
 			header[4], header[5], header[6], header[7], header[8]);
-		printk("checksum = 0x%x\n", checksum);
+		printk(KERN_DEBUG "checksum = 0x%x\n", checksum);
 #endif
 		/* Don't be strict on the checksum, here !
                    e.g. 'SCM SwapBox Plug and Play' has header[8]==0 (should be: b7)*/
@@ -1011,7 +1014,7 @@ static int __init isapnp_build_device_list(void)
 		INIT_LIST_HEAD(&card->devices);
 		isapnp_parse_resource_map(card);
 		if (isapnp_checksum_value != 0x00)
-			printk("isapnp: checksum for device %i is not valid (0x%x)\n", csn, isapnp_checksum_value);
+			printk(KERN_ERR "isapnp: checksum for device %i is not valid (0x%x)\n", csn, isapnp_checksum_value);
 		card->checksum = isapnp_checksum_value;
 
 		list_add_tail(&card->node, &isapnp_cards);
@@ -2181,19 +2184,22 @@ int __init isapnp_init(void)
 
 	if (isapnp_disable) {
 		isapnp_detected = 0;
-		printk("isapnp: ISA Plug & Play support disabled\n");
+		printk(KERN_INFO "isapnp: ISA Plug & Play support disabled\n");
 		return 0;
 	}
 #ifdef ISAPNP_REGION_OK
 	pidxr_res=request_region(_PIDXR, 1, "isapnp index");
 	if(!pidxr_res) {
-		printk("isapnp: Index Register 0x%x already used\n", _PIDXR);
+		printk(KERN_ERR "isapnp: Index Register 0x%x already used\n", _PIDXR);
 		return -EBUSY;
 	}
 #endif
 	pnpwrp_res=request_region(_PNPWRP, 1, "isapnp write");
 	if(!pnpwrp_res) {
-		printk("isapnp: Write Data Register 0x%x already used\n", _PNPWRP);
+		printk(KERN_ERR "isapnp: Write Data Register 0x%x already used\n", _PNPWRP);
+#ifdef ISAPNP_REGION_OK
+		release_region(_PIDXR, 1);
+#endif
 		return -EBUSY;
 	}
 	
@@ -2202,12 +2208,16 @@ int __init isapnp_init(void)
 	 *	so let the user know where.
 	 */
 	 
-	printk("isapnp: Scanning for PnP cards...\n");
+	printk(KERN_INFO "isapnp: Scanning for PnP cards...\n");
 	if (isapnp_rdp >= 0x203 && isapnp_rdp <= 0x3ff) {
 		isapnp_rdp |= 3;
 		isapnp_rdp_res=request_region(isapnp_rdp, 1, "isapnp read");
 		if(!isapnp_rdp_res) {
-			printk("isapnp: Read Data Register 0x%x already used\n", isapnp_rdp);
+			printk(KERN_ERR "isapnp: Read Data Register 0x%x already used\n", isapnp_rdp);
+#ifdef ISAPNP_REGION_OK
+			release_region(_PIDXR, 1);
+#endif
+			release_region(isapnp_rdp, 1);
 			return -EBUSY;
 		}
 		isapnp_set_rdp();
@@ -2219,7 +2229,7 @@ int __init isapnp_init(void)
 		    (isapnp_rdp < 0x203 || isapnp_rdp > 0x3ff)) {
 			isapnp_free_all_resources();
 			isapnp_detected = 0;
-			printk("isapnp: No Plug & Play device found\n");
+			printk(KERN_INFO "isapnp: No Plug & Play device found\n");
 			return 0;
 		}
 		isapnp_rdp_res=request_region(isapnp_rdp, 1, "isapnp read");
@@ -2231,19 +2241,19 @@ int __init isapnp_init(void)
 		cards++;
 		if (isapnp_verbose) {
 			struct list_head *devlist;
-			printk( "isapnp: Card '%s'\n", card->name[0]?card->name:"Unknown");
+			printk(KERN_INFO "isapnp: Card '%s'\n", card->name[0]?card->name:"Unknown");
 			if (isapnp_verbose < 2)
 				continue;
 			for (devlist = card->devices.next; devlist != &card->devices; devlist = devlist->next) {
 				struct pci_dev *dev = pci_dev_b(devlist);
-				printk("isapnp:   Device '%s'\n", dev->name[0]?card->name:"Unknown");
+				printk(KERN_INFO "isapnp:   Device '%s'\n", dev->name[0]?card->name:"Unknown");
 			}
 		}
 	}
 	if (cards) {
-		printk("isapnp: %i Plug & Play card%s detected total\n", cards, cards>1?"s":"");
+		printk(KERN_INFO "isapnp: %i Plug & Play card%s detected total\n", cards, cards>1?"s":"");
 	} else {
-		printk("isapnp: No Plug & Play card found\n");
+		printk(KERN_INFO "isapnp: No Plug & Play card found\n");
 	}
 #ifdef CONFIG_PROC_FS
 	isapnp_proc_init();

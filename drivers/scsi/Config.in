@@ -101,7 +101,7 @@ if [ "$CONFIG_MCA" = "y" ]; then
    fi
 fi
 if [ "$CONFIG_X86" = "y" ]; then
-   dep_tristate 'IBM ServeRAID support' CONFIG_SCSI_IPS $CONFIG_SCSI
+   dep_tristate 'IBM ServeRAID support' CONFIG_SCSI_IPS $CONFIG_SCSI $CONFIG_PCI
 fi
 dep_tristate 'Initio 9100U(W) support' CONFIG_SCSI_INITIO $CONFIG_SCSI $CONFIG_PCI
 dep_tristate 'Initio INI-A100U2W support' CONFIG_SCSI_INIA100 $CONFIG_SCSI $CONFIG_PCI

@@ -365,6 +365,11 @@ static void blk_init_free_list(request_queue_t *q)
 	 */
 	for (i = 0; i < queue_nr_requests; i++) {
 		rq = kmem_cache_alloc(request_cachep, SLAB_KERNEL);
+		if (rq == NULL) {
+			/* We'll get a `leaked requests' message from blk_cleanup_queue */
+			printk(KERN_EMERG "blk_init_free_list: error allocating requests\n");
+			break;
+		}
 		memset(rq, 0, sizeof(struct request));
 		rq->rq_status = RQ_INACTIVE;
 		list_add(&rq->table, &q->request_freelist[i & 1]);

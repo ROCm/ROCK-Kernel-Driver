@@ -162,18 +162,6 @@ struct usbdevfs_hub_portinfo {
 
 #define IROOT      1
 
-/*
- * sigh. rwsemaphores do not (yet) work from modules
- */
-
-#define rw_semaphore semaphore
-#define init_rwsem init_MUTEX
-#define down_read down
-#define down_write down
-#define up_read up
-#define up_write up
-
-
 struct dev_state {
 	struct list_head list;      /* state list */
 	struct rw_semaphore devsem; /* protects modifications to dev (dev == NULL indicating disconnect) */ 

@@ -78,8 +78,8 @@ P: 1024/85AD9EED AD C0 49 08 91 67 DF D7  FA 04 1A EE 09 E8 44 B0
 D: Unix98 pty support.
 D: APM update to 1.2 spec.
 D: /devfs hacking.
-S: 322 N. Riverside Dr.
-S: Neptune, NJ 07753
+S: 7 Kiwi Loop
+S: Howell, NJ 07731
 S: USA
 
 N: Erik Andersen
@@ -679,6 +679,14 @@ S: Ottawa, Ontario
 S: K1N 6Z9
 S: CANADA
 
+N: Jeff Dike
+E: jdike@karaya.com
+W: http://user-mode-linux.sourceforge.net
+D: User mode kernel port
+S: RR1 Box 67C
+S: Deering NH 03244
+S: USA
+
 N: Eddie C. Dost
 E: ecd@skynet.be
 D: Linux/Sparc kernel hacker
@@ -1062,6 +1070,11 @@ S: PO-Box 297
 S: 2400 AG, Alphen aan den Rijn
 S: The Netherlands
 
+N: Enver Haase
+E: ehaase@inf.fu-berlin.de
+W: http://www.inf.fu-berlin.de/~ehaase
+D: Driver for the Commodore A2232 serial board
+
 N: Bruno Haible
 E: haible@ma2s2.mathematik.uni-karlsruhe.de
 D: SysV FS, shm swapping, memory management fixes
@@ -1275,12 +1288,11 @@ S: Pittsburgh, PA 15203-1250
 S: USA
 
 N: Gareth Hughes
-E: gareth@valinux.com
-E: gareth@precisioninsight.com
+E: gareth.hughes@acm.org
 D: Pentium III FXSR, SSE support
-S: 11/187 West Street
-S: Crows Nest NSW 2065
-S: Australia
+D: Author/maintainer of most DRM drivers (especially ATI, MGA)
+D: Core DRM templates, general DRM and 3D-related hacking
+S: No fixed address
 
 N: Kenn Humborg
 E: kenn@wombat.ie
@@ -2259,6 +2271,15 @@ N: Ken Pizzini
 E: ken@halcyon.com
 D: CDROM driver "sonycd535" (Sony CDU-535/531)
 
+N: Stelian Pop
+E: stelian.pop@fr.alcove.com
+P: 1024D/EDBB6147 7B36 0E07 04BC 11DC A7A0  D3F7 7185 9E7A EDBB 6147
+D: sonypi, meye drivers, mct_u232 usb serial hacks
+S: Alcôve
+S: 153, bd. Anatole France 
+S: 93200 Saint Denis
+S: France
+
 N: Frederic Potter 
 E: fpotter@cirpack.com
 D: Some PCI kernel support
@@ -2355,14 +2376,15 @@ S: 75019 Paris
 S: France
 
 N: Rik van Riel
-E: riel@nl.linux.org
-W: http://www.nl.linux.org/~riel/
+E: riel@conectiva.com.br
+W: http://www.surriel.com/
 D: Linux-MM site, Documentation/sysctl/*, swap/mm readaround
 D: clustering contributor, kswapd fixes, random kernel hacker,
-D: nl.linux.org maintainer, minor scheduler additions
-S: IJsselstraat 23a
-S: 9725 GA  Groningen
-S: The Netherlands
+D: nl.linux.org administrator, minor scheduler additions
+S: Conectiva S.A.
+S: R. Tocantins, 89 - Cristo Rei
+S: 80050-430 - Curitiba - Paraná
+S: Brazil
 
 N: Pekka Riikonen
 E: priikone@poseidon.pspt.fi
@@ -2868,6 +2890,7 @@ S: Belgium
 N: Petr Vandrovec
 E: vandrove@vc.cvut.cz
 D: Small contributions to ncpfs
+D: Matrox framebuffer driver
 S: Chudenicka 8
 S: 10200 Prague 10, Hostivar
 S: Czech Republic

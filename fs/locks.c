@@ -112,7 +112,7 @@
  *
  *  Leases and LOCK_MAND
  *  Matthew Wilcox <willy@linuxcare.com>, June, 2000.
- *  Stephen Rothwell <sfr@linuxcare.com>, June, 2000.
+ *  Stephen Rothwell <sfr@canb.auug.org.au>, June, 2000.
  */
 
 #include <linux/slab.h>

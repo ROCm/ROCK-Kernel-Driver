@@ -10,7 +10,6 @@
 #include <linux/netlink.h>
 
 extern int slip_init_ctrl_dev(void);
-extern int strip_init_ctrl_dev(void);
 extern int x25_asy_init_ctrl_dev(void);
   
 extern int dmascc_init(void);
@@ -23,13 +22,13 @@ extern int arcnet_init(void);
 extern int scc_enet_init(void); 
 extern int fec_enet_init(void); 
 extern int dlci_setup(void); 
-extern int lapbeth_init(void);
 extern int sdla_setup(void); 
 extern int sdla_c_setup(void); 
 extern int comx_init(void);
 extern int lmc_setup(void);
 
 extern int madgemc_probe(void);
+extern int uml_net_probe(void);
 
 /* Pad device name to IFNAMSIZ=16. F.e. __PAD6 is string of 9 zeros. */
 #define __PAD6 "\0\0\0\0\0\0\0\0\0"
@@ -63,9 +62,6 @@ static struct net_probe pci_probes[] __initdata = {
 #endif
 #if defined(CONFIG_SDLA)
 	{sdla_c_setup, 0},
-#endif
-#if defined(CONFIG_LAPBETHER)
-	{lapbeth_init, 0},
 #endif
 #if defined(CONFIG_ARCNET)
 	{arcnet_init, 0},
@@ -107,6 +103,10 @@ static struct net_probe pci_probes[] __initdata = {
 #ifdef CONFIG_MADGEMC
 	{madgemc_probe, 0},
 #endif
+#ifdef CONFIG_UML_NET
+	{uml_net_probe, 0},
+#endif
+ 
 	{NULL, 0},
 };
 
@@ -139,9 +139,6 @@ static void __init network_ldisc_init(void)
 #endif
 #if defined(CONFIG_X25_ASY)
 	x25_asy_init_ctrl_dev();
-#endif
-#if defined(CONFIG_STRIP)
-	strip_init_ctrl_dev();
 #endif
 }
 

@@ -222,6 +222,7 @@ static inline void clear_in_cr4 (unsigned long mask)
 #define CX86_CCR4 0xe8
 #define CX86_CCR5 0xe9
 #define CX86_CCR6 0xea
+#define CX86_CCR7 0xeb
 #define CX86_DIR0 0xfe
 #define CX86_DIR1 0xff
 #define CX86_ARR_BASE 0xc4

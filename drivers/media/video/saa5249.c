@@ -102,6 +102,7 @@ struct saa5249_device
 	int disp_mode;
 	int virtual_mode;
 	struct i2c_client *client;
+	struct semaphore lock;
 };
 
 
@@ -175,6 +176,7 @@ static int saa5249_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 	}
 	memset(t, 0, sizeof(*t));
 	strcpy(client->name, IF_NAME);
+	init_MUTEX(&t->lock);
 	
 	/*
 	 *	Now create a video4linux device
@@ -188,7 +190,7 @@ static int saa5249_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 		return -ENOMEM;
 	}
 	memcpy(vd, &saa_template, sizeof(*vd));
-	
+		
 	for (pgbuf = 0; pgbuf < NUM_DAUS; pgbuf++) 
 	{
 		memset(t->vdau[pgbuf].pgbuf, ' ', sizeof(t->vdau[0].pgbuf));
@@ -199,7 +201,8 @@ static int saa5249_attach(struct i2c_adapter *adap, int addr, unsigned short fla
 		t->vdau[pgbuf].stopped = TRUE;
 		t->is_searching[pgbuf] = FALSE;
 	}
-	vd->priv=t;		 
+	vd->priv=t;	
+	 
 	
 	/*
 	 *	Register it
@@ -342,9 +345,8 @@ static int i2c_getdata(struct saa5249_device *t, int count, u8 *buf)
  *	Standard character-device-driver functions
  */
 
-static int saa5249_ioctl(struct video_device *vd, unsigned int cmd, void *arg) 
+static int do_saa5249_ioctl(struct saa5249_device *t, unsigned int cmd, void *arg) 
 {
-	struct saa5249_device *t=vd->priv;
 	static int virtual_mode = FALSE;
 
 	switch(cmd) 
@@ -602,6 +604,21 @@ static int saa5249_ioctl(struct video_device *vd, unsigned int cmd, void *arg)
 	return -EINVAL;
 }
 
+/*
+ *	Handle the locking
+ */
+ 
+static int saa5249_ioctl(struct video_device *vd, unsigned int cmd, void *arg) 
+{
+	struct saa5249_device *t=vd->priv;
+	int err;
+	
+	down(&t->lock);
+	err = do_saa5249_ioctl(t, cmd, arg);
+	up(&t->lock);
+
+	return err;
+}
 
 static int saa5249_open(struct video_device *vd, int nb) 
 {
@@ -632,7 +649,6 @@ static int saa5249_open(struct video_device *vd, int nb)
 		t->is_searching[pgbuf] = FALSE;
 	}
 	t->virtual_mode=FALSE;
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -643,7 +659,6 @@ static void saa5249_release(struct video_device *vd)
 	struct saa5249_device *t=vd->priv;
 	i2c_senddata(t, 1, 0x20, -1);		/* Turn off CCT */
 	i2c_senddata(t, 5, 3, 3, -1);		/* Turn off TV-display */
-	MOD_DEC_USE_COUNT;
 	return;
 }
 
@@ -669,6 +684,7 @@ module_exit(cleanup_saa_5249);
 
 static struct video_device saa_template =
 {
+	owner:		THIS_MODULE,
 	name:		IF_NAME,
 	type:		VID_TYPE_TELETEXT,	/*| VID_TYPE_TUNER ?? */
 	hardware:	VID_HARDWARE_SAA5249,

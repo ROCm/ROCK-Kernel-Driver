@@ -89,10 +89,8 @@ ENTRY(FPU_u_div)
 	movl	REGB,%ebx
 	movl	DEST,%edi
 
-	movw	EXP(%esi),%dx
-	movw	EXP(%ebx),%ax
-	.byte	0x0f,0xbf,0xc0	/* movsx	%ax,%eax */
-	.byte	0x0f,0xbf,0xd2	/* movsx	%dx,%edx */
+	movswl	EXP(%esi),%edx
+	movswl	EXP(%ebx),%eax
 	subl	%eax,%edx
 	addl	EXP_BIAS,%edx
 

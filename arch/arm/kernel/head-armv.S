@@ -79,7 +79,7 @@ ENTRY(stext)
  *     ideal, but in this case, it should ONLY set r0 and r1 to the
  *     appropriate value.
  */
-#if defined(CONFIG_ARCH_NETWINDER) || defined(CONFIG_ARCH_INTEGRATOR)
+#if defined(CONFIG_ARCH_NETWINDER)
 /*
  * Compatability cruft for old NetWinder NeTTroms.  This
  * code is currently scheduled for destruction in 2.5.xx
@@ -124,8 +124,6 @@ __entry:
  * FIXME - No bootloader, so manually set 'r1' with our architecture number.
  */
 		mov	r1, #MACH_TYPE_L7200
-#elif defined(CONFIG_ARCH_INTEGRATOR)
-		mov	r1, #MACH_TYPE_INTEGRATOR
 #endif
 
 		mov	r0, #F_BIT | I_BIT | MODE_SVC	@ make sure svc mode
@@ -236,14 +234,16 @@ __create_page_tables:
 		 * nearest megabyte boundary.
 		 */
 		add	r0, r4, #(TEXTADDR & 0xff000000) >> 18 @ start of kernel
+		bic	r2, r3, #0x00f00000
+		str	r2, [r0]			@ PAGE_OFFSET + 0MB
 		add	r0, r0, #(TEXTADDR & 0x00f00000) >> 18
-		str	r3, [r0], #4			@ PAGE_OFFSET + 0MB
+		str	r3, [r0], #4			@ KERNEL + 0MB
 		add	r3, r3, #1 << 20
-		str	r3, [r0], #4			@ PAGE_OFFSET + 1MB
+		str	r3, [r0], #4			@ KERNEL + 1MB
 		add	r3, r3, #1 << 20
-		str	r3, [r0], #4			@ PAGE_OFFSET + 2MB
+		str	r3, [r0], #4			@ KERNEL + 2MB
 		add	r3, r3, #1 << 20
-		str	r3, [r0], #4			@ PAGE_OFFSET + 3MB
+		str	r3, [r0], #4			@ KERNEL + 3MB
 
 		/*
 		 * Ensure that the first section of RAM is present.

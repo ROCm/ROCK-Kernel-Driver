@@ -42,8 +42,8 @@ if [ "$CONFIG_SERIAL_NONSTANDARD" = "y" ]; then
    if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
       dep_tristate '  Multi-Tech multiport card support (EXPERIMENTAL)' CONFIG_ISI m
    fi
-   dep_tristate '  Microgate SyncLink card support' CONFIG_SYNCLINK m
-   dep_tristate '  HDLC line discipline support' CONFIG_N_HDLC m
+   tristate '  Microgate SyncLink card support' CONFIG_SYNCLINK
+   tristate '  HDLC line discipline support' CONFIG_N_HDLC
    tristate '  SDL RISCom/8 card support' CONFIG_RISCOM8
    tristate '  Specialix IO8+ card support' CONFIG_SPECIALIX
    if [ "$CONFIG_SPECIALIX" != "n" ]; then
@@ -59,6 +59,9 @@ if [ "$CONFIG_SERIAL_NONSTANDARD" = "y" ]; then
      tristate '    Stallion EasyIO or EC8/32 support' CONFIG_STALLION
      tristate '    Stallion EC8/64, ONboard, Brumby support' CONFIG_ISTALLION
    fi
+fi
+if [ "$CONFIG_EXPERIMENTAL" = "y" -a "$CONFIG_ZORRO" = "y" ]; then
+   tristate 'Commodore A2232 serial support (EXPERIMENTAL)' CONFIG_A2232
 fi
 if [ "$CONFIG_FOOTBRIDGE" = "y" ]; then
    bool 'DC21285 serial port support' CONFIG_SERIAL_21285
@@ -135,6 +138,7 @@ if [ "$CONFIG_WATCHDOG" != "n" ]; then
    tristate '  Acquire SBC Watchdog Timer' CONFIG_ACQUIRE_WDT
    tristate '  Advantech SBC Watchdog Timer' CONFIG_ADVANTECH_WDT
    tristate '  SBC-60XX Watchdog Timer' CONFIG_60XX_WDT
+   tristate '  W83877F (EMACS) Watchdog Timer' CONFIG_W83877F_WDT
    tristate '  Mixcom Watchdog' CONFIG_MIXCOMWD 
    tristate '  Intel i810 TCO timer / Watchdog' CONFIG_I810_TCO
    if [ "$CONFIG_FOOTBRIDGE" = "y" ]; then
@@ -169,6 +173,9 @@ fi
 tristate 'Double Talk PC internal speech card support' CONFIG_DTLK
 tristate 'Siemens R3964 line discipline' CONFIG_R3964
 tristate 'Applicom intelligent fieldbus card support' CONFIG_APPLICOM
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+  tristate 'Sony Vaio Programmable I/O Control Device support' CONFIG_SONYPI $CONFIG_PCI
+fi
 
 mainmenu_option next_comment
 comment 'Ftape, the floppy tape device driver'

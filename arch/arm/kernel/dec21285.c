@@ -13,6 +13,7 @@
 #include <linux/ptrace.h>
 #include <linux/interrupt.h>
 #include <linux/mm.h>
+#include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
 
@@ -23,6 +24,11 @@
 #include <asm/hardware/dec21285.h>
 
 #define MAX_SLOTS		21
+
+#define PCICMD_ERROR_BITS ((PCI_STATUS_DETECTED_PARITY | \
+			PCI_STATUS_REC_MASTER_ABORT | \
+			PCI_STATUS_REC_TARGET_ABORT | \
+			PCI_STATUS_PARITY) << 16)
 
 extern int setup_arm_irq(int, struct irqaction *);
 extern void pcibios_report_status(u_int status_mask, int warn);
@@ -255,12 +261,33 @@ static void dc21285_parity_irq(int irq, void *dev_id, struct pt_regs *regs)
 	add_timer(timer);
 }
 
-void __init dc21285_init(struct arm_pci_sysdata *sysdata)
+void __init dc21285_setup_resources(struct resource **resource)
 {
-	unsigned long cntl;
+	struct resource *busmem, *busmempf;
+
+	busmem = kmalloc(sizeof(*busmem), GFP_KERNEL);
+	busmempf = kmalloc(sizeof(*busmempf), GFP_KERNEL);
+	memset(busmem, 0, sizeof(*busmem));
+	memset(busmempf, 0, sizeof(*busmempf));
+
+	busmem->flags = IORESOURCE_MEM;
+	busmem->name  = "Footbridge non-prefetch";
+	busmempf->flags = IORESOURCE_MEM | IORESOURCE_PREFETCH;
+	busmempf->name  = "Footbridge prefetch";
+
+	allocate_resource(&iomem_resource, busmempf, 0x20000000,
+			  0x80000000, 0xffffffff, 0x20000000, NULL, NULL);
+	allocate_resource(&iomem_resource, busmem, 0x40000000,
+			  0x80000000, 0xffffffff, 0x40000000, NULL, NULL);
+
+	resource[0] = &ioport_resource;
+	resource[1] = busmem;
+	resource[2] = busmempf;
+}
+
+void __init dc21285_init(void *sysdata)
+{
 	unsigned int mem_size, mem_mask;
-	unsigned int pci_cmd = PCI_COMMAND_IO | PCI_COMMAND_MEMORY |
-				PCI_COMMAND_MASTER | PCI_COMMAND_INVALIDATE;
 	int cfn_mode;
 
 	mem_size = (unsigned int)high_memory - PAGE_OFFSET;
@@ -286,26 +313,17 @@ void __init dc21285_init(struct arm_pci_sysdata *sysdata)
 		"central function" : "addin");
 
 	if (cfn_mode) {
-		static struct resource csrmem, csrio, busmem, busmempf;
-		struct pci_bus *bus;
+		static struct resource csrmem, csrio;
 
-		csrio.flags = IORESOURCE_IO;
-		csrio.name  = "Footbridge";
+		csrio.flags  = IORESOURCE_IO;
+		csrio.name   = "Footbridge";
 		csrmem.flags = IORESOURCE_MEM;
 		csrmem.name  = "Footbridge";
-		busmem.flags = IORESOURCE_MEM;
-		busmem.name  = "Footbridge non-prefetch";
-		busmempf.flags = IORESOURCE_MEM | IORESOURCE_PREFETCH;
-		busmempf.name  = "Footbridge prefetch";
 
 		allocate_resource(&ioport_resource, &csrio, 128,
 				  0xff00, 0xffff, 128, NULL, NULL);
 		allocate_resource(&iomem_resource, &csrmem, 128,
 				  0xf4000000, 0xf8000000, 128, NULL, NULL);
-		allocate_resource(&iomem_resource, &busmempf, 0x20000000,
-				  0x00000000, 0x80000000, 0x20000000, NULL, NULL);
-		allocate_resource(&iomem_resource, &busmem, 0x40000000,
-				  0x00000000, 0x80000000, 0x40000000, NULL, NULL);
 
 		/*
 		 * Map our SDRAM at a known address in PCI space, just in case
@@ -313,37 +331,23 @@ void __init dc21285_init(struct arm_pci_sysdata *sysdata)
 		 * necessary, since some VGA cards forcefully use PCI addresses
 		 * in the range 0x000a0000 to 0x000c0000. (eg, S3 cards).
 		 */
-		*CSR_PCICACHELINESIZE = 0x00002008;
 		*CSR_PCICSRBASE       = csrmem.start;
 		*CSR_PCICSRIOBASE     = csrio.start;
 		*CSR_PCISDRAMBASE     = __virt_to_bus(PAGE_OFFSET);
 		*CSR_PCIROMBASE       = 0;
-		*CSR_PCICMD           = pci_cmd |
-				(1 << 31) | (1 << 29) | (1 << 28) | (1 << 24);
+		*CSR_PCICMD = PCI_COMMAND_MEMORY | PCI_COMMAND_MASTER |
+			      PCI_COMMAND_INVALIDATE | PCICMD_ERROR_BITS;
 
-		bus = pci_scan_bus(0, &dc21285_ops, sysdata);
-		/*
-		 * bus->resource[0] is the IO resource for this bus
-		 * bus->resource[1] is the mem resource for this bus
-		 * bus->resource[2] is the prefetch mem resource for this bus
-		 */
-		bus->resource[1] = &busmem;
-		bus->resource[2] = &busmempf;
-
-		pci_cmd |= sysdata->bus[0].features;
-
-		printk("PCI: Fast back to back transfers %sabled\n",
-		       (sysdata->bus[0].features & PCI_COMMAND_FAST_BACK) ?
-			"en" : "dis");
+		pci_scan_bus(0, &dc21285_ops, sysdata);
 
 		/*
 		 * Clear any existing errors - we aren't
 		 * interested in historical data...
 		 */
-		cntl		= *CSR_SA110_CNTL & 0xffffde07;
-		*CSR_SA110_CNTL	= cntl | SA110_CNTL_RXSERR;
-		*CSR_PCICMD	= pci_cmd | 1 << 31 | 1 << 29 | 1 << 28 | 1 << 24;
-	} else {
+		*CSR_SA110_CNTL	= (*CSR_SA110_CNTL & 0xffffde07) |
+				  SA110_CNTL_RXSERR;
+		*CSR_PCICMD = (*CSR_PCICMD & 0xffff) | PCICMD_ERROR_BITS;
+	} else if (footbridge_cfn_mode() != 0) {
 		/*
 		 * If we are not compiled to accept "add-in" mode, then
 		 * we are using a constant virt_to_bus translation which

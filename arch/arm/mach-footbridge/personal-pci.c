@@ -11,6 +11,7 @@
 
 #include <asm/irq.h>
 #include <asm/mach/pci.h>
+#include <asm/hardware/dec21285.h>
 
 static int irqmap_personal_server[] __initdata = {
 	IRQ_IN0, IRQ_IN1, IRQ_IN2, IRQ_IN3, 0, 0, 0,
@@ -37,7 +38,9 @@ static int __init personal_server_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 }
 
 struct hw_pci personal_server_pci __initdata = {
-	init:		dc21285_init,
-	swizzle:	no_swizzle,
-	map_irq:	personal_server_map_irq,
+	setup_resources:	dc21285_setup_resources,
+	init:			dc21285_init,
+	mem_offset:		DC21285_PCI_MEM,
+	swizzle:		no_swizzle,
+	map_irq:		personal_server_map_irq,
 };

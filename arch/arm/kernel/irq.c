@@ -216,7 +216,7 @@ asmlinkage void do_IRQ(int irq, struct pt_regs * regs)
 
 	irq_exit(cpu, irq);
 
-	if (softirq_active(cpu) & softirq_mask(cpu))
+	if (softirq_pending(cpu))
 		do_softirq();
 	return;
 

@@ -918,7 +918,6 @@ static int sx_set_real_termios (void *ptr)
 	                       SP_DCEN);
 
 	sx_write_channel_byte (port, hi_break, 
-	                       I_OTHER(port->gs.tty) ? 0:
 	                       (I_IGNBRK(port->gs.tty)?BR_IGN:0 |
 	                        I_BRKINT(port->gs.tty)?BR_INT:0));
 
@@ -1140,9 +1139,7 @@ static inline void sx_check_modem_signals (struct sx_port *port)
 		sx_dprintk (SX_DEBUG_MODEMSIGNALS, "got a break.\n");
 
 		sx_write_channel_byte (port, hi_state, hi_state);
-		if (port->gs.flags & ASYNC_SAK) {
-			do_SAK (port->gs.tty);
-		}
+		gs_got_break (port);
 	}
 	if (hi_state & ST_DCD) {
 		hi_state &= ~ST_DCD;

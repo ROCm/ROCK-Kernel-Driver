@@ -62,7 +62,7 @@
  * Version Information
  */
 #define DRIVER_VERSION ""
-#define DRIVER_AUTHOR "Linus Torvalds, Johannes Erdfelt, Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber"
+#define DRIVER_AUTHOR "Linus 'Frodo Rabbit' Torvalds, Johannes Erdfelt, Randy Dunlap, Georg Acher, Deti Fliegl, Thomas Sailer, Roman Weissgaerber"
 #define DRIVER_DESC "USB Universal Host Controller Interface driver"
 
 
@@ -305,8 +305,7 @@ static void uhci_remove_td(struct uhci *uhci, struct uhci_td *td)
 	mb();
 	td->link = UHCI_PTR_TERM;
 
-	list_del(&td->fl_list);
-	INIT_LIST_HEAD(&td->fl_list);
+	list_del_init(&td->fl_list);
 	td->frame = -1;
 
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
@@ -438,8 +437,7 @@ static void uhci_remove_qh(struct uhci *uhci, struct uhci_qh *qh)
 	mb();
 	qh->element = qh->link = UHCI_PTR_TERM;
 
-	list_del(&qh->list);
-	INIT_LIST_HEAD(&qh->list);
+	list_del_init(&qh->list);
 
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
 
@@ -624,8 +622,7 @@ static void uhci_delete_queued_urb(struct uhci *uhci, struct urb *urb)
 			pltd->link = UHCI_PTR_TERM;
 	}
 
-	list_del(&urbp->queue_list);
-	INIT_LIST_HEAD(&urbp->queue_list);
+	list_del_init(&urbp->queue_list);
 
 out:
 	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
@@ -689,8 +686,7 @@ static void uhci_remove_td_from_urb(struct uhci_td *td)
 	if (list_empty(&td->list))
 		return;
 
-	list_del(&td->list);
-	INIT_LIST_HEAD(&td->list);
+	list_del_init(&td->list);
 
 	td->urb = NULL;
 }
@@ -1665,8 +1661,7 @@ static void uhci_transfer_result(struct uhci *uhci, struct urb *urb)
 			usb_pipetype(urb->pipe), urb);
 	}
 
-	list_del(&urb->urb_list);
-	INIT_LIST_HEAD(&urb->urb_list);
+	list_del_init(&urb->urb_list);
 
 	uhci_add_complete(urb);
 }
@@ -1723,8 +1718,7 @@ static int uhci_unlink_urb(struct urb *urb)
 		return 0;
 
 	spin_lock_irqsave(&uhci->urb_list_lock, flags);
-	list_del(&urb->urb_list);
-	INIT_LIST_HEAD(&urb->urb_list);
+	list_del_init(&urb->urb_list);
 	spin_unlock_irqrestore(&uhci->urb_list_lock, flags);
 
 	uhci_unlink_generic(uhci, urb);
@@ -2206,8 +2200,7 @@ static void uhci_free_pending_qhs(struct uhci *uhci)
 
 		tmp = tmp->next;
 
-		list_del(&qh->remove_list);
-		INIT_LIST_HEAD(&qh->remove_list);
+		list_del_init(&qh->remove_list);
 
 		uhci_free_qh(uhci, qh);
 	}
@@ -2300,8 +2293,7 @@ static void uhci_finish_completion(struct uhci *uhci)
 
 		tmp = tmp->next;
 
-		list_del(&urbp->complete_list);
-		INIT_LIST_HEAD(&urbp->complete_list);
+		list_del_init(&urbp->complete_list);
 
 		uhci_call_completion(urb);
 	}
@@ -2322,8 +2314,7 @@ static void uhci_remove_pending_qhs(struct uhci *uhci)
 
 		tmp = tmp->next;
 
-		list_del(&urb->urb_list);
-		INIT_LIST_HEAD(&urb->urb_list);
+		list_del_init(&urb->urb_list);
 
 		urbp->status = urb->status = -ECONNRESET;
 		uhci_call_completion(urb);

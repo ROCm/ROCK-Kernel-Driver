@@ -503,6 +503,21 @@ static void __init smp_init(void)
 #endif
 
 /*
+ * We need to finalize in a non-__init function or else race conditions
+ * between the root thread and the init thread may cause start_kernel to
+ * be reaped by free_initmem before the root thread has proceeded to
+ * cpu_idle.
+ */
+
+static void rest_init(void)
+{
+	kernel_thread(init, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
+	unlock_kernel();
+	current->need_resched = 1;
+ 	cpu_idle();
+} 
+
+/*
  *	Activate the first processor.
  */
  
@@ -584,10 +599,7 @@ asmlinkage void __init start_kernel(void)
 	 *	make syscalls (and thus be locked).
 	 */
 	smp_init();
-	kernel_thread(init, NULL, CLONE_FS | CLONE_FILES | CLONE_SIGNAL);
-	unlock_kernel();
-	current->need_resched = 1;
- 	cpu_idle();
+	rest_init();
 }
 
 #ifdef CONFIG_BLK_DEV_INITRD

@@ -171,6 +171,8 @@ static inline void proc_net_remove(const char *name)
 
 #else
 
+#define proc_root_driver NULL
+
 static inline struct proc_dir_entry *proc_net_create(const char *name, mode_t mode, 
 	get_info_t *get_info) {return NULL;}
 static inline void proc_net_remove(const char *name) {}

@@ -96,7 +96,7 @@ struct freecom_status {
 #define FCM_PACKET_OUTPUT 0x01
 
 /* Write a value to an ide register.  Or the ide register to write after
- * munging the addres a bit. */
+ * munging the address a bit. */
 #define FCM_PACKET_IDE_WRITE    0x40
 #define FCM_PACKET_IDE_READ     0xC0
 
@@ -412,7 +412,7 @@ int freecom_transport(Scsi_Cmnd *srb, struct us_data *us)
 
         US_DEBUG(pdump ((void *) fst, partial));
 
-	/* while we haven't recieved the IRQ */
+	/* while we haven't received the IRQ */
 	while (!(fst->Status & 0x2)) {
 		/* send a command to re-fetch the status */
 		US_DEBUGP("Re-attempting to get status...\n");

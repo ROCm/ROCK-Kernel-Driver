@@ -10,11 +10,23 @@
 
 #define MAX_SWAPFILES 8
 
+/*
+ * Magic header for a swap area. The first part of the union is
+ * what the swap magic looks like for the old (limited to 128MB)
+ * swap area format, the second part of the union adds - in the
+ * old reserved area - some extra information. Note that the first
+ * kilobyte is reserved for boot loader or disk label stuff...
+ *
+ * Having the magic at the end of the PAGE_SIZE makes detecting swap
+ * areas somewhat tricky on machines that support multiple page sizes.
+ * For 2.5 we'll probably want to move the magic to just beyond the
+ * bootbits...
+ */
 union swap_header {
 	struct 
 	{
 		char reserved[PAGE_SIZE - 10];
-		char magic[10];
+		char magic[10];			/* SWAP-SPACE or SWAPSPACE2 */
 	} magic;
 	struct 
 	{
@@ -46,6 +58,9 @@ union swap_header {
 #define SWAP_MAP_MAX	0x7fff
 #define SWAP_MAP_BAD	0x8000
 
+/*
+ * The in-memory structure used to track swap areas.
+ */
 struct swap_info_struct {
 	unsigned int flags;
 	kdev_t swap_device;

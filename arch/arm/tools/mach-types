@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Sun Jun 17 00:53:17 2001
+# Last update: Wed Jul 4 20:04:11 2001
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -91,12 +91,17 @@ mercury			ARCH_MERCURY		MERCURY			78
 empeg			SA1100_EMPEG		EMPEG			79
 adi_eb			ARCH_I80200FCC		I80200FCC		80
 itt_cpb			SA1100_ITT_CPB		ITT_CPB			81
-sa1110_svc		ARCH_SA1110_SVC		SA1110_SVC		82
+svc			SA1100_SVC		SVC			82
 alpha2			SA1100_ALPHA2		ALPHA2			84
 alpha1			SA1100_ALPHA1		ALPHA1			85
 netarm			ARCH_NETARM		NETARM			86
 simpad			SA1100_SIMPAD		SIMPAD			87
 pda1			ARCH_PDA1		PDA1			88
 lubbock			ARCH_LUBBOCK		LUBBOCK			89
+aniko			ARCH_ANIKO		ANIKO			90
+clep7212		ARCH_CLEP7212		CLEP7212		91
+cs89712			ARCH_CS89712		CS89712			92
+weararm			SA1100_WEARARM		WEARARM			93
+possio_px		SA1100_POSSIO_PX	POSSIO_PX		94
 
 # The following are unallocated

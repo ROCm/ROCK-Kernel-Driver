@@ -2731,7 +2731,7 @@ static int ace_change_mtu(struct net_device *dev, int new_mtu)
 	struct ace_private *ap = dev->priv;
 	struct ace_regs *regs = ap->regs;
 
-	if ((new_mtu < 68) || (new_mtu > ACE_JUMBO_MTU))
+	if (new_mtu > ACE_JUMBO_MTU)
 		return -EINVAL;
 
 	writel(new_mtu + ETH_HLEN + 4, &regs->IfMtu);

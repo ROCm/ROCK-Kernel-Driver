@@ -716,6 +716,7 @@ static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, lof
 static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t len, loff_t *pos)
 {
 	int i=0;
+	char c;
 
 	spin_lock (&mdc800->io_lock);
 	if (mdc800->state != READY)
@@ -738,7 +739,14 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 		}
 
 		/* check for command start */
-		if (buf [i] == (char) 0x55)
+		
+		if(get_user(c, buf+i))
+		{
+			spin_unlock (&mdc800->io_lock);
+			return -EFAULT;
+		}
+		
+		if (c == (char) 0x55)
 		{
 			mdc800->in_count=0;
 			mdc800->out_count=0;
@@ -749,7 +757,7 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 		/* save command byte */
 		if (mdc800->in_count < 8)
 		{
-			mdc800->in[mdc800->in_count]=buf[i];
+			mdc800->in[mdc800->in_count]=c;
 			mdc800->in_count++;
 		}
 		else

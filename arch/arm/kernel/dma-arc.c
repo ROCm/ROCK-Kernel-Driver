@@ -155,7 +155,7 @@ static void a5k_floppy_enable_dma(dmach_t channel, dma_t *dma)
 	}
 	memcpy((void *)0x1c, fiqhandler_start, fiqhandler_length);
 	regs.ARM_r9 = dma->buf.length;
-	regs.ARM_r10 = dma->buf.address;
+	regs.ARM_r10 = (unsigned long)dma->buf.address;
 	regs.ARM_fp = FLOPPYDMA_BASE;
 	set_fiq_regs(&regs);
 	enable_fiq(dma->dma_irq);

@@ -95,28 +95,27 @@ void rio_inc_mod_count (void);
 #if 1
 #define rio_spin_lock_irqsave(sem, flags) do { \
 	rio_dprintk (RIO_DEBUG_SPINLOCK, "spinlockirqsave: %p %s:%d\n", \
-					sem, __FILE__, __LINE__);\
-        spin_lock_irqsave(sem, flags);\
-        } while (0)
+	                                sem, __FILE__, __LINE__);\
+	spin_lock_irqsave(sem, flags);\
+	} while (0)
 
 #define rio_spin_unlock_irqrestore(sem, flags) do { \
 	rio_dprintk (RIO_DEBUG_SPINLOCK, "spinunlockirqrestore: %p %s:%d\n",\
-					sem, __FILE__, __LINE__);\
-        spin_unlock_irqrestore(sem, flags);\
-        } while (0)
-
+	                                sem, __FILE__, __LINE__);\
+	spin_unlock_irqrestore(sem, flags);\
+	} while (0)
 
 #define rio_spin_lock(sem) do { \
 	rio_dprintk (RIO_DEBUG_SPINLOCK, "spinlock: %p %s:%d\n",\
-					sem, __FILE__, __LINE__);\
-        spin_lock(sem);\
-        } while (0)
+	                                sem, __FILE__, __LINE__);\
+	spin_lock(sem);\
+	} while (0)
 
 #define rio_spin_unlock(sem) do { \
 	rio_dprintk (RIO_DEBUG_SPINLOCK, "spinunlock: %p %s:%d\n",\
-					sem, __FILE__, __LINE__);\
-        spin_unlock(sem);\
-        } while (0)
+	                                sem, __FILE__, __LINE__);\
+	spin_unlock(sem);\
+	} while (0)
 #else
 #define rio_spin_lock_irqsave(sem, flags) \
             spin_lock_irqsave(sem, flags)
@@ -165,7 +164,7 @@ static inline void *rio_memcpy_fromio (void *dest, void *source, int n)
 #define rio_memcpy_fromio                      memcpy_fromio
 #endif
 
-#define DEBUG
+#define DEBUG 1
 
 
 /* 

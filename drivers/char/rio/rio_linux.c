@@ -58,6 +58,7 @@
 #include <linux/pci.h>
 #include <linux/slab.h>
 #include <linux/miscdevice.h>
+#include <linux/init.h>
 
 #include <linux/compatmac.h>
 #include <linux/generic_serial.h>
@@ -165,7 +166,7 @@ RIOConf =
   /* startuptime */     HZ*2,           /* how long to wait for card to run */
   /* slowcook */        0,              /* TRUE -> always use line disc. */
   /* intrpolltime */    1,              /* The frequency of OUR polls */
-  /* breakinterval */   25,             /* x10 mS */
+  /* breakinterval */   25,             /* x10 mS XXX: units seem to be 1ms not 10! -- REW*/
   /* timer */           10,             /* mS */
   /* RtaLoadBase */     0x7000,
   /* HostLoadBase */    0x7C00,
@@ -203,10 +204,7 @@ static int rio_fw_ioctl (struct inode *inode, struct file *filp,
 		         unsigned int cmd, unsigned long arg);
 static int rio_init_drivers(void);
 
-
 void my_hd (void *addr, int len);
-
-
 
 static struct tty_driver rio_driver, rio_callout_driver;
 static struct tty_driver rio_driver2, rio_callout_driver2;
@@ -248,13 +246,11 @@ int rio_probe_addrs[]= {0xc0000, 0xd0000, 0xe0000};
 long rio_irqmask = -1;
 
 #ifndef TWO_ZERO
-#ifdef MODULE
 MODULE_AUTHOR("Rogier Wolff <R.E.Wolff@bitwizard.nl>, Patrick van de Lageweg <patrick@bitwizard.nl>");
 MODULE_DESCRIPTION("RIO driver");
 MODULE_PARM(rio_poll, "i");
 MODULE_PARM(rio_debug, "i");
 MODULE_PARM(rio_irqmask, "i");
-#endif
 #endif
 
 static struct real_driver rio_real_driver = {
@@ -383,8 +379,8 @@ int rio_minor (kdev_t device)
 
 int rio_ismodem (kdev_t device)
 {
-  return (MAJOR (device) != RIO_NORMAL_MAJOR0) &&
-         (MAJOR (device) != RIO_NORMAL_MAJOR1);
+  return (MAJOR (device) == RIO_NORMAL_MAJOR0) ||
+         (MAJOR (device) == RIO_NORMAL_MAJOR1);
 }
 
 
@@ -455,7 +451,6 @@ static void rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
   func_enter ();
 
   HostP = (struct Host*)ptr; /* &p->RIOHosts[(long)ptr]; */
-  
   rio_dprintk (RIO_DEBUG_IFLOW, "rio: enter rio_interrupt (%d/%d)\n", 
                irq, HostP->Ivec); 
 
@@ -624,8 +619,12 @@ static int rio_chars_in_buffer (void * ptr)
 /* Nothing special here... */
 static void rio_shutdown_port (void * ptr) 
 {
+  struct Port *PortP;
+
   func_enter();
 
+  PortP = (struct Port *)ptr;
+  PortP->gs.tty = NULL;
 #if 0
   port->gs.flags &= ~ GS_ACTIVE;
   if (!port->gs.tty) {
@@ -654,8 +653,14 @@ static void rio_shutdown_port (void * ptr)
    exit minicom.  I expect an "oops".  -- REW */
 static void rio_hungup (void *ptr)
 {
-  func_enter ();
+  struct Port *PortP;
+
+  func_enter();
+  
+  PortP = (struct Port *)ptr;
+  PortP->gs.tty = NULL;
   rio_dec_mod_count (); 
+
   func_exit ();
 }
 
@@ -679,9 +684,8 @@ static void rio_close (void *ptr)
     PortP->gs.count = 0; 
   }                
 
-
+  PortP->gs.tty = NULL;
   rio_dec_mod_count ();
-
   func_exit ();
 }
 
@@ -700,24 +704,28 @@ static int rio_fw_ioctl (struct inode *inode, struct file *filp,
   return rc;
 }
 
+extern int RIOShortCommand(struct rio_info *p, struct Port *PortP,
+               int command, int len, int arg);
 
 static int rio_ioctl (struct tty_struct * tty, struct file * filp, 
                      unsigned int cmd, unsigned long arg)
 {
-#if 0
   int rc;
-  struct rio_port *port = tty->driver_data;
+  struct Port *PortP;
   int ival;
 
-  /* func_enter2(); */
+  func_enter();
 
+  PortP = (struct Port *)tty->driver_data;
 
   rc  = 0;
   switch (cmd) {
+#if 0
   case TIOCGSOFTCAR:
     rc = Put_user(((tty->termios->c_cflag & CLOCAL) ? 1 : 0),
                   (unsigned int *) arg);
     break;
+#endif
   case TIOCSSOFTCAR:
     if ((rc = verify_area(VERIFY_READ, (void *) arg,
                           sizeof(int))) == 0) {
@@ -730,13 +738,39 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
   case TIOCGSERIAL:
     if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
                           sizeof(struct serial_struct))) == 0)
-      gs_getserial(&port->gs, (struct serial_struct *) arg);
+      gs_getserial(&PortP->gs, (struct serial_struct *) arg);
+    break;
+  case TCSBRK:
+    if ( PortP->State & RIO_DELETED ) {
+      rio_dprintk (RIO_DEBUG_TTY, "BREAK on deleted RTA\n");
+      rc = -EIO;      
+    } else {
+      if (RIOShortCommand(p, PortP, SBREAK, 2, 250) == RIO_FAIL) {
+         rio_dprintk (RIO_DEBUG_INTR, "SBREAK RIOShortCommand failed\n");
+         rc = -EIO;
+      }          
+    }
+    break;
+  case TCSBRKP:
+    if ( PortP->State & RIO_DELETED ) {
+      rio_dprintk (RIO_DEBUG_TTY, "BREAK on deleted RTA\n");
+      rc = -EIO;      
+    } else {
+      int l;
+      l = arg?arg*100:250;
+      if (l > 255) l = 255;
+      if (RIOShortCommand(p, PortP, SBREAK, 2, arg?arg*100:250) == RIO_FAIL) {
+         rio_dprintk (RIO_DEBUG_INTR, "SBREAK RIOShortCommand failed\n");
+         rc = -EIO;
+      }          
+    }
     break;
   case TIOCSSERIAL:
     if ((rc = verify_area(VERIFY_READ, (void *) arg,
                           sizeof(struct serial_struct))) == 0)
-      rc = gs_setserial(&port->gs, (struct serial_struct *) arg);
+      rc = gs_setserial(&PortP->gs, (struct serial_struct *) arg);
     break;
+#if 0
   case TIOCMGET:
     if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
                           sizeof(unsigned int))) == 0) {
@@ -768,17 +802,13 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
                            ((ival & TIOCM_RTS) ? 1 : 0));
     }
     break;
-
+#endif
   default:
     rc = -ENOIOCTLCMD;
     break;
   }
-  /* func_exit(); */
+  func_exit();
   return rc;
-#else
-  return -ENOIOCTLCMD;
-#endif
-
 }
 
 
@@ -1029,17 +1059,15 @@ static int rio_init_datastructures (void)
  free4:kfree (rio_termios);
  free3:kfree (p->RIOPortp);
  free2:kfree (p->RIOHosts);
- free1:kfree (p);
- free0:
-  if (p) {
-	rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p %p %p\n", 
+ free1:
+  rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p %p %p\n", 
         	       p, p->RIOHosts, p->RIOPortp, rio_termios, rio_termios);
-  }
+  kfree(p);        	      
+ free0:
   return -ENOMEM;
 }
 
-#ifdef MODULE
-static void rio_release_drivers(void)
+static void  __exit rio_release_drivers(void)
 {
   func_enter();
   tty_unregister_driver (&rio_callout_driver2);
@@ -1048,7 +1076,6 @@ static void rio_release_drivers(void)
   tty_unregister_driver (&rio_driver);
   func_exit();
 }
-#endif 
 
 #ifdef TWO_ZERO
 #define PDEV unsigned char pci_bus, unsigned pci_fun
@@ -1101,11 +1128,7 @@ void fix_rio_pci (PDEV)
 #endif
 
 
-#ifdef MODULE
-#define rio_init init_module
-#endif
-
-int rio_init(void) 
+static int __init rio_init(void) 
 {
   int found = 0;
   int i;
@@ -1255,6 +1278,7 @@ int rio_init(void)
       hp->Type  = RIO_PCI;
       hp->Copy  = rio_pcicopy;
       hp->Mode  = RIO_PCI_BOOT_FROM_RAM;
+      hp->HostLock = SPIN_LOCK_UNLOCKED;
 
       rio_dprintk (RIO_DEBUG_PROBE, "Ivec: %x\n", hp->Ivec);
       rio_dprintk (RIO_DEBUG_PROBE, "Mode: %x\n", hp->Mode);
@@ -1310,6 +1334,7 @@ int rio_init(void)
                              * Moreover, the ISA card will work with the 
                              * special PCI copy anyway. -- REW */
     hp->Mode = 0;
+    hp->HostLock = SPIN_LOCK_UNLOCKED;
 
     vpdp = get_VPD_PROM (hp);
     rio_dprintk (RIO_DEBUG_PROBE, "Got VPD ROM\n");
@@ -1388,8 +1413,7 @@ int rio_init(void)
 }
 
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit rio_exit (void)
 {
   int i; 
   struct Host *hp;
@@ -1424,9 +1448,9 @@ void cleanup_module(void)
 
   func_exit();
 }
-#endif
 
-
+module_init(rio_init);
+module_exit(rio_exit);
 
 /*
  * Anybody who knows why this doesn't work for me, please tell me -- REW.

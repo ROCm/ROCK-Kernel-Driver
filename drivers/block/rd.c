@@ -466,7 +466,7 @@ MODULE_PARM_DESC(rd_blocksize, "Blocksize of each RAM disk in bytes.");
  *	romfs
  * 	gzip
  */
-int __init 
+static int __init 
 identify_ramdisk_image(kdev_t device, struct file *fp, int start_block)
 {
 	const int size = 512;

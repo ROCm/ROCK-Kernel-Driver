@@ -124,6 +124,7 @@ static int zf_action = GEN_RESET;
 static int zf_is_open = 0;
 static int zf_expect_close = 0;
 static spinlock_t zf_lock;
+static spinlock_t zf_port_lock;
 static struct timer_list zf_timer;
 static unsigned long next_heartbeat = 0;
 
@@ -140,7 +141,7 @@ static unsigned long next_heartbeat = 0;
 #ifndef ZF_DEBUG
 #	define dprintk(format, args...)
 #else
-#	define dprintk(format, args...) printk(KERN_DEBUG PFX ":" __FUNCTION__ ":%d: " format, __LINE__ , ## args)
+#	define dprintk(format, args...) printk(KERN_DEBUG PFX; ":" __FUNCTION__ ":%d: " format, __LINE__ , ## args)
 #endif
 
 
@@ -175,7 +176,7 @@ static inline void zf_set_control(unsigned short new)
  *	Just get current counter value
  */
 
-inline unsigned short zf_get_timer(unsigned char n)
+static inline unsigned short zf_get_timer(unsigned char n)
 {
 	switch(n){
 		case WD1:
@@ -209,17 +210,20 @@ static inline void zf_set_timer(unsigned short new, unsigned char n)
 static void zf_timer_off(void)
 {
 	unsigned int ctrl_reg = 0;
+	unsigned long flags;
 
 	/* stop internal ping */
-	del_timer(&zf_timer);
+	del_timer_sync(&zf_timer);
 
+	spin_lock_irqsave(&zf_port_lock, flags);
 	/* stop watchdog timer */	
 	ctrl_reg = zf_get_control();
 	ctrl_reg |= (ENABLE_WD1|ENABLE_WD2);	/* disable wd1 and wd2 */
 	ctrl_reg &= ~(ENABLE_WD1|ENABLE_WD2);
 	zf_set_control(ctrl_reg);
+	spin_unlock_irqrestore(&zf_port_lock, flags);
 
-	printk(PFX ": Watchdog timer is now disabled\n");
+	printk(KERN_INFO PFX ": Watchdog timer is now disabled\n");
 }
 
 
@@ -229,6 +233,9 @@ static void zf_timer_off(void)
 static void zf_timer_on(void)
 {
 	unsigned int ctrl_reg = 0;
+	unsigned long flags;
+	
+	spin_lock_irqsave(&zf_port_lock, flags);
 
 	zf_writeb(PULSE_LEN, 0xff);
 
@@ -246,15 +253,17 @@ static void zf_timer_on(void)
 	ctrl_reg = zf_get_control();
 	ctrl_reg |= (ENABLE_WD1|zf_action);
 	zf_set_control(ctrl_reg);
+	spin_unlock_irqrestore(&zf_port_lock, flags);
 
-	printk(PFX ": Watchdog timer is now enabled\n");
+	printk(KERN_INFO PFX ": Watchdog timer is now enabled\n");
 }
 
 
 static void zf_ping(unsigned long data)
 {
 	unsigned int ctrl_reg = 0;
-
+	unsigned long flags;
+		
 	zf_writeb(COUNTER_2, 0xff);
 
 	if(time_before(jiffies, next_heartbeat)){
@@ -265,6 +274,8 @@ static void zf_ping(unsigned long data)
 		 * reset event is activated by transition from 0 to 1 on
 		 * RESET_WD1 bit and we assume that it is already zero...
 		 */
+
+		spin_lock_irqsave(&zf_port_lock, flags);
 		ctrl_reg = zf_get_control();    
 		ctrl_reg |= RESET_WD1;		
 		zf_set_control(ctrl_reg);	
@@ -272,11 +283,12 @@ static void zf_ping(unsigned long data)
 		/* ...and nothing changes until here */
 		ctrl_reg &= ~(RESET_WD1);
 		zf_set_control(ctrl_reg);		
+		spin_unlock_irqrestore(&zf_port_lock, flags);
 
 		zf_timer.expires = jiffies + ZF_HW_TIMEO;
 		add_timer(&zf_timer);
 	}else{
-		printk(PFX ": I will reset your machine\n");
+		printk(KERN_CRIT PFX ": I will reset your machine\n");
 	}
 }
 
@@ -396,7 +408,7 @@ static int zf_close(struct inode *inode, struct file *file)
 			zf_timer_off();
 		} else {
 			del_timer(&zf_timer);
-			printk(PFX ": device file closed unexpectedly. Will not stop the WDT!\n");
+			printk(KERN_ERR PFX ": device file closed unexpectedly. Will not stop the WDT!\n");
 		}
 		
 		spin_lock(&zf_lock);
@@ -427,9 +439,7 @@ static int zf_notify_sys(struct notifier_block *this, unsigned long code,
 
 
 static struct file_operations zf_fops = {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,34)
 	owner:          THIS_MODULE,
-#endif
 	read:           zf_read,
 	write:          zf_write,
 	ioctl:          zf_ioctl,
@@ -458,19 +468,19 @@ static void __init zf_show_action(int act)
 {
 	char *str[] = { "RESET", "SMI", "NMI", "SCI" };
 	
-	printk(PFX ": Watchdog using action = %s\n", str[act]);
+	printk(KERN_INFO PFX ": Watchdog using action = %s\n", str[act]);
 }
 
-int __init zf_init(void)
+static int __init zf_init(void)
 {
 	int ret;
 	
-	printk(PFX ": MachZ ZF-Logic Watchdog driver initializing.\n");
+	printk(KERN_INFO PFX ": MachZ ZF-Logic Watchdog driver initializing.\n");
 
 	ret = zf_get_ZFL_version();
 	printk("%#x\n", ret);
 	if((!ret) || (ret != 0xffff)){
-		printk(PFX ": no ZF-Logic found\n");
+		printk(KERN_WARNING PFX ": no ZF-Logic found\n");
 		return -ENODEV;
 	}
 
@@ -482,6 +492,7 @@ int __init zf_init(void)
 	zf_show_action(action);
 
 	spin_lock_init(&zf_lock);
+	spin_lock_init(&zf_port_lock);
 	
 	ret = misc_register(&zf_miscdev);
 	if (ret){
@@ -490,22 +501,12 @@ int __init zf_init(void)
 		goto out;
 	}
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,3)
-	if(check_region(ZF_IOBASE, 3)){
-#else
 	if(!request_region(ZF_IOBASE, 3, "MachZ ZFL WDT")){
-#endif
-
 		printk(KERN_ERR "cannot reserve I/O ports at %d\n",
 							ZF_IOBASE);
 		ret = -EBUSY;
 		goto no_region;
 	}
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,3)
-	request_region(ZF_IOBASE, 3, "MachZ ZFL WDT");
-#define __exit
-#endif
 
 	ret = register_reboot_notifier(&zf_notifier);
 	if(ret){

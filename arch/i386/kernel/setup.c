@@ -1438,8 +1438,16 @@ static void __init init_cyrix(struct cpuinfo_x86 *c)
 		break;
 
         case 5: /* 6x86MX/M II */
-		if (dir1 > 7) dir0_msn++;  /* M II */
-		else c->coma_bug = 1;      /* 6x86MX, it has the bug. */
+		if (dir1 > 7)
+		{
+			dir0_msn++;  /* M II */
+			/* Enable MMX extensions (App note 108) */
+			setCx86(CX86_CCR7, getCx86(CX86_CCR7)|1);
+		}
+		else
+		{
+			c->coma_bug = 1;      /* 6x86MX, it has the bug. */
+		}
 		tmp = (!(dir0_lsn & 7) || dir0_lsn & 1) ? 2 : 0;
 		Cx86_cb[tmp] = cyrix_model_mult2[dir0_lsn & 7];
 		p = Cx86_cb+tmp;

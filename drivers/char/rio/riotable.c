@@ -37,6 +37,8 @@ static char *_riotable_c_sccs_ = "@(#)riotable.c	1.2";
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include <linux/interrupt.h>
+
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/string.h>
@@ -499,7 +501,7 @@ struct Map *MapP;
 	struct Map *HostMapP;
 	struct Port *PortP;
 	int work_done = 0;
-	unsigned long flags;
+	unsigned long lock_flags, sem_flags;
 
 	rio_dprintk (RIO_DEBUG_TABLE, "Delete entry on host %x, rta %x\n",
 								MapP->HostUniqueNum, MapP->RtaUniqueNum);
@@ -507,10 +509,10 @@ struct Map *MapP;
 	for ( host=0; host < p->RIONumHosts; host++ ) {
 		HostP = &p->RIOHosts[host];
 
-		rio_spin_lock_irqsave( &HostP->HostLock, flags );
+		rio_spin_lock_irqsave( &HostP->HostLock, lock_flags );
 
 		if ( (HostP->Flags & RUN_STATE) != RC_RUNNING ) {
-			rio_spin_unlock_irqrestore(&HostP->HostLock, flags);
+			rio_spin_unlock_irqrestore(&HostP->HostLock, lock_flags);
 			continue;
 		}
 
@@ -527,7 +529,7 @@ struct Map *MapP;
 					if ( HostMapP->Topology[link].Unit != ROUTE_DISCONNECT ) {
 						rio_dprintk (RIO_DEBUG_TABLE, "Entry is in use and cannot be deleted!\n");
 						p->RIOError.Error = UNIT_IS_IN_USE;
-						rio_spin_unlock_irqrestore( &HostP->HostLock, flags);
+						rio_spin_unlock_irqrestore( &HostP->HostLock, lock_flags);
 						return EBUSY;
 					}
 				}
@@ -542,7 +544,7 @@ struct Map *MapP;
 						PortP = p->RIOPortp[port];
 						rio_dprintk (RIO_DEBUG_TABLE, "Unmap port\n");
 
-						rio_spin_lock_irqsave( &PortP->portSem, flags );
+						rio_spin_lock_irqsave( &PortP->portSem, sem_flags );
 
 						PortP->Mapped = 0;
 
@@ -600,7 +602,7 @@ struct Map *MapP;
 							WWORD(PortP->PhbP->destination,
 							 dest_unit + (dest_port << 8));
 						}
-						rio_spin_unlock_irqrestore(&PortP->portSem, flags);
+						rio_spin_unlock_irqrestore(&PortP->portSem, sem_flags);
 					}
 				}
 				rio_dprintk (RIO_DEBUG_TABLE, "Entry nulled.\n");
@@ -608,7 +610,7 @@ struct Map *MapP;
 				work_done++;
 			}
 		}
-		rio_spin_unlock_irqrestore(&HostP->HostLock, flags);
+		rio_spin_unlock_irqrestore(&HostP->HostLock, lock_flags);
 	}
 
 	/* XXXXX lock me up */

@@ -1454,7 +1454,7 @@ char *idetape_command_key_verbose (byte idetape_command_key)
 		case IDETAPE_WRITE_FILEMARK_CMD:	return("WRITE_FILEMARK_CMD");
 		case IDETAPE_SPACE_CMD:			return("SPACE_CMD");
 		case IDETAPE_INQUIRY_CMD:		return("INQUIRY_CMD");
-		case IDETAPE_ERASE_CMD:			return("ERASE_CMD")
+		case IDETAPE_ERASE_CMD:			return("ERASE_CMD");
 		case IDETAPE_MODE_SENSE_CMD:		return("MODE_SENSE_CMD");
 		case IDETAPE_MODE_SELECT_CMD:		return("MODE_SELECT_CMD");
 		case IDETAPE_LOAD_UNLOAD_CMD:		return("LOAD_UNLOAD_CMD");

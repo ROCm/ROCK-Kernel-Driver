@@ -50,13 +50,14 @@ void oldlatch_bupdate(unsigned char mask,unsigned char newdata)
 		BUG();
 }
 
-static void __init oldlatch_init(void)
+static int __init oldlatch_init(void)
 {
 	if (machine_is_archimedes()) {
 		oldlatch_aupdate(0xff, 0xff);
 		/* Thats no FDC reset...*/
 		oldlatch_bupdate(0xff, LATCHB_FDCRESET);
 	}
+	return 0;
 }
 
 __initcall(oldlatch_init);

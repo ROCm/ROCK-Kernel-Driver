@@ -7,36 +7,26 @@
  * it under the terms of the GNU General Public License version 2 as
  * published by the Free Software Foundation.
  */
-#define MAX_NR_BUS	2
-
-struct arm_bus_sysdata {
-	/*
-	 * bitmask of features we can turn.
-	 * See PCI command register for more info.
-	 */
-	u16		features;
-	/*
-	 * Maximum devsel for this bus.
-	 */
-	u16		maxdevsel;
-	/*
-	 * The maximum latency that devices on this
-	 * bus can withstand.
-	 */
-	u8		max_lat;
-};
-
-struct arm_pci_sysdata {
-	struct arm_bus_sysdata bus[MAX_NR_BUS];
-};
-
 struct hw_pci {
-	void		(*init)(struct arm_pci_sysdata *);
+	/* Initialise the hardware */
+	void		(*init)(void *);
+
+	/* Setup bus resources */
+	void		(*setup_resources)(struct resource **);
+
+	/*
+	 * This is the offset of PCI memory base registers
+	 * to physical memory.
+	 */
+	unsigned long	mem_offset;
+
+	/* IRQ swizzle */
 	u8		(*swizzle)(struct pci_dev *dev, u8 *pin);
+
+	/* IRQ mapping */
 	int		(*map_irq)(struct pci_dev *dev, u8 slot, u8 pin);
 };
 
 extern u8 no_swizzle(struct pci_dev *dev, u8 *pin);
-
-void __init dc21285_init(struct arm_pci_sysdata *);
-void __init plx90x0_init(struct arm_pci_sysdata *);
+extern void __init dc21285_setup_resources(struct resource **resource);
+extern void __init dc21285_init(void *sysdata);

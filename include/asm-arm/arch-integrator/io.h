@@ -35,12 +35,11 @@
 /*
  * Validate the pci memory address for ioremap.
  */
-#define iomem_valid_addr(iomem,size)	\
-	((iomem) > 0 && (iomem) + (size) <= 0x20000000)
+#define iomem_valid_addr(iomem,size)	(1)
 
 /*
  * Convert PCI memory space to a CPU physical address
  */
-#define iomem_to_phys(iomem)	((iomem) + PHYS_PCI_MEM_BASE)
+#define iomem_to_phys(iomem)	(iomem)
 
 #endif

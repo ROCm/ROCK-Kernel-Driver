@@ -38,6 +38,7 @@ static char *_rioboot_c_sccs_ = "@(#)rioboot.c	1.3";
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/errno.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/system.h>
 #include <asm/string.h>

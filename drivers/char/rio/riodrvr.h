@@ -33,12 +33,13 @@
 #ifndef __riodrvr_h
 #define __riodrvr_h
 
+#include <asm/param.h>	/* for HZ */
+
 #ifdef SCCS_LABELS
 static char *_riodrvr_h_sccs_ = "@(#)riodrvr.h	1.3";
 #endif
 
 #define MEMDUMP_SIZE	32
-#define HZ				100
 #define	MOD_DISABLE	(RIO_NOREAD|RIO_NOWRITE|RIO_NOXPRINT)
 
 

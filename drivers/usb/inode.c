@@ -260,11 +260,15 @@ static struct usb_bus *usbdevfs_findbus(int busnr)
         struct list_head *list;
         struct usb_bus *bus;
 
+	read_lock_irq (&usb_bus_list_lock);
         for (list = usb_bus_list.next; list != &usb_bus_list; list = list->next) {
                 bus = list_entry(list, struct usb_bus, bus_list);
-                if (bus->busnum == busnr)
+                if (bus->busnum == busnr) {
+			read_unlock_irq (&usb_bus_list_lock);
                         return bus;
+		}
         }
+	read_unlock_irq (&usb_bus_list_lock);
         return NULL;
 }
 
@@ -412,7 +416,7 @@ static int usbdevfs_root_readdir(struct file *filp, void *dirent, filldir_t fill
 		if (i < 2+NRSPECIAL)
 			return 0;
 		i -= 2+NRSPECIAL;
-		lock_kernel();
+		read_lock_irq (&usb_bus_list_lock);
 		for (list = usb_bus_list.next; list != &usb_bus_list; list = list->next) {
 			if (i > 0) {
 				i--;
@@ -424,7 +428,7 @@ static int usbdevfs_root_readdir(struct file *filp, void *dirent, filldir_t fill
 				break;
 			filp->f_pos++;
 		}
-		unlock_kernel();
+		read_unlock_irq (&usb_bus_list_lock);
 		return 0;
 	}
 }
@@ -635,13 +639,13 @@ struct super_block *usbdevfs_read_super(struct super_block *s, void *data, int s
 		list_add_tail(&inode->u.usbdev_i.slist, &s->u.usbdevfs_sb.ilist);
 		list_add_tail(&inode->u.usbdev_i.dlist, &special[i].inodes);
 	}
-	lock_kernel();
+	read_lock_irq (&usb_bus_list_lock);
 	for (blist = usb_bus_list.next; blist != &usb_bus_list; blist = blist->next) {
 		bus = list_entry(blist, struct usb_bus, bus_list);
 		new_bus_inode(bus, s);
 		recurse_new_dev_inode(bus->root_hub, s);
 	}
-	unlock_kernel();
+	read_unlock_irq (&usb_bus_list_lock);
         return s;
 
  out_no_root:

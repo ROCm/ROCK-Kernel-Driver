@@ -152,7 +152,7 @@ __setup("idle=", idle_setup);
 
 static long no_idt[2];
 static int reboot_mode;
-static int reboot_thru_bios;
+int reboot_thru_bios;
 
 static int __init reboot_setup(char *str)
 {

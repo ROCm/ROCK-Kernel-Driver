@@ -474,17 +474,18 @@ PKT *PacketP;
 	rio_spin_lock_irqsave(&PortP->portSem, flags);
 	switch( RBYTE(PktCmdP->Command) ) {
 		case BREAK_RECEIVED:
-		rio_dprintk (RIO_DEBUG_CMD, "Received a break!\n");
+			rio_dprintk (RIO_DEBUG_CMD, "Received a break!\n");
 			/* If the current line disc. is not multi-threading and
 	   			the current processor is not the default, reset rup_intr
 	   			and return FALSE to ensure that the command packet is
 	   			not freed. */
 			/* Call tmgr HANGUP HERE */
 			/* Fix this later when every thing works !!!! RAMRAJ */
+			gs_got_break (PortP);
 			break;
 
 		case COMPLETE:
-		rio_dprintk (RIO_DEBUG_CMD, "Command complete on phb %d host %d\n",
+			rio_dprintk (RIO_DEBUG_CMD, "Command complete on phb %d host %d\n",
 			     RBYTE(PktCmdP->PhbNum), HostP-p->RIOHosts);
 			subCommand = 1;
 			switch (RBYTE(PktCmdP->SubCommand)) {
@@ -548,6 +549,8 @@ PKT *PacketP;
 				** carrier.
 				*/
 				if (PortP->gs.tty == NULL)
+					break;
+				if (PortP->gs.tty->termios == NULL)
 					break;
 			  
 				if (!(PortP->gs.tty->termios->c_cflag & CLOCAL) &&
@@ -623,7 +626,8 @@ RIOGetCmdBlk()
 	struct CmdBlk *CmdBlkP;
 
 	CmdBlkP = (struct CmdBlk *)sysbrk(sizeof(struct CmdBlk));
-	bzero(CmdBlkP, sizeof(struct CmdBlk));
+	if (CmdBlkP)
+		bzero(CmdBlkP, sizeof(struct CmdBlk));
 
 	return CmdBlkP;
 }

@@ -21,6 +21,13 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
       dep_tristate '  QuickCam Colour Video For Linux (EXPERIMENTAL)' CONFIG_VIDEO_CQCAM $CONFIG_VIDEO_DEV $CONFIG_PARPORT
    fi
 fi
+if [ "$CONFIG_PARPORT" != "n" ]; then
+   if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+      if [ "$CONFIG_PARPORT_1284" != "n" ]; then
+         dep_tristate '  Winbond W9966CF Webcam Video For Linux (EXPERIMENTAL)' CONFIG_VIDEO_W9966 $CONFIG_VIDEO_DEV $CONFIG_PARPORT
+      fi
+   fi
+fi
 dep_tristate '  CPiA Video For Linux' CONFIG_VIDEO_CPIA $CONFIG_VIDEO_DEV
 if [ "$CONFIG_VIDEO_CPIA" != "n" ]; then
   if [ "$CONFIG_PARPORT_1284" != "n" ]; then
@@ -39,7 +46,9 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    dep_tristate '  Stradis 4:2:2 MPEG-2 video driver  (EXPERIMENTAL)' CONFIG_VIDEO_STRADIS $CONFIG_VIDEO_DEV $CONFIG_PCI
 fi
 dep_tristate '  Zoran ZR36057/36060 Video For Linux' CONFIG_VIDEO_ZORAN $CONFIG_VIDEO_DEV $CONFIG_PCI $CONFIG_I2C
-dep_tristate '    Include support for Iomega Buz' CONFIG_VIDEO_BUZ $CONFIG_VIDEO_ZORAN
 dep_tristate '  Zoran ZR36120/36125 Video For Linux' CONFIG_VIDEO_ZR36120 $CONFIG_VIDEO_DEV $CONFIG_PCI $CONFIG_I2C
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+  dep_tristate '  Sony Vaio Picturebook Motion Eye Video For Linux' CONFIG_VIDEO_MEYE $CONFIG_VIDEO_DEV $CONFIG_PCI $CONFIG_SONYPI
+fi
 
 endmenu

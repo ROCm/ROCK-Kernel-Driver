@@ -595,7 +595,7 @@ typedef struct {
 						* has been read into STp->buffer and is valid */
   int      frame_seq_number;                   /* logical frame number */
   int      logical_blk_num;                    /* logical block number */
-  unsigned first_frame_position;               /* physical frame to be transfered to/from host */
+  unsigned first_frame_position;               /* physical frame to be transferred to/from host */
   unsigned last_frame_position;                /* physical frame to be transferd to/from tape */
   int      cur_frames;                         /* current number of frames in internal buffer */
   int      max_frames;                         /* max number of frames in internal buffer */

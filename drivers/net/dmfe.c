@@ -127,8 +127,8 @@
 #define DMFE_TXTH_1K	0xC000		/* TX TH 1K  byte */
 
 #define DMFE_TIMER_WUT  (jiffies + HZ * 1)/* timer wakeup time : 1 second */
-#define DMFE_TX_TIMEOUT (HZ * 1.5)	/* tx packet time-out time 1.5 s" */
-#define DMFE_TX_KICK 	(HZ * 0.5)	/* tx packet Kick-out time 0.5 s" */
+#define DMFE_TX_TIMEOUT ((3*HZ)/2)	/* tx packet time-out time 1.5 s" */
+#define DMFE_TX_KICK 	(HZ/2)	/* tx packet Kick-out time 0.5 s" */
 
 #define DMFE_DBUG(dbug_now, msg, value) if (dmfe_debug || (dbug_now)) printk(KERN_ERR "<DMFE>: %s %lx\n", (msg), (long) (value))
 

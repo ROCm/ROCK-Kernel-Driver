@@ -34,7 +34,8 @@
 #ifdef CONFIG_SMP
 #include <asm/spinlock.h>
 
-#else /* !SMP */
+#elif !defined(spin_lock_init) /* !SMP and spin_lock_init not previously
+                                  defined (e.g. by including asm/spinlock.h */
 
 #define DEBUG_SPINLOCKS	0	/* 0 == no debugging, 1 == maintain lock state, 2 == full debug */
 

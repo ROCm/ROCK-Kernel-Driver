@@ -680,13 +680,16 @@ static inline int pci_module_init(struct pci_driver *drv)
 #if defined(CONFIG_HOTPLUG) && !defined(MODULE)
 	if (rc == 0)
 		return 0;
+#else
+	if (rc == 0)
+		rc = -ENODEV;		
 #endif
 
 	/* if we get here, we need to clean up pci driver instance
 	 * and return some sort of error */
 	pci_unregister_driver (drv);
 	
-	return -ENODEV;
+	return rc;
 }
 
 #endif /* !CONFIG_PCI */

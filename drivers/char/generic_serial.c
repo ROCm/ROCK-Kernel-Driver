@@ -344,7 +344,7 @@ static int gs_wait_tx_flushed (void * ptr, int timeout)
 	struct gs_port *port = ptr;
 	long end_jiffies;
 	int jiffies_to_transmit, charsleft = 0, rv = 0;
-	int to, rcib;
+	int rcib;
 
 	func_enter();
 
@@ -368,6 +368,7 @@ static int gs_wait_tx_flushed (void * ptr, int timeout)
 		return rv;
 	}
 	/* stop trying: now + twice the time it would normally take +  seconds */
+	if (timeout == 0) timeout = MAX_SCHEDULE_TIMEOUT;
 	end_jiffies  = jiffies; 
 	if (timeout !=  MAX_SCHEDULE_TIMEOUT)
 		end_jiffies += port->baud?(2 * rcib * 10 * HZ / port->baud):0;
@@ -376,11 +377,9 @@ static int gs_wait_tx_flushed (void * ptr, int timeout)
 	gs_dprintk (GS_DEBUG_FLUSH, "now=%lx, end=%lx (%ld).\n", 
 		    jiffies, end_jiffies, end_jiffies-jiffies); 
 
-	to = 100;
 	/* the expression is actually jiffies < end_jiffies, but that won't
 	   work around the wraparound. Tricky eh? */
-	while (to-- &&
-	       (charsleft = gs_real_chars_in_buffer (port->tty)) &&
+	while ((charsleft = gs_real_chars_in_buffer (port->tty)) &&
 	        time_after (end_jiffies, jiffies)) {
 		/* Units check: 
 		   chars * (bits/char) * (jiffies /sec) / (bits/sec) = jiffies!
@@ -1059,6 +1058,19 @@ void gs_getserial(struct gs_port *port, struct serial_struct *sp)
 	copy_to_user(sp, &sio, sizeof(struct serial_struct));
 }
 
+
+void gs_got_break(struct gs_port *port)
+{
+	if (port->flags & ASYNC_SAK) {
+		do_SAK (port->tty);
+	}
+	*(port->tty->flip.flag_buf_ptr) = TTY_BREAK;
+	port->tty->flip.flag_buf_ptr++;
+	port->tty->flip.char_buf_ptr++;
+	port->tty->flip.count++;
+}
+
+
 EXPORT_SYMBOL(gs_put_char);
 EXPORT_SYMBOL(gs_write);
 EXPORT_SYMBOL(gs_write_room);
@@ -1075,4 +1087,4 @@ EXPORT_SYMBOL(gs_set_termios);
 EXPORT_SYMBOL(gs_init_port);
 EXPORT_SYMBOL(gs_setserial);
 EXPORT_SYMBOL(gs_getserial);
-
+EXPORT_SYMBOL(gs_got_break);

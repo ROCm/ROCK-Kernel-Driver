@@ -48,16 +48,7 @@ extern __inline__ unsigned long ___mem_isa(unsigned long a)
 #define __arch_getw(a)		(*(volatile unsigned short *)(a))
 #define __arch_putw(v,a)	(*(volatile unsigned short *)(a) = (v))
 
-#include <asm/hardware/dec21285.h>
-
-/*
- * ioremap support - validate a PCI memory address,
- * and convert a PCI memory address to a physical
- * address for the page tables.
- */
-#define iomem_valid_addr(iomem,sz) \
-	((iomem) < 0x80000000 && (iomem) + (sz) <= 0x80000000)
-
-#define iomem_to_phys(iomem)	((iomem) + DC21285_PCI_MEM)
+#define iomem_valid_addr(iomem,sz)	(1)
+#define iomem_to_phys(iomem)		(iomem)
 
 #endif

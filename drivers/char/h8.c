@@ -54,9 +54,9 @@
 /*
  * Forward declarations.
  */
-static int   h8_init(void);
-int          h8_display_blank(void);
-int          h8_display_unblank(void);
+static int  h8_init(void);
+static int  h8_display_blank(void);
+static int  h8_display_unblank(void);
 
 static void  h8_intr(int irq, void *dev_id, struct pt_regs *regs);
 
@@ -106,10 +106,10 @@ static int h8_monitor_timer_active = 0;
 
 static char  driver_version[] = "X0.0";/* no spaces */
 
-union	intr_buf intrbuf;
-int	intr_buf_ptr;
-union   intr_buf xx;	
-u_char  last_temp;
+static union	intr_buf intrbuf;
+static int	intr_buf_ptr;
+static union   intr_buf xx;	
+static u_char  last_temp;
 
 /*
  * I/O Macros for register reads and writes.
@@ -122,40 +122,40 @@ u_char  last_temp;
 #define WRITE_DATA(d)	H8_WRITE((d), h8_base + H8_DATA_REG_OFF)
 #define WRITE_CMD(d)	H8_WRITE((d), h8_base + H8_CMD_REG_OFF)
 
-unsigned int h8_base = H8_BASE_ADDR;
-unsigned int h8_irq = H8_IRQ;
-unsigned int h8_state = H8_IDLE;
-unsigned int h8_index = -1;
-unsigned int h8_enabled = 0;
+static unsigned int h8_base = H8_BASE_ADDR;
+static unsigned int h8_irq = H8_IRQ;
+static unsigned int h8_state = H8_IDLE;
+static unsigned int h8_index = -1;
+static unsigned int h8_enabled = 0;
 
-LIST_HEAD(h8_actq);
-LIST_HEAD(h8_cmdq);
-LIST_HEAD(h8_freeq);
+static LIST_HEAD(h8_actq);
+static LIST_HEAD(h8_cmdq);
+static LIST_HEAD(h8_freeq);
 
 /* 
  * Globals used in thermal control of Alphabook1.
  */
-int cpu_speed_divisor = -1;			
-int h8_event_mask = 0;			
-DECLARE_WAIT_QUEUE_HEAD(h8_monitor_wait);
-unsigned int h8_command_mask = 0;
-int h8_uthermal_threshold = DEFAULT_UTHERMAL_THRESHOLD;
-int h8_uthermal_window = UTH_HYSTERESIS;		      
-int h8_debug = 0xfffffdfc;
-int h8_ldamp = MHZ_115;
-int h8_udamp = MHZ_57;
-u_char h8_current_temp = 0;
-u_char h8_system_temp = 0;
-int h8_sync_channel = 0;
-DECLARE_WAIT_QUEUE_HEAD(h8_sync_wait);
-int h8_init_performed;
+static int cpu_speed_divisor = -1;			
+static int h8_event_mask = 0;			
+static DECLARE_WAIT_QUEUE_HEAD(h8_monitor_wait);
+static unsigned int h8_command_mask = 0;
+static int h8_uthermal_threshold = DEFAULT_UTHERMAL_THRESHOLD;
+static int h8_uthermal_window = UTH_HYSTERESIS;		      
+static int h8_debug = 0xfffffdfc;
+static int h8_ldamp = MHZ_115;
+static int h8_udamp = MHZ_57;
+static u_char h8_current_temp = 0;
+static u_char h8_system_temp = 0;
+static int h8_sync_channel = 0;
+static DECLARE_WAIT_QUEUE_HEAD(h8_sync_wait);
+static int h8_init_performed;
 
 /* CPU speeds and clock divisor values */
-int speed_tab[6] = {230, 153, 115, 57, 28, 14};
+static int speed_tab[6] = {230, 153, 115, 57, 28, 14};
   
 /*
  * H8 interrupt handler
- */
+  */
 static void h8_intr(int irq, void *dev_id, struct pt_regs *regs)
 {
 	u_char	stat_reg, data_reg;
@@ -377,7 +377,7 @@ static int h8_get_info(char *buf, char **start, off_t fpos, int length)
 }
 
 /* Called from console driver -- must make sure h8_enabled. */
-int h8_display_blank(void)
+static int h8_display_blank(void)
 {
 #ifdef CONFIG_H8_DISPLAY_BLANK
         int     error;
@@ -393,7 +393,7 @@ int h8_display_blank(void)
 }
 
 /* Called from console driver -- must make sure h8_enabled. */
-int h8_display_unblank(void)
+static int h8_display_unblank(void)
 {
 #ifdef CONFIG_H8_DISPLAY_BLANK
         int error;
@@ -408,8 +408,7 @@ int h8_display_unblank(void)
         return 0;
 }
 
-int
-h8_alloc_queues(void)
+static int h8_alloc_queues(void)
 {
         h8_cmd_q_t *qp;
 	unsigned long flags;
@@ -419,7 +418,7 @@ h8_alloc_queues(void)
 				   GFP_KERNEL);
 
         if (!qp) {
-                printk("H8: could not allocate memory for command queue\n");
+                printk(KERN_ERR "H8: could not allocate memory for command queue\n");
                 return(0);
         }
         /* add to the free queue */
@@ -560,14 +559,14 @@ h8_read_event_status(void)
 {
 
         if(h8_debug & 0x200)
-                printk("h8_read_event_status: value 0x%x\n", intrbuf.word);
+                printk(KERN_DEBUG "h8_read_event_status: value 0x%x\n", intrbuf.word);
 
         /*
          * Power related items
          */
         if (intrbuf.word & H8_DC_CHANGE) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: DC_CHANGE\n");
+		    printk(KERN_DEBUG "h8_read_event_status: DC_CHANGE\n");
                 /* see if dc added or removed, set batt/dc flag, send event */
 
                 h8_set_event_mask(H8_MANAGE_BATTERY);
@@ -575,7 +574,7 @@ h8_read_event_status(void)
         }
 
         if (intrbuf.word & H8_POWER_BUTTON) {
-                printk("Power switch pressed - please wait - preparing to power 
+                printk(KERN_CRIT "Power switch pressed - please wait - preparing to power 
 off\n");
                 h8_set_event_mask(H8_POWER_BUTTON);
                 wake_up(&h8_monitor_wait);
@@ -586,7 +585,7 @@ off\n");
          */
         if (intrbuf.word & H8_THERMAL_THRESHOLD) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: THERMAL_THRESHOLD\n");
+		    printk(KERN_DEBUG "h8_read_event_status: THERMAL_THRESHOLD\n");
                 h8_set_event_mask(H8_MANAGE_UTHERM);
                 wake_up(&h8_monitor_wait);
         }
@@ -596,67 +595,67 @@ off\n");
          */
         if (intrbuf.word & H8_DOCKING_STATION_STATUS) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: DOCKING_STATION_STATUS\n");
+		    printk(KERN_DEBUG "h8_read_event_status: DOCKING_STATION_STATUS\n");
                 /* read_ext_status */
         }
         if (intrbuf.word & H8_EXT_BATT_STATUS) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: EXT_BATT_STATUS\n");
+		    printk(KERN_DEBUG "h8_read_event_status: EXT_BATT_STATUS\n");
 
         }
         if (intrbuf.word & H8_EXT_BATT_CHARGE_STATE) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: EXT_BATT_CHARGE_STATE\n");
+		    printk(KERN_DEBUG "h8_read_event_status: EXT_BATT_CHARGE_STATE\n");
 
         }
         if (intrbuf.word & H8_BATT_CHANGE_OVER) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: BATT_CHANGE_OVER\n");
+		    printk(KERN_DEBUG "h8_read_event_status: BATT_CHANGE_OVER\n");
 
         }
         if (intrbuf.word & H8_WATCHDOG) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: WATCHDOG\n");
+		    printk(KERN_DEBUG "h8_read_event_status: WATCHDOG\n");
                 /* nop */
         }
         if (intrbuf.word & H8_SHUTDOWN) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: SHUTDOWN\n");
+		    printk(KERN_DEBUG "h8_read_event_status: SHUTDOWN\n");
                 /* nop */
         }
         if (intrbuf.word & H8_KEYBOARD) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: KEYBOARD\n");
+		    printk(KERN_DEBUG "h8_read_event_status: KEYBOARD\n");
                 /* nop */
         }
         if (intrbuf.word & H8_EXT_MOUSE_OR_CASE_SWITCH) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: EXT_MOUSE_OR_CASE_SWITCH\n");
+		    printk(KERN_DEBUG "h8_read_event_status: EXT_MOUSE_OR_CASE_SWITCH\n");
                 /* read_ext_status*/
         }
         if (intrbuf.word & H8_INT_BATT_LOW) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: INT_BATT_LOW\n");
-                /* post event, warn user */
+		    printk(KERN_DEBUG "h8_read_event_status: INT_BATT_LOW\n"); post
+                /* event, warn user */
         }
         if (intrbuf.word & H8_INT_BATT_CHARGE_STATE) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: INT_BATT_CHARGE_STATE\n");
+		    printk(KERN_DEBUG "h8_read_event_status: INT_BATT_CHARGE_STATE\n");
                 /* nop - happens often */
         }
         if (intrbuf.word & H8_INT_BATT_STATUS) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: INT_BATT_STATUS\n");
+		    printk(KERN_DEBUG "h8_read_event_status: INT_BATT_STATUS\n");
 
         }
         if (intrbuf.word & H8_INT_BATT_CHARGE_THRESHOLD) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: INT_BATT_CHARGE_THRESHOLD\n");
+		    printk(KERN_DEBUG "h8_read_event_status: INT_BATT_CHARGE_THRESHOLD\n");
                 /* nop - happens often */
         }
         if (intrbuf.word & H8_EXT_BATT_LOW) {
 		if(h8_debug & 0x4)
-		    printk("h8_read_event_status: EXT_BATT_LOW\n");
+		    printk(KERN_DEBUG "h8_read_event_status: EXT_BATT_LOW\n");
                 /*if no internal, post event, warn user */
                 /* else nop */
         }
@@ -667,7 +666,7 @@ off\n");
 /*
  * Function called when H8 has performed requested command.
  */
-void
+static void
 h8_cmd_done(h8_cmd_q_t *qp)
 {
 
@@ -675,14 +674,14 @@ h8_cmd_done(h8_cmd_q_t *qp)
         switch (qp->cmdbuf[0]) {
 	case H8_SYNC:
 	    if (h8_debug & 0x40000) 
-	        printk("H8: Sync command done - byte returned was 0x%x\n", 
+	        printk(KERN_DEBUG "H8: Sync command done - byte returned was 0x%x\n", 
 		       qp->rcvbuf[0]);
 	    list_add(&qp->link, &h8_freeq);
 	    break;
 
 	case H8_RD_SN:
 	case H8_RD_ENET_ADDR:
-	    printk("H8: read Ethernet address: command done - address: %x - %x - %x - %x - %x - %x \n", 
+	    printk(KERN_DEBUG "H8: read Ethernet address: command done - address: %x - %x - %x - %x - %x - %x \n", 
 		   qp->rcvbuf[0], qp->rcvbuf[1], qp->rcvbuf[2],
 		   qp->rcvbuf[3], qp->rcvbuf[4], qp->rcvbuf[5]);
 	    list_add(&qp->link, &h8_freeq);
@@ -691,13 +690,13 @@ h8_cmd_done(h8_cmd_q_t *qp)
 	case H8_RD_HW_VER:
 	case H8_RD_MIC_VER:
 	case H8_RD_MAX_TEMP:
-	    printk("H8: Max recorded CPU temp %d, Sys temp %d\n",
+	    printk(KERN_DEBUG "H8: Max recorded CPU temp %d, Sys temp %d\n",
 		   qp->rcvbuf[0], qp->rcvbuf[1]);
 	    list_add(&qp->link, &h8_freeq);
 	    break;
 
 	case H8_RD_MIN_TEMP:
-	    printk("H8: Min recorded CPU temp %d, Sys temp %d\n",
+	    printk(KERN_DEBUG "H8: Min recorded CPU temp %d, Sys temp %d\n",
 		   qp->rcvbuf[0], qp->rcvbuf[1]);
 	    list_add(&qp->link, &h8_freeq);
 	    break;
@@ -712,11 +711,11 @@ h8_cmd_done(h8_cmd_q_t *qp)
 
 	case H8_RD_SYS_VARIENT:
 	case H8_RD_PWR_ON_CYCLES:
-	    printk(" H8: RD_PWR_ON_CYCLES command done\n");
+	    printk(KERN_DEBUG " H8: RD_PWR_ON_CYCLES command done\n");
 	    break;
 
 	case H8_RD_PWR_ON_SECS:
-	    printk("H8: RD_PWR_ON_SECS command done\n");
+	    printk(KERN_DEBUG "H8: RD_PWR_ON_SECS command done\n");
 	    break;
 
 	case H8_RD_RESET_STATUS:
@@ -741,7 +740,7 @@ h8_cmd_done(h8_cmd_q_t *qp)
 	case H8_RD_NEW_BUSY_SPEED:
 	case H8_RD_CONFIG_INTERFACE:
 	case H8_RD_INT_BATT_STATUS:
-	    printk("H8: Read int batt status cmd done - returned was %x %x %x\n",
+	    printk(KERN_DEBUG "H8: Read int batt status cmd done - returned was %x %x %x\n",
 		   qp->rcvbuf[0], qp->rcvbuf[1], qp->rcvbuf[2]);
 	    list_add(&qp->link, &h8_freeq);
 	    break;
@@ -752,7 +751,7 @@ h8_cmd_done(h8_cmd_q_t *qp)
 	case H8_CTL_EMU_BITPORT:
 	case H8_DEVICE_CONTROL:
 	    if(h8_debug & 0x20000) {
-	        printk("H8: Device control cmd done - byte returned was 0x%x\n",
+	        printk(KERN_DEBUG "H8: Device control cmd done - byte returned was 0x%x\n",
 		       qp->rcvbuf[0]);
 	    }
 	    list_add(&qp->link, &h8_freeq);
@@ -767,7 +766,7 @@ h8_cmd_done(h8_cmd_q_t *qp)
 	case H8_CTL_MOUSE_SENSITIVITY:
 	case H8_CTL_DIAG_MODE:
 	case H8_CTL_IDLE_AND_BUSY_SPDS:
-	    printk("H8: Idle and busy speed command done\n");
+	    printk(KERN_DEBUG "H8: Idle and busy speed command done\n");
 	    break;
 
 	case H8_CTL_TFT_BRT_BATT:
@@ -808,7 +807,7 @@ h8_cmd_done(h8_cmd_q_t *qp)
 	case H8_BQ_RD_REG:
 	case H8_BQ_WRT_REG:
 	case H8_PWR_OFF:
-	    printk ("H8: misc command completed\n");
+	    printk (KERN_DEBUG "H8: misc command completed\n");
 	    break;
         }
         return;
@@ -948,7 +947,7 @@ h8_monitor_thread(void * unused)
          */
         h8_get_curr_temp(curr_temp);
 
-        printk("H8: Initial CPU temp: %d\n", curr_temp[0]);
+        printk(KERN_INFO "H8: Initial CPU temp: %d\n", curr_temp[0]);
 
         if(curr_temp[0] >= h8_uthermal_threshold) {
                 h8_set_event_mask(H8_MANAGE_UTHERM);
@@ -965,7 +964,7 @@ h8_monitor_thread(void * unused)
 		sleep_on(&h8_monitor_wait);
 
                 if(h8_debug & 0x2)
-                        printk("h8_monitor_thread awakened, mask:%x\n",
+                        printk(KERN_DEBUG "h8_monitor_thread awakened, mask:%x\n",
                                 h8_event_mask);
 
                 if (h8_event_mask & (H8_MANAGE_UTHERM|H8_MANAGE_LTHERM)) {
@@ -1008,7 +1007,7 @@ h8_manage_therm(void)
         if(h8_event_mask & H8_MANAGE_UTHERM) {
 		/* Upper thermal interrupt received, need to cool down. */
 		if(h8_debug & 0x10)
-                        printk("H8: Thermal threshold %d F reached\n",
+                        printk(KERN_WARNING "H8: Thermal threshold %d F reached\n",
 			       h8_uthermal_threshold);
 		h8_set_cpu_speed(h8_udamp); 
                 h8_clear_event_mask(H8_MANAGE_UTHERM);
@@ -1027,7 +1026,7 @@ h8_manage_therm(void)
                         h8_set_upper_therm_thold(h8_uthermal_threshold);
                         h8_set_cpu_speed(h8_ldamp); /* adjustable */ 
                         if(h8_debug & 0x10)
-                            printk("H8: CPU cool, applying cpu_divisor: %d \n",
+                            printk(KERN_WARNING "H8: CPU cool, applying cpu_divisor: %d \n",
 				   h8_ldamp);
                         h8_clear_event_mask(H8_MANAGE_LTHERM);
                 }
@@ -1082,7 +1081,7 @@ h8_set_cpu_speed(int speed_divisor)
 #endif /* NOT_YET */
 
         if(h8_debug & 0x8)
-                printk("H8: Setting CPU speed to %d MHz\n",
+                printk(KERN_DEBUG "H8: Setting CPU speed to %d MHz\n",
 		       speed_tab[speed_divisor]); 
 
          /* Make the actual speed change */
@@ -1125,7 +1124,7 @@ h8_get_cpu_speed(void)
                 break;
         }
         if(h8_debug & 0x8)
-                printk("H8: CPU speed current setting: %d MHz\n", speed); 
+                printk(KERN_DEBUG "H8: CPU speed current setting: %d MHz\n", speed); 
 #endif  /* NOT_YET */
 	return speed;
 }

@@ -128,7 +128,7 @@ static ssize_t dtlk_read(struct file *file, char *buf,
 {
 	unsigned int minor = MINOR(file->f_dentry->d_inode->i_rdev);
 	char ch;
-	int retval, i = 0, retries;
+	int i = 0, retries;
 
 	/* Can't seek (pread) on the DoubleTalk.  */
 	if (ppos != &file->f_pos)
@@ -144,8 +144,8 @@ static ssize_t dtlk_read(struct file *file, char *buf,
 		while (i < count && dtlk_readable()) {
 			ch = dtlk_read_lpc();
 			/*        printk("dtlk_read() reads 0x%02x\n", ch); */
-			if ((retval = put_user(ch, buf++)))
-				return retval;
+			if (put_user(ch, buf++))
+				return -EFAULT;
 			i++;
 		}
 		if (i)
@@ -163,7 +163,7 @@ static ssize_t dtlk_read(struct file *file, char *buf,
 static ssize_t dtlk_write(struct file *file, const char *buf,
 			  size_t count, loff_t * ppos)
 {
-	int i = 0, retries = 0, err, ch;
+	int i = 0, retries = 0, ch;
 
 	TRACE_TEXT("(dtlk_write");
 #ifdef TRACING
@@ -171,7 +171,8 @@ static ssize_t dtlk_write(struct file *file, const char *buf,
 	{
 		int i, ch;
 		for (i = 0; i < count; i++) {
-			err = get_user(ch, buf + i);
+			if (get_user(ch, buf + i))
+				return -EFAULT;
 			if (' ' <= ch && ch <= '~')
 				printk("%c", ch);
 			else
@@ -189,7 +190,7 @@ static ssize_t dtlk_write(struct file *file, const char *buf,
 		return -EINVAL;
 
 	while (1) {
-		while (i < count && (err = get_user(ch, buf)) == 0 &&
+		while (i < count && !get_user(ch, buf) &&
 		       (ch == DTLK_CLEAR || dtlk_writeable())) {
 			dtlk_write_tts(ch);
 			buf++;
@@ -279,7 +280,6 @@ static int dtlk_ioctl(struct inode *inode,
 		      unsigned long arg)
 {
 	struct dtlk_settings *sp;
-	int err;
 	char portval;
 	TRACE_TEXT(" dtlk_ioctl");
 
@@ -287,9 +287,8 @@ static int dtlk_ioctl(struct inode *inode,
 
 	case DTLK_INTERROGATE:
 		sp = dtlk_interrogate();
-		err = copy_to_user((char *) arg, (char *) sp,
-				   sizeof(struct dtlk_settings));
-		if (err)
+		if (copy_to_user((char *) arg, (char *) sp,
+				   sizeof(struct dtlk_settings)))
 			return -EINVAL;
 		return 0;
 

@@ -391,6 +391,38 @@ static int pirq_serverworks_set(struct pci_dev *router, struct pci_dev *dev, int
 	return 1;
 }
 
+/* Support for AMD756 PCI IRQ Routing
+ * Jhon H. Caicedo <jhcaiced@osso.org.co>
+ * Jun/21/2001 0.2.0 Release, fixed to use "nybble" functions... (jhcaiced)
+ * Jun/19/2001 Alpha Release 0.1.0 (jhcaiced)
+ * The AMD756 pirq rules are nibble-based
+ * offset 0x56 0-3 PIRQA  4-7  PIRQB
+ * offset 0x57 0-3 PIRQC  4-7  PIRQD
+ */
+static int pirq_amd756_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
+{
+	u8 irq;
+	irq = 0;
+	if (pirq <= 4)
+	{
+		irq = read_config_nybble(router, 0x56, pirq - 1);
+	}
+	printk(KERN_INFO "AMD756: dev %04x:%04x, router pirq : %d get irq : %2d\n",
+		dev->vendor, dev->device, pirq, irq);
+	return irq;
+}
+
+static int pirq_amd756_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
+{
+	printk(KERN_INFO "AMD756: dev %04x:%04x, router pirq : %d SET irq : %2d\n", 
+		dev->vendor, dev->device, pirq, irq);
+	if (pirq <= 4)
+	{
+		write_config_nybble(router, 0x56, pirq - 1, irq);
+	}
+	return 1;
+}
+
 #ifdef CONFIG_PCI_BIOS
 
 static int pirq_bios_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
@@ -426,6 +458,8 @@ static struct irq_router pirq_routers[] = {
 	{ "VLSI 82C534", PCI_VENDOR_ID_VLSI, PCI_DEVICE_ID_VLSI_82C534, pirq_vlsi_get, pirq_vlsi_set },
 	{ "ServerWorks", PCI_VENDOR_ID_SERVERWORKS, PCI_DEVICE_ID_SERVERWORKS_OSB4,
 	  pirq_serverworks_get, pirq_serverworks_set },
+	{ "AMD756 VIPER", PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_VIPER_740B,
+		pirq_amd756_get, pirq_amd756_set },
 
 	{ "default", 0, 0, NULL, NULL }
 };

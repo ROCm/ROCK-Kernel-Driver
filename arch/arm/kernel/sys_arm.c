@@ -28,9 +28,9 @@
 #include <asm/uaccess.h>
 #include <asm/ipc.h>
 
-/*
- * Constant strings used in inlined functions in header files
- */
+extern unsigned long do_mremap(unsigned long addr, unsigned long old_len,
+			       unsigned long new_len, unsigned long flags,
+			       unsigned long new_addr);
 
 /*
  * sys_pipe() is the normal C calling standard for creating
