@@ -624,8 +624,6 @@ extern void __kill_fasync(struct fasync_struct *, int, int);
 
 #include <linux/ext3_fs_sb.h>
 #include <linux/hpfs_fs_sb.h>
-#include <linux/ufs_fs_sb.h>
-#include <linux/romfs_fs_sb.h>
 
 extern struct list_head super_blocks;
 extern spinlock_t sb_lock;
@@ -670,8 +668,6 @@ struct super_block {
 	union {
 		struct ext3_sb_info	ext3_sb;
 		struct hpfs_sb_info	hpfs_sb;
-		struct ufs_sb_info	ufs_sb;
-		struct romfs_sb_info	romfs_sb;
 		void			*generic_sbp;
 	} u;
 	/*

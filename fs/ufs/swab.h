@@ -25,7 +25,7 @@ enum {
 static __inline u64
 fs64_to_cpu(struct super_block *sbp, u64 n)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return le64_to_cpu(n);
 	else
 		return be64_to_cpu(n);
@@ -34,7 +34,7 @@ fs64_to_cpu(struct super_block *sbp, u64 n)
 static __inline u64
 cpu_to_fs64(struct super_block *sbp, u64 n)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return cpu_to_le64(n);
 	else
 		return cpu_to_be64(n);
@@ -43,7 +43,7 @@ cpu_to_fs64(struct super_block *sbp, u64 n)
 static __inline u32
 fs64_add(struct super_block *sbp, u32 *n, int d)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return *n = cpu_to_le64(le64_to_cpu(*n)+d);
 	else
 		return *n = cpu_to_be64(be64_to_cpu(*n)+d);
@@ -52,7 +52,7 @@ fs64_add(struct super_block *sbp, u32 *n, int d)
 static __inline u32
 fs64_sub(struct super_block *sbp, u32 *n, int d)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return *n = cpu_to_le64(le64_to_cpu(*n)-d);
 	else
 		return *n = cpu_to_be64(be64_to_cpu(*n)-d);
@@ -61,7 +61,7 @@ fs64_sub(struct super_block *sbp, u32 *n, int d)
 static __inline u32
 fs32_to_cpu(struct super_block *sbp, u32 n)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return le32_to_cpu(n);
 	else
 		return be32_to_cpu(n);
@@ -70,7 +70,7 @@ fs32_to_cpu(struct super_block *sbp, u32 n)
 static __inline u32
 cpu_to_fs32(struct super_block *sbp, u32 n)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return cpu_to_le32(n);
 	else
 		return cpu_to_be32(n);
@@ -79,7 +79,7 @@ cpu_to_fs32(struct super_block *sbp, u32 n)
 static __inline u32
 fs32_add(struct super_block *sbp, u32 *n, int d)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return *n = cpu_to_le32(le32_to_cpu(*n)+d);
 	else
 		return *n = cpu_to_be32(be32_to_cpu(*n)+d);
@@ -88,7 +88,7 @@ fs32_add(struct super_block *sbp, u32 *n, int d)
 static __inline u32
 fs32_sub(struct super_block *sbp, u32 *n, int d)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return *n = cpu_to_le32(le32_to_cpu(*n)-d);
 	else
 		return *n = cpu_to_be32(be32_to_cpu(*n)-d);
@@ -97,7 +97,7 @@ fs32_sub(struct super_block *sbp, u32 *n, int d)
 static __inline u16
 fs16_to_cpu(struct super_block *sbp, u16 n)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return le16_to_cpu(n);
 	else
 		return be16_to_cpu(n);
@@ -106,7 +106,7 @@ fs16_to_cpu(struct super_block *sbp, u16 n)
 static __inline u16
 cpu_to_fs16(struct super_block *sbp, u16 n)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return cpu_to_le16(n);
 	else
 		return cpu_to_be16(n);
@@ -115,7 +115,7 @@ cpu_to_fs16(struct super_block *sbp, u16 n)
 static __inline u16
 fs16_add(struct super_block *sbp, u16 *n, int d)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return *n = cpu_to_le16(le16_to_cpu(*n)+d);
 	else
 		return *n = cpu_to_be16(be16_to_cpu(*n)+d);
@@ -124,7 +124,7 @@ fs16_add(struct super_block *sbp, u16 *n, int d)
 static __inline u16
 fs16_sub(struct super_block *sbp, u16 *n, int d)
 {
-	if (sbp->u.ufs_sb.s_bytesex == BYTESEX_LE)
+	if (UFS_SB(sbp)->s_bytesex == BYTESEX_LE)
 		return *n = cpu_to_le16(le16_to_cpu(*n)-d);
 	else
 		return *n = cpu_to_be16(be16_to_cpu(*n)-d);
