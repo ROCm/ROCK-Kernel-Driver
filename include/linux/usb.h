@@ -104,6 +104,7 @@
 #include <linux/interrupt.h>	/* for in_interrupt() */
 #include <linux/list.h>		/* for struct list_head */
 #include <linux/device.h>	/* for struct device */
+#include <linux/fs.h>		/* for struct file_operations */
 
 
 static __inline__ void wait_ms(unsigned int ms)
@@ -648,14 +649,6 @@ struct usb_device_id {
  *	because its device has been (or is being) disconnected.  The
  *	handle passed is what was returned by probe(), or was provided
  *	to usb_driver_claim_interface().
- * @fops: USB drivers can reuse some character device framework in
- *	the USB subsystem by providing a file operations vector and
- *	a minor number.
- * @minor: Used with fops to simplify creating USB character devices.
- *	Such drivers have sixteen character devices, using the USB
- *	major number and starting with this minor number.
- * @num_minors: Used with minor to specify how many minors are used by
- *	this driver.
  * @ioctl: Used for drivers that want to talk to userspace through
  *	the "usbfs" filesystem.  This lets devices provide ways to
  *	expose information to user space regardless of where they
@@ -694,11 +687,6 @@ struct usb_driver {
 	    );
 
 	struct list_head driver_list;
-
-	struct file_operations *fops;
-	int minor;
-	int num_minors;
-
 	struct semaphore serialize;
 
 	/* ioctl -- userspace apps can talk to drivers through usbfs */
@@ -722,13 +710,8 @@ extern struct bus_type usb_bus_type;
 extern int usb_register(struct usb_driver *);
 extern void usb_deregister(struct usb_driver *);
 
-#ifndef CONFIG_USB_DYNAMIC_MINORS
-static inline int usb_register_dev(struct usb_driver *new_driver, int num_minors, int *start_minor) { return -ENODEV; }
-static inline void usb_deregister_dev(struct usb_driver *driver, int num_minors, int start_minor) {}
-#else
-extern int usb_register_dev(struct usb_driver *new_driver, int num_minors, int *start_minor);
-extern void usb_deregister_dev(struct usb_driver *driver, int num_minors, int start_minor);
-#endif
+extern int usb_register_dev(struct file_operations *fops, int minor, int num_minors, int *start_minor);
+extern void usb_deregister_dev(int num_minors, int start_minor);
 
 /* -------------------------------------------------------------------------- */
 

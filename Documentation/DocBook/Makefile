@@ -120,6 +120,7 @@ APISOURCES :=	$(TOPDIR)/drivers/media/video/videodev.c \
 		$(TOPDIR)/drivers/usb/core/urb.c \
 		$(TOPDIR)/drivers/usb/core/message.c \
 		$(TOPDIR)/drivers/usb/core/config.c \
+		$(TOPDIR)/drivers/usb/core/file.c \
 		$(TOPDIR)/drivers/usb/core/usb.c \
 		$(TOPDIR)/drivers/video/fbmem.c \
 		$(TOPDIR)/drivers/video/fbcmap.c \
