@@ -475,6 +475,7 @@ extern int scsi_dev_init(void);
 extern int scsi_mlqueue_insert(struct scsi_cmnd *, int);
 extern int scsi_attach_device(struct scsi_device *);
 extern void scsi_detach_device(struct scsi_device *);
+extern int scsi_get_device_flags(unsigned char *vendor, unsigned char *model);
 
 /*
  * Newer request-based interfaces.
@@ -512,6 +513,29 @@ extern void print_status(unsigned char status);
 extern int print_msg(const unsigned char *);
 extern const char *scsi_sense_key_string(unsigned char);
 extern const char *scsi_extd_sense_format(unsigned char, unsigned char);
+
+/*
+ * dev_info: for the black/white list in the old scsi_static_device_list
+ */
+struct dev_info {
+	char *vendor;
+	char *model;
+	char *revision;	/* revision known to be bad, unused */
+	unsigned flags;
+};
+
+extern struct dev_info scsi_static_device_list[] __initdata;
+
+/*
+ * scsi_dev_info_list: structure to hold black/white listed devices.
+ */
+struct scsi_dev_info_list {
+	struct list_head dev_info_list;
+	char vendor[8];
+	char model[16];
+	unsigned flags;
+	unsigned compatible; /* for use with scsi_static_device_list entries */
+};
 
 /*
  *  The scsi_device struct contains what we know about each given scsi

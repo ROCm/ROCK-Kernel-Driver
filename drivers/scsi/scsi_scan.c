@@ -54,18 +54,16 @@
 #define BLIST_INQUIRY_36	0x400	/* override additional length field */
 #define BLIST_INQUIRY_58	0x800	/* ... for broken inquiry responses */
 
-struct dev_info {
-	const char *vendor;
-	const char *model;
-	const char *revision;	/* revision known to be bad, unused */
-	unsigned flags;
-};
-
 /*
- * device_list: devices that require settings that differ from the
- * default, includes black-listed (broken) devices.
+ * scsi_static_device_list: deprecated list of devices that require
+ * settings that differ from the default, includes black-listed (broken)
+ * devices. The entries here are added to the tail of scsi_dev_info_list
+ * via scsi_dev_info_list_init.
+ *
+ * Do not add to this list, use the command line or proc interface to add
+ * to the scsi_dev_info_list. This table will eventually go away.
  */
-static struct dev_info device_list[] = {
+struct dev_info scsi_static_device_list[] __initdata = {
 	/*
 	 * The following devices are known not to tolerate a lun != 0 scan
 	 * for one reason or another. Some will respond to all luns,
@@ -183,6 +181,7 @@ static struct dev_info device_list[] = {
 	{"COMPAQ", "MSA1000", NULL, BLIST_FORCELUN},
 	{"HP", "C1557A", NULL, BLIST_FORCELUN},
 	{"IBM", "AuSaV1S2", NULL, BLIST_FORCELUN},
+	{ NULL, NULL, NULL, 0 },
 };
 
 #define ALLOC_FAILURE_MSG	KERN_ERR "%s: Allocation failure during" \
@@ -424,62 +423,6 @@ static void print_inquiry(unsigned char *inq_result)
 		printk(" CCS\n");
 	else
 		printk("\n");
-}
-
-/**
- * get_device_flags - get device specific flags from the device_list
- * @vendor:	vendor name
- * @model:	model name
- *
- * Description:
- *     Search device_list for an entry matching @vendor and @model, if
- *     found, return the matching flags value, else return 0.
- *     Partial matches count as success - good for @model, but maybe not
- *     @vendor.
- **/
-static int get_device_flags(unsigned char *vendor, unsigned char *model)
-{
-	int i;
-	size_t max;
-
-	for (i = 0; i < ARRAY_SIZE(device_list); i++) {
-		/*
-		 * XXX why skip leading spaces? If an odd INQUIRY value,
-		 * that should have been part of the device_list[] entry,
-		 * such as "  FOO" rather than "FOO". Since this code is
-		 * already here, and we don't know what device it is
-		 * trying to work with, leave it as-is.
-		 */
-		max = 8;	/* max length of vendor */
-		while ((max > 0) && *vendor == ' ') {
-			max--;
-			vendor++;
-		}
-		/*
-		 * XXX removing the following strlen() would be good,
-		 * using it means that for a an entry not in the list, we
-		 * scan every byte of every vendor listed in
-		 * device_list[], and never match a single one (and still
-		 * have to compare at least the first byte of each
-		 * vendor).
-		 */
-		if (memcmp(device_list[i].vendor, vendor,
-			    min(max, strlen(device_list[i].vendor))))
-			continue;
-		/*
-		 * Skip spaces again.
-		 */
-		max = 16;	/* max length of model */
-		while ((max > 0) && *model == ' ') {
-			max--;
-			model++;
-		}
-		if (memcmp(device_list[i].model, model,
-			   min(max, strlen(device_list[i].model))))
-			continue;
-		return device_list[i].flags;
-	}
-	return 0;
 }
 
 /**
@@ -1092,12 +1035,12 @@ int scsi_get_default_name(Scsi_Device *sdev)
  * Notes:
  *     If a device returns the same serial number for different LUNs or
  *     even for different LUNs on different devices, special handling must
- *     be added to get an id, or a new black list flag must to added and
- *     used in device_list[] (so we use the default name, or add a way to
- *     prefix the id/name with SCSI_UID_UNKNOWN - and change the define to
- *     something meaningful like SCSI_UID_NOT_UNIQUE). Complete user level
- *     scanning would be nice for such devices, so we do not need device
- *     specific code in the kernel.
+ *     be added to get an id, or a new black list flag must be added (so
+ *     we use the default name, or add a way to prefix the id/name with
+ *     SCSI_UID_UNKNOWN - and change the define to something meaningful
+ *     like SCSI_UID_NOT_UNIQUE). Complete user level scanning would be
+ *     nice for such devices, so we do not need device specific code in
+ *     the kernel.
  **/
 static void scsi_load_identifier(Scsi_Device *sdev, Scsi_Request *sreq)
 {
@@ -1176,7 +1119,7 @@ static int scsi_find_scsi_level(unsigned int channel, unsigned int id,
  *     If the INQUIRY is successful, sreq->sr_result is zero and: the
  *     INQUIRY data is in @inq_result; the scsi_level and INQUIRY length
  *     are copied to the Scsi_Device at @sreq->sr_device (sdev);
- *     any device_list flags value is stored in *@bflags.
+ *     any flags value is stored in *@bflags.
  **/
 static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 			   int *bflags)
@@ -1225,7 +1168,7 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
 	 * argument.
 	 */
 	BUG_ON(bflags == NULL);
-	*bflags = get_device_flags(&inq_result[8], &inq_result[16]);
+	*bflags = scsi_get_device_flags(&inq_result[8], &inq_result[16]);
 
 	possible_inq_resp_len = (unsigned char) inq_result[4] + 5;
 	if (BLIST_INQUIRY_36 & *bflags)
@@ -1306,7 +1249,7 @@ static void scsi_probe_lun(Scsi_Request *sreq, char *inq_result,
  * @sdevnew:	store the address of the newly allocated Scsi_Device
  * @sreq:	scsi request used when getting an identifier
  * @inq_result:	holds the result of a previous INQUIRY to the LUN
- * @bflags:	flags value from device_list
+ * @bflags:	black/white list flag
  *
  * Description:
  *     Allocate and initialize a Scsi_Device matching sdevscan. Optionally
@@ -1606,7 +1549,7 @@ alloc_failed:
 /**
  * scsi_sequential_lun_scan - sequentially scan a SCSI target
  * @sdevscan:	scan the host, channel, and id of this Scsi_Device
- * @bflags:	flags from device_list for LUN 0
+ * @bflags:	black/white list flag for LUN 0
  * @lun0_res:	result of scanning LUN 0
  *
  * Description:
