@@ -1689,6 +1689,15 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 			set_task_comm(me, ncomm);
 			return 0;
 		}
+		case PR_GET_NAME: {
+			struct task_struct *me = current;
+			unsigned char tcomm[sizeof(me->comm)];
+
+			get_task_comm(tcomm, me);
+			if (copy_to_user((char __user *)arg2, tcomm, sizeof(tcomm)))
+				return -EFAULT;
+			return 0;
+		}
 		default:
 			error = -EINVAL;
 			break;

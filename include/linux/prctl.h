@@ -50,5 +50,6 @@
                                                    process timing */
 
 #define PR_SET_NAME    15		/* Set process name */
+#define PR_GET_NAME    16		/* Get process name */
 
 #endif /* _LINUX_PRCTL_H */
