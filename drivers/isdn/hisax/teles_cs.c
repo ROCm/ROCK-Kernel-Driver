@@ -252,19 +252,6 @@ static void teles_detach(dev_link_t *link)
     if (link->state & DEV_CONFIG)
         teles_cs_release(link);
 
-    /*
-       If the device is currently configured and active, we won't
-       actually delete it yet.  Instead, it is marked so that when
-       the release() function is called, that will trigger a proper
-       detach().
-    */
-    if (link->state & DEV_CONFIG) {
-      DEBUG(0, "teles_cs: detach postponed, '%s' "
-               "still locked\n", link->dev->dev_name);
-        link->state |= DEV_STALE_LINK;
-        return;
-    }
-
     /* Break the link with Card Services */
     if (link->handle) {
         ret = pcmcia_deregister_client(link->handle);
@@ -461,10 +448,6 @@ static void teles_cs_release(dev_link_t *link)
     pcmcia_release_io(link->handle, &link->io);
     pcmcia_release_irq(link->handle, &link->irq);
     link->state &= ~DEV_CONFIG;
-
-    if (link->state & DEV_STALE_LINK)
-        teles_detach(link);
-
 } /* teles_cs_release */
 
 /*======================================================================

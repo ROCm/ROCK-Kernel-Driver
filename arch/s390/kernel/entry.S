@@ -70,7 +70,7 @@ _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
         .macro  CLEANUP_SAVE_ALL_BASE psworg,savearea,sync
 	l	%r1,SP_PSW+4(%r15)
 	cli	1(%r1),0xcf
-	jne	0f
+	bne	BASED(0f)
 	mvc	\savearea(16),SP_R12(%r15)
 0:	st	%r13,SP_R13(%r15)
 	.endm
@@ -140,9 +140,9 @@ _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
 	.macro	CLEANUP_RESTORE_ALL
 	l	%r1,SP_PSW+4(%r15)
 	cli	0(%r1),0x82
-	jne	0f
+	bne	BASED(0f)
 	mvc	SP_PSW(8,%r15),__LC_RETURN_PSW
-	j	1f
+	b	BASED(1f)
 0:	l	%r1,SP_R15(%r15)
 	mvc	SP_PSW(8,%r15),SP_PSW(%r1)
 	mvc	SP_R0(64,%r15),SP_R0(%r1)
@@ -157,9 +157,9 @@ _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
         tm      SP_PSW+1(%r15),0x01      # test problem state bit
 	bnz	BASED(0f)		 # from user -> not critical
 	clc	SP_PSW+4(4,%r15),BASED(.Lcritical_end)
-	jnl	0f
+	bnl	BASED(0f)
 	clc	SP_PSW+4(4,%r15),BASED(.Lcritical_start)
-	jl	0f
+	bl	BASED(0f)
 	l	%r1,BASED(.Lcleanup_critical)
 	basr	%r14,%r1
 0:
@@ -291,6 +291,7 @@ sysc_reschedule:
 # _TIF_SIGPENDING is set, call do_signal
 #
 sysc_sigpending:     
+	ni	__TI_flags+3(%r9),255-_TIF_SINGLE_STEP # clear TIF_SINGLE_STEP
         la      %r2,SP_PTREGS(%r15)    # load pt_regs
         sr      %r3,%r3                # clear *oldset
         l       %r1,BASED(.Ldo_signal)
@@ -311,7 +312,7 @@ sysc_restart:
 	b	BASED(sysc_do_restart) # restart svc
 
 #
-# _TIF_SINGLE_STEP is set, call do_debugger_trap
+# _TIF_SINGLE_STEP is set, call do_single_step
 #
 sysc_singlestep:
 	ni	__TI_flags+3(%r9),255-_TIF_SINGLE_STEP # clear TIF_SINGLE_STEP
@@ -319,7 +320,7 @@ sysc_singlestep:
 	la	%r2,SP_PTREGS(%r15)	# address of register-save area
 	l	%r1,BASED(.Lhandle_per)	# load adr. of per handler
 	la	%r14,BASED(sysc_return)	# load adr. of system return
-	br	%r1			# branch to do_debugger_trap
+	br	%r1			# branch to do_single_step
 
 __critical_end:
 
@@ -460,8 +461,9 @@ pgm_check_handler:
 	SAVE_ALL __LC_PGM_OLD_PSW,__LC_SAVE_AREA,1
         l       %r3,__LC_PGM_ILC         # load program interruption code
 	la	%r8,0x7f
-        l       %r7,BASED(.Ljump_table)
 	nr	%r8,%r3
+pgm_do_call:
+        l       %r7,BASED(.Ljump_table)
         sll     %r8,2
 	GET_THREAD_INFO
         l       %r7,0(%r8,%r7)		 # load address of handler routine
@@ -492,20 +494,12 @@ pgm_per_std:
 	mvc	__THREAD_per+__PER_atmid(2,%r1),__LC_PER_ATMID
 	mvc	__THREAD_per+__PER_address(4,%r1),__LC_PER_ADDRESS
 	mvc	__THREAD_per+__PER_access_id(1,%r1),__LC_PER_ACCESS_ID
-	la	%r4,0x7f
+	oi	__TI_flags+3(%r9),_TIF_SINGLE_STEP # set TIF_SINGLE_STEP
 	l	%r3,__LC_PGM_ILC	 # load program interruption code
-        nr      %r4,%r3                  # clear per-event-bit and ilc
-        be      BASED(pgm_per_only)      # only per or per+check ?
-        l       %r1,BASED(.Ljump_table)
-        sll     %r4,2
-        l       %r1,0(%r4,%r1)		 # load address of handler routine
-        la      %r2,SP_PTREGS(%r15)	 # address of register-save area
-	basr    %r14,%r1		 # branch to interrupt-handler
-pgm_per_only:
-	la      %r2,SP_PTREGS(15)	 # address of register-save area
-        l       %r1,BASED(.Lhandle_per)  # load adr. of per handler
-        la      %r14,BASED(sysc_return)  # load adr. of system return
-        br      %r1			 # branch to do_debugger_trap
+	la	%r8,0x7f
+	nr	%r8,%r3                  # clear per-event-bit and ilc
+	be	BASED(sysc_return)       # only per or per+check ?
+	b	BASED(pgm_do_call)
 
 #
 # it was a single stepped SVC that is causing all the trouble
@@ -745,7 +739,7 @@ cleanup_sysc_leave:
 .Ldo_extint:   .long  do_extint
 .Ldo_signal:   .long  do_signal
 .Ldo_softirq:  .long  do_softirq
-.Lhandle_per:  .long  do_debugger_trap
+.Lhandle_per:  .long  do_single_step
 .Ljump_table:  .long  pgm_check_table
 .Lschedule:    .long  schedule
 .Lclone:       .long  sys_clone

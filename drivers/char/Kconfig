@@ -811,16 +811,6 @@ config COBALT_LCD
 	  This option enables support for the LCD display and buttons found
 	  on Cobalt systems through a misc device.
 
-config H8
-	bool "Tadpole ANA H8 Support (OBSOLETE)"
-	depends on OBSOLETE && ALPHA_BOOK1
-	help
-	  The Hitachi H8/337 is a microcontroller used to deal with the power
-	  and thermal environment. If you say Y here, you will be able to
-	  communicate with it via a character special device.
-
-	  If unsure, say N.
-
 config DTLK
 	tristate "Double Talk PC internal speech card support"
 	help

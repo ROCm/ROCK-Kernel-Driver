@@ -17,7 +17,6 @@
  */
  
 #include <asm/hardware.h>
-#include <asm/mach-types.h>
 #include <asm/io.h>
 
 #include <asm/arch/bus.h>

@@ -56,6 +56,7 @@
 #include <asm/system.h>
 #include <asm/io.h>
 #include <asm/sections.h>
+#include <asm/setup.h>
 #include <asm/smp.h>
 
 #ifdef CONFIG_VT
@@ -82,23 +83,11 @@ extern void platform_reserve(void);
 extern int sh64_cache_init(void);
 extern int sh64_tlb_init(void);
 
-#define RAMDISK_IMAGE_START_MASK  	0x07FF
+#define RAMDISK_IMAGE_START_MASK	0x07FF
 #define RAMDISK_PROMPT_FLAG		0x8000
 #define RAMDISK_LOAD_FLAG		0x4000
 
-#define PARAM ((unsigned char *)empty_zero_page)
-#define MOUNT_ROOT_RDONLY (*(unsigned long *) (PARAM+0x000))
-#define RAMDISK_FLAGS (*(unsigned long *) (PARAM+0x004))
-#define ORIG_ROOT_DEV (*(unsigned long *) (PARAM+0x008))
-#define LOADER_TYPE (*(unsigned long *) (PARAM+0x00c))
-#define INITRD_START (*(unsigned long *) (PARAM+0x010))
-#define INITRD_SIZE (*(unsigned long *) (PARAM+0x014))
-
-#define COMMAND_LINE ((char *) (PARAM+256))
-#define COMMAND_LINE_SIZE 256
-
 static char command_line[COMMAND_LINE_SIZE] = { 0, };
-       char saved_command_line[COMMAND_LINE_SIZE];
 unsigned long long memory_start = CONFIG_MEMORY_START;
 unsigned long long memory_end = CONFIG_MEMORY_START + (CONFIG_MEMORY_SIZE_IN_MB * 1024 * 1024);
 
@@ -218,10 +207,10 @@ void __init setup_arch(char **cmdline_p)
 	last_pfn = PFN_DOWN(memory_end);
 	pages = last_pfn - first_pfn;
 
- 	/*
+	/*
 	 * Partially used pages are not usable - thus
 	 * we are rounding upwards:
- 	 */
+	 */
 	start_pfn = PFN_UP(__pa(_end));
 
 	/*

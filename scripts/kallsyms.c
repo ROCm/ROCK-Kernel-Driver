@@ -83,6 +83,11 @@ symbol_valid(struct sym_entry *s)
 	    strcmp(s->sym, "kallsyms_names") == 0)
 		return 0;
 
+	/* Exclude linker generated symbols which vary between passes */
+	if (strcmp(s->sym, "_SDA_BASE_") == 0 ||	/* ppc */
+	    strcmp(s->sym, "_SDA2_BASE_") == 0)		/* ppc */
+		return 0;
+
 	return 1;
 }
 

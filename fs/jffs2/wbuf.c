@@ -544,9 +544,9 @@ int jffs2_flush_wbuf_pad(struct jffs2_sb_info *c)
 
 #define PAGE_DIV(x) ( (x) & (~(c->wbuf_pagesize - 1)) )
 #define PAGE_MOD(x) ( (x) & (c->wbuf_pagesize - 1) )
-int jffs2_flash_writev(struct jffs2_sb_info *c, const struct iovec *invecs, unsigned long count, loff_t to, size_t *retlen, uint32_t ino)
+int jffs2_flash_writev(struct jffs2_sb_info *c, const struct kvec *invecs, unsigned long count, loff_t to, size_t *retlen, uint32_t ino)
 {
-	struct iovec outvecs[3];
+	struct kvec outvecs[3];
 	uint32_t totlen = 0;
 	uint32_t split_ofs = 0;
 	uint32_t old_totlen;
@@ -751,11 +751,11 @@ alldone:
 
 /*
  *	This is the entry for flash write.
- *	Check, if we work on NAND FLASH, if so build an iovec and write it via vritev
+ *	Check, if we work on NAND FLASH, if so build an kvec and write it via vritev
 */
 int jffs2_flash_write(struct jffs2_sb_info *c, loff_t ofs, size_t len, size_t *retlen, const u_char *buf)
 {
-	struct iovec vecs[1];
+	struct kvec vecs[1];
 
 	if (jffs2_can_mark_obsolete(c))
 		return c->mtd->write(c->mtd, ofs, len, retlen, buf);

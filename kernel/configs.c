@@ -58,8 +58,6 @@
 /**************************************************/
 /* globals and useful constants                   */
 
-static const char IKCONFIG_VERSION[] __attribute_used__ __initdata = "0.7";
-
 static ssize_t
 ikconfig_read_current(struct file *file, char __user *buf,
 		      size_t len, loff_t * offset)

@@ -46,10 +46,9 @@ static inline void __set_bit(int nr, void *addr)
  */
 #define smp_mb__before_clear_bit()	barrier()
 #define smp_mb__after_clear_bit()	barrier()
-static __inline__ void clear_bit(int nr, void * addr)
+static inline void clear_bit(int nr, volatile unsigned long *a)
 {
 	int	mask;
-	unsigned int *a = addr;
 	unsigned long flags;
 
 	a += nr >> 5;
@@ -59,10 +58,9 @@ static __inline__ void clear_bit(int nr, void * addr)
 	local_irq_restore(flags);
 }
 
-static inline void __clear_bit(int nr, void *addr)
+static inline void __clear_bit(int nr, volatile unsigned long *a)
 {
 	int	mask;
-	unsigned int *a = addr;
 
 	a += nr >> 5;
 	mask = 1 << (nr & 0x1f);
@@ -247,7 +245,7 @@ static inline unsigned long __ffs(unsigned long word)
  * @offset: The bitnumber to start searching at
  * @size: The maximum size to search
  */
-static inline unsigned long find_next_bit(unsigned long *addr,
+static inline unsigned long find_next_bit(const unsigned long *addr,
 	unsigned long size, unsigned long offset)
 {
 	unsigned int *p = ((unsigned int *) addr) + (offset >> 5);

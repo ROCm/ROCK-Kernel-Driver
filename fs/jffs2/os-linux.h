@@ -132,8 +132,9 @@ static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 #define jffs2_wbuf_dirty(c) (!!(c)->wbuf_len)
 struct kstatfs;
 
+struct kvec;
 /* wbuf.c */
-int jffs2_flash_writev(struct jffs2_sb_info *c, const struct iovec *vecs, unsigned long count, loff_t to, size_t *retlen, uint32_t ino);
+int jffs2_flash_writev(struct jffs2_sb_info *c, const struct kvec *vecs, unsigned long count, loff_t to, size_t *retlen, uint32_t ino);
 int jffs2_flash_write(struct jffs2_sb_info *c, loff_t ofs, size_t len, size_t *retlen, const u_char *buf);
 int jffs2_flash_read(struct jffs2_sb_info *c, loff_t ofs, size_t len, size_t *retlen, u_char *buf);
 int jffs2_check_oob_empty(struct jffs2_sb_info *c, struct jffs2_eraseblock *jeb,int mode);
@@ -185,7 +186,7 @@ int jffs2_remount_fs (struct super_block *, int *, char *);
 int jffs2_do_fill_super(struct super_block *sb, void *data, int silent);
 
 /* writev.c */
-int jffs2_flash_direct_writev(struct jffs2_sb_info *c, const struct iovec *vecs, 
+int jffs2_flash_direct_writev(struct jffs2_sb_info *c, const struct kvec *vecs, 
 		       unsigned long count, loff_t to, size_t *retlen);
 
 /* super.c */

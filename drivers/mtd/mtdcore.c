@@ -232,7 +232,7 @@ void put_mtd_device(struct mtd_info *mtd)
  *			dont implement their own
  */
 
-int default_mtd_writev(struct mtd_info *mtd, const struct iovec *vecs,
+int default_mtd_writev(struct mtd_info *mtd, const struct kvec *vecs,
 		       unsigned long count, loff_t to, size_t *retlen)
 {
 	unsigned long i;
@@ -262,7 +262,7 @@ int default_mtd_writev(struct mtd_info *mtd, const struct iovec *vecs,
  *		       implement their own
  */
 
-int default_mtd_readv(struct mtd_info *mtd, struct iovec *vecs,
+int default_mtd_readv(struct mtd_info *mtd, struct kvec *vecs,
 		      unsigned long count, loff_t from, size_t *retlen)
 {
 	unsigned long i;
@@ -409,7 +409,7 @@ int __init init_mtd(void)
 {
 #ifdef CONFIG_PROC_FS
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
-	if ((proc_mtd = create_proc_entry( "mtd", 0, 0 )))
+	if ((proc_mtd = create_proc_entry( "mtd", 0, NULL )))
 	  proc_mtd->read_proc = mtd_read_proc;
 #else
         proc_register_dynamic(&proc_root,&mtd_proc_entry);
@@ -438,7 +438,7 @@ static void __exit cleanup_mtd(void)
 #ifdef CONFIG_PROC_FS
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,2,0)
         if (proc_mtd)
-          remove_proc_entry( "mtd", 0);
+          remove_proc_entry( "mtd", NULL);
 #else
         proc_unregister(&proc_root,mtd_proc_entry.low_ino);
 #endif

@@ -69,7 +69,13 @@ extern int __cpu_up (unsigned int cpu);
 #endif
 
 #ifndef CONFIG_SMP
-#define smp_call_function_on(func,info,nonatomic,wait,cpu)      ({ 0; })
+static inline int
+smp_call_function_on(void (*func) (void *info), void *info,
+		     int nonatomic, int wait, int cpu)
+{
+	func(info);
+	return 0;
+}
 #define smp_get_cpu(cpu) ({ 0; })
 #define smp_put_cpu(cpu) ({ 0; })
 #endif
