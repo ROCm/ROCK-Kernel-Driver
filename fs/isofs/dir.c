@@ -254,11 +254,12 @@ static int isofs_readdir(struct file *filp,
 	struct iso_directory_record * tmpde;
 	struct inode *inode = filp->f_dentry->d_inode;
 
-	lock_kernel();
 
-	tmpname = (char *) __get_free_page(GFP_KERNEL);
-	if (!tmpname)
+	tmpname = (char *)__get_free_page(GFP_KERNEL);
+	if (tmpname == NULL)
 		return -ENOMEM;
+
+	lock_kernel();
 	tmpde = (struct iso_directory_record *) (tmpname+1024);
 
 	result = do_isofs_readdir(inode, filp, dirent, filldir, tmpname, tmpde);

@@ -1526,7 +1526,7 @@ void shrink_journal_memory(void)
  * Simple support for retying memory allocations.  Introduced to help to
  * debug different VM deadlock avoidance strategies. 
  */
-void * __jbd_kmalloc (char *where, size_t size, int flags, int retry)
+void * __jbd_kmalloc (const char *where, size_t size, int flags, int retry)
 {
 	void *p;
 	static unsigned long last_warning;

@@ -1803,7 +1803,7 @@ static void vortex_tx_timeout(struct net_device *dev)
 		   dev->name, inb(ioaddr + TxStatus),
 		   inw(ioaddr + EL3_STATUS));
 	EL3WINDOW(4);
-	printk(KERN_ERR "  diagnostics: net %04x media %04x dma %08x fifo %04x\n",
+	printk(KERN_ERR "  diagnostics: net %04x media %04x dma %08lx fifo %04x\n",
 			inw(ioaddr + Wn4_NetDiag),
 			inw(ioaddr + Wn4_Media),
 			inl(ioaddr + PktStatus),
@@ -2643,7 +2643,7 @@ dump_tx_ring(struct net_device *dev)
 					vp->full_bus_master_tx,
 					vp->dirty_tx, vp->dirty_tx % TX_RING_SIZE,
 					vp->cur_tx, vp->cur_tx % TX_RING_SIZE);
-			printk(KERN_ERR "  Transmit list %8.8x vs. %p.\n",
+			printk(KERN_ERR "  Transmit list %8.8lx vs. %p.\n",
 				   inl(ioaddr + DownListPtr),
 				   &vp->tx_ring[vp->dirty_tx % TX_RING_SIZE]);
 			issue_and_wait(dev, DownStall);
