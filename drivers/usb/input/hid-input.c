@@ -569,8 +569,10 @@ int hidinput_connect(struct hid_device *hid)
 		while (list != &report_enum->report_list) {
 			report = (struct hid_report *) list;
 
-			if (!report->maxfield)
+			if (!report->maxfield) {
+				list = list->next;
 				continue;
+			}
 
 			if (!hidinput) {
 				hidinput = kmalloc(sizeof(*hidinput), GFP_KERNEL);
