@@ -1732,147 +1732,130 @@ serial8250_pm(struct uart_port *port, unsigned int state,
 }
 
 /*
- * Resource handling.  This is complicated by the fact that resources
- * depend on the port type.  Maybe we should be claiming the standard
- * 8250 ports, and then trying to get other resources as necessary?
+ * Resource handling.
  */
-static int
-serial8250_request_std_resource(struct uart_8250_port *up, struct resource **res)
+static int serial8250_request_std_resource(struct uart_8250_port *up)
 {
 	unsigned int size = 8 << up->port.regshift;
 	int ret = 0;
 
 	switch (up->port.iotype) {
 	case UPIO_MEM:
-		if (up->port.mapbase) {
-			*res = request_mem_region(up->port.mapbase, size, "serial");
-			if (!*res)
-				ret = -EBUSY;
+		if (!up->port.mapbase)
+			break;
+
+		if (!request_mem_region(up->port.mapbase, size, "serial")) {
+			ret = -EBUSY;
+			break;
+		}
+
+		if (up->port.flags & UPF_IOREMAP) {
+			up->port.membase = ioremap(up->port.mapbase, size);
+			if (!up->port.membase) {
+				release_mem_region(up->port.mapbase, size);
+				ret = -ENOMEM;
+			}
 		}
 		break;
 
 	case UPIO_HUB6:
 	case UPIO_PORT:
-		*res = request_region(up->port.iobase, size, "serial");
-		if (!*res)
+		if (!request_region(up->port.iobase, size, "serial"))
 			ret = -EBUSY;
 		break;
 	}
 	return ret;
 }
 
-static int
-serial8250_request_rsa_resource(struct uart_8250_port *up, struct resource **res)
+static void serial8250_release_std_resource(struct uart_8250_port *up)
 {
 	unsigned int size = 8 << up->port.regshift;
-	unsigned long start;
-	int ret = 0;
 
 	switch (up->port.iotype) {
 	case UPIO_MEM:
-		if (up->port.mapbase) {
-			start = up->port.mapbase;
-			start += UART_RSA_BASE << up->port.regshift;
-			*res = request_mem_region(start, size, "serial-rsa");
-			if (!*res)
-				ret = -EBUSY;
+		if (!up->port.mapbase)
+			break;
+
+		if (up->port.flags & UPF_IOREMAP) {
+			iounmap(up->port.membase);
+			up->port.membase = NULL;
 		}
+
+		release_mem_region(up->port.mapbase, size);
 		break;
 
 	case UPIO_HUB6:
 	case UPIO_PORT:
-		start = up->port.iobase;
-		start += UART_RSA_BASE << up->port.regshift;
-		*res = request_region(start, size, "serial-rsa");
-		if (!*res)
+		release_region(up->port.iobase, size);
+		break;
+	}
+}
+
+static int serial8250_request_rsa_resource(struct uart_8250_port *up)
+{
+	unsigned long start = UART_RSA_BASE << up->port.regshift;
+	unsigned int size = 8 << up->port.regshift;
+	int ret = 0;
+
+	switch (up->port.iotype) {
+	case UPIO_MEM:
+		ret = -EINVAL;
+		break;
+
+	case UPIO_HUB6:
+	case UPIO_PORT:
+		start += up->port.iobase;
+		if (!request_region(start, size, "serial-rsa"))
 			ret = -EBUSY;
 		break;
 	}
 
 	return ret;
+}
+
+static void serial8250_release_rsa_resource(struct uart_8250_port *up)
+{
+	unsigned long offset = UART_RSA_BASE << up->port.regshift;
+	unsigned int size = 8 << up->port.regshift;
+
+	switch (up->port.iotype) {
+	case UPIO_MEM:
+		break;
+
+	case UPIO_HUB6:
+	case UPIO_PORT:
+		release_region(up->port.iobase + offset, size);
+		break;
+	}
 }
 
 static void serial8250_release_port(struct uart_port *port)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	unsigned long start, offset = 0, size = 0;
 
-	if (up->port.type == PORT_RSA) {
-		offset = UART_RSA_BASE << up->port.regshift;
-		size = 8;
-	}
-
-	size <<= up->port.regshift;
-
-	switch (up->port.iotype) {
-	case UPIO_MEM:
-		if (up->port.mapbase) {
-			/*
-			 * Unmap the area.
-			 */
-			iounmap(up->port.membase);
-			up->port.membase = NULL;
-
-			start = up->port.mapbase;
-
-			if (size)
-				release_mem_region(start + offset, size);
-			release_mem_region(start, 8 << up->port.regshift);
-		}
-		break;
-
-	case UPIO_HUB6:
-	case UPIO_PORT:
-		start = up->port.iobase;
-
-		if (size)
-			release_region(start + offset, size);
-		release_region(start + offset, 8 << up->port.regshift);
-		break;
-
-	default:
-		break;
-	}
+	serial8250_release_std_resource(up);
+	if (up->port.type == PORT_RSA)
+		serial8250_release_rsa_resource(up);
 }
 
 static int serial8250_request_port(struct uart_port *port)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	struct resource *res = NULL, *res_rsa = NULL;
 	int ret = 0;
 
-	if (up->port.type == PORT_RSA) {
-		ret = serial8250_request_rsa_resource(up, &res_rsa);
+	ret = serial8250_request_std_resource(up);
+	if (ret == 0 && up->port.type == PORT_RSA) {
+		ret = serial8250_request_rsa_resource(up);
 		if (ret < 0)
-			return ret;
+			serial8250_release_std_resource(up);
 	}
 
-	ret = serial8250_request_std_resource(up, &res);
-
-	/*
-	 * If we have a mapbase, then request that as well.
-	 */
-	if (ret == 0 && up->port.flags & UPF_IOREMAP) {
-		int size = res->end - res->start + 1;
-
-		up->port.membase = ioremap(up->port.mapbase, size);
-		if (!up->port.membase)
-			ret = -ENOMEM;
-	}
-
-	if (ret < 0) {
-		if (res_rsa)
-			release_resource(res_rsa);
-		if (res)
-			release_resource(res);
-	}
 	return ret;
 }
 
 static void serial8250_config_port(struct uart_port *port, int flags)
 {
 	struct uart_8250_port *up = (struct uart_8250_port *)port;
-	struct resource *res_std = NULL, *res_rsa = NULL;
 	int probeflags = PROBE_ANY;
 	int ret;
 
@@ -1888,11 +1871,11 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	 * Find the region that we can probe for.  This in turn
 	 * tells us whether we can probe for the type of port.
 	 */
-	ret = serial8250_request_std_resource(up, &res_std);
+	ret = serial8250_request_std_resource(up);
 	if (ret < 0)
 		return;
 
-	ret = serial8250_request_rsa_resource(up, &res_rsa);
+	ret = serial8250_request_rsa_resource(up);
 	if (ret < 0)
 		probeflags &= ~PROBE_RSA;
 
@@ -1901,14 +1884,10 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	if (up->port.type != PORT_UNKNOWN && flags & UART_CONFIG_IRQ)
 		autoconfig_irq(up);
 
-	/*
-	 * If the port wasn't an RSA port, release the resource.
-	 */
-	if (up->port.type != PORT_RSA && res_rsa)
-		release_resource(res_rsa);
-
-	if (up->port.type == PORT_UNKNOWN && res_std)
-		release_resource(res_std);
+	if (up->port.type != PORT_RSA && probeflags & PROBE_RSA)
+		serial8250_release_rsa_resource(up);
+	if (up->port.type == PORT_UNKNOWN)
+		serial8250_release_std_resource(up);
 }
 
 static int
