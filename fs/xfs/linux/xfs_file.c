@@ -280,7 +280,7 @@ linvfs_file_mmap(
 {
 	struct inode	*ip = filp->f_dentry->d_inode;
 	vnode_t		*vp = LINVFS_GET_VP(ip);
-	vattr_t		va = { .va_mask = AT_UPDATIME };
+	vattr_t		va = { .va_mask = XFS_AT_UPDATIME };
 	int		error;
 
 	if ((vp->v_type == VREG) && (vp->v_vfsp->vfs_flag & VFS_DMI)) {
@@ -291,7 +291,7 @@ linvfs_file_mmap(
 
 	vma->vm_ops = &linvfs_file_vm_ops;
 
-	VOP_SETATTR(vp, &va, AT_UPDATIME, NULL, error);
+	VOP_SETATTR(vp, &va, XFS_AT_UPDATIME, NULL, error);
 	UPDATE_ATIME(ip);
 	return 0;
 }

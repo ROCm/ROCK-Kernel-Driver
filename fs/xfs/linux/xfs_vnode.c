@@ -200,7 +200,7 @@ vn_revalidate(struct vnode *vp)
 
 	vn_trace_entry(vp, "vn_revalidate", (inst_t *)__return_address);
 
-	va.va_mask = AT_STAT|AT_GENCOUNT;
+	va.va_mask = XFS_AT_STAT|XFS_AT_GENCOUNT;
 
 	ASSERT(vp->v_bh.bh_first != NULL);
 

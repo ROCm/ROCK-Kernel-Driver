@@ -35,6 +35,8 @@
 #include <linux/sched.h>
 #include <linux/time.h>
 
+typedef struct timespec timespec_t;
+
 static inline void delay(long ticks)
 {
 	current->state = TASK_UNINTERRUPTIBLE;

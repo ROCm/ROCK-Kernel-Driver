@@ -112,7 +112,7 @@ uuid_create_nil(uuid_t *uuid)
 	memset(uuid, 0, sizeof(*uuid));
 }
 
-int
+boolean_t
 uuid_is_nil(uuid_t *uuid)
 {
 	int	i;
@@ -126,7 +126,7 @@ uuid_is_nil(uuid_t *uuid)
 	return B_TRUE;	/* is nil */
 }
 
-int
+boolean_t
 uuid_equal(uuid_t *uuid1, uuid_t *uuid2)
 {
 	return memcmp(uuid1, uuid2, sizeof(uuid_t)) ? B_FALSE : B_TRUE;

@@ -34,8 +34,6 @@
 
 #ifdef __KERNEL__
 
-#include <linux/types.h>
-
 /*
  * POSIX Extensions
  */
@@ -56,9 +54,6 @@ typedef unsigned int		__uint32_t;
 typedef signed long long int	__int64_t;
 typedef unsigned long long int	__uint64_t;
 
-typedef enum { B_FALSE, B_TRUE } boolean_t;
-
-
 typedef __int64_t		prid_t;		/* project ID */
 typedef __uint32_t		inst_t;		/* an instruction */
 
@@ -68,11 +63,17 @@ typedef __s64			xfs_daddr_t;	/* <disk address> type */
 typedef char *			xfs_caddr_t;	/* <core address> type */
 typedef __u32			xfs_dev_t;
 
-typedef struct timespec		timespec_t;
+typedef struct xfs_dirent {		/* data from readdir() */
+	xfs_ino_t	d_ino;		/* inode number of entry */
+	xfs_off_t	d_off;		/* offset of disk directory entry */
+	unsigned short	d_reclen;	/* length of this record */
+	char		d_name[1];	/* name of file */
+} xfs_dirent_t;
 
-typedef struct {
-	unsigned char	__u_bits[16];
-} uuid_t;
+#define DIRENTBASESIZE		(((xfs_dirent_t *)0)->d_name - (char *)0)
+#define DIRENTSIZE(namelen)	\
+	((DIRENTBASESIZE + (namelen) + \
+		sizeof(xfs_off_t)) & ~(sizeof(xfs_off_t) - 1))
 
 /* __psint_t is the same size as a pointer */
 #if (BITS_PER_LONG == 32)
@@ -151,7 +152,7 @@ typedef __uint64_t	xfs_fileoff_t;	/* block number in a file */
 typedef __int64_t	xfs_sfiloff_t;	/* signed block number in a file */
 typedef __uint64_t	xfs_filblks_t;	/* number of blocks in a file */
 
-typedef __uint8_t	xfs_arch_t;	/* architecutre of an xfs fs */
+typedef __uint8_t	xfs_arch_t;	/* architecture of an xfs fs */
 
 /*
  * Null values for the types.
@@ -193,119 +194,6 @@ typedef enum {
 	XFS_BTNUM_BNOi, XFS_BTNUM_CNTi, XFS_BTNUM_BMAPi, XFS_BTNUM_INOi,
 	XFS_BTNUM_MAX
 } xfs_btnum_t;
-
-
-#if defined(CONFIG_PROC_FS) && defined(__KERNEL__) && !defined(XFS_STATS_OFF)
-/*
- * XFS global statistics
- */
-struct xfsstats {
-# define XFSSTAT_END_EXTENT_ALLOC	4
-	__uint32_t		xs_allocx;
-	__uint32_t		xs_allocb;
-	__uint32_t		xs_freex;
-	__uint32_t		xs_freeb;
-# define XFSSTAT_END_ALLOC_BTREE	(XFSSTAT_END_EXTENT_ALLOC+4)
-	__uint32_t		xs_abt_lookup;
-	__uint32_t		xs_abt_compare;
-	__uint32_t		xs_abt_insrec;
-	__uint32_t		xs_abt_delrec;
-# define XFSSTAT_END_BLOCK_MAPPING	(XFSSTAT_END_ALLOC_BTREE+7)
-	__uint32_t		xs_blk_mapr;
-	__uint32_t		xs_blk_mapw;
-	__uint32_t		xs_blk_unmap;
-	__uint32_t		xs_add_exlist;
-	__uint32_t		xs_del_exlist;
-	__uint32_t		xs_look_exlist;
-	__uint32_t		xs_cmp_exlist;
-# define XFSSTAT_END_BLOCK_MAP_BTREE	(XFSSTAT_END_BLOCK_MAPPING+4)
-	__uint32_t		xs_bmbt_lookup;
-	__uint32_t		xs_bmbt_compare;
-	__uint32_t		xs_bmbt_insrec;
-	__uint32_t		xs_bmbt_delrec;
-# define XFSSTAT_END_DIRECTORY_OPS	(XFSSTAT_END_BLOCK_MAP_BTREE+4)
-	__uint32_t		xs_dir_lookup;
-	__uint32_t		xs_dir_create;
-	__uint32_t		xs_dir_remove;
-	__uint32_t		xs_dir_getdents;
-# define XFSSTAT_END_TRANSACTIONS	(XFSSTAT_END_DIRECTORY_OPS+3)
-	__uint32_t		xs_trans_sync;
-	__uint32_t		xs_trans_async;
-	__uint32_t		xs_trans_empty;
-# define XFSSTAT_END_INODE_OPS		(XFSSTAT_END_TRANSACTIONS+7)
-	__uint32_t		xs_ig_attempts;
-	__uint32_t		xs_ig_found;
-	__uint32_t		xs_ig_frecycle;
-	__uint32_t		xs_ig_missed;
-	__uint32_t		xs_ig_dup;
-	__uint32_t		xs_ig_reclaims;
-	__uint32_t		xs_ig_attrchg;
-# define XFSSTAT_END_LOG_OPS		(XFSSTAT_END_INODE_OPS+5)
-	__uint32_t		xs_log_writes;
-	__uint32_t		xs_log_blocks;
-	__uint32_t		xs_log_noiclogs;
-	__uint32_t		xs_log_force;
-	__uint32_t		xs_log_force_sleep;
-# define XFSSTAT_END_TAIL_PUSHING	(XFSSTAT_END_LOG_OPS+10)
-	__uint32_t		xs_try_logspace;
-	__uint32_t		xs_sleep_logspace;
-	__uint32_t		xs_push_ail;
-	__uint32_t		xs_push_ail_success;
-	__uint32_t		xs_push_ail_pushbuf;
-	__uint32_t		xs_push_ail_pinned;
-	__uint32_t		xs_push_ail_locked;
-	__uint32_t		xs_push_ail_flushing;
-	__uint32_t		xs_push_ail_restarts;
-	__uint32_t		xs_push_ail_flush;
-# define XFSSTAT_END_WRITE_CONVERT	(XFSSTAT_END_TAIL_PUSHING+2)
-	__uint32_t		xs_xstrat_quick;
-	__uint32_t		xs_xstrat_split;
-# define XFSSTAT_END_READ_WRITE_OPS	(XFSSTAT_END_WRITE_CONVERT+2)
-	__uint32_t		xs_write_calls;
-	__uint32_t		xs_read_calls;
-# define XFSSTAT_END_ATTRIBUTE_OPS	(XFSSTAT_END_READ_WRITE_OPS+4)
-	__uint32_t		xs_attr_get;
-	__uint32_t		xs_attr_set;
-	__uint32_t		xs_attr_remove;
-	__uint32_t		xs_attr_list;
-# define XFSSTAT_END_QUOTA_OPS		(XFSSTAT_END_ATTRIBUTE_OPS+8)
-	__uint32_t		xs_qm_dqreclaims;
-	__uint32_t		xs_qm_dqreclaim_misses;
-	__uint32_t		xs_qm_dquot_dups;
-	__uint32_t		xs_qm_dqcachemisses;
-	__uint32_t		xs_qm_dqcachehits;
-	__uint32_t		xs_qm_dqwants;
-	__uint32_t		xs_qm_dqshake_reclaims;
-	__uint32_t		xs_qm_dqinact_reclaims;
-# define XFSSTAT_END_INODE_CLUSTER	(XFSSTAT_END_QUOTA_OPS+3)
-	__uint32_t		xs_iflush_count;
-	__uint32_t		xs_icluster_flushcnt;
-	__uint32_t		xs_icluster_flushinode;
-# define XFSSTAT_END_VNODE_OPS		(XFSSTAT_END_INODE_CLUSTER+8)
-	__uint32_t		vn_active;	/* # vnodes not on free lists */
-	__uint32_t		vn_alloc;	/* # times vn_alloc called */
-	__uint32_t		vn_get;		/* # times vn_get called */
-	__uint32_t		vn_hold;	/* # times vn_hold called */
-	__uint32_t		vn_rele;	/* # times vn_rele called */
-	__uint32_t		vn_reclaim;	/* # times vn_reclaim called */
-	__uint32_t		vn_remove;	/* # times vn_remove called */
-	__uint32_t		vn_free;	/* # times vn_free called */
-/* Extra precision counters */
-	__uint64_t		xs_xstrat_bytes;
-	__uint64_t		xs_write_bytes;
-	__uint64_t		xs_read_bytes;
-};
-
-extern struct xfsstats xfsstats;
-
-# define XFS_STATS_INC(count)		( (count)++ )
-# define XFS_STATS_DEC(count)		( (count)-- )
-# define XFS_STATS_ADD(count, inc)	( (count) += (inc) )
-#else	/* !CONFIG_PROC_FS */
-# define XFS_STATS_INC(count)
-# define XFS_STATS_DEC(count)
-# define XFS_STATS_ADD(count, inc)
-#endif	/* !CONFIG_PROC_FS */
 
 
 /*

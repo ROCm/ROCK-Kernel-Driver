@@ -945,7 +945,7 @@ int xfs_ioc_xattr(
 
 	switch (cmd) {
 	case XFS_IOC_FSGETXATTR: {
-		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS;
+		va.va_mask = XFS_AT_XFLAGS|XFS_AT_EXTSIZE|XFS_AT_NEXTENTS;
 		VOP_GETATTR(vp, &va, 0, NULL, error);
 		if (error)
 			return -error;
@@ -965,7 +965,7 @@ int xfs_ioc_xattr(
 		if (copy_from_user(&fa, (struct fsxattr *)arg, sizeof(fa)))
 			return -XFS_ERROR(EFAULT);
 
-		va.va_mask = AT_XFLAGS | AT_EXTSIZE;
+		va.va_mask = XFS_AT_XFLAGS | XFS_AT_EXTSIZE;
 		va.va_xflags  = fa.fsx_xflags;
 		va.va_extsize = fa.fsx_extsize;
 
@@ -978,7 +978,7 @@ int xfs_ioc_xattr(
 
 	case XFS_IOC_FSGETXATTRA: {
 
-		va.va_mask = AT_XFLAGS|AT_EXTSIZE|AT_ANEXTENTS;
+		va.va_mask = XFS_AT_XFLAGS|XFS_AT_EXTSIZE|XFS_AT_ANEXTENTS;
 		VOP_GETATTR(vp, &va, 0, NULL, error);
 		if (error)
 			return -error;

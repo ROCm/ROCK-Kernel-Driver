@@ -31,7 +31,6 @@
  */
 
 #include <xfs.h>
-#include <asm/fcntl.h>
 
 
 /*
@@ -119,7 +118,7 @@ xfs_getattr(
 		xfs_ilock(ip, XFS_ILOCK_SHARED);
 
 	vap->va_size = ip->i_d.di_size;
-	if (vap->va_mask == AT_SIZE) {
+	if (vap->va_mask == XFS_AT_SIZE) {
 		if (!(flags & ATTR_LAZY))
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return 0;
@@ -137,7 +136,8 @@ xfs_getattr(
 	/*
 	 * Quick exit for non-stat callers
 	 */
-	if ((vap->va_mask & ~(AT_SIZE|AT_FSID|AT_NODEID|AT_NLINK)) == 0) {
+	if ((vap->va_mask &
+	    ~(XFS_AT_SIZE|XFS_AT_FSID|XFS_AT_NODEID|XFS_AT_NLINK)) == 0) {
 		if (!(flags & ATTR_LAZY))
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return 0;
@@ -224,8 +224,8 @@ xfs_getattr(
 	 * to be filled in are needed.
 	 */
 	if ((vap->va_mask &
-	     (AT_XFLAGS|AT_EXTSIZE|AT_NEXTENTS|AT_ANEXTENTS|
-	      AT_GENCOUNT|AT_VCODE)) == 0) {
+	     (XFS_AT_XFLAGS|XFS_AT_EXTSIZE|XFS_AT_NEXTENTS|XFS_AT_ANEXTENTS|
+	      XFS_AT_GENCOUNT|XFS_AT_VCODE)) == 0) {
 		if (!(flags & ATTR_LAZY))
 			xfs_iunlock(ip, XFS_ILOCK_SHARED);
 		return 0;
@@ -294,7 +294,7 @@ xfs_setattr(
 	 * Cannot set certain attributes.
 	 */
 	mask = vap->va_mask;
-	if (mask & AT_NOSET) {
+	if (mask & XFS_AT_NOSET) {
 		return XFS_ERROR(EINVAL);
 	}
 
@@ -308,11 +308,11 @@ xfs_setattr(
 	 * Timestamps do not need to be logged and hence do not
 	 * need to be done within a transaction.
 	 */
-	if (mask & AT_UPDTIMES) {
-		ASSERT((mask & ~AT_UPDTIMES) == 0);
-		timeflags = ((mask & AT_UPDATIME) ? XFS_ICHGTIME_ACC : 0) |
-			    ((mask & AT_UPDCTIME) ? XFS_ICHGTIME_CHG : 0) |
-			    ((mask & AT_UPDMTIME) ? XFS_ICHGTIME_MOD : 0);
+	if (mask & XFS_AT_UPDTIMES) {
+		ASSERT((mask & ~XFS_AT_UPDTIMES) == 0);
+		timeflags = ((mask & XFS_AT_UPDATIME) ? XFS_ICHGTIME_ACC : 0) |
+			    ((mask & XFS_AT_UPDCTIME) ? XFS_ICHGTIME_CHG : 0) |
+			    ((mask & XFS_AT_UPDMTIME) ? XFS_ICHGTIME_MOD : 0);
 		xfs_ichgtime(ip, timeflags);
 		return 0;
 	}
@@ -328,15 +328,15 @@ xfs_setattr(
 	 * If the IDs do change before we take the ilock, we're covered
 	 * because the i_*dquot fields will get updated anyway.
 	 */
-	if (XFS_IS_QUOTA_ON(mp) && (mask & (AT_UID|AT_GID))) {
+	if (XFS_IS_QUOTA_ON(mp) && (mask & (XFS_AT_UID|XFS_AT_GID))) {
 		qflags = 0;
-		if (mask & AT_UID) {
+		if (mask & XFS_AT_UID) {
 			uid = vap->va_uid;
 			qflags |= XFS_QMOPT_UQUOTA;
 		} else {
 			uid = ip->i_d.di_uid;
 		}
-		if (mask & AT_GID) {
+		if (mask & XFS_AT_GID) {
 			gid = vap->va_gid;
 			qflags |= XFS_QMOPT_GQUOTA;
 		}  else {
@@ -360,8 +360,8 @@ xfs_setattr(
 	 */
 	tp = NULL;
 	lock_flags = XFS_ILOCK_EXCL;
-	if (!(mask & AT_SIZE)) {
-		if ((mask != (AT_CTIME|AT_ATIME|AT_MTIME)) ||
+	if (!(mask & XFS_AT_SIZE)) {
+		if ((mask != (XFS_AT_CTIME|XFS_AT_ATIME|XFS_AT_MTIME)) ||
 		    (mp->m_flags & XFS_MOUNT_WSYNC)) {
 			tp = xfs_trans_alloc(mp, XFS_TRANS_SETATTR_NOT_SIZE);
 			commit_flags = 0;
@@ -400,7 +400,9 @@ xfs_setattr(
 	 * Only the owner or users with CAP_FOWNER
 	 * capability may do these things.
 	 */
-	if (mask & (AT_MODE|AT_XFLAGS|AT_EXTSIZE|AT_UID|AT_GID|AT_PROJID)) {
+	if (mask &
+	    (XFS_AT_MODE|XFS_AT_XFLAGS|XFS_AT_EXTSIZE|XFS_AT_UID|
+	     XFS_AT_GID|XFS_AT_PROJID)) {
 		/*
 		 * CAP_FOWNER overrides the following restrictions:
 		 *
@@ -424,7 +426,7 @@ xfs_setattr(
 		 * IDs of the calling process shall match the group owner of
 		 * the file when setting the set-group-ID bit on that file
 		 */
-		if (mask & AT_MODE) {
+		if (mask & XFS_AT_MODE) {
 			mode_t m = 0;
 
 			if ((vap->va_mode & ISUID) && !file_owner)
@@ -449,7 +451,7 @@ xfs_setattr(
 	 * and can change the group id only to a group of which he
 	 * or she is a member.
 	 */
-	if (mask & (AT_UID|AT_GID|AT_PROJID)) {
+	if (mask & (XFS_AT_UID|XFS_AT_GID|XFS_AT_PROJID)) {
 		/*
 		 * These IDs could have changed since we last looked at them.
 		 * But, we're assured that if the ownership did change
@@ -459,9 +461,9 @@ xfs_setattr(
 		iuid = ip->i_d.di_uid;
 		iprojid = ip->i_d.di_projid;
 		igid = ip->i_d.di_gid;
-		gid = (mask & AT_GID) ? vap->va_gid : igid;
-		uid = (mask & AT_UID) ? vap->va_uid : iuid;
-		projid = (mask & AT_PROJID) ? (xfs_prid_t)vap->va_projid :
+		gid = (mask & XFS_AT_GID) ? vap->va_gid : igid;
+		uid = (mask & XFS_AT_UID) ? vap->va_uid : iuid;
+		projid = (mask & XFS_AT_PROJID) ? (xfs_prid_t)vap->va_projid :
 			 iprojid;
 
 		/*
@@ -506,13 +508,13 @@ xfs_setattr(
 	/*
 	 * Truncate file.  Must have write permission and not be a directory.
 	 */
-	if (mask & AT_SIZE) {
+	if (mask & XFS_AT_SIZE) {
 		/* Short circuit the truncate case for zero length files */
 		if ((vap->va_size == 0) &&
 		   (ip->i_d.di_size == 0) && (ip->i_d.di_nextents == 0)) {
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
 			lock_flags &= ~XFS_ILOCK_EXCL;
-			if (mask & AT_CTIME)
+			if (mask & XFS_AT_CTIME)
 				xfs_ichgtime(ip, XFS_ICHGTIME_MOD | XFS_ICHGTIME_CHG);
 			code = 0;
 			goto error_return;
@@ -537,7 +539,7 @@ xfs_setattr(
 	/*
 	 * Change file access or modified times.
 	 */
-	if (mask & (AT_ATIME|AT_MTIME)) {
+	if (mask & (XFS_AT_ATIME|XFS_AT_MTIME)) {
 		if (!file_owner) {
 			if ((flags & ATTR_UTIME) &&
 			    !capable(CAP_FOWNER)) {
@@ -550,11 +552,11 @@ xfs_setattr(
 	/*
 	 * Change extent size or realtime flag.
 	 */
-	if (mask & (AT_EXTSIZE|AT_XFLAGS)) {
+	if (mask & (XFS_AT_EXTSIZE|XFS_AT_XFLAGS)) {
 		/*
 		 * Can't change extent size if any extents are allocated.
 		 */
-		if (ip->i_d.di_nextents && (mask & AT_EXTSIZE) &&
+		if (ip->i_d.di_nextents && (mask & XFS_AT_EXTSIZE) &&
 		    ((ip->i_d.di_extsize << mp->m_sb.sb_blocklog) !=
 		     vap->va_extsize) ) {
 			code = XFS_ERROR(EINVAL);	/* EFBIG? */
@@ -569,11 +571,11 @@ xfs_setattr(
 		 * with buffered data writes is implemented.
 		 *
 		 */
-		if ((mask & AT_EXTSIZE)				&&
+		if ((mask & XFS_AT_EXTSIZE)			&&
 		    ((ip->i_d.di_extsize << mp->m_sb.sb_blocklog) !=
 		     vap->va_extsize) &&
 		    (!((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ||
-		       ((mask & AT_XFLAGS) &&
+		       ((mask & XFS_AT_XFLAGS) &&
 			(vap->va_xflags & XFS_XFLAG_REALTIME))))) {
 			code = XFS_ERROR(EINVAL);
 			goto error_return;
@@ -582,7 +584,7 @@ xfs_setattr(
 		/*
 		 * Can't change realtime flag if any extents are allocated.
 		 */
-		if (ip->i_d.di_nextents && (mask & AT_XFLAGS) &&
+		if (ip->i_d.di_nextents && (mask & XFS_AT_XFLAGS) &&
 		    (ip->i_d.di_flags & XFS_DIFLAG_REALTIME) !=
 		    (vap->va_xflags & XFS_XFLAG_REALTIME)) {
 			code = XFS_ERROR(EINVAL);	/* EFBIG? */
@@ -592,11 +594,11 @@ xfs_setattr(
 		 * Extent size must be a multiple of the appropriate block
 		 * size, if set at all.
 		 */
-		if ((mask & AT_EXTSIZE) && vap->va_extsize != 0) {
+		if ((mask & XFS_AT_EXTSIZE) && vap->va_extsize != 0) {
 			xfs_extlen_t	size;
 
 			if ((ip->i_d.di_flags & XFS_DIFLAG_REALTIME) ||
-			    ((mask & AT_XFLAGS) &&
+			    ((mask & XFS_AT_XFLAGS) &&
 			    (vap->va_xflags & XFS_XFLAG_REALTIME))) {
 				size = mp->m_sb.sb_rextsize <<
 				       mp->m_sb.sb_blocklog;
@@ -611,7 +613,7 @@ xfs_setattr(
 		/*
 		 * If realtime flag is set then must have realtime data.
 		 */
-		if ((mask & AT_XFLAGS) &&
+		if ((mask & XFS_AT_XFLAGS) &&
 		    (vap->va_xflags & XFS_XFLAG_REALTIME)) {
 			if ((mp->m_sb.sb_rblocks == 0) ||
 			    (mp->m_sb.sb_rextsize == 0) ||
@@ -624,13 +626,13 @@ xfs_setattr(
 
 	/*
 	 * Now we can make the changes.	 Before we join the inode
-	 * to the transaction, if AT_SIZE is set then take care of
+	 * to the transaction, if XFS_AT_SIZE is set then take care of
 	 * the part of the truncation that must be done without the
 	 * inode lock.	This needs to be done before joining the inode
 	 * to the transaction, because the inode cannot be unlocked
 	 * once it is a part of the transaction.
 	 */
-	if (mask & AT_SIZE) {
+	if (mask & XFS_AT_SIZE) {
 		if (vap->va_size > ip->i_d.di_size) {
 			code = xfs_igrow_start(ip, vap->va_size, credp);
 			xfs_iunlock(ip, XFS_ILOCK_EXCL);
@@ -673,7 +675,7 @@ xfs_setattr(
 	/*
 	 * Truncate file.  Must have write permission and not be a directory.
 	 */
-	if (mask & AT_SIZE) {
+	if (mask & XFS_AT_SIZE) {
 		if (vap->va_size > ip->i_d.di_size) {
 			xfs_igrow_finish(tp, ip, vap->va_size,
 			    !(flags & ATTR_DMI));
@@ -703,7 +705,7 @@ xfs_setattr(
 	/*
 	 * Change file access modes.
 	 */
-	if (mask & AT_MODE) {
+	if (mask & XFS_AT_MODE) {
 		ip->i_d.di_mode &= IFMT;
 		ip->i_d.di_mode |= vap->va_mode & ~IFMT;
 
@@ -718,7 +720,7 @@ xfs_setattr(
 	 * and can change the group id only to a group of which he
 	 * or she is a member.
 	 */
-	if (mask & (AT_UID|AT_GID|AT_PROJID)) {
+	if (mask & (XFS_AT_UID|XFS_AT_GID|XFS_AT_PROJID)) {
 		/*
 		 * CAP_FSETID overrides the following restrictions:
 		 *
@@ -736,7 +738,7 @@ xfs_setattr(
 		 */
 		if (iuid != uid) {
 			if (XFS_IS_UQUOTA_ON(mp)) {
-				ASSERT(mask & AT_UID);
+				ASSERT(mask & XFS_AT_UID);
 				ASSERT(udqp);
 				ASSERT(xfs_qm_dqid(udqp) == (xfs_dqid_t)uid);
 				olddquot1 = xfs_qm_vop_chown(tp, ip,
@@ -750,7 +752,7 @@ xfs_setattr(
 		}
 		if (igid != gid) {
 			if (XFS_IS_GQUOTA_ON(mp)) {
-				ASSERT(mask & AT_GID);
+				ASSERT(mask & XFS_AT_GID);
 				ASSERT(gdqp);
 				ASSERT(xfs_qm_dqid(gdqp) == gid);
 				olddquot2 = xfs_qm_vop_chown(tp, ip,
@@ -778,14 +780,14 @@ xfs_setattr(
 	/*
 	 * Change file access or modified times.
 	 */
-	if (mask & (AT_ATIME|AT_MTIME)) {
-		if (mask & AT_ATIME) {
+	if (mask & (XFS_AT_ATIME|XFS_AT_MTIME)) {
+		if (mask & XFS_AT_ATIME) {
 			ip->i_d.di_atime.t_sec = vap->va_atime.tv_sec;
 			ip->i_d.di_atime.t_nsec = vap->va_atime.tv_nsec;
 			ip->i_update_core = 1;
 			timeflags &= ~XFS_ICHGTIME_ACC;
 		}
-		if (mask & AT_MTIME) {
+		if (mask & XFS_AT_MTIME) {
 			ip->i_d.di_mtime.t_sec = vap->va_mtime.tv_sec;
 			ip->i_d.di_mtime.t_nsec = vap->va_mtime.tv_nsec;
 			timeflags &= ~XFS_ICHGTIME_MOD;
@@ -798,15 +800,15 @@ xfs_setattr(
 	/*
 	 * Change XFS-added attributes.
 	 */
-	if (mask & (AT_EXTSIZE|AT_XFLAGS)) {
-		if (mask & AT_EXTSIZE) {
+	if (mask & (XFS_AT_EXTSIZE|XFS_AT_XFLAGS)) {
+		if (mask & XFS_AT_EXTSIZE) {
 			/*
 			 * Converting bytes to fs blocks.
 			 */
 			ip->i_d.di_extsize = vap->va_extsize >>
 				mp->m_sb.sb_blocklog;
 		}
-		if (mask & AT_XFLAGS) {
+		if (mask & XFS_AT_XFLAGS) {
 			ip->i_d.di_flags = 0;
 			if (vap->va_xflags & XFS_XFLAG_REALTIME) {
 				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
@@ -822,11 +824,11 @@ xfs_setattr(
 	}
 
 	/*
-	 * Change file inode change time only if AT_CTIME set
+	 * Change file inode change time only if XFS_AT_CTIME set
 	 * AND we have been called by a DMI function.
 	 */
 
-	if ( (flags & ATTR_DMI) && (mask & AT_CTIME) ) {
+	if ( (flags & ATTR_DMI) && (mask & XFS_AT_CTIME) ) {
 		ip->i_d.di_ctime.t_sec = vap->va_ctime.tv_sec;
 		ip->i_d.di_ctime.t_nsec = vap->va_ctime.tv_nsec;
 		ip->i_update_core = 1;
@@ -2015,7 +2017,7 @@ xfs_create(
 		return XFS_ERROR(EIO);
 
 	udqp = gdqp = NULL;
-	if (vap->va_mask & AT_PROJID)
+	if (vap->va_mask & XFS_AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
 	else
 		prid = (xfs_prid_t)dfltprid;
@@ -2076,7 +2078,7 @@ xfs_create(
 	if (resblks == 0 &&
 	    (error = XFS_DIR_CANENTER(mp, tp, dp, name, namelen)))
 		goto error_return;
-	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : 0;
+	rdev = (vap->va_mask & XFS_AT_RDEV) ? vap->va_rdev : 0;
 	error = xfs_dir_ialloc(&tp, dp,
 			MAKEIMODE(vap->va_type,vap->va_mode), 1,
 			rdev, credp, prid, resblks > 0,
@@ -2989,7 +2991,7 @@ xfs_mkdir(
 
 	mp = dp->i_mount;
 	udqp = gdqp = NULL;
-	if (vap->va_mask & AT_PROJID)
+	if (vap->va_mask & XFS_AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
 	else
 		prid = (xfs_prid_t)dfltprid;
@@ -3049,7 +3051,7 @@ xfs_mkdir(
 	/*
 	 * create the directory inode.
 	 */
-	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : 0;
+	rdev = (vap->va_mask & XFS_AT_RDEV) ? vap->va_rdev : 0;
 	error = xfs_dir_ialloc(&tp, dp, 
 			MAKEIMODE(vap->va_type,vap->va_mode), 2,
 			rdev, credp, prid, resblks > 0,
@@ -3594,7 +3596,7 @@ xfs_symlink(
 	/* Return through std_return after this point. */
 
 	udqp = gdqp = NULL;
-	if (vap->va_mask & AT_PROJID)
+	if (vap->va_mask & XFS_AT_PROJID)
 		prid = (xfs_prid_t)vap->va_projid;
 	else
 		prid = (xfs_prid_t)dfltprid;
@@ -3662,7 +3664,7 @@ xfs_symlink(
 	/*
 	 * Allocate an inode for the symlink.
 	 */
-	rdev = (vap->va_mask & AT_RDEV) ? vap->va_rdev : 0;
+	rdev = (vap->va_mask & XFS_AT_RDEV) ? vap->va_rdev : 0;
 
 	error = xfs_dir_ialloc(&tp, dp, IFLNK | (vap->va_mode&~IFMT),
 			       1, rdev, credp, prid, resblks > 0, &ip, NULL);
@@ -4824,7 +4826,7 @@ xfs_change_file_space(
 				break;
 		}
 
-		va.va_mask = AT_SIZE;
+		va.va_mask = XFS_AT_SIZE;
 		va.va_size = startoffset;
 
 		error = xfs_setattr(bdp, &va, attr_flags, credp);
