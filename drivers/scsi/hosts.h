@@ -103,7 +103,7 @@ struct scsi_host_template {
     /*
      * ioctl interface
      */
-    int (*ioctl)(Scsi_Device *dev, int cmd, void *arg);
+    int (*ioctl)(struct scsi_device *dev, int cmd, void *arg);
 
     /*
      * The command function takes a target, a command (this is a SCSI
@@ -116,7 +116,7 @@ struct scsi_host_template {
      * 2    host error return.
      * 3    mid level error return
      */
-    int (* command)(Scsi_Cmnd *);
+    int (* command)(struct scsi_cmnd *);
 
     /*
      * The QueueCommand function works in a similar manner
@@ -151,7 +151,7 @@ struct scsi_host_template {
      *   I/O pressure in the system if there are no other outstanding
      *   commands.
      * */
-    int (* queuecommand)(Scsi_Cmnd *, void (*done)(Scsi_Cmnd *));
+    int (* queuecommand)(struct scsi_cmnd *, void (*done)(struct scsi_cmnd *));
 
     /*
      * This is an error handling strategy routine.  You don't need to
@@ -169,10 +169,10 @@ struct scsi_host_template {
      * this function should and should not be attempting to do.
      */
      int (*eh_strategy_handler)(struct Scsi_Host *);
-     int (*eh_abort_handler)(Scsi_Cmnd *);
-     int (*eh_device_reset_handler)(Scsi_Cmnd *);
-     int (*eh_bus_reset_handler)(Scsi_Cmnd *);
-     int (*eh_host_reset_handler)(Scsi_Cmnd *);
+     int (*eh_abort_handler)(struct scsi_cmnd *);
+     int (*eh_device_reset_handler)(struct scsi_cmnd *);
+     int (*eh_bus_reset_handler)(struct scsi_cmnd *);
+     int (*eh_host_reset_handler)(struct scsi_cmnd *);
 
     /*
      * Old EH handlers, no longer used. Make them warn the user of old
@@ -206,13 +206,13 @@ struct scsi_host_template {
      * slave_destroy() routine at a minimum in order to avoid leaking memory
      * each time a device is tore down.
      */
-    int (* slave_alloc)(Scsi_Device *);
+    int (* slave_alloc)(struct scsi_device *);
 
     /*
      * slave_configure()  -  Optional
      * 
      * Once the device has responded to an INQUIRY and we know the device
-     * is online, we call into the low level driver with the Scsi_Device *
+     * is online, we call into the low level driver with the struct scsi_device *
      * If the low level device driver implements this function, it *must*
      * perform the task of setting the queue depth on the device.  All other
      * tasks are optional and depend on what the driver supports and various
@@ -237,7 +237,7 @@ struct scsi_host_template {
      *     device, so don't leave any loose memory hanging around, clean
      *     up after yourself before returning non-0
      */
-    int (* slave_configure)(Scsi_Device *);
+    int (* slave_configure)(struct scsi_device *);
 
     /*
      * slave_destroy()  -  Optional
@@ -248,7 +248,7 @@ struct scsi_host_template {
      * The low level driver is responsible for freeing any memory it allocated
      * in the slave_alloc or slave_configure calls. 
      */
-    void (* slave_destroy)(Scsi_Device *);
+    void (* slave_destroy)(struct scsi_device *);
 
     /*
      * This function determines the bios parameters for a given
@@ -369,10 +369,7 @@ struct scsi_host_template {
     struct list_head legacy_hosts;
 };
 
-typedef struct scsi_host_template Scsi_Host_Template;
-
-struct Scsi_Host
-{
+struct Scsi_Host {
 /* private: */
     /*
      * This information is private to the scsi mid-layer.  Wrapping it in a
@@ -520,8 +517,8 @@ struct Scsi_Host
  * thing.  This physical pseudo-device isn't real and won't be available
  * from any high-level drivers.
  */
-extern void scsi_free_host_dev(Scsi_Device *);
-extern Scsi_Device * scsi_get_host_dev(struct Scsi_Host *);
+extern void scsi_free_host_dev(struct scsi_device *);
+extern struct scsi_device *scsi_get_host_dev(struct Scsi_Host *);
 
 extern void scsi_unblock_requests(struct Scsi_Host *);
 extern void scsi_block_requests(struct Scsi_Host *);
@@ -581,9 +578,9 @@ extern void scsi_unregister(struct Scsi_Host *);
  * @pun:	SCSI target number (physical unit number)
  * @lun:	SCSI Logical Unit Number
  **/
-static inline Scsi_Device *scsi_find_device(struct Scsi_Host *shost,
+static inline struct scsi_device *scsi_find_device(struct Scsi_Host *shost,
                                             int channel, int pun, int lun) {
-        Scsi_Device *sdev;
+        struct scsi_device *sdev;
 
 	list_for_each_entry (sdev, &shost->my_devices, siblings)
                 if (sdev->channel == channel && sdev->id == pun
