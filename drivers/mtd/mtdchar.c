@@ -133,7 +133,7 @@ static ssize_t mtd_read(struct file *file, char *buf, size_t count,loff_t *ppos)
 
 	down(&mtd->mutex);
 	
-	if (*ppos + count > mtd->size)
+	if (count > mtd->size - *ppos)
 		count = mtd->size - *ppos;
 
 	if (!count)
@@ -202,7 +202,7 @@ static ssize_t mtd_write(struct file *file, const char *buf, size_t count,loff_t
 		return -ENOSPC;
 	}
 	
-	if (*ppos + count > mtd->size)
+	if (count > mtd->size - *ppos)
 		count = mtd->size - *ppos;
 
 	if (!count)

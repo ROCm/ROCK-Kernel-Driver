@@ -1334,7 +1334,7 @@ static ssize_t proc_pid_attr_read(struct file * file, char * buf,
 		free_page(page);
 		return 0;
 	}
-	if (count + *ppos > length)
+	if (count > length - *ppos)
 		count = length - *ppos;
 	end = count + *ppos;
 	if (copy_to_user(buf, (char *) page + *ppos, count))

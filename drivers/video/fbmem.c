@@ -848,7 +848,7 @@ fb_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
 	if (*ppos >= info->fix.smem_len)
 		goto err;
 	p = *ppos;
-	if (p + count > info->fix.smem_len)
+	if (count > info->fix.smem_len - p)
 		count = info->fix.smem_len - p;
 		
 	err = 0;

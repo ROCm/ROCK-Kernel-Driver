@@ -1706,14 +1706,12 @@ static ssize_t radeonfb_read(struct file *file, char *buf, size_t count, loff_t 
 	
 	down(&info->mutex);
 	p = *ppos;
-	if (*ppos  >= rinfo->mapped_vram)
+	if (p >= rinfo->mapped_vram)
 	{
 		up(&info->mutex);
 		return 0;
 	}
-	if (count >= rinfo->mapped_vram)
-		count = rinfo->mapped_vram;
-	if (count + p > rinfo->mapped_vram)
+	if (count > rinfo->mapped_vram - p)
 		count = rinfo->mapped_vram - p;
 	radeonfb_sync(info);
 	
@@ -1743,15 +1741,13 @@ static ssize_t radeonfb_write(struct file *file, const char *buf, size_t count,
 
 	down(&info->mutex);
 	p = *ppos; /* truncated */
-	if (*ppos > rinfo->mapped_vram)
+	if (p > rinfo->mapped_vram)
 	{
 		up(&info->mutex);
 		return -ENOSPC;
 	}
-	if (count >= rinfo->mapped_vram)
-		count = rinfo->mapped_vram;
 	err = 0;
-	if (count + p > rinfo->mapped_vram) {
+	if (count > rinfo->mapped_vram - p) {
 		count = rinfo->mapped_vram - p;
 		err = -ENOSPC;
 	}
@@ -2022,7 +2018,7 @@ static ssize_t radeon_show_one_edid(char *buf, loff_t off, size_t count, const u
 	if (off > EDID_LENGTH)
 		return 0;
 
-	if (off + count > EDID_LENGTH)
+	if (count > EDID_LENGTH - off)
 		count = EDID_LENGTH - off;
 
 	memcpy(buf, edid + off, count);
