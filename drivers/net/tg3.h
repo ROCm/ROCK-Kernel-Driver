@@ -1929,6 +1929,7 @@ struct tg3 {
 #define TG3_FLG2_TSO_CAPABLE		0x00000020
 #define TG3_FLG2_PHY_ADC_BUG		0x00000040
 #define TG3_FLG2_PHY_5704_A0_BUG	0x00000080
+#define TG3_FLG2_PHY_BER_BUG		0x00000100
 
 	u32				split_mode_max_reqs;
 #define SPLIT_MODE_5704_MAX_REQ		3
