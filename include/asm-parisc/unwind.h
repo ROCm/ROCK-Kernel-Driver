@@ -50,22 +50,22 @@ struct unwind_table {
 };
 
 struct unwind_frame_info {
-	unsigned long sp;
-	unsigned long ip;
 	struct task_struct *t;
 	/* Eventually we would like to be able to get at any of the registers
 	   available; but for now we only try to get the sp and ip for each
 	   frame */
 	/* struct pt_regs regs; */
+	unsigned long sp, ip, rp;
 	unsigned long prev_sp, prev_ip;
 };
 
 void * unwind_table_add(const char *name, unsigned long base_addr, 
 		 unsigned long gp,
-                 const void *start, const void *end);
+                 void *start, void *end);
 void unwind_frame_init(struct unwind_frame_info *info, struct task_struct *t, 
-		       struct pt_regs *regs);
+		       unsigned long sp, unsigned long ip, unsigned long rp);
 void unwind_frame_init_from_blocked_task(struct unwind_frame_info *info, struct task_struct *t);
+void unwind_frame_init_running(struct unwind_frame_info *info, struct pt_regs *regs);
 int unwind_once(struct unwind_frame_info *info);
 int unwind_to_user(struct unwind_frame_info *info);
 

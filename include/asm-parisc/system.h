@@ -166,6 +166,16 @@ static inline void set_eiem(unsigned long val)
 
 typedef struct {
 	volatile unsigned int lock[4];
+#ifdef CONFIG_DEBUG_SPINLOCK
+	unsigned long magic;
+	volatile unsigned int babble;
+	const char *module;
+	char *bfile;
+	int bline;
+	int oncpu;
+	void *previous;
+	struct task_struct * task;
+#endif
 } spinlock_t;
 
 #define __lock_aligned __attribute__((__section__(".data.lock_aligned")))

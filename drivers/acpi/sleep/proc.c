@@ -15,6 +15,7 @@
 
 #define ACPI_SYSTEM_FILE_SLEEP		"sleep"
 #define ACPI_SYSTEM_FILE_ALARM		"alarm"
+#define ACPI_SYSTEM_FILE_WAKEUP_DEVICE   "wakeup"
 
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
 ACPI_MODULE_NAME		("sleep")
@@ -352,6 +353,84 @@ end:
 	return_VALUE(result ? result : count);
 }
 
+extern struct list_head	acpi_wakeup_device_list;
+extern spinlock_t acpi_device_lock;
+
+static int
+acpi_system_wakeup_device_seq_show(struct seq_file *seq, void *offset)
+{
+	struct list_head * node, * next;
+
+	seq_printf(seq, "Device	Sleep state	Status\n");
+
+	spin_lock(&acpi_device_lock);
+	list_for_each_safe(node, next, &acpi_wakeup_device_list) {
+		struct acpi_device * dev = container_of(node, struct acpi_device, wakeup_list);
+
+		if (!dev->wakeup.flags.valid)
+			continue;
+		spin_unlock(&acpi_device_lock);
+		if (dev->wakeup.flags.run_wake)
+			seq_printf(seq, "%4s	%4d		%8s\n",
+				dev->pnp.bus_id, (u32) dev->wakeup.sleep_state,
+				dev->wakeup.state.enabled ? "*enabled" : "*disabled");
+		else
+			seq_printf(seq, "%4s	%4d		%8s\n",
+				dev->pnp.bus_id, (u32) dev->wakeup.sleep_state,
+				dev->wakeup.state.enabled ? "enabled" : "disabled");
+		spin_lock(&acpi_device_lock);
+	}
+	spin_unlock(&acpi_device_lock);
+	return 0;
+}
+
+static ssize_t
+acpi_system_write_wakeup_device (
+	struct file		*file,
+	const char __user	*buffer,
+	size_t			count,
+	loff_t			*ppos)
+{
+	struct list_head * node, * next;
+	char		strbuf[5];
+	char		str[5] = "";
+	int 		len = count;
+
+	if (len > 4) len = 4;
+
+	if (copy_from_user(strbuf, buffer, len))
+		return -EFAULT;
+	strbuf[len] = '\0';
+	sscanf(strbuf, "%s", str);
+
+	spin_lock(&acpi_device_lock);
+	list_for_each_safe(node, next, &acpi_wakeup_device_list) {
+		struct acpi_device * dev = container_of(node, struct acpi_device, wakeup_list);
+		if (!dev->wakeup.flags.valid)
+			continue;
+
+		if (!strncmp(dev->pnp.bus_id, str, 4)) {
+			dev->wakeup.state.enabled = dev->wakeup.state.enabled ? 0:1;
+			break;
+		}
+	}
+	spin_unlock(&acpi_device_lock);
+	return count;
+}
+
+static int
+acpi_system_wakeup_device_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_system_wakeup_device_seq_show, PDE(inode)->data);
+}
+
+static struct file_operations acpi_system_wakeup_device_fops = {
+	.open		= acpi_system_wakeup_device_open_fs,
+	.read		= seq_read,
+	.write		= acpi_system_write_wakeup_device,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
 
 static struct file_operations acpi_system_sleep_fops = {
 	.open		= acpi_system_sleep_open_fs,
@@ -388,6 +467,13 @@ static int acpi_sleep_proc_init(void)
 		S_IFREG|S_IRUGO|S_IWUSR, acpi_root_dir);
 	if (entry)
 		entry->proc_fops = &acpi_system_alarm_fops;
+
+	/* 'wakeup device' [R/W]*/
+	entry = create_proc_entry(ACPI_SYSTEM_FILE_WAKEUP_DEVICE,
+				  S_IFREG|S_IRUGO|S_IWUSR, acpi_root_dir);
+	if (entry)
+		entry->proc_fops = &acpi_system_wakeup_device_fops;
+
 	return 0;
 }
 

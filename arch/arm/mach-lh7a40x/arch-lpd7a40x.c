@@ -265,6 +265,7 @@ lpd7a400_map_io(void)
 #ifdef CONFIG_MACH_LPD7A400
 
 extern void lh7a400_init_irq (void);
+extern void lh7a40x_init_time (void);
 
 MACHINE_START (LPD7A400, "Logic Product Development LPD7A400-10")
 	MAINTAINER ("Marc Singer")
@@ -272,6 +273,7 @@ MACHINE_START (LPD7A400, "Logic Product Development LPD7A400-10")
 	BOOT_PARAMS (0xc0000100)
 	MAPIO (lpd7a400_map_io)
 	INITIRQ (lh7a400_init_irq)
+	INITTIME (lh7a40x_init_time)
 	INIT_MACHINE (lpd7a40x_init)
 MACHINE_END
 

@@ -5372,7 +5372,7 @@ static int sbpcd_block_ioctl(struct inode *inode, struct file *file,
 				unsigned cmd, unsigned long arg)
 {
 	struct sbpcd_drive *p = inode->i_bdev->bd_disk->private_data;
-	return cdrom_ioctl(p->sbpcd_infop, inode, cmd, arg);
+	return cdrom_ioctl(file, p->sbpcd_infop, inode, cmd, arg);
 }
 
 static int sbpcd_block_media_changed(struct gendisk *disk)

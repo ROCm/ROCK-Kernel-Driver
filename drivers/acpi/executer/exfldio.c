@@ -130,6 +130,21 @@ acpi_ex_setup_region (
 	if (rgn_desc->region.length < (obj_desc->common_field.base_byte_offset
 			   + field_datum_byte_offset
 			   + obj_desc->common_field.access_byte_width)) {
+		if (acpi_gbl_enable_interpeter_slack) {
+			/*
+			 * Slack mode only:  We will go ahead and allow access to this
+			 * field if it is within the region length rounded up to the next
+			 * access width boundary.
+			 */
+			if (ACPI_ROUND_UP (rgn_desc->region.length,
+					   obj_desc->common_field.access_byte_width) >=
+				(obj_desc->common_field.base_byte_offset +
+				 obj_desc->common_field.access_byte_width +
+				 field_datum_byte_offset)) {
+				return_ACPI_STATUS (AE_OK);
+			}
+		}
+
 		if (rgn_desc->region.length < obj_desc->common_field.access_byte_width) {
 			/*
 			 * This is the case where the access_type (acc_word, etc.) is wider
@@ -277,7 +292,7 @@ acpi_ex_access_region (
 				rgn_desc->region.space_id));
 		}
 		else if (status == AE_NOT_EXIST) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
+			ACPI_REPORT_ERROR ((
 				"Region %s(%X) has no handler\n",
 				acpi_ut_get_region_name (rgn_desc->region.space_id),
 				rgn_desc->region.space_id));
@@ -766,14 +781,83 @@ acpi_ex_set_buffer_datum (
 
 /*******************************************************************************
  *
+ * FUNCTION:    acpi_ex_common_buffer_setup
+ *
+ * PARAMETERS:  obj_desc            - Field object
+ *              buffer_length       - Length of caller's buffer
+ *              datum_count         - Where the datum_count is returned
+ *
+ * RETURN:      Status, datum_count
+ *
+ * DESCRIPTION: Common code to validate the incoming buffer size and compute
+ *              the number of field "datums" that must be read or written.
+ *              A "datum" is the smallest unit that can be read or written
+ *              to the field, it is either 1,2,4, or 8 bytes.
+ *
+ ******************************************************************************/
+
+acpi_status
+acpi_ex_common_buffer_setup (
+	union acpi_operand_object       *obj_desc,
+	u32                             buffer_length,
+	u32                             *datum_count)
+{
+	u32                             byte_field_length;
+	u32                             actual_byte_field_length;
+
+
+	ACPI_FUNCTION_TRACE ("ex_common_buffer_setup");
+
+
+	/*
+	 * Incoming buffer must be at least as long as the field, we do not
+	 * allow "partial" field reads/writes.  We do not care if the buffer is
+	 * larger than the field, this typically happens when an integer is
+	 * read/written to a field that is actually smaller than an integer.
+	 */
+	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (
+			 obj_desc->common_field.bit_length);
+	if (byte_field_length > buffer_length) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+			"Field size %X (bytes) is too large for buffer (%X)\n",
+			byte_field_length, buffer_length));
+
+		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
+	}
+
+	/*
+	 * Create "actual" field byte count (minimum number of bytes that
+	 * must be read), then convert to datum count (minimum number
+	 * of datum-sized units that must be read)
+	 */
+	actual_byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (
+			  obj_desc->common_field.start_field_bit_offset +
+			  obj_desc->common_field.bit_length);
+
+
+	*datum_count = ACPI_ROUND_UP_TO (actual_byte_field_length,
+			   obj_desc->common_field.access_byte_width);
+
+	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
+		"buffer_bytes %X, actual_bytes %X, Datums %X, byte_gran %X\n",
+		byte_field_length, actual_byte_field_length,
+		*datum_count, obj_desc->common_field.access_byte_width));
+
+	return_ACPI_STATUS (AE_OK);
+}
+
+
+/*******************************************************************************
+ *
  * FUNCTION:    acpi_ex_extract_from_field
  *
- * PARAMETERS:  *obj_desc           - Field to be read
- *              *Value              - Where to store value
+ * PARAMETERS:  obj_desc            - Field to be read
+ *              Buffer              - Where to store the field data
+ *              buffer_length       - Length of Buffer
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Retrieve the value of the given field
+ * DESCRIPTION: Retrieve the current value of the given field
  *
  ******************************************************************************/
 
@@ -789,7 +873,6 @@ acpi_ex_extract_from_field (
 	acpi_integer                    previous_raw_datum = 0;
 	acpi_integer                    this_raw_datum = 0;
 	acpi_integer                    merged_datum = 0;
-	u32                             byte_field_length;
 	u32                             datum_count;
 	u32                             i;
 
@@ -797,38 +880,12 @@ acpi_ex_extract_from_field (
 	ACPI_FUNCTION_TRACE ("ex_extract_from_field");
 
 
-	/*
-	 * The field must fit within the caller's buffer
-	 */
-	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (obj_desc->common_field.bit_length);
-	if (byte_field_length > buffer_length) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-			"Field size %X (bytes) too large for buffer (%X)\n",
-			byte_field_length, buffer_length));
+	/* Validate buffer, compute number of datums */
 
-		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
+	status = acpi_ex_common_buffer_setup (obj_desc, buffer_length, &datum_count);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
 	}
-
-	/* Convert field byte count to datum count, round up if necessary */
-
-	datum_count = ACPI_ROUND_UP_TO (byte_field_length,
-			   obj_desc->common_field.access_byte_width);
-
-	/*
-	 * If the field is not aligned on a datum boundary and does not
-	 * fit within a single datum, we must read an extra datum.
-	 *
-	 * We could just split the aligned and non-aligned cases since the
-	 * aligned case is so very simple, but this would require more code.
-	 */
-	if ((obj_desc->common_field.end_field_valid_bits != 0)    &&
-		(!(obj_desc->common_field.flags & AOPOBJ_SINGLE_DATUM))) {
-		datum_count++;
-	}
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"byte_len %X, datum_len %X, byte_gran %X\n",
-		byte_field_length, datum_count,obj_desc->common_field.access_byte_width));
 
 	/*
 	 * Clear the caller's buffer (the whole buffer length as given)
@@ -942,12 +999,13 @@ acpi_ex_extract_from_field (
  *
  * FUNCTION:    acpi_ex_insert_into_field
  *
- * PARAMETERS:  *obj_desc           - Field to be set
- *              Buffer              - Value to store
+ * PARAMETERS:  obj_desc            - Field to be written
+ *              Buffer              - Data to be written
+ *              buffer_length       - Length of Buffer
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Store the value into the given field
+ * DESCRIPTION: Store the Buffer contents into the given field
  *
  ******************************************************************************/
 
@@ -964,41 +1022,18 @@ acpi_ex_insert_into_field (
 	acpi_integer                    merged_datum;
 	acpi_integer                    previous_raw_datum;
 	acpi_integer                    this_raw_datum;
-	u32                             byte_field_length;
 	u32                             datum_count;
 
 
 	ACPI_FUNCTION_TRACE ("ex_insert_into_field");
 
 
-	/*
-	 * Incoming buffer must be at least as long as the field, we do not
-	 * allow "partial" field writes.  We do not care if the buffer is
-	 * larger than the field, this typically happens when an integer is
-	 * written to a field that is actually smaller than an integer.
-	 */
-	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (
-			 obj_desc->common_field.bit_length);
-	if (buffer_length < byte_field_length) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-			"Buffer length %X too small for field %X\n",
-			buffer_length, byte_field_length));
+	/* Validate buffer, compute number of datums */
 
-		return_ACPI_STATUS (AE_BUFFER_OVERFLOW);
+	status = acpi_ex_common_buffer_setup (obj_desc, buffer_length, &datum_count);
+	if (ACPI_FAILURE (status)) {
+		return_ACPI_STATUS (status);
 	}
-
-	byte_field_length = ACPI_ROUND_BITS_UP_TO_BYTES (
-			 obj_desc->common_field.start_field_bit_offset +
-			 obj_desc->common_field.bit_length);
-
-	/* Convert byte count to datum count, round up if necessary */
-
-	datum_count = ACPI_ROUND_UP_TO (byte_field_length,
-			  obj_desc->common_field.access_byte_width);
-
-	ACPI_DEBUG_PRINT ((ACPI_DB_BFIELD,
-		"Bytes %X, Datums %X, byte_gran %X\n",
-		byte_field_length, datum_count, obj_desc->common_field.access_byte_width));
 
 	/*
 	 * Break the request into up to three parts (similar to an I/O request):

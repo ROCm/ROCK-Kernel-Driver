@@ -380,18 +380,14 @@ get_wchan(struct task_struct *p)
 	/*
 	 * These bracket the sleeping functions..
 	 */
-#	define first_sched	((unsigned long) scheduling_functions_start_here)
-#	define last_sched	((unsigned long) scheduling_functions_end_here)
 
 	unwind_frame_init_from_blocked_task(&info, p);
 	do {
 		if (unwind_once(&info) < 0)
 			return 0;
 		ip = info.ip;
-		if (ip < first_sched || ip >= last_sched)
+		if (!in_sched_functions(ip))
 			return ip;
 	} while (count++ < 16);
 	return 0;
-#	undef first_sched
-#	undef last_sched
 }

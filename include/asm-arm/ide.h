@@ -17,18 +17,18 @@
 #define MAX_HWIFS	4
 #endif
 
-#if defined(CONFIG_ARCH_LH7A40X) || defined(CONFIG_ARCH_SA1100)
+#if defined(CONFIG_ARCH_SA1100)
 # include <asm/arch/ide.h>	/* obsolete + broken */
 #endif
 
-#if !defined(CONFIG_ARCH_L7200) && !defined(CONFIG_ARCH_LH7A40X)
+#if !defined(CONFIG_ARCH_L7200)
 # define IDE_ARCH_OBSOLETE_INIT
 # ifdef CONFIG_ARCH_CLPS7500
 #  define ide_default_io_ctl(base)	((base) + 0x206) /* obsolete */
 # else
 #  define ide_default_io_ctl(base)	(0)
 # endif
-#endif /* !ARCH_L7200 && !ARCH_LH7A40X */
+#endif /* !ARCH_L7200 */
 
 #define __ide_mm_insw(port,addr,len)	readsw(port,addr,len)
 #define __ide_mm_insl(port,addr,len)	readsl(port,addr,len)

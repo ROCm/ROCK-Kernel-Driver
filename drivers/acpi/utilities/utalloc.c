@@ -259,8 +259,8 @@ acpi_ut_validate_buffer (
  *
  * FUNCTION:    acpi_ut_initialize_buffer
  *
- * PARAMETERS:  required_length     - Length needed
- *              Buffer              - Buffer to be validated
+ * PARAMETERS:  Buffer              - Buffer to be validated
+ *              required_length     - Length needed
  *
  * RETURN:      Status
  *
@@ -603,7 +603,8 @@ acpi_ut_free_and_track (
  *
  * FUNCTION:    acpi_ut_find_allocation
  *
- * PARAMETERS:  Allocation             - Address of allocated memory
+ * PARAMETERS:  list_id                 - Memory list to search
+ *              Allocation              - Address of allocated memory
  *
  * RETURN:      A list element if found; NULL otherwise.
  *
@@ -646,7 +647,8 @@ acpi_ut_find_allocation (
  *
  * FUNCTION:    acpi_ut_track_allocation
  *
- * PARAMETERS:  Allocation          - Address of allocated memory
+ * PARAMETERS:  list_id             - Memory list to search
+ *              Allocation          - Address of allocated memory
  *              Size                - Size of the allocation
  *              alloc_type          - MEM_MALLOC or MEM_CALLOC
  *              Component           - Component type of caller
@@ -733,7 +735,8 @@ unlock_and_exit:
  *
  * FUNCTION:    acpi_ut_remove_allocation
  *
- * PARAMETERS:  Allocation          - Address of allocated memory
+ * PARAMETERS:  list_id             - Memory list to search
+ *              Allocation          - Address of allocated memory
  *              Component           - Component type of caller
  *              Module              - Source file name of caller
  *              Line                - Line number of caller

@@ -163,27 +163,6 @@ static void __init dmi_save_ident(struct dmi_header *dm, int slot, int string)
 #define MATCH		DMI_MATCH
 
 /*
- * Some machines, usually laptops, can't handle an enabled local APIC.
- * The symptoms include hangs or reboots when suspending or resuming,
- * attaching or detaching the power cord, or entering BIOS setup screens
- * through magic key sequences.
- */
-static int __init local_apic_kills_bios(struct dmi_blacklist *d)
-{
-#ifdef CONFIG_X86_LOCAL_APIC
-	extern int enable_local_apic;
-	if (enable_local_apic == 0) {
-		enable_local_apic = -1;
-		printk(KERN_WARNING "%s with broken BIOS detected. "
-		       "Refusing to enable the local APIC.\n",
-		       d->ident);
-	}
-#endif
-	return 0;
-}
-
-
-/*
  * Toshiba keyboard likes to repeat keys when they are not repeated.
  */
 
@@ -283,32 +262,6 @@ static __init int disable_acpi_pci(struct dmi_blacklist *d)
  */
  
 static __initdata struct dmi_blacklist dmi_blacklist[]={
-
-	/* Machines which have problems handling enabled local APICs */
-
-	{ local_apic_kills_bios, "Dell Inspiron", {
-			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "Inspiron"),
-			NO_MATCH, NO_MATCH
-			} },
-
-	{ local_apic_kills_bios, "Dell Latitude", {
-			MATCH(DMI_SYS_VENDOR, "Dell Computer Corporation"),
-			MATCH(DMI_PRODUCT_NAME, "Latitude"),
-			NO_MATCH, NO_MATCH
-			} },
-
-	{ local_apic_kills_bios, "IBM Thinkpad T20", {
-			MATCH(DMI_BOARD_VENDOR, "IBM"),
-			MATCH(DMI_BOARD_NAME, "264741U"),
-			NO_MATCH, NO_MATCH
-			} },
-
-	{ local_apic_kills_bios, "ASUS L3C", {
-			MATCH(DMI_BOARD_VENDOR, "ASUSTeK Computer INC."),
-			MATCH(DMI_BOARD_NAME, "P4_L3C"),
-			NO_MATCH, NO_MATCH
-			} },
 
 	{ broken_toshiba_keyboard, "Toshiba Satellite 4030cdt", { /* Keyboard generates spurious repeats */
 			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),

@@ -5,6 +5,7 @@
  *  Copyright 1999 SuSE GmbH
  *    changed by Philipp Rumpf
  *  Copyright 1999 Philipp Rumpf (prumpf@tux.org)
+ *  Copyright 2004 Randolph Chung (tausq@debian.org)
  *
  */
 
@@ -23,6 +24,7 @@
 #include <asm/pgalloc.h>
 #include <asm/tlb.h>
 #include <asm/pdc_chassis.h>
+#include <asm/mmzone.h>
 
 DEFINE_PER_CPU(struct mmu_gather, mmu_gathers);
 
@@ -32,10 +34,9 @@ extern char _end;	/* end of BSS, defined by linker */
 extern char __init_begin, __init_end;
 
 #ifdef CONFIG_DISCONTIGMEM
-struct node_map_data node_data[MAX_PHYSMEM_RANGES];
-bootmem_data_t bmem_data[MAX_PHYSMEM_RANGES];
-unsigned char *chunkmap;
-unsigned int maxchunkmap;
+struct node_map_data node_data[MAX_NUMNODES];
+bootmem_data_t bmem_data[MAX_NUMNODES];
+unsigned char pfnnid_map[PFNNID_MAP_MAX];
 #endif
 
 static struct resource data_resource = {
@@ -119,21 +120,6 @@ static void __init setup_bootmem(void)
 
 	disable_sr_hashing(); /* Turn off space register hashing */
 
-#ifdef CONFIG_DISCONTIGMEM
-	/*
-	 * The below is still true as of 2.4.2. If this is ever fixed,
-	 * we can remove this warning!
-	 */
-
-	printk(KERN_WARNING "\n\n");
-	printk(KERN_WARNING "CONFIG_DISCONTIGMEM is enabled, which is probably a mistake. This\n");
-	printk(KERN_WARNING "option can lead to heavy swapping, even when there are gigabytes\n");
-	printk(KERN_WARNING "of free memory.\n\n");
-#endif
-
-#ifdef __LP64__
-
-#ifndef CONFIG_DISCONTIGMEM
 	/*
 	 * Sort the ranges. Since the number of ranges is typically
 	 * small, and performance is not an issue here, just do
@@ -160,11 +146,10 @@ static void __init setup_bootmem(void)
 		}
 	}
 
+#ifndef CONFIG_DISCONTIGMEM
 	/*
 	 * Throw out ranges that are too far apart (controlled by
-	 * MAX_GAP). If CONFIG_DISCONTIGMEM wasn't implemented so
-	 * poorly, we would recommend enabling that option, but,
-	 * until it is fixed, this is the best way to go.
+	 * MAX_GAP).
 	 */
 
 	for (i = 1; i < npmem_ranges; i++) {
@@ -172,6 +157,11 @@ static void __init setup_bootmem(void)
 			(pmem_ranges[i-1].start_pfn +
 			 pmem_ranges[i-1].pages) > MAX_GAP) {
 			npmem_ranges = i;
+			printk("Large gap in memory detected (%ld pages). "
+			       "Consider turning on CONFIG_DISCONTIGMEM\n",
+			       pmem_ranges[i].start_pfn -
+			       (pmem_ranges[i-1].start_pfn +
+			        pmem_ranges[i-1].pages));
 			break;
 		}
 	}
@@ -193,8 +183,6 @@ static void __init setup_bootmem(void)
 				i,start, start + (size - 1), size >> 20);
 		}
 	}
-
-#endif /* __LP64__ */
 
 	sysram_resource_count = npmem_ranges;
 	for (i = 0; i < sysram_resource_count; i++) {
@@ -218,6 +206,7 @@ static void __init setup_bootmem(void)
 	mem_limit_func();       /* check for "mem=" argument */
 
 	mem_max = 0;
+	num_physpages = 0;
 	for (i = 0; i < npmem_ranges; i++) {
 		unsigned long rsize;
 
@@ -232,15 +221,16 @@ static void __init setup_bootmem(void)
 				npmem_ranges = i + 1;
 				mem_max = mem_limit;
 			}
+	        num_physpages += pmem_ranges[i].pages;
 			break;
 		}
+	    num_physpages += pmem_ranges[i].pages;
 		mem_max += rsize;
 	}
 
 	printk(KERN_INFO "Total Memory: %ld Mb\n",mem_max >> 20);
 
 #ifndef CONFIG_DISCONTIGMEM
-
 	/* Merge the ranges, keeping track of the holes */
 
 	{
@@ -272,9 +262,18 @@ static void __init setup_bootmem(void)
 	bootmap_start_pfn = PAGE_ALIGN(__pa((unsigned long) &_end)) >> PAGE_SHIFT;
 
 #ifdef CONFIG_DISCONTIGMEM
+	for (i = 0; i < MAX_PHYSMEM_RANGES; i++) {
+		memset(NODE_DATA(i), 0, sizeof(pg_data_t));
+		NODE_DATA(i)->bdata = &bmem_data[i];
+	}
+	memset(pfnnid_map, 0xff, sizeof(pfnnid_map));
+
+	numnodes = npmem_ranges;
+
 	for (i = 0; i < npmem_ranges; i++)
-		node_data[i].pg_data.bdata = &bmem_data[i];
+		node_set_online(i);
 #endif
+
 	/*
 	 * Initialize and free the full range of memory in each range.
 	 * Note that the only writing these routines do are to the bootmap,
@@ -443,16 +442,20 @@ unsigned long pcxl_dma_start;
 
 void __init mem_init(void)
 {
-	int i;
-
 	high_memory = __va((max_pfn << PAGE_SHIFT));
-	max_mapnr = (virt_to_page(high_memory - 1) - mem_map) + 1;
 
-	num_physpages = 0;
-	mem_map = zone_table[0]->zone_mem_map;
-	for (i = 0; i < npmem_ranges; i++)
-		num_physpages += free_all_bootmem_node(NODE_DATA(i));
-	totalram_pages = num_physpages;
+#ifndef CONFIG_DISCONTIGMEM
+	max_mapnr = page_to_pfn(virt_to_page(high_memory - 1)) + 1;
+	mem_map = zone_table[ZONE_DMA]->zone_mem_map;
+	totalram_pages += free_all_bootmem();
+#else
+	{
+		int i;
+
+		for (i = 0; i < npmem_ranges; i++)
+			totalram_pages += free_all_bootmem_node(NODE_DATA(i));
+	}
+#endif
 
 	printk(KERN_INFO "Memory: %luk available\n", num_physpages << (PAGE_SHIFT-10));
 
@@ -486,6 +489,7 @@ void show_mem(void)
 	show_free_areas();
 	printk(KERN_INFO "Free swap:	 %6ldkB\n",
 				nr_swap_pages<<(PAGE_SHIFT-10));
+#ifndef CONFIG_DISCONTIGMEM
 	i = max_mapnr;
 	while (i-- > 0) {
 		total++;
@@ -493,15 +497,55 @@ void show_mem(void)
 			reserved++;
 		else if (PageSwapCache(mem_map+i))
 			cached++;
-		else if (!atomic_read(&mem_map[i].count))
+		else if (!page_count(&mem_map[i]))
 			free++;
 		else
-			shared += atomic_read(&mem_map[i].count) - 1;
+			shared += page_count(&mem_map[i]) - 1;
 	}
+#else
+	for (i = 0; i < npmem_ranges; i++) {
+		int j;
+
+		for (j = node_start_pfn(i); j < node_end_pfn(i); j++) {
+			struct page *p;
+
+			p = node_mem_map(i) + j - node_start_pfn(i);
+
+			total++;
+			if (PageReserved(p))
+				reserved++;
+			else if (PageSwapCache(p))
+				cached++;
+			else if (!page_count(p))
+				free++;
+			else
+				shared += page_count(p) - 1;
+        	}
+	}
+#endif
 	printk(KERN_INFO "%d pages of RAM\n", total);
 	printk(KERN_INFO "%d reserved pages\n", reserved);
 	printk(KERN_INFO "%d pages shared\n", shared);
 	printk(KERN_INFO "%d pages swap cached\n", cached);
+
+
+#ifdef CONFIG_DISCONTIGMEM
+	{
+		struct zonelist *zl;
+		int i, j, k;
+
+		for (i = 0; i < npmem_ranges; i++) {
+			for (j = 0; j < MAX_NR_ZONES; j++) {
+				zl = NODE_DATA(i)->node_zonelists + j;
+
+				printk("Zone list for zone %d on node %d: ", j, i);
+				for (k = 0; zl->zones[k] != NULL; k++) 
+					printk("[%d/%s] ", zl->zones[k]->zone_pgdat->node_id, zl->zones[k]->name);
+				printk("\n");
+			}
+		}
+	}
+#endif
 }
 
 
@@ -544,7 +588,7 @@ static void __init map_pages(unsigned long start_vaddr, unsigned long start_padd
 #if PTRS_PER_PMD == 1
 		pmd = (pmd_t *)__pa(pg_dir);
 #else
-		pmd = (pmd_t *) (PAGE_MASK & pgd_val(*pg_dir));
+		pmd = (pmd_t *)pgd_address(*pg_dir);
 
 		/*
 		 * pmd is physical at this point
@@ -555,7 +599,7 @@ static void __init map_pages(unsigned long start_vaddr, unsigned long start_padd
 			pmd = (pmd_t *) __pa(pmd);
 		}
 
-		pgd_val(*pg_dir) = _PAGE_TABLE | (unsigned long) pmd;
+		pgd_populate(NULL, pg_dir, __va(pmd));
 #endif
 		pg_dir++;
 
@@ -568,15 +612,14 @@ static void __init map_pages(unsigned long start_vaddr, unsigned long start_padd
 			 * pg_table is physical at this point
 			 */
 
-			pg_table = (pte_t *) (PAGE_MASK & pmd_val(*pmd));
+			pg_table = (pte_t *)pmd_address(*pmd);
 			if (!pg_table) {
 				pg_table = (pte_t *)
 					alloc_bootmem_low_pages_node(NODE_DATA(0),PAGE_SIZE);
 				pg_table = (pte_t *) __pa(pg_table);
 			}
 
-			pmd_val(*pmd) = _PAGE_TABLE |
-					   (unsigned long) pg_table;
+			pmd_populate_kernel(NULL, pmd, __va(pg_table));
 
 			/* now change pg_table to kernel virtual addresses */
 
@@ -584,8 +627,6 @@ static void __init map_pages(unsigned long start_vaddr, unsigned long start_padd
 			for (tmp2 = start_pte; tmp2 < PTRS_PER_PTE; tmp2++,pg_table++) {
 				pte_t pte;
 
-#if !defined(CONFIG_STI_CONSOLE)
-#warning STI console should explicitly allocate executable pages but does not
 				/*
 				 * Map the fault vector writable so we can
 				 * write the HPMC checksum.
@@ -595,7 +636,6 @@ static void __init map_pages(unsigned long start_vaddr, unsigned long start_padd
 							&& address != gw_addr)
 				    pte = __mk_pte(address, PAGE_KERNEL_RO);
 				else
-#endif
 				    pte = __mk_pte(address, pgprot);
 
 				if (address >= end_paddr)
@@ -758,61 +798,26 @@ void __init paging_init(void)
 	flush_tlb_all_local();
 
 	for (i = 0; i < npmem_ranges; i++) {
-		unsigned long zones_size[MAX_NR_ZONES] = { 0, 0, 0, };
+		unsigned long zones_size[MAX_NR_ZONES] = { 0, 0, 0 };
 
+		/* We have an IOMMU, so all memory can go into a single
+		   ZONE_DMA zone. */
 		zones_size[ZONE_DMA] = pmem_ranges[i].pages;
+
 		free_area_init_node(i,NODE_DATA(i),NULL,zones_size,
-				(pmem_ranges[i].start_pfn << PAGE_SHIFT),0);
-	}
+				pmem_ranges[i].start_pfn, 0);
 
 #ifdef CONFIG_DISCONTIGMEM
-	/*
-	 * Initialize support for virt_to_page() macro.
-	 *
-	 * Note that MAX_ADDRESS is the largest virtual address that
-	 * we can map. However, since we map all physical memory into
-	 * the kernel address space, it also has an effect on the maximum
-	 * physical address we can map (MAX_ADDRESS - PAGE_OFFSET).
-	 */
-
-	maxchunkmap = MAX_ADDRESS >> CHUNKSHIFT;
-	chunkmap = (unsigned char *)alloc_bootmem(maxchunkmap);
-
-	for (i = 0; i < maxchunkmap; i++)
-	    chunkmap[i] = BADCHUNK;
-
-	for (i = 0; i < npmem_ranges; i++) {
-
-		ADJ_NODE_MEM_MAP(i) = NODE_MEM_MAP(i) - pmem_ranges[i].start_pfn;
 		{
-			unsigned long chunk_paddr;
-			unsigned long end_paddr;
-			int chunknum;
-
-			chunk_paddr = (pmem_ranges[i].start_pfn << PAGE_SHIFT);
-			end_paddr = chunk_paddr + (pmem_ranges[i].pages << PAGE_SHIFT);
-			chunk_paddr &= CHUNKMASK;
-
-			chunknum = (int)CHUNKNUM(chunk_paddr);
-			while (chunk_paddr < end_paddr) {
-				if (chunknum >= maxchunkmap)
-					goto badchunkmap1;
-				if (chunkmap[chunknum] != BADCHUNK)
-					goto badchunkmap2;
-				chunkmap[chunknum] = (unsigned char)i;
-				chunk_paddr += CHUNKSZ;
-				chunknum++;
-			}
+		    int j;
+		    for (j = (node_start_pfn(i) >> PFNNID_SHIFT);
+			 j <= (node_end_pfn(i) >> PFNNID_SHIFT);
+			 j++) {
+			pfnnid_map[j] = i;
+		    }
 		}
-	}
-
-	return;
-
-badchunkmap1:
-	panic("paging_init: Physical address exceeds maximum address space!\n");
-badchunkmap2:
-	panic("paging_init: Collision in chunk map array. CHUNKSZ needs to be smaller\n");
 #endif
+	}
 }
 
 #ifdef CONFIG_PA20

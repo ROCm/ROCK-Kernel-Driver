@@ -2,7 +2,7 @@
  *    interfaces to log Chassis Codes via PDC (firmware)
  *
  *    Copyright (C) 2002 Laurent Canet <canetl@esiee.fr>
- *    Copyright (C) 2002-2003 Thibaut Varene <varenet@esiee.fr>
+ *    Copyright (C) 2002-2004 Thibaut VARENE <varenet@esiee.fr>
  *
  *    This program is free software; you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
@@ -33,10 +33,28 @@
 
 #include <asm/pdc_chassis.h>
 #include <asm/processor.h>
+#include <asm/pdc.h>
+#include <asm/pdcpat.h>
 
 
 #ifdef CONFIG_PDC_CHASSIS
 static int pdc_chassis_old = 0;	
+static unsigned int pdc_chassis_enabled = 1;
+
+
+/**
+ * pdc_chassis_setup() - Enable/disable pdc_chassis code at boot time.
+ * @str configuration param: 0 to disable chassis log
+ * @return 1
+ */
+ 
+static int __init pdc_chassis_setup(char *str)
+{
+	/*panic_timeout = simple_strtoul(str, NULL, 0);*/
+	get_option(&str, &pdc_chassis_enabled);
+	return 1;
+}
+__setup("pdcchassis=", pdc_chassis_setup);
 
 
 /** 
@@ -114,29 +132,28 @@ void __init parisc_pdc_chassis_init(void)
 {
 #ifdef CONFIG_PDC_CHASSIS
 	int handle = 0;
+	if (pdc_chassis_enabled) {
+		DPRINTK(KERN_DEBUG "%s: parisc_pdc_chassis_init()\n", __FILE__);
 
-	DPRINTK(KERN_DEBUG "%s: parisc_pdc_chassis_init()\n", __FILE__);
+		/* Let see if we have something to handle... */
+		/* Check for PDC_PAT or old LED Panel */
+		pdc_chassis_checkold();
+		if (is_pdc_pat()) {
+			printk(KERN_INFO "Enabling PDC_PAT chassis codes support.\n");
+			handle = 1;
+		}
+		else if (pdc_chassis_old) {
+			printk(KERN_INFO "Enabling old style chassis LED panel support.\n");
+			handle = 1;
+		}
 
-	/* Let see if we have something to handle... */
-	/* Check for PDC_PAT or old LED Panel */
-	pdc_chassis_checkold();
-	if (is_pdc_pat()) {
-#ifdef __LP64__	/* see pdc_chassis_send_status() */
-		printk(KERN_INFO "Enabling PDC_PAT chassis codes support.\n");
-		handle = 1;
-#endif /* __LP64__ */
-	}
-	else if (pdc_chassis_old) {
-		printk(KERN_INFO "Enabling old style chassis LED panel support.\n");
-		handle = 1;
-	}
-	
-	if (handle) {
-		/* initialize panic notifier chain */
-		notifier_chain_register(&panic_notifier_list, &pdc_chassis_panic_block);
+		if (handle) {
+			/* initialize panic notifier chain */
+			notifier_chain_register(&panic_notifier_list, &pdc_chassis_panic_block);
 
-		/* initialize reboot notifier chain */
-		register_reboot_notifier(&pdc_chassis_reboot_block);
+			/* initialize reboot notifier chain */
+			register_reboot_notifier(&pdc_chassis_reboot_block);
+		}
 	}
 #endif /* CONFIG_PDC_CHASSIS */
 }
@@ -161,65 +178,68 @@ int pdc_chassis_send_status(int message)
 	/* Maybe we should do that in an other way ? */
 	int retval = 0;
 #ifdef CONFIG_PDC_CHASSIS
-	DPRINTK(KERN_DEBUG "%s: pdc_chassis_send_status(%d)\n", __FILE__, message);
+	if (pdc_chassis_enabled) {
 
-#ifdef __LP64__	/* pdc_pat_chassis_send_log is defined only when #ifdef __LP64__ */
-	if (is_pdc_pat()) {
-		switch(message) {
-			case PDC_CHASSIS_DIRECT_BSTART:
-				retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_BSTART, PDC_CHASSIS_LSTATE_RUN_NORMAL);
-				break;
-			
-			case PDC_CHASSIS_DIRECT_BCOMPLETE:
-				retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_BCOMPLETE, PDC_CHASSIS_LSTATE_RUN_NORMAL);
-				break;
-			
-			case PDC_CHASSIS_DIRECT_SHUTDOWN:
-				retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_SHUTDOWN, PDC_CHASSIS_LSTATE_NONOS);
-				break;
-			
-			case PDC_CHASSIS_DIRECT_PANIC:
-				retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_PANIC, PDC_CHASSIS_LSTATE_RUN_CRASHREC);
-				break;
-		
-			case PDC_CHASSIS_DIRECT_LPMC:
-				retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_LPMC, PDC_CHASSIS_LSTATE_RUN_SYSINT);
-				break;
+		DPRINTK(KERN_DEBUG "%s: pdc_chassis_send_status(%d)\n", __FILE__, message);
 
-			case PDC_CHASSIS_DIRECT_HPMC:
-				retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_HPMC, PDC_CHASSIS_LSTATE_RUN_NCRIT);
-				break;
+#ifdef CONFIG_PARISC64
+		if (is_pdc_pat()) {
+			switch(message) {
+				case PDC_CHASSIS_DIRECT_BSTART:
+					retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_BSTART, PDC_CHASSIS_LSTATE_RUN_NORMAL);
+					break;
 
-			default:
-				retval = -1;
-		}
-	} else retval = -1;
+				case PDC_CHASSIS_DIRECT_BCOMPLETE:
+					retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_BCOMPLETE, PDC_CHASSIS_LSTATE_RUN_NORMAL);
+					break;
+
+				case PDC_CHASSIS_DIRECT_SHUTDOWN:
+					retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_SHUTDOWN, PDC_CHASSIS_LSTATE_NONOS);
+					break;
+
+				case PDC_CHASSIS_DIRECT_PANIC:
+					retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_PANIC, PDC_CHASSIS_LSTATE_RUN_CRASHREC);
+					break;
+
+				case PDC_CHASSIS_DIRECT_LPMC:
+					retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_LPMC, PDC_CHASSIS_LSTATE_RUN_SYSINT);
+					break;
+
+				case PDC_CHASSIS_DIRECT_HPMC:
+					retval = pdc_pat_chassis_send_log(PDC_CHASSIS_PMSG_HPMC, PDC_CHASSIS_LSTATE_RUN_NCRIT);
+					break;
+
+				default:
+					retval = -1;
+			}
+		} else retval = -1;
 #else
-	if (pdc_chassis_old) {
-		switch (message) {
-			case PDC_CHASSIS_DIRECT_BSTART:
-			case PDC_CHASSIS_DIRECT_BCOMPLETE:
-				retval = pdc_chassis_disp(PDC_CHASSIS_DISP_DATA(OSTAT_RUN));
-				break;
-							
-			case PDC_CHASSIS_DIRECT_SHUTDOWN:
-				retval = pdc_chassis_disp(PDC_CHASSIS_DISP_DATA(OSTAT_SHUT));
-				break;
-			
-			case PDC_CHASSIS_DIRECT_HPMC:
-			case PDC_CHASSIS_DIRECT_PANIC:
-				retval = pdc_chassis_disp(PDC_CHASSIS_DISP_DATA(OSTAT_FLT));
-				break;
-		
-			case PDC_CHASSIS_DIRECT_LPMC:
-				retval = pdc_chassis_disp(PDC_CHASSIS_DISP_DATA(OSTAT_WARN));
-				break;
+		if (pdc_chassis_old) {
+			switch (message) {
+				case PDC_CHASSIS_DIRECT_BSTART:
+				case PDC_CHASSIS_DIRECT_BCOMPLETE:
+					retval = pdc_chassis_disp(PDC_CHASSIS_DISP_DATA(OSTAT_RUN));
+					break;
 
-			default:
-				retval = -1;
-		}
-	} else retval = -1;
-#endif /* __LP64__ */
+				case PDC_CHASSIS_DIRECT_SHUTDOWN:
+					retval = pdc_chassis_disp(PDC_CHASSIS_DISP_DATA(OSTAT_SHUT));
+					break;
+
+				case PDC_CHASSIS_DIRECT_HPMC:
+				case PDC_CHASSIS_DIRECT_PANIC:
+					retval = pdc_chassis_disp(PDC_CHASSIS_DISP_DATA(OSTAT_FLT));
+					break;
+
+				case PDC_CHASSIS_DIRECT_LPMC:
+					retval = pdc_chassis_disp(PDC_CHASSIS_DISP_DATA(OSTAT_WARN));
+					break;
+
+				default:
+					retval = -1;
+			}
+		} else retval = -1;
+#endif /* CONFIG_PARISC64 */
+	}	/* if (pdc_chassis_enabled) */
 #endif /* CONFIG_PDC_CHASSIS */
 	return retval;
 }
