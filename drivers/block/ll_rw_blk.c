@@ -376,6 +376,11 @@ void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
 	q->hardsect_size = size;
 }
 
+/*
+ * Returns the minimum that is _not_ zero, unless both are zero.
+ */
+#define min_not_zero(l, r) (l == 0) ? r : ((r == 0) ? l : min(l, r))
+
 /**
  * blk_queue_stack_limits - inherit underlying queue limits for stacked drivers
  * @t:	the stacking driver (top)
@@ -383,7 +388,9 @@ void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
  **/
 void blk_queue_stack_limits(request_queue_t *t, request_queue_t *b)
 {
-	t->max_sectors = min(t->max_sectors,b->max_sectors);
+	/* zero is "infinity" */
+	t->max_sectors = min_not_zero(t->max_sectors,b->max_sectors);
+
 	t->max_phys_segments = min(t->max_phys_segments,b->max_phys_segments);
 	t->max_hw_segments = min(t->max_hw_segments,b->max_hw_segments);
 	t->max_segment_size = min(t->max_segment_size,b->max_segment_size);
