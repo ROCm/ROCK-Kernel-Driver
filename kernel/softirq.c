@@ -140,41 +140,29 @@ void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 /* Tasklets */
 
 struct tasklet_head tasklet_vec[NR_CPUS] __cacheline_aligned;
+struct tasklet_head tasklet_hi_vec[NR_CPUS] __cacheline_aligned;
 
-void tasklet_schedule(struct tasklet_struct *t)
+void __tasklet_schedule(struct tasklet_struct *t)
 {
+	int cpu = smp_processor_id();
 	unsigned long flags;
-	int cpu;
 
-	cpu = smp_processor_id();
 	local_irq_save(flags);
-	/*
-	 * If nobody is running it then add it to this CPU's
-	 * tasklet queue.
-	 */
-	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state)) {
-		t->next = tasklet_vec[cpu].list;
-		tasklet_vec[cpu].list = t;
-		cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
-		tasklet_unlock(t);
-	}
+	t->next = tasklet_vec[cpu].list;
+	tasklet_vec[cpu].list = t;
+	cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
 	local_irq_restore(flags);
 }
 
-void tasklet_hi_schedule(struct tasklet_struct *t)
+void __tasklet_hi_schedule(struct tasklet_struct *t)
 {
+	int cpu = smp_processor_id();
 	unsigned long flags;
-	int cpu;
 
-	cpu = smp_processor_id();
 	local_irq_save(flags);
-
-	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state)) {
-		t->next = tasklet_hi_vec[cpu].list;
-		tasklet_hi_vec[cpu].list = t;
-		cpu_raise_softirq(cpu, HI_SOFTIRQ);
-		tasklet_unlock(t);
-	}
+	t->next = tasklet_hi_vec[cpu].list;
+	tasklet_hi_vec[cpu].list = t;
+	cpu_raise_softirq(cpu, HI_SOFTIRQ);
 	local_irq_restore(flags);
 }
 
@@ -193,28 +181,24 @@ static void tasklet_action(struct softirq_action *a)
 
 		list = list->next;
 
-		if (!tasklet_trylock(t))
-			BUG();
-		if (!atomic_read(&t->count)) {
-			if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
-				BUG();
-			t->func(t->data);
+		if (tasklet_trylock(t)) {
+			if (!atomic_read(&t->count)) {
+				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+					BUG();
+				t->func(t->data);
+				tasklet_unlock(t);
+				continue;
+			}
 			tasklet_unlock(t);
-			continue;
 		}
-		tasklet_unlock(t);
 
 		local_irq_disable();
 		t->next = tasklet_vec[cpu].list;
 		tasklet_vec[cpu].list = t;
-		cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
 		local_irq_enable();
+		__cpu_raise_softirq(cpu, TASKLET_SOFTIRQ);
 	}
 }
-
-
-
-struct tasklet_head tasklet_hi_vec[NR_CPUS] __cacheline_aligned;
 
 static void tasklet_hi_action(struct softirq_action *a)
 {
@@ -231,22 +215,22 @@ static void tasklet_hi_action(struct softirq_action *a)
 
 		list = list->next;
 
-		if (!tasklet_trylock(t))
-			BUG();
-		if (!atomic_read(&t->count)) {
-			if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
-				BUG();
-			t->func(t->data);
+		if (tasklet_trylock(t)) {
+			if (!atomic_read(&t->count)) {
+				if (!test_and_clear_bit(TASKLET_STATE_SCHED, &t->state))
+					BUG();
+				t->func(t->data);
+				tasklet_unlock(t);
+				continue;
+			}
 			tasklet_unlock(t);
-			continue;
 		}
-		tasklet_unlock(t);
 
 		local_irq_disable();
 		t->next = tasklet_hi_vec[cpu].list;
 		tasklet_hi_vec[cpu].list = t;
-		cpu_raise_softirq(cpu, HI_SOFTIRQ);
 		local_irq_enable();
+		__cpu_raise_softirq(cpu, HI_SOFTIRQ);
 	}
 }
 

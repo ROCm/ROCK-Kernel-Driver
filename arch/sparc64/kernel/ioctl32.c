@@ -1,4 +1,4 @@
-/* $Id: ioctl32.c,v 1.117 2001/06/02 21:39:55 davem Exp $
+/* $Id: ioctl32.c,v 1.119 2001/07/21 00:28:25 davem Exp $
  * ioctl32.c: Conversion between 32bit and 64bit native ioctls.
  *
  * Copyright (C) 1997-2000  Jakub Jelinek  (jakub@redhat.com)
@@ -89,9 +89,13 @@
 #include <linux/atm_tcp.h>
 #include <linux/sonet.h>
 #include <linux/atm_suni.h>
+#include <linux/mtd/mtd.h>
 
 #include <net/bluetooth/bluetooth.h>
 #include <net/bluetooth/hci.h>
+
+#include <linux/usb.h>
+#include <linux/usbdevice_fs.h>
 
 /* Use this to get at 32-bit user passed pointers. 
    See sys_sparc32.c for description about these. */
@@ -3081,6 +3085,453 @@ static int ioc_settimeout(unsigned int fd, unsigned int cmd, unsigned long arg)
 	return rw_long(fd, AUTOFS_IOC_SETTIMEOUT, arg);
 }
 
+struct usbdevfs_ctrltransfer32 {
+	__u8 requesttype;
+	__u8 request;
+	__u16 value;
+	__u16 index;
+	__u16 length;
+	__u32 timeout;  /* in milliseconds */
+	__u32 data;
+};
+
+#define USBDEVFS_CONTROL32           _IOWR('U', 0, struct usbdevfs_ctrltransfer32)
+
+static int do_usbdevfs_control(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct usbdevfs_ctrltransfer kctrl;
+	struct usbdevfs_ctrltransfer32 *uctrl;
+	mm_segment_t old_fs;
+	__u32 udata;
+	void *uptr, *kptr;
+	int err;
+
+	uctrl = (struct usbdevfs_ctrltransfer32 *) arg;
+
+	if (copy_from_user(&kctrl, uctrl,
+			   (sizeof(struct usbdevfs_ctrltransfer) -
+			    sizeof(void *))))
+		return -EFAULT;
+
+	if (get_user(udata, &uctrl->data))
+		return -EFAULT;
+	uptr = (void *) A(udata);
+
+	/* In usbdevice_fs, it limits the control buffer to a page,
+	 * for simplicity so do we.
+	 */
+	if (!uptr || kctrl.length > PAGE_SIZE)
+		return -EINVAL;
+
+	kptr = (void *)__get_free_page(GFP_KERNEL);
+
+	if ((kctrl.requesttype & 0x80) == 0) {
+		err = -EFAULT;
+		if (copy_from_user(kptr, uptr, kctrl.length))
+			goto out;
+	}
+
+	kctrl.data = kptr;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, USBDEVFS_CONTROL, (unsigned long)&kctrl);
+	set_fs(old_fs);
+
+	if (err >= 0 &&
+	    ((kctrl.requesttype & 0x80) != 0)) {
+		if (copy_to_user(uptr, kptr, kctrl.length))
+			err = -EFAULT;
+	}
+
+out:
+	free_page((unsigned long) kptr);
+	return err;
+}
+
+struct usbdevfs_bulktransfer32 {
+	unsigned int ep;
+	unsigned int len;
+	unsigned int timeout; /* in milliseconds */
+	__u32 data;
+};
+
+#define USBDEVFS_BULK32              _IOWR('U', 2, struct usbdevfs_bulktransfer32)
+
+static int do_usbdevfs_bulk(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct usbdevfs_bulktransfer kbulk;
+	struct usbdevfs_bulktransfer32 *ubulk;
+	mm_segment_t old_fs;
+	__u32 udata;
+	void *uptr, *kptr;
+	int err;
+
+	ubulk = (struct usbdevfs_bulktransfer32 *) arg;
+
+	if (get_user(kbulk.ep, &ubulk->ep) ||
+	    get_user(kbulk.len, &ubulk->len) ||
+	    get_user(kbulk.timeout, &ubulk->timeout) ||
+	    get_user(udata, &ubulk->data))
+		return -EFAULT;
+
+	uptr = (void *) A(udata);
+
+	/* In usbdevice_fs, it limits the control buffer to a page,
+	 * for simplicity so do we.
+	 */
+	if (!uptr || kbulk.len > PAGE_SIZE)
+		return -EINVAL;
+
+	kptr = (void *) __get_free_page(GFP_KERNEL);
+
+	if ((kbulk.ep & 0x80) == 0) {
+		err = -EFAULT;
+		if (copy_from_user(kptr, uptr, kbulk.len))
+			goto out;
+	}
+
+	kbulk.data = kptr;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, USBDEVFS_BULK, (unsigned long) &kbulk);
+	set_fs(old_fs);
+
+	if (err >= 0 &&
+	    ((kbulk.ep & 0x80) != 0)) {
+		if (copy_to_user(uptr, kptr, kbulk.len))
+			err = -EFAULT;
+	}
+
+out:
+	free_page((unsigned long) kptr);
+	return err;
+}
+
+/* This needs more work before we can enable it.  Unfortunately
+ * because of the fancy asynchronous way URB status/error is written
+ * back to userspace, we'll need to fiddle with USB devio internals
+ * and/or reimplement entirely the frontend of it ourselves. -DaveM
+ *
+ * The issue is:
+ *
+ *	When an URB is submitted via usbdevicefs it is put onto an
+ *	asynchronous queue.  When the URB completes, it may be reaped
+ *	via another ioctl.  During this reaping the status is written
+ *	back to userspace along with the length of the transfer.
+ *
+ *	We must translate into 64-bit kernel types so we pass in a kernel
+ *	space copy of the usbdevfs_urb structure.  This would mean that we
+ *	must do something to deal with the async entry reaping.  First we
+ *	have to deal somehow with this transitory memory we've allocated.
+ *	This is problematic since there are many call sites from which the
+ *	async entries can be destroyed (and thus when we'd need to free up
+ *	this kernel memory).  One of which is the close() op of usbdevicefs.
+ *	To handle that we'd need to make our own file_operations struct which
+ *	overrides usbdevicefs's release op with our own which runs usbdevicefs's
+ *	real release op then frees up the kernel memory.
+ *
+ *	But how to keep track of these kernel buffers?  We'd need to either
+ *	keep track of them in some table _or_ know about usbdevicefs internals
+ *	(ie. the exact layout of it's file private, which is actually defined
+ *	in linux/usbdevice_fs.h, the layout of the async queues are private to
+ *	devio.c)
+ *
+ * There is one possible other solution I considered, also involving knowledge
+ * of usbdevicefs internals:
+ *
+ *	After an URB is submitted, we "fix up" the address back to the user
+ *	space one.  This would work if the status/length fields written back
+ *	by the async URB completion lines up perfectly in the 32-bit type with
+ *	the 64-bit kernel type.  Unfortunately, it does not because the iso
+ *	frame descriptors, at the end of the struct, can be written back.
+ *
+ * I think we'll just need to simply duplicate the devio URB engine here.
+ */
+#if 0
+struct usbdevfs_urb32 {
+	__u8 type;
+	__u8 endpoint;
+	__s32 status;
+	__u32 flags;
+	__u32 buffer;
+	__s32 buffer_length;
+	__s32 actual_length;
+	__s32 start_frame;
+	__s32 number_of_packets;
+	__s32 error_count;
+	__u32 signr;
+	__u32 usercontext; /* unused */
+	struct usbdevfs_iso_packet_desc iso_frame_desc[0];
+};
+
+#define USBDEVFS_SUBMITURB32       _IOR('U', 10, struct usbdevfs_urb32)
+
+static int get_urb32(struct usbdevfs_urb *kurb,
+		     struct usbdevfs_urb32 *uurb)
+{
+	if (get_user(kurb->type, &uurb->type) ||
+	    __get_user(kurb->endpoint, &uurb->endpoint) ||
+	    __get_user(kurb->status, &uurb->status) ||
+	    __get_user(kurb->flags, &uurb->flags) ||
+	    __get_user(kurb->buffer_length, &uurb->buffer_length) ||
+	    __get_user(kurb->actual_length, &uurb->actual_length) ||
+	    __get_user(kurb->start_frame, &uurb->start_frame) ||
+	    __get_user(kurb->number_of_packets, &uurb->number_of_packets) ||
+	    __get_user(kurb->error_count, &uurb->error_count) ||
+	    __get_user(kurb->signr, &uurb->signr))
+		return -EFAULT;
+
+	kurb->usercontext = 0; /* unused currently */
+
+	return 0;
+}
+
+/* Just put back the values which usbdevfs actually changes. */
+static int put_urb32(struct usbdevfs_urb *kurb,
+		     struct usbdevfs_urb32 *uurb)
+{
+	if (put_user(kurb->status, &uurb->status) ||
+	    __put_user(kurb->actual_length, &uurb->actual_length) ||
+	    __put_user(kurb->error_count, &uurb->error_count))
+		return -EFAULT;
+
+	if (kurb->number_of_packets != 0) {
+		int i;
+
+		for (i = 0; i < kurb->number_of_packets; i++) {
+			if (__put_user(kurb->iso_frame_desc[i].actual_length,
+				       &uurb->iso_frame_desc[i].actual_length) ||
+			    __put_user(kurb->iso_frame_desc[i].status,
+				       &uurb->iso_frame_desc[i].status))
+				return -EFAULT;
+		}
+	}
+
+	return 0;
+}
+
+static int get_urb32_isoframes(struct usbdevfs_urb *kurb,
+			       struct usbdevfs_urb32 *uurb)
+{
+	unsigned int totlen;
+	int i;
+
+	if (kurb->type != USBDEVFS_URB_TYPE_ISO) {
+		kurb->number_of_packets = 0;
+		return 0;
+	}
+
+	if (kurb->number_of_packets < 1 ||
+	    kurb->number_of_packets > 128)
+		return -EINVAL;
+
+	if (copy_from_user(&kurb->iso_frame_desc[0],
+			   &uurb->iso_frame_desc[0],
+			   sizeof(struct usbdevfs_iso_packet_desc) *
+			   kurb->number_of_packets))
+		return -EFAULT;
+
+	totlen = 0;
+	for (i = 0; i < kurb->number_of_packets; i++) {
+		unsigned int this_len;
+
+		this_len = kurb->iso_frame_desc[i].length;
+		if (this_len > 1023)
+			return -EINVAL;
+
+		totlen += this_len;
+	}
+
+	if (totlen > 32768)
+		return -EINVAL;
+
+	kurb->buffer_length = totlen;
+
+	return 0;
+}
+
+static int do_usbdevfs_urb(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct usbdevfs_urb *kurb;
+	struct usbdevfs_urb32 *uurb;
+	mm_segment_t old_fs;
+	__u32 udata;
+	void *uptr, *kptr;
+	unsigned int buflen;
+	int err;
+
+	uurb = (struct usbdevfs_urb32 *) arg;
+
+	err = -ENOMEM;
+	kurb = kmalloc(sizeof(struct usbdevfs_urb) +
+		       (sizeof(struct usbdevfs_iso_packet_desc) * 128),
+		       GFP_KERNEL);
+	if (!kurb)
+		goto out;
+
+	err = -EFAULT;
+	if (get_urb32(kurb, uurb))
+		goto out;
+
+	err = get_urb32_isoframes(kurb, uurb);
+	if (err)
+		goto out;
+
+	err = -EFAULT;
+	if (__get_user(udata, &uurb->buffer))
+		goto out;
+	uptr = (void *) A(udata);
+
+	err = -ENOMEM;
+	buflen = kurb->buffer_length;
+	kptr = kmalloc(buflen, GFP_KERNEL);
+	if (!kptr)
+		goto out;
+
+	kurb->buffer = kptr;
+
+	err = -EFAULT;
+	if (copy_from_user(kptr, uptr, buflen))
+		goto out_kptr;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, USBDEVFS_SUBMITURB, (unsigned long) kurb);
+	set_fs(old_fs);
+
+	if (err >= 0) {
+		/* XXX Shit, this doesn't work for async URBs :-( XXX */
+		if (put_urb32(kurb, uurb)) {
+			err = -EFAULT;
+		} else if ((kurb->endpoint & USB_DIR_IN) != 0) {
+			if (copy_to_user(uptr, kptr, buflen))
+				err = -EFAULT;
+		}
+	}
+
+out_kptr:
+	kfree(kptr);
+
+out:
+	kfree(kurb);
+	return err;
+}
+#endif
+
+#define USBDEVFS_REAPURB32         _IOW('U', 12, u32)
+#define USBDEVFS_REAPURBNDELAY32   _IOW('U', 13, u32)
+
+static int do_usbdevfs_reapurb(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	mm_segment_t old_fs;
+	void *kptr;
+	int err;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd,
+			(cmd == USBDEVFS_REAPURB32 ?
+			 USBDEVFS_REAPURB :
+			 USBDEVFS_REAPURBNDELAY),
+			(unsigned long) &kptr);
+	set_fs(old_fs);
+
+	if (err >= 0 &&
+	    put_user(((u32)(long)kptr), (u32 *) A(arg)))
+		err = -EFAULT;
+
+	return err;
+}
+
+struct usbdevfs_disconnectsignal32 {
+	unsigned int signr;
+	u32 context;
+};
+
+#define USBDEVFS_DISCSIGNAL32      _IOR('U', 14, struct usbdevfs_disconnectsignal32)
+
+static int do_usbdevfs_discsignal(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	struct usbdevfs_disconnectsignal kdis;
+	struct usbdevfs_disconnectsignal32 *udis;
+	mm_segment_t old_fs;
+	u32 uctx;
+	int err;
+
+	udis = (struct usbdevfs_disconnectsignal32 *) arg;
+
+	if (get_user(kdis.signr, &udis->signr) ||
+	    __get_user(uctx, &udis->context))
+		return -EFAULT;
+
+	kdis.context = (void *) (long)uctx;
+
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	err = sys_ioctl(fd, USBDEVFS_DISCSIGNAL, (unsigned long) &kdis);
+	set_fs(old_fs);
+
+	return err;
+}
+
+struct mtd_oob_buf32 {
+	u32 start;
+	u32 length;
+	u32 ptr;	/* unsigned char* */
+};
+
+#define MEMWRITEOOB32 	_IOWR('M',3,struct mtd_oob_buf32)
+#define MEMREADOOB32 	_IOWR('M',4,struct mtd_oob_buf32)
+
+static inline int 
+mtd_rw_oob(unsigned int fd, unsigned int cmd, unsigned long arg)
+{
+	mm_segment_t 			old_fs 	= get_fs();
+	struct mtd_oob_buf32	*uarg 	= (struct mtd_oob_buf32 *)arg;
+	struct mtd_oob_buf		karg;
+	u32 tmp;
+	char *ptr;
+	int ret;
+
+	if (get_user(karg.start, &uarg->start) 		||
+	    get_user(karg.length, &uarg->length)	||
+	    get_user(tmp, &uarg->ptr))
+		return -EFAULT;
+
+	ptr = (char *)A(tmp);
+	if (0 >= karg.length) 
+		return -EINVAL;
+
+	karg.ptr = kmalloc(karg.length, GFP_KERNEL);
+	if (NULL == karg.ptr)
+		return -ENOMEM;
+
+	if (copy_from_user(karg.ptr, ptr, karg.length)) {
+		kfree(karg.ptr);
+		return -EFAULT;
+	}
+
+	set_fs(KERNEL_DS);
+	if (MEMREADOOB32 == cmd) 
+		ret = sys_ioctl(fd, MEMREADOOB, (unsigned long)&karg);
+	else if (MEMWRITEOOB32 == cmd)
+		ret = sys_ioctl(fd, MEMWRITEOOB, (unsigned long)&karg);
+	else
+		ret = -EINVAL;
+	set_fs(old_fs);
+
+	if (0 == ret && cmd == MEMREADOOB32) {
+		ret = copy_to_user(ptr, karg.ptr, karg.length);
+		ret |= put_user(karg.start, &uarg->start);
+		ret |= put_user(karg.length, &uarg->length);
+	}
+
+	kfree(karg.ptr);
+	return ((0 == ret) ? 0 : -EFAULT);
+}	
+
 struct ioctl_trans {
 	unsigned int cmd;
 	unsigned int handler;
@@ -3744,7 +4195,28 @@ COMPATIBLE_IOCTL(PCIIOC_CONTROLLER)
 COMPATIBLE_IOCTL(PCIIOC_MMAP_IS_IO)
 COMPATIBLE_IOCTL(PCIIOC_MMAP_IS_MEM)
 COMPATIBLE_IOCTL(PCIIOC_WRITE_COMBINE)
+/* USB */
+COMPATIBLE_IOCTL(USBDEVFS_RESETEP)
+COMPATIBLE_IOCTL(USBDEVFS_SETINTERFACE)
+COMPATIBLE_IOCTL(USBDEVFS_SETCONFIGURATION)
+COMPATIBLE_IOCTL(USBDEVFS_GETDRIVER)
+COMPATIBLE_IOCTL(USBDEVFS_DISCARDURB)
+COMPATIBLE_IOCTL(USBDEVFS_CLAIMINTERFACE)
+COMPATIBLE_IOCTL(USBDEVFS_RELEASEINTERFACE)
+COMPATIBLE_IOCTL(USBDEVFS_CONNECTINFO)
+COMPATIBLE_IOCTL(USBDEVFS_HUB_PORTINFO)
+COMPATIBLE_IOCTL(USBDEVFS_RESET)
+COMPATIBLE_IOCTL(USBDEVFS_CLEAR_HALT)
+/* MTD */
+COMPATIBLE_IOCTL(MEMGETINFO)
+COMPATIBLE_IOCTL(MEMERASE)
+COMPATIBLE_IOCTL(MEMLOCK)
+COMPATIBLE_IOCTL(MEMUNLOCK)
+COMPATIBLE_IOCTL(MEMGETREGIONCOUNT)
+COMPATIBLE_IOCTL(MEMGETREGIONINFO)
 /* And these ioctls need translation */
+HANDLE_IOCTL(MEMREADOOB32, mtd_rw_oob)
+HANDLE_IOCTL(MEMWRITEOOB32, mtd_rw_oob)
 HANDLE_IOCTL(SIOCGIFNAME, dev_ifname32)
 HANDLE_IOCTL(SIOCGIFCONF, dev_ifconf)
 HANDLE_IOCTL(SIOCGIFFLAGS, dev_ifsioc)
@@ -3905,6 +4377,12 @@ HANDLE_IOCTL(RTC32_IRQP_SET, do_rtc_ioctl)
 HANDLE_IOCTL(RTC32_EPOCH_READ, do_rtc_ioctl)
 HANDLE_IOCTL(RTC32_EPOCH_SET, do_rtc_ioctl)
 #endif
+HANDLE_IOCTL(USBDEVFS_CONTROL32, do_usbdevfs_control)
+HANDLE_IOCTL(USBDEVFS_BULK32, do_usbdevfs_bulk)
+/*HANDLE_IOCTL(USBDEVFS_SUBMITURB32, do_usbdevfs_urb)*/
+HANDLE_IOCTL(USBDEVFS_REAPURB32, do_usbdevfs_reapurb)
+HANDLE_IOCTL(USBDEVFS_REAPURBNDELAY32, do_usbdevfs_reapurb)
+HANDLE_IOCTL(USBDEVFS_DISCSIGNAL32, do_usbdevfs_discsignal)
 IOCTL_TABLE_END
 
 unsigned int ioctl32_hash_table[1024];

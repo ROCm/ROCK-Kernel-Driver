@@ -1,11 +1,12 @@
-/* $Id: hfc_pci.c,v 1.34.6.6 2001/06/09 15:14:17 kai Exp $
+/* $Id: hfc_pci.c,v 1.34.6.7 2001/07/27 09:08:27 kai Exp $
 
  * hfc_pci.c     low level driver for CCD´s hfc-pci based cards
  *
  * Author     Werner Cornelius (werner@isdn4linux.de)
  *            based on existing driver for CCD hfc ISA cards
+ *            type approval valid for HFC-S PCI A based card 
  *
- * Copyright 1999  by Werner Cornelius (werner@isdn4linux.de)
+ * Copyright 1999  by Werner Cornelius (werner@isdn-development.de)
  * Copyright 1999  by Karsten Keil (keil@isdn4linux.de)
  *
  * This program is free software; you can redistribute it and/or modify
@@ -35,7 +36,7 @@
 
 extern const char *CardType[];
 
-static const char *hfcpci_revision = "$Revision: 1.34.6.6 $";
+static const char *hfcpci_revision = "$Revision: 1.34.6.7 $";
 
 /* table entry in the PCI devices list */
 typedef struct {
@@ -1232,7 +1233,7 @@ HFCPCI_l1hw(struct PStack *st, int pr, void *arg)
 			l1_msg(cs, HW_POWERUP | CONFIRM, NULL);
 			break;
 		case (HW_ENABLE | REQUEST):
-			Write_hfc(cs, HFCPCI_STATES, HFCPCI_ACTIVATE | HFCPCI_DO_ACTION);
+			Write_hfc(cs, HFCPCI_STATES, HFCPCI_DO_ACTION);
 			break;
 		case (HW_DEACTIVATE | REQUEST):
 			cs->hw.hfcpci.mst_m &= ~HFCPCI_MASTER;

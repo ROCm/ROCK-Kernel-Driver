@@ -20,6 +20,23 @@ The certification is only valid for the combination of the tested software
 version and the tested hardware. Any changes to the HiSax source code may
 therefore affect the certification.
 
+Additional ITU approval tests have been carried out for all generic cards
+using Colognechip single chip solutions HFC-S PCI A for PCI cards as well
+as HFC-S USB based USB ISDN ta adapters.
+These tests included all layers 1-3 and as well all functional tests for 
+the layer 1. Because all hardware based on these chips are complete ISDN
+solutions in one chip all cards and USB-TAs using these chips are to be
+regarded as approved for those tests. Some additional electrical tests
+of the layer 1 which are independant of the driver and related to a
+special hardware used will be regarded as approved if at least one 
+solution has been tested including those electrical tests. So if cards 
+or tas have been completely approved for any other os, the approval
+for those electrical tests is valid for linux, too.
+Please send any questions regarding this drivers or approval abouts to 
+werner@isdn-development.de 
+Additional information and the type approval documents will be found
+shortly on the Colognechip website www.colognechip.com 
+
 If you change the main files of the HiSax ISDN stack, the certification will
 become invalid. Because in most countries it is illegal to connect
 unapproved ISDN equipment to the public network, I have to guarantee that
@@ -50,6 +67,7 @@ drivers/isdn/hisax/l3_1tr6.c
 drivers/isdn/hisax/cert.c
 drivers/isdn/hisax/elsa.c
 drivers/isdn/hisax/diva.c
+drivers/isdn/hisax/hfc_pci.c
 
 Please send any changes, bugfixes and patches to me rather than implementing
 them directly into the HiSax sources.

@@ -2,7 +2,7 @@
  * linux/mii.h: definitions for MII-compatible transceivers
  * Originally drivers/net/sunhme.h.
  *
- * Copyright (C) 1996, 1999 David S. Miller (davem@redhat.com)
+ * Copyright (C) 1996, 1999, 2001 David S. Miller (davem@redhat.com)
  */
 
 #ifndef __LINUX_MII_H__
@@ -10,19 +10,8 @@
 
 #include <linux/types.h>
 
-/* Inside the Happy Meal transceiver is the physical layer, they use an
- * implementations for National Semiconductor, part number DP83840VCE.
- * You can retrieve the data sheets and programming docs for this beast
- * from http://www.national.com/
- *
- * The DP83840 is capable of both 10 and 100Mbps ethernet, in both
- * half and full duplex mode.  It also supports auto negotiation.
- *
- * But.... THIS THING IS A PAIN IN THE ASS TO PROGRAM!
- * Debugging eeprom burnt code is more fun than programming this chip!
- */
+/* Generic MII registers. */
 
-/* First, the MII register numbers (actually DP83840 register numbers). */
 #define MII_BMCR            0x00        /* Basic mode control register */
 #define MII_BMSR            0x01        /* Basic mode status register  */
 #define MII_PHYSID1         0x02        /* PHYS ID 1                   */
@@ -35,10 +24,10 @@
 #define MII_NWAYTEST        0x14        /* N-way auto-neg test reg     */
 #define MII_RERRCOUNTER     0x15        /* Receive error counter       */
 #define MII_SREVISION       0x16        /* Silicon revision            */
-#define MII_CSCONFIG        0x17        /* CS configuration            */
+#define MII_RESV1           0x17        /* Reserved...                 */
 #define MII_LBRERROR        0x18        /* Lpback, rx, bypass error    */
 #define MII_PHYADDR         0x19        /* PHY address                 */
-#define MII_RESERVED        0x1a        /* Unused...                   */
+#define MII_RESV2           0x1a        /* Reserved...                 */
 #define MII_TPISTATUS       0x1b        /* TPI status for 10mbps       */
 #define MII_NCONFIG         0x1c        /* Network interface config    */
 
@@ -111,23 +100,6 @@
 #define NWAYTEST_RESV1          0x00ff  /* Unused...                   */
 #define NWAYTEST_LOOPBACK       0x0100  /* Enable loopback for N-way   */
 #define NWAYTEST_RESV2          0xfe00  /* Unused...                   */
-
-/* The Carrier Sense config register. */
-#define CSCONFIG_RESV1          0x0001  /* Unused...                   */
-#define CSCONFIG_LED4           0x0002  /* Pin for full-dplx LED4      */
-#define CSCONFIG_LED1           0x0004  /* Pin for conn-status LED1    */
-#define CSCONFIG_RESV2          0x0008  /* Unused...                   */
-#define CSCONFIG_TCVDISAB       0x0010  /* Turns off the transceiver   */
-#define CSCONFIG_DFBYPASS       0x0020  /* Bypass disconnect function  */
-#define CSCONFIG_GLFORCE        0x0040  /* Good link force for 100mbps */
-#define CSCONFIG_CLKTRISTATE    0x0080  /* Tristate 25m clock          */
-#define CSCONFIG_RESV3          0x0700  /* Unused...                   */
-#define CSCONFIG_ENCODE         0x0800  /* 1=MLT-3, 0=binary           */
-#define CSCONFIG_RENABLE        0x1000  /* Repeater mode enable        */
-#define CSCONFIG_TCDISABLE      0x2000  /* Disable timeout counter     */
-#define CSCONFIG_RESV4          0x4000  /* Unused...                   */
-#define CSCONFIG_NDISABLE       0x8000  /* Disable NRZI                */
-
 
 /* This structure is used in all SIOCxMIIxxx ioctl calls */
 struct mii_ioctl_data {

@@ -58,9 +58,6 @@ obj-$(CONFIG_ISDN_DRV_HISAX)	+= hisax.o
 obj-$(CONFIG_HISAX_SEDLBAUER_CS)	+= sedlbauer_cs.o
 obj-$(CONFIG_HISAX_ELSA_CS)	+= elsa_cs.o
 
-MD5FILES 	:= isac.c isdnl1.c isdnl2.c isdnl3.c \
-		   tei.c callc.c cert.c l3dss1.c l3_1tr6.c \
-		   elsa.c diva.c sedlbauer.c
 CERT := $(shell md5sum -c md5sums.asc >> /dev/null;echo $$?)
 CFLAGS_cert.o := -DCERTIFICATION=$(CERT)
 

@@ -2153,7 +2153,7 @@ typedef unsigned long ProcessorFlags_T;
 typedef struct pt_regs Registers_T;
 typedef struct request IO_Request_T;
 typedef request_queue_t RequestQueue_T;
-typedef struct semaphore Semaphore_T;
+typedef struct completion Completion_T;
 typedef struct super_block SuperBlock_T;
 typedef struct timer_list Timer_T;
 typedef wait_queue_head_t WaitQueue_T;
@@ -2220,7 +2220,7 @@ typedef struct DAC960_Command
   DAC960_CommandType_T CommandType;
   struct DAC960_Controller *Controller;
   struct DAC960_Command *Next;
-  Semaphore_T *Semaphore;
+  Completion_T *Waiting;
   unsigned int LogicalDriveNumber;
   unsigned int BlockNumber;
   unsigned int BlockCount;

@@ -8,7 +8,7 @@
  *	the older version didn't come out right using gcc 2.5.8, the newer one
  *	seems to fall out with gcc 2.6.2.
  *
- *	Version: $Id: igmp.c,v 1.45 2001/02/23 06:32:11 davem Exp $
+ *	Version: $Id: igmp.c,v 1.46 2001/07/27 09:27:29 davem Exp $
  *
  *	Authors:
  *		Alan Cox <Alan.Cox@linux.org>
@@ -112,7 +112,7 @@
 #define IGMP_Unsolicited_Report_Count		2
 
 
-#define IGMP_Initial_Report_Delay		(1*HZ)
+#define IGMP_Initial_Report_Delay		(1)
 
 /* IGMP_Initial_Report_Delay is not from IGMP specs!
  * IGMP specs require to report membership immediately after

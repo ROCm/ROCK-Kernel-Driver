@@ -1,4 +1,4 @@
-/* $Id: bitops.h,v 1.63 2001/07/17 16:17:33 anton Exp $
+/* $Id: bitops.h,v 1.64 2001/07/18 13:48:23 anton Exp $
  * bitops.h: Bit string operations on the Sparc.
  *
  * Copyright 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -25,8 +25,29 @@ static __inline__ int test_and_set_bit(unsigned long nr, volatile void *addr)
 {
 	register unsigned long mask asm("g2");
 	register unsigned long *ADDR asm("g1");
+
 	ADDR = ((unsigned long *) addr) + (nr >> 5);
 	mask = 1 << (nr & 31);
+
+	__asm__ __volatile__("
+	mov	%%o7, %%g4
+	call	___set_bit
+	 add	%%o7, 8, %%o7
+"	: "=&r" (mask)
+	: "0" (mask), "r" (ADDR)
+	: "g3", "g4", "g5", "g7", "memory", "cc");
+
+	return mask != 0;
+}
+
+static __inline__ void set_bit(unsigned long nr, volatile void *addr)
+{
+	register unsigned long mask asm("g2");
+	register unsigned long *ADDR asm("g1");
+
+	ADDR = ((unsigned long *) addr) + (nr >> 5);
+	mask = 1 << (nr & 31);
+
 	__asm__ __volatile__("
 	mov	%%o7, %%g4
 	call	___set_bit
@@ -34,13 +55,6 @@ static __inline__ int test_and_set_bit(unsigned long nr, volatile void *addr)
 "	: "=&r" (mask)
 	: "0" (mask), "r" (ADDR)
 	: "g3", "g4", "g5", "g7", "cc");
-
-	return mask != 0;
-}
-
-static __inline__ void set_bit(unsigned long nr, volatile void *addr)
-{
-	(void) test_and_set_bit(nr, addr);
 }
 
 static __inline__ int test_and_clear_bit(unsigned long nr, volatile void *addr)
@@ -50,6 +64,26 @@ static __inline__ int test_and_clear_bit(unsigned long nr, volatile void *addr)
 
 	ADDR = ((unsigned long *) addr) + (nr >> 5);
 	mask = 1 << (nr & 31);
+
+	__asm__ __volatile__("
+	mov	%%o7, %%g4
+	call	___clear_bit
+	 add	%%o7, 8, %%o7
+"	: "=&r" (mask)
+	: "0" (mask), "r" (ADDR)
+	: "g3", "g4", "g5", "g7", "memory", "cc");
+
+	return mask != 0;
+}
+
+static __inline__ void clear_bit(unsigned long nr, volatile void *addr)
+{
+	register unsigned long mask asm("g2");
+	register unsigned long *ADDR asm("g1");
+
+	ADDR = ((unsigned long *) addr) + (nr >> 5);
+	mask = 1 << (nr & 31);
+
 	__asm__ __volatile__("
 	mov	%%o7, %%g4
 	call	___clear_bit
@@ -57,13 +91,6 @@ static __inline__ int test_and_clear_bit(unsigned long nr, volatile void *addr)
 "	: "=&r" (mask)
 	: "0" (mask), "r" (ADDR)
 	: "g3", "g4", "g5", "g7", "cc");
-
-	return mask != 0;
-}
-
-static __inline__ void clear_bit(unsigned long nr, volatile void *addr)
-{
-	(void) test_and_clear_bit(nr, addr);
 }
 
 static __inline__ int test_and_change_bit(unsigned long nr, volatile void *addr)
@@ -73,6 +100,26 @@ static __inline__ int test_and_change_bit(unsigned long nr, volatile void *addr)
 
 	ADDR = ((unsigned long *) addr) + (nr >> 5);
 	mask = 1 << (nr & 31);
+
+	__asm__ __volatile__("
+	mov	%%o7, %%g4
+	call	___change_bit
+	 add	%%o7, 8, %%o7
+"	: "=&r" (mask)
+	: "0" (mask), "r" (ADDR)
+	: "g3", "g4", "g5", "g7", "memory", "cc");
+
+	return mask != 0;
+}
+
+static __inline__ void change_bit(unsigned long nr, volatile void *addr)
+{
+	register unsigned long mask asm("g2");
+	register unsigned long *ADDR asm("g1");
+
+	ADDR = ((unsigned long *) addr) + (nr >> 5);
+	mask = 1 << (nr & 31);
+
 	__asm__ __volatile__("
 	mov	%%o7, %%g4
 	call	___change_bit
@@ -80,13 +127,6 @@ static __inline__ int test_and_change_bit(unsigned long nr, volatile void *addr)
 "	: "=&r" (mask)
 	: "0" (mask), "r" (ADDR)
 	: "g3", "g4", "g5", "g7", "cc");
-
-	return mask != 0;
-}
-
-static __inline__ void change_bit(unsigned long nr, volatile void *addr)
-{
-	(void) test_and_change_bit(nr, addr);
 }
 
 /*

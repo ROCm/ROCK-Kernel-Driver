@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.46 2000/12/14 22:57:26 davem Exp $
+# $Id: Makefile,v 1.47 2001/07/27 09:42:22 davem Exp $
 # sparc64/Makefile
 #
 # Makefile for the architecture dependent flags and dependencies on the
@@ -98,7 +98,7 @@ archmrproper:
 
 archdep: check_asm
 
-check_asm:
+check_asm: include/linux/version.h
 	$(MAKE) -C arch/sparc64/kernel check_asm
 
 tftpboot.img:

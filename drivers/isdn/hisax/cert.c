@@ -1,4 +1,4 @@
-/* $Id: cert.c,v 2.3.6.1 2001/02/16 16:43:25 kai Exp $
+/* $Id: cert.c,v 2.3.6.2 2001/07/27 09:08:27 kai Exp $
  *
  * Author       Karsten Keil (keil@isdn4linux.de)
  *
@@ -20,6 +20,7 @@ certification_check(int output) {
 		printk(KERN_INFO "HiSax: Approved with ELSA Microlink PCI cards\n");
 		printk(KERN_INFO "HiSax: Approved with Eicon Technology Diva 2.01 PCI cards\n");
 		printk(KERN_INFO "HiSax: Approved with Sedlbauer Speedfax + cards\n");
+		printk(KERN_INFO "HiSax: Approved with HFC-S PCI A based cards\n");
 	}
 	return(0);
 #endif

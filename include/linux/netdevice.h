@@ -298,7 +298,6 @@ struct net_device
 
 	/* Interface address info. */
 	unsigned char		broadcast[MAX_ADDR_LEN];	/* hw bcast add	*/
-	unsigned char		pad;		/* make dev_addr aligned to 8 bytes */
 	unsigned char		dev_addr[MAX_ADDR_LEN];	/* hw address	*/
 	unsigned char		addr_len;	/* hardware address length	*/
 

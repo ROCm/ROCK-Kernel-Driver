@@ -14228,6 +14228,19 @@ CONFIG_APPLICOM
 
   If unsure, say N.
 
+Sony Vaio Programmable I/O Control Device support
+CONFIG_SONYPI
+  This driver enables access to the Sony Programmable I/O Control Device
+  which can be found in many (all ?) Sony Vaio laptops.
+
+  If you have one of those laptops, read Documentation/sonypi.txt,
+  and say Y or M here.
+
+  If you want to compile the driver as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want),
+  say M here and read <file:Documentation/modules.txt>. The module will be
+  called sonypi.o.
+
 Intel Random Number Generator support
 CONFIG_INTEL_RNG
   This driver provides kernel-side support for the Random Number
@@ -17520,6 +17533,19 @@ CONFIG_VIDEO_PMS
   module called pms.o ( = code which can be inserted in and removed
   from the running kernel whenever you want). If you want to compile
   it as a module, say M here and read Documentation/modules.txt.
+
+CONFIG_VIDEO_MEYE
+  This is the video4linux driver for the Motion Eye camera found
+  in the Vaio Picturebook laptops. Please read the material in
+  <file:Documentation/video4linux/meye.txt> for more information.
+
+  If you say Y or M here, you need to say Y or M to "Sony Programmable
+  I/O Control Device" in the character device section.
+
+  This driver is available as a module called meye.o ( = code
+  which can be inserted in and removed from the running kernel
+  whenever you want). If you want to compile it as a module, say M
+  here and read <file:Documentation/modules.txt>.
 
 IBM's S/390 architecture
 CONFIG_ARCH_S390

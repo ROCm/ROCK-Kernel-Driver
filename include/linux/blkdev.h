@@ -14,9 +14,7 @@ typedef struct elevator_s elevator_t;
 
 /*
  * Ok, this is an expanded form so that we can use the same
- * request for paging requests when that is implemented. In
- * paging, 'bh' is NULL, and the completion is used to wait
- * for the IO to be ready.
+ * request for paging requests.
  */
 struct request {
 	struct list_head queue;
@@ -184,7 +182,7 @@ extern atomic_t queued_sectors;
 #define PageAlignSize(size) (((size) + PAGE_SIZE -1) & PAGE_MASK)
 
 /* read-ahead in pages.. */
-#define MAX_READAHEAD	31
+#define MAX_READAHEAD	127
 #define MIN_READAHEAD	3
 
 #define blkdev_entry_to_request(entry) list_entry((entry), struct request, queue)

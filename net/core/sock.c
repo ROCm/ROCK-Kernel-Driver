@@ -7,7 +7,7 @@
  *		handler for protocols to use and generic option handler.
  *
  *
- * Version:	$Id: sock.c,v 1.111 2001/06/26 23:29:17 davem Exp $
+ * Version:	$Id: sock.c,v 1.112 2001/07/27 09:54:48 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -131,8 +131,6 @@
 #include <linux/filter.h>
 #endif
 
-#define min(a,b)	((a)<(b)?(a):(b))
-
 /* Run time adjustable parameters. */
 __u32 sysctl_wmem_max = SK_WMEM_MAX;
 __u32 sysctl_rmem_max = SK_RMEM_MAX;
@@ -232,7 +230,10 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 				val = sysctl_wmem_max;
 
 			sk->userlocks |= SOCK_SNDBUF_LOCK;
-			sk->sndbuf = max(val*2,SOCK_MIN_SNDBUF);
+			if ((val * 2) < SOCK_MIN_SNDBUF)
+				sk->sndbuf = SOCK_MIN_SNDBUF;
+			else
+				sk->sndbuf = (val * 2);
 
 			/*
 			 *	Wake up sending tasks if we
@@ -252,7 +253,10 @@ int sock_setsockopt(struct socket *sock, int level, int optname,
 
 			sk->userlocks |= SOCK_RCVBUF_LOCK;
 			/* FIXME: is this lower bound the right one? */
-			sk->rcvbuf = max(val*2,SOCK_MIN_RCVBUF);
+			if ((val * 2) < SOCK_MIN_RCVBUF)
+				sk->rcvbuf = SOCK_MIN_RCVBUF;
+			else
+				sk->rcvbuf = (val * 2);
 			break;
 
 		case SO_KEEPALIVE:
@@ -533,9 +537,9 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 			break;
 
 		case SO_PEERCRED:
-			lv=sizeof(sk->peercred);
-			len=min(len, lv);
-			if(copy_to_user((void*)optval, &sk->peercred, len))
+			if (len > sizeof(sk->peercred))
+				len = sizeof(sk->peercred);
+			if (copy_to_user(optval, &sk->peercred, len))
 				return -EFAULT;
 			goto lenout;
 
@@ -562,11 +566,12 @@ int sock_getsockopt(struct socket *sock, int level, int optname,
 		default:
 			return(-ENOPROTOOPT);
 	}
-	len=min(len,lv);
-	if(copy_to_user(optval,&v,len))
+	if (len > lv)
+		len = lv;
+	if (copy_to_user(optval, &v, len))
 		return -EFAULT;
 lenout:
-  	if(put_user(len, optlen))
+  	if (put_user(len, optlen))
   		return -EFAULT;
   	return 0;
 }

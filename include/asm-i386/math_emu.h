@@ -12,7 +12,6 @@ int save_i387_soft(void *s387, struct _fpstate * buf);
    */
 struct info {
 	long ___orig_eip;
-	long ___ret_from_system_call;
 	long ___ebx;
 	long ___ecx;
 	long ___edx;

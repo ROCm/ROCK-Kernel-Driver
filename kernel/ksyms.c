@@ -543,8 +543,8 @@ EXPORT_SYMBOL(__run_task_queue);
 EXPORT_SYMBOL(do_softirq);
 EXPORT_SYMBOL(raise_softirq);
 EXPORT_SYMBOL(cpu_raise_softirq);
-EXPORT_SYMBOL(tasklet_schedule);
-EXPORT_SYMBOL(tasklet_hi_schedule);
+EXPORT_SYMBOL(__tasklet_schedule);
+EXPORT_SYMBOL(__tasklet_hi_schedule);
 
 /* init task, for moving kthread roots - ought to export a function ?? */
 

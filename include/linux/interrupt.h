@@ -118,7 +118,7 @@ struct tasklet_struct name = { NULL, 0, ATOMIC_INIT(1), func, data }
 enum
 {
 	TASKLET_STATE_SCHED,	/* Tasklet is scheduled for execution */
-	TASKLET_STATE_RUN	/* Tasklet is running */
+	TASKLET_STATE_RUN	/* Tasklet is running (SMP only) */
 };
 
 struct tasklet_head
@@ -129,34 +129,68 @@ struct tasklet_head
 extern struct tasklet_head tasklet_vec[NR_CPUS];
 extern struct tasklet_head tasklet_hi_vec[NR_CPUS];
 
-#define tasklet_trylock(t) (!test_and_set_bit(TASKLET_STATE_RUN, &(t)->state))
-#define tasklet_unlock(t) do { smp_mb__before_clear_bit(); clear_bit(TASKLET_STATE_RUN, &(t)->state); } while(0)
-#define tasklet_unlock_wait(t) while (test_bit(TASKLET_STATE_RUN, &(t)->state)) { barrier(); }
+#ifdef CONFIG_SMP
+static inline int tasklet_trylock(struct tasklet_struct *t)
+{
+	return !test_and_set_bit(TASKLET_STATE_RUN, &(t)->state);
+}
 
-extern void tasklet_schedule(struct tasklet_struct *t);
-extern void tasklet_hi_schedule(struct tasklet_struct *t);
+static inline void tasklet_unlock(struct tasklet_struct *t)
+{
+	smp_mb__before_clear_bit(); 
+	clear_bit(TASKLET_STATE_RUN, &(t)->state);
+}
+
+static inline void tasklet_unlock_wait(struct tasklet_struct *t)
+{
+	while (test_bit(TASKLET_STATE_RUN, &(t)->state)) { barrier(); }
+}
+#else
+#define tasklet_trylock(t) 1
+#define tasklet_unlock_wait(t) do { } while (0)
+#define tasklet_unlock(t) do { } while (0)
+#endif
+
+extern void FASTCALL(__tasklet_schedule(struct tasklet_struct *t));
+
+static inline void tasklet_schedule(struct tasklet_struct *t)
+{
+	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state))
+		__tasklet_schedule(t);
+}
+
+extern void FASTCALL(__tasklet_hi_schedule(struct tasklet_struct *t));
+
+static inline void tasklet_hi_schedule(struct tasklet_struct *t)
+{
+	if (!test_and_set_bit(TASKLET_STATE_SCHED, &t->state))
+		__tasklet_hi_schedule(t);
+}
+
 
 static inline void tasklet_disable_nosync(struct tasklet_struct *t)
 {
 	atomic_inc(&t->count);
+	smp_mb__after_atomic_inc();
 }
 
 static inline void tasklet_disable(struct tasklet_struct *t)
 {
 	tasklet_disable_nosync(t);
 	tasklet_unlock_wait(t);
+	smp_mb();
 }
 
 static inline void tasklet_enable(struct tasklet_struct *t)
 {
-	if (atomic_dec_and_test(&t->count))
-		tasklet_schedule(t);
+	smp_mb__before_atomic_dec();
+	atomic_dec(&t->count);
 }
 
 static inline void tasklet_hi_enable(struct tasklet_struct *t)
 {
-	if (atomic_dec_and_test(&t->count))
-		tasklet_hi_schedule(t);
+	smp_mb__before_atomic_dec();
+	atomic_dec(&t->count);
 }
 
 extern void tasklet_kill(struct tasklet_struct *t);

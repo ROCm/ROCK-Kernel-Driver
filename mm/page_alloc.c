@@ -903,7 +903,6 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 		}
 
 		offset += size;
-		mask = -1;
 		for (i = 0; ; i++) {
 			unsigned long bitmap_size;
 
@@ -912,11 +911,32 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 				zone->free_area[i].map = NULL;
 				break;
 			}
-			mask += mask;
-			size = (size + ~mask) & mask;
-			bitmap_size = size >> (i+1);
-			bitmap_size = (bitmap_size + 7) >> 3;
-			bitmap_size = LONG_ALIGN(bitmap_size);
+
+			/*
+			 * Page buddy system uses "index >> (i+1)",
+			 * where "index" is at most "size-1".
+			 *
+			 * The extra "+3" is to round down to byte
+			 * size (8 bits per byte assumption). Thus
+			 * we get "(size-1) >> (i+4)" as the last byte
+			 * we can access.
+			 *
+			 * The "+1" is because we want to round the
+			 * byte allocation up rather than down. So
+			 * we should have had a "+7" before we shifted
+			 * down by three. Also, we have to add one as
+			 * we actually _use_ the last bit (it's [0,n]
+			 * inclusive, not [0,n[).
+			 *
+			 * So we actually had +7+1 before we shift
+			 * down by 3. But (n+8) >> 3 == (n >> 3) + 1
+			 * (modulo overflows, which we do not have).
+			 *
+			 * Finally, we LONG_ALIGN because all bitmap
+			 * operations are on longs.
+			 */
+			bitmap_size = (size-1) >> (i+4);
+			bitmap_size = LONG_ALIGN(bitmap_size+1);
 			zone->free_area[i].map = 
 			  (unsigned long *) alloc_bootmem_node(pgdat, bitmap_size);
 		}

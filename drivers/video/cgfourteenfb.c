@@ -1,4 +1,4 @@
-/* $Id: cgfourteenfb.c,v 1.9 2001/02/13 01:17:14 davem Exp $
+/* $Id: cgfourteenfb.c,v 1.10 2001/07/27 09:44:00 davem Exp $
  * cgfourteenfb.c: CGfourteen frame buffer driver
  *
  * Copyright (C) 1996,1998 Jakub Jelinek (jj@ultra.linux.cz)
@@ -242,6 +242,11 @@ static void cg14_setcursor (struct fb_info_sbusfb *fb)
 		u8 tmp = sbus_readb(&cur->ccr);
 
 		tmp |= CG14_CCR_ENABLE;
+		sbus_writeb(tmp, &cur->ccr);
+	} else {
+		u8 tmp = sbus_readb(&cur->ccr);
+
+		tmp &= ~CG14_CCR_ENABLE;
 		sbus_writeb(tmp, &cur->ccr);
 	}
 	sbus_writew(((c->cpos.fbx - c->chot.fbx) & 0xfff), &cur->cursx);

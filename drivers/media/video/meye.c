@@ -209,28 +209,23 @@ static void rvfree(void * mem, signed long size) {
 
 /* return a page table pointing to N pages of locked memory */
 static void *ptable_alloc(int npages, u32 *pt_addr) {
-	int i = 0;
+	int i;
 	void *vmem;
-	u32 ptable[npages+1];
-	signed long size;
+	u32 *ptable;
 	unsigned long adr;
 
-	size = (npages + 1) * PAGE_SIZE;
-	vmem = rvmalloc(size);
+	vmem = rvmalloc((npages + 1) * PAGE_SIZE);
 	if (!vmem)
 		return NULL;
 
-	memset(ptable, 0, sizeof(ptable));
         adr = (unsigned long)vmem;
-	while (size > 0) {
-		ptable[i++] = virt_to_bus(__va(kvirt_to_pa(adr)));
+	ptable = (u32 *)(vmem + npages * PAGE_SIZE);
+	for (i = 0; i < npages; i++) {
+		ptable[i] = (u32) kvirt_to_bus(adr);
 		adr += PAGE_SIZE;
-		size -= PAGE_SIZE;
 	}
 
-	memcpy(vmem + npages * PAGE_SIZE, ptable, PAGE_SIZE);
-	*pt_addr = ptable[npages];
-
+	*pt_addr = (u32) kvirt_to_bus(adr);
 	return vmem;
 }
 

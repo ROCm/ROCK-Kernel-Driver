@@ -1,4 +1,4 @@
-/* $Id: isdn_ppp.c,v 1.85.6.5 2001/05/26 15:19:56 kai Exp $
+/* $Id: isdn_ppp.c,v 1.85.6.6 2001/07/27 09:08:27 kai Exp $
  *
  * Linux ISDN subsystem, functions for synchronous PPP (linklevel).
  *
@@ -83,7 +83,7 @@ static void isdn_ppp_mp_cleanup( isdn_net_local * lp );
 static int isdn_ppp_bundle(struct ippp_struct *, int unit);
 #endif	/* CONFIG_ISDN_MPP */
   
-char *isdn_ppp_revision = "$Revision: 1.85.6.5 $";
+char *isdn_ppp_revision = "$Revision: 1.85.6.6 $";
 
 static struct ippp_struct *ippp_table[ISDN_MAX_CHANNELS];
 
@@ -1913,8 +1913,15 @@ isdn_ppp_hangup_slave(char *name)
 	sdev = lp->slave;
 	while (sdev) {
 		isdn_net_local *mlp = (isdn_net_local *) sdev->priv;
-		if ((mlp->flags & ISDN_NET_CONNECTED))
+
+		if (mlp->slave) { /* find last connected link in chain */
+			isdn_net_local *nlp = (isdn_net_local *) mlp->slave->priv;
+
+			if (!(nlp->flags & ISDN_NET_CONNECTED))
+				break;
+		} else if (mlp->flags & ISDN_NET_CONNECTED)
 			break;
+		
 		sdev = mlp->slave;
 	}
 	if (!sdev)

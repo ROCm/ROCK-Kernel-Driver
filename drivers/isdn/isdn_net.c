@@ -1,4 +1,4 @@
-/* $Id: isdn_net.c,v 1.140.6.6 2001/06/11 22:08:37 kai Exp $
+/* $Id: isdn_net.c,v 1.140.6.7 2001/07/27 11:15:53 kai Exp $
 
  * Linux ISDN subsystem, network interfaces and related functions (linklevel).
  *
@@ -190,7 +190,7 @@ static int isdn_net_start_xmit(struct sk_buff *, struct net_device *);
 static void isdn_net_ciscohdlck_connected(isdn_net_local *lp);
 static void isdn_net_ciscohdlck_disconnected(isdn_net_local *lp);
 
-char *isdn_net_revision = "$Revision: 1.140.6.6 $";
+char *isdn_net_revision = "$Revision: 1.140.6.7 $";
 
  /*
   * Code for raw-networking over ISDN
@@ -2028,17 +2028,8 @@ isdn_net_init(struct net_device *ndev)
 {
 	ushort max_hlhdr_len = 0;
 	isdn_net_local *lp = (isdn_net_local *) ndev->priv;
-	int drvidx,
-	 i;
+	int drvidx, i;
 
-	if (ndev == NULL) {
-		printk(KERN_WARNING "isdn_net_init: dev = NULL!\n");
-		return -ENODEV;
-	}
-	if (ndev->priv == NULL) {
-		printk(KERN_WARNING "isdn_net_init: dev->priv = NULL!\n");
-		return -ENODEV;
-	}
 	ether_setup(ndev);
 	lp->org_hhc = ndev->hard_header_cache;
 	lp->org_hcu = ndev->header_cache_update;

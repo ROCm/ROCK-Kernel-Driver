@@ -84,6 +84,14 @@ static char __attribute__ ((unused))
 #endif
 }
 
+#define MSDOS_LABEL_MAGIC1	0x55
+#define MSDOS_LABEL_MAGIC2	0xAA
+
+static inline int
+msdos_magic_present(unsigned char *p) {
+	return (p[0] == MSDOS_LABEL_MAGIC1 && p[1] == MSDOS_LABEL_MAGIC2);
+}
+
 /*
  * Create devices for each logical partition in an extended partition.
  * The logical partitions form a linked list, with each entry being
@@ -118,10 +126,10 @@ static void extended_partition(struct gendisk *hd, kdev_t dev)
 		if (!(bh = bread(dev,0,get_ptable_blocksize(dev))))
 			return;
 
-		if ((*(__u16 *) (bh->b_data+510)) != cpu_to_le16(MSDOS_LABEL_MAGIC))
+		if (!msdos_magic_present(bh->b_data + 510))
 			goto done;
 
-		p = (struct partition *) (0x1BE + bh->b_data);
+		p = (struct partition *) (bh->b_data + 0x1be);
 
 		this_size = hd->part[MINOR(dev)].nr_sects;
 
@@ -399,7 +407,7 @@ static void minix_partition(struct gendisk *hd, int minor)
 	/* The first sector of a Minix partition can have either
 	 * a secondary MBR describing its subpartitions, or
 	 * the normal boot sector. */
-	if ((*(__u16 *) (bh->b_data + 510)) != cpu_to_le16(MSDOS_LABEL_MAGIC) &&
+	if (msdos_magic_present (bh->b_data + 510) &&
 	    SYS_IND(p) == MINIX_PARTITION) { /* subpartition table present */
 
 		printk(" %s: <minix:", partition_name(hd, minor, buf));
@@ -441,11 +449,11 @@ read_mbr:
 check_table:
 #endif /* CONFIG_BLK_DEV_IDE */
 	/* Use bforget(), because we may have changed the disk geometry */
-	if (*(unsigned short *)  (0x1fe + data) != cpu_to_le16(MSDOS_LABEL_MAGIC)) {
+	if (!msdos_magic_present(data + 510)) {
 		bforget(bh);
 		return 0;
 	}
-	p = (struct partition *) (0x1be + data);
+	p = (struct partition *) (data + 0x1be);
 
 #ifdef CONFIG_BLK_DEV_IDE
 	if (!tested_for_xlate++) {	/* Do this only once per disk */
@@ -542,7 +550,7 @@ check_table:
 	/*
 	 *  Check for old-style Disk Manager partition table
 	 */
-	if (*(unsigned short *) (data+0xfc) == cpu_to_le16(MSDOS_LABEL_MAGIC)) {
+	if (msdos_magic_present(data + 0xfc)) {
 		p = (struct partition *) (0x1be + data);
 		for (i = 4 ; i < 16 ; i++, current_minor++) {
 			p--;

@@ -1,4 +1,4 @@
-/* $Id: fault.c,v 1.119 2001/03/24 09:36:10 davem Exp $
+/* $Id: fault.c,v 1.120 2001/07/18 13:40:05 anton Exp $
  * fault.c:  Page fault handlers for the Sparc.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -36,8 +36,6 @@
 
 extern struct sparc_phys_banks sp_banks[SPARC_PHYS_BANKS];
 extern int prom_node_root;
-
-struct linux_romvec *romvec;
 
 /* At boot time we determine these two values necessary for setting
  * up the segment maps and page table entries (pte's).

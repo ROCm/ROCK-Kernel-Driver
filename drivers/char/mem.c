@@ -260,7 +260,9 @@ static ssize_t read_kmem(struct file *file, char *buf,
 			if (len > PAGE_SIZE)
 				len = PAGE_SIZE;
 			len = vread(kbuf, (char *)p, len);
-			if (len && copy_to_user(buf, kbuf, len)) {
+			if (!len)
+				break;
+			if (copy_to_user(buf, kbuf, len)) {
 				free_page((unsigned long)kbuf);
 				return -EFAULT;
 			}

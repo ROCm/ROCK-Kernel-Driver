@@ -1,4 +1,4 @@
-/* $Id: isdn_tty.c,v 1.94.6.3 2001/07/03 14:48:25 kai Exp $
+/* $Id: isdn_tty.c,v 1.94.6.4 2001/07/27 11:15:53 kai Exp $
 
  * Linux ISDN subsystem, tty functions and AT-command emulator (linklevel).
  *
@@ -66,7 +66,7 @@ static int bit2si[8] =
 static int si2bit[8] =
 {4, 1, 4, 4, 4, 4, 4, 4};
 
-char *isdn_tty_revision = "$Revision: 1.94.6.3 $";
+char *isdn_tty_revision = "$Revision: 1.94.6.4 $";
 
 
 /* isdn_tty_try_read() is called from within isdn_tty_rcv_skb()
@@ -1181,8 +1181,6 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 	atemu *m = &info->emu;
 
 	if (isdn_tty_paranoia_check(info, tty->device, "isdn_tty_write"))
-		return 0;
-	if (!tty)
 		return 0;
 	if (from_user)
 		down(&info->write_sem);
