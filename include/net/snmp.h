@@ -41,7 +41,21 @@
  * cacheline machine it makes a *lot* of sense -AK
  */ 
 
- 
+struct snmp_item {
+	char *name;
+	int offset;
+};
+
+#define SNMP_ITEM(mib,entry,procname)	{	\
+	.name = procname,			\
+	.offset = offsetof(mib, entry),		\
+}
+
+#define SNMP_ITEM_SENTINEL {			\
+	.name = NULL,				\
+	.offset = 0,				\
+}
+
 /*
  * RFC 1213:  MIB-II
  * RFC 2011 (updates 1213):  SNMPv2-MIB-IP

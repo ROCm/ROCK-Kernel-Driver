@@ -57,16 +57,9 @@ static int sockstat6_seq_show(struct seq_file *seq, void *v)
 	return 0;
 }
 
-struct snmp6_item
-{
-	char *name;
-	int   offset;
-};
-#define SNMP6_SENTINEL	{ .name = NULL, .offset = 0 }
-
-static struct snmp6_item snmp6_ipv6_list[] = {
+static struct snmp_item snmp6_ipv6_list[] = {
 /* ipv6 mib according to RFC 2465 */
-#define SNMP6_GEN(x) { .name = #x , .offset = offsetof(struct ipv6_mib, x) }
+#define SNMP6_GEN(x)	SNMP_ITEM(struct ipv6_mib, x, "Ip6" #x)
 	SNMP6_GEN(Ip6InReceives),
 	SNMP6_GEN(Ip6InHdrErrors),
 	SNMP6_GEN(Ip6InTooBigErrors),
@@ -90,10 +83,10 @@ static struct snmp6_item snmp6_ipv6_list[] = {
 	SNMP6_GEN(Ip6InMcastPkts),
 	SNMP6_GEN(Ip6OutMcastPkts),
 #undef SNMP6_GEN
-	SNMP6_SENTINEL
+	SNMP_ITEM_SENTINEL
 };
 
-static struct snmp6_item snmp6_icmp6_list[] = {
+static struct snmp_item snmp6_icmp6_list[] = {
 /* icmpv6 mib according to RFC 2466
 
    Exceptions:  {In|Out}AdminProhibs are removed, because I see
@@ -104,7 +97,7 @@ static struct snmp6_item snmp6_icmp6_list[] = {
 		OutRouterAdvertisements too.
 		OutGroupMembQueries too.
  */
-#define SNMP6_GEN(x) { .name = #x , .offset = offsetof(struct icmpv6_mib, x) }
+#define SNMP6_GEN(x)	SNMP_ITEM(struct icmpv6_mib, x, #x)
 	SNMP6_GEN(Icmp6InMsgs),
 	SNMP6_GEN(Icmp6InErrors),
 	SNMP6_GEN(Icmp6InDestUnreachs),
@@ -134,17 +127,17 @@ static struct snmp6_item snmp6_icmp6_list[] = {
 	SNMP6_GEN(Icmp6OutGroupMembResponses),
 	SNMP6_GEN(Icmp6OutGroupMembReductions),
 #undef SNMP6_GEN
-	SNMP6_SENTINEL
+	SNMP_ITEM_SENTINEL
 };
 
-static struct snmp6_item snmp6_udp6_list[] = {
-#define SNMP6_GEN(x) { .name = "Udp6" #x , .offset = offsetof(struct udp_mib, Udp##x) }
+static struct snmp_item snmp6_udp6_list[] = {
+#define SNMP6_GEN(x)	SNMP_ITEM(struct udp_mib, Udp##x, "Udp6" #x)
 	SNMP6_GEN(InDatagrams),
 	SNMP6_GEN(NoPorts),
 	SNMP6_GEN(InErrors),
 	SNMP6_GEN(OutDatagrams),
 #undef SNMP6_GEN
-	SNMP6_SENTINEL
+	SNMP_ITEM_SENTINEL
 };
 
 static unsigned long
@@ -167,7 +160,7 @@ fold_field(void *mib[], int offt)
 }
 
 static inline void
-snmp6_seq_show_item(struct seq_file *seq, void **mib, struct snmp6_item *itemlist)
+snmp6_seq_show_item(struct seq_file *seq, void **mib, struct snmp_item *itemlist)
 {
 	int i;
 	for (i=0; itemlist[i].name; i++)
