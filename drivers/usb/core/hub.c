@@ -26,7 +26,6 @@
 #include <linux/ioctl.h>
 #include <linux/usb.h>
 #include <linux/usbdevice_fs.h>
-#include <linux/suspend.h>
 
 #include <asm/semaphore.h>
 #include <asm/uaccess.h>
@@ -2748,8 +2747,7 @@ static int hub_thread(void *__unused)
 	do {
 		hub_events();
 		wait_event_interruptible(khubd_wait, !list_empty(&hub_event_list)); 
-		if (current->flags & PF_FREEZE)
-			refrigerator(PF_FREEZE);
+		try_to_freeze(PF_FREEZE);
 	} while (!signal_pending(current));
 
 	pr_debug ("%s: khubd exiting\n", usbcore_name);

@@ -19,7 +19,6 @@
 #include <linux/delay.h>
 #include <linux/pci.h>
 #include <linux/moduleparam.h>
-#include <linux/suspend.h>
 #include <asm/atomic.h>
 
 #include "ieee1394_types.h"
@@ -1480,10 +1479,8 @@ static int nodemgr_host_thread(void *__hi)
 
 		if (down_interruptible(&hi->reset_sem) ||
 		    down_interruptible(&nodemgr_serialize)) {
-			if (current->flags & PF_FREEZE) {
-				refrigerator(0);
+			if (try_to_freeze(PF_FREEZE))
 				continue;
-			}
 			printk("NodeMgr: received unexpected signal?!\n" );
 			break;
 		}
