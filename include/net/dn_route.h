@@ -134,7 +134,7 @@ try_again:
 	}
 
 	sk->err = EHOSTUNREACH;
-	if (!sk->dead)
+	if (!test_bit(SOCK_DEAD, &sk->flags))
 		sk->state_change(sk);
 }
 

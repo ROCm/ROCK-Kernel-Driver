@@ -533,7 +533,7 @@ static int econet_release(struct socket *sock)
 
 	sock->sk = NULL;
 	sk->socket = NULL;
-	sk->dead = 1;
+	__set_bit(SOCK_DEAD, &sk->flags);
 
 	/* Purge queues */
 

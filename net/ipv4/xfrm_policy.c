@@ -728,7 +728,7 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx,
 		else {
 			dst_prev->child = dst1;
 			dst1->flags |= DST_NOHASH;
-			dst_clone(dst1);
+			dst_hold(dst1);
 		}
 		dst_prev = dst1;
 		if (xfrm[i]->props.mode) {
@@ -748,7 +748,7 @@ xfrm_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int nx,
 		if (err)
 			goto error;
 	} else {
-		dst_clone(&rt->u.dst);
+		dst_hold(&rt->u.dst);
 	}
 	dst_prev->child = &rt->u.dst;
 	for (dst_prev = dst; dst_prev != &rt->u.dst; dst_prev = dst_prev->child) {
@@ -853,7 +853,7 @@ restart:
 			    xdst->u.rt.fl.fl4_src == fl->fl4_src &&
 			    xdst->u.rt.fl.oif == fl->oif &&
 			    xfrm_bundle_ok(xdst, fl)) {
-				dst_clone(dst);
+				dst_hold(dst);
 				break;
 			}
 		}
@@ -919,7 +919,7 @@ restart:
 		}
 		dst->next = policy->bundles;
 		policy->bundles = dst;
-		dst_clone(dst);
+		dst_hold(dst);
 		write_unlock_bh(&policy->lock);
 	}
 	*dst_p = dst;

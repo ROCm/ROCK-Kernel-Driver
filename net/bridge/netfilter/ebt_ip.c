@@ -2,7 +2,7 @@
  *  ebt_ip
  *
  *	Authors:
- *	Bart De Schuymer <bart.de.schuymer@pandora.be>
+ *	Bart De Schuymer <bdschuym@pandora.be>
  *
  *  April, 2002
  *
@@ -86,7 +86,7 @@ static int ebt_ip_check(const char *tablename, unsigned int hookmask,
 	if (info->bitmask & ~EBT_IP_MASK || info->invflags & ~EBT_IP_MASK)
 		return -EINVAL;
 	if (info->bitmask & (EBT_IP_DPORT | EBT_IP_SPORT)) {
-		if (!info->bitmask & EBT_IPROTO)
+		if (!(info->bitmask & EBT_IPROTO))
 			return -EINVAL;
 		if (info->protocol != IPPROTO_TCP &&
 		    info->protocol != IPPROTO_UDP)
@@ -101,8 +101,10 @@ static int ebt_ip_check(const char *tablename, unsigned int hookmask,
 
 static struct ebt_match filter_ip =
 {
-	{NULL, NULL}, EBT_IP_MATCH, ebt_filter_ip, ebt_ip_check, NULL,
-	THIS_MODULE
+	.name		= EBT_IP_MATCH,
+	.match		= ebt_filter_ip,
+	.check		= ebt_ip_check,
+	.me		= THIS_MODULE,
 };
 
 static int __init init(void)

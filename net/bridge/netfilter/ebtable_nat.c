@@ -2,7 +2,7 @@
  *  ebtable_nat
  *
  *	Authors:
- *	Bart De Schuymer <bart.de.schuymer@pandora.be>
+ *	Bart De Schuymer <bdschuym@pandora.be>
  *
  *  April, 2002
  *
@@ -39,7 +39,7 @@ static struct ebt_replace initial_table =
 		[NF_BR_LOCAL_OUT]	= &initial_chains[1],
 		[NF_BR_POST_ROUTING]	= &initial_chains[2],
 	},
-	.entries	= (char *)initial_chains
+	.entries	= (char *)initial_chains,
 };
 
 static int check(const struct ebt_table_info *info, unsigned int valid_hooks)
@@ -77,19 +77,19 @@ static struct nf_hook_ops ebt_ops_nat[] = {
 		.hook		= ebt_nat_dst,
 		.pf		= PF_BRIDGE,
 		.hooknum	= NF_BR_LOCAL_OUT,
-		.priority	= NF_BR_PRI_NAT_DST_OTHER
+		.priority	= NF_BR_PRI_NAT_DST_OTHER,
 	},
 	{
 		.hook		= ebt_nat_src,
 		.pf		= PF_BRIDGE,
 		.hooknum	= NF_BR_POST_ROUTING,
-		.priority	= NF_BR_PRI_NAT_SRC
+		.priority	= NF_BR_PRI_NAT_SRC,
 	},
 	{
 		.hook		= ebt_nat_dst,
 		.pf		= PF_BRIDGE,
 		.hooknum	= NF_BR_PRE_ROUTING,
-		.priority	= NF_BR_PRI_NAT_DST_BRIDGED
+		.priority	= NF_BR_PRI_NAT_DST_BRIDGED,
 	},
 };
 

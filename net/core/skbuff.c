@@ -196,18 +196,44 @@ struct sk_buff *alloc_skb(unsigned int size, int gfp_mask)
 		goto nodata;
 
 	/* XXX: does not include slab overhead */
+	skb->next	  = skb->prev = NULL;
+	skb->list	  = NULL;
+	skb->sk		  = NULL;
+	skb->stamp.tv_sec = 0;	/* No idea about time */
+	skb->dev	  = NULL;
+	skb->dst	  = NULL;
+	skb->sp		  = NULL;
+	memset(skb->cb, 0, sizeof(skb->cb));
+	/* Set up other state */
+	skb->len	  = 0;
+	skb->data_len	  = 0;
+	skb->csum	  = 0;
+	skb->cloned	  = 0;
+	skb->pkt_type	  = PACKET_HOST;	/* Default type */
+	skb->ip_summed	  = 0;
+	skb->priority	  = 0;
+	atomic_set(&skb->users, 1);
+	skb->security	  = 0;	/* By default packets are insecure */
 	skb->truesize = size + sizeof(struct sk_buff);
-
+	
 	/* Load the data pointers. */
 	skb->head = skb->data = skb->tail = data;
 	skb->end  = data + size;
 
-	/* Set up other state */
-	skb->len      = 0;
-	skb->cloned   = 0;
-	skb->data_len = 0;
-
-	atomic_set(&skb->users, 1);
+	skb->destructor	  = NULL;
+#ifdef CONFIG_NETFILTER
+	skb->nfmark	= skb->nfcache = 0;
+	skb->nfct	= NULL;
+#ifdef CONFIG_NETFILTER_DEBUG
+	skb->nf_debug	= 0;
+#endif
+#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
+	skb->nf_bridge	= NULL;
+#endif
+#endif
+#ifdef CONFIG_NET_SCHED
+	skb->tc_index	= 0;
+#endif	
 	atomic_set(&(skb_shinfo(skb)->dataref), 1);
 	skb_shinfo(skb)->nr_frags  = 0;
 	skb_shinfo(skb)->tso_size = 0;
@@ -221,43 +247,6 @@ nodata:
 	goto out;
 }
 
-
-/*
- *	Slab constructor for a skb head.
- */
-static void skb_headerinit(void *p, kmem_cache_t *cache,
-			   unsigned long flags)
-{
-	struct sk_buff *skb = p;
-
-	skb->next	  = skb->prev = NULL;
-	skb->list	  = NULL;
-	skb->sk		  = NULL;
-	skb->stamp.tv_sec = 0;	/* No idea about time */
-	skb->dev	  = NULL;
-	skb->dst	  = NULL;
-	skb->sp		  = NULL;
-	memset(skb->cb, 0, sizeof(skb->cb));
-	skb->pkt_type	  = PACKET_HOST;	/* Default type */
-	skb->ip_summed	  = 0;
-	skb->priority	  = 0;
-	skb->security	  = 0;	/* By default packets are insecure */
-	skb->destructor	  = NULL;
-
-#ifdef CONFIG_NETFILTER
-	skb->nfmark	  = skb->nfcache = 0;
-	skb->nfct	  = NULL;
-#ifdef CONFIG_NETFILTER_DEBUG
-	skb->nf_debug	  = 0;
-#endif
-#if defined(CONFIG_BRIDGE) || defined(CONFIG_BRIDGE_MODULE)
-	skb->nf_bridge	  = NULL;
-#endif
-#endif
-#ifdef CONFIG_NET_SCHED
-	skb->tc_index	  = 0;
-#endif
-}
 
 static void skb_drop_fraglist(struct sk_buff *skb)
 {
@@ -339,7 +328,6 @@ void __kfree_skb(struct sk_buff *skb)
 	nf_bridge_put(skb->nf_bridge);
 #endif
 #endif
-	skb_headerinit(skb, NULL, 0);  /* clean state */
 	kfree_skbmem(skb);
 }
 
@@ -1261,7 +1249,7 @@ void __init skb_init(void)
 					      sizeof(struct sk_buff),
 					      0,
 					      SLAB_HWCACHE_ALIGN,
-					      skb_headerinit, NULL);
+					      NULL, NULL);
 	if (!skbuff_head_cache)
 		panic("cannot create skbuff cache");
 

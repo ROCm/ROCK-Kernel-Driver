@@ -118,7 +118,7 @@ static void dn_ack(struct sock *sk, struct sk_buff *skb, unsigned short ack)
 			break;
 	}
 
-	if (wakeup && !sk->dead)
+	if (wakeup && !test_bit(SOCK_DEAD, &sk->flags))
 		sk->state_change(sk);
 }
 
@@ -367,7 +367,7 @@ static void dn_nsp_conn_conf(struct sock *sk, struct sk_buff *skb)
 			}
 		}
                 dn_nsp_send_link(sk, DN_NOCHANGE, 0);
-                if (!sk->dead)
+                if (!test_bit(SOCK_DEAD, &sk->flags))
                 	sk->state_change(sk);
         }
 
@@ -428,7 +428,7 @@ static void dn_nsp_disc_init(struct sock *sk, struct sk_buff *skb)
 			break;
 	}
 
-	if (!sk->dead) {
+	if (!test_bit(SOCK_DEAD, &sk->flags)) {
 		if (sk->socket->state != SS_UNCONNECTED)
 			sk->socket->state = SS_DISCONNECTING;
 		sk->state_change(sk);
@@ -477,7 +477,7 @@ static void dn_nsp_disc_conf(struct sock *sk, struct sk_buff *skb)
 			scp->state = DN_CN;
 	}
 
-	if (!sk->dead) {
+	if (!test_bit(SOCK_DEAD, &sk->flags)) {
 		if (sk->socket->state != SS_UNCONNECTED)
 			sk->socket->state = SS_DISCONNECTING;
 		sk->state_change(sk);
@@ -549,7 +549,7 @@ static void dn_nsp_linkservice(struct sock *sk, struct sk_buff *skb)
 			}
 			break;
                 }
-		if (wake_up && !sk->dead)
+		if (wake_up && !test_bit(SOCK_DEAD, &sk->flags))
 			sk->state_change(sk);
         }
 
@@ -587,7 +587,7 @@ static __inline__ int dn_queue_skb(struct sock *sk, struct sk_buff *skb, int sig
 	 * Therefore the plain read_lock is ok here. -DaveM
 	 */
 	read_lock(&sk->callback_lock);
-        if (!sk->dead) {
+        if (!test_bit(SOCK_DEAD, &sk->flags)) {
 		struct socket *sock = sk->socket;
 		wake_up_interruptible(sk->sleep);
 		if (sock && sock->fasync_list &&
@@ -671,7 +671,7 @@ static void dn_returned_conn_init(struct sock *sk, struct sk_buff *skb)
 	if (scp->state == DN_CI) {
 		scp->state = DN_NC;
 		sk->state = TCP_CLOSE;
-		if (!sk->dead)
+		if (!test_bit(SOCK_DEAD, &sk->flags))
 			sk->state_change(sk);
 	}
 
@@ -861,7 +861,7 @@ int dn_nsp_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 		int other = 1;
 
 		/* both data and ack frames can kick a CC socket into RUN */
-		if ((scp->state == DN_CC) && !sk->dead) {
+		if ((scp->state == DN_CC) && !test_bit(SOCK_DEAD, &sk->flags)) {
 			scp->state = DN_RUN;
 			sk->state = TCP_ESTABLISHED;
 			sk->state_change(sk);

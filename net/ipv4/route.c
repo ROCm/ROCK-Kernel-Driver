@@ -930,7 +930,7 @@ void ip_rt_redirect(u32 old_gw, u32 daddr, u32 new_gw,
 				    rth->u.dst.dev != dev)
 					break;
 
-				dst_clone(&rth->u.dst);
+				dst_hold(&rth->u.dst);
 				rcu_read_unlock();
 
 				rt = dst_alloc(&ipv4_dst_ops);

@@ -800,7 +800,7 @@ static void tcp_v6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 
 			dst = ip6_route_output(sk, &fl);
 		} else
-			dst_clone(dst);
+			dst_hold(dst);
 
 		if (dst->error) {
 			sk->err_soft = -dst->error;

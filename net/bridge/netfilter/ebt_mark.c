@@ -2,15 +2,16 @@
  *  ebt_mark
  *
  *	Authors:
- *	Bart De Schuymer <bart.de.schuymer@pandora.be>
+ *	Bart De Schuymer <bdschuym@pandora.be>
  *
  *  July, 2002
  *
  */
 
-// The mark target can be used in any chain
-// I believe adding a mangle table just for marking is total overkill
-// Marking a frame doesn't really change anything in the frame anyway
+/* The mark target can be used in any chain,
+ * I believe adding a mangle table just for marking is total overkill.
+ * Marking a frame doesn't really change anything in the frame anyway.
+ */
 
 #include <linux/netfilter_bridge/ebtables.h>
 #include <linux/netfilter_bridge/ebt_mark_t.h>
@@ -46,8 +47,10 @@ static int ebt_target_mark_check(const char *tablename, unsigned int hookmask,
 
 static struct ebt_target mark_target =
 {
-	{NULL, NULL}, EBT_MARK_TARGET, ebt_target_mark,
-	ebt_target_mark_check, NULL, THIS_MODULE
+	.name		= EBT_MARK_TARGET,
+	.target		= ebt_target_mark,
+	.check		= ebt_target_mark_check,
+	.me		= THIS_MODULE,
 };
 
 static int __init init(void)

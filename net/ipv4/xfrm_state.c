@@ -680,7 +680,7 @@ int xfrm_user_policy(struct sock *sk, int optname, u8 *optval, int optlen)
 	err = -EINVAL;
 	read_lock(&xfrm_km_lock);
 	list_for_each_entry(km, &xfrm_km_list, list) {
-		pol = km->compile_policy(optname, data, optlen, &err);
+		pol = km->compile_policy(sk->family, optname, data, optlen, &err);
 		if (err >= 0)
 			break;
 	}

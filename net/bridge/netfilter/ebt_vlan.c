@@ -1,7 +1,7 @@
 /*
  * Description: EBTables 802.1Q match extension kernelspace module.
  * Authors: Nick Fedchik <nick@fedchik.org.ua>
- *          Bart De Schuymer <bart.de.schuymer@pandora.be>
+ *          Bart De Schuymer <bdschuym@pandora.be>
  *    
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -226,12 +226,10 @@ ebt_check_vlan(const char *tablename,
 }
 
 static struct ebt_match filter_vlan = {
-	{NULL, NULL},
-	EBT_VLAN_MATCH,
-	ebt_filter_vlan,
-	ebt_check_vlan,
-	NULL,
-	THIS_MODULE
+	.name		= EBT_VLAN_MATCH,
+	.match		= ebt_filter_vlan,
+	.check		= ebt_check_vlan,
+	.me		= THIS_MODULE,
 };
 
 /*

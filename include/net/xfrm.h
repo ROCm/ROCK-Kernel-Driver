@@ -223,7 +223,7 @@ struct xfrm_mgr
 	char			*id;
 	int			(*notify)(struct xfrm_state *x, int event);
 	int			(*acquire)(struct xfrm_state *x, struct xfrm_tmpl *, struct xfrm_policy *xp, int dir);
-	struct xfrm_policy	*(*compile_policy)(int opt, u8 *data, int len, int *dir);
+	struct xfrm_policy	*(*compile_policy)(u16 family, int opt, u8 *data, int len, int *dir);
 };
 
 extern int xfrm_register_km(struct xfrm_mgr *km);

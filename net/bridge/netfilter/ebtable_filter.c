@@ -2,7 +2,7 @@
  *  ebtable_filter
  *
  *	Authors:
- *	Bart De Schuymer <bart.de.schuymer@pandora.be>
+ *	Bart De Schuymer <bdschuym@pandora.be>
  *
  *  April, 2002
  *
@@ -27,7 +27,7 @@ static struct ebt_entries initial_chains[] =
 	{
 		.name	= "OUTPUT",
 		.policy	= EBT_ACCEPT,
-	}
+	},
 };
 
 static struct ebt_replace initial_table =
@@ -35,12 +35,12 @@ static struct ebt_replace initial_table =
 	.name		= "filter",
 	.valid_hooks	= FILTER_VALID_HOOKS,
 	.entries_size	= 3 * sizeof(struct ebt_entries),
-  	.hook_entry	= {
+	.hook_entry	= {
 		[NF_BR_LOCAL_IN]	= &initial_chains[0],
 		[NF_BR_FORWARD]		= &initial_chains[1],
-    		[NF_BR_LOCAL_OUT]	= &initial_chains[2],
+		[NF_BR_LOCAL_OUT]	= &initial_chains[2],
 	},
-	.entries	= (char *)initial_chains
+	.entries	= (char *)initial_chains,
 };
 
 static int check(const struct ebt_table_info *info, unsigned int valid_hooks)
@@ -77,14 +77,14 @@ static struct nf_hook_ops ebt_ops_filter[] = {
 		.hook		= ebt_hook,
 		.pf		= PF_BRIDGE,
 		.hooknum	= NF_BR_FORWARD,
-		.priority	= NF_BR_PRI_FILTER_BRIDGED
+		.priority	= NF_BR_PRI_FILTER_BRIDGED,
 	},
 	{
 		.hook		= ebt_hook,
 		.pf		= PF_BRIDGE,
 		.hooknum	= NF_BR_LOCAL_OUT,
-		.priority	= NF_BR_PRI_FILTER_OTHER
-	}
+		.priority	= NF_BR_PRI_FILTER_OTHER,
+	},
 };
 
 static int __init init(void)

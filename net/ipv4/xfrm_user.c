@@ -538,6 +538,21 @@ static int verify_newpolicy_info(struct xfrm_userpolicy_info *p)
 		return -EINVAL;
 	};
 
+	switch (p->family) {
+	case AF_INET:
+		break;
+
+	case AF_INET6:
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+		break;
+#else
+		return  -EAFNOSUPPORT;
+#endif
+
+	default:
+		return -EINVAL;
+	};
+
 	return verify_policy_dir(p->dir);
 }
 
@@ -1057,7 +1072,8 @@ static int xfrm_send_acquire(struct xfrm_state *x, struct xfrm_tmpl *xt,
 /* User gives us xfrm_user_policy_info followed by an array of 0
  * or more templates.
  */
-struct xfrm_policy *xfrm_compile_policy(int opt, u8 *data, int len, int *dir)
+struct xfrm_policy *xfrm_compile_policy(u16 family, int opt,
+                                        u8 *data, int len, int *dir)
 {
 	struct xfrm_userpolicy_info *p = (struct xfrm_userpolicy_info *)data;
 	struct xfrm_user_tmpl *ut = (struct xfrm_user_tmpl *) (p + 1);
