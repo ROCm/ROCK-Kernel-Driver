@@ -361,6 +361,7 @@ static int try_to_unmap_one(struct page * page, pte_addr_t paddr)
 		set_page_dirty(page);
 
 	mm->rss--;
+	page_cache_release(page);
 	ret = SWAP_SUCCESS;
 
 out_unlock:
@@ -401,7 +402,6 @@ int try_to_unmap(struct page * page)
 		if (ret == SWAP_SUCCESS) {
 			if (page_test_and_clear_dirty(page))
 				set_page_dirty(page);
-			page_cache_release(page);
 			page->pte.direct = 0;
 			ClearPageDirect(page);
 		}
@@ -441,7 +441,6 @@ int try_to_unmap(struct page * page)
 				if (page->pte.direct == 0 &&
 				    page_test_and_clear_dirty(page))
 					set_page_dirty(page);
-				page_cache_release(page);
 				break;
 			case SWAP_AGAIN:
 				/* Skip this pte, remembering status. */
