@@ -32,9 +32,8 @@ config ATM_ENI
 	  The driver works with MMF (-MF or ...F) and UTP-5 (-U5 or ...D)
 	  adapters.
 
-	  This driver is also available as a module.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called eni.
+	  To compile this driver as a module, choose M here: the module will
+	  be called eni.
 
 config ATM_ENI_DEBUG
 	bool "Enable extended debugging"
@@ -138,10 +137,8 @@ config ATM_FIRESTREAM
 	  Driver for the Fujitsu FireStream 155 (MB86697) and
 	  FireStream 50 (MB86695) ATM PCI chips.
 
-	  This driver is also available as a module.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  firestream.
+	  To compile this driver as a module, choose M here: the module will
+	  be called firestream.
 
 config ATM_ZATM
 	tristate "ZeitNet ZN1221/ZN1225"
@@ -150,9 +147,8 @@ config ATM_ZATM
 	  Driver for the ZeitNet ZN1221 (MMF) and ZN1225 (UTP-5) 155 Mbps ATM
 	  adapters.
 
-	  This driver is also available as a module.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called zatm.
+	  To compile this driver as a module, choose M here: the module will
+	  be called zatm.
 
 config ATM_ZATM_DEBUG
 	bool "Enable extended debugging"
@@ -176,10 +172,8 @@ config ATM_NICSTAR
 	  25 and for 155 Mbps, including IDT cards and the Fore ForeRunnerLE
 	  series. Say Y if you have one of those.
 
-	  This driver is also available as a module.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called
-	  nicstar.
+	  To compile this driver as a module, choose M here: the module will
+	  be called nicstar.
 
 config ATM_NICSTAR_USE_SUNI
 	bool "Use suni PHY driver (155Mbps)"
@@ -209,9 +203,8 @@ config ATM_IDT77252
 	help
 	  Driver for the IDT 77252 ATM PCI chips.
 
-	  This driver is also available as a module.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called idt77252
+	  To compile this driver as a module, choose M here: the module will
+	  be called idt77252.
 
 config ATM_IDT77252_DEBUG
 	bool "Enable debugging messages"

@@ -250,7 +250,7 @@ struct kmem_cache_s {
 	unsigned int		limit;
 /* 2) touched by every alloc & free from the backend */
 	struct kmem_list3	lists;
-	/* NUMA: kmem_3list_t	*nodelists[NR_NODES] */
+	/* NUMA: kmem_3list_t	*nodelists[MAX_NUMNODES] */
 	unsigned int		objsize;
 	unsigned int	 	flags;	/* constant flags */
 	unsigned int		num;	/* # of objs per slab */
@@ -2675,8 +2675,8 @@ struct seq_operations slabinfo_op = {
  * slabinfo_write - Tuning for the slab allocator
  * @file: unused
  * @buffer: user buffer
- * @count: data len
- * @data: unused
+ * @count: data length
+ * @ppos: unused
  */
 ssize_t slabinfo_write(struct file *file, const char __user *buffer,
 				size_t count, loff_t *ppos)

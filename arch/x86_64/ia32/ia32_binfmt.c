@@ -102,7 +102,7 @@ do {									      \
 		(const struct elf32_phdr *) (VSYSCALL32_BASE		      \
 					   + VSYSCALL32_EHDR->e_phoff);	      \
 	int i;								      \
-	for (i = 0; i < VSYSCALL_EHDR->e_phnum; ++i) {			      \
+	for (i = 0; i < VSYSCALL32_EHDR->e_phnum; ++i) {		      \
 		if (vsyscall_phdrs[i].p_type == PT_LOAD)		      \
 			DUMP_WRITE((void *) (u64) vsyscall_phdrs[i].p_vaddr,	      \
 				   PAGE_ALIGN(vsyscall_phdrs[i].p_memsz));    \

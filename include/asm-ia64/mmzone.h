@@ -92,14 +92,12 @@
 extern unsigned long max_low_pfn;
 
 
-#ifdef CONFIG_IA64_DIG
+#if defined(CONFIG_IA64_DIG)
 
 /*
  * Platform definitions for DIG platform with contiguous memory.
  */
-#define MAX_PHYSNODE_ID	8	/* Maximum node number +1 */
-#define NR_NODES	8	/* Maximum number of nodes in SSI */
-
+#define MAX_PHYSNODE_ID	8		/* Maximum node number +1 */
 #define MAX_PHYS_MEMORY	(1UL << 40)	/* 1 TB */
 
 /*
@@ -119,8 +117,28 @@ extern unsigned long max_low_pfn;
 # error Unsupported bank and nodesize!
 #endif
 #define BANKSIZE		(1UL << BANKSHIFT)
+
+#elif defined(CONFIG_IA64_SGI_SN2)
+
+/*
+ * SGI SN2 discontig definitions
+ */
+#define MAX_PHYSNODE_ID	2048	/* 2048 node ids (also called nasid) */
+#define MAX_PHYS_MEMORY	(1UL << 49)
+
+#define NR_BANKS_PER_NODE	4
+#define BANKSHIFT		38
+#define SN2_NODE_SIZE		(64UL*1024*1024*1024)	/* 64GB per node */
+#define BANKSIZE		(SN2_NODE_SIZE/NR_BANKS_PER_NODE)
+
+#endif /* CONFIG_IA64_DIG */
+
+#if defined(CONFIG_IA64_DIG) || defined (CONFIG_IA64_SGI_SN2)
+/* Common defines for both platforms */
+#include <asm/numnodes.h>
 #define BANK_OFFSET(addr)	((unsigned long)(addr) & (BANKSIZE-1))
-#define NR_BANKS		(NR_BANKS_PER_NODE * NR_NODES)
+#define NR_BANKS		(NR_BANKS_PER_NODE * (1 << NODES_SHIFT))
+#define NR_MEMBLKS		(NR_BANKS)
 
 /*
  * VALID_MEM_KADDR returns a boolean to indicate if a kaddr is
@@ -136,28 +154,6 @@ extern unsigned long max_low_pfn;
 #define BANK_MEM_MAP_INDEX(kaddr) \
 	(((unsigned long)(kaddr) & (MAX_PHYS_MEMORY-1)) >> BANKSHIFT)
 
-#elif defined(CONFIG_IA64_SGI_SN2)
-/*
- * SGI SN2 discontig definitions
- */
-#define MAX_PHYSNODE_ID	2048	/* 2048 node ids (also called nasid) */
-#define NR_NODES	128	/* Maximum number of nodes in SSI */
-#define MAX_PHYS_MEMORY	(1UL << 49)
+#endif /* CONFIG_IA64_DIG || CONFIG_IA64_SGI_SN2 */
 
-#define BANKSHIFT		38
-#define NR_BANKS_PER_NODE	4
-#define SN2_NODE_SIZE		(64UL*1024*1024*1024)	/* 64GB per node */
-#define BANKSIZE		(SN2_NODE_SIZE/NR_BANKS_PER_NODE)
-#define BANK_OFFSET(addr)	((unsigned long)(addr) & (BANKSIZE-1))
-#define NR_BANKS		(NR_BANKS_PER_NODE * NR_NODES)
-#define VALID_MEM_KADDR(kaddr)	1
-
-/*
- * Given a nodeid & a bank number, find the address of the mem_map
- * entry for the first page of the bank.
- */
-#define BANK_MEM_MAP_INDEX(kaddr) \
-	(((unsigned long)(kaddr) & (MAX_PHYS_MEMORY-1)) >> BANKSHIFT)
-
-#endif /* CONFIG_IA64_DIG */
 #endif /* _ASM_IA64_MMZONE_H */

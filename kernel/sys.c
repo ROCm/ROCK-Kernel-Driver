@@ -951,7 +951,7 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 
 	if (p->parent == current || p->real_parent == current) {
 		err = -EPERM;
-		if (p->session != current->session)
+		if (process_session(p) != process_session(current))
 			goto out;
 		err = -EACCES;
 		if (p->did_exec)
@@ -963,7 +963,7 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 	}
 
 	err = -EPERM;
-	if (p->leader)
+	if (process_session_leader(p))
 		goto out;
 
 	if (pgid != pid) {
@@ -972,7 +972,7 @@ asmlinkage long sys_setpgid(pid_t pid, pid_t pgid)
 		struct list_head *l;
 
 		for_each_task_pid(pgid, PIDTYPE_PGID, p, l, pid)
-			if (p->session == current->session)
+			if (process_session(p) == process_session(current))
 				goto ok_pgid;
 		goto out;
 	}
@@ -984,7 +984,7 @@ ok_pgid:
 
 	if (process_group(p) != pgid) {
 		detach_pid(p, PIDTYPE_PGID);
-		p->group_leader->__pgrp = pgid;
+		p->signal->pgrp = pgid;
 		attach_pid(p, PIDTYPE_PGID, pgid);
 	}
 
@@ -1026,7 +1026,7 @@ asmlinkage long sys_getpgrp(void)
 asmlinkage long sys_getsid(pid_t pid)
 {
 	if (!pid) {
-		return current->session;
+		return process_session(current);
 	} else {
 		int retval;
 		struct task_struct *p;
@@ -1038,7 +1038,7 @@ asmlinkage long sys_getsid(pid_t pid)
 		if(p) {
 			retval = security_task_getsid(p);
 			if (!retval)
-				retval = p->session;
+				retval = process_session(p);
 		}
 		read_unlock(&tasklist_lock);
 		return retval;
@@ -1059,10 +1059,10 @@ asmlinkage long sys_setsid(void)
 	if (pid)
 		goto out;
 
-	current->leader = 1;
+	current->signal->leader = 1;
 	__set_special_pids(current->pid, current->pid);
-	current->tty = NULL;
-	current->tty_old_pgrp = 0;
+	current->signal->tty = NULL;
+	current->signal->tty_old_pgrp = 0;
 	err = process_group(current);
 out:
 	write_unlock_irq(&tasklist_lock);

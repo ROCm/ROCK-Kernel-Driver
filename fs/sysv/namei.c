@@ -42,21 +42,12 @@ static int add_nondir(struct dentry *dentry, struct inode *inode)
 
 static int sysv_hash(struct dentry *dentry, struct qstr *qstr)
 {
-	unsigned long hash;
-	int i;
-	const unsigned char *name;
-
-	i = SYSV_NAMELEN;
-	if (i >= qstr->len)
-		return 0;
 	/* Truncate the name in place, avoids having to define a compare
 	   function. */
-	qstr->len = i;
-	name = qstr->name;
-	hash = init_name_hash();
-	while (i--)
-		hash = partial_name_hash(*name++, hash);
-	qstr->hash = end_name_hash(hash);
+	if (qstr->len > SYSV_NAMELEN) {
+		qstr->len = SYSV_NAMELEN;
+		qstr->hash = full_name_hash(qstr->name, qstr->len);
+	}
 	return 0;
 }
 

@@ -44,8 +44,11 @@ struct isakmp_hdr {
 
 
 static struct ip_vs_conn *
-esp_conn_in_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
-		struct iphdr *iph, union ip_vs_tphdr h, int inverse)
+esp_conn_in_get(const struct sk_buff *skb,
+		struct ip_vs_protocol *pp,
+		const struct iphdr *iph,
+		unsigned int proto_off,
+		int inverse)
 {
 	struct ip_vs_conn *cp;
 
@@ -81,8 +84,8 @@ esp_conn_in_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
 
 
 static struct ip_vs_conn *
-esp_conn_out_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
-		 struct iphdr *iph, union ip_vs_tphdr h, int inverse)
+esp_conn_out_get(const struct sk_buff *skb, struct ip_vs_protocol *pp,
+		 const struct iphdr *iph, unsigned int proto_off, int inverse)
 {
 	struct ip_vs_conn *cp;
 
@@ -120,7 +123,6 @@ esp_conn_out_get(struct sk_buff *skb, struct ip_vs_protocol *pp,
 
 static int
 esp_conn_schedule(struct sk_buff *skb, struct ip_vs_protocol *pp,
-		  struct iphdr *iph, union ip_vs_tphdr h,
 		  int *verdict, struct ip_vs_conn **cpp)
 {
 	/*
@@ -132,12 +134,18 @@ esp_conn_schedule(struct sk_buff *skb, struct ip_vs_protocol *pp,
 
 
 static void
-esp_debug_packet(struct ip_vs_protocol *pp, struct iphdr *iph, char *msg)
+esp_debug_packet(struct ip_vs_protocol *pp, const struct sk_buff *skb,
+		 int offset, const char *msg)
 {
 	char buf[256];
+	struct iphdr iph;
 
-	sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u",
-		pp->name, NIPQUAD(iph->saddr), NIPQUAD(iph->daddr));
+	if (skb_copy_bits(skb, offset, &iph, sizeof(iph)) < 0)
+		sprintf(buf, "%s TRUNCATED", pp->name);
+	else
+		sprintf(buf, "%s %u.%u.%u.%u->%u.%u.%u.%u",
+			pp->name, NIPQUAD(iph.saddr),
+			NIPQUAD(iph.daddr));
 
 	printk(KERN_DEBUG "IPVS: %s: %s\n", msg, buf);
 }

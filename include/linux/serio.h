@@ -18,10 +18,7 @@
 
 #include <linux/list.h>
 
-struct serio;
-
 struct serio {
-
 	void *private;
 	void *driver;
 	char *name;
@@ -45,7 +42,6 @@ struct serio {
 };
 
 struct serio_dev {
-
 	void *private;
 	char *name;
 

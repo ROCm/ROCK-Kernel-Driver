@@ -499,8 +499,8 @@ static struct task_struct * __init fork_by_hand(void)
 #ifdef CONFIG_NUMA
 
 /* which logical CPUs are on which nodes */
-cpumask_t node_2_cpu_mask[MAX_NR_NODES] =
-				{ [0 ... MAX_NR_NODES-1] = CPU_MASK_NONE };
+cpumask_t node_2_cpu_mask[MAX_NUMNODES] =
+				{ [0 ... MAX_NUMNODES-1] = CPU_MASK_NONE };
 /* which node each logical CPU is on */
 int cpu_2_node[NR_CPUS] = { [0 ... NR_CPUS-1] = 0 };
 
@@ -518,7 +518,7 @@ static inline void unmap_cpu_to_node(int cpu)
 	int node;
 
 	printk("Unmapping cpu %d from all nodes\n", cpu);
-	for (node = 0; node < MAX_NR_NODES; node ++)
+	for (node = 0; node < MAX_NUMNODES; node ++)
 		cpu_clear(cpu, node_2_cpu_mask[node]);
 	cpu_2_node[cpu] = -1;
 }

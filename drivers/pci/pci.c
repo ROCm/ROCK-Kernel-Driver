@@ -126,11 +126,13 @@ pci_find_capability(struct pci_dev *dev, int cap)
 
 /**
  * pci_bus_find_capability - query for devices' capabilities 
- * @dev: PCI device to query
- * @cap: capability code
+ * @bus:   the PCI bus to query
+ * @devfn: PCI device to query
+ * @cap:   capability code
  *
  * Like pci_find_capability() but works for pci devices that do not have a
  * pci_dev structure set up yet. 
+ *
  * Returns the address of the requested capability structure within the
  * device's PCI configuration space or 0 in case the device does not
  * support it.
