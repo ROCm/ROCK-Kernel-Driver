@@ -11,11 +11,11 @@
  * and additional input from James Simmon's port of Hannu Mallat's tdfx
  * driver.
  *
- * $Id$
- *
- * I have a Creative Graphics Blaster Exxtreme card - pm2fb on x86.
- * I have no access to other pm2fb implementations, and cannot test
- * on them. Therefore for now I am omitting Sparc and CVision code.
+ * I have a Creative Graphics Blaster Exxtreme card - pm2fb on x86.  I
+ * have no access to other pm2fb implementations. Sparc (and thus
+ * hopefully other big-endian) devices now work, thanks to a lot of
+ * testing work by Ron Murray. I have no access to CVision hardware,
+ * and therefore for now I am omitting the CVision code.
  *
  * Multiple boards support has been on the TODO list for ages.
  * Don't expect this to change.
@@ -46,10 +46,6 @@
 
 #if !defined(__LITTLE_ENDIAN) && !defined(__BIG_ENDIAN)
 #error	"The endianness of the target host has not been defined."
-#endif
-
-#if defined(__BIG_ENDIAN) && !defined(__sparc__)
-#define PM2FB_BE_APERTURE
 #endif
 
 #if !defined(CONFIG_PCI)
@@ -424,27 +420,36 @@ static void reset_config(struct pm2fb_par* p)
 
 static void set_aperture(struct pm2fb_par* p, u32 depth)
 {
+	/*
+	 * The hardware is little-endian. When used in big-endian
+	 * hosts, the on-chip aperture settings are used where
+	 * possible to translate from host to card byte order.
+	 */
 	WAIT_FIFO(p, 4);
 #ifdef __LITTLE_ENDIAN
-	pm2_WR(p, PM2R_APERTURE_ONE, 0);
-	pm2_WR(p, PM2R_APERTURE_TWO, 0);
+	pm2_WR(p, PM2R_APERTURE_ONE, PM2F_APERTURE_STANDARD);
 #else
 	switch (depth) {
-	case 8:
-	case 24:
-		pm2_WR(p, PM2R_APERTURE_ONE, 0);
-		pm2_WR(p, PM2R_APERTURE_TWO, 1);
+	case 24:	/* RGB->BGR */
+		/*
+		 * We can't use the aperture to translate host to
+		 * card byte order here, so we switch to BGR mode
+		 * in pm2fb_set_par().
+		 */
+	case 8:		/* B->B */
+		pm2_WR(p, PM2R_APERTURE_ONE, PM2F_APERTURE_STANDARD);
 		break;
-	case 16:
-		pm2_WR(p, PM2R_APERTURE_ONE, 2);
-		pm2_WR(p, PM2R_APERTURE_TWO, 1);
+	case 16:	/* HL->LH */
+		pm2_WR(p, PM2R_APERTURE_ONE, PM2F_APERTURE_HALFWORDSWAP);
 		break;
-	case 32:
-		pm2_WR(p, PM2R_APERTURE_ONE, 1);
-		pm2_WR(p, PM2R_APERTURE_TWO, 1);
+	case 32:	/* RGBA->ABGR */
+		pm2_WR(p, PM2R_APERTURE_ONE, PM2F_APERTURE_BYTESWAP);
 		break;
 	}
 #endif
+
+	// We don't use aperture two, so this may be superflous
+	pm2_WR(p, PM2R_APERTURE_TWO, PM2F_APERTURE_STANDARD);
 }
 
 static void set_color(struct pm2fb_par* p, unsigned char regno,
@@ -638,13 +643,11 @@ static int pm2fb_check_var(struct fb_var_screeninfo *var, struct fb_info *info)
 		var->blue.offset  = 0;
 		var->blue.length  = 5;
 		break;
+	case 32:
+		var->transp.offset = 24;
+		var->transp.length = 8;
 	case 24:
 		var->red.offset	  = 16;
-		var->green.offset = 8;
-		var->blue.offset  = 0;
-		var->red.length = var->green.length = var->blue.length = 8;
-	case 32:
-		var->red.offset   = 16;
 		var->green.offset = 8;
 		var->blue.offset  = 0;
 		var->red.length = var->green.length = var->blue.length = 8;
@@ -676,7 +679,7 @@ static int pm2fb_set_par(struct fb_info *info)
 	u32 stride;
 	u32 base;
 	u32 video = 0;
-	u32 clrmode = PM2F_RD_COLOR_MODE_RGB;
+	u32 clrmode = PM2F_RD_COLOR_MODE_RGB | PM2F_RD_GUI_ACTIVE;
 	u32 txtmap = 0;
 	u32 pixsize = 0;
 	u32 clrformat = 0;
@@ -771,22 +774,23 @@ static int pm2fb_set_par(struct fb_info *info)
 		break;
 	case 16:
 		pm2_WR(par, PM2R_FB_READ_PIXEL, 1);
-		clrmode |= PM2F_RD_TRUECOLOR | 0x06;
+		clrmode |= PM2F_RD_TRUECOLOR | PM2F_RD_PIXELFORMAT_RGB565;
 		txtmap = PM2F_TEXTEL_SIZE_16;
 		pixsize = 1;
 		clrformat = 0x70;
 		break;
 	case 32:
 		pm2_WR(par, PM2R_FB_READ_PIXEL, 2);
-		clrmode |= PM2F_RD_TRUECOLOR | 0x08;
+		clrmode |= PM2F_RD_TRUECOLOR | PM2F_RD_PIXELFORMAT_RGBA8888;
 		txtmap = PM2F_TEXTEL_SIZE_32;
 		pixsize = 2;
 		clrformat = 0x20;
 		break;
 	case 24:
 		pm2_WR(par, PM2R_FB_READ_PIXEL, 4);
-		clrmode |= PM2F_RD_TRUECOLOR | 0x09;
-#ifndef PM2FB_BE_APERTURE
+		clrmode |= PM2F_RD_TRUECOLOR | PM2F_RD_PIXELFORMAT_RGB888;
+#ifdef __BIG_ENDIAN
+		/* Use BGR not RGB */
 		clrmode &= ~PM2F_RD_COLOR_MODE_RGB;
 #endif
 		txtmap = PM2F_TEXTEL_SIZE_24;
@@ -819,8 +823,7 @@ static int pm2fb_set_par(struct fb_info *info)
 	WAIT_FIFO(par, 4);
 	switch (par->type) {
 	case PM2_TYPE_PERMEDIA2:
-		pm2_RDAC_WR(par, PM2I_RD_COLOR_MODE,
-			    PM2F_RD_COLOR_MODE_RGB | PM2F_RD_GUI_ACTIVE | clrmode);
+		pm2_RDAC_WR(par, PM2I_RD_COLOR_MODE, clrmode);
 		break;
 	case PM2_TYPE_PERMEDIA2V:
 		pm2v_RDAC_WR(par, PM2VI_RD_PIXEL_SIZE, pixsize);
@@ -1086,9 +1089,15 @@ static int __devinit pm2fb_probe(struct pci_dev *pdev,
 	pm2fb_fix.mmio_start = pci_resource_start(pdev, 0);
 	pm2fb_fix.mmio_len = PM2_REGS_SIZE;
 
-#ifdef PM2FB_BE_APERTURE
+#if defined(__BIG_ENDIAN)
+	/*
+	 * PM2 has a 64k register file, mapped twice in 128k. Lower
+	 * map is little-endian, upper map is big-endian.
+	 */
 	pm2fb_fix.mmio_start += PM2_REGS_SIZE;
+	DPRINTK("Adjusting register base for big-endian.\n");
 #endif
+	DPRINTK("Register base at 0x%lx\n", pm2fb_fix.mmio_start);
     
 	/* Registers - request region and map it. */
 	if ( !request_mem_region(pm2fb_fix.mmio_start, pm2fb_fix.mmio_len,
