@@ -1219,7 +1219,7 @@ restart:
 	read_unlock_bh(&rt6_lock);
 }
 
-int ipv6_route_ioctl(unsigned int cmd, void *arg)
+int ipv6_route_ioctl(unsigned int cmd, void __user *arg)
 {
 	struct in6_rtmsg rtmsg;
 	int err;
@@ -1886,7 +1886,7 @@ static int flush_delay;
 
 static
 int ipv6_sysctl_rtcache_flush(ctl_table *ctl, int write, struct file * filp,
-			      void *buffer, size_t *lenp)
+			      void __user *buffer, size_t *lenp)
 {
 	if (write) {
 		proc_dointvec(ctl, write, filp, buffer, lenp);

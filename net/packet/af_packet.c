@@ -1450,7 +1450,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 		case SIOCOUTQ:
 		{
 			int amount = atomic_read(&sk->sk_wmem_alloc);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 		case SIOCINQ:
 		{
@@ -1462,7 +1462,7 @@ static int packet_ioctl(struct socket *sock, unsigned int cmd,
 			if (skb)
 				amount = skb->len;
 			spin_unlock_bh(&sk->sk_receive_queue.lock);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 		case SIOCGSTAMP:
 			return sock_get_timestamp(sk, (struct timeval __user *)arg);

@@ -725,7 +725,7 @@ int udp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 		case SIOCOUTQ:
 		{
 			int amount = atomic_read(&sk->sk_wmem_alloc);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 
 		case SIOCINQ:
@@ -745,7 +745,7 @@ int udp_ioctl(struct sock *sk, int cmd, unsigned long arg)
 				amount = skb->len - sizeof(struct udphdr);
 			}
 			spin_unlock_irq(&sk->sk_receive_queue.lock);
-			return put_user(amount, (int *)arg);
+			return put_user(amount, (int __user *)arg);
 		}
 
 		default:

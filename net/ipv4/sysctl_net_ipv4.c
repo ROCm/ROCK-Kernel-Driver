@@ -62,7 +62,7 @@ extern ctl_table ipv4_route_table[];
 
 static
 int ipv4_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
-			void *buffer, size_t *lenp)
+			void __user *buffer, size_t *lenp)
 {
 	int val = ipv4_devconf.forwarding;
 	int ret;
@@ -75,9 +75,10 @@ int ipv4_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
 	return ret;
 }
 
-static int ipv4_sysctl_forward_strategy(ctl_table *table, int *name, int nlen,
-			 void *oldval, size_t *oldlenp,
-			 void *newval, size_t newlen, 
+static int ipv4_sysctl_forward_strategy(ctl_table *table,
+			 int __user *name, int nlen,
+			 void __user *oldval, size_t __user *oldlenp,
+			 void __user *newval, size_t newlen, 
 			 void **context)
 {
 	int *valp = table->data;
@@ -89,7 +90,7 @@ static int ipv4_sysctl_forward_strategy(ctl_table *table, int *name, int nlen,
 	if (newlen != sizeof(int))
 		return -EINVAL;
 
-	if (get_user(new, (int *)newval))
+	if (get_user(new, (int __user *)newval))
 		return -EFAULT;
 
 	if (new == *valp)

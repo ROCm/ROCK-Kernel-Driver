@@ -786,13 +786,13 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		case FIOSETOWN:
 		case SIOCSPGRP:
 			err = -EFAULT;
-			if (get_user(pid, (int *)arg))
+			if (get_user(pid, (int __user *)arg))
 				break;
 			err = f_setown(sock->file, pid, 1);
 			break;
 		case FIOGETOWN:
 		case SIOCGPGRP:
-			err = put_user(sock->file->f_owner.pid, (int *)arg);
+			err = put_user(sock->file->f_owner.pid, (int __user *)arg);
 			break;
 		case SIOCGIFBR:
 		case SIOCSIFBR:

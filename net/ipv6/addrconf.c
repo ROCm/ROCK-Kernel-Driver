@@ -1510,7 +1510,7 @@ ok:
  *	Special case for SIT interfaces where we create a new "virtual"
  *	device.
  */
-int addrconf_set_dstaddr(void *arg)
+int addrconf_set_dstaddr(void __user *arg)
 {
 	struct in6_ifreq ireq;
 	struct net_device *dev;
@@ -1630,7 +1630,7 @@ static int inet6_addr_del(int ifindex, struct in6_addr *pfx, int plen)
 }
 
 
-int addrconf_add_ifaddr(void *arg)
+int addrconf_add_ifaddr(void __user *arg)
 {
 	struct in6_ifreq ireq;
 	int err;
@@ -1647,7 +1647,7 @@ int addrconf_add_ifaddr(void *arg)
 	return err;
 }
 
-int addrconf_del_ifaddr(void *arg)
+int addrconf_del_ifaddr(void __user *arg)
 {
 	struct in6_ifreq ireq;
 	int err;
@@ -3003,7 +3003,7 @@ static void ipv6_ifa_notify(int event, struct inet6_ifaddr *ifp)
 
 static
 int addrconf_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
-			   void *buffer, size_t *lenp)
+			   void __user *buffer, size_t *lenp)
 {
 	int *valp = ctl->data;
 	int val = *valp;
@@ -3031,9 +3031,10 @@ int addrconf_sysctl_forward(ctl_table *ctl, int write, struct file * filp,
 }
 
 static int addrconf_sysctl_forward_strategy(ctl_table *table, 
-					    int *name, int nlen,
-					    void *oldval, size_t *oldlenp,
-					    void *newval, size_t newlen,
+					    int __user *name, int nlen,
+					    void __user *oldval,
+					    size_t __user *oldlenp,
+					    void __user *newval, size_t newlen,
 					    void **context)
 {
 	int *valp = table->data;
@@ -3043,7 +3044,7 @@ static int addrconf_sysctl_forward_strategy(ctl_table *table,
 		return 0;
 	if (newlen != sizeof(int))
 		return -EINVAL;
-	if (get_user(new, (int *)newval))
+	if (get_user(new, (int __user *)newval))
 		return -EFAULT;
 	if (new == *valp)
 		return 0;

@@ -1829,7 +1829,7 @@ static int unix_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	{
 		case SIOCOUTQ:
 			amount = atomic_read(&sk->sk_wmem_alloc);
-			err = put_user(amount, (int *)arg);
+			err = put_user(amount, (int __user *)arg);
 			break;
 		case SIOCINQ:
 		{
@@ -1844,7 +1844,7 @@ static int unix_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 			if (skb)
 				amount=skb->len;
 			spin_unlock(&sk->sk_receive_queue.lock);
-			err = put_user(amount, (int *)arg);
+			err = put_user(amount, (int __user *)arg);
 			break;
 		}
 

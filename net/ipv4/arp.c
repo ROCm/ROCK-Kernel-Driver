@@ -1103,7 +1103,7 @@ int arp_req_delete(struct arpreq *r, struct net_device * dev)
  *	Handle an ARP layer I/O control request.
  */
 
-int arp_ioctl(unsigned int cmd, void *arg)
+int arp_ioctl(unsigned int cmd, void __user *arg)
 {
 	int err;
 	struct arpreq r;

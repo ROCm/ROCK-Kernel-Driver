@@ -270,7 +270,7 @@ rpc_pipe_ioctl(struct inode *ino, struct file *filp,
 			msg = (struct rpc_pipe_msg *)filp->private_data;
 			len += msg->len - msg->copied;
 		}
-		return put_user(len, (int *)arg);
+		return put_user(len, (int __user *)arg);
 	default:
 		return -EINVAL;
 	}
