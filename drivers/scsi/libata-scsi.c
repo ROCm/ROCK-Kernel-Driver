@@ -251,6 +251,8 @@ static unsigned int ata_scsi_rw_xlat(struct ata_queued_cmd *qc, u8 *scsicmd,
 		tf->lbam = scsicmd[2];
 		tf->lbah = scsicmd[1] & 0x1f; /* mask out reserved bits */
 
+		tf->device |= ATA_LBA;
+
 		VPRINTK("six-byte command\n");
 		return 0;
 	}
