@@ -4,7 +4,7 @@
 #
 
 ARCH_DIR = arch/um
-OS := Linux
+OS := $(shell uname -s)
 
 # Recalculate MODLIB to reflect the EXTRAVERSION changes (via KERNELRELEASE)
 # The way the toplevel Makefile is written EXTRAVERSION is not supposed
