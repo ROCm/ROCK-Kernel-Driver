@@ -37,9 +37,10 @@ static inline unsigned long check_apicid_used(physid_mask_t bitmap, int apicid)
 	return 0;
 }
 
+/* we don't use the phys_cpu_present_map to indicate apicid presence */
 static inline unsigned long check_apicid_present(int bit) 
 {
-	return physid_isset(bit, phys_cpu_present_map);
+	return 1;
 }
 
 #define apicid_cluster(apicid) (apicid & 0xF0)
