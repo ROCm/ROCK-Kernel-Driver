@@ -869,7 +869,14 @@ static int lance_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	skblen = skb->len;
 
-	len = (skblen <= ETH_ZLEN) ? ETH_ZLEN : skblen;
+	len = skblen;
+	
+	if (len < ETH_ZLEN) {
+		skb = skb_padto(skb, ETH_ZLEN);
+		if (skb == NULL)
+			return 0;
+		len = ETH_ZLEN;
+	}
 
 	lp->stats.tx_bytes += len;
 
