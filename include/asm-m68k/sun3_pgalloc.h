@@ -18,7 +18,7 @@
 
 extern const char bad_pmd_string[];
 
-#define lpmd_alloc_one(mm,address)       ({ BUG(); ((pmd_t *)2); })
+#define pmd_alloc_one(mm,address)       ({ BUG(); ((pmd_t *)2); })
 
 
 static inline void pte_free_kernel(pte_t * pte)
