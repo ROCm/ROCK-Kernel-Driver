@@ -701,7 +701,6 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 {
 	struct udsl_data_ctx *ctx;
 	struct udsl_instance_data *instance;
-	unsigned long flags;
 
 	if (!urb)
 		return;
@@ -723,9 +722,9 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 		skb_put (ctx->skb, urb->actual_length);
 
 		/* queue the skb for processing and wake the SAR */
-		spin_lock_irqsave (&instance->recvqlock, flags);
+		spin_lock (&instance->recvqlock);
 		skb_queue_tail (&instance->recvqueue, ctx->skb);
-		spin_unlock_irqrestore (&instance->recvqlock, flags);
+		spin_unlock (&instance->recvqlock);
 		wake_up (&udsl_wqh);
 		/* get a new skb */
 		ctx->skb = dev_alloc_skb (UDSL_RECEIVE_BUFFER_SIZE);
