@@ -38,6 +38,7 @@
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/vmalloc.h>
+#include <linux/cdev.h>
 #include <asm/uaccess.h>
 #include <asm/atomic.h>
 #include <linux/devfs_fs_kernel.h>
@@ -1695,7 +1696,7 @@ static int arm_register(struct file_info *fi, struct pending_request *req)
                 spin_unlock_irqrestore(&host_info_lock, flags);
                 return sizeof(struct raw1394_request);
         }
-        retval = hpsb_register_addrspace(&raw1394_highlevel, &arm_ops, req->req.address,
+        retval = hpsb_register_addrspace(&raw1394_highlevel, fi->host, &arm_ops, req->req.address,
                 req->req.address + req->req.length);
         if (retval) {
                /* INSERT ENTRY */
@@ -1782,7 +1783,7 @@ static int arm_unregister(struct file_info *fi, struct pending_request *req)
                 spin_unlock_irqrestore(&host_info_lock, flags);
                 return sizeof(struct raw1394_request);
         } 
-        retval = hpsb_unregister_addrspace(&raw1394_highlevel, addr->start);
+        retval = hpsb_unregister_addrspace(&raw1394_highlevel, fi->host, addr->start);
         if (!retval) {
                 printk(KERN_ERR "raw1394: arm_Unregister failed -> EINVAL\n");
                 spin_unlock_irqrestore(&host_info_lock, flags);
@@ -2464,10 +2465,6 @@ static int raw1394_open(struct inode *inode, struct file *file)
 {
         struct file_info *fi;
 
-        if (ieee1394_file_to_instance(file) > 0) {
-                return -ENXIO;
-        }
-
         fi = kmalloc(sizeof(struct file_info), SLAB_KERNEL);
         if (fi == NULL)
                 return -ENOMEM;
@@ -2554,7 +2551,7 @@ static int raw1394_release(struct inode *inode, struct file *file)
                 }
                 if (!another_host) {
                         DBGMSG("raw1394_release: call hpsb_arm_unregister");
-                        retval = hpsb_unregister_addrspace(&raw1394_highlevel, addr->start);
+                        retval = hpsb_unregister_addrspace(&raw1394_highlevel, fi->host, addr->start);
                         if (!retval) {
                                 ++fail;
                                 printk(KERN_ERR "raw1394_release arm_Unregister failed\n");
@@ -2646,7 +2643,8 @@ static struct hpsb_highlevel raw1394_highlevel = {
         .fcp_request = fcp_request,
 };
 
-static struct file_operations file_ops = {
+static struct cdev raw1394_cdev;
+static struct file_operations raw1394_fops = {
 	.owner =	THIS_MODULE,
         .read =		raw1394_read, 
         .write =	raw1394_write,
@@ -2664,8 +2662,10 @@ static int __init init_raw1394(void)
         devfs_mk_cdev(MKDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_RAW1394 * 16),
 			S_IFCHR | S_IRUSR | S_IWUSR, RAW1394_DEVICE_NAME);
 
-        if (ieee1394_register_chardev(IEEE1394_MINOR_BLOCK_RAW1394,
-                                      THIS_MODULE, &file_ops)) {
+	cdev_init(&raw1394_cdev, &raw1394_fops);
+	raw1394_cdev.owner = THIS_MODULE;
+	kobject_set_name(&raw1394_cdev.kobj, RAW1394_DEVICE_NAME);
+	if (cdev_add(&raw1394_cdev, IEEE1394_RAW1394_DEV, 1)) {
                 HPSB_ERR("raw1394 failed to register minor device block");
                 devfs_remove(RAW1394_DEVICE_NAME);
                 hpsb_unregister_highlevel(&raw1394_highlevel);
@@ -2682,7 +2682,8 @@ static int __init init_raw1394(void)
 static void __exit cleanup_raw1394(void)
 {
 	hpsb_unregister_protocol(&raw1394_driver);
-        ieee1394_unregister_chardev(IEEE1394_MINOR_BLOCK_RAW1394);
+	cdev_unmap(IEEE1394_RAW1394_DEV, 1);
+	cdev_del(&raw1394_cdev);
         devfs_remove(RAW1394_DEVICE_NAME);
         hpsb_unregister_highlevel(&raw1394_highlevel);
 }
@@ -2690,3 +2691,4 @@ static void __exit cleanup_raw1394(void)
 module_init(init_raw1394);
 module_exit(cleanup_raw1394);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS_CHARDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_RAW1394 * 16);

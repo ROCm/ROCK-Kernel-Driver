@@ -35,6 +35,43 @@ static int fcp = 1;
 module_param(fcp, int, 0444);
 MODULE_PARM_DESC(fcp, "Map FCP registers (default = 1, disable = 0).");
 
+static void add_host(struct hpsb_host *host);
+static void host_reset(struct hpsb_host *host);
+static int read_maps(struct hpsb_host *host, int nodeid, quadlet_t *buffer,
+		     u64 addr, size_t length, u16 fl);
+static int write_fcp(struct hpsb_host *host, int nodeid, int dest,
+		     quadlet_t *data, u64 addr, size_t length, u16 flags);
+static int read_regs(struct hpsb_host *host, int nodeid, quadlet_t *buf,
+		     u64 addr, size_t length, u16 flags);
+static int write_regs(struct hpsb_host *host, int nodeid, int destid,
+		      quadlet_t *data, u64 addr, size_t length, u16 flags);
+static int lock_regs(struct hpsb_host *host, int nodeid, quadlet_t *store,
+		     u64 addr, quadlet_t data, quadlet_t arg, int extcode, u16 fl);
+static int lock64_regs(struct hpsb_host *host, int nodeid, octlet_t * store,
+		       u64 addr, octlet_t data, octlet_t arg, int extcode, u16 fl);
+
+static struct hpsb_highlevel csr_highlevel = {
+	.name =		"standard registers",
+	.add_host =	add_host,
+	.host_reset =	host_reset,
+};
+
+static struct hpsb_address_ops map_ops = {
+	.read = read_maps,
+};
+
+static struct hpsb_address_ops fcp_ops = {
+	.write = write_fcp,
+};
+
+static struct hpsb_address_ops reg_ops = {
+	.read = read_regs,
+	.write = write_regs,
+	.lock = lock_regs,
+	.lock64 = lock64_regs,
+};
+
+
 static u16 csr_crc16(unsigned *data, int length)
 {
         int check=0, i;
@@ -125,6 +162,24 @@ static inline void calculate_expire(struct csr_control *csr)
 
 static void add_host(struct hpsb_host *host)
 {
+	hpsb_register_addrspace(&csr_highlevel, host, &reg_ops,
+				CSR_REGISTER_BASE,
+				CSR_REGISTER_BASE + CSR_CONFIG_ROM);
+	hpsb_register_addrspace(&csr_highlevel, host, &map_ops,
+				CSR_REGISTER_BASE + CSR_CONFIG_ROM,
+				CSR_REGISTER_BASE + CSR_CONFIG_ROM_END);
+	if (fcp) {
+		hpsb_register_addrspace(&csr_highlevel, host, &fcp_ops,
+					CSR_REGISTER_BASE + CSR_FCP_COMMAND,
+					CSR_REGISTER_BASE + CSR_FCP_END);
+	}
+	hpsb_register_addrspace(&csr_highlevel, host, &map_ops,
+				CSR_REGISTER_BASE + CSR_TOPOLOGY_MAP,
+				CSR_REGISTER_BASE + CSR_TOPOLOGY_MAP_END);
+	hpsb_register_addrspace(&csr_highlevel, host, &map_ops,
+				CSR_REGISTER_BASE + CSR_SPEED_MAP,
+				CSR_REGISTER_BASE + CSR_SPEED_MAP_END);
+
         host->csr.lock = SPIN_LOCK_UNLOCKED;
 
         host->csr.rom_size = host->driver->get_rom(host, &host->csr.rom);
@@ -684,48 +739,10 @@ static int write_fcp(struct hpsb_host *host, int nodeid, int dest,
 }
 
 
-static struct hpsb_highlevel csr_highlevel = {
-	.name =		"standard registers",
-	.add_host =	add_host,
-        .host_reset =	host_reset,
-};
-
-
-static struct hpsb_address_ops map_ops = {
-        .read = read_maps,
-};
-
-static struct hpsb_address_ops fcp_ops = {
-        .write = write_fcp,
-};
-
-static struct hpsb_address_ops reg_ops = {
-        .read = read_regs,
-        .write = write_regs,
-        .lock = lock_regs,
-	.lock64 = lock64_regs,
-};
 
 void init_csr(void)
 {
 	hpsb_register_highlevel(&csr_highlevel);
-
-        hpsb_register_addrspace(&csr_highlevel, &reg_ops, CSR_REGISTER_BASE,
-                                CSR_REGISTER_BASE + CSR_CONFIG_ROM);
-        hpsb_register_addrspace(&csr_highlevel, &map_ops, 
-                                CSR_REGISTER_BASE + CSR_CONFIG_ROM,
-                                CSR_REGISTER_BASE + CSR_CONFIG_ROM_END);
-        if (fcp) {
-		hpsb_register_addrspace(&csr_highlevel, &fcp_ops,
-                                CSR_REGISTER_BASE + CSR_FCP_COMMAND,
-                                CSR_REGISTER_BASE + CSR_FCP_END);
-	}
-        hpsb_register_addrspace(&csr_highlevel, &map_ops,
-                                CSR_REGISTER_BASE + CSR_TOPOLOGY_MAP,
-                                CSR_REGISTER_BASE + CSR_TOPOLOGY_MAP_END);
-        hpsb_register_addrspace(&csr_highlevel, &map_ops,
-                                CSR_REGISTER_BASE + CSR_SPEED_MAP,
-                                CSR_REGISTER_BASE + CSR_SPEED_MAP_END);
 }
 
 void cleanup_csr(void)
