@@ -8,6 +8,8 @@
  *
  * 15May2002	akpm@zip.com.au
  *		Initial version
+ * 27Jun2002	axboe@suse.de
+ *		use bio_add_page() to build bio's just the right size
  */
 
 #include <linux/kernel.h>
@@ -21,12 +23,6 @@
 #include <linux/mpage.h>
 #include <linux/writeback.h>
 #include <linux/pagevec.h>
-
-/*
- * The largest-sized BIO which this code will assemble, in bytes.  Set this
- * to PAGE_CACHE_SIZE if your drivers are broken.
- */
-#define MPAGE_BIO_MAX_SIZE BIO_MAX_SIZE
 
 /*
  * I/O completion handler for multipage BIOs.
@@ -82,8 +78,6 @@ static void mpage_end_io_write(struct bio *bio)
 
 struct bio *mpage_bio_submit(int rw, struct bio *bio)
 {
-	bio->bi_vcnt = bio->bi_idx;
-	bio->bi_idx = 0;
 	bio->bi_end_io = mpage_end_io_read;
 	if (rw == WRITE)
 		bio->bi_end_io = mpage_end_io_write;
@@ -106,11 +100,7 @@ mpage_alloc(struct block_device *bdev,
 
 	if (bio) {
 		bio->bi_bdev = bdev;
-		bio->bi_vcnt = nr_vecs;
-		bio->bi_idx = 0;
-		bio->bi_size = 0;
 		bio->bi_sector = first_sector;
-		bio->bi_io_vec[0].bv_page = NULL;
 	}
 	return bio;
 }
@@ -169,7 +159,6 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	const unsigned blkbits = inode->i_blkbits;
 	const unsigned blocks_per_page = PAGE_CACHE_SIZE >> blkbits;
 	const unsigned blocksize = 1 << blkbits;
-	struct bio_vec *bvec;
 	sector_t block_in_file;
 	sector_t last_block;
 	sector_t blocks[MAX_BUF_PER_PAGE];
@@ -223,26 +212,22 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 	/*
 	 * This page will go to BIO.  Do we need to send this BIO off first?
 	 */
-	if (bio && (bio->bi_idx == bio->bi_vcnt ||
-			*last_block_in_bio != blocks[0] - 1))
+	if (bio && (*last_block_in_bio != blocks[0] - 1))
 		bio = mpage_bio_submit(READ, bio);
 
+alloc_new:
 	if (bio == NULL) {
-		unsigned nr_bvecs = MPAGE_BIO_MAX_SIZE / PAGE_CACHE_SIZE;
-
-		if (nr_bvecs > nr_pages)
-			nr_bvecs = nr_pages;
 		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
-					nr_bvecs, GFP_KERNEL);
+					nr_pages, GFP_KERNEL);
 		if (bio == NULL)
 			goto confused;
 	}
 
-	bvec = &bio->bi_io_vec[bio->bi_idx++];
-	bvec->bv_page = page;
-	bvec->bv_len = (first_hole << blkbits);
-	bvec->bv_offset = 0;
-	bio->bi_size += bvec->bv_len;
+	if (bio_add_page(bio, page, first_hole << blkbits, 0)) {
+		bio = mpage_bio_submit(READ, bio);
+		goto alloc_new;
+	}
+
 	if (buffer_boundary(&bh) || (first_hole != blocks_per_page))
 		bio = mpage_bio_submit(READ, bio);
 	else
@@ -330,7 +315,6 @@ mpage_writepage(struct bio *bio, struct page *page, get_block_t get_block,
 	const unsigned blkbits = inode->i_blkbits;
 	unsigned long end_index;
 	const unsigned blocks_per_page = PAGE_CACHE_SIZE >> blkbits;
-	struct bio_vec *bvec;
 	sector_t last_block;
 	sector_t block_in_file;
 	sector_t blocks[MAX_BUF_PER_PAGE];
@@ -432,15 +416,15 @@ page_is_mapped:
 	/*
 	 * This page will go to BIO.  Do we need to send this BIO off first?
 	 */
-	if (bio && (bio->bi_idx == bio->bi_vcnt ||
-				*last_block_in_bio != blocks[0] - 1))
+	if (bio && *last_block_in_bio != blocks[0] - 1)
 		bio = mpage_bio_submit(WRITE, bio);
 
+alloc_new:
 	if (bio == NULL) {
-		unsigned nr_bvecs = MPAGE_BIO_MAX_SIZE / PAGE_CACHE_SIZE;
+		const unsigned __nr_pages = 64;	/* FIXME */
 
 		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
-					nr_bvecs, GFP_NOFS|__GFP_HIGH);
+					__nr_pages, GFP_NOFS|__GFP_HIGH);
 		if (bio == NULL)
 			goto confused;
 	}
@@ -465,11 +449,11 @@ page_is_mapped:
 			try_to_free_buffers(page);
 	}
 
-	bvec = &bio->bi_io_vec[bio->bi_idx++];
-	bvec->bv_page = page;
-	bvec->bv_len = (first_unmapped << blkbits);
-	bvec->bv_offset = 0;
-	bio->bi_size += bvec->bv_len;
+	if (bio_add_page(bio, page, first_unmapped << blkbits, 0)) {
+		bio = mpage_bio_submit(WRITE, bio);
+		goto alloc_new;
+	}
+
 	BUG_ON(PageWriteback(page));
 	SetPageWriteback(page);
 	unlock_page(page);
