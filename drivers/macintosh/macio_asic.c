@@ -239,7 +239,7 @@ static void macio_pci_add_devices(struct macio_chip *chip)
 #ifdef CONFIG_PCI
 	if (chip->lbus.pdev)
 		parent = &chip->lbus.pdev->dev;
-#endif		
+#endif
 	pnode = of_node_get(chip->of_node);
 	if (pnode == NULL)
 		return;
@@ -269,7 +269,7 @@ static void macio_pci_add_devices(struct macio_chip *chip)
 				of_node_get(np);
 				if (macio_add_one_device(chip, &mbdev->ofdev.dev, np, mbdev) == NULL)
 					of_node_put(np);
-	}
+			}
 	/* Add serial ports if any */
 	if (sdev)
 		for (np = NULL; (np = of_get_next_child(sdev->ofdev.node, np)) != NULL;)
@@ -277,7 +277,7 @@ static void macio_pci_add_devices(struct macio_chip *chip)
 				of_node_get(np);
 				if (macio_add_one_device(chip, &sdev->ofdev.dev, np, NULL) == NULL)
 					of_node_put(np);
-	}
+			}
 }
 
 

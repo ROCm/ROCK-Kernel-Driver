@@ -54,29 +54,29 @@ airport_suspend(struct macio_dev *mdev, u32 state)
 	struct airport *card = priv->card;
 	unsigned long flags;
 	int err;
-	
-		printk(KERN_DEBUG "%s: Airport entering sleep mode\n", dev->name);
 
-		err = orinoco_lock(priv, &flags);
-		if (err) {
-			printk(KERN_ERR "%s: hw_unavailable on PBOOK_SLEEP_NOW\n",
-			       dev->name);
+	printk(KERN_DEBUG "%s: Airport entering sleep mode\n", dev->name);
+
+	err = orinoco_lock(priv, &flags);
+	if (err) {
+		printk(KERN_ERR "%s: hw_unavailable on PBOOK_SLEEP_NOW\n",
+		       dev->name);
 		return 0;
-		}
+	}
 
-		err = __orinoco_down(dev);
-		if (err)
-			printk(KERN_WARNING "%s: PBOOK_SLEEP_NOW: Error %d downing interface\n",
-			       dev->name, err);
+	err = __orinoco_down(dev);
+	if (err)
+		printk(KERN_WARNING "%s: PBOOK_SLEEP_NOW: Error %d downing interface\n",
+		       dev->name, err);
 
-		netif_device_detach(dev);
+	netif_device_detach(dev);
 
-		priv->hw_unavailable++;
+	priv->hw_unavailable++;
 
-		orinoco_unlock(priv, &flags);
+	orinoco_unlock(priv, &flags);
 
-		disable_irq(dev->irq);
-		pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, card->node, 0, 0);
+	disable_irq(dev->irq);
+	pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, card->node, 0, 0);
 
 	return 0;
 }
@@ -90,35 +90,35 @@ airport_resume(struct macio_dev *mdev)
 	unsigned long flags;
 	int err;
 
-		printk(KERN_DEBUG "%s: Airport waking up\n", dev->name);
+	printk(KERN_DEBUG "%s: Airport waking up\n", dev->name);
 
-		pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, card->node, 0, 1);
-		mdelay(200);
+	pmac_call_feature(PMAC_FTR_AIRPORT_ENABLE, card->node, 0, 1);
+	mdelay(200);
 
-		enable_irq(dev->irq);
+	enable_irq(dev->irq);
 
-		err = orinoco_reinit_firmware(dev);
-		if (err) {
-			printk(KERN_ERR "%s: Error %d re-initializing firmware on PBOOK_WAKE\n",
-			       dev->name, err);
+	err = orinoco_reinit_firmware(dev);
+	if (err) {
+		printk(KERN_ERR "%s: Error %d re-initializing firmware on PBOOK_WAKE\n",
+		       dev->name, err);
 		return 0;
-		}
+	}
 
-		spin_lock_irqsave(&priv->lock, flags);
+	spin_lock_irqsave(&priv->lock, flags);
 
-		netif_device_attach(dev);
+	netif_device_attach(dev);
 
-		priv->hw_unavailable--;
+	priv->hw_unavailable--;
 
-		if (priv->open && (! priv->hw_unavailable)) {
-			err = __orinoco_up(dev);
-			if (err)
-				printk(KERN_ERR "%s: Error %d restarting card on PBOOK_WAKE\n",
-				       dev->name, err);
-		}
+	if (priv->open && (! priv->hw_unavailable)) {
+		err = __orinoco_up(dev);
+		if (err)
+			printk(KERN_ERR "%s: Error %d restarting card on PBOOK_WAKE\n",
+			       dev->name, err);
+	}
 
 
-		spin_unlock_irqrestore(&priv->lock, flags);
+	spin_unlock_irqrestore(&priv->lock, flags);
 
 	return 0;
 }

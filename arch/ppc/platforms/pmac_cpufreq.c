@@ -155,10 +155,10 @@ pmu_set_cpu_speed(unsigned int low_speed)
 	pmu_request(&req, NULL, 6, PMU_CPU_SPEED, 'W', 'O', 'O', 'F', low_speed);
 	while (!req.complete)
 		pmu_poll();
-	
+
 	/* Prepare the northbridge for the speed transition */
 	pmac_call_feature(PMAC_FTR_SLEEP_STATE,NULL,1,1);
-
+	
 	/* Call low level code to backup CPU state and recover from
 	 * hardware reset
 	 */
@@ -203,7 +203,7 @@ pmu_set_cpu_speed(unsigned int low_speed)
 static int __pmac
 do_set_cpu_speed(int speed_mode)
 {
-	struct cpufreq_freqs    freqs;
+	struct cpufreq_freqs freqs;
 	int rc;
 	
 	freqs.old = cur_freq;
@@ -286,7 +286,7 @@ pmac_cpufreq_setup(void)
 	struct device_node	*cpunode;
 	u32			*value;
 	int			has_freq_ctl = 0;
-	
+       
 	if (strstr(cmd_line, "nocpufreq"))
 		return 0;
 

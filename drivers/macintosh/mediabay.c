@@ -625,7 +625,7 @@ static int __pmac media_bay_task(void *x)
 		for (i = 0; i < media_bay_count; ++i) {
 			down(&media_bays[i].lock);
 			if (!media_bays[i].sleeping)
-			media_bay_step(i);
+				media_bay_step(i);
 			up(&media_bays[i].lock);
 		}
 
@@ -642,9 +642,9 @@ static int __devinit media_bay_attach(struct macio_dev *mdev, const struct of_ma
 	volatile u32 *regbase;
 	struct device_node *ofnode;
 	int i;
-	
+
 	ofnode = mdev->ofdev.node;
-		
+
 	if (!request_OF_resource(ofnode, 0, NULL))
 		return -ENXIO;
 
@@ -660,7 +660,7 @@ static int __devinit media_bay_attach(struct macio_dev *mdev, const struct of_ma
 	}
 	
 	i = media_bay_count++;
-			bay = &media_bays[i];
+	bay = &media_bays[i];
 	bay->mdev = mdev;
 	bay->base = regbase;
 	bay->index = i;
@@ -708,12 +708,12 @@ static int __pmac media_bay_suspend(struct macio_dev *mdev, u32 state)
 	if (state != mdev->ofdev.dev.power_state && state >= 2) {
 		down(&bay->lock);
 		bay->sleeping = 1;
-			set_mb_power(bay, 0);
+		set_mb_power(bay, 0);
 		up(&bay->lock);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(MS_TO_HZ(10));
 		mdev->ofdev.dev.power_state = state;
-		}
+	}
 	return 0;
 }
 
@@ -724,13 +724,13 @@ static int __pmac media_bay_resume(struct macio_dev *mdev)
 	if (mdev->ofdev.dev.power_state != 0) {
 		mdev->ofdev.dev.power_state = 0;
 
-			/* We re-enable the bay using it's previous content
-			   only if it did not change. Note those bozo timings,
-			   they seem to help the 3400 get it right.
-			 */
-			/* Force MB power to 0 */
+	       	/* We re-enable the bay using it's previous content
+	       	   only if it did not change. Note those bozo timings,
+	       	   they seem to help the 3400 get it right.
+	       	 */
+	       	/* Force MB power to 0 */
 		down(&bay->lock);
-			set_mb_power(bay, 0);
+	       	set_mb_power(bay, 0);
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(MS_TO_HZ(MB_POWER_DELAY));
 	       	if (bay->ops->content(bay) != bay->content_id) {
@@ -738,14 +738,14 @@ static int __pmac media_bay_resume(struct macio_dev *mdev)
 			up(&bay->lock);
 	       		return 0;
 		}
-			set_mb_power(bay, 1);
-			bay->last_value = bay->content_id;
-			bay->value_count = MS_TO_HZ(MB_STABLE_DELAY);
-			bay->timer = MS_TO_HZ(MB_POWER_DELAY);
+	       	set_mb_power(bay, 1);
+	       	bay->last_value = bay->content_id;
+	       	bay->value_count = MS_TO_HZ(MB_STABLE_DELAY);
+	       	bay->timer = MS_TO_HZ(MB_POWER_DELAY);
 #ifdef CONFIG_BLK_DEV_IDE
-			bay->cd_retry = 0;
+	       	bay->cd_retry = 0;
 #endif
-			do {
+	       	do {
 			set_current_state(TASK_UNINTERRUPTIBLE);
 			schedule_timeout(MS_TO_HZ(10));
 	       		media_bay_step(bay->index);
@@ -832,7 +832,7 @@ static struct macio_driver media_bay_driver =
 static int __init media_bay_init(void)
 {
 	int i;
-	
+
 	for (i=0; i<MAX_BAYS; i++) {
 		memset((char *)&media_bays[i], 0, sizeof(struct media_bay_info));
 		media_bays[i].content_id	= -1;
@@ -842,7 +842,7 @@ static int __init media_bay_init(void)
 	}
 	if (_machine != _MACH_Pmac)
 		return -ENODEV;
-	
+
 	macio_register_driver(&media_bay_driver);	
 
 	return 0;
