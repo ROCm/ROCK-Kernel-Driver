@@ -22,8 +22,6 @@ struct files_stat_struct files_stat = {
 	.max_files = NR_FILE
 };
 
-/* list of free filps for root */
-static LIST_HEAD(free_list);
 /* public *and* exported. Not pretty! */
 spinlock_t __cacheline_aligned_in_smp files_lock = SPIN_LOCK_UNLOCKED;
 
@@ -52,41 +50,34 @@ void filp_dtor(void * objp, struct kmem_cache_s *cachep, unsigned long dflags)
 	spin_unlock_irqrestore(&filp_count_lock, flags);
 }
 
-static inline void file_free(struct file* f)
+static inline void file_free(struct file *f)
 {
-	if (files_stat.nr_free_files <= NR_RESERVED_FILES) {
-		list_add(&f->f_list, &free_list);
-		files_stat.nr_free_files++;
-	} else {
-		kmem_cache_free(filp_cachep, f);
-	}
+	kmem_cache_free(filp_cachep, f);
 }
 
 /* Find an unused file structure and return a pointer to it.
  * Returns NULL, if there are no more free file structures or
  * we run out of memory.
- *
- * SMP-safe.
  */
-struct file * get_empty_filp(void)
+struct file *get_empty_filp(void)
 {
 static int old_max = 0;
 	struct file * f;
 
-	if (likely(files_stat.nr_files < files_stat.max_files)) {
+	/*
+	 * Privileged users can go above max_files
+	 */
+	if (files_stat.nr_files < files_stat.max_files ||
+				capable(CAP_SYS_ADMIN)) {
 		f = kmem_cache_alloc(filp_cachep, GFP_KERNEL);
 		if (f) {
-got_one:
 			memset(f, 0, sizeof(*f));
 			if (security_file_alloc(f)) {
-				file_list_lock();
 				file_free(f);
-				file_list_unlock();
-
-				return NULL;
+				goto fail;
 			}
 			eventpoll_init_file(f);
-			atomic_set(&f->f_count,1);
+			atomic_set(&f->f_count, 1);
 			f->f_uid = current->fsuid;
 			f->f_gid = current->fsgid;
 			f->f_owner.lock = RW_LOCK_UNLOCKED;
@@ -95,24 +86,17 @@ got_one:
 			return f;
 		}
 	}
-	/* Use a reserved one if we're the superuser */
-	file_list_lock();
-	if (files_stat.nr_free_files && !current->euid) {
-		f = list_entry(free_list.next, struct file, f_list);
-		list_del(&f->f_list);
-		files_stat.nr_free_files--;
-		file_list_unlock();
-		goto got_one;
-	}
-	file_list_unlock();
+
 	/* Ran out of filps - report that */
-	if (files_stat.max_files > old_max) {
-		printk(KERN_INFO "VFS: file-max limit %d reached\n", files_stat.max_files);
+	if (files_stat.max_files >= old_max) {
+		printk(KERN_INFO "VFS: file-max limit %d reached\n",
+					files_stat.max_files);
 		old_max = files_stat.max_files;
 	} else {
 		/* Big problems... */
 		printk(KERN_WARNING "VFS: filp allocation failed\n");
 	}
+fail:
 	return NULL;
 }
 
@@ -166,11 +150,11 @@ void fput(struct file * file)
 /* __fput is called from task context when aio completion releases the last
  * last use of a struct file *.  Do not use otherwise.
  */
-void __fput(struct file * file)
+void __fput(struct file *file)
 {
-	struct dentry * dentry = file->f_dentry;
-	struct vfsmount * mnt = file->f_vfsmnt;
-	struct inode * inode = dentry->d_inode;
+	struct dentry *dentry = file->f_dentry;
+	struct vfsmount *mnt = file->f_vfsmnt;
+	struct inode *inode = dentry->d_inode;
 
 	/*
 	 * The function eventpoll_release() should be the first called
@@ -189,15 +173,15 @@ void __fput(struct file * file)
 	file->f_dentry = NULL;
 	file->f_vfsmnt = NULL;
 	list_del(&file->f_list);
-	file_free(file);
 	file_list_unlock();
+	file_free(file);
 	dput(dentry);
 	mntput(mnt);
 }
 
-struct file * fget(unsigned int fd)
+struct file *fget(unsigned int fd)
 {
-	struct file * file;
+	struct file *file;
 	struct files_struct *files = current->files;
 
 	read_lock(&files->file_lock);
@@ -208,16 +192,14 @@ struct file * fget(unsigned int fd)
 	return file;
 }
 
-/* Here. put_filp() is SMP-safe now. */
-
 void put_filp(struct file *file)
 {
-	if(atomic_dec_and_test(&file->f_count)) {
+	if (atomic_dec_and_test(&file->f_count)) {
 		security_file_free(file);
 		file_list_lock();
 		list_del(&file->f_list);
-		file_free(file);
 		file_list_unlock();
+		file_free(file);
 	}
 }
 
@@ -251,7 +233,7 @@ int fs_may_remount_ro(struct super_block *sb)
 		if (inode->i_nlink == 0)
 			goto too_bad;
 
-		/* Writable file? */
+		/* Writeable file? */
 		if (S_ISREG(inode->i_mode) && (file->f_mode & FMODE_WRITE))
 			goto too_bad;
 	}
