@@ -28,7 +28,6 @@
  * Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  *
  */
-#include <asm/uaccess.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
@@ -37,9 +36,10 @@
 #include <linux/proc_fs.h>
 #include <linux/dma-mapping.h>
 #include <linux/wait.h>
+#include <linux/seq_file.h>
 
-#include <asm/hardirq.h>	/* for is_atomic */
-
+#include <asm/hardirq.h>
+#include <asm/uaccess.h>
 #include <asm/iSeries/LparData.h>
 #include <asm/iSeries/HvLpEvent.h>
 #include <asm/iSeries/HvLpConfig.h>
@@ -184,21 +184,21 @@ static unsigned char e2a(unsigned char x)
 	return ' ';
 }
 
-/* Handle reads from the proc file system
- */
-static int proc_read(char *buf, char **start, off_t offset,
-		     int blen, int *eof, void *data)
+static int proc_viopath_show(struct seq_file *m, void *v)
 {
+	char *buf;
+	dma_addr_t handle;
 	HvLpEvent_Rc hvrc;
 	DECLARE_MUTEX_LOCKED(Semaphore);
-	dma_addr_t dmaa =
-	    dma_map_single(iSeries_vio_dev, buf, PAGE_SIZE, DMA_FROM_DEVICE);
-	int len = PAGE_SIZE;
 
-	if (len > blen)
-		len = blen;
+	buf = kmalloc(PAGE_SIZE, GFP_KERNEL);
+	if (!buf)
+		return 0;
+	memset(buf, 0, PAGE_SIZE);
 
-	memset(buf, 0x00, len);
+	handle = dma_map_single(iSeries_vio_dev, buf, PAGE_SIZE,
+				DMA_FROM_DEVICE);
+
 	hvrc = HvCallEvent_signalLpEventFast(viopath_hostLp,
 			HvLpEvent_Type_VirtualIo,
 			viomajorsubtype_config | vioconfigget,
@@ -206,50 +206,54 @@ static int proc_read(char *buf, char **start, off_t offset,
 			viopath_sourceinst(viopath_hostLp),
 			viopath_targetinst(viopath_hostLp),
 			(u64)(unsigned long)&Semaphore, VIOVERSION << 16,
-			((u64)dmaa) << 32, len, 0, 0);
+			((u64)handle) << 32, PAGE_SIZE, 0, 0);
+
 	if (hvrc != HvLpEvent_Rc_Good)
-		printk("viopath hv error on op %d\n", (int) hvrc);
+		printk("viopath hv error on op %d\n", (int)hvrc);
 
 	down(&Semaphore);
 
-	dma_unmap_single(iSeries_vio_dev, dmaa, PAGE_SIZE, DMA_FROM_DEVICE);
+	dma_unmap_single(iSeries_vio_dev, handle, PAGE_SIZE, DMA_FROM_DEVICE);
+	kfree(buf);
 
-	sprintf(buf + strlen(buf), "SRLNBR=");
-	buf[strlen(buf)] = e2a(xItExtVpdPanel.mfgID[2]);
-	buf[strlen(buf)] = e2a(xItExtVpdPanel.mfgID[3]);
-	buf[strlen(buf)] = e2a(xItExtVpdPanel.systemSerial[1]);
-	buf[strlen(buf)] = e2a(xItExtVpdPanel.systemSerial[2]);
-	buf[strlen(buf)] = e2a(xItExtVpdPanel.systemSerial[3]);
-	buf[strlen(buf)] = e2a(xItExtVpdPanel.systemSerial[4]);
-	buf[strlen(buf)] = e2a(xItExtVpdPanel.systemSerial[5]);
-	buf[strlen(buf)] = '\n';
-	*eof = 1;
-	return strlen(buf);
+	buf[PAGE_SIZE] = '\0';
+	seq_printf(m, "%s", buf);
+
+	seq_printf(m, "SRLNBR=%c%c%c%c%c%c%c\n",
+		   e2a(xItExtVpdPanel.mfgID[2]),
+		   e2a(xItExtVpdPanel.mfgID[3]),
+		   e2a(xItExtVpdPanel.systemSerial[1]),
+		   e2a(xItExtVpdPanel.systemSerial[2]),
+		   e2a(xItExtVpdPanel.systemSerial[3]),
+		   e2a(xItExtVpdPanel.systemSerial[4]),
+		   e2a(xItExtVpdPanel.systemSerial[5]));
+
+	return 0;
 }
 
-/* Handle writes to our proc file system
- */
-static int proc_write(struct file *file, const char *buffer,
-		      unsigned long count, void *data)
+static int proc_viopath_open(struct inode *inode, struct file *file)
 {
-	/* Doesn't do anything today!!!
-	 */
-	return count;
+	return single_open(file, proc_viopath_show, NULL);
 }
 
-/* setup our proc file system entries
- */
-static void vio_proc_init(struct proc_dir_entry *iSeries_proc)
+static struct file_operations proc_viopath_operations = {
+	.open		= proc_viopath_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
+static int __init vio_proc_init(void)
 {
-	struct proc_dir_entry *ent;
-	ent = create_proc_entry("config", S_IFREG | S_IRUSR, iSeries_proc);
-	if (!ent)
-		return;
-	ent->nlink = 1;
-	ent->data = NULL;
-	ent->read_proc = proc_read;
-	ent->write_proc = proc_write;
+	struct proc_dir_entry *e;
+
+	e = create_proc_entry("iSeries/config", 0, NULL);
+	if (e)
+		e->proc_fops = &proc_viopath_operations;
+
+        return 0;
 }
+__initcall(vio_proc_init);
 
 /* See if a given LP is active.  Allow for invalid lps to be passed in
  * and just return invalid
@@ -433,13 +437,8 @@ void vio_set_hostlp(void)
 	viopath_ourLp = HvLpConfig_getLpIndex();
 	viopath_hostLp = HvCallCfg_getHostingLpIndex(viopath_ourLp);
 
-	/* If we have a valid hosting LP, create a proc file system entry
-	 * for config information
-	 */
-	if (viopath_hostLp != HvLpIndexInvalid) {
-		iSeries_proc_callback(&vio_proc_init);
+	if (viopath_hostLp != HvLpIndexInvalid)
 		vio_setHandler(viomajorsubtype_config, handleConfig);
-	}
 }
 EXPORT_SYMBOL(vio_set_hostlp);
 

@@ -51,7 +51,6 @@
 #include <asm/iSeries/ItLpQueue.h>
 #include <asm/iSeries/IoHriMainStore.h>
 #include <asm/iSeries/iSeries_proc.h>
-#include <asm/proc_pmc.h>
 #include <asm/iSeries/mf.h>
 
 /* Function Prototypes */
@@ -393,12 +392,9 @@ void __init iSeries_init(unsigned long r3, unsigned long r4, unsigned long r5,
 
 	iSeries_setup_dprofile();
 
-	iSeries_proc_early_init();
 	mf_init();
 	mf_initialized = 1;
 	mb();
-
-	iSeries_proc_callback(&pmc_proc_init);
 }
 
 /*

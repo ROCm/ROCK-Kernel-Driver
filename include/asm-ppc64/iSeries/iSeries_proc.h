@@ -19,12 +19,6 @@
 #ifndef _ISERIES_PROC_H
 #define _ISERIES_PROC_H
 
-#include <linux/proc_fs.h>
-
 extern void iSeries_proc_early_init(void);
-
-typedef void (*iSeriesProcFunction)(struct proc_dir_entry *iSeries_proc);
-
-extern void iSeries_proc_callback(iSeriesProcFunction initFunction);
 
 #endif /* _iSeries_PROC_H */

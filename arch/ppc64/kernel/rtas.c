@@ -19,7 +19,6 @@
 #include <linux/init.h>
 
 #include <asm/prom.h>
-#include <asm/proc_fs.h>
 #include <asm/rtas.h>
 #include <asm/semaphore.h>
 #include <asm/machdep.h>

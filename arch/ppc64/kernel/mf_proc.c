@@ -16,10 +16,9 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
  */
+#include <linux/init.h>
 #include <asm/uaccess.h>
 #include <asm/iSeries/mf.h>
-
-static struct proc_dir_entry *mf_proc_root = NULL;
 
 static int proc_mf_dump_cmdline(char *page, char **start, off_t off,
 		int count, int *eof, void *data)
@@ -187,27 +186,28 @@ static int proc_mf_change_vmlinux(struct file *file, const char *buffer,
 	return count;			
 }
 
-void mf_proc_init(struct proc_dir_entry *iSeries_proc)
+static int __init mf_proc_init(void)
 {
+	struct proc_dir_entry *mf_proc_root;
 	struct proc_dir_entry *ent;
 	struct proc_dir_entry *mf;
 	char name[2];
 	int i;
 
-	mf_proc_root = proc_mkdir("mf", iSeries_proc);
+	mf_proc_root = proc_mkdir("iSeries/mf", NULL);
 	if (!mf_proc_root)
-		return;
+		return 1;
 
 	name[1] = '\0';
 	for (i = 0; i < 4; i++) {
 		name[0] = 'A' + i;
 		mf = proc_mkdir(name, mf_proc_root);
 		if (!mf)
-			return;
+			return 1;
 
 		ent = create_proc_entry("cmdline", S_IFREG|S_IRUSR|S_IWUSR, mf);
 		if (!ent)
-			return;
+			return 1;
 		ent->nlink = 1;
 		ent->data = (void *)(long)i;
 		ent->read_proc = proc_mf_dump_cmdline;
@@ -218,7 +218,7 @@ void mf_proc_init(struct proc_dir_entry *iSeries_proc)
 
 		ent = create_proc_entry("vmlinux", S_IFREG|S_IWUSR, mf);
 		if (!ent)
-			return;
+			return 1;
 		ent->nlink = 1;
 		ent->data = (void *)(long)i;
 #if 0
@@ -239,7 +239,7 @@ void mf_proc_init(struct proc_dir_entry *iSeries_proc)
 
 	ent = create_proc_entry("side", S_IFREG|S_IRUSR|S_IWUSR, mf_proc_root);
 	if (!ent)
-		return;
+		return 1;
 	ent->nlink = 1;
 	ent->data = (void *)0;
 	ent->read_proc = proc_mf_dump_side;
@@ -247,9 +247,13 @@ void mf_proc_init(struct proc_dir_entry *iSeries_proc)
 
 	ent = create_proc_entry("src", S_IFREG|S_IRUSR|S_IWUSR, mf_proc_root);
 	if (!ent)
-		return;
+		return 1;
 	ent->nlink = 1;
 	ent->data = (void *)0;
 	ent->read_proc = proc_mf_dump_src;
 	ent->write_proc = proc_mf_change_src;
+
+	return 0;
 }
+
+__initcall(mf_proc_init);
