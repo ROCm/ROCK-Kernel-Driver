@@ -182,7 +182,7 @@ void __init numa_initmem_init(unsigned long start_pfn, unsigned long end_pfn)
 	numnodes = 1;
 	for (i = 0; i < NR_CPUS; i++)
 		cpu_to_node[i] = 0;
-	node_to_cpumask[0] = 1;
+	node_to_cpumask[0] = cpumask_of_cpu(0);
 	setup_node_bootmem(0, start_pfn<<PAGE_SHIFT, end_pfn<<PAGE_SHIFT);
 }
 
