@@ -42,6 +42,8 @@ struct pglist_data node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 static unsigned long node0_io_hole_size;
 
+static int numa_disabled;
+
 EXPORT_SYMBOL(node_data);
 EXPORT_SYMBOL(numa_cpu_lookup_table);
 EXPORT_SYMBOL(numa_memory_lookup_table);
@@ -264,7 +266,7 @@ static int cpu_numa_callback(struct notifier_block *nfb,
 	if (action == CPU_UP_PREPARE) {
 		int depth = find_min_common_depth();
 
-		if (depth == -1)
+		if (depth == -1 || numa_disabled)
 			map_cpu_to_node(lcpu, 0);
 		else
 			numa_setup_cpu(lcpu, depth);
@@ -288,6 +290,7 @@ static int __init parse_numa_properties(void)
 
 	if (strstr(saved_command_line, "numa=off")) {
 		printk(KERN_WARNING "NUMA disabled by user\n");
+		numa_disabled = 1;
 		return -1;
 	}
 
