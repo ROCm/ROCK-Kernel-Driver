@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.111 $
+ *   $Revision: 1.112 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -24,7 +24,6 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define CHPID_LONGS (256 / (8 * sizeof(long))) /* 256 chpids */
 static struct channel_path *chps[NR_CHPIDS];
 
 static void *sei_page;

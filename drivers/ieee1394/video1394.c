@@ -864,6 +864,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 
 		d = find_ctx(&ctx->context_list, OHCI_ISO_RECEIVE, v.channel);
+		if (d == NULL) return -EFAULT;
 
 		if ((v.buffer<0) || (v.buffer>d->num_desc)) {
 			PRINT(KERN_ERR, ohci->host->id,
@@ -926,6 +927,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 
 		d = find_ctx(&ctx->context_list, OHCI_ISO_RECEIVE, v.channel);
+		if (d == NULL) return -EFAULT;
 
 		if ((v.buffer<0) || (v.buffer>d->num_desc)) {
 			PRINT(KERN_ERR, ohci->host->id,
@@ -1009,6 +1011,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 
 		d = find_ctx(&ctx->context_list, OHCI_ISO_TRANSMIT, v.channel);
+		if (d == NULL) return -EFAULT;
 
 		if ((v.buffer<0) || (v.buffer>d->num_desc)) {
 			PRINT(KERN_ERR, ohci->host->id,
@@ -1112,6 +1115,7 @@ static int video1394_ioctl(struct inode *inode, struct file *file,
 			return -EFAULT;
 
 		d = find_ctx(&ctx->context_list, OHCI_ISO_TRANSMIT, v.channel);
+		if (d == NULL) return -EFAULT;
 
 		if ((v.buffer<0) || (v.buffer>d->num_desc)) {
 			PRINT(KERN_ERR, ohci->host->id,

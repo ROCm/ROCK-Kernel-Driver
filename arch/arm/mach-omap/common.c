@@ -25,6 +25,58 @@
 
 /*
  * ----------------------------------------------------------------------------
+ * OMAP revision check
+ *
+ * Since we use the cpu_is_omapnnnn() macros, there's a chance that a board
+ * switches to an updated core. We want to print out the OMAP revision early.
+ *
+ * We use the system_serial registers for the revision information so we
+ * can see it in /proc/cpuinfo.
+ *
+ * If the OMAP detection gets more complicated, we may want to expand this
+ * to store the OMAP version and replace the current cpu_is_omapnnnn() macros.
+ *
+ * ----------------------------------------------------------------------------
+ */
+static void __init omap_check_revision(void)
+{
+	system_serial_high = omap_readl(OMAP_ID_BASE);
+	system_serial_low = OMAP_ID_REG;
+	system_rev = (OMAP_ID_REG >> ID_SHIFT) & ID_MASK;
+
+	printk("OMAP revision: %d.%d (0x%08x) id: 0x%08x detected as OMAP-",
+	       (system_serial_high >> 20) & 0xf,
+	       (system_serial_high >> 16) & 0xf,
+	       system_serial_high, system_serial_low);
+
+	switch (system_rev) {
+	case OMAP_ID_730:
+		printk("730\n");
+		system_rev = 0x730;
+		break;
+	case OMAP_ID_1510:
+		printk("1510\n");
+		system_rev = 0x1510;
+		break;
+	case OMAP_ID_1610:
+		printk("1610\n");
+		system_rev = 0x1610;
+		break;
+	case OMAP_ID_1710:
+		printk("1710\n");
+		system_rev = 0x1710;
+		break;
+	case OMAP_ID_5912:
+		printk("5912/1611B\n");
+		system_rev = 0x5912;
+		break;
+	default:
+		printk("unknown, please add support!\n");
+	}
+}
+
+/*
+ * ----------------------------------------------------------------------------
  * OMAP I/O mapping
  *
  * The machine specific code may provide the extra mapping besides the
@@ -64,7 +116,13 @@ static struct map_desc omap1610_io_desc[] __initdata = {
 static struct map_desc omap5912_io_desc[] __initdata = {
  { OMAP5912_DSP_BASE,    OMAP5912_DSP_START,    OMAP5912_DSP_SIZE,    MT_DEVICE },
  { OMAP5912_DSPREG_BASE, OMAP5912_DSPREG_START, OMAP5912_DSPREG_SIZE, MT_DEVICE },
- { OMAP5912_SRAM_BASE,   OMAP5912_SRAM_START,   OMAP5912_SRAM_SIZE,   MT_DEVICE }
+/*
+ * The OMAP5912 has 250kByte internal SRAM. Because the mapping is baseed on page
+ * size (4kByte), it seems that the last 2kByte (=0x800) of the 250kByte are not mapped.
+ * Add additional 2kByte (0x800) so that the last page is mapped and the last 2kByte
+ * can be used.
+ */
+ { OMAP5912_SRAM_BASE,   OMAP5912_SRAM_START,   OMAP5912_SRAM_SIZE + 0x800,   MT_DEVICE }
 };
 #endif
 
@@ -77,6 +135,7 @@ static void __init _omap_map_io(void)
 	/* We have to initialize the IO space mapping before we can run
 	 * cpu_is_omapxxx() macros. */
 	iotable_init(omap_io_desc, ARRAY_SIZE(omap_io_desc));
+	omap_check_revision();
 
 #ifdef CONFIG_ARCH_OMAP730
 	if (cpu_is_omap730()) {
@@ -102,8 +161,8 @@ static void __init _omap_map_io(void)
 	/* REVISIT: Refer to OMAP5910 Errata, Advisory SYS_1: "Timeout Abort
 	 * on a Posted Write in the TIPB Bridge".
 	 */
-	omap_writew(0x0, MPU_PUBLIC_TIPB_CNTL_REG);
-	omap_writew(0x0, MPU_PRIVATE_TIPB_CNTL_REG);
+	omap_writew(0x0, MPU_PUBLIC_TIPB_CNTL);
+	omap_writew(0x0, MPU_PRIVATE_TIPB_CNTL);
 
 	/* Must init clocks early to assure that timer interrupt works
 	 */

@@ -23,6 +23,8 @@
 #include <linux/errno.h>
 #include <linux/compiler.h>
 
+#define KMOD_PATH_LEN 256
+
 #ifdef CONFIG_KMOD
 /* modprobe exit status on success, -ve on error.  Return value
  * usually useless though. */

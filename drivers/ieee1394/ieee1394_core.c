@@ -32,6 +32,7 @@
 #include <linux/bitops.h>
 #include <linux/kdev_t.h>
 #include <linux/skbuff.h>
+#include <linux/suspend.h>
 
 #include <asm/byteorder.h>
 #include <asm/semaphore.h>
@@ -1032,6 +1033,11 @@ static int hpsbpkt_thread(void *__hi)
 	while (!down_interruptible(&khpsbpkt_sig)) {
 		if (khpsbpkt_kill)
 			break;
+
+		if (current->flags & PF_FREEZE) {
+			refrigerator(0);
+			continue;
+		}
 
 		while ((skb = skb_dequeue(&hpsbpkt_queue)) != NULL) {
 			packet = (struct hpsb_packet *)skb->data;

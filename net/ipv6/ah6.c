@@ -363,7 +363,7 @@ void ah6_err(struct sk_buff *skb, struct inet6_skb_parm *opt,
 	struct ip_auth_hdr *ah = (struct ip_auth_hdr*)(skb->data+offset);
 	struct xfrm_state *x;
 
-	if (type != ICMPV6_DEST_UNREACH ||
+	if (type != ICMPV6_DEST_UNREACH &&
 	    type != ICMPV6_PKT_TOOBIG)
 		return;
 

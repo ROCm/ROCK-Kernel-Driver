@@ -409,10 +409,8 @@ static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 		ipv6_addr_copy(&sin6->sin6_addr, &skb->nh.ipv6h->saddr);
 		sin6->sin6_flowinfo = 0;
 		sin6->sin6_scope_id = 0;
-		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL) {
-			struct inet6_skb_parm *opt = (struct inet6_skb_parm *) skb->cb;
-			sin6->sin6_scope_id = opt->iif;
-		}
+		if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL)
+			sin6->sin6_scope_id = IP6CB(skb)->iif;
 	}
 
 	sock_recv_timestamp(msg, sk, skb);

@@ -58,7 +58,7 @@ static int
 dasd_ioctl_readall_cmb(struct block_device *bdev, int no, long args)
 {
 	struct dasd_device *device;
-	struct cmbdata * __user udata;
+	struct cmbdata __user *udata;
 	struct cmbdata data;
 	size_t size;
 	int ret;
@@ -66,7 +66,7 @@ dasd_ioctl_readall_cmb(struct block_device *bdev, int no, long args)
 	device = bdev->bd_disk->private_data;
 	if (!device)
 		return -EINVAL;
-	udata = (void *) args;
+	udata = (void __user *) args;
 	size = _IOC_SIZE(no);
 
 	if (!access_ok(VERIFY_WRITE, udata, size))

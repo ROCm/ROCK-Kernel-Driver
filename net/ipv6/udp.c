@@ -432,10 +432,8 @@ try_again:
 
 			if (np->rxopt.all)
 				datagram_recv_ctl(sk, msg, skb);
-			if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL) {
-				struct inet6_skb_parm *opt = (struct inet6_skb_parm *) skb->cb;
-				sin6->sin6_scope_id = opt->iif;
-			}
+			if (ipv6_addr_type(&sin6->sin6_addr) & IPV6_ADDR_LINKLOCAL)
+				sin6->sin6_scope_id = IP6CB(skb)->iif;
 		}
   	}
 	err = copied;

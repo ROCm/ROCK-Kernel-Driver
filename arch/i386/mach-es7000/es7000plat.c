@@ -50,7 +50,6 @@ struct mip_reg		*mip_reg;
 struct mip_reg		*host_reg;
 int 			mip_port;
 unsigned long		mip_addr, host_addr;
-extern int (*platform_rename_gsi)();
 
 static int __init
 es7000_rename_gsi(int ioapic, int gsi)

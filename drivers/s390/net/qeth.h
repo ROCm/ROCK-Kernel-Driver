@@ -23,7 +23,7 @@
 
 #include "qeth_mpc.h"
 
-#define VERSION_QETH_H 		"$Revision: 1.109 $"
+#define VERSION_QETH_H 		"$Revision: 1.110 $"
 
 #ifdef CONFIG_QETH_IPV6
 #define QETH_VERSION_IPV6 	":IPv6"
@@ -380,11 +380,6 @@ enum qeth_qdio_buffer_states {
 	 * outbound: filled by driver; owned by hardware in order to be sent
 	 */
 	QETH_QDIO_BUF_PRIMED,
-	/*
-	 * inbound only: an error condition has been detected for a buffer
-	 *     the buffer will be discarded (not read out)
-	 */
-	QETH_QDIO_BUF_ERROR,
 };
 
 enum qeth_qdio_info_states {
@@ -423,7 +418,7 @@ struct qeth_qdio_q {
 
 struct qeth_qdio_out_buffer {
 	struct qdio_buffer *buffer;
-	volatile enum qeth_qdio_buffer_states state;
+	atomic_t state;
 	volatile int next_element_to_fill;
 	struct sk_buff_head skb_list;
 };

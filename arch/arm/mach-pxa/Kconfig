@@ -1,9 +1,9 @@
+if ARCH_PXA
 
 menu "Intel PXA2xx Implementations"
 
 choice
 	prompt "Select target board"
-	depends on ARCH_PXA
 
 config ARCH_LUBBOCK
 	bool "Intel DBPXA250 Development Platform"
@@ -32,3 +32,4 @@ config PXA27x
 	help
 	  Select code specific to PXA27x variants
 
+endif

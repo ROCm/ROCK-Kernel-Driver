@@ -827,8 +827,8 @@ static inline int e100_exec_cb(struct nic *nic, struct sk_buff *skb,
 	cb->prev->command &= cpu_to_le16(~cb_s);
 
 	while(nic->cb_to_send != nic->cb_to_use) {
-		if(unlikely((err = e100_exec_cmd(nic, nic->cuc_cmd,
-			nic->cb_to_send->dma_addr)))) {
+		if(unlikely(e100_exec_cmd(nic, nic->cuc_cmd,
+			nic->cb_to_send->dma_addr))) {
 			/* Ok, here's where things get sticky.  It's
 			 * possible that we can't schedule the command
 			 * because the controller is too busy, so
@@ -1323,7 +1323,7 @@ static inline int e100_tx_clean(struct nic *nic)
 static void e100_clean_cbs(struct nic *nic)
 {
 	if(nic->cbs) {
-		while(nic->cb_to_clean != nic->cb_to_use) {
+		while(nic->cbs_avail != nic->params.cbs.count) {
 			struct cb *cb = nic->cb_to_clean;
 			if(cb->skb) {
 				pci_unmap_single(nic->pdev,
@@ -1333,8 +1333,8 @@ static void e100_clean_cbs(struct nic *nic)
 				dev_kfree_skb(cb->skb);
 			}
 			nic->cb_to_clean = nic->cb_to_clean->next;
+			nic->cbs_avail++;
 		}
-		nic->cbs_avail = nic->params.cbs.count;
 		pci_free_consistent(nic->pdev,
 			sizeof(struct cb) * nic->params.cbs.count,
 			nic->cbs, nic->cbs_dma_addr);
@@ -1659,17 +1659,16 @@ static int e100_up(struct nic *nic)
 		goto err_clean_cbs;
 	e100_set_multicast_list(nic->netdev);
 	e100_start_receiver(nic);
-	netif_start_queue(nic->netdev);
 	mod_timer(&nic->watchdog, jiffies);
 	if((err = request_irq(nic->pdev->irq, e100_intr, SA_SHIRQ,
 		nic->netdev->name, nic->netdev)))
 		goto err_no_irq;
 	e100_enable_irq(nic);
+	netif_wake_queue(nic->netdev);
 	return 0;
 
 err_no_irq:
 	del_timer_sync(&nic->watchdog);
-	netif_stop_queue(nic->netdev);
 err_clean_cbs:
 	e100_clean_cbs(nic);
 err_rx_clean_list:

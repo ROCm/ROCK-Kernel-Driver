@@ -1071,103 +1071,103 @@ ccw_device_bug(struct ccw_device *cdev, enum dev_event dev_event)
  * device statemachine
  */
 fsm_func_t *dev_jumptable[NR_DEV_STATES][NR_DEV_EVENTS] = {
-	[DEV_STATE_NOT_OPER] {
-		[DEV_EVENT_NOTOPER]	ccw_device_nop,
-		[DEV_EVENT_INTERRUPT]	ccw_device_bug,
-		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_NOT_OPER] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_nop,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_bug,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_nop,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
-	[DEV_STATE_SENSE_PGID] {
-		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_sense_pgid_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_onoff_timeout,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_SENSE_PGID] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_sense_pgid_irq,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_onoff_timeout,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
-	[DEV_STATE_SENSE_ID] {
-		[DEV_EVENT_NOTOPER]	ccw_device_recog_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_sense_id_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_recog_timeout,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_SENSE_ID] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_recog_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_sense_id_irq,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_recog_timeout,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
-	[DEV_STATE_OFFLINE] {
-		[DEV_EVENT_NOTOPER]	ccw_device_offline_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_offline_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_OFFLINE] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_offline_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_offline_irq,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_nop,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
-	[DEV_STATE_VERIFY] {
-		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_verify_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_onoff_timeout,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_VERIFY] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_verify_irq,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_onoff_timeout,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
-	[DEV_STATE_ONLINE] {
-		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_online_timeout,
-		[DEV_EVENT_VERIFY]	ccw_device_online_verify,
+	[DEV_STATE_ONLINE] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_irq,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_online_timeout,
+		[DEV_EVENT_VERIFY]	= ccw_device_online_verify,
 	},
-	[DEV_STATE_W4SENSE] {
-		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_w4sense,
-		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
-		[DEV_EVENT_VERIFY]	ccw_device_online_verify,
+	[DEV_STATE_W4SENSE] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_w4sense,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_nop,
+		[DEV_EVENT_VERIFY]	= ccw_device_online_verify,
 	},
-	[DEV_STATE_DISBAND_PGID] {
-		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_disband_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_onoff_timeout,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_DISBAND_PGID] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_disband_irq,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_onoff_timeout,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
-	[DEV_STATE_BOXED] {
-		[DEV_EVENT_NOTOPER]	ccw_device_offline_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_stlck_done,
-		[DEV_EVENT_TIMEOUT]	ccw_device_stlck_done,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_BOXED] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_offline_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_stlck_done,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_stlck_done,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
 	/* states to wait for i/o completion before doing something */
-	[DEV_STATE_CLEAR_VERIFY] {
-		[DEV_EVENT_NOTOPER]     ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]   ccw_device_clear_verify,
-		[DEV_EVENT_TIMEOUT]	ccw_device_nop,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_CLEAR_VERIFY] = {
+		[DEV_EVENT_NOTOPER]     = ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]   = ccw_device_clear_verify,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_nop,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
-	[DEV_STATE_TIMEOUT_KILL] {
-		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_killing_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_killing_timeout,
-		[DEV_EVENT_VERIFY]	ccw_device_nop, //FIXME
+	[DEV_STATE_TIMEOUT_KILL] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_killing_irq,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_killing_timeout,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop, //FIXME
 	},
-	[DEV_STATE_WAIT4IO] {
-		[DEV_EVENT_NOTOPER]	ccw_device_online_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_wait4io_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_wait4io_timeout,
-		[DEV_EVENT_VERIFY]	ccw_device_wait4io_verify,
+	[DEV_STATE_WAIT4IO] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_online_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_wait4io_irq,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_wait4io_timeout,
+		[DEV_EVENT_VERIFY]	= ccw_device_wait4io_verify,
 	},
-	[DEV_STATE_QUIESCE] {
-		[DEV_EVENT_NOTOPER]	ccw_device_quiesce_done,
-		[DEV_EVENT_INTERRUPT]	ccw_device_quiesce_done,
-		[DEV_EVENT_TIMEOUT]	ccw_device_quiesce_timeout,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_QUIESCE] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_quiesce_done,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_quiesce_done,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_quiesce_timeout,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
 	/* special states for devices gone not operational */
-	[DEV_STATE_DISCONNECTED] {
-		[DEV_EVENT_NOTOPER]	ccw_device_nop,
-		[DEV_EVENT_INTERRUPT]	ccw_device_start_id,
-		[DEV_EVENT_TIMEOUT]	ccw_device_bug,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_DISCONNECTED] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_nop,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_start_id,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_bug,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
-	[DEV_STATE_DISCONNECTED_SENSE_ID] {
-		[DEV_EVENT_NOTOPER]	ccw_device_recog_notoper,
-		[DEV_EVENT_INTERRUPT]	ccw_device_sense_id_irq,
-		[DEV_EVENT_TIMEOUT]	ccw_device_recog_timeout,
-		[DEV_EVENT_VERIFY]	ccw_device_nop,
+	[DEV_STATE_DISCONNECTED_SENSE_ID] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_recog_notoper,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_sense_id_irq,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_recog_timeout,
+		[DEV_EVENT_VERIFY]	= ccw_device_nop,
 	},
-	[DEV_STATE_CMFCHANGE] {
-		[DEV_EVENT_NOTOPER]	ccw_device_change_cmfstate,
-		[DEV_EVENT_INTERRUPT]	ccw_device_change_cmfstate,
-		[DEV_EVENT_TIMEOUT]	ccw_device_change_cmfstate,
-		[DEV_EVENT_VERIFY]	ccw_device_change_cmfstate,
+	[DEV_STATE_CMFCHANGE] = {
+		[DEV_EVENT_NOTOPER]	= ccw_device_change_cmfstate,
+		[DEV_EVENT_INTERRUPT]	= ccw_device_change_cmfstate,
+		[DEV_EVENT_TIMEOUT]	= ccw_device_change_cmfstate,
+		[DEV_EVENT_VERIFY]	= ccw_device_change_cmfstate,
 	},
 };
 

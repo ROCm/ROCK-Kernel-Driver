@@ -25,7 +25,8 @@
 #define NR_BANKS 5
 
 static int mce_disabled __initdata;
-/* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic */ 
+/* 0: always panic, 1: panic if deadlock possible, 2: try to avoid panic,
+   3: never panic or exit (for testing only) */
 static int tolerant = 1;
 static int banks;
 static unsigned long bank[NR_BANKS] = { [0 ... NR_BANKS-1] = ~0UL };
@@ -105,7 +106,10 @@ static void mce_panic(char *msg, struct mce *backup, unsigned long start)
 	}
 	if (backup)
 		print_mce(backup);
-	panic(msg);
+	if (tolerant >= 3)
+		printk("Fake panic: %s\n", msg);
+	else
+		panic(msg);
 } 
 
 static int mce_available(struct cpuinfo_x86 *c)
@@ -151,23 +155,30 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 		if (!bank[i])
 			continue;
 		
-		/* Did this bank cause the exception? */ 
-		/* XXX: check more flags  */
-		if ((m.status & MCI_STATUS_PCC)) { 
-			panicm = m; 
-		} else {
-			m.rip = 0;
-			m.cs = 0;
-		}
-
 		m.misc = 0; 
 		m.addr = 0;
 
 		rdmsrl(MSR_IA32_MC0_STATUS + i*4, m.status);
 		if ((m.status & MCI_STATUS_VAL) == 0)
 			continue;
+		/* Should be implied by the banks check above, but
+		   check it anyways */
+		if ((m.status & MCI_STATUS_EN) == 0)
+			continue;
 
-		nowayout |= !!(m.status & (MCI_STATUS_OVER|MCI_STATUS_PCC));
+		/* Did this bank cause the exception? */
+		/* Assume that the bank with uncorrectable errors did it,
+		   and that there is only a single one. */
+		if (m.status & MCI_STATUS_UC) {
+			panicm = m;
+		} else {
+			m.rip = 0;
+			m.cs = 0;
+		}
+
+		/* In theory _OVER could be a nowayout too, but
+		   assume any overflowed errors were no fatal. */
+		nowayout |= !!(m.status & MCI_STATUS_PCC);
 		kill_it |= !!(m.status & MCI_STATUS_UC);
 		m.bank = i;
 
@@ -206,7 +217,8 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 
 		/* do_exit takes an awful lot of locks and has as slight risk 
 		   of deadlocking. If you don't want that don't set tolerant >= 2 */
-		do_exit(SIGBUS);
+		if (tolerant < 3)
+			do_exit(SIGBUS);
 	}
 }
 

@@ -85,14 +85,6 @@ int ocpi_enable(void)
 	val &= ~0xff;
 	omap_writel(val, OCPI_SEC);
 
-	val = omap_readl(OCPI_SEC);
-	val |= 0;
-	omap_writel(val, OCPI_SEC);
-
-	val = omap_readl(OCPI_SINT0);
-	val |= 0;
-	omap_writel(val, OCPI_SINT1);
-
 	return 0;
 }
 EXPORT_SYMBOL(ocpi_enable);

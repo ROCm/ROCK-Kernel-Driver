@@ -74,9 +74,9 @@ static inline void irq_bank_writel(unsigned long value, int bank, int offset)
 static void omap_ack_irq(unsigned int irq)
 {
 	if (irq > 31)
-		omap_writel(0x1, OMAP_IH2_BASE + IRQ_CONTROL_REG);
+		omap_writel(0x1, OMAP_IH2_BASE + IRQ_CONTROL_REG_OFFSET);
 
-	omap_writel(0x1, OMAP_IH1_BASE + IRQ_CONTROL_REG);
+	omap_writel(0x1, OMAP_IH1_BASE + IRQ_CONTROL_REG_OFFSET);
 }
 
 static void omap_mask_irq(unsigned int irq)
@@ -84,9 +84,9 @@ static void omap_mask_irq(unsigned int irq)
 	int bank = IRQ_BANK(irq);
 	u32 l;
 
-	l = omap_readl(irq_banks[bank].base_reg + IRQ_MIR);
+	l = omap_readl(irq_banks[bank].base_reg + IRQ_MIR_REG_OFFSET);
 	l |= 1 << IRQ_BIT(irq);
-	omap_writel(l, irq_banks[bank].base_reg + IRQ_MIR);
+	omap_writel(l, irq_banks[bank].base_reg + IRQ_MIR_REG_OFFSET);
 }
 
 static void omap_unmask_irq(unsigned int irq)
@@ -94,9 +94,9 @@ static void omap_unmask_irq(unsigned int irq)
 	int bank = IRQ_BANK(irq);
 	u32 l;
 
-	l = omap_readl(irq_banks[bank].base_reg + IRQ_MIR);
+	l = omap_readl(irq_banks[bank].base_reg + IRQ_MIR_REG_OFFSET);
 	l &= ~(1 << IRQ_BIT(irq));
-	omap_writel(l, irq_banks[bank].base_reg + IRQ_MIR);
+	omap_writel(l, irq_banks[bank].base_reg + IRQ_MIR_REG_OFFSET);
 }
 
 static void omap_mask_ack_irq(unsigned int irq)
@@ -121,7 +121,7 @@ static void omap_irq_set_cfg(int irq, int fiq, int priority, int trigger)
 	/* FIQ is only available on bank 0 interrupts */
 	fiq = bank ? 0 : (fiq & 0x1);
 	val = fiq | ((priority & 0x1f) << 2) | ((trigger & 0x1) << 1);
-	offset = IRQ_ILR0 + IRQ_BIT(irq) * 0x4;
+	offset = IRQ_ILR0_REG_OFFSET + IRQ_BIT(irq) * 0x4;
 	irq_bank_writel(val, bank, offset);
 }
 
@@ -182,13 +182,13 @@ void __init omap_init_irq(void)
 
 	/* Mask and clear all interrupts */
 	for (i = 0; i < irq_bank_count; i++) {
-		irq_bank_writel(~0x0, i, IRQ_MIR);
-		irq_bank_writel(0x0, i, IRQ_ITR);
+		irq_bank_writel(~0x0, i, IRQ_MIR_REG_OFFSET);
+		irq_bank_writel(0x0, i, IRQ_ITR_REG_OFFSET);
 	}
 
 	/* Clear any pending interrupts */
-	irq_bank_writel(0x03, 0, IRQ_CONTROL_REG);
-	irq_bank_writel(0x03, 1, IRQ_CONTROL_REG);
+	irq_bank_writel(0x03, 0, IRQ_CONTROL_REG_OFFSET);
+	irq_bank_writel(0x03, 1, IRQ_CONTROL_REG_OFFSET);
 
 	/* Install the interrupt handlers for each bank */
 	for (i = 0; i < irq_bank_count; i++) {

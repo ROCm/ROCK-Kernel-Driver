@@ -12,6 +12,7 @@
 #define COMMAND_LINE_SIZE 	896
 #define RAMDISK_ORIGIN		0x800000
 #define RAMDISK_SIZE		0x800000
+#define MEMORY_CHUNKS		16	/* max 0x7fff */
 
 #ifndef __ASSEMBLY__
 
