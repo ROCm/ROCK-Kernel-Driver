@@ -165,6 +165,9 @@ extern void call_rtas_display_status(char);
 extern void rtas_restart(char *cmd);
 extern void rtas_power_off(void);
 extern void rtas_halt(void);
+extern int rtas_get_sensor(int sensor, int index, int *state);
+extern int rtas_get_power_level(int powerdomain, int *level);
+extern int rtas_set_indicator(int indicator, int index, int new_value);
 
 /* Given an RTAS status code of 9900..9905 compute the hinted delay */
 unsigned int rtas_extended_busy_delay_time(int status);
@@ -179,6 +182,10 @@ static inline int rtas_is_extended_busy(int status)
  * of holding the buffer for long.
  */
 #define RTAS_DATA_BUF_SIZE 1024
+
+#define RTAS_UNKNOWN_OP	-1099	/* Return Status - Unknown RTAS Token */
+#define RTAS_BUSY	-2	/* RTAS Return Status - Busy */
+
 extern spinlock_t rtas_data_buf_lock;
 extern char rtas_data_buf[RTAS_DATA_BUF_SIZE];
 

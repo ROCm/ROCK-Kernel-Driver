@@ -28,6 +28,7 @@
 #include <asm/system.h>
 #include <asm/abs_addr.h>
 #include <asm/udbg.h>
+#include <asm/delay.h>
 
 struct flash_block_list_header rtas_firmware_flash_list = {0, 0};
 
@@ -180,23 +181,97 @@ rtas_call(int token, int nargs, int nret,
 }
 
 /* Given an RTAS status code of 990n compute the hinted delay of 10^n
- * (last digit) milliseconds.  For now we bound at n=3 (1 sec).
+ * (last digit) milliseconds.  For now we bound at n=5 (100 sec).
  */
 unsigned int
 rtas_extended_busy_delay_time(int status)
 {
 	int order = status - 9900;
-	unsigned int ms;
+	unsigned long ms;
 
 	if (order < 0)
 		order = 0;	/* RTC depends on this for -2 clock busy */
-	else if (order > 3)
-		order = 3;	/* bound */
+	else if (order > 5)
+		order = 5;	/* bound */
 
 	/* Use microseconds for reasonable accuracy */
 	for (ms = 1000; order > 0; order--)
 		ms = ms * 10;
 	return ms / (1000000/HZ); /* round down is fine */
+}
+
+int
+rtas_get_power_level(int powerdomain, int *level)
+{
+	int token = rtas_token("get-power-level");
+	long powerlevel;
+	int rc;
+
+	if (token == RTAS_UNKNOWN_SERVICE)
+		return RTAS_UNKNOWN_OP;
+
+	while(1) {
+		rc = (int) rtas_call(token, 1, 2, &powerlevel, powerdomain);
+		if (rc == RTAS_BUSY)
+			udelay(1);
+		else
+			break;
+	}
+	*level = (int) powerlevel;
+	return rc;
+}
+
+int
+rtas_get_sensor(int sensor, int index, int *state)
+{
+	int token = rtas_token("get-sensor-state");
+	unsigned int wait_time;
+	long returned_state;
+	int rc;
+
+	if (token == RTAS_UNKNOWN_SERVICE)
+		return RTAS_UNKNOWN_OP;
+
+	while (1) {
+		rc = (int) rtas_call(token, 2, 2, &returned_state, sensor,
+					index);
+		if (rc == RTAS_BUSY)
+			udelay(1);
+		else if (rtas_is_extended_busy(rc)) {
+			wait_time = rtas_extended_busy_delay_time(rc);
+			udelay(wait_time * 1000);
+		}
+		else
+			break;
+	}
+	*state = (int) returned_state;
+	return rc;
+}
+
+int
+rtas_set_indicator(int indicator, int index, int new_value)
+{
+	int token = rtas_token("set-indicator");
+	unsigned int wait_time;
+	int rc;
+
+	if (token == RTAS_UNKNOWN_SERVICE)
+		return RTAS_UNKNOWN_OP;
+
+	while (1) {
+		rc = (int) rtas_call(token, 3, 1, NULL, indicator, index,
+					new_value);
+		if (rc == RTAS_BUSY)
+			udelay(1);
+		else if (rtas_is_extended_busy(rc)) {
+			wait_time = rtas_extended_busy_delay_time(rc);
+			udelay(wait_time * 1000);
+		}
+		else
+			break;
+	}
+
+	return rc;
 }
 
 #define FLASH_BLOCK_LIST_VERSION (1UL)
@@ -315,3 +390,6 @@ EXPORT_SYMBOL(rtas_call);
 EXPORT_SYMBOL(rtas_data_buf);
 EXPORT_SYMBOL(rtas_data_buf_lock);
 EXPORT_SYMBOL(rtas_extended_busy_delay_time);
+EXPORT_SYMBOL(rtas_get_sensor);
+EXPORT_SYMBOL(rtas_get_power_level);
+EXPORT_SYMBOL(rtas_set_indicator);
