@@ -4303,7 +4303,6 @@ advansys_proc_info(char *buffer, char **start, off_t offset, int length,
     int                 leftlen;
     char                *curbuf;
     off_t               advoffset;
-    Scsi_Device         *scd;
 #ifdef ADVANSYS_STATS
     int                 tgt_id;
 #endif /* ADVANSYS_STATS */

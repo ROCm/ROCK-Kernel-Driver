@@ -1375,7 +1375,6 @@ static int wd7000_set_info(char *buffer, int length, struct Scsi_Host *host)
 static int wd7000_proc_info(char *buffer, char **start, off_t offset, int length, int hostno, int inout)
 {
 	struct Scsi_Host *host = NULL;
-	Scsi_Device *scd;
 	Adapter *adapter;
 	unsigned long flags;
 	char *pos = buffer;

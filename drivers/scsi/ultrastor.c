@@ -252,7 +252,7 @@ static struct ultrastor_config
 #if ULTRASTOR_MAX_CMDS == 1
   unsigned char mscp_busy;
 #else
-  unsigned short mscp_free;
+  unsigned long mscp_free;
 #endif
   volatile unsigned char aborted[ULTRASTOR_MAX_CMDS];
   struct mscp mscp[ULTRASTOR_MAX_CMDS];

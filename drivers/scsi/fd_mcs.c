@@ -740,7 +740,7 @@ static irqreturn_t fd_mcs_intr(int irq, void *dev_id, struct pt_regs *regs)
 #if DEBUG_RACE
 		in_interrupt_flag = 0;
 #endif
-		return;
+		return IRQ_HANDLED;
 	} else if (current_SC->SCp.phase & in_selection) {
 		status = inb(SCSI_Status_port);
 		if (!(status & 0x01)) {

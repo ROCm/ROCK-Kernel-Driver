@@ -1897,7 +1897,8 @@ static irqreturn_t do_interrupt_handler(int irq, void *shap,
    unsigned long spin_flags;
 
    /* Check if the interrupt must be processed by this handler */
-   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards) return;
+   if ((j = (unsigned int)((char *)shap - sha)) >= num_boards)
+	   return IRQ_NONE;
 
    spin_lock_irqsave(sh[j]->host_lock, spin_flags);
    ihdlr(irq, j);
