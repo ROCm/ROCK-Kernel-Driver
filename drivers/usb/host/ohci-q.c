@@ -658,7 +658,7 @@ static void td_submit_urb (struct urb *urb)
 				data += 4096; data_len -= 4096; cnt++;
 			}
 			/* maybe avoid ED halt on final TD short read */
-			if (!(urb->transfer_flags & USB_DISABLE_SPD))
+			if (!(urb->transfer_flags & URB_SHORT_NOT_OK))
 				info |= TD_R;
 			td_fill (ohci, info | (cnt ? TD_T_TOGGLE : toggle),
 				data, data_len, urb, cnt);
