@@ -406,8 +406,8 @@ do { \
  * regardless of whether CONFIG_SMP or CONFIG_PREEMPT are set. The various
  * methods are defined as nops in the case they are not required.
  */
-#define spin_trylock(lock)	_spin_trylock(lock)
-#define write_trylock(lock)	_write_trylock(lock)
+#define spin_trylock(lock)	__cond_lock(_spin_trylock(lock))
+#define write_trylock(lock)	__cond_lock(_write_trylock(lock))
 
 /* Where's read_trylock? */
 
@@ -448,7 +448,7 @@ do { \
 #define write_unlock_irq(lock)			_write_unlock_irq(lock)
 #define write_unlock_bh(lock)			_write_unlock_bh(lock)
 
-#define spin_trylock_bh(lock)			_spin_trylock_bh(lock)
+#define spin_trylock_bh(lock)			__cond_lock(_spin_trylock_bh(lock))
 
 #ifdef CONFIG_LOCKMETER
 extern void _metered_spin_lock   (spinlock_t *lock);
@@ -467,7 +467,7 @@ extern int  _metered_write_trylock(rwlock_t *lock);
 extern int _atomic_dec_and_lock(atomic_t *atomic, spinlock_t *lock);
 #endif
 
-#define atomic_dec_and_lock(atomic,lock) _atomic_dec_and_lock(atomic,lock)
+#define atomic_dec_and_lock(atomic,lock) __cond_lock(_atomic_dec_and_lock(atomic,lock))
 
 /*
  *  bit-based spin_lock()
@@ -491,6 +491,7 @@ static inline void bit_spin_lock(int bitnum, unsigned long *addr)
 			cpu_relax();
 	}
 #endif
+	__acquire(bitlock);
 }
 
 /*
@@ -498,18 +499,15 @@ static inline void bit_spin_lock(int bitnum, unsigned long *addr)
  */
 static inline int bit_spin_trylock(int bitnum, unsigned long *addr)
 {
+	preempt_disable();	
 #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)
-	int ret;
-
-	preempt_disable();
-	ret = !test_and_set_bit(bitnum, addr);
-	if (!ret)
+	if (test_and_set_bit(bitnum, addr)) {
 		preempt_enable();
-	return ret;
-#else
-	preempt_disable();
-	return 1;
+		return 0;
+	}
 #endif
+	__acquire(bitlock);
+	return 1;
 }
 
 /*
@@ -523,6 +521,7 @@ static inline void bit_spin_unlock(int bitnum, unsigned long *addr)
 	clear_bit(bitnum, addr);
 #endif
 	preempt_enable();
+	__release(bitlock);
 }
 
 /*
