@@ -519,7 +519,7 @@ consecutive sglist entries can be merged into one provided the first one
 ends and the second one starts on a page boundary - in fact this is a huge
 advantage for cards which either cannot do scatter-gather or have very
 limited number of scatter-gather entries) and returns the actual number
-of sg entries it mapped them to.
+of sg entries it mapped them to. On failure 0 is returned.
 
 Then you should loop count times (note: this can be less than nents times)
 and use sg_dma_address() and sg_dma_len() macros where you previously
@@ -841,6 +841,27 @@ to "Closing".
    deleted.
 
 2) More to come...
+
+			Handling Errors
+
+DMA address space is limited on some architectures and an allocation
+failure can be determined by:
+
+- checking if pci_alloc_consistent returns NULL or pci_map_sg returns 0
+
+- checking the returned dma_addr_t of pci_map_single and pci_map_page
+  by using pci_dma_error():
+
+	dma_addr_t dma_handle;
+
+	dma_handle = pci_map_single(dev, addr, size, direction);
+	if (pci_dma_error(dma_handle)) {
+		/*
+		 * reduce current DMA mapping usage,
+		 * delay and try again later or
+		 * reset driver.
+		 */
+	}
 
 			   Closing
 
