@@ -84,7 +84,8 @@ static struct rt6_info * ip6_rt_copy(struct rt6_info *ort);
 static struct dst_entry	*ip6_dst_check(struct dst_entry *dst, u32 cookie);
 static struct dst_entry *ip6_negative_advice(struct dst_entry *);
 static void		ip6_dst_destroy(struct dst_entry *);
-static void		ip6_dst_ifdown(struct dst_entry *, int how);
+static void		ip6_dst_ifdown(struct dst_entry *,
+				       struct net_device *dev, int how);
 static int		 ip6_dst_gc(void);
 
 static int		ip6_pkt_discard(struct sk_buff *skb);
@@ -153,12 +154,13 @@ static void ip6_dst_destroy(struct dst_entry *dst)
 	}	
 }
 
-static void ip6_dst_ifdown(struct dst_entry *dst, int how)
+static void ip6_dst_ifdown(struct dst_entry *dst, struct net_device *dev,
+			   int how)
 {
 	struct rt6_info *rt = (struct rt6_info *)dst;
 	struct inet6_dev *idev = rt->rt6i_idev;
 
-	if (idev != NULL && idev->dev != &loopback_dev) {
+	if (dev != &loopback_dev && idev != NULL && idev->dev == dev) {
 		struct inet6_dev *loopback_idev = in6_dev_get(&loopback_dev);
 		if (loopback_idev != NULL) {
 			rt->rt6i_idev = loopback_idev;
