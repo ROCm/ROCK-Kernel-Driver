@@ -488,8 +488,8 @@ void blk_queue_invalidate_tags(request_queue_t *q)
 
 		if (rq->tag == -1) {
 			printk("bad tag found on list\n");
-			list_del(&rq->queue);
-			rq->tagged = 0;
+			list_del(&rq->queuelist);
+			rq->flags &= ~REQ_QUEUED;
 		} else
 			blk_queue_end_tag(q, rq);
 
