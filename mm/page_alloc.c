@@ -27,8 +27,8 @@
 unsigned long totalram_pages;
 unsigned long totalhigh_pages;
 int nr_swap_pages;
-struct list_head inactive_list;
-struct list_head active_list;
+LIST_HEAD(active_list);
+LIST_HEAD(inactive_list);
 pg_data_t *pgdat_list;
 
 /*
@@ -809,9 +809,6 @@ void __init free_area_init_core(int nid, pg_data_t *pgdat, struct page **gmap,
 			realtotalpages -= zholes_size[i];
 			
 	printk("On node %d totalpages: %lu\n", nid, realtotalpages);
-
-	INIT_LIST_HEAD(&active_list);
-	INIT_LIST_HEAD(&inactive_list);
 
 	/*
 	 * Some architectures (with lots of mem and discontinous memory
