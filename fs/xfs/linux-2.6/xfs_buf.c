@@ -128,6 +128,73 @@ ktrace_t *pagebuf_trace_buf;
 #define pagebuf_deallocate(pb) \
 	kmem_zone_free(pagebuf_cache, (pb));
 
+/*
+ * Page Region interfaces.
+ *
+ * For pages in filesystems where the blocksize is smaller than the
+ * pagesize, we use the page->private field (long) to hold a bitmap
+ * of uptodate regions within the page.
+ *
+ * Each such region is "bytes per page / bits per long" bytes long.
+ *
+ * NBPPR == number-of-bytes-per-page-region
+ * BTOPR == bytes-to-page-region (rounded up)
+ * BTOPRT == bytes-to-page-region-truncated (rounded down)
+ */
+#if (BITS_PER_LONG == 32)
+#define PRSHIFT		(PAGE_CACHE_SHIFT - 5)	/* (32 == 1<<5) */
+#elif (BITS_PER_LONG == 64)
+#define PRSHIFT		(PAGE_CACHE_SHIFT - 6)	/* (64 == 1<<6) */
+#else
+#error BITS_PER_LONG must be 32 or 64
+#endif
+#define NBPPR		(PAGE_CACHE_SIZE/BITS_PER_LONG)
+#define BTOPR(b)	(((unsigned int)(b) + (NBPPR - 1)) >> PRSHIFT)
+#define BTOPRT(b)	(((unsigned int)(b) >> PRSHIFT))
+
+STATIC unsigned long
+page_region_mask(
+	size_t		offset,
+	size_t		length)
+{
+	unsigned long	mask;
+	int		first, final;
+
+	first = BTOPR(offset);
+	final = BTOPRT(offset + length - 1);
+	first = min(first, final);
+
+	mask = ~0UL;
+	mask <<= BITS_PER_LONG - (final - first);
+	mask >>= BITS_PER_LONG - (final);
+
+	ASSERT(offset + length <= PAGE_CACHE_SIZE);
+	ASSERT((final - first) < BITS_PER_LONG && (final - first) >= 0);
+
+	return mask;
+}
+
+STATIC inline void
+set_page_region(
+	struct page	*page,
+	size_t		offset,
+	size_t		length)
+{
+	page->private |= page_region_mask(offset, length);
+	if (page->private == ~0UL)
+		SetPageUptodate(page);
+}
+
+STATIC inline int
+test_page_region(
+	struct page	*page,
+	size_t		offset,
+	size_t		length)
+{
+	unsigned long	mask = page_region_mask(offset, length);
+
+	return (mask && (page->private & mask) == mask);
+}
 
 /*
  * Mapping of multi-page buffers into contiguous virtual space
@@ -312,7 +379,6 @@ _pagebuf_lookup_pages(
 	uint			flags)
 {
 	struct address_space	*mapping = bp->pb_target->pbr_mapping;
-	unsigned int		sectorshift = bp->pb_target->pbr_sshift;
 	size_t			blocksize = bp->pb_target->pbr_bsize;
 	size_t			size = bp->pb_count_desired;
 	size_t			nbytes, offset;
@@ -372,22 +438,11 @@ _pagebuf_lookup_pages(
 
 		if (!PageUptodate(page)) {
 			page_count--;
-			if (blocksize == PAGE_CACHE_SIZE) {
+			if (blocksize >= PAGE_CACHE_SIZE) {
 				if (flags & PBF_READ)
 					bp->pb_locked = 1;
 			} else if (!PagePrivate(page)) {
-				unsigned long	j, range;
-
-				/*
-				 * In this case page->private holds a bitmap
-				 * of uptodate sectors within the page
-				 */
-				ASSERT(blocksize < PAGE_CACHE_SIZE);
-				range = (offset + nbytes) >> sectorshift;
-				for (j = offset >> sectorshift; j < range; j++)
-					if (!test_bit(j, &page->private))
-						break;
-				if (j == range)
+				if (test_page_region(page, offset, nbytes))
 					page_count++;
 			}
 		}
@@ -1197,7 +1252,6 @@ bio_end_io_pagebuf(
 {
 	xfs_buf_t		*pb = (xfs_buf_t *)bio->bi_private;
 	unsigned int		i, blocksize = pb->pb_target->pbr_bsize;
-	unsigned int		sectorshift = pb->pb_target->pbr_sshift;
 	struct bio_vec		*bvec = bio->bi_io_vec;
 
 	if (bio->bi_size)
@@ -1215,14 +1269,7 @@ bio_end_io_pagebuf(
 			SetPageUptodate(page);
 		} else if (!PagePrivate(page) &&
 				(pb->pb_flags & _PBF_PAGE_CACHE)) {
-			unsigned long	j, range;
-
-			ASSERT(blocksize < PAGE_CACHE_SIZE);
-			range = (bvec->bv_offset + bvec->bv_len) >> sectorshift;
-			for (j = bvec->bv_offset >> sectorshift; j < range; j++)
-				set_bit(j, &page->private);
-			if (page->private == (unsigned long)(PAGE_CACHE_SIZE-1))
-				SetPageUptodate(page);
+			set_page_region(page, bvec->bv_offset, bvec->bv_len);
 		}
 
 		if (_pagebuf_iolocked(pb)) {
@@ -1527,11 +1574,12 @@ xfs_incore_relse(
 	truncate_inode_pages(btp->pbr_mapping, 0LL);
 }
 
-int
-xfs_setsize_buftarg(
+STATIC int
+xfs_setsize_buftarg_flags(
 	xfs_buftarg_t		*btp,
 	unsigned int		blocksize,
-	unsigned int		sectorsize)
+	unsigned int		sectorsize,
+	int			verbose)
 {
 	btp->pbr_bsize = blocksize;
 	btp->pbr_sshift = ffs(sectorsize) - 1;
@@ -1544,28 +1592,39 @@ xfs_setsize_buftarg(
 		return EINVAL;
 	}
 
-	/*
-	 * Disallow mounts with 64K pages and 512 byte sectors,
-	 * until the complete fix has been implemented.
-	 */
-	if ((PAGE_CACHE_SIZE == 64 * 1024) && (sectorsize == 512)) {
+	if (verbose &&
+	    (PAGE_CACHE_SIZE / BITS_PER_LONG) > sectorsize) {
 		printk(KERN_WARNING
-"XFS: Cannot use a 512-byte-sector filesystem (%s) with 64KB pagesize (yet)\n",
-			XFS_BUFTARG_NAME(btp));
-		return EINVAL;
+			"XFS: %u byte sectors in use on device %s.  "
+			"This is suboptimal; %u or greater is ideal.\n",
+			sectorsize, XFS_BUFTARG_NAME(btp),
+			(unsigned int)PAGE_CACHE_SIZE / BITS_PER_LONG);
 	}
 
 	return 0;
 }
 
+/*
+* When allocating the initial buffer target we have not yet
+* read in the superblock, so don't know what sized sectors
+* are being used is at this early stage.  Play safe.
+*/
 STATIC int
-block_releasepage(
-	struct page		*page,
-	int			gfp_mask)
+xfs_setsize_buftarg_early(
+	xfs_buftarg_t		*btp,
+	struct block_device	*bdev)
 {
-	printk("XFS: hey, what the...?  Where'd my hold on this page go!?\n");
-	dump_stack();
-	return 1;
+	return xfs_setsize_buftarg_flags(btp,
+			PAGE_CACHE_SIZE, bdev_hardsect_size(bdev), 0);
+}
+
+int
+xfs_setsize_buftarg(
+	xfs_buftarg_t		*btp,
+	unsigned int		blocksize,
+	unsigned int		sectorsize)
+{
+	return xfs_setsize_buftarg_flags(btp, blocksize, sectorsize, 1);
 }
 
 STATIC int
@@ -1578,7 +1637,6 @@ xfs_mapping_buftarg(
 	struct address_space	*mapping;
 	static struct address_space_operations mapping_aops = {
 		.sync_page = block_sync_page,
-		.releasepage = block_releasepage,
 	};
 
 	inode = new_inode(bdev->bd_inode->i_sb);
@@ -1613,7 +1671,7 @@ xfs_alloc_buftarg(
 
 	btp->pbr_dev =  bdev->bd_dev;
 	btp->pbr_bdev = bdev;
-	if (xfs_setsize_buftarg(btp, PAGE_CACHE_SIZE, bdev_hardsect_size(bdev)))
+	if (xfs_setsize_buftarg_early(btp, bdev))
 		goto error;
 	if (xfs_mapping_buftarg(btp, bdev))
 		goto error;
