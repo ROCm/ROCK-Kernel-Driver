@@ -5,6 +5,7 @@
  * This file contains the system call numbers.
  */
 
+#define __NR_restart_syscall      0
 #define __NR_exit		  1
 #define __NR_fork		  2
 #define __NR_read		  3
@@ -80,7 +81,7 @@
 #define __NR_sigpending		 73
 #define __NR_sethostname	 74
 #define __NR_setrlimit		 75
-#define __NR_old_getrlimit	 76
+#define __NR_getrlimit		 76
 #define __NR_getrusage		 77
 #define __NR_gettimeofday	 78
 #define __NR_settimeofday	 79
@@ -170,6 +171,7 @@
 #define __NR_mremap		163
 #define __NR_setresuid		164
 #define __NR_getresuid		165
+#define __NR_getpagesize	166
 #define __NR_query_module	167
 #define __NR_poll		168
 #define __NR_nfsservctl		169
@@ -194,7 +196,7 @@
 #define __NR_getpmsg		188	/* some people actually want streams */
 #define __NR_putpmsg		189	/* some people actually want streams */
 #define __NR_vfork		190
-#define __NR_getrlimit		191
+#define __NR_ugetrlimit		191
 #define __NR_mmap2		192
 #define __NR_truncate64		193
 #define __NR_ftruncate64	194
@@ -220,8 +222,71 @@
 #define __NR_setgid32		214
 #define __NR_setfsuid32		215
 #define __NR_setfsgid32		216
-
-#define	NR_syscalls		256
+#define __NR_pivot_root		217
+#define __NR_getdents64		220
+#define __NR_gettid		221
+#define __NR_tkill		222
+#define __NR_setxattr		223
+#define __NR_lsetxattr		224
+#define __NR_fsetxattr		225
+#define __NR_getxattr		226
+#define __NR_lgetxattr		227
+#define __NR_fgetxattr		228
+#define __NR_listxattr		229
+#define __NR_llistxattr		230
+#define __NR_flistxattr		231
+#define __NR_removexattr	232
+#define __NR_lremovexattr	233
+#define __NR_fremovexattr	234
+#define __NR_futex		235
+#define __NR_sendfile64		236
+#define __NR_mincore		237
+#define __NR_madvise		238
+#define __NR_fcntl64		239
+#define __NR_readahead		240
+#define __NR_io_setup		241
+#define __NR_io_destroy		242
+#define __NR_io_getevents	243
+#define __NR_io_submit		244
+#define __NR_io_cancel		245
+#define __NR_fadvise64		246
+#define __NR_exit_group		247
+#define __NR_lookup_dcookie	248
+#define __NR_epoll_create	249
+#define __NR_epoll_ctl		250
+#define __NR_epoll_wait		251
+#define __NR_remap_file_pages	252
+#define __NR_set_tid_address	253
+#define __NR_timer_create	254
+#define __NR_timer_settime	255
+#define __NR_timer_gettime	256
+#define __NR_timer_getoverrun	257
+#define __NR_timer_delete	258
+#define __NR_clock_settime	259
+#define __NR_clock_gettime	260
+#define __NR_clock_getres	261
+#define __NR_clock_nanosleep	262
+#define __NR_statfs64		263
+#define __NR_fstatfs64		264
+#define __NR_tgkill		265
+#define __NR_utimes		266
+#define __NR_fadvise64_64	267
+#define __NR_mbind		268
+#define __NR_get_mempolicy	269
+#define __NR_set_mempolicy	270
+#define __NR_mq_open		271
+#define __NR_mq_unlink		272
+#define __NR_mq_timedsend	273
+#define __NR_mq_timedreceive	274
+#define __NR_mq_notify		275
+#define __NR_mq_getsetattr	276
+#define __NR_waitid		277
+#define __NR_sys_setaltroot	278
+#define __NR_add_key		279
+#define __NR_request_key	280
+#define __NR_keyctl		281
+ 
+#define NR_syscalls		282
 
 /* user-visible error numbers are in the range -1 - -122: see
    <asm-m68k/errno.h> */
