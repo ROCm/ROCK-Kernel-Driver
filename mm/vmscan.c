@@ -791,7 +791,7 @@ int kswapd(void *unused)
 	 * us from recursively trying to free more memory as we're
 	 * trying to free the first piece of memory in the first place).
 	 */
-	tsk->flags |= PF_MEMALLOC | PF_KERNTHREAD;
+	tsk->flags |= PF_MEMALLOC;
 
 	/*
 	 * Kswapd main loop.

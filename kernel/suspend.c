@@ -1,5 +1,5 @@
 /*
- * linux/kernel/swsusp.c
+ * linux/kernel/suspend.c
  *
  * This file is to realize architecture-independent
  * machine suspend feature using pretty near only high-level routines
@@ -34,13 +34,6 @@
  * For TODOs,FIXMEs also look in Documentation/swsusp.txt
  */
 
-/*
- * TODO:
- *
- * - we should launch a kernel_thread to process suspend request, cleaning up
- * bdflush from this task. (check apm.c for something similar).
- */
-
 #include <linux/module.h>
 #include <linux/mm.h>
 #include <linux/swapctl.h>
@@ -65,6 +58,7 @@
 #include <linux/swap.h>
 #include <linux/pm.h>
 #include <linux/device.h>
+#include <linux/buffer_head.h>
 
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
@@ -78,7 +72,7 @@ unsigned char software_suspend_enabled = 0;
    we probably do not take enough locks for switching consoles, etc,
    so bad things might happen.
 */
-#ifndef CONFIG_VT
+#if !defined(CONFIG_VT) || !defined(CONFIG_VT_CONSOLE)
 #undef SUSPEND_CONSOLE
 #endif
 
@@ -152,7 +146,7 @@ static const char *name_resume = "Resume Machine: ";
 #define	DEBUG_DEFAULT	1
 #undef	DEBUG_PROCESS
 #undef	DEBUG_SLOW
-#define TEST_SWSUSP 0		/* Set to 1 to reboot instead of halt machine after suspension */
+#define TEST_SWSUSP 1		/* Set to 1 to reboot instead of halt machine after suspension */
 
 #ifdef DEBUG_DEFAULT
 #define PRINTD(func, f, a...)	\
@@ -775,16 +769,16 @@ void suspend_power_down(void)
 		machine_restart(NULL);
 	else
 #endif
+	{
+		device_shutdown();
 		machine_power_off();
+	}
 
 	printk(KERN_EMERG "%sProbably not capable for powerdown. System halted.\n", name_suspend);
 	machine_halt();
 	while (1);
 	/* NOTREACHED */
 }
-
-/* forward decl */
-void do_software_suspend(void);
 
 /*
  * Magic happens here
@@ -822,7 +816,6 @@ static void do_magic_resume_2(void)
 #ifdef SUSPEND_CONSOLE
 	update_screen(fg_console);	/* Hmm, is this the problem? */
 #endif
-	suspend_tq.routine = (void *)do_software_suspend;
 }
 
 static void do_magic_suspend_1(void)
@@ -851,7 +844,6 @@ static void do_magic_suspend_2(void)
 	drivers_resume(RESUME_PHASE1);
 	spin_unlock_irq(&suspend_pagedir_lock);
 	mark_swapfiles(((swp_entry_t) {0}), MARK_SWAP_RESUME);
-	suspend_tq.routine = (void *)do_software_suspend;
 	printk(KERN_WARNING "%sLeaving do_magic_suspend_2...\n", name_suspend);	
 }
 
@@ -859,43 +851,38 @@ static void do_magic_suspend_2(void)
 #include <asm/suspend.h>
 
 /*
- * This function is triggered using process bdflush. We try to swap out as
- * much as we can then make a copy of the occupied pages in memory so we can
- * make a copy of kernel state atomically, the I/O needed by saving won't
- * bother us anymore.
+ * We try to swap out as much as we can then make a copy of the
+ * occupied pages in memory so we can make a copy of kernel state
+ * atomically, the I/O needed by saving won't bother us anymore. 
  */
 void do_software_suspend(void)
 {
 	arch_prepare_suspend();
-	if (!prepare_suspend_console()) {
-		if (!prepare_suspend_processes()) {
-			free_some_memory();
-
-			/* No need to invalidate any vfsmnt list -- they will be valid after resume, anyway.
-			 *
-			 * We sync here -- so you have consistent filesystem state when things go wrong.
-			 * -- so that noone writes to disk after we do atomic copy of data.
-			 */
-			PRINTS("Syncing disks before copy\n");
-			do_suspend_sync();
-			if(drivers_suspend()==0)
-				do_magic(0);			/* This function returns after machine woken up from resume */
-			PRINTR("Restarting processes...\n");
-			thaw_processes();
-		}
+	if (prepare_suspend_console())
+		printk( "Can't allocate a console... proceeding\n");
+	if (!prepare_suspend_processes()) {
+		free_some_memory();
+		
+		/* No need to invalidate any vfsmnt list -- they will be valid after resume, anyway.
+		 *
+		 * We sync here -- so you have consistent filesystem state when things go wrong.
+		 * -- so that noone writes to disk after we do atomic copy of data.
+		 */
+		PRINTS("Syncing disks before copy\n");
+		do_suspend_sync();
+		if(drivers_suspend()==0)
+			do_magic(0);			/* This function returns after machine woken up from resume */
+		PRINTR("Restarting processes...\n");
+		thaw_processes();
 	}
 	software_suspend_enabled = 1;
 	MDELAY(1000);
 	restore_console ();
 }
 
-struct tq_struct suspend_tq =
-	{ routine: (void *)(void *)do_software_suspend, 
-	  data: 0 };
-
 /*
- * This is the trigger function, we must queue ourself since we
- * can be called from interrupt && bdflush context is needed
+ * This is main interface to the outside world. It needs to be
+ * called from process context.
  */
 void software_suspend(void)
 {
@@ -903,8 +890,8 @@ void software_suspend(void)
 		return;
 
 	software_suspend_enabled = 0;
-	queue_task(&suspend_tq, &tq_bdflush);
-	wakeup_bdflush();
+	BUG_ON(in_interrupt());
+	do_software_suspend();
 }
 
 /* More restore stuff */
@@ -1123,6 +1110,7 @@ static int resume_try_to_read(const char * specialfile, int noresume)
 	pagedir_order = get_bitmask_order(nr_pgdir_pages);
 
 	error = -ENOMEM;
+	free_page((unsigned long) cur);
 	pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
 	if(!pagedir_nosave)
 		goto resume_read_error;

@@ -577,7 +577,9 @@ static int loop_thread(void *data)
 	daemonize();
 
 	sprintf(current->comm, "loop%d", lo->lo_number);
-	current->flags |= PF_IOTHREAD;
+	current->flags |= PF_IOTHREAD;	/* loop can be used in an encrypted device
+					   hence, it mustn't be stopped at all because it could
+					   be indirectly used during suspension */
 
 	spin_lock_irq(&current->sigmask_lock);
 	sigfillset(&current->blocked);

@@ -122,8 +122,6 @@ void unlock_buffer(struct buffer_head *bh)
 	wake_up_buffer(bh);
 }
 
-DECLARE_TASK_QUEUE(tq_bdflush);
-
 /*
  * Block until a buffer comes unlocked.  This doesn't stop it
  * from becoming locked again - you have to lock it yourself

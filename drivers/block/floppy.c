@@ -4220,14 +4220,15 @@ static int __init floppy_setup(char *str)
 
 static int have_no_fdc= -ENODEV;
 
-static struct device device_floppy;
+static struct device device_floppy = {
+	name:		"floppy",
+	bus_id:		"03?0",
+};
 
 int __init floppy_init(void)
 {
 	int i,unit,drive;
 
-	strcpy(device_floppy.name, "floppy");
-	strcpy(device_floppy.bus_id, "03?0");
 	register_sys_device(&device_floppy);
 
 	raw_cmd = NULL;

@@ -1888,7 +1888,6 @@ static int reiserfs_journal_commit_thread(void *nullp) {
   spin_unlock_irq(&current->sigmask_lock);
 
   sprintf(current->comm, "kreiserfsd") ;
-  current->flags |= PF_KERNTHREAD;
   lock_kernel() ;
   while(1) {
 

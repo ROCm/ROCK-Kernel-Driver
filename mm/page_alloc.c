@@ -247,42 +247,26 @@ static struct page * rmqueue(zone_t *zone, unsigned int order)
 }
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
-int is_head_of_free_region(struct page *p)
+int is_head_of_free_region(struct page *page)
 {
-	pg_data_t *pgdat = pgdat_list;
-	unsigned type;
-	unsigned long flags;
+        zone_t *zone = page_zone(page);
+        unsigned long flags;
+	int order;
+	list_t *curr;
 
-	for (type=0;type < MAX_NR_ZONES; type++) {
-		zone_t *zone = pgdat->node_zones + type;
-		int order = MAX_ORDER - 1;
-		free_area_t *area;
-		struct list_head *head, *curr;
-		spin_lock_irqsave(&zone->lock, flags);	/* Should not matter as we need quiescent system for suspend anyway, but... */
-
-		do {
-			area = zone->free_area + order;
-			head = &area->free_list;
-			curr = head;
-
-			for(;;) {
-				if(!curr) {
-//					printk("FIXME: this should not happen but it does!!!");
-					break;
-				}
-				if(p != memlist_entry(curr, struct page, list)) {
-					curr = memlist_next(curr);
-					if (curr == head)
-						break;
-					continue;
-				}
+	/*
+	 * Should not matter as we need quiescent system for
+	 * suspend anyway, but...
+	 */
+	spin_lock_irqsave(&zone->lock, flags);
+	for (order = MAX_ORDER - 1; order >= 0; --order)
+		list_for_each(curr, &zone->free_area[order].free_list)
+			if (page == list_entry(curr, struct page, list)) {
+				spin_unlock_irqrestore(&zone->lock, flags);
 				return 1 << order;
 			}
-		} while(order--);
-		spin_unlock_irqrestore(&zone->lock, flags);
-
-	}
-	return 0;
+	spin_unlock_irqrestore(&zone->lock, flags);
+        return 0;
 }
 #endif /* CONFIG_SOFTWARE_SUSPEND */
 
