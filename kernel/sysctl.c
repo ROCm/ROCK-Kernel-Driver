@@ -888,27 +888,13 @@ int do_sysctl(int __user *name, int nlen, void __user *oldval, size_t __user *ol
 asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
 {
 	struct __sysctl_args tmp;
-	int name[2];
 	int error;
 
 	if (copy_from_user(&tmp, args, sizeof(tmp)))
 		return -EFAULT;
-	
-	if (tmp.nlen != 2 || copy_from_user(name, tmp.name, sizeof(name)) ||
-	    name[0] != CTL_KERN || name[1] != KERN_VERSION) { 
-		int i;
-		printk(KERN_INFO "%s: numerical sysctl ", current->comm); 
-		for (i = 0; i < tmp.nlen; i++) {
-			int n;
-			
-			if (get_user(n, tmp.name+i)) {
-				printk("? ");
-			} else {
-				printk("%d ", n);
-			}
-		}
-		printk("is obsolete.\n");
-	} 
+
+	if (tmp.nlen < 0 || tmp.nlen > CTL_MAXNAME)
+		return -EINVAL;
 
 	lock_kernel();
 	error = do_sysctl(tmp.name, tmp.nlen, tmp.oldval, tmp.oldlenp,
