@@ -332,7 +332,7 @@ pmac_setup_arch(void)
 
 #ifdef CONFIG_SMP
 	/* Check for Core99 */
-	if (find_devices("uni-n"))
+	if (find_devices("uni-n") || find_devices("u3"))
 		ppc_md.smp_ops = &core99_smp_ops;
 	else
 		ppc_md.smp_ops = &psurge_smp_ops;

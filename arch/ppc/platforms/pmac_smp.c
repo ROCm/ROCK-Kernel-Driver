@@ -556,9 +556,19 @@ static void __init smp_core99_setup_cpu(int cpu_nr)
 	/* Setup openpic */
 	do_openpic_setup_cpu();
 
-	/* Setup L2/L3 */
-	if (cpu_nr == 0)
+	if (cpu_nr == 0) {
+#ifdef CONFIG_POWER4
+		extern void g5_phy_disable_cpu1(void);
+
+		/* If we didn't start the second CPU, we must take
+		 * it off the bus
+		 */
+		if (machine_is_compatible("MacRISC4") &&
+		    num_online_cpus() < 2)		
+			g5_phy_disable_cpu1();
+#endif /* CONFIG_POWER4 */
 		if (ppc_md.progress) ppc_md.progress("core99_setup_cpu 0 done", 0x349);
+	}
 }
 
 void __init smp_core99_take_timebase(void)
