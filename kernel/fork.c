@@ -159,7 +159,20 @@ void finish_wait(wait_queue_head_t *q, wait_queue_t *wait)
 	unsigned long flags;
 
 	__set_current_state(TASK_RUNNING);
-	if (!list_empty(&wait->task_list)) {
+	/*
+	 * We can check for list emptiness outside the lock
+	 * IFF:
+	 *  - we use the "careful" check that verifies both
+	 *    the next and prev pointers, so that there cannot
+	 *    be any half-pending updates in progress on other
+	 *    CPU's that we haven't seen yet (and that might
+	 *    still change the stack area.
+	 * and
+	 *  - all other users take the lock (ie we can only
+	 *    have _one_ other CPU that looks at or modifies
+	 *    the list).
+	 */
+	if (!list_empty_careful(&wait->task_list)) {
 		spin_lock_irqsave(&q->lock, flags);
 		list_del_init(&wait->task_list);
 		spin_unlock_irqrestore(&q->lock, flags);
