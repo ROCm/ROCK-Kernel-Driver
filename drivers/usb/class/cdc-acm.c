@@ -538,7 +538,7 @@ static int acm_probe (struct usb_interface *intf,
 
 		cfacm = dev->config + i;
 
-		dbg("probing config %d", cfacm->bConfigurationValue);
+		dbg("probing config %d", cfacm->desc.bConfigurationValue);
 
 		if (cfacm->desc.bNumInterfaces != 2 ||
 		    usb_interface_claimed(cfacm->interface + 0) ||

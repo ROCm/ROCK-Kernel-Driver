@@ -1869,11 +1869,12 @@ S:	Maintained
 W:	http://www.kroah.com/linux-usb/
 
 USB CDC ETHERNET DRIVER
-P:	Brad Hards
-M:	bradh@frogmouth.net
+P:	Greg Kroah-Hartman
+M:	greg@kroah.com
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 S:	Maintained
+W:	http://www.kroah.com/linux-usb/
 
 USB EHCI DRIVER
 P:	David Brownell

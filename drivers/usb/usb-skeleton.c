@@ -72,13 +72,15 @@ MODULE_PARM(debug, "i");
 MODULE_PARM_DESC(debug, "Debug enabled or not");
 
 
-/* Define these values to match your device */
+/* Define these values to match your devices */
 #define USB_SKEL_VENDOR_ID	0xfff0
 #define USB_SKEL_PRODUCT_ID	0xfff0
 
 /* table of devices that work with this driver */
 static struct usb_device_id skel_table [] = {
 	{ USB_DEVICE(USB_SKEL_VENDOR_ID, USB_SKEL_PRODUCT_ID) },
+	/* "Gadget Zero" firmware runs under Linux */
+	{ USB_DEVICE(0x0525, 0xa4a0) },
 	{ }					/* Terminating entry */
 };
 
@@ -707,7 +709,7 @@ static int __init usb_skel_init(void)
 	/* register this driver with the USB subsystem */
 	result = usb_register(&skel_driver);
 	if (result < 0) {
-		err("usb_register failed for the "__FILE__" driver. Error number %d",
+		err("usb_register failed. Error number %d",
 		    result);
 		return -1;
 	}
