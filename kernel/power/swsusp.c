@@ -936,7 +936,6 @@ static int relocate_pagedir(void)
 	}
 
 	while ((m = (void *) __get_free_pages(GFP_ATOMIC, pagedir_order))) {
-		memset(m, 0, PAGE_SIZE);
 		if (!does_collide_order(old_pagedir, (unsigned long)m, pagedir_order))
 			break;
 		eaten_memory = m;
