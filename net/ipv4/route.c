@@ -2575,9 +2575,6 @@ ctl_table ipv4_route_table[] = {
 };
 #endif
 
-	rt_hash_rnd = (int) ((num_physpages ^ (num_physpages>>8)) ^
-			     (jiffies ^ (jiffies >> 7)));
-
 #ifdef CONFIG_NET_CLS_ROUTE
 struct ip_rt_acct *ip_rt_acct;
 
@@ -2636,6 +2633,9 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 int __init ip_rt_init(void)
 {
 	int i, order, goal, rc = 0;
+
+	rt_hash_rnd = (int) ((num_physpages ^ (num_physpages>>8)) ^
+			     (jiffies ^ (jiffies >> 7)));
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	for (order = 0;
