@@ -57,8 +57,6 @@
 # endif
 #endif
 
-#include <asm/tlbflush.h>
-
 /*
  * Find the drm_map that covers the range [offset, offset+size).
  */
