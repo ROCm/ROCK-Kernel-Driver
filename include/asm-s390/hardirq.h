@@ -80,15 +80,21 @@ typedef struct {
 
 extern void do_call_softirq(void);
 
-#define in_atomic()	(preempt_count() != 0)
-#define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
+#if CONFIG_PREEMPT
+# define in_atomic()	(in_interrupt() || preempt_count() == PREEMPT_ACTIVE)
+# define IRQ_EXIT_OFFSET (HARDIRQ_OFFSET-1)
+#else
+# define in_atomic()	(preempt_count() != 0)
+# define IRQ_EXIT_OFFSET HARDIRQ_OFFSET
+#endif
 
 #define irq_exit()							\
 do {									\
-	preempt_count() -= HARDIRQ_OFFSET;				\
+	preempt_count() -= IRQ_EXIT_OFFSET;				\
 	if (!in_interrupt() && softirq_pending(smp_processor_id()))	\
 		/* Use the async. stack for softirq */			\
 		do_call_softirq();					\
+	preempt_enable_no_resched();					\
 } while (0)
 
 #ifndef CONFIG_SMP

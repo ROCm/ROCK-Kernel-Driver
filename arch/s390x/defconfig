@@ -51,6 +51,7 @@ CONFIG_QDIO=y
 #
 # Misc
 #
+# CONFIG_PREEMPT is not set
 CONFIG_IPL=y
 # CONFIG_IPL_TAPE is not set
 CONFIG_IPL_VM=y

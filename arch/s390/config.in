@@ -30,6 +30,7 @@ if [ "$CONFIG_QDIO" != "n" ]; then
 fi
 
 comment 'Misc'
+bool 'Preemptible Kernel' CONFIG_PREEMPT
 bool 'Builtin IPL record support' CONFIG_IPL
 if [ "$CONFIG_IPL" = "y" ]; then
   choice 'IPL method generated into head.S' \

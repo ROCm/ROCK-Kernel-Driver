@@ -10,6 +10,7 @@
 #define __ASM_SOFTIRQ_H
 
 #include <linux/smp.h>
+#include <linux/preempt.h>
 
 #include <asm/atomic.h>
 #include <asm/hardirq.h>
@@ -28,6 +29,7 @@ do {									\
 	if (!in_interrupt() && softirq_pending(smp_processor_id()))	\
 		/* Use the async. stack for softirq */			\
 		do_call_softirq();					\
+	preempt_check_resched();					\
 } while (0)
 
 #endif	/* __ASM_SOFTIRQ_H */

@@ -25,10 +25,8 @@ struct thread_info {
 	struct exec_domain	*exec_domain;	/* execution domain */
 	unsigned long		flags;		/* low level flags */
 	unsigned int		cpu;		/* current CPU */
-	int 			preempt_count; /* 0 => preemptable, <0 => BUG */
+	unsigned int		preempt_count;  /* 0 => preemptable */
 };
-
-#define PREEMPT_ACTIVE		0x4000000
 
 /*
  * macros/functions for gaining access to the thread information structure
@@ -83,5 +81,7 @@ static inline struct thread_info *current_thread_info(void)
 #define _TIF_POLLING_NRFLAG	(1<<TIF_POLLING_NRFLAG)
 
 #endif /* __KERNEL__ */
+
+#define PREEMPT_ACTIVE		0x4000000
 
 #endif /* _ASM_THREAD_INFO_H */
