@@ -1259,6 +1259,23 @@ static int serial8250_startup(struct uart_port *port)
 	}
 
 	/*
+	 * For a XR16C850, we need to set the trigger levels
+	 */
+	if (up->port.type == PORT_16850) {
+		unsigned char fctr;
+
+		serial_outp(up, UART_LCR, 0xbf);
+
+		fctr = serial_inp(up, UART_FCTR) & ~(UART_FCTR_RX|UART_FCTR_TX);
+		serial_outp(up, UART_FCTR, fctr | UART_FCTR_TRGD | UART_FCTR_RX);
+		serial_outp(up, UART_TRG, UART_TRG_96);
+		serial_outp(up, UART_FCTR, fctr | UART_FCTR_TRGD | UART_FCTR_TX);
+		serial_outp(up, UART_TRG, UART_TRG_96);
+
+		serial_outp(up, UART_LCR, 0);
+	}
+
+	/*
 	 * If the "interrupt" for this port doesn't correspond with any
 	 * hardware interrupt, we use a timer-based system.  The original
 	 * driver used to do this with IRQ0.
@@ -1593,23 +1610,6 @@ serial8250_pm(struct uart_port *port, unsigned int state,
 			 */
 			serial_outp(up, UART_LCR, 0xBF);
 			serial_outp(up, UART_EFR, 0);
-			/*
-			 * For a XR16C850, we need to set the trigger levels
-			 */
-			if (up->port.type == PORT_16850) {
-				unsigned char fctr;
-
-				fctr = serial_inp(up, UART_FCTR) &
-					 ~(UART_FCTR_RX | UART_FCTR_TX);
-				serial_outp(up, UART_FCTR, fctr |
-						UART_FCTR_TRGD |
-						UART_FCTR_RX);
-				serial_outp(up, UART_TRG, UART_TRG_96);
-				serial_outp(up, UART_FCTR, fctr |
-						UART_FCTR_TRGD |
-						UART_FCTR_TX);
-				serial_outp(up, UART_TRG, UART_TRG_96);
-			}
 			serial_outp(up, UART_LCR, 0);
 		}
 
