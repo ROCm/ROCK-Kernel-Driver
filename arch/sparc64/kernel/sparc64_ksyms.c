@@ -143,7 +143,7 @@ EXPORT_SYMBOL(__global_restore_flags);
 
 #if defined(CONFIG_MCOUNT)
 extern void mcount(void);
-EXPORT_SYMBOL(mcount);
+EXPORT_SYMBOL_NOVERS(mcount);
 #endif
 
 /* Per-CPU information table */
