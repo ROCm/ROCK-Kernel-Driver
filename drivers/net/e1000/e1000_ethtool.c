@@ -258,7 +258,7 @@ e1000_ethtool_geeprom(struct e1000_adapter *adapter,
 	if ((eeprom->offset + eeprom->len) > max_len)
 		eeprom->len = (max_len - eeprom->offset);
 
-	for(i = 0; i < max_len; i++)
+	for(i = 0; i < (max_len >> 1); i++)
 		e1000_read_eeprom(&adapter->hw, i, &eeprom_buff[i]);
 }
 

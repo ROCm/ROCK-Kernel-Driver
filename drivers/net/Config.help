@@ -828,18 +828,23 @@ CONFIG_E1000
   This driver supports Intel(R) PRO/1000 gigabit ethernet family of
   adapters, which includes:
 
-     Controller  Adapter Name                     Board IDs
-     ----------  ------------                     ---------
-     82542       PRO/1000 Gigabit Server Adapter  700262-xxx,
-                                                  717037-xxx
-     82543       PRO/1000 F Server Adapter        738640-xxx,
-                                                  A38888-xxx,
-                                                  A06512-xxx
-     82543       PRO/1000 T Server Adapter        A19845-xxx,
-                                                  A33948-xxx
-     82544       PRO/1000 XT Server Adapter       A51580-xxx
-     82544       PRO/1000 XF Server Adapter       A50484-xxx
-     82544       PRO/1000 T Desktop Adapter       A62947-xxx
+     Controller  Adapter Name                         Board IDs
+     ----------  ------------                         ---------
+     82542       PRO/1000 Gigabit Server Adapter      700262-xxx,
+                                                      717037-xxx
+     82543       PRO/1000 F Server Adapter            738640-xxx,
+                                                      A38888-xxx
+     82543       PRO/1000 T Server Adapter            A19845-xxx,
+                                                      A33948-xxx
+     82544       PRO/1000 XT Server Adapter           A51580-xxx
+     82544       PRO/1000 XF Server Adapter           A50484-xxx
+     82544       PRO/1000 T Desktop Adapter           A62947-xxx
+     82540       PRO/1000 MT Desktop Adapter          A78408-xxx
+     82545       PRO/1000 MT Server Adapter           A92165-xxx
+     82546       PRO/1000 MT Dual Port Server Adapter A92111-xxx
+     82545       PRO/1000 MF Server Adapter           A91622-xxx
+     82545       PRO/1000 MF Server Adapter(LX)       A91624-xxx
+     82546       PRO/1000 MF Dual Port Server Adapter A91620-xxx 
 
   For more information on how to identify your adapter, go to the
   Adapter & Driver ID Guide at:

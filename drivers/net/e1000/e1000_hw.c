@@ -198,6 +198,10 @@ e1000_init_hw(struct e1000_hw *hw)
     uint32_t i;
     int32_t ret_val;
     uint16_t pci_cmd_word;
+    uint16_t pcix_cmd_word;
+    uint16_t pcix_stat_hi_word;
+    uint16_t cmd_mmrbc;
+    uint16_t stat_mmrbc;
 
     DEBUGFUNC("e1000_init_hw");
 
@@ -270,6 +274,21 @@ e1000_init_hw(struct e1000_hw *hw)
     if(hw->dma_fairness) {
         ctrl = E1000_READ_REG(hw, CTRL);
         E1000_WRITE_REG(hw, CTRL, ctrl | E1000_CTRL_PRIOR);
+    }
+
+    /* Workaround for PCI-X problem when BIOS sets MMRBC incorrectly. */
+    if(hw->bus_type == e1000_bus_type_pcix) {
+        e1000_read_pci_cfg(hw, PCIX_COMMAND_REGISTER, &pcix_cmd_word);
+        e1000_read_pci_cfg(hw, PCIX_STATUS_REGISTER_HI, &pcix_stat_hi_word);
+        cmd_mmrbc = (pcix_cmd_word & PCIX_COMMAND_MMRBC_MASK) >>
+            PCIX_COMMAND_MMRBC_SHIFT;
+        stat_mmrbc = (pcix_stat_hi_word & PCIX_STATUS_HI_MMRBC_MASK) >>
+            PCIX_STATUS_HI_MMRBC_SHIFT;
+        if(cmd_mmrbc > stat_mmrbc) {
+            pcix_cmd_word &= ~PCIX_COMMAND_MMRBC_MASK;
+            pcix_cmd_word |= stat_mmrbc << PCIX_COMMAND_MMRBC_SHIFT;
+            e1000_write_pci_cfg(hw, PCIX_COMMAND_REGISTER, &pcix_cmd_word);
+        }
     }
 
     /* Call a subroutine to configure the link and setup flow control. */

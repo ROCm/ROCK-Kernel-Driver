@@ -262,6 +262,7 @@ void e1000_reset_adaptive(struct e1000_hw *hw);
 void e1000_update_adaptive(struct e1000_hw *hw);
 void e1000_tbi_adjust_stats(struct e1000_hw *hw, struct e1000_hw_stats *stats, uint32_t frame_len, uint8_t * mac_addr);
 void e1000_get_bus_info(struct e1000_hw *hw);
+void e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 void e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t * value);
 
 /* PCI Device IDs */
@@ -1439,6 +1440,16 @@ struct e1000_hw {
 #define FC_DEFAULT_HI_THRESH        (0x8000)    /* 32KB */
 #define FC_DEFAULT_LO_THRESH        (0x4000)    /* 16KB */
 #define FC_DEFAULT_TX_TIMER         (0x100)     /* ~130 us */
+
+/* PCIX Config space */
+#define PCIX_COMMAND_REGISTER    0xE6
+#define PCIX_STATUS_REGISTER_LO  0xE8
+#define PCIX_STATUS_REGISTER_HI  0xEA
+
+#define PCIX_COMMAND_MMRBC_MASK      0x000C
+#define PCIX_COMMAND_MMRBC_SHIFT     0x2
+#define PCIX_STATUS_HI_MMRBC_MASK    0x0060
+#define PCIX_STATUS_HI_MMRBC_SHIFT   0x5
 
 
 /* The number of bits that we need to shift right to move the "pause"

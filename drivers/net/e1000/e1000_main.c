@@ -76,7 +76,7 @@
 
 char e1000_driver_name[] = "e1000";
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-char e1000_driver_version[] = "4.2.9-k1";
+char e1000_driver_version[] = "4.2.17-k1";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -1922,9 +1922,6 @@ e1000_alloc_rx_buffers(struct e1000_adapter *adapter)
 	int reserve_len;
 	int i;
 
-	if(!netif_running(netdev))
-		return;
-
 	reserve_len = 2;
 
 	i = rx_ring->next_to_use;
@@ -2021,8 +2018,15 @@ e1000_rx_checksum(struct e1000_adapter *adapter,
 }
 
 void
-e1000_write_pci_cfg(struct e1000_hw *hw,
-                    uint32_t reg, uint16_t *value)
+e1000_read_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
+{
+	struct e1000_adapter *adapter = hw->back;
+
+	pci_read_config_word(adapter->pdev, reg, value);
+}
+
+void
+e1000_write_pci_cfg(struct e1000_hw *hw, uint32_t reg, uint16_t *value)
 {
 	struct e1000_adapter *adapter = hw->back;
 
@@ -2092,10 +2096,10 @@ e1000_vlan_rx_kill_vid(struct net_device *netdev, uint16_t vid)
 	uint32_t vfta, index;
 
 	e1000_irq_disable(adapter);
-	
+
 	if(adapter->vlgrp)
 		adapter->vlgrp->vlan_devices[vid] = NULL;
-	
+
 	e1000_irq_enable(adapter);
 
 	/* remove VID from filter table*/
