@@ -6423,8 +6423,8 @@ static struct subsys_tbl_ent subsys_id_to_phy_id[] = {
 	{ PCI_VENDOR_ID_BROADCOM, 0x0007, PHY_ID_SERDES  }, /* BCM95701A7 */
 	{ PCI_VENDOR_ID_BROADCOM, 0x0008, PHY_ID_BCM5701 }, /* BCM95701A10 */
 	{ PCI_VENDOR_ID_BROADCOM, 0x8008, PHY_ID_BCM5701 }, /* BCM95701A12 */
-	{ PCI_VENDOR_ID_BROADCOM, 0x0009, PHY_ID_BCM5701 }, /* BCM95703Ax1 */
-	{ PCI_VENDOR_ID_BROADCOM, 0x8009, PHY_ID_BCM5701 }, /* BCM95703Ax2 */
+	{ PCI_VENDOR_ID_BROADCOM, 0x0009, PHY_ID_BCM5703 }, /* BCM95703Ax1 */
+	{ PCI_VENDOR_ID_BROADCOM, 0x8009, PHY_ID_BCM5703 }, /* BCM95703Ax2 */
 
 	/* 3com boards. */
 	{ PCI_VENDOR_ID_3COM, 0x1000, PHY_ID_BCM5401 }, /* 3C996T */
@@ -6524,19 +6524,27 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 			tp->tg3_flags |= TG3_FLAG_SERDES_WOL_CAP;
 	}
 
-	/* Now read the physical PHY_ID from the chip and verify
-	 * that it is sane.  If it doesn't look good, we fall back
-	 * to either the hard-coded table based PHY_ID and failing
-	 * that the value found in the eeprom area.
+	/* Reading the PHY ID register can conflict with ASF
+	 * firwmare access to the PHY hardware.
 	 */
-	err  = tg3_readphy(tp, MII_PHYSID1, &hw_phy_id_1);
-	err |= tg3_readphy(tp, MII_PHYSID2, &hw_phy_id_2);
+	err = 0;
+	if (tp->tg3_flags & TG3_FLAG_ENABLE_ASF) {
+		hw_phy_id_masked = PHY_ID_INVALID;
+	} else {
+		/* Now read the physical PHY_ID from the chip and verify
+		 * that it is sane.  If it doesn't look good, we fall back
+		 * to either the hard-coded table based PHY_ID and failing
+		 * that the value found in the eeprom area.
+		 */
+		err |= tg3_readphy(tp, MII_PHYSID1, &hw_phy_id_1);
+		err |= tg3_readphy(tp, MII_PHYSID2, &hw_phy_id_2);
 
-	hw_phy_id  = (hw_phy_id_1 & 0xffff) << 10;
-	hw_phy_id |= (hw_phy_id_2 & 0xfc00) << 16;
-	hw_phy_id |= (hw_phy_id_2 & 0x03ff) <<  0;
+		hw_phy_id  = (hw_phy_id_1 & 0xffff) << 10;
+		hw_phy_id |= (hw_phy_id_2 & 0xfc00) << 16;
+		hw_phy_id |= (hw_phy_id_2 & 0x03ff) <<  0;
 
-	hw_phy_id_masked = hw_phy_id & PHY_ID_MASK;
+		hw_phy_id_masked = hw_phy_id & PHY_ID_MASK;
+	}
 
 	if (!err && KNOWN_PHY_ID(hw_phy_id_masked)) {
 		tp->phy_id = hw_phy_id;
