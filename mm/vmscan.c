@@ -22,8 +22,8 @@
 #include <linux/highmem.h>
 #include <linux/file.h>
 #include <linux/writeback.h>
-#include <linux/compiler.h>
 #include <linux/suspend.h>
+#include <linux/buffer_head.h>		/* for try_to_release_page() */
 
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
