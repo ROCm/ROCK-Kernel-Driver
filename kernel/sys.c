@@ -19,6 +19,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
+#include <asm/unistd.h>
 
 /*
  * this is where the system-wide overflow UID and GID are defined, for
@@ -173,14 +174,6 @@ asmlinkage long sys_ni_syscall(void)
 {
 	return -ENOSYS;
 }
-
-/*
- * "Conditional" syscalls
- *
- * What we want is __attribute__((weak,alias("sys_ni_syscall"))),
- * but it doesn't work on sparc64, so we just do it by hand
- */
-#define cond_syscall(x) asm(".weak\t" #x "\n\t.set\t" #x ",sys_ni_syscall");
 
 cond_syscall(sys_nfsservctl)
 cond_syscall(sys_quotactl)
