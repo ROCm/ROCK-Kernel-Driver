@@ -2581,14 +2581,13 @@ static int create_composite_quirk(snd_usb_audio_t *chip,
 				  struct usb_interface *iface,
 				  const snd_usb_audio_quirk_t *quirk)
 {
-	struct usb_host_config *config = chip->dev->actconfig;
 	int probed_ifnum = get_iface_desc(iface->altsetting)->bInterfaceNumber;
 	int err;
 
 	for (quirk = quirk->data; quirk->ifnum >= 0; ++quirk) {
-		if (quirk->ifnum >= get_cfg_desc(config)->bNumInterfaces)
+		iface = usb_ifnum_to_if(chip->dev, quirk->ifnum);
+		if (!iface)
 			continue;
-		iface = get_iface(config, quirk->ifnum);
 		if (quirk->ifnum != probed_ifnum &&
 		    usb_interface_claimed(iface))
 			continue;
