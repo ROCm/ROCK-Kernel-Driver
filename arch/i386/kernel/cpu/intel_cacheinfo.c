@@ -58,7 +58,7 @@ static struct _cache_table cache_table[] __initdata =
 	{ 0x00, 0, 0}
 };
 
-unsigned int init_intel_cacheinfo(struct cpuinfo_x86 *c)
+unsigned int __init init_intel_cacheinfo(struct cpuinfo_x86 *c)
 {
 	unsigned int trace = 0, l1i = 0, l1d = 0, l2 = 0, l3 = 0; /* Cache sizes */
 
