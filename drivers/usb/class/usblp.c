@@ -1150,10 +1150,13 @@ static struct usb_driver usblp_driver = {
 
 static int __init usblp_init(void)
 {
-	if (usb_register(&usblp_driver))
-		return -1;
+	int retval;
+	retval = usb_register(&usblp_driver);
+	if (retval)
+		goto out;
 	info(DRIVER_VERSION ": " DRIVER_DESC);
-	return 0;
+out:
+	return retval;
 }
 
 static void __exit usblp_exit(void)

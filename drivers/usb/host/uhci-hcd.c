@@ -2099,7 +2099,7 @@ static void start_hc(struct uhci_hcd *uhci)
 	uhci->state_end = jiffies + HZ;
 	outw(USBCMD_RS | USBCMD_CF | USBCMD_MAXP, io_addr + USBCMD);
 
-        uhci->hcd.state = USB_STATE_READY;
+        uhci->hcd.state = USB_STATE_RUNNING;
 }
 
 /*
@@ -2143,6 +2143,20 @@ static void release_uhci(struct uhci_hcd *uhci)
 #endif
 }
 
+static int uhci_reset(struct usb_hcd *hcd)
+{
+	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
+
+	uhci->io_addr = (unsigned long) hcd->regs;
+
+	/* Maybe kick BIOS off this hardware.  Then reset, so we won't get
+	 * interrupts from any previous setup.
+	 */
+	pci_write_config_word(hcd->pdev, USBLEGSUP, USBLEGSUP_DEFAULT);
+	reset_hc(uhci);
+	return 0;
+}
+
 /*
  * Allocate a frame list, and then setup the skeleton
  *
@@ -2159,7 +2173,7 @@ static void release_uhci(struct uhci_hcd *uhci)
  *  - The fourth queue is the bandwidth reclamation queue, which loops back
  *    to the high speed control queue.
  */
-static int __devinit uhci_start(struct usb_hcd *hcd)
+static int uhci_start(struct usb_hcd *hcd)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	int retval = -EBUSY;
@@ -2171,7 +2185,6 @@ static int __devinit uhci_start(struct usb_hcd *hcd)
 	struct proc_dir_entry *ent;
 #endif
 
-	uhci->io_addr = (unsigned long) hcd->regs;
 	io_size = pci_resource_len(hcd->pdev, hcd->region);
 
 #ifdef CONFIG_PROC_FS
@@ -2187,10 +2200,6 @@ static int __devinit uhci_start(struct usb_hcd *hcd)
 	ent->size = 0;
 	uhci->proc_entry = ent;
 #endif
-
-	/* Reset here so we don't get any interrupts from an old setup */
-	/*  or broken setup */
-	reset_hc(uhci);
 
 	uhci->fsbr = 0;
 	uhci->fsbrtimeout = 0;
@@ -2343,9 +2352,6 @@ static int __devinit uhci_start(struct usb_hcd *hcd)
 
 	init_stall_timer(hcd);
 
-	/* disable legacy emulation */
-	pci_write_config_word(hcd->pdev, USBLEGSUP, USBLEGSUP_DEFAULT);
-
 	udev->speed = USB_SPEED_FULL;
 
 	if (usb_register_root_hub(udev, &hcd->pdev->dev) != 0) {
@@ -2446,7 +2452,7 @@ static int uhci_resume(struct usb_hcd *hcd)
 		reset_hc(uhci);
 		start_hc(uhci);
 	}
-	uhci->hcd.state = USB_STATE_READY;
+	uhci->hcd.state = USB_STATE_RUNNING;
 	return 0;
 }
 #endif
@@ -2484,6 +2490,7 @@ static const struct hc_driver uhci_driver = {
 	.flags =		HCD_USB11,
 
 	/* Basic lifecycle operations */
+	.reset =		uhci_reset,
 	.start =		uhci_start,
 #ifdef CONFIG_PM
 	.suspend =		uhci_suspend,
@@ -2504,18 +2511,9 @@ static const struct hc_driver uhci_driver = {
 };
 
 static const struct pci_device_id uhci_pci_ids[] = { {
-
 	/* handle any USB UHCI controller */
-	.class = 		((PCI_CLASS_SERIAL_USB << 8) | 0x00),
-	.class_mask = 	~0,
+	PCI_DEVICE_CLASS(((PCI_CLASS_SERIAL_USB << 8) | 0x00), ~0),
 	.driver_data =	(unsigned long) &uhci_driver,
-
-	/* no matter who makes it */
-	.vendor =	PCI_ANY_ID,
-	.device =	PCI_ANY_ID,
-	.subvendor =	PCI_ANY_ID,
-	.subdevice =	PCI_ANY_ID,
-
 	}, { /* end: all zeroes */ }
 };
 

@@ -991,8 +991,8 @@ int usb_set_address(struct usb_device *dev)
  *
  * This call is synchronous, and may not be used in an interrupt context.
  *
- * Only hub drivers (including virtual root hub drivers for host
- * controllers) should ever call this.
+ * Only the hub driver should ever call this; root hub registration
+ * uses it only indirectly.
  */
 #define NEW_DEVICE_RETRYS	2
 #define SET_ADDRESS_RETRYS	2
@@ -1417,11 +1417,46 @@ void usb_buffer_unmap_sg (struct usb_device *dev, unsigned pipe,
 			usb_pipein (pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE);
 }
 
+static int usb_device_suspend(struct device *dev, u32 state)
+{
+	struct usb_interface *intf;
+	struct usb_driver *driver;
+
+	if ((dev->driver == &usb_generic_driver) || 
+	    (dev->driver_data == &usb_generic_driver_data))
+		return 0;
+
+	intf = to_usb_interface(dev);
+	driver = to_usb_driver(dev->driver);
+
+	if (driver && driver->suspend)
+		return driver->suspend(intf, state);
+	return 0;
+}
+
+static int usb_device_resume(struct device *dev)
+{
+	struct usb_interface *intf;
+	struct usb_driver *driver;
+
+	if ((dev->driver == &usb_generic_driver) || 
+	    (dev->driver_data == &usb_generic_driver_data))
+		return 0;
+
+	intf = to_usb_interface(dev);
+	driver = to_usb_driver(dev->driver);
+
+	if (driver && driver->resume)
+		return driver->resume(intf);
+	return 0;
+}
 
 struct bus_type usb_bus_type = {
 	.name =		"usb",
 	.match =	usb_device_match,
 	.hotplug =	usb_hotplug,
+	.suspend =	usb_device_suspend,
+	.resume =	usb_device_resume,
 };
 
 #ifndef MODULE
@@ -1509,7 +1544,6 @@ EXPORT_SYMBOL(usb_match_id);
 EXPORT_SYMBOL(usb_find_interface);
 EXPORT_SYMBOL(usb_ifnum_to_if);
 
-EXPORT_SYMBOL(usb_new_device);
 EXPORT_SYMBOL(usb_reset_device);
 EXPORT_SYMBOL(usb_disconnect);
 

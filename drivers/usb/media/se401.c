@@ -30,16 +30,10 @@ static const char version[] = "0.24";
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/fs.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/pagemap.h>
 #include <linux/usb.h>
-#include <asm/io.h>
-#include <asm/semaphore.h>
-#include <linux/mm.h>
-
 #include "se401.h"
 
 static int flickerless=0;
@@ -122,131 +116,6 @@ static void rvfree(void *mem, unsigned long size)
 	vfree(mem);
 }
 
-
-
-/****************************************************************************
- *
- * /proc interface
- *
- ***************************************************************************/
-
-#warning please convert me from procfs to sysfs
-#undef CONFIG_VIDEO_PROC_FS
-
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-
-static struct proc_dir_entry *se401_proc_entry = NULL;
-extern struct proc_dir_entry *video_proc_entry;
-
-#define YES_NO(x) ((x) ? "yes" : "no")
-
-static int se401_read_proc(char *page, char **start, off_t off, int count,
-			   int *eof, void *data)
-{
-	char *out = page;
-	int i, len;
-	struct usb_se401 *se401 = data;
-	
-	/* Stay under PAGE_SIZE or else bla bla bla.... */
-
-	out+=sprintf(out, "driver_version  : %s\n", version);
-	out+=sprintf(out, "model           : %s\n", se401->camera_name);
-	out+=sprintf(out, "in use          : %s\n", YES_NO (se401->user));
-	out+=sprintf(out, "streaming       : %s\n", YES_NO (se401->streaming));
-	out+=sprintf(out, "button state    : %s\n", YES_NO (se401->button));
-	out+=sprintf(out, "button pressed  : %s\n", YES_NO (se401->buttonpressed));
-	out+=sprintf(out, "num_frames      : %d\n", SE401_NUMFRAMES);
-
-	out+=sprintf(out, "Sizes           :");
-	for (i=0; i<se401->sizes; i++) {
-		out+=sprintf(out, " %dx%d", se401->width[i],
-		    se401->height[i]);
-	}
-	out+=sprintf(out, "\n");
-	
-	out+=sprintf(out, "Frames total    : %d\n", se401->readcount);
-	out+=sprintf(out, "Frames read     : %d\n", se401->framecount);
-	out+=sprintf(out, "Packets dropped : %d\n", se401->dropped);
-	out+=sprintf(out, "Decoding Errors : %d\n", se401->error);
-
-	len = out - page;
-	len -= off;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-
-	*start = page + off;
-	
-	return len;	
-}
-
-static int se401_write_proc(struct file *file, const char *buffer, 
-			    unsigned long count, void *data)
-{
-	return -EINVAL;
-}
-
-static void create_proc_se401_cam (struct usb_se401 *se401)
-{
-	char name[7];
-	struct proc_dir_entry *ent;
-
-	if (!se401_proc_entry || !se401)
-		return;
-
-	sprintf (name, "video%d", se401->vdev.minor);
-
-	ent = create_proc_entry(name, S_IFREG | S_IRUGO | S_IWUSR,
-				se401_proc_entry);
-
-	if (!ent)
-		return;
-
-	ent->data = se401;
-	ent->read_proc = se401_read_proc;
-	ent->write_proc = se401_write_proc;
-	se401->proc_entry = ent;
-}
-
-static void destroy_proc_se401_cam (struct usb_se401 *se401)
-{
-	/* One to much, just to be sure :) */
-	char name[9];
-
-	if (!se401 || !se401->proc_entry)
-		return;
-	
-	sprintf(name, "video%d", se401->vdev.minor);
-	remove_proc_entry(name, se401_proc_entry);
-	se401->proc_entry = NULL;
-}
-
-static void proc_se401_create (void)
-{
-	if (video_proc_entry == NULL) {
-		err("/proc/video/ doesn't exist");
-		return;
-	}
-
-	se401_proc_entry=create_proc_entry("se401", S_IFDIR, video_proc_entry);
-
-	if (se401_proc_entry)
-		se401_proc_entry->owner = THIS_MODULE;
-	else
-		err("Unable to initialize /proc/video/se401");
-}
-
-static void proc_se401_destroy(void)
-{
-	if (se401_proc_entry == NULL)
-		return;
-
-	remove_proc_entry("se401", video_proc_entry);
-}
-#endif /* CONFIG_PROC_FS && CONFIG_VIDEO_PROC_FS */
 
 
 /****************************************************************************
@@ -1252,7 +1121,7 @@ static int se401_ioctl(struct inode *inode, struct file *file,
 	return video_usercopy(inode, file, cmd, arg, se401_do_ioctl);
 }
 
-static int se401_read(struct file *file, char *buf,
+static ssize_t se401_read(struct file *file, char *buf,
 		     size_t count, loff_t *ppos)
 {
 	int realcount=count, ret=0;
@@ -1517,9 +1386,6 @@ static int se401_probe(struct usb_interface *intf,
 		err("video_register_device failed");
 		return -EIO;
 	}
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-        create_proc_se401_cam(se401);
-#endif
 	info("registered new video device: video%d", se401->vdev.minor);
 
 	usb_set_intfdata (intf, se401);
@@ -1544,9 +1410,6 @@ static void se401_disconnect(struct usb_interface *intf)
 			wake_up_interruptible(&se401->wq);
 			se401->removed = 1;
 		}
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-		destroy_proc_se401_cam(se401);
-#endif
 	}
 }
 
@@ -1568,29 +1431,19 @@ static struct usb_driver se401_driver = {
 
 static int __init usb_se401_init(void)
 {
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-	proc_se401_create();
-#endif
-
 	info("SE401 usb camera driver version %s registering", version);
 	if (flickerless)
 		if (flickerless!=50 && flickerless!=60) {
 			info("Invallid flickerless value, use 0, 50 or 60.");
 			return -1;
 	}
-	if (usb_register(&se401_driver) < 0)
-		return -1;
-	return 0;
+	return usb_register(&se401_driver);
 }
 
 static void __exit usb_se401_exit(void)
 {
 	usb_deregister(&se401_driver);
 	info("SE401 driver deregistered");
-
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-	proc_se401_destroy();
-#endif
 }
 
 module_init(usb_se401_init);

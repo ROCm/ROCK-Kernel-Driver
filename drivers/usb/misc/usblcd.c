@@ -342,18 +342,21 @@ static struct usb_driver lcd_driver = {
 	.id_table =	id_table,
 };
 
-int usb_lcd_init(void)
+static int __init usb_lcd_init(void)
 {
-	if (usb_register(&lcd_driver) < 0)
-		return -1;
+	int retval;
+	retval = usb_register(&lcd_driver);
+	if (retval)
+		goto out;
 
 	info("%s (C) Adams IT Services http://www.usblcd.de", DRIVER_VERSION);
 	info("USBLCD support registered.");
-	return 0;
+out:
+	return retval;
 }
 
 
-void usb_lcd_cleanup(void)
+static void __exit usb_lcd_cleanup(void)
 {
 	struct lcd_usb_data *lcd = &lcd_instance;
 

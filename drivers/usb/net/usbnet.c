@@ -1,7 +1,9 @@
 /*
- * USB Host-to-Host Links
- * Copyright (C) 2000-2002 by David Brownell <dbrownell@users.sourceforge.net>
+ * USB Networking Links
+ * Copyright (C) 2000-2003 by David Brownell <dbrownell@users.sourceforge.net>
  * Copyright (C) 2002 Pavel Machek <pavel@ucw.cz>
+ * Copyright (C) 2003 David Hollis <dhollis@davehollis.com>
+ * Copyright (c) 2002-2003 TiVo Inc.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,63 +21,38 @@
  */
 
 /*
- * This is used for "USB networking", connecting USB hosts as peers.
+ * This is a generic "USB networking" framework that works with several
+ * kinds of full and high speed networking devices:
  *
- * It can be used with USB "network cables", for IP-over-USB communications;
- * Ethernet speeds without the Ethernet.  USB devices (including some PDAs)
- * can support such links directly, replacing device-specific protocols
- * with Internet standard ones.
- *
- * The links can be bridged using the Ethernet bridging (net/bridge)
- * support as appropriate.  Devices currently supported include:
- *
+ *   + USB host-to-host "network cables", used for IP-over-USB links.
+ *     These are often used for Laplink style connectivity products.
  *	- AnchorChip 2720
  *	- Belkin, eTEK (interops with Win32 drivers)
- *	- EPSON USB clients
  *	- GeneSys GL620USB-A
  *	- NetChip 1080 (interoperates with NetChip Win32 drivers)
  *	- Prolific PL-2301/2302 (replaces "plusb" driver)
- *	- PXA-250 or SA-1100 Linux PDAs like iPaq, Yopy, and Zaurus
+ *
+ *   + Smart USB devices can support such links directly, using Internet
+ *     standard protocols instead of proprietary host-to-device links.
+ *	- Linux PDAs like iPaq, Yopy, and Zaurus
+ *	- The BLOB boot loader (for diskless booting)
+ *	- Linux "gadgets", perhaps using PXA-2xx or Net2280 controllers
+ *	- Devices using EPSON's sample USB firmware
+ *	- CDC-Ethernet class devices, such as many cable modems
+ *
+ *   + Adapters to networks such as Ethernet.
+ *	- AX8817X based USB 2.0 products
+ *
+ * Links to these devices can be bridged using Linux Ethernet bridging.
+ * With minor exceptions, these all use similar USB framing for network
+ * traffic, but need different protocols for control traffic.
  *
  * USB devices can implement their side of this protocol at the cost
  * of two bulk endpoints; it's not restricted to "cable" applications.
  * See the SA1110, Zaurus, or EPSON device/client support in this driver;
- * slave/target drivers such as "usb-eth" (on most SA-1100 PDAs) are
- * used inside USB slave/target devices.
- *
- * 
- * Status:
- *
- * - AN2720 ... not widely available, but reportedly works well
- *
- * - Belkin/eTEK ... no known issues
- *
- * - Both GeneSys and PL-230x use interrupt transfers for driver-to-driver
- *   handshaking; it'd be worth implementing those as "carrier detect".
- *   Prefer generic hooks, not minidriver-specific hacks.
- *
- * - For Netchip, should use keventd to poll via control requests to detect
- *   hardware level "carrier detect". 
- *
- * - PL-230x ... the initialization protocol doesn't seem to match chip data
- *   sheets, sometimes it's not needed and sometimes it hangs.  Prolific has
- *   not responded to repeated support/information requests.
- *
- * - SA-1100 PDAs ... the standard ARM Linux SA-1100 support works nicely,
- *   as found in www.handhelds.org and other kernels.  The Sharp/Lineo
- *   kernels use different drivers, which also talk to this code.
- *
- * Interop with more Win32 drivers may be a good thing.
- *
- * Seems like reporting "peer connected" (carrier present) events may end
- * up going through the netlink event system, not hotplug ... so new links
- * would likely be handled with a link monitoring thread in some daemon.
- *
- * There are reports that bridging gives lower-than-usual throughput.
- *
- * Need smarter hotplug policy scripts ... ones that know how to arrange
- * bridging with "brctl", and can handle static and dynamic ("pump") setups.
- * Use those eventual "peer connected" events, and zeroconf.
+ * slave/target drivers such as "usb-eth" (on most SA-1100 PDAs) or
+ * "g_ether" (in the Linux "gadget" framework) implement that behavior
+ * within devices.
  *
  *
  * CHANGELOG:
@@ -126,6 +103,7 @@
  * 		vs pxa25x, and CDC Ethernet.  Throttle down log floods on
  * 		disconnect; other cleanups. (db)  Flush net1080 fifos
  * 		after several sequential framing errors. (Johannes Erdfelt)
+ * 22-aug-2003	AX8817X support (Dave Hollis).
  *
  *-------------------------------------------------------------------------*/
 
@@ -139,8 +117,10 @@
 #include <linux/random.h>
 #include <linux/ethtool.h>
 #include <linux/workqueue.h>
+#include <linux/mii.h>
 #include <asm/uaccess.h>
 #include <asm/unaligned.h>
+
 
 // #define	DEBUG			// error path messages, extra info
 // #define	VERBOSE			// more; success messages
@@ -157,7 +137,7 @@
 #include <linux/dma-mapping.h>
 
 
-#define DRIVER_VERSION		"25-Apr-2003"
+#define DRIVER_VERSION		"25-Aug-2003"
 
 /*-------------------------------------------------------------------------*/
 
@@ -217,6 +197,8 @@ struct usbnet {
 	struct net_device_stats	stats;
 	int			msg_level;
 	unsigned long		data [5];
+
+	struct mii_if_info	mii;
 
 	// various kinds of pending driver work
 	struct sk_buff_head	rxq;
@@ -399,6 +381,275 @@ static const struct driver_info	an2720_info = {
 
 #endif	/* CONFIG_USB_AN2720 */
 
+
+#ifdef CONFIG_USB_AX8817X
+#define NEED_MII
+/* ASIX AX8817X based USB 2.0 Ethernet Devices */
+
+#define HAVE_HARDWARE
+
+#include <linux/crc32.h>
+
+#define AX_CMD_SET_SW_MII		0x06
+#define AX_CMD_READ_MII_REG		0x07
+#define AX_CMD_WRITE_MII_REG		0x08
+#define AX_CMD_SET_HW_MII		0x0a
+#define AX_CMD_WRITE_RX_CTL		0x10
+#define AX_CMD_READ_IPG012		0x11
+#define AX_CMD_WRITE_IPG0		0x12
+#define AX_CMD_WRITE_IPG1		0x13
+#define AX_CMD_WRITE_IPG2		0x14
+#define AX_CMD_WRITE_MULTI_FILTER	0x16
+#define AX_CMD_READ_NODE_ID		0x17
+#define AX_CMD_READ_PHY_ID		0x19
+#define AX_CMD_WRITE_MEDIUM_MODE	0x1b
+#define AX_CMD_WRITE_GPIOS		0x1f
+
+#define AX_MCAST_FILTER_SIZE		8
+#define AX_MAX_MCAST			64
+
+static int ax8817x_read_cmd(struct usbnet *dev, u8 cmd, u16 value, u16 index,
+			    u16 size, void *data)
+{
+	return usb_control_msg(
+		dev->udev,
+		usb_rcvctrlpipe(dev->udev, 0),
+		cmd,
+		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		value,
+		index,
+		data,
+		size,
+		CONTROL_TIMEOUT_JIFFIES);
+}
+
+static int ax8817x_write_cmd(struct usbnet *dev, u8 cmd, u16 value, u16 index,
+			     u16 size, void *data)
+{
+	return usb_control_msg(
+		dev->udev,
+		usb_sndctrlpipe(dev->udev, 0),
+		cmd,
+		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		value,
+		index,
+		data,
+		size,
+		CONTROL_TIMEOUT_JIFFIES);
+}
+
+static void ax8817x_async_cmd_callback(struct urb *urb, struct pt_regs *regs)
+{
+	struct usb_ctrlrequest *req = (struct usb_ctrlrequest *)urb->context;
+	
+	if (urb->status < 0)
+		printk(KERN_DEBUG "ax8817x_async_cmd_callback() failed with %d",
+			urb->status);
+	
+	kfree(req);
+	usb_free_urb(urb);
+}
+
+static void ax8817x_write_cmd_async(struct usbnet *dev, u8 cmd, u16 value, u16 index,
+				    u16 size, void *data)
+{
+	struct usb_ctrlrequest *req;
+	int status;
+	struct urb *urb;
+	
+	if ((urb = usb_alloc_urb(0, GFP_ATOMIC)) == NULL) {
+		devdbg(dev, "Error allocating URB in write_cmd_async!");
+		return;
+	}
+	
+	if ((req = kmalloc(sizeof(struct usb_ctrlrequest), GFP_ATOMIC)) == NULL) {
+		deverr(dev, "Failed to allocate memory for control request");
+		usb_free_urb(urb);
+		return;
+	}
+
+	req->bRequestType = USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE;
+	req->bRequest = cmd;
+	req->wValue = cpu_to_le16(value);
+	req->wIndex = cpu_to_le16(index); 
+	req->wLength = cpu_to_le16(size);
+
+	usb_fill_control_urb(urb, dev->udev,
+			     usb_sndctrlpipe(dev->udev, 0),
+			     (void *)req, data, size,
+			     ax8817x_async_cmd_callback, req);
+
+	if((status = usb_submit_urb(urb, GFP_ATOMIC)) < 0)
+		deverr(dev, "Error submitting the control message: status=%d", status);
+}
+
+static void ax8817x_set_multicast(struct net_device *net)
+{
+	struct usbnet *dev = (struct usbnet *) net->priv;
+	u8 rx_ctl = 0x8c;
+
+	if (net->flags & IFF_PROMISC) {
+		rx_ctl |= 0x01;
+	} else if (net->flags & IFF_ALLMULTI
+		   || net->mc_count > AX_MAX_MCAST) {
+		rx_ctl |= 0x02;
+	} else if (net->mc_count == 0) {
+		/* just broadcast and directed */
+	} else {
+		struct dev_mc_list *mc_list = net->mc_list;
+		u8 *multi_filter;
+		u32 crc_bits;
+		int i;
+
+		multi_filter = kmalloc(AX_MCAST_FILTER_SIZE, GFP_ATOMIC);
+		if (multi_filter == NULL) {
+			/* Oops, couldn't allocate a buffer for setting the multicast
+			   filter. Try all multi mode. */
+			rx_ctl |= 0x02;
+		} else {
+			memset(multi_filter, 0, AX_MCAST_FILTER_SIZE);
+
+			/* Build the multicast hash filter. */
+			for (i = 0; i < net->mc_count; i++) {
+				crc_bits =
+				    ether_crc(ETH_ALEN,
+					      mc_list->dmi_addr) >> 26;
+				multi_filter[crc_bits >> 3] |=
+				    1 << (crc_bits & 7);
+				mc_list = mc_list->next;
+			}
+
+			ax8817x_write_cmd_async(dev, AX_CMD_WRITE_MULTI_FILTER, 0, 0,
+					   AX_MCAST_FILTER_SIZE, multi_filter);
+
+			rx_ctl |= 0x10;
+		}
+	}
+
+	ax8817x_write_cmd_async(dev, AX_CMD_WRITE_RX_CTL, rx_ctl, 0, 0, NULL);
+}
+
+static int ax8817x_mdio_read(struct net_device *netdev, int phy_id, int loc)
+{
+	struct usbnet *dev = netdev->priv;
+	u16 res;
+	u8 buf[4];
+
+	ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, &buf);
+	ax8817x_read_cmd(dev, AX_CMD_READ_MII_REG, phy_id, (__u16)loc, 2, (u16 *)&res);
+	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, &buf);
+
+	return res & 0xffff;
+}
+
+static void ax8817x_mdio_write(struct net_device *netdev, int phy_id, int loc, int val)
+{
+	struct usbnet *dev = netdev->priv;
+	u16 res = val;
+	u8 buf[4];
+
+	ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, &buf);
+	ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG, phy_id, (__u16)loc, 2, (u16 *)&res);
+	ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, &buf);
+}
+
+static int ax8817x_bind(struct usbnet *dev, struct usb_interface *intf)
+{
+	int ret;
+	u8 buf[6];
+	u16 *buf16 = (u16 *) buf;
+	int i;
+
+	dev->in = usb_rcvbulkpipe(dev->udev, 3);
+	dev->out = usb_sndbulkpipe(dev->udev, 2);
+
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_RX_CTL, 0x80, 0, 0, buf)) < 0) {
+		dbg("send AX_CMD_WRITE_RX_CTL failed: %d", ret);
+		return ret;
+	}
+
+	/* Get the MAC address */
+	memset(buf, 0, ETH_ALEN);
+	if ((ret = ax8817x_read_cmd(dev, AX_CMD_READ_NODE_ID, 0, 0, 6, buf)) < 0) {
+		dbg("read AX_CMD_READ_NODE_ID failed: %d", ret);
+		return ret;
+	}
+	memcpy(dev->net->dev_addr, buf, ETH_ALEN);
+
+	/* Get IPG values */
+	if ((ret = ax8817x_read_cmd(dev, AX_CMD_READ_IPG012, 0, 0, 3, buf)) < 0) {
+		dbg("Error reading IPG values: %d", ret);
+		return ret;
+	}
+
+	for(i = 0;i < 3;i++) {
+		ax8817x_write_cmd(dev, AX_CMD_WRITE_IPG0 + i, 0, 0, 1, &buf[i]);
+	}
+
+	/* Get the PHY id */
+	if ((ret = ax8817x_read_cmd(dev, AX_CMD_READ_PHY_ID, 0, 0, 2, buf)) < 0) {
+		dbg("error on read AX_CMD_READ_PHY_ID: %02x", ret);
+		return ret;
+	} else if (ret < 2) {
+		/* this should always return 2 bytes */
+		dbg("AX_CMD_READ_PHY_ID returned less than 2 bytes: ret=%02x", ret);
+		return -EIO;
+	}
+
+	/* Initialize MII structure */
+	dev->mii.dev = dev->net;
+	dev->mii.mdio_read = ax8817x_mdio_read;
+	dev->mii.mdio_write = ax8817x_mdio_write;
+	dev->mii.phy_id_mask = 0x3f;
+	dev->mii.reg_num_mask = 0x1f;
+	dev->mii.phy_id = buf[1];
+
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_SET_SW_MII, 0, 0, 0, &buf)) < 0) {
+		dbg("Failed to go to software MII mode: %02x", ret);
+		return ret;
+	}
+
+	*buf16 = cpu_to_le16(BMCR_RESET);
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG,
+				     dev->mii.phy_id, MII_BMCR, 2, buf16)) < 0) {
+		dbg("Failed to write MII reg - MII_BMCR: %02x", ret);
+		return ret;
+	}
+
+	/* Advertise that we can do full-duplex pause */
+	*buf16 = cpu_to_le16(ADVERTISE_ALL | ADVERTISE_CSMA | 0x0400);
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG,
+			   	     dev->mii.phy_id, MII_ADVERTISE, 
+				     2, buf16)) < 0) {
+		dbg("Failed to write MII_REG advertisement: %02x", ret);
+		return ret;
+	}
+
+	*buf16 = cpu_to_le16(BMCR_ANENABLE | BMCR_ANRESTART);
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_WRITE_MII_REG,
+			  	     dev->mii.phy_id, MII_BMCR, 
+				     2, buf16)) < 0) {
+		dbg("Failed to write MII reg autonegotiate: %02x", ret);
+		return ret;
+	}
+
+	if ((ret = ax8817x_write_cmd(dev, AX_CMD_SET_HW_MII, 0, 0, 0, &buf)) < 0) {
+		dbg("Failed to set hardware MII: %02x", ret);
+		return ret;
+	}
+
+	dev->net->set_multicast_list = ax8817x_set_multicast;
+
+	return 0;
+}
+
+static const struct driver_info ax8817x_info = {
+	.description = "ASIX AX8817x USB 2.0 Ethernet",
+	.bind = ax8817x_bind,
+	.flags =  FLAG_ETHER,
+};
+#endif /* CONFIG_USB_AX8817X */
+
 
 
 #ifdef	CONFIG_USB_BELKIN
@@ -470,7 +721,7 @@ struct ether_desc {
 	u8	bNumberPowerFilters;
 } __attribute__ ((packed));
 
-struct cdc_info {
+struct cdc_state {
 	struct header_desc	*header;
 	struct union_desc	*u;
 	struct ether_desc	*ether;
@@ -513,7 +764,7 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 	u8				*buf = intf->altsetting->extra;
 	int				len = intf->altsetting->extralen;
 	struct usb_interface_descriptor	*d;
-	struct cdc_info			*info = (void *) &dev->data;
+	struct cdc_state		*info = (void *) &dev->data;
 	int				status;
 
 	if (sizeof dev->data < sizeof *info)
@@ -522,12 +773,15 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 	/* expect strict spec conformance for the descriptors, but
 	 * cope with firmware which stores them in the wrong place
 	 */
-	if (len == 0 && dev->udev->config->extralen) {
-		/* Motorola SB4100 (and maybe others) put
-		 * CDC descriptors here
+	if (len == 0 && dev->udev->actconfig->extralen) {
+		/* Motorola SB4100 (and others: Brad Hards says it's
+		 * from a Broadcom design) put CDC descriptors here
 		 */
-		buf = dev->udev->config->extra;
-		len = dev->udev->config->extralen;
+		buf = dev->udev->actconfig->extra;
+		len = dev->udev->actconfig->extralen;
+		if (len)
+			dev_dbg (&intf->dev,
+				"CDC descriptors on config\n");
 	}
 
 	memset (info, 0, sizeof *info);
@@ -542,48 +796,92 @@ static int cdc_bind (struct usbnet *dev, struct usb_interface *intf)
 		 */
 		switch (buf [2]) {
 		case 0x00:		/* Header, mostly useless */
-			if (info->header)
+			if (info->header) {
+				dev_dbg (&intf->dev, "extra CDC header\n");
 				goto bad_desc;
+			}
 			info->header = (void *) buf;
-			if (info->header->bLength != sizeof *info->header)
+			if (info->header->bLength != sizeof *info->header) {
+				dev_dbg (&intf->dev, "CDC header len %u\n",
+					info->header->bLength);
 				goto bad_desc;
+			}
 			break;
 		case 0x06:		/* Union (groups interfaces) */
-			if (info->u)
+			if (info->u) {
+				dev_dbg (&intf->dev, "extra CDC union\n");
 				goto bad_desc;
+			}
 			info->u = (void *) buf;
-			if (info->u->bLength != sizeof *info->u)
+			if (info->u->bLength != sizeof *info->u) {
+				dev_dbg (&intf->dev, "CDC union len %u\n",
+					info->u->bLength);
 				goto bad_desc;
-			d = &intf->altsetting->desc;
-			if (info->u->bMasterInterface0 != d->bInterfaceNumber)
+			}
+
+			/* we need a master/control interface (what we're
+			 * probed with) and a slave/data interface; union
+			 * descriptors sort this all out.
+			 */
+			info->control = usb_ifnum_to_if(dev->udev,
+						info->u->bMasterInterface0);
+			info->data = usb_ifnum_to_if(dev->udev,
+						info->u->bSlaveInterface0);
+			if (!info->control || !info->data) {
+				dev_dbg (&intf->dev,
+					"master #%u/%p slave #%u/%p\n",
+					info->u->bMasterInterface0
+					info->control,
+					info->u->bSlaveInterface0,
+					info->data);
 				goto bad_desc;
-			info->data = dev->udev->actconfig->interface[0];
-			if (intf != (info->data + info->u->bMasterInterface0))
-				goto bad_desc;
+			}
+			if (info->control != intf) {
+				dev_dbg (&intf->dev, "bogus CDC Union\n");
+				/* Ambit USB Cable Modem (and maybe others)
+				 * interchanges master and slave interface.
+				 */
+				if (info->data == intf) {
+					info->data = info->control;
+					info->control = intf;
+				} else
+					goto bad_desc;
+			}
 
 			/* a data interface altsetting does the real i/o */
-			info->data += info->u->bSlaveInterface0;
 			d = &info->data->altsetting->desc;
-			if (info->u->bSlaveInterface0 != d->bInterfaceNumber
-				    || d->bInterfaceClass != USB_CLASS_CDC_DATA)
+			if (d->bInterfaceClass != USB_CLASS_CDC_DATA) {
+				dev_dbg (&intf->dev, "slave class %u\n",
+					d->bInterfaceClass);
 				goto bad_desc;
+			}
 			if (usb_interface_claimed (info->data))
 				return -EBUSY;
 			break;
 		case 0x0F:		/* Ethernet Networking */
-			if (info->ether)
+			if (info->ether) {
+				dev_dbg (&intf->dev, "extra CDC ether\n");
 				goto bad_desc;
+			}
 			info->ether = (void *) buf;
-			if (info->ether->bLength != sizeof *info->ether)
+			if (info->ether->bLength != sizeof *info->ether) {
+				dev_dbg (&intf->dev, "CDC ether len %u\n",
+					info->u->bLength);
 				goto bad_desc;
+			}
 			break;
 		}
 next_desc:
 		len -= buf [0];	/* bLength */
 		buf += buf [0];
 	}
-	if (!info->header || !info ->u || !info->ether)
+	if (!info->header || !info ->u || !info->ether) {
+		dev_dbg (&intf->dev, "missing cdc %s%s%sdescriptor\n",
+			info->header ? "" : "header ",
+			info->u ? "" : "union ",
+			info->ether ? "" : "ether ");
 		goto bad_desc;
+	}
 
 #ifdef CONFIG_USB_ZAURUS
 	/* Zaurus ethernet addresses aren't unique ... */
@@ -624,7 +922,7 @@ bad_desc:
 
 static void cdc_unbind (struct usbnet *dev, struct usb_interface *intf)
 {
-	struct cdc_info			*info = (void *) &dev->data;
+	struct cdc_state		*info = (void *) &dev->data;
 
 	/* disconnect master --> disconnect slave */
 	if (intf == info->control && info->data) {
@@ -2091,16 +2389,23 @@ static int usbnet_open (struct net_device *net)
 	}
 
 	netif_start_queue (net);
-	if (dev->msg_level >= 2)
+	if (dev->msg_level >= 2) {
+		char	*framing;
+
+		if (dev->driver_info->flags & FLAG_FRAMING_NC)
+			framing = "NetChip";
+		else if (dev->driver_info->flags & FLAG_FRAMING_GL)
+			framing = "GeneSys";
+		else if (dev->driver_info->flags & FLAG_FRAMING_Z)
+			framing = "Zaurus";
+		else
+			framing = "simple";
+
 		devinfo (dev, "open: enable queueing "
 				"(rx %d, tx %d) mtu %d %s framing",
 			RX_QLEN (dev), TX_QLEN (dev), dev->net->mtu,
-			(info->flags & (FLAG_FRAMING_NC | FLAG_FRAMING_GL))
-			    ? ((info->flags & FLAG_FRAMING_NC)
-				? "NetChip"
-				: "GeneSys")
-			    : "raw"
-			);
+			framing);
+	}
 
 	// delay posting reads until we're fully open
 	tasklet_schedule (&dev->bh);
@@ -2173,12 +2478,20 @@ usbnet_ethtool_ioctl (struct net_device *net, void __user *useraddr)
 
 static int usbnet_ioctl (struct net_device *net, struct ifreq *rq, int cmd)
 {
-	switch (cmd) {
-	case SIOCETHTOOL:
+	if (cmd == SIOCETHTOOL)
 		return usbnet_ethtool_ioctl (net, (void __user *)rq->ifr_data);
-	default:
-		return -EOPNOTSUPP;
+
+#ifdef NEED_MII
+	{
+	struct usbnet *dev = (struct usbnet *)net->priv;
+
+	if (dev->mii.mdio_read != NULL && dev->mii.mdio_write != NULL)
+		return generic_mii_ioctl(&dev->mii,
+				(struct mii_ioctl_data *) &rq->ifr_data,
+				cmd, NULL);
 	}
+#endif
+	return -EOPNOTSUPP;
 }
 
 /*-------------------------------------------------------------------------*/
@@ -2342,7 +2655,7 @@ static int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 		if (!((skb->len + sizeof *trailer) & 0x01))
 			*skb_put (skb, 1) = PAD_BYTE;
 		trailer = (struct nc_trailer *) skb_put (skb, sizeof *trailer);
-	} 
+	}
 #endif	/* CONFIG_USB_NET1080 */
 
 	usb_fill_bulk_urb (urb, dev->udev, dev->out,
@@ -2670,6 +2983,30 @@ static const struct usb_device_id	products [] = {
 },
 #endif
 
+#ifdef CONFIG_USB_AX8817X
+{
+	// Linksys USB200M
+	USB_DEVICE (0x077b, 0x2226),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, {
+	// Netgear FA120
+	USB_DEVICE (0x0846, 0x1040),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, {
+	// DLink DUB-E100
+	USB_DEVICE (0x2001, 0x1a00),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, {
+	// Intellinet, ST Lab USB Ethernet
+	USB_DEVICE (0x0b95, 0x1720),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, {
+	// Hawking UF200, TrendNet TU2-ET100
+	USB_DEVICE (0x07b8, 0x420a),
+	.driver_info =	(unsigned long) &ax8817x_info,
+}, 
+#endif
+
 #ifdef	CONFIG_USB_EPSON2888
 {
 	USB_DEVICE (0x0525, 0x2888),	// EPSON USB client
@@ -2834,18 +3171,19 @@ static struct usb_driver usbnet_driver = {
 
 static int __init usbnet_init (void)
 {
-	// compiler should optimize this out
-	if (sizeof (((struct sk_buff *)0)->cb) < sizeof (struct skb_data))
-		BUG ();
+	// compiler should optimize these out
+	BUG_ON (sizeof (((struct sk_buff *)0)->cb)
+			< sizeof (struct skb_data));
+#ifdef	CONFIG_USB_CDCETHER
+	BUG_ON ((sizeof (((struct usbnet *)0)->data)
+			< sizeof (struct cdc_state)));
+#endif
 
 	get_random_bytes (node_id, sizeof node_id);
 	node_id [0] &= 0xfe;	// clear multicast bit
 	node_id [0] |= 0x02;    // set local assignment bit (IEEE802)
 
- 	if (usb_register (&usbnet_driver) < 0)
- 		return -1;
-
-	return 0;
+ 	return usb_register(&usbnet_driver);
 }
 module_init (usbnet_init);
 

@@ -61,14 +61,9 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/fs.h>
 #include <linux/vmalloc.h>
 #include <linux/slab.h>
-#include <linux/proc_fs.h>
 #include <linux/pagemap.h>
-#include <linux/smp_lock.h>
-#include <linux/sched.h>
-#include <linux/signal.h>
 #include <linux/errno.h>
 #include <linux/videodev.h>
 #include <linux/usb.h>
@@ -515,123 +510,56 @@ exit:
 
 /***************** last of pencam  routines  *******************/
 
-/********************************************************************
- * /proc interface
- *******************************************************************/
-
-#warning please convert me from procfs to sysfs
-#undef CONFIG_VIDEO_PROC_FS
-
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-
-static struct proc_dir_entry *stv680_proc_entry = NULL;
-extern struct proc_dir_entry *video_proc_entry;
-
-#define YES_NO(x) ((x) ? "yes" : "no")
-#define ON_OFF(x) ((x) ? "(auto) on" : "(auto) off")
-
-static int stv680_read_proc (char *page, char **start, off_t off, int count, int *eof, void *data)
+/****************************************************************************
+ *  sysfs
+ ***************************************************************************/
+static inline struct usb_stv *cd_to_stv(struct class_device *cd)
 {
-	char *out = page;
-	int len;
-	struct usb_stv *stv680 = data;
-
-	/* Stay under PAGE_SIZE or else bla bla bla.... */
-
-	out += sprintf (out, "driver_version  : %s\n", DRIVER_VERSION);
-	out += sprintf (out, "model           : %s\n", stv680->camera_name);
-	out += sprintf (out, "in use          : %s\n", YES_NO (stv680->user));
-	out += sprintf (out, "streaming       : %s\n", YES_NO (stv680->streaming));
-	out += sprintf (out, "num_frames      : %d\n", STV680_NUMFRAMES);
-
-	out += sprintf (out, "Current size    : %ix%i\n", stv680->vwidth, stv680->vheight);
-	if (swapRGB_on == 0)
-		out += sprintf (out, "swapRGB         : %s\n", ON_OFF (swapRGB));
-	else if (swapRGB_on == 1)
-		out += sprintf (out, "swapRGB         : (forced) on\n");
-	else if (swapRGB_on == -1)
-		out += sprintf (out, "swapRGB         : (forced) off\n");
-
-	out += sprintf (out, "Palette         : %i", stv680->palette);
-
-	out += sprintf (out, "\n");
-
-	out += sprintf (out, "Frames total    : %d\n", stv680->readcount);
-	out += sprintf (out, "Frames read     : %d\n", stv680->framecount);
-	out += sprintf (out, "Packets dropped : %d\n", stv680->dropped);
-	out += sprintf (out, "Decoding Errors : %d\n", stv680->error);
-
-	len = out - page;
-	len -= off;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-
-	*start = page + off;
-	return len;
+	struct video_device *vdev = to_video_device(cd);
+	return video_get_drvdata(vdev);
 }
 
-static int create_proc_stv680_cam (struct usb_stv *stv680)
+#define stv680_file(name, variable, field)				\
+static ssize_t show_##name(struct class_device *class_dev, char *buf)	\
+{									\
+	struct video_device *vdev = to_video_device(class_dev);		\
+	struct usb_stv *stv = video_get_drvdata(vdev);			\
+	return sprintf(buf, field, stv->variable);			\
+}									\
+static CLASS_DEVICE_ATTR(name, S_IRUGO, show_##name, NULL);
+
+stv680_file(model, camera_name, "%s\n");
+stv680_file(in_use, user, "%d\n");
+stv680_file(streaming, streaming, "%d\n");
+stv680_file(palette, palette, "%i\n");
+stv680_file(frames_total, readcount, "%d\n");
+stv680_file(frames_read, framecount, "%d\n");
+stv680_file(packets_dropped, dropped, "%d\n");
+stv680_file(decoding_errors, error, "%d\n");
+
+static void stv680_create_sysfs_files(struct video_device *vdev)
 {
-	char name[9];
-	struct proc_dir_entry *ent;
-
-	if (!stv680_proc_entry || !stv680)
-		return -1;
-
-	sprintf (name, "video%d", stv680->vdev.minor);
-
-	ent = create_proc_entry (name, S_IFREG | S_IRUGO | S_IWUSR, stv680_proc_entry);
-	if (!ent)
-		return -1;
-
-	ent->data = stv680;
-	ent->read_proc = stv680_read_proc;
-	stv680->proc_entry = ent;
-	return 0;
+	video_device_create_file(vdev, &class_device_attr_model);
+	video_device_create_file(vdev, &class_device_attr_in_use);
+	video_device_create_file(vdev, &class_device_attr_streaming);
+	video_device_create_file(vdev, &class_device_attr_palette);
+	video_device_create_file(vdev, &class_device_attr_frames_total);
+	video_device_create_file(vdev, &class_device_attr_frames_read);
+	video_device_create_file(vdev, &class_device_attr_packets_dropped);
+	video_device_create_file(vdev, &class_device_attr_decoding_errors);
 }
 
-static void destroy_proc_stv680_cam (struct usb_stv *stv680)
+static void stv680_remove_sysfs_files(struct video_device *vdev)
 {
-	/* One to much, just to be sure :) */
-	char name[9];
-
-	if (!stv680 || !stv680->proc_entry)
-		return;
-
-	sprintf (name, "video%d", stv680->vdev.minor);
-	remove_proc_entry (name, stv680_proc_entry);
-	stv680->proc_entry = NULL;
+	video_device_remove_file(vdev, &class_device_attr_model);
+	video_device_remove_file(vdev, &class_device_attr_in_use);
+	video_device_remove_file(vdev, &class_device_attr_streaming);
+	video_device_remove_file(vdev, &class_device_attr_palette);
+	video_device_remove_file(vdev, &class_device_attr_frames_total);
+	video_device_remove_file(vdev, &class_device_attr_frames_read);
+	video_device_remove_file(vdev, &class_device_attr_packets_dropped);
+	video_device_remove_file(vdev, &class_device_attr_decoding_errors);
 }
-
-static int proc_stv680_create (void)
-{
-	if (video_proc_entry == NULL) {
-		PDEBUG (0, "STV(e): /proc/video/ doesn't exist!");
-		return -1;
-	}
-	stv680_proc_entry = create_proc_entry ("stv680", S_IFDIR, video_proc_entry);
-
-	if (stv680_proc_entry) {
-		stv680_proc_entry->owner = THIS_MODULE;
-	} else {
-		PDEBUG (0, "STV(e): Unable to initialize /proc/video/stv680");
-		return -1;
-	}
-	return 0;
-}
-
-static void proc_stv680_destroy (void)
-{
-	if (stv680_proc_entry == NULL)
-		return;
-
-	remove_proc_entry ("stv680", video_proc_entry);
-}
-#endif				/* CONFIG_PROC_FS && CONFIG_VIDEO_PROC_FS */
 
 /********************************************************************
  * Camera control
@@ -1123,7 +1051,7 @@ static int stv680_newframe (struct usb_stv *stv680, int framenr)
 static int stv_open (struct inode *inode, struct file *file)
 {
 	struct video_device *dev = video_devdata(file);
-	struct usb_stv *stv680 = (struct usb_stv *) dev;
+	struct usb_stv *stv680 = video_get_drvdata(dev);
 	int err = 0;
 
 	/* we are called with the BKL held */
@@ -1147,7 +1075,7 @@ static int stv_open (struct inode *inode, struct file *file)
 static int stv_close (struct inode *inode, struct file *file)
 {
 	struct video_device *dev = file->private_data;
-	struct usb_stv *stv680 = (struct usb_stv *) dev;
+	struct usb_stv *stv680 = video_get_drvdata(dev);
 	int i;
 
 	for (i = 0; i < STV680_NUMFRAMES; i++)
@@ -1174,7 +1102,7 @@ static int stv680_do_ioctl (struct inode *inode, struct file *file,
 			    unsigned int cmd, void *arg)
 {
 	struct video_device *vdev = file->private_data;
-	struct usb_stv *stv680 = (struct usb_stv *) vdev;
+	struct usb_stv *stv680 = video_get_drvdata(vdev);
 
 	if (!stv680->udev)
 		return -EIO;
@@ -1350,7 +1278,7 @@ static int stv680_ioctl(struct inode *inode, struct file *file,
 static int stv680_mmap (struct file *file, struct vm_area_struct *vma)
 {
 	struct video_device *dev = file->private_data;
-	struct usb_stv *stv680 = (struct usb_stv *) dev;
+	struct usb_stv *stv680 = video_get_drvdata(dev);
 	unsigned long start = vma->vm_start;
 	unsigned long size  = vma->vm_end-vma->vm_start;
 	unsigned long page, pos;
@@ -1385,13 +1313,13 @@ static int stv680_mmap (struct file *file, struct vm_area_struct *vma)
 	return 0;
 }
 
-static int stv680_read (struct file *file, char *buf,
+static ssize_t stv680_read (struct file *file, char *buf,
 			size_t count, loff_t *ppos)
 {
 	struct video_device *dev = file->private_data;
 	unsigned long int realcount = count;
 	int ret = 0;
-	struct usb_stv *stv680 = (struct usb_stv *) dev;
+	struct usb_stv *stv680 = video_get_drvdata(dev);
 	unsigned long int i;
 
 	if (STV680_NUMFRAMES != 2) {
@@ -1448,14 +1376,17 @@ static struct video_device stv680_template = {
 	.type =		VID_TYPE_CAPTURE,
 	.hardware =	VID_HARDWARE_SE401,
 	.fops =         &stv680_fops,
+	.release =	video_device_release,
+	.minor = 	-1,
 };
 
 static int stv680_probe (struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
 	struct usb_host_interface *interface;
-	struct usb_stv *stv680;
+	struct usb_stv *stv680 = NULL;
 	char *camera_name = NULL;
+	int retval = 0;
 
 	/* We don't handle multi-config cameras */
 	if (dev->descriptor.bNumConfigurations != 1) {
@@ -1471,12 +1402,14 @@ static int stv680_probe (struct usb_interface *intf, const struct usb_device_id 
 	} else {
 		PDEBUG (0, "STV(e): Vendor/Product ID do not match STV0680 values.");
 		PDEBUG (0, "STV(e): Check that the STV0680 camera is connected to the computer.");
-		return -ENODEV;
+		retval = -ENODEV;
+		goto error;
 	}
 	/* We found one */
 	if ((stv680 = kmalloc (sizeof (*stv680), GFP_KERNEL)) == NULL) {
 		PDEBUG (0, "STV(e): couldn't kmalloc stv680 struct.");
-		return -ENOMEM;
+		retval = -ENOMEM;
+		goto error;
 	}
 
 	memset (stv680, 0, sizeof (*stv680));
@@ -1484,24 +1417,34 @@ static int stv680_probe (struct usb_interface *intf, const struct usb_device_id 
 	stv680->udev = dev;
 	stv680->camera_name = camera_name;
 
-	memcpy (&stv680->vdev, &stv680_template, sizeof (stv680_template));
-	memcpy (stv680->vdev.name, stv680->camera_name, strlen (stv680->camera_name));
+	stv680->vdev = video_device_alloc();
+	if (!stv680->vdev) {
+		retval = -ENOMEM;
+		goto error;
+	}
+	memcpy(stv680->vdev, &stv680_template, sizeof(stv680_template));
+	stv680->vdev->dev = &intf->dev;
+	video_set_drvdata(stv680->vdev, stv680);
+
+	memcpy (stv680->vdev->name, stv680->camera_name, strlen (stv680->camera_name));
 	init_waitqueue_head (&stv680->wq);
 	init_MUTEX (&stv680->lock);
 	wmb ();
 
-	if (video_register_device (&stv680->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
-		kfree (stv680);
+	if (video_register_device (stv680->vdev, VFL_TYPE_GRABBER, video_nr) == -1) {
 		PDEBUG (0, "STV(e): video_register_device failed");
-		return -EIO;
+		retval = -EIO;
+		goto error;
 	}
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-	create_proc_stv680_cam (stv680);
-#endif
-	PDEBUG (0, "STV(i): registered new video device: video%d", stv680->vdev.minor);
+	PDEBUG (0, "STV(i): registered new video device: video%d", stv680->vdev->minor);
 
 	usb_set_intfdata (intf, stv680);
+	stv680_create_sysfs_files(stv680->vdev);
 	return 0;
+
+error:
+	kfree(stv680);
+	return retval;
 }
 
 static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
@@ -1528,9 +1471,6 @@ static inline void usb_stv680_remove_disconnected (struct usb_stv *stv680)
 		}
 	PDEBUG (0, "STV(i): %s disconnected", stv680->camera_name);
 
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-	destroy_proc_stv680_cam (stv680);
-#endif
 	/* Free the memory */
 	kfree (stv680);
 }
@@ -1543,7 +1483,11 @@ static void stv680_disconnect (struct usb_interface *intf)
 
 	if (stv680) {
 		/* We don't want people trying to open up the device */
-		video_unregister_device (&stv680->vdev);
+		if (stv680->vdev) {
+			stv680_remove_sysfs_files(stv680->vdev);
+			video_unregister_device(stv680->vdev);
+			stv680->vdev = NULL;
+		}
 		if (!stv680->user) {
 			usb_stv680_remove_disconnected (stv680);
 		} else {
@@ -1566,10 +1510,6 @@ static struct usb_driver stv680_driver = {
 
 static int __init usb_stv680_init (void)
 {
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-	if (proc_stv680_create () < 0)
-		return -1;
-#endif
 	if (usb_register (&stv680_driver) < 0) {
 		PDEBUG (0, "STV(e): Could not setup STV0680 driver");
 		return -1;
@@ -1584,10 +1524,6 @@ static void __exit usb_stv680_exit (void)
 {
 	usb_deregister (&stv680_driver);
 	PDEBUG (0, "STV(i): driver deregistered");
-
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
-	proc_stv680_destroy ();
-#endif
 }
 
 module_init (usb_stv680_init);

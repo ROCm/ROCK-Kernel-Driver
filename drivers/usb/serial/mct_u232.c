@@ -850,10 +850,19 @@ static int mct_u232_ioctl (struct usb_serial_port *port, struct file * file,
 
 static int __init mct_u232_init (void)
 {
-	usb_serial_register (&mct_u232_device);
-	usb_register (&mct_u232_driver);
+	int retval;
+	retval = usb_serial_register(&mct_u232_device);
+	if (retval)
+		goto failed_usb_serial_register;
+	retval = usb_register(&mct_u232_driver);
+	if (retval)
+		goto failed_usb_register;
 	info(DRIVER_DESC " " DRIVER_VERSION);
 	return 0;
+failed_usb_register:
+	usb_serial_deregister(&mct_u232_device);
+failed_usb_serial_register:
+	return retval;
 }
 
 
