@@ -1039,7 +1039,7 @@ static DEVICE_ATTR(devspec, S_IRUGO, pci_show_devspec, NULL);
 #endif /* CONFIG_PPC_OF */
 
 /* Add sysfs properties */
-void pcibios_add_platform_entries(struct pci_dev *dev)
+void pcibios_add_platform_entries(struct pci_dev *pdev)
 {
 #ifdef CONFIG_PPC_OF
 	device_create_file(&pdev->dev, &dev_attr_devspec);
