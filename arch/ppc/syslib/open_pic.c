@@ -33,6 +33,7 @@
 
 void* OpenPIC_Addr;
 static volatile struct OpenPIC *OpenPIC = NULL;
+
 /*
  * We define OpenPIC_InitSenses table thusly:
  * bit 0x1: sense, 0 for edge and 1 for level.
@@ -261,6 +262,20 @@ static void openpic_safe_writefield_IPI(volatile u_int *addr, u_int mask, u_int 
 }
 #endif /* CONFIG_SMP */
 
+#ifdef CONFIG_EPIC_SERIAL_MODE
+static void __init openpic_eicr_set_clk(u_int clkval)
+{
+	openpic_writefield(&OpenPIC->Global.Global_Configuration1,
+			OPENPIC_EICR_S_CLK_MASK, (clkval << 28));
+}
+
+static void __init openpic_enable_sie(void)
+{
+	openpic_setfield(&OpenPIC->Global.Global_Configuration1,
+			OPENPIC_EICR_SIE);
+}
+#endif
+
 #if defined(CONFIG_EPIC_SERIAL_MODE) || defined(CONFIG_PMAC_PBOOK)
 static void openpic_reset(void)
 {
@@ -272,21 +287,7 @@ static void openpic_reset(void)
 }
 #endif
 
-#ifdef CONFIG_EPIC_SERIAL_MODE
-static void openpic_enable_sie(void)
-{
-	openpic_setfield(&OpenPIC->Global.Global_Configuration1,
-			 OPENPIC_EICR_SIE);
-}
-
-static void openpic_eicr_set_clk(u_int clkval)
-{
-	openpic_writefield(&OpenPIC->Global.Global_Configuration1,
-			 OPENPIC_EICR_S_CLK_MASK, (clkval << 28));
-}
-#endif
-
-void openpic_set_sources(int first_irq, int num_irqs, void *first_ISR)
+void __init openpic_set_sources(int first_irq, int num_irqs, void *first_ISR)
 {
 	volatile OpenPIC_Source *src = first_ISR;
 	int i, last_irq;
@@ -300,7 +301,14 @@ void openpic_set_sources(int first_irq, int num_irqs, void *first_ISR)
 		ISR[i] = src;
 }
 
-void __init openpic_init(int linux_irq_offset)
+/*
+ * The `offset' parameter defines where the interrupts handled by the
+ * OpenPIC start in the space of interrupt numbers that the kernel knows
+ * about.  In other words, the OpenPIC's IRQ0 is numbered `offset' in the
+ * kernel's interrupt numbering scheme.
+ * We assume there is only one OpenPIC.
+ */
+void __init openpic_init(int offset)
 {
 	u_int t, i;
 	u_int timerfreq;
@@ -349,13 +357,13 @@ void __init openpic_init(int linux_irq_offset)
 		printk("OpenPIC timer frequency is %d.%06d MHz\n",
 		       timerfreq / 1000000, timerfreq % 1000000);
 
-	open_pic_irq_offset = linux_irq_offset;
+	open_pic_irq_offset = offset;
 
 	/* Initialize timer interrupts */
 	if ( ppc_md.progress ) ppc_md.progress("openpic: timer",0x3ba);
 	for (i = 0; i < OPENPIC_NUM_TIMERS; i++) {
 		/* Disabled, Priority 0 */
-		openpic_inittimer(i, 0, OPENPIC_VEC_TIMER+i+linux_irq_offset);
+		openpic_inittimer(i, 0, OPENPIC_VEC_TIMER+i+offset);
 		/* No processor */
 		openpic_maptimer(i, 0);
 	}
@@ -365,12 +373,10 @@ void __init openpic_init(int linux_irq_offset)
 	if ( ppc_md.progress ) ppc_md.progress("openpic: ipi",0x3bb);
 	for (i = 0; i < OPENPIC_NUM_IPI; i++) {
 		/* Disabled, Priority 10..13 */
-		openpic_initipi(i, 10+i, OPENPIC_VEC_IPI+i+linux_irq_offset);
+		openpic_initipi(i, 10+i, OPENPIC_VEC_IPI+i+offset);
 		/* IPIs are per-CPU */
-		irq_desc[OPENPIC_VEC_IPI+i+linux_irq_offset].status |=
-			IRQ_PER_CPU;
-		irq_desc[OPENPIC_VEC_IPI+i+linux_irq_offset].handler =
-			&open_pic_ipi;
+		irq_desc[OPENPIC_VEC_IPI+i+offset].status |= IRQ_PER_CPU;
+		irq_desc[OPENPIC_VEC_IPI+i+offset].handler = &open_pic_ipi;
 	}
 #endif
 
@@ -387,40 +393,36 @@ void __init openpic_init(int linux_irq_offset)
 			continue;
 
 		/* the bootloader may have left it enabled (bad !) */
-		openpic_disable_irq(i+linux_irq_offset);
+		openpic_disable_irq(i+offset);
 
-		/*
-		 * We find the value from either the InitSenses table
-		 * or assume a negative polarity level interrupt.
-		 */
-		sense = (i < OpenPIC_NumInitSenses)? OpenPIC_InitSenses[i]: 1;
+		sense = (i < OpenPIC_NumInitSenses)? OpenPIC_InitSenses[i]: \
+				(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE);
 
-		if ((sense & IRQ_SENSE_MASK) == 1)
-			irq_desc[i+linux_irq_offset].status = IRQ_LEVEL;
+		if (sense & IRQ_SENSE_MASK)
+			irq_desc[i+offset].status = IRQ_LEVEL;
 
 		/* Enabled, Priority 8 */
-		openpic_initirq(i, 8, i + linux_irq_offset,
-				(sense & IRQ_POLARITY_MASK),
+		openpic_initirq(i, 8, i+offset, (sense & IRQ_POLARITY_MASK),
 				(sense & IRQ_SENSE_MASK));
 		/* Processor 0 */
 		openpic_mapirq(i, 1<<0, 0);
 	}
 
 	/* Init descriptors */
-	for (i = linux_irq_offset; i < NumSources + linux_irq_offset; i++)
+	for (i = offset; i < NumSources + offset; i++)
 		irq_desc[i].handler = &open_pic;
 
 	/* Initialize the spurious interrupt */
 	if (ppc_md.progress) ppc_md.progress("openpic: spurious",0x3bd);
-	openpic_set_spurious(OPENPIC_VEC_SPURIOUS+linux_irq_offset);
+	openpic_set_spurious(OPENPIC_VEC_SPURIOUS+offset);
 
 	/* Initialize the cascade */
-	if (linux_irq_offset) {
-		if (request_irq(linux_irq_offset, no_action, SA_INTERRUPT,
+	if (offset) {
+		if (request_irq(offset, no_action, SA_INTERRUPT,
 				"82c59 cascade", NULL))
 			printk("Unable to get OpenPIC IRQ 0 for cascade\n");
 	}
- 	openpic_disable_8259_pass_through();
+	openpic_disable_8259_pass_through();
 #ifdef CONFIG_EPIC_SERIAL_MODE
 	openpic_eicr_set_clk(7);	/* Slowest value until we know better */
 	openpic_enable_sie();
@@ -479,7 +481,7 @@ static u_int openpic_get_priority(void)
 }
 #endif /* notused */
 
-static void openpic_set_priority(u_int pri)
+static void __init openpic_set_priority(u_int pri)
 {
 	DECL_THIS_CPU;
 
@@ -656,29 +658,18 @@ static void __init openpic_maptimer(u_int timer, u_int cpumask)
 }
 
 /*
- * Initalize the interrupt source which will generate an NMI (and disable it).
+ * Initalize the interrupt source which will generate an NMI.
+ * This raises the interrupt's priority from 8 to 9.
  *
  * irq: The logical IRQ which generates an NMI.
  */
 void __init
 openpic_init_nmi_irq(u_int irq)
 {
-	int sense;
-
-	/* If this wasn't given, assume a level, negative polarity interrupt. */
-	sense = (irq < OpenPIC_NumInitSenses) ? OpenPIC_InitSenses[irq] :
-		(IRQ_SENSE_LEVEL | IRQ_POLARITY_NEGATIVE);
-
-	openpic_safe_writefield(&ISR[irq]->Vector_Priority,
-				OPENPIC_PRIORITY_MASK | OPENPIC_VECTOR_MASK |
-				OPENPIC_SENSE_MASK | OPENPIC_POLARITY_MASK,
-				(9 << OPENPIC_PRIORITY_SHIFT) |
-				(irq + open_pic_irq_offset) |
-				((sense & IRQ_POLARITY_MASK) ?
-				 OPENPIC_POLARITY_POSITIVE :
-				 OPENPIC_POLARITY_NEGATIVE) |
-				((sense & IRQ_SENSE_MASK) ? OPENPIC_SENSE_LEVEL
-				 : OPENPIC_SENSE_EDGE));
+	check_arg_irq(irq);
+	openpic_safe_writefield(&ISR[irq - open_pic_irq_offset]->Vector_Priority,
+				OPENPIC_PRIORITY_MASK,
+				9 << OPENPIC_PRIORITY_SHIFT);
 }
 
 /*
@@ -752,7 +743,8 @@ void openpic_disable_ipi(u_int irq)
  *  pol: polarity (1 for positive, 0 for negative)
  *  sense: 1 for level, 0 for edge
  */
-static void openpic_initirq(u_int irq, u_int pri, u_int vec, int pol, int sense)
+static void __init
+openpic_initirq(u_int irq, u_int pri, u_int vec, int pol, int sense)
 {
 	openpic_safe_writefield(&ISR[irq]->Vector_Priority,
 				OPENPIC_PRIORITY_MASK | OPENPIC_VECTOR_MASK |
