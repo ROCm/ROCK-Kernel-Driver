@@ -5,14 +5,14 @@
  * pages.  A pagevec is a multipage container which is used for that.
  */
 
-#define PAGEVEC_SIZE	16
+#define PAGEVEC_SIZE	15
 
 struct page;
 struct address_space;
 
 struct pagevec {
-	unsigned nr;
-	int cold;
+	unsigned short nr;
+	unsigned short cold;
 	struct page *pages[PAGEVEC_SIZE];
 };
 
