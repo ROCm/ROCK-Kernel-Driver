@@ -272,7 +272,7 @@ static ssize_t \
 	return show_in(dev, buf, 0x##offset); \
 } \
 static DEVICE_ATTR(in##offset##_input, S_IRUGO, \
-		show_in##offset, NULL) \
+		show_in##offset, NULL); \
 static ssize_t \
 	show_in##offset##_min (struct device *dev, char *buf) \
 { \
@@ -294,17 +294,17 @@ static ssize_t set_in##offset##_max (struct device *dev, \
 	return set_in_max(dev, buf, count, 0x##offset); \
 } \
 static DEVICE_ATTR(in##offset##_min, S_IRUGO | S_IWUSR, \
-		show_in##offset##_min, set_in##offset##_min) \
+		show_in##offset##_min, set_in##offset##_min); \
 static DEVICE_ATTR(in##offset##_max, S_IRUGO | S_IWUSR, \
-		show_in##offset##_max, set_in##offset##_max)
+		show_in##offset##_max, set_in##offset##_max);
 
-sysfs_in(0)
-sysfs_in(1)
-sysfs_in(2)
-sysfs_in(3)
-sysfs_in(4)
-sysfs_in(5)
-sysfs_in(6)
+sysfs_in(0);
+sysfs_in(1);
+sysfs_in(2);
+sysfs_in(3);
+sysfs_in(4);
+sysfs_in(5);
+sysfs_in(6);
 
 #define device_create_file_in(client, offset) do { \
 	device_create_file(&client->dev, &dev_attr_in##offset##_input); \
@@ -410,15 +410,15 @@ static ssize_t set_fan##offset##_div(struct device *dev, const char *buf, \
 	return set_fan_div(dev, buf, count, offset - 1); \
 } \
 static DEVICE_ATTR(fan##offset##_input, S_IRUGO, \
-		show_fan##offset, NULL) \
+		show_fan##offset, NULL); \
 static DEVICE_ATTR(fan##offset##_min, S_IRUGO | S_IWUSR, \
-		show_fan##offset##_min, set_fan##offset##_min) \
+		show_fan##offset##_min, set_fan##offset##_min); \
 static DEVICE_ATTR(fan##offset##_div, S_IRUGO | S_IWUSR, \
-		show_fan##offset##_div, set_fan##offset##_div)
+		show_fan##offset##_div, set_fan##offset##_div);
 
-sysfs_fan(1)
-sysfs_fan(2)
-sysfs_fan(3)
+sysfs_fan(1);
+sysfs_fan(2);
+sysfs_fan(3);
 
 #define device_create_file_fan(client, offset) do { \
 	device_create_file(&client->dev, &dev_attr_fan##offset##_input); \
@@ -449,9 +449,9 @@ static ssize_t show_##reg(struct device *dev, char *buf, int nr) \
 	return sprintf_temp_from_reg(data->reg[nr], buf, nr); \
 }
 
-show_temp_reg(temp)
-show_temp_reg(temp_max)
-show_temp_reg(temp_hyst)
+show_temp_reg(temp);
+show_temp_reg(temp_max);
+show_temp_reg(temp_hyst);
 
 #define set_temp_reg(REG, reg) \
 static ssize_t set_##reg(struct device *dev, const char *buf, \
@@ -473,15 +473,15 @@ static ssize_t set_##reg(struct device *dev, const char *buf, \
 	return count; \
 }
 
-set_temp_reg(MAX, temp_max)
-set_temp_reg(HYST, temp_hyst)
+set_temp_reg(MAX, temp_max);
+set_temp_reg(HYST, temp_hyst);
 
 #define sysfs_temp(num) \
 static ssize_t show_temp##num(struct device *dev, char *buf) \
 { \
 	return show_temp(dev, buf, num-1); \
 } \
-static DEVICE_ATTR(temp##num##_input, S_IRUGO, show_temp##num, NULL) \
+static DEVICE_ATTR(temp##num##_input, S_IRUGO, show_temp##num, NULL); \
 static ssize_t show_temp_max##num(struct device *dev, char *buf) \
 { \
 	return show_temp_max(dev, buf, num-1); \
@@ -492,7 +492,7 @@ static ssize_t set_temp_max##num(struct device *dev, const char *buf, \
 	return set_temp_max(dev, buf, count, num-1); \
 } \
 static DEVICE_ATTR(temp##num##_max, S_IRUGO | S_IWUSR, \
-		show_temp_max##num, set_temp_max##num) \
+		show_temp_max##num, set_temp_max##num); \
 static ssize_t show_temp_hyst##num(struct device *dev, char *buf) \
 { \
 	return show_temp_hyst(dev, buf, num-1); \
@@ -503,12 +503,12 @@ static ssize_t set_temp_hyst##num(struct device *dev, const char *buf, \
 	return set_temp_hyst(dev, buf, count, num-1); \
 } \
 static DEVICE_ATTR(temp##num##_max_hyst, S_IRUGO | S_IWUSR, \
-		show_temp_hyst##num, set_temp_hyst##num)
+		show_temp_hyst##num, set_temp_hyst##num);
 
-sysfs_temp(1)
-sysfs_temp(2)
-sysfs_temp(3)
-sysfs_temp(4)
+sysfs_temp(1);
+sysfs_temp(2);
+sysfs_temp(3);
+sysfs_temp(4);
 
 /* VID */
 #define device_create_file_temp(client, num) do { \
@@ -523,7 +523,7 @@ static ssize_t show_vid(struct device *dev, char *buf)
 	return sprintf(buf, "%d\n", vid_from_reg(data->vid, data->vrm));
 }
 
-static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid, NULL)
+static DEVICE_ATTR(in0_ref, S_IRUGO, show_vid, NULL);
 #define device_create_file_vid(client) \
 device_create_file(&client->dev, &dev_attr_in0_ref)
 
@@ -544,7 +544,7 @@ static ssize_t set_vrm(struct device *dev, const char *buf, size_t count)
 }
 
 /* Alarms */
-static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm, set_vrm)
+static DEVICE_ATTR(vrm, S_IRUGO | S_IWUSR, show_vrm, set_vrm);
 #define device_create_file_vrm(client) \
 device_create_file(&client->dev, &dev_attr_vrm);
 
@@ -554,7 +554,7 @@ static ssize_t show_alarms(struct device *dev, char *buf)
 	return sprintf(buf, "%d\n", ALARMS_FROM_REG(data->alarms));
 }
 
-static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL)
+static DEVICE_ATTR(alarms, S_IRUGO, show_alarms, NULL);
 #define device_create_file_alarms(client) \
 device_create_file(&client->dev, &dev_attr_alarms)
 
@@ -594,9 +594,9 @@ static ssize_t set_pwm_enable1(struct device *dev, const char *buf,
 	return count;
 }
 
-static DEVICE_ATTR(fan1_pwm, S_IRUGO | S_IWUSR, show_pwm1, set_pwm1)
+static DEVICE_ATTR(fan1_pwm, S_IRUGO | S_IWUSR, show_pwm1, set_pwm1);
 static DEVICE_ATTR(fan1_pwm_enable, S_IRUGO | S_IWUSR,
-		show_pwm_enable1, set_pwm_enable1)
+		show_pwm_enable1, set_pwm_enable1);
 #define device_create_file_pwm1(client) do { \
 	device_create_file(&new_client->dev, &dev_attr_fan1_pwm); \
 	device_create_file(&new_client->dev, &dev_attr_fan1_pwm_enable); \
