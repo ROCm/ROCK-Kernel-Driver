@@ -92,7 +92,7 @@ static void __init initialize_physnode_map(void)
 			cur = eq->hi_shrd_mem_start;
 			topofmem = eq->hi_shrd_mem_start + eq->hi_shrd_mem_size;
 			while (cur < topofmem) {
-				physnode_map[cur >> 8] = nid;
+				physnode_map[cur >> 8] = (s8) nid;
 				cur ++;
 			}
 		}

@@ -56,7 +56,7 @@ bootmem_data_t node0_bdata;
  *     physnode_map[4-7] = 1;
  *     physnode_map[8- ] = -1;
  */
-u8 physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
+s8 physnode_map[MAX_ELEMENTS] = { [0 ... (MAX_ELEMENTS - 1)] = -1};
 
 unsigned long node_start_pfn[MAX_NUMNODES];
 unsigned long node_end_pfn[MAX_NUMNODES];

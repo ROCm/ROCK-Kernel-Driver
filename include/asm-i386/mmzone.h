@@ -37,12 +37,12 @@ extern struct pglist_data *node_data[];
 #define MAX_ELEMENTS 256
 #define PAGES_PER_ELEMENT (MAX_NR_PAGES/MAX_ELEMENTS)
 
-extern u8 physnode_map[];
+extern s8 physnode_map[];
 
 static inline int pfn_to_nid(unsigned long pfn)
 {
 #ifdef CONFIG_NUMA
-	return(physnode_map[(pfn) / PAGES_PER_ELEMENT]);
+	return((int) physnode_map[(pfn) / PAGES_PER_ELEMENT]);
 #else
 	return 0;
 #endif

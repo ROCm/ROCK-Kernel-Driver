@@ -193,7 +193,7 @@ static void __init initialize_physnode_map(void)
 		for (pfn = nmcp->start_pfn; pfn <= nmcp->end_pfn;
 						pfn += PAGES_PER_ELEMENT)
 		{
-			physnode_map[pfn / PAGES_PER_ELEMENT] = (int)nmcp->nid;
+			physnode_map[pfn / PAGES_PER_ELEMENT] = (s8) nmcp->nid;
 		}
 	}
 }
