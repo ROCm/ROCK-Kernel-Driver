@@ -611,8 +611,11 @@ Module parameters
 
     Module supports up to 8 cards.
 
-    Note: you need to load the firmware via hdsploader utility included
-          in alsa-tools and alsa-firmware packages.
+    Note: The firmware data can be automatically loaded via hotplug
+          when CONFIG_FW_LOADER is set.  Otherwise, you need to load
+          the firmware via hdsploader utility included in alsa-tools
+          package.
+          The firmware data is found in alsa-firmware package.
 
     Note: snd-page-alloc module does the job which snd-hammerfall-mem
           module did formerly.  It will allocate the buffers in advance
@@ -794,7 +797,7 @@ Module parameters
     is supported, the firmware data is loaded via hotplug automatically.
     Install the necessary firmware files in alsa-firmware package.
     When no hotplug fw loader is available, you need to load the
-    firmware via mixartoader utility in alsa-tools package.
+    firmware via mixartloader utility in alsa-tools package.
 
   Module snd-mpu401
   -----------------
