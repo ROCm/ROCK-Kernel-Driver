@@ -354,29 +354,29 @@ static int proc_info (char *buffer, char **start, off_t offset, int length,
  */
 
 Scsi_Host_Template usb_stor_host_template = {
-	name:			"usb-storage",
-	proc_info:		proc_info,
-	info:			host_info,
+	.name =			"usb-storage",
+	.proc_info =		proc_info,
+	.info =			host_info,
 
-	detect:			detect,
-	release:		release,
-	command:		command,
-	queuecommand:		queuecommand,
+	.detect =		detect,
+	.release =		release,
+	.command =		command,
+	.queuecommand =		queuecommand,
 
-	eh_abort_handler:	command_abort,
-	eh_device_reset_handler:device_reset,
-	eh_bus_reset_handler:	bus_reset,
-	eh_host_reset_handler:	host_reset,
+	.eh_abort_handler =	command_abort,
+	.eh_device_reset_handler =device_reset,
+	.eh_bus_reset_handler =	bus_reset,
+	.eh_host_reset_handler =host_reset,
 
-	can_queue:		1,
-	this_id:		-1,
+	.can_queue =		1,
+	.this_id =		-1,
 
-	sg_tablesize:		SG_ALL,
-	cmd_per_lun:		1,
-	present:		0,
-	unchecked_isa_dma:	FALSE,
-	use_clustering:		TRUE,
-	emulated:		TRUE
+	.sg_tablesize =		SG_ALL,
+	.cmd_per_lun =		1,
+	.present =		0,
+	.unchecked_isa_dma =	FALSE,
+	.use_clustering =	TRUE,
+	.emulated =		TRUE
 };
 
 unsigned char usb_stor_sense_notready[18] = {

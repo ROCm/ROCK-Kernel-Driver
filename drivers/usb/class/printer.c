@@ -786,13 +786,13 @@ static unsigned int usblp_quirks (__u16 vendor, __u16 product)
 }
 
 static struct file_operations usblp_fops = {
-	owner:		THIS_MODULE,
-	read:		usblp_read,
-	write:		usblp_write,
-	poll:		usblp_poll,
-	ioctl:		usblp_ioctl,
-	open:		usblp_open,
-	release:	usblp_release,
+	.owner =	THIS_MODULE,
+	.read =		usblp_read,
+	.write =	usblp_write,
+	.poll =		usblp_poll,
+	.ioctl =	usblp_ioctl,
+	.open =		usblp_open,
+	.release =	usblp_release,
 };
 
 static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
@@ -1100,11 +1100,11 @@ static struct usb_device_id usblp_ids [] = {
 MODULE_DEVICE_TABLE (usb, usblp_ids);
 
 static struct usb_driver usblp_driver = {
-	owner:		THIS_MODULE,
-	name:		"usblp",
-	probe:		usblp_probe,
-	disconnect:	usblp_disconnect,
-	id_table:	usblp_ids,
+	.owner =	THIS_MODULE,
+	.name =		"usblp",
+	.probe =	usblp_probe,
+	.disconnect =	usblp_disconnect,
+	.id_table =	usblp_ids,
 };
 
 static int __init usblp_init(void)

@@ -409,7 +409,7 @@ static struct proc_dir_entry *ov511_proc_entry = NULL;
 extern struct proc_dir_entry *video_proc_entry;
 
 static struct file_operations ov511_control_fops = {
-	ioctl:		ov51x_control_ioctl,
+	.ioctl =	ov51x_control_ioctl,
 };
 
 #define YES_NO(x) ((x) ? "yes" : "no")
@@ -4932,21 +4932,21 @@ ov51x_v4l1_mmap(struct file *file, struct vm_area_struct *vma)
 }
 
 static struct file_operations ov511_fops = {
-	owner:		THIS_MODULE,
-	open:		ov51x_v4l1_open,
-	release:       	ov51x_v4l1_close,
-	read:		ov51x_v4l1_read,
-	mmap:		ov51x_v4l1_mmap,
-	ioctl:          ov51x_v4l1_ioctl,
-	llseek:         no_llseek,
+	.owner =	THIS_MODULE,
+	.open =		ov51x_v4l1_open,
+	.release =     	ov51x_v4l1_close,
+	.read =		ov51x_v4l1_read,
+	.mmap =		ov51x_v4l1_mmap,
+	.ioctl =        ov51x_v4l1_ioctl,
+	.llseek =       no_llseek,
 };
 
 static struct video_device vdev_template = {
-	owner:		THIS_MODULE,
-	name:		"OV511 USB Camera",
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_OV511,
-	fops:           &ov511_fops,
+	.owner =	THIS_MODULE,
+	.name =		"OV511 USB Camera",
+	.type =		VID_TYPE_CAPTURE,
+	.hardware =	VID_HARDWARE_OV511,
+	.fops =         &ov511_fops,
 };
 
 #if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
@@ -6262,11 +6262,11 @@ ov51x_disconnect(struct usb_device *dev, void *ptr)
 }
 
 static struct usb_driver ov511_driver = {
-	owner:		THIS_MODULE,
-	name:		"ov511",
-	id_table:       device_table,
-	probe:		ov51x_probe,
-	disconnect:	ov51x_disconnect
+	.owner =	THIS_MODULE,
+	.name =		"ov511",
+	.id_table =     device_table,
+	.probe =	ov51x_probe,
+	.disconnect =	ov51x_disconnect
 };
 
 

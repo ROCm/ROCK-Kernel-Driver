@@ -366,14 +366,14 @@ static struct usb_device_id generic_device_ids[2]; /* Initially all zeroes. */
 
 /* All of the device info needed for the Generic Serial Converter */
 static struct usb_serial_device_type generic_device = {
-	owner:			THIS_MODULE,
-	name:			"Generic",
-	id_table:		generic_device_ids,
-	num_interrupt_in:	NUM_DONT_CARE,
-	num_bulk_in:		NUM_DONT_CARE,
-	num_bulk_out:		NUM_DONT_CARE,
-	num_ports:		1,
-	shutdown:		generic_shutdown,
+	.owner =		THIS_MODULE,
+	.name =			"Generic",
+	.id_table =		generic_device_ids,
+	.num_interrupt_in =	NUM_DONT_CARE,
+	.num_bulk_in =		NUM_DONT_CARE,
+	.num_bulk_out =		NUM_DONT_CARE,
+	.num_ports =		1,
+	.shutdown =		generic_shutdown,
 };
 #endif
 
@@ -395,10 +395,10 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 static void usb_serial_disconnect(struct usb_device *dev, void *ptr);
 
 static struct usb_driver usb_serial_driver = {
-	name:		"serial",
-	probe:		usb_serial_probe,
-	disconnect:	usb_serial_disconnect,
-	id_table:	NULL, 			/* check all devices */
+	.name =		"serial",
+	.probe =	usb_serial_probe,
+	.disconnect =	usb_serial_disconnect,
+	.id_table =	NULL, 			/* check all devices */
 };
 
 /* There is no MODULE_DEVICE_TABLE for usbserial.c.  Instead
@@ -1577,32 +1577,32 @@ static void usb_serial_disconnect(struct usb_device *dev, void *ptr)
 
 
 static struct tty_driver serial_tty_driver = {
-	magic:			TTY_DRIVER_MAGIC,
-	driver_name:		"usb-serial",
-	name:			"usb/tts/%d",
-	major:			SERIAL_TTY_MAJOR,
-	minor_start:		0,
-	num:			SERIAL_TTY_MINORS,
-	type:			TTY_DRIVER_TYPE_SERIAL,
-	subtype:		SERIAL_TYPE_NORMAL,
-	flags:			TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
+	.magic =		TTY_DRIVER_MAGIC,
+	.driver_name =		"usb-serial",
+	.name =			"usb/tts/%d",
+	.major =		SERIAL_TTY_MAJOR,
+	.minor_start =		0,
+	.num =			SERIAL_TTY_MINORS,
+	.type =			TTY_DRIVER_TYPE_SERIAL,
+	.subtype =		SERIAL_TYPE_NORMAL,
+	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
 
-	refcount:		&serial_refcount,
-	table:			serial_tty,
-	termios:		serial_termios,
-	termios_locked:		serial_termios_locked,
+	.refcount =		&serial_refcount,
+	.table =		serial_tty,
+	.termios =		serial_termios,
+	.termios_locked =	serial_termios_locked,
 
-	open:			serial_open,
-	close:			serial_close,
-	write:			serial_write,
-	write_room:		serial_write_room,
-	ioctl:			serial_ioctl,
-	set_termios:		serial_set_termios,
-	throttle:		serial_throttle,
-	unthrottle:		serial_unthrottle,
-	break_ctl:		serial_break,
-	chars_in_buffer:	serial_chars_in_buffer,
-	read_proc:		serial_read_proc,
+	.open =			serial_open,
+	.close =		serial_close,
+	.write =		serial_write,
+	.write_room =		serial_write_room,
+	.ioctl =		serial_ioctl,
+	.set_termios =		serial_set_termios,
+	.throttle =		serial_throttle,
+	.unthrottle =		serial_unthrottle,
+	.break_ctl =		serial_break,
+	.chars_in_buffer =	serial_chars_in_buffer,
+	.read_proc =		serial_read_proc,
 };
 
 
@@ -1931,15 +1931,15 @@ static int usb_console_wait_key(struct console *co)
 #endif
 
 static struct console usbcons = {
-	name:		"ttyUSB",			/* only [8] */
-	write:		usb_console_write,
+	.name =		"ttyUSB",			/* only [8] */
+	.write =	usb_console_write,
 #if 0
-	device:		usb_console_device,		/* TBD */
-	wait_key:	usb_console_wait_key,		/* TBD */
+	.device =	usb_console_device,		/* TBD */
+	.wait_key =	usb_console_wait_key,		/* TBD */
 #endif
-	setup:		usb_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.setup =	usb_console_setup,
+	.flags =	CON_PRINTBUFFER,
+	.index =	-1,
 };
 
 #endif /* CONFIG_USB_SERIAL_CONSOLE */

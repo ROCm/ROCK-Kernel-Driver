@@ -836,9 +836,9 @@ show_config (struct device *dev, char *buf, size_t count, loff_t off)
 	return sprintf (buf, "%u\n", udev->actconfig->bConfigurationValue);
 }
 static struct driver_file_entry usb_config_entry = {
-	name:	"configuration",
-	mode:	S_IRUGO,
-	show:	show_config,
+	.name =	"configuration",
+	.mode =	S_IRUGO,
+	.show =	show_config,
 };
 
 /* interfaces have one current setting; alternates
@@ -855,9 +855,9 @@ show_altsetting (struct device *dev, char *buf, size_t count, loff_t off)
 	return sprintf (buf, "%u\n", interface->altsetting->bAlternateSetting);
 }
 static struct driver_file_entry usb_altsetting_entry = {
-	name:	"altsetting",
-	mode:	S_IRUGO,
-	show:	show_altsetting,
+	.name =	"altsetting",
+	.mode =	S_IRUGO,
+	.show =	show_altsetting,
 };
 
 /* product driverfs file */
@@ -876,9 +876,9 @@ static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t
 	return len+1;
 }
 static struct driver_file_entry usb_product_entry = {
-	name:	"product",
-	mode:	S_IRUGO,
-	show:	show_product,
+	.name =	"product",
+	.mode =	S_IRUGO,
+	.show =	show_product,
 };
 
 /* manufacturer driverfs file */
@@ -898,9 +898,9 @@ show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
 	return len+1;
 }
 static struct driver_file_entry usb_manufacturer_entry = {
-	name:	"manufacturer",
-	mode:	S_IRUGO,
-	show:	show_manufacturer,
+	.name =	"manufacturer",
+	.mode =	S_IRUGO,
+	.show =	show_manufacturer,
 };
 
 /* serial number driverfs file */
@@ -920,9 +920,9 @@ show_serial (struct device *dev, char *buf, size_t count, loff_t off)
 	return len+1;
 }
 static struct driver_file_entry usb_serial_entry = {
-	name:	"serial",
-	mode:	S_IRUGO,
-	show:	show_serial,
+	.name =	"serial",
+	.mode =	S_IRUGO,
+	.show =	show_serial,
 };
 
 /*
@@ -1483,7 +1483,7 @@ struct list_head *usb_bus_get_list(void)
 #endif
 
 struct bus_type usb_bus_type = {
-	name:	"usb",
+	.name =	"usb",
 };
 
 /*

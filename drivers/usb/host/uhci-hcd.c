@@ -2476,45 +2476,45 @@ static int uhci_hcd_get_frame_number(struct usb_hcd *hcd)
 static const char hcd_name[] = "uhci-hcd";
 
 static const struct hc_driver uhci_driver = {
-	description:		hcd_name,
+	.description =		hcd_name,
 
 	/* Generic hardware linkage */
-	irq:			uhci_irq,
-	flags:			HCD_USB11,
+	.irq =			uhci_irq,
+	.flags =		HCD_USB11,
 
 	/* Basic lifecycle operations */
-	start:			uhci_start,
+	.start =		uhci_start,
 #ifdef CONFIG_PM
-	suspend:		uhci_suspend,
-	resume:			uhci_resume,
+	.suspend =		uhci_suspend,
+	.resume =		uhci_resume,
 #endif
-	stop:			uhci_stop,
+	.stop =			uhci_stop,
 
-	hcd_alloc:		uhci_hcd_alloc,
-	hcd_free:		uhci_hcd_free,
+	.hcd_alloc =		uhci_hcd_alloc,
+	.hcd_free =		uhci_hcd_free,
 
-	urb_enqueue:		uhci_urb_enqueue,
-	urb_dequeue:		uhci_urb_dequeue,
-	free_config:		NULL,
+	.urb_enqueue =		uhci_urb_enqueue,
+	.urb_dequeue =		uhci_urb_dequeue,
+	.free_config =		NULL,
 
-	get_frame_number:	uhci_hcd_get_frame_number,
+	.get_frame_number =	uhci_hcd_get_frame_number,
 
-	hub_status_data:	uhci_hub_status_data,
-	hub_control:		uhci_hub_control,
+	.hub_status_data =	uhci_hub_status_data,
+	.hub_control =		uhci_hub_control,
 };
 
 static const struct pci_device_id __devinitdata uhci_pci_ids[] = { {
 
 	/* handle any USB UHCI controller */
-	class: 		((PCI_CLASS_SERIAL_USB << 8) | 0x00),
-	class_mask: 	~0,
-	driver_data:	(unsigned long) &uhci_driver,
+	.class = 		((PCI_CLASS_SERIAL_USB << 8) | 0x00),
+	.class_mask = 	~0,
+	.driver_data =	(unsigned long) &uhci_driver,
 
 	/* no matter who makes it */
-	vendor:		PCI_ANY_ID,
-	device:		PCI_ANY_ID,
-	subvendor:	PCI_ANY_ID,
-	subdevice:	PCI_ANY_ID,
+	.vendor =	PCI_ANY_ID,
+	.device =	PCI_ANY_ID,
+	.subvendor =	PCI_ANY_ID,
+	.subdevice =	PCI_ANY_ID,
 
 	}, { /* end: all zeroes */ }
 };
@@ -2522,15 +2522,15 @@ static const struct pci_device_id __devinitdata uhci_pci_ids[] = { {
 MODULE_DEVICE_TABLE(pci, uhci_pci_ids);
 
 static struct pci_driver uhci_pci_driver = {
-	name:		(char *)hcd_name,
-	id_table:	uhci_pci_ids,
+	.name =		(char *)hcd_name,
+	.id_table =	uhci_pci_ids,
 
-	probe:		usb_hcd_pci_probe,
-	remove:		usb_hcd_pci_remove,
+	.probe =	usb_hcd_pci_probe,
+	.remove =	usb_hcd_pci_remove,
 
 #ifdef	CONFIG_PM
-	suspend:	usb_hcd_pci_suspend,
-	resume:		usb_hcd_pci_resume,
+	.suspend =	usb_hcd_pci_suspend,
+	.resume =	usb_hcd_pci_resume,
 #endif	/* PM */
 };
  

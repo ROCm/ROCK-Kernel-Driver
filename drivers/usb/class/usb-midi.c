@@ -988,12 +988,12 @@ static int usb_midi_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations usb_midi_fops = {
-	llseek:		usb_midi_llseek,
-	read:		usb_midi_read,
-	write:		usb_midi_write,
-	poll:		usb_midi_poll,
-	open:		usb_midi_open,
-	release:	usb_midi_release,
+	.llseek =	usb_midi_llseek,
+	.read =		usb_midi_read,
+	.write =	usb_midi_write,
+	.poll =		usb_midi_poll,
+	.open =		usb_midi_open,
+	.release =	usb_midi_release,
 };
 
 /* ------------------------------------------------------------------------- */
@@ -2095,11 +2095,11 @@ static void usb_midi_disconnect(struct usb_device *dev, void *ptr)
 
 
 static struct usb_driver usb_midi_driver = {
-	name: "midi",
-	probe: usb_midi_probe,
-	disconnect: usb_midi_disconnect,
-	id_table:	NULL, 			/* check all devices */
-	driver_list: LIST_HEAD_INIT(usb_midi_driver.driver_list)
+	.name = "midi",
+	.probe = usb_midi_probe,
+	.disconnect = usb_midi_disconnect,
+	.id_table =	NULL, 			/* check all devices */
+	.driver_list = LIST_HEAD_INIT(usb_midi_driver.driver_list)
 };
 
 /* ------------------------------------------------------------------------- */
@@ -2168,15 +2168,15 @@ static void snd_usb_midi_output_trigger(snd_rawmidi_substream_t * substream,
 
 static snd_rawmidi_ops_t snd_usbmidi_output =
 {
-        open:           snd_usbmidi_output_open,
-        close:          snd_usbmidi_output_close,
-        trigger:        snd_usbmidi_output_trigger,
+        .open =         snd_usbmidi_output_open,
+        .close =        snd_usbmidi_output_close,
+        .trigger =      snd_usbmidi_output_trigger,
 };
 static snd_rawmidi_ops_t snd_usbmidi_input =
 {
-        open:           snd_usbmidi_input_open,
-        close:          snd_usbmidi_input_close,
-        trigger:        snd_usbmidi_input_trigger,
+        .open =         snd_usbmidi_input_open,
+        .close =        snd_usbmidi_input_close,
+        .trigger =      snd_usbmidi_input_trigger,
 };
 
 int snd_usbmidi_midi(cs46xx_t *chip, int device, snd_rawmidi_t **rrawmidi)
@@ -2211,7 +2211,7 @@ int snd_usbmidi_create( snd_card_t * card,
 	int err, idx;
 	snd_region_t *region;
 	static snd_device_opt_t ops = {
-		dev_free: snd_usbmidi_dev_free,
+		.dev_free = snd_usbmidi_dev_free,
 	};
 
 	*rchip = NULL;

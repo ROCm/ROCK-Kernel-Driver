@@ -666,9 +666,9 @@ static loff_t usb_device_lseek(struct file * file, loff_t offset, int orig)
 }
 
 struct file_operations usbdevfs_devices_fops = {
-	llseek:		usb_device_lseek,
-	read:		usb_device_read,
-	poll:		usb_device_poll,
-	open:		usb_device_open,
-	release:	usb_device_release,
+	.llseek =	usb_device_lseek,
+	.read =		usb_device_read,
+	.poll =		usb_device_poll,
+	.open =		usb_device_open,
+	.release =	usb_device_release,
 };

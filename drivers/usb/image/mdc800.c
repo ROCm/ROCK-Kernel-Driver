@@ -923,11 +923,11 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 /* File Operations of this drivers */
 static struct file_operations mdc800_device_ops =
 {
-	owner:		THIS_MODULE,
-	read:		mdc800_device_read,
-	write:		mdc800_device_write,
-	open:		mdc800_device_open,
-	release:	mdc800_device_release,
+	.owner =	THIS_MODULE,
+	.read =		mdc800_device_read,
+	.write =	mdc800_device_write,
+	.open =		mdc800_device_open,
+	.release =	mdc800_device_release,
 };
 
 
@@ -943,11 +943,11 @@ MODULE_DEVICE_TABLE (usb, mdc800_table);
  */
 static struct usb_driver mdc800_usb_driver =
 {
-	owner:		THIS_MODULE,
-	name:		"mdc800",
-	probe:		mdc800_usb_probe,
-	disconnect:	mdc800_usb_disconnect,
-	id_table:	mdc800_table
+	.owner =	THIS_MODULE,
+	.name =		"mdc800",
+	.probe =	mdc800_usb_probe,
+	.disconnect =	mdc800_usb_disconnect,
+	.id_table =	mdc800_table
 };
 
 

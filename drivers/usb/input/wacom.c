@@ -428,10 +428,10 @@ static void wacom_disconnect(struct usb_device *dev, void *ptr)
 }
 
 static struct usb_driver wacom_driver = {
-	name:		"wacom",
-	probe:		wacom_probe,
-	disconnect:	wacom_disconnect,
-	id_table:	wacom_ids,
+	.name =		"wacom",
+	.probe =	wacom_probe,
+	.disconnect =	wacom_disconnect,
+	.id_table =	wacom_ids,
 };
 
 static int __init wacom_init(void)

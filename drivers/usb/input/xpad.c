@@ -304,10 +304,10 @@ static void xpad_disconnect(struct usb_device *udev, void *ptr)
 }
 
 static struct usb_driver xpad_driver = {
-	name:       "xpad",
-	probe:      xpad_probe,
-	disconnect: xpad_disconnect,
-	id_table:   xpad_table,
+	.name =     "xpad",
+	.probe =    xpad_probe,
+	.disconnect = xpad_disconnect,
+	.id_table = xpad_table,
 };
 
 static int __init usb_xpad_init(void)

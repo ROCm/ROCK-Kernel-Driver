@@ -91,10 +91,10 @@ static void usb_pwc_disconnect(struct usb_device *udev, void *ptr);
 
 static struct usb_driver pwc_driver =
 {
-	name:			"Philips webcam",	/* name */
-	id_table:		pwc_device_table,
-	probe:			usb_pwc_probe,		/* probe() */
-	disconnect:		usb_pwc_disconnect,	/* disconnect() */
+	.name =			"Philips webcam",	/* name */
+	.id_table =		pwc_device_table,
+	.probe =		usb_pwc_probe,		/* probe() */
+	.disconnect =		usb_pwc_disconnect,	/* disconnect() */
 };
 
 #define MAX_DEV_HINTS 10
@@ -130,21 +130,21 @@ static int  pwc_video_ioctl(struct inode *inode, struct file *file,
 static int  pwc_video_mmap(struct file *file, struct vm_area_struct *vma);
 
 static struct file_operations pwc_fops = {
-	owner:		THIS_MODULE,
-	open:		pwc_video_open,
-	release:       	pwc_video_close,
-	read:		pwc_video_read,
-	poll:		pwc_video_poll,
-	mmap:		pwc_video_mmap,
-	ioctl:          pwc_video_ioctl,
-	llseek:         no_llseek,
+	.owner =	THIS_MODULE,
+	.open =		pwc_video_open,
+	.release =     	pwc_video_close,
+	.read =		pwc_video_read,
+	.poll =		pwc_video_poll,
+	.mmap =		pwc_video_mmap,
+	.ioctl =        pwc_video_ioctl,
+	.llseek =       no_llseek,
 };
 static struct video_device pwc_template = {
-	owner:		THIS_MODULE,
-	name:		"Philips Webcam",	/* Filled in later */
-	type:		VID_TYPE_CAPTURE,
-	hardware:	VID_HARDWARE_PWC,
-	fops:           &pwc_fops,
+	.owner =	THIS_MODULE,
+	.name =		"Philips Webcam",	/* Filled in later */
+	.type =		VID_TYPE_CAPTURE,
+	.hardware =	VID_HARDWARE_PWC,
+	.fops =         &pwc_fops,
 };
 
 /***************************************************************************/

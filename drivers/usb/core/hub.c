@@ -1079,11 +1079,11 @@ static struct usb_device_id hub_id_table [] = {
 MODULE_DEVICE_TABLE (usb, hub_id_table);
 
 static struct usb_driver hub_driver = {
-	name:		"hub",
-	probe:		hub_probe,
-	ioctl:		hub_ioctl,
-	disconnect:	hub_disconnect,
-	id_table:	hub_id_table,
+	.name =		"hub",
+	.probe =	hub_probe,
+	.ioctl =	hub_ioctl,
+	.disconnect =	hub_disconnect,
+	.id_table =	hub_id_table,
 };
 
 /*

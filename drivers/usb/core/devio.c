@@ -324,9 +324,9 @@ static void driver_disconnect(struct usb_device *dev, void *context)
 }
 
 struct usb_driver usbdevfs_driver = {
-	name:		"usbfs",
-	probe:		driver_probe,
-	disconnect:	driver_disconnect,
+	.name =		"usbfs",
+	.probe =	driver_probe,
+	.disconnect =	driver_disconnect,
 };
 
 static int claimintf(struct dev_state *ps, unsigned int intf)
@@ -1256,10 +1256,10 @@ static unsigned int usbdev_poll(struct file *file, struct poll_table_struct *wai
 }
 
 struct file_operations usbdevfs_device_file_operations = {
-	llseek:		usbdev_lseek,
-	read:		usbdev_read,
-	poll:		usbdev_poll,
-	ioctl:		usbdev_ioctl,
-	open:		usbdev_open,
-	release:	usbdev_release,
+	.llseek =	usbdev_lseek,
+	.read =		usbdev_read,
+	.poll =		usbdev_poll,
+	.ioctl =	usbdev_ioctl,
+	.open =		usbdev_open,
+	.release =	usbdev_release,
 };

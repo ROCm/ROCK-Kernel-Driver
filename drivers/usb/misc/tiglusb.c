@@ -295,13 +295,13 @@ static int tiglusb_ioctl (struct inode *inode, struct file *file,
 /* ----- kernel module registering ------------------------------------ */
 
 static struct file_operations tiglusb_fops = {
-	owner:		THIS_MODULE,
-	llseek:		no_llseek,
-	read:		tiglusb_read,
-	write:		tiglusb_write,
-	ioctl:		tiglusb_ioctl,
-	open:		tiglusb_open,
-	release:	tiglusb_release,
+	.owner =	THIS_MODULE,
+	.llseek =	no_llseek,
+	.read =		tiglusb_read,
+	.write =	tiglusb_write,
+	.ioctl =	tiglusb_ioctl,
+	.open =		tiglusb_open,
+	.release =	tiglusb_release,
 };
 
 static int tiglusb_find_struct (void)
@@ -407,11 +407,11 @@ static struct usb_device_id tiglusb_ids[] = {
 MODULE_DEVICE_TABLE (usb, tiglusb_ids);
 
 static struct usb_driver tiglusb_driver = {
-	owner:		THIS_MODULE,
-	name:		"tiglusb",
-	probe:		tiglusb_probe,
-	disconnect:	tiglusb_disconnect,
-	id_table:	tiglusb_ids,
+	.owner =	THIS_MODULE,
+	.name =		"tiglusb",
+	.probe =	tiglusb_probe,
+	.disconnect =	tiglusb_disconnect,
+	.id_table =	tiglusb_ids,
 };
 
 /* --- initialisation code ------------------------------------- */

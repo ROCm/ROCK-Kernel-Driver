@@ -65,8 +65,8 @@ static int usb_open(struct inode * inode, struct file * file)
 }
 
 static struct file_operations usb_fops = {
-	owner:		THIS_MODULE,
-	open:		usb_open,
+	.owner =	THIS_MODULE,
+	.open =		usb_open,
 };
 
 int usb_major_init(void)

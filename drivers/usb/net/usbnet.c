@@ -296,12 +296,12 @@ MODULE_PARM_DESC (msg_level, "Initial message level (default = 1)");
  *-------------------------------------------------------------------------*/
 
 static const struct driver_info	an2720_info = {
-	description:	"AnchorChips/Cypress 2720",
+	.description =	"AnchorChips/Cypress 2720",
 	// no reset available!
 	// no check_connect available!
 
-	in: 2, out: 2,		// direction distinguishes these
-	epsize:	64,
+	.in = 2, out: 2,		// direction distinguishes these
+	.epsize =64,
 };
 
 #endif	/* CONFIG_USB_AN2720 */
@@ -319,10 +319,10 @@ static const struct driver_info	an2720_info = {
  *-------------------------------------------------------------------------*/
 
 static const struct driver_info	belkin_info = {
-	description:	"Belkin, eTEK, or compatible",
+	.description =	"Belkin, eTEK, or compatible",
 
-	in: 1, out: 1,		// direction distinguishes these
-	epsize:	64,
+	.in = 1, out: 1,		// direction distinguishes these
+	.epsize =64,
 };
 
 #endif	/* CONFIG_USB_BELKIN */
@@ -630,17 +630,17 @@ genelink_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 }
 
 static const struct driver_info	genelink_info = {
-	description:	"Genesys GeneLink",
-	flags:		FLAG_FRAMING_GL | FLAG_NO_SETINT,
-	reset:		genelink_reset,
-	rx_fixup:	genelink_rx_fixup,
-	tx_fixup:	genelink_tx_fixup,
+	.description =	"Genesys GeneLink",
+	.flags =	FLAG_FRAMING_GL | FLAG_NO_SETINT,
+	.reset =	genelink_reset,
+	.rx_fixup =	genelink_rx_fixup,
+	.tx_fixup =	genelink_tx_fixup,
 
-	in: 1, out: 2,
-	epsize:	64,
+	.in = 1, out: 2,
+	.epsize =64,
 
 #ifdef	GENELINK_ACK
-	check_connect:	genelink_check_connect,
+	.check_connect =genelink_check_connect,
 #endif
 };
 
@@ -671,11 +671,11 @@ static int linuxdev_check_connect (struct usbnet *dev)
 }
 
 static const struct driver_info	linuxdev_info = {
-	description:	"Linux Device",
+	.description =	"Linux Device",
 	// no reset defined (yet?)
-	check_connect:	linuxdev_check_connect,
-	in: 2, out: 1,
-	epsize:	64,
+	.check_connect =linuxdev_check_connect,
+	.in = 2, out: 1,
+	.epsize =64,
 };
 
 #endif	/* CONFIG_USB_LINUXDEV */
@@ -1118,15 +1118,15 @@ net1080_tx_fixup (struct usbnet *dev, struct sk_buff *skb, int flags)
 }
 
 static const struct driver_info	net1080_info = {
-	description:	"NetChip TurboCONNECT",
-	flags:		FLAG_FRAMING_NC,
-	reset:		net1080_reset,
-	check_connect:	net1080_check_connect,
-	rx_fixup:	net1080_rx_fixup,
-	tx_fixup:	net1080_tx_fixup,
+	.description =	"NetChip TurboCONNECT",
+	.flags =	FLAG_FRAMING_NC,
+	.reset =	net1080_reset,
+	.check_connect =net1080_check_connect,
+	.rx_fixup =	net1080_rx_fixup,
+	.tx_fixup =	net1080_tx_fixup,
 
-	in: 1, out: 1,		// direction distinguishes these
-	epsize:	64,
+	.in = 1, out: 1,		// direction distinguishes these
+	.epsize =64,
 };
 
 #endif /* CONFIG_USB_NET1080 */
@@ -1187,13 +1187,13 @@ static int pl_reset (struct usbnet *dev)
 }
 
 static const struct driver_info	prolific_info = {
-	description:	"Prolific PL-2301/PL-2302",
-	flags:		FLAG_NO_SETINT,
+	.description =	"Prolific PL-2301/PL-2302",
+	.flags =	FLAG_NO_SETINT,
 		/* some PL-2302 versions seem to fail usb_set_interface() */
-	reset:		pl_reset,
+	.reset =	pl_reset,
 
-	in: 3, out: 2,
-	epsize:	64,
+	.in = 3, out: 2,
+	.epsize =64,
 };
 
 #endif /* CONFIG_USB_PL2301 */
@@ -2048,32 +2048,32 @@ static const struct usb_device_id	products [] = {
 #ifdef	CONFIG_USB_AN2720
 {
 	USB_DEVICE (0x0547, 0x2720),	// AnchorChips defaults
-	driver_info:	(unsigned long) &an2720_info,
+	.driver_info =	(unsigned long) &an2720_info,
 },
 
 {
 	USB_DEVICE (0x0547, 0x2727),	// Xircom PGUNET
-	driver_info:	(unsigned long) &an2720_info,
+	.driver_info =	(unsigned long) &an2720_info,
 },
 #endif
 
 #ifdef	CONFIG_USB_BELKIN
 {
 	USB_DEVICE (0x050d, 0x0004),	// Belkin
-	driver_info:	(unsigned long) &belkin_info,
+	.driver_info =	(unsigned long) &belkin_info,
 }, {
 	USB_DEVICE (0x056c, 0x8100),	// eTEK
-	driver_info:	(unsigned long) &belkin_info,
+	.driver_info =	(unsigned long) &belkin_info,
 }, {
 	USB_DEVICE (0x0525, 0x9901),	// Advance USBNET (eTEK)
-	driver_info:	(unsigned long) &belkin_info,
+	.driver_info =	(unsigned long) &belkin_info,
 },
 #endif
 
 #ifdef	CONFIG_USB_GENESYS
 {
 	USB_DEVICE (0x05e3, 0x0502),	// GL620USB-A
-	driver_info:	(unsigned long) &genelink_info,
+	.driver_info =	(unsigned long) &genelink_info,
 },
 #endif
 
@@ -2085,28 +2085,28 @@ static const struct usb_device_id	products [] = {
 {
 	// 1183 = 0x049F, both used as hex values?
 	USB_DEVICE (0x049F, 0x505A),	// Compaq "Itsy"
-	driver_info:	(unsigned long) &linuxdev_info,
+	.driver_info =	(unsigned long) &linuxdev_info,
 },
 #endif
 
 #ifdef	CONFIG_USB_NET1080
 {
 	USB_DEVICE (0x0525, 0x1080),	// NetChip ref design
-	driver_info:	(unsigned long) &net1080_info,
+	.driver_info =	(unsigned long) &net1080_info,
 },
 {
 	USB_DEVICE (0x06D0, 0x0622),	// Laplink Gold
-	driver_info:	(unsigned long) &net1080_info,
+	.driver_info =	(unsigned long) &net1080_info,
 },
 #endif
 
 #ifdef CONFIG_USB_PL2301
 {
 	USB_DEVICE (0x067b, 0x0000),	// PL-2301
-	driver_info:	(unsigned long) &prolific_info,
+	.driver_info =	(unsigned long) &prolific_info,
 }, {
 	USB_DEVICE (0x067b, 0x0001),	// PL-2302
-	driver_info:	(unsigned long) &prolific_info,
+	.driver_info =	(unsigned long) &prolific_info,
 },
 #endif
 
@@ -2117,10 +2117,10 @@ static const struct usb_device_id	products [] = {
 MODULE_DEVICE_TABLE (usb, products);
 
 static struct usb_driver usbnet_driver = {
-	name:		driver_name,
-	id_table:	products,
-	probe:		usbnet_probe,
-	disconnect:	usbnet_disconnect,
+	.name =		driver_name,
+	.id_table =	products,
+	.probe =	usbnet_probe,
+	.disconnect =	usbnet_disconnect,
 };
 
 /*-------------------------------------------------------------------------*/

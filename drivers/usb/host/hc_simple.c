@@ -343,11 +343,11 @@ static int hci_get_current_frame_number (struct usb_device *usb_dev)
  **************************************************************************/
 
 static struct usb_operations hci_device_operations = {
-	allocate:		hci_alloc_dev,
-	deallocate:		hci_free_dev,
-	get_frame_number:	hci_get_current_frame_number,
-	submit_urb:		hci_submit_urb,
-	unlink_urb:		hci_unlink_urb,
+	.allocate =		hci_alloc_dev,
+	.deallocate =		hci_free_dev,
+	.get_frame_number =	hci_get_current_frame_number,
+	.submit_urb =		hci_submit_urb,
+	.unlink_urb =		hci_unlink_urb,
 };
 
 /***************************************************************************

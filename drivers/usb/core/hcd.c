@@ -1240,11 +1240,11 @@ static int hcd_free_dev (struct usb_device *udev)
  * bus glue for non-PCI system busses will need to use this.
  */
 struct usb_operations usb_hcd_operations = {
-	allocate:		hcd_alloc_dev,
-	get_frame_number:	hcd_get_frame_number,
-	submit_urb:		hcd_submit_urb,
-	unlink_urb:		hcd_unlink_urb,
-	deallocate:		hcd_free_dev,
+	.allocate =		hcd_alloc_dev,
+	.get_frame_number =	hcd_get_frame_number,
+	.submit_urb =		hcd_submit_urb,
+	.unlink_urb =		hcd_unlink_urb,
+	.deallocate =		hcd_free_dev,
 };
 EXPORT_SYMBOL (usb_hcd_operations);
 
