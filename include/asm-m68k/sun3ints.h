@@ -21,6 +21,8 @@
 #include <asm/intersil.h>
 #include <asm/oplib.h>
 
+#define SUN3_INT_VECS 192
+
 void sun3_enable_irq(unsigned int irq);
 void sun3_disable_irq(unsigned int irq);
 int sun3_request_irq(unsigned int irq,
