@@ -1069,7 +1069,6 @@ int ide_register_subdriver(struct ata_device *drive, struct ata_operations *driv
 
 	}
 	drive->revalidate = 1;
-	drive->suspend_reset = 0;
 
 	return 0;
 }
