@@ -62,58 +62,6 @@ config	IP_VS_TAB_BITS
 	  each hash entry uses 8 bytes, so you can estimate how much memory is
 	  needed for your box.
 
-choice
-	prompt "IPVS connection hash function"
-	default IP_VS_HASH_JENKINS
-	---help---
-	  IPVS connection hash function is used to hash IPVS connection
-	  entries. It takes the protocol, client address and port number
-	  <proto, addr, port> (in network order) to compute hash key. 
-	  Here you need to choose a hash function to compute hash key.
-	  The Jenkins hash is recommended by default.
-
-config	IP_VS_HASH_SHIFTXOR
-	bool "SHIFTXOR"
-	---help---
-	  The SHIFTXOR hash function is to compute key in the following way:
-	          key = ntohl(addr) + ip_vs_conn_rnd;
-	          key ^= (key >> IP_VS_CONN_TAB_BITS);
-	          key ^= (key >> 23);
-	          key = proto ^ key ^ ntohs(port)) & IP_VS_CONN_TAB_MASK;
-
-	  The random value ip_vs_conn_rnd is introduced to prevent from
-	  hash attack.
-
-config	IP_VS_HASH_GOLDENRATIO
-	bool "GOLDENRATIO"
-	---help---
-	  In Knuth's "The Art of Computer Programming", section 6.4, a
-	  multiplicative hashing scheme is introduced as a way to write hash
-	  function. The key is multiplied by the golden ratio of 2^32
-	  (2654435761) to produce a hash result. Note that 2654435761 is
-	  also a prime number.
-
-	  The GOLDENRATIO hash function is to compute connection hash key
-	  in the following way:
-	          key = ip_vs_conn_rnd ^ (proto + addr + port);
-	          key = ((key * 2654435761) >> (31 - IP_VS_CONN_TAB_BITS))
-	                & IP_VS_CONN_TAB_MASK;
-
-config	IP_VS_HASH_JENKINS
-	bool "JENKINS"
-	---help---
-	  The Jenkins hash support is included in the Linux kernel, the
-	  header file is at linux/include/jhash.h. You can read the
-	  http://burtleburtle.net/bob/hash/index.html for more information
-	  about the Jenkins hash.
-
-	  The Jenkins hash function is used to compute connection hash key
-	  in the following way:
-	          key = jhash_3words(addr, port, proto, ip_vs_conn_rnd)
-	                & IP_VS_CONN_TAB_MASK;
-
-endchoice
-
 comment "IPVS transport protocol load balancing support"
         depends on IP_VS
 

@@ -31,6 +31,7 @@
 #include <linux/vmalloc.h>
 #include <linux/proc_fs.h>		/* for proc_net_* */
 #include <linux/jhash.h>
+#include <linux/random.h>
 
 #include <net/ip_vs.h>
 
@@ -112,24 +113,10 @@ static inline void ct_write_unlock_bh(unsigned key)
 /*
  *	Returns hash value for IPVS connection entry
  */
-static inline unsigned
-ip_vs_conn_hashkey(unsigned proto, __u32 addr, __u16 port)
+static unsigned int ip_vs_conn_hashkey(unsigned proto, __u32 addr, __u16 port)
 {
-#ifdef CONFIG_IP_VS_HASH_SHIFTXOR
-	unsigned key = ntohl(addr) + ip_vs_conn_rnd;
-
-	key ^= (key >> IP_VS_CONN_TAB_BITS);
-	key ^= (key >> 23);
-	return (proto ^ key ^ ntohs(port)) & IP_VS_CONN_TAB_MASK;
-#endif
-#ifdef CONFIG_IP_VS_HASH_GOLDENRATIO
-	return (((ip_vs_conn_rnd ^ (proto + addr + port)) * 2654435761UL)
-		>> (31 - IP_VS_CONN_TAB_BITS)) & IP_VS_CONN_TAB_MASK;
-#endif
-#ifdef CONFIG_IP_VS_HASH_JENKINS
 	return jhash_3words(addr, port, proto, ip_vs_conn_rnd)
 		& IP_VS_CONN_TAB_MASK;
-#endif
 }
 
 
@@ -865,9 +852,7 @@ int ip_vs_conn_init(void)
 	proc_net_create("ip_vs_conn", 0, ip_vs_conn_getinfo);
 
 	/* calculate the random value for connection hash */
-	ip_vs_conn_rnd =
-		jhash_3words((u32) jiffies, (u32) ip_vs_conn_tab,
-			     net_random(), IP_VS_CONN_TAB_SIZE);
+	get_random_bytes(&ip_vs_conn_rnd, sizeof(ip_vs_conn_rnd));
 
 	return 0;
 }
