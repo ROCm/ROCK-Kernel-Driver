@@ -2583,10 +2583,10 @@ int acornscsi_queuecmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	    done(SCpnt);
 	    return 0;
 	}
-	save_flags_cli(flags);
+	local_irq_save(flags);
 	if (host->scsi.phase == PHASE_IDLE)
 	    acornscsi_kick(host);
-	restore_flags(flags);
+	local_irq_restore(flags);
     }
     return 0;
 }
