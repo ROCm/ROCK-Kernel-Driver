@@ -43,12 +43,10 @@
 #include <scsi/scsi.h>
 #include <linux/major.h>
 #include <linux/blk.h>
-
-#include <../drivers/scsi/scsi.h>
-#include <../drivers/scsi/hosts.h>
 #include <scsi/scsi_ioctl.h>
 
-#include <../drivers/scsi/qlogicfas.h>
+#include "scsi.h"
+#include "hosts.h"
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
