@@ -623,8 +623,8 @@ GLOBAL_ENTRY(ia64_ret_from_syscall)
 	adds r2=PT(R8)+16,sp			// r2 = &pt_regs.r8
 	adds r3=PT(R10)+16,sp			// r3 = &pt_regs.r10
 	;;
-.mem.offset 0,0; (p6) st8.spill [r2]=r8	// store return value in slot for r8 and set unat bit
-.mem.offset 8,0; (p6) st8.spill [r3]=r0	// clear error indication in slot for r10 and set unat bit
+(p6)	st8 [r2]=r8				// store return value in slot for r8
+(p6)	st8 [r3]=r0				// clear error indication in slot for r10
 (p7)	br.cond.spnt handle_syscall_error	// handle potential syscall failure
 END(ia64_ret_from_syscall)
 	// fall through
@@ -718,16 +718,16 @@ ENTRY(ia64_leave_syscall)
 (p6)	br.cond.spnt .work_pending
 	;;
 	// start restoring the state saved on the kernel stack (struct pt_regs):
-	ld8.fill r8=[r2],16
-	ld8.fill r9=[r3],16
+	ld8 r8=[r2],16
+	ld8 r9=[r3],16
 	mov f6=f0		// clear f6
 	;;
 	invala			// M0|1 invalidate ALAT
 	rsm psr.i | psr.ic	// M2 initiate turning off of interrupt and interruption collection
 	mov f9=f0		// clear f9
 
-	ld8.fill r10=[r2],16
-	ld8.fill r11=[r3],16
+	ld8 r10=[r2],16
+	ld8 r11=[r3],16
 	mov f7=f0		// clear f7
 	;;
 	ld8 r29=[r2],16		// load cr.ipsr
@@ -1144,8 +1144,8 @@ ENTRY(handle_syscall_error)
 (p6)	mov r9=r8
 (p6)	mov r10=0
 	;;
-.mem.offset 0,0; st8.spill [r2]=r9	// store errno in pt_regs.r8 and set unat bit
-.mem.offset 8,0; st8.spill [r3]=r10	// store error indication in pt_regs.r10 and set unat bit
+	st8 [r2]=r9		// store errno in pt_regs.r8
+	st8 [r3]=r10		// store error indication in pt_regs.r10
 	br.cond.sptk ia64_leave_syscall
 END(handle_syscall_error)
 
