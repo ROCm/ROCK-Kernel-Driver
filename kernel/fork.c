@@ -26,6 +26,7 @@
 #include <linux/binfmts.h>
 #include <linux/mman.h>
 #include <linux/fs.h>
+#include <linux/cpu.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
 #include <linux/jiffies.h>
@@ -1196,8 +1197,15 @@ long do_fork(unsigned long clone_flags,
 				wake_up_forked_thread(p);
 			else
 				wake_up_forked_process(p);
-		} else
+		} else {
+			int cpu = get_cpu();
+
 			p->state = TASK_STOPPED;
+			if (cpu_is_offline(task_cpu(p)))
+				set_task_cpu(p, cpu);
+
+			put_cpu();
+		}
 		++total_forks;
 
 		if (unlikely (trace)) {

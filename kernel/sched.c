@@ -331,7 +331,6 @@ static void enqueue_task(struct task_struct *p, prio_array_t *array)
 	p->array = array;
 }
 
-#ifdef CONFIG_SMP
 /*
  * Used by the migration code - we pull tasks from the head of the
  * remote queue so we want these tasks to show up at the head of the
@@ -344,7 +343,6 @@ static inline void enqueue_task_head(struct task_struct *p, prio_array_t *array)
 	array->nr_active++;
 	p->array = array;
 }
-#endif
 
 /*
  * effective_prio - return the priority that is based on the static
@@ -383,6 +381,15 @@ static int effective_prio(task_t *p)
 static inline void __activate_task(task_t *p, runqueue_t *rq)
 {
 	enqueue_task(p, rq->active);
+	rq->nr_running++;
+}
+
+/*
+ * __activate_idle_task - move idle task to the _front_ of runqueue.
+ */
+static inline void __activate_idle_task(task_t *p, runqueue_t *rq)
+{
+	enqueue_task_head(p, rq->active);
 	rq->nr_running++;
 }
 
@@ -749,7 +756,7 @@ static int try_to_wake_up(task_t * p, unsigned int state, int sync)
 	this_cpu = smp_processor_id();
 
 #ifdef CONFIG_SMP
-	if (unlikely(task_running(rq, p) || cpu_is_offline(this_cpu)))
+	if (unlikely(task_running(rq, p)))
 		goto out_activate;
 
 	new_cpu = cpu;
@@ -1781,9 +1788,6 @@ static inline void idle_balance(int this_cpu, runqueue_t *this_rq)
 {
 	struct sched_domain *sd;
 
-	if (unlikely(cpu_is_offline(this_cpu)))
-		return;
-
 	for_each_domain(this_cpu, sd) {
 		if (sd->flags & SD_BALANCE_NEWIDLE) {
 			if (load_balance_newidle(this_cpu, this_rq, sd)) {
@@ -1870,9 +1874,6 @@ static void rebalance_tick(int this_cpu, runqueue_t *this_rq,
 	unsigned long old_load, this_load;
 	unsigned long j = jiffies + CPU_OFFSET(this_cpu);
 	struct sched_domain *sd;
-
-	if (unlikely(cpu_is_offline(this_cpu)))
-		return;
 
 	/* Update our load */
 	old_load = this_rq->cpu_load;
@@ -3325,18 +3326,19 @@ EXPORT_SYMBOL_GPL(set_cpus_allowed);
  * So we race with normal scheduler movements, but that's OK, as long
  * as the task is no longer on this CPU.
  */
-static void __migrate_task(struct task_struct *p, int dest_cpu)
+static void __migrate_task(struct task_struct *p, int src_cpu, int dest_cpu)
 {
-	runqueue_t *rq_dest;
+	runqueue_t *rq_dest, *rq_src;
 
 	if (unlikely(cpu_is_offline(dest_cpu)))
 		return;
 
+	rq_src  = cpu_rq(src_cpu);
 	rq_dest = cpu_rq(dest_cpu);
 
-	double_rq_lock(this_rq(), rq_dest);
+	double_rq_lock(rq_src, rq_dest);
 	/* Already moved. */
-	if (task_cpu(p) != smp_processor_id())
+	if (task_cpu(p) != src_cpu)
 		goto out;
 	/* Affinity changed (again). */
 	if (!cpu_isset(dest_cpu, p->cpus_allowed))
@@ -3344,7 +3346,7 @@ static void __migrate_task(struct task_struct *p, int dest_cpu)
 
 	set_task_cpu(p, dest_cpu);
 	if (p->array) {
-		deactivate_task(p, this_rq());
+		deactivate_task(p, rq_src);
 		activate_task(p, rq_dest);
 		if (TASK_PREEMPTS_CURR(p, rq_dest))
 			resched_task(rq_dest->curr);
@@ -3352,7 +3354,7 @@ static void __migrate_task(struct task_struct *p, int dest_cpu)
 	p->timestamp = rq_dest->timestamp_last_tick;
 
 out:
-	double_rq_unlock(this_rq(), rq_dest);
+	double_rq_unlock(rq_src, rq_dest);
 }
 
 /*
@@ -3376,6 +3378,12 @@ static int migration_thread(void * data)
 			refrigerator(PF_FREEZE);
 
 		spin_lock_irq(&rq->lock);
+
+		if (cpu_is_offline(cpu)) {
+			spin_unlock_irq(&rq->lock);
+			goto wait_to_die;
+		}
+
 		if (rq->active_balance) {
 			active_load_balance(rq, cpu);
 			rq->active_balance = 0;
@@ -3394,7 +3402,8 @@ static int migration_thread(void * data)
 
 		if (req->type == REQ_MOVE_TASK) {
 			spin_unlock(&rq->lock);
-			__migrate_task(req->task, req->dest_cpu);
+			__migrate_task(req->task, smp_processor_id(),
+					req->dest_cpu);
 			local_irq_enable();
 		} else if (req->type == REQ_SET_DOMAIN) {
 			rq->sd = req->sd;
@@ -3407,23 +3416,27 @@ static int migration_thread(void * data)
 		complete(&req->done);
 	}
 	return 0;
+
+wait_to_die:
+	/* Wait for kthread_stop */
+	set_current_state(TASK_INTERRUPTIBLE);
+	while (!kthread_should_stop()) {
+		schedule();
+		set_current_state(TASK_INTERRUPTIBLE);
+	}
+	__set_current_state(TASK_RUNNING);
+	return 0;
 }
 
 #ifdef CONFIG_HOTPLUG_CPU
-/* migrate_all_tasks - function to migrate all the tasks from the
- * current cpu caller must have already scheduled this to the target
- * cpu via set_cpus_allowed.  Machine is stopped.  */
-void migrate_all_tasks(void)
+/* migrate_all_tasks - function to migrate all tasks from the dead cpu.  */
+static void migrate_all_tasks(int src_cpu)
 {
 	struct task_struct *tsk, *t;
-	int dest_cpu, src_cpu;
+	int dest_cpu;
 	unsigned int node;
 
-	/* We're nailed to this CPU. */
-	src_cpu = smp_processor_id();
-
-	/* Not required, but here for neatness. */
-	write_lock(&tasklist_lock);
+	write_lock_irq(&tasklist_lock);
 
 	/* watch out for per node tasks, let's stay on this node */
 	node = cpu_to_node(src_cpu);
@@ -3459,10 +3472,36 @@ void migrate_all_tasks(void)
 				       tsk->pid, tsk->comm, src_cpu);
 		}
 
-		__migrate_task(tsk, dest_cpu);
+		__migrate_task(tsk, src_cpu, dest_cpu);
 	} while_each_thread(t, tsk);
 
-	write_unlock(&tasklist_lock);
+	write_unlock_irq(&tasklist_lock);
+}
+
+/* Schedules idle task to be the next runnable task on current CPU.
+ * It does so by boosting its priority to highest possible and adding it to
+ * the _front_ of runqueue. Used by CPU offline code.
+ */
+void sched_idle_next(void)
+{
+	int cpu = smp_processor_id();
+	runqueue_t *rq = this_rq();
+	struct task_struct *p = rq->idle;
+	unsigned long flags;
+
+	/* cpu has to be offline */
+	BUG_ON(cpu_online(cpu));
+
+	/* Strictly not necessary since rest of the CPUs are stopped by now
+	 * and interrupts disabled on current cpu.
+	 */
+	spin_lock_irqsave(&rq->lock, flags);
+
+	__setscheduler(p, SCHED_FIFO, MAX_RT_PRIO-1);
+	/* Add idle task to _front_ of it's priority queue */
+	__activate_idle_task(p, rq);
+
+	spin_unlock_irqrestore(&rq->lock, flags);
 }
 #endif /* CONFIG_HOTPLUG_CPU */
 
@@ -3498,11 +3537,20 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 	case CPU_UP_CANCELED:
 		/* Unbind it from offline cpu so it can run.  Fall thru. */
 		kthread_bind(cpu_rq(cpu)->migration_thread,smp_processor_id());
+		kthread_stop(cpu_rq(cpu)->migration_thread);
+		cpu_rq(cpu)->migration_thread = NULL;
+		break;
 	case CPU_DEAD:
+		migrate_all_tasks(cpu);
 		rq = cpu_rq(cpu);
 		kthread_stop(rq->migration_thread);
 		rq->migration_thread = NULL;
-		BUG_ON(rq->nr_running != 0);
+		/* Idle task back to normal (off runqueue, low prio) */
+		rq = task_rq_lock(rq->idle, &flags);
+		deactivate_task(rq->idle, rq);
+		__setscheduler(rq->idle, SCHED_NORMAL, MAX_PRIO);
+		task_rq_unlock(rq, &flags);
+ 		BUG_ON(rq->nr_running != 0);
 
 		/* No need to migrate the tasks: it was best-effort if
 		 * they didn't do lock_cpu_hotplug().  Just wake up
@@ -3523,8 +3571,12 @@ static int migration_call(struct notifier_block *nfb, unsigned long action,
 	return NOTIFY_OK;
 }
 
+/* Register at highest priority so that task migration (migrate_all_tasks)
+ * happens before everything else.
+ */
 static struct notifier_block __devinitdata migration_notifier = {
 	.notifier_call = migration_call,
+	.priority = 10
 };
 
 int __init migration_init(void)
