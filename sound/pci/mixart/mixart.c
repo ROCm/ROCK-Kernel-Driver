@@ -460,8 +460,6 @@ static int mixart_sync_nonblock_events(mixart_mgr_t *mgr)
 
 /*
  *  prepare callback for all pcms
- *
- *  NOTE: this callback is non-atomic (pcm->info_flags |= SNDRV_PCM_INFO_NONATOMIC_OPS)
  */
 static int snd_mixart_prepare(snd_pcm_substream_t *subs)
 {
@@ -939,7 +937,7 @@ static int snd_mixart_pcm_analog(mixart_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_mixart_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_mixart_capture_ops);
 
-	pcm->info_flags = SNDRV_PCM_INFO_NONATOMIC_OPS;
+	pcm->info_flags = 0;
 	strcpy(pcm->name, name);
 
 	preallocate_buffers(chip, pcm);
@@ -970,7 +968,7 @@ static int snd_mixart_pcm_digital(mixart_t *chip)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_mixart_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_mixart_capture_ops);
 
-	pcm->info_flags = SNDRV_PCM_INFO_NONATOMIC_OPS;
+	pcm->info_flags = 0;
 	strcpy(pcm->name, name);
 
 	preallocate_buffers(chip, pcm);
