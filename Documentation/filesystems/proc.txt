@@ -380,9 +380,7 @@ Mapped:         280372 kB
 Slab:           684068 kB
 CommitLimit:   7669796 kB
 Committed_AS:   100056 kB
-CommitAvail:   7569740 kB
 PageTables:      24448 kB
-ReverseMaps:   1080904
 VmallocTotal:   112216 kB
 VmallocUsed:       428 kB
 VmallocChunk:   111088 kB
@@ -446,20 +444,8 @@ Committed_AS: The amount of memory presently allocated on the system.
               above) will not be permitted. This is useful if one needs
               to guarantee that processes will not fail due to lack of
               memory once that memory has been successfully allocated.
- CommitAvail: Based on the current overcommit ratio
-              ('vm.overcommit_ratio'), this is the amount of memory
-              currently available to be allocated under the overcommit
-              limit (the CommitLimit above). This is calculated as:
-              CommitAvail = CommitLimit - Committed_AS
-              This limit is only enforced if strict overcommit accounting
-              is enabled (mode 2 in 'vm.overcommit_memory'). CommitAvail
-              may be a negative number if strict accounting is not enabled
-              and the system's memory is currently overcommitted.
-              For more details, see the memory overcommit documentation
-              in vm/overcommit-accounting.
   PageTables: amount of memory dedicated to the lowest level of page
               tables.
- ReverseMaps: number of reverse mappings performed
 VmallocTotal: total size of vmalloc memory area
  VmallocUsed: amount of vmalloc area which is used
 VmallocChunk: largest contigious block of vmalloc area which is free

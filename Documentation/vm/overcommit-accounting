@@ -22,9 +22,8 @@ The overcommit policy is set via the sysctl `vm.overcommit_memory'.
 
 The overcommit percentage is set via `vm.overcommit_ratio'.
 
-The current overcommit limit, amount used, and amount remaining below
-the limit are viewable in /proc/meminfo as CommitLimit, Committed_AS, and
-CommitAvail respectively.
+The current overcommit limit and amount committed are viewable in
+/proc/meminfo as CommitLimit and Committed_AS respectively.
 
 Gotchas
 -------
