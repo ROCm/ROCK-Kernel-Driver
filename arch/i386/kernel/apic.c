@@ -713,7 +713,15 @@ void __init init_apic_mappings(void)
 		for (i = 0; i < nr_ioapics; i++) {
 			if (smp_found_config) {
 				ioapic_phys = mp_ioapics[i].mpc_apicaddr;
+				if (!ioapic_phys) {
+					printk(KERN_ERR "WARNING: bogus zero IO-APIC address found in MPTABLE, disabling IO/APIC support!\n");
+
+					smp_found_config = 0;
+					skip_ioapic_setup = 1;
+					goto fake_ioapic_page;
+				}
 			} else {
+fake_ioapic_page:
 				ioapic_phys = (unsigned long) alloc_bootmem_pages(PAGE_SIZE);
 				ioapic_phys = __pa(ioapic_phys);
 			}
