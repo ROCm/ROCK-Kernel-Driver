@@ -23,8 +23,6 @@ struct kioctx;
 
 #define KIOCB_SYNC_KEY		(~0U)
 
-#define KIOCB_PRIVATE_SIZE	(24 * sizeof(long))
-
 /* ki_flags bits */
 #define KIF_LOCKED		0
 #define KIF_KICKED		1
@@ -55,6 +53,7 @@ struct kiocb {
 	struct kioctx		*ki_ctx;	/* may be NULL for sync ops */
 	int			(*ki_cancel)(struct kiocb *, struct io_event *);
 	long			(*ki_retry)(struct kiocb *);
+	void			(*ki_dtor)(struct kiocb *);
 
 	struct list_head	ki_list;	/* the aio core uses this
 						 * for cancellation */
@@ -65,8 +64,7 @@ struct kiocb {
 	} ki_obj;
 	__u64			ki_user_data;	/* user's data for completion */
 	loff_t			ki_pos;
-
-	char			private[KIOCB_PRIVATE_SIZE];
+	void			*private;
 };
 
 #define is_sync_kiocb(iocb)	((iocb)->ki_key == KIOCB_SYNC_KEY)
@@ -79,6 +77,7 @@ struct kiocb {
 		(x)->ki_filp = (filp);			\
 		(x)->ki_ctx = &tsk->active_mm->default_kioctx;	\
 		(x)->ki_cancel = NULL;			\
+		(x)->ki_dtor = NULL;			\
 		(x)->ki_obj.tsk = tsk;			\
 	} while (0)
 

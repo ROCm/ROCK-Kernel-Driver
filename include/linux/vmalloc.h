@@ -36,6 +36,8 @@ extern void vunmap(void *addr);
  *	Lowlevel-APIs (not for driver use!)
  */
 extern struct vm_struct *get_vm_area(unsigned long size, unsigned long flags);
+extern struct vm_struct *__get_vm_area(unsigned long size, unsigned long flags,
+					unsigned long start, unsigned long end);
 extern struct vm_struct *remove_vm_area(void *addr);
 extern int map_vm_area(struct vm_struct *area, pgprot_t prot,
 			struct page ***pages);

@@ -617,17 +617,17 @@ struct sock_iocb {
 	struct scm_cookie	*scm;
 	struct msghdr		*msg, async_msg;
 	struct iovec		async_iov;
+	struct kiocb		*kiocb;
 };
 
 static inline struct sock_iocb *kiocb_to_siocb(struct kiocb *iocb)
 {
-	BUG_ON(sizeof(struct sock_iocb) > KIOCB_PRIVATE_SIZE);
 	return (struct sock_iocb *)iocb->private;
 }
 
 static inline struct kiocb *siocb_to_kiocb(struct sock_iocb *si)
 {
-	return container_of((void *)si, struct kiocb, private);
+	return si->kiocb;
 }
 
 struct socket_alloc {

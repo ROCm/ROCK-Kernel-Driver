@@ -34,8 +34,6 @@
 static LIST_HEAD(sq_mapping_list);
 static spinlock_t sq_mapping_lock = SPIN_LOCK_UNLOCKED;
 
-extern struct vm_struct *__get_vm_area(unsigned long size, unsigned long flags, unsigned long start, unsigned long end);
-
 /**
  * sq_flush - Flush (prefetch) the store queue cache
  *

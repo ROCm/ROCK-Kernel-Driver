@@ -807,7 +807,7 @@ static int prof_cpu_mask_write_proc (struct file *file, const char __user *buffe
 	{
 		unsigned i;
 		for (i=0; i<NR_CPUS; ++i) {
-			if ( paca[i].prof_buffer && cpu_isset(1, new_value) )
+			if ( paca[i].prof_buffer && cpu_isset(i, new_value) )
 				paca[i].prof_enabled = 1;
 			else
 				paca[i].prof_enabled = 0;

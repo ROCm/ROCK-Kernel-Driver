@@ -329,9 +329,6 @@ static int hugetlbfs_setattr(struct dentry *dentry, struct iattr *attr)
 	if (error)
 		goto out;
 
-	error = security_inode_setattr(dentry, attr);
-	if (error)
-		goto out;
 	if (ia_valid & ATTR_SIZE) {
 		error = -EINVAL;
 		if (!(attr->ia_size & ~HPAGE_MASK))
