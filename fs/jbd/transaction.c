@@ -1463,9 +1463,7 @@ __blist_del_buffer(struct journal_head **list, struct journal_head *jh)
  * is holding onto a copy of one of thee pointers, it could go bad.
  * Generally the caller needs to re-read the pointer from the transaction_t.
  *
- * If bh->b_jlist is BJ_SyncData then we may have been called
- * via journal_try_to_free_buffer() or journal_clean_data_list().  In that
- * case, j_list_lock will be held, and the journal may not be locked.
+ * Called under j_list_lock.  The journal may not be locked.
  */
 void __journal_unfile_buffer(struct journal_head *jh)
 {
