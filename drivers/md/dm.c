@@ -805,7 +805,7 @@ static void event_callback(void *context)
 {
 	struct mapped_device *md = (struct mapped_device *) context;
 
-	atomic_inc(&md->event_nr);;
+	atomic_inc(&md->event_nr);
 	wake_up(&md->eventq);
 }
 
