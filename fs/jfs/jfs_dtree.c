@@ -3360,9 +3360,8 @@ static int dtCompare(component_t * key,	/* search key */
 		     dtpage_t * p,	/* directory page */
 		     int si)
 {				/* entry slot index */
-	register int rc;
-	register wchar_t *kname, *name;
-	register int klen, namlen, len;
+	wchar_t *kname, *name;
+	int klen, namlen, len, rc;
 	idtentry_t *ih;
 	dtslot_t *t;
 
@@ -3437,9 +3436,8 @@ static int ciCompare(component_t * key,	/* search key */
 		     int si,	/* entry slot index */
 		     int flag)
 {
-	register int rc;
-	register wchar_t *kname, *name, x;
-	register int klen, namlen, len;
+	wchar_t *kname, *name, x;
+	int klen, namlen, len, rc;
 	ldtentry_t *lh;
 	idtentry_t *ih;
 	dtslot_t *t;
@@ -3543,8 +3541,8 @@ static int ciCompare(component_t * key,	/* search key */
 static void ciGetLeafPrefixKey(dtpage_t * lp, int li, dtpage_t * rp,
 			       int ri, component_t * key, int flag)
 {
-	register int klen, namlen;
-	register wchar_t *pl, *pr, *kname;
+	int klen, namlen;
+	wchar_t *pl, *pr, *kname;
 	wchar_t lname[JFS_NAME_MAX + 1];
 	component_t lkey = { 0, lname };
 	wchar_t rname[JFS_NAME_MAX + 1];
