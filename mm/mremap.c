@@ -391,9 +391,10 @@ unsigned long do_mremap(unsigned long addr,
 		/* can we just expand the current mapping? */
 		if (max_addr - addr >= new_len) {
 			int pages = (new_len - old_len) >> PAGE_SHIFT;
-			spin_lock(&vma->vm_mm->page_table_lock);
-			vma->vm_end = addr + new_len;
-			spin_unlock(&vma->vm_mm->page_table_lock);
+
+			vma_adjust(vma, vma->vm_start,
+				addr + new_len, vma->vm_pgoff, NULL);
+
 			current->mm->total_vm += pages;
 			if (vma->vm_flags & VM_LOCKED) {
 				current->mm->locked_vm += pages;
