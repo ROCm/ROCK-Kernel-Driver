@@ -239,7 +239,9 @@
 #define __NR_fremovexattr	234
 #define __NR_futex		235
 
-/* user-visible error numbers are in the range -1 - -122: see
+#define NR_syscalls		236
+
+/* user-visible error numbers are in the range -1 - -124: see
    <asm-m68k/errno.h> */
 
 #define __syscall_return(type, res) \
