@@ -136,7 +136,7 @@ static int kern_do_signal(struct pt_regs *regs, sigset_t *oldset, int error)
 	if (!oldset)
 		oldset = &current->blocked;
 
-	sig = get_signal_to_deliver(&info, regs);
+	sig = get_signal_to_deliver(&info, regs, NULL);
 	if(sig == 0)
 		return(0);
 

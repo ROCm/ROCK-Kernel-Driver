@@ -166,6 +166,7 @@ struct k_sigaction {
 
 #  include <asm/sigcontext.h>
 
+#define ptrace_signal_deliver(regs, cookie) do { } while (0)
 #define HAVE_ARCH_SYS_PAUSE
 
 #endif /* __KERNEL__ */
