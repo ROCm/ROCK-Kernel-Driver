@@ -17,6 +17,7 @@
 
 #include <linux/config.h>
 #include <linux/compiler.h>
+#include <linux/cpu.h>
 #include <linux/errno.h>
 #include <linux/sched.h>
 #include <linux/kernel.h>
@@ -121,6 +122,11 @@ void default_idle(void)
 
 	/* enable monitor call class 0 */
 	__ctl_set_bit(8, 15);
+
+#ifdef CONFIG_HOTPLUG_CPU
+	if (cpu_is_offline(smp_processor_id()))
+		cpu_die();
+#endif
 
 	/* 
 	 * Wait for external, I/O or machine check interrupt and
