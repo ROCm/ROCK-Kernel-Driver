@@ -92,7 +92,7 @@ typedef struct ide_info_t {
     int		hd;
 } ide_info_t;
 
-static void ide_release(u_long arg);
+static void ide_release(dev_link_t *);
 static int ide_event(event_t event, int priority,
 		     event_callback_args_t *args);
 
@@ -126,9 +126,6 @@ static dev_link_t *ide_attach(void)
     memset(info, 0, sizeof(*info));
     link = &info->link; link->priv = info;
 
-    init_timer(&link->release);
-    link->release.function = &ide_release;
-    link->release.data = (u_long)link;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_AUTO;
     link->io.Attributes2 = IO_DATA_PATH_WIDTH_8;
     link->io.IOAddrLines = 3;
@@ -187,9 +184,8 @@ static void ide_detach(dev_link_t *link)
     if (*linkp == NULL)
 	return;
 
-    del_timer(&link->release);
     if (link->state & DEV_CONFIG)
-	ide_release((u_long)link);
+	ide_release(link);
     
     if (link->handle) {
 	ret = CardServices(DeregisterClient, link->handle);
@@ -383,7 +379,7 @@ void ide_config(dev_link_t *link)
 cs_failed:
     cs_error(link->handle, last_fn, last_ret);
 failed:
-    ide_release((u_long)link);
+    ide_release(link);
     link->state &= ~DEV_CONFIG_PENDING;
 
 } /* ide_config */
@@ -396,9 +392,8 @@ failed:
     
 ======================================================================*/
 
-void ide_release(u_long arg)
+void ide_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
     ide_info_t *info = link->priv;
     
     DEBUG(0, "ide_release(0x%p)\n", link);
@@ -446,7 +441,7 @@ int ide_event(event_t event, int priority,
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
 	if (link->state & DEV_CONFIG)
-	    mod_timer(&link->release, jiffies + HZ/20);
+		ide_release(link);
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;

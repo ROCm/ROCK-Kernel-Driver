@@ -18,7 +18,6 @@
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/timer.h>
 #include <asm/io.h>
 #include <asm/system.h>
 
@@ -76,7 +75,7 @@ MODULE_PARM(isdnprot, "1-4i");
 */
 
 static void avma1cs_config(dev_link_t *link);
-static void avma1cs_release(u_long arg);
+static void avma1cs_release(dev_link_t *link);
 static int avma1cs_event(event_t event, int priority,
 			  event_callback_args_t *args);
 
@@ -156,8 +155,6 @@ static dev_link_t *avma1cs_attach(void)
     if (!link)
 	return NULL;
     memset(link, 0, sizeof(struct dev_link_t));
-    link->release.function = &avma1cs_release;
-    link->release.data = (u_long)link;
 
     /* The io structure describes IO port mapping */
     link->io.NumPorts1 = 16;
@@ -407,7 +404,7 @@ found_port:
     link->state &= ~DEV_CONFIG_PENDING;
     /* If any step failed, release any partially configured state */
     if (i != 0) {
-	avma1cs_release((u_long)link);
+	avma1cs_release(link);
 	return;
     }
 
@@ -435,9 +432,8 @@ found_port:
     
 ======================================================================*/
 
-static void avma1cs_release(u_long arg)
+static void avma1cs_release(dev_link_t *link)
 {
-    dev_link_t *link = (dev_link_t *)arg;
     local_info_t *local = link->priv;
 
     DEBUG(0, "avma1cs_release(0x%p)\n", link);
@@ -494,10 +490,8 @@ static int avma1cs_event(event_t event, int priority,
     switch (event) {
     case CS_EVENT_CARD_REMOVAL:
 	link->state &= ~DEV_PRESENT;
-	if (link->state & DEV_CONFIG) {
-	    link->release.expires =  jiffies + HZ/20;
-	    add_timer(&link->release);
-	}
+	if (link->state & DEV_CONFIG)
+		avma1cs_release(link);
 	break;
     case CS_EVENT_CARD_INSERTION:
 	link->state |= DEV_PRESENT | DEV_CONFIG_PENDING;
@@ -542,7 +536,7 @@ static void __exit exit_avma1_cs(void)
 	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG)
-			avma1cs_release((u_long)dev_list);
+			avma1cs_release(dev_list);
 		avma1cs_detach(dev_list);
 	}
 }
