@@ -6,7 +6,7 @@ menu "ACPI (Advanced Configuration and Power Interface) Support"
 
 config ACPI_HT
 	bool "ACPI Processor Enumeration for HT"
-	depends on MPENTIUM4
+	depends on X86
 	default y
 	---help---
 	  ACPI enumerates both logical (a.k.a. Hyper-Threaded -- HT)
