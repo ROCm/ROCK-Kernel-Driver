@@ -135,6 +135,26 @@ void add_timer(timer_t *timer)
 }
 
 /***
+ * add_timer_on - start a timer on a particular CPU
+ * @timer: the timer to be added
+ * @cpu: the CPU to start it on
+ *
+ * This is not very scalable on SMP.
+ */
+void add_timer_on(struct timer_list *timer, int cpu)
+{
+	tvec_base_t *base = tvec_bases+ cpu;
+  	unsigned long flags;
+  
+  	BUG_ON(timer_pending(timer) || !timer->function);
+
+	spin_lock_irqsave(&base->lock, flags);
+	internal_add_timer(base, timer);
+	timer->base = base;
+	spin_unlock_irqrestore(&base->lock, flags);
+}
+
+/***
  * mod_timer - modify a timer's timeout
  * @timer: the timer to be modified
  *
