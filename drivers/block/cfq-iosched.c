@@ -460,21 +460,35 @@ static struct cfq_queue *__cfq_get_queue(struct cfq_data *cfqd, int pid,
 					 int gfp_mask)
 {
 	const int hashval = hash_long(current->tgid, CFQ_QHASH_SHIFT);
-	struct cfq_queue *cfqq = __cfq_find_cfq_hash(cfqd, pid, hashval);
+	struct cfq_queue *cfqq, *new_cfqq = NULL;
+	request_queue_t *q = cfqd->queue;
+
+retry:
+	cfqq = __cfq_find_cfq_hash(cfqd, pid, hashval);
 
 	if (!cfqq) {
-		cfqq = mempool_alloc(cfq_mpool, gfp_mask);
+		if (new_cfqq) {
+			cfqq = new_cfqq;
+			new_cfqq = NULL;
+		} else if (gfp_mask & __GFP_WAIT) {
+			spin_unlock_irq(q->queue_lock);
+			new_cfqq = mempool_alloc(cfq_mpool, gfp_mask);
+			spin_lock_irq(q->queue_lock);
+			goto retry;
+		} else
+			return NULL;
 
-		if (cfqq) {
-			INIT_LIST_HEAD(&cfqq->cfq_hash);
-			INIT_LIST_HEAD(&cfqq->cfq_list);
-			RB_CLEAR_ROOT(&cfqq->sort_list);
+		INIT_LIST_HEAD(&cfqq->cfq_hash);
+		INIT_LIST_HEAD(&cfqq->cfq_list);
+		RB_CLEAR_ROOT(&cfqq->sort_list);
 
-			cfqq->pid = pid;
-			cfqq->queued[0] = cfqq->queued[1] = 0;
-			list_add(&cfqq->cfq_hash, &cfqd->cfq_hash[hashval]);
-		}
+		cfqq->pid = pid;
+		cfqq->queued[0] = cfqq->queued[1] = 0;
+		list_add(&cfqq->cfq_hash, &cfqd->cfq_hash[hashval]);
 	}
+
+	if (new_cfqq)
+		mempool_free(new_cfqq, cfq_mpool);
 
 	return cfqq;
 }
@@ -653,6 +667,7 @@ static int cfq_set_request(request_queue_t *q, struct request *rq, int gfp_mask)
 
 	crq = mempool_alloc(cfqd->crq_pool, gfp_mask);
 	if (crq) {
+		memset(crq, 0, sizeof(*crq));
 		RB_CLEAR(&crq->rb_node);
 		crq->request = rq;
 		crq->cfq_queue = NULL;
