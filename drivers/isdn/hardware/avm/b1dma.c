@@ -214,10 +214,6 @@ static inline u32 _get_slice(void **pp, unsigned char *dp)
 
 void b1dma_reset(avmcard *card)
 {
-	unsigned long flags;
-
-	save_flags(flags);
-	cli();
 	card->csr = 0x0;
 	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
 	b1dmaoutmeml(card->mbase+AMCC_MCSR, 0);
@@ -226,8 +222,6 @@ void b1dma_reset(avmcard *card)
 
 	t1outp(card->port, 0x10, 0x00);
 	t1outp(card->port, 0x07, 0x00);
-
-	restore_flags(flags);
 
 	b1dmaoutmeml(card->mbase+AMCC_MCSR, 0);
 	mdelay(10);
@@ -354,16 +348,16 @@ static void b1dma_queue_tx(avmcard *card, struct sk_buff *skb)
 {
 	unsigned long flags;
 
-	skb_queue_tail(&card->dma->send_queue, skb);
+	spin_lock_irqsave(&card->lock, flags);
 
-	spin_lock_irq_save(&card->lock, flags);
+	skb_queue_tail(&card->dma->send_queue, skb);
 
 	if (!(card->csr & EN_TX_TC_INT)) {
 		b1dma_dispatch_tx(card);
 		b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
 	}
 
-	spin_unlock_irq_restore(&card->lock, flags);
+	spin_unlock_irqrestore(&card->lock, flags);
 }
 
 /* ------------------------------------------------------------- */
@@ -371,7 +365,6 @@ static void b1dma_queue_tx(avmcard *card, struct sk_buff *skb)
 static void b1dma_dispatch_tx(avmcard *card)
 {
 	avmcard_dmainfo *dma = card->dma;
-	unsigned long flags;
 	struct sk_buff *skb;
 	u8 cmd, subcmd;
 	u16 len;
@@ -382,13 +375,6 @@ static void b1dma_dispatch_tx(avmcard *card)
 	inint = card->interrupt;
 
 	skb = skb_dequeue(&dma->send_queue);
-	if (!skb) {
-#ifdef CONFIG_B1DMA_DEBUG
-		printk(KERN_DEBUG "tx(%d): underrun\n", inint);
-#endif
-	        restore_flags(flags);
-		return;
-	}
 
 	len = CAPIMSG_LEN(skb->data);
 
@@ -617,16 +603,17 @@ static void b1dma_handle_interrupt(avmcard *card)
 		}
 	}
 
+	spin_lock(&card->lock);
+
 	if ((status & TX_TC_INT) != 0) {
-		spin_lock_irq_save(&card->lock, flags);
-
-		card->csr &= ~EN_TX_TC_INT;
-	        b1dma_dispatch_tx(card);
-
-		spin_unlock_irq_restore(&card->lock, flags);
+		if (skb_queue_empty(&card->dma->send_queue))
+			card->csr &= ~EN_TX_TC_INT;
+		else
+			b1dma_dispatch_tx(card);
 	}
 	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
 
+	spin_unlock(&card->lock);
 }
 
 void b1dma_interrupt(int interrupt, void *devptr, struct pt_regs *regs)
@@ -712,7 +699,6 @@ int b1dma_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
-	unsigned long flags;
 	int retval;
 
 	b1dma_reset(card);
@@ -739,9 +725,6 @@ int b1dma_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 		return -EIO;
 	}
 
-	save_flags(flags);
-	cli();
-
 	card->csr = AVM_FLAG;
 	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
 	b1dmaoutmeml(card->mbase+AMCC_MCSR,
@@ -756,7 +739,6 @@ int b1dma_load_firmware(struct capi_ctr *ctrl, capiloaddata *data)
 	b1dmaoutmeml(card->mbase+AMCC_RXLEN, 4);
 	card->csr |= EN_RX_TC_INT;
 	b1dmaoutmeml(card->mbase+AMCC_INTCSR, card->csr);
-	restore_flags(flags);
 
         b1dma_send_init(card);
 
@@ -858,7 +840,6 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 {
 	avmctrl_info *cinfo = (avmctrl_info *)(ctrl->driverdata);
 	avmcard *card = cinfo->card;
-	unsigned long flags;
 	u8 flag;
 	int len = 0;
 	char *s;
@@ -915,9 +896,6 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 	}
 	len += sprintf(page+len, "%-16s %s\n", "cardname", cinfo->cardname);
 
-	save_flags(flags);
-	cli();
-
 	txoff = (dma_addr_t)b1dmainmeml(card->mbase+0x2c)-card->dma->sendbuf.dmaaddr;
 	txlen = b1dmainmeml(card->mbase+0x30);
 
@@ -925,8 +903,6 @@ int b1dmactl_read_proc(char *page, char **start, off_t off,
 	rxlen = b1dmainmeml(card->mbase+0x28);
 
 	csr  = b1dmainmeml(card->mbase+AMCC_INTCSR);
-
-	restore_flags(flags);
 
         len += sprintf(page+len, "%-16s 0x%lx\n",
 				"csr (cached)", (unsigned long)card->csr);

@@ -10,6 +10,8 @@
 #ifndef _AVMCARD_H_
 #define _AVMCARD_H_
 
+#include <linux/spinlock.h>
+
 #define	AVMB1_PORTLEN		0x1f
 #define AVM_MAXVERSION		8
 #define AVM_NCCI_PER_CHANNEL	4
@@ -57,6 +59,8 @@ typedef struct avmcard_dmainfo {
 
 typedef struct avmcard {
 	char name[32];
+  
+	spinlock_t lock;
 	unsigned int port;
 	unsigned irq;
 	unsigned long membase;
