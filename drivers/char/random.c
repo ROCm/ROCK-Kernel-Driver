@@ -2033,57 +2033,103 @@ static __u32 twothirdsMD4Transform (__u32 const buf[4], __u32 const in[12])
 
 /* This should not be decreased so low that ISNs wrap too fast. */
 #define REKEY_INTERVAL	300
-#define HASH_BITS 24
+/*
+ * Bit layout of the tcp sequence numbers (before adding current time):
+ * bit 24-31: increased after every key exchange
+ * bit 0-23: hash(source,dest)
+ *
+ * The implementation is similar to the algorithm described
+ * in the Appendix of RFC 1185, except that
+ * - it uses a 1 MHz clock instead of a 250 kHz clock
+ * - it performs a rekey every 5 minutes, which is equivalent
+ * 	to a (source,dest) tulple dependent forward jump of the
+ * 	clock by 0..2^(HASH_BITS+1)
+ *
+ * Thus the average ISN wraparound time is 68 minutes instead of
+ * 4.55 hours.
+ *
+ * SMP cleanup and lock avoidance with poor man's RCU.
+ * 			Manfred Spraul <manfred@colorfullife.com>
+ * 		
+ */
+#define COUNT_BITS	8
+#define COUNT_MASK	( (1<<COUNT_BITS)-1)
+#define HASH_BITS	24
+#define HASH_MASK	( (1<<HASH_BITS)-1 )
+
+static struct keydata {
+	time_t rekey_time;
+	__u32	count;		// already shifted to the final position
+	__u32	secret[12];
+} ____cacheline_aligned ip_keydata[2];
+
+static spinlock_t ip_lock = SPIN_LOCK_UNLOCKED;
+static unsigned int ip_cnt;
+
+static struct keydata *__check_and_rekey(time_t time)
+{
+	struct keydata *keyptr;
+	spin_lock(&ip_lock);
+	keyptr = &ip_keydata[ip_cnt&1];
+	if (!keyptr->rekey_time || (time - keyptr->rekey_time) > REKEY_INTERVAL) {
+		keyptr = &ip_keydata[1^(ip_cnt&1)];
+		keyptr->rekey_time = time;
+		get_random_bytes(keyptr->secret, sizeof(keyptr->secret));
+		keyptr->count = (ip_cnt&COUNT_MASK)<<HASH_BITS;
+		mb();
+		ip_cnt++;
+	}
+	spin_unlock(&ip_lock);
+	return keyptr;
+}
+
+static inline struct keydata *check_and_rekey(time_t time)
+{
+	struct keydata *keyptr = &ip_keydata[ip_cnt&1];
+
+	rmb();
+	if (!keyptr->rekey_time || (time - keyptr->rekey_time) > REKEY_INTERVAL) {
+		keyptr = __check_and_rekey(time);
+	}
+
+	return keyptr;
+}
 
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 __u32 secure_tcpv6_sequence_number(__u32 *saddr, __u32 *daddr,
 				   __u16 sport, __u16 dport)
 {
-	static __u32	rekey_time;
-	static __u32	count;
-	static __u32	secret[12];
 	struct timeval 	tv;
 	__u32		seq;
+	__u32		hash[12];
+	struct keydata *keyptr;
 
-	/* The procedure is the same as for IPv4, but addresses are longer. */
+	/* The procedure is the same as for IPv4, but addresses are longer.
+	 * Thus we must use twothirdsMD4Transform.
+	 */
 
 	do_gettimeofday(&tv);	/* We need the usecs below... */
+	keyptr = check_and_rekey(tv.tv_sec);
 
-	if (!rekey_time || (tv.tv_sec - rekey_time) > REKEY_INTERVAL) {
-		rekey_time = tv.tv_sec;
-		/* First five words are overwritten below. */
-		get_random_bytes(&secret[5], sizeof(secret)-5*4);
-		count = (tv.tv_sec/REKEY_INTERVAL) << HASH_BITS;
-	}
+	memcpy(hash, saddr, 16);
+	hash[4]=(sport << 16) + dport;
+	memcpy(&hash[5],keyptr->secret,sizeof(__u32)*7);
 
-	memcpy(secret, saddr, 16);
-	secret[4]=(sport << 16) + dport;
-
-	seq = (twothirdsMD4Transform(daddr, secret) &
-	       ((1<<HASH_BITS)-1)) + count;
-
+	seq = twothirdsMD4Transform(daddr, hash) & HASH_MASK;
+	seq += keyptr->count;
 	seq += tv.tv_usec + tv.tv_sec*1000000;
+
 	return seq;
 }
 EXPORT_SYMBOL(secure_tcpv6_sequence_number);
 
 __u32 secure_ipv6_id(__u32 *daddr)
 {
-	static time_t	rekey_time;
-	static __u32	secret[12];
-	time_t		t;
+	struct keydata *keyptr;
 
-	/*
-	 * Pick a random secret every REKEY_INTERVAL seconds.
-	 */
-	t = CURRENT_TIME;
-	if (!rekey_time || (t - rekey_time) > REKEY_INTERVAL) {
-		rekey_time = t;
-		/* First word is overwritten below. */
-		get_random_bytes(secret, sizeof(secret));
-	}
+	keyptr = check_and_rekey(CURRENT_TIME);
 
-	return twothirdsMD4Transform(daddr, secret);
+	return halfMD4Transform(daddr, keyptr->secret);
 }
 
 EXPORT_SYMBOL(secure_ipv6_id);
@@ -2093,40 +2139,30 @@ EXPORT_SYMBOL(secure_ipv6_id);
 __u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
 				 __u16 sport, __u16 dport)
 {
-	static __u32	rekey_time;
-	static __u32	count;
-	static __u32	secret[12];
 	struct timeval 	tv;
 	__u32		seq;
+	__u32	hash[4];
+	struct keydata *keyptr;
 
 	/*
 	 * Pick a random secret every REKEY_INTERVAL seconds.
 	 */
 	do_gettimeofday(&tv);	/* We need the usecs below... */
-
-	if (!rekey_time || (tv.tv_sec - rekey_time) > REKEY_INTERVAL) {
-		rekey_time = tv.tv_sec;
-		/* First three words are overwritten below. */
-		get_random_bytes(&secret[3], sizeof(secret)-12);
-		count = (tv.tv_sec/REKEY_INTERVAL) << HASH_BITS;
-	}
+	keyptr = check_and_rekey(tv.tv_sec);
 
 	/*
 	 *  Pick a unique starting offset for each TCP connection endpoints
 	 *  (saddr, daddr, sport, dport).
-	 *  Note that the words are placed into the first words to be
-	 *  mixed in with the halfMD4.  This is because the starting
-	 *  vector is also a random secret (at secret+8), and further
-	 *  hashing fixed data into it isn't going to improve anything,
-	 *  so we should get started with the variable data.
+	 *  Note that the words are placed into the starting vector, which is 
+	 *  then mixed with a partial MD4 over random data.
 	 */
-	secret[0]=saddr;
-	secret[1]=daddr;
-	secret[2]=(sport << 16) + dport;
+	hash[0]=saddr;
+	hash[1]=daddr;
+	hash[2]=(sport << 16) + dport;
+	hash[3]=keyptr->secret[11];
 
-	seq = (halfMD4Transform(secret+8, secret) &
-	       ((1<<HASH_BITS)-1)) + count;
-
+	seq = halfMD4Transform(hash, keyptr->secret) & HASH_MASK;
+	seq += keyptr->count;
 	/*
 	 *	As close as possible to RFC 793, which
 	 *	suggests using a 250 kHz clock.
@@ -2148,31 +2184,22 @@ __u32 secure_tcp_sequence_number(__u32 saddr, __u32 daddr,
  */
 __u32 secure_ip_id(__u32 daddr)
 {
-	static time_t	rekey_time;
-	static __u32	secret[12];
-	time_t		t;
+	struct keydata *keyptr;
+	__u32 hash[4];
 
-	/*
-	 * Pick a random secret every REKEY_INTERVAL seconds.
-	 */
-	t = CURRENT_TIME;
-	if (!rekey_time || (t - rekey_time) > REKEY_INTERVAL) {
-		rekey_time = t;
-		/* First word is overwritten below. */
-		get_random_bytes(secret+1, sizeof(secret)-4);
-	}
+	keyptr = check_and_rekey(CURRENT_TIME);
 
 	/*
 	 *  Pick a unique starting offset for each IP destination.
-	 *  Note that the words are placed into the first words to be
-	 *  mixed in with the halfMD4.  This is because the starting
-	 *  vector is also a random secret (at secret+8), and further
-	 *  hashing fixed data into it isn't going to improve anything,
-	 *  so we should get started with the variable data.
+	 *  The dest ip address is placed in the starting vector,
+	 *  which is then hashed with random data.
 	 */
-	secret[0]=daddr;
+	hash[0] = daddr;
+	hash[1] = keyptr->secret[9];
+	hash[2] = keyptr->secret[10];
+	hash[3] = keyptr->secret[11];
 
-	return halfMD4Transform(secret+8, secret);
+	return halfMD4Transform(hash, keyptr->secret);
 }
 
 #ifdef CONFIG_SYN_COOKIES
