@@ -74,6 +74,7 @@
 #include "xfs_iomap.h"
 
 #include <linux/capability.h>
+#include <linux/writeback.h>
 
 
 #if defined(XFS_RW_TRACE)
@@ -871,24 +872,22 @@ retry:
 		xfs_iunlock(xip, XFS_ILOCK_EXCL);
 	}
 
-	if (ret <= 0) {
-		xfs_rwunlock(bdp, locktype);
-		error = -ret;
-		goto out_unlock_isem;
-	}
+	error = -ret;
+	if (ret <= 0)
+		goto out_unlock_internal;
 
 	XFS_STATS_ADD(xs_write_bytes, ret);
 
 	/* Handle various SYNC-type writes */
-	if ((file->f_flags & O_SYNC) || IS_SYNC(file->f_dentry->d_inode)) {
-
+	if ((file->f_flags & O_SYNC) || IS_SYNC(inode)) {
 		/*
 		 * If we're treating this as O_DSYNC and we have not updated the
 		 * size, force the log.
 		 */
+		if (!(mp->m_flags & XFS_MOUNT_OSYNCISOSYNC) &&
+		    !(xip->i_update_size)) {
+			xfs_inode_log_item_t	*iip = xip->i_itemp;
 
-		if (!(mp->m_flags & XFS_MOUNT_OSYNCISOSYNC)
-			&& !(xip->i_update_size)) {
 			/*
 			 * If an allocation transaction occurred
 			 * without extending the size, then we have to force
@@ -908,14 +907,8 @@ retry:
 			 * all changes affecting the inode are permanent
 			 * when we return.
 			 */
-
-			xfs_inode_log_item_t *iip;
-			xfs_lsn_t lsn;
-
-			iip = xip->i_itemp;
 			if (iip && iip->ili_last_lsn) {
-				lsn = iip->ili_last_lsn;
-				xfs_log_force(mp, lsn,
+				xfs_log_force(mp, iip->ili_last_lsn,
 						XFS_LOG_FORCE | XFS_LOG_SYNC);
 			} else if (xfs_ipincount(xip) > 0) {
 				xfs_log_force(mp, (xfs_lsn_t)0,
@@ -956,13 +949,21 @@ retry:
 				xfs_trans_set_sync(tp);
 				error = xfs_trans_commit(tp, 0, NULL);
 				xfs_iunlock(xip, XFS_ILOCK_EXCL);
+				if (error)
+					goto out_unlock_internal;
 			}
 		}
-	} /* (ioflags & O_SYNC) */
 
+		xfs_rwunlock(bdp, locktype);
+
+		error = sync_page_range(inode, mapping, pos, ret);
+		if (!error)
+			error = -ret;
+		goto out_unlock_isem;
+	}
+
+ out_unlock_internal:
 	xfs_rwunlock(bdp, locktype);
-	error = -ret;
-
  out_unlock_isem:
 	if (need_isem)
 		up(&inode->i_sem);
