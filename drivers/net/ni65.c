@@ -343,29 +343,64 @@ static int ni65_close(struct net_device *dev)
 	return 0;
 }
 
+static void cleanup_card(struct net_device *dev)
+{
+	struct priv *p = (struct priv *) dev->priv;
+	disable_dma(dev->dma);
+	free_dma(dev->dma);
+	release_region(dev->base_addr, cards[p->cardno].total_size);
+	ni65_free_buffer(p);
+}
+
+/* set: io,irq,dma or set it when calling insmod */
+static int irq;
+static int io;
+static int dma;
+
 /*
  * Probe The Card (not the lance-chip)
  */
-#ifdef MODULE
-static
-#endif
-int __init ni65_probe(struct net_device *dev)
+struct net_device * __init ni65_probe(int unit)
 {
-	int *port;
+	struct net_device *dev = alloc_etherdev(0);
 	static int ports[] = {0x360,0x300,0x320,0x340, 0};
+	int *port;
+	int err = 0;
 
-	if (dev->base_addr > 0x1ff)          /* Check a single specified location. */
-		 return ni65_probe1(dev, dev->base_addr);
-	else if (dev->base_addr > 0)         /* Don't probe at all. */
-		 return -ENXIO;
+	if (!dev)
+		return ERR_PTR(-ENOMEM);
 
-	for (port = ports; *port; port++)
-	{
-		if (ni65_probe1(dev, *port) == 0)
-			 return 0;
+	if (unit >= 0) {
+		sprintf(dev->name, "eth%d", unit);
+		netdev_boot_setup_check(dev);
+		irq = dev->irq;
+		dma = dev->dma;
+	} else {
+		dev->base_addr = io;
 	}
 
-	return -ENODEV;
+	if (dev->base_addr > 0x1ff) { /* Check a single specified location. */
+		err = ni65_probe1(dev, dev->base_addr);
+	} else if (dev->base_addr > 0) { /* Don't probe at all. */
+		err = -ENXIO;
+	} else {
+		for (port = ports; *port && ni65_probe1(dev, *port); port++)
+			;
+		if (!*port)
+			err = -ENODEV;
+	}
+	if (err)
+		goto out;
+
+	err = register_netdev(dev);
+	if (err)
+		goto out1;
+	return dev;
+out1:
+	cleanup_card(dev);
+out:
+	free_netdev(dev);
+	return ERR_PTR(err);
 }
 
 /*
@@ -376,6 +411,9 @@ static int __init ni65_probe1(struct net_device *dev,int ioaddr)
 	int i,j;
 	struct priv *p;
 	unsigned long flags;
+
+	dev->irq = irq;
+	dev->dma = dma;
 
 	for(i=0;i<NUM_CARDS;i++) {
 		if(!request_region(ioaddr, cards[i].total_size, cards[i].cardname))
@@ -521,9 +559,6 @@ static int __init ni65_probe1(struct net_device *dev,int ioaddr)
 	dev->watchdog_timeo	= HZ/2;
 	dev->get_stats		= ni65_get_stats;
 	dev->set_multicast_list = set_multicast_list;
-
-	ether_setup(dev);
-
 	return 0; /* everything is OK */
 }
 
@@ -1213,12 +1248,7 @@ static void set_multicast_list(struct net_device *dev)
 }
 
 #ifdef MODULE
-static struct net_device dev_ni65 = { .base_addr = 0x360, .irq = 9, .init = ni65_probe };
-
-/* set: io,irq,dma or set it when calling insmod */
-static int irq;
-static int io;
-static int dma;
+static struct net_device *dev_ni65;
 
 MODULE_PARM(irq, "i");
 MODULE_PARM(io, "i");
@@ -1229,26 +1259,15 @@ MODULE_PARM_DESC(dma, "ni6510 ISA DMA channel (ignored for some cards)");
 
 int init_module(void)
 {
-	dev_ni65.irq = irq;
-	dev_ni65.dma = dma;
-	dev_ni65.base_addr = io;
-	if (register_netdev(&dev_ni65) != 0)
-		return -EIO;
-	return 0;
+ 	dev_ni65 = ni65_probe(-1);
+	return IS_ERR(dev_ni65) ? PTR_ERR(dev_ni65) : 0;
 }
 
 void cleanup_module(void)
 {
-	struct priv *p;
-	p = (struct priv *) dev_ni65.priv;
-	if(!p)
-		BUG();
-	disable_dma(dev_ni65.dma);
-	free_dma(dev_ni65.dma);
-	unregister_netdev(&dev_ni65);
-	release_region(dev_ni65.base_addr,cards[p->cardno].total_size);
-	ni65_free_buffer(p);
-	dev_ni65.priv = NULL;
+ 	unregister_netdev(dev_ni65);
+ 	cleanup_card(dev_ni65);
+ 	free_netdev(dev_ni65);
 }
 #endif /* MODULE */
 
