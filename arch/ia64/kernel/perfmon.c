@@ -1513,7 +1513,7 @@ exit_pfm_fs(void)
 }
 
 static ssize_t
-pfm_read(struct file *filp, char *buf, size_t size, loff_t *ppos)
+pfm_read(struct file *filp, char __user *buf, size_t size, loff_t *ppos)
 {
 	pfm_context_t *ctx;
 	pfm_msg_t *msg;
@@ -1606,7 +1606,7 @@ abort:
 }
 
 static ssize_t
-pfm_write(struct file *file, const char *ubuf,
+pfm_write(struct file *file, const char __user *ubuf,
 			  size_t size, loff_t *ppos)
 {
 	DPRINT(("pfm_write called\n"));
@@ -4797,7 +4797,7 @@ recheck:
  * system-call entry point (must return long)
  */
 asmlinkage long
-sys_perfmonctl (int fd, int cmd, void *arg, int count, long arg5, long arg6, long arg7,
+sys_perfmonctl (int fd, int cmd, void __user *arg, int count, long arg5, long arg6, long arg7,
 		long arg8, long stack)
 {
 	struct pt_regs *regs = (struct pt_regs *)&stack;

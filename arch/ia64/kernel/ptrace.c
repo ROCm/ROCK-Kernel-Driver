@@ -152,7 +152,7 @@ ia64_increment_ip (struct pt_regs *regs)
 		ri = 0;
 		regs->cr_iip += 16;
 	} else if (ri == 2) {
-		get_user(w0, (char *) regs->cr_iip + 0);
+		get_user(w0, (char __user *) regs->cr_iip + 0);
 		if (((w0 >> 1) & 0xf) == IA64_MLX_TEMPLATE) {
 			/*
 			 * rfi'ing to slot 2 of an MLX bundle causes
@@ -174,7 +174,7 @@ ia64_decrement_ip (struct pt_regs *regs)
 	if (ia64_psr(regs)->ri == 0) {
 		regs->cr_iip -= 16;
 		ri = 2;
-		get_user(w0, (char *) regs->cr_iip + 0);
+		get_user(w0, (char __user *) regs->cr_iip + 0);
 		if (((w0 >> 1) & 0xf) == IA64_MLX_TEMPLATE) {
 			/*
 			 * rfi'ing to slot 2 of an MLX bundle causes
@@ -1458,11 +1458,11 @@ sys_ptrace (long request, pid_t pid, unsigned long addr, unsigned long data,
 		goto out_tsk;
 
 	      case PTRACE_GETREGS:
-		ret = ptrace_getregs(child, (struct pt_all_user_regs*) data);
+		ret = ptrace_getregs(child, (struct pt_all_user_regs __user *) data);
 		goto out_tsk;
 
 	      case PTRACE_SETREGS:
-		ret = ptrace_setregs(child, (struct pt_all_user_regs*) data);
+		ret = ptrace_setregs(child, (struct pt_all_user_regs __user *) data);
 		goto out_tsk;
 
 	      default:

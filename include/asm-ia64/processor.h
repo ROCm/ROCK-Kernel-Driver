@@ -200,7 +200,7 @@ typedef struct {
 #define GET_UNALIGN_CTL(task,addr)								\
 ({												\
 	put_user(((task)->thread.flags & IA64_THREAD_UAC_MASK) >> IA64_THREAD_UAC_SHIFT,	\
-		 (int *) (addr));								\
+		 (int __user *) (addr));							\
 })
 
 #define SET_FPEMU_CTL(task,value)								\
@@ -212,7 +212,7 @@ typedef struct {
 #define GET_FPEMU_CTL(task,addr)								\
 ({												\
 	put_user(((task)->thread.flags & IA64_THREAD_FPEMU_MASK) >> IA64_THREAD_FPEMU_SHIFT,	\
-		 (int *) (addr));								\
+		 (int __user *) (addr));							\
 })
 
 #ifdef CONFIG_IA32_SUPPORT

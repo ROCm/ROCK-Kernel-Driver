@@ -93,7 +93,7 @@ sys_getpagesize (void)
 }
 
 asmlinkage unsigned long
-ia64_shmat (int shmid, void *shmaddr, int shmflg)
+ia64_shmat (int shmid, void __user *shmaddr, int shmflg)
 {
 	unsigned long raddr;
 	int retval;
