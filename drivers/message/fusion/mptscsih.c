@@ -74,6 +74,8 @@
 #include <linux/delay.h>	/* for mdelay */
 #include <linux/interrupt.h>	/* needed for in_interrupt() proto */
 #include <linux/reboot.h>	/* notifier code */
+#include <linux/sched.h>
+#include <linux/workqueue.h>
 #include "../../scsi/scsi.h"
 #include <scsi/scsi_host.h>
 
@@ -185,7 +187,7 @@ static void	mptscsih_schedule_reset(void *hd);
 static int	mptscsih_do_cmd(MPT_SCSI_HOST *hd, INTERNAL_CMD *iocmd);
 static int	mptscsih_synchronize_cache(MPT_SCSI_HOST *hd, int portnum);
 
-static struct mpt_work_struct   mptscsih_rstTask;
+static struct work_struct   mptscsih_rstTask;
 
 #ifdef MPTSCSIH_ENABLE_DOMAIN_VALIDATION
 static int	mptscsih_do_raid(MPT_SCSI_HOST *hd, u8 action, INTERNAL_CMD *io);
@@ -231,7 +233,7 @@ static int	ScsiScanDvCtx = -1; /* Used only for bus scan and dv */
 static spinlock_t dvtaskQ_lock = SPIN_LOCK_UNLOCKED;
 static int dvtaskQ_active = 0;
 static int dvtaskQ_release = 0;
-static struct mpt_work_struct	mptscsih_dvTask;
+static struct work_struct	mptscsih_dvTask;
 #endif
 
 /*
@@ -249,31 +251,7 @@ static struct mptscsih_driver_setup
 static Scsi_Cmnd *foo_to[8];
 #endif
 
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-
-/* see mptscsih.h */
-
-static struct scsi_host_template driver_template = {
-	.proc_name			= "mptscsih",
-	.proc_info			= x_scsi_proc_info,
-	.name				= "MPT SCSI Host",
-	.info				= x_scsi_info,
-	.queuecommand			= x_scsi_queuecommand,
-	.slave_alloc			= x_scsi_slave_alloc,
-	.slave_configure		= x_scsi_slave_configure,
-	.slave_destroy			= x_scsi_slave_destroy,
-	.eh_abort_handler		= x_scsi_abort,
-	.eh_device_reset_handler	= x_scsi_dev_reset,
-	.eh_bus_reset_handler		= x_scsi_bus_reset,
-	.eh_host_reset_handler		= x_scsi_host_reset,
-	.bios_param			= x_scsi_bios_param,
-	.can_queue			= MPT_SCSI_CAN_QUEUE,
-	.this_id			= -1,
-	.sg_tablesize			= MPT_SCSI_SG_DEPTH,
-	.max_sectors			= MPT_SCSI_MAX_SECTORS,
-	.cmd_per_lun			= MPT_SCSI_CMD_PER_LUN,
-	.use_clustering			= ENABLE_CLUSTERING,
-};
+static struct scsi_host_template driver_template;
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
@@ -1459,7 +1437,6 @@ mptscsih_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 	}
 		
 	sh->max_lun = MPT_LAST_LUN + 1;
-	sh->max_sectors = MPT_SCSI_MAX_SECTORS;
 	sh->max_channel = 0;
 	sh->this_id = ioc->pfacts[0].PortSCSIID;
 		
@@ -1800,8 +1777,8 @@ mptscsih_remove(struct pci_dev *pdev)
 		}
 
 		dprintk((MYIOC_s_INFO_FMT
-		  "Free'd ScsiLookup (%d), chain (%d) and Target (%d+%d) memory\n",
-		  hd->ioc->name, sz1, szchain, sz3, sztarget));
+		  "Free'd ScsiLookup (%d) Target (%d+%d) memory\n",
+		  hd->ioc->name, sz1, sz3, sztarget));
 		dprintk(("Free'd done and free Q (%d) memory\n", szQ));
 
 		/* NULL the Scsi_Host pointer
@@ -1879,9 +1856,9 @@ mptscsih_resume(struct pci_dev *pdev)
 	if (!dvtaskQ_active) {
 		dvtaskQ_active = 1;
 		spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
-		MPT_INIT_WORK(&mptscsih_dvTask,
+		INIT_WORK(&mptscsih_dvTask,
 		  mptscsih_domainValidation, (void *) hd);
-		SCHEDULE_TASK(&mptscsih_dvTask);
+		schedule_work(&mptscsih_dvTask);
 	} else {
 		spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
 	}
@@ -1901,7 +1878,6 @@ static struct mpt_pci_driver mptscsih_driver = {
 	.resume		= mptscsih_resume,
 #endif
 };
-
 
 /*  SCSI host fops start here...  */
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
@@ -2434,9 +2410,9 @@ mptscsih_qcmd(Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 					if (!dvtaskQ_active) {
 						dvtaskQ_active = 1;
 						spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
-						MPT_INIT_WORK(&mptscsih_dvTask, mptscsih_domainValidation, (void *) hd);
+						INIT_WORK(&mptscsih_dvTask, mptscsih_domainValidation, (void *) hd);
 
-						SCHEDULE_TASK(&mptscsih_dvTask);
+						schedule_work(&mptscsih_dvTask);
 					} else {
 						spin_unlock_irqrestore(&dvtaskQ_lock, lflags);
 					}
@@ -3905,6 +3881,29 @@ mptscsih_event_process(MPT_ADAPTER *ioc, EventNotificationReply_t *pEvReply)
 	return 1;		/* currently means nothing really */
 }
 
+static struct scsi_host_template driver_template = {
+	.proc_name			= "mptscsih",
+	.proc_info			= mptscsih_proc_info,
+	.name				= "MPT SCSI Host",
+	.info				= mptscsih_info,
+	.queuecommand			= mptscsih_qcmd,
+	.slave_alloc			= mptscsih_slave_alloc,
+	.slave_configure		= mptscsih_slave_configure,
+	.slave_destroy			= mptscsih_slave_destroy,
+	.eh_abort_handler		= mptscsih_abort,
+	.eh_device_reset_handler	= mptscsih_dev_reset,
+	.eh_bus_reset_handler		= mptscsih_bus_reset,
+	.eh_host_reset_handler		= mptscsih_host_reset,
+	.bios_param			= mptscsih_bios_param,
+	.can_queue			= MPT_SCSI_CAN_QUEUE,
+	.this_id			= -1,
+	.sg_tablesize			= MPT_SCSI_SG_DEPTH,
+	.max_sectors			= 8192,
+	.cmd_per_lun			= 7,
+	.use_clustering			= ENABLE_CLUSTERING,
+};
+
+
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
  *  Private data...
@@ -4950,8 +4949,8 @@ static void mptscsih_taskmgmt_timeout(unsigned long data)
 	/* Call the reset handler. Already had a TM request
 	 * timeout - so issue a diagnostic reset
 	 */
-	MPT_INIT_WORK(&mptscsih_rstTask, mptscsih_schedule_reset, (void *)hd);
-	SCHEDULE_TASK(&mptscsih_rstTask);
+	INIT_WORK(&mptscsih_rstTask, mptscsih_schedule_reset, (void *)hd);
+	schedule_work(&mptscsih_rstTask);
 	return;
 }
 

@@ -102,9 +102,6 @@
 #define my_VERSION	MPT_LINUX_VERSION_COMMON
 #define MYNAM		"mptctl"
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,62)
-EXPORT_NO_SYMBOLS;
-#endif
 MODULE_AUTHOR(MODULEAUTHOR);
 MODULE_DESCRIPTION(my_NAME);
 MODULE_LICENSE("GPL");
@@ -547,38 +544,6 @@ mptctl_ioc_reset(MPT_ADAPTER *ioc, int reset_phase)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 /*
- *  struct file_operations functionality.
- *  Members:
- *	llseek, write, read, ioctl, open, release
- */
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,4,9)
-static loff_t
-mptctl_llseek(struct file *file, loff_t offset, int origin)
-{
-	return -ESPIPE;
-}
-#define no_llseek mptctl_llseek
-#endif
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-static ssize_t
-mptctl_write(struct file *file, const char *buf, size_t count, loff_t *ppos)
-{
-	printk(KERN_ERR MYNAM ": ioctl WRITE not yet supported\n");
-	return 0;
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-static ssize_t
-mptctl_read(struct file *file, char *buf, size_t count, loff_t *ptr)
-{
-	printk(KERN_ERR MYNAM ": ioctl READ not yet supported\n");
-	return 0;
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-/*
  *  MPT ioctl handler
  *  cmd - specify the particular IOCTL command to be issued
  *  arg - data specific to the command. Must not be null.
@@ -696,21 +661,6 @@ static int mptctl_do_reset(unsigned long arg)
 		return -1;
 	}
 
-	return 0;
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-static int mptctl_open(struct inode *inode, struct file *file)
-{
-	/*
-	 * Should support multiple management users
-	 */
-	return 0;
-}
-
-/*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
-static int mptctl_release(struct inode *inode, struct file *file)
-{
 	return 0;
 }
 
@@ -1278,10 +1228,8 @@ mptctl_getiocinfo (unsigned long arg, unsigned int data_size)
 	karg->pciId = pdev->device;
 	pci_read_config_byte(pdev, PCI_CLASS_REVISION, &revision);
 	karg->hwRev = revision;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	karg->subSystemDevice = pdev->subsystem_device;
 	karg->subSystemVendor = pdev->subsystem_vendor;
-#endif
 
 	if (cim_rev == 1) {
 		/* Get the PCI bus, device, and function numbers for the IOC
@@ -2455,10 +2403,8 @@ mptctl_hp_hostinfo(unsigned long arg, unsigned int data_size)
 
 	karg.vendor = pdev->vendor;
 	karg.device = pdev->device;
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	karg.subsystem_id = pdev->subsystem_device;
 	karg.subsystem_vendor = pdev->subsystem_vendor;
-#endif
 	karg.devfn = pdev->devfn;
 	karg.bus = pdev->bus->number;
 
@@ -2540,7 +2486,7 @@ mptctl_hp_hostinfo(unsigned long arg, unsigned int data_size)
 		break;
 	}
 
-	karg.base_io_addr = pdev->PCI_BASEADDR_START(0);
+	karg.base_io_addr = pci_resource_start(pdev, 0);
 
 	if ((int)ioc->chip_type <= (int) FC929)
 		karg.bus_phys_width = HP_BUS_WIDTH_UNK;
@@ -2739,20 +2685,10 @@ mptctl_hp_targetinfo(unsigned long arg)
 
 /*=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=*/
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,51)
-#define	owner_THIS_MODULE  .owner = THIS_MODULE,
-#else
-#define	owner_THIS_MODULE
-#endif
-
 static struct file_operations mptctl_fops = {
-	owner_THIS_MODULE
+	.owner =	THIS_MODULE,
 	.llseek =	no_llseek,
-	.read =		mptctl_read,
-	.write =	mptctl_write,
 	.ioctl =	mptctl_ioctl,
-	.open =		mptctl_open,
-	.release =	mptctl_release,
 };
 
 static struct miscdevice mptctl_miscdev = {
