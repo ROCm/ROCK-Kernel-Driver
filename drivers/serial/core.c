@@ -261,6 +261,56 @@ static void uart_shutdown(struct uart_info *info)
 }
 
 /**
+ *	uart_update_timeout - update per-port FIFO timeout.
+ *	@port: uart_port structure describing the port.
+ *	@cflag: termios cflag value
+ *	@quot: uart clock divisor quotient
+ *
+ *	Set the port FIFO timeout value.  The @cflag value should
+ *	reflect the actual hardware settings.
+ */
+void
+uart_update_timeout(struct uart_port *port, unsigned int cflag,
+		    unsigned int quot)
+{
+	unsigned int bits;
+
+	/* byte size and parity */
+	switch (cflag & CSIZE) {
+	case CS5:
+		bits = 7;
+		break;
+	case CS6:
+		bits = 8;
+		break;
+	case CS7:
+		bits = 9;
+		break;
+	default:
+		bits = 10;
+		break; // CS8
+	}
+
+	if (cflag & CSTOPB)
+		bits++;
+	if (cflag & PARENB)
+		bits++;
+
+	/*
+	 * The total number of bits to be transmitted in the fifo.
+	 */
+	bits = bits * port->fifosize;
+
+	/*
+	 * Figure the timeout to send the above number of bits.
+	 * Add .02 seconds of slop
+	 */
+	port->timeout = (HZ * bits) / (port->uartclk / (16 * quot)) + HZ/50;
+}
+
+EXPORT_SYMBOL(uart_update_timeout);
+
+/**
  *	uart_get_baud_rate - return baud rate for a particular port
  *	@port: uart_port structure describing the port in question.
  *	@tty: the tty structure corresponding to this port
@@ -386,39 +436,8 @@ uart_change_speed(struct uart_info *info, struct termios *old_termios)
 	 */
 	cflag = info->tty->termios->c_cflag;
 
-	/* byte size and parity */
-	switch (cflag & CSIZE) {
-	case CS5:
-		bits = 7;
-		break;
-	case CS6:
-		bits = 8;
-		break;
-	case CS7:
-		bits = 9;
-		break;
-	default:
-		bits = 10;
-		break; // CS8
-	}
-
-	if (cflag & CSTOPB)
-		bits++;
-	if (cflag & PARENB)
-		bits++;
-
 	quot = uart_get_divisor(port, tty, old_termios);
-
-	/*
-	 * The total number of bits to be transmitted in the fifo.
-	 */
-	bits = bits * port->fifosize;
-
-	/*
-	 * Figure the timeout to send the above number of bits.
-	 * Add .02 seconds of slop
-	 */
-	port->timeout = (HZ * bits) / (port->uartclk / (16 * quot)) + HZ/50;
+	uart_update_timeout(port, cflag, quot);
 
 	if (cflag & CRTSCTS)
 		info->flags |= UIF_CTS_FLOW;
