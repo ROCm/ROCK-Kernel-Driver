@@ -14,8 +14,6 @@
  *  Missing: IPv6 support. 
  */
 
-#include <linux/config.h>
-#if defined(CONFIG_SYN_COOKIES) 
 #include <linux/tcp.h>
 #include <linux/slab.h>
 #include <linux/random.h>
@@ -194,4 +192,3 @@ struct sock *cookie_v4_check(struct sock *sk, struct sk_buff *skb,
 	ret = get_cookie_sock(sk, skb, req, &rt->u.dst);
 out:	return ret;
 }
-#endif
