@@ -351,8 +351,8 @@ struct dscc4_dev_priv {
 #endif
 
 /* Functions prototypes */
-static inline void dscc4_rx_irq(struct dscc4_pci_priv *, struct dscc4_dev_priv *);
-static inline void dscc4_tx_irq(struct dscc4_pci_priv *, struct dscc4_dev_priv *);
+static void dscc4_rx_irq(struct dscc4_pci_priv *, struct dscc4_dev_priv *);
+static void dscc4_tx_irq(struct dscc4_pci_priv *, struct dscc4_dev_priv *);
 static int dscc4_found1(struct pci_dev *, unsigned long ioaddr);
 static int dscc4_init_one(struct pci_dev *, const struct pci_device_id *ent);
 static int dscc4_open(struct net_device *);
@@ -366,7 +366,6 @@ static void dscc4_tx_timeout(struct net_device *);
 static irqreturn_t dscc4_irq(int irq, void *dev_id, struct pt_regs *ptregs);
 static int dscc4_hdlc_attach(struct net_device *, unsigned short, unsigned short);
 static int dscc4_set_iface(struct dscc4_dev_priv *, struct net_device *);
-static inline int dscc4_set_quartz(struct dscc4_dev_priv *, int);
 #ifdef DSCC4_POLLING
 static int dscc4_tx_poll(struct dscc4_dev_priv *, struct net_device *);
 #endif
@@ -866,6 +865,18 @@ static void dscc4_init_registers(struct dscc4_dev_priv *dpriv,
 	//scc_writel(0x00250008 & ~RxActivate, dpriv, dev, CCR2);
 }
 
+static inline int dscc4_set_quartz(struct dscc4_dev_priv *dpriv, int hz)
+{
+	int ret = 0;
+
+	if ((hz < 0) || (hz > DSCC4_HZ_MAX))
+		ret = -EOPNOTSUPP;
+	else
+		dpriv->pci_priv->xtal_hz = hz;
+
+	return ret;
+}
+
 static int dscc4_found1(struct pci_dev *pdev, unsigned long ioaddr)
 {
 	struct dscc4_pci_priv *ppriv;
@@ -1340,18 +1351,6 @@ static int dscc4_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	return ret;
 }
 
-static inline int dscc4_set_quartz(struct dscc4_dev_priv *dpriv, int hz)
-{
-	int ret = 0;
-
-	if ((hz < 0) || (hz > DSCC4_HZ_MAX))
-		ret = -EOPNOTSUPP;
-	else
-		dpriv->pci_priv->xtal_hz = hz;
-
-	return ret;
-}
-
 static int dscc4_match(struct thingie *p, int value)
 {
 	int i;
@@ -1531,7 +1530,7 @@ out:
 	return IRQ_RETVAL(handled);
 }
 
-static inline void dscc4_tx_irq(struct dscc4_pci_priv *ppriv,
+static void dscc4_tx_irq(struct dscc4_pci_priv *ppriv,
 				struct dscc4_dev_priv *dpriv)
 {
 	struct net_device *dev = dscc4_to_dev(dpriv);
@@ -1700,7 +1699,7 @@ try:
 	goto try;
 }
 
-static inline void dscc4_rx_irq(struct dscc4_pci_priv *priv,
+static void dscc4_rx_irq(struct dscc4_pci_priv *priv,
 				    struct dscc4_dev_priv *dpriv)
 {
 	struct net_device *dev = dscc4_to_dev(dpriv);
