@@ -7,6 +7,7 @@
 CONFIG_UID16=y
 CONFIG_RWSEM_GENERIC_SPINLOCK=y
 # CONFIG_RWSEM_XCHGADD_ALGORITHM is not set
+CONFIG_ISA=y
 
 #
 # Code maturity level options
@@ -20,7 +21,9 @@ CONFIG_EXPERIMENTAL=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 # CONFIG_SYSCTL is not set
 CONFIG_LOG_BUF_SHIFT=14
-# CONFIG_IKCONFIG is not set
+CONFIG_EMBEDDED=y
+CONFIG_FUTEX=y
+CONFIG_EPOLL=y
 
 #
 # Loadable module support
@@ -42,19 +45,76 @@ CONFIG_CPU_H8300H=y
 CONFIG_CPU_CLOCK=16000
 # CONFIG_RAMKERNEL is not set
 CONFIG_ROMKERNEL=y
+# CONFIG_DEFAULT_CMDLINE is not set
 
 #
 # Executable file formats
 #
 CONFIG_KCORE_AOUT=y
 CONFIG_BINFMT_FLAT=y
+# CONFIG_BINFMT_ZFLAT is not set
+# CONFIG_BINFMT_MISC is not set
+
+#
+# Memory Technology Devices (MTD)
+#
+CONFIG_MTD=y
+# CONFIG_MTD_DEBUG is not set
+CONFIG_MTD_PARTITIONS=y
+# CONFIG_MTD_CONCAT is not set
+# CONFIG_MTD_REDBOOT_PARTS is not set
+# CONFIG_MTD_CMDLINE_PARTS is not set
+
+#
+# User Modules And Translation Layers
+#
+CONFIG_MTD_CHAR=y
+CONFIG_MTD_BLOCK=y
+# CONFIG_FTL is not set
+# CONFIG_NFTL is not set
+
+#
+# RAM/ROM/Flash chip drivers
+#
+# CONFIG_MTD_CFI is not set
+# CONFIG_MTD_JEDECPROBE is not set
+CONFIG_MTD_RAM=y
+# CONFIG_MTD_ROM is not set
+# CONFIG_MTD_ABSENT is not set
+# CONFIG_MTD_OBSOLETE_CHIPS is not set
+
+#
+# Mapping drivers for chip access
+#
+CONFIG_MTD_UCLINUX=y
+
+#
+# Self-contained MTD device drivers
+#
+# CONFIG_MTD_SLRAM is not set
+# CONFIG_MTD_MTDRAM is not set
+# CONFIG_MTD_BLKMTD is not set
+
+#
+# Disk-On-Chip Device Drivers
+#
+# CONFIG_MTD_DOC1000 is not set
+# CONFIG_MTD_DOC2000 is not set
+# CONFIG_MTD_DOC2001 is not set
+
+#
+# NAND Flash Device Drivers
+#
+# CONFIG_MTD_NAND is not set
 
 #
 # Block devices
 #
 # CONFIG_BLK_DEV_FD is not set
+# CONFIG_BLK_DEV_XD is not set
 # CONFIG_BLK_DEV_LOOP is not set
 # CONFIG_BLK_DEV_RAM is not set
+# CONFIG_BLK_DEV_INITRD is not set
 
 #
 # ATA/IDE/MFM/RLL support
@@ -156,6 +216,8 @@ CONFIG_RAMFS=y
 # CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
 # CONFIG_EFS_FS is not set
+# CONFIG_JFFS_FS is not set
+# CONFIG_JFFS2_FS is not set
 # CONFIG_CRAMFS is not set
 # CONFIG_VXFS_FS is not set
 # CONFIG_HPFS_FS is not set
@@ -180,8 +242,8 @@ CONFIG_FULLDEBUG=y
 # CONFIG_MAGIC_SYSRQ is not set
 # CONFIG_HIGHPROFILE is not set
 CONFIG_NO_KERNEL_MSG=y
-# CONFIG_GDB_MAGICPRINT is not set
-# CONFIG_SYSCALL_PRINT is not set
+CONFIG_GDB_MAGICPRINT=y
+CONFIG_SYSCALL_PRINT=y
 
 #
 # Security options
