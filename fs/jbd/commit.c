@@ -401,6 +401,13 @@ sync_datalist_empty:
 			continue;
 		}
 
+		/*
+		 * start_this_handle() uses t_outstanding_credits to determine
+		 * the free space in the log, but this counter is changed
+		 * by journal_next_log_block() also.
+		 */
+		commit_transaction->t_outstanding_credits--;
+
 		/* Bump b_count to prevent truncate from stumbling over
                    the shadowed buffer!  @@@ This can go if we ever get
                    rid of the BJ_IO/BJ_Shadow pairing of buffers. */
