@@ -138,6 +138,16 @@ static unsigned long get_stubs_size(const Elf64_Ehdr *hdr,
 	return relocs * sizeof(struct ppc64_stub_entry);
 }
 
+static void dedotify_versions(struct modversion_info *vers,
+			      unsigned long size)
+{
+	struct modversion_info *end;
+
+	for (end = (void *)vers + size; vers < end; vers++)
+		if (vers->name[0] == '.')
+			memmove(vers->name, vers->name+1, strlen(vers->name));
+}
+
 /* Undefined symbols which refer to .funcname, hack to funcname */
 static void dedotify(Elf64_Sym *syms, unsigned int numsyms, char *strtab)
 {
@@ -166,6 +176,9 @@ int module_frob_arch_sections(Elf64_Ehdr *hdr,
 			me->arch.stubs_section = i;
 		else if (strcmp(secstrings + sechdrs[i].sh_name, ".toc") == 0)
 			me->arch.toc_section = i;
+		else if (strcmp(secstrings+sechdrs[i].sh_name,"__versions")==0)
+			dedotify_versions((void *)hdr + sechdrs[i].sh_offset,
+					  sechdrs[i].sh_size);
 
 		/* We don't handle .init for the moment: rename to _init */
 		while ((p = strstr(secstrings + sechdrs[i].sh_name, ".init")))
