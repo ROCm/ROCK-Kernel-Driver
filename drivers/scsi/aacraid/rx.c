@@ -413,21 +413,21 @@ int aac_rx_init(struct aac_dev *dev)
 	 */
 	if (rx_readl(dev, MUnit.OMRx[0]) & SELF_TEST_FAILED) {
 		printk(KERN_ERR "%s%d: adapter self-test failed.\n", dev->name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 	/*
 	 *	Check to see if the board panic'd while booting.
 	 */
 	if (rx_readl(dev, MUnit.OMRx[0]) & KERNEL_PANIC) {
 		printk(KERN_ERR "%s%d: adapter kernel panic.\n", dev->name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 	/*
 	 *	Check to see if the monitor panic'd while booting.
 	 */
 	if (rx_readl(dev, MUnit.OMRx[0]) & MONITOR_PANIC) {
 		printk(KERN_ERR "%s%d: adapter monitor panic.\n", dev->name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 	start = jiffies;
 	/*
@@ -440,7 +440,7 @@ int aac_rx_init(struct aac_dev *dev)
 		{
 			status = rx_readl(dev, IndexRegs.Mailbox[7]) >> 16;
 			printk(KERN_ERR "%s%d: adapter kernel failed to start, init status = %ld.\n", dev->name, instance, status);
-			return -1;
+			goto error_iounmap;
 		}
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
@@ -448,7 +448,7 @@ int aac_rx_init(struct aac_dev *dev)
 	if (request_irq(dev->scsi_host_ptr->irq, aac_rx_intr, SA_SHIRQ|SA_INTERRUPT, "aacraid", (void *)dev)<0) 
 	{
 		printk(KERN_ERR "%s%d: Interrupt unavailable.\n", name, instance);
-		return -1;
+		goto error_iounmap;
 	}
 	/*
 	 *	Fill in the function dispatch table.
@@ -461,7 +461,7 @@ int aac_rx_init(struct aac_dev *dev)
 	dev->a_ops.adapter_check_health = aac_rx_check_health;
 
 	if (aac_init_adapter(dev) == NULL)
-		return -1;
+		goto error_irq;
 	/*
 	 *	Start any kernel threads needed
 	 */
@@ -469,7 +469,7 @@ int aac_rx_init(struct aac_dev *dev)
 	if(dev->thread_pid < 0)
 	{
 		printk(KERN_ERR "aacraid: Unable to create rx thread.\n");
-		return -1;
+		goto error_kfree;
 	}
 	/*
 	 *	Tell the adapter that all is configured, and it can start
@@ -477,4 +477,15 @@ int aac_rx_init(struct aac_dev *dev)
 	 */
 	aac_rx_start_adapter(dev);
 	return 0;
+
+error_kfree:
+	kfree(dev->queues);
+
+error_irq:
+	free_irq(dev->scsi_host_ptr->irq, (void *)dev);
+
+error_iounmap:
+	iounmap(dev->regs.rx);
+
+	return -1;
 }
