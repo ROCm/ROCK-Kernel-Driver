@@ -7,24 +7,6 @@
 
 #define DISPLAY_SIS_TIMINGS
 
-#if defined(DISPLAY_SIS_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 sis_proc;
-
-static int sis_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t sis_procs[] = {
-{
-		.name		= "sis",
-		.set		= 1,
-		.get_info	= sis_get_info,
-		.parent		= NULL,
-	},
-};
-#endif /* defined(DISPLAY_SIS_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static unsigned int init_chipset_sis5513(struct pci_dev *, const char *);
 static void init_hwif_sis5513(ide_hwif_t *);
 

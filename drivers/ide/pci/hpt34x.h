@@ -13,24 +13,6 @@
 
 #undef DISPLAY_HPT34X_TIMINGS
 
-#if defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 hpt34x_proc;
-
-static int hpt34x_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t hpt34x_procs[] = {
-	{
-		.name		= "hpt34x",
-		.set		= 1,
-		.get_info	= hpt34x_get_info,
-		.parent		= NULL,
-	},
-};
-#endif  /* defined(DISPLAY_HPT34X_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static unsigned int init_chipset_hpt34x(struct pci_dev *, const char *);
 static void init_hwif_hpt34x(ide_hwif_t *);
 

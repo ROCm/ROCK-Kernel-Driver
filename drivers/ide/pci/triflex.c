@@ -212,7 +212,7 @@ static unsigned int __init init_chipset_triflex(struct pci_dev *dev,
 		const char *name) 
 {
 #ifdef CONFIG_PROC_FS
-	ide_pci_register_host_proc(&triflex_proc);
+	ide_pci_create_host_proc("triflex", triflex_get_info);
 #endif
 	return 0;	
 }

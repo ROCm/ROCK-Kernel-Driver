@@ -7,24 +7,6 @@
 
 #define DISPLAY_AMD_TIMINGS
 
-#if defined(DISPLAY_AMD_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 amd74xx_proc;
-
-static int amd74xx_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t amd74xx_procs[] = {
-	{
-		.name		= "amd74xx",
-		.set		= 1,
-		.get_info	= amd74xx_get_info,
-		.parent		= NULL,
-	},
-};
-#endif  /* defined(DISPLAY_AMD_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static unsigned int init_chipset_amd74xx(struct pci_dev *, const char *);
 static void init_hwif_amd74xx(ide_hwif_t *);
 

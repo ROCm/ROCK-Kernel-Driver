@@ -567,7 +567,7 @@ static unsigned int __init init_chipset_via82cxxx(struct pci_dev *dev, const cha
 		via_base = pci_resource_start(dev, 4);
 		bmide_dev = dev;
 		isa_dev = isa;
-		ide_pci_register_host_proc(&via_procs[0]);
+		ide_pci_create_host_proc("via", via_get_info);
 		via_proc = 1;
 	}
 #endif /* DISPLAY_VIA_TIMINGS && CONFIG_PROC_FS */

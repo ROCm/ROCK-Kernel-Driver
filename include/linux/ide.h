@@ -1087,6 +1087,8 @@ typedef struct {
 } ide_proc_entry_t;
 
 #ifdef CONFIG_PROC_FS
+extern struct proc_dir_entry *proc_ide_root;
+
 extern void proc_ide_create(void);
 extern void proc_ide_destroy(void);
 extern void destroy_proc_ide_device(ide_hwif_t *, ide_drive_t *);
@@ -1096,6 +1098,10 @@ extern void ide_add_proc_entries(struct proc_dir_entry *, ide_proc_entry_t *, vo
 extern void ide_remove_proc_entries(struct proc_dir_entry *, ide_proc_entry_t *);
 read_proc_t proc_ide_read_capacity;
 read_proc_t proc_ide_read_geometry;
+
+#ifdef CONFIG_BLK_DEV_IDEPCI
+void ide_pci_create_host_proc(const char *, get_info_t *);
+#endif
 
 /*
  * Standard exit stuff:
@@ -1521,18 +1527,6 @@ void ide_unregister_driver(ide_driver_t *driver);
 int ide_register_subdriver(ide_drive_t *, ide_driver_t *);
 int ide_unregister_subdriver (ide_drive_t *drive);
 int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
-
-#ifdef CONFIG_PROC_FS
-typedef struct ide_pci_host_proc_s {
-	char				*name;
-	u8				set;
-	get_info_t			*get_info;
-	struct proc_dir_entry		*parent;
-	struct ide_pci_host_proc_s	*next;
-} ide_pci_host_proc_t;
-
-void ide_pci_register_host_proc(ide_pci_host_proc_t *);
-#endif /* CONFIG_PROC_FS */
 
 #define ON_BOARD		1
 #define NEVER_BOARD		0

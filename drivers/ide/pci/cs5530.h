@@ -7,24 +7,6 @@
 
 #define DISPLAY_CS5530_TIMINGS
 
-#if defined(DISPLAY_CS5530_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 cs5530_proc;
-
-static int cs5530_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t cs5530_procs[] = {
-	{
-		.name		= "cs5530",
-		.set		= 1,
-		.get_info	= cs5530_get_info,
-		.parent		= NULL,
-	},
-};
-#endif /* DISPLAY_CS5530_TIMINGS && CONFIG_PROC_FS */
-
 static unsigned int init_chipset_cs5530(struct pci_dev *, const char *);
 static void init_hwif_cs5530(ide_hwif_t *);
 

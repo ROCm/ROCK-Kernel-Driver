@@ -60,25 +60,6 @@
 #define UDIDETCR1	0x7B
 #define DTPR1		0x7C
 
-#if defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 cmd64x_proc;
-
-static char * print_cmd64x_get_info(char *, struct pci_dev *, int);
-static int cmd64x_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t cmd64x_procs[] = {
-	{
-		.name		= "cmd64x",
-		.set		= 1,
-		.get_info	= cmd64x_get_info,
-		.parent		= NULL,
-	},
-};
-#endif  /* defined(DISPLAY_CMD64X_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static unsigned int init_chipset_cmd64x(struct pci_dev *, const char *);
 static void init_hwif_cmd64x(ide_hwif_t *);
 

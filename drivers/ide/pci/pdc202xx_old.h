@@ -199,25 +199,6 @@ static void decode_registers (u8 registers, u8 value)
 
 #define DISPLAY_PDC202XX_TIMINGS
 
-#if defined(DISPLAY_PDC202XX_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 pdc202xx_proc;
-
-static int pdc202xx_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t pdc202xx_procs[] = {
-	{
-		.name		= "pdc202xx",
-		.set		= 1,
-		.get_info	= pdc202xx_get_info,
-		.parent		= NULL,
-	},
-};
-#endif /* DISPLAY_PDC202XX_TIMINGS && CONFIG_PROC_FS */
-
-
 static void init_setup_pdc202ata4(struct pci_dev *dev, ide_pci_device_t *d);
 static void init_setup_pdc20265(struct pci_dev *, ide_pci_device_t *);
 static void init_setup_pdc202xx(struct pci_dev *, ide_pci_device_t *);

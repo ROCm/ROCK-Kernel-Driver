@@ -474,6 +474,8 @@ struct seq_operations ide_drivers_op = {
 };
 
 #ifdef CONFIG_PROC_FS
+struct proc_dir_entry *proc_ide_root;
+
 ide_proc_entry_t generic_subdriver_entries[] = {
 	{ "capacity",	S_IFREG|S_IRUGO,	proc_ide_read_capacity,	NULL },
 	{ NULL, 0, NULL, NULL }
@@ -2401,6 +2403,10 @@ int __init ide_init (void)
 	bus_register(&ide_bus_type);
 
 	init_ide_data();
+
+#ifdef CONFIG_PROC_FS
+	proc_ide_root = proc_mkdir("ide", 0);
+#endif
 
 #ifdef CONFIG_BLK_DEV_ALI14XX
 	if (probe_ali14xx)

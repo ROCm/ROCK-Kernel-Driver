@@ -9,24 +9,6 @@
 
 #define DISPLAY_PIIX_TIMINGS
 
-#if defined(DISPLAY_PIIX_TIMINGS) && defined(CONFIG_PROC_FS)
-#include <linux/stat.h>
-#include <linux/proc_fs.h>
-
-static u8 piix_proc;
-
-static int piix_get_info(char *, char **, off_t, int);
-
-static ide_pci_host_proc_t piix_procs[] = {
-	{
-		.name		= "piix",
-		.set		= 1,
-		.get_info	= piix_get_info,
-		.parent		= NULL,
-	},
-};
-#endif  /* defined(DISPLAY_PIIX_TIMINGS) && defined(CONFIG_PROC_FS) */
-
 static void init_setup_piix(struct pci_dev *, ide_pci_device_t *);
 static unsigned int __devinit init_chipset_piix(struct pci_dev *, const char *);
 static void init_hwif_piix(ide_hwif_t *);
