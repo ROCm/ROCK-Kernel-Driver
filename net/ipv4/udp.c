@@ -858,54 +858,6 @@ csum_copy_err:
 	goto try_again;
 }
 
-int udp_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
-{
-	struct inet_opt *inet = inet_sk(sk);
-	struct sockaddr_in *usin = (struct sockaddr_in *) uaddr;
-	struct rtable *rt;
-	u32 saddr;
-	int oif;
-	int err;
-
-	
-	if (addr_len < sizeof(*usin)) 
-	  	return -EINVAL;
-
-	if (usin->sin_family != AF_INET) 
-	  	return -EAFNOSUPPORT;
-
-	sk_dst_reset(sk);
-
-	oif = sk->sk_bound_dev_if;
-	saddr = inet->saddr;
-	if (MULTICAST(usin->sin_addr.s_addr)) {
-		if (!oif)
-			oif = inet->mc_index;
-		if (!saddr)
-			saddr = inet->mc_addr;
-	}
-	err = ip_route_connect(&rt, usin->sin_addr.s_addr, saddr,
-			       RT_CONN_FLAGS(sk), oif,
-			       IPPROTO_UDP,
-			       inet->sport, usin->sin_port, sk);
-	if (err)
-		return err;
-	if ((rt->rt_flags & RTCF_BROADCAST) && !sock_flag(sk, SOCK_BROADCAST)) {
-		ip_rt_put(rt);
-		return -EACCES;
-	}
-  	if (!inet->saddr)
-	  	inet->saddr = rt->rt_src;	/* Update source address */
-	if (!inet->rcv_saddr)
-		inet->rcv_saddr = rt->rt_src;
-	inet->daddr = rt->rt_dst;
-	inet->dport = usin->sin_port;
-	sk->sk_state = TCP_ESTABLISHED;
-	inet->id = jiffies;
-
-	sk_dst_set(sk, &rt->u.dst);
-	return(0);
-}
 
 int udp_disconnect(struct sock *sk, int flags)
 {
@@ -1351,7 +1303,7 @@ static int udp_getsockopt(struct sock *sk, int level, int optname,
 struct proto udp_prot = {
  	.name =		"UDP",
 	.close =	udp_close,
-	.connect =	udp_connect,
+	.connect =	ip4_datagram_connect,
 	.disconnect =	udp_disconnect,
 	.ioctl =	udp_ioctl,
 	.destroy =	udp_destroy_sock,
@@ -1552,7 +1504,6 @@ void udp4_proc_exit(void)
 }
 #endif /* CONFIG_PROC_FS */
 
-EXPORT_SYMBOL(udp_connect);
 EXPORT_SYMBOL(udp_disconnect);
 EXPORT_SYMBOL(udp_hash);
 EXPORT_SYMBOL(udp_hash_lock);

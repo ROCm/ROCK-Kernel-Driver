@@ -916,7 +916,7 @@ static int rawv6_init_sk(struct sock *sk)
 struct proto rawv6_prot = {
 	.name =		"RAW",
 	.close =	rawv6_close,
-	.connect =	udpv6_connect,
+	.connect =	ip6_datagram_connect,
 	.disconnect =	udp_disconnect,
 	.ioctl =	rawv6_ioctl,
 	.init =		rawv6_init_sk,
