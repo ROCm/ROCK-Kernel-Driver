@@ -100,13 +100,9 @@ typedef struct
 #define WAN_PACKET_MR_ALLMULTI	2
 
 #ifdef __KERNEL__
+
 #ifndef netdevice_t
-#include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
- #define netdevice_t struct net_device
-#else
- #define netdevice_t struct device
-#endif
+#define netdevice_t struct net_device
 #endif
 
 /* Private wanpipe socket structures. */

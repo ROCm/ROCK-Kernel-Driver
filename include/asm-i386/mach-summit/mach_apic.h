@@ -13,7 +13,7 @@ extern int x86_summit;
 		((phys_apic) & XAPIC_DEST_CLUSTER_MASK) )
 
 #define APIC_DFR_VALUE	(x86_summit ? APIC_DFR_CLUSTER : APIC_DFR_FLAT)
-#define TARGET_CPUS	(x86_summit ? XAPIC_DEST_CPUS_MASK : cpu_online_map)
+#define TARGET_CPUS	(x86_summit ? XAPIC_DEST_CPUS_MASK : cpu_callout_map)
 
 #define INT_DELIVERY_MODE (x86_summit ? dest_Fixed : dest_LowestPrio)
 #define INT_DEST_MODE 1     /* logical delivery broadcast to all procs */

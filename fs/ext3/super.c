@@ -1154,7 +1154,7 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 		if (!bh) {
 			printk(KERN_ERR 
 			       "EXT3-fs: Can't read superblock on 2nd try.\n");
-			return -EINVAL;
+			goto failed_mount;
 		}
 		es = (struct ext3_super_block *)(((char *)bh->b_data) + offset);
 		sbi->s_es = es;

@@ -39,59 +39,7 @@
 #ifndef	_WANPIPE_H
 #define	_WANPIPE_H
 
-#include <linux/version.h>
-
-#ifndef KERNEL_VERSION
-  #define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))
-#endif
-
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,0)
- 
- #define LINUX_2_4
- #define netdevice_t struct net_device
-
- #define FREE_READ 1
- #define FREE_WRITE 0
-
- #define stop_net_queue(a) 	netif_stop_queue(a) 
- #define start_net_queue(a) 	netif_start_queue(a)
- #define is_queue_stopped(a)	netif_queue_stopped(a)
- #define wake_net_dev(a)	netif_wake_queue(a)
- #define is_dev_running(a)	netif_running(a)
- #define wan_dev_kfree_skb(a,b)	dev_kfree_skb_any(a)
-
-
-#elif LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
-
- #define LINUX_2_1
- #define netdevice_t struct device
- #define FREE_READ 1
- #define FREE_WRITE 0
-
- #define stop_net_queue(a) 	(set_bit(0, &##a->tbusy)) 
- #define start_net_queue(a) 	(clear_bit(0,&##a->tbusy))
- #define is_queue_stopped(a)	(##a->tbusy)
- #define wake_net_dev(a)	{clear_bit(0,&##a->tbusy);mark_bh(NET_BH);}
- #define is_dev_running(a)	(test_bit(0,&##a->start))
- #define wan_dev_kfree_skb(a,b)	dev_kfree_skb(a)
-
-#else
- #define LINUX_2_0
- #define netdevice_t struct device
-
- #define test_and_set_bit set_bit
- #define net_ratelimit() 1 
-
- #define stop_net_queue(a) 	(set_bit(0, &##a->tbusy)) 
- #define start_net_queue(a) 	(clear_bit(0,&##a->tbusy))
- #define is_queue_stopped(a)	(##a->tbusy)
- #define wake_net_dev(a)	{clear_bit(0,&##a->tbusy);mark_bh(NET_BH);}
- #define is_dev_running(a)	(test_bit(0,(void*)&##a->start))
- #define wan_dev_kfree_skb(a,b) dev_kfree_skb(a,b)  		 
- #define spin_lock_init(a)
- #define spin_lock(a)
- #define spin_unlock(a)
-#endif
+#define netdevice_t struct net_device
 
 #include <linux/wanrouter.h>
 
@@ -121,21 +69,11 @@
 #define MAX_LCN_NUM	4095	/* Maximum lcn number */
 #define MAX_FT1_RETRY 	100
 
-#ifdef LINUX_2_4
-  #ifndef AF_WANPIPE
+#ifndef AF_WANPIPE
 	#define AF_WANPIPE 25
 	#ifndef PF_WANPIPE
 		#define PF_WANPIPE AF_WANPIPE
 	#endif
-  #endif
-
-#else
-  #ifndef AF_WANPIPE
-	#define AF_WANPIPE 24
-	#ifndef PF_WANPIPE
-		#define PF_WANPIPE AF_WANPIPE
-	#endif
-  #endif
 #endif
 
 
@@ -321,12 +259,10 @@ typedef struct {
 #include <linux/sdladrv.h>	/* SDLA support module API definitions */
 #include <linux/sdlasfm.h>	/* SDLA firmware module definitions */
 #include <linux/workqueue.h>
-#ifdef LINUX_2_4
-  #include <linux/serial.h>
-  #include <linux/serialP.h>
-  #include <linux/serial_reg.h>
-  #include <asm/serial.h>
-#endif
+#include <linux/serial.h>
+#include <linux/serialP.h>
+#include <linux/serial_reg.h>
+#include <asm/serial.h>
 #include <linux/tty.h>
 #include <linux/tty_driver.h>
 #include <linux/tty_flip.h>

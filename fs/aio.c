@@ -76,7 +76,7 @@ static int __init aio_setup(void)
 
 	aio_wq = create_workqueue("aio");
 
-	printk(KERN_NOTICE "aio_setup: sizeof(struct page) = %d\n", (int)sizeof(struct page));
+	pr_debug("aio_setup: sizeof(struct page) = %d\n", (int)sizeof(struct page));
 
 	return 0;
 }
@@ -1193,7 +1193,7 @@ asmlinkage long sys_io_cancel(aio_context_t ctx_id, struct iocb *iocb,
 
 	if (NULL != cancel) {
 		struct io_event tmp;
-		printk("calling cancel\n");
+		pr_debug("calling cancel\n");
 		memset(&tmp, 0, sizeof(tmp));
 		tmp.obj = (u64)(unsigned long)kiocb->ki_user_obj;
 		tmp.data = kiocb->ki_user_data;

@@ -45,6 +45,9 @@ SECTIONS
 			*(.initcall6.init)
 			*(.initcall7.init)
 		__initcall_end = .;
+		__con_initcall_start = .;
+			*(.con_initcall.init)
+		__con_initcall_end = .;
 		. = ALIGN(32);
 		__initramfs_start = .;
 			usr/built-in.o(.init.ramfs)

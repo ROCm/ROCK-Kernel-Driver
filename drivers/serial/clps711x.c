@@ -567,10 +567,11 @@ static struct console clps711x_console = {
 	.index		= -1,
 };
 
-void __init clps711xuart_console_init(void)
+static void __init clps711xuart_console_init(void)
 {
 	register_console(&clps711x_console);
 }
+console_initcall(clps711xuart_console_init);
 
 #define CLPS711X_CONSOLE	&clps711x_console
 #else

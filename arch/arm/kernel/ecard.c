@@ -37,7 +37,6 @@
 #include <linux/mm.h>
 #include <linux/slab.h>
 #include <linux/proc_fs.h>
-#include <linux/notifier.h>
 #include <linux/device.h>
 #include <linux/init.h>
 
@@ -57,7 +56,7 @@
 
 enum req {
 	req_readbytes,
-	req_reset_all
+	req_reset
 };
 
 struct ecard_request {
@@ -131,14 +130,11 @@ slot_to_ecard(unsigned int slot)
 #define POD_INT_ADDR(x)	((volatile unsigned char *)\
 			 ((BUS_ADDR((x)) - IO_BASE) + IO_START))
 
-static inline void ecard_task_reset(void)
+static inline void ecard_task_reset(struct ecard_request *req)
 {
-	ecard_t *ec;
-
-	for (ec = cards; ec; ec = ec->next)
-		if (ec->loader)
-			ecard_loader_reset(POD_INT_ADDR(ec->podaddr),
-					   ec->loader);
+	struct expansion_card *ec = req->ec;
+	if (ec->loader)
+		ecard_loader_reset(POD_INT_ADDR(ec->podaddr), ec->loader);
 }
 
 static void
@@ -218,8 +214,8 @@ static void ecard_do_request(struct ecard_request *req)
 		ecard_task_readbytes(req);
 		break;
 
-	case req_reset_all:
-		ecard_task_reset();
+	case req_reset:
+		ecard_task_reset(req);
 		break;
 	}
 }
@@ -354,60 +350,6 @@ ecard_call(struct ecard_request *req)
 #endif
 
 /* ======================= Mid-level card control ===================== */
-
-/*
- * This function is responsible for resetting the expansion cards to a
- * sensible state immediately prior to rebooting the system.  This function
- * has process state (keventd), so we can sleep.
- *
- * Possible "val" values here:
- *  SYS_RESTART   -  restarting system
- *  SYS_HALT      - halting system
- *  SYS_POWER_OFF - powering down system
- *
- * We ignore all calls, unless it is a SYS_RESTART call - power down/halts
- * will be followed by a SYS_RESTART if ctrl-alt-del is pressed again.
- */
-static int ecard_reboot(struct notifier_block *me, unsigned long val, void *v)
-{
-	struct ecard_request req;
-
-	if (val != SYS_RESTART)
-		return 0;
-
-	/*
-	 * Disable the expansion card interrupt
-	 */
-	disable_irq(IRQ_EXPANSIONCARD);
-
-	/*
-	 * If we have any expansion card loader code which will handle
-	 * the reset for us, call it now.
-	 */
-	req.req = req_reset_all;
-	ecard_call(&req);
-
-	/*
-	 * Disable the expansion card interrupt again, just to be sure.
-	 */
-	disable_irq(IRQ_EXPANSIONCARD);
-
-	/*
-	 * Finally, reset the expansion card interrupt mask to
-	 * all enable (RISC OS doesn't set this)
-	 */
-#ifdef HAS_EXPMASK
-	have_expmask = ~0;
-	__raw_writeb(have_expmask, EXPMASK_ENABLE);
-#endif
-	return 0;
-}
-
-static struct notifier_block ecard_reboot_notifier = {
-	.notifier_call	= ecard_reboot,
-};
-
-
 
 static void
 ecard_readbytes(void *addr, ecard_t *ec, int off, int len, int useld)
@@ -1083,11 +1025,6 @@ static int __init ecard_init(void)
 {
 	int slot, irqhw;
 
-	/*
-	 * Register our reboot notifier
-	 */
-	register_reboot_notifier(&ecard_reboot_notifier);
-
 #ifdef CONFIG_CPU_32
 	init_waitqueue_head(&ecard_wait);
 #endif
@@ -1158,11 +1095,32 @@ static int ecard_drv_remove(struct device *dev)
 	return 0;
 }
 
+/*
+ * Before rebooting, we must make sure that the expansion card is in a
+ * sensible state, so it can be re-detected.  This means that the first
+ * page of the ROM must be visible.  We call the expansion cards reset
+ * handler, if any.
+ */
+static void ecard_drv_shutdown(struct device *dev)
+{
+	struct expansion_card *ec = ECARD_DEV(dev);
+	struct ecard_driver *drv = ECARD_DRV(dev->driver);
+	struct ecard_request req;
+
+	if (drv->shutdown)
+		drv->shutdown(ec);
+	ecard_release(ec);
+	req.req = req_reset;
+	req.ec = ec;
+	ecard_call(&req);
+}
+
 int ecard_register_driver(struct ecard_driver *drv)
 {
 	drv->drv.bus = &ecard_bus_type;
 	drv->drv.probe = ecard_drv_probe;
 	drv->drv.remove = ecard_drv_remove;
+	drv->drv.shutdown = ecard_drv_shutdown;
 
 	return driver_register(&drv->drv);
 }

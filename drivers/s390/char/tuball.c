@@ -131,7 +131,7 @@ __initfunc (long tub3270_con_init(long kmem_start, long kmem_end))
 #else
 #define tub3270_con_devno console_device
 
-void __init tub3270_con_init(void)
+static void __init tub3270_con_init(void)
 {
 	tub3270_con_bcb.bc_len = 65536;
 	if (!CONSOLE_IS_3270)
@@ -140,6 +140,8 @@ void __init tub3270_con_init(void)
 		tub3270_con_bcb.bc_len);
 	register_console(&tub3270_con);
 }
+console_initcall(tub3270_con_init);
+
 #endif
 
 static kdev_t

@@ -1,16 +1,6 @@
 /*
- * $Id: via82cxxx.c,v 3.35-ac2 2002/09/111 Alan Exp $
  *
- *  Copyright (c) 2000-2001 Vojtech Pavlik
- *
- *  Based on the work of:
- *	Michel Aubry
- *	Jeff Garzik
- *	Andre Hedrick
- */
-
-/*
- * Version 3.35
+ * Version 3.36
  *
  * VIA IDE driver for Linux. Supported southbridges:
  *
@@ -24,6 +14,10 @@
  *	Michel Aubry
  *	Jeff Garzik
  *	Andre Hedrick
+ *
+ * Documentation:
+ *	Obsolete device documentation publically available from via.com.tw
+ *	Current device documentation available under NDA only
  */
 
 /*
@@ -67,6 +61,7 @@
 #define VIA_SET_FIFO		0x040	/* Needs to have FIFO split set */
 #define VIA_NO_UNMASK		0x080	/* Doesn't work with IRQ unmasking on */
 #define VIA_BAD_ID		0x100	/* Has wrong vendor ID (0x1107) */
+#define VIA_BAD_AST		0x200	/* Don't touch Address Setup Timing */
 
 /*
  * VIA SouthBridge chips.
@@ -82,8 +77,8 @@ static struct via_isa_bridge {
 #ifdef FUTURE_BRIDGES
 	{ "vt8237",	PCI_DEVICE_ID_VIA_8237,     0x00, 0x2f, VIA_UDMA_133 },
 #endif
-	{ "vt8235",	PCI_DEVICE_ID_VIA_8235,     0x00, 0x2f, VIA_UDMA_133 },
-	{ "vt8233a",	PCI_DEVICE_ID_VIA_8233A,    0x00, 0x2f, VIA_UDMA_133 },
+	{ "vt8235",	PCI_DEVICE_ID_VIA_8235,     0x00, 0x2f, VIA_UDMA_133 | VIA_BAD_AST },
+	{ "vt8233a",	PCI_DEVICE_ID_VIA_8233A,    0x00, 0x2f, VIA_UDMA_133 | VIA_BAD_AST },
 	{ "vt8233c",	PCI_DEVICE_ID_VIA_8233C_0,  0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt8233",	PCI_DEVICE_ID_VIA_8233_0,   0x00, 0x2f, VIA_UDMA_100 },
 	{ "vt8231",	PCI_DEVICE_ID_VIA_8231,     0x00, 0x2f, VIA_UDMA_100 },
@@ -152,7 +147,7 @@ static int via_get_info(char *buffer, char **addr, off_t offset, int count)
 	via_print("----------VIA BusMastering IDE Configuration"
 		"----------------");
 
-	via_print("Driver Version:                     3.35-ac");
+	via_print("Driver Version:                     3.36");
 	via_print("South Bridge:                       VIA %s",
 		via_config->name);
 
@@ -292,9 +287,11 @@ static void via_set_speed(struct pci_dev *dev, u8 dn, struct ide_timing *timing)
 {
 	u8 t;
 
-	pci_read_config_byte(dev, VIA_ADDRESS_SETUP, &t);
-	t = (t & ~(3 << ((3 - dn) << 1))) | ((FIT(timing->setup, 1, 4) - 1) << ((3 - dn) << 1));
-	pci_write_config_byte(dev, VIA_ADDRESS_SETUP, t);
+	if (~via_config->flags & VIA_BAD_AST) {
+		pci_read_config_byte(dev, VIA_ADDRESS_SETUP, &t);
+		t = (t & ~(3 << ((3 - dn) << 1))) | ((FIT(timing->setup, 1, 4) - 1) << ((3 - dn) << 1));
+		pci_write_config_byte(dev, VIA_ADDRESS_SETUP, t);
+	}
 
 	pci_write_config_byte(dev, VIA_8BIT_TIMING + (1 - (dn >> 1)),
 		((FIT(timing->act8b, 1, 16) - 1) << 4) | (FIT(timing->rec8b, 1, 16) - 1));

@@ -198,12 +198,6 @@ void cpc_tty_init(pc300dev_t *pc300dev)
 	int port, aux;
 	st_cpc_tty_area * cpc_tty;
 
-	if (LINUX_VERSION_CODE < KERNEL_VERSION(2,4,0)) {
-		printk("%s-tty: Error: TTY driver is supported on 2.4.X kernel!\n",
-			((struct net_device*)(pc300dev->hdlc))->name);
-		return;
-	}
-	
 	/* hdlcX - X=interface number */
 	port = ((struct net_device*)(pc300dev->hdlc))->name[4] - '0';
 	if (port >= CPC_TTY_NPORTS) {

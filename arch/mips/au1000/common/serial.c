@@ -3054,10 +3054,11 @@ static struct console sercons = {
 /*
  *	Register console.
  */
-void __init au1000_serial_console_init(void)
+static void __init au1000_serial_console_init(void)
 {
 	register_console(&sercons);
 }
+console_initcall(au1000_serial_console_init);
 #endif
 
 /*

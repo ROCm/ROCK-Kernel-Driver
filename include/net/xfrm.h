@@ -492,85 +492,8 @@ extern int xfrm6_register_type(struct xfrm_type *type);
 extern int xfrm6_unregister_type(struct xfrm_type *type);
 extern struct xfrm_type *xfrm6_get_type(u8 proto);
 
-struct ah_data
-{
-	u8			*key;
-	int			key_len;
-	u8			*work_icv;
-	int			icv_full_len;
-	int			icv_trunc_len;
-
-	void			(*icv)(struct ah_data*,
-	                               struct sk_buff *skb, u8 *icv);
-
-	struct crypto_tfm	*tfm;
-};
-
-struct esp_data
-{
-	/* Confidentiality */
-	struct {
-		u8			*key;		/* Key */
-		int			key_len;	/* Key length */
-		u8			*ivec;		/* ivec buffer */
-		/* ivlen is offset from enc_data, where encrypted data start.
-		 * It is logically different of crypto_tfm_alg_ivsize(tfm).
-		 * We assume that it is either zero (no ivec), or
-		 * >= crypto_tfm_alg_ivsize(tfm). */
-		int			ivlen;
-		int			padlen;		/* 0..255 */
-		struct crypto_tfm	*tfm;		/* crypto handle */
-	} conf;
-
-	/* Integrity. It is active when icv_full_len != 0 */
-	struct {
-		u8			*key;		/* Key */
-		int			key_len;	/* Length of the key */
-		u8			*work_icv;
-		int			icv_full_len;
-		int			icv_trunc_len;
-		void			(*icv)(struct esp_data*,
-		                               struct sk_buff *skb,
-		                               int offset, int len, u8 *icv);
-		struct crypto_tfm	*tfm;
-	} auth;
-};
-
+struct crypto_tfm;
 typedef void (icv_update_fn_t)(struct crypto_tfm *, struct scatterlist *, unsigned int);
-extern void skb_ah_walk(const struct sk_buff *skb,
-                        struct crypto_tfm *tfm, icv_update_fn_t icv_update);
-extern void skb_icv_walk(const struct sk_buff *skb, struct crypto_tfm *tfm,
-			int offset, int len, icv_update_fn_t icv_update);
-extern int skb_to_sgvec(struct sk_buff *skb, struct scatterlist *sg, int offset, int len);
-extern int skb_cow_data(struct sk_buff *skb, int tailbits, struct sk_buff **trailer);
-extern void *pskb_put(struct sk_buff *skb, struct sk_buff *tail, int len);
-
-static inline void
-ah_hmac_digest(struct ah_data *ahp, struct sk_buff *skb, u8 *auth_data)
-{
-	struct crypto_tfm *tfm = ahp->tfm;
-
-	memset(auth_data, 0, ahp->icv_trunc_len);
-	crypto_hmac_init(tfm, ahp->key, &ahp->key_len);
-	skb_ah_walk(skb, tfm, crypto_hmac_update);
-	crypto_hmac_final(tfm, ahp->key, &ahp->key_len, ahp->work_icv);
-	memcpy(auth_data, ahp->work_icv, ahp->icv_trunc_len);
-}
-
-static inline void
-esp_hmac_digest(struct esp_data *esp, struct sk_buff *skb, int offset,
-                int len, u8 *auth_data)
-{
-	struct crypto_tfm *tfm = esp->auth.tfm;
-	char *icv = esp->auth.work_icv;
-
-	memset(auth_data, 0, esp->auth.icv_trunc_len);
-	crypto_hmac_init(tfm, esp->auth.key, &esp->auth.key_len);
-	skb_icv_walk(skb, tfm, offset, len, crypto_hmac_update);
-	crypto_hmac_final(tfm, esp->auth.key, &esp->auth.key_len, icv);
-	memcpy(auth_data, icv, esp->auth.icv_trunc_len);
-}
-
 
 typedef int (xfrm_dst_lookup_t)(struct xfrm_dst **dst, struct flowi *fl);
 int xfrm_dst_lookup_register(xfrm_dst_lookup_t *dst_lookup, unsigned short family);

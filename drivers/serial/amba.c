@@ -705,10 +705,11 @@ static struct console amba_console = {
 	.index		= -1,
 };
 
-void __init ambauart_console_init(void)
+static void __init ambauart_console_init(void)
 {
 	register_console(&amba_console);
 }
+console_initcall(ambauart_console_init);
 
 #define AMBA_CONSOLE	&amba_console
 #else

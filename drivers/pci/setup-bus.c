@@ -350,6 +350,7 @@ pci_bus_assign_resources(struct pci_bus *bus)
 {
 	struct pci_bus *b;
 	int found_vga = pbus_assign_resources_sorted(bus);
+	struct pci_dev *dev;
 
 	if (found_vga) {
 		/* Propagate presence of the VGA to upstream bridges */
@@ -357,9 +358,12 @@ pci_bus_assign_resources(struct pci_bus *bus)
 			b->resource[0]->flags |= IORESOURCE_BUS_HAS_VGA;
 		}
 	}
-	list_for_each_entry(b, &bus->children, node) {
-		pci_bus_assign_resources(b);
-		pci_setup_bridge(b);
+	list_for_each_entry(dev, &bus->devices, bus_list) {
+		b = dev->subordinate;
+		if (b) {
+			pci_bus_assign_resources(b);
+			pci_setup_bridge(b);
+		}
 	}
 }
 EXPORT_SYMBOL(pci_bus_assign_resources);

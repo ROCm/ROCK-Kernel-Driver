@@ -291,4 +291,25 @@ enum usb_device_speed {
 	USB_SPEED_HIGH				/* usb 2.0 */
 };
 
+enum usb_device_state {
+	/* NOTATTACHED isn't in the USB spec, and this state acts
+	 * the same as ATTACHED ... but it's clearer this way.
+	 */
+	USB_STATE_NOTATTACHED = 0,
+
+	/* the chapter 9 device states */
+	USB_STATE_ATTACHED,
+	USB_STATE_POWERED,
+	USB_STATE_DEFAULT,			/* limited function */
+	USB_STATE_ADDRESS,
+	USB_STATE_CONFIGURED,			/* most functions */
+
+	USB_STATE_SUSPENDED
+
+	/* NOTE:  there are actually four different SUSPENDED
+	 * states, returning to POWERED, DEFAULT, ADDRESS, or
+	 * CONFIGURED respectively when SOF tokens flow again.
+	 */
+};
+
 #endif	/* __LINUX_USB_CH9_H */

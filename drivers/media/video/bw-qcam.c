@@ -83,11 +83,9 @@ static unsigned int maxpoll=250;   /* Maximum busy-loop count for qcam I/O */
 static unsigned int yieldlines=4;  /* Yield after this many during capture */
 static int video_nr = -1;
 
-#if LINUX_VERSION_CODE >= 0x020117
 MODULE_PARM(maxpoll,"i");
 MODULE_PARM(yieldlines,"i");   
 MODULE_PARM(video_nr,"i");
-#endif
 
 static inline int read_lpstatus(struct qcam_device *q)
 {

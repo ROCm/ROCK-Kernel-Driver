@@ -178,12 +178,8 @@ extern int ip_fw_masq_timeouts(void *, int);
 
 #include <linux/config.h>
 #include <linux/version.h>
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,1,0)
 #include <linux/init.h>
 extern void ip_fw_init(void) __init;
-#else /* 2.0.x */
-extern void ip_fw_init(void);
-#endif /* 2.1.x */
 extern int ip_fw_ctl(int, void *, int);
 #ifdef CONFIG_IP_MASQUERADE
 extern int ip_masq_uctl(int, char *, int);

@@ -47,7 +47,6 @@ static char *_riocmd_c_sccs_ = "@(#)riocmd.c	1.2";
 #include <linux/termios.h>
 #include <linux/serial.h>
 
-#include <linux/compatmac.h>
 #include <linux/generic_serial.h>
 
 #include "linux_compat.h"

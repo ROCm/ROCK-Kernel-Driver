@@ -213,11 +213,17 @@ static void __init system3_init_irq(void)
 static int sdram_notifier(struct notifier_block *nb, unsigned long event,
 		void *data)
 {
+	struct cpufreq_policy *policy = data;
 	switch (event) {
-		case CPUFREQ_MINMAX:
-			cpufreq_updateminmax(data, 147500, 206000);
+		case CPUFREQ_ADJUST:
+		case CPUFREQ_INCOMPATIBLE:
+			cpufreq_verify_within_limits(policy, 147500, 206000);
 			break;
-
+		case CPUFREQ_NOTIFY:
+			if ((policy->min < 147500) || 
+			    (policy->max > 206000))
+				panic("cpufreq failed to limit the speed\n");
+			break;
 	}
 	return 0;
 }
@@ -405,7 +411,7 @@ static int __init system3_init(void)
 		goto DONE;
 	}
 
-#if defined( CONFIG_CPU_FREQ )
+#ifdef CONFIG_CPU_FREQ
 	ret = cpufreq_register_notifier(&system3_clkchg_block);
 	if ( ret != 0 ) {
 		printk( KERN_WARNING"PT Digital Board: could not register clock scale callback\n" );

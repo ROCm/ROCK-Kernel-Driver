@@ -63,6 +63,13 @@ SECTIONS
   .init.ramfs : { *(.init.ramfs) }
   __initramfs_end = .;
 
+  . = ALIGN(8);
+  .con_initcall.init : {
+	__con_initcall_start = .;
+	*(.con_initcall.init)
+	__con_initcall_end = .;
+  }
+
   . = ALIGN(64);
   __per_cpu_start = .;
   .data.percpu : { *(.data.percpu) }

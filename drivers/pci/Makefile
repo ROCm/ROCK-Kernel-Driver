@@ -2,7 +2,7 @@
 # Makefile for the PCI bus specific drivers.
 #
 
-obj-y		+= access.o probe.o pci.o pool.o quirks.o \
+obj-y		+= access.o bus.o probe.o pci.o pool.o quirks.o \
 			names.o pci-driver.o search.o hotplug.o \
 			pci-sysfs.o
 obj-$(CONFIG_PM)  += power.o

@@ -63,7 +63,6 @@ extern void ia64_ssc_connect_irq (long intr, long irq);
 
 static char *serial_name = "SimSerial driver";
 static char *serial_version = "0.6";
-static spinlock_t serial_lock = SPIN_LOCK_UNLOCKED;
 
 /*
  * This has been extracted from asm/serial.h. We need one eventually but
@@ -235,14 +234,14 @@ static void rs_put_char(struct tty_struct *tty, unsigned char ch)
 
 	if (!tty || !info->xmit.buf) return;
 
-	spin_lock_irqsave(&serial_lock, flags);
+	local_irq_save(flags);
 	if (CIRC_SPACE(info->xmit.head, info->xmit.tail, SERIAL_XMIT_SIZE) == 0) {
-		spin_unlock_irqrestore(&serial_lock, flags);
+		local_irq_restore(flags);
 		return;
 	}
 	info->xmit.buf[info->xmit.head] = ch;
 	info->xmit.head = (info->xmit.head + 1) & (SERIAL_XMIT_SIZE-1);
-	spin_unlock_irqrestore(&serial_lock, flags);
+	local_irq_restore(flags);
 }
 
 static _INLINE_ void transmit_chars(struct async_struct *info, int *intr_done)
@@ -250,7 +249,8 @@ static _INLINE_ void transmit_chars(struct async_struct *info, int *intr_done)
 	int count;
 	unsigned long flags;
 
-	spin_lock_irqsave(&serial_lock, flags);
+
+	local_irq_save(flags);
 
 	if (info->x_char) {
 		char c = info->x_char;
@@ -293,7 +293,7 @@ static _INLINE_ void transmit_chars(struct async_struct *info, int *intr_done)
 		info->xmit.tail += count;
 	}
 out:
-	spin_unlock_irqrestore(&serial_lock, flags);
+	local_irq_restore(flags);
 }
 
 static void rs_flush_chars(struct tty_struct *tty)
@@ -334,7 +334,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 				break;
 			}
 
-			spin_lock_irqsave(&serial_lock, flags);
+			local_irq_save(flags);
 			{
 				c1 = CIRC_SPACE_TO_END(info->xmit.head, info->xmit.tail,
 						       SERIAL_XMIT_SIZE);
@@ -344,7 +344,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 				info->xmit.head = ((info->xmit.head + c) &
 						   (SERIAL_XMIT_SIZE-1));
 			}
-			spin_unlock_irqrestore(&serial_lock, flags);
+			local_irq_restore(flags);
 
 			buf += c;
 			count -= c;
@@ -352,7 +352,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 		}
 		up(&tmp_buf_sem);
 	} else {
-		spin_lock_irqsave(&serial_lock, flags);
+		local_irq_save(flags);
 		while (1) {
 			c = CIRC_SPACE_TO_END(info->xmit.head, info->xmit.tail, SERIAL_XMIT_SIZE);
 			if (count < c)
@@ -367,7 +367,7 @@ static int rs_write(struct tty_struct * tty, int from_user,
 			count -= c;
 			ret += c;
 		}
-		spin_unlock_irqrestore(&serial_lock, flags);
+		local_irq_restore(flags);
 	}
 	/*
 	 * Hey, we transmit directly from here in our case
@@ -398,9 +398,9 @@ static void rs_flush_buffer(struct tty_struct *tty)
 	struct async_struct *info = (struct async_struct *)tty->driver_data;
 	unsigned long flags;
 
-	spin_lock_irqsave(&serial_lock, flags);
+	local_irq_save(flags);
 	info->xmit.head = info->xmit.tail = 0;
-	spin_unlock_irqrestore(&serial_lock, flags);
+	local_irq_restore(flags);
 
 	wake_up_interruptible(&tty->write_wait);
 
@@ -573,7 +573,7 @@ static void shutdown(struct async_struct * info)
 	       state->irq);
 #endif
 
-	spin_lock_irqsave(&serial_lock, flags);
+	local_irq_save(flags);
 	{
 		/*
 		 * First unlink the serial port from the IRQ chain...
@@ -611,7 +611,7 @@ static void shutdown(struct async_struct * info)
 
 		info->flags &= ~ASYNC_INITIALIZED;
 	}
-	spin_unlock_irqrestore(&serial_lock, flags);
+	local_irq_restore(flags);
 }
 
 /*
@@ -634,13 +634,13 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 
 	state = info->state;
 
-	spin_lock_irqsave(&serial_lock, flags);
+	local_irq_save(flags);
 	if (tty_hung_up_p(filp)) {
 #ifdef SIMSERIAL_DEBUG
 		printk("rs_close: hung_up\n");
 #endif
 		MOD_DEC_USE_COUNT;
-		spin_unlock_irqrestore(&serial_lock, flags);
+		local_irq_restore(flags);
 		return;
 	}
 #ifdef SIMSERIAL_DEBUG
@@ -665,11 +665,11 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	if (state->count) {
 		MOD_DEC_USE_COUNT;
-		spin_unlock_irqrestore(&serial_lock, flags);
+		local_irq_restore(flags);
 		return;
 	}
 	info->flags |= ASYNC_CLOSING;
-	spin_unlock_irqrestore(&serial_lock, flags);
+	local_irq_restore(flags);
 
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify
@@ -776,7 +776,7 @@ startup(struct async_struct *info)
 	if (!page)
 		return -ENOMEM;
 
-	spin_lock_irqsave(&serial_lock, flags);
+	local_irq_save(flags);
 
 	if (info->flags & ASYNC_INITIALIZED) {
 		free_page(page);
@@ -857,11 +857,11 @@ startup(struct async_struct *info)
 	}
 
 	info->flags |= ASYNC_INITIALIZED;
-	spin_unlock_irqrestore(&serial_lock, flags);
+	local_irq_restore(flags);
 	return 0;
 
 errout:
-	spin_unlock_irqrestore(&serial_lock, flags);
+	local_irq_restore(flags);
 	return retval;
 }
 

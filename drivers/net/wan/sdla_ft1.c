@@ -252,8 +252,6 @@ static int wpft1_exec(sdla_t *card, void *u_cmd, void *u_data)
 	CHDLC_MAILBOX_STRUCT* mbox = card->mbox;
 	int len;
 
-	
-#if defined(LINUX_2_1) || defined(LINUX_2_4)
 	if (copy_from_user((void*)&mbox->command, u_cmd, sizeof(ft1_exec_cmd_t))){
 		return -EFAULT;
 	}
@@ -281,36 +279,6 @@ static int wpft1_exec(sdla_t *card, void *u_cmd, void *u_data)
 	if (len && u_data && copy_to_user(u_data, (void*)&mbox->data, len)){
 		return -EFAULT;
 	}
-
-#else
-
-        if (!u_cmd || verify_area(VERIFY_WRITE, u_cmd, sizeof(ft1_exec_cmd_t))){
-                return -EFAULT;
-	}
-
-        memcpy_fromfs((void*)&mbox->command, u_cmd, sizeof(ft1_exec_cmd_t));
-
-	len = mbox->buffer_length;
-
-        if (len) {
-                if (!u_data || verify_area(VERIFY_READ, u_data, len))
-                        return -EFAULT;
-		memcpy_fromfs((void*)&mbox->data, u_data, len);
-        }
-
-        /* execute command */
-        if (!sdla_exec(mbox))
-               	return -EIO;
-
-        /* return result */
-        memcpy_tofs(u_cmd, (void*)&mbox->command, sizeof(ft1_exec_cmd_t));
-        len = mbox->buffer_length;
-
-        if (len && u_data && !verify_area(VERIFY_WRITE, u_data, len)){
-                memcpy_tofs(u_data, (void*)&mbox->data, len);
-	}
-
-#endif
 
 	return 0;
 

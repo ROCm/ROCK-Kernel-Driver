@@ -208,7 +208,8 @@ rpc_destroy_client(struct rpc_clnt *clnt)
 		rpcauth_destroy(clnt->cl_auth);
 		clnt->cl_auth = NULL;
 	}
-	rpc_rmdir(clnt->cl_pathname);
+	if (clnt->cl_pathname[0])
+		rpc_rmdir(clnt->cl_pathname);
 	if (clnt->cl_xprt) {
 		xprt_destroy(clnt->cl_xprt);
 		clnt->cl_xprt = NULL;
