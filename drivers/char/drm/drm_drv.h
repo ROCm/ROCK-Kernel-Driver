@@ -67,9 +67,6 @@
 #ifndef __HAVE_MULTIPLE_DMA_QUEUES
 #define __HAVE_MULTIPLE_DMA_QUEUES	0
 #endif
-#ifndef __HAVE_DMA_SCHEDULE
-#define __HAVE_DMA_SCHEDULE		0
-#endif
 #ifndef __HAVE_COUNTERS
 #define __HAVE_COUNTERS			0
 #endif
@@ -1116,10 +1113,6 @@ int DRM(unlock)( struct inode *inode, struct file *filp,
 		DRM(lock_transfer)( dev, &dev->lock.hw_lock->lock, 
 				    DRM_KERNEL_CONTEXT );
 		
-#if __HAVE_DMA_SCHEDULE
-		DRM(dma_schedule)( dev, 1 );
-#endif
-
 		if ( DRM(lock_free)( dev, &dev->lock.hw_lock->lock,
 				     DRM_KERNEL_CONTEXT ) ) {
 			DRM_ERROR( "\n" );

@@ -81,10 +81,8 @@
 #define __HAVE_DMA_WAITQUEUE		1
 
 #define __HAVE_DMA_WAITLIST		1
-/* removed from DRM HAVE_DMA_FREELIST */
-//#define __HAVE_DMA_FREELIST		1
 
-#define __HAVE_DMA_SCHEDULE		1
+/* removed from DRM HAVE_DMA_FREELIST & HAVE_DMA_SCHEDULE */
 
 #define __HAVE_IRQ			1
 #define __HAVE_IRQ_BH			1
