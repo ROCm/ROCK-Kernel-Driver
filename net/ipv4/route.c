@@ -2419,7 +2419,7 @@ struct ip_rt_acct *ip_rt_acct;
 /* This code sucks.  But you should have seen it before! --RR */
 
 /* IP route accounting ptr for this logical cpu number. */
-#define IP_RT_ACCT_CPU(i) (ip_rt_acct + cpu_logical_map(i) * 256)
+#define IP_RT_ACCT_CPU(i) (ip_rt_acct + i * 256)
 
 static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 			   int length, int *eof, void *data)
@@ -2441,6 +2441,8 @@ static int ip_rt_acct_read(char *buffer, char **start, off_t offset,
 	/* Add the other cpus in, one int at a time */
 	for (i = 1; i < NR_CPUS; i++) {
 		unsigned int j;
+		if (!cpu_online(i))
+			continue;
 		for (j = 0; j < length/4; j++)
 			((u32*)buffer)[j] += ((u32*)IP_RT_ACCT_CPU(i))[j];
 	}
