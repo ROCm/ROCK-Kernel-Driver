@@ -1,9 +1,5 @@
 #include <media/saa7146_vv.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME saa7146
-#endif
-
 #define BOARD_CAN_DO_VBI(dev)   (dev->revision != 0 && dev->vv_data->vbi_minor != -1) 
 
 /********************************************************************************/
@@ -111,7 +107,7 @@ void saa7146_buffer_next(struct saa7146_dev *dev,
 
 			saa7146_write(dev, PROT_ADDR1, 0);
 			/* write the address of the rps-program */
-			saa7146_write(dev, RPS_ADDR0, virt_to_bus(&dev->rps0[ 0]));
+			saa7146_write(dev, RPS_ADDR0, dev->d_rps0.dma_handle);
 			/* turn on rps */
 			saa7146_write(dev, MC1, (MASK_12 | MASK_28));
 		}
@@ -322,11 +318,11 @@ static ssize_t fops_read(struct file *file, char *data, size_t count, loff_t *pp
 
 	switch (fh->type) {
 	case V4L2_BUF_TYPE_VIDEO_CAPTURE: {
-		DEB_EE(("V4L2_BUF_TYPE_VIDEO_CAPTURE: file:%p, data:%p, count:%d\n",file, data, count));
+		DEB_EE(("V4L2_BUF_TYPE_VIDEO_CAPTURE: file:%p, data:%p, count:%lun", file, data, (unsigned long)count));
 		return saa7146_video_uops.read(file,data,count,ppos);
 		}
 	case V4L2_BUF_TYPE_VBI_CAPTURE: {
-		DEB_EE(("V4L2_BUF_TYPE_VBI_CAPTURE: file:%p, data:%p, count:%d\n",file, data, count));
+		DEB_EE(("V4L2_BUF_TYPE_VBI_CAPTURE: file:%p, data:%p, count:%lu\n", file, data, (unsigned long)count));
 		return saa7146_vbi_uops.read(file,data,count,ppos);
 		}
 		break;
@@ -393,13 +389,13 @@ int saa7146_vv_init(struct saa7146_dev* dev)
 	vv->video_minor = -1;
 	vv->vbi_minor = -1;
 
-	vv->clipping = (u32*)kmalloc(SAA7146_CLIPPING_MEM, GFP_KERNEL);
-	if( NULL == vv->clipping ) {
+	vv->d_clipping.cpu_addr = pci_alloc_consistent(dev->pci, SAA7146_CLIPPING_MEM, &vv->d_clipping.dma_handle);	
+	if( NULL == vv->d_clipping.cpu_addr ) {
 		ERR(("out of memory. aborting.\n"));
 		kfree(vv);
 		return -1;
 	}
-	memset(vv->clipping, 0x0, SAA7146_CLIPPING_MEM);
+	memset(vv->d_clipping.cpu_addr, 0x0, SAA7146_CLIPPING_MEM);
 
 	saa7146_video_uops.init(dev,vv);
 	saa7146_vbi_uops.init(dev,vv);
@@ -416,6 +412,7 @@ int saa7146_vv_release(struct saa7146_dev* dev)
 
 	DEB_EE(("dev:%p\n",dev));
  
+	pci_free_consistent(dev->pci, SAA7146_RPS_MEM, vv->d_clipping.cpu_addr, vv->d_clipping.dma_handle);
  	kfree(vv);
 	dev->vv_data = NULL;
 	dev->vv_callback = NULL;

@@ -1,10 +1,8 @@
 #include <media/saa7146_vv.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME saa7146
-#endif
-
 static int vbi_pixel_to_capture = 720 * 2;
+
+#define WRITE_RPS1(x) dev->d_rps1.cpu_addr[ count++ ] = cpu_to_le32(x)
 
 static
 int vbi_workaround(struct saa7146_dev *dev)
@@ -14,7 +12,7 @@ int vbi_workaround(struct saa7146_dev *dev)
         u32          *cpu;
         dma_addr_t   dma_addr;
 	
-	int i, index;
+	int i, count;
 
 	DECLARE_WAITQUEUE(wait, current);
 	
@@ -49,43 +47,43 @@ int vbi_workaround(struct saa7146_dev *dev)
 		saa7146_write(dev, NUM_LINE_BYTE3, (1<<16)|(2<<0));
 		saa7146_write(dev, MC2, MASK_04|MASK_20);
 	
-		index = 0;
+		count = 0;
 
 		/* load brs-control register */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (BRS_CTRL/4);
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
 		/* BXO = 1h, BRS to outbound */
-		dev->rps1[index++]=0xc000008c;   
+		WRITE_RPS1(0xc000008c);   
 		/* wait for vbi_a */
-		dev->rps1[index++] = CMD_PAUSE | MASK_10;
+		WRITE_RPS1(CMD_PAUSE | MASK_10);
 		/* upload brs */
-		dev->rps1[index++] = CMD_UPLOAD | MASK_08;
+		WRITE_RPS1(CMD_UPLOAD | MASK_08);
 		/* load brs-control register */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (BRS_CTRL/4);
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
 		/* BYO = 1, BXO = NQBIL (=1728 for PAL, for NTSC this is 858*2) - NumByte3 (=1440) = 288 */
-		dev->rps1[index++] = ((1728-(vbi_pixel_to_capture)) << 7) | MASK_19;
+		WRITE_RPS1(((1728-(vbi_pixel_to_capture)) << 7) | MASK_19);
 		/* wait for brs_done */
-		dev->rps1[index++] = CMD_PAUSE | MASK_08;
+		WRITE_RPS1(CMD_PAUSE | MASK_08);
 		/* upload brs */
-		dev->rps1[index++] = CMD_UPLOAD | MASK_08;
+		WRITE_RPS1(CMD_UPLOAD | MASK_08);
 		/* load video-dma3 NumLines3 and NumBytes3 */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (NUM_LINE_BYTE3/4);
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (NUM_LINE_BYTE3/4));
 		/* dev->vbi_count*2 lines, 720 pixel (= 1440 Bytes) */
-		dev->rps1[index++]= (2 << 16) | (vbi_pixel_to_capture);
+		WRITE_RPS1((2 << 16) | (vbi_pixel_to_capture));
 		/* load brs-control register */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (BRS_CTRL/4);
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (BRS_CTRL/4));
 		/* Set BRS right: note: this is an experimental value for BXO (=> PAL!) */
-		dev->rps1[index++] = (540 << 7) | (5 << 19);  // 5 == vbi_start  
+		WRITE_RPS1((540 << 7) | (5 << 19));  // 5 == vbi_start  
 		/* wait for brs_done */
-		dev->rps1[index++] = CMD_PAUSE | MASK_08;
+		WRITE_RPS1(CMD_PAUSE | MASK_08);
 		/* upload brs and video-dma3*/
-		dev->rps1[index++] = CMD_UPLOAD | MASK_08 | MASK_04;
+		WRITE_RPS1(CMD_UPLOAD | MASK_08 | MASK_04);
 		/* load mc2 register: enable dma3 */
-		dev->rps1[index++] = CMD_WR_REG | (1 << 8) | (MC1/4);
-		dev->rps1[index++] = MASK_20 | MASK_04;
+		WRITE_RPS1(CMD_WR_REG | (1 << 8) | (MC1/4));
+		WRITE_RPS1(MASK_20 | MASK_04);
 		/* generate interrupt */
-		dev->rps1[index++] = CMD_INTERRUPT;
+		WRITE_RPS1(CMD_INTERRUPT);
 		/* stop rps1 */
-		dev->rps1[index++] = CMD_STOP;
+		WRITE_RPS1(CMD_STOP);
 	
 		/* enable rps1 irqs */
 		IER_ENABLE(dev,MASK_28);
@@ -95,7 +93,7 @@ int vbi_workaround(struct saa7146_dev *dev)
 		current->state = TASK_INTERRUPTIBLE;
 
 		/* start rps1 to enable workaround */
-		saa7146_write(dev, RPS_ADDR1, virt_to_bus(&dev->rps1[ 0]));
+		saa7146_write(dev, RPS_ADDR1, dev->d_rps1.dma_handle);
 		saa7146_write(dev, MC1, (MASK_13 | MASK_29));	
 		
 		schedule();
@@ -164,33 +162,33 @@ void saa7146_set_vbi_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, s
 	   but by doing this, we can use the whole engine from video-buf.c... */
 	
 /*
-	dev->rps1[ count++ ] = CMD_PAUSE | CMD_OAN | CMD_SIG1 | e_wait;
-	dev->rps1[ count++ ] = CMD_PAUSE | CMD_OAN | CMD_SIG1 | o_wait;
+	WRITE_RPS1(CMD_PAUSE | CMD_OAN | CMD_SIG1 | e_wait);
+	WRITE_RPS1(CMD_PAUSE | CMD_OAN | CMD_SIG1 | o_wait);
 */
 	/* set bit 1 */
-	dev->rps1[ count++ ] = CMD_WR_REG | (1 << 8) | (MC2/4); 	
-	dev->rps1[ count++ ] = MASK_28 | MASK_12;
+	WRITE_RPS1(CMD_WR_REG | (1 << 8) | (MC2/4)); 	
+	WRITE_RPS1(MASK_28 | MASK_12);
 	
 	/* turn on video-dma3 */
-	dev->rps1[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-	dev->rps1[ count++ ] = MASK_04 | MASK_20;	    		/* => mask */
-	dev->rps1[ count++ ] = MASK_04 | MASK_20;			/* => values */
+	WRITE_RPS1(CMD_WR_REG_MASK | (MC1/4));		
+	WRITE_RPS1(MASK_04 | MASK_20);	    		/* => mask */
+	WRITE_RPS1(MASK_04 | MASK_20);			/* => values */
 	
 	/* wait for o_fid_a/b / e_fid_a/b toggle */
-	dev->rps1[ count++ ] = CMD_PAUSE | o_wait;
-	dev->rps1[ count++ ] = CMD_PAUSE | e_wait;
+	WRITE_RPS1(CMD_PAUSE | o_wait);
+	WRITE_RPS1(CMD_PAUSE | e_wait);
 
 	/* generate interrupt */
-	dev->rps1[ count++ ] = CMD_INTERRUPT;					
+	WRITE_RPS1(CMD_INTERRUPT);					
 
 	/* stop */
-	dev->rps1[ count++ ] = CMD_STOP;					
+	WRITE_RPS1(CMD_STOP);					
 
 	/* enable rps1 irqs */
 	IER_ENABLE(dev, MASK_28);
 
 	/* write the address of the rps-program */
-	saa7146_write(dev, RPS_ADDR1, virt_to_bus(&dev->rps1[ 0]));
+	saa7146_write(dev, RPS_ADDR1, dev->d_rps1.dma_handle);
 
 	/* turn on rps */
 	saa7146_write(dev, MC1, (MASK_13 | MASK_29));	

@@ -1,9 +1,5 @@
 #include <media/saa7146_vv.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME saa7146
-#endif
-
 #define my_min(type,x,y) \
 	({ type __x = (x), __y = (y); __x < __y ? __x: __y; })
 #define my_max(type,x,y) \
@@ -360,7 +356,7 @@ void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct saa7146_f
 	struct saa7146_video_dma *vdma2, u32* clip_format, u32* arbtr_ctrl, enum v4l2_field field)
 {
 	struct saa7146_vv *vv = dev->vv_data;
-	u32 *clipping = vv->clipping;
+	u32 *clipping = vv->d_clipping.cpu_addr;
 
 	int width = fh->ov.win.w.width;
 	int height =  fh->ov.win.w.height;
@@ -469,9 +465,9 @@ void calculate_clipping_registers_rect(struct saa7146_dev *dev, struct saa7146_f
 	*arbtr_ctrl &= 0xffff00ff;
 	*arbtr_ctrl |= 0x00001c00;	
 	
-	vdma2->base_even	= virt_to_bus(clipping);
-	vdma2->base_odd		= virt_to_bus(clipping);
-	vdma2->prot_addr	= virt_to_bus(clipping)+((sizeof(u32))*(numdwords));
+	vdma2->base_even	= vv->d_clipping.dma_handle;
+	vdma2->base_odd		= vv->d_clipping.dma_handle;
+	vdma2->prot_addr	= vv->d_clipping.dma_handle+((sizeof(u32))*(numdwords));
 	vdma2->base_page	= 0x04;
 	vdma2->pitch		= 0x00;
 	vdma2->num_line_byte	= (0 << 16 | (sizeof(u32))*(numdwords-1) );
@@ -953,6 +949,8 @@ int calculate_video_dma_grab_planar(struct saa7146_dev* dev, struct saa7146_buf 
 	return 0;
 }
 
+#define WRITE_RPS0(x) dev->d_rps0.cpu_addr[ count++ ] = cpu_to_le32(x)
+
 static
 void program_capture_engine(struct saa7146_dev *dev, int planar)
 {
@@ -962,58 +960,64 @@ void program_capture_engine(struct saa7146_dev *dev, int planar)
 	unsigned long e_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_E_FID_A : CMD_E_FID_B;
 	unsigned long o_wait = vv->current_hps_sync == SAA7146_HPS_SYNC_PORT_A ? CMD_O_FID_A : CMD_O_FID_B;
 
+	if( 0 != (dev->ext->ext_vv_data->flags & SAA7146_EXT_SWAP_ODD_EVEN)) {
+		unsigned long tmp = e_wait;
+		e_wait = o_wait;
+		o_wait = tmp;
+	}
+
 	/* write beginning of rps-program */
 	count = 0;
 
 	/* wait for o_fid_a/b / e_fid_a/b toggle only if bit 0 is not set*/
-	dev->rps0[ count++ ] = CMD_PAUSE | CMD_OAN | CMD_SIG0 | e_wait;
-	dev->rps0[ count++ ] = CMD_PAUSE | CMD_OAN | CMD_SIG0 | o_wait;
+	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | e_wait);
+	WRITE_RPS0(CMD_PAUSE | CMD_OAN | CMD_SIG0 | o_wait);
 
 	/* set bit 0 */
-	dev->rps0[ count++ ] = CMD_WR_REG | (1 << 8) | (MC2/4); 	
-	dev->rps0[ count++ ] = MASK_27 | MASK_11;
+	WRITE_RPS0(CMD_WR_REG | (1 << 8) | (MC2/4)); 	
+	WRITE_RPS0(MASK_27 | MASK_11);
 	
 	/* turn on video-dma1 */
-	dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-	dev->rps0[ count++ ] = MASK_06 | MASK_22;	    		/* => mask */
-	dev->rps0[ count++ ] = MASK_06 | MASK_22;			/* => values */
+	WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+	WRITE_RPS0(MASK_06 | MASK_22);	    		/* => mask */
+	WRITE_RPS0(MASK_06 | MASK_22);			/* => values */
 	if( 0 != planar ) {
 		/* turn on video-dma2 */
-		dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-		dev->rps0[ count++ ] = MASK_05 | MASK_21;	    		/* => mask */
-		dev->rps0[ count++ ] = MASK_05 | MASK_21;			/* => values */
+		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+		WRITE_RPS0(MASK_05 | MASK_21);	    		/* => mask */
+		WRITE_RPS0(MASK_05 | MASK_21);			/* => values */
 
 		/* turn on video-dma3 */
-		dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-		dev->rps0[ count++ ] = MASK_04 | MASK_20;	    		/* => mask */
-		dev->rps0[ count++ ] = MASK_04 | MASK_20;			/* => values */
+		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+		WRITE_RPS0(MASK_04 | MASK_20);	    		/* => mask */
+		WRITE_RPS0(MASK_04 | MASK_20);			/* => values */
 	}
 	
 	/* wait for o_fid_a/b / e_fid_a/b toggle */
-	dev->rps0[ count++ ] = CMD_PAUSE | e_wait;
-	dev->rps0[ count++ ] = CMD_PAUSE | o_wait;
+	WRITE_RPS0(CMD_PAUSE | e_wait);
+	WRITE_RPS0(CMD_PAUSE | o_wait);
 
 	/* turn off video-dma1 */
-	dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);
-	dev->rps0[ count++ ] = MASK_22 | MASK_06;	    		/* => mask */
-	dev->rps0[ count++ ] = MASK_22;					/* => values */
+	WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));
+	WRITE_RPS0(MASK_22 | MASK_06);	    		/* => mask */
+	WRITE_RPS0(MASK_22);					/* => values */
 	if( 0 != planar ) {
 		/* turn off video-dma2 */
-		dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-		dev->rps0[ count++ ] = MASK_05 | MASK_21;	    		/* => mask */
-		dev->rps0[ count++ ] = MASK_21;					/* => values */
+		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+		WRITE_RPS0(MASK_05 | MASK_21);	    		/* => mask */
+		WRITE_RPS0(MASK_21);					/* => values */
 
 		/* turn off video-dma3 */
-		dev->rps0[ count++ ] = CMD_WR_REG_MASK | (MC1/4);		
-		dev->rps0[ count++ ] = MASK_04 | MASK_20;	    		/* => mask */
-		dev->rps0[ count++ ] = MASK_20;					/* => values */
+		WRITE_RPS0(CMD_WR_REG_MASK | (MC1/4));		
+		WRITE_RPS0(MASK_04 | MASK_20);	    		/* => mask */
+		WRITE_RPS0(MASK_20);					/* => values */
 	}
 
 	/* generate interrupt */
-	dev->rps0[ count++ ] = CMD_INTERRUPT;					
+	WRITE_RPS0(CMD_INTERRUPT);					
 
 	/* stop */
-	dev->rps0[ count++ ] = CMD_STOP;					
+	WRITE_RPS0(CMD_STOP);					
 }
 
 void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struct saa7146_buf *next)
@@ -1035,7 +1039,7 @@ void saa7146_set_capture(struct saa7146_dev *dev, struct saa7146_buf *buf, struc
 	}
 
 	/* write the address of the rps-program */
-	saa7146_write(dev, RPS_ADDR0, virt_to_bus(&dev->rps0[ 0]));
+	saa7146_write(dev, RPS_ADDR0, dev->d_rps0.dma_handle);
 
 	/* turn on rps */
 	saa7146_write(dev, MC1, (MASK_12 | MASK_28));	

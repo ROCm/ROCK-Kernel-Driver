@@ -126,7 +126,7 @@ struct saa7146_vv
 	int 	current_hps_source;
 	int 	current_hps_sync;
 
-	u32	*clipping;	/* pointer to clipping memory */
+	struct saa7146_dma	d_clipping;	/* pointer to clipping memory */
 };
 
 #define SAA7146_EXCLUSIVE	0x1

@@ -12,9 +12,12 @@
 #include <linux/i2c.h>		/* for i2c subsystem */
 #include <asm/io.h>		/* for accessing devices */
 #include <linux/stringify.h>
+#include <linux/vmalloc.h>	/* for vmalloc() */
+#include <linux/mm.h>		/* for vmalloc_to_page() */
 
+/* ugly, but necessary to build the dvb stuff under 2.4. */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#include "compat.h"
+	#include "dvb_functions.h"
 #endif
 
 #define SAA7146_VERSION_CODE KERNEL_VERSION(0,5,0)
@@ -30,7 +33,16 @@ extern unsigned int saa7146_debug;
 	#define DEBUG_VARIABLE saa7146_debug
 #endif
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
+#define DEBUG_PROLOG printk("%s: %s(): ",__stringify(KBUILD_BASENAME),__FUNCTION__)
+#define INFO(x) { printk("%s: ",__stringify(KBUILD_BASENAME)); printk x; }
+#else
 #define DEBUG_PROLOG printk("%s: %s(): ",__stringify(KBUILD_MODNAME),__FUNCTION__)
+#define INFO(x) { printk("%s: ",__stringify(KBUILD_MODNAME)); printk x; }
+#endif
+
+#define ERR(x) { DEBUG_PROLOG; printk x; }
+
 #define DEB_S(x)    if (0!=(DEBUG_VARIABLE&0x01)) { DEBUG_PROLOG; printk x; } /* simple debug messages */
 #define DEB_D(x)    if (0!=(DEBUG_VARIABLE&0x02)) { DEBUG_PROLOG; printk x; } /* more detailed debug messages */
 #define DEB_EE(x)   if (0!=(DEBUG_VARIABLE&0x04)) { DEBUG_PROLOG; printk x; } /* print enter and exit of functions */
@@ -38,9 +50,6 @@ extern unsigned int saa7146_debug;
 #define DEB_VBI(x)  if (0!=(DEBUG_VARIABLE&0x10)) { DEBUG_PROLOG; printk x; } /* vbi debug messages */
 #define DEB_INT(x)  if (0!=(DEBUG_VARIABLE&0x20)) { DEBUG_PROLOG; printk x; } /* interrupt debug messages */
 #define DEB_CAP(x)  if (0!=(DEBUG_VARIABLE&0x40)) { DEBUG_PROLOG; printk x; } /* capture debug messages */
-
-#define ERR(x) { DEBUG_PROLOG; printk x; }
-#define INFO(x) { printk("%s: ",__stringify(KBUILD_MODNAME)); printk x; }
 
 #define IER_DISABLE(x,y) \
 	saa7146_write(x, IER, saa7146_read(x, IER) & ~(y));
@@ -97,6 +106,12 @@ struct saa7146_extension
 	void 	(*irq_func)(struct saa7146_dev*, u32* irq_mask);
 };
 
+struct saa7146_dma
+{
+	dma_addr_t	dma_handle;
+	u32		*cpu_addr;
+};
+
 struct saa7146_dev
 {
 	struct module			*module;
@@ -127,13 +142,13 @@ struct saa7146_dev
 	/* i2c-stuff */
         struct semaphore	i2c_lock;
 	u32			i2c_bitrate;
-	u32			*i2c_mem;	/* pointer to i2c memory */
+	struct saa7146_dma	d_i2c;	/* pointer to i2c memory */
 	wait_queue_head_t	i2c_wq;
 	int			i2c_op;
 	
 	/* memories */
-	u32			*rps0;
-	u32			*rps1;
+	struct saa7146_dma	d_rps0;
+	struct saa7146_dma	d_rps1;
 };
 
 /* from saa7146_i2c.c */

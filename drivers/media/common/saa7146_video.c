@@ -1,9 +1,5 @@
 #include <media/saa7146_vv.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME saa7146
-#endif
-
 static
 int memory = 32;
 
@@ -434,20 +430,25 @@ int get_control(struct saa7146_fh *fh, struct v4l2_control *c)
 	case V4L2_CID_BRIGHTNESS:
 		value = saa7146_read(dev, BCS_CTRL);
 		c->value = 0xff & (value >> 24);
+		DEB_D(("V4L2_CID_BRIGHTNESS: %d\n",c->value));
 		break;
 	case V4L2_CID_CONTRAST:
 		value = saa7146_read(dev, BCS_CTRL);
 		c->value = 0x7f & (value >> 16);
+		DEB_D(("V4L2_CID_CONTRAST: %d\n",c->value));
 		break;
 	case V4L2_CID_SATURATION:
 		value = saa7146_read(dev, BCS_CTRL);
 		c->value = 0x7f & (value >> 0);
+		DEB_D(("V4L2_CID_SATURATION: %d\n",c->value));
 		break;
 	case V4L2_CID_VFLIP:
 		c->value = vv->vflip;
+		DEB_D(("V4L2_CID_VFLIP: %d\n",c->value));
 		break;
 	case V4L2_CID_HFLIP:
 		c->value = vv->hflip;
+		DEB_D(("V4L2_CID_HFLIP: %d\n",c->value));
 		break;
 	default:
 		return -EINVAL;
@@ -876,7 +877,7 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 			return -EINVAL;	
 		}
 
-		DEB_EE(("VIDIOC_ENUMSTD: type:%d, index:%d\n",f->type,f->index));
+		DEB_EE(("VIDIOC_ENUM_FMT: type:%d, index:%d\n",f->type,f->index));
 		return 0;
 	}
 	case VIDIOC_QUERYCTRL:
@@ -974,6 +975,8 @@ int saa7146_video_do_ioctl(struct inode *inode, struct file *file, unsigned int 
 		
 		struct saa7146_fh *ov_fh = NULL;
 						
+		DEB_EE(("VIDIOC_S_STD\n"));
+
 		if( 0 != vv->streaming ) {
 			return -EBUSY;
 		}

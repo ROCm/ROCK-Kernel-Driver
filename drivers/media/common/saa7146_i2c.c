@@ -1,9 +1,5 @@
 #include <media/saa7146_vv.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,51)
-	#define KBUILD_MODNAME saa7146
-#endif
-
 /* helper function */
 static
 void my_wait(struct saa7146_dev *dev, long ms)
@@ -284,7 +280,7 @@ int saa7146_i2c_writeout(struct saa7146_dev *dev, u32* dword)
 int saa7146_i2c_transfer(struct saa7146_dev *dev, const struct i2c_msg msgs[], int num, int retries)
 {
 	int i = 0, count = 0;
-	u32* buffer = dev->i2c_mem;
+	u32* buffer = dev->d_i2c.cpu_addr;
 	int err = 0;
         int address_err = 0;
 	
@@ -381,8 +377,6 @@ static
 int saa7146_i2c_xfer(struct i2c_adapter* adapter, struct i2c_msg msg[], int num)
 {
 	struct saa7146_dev* dev = i2c_get_adapdata(adapter);
-	
-	DEB_I2C(("adapter: '%s'.\n", adapter->dev.name));
 	
 	/* use helper function to transfer data */
 	return saa7146_i2c_transfer(dev, msg, num, adapter->retries);
