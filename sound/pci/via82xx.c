@@ -725,7 +725,11 @@ static inline unsigned int calc_linear_pos(viadev_t *viadev, unsigned int idx, u
 	unsigned int size, res;
 
 	size = viadev->idx_table[idx].size;
-	res = viadev->idx_table[idx].offset + size - count;
+	/* FIXME: is this always true? */
+	if (count)
+		res = viadev->idx_table[idx].offset + size - count;
+	else
+		res = viadev->idx_table[idx].offset;
 
 	/* check the validity of the calculated position */
 	if (size < count || (res < viadev->lastpos && (res >= viadev->bufsize2 || viadev->lastpos < viadev->bufsize2))) {
