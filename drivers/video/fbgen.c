@@ -20,34 +20,6 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-int fb_set_var(struct fb_var_screeninfo *var, struct fb_info *info)
-{
-	int err;
-
-	if (memcmp(&info->var, var, sizeof(struct fb_var_screeninfo))) {
-		if (!info->fbops->fb_check_var) {
-			*var = info->var;
-			return 0;
-		}
-
-		if ((err = info->fbops->fb_check_var(var, info)))
-			return err;
-
-		if ((var->activate & FB_ACTIVATE_MASK) == FB_ACTIVATE_NOW) {
-			info->var = *var;
-
-			if (info->fbops->fb_set_par)
-				info->fbops->fb_set_par(info);
-
-			if (info->fbops->fb_pan_display)
-				info->fbops->fb_pan_display(&info->var,
-							    info);
-			fb_set_cmap(&info->cmap, 1, info);
-		}
-	}
-	return 0;
-}
-
 int cfb_cursor(struct fb_info *info, struct fbcursor *cursor)
 {
 	int i, size = ((cursor->size.x + 7) / 8) * cursor->size.y;
@@ -143,7 +115,6 @@ int fb_blank(int blank, struct fb_info *info)
 }
 
 /* generic frame buffer operations */
-EXPORT_SYMBOL(fb_set_var);
 EXPORT_SYMBOL(cfb_cursor);
 EXPORT_SYMBOL(fb_pan_display);
 EXPORT_SYMBOL(fb_blank);

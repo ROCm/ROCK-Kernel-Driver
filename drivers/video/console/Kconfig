@@ -121,8 +121,8 @@ config FBCON_ADVANCED
 config FBCON_ACCEL
 	tristate "Hardware acceleration support" if FBCON_ADVANCED
 	depends on FB
-	default m if !FBCON_ADVANCED && FB_NEOMAGIC!=y && !FB_VESA && !FB_FM2 && FB_HIT!=y && !FB_HP300 && !FB_Q40 && !FB_ANAKIN && !FB_G364 && FB_VIRTUAL!=y && !FB_CLPS711X && !FB_PMAG_BA && !FB_PMAGB_B && FB_3DFX!=y && !FB_TX3912 && !FB_MAXINE && !FB_APOLLO && FB_ATY!=y && !FB_MAC && FB_RIVA!=y && !FB_OF && FB_SGIVW!=y && (FB_NEOMAGIC=m || FB_HIT=m || FB_VIRTUAL=m || FB_3DFX=m || FB_RIVA=m || FB_SGIVW=m)
-	default y if !FBCON_ADVANCED && (FB_NEOMAGIC=y || FB_VESA || FB_FM2 || FB_HIT=y || FB_HP300 || FB_Q40 || FB_ANAKIN || FB_G364 || FB_VIRTUAL=y || FB_CLPS711X || FB_PMAG_BA || FB_PMAGB_B || FB_3DFX=y || FB_TX3912 || FB_MAXINE || FB_APOLLO || FB_ATY=y || FB_MAC || FB_RIVA=y || FB_OF || FB_SGIVW=y)
+	default m if !FBCON_ADVANCED && FB_NEOMAGIC!=y && !FB_VESA && !FB_FM2 && FB_HIT!=y && !FB_HP300 && !FB_Q40 && !FB_ANAKIN && !FB_G364 && FB_VIRTUAL!=y && !FB_CLPS711X && !FB_PMAG_BA && !FB_PMAGB_B && FB_3DFX!=y && !FB_TX3912 && !FB_MAXINE && !FB_APOLLO && FB_ATY!=y && !FB_MAC && FB_RIVA!=y && FB_HGA!=y && !FB_OF && FB_SGIVW!=y && (FB_NEOMAGIC=m || FB_HIT=m || FB_VIRTUAL=m || FB_3DFX=m || FB_RIVA=m || FB_SGIVW=m || FB_HGA=m)
+	default y if !FBCON_ADVANCED && (FB_NEOMAGIC=y || FB_VESA || FB_FM2 || FB_HIT=y || FB_HP300 || FB_Q40 || FB_ANAKIN || FB_G364 || FB_VIRTUAL=y || FB_CLPS711X || FB_PMAG_BA || FB_PMAGB_B || FB_3DFX=y || FB_TX3912 || FB_MAXINE || FB_APOLLO || FB_ATY=y || FB_MAC || FB_RIVA=y || FB_OF || FB_SGIVW=y || FB_HGA=y)
 
 config FBCON_AFB
 	tristate "Amiga bitplanes support" if FBCON_ADVANCED
@@ -165,15 +165,6 @@ config FBCON_IPLAN2P8
 	help
 	  This is the low level frame buffer console driver for 8 interleaved
 	  bitplanes (256 colors) on Atari.
-
-config FBCON_HGA
-	tristate "HGA monochrome support (EXPERIMENTAL)" if FBCON_ADVANCED
-	depends on FB
-	default m if !FBCON_ADVANCED && FB_HGA=m
-	default y if !FBCON_ADVANCED && FB_HGA=y
-	help
-	  This is the low level frame buffer console driver for Hercules mono
-	  graphics cards.
 
 # Guess what we need
 config FBCON_STI

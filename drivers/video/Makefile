@@ -5,7 +5,8 @@
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs    	:= fbmem.o fbcmap.o fbgen.o fbmon.o modedb.o cyber2000fb.o 
+export-objs    	:= fbmem.o fbcmap.o fbgen.o fbmon.o modedb.o cfbfillrect.o \
+		   cfbcopyarea.o cfbimgblt.o cyber2000fb.o 
 
 # Each configuration option enables a list of files.
 

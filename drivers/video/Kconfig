@@ -297,7 +297,7 @@ config FB_CT65550
 
 config FB_IMSTT
 	bool "IMS Twin Turbo display support"
-	depends on FB && PPC
+	depends on FB && PCI
 	help
 	  The IMS Twin Turbo is a PCI-based frame buffer card bundled with
 	  many Macintosh and compatible computers.

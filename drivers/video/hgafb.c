@@ -46,8 +46,6 @@
 #include <linux/ioport.h>
 #include <asm/io.h>
 #include <asm/vga.h>
-#include <video/fbcon.h>
-#include <video/fbcon-hga.h>
 
 #ifdef MODULE
 
@@ -73,8 +71,14 @@
 static unsigned long hga_vram_base;		/* Base of video memory */
 static unsigned long hga_vram_len;		/* Size of video memory */
 
+#define HGA_ROWADDR(row) ((row%4)*8192 + (row>>2)*90)
 #define HGA_TXT			0
 #define HGA_GFX			1
+
+static inline u8* rowaddr(struct fb_info *info, u_int row)
+{
+        return info->screen_base + HGA_ROWADDR(row);
+}
 
 static int hga_mode = -1;			/* 0 = txt, 1 = gfx mode */
 
@@ -137,7 +141,6 @@ static struct fb_fix_screeninfo hga_fix = {
 };
 
 static struct fb_info fb_info;
-static struct display disp;
 
 /* Don't assume that tty1 will be the initial current console. */
 static int release_io_port = 0;
@@ -188,7 +191,6 @@ static void hga_clear_screen(void)
 	if (fillchar != 0xbf)
 		isa_memset_io(hga_vram_base, fillchar, hga_vram_len);
 }
-
 
 #ifdef MODULE
 static void hga_txt_mode(void)
@@ -255,15 +257,13 @@ static void hga_gfx_mode(void)
 }
 
 #ifdef MODULE
-static void hga_show_logo(void)
+static void hga_show_logo(struct fb_info *info)
 {
 	int x, y;
-	unsigned long dest = hga_vram_base;
 	char *logo = linux_logo_bw;
 	for (y = 134; y < 134 + 80 ; y++) /* this needs some cleanup */
 		for (x = 0; x < 10 ; x++)
-			isa_writeb(~*(logo++),
-				   (dest + (y%4)*8192 + (y>>2)*90 + x + 40));
+			isa_writeb(~*(logo++),(dest + HGA_ROWADDR(y) + x + 40));
 }
 #endif /* MODULE */	
 
@@ -389,7 +389,6 @@ static int hgafb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
 /**
  *	hga_pan_display - pan or wrap the display
  *	@var:contains new xoffset, yoffset and vmode values
- *	@con:unused
  *	@info:pointer to fb_info object containing info for current hga board
  *
  *	This function looks only at xoffset, yoffset and the %FB_VMODE_YWRAP
@@ -398,12 +397,8 @@ static int hgafb_setcolreg(u_int regno, u_int red, u_int green, u_int blue,
  *	A zero is returned on success and %-EINVAL for failure.
  */
 
-int hga_pan_display(struct fb_var_screeninfo *var, int con,
-                    struct fb_info *info)
+int hgafb_pan_display(struct fb_var_screeninfo *var, struct fb_info *info)
 {
-	CHKINFO(-EINVAL);
-	DPRINTK("pan_disp: con:%d, wrap:%d, xoff:%d, yoff:%d\n", con, var->vmode & FB_VMODE_YWRAP, var->xoffset, var->yoffset);
-
 	if (var->vmode & FB_VMODE_YWRAP) {
 		if (var->yoffset < 0 || 
 		    var->yoffset >= info->var.yres_virtual ||
@@ -442,24 +437,84 @@ int hga_pan_display(struct fb_var_screeninfo *var, int con,
 
 static int hgafb_blank(int blank_mode, struct fb_info *info)
 {
-	CHKINFO( );
-	DPRINTK("hgafb_blank: blank_mode:%d, info:%x, fb_info:%x\n", blank_mode, (unsigned)info, (unsigned)&fb_info);
-
 	hga_blank(blank_mode);
 	return 0;
 }
 
+static void hgafb_fillrect(struct fb_info *info, struct fb_fillrect *rect)
+{
+	u_int rows, y;
+	u8 *dest;
+
+	y = rect->dy;
+
+	for (rows = rect->height; rows--; y++) {
+		dest = rowaddr(info, y) + (rect->dx >> 3);
+		switch (rect->rop) {
+		case ROP_COPY:
+			fb_memset(dest, rect->color, (rect->width >> 3));
+			break;
+		case ROP_XOR:
+			*dest = ~*dest;
+			break;
+		}
+	}
+}
+
+static void hgafb_copyarea(struct fb_info *info, struct fb_copyarea *area)
+{
+	u_int rows, y1, y2;
+	u8 *src, *dest;
+
+	if (area->dy <= area->sy) {
+		y1 = area->sy;
+		y2 = area->dy;
+
+		for (rows = area->height; rows--; ) {
+			src = rowaddr(info, y1) + (area->sx >> 3);
+			dest = rowaddr(info, y2) + (area->dx >> 3);
+			fb_memmove(dest, src, (area->width >> 3));
+			y1++;
+			y2++;
+		}
+	} else {
+		y1 = area->sy + area->height - 1;
+		y2 = area->dy + area->height - 1;
+
+		for (rows = area->height; rows--;) {
+			src = rowaddr(info, y1) + (area->sx >> 3);
+			dest = rowaddr(info, y2) + (area->dx >> 3);
+			fb_memmove(dest, src, (area->width >> 3));
+			y1--;
+			y2--;
+		}
+	}
+}
+
+static void hgafb_imageblit(struct fb_info *info, struct fb_image *image)
+{
+	u8 *dest, *cdat = image->data;
+	u_int rows, y = image->dy;
+	u8 d;
+
+	for (rows = image->height; rows--; y++) {
+		d = *cdat++;
+		dest = rowaddr(info, y) + (image->dx >> 3);
+		*dest = d;
+	}
+}
+
+
 static struct fb_ops hgafb_ops = {
 	.owner		= THIS_MODULE,
-	.fb_set_var	= gen_set_var,
-	.fb_get_cmap	= gen_get_cmap,
-	.fb_set_cmap	= gen_set_cmap,
 	.fb_setcolreg	= hgafb_setcolreg,
-	.fb_pan_display	= hga_pan_display,
+	.fb_pan_display	= hgafb_pan_display,
 	.fb_blank	= hgafb_blank,
+	.fb_fillrect	= hgafb_fillrect,
+	.fb_copyarea	= hgafb_copyarea,
+	.fb_imageblit	= hgafb_imageblit,
 };
 		
-
 /* ------------------------------------------------------------------------- *
  *
  * Functions in fb_info
@@ -484,27 +539,10 @@ int __init hgafb_init(void)
 
 	hga_gfx_mode();
 	hga_clear_screen();
-#ifdef MODULE
-	if (!nologo) hga_show_logo();
-#endif /* MODULE */
 
 	hga_fix.smem_start = VGA_MAP_MEM(hga_vram_base);
 	hga_fix.smem_len = hga_vram_len;
 
-	disp.var = hga_default_var;
-	disp.can_soft_blank = 1;
-	disp.inverse = 0;
-#ifdef FBCON_HAS_HGA
-	disp.dispsw = &fbcon_hga;
-#else
-#warning HGAFB will not work as a console!
-	disp.dispsw = &fbcon_dummy;
-#endif
-	disp.dispsw_data = NULL;
-
-	disp.scrollmode = SCROLL_YREDRAW;
-	
-	strcpy (fb_info.modename, hga_fix.id);
 	fb_info.node = NODEV;
 	fb_info.flags = FBINFO_FLAG_DEFAULT;
 	fb_info.var = hga_default_var;
@@ -516,18 +554,16 @@ int __init hgafb_init(void)
 	fb_info.monspecs.dpms = 0;
 	fb_info.fbops = &hgafb_ops;
 	fb_info.screen_base = (char *)hga_fix.smem_start;
-	fb_info.disp = &disp;
-	fb_info.currcon = 1;
-	fb_info.changevar = NULL;
-	fb_info.switch_con = gen_switch;
-	fb_info.updatevar = gen_update_var;
 
         if (register_framebuffer(&fb_info) < 0)
                 return -EINVAL;
 
+#ifdef MODULE
+	if (!nologo) hga_show_logo(&fb_info);
+#endif /* MODULE */
+
         printk(KERN_INFO "fb%d: %s frame buffer device\n",
-               minor(fb_info.node), fb_info.modename);
-	
+               minor(fb_info.node), fb_info.fix.id);
 	return 0;
 }
 
@@ -535,49 +571,21 @@ int __init hgafb_init(void)
 	 *  Setup
 	 */
 
-#ifndef MODULE
 int __init hgafb_setup(char *options)
 {
-	/* 
-	 * Parse user speficied options
-	 * `video=hga:font:VGA8x16' or
-	 * `video=hga:font:SUN8x16' recommended
-	 * Other supported fonts: VGA8x8, Acorn8x8, PEARL8x8
-	 * More different fonts can be used with the `setfont' utility.
-	 */
-
-	char *this_opt;
-
-	fb_info.fontname[0] = '\0';
-
-	if (!options || !*options)
-		return 0;
-
-	while ((this_opt = strsep(&options, ","))) {
-		if (!strncmp(this_opt, "font:", 5))
-			strcpy(fb_info.fontname, this_opt+5);
-	}
 	return 0;
 }
-#endif /* !MODULE */
-
-
-	/*
-	 * Cleanup
-	 */
 
 #ifdef MODULE
-static void hgafb_cleanup(struct fb_info *info)
+static void __exit hgafb_exit(void)
 {
 	hga_txt_mode();
 	hga_clear_screen();
-	unregister_framebuffer(info);
+	unregister_framebuffer(&fb_info);
 	if (release_io_ports) release_region(0x3b0, 12);
 	if (release_io_port) release_region(0x3bf, 1);
 }
-#endif /* MODULE */
-
-
+#endif
 
 /* -------------------------------------------------------------------------
  *
@@ -585,29 +593,14 @@ static void hgafb_cleanup(struct fb_info *info)
  *
  * ------------------------------------------------------------------------- */
 
-#ifdef MODULE
-int init_module(void)
-{
-	if (font)
-		strncpy(fb_info.fontname, font, sizeof(fb_info.fontname)-1);
-	else
-		fb_info.fontname[0] = '\0';
-
-	return hgafb_init();
-}
-
-void cleanup_module(void)
-{
-	hgafb_cleanup(&fb_info);
-}
-
 MODULE_AUTHOR("Ferenc Bakonyi (fero@drama.obuda.kando.hu)");
 MODULE_DESCRIPTION("FBDev driver for Hercules Graphics Adaptor");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(font, "s");
-MODULE_PARM_DESC(font, "Specifies one of the compiled-in fonts (VGA8x8, VGA8x16, SUN8x16, Acorn8x8, PEARL8x8) (default=none)");
 MODULE_PARM(nologo, "i");
 MODULE_PARM_DESC(nologo, "Disables startup logo if != 0 (default=0)");
 
-#endif /* MODULE */
+#ifdef MODULE
+module_init(hgafb_init);
+module_exit(hgafb_exit);
+#endif

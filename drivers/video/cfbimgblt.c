@@ -34,6 +34,8 @@
  *  the native cpu endians. I also need to deal with MSB position in the word.
  *
  */
+#include <linux/config.h>
+#include <linux/module.h>
 #include <linux/string.h>
 #include <linux/fb.h>
 #include <asm/types.h>
@@ -338,3 +340,10 @@ void cfb_imageblit(struct fb_info *p, struct fb_image *image)
 		end_mask = 0;
 	}
 }
+
+EXPORT_SYMBOL(cfb_imageblit);
+
+MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");
+MODULE_DESCRIPTION("Generic software accelerated imaging drawing");
+MODULE_LICENSE("GPL");
+

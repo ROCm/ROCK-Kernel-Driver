@@ -20,6 +20,8 @@
  *  the native cpu endians. I also need to deal with MSB position in the word.
  *  
  */
+#include <linux/config.h>
+#include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/fb.h>
@@ -667,3 +669,10 @@ void cfb_copyarea(struct fb_info *p, struct fb_copyarea *area)
 		}
 	}
 }
+
+EXPORT_SYMBOL(cfb_copyarea);
+
+MODULE_AUTHOR("James Simmons <jsimmons@users.sf.net>");
+MODULE_DESCRIPTION("Generic software accelerated copyarea");
+MODULE_LICENSE("GPL");
+
