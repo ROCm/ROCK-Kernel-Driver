@@ -743,6 +743,15 @@ static inline int pci_module_init(struct pci_driver *drv)
 	return rc;
 }
 
+/*
+ * PCI domain support.  Sometimes called PCI segment (eg by ACPI),
+ * a PCI domain is defined to be a set of PCI busses which share
+ * configuration space.
+ */
+#ifndef CONFIG_PCI_DOMAINS
+static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
+#endif
+
 #endif /* !CONFIG_PCI */
 
 /* these helpers provide future and backwards compatibility
@@ -799,16 +808,6 @@ extern int pci_pci_problems;
 #define PCIPCI_VIAETBF		8
 #define PCIPCI_VSFX		16
 #define PCIPCI_ALIMAGIK		32
-
-/*
- * PCI domain support.  Sometimes called PCI segment (eg by ACPI),
- * a PCI domain is defined to be a set of PCI busses which share
- * configuration space.
- */
-
-#ifndef CONFIG_PCI_DOMAINS
-static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
-#endif
 
 #endif /* __KERNEL__ */
 #endif /* LINUX_PCI_H */
