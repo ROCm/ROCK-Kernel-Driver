@@ -622,14 +622,12 @@ static int __init do_linuxrc(void * shell)
 	return execve(shell, argv, envp_init);
 }
 
-#endif
-
 static void __init handle_initrd(void)
 {
-#ifdef CONFIG_BLK_DEV_INITRD
 	int error;
 	int i, pid;
 
+	real_root_dev = ROOT_DEV;
 	create_dev("/dev/root.old", Root_RAM0, NULL);
 	/* mount initrd on rootfs' /root */
 	mount_block_root("/dev/root.old", root_mountflags & ~MS_RDONLY);
@@ -684,15 +682,21 @@ static void __init handle_initrd(void)
 		}
 		printk(!error ? "okay\n" : "failed\n");
 	}
-#endif
 }
 
-#ifdef CONFIG_BLK_DEV_INITRD
 static int __init initrd_load(void)
 {
 	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, 0), NULL);
 	create_dev("/dev/initrd", MKDEV(RAMDISK_MAJOR, INITRD_MINOR), NULL);
-	return rd_load_image("/dev/initrd");
+	/* Load the initrd data into /dev/ram0. Execute it as initrd unless
+	 * /dev/ram0 is supposed to be our actual root device, in
+	 * that case the ram disk is just set up here, and gets
+	 * mounted in the normal path. */
+	if (rd_load_image("/dev/initrd") && ROOT_DEV != Root_RAM0) {
+		handle_initrd();
+		return 1;
+	}
+	return 0;
 }
 #else
 static inline int initrd_load(void) { return 0; }
@@ -718,10 +722,6 @@ void __init prepare_namespace(void)
 
 	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
 
-#ifdef CONFIG_BLK_DEV_INITRD
-	real_root_dev = ROOT_DEV;
-#endif
-
 	create_dev("/dev/root", ROOT_DEV, NULL);
 
 	/* This has to be before mounting root, because even readonly mount of reiserfs would replay
@@ -729,10 +729,8 @@ void __init prepare_namespace(void)
 	software_resume();
 
 	if (mount_initrd) {
-		if (initrd_load() && ROOT_DEV != Root_RAM0) {
-			handle_initrd();
+		if (initrd_load())
 			goto out;
-		}
 	} else if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;
 	mount_root();
