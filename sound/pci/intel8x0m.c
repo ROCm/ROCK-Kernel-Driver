@@ -548,6 +548,10 @@ static irqreturn_t snd_intel8x0_interrupt(int irq, void *dev_id, struct pt_regs 
 
 	spin_lock(&chip->reg_lock);
 	status = igetdword(chip, chip->int_sta_reg);
+	if (status == 0xffffffff) { /* we are not yet resumed */
+		spin_unlock(&chip->reg_lock);
+		return IRQ_NONE;
+	}
 	if ((status & chip->int_sta_mask) == 0) {
 		if (status)
 			iputdword(chip, chip->int_sta_reg, status);
