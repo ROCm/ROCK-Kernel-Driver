@@ -4,7 +4,7 @@
 mainmenu_option next_comment
 comment 'Block devices'
 
-tristate 'Normal PC floppy disk support' CONFIG_BLK_DEV_FD
+tristate 'Normal floppy disk support' CONFIG_BLK_DEV_FD
 if [ "$CONFIG_AMIGA" = "y" ]; then
    tristate 'Amiga floppy support' CONFIG_AMIGA_FLOPPY
 fi
