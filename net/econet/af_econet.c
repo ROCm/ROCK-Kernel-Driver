@@ -255,6 +255,8 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 	struct ec_addr addr;
 	int err;
 	unsigned char port, cb;
+	struct sk_buff *skb = 0;
+	struct ec_cb *eb = 0;
 #ifdef CONFIG_ECONET_AUNUDP
 	struct msghdr udpmsg;
 	struct iovec iov[msg->msg_iovlen+1];
@@ -311,8 +313,6 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 	{
 		/* Real hardware Econet.  We're not worthy etc. */
 #ifdef CONFIG_ECONET_NATIVE
-		struct ec_cb *eb;
-		struct sk_buff *skb;
 		unsigned short proto = 0;
 
 		dev_hold(dev);
