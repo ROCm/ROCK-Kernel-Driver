@@ -8,6 +8,14 @@
 #include <asm/system.h>
 
 /*
+ * These are non-NULL pointers that will result in page faults
+ * under normal circumstances, used to verify that nobody uses
+ * non-initialized list entries.
+ */
+#define LIST_POISON1  ((void *) 0x00100100)
+#define LIST_POISON2  ((void *) 0x00200200)
+
+/*
  * Simple doubly linked list implementation.
  *
  * Some of the internal functions ("__xxx") are useful when
@@ -137,17 +145,25 @@ static inline void __list_del(struct list_head * prev, struct list_head * next)
 static inline void list_del(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
+	entry->next = LIST_POISON1;
+	entry->prev = LIST_POISON2;
 }
+
 /**
  * list_del_rcu - deletes entry from list without re-initialization
  * @entry: the element to delete from the list.
+ *
  * Note: list_empty on entry does not return true after this, 
  * the entry is in an undefined state. It is useful for RCU based
  * lockfree traversal.
+ *
+ * In particular, it means that we can not poison the forward 
+ * pointers that may still be used for walking the list.
  */
 static inline void list_del_rcu(struct list_head *entry)
 {
 	__list_del(entry->prev, entry->next);
+	entry->prev = LIST_POISON2;
 }
 
 /**
@@ -297,6 +313,20 @@ static inline void list_splice_init(struct list_head *list,
 		     prefetch(pos->member.next))
 
 /**
+ * list_for_each_entry_reverse - iterate backwards over list of given type.
+ * @pos:	the type * to use as a loop counter.
+ * @head:	the head for your list.
+ * @member:	the name of the list_struct within the struct.
+ */
+#define list_for_each_entry_reverse(pos, head, member)			\
+	for (pos = list_entry((head)->prev, typeof(*pos), member),	\
+		     prefetch(pos->member.prev);			\
+	     &pos->member != (head); 					\
+	     pos = list_entry(pos->member.prev, typeof(*pos), member),	\
+		     prefetch(pos->member.prev))
+
+
+/**
  * list_for_each_entry_safe - iterate over list of given type safe against removal of list entry
  * @pos:	the type * to use as a loop counter.
  * @n:		another type * to use as temporary storage
@@ -399,11 +429,27 @@ static __inline__ void __hlist_del(struct hlist_node *n)
 
 static __inline__ void hlist_del(struct hlist_node *n)
 {
-	if (n->pprev)
-		__hlist_del(n);
+	__hlist_del(n);
+	n->next = LIST_POISON1;
+	n->pprev = LIST_POISON2;
 }
 
-#define hlist_del_rcu hlist_del  /* list_del_rcu is identical too? */
+/**
+ * hlist_del_rcu - deletes entry from hash list without re-initialization
+ * @entry: the element to delete from the hash list.
+ *
+ * Note: list_unhashed() on entry does not return true after this, 
+ * the entry is in an undefined state. It is useful for RCU based
+ * lockfree traversal.
+ *
+ * In particular, it means that we can not poison the forward
+ * pointers that may still be used for walking the hash list.
+ */
+static inline void hlist_del_rcu(struct hlist_node *n)
+{
+	__hlist_del(n);
+	n->pprev = LIST_POISON2;
+}
 
 static __inline__ void hlist_del_init(struct hlist_node *n) 
 {
@@ -412,6 +458,8 @@ static __inline__ void hlist_del_init(struct hlist_node *n)
 		INIT_HLIST_NODE(n);
 	}
 }  
+
+#define hlist_del_rcu_init hlist_del_init
 
 static __inline__ void hlist_add_head(struct hlist_node *n, struct hlist_head *h) 
 { 
@@ -443,17 +491,50 @@ static __inline__ void hlist_add_before(struct hlist_node *n, struct hlist_node 
 	*(n->pprev) = n;
 }
 
+static __inline__ void hlist_add_after(struct hlist_node *n,
+				       struct hlist_node *next)
+{
+	next->next	= n->next;
+	*(next->pprev)	= n;
+	n->next		= next;
+}
+
 #define hlist_entry(ptr, type, member) container_of(ptr,type,member)
 
 /* Cannot easily do prefetch unfortunately */
 #define hlist_for_each(pos, head) \
-	for (pos = (head)->first; pos; \
+	for (pos = (head)->first; pos && ({ prefetch(pos->next); 1; }); \
 	     pos = pos->next) 
 
 #define hlist_for_each_safe(pos, n, head) \
 	for (pos = (head)->first; n = pos ? pos->next : 0, pos; \
 	     pos = n)
 
+/**
+ * hlist_for_each_entry	- iterate over list of given type
+ * @tpos:	the type * to use as a loop counter.
+ * @pos:	the &struct hlist_node to use as a loop counter.
+ * @head:	the head for your list.
+ * @member:	the name of the hlist_node within the struct.
+ */
+#define hlist_for_each_entry(tpos, pos, head, member)			 \
+	for (pos = (head)->first;					 \
+	     pos && ({ prefetch(pos->next); 1;}) &&			 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = pos->next)
+/**
+ * hlist_for_each_entry_safe - iterate over list of given type safe against removal of list entry
+ * @tpos:	the type * to use as a loop counter.
+ * @pos:	the &struct hlist_node to use as a loop counter.
+ * @n:		another &struct hlist_node to use as temporary storage
+ * @head:	the head for your list.
+ * @member:	the name of the hlist_node within the struct.
+ */
+#define hlist_for_each_entry_safe(tpos, pos, n, head, member) 		 \
+	for (pos = (head)->first;					 \
+	     pos && ({ n = pos->next; 1; }) && 				 \
+		({ tpos = hlist_entry(pos, typeof(*tpos), member); 1;}); \
+	     pos = n)
 #else
 #warning "don't include kernel headers in userspace"
 #endif /* __KERNEL__ */

@@ -1,4 +1,4 @@
-/* $Id: vmlinux.lds.in,v 1.5 2001/07/27 11:45:55 gniibe Exp $
+/* $Id: vmlinux.lds.S,v 1.8 2003/05/16 17:18:14 lethal Exp $
  * ld script to make SuperH Linux kernel
  * Written by Niibe Yutaka
  */
@@ -7,16 +7,14 @@
 
 #ifdef CONFIG_CPU_LITTLE_ENDIAN
 OUTPUT_FORMAT("elf32-sh-linux", "elf32-sh-linux", "elf32-sh-linux")
-jiffies = jiffies_64;        
 #else
 OUTPUT_FORMAT("elf32-shbig-linux", "elf32-shbig-linux", "elf32-shbig-linux")
-jiffies = jiffies_64 + 4;
 #endif
 OUTPUT_ARCH(sh)
 ENTRY(_start)
 SECTIONS
 {
-  . = 0x80000000 + CONFIG_MEMORY_START + 0x1000;
+  . = 0x80000000 + CONFIG_MEMORY_START + CONFIG_ZERO_PAGE_OFFSET;
   _text = .;			/* Text and read-only data */
   text = .;			/* Text and read-only data */
   .empty_zero_page : {
@@ -42,6 +40,15 @@ SECTIONS
 	CONSTRUCTORS
 	}
 
+  . = ALIGN(4096);
+  .data.page_aligned : { *(.data.idt) }
+
+  . = ALIGN(32);
+  __per_cpu_start = .;
+  .data.percpu : { *(.data.percpu) }
+  __per_cpu_end = .;
+  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
+
   _edata = .;			/* End of data section */
 
   . = ALIGN(8192);		/* init_task */
@@ -51,12 +58,17 @@ SECTIONS
 
   . = ALIGN(4096);		/* Init code and data */
   __init_begin = .;
-  .text.init : { *(.text.init) }
-  .data.init : { *(.data.init) }
+  _sinittext = .;
+  .init.text : { *(.init.text) }
+  _einittext = .;
+  .init.data : { *(.init.data) }
   . = ALIGN(16);
   __setup_start = .;
-  .setup.init : { *(.setup.init) }
+  .init.setup : { *(.init.setup) }
   __setup_end = .;
+  __start___param = .;
+  __param : { *(__param) }
+  __stop___param = .;
   __initcall_start = .;
   .initcall.init : {
 	*(.initcall1.init) 
@@ -71,27 +83,20 @@ SECTIONS
   __con_initcall_start = .;
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
+  SECURITY_INIT
+  __initramfs_start = .;
+  .init.ramfs : { *(.init.ramfs) }
+  __initramfs_end = .;
   __machvec_start = .;
-  .machvec.init : { *(.machvec.init) }
+  .init.machvec : { *(.init.machvec) }
   __machvec_end = .;
   . = ALIGN(4096);
   __init_end = .;
 
-  . = ALIGN(4096);
-  .data.page_aligned : { *(.data.idt) }
-
-#ifdef CONFIG_CPU_SH3	
-  . = ALIGN(16);
-#else
-  . = ALIGN(32);
-#endif	
-  .data.cacheline_aligned : { *(.data.cacheline_aligned) }
-
   . = ALIGN(4);
   __bss_start = .;		/* BSS */
-  .bss : {
-	*(.bss)
-	}
+  .bss : { *(.bss) }
+
   . = ALIGN(4);
   _end = . ;
 
@@ -101,8 +106,8 @@ SECTIONS
    * it's a module.
    */
   /DISCARD/ : {
-	*(.text.exit)
-	*(.data.exit)
+	*(.exit.text)
+	*(.exit.data)
 	*(.exitcall.exit)
 	}
 

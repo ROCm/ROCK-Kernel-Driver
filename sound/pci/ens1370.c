@@ -1634,8 +1634,10 @@ static int __devinit snd_ensoniq_1370_mixer(ensoniq_t * ensoniq)
 
 	/* try reset AK4531 */
 	outw(ES_1370_CODEC_WRITE(AK4531_RESET, 0x02), ES_REG(ensoniq, 1370_CODEC));
+	inw(ES_REG(ensoniq, 1370_CODEC));
 	udelay(100);
 	outw(ES_1370_CODEC_WRITE(AK4531_RESET, 0x03), ES_REG(ensoniq, 1370_CODEC));
+	inw(ES_REG(ensoniq, 1370_CODEC));
 	udelay(100);
 
 	memset(&ak4531, 0, sizeof(ak4531));
@@ -1975,6 +1977,7 @@ static int __devinit snd_ensoniq_create(snd_card_t * card,
 		}
 	/* AC'97 warm reset to start the bitclk */
 	outl(ensoniq->ctrl | ES_1371_SYNC_RES, ES_REG(ensoniq, CONTROL));
+	inl(ES_REG(ensoniq, CONTROL));
 	udelay(20);
 	outl(ensoniq->ctrl, ES_REG(ensoniq, CONTROL));
 	/* Init the sample rate converter */

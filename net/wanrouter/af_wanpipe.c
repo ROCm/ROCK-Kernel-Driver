@@ -84,12 +84,12 @@
  *      When the user sends a packet via send() system call
  *      the wanpipe_sendmsg() function is executed.  
  *      
- *      Each packet is enqueud into sk->write_queue transmit
+ *      Each packet is enqueud into sk->sk_write_queue transmit
  *      queue. When the packet is enqueued, a delayed transmit
  *      timer is triggerd which acts as a Bottom Half hander. 
  *
  *      wanpipe_delay_transmit() function (BH), dequeues packets
- *      from the sk->write_queue transmit queue and sends it 
+ *      from the sk->sk_write_queue transmit queue and sends it 
  *      to the deriver via dev->hard_start_xmit(skb, dev) function.  
  *      Note, this function is actual a function pointer of if_send()
  *      routine in the wanpipe driver.
@@ -99,7 +99,7 @@
  *         In order to provide 100% guaranteed packet delivery, 
  *         an atomic 'packet_sent' counter is implemented.  Counter 
  *         is incremented for each packet enqueued 
- *         into sk->write_queue.  Counter is decremented each
+ *         into sk->sk_write_queue.  Counter is decremented each
  *         time wanpipe_delayed_transmit() function successfuly 
  *         passes the packet to the driver. Before each send(), a poll
  *         routine checks the sock resources The maximum value of
@@ -263,16 +263,16 @@ static int wanpipe_rcv(struct sk_buff *skb, struct net_device *dev,
 			}
 			break;
 		case WAN_PACKET_CMD:
-			sk->state = chan->state;
+			sk->sk_state = chan->state;
 			/* Bug fix: update Mar6. 
                          * Do not set the sock lcn number here, since
          		 * cmd is not guaranteed to be executed on the
                          * board, thus Lcn could be wrong */
-			sk->data_ready(sk,skb->len);
+			sk->sk_data_ready(sk, skb->len);
 			kfree_skb(skb);
 			break;
 		case WAN_PACKET_ERR:
-			sk->state = chan->state;
+			sk->sk_state = chan->state;
 			if (sock_queue_err_skb(sk,skb)<0){
 				return -ENOMEM;
 			}
@@ -284,11 +284,11 @@ static int wanpipe_rcv(struct sk_buff *skb, struct net_device *dev,
 	}
 
 //??????????????????????
-//	if (sk->state == WANSOCK_DISCONNECTED){
-//		if (sk->zapped){
+//	if (sk->sk_state == WANSOCK_DISCONNECTED){
+//		if (sk->sk_zapped) {
 //			//printk(KERN_INFO "wansock: Disconnected, killing early\n");
 //			wanpipe_unlink_driver(sk);
-//			sk->bound_dev_if = 0;
+//			sk->sk_bound_dev_if = 0;
 //		}
 //	}
 
@@ -359,7 +359,7 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 
 	/* Initialize the new sock structure 
 	 */
-	newsk->bound_dev_if = dev->ifindex;
+	newsk->sk_bound_dev_if = dev->ifindex;
 	newwp = wp_sk(newsk);
 	newwp->card = wp->card;
 
@@ -395,7 +395,7 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 	chan->lcn = mbox_ptr->cmd.lcn;
 	card->u.x.svc_to_dev_map[(chan->lcn%MAX_X25_LCN)] = dev;
 
-	newsk->zapped=0;
+	newsk->sk_zapped = 0;
 	newwp->num = htons(X25_PROT);
 
 	if (wanpipe_do_bind(newsk, dev, newwp->num)) {
@@ -403,7 +403,7 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 		release_device(dev);
 		return -EINVAL;
 	}
-	newsk->state = WANSOCK_CONNECTING;
+	newsk->sk_state = WANSOCK_CONNECTING;
 
 
 	/* Fill in the standard sock address info */
@@ -416,23 +416,23 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 	sll->sll_halen = 0;
 
 	skb->dev = dev;
-	sk->ack_backlog++;
+	sk->sk_ack_backlog++;
 
 	/* We must do this manually, since the sock_queue_rcv_skb()
 	 * function sets the skb->dev to NULL.  However, we use
 	 * the dev field in the accept function.*/ 
-	if (atomic_read(&sk->rmem_alloc) + skb->truesize >= 
-			(unsigned)sk->rcvbuf){
+	if (atomic_read(&sk->sk_rmem_alloc) + skb->truesize >= 
+	    (unsigned)sk->sk_rcvbuf) {
 
          	wanpipe_unlink_driver(newsk);
 		wanpipe_kill_sock_irq (newsk);
-		--sk->ack_backlog;
+		--sk->sk_ack_backlog;
 		return -ENOMEM;
 	}	
 
 	skb_set_owner_r(skb, sk);
-	skb_queue_tail(&sk->receive_queue, skb);
-	sk->data_ready(sk,skb->len);
+	skb_queue_tail(&sk->sk_receive_queue, skb);
+	sk->sk_data_ready(sk, skb->len);
 	
 	return 0;
 }
@@ -456,22 +456,22 @@ static struct sock *wanpipe_make_new(struct sock *osk)
 {
 	struct sock *sk;
 
-	if (osk->type != SOCK_RAW)
+	if (osk->sk_type != SOCK_RAW)
 		return NULL;
 
 	if ((sk = wanpipe_alloc_socket()) == NULL)
 		return NULL;
 
-	sk->type        = osk->type;
-	sk->socket      = osk->socket;
-	sk->priority    = osk->priority;
-	sk->protocol    = osk->protocol;
+	sk->sk_type	= osk->sk_type;
+	sk->sk_socket	= osk->sk_socket;
+	sk->sk_priority	= osk->sk_priority;
+	sk->sk_protocol	= osk->sk_protocol;
 	wp_sk(sk)->num	= wp_sk(osk)->num;
-	sk->rcvbuf      = osk->rcvbuf;
-	sk->sndbuf      = osk->sndbuf;
-	sk->debug       = osk->debug;
-	sk->state       = WANSOCK_CONNECTING;
-	sk->sleep       = osk->sleep;
+	sk->sk_rcvbuf	= osk->sk_rcvbuf;
+	sk->sk_sndbuf	= osk->sk_sndbuf;
+	sk->sk_debug	= osk->sk_debug;
+	sk->sk_state	= WANSOCK_CONNECTING;
+	sk->sk_sleep	= osk->sk_sleep;
 
 	return sk;
 }
@@ -521,17 +521,17 @@ static struct sock *wanpipe_alloc_socket(void)
  *
  *	This function implements a sendto() system call,
  *      for AF_WANPIPE socket family. 
- *      During socket bind() sk->bound_dev_if is initialized
+ *      During socket bind() sk->sk_bound_dev_if is initialized
  *      to a correct network device. This number is used
  *      to find a network device to which the packet should
  *      be passed to.
  *
- *      Each packet is queued into sk->write_queue and 
+ *      Each packet is queued into sk->sk_write_queue and 
  *      delayed transmit bottom half handler is marked for 
  *      execution.
  *
  *      A socket must be in WANSOCK_CONNECTED state before
- *      a packet is queued into sk->write_queue.
+ *      a packet is queued into sk->sk_write_queue.
  *===========================================================*/
 
 static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
@@ -547,10 +547,10 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
 	int ifindex, err, reserve = 0;
 
 	
-	if (!sk->zapped)
+	if (!sk->sk_zapped)
 		return -ENETDOWN;
 
-	if (sk->state != WANSOCK_CONNECTED)
+	if (sk->sk_state != WANSOCK_CONNECTED)
 		return -ENOTCONN;	
 
 	if (msg->msg_flags&~MSG_DONTWAIT) 
@@ -564,7 +564,7 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
 	wp = wp_sk(sk);
 
 	if (saddr == NULL) {
-		ifindex	= sk->bound_dev_if;
+		ifindex	= sk->sk_bound_dev_if;
 		proto	= wp->num;
 		addr	= NULL;
 
@@ -573,7 +573,7 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
 			return -EINVAL;
 		}
 
-		ifindex = sk->bound_dev_if;
+		ifindex = sk->sk_bound_dev_if;
 		proto	= saddr->sll_protocol;
 		addr	= saddr->sll_addr;
 	}
@@ -619,19 +619,20 @@ static int wanpipe_sendmsg(struct kiocb *iocb, struct socket *sock,
 
 	skb->protocol = proto;
 	skb->dev = dev;
-	skb->priority = sk->priority;
+	skb->priority = sk->sk_priority;
 	skb->pkt_type = WAN_PACKET_DATA;
 
 	err = -ENETDOWN;
 	if (!(dev->flags & IFF_UP))
 		goto out_free;
 
-	if (atomic_read(&sk->wmem_alloc) + skb->truesize > (unsigned int)sk->sndbuf){
+	if (atomic_read(&sk->sk_wmem_alloc) + skb->truesize >
+	    (unsigned int)sk->sk_sndbuf){
 		kfree_skb(skb);
 		return -ENOBUFS;
 	}
 
-	skb_queue_tail(&sk->write_queue,skb);
+	skb_queue_tail(&sk->sk_write_queue,skb);
 	atomic_inc(&wp->packet_sent);
 
 	if (!(test_and_set_bit(0, &wp->timer))){
@@ -652,7 +653,7 @@ out_unlock:
  * wanpipe_delayed_tarnsmit
  *
  *	Transmit bottom half handler. It dequeues packets
- *      from sk->write_queue and passes them to the 
+ *      from sk->sk_write_queue and passes them to the 
  *      driver.  If the driver is busy, the packet is 
  *      re-enqueued.  
  *
@@ -675,7 +676,7 @@ static void wanpipe_delayed_transmit (unsigned long data)
 		return;
 	}
 	
-	if (sk->state != WANSOCK_CONNECTED || !sk->zapped){	
+	if (sk->sk_state != WANSOCK_CONNECTED || !sk->sk_zapped) {
 		clear_bit(0, &wp->timer);
 		DBG_PRINTK(KERN_INFO "wansock: Tx Timer, State not CONNECTED\n");
 		return;
@@ -701,13 +702,13 @@ static void wanpipe_delayed_transmit (unsigned long data)
 	}	
 	
 	/* Check for a packet in the fifo and send */
-	if ((skb=skb_dequeue(&sk->write_queue)) != NULL){
+	if ((skb = skb_dequeue(&sk->sk_write_queue)) != NULL){
 
 		if (dev->hard_start_xmit(skb, dev) != 0){			
 
 			/* Driver failed to transmit, re-enqueue
                          * the packet and retry again later */
-			skb_queue_head(&sk->write_queue,skb);
+			skb_queue_head(&sk->sk_write_queue,skb);
 			clear_bit(0,&wanpipe_tx_critical);
 			return;
 		}else{
@@ -718,11 +719,11 @@ static void wanpipe_delayed_transmit (unsigned long data)
                          */
 			atomic_dec(&wp->packet_sent);
 
-			if (skb_peek(&sk->write_queue) == NULL){
+			if (skb_peek(&sk->sk_write_queue) == NULL) {
 				/* If there is nothing to send, kick
 				 * the poll routine, which will trigger
 				 * the application to send more data */
-				sk->data_ready(sk,0);
+				sk->sk_data_ready(sk, 0);
 				clear_bit(0, &wp->timer);
 			}else{
 				/* Reschedule as fast as possible */
@@ -763,10 +764,10 @@ static int execute_command(struct sock *sk,  unsigned char cmd, unsigned int fla
 	int err=0;
 	DECLARE_WAITQUEUE(wait, current);
 	
-	dev = dev_get_by_index(sk->bound_dev_if);
+	dev = dev_get_by_index(sk->sk_bound_dev_if);
 	if (dev == NULL){
 		printk(KERN_INFO "wansock: Exec failed no dev %i\n",
-			sk->bound_dev_if);
+			sk->sk_bound_dev_if);
 		return -ENODEV;
 	}
 	dev_put(dev);
@@ -799,7 +800,7 @@ static int execute_command(struct sock *sk,  unsigned char cmd, unsigned int fla
 		atomic_set(&chan->command, cmd);
 	}
 
-	add_wait_queue(sk->sleep,&wait);
+	add_wait_queue(sk->sk_sleep,&wait);
 	current->state = TASK_INTERRUPTIBLE;
 	for (;;){
 		if (((mbox_cmd_t*)wp->mbox)->cmd.result != 0x7F) {
@@ -813,7 +814,7 @@ static int execute_command(struct sock *sk,  unsigned char cmd, unsigned int fla
 		schedule();
 	}
 	current->state = TASK_RUNNING;
-	remove_wait_queue(sk->sleep,&wait);
+	remove_wait_queue(sk->sk_sleep,&wait);
 	
 	return err;
 }
@@ -830,27 +831,29 @@ static void wanpipe_destroy_timer(unsigned long data)
 	struct sock *sk=(struct sock *)data;
 	wanpipe_opt *wp = wp_sk(sk);
 
-	if ((!atomic_read(&sk->wmem_alloc) && !atomic_read(&sk->rmem_alloc)) ||
+	if ((!atomic_read(&sk->sk_wmem_alloc) &&
+	     !atomic_read(&sk->sk_rmem_alloc)) ||
 	    (++wp->force == 5)) {
 
-		if (atomic_read(&sk->wmem_alloc) || atomic_read(&sk->rmem_alloc))
+		if (atomic_read(&sk->sk_wmem_alloc) ||
+		    atomic_read(&sk->sk_rmem_alloc))
 			printk(KERN_INFO "wansock: Warning, Packet Discarded due to sock shutdown!\n");
 
 		kfree(wp);
 		wp_sk(sk) = NULL;
 		
-		if (atomic_read(&sk->refcnt) != 1){
-			atomic_set(&sk->refcnt,1);
+		if (atomic_read(&sk->sk_refcnt) != 1) {
+			atomic_set(&sk->sk_refcnt, 1);
 			DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i ! :delay.\n",
-					atomic_read(&sk->refcnt));
+					atomic_read(&sk->sk_refcnt));
 		}
 		sock_put(sk);
 		atomic_dec(&wanpipe_socks_nr);
 		return;
 	}
 
-	sk->timer.expires=jiffies+5*HZ;
-	add_timer(&sk->timer);
+	sk->sk_timer.expires = jiffies + 5 * HZ;
+	add_timer(&sk->sk_timer);
 	printk(KERN_INFO "wansock: packet sk destroy delayed\n");
 }
 
@@ -866,11 +869,11 @@ static void wanpipe_unlink_driver (struct sock *sk)
 	struct net_device *dev;
 	wanpipe_common_t *chan=NULL;
 
-	sk->zapped=0;
-	sk->state = WANSOCK_DISCONNECTED;
+	sk->sk_zapped = 0;
+	sk->sk_state = WANSOCK_DISCONNECTED;
 	wp_sk(sk)->dev = NULL;
 
-	dev = dev_get_by_index(sk->bound_dev_if);
+	dev = dev_get_by_index(sk->sk_bound_dev_if);
 	if (!dev){
 		printk(KERN_INFO "wansock: No dev on release\n");
 		return;
@@ -915,7 +918,7 @@ static void wanpipe_link_driver(struct net_device *dev, struct sock *sk)
 	chan->mbox = wp->mbox;
 	chan->tx_timer = &wp->tx_timer;
 	wp->dev = dev;
-	sk->zapped = 1;
+	sk->sk_zapped = 1;
 	clear_bit(0,&chan->common_critical);
 }
 
@@ -966,23 +969,23 @@ static int wanpipe_release(struct socket *sock)
 	 */
 
 	if (wp->num == htons(X25_PROT) &&
-	    sk->state != WANSOCK_DISCONNECTED && sk->zapped) {
-		struct net_device *dev = dev_get_by_index(sk->bound_dev_if);
+	    sk->sk_state != WANSOCK_DISCONNECTED && sk->sk_zapped) {
+		struct net_device *dev = dev_get_by_index(sk->sk_bound_dev_if);
 		wanpipe_common_t *chan;
 		if (dev){
 			chan=dev->priv;
 			atomic_set(&chan->disconnect,1);
 			DBG_PRINTK(KERN_INFO "wansock: Sending Clear Indication %i\n",
-					sk->state);
+					sk->sk_state);
 			dev_put(dev);
 		}	
 	}
 
 	set_bit(1,&wanpipe_tx_critical);
 	write_lock(&wanpipe_sklist_lock);
-	for (skp = &wanpipe_sklist; *skp; skp = &(*skp)->next) {
+	for (skp = &wanpipe_sklist; *skp; skp = &(*skp)->sk_next) {
 		if (*skp == sk) {
-			*skp = sk->next;
+			*skp = sk->sk_next;
 			__sock_put(sk);
 			break;
 		}
@@ -999,35 +1002,37 @@ static int wanpipe_release(struct socket *sock)
 	 *	Now the socket is dead. No more input will appear.
 	 */
 
-	sk->state_change(sk);	/* It is useless. Just for sanity. */
+	sk->sk_state_change(sk);	/* It is useless. Just for sanity. */
 
 	sock->sk = NULL;
-	sk->socket = NULL;
+	sk->sk_socket = NULL;
 	sock_set_flag(sk, SOCK_DEAD);
 
 	/* Purge queues */
-	skb_queue_purge(&sk->receive_queue);
-	skb_queue_purge(&sk->write_queue);
-	skb_queue_purge(&sk->error_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
+	skb_queue_purge(&sk->sk_write_queue);
+	skb_queue_purge(&sk->sk_error_queue);
 
-	if (atomic_read(&sk->rmem_alloc) || atomic_read(&sk->wmem_alloc)) {
-		del_timer(&sk->timer);
+	if (atomic_read(&sk->sk_rmem_alloc) ||
+	    atomic_read(&sk->sk_wmem_alloc)) {
+		del_timer(&sk->sk_timer);
 		printk(KERN_INFO "wansock: Killing in Timer R %i , W %i\n",
-			atomic_read(&sk->rmem_alloc),atomic_read(&sk->wmem_alloc));
-		sk->timer.data=(unsigned long)sk;
-		sk->timer.expires=jiffies+HZ;
-		sk->timer.function=wanpipe_destroy_timer;
-		add_timer(&sk->timer);
+			atomic_read(&sk->sk_rmem_alloc),
+			atomic_read(&sk->sk_wmem_alloc));
+		sk->sk_timer.data	= (unsigned long)sk;
+		sk->sk_timer.expires	= jiffies + HZ;
+		sk->sk_timer.function	= wanpipe_destroy_timer;
+		add_timer(&sk->sk_timer);
 		return 0;
 	}
 
 	kfree(wp);
 	wp_sk(sk) = NULL;
 
-	if (atomic_read(&sk->refcnt) != 1){
+	if (atomic_read(&sk->sk_refcnt) != 1) {
 		DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i !:release.\n",
-					atomic_read(&sk->refcnt));
-		atomic_set(&sk->refcnt,1);
+					atomic_read(&sk->sk_refcnt));
+		atomic_set(&sk->sk_refcnt, 1);
 	}
 	sock_put(sk);
 	atomic_dec(&wanpipe_socks_nr);
@@ -1046,10 +1051,10 @@ static int wanpipe_release(struct socket *sock)
 static void check_write_queue(struct sock *sk)
 {
 
-	if (sk->state != WANSOCK_CONNECTED)
+	if (sk->sk_state != WANSOCK_CONNECTED)
 		return;
 
-	if (!atomic_read(&sk->wmem_alloc))
+	if (!atomic_read(&sk->sk_wmem_alloc))
 		return;
 
 	printk(KERN_INFO "wansock: MAJOR ERROR, Data lost on sock release !!!\n");
@@ -1071,8 +1076,9 @@ static void release_driver(struct sock *sk)
 	struct sk_buff *skb=NULL;
 	struct sock *deadsk=NULL;
 
-	if (sk->state == WANSOCK_LISTEN || sk->state == WANSOCK_BIND_LISTEN){
-		while ((skb=skb_dequeue(&sk->receive_queue))!=NULL){
+	if (sk->sk_state == WANSOCK_LISTEN ||
+	    sk->sk_state == WANSOCK_BIND_LISTEN) {
+		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 			if ((deadsk = get_newsk_from_skb(skb))){
 				DBG_PRINTK (KERN_INFO "wansock: RELEASE: FOUND DEAD SOCK\n");
 				sock_set_flag(deadsk, SOCK_DEAD);
@@ -1080,15 +1086,15 @@ static void release_driver(struct sock *sk)
 			}
 			kfree_skb(skb);
 		}
-		if (sk->zapped)
+		if (sk->sk_zapped)
 			wanpipe_unlink_card(sk);
 	}else{
-		if (sk->zapped)
+		if (sk->sk_zapped)
 			wanpipe_unlink_driver(sk);
 	}
-	sk->state = WANSOCK_DISCONNECTED;
-	sk->bound_dev_if = 0;
-	sk->zapped=0;
+	sk->sk_state	    = WANSOCK_DISCONNECTED;
+	sk->sk_bound_dev_if = 0;
+	sk->sk_zapped	    = 0;
 	wp = wp_sk(sk);
 
 	if (wp && wp->mbox) {
@@ -1108,11 +1114,11 @@ static void release_driver(struct sock *sk)
 
 static void start_cleanup_timer (struct sock *sk)
 {
-	del_timer(&sk->timer);
-	sk->timer.data = (unsigned long)sk;
-	sk->timer.expires = jiffies + HZ;
-	sk->timer.function = wanpipe_kill_sock_timer;
-	add_timer(&sk->timer);
+	del_timer(&sk->sk_timer);
+	sk->sk_timer.data	= (unsigned long)sk;
+	sk->sk_timer.expires	= jiffies + HZ;
+	sk->sk_timer.function	= wanpipe_kill_sock_timer;
+	add_timer(&sk->sk_timer);
 }
 
 
@@ -1137,15 +1143,15 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 	 * appropriate locks */
 	
 	if (test_bit(1,&wanpipe_tx_critical)){
-		sk->timer.expires=jiffies+10;
-		add_timer(&sk->timer);
+		sk->sk_timer.expires = jiffies + 10;
+		add_timer(&sk->sk_timer);
 		return;
 	}
 	
 	write_lock(&wanpipe_sklist_lock);
-	for (skp = &wanpipe_sklist; *skp; skp = &(*skp)->next) {
+	for (skp = &wanpipe_sklist; *skp; skp = &(*skp)->sk_next) {
 		if (*skp == sk) {
-			*skp = sk->next;
+			*skp = sk->sk_next;
 			__sock_put(sk);
 			break;
 		}
@@ -1154,8 +1160,8 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 
 
 	if (wp_sk(sk)->num == htons(X25_PROT) &&
-	    sk->state != WANSOCK_DISCONNECTED){
-		struct net_device *dev = dev_get_by_index(sk->bound_dev_if);
+	    sk->sk_state != WANSOCK_DISCONNECTED) {
+		struct net_device *dev = dev_get_by_index(sk->sk_bound_dev_if);
 		wanpipe_common_t *chan;
 		if (dev){
 			chan=dev->priv;
@@ -1166,20 +1172,21 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 
 	release_driver(sk);
 
-	sk->socket = NULL;
+	sk->sk_socket = NULL;
 
 	/* Purge queues */
-	skb_queue_purge(&sk->receive_queue);
-	skb_queue_purge(&sk->write_queue);
-	skb_queue_purge(&sk->error_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
+	skb_queue_purge(&sk->sk_write_queue);
+	skb_queue_purge(&sk->sk_error_queue);
 	
-	if (atomic_read(&sk->rmem_alloc) || atomic_read(&sk->wmem_alloc)) {
-		del_timer(&sk->timer);
+	if (atomic_read(&sk->sk_rmem_alloc) ||
+	    atomic_read(&sk->sk_wmem_alloc)) {
+		del_timer(&sk->sk_timer);
 		printk(KERN_INFO "wansock: Killing SOCK in Timer\n");
-		sk->timer.data=(unsigned long)sk;
-		sk->timer.expires=jiffies+HZ;
-		sk->timer.function=wanpipe_destroy_timer;
-		add_timer(&sk->timer);
+		sk->sk_timer.data	= (unsigned long)sk;
+		sk->sk_timer.expires	= jiffies + HZ;
+		sk->sk_timer.function	= wanpipe_destroy_timer;
+		add_timer(&sk->sk_timer);
 		return;
 	}
 
@@ -1188,10 +1195,10 @@ static void wanpipe_kill_sock_timer (unsigned long data)
 		wp_sk(sk) = NULL;
 	}
 
-	if (atomic_read(&sk->refcnt) != 1){
-		atomic_set(&sk->refcnt,1);
+	if (atomic_read(&sk->sk_refcnt) != 1) {
+		atomic_set(&sk->sk_refcnt, 1);
 		DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i ! :timer.\n",
-					atomic_read(&sk->refcnt));
+					atomic_read(&sk->sk_refcnt));
 	}
 	sock_put(sk);
 	atomic_dec(&wanpipe_socks_nr);
@@ -1210,16 +1217,16 @@ static void wanpipe_kill_sock_accept (struct sock *sk)
 	 * appropriate locks */
 	
 	write_lock(&wanpipe_sklist_lock);
-	for (skp = &wanpipe_sklist; *skp; skp = &(*skp)->next) {
+	for (skp = &wanpipe_sklist; *skp; skp = &(*skp)->sk_next) {
 		if (*skp == sk) {
-			*skp = sk->next;
+			*skp = sk->sk_next;
 			__sock_put(sk);
 			break;
 		}
 	}
 	write_unlock(&wanpipe_sklist_lock);
 
-	sk->socket = NULL;
+	sk->sk_socket = NULL;
 
 
 	if (wp_sk(sk)) {
@@ -1227,10 +1234,10 @@ static void wanpipe_kill_sock_accept (struct sock *sk)
 		wp_sk(sk) = NULL;
 	}
 
-	if (atomic_read(&sk->refcnt) != 1){
-		atomic_set(&sk->refcnt,1);
+	if (atomic_read(&sk->sk_refcnt) != 1) {
+		atomic_set(&sk->sk_refcnt, 1);
 		DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i ! :timer.\n",
-					atomic_read(&sk->refcnt));
+					atomic_read(&sk->sk_refcnt));
 	}
 	sock_put(sk);
 	atomic_dec(&wanpipe_socks_nr);
@@ -1244,17 +1251,17 @@ static void wanpipe_kill_sock_irq (struct sock *sk)
 	if (!sk)
 		return;
 
-	sk->socket = NULL;
+	sk->sk_socket = NULL;
 
 	if (wp_sk(sk)) {
 		kfree(wp_sk(sk));
 		wp_sk(sk) = NULL;
 	}
 
-	if (atomic_read(&sk->refcnt) != 1){
-		atomic_set(&sk->refcnt,1);
+	if (atomic_read(&sk->sk_refcnt) != 1) {
+		atomic_set(&sk->sk_refcnt, 1);
 		DBG_PRINTK(KERN_INFO "wansock: Error, wrong reference count: %i !:listen.\n",
-					atomic_read(&sk->refcnt));
+					atomic_read(&sk->sk_refcnt));
 	}
 	sock_put(sk);
 	atomic_dec(&wanpipe_socks_nr);
@@ -1277,7 +1284,7 @@ static int wanpipe_do_bind(struct sock *sk, struct net_device *dev,
 	wanpipe_common_t *chan=NULL;
 	int err=0;
 
-	if (sk->zapped){
+	if (sk->sk_zapped) {
 		err = -EALREADY;
 		goto bind_unlock_exit;
 	}
@@ -1293,29 +1300,29 @@ static int wanpipe_do_bind(struct sock *sk, struct net_device *dev,
 	if (dev) {
 		if (dev->flags&IFF_UP) {
 			chan=dev->priv;
-			sk->state = chan->state;
+			sk->sk_state = chan->state;
 
 			if (wp->num == htons(X25_PROT) && 
-			    sk->state != WANSOCK_DISCONNECTED && 
-			    sk->state != WANSOCK_CONNECTING){
+			    sk->sk_state != WANSOCK_DISCONNECTED && 
+			    sk->sk_state != WANSOCK_CONNECTING) {
 				DBG_PRINTK(KERN_INFO 
 					"wansock: Binding to Device not DISCONNECTED %i\n",
-						sk->state);
+						sk->sk_state);
 				release_device(dev);
 				err = -EAGAIN;
 				goto bind_unlock_exit;
 			}
 
 			wanpipe_link_driver(dev,sk);
-			sk->bound_dev_if = dev->ifindex;
+			sk->sk_bound_dev_if = dev->ifindex;
 
 			/* X25 Specific option */
 			if (wp->num == htons(X25_PROT))
 				wp_sk(sk)->svc = chan->svc;
 
 		} else {
-			sk->err = ENETDOWN;
-			sk->error_report(sk);
+			sk->sk_err = ENETDOWN;
+			sk->sk_error_report(sk);
 			release_device(dev);
 			err = -EINVAL;
 		}
@@ -1386,7 +1393,7 @@ static int wanpipe_bind(struct socket *sock, struct sockaddr *uaddr, int addr_le
 
 		if (sll->sll_protocol)
 			wp->num = sll->sll_protocol;
-		sk->state = WANSOCK_BIND_LISTEN;
+		sk->sk_state = WANSOCK_BIND_LISTEN;
 		return 0;
 
 	}else if (!strcmp(sll->sll_device,"svc_connect")){ 
@@ -1527,16 +1534,16 @@ static int wanpipe_create(struct socket *sock, int protocol)
 	if ((sk = wanpipe_alloc_socket()) == NULL)
 		return -ENOBUFS;
 
-	sk->reuse = 1;
+	sk->sk_reuse = 1;
 	sock->ops = &wanpipe_ops;
 	sock_init_data(sock,sk);
 
-	sk->zapped=0;
-	sk->family = PF_WANPIPE;
-	wp_sk(sk)->num = protocol;
-	sk->state = WANSOCK_DISCONNECTED;
-	sk->ack_backlog = 0;
-	sk->bound_dev_if=0;
+	sk->sk_zapped	    = 0;
+	sk->sk_family	    = PF_WANPIPE;
+	wp_sk(sk)->num	    = protocol;
+	sk->sk_state	    = WANSOCK_DISCONNECTED;
+	sk->sk_ack_backlog  = 0;
+	sk->sk_bound_dev_if = 0;
 
 	atomic_inc(&wanpipe_socks_nr);
 	
@@ -1544,7 +1551,7 @@ static int wanpipe_create(struct socket *sock, int protocol)
 	 * can also change the list */
 	set_bit(1,&wanpipe_tx_critical);
 	write_lock(&wanpipe_sklist_lock);
-	sk->next = wanpipe_sklist;
+	sk->sk_next = wanpipe_sklist;
 	wanpipe_sklist = sk;
 	sock_hold(sk);
 	write_unlock(&wanpipe_sklist_lock);
@@ -1586,7 +1593,7 @@ static int wanpipe_recvmsg(struct kiocb *iocb, struct socket *sock,
 	 */
 
 	if (flags & MSG_OOB){	
-		skb=skb_dequeue(&sk->error_queue);
+		skb = skb_dequeue(&sk->sk_error_queue);
 	}else{
 		skb=skb_recv_datagram(sk,flags,1,&err);
 	}
@@ -1653,7 +1660,7 @@ static void wanpipe_wakeup_driver(struct sock *sk)
 	struct net_device *dev = NULL;
 	wanpipe_common_t *chan=NULL;
 
-	dev = dev_get_by_index(sk->bound_dev_if);
+	dev = dev_get_by_index(sk->sk_bound_dev_if);
 	if (!dev)
 		return;
 
@@ -1663,7 +1670,8 @@ static void wanpipe_wakeup_driver(struct sock *sk)
 		return;
 	
 	if (atomic_read(&chan->receive_block)){  
-		if (atomic_read(&sk->rmem_alloc) < ((unsigned)sk->rcvbuf*0.9) ){
+		if (atomic_read(&sk->sk_rmem_alloc) <
+		    ((unsigned)sk->sk_rcvbuf * 0.9)) {
 			printk(KERN_INFO "wansock: Queuing task for wanpipe\n");
 			atomic_set(&chan->receive_block,0);
 			wanpipe_queue_tq(&chan->wanpipe_task);
@@ -1689,9 +1697,9 @@ static int wanpipe_getname(struct socket *sock, struct sockaddr *uaddr,
 	struct wan_sockaddr_ll *sll = (struct wan_sockaddr_ll*)uaddr;
 
 	sll->sll_family = AF_WANPIPE;
-	sll->sll_ifindex = sk->bound_dev_if;
+	sll->sll_ifindex = sk->sk_bound_dev_if;
 	sll->sll_protocol = wp_sk(sk)->num;
-	dev = dev_get_by_index(sk->bound_dev_if);
+	dev = dev_get_by_index(sk->sk_bound_dev_if);
 	if (dev) {
 		sll->sll_hatype = dev->type;
 		sll->sll_halen = dev->addr_len;
@@ -1725,7 +1733,7 @@ static int wanpipe_notifier(struct notifier_block *this, unsigned long msg, void
 	struct net_device *dev = (struct net_device *)data;
 	struct wanpipe_opt *po;
 
-	for (sk = wanpipe_sklist; sk; sk = sk->next) {
+	for (sk = wanpipe_sklist; sk; sk = sk->sk_next) {
 
 		if ((po = wp_sk(sk)) == NULL)
 			continue;
@@ -1735,25 +1743,25 @@ static int wanpipe_notifier(struct notifier_block *this, unsigned long msg, void
 		switch (msg) {
 		case NETDEV_DOWN:
 		case NETDEV_UNREGISTER:
-			if (dev->ifindex == sk->bound_dev_if) {
+			if (dev->ifindex == sk->sk_bound_dev_if) {
 				printk(KERN_INFO "wansock: Device down %s\n",dev->name);
-				if (sk->zapped){
+				if (sk->sk_zapped) {
 					wanpipe_unlink_driver(sk);
-					sk->err = ENETDOWN;
-					sk->error_report(sk);
+					sk->sk_err = ENETDOWN;
+					sk->sk_error_report(sk);
 				}
 
 				if (msg == NETDEV_UNREGISTER) {
 					printk(KERN_INFO "wansock: Unregistering Device: %s\n",
 						 	  dev->name);
 					wanpipe_unlink_driver(sk);
-					sk->bound_dev_if = 0;
+					sk->sk_bound_dev_if = 0;
 				}
 			}
 			break;
 		case NETDEV_UP:
-			if (dev->ifindex == sk->bound_dev_if &&
-			    po->num && !sk->zapped) {
+			if (dev->ifindex == sk->sk_bound_dev_if &&
+			    po->num && !sk->sk_zapped) {
 				printk(KERN_INFO "wansock: Registering Device: %s\n",
 						dev->name);
 				wanpipe_link_driver(dev,sk);
@@ -1781,20 +1789,21 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 	switch(cmd) 
 	{
 		case SIOCGSTAMP:
-			if(sk->stamp.tv_sec==0)
+			if (!sk->sk_stamp.tv_sec)
 				return -ENOENT;
 			err = -EFAULT;
-			if (!copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)))
+			if (!copy_to_user((void *)arg, &sk->sk_stamp,
+			    sizeof(struct timeval)))
 				err = 0;
 			return err;
 
 		case SIOC_WANPIPE_CHECK_TX:
 
-			return atomic_read(&sk->wmem_alloc);
+			return atomic_read(&sk->sk_wmem_alloc);
 
 		case SIOC_WANPIPE_SOCK_STATE:
 
-			if (sk->state == WANSOCK_CONNECTED)
+			if (sk->sk_state == WANSOCK_CONNECTED)
 				return 0;
 			
 			return 1;
@@ -1825,7 +1834,7 @@ static int wanpipe_ioctl(struct socket *sock, unsigned int cmd, unsigned long ar
 	
 		case SIOC_WANPIPE_SET_NONBLOCK:
 
-			if (sk->state != WANSOCK_DISCONNECTED)
+			if (sk->sk_state != WANSOCK_DISCONNECTED)
 				return -EINVAL;
 
 			sock->file->f_flags |= O_NONBLOCK;
@@ -1876,7 +1885,7 @@ static int wanpipe_debug (struct sock *origsk, void *arg)
 	int cnt=0, err=0;
 	wan_debug_t *dbg_data = (wan_debug_t *)arg;
 
-	for (sk = wanpipe_sklist; sk; sk = sk->next){
+	for (sk = wanpipe_sklist; sk; sk = sk->sk_next) {
 		wanpipe_opt *wp = wp_sk(sk);
 
 		if (sk == origsk){
@@ -1885,25 +1894,31 @@ static int wanpipe_debug (struct sock *origsk, void *arg)
 
 		if ((err=put_user(1, &dbg_data->debug[cnt].free)))
 			return err;
-		if ((err=put_user(sk->state, &dbg_data->debug[cnt].sk_state)))
+		if ((err = put_user(sk->sk_state,
+				    &dbg_data->debug[cnt].state_sk)))
 			return err;
-		if ((err=put_user(sk->rcvbuf, &dbg_data->debug[cnt].rcvbuf)))
+		if ((err = put_user(sk->sk_rcvbuf,
+				    &dbg_data->debug[cnt].rcvbuf)))
 			return err;
-		if ((err=put_user(atomic_read(&sk->rmem_alloc), &dbg_data->debug[cnt].rmem)))
+		if ((err = put_user(atomic_read(&sk->sk_rmem_alloc),
+				    &dbg_data->debug[cnt].rmem)))
 			return err;
-		if ((err=put_user(atomic_read(&sk->wmem_alloc), &dbg_data->debug[cnt].wmem)))
+		if ((err = put_user(atomic_read(&sk->sk_wmem_alloc),
+				    &dbg_data->debug[cnt].wmem)))
 			return err;
-		if ((err=put_user(sk->sndbuf, &dbg_data->debug[cnt].sndbuf)))
+		if ((err = put_user(sk->sk_sndbuf,
+				    &dbg_data->debug[cnt].sndbuf)))
 			return err;
 		if ((err=put_user(sk_count, &dbg_data->debug[cnt].sk_count)))
 			return err;
 		if ((err=put_user(wp->poll_cnt, &dbg_data->debug[cnt].poll_cnt)))
 			return err;
-		if ((err=put_user(sk->bound_dev_if, &dbg_data->debug[cnt].bound)))
+		if ((err = put_user(sk->sk_bound_dev_if,
+				    &dbg_data->debug[cnt].bound)))
 			return err;
 
-		if (sk->bound_dev_if){
-			dev = dev_get_by_index(sk->bound_dev_if);
+		if (sk->sk_bound_dev_if) {
+			dev = dev_get_by_index(sk->sk_bound_dev_if);
 			if (!dev)	
 				continue;
 
@@ -2014,7 +2029,7 @@ static int set_ioctl_cmd (struct sock *sk, void *arg)
 
 	if (!wp_sk(sk)->mbox) {
 		void *mbox_ptr;
-		struct net_device *dev = dev_get_by_index(sk->bound_dev_if);
+		struct net_device *dev = dev_get_by_index(sk->sk_bound_dev_if);
 		if (!dev)
 			return -ENODEV;
 
@@ -2078,28 +2093,28 @@ unsigned int wanpipe_poll(struct file * file, struct socket *sock, poll_table *w
 
 	++wp_sk(sk)->poll_cnt;
 
-	poll_wait(file, sk->sleep, wait);
+	poll_wait(file, sk->sk_sleep, wait);
 	mask = 0;
 
 	/* exceptional events? */
-	if (sk->err || !skb_queue_empty(&sk->error_queue)){
+	if (sk->sk_err || !skb_queue_empty(&sk->sk_error_queue)) {
 		mask |= POLLPRI;
 		return mask;
 	}
-	if (sk->shutdown & RCV_SHUTDOWN)
+	if (sk->sk_shutdown & RCV_SHUTDOWN)
 		mask |= POLLHUP;
 
 	/* readable? */
-	if (!skb_queue_empty(&sk->receive_queue)){
+	if (!skb_queue_empty(&sk->sk_receive_queue)) {
 		mask |= POLLIN | POLLRDNORM;
 	}
 
 	/* connection hasn't started yet */
-	if (sk->state == WANSOCK_CONNECTING){
+	if (sk->sk_state == WANSOCK_CONNECTING) {
 		return mask;
 	}
 
-	if (sk->state == WANSOCK_DISCONNECTED){
+	if (sk->sk_state == WANSOCK_DISCONNECTED) {
 		mask = POLLPRI;
 		return mask;
 	}
@@ -2120,7 +2135,7 @@ unsigned int wanpipe_poll(struct file * file, struct socket *sock, poll_table *w
 	if (sock_writeable(sk)){
 		mask |= POLLOUT | POLLWRNORM | POLLWRBAND;
 	}else{
-		set_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
+		set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
 	}
 		
 	return mask;
@@ -2142,10 +2157,10 @@ static int wanpipe_listen(struct socket *sock, int backlog)
 	if (wp_sk(sk)->num != htons(X25_PROT))
 		return -EINVAL;
 
-	if (sk->state == WANSOCK_BIND_LISTEN) {
+	if (sk->sk_state == WANSOCK_BIND_LISTEN) {
 
-		sk->max_ack_backlog = backlog;
-		sk->state           = WANSOCK_LISTEN;
+		sk->sk_max_ack_backlog = backlog;
+		sk->sk_state           = WANSOCK_LISTEN;
 		return 0;
 	}else{
 		printk(KERN_INFO "wansock: Listening sock was not binded\n");
@@ -2174,7 +2189,7 @@ static int wanpipe_link_card (struct sock *sk)
 
 	card->sk=sk;
 	card->func=wanpipe_listen_rcv;
-	sk->zapped=1;
+	sk->sk_zapped = 1;
  
 	return 0;
 }
@@ -2225,7 +2240,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 
 		case SIOC_WANPIPE_ACCEPT_CALL:
 
-			if (sk->state != WANSOCK_CONNECTING){
+			if (sk->sk_state != WANSOCK_CONNECTING) {
 				err = -EHOSTDOWN;
 				break;
 			}
@@ -2238,7 +2253,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
                          * Do not set the sock lcn number here, since
                          * it is done in wanpipe_listen_rcv(). 
                          */ 
-		 	if (sk->state == WANSOCK_CONNECTED){
+		 	if (sk->sk_state == WANSOCK_CONNECTED) {
 				wp->lcn = ((mbox_cmd_t*)wp->mbox)->cmd.lcn;	
 				DBG_PRINTK(KERN_INFO "\nwansock: Accept OK %i\n",
 					wp->lcn);
@@ -2254,7 +2269,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 
 		case SIOC_WANPIPE_CLEAR_CALL:
 
-			if (sk->state == WANSOCK_DISCONNECTED){
+			if (sk->sk_state == WANSOCK_DISCONNECTED) {
 				err = -EINVAL;
 				break;
 			}
@@ -2264,7 +2279,8 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
                          * if so, check whether user wants to wait until data
                          * is transmitted, or clear a call and drop packets */
                           
-			if (atomic_read(&sk->wmem_alloc) || check_driver_busy(sk)){
+			if (atomic_read(&sk->sk_wmem_alloc) ||
+			    check_driver_busy(sk)) {
 			  	mbox_cmd_t *mbox = wp->mbox;
 				if (mbox->cmd.qdm & 0x80){
 					mbox->cmd.result = 0x35;
@@ -2273,14 +2289,14 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 				}
 			}
 
-			sk->state = WANSOCK_DISCONNECTING;
+			sk->sk_state = WANSOCK_DISCONNECTING;
 
 			err = execute_command(sk,X25_CLEAR_CALL,0);
 			if (err < 0)
 				break;
 
 			err = -ECONNREFUSED;
-			if (sk->state == WANSOCK_DISCONNECTED){
+			if (sk->sk_state == WANSOCK_DISCONNECTED) {
 				DBG_PRINTK(KERN_INFO "\nwansock: CLEAR OK %i\n",
 					   wp->lcn);
 				wp->lcn = 0;
@@ -2290,7 +2306,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 
 		case SIOC_WANPIPE_RESET_CALL:
 
-			if (sk->state != WANSOCK_CONNECTED){
+			if (sk->sk_state != WANSOCK_CONNECTED) {
 				err = -EINVAL;
 				break;
 			}
@@ -2300,7 +2316,8 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
                          * if so, check whether user wants to wait until data
                          * is transmitted, or reset a call and drop packets */
                           
-			if (atomic_read(&sk->wmem_alloc) || check_driver_busy(sk)){
+			if (atomic_read(&sk->sk_wmem_alloc) ||
+			    check_driver_busy(sk)) {
 			  	mbox_cmd_t *mbox = wp->mbox;
 				if (mbox->cmd.qdm & 0x80){
 					mbox->cmd.result = 0x35;
@@ -2324,7 +2341,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 			if (err < 0)
 				break;
 
-			if (sk->state == WANSOCK_CONNECTED){
+			if (sk->sk_state == WANSOCK_CONNECTED) {
 
 				wp->lcn = ((mbox_cmd_t*)wp->mbox)->cmd.lcn;	
 
@@ -2332,7 +2349,8 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 					wp->lcn);
 				err = 0;
 
-			}else if (sk->state == WANSOCK_CONNECTING && (flags & O_NONBLOCK)){
+			} else if (sk->sk_state == WANSOCK_CONNECTING &&
+				   (flags & O_NONBLOCK)) {
 				wp->lcn = ((mbox_cmd_t*)wp->mbox)->cmd.lcn;
 				DBG_PRINTK(KERN_INFO "\nwansock: Place Call OK: Waiting %i\n",
 					wp->lcn);
@@ -2355,7 +2373,7 @@ static int wanpipe_exec_cmd(struct sock *sk, int cmd, unsigned int flags)
 
 static int check_driver_busy (struct sock *sk)
 {
-	struct net_device *dev = dev_get_by_index(sk->bound_dev_if);
+	struct net_device *dev = dev_get_by_index(sk->sk_bound_dev_if);
 	wanpipe_common_t *chan;
 
 	if (!dev)
@@ -2394,19 +2412,19 @@ static int wanpipe_accept(struct socket *sock, struct socket *newsock, int flags
 	if ((sk = sock->sk) == NULL)
 		return -EINVAL;
 
-	if (sk->type != SOCK_RAW)
+	if (sk->sk_type != SOCK_RAW)
 		return -EOPNOTSUPP;
 
-	if (sk->state != WANSOCK_LISTEN)
+	if (sk->sk_state != WANSOCK_LISTEN)
 		return -EINVAL;
 
 	if (wp_sk(sk)->num != htons(X25_PROT))
 		return -EINVAL;
 
-	add_wait_queue(sk->sleep,&wait);
+	add_wait_queue(sk->sk_sleep,&wait);
 	current->state = TASK_INTERRUPTIBLE;
 	for (;;){
-		skb = skb_dequeue(&sk->receive_queue);
+		skb = skb_dequeue(&sk->sk_receive_queue);
 		if (skb){
 			err=0;
 			break;
@@ -2418,7 +2436,7 @@ static int wanpipe_accept(struct socket *sock, struct socket *newsock, int flags
 		schedule();
 	}
 	current->state = TASK_RUNNING;
-	remove_wait_queue(sk->sleep,&wait);
+	remove_wait_queue(sk->sk_sleep,&wait);
 	
 	if (err != 0)
 		return err;
@@ -2430,18 +2448,18 @@ static int wanpipe_accept(struct socket *sock, struct socket *newsock, int flags
 
 	set_bit(1,&wanpipe_tx_critical);
 	write_lock(&wanpipe_sklist_lock);
-	newsk->next = wanpipe_sklist;
+	newsk->sk_next = wanpipe_sklist;
 	wanpipe_sklist = newsk;
 	sock_hold(sk);
 	write_unlock(&wanpipe_sklist_lock);
 	clear_bit(1,&wanpipe_tx_critical);
 
-	newsk->pair = NULL;
-	newsk->socket = newsock;
-	newsk->sleep = &newsock->wait;
+	newsk->sk_pair = NULL;
+	newsk->sk_socket = newsock;
+	newsk->sk_sleep = &newsock->wait;
 
 	/* Now attach up the new socket */
-	sk->ack_backlog--;
+	sk->sk_ack_backlog--;
 	newsock->sk = newsk;
 	
 	kfree_skb(skb);
@@ -2496,16 +2514,16 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 	if (wp_sk(sk)->num != htons(X25_PROT))
 		return -EINVAL;
 
-	if (sk->state == WANSOCK_CONNECTED)
+	if (sk->sk_state == WANSOCK_CONNECTED)
 		return -EISCONN;	/* No reconnect on a seqpacket socket */
 
-	if (sk->state != WAN_DISCONNECTED){
+	if (sk->sk_state != WAN_DISCONNECTED) {
 		printk(KERN_INFO "wansock: Trying to connect on channel NON DISCONNECT\n");
 		return -ECONNREFUSED;
 	}
 
-	sk->state   = WANSOCK_DISCONNECTED;	
-	sock->state = SS_UNCONNECTED;
+	sk->sk_state = WANSOCK_DISCONNECTED;	
+	sock->state  = SS_UNCONNECTED;
 
 	if (addr_len != sizeof(struct wan_sockaddr_ll))
 		return -EINVAL;
@@ -2513,16 +2531,16 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 	if (addr->sll_family != AF_WANPIPE)
 		return -EINVAL;
 
-	if ((dev = dev_get_by_index(sk->bound_dev_if)) == NULL)
+	if ((dev = dev_get_by_index(sk->sk_bound_dev_if)) == NULL)
 		return -ENETUNREACH;
 
 	dev_put(dev);
 	
-	if (!sk->zapped)		/* Must bind first - autobinding does not work */
+	if (!sk->sk_zapped) /* Must bind first - autobinding does not work */
 		return -EINVAL;
 
 	sock->state   = SS_CONNECTING;
-	sk->state     = WANSOCK_CONNECTING;
+	sk->sk_state  = WANSOCK_CONNECTING;
 
 	if (!wp_sk(sk)->mbox) {
 		if (wp_sk (sk)->svc)
@@ -2536,15 +2554,15 @@ static int wanpipe_connect(struct socket *sock, struct sockaddr *uaddr, int addr
 
 	if ((err=wanpipe_exec_cmd(sk, X25_PLACE_CALL,flags)) != 0){
 		sock->state = SS_UNCONNECTED;
-		sk->state = WANSOCK_CONNECTED;
+		sk->sk_state = WANSOCK_CONNECTED;
 		return err;
 	}
 
-	if (sk->state != WANSOCK_CONNECTED && (flags & O_NONBLOCK)){
+	if (sk->sk_state != WANSOCK_CONNECTED && (flags & O_NONBLOCK)) {
 		return 0;
 	}
 
-	if (sk->state != WANSOCK_CONNECTED) {
+	if (sk->sk_state != WANSOCK_CONNECTED) {
 		sock->state = SS_UNCONNECTED;
 		return -ECONNREFUSED; 
 	}

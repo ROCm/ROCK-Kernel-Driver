@@ -325,7 +325,7 @@ static inline int exec_permission_lite(struct inode *inode)
 
 	return -EACCES;
 ok:
-	return security_inode_permission_lite(inode, MAY_EXEC);
+	return security_inode_permission(inode, MAY_EXEC);
 }
 
 /*
@@ -1631,7 +1631,9 @@ int vfs_unlink(struct inode *dir, struct dentry *dentry)
 			error = dir->i_op->unlink(dir, dentry);
 	}
 	up(&dentry->d_inode->i_sem);
-	if (!error) {
+
+	/* We don't d_delete() NFS sillyrenamed files--they still exist. */
+	if (!error && !(dentry->d_flags & DCACHE_NFSFS_RENAMED)) {
 		d_delete(dentry);
 		inode_dir_notify(dir, DN_DELETE);
 	}

@@ -83,21 +83,21 @@ struct ncp_request_reply {
 };
 
 void ncp_tcp_data_ready(struct sock *sk, int len) {
-	struct ncp_server *server = sk->user_data;
+	struct ncp_server *server = sk->sk_user_data;
 
 	server->data_ready(sk, len);
 	schedule_work(&server->rcv.tq);
 }
 
 void ncp_tcp_error_report(struct sock *sk) {
-	struct ncp_server *server = sk->user_data;
+	struct ncp_server *server = sk->sk_user_data;
 	
 	server->error_report(sk);
 	schedule_work(&server->rcv.tq);
 }
 
 void ncp_tcp_write_space(struct sock *sk) {
-	struct ncp_server *server = sk->user_data;
+	struct ncp_server *server = sk->sk_user_data;
 	
 	/* We do not need any locking: we first set tx.creq, and then we do sendmsg,
 	   not vice versa... */
@@ -427,7 +427,7 @@ static void __ncpdgram_rcv_proc(void *s) {
 							unsigned int hdrl;
 							
 							result -= 8;
-							hdrl = sock->sk->family == AF_INET ? 8 : 6;
+							hdrl = sock->sk->sk_family == AF_INET ? 8 : 6;
 							if (sign_verify_reply(server, ((char*)req->reply_buf) + hdrl, result - hdrl, cpu_to_le32(result), ((char*)req->reply_buf) + result)) {
 								printk(KERN_INFO "ncpfs: Signature violation\n");
 								result = -EIO;

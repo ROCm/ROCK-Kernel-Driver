@@ -1545,10 +1545,11 @@ local inflate_huft *fixed_tl;
 local inflate_huft *fixed_td;
 
 
-local voidpf falloc(q, n, s)
-voidpf q;        /* opaque pointer (not used) */
-uInt n;         /* number of items */
-uInt s;         /* size of item */
+local voidpf falloc(
+	voidpf q,       /* opaque pointer (not used) */
+	uInt n,         /* number of items */
+	uInt s          /* size of item */
+)
 {
   Assert(s == sizeof(inflate_huft) && n <= fixed_left,
          "inflate_trees falloc overflow");
@@ -1558,10 +1559,11 @@ uInt s;         /* size of item */
 }
 
 
-local void ffree(q, p, n)
-voidpf q;
-voidpf p;
-uInt n;
+local void ffree(
+	voidpf q,
+	voidpf p,
+	uInt n
+)
 {
   Assert(0, "inflate_trees ffree called!");
   if (q) q = p; /* to make some compilers happy */
@@ -2164,10 +2166,11 @@ char *z_errmsg[] = {
 #define DO16(buf) DO8(buf); DO8(buf);
 
 /* ========================================================================= */
-uLong adler32(adler, buf, len)
-    uLong adler;
-    Bytef *buf;
-    uInt len;
+uLong adler32(
+	uLong adler,
+	Bytef *buf,
+	uInt len
+)
 {
     unsigned long s1 = adler & 0xffff;
     unsigned long s2 = (adler >> 16) & 0xffff;

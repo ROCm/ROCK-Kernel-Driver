@@ -940,7 +940,7 @@ static void handle_stripe(struct stripe_head *sh)
 			/* and fail all 'written' */
 			bi = sh->dev[i].written;
 			sh->dev[i].written = NULL;
-			while (bi && bi->bi_sector < dev->sector + STRIPE_SECTORS) {
+			while (bi && bi->bi_sector < sh->dev[i].sector + STRIPE_SECTORS) {
 				struct bio *bi2 = bi->bi_next;
 				clear_bit(BIO_UPTODATE, &bi->bi_flags);
 				if (--bi->bi_phys_segments == 0) {
@@ -1458,7 +1458,7 @@ static int run (mddev_t *mddev)
 				  GFP_KERNEL);
 	if ((conf = mddev->private) == NULL)
 		goto abort;
-	memset (conf, 0, sizeof (*conf));
+	memset (conf, 0, sizeof (*conf) + mddev->raid_disks * sizeof(struct disk_info) );
 	conf->mddev = mddev;
 
 	if ((conf->stripe_hashtbl = (struct stripe_head **) __get_free_pages(GFP_ATOMIC, HASH_PAGES_ORDER)) == NULL)

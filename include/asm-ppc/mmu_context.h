@@ -57,7 +57,7 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk,
 #define LAST_CONTEXT    	15
 #define FIRST_CONTEXT    	0
 
-#elif CONFIG_4xx
+#elif defined(CONFIG_4xx)
 #define NO_CONTEXT      	256
 #define LAST_CONTEXT    	255
 #define FIRST_CONTEXT    	1

@@ -286,7 +286,7 @@ free_nodes(void)
 static status __init
 register_with_devfs(void)
 {
-	struct pci_dev * dev;
+	struct pci_dev * dev = NULL;
 	devfs_handle_t device_dir_handle;
 	char devfs_path[40];
 
@@ -297,7 +297,7 @@ register_with_devfs(void)
 
 	/* FIXME: don't forget /dev/pci/mem & /dev/pci/io */
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		sprintf(devfs_path, "pci/%02x/%02x.%x",
 			dev->bus->number,
 			PCI_SLOT(dev->devfn),
@@ -325,14 +325,14 @@ devfn_to_vertex(unsigned char busnum, unsigned int devfn);
 static status __init
 register_with_devfs(void)
 {
-	struct pci_dev * dev;
+	struct pci_dev * dev = NULL;
 	devfs_handle_t device_dir_handle;
 
 	TRACE();
 
 	/* FIXME: don't forget /dev/.../pci/mem & /dev/.../pci/io */
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		device_dir_handle = devfn_to_vertex(dev->bus->number,
 						    dev->devfn);
 		if (device_dir_handle == NULL)

@@ -325,7 +325,7 @@ sn_pci_fixup(int arg)
 	/*
 	 * Initialize the device vertex in the pci_dev struct.
 	 */
-	pci_for_each_dev(device_dev) {
+	while ((device_dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, device_dev)) != NULL) {
 		unsigned int irq;
 		int idx;
 		u16 cmd;

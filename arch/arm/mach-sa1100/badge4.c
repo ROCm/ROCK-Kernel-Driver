@@ -35,6 +35,36 @@
 
 #include "generic.h"
 
+static struct resource sa1111_resources[] = {
+	[0] = {
+		.start		= BADGE4_SA1111_BASE,
+		.end		= BADGE4_SA1111_BASE + 0x00001fff,
+		.flags		= IORESOURCE_MEM,
+	},
+	[1] = {
+		.start		= BADGE4_IRQ_GPIO_SA1111,
+		.end		= BADGE4_IRQ_GPIO_SA1111,
+		.flags		= IORESOURCE_IRQ,
+	},
+};
+
+static u64 sa1111_dmamask = 0xffffffffUL;
+
+static struct platform_device sa1111_device = {
+	.name		= "sa1111",
+	.id		= 0,
+	.dev		= {
+		.name	= "Intel Corporation SA1111",
+		.dma_mask = &sa1111_dmamask;
+	},
+	.num_resources	= ARRAY_SIZE(sa1111_resources),
+	.resource	= sa1111_resources,
+};
+
+static struct platform_device *devices[] __initdata = {
+	&sa1111_device,
+};
+
 static int __init badge4_sa1111_init(void)
 {
 	/*
@@ -46,7 +76,7 @@ static int __init badge4_sa1111_init(void)
 	/*
 	 * Probe for SA1111.
 	 */
-	return sa1111_init(BADGE4_SA1111_BASE, BADGE4_IRQ_GPIO_SA1111);
+	return platform_add_devices(devices, ARRAY_SIZE(devices));
 }
 
 

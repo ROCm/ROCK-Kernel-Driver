@@ -52,7 +52,7 @@ check_bugs(void)
  * This is really horribly ugly.
  */
 int
-sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
+sys_ipc (uint call, int first, int second, int third, void __user *ptr, long fifth)
 {
 	int version, ret;
 
@@ -62,7 +62,7 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 	ret = -EINVAL;
 	switch (call) {
 	case SEMOP:
-		ret = sys_semop (first, (struct sembuf *)ptr, second);
+		ret = sys_semop (first, (struct sembuf __user *)ptr, second);
 		break;
 	case SEMGET:
 		ret = sys_semget (first, second, third);
@@ -73,13 +73,13 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 		if (!ptr)
 			break;
 		if ((ret = verify_area (VERIFY_READ, ptr, sizeof(long)))
-		    || (ret = get_user(fourth.__pad, (void **)ptr)))
+		    || (ret = get_user(fourth.__pad, (void *__user *)ptr)))
 			break;
 		ret = sys_semctl (first, second, third, fourth);
 		break;
 		}
 	case MSGSND:
-		ret = sys_msgsnd (first, (struct msgbuf *) ptr, second, third);
+		ret = sys_msgsnd (first, (struct msgbuf __user *) ptr, second, third);
 		break;
 	case MSGRCV:
 		switch (version) {
@@ -90,15 +90,15 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 				break;
 			if ((ret = verify_area (VERIFY_READ, ptr, sizeof(tmp)))
 			    || (ret = copy_from_user(&tmp,
-						(struct ipc_kludge *) ptr,
-						sizeof (tmp)) ? -EFAULT : 0))
+					(struct ipc_kludge __user *) ptr,
+					sizeof (tmp)) ? -EFAULT : 0))
 				break;
 			ret = sys_msgrcv (first, tmp.msgp, second, tmp.msgtyp,
 					  third);
 			break;
 			}
 		default:
-			ret = sys_msgrcv (first, (struct msgbuf *) ptr,
+			ret = sys_msgrcv (first, (struct msgbuf __user *) ptr,
 					  second, fifth, third);
 			break;
 		}
@@ -107,38 +107,28 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
 		ret = sys_msgget ((key_t) first, second);
 		break;
 	case MSGCTL:
-		ret = sys_msgctl (first, second, (struct msqid_ds *) ptr);
+		ret = sys_msgctl (first, second, (struct msqid_ds __user *) ptr);
 		break;
-	case SHMAT:
-		switch (version) {
-		default: {
-			ulong raddr;
+	case SHMAT: {
+		ulong raddr;
 
-			if ((ret = verify_area(VERIFY_WRITE, (ulong*) third,
-					       sizeof(ulong))))
-				break;
-			ret = sys_shmat (first, (char *) ptr, second, &raddr);
-			if (ret)
-				break;
-			ret = put_user (raddr, (ulong *) third);
+		if ((ret = verify_area(VERIFY_WRITE, (ulong __user *) third,
+				       sizeof(ulong))))
 			break;
-			}
-		case 1:	/* iBCS2 emulator entry point */
-			if (!segment_eq(get_fs(), get_ds()))
-				break;
-			ret = sys_shmat (first, (char *) ptr, second,
-					 (ulong *) third);
+		ret = sys_shmat (first, (char __user *) ptr, second, &raddr);
+		if (ret)
 			break;
-		}
+		ret = put_user (raddr, (ulong __user *) third);
 		break;
+		}
 	case SHMDT: 
-		ret = sys_shmdt ((char *)ptr);
+		ret = sys_shmdt ((char __user *)ptr);
 		break;
 	case SHMGET:
 		ret = sys_shmget (first, second, third);
 		break;
 	case SHMCTL:
-		ret = sys_shmctl (first, second, (struct shmid_ds *) ptr);
+		ret = sys_shmctl (first, second, (struct shmid_ds __user *) ptr);
 		break;
 	}
 
@@ -149,7 +139,7 @@ sys_ipc (uint call, int first, int second, int third, void *ptr, long fifth)
  * sys_pipe() is the normal C calling standard for creating
  * a pipe. It's not the way unix traditionally does this, though.
  */
-int sys_pipe(int *fildes)
+int sys_pipe(int __user *fildes)
 {
 	int fd[2];
 	int error;
@@ -219,7 +209,7 @@ ppc_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
 {
 	if ( (unsigned long)n >= 4096 )
 	{
-		unsigned long *buffer = (unsigned long *)n;
+		unsigned long __user *buffer = (unsigned long __user *)n;
 		if (verify_area(VERIFY_READ, buffer, 5*sizeof(unsigned long))
 		    || __get_user(n, buffer)
 		    || __get_user(inp, ((fd_set **)(buffer+1)))
@@ -231,7 +221,7 @@ ppc_select(int n, fd_set *inp, fd_set *outp, fd_set *exp, struct timeval *tvp)
 	return sys_select(n, inp, outp, exp, tvp);
 }
 
-int sys_uname(struct old_utsname * name)
+int sys_uname(struct old_utsname __user * name)
 {
 	int err = -EFAULT;
 
@@ -242,7 +232,7 @@ int sys_uname(struct old_utsname * name)
 	return err;
 }
 
-int sys_olduname(struct oldold_utsname * name)
+int sys_olduname(struct oldold_utsname __user * name)
 {
 	int error;
 

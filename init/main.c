@@ -37,6 +37,7 @@
 #include <linux/rcupdate.h>
 #include <linux/moduleparam.h>
 #include <linux/writeback.h>
+#include <linux/cpu.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -318,14 +319,16 @@ static void __init setup_per_cpu_areas(void)
 
 	/* Copy section for each CPU (we discard the original) */
 	size = ALIGN(__per_cpu_end - __per_cpu_start, SMP_CACHE_BYTES);
-	if (!size)
-		return;
+#ifdef CONFIG_MODULES
+	if (size < PERCPU_ENOUGH_ROOM)
+		size = PERCPU_ENOUGH_ROOM;
+#endif
 
 	ptr = alloc_bootmem(size * NR_CPUS);
 
 	for (i = 0; i < NR_CPUS; i++, ptr += size) {
 		__per_cpu_offset[i] = ptr - __per_cpu_start;
-		memcpy(ptr, __per_cpu_start, size);
+		memcpy(ptr, __per_cpu_start, __per_cpu_end - __per_cpu_start);
 	}
 }
 #endif /* !__GENERIC_PER_CPU */
@@ -388,6 +391,7 @@ asmlinkage void __init start_kernel(void)
 	lock_kernel();
 	printk(linux_banner);
 	setup_arch(&command_line);
+	setup_per_zone_pages_min();
 	setup_per_cpu_areas();
 
 	/*
@@ -435,8 +439,8 @@ asmlinkage void __init start_kernel(void)
 	pte_chain_init();
 	fork_init(num_physpages);
 	proc_caches_init();
-	security_scaffolding_startup();
 	buffer_init();
+	security_scaffolding_startup();
 	vfs_caches_init(num_physpages);
 	radix_tree_init();
 	signals_init();

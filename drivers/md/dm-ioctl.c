@@ -351,7 +351,8 @@ static int next_target(struct dm_target_spec *last, uint32_t next,
 
 static int populate_table(struct dm_table *table, struct dm_ioctl *args)
 {
-	int i = 0, r, first = 1;
+	int r, first = 1;
+	unsigned int i = 0;
 	struct dm_target_spec *spec;
 	char *params;
 	void *begin, *end;
@@ -380,7 +381,8 @@ static int populate_table(struct dm_table *table, struct dm_ioctl *args)
 		}
 
 		r = dm_table_add_target(table, spec->target_type,
-					spec->sector_start, spec->length,
+					(sector_t) spec->sector_start,
+					(sector_t) spec->length,
 					params);
 		if (r) {
 			DMWARN("internal error adding target to table");
@@ -558,7 +560,7 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	int r;
 	struct dm_table *t;
 	struct mapped_device *md;
-	int minor;
+	unsigned int minor = 0;
 
 	r = check_name(param->name);
 	if (r)
@@ -574,8 +576,8 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 		return r;
 	}
 
-	minor = (param->flags & DM_PERSISTENT_DEV_FLAG) ?
-		minor(to_kdev_t(param->dev)) : -1;
+	if (param->flags & DM_PERSISTENT_DEV_FLAG)
+		minor = minor(to_kdev_t(param->dev));
 
 	r = dm_create(minor, t, &md);
 	if (r) {
@@ -584,7 +586,7 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
 	}
 	dm_table_put(t);	/* md will have grabbed its own reference */
 
-	set_disk_ro(dm_disk(md), (param->flags & DM_READONLY_FLAG));
+	set_disk_ro(dm_disk(md), (param->flags & DM_READONLY_FLAG) ? 1 : 0);
 	r = dm_hash_insert(param->name, *param->uuid ? param->uuid : NULL, md);
 	dm_put(md);
 
@@ -595,9 +597,9 @@ static int create(struct dm_ioctl *param, struct dm_ioctl *user)
  * Build up the status struct for each target
  */
 static int __status(struct mapped_device *md, struct dm_ioctl *param,
-		    char *outbuf, int *len)
+		    char *outbuf, size_t *len)
 {
-	int i, num_targets;
+	unsigned int i, num_targets;
 	struct dm_target_spec *spec;
 	char *outptr;
 	status_type_t type;
@@ -657,7 +659,7 @@ static int __status(struct mapped_device *md, struct dm_ioctl *param,
 static int get_status(struct dm_ioctl *param, struct dm_ioctl *user)
 {
 	struct mapped_device *md;
-	int len = 0;
+	size_t len = 0;
 	int ret;
 	char *outbuf = NULL;
 
@@ -738,7 +740,8 @@ static int wait_device_event(struct dm_ioctl *param, struct dm_ioctl *user)
  */
 static int dep(struct dm_ioctl *param, struct dm_ioctl *user)
 {
-	int count, r;
+	int r;
+	unsigned int count;
 	struct mapped_device *md;
 	struct list_head *tmp;
 	size_t len = 0;
@@ -889,7 +892,7 @@ static int reload(struct dm_ioctl *param, struct dm_ioctl *user)
 	}
 	dm_table_put(t);	/* md will have taken its own reference */
 
-	set_disk_ro(dm_disk(md), (param->flags & DM_READONLY_FLAG));
+	set_disk_ro(dm_disk(md), (param->flags & DM_READONLY_FLAG) ? 1 : 0);
 	dm_put(md);
 
 	r = info(param, user);
@@ -945,7 +948,7 @@ static ioctl_fn lookup_ioctl(unsigned int cmd)
  * As well as checking the version compatibility this always
  * copies the kernel interface version out.
  */
-static int check_version(int cmd, struct dm_ioctl *user)
+static int check_version(unsigned int cmd, struct dm_ioctl *user)
 {
 	uint32_t version[3];
 	int r = 0;
@@ -1028,7 +1031,8 @@ static int validate_params(uint cmd, struct dm_ioctl *param)
 static int ctl_ioctl(struct inode *inode, struct file *file,
 		     uint command, ulong u)
 {
-	int r = 0, cmd;
+	int r = 0;
+	unsigned int cmd;
 	struct dm_ioctl *param;
 	struct dm_ioctl *user = (struct dm_ioctl *) u;
 	ioctl_fn fn = NULL;

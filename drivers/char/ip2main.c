@@ -94,9 +94,7 @@
 #include <linux/module.h>
 #include <linux/signal.h>
 #include <linux/sched.h>
-#ifdef	CONFIG_DEVFS_FS
 #include <linux/devfs_fs_kernel.h>
-#endif
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/pci.h>
@@ -229,11 +227,6 @@ static char *pcVersion = "1.2.14";
 
 /* String constants for port names */
 static char *pcDriver_name   = "ip2";
-#ifdef	CONFIG_DEVFS_FS
-static char *pcTty    		 = "tts/F%d";
-#else
-static char *pcTty    		 = "ttyF";
-#endif
 static char *pcIpl    		 = "ip2ipl";
 
 /* Serial subtype definitions */
@@ -302,9 +295,7 @@ static unsigned short find_eisa_board(int);
 /* Static Data */
 /***************/
 
-static struct tty_driver ip2_tty_driver;
-
-static int ref_count;
+static struct tty_driver *ip2_tty_driver;
 
 /* Here, then is a table of board pointers which the interrupt routine should
  * scan through to determine who it must service.
@@ -316,10 +307,6 @@ static i2eBordStrPtr i2BoardPtrTable[IP2_MAX_BOARDS];
 static i2ChanStrPtr  DevTable[IP2_MAX_PORTS];
 //DevTableMem just used to save addresses for kfree
 static void  *DevTableMem[IP2_MAX_BOARDS];
-
-static struct tty_struct * TtyTable[IP2_MAX_PORTS];
-static struct termios    * Termios[IP2_MAX_PORTS];
-static struct termios    * TermiosLocked[IP2_MAX_PORTS];
 
 /* This is the driver descriptor for the ip2ipl device, which is used to
  * download the loadware to the boards.
@@ -361,7 +348,7 @@ static int tracewrap;
 
 #if defined(MODULE) && defined(IP2DEBUG_OPEN)
 #define DBG_CNT(s) printk(KERN_DEBUG "(%s): [%x] refc=%d, ttyc=%d, modc=%x -> %s\n", \
-		    tty->name,(pCh->flags),ref_count, \
+		    tty->name,(pCh->flags),ip2_tty_driver->refcount, \
 		    tty->count,/*GET_USE_COUNT(module)*/0,s)
 #else
 #define DBG_CNT(s)
@@ -515,9 +502,10 @@ cleanup_module(void)
 		}
 	}
 	devfs_remove("ip2");
-	if ( ( err = tty_unregister_driver ( &ip2_tty_driver ) ) ) {
+	if ( ( err = tty_unregister_driver ( ip2_tty_driver ) ) ) {
 		printk(KERN_ERR "IP2: failed to unregister tty driver (%d)\n", err);
 	}
+	put_tty_driver(ip2_tty_driver);
 	if ( ( err = unregister_chrdev ( IP2_IPL_MAJOR, pcIpl ) ) ) {
 		printk(KERN_ERR "IP2: failed to unregister IPL driver (%d)\n", err);
 	}
@@ -544,6 +532,26 @@ cleanup_module(void)
 }
 #endif /* MODULE */
 
+static struct tty_operations ip2_ops = {
+	.open            = ip2_open,
+	.close           = ip2_close,
+	.write           = ip2_write,
+	.put_char        = ip2_putchar,
+	.flush_chars     = ip2_flush_chars,
+	.write_room      = ip2_write_room,
+	.chars_in_buffer = ip2_chars_in_buf,
+	.flush_buffer    = ip2_flush_buffer,
+	.ioctl           = ip2_ioctl,
+	.throttle        = ip2_throttle,
+	.unthrottle      = ip2_unthrottle,
+	.set_termios     = ip2_set_termios,
+	.set_ldisc       = ip2_set_line_discipline,
+	.stop            = ip2_stop,
+	.start           = ip2_start,
+	.hangup          = ip2_hangup,
+	.read_proc       = ip2_read_proc,
+};
+
 /******************************************************************************/
 /* Function:   ip2_loadmain()                                                 */
 /* Parameters: irq, io from command line of insmod et. al.                    */
@@ -564,10 +572,7 @@ cleanup_module(void)
 int
 ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize) 
 {
-#ifdef	CONFIG_DEVFS_FS
-	int j, box;
-#endif
-	int i;
+	int i, j, box;
 	int err;
 	int status = 0;
 	static int loaded;
@@ -621,15 +626,16 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 	}
 	loaded++;
 
+	ip2_tty_driver = alloc_tty_driver(IP2_MAX_PORTS);
+	if (!ip2_tty_driver)
+		return -ENOMEM;
+
 	/* Initialise the iiEllis subsystem. */
 	iiEllisInit();
 
 	/* Initialize arrays. */
 	memset( i2BoardPtrTable, 0, sizeof i2BoardPtrTable );
 	memset( DevTable, 0, sizeof DevTable );
-	memset( TtyTable, 0, sizeof TtyTable );
-	memset( Termios, 0, sizeof Termios );
-	memset( TermiosLocked, 0, sizeof TermiosLocked );
 
 	/* Initialise all the boards we can find (up to the maximum). */
 	for ( i = 0; i < IP2_MAX_BOARDS; ++i ) {
@@ -701,41 +707,39 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 				} 
 			} 
 #else /* LINUX_VERSION_CODE > 2.1.99 */
-			if (pci_present()) {
-				struct pci_dev *pci_dev_i = NULL;
-				pci_dev_i = pci_find_device(PCI_VENDOR_ID_COMPUTONE,
-							  PCI_DEVICE_ID_COMPUTONE_IP2EX, pci_dev_i);
-				if (pci_dev_i != NULL) {
-					unsigned int addr;
-					unsigned char pci_irq;
+			struct pci_dev *pci_dev_i = NULL;
+			pci_dev_i = pci_find_device(PCI_VENDOR_ID_COMPUTONE,
+						  PCI_DEVICE_ID_COMPUTONE_IP2EX, pci_dev_i);
+			if (pci_dev_i != NULL) {
+				unsigned int addr;
+				unsigned char pci_irq;
 
-					ip2config.type[i] = PCI;
-					status =
-					pci_read_config_dword(pci_dev_i, PCI_BASE_ADDRESS_1, &addr);
-					if ( addr & 1 ) {
-						ip2config.addr[i]=(USHORT)(addr&0xfffe);
-					} else {
-						printk( KERN_ERR "IP2: PCI I/O address error\n");
-					}
-					status =
-					pci_read_config_byte(pci_dev_i, PCI_INTERRUPT_LINE, &pci_irq);
+				ip2config.type[i] = PCI;
+				status =
+				pci_read_config_dword(pci_dev_i, PCI_BASE_ADDRESS_1, &addr);
+				if ( addr & 1 ) {
+					ip2config.addr[i]=(USHORT)(addr&0xfffe);
+				} else {
+					printk( KERN_ERR "IP2: PCI I/O address error\n");
+				}
+				status =
+				pci_read_config_byte(pci_dev_i, PCI_INTERRUPT_LINE, &pci_irq);
 
 //		If the PCI BIOS assigned it, lets try and use it.  If we
 //		can't acquire it or it screws up, deal with it then.
 
-//					if (!is_valid_irq(pci_irq)) {
-//						printk( KERN_ERR "IP2: Bad PCI BIOS IRQ(%d)\n",pci_irq);
-//						pci_irq = 0;
-//					}
-					ip2config.irq[i] = pci_irq;
-				} else {	// ann error
-					ip2config.addr[i] = 0;
-					if (status == PCIBIOS_DEVICE_NOT_FOUND) {
-						printk( KERN_ERR "IP2: PCI board %d not found\n", i );
-					} else {
-						pcibios_strerror(status);
-					}
-				} 
+//				if (!is_valid_irq(pci_irq)) {
+//					printk( KERN_ERR "IP2: Bad PCI BIOS IRQ(%d)\n",pci_irq);
+//					pci_irq = 0;
+//				}
+				ip2config.irq[i] = pci_irq;
+			} else {	// ann error
+				ip2config.addr[i] = 0;
+				if (status == PCIBIOS_DEVICE_NOT_FOUND) {
+					printk( KERN_ERR "IP2: PCI board %d not found\n", i );
+				} else {
+					pcibios_strerror(status);
+				}
 			} 
 #endif	/* ! 2_0_X */
 #else
@@ -780,57 +784,26 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, 2, 0 );
 
-	/* Zero out the normal tty device structure. */
-	memset ( &ip2_tty_driver, 0, sizeof ip2_tty_driver );
-
-	/* Initialise the relevant fields. */
-	ip2_tty_driver.magic                = TTY_DRIVER_MAGIC;
-	ip2_tty_driver.owner		    = THIS_MODULE;
-	ip2_tty_driver.name                 = pcTty;
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,1,0)
-	ip2_tty_driver.driver_name          = pcDriver_name;
-	ip2_tty_driver.read_proc          	= ip2_read_proc;
-#endif
-	ip2_tty_driver.major                = IP2_TTY_MAJOR;
-	ip2_tty_driver.minor_start          = 0;
-	ip2_tty_driver.num                  = IP2_MAX_PORTS;
-	ip2_tty_driver.type                 = TTY_DRIVER_TYPE_SERIAL;
-	ip2_tty_driver.subtype              = SERIAL_TYPE_NORMAL;
-	ip2_tty_driver.init_termios         = tty_std_termios;
-	ip2_tty_driver.init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
-#ifdef	CONFIG_DEVFS_FS
-	ip2_tty_driver.flags                = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-#else
-	ip2_tty_driver.flags                = TTY_DRIVER_REAL_RAW;
-#endif
-	ip2_tty_driver.refcount             = &ref_count;
-	ip2_tty_driver.table                = TtyTable;
-	ip2_tty_driver.termios              = Termios;
-	ip2_tty_driver.termios_locked       = TermiosLocked;
-
-	/* Setup the pointers to the implemented functions. */
-	ip2_tty_driver.open            = ip2_open;
-	ip2_tty_driver.close           = ip2_close;
-	ip2_tty_driver.write           = ip2_write;
-	ip2_tty_driver.put_char        = ip2_putchar;
-	ip2_tty_driver.flush_chars     = ip2_flush_chars;
-	ip2_tty_driver.write_room      = ip2_write_room;
-	ip2_tty_driver.chars_in_buffer = ip2_chars_in_buf;
-	ip2_tty_driver.flush_buffer    = ip2_flush_buffer;
-	ip2_tty_driver.ioctl           = ip2_ioctl;
-	ip2_tty_driver.throttle        = ip2_throttle;
-	ip2_tty_driver.unthrottle      = ip2_unthrottle;
-	ip2_tty_driver.set_termios     = ip2_set_termios;
-	ip2_tty_driver.set_ldisc       = ip2_set_line_discipline;
-	ip2_tty_driver.stop            = ip2_stop;
-	ip2_tty_driver.start           = ip2_start;
-	ip2_tty_driver.hangup          = ip2_hangup;
+	ip2_tty_driver->owner		    = THIS_MODULE;
+	ip2_tty_driver->name                 = "ttyF";
+	ip2_tty_driver->devfs_name	    = "tts/F";
+	ip2_tty_driver->driver_name          = pcDriver_name;
+	ip2_tty_driver->major                = IP2_TTY_MAJOR;
+	ip2_tty_driver->minor_start          = 0;
+	ip2_tty_driver->type                 = TTY_DRIVER_TYPE_SERIAL;
+	ip2_tty_driver->subtype              = SERIAL_TYPE_NORMAL;
+	ip2_tty_driver->init_termios         = tty_std_termios;
+	ip2_tty_driver->init_termios.c_cflag = B9600|CS8|CREAD|HUPCL|CLOCAL;
+	ip2_tty_driver->flags                = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	tty_set_operations(ip2_tty_driver, &ip2_ops);
 
 	ip2trace (ITRC_NO_PORT, ITRC_INIT, 3, 0 );
 
 	/* Register the tty devices. */
-	if ( ( err = tty_register_driver ( &ip2_tty_driver ) ) ) {
+	if ( ( err = tty_register_driver ( ip2_tty_driver ) ) ) {
 		printk(KERN_ERR "IP2: failed to register tty driver (%d)\n", err);
+		put_tty_driver(ip2_tty_driver);
+		return -EINVAL;
 	} else
 	/* Register the IPL driver. */
 	if ( ( err = register_chrdev ( IP2_IPL_MAJOR, pcIpl, &ip2_ipl ) ) ) {
@@ -851,7 +824,6 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 				continue;
 			}
 
-#ifdef	CONFIG_DEVFS_FS
 			if ( NULL != ( pB = i2BoardPtrTable[i] ) ) {
 				devfs_mk_cdev(MKDEV(IP2_IPL_MAJOR, 4 * i),
 						S_IRUSR | S_IWUSR | S_IRGRP | S_IFCHR,
@@ -867,14 +839,13 @@ ip2_loadmain(int *iop, int *irqp, unsigned char *firmware, int firmsize)
 			        {
 				    if ( pB->i2eChannelMap[box] & (1 << j) )
 				    {
-				        tty_register_device(&ip2_tty_driver,
+				        tty_register_device(ip2_tty_driver,
 					    j + ABS_BIGGEST_BOX *
 						    (box+i*ABS_MAX_BOXES), NULL);
 			    	    }
 			        }
 			    }
 			}
-#endif
 
 			if (poll_only) {
 //		Poll only forces driver to only use polling and
@@ -1646,9 +1617,6 @@ noblock:
 	/* first open - Assign termios structure to port */
 	if ( tty->count == 1 ) {
 		i2QueueCommands(PTYPE_INLINE, pCh, 0, 2, CMD_CTSFL_DSAB, CMD_RTSFL_DSAB);
-		if ( pCh->flags & ASYNC_SPLIT_TERMIOS ) {
-			*tty->termios = pCh->NormalTermios;
-		}
 		/* Now we must send the termios settings to the loadware */
 		set_params( pCh, NULL );
 	}
@@ -1707,13 +1675,6 @@ ip2_close( PTTY tty, struct file *pFile )
 		return;
 	}
 	pCh->flags |= ASYNC_CLOSING;	// last close actually
-
-	/*
-	 * Save the termios structure, since this port may have separate termios
-	 * for callout and dialin.
-	 */
-	if (pCh->flags & ASYNC_NORMAL_ACTIVE)
-		pCh->NormalTermios = *tty->termios;
 
 	tty->closing = 1;
 
@@ -3056,7 +3017,7 @@ ip2_ipl_ioctl ( struct inode *pInode, struct file *pFile, UINT cmd, ULONG arg )
 	case 13:
 		switch ( cmd ) {
 		case 64:	/* Driver - ip2stat */
-			PUT_USER(rc, ref_count, pIndex++ );
+			PUT_USER(rc, ip2_tty_driver->refcount, pIndex++ );
 			PUT_USER(rc, irq_counter, pIndex++  );
 			PUT_USER(rc, bh_counter, pIndex++  );
 			break;

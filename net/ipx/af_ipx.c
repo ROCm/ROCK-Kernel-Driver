@@ -143,16 +143,16 @@ static void ipx_remove_socket(struct sock *sk)
 	spin_lock_bh(&intrfc->if_sklist_lock);
 	s = intrfc->if_sklist;
 	if (s == sk) {
-		intrfc->if_sklist = s->next;
+		intrfc->if_sklist = s->sk_next;
 		goto out_unlock;
 	}
 
-	while (s && s->next) {
-		if (s->next == sk) {
-			s->next = sk->next;
+	while (s && s->sk_next) {
+		if (s->sk_next == sk) {
+			s->sk_next = sk->sk_next;
 			goto out_unlock;
 		}
-		s = s->next;
+		s = s->sk_next;
 	}
 out_unlock:
 	spin_unlock_bh(&intrfc->if_sklist_lock);
@@ -165,14 +165,14 @@ out:
 static void ipx_destroy_socket(struct sock *sk)
 {
 	ipx_remove_socket(sk);
-	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 #ifdef IPX_REFCNT_DEBUG
         atomic_dec(&ipx_sock_nr);
         printk(KERN_DEBUG "IPX socket %p released, %d are still alive\n", sk,
 			atomic_read(&ipx_sock_nr));
-	if (atomic_read(&sk->refcnt) != 1)
+	if (atomic_read(&sk->sk_refcnt) != 1)
 		printk(KERN_DEBUG "Destruction sock ipx %p delayed, cnt=%d\n",
-				sk, atomic_read(&sk->refcnt));
+				sk, atomic_read(&sk->sk_refcnt));
 #endif
 	sock_put(sk);
 }
@@ -246,14 +246,14 @@ static void ipxitf_insert_socket(struct ipx_interface *intrfc, struct sock *sk)
 	sock_hold(sk);
 	spin_lock_bh(&intrfc->if_sklist_lock);
 	ipx_sk(sk)->intrfc = intrfc;
-	sk->next = NULL;
+	sk->sk_next = NULL;
 	if (!intrfc->if_sklist)
 		intrfc->if_sklist = sk;
 	else {
 		struct sock *s = intrfc->if_sklist;
-		while (s->next)
-			s = s->next;
-		s->next = sk;
+		while (s->sk_next)
+			s = s->sk_next;
+		s->sk_next = sk;
 	}
 	spin_unlock_bh(&intrfc->if_sklist_lock);
 	ipxitf_put(intrfc);
@@ -266,7 +266,7 @@ static struct sock *__ipxitf_find_socket(struct ipx_interface *intrfc,
 	struct sock *s = intrfc->if_sklist;
 
 	while (s && ipx_sk(s)->port != port)
-	     s = s->next;
+	     s = s->sk_next;
 
 	return s;
 }
@@ -303,7 +303,7 @@ static struct sock *ipxitf_find_internal_socket(struct ipx_interface *intrfc,
 		if (ipxs->port == port &&
 		    !memcmp(node, ipxs->node, IPX_NODE_LEN))
 			break;
-		s = s->next;
+		s = s->sk_next;
 	}
 	spin_unlock_bh(&intrfc->if_sklist_lock);
 	ipxitf_put(intrfc);
@@ -324,14 +324,14 @@ void __ipxitf_down(struct ipx_interface *intrfc)
 	for (s = intrfc->if_sklist; s;) {
 		struct ipx_opt *ipxs = ipx_sk(s);
 
-		s->err = ENOLINK;
-		s->error_report(s);
+		s->sk_err = ENOLINK;
+		s->sk_error_report(s);
 		ipxs->intrfc = NULL;
 		ipxs->port   = 0;
-		s->zapped = 1;	/* Indicates it is no longer bound */
+		s->sk_zapped = 1;	/* Indicates it is no longer bound */
 		t = s;
-		s = s->next;
-		t->next = NULL;
+		s = s->sk_next;
+		t->sk_next = NULL;
 	}
 	intrfc->if_sklist = NULL;
 	spin_unlock_bh(&intrfc->if_sklist_lock);
@@ -429,7 +429,7 @@ static int ipxitf_demux_socket(struct ipx_interface *intrfc,
 			if (intrfc != ipx_internal_net)
 				break;
 		}
-		s = s->next;
+		s = s->sk_next;
 	}
 
 	/* skb was solely for us, and we did not make a copy, so free it. */
@@ -468,7 +468,7 @@ static struct sock *ncp_connection_hack(struct ipx_interface *intrfc,
 		spin_lock_bh(&intrfc->if_sklist_lock);
 		for (sk = intrfc->if_sklist;
 		     sk && ipx_sk(sk)->ipx_ncp_conn != connection;
-		     sk = sk->next);
+		     sk = sk->sk_next);
 		if (sk)
 			sock_hold(sk);
 		spin_unlock_bh(&intrfc->if_sklist_lock);
@@ -1385,7 +1385,7 @@ static int ipx_create(struct socket *sock, int protocol)
 			atomic_read(&ipx_sock_nr));
 #endif
 	sock_init_data(sock, sk);
-	sk->no_check = 1;		/* Checksum off by default */
+	sk->sk_no_check = 1;		/* Checksum off by default */
 	rc = 0;
 out:
 	return rc;
@@ -1402,7 +1402,7 @@ static int ipx_release(struct socket *sock)
 		goto out;
 
 	if (!sock_flag(sk, SOCK_DEAD))
-		sk->state_change(sk);
+		sk->sk_state_change(sk);
 
 	sock_set_flag(sk, SOCK_DEAD);
 	sock->sk = NULL;
@@ -1442,7 +1442,7 @@ static int ipx_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct sockaddr_ipx *addr = (struct sockaddr_ipx *)uaddr;
 	int rc = -EINVAL;
 
-	if (!sk->zapped || addr_len != sizeof(struct sockaddr_ipx))
+	if (!sk->sk_zapped || addr_len != sizeof(struct sockaddr_ipx))
 		goto out;
 
 	intrfc = ipxitf_find_using_net(addr->sipx_network);
@@ -1520,7 +1520,7 @@ static int ipx_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 #endif	/* CONFIG_IPX_INTERN */
 
 	ipxitf_insert_socket(intrfc, sk);
-	sk->zapped = 0;
+	sk->sk_zapped = 0;
 
 	rc = 0;
 out_put:
@@ -1538,7 +1538,7 @@ static int ipx_connect(struct socket *sock, struct sockaddr *uaddr,
 	int rc = -EINVAL;
 	struct ipx_route *rt;
 
-	sk->state	= TCP_CLOSE;
+	sk->sk_state	= TCP_CLOSE;
 	sock->state 	= SS_UNCONNECTED;
 
 	if (addr_len != sizeof(*addr))
@@ -1580,7 +1580,7 @@ static int ipx_connect(struct socket *sock, struct sockaddr *uaddr,
 
 	if (sock->type == SOCK_DGRAM) {
 		sock->state 	= SS_CONNECTED;
-		sk->state 	= TCP_ESTABLISHED;
+		sk->sk_state 	= TCP_ESTABLISHED;
 	}
 
 	if (rt)
@@ -1604,7 +1604,7 @@ static int ipx_getname(struct socket *sock, struct sockaddr *uaddr,
 
 	if (peer) {
 		rc = -ENOTCONN;
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			goto out;
 
 		addr = &ipxs->dest_addr;
@@ -1703,7 +1703,7 @@ static int ipx_sendmsg(struct kiocb *iocb, struct socket *sock,
 	int flags = msg->msg_flags;
 
 	/* Socket gets bound below anyway */
-/*	if (sk->zapped)
+/*	if (sk->sk_zapped)
 		return -EIO; */	/* Socket not bound */
 	if (flags & ~MSG_DONTWAIT)
 		goto out;
@@ -1733,7 +1733,7 @@ static int ipx_sendmsg(struct kiocb *iocb, struct socket *sock,
 			goto out;
 	} else {
 		rc = -ENOTCONN;
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			goto out;
 
 		usipx = &local_sipx;
@@ -1784,7 +1784,7 @@ static int ipx_recvmsg(struct kiocb *iocb, struct socket *sock,
 	}
 	
 	rc = -ENOTCONN;
-	if (sk->zapped)
+	if (sk->sk_zapped)
 		goto out;
 
 	skb = skb_recv_datagram(sk, flags & ~MSG_DONTWAIT,
@@ -1803,7 +1803,7 @@ static int ipx_recvmsg(struct kiocb *iocb, struct socket *sock,
 				     copied);
 	if (rc)
 		goto out_free;
-	sk->stamp = skb->stamp;
+	sk->sk_stamp = skb->stamp;
 
 	msg->msg_namelen = sizeof(*sipx);
 
@@ -1831,13 +1831,13 @@ static int ipx_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 
 	switch (cmd) {
 	case TIOCOUTQ:
-		amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
 		rc = put_user(amount, (int *)arg);
 		break;
 	case TIOCINQ: {
-		struct sk_buff *skb = skb_peek(&sk->receive_queue);
+		struct sk_buff *skb = skb_peek(&sk->sk_receive_queue);
 		/* These two are safe on a single CPU system as only
 		 * user tasks fiddle here */
 		if (skb)
@@ -1878,10 +1878,10 @@ static int ipx_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		rc = -EINVAL;
 		if (sk) {
 			rc = -ENOENT;
-			if (!sk->stamp.tv_sec)
+			if (!sk->sk_stamp.tv_sec)
 				break;
 			rc = -EFAULT;
-			if (!copy_to_user((void *)arg, &sk->stamp,
+			if (!copy_to_user((void *)arg, &sk->sk_stamp,
 					  sizeof(struct timeval)))
 				rc = 0;
 		}

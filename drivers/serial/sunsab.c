@@ -231,8 +231,10 @@ static void transmit_chars(struct uart_sunsab_port *up,
 		set_bit(SAB82532_ALLS, &up->irqflags);
 	}
 
+#if 0 /* bde@nwlink.com says this check causes problems */
 	if (!(stat->sreg.isr1 & SAB82532_ISR1_XPR))
 		return;
+#endif
 
 	if (!(readb(&up->regs->r.star) & SAB82532_STAR_XFW))
 		return;
@@ -242,6 +244,7 @@ static void transmit_chars(struct uart_sunsab_port *up,
 	if (uart_circ_empty(xmit) || uart_tx_stopped(&up->port)) {
 		up->interrupt_mask1 |= SAB82532_IMR1_XPR;
 		writeb(up->interrupt_mask1, &up->regs->w.imr1);
+		uart_write_wakeup(&up->port);
 		return;
 	}
 
@@ -827,11 +830,8 @@ static struct uart_ops sunsab_pops = {
 static struct uart_driver sunsab_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "serial",
-#ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/",
-#else
+	.devfs_name		= "tts/",
 	.dev_name		= "ttyS",
-#endif
 	.major			= TTY_MAJOR,
 };
 

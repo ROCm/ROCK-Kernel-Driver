@@ -297,7 +297,7 @@ extern void usb_serial_bus_deregister (struct usb_serial_device_type *device);
 
 extern struct usb_serial_device_type usb_serial_generic_device;
 extern struct bus_type usb_serial_bus_type;
-extern struct tty_driver usb_serial_tty_driver;
+extern struct tty_driver *usb_serial_tty_driver;
 
 /* Inline functions to check the sanity of a pointer that is passed to us */
 static inline int serial_paranoia_check (struct usb_serial *serial, const char *function)

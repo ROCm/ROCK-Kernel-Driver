@@ -176,11 +176,7 @@ DECLARE_TASK_QUEUE(tq_specialix);
 #undef RS_EVENT_WRITE_WAKEUP
 #define RS_EVENT_WRITE_WAKEUP	0
 
-static struct tty_driver specialix_driver;
-static int    specialix_refcount;
-static struct tty_struct * specialix_table[SX_NBOARD * SX_NPORT];
-static struct termios * specialix_termios[SX_NBOARD * SX_NPORT];
-static struct termios * specialix_termios_locked[SX_NBOARD * SX_NPORT];
+static struct tty_driver *specialix_driver;
 static unsigned char * tmp_buf;
 static DECLARE_MUTEX(tmp_buf_sem);
 
@@ -1442,12 +1438,6 @@ static int sx_open(struct tty_struct * tty, struct file * filp)
 	if ((error = block_til_ready(tty, filp, port)))
 		return error;
 
-	if ((port->count == 1) && (port->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->normal_termios;
-		save_flags(flags); cli();
-		sx_change_speed(bp, port);
-		restore_flags(flags);
-	}
 	return 0;
 }
 
@@ -1485,12 +1475,6 @@ static void sx_close(struct tty_struct * tty, struct file * filp)
 		return;
 	}
 	port->flags |= ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (port->flags & ASYNC_NORMAL_ACTIVE)
-		port->normal_termios = *tty->termios;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
@@ -2167,52 +2151,54 @@ static void do_softint(void *private_)
 	}
 }
 
+static struct tty_operations sx_ops = {
+	.open  = sx_open,
+	.close = sx_close,
+	.write = sx_write,
+	.put_char = sx_put_char,
+	.flush_chars = sx_flush_chars,
+	.write_room = sx_write_room,
+	.chars_in_buffer = sx_chars_in_buffer,
+	.flush_buffer = sx_flush_buffer,
+	.ioctl = sx_ioctl,
+	.throttle = sx_throttle,
+	.unthrottle = sx_unthrottle,
+	.set_termios = sx_set_termios,
+	.stop = sx_stop,
+	.start = sx_start,
+	.hangup = sx_hangup,
+};
 
 static int sx_init_drivers(void)
 {
 	int error;
 	int i;
 
+	specialix_driver = alloc_tty_driver(SX_NBOARD * SX_NPORT);
+	if (!specialix_driver) {
+		printk(KERN_ERR "sx: Couldn't allocate tty_driver.\n");
+		return 1;
+	}
 	
 	if (!(tmp_buf = (unsigned char *) get_zeroed_page(GFP_KERNEL))) {
 		printk(KERN_ERR "sx: Couldn't get free page.\n");
+		put_tty_driver(specialix_driver);
 		return 1;
 	}
 	init_bh(SPECIALIX_BH, do_specialix_bh);
-	memset(&specialix_driver, 0, sizeof(specialix_driver));
-	specialix_driver.magic = TTY_DRIVER_MAGIC;
-	specialix_driver.owner = THIS_MODULE;
-	specialix_driver.name = "ttyW";
-	specialix_driver.major = SPECIALIX_NORMAL_MAJOR;
-	specialix_driver.num = SX_NBOARD * SX_NPORT;
-	specialix_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	specialix_driver.subtype = SERIAL_TYPE_NORMAL;
-	specialix_driver.init_termios = tty_std_termios;
-	specialix_driver.init_termios.c_cflag =
+	specialix_driver->owner = THIS_MODULE;
+	specialix_driver->name = "ttyW";
+	specialix_driver->major = SPECIALIX_NORMAL_MAJOR;
+	specialix_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	specialix_driver->subtype = SERIAL_TYPE_NORMAL;
+	specialix_driver->init_termios = tty_std_termios;
+	specialix_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	specialix_driver.flags = TTY_DRIVER_REAL_RAW;
-	specialix_driver.refcount = &specialix_refcount;
-	specialix_driver.table = specialix_table;
-	specialix_driver.termios = specialix_termios;
-	specialix_driver.termios_locked = specialix_termios_locked;
+	specialix_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(specialix_driver, &sx_ops);
 
-	specialix_driver.open  = sx_open;
-	specialix_driver.close = sx_close;
-	specialix_driver.write = sx_write;
-	specialix_driver.put_char = sx_put_char;
-	specialix_driver.flush_chars = sx_flush_chars;
-	specialix_driver.write_room = sx_write_room;
-	specialix_driver.chars_in_buffer = sx_chars_in_buffer;
-	specialix_driver.flush_buffer = sx_flush_buffer;
-	specialix_driver.ioctl = sx_ioctl;
-	specialix_driver.throttle = sx_throttle;
-	specialix_driver.unthrottle = sx_unthrottle;
-	specialix_driver.set_termios = sx_set_termios;
-	specialix_driver.stop = sx_stop;
-	specialix_driver.start = sx_start;
-	specialix_driver.hangup = sx_hangup;
-
-	if ((error = tty_register_driver(&specialix_driver))) {
+	if ((error = tty_register_driver(specialix_driver))) {
+		put_tty_driver(specialix_driver);
 		free_page((unsigned long)tmp_buf);
 		printk(KERN_ERR "sx: Couldn't register specialix IO8+ driver, error = %d\n",
 		       error);
@@ -2220,7 +2206,6 @@ static int sx_init_drivers(void)
 	}
 	memset(sx_port, 0, sizeof(sx_port));
 	for (i = 0; i < SX_NPORT * SX_NBOARD; i++) {
-		sx_port[i].normal_termios  = specialix_driver.init_termios;
 		sx_port[i].magic = SPECIALIX_MAGIC;
 		sx_port[i].tqueue.routine = do_softint;
 		sx_port[i].tqueue.data = &sx_port[i];
@@ -2239,7 +2224,8 @@ static int sx_init_drivers(void)
 static void sx_release_drivers(void)
 {
 	free_page((unsigned long)tmp_buf);
-	tty_unregister_driver(&specialix_driver);
+	tty_unregister_driver(specialix_driver);
+	put_tty_driver(specialix_driver);
 }
 
 
@@ -2294,7 +2280,7 @@ int specialix_init(void)
 			found++;
 
 #ifdef CONFIG_PCI
-	if (pci_present()) {
+	{
 		struct pci_dev *pdev = NULL;
 
 		i=0;

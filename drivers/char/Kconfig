@@ -94,17 +94,20 @@ config COMPUTONE
 	  two modules called ip2 and ip2main.
 
 config ROCKETPORT
-	tristate "Comtrol Rocketport support"
+	tristate "Comtrol RocketPort support"
 	depends on SERIAL_NONSTANDARD
 	help
-	  This is a driver for the Comtrol Rocketport cards which provide
-	  multiple serial ports. You would need something like this to connect
-	  more than two modems to your Linux box, for instance in order to
-	  become a dial-in server.
+	  This driver supports Comtrol RocketPort and RocketModem PCI boards.   
+          These boards provide 2, 4, 8, 16, or 32 high-speed serial ports or
+          modems.  For information about the RocketPort/RocketModem  boards
+          and this driver read <file:Documentation/rocket.txt>.
 
 	  If you want to compile this driver as a module, say M here and read
 	  <file:Documentation/modules.txt>.  The module will be called
 	  rocket.
+
+	  If you want to compile this driver into the kernel, say Y here.  If
+          you don't have a Comtrol RocketPort/RocketModem card installed, say N.
 
 config CYCLADES
 	tristate "Cyclades async mux support"

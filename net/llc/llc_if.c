@@ -223,7 +223,7 @@ int llc_establish_connection(struct sock *sk, u8 *lmac, u8 *dmac, u8 dsap)
 	memcpy(laddr.mac, lmac, sizeof(laddr.mac));
 	existing = llc_lookup_established(llc->sap, &daddr, &laddr);
 	if (existing) {
-		if (existing->state == TCP_ESTABLISHED) {
+		if (existing->sk_state == TCP_ESTABLISHED) {
 			sk = existing;
 			goto out_put;
 		} else
@@ -261,7 +261,7 @@ int llc_send_disc(struct sock *sk)
 	struct sk_buff *skb;
 
 	sock_hold(sk);
-	if (sk->type != SOCK_STREAM || sk->state != TCP_ESTABLISHED ||
+	if (sk->sk_type != SOCK_STREAM || sk->sk_state != TCP_ESTABLISHED ||
 	    llc_sk(sk)->state == LLC_CONN_STATE_ADM ||
 	    llc_sk(sk)->state == LLC_CONN_OUT_OF_SVC)
 		goto out;
@@ -272,7 +272,7 @@ int llc_send_disc(struct sock *sk)
 	skb = alloc_skb(0, GFP_ATOMIC);
 	if (!skb)
 		goto out;
-	sk->state     = TCP_CLOSING;
+	sk->sk_state  = TCP_CLOSING;
 	ev	      = llc_conn_ev(skb);
 	ev->type      = LLC_CONN_EV_TYPE_PRIM;
 	ev->prim      = LLC_DISC_PRIM;

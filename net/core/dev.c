@@ -2863,10 +2863,6 @@ int unregister_netdevice(struct net_device *dev)
  *
  */
 
-extern void net_device_init(void);
-extern void ip_auto_config(void);
-
-
 /*
  *       This is called single threaded during boot, so no need
  *       to take the rtnl semaphore.
@@ -2999,11 +2995,6 @@ static int __init net_dev_init(void)
 #ifdef CONFIG_NET_SCHED
 	pktsched_init();
 #endif
-	/*
-	 *	Initialise network devices
-	 */
-
-	net_device_init();
 	rc = 0;
 out:
 	return rc;
@@ -3014,14 +3005,15 @@ subsys_initcall(net_dev_init);
 #ifdef CONFIG_HOTPLUG
 
 struct net_hotplug_todo {
-	struct net_hotplug_todo	*next;
+	struct list_head	list;
 	char			ifname[IFNAMSIZ];
 	int			is_register;
 };
 static spinlock_t net_hotplug_list_lock = SPIN_LOCK_UNLOCKED;
-static struct net_hotplug_todo *net_hotplug_list;
+static DECLARE_MUTEX(net_hotplug_run);
+static struct list_head net_hotplug_list = LIST_HEAD_INIT(net_hotplug_list);
 
-static void net_run_hotplug_one(struct net_hotplug_todo *ent)
+static inline void net_run_hotplug_one(struct net_hotplug_todo *ent)
 {
 	char *argv[3], *envp[5], ifname[12 + IFNAMSIZ], action_str[32];
 	int i;
@@ -3046,23 +3038,37 @@ static void net_run_hotplug_one(struct net_hotplug_todo *ent)
 	call_usermodehelper(argv [0], argv, envp, 0);
 }
 
+/* Run all queued hotplug requests. 
+ * Requests are run in FIFO order.
+ */
 static void net_run_hotplug_todo(void)
 {
-	struct net_hotplug_todo *list;
+	struct list_head list = LIST_HEAD_INIT(list);
 
+	/* This is racy but okay since any other requests will get
+	 * processed when the other guy does rtnl_unlock.
+	 */
+	if (list_empty(&net_hotplug_list))
+		return;
+
+	/* Need to guard against multiple cpu's getting out of order. */
+	down(&net_hotplug_run);	
+
+	/* Snapshot list, allow later requests */
 	spin_lock(&net_hotplug_list_lock);
-	list = net_hotplug_list;
-	net_hotplug_list = NULL;
+	list_splice_init(&net_hotplug_list, &list);
 	spin_unlock(&net_hotplug_list_lock);
 
-	while (list != NULL) {
-		struct net_hotplug_todo *next = list->next;
+	while (!list_empty(&list)) {
+		struct net_hotplug_todo *ent;
 
-		net_run_hotplug_one(list);
-
-		kfree(list);
-		list = next;
+		ent = list_entry(list.next, struct net_hotplug_todo, list);
+		list_del(&ent->list);
+		net_run_hotplug_one(ent);
+		kfree(ent);
 	}
+
+	up(&net_hotplug_run);
 }
 
 /* Notify userspace when a netdevice event occurs,
@@ -3074,15 +3080,17 @@ static void net_run_sbin_hotplug(struct net_device *dev, int is_register)
 {
 	struct net_hotplug_todo *ent = kmalloc(sizeof(*ent), GFP_KERNEL);
 
+	ASSERT_RTNL();
+
 	if (!ent)
 		return;
 
+	INIT_LIST_HEAD(&ent->list);
 	memcpy(ent->ifname, dev->name, IFNAMSIZ);
 	ent->is_register = is_register;
 
 	spin_lock(&net_hotplug_list_lock);
-	ent->next = net_hotplug_list;
-	net_hotplug_list = ent;
+	list_add(&ent->list, &net_hotplug_list);
 	spin_unlock(&net_hotplug_list_lock);
 }
 #endif

@@ -134,15 +134,9 @@ sisfb_query_VGA_config_space(PSIS_HW_DEVICE_INFO psishw_ext,
 
 	if (!init) {
 		init = TRUE;
-		pci_for_each_dev(pdev) {
-			DPRINTK("sisfb: Current: 0x%x, target: 0x%x\n",
-			         pdev->device, ivideo.chip_id);
-			if ((pdev->vendor == PCI_VENDOR_ID_SI)
-			           && (pdev->device == ivideo.chip_id)) {
-				valid_pdev = TRUE;
-				break;
-			}
-		}
+		pdev = pci_find_device(PCI_VENDOR_ID_SI, ivideo.chip_id, pdev);
+		if (pdev)
+			valid_pdev = TRUE;
 	}
 
 	if (!valid_pdev) {
@@ -192,15 +186,9 @@ BOOLEAN sisfb_query_north_bridge_space(PSIS_HW_DEVICE_INFO psishw_ext,
 			break;
 		}
 
-		pci_for_each_dev(pdev) {
-			DPRINTK("Current: 0x%x, target: 0x%x\n",
-					pdev->device, ivideo.chip_id);
-			if ((pdev->vendor == PCI_VENDOR_ID_SI)
-					&& (pdev->device == nbridge_id)) {
-				valid_pdev = TRUE;
-				break;
-			}
-		}
+		pdev = pci_find_device(PCI_VENDOR_ID_SI, nbridge_id, pdev);
+		if (pdev)
+			valid_pdev = TRUE;
 	}
 
 	if (!valid_pdev) {
@@ -2117,40 +2105,36 @@ static int sisfb_get_dram_size_300(void)
 
 	} else {		/* 540, 630, 730 */
 
-		pci_for_each_dev(pdev) {
+		pdev = pci_find_device(PCI_VENDOR_ID_SI, nbridge_id, pdev);
+		if (pdev) {
+			pci_read_config_byte(pdev, IND_BRI_DRAM_STATUS, &pci_data);
+			pci_data = (pci_data & BRI_DRAM_SIZE_MASK) >> 4;
+			ivideo.video_size = (unsigned int)(1 << (pci_data+21));
+			pdev_valid = 1;
 
-			if ((pdev->vendor == PCI_VENDOR_ID_SI) 
-				       && (pdev->device == nbridge_id)) {
-				pci_read_config_byte(pdev, IND_BRI_DRAM_STATUS, &pci_data);
-				pci_data = (pci_data & BRI_DRAM_SIZE_MASK) >> 4;
-				ivideo.video_size = (unsigned int)(1 << (pci_data+21));
-				pdev_valid = 1;
-	
-				reg = SIS_DATA_BUS_64 << 6;
-				switch (pci_data) {
-				   case BRI_DRAM_SIZE_2MB:
-					reg |= SIS_DRAM_SIZE_2MB;
-					break;
-				   case BRI_DRAM_SIZE_4MB:
-					reg |= SIS_DRAM_SIZE_4MB;
-					break;
-				   case BRI_DRAM_SIZE_8MB:
-					reg |= SIS_DRAM_SIZE_8MB;
-					break;
-				   case BRI_DRAM_SIZE_16MB:
-					reg |= SIS_DRAM_SIZE_16MB;
-					break;
-				   case BRI_DRAM_SIZE_32MB:
-					reg |= SIS_DRAM_SIZE_32MB;
-					break;
-				   case BRI_DRAM_SIZE_64MB:
-					reg |= SIS_DRAM_SIZE_64MB;
-					break;
-				}
-				outSISIDXREG(SISSR, IND_SIS_DRAM_SIZE, reg);
+			reg = SIS_DATA_BUS_64 << 6;
+			switch (pci_data) {
+			   case BRI_DRAM_SIZE_2MB:
+				reg |= SIS_DRAM_SIZE_2MB;
 				break;
-			}  
-		}   
+			   case BRI_DRAM_SIZE_4MB:
+				reg |= SIS_DRAM_SIZE_4MB;
+				break;
+			   case BRI_DRAM_SIZE_8MB:
+				reg |= SIS_DRAM_SIZE_8MB;
+				break;
+			   case BRI_DRAM_SIZE_16MB:
+				reg |= SIS_DRAM_SIZE_16MB;
+				break;
+			   case BRI_DRAM_SIZE_32MB:
+				reg |= SIS_DRAM_SIZE_32MB;
+				break;
+			   case BRI_DRAM_SIZE_64MB:
+				reg |= SIS_DRAM_SIZE_64MB;
+				break;
+			}
+			outSISIDXREG(SISSR, IND_SIS_DRAM_SIZE, reg);
+		}
 	
 		if (!pdev_valid)  return -1;
 	}
@@ -2334,12 +2318,10 @@ static int sisfb_get_dram_size_315(void)
 
 #ifdef LINUXBIOS
 
-		pci_for_each_dev(pdev) {
-
-			if ( (pdev->vendor == PCI_VENDOR_ID_SI)
-				&& ( (pdev->device == PCI_DEVICE_ID_SI_550) ||
-				     (pdev->device == PCI_DEVICE_ID_SI_650) ||
-				     (pdev->device == PCI_DEVICE_ID_SI_740))) {
+		while ((pdev = pci_find_device(PCI_VENDOR_ID_SI, PCI_ANY_ID, pdev)) != NULL) {
+			if ((pdev->device == PCI_DEVICE_ID_SI_550) ||
+			     (pdev->device == PCI_DEVICE_ID_SI_650) ||
+			     (pdev->device == PCI_DEVICE_ID_SI_740)) {
 				pci_read_config_byte(pdev, IND_BRI_DRAM_STATUS,
 				                     &pci_data);
 				pci_data = (pci_data & BRI_DRAM_SIZE_MASK) >> 4;
@@ -2408,11 +2390,7 @@ static int sisfb_get_dram_size_315(void)
 			       "now reading from PCI config\n");
 			pdev_valid = 0;
 
-			pci_for_each_dev(pdev) {
-
-			   if ( (pdev->vendor == PCI_VENDOR_ID_SI)
-			         && (pdev->device == PCI_DEVICE_ID_SI_550) ) {
-
+			while ((pdev = pci_find_device(PCI_VENDOR_ID_SI, PCI_DEVICE_ID_SI_550, pdev)) != NULL) {
 				pci_read_config_byte(pdev, IND_BRI_DRAM_STATUS,
 				                     &pci_data);
 				pci_data = (pci_data & BRI_DRAM_SIZE_MASK) >> 4;
@@ -2437,7 +2415,6 @@ static int sisfb_get_dram_size_315(void)
 					return -1;
 				}
 				outSISIDXREG(SISSR, IND_SIS_DRAM_SIZE, reg);
-			   }
 			}
 			if (!pdev_valid) {
 				printk(KERN_INFO "sisfb: Total confusion - No SiS PCI VGA device found?!\n");
@@ -3785,7 +3762,7 @@ int __init sisfb_init(void)
 	memset(&sis_disp, 0, sizeof(sis_disp));
 #endif	
 
-	pci_for_each_dev(pdev) {
+	while ((pdev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, pdev)) != NULL) {
 		for (b = sisdev_list; b->vendor; b++) {
 			if ((b->vendor == pdev->vendor)
 			    && (b->device == pdev->device)) {

@@ -236,8 +236,6 @@ static unsigned long lookup_dcookie(struct mm_struct * mm, unsigned long addr, o
 	struct vm_area_struct * vma;
 
 	for (vma = find_vma(mm, addr); vma; vma = vma->vm_next) {
-		if (!vma)
-			goto out;
  
 		if (!vma->vm_file)
 			continue;
@@ -250,7 +248,7 @@ static unsigned long lookup_dcookie(struct mm_struct * mm, unsigned long addr, o
 		*offset = (vma->vm_pgoff << PAGE_SHIFT) + addr - vma->vm_start; 
 		break;
 	}
-out:
+
 	return cookie;
 }
 
@@ -274,12 +272,17 @@ static void add_kernel_ctx_switch(unsigned int in_kernel)
 		add_event_entry(KERNEL_EXIT_SWITCH_CODE); 
 }
  
-static void add_user_ctx_switch(pid_t pid, unsigned long cookie)
+static void
+add_user_ctx_switch(struct task_struct const * task, unsigned long cookie)
 {
 	add_event_entry(ESCAPE_CODE);
 	add_event_entry(CTX_SWITCH_CODE); 
-	add_event_entry(pid);
+	add_event_entry(task->pid);
 	add_event_entry(cookie);
+	/* Another code for daemon back-compat */
+	add_event_entry(ESCAPE_CODE);
+	add_event_entry(CTX_TGID_CODE);
+	add_event_entry(task->tgid);
 }
 
  
@@ -446,7 +449,7 @@ static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 				mm = take_tasks_mm(new);
 
 				cookie = get_exec_dcookie(mm);
-				add_user_ctx_switch(new->pid, cookie);
+				add_user_ctx_switch(new, cookie);
 			}
 		} else {
 			add_sample(mm, s, in_kernel);

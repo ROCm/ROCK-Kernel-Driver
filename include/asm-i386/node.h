@@ -4,8 +4,7 @@
 #include <linux/device.h>
 #include <linux/mmzone.h>
 #include <linux/node.h>
-
-#include <asm/topology.h>
+#include <linux/topology.h>
 
 struct i386_node {
 	struct node node;

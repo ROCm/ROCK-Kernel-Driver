@@ -44,6 +44,7 @@ int main(void)
 	ENTRY(irqstackptr);
 	BLANK();
 #undef ENTRY
+#ifdef CONFIG_IA32_EMULATION
 #define ENTRY(entry) DEFINE(IA32_SIGCONTEXT_ ## entry, offsetof(struct sigcontext_ia32, entry))
 	ENTRY(eax);
 	ENTRY(ebx);
@@ -59,6 +60,7 @@ int main(void)
 	DEFINE(IA32_RT_SIGFRAME_sigcontext,
 	       offsetof (struct rt_sigframe32, uc.uc_mcontext));
 	BLANK();
+#endif
 
 	return 0;
 }

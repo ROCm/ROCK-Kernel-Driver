@@ -31,6 +31,7 @@ void foo(void)
         DEFINE(TASK_TGID, offsetof(struct task_struct, tgid));
         BLANK();
 
+	DEFINE(SIZEOF_PT_REGS, sizeof(struct pt_regs));
 	DEFINE(PT_PTRACED, PT_PTRACED);
 	DEFINE(CLONE_VM, CLONE_VM);
 	DEFINE(CLONE_UNTRACED, CLONE_UNTRACED);

@@ -724,7 +724,7 @@ void create_tce_tables_for_busesLP(struct list_head *bus_list)
 }
 
 void create_tce_tables(void) {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	struct device_node *dn, *mydn;
 
 	if (systemcfg->platform == PLATFORM_PSERIES_LPAR) {
@@ -737,7 +737,7 @@ void create_tce_tables(void) {
 	 * pci device_node.  This means get_tce_table() won't need to search
 	 * up the device tree to find it.
 	 */
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		mydn = dn = PCI_GET_DN(dev);
 		while (dn && dn->tce_table == NULL)
 			dn = dn->parent;

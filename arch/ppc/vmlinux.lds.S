@@ -54,6 +54,10 @@ SECTIONS
   __ex_table : { *(__ex_table) }
   __stop___ex_table = .;
 
+  __start___bug_table = .;
+  __bug_table : { *(__bug_table) }
+  __stop___bug_table = .;
+
   /* Read-write section, merged into data segment: */
   . = ALIGN(4096);
   .data    :
@@ -114,6 +118,8 @@ SECTIONS
   __con_initcall_start = .;
   .con_initcall.init : { *(.con_initcall.init) }
   __con_initcall_end = .;
+
+  SECURITY_INIT
 
   __start___ftr_fixup = .;
   __ftr_fixup : { *(__ftr_fixup) }

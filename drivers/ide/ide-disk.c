@@ -138,8 +138,6 @@ static int idedisk_start_tag(ide_drive_t *drive, struct request *rq)
 
 #ifndef CONFIG_IDE_TASKFILE_IO
 
-static int driver_blocked;
-
 /*
  * read_intr() is the handler for disk read/multread interrupts
  */
@@ -363,9 +361,6 @@ ide_startstop_t __ide_do_rw_disk (ide_drive_t *drive, struct request *rq, sector
 	ata_nsector_t		nsectors;
 
 	nsectors.all		= (u16) rq->nr_sectors;
-
-	if (driver_blocked)
-		panic("Request while ide driver is blocked?");
 
 	if (drive->using_tcq && idedisk_start_tag(drive, rq)) {
 		if (!ata_pending_commands(drive))
@@ -866,6 +861,11 @@ ide_startstop_t idedisk_error (ide_drive_t *drive, const char *msg, u8 stat)
 		return ide_stopped;
 	}
 #endif
+#ifdef CONFIG_IDE_TASKFILE_IO
+	/* make rq completion pointers new submission pointers */
+	blk_rq_prep_restart(rq);
+#endif
+
 	if (stat & BUSY_STAT || ((stat & WRERR_STAT) && !drive->nowerr)) {
 		/* other bits are useless when BUSY */
 		rq->errors |= ERROR_RESET;
@@ -1392,21 +1392,6 @@ static int write_cache (ide_drive_t *drive, int arg)
 	return 0;
 }
 
-static int call_idedisk_standby (ide_drive_t *drive, int arg)
-{
-	ide_task_t args;
-	u8 standby = (arg) ? WIN_STANDBYNOW2 : WIN_STANDBYNOW1;
-	memset(&args, 0, sizeof(ide_task_t));
-	args.tfRegister[IDE_COMMAND_OFFSET]	= standby;
-	args.command_type			= ide_cmd_type_parser(&args);
-	return ide_raw_taskfile(drive, &args, NULL);
-}
-
-static int do_idedisk_standby (ide_drive_t *drive)
-{
-	return call_idedisk_standby(drive, 0);
-}
-
 static int do_idedisk_flushcache (ide_drive_t *drive)
 {
 	ide_task_t args;
@@ -1505,37 +1490,75 @@ static void idedisk_add_settings(ide_drive_t *drive)
 #endif
 }
 
-static int idedisk_suspend(struct device *dev, u32 state, u32 level)
+/*
+ * Power Management state machine. This one is rather trivial for now,
+ * we should probably add more, like switching back to PIO on suspend
+ * to help some BIOSes, re-do the door locking on resume, etc...
+ */
+
+enum {
+	idedisk_pm_flush_cache	= ide_pm_state_start_suspend,
+	idedisk_pm_standby,
+
+	idedisk_pm_restore_dma	= ide_pm_state_start_resume,
+};
+
+static void idedisk_complete_power_step (ide_drive_t *drive, struct request *rq, u8 stat, u8 error)
 {
-	ide_drive_t *drive = dev->driver_data;
-
-	printk("Suspending device %p\n", dev->driver_data);
-
-	/* I hope that every freeze operation from the upper levels have
-	 * already been done...
-	 */
-
-	if (level != SUSPEND_SAVE_STATE)
-		return 0;
-
-	/* set the drive to standby */
-	printk(KERN_INFO "suspending: %s ", drive->name);
-	do_idedisk_standby(drive);
-	drive->blocked = 1;
-
-	BUG_ON (HWGROUP(drive)->handler);
-	return 0;
+	switch (rq->pm->pm_step) {
+	case idedisk_pm_flush_cache:	/* Suspend step 1 (flush cache) complete */
+		if (rq->pm->pm_state == 4)
+			rq->pm->pm_step = ide_pm_state_completed;
+		else
+			rq->pm->pm_step = idedisk_pm_standby;
+		break;
+	case idedisk_pm_standby:	/* Suspend step 2 (standby) complete */
+		rq->pm->pm_step = ide_pm_state_completed;
+		break;
+	}
 }
 
-static int idedisk_resume(struct device *dev, u32 level)
+static ide_startstop_t idedisk_start_power_step (ide_drive_t *drive, struct request *rq)
 {
-	ide_drive_t *drive = dev->driver_data;
+	ide_task_t *args = rq->special;
 
-	if (level != RESUME_RESTORE_STATE)
-		return 0;
-	BUG_ON(!drive->blocked);
-	drive->blocked = 0;
-	return 0;
+	memset(args, 0, sizeof(*args));
+
+	switch (rq->pm->pm_step) {
+	case idedisk_pm_flush_cache:	/* Suspend step 1 (flush cache) */
+		/* Not supported? Switch to next step now. */
+		if (!drive->wcache) {
+			idedisk_complete_power_step(drive, rq, 0, 0);
+			return ide_stopped;
+		}
+		if (drive->id->cfs_enable_2 & 0x2400)
+			args->tfRegister[IDE_COMMAND_OFFSET] = WIN_FLUSH_CACHE_EXT;
+		else
+			args->tfRegister[IDE_COMMAND_OFFSET] = WIN_FLUSH_CACHE;
+		args->command_type = ide_cmd_type_parser(args);
+		return do_rw_taskfile(drive, args);
+	case idedisk_pm_standby:	/* Suspend step 2 (standby) */
+		args->tfRegister[IDE_COMMAND_OFFSET] = WIN_STANDBYNOW1;
+		args->command_type = ide_cmd_type_parser(args);
+		return do_rw_taskfile(drive, args);
+
+	case idedisk_pm_restore_dma:	/* Resume step 1 (restore DMA) */
+		/*
+		 * Right now, all we do is call hwif->ide_dma_check(drive),
+		 * we could be smarter and check for current xfer_speed
+		 * in struct drive etc...
+		 * Also, this step could be implemented as a generic helper
+		 * as most subdrivers will use it
+		 */
+		if ((drive->id->capability & 1) == 0)
+			break;
+		if (HWIF(drive)->ide_dma_check == NULL)
+			break;
+		HWIF(drive)->ide_dma_check(drive);
+		break;
+	}
+	rq->pm->pm_step = ide_pm_state_completed;
+	return ide_stopped;
 }
 
 static void idedisk_setup (ide_drive_t *drive)
@@ -1681,9 +1704,11 @@ static ide_driver_t idedisk_driver = {
 	.proc			= idedisk_proc,
 	.attach			= idedisk_attach,
 	.drives			= LIST_HEAD_INIT(idedisk_driver.drives),
+	.start_power_step	= idedisk_start_power_step,
+	.complete_power_step	= idedisk_complete_power_step,
 	.gen_driver		= {
-		.suspend	= idedisk_suspend,
-		.resume		= idedisk_resume,
+		.suspend	= generic_ide_suspend,
+		.resume		= generic_ide_resume,
 	}
 };
 

@@ -19,7 +19,7 @@
  *
  *	Janos Farkas			:	delete timer on ifdown
  *	<chexum@bankinf.banki.hu>
- *	Andi Kleen			:	kill doube kfree on module
+ *	Andi Kleen			:	kill double kfree on module
  *						unload.
  *	Maciej W. Rozycki		:	FDDI support
  *	sekiya@USAGI			:	Don't send too many RS
@@ -343,6 +343,7 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 				"%s(): cannot create /proc/net/dev_snmp6/%s\n",
 				__FUNCTION__, dev->name));
 			neigh_parms_release(&nd_tbl, ndev->nd_parms);
+			ndev->dead = 1;
 			in6_dev_finish_destroy(ndev);
 			return NULL;
 		}
@@ -398,38 +399,6 @@ static struct inet6_dev * ipv6_find_idev(struct net_device *dev)
 		ipv6_mc_up(idev);
 	return idev;
 }
-
-void ipv6_addr_prefix(struct in6_addr *prefix,
-	struct in6_addr *addr, int prefix_len)
-{
-	unsigned long mask;
-	int ncopy, nbits;
-
-	memset(prefix, 0, sizeof(*prefix));
-
-	if (prefix_len <= 0)
-		return;
-	if (prefix_len > 128)
-		prefix_len = 128;
-
-	ncopy = prefix_len / 32;
-	switch (ncopy) {
-	case 4:	prefix->s6_addr32[3] = addr->s6_addr32[3];
-	case 3:	prefix->s6_addr32[2] = addr->s6_addr32[2];
-	case 2:	prefix->s6_addr32[1] = addr->s6_addr32[1];
-	case 1:	prefix->s6_addr32[0] = addr->s6_addr32[0];
-	case 0:	break;
-	}
-	nbits = prefix_len % 32;
-	if (nbits == 0)
-		return;
-
-	mask = ~((1 << (32 - nbits)) - 1);
-	mask = htonl(mask);
-
-	prefix->s6_addr32[ncopy] = addr->s6_addr32[ncopy] & mask;
-}
-
 
 static void dev_forward_change(struct inet6_dev *idev)
 {
@@ -1256,7 +1225,7 @@ static void sit_route_add(struct net_device *dev)
 	rtmsg.rtmsg_type	= RTMSG_NEWROUTE;
 	rtmsg.rtmsg_metric	= IP6_RT_PRIO_ADDRCONF;
 
-	/* prefix length - 96 bytes "::d.d.d.d" */
+	/* prefix length - 96 bits "::d.d.d.d" */
 	rtmsg.rtmsg_dst_len	= 96;
 	rtmsg.rtmsg_flags	= RTF_UP|RTF_NONEXTHOP;
 	rtmsg.rtmsg_ifindex	= dev->ifindex;
@@ -1924,10 +1893,11 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 	/* Shot the device (if unregistered) */
 
 	if (how == 1) {
-		neigh_parms_release(&nd_tbl, idev->nd_parms);
 #ifdef CONFIG_SYSCTL
 		addrconf_sysctl_unregister(&idev->cnf);
+		neigh_sysctl_unregister(idev->nd_parms);
 #endif
+		neigh_parms_release(&nd_tbl, idev->nd_parms);
 		in6_dev_put(idev);
 	}
 	return 0;

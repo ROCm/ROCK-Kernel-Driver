@@ -76,12 +76,8 @@ int mcfrs_console_cbaud = DEFAULT_CBAUD;
 /*
  *	Driver data structures.
  */
-struct tty_driver	mcfrs_serial_driver;
-static int		mcfrs_serial_refcount;
+static struct tty_driver *mcfrs_serial_driver;
 
-/* serial subtype definitions */
-#define SERIAL_TYPE_NORMAL	1
-  
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
 
@@ -108,10 +104,6 @@ static struct mcf_serial mcfrs_table[] = {
 
 
 #define	NR_PORTS	(sizeof(mcfrs_table) / sizeof(struct mcf_serial))
-
-static struct tty_struct	*mcfrs_serial_table[NR_PORTS];
-static struct termios		*mcfrs_serial_termios[NR_PORTS];
-static struct termios		*mcfrs_serial_termios_locked[NR_PORTS];
 
 /*
  * This is used to figure out the divisor speeds and the timeouts.
@@ -1190,13 +1182,6 @@ static void mcfrs_close(struct tty_struct *tty, struct file * filp)
 	info->flags |= ASYNC_CLOSING;
 
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -1408,11 +1393,6 @@ int mcfrs_open(struct tty_struct *tty, struct file * filp)
 		return retval;
 	}
 
-	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		mcfrs_change_speed(info);
-	}
-
 #ifdef SERIAL_DEBUG_OPEN
 	printk("mcfrs_open %s successful...\n", tty->name);
 #endif
@@ -1562,6 +1542,24 @@ static void show_serial_version(void)
 	printk(mcfrs_drivername);
 }
 
+static struct tty_operations mcfrs_ops = {
+	.open = mcfrs_open,
+	.close = mcfrs_close,
+	.write = mcfrs_write,
+	.flush_chars = mcfrs_flush_chars,
+	.write_room = mcfrs_write_room,
+	.chars_in_buffer = mcfrs_chars_in_buffer,
+	.flush_buffer = mcfrs_flush_buffer,
+	.ioctl = mcfrs_ioctl,
+	.throttle = mcfrs_throttle,
+	.unthrottle = mcfrs_unthrottle,
+	.set_termios = mcfrs_set_termios,
+	.stop = mcfrs_stop,
+	.start = mcfrs_start,
+	.hangup = mcfrs_hangup,
+	.read_proc = mcfrs_readproc,
+}
+
 /* mcfrs_init inits the driver */
 static int __init
 mcfrs_init(void)
@@ -1579,47 +1577,30 @@ mcfrs_init(void)
 	add_timer(&mcfrs_timer_struct);
 	mcfrs_ppstatus = mcf_getppdata() & (MCFPP_DCD0 | MCFPP_DCD1);
 #endif
+	mcfrs_serial_driver = alloc_tty_driver(NR_PORTS);
+	if (!mcfrs_serial_driver)
+		return -ENOMEM;
 
 	show_serial_version();
 
 	/* Initialize the tty_driver structure */
-	memset(&mcfrs_serial_driver, 0, sizeof(struct tty_driver));
-	mcfrs_serial_driver.magic = TTY_DRIVER_MAGIC;
-	mcfrs_serial_driver.name = "ttyS";
-	mcfrs_serial_driver.major = TTY_MAJOR;
-	mcfrs_serial_driver.minor_start = 64;
-	mcfrs_serial_driver.num = NR_PORTS;
-	mcfrs_serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	mcfrs_serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	mcfrs_serial_driver.init_termios = tty_std_termios;
+	mcfrs_serial_driver->name = "ttyS";
+	mcfrs_serial_driver->driver_name = "serial";
+	mcfrs_serial_driver->major = TTY_MAJOR;
+	mcfrs_serial_driver->minor_start = 64;
+	mcfrs_serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	mcfrs_serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	mcfrs_serial_driver->init_termios = tty_std_termios;
 
-	mcfrs_serial_driver.init_termios.c_cflag =
+	mcfrs_serial_driver->init_termios.c_cflag =
 		mcfrs_console_cbaud | CS8 | CREAD | HUPCL | CLOCAL;
-	mcfrs_serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	mcfrs_serial_driver.refcount = &mcfrs_serial_refcount;
-	mcfrs_serial_driver.table = mcfrs_serial_table;
-	mcfrs_serial_driver.termios = mcfrs_serial_termios;
-	mcfrs_serial_driver.termios_locked = mcfrs_serial_termios_locked;
+	mcfrs_serial_driver->flags = TTY_DRIVER_REAL_RAW;
 
-	mcfrs_serial_driver.open = mcfrs_open;
-	mcfrs_serial_driver.close = mcfrs_close;
-	mcfrs_serial_driver.write = mcfrs_write;
-	mcfrs_serial_driver.flush_chars = mcfrs_flush_chars;
-	mcfrs_serial_driver.write_room = mcfrs_write_room;
-	mcfrs_serial_driver.chars_in_buffer = mcfrs_chars_in_buffer;
-	mcfrs_serial_driver.flush_buffer = mcfrs_flush_buffer;
-	mcfrs_serial_driver.ioctl = mcfrs_ioctl;
-	mcfrs_serial_driver.throttle = mcfrs_throttle;
-	mcfrs_serial_driver.unthrottle = mcfrs_unthrottle;
-	mcfrs_serial_driver.set_termios = mcfrs_set_termios;
-	mcfrs_serial_driver.stop = mcfrs_stop;
-	mcfrs_serial_driver.start = mcfrs_start;
-	mcfrs_serial_driver.hangup = mcfrs_hangup;
-	mcfrs_serial_driver.read_proc = mcfrs_readproc;
-	mcfrs_serial_driver.driver_name = "serial";
+	tty_set_operations(mcfrs_serial_driver, &mcfrs_ops);
 
-	if (tty_register_driver(&mcfrs_serial_driver)) {
+	if (tty_register_driver(mcfrs_serial_driver)) {
 		printk("MCFRS: Couldn't register serial driver\n");
+		put_tty_driver(mcfrs_serial_driver);
 		return(-EBUSY);
 	}
 
@@ -1641,7 +1622,6 @@ mcfrs_init(void)
 		info->blocked_open = 0;
 		INIT_WORK(&info->tqueue, mcfrs_offintr, info);
 		INIT_WORK(&info->tqueue_hangup, do_serial_hangup, info);
-		info->normal_termios = mcfrs_serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 
@@ -1649,8 +1629,7 @@ mcfrs_init(void)
 		mcfrs_setsignals(info, 0, 0);
 		mcfrs_irqinit(info);
 
-		printk("%s%d at 0x%04x (irq = %d)", mcfrs_serial_driver.name,
-			info->line, info->addr, info->irq);
+		printk("ttyS%d at 0x%04x (irq = %d)", info->line, info->addr, info->irq);
 		printk(" is a builtin ColdFire UART\n");
 	}
 
@@ -1742,7 +1721,7 @@ int mcfrs_console_setup(struct console *cp, char *arg)
 static struct tty_driver *mcfrs_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &mcfrs_serial_driver;
+	return mcfrs_serial_driver;
 }
 
 

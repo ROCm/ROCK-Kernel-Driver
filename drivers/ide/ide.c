@@ -332,7 +332,7 @@ int ide_system_bus_speed (void)
 		if (idebus_parameter) {
 			/* user supplied value */
 			system_bus_speed = idebus_parameter;
-		} else if (pci_present()) {
+		} else if (pci_find_device(PCI_ANY_ID, PCI_ANY_ID, NULL) != NULL) {
 			/* safe default value for PCI */
 			system_bus_speed = 33;
 		} else {
@@ -1441,6 +1441,54 @@ int ata_attach(ide_drive_t *drive)
 
 EXPORT_SYMBOL(ata_attach);
 
+int generic_ide_suspend(struct device *dev, u32 state, u32 level)
+{
+	ide_drive_t *drive = dev->driver_data;
+	struct request rq;
+	struct request_pm_state rqpm;
+	ide_task_t args;
+
+	if (level == dev->power_state || level != SUSPEND_SAVE_STATE)
+		return 0;
+
+	memset(&rq, 0, sizeof(rq));
+	memset(&rqpm, 0, sizeof(rqpm));
+	memset(&args, 0, sizeof(args));
+	rq.flags = REQ_PM_SUSPEND;
+	rq.special = &args;
+	rq.pm = &rqpm;
+	rqpm.pm_step = ide_pm_state_start_suspend;
+	rqpm.pm_state = state;
+
+	return ide_do_drive_cmd(drive, &rq, ide_wait);
+}
+
+EXPORT_SYMBOL(generic_ide_suspend);
+
+int generic_ide_resume(struct device *dev, u32 level)
+{
+	ide_drive_t *drive = dev->driver_data;
+	struct request rq;
+	struct request_pm_state rqpm;
+	ide_task_t args;
+
+	if (level == dev->power_state || level != RESUME_RESTORE_STATE)
+		return 0;
+
+	memset(&rq, 0, sizeof(rq));
+	memset(&rqpm, 0, sizeof(rqpm));
+	memset(&args, 0, sizeof(args));
+	rq.flags = REQ_PM_RESUME;
+	rq.special = &args;
+	rq.pm = &rqpm;
+	rqpm.pm_step = ide_pm_state_start_resume;
+	rqpm.pm_state = 0;
+
+	return ide_do_drive_cmd(drive, &rq, ide_head_wait);
+}
+
+EXPORT_SYMBOL(generic_ide_resume);
+
 int generic_ide_ioctl(struct block_device *bdev, unsigned int cmd,
 			unsigned long arg)
 {
@@ -2115,10 +2163,7 @@ done:
 static void __init probe_for_hwifs (void)
 {
 #ifdef CONFIG_BLK_DEV_IDEPCI
-	if (pci_present())
-	{
-		ide_scan_pcibus(ide_scan_direction);
-	}
+	ide_scan_pcibus(ide_scan_direction);
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 
 #ifdef CONFIG_ETRAX_IDE

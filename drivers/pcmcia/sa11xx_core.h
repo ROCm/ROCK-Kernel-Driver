@@ -44,6 +44,8 @@ struct pcmcia_state {
  * use when responding to a Card Services query of some kind.
  */
 struct sa1100_pcmcia_socket {
+	struct pcmcia_socket	socket;
+
 	/*
 	 * Info from low level handler
 	 */

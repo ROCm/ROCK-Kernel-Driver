@@ -6,8 +6,22 @@
  *		 2000-2001 Christoph Rohland
  *		 2000-2001 SAP AG
  *		 2002 Red Hat Inc.
+ * Copyright (C) 2002-2003 Hugh Dickins.
+ * Copyright (C) 2002-2003 VERITAS Software Corporation.
  *
- * This file is released under the GPL.
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 
 /*
@@ -128,9 +142,8 @@ static struct backing_dev_info shmem_backing_dev_info = {
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
-LIST_HEAD (shmem_inodes);
+LIST_HEAD(shmem_inodes);
 static spinlock_t shmem_ilock = SPIN_LOCK_UNLOCKED;
-atomic_t shmem_nrpages = ATOMIC_INIT(0); /* Not used right now */
 
 static void shmem_free_block(struct inode *inode)
 {
@@ -488,16 +501,6 @@ done1:
 	}
 done2:
 	BUG_ON(info->swapped > info->next_index);
-	if (inode->i_mapping->nrpages) {
-		/*
-		 * Call truncate_inode_pages again: racing shmem_unuse_inode
-		 * may have swizzled a page in from swap since vmtruncate or
-		 * generic_delete_inode did it, before we lowered next_index.
-		 */
-		spin_unlock(&info->lock);
-		truncate_inode_pages(inode->i_mapping, inode->i_size);
-		spin_lock(&info->lock);
-	}
 	shmem_recalc_inode(inode);
 	spin_unlock(&info->lock);
 }
@@ -579,6 +582,7 @@ static inline int shmem_find_swp(swp_entry_t entry, swp_entry_t *dir, swp_entry_
 
 static int shmem_unuse_inode(struct shmem_inode_info *info, swp_entry_t entry, struct page *page)
 {
+	struct inode *inode;
 	unsigned long idx;
 	unsigned long size;
 	unsigned long limit;
@@ -643,8 +647,15 @@ lost2:
 	spin_unlock(&info->lock);
 	return 0;
 found:
-	if (move_from_swap_cache(page, idx + offset,
-			info->vfs_inode.i_mapping) == 0)
+	idx += offset;
+	inode = &info->vfs_inode;
+
+	/* Racing against delete or truncate? Must leave out of page cache */
+	limit = (inode->i_state & I_FREEING)? 0:
+		(inode->i_size + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT;
+
+	if (idx >= limit ||
+	    move_from_swap_cache(page, idx, inode->i_mapping) == 0)
 		shmem_swp_set(info, ptr + offset, 0);
 	shmem_swp_unmap(ptr);
 	spin_unlock(&info->lock);
@@ -653,7 +664,7 @@ found:
 	 * try_to_unuse will skip over mms, then reincrement count.
 	 */
 	swap_free(entry);
-	return 1;
+	return idx < limit;
 }
 
 /*
@@ -967,7 +978,7 @@ static int shmem_populate(struct vm_area_struct *vma,
 	size = (inode->i_size + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	if (pgoff >= size || pgoff + (len >> PAGE_SHIFT) > size)
 		return -EINVAL;
-	
+
 	while ((long) len > 0) {
 		struct page *page = NULL;
 		int err;
@@ -1186,22 +1197,6 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 			left = __copy_from_user(kaddr + offset, buf, bytes);
 			kunmap(page);
 		}
-		flush_dcache_page(page);
-		if (left) {
-			page_cache_release(page);
-			err = -EFAULT;
-			break;
-		}
-
-		if (!PageReferenced(page))
-			SetPageReferenced(page);
-		set_page_dirty(page);
-		page_cache_release(page);
-
-		/*
-		 * Our dirty pages are not counted in nr_dirty,
-		 * and we do not attempt to balance dirty pages.
-		 */
 
 		written += bytes;
 		count -= bytes;
@@ -1209,6 +1204,24 @@ shmem_file_write(struct file *file, const char __user *buf, size_t count, loff_t
 		buf += bytes;
 		if (pos > inode->i_size)
 			inode->i_size = pos;
+
+		flush_dcache_page(page);
+		set_page_dirty(page);
+		if (!PageReferenced(page))
+			SetPageReferenced(page);
+		page_cache_release(page);
+
+		if (left) {
+			pos -= left;
+			written -= left;
+			err = -EFAULT;
+			break;
+		}
+
+		/*
+		 * Our dirty pages are not counted in nr_dirty,
+		 * and we do not attempt to balance dirty pages.
+		 */
 
 		cond_resched();
 	} while (count);

@@ -221,6 +221,13 @@ static inline void ptep_set_wrprotect(pte_t *ptep)		{ clear_bit(_PAGE_BIT_RW, &p
 static inline void ptep_mkdirty(pte_t *ptep)			{ set_bit(_PAGE_BIT_DIRTY, &ptep->pte_low); }
 
 /*
+ * Macro to mark a page protection value as "uncacheable".  On processors which do not support
+ * it, this is a no-op.
+ */
+#define pgprot_noncached(prot)	((boot_cpu_data.x86 > 3)					  \
+				 ? (__pgprot(pgprot_val(prot) | _PAGE_PCD | _PAGE_PWT)) : (prot))
+
+/*
  * Conversion functions: convert a page and protection to a page entry,
  * and a page entry and page directory to the page they refer to.
  */

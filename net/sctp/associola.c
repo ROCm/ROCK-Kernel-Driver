@@ -96,7 +96,6 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 					  int gfp)
 {
 	struct sctp_opt *sp;
-	struct sctp_protocol *proto = sctp_get_protocol();
 	int i;
 
 	/* Retrieve the SCTP per socket area.  */
@@ -129,26 +128,26 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	asoc->state_timestamp = jiffies;
 
 	/* Set things that have constant value.  */
-	asoc->cookie_life.tv_sec = sctp_proto.valid_cookie_life / HZ;
-	asoc->cookie_life.tv_usec = (sctp_proto.valid_cookie_life % HZ) *
+	asoc->cookie_life.tv_sec = sctp_valid_cookie_life / HZ;
+	asoc->cookie_life.tv_usec = (sctp_valid_cookie_life % HZ) *
 					1000000L / HZ;
 
 	asoc->pmtu = 0;
 	asoc->frag_point = 0;
 
 	/* Initialize the default association max_retrans and RTO values.  */
-	asoc->max_retrans = proto->max_retrans_association;
-	asoc->rto_initial = proto->rto_initial;
-	asoc->rto_max = proto->rto_max;
-	asoc->rto_min = proto->rto_min;
+	asoc->max_retrans = sctp_max_retrans_association;
+	asoc->rto_initial = sctp_rto_initial;
+	asoc->rto_max = sctp_rto_max;
+	asoc->rto_min = sctp_rto_min;
 
-	asoc->overall_error_threshold = 0;
+	asoc->overall_error_threshold = asoc->max_retrans;
 	asoc->overall_error_count = 0;
 
 	/* Initialize the maximum mumber of new data packets that can be sent
 	 * in a burst.
 	 */
-	asoc->max_burst = proto->max_burst;
+	asoc->max_burst = sctp_max_burst;
 
 	/* Copy things from the endpoint.  */
 	for (i = SCTP_EVENT_TIMEOUT_NONE; i < SCTP_NUM_TIMEOUT_TYPES; ++i) {
@@ -177,10 +176,10 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 	 * RFC 6 - A SCTP receiver MUST be able to receive a minimum of
 	 * 1500 bytes in one SCTP packet.
 	 */
-	if (sk->rcvbuf < SCTP_DEFAULT_MINWINDOW)
+	if (sk->sk_rcvbuf < SCTP_DEFAULT_MINWINDOW)
 		asoc->rwnd = SCTP_DEFAULT_MINWINDOW;
 	else
-		asoc->rwnd = sk->rcvbuf;
+		asoc->rwnd = sk->sk_rcvbuf;
 
 	asoc->a_rwnd = asoc->rwnd;
 
@@ -277,6 +276,12 @@ struct sctp_association *sctp_association_init(struct sctp_association *asoc,
 
 	asoc->autoclose = sp->autoclose;
 
+	asoc->default_stream = sp->default_stream;
+	asoc->default_ppid = sp->default_ppid;
+	asoc->default_flags = sp->default_flags;
+	asoc->default_context = sp->default_context;
+	asoc->default_timetolive = sp->default_timetolive;
+	
 	return asoc;
 
 fail_init:
@@ -299,7 +304,7 @@ void sctp_association_free(struct sctp_association *asoc)
 
 	/* Decrement the backlog value for a TCP-style listening socket. */
 	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))
-		sk->ack_backlog--;
+		sk->sk_ack_backlog--;
 
 	/* Mark as dead, so other users can know this structure is
 	 * going away.
@@ -478,15 +483,7 @@ struct sctp_transport *sctp_assoc_add_peer(struct sctp_association *asoc,
 
 	peer->partial_bytes_acked = 0;
 	peer->flight_size = 0;
-
 	peer->error_threshold = peer->max_retrans;
-
-	/* Update the overall error threshold value of the association
-	 * taking the new peer's error threshold into account.
-	 */
-	asoc->overall_error_threshold =
-		min(asoc->overall_error_threshold + peer->error_threshold,
-		    asoc->max_retrans);
 
 	/* By default, enable heartbeat for peer address. */
 	peer->hb_allowed = 1;
@@ -550,12 +547,12 @@ void sctp_assoc_control_transport(struct sctp_association *asoc,
 	/* Record the transition on the transport.  */
 	switch (command) {
 	case SCTP_TRANSPORT_UP:
-		transport->active = 1;
+		transport->active = SCTP_ACTIVE;
 		spc_state = ADDRESS_AVAILABLE;
 		break;
 
 	case SCTP_TRANSPORT_DOWN:
-		transport->active = 0;
+		transport->active = SCTP_INACTIVE;
 		spc_state = ADDRESS_UNREACHABLE;
 		break;
 
@@ -857,7 +854,7 @@ void sctp_assoc_migrate(struct sctp_association *assoc, struct sock *newsk)
 
 	/* Decrement the backlog value for a TCP-style socket. */
 	if (sctp_style(oldsk, TCP))
-		oldsk->ack_backlog--;
+		oldsk->sk_ack_backlog--;
 
 	/* Release references to the old endpoint and the sock.  */
 	sctp_endpoint_put(assoc->ep);
@@ -1026,7 +1023,7 @@ static inline int sctp_peer_needs_update(struct sctp_association *asoc)
 	case SCTP_STATE_SHUTDOWN_RECEIVED:
 		if ((asoc->rwnd > asoc->a_rwnd) &&
 		    ((asoc->rwnd - asoc->a_rwnd) >=
-		     min_t(__u32, (asoc->base.sk->rcvbuf >> 1), asoc->pmtu)))
+		     min_t(__u32, (asoc->base.sk->sk_rcvbuf >> 1), asoc->pmtu)))
 			return 1;
 		break;
 	default:
@@ -1109,7 +1106,7 @@ int sctp_assoc_set_bind_addr_from_ep(struct sctp_association *asoc, int gfp)
 	 * the endpoint.
 	 */
 	scope = sctp_scope(&asoc->peer.active_path->ipaddr);
-	flags = (PF_INET6 == asoc->base.sk->family) ? SCTP_ADDR6_ALLOWED : 0;
+	flags = (PF_INET6 == asoc->base.sk->sk_family) ? SCTP_ADDR6_ALLOWED : 0;
 	if (asoc->peer.ipv4_address)
 		flags |= SCTP_ADDR4_PEERSUPP;
 	if (asoc->peer.ipv6_address)

@@ -32,6 +32,7 @@
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/rcupdate.h>
+#include <linux/cpu.h>
 
 #ifdef CONFIG_NUMA
 #define cpu_to_node_mask(cpu) node_to_cpumask(cpu_to_node(cpu))
@@ -779,7 +780,7 @@ static int sched_best_cpu(struct task_struct *p)
 		return best_cpu;
 
 	minload = 10000000;
-	for (i = 0; i < numnodes; i++) {
+	for_each_node_with_cpus(i) {
 		load = atomic_read(&node_nr_running[i]);
 		if (load < minload) {
 			minload = load;
@@ -1107,7 +1108,7 @@ static void rebalance_tick(runqueue_t *this_rq, int idle)
 #endif
 		if (!(j % IDLE_REBALANCE_TICK)) {
 			spin_lock(&this_rq->lock);
-			load_balance(this_rq, 0, cpu_to_node_mask(this_cpu));
+			load_balance(this_rq, idle, cpu_to_node_mask(this_cpu));
 			spin_unlock(&this_rq->lock);
 		}
 		return;
@@ -1257,7 +1258,6 @@ asmlinkage void schedule(void)
 		}
 	}
 
-	check_highmem_ptes();
 need_resched:
 	preempt_disable();
 	prev = current;
@@ -2296,7 +2296,7 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	 * it is sufficient to simply update the task's cpu field.
 	 */
 	if (!p->array && !task_running(rq, p)) {
-		set_task_cpu(p, __ffs(p->cpus_allowed));
+		set_task_cpu(p, any_online_cpu(p->cpus_allowed));
 		task_rq_unlock(rq, &flags);
 		return;
 	}
@@ -2310,9 +2310,35 @@ void set_cpus_allowed(task_t *p, unsigned long new_mask)
 	wait_for_completion(&req.done);
 }
 
+/* Move (not current) task off this cpu, onto dest cpu. */
+static void move_task_away(struct task_struct *p, int dest_cpu)
+{
+	runqueue_t *rq_dest;
+	unsigned long flags;
+
+	rq_dest = cpu_rq(dest_cpu);
+
+	local_irq_save(flags);
+	double_rq_lock(this_rq(), rq_dest);
+	if (task_cpu(p) != smp_processor_id())
+		goto out; /* Already moved */
+
+	set_task_cpu(p, dest_cpu);
+	if (p->array) {
+		deactivate_task(p, this_rq());
+		activate_task(p, rq_dest);
+		if (p->prio < rq_dest->curr->prio)
+			resched_task(rq_dest->curr);
+	}
+ out:
+	double_rq_unlock(this_rq(), rq_dest);
+	local_irq_restore(flags);
+}
+
 /*
  * migration_thread - this is a highprio system thread that performs
- * thread migration by 'pulling' threads into the target runqueue.
+ * thread migration by bumping thread off CPU then 'pushing' onto
+ * another runqueue.
  */
 static int migration_thread(void * data)
 {
@@ -2326,8 +2352,9 @@ static int migration_thread(void * data)
 	set_fs(KERNEL_DS);
 
 	/*
-	 * Either we are running on the right CPU, or there's a
-	 * a migration thread on the target CPU, guaranteed.
+	 * Either we are running on the right CPU, or there's a a
+	 * migration thread on this CPU, guaranteed (we're started
+	 * serially).
 	 */
 	set_cpus_allowed(current, 1UL << cpu);
 
@@ -2337,51 +2364,23 @@ static int migration_thread(void * data)
 	rq->migration_thread = current;
 
 	for (;;) {
-		runqueue_t *rq_src, *rq_dest;
 		struct list_head *head;
-		int cpu_src, cpu_dest;
 		migration_req_t *req;
-		unsigned long flags;
-		task_t *p;
 
-		spin_lock_irqsave(&rq->lock, flags);
+		spin_lock_irq(&rq->lock);
 		head = &rq->migration_queue;
 		current->state = TASK_INTERRUPTIBLE;
 		if (list_empty(head)) {
-			spin_unlock_irqrestore(&rq->lock, flags);
+			spin_unlock_irq(&rq->lock);
 			schedule();
 			continue;
 		}
 		req = list_entry(head->next, migration_req_t, list);
 		list_del_init(head->next);
-		spin_unlock_irqrestore(&rq->lock, flags);
+		spin_unlock_irq(&rq->lock);
 
-		p = req->task;
-		cpu_dest = __ffs(p->cpus_allowed & cpu_online_map);
-		rq_dest = cpu_rq(cpu_dest);
-repeat:
-		cpu_src = task_cpu(p);
-		rq_src = cpu_rq(cpu_src);
-
-		local_irq_save(flags);
-		double_rq_lock(rq_src, rq_dest);
-		if (task_cpu(p) != cpu_src) {
-			double_rq_unlock(rq_src, rq_dest);
-			local_irq_restore(flags);
-			goto repeat;
-		}
-		if (rq_src == rq) {
-			set_task_cpu(p, cpu_dest);
-			if (p->array) {
-				deactivate_task(p, rq_src);
-				__activate_task(p, rq_dest);
-				if (p->prio < rq_dest->curr->prio)
-					resched_task(rq_dest->curr);
-			}
-		}
-		double_rq_unlock(rq_src, rq_dest);
-		local_irq_restore(flags);
-
+		move_task_away(req->task,
+			       any_online_cpu(req->task->cpus_allowed));
 		complete(&req->done);
 	}
 }

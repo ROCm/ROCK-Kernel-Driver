@@ -45,6 +45,8 @@ extern void smp_send_reschedule(int cpu);
 extern void smp_invalidate_rcv(void);		/* Process an NMI */
 extern void (*mtrr_hook) (void);
 extern void zap_low_mappings(void);
+void smp_stop_cpu(void);
+
 
 #define SMP_TRAMPOLINE_BASE 0x6000
 

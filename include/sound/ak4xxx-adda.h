@@ -37,11 +37,13 @@ struct snd_ak4xxx_ops {
 	void (*set_rate_val)(akm4xxx_t *ak, unsigned int rate);
 };
 
+#define AK4XXX_IMAGE_SIZE	(AK4XXX_MAX_CHIPS * 16)	/* 64 bytes */
+
 struct snd_akm4xxx {
 	snd_card_t *card;
 	unsigned int num_adcs;				/* AK4524 or AK4528 ADCs */
 	unsigned int num_dacs;				/* AK4524 or AK4528 DACs */
-	unsigned char images[AK4XXX_MAX_CHIPS][16];	/* saved register image */
+	unsigned char images[AK4XXX_IMAGE_SIZE];	/* saved register image */
 	unsigned char ipga_gain[AK4XXX_MAX_CHIPS][2];	/* saved register image for IPGA (AK4528) */
 	unsigned long private_value[AK4XXX_MAX_CHIPS];	/* helper for driver */
 	void *private_data[AK4XXX_MAX_CHIPS];		/* helper for driver */
@@ -57,5 +59,10 @@ void snd_akm4xxx_write(akm4xxx_t *ak, int chip, unsigned char reg, unsigned char
 void snd_akm4xxx_reset(akm4xxx_t *ak, int state);
 void snd_akm4xxx_init(akm4xxx_t *ak);
 int snd_akm4xxx_build_controls(akm4xxx_t *ak);
+
+#define snd_akm4xxx_get(ak,chip,reg) (ak)->images[(chip) * 16 + (reg)]
+#define snd_akm4xxx_set(ak,chip,reg,val) ((ak)->images[(chip) * 16 + (reg)] = (val))
+#define snd_akm4xxx_get_ipga(ak,chip,reg) (ak)->ipga_gain[chip][(reg)-4]
+#define snd_akm4xxx_set_ipga(ak,chip,reg,val) ((ak)->ipga_gain[chip][(reg)-4] = (val))
 
 #endif /* __SOUND_AK4XXX_ADDA_H */

@@ -81,9 +81,10 @@ extern char *add_xterm_umid(char *base);
 extern int line_setup_irq(int fd, int input, int output, void *data);
 extern void line_close_chan(struct line *line);
 extern void line_disable(struct line *line, int current_irq);
-extern void line_register_devfs(struct lines *set, 
+extern struct tty_driver * line_register_devfs(struct lines *set, 
 				struct line_driver *line_driver, 
-				struct tty_driver *driver, struct line *lines,
+				struct tty_operations *driver,
+				struct line *lines,
 				int nlines);
 extern void lines_init(struct line *lines, int nlines);
 extern void close_lines(struct line *lines, int nlines);

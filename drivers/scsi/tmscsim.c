@@ -394,7 +394,7 @@ MODULE_DEVICE_TABLE(pci, tmscsim_pci_tbl);
 # define PCI_WRITE_CONFIG_WORD(pd, rv, bv) pci_write_config_word (pd, rv, bv)
 # define PCI_READ_CONFIG_WORD(pd, rv, bv) pci_read_config_word (pd, rv, bv)
 # define PCI_BUS_DEV pdev->bus->number, pdev->devfn
-# define PCI_PRESENT pci_present ()
+# define PCI_PRESENT (1)
 # define PCI_SET_MASTER pci_set_master (pdev)
 # define PCI_FIND_DEVICE(vend, id) (pdev = pci_find_device (vend, id, pdev))
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,3,10)

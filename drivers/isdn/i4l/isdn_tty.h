@@ -114,11 +114,7 @@ extern int isdn_tty_init(void);
 extern void isdn_tty_exit(void);
 
 struct isdn_modem {
-  int                refcount;			   /* Number of opens        */
-  struct tty_driver  tty_modem;			   /* tty-device             */
-  struct tty_struct  *modem_table[ISDN_MAX_CHANNELS]; /* ?? copied from Orig */
-  struct termios     *modem_termios[ISDN_MAX_CHANNELS];
-  struct termios     *modem_termios_locked[ISDN_MAX_CHANNELS];
+  struct tty_driver  *tty_modem;		   /* tty-device             */
   modem_info         info[ISDN_MAX_CHANNELS];	   /* Private data           */
 };
 

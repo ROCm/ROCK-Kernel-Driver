@@ -147,7 +147,8 @@ int ax25_rx_iframe(ax25_cb *ax25, struct sk_buff *skb)
 	}
 
 	if (ax25->sk != NULL && ax25->ax25_dev->values[AX25_VALUES_CONMODE] == 2) {
-		if ((!ax25->pidincl && ax25->sk->protocol == pid) || ax25->pidincl) {
+		if ((!ax25->pidincl && ax25->sk->sk_protocol == pid) ||
+		    ax25->pidincl) {
 			if (sock_queue_rcv_skb(ax25->sk, skb) == 0)
 				queued = 1;
 			else
@@ -277,7 +278,8 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 			/* Now find a suitable dgram socket */
 			sk = ax25_get_socket(&dest, &src, SOCK_DGRAM);
 			if (sk != NULL) {
-				if (atomic_read(&sk->rmem_alloc) >= sk->rcvbuf) {
+				if (atomic_read(&sk->sk_rmem_alloc) >=
+				    sk->sk_rcvbuf) {
 					kfree_skb(skb);
 				} else {
 					/*
@@ -355,7 +357,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 		sk = ax25_find_listener(next_digi, 1, dev, SOCK_SEQPACKET);
 
 	if (sk != NULL) {
-		if (sk->ack_backlog == sk->max_ack_backlog ||
+		if (sk->sk_ack_backlog == sk->sk_max_ack_backlog ||
 		    (make = ax25_make_new(sk, ax25_dev)) == NULL) {
 			if (mine)
 				ax25_return_dm(dev, &src, &dest, &dp);
@@ -366,12 +368,12 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 
 		ax25 = ax25_sk(make);
 		skb_set_owner_r(skb, make);
-		skb_queue_head(&sk->receive_queue, skb);
+		skb_queue_head(&sk->sk_receive_queue, skb);
 
-		make->state = TCP_ESTABLISHED;
-		make->pair  = sk;
+		make->sk_state = TCP_ESTABLISHED;
+		make->sk_pair  = sk;
 
-		sk->ack_backlog++;
+		sk->sk_ack_backlog++;
 	} else {
 		if (!mine) {
 			kfree_skb(skb);
@@ -435,7 +437,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	if (sk) {
 		if (!sock_flag(sk, SOCK_DEAD))
-			sk->data_ready(sk, skb->len);
+			sk->sk_data_ready(sk, skb->len);
 	} else
 		kfree_skb(skb);
 

@@ -1999,11 +1999,8 @@ console_initcall(serial8250_console_init);
 static struct uart_driver serial8250_reg = {
 	.owner			= THIS_MODULE,
 	.driver_name		= "serial",
-#ifdef CONFIG_DEVFS_FS
-	.dev_name		= "tts/",
-#else
+	.devfs_name		= "tts/",
 	.dev_name		= "ttyS",
-#endif
 	.major			= TTY_MAJOR,
 	.minor			= 64,
 	.nr			= UART_NR,
@@ -2064,9 +2061,11 @@ int register_serial(struct serial_struct *req)
 	return __register_serial(req, -1);
 }
 
-int __init early_serial_setup(struct serial_struct *req)
+int __init early_serial_setup(struct uart_port *port)
 {
-	__register_serial(req, req->line);
+	serial8250_isa_init_ports();
+	serial8250_ports[port->line].port	= *port;
+	serial8250_ports[port->line].port.ops	= &serial8250_pops;
 	return 0;
 }
 

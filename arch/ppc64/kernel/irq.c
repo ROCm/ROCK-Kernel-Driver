@@ -63,8 +63,11 @@ extern void iSeries_smp_message_recv( struct pt_regs * );
 volatile unsigned char *chrp_int_ack_special;
 static void register_irq_proc (unsigned int irq);
 
-irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned =
-	{ [0 ... NR_IRQS-1] = { 0, NULL, NULL, 0, SPIN_LOCK_UNLOCKED}};
+irq_desc_t irq_desc[NR_IRQS] __cacheline_aligned = {
+	[0 ... NR_IRQS-1] = {
+		.lock = SPIN_LOCK_UNLOCKED
+	}
+};
 	
 int ppc_spurious_interrupts = 0;
 unsigned long lpEvent_count = 0;
@@ -593,7 +596,6 @@ void __init init_IRQ(void)
 		once++;
 	
 	ppc_md.init_IRQ();
-	if(ppc_md.init_ras_IRQ) ppc_md.init_ras_IRQ(); 
 }
 
 static struct proc_dir_entry * root_irq_dir;

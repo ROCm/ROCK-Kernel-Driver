@@ -90,6 +90,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/vt_kern.h>
 #include <linux/selection.h>
+#include <linux/tiocl.h>
 #include <linux/kbd_kern.h>
 #include <linux/consolemap.h>
 #include <linux/timer.h>
@@ -138,9 +139,6 @@ extern int mda_console_init(void);
 extern int fb_console_init(void);
 #endif
 
-static struct tty_struct *console_table[MAX_NR_CONSOLES];
-static struct termios *console_termios[MAX_NR_CONSOLES];
-static struct termios *console_termios_locked[MAX_NR_CONSOLES];
 struct vc vc_cons [MAX_NR_CONSOLES];
 
 #ifndef VT_SINGLE_DRIVER
@@ -162,6 +160,12 @@ static void unblank_screen_t(unsigned long dummy);
 static void console_callback(void *ignored);
 
 static int printable;		/* Is console ready for printing? */
+
+/*
+ * ignore_poke: don't unblank the screen when things are typed.  This is
+ * mainly for the privacy of braille terminal users.
+ */
+static int ignore_poke;
 
 int do_poke_blanked_console;
 int console_blanked;
@@ -1314,7 +1318,7 @@ static void setterm_command(int currcons)
 		case 14: /* set vesa powerdown interval */
 			vesa_off_interval = ((par[1] < 60) ? par[1] : 60) * 60 * HZ;
 			break;
-		case 15:	/* Activate the previous console */
+		case 15: /* activate the previous console */
 			set_console(last_console);
 			break;
 	}
@@ -2181,12 +2185,12 @@ quit:
 	clear_bit(0, &printing);
 }
 
-struct tty_driver console_driver;
+struct tty_driver *console_driver;
 
 static struct tty_driver *vt_console_device(struct console *c, int *index)
 {
 	*index = c->index ? c->index-1 : fg_console;
-	return &console_driver;
+	return console_driver;
 }
 
 struct console vt_console_driver = {
@@ -2229,21 +2233,21 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 	ret = 0;
 	switch (type)
 	{
-		case 2:
+		case TIOCL_SETSEL:
 			acquire_console_sem();
-			ret = set_selection(arg, tty, 1);
+			ret = set_selection((struct tiocl_selection *)((char *)arg+1), tty, 1);
 			release_console_sem();
 			break;
-		case 3:
+		case TIOCL_PASTESEL:
 			ret = paste_selection(tty);
 			break;
-		case 4:
+		case TIOCL_UNBLANKSCREEN:
 			unblank_screen();
 			break;
-		case 5:
+		case TIOCL_SELLOADLUT:
 			ret = sel_loadlut(arg);
 			break;
-		case 6:
+		case TIOCL_GETSHIFTSTATE:
 			
 	/*
 	 * Make it possible to react to Shift+Mousebutton.
@@ -2254,14 +2258,14 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 	 		data = shift_state;
 			ret = __put_user(data, (char *) arg);
 			break;
-		case 7:
+		case TIOCL_GETMOUSEREPORTING:
 			data = mouse_reporting();
 			ret = __put_user(data, (char *) arg);
 			break;
-		case 10:
+		case TIOCL_SETVESABLANK:
 			set_vesa_blanking(arg);
 			break;;
-		case 11:	/* set kmsg redirect */
+		case TIOCL_SETKMSGREDIRECT:
 			if (!capable(CAP_SYS_ADMIN)) {
 				ret = -EPERM;
 			} else {
@@ -2271,16 +2275,23 @@ int tioclinux(struct tty_struct *tty, unsigned long arg)
 					kmsg_redirect = data;
 			}
 			break;
-		case 12:	/* get fg_console */
+		case TIOCL_GETFGCONSOLE:
 			ret = fg_console;
 			break;
-		case 13:	/* scroll console */
+		case TIOCL_SCROLLCONSOLE:
 			if (get_user(lines, (char *)arg+1)) {
 				ret = -EFAULT;
 			} else {
 				scrollfront(lines);
 				ret = 0;
 			}
+			break;
+		case TIOCL_BLANKSCREEN:	/* until explicitly unblanked, not only poked */
+			ignore_poke = 1;
+			do_blank_screen(0);
+			break;
+		case TIOCL_BLANKEDSCREEN:
+			ret = console_blanked;
 			break;
 		default:
 			ret = -EINVAL;
@@ -2459,8 +2470,6 @@ static void vc_init(unsigned int currcons, unsigned int rows, unsigned int cols,
  * the appropriate escape-sequence.
  */
 
-static int console_refcount;
-
 static int __init con_init(void)
 {
 	const char *display_desc = NULL;
@@ -2513,38 +2522,37 @@ static int __init con_init(void)
 }
 console_initcall(con_init);
 
+static struct tty_operations con_ops = {
+	.open = con_open,
+	.close = con_close,
+	.write = con_write,
+	.write_room = con_write_room,
+	.put_char = con_put_char,
+	.flush_chars = con_flush_chars,
+	.chars_in_buffer = con_chars_in_buffer,
+	.ioctl = vt_ioctl,
+	.stop = con_stop,
+	.start = con_start,
+	.throttle = con_throttle,
+	.unthrottle = con_unthrottle,
+};
+
 int __init vty_init(void)
 {
-	memset(&console_driver, 0, sizeof(struct tty_driver));
-	console_driver.magic = TTY_DRIVER_MAGIC;
-	console_driver.owner = THIS_MODULE;
-	console_driver.name = "vc/";
-	console_driver.name_base = 1;
-	console_driver.major = TTY_MAJOR;
-	console_driver.minor_start = 1;
-	console_driver.num = MAX_NR_CONSOLES;
-	console_driver.type = TTY_DRIVER_TYPE_CONSOLE;
-	console_driver.init_termios = tty_std_termios;
-	console_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
-	console_driver.refcount = &console_refcount;
-	console_driver.table = console_table;
-	console_driver.termios = console_termios;
-	console_driver.termios_locked = console_termios_locked;
-
-	console_driver.open = con_open;
-	console_driver.close = con_close;
-	console_driver.write = con_write;
-	console_driver.write_room = con_write_room;
-	console_driver.put_char = con_put_char;
-	console_driver.flush_chars = con_flush_chars;
-	console_driver.chars_in_buffer = con_chars_in_buffer;
-	console_driver.ioctl = vt_ioctl;
-	console_driver.stop = con_stop;
-	console_driver.start = con_start;
-	console_driver.throttle = con_throttle;
-	console_driver.unthrottle = con_unthrottle;
-
-	if (tty_register_driver(&console_driver))
+	console_driver = alloc_tty_driver(MAX_NR_CONSOLES);
+	if (!console_driver)
+		panic("Couldn't allocate console driver\n");
+	console_driver->owner = THIS_MODULE;
+	console_driver->devfs_name = "vc/";
+	console_driver->name = "tty";
+	console_driver->name_base = 1;
+	console_driver->major = TTY_MAJOR;
+	console_driver->minor_start = 1;
+	console_driver->type = TTY_DRIVER_TYPE_CONSOLE;
+	console_driver->init_termios = tty_std_termios;
+	console_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_RESET_TERMIOS;
+	tty_set_operations(console_driver, &con_ops);
+	if (tty_register_driver(console_driver))
 		panic("Couldn't register console driver\n");
 
 	kbd_init();
@@ -2712,14 +2720,7 @@ static void timer_do_blank_screen(int entering_gfx, int from_timer_handler)
 	hide_cursor(currcons);
 	if (!from_timer_handler)
 		del_timer_sync(&console_timer);
-	if (vesa_off_interval) {
-		console_timer.function = vesa_powerdown_screen;
-		mod_timer(&console_timer, jiffies + vesa_off_interval);
-	} else {
-		if (!from_timer_handler)
-			del_timer_sync(&console_timer);
-		console_timer.function = unblank_screen_t;
-	}
+	console_timer.function = unblank_screen_t;
 
 	save_screen(currcons);
 	/* In case we need to reset origin, blanking hook returns 1 */
@@ -2730,6 +2731,12 @@ static void timer_do_blank_screen(int entering_gfx, int from_timer_handler)
 
 	if (console_blank_hook && console_blank_hook(1))
 		return;
+
+	if (vesa_off_interval) {
+		console_timer.function = vesa_powerdown_screen;
+		mod_timer(&console_timer, jiffies + vesa_off_interval);
+	}
+
     	if (vesa_blank_mode)
 		sw->con_blank(vc_cons[currcons].d, vesa_blank_mode + 1);
 }
@@ -2754,6 +2761,7 @@ void unblank_screen(void)
 {
 	int currcons;
 
+	ignore_poke = 0;
 	if (!console_blanked)
 		return;
 	if (!vc_cons_allocated(fg_console)) {
@@ -2771,12 +2779,12 @@ void unblank_screen(void)
 	}
 
 	console_blanked = 0;
-	if (console_blank_hook)
-		console_blank_hook(0);
-	set_palette(currcons);
 	if (sw->con_blank(vc_cons[currcons].d, 0))
 		/* Low-level driver cannot restore -> do it ourselves */
 		update_screen(fg_console);
+	if (console_blank_hook)
+		console_blank_hook(0);
+	set_palette(currcons);
 	set_cursor(fg_console);
 }
 
@@ -2791,7 +2799,7 @@ static void blank_screen(unsigned long dummy)
 void poke_blanked_console(void)
 {
 	del_timer(&console_timer);
-	if (!vt_cons[fg_console] || vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
+	if (ignore_poke || !vt_cons[fg_console] || vt_cons[fg_console]->vc_mode == KD_GRAPHICS)
 		return;
 	if (console_blanked) {
 		console_timer.function = unblank_screen_t;

@@ -28,9 +28,7 @@
 #include <linux/serial_reg.h>
 #include <linux/interrupt.h>
 #include <asm/uaccess.h>
-#ifdef CONFIG_DEVFS_FS
-#  include <linux/devfs_fs_kernel.h>
-#endif
+#include <linux/devfs_fs_kernel.h>
 #include "ctctty.h"
 
 #define CTC_TTY_MAJOR       43
@@ -63,7 +61,6 @@ typedef struct {
   struct sk_buff_head   tx_queue;        /* transmit queue                 */
   struct sk_buff_head   rx_queue;        /* receive queue                  */
   struct tty_struct 	*tty;            /* Pointer to corresponding tty   */
-  struct termios	normal_termios;  /* For saving termios structs     */
   wait_queue_head_t	open_wait;
   wait_queue_head_t	close_wait;
   struct semaphore      write_sem;
@@ -73,11 +70,7 @@ typedef struct {
 
 /* Description of one CTC-tty */
 typedef struct {
-  int                refcount;			   /* Number of opens        */
-  struct tty_driver  ctc_tty_device;		   /* tty-device             */
-  struct tty_struct  *modem_table[CTC_TTY_MAX_DEVICES];
-  struct termios     *modem_termios[CTC_TTY_MAX_DEVICES];
-  struct termios     *modem_termios_locked[CTC_TTY_MAX_DEVICES];
+  struct tty_driver  *ctc_tty_device;		   /* tty-device             */
   ctc_tty_info       info[CTC_TTY_MAX_DEVICES];	   /* Private data           */
 } ctc_tty_driver;
 
@@ -88,12 +81,6 @@ static ctc_tty_driver *driver;
 #define MODEM_DO_RESTART
 
 #define CTC_TTY_NAME "ctctty"
-
-#ifdef CONFIG_DEVFS_FS
-static char *ctc_ttyname = "ctc/" CTC_TTY_NAME "%d";
-#else
-static char *ctc_ttyname = CTC_TTY_NAME;
-#endif
 
 static __u32 ctc_tty_magic = CTC_ASYNC_MAGIC;
 static int ctc_tty_shuttingdown = 0;
@@ -1006,10 +993,6 @@ ctc_tty_open(struct tty_struct *tty, struct file *filp)
 #endif
 		return retval;
 	}
-	if ((info->count == 1) && (info->flags & CTC_ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		ctc_tty_change_speed(info);
-	}
 #ifdef CTC_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "ctc_tty_open %s successful...\n", tty->name);
 #endif
@@ -1058,13 +1041,6 @@ ctc_tty_close(struct tty_struct *tty, struct file *filp)
 		return;
 	}
 	info->flags |= CTC_ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & CTC_ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-
 	tty->closing = 1;
 	/*
 	 * At this point we stop accepting input.  To do this, we
@@ -1154,6 +1130,21 @@ ctc_tty_task(unsigned long arg)
 	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 }
 
+static struct tty_operations ctc_ops = {
+	.open = ctc_tty_open,
+	.close = ctc_tty_close,
+	.write = ctc_tty_write,
+	.flush_chars = ctc_tty_flush_chars,
+	.write_room = ctc_tty_write_room,
+	.chars_in_buffer = ctc_tty_chars_in_buffer,
+	.flush_buffer = ctc_tty_flush_buffer,
+	.ioctl = ctc_tty_ioctl,
+	.throttle = ctc_tty_throttle,
+	.unthrottle = ctc_tty_unthrottle,
+	.set_termios = ctc_tty_set_termios,
+	.hangup = ctc_tty_hangup,
+};
+
 int
 ctc_tty_init(void)
 {
@@ -1167,44 +1158,31 @@ ctc_tty_init(void)
 		return -ENOMEM;
 	}
 	memset(driver, 0, sizeof(ctc_tty_driver));
-	device = &driver->ctc_tty_device;
+	device = alloc_tty_driver(CTC_TTY_MAX_DEVICES);
+	if (!device) {
+		kfree(driver);
+		printk(KERN_WARNING "Out of memory in ctc_tty_modem_init\n");
+		return -ENOMEM;
+	}
 
-	device->magic = TTY_DRIVER_MAGIC;
-	device->name = ctc_ttyname;
+	device->devfs_name = "ctc/" CTC_TTY_NAME;
+	device->name = CTC_TTY_NAME;
 	device->major = CTC_TTY_MAJOR;
 	device->minor_start = 0;
-	device->num = CTC_TTY_MAX_DEVICES;
 	device->type = TTY_DRIVER_TYPE_SERIAL;
 	device->subtype = SERIAL_TYPE_NORMAL;
 	device->init_termios = tty_std_termios;
 	device->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 	device->flags = TTY_DRIVER_REAL_RAW;
-	device->refcount = &driver->refcount;
-	device->table = driver->modem_table;
-	device->termios = driver->modem_termios;
-	device->termios_locked = driver->modem_termios_locked;
-	device->open = ctc_tty_open;
-	device->close = ctc_tty_close;
-	device->write = ctc_tty_write;
-	device->put_char = NULL;
-	device->flush_chars = ctc_tty_flush_chars;
-	device->write_room = ctc_tty_write_room;
-	device->chars_in_buffer = ctc_tty_chars_in_buffer;
-	device->flush_buffer = ctc_tty_flush_buffer;
-	device->ioctl = ctc_tty_ioctl;
-	device->throttle = ctc_tty_throttle;
-	device->unthrottle = ctc_tty_unthrottle;
-	device->set_termios = ctc_tty_set_termios;
-	device->stop = NULL;
-	device->start = NULL;
-	device->hangup = ctc_tty_hangup;
-	device->driver_name = "ctc_tty";
-
+	device->driver_name = "ctc_tty",
+	tty_set_operations(device, &ctc_ops);
 	if (tty_register_driver(device)) {
 		printk(KERN_WARNING "ctc_tty: Couldn't register serial-device\n");
+		put_tty_driver(device);
 		kfree(driver);
 		return -1;
 	}
+	driver->ctc_tty_device = device;
 	for (i = 0; i < CTC_TTY_MAX_DEVICES; i++) {
 		info = &driver->info[i];
 		init_MUTEX(&info->write_sem);
@@ -1215,7 +1193,6 @@ ctc_tty_init(void)
 		info->tty = 0;
 		info->count = 0;
 		info->blocked_open = 0;
-		info->normal_termios = device->init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		skb_queue_head_init(&info->tx_queue);
@@ -1286,8 +1263,9 @@ ctc_tty_cleanup(void) {
 	
 	spin_lock_irqsave(&ctc_tty_lock, saveflags);
 	ctc_tty_shuttingdown = 1;
-	tty_unregister_driver(&driver->ctc_tty_device);
+	tty_unregister_driver(driver->ctc_tty_device);
 	kfree(driver);
+	put_tty_driver(driver->ctc_tty_device);
 	driver = NULL;
 	spin_unlock_irqrestore(&ctc_tty_lock, saveflags);
 }

@@ -197,11 +197,7 @@
 /*
  * Things needed by tty driver
  */
-static struct tty_driver siccnormal_driver;
-static int siccuart_refcount;
-static struct tty_struct *siccuart_table[SERIAL_SICC_NR];
-static struct termios *siccuart_termios[SERIAL_SICC_NR];
-static struct termios *siccuart_termios_locked[SERIAL_SICC_NR];
+static struct tty_driver *siccnormal_driver;
 
 #if defined(CONFIG_SERIAL_SICC_CONSOLE) && defined(CONFIG_MAGIC_SYSRQ)
 #define SUPPORT_SYSRQ
@@ -269,7 +265,6 @@ struct SICC_state {
     unsigned int        closing_wait;
     unsigned int        custom_divisor;
     unsigned int        flags;
-    struct termios      normal_termios;
     int         count;
     struct SICC_info    *info;
 };
@@ -1473,12 +1468,6 @@ static void siccuart_close(struct tty_struct *tty, struct file *filp)
     info->flags |= ASYNC_CLOSING;
     restore_flags(flags);
     /*
-     * Save the termios structure, since this port may have
-     * separate termios for callout and dialin.
-     */
-    if (info->flags & ASYNC_NORMAL_ACTIVE)
-        info->state->normal_termios = *tty->termios;
-    /*
      * Now we wait for the transmit buffer to clear; and we notify
      * the line discipline to only process XON/XOFF characters.
      */
@@ -1761,10 +1750,6 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
         return retval;
     }
 
-    if ((info->state->count == 1) &&
-        (info->flags & ASYNC_SPLIT_TERMIOS)) {
-	*tty->termios = info->state->normal_termios;
-    }
 #ifdef CONFIG_SERIAL_SICC_CONSOLE
     if (siccuart_cons.cflag && siccuart_cons.index == line) {
         tty->termios->c_cflag = siccuart_cons.cflag;
@@ -1775,47 +1760,46 @@ static int siccuart_open(struct tty_struct *tty, struct file *filp)
     return 0;
 }
 
+static struct tty_operations sicc_ops = {
+	.open = siccuart_open,
+	.close = siccuart_close,
+	.write = siccuart_write,
+	.put_char = siccuart_put_char,
+	.flush_chars = siccuart_flush_chars,
+	.write_room = siccuart_write_room,
+	.chars_in_buffer = siccuart_chars_in_buffer,
+	.flush_buffer  = siccuart_flush_buffer,
+	.ioctl = siccuart_ioctl,
+	.throttle = siccuart_throttle,
+	.unthrottle = siccuart_unthrottle,
+	.send_xchar = siccuart_send_xchar,
+	.set_termios = siccuart_set_termios,
+	.stop = siccuart_stop,
+	.start = siccuart_start,
+	.hangup = siccuart_hangup,
+	.break_ctl = siccuart_break_ctl,
+	.wait_until_sent = siccuart_wait_until_sent,
+};
+
 int __init siccuart_init(void)
 {
     int i;
+    siccnormal_driver = alloc_tty_driver(SERIAL_SICC_NR);
+    if (!siccnormal_driver)
+	return -ENOMEM;
     printk("IBM Vesta SICC serial port driver V 0.1 by Yudong Yang and Yi Ge / IBM CRL .\n");
-    siccnormal_driver.magic = TTY_DRIVER_MAGIC;
-    siccnormal_driver.driver_name = "serial_sicc";
-    siccnormal_driver.name = SERIAL_SICC_NAME;
-    siccnormal_driver.major = SERIAL_SICC_MAJOR;
-    siccnormal_driver.minor_start = SERIAL_SICC_MINOR;
-    siccnormal_driver.num = SERIAL_SICC_NR;
-    siccnormal_driver.type = TTY_DRIVER_TYPE_SERIAL;
-    siccnormal_driver.subtype = SERIAL_TYPE_NORMAL;
-    siccnormal_driver.init_termios = tty_std_termios;
-    siccnormal_driver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-    siccnormal_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-    siccnormal_driver.refcount = &siccuart_refcount;
-    siccnormal_driver.table = siccuart_table;
-    siccnormal_driver.termios = siccuart_termios;
-    siccnormal_driver.termios_locked = siccuart_termios_locked;
+    siccnormal_driver->driver_name = "serial_sicc";
+    siccnormal_driver->name = SERIAL_SICC_NAME;
+    siccnormal_driver->major = SERIAL_SICC_MAJOR;
+    siccnormal_driver->minor_start = SERIAL_SICC_MINOR;
+    siccnormal_driver->type = TTY_DRIVER_TYPE_SERIAL;
+    siccnormal_driver->subtype = SERIAL_TYPE_NORMAL;
+    siccnormal_driver->init_termios = tty_std_termios;
+    siccnormal_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+    siccnormal_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+    tty_set_operations(siccnormal_driver, &sicc_ops);
 
-    siccnormal_driver.open = siccuart_open;
-    siccnormal_driver.close = siccuart_close;
-    siccnormal_driver.write = siccuart_write;
-    siccnormal_driver.put_char = siccuart_put_char;
-    siccnormal_driver.flush_chars = siccuart_flush_chars;
-    siccnormal_driver.write_room = siccuart_write_room;
-    siccnormal_driver.chars_in_buffer = siccuart_chars_in_buffer;
-    siccnormal_driver.flush_buffer  = siccuart_flush_buffer;
-    siccnormal_driver.ioctl = siccuart_ioctl;
-    siccnormal_driver.throttle = siccuart_throttle;
-    siccnormal_driver.unthrottle = siccuart_unthrottle;
-    siccnormal_driver.send_xchar = siccuart_send_xchar;
-    siccnormal_driver.set_termios = siccuart_set_termios;
-    siccnormal_driver.stop = siccuart_stop;
-    siccnormal_driver.start = siccuart_start;
-    siccnormal_driver.hangup = siccuart_hangup;
-    siccnormal_driver.break_ctl = siccuart_break_ctl;
-    siccnormal_driver.wait_until_sent = siccuart_wait_until_sent;
-    siccnormal_driver.read_proc = NULL;
-
-    if (tty_register_driver(&siccnormal_driver))
+    if (tty_register_driver(siccnormal_driver))
         panic("Couldn't register SICC serial driver\n");
 
     for (i = 0; i < SERIAL_SICC_NR; i++) {
@@ -1823,7 +1807,6 @@ int __init siccuart_init(void)
         state->line     = i;
         state->close_delay  = 5 * HZ / 10;
         state->closing_wait = 30 * HZ;
-        state->normal_termios   = siccnormal_driver.init_termios;
     }
 
 
@@ -1922,7 +1905,7 @@ static int siccuart_console_wait_key(struct console *co)
 static struct tty_driver *siccuart_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &siccnormal_driver;
+	return siccnormal_driver;
 }
 
 static int __init siccuart_console_setup(struct console *co, char *options)

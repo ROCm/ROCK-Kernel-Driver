@@ -136,17 +136,8 @@ static int	stl_nrbrds = sizeof(stl_brdconf) / sizeof(stlconf_t);
 static char	*stl_drvtitle = "Stallion Multiport Serial Driver";
 static char	*stl_drvname = "stallion";
 static char	*stl_drvversion = "5.6.0";
-#ifdef CONFIG_DEVFS_FS
-static char	*stl_serialname = "tts/E%d";
-#else
-static char	*stl_serialname = "ttyE";
-#endif
 
-static struct tty_driver	stl_serial;
-static struct tty_struct	*stl_ttys[STL_MAXDEVS];
-static struct termios		*stl_termios[STL_MAXDEVS];
-static struct termios		*stl_termioslocked[STL_MAXDEVS];
-static int			stl_refcount;
+static struct tty_driver	*stl_serial;
 
 /*
  *	We will need to allocate a temporary write buffer for chars that
@@ -792,7 +783,8 @@ static void __exit stallion_module_exit(void)
  *	a hangup on every open port - to try to flush out any processes
  *	hanging onto ports.
  */
-	i = tty_unregister_driver(&stl_serial);
+	i = tty_unregister_driver(stl_serial);
+	put_tty_driver(stl_serial);
 	if (i) {
 		printk("STALLION: failed to un-register tty driver, "
 			"errno=%d\n", -i);
@@ -1086,10 +1078,6 @@ static int stl_open(struct tty_struct *tty, struct file *filp)
 	}
 	portp->flags |= ASYNC_NORMAL_ACTIVE;
 
-	if ((portp->refcount == 1) && (portp->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = portp->normaltermios;
-		stl_setport(portp, tty->termios);
-	}
 	return(0);
 }
 
@@ -1180,9 +1168,6 @@ static void stl_close(struct tty_struct *tty, struct file *filp)
 
 	portp->refcount = 0;
 	portp->flags |= ASYNC_CLOSING;
-
-	if (portp->flags & ASYNC_NORMAL_ACTIVE)
-		portp->normaltermios = *tty->termios;
 
 /*
  *	May want to wait for any data to drain before closing. The BUSY
@@ -2295,7 +2280,6 @@ static int __init stl_initports(stlbrd_t *brdp, stlpanel_t *panelp)
 		portp->baud_base = STL_BAUDBASE;
 		portp->close_delay = STL_CLOSEDELAY;
 		portp->closing_wait = 30 * HZ;
-		portp->normaltermios = stl_deftermios;
 		INIT_WORK(&portp->tqueue, stl_offintr, portp);
 		init_waitqueue_head(&portp->open_wait);
 		init_waitqueue_head(&portp->close_wait);
@@ -2809,9 +2793,6 @@ static inline int stl_findpcibrds()
 	printk("stl_findpcibrds()\n");
 #endif
 
-	if (! pci_present())
-		return(0);
-
 	for (i = 0; (i < stl_nrpcibrds); i++)
 		while ((dev = pci_find_device(stl_pcibrds[i].vendid,
 		    stl_pcibrds[i].devid, dev))) {
@@ -3140,6 +3121,28 @@ static int stl_memioctl(struct inode *ip, struct file *fp, unsigned int cmd, uns
 	return(rc);
 }
 
+static struct tty_operations stl_ops = {
+	.open = stl_open,
+	.close = stl_close,
+	.write = stl_write,
+	.put_char = stl_putchar,
+	.flush_chars = stl_flushchars,
+	.write_room = stl_writeroom,
+	.chars_in_buffer = stl_charsinbuffer,
+	.ioctl = stl_ioctl,
+	.set_termios = stl_settermios,
+	.throttle = stl_throttle,
+	.unthrottle = stl_unthrottle,
+	.stop = stl_stop,
+	.start = stl_start,
+	.hangup = stl_hangup,
+	.flush_buffer = stl_flushbuffer,
+	.break_ctl = stl_breakctl,
+	.wait_until_sent = stl_waituntilsent,
+	.send_xchar = stl_sendxchar,
+	.read_proc = stl_readproc,
+};
+
 /*****************************************************************************/
 
 int __init stl_init(void)
@@ -3148,6 +3151,10 @@ int __init stl_init(void)
 	printk(KERN_INFO "%s: version %s\n", stl_drvtitle, stl_drvversion);
 
 	stl_initbrds();
+
+	stl_serial = alloc_tty_driver(STL_MAXBRDS * STL_MAXPORTS);
+	if (!stl_serial)
+		return -1;
 
 /*
  *	Allocate a temporary write buffer.
@@ -3171,48 +3178,23 @@ int __init stl_init(void)
 				&stl_fsiomem, NULL, "staliomem/%d", i);
 	}
 
-/*
- *	Set up the tty driver structure and register us as a driver.
- */
-	memset(&stl_serial, 0, sizeof(struct tty_driver));
-	stl_serial.magic = TTY_DRIVER_MAGIC;
-	stl_serial.owner = THIS_MODULE;
-	stl_serial.driver_name = stl_drvname;
-	stl_serial.name = stl_serialname;
-	stl_serial.major = STL_SERIALMAJOR;
-	stl_serial.minor_start = 0;
-	stl_serial.num = STL_MAXBRDS * STL_MAXPORTS;
-	stl_serial.type = TTY_DRIVER_TYPE_SERIAL;
-	stl_serial.subtype = SERIAL_TYPE_NORMAL;
-	stl_serial.init_termios = stl_deftermios;
-	stl_serial.flags = TTY_DRIVER_REAL_RAW;
-	stl_serial.refcount = &stl_refcount;
-	stl_serial.table = stl_ttys;
-	stl_serial.termios = stl_termios;
-	stl_serial.termios_locked = stl_termioslocked;
-	
-	stl_serial.open = stl_open;
-	stl_serial.close = stl_close;
-	stl_serial.write = stl_write;
-	stl_serial.put_char = stl_putchar;
-	stl_serial.flush_chars = stl_flushchars;
-	stl_serial.write_room = stl_writeroom;
-	stl_serial.chars_in_buffer = stl_charsinbuffer;
-	stl_serial.ioctl = stl_ioctl;
-	stl_serial.set_termios = stl_settermios;
-	stl_serial.throttle = stl_throttle;
-	stl_serial.unthrottle = stl_unthrottle;
-	stl_serial.stop = stl_stop;
-	stl_serial.start = stl_start;
-	stl_serial.hangup = stl_hangup;
-	stl_serial.flush_buffer = stl_flushbuffer;
-	stl_serial.break_ctl = stl_breakctl;
-	stl_serial.wait_until_sent = stl_waituntilsent;
-	stl_serial.send_xchar = stl_sendxchar;
-	stl_serial.read_proc = stl_readproc;
+	stl_serial->owner = THIS_MODULE;
+	stl_serial->driver_name = stl_drvname;
+	stl_serial->name = "ttyE";
+	stl_serial->devfs_name = "tts/E";
+	stl_serial->major = STL_SERIALMAJOR;
+	stl_serial->minor_start = 0;
+	stl_serial->type = TTY_DRIVER_TYPE_SERIAL;
+	stl_serial->subtype = SERIAL_TYPE_NORMAL;
+	stl_serial->init_termios = stl_deftermios;
+	stl_serial->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(stl_serial, &stl_ops);
 
-	if (tty_register_driver(&stl_serial))
+	if (tty_register_driver(stl_serial)) {
+		put_tty_driver(stl_serial);
 		printk("STALLION: failed to register serial driver\n");
+		return -1;
+	}
 
 	return(0);
 }

@@ -27,6 +27,7 @@
 #include <linux/kmod.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/workqueue.h>
 #include <sound/core.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -79,7 +80,7 @@ typedef struct pmac_gpio {
 	int active_state;
 } pmac_gpio_t;
 
-typedef struct pmac_tumber_t {
+typedef struct pmac_tumbler_t {
 	pmac_keywest_t i2c;
 	pmac_gpio_t audio_reset;
 	pmac_gpio_t amp_mute;
@@ -92,10 +93,11 @@ typedef struct pmac_tumber_t {
 	unsigned int mix_vol[VOL_IDX_LAST_MIX][2]; /* stereo volumes for tas3004 */
 	int drc_range;
 	int drc_enable;
+#ifdef CONFIG_PMAC_PBOOK
+	struct work_struct resume_workq;
+#endif
 } pmac_tumbler_t;
 
-
-#define number_of(ary) (sizeof(ary) / sizeof(ary[0]))
 
 /*
  */
@@ -168,16 +170,16 @@ static int tumbler_set_master_volume(pmac_tumbler_t *mix)
 		left_vol = 0;
 	else {
 		left_vol = mix->master_vol[0];
-		if (left_vol >= number_of(master_volume_table))
-			left_vol = number_of(master_volume_table) - 1;
+		if (left_vol >= ARRAY_SIZE(master_volume_table))
+			left_vol = ARRAY_SIZE(master_volume_table) - 1;
 		left_vol = master_volume_table[left_vol];
 	}
 	if (! mix->master_switch[1])
 		right_vol = 0;
 	else {
 		right_vol = mix->master_vol[1];
-		if (right_vol >= number_of(master_volume_table))
-			right_vol = number_of(master_volume_table) - 1;
+		if (right_vol >= ARRAY_SIZE(master_volume_table))
+			right_vol = ARRAY_SIZE(master_volume_table) - 1;
 		right_vol = master_volume_table[right_vol];
 	}
 
@@ -203,7 +205,7 @@ static int tumbler_info_master_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_inf
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 2;
 	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = number_of(master_volume_table) - 1;
+	uinfo->value.integer.max = ARRAY_SIZE(master_volume_table) - 1;
 	return 0;
 }
 
@@ -479,7 +481,7 @@ static struct tumbler_mono_vol tumbler_pcm_vol_info = {
 	.index = VOL_IDX_PCM_MONO,
 	.reg = TAS_REG_PCM,
 	.bytes = 3,
-	.max = number_of(mixer_volume_table),
+	.max = ARRAY_SIZE(mixer_volume_table),
 	.table = mixer_volume_table,
 };
 
@@ -487,7 +489,7 @@ static struct tumbler_mono_vol tumbler_bass_vol_info = {
 	.index = VOL_IDX_BASS,
 	.reg = TAS_REG_BASS,
 	.bytes = 1,
-	.max = number_of(bass_volume_table),
+	.max = ARRAY_SIZE(bass_volume_table),
 	.table = bass_volume_table,
 };
 
@@ -495,7 +497,7 @@ static struct tumbler_mono_vol tumbler_treble_vol_info = {
 	.index = VOL_IDX_TREBLE,
 	.reg = TAS_REG_TREBLE,
 	.bytes = 1,
-	.max = number_of(treble_volume_table),
+	.max = ARRAY_SIZE(treble_volume_table),
 	.table = treble_volume_table,
 };
 
@@ -504,7 +506,7 @@ static struct tumbler_mono_vol snapper_bass_vol_info = {
 	.index = VOL_IDX_BASS,
 	.reg = TAS_REG_BASS,
 	.bytes = 1,
-	.max = number_of(snapper_bass_volume_table),
+	.max = ARRAY_SIZE(snapper_bass_volume_table),
 	.table = snapper_bass_volume_table,
 };
 
@@ -512,7 +514,7 @@ static struct tumbler_mono_vol snapper_treble_vol_info = {
 	.index = VOL_IDX_TREBLE,
 	.reg = TAS_REG_TREBLE,
 	.bytes = 1,
-	.max = number_of(snapper_treble_volume_table),
+	.max = ARRAY_SIZE(snapper_treble_volume_table),
 	.table = snapper_treble_volume_table,
 };
 
@@ -546,8 +548,8 @@ static int snapper_set_mix_vol1(pmac_tumbler_t *mix, int idx, int ch, int reg)
 	unsigned char block[9];
 
 	vol = mix->mix_vol[idx][ch];
-	if (vol >= number_of(mixer_volume_table)) {
-		vol = number_of(mixer_volume_table) - 1;
+	if (vol >= ARRAY_SIZE(mixer_volume_table)) {
+		vol = ARRAY_SIZE(mixer_volume_table) - 1;
 		mix->mix_vol[idx][ch] = vol;
 	}
 
@@ -579,7 +581,7 @@ static int snapper_info_mix(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
 	uinfo->count = 2;
 	uinfo->value.integer.min = 0;
-	uinfo->value.integer.max = number_of(mixer_volume_table) - 1;
+	uinfo->value.integer.max = ARRAY_SIZE(mixer_volume_table) - 1;
 	return 0;
 }
 
@@ -877,28 +879,46 @@ static void tumbler_reset_audio(pmac_t *chip)
 
 #ifdef CONFIG_PMAC_PBOOK
 /* resume mixer */
-static void tumbler_resume(pmac_t *chip)
+/* we call the i2c transfer in a workqueue because it may need either schedule()
+ * or completion from timer interrupts.
+ */
+static void tumbler_resume_work(void *arg)
 {
+	pmac_t *chip = (pmac_t *)arg;
 	pmac_tumbler_t *mix = chip->mixer_data;
-	snd_assert(mix, return);
+
 	tumbler_reset_audio(chip);
-	if (mix->i2c.client)
-		tumbler_init_client(&mix->i2c);
+	if (mix->i2c.client) {
+		if (tumbler_init_client(&mix->i2c) < 0)
+			printk(KERN_ERR "tumbler_init_client error\n");
+	} else
+		printk(KERN_ERR "tumbler: i2c is not initialized\n");
 	if (chip->model == PMAC_TUMBLER) {
 		tumbler_set_mono_volume(mix, &tumbler_pcm_vol_info);
 		tumbler_set_mono_volume(mix, &tumbler_bass_vol_info);
 		tumbler_set_mono_volume(mix, &tumbler_treble_vol_info);
+		tumbler_set_drc(mix);
 	} else {
 		snapper_set_mix_vol(mix, VOL_IDX_PCM);
 		snapper_set_mix_vol(mix, VOL_IDX_PCM2);
 		snapper_set_mix_vol(mix, VOL_IDX_ADC);
 		tumbler_set_mono_volume(mix, &tumbler_bass_vol_info);
 		tumbler_set_mono_volume(mix, &tumbler_treble_vol_info);
+		snapper_set_drc(mix);
 	}
-	tumbler_set_drc(mix);
 	tumbler_set_master_volume(mix);
 	if (chip->update_automute)
 		chip->update_automute(chip, 0);
+}
+
+static void tumbler_resume(pmac_t *chip)
+{
+	pmac_tumbler_t *mix = chip->mixer_data;
+	snd_assert(mix, return);
+	INIT_WORK(&mix->resume_workq, tumbler_resume_work, chip);
+	if (schedule_work(&mix->resume_workq))
+		return;
+	printk(KERN_ERR "ALSA tumbler: cannot schedule resume-workqueue.\n");
 }
 #endif
 
@@ -1001,12 +1021,12 @@ int __init snd_pmac_tumbler_init(pmac_t *chip)
 	sprintf(chip->card->mixername, "PowerMac %s", chipname);
 
 	if (chip->model == PMAC_TUMBLER) {
-		for (i = 0; i < number_of(tumbler_mixers); i++) {
+		for (i = 0; i < ARRAY_SIZE(tumbler_mixers); i++) {
 			if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&tumbler_mixers[i], chip))) < 0)
 				return err;
 		}
 	} else {
-		for (i = 0; i < number_of(snapper_mixers); i++) {
+		for (i = 0; i < ARRAY_SIZE(snapper_mixers); i++) {
 			if ((err = snd_ctl_add(chip->card, snd_ctl_new1(&snapper_mixers[i], chip))) < 0)
 				return err;
 		}

@@ -267,9 +267,6 @@ void __init ebus_init(void)
 	int reg, nreg;
 	int num_ebus = 0;
 
-	if (!pci_present())
-		return;
-
 	prom_getstring(prom_root_node, "name", lbuf, sizeof(lbuf));
 	for (sp = ebus_blacklist; sp->esname != NULL; sp++) {
 		if (strcmp(lbuf, sp->esname) == 0) {

@@ -17,6 +17,7 @@ endif
 # Toplevel Module Dependency
 obj-$(CONFIG_SND_ALS100) += $(OPL3_OBJS)
 obj-$(CONFIG_SND_AZT2320) += $(OPL3_OBJS)
+obj-$(CONFIG_SND_AZT3328) += $(OPL3_OBJS)
 obj-$(CONFIG_SND_DT019X) += $(OPL3_OBJS)
 obj-$(CONFIG_SND_ES18XX) += $(OPL3_OBJS)
 obj-$(CONFIG_SND_OPL3SA2) += $(OPL3_OBJS)

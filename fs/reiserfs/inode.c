@@ -2109,11 +2109,13 @@ done:
 	 * someone else could have locked them and sent them down the 
 	 * pipe without locking the page
 	 */
+	bh = head ;
 	do {
 	    if (!buffer_uptodate(bh)) {
 	        partial = 1;
 		break;
 	    }
+	    bh = bh->b_this_page;
 	} while(bh != head);
 	if (!partial)
 	    SetPageUptodate(page);

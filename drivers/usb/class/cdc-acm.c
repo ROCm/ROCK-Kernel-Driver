@@ -154,7 +154,7 @@ struct acm {
 };
 
 static struct usb_driver acm_driver;
-static struct tty_driver acm_tty_driver;
+static struct tty_driver *acm_tty_driver;
 static struct acm *acm_table[ACM_TTY_MINORS];
 
 #define ACM_READY(acm)	(acm && acm->dev && acm->used)
@@ -364,7 +364,7 @@ static void acm_tty_close(struct tty_struct *tty, struct file *filp)
 			usb_unlink_urb(acm->writeurb);
 			usb_unlink_urb(acm->readurb);
 		} else {
-			tty_unregister_device(&acm_tty_driver, acm->minor);
+			tty_unregister_device(acm_tty_driver, acm->minor);
 			acm_table[acm->minor] = NULL;
 			usb_free_urb(acm->ctrlurb);
 			usb_free_urb(acm->readurb);
@@ -667,7 +667,7 @@ static int acm_probe (struct usb_interface *intf,
 		usb_driver_claim_interface(&acm_driver, acm->iface + 0, acm);
 		usb_driver_claim_interface(&acm_driver, acm->iface + 1, acm);
 
-		tty_register_device(&acm_tty_driver, minor, &intf->dev);
+		tty_register_device(acm_tty_driver, minor, &intf->dev);
 
 		acm_table[minor] = acm;
 		usb_set_intfdata (intf, acm);
@@ -699,7 +699,7 @@ static void acm_disconnect(struct usb_interface *intf)
 	usb_driver_release_interface(&acm_driver, acm->iface + 1);
 
 	if (!acm->used) {
-		tty_unregister_device(&acm_tty_driver, acm->minor);
+		tty_unregister_device(acm_tty_driver, acm->minor);
 		acm_table[acm->minor] = NULL;
 		usb_free_urb(acm->ctrlurb);
 		usb_free_urb(acm->readurb);
@@ -736,30 +736,7 @@ static struct usb_driver acm_driver = {
  * TTY driver structures.
  */
 
-static int acm_tty_refcount;
-
-static struct tty_struct *acm_tty_table[ACM_TTY_MINORS];
-static struct termios *acm_tty_termios[ACM_TTY_MINORS];
-static struct termios *acm_tty_termios_locked[ACM_TTY_MINORS];
-
-static struct tty_driver acm_tty_driver = {
-	.magic =		TTY_DRIVER_MAGIC,
-	.owner =		THIS_MODULE,
-	.driver_name =		"acm",
-	.name =			"usb/acm/",
-	.major =		ACM_TTY_MAJOR,
-	.minor_start =		0,
-	.num =			ACM_TTY_MINORS,
-	.type =			TTY_DRIVER_TYPE_SERIAL,
-	.subtype =		SERIAL_TYPE_NORMAL,
-	.flags =		TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
-
-	.refcount =		&acm_tty_refcount,
-
-	.table =		acm_tty_table,
-	.termios =		acm_tty_termios,
-	.termios_locked =	acm_tty_termios_locked,
-
+static struct tty_operations acm_ops = {
 	.open =			acm_tty_open,
 	.close =		acm_tty_close,
 	.write =		acm_tty_write,
@@ -780,14 +757,29 @@ static struct tty_driver acm_tty_driver = {
 
 static int __init acm_init(void)
 {
-	acm_tty_driver.init_termios =		tty_std_termios;
-	acm_tty_driver.init_termios.c_cflag =	B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	acm_tty_driver = alloc_tty_driver(ACM_TTY_MINORS);
+	if (!acm_tty_driver)
+		return -ENOMEM;
+	acm_tty_driver->owner = THIS_MODULE,
+	acm_tty_driver->driver_name = "acm",
+	acm_tty_driver->name = "usb/acm/",
+	acm_tty_driver->major = ACM_TTY_MAJOR,
+	acm_tty_driver->minor_start = 0,
+	acm_tty_driver->type = TTY_DRIVER_TYPE_SERIAL,
+	acm_tty_driver->subtype = SERIAL_TYPE_NORMAL,
+	acm_tty_driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS,
+	acm_tty_driver->init_termios = tty_std_termios;
+	acm_tty_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	tty_set_operations(acm_tty_driver, &acm_ops);
 
-	if (tty_register_driver(&acm_tty_driver))
+	if (tty_register_driver(acm_tty_driver)) {
+		put_tty_driver(acm_tty_driver);
 		return -1;
+	}
 
 	if (usb_register(&acm_driver) < 0) {
-		tty_unregister_driver(&acm_tty_driver);
+		tty_unregister_driver(acm_tty_driver);
+		put_tty_driver(acm_tty_driver);
 		return -1;
 	}
 
@@ -799,7 +791,8 @@ static int __init acm_init(void)
 static void __exit acm_exit(void)
 {
 	usb_deregister(&acm_driver);
-	tty_unregister_driver(&acm_tty_driver);
+	tty_unregister_driver(acm_tty_driver);
+	put_tty_driver(acm_tty_driver);
 }
 
 module_init(acm_init);

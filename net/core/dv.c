@@ -5,8 +5,6 @@
  *
  *		Generic frame diversion
  *
- * Version:	@(#)eth.c	0.41	09/09/2000
- *
  * Authors:	
  * 		Benoit LOCHER:	initial integration within the kernel with support for ethernet
  * 		Dave Miller:	improvement on the code (correctness, performance and source files)

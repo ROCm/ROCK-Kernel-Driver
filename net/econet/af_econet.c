@@ -101,10 +101,10 @@ static void econet_remove_socket(struct sock **list, struct sock *sk)
 
 	while ((s = *list) != NULL) {
 		if (s == sk) {
-			*list = s->next;
+			*list = s->sk_next;
 			break;
 		}
-		list = &s->next;
+		list = &s->sk_next;
 	}
 
 	write_unlock_bh(&econet_lock);
@@ -115,7 +115,7 @@ static void econet_remove_socket(struct sock **list, struct sock *sk)
 static void econet_insert_socket(struct sock **list, struct sock *sk)
 {
 	write_lock_bh(&econet_lock);
-	sk->next = *list;
+	sk->sk_next = *list;
 	sock_hold(sk);
 	write_unlock_bh(&econet_lock);
 }
@@ -170,7 +170,7 @@ static int econet_recvmsg(struct kiocb *iocb, struct socket *sock,
 	err = memcpy_toiovec(msg->msg_iov, skb->data, copied);
 	if (err)
 		goto out_free;
-	sk->stamp=skb->stamp;
+	sk->sk_stamp = skb->stamp;
 
 	if (msg->msg_name)
 		memcpy(msg->msg_name, skb->cb, msg->msg_namelen);
@@ -364,7 +364,7 @@ static int econet_sendmsg(struct kiocb *iocb, struct socket *sock,
 		err = memcpy_fromiovec(skb_put(skb,len), msg->msg_iov, len);
 		skb->protocol = proto;
 		skb->dev = dev;
-		skb->priority = sk->priority;
+		skb->priority = sk->sk_priority;
 		if (err)
 			goto out_free;
 		
@@ -500,13 +500,14 @@ static void econet_destroy_timer(unsigned long data)
 {
 	struct sock *sk=(struct sock *)data;
 
-	if (!atomic_read(&sk->wmem_alloc) && !atomic_read(&sk->rmem_alloc)) {
+	if (!atomic_read(&sk->sk_wmem_alloc) &&
+	    !atomic_read(&sk->sk_rmem_alloc)) {
 		sk_free(sk);
 		return;
 	}
 
-	sk->timer.expires=jiffies+10*HZ;
-	add_timer(&sk->timer);
+	sk->sk_timer.expires = jiffies + 10 * HZ;
+	add_timer(&sk->sk_timer);
 	printk(KERN_DEBUG "econet socket destroy delayed\n");
 }
 
@@ -527,21 +528,22 @@ static int econet_release(struct socket *sock)
 	 *	Now the socket is dead. No more input will appear.
 	 */
 
-	sk->state_change(sk);	/* It is useless. Just for sanity. */
+	sk->sk_state_change(sk);	/* It is useless. Just for sanity. */
 
 	sock->sk = NULL;
-	sk->socket = NULL;
+	sk->sk_socket = NULL;
 	sock_set_flag(sk, SOCK_DEAD);
 
 	/* Purge queues */
 
-	skb_queue_purge(&sk->receive_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 
-	if (atomic_read(&sk->rmem_alloc) || atomic_read(&sk->wmem_alloc)) {
-		sk->timer.data=(unsigned long)sk;
-		sk->timer.expires=jiffies+HZ;
-		sk->timer.function=econet_destroy_timer;
-		add_timer(&sk->timer);
+	if (atomic_read(&sk->sk_rmem_alloc) ||
+	    atomic_read(&sk->sk_wmem_alloc)) {
+		sk->sk_timer.data     = (unsigned long)sk;
+		sk->sk_timer.expires  = jiffies + HZ;
+		sk->sk_timer.function = econet_destroy_timer;
+		add_timer(&sk->sk_timer);
 		return 0;
 	}
 
@@ -570,7 +572,7 @@ static int econet_create(struct socket *sock, int protocol)
 	if (sk == NULL)
 		goto out;
 
-	sk->reuse = 1;
+	sk->sk_reuse = 1;
 	sock->ops = &econet_ops;
 	sock_init_data(sock,sk);
 
@@ -578,8 +580,8 @@ static int econet_create(struct socket *sock, int protocol)
 	if (!eo)
 		goto out_free;
 	memset(eo, 0, sizeof(*eo));
-	sk->zapped=0;
-	sk->family = PF_ECONET;
+	sk->sk_zapped = 0;
+	sk->sk_family = PF_ECONET;
 	eo->num = protocol;
 
 	econet_insert_socket(&econet_sklist, sk);
@@ -671,9 +673,10 @@ static int econet_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg
 
 	switch(cmd) {
 		case SIOCGSTAMP:
-			if(sk->stamp.tv_sec==0)
+			if (!sk->sk_stamp.tv_sec)
 				return -ENOENT;
-			return copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
+			return copy_to_user((void *)arg, &sk->sk_stamp,
+					  sizeof(struct timeval)) ? -EFAULT : 0;
 		case SIOCSIFADDR:
 		case SIOCGIFADDR:
 			return ec_dev_ioctl(sock, cmd, (void *)arg);
@@ -733,7 +736,7 @@ static struct sock *ec_listening_socket(unsigned char port, unsigned char
 		    (opt->net == net || opt->net == 0))
 			return sk;
 
-		sk = sk->next;
+		sk = sk->sk_next;
 	}
 
 	return NULL;
@@ -990,9 +993,9 @@ static int __init aun_udp_initialise(void)
 		return error;
 	}
 	
-	udpsock->sk->reuse = 1;
-	udpsock->sk->allocation = GFP_ATOMIC;	/* we're going to call it
-						   from interrupts */
+	udpsock->sk->sk_reuse = 1;
+	udpsock->sk->sk_allocation = GFP_ATOMIC; /* we're going to call it
+						    from interrupts */
 	
 	error = udpsock->ops->bind(udpsock, (struct sockaddr *)&sin,
 				sizeof(sin));
@@ -1002,7 +1005,7 @@ static int __init aun_udp_initialise(void)
 		goto release;
 	}
 
-	udpsock->sk->data_ready = aun_data_available;
+	udpsock->sk->sk_data_ready = aun_data_available;
 
 	return 0;
 

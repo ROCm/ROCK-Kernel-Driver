@@ -32,10 +32,6 @@
 #include <asm/byteorder.h>
 #include <asm/uaccess.h>
 
-#ifndef PCI_DMA_BUS_IS_PHYS
-#define PCI_DMA_BUS_IS_PHYS 1
-#endif
-
 #if defined(CONFIG_VLAN_8021Q) || defined(CONFIG_VLAN_8021Q_MODULE)
 #define TG3_VLAN_TAG_USED 1
 #else
@@ -55,8 +51,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"1.5"
-#define DRV_MODULE_RELDATE	"March 21, 2003"
+#define DRV_MODULE_VERSION	"1.6"
+#define DRV_MODULE_RELDATE	"June 11, 2003"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -2234,72 +2230,16 @@ static void tg3_tx_timeout(struct net_device *dev)
 	schedule_work(&tp->reset_task);
 }
 
-#if !PCI_DMA_BUS_IS_PHYS
-static void tg3_set_txd_addr(struct tg3 *tp, int entry, dma_addr_t mapping)
-{
-	if (tp->tg3_flags & TG3_FLAG_HOST_TXDS) {
-		struct tg3_tx_buffer_desc *txd = &tp->tx_ring[entry];
-
-		txd->addr_hi = ((u64) mapping >> 32);
-		txd->addr_lo = ((u64) mapping & 0xffffffff);
-	} else {
-		unsigned long txd;
-
-		txd = (tp->regs +
-		       NIC_SRAM_WIN_BASE +
-		       NIC_SRAM_TX_BUFFER_DESC);
-		txd += (entry * TXD_SIZE);
-
-		if (sizeof(dma_addr_t) != sizeof(u32))
-			writel(((u64) mapping >> 32),
-			       txd + TXD_ADDR + TG3_64BIT_REG_HIGH);
-
-		writel(((u64) mapping & 0xffffffff),
-		       txd + TXD_ADDR + TG3_64BIT_REG_LOW);
-	}
-}
-#endif
-
 static void tg3_set_txd(struct tg3 *, int, dma_addr_t, int, u32, u32);
 
 static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 				       u32 guilty_entry, int guilty_len,
 				       u32 last_plus_one, u32 *start, u32 mss)
 {
+	struct sk_buff *new_skb = skb_copy(skb, GFP_ATOMIC);
 	dma_addr_t new_addr;
 	u32 entry = *start;
 	int i;
-
-#if !PCI_DMA_BUS_IS_PHYS
-	/* IOMMU, just map the guilty area again which is guaranteed to
-	 * use different addresses.
-	 */
-
-	i = 0;
-	while (entry != guilty_entry) {
-		entry = NEXT_TX(entry);
-		i++;
-	}
-	if (i == 0) {
-		new_addr = pci_map_single(tp->pdev, skb->data, guilty_len,
-					  PCI_DMA_TODEVICE);
-	} else {
-		skb_frag_t *frag = &skb_shinfo(skb)->frags[i - 1];
-
-		new_addr = pci_map_page(tp->pdev,
-					frag->page, frag->page_offset,
-					guilty_len, PCI_DMA_TODEVICE);
-	}
-	pci_unmap_single(tp->pdev, pci_unmap_addr(&tp->tx_buffers[guilty_entry],
-						  mapping),
-			 guilty_len, PCI_DMA_TODEVICE);
-	tg3_set_txd_addr(tp, guilty_entry, new_addr);
-	pci_unmap_addr_set(&tp->tx_buffers[guilty_entry], mapping,
-			   new_addr);
-	*start = last_plus_one;
-#else
-	/* Oh well, no IOMMU, have to allocate a whole new SKB. */
-	struct sk_buff *new_skb = skb_copy(skb, GFP_ATOMIC);
 
 	if (!new_skb) {
 		dev_kfree_skb(skb);
@@ -2337,7 +2277,6 @@ static int tigon3_4gb_hwbug_workaround(struct tg3 *tp, struct sk_buff *skb,
 	}
 
 	dev_kfree_skb(skb);
-#endif
 
 	return 0;
 }
@@ -6740,7 +6679,7 @@ static int __devinit tg3_init_one(struct pci_dev *pdev,
 	}
 
 	/* Configure DMA attributes. */
-	if (!pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff)) {
+	if (!pci_set_dma_mask(pdev, (u64) 0xffffffffffffffffULL)) {
 		pci_using_dac = 1;
 		if (pci_set_consistent_dma_mask(pdev,
 						(u64) 0xffffffffffffffff)) {

@@ -564,6 +564,7 @@ static void snd_via82xx_channel_reset(via82xx_t *chip, viadev_t *viadev)
 {
 	outb(VIA_REG_CTRL_PAUSE | VIA_REG_CTRL_TERMINATE | VIA_REG_CTRL_RESET,
 	     VIADEV_REG(viadev, OFFSET_CONTROL));
+	inb(VIADEV_REG(viadev, OFFSET_CONTROL));
 	udelay(50);
 	/* disable interrupts */
 	outb(0x00, VIADEV_REG(viadev, OFFSET_CONTROL));

@@ -28,9 +28,8 @@ static int ssl_version = 1;
 /* Referenced only by tty_driver below - presumably it's locked correctly
  * by the tty driver.
  */
-static int ssl_refcount = 0;
 
-static struct tty_driver ssl_driver;
+static struct tty_driver *ssl_driver;
 
 #define NR_PORTS 64
 
@@ -190,8 +189,7 @@ void ssl_hangup(struct tty_struct *tty)
 {
 }
 
-static struct tty_driver ssl_driver = {
-	.refcount 		= &ssl_refcount,
+static struct tty_operations ssl_ops = {
 	.open 	 		= ssl_open,
 	.close 	 		= ssl_close,
 	.write 	 		= ssl_write,
@@ -205,7 +203,8 @@ static struct tty_driver ssl_driver = {
 	.set_termios 		= ssl_set_termios,
 	.stop 	 		= ssl_stop,
 	.start 	 		= ssl_start,
-	.hangup 	 	= ssl_hangup
+	.hangup 	 	= ssl_hangup,
+	.write_room		= line_write_room,
 };
 
 /* Changed by ssl_init and referenced by ssl_exit, which are both serialized
@@ -220,8 +219,8 @@ int ssl_init(void)
 	printk(KERN_INFO "Initializing software serial port version %d\n", 
 	       ssl_version);
 
-	line_register_devfs(&lines, &driver, &ssl_driver, serial_lines, 
-			    sizeof(serial_lines)/sizeof(serial_lines[0]));
+	ssl_driver = line_register_devfs(&lines, &driver, &ssl_ops,
+		serial_lines, sizeof(serial_lines)/sizeof(serial_lines[0]));
 
 	lines_init(serial_lines, sizeof(serial_lines)/sizeof(serial_lines[0]));
 

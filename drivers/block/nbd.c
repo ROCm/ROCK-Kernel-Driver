@@ -120,7 +120,7 @@ static int nbd_xmit(int send, struct socket *sock, char *buf, int size, int msg_
 
 
 	do {
-		sock->sk->allocation = GFP_NOIO;
+		sock->sk->sk_allocation = GFP_NOIO;
 		iov.iov_base = buf;
 		iov.iov_len = size;
 		msg.msg_name = NULL;

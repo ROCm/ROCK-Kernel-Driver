@@ -36,17 +36,11 @@ extern struct file_operations jfs_file_operations;
 struct address_space_operations jfs_aops;
 extern int freeZeroLink(struct inode *);
 
-struct inode *jfs_iget(struct super_block *sb, ino_t ino)
+void jfs_read_inode(struct inode *inode)
 {
-	struct inode *inode = iget_locked(sb, ino);
-
-	if (!inode || !(inode->i_state & I_NEW))
-		return inode;
-
 	if (diRead(inode)) { 
 		make_bad_inode(inode);
-		unlock_new_inode(inode);
-		return NULL;
+		return;
 	}
 
 	if (S_ISREG(inode->i_mode)) {
@@ -69,8 +63,6 @@ struct inode *jfs_iget(struct super_block *sb, ino_t ino)
 		init_special_inode(inode, inode->i_mode,
 				   kdev_t_to_nr(inode->i_rdev));
 	}
-	unlock_new_inode(inode);
-	return inode;
 }
 
 /* This define is from fs/open.c */

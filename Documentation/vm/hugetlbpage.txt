@@ -67,14 +67,21 @@ If the user applications are going to request hugepages using mmap system
 call, then it is required that system administrator mount a file system of
 type hugetlbfs:
 
-	mount none /mnt/huge -t hugetlbfs
+	mount none /mnt/huge -t hugetlbfs <uid=value> <gid=value> <mode=value>
 
 This command mounts a (pseudo) filesystem of type hugetlbfs on the directory
-/mnt/huge.  Any files created on /mnt/huge uses hugepages.  An example is
-given at the end of this document.
+/mnt/huge.  Any files created on /mnt/huge uses hugepages.  The uid and gid
+options sets the owner and group of the root of the file system.  By default
+the uid and gid of the current process are taken.  The mode option sets the
+mode of root of file system to value & 0777.  This value is given in octal.
+By default the value 0755 is picked.  An example is given at the end of this
+document.
 
 read and write system calls are not supported on files that reside on hugetlb
 file systems.
+
+A regular chown, chgrp and chmod commands (with right permissions) could be
+used to change the file attributes on hugetlbfs.
 
 Also, it is important to note that no such mount command is required if the
 applications are going to use only shmat/shmget system calls.  It is possible

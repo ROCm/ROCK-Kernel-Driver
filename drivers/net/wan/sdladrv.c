@@ -1905,13 +1905,7 @@ static int detect_s514 (sdlahw_t* hw)
 	struct pci_dev *pci_dev;
 
 
-#ifdef CONFIG_PCI
-        if(!pci_present())
-        {
-                printk(KERN_INFO "%s: PCI BIOS not present!\n", modname);
-                return 0;
-        }
-#else
+#ifndef CONFIG_PCI
         printk(KERN_INFO "%s: Linux not compiled for PCI usage!\n", modname);
         return 0;
 #endif

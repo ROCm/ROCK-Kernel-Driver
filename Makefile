@@ -1,6 +1,6 @@
 VERSION = 2
 PATCHLEVEL = 5
-SUBLEVEL = 70
+SUBLEVEL = 71
 EXTRAVERSION =
 
 # *DOCUMENTATION*
@@ -36,13 +36,36 @@ KERNELRELEASE=$(VERSION).$(PATCHLEVEL).$(SUBLEVEL)$(EXTRAVERSION)
 SUBARCH := $(shell uname -m | sed -e s/i.86/i386/ -e s/sun4u/sparc64/ \
 				  -e s/arm.*/arm/ -e s/sa110/arm/ \
 				  -e s/s390x/s390/ )
-ARCH := $(SUBARCH)
 
 # Remove hyphens since they have special meaning in RPM filenames
 KERNELPATH=kernel-$(subst -,,$(KERNELRELEASE))
 
+# Cross compiling and selecting different set of gcc/bin-utils
+# ---------------------------------------------------------------------------
+#
+# When performing cross compilation for other architectures ARCH shall be set
+# to the target architecture. (See arch/* for the possibilities).
+# ARCH can be set during invocation of make:
+# make ARCH=ia64
+# Another way is to have ARCH set in the environment.
+# The default ARCH is the host where make is executed.
+
+# CROSS_COMPILE specify the prefix used for all executables used
+# during compilation. Only gcc and related bin-utils executables
+# are prefixed with $(CROSS_COMPILE).
+# CROSS_COMPILE can be set on the command line
+# make CROSS_COMPILE=ia64-linux-
+# Alternatively CROSS_COMPILE can be set in the environment.
+# Default value for CROSS_COMPILE is not to prefix executables
+# Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile
+
+ARCH		?= $(SUBARCH)
+CROSS_COMPILE	?=
+
+# Architecture as present in compile.h
 UTS_MACHINE := $(ARCH)
 
+# SHELL used by kbuild
 CONFIG_SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	  else if [ -x /bin/bash ]; then echo /bin/bash; \
 	  else echo sh; fi ; fi)
@@ -53,7 +76,6 @@ HOSTCXX  	= g++
 HOSTCFLAGS	= -Wall -Wstrict-prototypes -O2 -fomit-frame-pointer
 HOSTCXXFLAGS	= -O2
 
-CROSS_COMPILE 	=
 
 # 	That's our default target when none is given on the command line
 #	Note that 'modules' will be added as a prerequisite as well, 
@@ -68,25 +90,23 @@ KBUILD_MODULES :=
 KBUILD_BUILTIN := 1
 
 #	If we have only "make modules", don't compile built-in objects.
+#	When we're building modules with modversions, we need to consider
+#	the built-in objects during the descend as well, in order to
+#	make sure the checksums are uptodate before we record them.
 
 ifeq ($(MAKECMDGOALS),modules)
-  KBUILD_BUILTIN :=
+  KBUILD_BUILTIN := $(if $(CONFIG_MODVERSIONS),1)
 endif
 
 #	If we have "make <whatever> modules", compile modules
 #	in addition to whatever we do anyway.
-
-ifneq ($(filter modules,$(MAKECMDGOALS)),)
-  KBUILD_MODULES := 1
-endif
-
 #	Just "make" or "make all" shall build modules as well
 
-ifeq ($(MAKECMDGOALS),)
+ifneq ($(filter all modules,$(MAKECMDGOALS)),)
   KBUILD_MODULES := 1
 endif
 
-ifneq ($(filter all,$(MAKECMDGOALS)),)
+ifeq ($(MAKECMDGOALS),)
   KBUILD_MODULES := 1
 endif
 
@@ -182,7 +202,7 @@ GENKSYMS	= scripts/genksyms/genksyms
 DEPMOD		= /sbin/depmod
 KALLSYMS	= scripts/kallsyms
 PERL		= perl
-CHECK		= /home/torvalds/parser/check
+CHECK		= sparse
 MODFLAGS	= -DMODULE
 CFLAGS_MODULE   = $(MODFLAGS)
 AFLAGS_MODULE   = $(MODFLAGS)
@@ -266,7 +286,9 @@ init-y		:= $(patsubst %/, %/built-in.o, $(init-y))
 core-y		:= $(patsubst %/, %/built-in.o, $(core-y))
 drivers-y	:= $(patsubst %/, %/built-in.o, $(drivers-y))
 net-y		:= $(patsubst %/, %/built-in.o, $(net-y))
-libs-y		:= $(patsubst %/, %/lib.a, $(libs-y))
+libs-y1		:= $(patsubst %/, %/lib.a, $(libs-y))
+libs-y2		:= $(patsubst %/, %/built-in.o, $(libs-y))
+libs-y		:= $(libs-y1) $(libs-y2)
 
 ifdef include_config
 
@@ -284,18 +306,6 @@ ifdef include_config
 
 ifndef CONFIG_FRAME_POINTER
 CFLAGS		+= -fomit-frame-pointer
-endif
-
-#	When we're building modules with modversions, we need to consider
-#	the built-in objects during the descend as well, in order to
-#	make sure the checksums are uptodate before we record them.
-
-ifdef CONFIG_MODVERSIONS
-ifeq ($(KBUILD_MODULES),1)
-ifneq ($(KBUILD_BUILTIN),1)
-  KBUILD_BUILTIN := 1
-endif
-endif
 endif
 
 #
@@ -356,7 +366,7 @@ define rule_vmlinux__
 endef
 
 define rule_vmlinux
-	$(rule_vmlinux__)
+	$(rule_vmlinux__); \
 	$(NM) $@ | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' | sort > System.map
 endef
 
@@ -422,9 +432,8 @@ else
 	@echo '*** Warning: Overriding SUBDIRS on the command line can cause'
 	@echo '***          inconsistencies'
 endif
-	$(Q)mkdir -p $(MODVERDIR)
 endif
-	@echo '  Starting the build. KBUILD_BUILTIN=$(KBUILD_BUILTIN) KBUILD_MODULES=$(KBUILD_MODULES)'
+	$(if $(CONFIG_MODULES),$(Q)mkdir -p $(MODVERDIR))
 
 #	This can be used by arch/$ARCH/Makefile to preprocess
 #	their vmlinux.lds.S file
@@ -446,9 +455,7 @@ targets += arch/$(ARCH)/vmlinux.lds.s
 %.o: %.c scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %/:      scripts prepare FORCE
-	$(Q)$(MAKE) $(build)=$(@D)
-%.ko: scripts FORCE
-	$(Q)$(MAKE) $(build)=$(@D) $@
+	$(Q)$(MAKE) KBUILD_MODULES=$(if $(CONFIG_MODULES),1) $(build)=$(@D)
 %.lst: %.c scripts FORCE
 	$(Q)$(MAKE) $(build)=$(@D) $@
 %.s: %.S scripts FORCE
@@ -490,7 +497,7 @@ define filechk_version.h
 	if expr length "$(KERNELRELEASE)" \> $(uts_len) >/dev/null ; then \
 	  echo '"$(KERNELRELEASE)" exceeds $(uts_len) characters' >&2; \
 	  exit 1; \
-	fi;
+	fi; \
 	(echo \#define UTS_RELEASE \"$(KERNELRELEASE)\"; \
 	  echo \#define LINUX_VERSION_CODE `expr $(VERSION) \\* 65536 + $(PATCHLEVEL) \\* 256 + $(SUBLEVEL)`; \
 	 echo '#define KERNEL_VERSION(a,b,c) (((a) << 16) + ((b) << 8) + (c))'; \
@@ -783,25 +790,28 @@ rpm:	clean spec
 
 help:
 	@echo  'Cleaning targets:'
-	@echo  '  clean		- remove most generated files but keep the config'
-	@echo  '  mrproper	- remove all generated files + config + various backup files'
+	@echo  '  clean		  - remove most generated files but keep the config'
+	@echo  '  mrproper	  - remove all generated files + config + various backup files'
 	@echo  ''
 	@echo  'Configuration targets:'
-	@echo  '  oldconfig	- Update current config utilising a line-oriented program'
-	@echo  '  menuconfig	- Update current config utilising a menu based program'
-	@echo  '  xconfig	- Update current config utilising a X-based program'
-	@echo  '  defconfig	- New config with default answer to all options'
-	@echo  '  allmodconfig	- New config selecting modules when possible'
-	@echo  '  allyesconfig	- New config where all options are accepted with yes'
-	@echo  '  allnoconfig	- New minimal config'
+	@echo  '  oldconfig	  - Update current config utilising a line-oriented program'
+	@echo  '  menuconfig	  - Update current config utilising a menu based program'
+	@echo  '  xconfig	  - Update current config utilising a QT based front-end'
+	@echo  '  gconfig	  - Update current config utilising a GTK based front-end'
+	@echo  '  defconfig	  - New config with default answer to all options'
+	@echo  '  allmodconfig	  - New config selecting modules when possible'
+	@echo  '  allyesconfig	  - New config where all options are accepted with yes'
+	@echo  '  allnoconfig	  - New minimal config'
 	@echo  ''
 	@echo  'Other generic targets:'
-	@echo  '  all		- Build all targets marked with [*]'
-	@echo  '* vmlinux	- Build the bare kernel'
-	@echo  '* modules	- Build all modules'
-	@echo  '  dir/file.[ois]- Build specified target only'
-	@echo  '  rpm		- Build a kernel as an RPM package'
-	@echo  '  tags/TAGS	- Generate tags file for editors'
+	@echo  '  all		  - Build all targets marked with [*]'
+	@echo  '* vmlinux	  - Build the bare kernel'
+	@echo  '* modules	  - Build all modules'
+	@echo  '  modules_install - Install all modules'
+	@echo  '  dir/            - Build all files in dir and below'
+	@echo  '  dir/file.[ois]  - Build specified target only'
+	@echo  '  rpm		  - Build a kernel as an RPM package'
+	@echo  '  tags/TAGS	  - Generate tags file for editors'
 	@echo  ''
 	@echo  'Documentation targets:'
 	@$(MAKE) --no-print-directory -f Documentation/DocBook/Makefile dochelp
@@ -809,6 +819,9 @@ help:
 	@echo  'Architecture specific targets ($(ARCH)):'
 	@$(if $(archhelp),$(archhelp),\
 		echo '  No architecture specific help defined for $(ARCH)')
+	@echo  ''
+	@echo  '  make V=0|1 [targets] 0 => quiet build (default), 1 => verbose build'
+	@echo  '  make C=1   [targets] Check all c source with checker tool'
 	@echo  ''
 	@echo  'Execute "make" or "make all" to build all targets marked with [*] '
 	@echo  'For further info browse Documentation/kbuild/*'

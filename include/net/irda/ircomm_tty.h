@@ -92,8 +92,6 @@ struct ircomm_tty_cb {
 	void *skey;
 	void *ckey;
 
-	struct termios	  normal_termios;
-
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
 	struct timer_list watchdog_timer;

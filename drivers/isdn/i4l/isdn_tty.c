@@ -62,12 +62,6 @@ isdn_tty_event_callback(struct isdn_slot *slot, int pr, void *arg)
 #define MODEM_PARANOIA_CHECK
 #define MODEM_DO_RESTART
 
-#ifdef CONFIG_DEVFS_FS
-static char *isdn_ttyname_ttyI = "isdn/ttyI%d";
-#else
-static char *isdn_ttyname_ttyI = "ttyI";
-#endif
-
 struct isdn_modem isdn_mdm;
 
 static int bit2si[8] =
@@ -1768,10 +1762,6 @@ isdn_tty_open(struct tty_struct *tty, struct file *filp)
 #endif
 		return retval;
 	}
-	if ((info->count == 1) && (info->flags & ISDN_ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		isdn_tty_change_speed(info);
-	}
 #ifdef ISDN_DEBUG_MODEM_OPEN
 	printk(KERN_DEBUG "isdn_tty_open ttyi%d successful...\n", info->line);
 #endif
@@ -1826,13 +1816,6 @@ isdn_tty_close(struct tty_struct *tty, struct file *filp)
 		goto out;
 	}
 	info->flags |= ISDN_ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ISDN_ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-
 	tty->closing = 1;
 	/*
 	 * At this point we stop accepting input.  To do this, we
@@ -2003,6 +1986,21 @@ modem_write_profile(atemu * m)
 		group_send_sig_info(SIGIO, SEND_SIG_PRIV, dev->profd);
 }
 
+static struct tty_operations modem_ops = {
+	.open = isdn_tty_open,
+	.close = isdn_tty_close,
+	.write = isdn_tty_write,
+	.flush_chars = isdn_tty_flush_chars,
+	.write_room = isdn_tty_write_room,
+	.chars_in_buffer = isdn_tty_chars_in_buffer,
+	.flush_buffer = isdn_tty_flush_buffer,
+	.ioctl = isdn_tty_ioctl,
+	.throttle = isdn_tty_throttle,
+	.unthrottle = isdn_tty_unthrottle,
+	.set_termios = isdn_tty_set_termios,
+	.hangup = isdn_tty_hangup,
+};
+
 int
 isdn_tty_init(void)
 {
@@ -2011,39 +2009,21 @@ isdn_tty_init(void)
 	modem_info *info;
 
 	m = &isdn_mdm;
-	memset(&m->tty_modem, 0, sizeof(struct tty_driver));
-	m->tty_modem.magic = TTY_DRIVER_MAGIC;
-	m->tty_modem.name = isdn_ttyname_ttyI;
-	m->tty_modem.major = ISDN_TTY_MAJOR;
-	m->tty_modem.minor_start = 0;
-	m->tty_modem.num = ISDN_MAX_CHANNELS;
-	m->tty_modem.type = TTY_DRIVER_TYPE_SERIAL;
-	m->tty_modem.subtype = SERIAL_TYPE_NORMAL;
-	m->tty_modem.init_termios = tty_std_termios;
-	m->tty_modem.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	m->tty_modem.flags = TTY_DRIVER_REAL_RAW;
-	m->tty_modem.refcount = &m->refcount;
-	m->tty_modem.table = m->modem_table;
-	m->tty_modem.termios = m->modem_termios;
-	m->tty_modem.termios_locked = m->modem_termios_locked;
-	m->tty_modem.open = isdn_tty_open;
-	m->tty_modem.close = isdn_tty_close;
-	m->tty_modem.write = isdn_tty_write;
-	m->tty_modem.put_char = NULL;
-	m->tty_modem.flush_chars = isdn_tty_flush_chars;
-	m->tty_modem.write_room = isdn_tty_write_room;
-	m->tty_modem.chars_in_buffer = isdn_tty_chars_in_buffer;
-	m->tty_modem.flush_buffer = isdn_tty_flush_buffer;
-	m->tty_modem.ioctl = isdn_tty_ioctl;
-	m->tty_modem.throttle = isdn_tty_throttle;
-	m->tty_modem.unthrottle = isdn_tty_unthrottle;
-	m->tty_modem.set_termios = isdn_tty_set_termios;
-	m->tty_modem.stop = NULL;
-	m->tty_modem.start = NULL;
-	m->tty_modem.hangup = isdn_tty_hangup;
-	m->tty_modem.driver_name = "isdn_tty";
-
-	retval = tty_register_driver(&m->tty_modem);
+	m->tty_modem = alloc_tty_driver(ISDN_MAX_CHANNELS);
+	if (!m->tty_modem)
+		return -ENOMEM;
+	m->tty_modem->name = "ttyI";
+	m->tty_modem->devfs_name = "isdn/ttyI";
+	m->tty_modem->major = ISDN_TTY_MAJOR;
+	m->tty_modem->minor_start = 0;
+	m->tty_modem->type = TTY_DRIVER_TYPE_SERIAL;
+	m->tty_modem->subtype = SERIAL_TYPE_NORMAL;
+	m->tty_modem->init_termios = tty_std_termios;
+	m->tty_modem->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	m->tty_modem->flags = TTY_DRIVER_REAL_RAW;
+	m->tty_modem->driver_name = "isdn_tty";
+	tty_set_operations(m->tty_modem, &modem_ops);
+	retval = tty_register_driver(m->tty_modem);
 	if (retval) {
 		printk(KERN_WARNING "isdn_tty: Couldn't register modem-device\n");
 		goto err;
@@ -2071,7 +2051,6 @@ isdn_tty_init(void)
 		info->x_char = 0;
 		info->count = 0;
 		info->blocked_open = 0;
-		info->normal_termios = m->tty_modem.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		info->isdn_slot = NULL;
@@ -2117,8 +2096,10 @@ isdn_tty_init(void)
 		kfree(info->xmit_buf - 4);
 	}
  err_unregister_tty:
-	tty_unregister_driver(&isdn_mdm.tty_modem);
+	tty_unregister_driver(&isdn_mdm->tty_modem);
  err:
+	put_tty_driver(&isdn_mdm->tty_modem);
+	isdn_mdm->tty_modem = NULL;
 	return retval;
 }
 
@@ -2137,7 +2118,9 @@ isdn_tty_exit(void)
 #endif
 		kfree(info->xmit_buf - 4);
 	}
-	tty_unregister_driver(&isdn_mdm.tty_modem);
+	tty_unregister_driver(&isdn_mdm->tty_modem);
+	put_tty_driver(&isdn_mdm->tty_modem);
+	isdn_mdm->tty_modem = NULL;
 }
 
 /*

@@ -78,7 +78,6 @@ typedef struct {
 	wait_queue_head_t	raw_wait;
 #endif
 	struct work_struct	tqhangup;
-	struct termios		normaltermios;
 	asysigs_t		asig;
 	unsigned long		addr;
 	unsigned long		rxoffset;

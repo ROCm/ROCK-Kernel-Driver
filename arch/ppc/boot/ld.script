@@ -81,6 +81,7 @@ SECTIONS
   /DISCARD/ : {
     *(__ksymtab)
     *(__ksymtab_strings)
+    *(__bug_table)
   }
 
 }

@@ -533,11 +533,11 @@ extern void chrp_request_regions(void);
 
 void __init pcibios_final_fixup(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 
 	check_s7a();
 
-	pci_for_each_dev(dev)
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL)
 		pci_read_irq_line(dev);
 
 	chrp_request_regions();

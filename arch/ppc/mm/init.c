@@ -64,7 +64,7 @@ unsigned long ppc_memoffset = PAGE_OFFSET;
 int mem_init_done;
 int init_bootmem_done;
 int boot_mapsize;
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_PMAC
 unsigned long agp_special_page;
 #endif
 
@@ -411,16 +411,18 @@ void __init mem_init(void)
 	}
 #endif /* CONFIG_BLK_DEV_INITRD */
 
-#if defined(CONFIG_ALL_PPC)
+#ifdef CONFIG_PPC_OF
 	/* mark the RTAS pages as reserved */
 	if ( rtas_data )
 		for (addr = (ulong)__va(rtas_data);
 		     addr < PAGE_ALIGN((ulong)__va(rtas_data)+rtas_size) ;
 		     addr += PAGE_SIZE)
 			SetPageReserved(virt_to_page(addr));
+#endif
+#ifdef CONFIG_PPC_PMAC
 	if (agp_special_page)
 		SetPageReserved(virt_to_page(agp_special_page));
-#endif /* defined(CONFIG_ALL_PPC) */
+#endif
 	if ( sysmap )
 		for (addr = (unsigned long)sysmap;
 		     addr < PAGE_ALIGN((unsigned long)sysmap+sysmap_size) ;
@@ -465,10 +467,10 @@ void __init mem_init(void)
 	if (sysmap)
 		printk("System.map loaded at 0x%08x for debugger, size: %ld bytes\n",
 			(unsigned int)sysmap, sysmap_size);
-#if defined(CONFIG_ALL_PPC)
+#ifdef CONFIG_PPC_PMAC
 	if (agp_special_page)
 		printk(KERN_INFO "AGP special page: 0x%08lx\n", agp_special_page);
-#endif /* defined(CONFIG_ALL_PPC) */
+#endif
 
 	/* Make sure all our pagetable pages have page->mapping
 	   and page->index set correctly. */
@@ -521,13 +523,15 @@ set_phys_avail(unsigned long total_memory)
 				  initrd_end - initrd_start, 1);
 	}
 #endif /* CONFIG_BLK_DEV_INITRD */
-#ifdef CONFIG_ALL_PPC
+#ifdef CONFIG_PPC_OF
 	/* remove the RTAS pages from the available memory */
 	if (rtas_data)
 		mem_pieces_remove(&phys_avail, rtas_data, rtas_size, 1);
+#endif
 	/* remove the sysmap pages from the available memory */
 	if (sysmap)
 		mem_pieces_remove(&phys_avail, __pa(sysmap), sysmap_size, 1);
+#ifdef CONFIG_PPC_PMAC
 	/* Because of some uninorth weirdness, we need a page of
 	 * memory as high as possible (it must be outside of the
 	 * bus address seen as the AGP aperture). It will be used
@@ -542,7 +546,7 @@ set_phys_avail(unsigned long total_memory)
 		mem_pieces_remove(&phys_avail, agp_special_page, PAGE_SIZE, 0);	
 		agp_special_page = (unsigned long)__va(agp_special_page);
 	}
-#endif /* CONFIG_ALL_PPC */
+#endif /* CONFIG_PPC_PMAC */
 }
 
 /* Mark some memory as reserved by removing it from phys_avail. */

@@ -31,37 +31,12 @@
 #include <asm/bitops.h>
 #include <linux/devpts_fs.h>
 
-struct pty_struct {
-	int	magic;
-	wait_queue_head_t open_wait;
-};
-
-#define PTY_MAGIC 0x5001
-
-static struct tty_driver pty_driver, pty_slave_driver;
-static int pty_refcount;
-
-/* Note: one set of tables for BSD and one for Unix98 */
-static struct tty_struct *pty_table[NR_PTYS];
-static struct termios *pty_termios[NR_PTYS];
-static struct termios *pty_termios_locked[NR_PTYS];
-static struct tty_struct *ttyp_table[NR_PTYS];
-static struct termios *ttyp_termios[NR_PTYS];
-static struct termios *ttyp_termios_locked[NR_PTYS];
-static struct pty_struct pty_state[NR_PTYS];
+static struct tty_driver *pty_driver, *pty_slave_driver;
 
 #ifdef CONFIG_UNIX98_PTYS
 /* These are global because they are accessed in tty_io.c */
-struct tty_driver ptm_driver;
-struct tty_driver pts_driver;
-
-static struct tty_struct *ptm_table[UNIX98_NR_MAJORS*NR_PTYS];
-static struct termios *ptm_termios[UNIX98_NR_MAJORS*NR_PTYS];
-static struct termios *ptm_termios_locked[UNIX98_NR_MAJORS*NR_PTYS];
-static struct tty_struct *pts_table[UNIX98_NR_MAJORS*NR_PTYS];
-static struct termios *pts_termios[UNIX98_NR_MAJORS*NR_PTYS];
-static struct termios *pts_termios_locked[UNIX98_NR_MAJORS*NR_PTYS];
-static struct pty_struct ptm_state[UNIX98_NR_MAJORS*NR_PTYS];
+struct tty_driver *ptm_driver;
+struct tty_driver *pts_driver;
 #endif
 
 static void pty_close(struct tty_struct * tty, struct file * filp)
@@ -87,7 +62,7 @@ static void pty_close(struct tty_struct * tty, struct file * filp)
 	if (tty->driver->subtype == PTY_TYPE_MASTER) {
 		set_bit(TTY_OTHER_CLOSED, &tty->flags);
 #ifdef CONFIG_UNIX98_PTYS
-		if (tty->driver == &ptm_driver)
+		if (tty->driver == ptm_driver)
 			devpts_pty_kill(tty->index);
 #endif
 		tty_vhangup(tty->link);
@@ -300,16 +275,10 @@ static void pty_flush_buffer(struct tty_struct *tty)
 
 static int pty_open(struct tty_struct *tty, struct file * filp)
 {
-	int	retval;
-	int	line;
-	struct	pty_struct *pty;
+	int	retval = -ENODEV;
 
-	retval = -ENODEV;
 	if (!tty || !tty->link)
 		goto out;
-	line = tty->index;
-	pty = (struct pty_struct *)(tty->driver->driver_state) + line;
-	tty->driver_data = pty;
 
 	retval = -EIO;
 	if (test_bit(TTY_OTHER_CLOSED, &tty->flags))
@@ -320,7 +289,6 @@ static int pty_open(struct tty_struct *tty, struct file * filp)
 		goto out;
 
 	clear_bit(TTY_OTHER_CLOSED, &tty->link->flags);
-	wake_up_interruptible(&pty->open_wait);
 	set_bit(TTY_THROTTLED, &tty->flags);
 	set_bit(TTY_DO_WRITE_WAKEUP, &tty->flags);
 	retval = 0;
@@ -334,124 +302,114 @@ static void pty_set_termios(struct tty_struct *tty, struct termios *old_termios)
         tty->termios->c_cflag |= (CS8 | CREAD);
 }
 
+static struct tty_operations pty_ops = {
+	.open = pty_open,
+	.close = pty_close,
+	.write = pty_write,
+	.write_room = pty_write_room,
+	.flush_buffer = pty_flush_buffer,
+	.chars_in_buffer = pty_chars_in_buffer,
+	.unthrottle = pty_unthrottle,
+	.set_termios = pty_set_termios,
+};
+
 int __init pty_init(void)
 {
-	int i;
-
 	/* Traditional BSD devices */
 
-	memset(&pty_state, 0, sizeof(pty_state));
-	for (i = 0; i < NR_PTYS; i++)
-		init_waitqueue_head(&pty_state[i].open_wait);
-	memset(&pty_driver, 0, sizeof(struct tty_driver));
-	pty_driver.magic = TTY_DRIVER_MAGIC;
-	pty_driver.owner = THIS_MODULE;
-	pty_driver.driver_name = "pty_master";
-#ifdef CONFIG_DEVFS_FS
-	pty_driver.name = "pty/m";
-#else
-	pty_driver.name = "pty";
-#endif
-	pty_driver.major = PTY_MASTER_MAJOR;
-	pty_driver.minor_start = 0;
-	pty_driver.num = NR_PTYS;
-	pty_driver.type = TTY_DRIVER_TYPE_PTY;
-	pty_driver.subtype = PTY_TYPE_MASTER;
-	pty_driver.init_termios = tty_std_termios;
-	pty_driver.init_termios.c_iflag = 0;
-	pty_driver.init_termios.c_oflag = 0;
-	pty_driver.init_termios.c_cflag = B38400 | CS8 | CREAD;
-	pty_driver.init_termios.c_lflag = 0;
-	pty_driver.flags = TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_REAL_RAW;
-	pty_driver.refcount = &pty_refcount;
-	pty_driver.table = pty_table;
-	pty_driver.termios = pty_termios;
-	pty_driver.termios_locked = pty_termios_locked;
-	pty_driver.driver_state = pty_state;
-	pty_driver.other = &pty_slave_driver;
+	pty_driver = alloc_tty_driver(NR_PTYS);
+	if (!pty_driver)
+		panic("Couldn't allocate pty driver");
 
-	pty_driver.open = pty_open;
-	pty_driver.close = pty_close;
-	pty_driver.write = pty_write;
-	pty_driver.write_room = pty_write_room;
-	pty_driver.flush_buffer = pty_flush_buffer;
-	pty_driver.chars_in_buffer = pty_chars_in_buffer;
-	pty_driver.unthrottle = pty_unthrottle;
-	pty_driver.set_termios = pty_set_termios;
+	pty_slave_driver = alloc_tty_driver(NR_PTYS);
+	if (!pty_slave_driver)
+		panic("Couldn't allocate pty slave driver");
 
-	pty_slave_driver = pty_driver;
-	pty_slave_driver.driver_name = "pty_slave";
-	pty_slave_driver.proc_entry = 0;
-#ifdef CONFIG_DEVFS_FS
-	pty_slave_driver.name = "pty/s";
-#else
-	pty_slave_driver.name = "ttyp";
-#endif
-	pty_slave_driver.subtype = PTY_TYPE_SLAVE;
-	pty_slave_driver.major = PTY_SLAVE_MAJOR;
-	pty_slave_driver.minor_start = 0;
-	pty_slave_driver.init_termios = tty_std_termios;
-	pty_slave_driver.init_termios.c_cflag = B38400 | CS8 | CREAD;
-	/* Slave ptys are registered when their corresponding master pty
-	 * is opened, and unregistered when the pair is closed.
-	 */
-	pty_slave_driver.flags |= TTY_DRIVER_NO_DEVFS;
-	pty_slave_driver.table = ttyp_table;
-	pty_slave_driver.termios = ttyp_termios;
-	pty_slave_driver.termios_locked = ttyp_termios_locked;
-	pty_slave_driver.driver_state = pty_state;
-	pty_slave_driver.other = &pty_driver;
+	pty_driver->owner = THIS_MODULE;
+	pty_driver->driver_name = "pty_master";
+	pty_driver->name = "pty";
+	pty_driver->devfs_name = "pty/m";
+	pty_driver->major = PTY_MASTER_MAJOR;
+	pty_driver->minor_start = 0;
+	pty_driver->type = TTY_DRIVER_TYPE_PTY;
+	pty_driver->subtype = PTY_TYPE_MASTER;
+	pty_driver->init_termios = tty_std_termios;
+	pty_driver->init_termios.c_iflag = 0;
+	pty_driver->init_termios.c_oflag = 0;
+	pty_driver->init_termios.c_cflag = B38400 | CS8 | CREAD;
+	pty_driver->init_termios.c_lflag = 0;
+	pty_driver->flags = TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_REAL_RAW;
+	pty_driver->other = pty_slave_driver;
+	tty_set_operations(pty_driver, &pty_ops);
+	pty_driver->ioctl = pty_bsd_ioctl;
 
-	if (tty_register_driver(&pty_driver))
+	pty_slave_driver->owner = THIS_MODULE;
+	pty_slave_driver->driver_name = "pty_slave";
+	pty_slave_driver->name = "ttyp";
+	pty_slave_driver->devfs_name = "pty/s";
+	pty_slave_driver->major = PTY_SLAVE_MAJOR;
+	pty_slave_driver->minor_start = 0;
+	pty_slave_driver->type = TTY_DRIVER_TYPE_PTY;
+	pty_slave_driver->subtype = PTY_TYPE_SLAVE;
+	pty_slave_driver->init_termios = tty_std_termios;
+	pty_slave_driver->init_termios.c_cflag = B38400 | CS8 | CREAD;
+	pty_slave_driver->flags = TTY_DRIVER_RESET_TERMIOS |
+			TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	pty_slave_driver->other = pty_driver;
+	tty_set_operations(pty_slave_driver, &pty_ops);
+
+	if (tty_register_driver(pty_driver))
 		panic("Couldn't register pty driver");
-	if (tty_register_driver(&pty_slave_driver))
+	if (tty_register_driver(pty_slave_driver))
 		panic("Couldn't register pty slave driver");
 
-	/* 
-	 * only the master pty gets this ioctl (which is why we
-	 * assign it here, instead of up with the rest of the
-	 * pty_driver initialization. <cananian@alumni.princeton.edu>
-	 */
-	pty_driver.ioctl = pty_bsd_ioctl;
 
 	/* Unix98 devices */
 #ifdef CONFIG_UNIX98_PTYS
 	devfs_mk_dir("pts");
 	printk("pty: %d Unix98 ptys configured\n", UNIX98_NR_MAJORS*NR_PTYS);
-	ptm_driver = pty_driver;
-	ptm_driver.name = "ptm";
-	ptm_driver.proc_entry = 0;
-	ptm_driver.major = UNIX98_PTY_MASTER_MAJOR;
-	ptm_driver.minor_start = 0;
-	ptm_driver.num = UNIX98_NR_MAJORS * NR_PTYS;
-	ptm_driver.other = &pts_driver;
-	ptm_driver.flags |= TTY_DRIVER_NO_DEVFS;
-	ptm_driver.table = ptm_table;
-	ptm_driver.termios = ptm_termios;
-	ptm_driver.termios_locked = ptm_termios_locked;
-	ptm_driver.driver_state = ptm_state;
+	ptm_driver = alloc_tty_driver(UNIX98_NR_MAJORS * NR_PTYS);
+	if (!ptm_driver)
+		panic("Couldn't allocate Unix98 ptm driver");
+	pts_driver = alloc_tty_driver(UNIX98_NR_MAJORS * NR_PTYS);
+	if (!pts_driver)
+		panic("Couldn't allocate Unix98 pts driver");
 
-	for (i = 0; i < UNIX98_NR_MAJORS*NR_PTYS; i++)
-		init_waitqueue_head(&ptm_state[i].open_wait);
+	ptm_driver->owner = THIS_MODULE;
+	ptm_driver->driver_name = "pty_master";
+	ptm_driver->name = "ptm";
+	ptm_driver->major = UNIX98_PTY_MASTER_MAJOR;
+	ptm_driver->minor_start = 0;
+	ptm_driver->type = TTY_DRIVER_TYPE_PTY;
+	ptm_driver->subtype = PTY_TYPE_MASTER;
+	ptm_driver->init_termios = tty_std_termios;
+	ptm_driver->init_termios.c_iflag = 0;
+	ptm_driver->init_termios.c_oflag = 0;
+	ptm_driver->init_termios.c_cflag = B38400 | CS8 | CREAD;
+	ptm_driver->init_termios.c_lflag = 0;
+	ptm_driver->flags = TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_REAL_RAW |
+				TTY_DRIVER_NO_DEVFS;
+	ptm_driver->other = pts_driver;
+	tty_set_operations(ptm_driver, &pty_ops);
+	ptm_driver->ioctl = pty_unix98_ioctl;
+
+	pts_driver->owner = THIS_MODULE;
+	pts_driver->driver_name = "pty_slave";
+	pts_driver->name = "pts";
+	pts_driver->major = UNIX98_PTY_SLAVE_MAJOR;
+	pts_driver->minor_start = 0;
+	pts_driver->type = TTY_DRIVER_TYPE_PTY;
+	pts_driver->subtype = PTY_TYPE_SLAVE;
+	pts_driver->init_termios = tty_std_termios;
+	pts_driver->init_termios.c_cflag = B38400 | CS8 | CREAD;
+	pts_driver->flags = TTY_DRIVER_RESET_TERMIOS |
+			TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	pts_driver->other = ptm_driver;
+	tty_set_operations(pts_driver, &pty_ops);
 	
-	pts_driver = pty_slave_driver;
-	pts_driver.name = "pts";
-	pts_driver.proc_entry = 0;
-	pts_driver.major = UNIX98_PTY_SLAVE_MAJOR;
-	pts_driver.minor_start = 0;
-	pts_driver.num = UNIX98_NR_MAJORS * NR_PTYS;
-	pts_driver.other = &ptm_driver;
-	pts_driver.flags |= TTY_DRIVER_NO_DEVFS;
-	pts_driver.table = pts_table;
-	pts_driver.termios = pts_termios;
-	pts_driver.termios_locked = pts_termios_locked;
-	pts_driver.driver_state = ptm_state;
-	
-	ptm_driver.ioctl = pty_unix98_ioctl;
-	
-	if (tty_register_driver(&ptm_driver))
+	if (tty_register_driver(ptm_driver))
 		panic("Couldn't register Unix98 ptm driver");
-	if (tty_register_driver(&pts_driver))
+	if (tty_register_driver(pts_driver))
 		panic("Couldn't register Unix98 pts driver");
 #endif
 	return 0;

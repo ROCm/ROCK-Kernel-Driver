@@ -10,6 +10,7 @@ snd-mpu401-uart-objs := mpu401_uart.o
 obj-$(CONFIG_SND_MPU401) += snd-mpu401.o snd-mpu401-uart.o
 obj-$(CONFIG_SND_ALS100) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_AZT2320) += snd-mpu401-uart.o
+obj-$(CONFIG_SND_AZT3328) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_DT019X) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_ES18XX) += snd-mpu401-uart.o
 obj-$(CONFIG_SND_OPL3SA2) += snd-mpu401-uart.o

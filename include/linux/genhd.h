@@ -158,16 +158,15 @@ static inline void disk_stat_set_all(struct gendisk *gendiskp, int value)	{
 #ifdef  CONFIG_SMP
 static inline int init_disk_stats(struct gendisk *disk)
 {
-	disk->dkstats = kmalloc_percpu(sizeof (struct disk_stats), GFP_KERNEL);
+	disk->dkstats = alloc_percpu(struct disk_stats);
 	if (!disk->dkstats)
 		return 0;
-	disk_stat_set_all(disk, 0);
 	return 1;
 }
 
 static inline void free_disk_stats(struct gendisk *disk)
 {
-	kfree_percpu(disk->dkstats);
+	free_percpu(disk->dkstats);
 }
 #else	/* CONFIG_SMP */
 static inline int init_disk_stats(struct gendisk *disk)

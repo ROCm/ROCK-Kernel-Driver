@@ -900,10 +900,10 @@ smb_newconn(struct smb_sb_info *server, struct smb_conn_opt *opt)
 	 * Store the server in sock user_data (Only used by sunrpc)
 	 */
 	sk = SOCKET_I(filp->f_dentry->d_inode)->sk;
-	sk->user_data = server;
+	sk->sk_user_data = server;
 
 	/* chain into the data_ready callback */
-	server->data_ready = xchg(&sk->data_ready, smb_data_ready);
+	server->data_ready = xchg(&sk->sk_data_ready, smb_data_ready);
 
 	/* check if we have an old smbmount that uses seconds for the 
 	   serverzone */

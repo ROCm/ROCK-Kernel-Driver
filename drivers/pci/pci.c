@@ -55,11 +55,11 @@ pci_bus_max_busnr(struct pci_bus* bus)
 unsigned char __devinit
 pci_max_busnr(void)
 {
-	struct pci_bus* bus;
+	struct pci_bus *bus = NULL;
 	unsigned char max, n;
 
 	max = 0;
-	pci_for_each_bus(bus) {
+	while ((bus = pci_find_next_bus(bus)) != NULL) {
 		n = pci_bus_max_busnr(bus);
 		if(n > max)
 			max = n;
@@ -714,9 +714,9 @@ pci_set_consistent_dma_mask(struct pci_dev *dev, u64 mask)
      
 static int __devinit pci_init(void)
 {
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		pci_fixup_device(PCI_FIXUP_FINAL, dev);
 	}
 	return 0;

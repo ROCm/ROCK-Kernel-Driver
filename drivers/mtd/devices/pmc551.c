@@ -681,11 +681,6 @@ int __init init_pmc551(void)
 
         printk(KERN_INFO PMC551_VERSION);
 
-        if(!pci_present()) {
-                printk(KERN_NOTICE "pmc551: PCI not enabled.\n");
-                return -ENODEV;
-        }
-
         /*
          * PCU-bus chipset probe.
          */

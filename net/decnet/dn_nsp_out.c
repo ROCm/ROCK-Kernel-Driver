@@ -92,20 +92,20 @@ try_again:
 	}
 
 	memset(&fl, 0, sizeof(fl));
-	fl.oif = sk->bound_dev_if;
+	fl.oif = sk->sk_bound_dev_if;
 	fl.fld_src = dn_saddr2dn(&scp->addr);
 	fl.fld_dst = dn_saddr2dn(&scp->peer);
 	dn_sk_ports_copy(&fl, scp);
 	fl.proto = DNPROTO_NSP;
-	if (dn_route_output_sock(&sk->dst_cache, &fl, sk, 0) == 0) {
+	if (dn_route_output_sock(&sk->sk_dst_cache, &fl, sk, 0) == 0) {
 		dst = sk_dst_get(sk);
-		sk->route_caps = dst->dev->features;
+		sk->sk_route_caps = dst->dev->features;
 		goto try_again;
 	}
 
-	sk->err = EHOSTUNREACH;
+	sk->sk_err = EHOSTUNREACH;
 	if (!sock_flag(sk, SOCK_DEAD))
-		sk->state_change(sk);
+		sk->sk_state_change(sk);
 }
 
 
@@ -155,40 +155,42 @@ struct sk_buff *dn_alloc_send_skb(struct sock *sk, int *size, int noblock, int *
 			break;
 		}
 
-		if (sk->shutdown & SEND_SHUTDOWN) {
+		if (sk->sk_shutdown & SEND_SHUTDOWN) {
 			*err = EINVAL;
 			break;
 		}
 
-		if (sk->err)
+		if (sk->sk_err)
 			break;
 
 		len = *size + 11;
-		space = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		space = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 
 		if (space < len) {
-			if ((sk->socket->type == SOCK_STREAM) && (space >= (16 + 11)))
+			if ((sk->sk_socket->type == SOCK_STREAM) &&
+			    (space >= (16 + 11)))
 				len = space;
 		}
 
 		if (space < len) {
-			set_bit(SOCK_ASYNC_NOSPACE, &sk->socket->flags);
+			set_bit(SOCK_ASYNC_NOSPACE, &sk->sk_socket->flags);
 			if (noblock) {
 				*err = EWOULDBLOCK;
 				break;
 			}
 
-			clear_bit(SOCK_ASYNC_WAITDATA, &sk->socket->flags);
+			clear_bit(SOCK_ASYNC_WAITDATA, &sk->sk_socket->flags);
 			SOCK_SLEEP_PRE(sk)
 
-			if ((sk->sndbuf - atomic_read(&sk->wmem_alloc)) < len)
+			if ((sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc)) <
+			    len)
 				schedule();
 
 			SOCK_SLEEP_POST(sk)
 			continue;
 		}
 
-		if ((skb = dn_alloc_skb(sk, len, sk->allocation)) == NULL)
+		if ((skb = dn_alloc_skb(sk, len, sk->sk_allocation)) == NULL)
 			continue;
 
 		*size = len - 11;
@@ -546,7 +548,7 @@ void dn_send_conn_ack (struct sock *sk)
 	struct sk_buff *skb = NULL;
         struct nsp_conn_ack_msg *msg;
 
-	if ((skb = dn_alloc_skb(sk, 3, sk->allocation)) == NULL)
+	if ((skb = dn_alloc_skb(sk, 3, sk->sk_allocation)) == NULL)
 		return;
 
         msg = (struct nsp_conn_ack_msg *)skb_put(skb, 3);
@@ -662,7 +664,7 @@ void dn_nsp_send_disc(struct sock *sk, unsigned char msgflg,
 	if (reason == 0)
 		reason = scp->discdata_out.opt_status;
 
-	dn_nsp_do_disc(sk, msgflg, reason, gfp, sk->dst_cache, ddl, 
+	dn_nsp_do_disc(sk, msgflg, reason, gfp, sk->sk_dst_cache, ddl, 
 		scp->discdata_out.opt_data, scp->addrrem, scp->addrloc);
 }
 
@@ -714,14 +716,15 @@ static int dn_nsp_retrans_conninit(struct sock *sk)
 void dn_nsp_send_conninit(struct sock *sk, unsigned char msgflg)
 {
 	struct dn_scp *scp = DN_SK(sk);
-	struct sk_buff *skb = NULL;
 	struct nsp_conn_init_msg *msg;
 	unsigned char aux;
 	unsigned char menuver;
 	struct dn_skb_cb *cb;
 	unsigned char type = 1;
+	int allocation = (msgflg == NSP_CI) ? sk->sk_allocation : GFP_ATOMIC;
+	struct sk_buff *skb = dn_alloc_skb(sk, 200, allocation);
 
-	if ((skb = dn_alloc_skb(sk, 200, (msgflg == NSP_CI) ? sk->allocation : GFP_ATOMIC)) == NULL)
+	if (!skb)
 		return;
 
 	cb  = DN_SKB_CB(skb);

@@ -171,13 +171,7 @@ static void *a2232_driver_ID = &a2232_driver_ID; // Some memory address WE own.
 static struct a2232_port a2232_ports[MAX_A2232_BOARDS*NUMLINES];
 
 /* TTY driver structs */
-static struct tty_driver a2232_driver;
-
-/* Variables used by the TTY driver */
-static int a2232_refcount;
-static struct tty_struct *a2232_table[MAX_A2232_BOARDS*NUMLINES] = { NULL, };
-static struct termios *a2232_termios[MAX_A2232_BOARDS*NUMLINES];
-static struct termios *a2232_termios_locked[MAX_A2232_BOARDS*NUMLINES];
+static struct tty_driver *a2232_driver;
 
 /* nr of cards completely (all ports) and correctly configured */
 static int nr_a2232; 
@@ -472,11 +466,6 @@ static int  a2232_open(struct tty_struct * tty, struct file * filp)
 		return retval;
 	}
 
-	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)){
-		*tty->termios = port->gs.normal_termios;
-		a2232_set_real_termios (port);
-	}
-
 	a2232_enable_rx_interrupts(port);
 	
 	return 0;
@@ -674,7 +663,6 @@ static void a2232_init_portstructs(void)
 		port->which_a2232 = i/NUMLINES;
 		port->which_port_on_a2232 = i%NUMLINES;
 		port->disable_rx = port->throttle_input = port->cd_status = 0;
-		port->gs.normal_termios = tty_std_termios;
 		port->gs.magic = A2232_MAGIC;
 		port->gs.close_delay = HZ/2;
 		port->gs.closing_wait = 30 * HZ;
@@ -687,47 +675,46 @@ static void a2232_init_portstructs(void)
 	}
 }
 
+static struct tty_operations a2232_ops = {
+	.open = a2232_open,
+	.close = gs_close,
+	.write = gs_write,
+	.put_char = gs_put_char,
+	.flush_chars = gs_flush_chars,
+	.write_room = gs_write_room,
+	.chars_in_buffer = gs_chars_in_buffer,
+	.flush_buffer = gs_flush_buffer,
+	.ioctl = a2232_ioctl,
+	.throttle = a2232_throttle,
+	.unthrottle = a2232_unthrottle,
+	.set_termios = gs_set_termios,
+	.stop = gs_stop,
+	.start = gs_start,
+	.hangup = gs_hangup,
+};
+
 static int a2232_init_drivers(void)
 {
 	int error;
 
-	memset(&a2232_driver, 0, sizeof(a2232_driver));
-	a2232_driver.magic = TTY_DRIVER_MAGIC;
-	a2232_driver.owner = THIS_MODULE;
-	a2232_driver.driver_name = "commodore_a2232";
-	a2232_driver.name = "ttyY";
-	a2232_driver.major = A2232_NORMAL_MAJOR;
-	a2232_driver.num = NUMLINES * nr_a2232;
-	a2232_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	a2232_driver.subtype = SERIAL_TTY_NORMAL;
-	a2232_driver.init_termios = tty_std_termios;
-	a2232_driver.init_termios.c_cflag =
+	a2232_driver = alloc_tty_driver(NUMLINES * nr_a2232);
+	if (!a2232_driver)
+		return -ENOMEM;
+	a2232_driver->owner = THIS_MODULE;
+	a2232_driver->driver_name = "commodore_a2232";
+	a2232_driver->name = "ttyY";
+	a2232_driver->major = A2232_NORMAL_MAJOR;
+	a2232_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	a2232_driver->subtype = SERIAL_TTY_NORMAL;
+	a2232_driver->init_termios = tty_std_termios;
+	a2232_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	a2232_driver.flags = TTY_DRIVER_REAL_RAW;
-	a2232_driver.refcount = &a2232_refcount;
-	a2232_driver.table = a2232_table;
-	a2232_driver.termios = a2232_termios;
-	a2232_driver.termios_locked = a2232_termios_locked;
-
-	a2232_driver.open = a2232_open;
-	a2232_driver.close = gs_close;
-	a2232_driver.write = gs_write;
-	a2232_driver.put_char = gs_put_char;
-	a2232_driver.flush_chars = gs_flush_chars;
-	a2232_driver.write_room = gs_write_room;
-	a2232_driver.chars_in_buffer = gs_chars_in_buffer;
-	a2232_driver.flush_buffer = gs_flush_buffer;
-	a2232_driver.ioctl = a2232_ioctl;
-	a2232_driver.throttle = a2232_throttle;
-	a2232_driver.unthrottle = a2232_unthrottle;
-	a2232_driver.set_termios = gs_set_termios;
-	a2232_driver.stop = gs_stop;
-	a2232_driver.start = gs_start;
-	a2232_driver.hangup = gs_hangup;
-
-	if ((error = tty_register_driver(&a2232_driver))) {
+	a2232_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(a2232_driver, &a2232_ops);
+	if ((error = tty_register_driver(a2232_driver))) {
 		printk(KERN_ERR "A2232: Couldn't register A2232 driver, error = %d\n",
 		       error);
+		put_tty_driver(a2232_driver);
 		return 1;
 	}
 	return 0;
@@ -840,7 +827,8 @@ void cleanup_module(void)
 		zorro_release_device(zd_a2232[i]);
 	}
 
-	tty_unregister_driver(&a2232_driver);
+	tty_unregister_driver(a2232_driver);
+	put_tty_driver(a2232_driver);
 	free_irq(IRQ_AMIGA_VERTB, a2232_driver_ID);
 }
 #endif

@@ -335,8 +335,7 @@ static char *serial_version = "$Revision: 1.3 $";
 
 static DECLARE_TASK_QUEUE(tq_serial);
 
-struct tty_driver serial_driver;
-static int serial_refcount;
+static struct tty_driver *serial_driver;
 
 /* serial subtype definitions */
 #ifndef SERIAL_TYPE_NORMAL
@@ -488,10 +487,6 @@ static struct e100_serial rs_table[] = {
 
 
 #define NR_PORTS (sizeof(rs_table)/sizeof(struct e100_serial))
-  
-static struct tty_struct *serial_table[NR_PORTS]; 
-static struct termios *serial_termios[NR_PORTS];
-static struct termios *serial_termios_locked[NR_PORTS];
 
 #ifdef CONFIG_ETRAX_SERIAL_PROC_ENTRY
 #define PROCSTAT(x) x
@@ -3011,12 +3006,6 @@ rs_close(struct tty_struct *tty, struct file * filp)
 	}
 	info->flags |= ASYNC_CLOSING;
 	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-	/*
 	 * Now we wait for the transmit buffer to clear; and we notify 
 	 * the line discipline to only process XON/XOFF characters.
 	 */
@@ -3324,11 +3313,6 @@ rs_open(struct tty_struct *tty, struct file * filp)
 		return retval;
 	}
 
-	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		change_speed(info);
-	}
-
 #ifdef SERIAL_DEBUG_OPEN
 	printk("rs_open ttyS%d successful...\n", info->line);
 #endif
@@ -3434,12 +3418,37 @@ show_serial_version(void)
 }
 
 /* rs_init inits the driver at boot (using the module_init chain) */
+  
+static struct tty_operations rs_ops = {
+	.open = rs_open,
+	.close = rs_close,
+	.write = rs_write,
+	.flush_chars = rs_flush_chars,
+	.write_room = rs_write_room,
+	.chars_in_buffer = rs_chars_in_buffer,
+	.flush_buffer = rs_flush_buffer,
+	.ioctl = rs_ioctl,
+	.throttle = rs_throttle,
+	.unthrottle = rs_unthrottle,
+	.set_termios = rs_set_termios,
+	.stop = rs_stop,
+	.start = rs_start,
+	.hangup = rs_hangup,
+	.break_ctl = rs_break,
+	.send_xchar = rs_send_xchar,
+	.wait_until_sent = rs_wait_until_sent,
+	.read_proc = rs_read_proc,
+};
 
 static int __init
 rs_init(void)
 {
 	int i;
 	struct e100_serial *info;
+	struct tty_driver *driver = alloc_tty_driver(NR_PORTS);
+
+	if (!driver)
+		return -ENOMEM;
 
 	show_serial_version();
         
@@ -3455,52 +3464,20 @@ rs_init(void)
 
 	/* Initialize the tty_driver structure */
   
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-#if (LINUX_VERSION_CODE > 0x20100)
-	serial_driver.driver_name = "serial";
-#endif
-	serial_driver.name = "ttyS";
-	serial_driver.major = TTY_MAJOR;
-	serial_driver.minor_start = 64;
-	serial_driver.num = NR_PORTS;       /* etrax100 has 4 serial ports */
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	driver->driver_name = "serial";
+	driver->name = "ttyS";
+	driver->major = TTY_MAJOR;
+	driver->minor_start = 64;
+	driver->type = TTY_DRIVER_TYPE_SERIAL;
+	driver->subtype = SERIAL_TYPE_NORMAL;
+	driver->init_termios = tty_std_termios;
+	driver->init_termios.c_cflag =
 		B115200 | CS8 | CREAD | HUPCL | CLOCAL; /* is normally B9600 default... */
-	serial_driver.flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
-	serial_driver.refcount = &serial_refcount;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
-  
-	serial_driver.open = rs_open;
-	serial_driver.close = rs_close;
-	serial_driver.write = rs_write;
-	/* should we have an rs_put_char as well here ? */
-	serial_driver.flush_chars = rs_flush_chars;
-	serial_driver.write_room = rs_write_room;
-	serial_driver.chars_in_buffer = rs_chars_in_buffer;
-	serial_driver.flush_buffer = rs_flush_buffer;
-	serial_driver.ioctl = rs_ioctl;
-	serial_driver.throttle = rs_throttle;
-	serial_driver.unthrottle = rs_unthrottle;
-	serial_driver.set_termios = rs_set_termios;
-	serial_driver.stop = rs_stop;
-	serial_driver.start = rs_start;
-	serial_driver.hangup = rs_hangup;
-#if (LINUX_VERSION_CODE >= 131394) /* Linux 2.1.66 */
-	serial_driver.break_ctl = rs_break;
-#endif
-#if (LINUX_VERSION_CODE >= 131343)
-	serial_driver.send_xchar = rs_send_xchar;
-	serial_driver.wait_until_sent = rs_wait_until_sent;
-	serial_driver.read_proc = rs_read_proc;
-#endif
-	  
-	if (tty_register_driver(&serial_driver))
+	driver->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_NO_DEVFS;
+	tty_set_operations(driver, &rs_ops);
+	if (tty_register_driver(driver))
 		panic("Couldn't register serial driver\n");
+	serial_driver = driver;
   
 	/* do some initializing for the separate ports */
   
@@ -3520,7 +3497,6 @@ rs_init(void)
 		info->blocked_open = 0;
 		info->tqueue.routine = do_softint;
 		info->tqueue.data = info;
-		info->normal_termios = serial_driver.init_termios;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		info->xmit.buf = NULL;
@@ -3541,7 +3517,7 @@ rs_init(void)
 
 		if (info->enabled) {
 			printk(KERN_INFO "%s%d at 0x%x is a builtin UART with DMA\n",
-			       serial_driver.name, info->line, (unsigned int)info->port);
+			       serial_driver->name, info->line, (unsigned int)info->port);
 		}
 	}
 

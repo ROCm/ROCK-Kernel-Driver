@@ -5,5 +5,4 @@
 .S.o:
 	$(CC) $(AFLAGS) -D__ASSEMBLY__ -c $< -o $@
 
-L_TARGET = lib.a
-obj-y  = ashrdi3.o checksum.o memcpy.o memset.o abs.o
+lib-y  = ashrdi3.o checksum.o memcpy.o memset.o abs.o

@@ -122,12 +122,6 @@ int tun_net_init(struct net_device *dev)
    
 	DBG(KERN_INFO "%s: tun_net_init\n", tun->name);
 
-	SET_MODULE_OWNER(dev);
-	dev->open = tun_net_open;
-	dev->hard_start_xmit = tun_net_xmit;
-	dev->stop = tun_net_close;
-	dev->get_stats = tun_net_stats;
-
 	switch (tun->flags & TUN_TYPE_MASK) {
 	case TUN_TUN_DEV:
 		/* Point-to-Point TUN Device */
@@ -199,14 +193,14 @@ static __inline__ ssize_t tun_get_user(struct tun_struct *tun, struct iovec *iv,
 	skb_reserve(skb, 2);
 	memcpy_fromiovec(skb_put(skb, len), iv, len);
 
-	skb->dev = &tun->dev;
+	skb->dev = tun->dev;
 	switch (tun->flags & TUN_TYPE_MASK) {
 	case TUN_TUN_DEV:
 		skb->mac.raw = skb->data;
 		skb->protocol = pi.proto;
 		break;
 	case TUN_TAP_DEV:
-		skb->protocol = eth_type_trans(skb, &tun->dev);
+		skb->protocol = eth_type_trans(skb, tun->dev);
 		break;
 	};
 
@@ -325,7 +319,7 @@ static ssize_t tun_chr_readv(struct file *file, const struct iovec *iv,
 			schedule();
 			continue;
 		}
-		netif_start_queue(&tun->dev);
+		netif_start_queue(tun->dev);
 
 		ret = tun_put_user(tun, skb, (struct iovec *) iv, len);
 
@@ -345,6 +339,24 @@ static ssize_t tun_chr_read(struct file * file, char * buf,
 {
 	struct iovec iv = { buf, count };
 	return tun_chr_readv(file, &iv, 1, pos);
+}
+
+static void tun_setup(struct net_device *dev)
+{
+	struct tun_struct *tun = dev->priv;
+
+	skb_queue_head_init(&tun->readq);
+	init_waitqueue_head(&tun->read_wait);
+
+	tun->owner = -1;
+	dev->init = tun_net_init;
+	tun->name = dev->name;
+	SET_MODULE_OWNER(dev);
+	dev->open = tun_net_open;
+	dev->hard_start_xmit = tun_net_xmit;
+	dev->stop = tun_net_close;
+	dev->get_stats = tun_net_stats;
+	dev->destructor = (void (*)(struct net_device *))kfree;
 }
 
 static int tun_set_iff(struct file *file, struct ifreq *ifr)
@@ -367,30 +379,18 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 				return -EPERM;
 	} else {
 		char *name;
-
-		/* Allocate new device */
-		if (!(tun = kmalloc(sizeof(struct tun_struct), GFP_KERNEL)) )
-			return -ENOMEM;
-		memset(tun, 0, sizeof(struct tun_struct));
-
-		skb_queue_head_init(&tun->readq);
-		init_waitqueue_head(&tun->read_wait);
-
-		tun->owner = -1;
-		tun->dev.init = tun_net_init;
-		tun->dev.priv = tun;
-		SET_MODULE_OWNER(&tun->dev);
+		unsigned long flags = 0;
 
 		err = -EINVAL;
 
 		/* Set dev type */
 		if (ifr->ifr_flags & IFF_TUN) {
 			/* TUN device */
-			tun->flags |= TUN_TUN_DEV;
+			flags |= TUN_TUN_DEV;
 			name = "tun%d";
 		} else if (ifr->ifr_flags & IFF_TAP) {
 			/* TAP device */
-			tun->flags |= TUN_TAP_DEV;
+			flags |= TUN_TAP_DEV;
 			name = "tap%d";
 		} else 
 			goto failed;
@@ -398,12 +398,27 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 		if (*ifr->ifr_name)
 			name = ifr->ifr_name;
 
-		if ((err = dev_alloc_name(&tun->dev, name)) < 0)
+		dev = alloc_netdev(sizeof(struct tun_struct), name,
+				   tun_setup);
+		if (!dev)
+			return -ENOMEM;
+
+		tun = dev->priv;
+		tun->flags = flags;
+
+		if (strchr(dev->name, '%')) {
+			err = dev_alloc_name(dev, dev->name);
+			if (err < 0) {
+				kfree(dev);
+				goto failed;
+			}
+		}
+
+		if ((err = register_netdevice(tun->dev))) {
+			kfree(dev);
 			goto failed;
-		if ((err = register_netdevice(&tun->dev)))
-			goto failed;
+		}
 	
-		tun->name = tun->dev.name;
 	}
 
 	DBG(KERN_INFO "%s: tun_set_iff\n", tun->name);
@@ -419,9 +434,7 @@ static int tun_set_iff(struct file *file, struct ifreq *ifr)
 
 	strcpy(ifr->ifr_name, tun->name);
 	return 0;
-
-failed:
-	kfree(tun);
+ failed:
 	return err;
 }
 
@@ -548,13 +561,13 @@ static int tun_chr_close(struct inode *inode, struct file *file)
 	/* Drop read queue */
 	skb_queue_purge(&tun->readq);
 
-	if (!(tun->flags & TUN_PERSIST)) {
-		dev_close(&tun->dev);
-		unregister_netdevice(&tun->dev);
-		kfree(tun);
-	}
+	if (!(tun->flags & TUN_PERSIST)) 
+		unregister_netdevice(tun->dev);
 
 	rtnl_unlock();
+
+	if (!(tun->flags & TUN_PERSIST)) 
+		kfree(tun);
 	return 0;
 }
 
@@ -572,11 +585,10 @@ static struct file_operations tun_fops = {
 	.fasync = tun_chr_fasync		
 };
 
-static struct miscdevice tun_miscdev=
-{
-	TUN_MINOR,
-	"net/tun",
-	&tun_fops
+static struct miscdevice tun_miscdev = {
+	.minor = TUN_MINOR,
+	.name = "net/tun",
+	.fops = &tun_fops
 };
 
 int __init tun_init(void)

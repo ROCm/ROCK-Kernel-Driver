@@ -397,6 +397,7 @@ static int multipath_run (mddev_t *mddev)
 			mdidx(mddev));
 		goto out_free_conf;
 	}
+	memset(conf->multipaths, 0, sizeof(struct multipath_info)*mddev->raid_disks);
 
 	conf->working_disks = 0;
 	ITERATE_RDEV(mddev,rdev,tmp) {

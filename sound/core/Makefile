@@ -45,6 +45,7 @@ obj-$(CONFIG_SND_MTPAV) += snd-rawmidi.o snd.o snd-timer.o
 obj-$(CONFIG_SND_MPU401) += snd-rawmidi.o snd.o snd-timer.o
 obj-$(CONFIG_SND_ALS100) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_AZT2320) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o snd-hwdep.o
+obj-$(CONFIG_SND_AZT3328) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_CMI8330) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o
 obj-$(CONFIG_SND_DT019X) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o snd-hwdep.o
 obj-$(CONFIG_SND_ES18XX) += snd-pcm.o snd-timer.o snd-page-alloc.o snd.o snd-rawmidi.o snd-hwdep.o

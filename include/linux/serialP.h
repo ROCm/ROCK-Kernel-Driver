@@ -49,7 +49,6 @@ struct serial_state {
 	unsigned short	close_delay;
 	unsigned short	closing_wait; /* time to wait before closing */
 	struct async_icount	icount;	
-	struct termios		normal_termios;
 	int	io_type;
 	struct async_struct *info;
 	struct pci_dev	*dev;

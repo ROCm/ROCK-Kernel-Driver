@@ -199,8 +199,6 @@ struct mgsl_struct {
 	
 	struct mgsl_icount	icount;
 	
-	struct termios		normal_termios;
-
 	struct tty_struct 	*tty;
 	int			timeout;
 	int			x_char;		/* xon/xoff character */
@@ -934,8 +932,7 @@ static struct pci_driver synclink_pci_driver = {
 	.remove		= __devexit_p(synclink_remove_one),
 };
 
-static struct tty_driver serial_driver;
-static int serial_refcount;
+static struct tty_driver *serial_driver;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
@@ -943,10 +940,6 @@ static int serial_refcount;
 
 static void mgsl_change_params(struct mgsl_struct *info);
 static void mgsl_wait_until_sent(struct tty_struct *tty, int timeout);
-
-static struct tty_struct *serial_table[MAX_TOTAL_DEVICES];
-static struct termios *serial_termios[MAX_TOTAL_DEVICES];
-static struct termios *serial_termios_locked[MAX_TOTAL_DEVICES];
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -3206,12 +3199,6 @@ static void mgsl_close(struct tty_struct *tty, struct file * filp)
 	
 	info->flags |= ASYNC_CLOSING;
 	
-	/* Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-
 	/* set tty->closing to notify line discipline to 
 	 * only process XON/XOFF characters. Only the N_TTY
 	 * discipline appears to use this (ppp does not).
@@ -3568,12 +3555,6 @@ static int mgsl_open(struct tty_struct *tty, struct file * filp)
 		goto cleanup;
 	}
 
-	if ((info->count == 1) &&
-	    info->flags & ASYNC_SPLIT_TERMIOS) {
-		*tty->termios = info->normal_termios;
-		mgsl_change_params(info);
-	}
-	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgsl_open(%s) success\n",
 			 __FILE__,__LINE__, info->device_name);
@@ -4450,6 +4431,30 @@ struct mgsl_struct* mgsl_allocate_device()
 
 }	/* end of mgsl_allocate_device()*/
 
+static struct tty_operations mgsl_ops = {
+	.open = mgsl_open,
+	.close = mgsl_close,
+	.write = mgsl_write,
+	.put_char = mgsl_put_char,
+	.flush_chars = mgsl_flush_chars,
+	.write_room = mgsl_write_room,
+	.chars_in_buffer = mgsl_chars_in_buffer,
+	.flush_buffer = mgsl_flush_buffer,
+	.ioctl = mgsl_ioctl,
+	.throttle = mgsl_throttle,
+	.unthrottle = mgsl_unthrottle,
+	.send_xchar = mgsl_send_xchar,
+	.break_ctl = mgsl_break,
+	.wait_until_sent = mgsl_wait_until_sent,
+ 	.read_proc = mgsl_read_proc,
+	.set_termios = mgsl_set_termios,
+	.stop = mgsl_stop,
+	.start = mgsl_start,
+	.hangup = mgsl_hangup,
+	.tiocmget = tiocmget,
+	.tiocmset = tiocmset,
+};
+
 /*
  * perform tty device initialization
  */
@@ -4457,70 +4462,29 @@ int mgsl_init_tty(void);
 int mgsl_init_tty()
 {
 	struct mgsl_struct *info;
-
-	memset(serial_table,0,sizeof(struct tty_struct*)*MAX_TOTAL_DEVICES);
-	memset(serial_termios,0,sizeof(struct termios*)*MAX_TOTAL_DEVICES);
-	memset(serial_termios_locked,0,sizeof(struct termios*)*MAX_TOTAL_DEVICES);
-
-	/* Initialize the tty_driver structure */
+	serial_driver = alloc_tty_driver(mgsl_device_count);
+	if (!serial_driver)
+		return -ENOMEM;
 	
-	memset(&serial_driver, 0, sizeof(struct tty_driver));
-	serial_driver.magic = TTY_DRIVER_MAGIC;
-	serial_driver.owner = THIS_MODULE;
-	serial_driver.driver_name = "synclink";
-	serial_driver.name = "ttySL";
-	serial_driver.major = ttymajor;
-	serial_driver.minor_start = 64;
-	serial_driver.num = mgsl_device_count;
-	serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	serial_driver.subtype = SERIAL_TYPE_NORMAL;
-	serial_driver.init_termios = tty_std_termios;
-	serial_driver.init_termios.c_cflag =
+	serial_driver->owner = THIS_MODULE;
+	serial_driver->driver_name = "synclink";
+	serial_driver->name = "ttySL";
+	serial_driver->major = ttymajor;
+	serial_driver->minor_start = 64;
+	serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	serial_driver->subtype = SERIAL_TYPE_NORMAL;
+	serial_driver->init_termios = tty_std_termios;
+	serial_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	serial_driver.flags = TTY_DRIVER_REAL_RAW;
-	serial_driver.refcount = &serial_refcount;
-	serial_driver.table = serial_table;
-	serial_driver.termios = serial_termios;
-	serial_driver.termios_locked = serial_termios_locked;
-
-	serial_driver.open = mgsl_open;
-	serial_driver.close = mgsl_close;
-	serial_driver.write = mgsl_write;
-	serial_driver.put_char = mgsl_put_char;
-	serial_driver.flush_chars = mgsl_flush_chars;
-	serial_driver.write_room = mgsl_write_room;
-	serial_driver.chars_in_buffer = mgsl_chars_in_buffer;
-	serial_driver.flush_buffer = mgsl_flush_buffer;
-	serial_driver.ioctl = mgsl_ioctl;
-	serial_driver.throttle = mgsl_throttle;
-	serial_driver.unthrottle = mgsl_unthrottle;
-	serial_driver.send_xchar = mgsl_send_xchar;
-	serial_driver.break_ctl = mgsl_break;
-	serial_driver.wait_until_sent = mgsl_wait_until_sent;
- 	serial_driver.read_proc = mgsl_read_proc;
-	serial_driver.set_termios = mgsl_set_termios;
-	serial_driver.stop = mgsl_stop;
-	serial_driver.start = mgsl_start;
-	serial_driver.hangup = mgsl_hangup;
-	serial_driver.tiocmget = tiocmget;
-	serial_driver.tiocmset = tiocmset;
-	
-	if (tty_register_driver(&serial_driver) < 0)
+	serial_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(serial_driver, &mgsl_ops);
+	if (tty_register_driver(serial_driver) < 0)
 		printk("%s(%d):Couldn't register serial driver\n",
 			__FILE__,__LINE__);
 			
  	printk("%s %s, tty major#%d\n",
 		driver_name, driver_version,
-		serial_driver.major);
-		
-	/* Propagate these values to all device instances */
-	
-	info = mgsl_device_list;
-	while(info){
-		info->normal_termios  = serial_driver.init_termios;
-		info = info->next_device;
-	}
-
+		serial_driver->major);
 	return 0;
 }
 
@@ -4609,10 +4573,11 @@ static void __exit synclink_exit(void)
 
 	printk("Unloading %s: %s\n", driver_name, driver_version);
 
-	if ((rc = tty_unregister_driver(&serial_driver)))
+	if ((rc = tty_unregister_driver(serial_driver)))
 		printk("%s(%d) failed to unregister tty driver err=%d\n",
 		       __FILE__,__LINE__,rc);
 
+	put_tty_driver(serial_driver);
 	info = mgsl_device_list;
 	while(info) {
 #ifdef CONFIG_SYNCLINK_SYNCPPP

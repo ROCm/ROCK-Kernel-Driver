@@ -29,6 +29,8 @@
 #include <linux/pnpbios.h>
 #include <linux/init.h>
 
+#include <asm/uaccess.h>
+
 static struct proc_dir_entry *proc_pnp = NULL;
 static struct proc_dir_entry *proc_pnp_boot = NULL;
 
@@ -178,18 +180,31 @@ static int proc_write_node(struct file *file, const char *buf,
 	struct pnp_bios_node *node;
 	int boot = (long)data >> 8;
 	u8 nodenum = (long)data;
+	int ret = count;
 
 	node = pnpbios_kmalloc(node_info.max_node_size, GFP_KERNEL);
-	if (!node) return -ENOMEM;
-	if ( pnp_bios_get_dev_node(&nodenum, boot, node) )
-		return -EIO;
-	if (count != node->size - sizeof(struct pnp_bios_node))
-		return -EINVAL;
-	memcpy(node->data, buf, count);
-	if (pnp_bios_set_dev_node(node->handle, boot, node) != 0)
-	    return -EINVAL;
+	if (!node)
+		return -ENOMEM;
+	if (pnp_bios_get_dev_node(&nodenum, boot, node)) {
+		ret = -EIO;
+		goto out;
+	}
+	if (count != node->size - sizeof(struct pnp_bios_node)) {
+		ret = -EINVAL;
+		goto out;
+	}
+	if (copy_from_user(node->data, buf, count)) {
+		ret = -EFAULT;
+		goto out;
+	}
+	if (pnp_bios_set_dev_node(node->handle, boot, node) != 0) {
+		ret = -EINVAL;
+		goto out;
+	}
+	ret = count;
+out:
 	kfree(node);
-	return count;
+	return ret;
 }
 
 int pnpbios_interface_attach_device(struct pnp_bios_node * node)

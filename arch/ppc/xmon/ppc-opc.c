@@ -394,18 +394,13 @@ const struct powerpc_operand powerpc_operands[] =
 
 /*ARGSUSED*/
 static unsigned long 
-insert_bat (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_bat(unsigned long insn, long value, const char **errmsg)
 {
   return insn | (((insn >> 21) & 0x1f) << 16);
 }
 
 static long
-extract_bat (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_bat(unsigned long insn, int *invalid)
 {
   if (invalid != (int *) NULL
       && ((insn >> 21) & 0x1f) != ((insn >> 16) & 0x1f))
@@ -421,18 +416,13 @@ extract_bat (insn, invalid)
 
 /*ARGSUSED*/
 static unsigned long
-insert_bba (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_bba(unsigned long insn, long value, const char **errmsg)
 {
   return insn | (((insn >> 16) & 0x1f) << 11);
 }
 
 static long
-extract_bba (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_bba(unsigned long insn, int *invalid)
 {
   if (invalid != (int *) NULL
       && ((insn >> 16) & 0x1f) != ((insn >> 11) & 0x1f))
@@ -445,19 +435,14 @@ extract_bba (insn, invalid)
 
 /*ARGSUSED*/
 static unsigned long
-insert_bd (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_bd(unsigned long insn, long value, const char **errmsg)
 {
   return insn | (value & 0xfffc);
 }
 
 /*ARGSUSED*/
 static long
-extract_bd (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_bd(unsigned long insn, int *invalid)
 {
   if ((insn & 0x8000) != 0)
     return (insn & 0xfffc) - 0x10000;
@@ -474,10 +459,7 @@ extract_bd (insn, invalid)
 
 /*ARGSUSED*/
 static unsigned long
-insert_bdm (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_bdm(unsigned long insn, long value, const char **errmsg)
 {
   if ((value & 0x8000) != 0)
     insn |= 1 << 21;
@@ -485,9 +467,7 @@ insert_bdm (insn, value, errmsg)
 }
 
 static long
-extract_bdm (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_bdm(unsigned long insn, int *invalid)
 {
   if (invalid != (int *) NULL
       && ((insn & (1 << 21)) == 0
@@ -505,10 +485,7 @@ extract_bdm (insn, invalid)
 
 /*ARGSUSED*/
 static unsigned long
-insert_bdp (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_bdp(unsigned long insn, long value, const char **errmsg)
 {
   if ((value & 0x8000) == 0)
     insn |= 1 << 21;
@@ -516,9 +493,7 @@ insert_bdp (insn, value, errmsg)
 }
 
 static long
-extract_bdp (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_bdp(unsigned long insn, int *invalid)
 {
   if (invalid != (int *) NULL
       && ((insn & (1 << 21)) == 0
@@ -561,10 +536,7 @@ valid_bo (long value)
    the field to an illegal value.  */
 
 static unsigned long
-insert_bo (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_bo(unsigned long insn, long value, const char **errmsg)
 {
   if (errmsg != (const char **) NULL
       && ! valid_bo (value))
@@ -573,9 +545,7 @@ insert_bo (insn, value, errmsg)
 }
 
 static long
-extract_bo (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_bo(unsigned long insn, int *invalid)
 {
   long value;
 
@@ -591,10 +561,7 @@ extract_bo (insn, invalid)
    extracting it, we force it to be even.  */
 
 static unsigned long
-insert_boe (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_boe(unsigned long insn, long value, const char **errmsg)
 {
   if (errmsg != (const char **) NULL)
     {
@@ -607,9 +574,7 @@ insert_boe (insn, value, errmsg)
 }
 
 static long
-extract_boe (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_boe(unsigned long insn, int *invalid)
 {
   long value;
 
@@ -625,19 +590,14 @@ extract_boe (insn, invalid)
 
 /*ARGSUSED*/
 static unsigned long
-insert_ds (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_ds(unsigned long insn, long value, const char **errmsg)
 {
   return insn | (value & 0xfffc);
 }
 
 /*ARGSUSED*/
 static long
-extract_ds (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_ds(unsigned long insn, int *invalid)
 {
   if ((insn & 0x8000) != 0)
     return (insn & 0xfffc) - 0x10000;
@@ -650,19 +610,14 @@ extract_ds (insn, invalid)
 
 /*ARGSUSED*/
 static unsigned long
-insert_li (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_li(unsigned long insn, long value, const char **errmsg)
 {
   return insn | (value & 0x3fffffc);
 }
 
 /*ARGSUSED*/
 static long
-extract_li (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_li(unsigned long insn, int *invalid)
 {
   if ((insn & 0x2000000) != 0)
     return (insn & 0x3fffffc) - 0x4000000;
@@ -676,10 +631,7 @@ extract_li (insn, invalid)
    instruction which uses a field of this type.  */
 
 static unsigned long
-insert_mbe (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_mbe(unsigned long insn, long value, const char **errmsg)
 {
   unsigned long uval;
   int mb, me;
@@ -718,9 +670,7 @@ insert_mbe (insn, value, errmsg)
 }
 
 static long
-extract_mbe (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_mbe(unsigned long insn, int *invalid)
 {
   long ret;
   int mb, me;
@@ -742,19 +692,14 @@ extract_mbe (insn, invalid)
 
 /*ARGSUSED*/
 static unsigned long
-insert_mb6 (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_mb6(unsigned long insn, long value, const char **errmsg)
 {
   return insn | ((value & 0x1f) << 6) | (value & 0x20);
 }
 
 /*ARGSUSED*/
 static long
-extract_mb6 (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_mb6(unsigned long insn, int *invalid)
 {
   return ((insn >> 6) & 0x1f) | (insn & 0x20);
 }
@@ -763,10 +708,7 @@ extract_mb6 (insn, invalid)
    0.  */
 
 static unsigned long
-insert_nb (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_nb(unsigned long insn, long value, const char **errmsg)
 {
   if (value < 0 || value > 32)
     *errmsg = "value out of range";
@@ -777,9 +719,7 @@ insert_nb (insn, value, errmsg)
 
 /*ARGSUSED*/
 static long
-extract_nb (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_nb(unsigned long insn, int *invalid)
 {
   long ret;
 
@@ -796,18 +736,13 @@ extract_nb (insn, invalid)
 
 /*ARGSUSED*/
 static unsigned long
-insert_nsi (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_nsi(unsigned long insn, long value, const char **errmsg)
 {
   return insn | ((- value) & 0xffff);
 }
 
 static long
-extract_nsi (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_nsi(unsigned long insn, int *invalid)
 {
   if (invalid != (int *) NULL)
     *invalid = 1;
@@ -822,10 +757,7 @@ extract_nsi (insn, invalid)
    equal the RT field.  */
 
 static unsigned long
-insert_ral (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_ral(unsigned long insn, long value, const char **errmsg)
 {
   if (value == 0
       || value == ((insn >> 21) & 0x1f))
@@ -837,10 +769,7 @@ insert_ral (insn, value, errmsg)
    restrictions.  */
 
 static unsigned long
-insert_ram (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_ram(unsigned long insn, long value, const char **errmsg)
 {
   if (value >= ((insn >> 21) & 0x1f))
     *errmsg = "index register in load range";
@@ -852,10 +781,7 @@ insert_ram (insn, value, errmsg)
    field may not be zero.  */
 
 static unsigned long
-insert_ras (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_ras(unsigned long insn, long value, const char **errmsg)
 {
   if (value == 0)
     *errmsg = "invalid register operand when updating";
@@ -870,18 +796,13 @@ insert_ras (insn, value, errmsg)
 
 /*ARGSUSED*/
 static unsigned long 
-insert_rbs (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_rbs(unsigned long insn, long value, const char **errmsg)
 {
   return insn | (((insn >> 21) & 0x1f) << 11);
 }
 
 static long
-extract_rbs (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_rbs(unsigned long insn, int *invalid)
 {
   if (invalid != (int *) NULL
       && ((insn >> 21) & 0x1f) != ((insn >> 11) & 0x1f))
@@ -893,19 +814,14 @@ extract_rbs (insn, invalid)
 
 /*ARGSUSED*/
 static unsigned long
-insert_sh6 (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_sh6(unsigned long insn, long value, const char **errmsg)
 {
   return insn | ((value & 0x1f) << 11) | ((value & 0x20) >> 4);
 }
 
 /*ARGSUSED*/
 static long
-extract_sh6 (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_sh6(unsigned long insn, int *invalid)
 {
   return ((insn >> 11) & 0x1f) | ((insn << 4) & 0x20);
 }
@@ -914,18 +830,13 @@ extract_sh6 (insn, invalid)
    lower 5 bits are stored in the upper 5 and vice- versa.  */
 
 static unsigned long
-insert_spr (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_spr(unsigned long insn, long value, const char **errmsg)
 {
   return insn | ((value & 0x1f) << 16) | ((value & 0x3e0) << 6);
 }
 
 static long
-extract_spr (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_spr(unsigned long insn, int *invalid)
 {
   return ((insn >> 16) & 0x1f) | ((insn >> 6) & 0x3e0);
 }
@@ -941,10 +852,7 @@ extract_spr (insn, invalid)
 #define TB (268)
 
 static unsigned long
-insert_tbr (insn, value, errmsg)
-     unsigned long insn;
-     long value;
-     const char **errmsg;
+insert_tbr(unsigned long insn, long value, const char **errmsg)
 {
   if (value == 0)
     value = TB;
@@ -952,9 +860,7 @@ insert_tbr (insn, value, errmsg)
 }
 
 static long
-extract_tbr (insn, invalid)
-     unsigned long insn;
-     int *invalid;
+extract_tbr(unsigned long insn, int *invalid)
 {
   long ret;
 

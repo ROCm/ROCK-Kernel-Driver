@@ -11,7 +11,7 @@
 #include <linux/notifier.h>
 #include <linux/smp.h>
 #include <linux/oprofile.h>
-#include <linux/device.h>
+#include <linux/sysdev.h>
 #include <asm/nmi.h>
 #include <asm/msr.h>
 #include <asm/apic.h>
@@ -31,53 +31,48 @@ static int nmi_enabled = 0;
 
 #ifdef CONFIG_PM
 
-static int nmi_suspend(struct device *dev, u32 state, u32 level)
+static int nmi_suspend(struct sys_device *dev, u32 state)
 {
-	if (level != SUSPEND_POWER_DOWN)
-		return 0;
 	if (nmi_enabled == 1)
 		nmi_stop();
 	return 0;
 }
 
 
-static int nmi_resume(struct device *dev, u32 level)
+static int nmi_resume(struct sys_device *dev)
 {
-	if (level != RESUME_POWER_ON)
-		return 0;
 	if (nmi_enabled == 1)
 		nmi_start();
 	return 0;
 }
 
 
-static struct device_driver nmi_driver = {
-	.name		= "oprofile",
-	.bus		= &system_bus_type,
+static struct sysdev_class oprofile_sysclass = {
+	set_kset_name("oprofile"),
 	.resume		= nmi_resume,
 	.suspend	= nmi_suspend,
 };
 
 
-static struct device device_nmi = {
-	.name	= "oprofile",
-	.bus_id = "oprofile",
-	.driver	= &nmi_driver,
-	.parent = &device_lapic.dev,
+static struct sys_device device_oprofile = {
+	.id	= 0,
+	.cls	= &oprofile_sysclass,
 };
 
 
 static int __init init_driverfs(void)
 {
-	driver_register(&nmi_driver);
-	return device_register(&device_nmi);
+	int error;
+	if (!(error = sysdev_class_register(&oprofile_sysclass)))
+		error = sys_device_register(&device_oprofile);
+	return error;
 }
 
 
 static void __exit exit_driverfs(void)
 {
-	device_unregister(&device_nmi);
-	driver_unregister(&nmi_driver);
+	sys_device_unregister(&device_oprofile);
+	sysdev_class_unregister(&oprofile_sysclass);
 }
 
 #else

@@ -309,7 +309,8 @@ static int __init amdtco_init(void)
 	sema_init(&open_sem, 1);
 	spin_lock_init(&amdtco_lock);
 
-	pci_for_each_dev(dev) {
+	dev = NULL;
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if (pci_match_device (amdtco_pci_tbl, dev) != NULL)
 			goto found_one;
 	}

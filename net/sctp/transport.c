@@ -82,8 +82,6 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 					   const union sctp_addr *addr,
 					   int gfp)
 {
-	struct sctp_protocol *proto = sctp_get_protocol();
-
 	/* Copy in the address.  */
 	peer->ipaddr = *addr;
 	peer->af_specific = sctp_get_af_specific(addr->sa.sa_family);
@@ -99,7 +97,7 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 	 * parameter 'RTO.Initial'.
 	 */
 	peer->rtt = 0;
-	peer->rto = proto->rto_initial;
+	peer->rto = sctp_rto_initial;
 	peer->rttvar = 0;
 	peer->srtt = 0;
 	peer->rto_pending = 0;
@@ -108,11 +106,11 @@ struct sctp_transport *sctp_transport_init(struct sctp_transport *peer,
 	peer->last_time_used = jiffies;
 	peer->last_time_ecne_reduced = jiffies;
 
-	peer->active = 1;
+	peer->active = SCTP_ACTIVE;
 	peer->hb_allowed = 0;
 
 	/* Initialize the default path max_retrans.  */
-	peer->max_retrans = proto->max_retrans_path;
+	peer->max_retrans = sctp_max_retrans_path;
 	peer->error_threshold = 0;
 	peer->error_count = 0;
 
@@ -245,7 +243,7 @@ void sctp_transport_route(struct sctp_transport *transport,
 	if (dst) {
 		transport->pmtu = dst_pmtu(dst);
 
-		/* Initialize sk->rcv_saddr, if the transport is the
+		/* Initialize sk->sk_rcv_saddr, if the transport is the
 		 * association's active path for getsockname().
 		 */ 
 		if (asoc && (transport == asoc->peer.active_path))
@@ -272,8 +270,6 @@ void sctp_transport_put(struct sctp_transport *transport)
 /* Update transport's RTO based on the newly calculated RTT. */
 void sctp_transport_update_rto(struct sctp_transport *tp, __u32 rtt)
 {
-	struct sctp_protocol *proto = sctp_get_protocol();
-
 	/* Check for valid transport.  */
 	SCTP_ASSERT(tp, "NULL transport", return);
 
@@ -292,10 +288,10 @@ void sctp_transport_update_rto(struct sctp_transport *tp, __u32 rtt)
 		 * For example, assuming the default value of RTO.Alpha of
 		 * 1/8, rto_alpha would be expressed as 3.
 		 */
-		tp->rttvar = tp->rttvar - (tp->rttvar >> proto->rto_beta)
-			+ ((abs(tp->srtt - rtt)) >> proto->rto_beta);
-		tp->srtt = tp->srtt - (tp->srtt >> proto->rto_alpha)
-			+ (rtt >> proto->rto_alpha);
+		tp->rttvar = tp->rttvar - (tp->rttvar >> sctp_rto_beta)
+			+ ((abs(tp->srtt - rtt)) >> sctp_rto_beta);
+		tp->srtt = tp->srtt - (tp->srtt >> sctp_rto_alpha)
+			+ (rtt >> sctp_rto_alpha);
 	} else {
 		/* 6.3.1 C2) When the first RTT measurement R is made, set
 		 * SRTT <- R, RTTVAR <- R/2.

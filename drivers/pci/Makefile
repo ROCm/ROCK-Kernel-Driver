@@ -12,6 +12,9 @@ ifndef CONFIG_SPARC64
 obj-$(CONFIG_PCI) += setup-res.o
 endif
 
+# Build the PCI Hotplug drivers if we were asked to
+obj-$(CONFIG_HOTPLUG_PCI) += hotplug/
+
 #
 # Some architectures use the generic PCI setup functions
 #
@@ -39,16 +42,17 @@ endif
 
 host-progs := gen-devlist
 
+# Dependencies on generated files need to be listed explicitly
+$(obj)/names.o: $(obj)/devlist.h $(obj)/classlist.h
+$(obj)/classlist.h: $(obj)/devlist.h
+
+# And that's how to generate them
+quiet_cmd_devlist = DEVLIST $@
+      cmd_devlist = ( cd $(obj); ./gen-devlist ) < $<
+$(obj)/devlist.h: $(src)/pci.ids $(obj)/gen-devlist
+	$(call cmd,devlist)
+
 # Files generated that shall be removed upon make clean
 clean-files := devlist.h classlist.h
 
-# Dependencies on generated files need to be listed explicitly
 
-$(obj)/names.o: $(obj)/devlist.h $(obj)/classlist.h
-
-# And that's how to generate them
-
-$(obj)/devlist.h: $(src)/pci.ids $(obj)/gen-devlist
-	( cd $(obj); ./gen-devlist ) < $<
-
-$(obj)/classlist.h: $(obj)/devlist.h

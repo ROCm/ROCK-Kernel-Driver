@@ -4,6 +4,63 @@
 # Andre Hedrick <andre@linux-ide.org>
 #
 
+menu "ATA/ATAPI/MFM/RLL support"
+
+config IDE
+	tristate "ATA/ATAPI/MFM/RLL support"
+	---help---
+	  If you say Y here, your kernel will be able to manage low cost mass
+	  storage units such as ATA/(E)IDE and ATAPI units. The most common
+	  cases are IDE hard drives and ATAPI CD-ROM drives.
+
+	  If your system is pure SCSI and doesn't use these interfaces, you
+	  can say N here.
+
+	  Integrated Disk Electronics (IDE aka ATA-1) is a connecting standard
+	  for mass storage units such as hard disks. It was designed by
+	  Western Digital and Compaq Computer in 1984. It was then named
+	  ST506. Quite a number of disks use the IDE interface.
+
+	  AT Attachment (ATA) is the superset of the IDE specifications.
+	  ST506 was also called ATA-1.
+
+	  Fast-IDE is ATA-2 (also named Fast ATA), Enhanced IDE (EIDE) is
+	  ATA-3. It provides support for larger disks (up to 8.4GB by means of
+	  the LBA standard), more disks (4 instead of 2) and for other mass
+	  storage units such as tapes and cdrom. UDMA/33 (aka UltraDMA/33) is
+	  ATA-4 and provides faster (and more CPU friendly) transfer modes
+	  than previous PIO (Programmed processor Input/Output) from previous
+	  ATA/IDE standards by means of fast DMA controllers.
+
+	  ATA Packet Interface (ATAPI) is a protocol used by EIDE tape and
+	  CD-ROM drives, similar in many respects to the SCSI protocol.
+
+	  SMART IDE (Self Monitoring, Analysis and Reporting Technology) was
+	  designed in order to prevent data corruption and disk crash by
+	  detecting pre hardware failure conditions (heat, access time, and
+	  the like...). Disks built since June 1995 may follow this standard.
+	  The kernel itself doesn't manage this; however there are quite a
+	  number of user programs such as smart that can query the status of
+	  SMART parameters from disk drives.
+
+	  If you want to compile this driver as a module ( = code which can be
+	  inserted in and removed from the running kernel whenever you want),
+	  say M here and read <file:Documentation/modules.txt>. The module
+	  will be called ide.
+
+	  For further information, please read <file:Documentation/ide.txt>.
+
+	  If unsure, say Y.
+
+config IDE_MAX_HWIFS 
+	int "Max IDE interfaces"
+	depends on ALPHA && IDE
+	default 4
+	help
+	  This is the maximum number of IDE hardware interfaces that will
+	  be supported by the driver. Make sure it is at least as high as
+	  the number of IDE interfaces in your system.
+
 menu "IDE, ATA and ATAPI Block devices"
 	depends on IDE!=n
 
@@ -219,7 +276,15 @@ config IDE_TASK_IOCTL
 
 	  If you are unsure, say N here.
 
-#bool '  IDE Taskfile IO' CONFIG_IDE_TASKFILE_IO
+config IDE_TASKFILE_IO
+	bool 'IDE Taskfile IO'
+	depends on BLK_DEV_IDE
+	default y
+	---help---
+	  Use new taskfile IO code.
+
+	  It is safe to say Y to this question, in most cases.
+
 comment "IDE chipset support/bugfixes"
 	depends on BLK_DEV_IDE
 
@@ -268,7 +333,7 @@ config BLK_DEV_IDEPNP
 config BLK_DEV_IDEPCI
 	bool "PCI IDE chipset support" if PCI
 	depends on BLK_DEV_IDE
-	default BLK_DEV_IDEDMA_PMAC if ALL_PPC && BLK_DEV_IDEDMA_PMAC
+	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDEDMA_PMAC
 	help
 	  Say Y here for PCI systems which use IDE drive(s).
 	  This option helps the IDE driver to automatically detect and
@@ -409,7 +474,7 @@ config BLK_DEV_IDEDMA
 	bool
 	depends on BLK_DEV_IDE
 	default BLK_DEV_IDEDMA_ICS if ARCH_ACORN
-	default BLK_DEV_IDEDMA_PMAC if ALL_PPC && BLK_DEV_IDE_PMAC
+	default BLK_DEV_IDEDMA_PMAC if PPC_PMAC && BLK_DEV_IDE_PMAC
 	default BLK_DEV_IDEDMA_PCI if PCI && BLK_DEV_IDEPCI
 
 config IDEDMA_PCI_WIP
@@ -734,7 +799,7 @@ config BLK_DEV_SL82C105
 
 config BLK_DEV_IDE_PMAC
 	bool "Builtin PowerMac IDE support"
-	depends on BLK_DEV_IDE && ALL_PPC
+	depends on BLK_DEV_IDE && PPC_PMAC
 	help
 	  This driver provides support for the built-in IDE controller on
 	  most of the recent Apple Power Macintoshes and PowerBooks.
@@ -1071,11 +1136,6 @@ config BLK_DEV_PDC202XX
 
 	  If unsure, say N.
 
-##if [ "$CONFIG_IDE_TASKFILE_IO" = "y" ]; then
-##  dep_mbool CONFIG_BLK_DEV_TF_DISK $CONFIG_BLK_DEV_IDEDISK
-##else
-##  dep_mbool CONFIG_BLK_DEV_NTF_DISK $CONFIG_BLK_DEV_IDEDISK
-##fi
 config BLK_DEV_IDE_MODES
 	bool
 	depends on BLK_DEV_4DRIVES || BLK_DEV_ALI14XX || BLK_DEV_DTC2278 || BLK_DEV_HT6560B || BLK_DEV_PDC4030 || BLK_DEV_QD65XX || BLK_DEV_UMC8672 || BLK_DEV_AEC62XX=y || BLK_DEV_ALI15X3=y || BLK_DEV_AMD74XX=y || BLK_DEV_CMD640 || BLK_DEV_CMD64X=y || BLK_DEV_CS5530=y || BLK_DEV_CY82C693=y || BLK_DEV_HPT34X=y || BLK_DEV_HPT366=y || BLK_DEV_IDE_PMAC || BLK_DEV_IT8172 || BLK_DEV_MPC8xx_IDE || BLK_DEV_NFORCE=y || BLK_DEV_OPTI621=y || BLK_DEV_PDC202XX || BLK_DEV_PIIX=y || BLK_DEV_SVWKS=y || BLK_DEV_SIIMAGE=y || BLK_DEV_SIS5513=y || BLK_DEV_SL82C105=y || BLK_DEV_SLC90E66=y || BLK_DEV_VIA82CXXX=y
@@ -1083,3 +1143,4 @@ config BLK_DEV_IDE_MODES
 
 endmenu
 
+endmenu

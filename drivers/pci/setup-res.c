@@ -23,7 +23,7 @@
 #include <linux/ioport.h>
 #include <linux/cache.h>
 #include <linux/slab.h>
-
+#include "pci.h"
 
 #define DEBUG_CONFIG 0
 #if DEBUG_CONFIG

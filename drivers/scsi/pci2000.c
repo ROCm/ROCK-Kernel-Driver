@@ -668,13 +668,6 @@ int Pci2000_Detect (Scsi_Host_Template *tpnt)
 	UCHAR			   *consistent;
 	dma_addr_t			consistentDma;
 
-
-	if ( !pci_present () )
-		{
-		printk ("pci2000: PCI BIOS not present\n");
-		return 0;
-		}
-
 	while ( (pdev = pci_find_device (VENDOR_PSI, DEVICE_ROY_1, pdev)) != NULL )
 		{
 		if (pci_enable_device(pdev))

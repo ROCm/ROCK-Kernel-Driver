@@ -2694,12 +2694,6 @@ int __init sym53c8xx_detect(Scsi_Host_Template *tpnt)
 #endif
 
 	/*
-	 *  PCI is required.
-	 */
-	if (!pci_present())
-		return 0;
-
-	/*
 	 *    Initialize driver general stuff.
 	 */
 #ifdef SYM_LINUX_BOOT_COMMAND_LINE_SUPPORT

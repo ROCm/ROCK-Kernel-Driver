@@ -370,18 +370,17 @@ int patch_alc650(ac97_t * ac97)
 	unsigned short val;
 	int spdif = 0;
 
-	/* FIXME: set the above 1 if we can detect the chip rev.E correctly.
+	/* FIXME: set the below 1 if we can detect the chip rev.E correctly.
 	 *        this is used for switching mic and center/lfe, which needs
 	 *        resetting GPIO0 level on the older revision.
 	 */
 	ac97->spec.dev_flags = 0;
 
-	/* check spdif */
-	if (ac97->spec.dev_flags) {
-		val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
-		if (val & AC97_EA_SPCV)
-			spdif = 1;
-	}
+	/* check spdif (should be only on rev.E) */
+	val = snd_ac97_read(ac97, AC97_EXTENDED_STATUS);
+	if (val & AC97_EA_SPCV)
+		spdif = 1;
+
 	if (spdif) {
 		/* enable spdif in */
 		snd_ac97_write_cache(ac97, AC97_ALC650_CLOCK,

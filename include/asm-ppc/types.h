@@ -19,7 +19,7 @@ typedef unsigned long long __u64;
 
 typedef struct {
 	__u32 u[4];
-} __attribute((aligned(16))) __vector128;
+} __vector128;
 
 /*
  * XXX allowed outside of __KERNEL__ for now, until glibc gets

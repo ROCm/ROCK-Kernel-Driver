@@ -44,7 +44,7 @@ void llc_save_primitive(struct sk_buff* skb, u8 prim)
 	struct sockaddr_llc *addr = llc_ui_skb_cb(skb);
 
        /* save primitive for use by the user. */
-	addr->sllc_family = skb->sk->family;
+	addr->sllc_family = skb->sk->sk_family;
 	addr->sllc_arphrd = skb->dev->type;
 	addr->sllc_test   = prim == LLC_TEST_PRIM;
 	addr->sllc_xid    = prim == LLC_XID_PRIM;
@@ -110,18 +110,19 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 		struct sock *parent = skb->sk;
 
 		skb->sk = sk;
-		skb_queue_tail(&parent->receive_queue, skb);
-		sk->state_change(parent);
+		skb_queue_tail(&parent->sk_receive_queue, skb);
+		sk->sk_state_change(parent);
 	}
 		break;
 	case LLC_DISC_PRIM:
 		sock_hold(sk);
-		if (sk->type == SOCK_STREAM && sk->state == TCP_ESTABLISHED) {
-			sk->shutdown       = SHUTDOWN_MASK;
-			sk->socket->state  = SS_UNCONNECTED;
-			sk->state          = TCP_CLOSE;
+		if (sk->sk_type == SOCK_STREAM &&
+		    sk->sk_state == TCP_ESTABLISHED) {
+			sk->sk_shutdown       = SHUTDOWN_MASK;
+			sk->sk_socket->state  = SS_UNCONNECTED;
+			sk->sk_state          = TCP_CLOSE;
 			if (!sock_flag(sk, SOCK_DEAD)) {
-				sk->state_change(sk);
+				sk->sk_state_change(sk);
 				sock_set_flag(sk, SOCK_DEAD);
 			}
 		}
@@ -149,28 +150,29 @@ int llc_conn_state_process(struct sock *sk, struct sk_buff *skb)
 	switch (ev->cfm_prim) {
 	case LLC_DATA_PRIM:
 		if (!llc_data_accept_state(llc->state))
-			sk->write_space(sk);
+			sk->sk_write_space(sk);
 		else
 			rc = llc->failed_data_req = 1;
 		break;
 	case LLC_CONN_PRIM:
-		if (sk->type == SOCK_STREAM && sk->state == TCP_SYN_SENT) {
+		if (sk->sk_type == SOCK_STREAM &&
+		    sk->sk_state == TCP_SYN_SENT) {
 			if (ev->status) {
-				sk->socket->state = SS_UNCONNECTED;
-				sk->state         = TCP_CLOSE;
+				sk->sk_socket->state = SS_UNCONNECTED;
+				sk->sk_state         = TCP_CLOSE;
 			} else {
-				sk->socket->state = SS_CONNECTED;
-				sk->state         = TCP_ESTABLISHED;
+				sk->sk_socket->state = SS_CONNECTED;
+				sk->sk_state         = TCP_ESTABLISHED;
 			}
-			sk->state_change(sk);
+			sk->sk_state_change(sk);
 		}
 		break;
 	case LLC_DISC_PRIM:
 		sock_hold(sk);
-		if (sk->type == SOCK_STREAM && sk->state == TCP_CLOSING) {
-			sk->socket->state = SS_UNCONNECTED;
-			sk->state         = TCP_CLOSE;
-			sk->state_change(sk);
+		if (sk->sk_type == SOCK_STREAM && sk->sk_state == TCP_CLOSING) {
+			sk->sk_socket->state = SS_UNCONNECTED;
+			sk->sk_state         = TCP_CLOSE;
+			sk->sk_state_change(sk);
 		}
 		sock_put(sk);
 		break;
@@ -199,7 +201,7 @@ out_skb_put:
 void llc_conn_send_pdu(struct sock *sk, struct sk_buff *skb)
 {
 	/* queue PDU to send to MAC layer */
-	skb_queue_tail(&sk->write_queue, skb);
+	skb_queue_tail(&sk->sk_write_queue, skb);
 	llc_conn_send_pdus(sk);
 }
 
@@ -250,7 +252,7 @@ void llc_conn_resend_i_pdu_as_cmd(struct sock *sk, u8 nr, u8 first_p_bit)
 		pdu = llc_pdu_sn_hdr(skb);
 		llc_pdu_set_cmd_rsp(skb, LLC_PDU_CMD);
 		llc_pdu_set_pf_bit(skb, first_p_bit);
-		skb_queue_tail(&sk->write_queue, skb);
+		skb_queue_tail(&sk->sk_write_queue, skb);
 		first_p_bit = 0;
 		llc->vS = LLC_I_GET_NS(pdu);
 		howmany_resend++;
@@ -291,7 +293,7 @@ void llc_conn_resend_i_pdu_as_rsp(struct sock *sk, u8 nr, u8 first_f_bit)
 
 		llc_pdu_set_cmd_rsp(skb, LLC_PDU_RSP);
 		llc_pdu_set_pf_bit(skb, first_f_bit);
-		skb_queue_tail(&sk->write_queue, skb);
+		skb_queue_tail(&sk->sk_write_queue, skb);
 		first_f_bit = 0;
 		llc->vS = LLC_I_GET_NS(pdu);
 		howmany_resend++;
@@ -351,7 +353,7 @@ static void llc_conn_send_pdus(struct sock *sk)
 {
 	struct sk_buff *skb;
 
-	while ((skb = skb_dequeue(&sk->write_queue)) != NULL) {
+	while ((skb = skb_dequeue(&sk->sk_write_queue)) != NULL) {
 		struct llc_pdu_sn *pdu = llc_pdu_sn_hdr(skb);
 
 		if (!LLC_PDU_TYPE_IS_I(pdu) &&
@@ -391,7 +393,7 @@ static int llc_conn_service(struct sock *sk, struct sk_buff *skb)
 		if (!rc && trans->next_state != NO_STATE_CHANGE) {
 			llc->state = trans->next_state;
 			if (!llc_data_accept_state(llc->state))
-				sk->state_change(sk);
+				sk->sk_state_change(sk);
 		}
 	}
 out:
@@ -489,7 +491,7 @@ struct sock *llc_lookup_established(struct llc_sap *sap, struct llc_addr *daddr,
 	struct sock *rc;
 
 	read_lock_bh(&sap->sk_list.lock);
-	for (rc = sap->sk_list.list; rc; rc = rc->next) {
+	for (rc = sap->sk_list.list; rc; rc = rc->sk_next) {
 		struct llc_opt *llc = llc_sk(rc);
 
 		if (llc->laddr.lsap == laddr->lsap &&
@@ -518,10 +520,10 @@ struct sock *llc_lookup_listener(struct llc_sap *sap, struct llc_addr *laddr)
 	struct sock *rc;
 
 	read_lock_bh(&sap->sk_list.lock);
-	for (rc = sap->sk_list.list; rc; rc = rc->next) {
+	for (rc = sap->sk_list.list; rc; rc = rc->sk_next) {
 		struct llc_opt *llc = llc_sk(rc);
 
-		if (rc->type == SOCK_STREAM && rc->state == TCP_LISTEN &&
+		if (rc->sk_type == SOCK_STREAM && rc->sk_state == TCP_LISTEN &&
 		    llc->laddr.lsap == laddr->lsap &&
 		    llc_mac_match(llc->laddr.mac, laddr->mac))
 			break;
@@ -545,10 +547,10 @@ struct sock *llc_lookup_dgram(struct llc_sap *sap, struct llc_addr *laddr)
 	struct sock *rc;
 
 	read_lock_bh(&sap->sk_list.lock);
-	for (rc = sap->sk_list.list; rc; rc = rc->next) {
+	for (rc = sap->sk_list.list; rc; rc = rc->sk_next) {
 		struct llc_opt *llc = llc_sk(rc);
 
-		if (rc->type == SOCK_DGRAM &&
+		if (rc->sk_type == SOCK_DGRAM &&
 		    llc->laddr.lsap == laddr->lsap &&
 		    llc_mac_match(llc->laddr.mac, laddr->mac))
 			break;

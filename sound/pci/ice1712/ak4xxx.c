@@ -97,17 +97,6 @@ static void snd_ice1712_akm4xxx_write(akm4xxx_t *ak, int chip,
 		udelay(1);
 	}
 
-	/* save the data */
-	if (ak->type == SND_AK4524 || ak->type == SND_AK4528) {
-		if ((addr != 0x04 && addr != 0x05) || (data & 0x80) == 0)
-			ak->images[chip][addr] = data;
-		else
-			ak->ipga_gain[chip][addr-4] = data;
-	} else {
-		/* AK4529, or else */
-		ak->images[chip][addr] = data;
-	}
-	
 	if (priv->cs_mask == priv->cs_addr) {
 		if (priv->cif) {
 			/* assert a cs pulse to trigger */
@@ -179,3 +168,7 @@ int __devinit snd_ice1712_akm4xxx_build_controls(ice1712_t *ice)
 	}
 	return 0;
 }
+
+EXPORT_SYMBOL(snd_ice1712_akm4xxx_init);
+EXPORT_SYMBOL(snd_ice1712_akm4xxx_free);
+EXPORT_SYMBOL(snd_ice1712_akm4xxx_build_controls);

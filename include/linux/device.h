@@ -3,21 +3,9 @@
  *
  * Copyright (c) 2001-2003 Patrick Mochel <mochel@osdl.org>
  *
- * This is a relatively simple centralized driver model.
- * The data structures were mainly lifted directly from the PCI
- * driver model. These are thought to be the common fields that
- * are relevant to all device buses.
+ * This file is released under the GPLv2
  *
- * All the devices are arranged in a tree. All devices should
- * have some sort of parent bus of whom they are children of.
- * Devices should not be direct children of the system root.
- *
- * Device drivers should not directly call the device_* routines
- * or access the contents of struct device directly. Instead,
- * abstract that from the drivers and write bus-specific wrappers
- * that do it for you.
- *
- * See Documentation/driver-model.txt for more information.
+ * See Documentation/driver-model/ for more information.
  */
 
 #ifndef _DEVICE_H_
@@ -169,6 +157,8 @@ struct class {
 
 	int	(*hotplug)(struct class_device *dev, char **envp, 
 			   int num_envp, char *buffer, int buffer_size);
+
+	void	(*release)(struct class_device *dev);
 };
 
 extern int class_register(struct class *);
@@ -312,6 +302,8 @@ extern void device_unregister(struct device * dev);
 extern void device_initialize(struct device * dev);
 extern int device_add(struct device * dev);
 extern void device_del(struct device * dev);
+extern int device_for_each_child(struct device *, void *,
+		     int (*fn)(struct device *, void *));
 
 /*
  * Manual binding of a device to driver. See drivers/base/bus.c 
@@ -359,30 +351,6 @@ extern int (*platform_notify_remove)(struct device * dev);
 extern struct device * get_device(struct device * dev);
 extern void put_device(struct device * dev);
 
-/* drivers/base/sys.c */
-
-struct sys_root {
-	u32		id;
-	struct device 	dev;
-	struct device	sysdev;
-};
-
-extern int sys_register_root(struct sys_root *);
-extern void sys_unregister_root(struct sys_root *);
-
-
-struct sys_device {
-	char		* name;
-	u32		id;
-	struct sys_root	* root;
-	struct device	dev;
-	struct class_device class_dev;
-};
-
-extern int sys_device_register(struct sys_device *);
-extern void sys_device_unregister(struct sys_device *);
-
-extern struct bus_type system_bus_type;
 
 /* drivers/base/platform.c */
 
@@ -393,6 +361,8 @@ struct platform_device {
 	u32		num_resources;
 	struct resource	* resource;
 };
+
+#define to_platform_device(x) container_of((x), struct platform_device, dev)
 
 extern int platform_device_register(struct platform_device *);
 extern void platform_device_unregister(struct platform_device *);

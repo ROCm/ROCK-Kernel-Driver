@@ -783,7 +783,7 @@ void llc_conn_set_p_flag(struct sock *sk, u8 value)
 	llc_sk(sk)->p_flag = value;
 
 	if (state_changed)
-		sk->state_change(sk);
+		sk->sk_state_change(sk);
 }
 
 int llc_conn_ac_send_sabme_cmd_p_set_x(struct sock *sk, struct sk_buff *skb)

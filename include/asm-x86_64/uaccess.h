@@ -237,6 +237,7 @@ extern unsigned long copy_user_generic(void *to, const void *from, unsigned len)
 
 extern unsigned long copy_to_user(void *to, const void *from, unsigned len); 
 extern unsigned long copy_from_user(void *to, const void *from, unsigned len); 
+extern unsigned long copy_in_user(void *to, const void *from, unsigned len); 
 
 static inline int __copy_from_user(void *dst, const void *src, unsigned size) 
 { 
@@ -293,6 +294,47 @@ static inline int __copy_to_user(void *dst, const void *src, unsigned size)
 		asm("":::"memory");
 		__put_user_asm(1[(u64*)src],1+(u64*)dst,ret,"q","","ir",8);
 		return ret; 
+	default:
+		return copy_user_generic(dst,src,size); 
+	}
+}	
+
+
+static inline int __copy_in_user(void *dst, const void *src, unsigned size) 
+{ 
+	if (!__builtin_constant_p(size))
+		return copy_user_generic(dst,src,size);
+	int ret = 0; 
+	switch (size) { 
+	case 1: { 
+		u8 tmp;
+		__get_user_asm(tmp,(u8 *)src,ret,"b","b","=q",1); 
+		if (!ret)
+			__put_user_asm(tmp,(u8 *)dst,ret,"b","b","iq",1); 
+		return ret;
+	}
+	case 2: { 
+		u16 tmp;
+		__get_user_asm(tmp,(u16 *)src,ret,"w","w","=r",2); 
+		if (!ret)
+			__put_user_asm(tmp,(u16 *)dst,ret,"w","w","ir",2); 
+		return ret;
+	}
+
+	case 4: { 
+		u32 tmp;
+		__get_user_asm(tmp,(u32 *)src,ret,"l","k","=r",4); 
+		if (!ret)
+			__put_user_asm(tmp,(u32 *)dst,ret,"l","k","ir",4); 
+		return ret;
+	}
+	case 8: { 
+		u64 tmp;
+		__get_user_asm(tmp,(u64 *)src,ret,"q","","=r",8); 
+		if (!ret)
+			__put_user_asm(tmp,(u64 *)dst,ret,"q","","ir",8); 
+		return ret;
+	}
 	default:
 		return copy_user_generic(dst,src,size); 
 	}

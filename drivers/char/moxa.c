@@ -153,7 +153,7 @@ struct moxa_str {
 	int asyncflags;
 	unsigned long statusflags;
 	struct tty_struct *tty;
-	struct termios normal_termios;
+	int cflag;
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
 	struct work_struct tqueue;
@@ -206,12 +206,8 @@ MODULE_PARM(verbose, "i");
 
 #endif				//MODULE
 
-static struct tty_driver moxaDriver;
-static struct tty_struct *moxaTable[MAX_PORTS + 1];
-static struct termios *moxaTermios[MAX_PORTS + 1];
-static struct termios *moxaTermiosLocked[MAX_PORTS + 1];
+static struct tty_driver *moxaDriver;
 static struct moxa_str moxaChannels[MAX_PORTS];
-static int moxaRefcount;
 static unsigned char *moxaXmitBuff;
 static int moxaTimer_on;
 static struct timer_list moxaTimer;
@@ -312,13 +308,32 @@ void cleanup_module(void)
 		if (moxaEmptyTimer_on[i])
 			del_timer(&moxaEmptyTimer[i]);
 
-	if (tty_unregister_driver(&moxaDriver))
+	if (tty_unregister_driver(moxaDriver))
 		printk("Couldn't unregister MOXA Intellio family serial driver\n");
+	put_tty_driver(moxaDriver);
 	if (verbose)
 		printk("Done\n");
 
 }
 #endif
+
+static struct tty_operations moxa_ops = {
+	.open = moxa_open,
+	.close = moxa_close,
+	.write = moxa_write,
+	.write_room = moxa_write_room,
+	.flush_buffer = moxa_flush_buffer,
+	.chars_in_buffer = moxa_chars_in_buffer,
+	.flush_chars = moxa_flush_chars,
+	.put_char = moxa_put_char,
+	.ioctl = moxa_ioctl,
+	.throttle = moxa_throttle,
+	.unthrottle = moxa_unthrottle,
+	.set_termios = moxa_set_termios,
+	.stop = moxa_stop,
+	.start = moxa_start,
+	.hangup = moxa_hangup,
+};
 
 int moxa_init(void)
 {
@@ -327,43 +342,24 @@ int moxa_init(void)
 	int ret1, ret2;
 
 	printk(KERN_INFO "MOXA Intellio family driver version %s\n", MOXA_VERSION);
+	moxaDriver = alloc_tty_driver(MAX_PORTS + 1);
+	if (!moxaDriver)
+		return -ENOMEM;
 
 	init_MUTEX(&moxaBuffSem);
-	memset(&moxaDriver, 0, sizeof(struct tty_driver));
-	moxaDriver.magic = TTY_DRIVER_MAGIC;
-	moxaDriver.owner = THIS_MODULE;
-	moxaDriver.name = "ttya";
-	moxaDriver.major = ttymajor;
-	moxaDriver.minor_start = 0;
-	moxaDriver.num = MAX_PORTS + 1;
-	moxaDriver.type = TTY_DRIVER_TYPE_SERIAL;
-	moxaDriver.subtype = SERIAL_TYPE_NORMAL;
-	moxaDriver.init_termios = tty_std_termios;
-	moxaDriver.init_termios.c_iflag = 0;
-	moxaDriver.init_termios.c_oflag = 0;
-	moxaDriver.init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
-	moxaDriver.init_termios.c_lflag = 0;
-	moxaDriver.flags = TTY_DRIVER_REAL_RAW;
-	moxaDriver.refcount = &moxaRefcount;
-	moxaDriver.table = moxaTable;
-	moxaDriver.termios = moxaTermios;
-	moxaDriver.termios_locked = moxaTermiosLocked;
-
-	moxaDriver.open = moxa_open;
-	moxaDriver.close = moxa_close;
-	moxaDriver.write = moxa_write;
-	moxaDriver.write_room = moxa_write_room;
-	moxaDriver.flush_buffer = moxa_flush_buffer;
-	moxaDriver.chars_in_buffer = moxa_chars_in_buffer;
-	moxaDriver.flush_chars = moxa_flush_chars;
-	moxaDriver.put_char = moxa_put_char;
-	moxaDriver.ioctl = moxa_ioctl;
-	moxaDriver.throttle = moxa_throttle;
-	moxaDriver.unthrottle = moxa_unthrottle;
-	moxaDriver.set_termios = moxa_set_termios;
-	moxaDriver.stop = moxa_stop;
-	moxaDriver.start = moxa_start;
-	moxaDriver.hangup = moxa_hangup;
+	moxaDriver->owner = THIS_MODULE;
+	moxaDriver->name = "ttya";
+	moxaDriver->major = ttymajor;
+	moxaDriver->minor_start = 0;
+	moxaDriver->type = TTY_DRIVER_TYPE_SERIAL;
+	moxaDriver->subtype = SERIAL_TYPE_NORMAL;
+	moxaDriver->init_termios = tty_std_termios;
+	moxaDriver->init_termios.c_iflag = 0;
+	moxaDriver->init_termios.c_oflag = 0;
+	moxaDriver->init_termios.c_cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
+	moxaDriver->init_termios.c_lflag = 0;
+	moxaDriver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(moxaDriver, &moxa_ops);
 
 	moxaXmitBuff = 0;
 
@@ -376,7 +372,7 @@ int moxa_init(void)
 		ch->closing_wait = 30 * HZ;
 		ch->count = 0;
 		ch->blocked_open = 0;
-		ch->normal_termios = moxaDriver.init_termios;
+		ch->cflag = B9600 | CS8 | CREAD | CLOCAL | HUPCL;
 		init_waitqueue_head(&ch->open_wait);
 		init_waitqueue_head(&ch->close_wait);
 	}
@@ -392,8 +388,9 @@ int moxa_init(void)
 	MoxaDriverInit();
 	printk("Tty devices major number = %d\n", ttymajor);
 
-	if (tty_register_driver(&moxaDriver)) {
+	if (tty_register_driver(moxaDriver)) {
 		printk(KERN_ERR "Couldn't install MOXA Smartio family driver !\n");
+		put_tty_driver(moxaDriver);
 		return -1;
 	}
 	for (i = 0; i < MAX_PORTS; i++) {
@@ -559,9 +556,6 @@ static int moxa_open(struct tty_struct *tty, struct file *filp)
 	ch->count++;
 	tty->driver_data = ch;
 	ch->tty = tty;
-	if (ch->count == 1 && (ch->asyncflags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = ch->normal_termios;
-	}
 	if (!(ch->asyncflags & ASYNC_INITIALIZED)) {
 		ch->statusflags = 0;
 		set_tty_param(tty);
@@ -621,12 +615,7 @@ static void moxa_close(struct tty_struct *tty, struct file *filp)
 	}
 	ch->asyncflags |= ASYNC_CLOSING;
 
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (ch->asyncflags & ASYNC_NORMAL_ACTIVE)
-		ch->normal_termios = *tty->termios;
+	ch->cflag = *tty->termios->c_cflag;
 	if (ch->asyncflags & ASYNC_INITIALIZED) {
 		setup_empty_event(tty);
 		tty_wait_until_sent(tty, 30 * HZ);	/* 30 seconds timeout */
@@ -1688,7 +1677,7 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 			}
 
 			if (!moxaChannels[i].tty || !moxaChannels[i].tty->termios)
-				GMStatus[i].cflag = moxaChannels[i].normal_termios.c_cflag;
+				GMStatus[i].cflag = moxaChannels[i].cflag;
 			else
 				GMStatus[i].cflag = moxaChannels[i].tty->termios->c_cflag;
 		}

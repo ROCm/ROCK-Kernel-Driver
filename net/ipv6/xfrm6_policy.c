@@ -146,7 +146,7 @@ __xfrm6_bundle_create(struct xfrm_policy *policy, struct xfrm_state **xfrm, int 
 		memcpy(&dst_prev->metrics, &rt->u.dst.metrics, sizeof(dst_prev->metrics));
 		dst_prev->path		= &rt->u.dst;
 
-		/* Copy neighbout for reachability confirmation */
+		/* Copy neighbour for reachability confirmation */
 		dst_prev->neighbour	= neigh_clone(rt->u.dst.neighbour);
 		dst_prev->input		= rt->u.dst.input;
 		dst_prev->output	= dst_prev->xfrm->type->output;
@@ -177,6 +177,7 @@ _decode_session6(struct sk_buff *skb, struct flowi *fl)
 	struct ipv6_opt_hdr *exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
 	u8 nexthdr = skb->nh.ipv6h->nexthdr;
 
+	memset(fl, 0, sizeof(struct flowi));
 	ipv6_addr_copy(&fl->fl6_dst, &hdr->daddr);
 	ipv6_addr_copy(&fl->fl6_src, &hdr->saddr);
 

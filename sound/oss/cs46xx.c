@@ -5725,11 +5725,6 @@ int __init cs46xx_init_module(void)
 	int rtn = 0;
 	CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO 
 		"cs46xx: cs46xx_init_module()+ \n"));
-	if (!pci_present()) {	/* No PCI bus in this machine! */
-		CS_DBGOUT(CS_INIT | CS_FUNCTION, 2, printk(KERN_INFO
-			"cs46xx: cs46xx_init_module()- no pci bus found\n"));
-		return -ENODEV;
-	}
 	rtn = pci_module_init(&cs46xx_pci_driver);
 
 	if(rtn == -ENODEV)

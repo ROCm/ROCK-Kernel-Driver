@@ -59,6 +59,7 @@
 #include <asm/eeh.h>
 #include <asm/processor.h>
 #include <asm/mmzone.h>
+#include <asm/cputable.h>
 
 #include <asm/ppcdebug.h>
 
@@ -699,7 +700,7 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long ea,
 	int local = 0;
 
 	/* handle i-cache coherency */
-	if (!cpu_has_noexecute()) {
+	if (!(cur_cpu_spec->cpu_features & CPU_FTR_NOEXECUTE)) {
 		unsigned long pfn = pte_pfn(pte);
 		if (pfn_valid(pfn)) {
 			struct page *page = pfn_to_page(pfn);

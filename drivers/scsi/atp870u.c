@@ -2321,10 +2321,6 @@ static int atp870u_detect(Scsi_Host_Template * tpnt)
 	};
 
 	printk(KERN_INFO "aec671x_detect: \n");
-	if (!pci_present()) {
-		printk(KERN_INFO "   NO PCI SUPPORT.\n");
-		return count;
-	}
 	tpnt->proc_name = "atp870u";
 
 	h = 0;

@@ -136,7 +136,7 @@ static inline void *usb_get_intfdata (struct usb_interface *intf)
 
 static inline void usb_set_intfdata (struct usb_interface *intf, void *data)
 {
-	return dev_set_drvdata (&intf->dev, data);
+	dev_set_drvdata(&intf->dev, data);
 }
 
 /* USB_DT_CONFIG: Configuration descriptor information.

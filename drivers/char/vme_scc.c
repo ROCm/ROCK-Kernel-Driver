@@ -90,14 +90,10 @@ static irqreturn_t scc_spcond_int(int irq, void *data, struct pt_regs *fp);
 static void scc_setsignals(struct scc_port *port, int dtr, int rts);
 static void scc_break_ctl(struct tty_struct *tty, int break_state);
 
-static struct tty_driver scc_driver;
+static struct tty_driver *scc_driver;
 
-static struct tty_struct *scc_table[2] = { NULL, };
-static struct termios * scc_termios[2];
-static struct termios * scc_termios_locked[2];
 struct scc_port scc_ports[2];
 
-int scc_refcount;
 int scc_initialized = 0;
 
 /*---------------------------------------------------------------------------
@@ -119,6 +115,25 @@ static struct real_driver scc_real_driver = {
 };
 
 
+static struct tty_operations scc_ops = {
+	.open	= scc_open,
+	.close = gs_close,
+	.write = gs_write,
+	.put_char = gs_put_char,
+	.flush_chars = gs_flush_chars,
+	.write_room = gs_write_room,
+	.chars_in_buffer = gs_chars_in_buffer,
+	.flush_buffer = gs_flush_buffer,
+	.ioctl = scc_ioctl,
+	.throttle = scc_throttle,
+	.unthrottle = scc_unthrottle,
+	.set_termios = gs_set_termios,
+	.stop = gs_stop,
+	.start = gs_start,
+	.hangup = gs_hangup,
+	.break_ctl = scc_break_ctl,
+};
+
 /*----------------------------------------------------------------------------
  * vme_scc_init() and support functions
  *---------------------------------------------------------------------------*/
@@ -127,49 +142,27 @@ static int scc_init_drivers(void)
 {
 	int error;
 
-	memset(&scc_driver, 0, sizeof(scc_driver));
-	scc_driver.magic = TTY_DRIVER_MAGIC;
-	scc_driver.owner = THIS_MODULE;
-	scc_driver.driver_name = "scc";
-#ifdef CONFIG_DEVFS_FS
-	scc_driver.name = "tts/";
-#else
-	scc_driver.name = "ttyS";
-#endif
-	scc_driver.major = TTY_MAJOR;
-	scc_driver.minor_start = SCC_MINOR_BASE;
-	scc_driver.num = 2;
-	scc_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	scc_driver.subtype = SERIAL_TYPE_NORMAL;
-	scc_driver.init_termios = tty_std_termios;
-	scc_driver.init_termios.c_cflag =
+	scc_driver = alloc_tty_driver(2);
+	if (!scc_driver)
+		return -ENOMEM;
+	scc_driver->owner = THIS_MODULE;
+	scc_driver->driver_name = "scc";
+	scc_driver->name = "ttyS";
+	scc_driver->devfs_name = "tts/";
+	scc_driver->major = TTY_MAJOR;
+	scc_driver->minor_start = SCC_MINOR_BASE;
+	scc_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	scc_driver->subtype = SERIAL_TYPE_NORMAL;
+	scc_driver->init_termios = tty_std_termios;
+	scc_driver->init_termios.c_cflag =
 	  B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	scc_driver.flags = TTY_DRIVER_REAL_RAW;
-	scc_driver.refcount = &scc_refcount;
-	scc_driver.table = scc_table;
-	scc_driver.termios = scc_termios;
-	scc_driver.termios_locked = scc_termios_locked;
+	scc_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(scc_driver, &scc_ops);
 
-	scc_driver.open	= scc_open;
-	scc_driver.close = gs_close;
-	scc_driver.write = gs_write;
-	scc_driver.put_char = gs_put_char;
-	scc_driver.flush_chars = gs_flush_chars;
-	scc_driver.write_room = gs_write_room;
-	scc_driver.chars_in_buffer = gs_chars_in_buffer;
-	scc_driver.flush_buffer = gs_flush_buffer;
-	scc_driver.ioctl = scc_ioctl;
-	scc_driver.throttle = scc_throttle;
-	scc_driver.unthrottle = scc_unthrottle;
-	scc_driver.set_termios = gs_set_termios;
-	scc_driver.stop = gs_stop;
-	scc_driver.start = gs_start;
-	scc_driver.hangup = gs_hangup;
-	scc_driver.break_ctl = scc_break_ctl;
-
-	if ((error = tty_register_driver(&scc_driver))) {
+	if ((error = tty_register_driver(scc_driver))) {
 		printk(KERN_ERR "scc: Couldn't register scc driver, error = %d\n",
 		       error);
+		put_tty_driver(scc_driver);
 		return 1;
 	}
 
@@ -187,7 +180,6 @@ static void scc_init_portstructs(void)
 
 	for (i = 0; i < 2; i++) {
 		port = scc_ports + i;
-		port->gs.normal_termios = tty_std_termios;
 		port->gs.magic = SCC_MAGIC;
 		port->gs.close_delay = HZ/2;
 		port->gs.closing_wait = 30 * HZ;
@@ -925,11 +917,6 @@ static int scc_open (struct tty_struct * tty, struct file * filp)
 		return retval;
 	}
 
-	if ((port->gs.count == 1) && (port->gs.flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = port->gs.normal_termios;
-		scc_set_real_termios (port);
-	}
-
 	port->c_dcd = scc_get_CD (port);
 
 	scc_enable_rx_interrupts(port);
@@ -1043,7 +1030,7 @@ static void scc_console_write (struct console *co, const char *str, unsigned cou
 static struct tty_driver *scc_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &scc_driver;
+	return scc_driver;
 }
 
 

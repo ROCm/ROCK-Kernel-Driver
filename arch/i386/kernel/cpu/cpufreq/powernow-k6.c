@@ -142,7 +142,6 @@ static int powernow_k6_target (struct cpufreq_policy *policy,
 
 static int powernow_k6_cpu_init(struct cpufreq_policy *policy)
 {
-	struct cpuinfo_x86 *c = cpu_data;
 	unsigned int i;
 
 	if (policy->cpu != 0)

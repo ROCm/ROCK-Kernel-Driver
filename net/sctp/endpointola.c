@@ -151,12 +151,12 @@ struct sctp_endpoint *sctp_endpoint_init(struct sctp_endpoint *ep,
 	/* FIXME - Should the min and max window size be configurable
 	 * sysctl parameters as opposed to be constants?
 	 */
-	sk->rcvbuf = SCTP_DEFAULT_MAXWINDOW;
-	sk->sndbuf = SCTP_DEFAULT_MAXWINDOW * 2;
+	sk->sk_rcvbuf = SCTP_DEFAULT_MAXWINDOW;
+	sk->sk_sndbuf = SCTP_DEFAULT_MAXWINDOW * 2;
 
 	/* Use SCTP specific send buffer space queues.  */
-	sk->write_space = sctp_write_space;
-	sk->use_write_queue = 1;
+	sk->sk_write_space = sctp_write_space;
+	sk->sk_use_write_queue = 1;
 
 	/* Initialize the secret key used with cookie. */
 	get_random_bytes(&ep->secret_key[0], SCTP_SECRET_SIZE);
@@ -178,7 +178,7 @@ void sctp_endpoint_add_asoc(struct sctp_endpoint *ep,
 
 	/* Increment the backlog value for a TCP-style listening socket. */
 	if (sctp_style(sk, TCP) && sctp_sstate(sk, LISTENING))
-		sk->ack_backlog++;
+		sk->sk_ack_backlog++;
 }
 
 /* Free the endpoint structure.  Delay cleanup until
@@ -195,7 +195,7 @@ void sctp_endpoint_destroy(struct sctp_endpoint *ep)
 {
 	SCTP_ASSERT(ep->base.dead, "Endpoint is not dead", return);
 
-	ep->base.sk->state = SCTP_SS_CLOSED;
+	ep->base.sk->sk_state = SCTP_SS_CLOSED;
 
 	/* Unlink this endpoint, so we can't find it again! */
 	sctp_unhash_endpoint(ep);
@@ -209,7 +209,7 @@ void sctp_endpoint_destroy(struct sctp_endpoint *ep)
 	sctp_bind_addr_free(&ep->base.bind_addr);
 
 	/* Remove and free the port */
-	if (ep->base.sk->prev != NULL)
+	if (ep->base.sk->sk_prev)
 		sctp_put_port(ep->base.sk);
 
 	/* Give up our hold on the sock. */

@@ -15,7 +15,7 @@ quiet_cmd_elftoaout = ELT2AOUT $@
 quiet_cmd_piggy     = PIGGY    $@
       cmd_piggy     = $(obj)/piggyback $@ System.map $(ROOT_IMG)
 quiet_cmd_strip     = STRIP $@
-      cmd_strip     = $(STRIP) -R .comment -R .note vmlinux -o $@
+      cmd_strip     = $(STRIP) -R .comment -R .note -K sun4u_init -K _end -K _start vmlinux -o $@
 
 
 # Actual linking

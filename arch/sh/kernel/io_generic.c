@@ -1,4 +1,4 @@
-/* $Id: io_generic.c,v 1.12 2000/11/14 16:45:11 sugioka Exp $
+/* $Id: io_generic.c,v 1.1.1.1.4.2.2.1 2003/01/10 17:26:56 lethal Exp $
  *
  * linux/arch/sh/kernel/io_generic.c
  *
@@ -17,7 +17,7 @@
 #include <asm/machvec.h>
 #include <linux/module.h>
 
-#if defined(__sh3__)
+#if defined(CONFIG_CPU_SH3)
 /* I'm not sure SH7709 has this kind of bug */
 #define SH3_PCMCIA_BUG_WORKAROUND 1
 #define DUMMY_READ_AREA6	  0xba000000

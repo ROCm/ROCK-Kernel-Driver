@@ -162,10 +162,17 @@ sb1000_probe_one(struct pnp_dev *pdev, const struct pnp_device_id *id)
 		
 	irq = pnp_irq(pdev, 0);
 
-	if (!request_region(ioaddr[0], 16, dev->name))
+	if (!request_region(ioaddr[0], 16, "sb1000"))
 		goto out_disable;
-	if (!request_region(ioaddr[1], 16, dev->name))
+	if (!request_region(ioaddr[1], 16, "sb1000"))
 		goto out_release_region0;
+
+	dev = alloc_etherdev(sizeof(struct sb1000_private));
+	if (!dev) {
+		error = -ENOMEM;
+		goto out_release_regions;
+	}
+
 		 
 	dev->base_addr = ioaddr[0];
 	/* mem_start holds the second I/O address */
@@ -176,12 +183,6 @@ sb1000_probe_one(struct pnp_dev *pdev, const struct pnp_device_id *id)
 		printk(KERN_NOTICE "%s: sb1000 at (%#3.3lx,%#3.3lx), "
 			"S/N %#8.8x, IRQ %d.\n", dev->name, dev->base_addr,
 			dev->mem_start, serial_number, dev->irq);
-
-	dev = alloc_etherdev(sizeof(struct sb1000_private));
-	if (!dev) {
-		error = -ENOMEM;
-		goto out_release_regions;
-	}
 
 	/*
 	 * The SB1000 is an rx-only cable modem device.  The uplink is a modem
@@ -212,11 +213,9 @@ sb1000_probe_one(struct pnp_dev *pdev, const struct pnp_device_id *id)
 
 	error = register_netdev(dev);
 	if (error)
-		goto out_unregister;
+		goto out_release_regions;
 	return 0;
 
- out_unregister:
-	unregister_netdev(dev);
  out_release_regions:
 	release_region(ioaddr[1], 16);
  out_release_region0:
@@ -236,6 +235,7 @@ sb1000_remove_one(struct pnp_dev *pdev)
 	unregister_netdev(dev);
 	release_region(dev->base_addr, 16);
 	release_region(dev->mem_start, 16);
+	kfree(dev);
 }
 
 static struct pnp_driver sb1000_driver = {

@@ -618,9 +618,6 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		return -ENODEV;
 	probed++;
 
-	if (!pci_present())		/* is PCI support present? */
-		return -ENODEV;
-
 	version_disp = 0;
 
 	while ((pdev = pci_find_class(PCI_CLASS_NETWORK_ETHERNET<<8, pdev))) {
@@ -645,8 +642,7 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 		      (pdev->device == PCI_DEVICE_ID_SGI_ACENIC)))
 			continue;
 
-		dev = init_etherdev(NULL, sizeof(struct ace_private));
-
+		dev = alloc_etherdev(sizeof(struct ace_private));
 		if (dev == NULL) {
 			printk(KERN_ERR "acenic: Unable to allocate "
 			       "net_device structure!\n");
@@ -655,13 +651,6 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 
 		SET_MODULE_OWNER(dev);
 		SET_NETDEV_DEV(dev, &pdev->dev);
-
-		if (!dev->priv)
-			dev->priv = kmalloc(sizeof(*ap), GFP_KERNEL);
-		if (!dev->priv) {
-			printk(KERN_ERR "acenic: Unable to allocate memory\n");
-			return -ENOMEM;
-		}
 
 		ap = dev->priv;
 		ap->pdev = pdev;
@@ -740,6 +729,12 @@ int __devinit acenic_probe (ACE_PROBE_ARG)
 			       "AceNIC %i will be disabled.\n",
 			       dev->name, boards_found);
 			break;
+		}
+
+		if (register_netdev(dev)) {
+			printk(KERN_ERR "acenic: device registration failed\n");
+			kfree(dev);
+			continue;
 		}
 
 		switch(pdev->vendor) {

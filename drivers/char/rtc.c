@@ -284,12 +284,13 @@ static ssize_t rtc_read(struct file *file, char *buf,
 
 	add_wait_queue(&rtc_wait, &wait);
 
-	current->state = TASK_INTERRUPTIBLE;
-		
 	do {
 		/* First make it right. Then make it fast. Putting this whole
 		 * block within the parentheses of a while would be too
 		 * confusing. And no, xchg() is not the answer. */
+
+		__set_current_state(TASK_INTERRUPTIBLE);
+		
 		spin_lock_irq (&rtc_lock);
 		data = rtc_irq_data;
 		rtc_irq_data = 0;

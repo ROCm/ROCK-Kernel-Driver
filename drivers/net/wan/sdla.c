@@ -1682,11 +1682,13 @@ static int __init init_sdla(void)
 
 static void __exit exit_sdla(void)
 {
+#ifdef MODULE
 	unregister_netdev(&sdla0);
 	if (sdla0.priv)
 		kfree(sdla0.priv);
 	if (sdla0.irq)
 		free_irq(sdla0.irq, &sdla0);
+#endif
 }
 
 MODULE_LICENSE("GPL");

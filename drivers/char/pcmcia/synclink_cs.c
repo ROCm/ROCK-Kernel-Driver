@@ -154,8 +154,6 @@ typedef struct _mgslpc_info {
 	
 	struct mgsl_icount	icount;
 	
-	struct termios		normal_termios;
-	
 	struct tty_struct 	*tty;
 	int			timeout;
 	int			x_char;		/* xon/xoff character */
@@ -497,18 +495,13 @@ MODULE_LICENSE("GPL");
 static char *driver_name = "SyncLink PC Card driver";
 static char *driver_version = "$Revision: 4.10 $";
 
-static struct tty_driver serial_driver;
-static int serial_refcount;
+static struct tty_driver *serial_driver;
 
 /* number of characters left in xmit buffer before we ask for more */
 #define WAKEUP_CHARS 256
 
 static void mgslpc_change_params(MGSLPC_INFO *info);
 static void mgslpc_wait_until_sent(struct tty_struct *tty, int timeout);
-
-static struct tty_struct *serial_table[MAX_DEVICE_COUNT];
-static struct termios *serial_termios[MAX_DEVICE_COUNT];
-static struct termios *serial_termios_locked[MAX_DEVICE_COUNT];
 
 #ifndef MIN
 #define MIN(a,b)	((a) < (b) ? (a) : (b))
@@ -610,12 +603,6 @@ static dev_link_t *mgslpc_attach(void)
     }
 
     mgslpc_add_device(info);
-
-    memset(serial_table,0,sizeof(struct tty_struct*)*MAX_DEVICE_COUNT);
-    memset(serial_termios,0,sizeof(struct termios*)*MAX_DEVICE_COUNT);
-    memset(serial_termios_locked,0,sizeof(struct termios*)*MAX_DEVICE_COUNT);
-
-    info->normal_termios  = serial_driver.init_termios;
 
     return link;
 }
@@ -2580,12 +2567,6 @@ static void mgslpc_close(struct tty_struct *tty, struct file * filp)
 	
 	info->flags |= ASYNC_CLOSING;
 	
-	/* Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
-
 	/* set tty->closing to notify line discipline to 
 	 * only process XON/XOFF characters. Only the N_TTY
 	 * discipline appears to use this (ppp does not).
@@ -2891,12 +2872,6 @@ static int mgslpc_open(struct tty_struct *tty, struct file * filp)
 		goto cleanup;
 	}
 
-	if ((info->count == 1) &&
-	    info->flags & ASYNC_SPLIT_TERMIOS) {
-		*tty->termios = info->normal_termios;
-		mgslpc_change_params(info);
-	}
-	
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("%s(%d):mgslpc_open(%s) success\n",
 			 __FILE__,__LINE__, info->device_name);
@@ -3140,6 +3115,30 @@ static struct pcmcia_driver mgslpc_driver = {
 	.detach		= mgslpc_detach,
 };
 
+static struct tty_operations mgslpc_ops = {
+	.open = mgslpc_open,
+	.close = mgslpc_close,
+	.write = mgslpc_write,
+	.put_char = mgslpc_put_char,
+	.flush_chars = mgslpc_flush_chars,
+	.write_room = mgslpc_write_room,
+	.chars_in_buffer = mgslpc_chars_in_buffer,
+	.flush_buffer = mgslpc_flush_buffer,
+	.ioctl = mgslpc_ioctl,
+	.throttle = mgslpc_throttle,
+	.unthrottle = mgslpc_unthrottle,
+	.send_xchar = mgslpc_send_xchar,
+	.break_ctl = mgslpc_break,
+	.wait_until_sent = mgslpc_wait_until_sent,
+	.read_proc = mgslpc_read_proc,
+	.set_termios = mgslpc_set_termios,
+	.stop = tx_pause,
+	.start = tx_release,
+	.hangup = mgslpc_hangup,
+	.tiocmget = tiocmget,
+	.tiocmset = tiocmset,
+};
+
 static int __init synclink_cs_init(void)
 {
     int error;
@@ -3151,60 +3150,38 @@ static int __init synclink_cs_init(void)
 
     printk("%s %s\n", driver_name, driver_version);
 
+    serial_driver = alloc_tty_driver(MAX_DEVICE_COUNT);
+    if (!serial_driver)
+	    return -ENOMEM;
+
     error = pcmcia_register_driver(&mgslpc_driver);
-    if (error)
+    if (error) {
+	    put_tty_driver(serial_driver);
 	    return error;
+    }
 
     /* Initialize the tty_driver structure */
 	
-    memset(&serial_driver, 0, sizeof(struct tty_driver));
-    serial_driver.magic = TTY_DRIVER_MAGIC;
-    serial_driver.owner = THIS_MODULE;
-    serial_driver.driver_name = "synclink_cs";
-    serial_driver.name = "ttySLP";
-    serial_driver.major = ttymajor;
-    serial_driver.minor_start = 64;
-    serial_driver.num = MAX_DEVICE_COUNT;
-    serial_driver.type = TTY_DRIVER_TYPE_SERIAL;
-    serial_driver.subtype = SERIAL_TYPE_NORMAL;
-    serial_driver.init_termios = tty_std_termios;
-    serial_driver.init_termios.c_cflag =
+    serial_driver->owner = THIS_MODULE;
+    serial_driver->driver_name = "synclink_cs";
+    serial_driver->name = "ttySLP";
+    serial_driver->major = ttymajor;
+    serial_driver->minor_start = 64;
+    serial_driver->type = TTY_DRIVER_TYPE_SERIAL;
+    serial_driver->subtype = SERIAL_TYPE_NORMAL;
+    serial_driver->init_termios = tty_std_termios;
+    serial_driver->init_termios.c_cflag =
 	    B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-    serial_driver.flags = TTY_DRIVER_REAL_RAW;
-    serial_driver.refcount = &serial_refcount;
-    serial_driver.table = serial_table;
-    serial_driver.termios = serial_termios;
-    serial_driver.termios_locked = serial_termios_locked;
+    serial_driver->flags = TTY_DRIVER_REAL_RAW;
+    tty_set_operations(serial_driver, &mgslpc_ops);
 
-    serial_driver.open = mgslpc_open;
-    serial_driver.close = mgslpc_close;
-    serial_driver.write = mgslpc_write;
-    serial_driver.put_char = mgslpc_put_char;
-    serial_driver.flush_chars = mgslpc_flush_chars;
-    serial_driver.write_room = mgslpc_write_room;
-    serial_driver.chars_in_buffer = mgslpc_chars_in_buffer;
-    serial_driver.flush_buffer = mgslpc_flush_buffer;
-    serial_driver.ioctl = mgslpc_ioctl;
-    serial_driver.throttle = mgslpc_throttle;
-    serial_driver.unthrottle = mgslpc_unthrottle;
-    serial_driver.send_xchar = mgslpc_send_xchar;
-    serial_driver.break_ctl = mgslpc_break;
-    serial_driver.wait_until_sent = mgslpc_wait_until_sent;
-    serial_driver.read_proc = mgslpc_read_proc;
-    serial_driver.set_termios = mgslpc_set_termios;
-    serial_driver.stop = tx_pause;
-    serial_driver.start = tx_release;
-    serial_driver.hangup = mgslpc_hangup;
-    serial_driver.tiocmget = tiocmget;
-    serial_driver.tiocmset = tiocmset;
-	
-    if (tty_register_driver(&serial_driver) < 0)
+    if (tty_register_driver(serial_driver) < 0)
 	    printk("%s(%d):Couldn't register serial driver\n",
 		   __FILE__,__LINE__);
 			
     printk("%s %s, tty major#%d\n",
 	   driver_name, driver_version,
-	   serial_driver.major);
+	   serial_driver->major);
 	
     return 0;
 }
@@ -3218,9 +3195,10 @@ static void __exit synclink_cs_exit(void)
 	while(mgslpc_device_list)
 		mgslpc_remove_device(mgslpc_device_list);
 
-	if ((rc = tty_unregister_driver(&serial_driver)))
+	if ((rc = tty_unregister_driver(serial_driver)))
 		printk("%s(%d) failed to unregister tty driver err=%d\n",
 		       __FILE__,__LINE__,rc);
+	put_tty_driver(serial_driver);
 
 	pcmcia_unregister_driver(&mgslpc_driver);
 

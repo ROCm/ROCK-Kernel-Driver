@@ -45,7 +45,7 @@ hpusbscsi_usb_probe(struct usb_interface *intf,
 	struct usb_host_interface *altsetting =	intf->altsetting;
 	struct hpusbscsi *new;
 	int error = -ENOMEM;
-	int i, result;
+	int i;
 
 	if (altsetting->desc.bNumEndpoints != 3) {
 		printk (KERN_ERR "Wrong number of endpoints\n");
@@ -91,17 +91,6 @@ hpusbscsi_usb_probe(struct usb_interface *intf,
 			new->interrupt_interval= altsetting->endpoint[i].desc.
 				bInterval;
 		}
-	}
-
-	/* USB initialisation magic for the simple case */
-	result = usb_set_interface(dev, altsetting->desc.bInterfaceNumber, 0);
-	switch (result) {
-	case 0:		/* no error */
-		break;
-	default:
-		printk(KERN_ERR "unknown error %d from usb_set_interface\n",
-			 result);
-		goto out_free_controlurb;
 	}
 
 	/* build and submit an interrupt URB for status byte handling */

@@ -120,12 +120,6 @@ static int transfer_xor(struct loop_device *lo, int cmd, char *raw_buf,
 	return 0;
 }
 
-static int none_status(struct loop_device *lo, const struct loop_info64 *info)
-{
-	lo->lo_flags |= LO_FLAGS_BH_REMAP;
-	return 0;
-}
-
 static int xor_status(struct loop_device *lo, const struct loop_info64 *info)
 {
 	if (info->lo_encrypt_key_size <= 0)
@@ -136,7 +130,6 @@ static int xor_status(struct loop_device *lo, const struct loop_info64 *info)
 struct loop_func_table none_funcs = { 
 	.number = LO_CRYPT_NONE,
 	.transfer = transfer_none,
-	.init = none_status,
 }; 	
 
 struct loop_func_table xor_funcs = { 
@@ -236,7 +229,6 @@ do_lo_send(struct loop_device *lo, struct bio_vec *bvec, int bsize, loff_t pos)
 	up(&mapping->host->i_sem);
 out:
 	kunmap(bvec->bv_page);
-	balance_dirty_pages_ratelimited(mapping);
 	return ret;
 
 unlock:
@@ -440,17 +432,46 @@ static int loop_end_io_transfer(struct bio *bio, unsigned int bytes_done, int er
 	return 0;
 }
 
+static struct bio *loop_copy_bio(struct bio *rbh)
+{
+	struct bio *bio;
+	struct bio_vec *bv;
+	int i;
+
+	bio = bio_alloc(__GFP_NOWARN, rbh->bi_vcnt);
+	if (!bio)
+		return NULL;
+
+	/*
+	 * iterate iovec list and alloc pages
+	 */
+	__bio_for_each_segment(bv, rbh, i, 0) {
+		struct bio_vec *bbv = &bio->bi_io_vec[i];
+
+		bbv->bv_page = alloc_page(__GFP_NOWARN|__GFP_HIGHMEM);
+		if (bbv->bv_page == NULL)
+			goto oom;
+
+		bbv->bv_len = bv->bv_len;
+		bbv->bv_offset = bv->bv_offset;
+	}
+
+	bio->bi_vcnt = rbh->bi_vcnt;
+	bio->bi_size = rbh->bi_size;
+
+	return bio;
+
+oom:
+	while (--i >= 0)
+		__free_page(bio->bi_io_vec[i].bv_page);
+
+	bio_put(bio);
+	return NULL;
+}
+
 static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 {
 	struct bio *bio;
-
-	/*
-	 * for xfer_funcs that can operate on the same bh, do that
-	 */
-	if (lo->lo_flags & LO_FLAGS_BH_REMAP) {
-		bio = rbh;
-		goto out_bh;
-	}
 
 	/*
 	 * When called on the page reclaim -> writepage path, this code can
@@ -462,17 +483,16 @@ static struct bio *loop_get_buffer(struct loop_device *lo, struct bio *rbh)
 		int flags = current->flags;
 
 		current->flags &= ~PF_MEMALLOC;
-		bio = bio_copy(rbh, (GFP_ATOMIC & ~__GFP_HIGH) | __GFP_NOWARN,
-					rbh->bi_rw & WRITE);
-		current->flags = flags;
+		bio = loop_copy_bio(rbh);
+		if (flags & PF_MEMALLOC)
+			current->flags |= PF_MEMALLOC;
+
 		if (bio == NULL)
 			blk_congestion_wait(WRITE, HZ/10);
 	} while (bio == NULL);
 
 	bio->bi_end_io = loop_end_io_transfer;
 	bio->bi_private = rbh;
-
-out_bh:
 	bio->bi_sector = rbh->bi_sector + (lo->lo_offset >> 9);
 	bio->bi_rw = rbh->bi_rw;
 	bio->bi_bdev = lo->lo_device;
@@ -480,9 +500,8 @@ out_bh:
 	return bio;
 }
 
-static int
-bio_transfer(struct loop_device *lo, struct bio *to_bio,
-			      struct bio *from_bio)
+static int loop_transfer_bio(struct loop_device *lo,
+			     struct bio *to_bio, struct bio *from_bio)
 {
 	unsigned long IV = loop_get_iv(lo, from_bio->bi_sector);
 	struct bio_vec *from_bvec, *to_bvec;
@@ -509,7 +528,6 @@ static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 {
 	struct bio *new_bio = NULL;
 	struct loop_device *lo = q->queuedata;
-	unsigned long IV;
 	int rw = bio_rw(old_bio);
 
 	if (!lo)
@@ -531,8 +549,6 @@ static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 		goto err;
 	}
 
-	blk_queue_bounce(q, &old_bio);
-
 	/*
 	 * file backed, queue for loop_thread to handle
 	 */
@@ -545,9 +561,8 @@ static int loop_make_request(request_queue_t *q, struct bio *old_bio)
 	 * piggy old buffer on original, and submit for I/O
 	 */
 	new_bio = loop_get_buffer(lo, old_bio);
-	IV = loop_get_iv(lo, old_bio->bi_sector);
 	if (rw == WRITE) {
-		if (bio_transfer(lo, new_bio, old_bio))
+		if (loop_transfer_bio(lo, new_bio, old_bio))
 			goto err;
 	}
 
@@ -579,7 +594,7 @@ static inline void loop_handle_bio(struct loop_device *lo, struct bio *bio)
 	} else {
 		struct bio *rbh = bio->bi_private;
 
-		ret = bio_transfer(lo, bio, rbh);
+		ret = loop_transfer_bio(lo, bio, rbh);
 
 		bio_endio(rbh, rbh->bi_size, ret);
 		loop_put_buffer(bio);
@@ -715,7 +730,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		goto out_putf;
 	}
 	lo->old_gfp_mask = inode->i_mapping->gfp_mask;
-	inode->i_mapping->gfp_mask = GFP_NOIO;
+	inode->i_mapping->gfp_mask &= ~(__GFP_IO|__GFP_FS);
 
 	set_blocksize(bdev, lo_blocksize);
 
@@ -726,7 +741,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 	 * device
 	 */
 	blk_queue_make_request(&lo->lo_queue, loop_make_request);
-	blk_queue_bounce_limit(&lo->lo_queue, BLK_BOUNCE_HIGH);
 	lo->lo_queue.queuedata = lo;
 
 	/*

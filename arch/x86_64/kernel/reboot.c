@@ -12,6 +12,7 @@
 #include <asm/system.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
+#include <asm/apic.h>
 
 /*
  * Power off function, if any
@@ -93,21 +94,24 @@ static void reboot_warm(void)
 static void smp_halt(void)
 {
 	int cpuid = safe_smp_processor_id(); 
-
-	/* Only run this on the boot processor */
-	if (cpuid != boot_cpu_id) { 
 		static int first_entry = 1;
+
 		if (first_entry) { 
 			first_entry = 0;
 			smp_call_function((void *)machine_restart, NULL, 1, 0);
-		} else {
-			/* AP reentering. just halt */
-			for(;;) 
-				asm volatile("hlt");
 		} 
 			
+	smp_stop_cpu(); 
+
+	/* AP calling this. Just halt */
+	if (cpuid != boot_cpu_id) { 
+		for (;;) 
+			asm("hlt");
 	}
-	smp_send_stop();
+
+	/* Wait for all other CPUs to have run smp_stop_cpu */
+	while (cpu_online_map) 
+		rep_nop(); 
 }
 #endif
 
@@ -128,7 +132,15 @@ void machine_restart(char * __unused)
 	smp_halt(); 
 #endif
 
+	local_irq_disable();
+       
+#ifndef CONFIG_SMP
+	disable_local_APIC();
+#endif
+
 	disable_IO_APIC();
+	
+	local_irq_enable();
 	
 	/* Tell the BIOS if we want cold or warm reboot */
 	*((unsigned short *)__va(0x472)) = reboot_mode;

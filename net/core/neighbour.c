@@ -1094,6 +1094,7 @@ struct neigh_parms *neigh_parms_alloc(struct net_device *dev,
 			kfree(p);
 			return NULL;
 		}
+		p->sysctl_table = NULL;
 		write_lock_bh(&tbl->lock);
 		p->next		= tbl->parms.next;
 		tbl->parms.next = p;
@@ -1113,9 +1114,6 @@ void neigh_parms_release(struct neigh_table *tbl, struct neigh_parms *parms)
 		if (*p == parms) {
 			*p = parms->next;
 			write_unlock_bh(&tbl->lock);
-#ifdef CONFIG_SYSCTL
-			neigh_sysctl_unregister(parms);
-#endif
 			kfree(parms);
 			return;
 		}
@@ -1178,9 +1176,6 @@ int neigh_table_clear(struct neigh_table *tbl)
 		}
 	}
 	write_unlock(&neigh_tbl_lock);
-#ifdef CONFIG_SYSCTL
-	neigh_sysctl_unregister(&tbl->parms);
-#endif
 	return 0;
 }
 

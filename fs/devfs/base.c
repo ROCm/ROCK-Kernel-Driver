@@ -1684,7 +1684,14 @@ int devfs_mk_dir(const char *fmt, ...)
 	}
 
 	error = _devfs_append_entry(dir, de, &old);
-	if (error) {
+	if (error == -EEXIST) {
+		/*
+		 * devfs_mk_dir() of an already-existing directory will
+		 * return success.
+		 */
+		error = 0;
+		devfs_put(old);
+	} else if (error) {
 		PRINTK("(%s): could not append to dir: %p \"%s\"\n",
 				buf, dir, dir->name);
 		devfs_put(old);
@@ -1709,6 +1716,13 @@ void devfs_remove(const char *fmt, ...)
 	n = vsnprintf(buf, 64, fmt, args);
 	if (n < 64 && buf[0]) {
 		devfs_handle_t de = _devfs_find_entry(NULL, buf, 0);
+
+		if (!de) {
+			printk(KERN_ERR "%s: %s not found, cannot remove\n",
+			       __FUNCTION__, buf);
+			dump_stack();
+			return;
+		}
 
 		write_lock(&de->parent->u.dir.lock);
 		_devfs_unregister(de->parent, de);

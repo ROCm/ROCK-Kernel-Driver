@@ -26,7 +26,6 @@
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/ctype.h>
-#include <linux/workqueue.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -49,6 +48,8 @@ static void snd_card_id_read(snd_info_entry_t *entry, snd_info_buffer_t * buffer
 {
 	snd_iprintf(buffer, "%s\n", entry->card->id);
 }
+
+static void snd_card_free_thread(void * __card);
 
 /**
  *  snd_card_new - create and initialize a soundcard structure
@@ -115,6 +116,7 @@ snd_card_t *snd_card_new(int idx, const char *xid,
 	INIT_LIST_HEAD(&card->ctl_files);
 	spin_lock_init(&card->files_lock);
 	init_waitqueue_head(&card->shutdown_sleep);
+	INIT_WORK(&card->free_workq, snd_card_free_thread, card);
 #ifdef CONFIG_PM
 	init_MUTEX(&card->power_lock);
 	init_waitqueue_head(&card->power_sleep);
@@ -327,16 +329,15 @@ static void snd_card_free_thread(void * __card)
  */
 int snd_card_free_in_thread(snd_card_t * card)
 {
-	DECLARE_WORK(works, snd_card_free_thread, card);
-
 	if (card->files == NULL) {
 		snd_card_free(card);
 		return 0;
 	}
-	if (schedule_work(&works))
+
+	if (schedule_work(&card->free_workq))
 		return 0;
 
-	snd_printk(KERN_ERR "kernel_thread failed in snd_card_free_in_thread for card %i\n", card->number);
+	snd_printk(KERN_ERR "schedule_work() failed in snd_card_free_in_thread for card %i\n", card->number);
 	/* try to free the structure immediately */
 	snd_card_free(card);
 	return -EFAULT;
@@ -354,6 +355,10 @@ static void choose_default_id(snd_card_t * card)
 		id++;
 	}
 	id = card->id;
+	while (*spos != '\0' && !isalnum(*spos))
+		spos++;
+	if (isdigit(*spos))
+		*id++ = isalpha(card->shortname[0]) ? card->shortname[0] : 'D';
 	while (*spos != '\0' && (size_t)(id - card->id) < sizeof(card->id) - 1) {
 		if (isalnum(*spos))
 			*id++ = *spos;
@@ -362,6 +367,9 @@ static void choose_default_id(snd_card_t * card)
 	*id = '\0';
 
 	id = card->id;
+	
+	if (*id == '\0')
+		strcpy(id, "default");
 
 	while (1) {
 	      	if (loops-- == 0) {
@@ -421,7 +429,7 @@ int snd_card_register(snd_card_t * card)
 		write_unlock(&snd_card_rwlock);
 		return 0;
 	}
-	if (!card->id[0])
+	if (card->id[0] == '\0')
 		choose_default_id(card);
 	snd_cards[card->number] = card;
 	snd_cards_count++;

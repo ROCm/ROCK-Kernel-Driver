@@ -199,7 +199,7 @@ extern void dump_stack(void);
 
 /*
  * Check at compile time that something is of a particular type.
- * Always evaluates to 1 so you may use it easily in conparisons.
+ * Always evaluates to 1 so you may use it easily in comparisons.
  */
 #define typecheck(type,x) \
 ({	type __dummy; \
@@ -227,14 +227,6 @@ struct sysinfo {
 	unsigned int mem_unit;		/* Memory unit size in bytes */
 	char _f[20-2*sizeof(long)-sizeof(int)];	/* Padding: libc5 uses this.. */
 };
-
-#define BUG_ON(condition) do { if (unlikely((condition)!=0)) BUG(); } while(0)
-#define WARN_ON(condition) do { \
-	if (unlikely((condition)!=0)) { \
-		printk("Badness in %s at %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \
-		dump_stack(); \
-	} \
-} while (0)
 
 extern void BUILD_BUG(void);
 #define BUILD_BUG_ON(condition) do { if (condition) BUILD_BUG(); } while(0)

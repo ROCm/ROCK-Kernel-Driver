@@ -1381,27 +1381,23 @@ static void __exit slip_exit(void)
 			local_bh_enable();
 		} while (busy && time_before(jiffies, timeout));
 
-		busy = 0;
 		for (i = 0; i < slip_maxdev; i++) {
 			struct slip_ctrl *slc = slip_ctrls[i];
 			if (slc) {
 				unregister_netdev(&slc->dev);
 				if (slc->ctrl.tty) {
 					printk(KERN_ERR "%s: tty discipline is still running\n", slc->dev.name);
-					/* Pin module forever */
-					MOD_INC_USE_COUNT;
-					busy++;
-					continue;
+					/* Intentionally leak the control block. */
+				} else {
+					sl_free_bufs(&slc->ctrl);
+					kfree(slc);
 				}
-				sl_free_bufs(&slc->ctrl);
-				kfree(slc);
 				slip_ctrls[i] = NULL;
 			}
 		}
-		if (!busy) {
-			kfree(slip_ctrls);
-			slip_ctrls = NULL;
-		}
+
+		kfree(slip_ctrls);
+		slip_ctrls = NULL;
 	}
 	if ((i = tty_register_ldisc(N_SLIP, NULL)))
 	{

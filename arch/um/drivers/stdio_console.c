@@ -36,9 +36,7 @@
  * by the tty driver.
  */
 
-static struct tty_driver console_driver;
-
-static int console_refcount = 0;
+static struct tty_driver *console_driver;
 
 static struct chan_ops init_console_ops = {
 	.type		= "you shouldn't see this",
@@ -167,8 +165,8 @@ int stdio_init(void)
 
 	printk(KERN_INFO "Initializing stdio console driver\n");
 
-	line_register_devfs(&console_lines, &driver, &console_driver, vts, 
-			    sizeof(vts)/sizeof(vts[0]));
+	console_driver = line_register_devfs(&console_lines, &driver,
+				&console_ops, vts, sizeof(vts)/sizeof(vts[0]));
 
 	lines_init(vts, sizeof(vts)/sizeof(vts[0]));
 
@@ -190,19 +188,19 @@ static void console_write(struct console *console, const char *string,
 	if(con_init_done) up(&vts[console->index].sem);
 }
 
-static struct tty_driver console_driver = {
-	.refcount 		= &console_refcount,
+static struct tty_operations console_ops = {
 	.open 	 		= con_open,
 	.close 	 		= con_close,
 	.write 	 		= con_write,
 	.chars_in_buffer 	= chars_in_buffer,
-	.set_termios 		= set_termios
+	.set_termios 		= set_termios,
+	.write_room		= line_write_room,
 };
 
 static struct tty_driver *console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &console_driver;
+	return console_driver;
 }
 
 static int console_setup(struct console *co, char *options)

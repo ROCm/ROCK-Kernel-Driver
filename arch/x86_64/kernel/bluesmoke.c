@@ -125,9 +125,9 @@ void do_machine_check(struct pt_regs * regs, long error_code)
 
 static struct pci_dev *find_k8_nb(void)
 { 
-	struct pci_dev *dev;
+	struct pci_dev *dev = NULL;
 	int cpu = smp_processor_id(); 
-	pci_for_each_dev(dev) {
+	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		if (dev->bus->number==0 && PCI_FUNC(dev->devfn)==3 &&
 		    PCI_SLOT(dev->devfn) == (24U+cpu))
 			return dev;
@@ -363,21 +363,11 @@ static void __init k8_mcheck_init(struct cpuinfo_x86 *c)
 	machine_check_vector = k8_machine_check; 
 	for (i = 0; i < banks; i++) { 
 		u64 val = ((1UL<<i) & disabled_banks) ? 0 : ~0UL; 
+		if (val && i == 4) 
+			val = k8_nb_flags;
 		wrmsrl(MSR_IA32_MC0_CTL+4*i, val);
 		wrmsrl(MSR_IA32_MC0_STATUS+4*i,0); 
 	}
-
-	nb = find_k8_nb(); 
-	if (nb != NULL) {
-		u32 reg, reg2;
-		pci_read_config_dword(nb, 0x40, &reg); 
-		pci_write_config_dword(nb, 0x40, k8_nb_flags);
-		pci_read_config_dword(nb, 0x44, &reg2);
-		pci_write_config_dword(nb, 0x44, reg2); 
-		printk(KERN_INFO "Machine Check for K8 Northbridge %d enabled (%x,%x)\n",
-		       nb->devfn, reg, reg2);
-		ignored_banks |= (1UL<<4); 
-	} 
 
 	set_in_cr4(X86_CR4_MCE);	   	
 

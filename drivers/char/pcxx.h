@@ -123,7 +123,6 @@ struct channel {
 	ulong						c_cflag;
 	ulong						c_lflag;
 	ulong						c_oflag;
-	struct termios				normal_termios;
 	struct digi_struct			digiext;
 	ulong						dummy[8];
 };

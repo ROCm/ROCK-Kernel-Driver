@@ -72,6 +72,12 @@ static inline int is_vm_hugetlb_page(struct vm_area_struct *vma)
 #endif /* !CONFIG_HUGETLB_PAGE */
 
 #ifdef CONFIG_HUGETLBFS
+struct hugetlbfs_config {
+        uid_t   uid;
+        gid_t   gid;
+        umode_t mode;
+};
+
 extern struct file_operations hugetlbfs_file_operations;
 extern struct vm_operations_struct hugetlb_vm_ops;
 struct file *hugetlb_zero_setup(size_t);

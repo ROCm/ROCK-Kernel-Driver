@@ -201,11 +201,7 @@ static int rio_init_drivers(void);
 
 void my_hd (void *addr, int len);
 
-static struct tty_driver rio_driver, rio_driver2;
-
-static struct tty_struct * rio_table[RIO_NPORTS];
-static struct termios ** rio_termios;
-static struct termios ** rio_termios_locked;
+static struct tty_driver *rio_driver, *rio_driver2;
 
 /* The name "p" is a bit non-descript. But that's what the rio-lynxos
 sources use all over the place. */
@@ -214,7 +210,6 @@ struct rio_info *p;
 /* struct rio_board boards[RIO_HOSTS]; */
 struct rio_port *rio_ports;
 
-int rio_refcount;
 int rio_initialized;
 int rio_nports;
 int rio_debug;
@@ -366,13 +361,13 @@ int RIODelay_ni (struct Port *PortP, int njiffies)
 
 int rio_minor(struct tty_struct *tty)
 {
-	return tty->index + (tty->driver->termios - rio_termios);
+	return tty->index + (tty->driver == rio_driver) ? 0 : 256;
 }
 
 
 int rio_ismodem(struct tty_struct *tty)
 {
-	return tty->driver == &rio_driver || tty->driver == &rio_driver2;
+	return 1;
 }
 
 
@@ -865,66 +860,77 @@ struct vpd_prom *get_VPD_PROM (struct Host *hp)
   return &vpdp;
 }
 
-
+static struct tty_operations rio_ops = {
+	.open  = riotopen,
+	.close = gs_close,
+	.write = gs_write,
+	.put_char = gs_put_char,
+	.flush_chars = gs_flush_chars,
+	.write_room = gs_write_room,
+	.chars_in_buffer = gs_chars_in_buffer,
+	.flush_buffer = gs_flush_buffer,
+	.ioctl = rio_ioctl,
+	.throttle = rio_throttle,
+	.unthrottle = rio_unthrottle,
+	.set_termios = gs_set_termios,
+	.stop = gs_stop,
+	.start = gs_start,
+	.hangup = gs_hangup,
+};
 
 static int rio_init_drivers(void)
 {
-  int error;
-  
-  func_enter();
+	int error = -ENOMEM;
 
-  memset(&rio_driver, 0, sizeof(rio_driver));
-  rio_driver.magic = TTY_DRIVER_MAGIC;
-  rio_driver.owner = THIS_MODULE;
-  rio_driver.driver_name = "specialix_rio";
-  rio_driver.name = "ttySR";
-  rio_driver.major = RIO_NORMAL_MAJOR0;
-  rio_driver.num = 256;
-  rio_driver.type = TTY_DRIVER_TYPE_SERIAL;
-  rio_driver.subtype = SERIAL_TYPE_NORMAL;
-  rio_driver.init_termios = tty_std_termios;
-  rio_driver.init_termios.c_cflag =
-    B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-  rio_driver.flags = TTY_DRIVER_REAL_RAW;
-  rio_driver.refcount = &rio_refcount;
-  rio_driver.table = rio_table;
-  rio_driver.termios = rio_termios;
-  rio_driver.termios_locked = rio_termios_locked;
+	rio_driver = alloc_tty_driver(256);
+	if (!rio_driver)
+		goto out;
+	rio_driver2 = alloc_tty_driver(256);
+	if (!rio_driver2)
+		goto out1;
 
-  rio_driver.open  = riotopen;
-  rio_driver.close = gs_close;
-  rio_driver.write = gs_write;
-  rio_driver.put_char = gs_put_char;
-  rio_driver.flush_chars = gs_flush_chars;
-  rio_driver.write_room = gs_write_room;
-  rio_driver.chars_in_buffer = gs_chars_in_buffer;
-  rio_driver.flush_buffer = gs_flush_buffer;
-  rio_driver.ioctl = rio_ioctl;
-  rio_driver.throttle = rio_throttle;
-  rio_driver.unthrottle = rio_unthrottle;
-  rio_driver.set_termios = gs_set_termios;
-  rio_driver.stop = gs_stop;
-  rio_driver.start = gs_start;
-  rio_driver.hangup = gs_hangup;
+	func_enter();
 
-  rio_driver2 = rio_driver;
-  rio_driver2.major = RIO_NORMAL_MAJOR1;
-  rio_driver2.termios += 256;
-  rio_driver2.termios_locked += 256;
+	rio_driver->owner = THIS_MODULE;
+	rio_driver->driver_name = "specialix_rio";
+	rio_driver->name = "ttySR";
+	rio_driver->major = RIO_NORMAL_MAJOR0;
+	rio_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	rio_driver->subtype = SERIAL_TYPE_NORMAL;
+	rio_driver->init_termios = tty_std_termios;
+	rio_driver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	rio_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(rio_driver, &rio_ops);
 
-  rio_dprintk (RIO_DEBUG_INIT, "set_termios = %p\n", gs_set_termios);
+	rio_driver2->owner = THIS_MODULE;
+	rio_driver2->driver_name = "specialix_rio";
+	rio_driver2->name = "ttySR";
+	rio_driver2->major = RIO_NORMAL_MAJOR1;
+	rio_driver2->type = TTY_DRIVER_TYPE_SERIAL;
+	rio_driver2->subtype = SERIAL_TYPE_NORMAL;
+	rio_driver2->init_termios = tty_std_termios;
+	rio_driver2->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	rio_driver2->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(rio_driver2, &rio_ops);
 
-  if ((error = tty_register_driver(&rio_driver))) goto bad1;
-  if ((error = tty_register_driver(&rio_driver2))) goto bad2;
+	rio_dprintk (RIO_DEBUG_INIT, "set_termios = %p\n", gs_set_termios);
 
-  func_exit();
-  return 0;
-  /* 
- bad3:tty_unregister_driver (&rio_driver2);
- bad2:tty_unregister_driver (&rio_driver);
- bad1:printk(KERN_ERR "rio: Couldn't register a rio driver, error = %d\n",
-             error);
-  return 1;
+	if ((error = tty_register_driver(rio_driver)))
+		goto out2;
+	if ((error = tty_register_driver(rio_driver2)))
+		goto out3;
+	func_exit();
+	return 0;
+out3:
+	tty_unregister_driver(rio_driver);
+out2:
+	put_tty_driver(rio_driver2);
+out1:
+	put_tty_driver(rio_driver);
+out:
+	printk(KERN_ERR "rio: Couldn't register a rio driver, error = %d\n",
+	     error);
+	return 1;
 }
 
 
@@ -966,16 +972,10 @@ static int rio_init_datastructures (void)
   if (!(p                  = ckmalloc (              RI_SZ))) goto free0;
   if (!(p->RIOHosts        = ckmalloc (RIO_HOSTS * HOST_SZ))) goto free1;
   if (!(p->RIOPortp        = ckmalloc (RIO_PORTS * PORT_SZ))) goto free2;
-  if (!(rio_termios        = ckmalloc (RIO_PORTS * TMIO_SZ))) goto free3;
-  if (!(rio_termios_locked = ckmalloc (RIO_PORTS * TMIO_SZ))) goto free4;
   p->RIOConf = RIOConf;
-  rio_dprintk (RIO_DEBUG_INIT, "Got : %p %p %p %p %p\n", 
-               p, p->RIOHosts, p->RIOPortp, rio_termios, rio_termios);
+  rio_dprintk (RIO_DEBUG_INIT, "Got : %p %p %p\n", 
+               p, p->RIOHosts, p->RIOPortp);
 
-  /* Adjust the values in the "driver" */
-  rio_driver.termios = rio_termios;
-  rio_driver.termios_locked = rio_termios_locked;
-  
 #if 1
   for (i = 0; i < RIO_PORTS; i++) {
     port = p->RIOPortp[i] = ckmalloc (sizeof (struct Port));
@@ -984,7 +984,6 @@ static int rio_init_datastructures (void)
     }
     rio_dprintk (RIO_DEBUG_INIT, "initing port %d (%d)\n", i, port->Mapped);
     port->PortNum = i;
-    port->gs.normal_termios  = tty_std_termios;
     port->gs.magic = RIO_MAGIC;
     port->gs.close_delay = HZ/2;
     port->gs.closing_wait = 30 * HZ;
@@ -1013,13 +1012,12 @@ static int rio_init_datastructures (void)
  free6:for (i--;i>=0;i--)
         kfree (p->RIOPortp[i]);
 /*free5: */
-       kfree (rio_termios_locked); 
- free4:kfree (rio_termios);
+ free4:
  free3:kfree (p->RIOPortp);
  free2:kfree (p->RIOHosts);
  free1:
-  rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p %p %p\n", 
-        	       p, p->RIOHosts, p->RIOPortp, rio_termios, rio_termios);
+  rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p\n", 
+        	       p, p->RIOHosts, p->RIOPortp);
   kfree(p);        	      
  free0:
   return -ENOMEM;
@@ -1028,8 +1026,10 @@ static int rio_init_datastructures (void)
 static void  __exit rio_release_drivers(void)
 {
   func_enter();
-  tty_unregister_driver (&rio_driver2);
-  tty_unregister_driver (&rio_driver);
+  tty_unregister_driver(rio_driver2);
+  tty_unregister_driver(rio_driver);
+  put_tty_driver(rio_driver2);
+  put_tty_driver(rio_driver);
   func_exit();
 }
 
@@ -1126,7 +1126,6 @@ static int __init rio_init(void)
   }
 
 #ifdef CONFIG_PCI
-  if (pci_present ()) {
     /* First look for the JET devices: */
 #ifndef TWO_ZERO
     while ((pdev = pci_find_device (PCI_VENDOR_ID_SPECIALIX, 
@@ -1277,7 +1276,6 @@ static int __init rio_init(void)
 #else
     }  /* Emacs from getting confused we have two closing braces too. */
 #endif
-  }
 #endif /* PCI */
 
   /* Now probe for ISA cards... */
@@ -1399,8 +1397,6 @@ static void __exit rio_exit (void)
   rio_release_drivers ();
 
   /* Release dynamically allocated memory */
-  kfree (rio_termios_locked); 
-  kfree (rio_termios);
   kfree (p->RIOPortp);
   kfree (p->RIOHosts);
   kfree (p);
@@ -1431,3 +1427,4 @@ module_exit(rio_exit);
  * tab-width: 8
  * End:
  */
+

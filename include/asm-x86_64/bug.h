@@ -18,7 +18,15 @@ struct bug_frame {
 #define BUG() \
 	asm volatile("ud2 ; .quad %c1 ; .short %c0" :: \
 		     "i"(__LINE__), "i" (__stringify(KBUILD_BASENAME)))
+#define BUG_ON(condition) do { if (unlikely((condition)!=0)) BUG(); } while(0)
 #define PAGE_BUG(page) BUG()
 void out_of_line_bug(void);
+
+#define WARN_ON(condition) do { \
+	if (unlikely((condition)!=0)) { \
+		printk("Badness in %s at %s:%d\n", __FUNCTION__, __FILE__, __LINE__); \
+		dump_stack(); \
+	} \
+} while (0)
 
 #endif

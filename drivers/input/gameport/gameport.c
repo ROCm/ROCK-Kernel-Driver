@@ -37,7 +37,7 @@ static LIST_HEAD(gameport_dev_list);
 
 #ifdef __i386__
 
-#define DELTA(x,y)      ((y)-(x)+((y)<(x)?1193180/HZ:0))
+#define DELTA(x,y)      ((y)-(x)+((y)<(x)?1193182/HZ:0))
 #define GET_TIME(x)     do { x = get_time_pit(); } while (0)
 
 static unsigned int get_time_pit(void)

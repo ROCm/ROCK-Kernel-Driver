@@ -235,7 +235,6 @@ extern inline int bio_hw_segments(struct request_queue *, struct bio *);
 
 extern inline void __bio_clone(struct bio *, struct bio *);
 extern struct bio *bio_clone(struct bio *, int);
-extern struct bio *bio_copy(struct bio *, int, int);
 
 extern inline void bio_init(struct bio *);
 

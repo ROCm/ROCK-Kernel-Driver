@@ -121,9 +121,6 @@ static int parport_pc_find_nonpci_ports (int autoirq, int autodma)
 	struct linux_ebus_device *edev;
 	int count = 0;
 
-	if (!pci_present())
-		return 0;
-
 	for_each_ebus(ebus) {
 		for_each_ebusdev(edev, ebus) {
 			if (ebus_ecpp_p(edev)) {

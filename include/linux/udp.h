@@ -17,10 +17,7 @@
 #ifndef _LINUX_UDP_H
 #define _LINUX_UDP_H
 
-#include <linux/config.h>
-#include <asm/byteorder.h>
-#include <net/sock.h>
-#include <linux/ip.h>
+#include <linux/types.h>
 
 struct udphdr {
 	__u16	source;
@@ -35,6 +32,12 @@ struct udphdr {
 
 /* UDP encapsulation types */
 #define UDP_ENCAP_ESPINUDP	2 /* draft-ietf-ipsec-udp-encaps-06 */
+
+#ifdef __KERNEL__
+
+#include <linux/config.h>
+#include <net/sock.h>
+#include <linux/ip.h>
 
 struct udp_opt {
 	int		pending;	/* Any pending frames ? */
@@ -62,5 +65,7 @@ struct udp_sock {
 };
 
 #define udp_sk(__sk) (&((struct udp_sock *)__sk)->udp)
+
+#endif
 
 #endif	/* _LINUX_UDP_H */

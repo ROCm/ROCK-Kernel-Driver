@@ -2694,16 +2694,9 @@ int __init ip_rt_init(void)
 	ipv4_dst_ops.gc_thresh = (rt_hash_mask + 1);
 	ip_rt_max_size = (rt_hash_mask + 1) * 16;
 
-	rt_cache_stat = kmalloc_percpu(sizeof (struct rt_cache_stat),
-					GFP_KERNEL);
+	rt_cache_stat = alloc_percpu(struct rt_cache_stat);
 	if (!rt_cache_stat) 
 		goto out_enomem1;
-	for (i = 0; i < NR_CPUS; i++) {
-		if (cpu_possible(i)) {
-			memset(per_cpu_ptr(rt_cache_stat, i), 0,
-			       sizeof (struct rt_cache_stat));
-		}
-	}
 
 	devinet_init();
 	ip_fib_init();
@@ -2739,7 +2732,7 @@ int __init ip_rt_init(void)
 out:
 	return rc;
 out_enomem:
-	kfree_percpu(rt_cache_stat);
+	free_percpu(rt_cache_stat);
 out_enomem1:
 	rc = -ENOMEM;
 	goto out;

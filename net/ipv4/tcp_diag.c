@@ -54,32 +54,32 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 
 	nlh = NLMSG_PUT(skb, pid, seq, TCPDIAG_GETSOCK, sizeof(*r));
 	r = NLMSG_DATA(nlh);
-	if (sk->state != TCP_TIME_WAIT) {
+	if (sk->sk_state != TCP_TIME_WAIT) {
 		if (ext & (1<<(TCPDIAG_MEMINFO-1)))
 			minfo = TCPDIAG_PUT(skb, TCPDIAG_MEMINFO, sizeof(*minfo));
 		if (ext & (1<<(TCPDIAG_INFO-1)))
 			info = TCPDIAG_PUT(skb, TCPDIAG_INFO, sizeof(*info));
 	}
-	r->tcpdiag_family = sk->family;
-	r->tcpdiag_state = sk->state;
+	r->tcpdiag_family = sk->sk_family;
+	r->tcpdiag_state = sk->sk_state;
 	r->tcpdiag_timer = 0;
 	r->tcpdiag_retrans = 0;
 
-	r->id.tcpdiag_if = sk->bound_dev_if;
+	r->id.tcpdiag_if = sk->sk_bound_dev_if;
 	r->id.tcpdiag_cookie[0] = (u32)(unsigned long)sk;
 	r->id.tcpdiag_cookie[1] = (u32)(((unsigned long)sk >> 31) >> 1);
 
 	if (r->tcpdiag_state == TCP_TIME_WAIT) {
 		struct tcp_tw_bucket *tw = (struct tcp_tw_bucket*)sk;
-		long tmo = tw->ttd - jiffies;
+		long tmo = tw->tw_ttd - jiffies;
 		if (tmo < 0)
 			tmo = 0;
 
-		r->id.tcpdiag_sport = tw->sport;
-		r->id.tcpdiag_dport = tw->dport;
-		r->id.tcpdiag_src[0] = tw->rcv_saddr;
-		r->id.tcpdiag_dst[0] = tw->daddr;
-		r->tcpdiag_state = tw->substate;
+		r->id.tcpdiag_sport = tw->tw_sport;
+		r->id.tcpdiag_dport = tw->tw_dport;
+		r->id.tcpdiag_src[0] = tw->tw_rcv_saddr;
+		r->id.tcpdiag_dst[0] = tw->tw_daddr;
+		r->tcpdiag_state = tw->tw_substate;
 		r->tcpdiag_timer = 3;
 		r->tcpdiag_expires = (tmo*1000+HZ-1)/HZ;
 		r->tcpdiag_rqueue = 0;
@@ -89,9 +89,9 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 #ifdef CONFIG_IPV6
 		if (r->tcpdiag_family == AF_INET6) {
 			ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_src,
-				       &tw->v6_rcv_saddr);
+				       &tw->tw_v6_rcv_saddr);
 			ipv6_addr_copy((struct in6_addr *)r->id.tcpdiag_dst,
-				       &tw->v6_daddr);
+				       &tw->tw_v6_daddr);
 		}
 #endif
 		nlh->nlmsg_len = skb->tail - b;
@@ -124,10 +124,10 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 		r->tcpdiag_timer = 4;
 		r->tcpdiag_retrans = tp->probes_out;
 		r->tcpdiag_expires = EXPIRES_IN_MS(tp->timeout);
-	} else if (timer_pending(&sk->timer)) {
+	} else if (timer_pending(&sk->sk_timer)) {
 		r->tcpdiag_timer = 2;
 		r->tcpdiag_retrans = tp->probes_out;
-		r->tcpdiag_expires = EXPIRES_IN_MS(sk->timer.expires);
+		r->tcpdiag_expires = EXPIRES_IN_MS(sk->sk_timer.expires);
 	} else {
 		r->tcpdiag_timer = 0;
 		r->tcpdiag_expires = 0;
@@ -140,16 +140,16 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 	r->tcpdiag_inode = sock_i_ino(sk);
 
 	if (minfo) {
-		minfo->tcpdiag_rmem = atomic_read(&sk->rmem_alloc);
-		minfo->tcpdiag_wmem = sk->wmem_queued;
-		minfo->tcpdiag_fmem = sk->forward_alloc;
-		minfo->tcpdiag_tmem = atomic_read(&sk->wmem_alloc);
+		minfo->tcpdiag_rmem = atomic_read(&sk->sk_rmem_alloc);
+		minfo->tcpdiag_wmem = sk->sk_wmem_queued;
+		minfo->tcpdiag_fmem = sk->sk_forward_alloc;
+		minfo->tcpdiag_tmem = atomic_read(&sk->sk_wmem_alloc);
 	}
 
 	if (info) {
 		u32 now = tcp_time_stamp;
 
-		info->tcpi_state = sk->state;
+		info->tcpi_state = sk->sk_state;
 		info->tcpi_ca_state = tp->ca_state;
 		info->tcpi_retransmits = tp->retransmits;
 		info->tcpi_probes = tp->probes_out;
@@ -264,7 +264,7 @@ static int tcpdiag_get_exact(struct sk_buff *in_skb, struct nlmsghdr *nlh)
 
 out:
 	if (sk) {
-		if (sk->state == TCP_TIME_WAIT)
+		if (sk->sk_state == TCP_TIME_WAIT)
 			tcp_tw_put((struct tcp_tw_bucket*)sk);
 		else
 			sock_put(sk);
@@ -325,7 +325,7 @@ int tcpdiag_bc_run(char *bc, int len, struct sock *sk)
 			yes = ntohs(inet->dport) <= op[1].no;
 			break;
 		case TCPDIAG_BC_AUTO:
-			yes = !(sk->userlocks&SOCK_BINDPORT_LOCK);
+			yes = !(sk->sk_userlocks & SOCK_BINDPORT_LOCK);
 			break;
 		case TCPDIAG_BC_S_COND:
 		case TCPDIAG_BC_D_COND:
@@ -344,7 +344,7 @@ int tcpdiag_bc_run(char *bc, int len, struct sock *sk)
 				break;
 
 #ifdef CONFIG_IPV6
-			if (sk->family == AF_INET6) {
+			if (sk->sk_family == AF_INET6) {
 				struct ipv6_pinfo *np = inet6_sk(sk);
 
 				if (op->code == TCPDIAG_BC_S_COND)
@@ -362,7 +362,8 @@ int tcpdiag_bc_run(char *bc, int len, struct sock *sk)
 
 			if (bitstring_match(addr, cond->addr, cond->prefix_len))
 				break;
-			if (sk->family == AF_INET6 && cond->family == AF_INET) {
+			if (sk->sk_family == AF_INET6 &&
+			    cond->family == AF_INET) {
 				if (addr[0] == 0 && addr[1] == 0 &&
 				    addr[2] == htonl(0xffff) &&
 				    bitstring_match(addr+3, cond->addr, cond->prefix_len))
@@ -466,7 +467,7 @@ int tcpdiag_dump(struct sk_buff *skb, struct netlink_callback *cb)
 
 			for (sk = tcp_listening_hash[i], num = 0;
 			     sk != NULL;
-			     sk = sk->next, num++) {
+			     sk = sk->sk_next, num++) {
 				struct inet_opt *inet = inet_sk(sk);
 				if (num < s_num)
 					continue;
@@ -506,12 +507,12 @@ skip_listen_ht:
 
 		for (sk = head->chain, num = 0;
 		     sk != NULL;
-		     sk = sk->next, num++) {
+		     sk = sk->sk_next, num++) {
 			struct inet_opt *inet = inet_sk(sk);
 
 			if (num < s_num)
 				continue;
-			if (!(r->tcpdiag_states&(1<<sk->state)))
+			if (!(r->tcpdiag_states & (1 << sk->sk_state)))
 				continue;
 			if (r->id.tcpdiag_sport != inet->sport &&
 			    r->id.tcpdiag_sport)
@@ -531,12 +532,12 @@ skip_listen_ht:
 		if (r->tcpdiag_states&TCPF_TIME_WAIT) {
 			for (sk = tcp_ehash[i+tcp_ehash_size].chain;
 			     sk != NULL;
-			     sk = sk->next, num++) {
+			     sk = sk->sk_next, num++) {
 				struct inet_opt *inet = inet_sk(sk);
 
 				if (num < s_num)
 					continue;
-				if (!(r->tcpdiag_states&(1<<sk->zapped)))
+				if (!(r->tcpdiag_states & (1 << sk->sk_zapped)))
 					continue;
 				if (r->id.tcpdiag_sport != inet->sport &&
 				    r->id.tcpdiag_sport)
@@ -622,7 +623,7 @@ static void tcpdiag_rcv(struct sock *sk, int len)
 {
 	struct sk_buff *skb;
 
-	while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
+	while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 		tcpdiag_rcv_skb(skb);
 		kfree_skb(skb);
 	}

@@ -94,19 +94,19 @@ static void nr_remove_socket(struct sock *sk)
 	spin_lock_bh(&nr_list_lock);
 
 	if ((s = nr_list) == sk) {
-		nr_list = s->next;
+		nr_list = s->sk_next;
 		spin_unlock_bh(&nr_list_lock);
 		return;
 	}
 
-	while (s != NULL && s->next != NULL) {
-		if (s->next == sk) {
-			s->next = sk->next;
+	while (s && s->sk_next) {
+		if (s->sk_next == sk) {
+			s->sk_next = sk->sk_next;
 			spin_unlock_bh(&nr_list_lock);
 			return;
 		}
 
-		s = s->next;
+		s = s->sk_next;
 	}
 
 	spin_unlock_bh(&nr_list_lock);
@@ -120,7 +120,7 @@ static void nr_kill_by_device(struct net_device *dev)
 	struct sock *s;
 
 	spin_lock_bh(&nr_list_lock);
-	for (s = nr_list; s != NULL; s = s->next) {
+	for (s = nr_list; s; s = s->sk_next) {
 		if (nr_sk(s)->device == dev)
 			nr_disconnect(s, ENETUNREACH);
 	}
@@ -149,7 +149,7 @@ static int nr_device_event(struct notifier_block *this, unsigned long event, voi
 static void nr_insert_socket(struct sock *sk)
 {
 	spin_lock_bh(&nr_list_lock);
-	sk->next = nr_list;
+	sk->sk_next = nr_list;
 	nr_list  = sk;
 	spin_unlock_bh(&nr_list_lock);
 }
@@ -163,9 +163,9 @@ static struct sock *nr_find_listener(ax25_address *addr)
 	struct sock *s;
 
 	spin_lock_bh(&nr_list_lock);
-	for (s = nr_list; s != NULL; s = s->next) {
+	for (s = nr_list; s; s = s->sk_next) {
 		if (!ax25cmp(&nr_sk(s)->source_addr, addr) &&
-		    s->state == TCP_LISTEN) {
+		    s->sk_state == TCP_LISTEN) {
 			spin_unlock_bh(&nr_list_lock);
 			return s;
 		}
@@ -183,7 +183,7 @@ static struct sock *nr_find_socket(unsigned char index, unsigned char id)
 	struct sock *s;
 
 	spin_lock_bh(&nr_list_lock);
-	for (s = nr_list; s != NULL; s = s->next) {
+	for (s = nr_list; s; s = s->sk_next) {
 		nr_cb *nr = nr_sk(s);
 		
 		if (nr->my_index == index && nr->my_id == id) {
@@ -205,7 +205,7 @@ static struct sock *nr_find_peer(unsigned char index, unsigned char id,
 	struct sock *s;
 
 	spin_lock_bh(&nr_list_lock);
-	for (s = nr_list; s != NULL; s = s->next) {
+	for (s = nr_list; s; s = s->sk_next) {
 		nr_cb *nr = nr_sk(s);
 		
 		if (nr->your_index == index && nr->your_id == id &&
@@ -274,7 +274,7 @@ void nr_destroy_socket(struct sock *sk)
 
 	nr_clear_queues(sk);		/* Flush the queues */
 
-	while ((skb = skb_dequeue(&sk->receive_queue)) != NULL) {
+	while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
 		if (skb->sk != sk) { /* A pending connection */
 			/* Queue the unaccepted socket for death */
 			sock_set_flag(skb->sk, SOCK_DEAD);
@@ -285,13 +285,14 @@ void nr_destroy_socket(struct sock *sk)
 		kfree_skb(skb);
 	}
 
-	if (atomic_read(&sk->wmem_alloc) != 0 || atomic_read(&sk->rmem_alloc) != 0) {
+	if (atomic_read(&sk->sk_wmem_alloc) ||
+	    atomic_read(&sk->sk_rmem_alloc)) {
 		/* Defer: outstanding buffers */
-		init_timer(&sk->timer);
-		sk->timer.expires  = jiffies + 10 * HZ;
-		sk->timer.function = nr_destroy_timer;
-		sk->timer.data     = (unsigned long)sk;
-		add_timer(&sk->timer);
+		init_timer(&sk->sk_timer);
+		sk->sk_timer.expires  = jiffies + 10 * HZ;
+		sk->sk_timer.function = nr_destroy_timer;
+		sk->sk_timer.data     = (unsigned long)sk;
+		add_timer(&sk->sk_timer);
 	} else
 		sk_free(sk);
 }
@@ -407,10 +408,10 @@ static int nr_listen(struct socket *sock, int backlog)
 {
 	struct sock *sk = sock->sk;
 
-	if (sk->state != TCP_LISTEN) {
+	if (sk->sk_state != TCP_LISTEN) {
 		memset(&nr_sk(sk)->user_addr, 0, AX25_ADDR_LEN);
-		sk->max_ack_backlog = backlog;
-		sk->state           = TCP_LISTEN;
+		sk->sk_max_ack_backlog = backlog;
+		sk->sk_state           = TCP_LISTEN;
 		return 0;
 	}
 
@@ -433,7 +434,7 @@ static int nr_create(struct socket *sock, int protocol)
 	sock_init_data(sock, sk);
 
 	sock->ops    = &nr_proto_ops;
-	sk->protocol = protocol;
+	sk->sk_protocol = protocol;
 
 	skb_queue_head_init(&nr->ack_queue);
 	skb_queue_head_init(&nr->reseq_queue);
@@ -462,7 +463,7 @@ static struct sock *nr_make_new(struct sock *osk)
 	struct sock *sk;
 	nr_cb *nr, *onr;
 
-	if (osk->type != SOCK_SEQPACKET)
+	if (osk->sk_type != SOCK_SEQPACKET)
 		return NULL;
 
 	if ((sk = nr_alloc_sock()) == NULL)
@@ -472,16 +473,16 @@ static struct sock *nr_make_new(struct sock *osk)
 
 	sock_init_data(NULL, sk);
 
-	sk->type     = osk->type;
-	sk->socket   = osk->socket;
-	sk->priority = osk->priority;
-	sk->protocol = osk->protocol;
-	sk->rcvbuf   = osk->rcvbuf;
-	sk->sndbuf   = osk->sndbuf;
-	sk->debug    = osk->debug;
-	sk->state    = TCP_ESTABLISHED;
-	sk->sleep    = osk->sleep;
-	sk->zapped   = osk->zapped;
+	sk->sk_type     = osk->sk_type;
+	sk->sk_socket   = osk->sk_socket;
+	sk->sk_priority = osk->sk_priority;
+	sk->sk_protocol = osk->sk_protocol;
+	sk->sk_rcvbuf   = osk->sk_rcvbuf;
+	sk->sk_sndbuf   = osk->sk_sndbuf;
+	sk->sk_debug    = osk->sk_debug;
+	sk->sk_state    = TCP_ESTABLISHED;
+	sk->sk_sleep    = osk->sk_sleep;
+	sk->sk_zapped   = osk->sk_zapped;
 
 	skb_queue_head_init(&nr->ack_queue);
 	skb_queue_head_init(&nr->reseq_queue);
@@ -533,16 +534,16 @@ static int nr_release(struct socket *sock)
 		nr_stop_t4timer(sk);
 		nr_stop_idletimer(sk);
 		nr->state    = NR_STATE_2;
-		sk->state    = TCP_CLOSE;
-		sk->shutdown |= SEND_SHUTDOWN;
-		sk->state_change(sk);
+		sk->sk_state    = TCP_CLOSE;
+		sk->sk_shutdown |= SEND_SHUTDOWN;
+		sk->sk_state_change(sk);
 		sock_set_flag(sk, SOCK_DEAD);
 		sock_set_flag(sk, SOCK_DESTROY);
-		sk->socket   = NULL;
+		sk->sk_socket   = NULL;
 		break;
 
 	default:
-		sk->socket = NULL;
+		sk->sk_socket = NULL;
 		break;
 	}
 
@@ -559,7 +560,7 @@ static int nr_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	struct net_device *dev;
 	ax25_address *user, *source;
 
-	if (sk->zapped == 0)
+	if (!sk->sk_zapped)
 		return -EINVAL;
 
 	if (addr_len < sizeof(struct sockaddr_ax25) || addr_len > sizeof(struct
@@ -601,7 +602,7 @@ full_sockaddr_ax25))
 	nr->device = dev;
 	nr_insert_socket(sk);
 
-	sk->zapped = 0;
+	sk->sk_zapped = 0;
 	SOCK_DEBUG(sk, "NET/ROM: socket is bound\n");
 	return 0;
 }
@@ -615,20 +616,20 @@ static int nr_connect(struct socket *sock, struct sockaddr *uaddr,
 	ax25_address *user, *source = NULL;
 	struct net_device *dev;
 
-	if (sk->state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
+	if (sk->sk_state == TCP_ESTABLISHED && sock->state == SS_CONNECTING) {
 		sock->state = SS_CONNECTED;
 		return 0;	/* Connect completed during a ERESTARTSYS event */
 	}
 
-	if (sk->state == TCP_CLOSE && sock->state == SS_CONNECTING) {
+	if (sk->sk_state == TCP_CLOSE && sock->state == SS_CONNECTING) {
 		sock->state = SS_UNCONNECTED;
 		return -ECONNREFUSED;
 	}
 
-	if (sk->state == TCP_ESTABLISHED)
+	if (sk->sk_state == TCP_ESTABLISHED)
 		return -EISCONN;	/* No reconnect on a seqpacket socket */
 
-	sk->state   = TCP_CLOSE;	
+	sk->sk_state   = TCP_CLOSE;	
 	sock->state = SS_UNCONNECTED;
 
 	if (addr_len != sizeof(struct sockaddr_ax25) && addr_len != sizeof(struct full_sockaddr_ax25))
@@ -637,8 +638,8 @@ static int nr_connect(struct socket *sock, struct sockaddr *uaddr,
 	if (addr->sax25_family != AF_NETROM)
 		return -EINVAL;
 
-	if (sk->zapped) {	/* Must bind first - autobinding in this may or may not work */
-		sk->zapped = 0;
+	if (sk->sk_zapped) {	/* Must bind first - autobinding in this may or may not work */
+		sk->sk_zapped = 0;
 
 		if ((dev = nr_dev_first()) == NULL)
 			return -ENETUNREACH;
@@ -668,8 +669,8 @@ static int nr_connect(struct socket *sock, struct sockaddr *uaddr,
 	circuit++;
 
 	/* Move to connecting socket, start sending Connect Requests */
-	sock->state            = SS_CONNECTING;
-	sk->state              = TCP_SYN_SENT;
+	sock->state  = SS_CONNECTING;
+	sk->sk_state = TCP_SYN_SENT;
 
 	nr_establish_data_link(sk);
 
@@ -678,21 +679,21 @@ static int nr_connect(struct socket *sock, struct sockaddr *uaddr,
 	nr_start_heartbeat(sk);
 
 	/* Now the loop */
-	if (sk->state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
+	if (sk->sk_state != TCP_ESTABLISHED && (flags & O_NONBLOCK))
 		return -EINPROGRESS;
 		
 	/*
 	 * A Connect Ack with Choke or timeout or failed routing will go to
 	 * closed.
 	 */
-	if (sk->state == TCP_SYN_SENT) {
+	if (sk->sk_state == TCP_SYN_SENT) {
 		struct task_struct *tsk = current;
 		DECLARE_WAITQUEUE(wait, tsk);
 
-		add_wait_queue(sk->sleep, &wait);
+		add_wait_queue(sk->sk_sleep, &wait);
 		for (;;) {
 			set_current_state(TASK_INTERRUPTIBLE);
-			if (sk->state != TCP_SYN_SENT)
+			if (sk->sk_state != TCP_SYN_SENT)
 				break;
 			if (!signal_pending(tsk)) {
 				schedule();
@@ -701,10 +702,10 @@ static int nr_connect(struct socket *sock, struct sockaddr *uaddr,
 			return -ERESTARTSYS;
 		}
 		current->state = TASK_RUNNING;
-		remove_wait_queue(sk->sleep, &wait);
+		remove_wait_queue(sk->sk_sleep, &wait);
 	}
 
-	if (sk->state != TCP_ESTABLISHED) {
+	if (sk->sk_state != TCP_ESTABLISHED) {
 		sock->state = SS_UNCONNECTED;
 		return sock_error(sk);	/* Always set at this point */
 	}
@@ -727,12 +728,12 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 		return -EINVAL;
 
 	lock_sock(sk);
-	if (sk->type != SOCK_SEQPACKET) {
+	if (sk->sk_type != SOCK_SEQPACKET) {
 		err = -EOPNOTSUPP;
 		goto out;
 	}
 
-	if (sk->state != TCP_LISTEN) {
+	if (sk->sk_state != TCP_LISTEN) {
 		err = -EINVAL;
 		goto out;
 	}
@@ -741,9 +742,9 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 	 *	The write queue this time is holding sockets ready to use
 	 *	hooked into the SABM we saved
 	 */
-	add_wait_queue(sk->sleep, &wait);
+	add_wait_queue(sk->sk_sleep, &wait);
 	for (;;) {
-		skb = skb_dequeue(&sk->receive_queue);
+		skb = skb_dequeue(&sk->sk_receive_queue);
 		if (skb)
 			break;
 
@@ -759,16 +760,16 @@ static int nr_accept(struct socket *sock, struct socket *newsock, int flags)
 		return -ERESTARTSYS;
 	}
 	current->state = TASK_RUNNING;
-	remove_wait_queue(sk->sleep, &wait);
+	remove_wait_queue(sk->sk_sleep, &wait);
 
 	newsk = skb->sk;
-	newsk->pair = NULL;
-	newsk->socket = newsock;
-	newsk->sleep = &newsock->wait;
+	newsk->sk_pair = NULL;
+	newsk->sk_socket = newsock;
+	newsk->sk_sleep = &newsock->wait;
 
 	/* Now attach up the new socket */
 	kfree_skb(skb);
-	sk->ack_backlog--;
+	sk->sk_ack_backlog--;
 	newsock->sk = newsk;
 
 out:
@@ -783,7 +784,7 @@ static int nr_getname(struct socket *sock, struct sockaddr *uaddr,
 	nr_cb *nr = nr_sk(sk);
 
 	if (peer != 0) {
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 		sax->fsa_ax25.sax25_family = AF_NETROM;
 		sax->fsa_ax25.sax25_ndigis = 1;
@@ -893,7 +894,8 @@ int nr_rx_frame(struct sk_buff *skb, struct net_device *dev)
 
 	user = (ax25_address *)(skb->data + 21);
 
-	if (sk == NULL || sk->ack_backlog == sk->max_ack_backlog || (make = nr_make_new(sk)) == NULL) {
+	if (!sk || sk->sk_ack_backlog == sk->sk_max_ack_backlog ||
+	    (make = nr_make_new(sk)) == NULL) {
 		nr_transmit_refusal(skb, 0);
 		return 0;
 	}
@@ -901,7 +903,7 @@ int nr_rx_frame(struct sk_buff *skb, struct net_device *dev)
 	window = skb->data[20];
 
 	skb->sk             = make;
-	make->state         = TCP_ESTABLISHED;
+	make->sk_state	    = TCP_ESTABLISHED;
 
 	/* Fill in his circuit details */
 	nr_make = nr_sk(make);
@@ -941,18 +943,18 @@ int nr_rx_frame(struct sk_buff *skb, struct net_device *dev)
 	nr_make->vr        = 0;
 	nr_make->vl        = 0;
 	nr_make->state     = NR_STATE_3;
-	sk->ack_backlog++;
-	make->pair = sk;
+	sk->sk_ack_backlog++;
+	make->sk_pair = sk;
 
 	nr_insert_socket(make);
 
-	skb_queue_head(&sk->receive_queue, skb);
+	skb_queue_head(&sk->sk_receive_queue, skb);
 
 	nr_start_heartbeat(make);
 	nr_start_idletimer(make);
 
 	if (!sock_flag(sk, SOCK_DEAD))
-		sk->data_ready(sk, skb->len);
+		sk->sk_data_ready(sk, skb->len);
 
 	return 1;
 }
@@ -972,10 +974,10 @@ static int nr_sendmsg(struct kiocb *iocb, struct socket *sock,
 	if (msg->msg_flags & ~(MSG_DONTWAIT|MSG_EOR))
 		return -EINVAL;
 
-	if (sk->zapped)
+	if (sk->sk_zapped)
 		return -EADDRNOTAVAIL;
 
-	if (sk->shutdown & SEND_SHUTDOWN) {
+	if (sk->sk_shutdown & SEND_SHUTDOWN) {
 		send_sig(SIGPIPE, current, 0);
 		return -EPIPE;
 	}
@@ -992,7 +994,7 @@ static int nr_sendmsg(struct kiocb *iocb, struct socket *sock,
 		if (sax.sax25_family != AF_NETROM)
 			return -EINVAL;
 	} else {
-		if (sk->state != TCP_ESTABLISHED)
+		if (sk->sk_state != TCP_ESTABLISHED)
 			return -ENOTCONN;
 		sax.sax25_family = AF_NETROM;
 		sax.sax25_call   = nr->dest_addr;
@@ -1038,7 +1040,7 @@ static int nr_sendmsg(struct kiocb *iocb, struct socket *sock,
 	memcpy_fromiovec(asmptr, msg->msg_iov, len);
 	SOCK_DEBUG(sk, "NET/ROM: Transmitting buffer\n");
 
-	if (sk->state != TCP_ESTABLISHED) {
+	if (sk->sk_state != TCP_ESTABLISHED) {
 		kfree_skb(skb);
 		return -ENOTCONN;
 	}
@@ -1062,7 +1064,7 @@ static int nr_recvmsg(struct kiocb *iocb, struct socket *sock,
 	 * us! We do one quick check first though
 	 */
 
-	if (sk->state != TCP_ESTABLISHED)
+	if (sk->sk_state != TCP_ESTABLISHED)
 		return -ENOTCONN;
 
 	/* Now we can treat all alike */
@@ -1099,7 +1101,7 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 	switch (cmd) {
 	case TIOCOUTQ: {
 		long amount;
-		amount = sk->sndbuf - atomic_read(&sk->wmem_alloc);
+		amount = sk->sk_sndbuf - atomic_read(&sk->sk_wmem_alloc);
 		if (amount < 0)
 			amount = 0;
 		return put_user(amount, (int *)arg);
@@ -1109,16 +1111,16 @@ static int nr_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
 		struct sk_buff *skb;
 		long amount = 0L;
 		/* These two are safe on a single CPU system as only user tasks fiddle here */
-		if ((skb = skb_peek(&sk->receive_queue)) != NULL)
+		if ((skb = skb_peek(&sk->sk_receive_queue)) != NULL)
 			amount = skb->len;
 		return put_user(amount, (int *)arg);
 	}
 
 	case SIOCGSTAMP:
 		if (sk != NULL) {
-			if (sk->stamp.tv_sec == 0)
+			if (!sk->sk_stamp.tv_sec)
 				return -ENOENT;
-			return copy_to_user((void *)arg, &sk->stamp, sizeof(struct timeval)) ? -EFAULT : 0;
+			return copy_to_user((void *)arg, &sk->sk_stamp, sizeof(struct timeval)) ? -EFAULT : 0;
 		}
 		return -EINVAL;
 
@@ -1160,7 +1162,7 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 
 	len += sprintf(buffer, "user_addr dest_node src_node  dev    my  your  st  vs  vr  va    t1     t2     t4      idle   n2  wnd Snd-Q Rcv-Q inode\n");
 
-	for (s = nr_list; s != NULL; s = s->next) {
+	for (s = nr_list; s; s = s->sk_next) {
 		nr_cb *nr = nr_sk(s);
 
 		if ((dev = nr->device) == NULL)
@@ -1194,9 +1196,9 @@ static int nr_get_info(char *buffer, char **start, off_t offset, int length)
 			nr->n2count,
 			nr->n2,
 			nr->window,
-			atomic_read(&s->wmem_alloc),
-			atomic_read(&s->rmem_alloc),
-			s->socket != NULL ? SOCK_INODE(s->socket)->i_ino : 0L);
+			atomic_read(&s->sk_wmem_alloc),
+			atomic_read(&s->sk_rmem_alloc),
+			s->sk_socket ? SOCK_INODE(s->sk_socket)->i_ino : 0L);
 
 		pos = begin + len;
 

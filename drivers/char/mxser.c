@@ -258,7 +258,7 @@ struct mxser_struct {
 	int xmit_tail;
 	int xmit_cnt;
 	struct work_struct tqueue;
-	struct termios normal_termios;
+	int cflag;
 	wait_queue_head_t open_wait;
 	wait_queue_head_t close_wait;
 	wait_queue_head_t delta_msr_wait;
@@ -288,12 +288,8 @@ static int mxserBoardCAP[MXSER_BOARDS] =
 };
 
 
-static struct tty_driver mxvar_sdriver;
-static int mxvar_refcount;
+static struct tty_driver *mxvar_sdriver;
 static struct mxser_struct mxvar_table[MXSER_PORTS];
-static struct tty_struct *mxvar_tty[MXSER_PORTS + 1];
-static struct termios *mxvar_termios[MXSER_PORTS + 1];
-static struct termios *mxvar_termios_locked[MXSER_PORTS + 1];
 static struct mxser_log mxvar_log;
 static int mxvar_diagflag;
 /*
@@ -368,8 +364,9 @@ static void __exit mxser_module_exit(void)
 
 	if (verbose)
 		printk("Unloading module mxser ...\n");
-	if ((err |= tty_unregister_driver(&mxvar_sdriver)))
+	if ((err |= tty_unregister_driver(mxvar_sdriver)))
 		printk("Couldn't unregister MOXA Smartio family serial driver\n");
+	put_tty_driver(mxvar_sdriver);
 
 	for (i = 0; i < MXSER_BOARDS; i++) {
 		if (mxsercfg[i].board_type == -1)
@@ -420,7 +417,7 @@ int mxser_initbrd(int board, struct mxser_hwconf *hwconf)
 		info->close_delay = 5 * HZ / 10;
 		info->closing_wait = 30 * HZ;
 		INIT_WORK(&info->tqueue, mxser_do_softint, info);
-		info->normal_termios = mxvar_sdriver.init_termios;
+		info->cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		init_waitqueue_head(&info->delta_msr_wait);
@@ -479,6 +476,24 @@ static int mxser_get_PCI_conf(struct pci_dev *pdev, int board_type, struct mxser
 	return (0);
 }
 
+static struct tty_operations mxser_ops = {
+	.open = mxser_open,
+	.close = mxser_close,
+	.write = mxser_write,
+	.put_char = mxser_put_char,
+	.flush_chars = mxser_flush_chars,
+	.write_room = mxser_write_room,
+	.chars_in_buffer = mxser_chars_in_buffer,
+	.flush_buffer = mxser_flush_buffer,
+	.ioctl = mxser_ioctl,
+	.throttle = mxser_throttle,
+	.unthrottle = mxser_unthrottle,
+	.set_termios = mxser_set_termios,
+	.stop = mxser_stop,
+	.start = mxser_start,
+	.hangup = mxser_hangup,
+};
+
 static int __init mxser_module_init(void)
 {
 	int i, m, retval, b;
@@ -486,43 +501,24 @@ static int __init mxser_module_init(void)
 	int ret1, ret2;
 	struct mxser_hwconf hwconf;
 
+	mxvar_sdriver = alloc_tty_driver(MXSER_PORTS + 1);
+	if (!mxvar_sdriver)
+		return -ENOMEM;
+
 	printk("MOXA Smartio family driver version %s\n", MXSER_VERSION);
 
 	/* Initialize the tty_driver structure */
 
-	memset(&mxvar_sdriver, 0, sizeof(struct tty_driver));
-	mxvar_sdriver.magic = TTY_DRIVER_MAGIC;
-	mxvar_sdriver.owner = THIS_MODULE;
-	mxvar_sdriver.name = "ttyM";
-	mxvar_sdriver.major = ttymajor;
-	mxvar_sdriver.minor_start = 0;
-	mxvar_sdriver.num = MXSER_PORTS + 1;
-	mxvar_sdriver.type = TTY_DRIVER_TYPE_SERIAL;
-	mxvar_sdriver.subtype = SERIAL_TYPE_NORMAL;
-	mxvar_sdriver.init_termios = tty_std_termios;
-	mxvar_sdriver.init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
-	mxvar_sdriver.flags = TTY_DRIVER_REAL_RAW;
-	mxvar_sdriver.refcount = &mxvar_refcount;
-	mxvar_sdriver.table = mxvar_tty;
-	mxvar_sdriver.termios = mxvar_termios;
-	mxvar_sdriver.termios_locked = mxvar_termios_locked;
-
-	mxvar_sdriver.open = mxser_open;
-	mxvar_sdriver.close = mxser_close;
-	mxvar_sdriver.write = mxser_write;
-	mxvar_sdriver.put_char = mxser_put_char;
-	mxvar_sdriver.flush_chars = mxser_flush_chars;
-	mxvar_sdriver.write_room = mxser_write_room;
-	mxvar_sdriver.chars_in_buffer = mxser_chars_in_buffer;
-	mxvar_sdriver.flush_buffer = mxser_flush_buffer;
-	mxvar_sdriver.ioctl = mxser_ioctl;
-	mxvar_sdriver.throttle = mxser_throttle;
-	mxvar_sdriver.unthrottle = mxser_unthrottle;
-	mxvar_sdriver.set_termios = mxser_set_termios;
-	mxvar_sdriver.stop = mxser_stop;
-	mxvar_sdriver.start = mxser_start;
-	mxvar_sdriver.hangup = mxser_hangup;
-
+	mxvar_sdriver->owner = THIS_MODULE;
+	mxvar_sdriver->name = "ttyM";
+	mxvar_sdriver->major = ttymajor;
+	mxvar_sdriver->minor_start = 0;
+	mxvar_sdriver->type = TTY_DRIVER_TYPE_SERIAL;
+	mxvar_sdriver->subtype = SERIAL_TYPE_NORMAL;
+	mxvar_sdriver->init_termios = tty_std_termios;
+	mxvar_sdriver->init_termios.c_cflag = B9600 | CS8 | CREAD | HUPCL | CLOCAL;
+	mxvar_sdriver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(mxvar_sdriver, &mxser_ops);
 	printk("Tty devices major number = %d\n", ttymajor);
 
 	mxvar_diagflag = 0;
@@ -648,9 +644,10 @@ static int __init mxser_module_init(void)
 	}
 
 
-	if (!tty_register_driver(&mxvar_sdriver))
+	if (!tty_register_driver(mxvar_sdriver))
 		return 0;
 
+	put_tty_driver(mxvar_sdriver);
 	printk("Couldn't install MOXA Smartio family driver !\n");
 
 	for (i = 0; i < MXSER_BOARDS; i++) {
@@ -722,15 +719,7 @@ static int mxser_open(struct tty_struct *tty, struct file *filp)
 	if (retval)
 		return (retval);
 
-	retval = mxser_block_til_ready(tty, filp, info);
-	if (retval)
-		return (retval);
-
-	if ((info->count == 1) && (info->flags & ASYNC_SPLIT_TERMIOS)) {
-		*tty->termios = info->normal_termios;
-		mxser_change_speed(info, 0);
-	}
-	return (0);
+	return mxser_block_til_ready(tty, filp, info);
 }
 
 /*
@@ -780,12 +769,7 @@ static void mxser_close(struct tty_struct *tty, struct file *filp)
 		return;
 	}
 	info->flags |= ASYNC_CLOSING;
-	/*
-	 * Save the termios structure, since this port may have
-	 * separate termios for callout and dialin.
-	 */
-	if (info->flags & ASYNC_NORMAL_ACTIVE)
-		info->normal_termios = *tty->termios;
+	info->cflag = tty->termios->c_cflag;
 	/*
 	 * Now we wait for the transmit buffer to clear; and we notify
 	 * the line discipline to only process XON/XOFF characters.
@@ -1140,7 +1124,7 @@ static int mxser_ioctl_special(unsigned int cmd, unsigned long arg)
 				continue;
 			}
 			if (!mxvar_table[i].tty || !mxvar_table[i].tty->termios)
-				GMStatus[i].cflag = mxvar_table[i].normal_termios.c_cflag;
+				GMStatus[i].cflag = mxvar_table[i].cflag;
 			else
 				GMStatus[i].cflag = mxvar_table[i].tty->termios->c_cflag;
 

@@ -19,6 +19,7 @@ struct request_queue;
 typedef struct request_queue request_queue_t;
 struct elevator_s;
 typedef struct elevator_s elevator_t;
+struct request_pm_state;
 
 #define BLKDEV_MIN_RQ	4
 #define BLKDEV_MAX_RQ	128
@@ -102,6 +103,11 @@ struct request {
 	void *sense;
 
 	unsigned int timeout;
+
+	/*
+	 * For Power Management requests
+	 */
+	struct request_pm_state *pm;
 };
 
 /*
@@ -130,6 +136,10 @@ enum rq_flag_bits {
 	__REQ_DRIVE_CMD,
 	__REQ_DRIVE_TASK,
 	__REQ_DRIVE_TASKFILE,
+	__REQ_PREEMPT,		/* set for "ide_preempt" requests */
+	__REQ_PM_SUSPEND,	/* suspend request */
+	__REQ_PM_RESUME,	/* resume request */
+	__REQ_PM_SHUTDOWN,	/* shutdown request */
 	__REQ_NR_BITS,	/* stops here */
 };
 
@@ -151,6 +161,23 @@ enum rq_flag_bits {
 #define REQ_DRIVE_CMD	(1 << __REQ_DRIVE_CMD)
 #define REQ_DRIVE_TASK	(1 << __REQ_DRIVE_TASK)
 #define REQ_DRIVE_TASKFILE	(1 << __REQ_DRIVE_TASKFILE)
+#define REQ_PREEMPT	(1 << __REQ_PREEMPT)
+#define REQ_PM_SUSPEND	(1 << __REQ_PM_SUSPEND)
+#define REQ_PM_RESUME	(1 << __REQ_PM_RESUME)
+#define REQ_PM_SHUTDOWN	(1 << __REQ_PM_SHUTDOWN)
+
+/*
+ * State information carried for REQ_PM_SUSPEND and REQ_PM_RESUME
+ * requests. Some step values could eventually be made generic.
+ */
+struct request_pm_state
+{
+	/* PM state machine step value, currently driver specific */
+	int	pm_step;
+	/* requested PM state value (S1, S2, S3, S4, ...) */
+	u32	pm_state;
+	void*	data;		/* for driver use */
+};
 
 #include <linux/elevator.h>
 
@@ -277,6 +304,12 @@ struct request_queue
 #define blk_queue_tagged(q)	test_bit(QUEUE_FLAG_QUEUED, &(q)->queue_flags)
 #define blk_fs_request(rq)	((rq)->flags & REQ_CMD)
 #define blk_pc_request(rq)	((rq)->flags & REQ_BLOCK_PC)
+
+#define blk_pm_suspend_request(rq)	((rq)->flags & REQ_PM_SUSPEND)
+#define blk_pm_resume_request(rq)	((rq)->flags & REQ_PM_RESUME)
+#define blk_pm_request(rq)	\
+	((rq)->flags & (REQ_PM_SUSPEND | REQ_PM_RESUME))
+
 #define list_entry_rq(ptr)	list_entry((ptr), struct request, queuelist)
 
 #define rq_data_dir(rq)		((rq)->flags & 1)
@@ -431,7 +464,6 @@ extern void blk_queue_max_hw_segments(request_queue_t *, unsigned short);
 extern void blk_queue_max_segment_size(request_queue_t *, unsigned int);
 extern void blk_queue_hardsect_size(request_queue_t *, unsigned short);
 extern void blk_queue_segment_boundary(request_queue_t *, unsigned long);
-extern void blk_queue_assign_lock(request_queue_t *, spinlock_t *);
 extern void blk_queue_prep_rq(request_queue_t *, prep_rq_fn *pfn);
 extern void blk_queue_merge_bvec(request_queue_t *, merge_bvec_fn *);
 extern void blk_queue_dma_alignment(request_queue_t *, int);
@@ -458,6 +490,7 @@ extern void blk_queue_invalidate_tags(request_queue_t *);
 extern void blk_congestion_wait(int rw, long timeout);
 
 extern void blk_rq_bio_prep(request_queue_t *, struct request *, struct bio *);
+extern void blk_rq_prep_restart(struct request *);
 
 #define MAX_PHYS_SEGMENTS 128
 #define MAX_HW_SEGMENTS 128

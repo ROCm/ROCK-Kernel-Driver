@@ -107,11 +107,7 @@ static struct raw3215_req *raw3215_freelist;
 /* spinlock to protect free list */
 static spinlock_t raw3215_freelist_lock;
 
-static struct tty_driver tty3215_driver;
-static struct tty_struct *tty3215_table[NR_3215];
-static struct termios *tty3215_termios[NR_3215];
-static struct termios *tty3215_termios_locked[NR_3215];
-static int tty3215_refcount;
+static struct tty_driver *tty3215_driver;
 
 /*
  * Get a request structure from the free list
@@ -843,7 +839,7 @@ con3215_write(struct console *co, const char *str, unsigned int count)
 static struct tty_driver *con3215_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &tty3215_driver;
+	return tty3215_driver;
 }
 
 /*
@@ -1155,6 +1151,21 @@ tty3215_start(struct tty_struct *tty)
 	}
 }
 
+static struct tty_operations tty3215_ops = {
+	.open = tty3215_open,
+	.close = tty3215_close,
+	.write = tty3215_write,
+	.put_char = tty3215_put_char,
+	.flush_chars = tty3215_flush_chars,
+	.write_room = tty3215_write_room,
+	.chars_in_buffer = tty3215_chars_in_buffer,
+	.flush_buffer = tty3215_flush_buffer,
+	.ioctl = tty3215_ioctl,
+	.throttle = tty3215_throttle,
+	.unthrottle = tty3215_unthrottle,
+	.stop = tty3215_stop,
+	.start = tty3215_start,
+};
 
 /*
  * 3215 tty registration code called from tty_init().
@@ -1163,70 +1174,54 @@ tty3215_start(struct tty_struct *tty)
 int __init
 tty3215_init(void)
 {
+	struct tty_driver *driver;
 	int ret;
 
 	if (!CONSOLE_IS_3215)
 		return 0;
 
+	driver = alloc_tty_driver(NR_3215);
+	if (!driver)
+		return -ENOMEM;
+
 	ret = ccw_driver_register(&raw3215_ccw_driver);
-	if (ret)
+	if (ret) {
+		put_tty_driver(driver);
 		return ret;
+	}
 	/*
 	 * Initialize the tty_driver structure
 	 * Entries in tty3215_driver that are NOT initialized:
 	 * proc_entry, set_termios, flush_buffer, set_ldisc, write_proc
 	 */
 
-	memset(&tty3215_driver, 0, sizeof(struct tty_driver));
-	tty3215_driver.magic = TTY_DRIVER_MAGIC;
-	tty3215_driver.owner = THIS_MODULE;
-	tty3215_driver.driver_name = "tty3215";
-	tty3215_driver.name = "ttyS";
-	tty3215_driver.major = TTY_MAJOR;
-	tty3215_driver.minor_start = 64;
-	tty3215_driver.num = NR_3215;
-	tty3215_driver.type = TTY_DRIVER_TYPE_SYSTEM;
-	tty3215_driver.subtype = SYSTEM_TYPE_TTY;
-	tty3215_driver.init_termios = tty_std_termios;
-	tty3215_driver.init_termios.c_iflag = IGNBRK | IGNPAR;
-	tty3215_driver.init_termios.c_oflag = ONLCR | XTABS;
-	tty3215_driver.init_termios.c_lflag = ISIG;
-	tty3215_driver.flags = TTY_DRIVER_REAL_RAW;
-	tty3215_driver.refcount = &tty3215_refcount;
-	tty3215_driver.table = tty3215_table;
-	tty3215_driver.termios = tty3215_termios;
-	tty3215_driver.termios_locked = tty3215_termios_locked;
-
-	tty3215_driver.open = tty3215_open;
-	tty3215_driver.close = tty3215_close;
-	tty3215_driver.write = tty3215_write;
-	tty3215_driver.put_char = tty3215_put_char;
-	tty3215_driver.flush_chars = tty3215_flush_chars;
-	tty3215_driver.write_room = tty3215_write_room;
-	tty3215_driver.chars_in_buffer = tty3215_chars_in_buffer;
-	tty3215_driver.flush_buffer = tty3215_flush_buffer;
-	tty3215_driver.ioctl = tty3215_ioctl;
-	tty3215_driver.throttle = tty3215_throttle;
-	tty3215_driver.unthrottle = tty3215_unthrottle;
-	tty3215_driver.send_xchar = NULL;
-	tty3215_driver.set_termios = NULL;
-	tty3215_driver.stop = tty3215_stop;
-	tty3215_driver.start = tty3215_start;
-	tty3215_driver.hangup = NULL;
-	tty3215_driver.break_ctl = NULL;
-	tty3215_driver.wait_until_sent = NULL;
-	tty3215_driver.read_proc = NULL;
-
-	ret = tty_register_driver(&tty3215_driver);
-	if (ret)
+	driver->owner = THIS_MODULE;
+	driver->driver_name = "tty3215";
+	driver->name = "ttyS";
+	driver->major = TTY_MAJOR;
+	driver->minor_start = 64;
+	driver->type = TTY_DRIVER_TYPE_SYSTEM;
+	driver->subtype = SYSTEM_TYPE_TTY;
+	driver->init_termios = tty_std_termios;
+	driver->init_termios.c_iflag = IGNBRK | IGNPAR;
+	driver->init_termios.c_oflag = ONLCR | XTABS;
+	driver->init_termios.c_lflag = ISIG;
+	driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(driver, &tty3215_ops);
+	ret = tty_register_driver(driver);
+	if (ret) {
 		printk("Couldn't register tty3215 driver\n");
-	return ret;
+		put_tty_driver(driver);
+		return ret;
+	}
+	tty3215_driver = driver;
 }
 
 static void __exit
 tty3215_exit(void)
 {
-	tty_unregister_driver(&tty3215_driver);
+	tty_unregister_driver(tty3215_driver);
+	put_tty_driver(tty3215_driver);
 	ccw_driver_unregister(&raw3215_ccw_driver);
 }
 

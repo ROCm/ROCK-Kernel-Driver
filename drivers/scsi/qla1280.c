@@ -360,7 +360,6 @@ static inline uint16_t qla1280_addr48_63(dma_addr_t dma)
  */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 4, 0)
 #define pci_set_dma_mask(dev, mask)		dev->dma_mask = mask;
-#define pci_present()				pcibios_present()
 #define pci_enable_device(pdev)			0
 #define pci_find_subsys(id, dev, sid, sdev, pdev) pci_find_device(id,dev,pdev)
 #define scsi_set_pci_device(host, pdev)
@@ -1008,11 +1007,6 @@ qla1280_detect(Scsi_Host_Template * template)
 	       "arguments to\n"
 	       "qla1280: insmod or else it might trash certain memory areas.\n");
 #endif
-
-	if (!pci_present()) {
-		printk(KERN_INFO "scsi: PCI not present\n");
-		return 0;
-	}
 
 	bdp = &ql1280_board_tbl[0];
 	qla1280_hostlist = NULL;

@@ -281,16 +281,15 @@ static unsigned int __init init_chipset_cs5530 (struct pci_dev *dev, const char 
 	}
 #endif /* DISPLAY_CS5530_TIMINGS && CONFIG_PROC_FS */
 
-	pci_for_each_dev (dev) {
-		if (dev->vendor == PCI_VENDOR_ID_CYRIX) {
-			switch (dev->device) {
-				case PCI_DEVICE_ID_CYRIX_PCI_MASTER:
-					master_0 = dev;
-					break;
-				case PCI_DEVICE_ID_CYRIX_5530_LEGACY:
-					cs5530_0 = dev;
-					break;
-			}
+	dev = NULL;
+	while ((dev = pci_find_device(PCI_VENDOR_ID_CYRIX, PCI_ANY_ID, dev)) != NULL) {
+		switch (dev->device) {
+			case PCI_DEVICE_ID_CYRIX_PCI_MASTER:
+				master_0 = dev;
+				break;
+			case PCI_DEVICE_ID_CYRIX_5530_LEGACY:
+				cs5530_0 = dev;
+				break;
 		}
 	}
 	if (!master_0) {

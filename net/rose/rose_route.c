@@ -907,11 +907,11 @@ int rose_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 			rose->neighbour	 = NULL;
 			rose->lci	 = 0;
 			rose->state	 = ROSE_STATE_0;
-			sk->state	 = TCP_CLOSE;
-			sk->err		 = 0;
-			sk->shutdown	 |= SEND_SHUTDOWN;
+			sk->sk_state	 = TCP_CLOSE;
+			sk->sk_err	 = 0;
+			sk->sk_shutdown	 |= SEND_SHUTDOWN;
 			if (!sock_flag(sk, SOCK_DEAD)) {
-				sk->state_change(sk);
+				sk->sk_state_change(sk);
 				sock_set_flag(sk, SOCK_DEAD);
 			}
 		}

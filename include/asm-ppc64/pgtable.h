@@ -303,6 +303,11 @@ static inline void ptep_mkdirty(pte_t *ptep)
 	pte_update(ptep, 0, _PAGE_DIRTY);
 }
 
+/*
+ * Macro to mark a page protection value as "uncacheable".
+ */
+#define pgprot_noncached(prot)	(__pgprot(pgprot_val(prot) | _PAGE_NO_CACHE | _PAGE_GUARDED))
+
 #define pte_same(A,B)	(((pte_val(A) ^ pte_val(B)) & ~_PAGE_HPTEFLAGS) == 0)
 
 /*
