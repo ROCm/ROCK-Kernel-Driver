@@ -1958,7 +1958,7 @@ static boolean DAC960_RegisterBlockDevice(DAC960_Controller_T *Controller)
 
   Controller->RequestQueue = RequestQueue;
   for (n = 0; n < DAC960_MaxLogicalDrives; n++) {
-	struct gendisk *disk = &Controller->disks[n];
+	struct gendisk *disk = Controller->disks[n];
 	memset(disk, 0, sizeof(struct gendisk));
 	sprintf(disk->disk_name, "rd/c%dd%d", Controller->ControllerNumber, n);
 	disk->major = MajorNumber;
@@ -1983,7 +1983,7 @@ static void DAC960_UnregisterBlockDevice(DAC960_Controller_T *Controller)
   int MajorNumber = DAC960_MAJOR + Controller->ControllerNumber;
   int disk;
   for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++)
-	  del_gendisk(&Controller->disks[disk]);
+	  del_gendisk(Controller->disks[disk]);
   /*
     Unregister the Block Device Major Number for this DAC960 Controller.
   */
@@ -2018,7 +2018,7 @@ static void DAC960_ComputeGenericDiskInfo(DAC960_Controller_T *Controller)
 {
 	int disk;
 	for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++)
-		set_capacity(Controller->disks + disk, disk_size(Controller, disk));
+		set_capacity(Controller->disks[disk], disk_size(Controller, disk));
 }
 
 static int DAC960_revalidate(kdev_t dev)
@@ -2026,7 +2026,7 @@ static int DAC960_revalidate(kdev_t dev)
 	int ctlr = DAC960_ControllerNumber(dev);
 	int disk = DAC960_LogicalDriveNumber(dev);
 	DAC960_Controller_T *p = DAC960_Controllers[ctlr];
-	set_capacity(&p->disks[disk], disk_size(p, disk));
+	set_capacity(p->disks[disk], disk_size(p, disk));
 	return 0;
 }
 
@@ -2099,6 +2099,7 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
   unsigned short VendorID = 0, DeviceID = 0;
   unsigned int MemoryWindowSize = 0;
   PCI_Device_T *PCI_Device = NULL;
+  int i;
   switch (HardwareType)
     {
     case DAC960_BA_Controller:
@@ -2199,6 +2200,11 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 	  goto Failure;
 	}
       memset(Controller, 0, sizeof(DAC960_Controller_T));
+      for (i = 0; i < DAC960_MaxLogicalDrives; i++) {
+		Controller->disks[i] = alloc_disk();
+		if (!Controller->disks[i])
+			goto Enomem;
+      }
       Controller->ControllerNumber = DAC960_ControllerCount;
       init_waitqueue_head(&Controller->CommandWaitQueue);
       init_waitqueue_head(&Controller->HealthStatusWaitQueue);
@@ -2455,6 +2461,12 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
       if (Controller->IRQ_Channel > 0)
 	free_irq(IRQ_Channel, Controller);
     }
+    return;
+Enomem:
+      while (i--)
+	put_disk(Controller->disks[i]);
+      kfree(Controller);
+      goto Failure;
 }
 
 
@@ -2493,7 +2505,10 @@ static void DAC960_SortControllers(void)
       DAC960_Controller_T *Controller = DAC960_Controllers[ControllerNumber];
       if (!Controller->ControllerDetectionSuccessful)
 	{
+	  int i;
 	  DAC960_Controllers[ControllerNumber] = NULL;
+	  for (i = 0; i < DAC960_MaxLogicalDrives; i++)
+		put_disk(Controller->disks[i]);
 	  kfree(Controller);
 	}
     }
@@ -2534,6 +2549,7 @@ static void DAC960_InitializeController(DAC960_Controller_T *Controller)
 
 static void DAC960_FinalizeController(DAC960_Controller_T *Controller)
 {
+  int i;
   if (Controller->ControllerInitialized)
     {
       del_timer(&Controller->MonitoringTimer);
@@ -2578,6 +2594,8 @@ static void DAC960_FinalizeController(DAC960_Controller_T *Controller)
   DAC960_UnregisterBlockDevice(Controller);
   DAC960_DestroyAuxiliaryStructures(Controller);
   DAC960_Controllers[Controller->ControllerNumber] = NULL;
+  for (i = 0; i < DAC960_MaxLogicalDrives; i++)
+	put_disk(Controller->disks[i]);
   kfree(Controller);
 }
 
@@ -2606,8 +2624,8 @@ static int DAC960_Initialize(void)
       if (Controller == NULL) continue;
       DAC960_InitializeController(Controller);
       for (disk = 0; disk < DAC960_MaxLogicalDrives; disk++) {
-	set_capacity(&Controller->disks[disk], disk_size(Controller, disk));
-	add_disk(&Controller->disks[disk]);
+	set_capacity(Controller->disks[disk], disk_size(Controller, disk));
+	add_disk(Controller->disks[disk]);
       }
     }
   DAC960_CreateProcEntries();
@@ -5250,10 +5268,10 @@ static int DAC960_Open(Inode_T *Inode, File_T *File)
       Controller->LogicalDriveInitiallyAccessible[LogicalDriveNumber] = true;
       size = disk_size(Controller, LogicalDriveNumber);
       /* BROKEN, same as modular ide-floppy/ide-disk; same fix - ->probe() */
-      set_capacity(&Controller->disks[LogicalDriveNumber], size);
-      add_disk(&Controller->disks[LogicalDriveNumber]);
+      set_capacity(Controller->disks[LogicalDriveNumber], size);
+      add_disk(Controller->disks[LogicalDriveNumber]);
     }
-  if (!get_capacity(&Controller->disks[LogicalDriveNumber]))
+  if (!get_capacity(Controller->disks[LogicalDriveNumber]))
     return -ENXIO;
   /*
     Increment Controller and Logical Drive Usage Counts.
