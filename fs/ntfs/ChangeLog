@@ -60,6 +60,14 @@ ToDo:
 	  attribute code path of fs/ntfs/aops.c::ntfs_writepage() otherwise
 	  the radix-tree tag PAGECACHE_TAG_DIRTY remains set even though the
 	  page is clean.
+	- Implement ntfs_mft_writepage() so it now checks if any of the mft
+	  records in the page are dirty and if so redirties the page and
+	  returns.  Otherwise it just returns (after doing set_page_writeback(),
+	  unlock_page(), end_page_writeback() or the radix-tree tag
+	  PAGECACHE_TAG_DIRTY remains set even though the page is clean), thus
+	  alowing the VM to do with the page as it pleases.  Also, at umount
+	  time, now only throw away dirty mft (meta)data pages if dirty inodes
+	  are present and ask the user to email us if they see this happening.
 
 2.1.12 - Fix the second fix to the decompression engine and some cleanups.
 

@@ -476,7 +476,10 @@ void __mark_mft_record_dirty(ntfs_inode *ni)
 	BUG_ON(!page);
 	BUG_ON(NInoAttr(ni));
 
-	/* Set the page containing the mft record dirty. */
+	/*
+	 * Set the page containing the mft record dirty.  This also marks the
+	 * $MFT inode dirty (I_DIRTY_PAGES).
+	 */
 	__set_page_dirty_nobuffers(page);
 
 	/* Determine the base vfs inode and mark it dirty, too. */
@@ -878,17 +881,176 @@ err_out:
 	return err;
 }
 
+/**
+ * ntfs_mft_writepage - check if a metadata page contains dirty mft records
+ * @page:	metadata page possibly containing dirty mft records
+ * @wbc:	writeback control structure
+ *
+ * This is called from the VM when it wants to have a dirty $MFT/$DATA metadata
+ * page cache page cleaned.  The VM has already locked the page and marked it
+ * clean.  Instead of writing the page as a conventional ->writepage function
+ * would do, we check if the page still contains any dirty mft records (it must
+ * have done at some point in the past since the page was marked dirty) and if
+ * none are found, i.e. all mft records are clean, we unlock the page and
+ * return.  The VM is then free to do with the page as it pleases.  If on the
+ * other hand we do find any dirty mft records in the page, we redirty the page
+ * before unlocking it and returning so the VM knows that the page is still
+ * busy and cannot be thrown out.
+ *
+ * Note, we do not actually write any dirty mft records here because they are
+ * dirty inodes and hence will be written by the VFS inode dirty code paths.
+ * There is no need to write them from the VM page dirty code paths, too and in
+ * fact once we implement journalling it would be a complete nightmare having
+ * two code paths leading to mft record writeout.
+ */
 static int ntfs_mft_writepage(struct page *page, struct writeback_control *wbc)
 {
 	struct inode *mft_vi = page->mapping->host;
 	struct super_block *sb = mft_vi->i_sb;
 	ntfs_volume *vol = NTFS_SB(sb);
+	u8 *maddr;
+	MFT_RECORD *m;
+	ntfs_inode **extent_nis;
+	unsigned long mft_no;
+	int nr, i, j;
+	BOOL is_dirty = FALSE;
 
 	BUG_ON(mft_vi != vol->mft_ino);
-	ntfs_warning(sb, "VM writeback of $MFT is not implemented yet:  "
-			"Redirtying the page.");
-	redirty_page_for_writepage(wbc, page);
-	unlock_page(page);
+	/* The first mft record number in the page. */
+	mft_no = page->index << (PAGE_CACHE_SHIFT - vol->mft_record_size_bits);
+	/* Number of mft records in the page. */
+	nr = PAGE_CACHE_SIZE >> vol->mft_record_size_bits;
+	BUG_ON(!nr);
+	ntfs_debug("Entering for %i inodes starting at 0x%lx.", nr, mft_no);
+	/* Iterate over the mft records in the page looking for a dirty one. */
+	maddr = (u8*)kmap(page);
+	for (i = 0; i < nr; ++i, ++mft_no, maddr += vol->mft_record_size) {
+		struct inode *vi;
+		ntfs_inode *ni, *eni;
+		ntfs_attr na;
+
+		na.mft_no = mft_no;
+		na.name = NULL;
+		na.name_len = 0;
+		na.type = AT_UNUSED;
+
+		/*
+		 * Check if the inode corresponding to this mft record is in
+		 * the VFS inode cache and obtain a reference to it if it is.
+		 */
+		vi = ilookup5(sb, mft_no, (test_t)ntfs_test_inode, &na);
+		if (vi) {
+			/* The inode is in icache.  Check if it is dirty. */
+			ni = NTFS_I(vi);
+			if (!NInoDirty(ni)) {
+				/* The inode is not dirty, skip this record. */
+				iput(vi);
+				continue;
+			}
+			/* The inode is dirty, no need to search further. */
+			iput(vi);
+			is_dirty = TRUE;
+			break;
+		}
+		/* The inode is not in icache. */
+		/* Skip the record if it is not a mft record (type "FILE"). */
+		if (!ntfs_is_mft_recordp(maddr))
+			continue;
+		m = (MFT_RECORD*)maddr;
+		/*
+		 * Skip the mft record if it is not in use.  FIXME:  What about
+		 * deleted/deallocated (extent) inodes?  (AIA)
+		 */
+		if (!(m->flags & MFT_RECORD_IN_USE))
+			continue;
+		/* Skip the mft record if it is a base inode. */
+		if (!m->base_mft_record)
+			continue;
+		/*
+		 * This is an extent mft record.  Check if the inode
+		 * corresponding to its base mft record is in icache.
+		 */
+		na.mft_no = MREF_LE(m->base_mft_record);
+		vi = ilookup5(sb, na.mft_no, (test_t)ntfs_test_inode,
+				&na);
+		if (!vi) {
+			/*
+			 * The base inode is not in icache.  Skip this extent
+			 * mft record.
+			 */
+			continue;
+		}
+		/*
+		 * The base inode is in icache.  Check if it has the extent
+		 * inode corresponding to this extent mft record attached.
+		 */
+		ni = NTFS_I(vi);
+		down(&ni->extent_lock);
+		if (ni->nr_extents <= 0) {
+			/*
+			 * The base inode has no attached extent inodes.  Skip
+			 * this extent mft record.
+			 */
+			up(&ni->extent_lock);
+			iput(vi);
+			continue;
+		}
+		/* Iterate over the attached extent inodes. */
+		extent_nis = ni->ext.extent_ntfs_inos;
+		for (eni = NULL, j = 0; j < ni->nr_extents; ++j) {
+			if (mft_no == extent_nis[j]->mft_no) {
+				/*
+				 * Found the extent inode corresponding to this
+				 * extent mft record.
+				 */
+				eni = extent_nis[j];
+				break;
+			}
+		}
+		/*
+		 * If the extent inode was not attached to the base inode, skip
+		 * this extent mft record.
+		 */
+		if (!eni) {
+			up(&ni->extent_lock);
+			iput(vi);
+			continue;
+		}
+		/*
+		 * Found the extent inode corrsponding to this extent mft
+		 * record.  If it is dirty, no need to search further.
+		 */
+		if (NInoDirty(eni)) {
+			up(&ni->extent_lock);
+			iput(vi);
+			is_dirty = TRUE;
+			break;
+		}
+		/* The extent inode is not dirty, so do the next record. */
+		up(&ni->extent_lock);
+		iput(vi);
+	}
+	kunmap(page);
+	/* If a dirty mft record was found, redirty the page. */
+	if (is_dirty) {
+		ntfs_debug("Inode 0x%lx is dirty.  Redirtying the page "
+				"starting at inode 0x%lx.", mft_no,
+				page->index << (PAGE_CACHE_SHIFT -
+				vol->mft_record_size_bits));
+		redirty_page_for_writepage(wbc, page);
+		unlock_page(page);
+	} else {
+		/*
+		 * Keep the VM happy.  This must be done otherwise the
+		 * radix-tree tag PAGECACHE_TAG_DIRTY remains set even though
+		 * the page is clean.
+		 */
+		BUG_ON(PageWriteback(page));
+		set_page_writeback(page);
+		unlock_page(page);
+		end_page_writeback(page);
+	}
+	ntfs_debug("Done.");
 	return 0;
 }
 

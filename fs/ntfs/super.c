@@ -1378,20 +1378,38 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 		vol->mftmirr_ino = NULL;
 	}
 	/*
-	 * Throw away all mft data page cache pages to allow a clean umount.
-	 * All inodes should by now be written out and clean so this should not
-	 * loose any data while removing all the pages which have the dirty bit
-	 * set.
+	 * If any dirty inodes are left, throw away all mft data page cache
+	 * pages to allow a clean umount.  This should never happen any more
+	 * due to mft.c::ntfs_mft_writepage() cleaning all the dirty pages as
+	 * the underlying mft records are written out and cleaned.  If it does,
+	 * happen anyway, we want to know...
 	 */
 	ntfs_commit_inode(vol->mft_ino);
-	down(&vol->mft_ino->i_sem);
-	truncate_inode_pages(vol->mft_ino->i_mapping, 0);
-	up(&vol->mft_ino->i_sem);
 	write_inode_now(vol->mft_ino, 1);
-	if (!list_empty(&vfs_sb->s_dirty) || !list_empty(&vfs_sb->s_io))
-		ntfs_error(vfs_sb, "Dirty inodes found at umount time.  "
-				"They have been thrown away and their changes "
-				"have been lost.  You should run chkdsk.");
+	if (!list_empty(&vfs_sb->s_dirty)) {
+		char *s1, *s2;
+
+		down(&vol->mft_ino->i_sem);
+		truncate_inode_pages(vol->mft_ino->i_mapping, 0);
+		up(&vol->mft_ino->i_sem);
+		write_inode_now(vol->mft_ino, 1);
+		if (!list_empty(&vfs_sb->s_dirty)) {
+			static char *_s1 = "inodes";
+			static char *_s2 = "";
+			s1 = _s1;
+			s2 = _s2;
+		} else {
+			static char *_s1 = "mft pages";
+			static char *_s2 = "They have been thrown away.  ";
+			s1 = _s1;
+			s2 = _s2;
+		}
+		ntfs_error(vfs_sb, "Dirty %s found at umount time.  %s"
+				"You should run chkdsk.  Please email "
+				"linux-ntfs-dev@lists.sourceforge.net and say "
+				"that you saw this message.  Thank you.", s1,
+				s2);
+	}
 #endif /* NTFS_RW */
 
 	iput(vol->mft_ino);
