@@ -1967,8 +1967,6 @@ static void es1968_update_hw_volume(unsigned long private_data)
 			if ((val & 0xff00) < 0x1f00)
 				val += 0x0100;
 		}
-		if (val == 0x1f1f)
-			val |= 0x8000;
 		snd_ac97_write_cache(chip->ac97, AC97_MASTER, val);
 		snd_ctl_notify(chip->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       &chip->master_volume->id);

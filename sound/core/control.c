@@ -22,6 +22,7 @@
 #include <sound/driver.h>
 #include <linux/threads.h>
 #include <linux/interrupt.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
 #include <linux/time.h>
