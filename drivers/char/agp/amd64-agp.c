@@ -495,7 +495,7 @@ int __init agp_amd64_init(void)
 	int err = 0;
 	if (agp_off)
 		return -EINVAL;
-	if (pci_module_init(&agp_amd64_pci_driver) == 0) { 
+	if (pci_module_init(&agp_amd64_pci_driver) > 0) { 
 		struct pci_dev *dev;
 		if (!agp_try_unsupported && !agp_try_unsupported_boot) { 
 			printk(KERN_INFO "No supported AGP bridge found.\n");
