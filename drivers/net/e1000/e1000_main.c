@@ -87,7 +87,6 @@ static struct pci_device_id e1000_pci_tbl[] = {
 	{0x8086, 0x1011, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1012, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1013, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
-	{0x8086, 0x1014, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1015, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1016, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},
 	{0x8086, 0x1017, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0},

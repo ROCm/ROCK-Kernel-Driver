@@ -1311,6 +1311,7 @@ struct e1000_hw {
 #define E1000_RCTL_DPF            0x00400000    /* discard pause frames */
 #define E1000_RCTL_PMCF           0x00800000    /* pass MAC control frames */
 #define E1000_RCTL_BSEX           0x02000000    /* Buffer size extension */
+#define E1000_RCTL_SECRC          0x04000000    /* Strip Ethernet CRC */
 
 /* Receive Descriptor */
 #define E1000_RDT_DELAY 0x0000ffff      /* Delay timer (1=1024us) */
