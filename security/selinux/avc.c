@@ -22,8 +22,6 @@
 #include <linux/un.h>
 #include <net/af_unix.h>
 #include <linux/ip.h>
-#include <linux/udp.h>
-#include <linux/tcp.h>
 #include "avc.h"
 #include "avc_ss.h"
 #include "class_to_string.h"
@@ -640,46 +638,12 @@ void avc_audit(u32 ssid, u32 tsid,
 					break;
 				}
 			}
-			if (a->u.net.daddr) {
-				printk(" daddr=%d.%d.%d.%d",
-				       NIPQUAD(a->u.net.daddr));
-				if (a->u.net.port)
-					printk(" dest=%d", a->u.net.port);
-			} else if (a->u.net.saddr) {
-				printk(" saddr=%d.%d.%d.%d",
-				       NIPQUAD(a->u.net.saddr));
-				if (a->u.net.port)
-					printk(" src=%d", a->u.net.port);
-			} else if (a->u.net.port)
-				printk(" port=%d", a->u.net.port);
-			if (a->u.net.skb) {
-				struct sk_buff *skb = a->u.net.skb;
+			
+			avc_print_ipv4_addr(a->u.net.saddr, a->u.net.sport,
+			                    "saddr", "src");
+			avc_print_ipv4_addr(a->u.net.daddr, a->u.net.dport,
+			                    "daddr", "dest");
 
-				if ((skb->protocol == htons(ETH_P_IP)) &&
-				     skb->nh.iph) {
-					u16 source = 0, dest = 0;
-					u8  protocol = skb->nh.iph->protocol;
-
-
-					if (protocol == IPPROTO_TCP &&
-					    skb->h.th) {
-						source = skb->h.th->source;
-						dest = skb->h.th->dest;
-					}
-					if (protocol == IPPROTO_UDP &&
-					    skb->h.uh) {
-						source = skb->h.uh->source;
-						dest = skb->h.uh->dest;
-					}
-
-					avc_print_ipv4_addr(skb->nh.iph->saddr,
-					                    source,
-					                    "saddr", "source");
-					avc_print_ipv4_addr(skb->nh.iph->daddr,
-					                    dest,
-					                    "daddr", "dest");
-				}
-			}
 			if (a->u.net.netif)
 				printk(" netif=%s", a->u.net.netif);
 			break;

@@ -56,6 +56,7 @@
 #include <linux/netdevice.h>	/* for network interface checks */
 #include <linux/netlink.h>
 #include <linux/tcp.h>
+#include <linux/udp.h>
 #include <linux/quota.h>
 #include <linux/un.h>		/* for Unix socket types */
 #include <net/af_unix.h>	/* for Unix socket types */
@@ -2372,6 +2373,69 @@ static void selinux_task_to_inode(struct task_struct *p,
 
 #ifdef CONFIG_SECURITY_NETWORK
 
+static void selinux_parse_skb_ipv4(struct sk_buff *skb, struct avc_audit_data *ad)
+{
+	int dlen, ihlen;
+	struct iphdr *iph;
+
+	if (skb->len < sizeof(struct iphdr))
+		goto out;
+	
+	iph = skb->nh.iph;
+	ihlen = iph->ihl * 4;
+	if (ihlen < sizeof(struct iphdr))
+		goto out;
+
+	dlen = skb->len - ihlen;
+	ad->u.net.saddr = iph->saddr;
+	ad->u.net.daddr = iph->daddr;
+
+	switch (iph->protocol) {
+        case IPPROTO_TCP: {
+        	int offset;
+        	struct tcphdr tcph;
+
+        	if (ntohs(iph->frag_off) & IP_OFFSET)
+        		break;
+        		
+		if (dlen < sizeof(tcph))
+			break;
+
+		offset = skb->nh.raw - skb->data + ihlen;
+		if (skb_copy_bits(skb, offset, &tcph, sizeof(tcph)) < 0)
+			break;
+
+		ad->u.net.sport = tcph.source;
+		ad->u.net.dport = tcph.dest;
+		break;
+        }
+        
+        case IPPROTO_UDP: {
+        	int offset;
+        	struct udphdr udph;
+        	
+        	if (ntohs(iph->frag_off) & IP_OFFSET)
+        		break;
+        		
+        	if (dlen < sizeof(udph))
+        		break;
+
+		offset = skb->nh.raw - skb->data + ihlen;
+        	if (skb_copy_bits(skb, offset, &udph, sizeof(udph)) < 0)
+        		break;	
+
+        	ad->u.net.sport = udph.source;
+        	ad->u.net.dport = udph.dest;
+        	break;
+        }
+
+        default:
+        	break;
+        }
+out:
+	return;
+}
+
 /* socket security operations */
 static int socket_has_perm(struct task_struct *task, struct socket *sock,
 			   u32 perms)
@@ -2460,7 +2524,7 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 			if (err)
 				goto out;
 			AVC_AUDIT_DATA_INIT(&ad,NET);
-			ad.u.net.port = snum;
+			ad.u.net.sport = htons(snum);
 			err = avc_has_perm(isec->sid, sid,
 					   isec->sclass,
 					   SOCKET__NAME_BIND, NULL, &ad);
@@ -2488,7 +2552,7 @@ static int selinux_socket_bind(struct socket *sock, struct sockaddr *address, in
 			goto out;
 		
 		AVC_AUDIT_DATA_INIT(&ad,NET);
-		ad.u.net.port = snum;
+		ad.u.net.sport = htons(snum);
 		ad.u.net.saddr = addr->sin_addr.s_addr;
 		err = avc_has_perm(isec->sid, sid,
 		                   isec->sclass, node_perm, NULL, &ad);
@@ -2686,7 +2750,7 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 
 	AVC_AUDIT_DATA_INIT(&ad, NET);
 	ad.u.net.netif = dev->name;
-	ad.u.net.skb = skb;
+	selinux_parse_skb_ipv4(skb, &ad);
 
 	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
 	                   netif_perm, &nsec->avcr, &ad);
@@ -2812,7 +2876,7 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 
 	AVC_AUDIT_DATA_INIT(&ad, NET);
 	ad.u.net.netif = dev->name;
-	ad.u.net.skb = skb;
+	selinux_parse_skb_ipv4(skb, &ad);
 
 	err = avc_has_perm(isec->sid, nsec->if_sid, SECCLASS_NETIF,
 	                   netif_perm, &nsec->avcr, &ad) ? NF_DROP : NF_ACCEPT;
