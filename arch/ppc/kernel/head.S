@@ -1362,7 +1362,7 @@ setup_7450_23_hid0:
 	isync
 	blr
 
-/* 7450
+/* 7455
  * Enable Store Gathering (SGE), Branch Folding (FOLD)
  * Branch History Table (BHTE), Branch Target ICache (BTIC)
  * Dynamic Power Management (DPM), Speculative (SPD)
