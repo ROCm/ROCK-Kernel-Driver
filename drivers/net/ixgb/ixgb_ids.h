@@ -47,6 +47,7 @@
 
 #define IXGB_SUBDEVICE_ID_A12F  0xA12F
 #define IXGB_SUBDEVICE_ID_A02F  0xA02F
+#define IXGB_DEVICE_ID_82597EX_LR   0x1B48
 
 #endif				/* #ifndef _IXGB_IDS_H_ */
 
