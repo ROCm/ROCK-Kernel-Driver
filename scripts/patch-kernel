@@ -68,7 +68,7 @@ done
 # ---------------------------------------------------------------------------
 # Find a file, first parameter is basename of file
 # it tries many compression mechanisms and sets variables to say how to get it
-function findFile {
+findFile () {
   filebase=$1;
 
   if [ -r ${filebase}.gz ]; then
@@ -106,7 +106,7 @@ function findFile {
 # Apply a patch and check it goes in cleanly
 # First param is patch name (e.g. patch-2.4.9-ac5) - without path or extension
 
-function applyPatch {
+applyPatch () {
   echo -n "Applying $1 (${name})... "
   if $uncomp ${patchdir}/$1${ext} | patch -p1 -s -N -E -d $sourcedir
   then
