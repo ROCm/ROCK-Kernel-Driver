@@ -6,6 +6,5 @@
 EXTRA_AFLAGS := -ansi
 EXTRA_CFLAGS := -Werror
 
-L_TARGET = lib.a
-obj-y   := bootstr.o devops.o init.o memory.o misc.o \
+lib-y   := bootstr.o devops.o init.o memory.o misc.o \
 	   tree.o console.o printf.o p1275.o map.o

@@ -5,8 +5,6 @@
 EXTRA_AFLAGS := $(CFLAGS)
 EXTRA_CFLAGS := -Werror
 
-L_TARGET := lib.a
-
 # Many of these routines have implementations tuned for ev6.
 # Choose them iff we're targeting ev6 specifically.
 ev6-$(CONFIG_ALPHA_EV6) := ev6-
@@ -14,7 +12,7 @@ ev6-$(CONFIG_ALPHA_EV6) := ev6-
 # Several make use of the cttz instruction introduced in ev67.
 ev67-$(CONFIG_ALPHA_EV67) := ev67-
 
-obj-y =	__divqu.o __remqu.o __divlu.o __remlu.o \
+lib-y =	__divqu.o __remqu.o __divlu.o __remlu.o \
 	udelay.o \
 	$(ev6-y)memset.o \
 	$(ev6-y)memcpy.o \
@@ -43,7 +41,7 @@ obj-y =	__divqu.o __remqu.o __divlu.o __remlu.o \
 	fpreg.o \
 	callback_srm.o srm_puts.o srm_printk.o
 
-obj-$(CONFIG_SMP) += dec_and_lock.o
+lib-$(CONFIG_SMP) += dec_and_lock.o
 
 # The division routines are built from single source, with different defines.
 AFLAGS___divqu.o = -DDIV

@@ -3,9 +3,7 @@
 # Linux.
 #
 
-L_TARGET = lib.a
-
-obj-y := bootstr.o devmap.o devops.o init.o memory.o misc.o mp.o \
+lib-y := bootstr.o devmap.o devops.o init.o memory.o misc.o mp.o \
 	 palloc.o ranges.o segment.o console.o printf.o tree.o
 
-obj-$(CONFIG_SUN4) += sun4prom.o
+lib-$(CONFIG_SUN4) += sun4prom.o

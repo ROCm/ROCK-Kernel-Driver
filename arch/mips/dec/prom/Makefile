@@ -3,9 +3,7 @@
 # under Linux.
 #
 
-L_TARGET := lib.a
-
-obj-y := init.o memory.o cmdline.o identify.o locore.o
+lib-y := init.o memory.o cmdline.o identify.o locore.o
 
 EXTRA_AFLAGS := $(CFLAGS)
 
