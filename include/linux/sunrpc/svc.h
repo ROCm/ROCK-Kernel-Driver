@@ -48,43 +48,49 @@ struct svc_serv {
  * This is use to determine the max number of pages nfsd is
  * willing to return in a single READ operation.
  */
-#define RPCSVC_MAXPAYLOAD	16384u
+#define RPCSVC_MAXPAYLOAD	(64*1024u)
 
 /*
- * Buffer to store RPC requests or replies in.
- * Each server thread has one of these beasts.
+ * RPC Requsts and replies are stored in one or more pages.
+ * We maintain an array of pages for each server thread.
+ * Requests are copied into these pages as they arrive.  Remaining
+ * pages are available to write the reply into.
  *
- * Area points to the allocated memory chunk currently owned by the
- * buffer. Base points to the buffer containing the request, which is
- * different from area when directly reading from an sk_buff. buf is
- * the current read/write position while processing an RPC request.
+ * Currently pages are all re-used by the same server.  Later we 
+ * will use ->sendpage to transmit pages with reduced copying.  In
+ * that case we will need to give away the page and allocate new ones.
+ * In preparation for this, we explicitly move pages off the recv
+ * list onto the transmit list, and back.
  *
- * The array of iovecs can hold additional data that the server process
- * may not want to copy into the RPC reply buffer, but pass to the 
- * network sendmsg routines directly. The prime candidate for this
- * will of course be NFS READ operations, but one might also want to
- * do something about READLINK and READDIR. It might be worthwhile
- * to implement some generic readdir cache in the VFS layer...
+ * We use xdr_buf for holding responses as it fits well with NFS
+ * read responses (that have a header, and some data pages, and possibly
+ * a tail) and means we can share some client side routines.
  *
- * On the receiving end of the RPC server, the iovec may be used to hold
- * the list of IP fragments once we get to process fragmented UDP
- * datagrams directly.
+ * The xdr_buf.head iovec always points to the first page in the rq_*pages
+ * list.  The xdr_buf.pages pointer points to the second page on that
+ * list.  xdr_buf.tail points to the end of the first page.
+ * This assumes that the non-page part of an rpc reply will fit
+ * in a page - NFSd ensures this.  lockd also has no trouble.
  */
-#define RPCSVC_MAXIOV		((RPCSVC_MAXPAYLOAD+PAGE_SIZE-1)/PAGE_SIZE + 1)
-struct svc_buf {
-	u32 *			area;	/* allocated memory */
-	u32 *			base;	/* base of RPC datagram */
-	int			buflen;	/* total length of buffer */
-	u32 *			buf;	/* read/write pointer */
-	int			len;	/* current end of buffer */
+#define RPCSVC_MAXPAGES		((RPCSVC_MAXPAYLOAD+PAGE_SIZE-1)/PAGE_SIZE + 1)
 
-	/* iovec for zero-copy NFS READs */
-	struct iovec		iov[RPCSVC_MAXIOV];
-	int			nriov;
-};
-#define svc_getu32(argp, val)	{ (val) = *(argp)->buf++; (argp)->len--; }
-#define svc_putu32(resp, val)	{ *(resp)->buf++ = (val); (resp)->len++; }
+static inline u32 svc_getu32(struct iovec *iov)
+{
+	u32 val, *vp;
+	vp = iov->iov_base;
+	val = *vp++;
+	iov->iov_base = (void*)vp;
+	iov->iov_len -= sizeof(u32);
+	return val;
+}
+static inline void svc_putu32(struct iovec *iov, u32 val)
+{
+	u32 *vp = iov->iov_base + iov->iov_len;
+	*vp = val;
+	iov->iov_len += sizeof(u32);
+}
 
+	
 /*
  * The context of a single thread, including the request currently being
  * processed.
@@ -102,9 +108,15 @@ struct svc_rqst {
 	struct svc_cred		rq_cred;	/* auth info */
 	struct sk_buff *	rq_skbuff;	/* fast recv inet buffer */
 	struct svc_deferred_req*rq_deferred;	/* deferred request we are replaying */
-	struct svc_buf		rq_defbuf;	/* default buffer */
-	struct svc_buf		rq_argbuf;	/* argument buffer */
-	struct svc_buf		rq_resbuf;	/* result buffer */
+
+	struct xdr_buf		rq_arg;
+	struct xdr_buf		rq_res;
+	struct page *		rq_argpages[RPCSVC_MAXPAGES];
+	struct page *		rq_respages[RPCSVC_MAXPAGES];
+	short			rq_argused;	/* pages used for argument */
+	short			rq_arghi;	/* pages available in argument page list */
+	short			rq_resused;	/* pages used for result */
+
 	u32			rq_xid;		/* transmission id */
 	u32			rq_prog;	/* program number */
 	u32			rq_vers;	/* program version */
@@ -135,6 +147,38 @@ struct svc_rqst {
 
 	wait_queue_head_t	rq_wait;	/* synchronization */
 };
+
+/*
+ * Check buffer bounds after decoding arguments
+ */
+static inline int
+xdr_argsize_check(struct svc_rqst *rqstp, u32 *p)
+{
+	char *cp = (char *)p;
+	struct iovec *vec = &rqstp->rq_arg.head[0];
+	return cp - (char*)vec->iov_base <= vec->iov_len;
+}
+
+static inline int
+xdr_ressize_check(struct svc_rqst *rqstp, u32 *p)
+{
+	struct iovec *vec = &rqstp->rq_res.head[0];
+	char *cp = (char*)p;
+
+	vec->iov_len = cp - (char*)vec->iov_base;
+	rqstp->rq_res.len = vec->iov_len;
+
+	return vec->iov_len <= PAGE_SIZE;
+}
+
+static int inline take_page(struct svc_rqst *rqstp)
+{
+	if (rqstp->rq_arghi <= rqstp->rq_argused)
+		return -ENOMEM;
+	rqstp->rq_respages[rqstp->rq_resused++] =
+		rqstp->rq_argpages[--rqstp->rq_arghi];
+	return 0;
+}
 
 struct svc_deferred_req {
 	struct svc_serv		*serv;

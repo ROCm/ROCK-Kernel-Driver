@@ -577,7 +577,7 @@ found:
  */
 int
 nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
-          char *buf, unsigned long *count)
+          struct iovec *vec, int vlen, unsigned long *count)
 {
 	struct raparms	*ra;
 	mm_segment_t	oldfs;
@@ -603,7 +603,7 @@ nfsd_read(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	err = vfs_read(&file, buf, *count, &offset);
+	err = vfs_readv(&file, vec, vlen, *count, &offset);
 	set_fs(oldfs);
 
 	/* Write back readahead params */
@@ -629,7 +629,8 @@ out:
  */
 int
 nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
-				char *buf, unsigned long cnt, int *stablep)
+				struct iovec *vec, int vlen,
+	   			unsigned long cnt, int *stablep)
 {
 	struct svc_export	*exp;
 	struct file		file;
@@ -677,7 +678,7 @@ nfsd_write(struct svc_rqst *rqstp, struct svc_fh *fhp, loff_t offset,
 
 	/* Write the data. */
 	oldfs = get_fs(); set_fs(KERNEL_DS);
-	err = vfs_write(&file, buf, cnt, &offset);
+	err = vfs_writev(&file, vec, vlen, cnt, &offset);
 	if (err >= 0)
 		nfsdstats.io_write += cnt;
 	set_fs(oldfs);

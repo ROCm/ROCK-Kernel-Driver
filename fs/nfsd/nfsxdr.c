@@ -14,6 +14,7 @@
 #include <linux/sunrpc/svc.h>
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/xdr.h>
+#include <linux/mm.h>
 
 #define NFSDDBG_FACILITY		NFSDDBG_XDR
 
@@ -176,27 +177,6 @@ encode_fattr(struct svc_rqst *rqstp, u32 *p, struct svc_fh *fhp)
 	return p;
 }
 
-/*
- * Check buffer bounds after decoding arguments
- */
-static inline int
-xdr_argsize_check(struct svc_rqst *rqstp, u32 *p)
-{
-	struct svc_buf	*buf = &rqstp->rq_argbuf;
-
-	return p - buf->base <= buf->buflen;
-}
-
-static inline int
-xdr_ressize_check(struct svc_rqst *rqstp, u32 *p)
-{
-	struct svc_buf	*buf = &rqstp->rq_resbuf;
-
-	buf->len = p - buf->base;
-	dprintk("nfsd: ressize_check p %p base %p len %d\n",
-			p, buf->base, buf->buflen);
-	return (buf->len <= buf->buflen);
-}
 
 /*
  * XDR decode functions
@@ -241,13 +221,31 @@ int
 nfssvc_decode_readargs(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd_readargs *args)
 {
+	int len;
+	int v,pn;
 	if (!(p = decode_fh(p, &args->fh)))
 		return 0;
 
 	args->offset    = ntohl(*p++);
-	args->count     = ntohl(*p++);
-	args->totalsize = ntohl(*p++);
+	len = args->count     = ntohl(*p++);
+	p++; /* totalcount - unused */
 
+	if (len > NFSSVC_MAXBLKSIZE)
+		len = NFSSVC_MAXBLKSIZE;
+
+	/* set up somewhere to store response.
+	 * We take pages, put them on reslist and include in iovec
+	 */
+	v=0;
+	while (len > 0) {
+		pn=rqstp->rq_resused;
+		take_page(rqstp);
+		args->vec[v].iov_base = page_address(rqstp->rq_respages[pn]);
+		args->vec[v].iov_len = len < PAGE_SIZE?len:PAGE_SIZE;
+		v++;
+		len -= PAGE_SIZE;
+	}
+	args->vlen = v;
 	return xdr_argsize_check(rqstp, p);
 }
 
@@ -255,17 +253,30 @@ int
 nfssvc_decode_writeargs(struct svc_rqst *rqstp, u32 *p,
 					struct nfsd_writeargs *args)
 {
+	int len;
+	int v;
 	if (!(p = decode_fh(p, &args->fh)))
 		return 0;
 
 	p++;				/* beginoffset */
 	args->offset = ntohl(*p++);	/* offset */
 	p++;				/* totalcount */
-	args->len = ntohl(*p++);
-	args->data = (char *) p;
-	p += XDR_QUADLEN(args->len);
-
-	return xdr_argsize_check(rqstp, p);
+	len = args->len = ntohl(*p++);
+	args->vec[0].iov_base = (void*)p;
+	args->vec[0].iov_len = rqstp->rq_arg.head[0].iov_len -
+				(((void*)p) - rqstp->rq_arg.head[0].iov_base);
+	if (len > NFSSVC_MAXBLKSIZE)
+		len = NFSSVC_MAXBLKSIZE;
+	v = 0;
+	while (len > args->vec[v].iov_len) {
+		len -= args->vec[v].iov_len;
+		v++;
+		args->vec[v].iov_base = page_address(rqstp->rq_argpages[v]);
+		args->vec[v].iov_len = PAGE_SIZE;
+	}
+	args->vec[v].iov_len = len;
+	args->vlen = v+1;
+	return args->vec[0].iov_len > 0;
 }
 
 int
@@ -371,9 +382,22 @@ nfssvc_encode_readres(struct svc_rqst *rqstp, u32 *p,
 {
 	p = encode_fattr(rqstp, p, &resp->fh);
 	*p++ = htonl(resp->count);
-	p += XDR_QUADLEN(resp->count);
+	xdr_ressize_check(rqstp, p);
 
-	return xdr_ressize_check(rqstp, p);
+	/* now update rqstp->rq_res to reflect data aswell */
+	rqstp->rq_res.page_base = 0;
+	rqstp->rq_res.page_len = resp->count;
+	if (resp->count & 3) {
+		/* need to pad with tail */
+		rqstp->rq_res.tail[0].iov_base = p;
+		*p = 0;
+		rqstp->rq_res.tail[0].iov_len = 4 - (resp->count&3);
+	}
+	rqstp->rq_res.len = 
+		rqstp->rq_res.head[0].iov_len+
+		rqstp->rq_res.page_len+
+		rqstp->rq_res.tail[0].iov_len;
+	return 1;
 }
 
 int

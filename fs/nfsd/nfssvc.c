@@ -277,7 +277,8 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 
 	/* Decode arguments */
 	xdr = proc->pc_decode;
-	if (xdr && !xdr(rqstp, rqstp->rq_argbuf.buf, rqstp->rq_argp)) {
+	if (xdr && !xdr(rqstp, (u32*)rqstp->rq_arg.head[0].iov_base,
+			rqstp->rq_argp)) {
 		dprintk("nfsd: failed to decode arguments!\n");
 		nfsd_cache_update(rqstp, RC_NOCACHE, NULL);
 		*statp = rpc_garbage_args;
@@ -293,14 +294,15 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 	}
 		
 	if (rqstp->rq_proc != 0)
-		svc_putu32(&rqstp->rq_resbuf, nfserr);
+		svc_putu32(&rqstp->rq_res.head[0], nfserr);
 
 	/* Encode result.
 	 * For NFSv2, additional info is never returned in case of an error.
 	 */
 	if (!(nfserr && rqstp->rq_vers == 2)) {
 		xdr = proc->pc_encode;
-		if (xdr && !xdr(rqstp, rqstp->rq_resbuf.buf, rqstp->rq_resp)) {
+		if (xdr && !xdr(rqstp, (u32*)(rqstp->rq_res.head[0].iov_base+rqstp->rq_res.head[0].iov_len),
+				rqstp->rq_resp)) {
 			/* Failed to encode result. Release cache entry */
 			dprintk("nfsd: failed to encode result!\n");
 			nfsd_cache_update(rqstp, RC_NOCACHE, NULL);

@@ -43,11 +43,11 @@ static int	nfs3_ftypes[] = {
 /*
  * Reserve room in the send buffer
  */
-static void
-svcbuf_reserve(struct svc_buf *buf, u32 **ptr, int *len, int nr)
+static inline void
+svcbuf_reserve(struct xdr_buf *buf, u32 **ptr, int *len, int nr)
 {
-	*ptr = buf->buf + nr;
-	*len = buf->buflen - buf->len - nr;
+	*ptr = (u32*)(buf->head[0].iov_base+buf->head[0].iov_len) + nr;
+	*len = ((PAGE_SIZE-buf->head[0].iov_len)>>2) - nr;
 }
 
 /*
@@ -150,7 +150,7 @@ nfsd3_proc_readlink(struct svc_rqst *rqstp, struct nfsd_fhandle     *argp,
 	dprintk("nfsd: READLINK(3) %s\n", SVCFH_fmt(&argp->fh));
 
 	/* Reserve room for status, post_op_attr, and path length */
-	svcbuf_reserve(&rqstp->rq_resbuf, &path, &dummy,
+	svcbuf_reserve(&rqstp->rq_res, &path, &dummy,
 				1 + NFS3_POST_OP_ATTR_WORDS + 1);
 
 	/* Read the symlink. */
@@ -167,8 +167,7 @@ static int
 nfsd3_proc_read(struct svc_rqst *rqstp, struct nfsd3_readargs *argp,
 				        struct nfsd3_readres  *resp)
 {
-	u32 *	buffer;
-	int	nfserr, avail;
+	int	nfserr;
 
 	dprintk("nfsd: READ(3) %s %lu bytes at %lu\n",
 				SVCFH_fmt(&argp->fh),
@@ -179,18 +178,17 @@ nfsd3_proc_read(struct svc_rqst *rqstp, struct nfsd3_readargs *argp,
 	 * 1 (status) + 22 (post_op_attr) + 1 (count) + 1 (eof)
 	 * + 1 (xdr opaque byte count) = 26
 	 */
-	svcbuf_reserve(&rqstp->rq_resbuf, &buffer, &avail,
-			1 + NFS3_POST_OP_ATTR_WORDS + 3);
-	resp->count = argp->count;
-	if ((avail << 2) < resp->count)
-		resp->count = avail << 2;
 
-	svc_reserve(rqstp, ((1 + NFS3_POST_OP_ATTR_WORDS + 3)<<2) + argp->count +4);
+	resp->count = argp->count;
+	if (NFSSVC_MAXBLKSIZE < resp->count)
+		resp->count = NFSSVC_MAXBLKSIZE;
+
+	svc_reserve(rqstp, ((1 + NFS3_POST_OP_ATTR_WORDS + 3)<<2) + resp->count +4);
 
 	fh_copy(&resp->fh, &argp->fh);
 	nfserr = nfsd_read(rqstp, &resp->fh,
 				  argp->offset,
-				  (char *) buffer,
+			   	  argp->vec, argp->vlen,
 				  &resp->count);
 	if (nfserr == 0) {
 		struct inode	*inode = resp->fh.fh_dentry->d_inode;
@@ -220,7 +218,7 @@ nfsd3_proc_write(struct svc_rqst *rqstp, struct nfsd3_writeargs *argp,
 	resp->committed = argp->stable;
 	nfserr = nfsd_write(rqstp, &resp->fh,
 				   argp->offset,
-				   argp->data,
+				   argp->vec, argp->vlen,
 				   argp->len,
 				   &resp->committed);
 	resp->count = argp->count;
@@ -447,7 +445,7 @@ nfsd3_proc_readdir(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 				argp->count, (u32) argp->cookie);
 
 	/* Reserve buffer space for status, attributes and verifier */
-	svcbuf_reserve(&rqstp->rq_resbuf, &buffer, &count,
+	svcbuf_reserve(&rqstp->rq_res, &buffer, &count,
 				1 + NFS3_POST_OP_ATTR_WORDS + 2);
 
 	/* Make sure we've room for the NULL ptr & eof flag, and shrink to
@@ -490,7 +488,7 @@ nfsd3_proc_readdirplus(struct svc_rqst *rqstp, struct nfsd3_readdirargs *argp,
 				argp->count, (u32) argp->cookie);
 
 	/* Reserve buffer space for status, attributes and verifier */
-	svcbuf_reserve(&rqstp->rq_resbuf, &buffer, &count,
+	svcbuf_reserve(&rqstp->rq_res, &buffer, &count,
 				1 + NFS3_POST_OP_ATTR_WORDS + 2);
 
 	/* Make sure we've room for the NULL ptr & eof flag, and shrink to

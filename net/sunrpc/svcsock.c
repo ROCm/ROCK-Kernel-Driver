@@ -234,7 +234,7 @@ svc_sock_received(struct svc_sock *svsk)
  */
 void svc_reserve(struct svc_rqst *rqstp, int space)
 {
-	space += rqstp->rq_resbuf.len<<2;
+	space += rqstp->rq_res.head[0].iov_len;
 
 	if (space < rqstp->rq_reserved) {
 		struct svc_sock *svsk = rqstp->rq_sock;
@@ -278,13 +278,12 @@ svc_sock_release(struct svc_rqst *rqstp)
 	 * But first, check that enough space was reserved
 	 * for the reply, otherwise we have a bug!
 	 */
-	if ((rqstp->rq_resbuf.len<<2) >  rqstp->rq_reserved)
+	if ((rqstp->rq_res.len) >  rqstp->rq_reserved)
 		printk(KERN_ERR "RPC request reserved %d but used %d\n",
 		       rqstp->rq_reserved,
-		       rqstp->rq_resbuf.len<<2);
+		       rqstp->rq_res.len);
 
-	rqstp->rq_resbuf.buf = rqstp->rq_resbuf.base;
-	rqstp->rq_resbuf.len = 0;
+	rqstp->rq_res.head[0].iov_len = 0;
 	svc_reserve(rqstp, 0);
 	rqstp->rq_sock = NULL;
 
@@ -348,8 +347,9 @@ svc_sendto(struct svc_rqst *rqstp, struct iovec *iov, int nr)
 	len = sock_sendmsg(sock, &msg, buflen);
 	set_fs(oldfs);
 
-	dprintk("svc: socket %p sendto([%p %Zu... ], %d, %d) = %d\n",
-			rqstp->rq_sock, iov[0].iov_base, iov[0].iov_len, nr, buflen, len);
+	dprintk("svc: socket %p sendto([%p %Zu... ], %d, %d) = %d (addr %x)\n",
+			rqstp->rq_sock, iov[0].iov_base, iov[0].iov_len, nr, buflen, len,
+		rqstp->rq_addr.sin_addr.s_addr);
 
 	return len;
 }
@@ -480,13 +480,15 @@ svc_write_space(struct sock *sk)
 /*
  * Receive a datagram from a UDP socket.
  */
+extern int
+csum_partial_copy_to_xdr(struct xdr_buf *xdr, struct sk_buff *skb);
+
 static int
 svc_udp_recvfrom(struct svc_rqst *rqstp)
 {
 	struct svc_sock	*svsk = rqstp->rq_sock;
 	struct svc_serv	*serv = svsk->sk_server;
 	struct sk_buff	*skb;
-	u32		*data;
 	int		err, len;
 
 	if (test_and_clear_bit(SK_CHNGBUF, &svsk->sk_flags))
@@ -512,39 +514,27 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 	}
 	set_bit(SK_DATA, &svsk->sk_flags); /* there may be more data... */
 
-	/* Sorry. */
-	if (skb_is_nonlinear(skb)) {
-		if (skb_linearize(skb, GFP_KERNEL) != 0) {
-			kfree_skb(skb);
-			svc_sock_received(svsk);
-			return 0;
-		}
-	}
-
-	if (skb->ip_summed != CHECKSUM_UNNECESSARY) {
-		if ((unsigned short)csum_fold(skb_checksum(skb, 0, skb->len, skb->csum))) {
-			skb_free_datagram(svsk->sk_sk, skb);
-			svc_sock_received(svsk);
-			return 0;
-		}
-	}
-
-
 	len  = skb->len - sizeof(struct udphdr);
-	data = (u32 *) (skb->data + sizeof(struct udphdr));
 
-	rqstp->rq_skbuff      = skb;
-	rqstp->rq_argbuf.base = data;
-	rqstp->rq_argbuf.buf  = data;
-	rqstp->rq_argbuf.len  = (len >> 2);
-	rqstp->rq_argbuf.buflen = (len >> 2);
-	/* rqstp->rq_resbuf      = rqstp->rq_defbuf; */
+	if (csum_partial_copy_to_xdr(&rqstp->rq_arg, skb)) {
+		/* checksum error */
+		skb_free_datagram(svsk->sk_sk, skb);
+		svc_sock_received(svsk);
+		return 0;
+	}
+
+
+	rqstp->rq_arg.len = len;
+	rqstp->rq_arg.page_len = len - rqstp->rq_arg.head[0].iov_len;
+	rqstp->rq_argused += (rqstp->rq_arg.page_len + PAGE_SIZE - 1)/ PAGE_SIZE;
 	rqstp->rq_prot        = IPPROTO_UDP;
 
 	/* Get sender address */
 	rqstp->rq_addr.sin_family = AF_INET;
 	rqstp->rq_addr.sin_port = skb->h.uh->source;
 	rqstp->rq_addr.sin_addr.s_addr = skb->nh.iph->saddr;
+
+	skb_free_datagram(svsk->sk_sk, skb);
 
 	if (serv->sv_stats)
 		serv->sv_stats->netudpcnt++;
@@ -559,21 +549,36 @@ svc_udp_recvfrom(struct svc_rqst *rqstp)
 static int
 svc_udp_sendto(struct svc_rqst *rqstp)
 {
-	struct svc_buf	*bufp = &rqstp->rq_resbuf;
 	int		error;
+	struct iovec vec[RPCSVC_MAXPAGES];
+	int v;
+	int base, len;
 
 	/* Set up the first element of the reply iovec.
 	 * Any other iovecs that may be in use have been taken
 	 * care of by the server implementation itself.
 	 */
-	/* bufp->base = bufp->area; */
-	bufp->iov[0].iov_base = bufp->base;
-	bufp->iov[0].iov_len  = bufp->len << 2;
-
-	error = svc_sendto(rqstp, bufp->iov, bufp->nriov);
+	vec[0] = rqstp->rq_res.head[0];
+	v=1;
+	base=rqstp->rq_res.page_base;
+	len = rqstp->rq_res.page_len;
+	while (len) {
+		vec[v].iov_base = page_address(rqstp->rq_res.pages[v-1]) + base;
+		vec[v].iov_len = PAGE_SIZE-base;
+		if (len <= vec[v].iov_len)
+			vec[v].iov_len = len;
+		len -= vec[v].iov_len;
+		base = 0;
+		v++;
+	}
+	if (rqstp->rq_res.tail[0].iov_len) {
+		vec[v] = rqstp->rq_res.tail[0];
+		v++;
+	}
+	error = svc_sendto(rqstp, vec, v);
 	if (error == -ECONNREFUSED)
 		/* ICMP error on earlier request. */
-		error = svc_sendto(rqstp, bufp->iov, bufp->nriov);
+		error = svc_sendto(rqstp, vec, v);
 
 	return error;
 }
@@ -785,8 +790,9 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 {
 	struct svc_sock	*svsk = rqstp->rq_sock;
 	struct svc_serv	*serv = svsk->sk_server;
-	struct svc_buf	*bufp = &rqstp->rq_argbuf;
 	int		len;
+	struct iovec vec[RPCSVC_MAXPAGES];
+	int pnum, vlen;
 
 	dprintk("svc: tcp_recv %p data %d conn %d close %d\n",
 		svsk, test_bit(SK_DATA, &svsk->sk_flags),
@@ -851,7 +857,7 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 		}
 		svsk->sk_reclen &= 0x7fffffff;
 		dprintk("svc: TCP record, %d bytes\n", svsk->sk_reclen);
-		if (svsk->sk_reclen > (bufp->buflen<<2)) {
+		if (svsk->sk_reclen > serv->sv_bufsz) {
 			printk(KERN_NOTICE "RPC: bad TCP reclen 0x%08lx (large)\n",
 			       (unsigned long) svsk->sk_reclen);
 			goto err_delete;
@@ -869,30 +875,35 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 		svc_sock_received(svsk);
 		return -EAGAIN;	/* record not complete */
 	}
+	len = svsk->sk_reclen;
 	set_bit(SK_DATA, &svsk->sk_flags);
 
-	/* Frob argbuf */
-	bufp->iov[0].iov_base += 4;
-	bufp->iov[0].iov_len  -= 4;
+	vec[0] = rqstp->rq_arg.head[0];
+	vlen = PAGE_SIZE;
+	pnum = 1;
+	while (vlen < len) {
+		vec[pnum].iov_base = page_address(rqstp->rq_argpages[rqstp->rq_argused++]);
+		vec[pnum].iov_len = PAGE_SIZE;
+		pnum++;
+		vlen += PAGE_SIZE;
+	}
 
 	/* Now receive data */
-	len = svc_recvfrom(rqstp, bufp->iov, bufp->nriov, svsk->sk_reclen);
+	len = svc_recvfrom(rqstp, vec, pnum, len);
 	if (len < 0)
 		goto error;
 
 	dprintk("svc: TCP complete record (%d bytes)\n", len);
-
-	/* Position reply write pointer immediately after args,
-	 * allowing for record length */
-	rqstp->rq_resbuf.base = rqstp->rq_argbuf.base + 1 + (len>>2);
-	rqstp->rq_resbuf.buf  = rqstp->rq_resbuf.base + 1;
-	rqstp->rq_resbuf.len  = 1;
-	rqstp->rq_resbuf.buflen= rqstp->rq_argbuf.buflen - (len>>2) - 1;
+	rqstp->rq_arg.len = len;
+	rqstp->rq_arg.page_base = 0;
+	if (len <= rqstp->rq_arg.head[0].iov_len) {
+		rqstp->rq_arg.head[0].iov_len = len;
+		rqstp->rq_arg.page_len = 0;
+	} else {
+		rqstp->rq_arg.page_len = len - rqstp->rq_arg.head[0].iov_len;
+	}
 
 	rqstp->rq_skbuff      = 0;
-	rqstp->rq_argbuf.buf += 1;
-	rqstp->rq_argbuf.len  = (len >> 2);
-	rqstp->rq_argbuf.buflen = (len >> 2) +1;
 	rqstp->rq_prot	      = IPPROTO_TCP;
 
 	/* Reset TCP read info */
@@ -928,23 +939,44 @@ svc_tcp_recvfrom(struct svc_rqst *rqstp)
 static int
 svc_tcp_sendto(struct svc_rqst *rqstp)
 {
-	struct svc_buf	*bufp = &rqstp->rq_resbuf;
+	struct xdr_buf	*xbufp = &rqstp->rq_res;
+	struct iovec vec[RPCSVC_MAXPAGES];
+	int v;
+	int base, len;
 	int sent;
+	u32 reclen;
 
 	/* Set up the first element of the reply iovec.
 	 * Any other iovecs that may be in use have been taken
 	 * care of by the server implementation itself.
 	 */
-	bufp->iov[0].iov_base = bufp->base;
-	bufp->iov[0].iov_len  = bufp->len << 2;
-	bufp->base[0] = htonl(0x80000000|((bufp->len << 2) - 4));
+	reclen = htonl(0x80000000|((xbufp->len ) - 4));
+	memcpy(xbufp->head[0].iov_base, &reclen, 4);
 
-	sent = svc_sendto(rqstp, bufp->iov, bufp->nriov);
-	if (sent != bufp->len<<2) {
+	vec[0] = rqstp->rq_res.head[0];
+	v=1;
+	base= xbufp->page_base;
+	len = xbufp->page_len;
+	while (len) {
+		vec[v].iov_base = page_address(xbufp->pages[v-1]) + base;
+		vec[v].iov_len = PAGE_SIZE-base;
+		if (len <= vec[v].iov_len)
+			vec[v].iov_len = len;
+		len -= vec[v].iov_len;
+		base = 0;
+		v++;
+	}
+	if (xbufp->tail[0].iov_len) {
+		vec[v] = xbufp->tail[0];
+		v++;
+	}
+
+	sent = svc_sendto(rqstp, vec, v);
+	if (sent != xbufp->len) {
 		printk(KERN_NOTICE "rpc-srv/tcp: %s: %s %d when sending %d bytes - shutting down socket\n",
 		       rqstp->rq_sock->sk_server->sv_name,
 		       (sent<0)?"got error":"sent only",
-		       sent, bufp->len << 2);
+		       sent, xbufp->len);
 		svc_delete_socket(rqstp->rq_sock);
 		sent = -EAGAIN;
 	}
@@ -1016,6 +1048,8 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 {
 	struct svc_sock		*svsk =NULL;
 	int			len;
+	int 			pages;
+	struct xdr_buf		*arg;
 	DECLARE_WAITQUEUE(wait, current);
 
 	dprintk("svc: server %p waiting for data (to = %ld)\n",
@@ -1031,9 +1065,35 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 			 rqstp);
 
 	/* Initialize the buffers */
-	rqstp->rq_argbuf = rqstp->rq_defbuf;
-	rqstp->rq_resbuf = rqstp->rq_defbuf;
+	/* first reclaim pages that were moved to response list */
+	while (rqstp->rq_resused) 
+		rqstp->rq_argpages[rqstp->rq_arghi++] =
+			rqstp->rq_respages[--rqstp->rq_resused];
+	/* now allocate needed pages.  If we get a failure, sleep briefly */
+	pages = 2 + (serv->sv_bufsz + PAGE_SIZE -1) / PAGE_SIZE;
+	while (rqstp->rq_arghi < pages) {
+		struct page *p = alloc_page(GFP_KERNEL);
+		if (!p) {
+			set_current_state(TASK_UNINTERRUPTIBLE);
+			schedule_timeout(HZ/2);
+			current->state = TASK_RUNNING;
+			continue;
+		}
+		rqstp->rq_argpages[rqstp->rq_arghi++] = p;
+	}
 
+	/* Make arg->head point to first page and arg->pages point to rest */
+	arg = &rqstp->rq_arg;
+	arg->head[0].iov_base = page_address(rqstp->rq_argpages[0]);
+	arg->head[0].iov_len = PAGE_SIZE;
+	rqstp->rq_argused = 1;
+	arg->pages = rqstp->rq_argpages + 1;
+	arg->page_base = 0;
+	/* save at least one page for response */
+	arg->page_len = (pages-2)*PAGE_SIZE;
+	arg->len = (pages-1)*PAGE_SIZE;
+	arg->tail[0].iov_len = 0;
+	
 	if (signalled())
 		return -EINTR;
 
@@ -1108,12 +1168,6 @@ svc_recv(struct svc_serv *serv, struct svc_rqst *rqstp, long timeout)
 	rqstp->rq_secure  = ntohs(rqstp->rq_addr.sin_port) < 1024;
 	rqstp->rq_userset = 0;
 	rqstp->rq_chandle.defer = svc_defer;
-
-	svc_getu32(&rqstp->rq_argbuf, rqstp->rq_xid);
-	svc_putu32(&rqstp->rq_resbuf, rqstp->rq_xid);
-
-	/* Assume that the reply consists of a single buffer. */
-	rqstp->rq_resbuf.nriov = 1;
 
 	if (serv->sv_stats)
 		serv->sv_stats->netcnt++;
@@ -1354,23 +1408,25 @@ static struct cache_deferred_req *
 svc_defer(struct cache_req *req)
 {
 	struct svc_rqst *rqstp = container_of(req, struct svc_rqst, rq_chandle);
-	int size = sizeof(struct svc_deferred_req) + (rqstp->rq_argbuf.buflen << 2);
+	int size = sizeof(struct svc_deferred_req) + (rqstp->rq_arg.head[0].iov_len);
 	struct svc_deferred_req *dr;
 
+	if (rqstp->rq_arg.page_len)
+		return NULL; /* if more than a page, give up FIXME */
 	if (rqstp->rq_deferred) {
 		dr = rqstp->rq_deferred;
 		rqstp->rq_deferred = NULL;
 	} else {
 		/* FIXME maybe discard if size too large */
-		dr = kmalloc(size<<2, GFP_KERNEL);
+		dr = kmalloc(size, GFP_KERNEL);
 		if (dr == NULL)
 			return NULL;
 
 		dr->serv = rqstp->rq_server;
 		dr->prot = rqstp->rq_prot;
 		dr->addr = rqstp->rq_addr;
-		dr->argslen = rqstp->rq_argbuf.buflen;
-		memcpy(dr->args, rqstp->rq_argbuf.base, dr->argslen<<2);
+		dr->argslen = rqstp->rq_arg.head[0].iov_len >> 2;
+		memcpy(dr->args, rqstp->rq_arg.head[0].iov_base, dr->argslen<<2);
 	}
 	spin_lock(&rqstp->rq_server->sv_lock);
 	rqstp->rq_sock->sk_inuse++;
@@ -1388,10 +1444,10 @@ static int svc_deferred_recv(struct svc_rqst *rqstp)
 {
 	struct svc_deferred_req *dr = rqstp->rq_deferred;
 
-	rqstp->rq_argbuf.base = dr->args;
-	rqstp->rq_argbuf.buf  = dr->args;
-	rqstp->rq_argbuf.len  = dr->argslen;
-	rqstp->rq_argbuf.buflen = dr->argslen;
+	rqstp->rq_arg.head[0].iov_base = dr->args;
+	rqstp->rq_arg.head[0].iov_len = dr->argslen<<2;
+	rqstp->rq_arg.page_len = 0;
+	rqstp->rq_arg.len = dr->argslen<<2;
 	rqstp->rq_prot        = dr->prot;
 	rqstp->rq_addr        = dr->addr;
 	return dr->argslen<<2;
