@@ -790,13 +790,9 @@ static void scsi_softirq(struct softirq_action *h)
 				if ((status_byte(SCpnt->result) & CHECK_CONDITION) != 0) {
 					SCSI_LOG_MLCOMPLETE(3, print_sense("bh", SCpnt));
 				}
-				if (SCpnt->device->host->eh_wait != NULL) {
-					scsi_eh_eflags_set(SCpnt, SCSI_EH_CMD_FAILED | SCSI_EH_CMD_ERR);
-					SCpnt->owner = SCSI_OWNER_ERROR_HANDLER;
-					SCpnt->state = SCSI_STATE_FAILED;
 
-					scsi_host_failed_inc_and_test(SCpnt->device->host);
-				} else {
+				if (!scsi_eh_scmd_add(SCpnt, 0))
+				{
 					/*
 					 * We only get here if the error
 					 * recovery thread has died.
@@ -1296,6 +1292,44 @@ void scsi_device_put(struct scsi_device *sdev)
 {
 	sdev->access_count--;
 	module_put(sdev->host->hostt->module);
+}
+
+/**
+ * scsi_set_device_offline - set scsi_device offline
+ * @sdev:	pointer to struct scsi_device to offline. 
+ *
+ * Locks:	host_lock held on entry.
+ **/
+void scsi_set_device_offline(struct scsi_device *sdev)
+{
+	struct scsi_cmnd *scmd;
+	int	cmds_active = 0;
+	unsigned long flags;
+
+	sdev->online = FALSE;
+
+	spin_lock_irqsave(&sdev->list_lock, flags);
+	list_for_each_entry(scmd, &sdev->cmd_list, list) {
+		if (scmd->request && scmd->request->rq_status != RQ_INACTIVE) {
+			/*
+			 * If we are unable to remove the timer, it means
+			 * that the command has already timed out or
+			 * finished.
+			 */
+			if (!scsi_delete_timer(scmd)) {
+				continue;
+			}
+
+			++cmds_active;
+
+			scsi_eh_scmd_add(scmd, SCSI_EH_CANCEL_CMD);
+		}
+	}
+	spin_unlock_irqrestore(&sdev->list_lock, flags);
+
+	if (!cmds_active) {
+		/* FIXME: Send online state change hotplug event */
+	}
 }
 
 /*
