@@ -2242,8 +2242,8 @@ static int __devinit de4x5_pci_probe (struct pci_dev *pdev,
 		return -ENODEV;
 
 	/* Ok, the device seems to be for us. */
-	if (pci_enable_device (pdev))
-		return -ENODEV;
+	if ((error = pci_enable_device (pdev)))
+		return error;
 
 	if (!(dev = alloc_etherdev (sizeof (struct de4x5_private)))) {
 		error = -ENOMEM;
