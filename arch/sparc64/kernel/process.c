@@ -591,6 +591,8 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 	p->thread.smp_lock_pc = 0;
 #endif
 
+	p->user_tid = NULL;
+
 	/* Calculate offset to stack_frame & pt_regs */
 	child_trap_frame = ((char *)t) + (THREAD_SIZE - (TRACEREG_SZ+REGWIN_SZ));
 	memcpy(child_trap_frame, (((struct reg_window *)regs)-1), (TRACEREG_SZ+REGWIN_SZ));
@@ -646,6 +648,19 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long sp,
 
 	/* Set the second return value for the parent. */
 	regs->u_regs[UREG_I1] = 0;
+
+	if (!(clone_flags & (CLONE_SETTID | CLONE_CLEARTID)))
+		return 0;
+
+	if (t->flags & _TIF_32BIT)
+		t->kregs->u_regs[UREG_G2] &= 0xffffffff;
+
+	if (clone_flags & CLONE_SETTID)
+		if (put_user(p->pid, (int *)t->kregs->u_regs[UREG_G2]))
+			return -EFAULT;
+
+	if (clone_flags & CLONE_CLEARTID)
+		p->user_tid = (int *) t->kregs->u_regs[UREG_G2];
 
 	return 0;
 }
@@ -791,6 +806,7 @@ asmlinkage int sparc_execve(struct pt_regs *regs)
 		current_thread_info()->xfsr[0] = 0;
 		current_thread_info()->fpsaved[0] = 0;
 		regs->tstate &= ~TSTATE_PEF;
+		current->ptrace &= ~PT_DTRACE;
 	}
 out:
 	return error;
