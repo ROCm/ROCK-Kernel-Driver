@@ -129,24 +129,24 @@ struct nw_nfs_info {
 
 struct nw_info_struct {
 	__u32 spaceAlloc __attribute__((packed));
-	__u32 attributes __attribute__((packed));
+	__le32 attributes __attribute__((packed));
 	__u16 flags __attribute__((packed));
-	__u32 dataStreamSize __attribute__((packed));
-	__u32 totalStreamSize __attribute__((packed));
+	__le32 dataStreamSize __attribute__((packed));
+	__le32 totalStreamSize __attribute__((packed));
 	__u16 numberOfStreams __attribute__((packed));
-	__u16 creationTime __attribute__((packed));
-	__u16 creationDate __attribute__((packed));
+	__le16 creationTime __attribute__((packed));
+	__le16 creationDate __attribute__((packed));
 	__u32 creatorID __attribute__((packed));
-	__u16 modifyTime __attribute__((packed));
-	__u16 modifyDate __attribute__((packed));
+	__le16 modifyTime __attribute__((packed));
+	__le16 modifyDate __attribute__((packed));
 	__u32 modifierID __attribute__((packed));
-	__u16 lastAccessDate __attribute__((packed));
+	__le16 lastAccessDate __attribute__((packed));
 	__u16 archiveTime __attribute__((packed));
 	__u16 archiveDate __attribute__((packed));
 	__u32 archiverID __attribute__((packed));
 	__u16 inheritedRightsMask __attribute__((packed));
-	__u32 dirEntNum __attribute__((packed));
-	__u32 DosDirNum __attribute__((packed));
+	__le32 dirEntNum __attribute__((packed));
+	__le32 DosDirNum __attribute__((packed));
 	__u32 volNumber __attribute__((packed));
 	__u32 EADataSize __attribute__((packed));
 	__u32 EAKeyCount __attribute__((packed));
@@ -176,17 +176,17 @@ struct nw_info_struct {
 #define DM_MAXIMUM_SPACE	  (cpu_to_le32(0x2000))
 
 struct nw_modify_dos_info {
-	__u32 attributes __attribute__((packed));
-	__u16 creationDate __attribute__((packed));
-	__u16 creationTime __attribute__((packed));
+	__le32 attributes __attribute__((packed));
+	__le16 creationDate __attribute__((packed));
+	__le16 creationTime __attribute__((packed));
 	__u32 creatorID __attribute__((packed));
-	__u16 modifyDate __attribute__((packed));
-	__u16 modifyTime __attribute__((packed));
+	__le16 modifyDate __attribute__((packed));
+	__le16 modifyTime __attribute__((packed));
 	__u32 modifierID __attribute__((packed));
 	__u16 archiveDate __attribute__((packed));
 	__u16 archiveTime __attribute__((packed));
 	__u32 archiverID __attribute__((packed));
-	__u16 lastAccessDate __attribute__((packed));
+	__le16 lastAccessDate __attribute__((packed));
 	__u16 inheritanceGrantMask __attribute__((packed));
 	__u16 inheritanceRevokeMask __attribute__((packed));
 	__u32 maximumSpace __attribute__((packed));

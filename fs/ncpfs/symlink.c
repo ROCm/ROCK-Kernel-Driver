@@ -67,8 +67,8 @@ static int ncp_symlink_readpage(struct file *file, struct page *page)
 
 	if (NCP_FINFO(inode)->flags & NCPI_KLUDGE_SYMLINK) {
 		if (length<NCP_MIN_SYMLINK_SIZE || 
-		    ((__u32 *)rawlink)[0]!=NCP_SYMLINK_MAGIC0 ||
-		    ((__u32 *)rawlink)[1]!=NCP_SYMLINK_MAGIC1)
+		    ((__le32 *)rawlink)[0]!=NCP_SYMLINK_MAGIC0 ||
+		    ((__le32 *)rawlink)[1]!=NCP_SYMLINK_MAGIC1)
 		    	goto failEIO;
 		link = rawlink + 8;
 		length -= 8;
@@ -110,7 +110,8 @@ int ncp_symlink(struct inode *dir, struct dentry *dentry, const char *symname) {
 	char *rawlink;
 	int length, err, i, outlen;
 	int kludge;
-	int mode, attr;
+	int mode;
+	__le32 attr;
 	unsigned int hdr;
 
 	DPRINTK("ncp_symlink(dir=%p,dentry=%p,symname=%s)\n",dir,dentry,symname);
@@ -133,8 +134,8 @@ int ncp_symlink(struct inode *dir, struct dentry *dentry, const char *symname) {
 	if (kludge) {
 		mode = 0;
 		attr = aSHARED | aHIDDEN;
-		((__u32 *)rawlink)[0]=NCP_SYMLINK_MAGIC0;
-		((__u32 *)rawlink)[1]=NCP_SYMLINK_MAGIC1;
+		((__le32 *)rawlink)[0]=NCP_SYMLINK_MAGIC0;
+		((__le32 *)rawlink)[1]=NCP_SYMLINK_MAGIC1;
 		hdr = 8;
 	} else {
 		mode = S_IFLNK | S_IRWXUGO;

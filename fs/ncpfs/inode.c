@@ -792,7 +792,7 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 {
 	struct inode *inode = dentry->d_inode;
 	int result = 0;
-	int info_mask;
+	__le32 info_mask;
 	struct nw_modify_dos_info info;
 	struct ncp_server *server;
 

@@ -36,7 +36,7 @@ struct ncp_fs_info {
 				   used for read/write requests! */
 
 	int volume_number;
-	__u32 directory_id;
+	__le32 directory_id;
 };
 
 struct ncp_fs_info_v2 {
@@ -46,7 +46,7 @@ struct ncp_fs_info_v2 {
 	unsigned int buffer_size;
 
 	unsigned int volume_number;
-	__u32 directory_id;
+	__le32 directory_id;
 
 	__u32 dummy1;
 	__u32 dummy2;
@@ -78,7 +78,7 @@ struct ncp_setroot_ioctl
 {
 	int		volNumber;
 	int		namespace;
-	__u32		dirEntNum;
+	__le32		dirEntNum;
 };
 
 struct ncp_objectname_ioctl

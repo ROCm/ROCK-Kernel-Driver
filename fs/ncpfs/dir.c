@@ -174,7 +174,7 @@ ncp_force_unlink(struct inode *dir, struct dentry* dentry)
 {
         int res=0x9c,res2;
 	struct nw_modify_dos_info info;
-	__u32 old_nwattr;
+	__le32 old_nwattr;
 	struct inode *inode;
 
 	memset(&info, 0, sizeof(info));
@@ -211,8 +211,8 @@ ncp_force_rename(struct inode *old_dir, struct dentry* old_dentry, char *_old_na
 	struct nw_modify_dos_info info;
         int res=0x90,res2;
 	struct inode *old_inode = old_dentry->d_inode;
-	__u32 old_nwattr = NCP_FINFO(old_inode)->nwattr;
-	__u32 new_nwattr = 0; /* shut compiler warning */
+	__le32 old_nwattr = NCP_FINFO(old_inode)->nwattr;
+	__le32 new_nwattr = 0; /* shut compiler warning */
 	int old_nwattr_changed = 0;
 	int new_nwattr_changed = 0;
 
@@ -766,7 +766,9 @@ int ncp_conn_logged_in(struct super_block *sb)
 	if (ncp_single_volume(server)) {
 		int len;
 		struct dentry* dent;
-		__u32 volNumber, dirEntNum, DosDirNum;
+		__u32 volNumber;
+		__le32 dirEntNum;
+		__le32 DosDirNum;
 		__u8 __name[NCP_MAXPATHLEN + 1];
 
 		len = sizeof(__name);
@@ -885,7 +887,7 @@ out_close:
 }
 
 int ncp_create_new(struct inode *dir, struct dentry *dentry, int mode,
-		   dev_t rdev, int attributes)
+		   dev_t rdev, __le32 attributes)
 {
 	struct ncp_server *server = NCP_SERVER(dir);
 	struct ncp_entry_info finfo;
