@@ -399,8 +399,8 @@ static int longhaul_cpu_init (struct cpufreq_policy *policy)
 		cpuname = "C3 'Ezra-T [C5M]";
 		longhaul_version=3;
 		numscales=32;
-		memcpy (clock_ratio, longhaul3_clock_ratio, sizeof(longhaul3_clock_ratio));
-		memcpy (eblcr_table, c5m_eblcr, sizeof(c5m_eblcr));
+		memcpy (clock_ratio, ezrat_clock_ratio, sizeof(ezrat_clock_ratio));
+		memcpy (eblcr_table, ezrat_eblcr, sizeof(ezrat_eblcr));
 		break;
 	/*
 	case 9:

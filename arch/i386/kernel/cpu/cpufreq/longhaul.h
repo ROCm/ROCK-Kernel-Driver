@@ -157,7 +157,7 @@ static int __initdata ezra_eblcr[16] = {
 /*
  * VIA C3 (Ezra-T) [C5M].
  */
-static int __initdata longhaul3_clock_ratio[32] = {
+static int __initdata ezrat_clock_ratio[32] = {
 	100, /* 0000 -> 10.0x */
 	30,  /* 0001 ->  3.0x */
 	40,  /* 0010 ->  4.0x */
@@ -193,7 +193,7 @@ static int __initdata longhaul3_clock_ratio[32] = {
 	-1,  /* 1111 -> RESERVED (12.0x) */
 };
 
-static int __initdata c5m_eblcr[32] = {
+static int __initdata ezrat_eblcr[32] = {
 	50,  /* 0000 ->  5.0x */
 	30,  /* 0001 ->  3.0x */
 	40,  /* 0010 ->  4.0x */
