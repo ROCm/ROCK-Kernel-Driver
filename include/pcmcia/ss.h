@@ -126,18 +126,20 @@ typedef struct cb_bridge_map {
 /*
  * Socket operations.
  */
+struct pcmcia_socket;
+
 struct pccard_operations {
 	struct module *owner;
-	int (*init)(unsigned int sock);
-	int (*suspend)(unsigned int sock);
-	int (*register_callback)(unsigned int sock, void (*handler)(void *, unsigned int), void * info);
-	int (*inquire_socket)(unsigned int sock, socket_cap_t *cap);
-	int (*get_status)(unsigned int sock, u_int *value);
-	int (*get_socket)(unsigned int sock, socket_state_t *state);
-	int (*set_socket)(unsigned int sock, socket_state_t *state);
-	int (*set_io_map)(unsigned int sock, struct pccard_io_map *io);
-	int (*set_mem_map)(unsigned int sock, struct pccard_mem_map *mem);
-	void (*proc_setup)(unsigned int sock, struct proc_dir_entry *base);
+	int (*init)(struct pcmcia_socket *sock);
+	int (*suspend)(struct pcmcia_socket *sock);
+	int (*register_callback)(struct pcmcia_socket *sock, void (*handler)(void *, unsigned int), void * info);
+	int (*inquire_socket)(struct pcmcia_socket *sock, socket_cap_t *cap);
+	int (*get_status)(struct pcmcia_socket *sock, u_int *value);
+	int (*get_socket)(struct pcmcia_socket *sock, socket_state_t *state);
+	int (*set_socket)(struct pcmcia_socket *sock, socket_state_t *state);
+	int (*set_io_map)(struct pcmcia_socket *sock, struct pccard_io_map *io);
+	int (*set_mem_map)(struct pcmcia_socket *sock, struct pccard_mem_map *mem);
+	void (*proc_setup)(struct pcmcia_socket *sock, struct proc_dir_entry *base);
 };
 
 /*

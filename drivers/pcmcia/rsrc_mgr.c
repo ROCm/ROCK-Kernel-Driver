@@ -372,7 +372,7 @@ static int checksum(socket_info_t *s, u_long base)
     s->cis_virt = ioremap(base, s->cap.map_size);
     s->cis_mem.card_start = 0;
     s->cis_mem.flags = MAP_ACTIVE;
-    s->ss_entry->set_mem_map(s->sock, &s->cis_mem);
+    s->ss_entry->set_mem_map(s, &s->cis_mem);
     /* Don't bother checking every word... */
     a = 0; b = -1;
     for (i = 0; i < s->cap.map_size; i += 44) {

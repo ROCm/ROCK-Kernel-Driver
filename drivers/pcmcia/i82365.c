@@ -167,6 +167,7 @@ typedef struct vg46x_state_t {
 typedef struct socket_info_t {
     u_short		type, flags;
     struct pcmcia_socket	socket;
+    unsigned int	number;
     socket_cap_t	cap;
     ioaddr_t		ioaddr;
     u_short		psock;
@@ -1014,8 +1015,9 @@ static void pcic_interrupt_wrapper(u_long data)
 
 /*====================================================================*/
 
-static int pcic_register_callback(unsigned int sock, void (*handler)(void *, unsigned int), void * info)
+static int pcic_register_callback(struct pcmcia_socket *s, void (*handler)(void *, unsigned int), void * info)
 {
+    unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
     socket[sock].handler = handler;
     socket[sock].info = info;
     return 0;
@@ -1023,8 +1025,9 @@ static int pcic_register_callback(unsigned int sock, void (*handler)(void *, uns
 
 /*====================================================================*/
 
-static int pcic_inquire_socket(unsigned int sock, socket_cap_t *cap)
+static int pcic_inquire_socket(struct pcmcia_socket *s, socket_cap_t *cap)
 {
+    unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
     *cap = socket[sock].cap;
     return 0;
 } /* pcic_inquire_socket */
@@ -1371,9 +1374,9 @@ static int proc_read_exca(char *buf, char **start, off_t pos,
     return (p - buf);
 }
 
-static void pcic_proc_setup(unsigned int sock, struct proc_dir_entry *base)
+static void pcic_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
 {
-    socket_info_t *s = &socket[sock];
+    socket_info_t *s = container_of(sock, struct socket_info_t, socket);
 
     if (s->flags & IS_ALIVE)
     	return;
@@ -1421,8 +1424,10 @@ static void pcic_proc_remove(u_short sock)
 #endif
 	
 
-static int pcic_get_status(unsigned int sock, u_int *value)
+static int pcic_get_status(struct pcmcia_socket *s, u_int *value)
 {
+	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+
 	if (socket[sock].flags & IS_ALIVE) {
 		*value = 0;
 		return -EINVAL;
@@ -1431,39 +1436,45 @@ static int pcic_get_status(unsigned int sock, u_int *value)
 	LOCKED(i365_get_status(sock, value));
 }
 
-static int pcic_get_socket(unsigned int sock, socket_state_t *state)
+static int pcic_get_socket(struct pcmcia_socket *s, socket_state_t *state)
 {
+	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+
 	if (socket[sock].flags & IS_ALIVE)
 		return -EINVAL;
 
 	LOCKED(i365_get_socket(sock, state));
 }
 
-static int pcic_set_socket(unsigned int sock, socket_state_t *state)
+static int pcic_set_socket(struct pcmcia_socket *s, socket_state_t *state)
 {
+	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
+
 	if (socket[sock].flags & IS_ALIVE)
 		return -EINVAL;
 
 	LOCKED(i365_set_socket(sock, state));
 }
 
-static int pcic_set_io_map(unsigned int sock, struct pccard_io_map *io)
+static int pcic_set_io_map(struct pcmcia_socket *s, struct pccard_io_map *io)
 {
+	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
 	if (socket[sock].flags & IS_ALIVE)
 		return -EINVAL;
 
 	LOCKED(i365_set_io_map(sock, io));
 }
 
-static int pcic_set_mem_map(unsigned int sock, struct pccard_mem_map *mem)
+static int pcic_set_mem_map(struct pcmcia_socket *s, struct pccard_mem_map *mem)
 {
+	unsigned int sock = container_of(s, struct socket_info_t, socket)->number;
 	if (socket[sock].flags & IS_ALIVE)
 		return -EINVAL;
 
 	LOCKED(i365_set_mem_map(sock, mem));
 }
 
-static int pcic_init(unsigned int s)
+static int pcic_init(struct pcmcia_socket *s)
 {
 	int i;
 	pccard_io_map io = { 0, 0, 0, 0, 1 };
@@ -1482,7 +1493,7 @@ static int pcic_init(unsigned int s)
 	return 0;
 }
 
-static int pcic_suspend(unsigned int sock)
+static int pcic_suspend(struct pcmcia_socket *sock)
 {
 	return pcic_set_socket(sock, &dead_socket);
 }
@@ -1558,6 +1569,7 @@ static int __init init_i82365(void)
     for (i = 0; i < sockets; i++) {
 	    socket[i].socket.dev.dev = &i82365_device.dev;
 	    socket[i].socket.ss_entry = &pcic_operations;
+	    socket[i].number = i;
 	    ret = pcmcia_register_socket(&socket[i].socket);	    
 	    if (ret && i--) {
 		    for (; i>= 0; i--)

@@ -38,44 +38,44 @@
 #define MAX_SOCKETS (8)
 static pci_socket_t pci_socket_array[MAX_SOCKETS];
 
-static int pci_init_socket(unsigned int sock)
+static int pci_init_socket(struct pcmcia_socket *sock)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	if (socket->op && socket->op->init)
 		return socket->op->init(socket);
 	return -EINVAL;
 }
 
-static int pci_suspend_socket(unsigned int sock)
+static int pci_suspend_socket(struct pcmcia_socket *sock)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	if (socket->op && socket->op->suspend)
 		return socket->op->suspend(socket);
 	return -EINVAL;
 }
 
-static int pci_register_callback(unsigned int sock, void (*handler)(void *, unsigned int), void * info)
+static int pci_register_callback(struct pcmcia_socket *sock, void (*handler)(void *, unsigned int), void * info)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	socket->handler = handler;
 	socket->info = info;
 	return 0;
 }
 
-static int pci_inquire_socket(unsigned int sock, socket_cap_t *cap)
+static int pci_inquire_socket(struct pcmcia_socket *sock, socket_cap_t *cap)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	*cap = socket->cap;
 	return 0;
 }
 
-static int pci_get_status(unsigned int sock, unsigned int *value)
+static int pci_get_status(struct pcmcia_socket *sock, unsigned int *value)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	if (socket->op && socket->op->get_status)
 		return socket->op->get_status(socket, value);
@@ -83,45 +83,45 @@ static int pci_get_status(unsigned int sock, unsigned int *value)
 	return -EINVAL;
 }
 
-static int pci_get_socket(unsigned int sock, socket_state_t *state)
+static int pci_get_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	if (socket->op && socket->op->get_socket)
 		return socket->op->get_socket(socket, state);
 	return -EINVAL;
 }
 
-static int pci_set_socket(unsigned int sock, socket_state_t *state)
+static int pci_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	if (socket->op && socket->op->set_socket)
 		return socket->op->set_socket(socket, state);
 	return -EINVAL;
 }
 
-static int pci_set_io_map(unsigned int sock, struct pccard_io_map *io)
+static int pci_set_io_map(struct pcmcia_socket *sock, struct pccard_io_map *io)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	if (socket->op && socket->op->set_io_map)
 		return socket->op->set_io_map(socket, io);
 	return -EINVAL;
 }
 
-static int pci_set_mem_map(unsigned int sock, struct pccard_mem_map *mem)
+static int pci_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *mem)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	if (socket->op && socket->op->set_mem_map)
 		return socket->op->set_mem_map(socket, mem);
 	return -EINVAL;
 }
 
-static void pci_proc_setup(unsigned int sock, struct proc_dir_entry *base)
+static void pci_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
 {
-	pci_socket_t *socket = pci_socket_array + sock;
+	pci_socket_t *socket = container_of(sock, struct pci_socket, socket);
 
 	if (socket->op && socket->op->proc_setup)
 		socket->op->proc_setup(socket, base);

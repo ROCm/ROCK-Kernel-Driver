@@ -243,7 +243,7 @@ static int register_callback(socket_info_t *s, void (*handler)(void *, unsigned 
 
 	if (handler && !try_module_get(s->ss_entry->owner))
 		return -ENODEV;
-	error = s->ss_entry->register_callback(s->sock, handler, info);
+	error = s->ss_entry->register_callback(s, handler, info);
 	if (!handler)
 		module_put(s->ss_entry->owner);
 	return error;
@@ -251,34 +251,34 @@ static int register_callback(socket_info_t *s, void (*handler)(void *, unsigned 
 
 static int get_socket_status(socket_info_t *s, int *val)
 {
-	return s->ss_entry->get_status(s->sock, val);
+	return s->ss_entry->get_status(s, val);
 }
 
 static int set_socket(socket_info_t *s, socket_state_t *state)
 {
-	return s->ss_entry->set_socket(s->sock, state);
+	return s->ss_entry->set_socket(s, state);
 }
 
 static int set_io_map(socket_info_t *s, struct pccard_io_map *io)
 {
-	return s->ss_entry->set_io_map(s->sock, io);
+	return s->ss_entry->set_io_map(s, io);
 }
 
 static int set_mem_map(socket_info_t *s, struct pccard_mem_map *mem)
 {
-	return s->ss_entry->set_mem_map(s->sock, mem);
+	return s->ss_entry->set_mem_map(s, mem);
 }
 
 static int suspend_socket(socket_info_t *s)
 {
 	s->socket = dead_socket;
-	return s->ss_entry->suspend(s->sock);
+	return s->ss_entry->suspend(s);
 }
 
 static int init_socket(socket_info_t *s)
 {
 	s->socket = dead_socket;
-	return s->ss_entry->init(s->sock);
+	return s->ss_entry->init(s);
 }
 
 /*====================================================================*/
@@ -375,7 +375,7 @@ static int pcmcia_add_socket(struct class_device *class_dev)
 	spin_lock_init(&socket->lock);
 
 	init_socket(socket);
-	socket->ss_entry->inquire_socket(socket->sock, &socket->cap);
+	socket->ss_entry->inquire_socket(socket, &socket->cap);
 
 	init_completion(&socket->thread_done);
 	init_waitqueue_head(&socket->thread_wait);
@@ -394,7 +394,7 @@ static int pcmcia_add_socket(struct class_device *class_dev)
 		sprintf(name, "%02d", socket->sock);
 		socket->proc = proc_mkdir(name, proc_pccard);
 		if (socket->proc)
-			socket->ss_entry->proc_setup(socket->sock, socket->proc);
+			socket->ss_entry->proc_setup(socket, socket->proc);
 #ifdef PCMCIA_DEBUG
 		if (socket->proc)
 			create_proc_read_entry("clients", 0, socket->proc,

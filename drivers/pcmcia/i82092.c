@@ -80,6 +80,7 @@ static struct pccard_operations i82092aa_operations = {
 /* The card can do upto 4 sockets, allocate a structure for each of them */
 
 struct socket_info {
+	int	number;
 	int	card_state; 	/*  0 = no socket,
 				    1 = empty socket, 
 				    2 = card but not initialized,
@@ -144,6 +145,8 @@ static int __init i82092aa_pci_probe(struct pci_dev *dev, const struct pci_devic
 		sockets[i].cap.map_size = 0x1000;
 		sockets[i].cap.irq_mask = 0;
 		sockets[i].cap.pci_irq  = dev->irq;
+
+		sockets[i].number = i;
 		
 		if (card_present(i)) {
 			sockets[i].card_state = 3;
@@ -443,7 +446,7 @@ static void set_bridge_state(int sock)
 
 
       
-static int i82092aa_init(unsigned int s)
+static int i82092aa_init(struct pcmcia_socket *sock)
 {
 	int i;
         pccard_io_map io = { 0, 0, 0, 0, 1 };
@@ -452,21 +455,21 @@ static int i82092aa_init(unsigned int s)
         enter("i82092aa_init");
                         
         mem.sys_stop = 0x0fff;
-        i82092aa_set_socket(s, &dead_socket);
+        i82092aa_set_socket(sock, &dead_socket);
         for (i = 0; i < 2; i++) {
         	io.map = i;
-                i82092aa_set_io_map(s, &io);
+                i82092aa_set_io_map(sock, &io);
 	}
         for (i = 0; i < 5; i++) {
         	mem.map = i;
-                i82092aa_set_mem_map(s, &mem);
+                i82092aa_set_mem_map(sock, &mem);
 	}
 	
 	leave("i82092aa_init");
 	return 0;
 }
                                                                                                                                                                                                                                               
-static int i82092aa_suspend(unsigned int sock)
+static int i82092aa_suspend(struct pcmcia_socket *sock)
 {
 	int retval;
 	enter("i82092aa_suspend");
@@ -475,8 +478,9 @@ static int i82092aa_suspend(unsigned int sock)
         return retval;
 }
        
-static int i82092aa_register_callback(unsigned int sock, void (*handler)(void *, unsigned int), void * info)
+static int i82092aa_register_callback(struct pcmcia_socket *socket, void (*handler)(void *, unsigned int), void * info)
 {
+	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
 	enter("i82092aa_register_callback");
 	sockets[sock].handler = handler;
         sockets[sock].info = info;
@@ -484,8 +488,9 @@ static int i82092aa_register_callback(unsigned int sock, void (*handler)(void *,
 	return 0;
 } /* i82092aa_register_callback */
                                         
-static int i82092aa_inquire_socket(unsigned int sock, socket_cap_t *cap)
+static int i82092aa_inquire_socket(struct pcmcia_socket *socket, socket_cap_t *cap)
 {
+	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
 	enter("i82092aa_inquire_socket");
 	*cap = sockets[sock].cap;
 	leave("i82092aa_inquire_socket");
@@ -493,8 +498,9 @@ static int i82092aa_inquire_socket(unsigned int sock, socket_cap_t *cap)
 } /* i82092aa_inquire_socket */
 
 
-static int i82092aa_get_status(unsigned int sock, u_int *value)
+static int i82092aa_get_status(struct pcmcia_socket *socket, u_int *value)
 {
+	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
 	unsigned int status;
 	
 	enter("i82092aa_get_status");
@@ -535,8 +541,9 @@ static int i82092aa_get_status(unsigned int sock, u_int *value)
 }
 
 
-static int i82092aa_get_socket(unsigned int sock, socket_state_t *state) 
+static int i82092aa_get_socket(struct pcmcia_socket *socket, socket_state_t *state) 
 {
+	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
 	unsigned char reg,vcc,vpp;
 	
 	enter("i82092aa_get_socket");
@@ -606,8 +613,9 @@ static int i82092aa_get_socket(unsigned int sock, socket_state_t *state)
 	return 0;
 }
 
-static int i82092aa_set_socket(unsigned int sock, socket_state_t *state) 
+static int i82092aa_set_socket(struct pcmcia_socket *socket, socket_state_t *state) 
 {
+	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
 	unsigned char reg;
 	
 	enter("i82092aa_set_socket");
@@ -702,8 +710,9 @@ static int i82092aa_set_socket(unsigned int sock, socket_state_t *state)
 	return 0;
 }
 
-static int i82092aa_set_io_map(unsigned sock, struct pccard_io_map *io)
+static int i82092aa_set_io_map(struct pcmcia_socket *socket, struct pccard_io_map *io)
 {
+	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
 	unsigned char map, ioctl;
 	
 	enter("i82092aa_set_io_map");
@@ -745,8 +754,9 @@ static int i82092aa_set_io_map(unsigned sock, struct pccard_io_map *io)
 	return 0;
 }
 
-static int i82092aa_set_mem_map(unsigned sock, struct pccard_mem_map *mem)
+static int i82092aa_set_mem_map(struct pcmcia_socket *socket, struct pccard_mem_map *mem)
 {
+	unsigned int sock = container_of(socket, struct socket_info, socket)->number;
 	unsigned short base, i;
 	unsigned char map;
 	
@@ -822,7 +832,7 @@ static int i82092aa_set_mem_map(unsigned sock, struct pccard_mem_map *mem)
 	return 0;
 }
 
-static void i82092aa_proc_setup(unsigned int sock, struct proc_dir_entry *base)
+static void i82092aa_proc_setup(struct pcmcia_socket *socket, struct proc_dir_entry *base)
 {
 	
 }

@@ -86,7 +86,7 @@ void release_cis_mem(socket_info_t *s)
 {
     if (s->cis_mem.sys_start != 0) {
 	s->cis_mem.flags &= ~MAP_ACTIVE;
-	s->ss_entry->set_mem_map(s->sock, &s->cis_mem);
+	s->ss_entry->set_mem_map(s, &s->cis_mem);
 	if (!(s->cap.features & SS_CAP_STATIC_MAP))
 	    release_mem_region(s->cis_mem.sys_start, s->cap.map_size);
 	iounmap(s->cis_virt);
@@ -119,7 +119,7 @@ set_cis_map(socket_info_t *s, unsigned int card_offset, unsigned int flags)
     }
     mem->card_start = card_offset;
     mem->flags = flags;
-    s->ss_entry->set_mem_map(s->sock, mem);
+    s->ss_entry->set_mem_map(s, mem);
     if (s->cap.features & SS_CAP_STATIC_MAP) {
 	if (s->cis_virt)
 	    iounmap(s->cis_virt);
