@@ -393,6 +393,11 @@ static int tda10046_fwupload(struct dvb_frontend* fe)
 	int ret;
 	const struct firmware *fw;
 
+	/* reset + wake up chip */
+	tda1004x_write_mask(state, TDA1004X_CONFC4, 1, 0);
+	tda1004x_write_mask(state, TDA10046H_CONF_TRISTATE1, 1, 0);
+	msleep(100);
+
 	/* don't re-upload unless necessary */
 	if (tda1004x_check_upload_ok(state, 0x20) == 0) return 0;
 
@@ -403,11 +408,6 @@ static int tda10046_fwupload(struct dvb_frontend* fe)
 		printk("tda1004x: no firmware upload (timeout or file not found?)\n");
    	   	return ret;
 	}
-
-	/* reset chip */
-	tda1004x_write_mask(state, TDA1004X_CONFC4, 1, 0);
-	tda1004x_write_mask(state, TDA10046H_CONF_TRISTATE1, 1, 0);
-	msleep(10);
 
 	/* set parameters */
 	tda1004x_write_byteI(state, TDA10046H_CONFPLL2, 10);
@@ -533,6 +533,8 @@ static int tda10045_init(struct dvb_frontend* fe)
 	tda1004x_write_mask(state, TDA1004X_CONFC1, 0x10, 0); // VAGC polarity
 	tda1004x_write_byteI(state, TDA1004X_CONFADC1, 0x2e);
 
+	tda1004x_write_mask(state, 0x1f, 0x01, state->config->invert_oclk);
+
 	state->initialised = 1;
 	return 0;
 		}
@@ -585,6 +587,8 @@ static int tda10046_init(struct dvb_frontend* fe)
 	tda1004x_write_mask(state, TDA10046H_GPIO_SELECT, 8, 8); // GPIO select
 	tda10046h_set_bandwidth(state, BANDWIDTH_8_MHZ); // default bandwidth 8 MHz
 
+	tda1004x_write_mask(state, 0x3a, 0x80, state->config->invert_oclk << 7);
+
 	state->initialised = 1;
 	return 0;
 }
@@ -616,12 +620,13 @@ static int tda1004x_set_fe(struct dvb_frontend* fe,
 	if (state->demod_type == TDA1004X_DEMOD_TDA10046)
 		tda1004x_write_mask(state, TDA10046H_AGC_CONF, 4, 4);
 
-	// Hardcoded to use auto as much as possible
-	// The TDA10045 is very unreliable if AUTO mode is _not_ used. I have not
-	// yet tested the TDA10046 to see if this issue has been fixed
+	// Hardcoded to use auto as much as possible on the TDA10045 as it
+	// is very unreliable if AUTO mode is _not_ used.
+	if (state->demod_type == TDA1004X_DEMOD_TDA10045) {
 	fe_params->u.ofdm.code_rate_HP = FEC_AUTO;
 	fe_params->u.ofdm.guard_interval = GUARD_INTERVAL_AUTO;
 	fe_params->u.ofdm.transmission_mode = TRANSMISSION_MODE_AUTO;
+	}
 
 	// Set standard params.. or put them to auto
 	if ((fe_params->u.ofdm.code_rate_HP == FEC_AUTO) ||
@@ -1170,6 +1175,7 @@ static struct dvb_frontend_ops tda10045_ops = {
 
 	.set_frontend = tda1004x_set_fe,
 	.get_frontend = tda1004x_get_fe,
+	.get_tune_settings = tda1004x_get_tune_settings,
 
 	.read_status = tda1004x_read_status,
 	.read_ber = tda1004x_read_ber,

@@ -393,7 +393,7 @@ static int mt312_read_status(struct dvb_frontend* fe, fe_status_t *s)
 {
 	struct mt312_state *state = (struct mt312_state*) fe->demodulator_priv;
 	int ret;
-	u8 status[3], vit_mode;
+	u8 status[3];
 
 	*s = 0;
 
@@ -412,17 +412,6 @@ static int mt312_read_status(struct dvb_frontend* fe, fe_status_t *s)
 		*s |= FE_HAS_SYNC;	/* byte align lock */
 	if (status[0] & 0x01)
 		*s |= FE_HAS_LOCK;	/* qpsk lock */
-
-	// VP310 doesn't have AUTO, so we "implement it here" ACCJr
-	if ((state->id == ID_VP310) && !(status[0] & 0x01)) {
-		if ((ret = mt312_readreg(state, VIT_MODE, &vit_mode)) < 0)
-			return ret;
-		vit_mode ^= 0x40;
-		if ((ret = mt312_writereg(state, VIT_MODE, vit_mode)) < 0)
-                	return ret;
-		if ((ret = mt312_writereg(state, GO, 0x01)) < 0)
-                	return ret;
-	}
 
 	return 0;
 }
@@ -638,7 +627,42 @@ static void mt312_release(struct dvb_frontend* fe)
 	kfree(state);
 }
 
-static struct dvb_frontend_ops mt312_ops;
+static struct dvb_frontend_ops vp310_mt312_ops;
+
+struct dvb_frontend* vp310_attach(const struct mt312_config* config,
+				  struct i2c_adapter* i2c)
+{
+	struct mt312_state* state = NULL;
+
+	/* allocate memory for the internal state */
+	state = (struct mt312_state*) kmalloc(sizeof(struct mt312_state), GFP_KERNEL);
+	if (state == NULL)
+		goto error;
+
+	/* setup the state */
+	state->config = config;
+	state->i2c = i2c;
+	memcpy(&state->ops, &vp310_mt312_ops, sizeof(struct dvb_frontend_ops));
+	strcpy(state->ops.info.name, "Zarlink VP310 DVB-S");
+
+	/* check if the demod is there */
+	if (mt312_readreg(state, ID, &state->id) < 0)
+		goto error;
+	if (state->id != ID_VP310) {
+		goto error;
+	}
+
+	/* create dvb_frontend */
+		state->frequency = 90;
+	state->frontend.ops = &state->ops;
+	state->frontend.demodulator_priv = state;
+	return &state->frontend;
+
+error:
+	if (state)
+		kfree(state);
+	return NULL;
+}
 
 struct dvb_frontend* mt312_attach(const struct mt312_config* config,
 				  struct i2c_adapter* i2c)
@@ -647,52 +671,44 @@ struct dvb_frontend* mt312_attach(const struct mt312_config* config,
 
 	/* allocate memory for the internal state */
 	state = (struct mt312_state*) kmalloc(sizeof(struct mt312_state), GFP_KERNEL);
-	if (state == NULL) goto error;
+	if (state == NULL)
+		goto error;
 
 	/* setup the state */
 	state->config = config;
 	state->i2c = i2c;
-	memcpy(&state->ops, &mt312_ops, sizeof(struct dvb_frontend_ops));
+	memcpy(&state->ops, &vp310_mt312_ops, sizeof(struct dvb_frontend_ops));
+	strcpy(state->ops.info.name, "Zarlink MT312 DVB-S");
 
 	/* check if the demod is there */
-	if (mt312_readreg(state, ID, &state->id) < 0) goto error;
-	switch(state->id) {
-	case ID_VP310:
-		state->frequency = 90;
-		printk("mt312: Detected Zarlink VP310\n");
-		break;
-
-	case ID_MT312:
-		state->frequency = 60;
-		printk("mt312: Detected Zarlink MT312\n");
-		break;
-
-	default:
+	if (mt312_readreg(state, ID, &state->id) < 0)
+		goto error;
+	if (state->id != ID_MT312) {
 		goto error;
 }
 
 	/* create dvb_frontend */
+	state->frequency = 60;
 	state->frontend.ops = &state->ops;
 	state->frontend.demodulator_priv = state;
 	return &state->frontend;
 
 error:
-	if (state) kfree(state);
+	if (state)
+		kfree(state);
 	return NULL;
 }
 
-static struct dvb_frontend_ops mt312_ops = {
+static struct dvb_frontend_ops vp310_mt312_ops = {
 
 	.info = {
-		.name = "Zarlink VP310/MT312 DVB-S",
+		.name = "Zarlink ???? DVB-S",
 		.type = FE_QPSK,
 		.frequency_min = 950000,
 		.frequency_max = 2150000,
 		.frequency_stepsize = (MT312_PLL_CLK / 1000) / 128,
-		/*.frequency_tolerance = 29500,         FIXME: binary compatibility waste? */
 		.symbol_rate_min = MT312_SYS_CLK / 128,
 		.symbol_rate_max = MT312_SYS_CLK / 2,
-		/*.symbol_rate_tolerance = 500,         FIXME: binary compatibility waste? 2% */
 		.caps =
 		    FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
 		    FE_CAN_FEC_3_4 | FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
@@ -729,3 +745,4 @@ MODULE_AUTHOR("Andreas Oberritter <obi@linuxtv.org>");
 MODULE_LICENSE("GPL");
 
 EXPORT_SYMBOL(mt312_attach);
+EXPORT_SYMBOL(vp310_attach);

@@ -34,6 +34,9 @@ struct tda1004x_config
 	/* does the "inversion" need inverted? */
 	u8 invert:1;
 
+	/* Does the OCLK signal need inverted? */
+	u8 invert_oclk:1;
+
 	/* PLL maintenance */
 	int (*pll_init)(struct dvb_frontend* fe);
 	int (*pll_set)(struct dvb_frontend* fe, struct dvb_frontend_parameters* params);

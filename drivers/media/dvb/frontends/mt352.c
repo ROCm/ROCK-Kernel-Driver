@@ -65,8 +65,7 @@ int mt352_write(struct dvb_frontend* fe, u8* ibuf, int ilen)
 			       .buf = ibuf, .len = ilen };
 	int err = i2c_transfer(state->i2c, &msg, 1);
 	if (err != 1) {
-		printk(KERN_WARNING
-		       "mt352_write() failed (err = %d)!\n", err);
+		dprintk("mt352_write() failed (err = %d)!\n", err);
 		return err;
 }
 
@@ -88,8 +87,7 @@ static u8 mt352_read_register(struct mt352_state* state, u8 reg)
 	ret = i2c_transfer(state->i2c, msg, 2);
 
 	if (ret != 2)
-		printk(KERN_WARNING
-		       "%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
+		dprintk("%s: readreg error (ret == %i)\n", __FUNCTION__, ret);
 
 	return b1[0];
 }

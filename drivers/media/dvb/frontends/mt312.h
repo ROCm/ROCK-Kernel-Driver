@@ -41,4 +41,7 @@ struct mt312_config
 extern struct dvb_frontend* mt312_attach(const struct mt312_config* config,
 					 struct i2c_adapter* i2c);
 
+extern struct dvb_frontend* vp310_attach(const struct mt312_config* config,
+					 struct i2c_adapter* i2c);
+
 #endif // MT312_H
