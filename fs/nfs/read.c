@@ -38,11 +38,18 @@ struct nfs_read_data {
 	struct rpc_task		task;
 	struct inode		*inode;
 	struct rpc_cred		*cred;
-	struct nfs_readargs	args;	/* XDR argument struct */
-	struct nfs_readres	res;	/* ... and result struct */
 	struct nfs_fattr	fattr;	/* fattr storage */
 	struct list_head	pages;	/* Coalesced read requests */
 	struct page		*pagevec[NFS_READ_MAXIOV];
+	union {
+		struct {
+			struct nfs_readargs args;
+			struct nfs_readres  res;
+		} v3;   /* also v2 */
+#ifdef CONFIG_NFS_V4
+		/* NFSv4 data will come here... */
+#endif
+	} u;
 };
 
 /*
@@ -64,7 +71,7 @@ static __inline__ struct nfs_read_data *nfs_readdata_alloc(void)
 	if (p) {
 		memset(p, 0, sizeof(*p));
 		INIT_LIST_HEAD(&p->pages);
-		p->args.pages = p->pagevec;
+		p->u.v3.args.pages = p->pagevec;
 	}
 	return p;
 }
@@ -190,11 +197,13 @@ nfs_readpage_async(struct file *file, struct inode *inode, struct page *page)
 static void
 nfs_read_rpcsetup(struct list_head *head, struct nfs_read_data *data)
 {
+	struct nfs_readargs	*args = &data->u.v3.args;
+	struct nfs_readres 	*res = &data->u.v3.res;
 	struct nfs_page		*req;
 	struct page		**pages;
 	unsigned int		count;
 
-	pages = data->args.pages;
+	pages = &args->pages[0];
 	count = 0;
 	while (!list_empty(head)) {
 		struct nfs_page *req = nfs_list_entry(head->next);
@@ -206,13 +215,13 @@ nfs_read_rpcsetup(struct list_head *head, struct nfs_read_data *data)
 	req = nfs_list_entry(data->pages.next);
 	data->inode	  = req->wb_inode;
 	data->cred	  = req->wb_cred;
-	data->args.fh     = NFS_FH(req->wb_inode);
-	data->args.offset = req_offset(req) + req->wb_offset;
-	data->args.pgbase = req->wb_offset;
-	data->args.count  = count;
-	data->res.fattr   = &data->fattr;
-	data->res.count   = count;
-	data->res.eof     = 0;
+	args->fh	  = NFS_FH(req->wb_inode);
+	args->offset	  = req_offset(req) + req->wb_offset;
+	args->pgbase	  = req->wb_offset;
+	args->count	  = count;
+	res->fattr	  = &data->fattr;
+	res->count	  = count;
+	res->eof	  = 0;
 }
 
 static void
@@ -264,8 +273,8 @@ nfs_pagein_one(struct list_head *head, struct inode *inode)
 #else
 	msg.rpc_proc = NFSPROC_READ;
 #endif
-	msg.rpc_argp = &data->args;
-	msg.rpc_resp = &data->res;
+	msg.rpc_argp = &data->u.v3.args;
+	msg.rpc_resp = &data->u.v3.res;
 	msg.rpc_cred = data->cred;
 
 	/* Start the async call */
@@ -273,8 +282,8 @@ nfs_pagein_one(struct list_head *head, struct inode *inode)
 		task->tk_pid,
 		inode->i_sb->s_id,
 		(long long)NFS_FILEID(inode),
-		(unsigned int)data->args.count,
-		(unsigned long long)data->args.offset);
+		(unsigned int)data->u.v3.args.count,
+		(unsigned long long)data->u.v3.args.offset);
 
 	rpc_clnt_sigmask(clnt, &oldset);
 	rpc_call_setup(task, &msg, 0);
@@ -404,7 +413,8 @@ nfs_readpage_result(struct rpc_task *task)
 {
 	struct nfs_read_data	*data = (struct nfs_read_data *) task->tk_calldata;
 	struct inode		*inode = data->inode;
-	unsigned int		count = data->res.count;
+	unsigned int		count = data->u.v3.res.count;
+	int			eof = data->u.v3.res.eof;
 
 	dprintk("NFS: %4d nfs_readpage_result, (status %d)\n",
 		task->tk_pid, task->tk_status);
@@ -424,7 +434,7 @@ nfs_readpage_result(struct rpc_task *task)
 				memset(p + count, 0, PAGE_CACHE_SIZE - count);
 				kunmap(page);
 				count = 0;
-				if (data->res.eof)
+				if (eof)
 					SetPageUptodate(page);
 				else
 					SetPageError(page);
