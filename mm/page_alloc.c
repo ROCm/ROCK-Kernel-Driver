@@ -539,7 +539,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 {
 	const int wait = gfp_mask & __GFP_WAIT;
 	unsigned long min;
-	struct zone **zones, *classzone;
+	struct zone **zones;
 	struct page *page;
 	struct reclaim_state reclaim_state;
 	struct task_struct *p = current;
@@ -554,8 +554,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		cold = 1;
 
 	zones = zonelist->zones;  /* the list of zones suitable for gfp_mask */
-	classzone = zones[0]; 
-	if (classzone == NULL)    /* no zones in the zonelist */
+	if (zones[0] == NULL)     /* no zones in the zonelist */
 		return NULL;
 
 	/* Go through the zonelist once, looking for a zone with enough free */
@@ -630,7 +629,7 @@ rebalance:
 	reclaim_state.reclaimed_slab = 0;
 	p->reclaim_state = &reclaim_state;
 
-	try_to_free_pages(classzone, gfp_mask, order);
+	try_to_free_pages(zones, gfp_mask, order);
 
 	p->reclaim_state = NULL;
 	p->flags &= ~PF_MEMALLOC;

@@ -483,7 +483,7 @@ void invalidate_bdev(struct block_device *bdev, int destroy_dirty_buffers)
  */
 static void free_more_memory(void)
 {
-	struct zone *zone;
+	struct zone **zones;
 	pg_data_t *pgdat;
 
 	wakeup_bdflush(1024);
@@ -491,9 +491,9 @@ static void free_more_memory(void)
 	yield();
 
 	for_each_pgdat(pgdat) {
-		zone = pgdat->node_zonelists[GFP_NOFS&GFP_ZONEMASK].zones[0];
-		if (zone)
-			try_to_free_pages(zone, GFP_NOFS, 0);
+		zones = pgdat->node_zonelists[GFP_NOFS&GFP_ZONEMASK].zones;
+		if (*zones)
+			try_to_free_pages(zones, GFP_NOFS, 0);
 	}
 }
 
