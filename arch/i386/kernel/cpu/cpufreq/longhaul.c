@@ -256,6 +256,16 @@ static int __init longhaul_get_ranges (void)
 	dprintk (KERN_INFO PFX "FSB: %dMHz Lowestspeed=%dMHz Highestspeed=%dMHz\n",
 		 fsb, lowest_speed/1000, highest_speed/1000);
 
+	if (lowest_speed == highest_speed) {
+		printk (KERN_INFO PFX "highestspeed == lowest, aborting.\n");
+		return -EINVAL;
+	}
+	if (lowest_speed > highest_speed) {
+		printk (KERN_INFO PFX "nonsense! lowest (%d > %d) !\n",
+			lowest_speed, highest_speed);
+		return -EINVAL;
+	}
+
 	longhaul_table = kmalloc((numscales + 1) * sizeof(struct cpufreq_frequency_table), GFP_KERNEL);
 	if(!longhaul_table)
 		return -ENOMEM;
