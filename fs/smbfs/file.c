@@ -42,9 +42,7 @@ smb_fsync(struct file *file, struct dentry * dentry, int datasync)
 	 * Note: this function requires all pages to have been written already
 	 *       (should be ok with writepage_sync)
 	 */
-	smb_lock_server(server);
 	result = smb_proc_flush(server, SMB_I(dentry->d_inode)->fileid);
-	smb_unlock_server(server);
 	return result;
 }
 
@@ -129,7 +127,7 @@ smb_writepage_sync(struct inode *inode, struct page *page,
 
 	offset = ((loff_t)page->index << PAGE_CACHE_SHIFT) + pageoffset;
 	VERBOSE("file ino=%ld, fileid=%d, count=%d@%Ld, wsize=%d\n",
-		inode->i_ino, inode->u.smbfs_i.fileid, count, offset, wsize);
+		inode->i_ino, SMB_I(inode)->fileid, count, offset, wsize);
 
 	do {
 		if (count < wsize)
