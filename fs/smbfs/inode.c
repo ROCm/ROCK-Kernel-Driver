@@ -25,6 +25,7 @@
 #include <linux/mount.h>
 #include <linux/net.h>
 #include <linux/vfs.h>
+#include <linux/highuid.h>
 #include <linux/smb_fs.h>
 #include <linux/smbno.h>
 #include <linux/smb_mount.h>
@@ -447,6 +448,19 @@ smb_show_options(struct seq_file *s, struct vfsmount *m)
 }
 
 static void
+smb_unload_nls(struct smb_sb_info *server)
+{
+	if (server->remote_nls) {
+		unload_nls(server->remote_nls);
+		server->remote_nls = NULL;
+	}
+	if (server->local_nls) {
+		unload_nls(server->local_nls);
+		server->local_nls = NULL;
+	}
+}
+
+static void
 smb_put_super(struct super_block *sb)
 {
 	struct smb_sb_info *server = SMB_SB(sb);
@@ -461,15 +475,7 @@ smb_put_super(struct super_block *sb)
 		kill_proc(server->conn_pid, SIGTERM, 1);
 
 	smb_kfree(server->ops);
-
-	if (server->remote_nls) {
-		unload_nls(server->remote_nls);
-		server->remote_nls = NULL;
-	}
-	if (server->local_nls) {
-		unload_nls(server->local_nls);
-		server->local_nls = NULL;
-	}
+	smb_unload_nls(server);
 	sb->s_fs_info = NULL;
 	smb_unlock_server(server);
 	smb_kfree(server);
@@ -545,10 +551,8 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	if (ver == SMB_MOUNT_OLDVERSION) {
 		mnt->version = oldmnt->version;
 
-		/* FIXME: is this enough to convert uid/gid's ? */
-		mnt->mounted_uid = oldmnt->mounted_uid;
-		mnt->uid = oldmnt->uid;
-		mnt->gid = oldmnt->gid;
+		mnt->uid = low2highuid(oldmnt->uid);
+		mnt->gid = low2highuid(oldmnt->gid);
 
 		mnt->file_mode = (oldmnt->file_mode & S_IRWXUGO) | S_IFREG;
 		mnt->dir_mode = (oldmnt->dir_mode & S_IRWXUGO) | S_IFDIR;
@@ -557,9 +561,8 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 	} else {
 		if (parse_options(mnt, raw_data))
 			goto out_bad_option;
-
-		mnt->mounted_uid = current->uid;
 	}
+	mnt->mounted_uid = current->uid;
 	smb_setcodepage(server, &mnt->codepage);
 
 	/*
@@ -570,6 +573,11 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 		printk("SMBFS: Using core getattr (Win 95 speedup)\n");
 	else if (mnt->flags & SMB_MOUNT_DIRATTR)
 		printk("SMBFS: Using dir ff getattr\n");
+
+	if (smbiod_register_server(server) < 0) {
+		printk(KERN_ERR "smbfs: failed to start smbiod\n");
+		goto out_no_smbiod;
+	}
 
 	/*
 	 * Keep the super block locked while we get the root inode.
@@ -584,12 +592,12 @@ int smb_fill_super(struct super_block *sb, void *raw_data, int silent)
 		goto out_no_root;
 	smb_new_dentry(sb->s_root);
 
-	smbiod_register_server(server);
-
 	return 0;
 
 out_no_root:
 	iput(root_inode);
+out_no_smbiod:
+	smb_unload_nls(server);
 out_bad_option:
 	smb_kfree(mem);
 out_no_mem:

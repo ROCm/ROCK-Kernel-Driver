@@ -10,7 +10,7 @@
  *  This file provides the core support for the IM-PD1 module.
  *
  * Module / boot parameters.
- *   id=n   impd1.id=n - set the logic module position in stack to 'n'
+ *   lmid=n   impd1.lmid=n - set the logic module position in stack to 'n'
  */
 #include <linux/module.h>
 #include <linux/moduleparam.h>
@@ -21,16 +21,14 @@
 #include <asm/io.h>
 #include <asm/hardware/icst525.h>
 #include <asm/hardware/amba.h>
+#include <asm/arch/lm.h>
 #include <asm/arch/impd1.h>
 #include <asm/sizes.h>
 
 static int module_id;
 
-module_param_named(lmid, module_id, int, 0);
+module_param_named(lmid, module_id, int, 0444);
 MODULE_PARM_DESC(lmid, "logic module stack position");
-
-#define ROM_OFFSET	0x0fffff00
-#define ROM_SIZE	256
 
 struct impd1_module {
 	void	*base;
@@ -142,17 +140,15 @@ static struct impd1_device impd1_devs[] = {
 	}
 };
 
-static int impd1_probe(struct device *dev)
+static int impd1_probe(struct lm_device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct resource *res = &pdev->resource[0];
 	struct impd1_module *impd1;
 	int i, ret;
 
-	if (pdev->id != module_id)
+	if (dev->id != module_id)
 		return -EINVAL;
 
-	if (!request_mem_region(res->start, SZ_4K, "LM registers"))
+	if (!request_mem_region(dev->resource.start, SZ_4K, "LM registers"))
 		return -EBUSY;
 
 	impd1 = kmalloc(sizeof(struct impd1_module), GFP_KERNEL);
@@ -162,22 +158,22 @@ static int impd1_probe(struct device *dev)
 	}
 	memset(impd1, 0, sizeof(struct impd1_module));
 
-	impd1->base = ioremap(res->start, SZ_4K);
+	impd1->base = ioremap(dev->resource.start, SZ_4K);
 	if (!impd1->base) {
 		ret = -ENOMEM;
 		goto free_impd1;
 	}
 
-	dev_set_drvdata(dev, impd1);
+	lm_set_drvdata(dev, impd1);
 
-	printk("IM-PD1 found at 0x%08lx\n", res->start);
+	printk("IM-PD1 found at 0x%08lx\n", dev->resource.start);
 
 	for (i = 0; i < ARRAY_SIZE(impd1_devs); i++) {
 		struct impd1_device *idev = impd1_devs + i;
 		struct amba_device *d;
 		unsigned long pc_base;
 
-		pc_base = res->start + idev->offset;
+		pc_base = dev->resource.start + idev->offset;
 
 		d = kmalloc(sizeof(struct amba_device), GFP_KERNEL);
 		if (!d)
@@ -186,16 +182,16 @@ static int impd1_probe(struct device *dev)
 		memset(d, 0, sizeof(struct amba_device));
 
 		snprintf(d->dev.bus_id, sizeof(d->dev.bus_id),
-			 "lm%x:%5.5lx", pdev->id, idev->offset >> 12);
+			 "lm%x:%5.5lx", dev->id, idev->offset >> 12);
 
-		d->dev.parent	= &pdev->dev;
-		d->res.start	= res->start + idev->offset;
+		d->dev.parent	= &dev->dev;
+		d->res.start	= dev->resource.start + idev->offset;
 		d->res.end	= d->res.start + SZ_4K - 1;
 		d->res.flags	= IORESOURCE_MEM;
-		d->irq		= pdev->resource[1].start;
+		d->irq		= dev->irq;
 		d->periphid	= idev->id;
 
-		ret = amba_device_register(d, res);
+		ret = amba_device_register(d, &dev->resource);
 		if (ret) {
 			printk("unable to register device %s: %d\n",
 				d->dev.bus_id, ret);
@@ -211,47 +207,44 @@ static int impd1_probe(struct device *dev)
 	if (impd1)
 		kfree(impd1);
  release_lm:
-	release_mem_region(res->start, SZ_4K);
+	release_mem_region(dev->resource.start, SZ_4K);
 	return ret;
 }
 
-static int impd1_remove(struct device *dev)
+static void impd1_remove(struct lm_device *dev)
 {
-	struct platform_device *pdev = to_platform_device(dev);
-	struct resource *res = &pdev->resource[0];
-	struct impd1_module *impd1 = dev_get_drvdata(dev);
+	struct impd1_module *impd1 = lm_get_drvdata(dev);
 	struct list_head *l, *n;
 
-	list_for_each_safe(l, n, &dev->children) {
+	list_for_each_safe(l, n, &dev->dev.children) {
 		struct device *d = list_to_dev(l);
 
 		device_unregister(d);
 	}
 
-	dev_set_drvdata(dev, NULL);
+	lm_set_drvdata(dev, NULL);
 
 	iounmap(impd1->base);
 	kfree(impd1);
-	release_mem_region(res->start, SZ_4K);
-
-	return 0;
+	release_mem_region(dev->resource.start, SZ_4K);
 }
 
-static struct device_driver impd1_driver = {
-	.name		= "lm",
-	.bus		= &platform_bus_type,
+static struct lm_driver impd1_driver = {
+	.drv = {
+		.name	= "impd1",
+	},
 	.probe		= impd1_probe,
 	.remove		= impd1_remove,
 };
 
 static int __init impd1_init(void)
 {
-	return driver_register(&impd1_driver);
+	return lm_driver_register(&impd1_driver);
 }
 
 static void __exit impd1_exit(void)
 {
-	driver_unregister(&impd1_driver);
+	lm_driver_unregister(&impd1_driver);
 }
 
 module_init(impd1_init);

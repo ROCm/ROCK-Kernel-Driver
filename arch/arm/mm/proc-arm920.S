@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mm/arm920.S: MMU functions for ARM920
+ *  linux/arch/arm/mm/proc-arm920.S: MMU functions for ARM920
  *
  *  Copyright (C) 1999,2000 ARM Limited
  *  Copyright (C) 2000 Deep Blue Solutions Ltd.
@@ -28,6 +28,7 @@
 #include <linux/config.h>
 #include <linux/init.h>
 #include <asm/assembler.h>
+#include <asm/pgtable.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
 #include <asm/page.h>
@@ -333,19 +334,19 @@ ENTRY(cpu_arm920_switch_mm)
 ENTRY(cpu_arm920_set_pte)
 	str	r1, [r0], #-2048		@ linux version
 
-	eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
+	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
-	bic	r2, r1, #0xff0
-	bic	r2, r2, #3
-	orr	r2, r2, #HPTE_TYPE_SMALL
+	bic	r2, r1, #PTE_SMALL_AP_MASK
+	bic	r2, r2, #PTE_TYPE_MASK
+	orr	r2, r2, #PTE_TYPE_SMALL
 
-	tst	r1, #LPTE_USER			@ User or Exec?
-	orrne	r2, r2, #HPTE_AP_READ
+	tst	r1, #L_PTE_USER			@ User?
+	orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
 
-	tst	r1, #LPTE_WRITE | LPTE_DIRTY	@ Write and Dirty?
-	orreq	r2, r2, #HPTE_AP_WRITE
+	tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
+	orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
 
-	tst	r1, #LPTE_PRESENT | LPTE_YOUNG	@ Present and Young?
+	tst	r1, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young?
 	movne	r2, #0
 
 #ifdef CONFIG_CPU_DCACHE_WRITETHROUGH
@@ -361,7 +362,7 @@ ENTRY(cpu_arm920_set_pte)
 
 
 ENTRY(cpu_arm920_name)
-	.ascii	"Arm920T"
+	.ascii	"ARM920T"
 #ifndef CONFIG_CPU_ICACHE_DISABLE
 	.ascii	"i"
 #endif

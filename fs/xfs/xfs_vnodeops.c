@@ -66,7 +66,6 @@
 #include "xfs_utils.h"
 #include "xfs_trans_space.h"
 #include "xfs_dir_leaf.h"
-#include "xfs_dmapi.h"
 #include "xfs_mac.h"
 #include "xfs_log_priv.h"
 
@@ -153,10 +152,9 @@ xfs_getattr(
 	vap->va_nblocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
 	vap->va_fsid = mp->m_dev;
-#if XFS_BIG_FILESYSTEMS
-	vap->va_nodeid = ip->i_ino + mp->m_inoadd;
-#else
 	vap->va_nodeid = ip->i_ino;
+#if XFS_BIG_INUMS
+	vap->va_nodeid += mp->m_inoadd;
 #endif
 	vap->va_nlink = ip->i_d.di_nlink;
 
@@ -266,6 +264,16 @@ xfs_getattr(
 			XFS_XFLAG_REALTIME : 0) |
 		((ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) ?
 			XFS_XFLAG_PREALLOC : 0) |
+	        ((ip->i_d.di_flags & XFS_DIFLAG_IMMUTABLE) ?
+		        XFS_XFLAG_IMMUTABLE : 0) |
+		((ip->i_d.di_flags & XFS_DIFLAG_APPEND) ?
+		        XFS_XFLAG_APPEND : 0) |
+		((ip->i_d.di_flags & XFS_DIFLAG_SYNC) ?
+		        XFS_XFLAG_SYNC : 0) |
+		((ip->i_d.di_flags & XFS_DIFLAG_NOATIME) ?
+		        XFS_XFLAG_NOATIME : 0) |
+		((ip->i_d.di_flags & XFS_DIFLAG_NODUMP) ?
+		        XFS_XFLAG_NODUMP: 0) |
 		(XFS_IFORK_Q(ip) ?
 			XFS_XFLAG_HASATTR : 0);
 	vap->va_extsize = ip->i_d.di_extsize << mp->m_sb.sb_blocklog;
@@ -648,6 +656,20 @@ xfs_setattr(
 				goto error_return;
 			}
 		}
+
+		/*
+		 * Can't modify an immutable/append-only file unless
+		 * we have appropriate permission.
+		 */
+		if ((mask & XFS_AT_XFLAGS) &&
+		    (ip->i_d.di_flags &
+				(XFS_DIFLAG_IMMUTABLE|XFS_DIFLAG_APPEND) ||
+		     (vap->va_xflags &
+				(XFS_XFLAG_IMMUTABLE | XFS_XFLAG_APPEND))) &&
+		    !capable(CAP_LINUX_IMMUTABLE)) {
+			code = XFS_ERROR(EPERM);
+			goto error_return;
+		}
 	}
 
 	/*
@@ -833,6 +855,16 @@ xfs_setattr(
 				ip->i_d.di_flags |= XFS_DIFLAG_REALTIME;
 				ip->i_iocore.io_flags |= XFS_IOCORE_RT;
 			}
+			if (vap->va_xflags & XFS_XFLAG_IMMUTABLE)
+				ip->i_d.di_flags |= XFS_DIFLAG_IMMUTABLE;
+			if (vap->va_xflags & XFS_XFLAG_APPEND)
+				ip->i_d.di_flags |= XFS_DIFLAG_APPEND;
+			if (vap->va_xflags & XFS_XFLAG_SYNC)
+				ip->i_d.di_flags |= XFS_DIFLAG_SYNC;
+			if (vap->va_xflags & XFS_XFLAG_NOATIME)
+				ip->i_d.di_flags |= XFS_DIFLAG_NOATIME;
+			if (vap->va_xflags & XFS_XFLAG_NODUMP)
+				ip->i_d.di_flags |= XFS_DIFLAG_NODUMP;
 			/* can't set PREALLOC this way, just ignore it */
 		}
 		xfs_trans_log_inode(tp, ip, XFS_ILOG_CORE);
@@ -858,7 +890,7 @@ xfs_setattr(
 	if (timeflags && !(flags & ATTR_DMI))
 		xfs_ichgtime(ip, timeflags);
 
-	XFS_STATS_INC(xfsstats.xs_ig_attrchg);
+	XFS_STATS_INC(xs_ig_attrchg);
 
 	/*
 	 * If this is a synchronous mount, make sure that the
@@ -905,7 +937,7 @@ xfs_setattr(
 
 	if (DM_EVENT_ENABLED(vp->v_vfsp, ip, DM_EVENT_ATTRIBUTE) &&
 	    !(flags & ATTR_DMI)) {
-		(void) XFS_SEND_NAMESP(mp, DM_EVENT_ATTRIBUTE, bdp, DM_RIGHT_NULL,
+		(void) XFS_SEND_NAMESP(mp, DM_EVENT_ATTRIBUTE, vp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL, NULL, NULL,
 					0, 0, AT_DELAY_FLAG(flags));
 	}
@@ -1635,7 +1667,7 @@ xfs_release(
 		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
-		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC))) {
+		    (!(ip->i_d.di_flags & (XFS_DIFLAG_PREALLOC|XFS_DIFLAG_APPEND)))) {
 			if ((error = xfs_inactive_free_eofblocks(mp, ip)))
 				return (error);
 			/* Update linux inode block count after free above */
@@ -1710,7 +1742,7 @@ xfs_inactive(
 		if ((((ip->i_d.di_mode & IFMT) == IFREG) &&
 		     ((ip->i_d.di_size > 0) || (VN_CACHED(vp) > 0)) &&
 		     (ip->i_df.if_flags & XFS_IFEXTENTS))  &&
-		    (!(ip->i_d.di_flags & XFS_DIFLAG_PREALLOC) ||
+		    (!(ip->i_d.di_flags & (XFS_DIFLAG_PREALLOC|XFS_DIFLAG_APPEND)) ||
 		     (ip->i_delayed_blks != 0))) {
 			if ((error = xfs_inactive_free_eofblocks(mp, ip)))
 				return (VN_INACTIVE_CACHE);
@@ -1948,7 +1980,7 @@ xfs_create(
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_CREATE,
-				dir_bdp, DM_RIGHT_NULL, NULL,
+				dir_vp, DM_RIGHT_NULL, NULL,
 				DM_RIGHT_NULL, name, NULL,
 				dm_di_mode, 0, 0);
 
@@ -2114,8 +2146,8 @@ std_return:
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 							DM_EVENT_POSTCREATE)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTCREATE,
-			dir_bdp, DM_RIGHT_NULL,
-			*vpp ? vn_bhv_lookup_unlocked(VN_BHV_HEAD(vp), &xfs_vnodeops):NULL,
+			dir_vp, DM_RIGHT_NULL,
+			*vpp ? vp:NULL,
 			DM_RIGHT_NULL, name, NULL,
 			dm_di_mode, error, 0);
 	}
@@ -2428,7 +2460,7 @@ xfs_remove(
 	namelen = VNAMELEN(dentry);
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
-		error = XFS_SEND_NAMESP(mp, DM_EVENT_REMOVE, dir_bdp,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_REMOVE, dir_vp,
 					DM_RIGHT_NULL, NULL, DM_RIGHT_NULL,
 					name, NULL, 0, 0, 0);
 		if (error)
@@ -2594,7 +2626,7 @@ xfs_remove(
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp,
 						DM_EVENT_POSTREMOVE)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTREMOVE,
-				dir_bdp, DM_RIGHT_NULL,
+				dir_vp, DM_RIGHT_NULL,
 				NULL, DM_RIGHT_NULL,
 				name, NULL, dm_di_mode, error, 0);
 	}
@@ -2678,8 +2710,8 @@ xfs_link(
 
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, tdp, DM_EVENT_LINK)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_LINK,
-					target_dir_bdp, DM_RIGHT_NULL,
-					src_bdp, DM_RIGHT_NULL,
+					target_dir_vp, DM_RIGHT_NULL,
+					src_vp, DM_RIGHT_NULL,
 					target_name, NULL, 0, 0, 0);
 		if (error)
 			return error;
@@ -2782,8 +2814,8 @@ std_return:
 	if (DM_EVENT_ENABLED(src_vp->v_vfsp, sip,
 						DM_EVENT_POSTLINK)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTLINK,
-				target_dir_bdp, DM_RIGHT_NULL,
-				src_bdp, DM_RIGHT_NULL,
+				target_dir_vp, DM_RIGHT_NULL,
+				src_vp, DM_RIGHT_NULL,
 				target_name, NULL, 0, error, 0);
 	}
 	return error;
@@ -2844,7 +2876,7 @@ xfs_mkdir(
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_CREATE)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_CREATE,
-					dir_bdp, DM_RIGHT_NULL, NULL,
+					dir_vp, DM_RIGHT_NULL, NULL,
 					DM_RIGHT_NULL, dir_name, NULL,
 					dm_di_mode, 0, 0);
 		if (error)
@@ -3003,8 +3035,8 @@ std_return:
 			DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 						DM_EVENT_POSTCREATE)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTCREATE,
-					dir_bdp, DM_RIGHT_NULL,
-					created ? XFS_ITOBHV(cdp):NULL,
+					dir_vp, DM_RIGHT_NULL,
+					created ? XFS_ITOV(cdp):NULL,
 					DM_RIGHT_NULL,
 					dir_name, NULL,
 					dm_di_mode, error, 0);
@@ -3067,7 +3099,7 @@ xfs_rmdir(
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_REMOVE)) {
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_REMOVE,
-					dir_bdp, DM_RIGHT_NULL,
+					dir_vp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL,
 					name, NULL, 0, 0, 0);
 		if (error)
@@ -3261,7 +3293,7 @@ xfs_rmdir(
 std_return:
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_POSTREMOVE)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTREMOVE,
-					dir_bdp, DM_RIGHT_NULL,
+					dir_vp, DM_RIGHT_NULL,
 					NULL, DM_RIGHT_NULL,
 					name, NULL, dm_di_mode,
 					error, 0);
@@ -3405,7 +3437,7 @@ xfs_symlink(
 	}
 
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, dp, DM_EVENT_SYMLINK)) {
-		error = XFS_SEND_NAMESP(mp, DM_EVENT_SYMLINK, dir_bdp,
+		error = XFS_SEND_NAMESP(mp, DM_EVENT_SYMLINK, dir_vp,
 					DM_RIGHT_NULL, NULL, DM_RIGHT_NULL,
 					link_name, target_path, 0, 0, 0);
 		if (error)
@@ -3597,8 +3629,8 @@ std_return:
 	if (DM_EVENT_ENABLED(dir_vp->v_vfsp, XFS_BHVTOI(dir_bdp),
 			     DM_EVENT_POSTSYMLINK)) {
 		(void) XFS_SEND_NAMESP(mp, DM_EVENT_POSTSYMLINK,
-					dir_bdp, DM_RIGHT_NULL,
-					error ? NULL : XFS_ITOBHV(ip),
+					dir_vp, DM_RIGHT_NULL,
+					error ? NULL : XFS_ITOV(ip),
 					DM_RIGHT_NULL, link_name, target_path,
 					0, error, 0);
 	}
@@ -4236,8 +4268,8 @@ dmapi_enospc_check:
 	    DM_EVENT_ENABLED(XFS_MTOVFS(mp), ip, DM_EVENT_NOSPACE)) {
 
 		error = XFS_SEND_NAMESP(mp, DM_EVENT_NOSPACE,
-				XFS_ITOBHV(ip), DM_RIGHT_NULL,
-				XFS_ITOBHV(ip), DM_RIGHT_NULL,
+				XFS_ITOV(ip), DM_RIGHT_NULL,
+				XFS_ITOV(ip), DM_RIGHT_NULL,
 				NULL, NULL, 0, 0, 0); /* Delay flag intentionally unused */
 		if (error == 0)
 			goto retry;	/* Maybe DMAPI app. has made space */

@@ -262,7 +262,7 @@ xfs_dir_createname(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	if ((retval = xfs_dir_ino_validate(trans->t_mountp, inum)))
 		return (retval);
 
-	XFS_STATS_INC(xfsstats.xs_dir_create);
+	XFS_STATS_INC(xs_dir_create);
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -367,7 +367,7 @@ xfs_dir_removename(xfs_trans_t *trans, xfs_inode_t *dp, char *name,
 	int count, totallen, newsize, retval;
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
-	XFS_STATS_INC(xfsstats.xs_dir_remove);
+	XFS_STATS_INC(xs_dir_remove);
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -411,7 +411,7 @@ xfs_dir_lookup(xfs_trans_t *trans, xfs_inode_t *dp, char *name, int namelen,
 
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 
-	XFS_STATS_INC(xfsstats.xs_dir_lookup);
+	XFS_STATS_INC(xs_dir_lookup);
 	/*
 	 * Fill in the arg structure for this request.
 	 */
@@ -454,7 +454,7 @@ xfs_dir_getdents(xfs_trans_t *trans, xfs_inode_t *dp, uio_t *uio, int *eofp)
 	int  alignment, retval;
 	xfs_dir_put_t put;
 
-	XFS_STATS_INC(xfsstats.xs_dir_getdents);
+	XFS_STATS_INC(xs_dir_getdents);
 	ASSERT((dp->i_d.di_mode & IFMT) == IFDIR);
 
 	/*
