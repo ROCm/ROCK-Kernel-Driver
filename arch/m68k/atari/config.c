@@ -60,7 +60,7 @@ static int atari_get_hardware_list(char *buffer);
 
 /* atari specific irq functions */
 extern void atari_init_IRQ (void);
-extern int atari_request_irq (unsigned int irq, void (*handler)(int, void *, struct pt_regs *),
+extern int atari_request_irq (unsigned int irq, irqreturn_t (*handler)(int, void *, struct pt_regs *),
                               unsigned long flags, const char *devname, void *dev_id);
 extern void atari_free_irq (unsigned int irq, void *dev_id);
 extern void atari_enable_irq (unsigned int);
@@ -72,7 +72,7 @@ static void atari_heartbeat( int on );
 #endif
 
 /* atari specific timer functions (in time.c) */
-extern void atari_sched_init(void (*)(int, void *, struct pt_regs *));
+extern void atari_sched_init(irqreturn_t (*)(int, void *, struct pt_regs *));
 extern unsigned long atari_gettimeoffset (void);
 extern int atari_mste_hwclk (int, struct rtc_time *);
 extern int atari_tt_hwclk (int, struct rtc_time *);
