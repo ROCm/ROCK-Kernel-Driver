@@ -74,7 +74,9 @@ static int max_interrupt_work = 10;
 
 #include <linux/config.h>
 #include <linux/module.h>
+#ifdef CONFIG_MCA
 #include <linux/mca.h>
+#endif
 #include <linux/isapnp.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
