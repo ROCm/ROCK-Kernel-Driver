@@ -268,6 +268,7 @@ int usb_driver_claim_interface(struct usb_driver *driver, struct usb_interface *
 	if (!iface || !driver)
 		return -EINVAL;
 
+	/* this is mainly to lock against usbfs */
 	lock_kernel();
 	if (iface->driver) {
 		unlock_kernel();
