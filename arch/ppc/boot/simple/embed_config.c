@@ -749,25 +749,25 @@ embed_config(bd_t ** bdp)
 	static const unsigned long line_size = 32;
 	static const unsigned long congruence_classes = 256;
 	unsigned long addr;
-	u_char *cp;
-	int i;
+	unsigned long dccr;
 	bd_t *bd;
 
 	/*
-	 * At one point, we were getting machine checks.  Linux was not
-	 * invalidating the data cache before it was enabled.  The
-	 * following code was added to do that.  Soon after we had done
-	 * that, we found the real reasons for the machine checks.  I've
-	 * run the kernel a few times with the following code
-	 * temporarily removed without any apparent problems.  However,
-	 * I objdump'ed the kernel and boot code and found out that
-	 * there were no other dccci's anywhere, so I put the code back
-	 * in and have been reluctant to remove it.  It seems safer to
-	 * just leave it here.
+	 * Invalidate the data cache if the data cache is turned off.
+	 * - The 405 core does not invalidate the data cache on power-up
+	 *   or reset but does turn off the data cache. We cannot assume
+	 *   that the cache contents are valid.
+	 * - If the data cache is turned on this must have been done by
+	 *   a bootloader and we assume that the cache contents are
+	 *   valid.
 	 */
-	for (addr = 0;
-	     addr < (congruence_classes * line_size); addr += line_size) {
-	      __asm__("dccci 0,%0": :"b"(addr));
+	__asm__("mfdccr %0": "=r" (dccr));
+	if (dccr == 0) {
+		for (addr = 0;
+		     addr < (congruence_classes * line_size);
+		     addr += line_size) {
+			__asm__("dccci 0,%0": :"b"(addr));
+		}
 	}
 
 	bd = &bdinfo;
@@ -775,6 +775,9 @@ embed_config(bd_t ** bdp)
 	bd->bi_memsize = XPAR_DDR_0_SIZE;
 	bd->bi_intfreq = XPAR_CORE_CLOCK_FREQ_HZ;
 	bd->bi_busfreq = XPAR_PLB_CLOCK_FREQ_HZ;
+	bd->bi_pci_busfreq = XPAR_PCI_0_CLOCK_FREQ_HZ;
+	timebase_period_ns = 1000000000 / bd->bi_tbfreq;
+	/* see bi_tbfreq definition in arch/ppc/platforms/4xx/xilinx_ml300.h */
 }
 #endif /* CONFIG_XILINX_ML300 */
 
