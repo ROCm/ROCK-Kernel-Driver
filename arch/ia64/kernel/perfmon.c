@@ -639,7 +639,7 @@ pfm_get_unmapped_area(struct file *file, unsigned long addr, unsigned long len, 
 
 
 static struct super_block *
-pfmfs_get_sb(struct file_system_type *fs_type, int flags, char *dev_name, void *data)
+pfmfs_get_sb(struct file_system_type *fs_type, int flags, const char *dev_name, void *data)
 {
 	return get_sb_pseudo(fs_type, "pfm:", NULL, PFMFS_MAGIC);
 }
