@@ -1406,6 +1406,12 @@ config ZISOFS_FS
 	depends on ZISOFS
 	default ISO9660_FS
 
+# Meta block cache for Extended Attributes (ext2/ext3)
+config FS_MBCACHE
+	tristate
+	depends on EXT2_FS_XATTR || EXT3_FS_XATTR
+	default m if EXT2_FS=m || EXT3_FS=m
+	default y if EXT2_FS=y || EXT3_FS=y
 
 menu "Partition Types"
 
