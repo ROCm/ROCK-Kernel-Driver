@@ -17,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/errno.h>
 #include <linux/device.h>
+#include <linux/pci.h>
 #include <asm/hvcall.h>
 #include <asm/prom.h>
 #include <asm/scatterlist.h>
@@ -44,8 +45,11 @@ int vio_register_driver(struct vio_driver *drv);
 void vio_unregister_driver(struct vio_driver *drv);
 const struct vio_device_id * vio_match_device(const struct vio_device_id *ids, 
 						const struct vio_dev *dev);
+
 struct vio_dev * __devinit vio_register_device(struct device_node *node_vdev);
 void __devinit vio_unregister_device(struct vio_dev *dev);
+struct vio_dev *vio_find_node(struct device_node *vnode);
+
 const void * vio_get_attribute(struct vio_dev *vdev, void* which, int* length);
 int vio_get_irq(struct vio_dev *dev);
 struct iommu_table * vio_build_iommu_table(struct vio_dev *dev);
@@ -64,6 +68,33 @@ void *vio_alloc_consistent(struct vio_dev *dev, size_t size,
 			   dma_addr_t *dma_handle);
 void vio_free_consistent(struct vio_dev *dev, size_t size, void *vaddr, 
 			 dma_addr_t dma_handle);
+
+static inline int vio_dma_supported(struct vio_dev *hwdev, u64 mask)
+{
+	return 1;
+}
+
+#define vio_map_page(dev, page, off, size, dir) \
+		vio_map_single(dev, (page_address(page) + (off)), size, dir)
+#define vio_unmap_page(dev,addr,sz,dir) vio_unmap_single(dev,addr,sz,dir)
+
+
+static inline void vio_dma_sync_single(struct vio_dev *hwdev,
+				       dma_addr_t dma_handle,
+				       size_t size, int direction)
+{
+	BUG_ON(direction == PCI_DMA_NONE);
+	/* nothing to do */
+}
+
+static inline void vio_dma_sync_sg(struct vio_dev *hwdev,
+				   struct scatterlist *sg,
+				   int nelems, int direction)
+{
+	BUG_ON(direction == PCI_DMA_NONE);
+	/* nothing to do */
+}
+static inline int vio_set_dma_mask(struct vio_dev *dev, u64 mask) { return -EIO; }
 
 extern struct bus_type vio_bus_type;
 
