@@ -615,7 +615,7 @@ static int enough_swap(void)
 
 	si_swapinfo(&i);
 	if (i.freeswap < (pmdisk_pages + PAGES_FOR_IO))  {
-		pr_debug("pmdisk: Not enough swap. Need %d\n",i.freeswap);
+		pr_debug("pmdisk: Not enough swap. Need %ld\n",i.freeswap);
 		return 0;
 	}
 	return 1;
@@ -842,33 +842,6 @@ static int __init relocate_pagedir(void)
 	return 0;
 }
 
-/*
- * Sanity check if this image makes sense with this kernel/swap context
- * I really don't think that it's foolproof but more than nothing..
- */
-
-static int __init sanity_check_failed(char *reason)
-{
-	printk(KERN_ERR "pmdisk: Resume mismatch: %s\n",reason);
-	return -EPERM;
-}
-
-static int __init sanity_check(struct suspend_header *sh)
-{
-	if(sh->version_code != LINUX_VERSION_CODE)
-		return sanity_check_failed("Incorrect kernel version");
-	if(sh->num_physpages != num_physpages)
-		return sanity_check_failed("Incorrect memory size");
-	if(strncmp(sh->machine, system_utsname.machine, 8))
-		return sanity_check_failed("Incorrect machine type");
-	if(strncmp(sh->version, system_utsname.version, 20))
-		return sanity_check_failed("Incorrect version");
-	if(sh->num_cpus != num_online_cpus())
-		return sanity_check_failed("Incorrect number of cpus");
-	if(sh->page_size != PAGE_SIZE)
-		return sanity_check_failed("Incorrect PAGE_SIZE");
-	return 0;
-}
 
 static struct block_device * resume_bdev;
 
@@ -959,33 +932,31 @@ write_page(pgoff_t page_off, void * page)
 extern dev_t __init name_to_dev_t(const char *line);
 
 
-#define next_entry(diskpage)	diskpage->link.next
+#define next_entry(diskpage)	(diskpage)->link.next
 
-static int __init read_suspend_image(void)
+
+static int __init check_sig(swp_entry_t * next)
 {
-	swp_entry_t next;
-	int i, nr_pgdir_pages;
-	union diskpage *cur;
-	int error = 0;
+	union swap_header * hdr;
+	int error;
 
-	cur = (union diskpage *)get_zeroed_page(GFP_ATOMIC);
-	if (!cur)
+	hdr = (union swap_header *)get_zeroed_page(GFP_ATOMIC);
+	if (!hdr)
 		return -ENOMEM;
 
-	if ((error = read_page(0, cur)))
-		goto Done;
-
+	if ((error = read_page(0,hdr)))
+		return error;
 	/*
 	 * We have to read next position before we overwrite it
 	 */
-	next = next_entry(cur);
+	*next = next_entry((union diskpage *)hdr);
 
-	if (!memcmp("P1",cur->swh.magic.magic,2))
-		memcpy(cur->swh.magic.magic,"SWAP-SPACE",10);
-	else if (!memcmp("P2",cur->swh.magic.magic,2))
-		memcpy(cur->swh.magic.magic,"SWAPSPACE2",10);
-	else if ((!memcmp("SWAP-SPACE",cur->swh.magic.magic,10)) ||
-		 (!memcmp("SWAPSPACE2",cur->swh.magic.magic,10))) {
+	if (!memcmp("P1",hdr->magic.magic,2))
+		memcpy(hdr->magic.magic,"SWAP-SPACE",10);
+	else if (!memcmp("P2",hdr->magic.magic,2))
+		memcpy(hdr->magic.magic,"SWAPSPACE2",10);
+	else if ((!memcmp("SWAP-SPACE",hdr->magic.magic,10)) ||
+		 (!memcmp("SWAPSPACE2",hdr->magic.magic,10))) {
 		pr_debug(KERN_ERR "pmdisk: Partition is normal swap space\n");
 		error = -EINVAL;
 		goto Done;
@@ -998,62 +969,145 @@ static int __init read_suspend_image(void)
 	/*
 	 * Reset swap signature now.
 	 */
-	if ((error = write_page(0,cur)))
+	if ((error = write_page(0,hdr)))
 		goto Done;
 
 	pr_debug( "%sSignature found, resuming\n", name_resume );
+ Done:
+	free_page((unsigned long)hdr);
+	return error;
+}
 
-	if ((error = read_page(swp_offset(next), cur)))
+
+/*
+ * Sanity check if this image makes sense with this kernel/swap context
+ * I really don't think that it's foolproof but more than nothing..
+ */
+
+static const char * __init sanity_check(struct suspend_header *sh)
+{
+	if(sh->version_code != LINUX_VERSION_CODE)
+		return "Incorrect kernel version";
+	if(sh->num_physpages != num_physpages)
+		return "Incorrect memory size";
+	if(strncmp(sh->machine, system_utsname.machine, 8))
+		return "Incorrect machine type";
+	if(strncmp(sh->version, system_utsname.version, 20))
+		return "Incorrect version";
+	if(sh->num_cpus != num_online_cpus())
+		return "Incorrect number of cpus";
+	if(sh->page_size != PAGE_SIZE)
+		return "Incorrect PAGE_SIZE";
+	return 0;
+}
+
+
+static int __init check_header(swp_entry_t * next)
+{
+	struct suspend_header * sh;
+	const char * reason = NULL;
+	int error;
+
+	sh = (struct suspend_header *)get_zeroed_page(GFP_ATOMIC);
+	if (!sh)
+		return -ENOMEM;
+
+	if ((error = read_page(swp_offset(*next), sh)))
 		goto Done;
+
  	/* Is this same machine? */
-	if ((error = sanity_check(&cur->sh)))
+	if ((reason = sanity_check(sh))) {
+		printk(KERN_ERR "pmdisk: Resume mismatch: %s\n",reason);
+		error = -EPERM;
 		goto Done;
-	next = next_entry(cur);
+	}
 
-	pagedir_save = cur->sh.suspend_pagedir;
-	pmdisk_pages = cur->sh.num_pbes;
+	*next = next_entry((union diskpage *)sh);
+	pagedir_save = sh->suspend_pagedir;
+	pmdisk_pages = sh->num_pbes;
+ Done:
+	free_page((unsigned long)sh);
+	return error;
+}
+
+
+static int __init read_pagedir(swp_entry_t start)
+{
+	int i, nr_pgdir_pages;
+	swp_entry_t entry = start;
+	int error = 0;
+
 	nr_pgdir_pages = SUSPEND_PD_PAGES(pmdisk_pages);
 	pagedir_order = get_bitmask_order(nr_pgdir_pages);
 
 	pm_pagedir_nosave = (suspend_pagedir_t *)__get_free_pages(GFP_ATOMIC, pagedir_order);
-	if (!pm_pagedir_nosave) {
-		error = -ENOMEM;
-		goto Done;
-	}
+	if (!pm_pagedir_nosave)
+		return -ENOMEM;
 
-	pr_debug( "%sReading pagedir, ", name_resume );
+	pr_debug("pmdisk: sReading pagedir\n");
 
 	/* We get pages in reverse order of saving! */
-	for (i=nr_pgdir_pages-1; i>=0; i--) {
-		BUG_ON (!next.val);
-		cur = (union diskpage *)((char *) pm_pagedir_nosave)+i;
-		error = read_page(swp_offset(next), cur);
-		if (error)
-			goto FreePagedir;
-		next = next_entry(cur);
-	}
-	BUG_ON (next.val);
+	for (i = nr_pgdir_pages-1; i >= 0 && !error; i--) {
+		void * data = ((char *)pm_pagedir_nosave) + i * PAGE_SIZE;
+		unsigned long offset = swp_offset(entry);
 
+		if (offset) {
+			if (!(error = read_page(offset, data)))
+				entry = next_entry((union diskpage *)data);
+		} else
+			error = -EFAULT;
+	}
+	if (swp_offset(entry))
+		error = -E2BIG;
+	if (error)
+		free_pages((unsigned long)pm_pagedir_nosave,pagedir_order);
+	return error;
+}
+
+
+/**
+ *	read_image_data - Read image pages from swap.
+ *
+ *	You do not need to check for overlaps, check_pagedir()
+ *	already did that.
+ */
+
+static int __init read_image_data(void)
+{
+	struct pbe * p;
+	int error = 0;
+	int i;
+
+	printk( "Reading image data (%d pages): ", pmdisk_pages );
+	for(i = 0, p = pm_pagedir_nosave; i < pmdisk_pages && !error; i++, p++) {
+		if (!(i%100))
+			printk( "." );
+		error = read_page(swp_offset(p->swap_address),
+				  (void *)p->address);
+	}
+	printk(" %d done|\n",i);
+	return error;
+}
+
+
+static int __init read_suspend_image(void)
+{
+	swp_entry_t next;
+	int error = 0;
+
+	if ((error = check_sig(&next)))
+		return error;
+	if ((error = check_header(&next)))
+		return error;
+	if ((error = read_pagedir(next)))
+		return error;
 	if ((error = relocate_pagedir()))
 		goto FreePagedir;
 	if ((error = check_pagedir()))
 		goto FreePagedir;
-
-	printk( "Reading image data (%d pages): ", pmdisk_pages );
-	for(i=0; i < pmdisk_pages; i++) {
-		swp_entry_t swap_address = (pm_pagedir_nosave+i)->swap_address;
-		if (!(i%100))
-			printk( "." );
-		/* You do not need to check for overlaps...
-		   ... check_pagedir already did this work */
-		error = read_page(swp_offset(swap_address),
-				  (char *)((pm_pagedir_nosave+i)->address));
-		if (error)
-			goto FreePagedir;
-	}
-	printk( "|\n" );
+	if ((error = read_image_data()))
+		goto FreePagedir;
  Done:
-	free_page((unsigned long)cur);
 	return error;
  FreePagedir:
 	free_pages((unsigned long)pm_pagedir_nosave,pagedir_order);
