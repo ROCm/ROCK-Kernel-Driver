@@ -41,13 +41,13 @@
 /* kgdb stuff */
 #define assert(p) KERNEL_ASSERT(#p, p)
 #else
-#define assert(p) {\
-if (!(p))\
-	{\
-		printk("assert(%s)\n",#p);\
-		BUG();\
-	}\
-}
+#define assert(p) do {	\
+	if (!(p)) {	\
+		printk(KERN_CRIT "BUG at %s:%d assert(%s)\n",	\
+		       __FILE__, __LINE__, #p);			\
+		BUG();	\
+	}		\
+} while (0)
 #endif
 
 /*
@@ -57,33 +57,53 @@ if (!(p))\
 #ifdef CONFIG_JFS_DEBUG
 #define ASSERT(p) assert(p)
 
-/* dump memory contents */
-extern void dump_mem(char *label, void *data, int length);
+/* printk verbosity */
+#define JFS_LOGLEVEL_ERR 1
+#define JFS_LOGLEVEL_WARN 2
+#define JFS_LOGLEVEL_DEBUG 3
+#define JFS_LOGLEVEL_INFO 4
+
 extern int jfsloglevel;
 
+/* dump memory contents */
+extern void dump_mem(char *label, void *data, int length);
+
 /* information message: e.g., configuration, major event */
-#define jFYI(button, prspec) \
-	do { if (button && jfsloglevel > 1) printk prspec; } while (0)
+#define jfs_info(fmt, arg...) do {			\
+	if (jfsloglevel >= JFS_LOGLEVEL_INFO)		\
+		printk(KERN_INFO fmt "\n", ## arg);	\
+} while (0)
+
+/* debug message: ad hoc */
+#define jfs_debug(fmt, arg...) do {			\
+	if (jfsloglevel >= JFS_LOGLEVEL_DEBUG)		\
+		printk(KERN_DEBUG fmt "\n", ## arg);	\
+} while (0)
+
+/* warn message: */
+#define jfs_warn(fmt, arg...) do {			\
+	if (jfsloglevel >= JFS_LOGLEVEL_WARN)		\
+		printk(KERN_WARNING fmt "\n", ## arg);	\
+} while (0)
 
 /* error event message: e.g., i/o error */
-extern int jfsERROR;
-#define jERROR(button, prspec) \
-	do { if (button && jfsloglevel > 0) { printk prspec; } } while (0)
-
-/* debug event message: */
-#define jEVENT(button,prspec) \
-	do { if (button) printk prspec; } while (0)
+#define jfs_err(fmt, arg...) do {			\
+	if (jfsloglevel >= JFS_LOGLEVEL_ERR)		\
+		printk(KERN_ERR "%s:%d " fmt "\n",	\
+		       __FILE__, __LINE__, ## arg);	\
+} while (0)
 
 /*
  *	debug OFF
  *	---------
  */
 #else				/* CONFIG_JFS_DEBUG */
-#define dump_mem(label,data,length)
-#define ASSERT(p)
-#define jEVENT(button,prspec)
-#define jERROR(button,prspec)
-#define jFYI(button,prspec)
+#define dump_mem(label,data,length) do {} while (0)
+#define ASSERT(p) do {} while (0)
+#define jfs_info(fmt, arg...) do {} while (0)
+#define jfs_debug(fmt, arg...) do {} while (0)
+#define jfs_warn(fmt, arg...) do {} while (0)
+#define jfs_err(fmt, arg...) do {} while (0)
 #endif				/* CONFIG_JFS_DEBUG */
 
 /*

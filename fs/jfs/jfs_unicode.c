@@ -47,7 +47,6 @@ int jfs_strfromUCS_le(char *to, const wchar_t * from,	/* LITTLE ENDIAN */
 		}
 	}
 	to[outlen] = 0;
-	jEVENT(0, ("jfs_strfromUCS returning %d - '%s'\n", outlen, to));
 	return outlen;
 }
 
@@ -63,21 +62,16 @@ int jfs_strtoUCS(wchar_t * to,
 	int charlen;
 	int i;
 
-	jEVENT(0, ("jfs_strtoUCS - '%s'\n", from));
-
 	for (i = 0; len && *from; i++, from += charlen, len -= charlen) {
 		charlen = codepage->char2uni(from, len, &to[i]);
 		if (charlen < 1) {
-			jERROR(1, ("jfs_strtoUCS: char2uni returned %d.\n",
-				   charlen));
-			jERROR(1, ("charset = %s, char = 0x%x\n",
-				   codepage->charset, (unsigned char) *from));
+			jfs_err("jfs_strtoUCS: char2uni returned %d.", charlen);
+			jfs_err("charset = %s, char = 0x%x",
+				codepage->charset, (unsigned char) *from);
 			to[i] = 0x003f;	/* a question mark */
 			charlen = 1;
 		}
 	}
-
-	jEVENT(0, (" returning %d\n", i));
 
 	to[i] = 0;
 	return i;
