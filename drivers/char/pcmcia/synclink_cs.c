@@ -582,6 +582,7 @@ static dev_link_t *mgslpc_attach(void)
     link->priv = info;
     
     /* Initialize the dev_link_t structure */
+    init_timer(&link->release);
     link->release.function = &mgslpc_release;
     link->release.data = (u_long)link;
 

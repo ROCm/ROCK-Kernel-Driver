@@ -855,6 +855,7 @@ ether3_probe(struct expansion_card *ec, const struct ecard_id *id)
 	}
 
 	priv = (struct dev_priv *) dev->priv;
+	init_timer(&priv->timer);
 
 	/* Reset card...
 	 */
