@@ -57,8 +57,8 @@ struct smb_vol {
 	mode_t file_mode;
 	mode_t dir_mode;
 	int rw;
-    unsigned int rsize;
-    unsigned int wsize;
+	unsigned int rsize;
+	unsigned int wsize;
 	unsigned short int port;
 };
 
