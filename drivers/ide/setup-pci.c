@@ -542,6 +542,13 @@ static int ide_setup_pci_controller(struct pci_dev *dev, ide_pci_device_t *d, in
 	return 0;
 }
 
+static void ide_release_pci_controller(struct pci_dev *dev, ide_pci_device_t *d,
+				       int noisy)
+{
+	/* Balance ide_pci_enable() */
+	pci_disable_device(dev);
+}
+
 /**
  *	ide_pci_setup_ports	-	configure ports/devices on PCI IDE
  *	@dev: PCI device
@@ -672,7 +679,7 @@ static int do_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d,
 		 */
 		ret = d->init_chipset ? d->init_chipset(dev, d->name) : 0;
 		if (ret < 0)
-			goto out;
+			goto err_release_pci_controller;
 		pciirq = ret;
 	} else if (tried_config) {
 		if (noisy)
@@ -687,7 +694,7 @@ static int do_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d,
 		if (d->init_chipset) {
 			ret = d->init_chipset(dev, d->name);
 			if (ret < 0)
-				goto out;
+				goto err_release_pci_controller;
 		}
 		if (noisy)
 #ifdef __sparc__
@@ -705,6 +712,10 @@ static int do_ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d,
 	ide_pci_setup_ports(dev, d, pciirq, index);
 out:
 	return ret;
+
+err_release_pci_controller:
+	ide_release_pci_controller(dev, d, noisy);
+	goto out;
 }
 
 int ide_setup_pci_device(struct pci_dev *dev, ide_pci_device_t *d)
