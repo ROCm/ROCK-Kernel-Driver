@@ -719,12 +719,8 @@ void handler_irq(int irq, struct pt_regs *regs)
 	 */
 	{
 		unsigned long clr_mask = 1 << irq;
-		unsigned long tick_mask;
+		unsigned long tick_mask = tick_ops->softint_mask;
 
-		if (SPARC64_USE_STICK)
-			tick_mask = (1UL << 16);
-		else
-			tick_mask = (1UL << 0);
 		if ((irq == 14) && (get_softint() & tick_mask)) {
 			irq = 0;
 			clr_mask = tick_mask;
