@@ -752,70 +752,70 @@ setup_avm_pcipnp(struct IsdnCard *card)
 		cs->hw.avm.cfg_reg = card->para[1];
 		cs->irq = card->para[0];
 		cs->subtyp = AVM_FRITZ_PNP;
-	} else {
+		goto ready;
+	}
 #ifdef __ISAPNP__
-		if (isapnp_present()) {
-			struct pnp_dev *pnp_avm_d = NULL;
-			if ((pnp_avm_c = pnp_find_card(
+	if (isapnp_present()) {
+		struct pnp_dev *pnp_avm_d = NULL;
+		if ((pnp_avm_c = pnp_find_card(
+			ISAPNP_VENDOR('A', 'V', 'M'),
+			ISAPNP_FUNCTION(0x0900), pnp_avm_c))) {
+			if ((pnp_avm_d = pnp_find_dev(pnp_avm_c,
 				ISAPNP_VENDOR('A', 'V', 'M'),
-				ISAPNP_FUNCTION(0x0900), pnp_avm_c))) {
-				if ((pnp_avm_d = pnp_find_dev(pnp_avm_c,
-					ISAPNP_VENDOR('A', 'V', 'M'),
-					ISAPNP_FUNCTION(0x0900), pnp_avm_d))) {
-					int err;
+				ISAPNP_FUNCTION(0x0900), pnp_avm_d))) {
+				int err;
 
-					pnp_disable_dev(pnp_avm_d);
-					err = pnp_activate_dev(pnp_avm_d);
-					if (err<0) {
-						printk(KERN_WARNING "%s: pnp_activate_dev ret(%d)\n",
-							__FUNCTION__, err);
-						return(0);
-					}
-					cs->hw.avm.cfg_reg =
-						pnp_port_start(pnp_avm_d, 0);
-					cs->irq = pnp_irq(pnp_avm_d, 0);
-					if (!cs->irq) {
-						printk(KERN_ERR "FritzPnP:No IRQ\n");
-						return(0);
-					}
-					if (!cs->hw.avm.cfg_reg) {
-						printk(KERN_ERR "FritzPnP:No IO address\n");
-						return(0);
-					}
-					cs->subtyp = AVM_FRITZ_PNP;
-					goto ready;
+				pnp_disable_dev(pnp_avm_d);
+				err = pnp_activate_dev(pnp_avm_d);
+				if (err<0) {
+					printk(KERN_WARNING "%s: pnp_activate_dev ret(%d)\n",
+						__FUNCTION__, err);
+					return(0);
 				}
+				cs->hw.avm.cfg_reg =
+					pnp_port_start(pnp_avm_d, 0);
+				cs->irq = pnp_irq(pnp_avm_d, 0);
+				if (!cs->irq) {
+					printk(KERN_ERR "FritzPnP:No IRQ\n");
+					return(0);
+				}
+				if (!cs->hw.avm.cfg_reg) {
+					printk(KERN_ERR "FritzPnP:No IO address\n");
+					return(0);
+				}
+				cs->subtyp = AVM_FRITZ_PNP;
+				goto ready;
 			}
-		} else {
-			printk(KERN_INFO "FritzPnP: no ISA PnP present\n");
 		}
+	} else {
+		printk(KERN_INFO "FritzPnP: no ISA PnP present\n");
+	}
 #endif
 #ifdef CONFIG_PCI
-		if ((dev_avm = pci_find_device(PCI_VENDOR_ID_AVM,
-			PCI_DEVICE_ID_AVM_A1,  dev_avm))) {
-			cs->irq = dev_avm->irq;
-			if (!cs->irq) {
-				printk(KERN_ERR "FritzPCI: No IRQ for PCI card found\n");
-				return(0);
-			}
-			if (pci_enable_device(dev_avm))
-				return(0);
-			cs->hw.avm.cfg_reg = pci_resource_start(dev_avm, 1);
-			if (!cs->hw.avm.cfg_reg) {
-				printk(KERN_ERR "FritzPCI: No IO-Adr for PCI card found\n");
-				return(0);
-			}
-			cs->subtyp = AVM_FRITZ_PCI;
-		} else {
-			printk(KERN_WARNING "FritzPCI: No PCI card found\n");
+	if ((dev_avm = pci_find_device(PCI_VENDOR_ID_AVM,
+		PCI_DEVICE_ID_AVM_A1,  dev_avm))) {
+		cs->irq = dev_avm->irq;
+		if (!cs->irq) {
+			printk(KERN_ERR "FritzPCI: No IRQ for PCI card found\n");
 			return(0);
 		}
-		cs->irq_flags |= SA_SHIRQ;
-#else
-		printk(KERN_WARNING "FritzPCI: NO_PCI_BIOS\n");
-		return (0);
-#endif /* CONFIG_PCI */
+		if (pci_enable_device(dev_avm))
+			return(0);
+		cs->hw.avm.cfg_reg = pci_resource_start(dev_avm, 1);
+		if (!cs->hw.avm.cfg_reg) {
+			printk(KERN_ERR "FritzPCI: No IO-Adr for PCI card found\n");
+			return(0);
+		}
+		cs->subtyp = AVM_FRITZ_PCI;
+	} else {
+		printk(KERN_WARNING "FritzPCI: No PCI card found\n");
+		return(0);
 	}
+	cs->irq_flags |= SA_SHIRQ;
+#else
+	printk(KERN_WARNING "FritzPCI: NO_PCI_BIOS\n");
+	return (0);
+#endif /* CONFIG_PCI */
 ready:
 	cs->hw.avm.isac = cs->hw.avm.cfg_reg + 0x10;
 	if (!request_region(cs->hw.avm.cfg_reg, 32,

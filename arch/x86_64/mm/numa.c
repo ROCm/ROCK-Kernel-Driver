@@ -135,7 +135,7 @@ void __init setup_node_zones(int nodeid)
 		zones[ZONE_NORMAL] = end_pfn - start_pfn; 
 	} 
     
-	free_area_init_node(nodeid, NODE_DATA(nodeid), NULL, zones, 
+	free_area_init_node(nodeid, NODE_DATA(nodeid), zones,
 			    start_pfn, NULL); 
 } 
 

@@ -169,7 +169,7 @@ ACI MIXER DRIVER
 P:	Robert Siemer
 M:	Robert.Siemer@gmx.de
 L:	linux-sound@vger.kernel.org
-W:	http://www.uni-karlsruhe.de/~Robert.Siemer/Private/
+W:	http://www.stud.uni-karlsruhe.de/~uh1b/
 S:	Maintained
 
 ACP/MWAVE MODEM
@@ -195,8 +195,8 @@ S:	Maintained
 
 AD1816 SOUND DRIVER
 P:	Thorsten Knabe
-W:	http://www.student.informatik.tu-darmstadt.de/~tek/projects/linux.html
-W:	http://www.tu-darmstadt.de/~tek01/projects/linux.html
+M:	Thorsten Knabe <linux@thorsten-knabe.de>
+W:	http://linux.thorsten-knabe.de
 S:	Maintained
 
 ADT746X FAN DRIVER
@@ -762,8 +762,8 @@ M:	saw@saw.sw.com.sg
 S:	Maintained
 
 EMU10K1 SOUND DRIVER
-P:	Rui Sousa	
-M:	rui.p.m.sousa@clix.pt	
+P:	James Courtier-Dutton
+M:	James@superbug.demon.co.uk
 L:	emu10k1-devel@lists.sourceforge.net
 W:	http://sourceforge.net/projects/emu10k1/
 S:	Maintained
@@ -827,10 +827,8 @@ M:	viro@math.psu.edu
 S:	Maintained
 
 FIRMWARE LOADER (request_firmware)
-P:	Manuel Estrada Sainz
-M:	ranty@debian.org
 L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Orphan
 
 FPU EMULATOR
 P:	Bill Metzenthen

@@ -555,8 +555,7 @@ int sys_clone(unsigned long clone_flags, unsigned long usp,
 	CHECK_FULL_REGS(regs);
 	if (usp == 0)
 		usp = regs->gpr[1];	/* stack pointer for child */
- 	return do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0,
-			parent_tidp, child_tidp);
+ 	return do_fork(clone_flags, usp, regs, 0, parent_tidp, child_tidp);
 }
 
 int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,

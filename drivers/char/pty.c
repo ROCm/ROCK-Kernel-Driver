@@ -32,12 +32,6 @@
 #include <asm/bitops.h>
 #include <linux/devpts_fs.h>
 
-#if defined(CONFIG_LEGACY_PTYS) || defined(CONFIG_UNIX98_PTYS)
-
-#ifdef CONFIG_LEGACY_PTYS
-static struct tty_driver *pty_driver, *pty_slave_driver;
-#endif
-
 /* These are global because they are accessed in tty_io.c */
 #ifdef CONFIG_UNIX98_PTYS
 struct tty_driver *ptm_driver;
@@ -205,19 +199,6 @@ static int pty_chars_in_buffer(struct tty_struct *tty)
 	return ((count < N_TTY_BUF_SIZE/2) ? 0 : count);
 }
 
-/* 
- * Return the device number of a Unix98 PTY (only!).  This lets us open a
- * master pty with the multi-headed ptmx device, then find out which
- * one we got after it is open, with an ioctl.
- */
-#ifdef CONFIG_UNIX98_PTYS
-static int pty_get_device_number(struct tty_struct *tty, unsigned __user *value)
-{
-	unsigned int result = tty->index;
-	return put_user(result, value);
-}
-#endif
-
 /* Set the lock flag on a pty */
 static int pty_set_lock(struct tty_struct *tty, int __user * arg)
 {
@@ -230,41 +211,6 @@ static int pty_set_lock(struct tty_struct *tty, int __user * arg)
 		clear_bit(TTY_PTY_LOCK, &tty->flags);
 	return 0;
 }
-
-#ifdef CONFIG_LEGACY_PTYS
-static int pty_bsd_ioctl(struct tty_struct *tty, struct file *file,
-			 unsigned int cmd, unsigned long arg)
-{
-	if (!tty) {
-		printk("pty_ioctl called with NULL tty!\n");
-		return -EIO;
-	}
-	switch(cmd) {
-	case TIOCSPTLCK: /* Set PT Lock (disallow slave open) */
-		return pty_set_lock(tty, (int __user *) arg);
-	}
-	return -ENOIOCTLCMD;
-}
-#endif
-
-#ifdef CONFIG_UNIX98_PTYS
-static int pty_unix98_ioctl(struct tty_struct *tty, struct file *file,
-			    unsigned int cmd, unsigned long arg)
-{
-	if (!tty) {
-		printk("pty_unix98_ioctl called with NULL tty!\n");
-		return -EIO;
-	}
-	switch(cmd) {
-	case TIOCSPTLCK: /* Set PT Lock (disallow slave open) */
-		return pty_set_lock(tty, (int __user *)arg);
-	case TIOCGPTN: /* Get PT Number */
-		return pty_get_device_number(tty, (unsigned int __user *)arg);
-	}
-
-	return -ENOIOCTLCMD;
-}
-#endif
 
 static void pty_flush_buffer(struct tty_struct *tty)
 {
@@ -322,42 +268,22 @@ static struct tty_operations pty_ops = {
 	.set_termios = pty_set_termios,
 };
 
-/* sysctl support for setting limits on the number of Unix98 ptys allocated.
-   Otherwise one can eat up all kernel memory by opening /dev/ptmx repeatedly. */
-#ifdef CONFIG_UNIX98_PTYS
-int pty_limit = NR_UNIX98_PTY_DEFAULT;
-static int pty_limit_min = 0;
-static int pty_limit_max = NR_UNIX98_PTY_MAX;
-
-ctl_table pty_table[] = {
-	{
-		.ctl_name	= PTY_MAX,
-		.procname	= "max",
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.data		= &pty_limit,
-		.proc_handler	= &proc_dointvec_minmax,
-		.strategy	= &sysctl_intvec,
-		.extra1		= &pty_limit_min,
-		.extra2		= &pty_limit_max,
-	}, {
-		.ctl_name	= PTY_NR,
-		.procname	= "nr",
-		.maxlen		= sizeof(int),
-		.mode		= 0444,
-		.proc_handler	= &proc_dointvec,
-	}, {
-		.ctl_name	= 0
-	}
-};
-#endif
-
-/* Initialization */
-
-static int __init pty_init(void)
-{
+/* Traditional BSD devices */
 #ifdef CONFIG_LEGACY_PTYS
-	/* Traditional BSD devices */
+static struct tty_driver *pty_driver, *pty_slave_driver;
+
+static int pty_bsd_ioctl(struct tty_struct *tty, struct file *file,
+			 unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case TIOCSPTLCK: /* Set PT Lock (disallow slave open) */
+		return pty_set_lock(tty, (int __user *) arg);
+	}
+	return -ENOIOCTLCMD;
+}
+
+static void __init legacy_pty_init(void)
+{
 
 	pty_driver = alloc_tty_driver(NR_PTYS);
 	if (!pty_driver)
@@ -404,11 +330,58 @@ static int __init pty_init(void)
 		panic("Couldn't register pty driver");
 	if (tty_register_driver(pty_slave_driver))
 		panic("Couldn't register pty slave driver");
+}
+#else
+static inline void legacy_pty_init(void) { }
+#endif
 
-#endif /* CONFIG_LEGACY_PTYS */
-
+/* Unix98 devices */
 #ifdef CONFIG_UNIX98_PTYS
-	/* Unix98 devices */
+/*
+ * sysctl support for setting limits on the number of Unix98 ptys allocated.
+ * Otherwise one can eat up all kernel memory by opening /dev/ptmx repeatedly.
+ */
+int pty_limit = NR_UNIX98_PTY_DEFAULT;
+static int pty_limit_min = 0;
+static int pty_limit_max = NR_UNIX98_PTY_MAX;
+
+ctl_table pty_table[] = {
+	{
+		.ctl_name	= PTY_MAX,
+		.procname	= "max",
+		.maxlen		= sizeof(int),
+		.mode		= 0644,
+		.data		= &pty_limit,
+		.proc_handler	= &proc_dointvec_minmax,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &pty_limit_min,
+		.extra2		= &pty_limit_max,
+	}, {
+		.ctl_name	= PTY_NR,
+		.procname	= "nr",
+		.maxlen		= sizeof(int),
+		.mode		= 0444,
+		.proc_handler	= &proc_dointvec,
+	}, {
+		.ctl_name	= 0
+	}
+};
+
+static int pty_unix98_ioctl(struct tty_struct *tty, struct file *file,
+			    unsigned int cmd, unsigned long arg)
+{
+	switch (cmd) {
+	case TIOCSPTLCK: /* Set PT Lock (disallow slave open) */
+		return pty_set_lock(tty, (int __user *)arg);
+	case TIOCGPTN: /* Get PT Number */
+		return put_user(tty->index, (unsigned int __user *)arg);
+	}
+
+	return -ENOIOCTLCMD;
+}
+
+static void __init unix98_pty_init(void)
+{
 	devfs_mk_dir("pts");
 	ptm_driver = alloc_tty_driver(NR_UNIX98_PTY_MAX);
 	if (!ptm_driver)
@@ -455,10 +428,15 @@ static int __init pty_init(void)
 		panic("Couldn't register Unix98 pts driver");
 
 	pty_table[1].data = &ptm_driver->refcount;
-#endif /* CONFIG_UNIX98_PTYS */
+}
+#else
+static inline void unix98_pty_init(void) { }
+#endif
 
+static int __init pty_init(void)
+{
+	legacy_pty_init();
+	unix98_pty_init();
 	return 0;
 }
 module_init(pty_init);
-
-#endif /* CONFIG_LEGACY_PTYS || CONFIG_UNIX98_PTYS */

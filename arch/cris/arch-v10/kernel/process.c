@@ -180,7 +180,7 @@ asmlinkage int sys_clone(unsigned long newusp, unsigned long flags,
 {
 	if (!newusp)
 		newusp = rdusp();
-	return do_fork(flags & ~CLONE_IDLETASK, newusp, regs, 0, parent_tid, child_tid);
+	return do_fork(flags, newusp, regs, 0, parent_tid, child_tid);
 }
 
 /* vfork is a system call in i386 because of register-pressure - maybe

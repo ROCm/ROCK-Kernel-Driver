@@ -356,19 +356,15 @@ start_secondary (void *unused)
 	return cpu_idle();
 }
 
-static struct task_struct * __devinit
-fork_by_hand (void)
+struct pt_regs * __init idle_regs(struct pt_regs *regs)
 {
-	/*
-	 * Don't care about the IP and regs settings since we'll never reschedule the
-	 * forked task.
-	 */
-	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, 0, 0, NULL, NULL);
+	return NULL;
 }
 
 struct create_idle {
 	struct task_struct *idle;
 	struct completion done;
+	int cpu;
 };
 
 void
@@ -376,7 +372,7 @@ do_fork_idle(void *_c_idle)
 {
 	struct create_idle *c_idle = _c_idle;
 
-	c_idle->idle = fork_by_hand();
+	c_idle->idle = fork_idle(c_idle->cpu);
 	complete(&c_idle->done);
 }
 
@@ -384,10 +380,11 @@ static int __devinit
 do_boot_cpu (int sapicid, int cpu)
 {
 	int timeout;
-	struct create_idle c_idle;
+	struct create_idle c_idle = {
+		.cpu	= cpu,
+		.done	= COMPLETION_INITIALIZER(c_idle.done),
+	};
 	DECLARE_WORK(work, do_fork_idle, &c_idle);
-
-	init_completion(&c_idle.done);
 	/*
 	 * We can't use kernel_thread since we must avoid to reschedule the child.
 	 */
@@ -400,16 +397,6 @@ do_boot_cpu (int sapicid, int cpu)
 
 	if (IS_ERR(c_idle.idle))
 		panic("failed fork for CPU %d", cpu);
-	wake_up_forked_process(c_idle.idle);
-
-	/*
-	 * We remove it from the pidhash and the runqueue
-	 * once we got the process:
-	 */
-	init_idle(c_idle.idle, cpu);
-
-	unhash_process(c_idle.idle);
-
 	task_for_booting_cpu = c_idle.idle;
 
 	Dprintk("Sending wakeup vector %lu to AP 0x%x/0x%x.\n", ap_wakeup_vector, cpu, sapicid);
@@ -719,3 +706,4 @@ init_smp_config(void)
 		printk(KERN_ERR "SMP: Can't set SAL AP Boot Rendezvous: %s\n",
 		       ia64_sal_strerror(sal_ret));
 }
+

@@ -90,12 +90,6 @@ void fat_truncate(struct inode *inode)
 	const unsigned int cluster_size = sbi->cluster_size;
 	int nr_clusters;
 
-	/* Why no return value?  Surely the disk could fail... */
-	if (IS_RDONLY (inode))
-		return /* -EPERM */;
-	if (IS_IMMUTABLE(inode))
-		return /* -EPERM */;
-
 	/* 
 	 * This protects against truncating a file bigger than it was then
 	 * trying to write into the hole.

@@ -2910,9 +2910,14 @@ static int __devinit hp100_pci_probe (struct pci_dev *pdev,
 	int ioaddr = pci_resource_start(pdev, 0);
 	u_short pci_command;
 	int err;
-	
+
 	if (!dev)
 		return -ENOMEM;
+
+	if (pci_enable_device(pdev)) {
+		err = -ENODEV;
+		goto out0;
+	}
 
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
@@ -2951,6 +2956,8 @@ static int __devinit hp100_pci_probe (struct pci_dev *pdev,
 	release_region(dev->base_addr, HP100_REGION_SIZE);
  out1:
 	free_netdev(dev);
+	pci_disable_device(pdev);
+ out0:
 	return err;
 }
 
@@ -2959,6 +2966,7 @@ static void __devexit hp100_pci_remove (struct pci_dev *pdev)
 	struct net_device *dev = pci_get_drvdata(pdev);
 
 	cleanup_dev(dev);
+	pci_disable_device(pdev);
 }
 
 

@@ -39,16 +39,25 @@ static inline int need_signal_i387(struct task_struct *me)
  * FPU lazy state save handling...
  */
 
-#define kernel_fpu_end() stts()
-
 #define unlazy_fpu(tsk) do { \
 	if ((tsk)->thread_info->status & TS_USEDFPU) \
 		save_init_fpu(tsk); \
 } while (0)
 
+/* Ignore delayed exceptions from user space */
+static inline void tolerant_fwait(void)
+{
+	asm volatile("1: fwait\n"
+		     "2:\n"
+		     "   .section __ex_table,\"a\"\n"
+		     "	.align 8\n"
+		     "	.quad 1b,2b\n"
+		     "	.previous\n");
+}
+
 #define clear_fpu(tsk) do { \
 	if ((tsk)->thread_info->status & TS_USEDFPU) {		\
-		asm volatile("fnclex ; fwait");			\
+		tolerant_fwait();				\
 		(tsk)->thread_info->status &= ~TS_USEDFPU;	\
 		stts();						\
 	}							\
@@ -116,6 +125,7 @@ static inline int save_i387_checking(struct i387_fxsave_struct __user *fx)
 static inline void kernel_fpu_begin(void)
 {
 	struct thread_info *me = current_thread_info();
+	preempt_disable();
 	if (me->status & TS_USEDFPU) { 
 		asm volatile("rex64 ; fxsave %0 ; fnclex"
 			      : "=m" (me->task->thread.i387.fxsave));
@@ -125,9 +135,15 @@ static inline void kernel_fpu_begin(void)
 	clts();
 }
 
+static inline void kernel_fpu_end(void)
+{
+	stts();
+	preempt_enable();
+}
+
 static inline void save_init_fpu( struct task_struct *tsk )
 {
-	asm volatile( "fxsave %0 ; fnclex"
+	asm volatile( "rex64 ; fxsave %0 ; fnclex"
 		      : "=m" (tsk->thread.i387.fxsave));
 	tsk->thread_info->status &= ~TS_USEDFPU;
 	stts();

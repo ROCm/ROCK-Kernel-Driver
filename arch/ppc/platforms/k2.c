@@ -464,10 +464,6 @@ static void __init k2_setup_arch(void)
 		ROOT_DEV = Root_HDC1;
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
-
 	/* Identify the system */
 	printk(KERN_INFO "System Identification: SBS K2 - PowerPC 750 @ "
 			"%d Mhz\n", k2_get_cpu_speed() / 1000000);

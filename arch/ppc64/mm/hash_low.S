@@ -278,6 +278,10 @@ htab_wrong_access:
 	b	bail
 
 htab_pte_insert_failure:
-	b	.htab_insert_failure
+	/* Bail out restoring old PTE */
+	ld	r6,STK_PARM(r6)(r1)
+	std	r31,0(r6)
+	li	r3,-1
+	b	bail
 
 

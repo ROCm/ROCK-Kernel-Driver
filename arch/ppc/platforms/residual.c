@@ -504,7 +504,7 @@ void __init print_residual_device_info(void)
 #define did dev->DeviceId
 
 	/* make sure we have residual data first */
-	if ( res->ResidualLength == 0 )
+	if (!have_residual_data)
 		return;
 
 	printk("Residual: %ld devices\n", res->ActualNumDevices);
@@ -639,7 +639,7 @@ void print_residual_device_info(void)
 #define did dev->DeviceId
 
 	/* make sure we have residual data first */
-	if ( res->ResidualLength == 0 )
+	if (!have_residual_data)
 		return;
 	printk("Residual: %ld devices\n", res->ActualNumDevices);
 	for ( i = 0;
@@ -790,7 +790,7 @@ PPC_DEVICE __init *residual_find_device(unsigned long BusMask,
 			 int n)
 {
 	int i;
-	if ( !res->ResidualLength ) return NULL;
+	if (!have_residual_data) return NULL;
 	for (i=0; i<res->ActualNumDevices; i++) {
 #define Dev res->Devices[i].DeviceId
 		if ( (Dev.BusId&BusMask)                                  &&
@@ -813,7 +813,7 @@ PPC_DEVICE __init *residual_find_device_id(unsigned long BusMask,
 			 int n)
 {
 	int i;
-	if ( !res->ResidualLength ) return NULL;
+	if (!have_residual_data) return NULL;
 	for (i=0; i<res->ActualNumDevices; i++) {
 #define Dev res->Devices[i].DeviceId
 		if ( (Dev.BusId&BusMask)                                  &&
@@ -825,6 +825,129 @@ PPC_DEVICE __init *residual_find_device_id(unsigned long BusMask,
 #undef Dev
 	}
 	return NULL;
+}
+
+static int __init
+residual_scan_pcibridge(PnP_TAG_PACKET * pkt, struct pci_dev *dev)
+{
+	int irq = -1;
+
+#define data pkt->L4_Pack.L4_Data.L4_PPCPack.PPCData
+	if (dev->bus->number == data[16]) {
+		int i, size;
+
+		size = 3 + ld_le16((u_short *) (&pkt->L4_Pack.Count0));
+		for (i = 20; i < size - 4; i += 12) {
+			unsigned char pin;
+			int line_irq;
+
+			if (dev->devfn != data[i + 1])
+				continue;
+
+			pci_read_config_byte(dev, PCI_INTERRUPT_PIN, &pin);
+			if (pin) {
+				line_irq = ld_le16((unsigned short *)
+						(&data[i + 4 + 2 * (pin - 1)]));
+				irq = (line_irq == 0xffff) ? 0
+							   : line_irq & 0x7fff;
+			} else
+				irq = 0;
+
+			break;
+		}
+	}
+#undef data
+
+	return irq;
+}
+
+int __init
+residual_pcidev_irq(struct pci_dev *dev)
+{
+	int i = 0;
+	int irq = -1;
+	PPC_DEVICE *bridge;
+
+	while ((bridge = residual_find_device
+	       (-1, NULL, BridgeController, PCIBridge, -1, i++))) {
+
+		PnP_TAG_PACKET *pkt;
+		if (bridge->AllocatedOffset) {
+			pkt = PnP_find_large_vendor_packet(res->DevicePnPHeap +
+					   bridge->AllocatedOffset, 3, 0);
+			if (!pkt)
+				continue;
+
+			irq = residual_scan_pcibridge(pkt, dev);
+			if (irq != -1)
+				break;
+		}
+	}
+
+	return (irq < 0) ? 0 : irq;
+}
+
+void __init residual_irq_mask(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
+{
+	PPC_DEVICE *dev;
+	int i = 0;
+	unsigned short irq_mask = 0x000; /* default to edge */
+
+	while ((dev = residual_find_device(-1, NULL, -1, -1, -1, i++))) {
+		PnP_TAG_PACKET *pkt;
+		unsigned short mask;
+		int size;
+		int offset = dev->AllocatedOffset;
+
+		if (!offset)
+			continue;
+
+		pkt = PnP_find_packet(res->DevicePnPHeap + offset,
+					      IRQFormat, 0);
+		if (!pkt)
+			continue;
+
+		size = tag_small_count(pkt->S1_Pack.Tag) + 1;
+		mask = ld_le16((unsigned short *)pkt->S4_Pack.IRQMask);
+		if (size > 3 && (pkt->S4_Pack.IRQInfo & 0x0c))
+			irq_mask |= mask;
+	}
+
+	*irq_edge_mask_lo = irq_mask & 0xff;
+	*irq_edge_mask_hi = irq_mask >> 8;
+}
+
+unsigned int __init residual_isapic_addr(void)
+{
+	PPC_DEVICE *isapic;
+	PnP_TAG_PACKET *pkt;
+	unsigned int addr;
+
+	isapic = residual_find_device(~0, NULL, SystemPeripheral,
+				      ProgrammableInterruptController,
+				      ISA_PIC, 0);
+	if (!isapic)
+		goto unknown;
+
+	pkt = PnP_find_large_vendor_packet(res->DevicePnPHeap +
+						isapic->AllocatedOffset, 9, 0);
+	if (!pkt)
+		goto unknown;
+
+#define p pkt->L4_Pack.L4_Data.L4_PPCPack
+	/* Must be 32-bit memory address */
+	if (!((p.PPCData[0] == 2) && (p.PPCData[1] == 32)))
+		goto unknown;
+
+	/* It doesn't seem to work where length != 1 (what can I say? :-/ ) */
+	if (ld_le32((unsigned int *)(p.PPCData + 12)) != 1)
+		goto unknown;
+
+	addr = ld_le32((unsigned int *) (p.PPCData + 4));
+#undef p
+	return addr;
+unknown:
+	return 0;
 }
 
 PnP_TAG_PACKET *PnP_find_packet(unsigned char *p,
@@ -901,7 +1024,7 @@ static int proc_prep_residual_read(char * buf, char ** start, off_t off,
 int __init
 proc_prep_residual_init(void)
 {
-	if (res->ResidualLength)
+	if (have_residual_data)
 		create_proc_read_entry("residual", S_IRUGO, NULL,
 					proc_prep_residual_read, NULL);
 	return 0;

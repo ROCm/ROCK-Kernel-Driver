@@ -307,8 +307,8 @@ static int gfar_probe(struct ocp_device *ocpdev)
 	/* Print out the device info */
 	printk(KERN_INFO DEVICE_NAME, dev->name);
 	for (idx = 0; idx < 6; idx++)
-		printk(KERN_INFO "%2.2x%c", dev->dev_addr[idx], idx == 5 ? ' ' : ':');
-	printk(KERN_INFO "\n");
+		printk("%2.2x%c", dev->dev_addr[idx], idx == 5 ? ' ' : ':');
+	printk("\n");
 
 	/* Even more device info helps when determining which kernel */
 	/* provided which set of benchmarks.  Since this is global for all */

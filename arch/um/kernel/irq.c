@@ -18,6 +18,7 @@
 #include "linux/proc_fs.h"
 #include "linux/init.h"
 #include "linux/seq_file.h"
+#include "linux/profile.h"
 #include "asm/irq.h"
 #include "asm/hw_irq.h"
 #include "asm/hardirq.h"
@@ -29,6 +30,7 @@
 #include "user_util.h"
 #include "kern_util.h"
 #include "irq_user.h"
+#include "irq_kern.h"
 
 static void register_irq_proc (unsigned int irq);
 
@@ -83,65 +85,55 @@ struct hw_interrupt_type no_irq_type = {
 	end_none
 };
 
-/* Not changed */
-volatile unsigned long irq_err_count;
-
 /*
  * Generic, controller-independent functions:
  */
 
-int get_irq_list(char *buf)
+int show_interrupts(struct seq_file *p, void *v)
 {
-	int i, j;
-	unsigned long flags;
+	int i = *(loff_t *) v, j;
 	struct irqaction * action;
-	char *p = buf;
+	unsigned long flags;
 
-	p += sprintf(p, "           ");
-	for (j=0; j<num_online_cpus(); j++)
-		p += sprintf(p, "CPU%d       ",j);
-	*p++ = '\n';
+	if (i == 0) {
+		seq_printf(p, "           ");
+		for (j=0; j<NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "CPU%d       ",j);
+		seq_putc(p, '\n');
+	}
 
-	for (i = 0 ; i < NR_IRQS ; i++) {
+	if (i < NR_IRQS) {
 		spin_lock_irqsave(&irq_desc[i].lock, flags);
 		action = irq_desc[i].action;
 		if (!action) 
-			goto end;
-		p += sprintf(p, "%3d: ",i);
+			goto skip;
+		seq_printf(p, "%3d: ",i);
 #ifndef CONFIG_SMP
-		p += sprintf(p, "%10u ", kstat_irqs(i));
+		seq_printf(p, "%10u ", kstat_irqs(i));
 #else
-		for (j = 0; j < num_online_cpus(); j++)
-			p += sprintf(p, "%10u ",
-				kstat_cpu(cpu_logical_map(j)).irqs[i]);
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", kstat_cpu(j).irqs[i]);
 #endif
-		p += sprintf(p, " %14s", irq_desc[i].handler->typename);
-		p += sprintf(p, "  %s", action->name);
+		seq_printf(p, " %14s", irq_desc[i].handler->typename);
+		seq_printf(p, "  %s", action->name);
 
 		for (action=action->next; action; action = action->next)
-			p += sprintf(p, ", %s", action->name);
-		*p++ = '\n';
-	end:
+			seq_printf(p, ", %s", action->name);
+
+		seq_putc(p, '\n');
+skip:
 		spin_unlock_irqrestore(&irq_desc[i].lock, flags);
+	} else if (i == NR_IRQS) {
+		seq_printf(p, "NMI: ");
+		for (j = 0; j < NR_CPUS; j++)
+			if (cpu_online(j))
+				seq_printf(p, "%10u ", nmi_count(j));
+		seq_putc(p, '\n');
 	}
-	p += sprintf(p, "\n");
-#ifdef notdef
-#ifdef CONFIG_SMP
-	p += sprintf(p, "LOC: ");
-	for (j = 0; j < num_online_cpus(); j++)
-		p += sprintf(p, "%10u ",
-			apic_timer_irqs[cpu_logical_map(j)]);
-	p += sprintf(p, "\n");
-#endif
-#endif
-	p += sprintf(p, "ERR: %10lu\n", irq_err_count);
-	return p - buf;
-}
 
-
-int show_interrupts(struct seq_file *p, void *v)
-{
-	return(0);
+	return 0;
 }
 
 /*
@@ -282,13 +274,12 @@ unsigned int do_IRQ(int irq, union uml_pt_regs *regs)
 	 * 0 return value means that this irq is already being
 	 * handled by some other CPU. (or is disabled)
 	 */
-	int cpu = smp_processor_id();
 	irq_desc_t *desc = irq_desc + irq;
 	struct irqaction * action;
 	unsigned int status;
 
 	irq_enter();
-	kstat_cpu(cpu).irqs[irq]++;
+	kstat_this_cpu.irqs[irq]++;
 	spin_lock(&desc->lock);
 	desc->handler->ack(irq);
 	/*
@@ -385,7 +376,7 @@ out:
  */
  
 int request_irq(unsigned int irq,
-		void (*handler)(int, void *, struct pt_regs *),
+		irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		unsigned long irqflags, 
 		const char * devname,
 		void *dev_id)
@@ -433,15 +424,19 @@ int request_irq(unsigned int irq,
 EXPORT_SYMBOL(request_irq);
 
 int um_request_irq(unsigned int irq, int fd, int type,
-		   void (*handler)(int, void *, struct pt_regs *),
+		   irqreturn_t (*handler)(int, void *, struct pt_regs *),
 		   unsigned long irqflags, const char * devname,
 		   void *dev_id)
 {
-	int retval;
+	int err;
 
-	retval = request_irq(irq, handler, irqflags, devname, dev_id);
-	if(retval) return(retval);
-	return(activate_fd(irq, fd, type, dev_id));
+	err = request_irq(irq, handler, irqflags, devname, dev_id);
+	if(err)
+		return(err);
+
+	if(fd != -1)
+		err = activate_fd(irq, fd, type, dev_id);
+	return(err);
 }
 
 /* this was setup_x86_irq but it seems pretty generic */
@@ -474,7 +469,8 @@ int setup_irq(unsigned int irq, struct irqaction * new)
 	 */
 	spin_lock_irqsave(&desc->lock,flags);
 	p = &desc->action;
-	if ((old = *p) != NULL) {
+	old = *p;
+	if (old != NULL) {
 		/* Can't share interrupts unless both agree to */
 		if (!(old->flags & new->flags & SA_SHIRQ)) {
 			spin_unlock_irqrestore(&desc->lock,flags);
@@ -586,12 +582,14 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 					unsigned long count, void *data)
 {
 	int irq = (long) data, full_count = count, err;
-	cpumask_t new_value, tmp;
+	cpumask_t new_value;
 
 	if (!irq_desc[irq].handler->set_affinity)
 		return -EIO;
 
 	err = cpumask_parse(buffer, count, new_value);
+	if(err)
+		return(err);
 
 #ifdef CONFIG_SMP
 	/*
@@ -599,9 +597,11 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 	 * way to make the system unusable accidentally :-) At least
 	 * one online CPU still has to be targeted.
 	 */
-	cpus_and(tmp, new_value, cpu_online_map);
-	if (cpus_empty(tmp))
-		return -EINVAL;
+	{ cpumask_t tmp;
+	  cpus_and(tmp, new_value, cpu_online_map);
+	  if (cpus_empty(tmp))
+		  return -EINVAL;
+	}
 #endif
 
 	irq_affinity[irq] = new_value;

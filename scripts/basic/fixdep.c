@@ -93,6 +93,14 @@
  * (Note: it'd be easy to port over the complete mkdep state machine,
  *  but I don't think the added complexity is worth it)
  */
+/*
+ * Note 2: if somebody writes HELLO_CONFIG_BOOM in a file, it will depend onto
+ * CONFIG_BOOM. This could seem a bug (not too hard to fix), but please do not
+ * fix it! Some UserModeLinux files (look at arch/um/) call CONFIG_BOOM as
+ * UML_CONFIG_BOOM, to avoid conflicts with /usr/include/linux/autoconf.h,
+ * through arch/um/include/uml-config.h; this fixdep "bug" makes sure that
+ * those files will have correct dependencies.
+ */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -310,6 +318,7 @@ void parse_dep_file(void *map, size_t len)
 		}
 		memcpy(s, m, p-m); s[p-m] = 0;
 		if (strrcmp(s, "include/linux/autoconf.h") &&
+		    strrcmp(s, "arch/um/include/uml-config.h") &&
 		    strrcmp(s, ".ver")) {
 			printf("  %s \\\n", s);
 			do_config_file(s);

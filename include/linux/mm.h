@@ -26,6 +26,12 @@ extern void * high_memory;
 extern unsigned long vmalloc_earlyreserve;
 extern int page_cluster;
 
+#ifdef CONFIG_SYSCTL
+extern int sysctl_legacy_va_layout;
+#else
+#define sysctl_legacy_va_layout 0
+#endif
+
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/processor.h>
@@ -195,21 +201,21 @@ struct page {
 	page_flags_t flags;		/* Atomic flags, some possibly
 					 * updated asynchronously */
 	atomic_t _count;		/* Usage count, see below. */
-	unsigned int mapcount;		/* Count of ptes mapped in mms,
+	atomic_t _mapcount;		/* Count of ptes mapped in mms,
 					 * to show when page is mapped
-					 * & limit reverse map searches,
-					 * protected by PG_maplock.
+					 * & limit reverse map searches.
 					 */
 	unsigned long private;		/* Mapping-private opaque data:
 					 * usually used for buffer_heads
 					 * if PagePrivate set; used for
 					 * swp_entry_t if PageSwapCache
 					 */
-	struct address_space *mapping;	/* If PG_anon clear, points to
+	struct address_space *mapping;	/* If low bit clear, points to
 					 * inode address_space, or NULL.
 					 * If page mapped as anonymous
-					 * memory, PG_anon is set, and
-					 * it points to anon_vma object.
+					 * memory, low bit is set, and
+					 * it points to anon_vma object:
+					 * see PAGE_MAPPING_ANON below.
 					 */
 	pgoff_t index;			/* Our offset within mapping. */
 	struct list_head lru;		/* Pageout list, eg. active_list
@@ -433,22 +439,30 @@ void page_address_init(void);
 
 /*
  * On an anonymous page mapped into a user virtual memory area,
- * page->mapping points to its anon_vma, not to a struct address_space.
+ * page->mapping points to its anon_vma, not to a struct address_space;
+ * with the PAGE_MAPPING_ANON bit set to distinguish it.
  *
  * Please note that, confusingly, "page_mapping" refers to the inode
  * address_space which maps the page from disk; whereas "page_mapped"
  * refers to user virtual address space into which the page is mapped.
  */
+#define PAGE_MAPPING_ANON	1
+
 extern struct address_space swapper_space;
 static inline struct address_space *page_mapping(struct page *page)
 {
-	struct address_space *mapping = NULL;
+	struct address_space *mapping = page->mapping;
 
 	if (unlikely(PageSwapCache(page)))
 		mapping = &swapper_space;
-	else if (likely(!PageAnon(page)))
-		mapping = page->mapping;
+	else if (unlikely((unsigned long)mapping & PAGE_MAPPING_ANON))
+		mapping = NULL;
 	return mapping;
+}
+
+static inline int PageAnon(struct page *page)
+{
+	return ((unsigned long)page->mapping & PAGE_MAPPING_ANON) != 0;
 }
 
 /*
@@ -463,11 +477,26 @@ static inline pgoff_t page_index(struct page *page)
 }
 
 /*
+ * The atomic page->_mapcount, like _count, starts from -1:
+ * so that transitions both from it and to it can be tracked,
+ * using atomic_inc_and_test and atomic_add_negative(-1).
+ */
+static inline void reset_page_mapcount(struct page *page)
+{
+	atomic_set(&(page)->_mapcount, -1);
+}
+
+static inline int page_mapcount(struct page *page)
+{
+	return atomic_read(&(page)->_mapcount) + 1;
+}
+
+/*
  * Return true if this page is mapped into pagetables.
  */
 static inline int page_mapped(struct page *page)
 {
-	return page->mapcount != 0;
+	return atomic_read(&(page)->_mapcount) >= 0;
 }
 
 /*
@@ -599,11 +628,10 @@ static inline pmd_t *pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long a
 }
 
 extern void free_area_init(unsigned long * zones_size);
-extern void free_area_init_node(int nid, pg_data_t *pgdat, struct page *pmap,
+extern void free_area_init_node(int nid, pg_data_t *pgdat,
 	unsigned long * zones_size, unsigned long zone_start_pfn, 
 	unsigned long *zholes_size);
-extern void memmap_init_zone(struct page *, unsigned long, int,
-	unsigned long, unsigned long);
+extern void memmap_init_zone(unsigned long, int, unsigned long, unsigned long);
 extern void mem_init(void);
 extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);

@@ -262,7 +262,7 @@ sys_clone(unsigned long clone_flags, unsigned long usp,
 	if(usp == 0)
 		usp = regs->gr[30];
 
-	return do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0, user_tid, NULL);
+	return do_fork(clone_flags, usp, regs, 0, user_tid, NULL);
 }
 
 int

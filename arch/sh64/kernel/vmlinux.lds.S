@@ -106,9 +106,6 @@ SECTIONS
   __setup_start = .;
   .init.setup : C_PHYS(.init.setup) { *(.init.setup) }
   __setup_end = .;
-  __start___param = .;
-  __param : C_PHYS(__param) { *(__param) }
-  __stop___param = .;
   __initcall_start = .;
   .initcall.init : C_PHYS(.initcall.init) {
   	*(.initcall1.init)

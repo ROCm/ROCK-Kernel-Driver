@@ -123,6 +123,7 @@ static int __init hugetlb_setup(char *s)
 }
 __setup("hugepages=", hugetlb_setup);
 
+#ifdef CONFIG_SYSCTL
 static void update_and_free_page(struct page *page)
 {
 	int i;
@@ -188,7 +189,6 @@ static unsigned long set_max_huge_pages(unsigned long count)
 	return nr_huge_pages;
 }
 
-#ifdef CONFIG_SYSCTL
 int hugetlb_sysctl_handler(struct ctl_table *table, int write,
 			   struct file *file, void __user *buffer,
 			   size_t *length, loff_t *ppos)

@@ -63,8 +63,14 @@
 #define X86_FEATURE_K8_C	(3*32+ 4) /* C stepping K8 */
 
 /* Intel-defined CPU features, CPUID level 0x00000001 (ecx), word 4 */
-#define X86_FEATURE_EST		(4*32+ 7) /* Enhanced SpeedStep */
+#define X86_FEATURE_XMM3	(4*32+ 0) /* Streaming SIMD Extensions-3 */
 #define X86_FEATURE_MWAIT	(4*32+ 3) /* Monitor/Mwait support */
+#define X86_FEATURE_DSCPL	(4*32+ 4) /* CPL Qualified Debug Store */
+#define X86_FEATURE_EST		(4*32+ 7) /* Enhanced SpeedStep */
+#define X86_FEATURE_TM2		(4*32+ 8) /* Thermal Monitor 2 */
+#define X86_FEATURE_CID		(4*32+10) /* Context ID */
+#define X86_FEATURE_CX16	(4*32+13) /* CMPXCHG16B */
+#define X86_FEATURE_XTPR	(4*32+14) /* Send Task Priority Messages */
 
 #define cpu_has(c, bit)                test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)      test_bit(bit, boot_cpu_data.x86_capability)
@@ -81,6 +87,8 @@
 #define cpu_has_mmx            1
 #define cpu_has_fxsr           1
 #define cpu_has_xmm            1
+#define cpu_has_xmm2           1
+#define cpu_has_xmm3           boot_cpu_has(X86_FEATURE_XMM3)
 #define cpu_has_ht             boot_cpu_has(X86_FEATURE_HT)
 #define cpu_has_mp             1 /* XXX */
 #define cpu_has_k6_mtrr        0

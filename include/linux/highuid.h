@@ -44,8 +44,8 @@ extern void __bad_gid(void);
 #ifdef CONFIG_UID16
 
 /* prevent uid mod 65536 effect by returning a default value for high UIDs */
-#define high2lowuid(uid) ((uid) > 65535 ? (old_uid_t)overflowuid : (old_uid_t)(uid))
-#define high2lowgid(gid) ((gid) > 65535 ? (old_gid_t)overflowgid : (old_gid_t)(gid))
+#define high2lowuid(uid) ((uid) & ~0xFFFF ? (old_uid_t)overflowuid : (old_uid_t)(uid))
+#define high2lowgid(gid) ((gid) & ~0xFFFF ? (old_gid_t)overflowgid : (old_gid_t)(gid))
 /*
  * -1 is different in 16 bits than it is in 32 bits
  * these macros are used by chown(), setreuid(), ...,
@@ -89,8 +89,8 @@ extern int fs_overflowgid;
  * Since these macros are used in architectures that only need limited
  * 16-bit UID back compatibility, we won't use old_uid_t and old_gid_t
  */
-#define fs_high2lowuid(uid) ((uid) > 65535 ? (uid16_t)fs_overflowuid : (uid16_t)(uid))
-#define fs_high2lowgid(gid) ((gid) > 65535 ? (gid16_t)fs_overflowgid : (gid16_t)(gid))
+#define fs_high2lowuid(uid) ((uid) & ~0xFFFF ? (uid16_t)fs_overflowuid : (uid16_t)(uid))
+#define fs_high2lowgid(gid) ((gid) & ~0xFFFF ? (gid16_t)fs_overflowgid : (gid16_t)(gid))
 
 #define low_16_bits(x)	((x) & 0xFFFF)
 #define high_16_bits(x)	(((x) & 0xFFFF0000) >> 16)

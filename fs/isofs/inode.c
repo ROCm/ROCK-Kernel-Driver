@@ -108,7 +108,7 @@ static int init_inodecache(void)
 {
 	isofs_inode_cachep = kmem_cache_create("isofs_inode_cache",
 					     sizeof(struct iso_inode_info),
-					     0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
+					     0, SLAB_RECLAIM_ACCOUNT,
 					     init_once, NULL);
 	if (isofs_inode_cachep == NULL)
 		return -ENOMEM;
@@ -715,6 +715,7 @@ root_found:
 	  }
 
 	s->s_magic = ISOFS_SUPER_MAGIC;
+	s->s_maxbytes = 0xffffffff; /* We can handle files up to 4 GB */
 
 	/* The CDROM is read-only, has no nodes (devices) on it, and since
 	   all of the files appear to be owned by root, we really do not want

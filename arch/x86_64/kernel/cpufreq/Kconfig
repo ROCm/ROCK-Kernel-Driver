@@ -46,4 +46,53 @@ config X86_POWERNOW_K8_ACPI
 	depends on ((X86_POWERNOW_K8 = "m" && ACPI_PROCESSOR) || (X86_POWERNOW_K8 = "y" && ACPI_PROCESSOR = "y"))
 	default y
 
+config X86_SPEEDSTEP_CENTRINO
+	tristate "Intel Enhanced SpeedStep"
+	depends on CPU_FREQ_TABLE
+	help
+	  This adds the CPUFreq driver for Enhanced SpeedStep enabled
+	  mobile CPUs.  This means Intel Pentium M (Centrino) CPUs
+	  or 64bit enabled Intel Xeons.
+
+	  For details, take a look at <file:Documentation/cpu-freq/>.
+
+	  If in doubt, say N.
+
+config X86_SPEEDSTEP_CENTRINO_TABLE
+	bool
+	depends on X86_SPEEDSTEP_CENTRINO
+	default y
+
+config X86_SPEEDSTEP_CENTRINO_ACPI
+	bool "Use ACPI tables to decode valid frequency/voltage pairs (EXPERIMENTAL)"
+	depends on EXPERIMENTAL
+	depends on ((X86_SPEEDSTEP_CENTRINO = "m" && ACPI_PROCESSOR) || (X86_SPEEDSTEP_CENTRINO = "y" && ACPI_PROCESSOR = "y"))
+	help
+	  Use primarily the information provided in the BIOS ACPI tables
+	  to determine valid CPU frequency and voltage pairings.
+
+	  If in doubt, say Y.
+
+config X86_ACPI_CPUFREQ
+	tristate "ACPI Processor P-States driver"
+	depends on CPU_FREQ_TABLE && ACPI_PROCESSOR
+	help
+	  This driver adds a CPUFreq driver which utilizes the ACPI
+	  Processor Performance States.
+
+	  For details, take a look at <file:Documentation/cpu-freq/>.
+
+	  If in doubt, say N.
+
+config X86_ACPI_CPUFREQ_PROC_INTF
+        bool "/proc/acpi/processor/../performance interface (deprecated)"
+	depends on X86_ACPI_CPUFREQ && PROC_FS
+	help
+	  This enables the deprecated /proc/acpi/processor/../performance
+	  interface. While it is helpful for debugging, the generic,
+	  cross-architecture cpufreq interfaces should be used.
+
+	  If in doubt, say N.
+
 endmenu
+

@@ -1,15 +1,11 @@
 
-hostprogs-y	:= mk_sc
-always		:= $(hostprogs-y) mk_thread
-targets		:= mk_thread_kern.o mk_thread_user.o
+hostprogs-y	:= mk_sc mk_thread
+always		:= $(hostprogs-y)
 
-mk_sc-objs	:= mk_sc.o
+mk_thread-objs	:= mk_thread_kern.o mk_thread_user.o
 
-$(obj)/mk_thread : $(obj)/mk_thread_kern.o $(obj)/mk_thread_user.o
-	$(CC) $(CFLAGS) -o $@ $^
-
-$(obj)/mk_thread_user.o : $(src)/mk_thread_user.c
-	$(CC) $(USER_CFLAGS) -c -o $@ $<
+HOSTCFLAGS_mk_thread_kern.o	:= $(CFLAGS) $(CPPFLAGS)
+HOSTCFLAGS_mk_thread_user.o	:= $(USER_CFLAGS)
 
 clean :
 	$(RM) -f $(build-targets)

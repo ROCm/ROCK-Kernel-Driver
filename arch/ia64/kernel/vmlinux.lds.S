@@ -135,12 +135,6 @@ SECTIONS
 	  *(.init.setup)
 	  __setup_end = .;
 	}
-  __param : AT(ADDR(__param) - LOAD_OFFSET)
-        {
-	  __start___param = .;
-	  *(__param)
-	  __stop___param = .;
-	}
   .initcall.init : AT(ADDR(.initcall.init) - LOAD_OFFSET)
 	{
 	  __initcall_start = .;

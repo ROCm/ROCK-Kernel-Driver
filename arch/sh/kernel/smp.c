@@ -98,18 +98,11 @@ void __devinit smp_prepare_boot_cpu(void)
 int __cpu_up(unsigned int cpu)
 {
 	struct task_struct *tsk;
-	struct pt_regs regs;
 
-	memset(&regs, 0, sizeof(struct pt_regs));
-	tsk = copy_process(CLONE_VM | CLONE_IDLETASK, 0, &regs, 0, 0, 0);
+	tsk = fork_idle(cpu);
 
 	if (IS_ERR(tsk))
 		panic("Failed forking idle task for cpu %d\n", cpu);
-	
-	wake_up_forked_process(tsk);
-
-	init_idle(tsk, cpu);
-	unhash_process(tsk);
 	
 	tsk->thread_info->cpu = cpu;
 

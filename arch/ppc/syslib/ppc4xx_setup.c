@@ -61,10 +61,6 @@ ppc4xx_setup_arch(void)
 #ifdef CONFIG_PCI
 	ppc4xx_find_bridges();
 #endif
-
-#if defined(CONFIG_FB)
-	conswitchp = &dummy_con;
-#endif
 }
 
 /*

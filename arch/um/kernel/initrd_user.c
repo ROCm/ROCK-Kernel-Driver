@@ -6,7 +6,6 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <errno.h>
 
 #include "user_util.h"
@@ -19,13 +18,15 @@ int load_initrd(char *filename, void *buf, int size)
 {
 	int fd, n;
 
-	if((fd = os_open_file(filename, of_read(OPENFLAGS()), 0)) < 0){
-		printk("Opening '%s' failed - errno = %d\n", filename, errno);
+	fd = os_open_file(filename, of_read(OPENFLAGS()), 0);
+	if(fd < 0){
+		printk("Opening '%s' failed - err = %d\n", filename, -fd);
 		return(-1);
 	}
-	if((n = read(fd, buf, size)) != size){
-		printk("Read of %d bytes from '%s' returned %d, errno = %d\n",
-		       size, filename, n, errno);
+	n = os_read_file(fd, buf, size);
+	if(n != size){
+		printk("Read of %d bytes from '%s' failed, err = %d\n", size,
+		       filename, -n);
 		return(-1);
 	}
 	return(0);

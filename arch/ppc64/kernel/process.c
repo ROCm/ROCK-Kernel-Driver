@@ -458,7 +458,7 @@ int sys_clone(unsigned long clone_flags, unsigned long p2, unsigned long p3,
 		}
 	}
 
-	return do_fork(clone_flags & ~CLONE_IDLETASK, p2, regs, 0,
+	return do_fork(clone_flags, p2, regs, 0,
 		    (int __user *)parent_tidptr, (int __user *)child_tidptr);
 }
 

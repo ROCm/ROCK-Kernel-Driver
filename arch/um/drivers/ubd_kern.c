@@ -8,6 +8,13 @@
  * old style ubd by setting UBD_SHIFT to 0
  * 2002-09-27...2002-10-18 massive tinkering for 2.5
  * partitions have changed in 2.5
+ * 2003-01-29 more tinkering for 2.5.59-1
+ * This should now address the sysfs problems and has
+ * the symlink for devfs to allow for booting with
+ * the common /dev/ubd/discX/... names rather than
+ * only /dev/ubdN/discN this version also has lots of
+ * clean ups preparing for ubd-many.
+ * James McMechan
  */
 
 #define MAJOR_NR UBD_MAJOR
@@ -40,9 +47,12 @@
 #include "mconsole_kern.h"
 #include "init.h"
 #include "irq_user.h"
+#include "irq_kern.h"
 #include "ubd_user.h"
 #include "2_5compat.h"
 #include "os.h"
+#include "mem.h"
+#include "mem_kern.h"
 
 static spinlock_t ubd_io_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t ubd_lock = SPIN_LOCK_UNLOCKED;
@@ -56,6 +66,10 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 
 #define MAX_DEV (8)
 
+/* Changed in early boot */
+static int ubd_do_mmap = 0;
+#define UBD_MMAP_BLOCK_SIZE PAGE_SIZE
+
 static struct block_device_operations ubd_blops = {
         .owner		= THIS_MODULE,
         .open		= ubd_open,
@@ -67,7 +81,7 @@ static struct block_device_operations ubd_blops = {
 static request_queue_t *ubd_queue;
 
 /* Protected by ubd_lock */
-static int fake_major = 0;
+static int fake_major = MAJOR_NR;
 
 static struct gendisk *ubd_gendisk[MAX_DEV];
 static struct gendisk *fake_gendisk[MAX_DEV];
@@ -96,13 +110,19 @@ struct cow {
 
 struct ubd {
 	char *file;
-	int is_dir;
 	int count;
 	int fd;
 	__u64 size;
 	struct openflags boot_openflags;
 	struct openflags openflags;
+	int no_cow;
 	struct cow cow;
+
+	int map_writes;
+	int map_reads;
+	int nomap_writes;
+	int nomap_reads;
+	int write_maps;
 };
 
 #define DEFAULT_COW { \
@@ -115,21 +135,28 @@ struct ubd {
 
 #define DEFAULT_UBD { \
 	.file = 		NULL, \
-	.is_dir =		0, \
 	.count =		0, \
 	.fd =			-1, \
 	.size =			-1, \
 	.boot_openflags =	OPEN_FLAGS, \
 	.openflags =		OPEN_FLAGS, \
+        .no_cow =               0, \
         .cow =			DEFAULT_COW, \
+	.map_writes		= 0, \
+	.map_reads		= 0, \
+	.nomap_writes		= 0, \
+	.nomap_reads		= 0, \
+	.write_maps		= 0, \
 }
 
 struct ubd ubd_dev[MAX_DEV] = { [ 0 ... MAX_DEV - 1 ] = DEFAULT_UBD };
 
 static int ubd0_init(void)
 {
-	if(ubd_dev[0].file == NULL)
-		ubd_dev[0].file = "root_fs";
+	struct ubd *dev = &ubd_dev[0];
+
+	if(dev->file == NULL)
+		dev->file = "root_fs";
 	return(0);
 }
 
@@ -196,18 +223,45 @@ __uml_help(fake_ide_setup,
 "    Create ide0 entries that map onto ubd devices.\n\n"
 );
 
+static int parse_unit(char **ptr)
+{
+	char *str = *ptr, *end;
+	int n = -1;
+
+	if(isdigit(*str)) {
+		n = simple_strtoul(str, &end, 0);
+		if(end == str)
+			return(-1);
+		*ptr = end;
+	}
+	else if (('a' <= *str) && (*str <= 'h')) {
+		n = *str - 'a';
+		str++;
+		*ptr = str;
+	}
+	return(n);
+}
+
 static int ubd_setup_common(char *str, int *index_out)
 {
+	struct ubd *dev;
 	struct openflags flags = global_openflags;
 	char *backing_file;
 	int n, err;
 
 	if(index_out) *index_out = -1;
-	n = *str++;
+	n = *str;
 	if(n == '='){
-		static int fake_major_allowed = 1;
 		char *end;
 		int major;
+
+		str++;
+		if(!strcmp(str, "mmap")){
+			CHOOSE_MODE(printk("mmap not supported by the ubd "
+					   "driver in tt mode\n"),
+				    ubd_do_mmap = 1);
+			return(0);
+		}
 
 		if(!strcmp(str, "sync")){
 			global_openflags.s = 1;
@@ -220,20 +274,14 @@ static int ubd_setup_common(char *str, int *index_out)
 			return(1);
 		}
 
-		if(!fake_major_allowed){
-			printk(KERN_ERR "Can't assign a fake major twice\n");
-			return(1);
-		}
-
 		err = 1;
  		spin_lock(&ubd_lock);
- 		if(!fake_major_allowed){
+ 		if(fake_major != MAJOR_NR){
  			printk(KERN_ERR "Can't assign a fake major twice\n");
  			goto out1;
  		}
  
  		fake_major = major;
-		fake_major_allowed = 0;
 
 		printk(KERN_INFO "Setting extra ubd major number to %d\n",
 		       major);
@@ -243,25 +291,23 @@ static int ubd_setup_common(char *str, int *index_out)
 		return(err);
 	}
 
-	if(n < '0'){
-		printk(KERN_ERR "ubd_setup : index out of range\n"); }
-
-	if((n >= '0') && (n <= '9')) n -= '0';
-	else if((n >= 'a') && (n <= 'z')) n -= 'a';
-	else {
-		printk(KERN_ERR "ubd_setup : device syntax invalid\n");
+	n = parse_unit(&str);
+	if(n < 0){
+		printk(KERN_ERR "ubd_setup : couldn't parse unit number "
+		       "'%s'\n", str);
 		return(1);
 	}
 	if(n >= MAX_DEV){
-		printk(KERN_ERR "ubd_setup : index out of range "
-		       "(%d devices)\n", MAX_DEV);	
+		printk(KERN_ERR "ubd_setup : index %d out of range "
+		       "(%d devices)\n", n, MAX_DEV);
 		return(1);
 	}
 
 	err = 1;
 	spin_lock(&ubd_lock);
 
-	if(ubd_dev[n].file != NULL){
+	dev = &ubd_dev[n];
+	if(dev->file != NULL){
 		printk(KERN_ERR "ubd_setup : device already configured\n");
 		goto out2;
 	}
@@ -276,6 +322,11 @@ static int ubd_setup_common(char *str, int *index_out)
 		flags.s = 1;
 		str++;
 	}
+	if (*str == 'd'){
+		dev->no_cow = 1;
+		str++;
+	}
+
 	if(*str++ != '='){
 		printk(KERN_ERR "ubd_setup : Expected '='\n");
 		goto out2;
@@ -284,14 +335,17 @@ static int ubd_setup_common(char *str, int *index_out)
 	err = 0;
 	backing_file = strchr(str, ',');
 	if(backing_file){
-		*backing_file = '\0';
-		backing_file++;
+		if(dev->no_cow)
+			printk(KERN_ERR "Can't specify both 'd' and a "
+			       "cow file\n");
+		else {
+			*backing_file = '\0';
+			backing_file++;
+		}
 	}
-	ubd_dev[n].file = str;
-	if(ubd_is_dir(ubd_dev[n].file))
-		ubd_dev[n].is_dir = 1;
-	ubd_dev[n].cow.file = backing_file;
-	ubd_dev[n].boot_openflags = flags;
+	dev->file = str;
+	dev->cow.file = backing_file;
+	dev->boot_openflags = flags;
  out2:
 	spin_unlock(&ubd_lock);
 	return(err);
@@ -321,8 +375,7 @@ __uml_help(ubd_setup,
 static int fakehd_set = 0;
 static int fakehd(char *str)
 {
-	printk(KERN_INFO 
-	       "fakehd : Changing ubd name to \"hd\".\n");
+	printk(KERN_INFO "fakehd : Changing ubd name to \"hd\".\n");
 	fakehd_set = 1;
 	return 1;
 }
@@ -368,32 +421,42 @@ static void ubd_handler(void)
 {
 	struct io_thread_req req;
 	struct request *rq = elv_next_request(ubd_queue);
-	int n;
+	int n, err;
 
 	do_ubd = NULL;
 	intr_count++;
 	n = read_ubd_fs(thread_fd, &req, sizeof(req));
 	if(n != sizeof(req)){
 		printk(KERN_ERR "Pid %d - spurious interrupt in ubd_handler, "
-		       "errno = %d\n", os_getpid(), -n);
+		       "err = %d\n", os_getpid(), -n);
 		spin_lock(&ubd_io_lock);
 		end_request(rq, 0);
 		spin_unlock(&ubd_io_lock);
 		return;
 	}
         
-        if((req.offset != ((__u64) (rq->sector)) << 9) ||
-	   (req.length != (rq->current_nr_sectors) << 9))
+	if((req.op != UBD_MMAP) &&
+	   ((req.offset != ((__u64) (rq->sector)) << 9) ||
+	    (req.length != (rq->current_nr_sectors) << 9)))
 		panic("I/O op mismatch");
 	
+	if(req.map_fd != -1){
+		err = physmem_subst_mapping(req.buffer, req.map_fd,
+					    req.map_offset, 1);
+		if(err)
+			printk("ubd_handler - physmem_subst_mapping failed, "
+			       "err = %d\n", -err);
+	}
+
 	ubd_finish(rq, req.error);
 	reactivate_fd(thread_fd, UBD_IRQ);	
 	do_ubd_request(ubd_queue);
 }
 
-static void ubd_intr(int irq, void *dev, struct pt_regs *unused)
+static irqreturn_t ubd_intr(int irq, void *dev, struct pt_regs *unused)
 {
 	ubd_handler();
+	return(IRQ_HANDLED);
 }
 
 /* Only changed by ubd_init, which is an initcall. */
@@ -417,10 +480,14 @@ static int ubd_file_size(struct ubd *dev, __u64 *size_out)
 
 static void ubd_close(struct ubd *dev)
 {
+	if(ubd_do_mmap)
+		physmem_forget_descriptor(dev->fd);
 	os_close_file(dev->fd);
 	if(dev->cow.file == NULL)
 		return;
 
+	if(ubd_do_mmap)
+		physmem_forget_descriptor(dev->cow.fd);
 	os_close_file(dev->cow.fd);
 	vfree(dev->cow.bitmap);
 	dev->cow.bitmap = NULL;
@@ -429,18 +496,20 @@ static void ubd_close(struct ubd *dev)
 static int ubd_open_dev(struct ubd *dev)
 {
 	struct openflags flags;
-	int err, n, create_cow, *create_ptr;
+	char **back_ptr;
+	int err, create_cow, *create_ptr;
 
+	dev->openflags = dev->boot_openflags;
 	create_cow = 0;
 	create_ptr = (dev->cow.file != NULL) ? &create_cow : NULL;
-	dev->fd = open_ubd_file(dev->file, &dev->openflags, &dev->cow.file,
+	back_ptr = dev->no_cow ? NULL : &dev->cow.file;
+	dev->fd = open_ubd_file(dev->file, &dev->openflags, back_ptr,
 				&dev->cow.bitmap_offset, &dev->cow.bitmap_len, 
 				&dev->cow.data_offset, create_ptr);
 
 	if((dev->fd == -ENOENT) && create_cow){
-		n = dev - ubd_dev;
 		dev->fd = create_cow_file(dev->file, dev->cow.file, 
-					  dev->openflags, 1 << 9,
+					  dev->openflags, 1 << 9, PAGE_SIZE,
 					  &dev->cow.bitmap_offset, 
 					  &dev->cow.bitmap_len,
 					  &dev->cow.data_offset);
@@ -455,13 +524,17 @@ static int ubd_open_dev(struct ubd *dev)
 	if(dev->cow.file != NULL){
 		err = -ENOMEM;
 		dev->cow.bitmap = (void *) vmalloc(dev->cow.bitmap_len);
-		if(dev->cow.bitmap == NULL) goto error;
+		if(dev->cow.bitmap == NULL){
+			printk(KERN_ERR "Failed to vmalloc COW bitmap\n");
+			goto error;
+		}
 		flush_tlb_kernel_vm();
 
 		err = read_cow_bitmap(dev->fd, dev->cow.bitmap, 
 				      dev->cow.bitmap_offset, 
 				      dev->cow.bitmap_len);
-		if(err) goto error;
+		if(err < 0)
+			goto error;
 
 		flags = dev->openflags;
 		flags.w = 0;
@@ -481,17 +554,31 @@ static int ubd_new_disk(int major, u64 size, int unit,
 			
 {
 	struct gendisk *disk;
+	char from[sizeof("ubd/nnnnn\0")], to[sizeof("discnnnnn/disc\0")];
+	int err;
 
 	disk = alloc_disk(1 << UBD_SHIFT);
-	if (!disk)
-		return -ENOMEM;
+	if(disk == NULL)
+		return(-ENOMEM);
 
 	disk->major = major;
 	disk->first_minor = unit << UBD_SHIFT;
 	disk->fops = &ubd_blops;
 	set_capacity(disk, size / 512);
-	sprintf(disk->disk_name, "ubd");
-	sprintf(disk->devfs_name, "ubd/disc%d", unit);
+	if(major == MAJOR_NR){
+		sprintf(disk->disk_name, "ubd%c", 'a' + unit);
+		sprintf(disk->devfs_name, "ubd/disc%d", unit);
+		sprintf(from, "ubd/%d", unit);
+		sprintf(to, "disc%d/disc", unit);
+		err = devfs_mk_symlink(from, to);
+		if(err)
+			printk("ubd_new_disk failed to make link from %s to "
+			       "%s, error = %d\n", from, to, err);
+	}
+	else {
+		sprintf(disk->disk_name, "ubd_fake%d", unit);
+		sprintf(disk->devfs_name, "ubd_fake/disc%d", unit);
+	}
 
 	disk->private_data = &ubd_dev[unit];
 	disk->queue = ubd_queue;
@@ -506,24 +593,21 @@ static int ubd_add(int n)
 	struct ubd *dev = &ubd_dev[n];
 	int err;
 
-	if(dev->is_dir)
-		return(-EISDIR);
-
-	if (!dev->file)
+	if(dev->file == NULL)
 		return(-ENODEV);
 
 	if (ubd_open_dev(dev))
 		return(-ENODEV);
 
 	err = ubd_file_size(dev, &dev->size);
-	if(err)
+	if(err < 0)
 		return(err);
 
 	err = ubd_new_disk(MAJOR_NR, dev->size, n, &ubd_gendisk[n]);
 	if(err) 
 		return(err);
  
-	if(fake_major)
+	if(fake_major != MAJOR_NR)
 		ubd_new_disk(fake_major, dev->size, n, 
 			     &fake_gendisk[n]);
 
@@ -561,42 +645,42 @@ static int ubd_config(char *str)
 	return(err);
 }
 
-static int ubd_get_config(char *dev, char *str, int size, char **error_out)
+static int ubd_get_config(char *name, char *str, int size, char **error_out)
 {
-	struct ubd *ubd;
+	struct ubd *dev;
 	char *end;
-	int major, n = 0;
+	int n, len = 0;
 
-	major = simple_strtoul(dev, &end, 0);
-	if((*end != '\0') || (end == dev)){
-		*error_out = "ubd_get_config : didn't parse major number";
+	n = simple_strtoul(name, &end, 0);
+	if((*end != '\0') || (end == name)){
+		*error_out = "ubd_get_config : didn't parse device number";
 		return(-1);
 	}
 
-	if((major >= MAX_DEV) || (major < 0)){
-		*error_out = "ubd_get_config : major number out of range";
+	if((n >= MAX_DEV) || (n < 0)){
+		*error_out = "ubd_get_config : device number out of range";
 		return(-1);
 	}
 
-	ubd = &ubd_dev[major];
+	dev = &ubd_dev[n];
 	spin_lock(&ubd_lock);
 
-	if(ubd->file == NULL){
-		CONFIG_CHUNK(str, size, n, "", 1);
+	if(dev->file == NULL){
+		CONFIG_CHUNK(str, size, len, "", 1);
 		goto out;
 	}
 
-	CONFIG_CHUNK(str, size, n, ubd->file, 0);
+	CONFIG_CHUNK(str, size, len, dev->file, 0);
 
-	if(ubd->cow.file != NULL){
-		CONFIG_CHUNK(str, size, n, ",", 0);
-		CONFIG_CHUNK(str, size, n, ubd->cow.file, 1);
+	if(dev->cow.file != NULL){
+		CONFIG_CHUNK(str, size, len, ",", 0);
+		CONFIG_CHUNK(str, size, len, dev->cow.file, 1);
 	}
-	else CONFIG_CHUNK(str, size, n, "", 1);
+	else CONFIG_CHUNK(str, size, len, "", 1);
 
  out:
 	spin_unlock(&ubd_lock);
-	return(n);
+	return(len);
 }
 
 static int ubd_remove(char *str)
@@ -604,11 +688,9 @@ static int ubd_remove(char *str)
 	struct ubd *dev;
 	int n, err = -ENODEV;
 
-	if(!isdigit(*str))
-		return(err);	/* it should be a number 0-7/a-h */
+	n = parse_unit(&str);
 
-	n = *str - '0';
-	if(n >= MAX_DEV) 
+	if((n < 0) || (n >= MAX_DEV))
 		return(err);
 
 	dev = &ubd_dev[n];
@@ -669,7 +751,7 @@ int ubd_init(void)
 		
 	elevator_init(ubd_queue, &elevator_noop);
 
-	if (fake_major != 0) {
+	if (fake_major != MAJOR_NR) {
 		char name[sizeof("ubd_nnn\0")];
 
 		snprintf(name, sizeof(name), "ubd_%d", fake_major);
@@ -696,6 +778,7 @@ int ubd_driver_init(void){
 	io_pid = start_io_thread(stack + PAGE_SIZE - sizeof(void *), 
 				 &thread_fd);
 	if(io_pid < 0){
+		io_pid = -1;
 		printk(KERN_ERR 
 		       "ubd : Failed to start I/O thread (errno = %d) - "
 		       "falling back to synchronous I/O\n", -io_pid);
@@ -703,8 +786,8 @@ int ubd_driver_init(void){
 	}
 	err = um_request_irq(UBD_IRQ, thread_fd, IRQ_READ, ubd_intr, 
 			     SA_INTERRUPT, "ubd", ubd_dev);
-	if(err != 0) printk(KERN_ERR 
-			    "um_request_irq failed - errno = %d\n", -err);
+	if(err != 0)
+		printk(KERN_ERR "um_request_irq failed - errno = %d\n", -err);
 	return(err);
 }
 
@@ -714,15 +797,9 @@ static int ubd_open(struct inode *inode, struct file *filp)
 {
 	struct gendisk *disk = inode->i_bdev->bd_disk;
 	struct ubd *dev = disk->private_data;
-	int err = -EISDIR;
+	int err = 0;
 
-	if(dev->is_dir == 1)
-		goto out;
-
-	err = 0;
 	if(dev->count == 0){
-		dev->openflags = dev->boot_openflags;
-
 		err = ubd_open_dev(dev);
 		if(err){
 			printk(KERN_ERR "%s: Can't open \"%s\": errno = %d\n",
@@ -749,61 +826,155 @@ static int ubd_release(struct inode * inode, struct file * file)
 	return(0);
 }
 
-void cowify_req(struct io_thread_req *req, struct ubd *dev)
+static void cowify_bitmap(__u64 io_offset, int length, unsigned long *cow_mask,
+			  __u64 *cow_offset, unsigned long *bitmap,
+			  __u64 bitmap_offset, unsigned long *bitmap_words,
+			  __u64 bitmap_len)
 {
-        int i, update_bitmap, sector = req->offset >> 9;
+	__u64 sector = io_offset >> 9;
+	int i, update_bitmap = 0;
+
+	for(i = 0; i < length >> 9; i++){
+		if(cow_mask != NULL)
+			ubd_set_bit(i, (unsigned char *) cow_mask);
+		if(ubd_test_bit(sector + i, (unsigned char *) bitmap))
+			continue;
+
+		update_bitmap = 1;
+		ubd_set_bit(sector + i, (unsigned char *) bitmap);
+	}
+
+	if(!update_bitmap)
+		return;
+
+	*cow_offset = sector / (sizeof(unsigned long) * 8);
+
+	/* This takes care of the case where we're exactly at the end of the
+	 * device, and *cow_offset + 1 is off the end.  So, just back it up
+	 * by one word.  Thanks to Lynn Kerby for the fix and James McMechan
+	 * for the original diagnosis.
+	 */
+	if(*cow_offset == ((bitmap_len + sizeof(unsigned long) - 1) /
+			   sizeof(unsigned long) - 1))
+		(*cow_offset)--;
+
+	bitmap_words[0] = bitmap[*cow_offset];
+	bitmap_words[1] = bitmap[*cow_offset + 1];
+
+	*cow_offset *= sizeof(unsigned long);
+	*cow_offset += bitmap_offset;
+}
+
+static void cowify_req(struct io_thread_req *req, unsigned long *bitmap,
+		       __u64 bitmap_offset, __u64 bitmap_len)
+{
+	__u64 sector = req->offset >> 9;
+	int i;
 
 	if(req->length > (sizeof(req->sector_mask) * 8) << 9)
 		panic("Operation too long");
+
 	if(req->op == UBD_READ) {
 		for(i = 0; i < req->length >> 9; i++){
-			if(ubd_test_bit(sector + i, (unsigned char *) 
-					dev->cow.bitmap)){
+			if(ubd_test_bit(sector + i, (unsigned char *) bitmap))
 				ubd_set_bit(i, (unsigned char *) 
 					    &req->sector_mask);
-			}
                 }
-        } 
-        else {
-		update_bitmap = 0;
-		for(i = 0; i < req->length >> 9; i++){
-			ubd_set_bit(i, (unsigned char *) 
-				    &req->sector_mask);
-			if(!ubd_test_bit(sector + i, (unsigned char *) 
-					 dev->cow.bitmap))
-				update_bitmap = 1;
-			ubd_set_bit(sector + i, (unsigned char *) 
-				    dev->cow.bitmap);
-		}
-		if(update_bitmap){
-			req->cow_offset = sector / (sizeof(unsigned long) * 8);
-			req->bitmap_words[0] = 
-				dev->cow.bitmap[req->cow_offset];
-			req->bitmap_words[1] = 
-				dev->cow.bitmap[req->cow_offset + 1];
-			req->cow_offset *= sizeof(unsigned long);
-			req->cow_offset += dev->cow.bitmap_offset;
-		}
 	}
+	else cowify_bitmap(req->offset, req->length, &req->sector_mask,
+			   &req->cow_offset, bitmap, bitmap_offset,
+			   req->bitmap_words, bitmap_len);
+}
+
+static int mmap_fd(struct request *req, struct ubd *dev, __u64 offset)
+{
+	__u64 sector;
+	unsigned char *bitmap;
+	int bit, i;
+
+	/* mmap must have been requested on the command line */
+	if(!ubd_do_mmap)
+		return(-1);
+
+	/* The buffer must be page aligned */
+	if(((unsigned long) req->buffer % UBD_MMAP_BLOCK_SIZE) != 0)
+		return(-1);
+
+	/* The request must be a page long */
+	if((req->current_nr_sectors << 9) != PAGE_SIZE)
+		return(-1);
+
+	if(dev->cow.file == NULL)
+		return(dev->fd);
+
+	sector = offset >> 9;
+	bitmap = (unsigned char *) dev->cow.bitmap;
+	bit = ubd_test_bit(sector, bitmap);
+
+	for(i = 1; i < req->current_nr_sectors; i++){
+		if(ubd_test_bit(sector + i, bitmap) != bit)
+			return(-1);
+	}
+
+	if(bit || (rq_data_dir(req) == WRITE))
+		offset += dev->cow.data_offset;
+
+	/* The data on disk must be page aligned */
+	if((offset % UBD_MMAP_BLOCK_SIZE) != 0)
+		return(-1);
+
+	return(bit ? dev->fd : dev->cow.fd);
+}
+
+static int prepare_mmap_request(struct ubd *dev, int fd, __u64 offset,
+				struct request *req,
+				struct io_thread_req *io_req)
+{
+	int err;
+
+	if(rq_data_dir(req) == WRITE){
+		/* Writes are almost no-ops since the new data is already in the
+		 * host page cache
+		 */
+		dev->map_writes++;
+		if(dev->cow.file != NULL)
+			cowify_bitmap(io_req->offset, io_req->length,
+				      &io_req->sector_mask, &io_req->cow_offset,
+				      dev->cow.bitmap, dev->cow.bitmap_offset,
+				      io_req->bitmap_words,
+				      dev->cow.bitmap_len);
+	}
+	else {
+		int w;
+
+		if((dev->cow.file != NULL) && (fd == dev->cow.fd))
+			w = 0;
+		else w = dev->openflags.w;
+
+		if((dev->cow.file != NULL) && (fd == dev->fd))
+			offset += dev->cow.data_offset;
+
+		err = physmem_subst_mapping(req->buffer, fd, offset, w);
+		if(err){
+			printk("physmem_subst_mapping failed, err = %d\n",
+			       -err);
+			return(1);
+		}
+		dev->map_reads++;
+	}
+	io_req->op = UBD_MMAP;
+	io_req->buffer = req->buffer;
+	return(0);
 }
 
 static int prepare_request(struct request *req, struct io_thread_req *io_req)
 {
 	struct gendisk *disk = req->rq_disk;
 	struct ubd *dev = disk->private_data;
-	__u64 block;
-	int nsect;
+	__u64 offset;
+	int len, fd;
 
 	if(req->rq_status == RQ_INACTIVE) return(1);
-
-	if(dev->is_dir){
-		strcpy(req->buffer, "HOSTFS:");
-		strcat(req->buffer, dev->file);
- 		spin_lock(&ubd_io_lock);
-		end_request(req, 1);
- 		spin_unlock(&ubd_io_lock);
-		return(1);
-	}
 
 	if((rq_data_dir(req) == WRITE) && !dev->openflags.w){
 		printk("Write attempted on readonly ubd device %s\n", 
@@ -814,23 +985,49 @@ static int prepare_request(struct request *req, struct io_thread_req *io_req)
 		return(1);
 	}
 
-        block = req->sector;
-        nsect = req->current_nr_sectors;
+	offset = ((__u64) req->sector) << 9;
+	len = req->current_nr_sectors << 9;
 
-	io_req->op = rq_data_dir(req) == READ ? UBD_READ : UBD_WRITE;
 	io_req->fds[0] = (dev->cow.file != NULL) ? dev->cow.fd : dev->fd;
 	io_req->fds[1] = dev->fd;
+	io_req->map_fd = -1;
+	io_req->cow_offset = -1;
+	io_req->offset = offset;
+	io_req->length = len;
+	io_req->error = 0;
+	io_req->sector_mask = 0;
+
+	fd = mmap_fd(req, dev, io_req->offset);
+	if(fd > 0){
+		/* If mmapping is otherwise OK, but the first access to the
+		 * page is a write, then it's not mapped in yet.  So we have
+		 * to write the data to disk first, then we can map the disk
+		 * page in and continue normally from there.
+		 */
+		if((rq_data_dir(req) == WRITE) && !is_remapped(req->buffer)){
+			io_req->map_fd = dev->fd;
+			io_req->map_offset = io_req->offset +
+				dev->cow.data_offset;
+			dev->write_maps++;
+		}
+		else return(prepare_mmap_request(dev, fd, io_req->offset, req,
+						 io_req));
+	}
+
+	if(rq_data_dir(req) == READ)
+		dev->nomap_reads++;
+	else dev->nomap_writes++;
+
+	io_req->op = (rq_data_dir(req) == READ) ? UBD_READ : UBD_WRITE;
 	io_req->offsets[0] = 0;
 	io_req->offsets[1] = dev->cow.data_offset;
-	io_req->offset = ((__u64) block) << 9;
-	io_req->length = nsect << 9;
 	io_req->buffer = req->buffer;
 	io_req->sectorsize = 1 << 9;
-	io_req->sector_mask = 0;
-	io_req->cow_offset = -1;
-	io_req->error = 0;
 
-        if(dev->cow.file != NULL) cowify_req(io_req, dev);
+	if(dev->cow.file != NULL)
+		cowify_req(io_req, dev->cow.bitmap, dev->cow.bitmap_offset,
+			   dev->cow.bitmap_len);
+
 	return(0);
 }
 
@@ -841,7 +1038,7 @@ static void do_ubd_request(request_queue_t *q)
 	int err, n;
 
 	if(thread_fd == -1){
-		while(!list_empty(&q->queue_head)){
+		while(!elv_queue_empty(q)){
 			req = elv_next_request(q);
 			err = prepare_request(req, &io_req);
 			if(!err){
@@ -851,7 +1048,8 @@ static void do_ubd_request(request_queue_t *q)
 		}
 	}
 	else {
-		if(do_ubd || list_empty(&q->queue_head)) return;
+		if(do_ubd || elv_queue_empty(q))
+			return;
 		req = elv_next_request(q);
 		err = prepare_request(req, &io_req);
 		if(!err){
@@ -885,7 +1083,7 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 		g.heads = 128;
 		g.sectors = 32;
 		g.cylinders = dev->size / (128 * 32 * 512);
-		g.start = 2;
+		g.start = get_start_sect(inode->i_bdev);
 		return(copy_to_user(loc, &g, sizeof(g)) ? -EFAULT : 0);
 
 	case HDIO_SET_UNMASKINTR:
@@ -934,6 +1132,142 @@ static int ubd_ioctl(struct inode * inode, struct file * file,
 	}
 	return(-EINVAL);
 }
+
+static int ubd_check_remapped(int fd, unsigned long address, int is_write,
+			      __u64 offset)
+{
+	__u64 bitmap_offset;
+	unsigned long new_bitmap[2];
+	int i, err, n;
+
+	/* If it's not a write access, we can't do anything about it */
+	if(!is_write)
+		return(0);
+
+	/* We have a write */
+	for(i = 0; i < sizeof(ubd_dev) / sizeof(ubd_dev[0]); i++){
+		struct ubd *dev = &ubd_dev[i];
+
+		if((dev->fd != fd) && (dev->cow.fd != fd))
+			continue;
+
+		/* It's a write to a ubd device */
+
+		if(!dev->openflags.w){
+			/* It's a write access on a read-only device - probably
+			 * shouldn't happen.  If the kernel is trying to change
+			 * something with no intention of writing it back out,
+			 * then this message will clue us in that this needs
+			 * fixing
+			 */
+			printk("Write access to mapped page from readonly ubd "
+			       "device %d\n", i);
+			return(0);
+		}
+
+		/* It's a write to a writeable ubd device - it must be COWed
+		 * because, otherwise, the page would have been mapped in
+		 * writeable
+		 */
+
+		if(!dev->cow.file)
+			panic("Write fault on writeable non-COW ubd device %d",
+			      i);
+
+		/* It should also be an access to the backing file since the
+		 * COW pages should be mapped in read-write
+		 */
+
+		if(fd == dev->fd)
+			panic("Write fault on a backing page of ubd "
+			      "device %d\n", i);
+
+		/* So, we do the write, copying the backing data to the COW
+		 * file...
+		 */
+
+		err = os_seek_file(dev->fd, offset + dev->cow.data_offset);
+		if(err < 0)
+			panic("Couldn't seek to %lld in COW file of ubd "
+			      "device %d, err = %d",
+			      offset + dev->cow.data_offset, i, -err);
+
+		n = os_write_file(dev->fd, (void *) address, PAGE_SIZE);
+		if(n != PAGE_SIZE)
+			panic("Couldn't copy data to COW file of ubd "
+			      "device %d, err = %d", i, -n);
+
+		/* ... updating the COW bitmap... */
+
+		cowify_bitmap(offset, PAGE_SIZE, NULL, &bitmap_offset,
+			      dev->cow.bitmap, dev->cow.bitmap_offset,
+			      new_bitmap, dev->cow.bitmap_len);
+
+		err = os_seek_file(dev->fd, bitmap_offset);
+		if(err < 0)
+			panic("Couldn't seek to %lld in COW file of ubd "
+			      "device %d, err = %d", bitmap_offset, i, -err);
+
+		n = os_write_file(dev->fd, new_bitmap, sizeof(new_bitmap));
+		if(n != sizeof(new_bitmap))
+			panic("Couldn't update bitmap  of ubd device %d, "
+			      "err = %d", i, -n);
+
+		/* Maybe we can map the COW page in, and maybe we can't.  If
+		 * it is a pre-V3 COW file, we can't, since the alignment will
+		 * be wrong.  If it is a V3 or later COW file which has been
+		 * moved to a system with a larger page size, then maybe we
+		 * can't, depending on the exact location of the page.
+		 */
+
+		offset += dev->cow.data_offset;
+
+		/* Remove the remapping, putting the original anonymous page
+		 * back.  If the COW file can be mapped in, that is done.
+		 * Otherwise, the COW page is read in.
+		 */
+
+		if(!physmem_remove_mapping((void *) address))
+			panic("Address 0x%lx not remapped by ubd device %d",
+			      address, i);
+		if((offset % UBD_MMAP_BLOCK_SIZE) == 0)
+			physmem_subst_mapping((void *) address, dev->fd,
+					      offset, 1);
+		else {
+			err = os_seek_file(dev->fd, offset);
+			if(err < 0)
+				panic("Couldn't seek to %lld in COW file of "
+				      "ubd device %d, err = %d", offset, i,
+				      -err);
+
+			n = os_read_file(dev->fd, (void *) address, PAGE_SIZE);
+			if(n != PAGE_SIZE)
+				panic("Failed to read page from offset %llx of "
+				      "COW file of ubd device %d, err = %d",
+				      offset, i, -n);
+		}
+
+		return(1);
+	}
+
+	/* It's not a write on a ubd device */
+	return(0);
+}
+
+static struct remapper ubd_remapper = {
+	.list	= LIST_HEAD_INIT(ubd_remapper.list),
+	.proc	= ubd_check_remapped,
+};
+
+static int ubd_remapper_setup(void)
+{
+	if(ubd_do_mmap)
+		register_remapper(&ubd_remapper);
+
+	return(0);
+}
+
+__initcall(ubd_remapper_setup);
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

@@ -188,7 +188,7 @@ asmlinkage int m68k_clone(struct pt_regs *regs)
 	newsp = regs->d2;
 	if (!newsp)
 		newsp = rdusp();
-        return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, NULL, NULL);
+        return do_fork(clone_flags, newsp, regs, 0, NULL, NULL);
 }
 
 int copy_thread(int nr, unsigned long clone_flags,

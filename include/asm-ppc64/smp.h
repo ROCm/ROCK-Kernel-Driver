@@ -36,6 +36,8 @@ extern void smp_message_recv(int, struct pt_regs *);
 #define smp_processor_id() (get_paca()->paca_index)
 #define hard_smp_processor_id() (get_paca()->hw_cpu_id)
 
+extern cpumask_t cpu_sibling_map[NR_CPUS];
+
 /* Since OpenPIC has only 4 IPIs, we use slightly different message numbers.
  *
  * Make sure this matches openpic_request_IPIs in open_pic.c, or what shows up

@@ -110,10 +110,7 @@
 
 #include	<linux/module.h>
 #include	<linux/init.h>
-
-#ifdef CONFIG_PROC_FS
 #include 	<linux/proc_fs.h>
-#endif
 
 #include	"h/skdrv1st.h"
 #include	"h/skdrv2nd.h"
@@ -5113,9 +5110,12 @@ static void __devexit skge_remove_one(struct pci_dev *pdev)
 	if ((pAC->GIni.GIMacsFound == 2) && pAC->RlmtNets == 2)
 		have_second_mac = 1;
 
+	remove_proc_entry(dev->name, pSkRootDir);
 	unregister_netdev(dev);
-	if (have_second_mac)
+	if (have_second_mac) {
+		remove_proc_entry(pAC->dev[1]->name, pSkRootDir);
 		unregister_netdev(pAC->dev[1]);
+	}
 
 	SkGeYellowLED(pAC, pAC->IoBase, 0);
 
@@ -5182,9 +5182,9 @@ static int __init skge_init(void)
 {
 	int error;
 
+#ifdef CONFIG_PROC_FS
 	memcpy(&SK_Root_Dir_entry, BOOT_STRING, sizeof(SK_Root_Dir_entry) - 1);
 
-#ifdef CONFIG_PROC_FS
 	pSkRootDir = proc_mkdir(SK_Root_Dir_entry, proc_net);
 	if (!pSkRootDir) {
 		printk(KERN_WARNING "Unable to create /proc/net/%s",

@@ -49,7 +49,7 @@ static void __init do_security_initcalls(void)
 }
 
 /**
- * security_scaffolding_startup - initialzes the security scaffolding framework
+ * security_scaffolding_startup - initializes the security scaffolding framework
  *
  * This should be called early in the kernel initialization sequence.
  */
@@ -183,7 +183,7 @@ int mod_unreg_security (const char *name, struct security_operations *ops)
  * capable - calls the currently loaded security module's capable() function with the specified capability
  * @cap: the requested capability level.
  *
- * This function calls the currently loaded security module's cabable()
+ * This function calls the currently loaded security module's capable()
  * function with a pointer to the current task and the specified @cap value.
  *
  * This allows the security module to implement the capable function call

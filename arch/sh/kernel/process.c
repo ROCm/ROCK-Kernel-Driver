@@ -440,7 +440,7 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp,
 {
 	if (!newsp)
 		newsp = regs.regs[15];
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
+	return do_fork(clone_flags, newsp, &regs, 0,
 			(int __user *)parent_tidptr, (int __user *)child_tidptr);
 }
 

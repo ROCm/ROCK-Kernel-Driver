@@ -57,6 +57,13 @@
 	/* Kernel symbol table: strings */				\
         __ksymtab_strings : AT(ADDR(__ksymtab_strings) - LOAD_OFFSET) {	\
 		*(__ksymtab_strings)					\
+	}								\
+									\
+	/* Built-in module parameters. */				\
+	__param : AT(ADDR(__param) - LOAD_OFFSET) {			\
+		VMLINUX_SYMBOL(__start___param) = .;			\
+		*(__param)						\
+		VMLINUX_SYMBOL(__stop___param) = .;			\
 	}
 
 #define SECURITY_INIT							\

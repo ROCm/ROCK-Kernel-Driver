@@ -79,8 +79,10 @@ unsigned long pci_mem_start = 0x10000000;
 
 unsigned long saved_video_mode;
 
+#ifdef CONFIG_SWIOTLB
 int swiotlb;
 EXPORT_SYMBOL(swiotlb);
+#endif
 
 /*
  * Setup options
@@ -765,6 +767,7 @@ static struct _cache_table cache_table[] __initdata =
 	{ 0x43, LVL_2,      512 },
 	{ 0x44, LVL_2,      1024 },
 	{ 0x45, LVL_2,      2048 },
+	{ 0x60, LVL_1_DATA, 16 },
 	{ 0x66, LVL_1_DATA, 8 },
 	{ 0x67, LVL_1_DATA, 16 },
 	{ 0x68, LVL_1_DATA, 32 },
@@ -1059,8 +1062,8 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
 		/* Intel-defined (#2) */
-		"pni", NULL, NULL, "monitor", "ds_cpl", NULL, NULL, "tm2",
-		"est", NULL, "cid", NULL, NULL, "cmpxchg16b", NULL, NULL,
+		"pni", NULL, NULL, "monitor", "ds_cpl", NULL, NULL, "est",
+		"tm2", NULL, "cid", NULL, NULL, "cx16", "xtpr", NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 	};

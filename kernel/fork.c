@@ -152,7 +152,12 @@ void fastcall prepare_to_wait(wait_queue_head_t *q, wait_queue_t *wait, int stat
 	spin_lock_irqsave(&q->lock, flags);
 	if (list_empty(&wait->task_list))
 		__add_wait_queue(q, wait);
-	set_current_state(state);
+	/*
+	 * don't alter the task state if this is just going to
+	 * queue an async wait queue callback
+	 */
+	if (is_sync_wait(wait))
+		set_current_state(state);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
@@ -167,7 +172,12 @@ prepare_to_wait_exclusive(wait_queue_head_t *q, wait_queue_t *wait, int state)
 	spin_lock_irqsave(&q->lock, flags);
 	if (list_empty(&wait->task_list))
 		__add_wait_queue_tail(q, wait);
-	set_current_state(state);
+	/*
+	 * don't alter the task state if this is just going to
+ 	 * queue an async wait queue callback
+	 */
+	if (is_sync_wait(wait))
+		set_current_state(state);
 	spin_unlock_irqrestore(&q->lock, flags);
 }
 
@@ -280,7 +290,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
 	mm->locked_vm = 0;
 	mm->mmap = NULL;
 	mm->mmap_cache = NULL;
-	mm->free_area_cache = TASK_UNMAPPED_BASE;
+	mm->free_area_cache = oldmm->mmap_base;
 	mm->map_count = 0;
 	mm->rss = 0;
 	cpus_clear(mm->cpu_vm_mask);
@@ -467,20 +477,34 @@ void mmput(struct mm_struct *mm)
 	}
 }
 
-/*
- * Checks if the use count of an mm is non-zero and if so
- * returns a reference to it after bumping up the use count.
- * If the use count is zero, it means this mm is going away,
- * so return NULL.
+/**
+ * get_task_mm - acquire a reference to the task's mm
+ *
+ * Returns %NULL if the task has no mm.  Checks if the use count
+ * of the mm is non-zero and if so returns a reference to it, after
+ * bumping up the use count.  User must release the mm via mmput()
+ * after use.  Typically used by /proc and ptrace.
+ *
+ * If the use count is zero, it means that this mm is going away,
+ * so return %NULL.  This only happens in the case of an AIO daemon
+ * which has temporarily adopted an mm (see use_mm), in the course
+ * of its final mmput, before exit_aio has completed.
  */
-struct mm_struct *mmgrab(struct mm_struct *mm)
+struct mm_struct *get_task_mm(struct task_struct *task)
 {
-	spin_lock(&mmlist_lock);
-	if (!atomic_read(&mm->mm_users))
-		mm = NULL;
-	else
-		atomic_inc(&mm->mm_users);
-	spin_unlock(&mmlist_lock);
+	struct mm_struct *mm;
+
+	task_lock(task);
+	mm = task->mm;
+	if (mm) {
+		spin_lock(&mmlist_lock);
+		if (!atomic_read(&mm->mm_users))
+			mm = NULL;
+		else
+			atomic_inc(&mm->mm_users);
+		spin_unlock(&mmlist_lock);
+	}
+	task_unlock(task);
 	return mm;
 }
 
@@ -865,12 +889,13 @@ asmlinkage long sys_set_tid_address(int __user *tidptr)
  * parts of the process environment (as per the clone
  * flags). The actual kick-off is left to the caller.
  */
-struct task_struct *copy_process(unsigned long clone_flags,
+static task_t *copy_process(unsigned long clone_flags,
 				 unsigned long stack_start,
 				 struct pt_regs *regs,
 				 unsigned long stack_size,
 				 int __user *parent_tidptr,
-				 int __user *child_tidptr)
+				 int __user *child_tidptr,
+				 int pid)
 {
 	int retval;
 	struct task_struct *p = NULL;
@@ -930,13 +955,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 
 	p->did_exec = 0;
 	copy_flags(clone_flags, p);
-	if (clone_flags & CLONE_IDLETASK)
-		p->pid = 0;
-	else {
-		p->pid = alloc_pidmap();
-		if (p->pid == -1)
-			goto bad_fork_cleanup;
-	}
+	p->pid = pid;
 	retval = -EFAULT;
 	if (clone_flags & CLONE_PARENT_SETTID)
 		if (put_user(p->pid, parent_tidptr))
@@ -965,6 +984,7 @@ struct task_struct *copy_process(unsigned long clone_flags,
 	p->start_time = get_jiffies_64();
 	p->security = NULL;
 	p->io_context = NULL;
+	p->io_wait = NULL;
 	p->audit_context = NULL;
 #ifdef CONFIG_NUMA
  	p->mempolicy = mpol_copy(p->mempolicy);
@@ -1033,6 +1053,17 @@ struct task_struct *copy_process(unsigned long clone_flags,
 
 	/* Need tasklist lock for parent etc handling! */
 	write_lock_irq(&tasklist_lock);
+
+	/*
+	 * The task hasn't been attached yet, so cpus_allowed mask cannot
+	 * have changed. The cpus_allowed mask of the parent may have
+	 * changed after it was copied first time, and it may then move to
+	 * another CPU - so we re-copy it here and set the child's CPU to
+	 * the parent's CPU. This avoids alot of nasty races.
+	 */
+	p->cpus_allowed = current->cpus_allowed;
+	set_task_cpu(p, smp_processor_id());
+
 	/*
 	 * Check for pending SIGKILL! The new thread should not be allowed
 	 * to slip out of an OOM kill. (or normal SIGKILL.)
@@ -1127,8 +1158,6 @@ bad_fork_cleanup_policy:
 	mpol_free(p->mempolicy);
 #endif
 bad_fork_cleanup:
-	if (p->pid > 0)
-		free_pidmap(p->pid);
 	if (p->binfmt)
 		module_put(p->binfmt->module);
 bad_fork_cleanup_put_domain:
@@ -1142,9 +1171,28 @@ bad_fork_free:
 	goto fork_out;
 }
 
+struct pt_regs * __init __attribute__((weak)) idle_regs(struct pt_regs *regs)
+{
+	memset(regs, 0, sizeof(struct pt_regs));
+	return regs;
+}
+
+task_t * __init fork_idle(int cpu)
+{
+	task_t *task;
+	struct pt_regs regs;
+
+	task = copy_process(CLONE_VM, 0, idle_regs(&regs), 0, NULL, NULL, 0);
+	if (!task)
+		return ERR_PTR(-ENOMEM);
+	init_idle(task, cpu);
+	unhash_process(task);
+	return task;
+}
+
 static inline int fork_traceflag (unsigned clone_flags)
 {
-	if (clone_flags & (CLONE_UNTRACED | CLONE_IDLETASK))
+	if (clone_flags & CLONE_UNTRACED)
 		return 0;
 	else if (clone_flags & CLONE_VFORK) {
 		if (current->ptrace & PT_TRACE_VFORK)
@@ -1173,21 +1221,21 @@ long do_fork(unsigned long clone_flags,
 {
 	struct task_struct *p;
 	int trace = 0;
-	long pid;
+	long pid = alloc_pidmap();
 
+	if (pid < 0)
+		return -EAGAIN;
 	if (unlikely(current->ptrace)) {
 		trace = fork_traceflag (clone_flags);
 		if (trace)
 			clone_flags |= CLONE_PTRACE;
 	}
 
-	p = copy_process(clone_flags, stack_start, regs, stack_size, parent_tidptr, child_tidptr);
+	p = copy_process(clone_flags, stack_start, regs, stack_size, parent_tidptr, child_tidptr, pid);
 	/*
 	 * Do this prior waking up the new thread - the thread pointer
 	 * might get invalid after that point, if the thread exits quickly.
 	 */
-	pid = IS_ERR(p) ? PTR_ERR(p) : p->pid;
-
 	if (!IS_ERR(p)) {
 		struct completion vfork;
 
@@ -1204,31 +1252,10 @@ long do_fork(unsigned long clone_flags,
 			set_tsk_thread_flag(p, TIF_SIGPENDING);
 		}
 
-		if (!(clone_flags & CLONE_STOPPED)) {
-			/*
-			 * Do the wakeup last. On SMP we treat fork() and
-			 * CLONE_VM separately, because fork() has already
-			 * created cache footprint on this CPU (due to
-			 * copying the pagetables), hence migration would
-			 * probably be costy. Threads on the other hand
-			 * have less traction to the current CPU, and if
-			 * there's an imbalance then the scheduler can
-			 * migrate this fresh thread now, before it
-			 * accumulates a larger cache footprint:
-			 */
-			if (clone_flags & CLONE_VM)
-				wake_up_forked_thread(p);
-			else
-				wake_up_forked_process(p);
-		} else {
-			int cpu = get_cpu();
-
+		if (!(clone_flags & CLONE_STOPPED))
+			wake_up_new_task(p, clone_flags);
+		else
 			p->state = TASK_STOPPED;
-			if (cpu_is_offline(task_cpu(p)))
-				set_task_cpu(p, cpu);
-
-			put_cpu();
-		}
 		++total_forks;
 
 		if (unlikely (trace)) {
@@ -1240,12 +1267,10 @@ long do_fork(unsigned long clone_flags,
 			wait_for_completion(&vfork);
 			if (unlikely (current->ptrace & PT_TRACE_VFORK_DONE))
 				ptrace_notify ((PTRACE_EVENT_VFORK_DONE << 8) | SIGTRAP);
-		} else
-			/*
-			 * Let the child process run first, to avoid most of the
-			 * COW overhead when the child exec()s afterwards.
-			 */
-			set_need_resched();
+		}
+	} else {
+		free_pidmap(pid);
+		pid = PTR_ERR(p);
 	}
 	return pid;
 }

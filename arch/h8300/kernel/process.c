@@ -189,7 +189,7 @@ asmlinkage int h8300_clone(struct pt_regs *regs)
 	newsp = regs->er2;
 	if (!newsp)
 		newsp  = rdusp();
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, NULL, NULL);
+	return do_fork(clone_flags, newsp, regs, 0, NULL, NULL);
 
 }
 

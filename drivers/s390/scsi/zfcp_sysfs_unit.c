@@ -26,7 +26,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.25 $"
+#define ZFCP_SYSFS_UNIT_C_REVISION "$Revision: 1.27 $"
 
 #include "zfcp_ext.h"
 
@@ -64,6 +64,8 @@ static DEVICE_ATTR(_name, S_IRUGO, zfcp_sysfs_unit_##_name##_show, NULL);
 
 ZFCP_DEFINE_UNIT_ATTR(status, "0x%08x\n", atomic_read(&unit->status));
 ZFCP_DEFINE_UNIT_ATTR(scsi_lun, "0x%x\n", unit->scsi_lun);
+ZFCP_DEFINE_UNIT_ATTR(in_recovery, "%d\n", atomic_test_mask
+		      (ZFCP_STATUS_COMMON_ERP_INUSE, &unit->status));
 
 /**
  * zfcp_sysfs_unit_failed_store - failed state of unit
@@ -101,7 +103,7 @@ zfcp_sysfs_unit_failed_store(struct device *dev, const char *buf, size_t count)
 	zfcp_erp_wait(unit->port->adapter);
  out:
 	up(&zfcp_data.config_sema);
-	return retval ? retval : count;
+	return retval ? retval : (ssize_t) count;
 }
 
 /**
@@ -126,29 +128,6 @@ zfcp_sysfs_unit_failed_show(struct device *dev, char *buf)
 
 static DEVICE_ATTR(failed, S_IWUSR | S_IRUGO, zfcp_sysfs_unit_failed_show,
 		   zfcp_sysfs_unit_failed_store);
-
-/**
- * zfcp_sysfs_unit_in_recovery_show - recovery state of unit
- * @dev: pointer to belonging device
- * @buf: pointer to input buffer
- *
- * Show function of "in_recovery" attribute of unit. Will be
- * "0" if no error recovery is pending for unit, otherwise "1".
- */
-static ssize_t
-zfcp_sysfs_unit_in_recovery_show(struct device *dev, char *buf)
-{
-	struct zfcp_unit *unit;
-
-	unit = dev_get_drvdata(dev);
-	if (atomic_test_mask(ZFCP_STATUS_COMMON_ERP_INUSE, &unit->status))
-		return sprintf(buf, "1\n");
-	else
-		return sprintf(buf, "0\n");
-}
-
-static DEVICE_ATTR(in_recovery, S_IRUGO, zfcp_sysfs_unit_in_recovery_show,
-		   NULL);
 
 static struct attribute *zfcp_unit_attrs[] = {
 	&dev_attr_scsi_lun.attr,

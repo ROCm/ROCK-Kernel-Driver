@@ -228,10 +228,6 @@ pcore_setup_arch(void)
 		ROOT_DEV = Root_SDA2;
 #endif
 
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
-
  	printk(KERN_INFO "Force PowerCore ");
 	if (board_type == PCORE_TYPE_6750)
 		printk("6750\n");

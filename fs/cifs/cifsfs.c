@@ -561,7 +561,7 @@ cifs_init_inodecache(void)
 {
 	cifs_inode_cachep = kmem_cache_create("cifs_inode_cache",
 					      sizeof (struct cifsInodeInfo),
-					      0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
+					      0, SLAB_RECLAIM_ACCOUNT,
 					      cifs_init_once, NULL);
 	if (cifs_inode_cachep == NULL)
 		return -ENOMEM;

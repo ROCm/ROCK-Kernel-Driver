@@ -411,15 +411,6 @@ secondary_cpu_start(int cpuid, struct task_struct *idle)
 	return 0;
 }
 
-static struct task_struct * __init
-fork_by_hand(void)
-{
-	/* Don't care about the contents of regs since we'll never
-	   reschedule the forked task. */
-	struct pt_regs regs;
-	return copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
-}
-
 /*
  * Bring one cpu online.
  */
@@ -435,14 +426,9 @@ smp_boot_one_cpu(int cpuid)
 	   the other task-y sort of data structures set up like we
 	   wish.  We can't use kernel_thread since we must avoid
 	   rescheduling the child.  */
-	idle = fork_by_hand();
+	idle = fork_idle(cpuid);
 	if (IS_ERR(idle))
 		panic("failed fork for CPU %d", cpuid);
-
-	wake_up_forked_process(idle);
-
-	init_idle(idle, cpuid);
-	unhash_process(idle);
 
 	DBGS(("smp_boot_one_cpu: CPU %d state 0x%lx flags 0x%lx\n",
 	      cpuid, idle->state, idle->flags));

@@ -7,6 +7,7 @@
 #include <sys/mman.h>
 #include <sys/ptrace.h>
 #include "mem_user.h"
+#include "mem.h"
 #include "user.h"
 #include "os.h"
 #include "proc_mm.h"
@@ -15,12 +16,12 @@ void map(int fd, unsigned long virt, unsigned long phys, unsigned long len,
 	 int r, int w, int x)
 {
 	struct proc_mm_op map;
-	struct mem_region *region;
-	int prot, n;
+	__u64 offset;
+	int prot, n, phys_fd;
 
 	prot = (r ? PROT_READ : 0) | (w ? PROT_WRITE : 0) | 
 		(x ? PROT_EXEC : 0);
-	region = phys_region(phys);
+	phys_fd = phys_mapping(phys, &offset);
 
 	map = ((struct proc_mm_op) { .op 	= MM_MMAP,
 				     .u 	= 
@@ -30,12 +31,12 @@ void map(int fd, unsigned long virt, unsigned long phys, unsigned long len,
 					 .prot		= prot,
 					 .flags		= MAP_SHARED | 
 					                  MAP_FIXED,
-					 .fd		= region->fd,
-					 .offset	= phys_offset(phys)
+					 .fd		= phys_fd,
+					 .offset	= offset
 				       } } } );
 	n = os_write_file(fd, &map, sizeof(map));
 	if(n != sizeof(map)) 
-		printk("map : /proc/mm map failed, errno = %d\n", errno);
+		printk("map : /proc/mm map failed, err = %d\n", -n);
 }
 
 int unmap(int fd, void *addr, int len)
@@ -49,8 +50,13 @@ int unmap(int fd, void *addr, int len)
 					 { .addr 	= (unsigned long) addr,
 					   .len		= len } } } );
 	n = os_write_file(fd, &unmap, sizeof(unmap));
-	if((n != 0) && (n != sizeof(unmap)))
-		return(-errno);
+	if(n != sizeof(unmap)) {
+		if(n < 0)
+			return(n);
+		else if(n > 0)
+			return(-EIO);
+	}
+
 	return(0);
 }
 
@@ -71,11 +77,15 @@ int protect(int fd, unsigned long addr, unsigned long len, int r, int w,
 					   .prot	= prot } } } );
 
 	n = os_write_file(fd, &protect, sizeof(protect));
-	if((n != 0) && (n != sizeof(protect))){
+	if(n != sizeof(protect)) {
+		if(n == 0) return(0);
+
 		if(must_succeed)
-			panic("protect failed, errno = %d", errno);
-		return(-errno);
+			panic("protect failed, err = %d", -n);
+
+		return(-EIO);
 	}
+
 	return(0);
 }
 

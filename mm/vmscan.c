@@ -219,7 +219,7 @@ static int shrink_slab(unsigned long scanned, unsigned int gfp_mask,
 	return 0;
 }
 
-/* Must be called with page's rmap lock held. */
+/* Called without lock on whether page is mapped, so answer is unstable */
 static inline int page_mapping_inuse(struct page *page)
 {
 	struct address_space *mapping;
@@ -377,26 +377,19 @@ static int shrink_list(struct list_head *page_list, struct scan_control *sc)
 		if (page_mapped(page) || PageSwapCache(page))
 			sc->nr_scanned++;
 
-		page_map_lock(page);
-		referenced = page_referenced(page);
-		if (referenced && page_mapping_inuse(page)) {
-			/* In active use or really unfreeable.  Activate it. */
-			page_map_unlock(page);
+		referenced = page_referenced(page, 1);
+		/* In active use or really unfreeable?  Activate it. */
+		if (referenced && page_mapping_inuse(page))
 			goto activate_locked;
-		}
 
 #ifdef CONFIG_SWAP
 		/*
 		 * Anonymous process memory has backing store?
 		 * Try to allocate it some swap space here.
-		 *
-		 * XXX: implement swap clustering ?
 		 */
 		if (PageAnon(page) && !PageSwapCache(page)) {
-			page_map_unlock(page);
 			if (!add_to_swap(page))
 				goto activate_locked;
-			page_map_lock(page);
 		}
 #endif /* CONFIG_SWAP */
 
@@ -411,16 +404,13 @@ static int shrink_list(struct list_head *page_list, struct scan_control *sc)
 		if (page_mapped(page) && mapping) {
 			switch (try_to_unmap(page)) {
 			case SWAP_FAIL:
-				page_map_unlock(page);
 				goto activate_locked;
 			case SWAP_AGAIN:
-				page_map_unlock(page);
 				goto keep_locked;
 			case SWAP_SUCCESS:
 				; /* try to free the page below */
 			}
 		}
-		page_map_unlock(page);
 
 		if (PageDirty(page)) {
 			if (referenced)
@@ -723,25 +713,12 @@ refill_inactive_zone(struct zone *zone, struct scan_control *sc)
 		page = lru_to_page(&l_hold);
 		list_del(&page->lru);
 		if (page_mapped(page)) {
-			if (!reclaim_mapped) {
+			if (!reclaim_mapped ||
+			    (total_swap_pages == 0 && PageAnon(page)) ||
+			    page_referenced(page, 0)) {
 				list_add(&page->lru, &l_active);
 				continue;
 			}
-			page_map_lock(page);
-			if (page_referenced(page)) {
-				page_map_unlock(page);
-				list_add(&page->lru, &l_active);
-				continue;
-			}
-			page_map_unlock(page);
-		}
-		/*
-		 * FIXME: need to consider page_count(page) here if/when we
-		 * reap orphaned pages via the LRU (Daniel's locking stuff)
-		 */
-		if (total_swap_pages == 0 && PageAnon(page)) {
-			list_add(&page->lru, &l_active);
-			continue;
 		}
 		list_add(&page->lru, &l_inactive);
 	}

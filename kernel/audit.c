@@ -708,7 +708,7 @@ void audit_log_d_path(struct audit_buffer *ab, const char *prefix,
 		audit_log_move(ab);
 	avail = sizeof(ab->tmp) - ab->len;
 	p = d_path(dentry, vfsmnt, ab->tmp + ab->len, avail);
-	if (p == ERR_PTR(-ENAMETOOLONG)) {
+	if (IS_ERR(p)) {
 		/* FIXME: can we save some information here? */
 		audit_log_format(ab, "<toolong>");
 	} else {

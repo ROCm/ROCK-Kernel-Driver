@@ -343,7 +343,7 @@ void __init init_bsp_APIC(void)
 
 void __init setup_local_APIC (void)
 {
-	unsigned long value, ver, maxlvt;
+	unsigned long oldvalue, value, ver, maxlvt;
 
 	/* Pound the ESR really hard over the head with a big hammer - mbligh */
 	if (esr_disable) {
@@ -459,9 +459,7 @@ void __init setup_local_APIC (void)
 		maxlvt = get_maxlvt();
 		if (maxlvt > 3)		/* Due to the Pentium erratum 3AP. */
 			apic_write(APIC_ESR, 0);
-		value = apic_read(APIC_ESR);
-		apic_printk(APIC_VERBOSE, "ESR value before enabling vector:"
-				" %08lx\n", value);
+		oldvalue = apic_read(APIC_ESR);
 
 		value = ERROR_APIC_VECTOR;      // enables sending errors
 		apic_write_around(APIC_LVTERR, value);
@@ -471,8 +469,10 @@ void __init setup_local_APIC (void)
 		if (maxlvt > 3)
 			apic_write(APIC_ESR, 0);
 		value = apic_read(APIC_ESR);
-		apic_printk(APIC_VERBOSE, "ESR value after enabling vector:"
-				" %08lx\n", value);
+		if (value != oldvalue)
+			apic_printk(APIC_VERBOSE, "ESR value before enabling "
+				"vector: 0x%08lx  after: 0x%08lx\n",
+				oldvalue, value);
 	} else {
 		if (esr_disable)	
 			/* 

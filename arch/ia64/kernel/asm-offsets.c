@@ -195,11 +195,6 @@ void foo(void)
 	DEFINE(IA64_TIMESPEC_TV_NSEC_OFFSET, offsetof (struct timespec, tv_nsec));
 
 
-	DEFINE(CLONE_IDLETASK_BIT, 12);
-#if CLONE_IDLETASK != (1 << 12)
-# error "CLONE_IDLETASK_BIT incorrect, please fix"
-#endif
-
 	DEFINE(CLONE_SETTLS_BIT, 19);
 #if CLONE_SETTLS != (1<<19)
 # error "CLONE_SETTLS_BIT incorrect, please fix"

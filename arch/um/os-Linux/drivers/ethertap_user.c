@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stddef.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <sys/errno.h>
 #include <sys/socket.h>
@@ -17,6 +16,7 @@
 #include <net/if.h>
 #include "user.h"
 #include "kern_util.h"
+#include "user_util.h"
 #include "net_user.h"
 #include "etap.h"
 #include "helper.h"
@@ -42,13 +42,14 @@ static void etap_change(int op, unsigned char *addr, unsigned char *netmask,
 {
 	struct addr_change change;
 	void *output;
+	int n;
 
 	change.what = op;
 	memcpy(change.addr, addr, sizeof(change.addr));
 	memcpy(change.netmask, netmask, sizeof(change.netmask));
-	if(write(fd, &change, sizeof(change)) != sizeof(change))
-		printk("etap_change - request failed, errno = %d\n",
-		       errno);
+	n = os_write_file(fd, &change, sizeof(change));
+	if(n != sizeof(change))
+		printk("etap_change - request failed, err = %d\n", -n);
 	output = um_kmalloc(page_size());
 	if(output == NULL)
 		printk("etap_change : Failed to allocate output buffer\n");
@@ -82,15 +83,15 @@ static void etap_pre_exec(void *arg)
 	struct etap_pre_exec_data *data = arg;
 
 	dup2(data->control_remote, 1);
-	close(data->data_me);
-	close(data->control_me);
+	os_close_file(data->data_me);
+	os_close_file(data->control_me);
 }
 
 static int etap_tramp(char *dev, char *gate, int control_me, 
 		      int control_remote, int data_me, int data_remote)
 {
 	struct etap_pre_exec_data pe_data;
-	int pid, status, err;
+	int pid, status, err, n;
 	char version_buf[sizeof("nnnnn\0")];
 	char data_fd_buf[sizeof("nnnnnn\0")];
 	char gate_buf[sizeof("nnn.nnn.nnn.nnn\0")];
@@ -114,21 +115,22 @@ static int etap_tramp(char *dev, char *gate, int control_me,
 	pe_data.data_me = data_me;
 	pid = run_helper(etap_pre_exec, &pe_data, args, NULL);
 
-	if(pid < 0) err = errno;
-	close(data_remote);
-	close(control_remote);
-	if(read(control_me, &c, sizeof(c)) != sizeof(c)){
-		printk("etap_tramp : read of status failed, errno = %d\n",
-		       errno);
-		return(EINVAL);
+	if(pid < 0) err = pid;
+	os_close_file(data_remote);
+	os_close_file(control_remote);
+	n = os_read_file(control_me, &c, sizeof(c));
+	if(n != sizeof(c)){
+		printk("etap_tramp : read of status failed, err = %d\n", -n);
+		return(-EINVAL);
 	}
 	if(c != 1){
 		printk("etap_tramp : uml_net failed\n");
-		err = EINVAL;
-		if(waitpid(pid, &status, 0) < 0) err = errno;
-		else if(!WIFEXITED(status) || (WEXITSTATUS(status) != 1)){
+		err = -EINVAL;
+		CATCH_EINTR(n = waitpid(pid, &status, 0));
+		if(n < 0)
+			err = -errno;
+		else if(!WIFEXITED(status) || (WEXITSTATUS(status) != 1))
 			printk("uml_net didn't exit with status 1\n");
-		}
 	}
 	return(err);
 }
@@ -143,14 +145,14 @@ static int etap_open(void *data)
 	if(err) return(err);
 
 	err = os_pipe(data_fds, 0, 0);
-	if(err){
-		printk("data os_pipe failed - errno = %d\n", -err);
+	if(err < 0){
+		printk("data os_pipe failed - err = %d\n", -err);
 		return(err);
 	}
 
 	err = os_pipe(control_fds, 1, 0);
-	if(err){
-		printk("control os_pipe failed - errno = %d\n", -err);
+	if(err < 0){
+		printk("control os_pipe failed - err = %d\n", -err);
 		return(err);
 	}
 	
@@ -167,9 +169,9 @@ static int etap_open(void *data)
 		kfree(output);
 	}
 
-	if(err != 0){
-		printk("etap_tramp failed - errno = %d\n", err);
-		return(-err);
+	if(err < 0){
+		printk("etap_tramp failed - err = %d\n", -err);
+		return(err);
 	}
 
 	pri->data_fd = data_fds[0];
@@ -183,11 +185,11 @@ static void etap_close(int fd, void *data)
 	struct ethertap_data *pri = data;
 
 	iter_addresses(pri->dev, etap_close_addr, &pri->control_fd);
-	close(fd);
+	os_close_file(fd);
 	os_shutdown_socket(pri->data_fd, 1, 1);
-	close(pri->data_fd);
+	os_close_file(pri->data_fd);
 	pri->data_fd = -1;
-	close(pri->control_fd);
+	os_close_file(pri->control_fd);
 	pri->control_fd = -1;
 }
 

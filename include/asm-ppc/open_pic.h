@@ -23,7 +23,7 @@
 
 #define OPENPIC_VEC_TIMER	110	/* and up */
 #define OPENPIC_VEC_IPI		118	/* and up */
-#define OPENPIC_VEC_SPURIOUS	127
+#define OPENPIC_VEC_SPURIOUS	239
 
 /* OpenPIC IRQ controller structure */
 extern struct hw_interrupt_type open_pic;

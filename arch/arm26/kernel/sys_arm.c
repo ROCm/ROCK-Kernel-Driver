@@ -256,7 +256,7 @@ asmlinkage int sys_clone(unsigned long clone_flags, unsigned long newsp, struct 
 	if (!newsp)
 		newsp = regs->ARM_sp;
 
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, regs, 0, NULL, NULL);
+	return do_fork(clone_flags, newsp, regs, 0, NULL, NULL);
 }
 
 asmlinkage int sys_vfork(struct pt_regs *regs)

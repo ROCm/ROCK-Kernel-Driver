@@ -1571,6 +1571,39 @@ static inline ino_t parent_ino(struct dentry *dentry)
 /* kernel/fork.c */
 extern int unshare_files(void);
 
+/* Transaction based IO helpers */
+
+/*
+ * An argresp is stored in an allocated page and holds the
+ * size of the argument or response, along with its content
+ */
+struct simple_transaction_argresp {
+	ssize_t size;
+	char data[0];
+};
+
+#define SIMPLE_TRANSACTION_LIMIT (PAGE_SIZE - sizeof(struct simple_transaction_argresp))
+
+char *simple_transaction_get(struct file *file, const char __user *buf,
+				size_t size);
+ssize_t simple_transaction_read(struct file *file, char __user *buf,
+				size_t size, loff_t *pos);
+int simple_transaction_release(struct inode *inode, struct file *file);
+
+static inline void simple_transaction_set(struct file *file, size_t n)
+{
+	struct simple_transaction_argresp *ar = file->private_data;
+
+	BUG_ON(n > SIMPLE_TRANSACTION_LIMIT);
+
+	/*
+	 * The barrier ensures that ar->size will really remain zero until
+	 * ar->data is ready for reading.
+	 */
+	smp_mb();
+	ar->size = n;
+}
+
 #ifdef CONFIG_SECURITY
 static inline char *alloc_secdata(void)
 {

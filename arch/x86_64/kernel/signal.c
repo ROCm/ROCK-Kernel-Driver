@@ -40,7 +40,7 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
             sigset_t *set, struct pt_regs * regs); 
 
 asmlinkage long
-sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize, struct pt_regs regs)
+sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize, struct pt_regs *regs)
 {
 	sigset_t saveset, newset;
 
@@ -59,21 +59,22 @@ sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize, struct pt_regs re
 	spin_unlock_irq(&current->sighand->siglock);
 #ifdef DEBUG_SIG
 	printk("rt_sigsuspend savset(%lx) newset(%lx) regs(%p) rip(%lx)\n",
-		saveset, newset, &regs, regs.rip);
+		saveset, newset, regs, regs->rip);
 #endif 
-	regs.rax = -EINTR;
+	regs->rax = -EINTR;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if (do_signal(&regs, &saveset))
+		if (do_signal(regs, &saveset))
 			return -EINTR;
 	}
 }
 
 asmlinkage long
-sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss, struct pt_regs regs)
+sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss,
+		struct pt_regs *regs)
 {
-	return do_sigaltstack(uss, uoss, regs.rsp);
+	return do_sigaltstack(uss, uoss, regs->rsp);
 }
 
 
@@ -134,13 +135,13 @@ badframe:
 	return 1;
 }
 
-asmlinkage long sys_rt_sigreturn(struct pt_regs regs)
+asmlinkage long sys_rt_sigreturn(struct pt_regs *regs)
 {
 	struct rt_sigframe __user *frame;
 	sigset_t set;
 	long eax;
 
-	frame = (struct rt_sigframe __user *)(regs.rsp - 8);
+	frame = (struct rt_sigframe __user *)(regs->rsp - 8);
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame))) { 
 		goto badframe;
 	} 
@@ -154,7 +155,7 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs regs)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 	
-	if (restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax)) { 
+	if (restore_sigcontext(regs, &frame->uc.uc_mcontext, &eax)) {
 		goto badframe;
 	} 
 
@@ -162,13 +163,13 @@ asmlinkage long sys_rt_sigreturn(struct pt_regs regs)
 	printk("%d sigreturn rip:%lx rsp:%lx frame:%p rax:%lx\n",current->pid,regs.rip,regs.rsp,frame,eax);
 #endif
 
-	if (do_sigaltstack(&frame->uc.uc_stack, NULL, regs.rsp) == -EFAULT)
+	if (do_sigaltstack(&frame->uc.uc_stack, NULL, regs->rsp) == -EFAULT)
 		goto badframe;
 
 	return eax;
 
 badframe:
-	signal_fault(&regs,frame,"sigreturn");
+	signal_fault(regs,frame,"sigreturn");
 	return 0;
 }	
 

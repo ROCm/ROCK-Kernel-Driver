@@ -685,7 +685,8 @@ config PPC_OF
 
 config PPC_GEN550
 	bool
-	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE || PRPMC750 || K2 || PRPMC800
+	depends on SANDPOINT || MCPN765 || SPRUCE || PPLUS || PCORE || \
+		PRPMC750 || K2 || PRPMC800 || LOPEC
 	default y
 
 config FORCE
@@ -811,10 +812,6 @@ config PREEMPT
 config HIGHMEM
 	bool "High memory support"
 
-config KERNEL_ELF
-	bool
-	default y
-
 source "fs/Kconfig.binfmt"
 
 config PROC_DEVICETREE
@@ -832,10 +829,11 @@ config PREP_RESIDUAL
 	  Some PReP systems have residual data passed to the kernel by the
 	  firmware.  This allows detection of memory size, devices present and
 	  other useful pieces of information.  Sometimes this information is
-	  not present or incorrect.
+	  not present or incorrect, in which case it could lead to the machine 
+	  behaving incorrectly.  If this happens, either disable PREP_RESIDUAL
+	  or pass the 'noresidual' option to the kernel.
 
-	  Unless you expect to boot on a PReP system, there is no need to
-	  select Y.
+	  If you are running a PReP system, say Y here, otherwise say N.
 
 config PROC_PREPRESIDUAL
 	bool "Support for reading of PReP Residual Data in /proc"

@@ -61,12 +61,6 @@ SECTIONS
 	__setup_end = .;
 	}
 
-  __param : {
-	__start___param = .;
-	*(__param)
-	__stop___param = .;
-	}
-
   .initcall.init : {
 	__initcall_start = .;
 	*(.initcall1.init)

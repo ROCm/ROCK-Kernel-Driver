@@ -23,7 +23,6 @@ show up in /proc/sys/kernel:
 - dentry-state
 - domainname
 - hostname
-- htab-reclaim                [ PPC only ]
 - hotplug
 - java-appletviewer           [ binfmt_java, obsolete ]
 - java-interpreter            [ binfmt_java, obsolete ]
@@ -54,7 +53,6 @@ show up in /proc/sys/kernel:
 - tainted
 - threads-max
 - version
-- zero-paged                  [ PPC only ]
 
 ==============================================================
 
@@ -143,14 +141,6 @@ Information Service) or YP (Yellow Pages) domainname. These two
 domain names are in general different. For a detailed discussion
 see the hostname(1) man page.
 
-==============================================================
-
-htab-reclaim: (PPC only)
-
-Setting this to a non-zero value, the PowerPC htab
-(see Documentation/powerpc/ppc_htab.txt) is pruned
-each time the system hits the idle loop.
- 
 ==============================================================
 
 hotplug:
@@ -322,11 +312,3 @@ can be ORed together:
       Set by modutils >= 2.4.9 and module-init-tools.
   4 - Unsafe SMP processors: SMP with CPUs not designed for SMP.
 
-==============================================================
-
-zero-paged: (PPC only)
-
-When enabled (non-zero), Linux-PPC will pre-zero pages in
-the idle loop, possibly speeding up get_free_pages. Since
-this only affects what the idle loop is doing, you should
-enable this and see if anything changes.

@@ -701,7 +701,7 @@ module_exit(pci_hotplug_exit);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
-module_param(debug, bool, 644);
+module_param(debug, bool, 0644);
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
 
 EXPORT_SYMBOL_GPL(pci_hotplug_slots_subsys);

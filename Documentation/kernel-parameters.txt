@@ -579,6 +579,20 @@ running once the system is up.
 				so, the driver will manage that printer.
 				See also header of drivers/char/lp.c.
 
+	lpj=n		[KNL]
+			Sets loops_per_jiffy to given constant, thus avoiding
+			time-consuming boot-time autodetection (up to 250 ms per
+			CPU). 0 enables autodetection (default). To determine
+			the correct value for your kernel, boot with normal
+			autodetection and see what value is printed. Note that
+			on SMP systems the preset will be applied to all CPUs,
+			which is likely to cause problems if your CPUs need
+			significantly divergent settings. An incorrect value
+			will cause delays in the kernel to be wrong, leading to
+			unpredictable I/O errors and other breakage. Although
+			unlikely, in the extreme case this might damage your
+			hardware.
+
 	ltpc=		[NET]
 			Format: <io>,<irq>,<dma>
 
@@ -751,6 +765,8 @@ running once the system is up.
 			lowmem mapping on PPC40x.
 
 	nomce		[IA-32] Machine Check Exception
+
+	noresidual	[PPC] Don't use residual data on PReP machines.
 
 	noresume	[SWSUSP] Disables resume and restore original swap space.
  

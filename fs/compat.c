@@ -429,6 +429,8 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 			       		fn = d_path(filp->f_dentry,
 						filp->f_vfsmnt, path,
 						PAGE_SIZE);
+					if (IS_ERR(fn))
+						fn = "?";
 				}
 
 				sprintf(buf,"'%c'", (cmd>>24) & 0x3f);
@@ -1373,13 +1375,13 @@ int compat_do_execve(char * filename,
 	int retval;
 	int i;
 
-	sched_balance_exec();
-
 	file = open_exec(filename);
 
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
 		return retval;
+
+	sched_exec();
 
 	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0]));
@@ -1390,6 +1392,8 @@ int compat_do_execve(char * filename,
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
+	bprm.interp_flags = 0;
+	bprm.interp_data = 0;
 	bprm.security = NULL;
 	bprm.mm = mm_alloc();
 	retval = -ENOMEM;

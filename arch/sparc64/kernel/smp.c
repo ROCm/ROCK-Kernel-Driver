@@ -303,14 +303,7 @@ static int __devinit smp_boot_one_cpu(unsigned int cpu)
 	struct task_struct *p;
 	int timeout, ret, cpu_node;
 
-	kernel_thread(NULL, NULL, CLONE_IDLETASK);
-
-	p = prev_task(&init_task);
-
-	init_idle(p, cpu);
-
-	unhash_process(p);
-
+	p = fork_idle(cpu);
 	callin_flag = 0;
 	cpu_new_thread = p->thread_info;
 	cpu_set(cpu, cpu_callout_map);

@@ -23,7 +23,6 @@
 #include <linux/cpumask.h>
 
 struct node {
-	cpumask_t cpumap;	/* Bitmap of CPUs on the Node */
 	struct sys_device	sysdev;
 };
 

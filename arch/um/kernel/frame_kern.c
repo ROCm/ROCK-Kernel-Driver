@@ -6,7 +6,6 @@
 #include "asm/ptrace.h"
 #include "asm/uaccess.h"
 #include "asm/signal.h"
-#include "asm/uaccess.h"
 #include "asm/ucontext.h"
 #include "frame_kern.h"
 #include "sigcontext.h"
@@ -29,12 +28,15 @@ static int copy_restorer(void (*restorer)(void), unsigned long start,
 			    sizeof(restorer)));
 }
 
+extern int userspace_pid[];
+
 static int copy_sc_to_user(void *to, void *fp, struct pt_regs *from, 
 			   struct arch_frame_data *arch)
 {
 	return(CHOOSE_MODE(copy_sc_to_user_tt(to, fp, UPT_SC(&from->regs), 
 					      arch),
-			   copy_sc_to_user_skas(to, fp, &from->regs,
+			   copy_sc_to_user_skas(userspace_pid[0], to, fp,
+						&from->regs,
 						current->thread.cr2,
 						current->thread.err)));
 }

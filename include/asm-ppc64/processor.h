@@ -626,12 +626,9 @@ static inline void prefetchw(const void *x)
 
 #define spin_lock_prefetch(x)	prefetchw(x)
 
-#ifdef CONFIG_SCHED_SMT
-#define ARCH_HAS_SCHED_DOMAIN
-#define ARCH_HAS_SCHED_WAKE_IDLE
-#endif
-
 #endif /* ASSEMBLY */
+
+#define HAVE_ARCH_PICK_MMAP_LAYOUT
 
 /*
  * Number of entries in the SLB. If this ever changes we should handle

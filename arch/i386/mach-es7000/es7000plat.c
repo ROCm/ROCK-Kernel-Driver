@@ -237,7 +237,7 @@ es7000_mip_write(struct mip_reg *mip_reg)
 	}
 
 	status = ((unsigned long long)mip_reg->off_0 &
-		(unsigned long long)0xffff0000000000) >> 48;
+		(unsigned long long)0xffff0000000000ULL) >> 48;
 	mip_reg->off_38 = ((unsigned long long)mip_reg->off_38 &
 		(unsigned long long)~MIP_VALID);
 	return status;

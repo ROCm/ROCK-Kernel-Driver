@@ -280,8 +280,8 @@ init_mem_alloc (unsigned long ram_start, unsigned long ram_len)
 #if ((PAGE_OFFSET >> PAGE_SHIFT) & ((1UL << (MAX_ORDER - 1)) - 1))
 #error MAX_ORDER is too large for given PAGE_OFFSET (use CONFIG_FORCE_MAX_ZONEORDER to change it)
 #endif
-
-	free_area_init_node (0, NODE_DATA(0), 0, zones_size,
+	NODE_DATA(0)->node_mem_map = NULL;
+	free_area_init_node (0, NODE_DATA(0), zones_size,
 			     ADDR_TO_PAGE (PAGE_OFFSET), 0);
 	mem_map = NODE_DATA(0)->node_mem_map;
 }

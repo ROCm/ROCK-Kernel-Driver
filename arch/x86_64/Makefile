@@ -77,6 +77,7 @@ boot := arch/x86_64/boot
 all: bzImage
 
 BOOTIMAGE                     := arch/x86_64/boot/bzImage
+KBUILD_IMAGE                  := $(BOOTIMAGE)
 
 bzImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)

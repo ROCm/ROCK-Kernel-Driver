@@ -29,7 +29,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.115 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.121 $"
 
 #include "zfcp_ext.h"
 
@@ -48,10 +48,10 @@ static void zfcp_ns_gid_pn_handler(unsigned long);
 
 static inline int zfcp_sg_list_alloc(struct zfcp_sg_list *, size_t);
 static inline int zfcp_sg_list_free(struct zfcp_sg_list *);
-static inline int zfcp_sg_list_copy_from_user(struct zfcp_sg_list *, void *,
-					      size_t);
-static inline int zfcp_sg_list_copy_to_user(void *, struct zfcp_sg_list *,
-					    size_t);
+static inline int zfcp_sg_list_copy_from_user(struct zfcp_sg_list *,
+					      void __user *, size_t);
+static inline int zfcp_sg_list_copy_to_user(void __user *,
+					    struct zfcp_sg_list *, size_t);
 
 static int zfcp_cfdc_dev_ioctl(struct inode *, struct file *,
 	unsigned int, unsigned long);
@@ -95,7 +95,7 @@ MODULE_PARM_DESC(device, "specify initial device");
 module_param(loglevel, uint, 0);
 MODULE_PARM_DESC(loglevel,
 		 "log levels, 8 nibbles: "
-		 "(unassigned) ERP QDIO DIO Config FSF SCSI Other, "
+		 "(unassigned) FC ERP QDIO CIO Config FSF SCSI Other, "
 		 "levels: 0=none 1=normal 2=devel 3=trace");
 
 #ifdef ZFCP_PRINT_FLAGS
@@ -382,7 +382,7 @@ static int
 zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
                     unsigned int command, unsigned long buffer)
 {
-	struct zfcp_cfdc_sense_data sense_data, *sense_data_user;
+	struct zfcp_cfdc_sense_data sense_data, __user *sense_data_user;
 	struct zfcp_adapter *adapter = NULL;
 	struct zfcp_fsf_req *fsf_req = NULL;
 	struct zfcp_sg_list *sg_list = NULL;
@@ -403,7 +403,7 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 		goto out;
 	}
 
-	if ((sense_data_user = (struct zfcp_cfdc_sense_data*)buffer) == NULL) {
+	if ((sense_data_user = (void __user *) buffer) == NULL) {
 		ZFCP_LOG_INFO("sense data record is required\n");
 		retval = -EINVAL;
 		goto out;
@@ -519,6 +519,12 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
 
 	wait_event(fsf_req->completion_wq,
 	           fsf_req->status & ZFCP_STATUS_FSFREQ_COMPLETED);
+
+	if ((fsf_req->qtcb->prefix.prot_status != FSF_PROT_GOOD) &&
+	    (fsf_req->qtcb->prefix.prot_status != FSF_PROT_FSF_STATUS_PRESENTED)) {
+		retval = -ENXIO;
+		goto out;
+	}
 
 	sense_data.fsf_status = fsf_req->qtcb->header.fsf_status;
 	memcpy(&sense_data.fsf_status_qual,
@@ -637,7 +643,8 @@ zfcp_sg_list_free(struct zfcp_sg_list *sg_list)
  *              -EFAULT - Memory I/O operation fault
  */
 static inline int
-zfcp_sg_list_copy_from_user(struct zfcp_sg_list *sg_list, void *user_buffer,
+zfcp_sg_list_copy_from_user(struct zfcp_sg_list *sg_list,
+			    void __user *user_buffer,
                             size_t size)
 {
 	struct scatterlist *sg;
@@ -671,7 +678,8 @@ zfcp_sg_list_copy_from_user(struct zfcp_sg_list *sg_list, void *user_buffer,
  *              -EFAULT - Memory I/O operation fault
  */
 static inline int
-zfcp_sg_list_copy_to_user(void *user_buffer, struct zfcp_sg_list *sg_list,
+zfcp_sg_list_copy_to_user(void __user  *user_buffer,
+			  struct zfcp_sg_list *sg_list,
                           size_t size)
 {
 	struct scatterlist *sg;
@@ -1646,15 +1654,7 @@ static void zfcp_ns_gid_pn_handler(unsigned long data)
 	ct_iu_req = zfcp_sg_to_address(ct->req);
 	ct_iu_resp = zfcp_sg_to_address(ct->resp);
 
-        if (ct_iu_resp->header.revision != ZFCP_CT_REVISION)
-		goto failed;
-        if (ct_iu_resp->header.gs_type != ZFCP_CT_DIRECTORY_SERVICE)
-		goto failed;
-        if (ct_iu_resp->header.gs_subtype != ZFCP_CT_NAME_SERVER)
-		goto failed;
-        if (ct_iu_resp->header.options != ZFCP_CT_SYNCHRONOUS)
-		goto failed;
-        if (ct_iu_resp->header.cmd_rsp_code != ZFCP_CT_ACCEPT) {
+	if (zfcp_check_ct_response(&ct_iu_resp->header)) {
 		/* FIXME: do we need some specific erp entry points */
 		atomic_set_mask(ZFCP_STATUS_PORT_INVALID_WWPN, &port->status);
 		goto failed;
@@ -1675,7 +1675,7 @@ static void zfcp_ns_gid_pn_handler(unsigned long data)
 		       zfcp_get_busid_by_port(port), port->wwpn, port->d_id);
 	goto out;
 
-failed:
+ failed:
 	ZFCP_LOG_NORMAL("warning: failed gid_pn nameserver request for wwpn "
 			"0x%016Lx for adapter %s\n",
 			port->wwpn, zfcp_get_busid_by_port(port));
@@ -1688,6 +1688,171 @@ failed:
  out:
         zfcp_gid_pn_buffers_free(gid_pn);
 	return;
+}
+
+/* reject CT_IU reason codes acc. to FC-GS-4 */
+static const struct zfcp_rc_entry zfcp_ct_rc[] = {
+	{0x01, "invalid command code"},
+	{0x02, "invalid version level"},
+	{0x03, "logical error"},
+	{0x04, "invalid CT_IU size"},
+	{0x05, "logical busy"},
+	{0x07, "protocol error"},
+	{0x09, "unable to perform command request"},
+	{0x0b, "command not supported"},
+	{0x0d, "server not available"},
+	{0x0e, "session could not be established"},
+	{0xff, "vendor specific error"},
+	{0, NULL},
+};
+
+/* LS_RJT reason codes acc. to FC-FS */
+static const struct zfcp_rc_entry zfcp_ls_rjt_rc[] = {
+	{0x01, "invalid LS_Command code"},
+	{0x03, "logical error"},
+	{0x05, "logical busy"},
+	{0x07, "protocol error"},
+	{0x09, "unable to perform command request"},
+	{0x0b, "command not supported"},
+	{0x0e, "command already in progress"},
+	{0xff, "vendor specific error"},
+	{0, NULL},
+};
+
+/* reject reason codes according to FC-PH/FC-FS */
+static const struct zfcp_rc_entry zfcp_p_rjt_rc[] = {
+	{0x01, "invalid D_ID"},
+	{0x02, "invalid S_ID"},
+	{0x03, "Nx_Port not available, temporary"},
+	{0x04, "Nx_Port not available, permament"},
+	{0x05, "class not supported"},
+	{0x06, "delimiter usage error"},
+	{0x07, "TYPE not supported"},
+	{0x08, "invalid Link_Control"},
+	{0x09, "invalid R_CTL field"},
+	{0x0a, "invalid F_CTL field"},
+	{0x0b, "invalid OX_ID"},
+	{0x0c, "invalid RX_ID"},
+	{0x0d, "invalid SEQ_ID"},
+	{0x0e, "invalid DF_CTL"},
+	{0x0f, "invalid SEQ_CNT"},
+	{0x10, "invalid parameter field"},
+	{0x11, "exchange error"},
+	{0x12, "protocol error"},
+	{0x13, "incorrect length"},
+	{0x14, "unsupported ACK"},
+	{0x15, "class of service not supported by entity at FFFFFE"},
+	{0x16, "login required"},
+	{0x17, "excessive sequences attempted"},
+	{0x18, "unable to establish exchange"},
+	{0x1a, "fabric path not available"},
+	{0x1b, "invalid VC_ID (class 4)"},
+	{0x1c, "invalid CS_CTL field"},
+	{0x1d, "insufficient resources for VC (class 4)"},
+	{0x1f, "invalid class of service"},
+	{0x20, "preemption request rejected"},
+	{0x21, "preemption not enabled"},
+	{0x22, "multicast error"},
+	{0x23, "multicast error terminate"},
+	{0x24, "process login required"},
+	{0xff, "vendor specific reject"},
+	{0, NULL},
+};
+
+/**
+ * zfcp_rc_description - return description for given reaon code
+ * @code: reason code
+ * @rc_table: table of reason codes and descriptions
+ */
+static inline const char *
+zfcp_rc_description(u8 code, const struct zfcp_rc_entry *rc_table)
+{
+	const char *descr = "unknown reason code";
+
+	do {
+		if (code == rc_table->code) {
+			descr = rc_table->description;
+			break;
+		}
+		rc_table++;
+	} while (rc_table->code && rc_table->description);
+
+	return descr;
+}
+
+/**
+ * zfcp_check_ct_response - evaluate reason code for CT_IU
+ * @rjt: response payload to an CT_IU request
+ * Return: 0 for accept CT_IU, 1 for reject CT_IU or invlid response code
+ */
+int
+zfcp_check_ct_response(struct ct_hdr *rjt)
+{
+	if (rjt->cmd_rsp_code == ZFCP_CT_ACCEPT)
+		return 0;
+
+	if (rjt->cmd_rsp_code != ZFCP_CT_REJECT) {
+		ZFCP_LOG_NORMAL("error: invalid Generic Service command/"
+				"response code (0x%04hx)\n",
+				rjt->cmd_rsp_code);
+		return 1;
+	}
+
+	ZFCP_LOG_INFO("Generic Service command rejected\n");
+	ZFCP_LOG_INFO("%s (0x%02x, 0x%02x, 0x%02x)\n",
+		      zfcp_rc_description(rjt->reason_code, zfcp_ct_rc),
+		      (u32) rjt->reason_code, (u32) rjt->reason_code_expl,
+		      (u32) rjt->vendor_unique);
+
+	return 1;
+}
+
+/**
+ * zfcp_print_els_rjt - print reject parameter and description for ELS reject
+ * @rjt_par: reject parameter acc. to FC-PH/FC-FS
+ * @rc_table: table of reason codes and descriptions
+ */
+static inline void
+zfcp_print_els_rjt(struct zfcp_ls_rjt_par *rjt_par,
+		   const struct zfcp_rc_entry *rc_table)
+{
+	ZFCP_LOG_INFO("%s (%02x %02x %02x %02x)\n",
+		      zfcp_rc_description(rjt_par->reason_code, rc_table),
+		      (u32) rjt_par->action, (u32) rjt_par->reason_code,
+		      (u32) rjt_par->reason_expl, (u32) rjt_par->vendor_unique);
+}
+
+/**
+ * zfcp_fsf_handle_els_rjt - evaluate status qualifier/reason code on ELS reject
+ * @sq: status qualifier word
+ * @rjt_par: reject parameter as described in FC-PH and FC-FS
+ * Return: -EROMTEIO for LS_RJT, -EREMCHG for invalid D_ID, -EIO else
+ */
+int
+zfcp_handle_els_rjt(u32 sq, struct zfcp_ls_rjt_par *rjt_par)
+{
+	int ret = -EIO;
+
+	if (sq == FSF_IOSTAT_NPORT_RJT) {
+		ZFCP_LOG_INFO("ELS rejected (P_RJT)\n");
+		zfcp_print_els_rjt(rjt_par, zfcp_p_rjt_rc);
+		/* invalid d_id */
+		if (rjt_par->reason_code == 0x01)
+			ret = -EREMCHG;
+	} else if (sq == FSF_IOSTAT_FABRIC_RJT) {
+		ZFCP_LOG_INFO("ELS rejected (F_RJT)\n");
+		zfcp_print_els_rjt(rjt_par, zfcp_p_rjt_rc);
+		/* invalid d_id */
+		if (rjt_par->reason_code == 0x01)
+			ret = -EREMCHG;
+	} else if (sq == FSF_IOSTAT_LS_RJT) {
+		ZFCP_LOG_INFO("ELS rejected (LS_RJT)\n");
+		zfcp_print_els_rjt(rjt_par, zfcp_ls_rjt_rc);
+		ret = -EREMOTEIO;
+	} else
+		ZFCP_LOG_INFO("unexpected SQ: 0x%02x\n", sq);
+
+	return ret;
 }
 
 #undef ZFCP_LOG_AREA

@@ -1034,6 +1034,7 @@ int security_load_policy(void *data, size_t len)
 	LOAD_LOCK;
 
 	if (!ss_initialized) {
+		avtab_cache_init();
 		if (policydb_read(&policydb, fp)) {
 			LOAD_UNLOCK;
 			return -EINVAL;

@@ -324,19 +324,20 @@ int_restore_rest:
  * Certain special system calls that need to save a complete full stack frame.
  */ 								
 	
-	.macro PTREGSCALL label,func
+	.macro PTREGSCALL label,func,arg
 	.globl \label
 \label:
 	leaq	\func(%rip),%rax
+	leaq    -ARGOFFSET+8(%rsp),\arg /* 8 for return address */
 	jmp	ptregscall_common
 	.endm
 
-	PTREGSCALL stub_clone, sys_clone
-	PTREGSCALL stub_fork, sys_fork
-	PTREGSCALL stub_vfork, sys_vfork
-	PTREGSCALL stub_rt_sigsuspend, sys_rt_sigsuspend
-	PTREGSCALL stub_sigaltstack, sys_sigaltstack
-	PTREGSCALL stub_iopl, sys_iopl
+	PTREGSCALL stub_clone, sys_clone, %r8
+	PTREGSCALL stub_fork, sys_fork, %rdi
+	PTREGSCALL stub_vfork, sys_vfork, %rdi
+	PTREGSCALL stub_rt_sigsuspend, sys_rt_sigsuspend, %rdx
+	PTREGSCALL stub_sigaltstack, sys_sigaltstack, %rdx
+	PTREGSCALL stub_iopl, sys_iopl, %rsi
 
 ENTRY(ptregscall_common)
 	CFI_STARTPROC
@@ -386,6 +387,7 @@ ENTRY(stub_rt_sigreturn)
 	CFI_STARTPROC
 	addq $8, %rsp		
 	SAVE_REST
+	movq %rsp,%rdi
 	FIXUP_TOP_OF_STACK %r11
 	call sys_rt_sigreturn
 	movq %rax,RAX(%rsp) # fixme, this could be done at the higher layer

@@ -78,7 +78,7 @@ static inline struct shmid_kernel *shm_rmid(int id)
 
 static inline int shm_addid(struct shmid_kernel *shp)
 {
-	return ipc_addid(&shm_ids, &shp->shm_perm, shm_ctlmni+1);
+	return ipc_addid(&shm_ids, &shp->shm_perm, shm_ctlmni);
 }
 
 
@@ -687,6 +687,10 @@ long do_shmat(int shmid, char __user *shmaddr, int shmflg, ulong *raddr)
 		prot = PROT_READ | PROT_WRITE;
 		o_flags = O_RDWR;
 		acc_mode = S_IRUGO | S_IWUGO;
+	}
+	if (shmflg & SHM_EXEC) {
+		prot |= PROT_EXEC;
+		acc_mode |= S_IXUGO;
 	}
 
 	/*

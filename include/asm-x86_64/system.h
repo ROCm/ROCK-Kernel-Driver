@@ -297,11 +297,11 @@ static inline unsigned long __cmpxchg(volatile void *ptr, unsigned long old,
 #define mb() 	asm volatile("mfence":::"memory")
 #define rmb()	asm volatile("lfence":::"memory")
 
-/* could use SFENCE here, but it would be only needed for unordered SSE
-   store instructions and we always do an explicit sfence with them currently.
-   the ordering of normal stores is serialized enough. Just make it a compile
-   barrier. */
+#ifdef CONFIG_UNORDERED_IO
+#define wmb()	asm volatile("sfence" ::: "memory")
+#else
 #define wmb()	asm volatile("" ::: "memory")
+#endif
 #define read_barrier_depends()	do {} while(0)
 #define set_mb(var, value) do { xchg(&var, value); } while (0)
 #define set_wmb(var, value) do { var = value; wmb(); } while (0)

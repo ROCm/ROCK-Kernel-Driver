@@ -270,35 +270,32 @@ quiet_ni_syscall:
 	ret
 	CFI_ENDPROC
 	
-	.macro PTREGSCALL label, func
+	.macro PTREGSCALL label, func, arg
 	.globl \label
 \label:
 	leaq \func(%rip),%rax
+	leaq -ARGOFFSET+8(%rsp),\arg	/* 8 for return address */
 	jmp  ia32_ptregs_common	
 	.endm
 
-	PTREGSCALL stub32_rt_sigreturn, sys32_rt_sigreturn
-	PTREGSCALL stub32_sigreturn, sys32_sigreturn
-	PTREGSCALL stub32_sigaltstack, sys32_sigaltstack
-	PTREGSCALL stub32_sigsuspend, sys32_sigsuspend
-	PTREGSCALL stub32_execve, sys32_execve
-	PTREGSCALL stub32_fork, sys_fork
-	PTREGSCALL stub32_clone, sys32_clone
-	PTREGSCALL stub32_vfork, sys_vfork
-	PTREGSCALL stub32_iopl, sys_iopl
-	PTREGSCALL stub32_rt_sigsuspend, sys_rt_sigsuspend
+	PTREGSCALL stub32_rt_sigreturn, sys32_rt_sigreturn, %rdi
+	PTREGSCALL stub32_sigreturn, sys32_sigreturn, %rdi
+	PTREGSCALL stub32_sigaltstack, sys32_sigaltstack, %rdx
+	PTREGSCALL stub32_sigsuspend, sys32_sigsuspend, %rcx
+	PTREGSCALL stub32_execve, sys32_execve, %rcx
+	PTREGSCALL stub32_fork, sys_fork, %rdi
+	PTREGSCALL stub32_clone, sys32_clone, %rdx
+	PTREGSCALL stub32_vfork, sys_vfork, %rdi
+	PTREGSCALL stub32_iopl, sys_iopl, %rsi
+	PTREGSCALL stub32_rt_sigsuspend, sys_rt_sigsuspend, %rdx
 
 ENTRY(ia32_ptregs_common)
 	CFI_STARTPROC
 	popq %r11
 	SAVE_REST
-	movq %r11, %r15
 	call *%rax
-	movq %r15, %r11
 	RESTORE_REST
-	leaq ia32_sysret(%rip),%r11
-	pushq %r11
-	ret
+	jmp  ia32_sysret	/* misbalances the return cache */
 	CFI_ENDPROC
 
 	.data
@@ -332,7 +329,7 @@ ia32_sys_call_table:
 	.quad sys_getuid16
 	.quad sys_stime		/* stime */		/* 25 */
 	.quad sys32_ptrace	/* ptrace */
-	.quad sys_alarm		/* XXX sign extension??? */ 
+	.quad sys_alarm
 	.quad sys_fstat	/* (old)fstat */
 	.quad sys_pause
 	.quad compat_sys_utime	/* 30 */
@@ -558,7 +555,7 @@ ia32_sys_call_table:
 	.quad sys_fadvise64		/* 250 */
 	.quad quiet_ni_syscall 	/* free_huge_pages */
 	.quad sys_exit_group
-	.quad sys_lookup_dcookie
+	.quad sys32_lookup_dcookie
 	.quad sys_epoll_create
 	.quad sys_epoll_ctl		/* 255 */
 	.quad sys_epoll_wait
