@@ -94,7 +94,7 @@ extern void prepare_namespace(void);
 #ifdef	CONFIG_ACPI
 extern void acpi_early_init(void);
 #else
-static inline acpi_early_init() { }
+static inline void acpi_early_init(void) { }
 #endif
 
 #ifdef CONFIG_TC
