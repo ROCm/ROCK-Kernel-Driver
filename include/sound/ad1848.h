@@ -157,10 +157,6 @@ typedef struct _snd_ad1848 ad1848_t;
 /* exported functions */
 
 void snd_ad1848_out(ad1848_t *chip, unsigned char reg, unsigned char value);
-void snd_ad1848_dout(ad1848_t *chip, unsigned char reg, unsigned char value);
-unsigned char snd_ad1848_in(ad1848_t *chip, unsigned char reg);
-void snd_ad1848_mce_up(ad1848_t *chip);
-void snd_ad1848_mce_down(ad1848_t *chip);
 
 int snd_ad1848_create(snd_card_t * card,
 		      unsigned long port,
@@ -171,7 +167,6 @@ int snd_ad1848_create(snd_card_t * card,
 int snd_ad1848_pcm(ad1848_t * chip, int device, snd_pcm_t **rpcm);
 const snd_pcm_ops_t *snd_ad1848_get_pcm_ops(int direction);
 int snd_ad1848_mixer(ad1848_t * chip);
-irqreturn_t snd_ad1848_interrupt(int irq, void *dev_id, struct pt_regs *regs);
 
 /* exported mixer stuffs */
 enum { AD1848_MIX_SINGLE, AD1848_MIX_DOUBLE, AD1848_MIX_CAPTURE };

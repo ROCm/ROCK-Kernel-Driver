@@ -30,8 +30,6 @@ MODULE_AUTHOR("Uros Bizjak <uros@kss-loka.si>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture FM Instrument support.");
 MODULE_LICENSE("GPL");
 
-char *snd_seq_fm_id = SNDRV_SEQ_INSTR_ID_OPL2_3;
-
 static int snd_seq_fm_put(void *private_data, snd_seq_kinstr_t *instr,
 			  char __user *instr_data, long len, int atomic, int cmd)
 {
@@ -129,7 +127,7 @@ int snd_seq_fm_init(snd_seq_kinstr_ops_t *ops,
 	memset(ops, 0, sizeof(*ops));
 	// ops->private_data = private_data;
 	ops->add_len = sizeof(fm_instrument_t);
-	ops->instr_type = snd_seq_fm_id;
+	ops->instr_type = SNDRV_SEQ_INSTR_ID_OPL2_3;
 	ops->put = snd_seq_fm_put;
 	ops->get = snd_seq_fm_get;
 	ops->get_size = snd_seq_fm_get_size;
@@ -155,5 +153,4 @@ static void __exit alsa_ainstr_fm_exit(void)
 module_init(alsa_ainstr_fm_init)
 module_exit(alsa_ainstr_fm_exit)
 
-EXPORT_SYMBOL(snd_seq_fm_id);
 EXPORT_SYMBOL(snd_seq_fm_init);
