@@ -17,9 +17,9 @@
 /*
  * There are not real ISA nor PCI buses, so we fake it.
  */
-#define __io_pci(a)             (PCIO_BASE + (a))
-#define __mem_pci(a)            ((unsigned long)(a))
-#define __mem_isa(a)            ((unsigned long)(a))
+#define __io_pci(a)		((void __iomem *)(PCIO_BASE + (a)))
+#define __mem_pci(a)		(a)
+#define __mem_isa(a)		(a)
 
 #define __ioaddr(p)             __io_pci(p)
 
