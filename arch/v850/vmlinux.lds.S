@@ -237,3 +237,13 @@ _jiffies = _jiffies_64 ;
 #  include "rte_ma1_cb.ld"
 # endif
 #endif
+
+#ifdef CONFIG_RTE_CB_NB85E
+# ifdef CONFIG_ROM_KERNEL
+#  include "rte_nb85e_cb-rom.ld"
+# elif defined(CONFIG_RTE_CB_MULTI)
+#  include "rte_nb85e_cb-multi.ld"
+# else
+#  include "rte_nb85e_cb.ld"
+# endif
+#endif
