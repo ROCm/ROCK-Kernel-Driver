@@ -19,7 +19,7 @@ typedef unsigned int elf_greg_t;
 #include <linux/module.h>
 #include <linux/config.h>
 #include <linux/elfcore.h>
-#include <linux/compat.h>
+#include <linux/compat.h>		/* struct compat_timeval */
 
 #define elf_prstatus elf_prstatus32
 struct elf_prstatus32
