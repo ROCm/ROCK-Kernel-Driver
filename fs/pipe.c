@@ -86,6 +86,17 @@ pipe_iov_copy_to_user(struct iovec *iov, const void *from, unsigned long len)
 	return 0;
 }
 
+static void release_pipe_buf(struct pipe_inode_info *info, struct pipe_buffer *buf)
+{
+	struct page *page = buf->page;
+
+	if (info->tmp_page) {
+		__free_page(page);
+		return;
+	}
+	info->tmp_page = page;
+}
+
 static ssize_t
 pipe_readv(struct file *filp, const struct iovec *_iov,
 	   unsigned long nr_segs, loff_t *ppos)
@@ -127,7 +138,7 @@ pipe_readv(struct file *filp, const struct iovec *_iov,
 			buf->offset += chars;
 			buf->len -= chars;
 			if (!buf->len) {
-				__free_page(buf->page);
+				release_pipe_buf(info, buf);
 				buf->page = NULL;
 				curbuf = (curbuf + 1) & (PIPE_BUFFERS-1);
 				info->curbuf = curbuf;
@@ -236,12 +247,16 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 			ssize_t chars;
 			int newbuf = (info->curbuf + bufs) & (PIPE_BUFFERS-1);
 			struct pipe_buffer *buf = info->bufs + newbuf;
-			struct page *page = alloc_page(GFP_USER);
+			struct page *page = info->tmp_page;
 			int error;
 
-			if (unlikely(!page)) {
-				ret = ret ? : -ENOMEM;
-				break;
+			if (!page) {
+				page = alloc_page(GFP_KERNEL);
+				if (unlikely(!page)) {
+					ret = ret ? : -ENOMEM;
+					break;
+				}
+				info->tmp_page = page;
 			}
 			/* Always wakeup, even if the copy fails. Otherwise
 			 * we lock up (O_NONBLOCK-)readers that sleep due to
@@ -257,7 +272,6 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 			kunmap(page);
 			if (unlikely(error)) {
 				if (!ret) ret = -EFAULT;
-				__free_page(page);
 				break;
 			}
 			ret += chars;
@@ -267,6 +281,7 @@ pipe_writev(struct file *filp, const struct iovec *_iov,
 			buf->offset = 0;
 			buf->len = chars;
 			info->nrbufs = ++bufs;
+			info->tmp_page = NULL;
 
 			total_len -= chars;
 			if (!total_len)
@@ -593,24 +608,19 @@ void free_pipe_info(struct inode *inode)
 	struct pipe_inode_info *info = inode->i_pipe;
 
 	inode->i_pipe = NULL;
+	if (info->tmp_page)
+		__free_page(info->tmp_page);
 	for (i = 0; i < PIPE_BUFFERS; i++) {
-		struct page *page = info->bufs[i].page;
-
-		/* We'll make this a data-dependent free some day .. */
-		if (page)
-			__free_page(page);
+		struct pipe_buffer *buf = info->bufs + i;
+		if (buf->page)
+			release_pipe_buf(info, buf);
 	}
 	kfree(info);
 }
 
 struct inode* pipe_new(struct inode* inode)
 {
-	unsigned long page;
 	struct pipe_inode_info *info;
-
-	page = __get_free_page(GFP_USER);
-	if (!page)
-		return NULL;
 
 	info = kmalloc(sizeof(struct pipe_inode_info), GFP_KERNEL);
 	if (!info)
@@ -623,7 +633,6 @@ struct inode* pipe_new(struct inode* inode)
 
 	return inode;
 fail_page:
-	free_page(page);
 	return NULL;
 }
 

@@ -14,6 +14,7 @@ struct pipe_inode_info {
 	wait_queue_head_t wait;
 	unsigned int nrbufs, curbuf;
 	struct pipe_buffer bufs[PIPE_BUFFERS];
+	struct page *tmp_page;
 	unsigned int start;
 	unsigned int readers;
 	unsigned int writers;
