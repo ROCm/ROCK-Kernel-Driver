@@ -153,17 +153,15 @@ ssize_t do_read(struct file *pFile, char *pUserBuffer, size_t BufferSize, loff_t
 	klog_t *pHeadItem;
 
 	if (BufferSize < sizeof(klog_t))
-	{
-		printk(KERN_WARNING "Divas: Divalog buffer specifed a size that is too small (%d - %d required)\n",
-			BufferSize, sizeof(klog_t));
 		return -EIO;
-	}
 
 	pHeadItem = (klog_t *) DivasLogFifoRead();
 
-	if (pHeadItem)
-	{
-		memcpy(pClientLogBuffer, pHeadItem, sizeof(klog_t));
+	if (pHeadItem) {
+		if (copy_to_user(pClientLogBuffer, pHeadItem, sizeof(klog_t))) {
+			kfree(pHeadItem);
+			return -EFAULT;
+		}
 		kfree(pHeadItem);
 		return sizeof(klog_t);
 	}
