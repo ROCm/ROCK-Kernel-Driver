@@ -227,15 +227,15 @@ int setup_signal_stack_sc(unsigned long stack_top, int sig,
 				      sizeof(frame->extramask));
 
 	/*
-	 * This is movl $,%eax ; int $0x80
+	 * This is popl %eax ; movl $,%eax ; int $0x80
 	 *
 	 * WE DO NOT USE IT ANY MORE! It's only left here for historical
 	 * reasons and because gdb uses it as a signature to notice
 	 * signal handler stack frames.
 	 */
-	err |= __put_user(0xb8, (char __user *)(frame->retcode+0));
-	err |= __put_user(__NR_rt_sigreturn, (int __user *)(frame->retcode+1));
-	err |= __put_user(0x80cd, (short __user *)(frame->retcode+5));
+	err |= __put_user(0xb858, (short __user *)(frame->retcode+0));
+	err |= __put_user(__NR_sigreturn, (int __user *)(frame->retcode+2));
+	err |= __put_user(0x80cd, (short __user *)(frame->retcode+6));
 
 	if(err)
 		return(err);
