@@ -293,15 +293,17 @@ static void read_cis_cache(struct pcmcia_socket *s, int attr, u_int addr,
 #endif
 	ret = read_cis_mem(s, attr, addr, len, ptr);
 
-    /* Copy data into the cache */
-    cis = kmalloc(sizeof(struct cis_cache_entry) + len, GFP_KERNEL);
-    if (cis) {
-	cis->addr = addr;
-	cis->len = len;
-	cis->attr = attr;
-	memcpy(cis->cache, ptr, len);
-	list_add(&cis->node, &s->cis_cache);
-    }
+	if (ret == 0) {
+		/* Copy data into the cache */
+		cis = kmalloc(sizeof(struct cis_cache_entry) + len, GFP_KERNEL);
+		if (cis) {
+			cis->addr = addr;
+			cis->len = len;
+			cis->attr = attr;
+			memcpy(cis->cache, ptr, len);
+			list_add(&cis->node, &s->cis_cache);
+		}
+	}
 }
 
 static void
