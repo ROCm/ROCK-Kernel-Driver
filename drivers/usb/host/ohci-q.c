@@ -156,7 +156,7 @@ static void periodic_link (struct ohci_hcd *ohci, struct ed *ed)
 				ed->hwNextED = *prev_p;
 			wmb ();
 			*prev = ed;
-			*prev_p = cpu_to_le32p (&ed->dma);
+			*prev_p = cpu_to_le32(ed->dma);
 			wmb();
 		}
 		ohci->load [i] += ed->load;
