@@ -372,6 +372,13 @@ ProgramCheckException(struct pt_regs *regs)
 {
 	siginfo_t info;
 
+#ifdef CONFIG_DEBUG_KERNEL
+	if (debugger_fault_handler) {
+		debugger_fault_handler(regs);
+		return;
+	}
+#endif
+
 	if (regs->msr & 0x100000) {
 		/* IEEE FP exception */
 
