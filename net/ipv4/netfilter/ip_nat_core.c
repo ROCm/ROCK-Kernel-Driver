@@ -880,6 +880,14 @@ icmp_reply_translation(struct sk_buff **pskb,
 		/* Mapping the inner packet is just like a normal packet, except
 		 * it was never src/dst reversed, so where we would normally
 		 * apply a dst manip, we apply a src, and vice versa. */
+
+		/* Only true for forwarded packets, locally generated packets
+		 * never hit PRE_ROUTING, we need to apply their PRE_ROUTING
+		 * manips in LOCAL_OUT. */
+		if (hooknum == NF_IP_LOCAL_OUT &&
+		    info->manips[i].hooknum == NF_IP_PRE_ROUTING)
+			hooknum = info->manips[i].hooknum;
+
 		if (info->manips[i].hooknum != hooknum)
 			continue;
 
