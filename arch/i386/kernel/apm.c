@@ -785,9 +785,9 @@ extern void default_idle(void);
 
 static void apm_cpu_idle(void)
 {
-	static int use_apm_idle = 0;
-	static unsigned int last_jiffies = 0;
-	static unsigned int last_stime = 0;
+	static int use_apm_idle; /* = 0 */
+	static unsigned int last_jiffies; /* = 0 */
+	static unsigned int last_stime; /* = 0 */
 
 	int apm_is_idle = 0;
 	unsigned int jiffies_since_last_check = jiffies - last_jiffies;
