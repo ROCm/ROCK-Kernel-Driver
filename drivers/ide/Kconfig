@@ -812,7 +812,7 @@ config BLK_DEV_IDE_RAPIDE
 
 config BLK_DEV_IDE_BAST
 	tristate "Simtec BAST / Thorcom VR1000 IDE support"
-	depends on ARM && (ARCH_BAST || MACH_VR100)
+	depends on ARM && (ARCH_BAST || MACH_VR1000)
 	help
 	  Say Y here if you want to support the onboard IDE channels on the
 	  Simtec BAST or the Thorcom VR1000
