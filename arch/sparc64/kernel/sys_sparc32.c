@@ -2507,6 +2507,17 @@ asmlinkage compat_ssize_t sys32_readahead(int fd, u32 offhi, u32 offlo, s32 coun
 	return sys_readahead(fd, ((loff_t)AA(offhi) << 32) | AA(offlo), count);
 }
 
+long sys32_fadvise64(int fd, u32 offhi, u32 offlo, s32 len, int advice)
+{
+	return sys_fadvise64_64(fd, ((loff_t)AA(offhi)<<32)|AA(offlo), len, advice);
+}
+
+long sys32_fadvise64_64(int fd, u32 offhi, u32 offlo, u32 lenhi, u32 lenlo, int advice)
+{
+	return sys_fadvise64_64(fd, ((loff_t)AA(offhi)<<32)|AA(offlo),
+				((loff_t)AA(lenhi)<<32)|AA(lenlo), advice);
+}
+
 extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
 
 asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)

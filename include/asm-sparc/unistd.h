@@ -225,8 +225,8 @@
 #define __NR_socketcall         206 /* Linux Specific                              */
 #define __NR_syslog             207 /* Linux Specific                              */
 #define __NR_lookup_dcookie     208 /* Linux Specific                              */
-/* #define __NR_iopl            209    Linux Specific - i386 specific, unused      */
-/* #define __NR_idle            210    Linux Specific - was sys_idle, now unused   */
+#define __NR_fadvise64          209 /* Linux Specific                              */
+#define __NR_fadvise64_64       210 /* Linux Specific                              */
 /* #define __NR_vm86            211    Linux Specific - i386 specific, unused      */
 #define __NR_waitpid            212 /* Linux Specific                              */
 #define __NR_swapoff            213 /* Linux Specific                              */
