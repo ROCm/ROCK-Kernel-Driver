@@ -237,7 +237,8 @@ static void tcp_delack_timer(unsigned long data)
 	if (skb_queue_len(&tp->ucopy.prequeue)) {
 		struct sk_buff *skb;
 
-		net_statistics[smp_processor_id()*2].TCPSchedulerFailed += skb_queue_len(&tp->ucopy.prequeue);
+		NET_ADD_STATS_BH(TCPSchedulerFailed,
+				  skb_queue_len(&tp->ucopy.prequeue));
 
 		while ((skb = __skb_dequeue(&tp->ucopy.prequeue)) != NULL)
 			sk->backlog_rcv(sk, skb);

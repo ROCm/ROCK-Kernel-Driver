@@ -110,7 +110,7 @@
  *	Snmp MIB for the UDP layer
  */
 
-struct udp_mib		udp_statistics[NR_CPUS*2];
+DEFINE_SNMP_STAT(struct udp_mib, udp_statistics);
 
 struct sock *udp_hash[UDP_HTABLE_SIZE];
 rwlock_t udp_hash_lock = RW_LOCK_UNLOCKED;

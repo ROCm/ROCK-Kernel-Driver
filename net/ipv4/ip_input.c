@@ -149,7 +149,7 @@
  *	SNMP management statistics
  */
 
-struct ip_mib ip_statistics[NR_CPUS*2];
+DEFINE_SNMP_STAT(struct ip_mib, ip_statistics);
 
 /*
  *	Process Router Attention IP option
