@@ -68,44 +68,42 @@ static char *ax2asc2(ax25_address *a, char *buf)
 #endif /* CONFIG_AX25 */
 
 struct arp_iter_state {
-	loff_t  is_pneigh: 1,
-		bucket:	   6,
-		pos:	   sizeof(loff_t) * 8 - 7;
+	int is_pneigh, bucket;
 };
 
-static __inline__ struct neighbour *neigh_get_bucket(loff_t *pos)
+static __inline__ struct neighbour *neigh_get_bucket(struct seq_file *seq,
+						     loff_t *pos)
 {
 	struct neighbour *n = NULL;
-	struct arp_iter_state* state = (struct arp_iter_state *)pos;
-	loff_t l = state->pos;
-	int i, bucket = state->bucket;
+	struct arp_iter_state* state = seq->private;
+	loff_t l = *pos;
+	int i;
 
-	for (; bucket <= NEIGH_HASHMASK; ++bucket)
-		for (i = 0, n = arp_tbl.hash_buckets[bucket]; n;
+	for (; state->bucket <= NEIGH_HASHMASK; ++state->bucket)
+		for (i = 0, n = arp_tbl.hash_buckets[state->bucket]; n;
 		     ++i, n = n->next)
 			/* Do not confuse users "arp -a" with magic entries */
 			if ((n->nud_state & ~NUD_NOARP) && !l--) {
-				state->pos    = i;
-				state->bucket = bucket;
+				*pos = i;
 				goto out;
 			}
 out:
 	return n;
 }
 
-static __inline__ struct pneigh_entry *pneigh_get_bucket(loff_t *pos)
+static __inline__ struct pneigh_entry *pneigh_get_bucket(struct seq_file *seq,
+							 loff_t *pos)
 {
 	struct pneigh_entry *n = NULL;
-	struct arp_iter_state* state = (struct arp_iter_state *)pos;
-	loff_t l = state->pos;
-	int i, bucket = state->bucket;
+	struct arp_iter_state* state = seq->private;
+	loff_t l = *pos;
+	int i;
 
-	for (; bucket <= PNEIGH_HASHMASK; ++bucket)
-		for (i = 0, n = arp_tbl.phash_buckets[bucket]; n;
+	for (; state->bucket <= PNEIGH_HASHMASK; ++state->bucket)
+		for (i = 0, n = arp_tbl.phash_buckets[state->bucket]; n;
 		     ++i, n = n->next)
 			if (!l--) {
-				state->pos    = i;
-				state->bucket = bucket;
+				*pos = i;
 				goto out;
 			}
 out:
@@ -114,18 +112,16 @@ out:
 
 static __inline__ void *arp_get_bucket(struct seq_file *seq, loff_t *pos)
 {
-	void *rc = neigh_get_bucket(pos);
+	void *rc = neigh_get_bucket(seq, pos);
 
 	if (!rc) {
-		struct arp_iter_state* state = (struct arp_iter_state *)pos;
+		struct arp_iter_state* state = seq->private;
 
 		read_unlock_bh(&arp_tbl.lock);
 		state->is_pneigh = 1;
 		state->bucket	 = 0;
-		state->pos	 = 0;
-		/* HACK: till there is state we can pass to seq_show...  */
-		seq->private = (void *)1;
-		rc = pneigh_get_bucket(pos);
+		*pos		 = 0;
+		rc = pneigh_get_bucket(seq, pos);
 	}
 	return rc;
 }
@@ -146,33 +142,31 @@ static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 		goto out;
 	}
 
-	state = (struct arp_iter_state *)pos;
+	state = seq->private;
 	if (!state->is_pneigh) {
 		struct neighbour *n = v;
 
 		rc = n = n->next;
 		if (n)
 			goto out;
-		state->pos = 0;
+		*pos = 0;
 		++state->bucket;
-		rc = neigh_get_bucket(pos);
+		rc = neigh_get_bucket(seq, pos);
 		if (rc)
 			goto out;
 		read_unlock_bh(&arp_tbl.lock);
-		/* HACK: till there is state we can pass to seq_show...  */
-		seq->private	 = (void *)1;
 		state->is_pneigh = 1;
 		state->bucket	 = 0;
-		state->pos	 = 0;
-		rc = pneigh_get_bucket(pos);
+		*pos		 = 0;
+		rc = pneigh_get_bucket(seq, pos);
 	} else {
 		struct pneigh_entry *pn = v;
 
 		pn = pn->next;
 		if (!pn) {
 			++state->bucket;
-			state->pos = 0;
-			pn = pneigh_get_bucket(pos);
+			*pos = 0;
+			pn   = pneigh_get_bucket(seq, pos);
 		}
 		rc = pn;
 	}
@@ -183,7 +177,9 @@ out:
 
 static void arp_seq_stop(struct seq_file *seq, void *v)
 {
-	if (!seq->private)
+	struct arp_iter_state* state = seq->private;
+
+	if (!state->is_pneigh)
 		read_unlock_bh(&arp_tbl.lock);
 }
 
@@ -241,7 +237,9 @@ static int arp_seq_show(struct seq_file *seq, void *v)
 		seq_puts(seq, "IP address       HW type     Flags       "
 			      "HW address            Mask     Device\n");
 	else {
-		if (seq->private)
+		struct arp_iter_state* state = seq->private;
+
+		if (state->is_pneigh)
 			arp_format_pneigh_entry(seq, v);
 		else
 			arp_format_neigh_entry(seq, v);
@@ -405,7 +403,35 @@ static struct seq_operations udp_seq_ops = {
 
 static int arp_seq_open(struct inode *inode, struct file *file)
 {
-	return seq_open(file, &arp_seq_ops);
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct arp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+       
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &arp_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static int arp_seq_release(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq = (struct seq_file *)file->private_data;
+
+	kfree(seq->private);
+	seq->private = NULL;
+
+	return seq_release(inode, file);
 }
 
 static int fib_seq_open(struct inode *inode, struct file *file)
@@ -422,7 +448,7 @@ static struct file_operations arp_seq_fops = {
 	.open           = arp_seq_open,
 	.read           = seq_read,
 	.llseek         = seq_lseek,
-	.release	= seq_release,
+	.release	= arp_seq_release,
 };
 
 static struct file_operations fib_seq_fops = {
