@@ -654,6 +654,8 @@ void __devinit pci_process_bridge_OF_ranges(struct pci_controller *hose,
 			cpu_phys_addr = cpu_phys_addr << 32 | ranges[4];
 
 		size = (unsigned long)ranges[na+3] << 32 | ranges[na+4];
+		if (size == 0)
+			continue;
 		switch ((ranges[0] >> 24) & 0x3) {
 		case 1:		/* I/O space */
 			hose->io_base_phys = cpu_phys_addr;
