@@ -43,6 +43,8 @@ extern const char *CardType[];
 
 const char *w6692_revision = "$Revision: 1.12.6.6 $";
 
+static spinlock_t w6692_lock = SPIN_LOCK_UNLOCKED;
+
 #define DBUSY_TIMER_VALUE 80
 
 static char *W6692Ver[] __initdata =
@@ -102,8 +104,9 @@ W6692_new_ph(struct IsdnCardState *cs)
 }
 
 static void
-W6692_bh(struct IsdnCardState *cs)
+W6692_bh(void *data)
 {
+	struct IsdnCardState *cs = data;
 	struct PStack *stptr;
 
 	if (!cs)
@@ -135,21 +138,21 @@ void
 W6692_sched_event(struct IsdnCardState *cs, int event)
 {
 	test_and_set_bit(event, &cs->event);
-	schedule_work(&cs->tqueue);
+	schedule_work(&cs->work);
 }
 
 static void
 W6692B_sched_event(struct BCState *bcs, int event)
 {
 	bcs->event |= 1 << event;
-	schedule_work(&bcs->tqueue);
+	schedule_work(&bcs->work);
 }
 
 static void
 W6692_empty_fifo(struct IsdnCardState *cs, int count)
 {
 	u_char *ptr;
-	long flags;
+	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
 		debugl1(cs, "W6692_empty_fifo");
@@ -164,11 +167,10 @@ W6692_empty_fifo(struct IsdnCardState *cs, int count)
 	}
 	ptr = cs->rcvbuf + cs->rcvidx;
 	cs->rcvidx += count;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&w6692_lock, flags);
 	cs->readW6692fifo(cs, ptr, count);
 	cs->writeW6692(cs, W_D_CMDR, W_D_CMDR_RACK);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&w6692_lock, flags);
 	if (cs->debug & L1_DEB_ISAC_FIFO) {
 		char *t = cs->dlog;
 
@@ -183,7 +185,7 @@ W6692_fill_fifo(struct IsdnCardState *cs)
 {
 	int count, more;
 	u_char *ptr;
-	long flags;
+	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_ISAC) && !(cs->debug & L1_DEB_ISAC_FIFO))
 		debugl1(cs, "W6692_fill_fifo");
@@ -200,14 +202,13 @@ W6692_fill_fifo(struct IsdnCardState *cs)
 		more = !0;
 		count = W_D_FIFO_THRESH;
 	}
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&w6692_lock, flags);
 	ptr = cs->tx_skb->data;
 	skb_pull(cs->tx_skb, count);
 	cs->tx_cnt += count;
 	cs->writeW6692fifo(cs, ptr, count);
 	cs->writeW6692(cs, W_D_CMDR, more ? W_D_CMDR_XMS : (W_D_CMDR_XMS | W_D_CMDR_XME));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&w6692_lock , flags);
 	if (test_and_set_bit(FLG_DBUSY_TIMER, &cs->HW_Flags)) {
 		debugl1(cs, "W6692_fill_fifo dbusytimer running");
 		del_timer(&cs->dbusytimer);
@@ -229,7 +230,7 @@ W6692B_empty_fifo(struct BCState *bcs, int count)
 {
 	u_char *ptr;
 	struct IsdnCardState *cs = bcs->cs;
-	long flags;
+	unsigned long flags;
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
 		debugl1(cs, "W6692B_empty_fifo");
@@ -243,11 +244,10 @@ W6692B_empty_fifo(struct BCState *bcs, int count)
 	}
 	ptr = bcs->hw.w6692.rcvbuf + bcs->hw.w6692.rcvidx;
 	bcs->hw.w6692.rcvidx += count;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&w6692_lock, flags);
 	READW6692BFIFO(cs, bcs->channel, ptr, count);
 	cs->BC_Write_Reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACK | W_B_CMDR_RACT);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&w6692_lock , flags);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -264,7 +264,7 @@ W6692B_fill_fifo(struct BCState *bcs)
 	struct IsdnCardState *cs = bcs->cs;
 	int more, count;
 	u_char *ptr;
-	long flags;
+	unsigned long flags;
 
 
 	if ((cs->debug & L1_DEB_HSCX) && !(cs->debug & L1_DEB_HSCX_FIFO))
@@ -282,15 +282,14 @@ W6692B_fill_fifo(struct BCState *bcs)
 	} else
 		count = bcs->tx_skb->len;
 
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&w6692_lock, flags);
 	ptr = bcs->tx_skb->data;
 	skb_pull(bcs->tx_skb, count);
 	bcs->tx_cnt -= count;
 	bcs->hw.w6692.count += count;
 	WRITEW6692BFIFO(cs, bcs->channel, ptr, count);
 	cs->BC_Write_Reg(cs, bcs->channel, W_B_CMDR, W_B_CMDR_RACT | W_B_CMDR_XMS | (more ? 0 : W_B_CMDR_XME));
-	restore_flags(flags);
+	spin_unlock_irqrestore(&w6692_lock , flags);
 	if (cs->debug & L1_DEB_HSCX_FIFO) {
 		char *t = bcs->blog;
 
@@ -411,7 +410,7 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 	u_char val, exval, v1;
 	struct sk_buff *skb;
 	unsigned int count;
-	long flags;
+	unsigned long flags;
 	int icnt = 5;
 
 	if (!cs) {
@@ -442,8 +441,7 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 			if (count == 0)
 				count = W_D_FIFO_THRESH;
 			W6692_empty_fifo(cs, count);
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&w6692_lock, flags);
 			if ((count = cs->rcvidx) > 0) {
 				cs->rcvidx = 0;
 				if (!(skb = alloc_skb(count, GFP_ATOMIC)))
@@ -453,7 +451,7 @@ W6692_interrupt(int intno, void *dev_id, struct pt_regs *regs)
 					skb_queue_tail(&cs->rq, skb);
 				}
 			}
-			restore_flags(flags);
+			spin_unlock_irqrestore(&w6692_lock , flags);
 		}
 		cs->rcvidx = 0;
 		W6692_sched_event(cs, D_RCVBUFREADY);
@@ -745,20 +743,19 @@ static void
 W6692_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	long flags;
+	unsigned long flags;
 
 	switch (pr) {
 		case (PH_DATA | REQUEST):
-			save_flags(flags);
-			cli();
+			spin_lock_irqsave(&w6692_lock, flags);
 			if (st->l1.bcs->tx_skb) {
 				skb_queue_tail(&st->l1.bcs->squeue, skb);
-				restore_flags(flags);
+				spin_unlock_irqrestore(&w6692_lock , flags);
 			} else {
 				st->l1.bcs->tx_skb = skb;
 				test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 				st->l1.bcs->hw.w6692.count = 0;
-				restore_flags(flags);
+				spin_unlock_irqrestore(&w6692_lock , flags);
 				st->l1.bcs->cs->BC_Send_Data(st->l1.bcs);
 			}
 			break;
@@ -887,7 +884,7 @@ void resetW6692(struct IsdnCardState *cs)
 void __init initW6692(struct IsdnCardState *cs, int part)
 {
 	if (part & 1) {
-		INIT_WORK(&cs->tqueue, (void *) (void *) W6692_bh, NULL);
+		INIT_WORK(&cs->work, W6692_bh, cs);
 		cs->setstack_d = setstack_W6692;
 		cs->DC_Close = DC_Close_W6692;
 		cs->dbusytimer.function = (void *) dbusy_timer_handler;

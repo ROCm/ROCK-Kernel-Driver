@@ -1,21 +1,20 @@
-/* $Id: isdn_audio.c,v 1.21.6.3 2002/08/13 09:45:33 keil Exp $
- *
- * Linux ISDN subsystem, audio conversion and compression (linklevel).
+/* Linux ISDN subsystem, audio conversion and compression
  *
  * Copyright 1994-1999 by Fritz Elfert (fritz@isdn4linux.de)
- * DTMF code (c) 1996 by Christian Mock (cm@tahina.priv.at)
- * Silence detection (c) 1998 by Armin Schindler (mac@gismo.telekom.de)
+ *           1996      by Christian Mock (cm@tahina.priv.at)
+ *           1998      by Armin Schindler (mac@gismo.telekom.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
  *
+ * DTMF code         by Christian Mock
+ * Silence detection by Armin Schindler
  */
 
 #include <linux/isdn.h>
 #include "isdn_audio.h"
 #include "isdn_common.h"
-
-char *isdn_audio_revision = "$Revision: 1.21.6.3 $";
+#include "isdn_tty.h"
 
 /*
  * Misc. lookup-tables.
@@ -507,7 +506,7 @@ isdn_audio_goertzel(int *sample, modem_info * info)
 		    ((sk2 * sk2) >> AMP_BITS);
 	}
 	skb_queue_tail(&info->dtmf_queue, skb);
-	isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
+	mod_timer(&info->read_timer, jiffies + 4);
 }
 
 void
@@ -518,8 +517,6 @@ isdn_audio_eval_dtmf(modem_info * info)
 	dtmf_state *s;
 	int silence;
 	int i;
-	int di;
-	int ch;
 	unsigned long flags;
 	int grp[2];
 	char what;
@@ -564,15 +561,11 @@ isdn_audio_eval_dtmf(modem_info * info)
 			ISDN_AUDIO_SKB_LOCK(skb) = 0;
 			save_flags(flags);
 			cli();
-			di = isdn_slot_driver(info->isdn_slot);
-			ch = isdn_slot_channel(info->isdn_slot);
-			__skb_queue_tail(&dev->drv[di]->rpqueue[ch], skb);
-			dev->drv[di]->rcvcount[ch] += 2;
+			isdn_tty_queue_tail(info, skb, 2);
 			restore_flags(flags);
 			/* Schedule dequeuing */
 			if ((dev->modempoll) && (info->rcvsched))
-				isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
-			wake_up_interruptible(&dev->drv[di]->rcv_waitq[ch]);
+				mod_timer(&info->read_timer, jiffies + 4);
 		} else
 			kfree_skb(skb);
 		s->last = what;
@@ -661,8 +654,6 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 {
 	struct sk_buff *skb;
 	unsigned long flags;
-	int di;
-	int ch;
 	char *p;
 
 	skb = dev_alloc_skb(2);
@@ -685,15 +676,11 @@ isdn_audio_put_dle_code(modem_info * info, u_char code)
 	ISDN_AUDIO_SKB_LOCK(skb) = 0;
 	save_flags(flags);
 	cli();
-	di = isdn_slot_driver(info->isdn_slot);
-	ch = isdn_slot_channel(info->isdn_slot);
-	__skb_queue_tail(&dev->drv[di]->rpqueue[ch], skb);
-	dev->drv[di]->rcvcount[ch] += 2;
+	isdn_tty_queue_tail(info, skb, 2);
 	restore_flags(flags);
 	/* Schedule dequeuing */
 	if ((dev->modempoll) && (info->rcvsched))
-		isdn_timer_ctrl(ISDN_TIMER_MODEMREAD, 1);
-	wake_up_interruptible(&dev->drv[di]->rcv_waitq[ch]);
+		mod_timer(&info->read_timer, jiffies + 4);
 }
 
 void

@@ -30,6 +30,7 @@ static u_char deb[32];
 const char *ModemIn[] = {"RBR","IER","IIR","LCR","MCR","LSR","MSR","SCR"};
 const char *ModemOut[] = {"THR","IER","FCR","LCR","MCR","LSR","MSR","SCR"};
 #endif
+static spinlock_t elsa_ser_lock = SPIN_LOCK_UNLOCKED;
 
 static char *MInit_1 = "AT&F&C1E0&D2\r\0";
 static char *MInit_2 = "ATL2M1S64=13\r\0";
@@ -134,14 +135,13 @@ static void change_speed(struct IsdnCardState *cs, int baud)
 	serial_outp(cs, UART_IER, cs->hw.elsa.IER);
 
 	debugl1(cs,"modem quot=0x%x", quot);
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&elsa_ser_lock, flags);
 	serial_outp(cs, UART_LCR, cval | UART_LCR_DLAB);/* set DLAB */
 	serial_outp(cs, UART_DLL, quot & 0xff);		/* LS of divisor */
 	serial_outp(cs, UART_DLM, quot >> 8);		/* MS of divisor */
 	serial_outp(cs, UART_LCR, cval);		/* reset DLAB */
 	serial_inp(cs, UART_RX);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 }
 
 static int mstartup(struct IsdnCardState *cs)
@@ -150,7 +150,7 @@ static int mstartup(struct IsdnCardState *cs)
 	int	retval=0;
 
 
-	save_flags(flags); cli();
+	spin_lock_irqsave(&elsa_ser_lock, flags);
 
 	/*
 	 * Clear the FIFO buffers and disable them
@@ -207,7 +207,7 @@ static int mstartup(struct IsdnCardState *cs)
 	change_speed(cs, BASE_BAUD);
 	cs->hw.elsa.MFlag = 1;
 errout:
-	restore_flags(flags);
+	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 	return retval;
 }
 
@@ -224,7 +224,7 @@ static void mshutdown(struct IsdnCardState *cs)
 	printk(KERN_DEBUG"Shutting down serial ....");
 #endif
 	
-	save_flags(flags); cli(); /* Disable interrupts */
+	spin_lock_irqsave(&elsa_ser_lock, flags);  /* Disable interrupts */
 
 	/*
 	 * clear delta_msr_wait queue to avoid mem leaks: we may free the irq
@@ -245,7 +245,7 @@ static void mshutdown(struct IsdnCardState *cs)
 	serial_outp(cs, UART_FCR, (UART_FCR_CLEAR_RCVR | UART_FCR_CLEAR_XMIT));
 	serial_inp(cs, UART_RX);    /* read data port to reset things */
 	
-	restore_flags(flags);
+	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 #ifdef SERIAL_DEBUG_OPEN
 	printk(" done\n");
 #endif
@@ -256,14 +256,13 @@ write_modem(struct BCState *bcs) {
 	int ret=0;
 	struct IsdnCardState *cs = bcs->cs;
 	int count, len, fp;
-	long flags;
+	unsigned long flags;
 	
 	if (!bcs->tx_skb)
 		return 0;
 	if (bcs->tx_skb->len <= 0)
 		return 0;
-	save_flags(flags);
-	cli();
+	spin_lock_irqsave(&elsa_ser_lock, flags);
 	len = bcs->tx_skb->len;
 	if (len > MAX_MODEM_BUF - cs->hw.elsa.transcnt)
 		len = MAX_MODEM_BUF - cs->hw.elsa.transcnt;
@@ -289,7 +288,7 @@ write_modem(struct BCState *bcs) {
 			cs->hw.elsa.IER |= UART_IER_THRI;
 		serial_outp(cs, UART_IER, cs->hw.elsa.IER);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 	return(ret);
 }
 
@@ -460,14 +459,13 @@ void
 modem_write_cmd(struct IsdnCardState *cs, u_char *buf, int len) {
 	int count, fp;
 	u_char *msg = buf;
-	long flags;
+	unsigned long flags;
 	
 	if (!len)
 		return;
-	save_flags(flags);
-	cli();		
+	spin_lock_irqsave(&elsa_ser_lock, flags);
 	if (len > (MAX_MODEM_BUF - cs->hw.elsa.transcnt)) {
-		restore_flags(flags);
+		spin_unlock_irqrestore(&elsa_ser_lock, flags);
 		return;
 	}
 	fp = cs->hw.elsa.transcnt + cs->hw.elsa.transp;
@@ -488,17 +486,16 @@ modem_write_cmd(struct IsdnCardState *cs, u_char *buf, int len) {
 		cs->hw.elsa.IER |= UART_IER_THRI;
 		serial_outp(cs, UART_IER, cs->hw.elsa.IER);
 	}
-	restore_flags(flags);
+	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 }
 
 void
 modem_set_init(struct IsdnCardState *cs) {
-	long flags;
+	unsigned long flags;
 	int timeout;
 
 #define RCV_DELAY 20000	
-	save_flags(flags);
-	sti();
+	spin_lock_irqsave(&elsa_ser_lock, flags);
 	modem_write_cmd(cs, MInit_1, strlen(MInit_1));
 	timeout = 1000;
 	while(timeout-- && cs->hw.elsa.transcnt)
@@ -541,17 +538,16 @@ modem_set_init(struct IsdnCardState *cs) {
 		udelay(1000);
 	debugl1(cs, "msi tout=%d", timeout);
 	udelay(RCV_DELAY);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 }
 
 void
 modem_set_dial(struct IsdnCardState *cs, int outgoing) {
-	long flags;
+	unsigned long flags;
 	int timeout;
 #define RCV_DELAY 20000	
 
-	save_flags(flags);
-	sti();
+	spin_lock_irqsave(&elsa_ser_lock, flags);
 	modem_write_cmd(cs, MInit_speed28800, strlen(MInit_speed28800));
 	timeout = 1000;
 	while(timeout-- && cs->hw.elsa.transcnt)
@@ -567,26 +563,25 @@ modem_set_dial(struct IsdnCardState *cs, int outgoing) {
 		udelay(1000);
 	debugl1(cs, "msi tout=%d", timeout);
 	udelay(RCV_DELAY);
-	restore_flags(flags);
+	spin_unlock_irqrestore(&elsa_ser_lock, flags);
 }
 
 void
 modem_l2l1(struct PStack *st, int pr, void *arg)
 {
 	struct sk_buff *skb = arg;
-	long flags;
+	unsigned long flags;
 
 	if (pr == (PH_DATA | REQUEST)) {
-		save_flags(flags);
-		cli();
+		spin_lock_irqsave(&elsa_ser_lock, flags);
 		if (st->l1.bcs->tx_skb) {
 			skb_queue_tail(&st->l1.bcs->squeue, skb);
-			restore_flags(flags);
+			spin_unlock_irqrestore(&elsa_ser_lock, flags);
 		} else {
 			st->l1.bcs->tx_skb = skb;
 			test_and_set_bit(BC_FLG_BUSY, &st->l1.bcs->Flag);
 			st->l1.bcs->hw.hscx.count = 0;
-			restore_flags(flags);
+			spin_unlock_irqrestore(&elsa_ser_lock, flags);
 			write_modem(st->l1.bcs);
 		}
 	} else if (pr == (PH_ACTIVATE | REQUEST)) {

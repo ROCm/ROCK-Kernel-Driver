@@ -106,8 +106,9 @@ static const char *amd7930_revision = "$Revision: 1.5.6.4 $";
 static void Bchan_fill_fifo(struct BCState *, struct sk_buff *);
 
 static void
-Bchan_xmt_bh(struct BCState *bcs)
+Bchan_xmt_bh(void *data)
 {
+	struct BCState *bcs = data;
 	struct sk_buff *skb;
 
 	if (bcs->hw.amd7930.tx_skb != NULL) {
@@ -120,14 +121,14 @@ Bchan_xmt_bh(struct BCState *bcs)
 	} else {
 		clear_bit(BC_FLG_BUSY, &bcs->Flag);
 		bcs->event |= 1 << B_XMTBUFREADY;
-		schedule_work(&bcs->tqueue);
+		schedule_work(&bcs->work);
 	}
 }
 
 static void
 Bchan_xmit_callback(struct BCState *bcs)
 {
-	schedule_work(&bcs->hw.amd7930.tq_xmt);
+	schedule_work(&bcs->hw.amd7930.xmt_work);
 }
 
 /* B channel transmission: two modes (three, if you count L1_MODE_NULL)
@@ -259,12 +260,13 @@ Bchan_recv_callback(struct BCState *bcs)
 			      (void *) &Bchan_recv_callback, (void *) bcs);
 	}
 
-	schedule_work(&hw->tq_rcv);
+	schedule_work(&hw->rcv_work);
 }
 
 static void
-Bchan_rcv_bh(struct BCState *bcs)
+Bchan_rcv_bh(void *data)
 {
+	struct BCState *bcs = data;
 	struct IsdnCardState *cs = bcs->cs;
 	struct amd7930_hw *hw = &bcs->hw.amd7930;
 	struct sk_buff *skb;
@@ -305,7 +307,7 @@ Bchan_rcv_bh(struct BCState *bcs)
 						skb_queue_tail(&bcs->rqueue, hw->rv_skb);
 						hw->rv_skb = skb;
 						bcs->event |= 1 << B_RCVBUFREADY;
-						schedule_work(&bcs->tqueue);
+						schedule_work(&bcs->work);
 					}
 				} else if (len > 0) {
 					/* Small packet received */
@@ -316,7 +318,7 @@ Bchan_rcv_bh(struct BCState *bcs)
 						memcpy(skb_put(skb, len), hw->rv_skb->tail, len);
 						skb_queue_tail(&bcs->rqueue, skb);
 						bcs->event |= 1 << B_RCVBUFREADY;
-						schedule_work(&bcs->tqueue);
+						schedule_work(&bcs->work);
 					}
 				} else {
 					/* Reception Error */
@@ -332,7 +334,7 @@ Bchan_rcv_bh(struct BCState *bcs)
 				       RCV_BUFSIZE/RCV_BUFBLKS);
 				skb_queue_tail(&bcs->rqueue, skb);
 				bcs->event |= 1 << B_RCVBUFREADY;
-				schedule_work(&bcs->tqueue);
+				schedule_work(&bcs->work);
 			}
 		}
 
@@ -416,12 +418,8 @@ Bchan_init(struct BCState *bcs)
 		return;
 	}
 
-	bcs->hw.amd7930.tq_rcv.sync = 0;
-	INIT_WORK(&bcs->hw.amd7930.tq_rcv, (void (*)(void *)) &Bchan_rcv_bh,
-			(void *) bcs);
-
-	INIT_WORK(&bcs->hw.amd7930.tq_xmt, (void (*)(void *)) &Bchan_xmt_bh,
-			(void *) bcs);
+	INIT_WORK(&bcs->hw.amd7930.rcv_work, &Bchan_rcv_bh, bcs);
+	INIT_WORK(&bcs->hw.amd7930.xmt_work, &Bchan_xmt_bh, bcs);
 }
 
 static void

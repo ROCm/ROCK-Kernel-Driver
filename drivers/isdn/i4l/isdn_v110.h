@@ -1,12 +1,9 @@
-/* $Id: isdn_v110.h,v 1.4.6.1 2001/09/23 22:24:32 kai Exp $
- *
- * Linux ISDN subsystem, V.110 related functions (linklevel).
+/* Linux ISDN subsystem, V.110 related functions
  *
  * Copyright by Thomas Pfeiffer (pfeiffer@pds.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
- *
  */
 
 #ifndef ISDN_V110_H
@@ -29,7 +26,10 @@ extern struct sk_buff *isdn_v110_encode(isdn_v110_stream *, struct sk_buff *);
  */
 extern struct sk_buff *isdn_v110_decode(isdn_v110_stream *, struct sk_buff *);
 
-extern int isdn_v110_stat_callback(struct isdn_v110 *v110, isdn_ctrl *);
-extern void isdn_v110_close(isdn_v110_stream * v);
+extern void isdn_v110_open(struct isdn_slot *slot, struct isdn_v110 *iv110);
+
+extern void isdn_v110_close(struct isdn_slot *slot, struct isdn_v110 *iv110);
+
+extern int  isdn_v110_bsent(struct isdn_slot *slot, struct isdn_v110 *iv110);
 
 #endif
