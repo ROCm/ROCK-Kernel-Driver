@@ -35,6 +35,7 @@
 
 #include "drmP.h"
 
+#include "linux/pci.h"
 
 /**
  * Get interrupt from bus id.
@@ -139,7 +140,9 @@ int DRM(getunique)(struct inode *inode, struct file *filp,
  * \return zero on success or a negative number on failure.
  *
  * Copies the bus id from userspace into drm_device::unique, and searches for
- * the respective PCI device, updating drm_device::pdev.
+ * the respective PCI device, updating drm_device::pdev.  Deprecated in
+ * interface version 1.1 and will return EBUSY when setversion has requested
+ * version 1.1 or greater.
  */
 int DRM(setunique)(struct inode *inode, struct file *filp,
 		   unsigned int cmd, unsigned long arg)
@@ -213,6 +216,36 @@ int DRM(setunique)(struct inode *inode, struct file *filp,
 #endif
 		}
         } while(0);
+
+	return 0;
+}
+
+static int
+DRM(set_busid)(drm_device_t *dev)
+{
+	if (dev->unique != NULL)
+		return EBUSY;
+
+	dev->unique_len = 20;
+	dev->unique = DRM(alloc)(dev->unique_len + 1, DRM_MEM_DRIVER);
+	if (dev->unique == NULL)
+		return ENOMEM;
+
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,74)
+	snprintf(dev->unique, dev->unique_len, "pci:%s", pci_name(dev->pdev));
+#else
+	{
+		int domain = 0;
+#ifdef __alpha__
+		struct pci_controller *hose = pci_dev->sysdata;
+
+		domain = hose->bus->number;
+#endif
+		snprintf(dev->unique, dev->unique_len, "pci:%04x:%02x:%02x.%d",
+			domain, dev->pdev->bus->number,
+			PCI_SLOT(dev->pdev->devfn), PCI_FUNC(dev->pdev->devfn));
+	}
+#endif
 
 	return 0;
 }
@@ -361,5 +394,45 @@ int DRM(getstats)( struct inode *inode, struct file *filp,
 
 	if (copy_to_user((drm_stats_t *)arg, &stats, sizeof(stats)))
 		return -EFAULT;
+	return 0;
+}
+
+int DRM(setversion)(DRM_IOCTL_ARGS)
+{
+	DRM_DEVICE;
+	drm_set_version_t sv;
+	drm_set_version_t retv;
+
+	DRM_COPY_FROM_USER_IOCTL(sv, (drm_set_version_t *)data, sizeof(sv));
+
+	retv.drm_di_major = 1;
+	retv.drm_di_minor = 1;
+	retv.drm_dd_major = DRIVER_MAJOR;
+	retv.drm_dd_minor = DRIVER_MINOR;
+	
+	DRM_COPY_TO_USER_IOCTL((drm_set_version_t *)data, retv, sizeof(sv));
+
+	if (sv.drm_di_major != -1) {
+		if (sv.drm_di_major != 1 || sv.drm_di_minor < 0)
+			return EINVAL;
+		if (sv.drm_di_minor > 1)
+			return EINVAL;
+		if (sv.drm_di_minor >= 1) {
+			/*
+			 * Version 1.1 includes tying of DRM to specific device
+			 */
+			DRM(set_busid)(dev);
+		}
+	}
+
+	if (sv.drm_dd_major != -1) {
+		if (sv.drm_dd_major != DRIVER_MAJOR || sv.drm_dd_minor < 0)
+			return EINVAL;
+		if (sv.drm_dd_minor > DRIVER_MINOR)
+			return EINVAL;
+#ifdef DRIVER_SETVERSION
+		DRIVER_SETVERSION(dev, sv);
+#endif
+	}
 	return 0;
 }

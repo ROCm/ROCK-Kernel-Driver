@@ -819,6 +819,8 @@ extern int	     DRM(getclient)(struct inode *inode, struct file *filp,
 				    unsigned int cmd, unsigned long arg);
 extern int	     DRM(getstats)(struct inode *inode, struct file *filp,
 				   unsigned int cmd, unsigned long arg);
+extern int	     DRM(setversion)(struct inode *inode, struct file *filp,
+				     unsigned int cmd, unsigned long arg);
 
 				/* Context IOCTL support (drm_context.h) */
 extern int	     DRM(resctx)( struct inode *inode, struct file *filp,
