@@ -161,6 +161,16 @@ static int ramdisk_writepage(struct page *page, struct writeback_control *wbc)
 }
 
 /*
+ * This is a little speedup thing: short-circuit attempts to write back the
+ * ramdisk blockdev inode to its non-existent backing store.
+ */
+static int ramdisk_writepages(struct address_space *mapping,
+				struct writeback_control *wbc)
+{
+	return 0;
+}
+
+/*
  * ramdisk blockdev pages have their own ->set_page_dirty() because we don't
  * want them to contribute to dirty memory accounting.
  */
@@ -176,6 +186,7 @@ static struct address_space_operations ramdisk_aops = {
 	.commit_write	= ramdisk_commit_write,
 	.writepage	= ramdisk_writepage,
 	.set_page_dirty	= ramdisk_set_page_dirty,
+	.writepages	= ramdisk_writepages,
 };
 
 static int rd_blkdev_pagecache_IO(int rw, struct bio_vec *vec, sector_t sector,
