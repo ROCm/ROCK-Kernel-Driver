@@ -27,31 +27,6 @@
 #include "types.h"
 
 /*
- * Defined bits for the flags field in the ntfs_volume structure.
- */
-typedef enum {
-	NV_ShowSystemFiles,	/* 1: Return system files in ntfs_readdir(). */
-	NV_CaseSensitive,	/* 1: Treat file names as case sensitive and
-				      create filenames in the POSIX namespace.
-				      Otherwise be case insensitive and create
-				      file names in WIN32 namespace. */
-} ntfs_volume_flags;
-
-#define NVolShowSystemFiles(n_vol)	test_bit(NV_ShowSystemFiles,	\
-							&(n_vol)->flags)
-#define NVolSetShowSystemFiles(n_vol)	set_bit(NV_ShowSystemFiles,	\
-							&(n_vol)->flags)
-#define NVolClearShowSystemFiles(n_vol)	clear_bit(NV_ShowSystemFiles,	\
-							&(n_vol)->flags)
-
-#define NVolCaseSensitive(n_vol)	test_bit(NV_CaseSensitive,	\
-							&(n_vol)->flags)
-#define NVolSetCaseSensitive(n_vol)	set_bit(NV_CaseSensitive,	\
-							&(n_vol)->flags)
-#define NVolClearCaseSensitive(n_vol)	clear_bit(NV_CaseSensitive,	\
-							&(n_vol)->flags)
-
-/*
  * The NTFS in memory super block structure.
  */
 typedef struct {
@@ -100,15 +75,13 @@ typedef struct {
 	LCN mft_zone_start;		/* First cluster of the mft zone. */
 	LCN mft_zone_end;		/* First cluster beyond the mft zone. */
 	struct inode *mft_ino;		/* The VFS inode of $MFT. */
+
+	struct inode *mftbmp_ino;	/* Attribute inode for $MFT/$BITMAP. */
 	struct rw_semaphore mftbmp_lock; /* Lock for serializing accesses to the
 					    mft record bitmap ($MFT/$BITMAP). */
 	unsigned long nr_mft_records;	/* Number of mft records == number of
 					   bits in mft bitmap. */
-	struct address_space mftbmp_mapping; /* Page cache for $MFT/$BITMAP. */
-	run_list mftbmp_rl;		/* Run list for $MFT/$BITMAP. */
-	s64 mftbmp_size;		/* Data size of $MFT/$BITMAP. */
-	s64 mftbmp_initialized_size;	/* Initialized size of $MFT/$BITMAP. */
-	s64 mftbmp_allocated_size;	/* Allocated size of $MFT/$BITMAP. */
+
 	struct inode *mftmirr_ino;	/* The VFS inode of $MFTMirr. */
 	struct inode *lcnbmp_ino;	/* The VFS inode of $Bitmap. */
 	struct rw_semaphore lcnbmp_lock; /* Lock for serializing accesses to the
@@ -123,6 +96,39 @@ typedef struct {
 					   only, otherwise NULL). */
 	struct nls_table *nls_map;
 } ntfs_volume;
+
+/*
+ * Defined bits for the flags field in the ntfs_volume structure.
+ */
+typedef enum {
+	NV_ShowSystemFiles,	/* 1: Return system files in ntfs_readdir(). */
+	NV_CaseSensitive,	/* 1: Treat file names as case sensitive and
+				      create filenames in the POSIX namespace.
+				      Otherwise be case insensitive and create
+				      file names in WIN32 namespace. */
+} ntfs_volume_flags;
+
+/*
+ * Macro tricks to expand the NVolFoo(), NVolSetFoo(), and NVolClearFoo()
+ * functions.
+ */
+#define NVOL_FNS(flag)					\
+static inline int NVol##flag(ntfs_volume *vol)		\
+{							\
+	return test_bit(NV_##flag, &(vol)->flags);	\
+}							\
+static inline void NVolSet##flag(ntfs_volume *vol)	\
+{							\
+	set_bit(NV_##flag, &(vol)->flags);		\
+}							\
+static inline void NVolClear##flag(ntfs_volume *vol)	\
+{							\
+	clear_bit(NV_##flag, &(vol)->flags);		\
+}
+
+/* Emit the ntfs volume bitops functions. */
+NVOL_FNS(ShowSystemFiles)
+NVOL_FNS(CaseSensitive)
 
 #endif /* _LINUX_NTFS_VOLUME_H */
 

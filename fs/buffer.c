@@ -2311,12 +2311,14 @@ sector_t generic_block_bmap(struct address_space *mapping, sector_t block,
 	return tmp.b_blocknr;
 }
 
+#if 0
 int generic_direct_IO(int rw, struct inode *inode,
 			struct kiobuf *iobuf, unsigned long blocknr,
 			int blocksize, get_block_t *get_block)
 {
-	int i, nr_blocks, retval;
+	int i, nr_blocks, retval = 0;
 	sector_t *blocks = iobuf->blocks;
+	struct block_device *bdev = NULL;
 
 	nr_blocks = iobuf->length / blocksize;
 	/* build the blocklist */
@@ -2346,15 +2348,17 @@ int generic_direct_IO(int rw, struct inode *inode,
 				BUG();
 		}
 		blocks[i] = bh.b_blocknr;
+		bdev = bh.b_bdev;
 	}
 
 	/* This does not understand multi-device filesystems currently */
-	retval = brw_kiovec(rw, 1, &iobuf,
-			inode->i_sb->s_bdev, blocks, blocksize);
+	if (bdev)
+		retval = brw_kiovec(rw, 1, &iobuf, bdev, blocks, blocksize);
 
  out:
 	return retval;
 }
+#endif
 
 /*
  * Start I/O on a physical range of kernel memory, defined by a vector

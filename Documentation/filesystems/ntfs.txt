@@ -247,6 +247,28 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.20:
+	- Support non-resident directory index bitmaps. This means we now cope
+	  with huge directories without problems.
+	- Fix a page leak that manifested itself in some cases when reading
+	  directory contents.
+	- Internal cleanups.
+2.0.19:
+	- Fix race condition and improvements in block i/o interface.
+	- Optimization when reading compressed files.
+2.0.18:
+	- Fix race condition in reading of compressed files.
+2.0.17:
+	- Cleanups and optimizations.
+2.0.16:
+	- Fix stupid bug introduced in 2.0.15 in new attribute inode API.
+	- Big internal cleanup replacing the mftbmp access hacks by using the
+	  new attribute inode API instead.
+2.0.15:
+	- Bug fix in parsing of remount options.
+	- Internal changes implementing attribute (fake) inodes allowing all
+	  attribute i/o to go via the page cache and to use all the normal
+	  vfs/mm functionality.
 2.0.14:
 	- Internal changes improving run list merging code and minor locking
 	  change to not rely on BKL in ntfs_statfs().

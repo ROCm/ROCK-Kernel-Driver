@@ -32,11 +32,20 @@
 #define PSR_F_BIT	0x00000040
 #define PSR_I_BIT	0x00000080
 #define PSR_J_BIT	0x01000000
+#define PSR_Q_BIT	0x08000000
 #define PSR_V_BIT	0x10000000
 #define PSR_C_BIT	0x20000000
 #define PSR_Z_BIT	0x40000000
 #define PSR_N_BIT	0x80000000
 #define PCMASK		0
+
+/*
+ * Groups of PSR bits
+ */
+#define PSR_f		0xff000000	/* Flags		*/
+#define PSR_s		0x00ff0000	/* Status		*/
+#define PSR_x		0x0000ff00	/* Extension		*/
+#define PSR_c		0x000000ff	/* Control		*/
 
 /*
  * CR1 bits
@@ -121,7 +130,7 @@ static inline int valid_user_regs(struct pt_regs *regs)
 	/*
 	 * Force CPSR to something logical...
 	 */
-	regs->ARM_cpsr &= (PSR_V_BIT|PSR_C_BIT|PSR_Z_BIT|PSR_N_BIT|MODE32_BIT);
+	regs->ARM_cpsr &= PSR_f | PSR_s | PSR_x | PSR_T_BIT | MODE32_BIT;
 
 	return 0;
 }

@@ -135,6 +135,7 @@ static BOOL parse_options(ntfs_volume *vol, char *opt)
 	}
 	if (!opt || !*opt)
 		goto no_mount_options;
+	ntfs_debug("Entering with mount options string: %s", opt);
 	while ((p = strsep(&opt, ","))) {
 		if ((v = strchr(p, '=')))
 			*v++ = '\0';
@@ -217,7 +218,7 @@ no_mount_options:
 		}
 	}
 	if (nls_map) {
-		if (vol->nls_map) {
+		if (vol->nls_map && vol->nls_map != nls_map) {
 			ntfs_error(vol->sb, "Cannot change NLS character set "
 					"on remount.");
 			return FALSE;
@@ -249,8 +250,8 @@ no_mount_options:
 			mft_zone_multiplier = 1;
 		}
 		vol->mft_zone_multiplier = mft_zone_multiplier;
-	} if (!vol->mft_zone_multiplier)
-		/* Not specified and it is the first mount, so set default. */
+	}
+	if (!vol->mft_zone_multiplier)
 		vol->mft_zone_multiplier = 1;
 	if (on_errors != -1)
 		vol->on_errors = on_errors;
@@ -304,7 +305,7 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 {
 	ntfs_volume *vol = NTFS_SB(sb);
 
-	ntfs_debug("Entering.");
+	ntfs_debug("Entering with remount options string: %s", opt);
 
 	// FIXME/TODO: If left like this we will have problems with rw->ro and
 	// ro->rw, as well as with sync->async and vice versa remounts.
@@ -322,6 +323,11 @@ static int ntfs_remount(struct super_block *sb, int *flags, char *opt)
 
 	if (!parse_options(vol, opt))
 		return -EINVAL;
+
+#ifndef NTFS_RW
+	*flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+#endif
+
 	return 0;
 }
 
@@ -774,144 +780,20 @@ upcase_failed:
  */
 static BOOL load_system_files(ntfs_volume *vol)
 {
-	VCN next_vcn, last_vcn, highest_vcn;
 	struct super_block *sb = vol->sb;
 	struct inode *tmp_ino;
 	MFT_RECORD *m;
-	ATTR_RECORD *attr;
 	VOLUME_INFORMATION *vi;
 	attr_search_context *ctx;
-	run_list_element *rl;
 
 	ntfs_debug("Entering.");
-	/*
-	 * We have $MFT already (vol->mft_ino) but we need to setup access to
-	 * the $MFT/$BITMAP attribute.
-	 */
-	m = map_mft_record(READ, NTFS_I(vol->mft_ino));
-	if (IS_ERR(m)) {
-		ntfs_error(sb, "Failed to map $MFT.");
+
+	/* Get mft bitmap attribute inode. */
+	vol->mftbmp_ino = ntfs_attr_iget(vol->mft_ino, AT_BITMAP, NULL, 0);
+	if (IS_ERR(vol->mftbmp_ino)) {
+		ntfs_error(sb, "Failed to load $MFT/$BITMAP attribute.");
 		return FALSE;
 	}
-	if (!(ctx = get_attr_search_ctx(NTFS_I(vol->mft_ino), m))) {
-		ntfs_error(sb, "Failed to get attribute search context.");
-		goto unmap_err_out;
-	}
-	/* Load all attribute extents. */
-	attr = NULL;
-	rl = NULL;
-	next_vcn = last_vcn = highest_vcn = 0;
-	while (lookup_attr(AT_BITMAP, NULL, 0, 0, next_vcn, NULL, 0, ctx)) {
-		run_list_element *nrl;
-
-		/* Cache the current attribute extent. */
-		attr = ctx->attr;
-		/* $MFT/$BITMAP must be non-resident. */
-		if (!attr->non_resident) {
-			ntfs_error(sb, "$MFT/$BITMAP must be non-resident but "
-					"a resident extent was found. $MFT is "
-					"corrupt. Run chkdsk.");
-			goto put_err_out;
-		}
-		/* $MFT/$BITMAP must be uncompressed and unencrypted. */
-		if (attr->flags & ATTR_COMPRESSION_MASK ||
-				attr->flags & ATTR_IS_ENCRYPTED) {
-			ntfs_error(sb, "$MFT/$BITMAP must be uncompressed and "
-					"unencrypted but a compressed/"
-					"encrypted extent was found. $MFT is "
-					"corrupt. Run chkdsk.");
-			goto put_err_out;
-		}
-		/*
-		 * Decompress the mapping pairs array of this extent
-		 * and merge the result into the existing run list. Note we
-		 * don't need any locking at this stage as we are already
-		 * running exclusively as we are mount in progress task.
-		 */
-		nrl = decompress_mapping_pairs(vol, attr, rl);
-		if (IS_ERR(nrl)) {
-			ntfs_error(sb, "decompress_mapping_pairs() failed with "
-					"error code %ld. $MFT is corrupt.",
-					PTR_ERR(nrl));
-			goto put_err_out;
-		}
-		rl = nrl;
-
-		/* Are we in the first extent? */
-		if (!next_vcn) {
-			/* Get the last vcn in the $BITMAP attribute. */
-			last_vcn = sle64_to_cpu(attr->_ANR(allocated_size)) >>
-					vol->cluster_size_bits;
-			vol->mftbmp_size = sle64_to_cpu(attr->_ANR(data_size));
-			vol->mftbmp_initialized_size =
-					sle64_to_cpu(attr->_ANR(initialized_size));
-			vol->mftbmp_allocated_size =
-					sle64_to_cpu(attr->_ANR(allocated_size));
-			/* Consistency check. */
-			if (vol->mftbmp_size < (vol->nr_mft_records + 7) >> 3) {
-				ntfs_error(sb, "$MFT/$BITMAP is too short to "
-						"contain a complete mft "
-						"bitmap: impossible. $MFT is "
-						"corrupt. Run chkdsk.");
-				goto put_err_out;
-			}
-		}
-
-		/* Get the lowest vcn for the next extent. */
-		highest_vcn = sle64_to_cpu(attr->_ANR(highest_vcn));
-		next_vcn = highest_vcn + 1;
-
-		/* Only one extent or error, which we catch below. */
-		if (next_vcn <= 0)
-			break;
-
-		/* Avoid endless loops due to corruption. */
-		if (next_vcn < sle64_to_cpu(attr->_ANR(lowest_vcn))) {
-			ntfs_error(sb, "$MFT/$BITMAP has corrupt attribute "
-					"list attribute. Run chkdsk.");
-			goto put_err_out;
-		}
-
-	}
-	if (!attr) {
-		ntfs_error(sb, "Missing or invalid $BITMAP attribute in file "
-				"$MFT. $MFT is corrupt. Run chkdsk.");
-put_err_out:
-		put_attr_search_ctx(ctx);
-unmap_err_out:
-		unmap_mft_record(READ, NTFS_I(vol->mft_ino));
-		return FALSE;
-	}
-
-	/* We are finished with $MFT/$BITMAP. */
-	put_attr_search_ctx(ctx);
-	unmap_mft_record(READ, NTFS_I(vol->mft_ino));
-
-	/* Catch errors. */
-	if (highest_vcn && highest_vcn != last_vcn - 1) {
-		ntfs_error(sb, "Failed to load the complete run list for "
-				"$MFT/$BITMAP. Driver bug or corrupt $MFT. "
-				"Run chkdsk.");
-		ntfs_debug("highest_vcn = 0x%Lx, last_vcn - 1 = 0x%Lx",
-				(long long)highest_vcn,
-				(long long)last_vcn - 1);
-		return FALSE;;
-	}
-
-	/* Setup the run list and the address space in the volume structure. */
-	vol->mftbmp_rl.rl = rl;
-	vol->mftbmp_mapping.a_ops = &ntfs_mftbmp_aops;
-	
-	/*
-	 * Not inode data, set to volume. Our mft bitmap access kludge...
-	 * We can only pray this is not going to cause problems... If it does
-	 * cause problems we will need a fake inode for this.
-	 */
-	vol->mftbmp_mapping.host = (struct inode*)vol;
-
-	// FIXME: If mounting read-only, it would be ok to ignore errors when
-	// loading the mftbmp but we then need to make sure nobody remounts the
-	// volume read-write...
 
 	/* Get mft mirror inode. */
 	vol->mftmirr_ino = ntfs_iget(sb, FILE_MFTMirr);
@@ -919,7 +801,7 @@ unmap_err_out:
 		if (!IS_ERR(vol->mftmirr_ino))
 			iput(vol->mftmirr_ino);
 		ntfs_error(sb, "Failed to load $MFTMirr.");
-		return FALSE;
+		goto iput_mftbmp_err_out;
 	}
 	// FIXME: Compare mftmirr with mft and repair if appropriate and not
 	// a read-only mount.
@@ -954,7 +836,7 @@ bitmap_failed:
 			iput(vol->vol_ino);
 volume_failed:
 		ntfs_error(sb, "Failed to load $Volume.");
-		goto iput_bmp_mirr_err_out;
+		goto iput_lcnbmp_err_out;
 	}
 	m = map_mft_record(READ, NTFS_I(vol->vol_ino));
 	if (IS_ERR(m)) {
@@ -978,8 +860,8 @@ get_ctx_vol_failed:
 			le16_to_cpu(ctx->attr->_ARA(value_offset)));
 	/* Some bounds checks. */
 	if ((u8*)vi < (u8*)ctx->attr || (u8*)vi +
-			le32_to_cpu(ctx->attr->_ARA(value_length)) > (u8*)ctx->attr +
-			le32_to_cpu(ctx->attr->length))
+			le32_to_cpu(ctx->attr->_ARA(value_length)) >
+			(u8*)ctx->attr + le32_to_cpu(ctx->attr->length))
 		goto err_put_vol;
 	/* Setup volume flags and version. */
 	vol->vol_flags = vi->flags;
@@ -1000,7 +882,7 @@ get_ctx_vol_failed:
 		ntfs_error(sb, "Failed to load $LogFile.");
 		// FIMXE: We only want to empty the thing so pointless bailing
 		// out. Can recover/ignore.
-		goto iput_vol_bmp_mirr_err_out;
+		goto iput_vol_err_out;
 	}
 	// FIXME: Empty the logfile, but only if not read-only.
 	// FIXME: What happens if someone remounts rw? We need to empty the file
@@ -1015,7 +897,7 @@ get_ctx_vol_failed:
 		if (!IS_ERR(tmp_ino))
 			iput(tmp_ino);
 		ntfs_error(sb, "Failed to load $AttrDef.");
-		goto iput_vol_bmp_mirr_err_out;
+		goto iput_vol_err_out;
 	}
 	// FIXME: Parse the attribute definitions.
 	iput(tmp_ino);
@@ -1025,7 +907,7 @@ get_ctx_vol_failed:
 		if (!IS_ERR(vol->root_ino))
 			iput(vol->root_ino);
 		ntfs_error(sb, "Failed to load root directory.");
-		goto iput_vol_bmp_mirr_err_out;
+		goto iput_vol_err_out;
 	}
 	/* If on NTFS versions before 3.0, we are done. */
 	if (vol->major_ver < 3)
@@ -1037,7 +919,7 @@ get_ctx_vol_failed:
 		if (!IS_ERR(vol->secure_ino))
 			iput(vol->secure_ino);
 		ntfs_error(sb, "Failed to load $Secure.");
-		goto iput_root_vol_bmp_mirr_err_out;
+		goto iput_root_err_out;
 	}
 	// FIXME: Initialize security.
 	/* Get the extended system files' directory inode. */
@@ -1046,7 +928,7 @@ get_ctx_vol_failed:
 		if (!IS_ERR(tmp_ino))
 			iput(tmp_ino);
 		ntfs_error(sb, "Failed to load $Extend.");
-		goto iput_sec_root_vol_bmp_mirr_err_out;
+		goto iput_sec_err_out;
 	}
 	// FIXME: Do something. E.g. want to delete the $UsnJrnl if exists.
 	// Note we might be doing this at the wrong level; we might want to
@@ -1055,16 +937,18 @@ get_ctx_vol_failed:
 	// for the files in $Extend directory.
 	iput(tmp_ino);
 	return TRUE;
-iput_sec_root_vol_bmp_mirr_err_out:
+iput_sec_err_out:
 	iput(vol->secure_ino);
-iput_root_vol_bmp_mirr_err_out:
+iput_root_err_out:
 	iput(vol->root_ino);
-iput_vol_bmp_mirr_err_out:
+iput_vol_err_out:
 	iput(vol->vol_ino);
-iput_bmp_mirr_err_out:
+iput_lcnbmp_err_out:
 	iput(vol->lcnbmp_ino);
 iput_mirr_err_out:
 	iput(vol->mftmirr_ino);
+iput_mftbmp_err_out:
+	iput(vol->mftbmp_ino);
 	return FALSE;
 }
 
@@ -1082,8 +966,10 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 	ntfs_volume *vol = NTFS_SB(vfs_sb);
 
 	ntfs_debug("Entering.");
+
 	iput(vol->vol_ino);
 	vol->vol_ino = NULL;
+
 	/* NTFS 3.0+ specific clean up. */
 	if (vol->major_ver >= 3) {
 		if (vol->secure_ino) {
@@ -1091,29 +977,26 @@ static void ntfs_put_super(struct super_block *vfs_sb)
 			vol->secure_ino = NULL;
 		}
 	}
+
 	iput(vol->root_ino);
 	vol->root_ino = NULL;
+
 	down_write(&vol->lcnbmp_lock);
 	iput(vol->lcnbmp_ino);
 	vol->lcnbmp_ino = NULL;
 	up_write(&vol->lcnbmp_lock);
+
 	iput(vol->mftmirr_ino);
 	vol->mftmirr_ino = NULL;
+
+	down_write(&vol->mftbmp_lock);
+	iput(vol->mftbmp_ino);
+	vol->mftbmp_ino = NULL;
+	up_write(&vol->mftbmp_lock);
+
 	iput(vol->mft_ino);
 	vol->mft_ino = NULL;
-	down_write(&vol->mftbmp_lock);
-	/*
-	 * Clean up mft bitmap address space. Ignore the _inode_ bit in the
-	 * name of the function... FIXME: This destroys dirty pages!!! (AIA)
-	 */
-	truncate_inode_pages(&vol->mftbmp_mapping, 0);
-	vol->mftbmp_mapping.a_ops = NULL;
-	vol->mftbmp_mapping.host = NULL;
-	up_write(&vol->mftbmp_lock);
-	down_write(&vol->mftbmp_rl.lock);
-	ntfs_free(vol->mftbmp_rl.rl);
-	vol->mftbmp_rl.rl = NULL;
-	up_write(&vol->mftbmp_rl.lock);
+
 	vol->upcase_len = 0;
 	/*
 	 * Decrease the number of mounts and destroy the global default upcase
@@ -1241,60 +1124,41 @@ handle_partial_page:
 static unsigned long __get_nr_free_mft_records(ntfs_volume *vol)
 {
 	struct address_space *mapping;
-	filler_t *readpage;
 	struct page *page;
 	unsigned long index, max_index, nr_free = 0;
 	unsigned int max_size, i;
 	u32 *b;
 
-	ntfs_debug("Entering.");
-	/* Serialize accesses to the inode bitmap. */
-	mapping = &vol->mftbmp_mapping;
-	readpage = (filler_t*)mapping->a_ops->readpage;
+	mapping = vol->mftbmp_ino->i_mapping;
 	/*
-	 * Convert the number of bits into bytes rounded up, then convert into
-	 * multiples of PAGE_CACHE_SIZE.
+	 * Convert the number of bits into bytes rounded up to a multiple of 8
+	 * bytes, then convert into multiples of PAGE_CACHE_SIZE.
 	 */
-	max_index = (vol->nr_mft_records + 7) >> (3 + PAGE_CACHE_SHIFT);
+	max_index = (((vol->nr_mft_records + 7) >> 3) + 7) >> PAGE_CACHE_SHIFT;
 	/* Use multiples of 4 bytes. */
 	max_size = PAGE_CACHE_SIZE >> 2;
 	ntfs_debug("Reading $MFT/$BITMAP, max_index = 0x%lx, max_size = "
 			"0x%x.", max_index, max_size);
 	for (index = 0UL; index < max_index;) {
 handle_partial_page:
-		/*
-		 * Read the page from page cache, getting it from backing store
-		 * if necessary, and increment the use count.
-		 */
-		page = read_cache_page(mapping, index++, (filler_t*)readpage,
-				vol);
-		/* Ignore pages which errored synchronously. */
+		page = ntfs_map_page(mapping, index++);
 		if (IS_ERR(page)) {
-			ntfs_debug("Sync read_cache_page() error. Skipping "
-					"page (index 0x%lx).", index - 1);
+			ntfs_debug("ntfs_map_page() error. Skipping page "
+					"(index 0x%lx).", index - 1);
 			continue;
 		}
-		wait_on_page_locked(page);
-		if (!PageUptodate(page)) {
-			ntfs_debug("Async read_cache_page() error. Skipping "
-					"page (index 0x%lx).", index - 1);
-			/* Ignore pages which errored asynchronously. */
-			page_cache_release(page);
-			continue;
-		}
-		b = (u32*)kmap(page);
+		b = (u32*)page_address(page);
 		/* For each 4 bytes, add up the number of zero bits. */
-	  	for (i = 0; i < max_size; i++)
+		for (i = 0; i < max_size; i++)
 			nr_free += 32 - hweight32(b[i]);
-		kunmap(page);
-		page_cache_release(page);
+		ntfs_unmap_page(page);
 	}
 	if (index == max_index) {
 		/*
 		 * Get the multiples of 4 bytes in use in the final partial
 		 * page.
 		 */
-		max_size = ((((vol->nr_mft_records + 7) >> 3) &
+		max_size = ((((((vol->nr_mft_records + 7) >> 3) + 7) & ~7) &
 				~PAGE_CACHE_MASK) + 3) >> 2;
 		/* If there is a partial page go back and do it. */
 		if (max_size) {
@@ -1308,7 +1172,6 @@ handle_partial_page:
 	}
 	ntfs_debug("Finished reading $MFT/$BITMAP, last index = 0x%lx",
 			index - 1);
-	ntfs_debug("Exiting.");
 	return nr_free;
 }
 
@@ -1354,6 +1217,7 @@ static int ntfs_statfs(struct super_block *sb, struct statfs *sfs)
 		size = 0LL;
 	/* Free blocks avail to non-superuser, same as above on NTFS. */
 	sfs->f_bavail = sfs->f_bfree = size;
+	/* Serialize accesses to the inode bitmap. */
 	down_read(&vol->mftbmp_lock);
 	/* Total file nodes in file system (at this moment in time). */
 	sfs->f_files  = vol->mft_ino->i_size >> vol->mft_record_size_bits;
@@ -1399,10 +1263,8 @@ struct super_operations ntfs_sops = {
 	dirty_inode:	ntfs_dirty_inode,	/* VFS: Called from
 						   __mark_inode_dirty(). */
 	//write_inode:	NULL,		/* VFS: Write dirty inode to disk. */
-	//put_inode:	NULL,		/* VFS: Called whenever the reference
-	//				   count (i_count) of the inode is
-	//				   going to be decreased but before the
-	//				   actual decrease. */
+	put_inode:	ntfs_put_inode,	/* VFS: Called just before the inode
+					   reference count is decreased. */
 	//delete_inode:	NULL,		/* VFS: Delete inode from disk. Called
 	//				   when i_count becomes 0 and i_nlink is
 	//				   also 0. */
@@ -1444,6 +1306,9 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	int result;
 
 	ntfs_debug("Entering.");
+#ifndef NTFS_RW
+	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
+#endif
 	/* Allocate a new ntfs_volume and place it in sb->u.generic_sbp. */
 	sb->u.generic_sbp = kmalloc(sizeof(ntfs_volume), GFP_NOFS);
 	vol = NTFS_SB(sb);
@@ -1458,6 +1323,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->sb = sb;
 	vol->upcase = NULL;
 	vol->mft_ino = NULL;
+	vol->mftbmp_ino = NULL;
+	init_rwsem(&vol->mftbmp_lock);
 	vol->mftmirr_ino = NULL;
 	vol->lcnbmp_ino = NULL;
 	init_rwsem(&vol->lcnbmp_lock);
@@ -1469,37 +1336,10 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->on_errors = 0;
 	vol->mft_zone_multiplier = 0;
 	vol->nls_map = NULL;
-	init_rwsem(&vol->mftbmp_lock);
-	init_run_list(&vol->mftbmp_rl);
-
-	/* Initialize the mftbmp address space mapping.  */
-	INIT_RADIX_TREE(&vol->mftbmp_mapping.page_tree, GFP_ATOMIC);
-	rwlock_init(&vol->mftbmp_mapping.page_lock);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.clean_pages);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.dirty_pages);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.locked_pages);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.io_pages);
-	vol->mftbmp_mapping.nrpages = 0;
-	vol->mftbmp_mapping.a_ops = NULL;
-	vol->mftbmp_mapping.host = NULL;
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.i_mmap_shared);
-	spin_lock_init(&vol->mftbmp_mapping.i_shared_lock);
-	/*
-	 * private_lock and private_list are unused by ntfs.  But they
-	 * are available.
-	 */
-	spin_lock_init(&vol->mftbmp_mapping.private_lock);
-	INIT_LIST_HEAD(&vol->mftbmp_mapping.private_list);
-	vol->mftbmp_mapping.assoc_mapping = NULL;
-	vol->mftbmp_mapping.dirtied_when = 0;
-	vol->mftbmp_mapping.gfp_mask = GFP_HIGHUSER;
-	vol->mftbmp_mapping.backing_dev_info =
-			sb->s_bdev->bd_inode->i_mapping->backing_dev_info;
 
 	/*
 	 * Default is group and other don't have any access to files or
-	 * directories while owner has full access. Further files by default
+	 * directories while owner has full access. Further, files by default
 	 * are not executable but directories are of course browseable.
 	 */
 	vol->fmask = 0177;
@@ -1508,9 +1348,6 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	/* Important to get the mount options dealt with now. */
 	if (!parse_options(vol, (char*)opt))
 		goto err_out_now;
-	
-	/* We are just a read-only fs at the moment. */
-	sb->s_flags |= MS_RDONLY | MS_NOATIME | MS_NODIRATIME;
 
 	/*
 	 * TODO: Fail safety check. In the future we should really be able to
@@ -1666,11 +1503,8 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	vol->lcnbmp_ino = NULL;
 	iput(vol->mftmirr_ino);
 	vol->mftmirr_ino = NULL;
-	truncate_inode_pages(&vol->mftbmp_mapping, 0);
-	vol->mftbmp_mapping.a_ops = NULL;
-	vol->mftbmp_mapping.host = NULL;
-	ntfs_free(vol->mftbmp_rl.rl);
-	vol->mftbmp_rl.rl = NULL;
+	iput(vol->mftbmp_ino);
+	vol->mftbmp_ino = NULL;
 	vol->upcase_len = 0;
 	if (vol->upcase != default_upcase)
 		ntfs_free(vol->upcase);
@@ -1707,7 +1541,8 @@ cond_iput_mft_ino_err_out_now:
 	 * inode we have ever called ntfs_iget()/iput() on, otherwise we A)
 	 * leak resources and B) a subsequent mount fails automatically due to
 	 * ntfs_iget() never calling down into our ntfs_read_locked_inode()
-	 * method again...
+	 * method again... FIXME: Do we need to do this twice now because of
+	 * attribute inodes? I think not, so leave as is for now... (AIA)
 	 */
 	if (invalidate_inodes(sb)) {
 		ntfs_error(sb, "Busy inodes left. This is most likely a NTFS "
@@ -1788,7 +1623,7 @@ static int __init init_ntfs_fs(void)
 
 	/* This may be ugly but it results in pretty output so who cares. (-8 */
 	printk(KERN_INFO "NTFS driver " NTFS_VERSION " [Flags: R/"
-#ifdef CONFIG_NTFS_RW
+#ifdef NTFS_RW
 			"W"
 #else
 			"O"
@@ -1799,7 +1634,7 @@ static int __init init_ntfs_fs(void)
 #ifdef MODULE
 			" MODULE"
 #endif
-			"]. Copyright (c) 2001,2002 Anton Altaparmakov.\n");
+			"].\n");
 
 	ntfs_debug("Debug messages are enabled.");
 
@@ -1899,7 +1734,7 @@ static void __exit exit_ntfs_fs(void)
 }
 
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
-MODULE_DESCRIPTION("NTFS 1.2/3.x driver");
+MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2002 Anton Altaparmakov");
 MODULE_LICENSE("GPL");
 #ifdef DEBUG
 MODULE_PARM(debug_msgs, "i");

@@ -53,6 +53,7 @@
     via pci_alloc_consistent()
     
   DONE:
+  - restart IT DMA after a bus reset
   - safely obtain and release ISO Tx channels in cooperation with OHCI driver
   - map received DIF blocks to their proper location in DV frame (ensure
     recovery if dropped packet)
@@ -192,71 +193,19 @@ static inline struct video_card* file_to_video_card(struct file *file)
 /* Memory management functions */
 /*******************************/
 
-#define MDEBUG(x)	do { } while(0)		/* Debug memory management */
-
-/* [DaveM] I've recoded most of this so that:
- * 1) It's easier to tell what is happening
- * 2) It's more portable, especially for translating things
- *    out of vmalloc mapped areas in the kernel.
- * 3) Less unnecessary translations happen.
- *
- * The code used to assume that the kernel vmalloc mappings
- * existed in the page tables of every process, this is simply
- * not guarenteed.  We now use pgd_offset_k which is the
- * defined way to get at the kernel page tables.
- */
-
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-static inline struct page *uvirt_to_page(pgd_t *pgd, unsigned long adr)
-{
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-	struct page *ret = NULL;
-	
-	if (!pgd_none(*pgd)) {
-                pmd = pmd_offset(pgd, adr);
-                if (!pmd_none(*pmd)) {
-                        ptep = pte_offset_kernel(pmd, adr);
-                        pte = *ptep;
-                        if(pte_present(pte))
-				ret = pte_page(pte);
-                }
-        }
-	return ret;
-}
-
-/* Here we want the physical address of the memory.
- * This is used when initializing the contents of the
- * area and marking the pages as reserved, and for
- * handling page faults on the rvmalloc()ed buffer
- */
-static inline unsigned long kvirt_to_pa(unsigned long adr) 
-{
-        unsigned long va, kva, ret;
-
-        va = VMALLOC_VMADDR(adr);
-	kva = (unsigned long) page_address(uvirt_to_page(pgd_offset_k(va), va));
-	kva |= adr & (PAGE_SIZE-1); /* restore the offset */
-	ret = __pa(kva);
-        MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
-        return ret;
-}
-
 static void * rvmalloc(unsigned long size)
 {
 	void * mem;
-	unsigned long adr, page;
-        
+	unsigned long adr;
+
+	size = PAGE_ALIGN(size);
 	mem=vmalloc_32(size);
 	if (mem) {
 		memset(mem, 0, size); /* Clear the ram out, 
 					 no junk to the user */
 	        adr=(unsigned long) mem;
 		while (size > 0) {
-	                page = kvirt_to_pa(adr);
-			mem_map_reserve(virt_to_page(__va(page)));
+			mem_map_reserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -266,13 +215,12 @@ static void * rvmalloc(unsigned long size)
 
 static void rvfree(void * mem, unsigned long size)
 {
-        unsigned long adr, page;
-        
+        unsigned long adr;
+
 	if (mem) {
 	        adr=(unsigned long) mem;
 		while (size > 0) {
-	                page = kvirt_to_pa(adr);
-			mem_map_unreserve(virt_to_page(__va(page)));
+			mem_map_unreserve(vmalloc_to_page((void *)adr));
 			adr+=PAGE_SIZE;
 			size-=PAGE_SIZE;
 		}
@@ -1166,9 +1114,9 @@ static int do_dv1394_init(struct video_card *video, struct dv1394_init *init)
 		
 		/* fill the sglist with the kernel addresses of pages in the non-contiguous buffer */
 		for(i = 0; i < video->user_dma.n_pages; i++) {
-			unsigned long va = VMALLOC_VMADDR( (unsigned long) video->user_buf + i * PAGE_SIZE );
+			unsigned long va = (unsigned long) video->user_buf + i * PAGE_SIZE;
 			
-			video->user_dma.sglist[i].page = uvirt_to_page(pgd_offset_k(va), va);
+			video->user_dma.sglist[i].page = vmalloc_to_page((void *)va);
 			video->user_dma.sglist[i].length = PAGE_SIZE;
 		}
 		
@@ -1492,7 +1440,7 @@ static int do_dv1394_shutdown(struct video_card *video, int free_user_buf)
 static struct page * dv1394_nopage(struct vm_area_struct * area, unsigned long address, int write_access)
 {
 	unsigned long offset;
-	unsigned long page, kernel_virt_addr;
+	unsigned long kernel_virt_addr;
 	struct page *ret = NOPAGE_SIGBUS;
 
 	struct video_card *video = (struct video_card*) area->vm_private_data;
@@ -1510,10 +1458,7 @@ static struct page * dv1394_nopage(struct vm_area_struct * area, unsigned long a
 
 	offset = address - area->vm_start;
 	kernel_virt_addr = (unsigned long) video->user_buf + offset;
-
-	page = kvirt_to_pa(kernel_virt_addr);
-	
-	ret = virt_to_page(__va(page));
+	ret = vmalloc_to_page((void *)kernel_virt_addr);
 	get_page(ret);
 
  out:
@@ -2936,9 +2881,129 @@ static void dv1394_add_host (struct hpsb_host *host)
 	dv1394_init(ohci, DV1394_PAL, MODE_TRANSMIT);
 }
 
+
+/* Bus reset handler. In the event of a bus reset, we may need to
+   re-start the DMA contexts - otherwise the user program would
+   end up waiting forever.
+*/
+
+static void dv1394_host_reset(struct hpsb_host *host)
+{
+	struct ti_ohci *ohci;
+	struct video_card *video = NULL;
+	unsigned long flags;
+	struct list_head *lh;
+	
+	/* We only work with the OHCI-1394 driver */
+	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
+		return;
+
+	ohci = (struct ti_ohci *)host->hostdata;
+
+
+	/* find the corresponding video_cards */
+	spin_lock_irqsave(&dv1394_cards_lock, flags);
+	if(!list_empty(&dv1394_cards)) {
+		list_for_each(lh, &dv1394_cards) {
+			video = list_entry(lh, struct video_card, list);
+			if((video->id >> 2) == ohci->id)
+				break;
+		}
+	}
+	spin_unlock_irqrestore(&dv1394_cards_lock, flags);
+
+	if(!video)
+		return;
+
+	/* check IT context */
+	if(video->ohci_it_ctx != -1) {
+		u32 ctx;
+		
+		spin_lock_irqsave(&video->spinlock, flags);
+		
+		ctx = reg_read(video->ohci, video->ohci_IsoXmitContextControlSet);
+
+		/* if(RUN but not ACTIVE) */
+		if( (ctx & (1<<15)) &&
+		    !(ctx & (1<<10)) ) {
+
+			debug_printk("dv1394: IT context stopped due to bus reset; waking it up\n");
+
+			/* to be safe, assume a frame has been dropped. User-space programs
+			   should handle this condition like an underflow. */
+			video->dropped_frames++;
+			
+			/* for some reason you must clear, then re-set the RUN bit to restart DMA */
+			
+			/* clear RUN */
+			reg_write(video->ohci, video->ohci_IsoXmitContextControlClear, (1 << 15));
+			flush_pci_write(video->ohci);
+			
+			/* set RUN */
+			reg_write(video->ohci, video->ohci_IsoXmitContextControlSet, (1 << 15));
+			flush_pci_write(video->ohci);
+			
+			/* set the WAKE bit (just in case; this isn't strictly necessary) */
+			reg_write(video->ohci, video->ohci_IsoXmitContextControlSet, (1 << 12));
+			flush_pci_write(video->ohci);
+
+			irq_printk("dv1394: AFTER IT restart ctx 0x%08x ptr 0x%08x\n",
+				   reg_read(video->ohci, video->ohci_IsoXmitContextControlSet),
+				   reg_read(video->ohci, video->ohci_IsoXmitCommandPtr));
+		}
+
+		spin_unlock_irqrestore(&video->spinlock, flags);
+	}
+	
+	/* check IR context */
+	if(video->ohci_ir_ctx != -1) {
+		u32 ctx;
+		
+		spin_lock_irqsave(&video->spinlock, flags);
+		
+		ctx = reg_read(video->ohci, video->ohci_IsoRcvContextControlSet);
+
+		/* if(RUN but not ACTIVE) */
+		if( (ctx & (1<<15)) &&
+		    !(ctx & (1<<10)) ) {
+
+			debug_printk("dv1394: IR context stopped due to bus reset; waking it up\n");
+
+			/* to be safe, assume a frame has been dropped. User-space programs
+			   should handle this condition like an overflow. */
+			video->dropped_frames++;
+
+			/* for some reason you must clear, then re-set the RUN bit to restart DMA */
+			/* XXX this doesn't work for me, I can't get IR DMA to restart :[ */
+			
+			/* clear RUN */
+			reg_write(video->ohci, video->ohci_IsoRcvContextControlClear, (1 << 15));
+			flush_pci_write(video->ohci);
+			
+			/* set RUN */
+			reg_write(video->ohci, video->ohci_IsoRcvContextControlSet, (1 << 15));
+			flush_pci_write(video->ohci);
+			
+			/* set the WAKE bit (just in case; this isn't strictly necessary) */
+			reg_write(video->ohci, video->ohci_IsoRcvContextControlSet, (1 << 12));
+			flush_pci_write(video->ohci);
+
+			irq_printk("dv1394: AFTER IR restart ctx 0x%08x ptr 0x%08x\n",
+				   reg_read(video->ohci, video->ohci_IsoRcvContextControlSet),
+				   reg_read(video->ohci, video->ohci_IsoRcvCommandPtr));
+		}
+
+		spin_unlock_irqrestore(&video->spinlock, flags);
+	}
+
+	/* wake readers/writers/ioctl'ers */
+	wake_up_interruptible(&video->waitq);
+}
+
 static struct hpsb_highlevel_ops hl_ops = {
 	add_host:	dv1394_add_host,
 	remove_host:	dv1394_remove_host,
+	host_reset:     dv1394_host_reset,
 };
 
 

@@ -1430,8 +1430,7 @@ asmlinkage long sys_sched_yield(void)
 		} else
 			current->time_slice--;
 	} else if (unlikely(rt_task(current))) {
-		list_del(&current->run_list);
-		list_add_tail(&current->run_list, array->queue + current->prio);
+		list_move_tail(&current->run_list, array->queue + current->prio);
 	} else {
 		list_del(&current->run_list);
 		if (list_empty(array->queue + current->prio))

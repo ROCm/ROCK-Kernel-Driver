@@ -389,9 +389,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 		dinfo.product = dev->descriptor.idProduct;
 		dinfo.version = dev->descriptor.bcdDevice;
 		dinfo.num_applications = hid->maxapplication;
-		if (copy_to_user((void *) arg, &dinfo, sizeof(dinfo)))
-			return -EFAULT;
-		return 0;
+		return copy_to_user((void *) arg, &dinfo, sizeof(dinfo));
 	}
 
 	case HIDIOCGFLAG:
@@ -482,9 +480,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 
 		rinfo.num_fields = report->maxfield;
 
-		if (copy_to_user((void *) arg, &rinfo, sizeof(rinfo)))
-			return -EFAULT;
-		return 0;
+		return copy_to_user((void *) arg, &rinfo, sizeof(rinfo));
 
 	case HIDIOCGFIELDINFO:
 	{
@@ -516,9 +512,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 		finfo.unit_exponent = field->unit_exponent;
 		finfo.unit = field->unit;
 
-		if (copy_to_user((void *) arg, &finfo, sizeof(finfo)))
-			return -EFAULT;
-		return 0;
+		return copy_to_user((void *) arg, &finfo, sizeof(finfo));
 	}
 
 	case HIDIOCGUCODE:
@@ -539,17 +533,39 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 
 		uref.usage_code = field->usage[uref.usage_index].hid;
 
-		if (copy_to_user((void *) arg, &uref, sizeof(uref)))
-			return -EFAULT;
-		return 0;
+		return copy_to_user((void *) arg, &uref, sizeof(uref));
 
 	case HIDIOCGUSAGE:
+		if (copy_from_user(&uref, (void *) arg, sizeof(uref)))
+			return -EFAULT;
+
+		if (uref.report_id == HID_REPORT_ID_UNKNOWN) {
+			field = hiddev_lookup_usage(hid, &uref);
+			if (field == NULL)
+				return -EINVAL;
+		} else {
+			rinfo.report_type = uref.report_type;
+			rinfo.report_id = uref.report_id;
+			if ((report = hiddev_lookup_report(hid, &rinfo)) == NULL)
+				return -EINVAL;
+
+			if (uref.field_index >= report->maxfield)
+				return -EINVAL;
+
+			field = report->field[uref.field_index];
+			if (uref.usage_index >= field->maxusage)
+				return -EINVAL;
+		}
+
+		uref.value = field->value[uref.usage_index];
+
+		return copy_to_user((void *) arg, &uref, sizeof(uref));
+
 	case HIDIOCSUSAGE:
 		if (copy_from_user(&uref, (void *) arg, sizeof(uref)))
 			return -EFAULT;
 
-		if (cmd == HIDIOCSUSAGE &&
-		    uref.report_type != HID_REPORT_TYPE_OUTPUT)
+		if (uref.report_type == HID_REPORT_TYPE_INPUT)
 			return -EINVAL;
 
 		if (uref.report_id == HID_REPORT_ID_UNKNOWN) {
@@ -570,14 +586,7 @@ static int hiddev_ioctl(struct inode *inode, struct file *file,
 				return -EINVAL;
 		}
 
-		if (cmd == HIDIOCGUSAGE) {
-			uref.value = field->value[uref.usage_index];
-			if (copy_to_user((void *) arg, &uref, sizeof(uref)))
-				return -EFAULT;
-			return 0;
-		} else {
-			field->value[uref.usage_index] = uref.value;
-		}
+		field->value[uref.usage_index] = uref.value;
 
 		return 0;
 
@@ -626,9 +635,9 @@ int hiddev_connect(struct hid_device *hid)
 	if (i == hid->maxapplication)
 		return -1;
 
-	retval = usb_register_dev (&hiddev_fops, HIDDEV_MINOR_BASE, 1, &minor);
+	retval = usb_register_dev(&hiddev_fops, HIDDEV_MINOR_BASE, 1, &minor);
 	if (retval) {
-		err ("Not able to get a minor for this device.");
+		err("Not able to get a minor for this device.");
 		return -1;
 	}
 

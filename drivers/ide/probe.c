@@ -312,8 +312,7 @@ byte eighty_ninty_three(struct ata_device *drive)
 int ide_config_drive_speed(struct ata_device *drive, byte speed)
 {
 	struct ata_channel *ch = drive->channel;
-	int i;
-	int error = 1;
+	int ret;
 
 #if defined(CONFIG_BLK_DEV_IDEDMA) && !defined(__CRIS__)
 	u8 unit = (drive->select.b.unit & 0x01);
@@ -338,33 +337,14 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 	if (drive->quirk_list == 2)
 		ata_irq_enable(drive, 1);
 	udelay(1);
-
-	/* FIXME: use ata_status_poll()  --bkz */
-
-	ata_busy_poll(drive, WAIT_CMD);
-
-	/*
-	 * Allow status to settle, then read it again.
-	 * A few rare drives vastly violate the 400ns spec here,
-	 * so we'll wait up to 10usec for a "good" status
-	 * rather than expensively fail things immediately.
-	 * This fix courtesy of Matthew Faupel & Niccolo Rigacci.
-	 */
-	for (i = 0; i < 10; i++) {
-		udelay(1);
-		if (ata_status(drive, DRIVE_READY, BUSY_STAT | DRQ_STAT | ERR_STAT)) {
-			error = 0;
-			break;
-		}
-	}
-
+	ret = ata_status_poll(drive, 0, BUSY_STAT, WAIT_CMD, NULL);
 	ata_mask(drive);
 
 	enable_irq(ch->irq);
 
-	if (error) {
+	if (ret != ATA_OP_READY) {
 		ata_dump(drive, NULL, "set drive speed");
-		return error;
+		return 1;
 	}
 
 	drive->id->dma_ultra &= ~0xFF00;
@@ -399,7 +379,7 @@ int ide_config_drive_speed(struct ata_device *drive, byte speed)
 
 	drive->current_speed = speed;
 
-	return error;
+	return 0;
 }
 
 static inline void do_identify(struct ata_device *drive, u8 cmd)

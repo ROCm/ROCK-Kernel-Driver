@@ -460,7 +460,7 @@ struct video_card {
 	   This is a regular int, but use test_and_set_bit() (on bit zero) 
 	   for atomicity.
 	 */
-	int open;
+	unsigned long open;
 
 	/* 
 	   2) the spinlock - this provides mutual exclusion between the interrupt

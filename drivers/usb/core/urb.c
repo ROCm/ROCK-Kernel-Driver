@@ -105,7 +105,7 @@ struct urb * usb_get_urb(struct urb *urb)
  * any transfer flags.
  *
  * Successful submissions return 0; otherwise this routine returns a
- * negative error number.  If the submission is successful, the complete
+ * negative error number.  If the submission is successful, the complete()
  * fuction of the urb will be called when the USB host driver is
  * finished with the urb (either a successful transmission, or some
  * error case.)
@@ -117,8 +117,8 @@ struct urb * usb_get_urb(struct urb *urb)
  * driver which issued the request.  The completion handler may then
  * immediately free or reuse that URB.
  *
- * Bulk URBs will be queued if the USB_QUEUE_BULK transfer flag is set
- * in the URB.  This can be used to maximize bandwidth utilization by
+ * Bulk URBs may be queued by submitting an URB to an endpoint before
+ * previous ones complete.  This can maximize bandwidth utilization by
  * letting the USB controller start work on the next URB without any
  * delay to report completion (scheduling and processing an interrupt)
  * and then submit that next request.
@@ -128,16 +128,19 @@ struct urb * usb_get_urb(struct urb *urb)
  *
  * Reserved Bandwidth Transfers:
  *
- * Periodic URBs (interrupt or isochronous) are completed repeatedly,
+ * Periodic URBs (interrupt or isochronous) are performed repeatedly.
+ *
+ * For interrupt requests this is (currently) automagically done
  * until the original request is aborted.  When the completion callback
  * indicates the URB has been unlinked (with a special status code),
  * control of that URB returns to the device driver.  Otherwise, the
  * completion handler does not control the URB, and should not change
  * any of its fields.
  *
- * Note that isochronous URBs should be submitted in a "ring" data
- * structure (using urb->next) to ensure that they are resubmitted
- * appropriately.
+ * For isochronous requests, the completion handler is expected to
+ * submit an urb, typically resubmitting its parameter, until drivers
+ * stop wanting data transfers.  (For example, audio playback might have
+ * finished, or a webcam turned off.)
  *
  * If the USB subsystem can't reserve sufficient bandwidth to perform
  * the periodic request, and bandwidth reservation is being done for
@@ -274,17 +277,18 @@ int usb_submit_urb(struct urb *urb, int mem_flags)
 
 	/* enforce simple/standard policy */
 	allowed = USB_ASYNC_UNLINK;	// affects later unlinks
-	allowed |= USB_NO_FSBR;		// only affects UHCI
 	switch (temp) {
-	case PIPE_CONTROL:
-		allowed |= USB_DISABLE_SPD;
-		break;
 	case PIPE_BULK:
-		allowed |= USB_DISABLE_SPD | USB_QUEUE_BULK
-				| USB_ZERO_PACKET | URB_NO_INTERRUPT;
-		break;
-	case PIPE_INTERRUPT:
-		allowed |= USB_DISABLE_SPD;
+		allowed |= URB_NO_INTERRUPT;
+		if (is_out)
+			allowed |= USB_ZERO_PACKET;
+		/* FALLTHROUGH */
+	case PIPE_CONTROL:
+		allowed |= USB_NO_FSBR;	/* only affects UHCI */
+		/* FALLTHROUGH */
+	default:			/* all non-iso endpoints */
+		if (!is_out)
+			allowed |= URB_SHORT_NOT_OK;
 		break;
 	case PIPE_ISOCHRONOUS:
 		allowed |= USB_ISO_ASAP;

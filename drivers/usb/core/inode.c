@@ -162,6 +162,9 @@ static struct inode *usbfs_get_inode (struct super_block *sb, int mode, int dev)
 		case S_IFDIR:
 			inode->i_op = &usbfs_dir_inode_operations;
 			inode->i_fop = &simple_dir_operations;
+
+			/* directory inodes start off with i_nlink == 2 (for "." entry) */
+			inode->i_nlink++;
 			break;
 		}
 	}
@@ -317,13 +320,13 @@ static int usbfs_fill_super(struct super_block *sb, void *data, int silent)
 	inode = usbfs_get_inode(sb, S_IFDIR | 0755, 0);
 
 	if (!inode) {
-		dbg("%s: could not get inode!\n",__FUNCTION__);
+		dbg("%s: could not get inode!",__FUNCTION__);
 		return -ENOMEM;
 	}
 
 	root = d_alloc_root(inode);
 	if (!root) {
-		dbg("%s: could not get root dentry!\n",__FUNCTION__);
+		dbg("%s: could not get root dentry!",__FUNCTION__);
 		iput(inode);
 		return -ENOMEM;
 	}
@@ -364,7 +367,7 @@ static int fs_create_by_name (const char *name, mode_t mode,
 	}
 
 	if (!parent) {
-		dbg("Ah! can not find a parent!\n");
+		dbg("Ah! can not find a parent!");
 		return -EFAULT;
 	}
 
@@ -390,7 +393,7 @@ static int fs_create_by_name (const char *name, mode_t mode,
 				error = vfs_mkdir(parent->d_inode,d,mode);
 				break;
 			default:
-				err("cannot create special files\n");
+				err("cannot create special files");
 		}
 		*dentry = d;
 	}
@@ -408,7 +411,7 @@ static struct dentry *fs_create_file (const char *name, mode_t mode,
 	struct dentry *dentry;
 	int error;
 
-	dbg("creating file '%s'\n",name);
+	dbg("creating file '%s'",name);
 
 	error = fs_create_by_name(name,mode,parent,&dentry);
 	if (error) {
@@ -510,7 +513,7 @@ static int get_mount (void)
 	mntput(mnt);
 
 go_ahead:
-	dbg("mount_count = %d\n", mount_count);
+	dbg("mount_count = %d", mount_count);
 	return 0;
 }
 
@@ -526,7 +529,7 @@ static void remove_mount (void)
 
 	spin_unlock (&mount_lock);
 	mntput(mnt);
-	dbg("mount_count = %d\n", mount_count);
+	dbg("mount_count = %d", mount_count);
 }
 
 static int create_special_files (void)

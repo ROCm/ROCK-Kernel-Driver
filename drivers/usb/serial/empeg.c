@@ -171,8 +171,6 @@ static int empeg_open (struct usb_serial_port *port, struct file *filp)
 		empeg_read_bulk_callback,
 		port);
 
-	port->read_urb->transfer_flags |= USB_QUEUE_BULK;
-
 	result = usb_submit_urb(port->read_urb, GFP_KERNEL);
 
 	if (result)
@@ -269,8 +267,6 @@ static int empeg_write (struct usb_serial_port *port, int from_user, const unsig
 			transfer_size,
 			empeg_write_bulk_callback,
 			port);
-
-		urb->transfer_flags |= USB_QUEUE_BULK;
 
 		/* send it down the pipe */
 		status = usb_submit_urb(urb, GFP_ATOMIC);
@@ -423,8 +419,6 @@ static void empeg_read_bulk_callback (struct urb *urb)
 		port->read_urb->transfer_buffer_length,
 		empeg_read_bulk_callback,
 		port);
-
-	port->read_urb->transfer_flags |= USB_QUEUE_BULK;
 
 	result = usb_submit_urb(port->read_urb, GFP_ATOMIC);
 

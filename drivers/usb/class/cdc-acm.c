@@ -619,7 +619,7 @@ static void *acm_probe(struct usb_device *dev, unsigned int ifnum,
 			buf += readsize, acm->writesize, acm_write_bulk, acm);
 		acm->writeurb->transfer_flags |= USB_NO_FSBR;
 
-		printk(KERN_INFO "ttyACM%d: USB ACM device\n", minor);
+		info("ttyACM%d: USB ACM device", minor);
 
 		acm_set_control(acm, acm->ctrlout);
 

@@ -61,7 +61,7 @@ static inline void wakeup_softirqd(unsigned cpu)
 
 asmlinkage void do_softirq()
 {
-	unsigned long cpu;
+	int cpu;
 	__u32 pending;
 	long flags;
 	__u32 mask;

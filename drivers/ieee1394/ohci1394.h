@@ -21,6 +21,8 @@
 #ifndef _OHCI1394_H
 #define _OHCI1394_H
 
+#include <asm/io.h>
+
 #include "ieee1394_types.h"
 #include <asm/io.h>
 
@@ -144,7 +146,16 @@ struct ti_ohci {
 
         struct pci_dev *dev;
 
-        u32 state;
+	enum { 
+		OHCI_INIT_ALLOC_HOST,
+		OHCI_INIT_HAVE_MEM_REGION,
+		OHCI_INIT_HAVE_IOMAPPING,
+		OHCI_INIT_HAVE_CONFIG_ROM_BUFFER,
+		OHCI_INIT_HAVE_SELFID_BUFFER,
+		OHCI_INIT_HAVE_TXRX_BUFFERS__MAYBE,
+		OHCI_INIT_HAVE_IRQ,
+		OHCI_INIT_DONE,
+	} init_state;
         
         /* remapped memory spaces */
         void *registers; 

@@ -30,7 +30,7 @@
 #include "ntfs.h"
 
 /**
- * end_buffer_read_attr_async - async io completion for reading attributes
+ * ntfs_end_buffer_async_read - async io completion for reading attributes
  * @bh:		buffer head on which io is completed
  * @uptodate:	whether @bh is now uptodate or not
  *
@@ -45,25 +45,22 @@
  * record size, and index_block_size_bits, to the log(base 2) of the ntfs
  * record size.
  */
-static void end_buffer_read_attr_async(struct buffer_head *bh, int uptodate)
+static void ntfs_end_buffer_async_read(struct buffer_head *bh, int uptodate)
 {
 	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
 	unsigned long flags;
 	struct buffer_head *tmp;
 	struct page *page;
 	ntfs_inode *ni;
-
-	if (likely(uptodate))
-		set_buffer_uptodate(bh);
-	else
-		clear_buffer_uptodate(bh);
+	int page_uptodate = 1;
 
 	page = bh->b_page;
-
 	ni = NTFS_I(page->mapping->host);
 
 	if (likely(uptodate)) {
 		s64 file_ofs;
+
+		set_buffer_uptodate(bh);
 
 		file_ofs = (page->index << PAGE_CACHE_SHIFT) + bh_offset(bh);
 		/* Check for the current buffer head overflowing. */
@@ -78,22 +75,28 @@ static void end_buffer_read_attr_async(struct buffer_head *bh, int uptodate)
 			flush_dcache_page(page);
 			kunmap_atomic(addr, KM_BIO_SRC_IRQ);
 		}
-	} else
+	} else {
+		clear_buffer_uptodate(bh);
+		ntfs_error(ni->vol->sb, "Buffer I/O error, logical block %Lu.",
+				(unsigned long long)bh->b_blocknr);
 		SetPageError(page);
+	}
 
 	spin_lock_irqsave(&page_uptodate_lock, flags);
 	clear_buffer_async_read(bh);
 	unlock_buffer(bh);
-
-	tmp = bh->b_this_page;
-	while (tmp != bh) {
-		if (buffer_locked(tmp)) {
-			if (buffer_async_read(tmp))
+	tmp = bh;
+	do {
+		if (!buffer_uptodate(tmp))
+			page_uptodate = 0;
+		if (buffer_async_read(tmp)) {
+			if (likely(buffer_locked(tmp)))
 				goto still_busy;
-		} else if (!buffer_uptodate(tmp))
-			SetPageError(page);
+			/* Async buffers must be locked. */
+			BUG();
+		}
 		tmp = tmp->b_this_page;
-	}
+	} while (tmp != bh);
 	spin_unlock_irqrestore(&page_uptodate_lock, flags);
 	/*
 	 * If none of the buffers had errors then we can set the page uptodate,
@@ -101,7 +104,7 @@ static void end_buffer_read_attr_async(struct buffer_head *bh, int uptodate)
 	 * attribute is mst protected, i.e. if NInoMstProteced(ni) is true.
 	 */
 	if (!NInoMstProtected(ni)) {
-		if (likely(!PageError(page)))
+		if (likely(page_uptodate && !PageError(page)))
 			SetPageUptodate(page);
 		unlock_page(page);
 		return;
@@ -127,12 +130,15 @@ static void end_buffer_read_attr_async(struct buffer_head *bh, int uptodate)
 		}
 		flush_dcache_page(page);
 		kunmap_atomic(addr, KM_BIO_SRC_IRQ);
-		if (likely(!nr_err && recs))
-			SetPageUptodate(page);
-		else {
-			ntfs_error(ni->vol->sb, "Setting page error, index "
-					"0x%lx.", page->index);
-			SetPageError(page);
+		if (likely(!PageError(page))) {
+			if (likely(!nr_err && recs)) {
+				if (likely(page_uptodate))
+					SetPageUptodate(page);
+			} else {
+				ntfs_error(ni->vol->sb, "Setting page error, "
+						"index 0x%lx.", page->index);
+				SetPageError(page);
+			}
 		}
 	}
 	unlock_page(page);
@@ -143,12 +149,12 @@ still_busy:
 }
 
 /**
- * ntfs_attr_read_block - fill a @page of an address space with data
+ * ntfs_read_block - fill a @page of an address space with data
  * @page:	page cache page to fill with data
  *
  * Fill the page @page of the address space belonging to the @page->host inode.
  * We read each buffer asynchronously and when all buffers are read in, our io
- * completion handler end_buffer_read_attr_async(), if required, automatically
+ * completion handler ntfs_end_buffer_read_async(), if required, automatically
  * applies the mst fixups to the page before finally marking it uptodate and
  * unlocking it.
  *
@@ -156,12 +162,13 @@ still_busy:
  *
  * Contains an adapted version of fs/buffer.c::block_read_full_page().
  */
-static int ntfs_attr_read_block(struct page *page)
+static int ntfs_read_block(struct page *page)
 {
 	VCN vcn;
 	LCN lcn;
 	ntfs_inode *ni;
 	ntfs_volume *vol;
+	run_list_element *rl;
 	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
 	sector_t iblock, lblock, zblock;
 	unsigned int blocksize, blocks, vcn_ofs;
@@ -186,12 +193,13 @@ static int ntfs_attr_read_block(struct page *page)
 	zblock = (ni->initialized_size + blocksize - 1) >> blocksize_bits;
 
 #ifdef DEBUG
-	if (unlikely(!ni->run_list.rl && !ni->mft_no))
+	if (unlikely(!ni->run_list.rl && !ni->mft_no && !NInoAttr(ni)))
 		panic("NTFS: $MFT/$DATA run list has been unmapped! This is a "
 				"very serious bug! Cannot continue...");
 #endif
 
 	/* Loop through all the buffers in the page. */
+	rl = NULL;
 	nr = i = 0;
 	do {
 		if (unlikely(buffer_uptodate(bh)))
@@ -210,11 +218,18 @@ static int ntfs_attr_read_block(struct page *page)
 					vol->cluster_size_bits;
 			vcn_ofs = ((VCN)iblock << blocksize_bits) &
 					vol->cluster_size_mask;
-retry_remap:
-			/* Convert the vcn to the corresponding lcn. */
-			down_read(&ni->run_list.lock);
-			lcn = vcn_to_lcn(ni->run_list.rl, vcn);
-			up_read(&ni->run_list.lock);
+			if (!rl) {
+lock_retry_remap:
+				down_read(&ni->run_list.lock);
+				rl = ni->run_list.rl;
+			}
+			if (likely(rl != NULL)) {
+				/* Seek to element containing target vcn. */
+				while (rl->length && rl[1].vcn <= vcn)
+					rl++;
+				lcn = vcn_to_lcn(rl, vcn);
+			} else
+				lcn = (LCN)LCN_RL_NOT_MAPPED;
 			/* Successful remap. */
 			if (lcn >= 0) {
 				/* Setup buffer head to correct block. */
@@ -235,8 +250,14 @@ retry_remap:
 			/* If first try and run list unmapped, map and retry. */
 			if (!is_retry && lcn == LCN_RL_NOT_MAPPED) {
 				is_retry = TRUE;
+				/*
+				 * Attempt to map run list, dropping lock for
+				 * the duration.
+				 */
+				up_read(&ni->run_list.lock);
 				if (!map_run_list(ni, vcn))
-					goto retry_remap;
+					goto lock_retry_remap;
+				rl = NULL;
 			}
 			/* Hard error, zero out region. */
 			SetPageError(page);
@@ -261,18 +282,29 @@ handle_zblock:
 		set_buffer_uptodate(bh);
 	} while (i++, iblock++, (bh = bh->b_this_page) != head);
 
+	/* Release the lock if we took it. */
+	if (rl)
+		up_read(&ni->run_list.lock);
+
 	/* Check we have at least one buffer ready for i/o. */
 	if (nr) {
+		struct buffer_head *tbh;
+
 		/* Lock the buffers. */
 		for (i = 0; i < nr; i++) {
-			struct buffer_head *tbh = arr[i];
+			tbh = arr[i];
 			lock_buffer(tbh);
-			tbh->b_end_io = end_buffer_read_attr_async;
+			tbh->b_end_io = ntfs_end_buffer_async_read;
 			set_buffer_async_read(tbh);
 		}
 		/* Finally, start i/o on the buffers. */
-		for (i = 0; i < nr; i++)
-			submit_bh(READ, arr[i]);
+		for (i = 0; i < nr; i++) {
+			tbh = arr[i];
+			if (likely(!buffer_uptodate(tbh)))
+				submit_bh(READ, tbh);
+			else
+				ntfs_end_buffer_async_read(tbh, 1);
+		}
 		return 0;
 	}
 	/* No i/o was scheduled on any of the buffers. */
@@ -285,27 +317,27 @@ handle_zblock:
 }
 
 /**
- * ntfs_file_readpage - fill a @page of a @file with data from the device
+ * ntfs_readpage - fill a @page of a @file with data from the device
  * @file:	open file to which the page @page belongs or NULL
  * @page:	page cache page to fill with data
  *
- * For non-resident attributes, ntfs_file_readpage() fills the @page of the open
+ * For non-resident attributes, ntfs_readpage() fills the @page of the open
  * file @file by calling the ntfs version of the generic block_read_full_page()
- * function provided by the kernel, ntfs_attr_read_block(), which in turn
- * creates and reads in the buffers associated with the page asynchronously.
+ * function, ntfs_read_block(), which in turn creates and reads in the buffers
+ * associated with the page asynchronously.
  *
- * For resident attributes, OTOH, ntfs_file_readpage() fills @page by copying
- * the data from the mft record (which at this stage is most likely in memory)
- * and fills the remainder with zeroes. Thus, in this case, I/O is synchronous,
- * as even if the mft record is not cached at this point in time, we need to
- * wait for it to be read in before we can do the copy.
+ * For resident attributes, OTOH, ntfs_readpage() fills @page by copying the
+ * data from the mft record (which at this stage is most likely in memory) and
+ * fills the remainder with zeroes. Thus, in this case, I/O is synchronous, as
+ * even if the mft record is not cached at this point in time, we need to wait
+ * for it to be read in before we can do the copy.
  *
- * Return 0 on success or -errno on error.
+ * Return 0 on success and -errno on error.
  */
-static int ntfs_file_readpage(struct file *file, struct page *page)
+int ntfs_readpage(struct file *file, struct page *page)
 {
 	s64 attr_pos;
-	ntfs_inode *ni;
+	ntfs_inode *ni, *base_ni;
 	char *addr;
 	attr_search_context *ctx;
 	MFT_RECORD *mrec;
@@ -317,40 +349,45 @@ static int ntfs_file_readpage(struct file *file, struct page *page)
 
 	ni = NTFS_I(page->mapping->host);
 
-	/* Is the unnamed $DATA attribute resident? */
 	if (NInoNonResident(ni)) {
-		/* Attribute is not resident. */
-
-		/* If the file is encrypted, we deny access, just like NT4. */
-		if (NInoEncrypted(ni)) {
-			err = -EACCES;
-			goto unl_err_out;
+		/*
+		 * Only unnamed $DATA attributes can be compressed or
+		 * encrypted.
+		 */
+		if (ni->type == AT_DATA && !ni->name_len) {
+			/* If file is encrypted, deny access, just like NT4. */
+			if (NInoEncrypted(ni)) {
+				err = -EACCES;
+				goto err_out;
+			}
+			/* Compressed data streams are handled in compress.c. */
+			if (NInoCompressed(ni))
+				return ntfs_read_compressed_block(page);
 		}
-		/* Compressed data stream. Handled in compress.c. */
-		if (NInoCompressed(ni))
-			return ntfs_file_read_compressed_block(page);
 		/* Normal data stream. */
-		return ntfs_attr_read_block(page);
+		return ntfs_read_block(page);
 	}
 	/* Attribute is resident, implying it is not compressed or encrypted. */
+	if (!NInoAttr(ni))
+		base_ni = ni;
+	else
+		base_ni = ni->_INE(base_ntfs_ino);
 
 	/* Map, pin and lock the mft record for reading. */
-	mrec = map_mft_record(READ, ni);
+	mrec = map_mft_record(READ, base_ni);
 	if (unlikely(IS_ERR(mrec))) {
 		err = PTR_ERR(mrec);
-		goto unl_err_out;
+		goto err_out;
 	}
-
-	ctx = get_attr_search_ctx(ni, mrec);
+	ctx = get_attr_search_ctx(base_ni, mrec);
 	if (unlikely(!ctx)) {
 		err = -ENOMEM;
-		goto unm_unl_err_out;
+		goto unm_err_out;
 	}
-
-	/* Find the data attribute in the mft record. */
-	if (unlikely(!lookup_attr(AT_DATA, NULL, 0, 0, 0, NULL, 0, ctx))) {
+	if (unlikely(!lookup_attr(ni->type, ni->name, ni->name_len,
+			IGNORE_CASE, 0, NULL, 0, ctx))) {
 		err = -ENOENT;
-		goto put_unm_unl_err_out;
+		goto put_unm_err_out;
 	}
 
 	/* Starting position of the page within the attribute value. */
@@ -377,253 +414,21 @@ static int ntfs_file_readpage(struct file *file, struct page *page)
 	kunmap(page);
 
 	SetPageUptodate(page);
-put_unm_unl_err_out:
+put_unm_err_out:
 	put_attr_search_ctx(ctx);
-unm_unl_err_out:
-	unmap_mft_record(READ, ni);
-unl_err_out:
+unm_err_out:
+	unmap_mft_record(READ, base_ni);
+err_out:
 	unlock_page(page);
 	return err;
 }
 
 /**
- * ntfs_mst_readpage - fill a @page of the mft or a directory with data
- * @file:	open file/directory to which the @page belongs or NULL
- * @page:	page cache page to fill with data
- *
- * Readpage method for the VFS address space operations of directory inodes
- * and the $MFT/$DATA attribute.
- *
- * We just call ntfs_attr_read_block() here, in fact we only need this wrapper
- * because of the difference in function parameters.
+ * ntfs_aops - general address space operations for inodes and attributes
  */
-int ntfs_mst_readpage(struct file *file, struct page *page)
-{
-	if (unlikely(!PageLocked(page)))
-		PAGE_BUG(page);
-
-	return ntfs_attr_read_block(page);
-}
-
-/**
- * end_buffer_read_mftbmp_async -
- *
- * Async io completion handler for accessing mft bitmap. Adapted from
- * end_buffer_read_mst_async().
- */
-static void end_buffer_read_mftbmp_async(struct buffer_head *bh, int uptodate)
-{
-	static spinlock_t page_uptodate_lock = SPIN_LOCK_UNLOCKED;
-	unsigned long flags;
-	struct buffer_head *tmp;
-	struct page *page;
-
-	if (likely(uptodate))
-		set_buffer_uptodate(bh);
-	else
-		clear_buffer_uptodate(bh);
-
-	page = bh->b_page;
-
-	if (likely(uptodate)) {
-		s64 file_ofs;
-
-		/* Host is the ntfs volume. Our mft bitmap access kludge... */
-		ntfs_volume *vol = (ntfs_volume*)page->mapping->host;
-
-		file_ofs = (page->index << PAGE_CACHE_SHIFT) + bh_offset(bh);
-		if (file_ofs + bh->b_size > vol->mftbmp_initialized_size) {
-			char *addr;
-			int ofs = 0;
-
-			if (file_ofs < vol->mftbmp_initialized_size)
-				ofs = vol->mftbmp_initialized_size - file_ofs;
-			addr = kmap_atomic(page, KM_BIO_SRC_IRQ);
-			memset(addr + bh_offset(bh) + ofs, 0, bh->b_size - ofs);
-			flush_dcache_page(page);
-			kunmap_atomic(addr, KM_BIO_SRC_IRQ);
-		}
-	} else
-		SetPageError(page);
-
-	spin_lock_irqsave(&page_uptodate_lock, flags);
-	clear_buffer_async_read(bh);
-	unlock_buffer(bh);
-
-	tmp = bh->b_this_page;
-	while (tmp != bh) {
-		if (buffer_locked(tmp)) {
-			if (buffer_async_read(tmp))
-				goto still_busy;
-		} else if (!buffer_uptodate(tmp))
-			SetPageError(page);
-		tmp = tmp->b_this_page;
-	}
-
-	spin_unlock_irqrestore(&page_uptodate_lock, flags);
-	if (likely(!PageError(page)))
-		SetPageUptodate(page);
-	unlock_page(page);
-	return;
-still_busy:
-	spin_unlock_irqrestore(&page_uptodate_lock, flags);
-	return;
-}
-
-/**
- * ntfs_mftbmp_readpage -
- *
- * Readpage for accessing mft bitmap. Adapted from ntfs_mst_readpage().
- */
-static int ntfs_mftbmp_readpage(ntfs_volume *vol, struct page *page)
-{
-	VCN vcn;
-	LCN lcn;
-	struct buffer_head *bh, *head, *arr[MAX_BUF_PER_PAGE];
-	sector_t iblock, lblock, zblock;
-	unsigned int blocksize, blocks, vcn_ofs;
-	int nr, i;
-	unsigned char blocksize_bits;
-
-	if (unlikely(!PageLocked(page)))
-		PAGE_BUG(page);
-
-	blocksize = vol->sb->s_blocksize;
-	blocksize_bits = vol->sb->s_blocksize_bits;
-
-	if (!page_has_buffers(page))
-		create_empty_buffers(page, blocksize, 0);
-	bh = head = page_buffers(page);
-	if (unlikely(!bh))
-		return -ENOMEM;
-
-	blocks = PAGE_CACHE_SIZE >> blocksize_bits;
-	iblock = page->index << (PAGE_CACHE_SHIFT - blocksize_bits);
-	lblock = (vol->mftbmp_allocated_size + blocksize - 1) >> blocksize_bits;
-	zblock = (vol->mftbmp_initialized_size + blocksize - 1) >>
-			blocksize_bits;
-
-	/* Loop through all the buffers in the page. */
-	nr = i = 0;
-	do {
-		if (unlikely(buffer_uptodate(bh)))
-			continue;
-		if (unlikely(buffer_mapped(bh))) {
-			arr[nr++] = bh;
-			continue;
-		}
-		bh->b_bdev = vol->sb->s_bdev;
-		/* Is the block within the allowed limits? */
-		if (iblock < lblock) {
-			/* Convert iblock into corresponding vcn and offset. */
-			vcn = (VCN)iblock << blocksize_bits >>
-					vol->cluster_size_bits;
-			vcn_ofs = ((VCN)iblock << blocksize_bits) &
-					vol->cluster_size_mask;
-			/* Convert the vcn to the corresponding lcn. */
-			down_read(&vol->mftbmp_rl.lock);
-			lcn = vcn_to_lcn(vol->mftbmp_rl.rl, vcn);
-			up_read(&vol->mftbmp_rl.lock);
-			/* Successful remap. */
-			if (lcn >= 0) {
-				/* Setup buffer head to correct block. */
-				bh->b_blocknr = ((lcn << vol->cluster_size_bits)
-						+ vcn_ofs) >> blocksize_bits;
-				set_buffer_mapped(bh);
-				/* Only read initialized data blocks. */
-				if (iblock < zblock) {
-					arr[nr++] = bh;
-					continue;
-				}
-				/* Fully non-initialized data block, zero it. */
-				goto handle_zblock;
-			}
-			if (lcn != LCN_HOLE) {
-				/* Hard error, zero out region. */
-				SetPageError(page);
-				ntfs_error(vol->sb, "vcn_to_lcn(vcn = 0x%Lx) "
-						"failed with error code "
-						"0x%Lx.", (long long)vcn,
-						(long long)-lcn);
-				// FIXME: Depending on vol->on_errors, do
-				// something.
-			}
-		}
-		/*
-		 * Either iblock was outside lblock limits or vcn_to_lcn()
-		 * returned error. Just zero that portion of the page and set
-		 * the buffer uptodate.
-		 */
-		bh->b_blocknr = -1UL;
-		clear_buffer_mapped(bh);
-handle_zblock:
-		memset(kmap(page) + i * blocksize, 0, blocksize);
-		flush_dcache_page(page);
-		kunmap(page);
-		set_buffer_uptodate(bh);
-	} while (i++, iblock++, (bh = bh->b_this_page) != head);
-
-	/* Check we have at least one buffer ready for i/o. */
-	if (nr) {
-		/* Lock the buffers. */
-		for (i = 0; i < nr; i++) {
-			struct buffer_head *tbh = arr[i];
-			lock_buffer(tbh);
-			tbh->b_end_io = end_buffer_read_mftbmp_async;
-			set_buffer_async_read(tbh);
-		}
-		/* Finally, start i/o on the buffers. */
-		for (i = 0; i < nr; i++)
-			submit_bh(READ, arr[i]);
-		return 0;
-	}
-	/* No i/o was scheduled on any of the buffers. */
-	if (likely(!PageError(page)))
-		SetPageUptodate(page);
-	else /* Signal synchronous i/o error. */
-		nr = -EIO;
-	unlock_page(page);
-	return nr;
-}
-
-/**
- * ntfs_file_aops - address space operations for accessing normal file data
- */
-struct address_space_operations ntfs_file_aops = {
+struct address_space_operations ntfs_aops = {
 	writepage:	NULL,			/* Write dirty page to disk. */
-	readpage:	ntfs_file_readpage,	/* Fill page with data. */
-	sync_page:	block_sync_page,	/* Currently, just unplugs the
-						   disk request queue. */
-	prepare_write:	NULL,			/* . */
-	commit_write:	NULL,			/* . */
-};
-
-typedef int readpage_t(struct file *, struct page *);
-
-/**
- * ntfs_mftbmp_aops - address space operations for accessing mftbmp
- */
-struct address_space_operations ntfs_mftbmp_aops = {
-	writepage:	NULL,			/* Write dirty page to disk. */
-	readpage:	(readpage_t*)ntfs_mftbmp_readpage, /* Fill page with
-							      data. */
-	sync_page:	block_sync_page,	/* Currently, just unplugs the
-						   disk request queue. */
-	prepare_write:	NULL,			/* . */
-	commit_write:	NULL,			/* . */
-};
-
-/**
- * ntfs_dir_aops -
- *
- * Address space operations for accessing normal directory data (i.e. index
- * allocation attribute). We can't just use the same operations as for files
- * because 1) the attribute is different and even more importantly 2) the index
- * records have to be multi sector transfer deprotected (i.e. fixed-up).
- */
-struct address_space_operations ntfs_dir_aops = {
-	writepage:	NULL,			/* Write dirty page to disk. */
-	readpage:	ntfs_mst_readpage,	/* Fill page with data. */
+	readpage:	ntfs_readpage,		/* Fill page with data. */
 	sync_page:	block_sync_page,	/* Currently, just unplugs the
 						   disk request queue. */
 	prepare_write:	NULL,			/* . */

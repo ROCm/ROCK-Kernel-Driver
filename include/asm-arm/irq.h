@@ -37,6 +37,7 @@ extern void enable_irq(unsigned int);
 #define IRQT_BOTHEDGE	(__IRQT_RISEDGE|__IRQT_FALEDGE)
 #define IRQT_LOW	(__IRQT_LOWLVL)
 #define IRQT_HIGH	(__IRQT_HIGHLVL)
+#define IRQT_PROBE	(1 << 4)
 
 int set_irq_type(unsigned int irq, unsigned int type);
 

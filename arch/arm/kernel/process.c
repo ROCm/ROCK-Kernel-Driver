@@ -75,10 +75,10 @@ void (*pm_power_off)(void);
  */
 void default_idle(void)
 {
-	__cli();
+	local_irq_disable();
 	if (!need_resched() && !hlt_counter)
 		arch_idle();
-	__sti();
+	local_irq_enable();
 }
 
 /*

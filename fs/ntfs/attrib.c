@@ -935,78 +935,51 @@ err_out:
  */
 int map_run_list(ntfs_inode *ni, VCN vcn)
 {
+	ntfs_inode *base_ni;
 	attr_search_context *ctx;
 	MFT_RECORD *mrec;
-	const uchar_t *name;
-	u32 name_len;
-	ATTR_TYPES at;
 	int err = 0;
 	
 	ntfs_debug("Mapping run list part containing vcn 0x%Lx.",
 			(long long)vcn);
 
-	/* Map, pin and lock the mft record for reading. */
-	mrec = map_mft_record(READ, ni);
+	if (!NInoAttr(ni))
+		base_ni = ni;
+	else
+		base_ni = ni->_INE(base_ntfs_ino);
+
+	mrec = map_mft_record(READ, base_ni);
 	if (IS_ERR(mrec))
 		return PTR_ERR(mrec);
-
-	ctx = get_attr_search_ctx(ni, mrec);
+	ctx = get_attr_search_ctx(base_ni, mrec);
 	if (!ctx) {
 		err = -ENOMEM;
-		goto unm_err_out;
+		goto err_out;
 	}
-
-	/* The attribute type is determined from the inode type. */
-	if (S_ISDIR(VFS_I(ni)->i_mode)) {
-		at = AT_INDEX_ALLOCATION;
-		name = I30;
-		name_len = 4;
-	} else {
-		at = AT_DATA;
-		name = NULL;
-		name_len = 0;
-	}
-
-	/* Find the attribute in the mft record. */
-	if (!lookup_attr(at, name, name_len, CASE_SENSITIVE, vcn, NULL, 0,
-			ctx)) {
+	if (!lookup_attr(ni->type, ni->name, ni->name_len, IGNORE_CASE, vcn,
+			NULL, 0, ctx)) {
 		put_attr_search_ctx(ctx);
 		err = -ENOENT;
-		goto unm_err_out;
+		goto err_out;
 	}
 
-	/* Lock the run list. */
 	down_write(&ni->run_list.lock);
-
-	/* Make sure someone else didn't do the work while we were spinning. */
+	/* Make sure someone else didn't do the work while we were sleeping. */
 	if (likely(vcn_to_lcn(ni->run_list.rl, vcn) <= LCN_RL_NOT_MAPPED)) {
 		run_list_element *rl;
 
-		/* Decode the run list. */
 		rl = decompress_mapping_pairs(ni->vol, ctx->attr,
 				ni->run_list.rl);
-
-		/* Flag any errors or set the run list if successful. */
 		if (unlikely(IS_ERR(rl)))
 			err = PTR_ERR(rl);
 		else
 			ni->run_list.rl = rl;
 	}
-
-	/* Unlock the run list. */
 	up_write(&ni->run_list.lock);
 	
 	put_attr_search_ctx(ctx);
-
-	/* Unlock, unpin and release the mft record. */
-	unmap_mft_record(READ, ni);
-
-	/* If an error occured, return it. */
-	ntfs_debug("Done.");
-	return err;
-
-unm_err_out:
-	unmap_mft_record(READ, ni);
+err_out:
+	unmap_mft_record(READ, base_ni);
 	return err;
 }
 
