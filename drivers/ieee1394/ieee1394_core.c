@@ -1000,7 +1000,7 @@ int ieee1394_register_chardev(int blocknum,
 			      struct file_operations *file_ops)
 {
 	int retval;
-	
+
 	if( (blocknum < 0) || (blocknum > 15) )
 		return -EINVAL;
 
@@ -1016,7 +1016,7 @@ int ieee1394_register_chardev(int blocknum,
 		/* block already taken */
 		retval = -EBUSY;
 	}
-	
+
 	write_unlock(&ieee1394_chardevs_lock);
 
 	return retval;
@@ -1027,14 +1027,14 @@ void ieee1394_unregister_chardev(int blocknum)
 {
 	if( (blocknum < 0) || (blocknum > 15) )
 		return;
-	
+
 	write_lock(&ieee1394_chardevs_lock);
-	
+
 	if(ieee1394_chardevs[blocknum].file_ops) {
 		ieee1394_chardevs[blocknum].file_ops = NULL;
 		ieee1394_chardevs[blocknum].module = NULL;
 	}
-	
+
 	write_unlock(&ieee1394_chardevs_lock);
 }
 
@@ -1055,7 +1055,7 @@ static int ieee1394_get_chardev(int blocknum,
 {
 	int ret = 0;
        
-	if( (blocknum < 0) || (blocknum > 15) )
+	if ((blocknum < 0) || (blocknum > 15))
 		return ret;
 
 	read_lock(&ieee1394_chardevs_lock);
@@ -1063,15 +1063,15 @@ static int ieee1394_get_chardev(int blocknum,
 	*module = ieee1394_chardevs[blocknum].module;
 	*file_ops = ieee1394_chardevs[blocknum].file_ops;
 
-	if(*file_ops == NULL)
+	if (*file_ops == NULL)
 		goto out;
 
-	if(!try_module_get(*module))
+	if (!try_module_get(*module))
 		goto out;
 
 	/* success! */
 	ret = 1;
-	
+
 out:
 	read_unlock(&ieee1394_chardevs_lock);
 	return ret;
@@ -1101,11 +1101,11 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	  reference count of whatever module file->f_op->owner points
 	  to, immediately after this function returns.
 	*/
-	
+
         /* shift away lower four bits of the minor
 	   to get the index of the ieee1394_driver
 	   we want */
-	
+
 	blocknum = (minor(inode->i_rdev) >> 4) & 0xF;
 
 	/* look up the driver */
@@ -1126,14 +1126,14 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 	if(retval == 0) {
 		
 		/* If the open() succeeded, then ieee1394 will be left
-		   with an extra module reference, so we discard it here.
+		 * with an extra module reference, so we discard it here.
+		 *
+		 * The task-specific driver still has the extra reference
+		 * given to it by ieee1394_get_chardev(). This extra
+		 * reference prevents the module from unloading while the
+		 * file is open, and will be dropped by the VFS when the
+		 * file is released. */
 
-		   The task-specific driver still has the extra
-		   reference given to it by ieee1394_get_chardev().
-		   This extra reference prevents the module from
-		   unloading while the file is open, and will be
-		   dropped by the VFS when the file is released.
-		*/
 		module_put(THIS_MODULE);
 	} else {
 		/* point the file's f_ops back to ieee1394. The VFS will then
@@ -1142,11 +1142,10 @@ static int ieee1394_dispatch_open(struct inode *inode, struct file *file)
 		
 		file->f_op = &ieee1394_chardev_ops;
 
-		/* if the open() failed, then we need to drop the
-		   extra reference we gave to the task-specific
-		   driver */
+		/* If the open() failed, then we need to drop the extra
+		 * reference we gave to the task-specific driver. */
+
 		module_put(module);
-	
 	}
 
 	return retval;
@@ -1199,10 +1198,10 @@ static void __exit ieee1394_cleanup(void)
 	kmem_cache_destroy(hpsb_packet_cache);
 
 	unregister_chrdev(IEEE1394_MAJOR, "ieee1394");
-	
+
 	/* it's ok to pass a NULL devfs_handle to devfs_unregister */
 	devfs_unregister(ieee1394_devfs_handle);
-	
+
 	remove_proc_entry("ieee1394", proc_bus);
 }
 
@@ -1298,10 +1297,16 @@ EXPORT_SYMBOL(hpsb_iso_xmit_init);
 EXPORT_SYMBOL(hpsb_iso_recv_init);
 EXPORT_SYMBOL(hpsb_iso_xmit_start);
 EXPORT_SYMBOL(hpsb_iso_recv_start);
+EXPORT_SYMBOL(hpsb_iso_recv_listen_channel);
+EXPORT_SYMBOL(hpsb_iso_recv_unlisten_channel);
+EXPORT_SYMBOL(hpsb_iso_recv_set_channel_mask);
 EXPORT_SYMBOL(hpsb_iso_stop);
 EXPORT_SYMBOL(hpsb_iso_shutdown);
-EXPORT_SYMBOL(hpsb_iso_xmit_queue_packets);
+EXPORT_SYMBOL(hpsb_iso_xmit_queue_packet);
+EXPORT_SYMBOL(hpsb_iso_xmit_sync);
 EXPORT_SYMBOL(hpsb_iso_recv_release_packets);
 EXPORT_SYMBOL(hpsb_iso_n_ready);
-EXPORT_SYMBOL(hpsb_iso_packet_data);
-EXPORT_SYMBOL(hpsb_iso_packet_info);
+EXPORT_SYMBOL(hpsb_iso_packet_sent);
+EXPORT_SYMBOL(hpsb_iso_packet_received);
+EXPORT_SYMBOL(hpsb_iso_wake);
+

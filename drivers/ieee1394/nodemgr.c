@@ -1089,8 +1089,7 @@ static int read_businfo_block(struct hpsb_host *host, nodeid_t nodeid, unsigned 
 
 static void nodemgr_remove_node(struct node_entry *ne)
 {
-	HPSB_DEBUG("%s removed: Node[" NODE_BUS_FMT "]  GUID[%016Lx]  [%s]",
-		   (ne->host->node_id == ne->nodeid) ? "Host" : "Device",
+	HPSB_DEBUG("Device removed: Node[" NODE_BUS_FMT "]  GUID[%016Lx]  [%s]",
 		   NODE_BUS_ARGS(ne->nodeid), (unsigned long long)ne->guid,
 		   ne->vendor_name ?: "Unknown");
 

@@ -296,6 +296,10 @@
  *		   returns the dead bit in status. Thanks to Chandan (chandan@toad.net) for this one.
  *	04/27/02 - Fix sbp2 login problem on SMP systems, enable real spinlocks by default. (JSG)
  *	06/09/02 - Don't force 36-bute SCSI inquiry, but leave in a define for badly behaved devices. (JSG)   
+ *	02/04/03 - Fixed a SMP deadlock (don't hold sbp2_command_lock while calling sbp2scsi_complete_command).
+ *		   Also save/restore irq flags in sbp2scsi_complete_command  - Sancho Dauskardt <sda@bdit.de>
+ *	02/06/03 - Removed spinlock debugging; use kernel stuff instead (sda)
+ *
  */
 
 
@@ -346,7 +350,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 697 $ James Goodwin <jamesg@filanet.com>";
+	"$Rev: 779 $ James Goodwin <jamesg@filanet.com>";
 
 /*
  * Module load parameter definitions
@@ -488,19 +492,6 @@ static u32 global_outstanding_dmas = 0;
 
 #define SBP2_ERR(fmt, args...)		HPSB_ERR("sbp2: "fmt, ## args)
 
-/*
- * Spinlock debugging stuff.
- */
-#define SBP2_USE_REAL_SPINLOCKS
-
-#ifdef SBP2_USE_REAL_SPINLOCKS
-#define sbp2_spin_lock(lock, flags)	spin_lock_irqsave(lock, flags)	
-#define sbp2_spin_unlock(lock, flags)	spin_unlock_irqrestore(lock, flags);
-static spinlock_t sbp2_host_info_lock = SPIN_LOCK_UNLOCKED;
-#else
-#define sbp2_spin_lock(lock, flags)	do {save_flags(flags); cli();} while (0)	
-#define sbp2_spin_unlock(lock, flags)	do {restore_flags(flags);} while (0)
-#endif
 
 /*
  * Globals
@@ -511,6 +502,8 @@ static Scsi_Host_Template scsi_driver_template;
 static u8 sbp2_speedto_maxrec[] = { 0x7, 0x8, 0x9 };
 
 static LIST_HEAD(sbp2_host_info_list);
+
+static spinlock_t sbp2_host_info_lock = SPIN_LOCK_UNLOCKED;
 
 static struct hpsb_highlevel *sbp2_hl_handle = NULL;
 
@@ -686,12 +679,12 @@ static int sbp2util_create_command_orb_pool(struct scsi_id_instance_data *scsi_i
 
 	orbs = sbp2_serialize_io ? 2 : SBP2_MAX_COMMAND_ORBS;
         
-	sbp2_spin_lock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	for (i = 0; i < orbs; i++) {
 		command = (struct sbp2_command_info *)
 		    kmalloc(sizeof(struct sbp2_command_info), GFP_KERNEL);
 		if (!command) {
-			sbp2_spin_unlock(&scsi_id->sbp2_command_orb_lock, flags);
+			spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 			return(-ENOMEM);
 		}
 		memset(command, '\0', sizeof(struct sbp2_command_info));
@@ -708,7 +701,7 @@ static int sbp2util_create_command_orb_pool(struct scsi_id_instance_data *scsi_i
 		INIT_LIST_HEAD(&command->list);
 		list_add_tail(&command->list, &scsi_id->sbp2_command_orb_completed);
 	}
-	sbp2_spin_unlock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 	return 0;
 }
 
@@ -722,7 +715,7 @@ static void sbp2util_remove_command_orb_pool(struct scsi_id_instance_data *scsi_
 	struct sbp2_command_info *command;
 	unsigned long flags;
         
-	sbp2_spin_lock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	if (!list_empty(&scsi_id->sbp2_command_orb_completed)) {
 		list_for_each_safe(lh, next, &scsi_id->sbp2_command_orb_completed) {
 			command = list_entry(lh, struct sbp2_command_info, list);
@@ -740,7 +733,7 @@ static void sbp2util_remove_command_orb_pool(struct scsi_id_instance_data *scsi_
 			kfree(command);
 		}
 	}
-	sbp2_spin_unlock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 	return;
 }
 
@@ -755,17 +748,17 @@ static struct sbp2_command_info *sbp2util_find_command_for_orb(
 	struct sbp2_command_info *command;
 	unsigned long flags;
 
-	sbp2_spin_lock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	if (!list_empty(&scsi_id->sbp2_command_orb_inuse)) {
 		list_for_each(lh, &scsi_id->sbp2_command_orb_inuse) {
 			command = list_entry(lh, struct sbp2_command_info, list);
 			if (command->command_orb_dma == orb) {
-				sbp2_spin_unlock(&scsi_id->sbp2_command_orb_lock, flags);
+				spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 				return (command);
 			}
 		}
 	}
-	sbp2_spin_unlock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 
 	SBP2_ORB_DEBUG("could not match command orb %x", (unsigned int)orb);
 
@@ -782,17 +775,17 @@ static struct sbp2_command_info *sbp2util_find_command_for_SCpnt(struct scsi_id_
 	struct sbp2_command_info *command;
 	unsigned long flags;
 
-	sbp2_spin_lock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	if (!list_empty(&scsi_id->sbp2_command_orb_inuse)) {
 		list_for_each(lh, &scsi_id->sbp2_command_orb_inuse) {
 			command = list_entry(lh, struct sbp2_command_info, list);
 			if (command->Current_SCpnt == SCpnt) {
-				sbp2_spin_unlock(&scsi_id->sbp2_command_orb_lock, flags);
+				spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 				return (command);
 			}
 		}
 	}
-	sbp2_spin_unlock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 	return(NULL);
 }
 
@@ -809,7 +802,7 @@ static struct sbp2_command_info *sbp2util_allocate_command_orb(
 	struct sbp2_command_info *command = NULL;
 	unsigned long flags;
 
-	sbp2_spin_lock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	if (!list_empty(&scsi_id->sbp2_command_orb_completed)) {
 		lh = scsi_id->sbp2_command_orb_completed.next;
 		list_del(lh);
@@ -820,7 +813,7 @@ static struct sbp2_command_info *sbp2util_allocate_command_orb(
 	} else {
 		SBP2_ERR("sbp2util_allocate_command_orb - No orbs available!");
 	}
-	sbp2_spin_unlock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 	return (command);
 }
 
@@ -865,11 +858,11 @@ static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_i
 {
 	unsigned long flags;
 
-	sbp2_spin_lock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_lock_irqsave(&scsi_id->sbp2_command_orb_lock, flags);
 	list_del(&command->list);
 	sbp2util_free_command_dma(command);
 	list_add_tail(&command->list, &scsi_id->sbp2_command_orb_completed);
-	sbp2_spin_unlock(&scsi_id->sbp2_command_orb_lock, flags);
+	spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 }
 
 
@@ -992,9 +985,9 @@ static void sbp2_update(struct unit_directory *ud)
 	/* Complete any pending commands with busy (so they get
 	 * retried) and remove them from our queue
 	 */
-	sbp2_spin_lock(&hi->sbp2_command_lock, flags);
+	spin_lock_irqsave(&hi->sbp2_command_lock, flags);
 	sbp2scsi_complete_all_commands(hi, scsi_id, DID_BUS_BUSY);
-	sbp2_spin_unlock(&hi->sbp2_command_lock, flags);
+	spin_unlock_irqrestore(&hi->sbp2_command_lock, flags);
 }
 
 /*
@@ -1024,9 +1017,9 @@ static void sbp2_add_host(struct hpsb_host *host)
 	hi->host = host;
 	hi->sbp2_command_lock = SPIN_LOCK_UNLOCKED;
 
-	sbp2_spin_lock(&sbp2_host_info_lock, flags);
+	spin_lock_irqsave(&sbp2_host_info_lock, flags);
 	list_add_tail(&hi->list, &sbp2_host_info_list);
-	sbp2_spin_unlock(&sbp2_host_info_lock, flags);
+	spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
 
 	/* Register our host with the SCSI stack. */
 	hi->scsi_host = scsi_register (&scsi_driver_template, sizeof(void *));
@@ -1085,7 +1078,7 @@ static void sbp2_remove_host(struct hpsb_host *host)
 
 	SBP2_DEBUG("sbp2_remove_host");
 
-	sbp2_spin_lock(&sbp2_host_info_lock, flags);
+	spin_lock_irqsave(&sbp2_host_info_lock, flags);
 
 	hi = sbp2_find_host_info(host);
 	if (hi != NULL) {
@@ -1095,7 +1088,7 @@ static void sbp2_remove_host(struct hpsb_host *host)
 	else
 		SBP2_ERR("attempt to remove unknown host %p", host);
 
-	sbp2_spin_unlock(&sbp2_host_info_lock, flags);
+	spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
 }
 
 /*
@@ -2521,16 +2514,16 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
 		return(RCODE_ADDRESS_ERROR);
 	}
 
-	sbp2_spin_lock(&sbp2_host_info_lock, flags);
+	spin_lock_irqsave(&sbp2_host_info_lock, flags);
 	hi = sbp2_find_host_info(host);
-	sbp2_spin_unlock(&sbp2_host_info_lock, flags);
+	spin_unlock_irqrestore(&sbp2_host_info_lock, flags);
 
 	if (!hi) {
 		SBP2_ERR("host info is NULL - this is bad!");
 		return(RCODE_ADDRESS_ERROR);
 	}
 
-	sbp2_spin_lock(&hi->sbp2_command_lock, flags);
+	spin_lock_irqsave(&hi->sbp2_command_lock, flags);
 
 	/*
 	 * Find our scsi_id structure by looking at the status fifo address written to by
@@ -2541,7 +2534,7 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
 
 	if (!scsi_id) {
 		SBP2_ERR("scsi_id is NULL - device is gone?");
-		sbp2_spin_unlock(&hi->sbp2_command_lock, flags);
+		spin_unlock_irqrestore(&hi->sbp2_command_lock, flags);
 		return(RCODE_ADDRESS_ERROR);
 	}
 
@@ -2605,13 +2598,6 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
 			}
 
 			SBP2_ORB_DEBUG("completing command orb %p", &command->command_orb);
-
-			/*
-			 * Complete the SCSI command
-			 */
-			SBP2_DEBUG("Completing SCSI command");
-			sbp2scsi_complete_command(hi, scsi_id, scsi_status, SCpnt, command->Current_done);
-			SBP2_ORB_DEBUG("command orb completed");
 		}
 
 		/*
@@ -2635,7 +2621,23 @@ static int sbp2_handle_status_write(struct hpsb_host *host, int nodeid, int dest
 		}
 	}
 
-	sbp2_spin_unlock(&hi->sbp2_command_lock, flags);
+	spin_unlock_irqrestore(&hi->sbp2_command_lock, flags);
+
+
+	if (SCpnt) {
+
+		/*
+		 * Complete the SCSI command.
+		 *
+		 * Only do it after we've released the sbp2_command_lock,
+		 * as it might otherwise deadlock with the 
+		 * io_request_lock (in sbp2scsi_queuecommand).
+		 */
+		SBP2_DEBUG("Completing SCSI command");
+		sbp2scsi_complete_command(hi, scsi_id, scsi_status, SCpnt, command->Current_done);
+		SBP2_ORB_DEBUG("command orb completed");
+	}
+
 	return(RCODE_COMPLETE);
 }
 
@@ -2715,12 +2717,12 @@ static int sbp2scsi_queuecommand (Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 	/*
 	 * Try and send our SCSI command
 	 */
-	sbp2_spin_lock(&hi->sbp2_command_lock, flags);
+	spin_lock_irqsave(&hi->sbp2_command_lock, flags);
 	if (sbp2_send_command(hi, scsi_id, SCpnt, done)) {
 		SBP2_ERR("Error sending SCSI command");
 		sbp2scsi_complete_command(hi, scsi_id, SBP2_SCSI_STATUS_SELECTION_TIMEOUT, SCpnt, done);
 	}
-	sbp2_spin_unlock(&hi->sbp2_command_lock, flags);
+	spin_unlock_irqrestore(&hi->sbp2_command_lock, flags);
 
 	return(0);
 }
@@ -2761,10 +2763,14 @@ static void sbp2scsi_complete_all_commands(struct sbp2scsi_host_info *hi,
 
 /*
  * This function is called in order to complete a regular SBP-2 command.
+ *
+ * This can be called in interrupt context.
  */
 static void sbp2scsi_complete_command(struct sbp2scsi_host_info *hi, struct scsi_id_instance_data *scsi_id, u32 scsi_status,
 				      Scsi_Cmnd *SCpnt, void (*done)(Scsi_Cmnd *))
 {
+	unsigned long flags;
+
 	SBP2_DEBUG("sbp2scsi_complete_command");
 
 	/*
@@ -2864,13 +2870,13 @@ static void sbp2scsi_complete_command(struct sbp2scsi_host_info *hi, struct scsi
 	 * Tell scsi stack that we're done with this command
 	 */
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0)
-	spin_lock_irq(&io_request_lock);
+	spin_lock_irqsave(&io_request_lock,flags);
 	done (SCpnt);
-	spin_unlock_irq(&io_request_lock);
+	spin_unlock_irqrestore(&io_request_lock,flags);
 #else
-	spin_lock_irq(hi->scsi_host->host_lock);
+	spin_lock_irqsave(hi->scsi_host->host_lock,flags);
 	done (SCpnt);
-	spin_unlock_irq(hi->scsi_host->host_lock);
+	spin_unlock_irqrestore(hi->scsi_host->host_lock,flags);
 #endif
 
 	return;
@@ -2896,7 +2902,7 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
 		 * Right now, just return any matching command structures
 		 * to the free pool.
 		 */
-		sbp2_spin_lock(&hi->sbp2_command_lock, flags);
+		spin_lock_irqsave(&hi->sbp2_command_lock, flags);
 		command = sbp2util_find_command_for_SCpnt(scsi_id, SCpnt);
 		if (command) {
 			SBP2_DEBUG("Found command to abort");
@@ -2921,7 +2927,7 @@ static int sbp2scsi_abort (Scsi_Cmnd *SCpnt)
 		 */
 		sbp2_agent_reset(hi, scsi_id, 0);
 		sbp2scsi_complete_all_commands(hi, scsi_id, DID_BUS_BUSY);		
-		sbp2_spin_unlock(&hi->sbp2_command_lock, flags);
+		spin_unlock_irqrestore(&hi->sbp2_command_lock, flags);
 	}
 
 	return(SUCCESS);
