@@ -507,6 +507,7 @@ struct input_event {
 #define BUS_AMIGA		0x16
 #define BUS_ADB			0x17
 #define BUS_I2C			0x18
+#define BUS_HOST		0x19
 
 /*
  * Values describing the status of an effect
