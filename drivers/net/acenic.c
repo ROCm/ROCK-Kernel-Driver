@@ -444,7 +444,7 @@ MODULE_PARM_DESC(max_rx_desc, "AceNIC/3C985/GA620 max number of receive descript
 MODULE_PARM_DESC(tx_ratio, "AceNIC/3C985/GA620 ratio of NIC memory used for TX/RX descriptors (range 0-63)");
 
 
-static char version[] __initdata = 
+static char version[] __devinitdata = 
   "acenic.c: v0.92 08/05/2002  Jes Sorensen, linux-acenic@SunSITE.dk\n"
   "                            http://home.cern.ch/~jes/gige/acenic.html\n";
 
@@ -898,7 +898,7 @@ static inline void ace_issue_cmd(struct ace_regs __iomem *regs, struct cmd *cmd)
 }
 
 
-static int __init ace_init(struct net_device *dev)
+static int __devinit ace_init(struct net_device *dev)
 {
 	struct ace_private *ap;
 	struct ace_regs __iomem *regs;
@@ -2901,7 +2901,7 @@ static struct net_device_stats *ace_get_stats(struct net_device *dev)
 }
 
 
-static void __init ace_copy(struct ace_regs __iomem *regs, void *src,
+static void __devinit ace_copy(struct ace_regs __iomem *regs, void *src,
 			    u32 dest, int size)
 {
 	void __iomem *tdest;
@@ -2934,7 +2934,7 @@ static void __init ace_copy(struct ace_regs __iomem *regs, void *src,
 }
 
 
-static void __init ace_clear(struct ace_regs __iomem *regs, u32 dest, int size)
+static void __devinit ace_clear(struct ace_regs __iomem *regs, u32 dest, int size)
 {
 	void __iomem *tdest;
 	short tsize = 0, i;
@@ -2967,7 +2967,7 @@ static void __init ace_clear(struct ace_regs __iomem *regs, u32 dest, int size)
  * This operation requires the NIC to be halted and is performed with
  * interrupts disabled and with the spinlock hold.
  */
-int __init ace_load_firmware(struct net_device *dev)
+int __devinit ace_load_firmware(struct net_device *dev)
 {
 	struct ace_private *ap = netdev_priv(dev);
 	struct ace_regs __iomem *regs = ap->regs;
@@ -3018,7 +3018,7 @@ int __init ace_load_firmware(struct net_device *dev)
  * Thanks to Stevarino Webinski for helping tracking down the bugs in the
  * code i2c readout code by beta testing all my hacks.
  */
-static void __init eeprom_start(struct ace_regs __iomem *regs)
+static void __devinit eeprom_start(struct ace_regs __iomem *regs)
 {
 	u32 local;
 
@@ -3047,7 +3047,7 @@ static void __init eeprom_start(struct ace_regs __iomem *regs)
 }
 
 
-static void __init eeprom_prep(struct ace_regs __iomem *regs, u8 magic)
+static void __devinit eeprom_prep(struct ace_regs __iomem *regs, u8 magic)
 {
 	short i;
 	u32 local;
@@ -3084,7 +3084,7 @@ static void __init eeprom_prep(struct ace_regs __iomem *regs, u8 magic)
 }
 
 
-static int __init eeprom_check_ack(struct ace_regs __iomem *regs)
+static int __devinit eeprom_check_ack(struct ace_regs __iomem *regs)
 {
 	int state;
 	u32 local;
@@ -3112,7 +3112,7 @@ static int __init eeprom_check_ack(struct ace_regs __iomem *regs)
 }
 
 
-static void __init eeprom_stop(struct ace_regs __iomem *regs)
+static void __devinit eeprom_stop(struct ace_regs __iomem *regs)
 {
 	u32 local;
 
@@ -3147,7 +3147,7 @@ static void __init eeprom_stop(struct ace_regs __iomem *regs)
 /*
  * Read a whole byte from the EEPROM.
  */
-static int __init read_eeprom_byte(struct net_device *dev,
+static int __devinit read_eeprom_byte(struct net_device *dev,
 				   unsigned long offset)
 {
 	struct ace_private *ap = netdev_priv(dev);
