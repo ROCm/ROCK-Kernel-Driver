@@ -113,6 +113,10 @@ static int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
+	/*
+	 * Why flush ? filemap_sync_pte already flushed the tlbs with the
+	 * dirty bits.
+	 */
 	flush_tlb_range(vma, end - size, end);
 
 	spin_unlock(&vma->vm_mm->page_table_lock);

@@ -863,6 +863,9 @@ int zeromap_page_range(struct vm_area_struct *vma, unsigned long address, unsign
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));
+	/*
+	 * Why flush? zeromap_pte_range has a BUG_ON for !pte_none()
+	 */
 	flush_tlb_range(vma, beg, end);
 	spin_unlock(&mm->page_table_lock);
 	return error;
@@ -944,6 +947,9 @@ int remap_page_range(struct vm_area_struct *vma, unsigned long from, unsigned lo
 		from = (from + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (from && (from < end));
+	/*
+	 * Why flush? remap_pte_range has a BUG_ON for !pte_none()
+	 */
 	flush_tlb_range(vma, beg, end);
 	spin_unlock(&mm->page_table_lock);
 	return error;
