@@ -225,9 +225,11 @@ static unsigned extract_clock(unsigned msr)
 }
 
 /* Return the current CPU frequency in kHz */
-static unsigned get_cur_freq(void)
+static unsigned int get_cur_freq(unsigned int cpu)
 {
 	unsigned l, h;
+	if (cpu)
+		return 0;
 
 	rdmsr(MSR_IA32_PERF_STATUS, l, h);
 	return extract_clock(l);
@@ -322,7 +324,7 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
                 goto err_kfree;
         }
 
-	cur_freq = get_cur_freq();
+	cur_freq = get_cur_freq(0);
 
         for (i=0; i<p.state_count; i++) {
 		centrino_model->op_points[i].index = p.states[i].control;
@@ -391,7 +393,7 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 		}
 	}
 
-	freq = get_cur_freq();
+	freq = get_cur_freq(0);
 
 	policy->governor = CPUFREQ_DEFAULT_GOVERNOR;
 	policy->cpuinfo.transition_latency = 10; /* 10uS transition latency */
@@ -516,6 +518,7 @@ static struct cpufreq_driver centrino_driver = {
 	.exit		= centrino_cpu_exit,
 	.verify 	= centrino_verify,
 	.target 	= centrino_target,
+	.get		= get_cur_freq,
 	.attr           = centrino_attr,
 	.owner		= THIS_MODULE,
 };
