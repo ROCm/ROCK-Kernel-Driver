@@ -12,7 +12,7 @@
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <linux/errno.h>
-#include <asm/efi.h>
+#include <linux/efi.h>
 #include <asm/sn/klclock.h>
 
 /*

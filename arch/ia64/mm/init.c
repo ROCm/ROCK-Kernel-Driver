@@ -14,11 +14,11 @@
 #include <linux/reboot.h>
 #include <linux/slab.h>
 #include <linux/swap.h>
+#include <linux/efi.h>
 
 #include <asm/a.out.h>
 #include <asm/bitops.h>
 #include <asm/dma.h>
-#include <asm/efi.h>
 #include <asm/ia32.h>
 #include <asm/io.h>
 #include <asm/machvec.h>

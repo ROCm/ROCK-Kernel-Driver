@@ -27,6 +27,6 @@ irq_cannonicalize (int irq)
 extern void disable_irq (unsigned int);
 extern void disable_irq_nosync (unsigned int);
 extern void enable_irq (unsigned int);
-extern void set_irq_affinity_info (int irq, int dest, int redir);
+extern void set_irq_affinity_info (unsigned int irq, int dest, int redir);
 
 #endif /* _ASM_IA64_IRQ_H */

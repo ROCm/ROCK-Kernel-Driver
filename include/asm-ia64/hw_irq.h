@@ -53,6 +53,10 @@ typedef u8 ia64_vector;
 #define IA64_IPI_RESCHEDULE		0xfd	/* SMP reschedule */
 #define IA64_IPI_VECTOR			0xfe	/* inter-processor interrupt vector */
 
+/* Used for encoding redirected irqs */
+
+#define IA64_IRQ_REDIRECTED		(1 << 31)
+
 /* IA64 inter-cpu interrupt related definitions */
 
 #define IA64_IPI_DEFAULT_BASE_ADDR	0xfee00000
@@ -68,14 +72,12 @@ enum {
 
 extern __u8 isa_irq_to_vector_map[16];
 #define isa_irq_to_vector(x)	isa_irq_to_vector_map[(x)]
-extern __u8 gsi_to_vector_map[255];
-#define gsi_to_vector(x)	gsi_to_vector_map[(x)]
 
 extern unsigned long ipi_base_addr;
 
 extern struct hw_interrupt_type irq_type_ia64_lsapic;	/* CPU-internal interrupt controller */
 
-extern int ia64_alloc_irq (void);	/* allocate a free irq */
+extern int ia64_alloc_vector (void);	/* allocate a free vector */
 extern void ia64_send_ipi (int cpu, int vector, int delivery_mode, int redirect);
 extern void register_percpu_irq (ia64_vector vec, struct irqaction *action);
 

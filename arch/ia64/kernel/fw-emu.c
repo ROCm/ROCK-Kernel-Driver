@@ -13,7 +13,7 @@
 # include <linux/pci.h>
 #endif
 
-#include <asm/efi.h>
+#include <linux/efi.h>
 #include <asm/io.h>
 #include <asm/pal.h>
 #include <asm/sal.h>

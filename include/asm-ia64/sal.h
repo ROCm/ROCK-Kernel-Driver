@@ -24,9 +24,9 @@
  */
 
 #include <linux/spinlock.h>
+#include <linux/efi.h>
 
 #include <asm/pal.h>
-#include <asm/efi.h>
 #include <asm/system.h>
 #include <asm/fpu.h>
 
@@ -535,7 +535,7 @@ typedef struct sal_log_pci_comp_err_info
     u64             reg_data_pairs[1];
     /* array of address/data register pairs is num_mem_regs + num_io_regs
        elements long.  Each array element consists of a u64 address followed
-       by a u64 data value.  The oem_data array immediately follows the the
+       by a u64 data value.  The oem_data array immediately follows the
        reg_data_pairs array */
     u8              oem_data[1];        /* Variable length data */
 } sal_log_pci_comp_err_info_t;

@@ -13,7 +13,7 @@
  * over and over again with slight variations and possibly making a
  * mistake somewhere.
  *
- * Copyright (C) 1998-2001 Hewlett-Packard Co
+ * Copyright (C) 1998-2002 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  * Copyright (C) 1999 Asit Mallick <asit.k.mallick@intel.com>
  * Copyright (C) 1999 Don Dugger <don.dugger@intel.com>
@@ -277,9 +277,9 @@ __outsl (unsigned long port, void *src, unsigned long count)
 }
 
 /*
- * Unfortunately, some platforms are broken and do not follow the
- * IA-64 architecture specification regarding legacy I/O support.
- * Thus, we have to make these operations platform dependent...
+ * Unfortunately, some platforms are broken and do not follow the IA-64 architecture
+ * specification regarding legacy I/O support.  Thus, we have to make these operations
+ * platform dependent...
  */
 #define __inb		platform_inb
 #define __inw		platform_inw
@@ -289,19 +289,19 @@ __outsl (unsigned long port, void *src, unsigned long count)
 #define __outl		platform_outl
 #define __mmiob         platform_mmiob
 
-#define inb		__inb
-#define inw		__inw
-#define inl		__inl
-#define insb		__insb
-#define insw		__insw
-#define insl		__insl
-#define outb		__outb
-#define outw		__outw
-#define outl		__outl
-#define outsb		__outsb
-#define outsw		__outsw
-#define outsl		__outsl
-#define mmiob           __mmiob
+#define inb(p)		__inb(p)
+#define inw(p)		__inw(p)
+#define inl(p)		__inl(p)
+#define insb(p)		__insb(p)
+#define insw(p)		__insw(p)
+#define insl(p)		__insl(p)
+#define outb(v,p)	__outb(v,p)
+#define outw(v,p)	__outw(v,p)
+#define outl(v,p)	__outl(v,p)
+#define outsb(v,p)	__outsb(v,p)
+#define outsw(v,p)	__outsw(v,p)
+#define outsl(v,p)	__outsl(v,p)
+#define mmiob()		__mmiob()
 
 /*
  * The address passed to these functions are ioremap()ped already.
