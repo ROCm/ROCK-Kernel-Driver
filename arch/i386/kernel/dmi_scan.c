@@ -470,6 +470,7 @@ static __init int init_ints_after_s1(struct dmi_blacklist *d)
 	return 0;
 }
 
+#ifdef CONFIG_ACPI_SLEEP
 static __init int reset_videomode_after_s3(struct dmi_blacklist *d)
 {
 	/* See acpi_wakeup.S */
@@ -484,6 +485,7 @@ static __init int reset_videobios_after_s3(struct dmi_blacklist *d)
 	acpi_video_flags |= 1;
 	return 0;
 }
+#endif
 
 /*
  * Some Bioses enable the PS/2 mouse (touchpad) at resume, even if it was
@@ -758,10 +760,12 @@ static __initdata struct dmi_blacklist dmi_blacklist[]={
 			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },
+#ifdef CONFIG_ACPI_SLEEP
 	{ reset_videomode_after_s3, "Toshiba Satellite 4030cdt", { /* Reset video mode after returning from ACPI S3 sleep */
 			MATCH(DMI_PRODUCT_NAME, "S4030CDT/4.3"),
 			NO_MATCH, NO_MATCH, NO_MATCH
 			} },
+#endif
 
 	{ print_if_true, KERN_WARNING "IBM T23 - BIOS 1.03b+ and controller firmware 1.02+ may be needed for Linux APM.", {
 			MATCH(DMI_SYS_VENDOR, "IBM"),
