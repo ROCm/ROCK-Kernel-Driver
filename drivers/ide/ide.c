@@ -123,7 +123,7 @@ static int initializing;	/* set while initializing built-in drivers */
  */
 spinlock_t ide_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 static int ide_scan_direction;	/* THIS was formerly 2.2.x pci=reverse */
 #endif
 
@@ -1614,7 +1614,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 		 * For PCI, we cannot tell the difference,
 		 * so in that case we just ignore it and hope it goes away.
 		 */
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 		if (ch->pci_dev && !ch->pci_dev->vendor)
 #endif
 		{
@@ -1622,7 +1622,7 @@ void ata_irq_request(int irq, void *data, struct pt_regs *regs)
 			 * safely try to do something about it:
 			 */
 			unexpected_irq(irq);
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 		} else {
 			/*
 			 * Whack the status register, just in case we have a leftover pending IRQ.
@@ -1936,7 +1936,6 @@ static int ide_release(struct inode * inode, struct file * file)
 
 #ifdef CONFIG_PROC_FS
 ide_proc_entry_t generic_subdriver_entries[] = {
-	{ "capacity",	S_IFREG|S_IRUGO,	proc_ide_read_capacity,	NULL },
 	{ NULL, 0, NULL, NULL }
 };
 #endif
@@ -2142,7 +2141,7 @@ void ide_unregister(struct ata_channel *ch)
 	ch->chipset = old.chipset;
 	ch->autodma = old.autodma;
 	ch->udma_four = old.udma_four;
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 	ch->pci_dev = old.pci_dev;
 #endif
 	ch->straight8 = old.straight8;
@@ -2849,7 +2848,7 @@ int __init ide_setup (char *s)
 		return 1;
 	}
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 	if (!strcmp(s, "ide=reverse")) {
 		ide_scan_direction = 1;
 		printk(" : Enabled support for IDE inverse scan order.\n");
@@ -3051,7 +3050,7 @@ int __init ide_setup (char *s)
 			case -8: /* minus8 */
 				goto bad_option;
 			case -7: /* ata66 */
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 				hwif->udma_four = 1;
 				goto done;
 #else
@@ -3332,7 +3331,6 @@ EXPORT_SYMBOL(ide_stall_queue);
 #ifdef CONFIG_PROC_FS
 EXPORT_SYMBOL(ide_add_proc_entries);
 EXPORT_SYMBOL(ide_remove_proc_entries);
-EXPORT_SYMBOL(proc_ide_read_geometry);
 #endif
 EXPORT_SYMBOL(ide_add_setting);
 EXPORT_SYMBOL(ide_remove_setting);
@@ -3433,7 +3431,7 @@ static int __init ata_module_init(void)
 	 */
 #ifdef CONFIG_PCI
 	if (pci_present()) {
-# ifdef CONFIG_BLK_DEV_IDEPCI
+# ifdef CONFIG_PCI
 		ide_scan_pcibus(ide_scan_direction);
 # else
 #  ifdef CONFIG_BLK_DEV_RZ1000

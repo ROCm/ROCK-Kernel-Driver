@@ -489,7 +489,8 @@ void ide_setup_dma(struct ata_channel *ch, unsigned long dma_base, unsigned int 
 		goto dma_alloc_failure;
 	}
 
-	ch->XXX_udma = XXX_ide_dmaproc;
+	if (!ch->XXX_udma)
+		ch->XXX_udma = XXX_ide_dmaproc;
 
 	if (ch->chipset != ide_trm290) {
 		u8 dma_stat = inb(dma_base+2);

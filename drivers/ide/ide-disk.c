@@ -490,106 +490,6 @@ static void idedisk_pre_reset(struct ata_device *drive)
 
 #ifdef CONFIG_PROC_FS
 
-static int smart_enable(struct ata_device *drive)
-{
-	struct ata_taskfile args;
-
-	memset(&args, 0, sizeof(args));
-	args.taskfile.feature = SMART_ENABLE;
-	args.taskfile.low_cylinder = SMART_LCYL_PASS;
-	args.taskfile.high_cylinder = SMART_HCYL_PASS;
-	args.taskfile.command = WIN_SMART;
-	ide_cmd_type_parser(&args);
-
-	return ide_raw_taskfile(drive, &args, NULL);
-}
-
-static int get_smart_values(struct ata_device *drive, u8 *buf)
-{
-	struct ata_taskfile args;
-
-	memset(&args, 0, sizeof(args));
-	args.taskfile.feature = SMART_READ_VALUES;
-	args.taskfile.sector_count = 0x01;
-	args.taskfile.low_cylinder = SMART_LCYL_PASS;
-	args.taskfile.high_cylinder = SMART_HCYL_PASS;
-	args.taskfile.command = WIN_SMART;
-	ide_cmd_type_parser(&args);
-
-	smart_enable(drive);
-
-	return ide_raw_taskfile(drive, &args, buf);
-}
-
-static int get_smart_thresholds(struct ata_device *drive, u8 *buf)
-{
-	struct ata_taskfile args;
-
-	memset(&args, 0, sizeof(args));
-	args.taskfile.feature = SMART_READ_THRESHOLDS;
-	args.taskfile.sector_count = 0x01;
-	args.taskfile.low_cylinder = SMART_LCYL_PASS;
-	args.taskfile.high_cylinder = SMART_HCYL_PASS;
-	args.taskfile.command = WIN_SMART;
-	ide_cmd_type_parser(&args);
-
-	smart_enable(drive);
-
-	return ide_raw_taskfile(drive, &args, buf);
-}
-
-static int proc_idedisk_read_cache
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_device *drive = (struct ata_device *) data;
-	char		*out = page;
-	int		len;
-
-	if (drive->id)
-		len = sprintf(out,"%i\n", drive->id->buf_size / 2);
-	else
-		len = sprintf(out,"(none)\n");
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-static int proc_idedisk_read_smart_thresholds
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_device *drive = (struct ata_device *)data;
-	int		len = 0, i = 0;
-
-	if (!get_smart_thresholds(drive, page)) {
-		unsigned short *val = (unsigned short *) page;
-		char *out = ((char *)val) + (SECTOR_WORDS * 4);
-		page = out;
-		do {
-			out += sprintf(out, "%04x%c", le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
-			val += 1;
-		} while (i < (SECTOR_WORDS * 2));
-		len = out - page;
-	}
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
-static int proc_idedisk_read_smart_values
-	(char *page, char **start, off_t off, int count, int *eof, void *data)
-{
-	struct ata_device *drive = (struct ata_device *)data;
-	int len = 0, i = 0;
-
-	if (!get_smart_values(drive, page)) {
-		unsigned short *val = (unsigned short *) page;
-		char *out = ((char *)val) + (SECTOR_WORDS * 4);
-		page = out;
-		do {
-			out += sprintf(out, "%04x%c", le16_to_cpu(*val), (++i & 7) ? ' ' : '\n');
-			val += 1;
-		} while (i < (SECTOR_WORDS * 2));
-		len = out - page;
-	}
-	PROC_IDE_READ_RETURN(page,start,off,count,eof,len);
-}
-
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 static int proc_idedisk_read_tcq
 	(char *page, char **start, off_t off, int count, int *eof, void *data)
@@ -638,10 +538,6 @@ static int proc_idedisk_read_tcq
 #endif
 
 static ide_proc_entry_t idedisk_proc[] = {
-	{ "cache",		S_IFREG|S_IRUGO,	proc_idedisk_read_cache,		NULL },
-	{ "geometry",		S_IFREG|S_IRUGO,	proc_ide_read_geometry,			NULL },
-	{ "smart_values",	S_IFREG|S_IRUSR,	proc_idedisk_read_smart_values,		NULL },
-	{ "smart_thresholds",	S_IFREG|S_IRUSR,	proc_idedisk_read_smart_thresholds,	NULL },
 #ifdef CONFIG_BLK_DEV_IDE_TCQ
 	{ "tcq",		S_IFREG|S_IRUSR,	proc_idedisk_read_tcq,			NULL },
 #endif
@@ -650,9 +546,9 @@ static ide_proc_entry_t idedisk_proc[] = {
 
 #else
 
-#define	idedisk_proc	NULL
+# define	idedisk_proc	NULL
 
-#endif	/* CONFIG_PROC_FS */
+#endif
 
 /*
  * This is tightly woven into the driver->special can not touch.

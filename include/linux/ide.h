@@ -15,6 +15,7 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/interrupt.h>
 #include <linux/bitops.h>
+#include <asm/byteorder.h>
 #include <asm/hdreg.h>
 
 /*
@@ -265,6 +266,50 @@ void ide_setup_ports(hw_regs_t *hw,
 
 struct ide_settings_s;
 
+typedef union {
+	unsigned all			: 8;	/* all of the bits together */
+	struct {
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+		unsigned head		: 4;	/* always zeros here */
+		unsigned unit		: 1;	/* drive select number: 0/1 */
+		unsigned bit5		: 1;	/* always 1 */
+		unsigned lba		: 1;	/* using LBA instead of CHS */
+		unsigned bit7		: 1;	/* always 1 */
+#elif defined(__BIG_ENDIAN_BITFIELD)
+		unsigned bit7		: 1;
+		unsigned lba		: 1;
+		unsigned bit5		: 1;
+		unsigned unit		: 1;
+		unsigned head		: 4;
+#else
+#error "Please fix <asm/byteorder.h>"
+#endif
+	} b;
+} select_t;
+
+typedef union {
+	unsigned all			: 8;	/* all of the bits together */
+	struct {
+#if defined(__LITTLE_ENDIAN_BITFIELD)
+		unsigned bit0		: 1;
+		unsigned nIEN		: 1;	/* device INTRQ to host */
+		unsigned SRST		: 1;	/* host soft reset bit */
+		unsigned bit3		: 1;	/* ATA-2 thingy */
+		unsigned reserved456	: 3;
+		unsigned HOB		: 1;	/* 48-bit address ordering */
+#elif defined(__BIG_ENDIAN_BITFIELD)
+		unsigned HOB		: 1;
+		unsigned reserved456	: 3;
+		unsigned bit3		: 1;
+		unsigned SRST		: 1;
+		unsigned nIEN		: 1;
+		unsigned bit0		: 1;
+#else
+#error "Please fix <asm/byteorder.h>"
+#endif
+	} b;
+} control_t;
+
 /*
  * ATA/ATAPI device structure :
  */
@@ -386,7 +431,7 @@ struct ata_channel {
 
 	ide_ioreg_t	io_ports[IDE_NR_PORTS];	/* task file registers */
 	hw_regs_t	hw;		/* Hardware info */
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 	struct pci_dev	*pci_dev;	/* for pci chipsets */
 #endif
 	struct ata_device drives[MAX_DRIVES];	/* drive info */
@@ -589,7 +634,6 @@ void destroy_proc_ide_drives(struct ata_channel *);
 void create_proc_ide_interfaces(void);
 void ide_add_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p, void *data);
 void ide_remove_proc_entries(struct proc_dir_entry *dir, ide_proc_entry_t *p);
-read_proc_t proc_ide_read_capacity;
 read_proc_t proc_ide_read_geometry;
 
 /*
@@ -797,6 +841,7 @@ extern int ide_cmd_ioctl(struct ata_device *drive, unsigned long arg);
 void ide_delay_50ms(void);
 
 extern byte ide_auto_reduce_xfer(struct ata_device *);
+extern void ide_fix_driveid(struct hd_driveid *id);
 extern int ide_driveid_update(struct ata_device *);
 extern int ide_ata66_check(struct ata_device *, struct ata_taskfile *);
 extern int ide_config_drive_speed(struct ata_device *, byte);
@@ -854,7 +899,7 @@ extern struct ata_device *ide_scan_devices(byte, const char *, struct ata_operat
 extern int ide_register_subdriver(struct ata_device *, struct ata_operations *);
 extern int ide_unregister_subdriver(struct ata_device *drive);
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
+#ifdef CONFIG_PCI
 # define ON_BOARD		1
 # define NEVER_BOARD		0
 # ifdef CONFIG_BLK_DEV_OFFBOARD
