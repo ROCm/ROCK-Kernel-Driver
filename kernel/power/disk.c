@@ -65,7 +65,7 @@ static int power_down(u32 mode)
 	machine_halt();
 	/* Valid image is on the disk, if we continue we risk serious data corruption
 	   after resume. */
-	printk("Please power me down manually\n");
+	printk(KERN_CRIT "Please power me down manually\n");
 	while(1);
 	return 0;
 }

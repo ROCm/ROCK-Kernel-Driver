@@ -99,8 +99,8 @@ unsigned int nr_copy_pages __nosavedata = 0;
    MMU hardware.
  */
 suspend_pagedir_t *pagedir_nosave __nosavedata = NULL;
-suspend_pagedir_t *pagedir_save;
-int pagedir_order __nosavedata = 0;
+static suspend_pagedir_t *pagedir_save;
+static int pagedir_order __nosavedata = 0;
 
 #define SWSUSP_SIG	"S1SUSPEND"
 
@@ -118,9 +118,6 @@ struct swsusp_info swsusp_info;
  * without paging. Might this be more?
  */
 #define PAGES_FOR_IO	512
-
-static const char name_suspend[] = "Suspend Machine: ";
-static const char name_resume[] = "Resume Machine: ";
 
 /*
  * Saving part...
@@ -141,10 +138,10 @@ static int mark_swapfiles(swp_entry_t prev)
 	rw_swap_page_sync(READ, 
 			  swp_entry(root_swap, 0),
 			  virt_to_page((unsigned long)&swsusp_header));
-	if (!memcmp("SWAP-SPACE",swsusp_header.sig,10) ||
-	    !memcmp("SWAPSPACE2",swsusp_header.sig,10)) {
-		memcpy(swsusp_header.orig_sig,swsusp_header.sig,10);
-		memcpy(swsusp_header.sig,SWSUSP_SIG,10);
+	if (!memcmp("SWAP-SPACE",swsusp_header.sig, 10) ||
+	    !memcmp("SWAPSPACE2",swsusp_header.sig, 10)) {
+		memcpy(swsusp_header.orig_sig,swsusp_header.sig, 10);
+		memcpy(swsusp_header.sig,SWSUSP_SIG, 10);
 		swsusp_header.swsusp_info = prev;
 		error = rw_swap_page_sync(WRITE, 
 					  swp_entry(root_swap, 0),
@@ -265,9 +262,10 @@ static int write_page(unsigned long addr, swp_entry_t * loc)
 
 
 /**
- *	free_data - Free the swap entries used by the saved image.
+ *	data_free - Free the swap entries used by the saved image.
  *
  *	Walk the list of used swap entries and free each one. 
+ *	This is only used for cleanup when suspend fails.
  */
 
 static void data_free(void)
@@ -287,7 +285,7 @@ static void data_free(void)
 
 
 /**
- *	write_data - Write saved image to swap.
+ *	data_write - Write saved image to swap.
  *
  *	Walk the list of pages in the image and sync each one to swap.
  */
@@ -351,15 +349,16 @@ static int close_swap(void)
 }
 
 /**
- *	free_pagedir - Free pages used by the page directory.
+ *	free_pagedir_entries - Free pages used by the page directory.
+ *
+ *	This is used during suspend for error recovery.
  */
 
 static void free_pagedir_entries(void)
 {
-	int num = swsusp_info.pagedir_pages;
 	int i;
 
-	for (i = 0; i < num; i++)
+	for (i = 0; i < swsusp_info.pagedir_pages; i++)
 		swap_free(swsusp_info.pagedir[i]);
 }
 
@@ -379,7 +378,7 @@ static int write_pagedir(void)
 	swsusp_info.pagedir_pages = n;
 	printk( "Writing pagedir (%d pages)\n", n);
 	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE)
-		error = write_page(addr,&swsusp_info.pagedir[i]);
+		error = write_page(addr, &swsusp_info.pagedir[i]);
 	return error;
 }
 
@@ -668,8 +667,8 @@ static void calc_order(void)
 /**
  *	alloc_pagedir - Allocate the page directory.
  *
- *	First, determine exactly how many contiguous pages we need, 
- *	allocate them, then mark each 'unsavable'.
+ *	First, determine exactly how many contiguous pages we need and
+ *	allocate them.
  */
 
 static int alloc_pagedir(void)
@@ -721,7 +720,7 @@ static int alloc_image_pages(void)
 
 static int enough_free_mem(void)
 {
-	if(nr_free_pages() < (nr_copy_pages + PAGES_FOR_IO)) {
+	if (nr_free_pages() < (nr_copy_pages + PAGES_FOR_IO)) {
 		pr_debug("swsusp: Not enough free pages: Have %d\n",
 			 nr_free_pages());
 		return 0;
@@ -757,7 +756,7 @@ static int swsusp_alloc(void)
 	int error;
 
 	pr_debug("suspend: (pages needed: %d + %d free: %d)\n",
-		 nr_copy_pages,PAGES_FOR_IO,nr_free_pages());
+		 nr_copy_pages, PAGES_FOR_IO, nr_free_pages());
 
 	pagedir_nosave = NULL;
 	if (!enough_free_mem())
@@ -788,7 +787,7 @@ int suspend_prepare_image(void)
 
 	pr_debug("swsusp: critical section: \n");
 	if (save_highmem()) {
-		printk(KERN_CRIT "%sNot enough free pages for highmem\n", name_suspend);
+		printk(KERN_CRIT "Suspend machine: Not enough free pages for highmem\n");
 		return -ENOMEM;
 	}
 
@@ -900,8 +899,8 @@ static int __init does_collide_order(suspend_pagedir_t *pagedir, unsigned long a
 	int i;
 	unsigned long addre = addr + (PAGE_SIZE<<order);
 	
-	for(i=0; i < nr_copy_pages; i++)
-		if((pagedir+i)->orig_address >= addr &&
+	for (i=0; i < nr_copy_pages; i++)
+		if ((pagedir+i)->orig_address >= addr &&
 			(pagedir+i)->orig_address < addre)
 			return 1;
 
@@ -1023,7 +1022,7 @@ static int submit(int rw, pgoff_t page_off, void * page)
 	int error = 0;
 	struct bio * bio;
 
-	bio = bio_alloc(GFP_ATOMIC,1);
+	bio = bio_alloc(GFP_ATOMIC, 1);
 	if (!bio)
 		return -ENOMEM;
 	bio->bi_sector = page_off * (PAGE_SIZE >> 9);
@@ -1049,12 +1048,12 @@ static int submit(int rw, pgoff_t page_off, void * page)
 
 int bio_read_page(pgoff_t page_off, void * page)
 {
-	return submit(READ,page_off,page);
+	return submit(READ, page_off, page);
 }
 
 int bio_write_page(pgoff_t page_off, void * page)
 {
-	return submit(WRITE,page_off,page);
+	return submit(WRITE, page_off, page);
 }
 
 /*
@@ -1104,16 +1103,16 @@ static int __init check_sig(void)
 {
 	int error;
 
-	memset(&swsusp_header,0,sizeof(swsusp_header));
-	if ((error = bio_read_page(0,&swsusp_header)))
+	memset(&swsusp_header, 0, sizeof(swsusp_header));
+	if ((error = bio_read_page(0, &swsusp_header)))
 		return error;
-	if (!memcmp(SWSUSP_SIG,swsusp_header.sig,10)) {
-		memcpy(swsusp_header.sig,swsusp_header.orig_sig,10);
+	if (!memcmp(SWSUSP_SIG, swsusp_header.sig, 10)) {
+		memcpy(swsusp_header.sig, swsusp_header.orig_sig, 10);
 
 		/*
 		 * Reset swap signature now.
 		 */
-		error = bio_write_page(0,&swsusp_header);
+		error = bio_write_page(0, &swsusp_header);
 	} else { 
 		pr_debug(KERN_ERR "swsusp: Invalid partition type.\n");
 		return -EINVAL;
@@ -1187,7 +1186,7 @@ static int __init read_pagedir(void)
 			error = -EFAULT;
 	}
 	if (error)
-		free_pages((unsigned long)pagedir_nosave,pagedir_order);
+		free_pages((unsigned long)pagedir_nosave, pagedir_order);
 	return error;
 }
 
