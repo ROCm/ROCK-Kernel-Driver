@@ -131,16 +131,11 @@ static int proc_fd_link(struct inode *inode, struct dentry **dentry, struct vfsm
 
 static int proc_exe_link(struct inode *inode, struct dentry **dentry, struct vfsmount **mnt)
 {
-	struct mm_struct * mm;
 	struct vm_area_struct * vma;
 	int result = -ENOENT;
 	struct task_struct *task = proc_task(inode);
+	struct mm_struct * mm = get_task_mm(task);
 
-	task_lock(task);
-	mm = task->mm;
-	if (mm)
-		atomic_inc(&mm->mm_users);
-	task_unlock(task);
 	if (!mm)
 		goto out;
 	down_read(&mm->mmap_sem);
@@ -203,13 +198,8 @@ static int proc_root_link(struct inode *inode, struct dentry **dentry, struct vf
 
 static int proc_pid_environ(struct task_struct *task, char * buffer)
 {
-	struct mm_struct *mm;
 	int res = 0;
-	task_lock(task);
-	mm = task->mm;
-	if (mm)
-		atomic_inc(&mm->mm_users);
-	task_unlock(task);
+	struct mm_struct *mm = get_task_mm(task);
 	if (mm) {
 		int len = mm->env_end - mm->env_start;
 		if (len > PAGE_SIZE)
@@ -222,38 +212,36 @@ static int proc_pid_environ(struct task_struct *task, char * buffer)
 
 static int proc_pid_cmdline(struct task_struct *task, char * buffer)
 {
-	struct mm_struct *mm;
 	int res = 0;
-	task_lock(task);
-	mm = task->mm;
-	if (mm)
-		atomic_inc(&mm->mm_users);
-	task_unlock(task);
-	if (mm) {
-		int len = mm->arg_end - mm->arg_start;
-		if (len > PAGE_SIZE)
-			len = PAGE_SIZE;
-		res = access_process_vm(task, mm->arg_start, buffer, len, 0);
-		// If the nul at the end of args has been overwritten, then
-		// assume application is using setproctitle(3).
-		if ( res > 0 && buffer[res-1] != '\0' )
-		{
-			len = strnlen( buffer, res );
-			if ( len < res )
-			{
-			    res = len;
-			}
-			else
-			{
-				len = mm->env_end - mm->env_start;
-				if (len > PAGE_SIZE - res)
-					len = PAGE_SIZE - res;
-				res += access_process_vm(task, mm->env_start, buffer+res, len, 0);
-				res = strnlen( buffer, res );
-			}
+	int len;
+	struct mm_struct *mm = get_task_mm(task);
+	if (!mm)
+		goto out;
+
+ 	len = mm->arg_end - mm->arg_start;
+ 
+	if (len > PAGE_SIZE)
+		len = PAGE_SIZE;
+ 
+	res = access_process_vm(task, mm->arg_start, buffer, len, 0);
+
+	// If the nul at the end of args has been overwritten, then
+	// assume application is using setproctitle(3).
+	if (res > 0 && buffer[res-1] != '\0') {
+		len = strnlen(buffer, res);
+		if (len < res) {
+		    res = len;
+		} else {
+			len = mm->env_end - mm->env_start;
+			if (len > PAGE_SIZE - res)
+				len = PAGE_SIZE - res;
+			res += access_process_vm(task, mm->env_start, buffer+res, len, 0);
+			res = strnlen(buffer, res);
 		}
-		mmput(mm);
 	}
+	mmput(mm);
+
+out:
 	return res;
 }
 
@@ -421,54 +409,59 @@ static ssize_t mem_read(struct file * file, char * buf,
 	struct task_struct *task = proc_task(file->f_dentry->d_inode);
 	char *page;
 	unsigned long src = *ppos;
-	int copied = 0;
+	int ret = -ESRCH;
 	struct mm_struct *mm;
 
-
 	if (!MAY_PTRACE(task))
-		return -ESRCH;
+		goto out;
 
+	ret = -ENOMEM;
 	page = (char *)__get_free_page(GFP_USER);
 	if (!page)
-		return -ENOMEM;
+		goto out;
 
-	task_lock(task);
-	mm = task->mm;
-	if (mm)
-		atomic_inc(&mm->mm_users);
-	task_unlock(task);
+	ret = 0;
+ 
+	mm = get_task_mm(task);
 	if (!mm)
-		return 0;
+		goto out_free;
 
-	if (file->private_data != (void*)((long)current->self_exec_id) ) {
-		mmput(mm);
-		return -EIO;
-	}
-		
+	ret = -EIO;
+ 
+	if (file->private_data != (void*)((long)current->self_exec_id))
+		goto out_put;
 
+	ret = 0;
+ 
 	while (count > 0) {
 		int this_len, retval;
 
 		this_len = (count > PAGE_SIZE) ? PAGE_SIZE : count;
 		retval = access_process_vm(task, src, page, this_len, 0);
 		if (!retval) {
-			if (!copied)
-				copied = -EIO;
+			if (!ret)
+				ret = -EIO;
 			break;
 		}
+
 		if (copy_to_user(buf, page, retval)) {
-			copied = -EFAULT;
+			ret = -EFAULT;
 			break;
 		}
-		copied += retval;
+ 
+		ret += retval;
 		src += retval;
 		buf += retval;
 		count -= retval;
 	}
 	*ppos = src;
+
+out_put:
 	mmput(mm);
+out_free:
 	free_page((unsigned long) page);
-	return copied;
+out:
+	return ret;
 }
 
 #define mem_write NULL

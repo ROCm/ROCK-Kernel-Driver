@@ -810,6 +810,27 @@ static inline char * d_path(struct dentry *dentry, struct vfsmount *vfsmnt,
 	return res;
 }
 
+ 
+/**
+ * get_task_mm - acquire a reference to the task's mm
+ *
+ * Returns %NULL if the task has no mm. User must release
+ * the mm via mmput() after use.
+ */
+static inline struct mm_struct * get_task_mm(struct task_struct * task)
+{
+	struct mm_struct * mm;
+ 
+	task_lock(task);
+	mm = task->mm;
+	if (mm)
+		atomic_inc(&mm->mm_users);
+	task_unlock(task);
+
+	return mm;
+}
+ 
+ 
 /* set thread flags in other task's structures
  * - see asm/thread_info.h for TIF_xxxx flags available
  */

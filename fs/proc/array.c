@@ -277,15 +277,11 @@ static inline char *task_cap(struct task_struct *p, char *buffer)
 int proc_pid_status(struct task_struct *task, char * buffer)
 {
 	char * orig = buffer;
-	struct mm_struct *mm;
+	struct mm_struct *mm = get_task_mm(task);
 
 	buffer = task_name(task, buffer);
 	buffer = task_state(task, buffer);
-	task_lock(task);
-	mm = task->mm;
-	if(mm)
-		atomic_inc(&mm->mm_users);
-	task_unlock(task);
+ 
 	if (mm) {
 		buffer = task_mem(mm, buffer);
 		mmput(mm);
@@ -481,14 +477,9 @@ static void statm_pgd_range(pgd_t * pgd, unsigned long address, unsigned long en
 
 int proc_pid_statm(struct task_struct *task, char * buffer)
 {
-	struct mm_struct *mm;
 	int size=0, resident=0, share=0, trs=0, lrs=0, drs=0, dt=0;
+	struct mm_struct *mm = get_task_mm(task);
 
-	task_lock(task);
-	mm = task->mm;
-	if(mm)
-		atomic_inc(&mm->mm_users);
-	task_unlock(task);
 	if (mm) {
 		struct vm_area_struct * vma;
 		down_read(&mm->mmap_sem);
@@ -626,11 +617,8 @@ ssize_t proc_pid_read_maps (struct task_struct *task, struct file * file, char *
 	if (!tmp)
 		goto out_free1;
 
-	task_lock(task);
-	mm = task->mm;
-	if (mm)
-		atomic_inc(&mm->mm_users);
-	task_unlock(task);
+	mm = get_task_mm(task);
+ 
 	retval = 0;
 	if (!mm)
 		goto out_free2;

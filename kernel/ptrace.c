@@ -124,12 +124,7 @@ int access_process_vm(struct task_struct *tsk, unsigned long addr, void *buf, in
 	struct page *page;
 	void *old_buf = buf;
 
-	/* Worry about races with exit() */
-	task_lock(tsk);
-	mm = tsk->mm;
-	if (mm)
-		atomic_inc(&mm->mm_users);
-	task_unlock(tsk);
+	mm = get_task_mm(tsk);
 	if (!mm)
 		return 0;
 
