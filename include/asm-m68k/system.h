@@ -7,7 +7,10 @@
 #include <asm/segment.h>
 #include <asm/entry.h>
 
-#define prepare_to_switch()	do { } while(0)
+#define prepare_arch_schedule(prev)		do { } while(0)
+#define finish_arch_schedule(prev)		do { } while(0)
+#define prepare_arch_switch(rq)			do { } while(0)
+#define finish_arch_switch(rq)			spin_unlock_irq(&(rq)->lock)
 
 /*
  * switch_to(n) should switch tasks to task ptr, first checking that
@@ -32,19 +35,16 @@
  * 02/17/96 - Jes Sorensen (jds@kom.auc.dk)
  *
  * Changed 96/09/19 by Andreas Schwab
- * pass prev in a0, next in a1, offset of tss in d1, and whether
- * the mm structures are shared in d2 (to avoid atc flushing).
+ * pass prev in a0, next in a1
  */
 asmlinkage void resume(void);
-#define switch_to(prev,next,last) { \
+#define switch_to(prev,next,last) do { \
   register void *_prev __asm__ ("a0") = (prev); \
   register void *_next __asm__ ("a1") = (next); \
-  register void *_last __asm__ ("d1"); \
   __asm__ __volatile__("jbsr resume" \
-		       : "=d" (_last) : "a" (_prev), "a" (_next) \
-		       : "d0", /* "d1", */ "d2", "d3", "d4", "d5", "a0", "a1"); \
-  (last) = _last; \
-}
+		       : : "a" (_prev), "a" (_next) \
+		       : "d0", "d1", "d2", "d3", "d4", "d5", "a0", "a1"); \
+} while (0)
 
 
 /* interrupt control.. */

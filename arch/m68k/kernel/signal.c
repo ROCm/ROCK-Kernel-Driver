@@ -792,10 +792,10 @@ static void setup_frame (int sig, struct k_sigaction *ka,
 		regs->stkadj = fsize;
 	}
 
-	err |= __put_user((current->exec_domain
-			   && current->exec_domain->signal_invmap
+	err |= __put_user((current_thread_info()->exec_domain
+			   && current_thread_info()->exec_domain->signal_invmap
 			   && sig < 32
-			   ? current->exec_domain->signal_invmap[sig]
+			   ? current_thread_info()->exec_domain->signal_invmap[sig]
 			   : sig),
 			  &frame->sig);
 
@@ -870,10 +870,10 @@ static void setup_rt_frame (int sig, struct k_sigaction *ka, siginfo_t *info,
 		regs->stkadj = fsize;
 	}
 
-	err |= __put_user((current->exec_domain
-			   && current->exec_domain->signal_invmap
+	err |= __put_user((current_thread_info()->exec_domain
+			   && current_thread_info()->exec_domain->signal_invmap
 			   && sig < 32
-			   ? current->exec_domain->signal_invmap[sig]
+			   ? current_thread_info()->exec_domain->signal_invmap[sig]
 			   : sig),
 			  &frame->sig);
 	err |= __put_user(&frame->info, &frame->pinfo);

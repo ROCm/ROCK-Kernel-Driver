@@ -68,21 +68,11 @@ ENTRY(trap)
 	addql	#4,%sp
 	jra	ret_from_exception
 
-ENTRY(reschedule)
-	| save top of frame
-	movel	%sp,%curptr@(TASK_THREAD+THREAD_ESP0)
-
-	pea	ret_from_exception
-	jmp	schedule
-
-	| After a fork we jump here directly from resume,
-	| so that %d1 contains the previous task
-	| Theoretically only needed on SMP, but let's watch
-	| what happens in schedule_tail() in future...
+	| schedule_tail is only used with CONFIG_SMP
 ENTRY(ret_from_fork)
-	movel	%d1,%sp@-
+#ifdef CONFIG_SMP
 	jsr	schedule_tail
-	addql	#4,%sp
+#endif
 	jra	ret_from_exception
 
 badsys:
@@ -128,38 +118,54 @@ ENTRY(system_call)
 	| save top of frame
 	movel	%sp,%curptr@(TASK_THREAD+THREAD_ESP0)
 
-	btst	#PT_TRACESYS_BIT,%curptr@(TASK_PTRACE+PT_TRACESYS_OFF)
+	tstb	%curptr@(TASK_SYSCALL_TRACE)
 	jne	do_trace
 	cmpl	#NR_syscalls,%d0
 	jcc	badsys
 	jbsr	@(sys_call_table,%d0:l:4)@(0)
 	movel	%d0,%sp@(PT_D0)		| save the return value
 
+	|oriw	#0x0700,%sr
+	movel	%curptr@(TASK_WORK),%d0
+	jne	syscall_exit_work
+1:	RESTORE_ALL
+
+syscall_exit_work:
+	btst	#5,%sp@(PT_SR)		| check if returning to kernel
+	bnes	1b			| if so, skip resched, signals
+	tstw	%d0
+	jeq	do_signal_return
+	tstb	%d0
+	jne	do_delayed_trace
+
+	pea	resume_userspace
+	jmp	schedule
+
 ret_from_exception:
 	btst	#5,%sp@(PT_SR)		| check if returning to kernel
-	bnes	2f			| if so, skip resched, signals
+	bnes	1f			| if so, skip resched, signals
 	| only allow interrupts when we are really the last one on the
 	| kernel stack, otherwise stack overflow can occur during
 	| heavy interrupt load
 	andw	#ALLOWINT,%sr
-	tstl	%curptr@(TASK_NEEDRESCHED)
-	jne	reschedule
-#if 0
-	cmpl	#task,%curptr		| task[0] cannot have signals
-	jeq	2f
-#endif
-					| check for delayed trace
-	bclr	#PT_DTRACE_BIT,%curptr@(TASK_PTRACE+PT_DTRACE_OFF)
-	jne	do_delayed_trace
-5:
-	tstl	%curptr@(TASK_STATE)	| state
-	jne	reschedule
 
-	tstl	%curptr@(TASK_SIGPENDING)
-	jne	Lsignal_return
-2:	RESTORE_ALL
+resume_userspace:
+	movel	%curptr@(TASK_WORK),%d0
+	lsrl	#8,%d0
+	jne	exit_work
+1:	RESTORE_ALL
 
-Lsignal_return:
+exit_work:
+	| save top of frame
+	movel	%sp,%curptr@(TASK_THREAD+THREAD_ESP0)
+	tstb	%d0
+	jeq	do_signal_return
+
+	pea	resume_userspace
+	jmp	schedule
+
+do_signal_return:
+	|andw	#ALLOWINT,%sr
 	subql	#4,%sp			| dummy return address
 	SAVE_SWITCH_STACK
 	pea	%sp@(SWITCH_STACK_SIZE)
@@ -168,7 +174,7 @@ Lsignal_return:
 	addql	#8,%sp
 	RESTORE_SWITCH_STACK
 	addql	#4,%sp
-	RESTORE_ALL
+	jbra	resume_userspace
 
 do_delayed_trace:
 	bclr	#7,%sp@(PT_SR)		| clear trace bit in SR
@@ -178,13 +184,13 @@ do_delayed_trace:
 	jbsr	send_sig
 	addql	#8,%sp
 	addql	#4,%sp
-	jra	5b
+	jbra	resume_userspace
 
 
 #if 0
 #if CONFIG_AMIGA
 ami_inthandler:
-	addql	#1,irq_stat+8		| local_irq_count
+	addql	#1,irq_stat+CPUSTAT_LOCAL_IRQ_COUNT
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
 
@@ -216,14 +222,14 @@ ENTRY(nmi_handler)
 inthandler:
 	SAVE_ALL_INT
 	GET_CURRENT(%d0)
-	addql	#1,irq_stat+8		| local_irq_count
+	addql	#1,irq_stat+CPUSTAT_LOCAL_IRQ_COUNT
 					|  put exception # in d0
 	bfextu %sp@(PT_VECTOR){#4,#10},%d0
 
 	movel	%sp,%sp@-
 	movel	%d0,%sp@- 		|  put vector # on stack
 #if defined(MACH_Q40_ONLY) && defined(CONFIG_BLK_DEV_FD)
-	btstb	#4,0xff000000	| Q40 floppy needs very special treatment ...
+	btstb	#4,0xff000000		| Q40 floppy needs very special treatment ...
 	jbeq	1f
 	btstb	#3,0xff000004		
 	jbeq	1f
@@ -231,11 +237,11 @@ inthandler:
 	jbra	3f
 1:
 #endif		
-	jbsr	process_int|  process the IRQ
+	jbsr	process_int		|  process the IRQ
 3:     	addql	#8,%sp			|  pop parameters off stack
 
 ret_from_interrupt:
-	subql	#1,irq_stat+8		| local_irq_count
+	subql	#1,irq_stat+CPUSTAT_LOCAL_IRQ_COUNT
 	jeq	1f
 2:
 	RESTORE_ALL
@@ -248,11 +254,8 @@ ret_from_interrupt:
 	jhi	2b
 #endif
 	/* check if we need to do software interrupts */
-
-	movel	irq_stat,%d0		| softirq_active
-	andl	irq_stat+4,%d0		| softirq_mask
+	tstl	irq_stat+CPUSTAT_SOFTIRQ_PENDING
 	jeq	ret_from_exception
-
 	pea	ret_from_exception
 	jra	do_softirq
 

@@ -1543,8 +1543,8 @@ L(cache_done):
 /*
  * Setup initial stack pointer
  */
-	lea	init_task_union,%curptr
-	lea	0x2000(%curptr),%sp
+	lea	init_task,%curptr
+	lea	init_thread_union+THREAD_SIZE,%sp
 
 	putc	'K'
 
