@@ -25,6 +25,7 @@
 #include <asm/irq.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include "pmac.h"
 #include <sound/pcm_params.h>
@@ -243,7 +244,10 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 		snd_pmac_dma_set_command(rec, &chip->extra_dma);
 		snd_pmac_dma_run(rec, RUN);
 	}
-	offset = runtime->dma_addr;
+	/* continuous DMA memory type doesn't provide the physical address,
+	 * so we need to resolve the address here...
+	 */
+	offset = virt_to_bus(runtime->dma_area);
 	for (i = 0, cp = rec->cmd.cmds; i < rec->nperiods; i++, cp++) {
 		st_le32(&cp->phy_addr, offset);
 		st_le16(&cp->req_count, rec->period_size);
@@ -650,9 +654,7 @@ static snd_pcm_ops_t snd_pmac_capture_ops = {
 
 static void pmac_pcm_free(snd_pcm_t *pcm)
 {
-#if 0
 	snd_pcm_lib_preallocate_free_for_all(pcm);
-#endif
 }
 
 int __init snd_pmac_pcm_new(pmac_t *chip)
@@ -686,10 +688,8 @@ int __init snd_pmac_pcm_new(pmac_t *chip)
 	chip->playback.cur_freqs = chip->freqs_ok;
 	chip->capture.cur_freqs = chip->freqs_ok;
 
-#if 0
 	/* preallocate 64k buffer */
 	snd_pcm_lib_preallocate_pages_for_all(pcm, 64 * 1024, 64 * 1024, GFP_KERNEL);
-#endif
 
 	return 0;
 }

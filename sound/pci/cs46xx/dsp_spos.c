@@ -36,74 +36,6 @@
 #include "cs46xx_lib.h"
 #include "dsp_spos.h"
 
-#if 0
-/* OBSOLETE NOW */
-
-static void handle_goto (cs46xx_t * chip,u32  * hival,u32 * loval,char * format, u32 overlay_begin_address);
-
-typedef struct _dsp_opcode_desc_t {
-	u32 hival,loval;
-	u32 himask,lomask;
-	void (*handler_func)(cs46xx_t * chip,u32 * hival,u32 * loval,char * format, u32 overlay_begin_address);
-	char * format;
-} dsp_opcode_desc_t;
-
-/* NOTE: theese opcodes are known needed to be reallocated,
-   there may be more. */
-dsp_opcode_desc_t dsp_opcodes[] = {
-	{ 0x01000,0x02730, 0xFF000,0x07FFF,handle_goto,"goto %s" },
-	{ 0x01000,0x00730, 0xFF000,0x07FFF,handle_goto,"goto %s after" },
-	{ 0x01000,0x02630, 0xFF000,0x07FFF,handle_goto,"if (tb) goto %s" },
-	{ 0x01000,0x00630, 0xFF000,0x07FFF,handle_goto,"if (tb) goto %s after" },
-	{ 0x01000,0x00530, 0xFF000,0x07FFF,handle_goto,"if (lt) goto %s after" },
-	{ 0x01000,0x02530, 0xFF000,0x07FFF,handle_goto,"if (lt) goto %s" },
-	{ 0x01000,0x006B0, 0xFF000,0x07FFF,handle_goto,"if (!tb) goto %s after" },
-	{ 0x01000,0x026B0, 0xFF000,0x07FFF,handle_goto,"if (!tb) goto %s" },
-	{ 0x01000,0x00FB0, 0xFF000,0x07FFF,handle_goto,"if (gt) goto %s after" },
-	{ 0x01000,0x02FB0, 0xFF000,0x07FFF,handle_goto,"if (gt) goto %s" },
-	{ 0x01000,0x02734, 0xFF000,0x07FFF,NULL,"goto *ind" },
-	{ 0x01000,0x00734, 0xFF000,0x07FFF,NULL,"goto *ind after" },
-	{ 0x01000,0x02130, 0xFF000,0x07FFF,handle_goto,"if (N) goto %s" },
-	{ 0x01000,0x00130, 0xFF000,0x07FFF,handle_goto,"if (N) goto %s after" },
-	{ 0x01000,0x020F2, 0xFF000,0x07FFF,handle_goto,"tb = Z, if(!Z) goto %s" },
-	{ 0x01000,0x000F2, 0xFF000,0x07FFF,handle_goto,"tb = Z, if(!Z) goto %s after" },
-	{ 0x01000,0x04030, 0xFF000,0x07FFF,handle_goto,"if(Z) goto %s" },
-	{ 0x01000,0x00030, 0xFF000,0x07FFF,handle_goto,"if(Z) goto %s after" },
-	{ 0x01000,0x020B0, 0xFF000,0x07FFF,handle_goto,"if(!Z) goto %s" },
-	{ 0x01000,0x000B0, 0xFF000,0x07FFF,handle_goto,"if(!Z) goto %s after" },
-	{ 0x01000,0x02731, 0xFF000,0x07FFF,handle_goto,"%s();" },
-};
-
-static void handle_goto (cs46xx_t * chip,u32  * hival,u32 * loval,
-			 char * format, u32 overlay_begin_address)
-{
-	u32 address ;
-	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
-
-	address  = (*hival & 0x00FFF) << 5;
-	address |=  *loval >> 15;
- 
-	snd_printdd("handle_goto[1]: %05x:%05x addr %04x\n",*hival,*loval,address);
-
-	if ( !(address & 0x8000) ) {
-		address += (ins->code.offset / 2) - overlay_begin_address;
-	} else {
-		snd_printdd("handle_goto[1]: ROM symbol not reallocated\n");
-	}
-
-	*hival &= 0xFF000;
-	*loval &= 0x07FFF;
-
-	*hival |= ( (address >> 5)  & 0x00FFF);
-	*loval |= ( (address << 15) & 0xF8000);
-
-	address  = (*hival & 0x00FFF) << 5;
-	address |=  *loval >> 15;
-
-	snd_printdd("handle_goto:[2] %05x:%05x addr %04x\n",*hival,*loval,address);
-}
-#endif /* #if 0 */
-
 static wide_opcode_t wide_opcodes[] = { 
 	WIDE_FOR_BEGIN_LOOP,
 	WIDE_FOR_BEGIN_LOOP2,
@@ -133,18 +65,6 @@ static int shadow_and_reallocate_code (cs46xx_t * chip,u32 * data,u32 size, u32 
 		hival = data[i++];
 
 		if (ins->code.offset > 0) {
-#if 0
-			/* OBSOLETE NOW */
-			for (j = 0;j < sizeof(dsp_opcodes) / sizeof(dsp_opcode_desc_t); ++j) {
-				if ( (hival & dsp_opcodes[j].himask) == dsp_opcodes[j].hival &&
-				     (loval & dsp_opcodes[j].lomask) == dsp_opcodes[j].loval &&
-				     dsp_opcodes[j].handler_func != NULL) {
-					dsp_opcodes[j].handler_func (chip,&hival,&loval,dsp_opcodes[j].format, overlay_begin_address);
-					nreallocated ++;
-				}
-			}
-#endif
-
 			mop_operands = (hival >> 6) & 0x03fff;
 			mop_type = mop_operands >> 10;
       
@@ -337,7 +257,10 @@ dsp_spos_instance_t *  cs46xx_dsp_spos_create (cs46xx_t * chip)
 
 	/* default SPDIF input sample rate
 	   to 48000 khz */
-	ins->spdif_in_sample_rate = 32000;
+	ins->spdif_in_sample_rate = 48000;
+
+	/* maximize volume */
+	ins->spdif_input_volume = 0x80008000;
 
 	return ins;
 }
@@ -655,7 +578,6 @@ static void cs46xx_dsp_proc_parameter_dump_read (snd_info_entry_t *entry, snd_in
 static void cs46xx_dsp_proc_sample_dump_read (snd_info_entry_t *entry, snd_info_buffer_t * buffer)
 {
 	cs46xx_t *chip = snd_magic_cast(cs46xx_t, entry->private_data, return);
-	/*dsp_spos_instance_t * ins = chip->dsp_spos_instance; */
 	int i,col = 0;
 	unsigned long dst = chip->region.idx[2].remap_addr;
 
@@ -1370,7 +1292,8 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 
 	/* create the record mixer SCB */
 	record_mix_scb = cs46xx_dsp_create_mix_only_scb(chip,"RecordMixerSCB",
-							MIX_SAMPLE_BUF2,0x170,
+							MIX_SAMPLE_BUF2,
+							RECORD_MIXER_SCB_ADDR,
 							vari_decimate_scb,
 							SCB_ON_PARENT_SUBLIST_SCB);
 	ins->record_mixer_scb = record_mix_scb;
@@ -1417,8 +1340,7 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 		goto _fail_end;
 
 
-	/* the magic snooper */
-
+	/* SPDIF input sampel rate converter */
 	src_task_scb = cs46xx_dsp_create_src_task_scb(chip,"SrcTaskSCB_SPDIFI",
 						      SRC_OUTPUT_BUF1,
 						      SRC_DELAY_BUF1,SRCTASK_SCB_ADDR,
@@ -1426,6 +1348,8 @@ int cs46xx_dsp_scb_and_task_init (cs46xx_t *chip)
 						      SCB_ON_PARENT_SUBLIST_SCB);
 
 	if (!src_task_scb) goto _fail_end;
+
+	cs46xx_src_unlink(chip,src_task_scb);
 
 	/* NOTE: when we now how to detect the SPDIF input
 	   sample rate we will use this SRC to adjust it */
@@ -1644,19 +1568,14 @@ int  cs46xx_dsp_disable_spdif_out (cs46xx_t *chip)
 int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
+	unsigned int flags;
 
 	/* turn on amplifier */
 	chip->active_ctrl(chip, 1);
 	chip->amplifier_ctrl(chip, 1);
 
-	/* set SPDIF input sample rate 
-	   NOTE: only 48khz support for SPDIF input this time */
-	cs46xx_dsp_set_src_sample_rate(chip,ins->spdif_in_src,48000);
-
-
 	snd_assert (ins->asynch_rx_scb == NULL,return -EINVAL);
 	snd_assert (ins->spdif_in_src != NULL,return -EINVAL);
-
 	/* create and start the asynchronous receiver SCB */
 	ins->asynch_rx_scb = cs46xx_dsp_create_asynch_fg_rx_scb(chip,"AsynchFGRxSCB",
 								ASYNCRX_SCB_ADDR,
@@ -1665,21 +1584,24 @@ int cs46xx_dsp_enable_spdif_in (cs46xx_t *chip)
 								ins->spdif_in_src,
 								SCB_ON_PARENT_SUBLIST_SCB);
 
-	if (!ins->asynch_rx_scb) 
-		return -EINVAL;
-
+	save_flags(flags);
+	cli();
 	/* reset SPDIF input sample buffer pointer */
 	snd_cs46xx_poke (chip, (SPDIFI_SCB_INST + 0x0c) << 2,
 			 (SPDIFI_IP_OUTPUT_BUFFER1 << 0x10) | 0xFFFC);
 
-	/* time countdown enable */
-	cs46xx_poke_via_dsp (chip,SP_ASER_COUNTDOWN, 0x80000000);
-
 	/* reset FIFO ptr */
 	cs46xx_poke_via_dsp (chip,SP_SPDIN_FIFOPTR, 0x0);
+	cs46xx_src_link(chip,ins->spdif_in_src);
 
-	/* SPDIF input MASTER ENABLE */
-	cs46xx_poke_via_dsp (chip,SP_SPDIN_CONTROL, 0x800003ff);
+	/* restore SPDIF input volume */
+	snd_cs46xx_poke(chip, (ASYNCRX_SCB_ADDR + 0xE) << 2, ins->spdif_input_volume);
+	snd_cs46xx_poke(chip, (ASYNCRX_SCB_ADDR + 0xF) << 2, ins->spdif_input_volume);
+	restore_flags(flags);
+
+	/* set SPDIF input sample rate and unmute
+	   NOTE: only 48khz support for SPDIF input this time */
+	cs46xx_dsp_set_src_sample_rate(chip,ins->spdif_in_src,48000);
 
 	/* monitor state */
 	ins->spdif_status_in = 1;
@@ -1692,16 +1614,13 @@ int cs46xx_dsp_disable_spdif_in (cs46xx_t *chip)
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
 	snd_assert (ins->asynch_rx_scb != NULL, return -EINVAL);
-
-	/* Time countdown disable */
-	cs46xx_poke_via_dsp (chip,SP_ASER_COUNTDOWN, 0x00000000);
-
-	/* SPDIF input MASTER DISABLE */
-	cs46xx_poke_via_dsp (chip,SP_SPDIN_CONTROL, 0x000003ff);
+	snd_assert (ins->spdif_in_src != NULL,return -EINVAL);
 
 	/* Remove the asynchronous receiver SCB */
 	cs46xx_dsp_remove_scb (chip,ins->asynch_rx_scb);
 	ins->asynch_rx_scb = NULL;
+
+	cs46xx_src_unlink(chip,ins->spdif_in_src);
 
 	/* monitor state */
 	ins->spdif_status_in = 0;

@@ -177,6 +177,7 @@ typedef struct _dsp_spos_instance_t {
 	/* SPDIF status */
 	int spdif_status_out;
 	int spdif_status_in;
+	u32 spdif_input_volume;
 
 	/* SPDIF input sample rate converter */
 	dsp_scb_descriptor_t * spdif_in_src;

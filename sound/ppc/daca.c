@@ -24,6 +24,7 @@
 #include <linux/i2c.h>
 #include <linux/i2c-dev.h>
 #include <linux/kmod.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include "pmac.h"
 

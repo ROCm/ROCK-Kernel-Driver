@@ -1195,8 +1195,12 @@ int snd_emu10k1_proc_done(emu10k1_t * emu);
 #define A_EXTIN_AC97_R		0x01	/* AC'97 capture channel - right */
 #define A_EXTIN_SPDIF_CD_L	0x02	/* digital CD left */
 #define A_EXTIN_SPDIF_CD_R	0x03	/* digital CD left */
+#define A_EXTIN_OPT_SPDIF_L     0x04    /* audigy drive Optical SPDIF - left */
+#define A_EXTIN_OPT_SPDIF_R     0x05    /*                              right */ 
 #define A_EXTIN_LINE2_L		0x08	/* audigy drive line2/mic2 - left */
 #define A_EXTIN_LINE2_R		0x09	/*                           right */
+#define A_EXTIN_RCA_SPDIF_L     0x0a    /* audigy drive RCA SPDIF - left */
+#define A_EXTIN_RCA_SPDIF_R     0x0b    /*                          right */
 #define A_EXTIN_AUX2_L		0x0c	/* audigy drive aux2 - left */
 #define A_EXTIN_AUX2_R		0x0d	/*                   - right */
 

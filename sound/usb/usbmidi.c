@@ -194,7 +194,7 @@ struct usbmidi {
 
 struct usbmidi_out_endpoint {
 	usbmidi_t* umidi;
-	urb_t* urb;
+	struct urb* urb;
 	int max_transfer;		/* size of urb buffer */
 	struct tasklet_struct tasklet;
 
@@ -214,7 +214,7 @@ struct usbmidi_out_endpoint {
 struct usbmidi_in_endpoint {
 	usbmidi_t* umidi;
 	usbmidi_endpoint_t* ep;
-	urb_t* urb;
+	struct urb* urb;
 	struct usbmidi_in_port {
 		int seq_port;
 		snd_midi_event_t* midi_event;
@@ -229,7 +229,7 @@ static void snd_usbmidi_do_output(usbmidi_out_endpoint_t* ep);
 /*
  * Submits the URB, with error handling.
  */
-static int snd_usbmidi_submit_urb(urb_t* urb, int flags)
+static int snd_usbmidi_submit_urb(struct urb* urb, int flags)
 {
 	int err = usb_submit_urb(urb, flags);
 	if (err < 0 && err != -ENODEV)
@@ -283,7 +283,7 @@ static void snd_usbmidi_input_packet(usbmidi_in_endpoint_t* ep,
 /*
  * Processes the data read from the device.
  */
-static void snd_usbmidi_in_urb_complete(urb_t* urb)
+static void snd_usbmidi_in_urb_complete(struct urb* urb)
 {
 	usbmidi_in_endpoint_t* ep = snd_magic_cast(usbmidi_in_endpoint_t, urb->context, return);
 
@@ -305,7 +305,7 @@ static void snd_usbmidi_in_urb_complete(urb_t* urb)
 	}
 }
 
-static void snd_usbmidi_out_urb_complete(urb_t* urb)
+static void snd_usbmidi_out_urb_complete(struct urb* urb)
 {
 	usbmidi_out_endpoint_t* ep = snd_magic_cast(usbmidi_out_endpoint_t, urb->context, return);
 	unsigned long flags;

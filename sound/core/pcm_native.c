@@ -438,8 +438,10 @@ static int snd_pcm_hw_free(snd_pcm_substream_t * substream)
 	}
 	if (atomic_read(&runtime->mmap_count))
 		return -EBADFD;
-	if (substream->ops->hw_free == NULL)
+	if (substream->ops->hw_free == NULL) {
+		runtime->status->state = SNDRV_PCM_STATE_OPEN;
 		return 0;
+	}
 	result = substream->ops->hw_free(substream);
 	runtime->status->state = SNDRV_PCM_STATE_OPEN;
 	return result;
@@ -463,6 +465,7 @@ static int snd_pcm_sw_params(snd_pcm_substream_t * substream, snd_pcm_sw_params_
 		return -EINVAL;
 	if (params->silence_threshold + params->silence_size > runtime->buffer_size)
 		return -EINVAL;
+	spin_lock_irq(&runtime->lock);
 	runtime->tstamp_mode = params->tstamp_mode;
 	runtime->sleep_min = params->sleep_min;
 	runtime->period_step = params->period_step;
@@ -473,7 +476,6 @@ static int snd_pcm_sw_params(snd_pcm_substream_t * substream, snd_pcm_sw_params_
 	runtime->silence_size = params->silence_size;
 	runtime->xfer_align = params->xfer_align;
         params->boundary = runtime->boundary;
-	spin_lock_irq(&runtime->lock);
 	if (snd_pcm_running(substream)) {
 		if (runtime->sleep_min)
 			snd_pcm_tick_prepare(substream);

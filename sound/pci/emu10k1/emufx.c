@@ -91,14 +91,14 @@ static char *audigy_ins[16] = {
 	/* 0x01 */ "AC97 Right",
 	/* 0x02 */ "Audigy CD Left",
 	/* 0x03 */ "Audigy CD Right",
-	/* 0x04 */ NULL,
-	/* 0x05 */ NULL,
+	/* 0x04 */ "Optical IEC958 Left",
+	/* 0x05 */ "Optical IEC958 Right",
 	/* 0x06 */ NULL,
 	/* 0x07 */ NULL,
 	/* 0x08 */ "Line/Mic 2 Left",
 	/* 0x09 */ "Line/Mic 2 Right",
-	/* 0x0a */ NULL,
-	/* 0x0b */ NULL,
+	/* 0x0a */ "SPDIF Left",
+	/* 0x0b */ "SPDIF Right",
 	/* 0x0c */ "Aux2 Left",
 	/* 0x0d */ "Aux2 Right",
 	/* 0x0e */ NULL,
@@ -1313,6 +1313,17 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "Audigy CD Capture Volume", gpr, 0);
 	gpr += 2;
 
+ 	/* Optical SPDIF Playback Volume */
+	A_ADD_VOLUME_IN(playback, gpr, A_EXTIN_OPT_SPDIF_L);
+	A_ADD_VOLUME_IN(playback+1, gpr+1, A_EXTIN_OPT_SPDIF_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Optical IEC958 Playback Volume", gpr, 0);
+	gpr += 2;
+	/* Optical SPDIF Capture Volume */
+	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_OPT_SPDIF_L);
+	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_OPT_SPDIF_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "Optical IEC958 Capture Volume", gpr, 0);
+	gpr += 2;
+
 	/* Line2 Playback Volume */
 	A_ADD_VOLUME_IN(playback, gpr, A_EXTIN_LINE2_L);
 	A_ADD_VOLUME_IN(playback+1, gpr+1, A_EXTIN_LINE2_R);
@@ -1322,6 +1333,17 @@ A_OP(icode, &ptr, iMAC0, A_GPR(var), A_GPR(var), A_GPR(vol), A_EXTIN(input))
 	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_LINE2_L);
 	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_LINE2_R);
 	snd_emu10k1_init_stereo_control(&controls[nctl++], "Line2 Capture Volume", gpr, 0);
+	gpr += 2;
+        
+	/* RCA SPDIF Playback Volume */
+	A_ADD_VOLUME_IN(playback, gpr, A_EXTIN_RCA_SPDIF_L);
+	A_ADD_VOLUME_IN(playback+1, gpr+1, A_EXTIN_RCA_SPDIF_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "RCA SPDIF Playback Volume", gpr, 0);
+	gpr += 2;
+	/* RCA SPDIF Capture Volume */
+	A_ADD_VOLUME_IN(capture, gpr, A_EXTIN_RCA_SPDIF_L);
+	A_ADD_VOLUME_IN(capture+1, gpr+1, A_EXTIN_RCA_SPDIF_R);
+	snd_emu10k1_init_stereo_control(&controls[nctl++], "RCA SPDIF Capture Volume", gpr, 0);
 	gpr += 2;
 
 	/* Aux2 Playback Volume */

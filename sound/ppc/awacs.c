@@ -25,6 +25,7 @@
 #include <asm/nvram.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include "pmac.h"
 
@@ -134,12 +135,20 @@ static int snd_pmac_awacs_get_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 	pmac_t *chip = snd_kcontrol_chip(kcontrol);
 	int reg = kcontrol->private_value & 0xff;
 	int lshift = (kcontrol->private_value >> 8) & 0xff;
+	int inverted = (kcontrol->private_value >> 16) & 1;
 	unsigned long flags;
+	int vol[2];
 
 	spin_lock_irqsave(&chip->reg_lock, flags);
-	ucontrol->value.integer.value[0] = 0x0f - ((chip->awacs_reg[reg] >> lshift) & 0xf);
-	ucontrol->value.integer.value[1] = 0x0f - (chip->awacs_reg[reg] & 0xf);
+	vol[0] = (chip->awacs_reg[reg] >> lshift) & 0xf;
+	vol[1] = chip->awacs_reg[reg] & 0xf;
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	if (inverted) {
+		vol[0] = 0x0f - vol[0];
+		vol[1] = 0x0f - vol[1];
+	}
+	ucontrol->value.integer.value[0] = vol[0];
+	ucontrol->value.integer.value[1] = vol[1];
 	return 0;
 }
 
@@ -148,14 +157,24 @@ static int snd_pmac_awacs_put_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 	pmac_t *chip = snd_kcontrol_chip(kcontrol);
 	int reg = kcontrol->private_value & 0xff;
 	int lshift = (kcontrol->private_value >> 8) & 0xff;
+	int inverted = (kcontrol->private_value >> 16) & 1;
 	int val, oldval;
 	unsigned long flags;
+	int vol[2];
 
+	vol[0] = ucontrol->value.integer.value[0];
+	vol[1] = ucontrol->value.integer.value[1];
+	if (inverted) {
+		vol[0] = 0x0f - vol[0];
+		vol[1] = 0x0f - vol[1];
+	}
+	vol[0] &= 0x0f;
+	vol[1] &= 0x0f;
 	spin_lock_irqsave(&chip->reg_lock, flags);
 	oldval = chip->awacs_reg[reg];
 	val = oldval & ~(0xf | (0xf << lshift));
-	val |= ((0x0f - (ucontrol->value.integer.value[0] & 0xf)) << lshift);
-	val |= 0x0f - (ucontrol->value.integer.value[1] & 0xf);
+	val |= vol[0] << lshift;
+	val |= vol[1];
 	if (oldval != val)
 		snd_pmac_awacs_write_reg(chip, reg, val);
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
@@ -163,12 +182,12 @@ static int snd_pmac_awacs_put_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_valu
 }
 
 
-#define AWACS_VOLUME(xname, xreg, xshift) \
+#define AWACS_VOLUME(xname, xreg, xshift, xinverted) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = 0, \
   .info = snd_pmac_awacs_info_volume, \
   .get = snd_pmac_awacs_get_volume, \
   .put = snd_pmac_awacs_put_volume, \
-  .private_value = (xreg) | ((xshift) << 8) }
+  .private_value = (xreg) | ((xshift) << 8) | ((xinverted) << 16) }
 
 /*
  * mute master/ogain for AWACS: mono
@@ -539,9 +558,9 @@ static int snd_pmac_screamer_mic_boost_put(snd_kcontrol_t *kcontrol, snd_ctl_ele
  * lists of mixer elements
  */
 static snd_kcontrol_new_t snd_pmac_awacs_mixers[] __initdata = {
-	AWACS_VOLUME("Master Playback Volume", 2, 6),
+	AWACS_VOLUME("Master Playback Volume", 2, 6, 1),
 	AWACS_SWITCH("Master Capture Switch", 1, SHIFT_LOOPTHRU, 0),
-	AWACS_VOLUME("Capture Volume", 0, 4),
+	AWACS_VOLUME("Capture Volume", 0, 4, 0),
 	AWACS_SWITCH("Line Capture Switch", 0, SHIFT_MUX_LINE, 0),
 	AWACS_SWITCH("CD Capture Switch", 0, SHIFT_MUX_CD, 0),
 	AWACS_SWITCH("Mic Capture Switch", 0, SHIFT_MUX_MIC, 0),
@@ -564,7 +583,7 @@ static snd_kcontrol_new_t snd_pmac_screamer_mic_boost[] __initdata = {
 };
 
 static snd_kcontrol_new_t snd_pmac_awacs_speaker_vol[] __initdata = {
-	AWACS_VOLUME("PC Speaker Playback Volume", 4, 6),
+	AWACS_VOLUME("PC Speaker Playback Volume", 4, 6, 1),
 };
 static snd_kcontrol_new_t snd_pmac_awacs_speaker_sw __initdata =
 AWACS_SWITCH("PC Speaker Playback Switch", 1, SHIFT_SPKMUTE, 1);

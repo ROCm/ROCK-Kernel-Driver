@@ -6,9 +6,9 @@
  *
  *  KNOWN BUGS:
  *    - Sometimes the SPDIF input DSP tasks get's unsynchronized
- *      and the SPDIF get somewhat "distorcionated". To get around
- *      this problem when it happens, mute and unmute the SPDIF input 
- *      mixer controll.
+ *      and the SPDIF get somewhat "distorcionated", or/and left right channel
+ *      are swapped. To get around this problem when it happens, mute and unmute 
+ *      the SPDIF input mixer controll.
  *    - On the Hercules Game Theater XP the amplifier are sometimes turned
  *      off on inadecuate moments which causes distorcions on sound.
  *
@@ -16,11 +16,19 @@
  *    - Secondary CODEC on some soundcards
  *    - SPDIF input support for other sample rates then 48khz
  *    - Independent PCM channels for rear output
+ *    - Posibility to mix the SPDIF output with analog sources.
  *
  *  NOTE: with CONFIG_SND_CS46XX_NEW_DSP unset uses old DSP image (which
  *        is default configuration), no SPDIF, no secondary codec, no
  *        multi channel PCM.  But known to work.
  *
+ *  FINALLY: A credit to the developers Tom and Jordan 
+ *           at Cirrus for have helping me out with the DSP, however we
+ *           still dont have sufficient documentation and technical
+ *           references to be able to implement all fancy feutures
+ *           supported by the cs46xx DPS's. 
+ *           Benny <benny@hostmobility.com>
+ *                
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
  *   the Free Software Foundation; either version 2 of the License, or
@@ -839,6 +847,8 @@ static int snd_cs46xx_playback_copy(snd_pcm_substream_t *substream,
 	char *hwbuf;
 	cs46xx_pcm_t *cpcm = snd_magic_cast(cs46xx_pcm_t, substream->runtime->private_data, return -ENXIO);
 
+	snd_assert(runtime->dma_area, return -EINVAL);
+
 	hwoffb = hwoff << cpcm->shift;
 	bytes = frames << cpcm->shift;
 	hwbuf = runtime->dma_area + hwoffb;
@@ -895,6 +905,8 @@ static int snd_cs46xx_playback_trigger(snd_pcm_substream_t * substream,
 			cs46xx_dsp_pcm_link(chip,cpcm->pcm_channel);
 		if (substream->runtime->periods != CS46XX_FRAGS)
 			snd_cs46xx_playback_transfer(substream, 0);
+		/* raise playback volume */
+		snd_cs46xx_poke(chip, (cpcm->pcm_channel->pcm_reader_scb->address + 0xE) << 2, 0x80008000);
 #else
 		if (substream->runtime->periods != CS46XX_FRAGS)
 			snd_cs46xx_playback_transfer(substream, 0);
@@ -1028,7 +1040,7 @@ static int snd_cs46xx_playback_prepare(snd_pcm_substream_t * substream)
 	    cpcm->pcm_channel->src_scb->ref_count != 1) {
 		cs46xx_dsp_destroy_pcm_channel (chip,cpcm->pcm_channel);
 
-		if ( (cpcm->pcm_channel = cs46xx_dsp_create_pcm_channel (chip,runtime->rate,cpcm)) == NULL) {
+		if ( (cpcm->pcm_channel = cs46xx_dsp_create_pcm_channel (chip, runtime->rate, cpcm, cpcm->hw_addr)) == NULL) {
 			snd_printk(KERN_ERR "cs46xx: failed to re-create virtual PCM channel\n");
 			return -ENXIO;
 		}
@@ -1073,9 +1085,6 @@ static int snd_cs46xx_playback_prepare(snd_pcm_substream_t * substream)
 	cpcm->appl_ptr = 0;
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	/* playback address */
-	snd_cs46xx_poke(chip, (cpcm->pcm_channel->pcm_reader_scb->address + 2) << 2, cpcm->hw_addr);
-
 	tmp = snd_cs46xx_peek(chip, (cpcm->pcm_channel->pcm_reader_scb->address) << 2);
 	tmp &= ~0x000003ff;
 	tmp |= (4 << cpcm->shift) - 1;
@@ -1315,7 +1324,7 @@ static int snd_cs46xx_playback_open(snd_pcm_substream_t * substream)
 
 	cpcm->substream = substream;
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
-	cpcm->pcm_channel = cs46xx_dsp_create_pcm_channel (chip,runtime->rate,cpcm);
+	cpcm->pcm_channel = cs46xx_dsp_create_pcm_channel (chip, runtime->rate, cpcm, cpcm->hw_addr);
 
 	if (cpcm->pcm_channel == NULL) {
 		snd_printk(KERN_ERR "cs46xx: failed to create virtual PCM channel\n");
@@ -1522,7 +1531,7 @@ static int snd_cs46xx_vol_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 	int change = (old != val);
 	if (change) {
 		snd_cs46xx_poke(chip, reg, val);
-#ifndef CONFIG_SND_CS46XX_NEW_DSP
+#ifdef CONFIG_SND_CS46XX_NEW_DSP
 		/* NOTE: this updates the current left and right volume
 		   that should be automatically updated by the DSP and
 		   not touched by the host. But for some strange reason
@@ -1531,6 +1540,14 @@ static int snd_cs46xx_vol_put(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 		   channel volume. 
 		*/
 		snd_cs46xx_poke(chip, reg + 4, val);
+
+		/* shadow the SPDIF input volume */
+		if (reg == (ASYNCRX_SCB_ADDR + 0xE) << 2) {
+			/* FIXME: I known this is uggly ...
+			   any other suggestion ? 
+			*/
+			chip->dsp_spos_instance->spdif_input_volume = val;
+		}
 #endif
 	}
 	return change;
@@ -1579,8 +1596,10 @@ static int snd_cs46xx_iec958_put(snd_kcontrol_t *kcontrol,
 		break;
 	case CS46XX_MIXER_SPDIF_INPUT_ELEMENT:
 		change = chip->dsp_spos_instance->spdif_status_in;
-		if (ucontrol->value.integer.value[0] && !change) 
+		if (ucontrol->value.integer.value[0] && !change) {
 			cs46xx_dsp_enable_spdif_in(chip);
+			/* restore volume */
+		}
 		else if (change && !ucontrol->value.integer.value[0])
 			cs46xx_dsp_disable_spdif_in(chip);
 		
@@ -1822,7 +1841,7 @@ static snd_kcontrol_new_t snd_cs46xx_controls[] __devinitdata = {
 	.info = snd_mixer_boolean_info,
 	.get = snd_cs46xx_iec958_get,
 	.put = snd_cs46xx_iec958_put,
-    .private_value = CS46XX_MIXER_SPDIF_INPUT_ELEMENT,
+	.private_value = CS46XX_MIXER_SPDIF_INPUT_ELEMENT,
 },
 {
 	.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
@@ -2742,12 +2761,14 @@ static int snd_cs46xx_chip_init(cs46xx_t *chip, int busywait)
 	snd_cs46xx_poke(chip, BA1_CVOL, 0x80008000);
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
+	/* time countdown enable */
+	cs46xx_poke_via_dsp (chip,SP_ASER_COUNTDOWN, 0x80000000);
+        
+	/* SPDIF input MASTER ENABLE */
+	cs46xx_poke_via_dsp (chip,SP_SPDIN_CONTROL, 0x800003ff);
+
 	/* mute spdif out */
 	cs46xx_dsp_disable_spdif_out(chip);
-
-	/* mute spdif in */
-	cs46xx_poke_via_dsp (chip,SP_ASER_COUNTDOWN, 0x00000000);
-	cs46xx_poke_via_dsp (chip,SP_SPDIN_CONTROL, 0x000003ff);
 #endif
 
 	return 0;
@@ -2943,6 +2964,9 @@ static void hercules_mixer_init (cs46xx_t *chip)
 	snd_printdd ("initializing Hercules mixer\n");
 
 #ifdef CONFIG_SND_CS46XX_NEW_DSP
+	/* turnon Amplifier and leave it on */
+	chip->amplifier_ctrl(chip, 1);
+
 	for (idx = 0 ; idx < sizeof(snd_hercules_controls) / 
 		     sizeof(snd_hercules_controls[0]) ; idx++) {
 		snd_kcontrol_t *kctl;

@@ -22,6 +22,7 @@
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include "pmac.h"
 #include "burgundy.h"
@@ -196,9 +197,10 @@ static int snd_pmac_burgundy_put_volume(snd_kcontrol_t *kcontrol, snd_ctl_elem_v
 
 #define BURGUNDY_VOLUME(xname, xindex, addr, shift) \
 { .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, .index = xindex,\
-  .info = snd_pmac_burgundy_info_volume,\ .get = snd_pmac_burgundy_get_volume,\
-  .put = snd_pmac_burgundy_put_volume,\ .private_value = ((ADDR2BASE(addr) &
-  0xff) | ((shift) << 8)) }
+  .info = snd_pmac_burgundy_info_volume,\
+  .get = snd_pmac_burgundy_get_volume,\
+  .put = snd_pmac_burgundy_put_volume,\
+  .private_value = ((ADDR2BASE(addr) & 0xff) | ((shift) << 8)) }
 
 /* lineout/speaker */
 

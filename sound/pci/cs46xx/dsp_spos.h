@@ -75,10 +75,6 @@ typedef enum  {
 #define MIX_SAMPLE_BUF1          0x1400
 #define MIX_SAMPLE_BUF2          0x3000
 
-// #define SPDIFI_IP_OUTPUT_BUFFER1 0x2800
-// #define SRC_OUTPUT_BUF2          0x1280
-// #define SRC_DELAY_BUF2           0x1288
-
 /* Task stack address */
 #define HFG_STACK                0x066A
 #define FG_STACK                 0x066E
@@ -107,6 +103,7 @@ typedef enum  {
 #define SEC_CODECOUT_SCB_ADDR    0x140
 #define OUTPUTSNOOPII_SCB_ADDR   0x150
 #define PCMSERIALIN_PCM_SCB_ADDR 0x160
+#define RECORD_MIXER_SCB_ADDR    0x170
 
 /* hyperforground SCB's*/
 #define HFG_TREE_SCB             0xBA0
@@ -184,4 +181,3 @@ typedef enum  {
 
 #endif /* __DSP_SPOS_H__ */
 #endif /* CONFIG_SND_CS46XX_NEW_DSP  */
-

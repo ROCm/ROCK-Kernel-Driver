@@ -276,14 +276,13 @@ int snd_ac97_update(ac97_t *ac97, unsigned short reg, unsigned short value)
 	return change;
 }
 
-int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value)
+int snd_ac97_update_bits_nolock(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value)
 {
 	int change;
 	unsigned short old, new;
 
 	if (!snd_ac97_valid_reg(ac97, reg))
 		return -EINVAL;
-	spin_lock(&ac97->reg_lock);
 	old = ac97->regs[reg];
 	new = (old & ~mask) | value;
 	change = old != new;
@@ -291,6 +290,14 @@ int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, 
 		ac97->write(ac97, reg, new);
 		ac97->regs[reg] = new;
 	}
+	return change;
+}
+
+int snd_ac97_update_bits(ac97_t *ac97, unsigned short reg, unsigned short mask, unsigned short value)
+{
+	int change;
+	spin_lock(&ac97->reg_lock);
+	change = snd_ac97_update_bits_nolock(ac97, reg, mask, value);
 	spin_unlock(&ac97->reg_lock);
 	return change;
 }
@@ -740,16 +747,16 @@ static int snd_ac97_spdif_default_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 		case 2: x = 0; break;  // 48.0
 		default: x = 0; break; // illegal.
 		}
-		change = snd_ac97_update_bits(ac97, AC97_CSR_SPDIF, 0x3fff, ((val & 0xcfff) | (x << 12)));
+		change = snd_ac97_update_bits_nolock(ac97, AC97_CSR_SPDIF, 0x3fff, ((val & 0xcfff) | (x << 12)));
 	} else if (ac97->flags & AC97_CX_SPDIF) {
 		int v;
 		v = ucontrol->value.iec958.status[0] & (IEC958_AES0_CON_EMPHASIS_5015|IEC958_AES0_CON_NOT_COPYRIGHT) ? 0 : AC97_CXR_COPYRGT;
 		v |= ucontrol->value.iec958.status[0] & IEC958_AES0_NONAUDIO ? AC97_CXR_SPDIF_AC3 : AC97_CXR_SPDIF_PCM;
-		change = snd_ac97_update_bits(ac97, AC97_CXR_AUDIO_MISC, 
-					      AC97_CXR_SPDIF_MASK | AC97_CXR_COPYRGT,
-					      v);
+		change = snd_ac97_update_bits_nolock(ac97, AC97_CXR_AUDIO_MISC, 
+						     AC97_CXR_SPDIF_MASK | AC97_CXR_COPYRGT,
+						     v);
 	} else {
-		change = snd_ac97_update_bits(ac97, AC97_SPDIF, 0x3fff, val);
+		change = snd_ac97_update_bits_nolock(ac97, AC97_SPDIF, 0x3fff, val);
 	}
 
 	change |= ac97->spdif_status != new;

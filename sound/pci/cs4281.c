@@ -549,8 +549,11 @@ static void snd_cs4281_delay(unsigned int delay, int can_schedule)
 				set_current_state(TASK_UNINTERRUPTIBLE);
 				schedule_timeout(1);
 			} while (end_time - (signed long)jiffies >= 0);
-		} else
-			mdelay(delay);
+		} else {
+			delay += 999;
+			delay /= 1000;
+			mdelay(delay > 0 ? delay : 1);
+		}
 	} else {
 		udelay(delay);
 	}
@@ -562,7 +565,7 @@ inline static void snd_cs4281_delay_long(int can_schedule)
 		set_current_state(TASK_UNINTERRUPTIBLE);
 		schedule_timeout(1);
 	} else
-		mdelay(1999 / HZ);
+		mdelay(10);
 }
 
 static inline void snd_cs4281_pokeBA0(cs4281_t *chip, unsigned long offset, unsigned int val)
@@ -1502,7 +1505,7 @@ static int __devinit snd_cs4281_create(snd_card_t * card,
 		return -ENOMEM;
 	}
 	
-	tmp = snd_cs4281_chip_init(chip, 0);
+	tmp = snd_cs4281_chip_init(chip, 1);
 	if (tmp) {
 		snd_cs4281_free(chip);
 		return tmp;
