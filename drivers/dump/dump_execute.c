@@ -81,6 +81,10 @@ int dump_complete(void)
 	ret = dump_dev_resume();
 
 	if ((panic_timeout > 0) && (!(dump_config.flags & (DUMP_FLAGS_SOFTBOOT | DUMP_FLAGS_NONDISRUPT)))) {
+		printk(KERN_EMERG "Rebooting in %d seconds..",panic_timeout);
+#ifdef CONFIG_SMP
+		smp_send_stop();
+#endif
 		mdelay(panic_timeout * 1000);
 		machine_restart(NULL);
 	}

@@ -57,7 +57,7 @@ static struct hook_rec ltt_##name##_rec = { \
 #ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
 /* TRACE_SYSCALL_ENTRY */
 extern void ltt_pre_syscall(struct pt_regs *);
-static void ltt_pre_syscall_hook(struct hook *h, struct pt_regs *regs)
+asmlinkage void ltt_pre_syscall_hook(struct hook *h, struct pt_regs *regs)
 {
 	ltt_pre_syscall(regs);
 }
@@ -84,7 +84,7 @@ static int disable_pre_syscall_hooks(void)
 }
 
 /* TRACE_SYSCALL_EXIT */
-static void ltt_post_syscall_hook(struct hook *h, struct pt_regs *regs)
+asmlinkage void ltt_post_syscall_hook(struct hook *h, struct pt_regs *regs)
 {
 	ltt_log_event(TRACE_EV_SYSCALL_EXIT, NULL);
 }
@@ -111,7 +111,7 @@ static int disable_post_syscall_hooks(void)
 }
 #endif
 /* TRACE_TRAP_ENTRY */
-static void ltt_trap_entry_hook(struct hook *h, int trapnr, unsigned long eip, struct pt_regs *regs)
+asmlinkage void ltt_trap_entry_hook(struct hook *h, int trapnr, unsigned long eip, struct pt_regs *regs)
 {
 	TRACE_TRAP_ENTRY(trapnr, eip);
 }
@@ -136,7 +136,7 @@ static int disable_trap_entry_hooks(void)
 }
 
 /* TRACE_TRAP_EXIT */
-static void ltt_trap_exit_hook(struct hook *h)
+asmlinkage void ltt_trap_exit_hook(struct hook *h)
 {
 	TRACE_TRAP_EXIT();
 }
@@ -162,7 +162,7 @@ static int disable_trap_exit_hooks(void)
 }
 
 /* TRACE_IRQ_ENTRY */
-static void ltt_irq_entry_hook(struct hook *h, unsigned int irq, struct pt_regs *regs, int irq_in_kernel)
+asmlinkage void ltt_irq_entry_hook(struct hook *h, unsigned int irq, struct pt_regs *regs, int irq_in_kernel)
 {
 	TRACE_IRQ_ENTRY(irq, irq_in_kernel);
 }
@@ -188,7 +188,7 @@ static int disable_irq_entry_hooks(void)
 }
 
 /* TRACE_IRQ_EXIT */
-static void ltt_irq_exit_hook(struct hook *h)
+asmlinkage void ltt_irq_exit_hook(struct hook *h)
 {
 	TRACE_IRQ_EXIT();
 }
@@ -214,7 +214,7 @@ static int disable_irq_exit_hooks(void)
 }
 
 /* TRACE_SCHEDCHANGE */
-static void ltt_sched_switch_hook(struct hook *h, struct task_struct *prev, struct task_struct *next)
+asmlinkage void ltt_sched_switch_hook(struct hook *h, struct task_struct *prev, struct task_struct *next)
 {
 	TRACE_SCHEDCHANGE(prev, next);
 }
@@ -241,7 +241,7 @@ static int disable_schedchange_hooks(void)
 
 
 /* TRACE_KERNEL_TIMER */
-static void ltt_kernel_timer_hook(struct hook *h, unsigned long nr)
+asmlinkage void ltt_kernel_timer_hook(struct hook *h, unsigned long nr)
 {
 	TRACE_EVENT(TRACE_EV_KERNEL_TIMER, NULL);
 }
@@ -266,15 +266,15 @@ static int disable_kernel_timer_hooks(void)
 	return 0;
 }
 
-static void ltt_softirq_hook(struct hook *h, int index)
+asmlinkage void ltt_softirq_hook(struct hook *h, int index)
 {
 	TRACE_SOFT_IRQ(TRACE_EV_SOFT_IRQ_SOFT_IRQ, index);
 }
-static void ltt_tasklet_action_hook(struct hook *h, unsigned long fn)
+asmlinkage void ltt_tasklet_action_hook(struct hook *h, unsigned long fn)
 {
 	TRACE_SOFT_IRQ(TRACE_EV_SOFT_IRQ_TASKLET_ACTION, fn);
 }
-static void ltt_tasklet_hi_action_hook(struct hook *h, unsigned long fn)
+asmlinkage void ltt_tasklet_hi_action_hook(struct hook *h, unsigned long fn)
 {
 	TRACE_SOFT_IRQ(TRACE_EV_SOFT_IRQ_TASKLET_HI_ACTION, fn);
 }
@@ -318,27 +318,27 @@ static int disable_softirq_hooks(void)
 }
 
 /* TRACE_PROCESS */
-static void ltt_kthread_hook(struct hook *h, unsigned int ret, unsigned int fn)
+asmlinkage void ltt_kthread_hook(struct hook *h, unsigned int ret, unsigned int fn)
 {
 	TRACE_PROCESS(TRACE_EV_PROCESS_KTHREAD, ret, fn);
 }
-static void ltt_process_exit_hook(struct hook *h, pid_t pid)
+asmlinkage void ltt_process_exit_hook(struct hook *h, pid_t pid)
 {
 	TRACE_PROCESS_EXIT(0, 0);
 }
-static void ltt_process_wait_hook(struct hook *h, pid_t pid)
+asmlinkage void ltt_process_wait_hook(struct hook *h, pid_t pid)
 {
 	TRACE_PROCESS(TRACE_EV_PROCESS_WAIT, pid, 0);
 }
-static void ltt_fork_hook(struct hook *h, unsigned long clone_flags, struct task_struct *p, int ret)
+asmlinkage void ltt_fork_hook(struct hook *h, unsigned long clone_flags, struct task_struct *p, int ret)
 {
 	TRACE_PROCESS(TRACE_EV_PROCESS_FORK, ret, 0);
 }
-static void ltt_process_wakeup_hook(struct hook *h, pid_t pid, unsigned long state)
+asmlinkage void ltt_process_wakeup_hook(struct hook *h, pid_t pid, unsigned long state)
 {
 	TRACE_PROCESS(TRACE_EV_PROCESS_WAKEUP, pid, state);
 }
-static void ltt_signal_hook(struct hook *h, int sig, pid_t pid)
+asmlinkage void ltt_signal_hook(struct hook *h, int sig, pid_t pid)
 {
 	TRACE_PROCESS(TRACE_EV_PROCESS_SIGNAL, sig, pid);
 }
@@ -402,51 +402,51 @@ static int disable_process_hooks(void)
 }
 
 /* TRACE_FILE_SYSTEM */
-static void ltt_buf_wait_start_hook(struct hook *h, struct buffer_head *bh)
+asmlinkage void ltt_buf_wait_start_hook(struct hook *h, struct buffer_head *bh)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_BUF_WAIT_START, 0, 0, NULL);
 }
-static void ltt_buf_wait_end_hook(struct hook *h, struct buffer_head *bh)
+asmlinkage void ltt_buf_wait_end_hook(struct hook *h, struct buffer_head *bh)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_BUF_WAIT_END, 0, 0, NULL);
 }
-static void ltt_exec_hook(struct hook *h, int len, char *name, struct pt_regs *regs)
+asmlinkage void ltt_exec_hook(struct hook *h, int len, char *name, struct pt_regs *regs)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_EXEC, 0, len, name);
 }
-static void ltt_ioctl_hook(struct hook *h, unsigned int fd, unsigned int cmd)
+asmlinkage void ltt_ioctl_hook(struct hook *h, unsigned int fd, unsigned int cmd)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_IOCTL, fd, cmd, NULL);
 }
-static void ltt_open_hook(struct hook *h, unsigned int fd, unsigned int len, char *name)
+asmlinkage void ltt_open_hook(struct hook *h, unsigned int fd, unsigned int len, char *name)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_OPEN, fd, len, name);
 }
-static void ltt_close_hook(struct hook *h, unsigned int fd)
+asmlinkage void ltt_close_hook(struct hook *h, unsigned int fd)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_CLOSE, fd, 0, NULL);
 }
-static void ltt_lseek_hook(struct hook *h, unsigned int fd, off_t offset)
+asmlinkage void ltt_lseek_hook(struct hook *h, unsigned int fd, off_t offset)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_SEEK, fd, offset, NULL);
 }
-static void ltt_llseek_hook(struct hook *h, unsigned int fd, loff_t offset)
+asmlinkage void ltt_llseek_hook(struct hook *h, unsigned int fd, loff_t offset)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_SEEK, fd, offset, NULL);
 }
-static void ltt_read_hook(struct hook *h, unsigned int fd, size_t count)
+asmlinkage void ltt_read_hook(struct hook *h, unsigned int fd, size_t count)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_READ, fd, count, NULL);
 }
-static void ltt_write_hook(struct hook *h, unsigned int fd, size_t count)
+asmlinkage void ltt_write_hook(struct hook *h, unsigned int fd, size_t count)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_WRITE, fd, count, NULL);
 }
-static void ltt_select_hook(struct hook *h, unsigned int fd, long timeout)
+asmlinkage void ltt_select_hook(struct hook *h, unsigned int fd, long timeout)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_SELECT, fd, timeout, NULL);
 }
-static void ltt_poll_hook(struct hook *h, unsigned int fd)
+asmlinkage void ltt_poll_hook(struct hook *h, unsigned int fd)
 {
 	TRACE_FILE_SYSTEM(TRACE_EV_FILE_SYSTEM_POLL, fd, 0, NULL);
 }
@@ -552,15 +552,15 @@ static int disable_fs_hooks(void)
 }
 
 /* TRACE_TIMER */
-static void ltt_timer_expired_hook(struct hook *h, struct task_struct *p)
+asmlinkage void ltt_timer_expired_hook(struct hook *h, struct task_struct *p)
 {
 	TRACE_TIMER(TRACE_EV_TIMER_EXPIRED, 0, 0, 0);
 }
-static void ltt_setitimer_hook(struct hook *h, int which, unsigned long interval, unsigned long value)
+asmlinkage void ltt_setitimer_hook(struct hook *h, int which, unsigned long interval, unsigned long value)
 {
 	TRACE_TIMER(TRACE_EV_TIMER_SETITIMER, which, interval, value);
 }
-static void ltt_settimeout_hook(struct hook *h, unsigned long timeout)
+asmlinkage void ltt_settimeout_hook(struct hook *h, unsigned long timeout)
 {
 	TRACE_TIMER(TRACE_EV_TIMER_SETTIMEOUT, 0, timeout, 0);
 }
@@ -604,27 +604,27 @@ static int disable_timer_hooks(void)
 
 
 /* TRACE_MEMORY */
-static void ltt_mm_page_alloc_hook(struct hook *h, unsigned int order)
+asmlinkage void ltt_mm_page_alloc_hook(struct hook *h, unsigned int order)
 {
 	TRACE_MEMORY(TRACE_EV_MEMORY_PAGE_ALLOC, order);
 }
-static void ltt_mm_page_free_hook(struct hook *h, unsigned int order)
+asmlinkage void ltt_mm_page_free_hook(struct hook *h, unsigned int order)
 {
 	TRACE_MEMORY(TRACE_EV_MEMORY_PAGE_FREE, order);
 }
-static void ltt_mm_swap_in_hook(struct hook *h, unsigned long address)
+asmlinkage void ltt_mm_swap_in_hook(struct hook *h, unsigned long address)
 {
 	TRACE_MEMORY(TRACE_EV_MEMORY_SWAP_IN, address);
 }
-static void ltt_mm_swap_out_hook(struct hook *h, struct page *page)
+asmlinkage void ltt_mm_swap_out_hook(struct hook *h, struct page *page)
 {
 	TRACE_MEMORY(TRACE_EV_MEMORY_SWAP_OUT, ((unsigned long) page));
 }
-static void ltt_page_wait_start_hook(struct hook *h, struct page *page)
+asmlinkage void ltt_page_wait_start_hook(struct hook *h, struct page *page)
 {
 	TRACE_MEMORY(TRACE_EV_MEMORY_PAGE_WAIT_START, 0);
 }
-static void ltt_page_wait_end_hook(struct hook *h, struct page *page)
+asmlinkage void ltt_page_wait_end_hook(struct hook *h, struct page *page)
 {
 	TRACE_MEMORY(TRACE_EV_MEMORY_PAGE_WAIT_END, 0);
 }
@@ -687,22 +687,22 @@ static int disable_mm_hooks(void)
 	return 0;
 }
 /* TRACE_SOCKET */
-static void ltt_sk_send_hook(struct hook *h, int type, int size)
+asmlinkage void ltt_sk_send_hook(struct hook *h, int type, int size)
 {
 	TRACE_SOCKET(TRACE_EV_SOCKET_SEND, type, size);
 }
 
-static void ltt_sk_receive_hook(struct hook *h, int type, int size)
+asmlinkage void ltt_sk_receive_hook(struct hook *h, int type, int size)
 {
 	TRACE_SOCKET(TRACE_EV_SOCKET_RECEIVE, type, size);
 }
 
-static void ltt_sk_create_hook(struct hook *h, int retval, int type)
+asmlinkage void ltt_sk_create_hook(struct hook *h, int retval, int type)
 {
 	TRACE_SOCKET(TRACE_EV_SOCKET_CREATE, retval, type);
 }
 
-static void ltt_sk_call_hook(struct hook *h, int call, unsigned long a0)
+asmlinkage void ltt_sk_call_hook(struct hook *h, int call, unsigned long a0)
 {
 	TRACE_SOCKET(TRACE_EV_SOCKET_CALL, call, a0);
 }
@@ -752,19 +752,19 @@ static int disable_socket_hooks(void)
 }
 
 /* TRACE_IPC */
-static void ltt_ipc_call_hook(struct hook *h, unsigned int call, int first)
+asmlinkage void ltt_ipc_call_hook(struct hook *h, unsigned int call, int first)
 {
 	TRACE_IPC(TRACE_EV_IPC_CALL, call, first);
 }
-static void ltt_ipc_msg_create_hook(struct hook *h, int err, int flag)
+asmlinkage void ltt_ipc_msg_create_hook(struct hook *h, int err, int flag)
 {
 	TRACE_IPC(TRACE_EV_IPC_MSG_CREATE, err, flag);
 }
-static void ltt_ipc_sem_create_hook(struct hook *h, int err, int flag)
+asmlinkage void ltt_ipc_sem_create_hook(struct hook *h, int err, int flag)
 {
 	TRACE_IPC(TRACE_EV_IPC_SEM_CREATE, err, flag);
 }
-static void ltt_ipc_shm_create_hook(struct hook *h, int err, int flag)
+asmlinkage void ltt_ipc_shm_create_hook(struct hook *h, int err, int flag)
 {
 	TRACE_IPC(TRACE_EV_IPC_SHM_CREATE, err, flag);
 }
@@ -814,12 +814,12 @@ static int disable_ipc_hooks(void)
 }
 
 /* TRACE_NETWORK */
-static void ltt_net_pkt_out_hook(struct hook *h, unsigned short protocol)
+asmlinkage void ltt_net_pkt_out_hook(struct hook *h, unsigned short protocol)
 {
 	TRACE_NETWORK(TRACE_EV_NETWORK_PACKET_OUT, protocol);
 }
 
-static void ltt_net_pkt_in_hook(struct hook *h, unsigned short protocol)
+asmlinkage void ltt_net_pkt_in_hook(struct hook *h, unsigned short protocol)
 {
 	TRACE_NETWORK(TRACE_EV_NETWORK_PACKET_IN, protocol);
 }

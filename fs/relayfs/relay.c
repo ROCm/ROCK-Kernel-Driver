@@ -173,6 +173,21 @@ rchan_destroy_buf(struct rchan *rchan)
 }
 
 /**
+ *     remove_rchan_file - remove the channel file
+ *     @private: pointer to the channel struct
+ *
+ *     Internal - manages the removal of old channel file
+ */
+static void
+remove_rchan_file(void *private)
+{
+	struct rchan *rchan = (struct rchan *)private;
+
+	relayfs_remove_file(rchan->dentry);
+}
+ 
+
+/**
  *	relay_release - perform end-of-buffer processing for last buffer
  *	@rchan: the channel
  *
@@ -198,9 +213,8 @@ relay_release(struct rchan *rchan)
 
 	rchan_free_id(rchan->id);
 
-	err = relayfs_remove_file(rchan->dentry);
-	if (err)
-		goto exit;
+	INIT_WORK(&rchan->work, remove_rchan_file, rchan);
+	schedule_delayed_work(&rchan->work, 1);
 
 	clear_readers(rchan);
 	kfree(rchan);

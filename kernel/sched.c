@@ -2250,10 +2250,10 @@ switch_tasks:
 		++*switch_count;
 
 		prepare_arch_switch(rq, next);
-		TRIG_EVENT(sched_switch_hook, prev, next);
 		prev = context_switch(rq, prev, next);
 		barrier();
 
+		TRIG_EVENT(sched_switch_hook, prev, next);
 		finish_task_switch(prev);
 	} else
 		spin_unlock_irq(&rq->lock);

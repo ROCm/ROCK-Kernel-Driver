@@ -487,6 +487,8 @@ void smp_send_stop(void)
 	smp_stop_cpu();
 }
 
+EXPORT_SYMBOL(smp_send_stop);
+
 /*
  * Reschedule call back. Nothing to do,
  * all the work is done automatically when

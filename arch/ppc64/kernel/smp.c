@@ -698,6 +698,8 @@ void smp_send_stop(void)
 	smp_call_function(stop_this_cpu, NULL, 1, 0);
 }
 
+EXPORT_SYMBOL(smp_send_stop);
+
 /*
  * Structure and data for smp_call_function(). This is designed to minimise
  * static memory requirements. It also looks cleaner.
