@@ -53,7 +53,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#123 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic7xxx_osm.h#128 $
  *
  */
 #ifndef _AIC7XXX_LINUX_H_
@@ -299,7 +299,7 @@ ahc_scb_timer_reset(struct scb *scb, u_int usec)
 #include <linux/smp.h>
 #endif
 
-#define AIC7XXX_DRIVER_VERSION "6.2.28"
+#define AIC7XXX_DRIVER_VERSION "6.2.30"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -907,7 +907,7 @@ int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
  */
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
 #if defined(__sparc_v9__) || defined(__powerpc__)
-#error "PPC and Sparc platforms are only support under 2.1.92 and above"
+#error "PPC and Sparc platforms are only supported under 2.1.92 and above"
 #endif
 #include <linux/bios32.h>
 #endif

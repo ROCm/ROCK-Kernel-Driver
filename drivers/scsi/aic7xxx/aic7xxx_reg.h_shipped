@@ -3,7 +3,7 @@
  *		 from the following source files:
  *
  * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.seq#54 $
- * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.reg#37 $
+ * $Id: //depot/aic7xxx/aic7xxx/aic7xxx.reg#38 $
  */
 typedef int (ahc_reg_print_t)(u_int, u_int *, u_int);
 typedef struct ahc_reg_parse_entry {
@@ -1776,7 +1776,7 @@ ahc_reg_print_t ahc_sg_cache_pre_print;
 #define	SEQ_MAILBOX_SHIFT	0x00
 #define	TARGET_DATA_IN	0x01
 #define	HOST_MSG	0xff
-#define	MAX_OFFSET	0xff
+#define	MAX_OFFSET	0x7f
 #define	BUS_16_BIT	0x01
 #define	SCB_UPLOAD_SIZE	0x20
 #define	STACK_SIZE	0x04

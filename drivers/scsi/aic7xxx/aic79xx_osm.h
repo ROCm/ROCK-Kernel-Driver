@@ -36,7 +36,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGES.
  *
- * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#108 $
+ * $Id: //depot/aic7xxx/linux/drivers/scsi/aic7xxx/aic79xx_osm.h#117 $
  *
  */
 #ifndef _AIC79XX_LINUX_H_
@@ -286,7 +286,7 @@ ahd_scb_timer_reset(struct scb *scb, u_int usec)
 #include <linux/smp.h>
 #endif
 
-#define AIC79XX_DRIVER_VERSION "1.3.0"
+#define AIC79XX_DRIVER_VERSION "1.3.4"
 
 /**************************** Front End Queues ********************************/
 /*
@@ -487,7 +487,7 @@ struct ahd_linux_target {
  * Per-SCB OSM storage.
  */
 typedef enum {
-	AHD_UP_EH_SEMAPHORE = 0x1
+	AHD_SCB_UP_EH_SEM = 0x1
 } ahd_linux_scb_flags;
 
 struct scb_platform_data {
@@ -947,7 +947,7 @@ void ahd_power_state_change(struct ahd_softc *ahd,
  */
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(2,1,92)
 #if defined(__sparc_v9__) || defined(__powerpc__)
-#error "PPC and Sparc platforms are only support under 2.1.92 and above"
+#error "PPC and Sparc platforms are only supported under 2.1.92 and above"
 #endif
 #include <linux/bios32.h>
 #endif
