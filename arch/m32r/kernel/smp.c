@@ -441,9 +441,10 @@ static void flush_tlb_others(cpumask_t cpumask, struct mm_struct *mm,
 	 */
 	send_IPI_mask(cpumask, INVALIDATE_TLB_IPI, 0);
 
-	while (!cpus_empty(flush_cpumask))
+	while (!cpus_empty(flush_cpumask)) {
 		/* nothing. lockup detection does not belong here */
 		mb();
+	}
 
 	flush_mm = NULL;
 	flush_vma = NULL;
