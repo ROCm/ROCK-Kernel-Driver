@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.138 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.145 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.138 $	 $Date: 2004/09/17 10:40:53 $
+ *    $Revision: 1.145 $	 $Date: 2004/10/08 15:08:40 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -79,7 +79,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.138 $"
+#define VERSION_QETH_C "$Revision: 1.145 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -3835,6 +3835,7 @@ qeth_do_send_packet(struct qeth_card *card, struct qeth_qdio_out_q *queue,
 				/* return EBUSY because we sent old packet, not
 				 * the current one */
 				rc = -EBUSY;
+				atomic_set(&queue->state, QETH_OUT_Q_UNLOCKED);
 				goto out;
 			}
 		}
