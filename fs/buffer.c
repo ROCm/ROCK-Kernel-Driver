@@ -203,42 +203,27 @@ void end_buffer_io_sync(struct buffer_head *bh, int uptodate)
 }
 
 /*
- * write out all the dirty data associated with a block device
- * via its mapping.  Does not take the superblock lock.
- *
- * If `wait' is true, wait on the writeout.
- *
- * FIXME: rename this function.
+ * Write out and wait upon all the dirty data associated with a block
+ * device via its mapping.  Does not take the superblock lock.
  */
-int sync_buffers(struct block_device *bdev, int wait)
+int sync_blockdev(struct block_device *bdev)
 {
-	int ret;
+	int ret = 0;
 
-	ret = filemap_fdatawrite(bdev->bd_inode->i_mapping);
-	if (wait) {
+	if (bdev) {
 		int err;
 
+		ret = filemap_fdatawait(bdev->bd_inode->i_mapping);
+		err = filemap_fdatawrite(bdev->bd_inode->i_mapping);
+		if (!ret)
+			ret = err;
 		err = filemap_fdatawait(bdev->bd_inode->i_mapping);
 		if (!ret)
 			ret = err;
 	}
 	return ret;
 }
-
-/*
- * Write out all the dirty data associated with a block device
- * via its mapping.  Does not take the superblock lock.
- *
- * Wait on the writeout.
- */
-int fsync_no_super(struct block_device *bdev)
-{
-	int ret = 0;
-
-	if (bdev)
-		ret = sync_buffers(bdev, 1);
-	return ret;
-}
+EXPORT_SYMBOL(sync_blockdev);
 
 /*
  * Write out and wait upon all dirty data associated with this
@@ -254,7 +239,7 @@ int fsync_super(struct super_block *sb)
 		sb->s_op->write_super(sb);
 	unlock_super(sb);
 
-	return fsync_no_super(sb->s_bdev);
+	return sync_blockdev(sb->s_bdev);
 }
 
 /*
@@ -270,7 +255,7 @@ int fsync_bdev(struct block_device *bdev)
 		drop_super(sb);
 		return res;
 	}
-	return fsync_no_super(bdev);
+	return sync_blockdev(bdev);
 }
 
 /*
@@ -324,7 +309,7 @@ int file_fsync(struct file *filp, struct dentry *dentry, int datasync)
 	unlock_super(sb);
 
 	/* .. finally sync the buffers to disk */
-	ret = sync_buffers(sb->s_bdev, 1);
+	ret = sync_blockdev(sb->s_bdev);
 	return ret;
 }
 

@@ -260,7 +260,7 @@ int journal_recover(journal_t *journal)
 	journal->j_transaction_sequence = ++info.end_transaction;
 		
 	journal_clear_revoke(journal);
-	fsync_no_super(journal->j_fs_dev);
+	sync_blockdev(journal->j_fs_dev);
 	return err;
 }
 

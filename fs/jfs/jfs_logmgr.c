@@ -1432,7 +1432,7 @@ static int lmLogShutdown(log_t * log)
 	 * We need to make sure all of the "written" metapages
 	 * actually make it to disk
 	 */
-	fsync_no_super(log->sb->s_bdev);
+	sync_blockdev(log->sb->s_bdev);
 
 	/*
 	 * write the last SYNCPT record with syncpoint = 0

@@ -161,7 +161,7 @@ void set_buffer_async_io(struct buffer_head *bh);
 void invalidate_inode_buffers(struct inode *);
 void invalidate_bdev(struct block_device *, int);
 void __invalidate_buffers(kdev_t dev, int);
-int sync_buffers(struct block_device *, int);
+int sync_blockdev(struct block_device *bdev);
 void __wait_on_buffer(struct buffer_head *);
 void sleep_on_buffer(struct buffer_head *bh);
 void wake_up_buffer(struct buffer_head *bh);

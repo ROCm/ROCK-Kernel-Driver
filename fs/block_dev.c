@@ -84,7 +84,7 @@ int set_blocksize(kdev_t dev, int size)
 
 	/* Ok, we're actually changing the blocksize.. */
 	bdev = bdget(kdev_t_to_nr(dev));
-	sync_buffers(bdev, 2);
+	sync_blockdev(bdev);
 	blksize_size[major(dev)][minor(dev)] = size;
 	bdev->bd_inode->i_blkbits = blksize_bits(size);
 	kill_bdev(bdev);
@@ -180,11 +180,6 @@ static loff_t block_llseek(struct file *file, loff_t offset, int origin)
 	return retval;
 }
 	
-static int __block_fsync(struct inode * inode)
-{
-	return sync_buffers(inode->i_bdev, 1);
-}
-
 /*
  *	Filp may be NULL when we are called by an msync of a vma
  *	since the vma has no handle.
@@ -194,7 +189,7 @@ static int block_fsync(struct file *filp, struct dentry *dentry, int datasync)
 {
 	struct inode * inode = dentry->d_inode;
 
-	return __block_fsync(inode);
+	return sync_blockdev(inode->i_bdev);
 }
 
 /*
@@ -693,10 +688,8 @@ int blkdev_put(struct block_device *bdev, int kind)
 	lock_kernel();
 	switch (kind) {
 	case BDEV_FILE:
-		__block_fsync(bd_inode);
-		break;
 	case BDEV_FS:
-		fsync_no_super(bdev);
+		sync_blockdev(bd_inode->i_bdev);
 		break;
 	}
 	if (!--bdev->bd_openers)
