@@ -937,7 +937,7 @@ static int xfrm_user_rcv_skb(struct sk_buff *skb)
 		rlen = NLMSG_ALIGN(nlh->nlmsg_len);
 		if (rlen > skb->len)
 			rlen = skb->len;
-		if (xfrm_user_rcv_msg(skb, nlh, &err)) {
+		if (xfrm_user_rcv_msg(skb, nlh, &err) < 0) {
 			if (err == 0)
 				return -1;
 			netlink_ack(skb, nlh, err);
