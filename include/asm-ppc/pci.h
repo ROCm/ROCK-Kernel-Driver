@@ -271,9 +271,10 @@ int pci_mmap_page_range(struct pci_dev *pdev, struct vm_area_struct *vma,
 /* Tell drivers/pci/proc.c that we have pci_mmap_page_range() */
 #define HAVE_PCI_MMAP	1
 
-#endif	/* __KERNEL__ */
+extern void
+pcibios_resource_to_bus(struct pci_dev *dev, struct pci_bus_region *region,
+			struct resource *res);
 
-/* generic pci stuff */
-#include <asm-generic/pci.h>
+#endif	/* __KERNEL__ */
 
 #endif /* __PPC_PCI_H */
