@@ -281,12 +281,6 @@ EXPORT_SYMBOL(qdisc_copy_stats);
 EXPORT_SYMBOL(qdisc_new_estimator);
 EXPORT_SYMBOL(qdisc_kill_estimator);
 #endif
-#ifdef CONFIG_NET_CLS_POLICE
-EXPORT_SYMBOL(tcf_police);
-EXPORT_SYMBOL(tcf_police_locate);
-EXPORT_SYMBOL(tcf_police_destroy);
-EXPORT_SYMBOL(tcf_police_dump);
-#endif
 #endif
 #ifdef CONFIG_NET_CLS
 EXPORT_SYMBOL(register_tcf_proto_ops);
