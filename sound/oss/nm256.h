@@ -1,6 +1,7 @@
 #ifndef _NM256_H_
 #define _NM256_H_
 
+#include <linux/spinlock.h>
 #include "ac97.h"
 
 /* The revisions that we currently handle.  */
@@ -33,6 +34,8 @@ struct nm256_info
     int dev_for_play;
     int dev_for_record;
 
+	spinlock_t lock;
+	
     /* The mixer device. */
     int mixer_oss_dev;
 
