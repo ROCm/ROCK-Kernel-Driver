@@ -24,6 +24,7 @@
 #include <asm/machdep.h>
 #include <asm/paca.h>
 #include <asm/page.h>
+#include <asm/param.h>
 #include <asm/system.h>
 #include <asm/abs_addr.h>
 #include <asm/udbg.h>
@@ -176,6 +177,26 @@ rtas_call(int token, int nargs, int nret,
 		for (i = 0; i < nret-1; ++i)
 			outputs[i] = rtas_args->rets[i+1];
 	return (ulong)((nret > 0) ? rtas_args->rets[0] : 0);
+}
+
+/* Given an RTAS status code of 990n compute the hinted delay of 10^n
+ * (last digit) milliseconds.  For now we bound at n=3 (1 sec).
+ */
+unsigned int
+rtas_extended_busy_delay_time(int status)
+{
+	int order = status - 9900;
+	unsigned int ms;
+
+	if (order < 0)
+		order = 0;	/* RTC depends on this for -2 clock busy */
+	else if (order > 3)
+		order = 3;	/* bound */
+
+	/* Use microseconds for reasonable accuracy */
+	for (ms = 1000; order > 0; order--)
+		ms = ms * 10;
+	return ms / (1000000/HZ); /* round down is fine */
 }
 
 #define FLASH_BLOCK_LIST_VERSION (1UL)
