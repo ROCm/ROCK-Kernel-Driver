@@ -275,10 +275,11 @@ extern int (*console_blank_hook)(int);
  */
 
 /*
- * Define to always call the APM BIOS busy routine even if the clock was
- * not slowed by the idle routine.
+ * Define as 1 to make the driver always call the APM BIOS busy
+ * routine even if the clock was not reported as slowed by the
+ * idle routine.  Otherwise, define as 0.
  */
-#define ALWAYS_CALL_BUSY
+#define ALWAYS_CALL_BUSY   1
 
 /*
  * Define to make the APM BIOS calls zero all data segment registers (so
@@ -747,7 +748,6 @@ static int set_system_power_state(u_short state)
 static int apm_do_idle(void)
 {
 	u32	eax;
-	int	slowed;
 
 	if (apm_bios_call_simple(APM_FUNC_IDLE, 0, 0, &eax)) {
 		static unsigned long t;
@@ -759,13 +759,8 @@ static int apm_do_idle(void)
 		}
 		return -1;
 	}
-	slowed = (apm_info.bios.flags & APM_IDLE_SLOWS_CLOCK) != 0;
-#ifdef ALWAYS_CALL_BUSY
-	clock_slowed = 1;
-#else
-	clock_slowed = slowed;
-#endif
-	return slowed;
+	clock_slowed = (apm_info.bios.flags & APM_IDLE_SLOWS_CLOCK) != 0;
+	return clock_slowed;
 }
 
 /**
@@ -778,7 +773,7 @@ static void apm_do_busy(void)
 {
 	u32	dummy;
 
-	if (clock_slowed) {
+	if (clock_slowed || ALWAYS_CALL_BUSY) {
 		(void) apm_bios_call_simple(APM_FUNC_BUSY, 0, 0, &dummy);
 		clock_slowed = 0;
 	}
