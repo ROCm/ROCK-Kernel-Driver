@@ -147,6 +147,7 @@ void dst_release(struct dst_entry * dst)
 {
 	if (dst) {
 		WARN_ON(atomic_read(&dst->__refcnt) < 1);
+		smp_mb__before_atomic_dec();
 		atomic_dec(&dst->__refcnt);
 	}
 }
