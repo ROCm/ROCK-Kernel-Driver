@@ -17,10 +17,14 @@
 #define DRM_UDELAY(d)			udelay(d)
 /** Read a byte from a MMIO region */
 #define DRM_READ8(map, offset)		readb(((unsigned long)(map)->handle) + (offset))
+/** Read a word from a MMIO region */
+#define DRM_READ16(map, offset)         readw(((unsigned long)(map)->handle) + (offset))
 /** Read a dword from a MMIO region */
 #define DRM_READ32(map, offset)		readl(((unsigned long)(map)->handle) + (offset))
 /** Write a byte into a MMIO region */
 #define DRM_WRITE8(map, offset, val)	writeb(val, ((unsigned long)(map)->handle) + (offset))
+/** Write a word into a MMIO region */
+#define DRM_WRITE16(map, offset, val)   writew(val, ((unsigned long)(map)->handle) + (offset))
 /** Write a dword into a MMIO region */
 #define DRM_WRITE32(map, offset, val)	writel(val, ((unsigned long)(map)->handle) + (offset))
 /** Read memory barrier */
