@@ -148,7 +148,7 @@ static void background_writeout(unsigned long _min_pages)
 		writeback_unlocked_inodes(&nr_to_write, WB_SYNC_NONE, NULL);
 		min_pages -= MAX_WRITEBACK_PAGES - nr_to_write;
 	} while (nr_to_write <= 0);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 }
 
 /*
@@ -206,7 +206,7 @@ static void wb_kupdate(unsigned long arg)
 	next_jif = start_jif + wb_writeback_jifs;
 	nr_to_write = ps.nr_dirty;
 	writeback_unlocked_inodes(&nr_to_write, WB_SYNC_NONE, &oldest_jif);
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 	yield();
 
 	if (time_before(next_jif, jiffies + HZ))

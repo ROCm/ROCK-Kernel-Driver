@@ -220,7 +220,7 @@ repeat_alloc:
 	if (gfp_mask == gfp_nowait)
 		return NULL;
 
-	run_task_queue(&tq_disk);
+	blk_run_queues();
 
 	add_wait_queue_exclusive(&pool->wait, &wait);
 	set_task_state(current, TASK_UNINTERRUPTIBLE);

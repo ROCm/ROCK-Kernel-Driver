@@ -1079,6 +1079,7 @@ extern int blkdev_get(struct block_device *, mode_t, unsigned, int);
 extern int blkdev_put(struct block_device *, int);
 extern int bd_claim(struct block_device *, void *);
 extern void bd_release(struct block_device *);
+extern void blk_run_queues(void);
 
 /* fs/devices.c */
 extern const struct block_device_operations *get_blkfops(unsigned int);
