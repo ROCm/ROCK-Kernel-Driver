@@ -1432,7 +1432,6 @@ static char *vmstat_text[] = {
 	"nr_dirty",
 	"nr_writeback",
 	"nr_page_table_pages",
-	"nr_reverse_maps",
 	"nr_mapped",
 	"nr_slab",
 

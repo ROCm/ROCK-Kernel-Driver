@@ -209,8 +209,6 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 		goto out;
 	}
 
-	BUG_ON(!cur_pte_chain->ptes[NRPTE-1]);
-
 	for (i = NRPTE-2; i >= 0; i--) {
 		if (!cur_pte_chain->ptes[i]) {
 			cur_pte_chain->ptes[i] = pte_paddr;
@@ -220,7 +218,6 @@ page_add_rmap(struct page *page, pte_t *ptep, struct pte_chain *pte_chain)
 	BUG();
 out:
 	pte_chain_unlock(page);
-	inc_page_state(nr_reverse_maps);
 	return pte_chain;
 }
 
@@ -251,7 +248,6 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 	if (PageDirect(page)) {
 		if (page->pte.direct == pte_paddr) {
 			page->pte.direct = 0;
-			dec_page_state(nr_reverse_maps);
 			ClearPageDirect(page);
 			goto out;
 		}
@@ -274,7 +270,6 @@ void page_remove_rmap(struct page * page, pte_t * ptep)
 				if (pa != pte_paddr)
 					continue;
 				pc->ptes[i] = start->ptes[victim_i];
-				dec_page_state(nr_reverse_maps);
 				start->ptes[victim_i] = 0;
 				if (victim_i == NRPTE-1) {
 					/* Emptied a pte_chain */
@@ -435,7 +430,6 @@ int try_to_unmap(struct page * page)
 		ret = try_to_unmap_one(page, page->pte.direct);
 		if (ret == SWAP_SUCCESS) {
 			page->pte.direct = 0;
-			dec_page_state(nr_reverse_maps);
 			ClearPageDirect(page);
 		}
 		goto out;
@@ -466,7 +460,6 @@ int try_to_unmap(struct page * page)
 				 */
 				pc->ptes[i] = start->ptes[victim_i];
 				start->ptes[victim_i] = 0;
-				dec_page_state(nr_reverse_maps);
 				victim_i++;
 				if (victim_i == NRPTE) {
 					page->pte.chain = start->next;
