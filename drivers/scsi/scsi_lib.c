@@ -240,7 +240,7 @@ void scsi_queue_next_request(request_queue_t * q, Scsi_Cmnd * SCpnt)
 		SCpnt->request->special = (void *) SCpnt;
 		if(blk_rq_tagged(SCpnt->request))
 			blk_queue_end_tag(q, SCpnt->request);
-		_elv_add_request(q, SCpnt->request, 0, 0);
+		__elv_add_request(q, SCpnt->request, 0, 0);
 	}
 
 	/*
@@ -951,7 +951,7 @@ void scsi_request_fn(request_queue_t * q)
 				SCpnt->request->flags |= REQ_SPECIAL;
 				if(blk_rq_tagged(SCpnt->request))
 					blk_queue_end_tag(q, SCpnt->request);
-				_elv_add_request(q, SCpnt->request, 0, 0);
+				__elv_add_request(q, SCpnt->request, 0, 0);
 				break;
 			}
 

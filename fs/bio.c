@@ -122,6 +122,7 @@ inline void bio_init(struct bio *bio)
 	bio->bi_max_vecs = 0;
 	bio->bi_end_io = NULL;
 	atomic_set(&bio->bi_cnt, 1);
+	bio->bi_private = NULL;
 }
 
 /**
@@ -354,7 +355,7 @@ int bio_get_nr_vecs(struct block_device *bdev)
 	request_queue_t *q = bdev_get_queue(bdev);
 	int nr_pages;
 
-	nr_pages = q->max_sectors >> (PAGE_SHIFT - 9);
+	nr_pages = ((q->max_sectors << 9) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	if (nr_pages > q->max_phys_segments)
 		nr_pages = q->max_phys_segments;
 	if (nr_pages > q->max_hw_segments)
@@ -385,13 +386,13 @@ int bio_add_page(struct bio *bio, struct page *page, unsigned int len,
 	 * cloned bio must not modify vec list
 	 */
 	if (unlikely(bio_flagged(bio, BIO_CLONED)))
-		return 1;
+		return 0;
 
 	if (bio->bi_vcnt >= bio->bi_max_vecs)
-		return 1;
+		return 0;
 
 	if (((bio->bi_size + len) >> 9) > q->max_sectors)
-		return 1;
+		return 0;
 
 	/*
 	 * we might loose a segment or two here, but rather that than
@@ -404,7 +405,7 @@ retry_segments:
 
 	if (fail_segments) {
 		if (retried_segments)
-			return 1;
+			return 0;
 
 		bio->bi_flags &= ~(1 << BIO_SEG_VALID);
 		retried_segments = 1;
@@ -425,18 +426,24 @@ retry_segments:
 	 * depending on offset), it can specify a merge_bvec_fn in the
 	 * queue to get further control
 	 */
-	if (q->merge_bvec_fn && q->merge_bvec_fn(q, bio, bvec)) {
-		bvec->bv_page = NULL;
-		bvec->bv_len = 0;
-		bvec->bv_offset = 0;
-		return 1;
+	if (q->merge_bvec_fn) {
+		/*
+		 * merge_bvec_fn() returns number of bytes it can accept
+		 * at this offset
+		 */
+		if (q->merge_bvec_fn(q, bio, bvec) < len) {
+			bvec->bv_page = NULL;
+			bvec->bv_len = 0;
+			bvec->bv_offset = 0;
+			return 0;
+		}
 	}
 
 	bio->bi_vcnt++;
 	bio->bi_phys_segments++;
 	bio->bi_hw_segments++;
 	bio->bi_size += len;
-	return 0;
+	return len;
 }
 
 /**
@@ -446,14 +453,15 @@ retry_segments:
  * @error:	error, if any
  *
  * Description:
- *   bio_endio() will end I/O @bytes_done number of bytes. This may be just
- *   a partial part of the bio, or it may be the whole bio. bio_endio() is
- *   the preferred way to end I/O on a bio, it takes care of decrementing
+ *   bio_endio() will end I/O on @bytes_done number of bytes. This may be
+ *   just a partial part of the bio, or it may be the whole bio. bio_endio()
+ *   is the preferred way to end I/O on a bio, it takes care of decrementing
  *   bi_size and clearing BIO_UPTODATE on error. @error is 0 on success, and
  *   and one of the established -Exxxx (-EIO, for instance) error values in
- *   case something went wrong.
+ *   case something went wrong. Noone should call bi_end_io() directly on
+ *   a bio unless they own it and thus know that it has an end_io function.
  **/
-int bio_endio(struct bio *bio, unsigned int bytes_done, int error)
+void bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 {
 	if (error)
 		clear_bit(BIO_UPTODATE, &bio->bi_flags);
@@ -465,7 +473,9 @@ int bio_endio(struct bio *bio, unsigned int bytes_done, int error)
 	}
 
 	bio->bi_size -= bytes_done;
-	return bio->bi_end_io(bio, bytes_done, error);
+
+	if (bio->bi_end_io)
+		bio->bi_end_io(bio, bytes_done, error);
 }
 
 static void __init biovec_init_pools(void)
@@ -537,7 +547,7 @@ static int __init init_bio(void)
 	return 0;
 }
 
-module_init(init_bio);
+subsys_initcall(init_bio);
 
 EXPORT_SYMBOL(bio_alloc);
 EXPORT_SYMBOL(bio_put);
