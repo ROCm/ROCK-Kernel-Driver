@@ -28,6 +28,7 @@ struct kbd_data {
 	struct kbdiacr *accent_table;
 	unsigned int accent_table_size;
 	unsigned char diacr;
+	unsigned short sysrq;
 };
 
 struct kbd_data *kbd_alloc(void);

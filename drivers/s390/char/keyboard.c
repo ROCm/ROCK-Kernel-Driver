@@ -10,6 +10,7 @@
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/sched.h>
+#include <linux/sysrq.h>
 
 #include <linux/kbd_kern.h>
 #include <linux/kbd_diacr.h>
@@ -220,6 +221,9 @@ k_dead(struct kbd_data *kbd, unsigned char value)
 	kbd->diacr = (kbd->diacr ? handle_diacr(kbd, value) : value);
 }
 
+/*
+ * Normal character handler.
+ */
 static void
 k_self(struct kbd_data *kbd, unsigned char value)
 {
@@ -236,6 +240,9 @@ k_ignore(struct kbd_data *kbd, unsigned char value)
 {
 }
 
+/*
+ * Function key handler.
+ */
 static void
 k_fn(struct kbd_data *kbd, unsigned char value)
 {
@@ -282,14 +289,10 @@ void
 kbd_keycode(struct kbd_data *kbd, unsigned int keycode)
 {
 	unsigned short keysym;
-	unsigned char type;
+	unsigned char type, value;
 
 	if (!kbd || !kbd->tty)
 		return;
-
-#ifdef CONFIG_MAGIC_SYSRQ	       /* Handle the SysRq Hack */
-	// FIXME
-#endif
 
 	if (keycode >= 384)
 		keysym = kbd->key_maps[5][keycode - 384];
@@ -299,13 +302,34 @@ kbd_keycode(struct kbd_data *kbd, unsigned int keycode)
 		keysym = kbd->key_maps[1][keycode - 128];
 	else
 		keysym = kbd->key_maps[0][keycode];
-	type = KTYP(keysym);
 
+	type = KTYP(keysym);
 	if (type >= 0xf0) {
 		type -= 0xf0;
 		if (type == KT_LETTER)
 			type = KT_LATIN;
-		(*k_handler[type])(kbd, keysym & 0xff);
+		value = KVAL(keysym);
+#ifdef CONFIG_MAGIC_SYSRQ	       /* Handle the SysRq Hack */
+		if (kbd->sysrq) {
+			if (kbd->sysrq == K(KT_LATIN, '-')) {
+				kbd->sysrq = 0;
+				handle_sysrq(value, 0, kbd->tty);
+				return;
+			}
+			if (value == '-') {
+				kbd->sysrq = K(KT_LATIN, '-');
+				return;
+			}
+			/* Incomplete sysrq sequence. */
+			(*k_handler[KTYP(kbd->sysrq)])(kbd, KVAL(kbd->sysrq));
+			kbd->sysrq = 0;
+		} else if ((type == KT_LATIN && value == '^') ||
+			   (type == KT_DEAD && ret_diacr[value] == '^')) {
+			kbd->sysrq = K(type, value);
+			return;
+		}
+#endif
+		(*k_handler[type])(kbd, value);
 	} else
 		to_utf8(kbd->tty, keysym);
 }
@@ -322,8 +346,14 @@ do_kdsk_ioctl(struct kbd_data *kbd, struct kbentry *user_kbe,
 
 	if (copy_from_user(&tmp, user_kbe, sizeof(struct kbentry)))
 		return -EFAULT;
-	if (tmp.kb_index >= NR_KEYS || tmp.kb_table >= MAX_NR_KEYMAPS)
+#if NR_KEYS < 256
+	if (tmp.kb_index >= NR_KEYS)
+		return -EINVAL;
+#endif
+#if MAX_NR_KEYMAPS < 256
+	if (tmp.kb_table >= MAX_NR_KEYMAPS)
 		return -EINVAL;	
+#endif
 
 	switch (cmd) {
 	case KDGKBENT:
@@ -390,8 +420,10 @@ do_kdgkb_ioctl(struct kbd_data *kbd, struct kbsentry *u_kbs,
 	/* Get u_kbs->kb_func. */
 	if (get_user(kb_func, &u_kbs->kb_func))
 		return -EFAULT;
+#if MAX_NR_FUNC < 256
 	if (kb_func >= MAX_NR_FUNC)
 		return -EINVAL;
+#endif
 
 	switch (cmd) {
 	case KDGKBSENT:

@@ -1,6 +1,6 @@
 /*
  *
- * linux/drivers/s390/net/qeth.c ($Revision: 1.171 $)
+ * linux/drivers/s390/net/qeth.c ($Revision: 1.177 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -11,6 +11,7 @@
  *                                               numerous bugfixes)
  *            Frank Pavlic <pavlic@de.ibm.com>  (query/purge ARP, SNMP, fixes)
  *            Andreas Herrmann <aherrman@de.ibm.com> (bugfixes)
+ *            Thomas Spatzier <tspat@de.ibm.com> (bugfixes)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -165,7 +166,7 @@ MODULE_PARM_DESC(qeth_sparebufs, "the number of pre-allocated spare buffers "
 		 "reserved for low memory situations");
 
 /****************** MODULE STUFF **********************************/
-#define VERSION_QETH_C "$Revision: 1.171 $"
+#define VERSION_QETH_C "$Revision: 1.177 $"
 static const char *version = "qeth S/390 OSA-Express driver ("
     VERSION_QETH_C "/" VERSION_QETH_H "/" VERSION_QETH_MPC_H
     QETH_VERSION_IPV6 QETH_VERSION_VLAN ")";
@@ -313,6 +314,21 @@ my_spin_lock_nonbusy(struct qeth_card *card, spinlock_t * lock)
 		qeth_wait_nonbusy(QETH_IDLE_WAIT_TIME);
 	}
 }
+
+static int inline
+my_down_trylock_nonbusy(struct qeth_card *card, struct semaphore  *sema)
+{
+	for (;;) {
+		if (card) {
+			if (atomic_read(&card->shutdown_phase))
+				return -1;
+		}
+		if (down_trylock(sema))
+			return 0;
+		qeth_wait_nonbusy(QETH_IDLE_WAIT_TIME);
+	}
+}
+
 
 #ifdef CONFIG_ARCH_S390X
 #define QETH_GET_ADDR(x) ((__u32)(unsigned long)x)
@@ -2567,7 +2583,8 @@ static void
 qeth_wakeup_procfile(void)
 {
 	QETH_DBF_TEXT5(0, trace, "procwkup");
-	if (atomic_read(&qeth_procfile_ioctl_sem.count) <
+	/* is this if statement correct? */
+	if (atomic_read(&qeth_procfile_ioctl_sem.count) <=
 	    PROCFILE_SLEEP_SEM_MAX_VALUE)
 		up(&qeth_procfile_ioctl_sem);
 }
@@ -2577,7 +2594,6 @@ qeth_sleepon_procfile(void)
 {
 	QETH_DBF_TEXT5(0, trace, "procslp");
 	if (down_interruptible(&qeth_procfile_ioctl_sem)) {
-		up(&qeth_procfile_ioctl_sem);
 		return -ERESTARTSYS;
 	}
 	return 0;
@@ -3603,7 +3619,7 @@ qeth_set_vipas(struct qeth_card *card, int set_only)
 			 * so we clone the entry */
 			ne = (struct qeth_vipa_entry *)
 			    kmalloc(sizeof (struct qeth_vipa_entry),
-				    GFP_KERNEL);
+				    GFP_ATOMIC);
 			if (ne) {
 				ne->version = e->version;
 				ne->flag = e->flag;
@@ -4114,6 +4130,9 @@ __qeth_setipms_ipv6(struct qeth_card *card, int use_setipm_retries)
 	while (addr) {
 		if (qeth_is_ipma_in_list(addr,
 					 card->ip_mc_current_state.ipm6_ifa)) {
+			qeth_remove_mc_ifa_from_list(
+					&card->ip_mc_new_state.ipm6_ifa,
+					addr);
 			addr = addr->next;
 			continue;
 		}
@@ -4147,8 +4166,13 @@ __qeth_setipms_ipv6(struct qeth_card *card, int use_setipm_retries)
 				  CARD_BUS_ID(card), result);
  			sprintf(dbf_text, "sms6%4x", result);
  			QETH_DBF_TEXT3(0, trace, dbf_text);
-			qeth_remove_mc_ifa_from_list
-				(&card->ip_mc_current_state.ipm6_ifa, addr);
+		} else {
+			qeth_remove_mc_ifa_from_list(
+					&card->ip_mc_new_state.ipm6_ifa,
+					addr);
+			qeth_add_mc_ifa_to_list(
+					&card->ip_mc_current_state.ipm6_ifa,
+					addr);
 		}
 		addr = addr->next;
 	}
@@ -4584,7 +4608,7 @@ __qeth_takeover_ip_ipms6_mc(struct qeth_card *card, struct inet6_dev *in6_dev)
 			ndisc_mc_map(&im6->mca_addr, buf, card->dev, 0);
 			ipmanew =
 			    (struct qeth_ipm_mac *)
-			    kmalloc(sizeof (struct qeth_ipm_mac), GFP_KERNEL);
+			    kmalloc(sizeof (struct qeth_ipm_mac), GFP_ATOMIC);
 			if (!ipmanew) {
 				PRINT_WARN("No memory for IPM address "
 					   "handling. Multicast IP "
@@ -4659,7 +4683,7 @@ qeth_takeover_ip_ipms6(struct qeth_card *card)
 
 		while (ifa) {
 			ifanew =
-			    kmalloc(sizeof (struct inet6_ifaddr), GFP_KERNEL);
+			    kmalloc(sizeof (struct inet6_ifaddr), GFP_ATOMIC);
 			if (!ifanew) {
 				PRINT_WARN("No memory for IP address "
 					   "handling. Some of the IPs "
@@ -4893,7 +4917,7 @@ __qeth_takeover_ip_ipms_mc(struct qeth_card *card, struct in_device *in4_dev)
 			qeth_get_mac_for_ipm(im4->multiaddr, buf, in4_dev->dev);
 			ipmanew =
 			    (struct qeth_ipm_mac *)
-			    kmalloc(sizeof (struct qeth_ipm_mac), GFP_KERNEL);
+			    kmalloc(sizeof (struct qeth_ipm_mac), GFP_ATOMIC);
 			if (!ipmanew) {
 				PRINT_WARN("No memory for IPM address "
 					   "handling. Multicast IP %08x"
@@ -4959,7 +4983,7 @@ qeth_takeover_ip_ipms(struct qeth_card *card)
 		ifa = ((struct in_device *) card->dev->ip_ptr)->ifa_list;
 
 		while (ifa) {
-			ifanew = kmalloc(sizeof (struct in_ifaddr), GFP_KERNEL);
+			ifanew = kmalloc(sizeof (struct in_ifaddr), GFP_ATOMIC);
 			if (!ifanew) {
 				PRINT_WARN("No memory for IP address "
 					   "handling. Some of the IPs "
@@ -5616,9 +5640,9 @@ qeth_softsetup_card(struct qeth_card *card, int wait_for_lock)
 	int use_setip_retries = 1;
 
 	if (wait_for_lock == QETH_WAIT_FOR_LOCK) {
-		spin_lock(&card->softsetup_lock);
+		down(&card->softsetup_sema);
 	} else if (wait_for_lock == QETH_DONT_WAIT_FOR_LOCK) {
-		if (!spin_trylock(&card->softsetup_lock)) {
+		if (!down_trylock(&card->softsetup_sema)) {
 			return -EAGAIN;
 		}
 	} else if (wait_for_lock == QETH_LOCK_ALREADY_HELD) {
@@ -5670,7 +5694,7 @@ out:
 		netif_wake_queue(card->dev);
 	}
 	if (wait_for_lock != QETH_LOCK_ALREADY_HELD)
-		spin_unlock(&card->softsetup_lock);
+		up(&card->softsetup_sema);
 	return result;
 }
 
@@ -7871,7 +7895,7 @@ qeth_hardsetup_card(struct qeth_card *card, int in_recovery)
 	cleanup_qdio = in_recovery;	/* if we are in recovery, we clean
 					   the qdio stuff up */
 
-	spin_lock(&card->hardsetup_lock);
+	down(&card->hardsetup_sema);
 	atomic_set(&card->write_busy, 0);
 
 	do {
@@ -8182,7 +8206,7 @@ qeth_hardsetup_card(struct qeth_card *card, int in_recovery)
 	}
 
 exit:
-	spin_unlock(&card->hardsetup_lock);
+	up(&card->hardsetup_sema);
 	return result;
 }
 
@@ -8234,13 +8258,13 @@ qeth_reinit_thread(void *param)
 
 		atomic_set(&card->escape_softsetup, 1);
 
-		if (-1 == my_spin_lock_nonbusy(card, &card->softsetup_lock)) {
+		if (-1 == my_down_trylock_nonbusy(card, &card->softsetup_sema)) {
 			atomic_set(&card->escape_softsetup, 0);
 			goto out;
 		}
 		atomic_set(&card->escape_softsetup, 0);
 		if (atomic_read(&card->shutdown_phase)) {
-			spin_unlock(&card->softsetup_lock);
+			up(&card->softsetup_sema);
 			goto out_wakeup;
 		}
 		if (!qeth_verify_card(card))
@@ -8284,7 +8308,7 @@ qeth_reinit_thread(void *param)
 		} else {
 			QETH_DBF_TEXT1(0, trace, "ri-sftst");
 			qeth_softsetup_card(card, QETH_LOCK_ALREADY_HELD);
-			spin_unlock(&card->softsetup_lock);
+			up(&card->softsetup_sema);
 
 			if (!already_registered) {
 				QETH_DBF_TEXT1(0, trace, "ri-regcd");
@@ -8410,8 +8434,8 @@ qeth_alloc_card(void)
 
 	qeth_fill_qeth_card_options(card);
 
-	spin_lock_init(&card->softsetup_lock);
-	spin_lock_init(&card->hardsetup_lock);
+	init_MUTEX(&card->softsetup_sema);
+	init_MUTEX(&card->hardsetup_sema);
 	spin_lock_init(&card->ioctl_lock);
 #ifdef QETH_VLAN
 	spin_lock_init(&card->vlan_lock);
@@ -8889,11 +8913,11 @@ qeth_procfile_open(struct inode *inode, struct file *file)
 
 	QETH_DBF_TEXT2(0, trace, "procread");
 	length += sprintf(buffer + length,
-			  "devices            CHPID     "
+			  "devices                  CHPID     "
 			  "device     cardtype port chksum prio-q'ing "
 			  "rtr fsz cnt\n");
 	length += sprintf(buffer + length,
-			  "-------------------- --- ----"
+			  "-------------------------- --- ----"
 			  "------ -------------- --     -- ---------- "
 			  "--- --- ---\n");
 	card = firstcard;
@@ -9547,19 +9571,20 @@ qeth_procfile_ioctl(struct inode *inode, struct file *file,
 {
 
 	int result;
-	down_interruptible(&qeth_procfile_ioctl_lock);
-	switch (cmd) {
-
-	case QETH_IOCPROC_OSAEINTERFACES:
-		result = qeth_procfile_getinterfaces(arg);
-		break;
-	case QETH_IOCPROC_INTERFACECHANGES:
-		result = qeth_procfile_interfacechanges(arg);
-		break;
-	default:
-		result = -EOPNOTSUPP;
-	}
-	up(&qeth_procfile_ioctl_lock);
+	if (!down_interruptible(&qeth_procfile_ioctl_lock)) {
+		switch (cmd) {
+			case QETH_IOCPROC_OSAEINTERFACES:
+				result = qeth_procfile_getinterfaces(arg);
+				break;
+			case QETH_IOCPROC_INTERFACECHANGES:
+				result = qeth_procfile_interfacechanges(arg);
+				break;
+			default:
+				result = -EOPNOTSUPP;
+		}
+		up(&qeth_procfile_ioctl_lock);
+	} else
+		result = -ERESTARTSYS;
 	return result;
 };
 
@@ -10704,18 +10729,6 @@ out:
 	return -ENODEV;
 }
 
-static void
-qeth_remove_device(struct ccwgroup_device *gdev)
-{
-	struct qeth_card *card = gdev->dev.driver_data;
-
-	__qeth_remove_attributes(&gdev->dev);
-	gdev->dev.driver_data = NULL;
-	if (card)
-		qeth_free_card(card);
-	put_device(&gdev->dev);
-}
-
 static int
 qeth_set_online(struct ccwgroup_device *gdev)
 {
@@ -10750,6 +10763,21 @@ qeth_set_offline(struct ccwgroup_device *gdev)
 	qeth_free_card_stuff(card);
 
 	return 0;
+}
+
+static void
+qeth_remove_device(struct ccwgroup_device *gdev)
+{
+	struct qeth_card *card = gdev->dev.driver_data;
+
+	if (card && qeth_does_card_exist(card))
+		/* Means that card is already in list. */
+		qeth_set_offline(gdev);
+	__qeth_remove_attributes(&gdev->dev);
+	gdev->dev.driver_data = NULL;
+	if (card)
+		qeth_free_card(card);
+	put_device(&gdev->dev);
 }
 
 static struct ccwgroup_driver qeth_ccwgroup_driver = {

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/device.c
  *  bus driver for ccw devices
- *   $Revision: 1.78 $
+ *   $Revision: 1.85 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -117,8 +117,11 @@ struct bus_type ccw_bus_type = {
 static int io_subchannel_probe (struct device *);
 static int io_subchannel_remove (struct device *);
 void io_subchannel_irq (struct device *);
+static int io_subchannel_notify(struct device *, int);
+static void io_subchannel_verify(struct device *);
+static void io_subchannel_ioterm(struct device *);
 
-static struct css_driver io_subchannel_driver = {
+struct css_driver io_subchannel_driver = {
 	.subchannel_type = SUBCHANNEL_TYPE_IO,
 	.drv = {
 		.name = "io_subchannel",
@@ -127,6 +130,9 @@ static struct css_driver io_subchannel_driver = {
 		.remove = &io_subchannel_remove,
 	},
 	.irq = io_subchannel_irq,
+	.notify = io_subchannel_notify,
+	.verify = io_subchannel_verify,
+	.termination = io_subchannel_ioterm,
 };
 
 struct workqueue_struct *ccw_device_work;
@@ -234,41 +240,58 @@ online_show (struct device *dev, char *buf)
 	return sprintf(buf, cdev->online ? "1\n" : "0\n");
 }
 
-void
+int
 ccw_device_set_offline(struct ccw_device *cdev)
 {
 	int ret;
 
 	if (!cdev)
-		return;
+		return -ENODEV;
 	if (!cdev->online || !cdev->drv)
-		return;
+		return -EINVAL;
 
-	if (cdev->drv->set_offline)
-		if (cdev->drv->set_offline(cdev) != 0)
-			return;
-
+	if (cdev->private->state == DEV_STATE_DISCONNECTED) {
+		struct subchannel *sch;
+		/* 
+		 * Forced offline in disconnected state means 
+		 * 'throw away device'.
+		 */
+		sch = to_subchannel(cdev->dev.parent);
+		device_unregister(&sch->dev);
+		/* Reset intparm to zeroes. */
+		sch->schib.pmcw.intparm = 0;
+		cio_modify(sch);
+		put_device(&sch->dev);
+		return 0;
+	}
+	if (cdev->drv->set_offline) {
+		ret = cdev->drv->set_offline(cdev);
+		if (ret != 0)
+			return ret;
+	}
 	cdev->online = 0;
 	spin_lock_irq(cdev->ccwlock);
 	ret = ccw_device_offline(cdev);
 	spin_unlock_irq(cdev->ccwlock);
 	if (ret == 0)
 		wait_event(cdev->private->wait_q, dev_fsm_final_state(cdev));
-	else
-		//FIXME: we can't fail!
+	else {
 		pr_debug("ccw_device_offline returned %d, device %s\n",
 			 ret, cdev->dev.bus_id);
+		cdev->online = 1;
+	}
+	return ret;
 }
 
-void
+int
 ccw_device_set_online(struct ccw_device *cdev)
 {
 	int ret;
 
 	if (!cdev)
-		return;
+		return -ENODEV;
 	if (cdev->online || !cdev->drv)
-		return;
+		return -EINVAL;
 
 	spin_lock_irq(cdev->ccwlock);
 	ret = ccw_device_online(cdev);
@@ -278,13 +301,13 @@ ccw_device_set_online(struct ccw_device *cdev)
 	else {
 		pr_debug("ccw_device_online returned %d, device %s\n",
 			 ret, cdev->dev.bus_id);
-		return;
+		return ret;
 	}
 	if (cdev->private->state != DEV_STATE_ONLINE)
-		return;
+		return -ENODEV;
 	if (!cdev->drv->set_online || cdev->drv->set_online(cdev) == 0) {
 		cdev->online = 1;
-		return;
+		return 0;
 	}
 	spin_lock_irq(cdev->ccwlock);
 	ret = ccw_device_offline(cdev);
@@ -294,6 +317,7 @@ ccw_device_set_online(struct ccw_device *cdev)
 	else 
 		pr_debug("ccw_device_offline returned %d, device %s\n",
 			 ret, cdev->dev.bus_id);
+	return (ret = 0) ? -ENODEV : ret;
 }
 
 static ssize_t
@@ -342,7 +366,7 @@ stlck_store(struct device *dev, const char *buf, size_t count)
 		  ccw_device_unbox_recog, (void *) cdev);
 	queue_work(ccw_device_work, &cdev->private->kick_work);
 	
-	return 0;
+	return count;
 }
 
 static DEVICE_ATTR(chpids, 0444, chpids_show, NULL);
@@ -391,12 +415,6 @@ subchannel_add_files (struct device *dev)
 	return sysfs_create_group(&dev->kobj, &subch_attr_group);
 }
 
-static inline void
-subchannel_remove_files(struct device *dev)
-{
-	sysfs_remove_group(&dev->kobj, &subch_attr_group);
-}
-
 static struct attribute * ccwdev_attrs[] = {
 	&dev_attr_devtype.attr,
 	&dev_attr_cutype.attr,
@@ -438,7 +456,7 @@ ccw_device_add_stlck(void *data)
 
 /* this is a simple abstraction for device_register that sets the
  * correct bus type and adds the bus specific files */
-static int
+int
 ccw_device_register(struct ccw_device *cdev)
 {
 	struct device *dev = &cdev->dev;
@@ -456,16 +474,20 @@ ccw_device_register(struct ccw_device *cdev)
 }
 
 void
-ccw_device_unregister(void *data)
+ccw_device_do_unreg_rereg(void *data)
 {
 	struct device *dev;
 
 	dev = (struct device *)data;
-
 	device_remove_files(dev);
-	device_unregister(dev);
+	device_del(dev);
+	if (device_add(dev)) {
+		put_device(dev);
+		return;
+	}
+	if (device_add_files(dev))
+		device_unregister(dev);
 }
-	
 
 static void
 ccw_device_release(struct device *dev)
@@ -490,6 +512,10 @@ io_subchannel_register(void *data)
 	cdev = (struct ccw_device *) data;
 	sch = to_subchannel(cdev->dev.parent);
 
+	if (!list_empty(&sch->dev.children)) {
+		bus_rescan_devices(&ccw_bus_type);
+		goto out;
+	}
 	/* make it known to the system */
 	ret = ccw_device_register(cdev);
 	if (ret) {
@@ -657,8 +683,46 @@ io_subchannel_remove (struct device *dev)
 	dev_fsm_event(cdev, DEV_EVENT_NOTOPER);
 	put_device(&cdev->dev);
 	dev->driver_data = NULL;
-	subchannel_remove_files(dev);
 	return 0;
+}
+
+static int
+io_subchannel_notify(struct device *dev, int event)
+{
+	struct ccw_device *cdev;
+
+	cdev = dev->driver_data;
+	if (!cdev)
+		return 0;
+	if (!cdev->drv)
+		return 0;
+	if (!cdev->online)
+		return 0;
+	return cdev->drv->notify ? cdev->drv->notify(cdev, event) : 0;
+}
+
+static void
+io_subchannel_verify(struct device *dev)
+{
+	struct ccw_device *cdev;
+
+	cdev = dev->driver_data;
+	if (cdev)
+		dev_fsm_event(cdev, DEV_EVENT_VERIFY);
+}
+
+static void
+io_subchannel_ioterm(struct device *dev)
+{
+	struct ccw_device *cdev;
+
+	cdev = dev->driver_data;
+	if (!cdev)
+		return;
+	cdev->private->state = DEV_STATE_CLEAR_VERIFY;
+	if (cdev->handler)
+		cdev->handler(cdev, cdev->private->intparm,
+			      ERR_PTR(-EIO));
 }
 
 #ifdef CONFIG_CCW_CONSOLE
@@ -797,7 +861,7 @@ ccw_device_remove (struct device *dev)
 	int ret;
 
 	pr_debug("removing device %s, sch %d, devno %x\n",
-		 cdev->dev.name,
+		 cdev->dev.bus_id,
 		 cdev->private->irq,
 		 cdev->private->devno);
 	if (cdrv->remove)

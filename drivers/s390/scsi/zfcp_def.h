@@ -31,10 +31,8 @@
 #ifndef ZFCP_DEF_H
 #define ZFCP_DEF_H
 
-#ifdef __KERNEL__
-
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_DEF_REVISION "$Revision: 1.45 $"
+#define ZFCP_DEF_REVISION "$Revision: 1.48 $"
 
 /*************************** INCLUDES *****************************************/
 
@@ -757,6 +755,8 @@ struct zfcp_unit {
 	struct zfcp_erp_action erp_action;     /* pending error recovery */
         atomic_t               erp_counter;
 	struct device          sysfs_device;   /* sysfs device */
+	atomic_t               scsi_add_work;  /* used to synchronize */
+	wait_queue_head_t      scsi_add_wq;    /* wait for scsi_add_device */
 };
 
 /* FSF request */
@@ -801,6 +801,14 @@ struct zfcp_data {
 	struct notifier_block	reboot_notifier;     /* used to register cleanup
 							functions */
 	atomic_t		loglevel;            /* current loglevel */
+#ifndef MODULE                                       /* initial parameters
+							needed if ipl from a
+							scsi device is wanted */
+	char                    init_busid[BUS_ID_SIZE];
+	wwn_t                   init_wwpn;
+	fcp_lun_t               init_fcp_lun;
+	int                     init_is_valid;
+#endif
 #ifdef ZFCP_STAT_REQSIZES                            /* Statistical accounting
 							of processed data */
 	struct list_head	read_req_head;
@@ -949,5 +957,4 @@ zfcp_adapter_wait(struct zfcp_adapter *adapter)
 	wait_event(adapter->remove_wq, atomic_read(&adapter->refcount) == 0);
 }
 
-#endif /* __KERNEL_- */
 #endif /* ZFCP_DEF_H */

@@ -444,7 +444,7 @@ tty3270_rcl_add(struct tty3270 *tp, char *input, int len)
 	if (len <= 0)
 		return;
 	if (tp->rcl_nr >= tp->rcl_max) {
-		s = list_entry(&tp->rcl_lines, struct string, list);
+		s = list_entry(tp->rcl_lines.next, struct string, list);
 		list_del(&s->list);
 		free_string(&tp->freemem, s);
 		tp->rcl_nr--;

@@ -1,5 +1,5 @@
 /*
- * $Id: ctcmain.c,v 1.49 2003/10/15 11:28:37 mschwide Exp $
+ * $Id: ctcmain.c,v 1.50 2003/12/02 15:18:50 cohuck Exp $
  *
  * CTC / ESCON network driver
  *
@@ -36,7 +36,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.49 $
+ * RELEASE-TAG: CTC/ESCON network driver $Revision: 1.50 $
  *
  */
 
@@ -272,7 +272,7 @@ static void
 print_banner(void)
 {
 	static int printed = 0;
-	char vbuf[] = "$Revision: 1.49 $";
+	char vbuf[] = "$Revision: 1.50 $";
 	char *version = vbuf;
 
 	if (printed)
@@ -3000,7 +3000,8 @@ ctc_remove_device(struct ccwgroup_device *cgdev)
 	priv = cgdev->dev.driver_data;
 	if (!priv)
 		return;
-
+	if (cgdev->state == CCWGROUP_ONLINE)
+		ctc_shutdown_device(cgdev);
 	ctc_remove_files(&cgdev->dev);
 	cgdev->dev.driver_data = NULL;
 	kfree(priv);

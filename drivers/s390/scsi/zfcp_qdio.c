@@ -27,7 +27,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_QDIO_C_REVISION "$Revision: 1.9 $"
+#define ZFCP_QDIO_C_REVISION "$Revision: 1.10 $"
 
 #include "zfcp_ext.h"
 
@@ -414,7 +414,7 @@ zfcp_qdio_response_handler(struct ccw_device *ccw_device,
 				break;
 		};
 
-		if (unlikely(!buffere->flags & SBAL_FLAGS_LAST_ENTRY)) {
+		if (unlikely(!(buffere->flags & SBAL_FLAGS_LAST_ENTRY))) {
 			ZFCP_LOG_NORMAL("bug: End of inbound data "
 					"not marked!\n");
 		}

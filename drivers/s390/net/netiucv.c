@@ -1,5 +1,5 @@
 /*
- * $Id: netiucv.c,v 1.29 2003/10/24 16:35:31 mschwide Exp $
+ * $Id: netiucv.c,v 1.30 2003/12/02 12:29:32 braunu Exp $
  *
  * IUCV network driver
  *
@@ -30,7 +30,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV network driver $Revision: 1.29 $
+ * RELEASE-TAG: IUCV network driver $Revision: 1.30 $
  *
  */
 
@@ -1462,7 +1462,7 @@ netiucv_add_files(struct device *dev)
 		return ret;
 	ret = sysfs_create_group(&dev->kobj, &netiucv_stat_attr_group);
 	if (ret)
-		sysfs_remove_group(&dev->kobj, &netiucv_stat_attr_group);
+		sysfs_remove_group(&dev->kobj, &netiucv_attr_group);
 	return ret;
 }
 
@@ -1729,7 +1729,7 @@ static struct device_driver netiucv_driver = {
 static void
 netiucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.29 $";
+	char vbuf[] = "$Revision: 1.30 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {

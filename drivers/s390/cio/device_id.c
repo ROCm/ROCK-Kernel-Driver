@@ -196,17 +196,11 @@ __ccw_device_sense_id_start(struct ccw_device *cdev)
 	ret = -ENODEV;
 	while (cdev->private->imask != 0) {
 		if ((sch->lpm & cdev->private->imask) != 0 &&
-		    cdev->private->iretry-- > 0) {
-			/* 0x00E2C9C4 == ebcdic "SID" */
+		    cdev->private->iretry > 0) {
+			cdev->private->iretry--;
 			ret = cio_start (sch, cdev->private->iccws,
-					 0x00E2C9C4, cdev->private->imask);
+					 cdev->private->imask);
 			/* ret is 0, -EBUSY, -EACCES or -ENODEV */
-			if (ret == -EBUSY) {
-				struct irb irb;
-				if (tsch(sch->irq, &irb))
-					udelay(100);
-				continue;
-			}
 			if (ret != -EACCES)
 				return ret;
 		}
@@ -226,7 +220,7 @@ ccw_device_sense_id_start(struct ccw_device *cdev)
 	cdev->private->imask = 0x80;
 	cdev->private->iretry = 5;
 	ret = __ccw_device_sense_id_start(cdev);
-	if (ret)
+	if (ret && ret != -EBUSY)
 		ccw_device_sense_id_done(cdev, ret);
 }
 
@@ -302,11 +296,17 @@ ccw_device_sense_id_irq(struct ccw_device *cdev, enum dev_event dev_event)
 
 	sch = to_subchannel(cdev->dev.parent);
 	irb = (struct irb *) __LC_IRB;
-	/* Ignore unsolicited interrupts. */
+	/*
+	 * Unsolicited interrupts may pertain to an earlier status pending or
+	 * busy condition on the subchannel. Retry sense id.
+	 */
 	if (irb->scsw.stctl ==
-	    		(SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS))
+	    (SCSW_STCTL_STATUS_PEND | SCSW_STCTL_ALERT_STATUS)) {
+		ret = __ccw_device_sense_id_start(cdev);
+		if (ret && ret != -EBUSY)
+			ccw_device_sense_id_done(cdev, ret);
 		return;
-
+	}
 	if (ccw_device_accumulate_and_sense(cdev, irb) != 0)
 		return;
 	ret = ccw_device_check_sense_id(cdev);

@@ -25,7 +25,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.28 $"
+#define ZFCP_SYSFS_PORT_C_REVISION "$Revision: 1.32 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -110,9 +110,9 @@ zfcp_sysfs_unit_add_store(struct device *dev, const char *buf, size_t count)
 
 	retval = 0;
 
-	/* try to open unit only if adapter is online */
-	if (port->adapter->ccw_device->online == 1)
-		zfcp_erp_unit_reopen(unit, ZFCP_STATUS_COMMON_ERP_FAILED);
+	zfcp_erp_unit_reopen(unit, 0);
+	zfcp_erp_wait(unit->port->adapter);
+	wait_event(unit->scsi_add_wq, atomic_read(&unit->scsi_add_work) == 0);
 	zfcp_unit_put(unit);
  out:
 	up(&zfcp_data.config_sema);
@@ -165,10 +165,7 @@ zfcp_sysfs_unit_remove_store(struct device *dev, const char *buf, size_t count)
 		goto out;
 	}
 
-	/* shutdown unit only if adapter is online */
-	if (port->adapter->ccw_device->online == 1)
-		zfcp_erp_unit_shutdown(unit, 0);
-
+	zfcp_erp_unit_shutdown(unit, 0);
 	zfcp_erp_wait(unit->port->adapter);
 	zfcp_unit_put(unit);
 	zfcp_sysfs_unit_remove_files(&unit->sysfs_device);
@@ -219,6 +216,7 @@ zfcp_sysfs_port_failed_store(struct device *dev, const char *buf, size_t count)
 	}
 	zfcp_erp_modify_port_status(port, ZFCP_STATUS_COMMON_RUNNING, ZFCP_SET);
 	zfcp_erp_port_reopen(port, ZFCP_STATUS_COMMON_ERP_FAILED);
+	zfcp_erp_wait(port->adapter);
  out:
 	up(&zfcp_data.config_sema);
 	return retval ? retval : count;

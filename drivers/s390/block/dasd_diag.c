@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.32 $
+ * $Revision: 1.33 $
  */
 
 #include <linux/config.h>
@@ -393,7 +393,7 @@ dasd_diag_build_cp(struct dasd_device * device, struct request *req)
 	recid = first_rec;
 	rq_for_each_bio(bio, req) {
 		bio_for_each_segment(bv, bio, i) {
-			dst = kmap(bv->bv_page) + bv->bv_offset;
+			dst = page_address(bv->bv_page) + bv->bv_offset;
 			for (off = 0; off < bv->bv_len; off += blksize) {
 				memset(dbio, 0, sizeof (struct dasd_diag_bio));
 				dbio->type = rw_cmd;

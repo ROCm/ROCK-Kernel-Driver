@@ -28,7 +28,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_FSF_C_REVISION "$Revision: 1.15 $"
+#define ZFCP_FSF_C_REVISION "$Revision: 1.16 $"
 
 #include "zfcp_ext.h"
 
@@ -2424,9 +2424,9 @@ zfcp_fsf_open_unit(struct zfcp_erp_action *erp_action)
 	}
 
 	erp_action->fsf_req->qtcb->header.port_handle =
-	    erp_action->port->handle;
-	*(fcp_lun_t *) & (erp_action->fsf_req->qtcb->bottom.support.fcp_lun)
-	    = erp_action->unit->fcp_lun;
+		erp_action->port->handle;
+	erp_action->fsf_req->qtcb->bottom.support.fcp_lun =
+		erp_action->unit->fcp_lun;
 	atomic_set_mask(ZFCP_STATUS_COMMON_OPENING, &erp_action->unit->status);
 	erp_action->fsf_req->data.open_unit.unit = erp_action->unit;
 	erp_action->fsf_req->erp_action = erp_action;

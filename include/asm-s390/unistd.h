@@ -323,6 +323,7 @@
 #undef  __NR_getdents64
 #undef  __NR_fcntl64
 #undef  __NR_sendfile64
+#undef  __NR_fadvise64_64
 
 #define __NR_select		142
 #define __NR_getrlimit		191	/* SuS compliant getrlimit */

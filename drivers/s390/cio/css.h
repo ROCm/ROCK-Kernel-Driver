@@ -79,6 +79,7 @@ struct ccw_device_private {
 		unsigned int esid:1;        /* Ext. SenseID supported by HW */
 		unsigned int dosense:1;	    /* delayed SENSE required */
 		unsigned int doverify:1;    /* delayed path verification */
+		unsigned int donotify:1;    /* call notify function */
 	} __attribute__((packed)) flags;
 	unsigned long intparm;	/* user interruption parameter */
 	struct qdio_irq *qdio_data;
@@ -100,12 +101,16 @@ struct css_driver {
 	unsigned int subchannel_type;
 	struct device_driver drv;
 	void (*irq)(struct device *);
+	int (*notify)(struct device *, int);
+	void (*verify)(struct device *);
+	void (*termination)(struct device *);
 };
 
 /*
  * all css_drivers have the css_bus_type
  */
 extern struct bus_type css_bus_type;
+extern struct css_driver io_subchannel_driver;
 
 int css_probe_device(int irq);
 extern struct subchannel * get_subchannel_by_schid(int irq);
@@ -117,4 +122,11 @@ extern int css_init_done;
 extern struct bus_type css_bus_type;
 extern struct device css_bus_device;
 
+/* Some helper functions for disconnected state. */
+int device_is_disconnected(struct subchannel *);
+void device_set_disconnected(struct subchannel *);
+void device_trigger_reprobe(struct subchannel *);
+
+/* Helper function for vary on/off. */
+void device_set_waiting(struct subchannel *);
 #endif

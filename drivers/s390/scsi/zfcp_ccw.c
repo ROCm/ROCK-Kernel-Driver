@@ -25,7 +25,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_CCW_C_REVISION "$Revision: 1.35 $"
+#define ZFCP_CCW_C_REVISION "$Revision: 1.36 $"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -158,6 +158,7 @@ zfcp_ccw_set_online(struct ccw_device *ccw_device)
 	zfcp_erp_modify_adapter_status(adapter, ZFCP_STATUS_COMMON_RUNNING,
 				       ZFCP_SET);
 	zfcp_erp_adapter_reopen(adapter, ZFCP_STATUS_COMMON_ERP_FAILED);
+	zfcp_erp_wait(adapter);
  out:
 	up(&zfcp_data.config_sema);
 	return retval;

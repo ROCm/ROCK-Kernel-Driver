@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/css.c
  *  driver for channel subsystem
- *   $Revision: 1.60 $
+ *   $Revision: 1.65 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *			 IBM Corporation
@@ -85,6 +85,8 @@ css_subchannel_release(struct device *dev)
 		kfree(sch);
 }
 
+extern int css_get_ssd_info(struct subchannel *sch);
+
 static int
 css_register_subchannel(struct subchannel *sch)
 {
@@ -100,10 +102,10 @@ css_register_subchannel(struct subchannel *sch)
 	if (ret)
 		printk (KERN_WARNING "%s: could not register %s\n",
 			__func__, sch->dev.bus_id);
+	else
+		css_get_ssd_info(sch);
 	return ret;
 }
-
-extern int css_get_ssd_info(struct subchannel *sch);
 
 int
 css_probe_device(int irq)
@@ -117,9 +119,25 @@ css_probe_device(int irq)
 	ret = css_register_subchannel(sch);
 	if (ret)
 		css_free_subchannel(sch);
-	else
-		css_get_ssd_info(sch);
 	return ret;
+}
+
+static struct subchannel *
+__get_subchannel_by_stsch(int irq)
+{
+	struct subchannel *sch;
+	int cc;
+	struct schib schib;
+
+	cc = stsch(irq, &schib);
+	if (cc)
+		return NULL;
+	sch = (struct subchannel *)(unsigned long)schib.pmcw.intparm;
+	if (!sch)
+		return NULL;
+	if (get_device(&sch->dev))
+		return sch;
+	return NULL;
 }
 
 struct subchannel *
@@ -132,11 +150,17 @@ get_subchannel_by_schid(int irq)
 	if (!get_bus(&css_bus_type))
 		return NULL;
 
-	sch = NULL;
+	/* Try to get subchannel from pmcw first. */ 
+	sch = __get_subchannel_by_stsch(irq);
+	if (sch)
+		goto out;
+	if (!get_driver(&io_subchannel_driver.drv))
+		goto out;
 	down_read(&css_bus_type.subsys.rwsem);
 
-	list_for_each(entry, &css_bus_type.devices.list) {
-		dev = get_device(container_of(entry, struct device, bus_list));
+	list_for_each(entry, &io_subchannel_driver.drv.devices) {
+		dev = get_device(container_of(entry,
+					      struct device, driver_list));
 		if (!dev)
 			continue;
 		sch = to_subchannel(dev);
@@ -146,6 +170,8 @@ get_subchannel_by_schid(int irq)
 		sch = NULL;
 	}
 	up_read(&css_bus_type.subsys.rwsem);
+	put_driver(&io_subchannel_driver.drv);
+out:
 	put_bus(&css_bus_type);
 
 	return sch;
@@ -170,15 +196,22 @@ css_get_subchannel_status(struct subchannel *sch, int schid)
 static inline int
 css_evaluate_subchannel(int irq)
 {
-	int event, ret;
+	int event, ret, disc;
 	struct subchannel *sch;
 
 	sch = get_subchannel_by_schid(irq);
+	disc = sch ? device_is_disconnected(sch) : 0;
 	event = css_get_subchannel_status(sch, irq);
 	switch (event) {
 	case CIO_GONE:
 		if (!sch) {
 			/* Never used this subchannel. Ignore. */
+			ret = 0;
+			break;
+		}
+		if (sch->driver && sch->driver->notify &&
+		    sch->driver->notify(&sch->dev, CIO_GONE)) {
+			device_set_disconnected(sch);
 			ret = 0;
 			break;
 		}
@@ -194,7 +227,11 @@ css_evaluate_subchannel(int irq)
 		ret = 0;
 		break;
 	case CIO_REVALIDATE:
-		/* Revalidation machine check. Sick. */
+		/* 
+		 * Revalidation machine check. Sick.
+		 * We don't notify the driver since we have to throw the device
+		 * away in any case.
+		 */
 		device_unregister(&sch->dev);
 		/* Reset intparm to zeroes. */
 		sch->schib.pmcw.intparm = 0;
@@ -203,6 +240,9 @@ css_evaluate_subchannel(int irq)
 		ret = css_probe_device(irq);
 		break;
 	case CIO_OPER:
+		if (disc)
+			/* Get device operational again. */
+			device_trigger_reprobe(sch);
 		ret = sch ? 0 : css_probe_device(irq);
 		break;
 	default:

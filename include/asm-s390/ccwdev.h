@@ -93,6 +93,7 @@ struct ccw_driver {
 					/* device is no longer available     */
 	int (*set_online) (struct ccw_device *);
 	int (*set_offline) (struct ccw_device *);
+	int (*notify) (struct ccw_device *, int);
 	struct device_driver driver;	/* higher level structure, don't init
 					   this from your driver	     */
 	char *name;
@@ -149,8 +150,8 @@ extern int ccw_device_clear(struct ccw_device *, unsigned long);
 extern int read_dev_chars(struct ccw_device *cdev, void **buffer, int length);
 extern int read_conf_data(struct ccw_device *cdev, void **buffer, int *length);
 
-extern void ccw_device_set_online(struct ccw_device *cdev);
-extern void ccw_device_set_offline(struct ccw_device *cdev);
+extern int ccw_device_set_online(struct ccw_device *cdev);
+extern int ccw_device_set_offline(struct ccw_device *cdev);
 
 
 extern struct ciw *ccw_device_get_ciw(struct ccw_device *, __u32 cmd);

@@ -543,7 +543,7 @@ io_preempt:
 io_resume_loop:
 	tm	__TI_flags+3(%r9),_TIF_NEED_RESCHED
 	bno	BASED(io_leave)
-	mvc     __TI_precount(4,%r9),.Lc_pactive
+	mvc     __TI_precount(4,%r9),BASED(.Lc_pactive)
 	# hmpf, we are on the async. stack but to call schedule
 	# we have to move the interrupt frame to the process stack
 	l	%r1,SP_R15(%r15)

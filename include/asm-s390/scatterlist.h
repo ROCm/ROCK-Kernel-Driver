@@ -7,6 +7,10 @@ struct scatterlist {
     unsigned int length;
 };
 
-#define ISA_DMA_THRESHOLD (0xffffffffffffffff)
+#ifdef __s390x__
+#define ISA_DMA_THRESHOLD (0xffffffffffffffffUL)
+#else
+#define ISA_DMA_THRESHOLD (0xffffffffUL)
+#endif
 
 #endif /* _ASMS390X_SCATTERLIST_H */

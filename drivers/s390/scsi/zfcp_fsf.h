@@ -30,8 +30,6 @@
 #ifndef FSF_H
 #define FSF_H
 
-#ifdef __KERNEL__
-
 #define FSF_QTCB_VERSION1			0x00000001
 #define FSF_QTCB_CURRENT_VERSION		FSF_QTCB_VERSION1
 
@@ -354,5 +352,4 @@ struct fsf_qtcb {
 	union  fsf_qtcb_bottom bottom;
 } __attribute__ ((packed));
 
-#endif				/* __KERNEL__ */
 #endif				/* FSF_H */

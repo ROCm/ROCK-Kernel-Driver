@@ -49,6 +49,8 @@ ccw_device_clear(struct ccw_device *cdev, unsigned long intparm)
 
 	if (!cdev)
 		return -ENODEV;
+	if (cdev->private->state == DEV_STATE_NOT_OPER)
+		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE &&
 	    cdev->private->state != DEV_STATE_W4SENSE)
 		return -EINVAL;
@@ -73,6 +75,8 @@ ccw_device_start(struct ccw_device *cdev, struct ccw1 *cpa,
 	sch = to_subchannel(cdev->dev.parent);
 	if (!sch)
 		return -ENODEV;
+	if (cdev->private->state == DEV_STATE_NOT_OPER)
+		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE ||
 	    sch->schib.scsw.actl != 0 ||
 	    cdev->private->flags.doverify)
@@ -80,8 +84,7 @@ ccw_device_start(struct ccw_device *cdev, struct ccw1 *cpa,
 	ret = cio_set_options (sch, flags);
 	if (ret)
 		return ret;
-	/* 0xe4e2c5d9 == ebcdic "USER" */
-	ret = cio_start (sch, cpa, 0xe4e2c5d9, lpm);
+	ret = cio_start (sch, cpa, lpm);
 	if (ret == 0)
 		cdev->private->intparm = intparm;
 	return ret;
@@ -111,6 +114,8 @@ ccw_device_halt(struct ccw_device *cdev, unsigned long intparm)
 
 	if (!cdev)
 		return -ENODEV;
+	if (cdev->private->state == DEV_STATE_NOT_OPER)
+		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE &&
 	    cdev->private->state != DEV_STATE_W4SENSE)
 		return -EINVAL;
@@ -132,6 +137,8 @@ ccw_device_resume(struct ccw_device *cdev)
 		return -ENODEV;
 	sch = to_subchannel(cdev->dev.parent);
 	if (!sch)
+		return -ENODEV;
+	if (cdev->private->state == DEV_STATE_NOT_OPER)
 		return -ENODEV;
 	if (cdev->private->state != DEV_STATE_ONLINE ||
 	    !(sch->schib.scsw.actl & SCSW_ACTL_SUSPENDED))
@@ -251,7 +258,7 @@ __ccw_device_retry_loop(struct ccw_device *cdev, struct ccw1 *ccw, long magic)
 
 	sch = to_subchannel(cdev->dev.parent);
 	do {
-		ret = cio_start (sch, ccw, magic, 0);
+		ret = cio_start (sch, ccw, 0);
 		if ((ret == -EBUSY) || (ret == -EACCES)) {
 			/* Try again later. */
 			spin_unlock_irq(&sch->lock);
@@ -447,21 +454,25 @@ ccw_device_stlck(struct ccw_device *cdev)
 	CIO_TRACE_EVENT(2, "stl lock");
 	CIO_TRACE_EVENT(2, cdev->dev.bus_id);
 
+	spin_lock_irqsave(&sch->lock, flags);
+	ret = cio_enable_subchannel(sch, 3);
+	if (ret)
+		goto out_unlock;
 	/* Setup ccw. This cmd code seems not to be in use elsewhere. */
 	cdev->private->iccws[0].cmd_code = CCW_CMD_STLCK;
 	cdev->private->iccws[0].cda = (__u32) __pa(buf);
 	cdev->private->iccws[0].count = 32;
 	cdev->private->iccws[0].flags = CCW_FLAG_SLI;
 
-	spin_lock_irqsave(&sch->lock, flags);
-	ret = cio_start(sch, cdev->private->iccws, 0xE2D3C3D2, 0);
+	ret = cio_start(sch, cdev->private->iccws, 0);
+	if (ret) {
+		cio_disable_subchannel(sch); //FIXME: return code?
+		goto out_unlock;
+	}
 	spin_unlock_irqrestore(&sch->lock, flags);
-	if (ret)
-		return ret;
-
-	wait_event(cdev->private->wait_q, sch->schib.scsw.actl == 0);
+	wait_event(cdev->private->wait_q, cdev->private->irb.scsw.actl == 0);
 	spin_lock_irqsave(&sch->lock, flags);
-
+	cio_disable_subchannel(sch); //FIXME: return code?
 	if ((cdev->private->irb.scsw.dstat !=
 	     (DEV_STAT_CHN_END|DEV_STAT_DEV_END)) ||
 	    (cdev->private->irb.scsw.cstat != 0))
@@ -469,8 +480,8 @@ ccw_device_stlck(struct ccw_device *cdev)
 
 	/* Clear irb. */
 	memset(&cdev->private->irb, 0, sizeof(struct irb));
+out_unlock:
 	spin_unlock_irqrestore(&sch->lock, flags);
-
 	return ret;
 }
 

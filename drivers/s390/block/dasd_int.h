@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.50 $
+ * $Revision: 1.52 $
  */
 
 #ifndef DASD_INT_H
@@ -268,6 +268,7 @@ struct dasd_device {
 	unsigned int s2b_shift;		/* log2 (bp_block/512) */
 	int ro_flag;			/* read-only flag */
 	int use_diag_flag;		/* diag allowed flag */
+	int disconnect_error_flag;	/* return -EIO when disconnected */
 
 
 	/* Device discipline stuff. */
@@ -308,6 +309,8 @@ struct dasd_device {
 #define DASD_STOPPED_NOT_ACC 1         /* not accessible */
 #define DASD_STOPPED_QUIESCE 2         /* Quiesced */
 #define DASD_STOPPED_PENDING 4         /* long busy */
+#define DASD_STOPPED_DC_WAIT 8         /* disconnected, wait */
+#define DASD_STOPPED_DC_EIO  16        /* disconnected, return -EIO */
 
 
 void dasd_put_device_wake(struct dasd_device *);
@@ -461,6 +464,7 @@ int dasd_generic_probe (struct ccw_device *, struct dasd_discipline *);
 void dasd_generic_remove (struct ccw_device *cdev);
 int dasd_generic_set_online(struct ccw_device *, struct dasd_discipline *);
 int dasd_generic_set_offline (struct ccw_device *cdev);
+int dasd_generic_notify(struct ccw_device *, int);
 void dasd_generic_auto_online (struct ccw_driver *);
 
 /* externals in dasd_devmap.c */

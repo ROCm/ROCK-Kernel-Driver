@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/cio.c
  *   S/390 common I/O routines -- low level i/o calls
- *   $Revision: 1.112 $
+ *   $Revision: 1.114 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -184,7 +184,6 @@ cio_start_handle_notoper(struct subchannel *sch, __u8 lpm)
 int
 cio_start (struct subchannel *sch,	/* subchannel structure */
 	   struct ccw1 * cpa,		/* logical channel prog addr */
-	   unsigned int intparm,	/* interruption parameter */
 	   __u8 lpm)			/* logical path mask */
 {
 	char dbf_txt[15];
@@ -200,7 +199,7 @@ cio_start (struct subchannel *sch,	/* subchannel structure */
 	sch->orb.pfch = sch->options.prefetch == 0;
 	sch->orb.spnd = sch->options.suspend;
 	sch->orb.ssic = sch->options.suspend && sch->options.inter;
-	sch->orb.lpm = (lpm != 0) ? lpm : sch->lpm;
+	sch->orb.lpm = (lpm != 0) ? (lpm & sch->opm) : sch->lpm;
 #ifdef CONFIG_ARCH_S390X
 	/*
 	 * for 64 bit we always support 64 bit IDAWs with 4k page size only
@@ -565,12 +564,12 @@ cio_validate_subchannel (struct subchannel *sch, unsigned int irq)
 			      "at devno %04X\n", sch->schib.pmcw.dev);
 		return -ENODEV;
 	}
-
+	sch->opm = 0xff;
+	chsc_validate_chpids(sch);
 	sch->lpm = sch->schib.pmcw.pim &
 		sch->schib.pmcw.pam &
-		sch->schib.pmcw.pom;
-
-	chsc_validate_chpids(sch);
+		sch->schib.pmcw.pom &
+		sch->opm;
 
 	CIO_DEBUG(KERN_INFO, 0,
 		  "Detected device %04X on subchannel %s"

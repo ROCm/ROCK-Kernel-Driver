@@ -135,7 +135,7 @@ sys32_alarm_wrapper:
 compat_sys_utime_wrapper:
 	llgtr	%r2,%r2			# char *
 	llgtr	%r3,%r3			# struct compat_utimbuf *
-	jg	compat_sys_utime		# branch to system call
+	jg	compat_sys_utime	# branch to system call
 
 	.globl  sys32_access_wrapper 
 sys32_access_wrapper:
@@ -1192,14 +1192,14 @@ sys32_sched_setaffinity_wrapper:
 	lgfr	%r2,%r2			# int
 	llgfr	%r3,%r3			# unsigned int
 	llgtr	%r4,%r4			# unsigned long *
-	jg	sys32_sched_setaffinity
+	jg	compat_sys_sched_setaffinity
 
 	.globl	sys32_sched_getaffinity_wrapper
 sys32_sched_getaffinity_wrapper:
 	lgfr	%r2,%r2			# int
 	llgfr	%r3,%r3			# unsigned int
 	llgtr	%r4,%r4			# unsigned long *
-	jg	sys32_sched_getaffinity
+	jg	compat_sys_sched_getaffinity
 
 	.globl  sys32_exit_group_wrapper
 sys32_exit_group_wrapper:
@@ -1231,6 +1231,77 @@ sys_epoll_wait_wrapper:
 	lgfr	%r4,%r4			# int
 	lgfr	%r5,%r5			# int
 	jg	sys_epoll_wait		# branch to system call
+
+	.globl	sys32_fadvise64_wrapper
+sys32_fadvise64_wrapper:
+	lgfr	%r2,%r2			# int
+	sllg	%r3,%r3,32		# get high word of 64bit loff_t
+	or	%r3,%r4			# get low word of 64bit loff_t
+	llgfr	%r4,%r5			# size_t (unsigned long)
+	lgfr	%r5,%r6			# int
+	jg	sys_fadvise64
+
+	.globl	sys32_fadvise64_64_wrapper
+sys32_fadvise64_64_wrapper:
+	llgtr	%r2,%r2			# struct fadvise64_64_args *
+	jg	s390_fadvise64_64
+
+	.globl	sys32_clock_settime_wrapper
+sys32_clock_settime_wrapper:
+	lgfr	%r2,%r2			# clockid_t (int)
+	llgtr	%r3,%r3			# struct compat_timespec *
+	jg	compat_clock_settime
+
+	.globl	sys32_clock_gettime_wrapper
+sys32_clock_gettime_wrapper:
+	lgfr	%r2,%r2			# clockid_t (int)
+	llgtr	%r3,%r3			# struct compat_timespec *
+	jg	compat_clock_gettime
+
+	.globl	sys32_clock_getres_wrapper
+sys32_clock_getres_wrapper:
+	lgfr	%r2,%r2			# clockid_t (int)
+	llgtr	%r3,%r3			# struct compat_timespec *
+	jg	compat_clock_getres
+
+	.globl	sys32_clock_nanosleep_wrapper
+sys32_clock_nanosleep_wrapper:
+	lgfr	%r2,%r2			# clockid_t (int)
+	lgfr	%r3,%r3			# int
+	llgtr	%r4,%r4			# struct compat_timespec *
+	llgtr	%r5,%r5			# struct compat_timespec *
+	jg	compat_clock_nanosleep
+
+	.globl	sys32_timer_create_wrapper
+sys32_timer_create_wrapper:
+	lgfr	%r2,%r2			# timer_t (int)
+	llgtr	%r3,%r3			# struct compat_sigevent *
+	llgtr	%r4,%r4			# timer_t *
+	jg	sys32_timer_create
+
+	.globl	sys32_timer_settime_wrapper
+sys32_timer_settime_wrapper:
+	lgfr	%r2,%r2			# timer_t (int)
+	lgfr	%r3,%r3			# int
+	llgtr	%r4,%r4			# struct compat_itimerspec *
+	llgtr	%r5,%r5			# struct compat_itimerspec *
+	jg	compat_timer_settime
+
+	.globl	sys32_timer_gettime_wrapper
+sys32_timer_gettime_wrapper:
+	lgfr	%r2,%r2			# timer_t (int)
+	llgtr	%r3,%r3			# struct compat_itimerspec *
+	jg	compat_timer_gettime
+
+	.globl	sys32_timer_getoverrun_wrapper
+sys32_timer_getoverrun_wrapper:
+	lgfr	%r2,%r2			# timer_t (int)
+	jg	sys_timer_getoverrun
+
+	.globl	sys32_timer_delete_wrapper
+sys32_timer_delete_wrapper:
+	lgfr	%r2,%r2			# timer_t (int)
+	jg	sys_timer_delete
 
 	.globl	sys32_io_setup_wrapper
 sys32_io_setup_wrapper:

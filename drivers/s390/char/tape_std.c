@@ -187,12 +187,12 @@ tape_std_terminate_write(struct tape_device *device)
 	DBF_LH(5, "tape%d: terminate write %dxEOF\n", device->first_minor,
 		device->required_tapemarks);
 
-	rc = tape_std_mtweof(device, device->required_tapemarks);
+	rc = tape_mtop(device, MTWEOF, device->required_tapemarks);
 	if (rc)
 		return rc;
 
 	device->required_tapemarks = 0;
-	return tape_std_mtbsr(device, 1);
+	return tape_mtop(device, MTBSR, 1);
 }
 
 /*
@@ -422,7 +422,7 @@ tape_std_mtbsf(struct tape_device *device, int mt_count)
 	/* execute it */
 	rc = tape_do_io_free(device, request);
 	if (rc == 0) {
-		rc = tape_std_mtfsr(device, 1);
+		rc = tape_mtop(device, MTFSR, 1);
 		if (rc > 0)
 			rc = 0;
 	}
@@ -453,7 +453,7 @@ tape_std_mtfsfm(struct tape_device *device, int mt_count)
 	/* execute it */
 	rc = tape_do_io_free(device, request);
 	if (rc == 0) {
-		rc = tape_std_mtbsr(device, 1);
+		rc = tape_mtop(device, MTBSR, 1);
 		if (rc > 0)
 			rc = 0;
 	}
@@ -537,7 +537,7 @@ tape_std_mteom(struct tape_device *device, int mt_count)
 	/*
 	 * Seek from the beginning of tape (rewind).
 	 */
-	if ((rc = tape_std_mtrew(device, 1)) < 0)
+	if ((rc = tape_mtop(device, MTREW, 1)) < 0)
 		return rc;
 
 	/*
@@ -547,13 +547,13 @@ tape_std_mteom(struct tape_device *device, int mt_count)
 	 * encountered).
 	 */
 	do {
-		if ((rc = tape_std_mtfsf(device, 1)) < 0)
+		if ((rc = tape_mtop(device, MTFSF, 1)) < 0)
 			return rc;
-		if ((rc = tape_std_mtfsr(device, 1)) < 0)
+		if ((rc = tape_mtop(device, MTFSR, 1)) < 0)
 			return rc;
 	} while (rc == 0);
 
-	return tape_std_mtbsr(device, 1);
+	return tape_mtop(device, MTBSR, 1);
 }
 
 /*
@@ -577,7 +577,7 @@ tape_std_mtreten(struct tape_device *device, int mt_count)
 	/* execute it, MTRETEN rc gets ignored */
 	rc = tape_do_io_interruptible(device, request);
 	tape_free_request(request);
-	return tape_std_mtrew(device, 1);
+	return tape_mtop(device, MTREW, 1);
 }
 
 /*
@@ -610,7 +610,7 @@ tape_std_mterase(struct tape_device *device, int mt_count)
 int
 tape_std_mtunload(struct tape_device *device, int mt_count)
 {
-	return tape_std_mtoffl(device, mt_count);
+	return tape_mtop(device, MTOFFL, mt_count);
 }
 
 /*
@@ -721,9 +721,9 @@ tape_std_process_eov(struct tape_device *device)
 	 * End of volume: We have to backspace the last written record, then
 	 * we TRY to write a tapemark and then backspace over the written TM
 	 */
-	if (tape_std_mtbsr(device, 1) == 0 &&
-	    tape_std_mtweof(device, 1) == 0) {
-		tape_std_mtbsr(device, 1);
+	if (tape_mtop(device, MTBSR, 1) == 0 &&
+	    tape_mtop(device, MTWEOF, 1) == 0) {
+		tape_mtop(device, MTBSR, 1);
 	}
 }
 

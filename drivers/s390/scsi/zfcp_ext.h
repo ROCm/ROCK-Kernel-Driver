@@ -30,9 +30,7 @@
 #ifndef ZFCP_EXT_H
 #define ZFCP_EXT_H
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_EXT_REVISION "$Revision: 1.36 $"
-
-#ifdef __KERNEL__
+#define ZFCP_EXT_REVISION "$Revision: 1.38 $"
 
 #include "zfcp_def.h"
 
@@ -158,5 +156,4 @@ extern void zfcp_in_els_dbf_event(struct zfcp_adapter *, const char *,
 #ifdef ZFCP_STAT_REQSIZES
 extern int  zfcp_statistics_inc(struct list_head *, u32);
 #endif
-#endif	/* __KERNEL__ */
 #endif	/* ZFCP_EXT_H */

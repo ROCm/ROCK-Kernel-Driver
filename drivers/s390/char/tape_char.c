@@ -151,10 +151,17 @@ tapechar_read (struct file *filp, char *data, size_t count, loff_t *ppos)
 		block_size = device->char_data.block_size;
 	} else {
 		block_size = count;
-		rc = tapechar_check_idalbuffer(device, block_size);
-		if (rc)
-			return rc;
 	}
+
+	rc = tapechar_check_idalbuffer(device, block_size);
+	if (rc)
+		return rc;
+
+#ifdef CONFIG_S390_TAPE_BLOCK
+	/* Changes position. */
+	device->blk_data.medium_changed = 1;
+#endif
+
 	DBF_EVENT(6, "TCHAR:nbytes: %lx\n", block_size);
 	/* Let the discipline build the ccw chain. */
 	request = device->discipline->read_block(device, block_size);
@@ -207,11 +214,18 @@ tapechar_write(struct file *filp, const char *data, size_t count, loff_t *ppos)
 		nblocks = count / block_size;
 	} else {
 		block_size = count;
-		rc = tapechar_check_idalbuffer(device, block_size);
-		if (rc)
-			return rc;
 		nblocks = 1;
 	}
+
+	rc = tapechar_check_idalbuffer(device, block_size);
+	if (rc)
+		return rc;
+
+#ifdef CONFIG_S390_TAPE_BLOCK
+	/* Changes position. */
+	device->blk_data.medium_changed = 1;
+#endif
+
 	DBF_EVENT(6,"TCHAR:nbytes: %lx\n", block_size);
 	DBF_EVENT(6, "TCHAR:nblocks: %x\n", nblocks);
 	/* Let the discipline build the ccw chain. */
@@ -273,16 +287,20 @@ tapechar_open (struct inode *inode, struct file *filp)
 	struct tape_device *device;
 	int minor, rc;
 
+	DBF_EVENT(6, "TCHAR:open: %i:%i\n",
+		imajor(filp->f_dentry->d_inode),
+		iminor(filp->f_dentry->d_inode));
+
 	if (imajor(filp->f_dentry->d_inode) != tapechar_major)
 		return -ENODEV;
 
 	minor = iminor(filp->f_dentry->d_inode);
 	device = tape_get_device(minor / TAPE_MINORS_PER_DEV);
 	if (IS_ERR(device)) {
+		DBF_EVENT(3, "TCHAR:open: tape_get_device() failed\n");
 		return PTR_ERR(device);
 	}
 
-	DBF_EVENT(6, "TCHAR:open: %x\n", iminor(inode));
 
 	rc = tape_open(device);
 	if (rc == 0) {
@@ -370,6 +388,9 @@ tapechar_ioctl(struct inode *inp, struct file *filp,
 			case MTBSFM:
 			case MTFSFM:
 			case MTSEEK:
+#ifdef CONFIG_S390_TAPE_BLOCK
+				device->blk_data.medium_changed = 1;
+#endif
 				if (device->required_tapemarks)
 					tape_std_terminate_write(device);
 			default:

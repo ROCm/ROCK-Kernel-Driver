@@ -10,7 +10,7 @@
 #ifndef __QETH_MPC_H__
 #define __QETH_MPC_H__
 
-#define VERSION_QETH_MPC_H "$Revision: 1.17 $"
+#define VERSION_QETH_MPC_H "$Revision: 1.18 $"
 
 #define QETH_IPA_TIMEOUT (card->ipa_timeout)
 #define QETH_MPC_TIMEOUT 2000
@@ -320,8 +320,9 @@ struct ipa_cmd{
 }__attribute__ ((packed));
 
 #define QETH_IOC_MAGIC 0x22
-#define QETH_IOCPROC_OSAEINTERFACES _IOWR(QETH_IOC_MAGIC, 1, arg)
-#define QETH_IOCPROC_INTERFACECHANGES _IOWR(QETH_IOC_MAGIC, 2, arg)
+/* these don't really have 'unsigned long' arguments but were defined that way */
+#define QETH_IOCPROC_OSAEINTERFACES _IOWR(QETH_IOC_MAGIC, 1, unsigned long)
+#define QETH_IOCPROC_INTERFACECHANGES _IOWR(QETH_IOC_MAGIC, 2, unsigned long)
 
 #define SNMP_QUERY_CARD_INFO 0x00000002L
 #define SNMP_REGISETER_MIB   0x00000004L

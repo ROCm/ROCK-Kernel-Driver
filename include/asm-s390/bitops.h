@@ -526,10 +526,10 @@ __constant_test_bit(unsigned long nr, const volatile unsigned long *addr) {
  * Find-bit routines..
  */
 static inline int
-find_first_zero_bit(unsigned long * addr, unsigned size)
+find_first_zero_bit(unsigned long * addr, unsigned int size)
 {
 	unsigned long cmp, count;
-        int res;
+        unsigned int res;
 
         if (!size)
                 return 0;
@@ -565,10 +565,10 @@ find_first_zero_bit(unsigned long * addr, unsigned size)
 }
 
 static inline int
-find_first_bit(unsigned long * addr, unsigned size)
+find_first_bit(unsigned long * addr, unsigned int size)
 {
 	unsigned long cmp, count;
-        int res;
+        unsigned int res;
 
         if (!size)
                 return 0;
@@ -1022,7 +1022,7 @@ extern inline int ffs (int x)
 /*
  * fls: find last bit set.
  */
-extern __inline__ int fls(int x)
+static __inline__ int fls(int x)
 {
 	int r = 32;
 
@@ -1095,10 +1095,10 @@ extern __inline__ int fls(int x)
 #ifndef __s390x__
 
 static inline int 
-ext2_find_first_zero_bit(void *vaddr, unsigned size)
+ext2_find_first_zero_bit(void *vaddr, unsigned int size)
 {
 	unsigned long cmp, count;
-        int res;
+        unsigned int res;
 
         if (!size)
                 return 0;
@@ -1135,12 +1135,12 @@ ext2_find_first_zero_bit(void *vaddr, unsigned size)
 }
 
 static inline int 
-ext2_find_next_zero_bit(void *vaddr, unsigned size, unsigned offset)
+ext2_find_next_zero_bit(void *vaddr, unsigned int size, unsigned offset)
 {
         unsigned long *addr = vaddr;
         unsigned long *p = addr + (offset >> 5);
         unsigned long word, reg;
-        int bit = offset & 31UL, res;
+        unsigned int bit = offset & 31UL, res;
 
         if (offset >= size)
                 return size;

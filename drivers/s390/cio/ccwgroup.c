@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/ccwgroup.c
  *  bus driver for ccwgroup
- *   $Revision: 1.18 $
+ *   $Revision: 1.19 $
  *
  *    Copyright (C) 2002 IBM Deutschland Entwicklung GmbH,
  *                       IBM Corporation
@@ -344,7 +344,6 @@ ccwgroup_remove (struct device *dev)
 	pr_debug("%s: device %s\n", __func__, gdev->dev.name);
 
 	device_remove_file(dev, &dev_attr_online);
-	ccwgroup_set_offline(gdev);
 
 	if (gdrv && gdrv->remove)
 		gdrv->remove(gdev);
@@ -422,12 +421,11 @@ ccwgroup_remove_ccwdev(struct ccw_device *cdev)
 {
 	struct ccwgroup_device *gdev;
 
+	/* Ignore offlining errors, device is gone anyway. */
 	ccw_device_set_offline(cdev);
 	/* If one of its devices is gone, the whole group is done for. */
 	gdev = __ccwgroup_get_gdev_by_cdev(cdev);
 	if (gdev) {
-		// FIXME: ccwgroup_set_offline returns a status which is ignored
-		ccwgroup_set_offline(gdev);
 		__ccwgroup_remove_symlinks(gdev);
 		device_unregister(&gdev->dev);
 		put_device(&gdev->dev);

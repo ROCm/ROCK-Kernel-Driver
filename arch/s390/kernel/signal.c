@@ -167,6 +167,9 @@ static int restore_sigregs(struct pt_regs *regs, _sigregs *sregs)
 {
 	int err;
 
+	/* Alwys make any pending restarted system call return -EINTR */
+	current_thread_info()->restart_block.fn = do_no_restart_syscall;
+
 	err = __copy_from_user(regs, &sregs->regs, sizeof(_s390_regs_common));
 	regs->psw.mask = PSW_USER_BITS | (regs->psw.mask & PSW_MASK_CC);
 	regs->psw.addr |= PSW_ADDR_AMODE;

@@ -551,7 +551,7 @@ pfault_interrupt(struct pt_regs *regs, __u16 error_code)
 		return;
 
 	/*
-	 * Get the token (= address of kernel stack of affected task).
+	 * Get the token (= address of the task structure of the affected task).
 	 */
 	tsk = *(struct task_struct **) __LC_PFAULT_INTPARM;
 

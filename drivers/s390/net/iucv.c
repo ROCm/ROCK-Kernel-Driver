@@ -1,5 +1,5 @@
 /* 
- * $Id: iucv.c,v 1.17 2003/10/14 12:10:19 cohuck Exp $
+ * $Id: iucv.c,v 1.19 2003/12/18 15:28:49 braunu Exp $
  *
  * IUCV network driver
  *
@@ -29,7 +29,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
- * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.17 $
+ * RELEASE-TAG: IUCV lowlevel driver $Revision: 1.19 $
  *
  */
 
@@ -349,7 +349,7 @@ do { \
 static void
 iucv_banner(void)
 {
-	char vbuf[] = "$Revision: 1.17 $";
+	char vbuf[] = "$Revision: 1.19 $";
 	char *version = vbuf;
 
 	if ((version = strchr(version, ':'))) {
@@ -371,6 +371,11 @@ static int
 iucv_init(void)
 {
 	int ret;
+
+	if (!MACHINE_IS_VM) {
+		printk(KERN_ERR "IUCV: IUCV connection needs VM as base\n");
+		return -EPROTONOSUPPORT;
+	}
 
 	if (iucv_external_int_buffer)
 		return 0;
@@ -768,7 +773,7 @@ iucv_register_program (__u8 pgmname[16],
 	}
 
 	/* Allocate handler entry */
-	new_handler = (handler *)kmalloc(sizeof(handler), GFP_KERNEL);
+	new_handler = (handler *)kmalloc(sizeof(handler), GFP_ATOMIC);
 	if (new_handler == NULL) {
 		printk(KERN_WARNING "%s: storage allocation for new handler "
 		       "failed.\n", __FUNCTION__);
@@ -783,7 +788,7 @@ iucv_register_program (__u8 pgmname[16],
 
 		max_connections = iucv_query_maxconn();
 		iucv_pathid_table = kmalloc(max_connections * sizeof(handler *),
-				       GFP_KERNEL);
+				       GFP_ATOMIC);
 		if (iucv_pathid_table == NULL) {
 			printk(KERN_WARNING "%s: iucv_pathid_table storage "
 			       "allocation failed\n", __FUNCTION__);

@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999-2001
  *
- * $Revision: 1.119 $
+ * $Revision: 1.123 $
  */
 
 #include <linux/config.h>
@@ -871,6 +871,7 @@ dasd_handle_killed_request(struct ccw_device *cdev, unsigned long intparm)
 
 	dasd_clear_timer(device);
 	dasd_schedule_bh(device);
+	dasd_put_device(device);
 }
 
 static void
@@ -931,8 +932,10 @@ dasd_int_handler(struct ccw_device *cdev, unsigned long intparm,
 	mask = DEV_STAT_ATTENTION | DEV_STAT_DEV_END | DEV_STAT_UNIT_EXCEP;
 	if ((irb->scsw.dstat & mask) == mask) {
 		device = dasd_device_from_cdev(cdev);
-		if (!IS_ERR(device))
+		if (!IS_ERR(device)) {
 			dasd_handle_state_change_pending(device);
+			dasd_put_device(device);
+		}
 		return;
 	}
 
@@ -950,7 +953,6 @@ dasd_int_handler(struct ccw_device *cdev, unsigned long intparm,
 
 	device = (struct dasd_device *) cqr->device;
 	if (device == NULL ||
-	    device != dasd_device_from_cdev(cdev) ||
 	    strncmp(device->discipline->ebcname, (char *) &cqr->magic, 4)) {
 		MESSAGE(KERN_DEBUG, "invalid device in request: bus_id %s",
 			cdev->dev.bus_id);
@@ -1148,6 +1150,11 @@ __dasd_process_blk_queue(struct dasd_device * device)
 				  "(%s) Rejecting write request %p",
 				  device->cdev->dev.bus_id,
 				  req);
+			blkdev_dequeue_request(req);
+			dasd_end_request(req, 0);
+			continue;
+		}
+		if (device->stopped & DASD_STOPPED_DC_EIO) {
 			blkdev_dequeue_request(req);
 			dasd_end_request(req, 0);
 			continue;
@@ -1755,6 +1762,7 @@ dasd_generic_remove (struct ccw_device *cdev)
 	device = dasd_device_from_cdev(cdev);
 	if (!IS_ERR(device)) {
 		dasd_set_target_state(device, DASD_STATE_NEW);
+		/* dasd_delete_device destroys the device reference. */
 		dasd_delete_device(device);
 	}
 }
@@ -1803,6 +1811,8 @@ dasd_generic_set_online (struct ccw_device *cdev,
 	 * to wait for each single device but for all at once. */
 	wait_event(dasd_init_waitq, _wait_for_device(device));
 
+	dasd_put_device(device);
+
 	return rc;
 }
 
@@ -1816,10 +1826,58 @@ dasd_generic_set_offline (struct ccw_device *cdev)
 		printk (KERN_WARNING "Can't offline dasd device with open"
 			" count = %i.\n",
 			atomic_read(&device->open_count));
+		dasd_put_device(device);
 		return -EBUSY;
 	}
+	dasd_put_device(device);
 	dasd_generic_remove (cdev);
 	return 0;
+}
+
+int
+dasd_generic_notify(struct ccw_device *cdev, int event)
+{
+	struct dasd_device *device;
+	struct dasd_ccw_req *cqr;
+	unsigned long flags;
+	int ret;
+
+	device = dasd_device_from_cdev(cdev);
+	if (IS_ERR(device))
+		return 0;
+	spin_lock_irqsave(get_ccwdev_lock(cdev), flags);
+	ret = 0;
+	switch (event) {
+	case CIO_GONE:
+	case CIO_NO_PATH:
+		if (device->state < DASD_STATE_BASIC)
+			break;
+		/* Device is active. We want to keep it. */
+		if (device->disconnect_error_flag) {
+			list_for_each_entry(cqr, &device->ccw_queue, list)
+				if (cqr->status == DASD_CQR_IN_IO)
+					cqr->status = DASD_CQR_FAILED;
+			device->stopped |= DASD_STOPPED_DC_EIO;
+			dasd_schedule_bh(device);
+		} else {
+			list_for_each_entry(cqr, &device->ccw_queue, list)
+				if (cqr->status == DASD_CQR_IN_IO)
+					cqr->status = DASD_CQR_QUEUED;
+			device->stopped |= DASD_STOPPED_DC_WAIT;
+			dasd_set_timer(device, 0);
+		}
+		ret = 1;
+		break;
+	case CIO_OPER:
+		/* FIXME: add a sanity check. */
+		device->stopped &= ~(DASD_STOPPED_DC_WAIT|DASD_STOPPED_DC_EIO);
+		dasd_schedule_bh(device);
+		ret = 1;
+		break;
+	}
+	spin_unlock_irqrestore(get_ccwdev_lock(cdev), flags);
+	dasd_put_device(device);
+	return ret;
 }
 
 /*

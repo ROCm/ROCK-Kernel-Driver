@@ -46,8 +46,11 @@ debug_info_t *tape_dbf_area = NULL;
  */
 const char *tape_state_verbose[TS_SIZE] =
 {
-	[TS_UNUSED] = "UNUSED",	[TS_IN_USE] = "IN_USE",
-	[TS_INIT] = "INIT  ",	[TS_NOT_OPER] = "NOT_OP"
+	[TS_UNUSED]   = "UNUSED",
+	[TS_IN_USE]   = "IN_USE",
+	[TS_BLKUSE]   = "BLKUSE",
+	[TS_INIT]     = "INIT  ",
+	[TS_NOT_OPER] = "NOT_OP"
 };
 
 const char *tape_op_verbose[TO_SIZE] =
@@ -165,7 +168,7 @@ static struct attribute_group tape_attr_group = {
 /*
  * Tape state functions
  */
-static void
+void
 tape_state_set(struct tape_device *device, enum tape_state newstate)
 {
 	const char *str;
@@ -371,7 +374,6 @@ tape_disable_device(struct tape_device *device)
 	device->discipline->cleanup_device(device);
 	tape_remove_minor(device);
 
-	/* FIXME: This should be more something like TS_OFFLINE */
 	tape_med_state_set(device, MS_UNKNOWN);
 	device->tape_state = TS_INIT;
 }
@@ -464,7 +466,7 @@ tape_get_device(int devindex)
 	device = ERR_PTR(-ENODEV);
 	read_lock(&tape_device_lock);
 	list_for_each_entry(tmp, &tape_device_list, node) {
-		if (tmp->first_minor * TAPE_MINORS_PER_DEV == devindex) {
+		if (tmp->first_minor / TAPE_MINORS_PER_DEV == devindex) {
 			device = tape_get_device_reference(tmp);
 			break;
 		}
@@ -688,11 +690,14 @@ __tape_do_io(struct tape_device *device, struct tape_request *request)
 		case TO_MSEN:
 		case TO_ASSIGN:
 		case TO_UNASSIGN:
+		case TO_READ_ATTMSG:
 			if (device->tape_state == TS_INIT)
 				break;
 			if (device->tape_state == TS_UNUSED)
 				break;
 		default:
+			if (device->tape_state == TS_BLKUSE)
+				break;
 			if (device->tape_state != TS_IN_USE)
 				return -ENODEV;
 	}
@@ -732,6 +737,8 @@ int
 tape_do_io_async(struct tape_device *device, struct tape_request *request)
 {
 	int rc;
+
+	DBF_LH(6, "tape_do_io_async(%p, %p)\n", device, request);
 
 	spin_lock_irq(get_ccwdev_lock(device->cdev));
 	/* Add request to request queue and try to start it. */
@@ -945,6 +952,9 @@ tape_open(struct tape_device *device)
 	} else if (device->tape_state == TS_IN_USE) {
 		DBF_EVENT(6, "TAPE:dbusy\n");
 		rc = -EBUSY;
+	} else if (device->tape_state == TS_BLKUSE) {
+		DBF_EVENT(6, "TAPE:dbusy\n");
+		rc = -EBUSY;
 	} else if (device->discipline != NULL &&
 		   !try_module_get(device->discipline->owner)) {
 		DBF_EVENT(6, "TAPE:nodisc\n");
@@ -1073,7 +1083,7 @@ tape_init (void)
 #ifdef DBF_LIKE_HELL
 	debug_set_level(tape_dbf_area, 6);
 #endif
-	DBF_EVENT(3, "tape init: ($Revision: 1.36 $)\n");
+	DBF_EVENT(3, "tape init: ($Revision: 1.41 $)\n");
 	tape_proc_init();
 	tapechar_init ();
 	tapeblock_init ();
@@ -1098,7 +1108,7 @@ tape_exit(void)
 MODULE_AUTHOR("(C) 2001 IBM Deutschland Entwicklung GmbH by Carsten Otte and "
 	      "Michael Holzheu (cotte@de.ibm.com,holzheu@de.ibm.com)");
 MODULE_DESCRIPTION("Linux on zSeries channel attached "
-		   "tape device driver ($Revision: 1.36 $)");
+		   "tape device driver ($Revision: 1.41 $)");
 MODULE_LICENSE("GPL");
 
 module_init(tape_init);

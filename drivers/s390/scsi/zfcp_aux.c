@@ -28,7 +28,7 @@
  */
 
 /* this drivers version (do not edit !!! generated and updated by cvs) */
-#define ZFCP_AUX_REVISION "$Revision: 1.76 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.79 $"
 
 /********************** INCLUDES *********************************************/
 
@@ -316,6 +316,89 @@ zfcp_in_els_dbf_event(struct zfcp_adapter *adapter, const char *text,
 #endif
 }
 
+#ifndef MODULE
+/**
+ * zfcp_device_setup - setup function
+ * @str: pointer to parameter string
+ *
+ * Parse the kernel parameter string "zfcp_device=..."
+ */
+static int __init
+zfcp_device_setup(char *str)
+{
+	char *tmp;
+
+	tmp = strchr(str, ',');
+	if (!tmp)
+		goto err_out;
+	*tmp++ = '\0';
+	strncpy(zfcp_data.init_busid, str, BUS_ID_SIZE);
+	zfcp_data.init_busid[BUS_ID_SIZE-1] = '\0';
+
+	zfcp_data.init_wwpn = simple_strtoull(tmp, &tmp, 0);
+	if (*tmp++ != ',')
+		goto err_out;
+	if (*tmp == '\0')
+		goto err_out;
+
+	zfcp_data.init_fcp_lun = simple_strtoull(tmp, &tmp, 0);
+	if (*tmp != '\0')
+		goto err_out;
+
+	zfcp_data.init_is_valid = 1;
+	goto out;
+
+ err_out:
+	ZFCP_LOG_NORMAL("Parse error for parameter string %s\n", str);
+ out:
+	return 1;
+}
+
+__setup("zfcp_device=", zfcp_device_setup);
+
+static void __init
+zfcp_init_device_configure(void)
+{
+	int found = 0;
+	unsigned long flags;
+	struct zfcp_adapter *adapter;
+	struct zfcp_port *port;
+	struct zfcp_unit *unit;
+
+	down(&zfcp_data.config_sema);
+	read_lock_irqsave(&zfcp_data.config_lock, flags);
+	list_for_each_entry(adapter, &zfcp_data.adapter_list_head, list)
+		if (strcmp(zfcp_data.init_busid,
+			   zfcp_get_busid_by_adapter(adapter)) == 0) {
+			zfcp_adapter_get(adapter);
+			found = 1;
+			break;
+		}
+	read_unlock_irqrestore(&zfcp_data.config_lock, flags);
+	if (!found)
+		goto out_adapter;
+	port = zfcp_port_enqueue(adapter, zfcp_data.init_wwpn, 0);
+	if (!port)
+		goto out_port;
+	unit = zfcp_unit_enqueue(port, zfcp_data.init_fcp_lun);
+	if (!unit)
+		goto out_unit;
+	up(&zfcp_data.config_sema);
+	ccw_device_set_online(adapter->ccw_device);
+	down(&zfcp_data.config_sema);
+	wait_event(unit->scsi_add_wq, atomic_read(&unit->scsi_add_work) == 0);
+	zfcp_unit_put(unit);
+ out_unit:
+	zfcp_port_put(port);
+ out_port:
+	zfcp_adapter_put(adapter);
+ out_adapter:
+	up(&zfcp_data.config_sema);
+	return;
+}
+
+#endif  /* #ifndef MODULE */
+
 static int __init
 zfcp_module_init(void)
 {
@@ -357,6 +440,11 @@ zfcp_module_init(void)
 		ZFCP_LOG_NORMAL("Registering with common I/O layer failed.\n");
 		goto out_ccw_register;
 	}
+#ifndef MODULE
+	if (zfcp_data.init_is_valid)
+		zfcp_init_device_configure();
+#endif
+
 	goto out;
 
  out_ccw_register:
@@ -392,13 +480,8 @@ int
 zfcp_reboot_handler(struct notifier_block *notifier, unsigned long code,
 		    void *ptr)
 {
-	int retval = NOTIFY_DONE;
-
-	/* block access to config (for rest of lifetime of this Linux) */
-	down(&zfcp_data.config_sema);
-	zfcp_erp_adapter_shutdown_all();
-
-	return retval;
+	zfcp_ccw_unregister();
+	return NOTIFY_DONE;
 }
 
 #undef ZFCP_LOG_AREA
@@ -504,6 +587,7 @@ zfcp_unit_enqueue(struct zfcp_port *port, fcp_lun_t fcp_lun)
 		return NULL;
 	memset(unit, 0, sizeof (struct zfcp_unit));
 
+	init_waitqueue_head(&unit->scsi_add_wq);
 	/* initialise reference count stuff */
 	atomic_set(&unit->refcount, 0);
 	init_waitqueue_head(&unit->remove_wq);
@@ -899,7 +983,6 @@ zfcp_adapter_enqueue(struct ccw_device *ccw_device)
 	/* put allocated adapter at list tail */
 	write_lock_irq(&zfcp_data.config_lock);
 	atomic_clear_mask(ZFCP_STATUS_COMMON_REMOVE, &adapter->status);
-	atomic_set_mask(ZFCP_STATUS_COMMON_RUNNING, &adapter->status);
 	list_add_tail(&adapter->list, &zfcp_data.adapter_list_head);
 	write_unlock_irq(&zfcp_data.config_lock);
 

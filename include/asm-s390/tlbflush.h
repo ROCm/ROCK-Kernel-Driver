@@ -140,8 +140,7 @@ static inline void flush_tlb_range(struct vm_area_struct *vma,
 	__flush_tlb_mm(vma->vm_mm); 
 }
 
-#define flush_tlb_kernel_range(start, end) \
-	__flush_tlb_mm(&init_mm)
+#define flush_tlb_kernel_range(start, end) global_flush_tlb()
 
 #endif
 

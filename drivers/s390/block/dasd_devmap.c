@@ -11,7 +11,7 @@
  * functions may not be called from interrupt context. In particular
  * dasd_get_device is a no-no from interrupt context.
  *
- * $Revision: 1.23 $
+ * $Revision: 1.25 $
  */
 
 #include <linux/config.h>
@@ -460,7 +460,7 @@ dasd_create_device(struct ccw_device *cdev)
 	device = dasd_alloc_device();
 	if (IS_ERR(device))
 		return device;
-	atomic_set(&device->ref_count, 1);
+	atomic_set(&device->ref_count, 2);
 
 	spin_lock(&dasd_devmap_lock);
 	if (!devmap->device) {
@@ -491,7 +491,8 @@ dasd_create_device(struct ccw_device *cdev)
 static DECLARE_WAIT_QUEUE_HEAD(dasd_delete_wq);
 
 /*
- * Remove a dasd device structure.
+ * Remove a dasd device structure. The passed referenced
+ * is destroyed.
  */
 void
 dasd_delete_device(struct dasd_device *device)
@@ -502,11 +503,19 @@ dasd_delete_device(struct dasd_device *device)
 	/* First remove device pointer from devmap. */
 	devmap = dasd_find_busid(device->cdev->dev.bus_id);
 	spin_lock(&dasd_devmap_lock);
+	if (devmap->device != device) {
+		spin_unlock(&dasd_devmap_lock);
+		dasd_put_device(device);
+		return;
+	}
 	devmap->device = NULL;
 	spin_unlock(&dasd_devmap_lock);
 
+	/* Drop ref_count by 2, one for the devmap reference and
+	 * one for the passed reference. */
+	atomic_sub(2, &device->ref_count);
+
 	/* Wait for reference counter to drop to zero. */
-	atomic_dec(&device->ref_count);
 	wait_event(dasd_delete_wq, atomic_read(&device->ref_count) == 0);
 
 	/* Disconnect dasd_device structure from ccw_device structure. */
@@ -542,8 +551,10 @@ dasd_device_from_cdev(struct ccw_device *cdev)
 	device = ERR_PTR(-ENODEV);
 	spin_lock(&dasd_devmap_lock);
 	devmap = cdev->dev.driver_data;
-	if (devmap && devmap->device)
+	if (devmap && devmap->device) {
 		device = devmap->device;
+		dasd_get_device(device);
+	}
 	spin_unlock(&dasd_devmap_lock);
 	return device;
 }

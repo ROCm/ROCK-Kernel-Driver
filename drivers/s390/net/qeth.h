@@ -14,7 +14,7 @@
 
 #define QETH_NAME " qeth"
 
-#define VERSION_QETH_H "$Revision: 1.59 $"
+#define VERSION_QETH_H "$Revision: 1.60 $"
 
 /******************** CONFIG STUFF ***********************/
 //#define QETH_DBF_LIKE_HELL
@@ -894,8 +894,8 @@ struct qeth_card {	/* pointed to by dev->priv */
 	atomic_t is_open;	/* card is in use */
 
 	/* prevents deadlocks :-O */
-	spinlock_t softsetup_lock;
-	spinlock_t hardsetup_lock;
+	struct semaphore softsetup_sema;
+	struct semaphore hardsetup_sema;
 	spinlock_t ioctl_lock;
 	atomic_t softsetup_thread_is_running;
 	struct semaphore softsetup_thread_sem;

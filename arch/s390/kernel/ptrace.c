@@ -405,7 +405,7 @@ poke_user_emu31(struct task_struct *child, addr_t addr, addr_t data)
 			if ((tmp & ~PSW32_MASK_CC) != PSW32_USER_BITS)
 				/* Invalid psw mask. */
 				return -EINVAL;
-			__KSTK_PTREGS(child)->psw.mask = PSW_USER_BITS |
+			__KSTK_PTREGS(child)->psw.mask = PSW_USER32_BITS |
 				((tmp & PSW32_MASK_CC) << 32);
 		} else if (addr == (addr_t) &dummy32->regs.psw.addr) {
 			/* Build a 64 bit psw address from 31 bit address. */
