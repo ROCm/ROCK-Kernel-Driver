@@ -486,11 +486,10 @@ static struct chipset_bus_clock_list_entry sixty_six_base_hpt374[] = {
 static struct pci_dev *hpt_devs[HPT366_MAX_DEVS];
 static int n_hpt_devs;
 
-static u8 hpt366_proc = 0;
-
 static unsigned int hpt_min_rev(struct pci_dev *dev, int rev);
 
 #if defined(DISPLAY_HPT366_TIMINGS) && defined(CONFIG_PROC_FS)
+static u8 hpt366_proc = 0;
 static int hpt366_get_info(char *, char **, off_t, int);
 extern int (*hpt366_display_info)(char *, char **, off_t, int); /* ide-proc.c */
 
@@ -788,9 +787,6 @@ static int hpt3xx_tune_chipset(struct ata_device *drive, byte speed)
 	if ((drive->type != ATA_DISK) && (speed < XFER_SW_DMA_0))
 		return -1;
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
-
 	if (hpt_min_rev(dev, 7)) {
 		hpt374_tune_chipset(drive, speed);
 	} else if (hpt_min_rev(dev, 5)) {
@@ -863,9 +859,6 @@ static int config_chipset_for_dma(struct ata_device *drive)
 	struct pci_dev *dev = drive->channel->pci_dev;
 	int map;
 	byte mode;
-
-	/* FIXME: remove this --bkz */
-	config_chipset_for_pio(drive);
 
 	if (drive->type != ATA_DISK)
 		return 0;

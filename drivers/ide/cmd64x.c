@@ -537,8 +537,6 @@ static int cmd64x_tune_chipset(struct ata_device *drive, byte speed)
 	(void) pci_write_config_byte(dev, pciU, regU);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
@@ -657,8 +655,6 @@ speed_break :
 	pci_write_config_word(dev, dma_pci, multi);
 	pci_write_config_word(dev, udma_pci, ultra);
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 	return ide_config_drive_speed(drive, speed);

@@ -187,8 +187,6 @@ static int it8172_tune_chipset (struct ata_device *drive, byte speed)
 
     it8172_tune_drive(drive, it8172_dma_2_pio(speed));
 
-    if (!drive->init_speed)
-	drive->init_speed = speed;
     err = ide_config_drive_speed(drive, speed);
     drive->current_speed = speed;
     return err;

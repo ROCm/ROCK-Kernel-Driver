@@ -123,8 +123,6 @@ static int aec_set_drive(struct ata_device *drive, unsigned char speed)
 	else
 		aec_set_speed_new(drive->channel->pci_dev, drive->dn, &t);
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 	return 0;

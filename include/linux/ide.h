@@ -393,7 +393,6 @@ struct ata_device {
 	int		crc_count;	/* crc counter to reduce drive speed */
 	byte		quirk_list;	/* drive is considered quirky if set for a specific host */
 	byte		suspend_reset;	/* drive suspend mode flag, soft-reset recovers */
-	byte		init_speed;	/* transfer rate set at boot */
 	byte		current_speed;	/* current transfer rate set */
 	byte		dn;		/* now wide spread use */
 	byte		wcache;		/* status of write cache */

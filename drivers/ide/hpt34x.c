@@ -137,8 +137,6 @@ static int hpt34x_tune_chipset(struct ata_device *drive, byte speed)
 		hi_speed, lo_speed, err);
 #endif
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 	return ide_config_drive_speed(drive, speed);
 }

@@ -357,8 +357,6 @@ static int svwks_tune_chipset(struct ata_device *drive, byte speed)
 	pci_write_config_byte(dev, drive_pci3, ultra_timing);
 	pci_write_config_byte(dev, 0x54, ultra_enable);
 #endif
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 	return ide_config_drive_speed(drive, speed);

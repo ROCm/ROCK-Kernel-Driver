@@ -1,6 +1,6 @@
 /**** vi:set ts=8 sts=8 sw=8:************************************************
  *
- *  linux/drivers/ide/pdc202xx.c	Version 0.30	Mar. 18, 2000
+ *  linux/drivers/ide/pdc202xx.c	Version 0.30	May. 28, 2002
  *
  *  Copyright (C) 1998-2000	Andre Hedrick <andre@linux-ide.org>
  *  May be copied or modified under the terms of the GNU General Public License
@@ -61,6 +61,10 @@
 #define	IORDY_EN	0x20	/* PIO: IOREADY */
 #define	PREFETCH_EN	0x10	/* PIO: PREFETCH */
 
+
+#define PDC_CLOCK(high_16) IN_BYTE(high_16 + 0x11)
+#define UDMA_SPEED_FLAG(high_16) IN_BYTE(high_16 + 0x001f)
+
 #if PDC202XX_DECODE_REGISTER_INFO
 
 struct pdc_bit_messages {
@@ -119,6 +123,13 @@ static void pdc_dump_bits(struct pdc_bit_messages *msgs, byte bits)
 }
 #endif /* PDC202XX_DECODE_REGISTER_INFO */
 
+
+static inline int init_high_16 (struct pci_dev *dev)
+{
+	return pci_resource_start(dev, 4);
+}
+
+
 int check_in_drive_lists(struct ata_device *drive)
 {
 	static const char *pdc_quirk_drives[] = {
@@ -172,7 +183,7 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 	struct pci_dev *dev = hwif->pci_dev;
 
 	unsigned int		drive_conf;
-	byte			drive_pci, AP, BP, CP, DP;
+	byte			drive_pci, AP, BP, CP;
 	byte			TA = 0, TB = 0, TC = 0;
 
 	if (drive->dn > 3)
@@ -187,7 +198,6 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 	pci_read_config_byte(dev, (drive_pci), &AP);
 	pci_read_config_byte(dev, (drive_pci)|0x01, &BP);
 	pci_read_config_byte(dev, (drive_pci)|0x02, &CP);
-	pci_read_config_byte(dev, (drive_pci)|0x03, &DP);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (speed >= XFER_SW_DMA_0) {
@@ -198,10 +208,9 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 			/* clear DMA modes of lower 8421 bits of C Register */
 			pci_write_config_byte(dev, (drive_pci)|0x02, CP & ~0x0F);
 		}
-	} else {
-#else
-	{
+	} else
 #endif /* CONFIG_BLK_DEV_IDEDMA */
+	{
 		if ((AP & 0x0F) || (BP & 0x07)) {
 			/* clear PIO modes of lower 8421 bits of A Register */
 			pci_write_config_byte(dev, (drive_pci), AP & ~0x0F);
@@ -242,10 +251,9 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
         if (speed >= XFER_SW_DMA_0) {
 		pci_write_config_byte(dev, (drive_pci)|0x01, BP|TB);
 		pci_write_config_byte(dev, (drive_pci)|0x02, CP|TC);
-	} else {
-#else
-	{
+	} else
 #endif /* CONFIG_BLK_DEV_IDEDMA */
+	{
 		pci_write_config_byte(dev, (drive_pci), AP|TA);
 		pci_write_config_byte(dev, (drive_pci)|0x01, BP|TB);
 	}
@@ -269,8 +277,6 @@ static int pdc202xx_tune_chipset(struct ata_device *drive, byte speed)
 	printk(KERN_DEBUG "DP(%x)\n", DP);
 #endif
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 #if PDC202XX_DEBUG_DRIVE_INFO
@@ -300,7 +306,7 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 	unsigned long indexreg	= (hwif->dma_base + 1);
 	unsigned long datareg	= (hwif->dma_base + 3);
 #else
-	unsigned long high_16	= pci_resource_start(hwif->pci_dev, 4);
+	unsigned long high_16	= init_high_16(hwif->pci_dev);
 	unsigned long indexreg	= high_16 + (hwif->unit ? 0x09 : 0x01);
 	unsigned long datareg	= (indexreg + 2);
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -394,8 +400,6 @@ static int pdc202xx_new_tune_chipset(struct ata_device *drive, byte speed)
 			;
 	}
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 	return ide_config_drive_speed(drive, speed);
@@ -427,7 +431,7 @@ static int config_chipset_for_dma(struct ata_device *drive, byte udma)
 	struct ata_channel *hwif = drive->channel;
 	struct hd_driveid *mate_id = hwif->drives[!(drive->dn%2)].id;
 	struct pci_dev *dev	= hwif->pci_dev;
-	unsigned long high_16   = pci_resource_start(dev, 4);
+	unsigned long high_16   = init_high_16(dev);
 	unsigned long dma_base  = hwif->dma_base;
 	unsigned long indexreg	= dma_base + 1;
 	unsigned long datareg	= dma_base + 3;
@@ -458,7 +462,7 @@ static int config_chipset_for_dma(struct ata_device *drive, byte udma)
 	}
 
 	if (!jumpbit)
-		CLKSPD = IN_BYTE(high_16 + 0x11);
+		CLKSPD = PDC_CLOCK(high_16);
 	/*
 	 * Set the control register to use the 66Mhz system
 	 * clock for UDMA 3/4 mode operation. If one drive on
@@ -568,12 +572,9 @@ static int config_drive_xfer_rate(struct ata_device *drive)
 
 	if (id && (id->capability & 1) && hwif->autodma) {
 		/* Consult the list of known "bad" drives */
-		if (udma_black_list(drive)) {
-			on = 0;
-			goto fast_ata_pio;
-		}
-		on = 0;
 		verbose = 0;
+		if (udma_black_list(drive))
+			goto no_dma_set;
 		if (id->field_valid & 4) {
 			if (id->dma_ultra & 0x007F) {
 				/* Force if Capable UltraDMA */
@@ -599,13 +600,8 @@ try_dma_modes:
 			on = config_chipset_for_dma(drive, 0);
 			if (!on)
 				goto no_dma_set;
-		} else {
-			goto fast_ata_pio;
-		}
+		} else goto no_dma_set;
 	} else if ((id->capability & 8) || (id->field_valid & 2)) {
-fast_ata_pio:
-		on = 0;
-		verbose = 0;
 no_dma_set:
 		config_chipset_for_pio(drive, 5);
 	}
@@ -618,12 +614,12 @@ no_dma_set:
 static int pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
 {
 	struct ata_channel *ch = drive->channel;
-	unsigned long high_16 = pci_resource_start(ch->pci_dev, 4);
+	unsigned long high_16 = init_high_16(ch->pci_dev);
 	unsigned long atapi_reg = high_16 + (ch->unit ? 0x24 : 0x00);
 
 	if (drive->addressing) {
 		unsigned long word_count = 0;
-		u8 clock = IN_BYTE(high_16 + 0x11);
+		u8 clock = PDC_CLOCK(high_16);
 
 		outb(clock|(ch->unit ? 0x08 : 0x02), high_16 + 0x11);
 		word_count = (rq->nr_sectors << 8);
@@ -644,14 +640,14 @@ static int pdc202xx_udma_start(struct ata_device *drive, struct request *rq)
 int pdc202xx_udma_stop(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
-	unsigned long high_16 = pci_resource_start(ch->pci_dev, 4);
+	unsigned long high_16 = init_high_16(ch->pci_dev);
 	unsigned long atapi_reg	= high_16 + (ch->unit ? 0x24 : 0x00);
 	unsigned long dma_base = ch->dma_base;
 	u8 dma_stat, clock;
 
 	if (drive->addressing) {
 		outl(0, atapi_reg);	/* zero out extra */
-		clock = IN_BYTE(high_16 + 0x11);
+		clock = PDC_CLOCK(high_16);
 		OUT_BYTE(clock & ~(ch->unit ? 0x08:0x02), high_16 + 0x11);
 	}
 
@@ -667,22 +663,10 @@ int pdc202xx_udma_stop(struct ata_device *drive)
 static int pdc202xx_udma_irq_status(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
-	unsigned long high_16 = pci_resource_start(ch->pci_dev, 4);
-	u8 dma_stat, sc1d;
+	u8 dma_stat;
 
 	dma_stat = IN_BYTE(ch->dma_base + 2);
 
-	sc1d = IN_BYTE(high_16 + 0x001d);
-	if (ch->unit) {
-		if ((sc1d & 0x50) == 0x50) goto somebody_else;
-		else if ((sc1d & 0x40) == 0x40)
-			return (dma_stat & 4) == 4;
-	} else {
-		if ((sc1d & 0x05) == 0x05) goto somebody_else;
-		else if ((sc1d & 0x04) == 0x04)
-			return (dma_stat & 4) == 4;
-	}
-somebody_else:
 	return (dma_stat & 4) == 4;	/* return 1 if INTR asserted */
 }
 
@@ -710,8 +694,8 @@ void pdc202xx_new_reset(struct ata_device *drive)
 
 void pdc202xx_reset(struct ata_device *drive)
 {
-	unsigned long high_16	= pci_resource_start(drive->channel->pci_dev, 4);
-	byte udma_speed_flag	= IN_BYTE(high_16 + 0x001f);
+	unsigned long high_16	= init_high_16(drive->channel->pci_dev);
+	byte udma_speed_flag	= UDMA_SPEED_FLAG(high_16);
 
 	set_reg_and_wait(udma_speed_flag | 0x10, high_16 + 0x001f, 100);
 	set_reg_and_wait(udma_speed_flag & ~0x10, high_16 + 0x001f, 2000);		/* 2 seconds ?! */
@@ -722,8 +706,8 @@ void pdc202xx_reset(struct ata_device *drive)
 /* FIXME: should be splited for old & new chipsets --bkz */
 static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 {
-	unsigned long high_16	= pci_resource_start(dev, 4);
-	byte udma_speed_flag	= IN_BYTE(high_16 + 0x001f);
+	unsigned long high_16	= init_high_16(dev);
+	byte udma_speed_flag	= UDMA_SPEED_FLAG(high_16);
 	byte primary_mode	= IN_BYTE(high_16 + 0x001a);
 	byte secondary_mode	= IN_BYTE(high_16 + 0x001b);
 	byte newchip		= 0;
@@ -788,7 +772,7 @@ static unsigned int __init pdc202xx_init_chipset(struct pci_dev *dev)
 	if (!(udma_speed_flag & 1)) {
 		printk("%s: FORCING BURST BIT 0x%02x -> 0x%02x ", dev->name, udma_speed_flag, (udma_speed_flag|1));
 		OUT_BYTE(udma_speed_flag|1, high_16 + 0x001f);
-		printk("%sCTIVE\n", (IN_BYTE(high_16 + 0x001f) & 1) ? "A" : "INA");
+		printk("%sCTIVE\n", (UDMA_SPEED_FLAG(high_16) & 1) ? "A" : "INA");
 	}
 #endif /* CONFIG_PDC202XX_BURST */
 
@@ -856,16 +840,13 @@ static void __init ide_init_pdc202xx(struct ata_channel *hwif)
 		hwif->highmem = 1;
 		if (!noautodma)
 			hwif->autodma = 1;
-	} else {
+	} else
+#endif
+	{
 		hwif->drives[0].autotune = 1;
 		hwif->drives[1].autotune = 1;
 		hwif->autodma = 0;
 	}
-#else
-	hwif->drives[0].autotune = 1;
-	hwif->drives[1].autotune = 1;
-	hwif->autodma = 0;
-#endif
 }
 
 
@@ -980,9 +961,8 @@ int __init init_pdc202xx(void)
 {
 	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
 		ata_register_chipset(&chipsets[i]);
-	}
 
         return 0;
 }

@@ -362,9 +362,6 @@ icside_config_if(struct ata_device *drive, int xfer_mode)
 
 	drive->drive_data = cycle_time;
 
-	if (!drive->init_speed)
-		drive->init_speed = xfer_mode;
-
 	if (cycle_time && ide_config_drive_speed(drive, xfer_mode) == 0)
 		on = 1;
 	else

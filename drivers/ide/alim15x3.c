@@ -377,8 +377,6 @@ static int ali15x3_tune_chipset(struct ata_device *drive, byte speed)
 	}
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-	if (!drive->init_speed)
-		drive->init_speed = speed;
 	drive->current_speed = speed;
 
 	return ide_config_drive_speed(drive, speed);
