@@ -558,6 +558,19 @@ void bio_set_pages_dirty(struct bio *bio)
 	}
 }
 
+void bio_release_pages(struct bio *bio)
+{
+	struct bio_vec *bvec = bio->bi_io_vec;
+	int i;
+
+	for (i = 0; i < bio->bi_vcnt; i++) {
+		struct page *page = bvec[i].bv_page;
+
+		if (page)
+			put_page(page);
+	}
+}
+
 /*
  * bio_check_pages_dirty() will check that all the BIO's pages are still dirty.
  * If they are, then fine.  If, however, some pages are clean then they must
@@ -592,6 +605,7 @@ static void bio_dirty_fn(void *data)
 		struct bio *next = bio->bi_private;
 
 		bio_set_pages_dirty(bio);
+		bio_release_pages(bio);
 		bio_put(bio);
 		bio = next;
 	}
