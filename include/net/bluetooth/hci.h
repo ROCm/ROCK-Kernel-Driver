@@ -304,6 +304,8 @@ struct hci_cp_inquiry {
 	__u8     num_rsp;
 } __attribute__ ((packed));
 
+#define OCF_INQUIRY_CANCEL	0x0002
+
 #define OCF_LINK_KEY_REPLY	0x000B
 #define OCF_LINK_KEY_NEG_REPLY	0x000C
 struct hci_cp_link_key_reply {
