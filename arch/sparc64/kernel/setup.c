@@ -40,6 +40,7 @@
 #include <asm/head.h>
 #include <asm/starfire.h>
 #include <asm/hardirq.h>
+#include <asm/mmu_context.h>
 
 #ifdef CONFIG_IP_PNP
 #include <net/ipconfig.h>
