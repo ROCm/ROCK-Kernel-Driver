@@ -590,9 +590,7 @@ static irqreturn_t isicom_interrupt(int irq, void *dev_id,
 							port->status &= ~ISI_DCD;
 							if (!((port->flags & ASYNC_CALLOUT_ACTIVE) &&
 								(port->flags & ASYNC_CALLOUT_NOHUP))) {
-								MOD_INC_USE_COUNT;
-								if (schedule_task(&port->hangup_tq) == 0)
-									MOD_DEC_USE_COUNT;
+								schedule_task(&port->hangup_tq);
 							}
 						}
 					}
@@ -846,7 +844,6 @@ static inline void isicom_setup_board(struct isi_board * bp)
 #endif	
 	
 	bp->status |= BOARD_ACTIVE;
-	MOD_INC_USE_COUNT;
 	return;
 }
  
@@ -1104,7 +1101,6 @@ static inline void isicom_shutdown_board(struct isi_board * bp)
 	for(channel = 0; channel < bp->port_count; channel++, port++) {
 		drop_dtr_rts(port);
 	}	
-	MOD_DEC_USE_COUNT;
 }
 
 static void isicom_shutdown_port(struct isi_port * port)
@@ -1644,7 +1640,6 @@ static void do_isicom_hangup(void * data)
 	tty = port->tty;
 	if (tty)
 		tty_hangup(tty);	/* FIXME: module removal race here - AKPM */
-	MOD_DEC_USE_COUNT;
 }
 
 static void isicom_hangup(struct tty_struct * tty)
@@ -1715,6 +1710,7 @@ static int register_drivers(void)
 	/* tty driver structure initialization */
 	memset(&isicom_normal, 0, sizeof(struct tty_driver));
 	isicom_normal.magic	= TTY_DRIVER_MAGIC;
+	isicom_normal.owner	= THIS_MODULE;
 	isicom_normal.name 	= "ttyM";
 	isicom_normal.major	= ISICOM_NMAJOR;
 	isicom_normal.minor_start	= 0;
