@@ -18,11 +18,11 @@
 #include <asm/cachectl.h>
 #include <asm/cpu.h>
 #include <asm/mipsregs.h>
+#include <asm/prefetch.h>
 #include <asm/system.h>
 
 #ifdef CONFIG_SGI_IP27
 #include <asm/sn/types.h>
-#include <asm/sn/intr_public.h>
 #endif
 
 /*
@@ -53,7 +53,6 @@ struct cpuinfo_mips {
 	cnodeid_t	p_nodeid;	/* my node ID in compact-id-space */
 	nasid_t		p_nasid;	/* my node ID in numa-as-id-space */
 	unsigned char	p_slice;	/* Physical position on node board */
-	struct hub_intmasks_s p_intmasks; /* SN0 per-CPU interrupt masks */
 #endif
 #if 0
 	unsigned long		loops_per_sec;
@@ -77,6 +76,7 @@ struct cpuinfo_mips {
 	struct cache_desc	dcache;	/* Primary D or combined I/D cache */
 	struct cache_desc	scache;	/* Secondary cache */
 	struct cache_desc	tcache;	/* Tertiary/split secondary cache */
+	void 			*data;	/* Additional data */
 } __attribute__((aligned(SMP_CACHE_BYTES)));
 
 extern struct cpuinfo_mips cpu_data[];
@@ -286,5 +286,21 @@ static inline unsigned long long sched_clock(void)
 {
 	return 0ULL;
 }
+
+#ifdef CONFIG_CPU_HAS_PREFETCH
+
+#define ARCH_HAS_PREFETCH
+
+extern inline void prefetch(const void *addr)
+{
+	__asm__ __volatile__(
+	"	.set	mips4		\n"
+	"	pref	%0, (%1)	\n"
+	"	.set	mips0		\n"
+	:
+	: "i" (Pref_Load), "r" (addr));
+}
+
+#endif
 
 #endif /* _ASM_PROCESSOR_H */

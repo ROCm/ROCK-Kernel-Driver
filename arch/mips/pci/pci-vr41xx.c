@@ -159,7 +159,7 @@ void __init vr41xx_pciu_init(struct vr41xx_pci_address_map *map)
 	writew(0, MPCIINTREG);
 
 	/* Supply VTClock to PCIU */
-	vr41xx_clock_supply(PCIU_CLOCK);
+	vr41xx_supply_clock(PCIU_CLOCK);
 
 	/*
 	 * Sleep for 1us after setting MSKPPCIU bit in CMUCLKMSK
@@ -179,7 +179,7 @@ void __init vr41xx_pciu_init(struct vr41xx_pci_address_map *map)
 		printk(KERN_INFO "Warning: PCI Clock is over 33MHz.\n");
 
 	/* Supply PCI clock by PCI bus */
-	vr41xx_clock_supply(PCI_CLOCK);
+	vr41xx_supply_clock(PCI_CLOCK);
 
 	/*
 	 * Set PCI memory & I/O space address conversion registers

@@ -220,6 +220,7 @@ static int orinoco_pci_init_one(struct pci_dev *pdev,
 	dev->mem_end = pci_iorange + pci_iolen - 1;
 
 	SET_MODULE_OWNER(dev);
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	printk(KERN_DEBUG
 	       "Detected Orinoco/Prism2 PCI device at %s, mem:0x%lX to 0x%lX -> 0x%p, irq:%d\n",
@@ -276,9 +277,6 @@ static void __devexit orinoco_pci_remove_one(struct pci_dev *pdev)
 {
 	struct net_device *dev = pci_get_drvdata(pdev);
 	struct orinoco_private *priv = dev->priv;
-
-	if (! dev)
-		BUG();
 
 	unregister_netdev(dev);
 

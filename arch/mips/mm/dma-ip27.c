@@ -29,7 +29,7 @@ void *dma_alloc_noncoherent(struct device *dev, size_t size,
 	/* ignore region specifiers */
 	gfp &= ~(__GFP_DMA | __GFP_HIGHMEM);
 
-	if (dev == NULL || (*dev->dma_mask < 0xffffffff))
+	if (dev == NULL || (dev->coherent_dma_mask < 0xffffffff))
 		gfp |= GFP_DMA;
 	ret = (void *) __get_free_pages(gfp, get_order(size));
 
@@ -175,6 +175,13 @@ void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nele
 
 EXPORT_SYMBOL(dma_sync_sg_for_device);
 
+int dma_mapping_error(dma_addr_t dma_addr)
+{
+	return 0;
+}
+
+EXPORT_SYMBOL(dma_mapping_error);
+
 int dma_supported(struct device *dev, u64 mask)
 {
 	/*
@@ -213,7 +220,7 @@ dma64_addr_t pci_dac_page_to_dma(struct pci_dev *pdev,
 	return (dma64_addr_t) pdev_to_baddr(pdev, addr);
 }
 
-EXPORT_SYMBOL(dma_cache_sync);
+EXPORT_SYMBOL(pci_dac_page_to_dma);
 
 struct page *pci_dac_dma_to_page(struct pci_dev *pdev,
 	dma64_addr_t dma_addr)

@@ -1127,7 +1127,7 @@ rpciod(void *ptr)
 		__rpc_schedule();
 		if (current->flags & PF_FREEZE) {
 			spin_unlock_bh(&rpc_queue_lock);
-			refrigerator(PF_IOTHREAD);
+			refrigerator(PF_FREEZE);
 			spin_lock_bh(&rpc_queue_lock);
 		}
 

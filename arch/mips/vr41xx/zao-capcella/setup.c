@@ -1,7 +1,7 @@
 /*
  *  setup.c, Setup for the ZAO Networks Capcella.
  *
- *  Copyright (C) 2002-2003  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
+ *  Copyright (C) 2002-2004  Yoichi Yuasa <yuasa@hh.iij4u.or.jp>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
@@ -18,20 +18,11 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
 #include <linux/config.h>
-#include <linux/init.h>
 #include <linux/ioport.h>
-#include <linux/major.h>
-#include <linux/kdev_t.h>
-#include <linux/root_dev.h>
 
+#include <asm/io.h>
 #include <asm/pci_channel.h>
-#include <asm/time.h>
 #include <asm/vr41xx/capcella.h>
-
-#ifdef CONFIG_BLK_DEV_INITRD
-extern unsigned long initrd_start, initrd_end;
-extern void * __rd_start, * __rd_end;
-#endif
 
 #ifdef CONFIG_PCI
 static struct resource vr41xx_pci_io_resource = {
@@ -81,28 +72,16 @@ static struct vr41xx_pci_address_map pci_address_map = {
 };
 #endif
 
-static void __init zao_capcella_setup(void)
+const char *get_system_type(void)
+{
+	return "ZAO Networks Capcella";
+}
+
+static int zao_capcella_setup(void)
 {
 	set_io_port_base(IO_PORT_BASE);
 	ioport_resource.start = IO_PORT_RESOURCE_START;
 	ioport_resource.end = IO_PORT_RESOURCE_END;
-	iomem_resource.start = IO_MEM1_RESOURCE_START;
-	iomem_resource.end = IO_MEM2_RESOURCE_END;
-
-#ifdef CONFIG_BLK_DEV_INITRD
-	ROOT_DEV = Root_RAM0;
-	initrd_start = (unsigned long)&__rd_start;
-	initrd_end = (unsigned long)&__rd_end;
-#endif
-
-	board_time_init = vr41xx_time_init;
-	board_timer_setup = vr41xx_timer_setup;
-
-	vr41xx_bcu_init();
-
-	vr41xx_cmu_init();
-
-	vr41xx_pmu_init();
 
 #ifdef CONFIG_SERIAL_8250
 	vr41xx_siu_init(SIU_RS232C, 0);
@@ -112,6 +91,8 @@ static void __init zao_capcella_setup(void)
 #ifdef CONFIG_PCI
 	vr41xx_pciu_init(&pci_address_map);
 #endif
+
+	return 0;
 }
 
 early_initcall(zao_capcella_setup);

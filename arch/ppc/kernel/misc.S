@@ -1372,4 +1372,16 @@ _GLOBAL(sys_call_table)
 	.long sys_statfs64
 	.long sys_fstatfs64
 	.long ppc_fadvise64_64
-	.long sys_ni_syscall	/* 255 - rtas (used on ppc64) */
+	.long sys_ni_syscall		/* 255 - rtas (used on ppc64) */
+	.long sys_ni_syscall		/* 256 reserved for sys_debug_setcontext */
+	.long sys_ni_syscall		/* 257 reserved for vserver */
+	.long sys_ni_syscall		/* 258 reserved for new sys_remap_file_pages */
+	.long sys_ni_syscall		/* 259 reserved for new sys_mbind */
+	.long sys_ni_syscall		/* 260 reserved for new sys_get_mempolicy */
+	.long sys_ni_syscall		/* 261 reserved for new sys_set_mempolicy */
+	.long sys_mq_open
+	.long sys_mq_unlink
+	.long sys_mq_timedsend
+	.long sys_mq_timedreceive	/* 265 */
+	.long sys_mq_notify
+	.long sys_mq_getsetattr

@@ -56,8 +56,6 @@
 
 #else
 
-void swarm_setup(void);
-
 #ifdef LEDS_PHYS
 extern void setleds(char *str);
 #else

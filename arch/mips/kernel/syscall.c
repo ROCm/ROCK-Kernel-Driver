@@ -63,6 +63,13 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 {
 	struct vm_area_struct * vmm;
 	int do_color_align;
+	unsigned long task_size;
+
+#if CONFIG_MIPS32
+	task_size = TASK_SIZE;
+#else
+	task_size = (current->thread.mflags & MF_32BIT_ADDR) ? TASK_SIZE32 : TASK_SIZE;
+#endif
 
 	if (flags & MAP_FIXED) {
 		/*
@@ -74,7 +81,7 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		return addr;
 	}
 
-	if (len > TASK_SIZE)
+	if (len > task_size)
 		return -ENOMEM;
 	do_color_align = 0;
 	if (filp || (flags & MAP_SHARED))
@@ -85,7 +92,7 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 		else
 			addr = PAGE_ALIGN(addr);
 		vmm = find_vma(current->mm, addr);
-		if (TASK_SIZE - len >= addr &&
+		if (task_size - len >= addr &&
 		    (!vmm || addr + len <= vmm->vm_start))
 			return addr;
 	}
@@ -97,7 +104,7 @@ unsigned long arch_get_unmapped_area(struct file *filp, unsigned long addr,
 
 	for (vmm = find_vma(current->mm, addr); ; vmm = vmm->vm_next) {
 		/* At this point:  (!vmm || addr < vmm->vm_end). */
-		if (TASK_SIZE - len < addr)
+		if (task_size - len < addr)
 			return -ENOMEM;
 		if (!vmm || addr + len <= vmm->vm_start)
 			return addr;
@@ -363,6 +370,22 @@ asmlinkage int sys_ipc (uint call, int first, int second,
 	default:
 		return -ENOSYS;
 	}
+}
+
+/*
+ * Native ABI that is O32 or N64 version
+ */
+asmlinkage long sys_shmat(int shmid, char __user *shmaddr,
+                          int shmflg, unsigned long *addr)
+{
+	unsigned long raddr;
+	int err;
+
+	err = do_shmat(shmid, shmaddr, shmflg, &raddr);
+	if (err)
+		return err;
+
+	return put_user(raddr, addr);
 }
 
 /*

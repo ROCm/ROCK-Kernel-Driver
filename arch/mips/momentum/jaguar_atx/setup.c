@@ -1,6 +1,4 @@
 /*
- * setup.c
- *
  * BRIEF MODULE DESCRIPTION
  * Momentum Computer Jaguar-ATX board dependent boot routines
  *
@@ -42,15 +40,16 @@
  *  675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <linux/config.h>
+#include <linux/bcd.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/mm.h>
+#include <linux/bootmem.h>
 #include <linux/swap.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>
 #include <linux/interrupt.h>
-#include <linux/pci.h>
 #include <linux/timex.h>
 #include <linux/vmalloc.h>
 #include <asm/time.h>
@@ -59,16 +58,15 @@
 #include <asm/io.h>
 #include <asm/irq.h>
 #include <asm/pci.h>
+#include <asm/pci_channel.h>
 #include <asm/processor.h>
 #include <asm/ptrace.h>
 #include <asm/reboot.h>
-#include <linux/bootmem.h>
-#include <linux/blk.h>
+#include <asm/tlbflush.h>
 #include <asm/mv64340.h>
+
 #include "jaguar_atx_fpga.h"
 
-
-unsigned long mv64340_base;
 extern unsigned long mv64340_sram_base;
 unsigned long cpu_clock;
 
@@ -81,78 +79,88 @@ void momenco_time_init(void);
 
 static char reset_reason;
 
-#define ENTRYLO(x) ((pte_val(mk_pte_phys((x), PAGE_KERNEL_UNCACHED)) >> 6)|1)
+static inline unsigned long ENTRYLO(unsigned long paddr)
+{
+	return ((paddr & PAGE_MASK) |
+	       (_PAGE_PRESENT | __READABLE | __WRITEABLE | _PAGE_GLOBAL |
+		_CACHE_UNCACHED)) >> 6;
+}
 
 void __init bus_error_init(void) { /* nothing */ }
 
-/* setup code for a handoff from a version 2 PMON 2000 PROM */
-void PMON_v2_setup(void)
+/*
+ * Load a few TLB entries for the MV64340 and perhiperals. The MV64340 is going
+ * to be hit on every IRQ anyway - there's absolutely no point in letting it be
+ * a random TLB entry, as it'll just cause needless churning of the TLB. And we
+ * use the other half for the serial port, which is just a PITA otherwise :)
+ *
+ *	Device			Physical	Virtual
+ *	MV64340 Internal Regs	0xf4000000	0xf4000000
+ *	Ocelot-C[S] PLD (CS0)	0xfc000000	0xfc000000
+ *	NVRAM (CS1)		0xfc800000	0xfc800000
+ *	UARTs (CS2)		0xfd000000	0xfd000000
+ *	Internal SRAM		0xfe000000	0xfe000000
+ *	M-Systems DOC (CS3)	0xff000000	0xff000000
+ */
+
+static __init void wire_stupidity_into_tlb(void)
 {
-	/* Some wired TLB entries for the MV64340 and perhiperals. The
-	   MV64340 is going to be hit on every IRQ anyway - there's
-	   absolutely no point in letting it be a random TLB entry, as
-	   it'll just cause needless churning of the TLB. And we use
-	   the other half for the serial port, which is just a PITA
-	   otherwise :)
+#ifdef CONFIG_MIPS32
+	write_c0_wired(0);
+	local_flush_tlb_all();
 
-		Device			Physical	Virtual
-		MV64340 Internal Regs	0xf4000000	0xf4000000
-		Ocelot-C[S] PLD (CS0)	0xfc000000	0xfc000000
-		NVRAM (CS1)		0xfc800000	0xfc800000
-		UARTs (CS2)		0xfd000000	0xfd000000
-		Internal SRAM		0xfe000000	0xfe000000
-		M-Systems DOC (CS3)	0xff000000	0xff000000
-	*/
-  printk("PMON_v2_setup\n");
-
-#ifdef CONFIG_MIPS64
 	/* marvell and extra space */
-	add_wired_entry(ENTRYLO(0xf4000000), ENTRYLO(0xf4010000), 0xfffffffff4000000, PM_64K);
+	add_wired_entry(ENTRYLO(0xf4000000), ENTRYLO(0xf4010000),
+	                0xf4000000UL, PM_64K);
 	/* fpga, rtc, and uart */
-	add_wired_entry(ENTRYLO(0xfc000000), ENTRYLO(0xfd000000), 0xfffffffffc000000, PM_16M);
-	/* m-sys and internal SRAM */
-	add_wired_entry(ENTRYLO(0xfe000000), ENTRYLO(0xff000000), 0xfffffffffe000000, PM_16M);
-
-	mv64340_base = 0xfffffffff4000000;
-	mv64340_sram_base = 0xfffffffffe000000;
-#else
-	/* marvell and extra space */
-	add_wired_entry(ENTRYLO(0xf4000000), ENTRYLO(0xf4010000), 0xf4000000, PM_64K);
-	/* fpga, rtc, and uart */
-	add_wired_entry(ENTRYLO(0xfc000000), ENTRYLO(0xfd000000), 0xfc000000, PM_16M);
-	/* m-sys and internal SRAM */
-	add_wired_entry(ENTRYLO(0xfe000000), ENTRYLO(0xff000000), 0xfe000000, PM_16M);
+	add_wired_entry(ENTRYLO(0xfc000000), ENTRYLO(0xfd000000),
+	                0xfc000000UL, PM_16M);
+//	/* m-sys and internal SRAM */
+//	add_wired_entry(ENTRYLO(0xfe000000), ENTRYLO(0xff000000),
+//	                0xfe000000UL, PM_16M);
 
 	mv64340_base = 0xf4000000;
-	mv64340_sram_base = 0xfe000000;
+	//mv64340_sram_base = 0xfe000000;	/* Currently unused */
 #endif
 }
 
-#define CONV_BCD_TO_BIN(val)	(((val) & 0xf) + (((val) >> 4) * 10))
-#define CONV_BIN_TO_BCD(val)	(((val) % 10) + (((val) / 10) << 4))
+unsigned long mv64340_base	= 0xf4000000L;
+unsigned long ja_fpga_base	= JAGUAR_ATX_CS0_ADDR;
+unsigned long uart_base		= 0xfd000000L;
+static unsigned char *rtc_base	= (unsigned char*) 0xfc800000L;
+
+static __init int per_cpu_mappings(void)
+{
+	mv64340_base	= (unsigned long) ioremap(0xf4000000, 0x10000);
+	ja_fpga_base	= (unsigned long) ioremap(JAGUAR_ATX_CS0_ADDR,  0x1000);
+	uart_base	= (unsigned long) ioremap(0xfd000000UL, 0x1000);
+	rtc_base	= ioremap(0xfc000000UL, 0x8000);
+	// ioremap(0xfe000000,  32 << 20);
+	write_c0_wired(0);
+	local_flush_tlb_all();
+	ja_setup_console();
+
+	return 0;
+}
+arch_initcall(per_cpu_mappings);
 
 unsigned long m48t37y_get_time(void)
 {
-#ifdef CONFIG_MIPS64
-	unsigned char *rtc_base = (unsigned char*)0xfffffffffc800000;
-#else
-	unsigned char *rtc_base = (unsigned char*)0xfc800000;
-#endif
 	unsigned int year, month, day, hour, min, sec;
 
 	/* stop the update */
 	rtc_base[0x7ff8] = 0x40;
 
-	year = CONV_BCD_TO_BIN(rtc_base[0x7fff]);
-	year += CONV_BCD_TO_BIN(rtc_base[0x7ff1]) * 100;
+	year = BCD2BIN(rtc_base[0x7fff]);
+	year += BCD2BIN(rtc_base[0x7ff1]) * 100;
 
-	month = CONV_BCD_TO_BIN(rtc_base[0x7ffe]);
+	month = BCD2BIN(rtc_base[0x7ffe]);
 
-	day = CONV_BCD_TO_BIN(rtc_base[0x7ffd]);
+	day = BCD2BIN(rtc_base[0x7ffd]);
 
-	hour = CONV_BCD_TO_BIN(rtc_base[0x7ffb]);
-	min = CONV_BCD_TO_BIN(rtc_base[0x7ffa]);
-	sec = CONV_BCD_TO_BIN(rtc_base[0x7ff9]);
+	hour = BCD2BIN(rtc_base[0x7ffb]);
+	min = BCD2BIN(rtc_base[0x7ffa]);
+	sec = BCD2BIN(rtc_base[0x7ff9]);
 
 	/* start the update */
 	rtc_base[0x7ff8] = 0x00;
@@ -162,11 +170,6 @@ unsigned long m48t37y_get_time(void)
 
 int m48t37y_set_time(unsigned long sec)
 {
-#ifdef CONFIG_MIPS64
-	unsigned char *rtc_base = (unsigned char*)0xfffffffffc800000;
-#else
-	unsigned char *rtc_base = (unsigned char*)0xfc800000;
-#endif
 	struct rtc_time tm;
 
 	/* convert to a more useful format -- note months count from 0 */
@@ -177,22 +180,22 @@ int m48t37y_set_time(unsigned long sec)
 	rtc_base[0x7ff8] = 0x80;
 
 	/* year */
-	rtc_base[0x7fff] = CONV_BIN_TO_BCD(tm.tm_year % 100);
-	rtc_base[0x7ff1] = CONV_BIN_TO_BCD(tm.tm_year / 100);
+	rtc_base[0x7fff] = BIN2BCD(tm.tm_year % 100);
+	rtc_base[0x7ff1] = BIN2BCD(tm.tm_year / 100);
 
 	/* month */
-	rtc_base[0x7ffe] = CONV_BIN_TO_BCD(tm.tm_mon);
+	rtc_base[0x7ffe] = BIN2BCD(tm.tm_mon);
 
 	/* day */
-	rtc_base[0x7ffd] = CONV_BIN_TO_BCD(tm.tm_mday);
+	rtc_base[0x7ffd] = BIN2BCD(tm.tm_mday);
 
 	/* hour/min/sec */
-	rtc_base[0x7ffb] = CONV_BIN_TO_BCD(tm.tm_hour);
-	rtc_base[0x7ffa] = CONV_BIN_TO_BCD(tm.tm_min);
-	rtc_base[0x7ff9] = CONV_BIN_TO_BCD(tm.tm_sec);
+	rtc_base[0x7ffb] = BIN2BCD(tm.tm_hour);
+	rtc_base[0x7ffa] = BIN2BCD(tm.tm_min);
+	rtc_base[0x7ff9] = BIN2BCD(tm.tm_sec);
 
 	/* day of week -- not really used, but let's keep it up-to-date */
-	rtc_base[0x7ffc] = CONV_BIN_TO_BCD(tm.tm_wday + 1);
+	rtc_base[0x7ffc] = BIN2BCD(tm.tm_wday + 1);
 
 	/* disable writing */
 	rtc_base[0x7ff8] = 0x00;
@@ -205,8 +208,14 @@ void momenco_timer_setup(struct irqaction *irq)
 	setup_irq(8, irq);
 }
 
+/*
+ * Ugly but the least of all evils.  TLB initialization did flush the TLB so
+ * We need to setup mappings again before we can touch the RTC.
+ */
 void momenco_time_init(void)
 {
+	wire_stupidity_into_tlb();
+
 	mips_hpt_frequency = cpu_clock / 2;
 	board_timer_setup = momenco_timer_setup;
 
@@ -214,7 +223,129 @@ void momenco_time_init(void)
 	rtc_set_time = m48t37y_set_time;
 }
 
-static void __init momenco_jaguar_atx_setup(void)
+static struct resource mv_pci_io_mem0_resource = {
+	.name	= "MV64340 PCI0 IO MEM",
+	.flags	= IORESOURCE_IO
+};
+
+static struct resource mv_pci_mem0_resource = {
+	.name	= "MV64340 PCI0 MEM",
+	.flags	= IORESOURCE_MEM
+};
+
+extern struct pci_ops mv64340_bus0_pci_ops;
+
+static struct pci_controller mv_bus0_controller = {
+	.pci_ops	= &mv64340_bus0_pci_ops,
+	.mem_resource	= &mv_pci_mem0_resource,
+	.io_resource	= &mv_pci_io_mem0_resource,
+};
+
+static uint32_t mv_io_base, mv_io_size;
+
+static void ja_pci0_init(void)
+{
+	uint32_t mem0_base, mem0_size;
+	uint32_t io_base, io_size;
+
+	io_base = MV_READ(MV64340_PCI_0_IO_BASE_ADDR) << 16;
+	io_size = (MV_READ(MV64340_PCI_0_IO_SIZE) + 1) << 16;
+	mem0_base = MV_READ(MV64340_PCI_0_MEMORY0_BASE_ADDR) << 16;
+	mem0_size = (MV_READ(MV64340_PCI_0_MEMORY0_SIZE) + 1) << 16;
+
+	mv_pci_io_mem0_resource.start	= 0;
+	mv_pci_io_mem0_resource.end	= io_size - 1;
+	mv_pci_mem0_resource.start	= mem0_base;
+	mv_pci_mem0_resource.end	= mem0_base + mem0_size - 1;
+	mv_bus0_controller.mem_offset	= mem0_base;
+	mv_bus0_controller.io_offset	= 0;
+
+	ioport_resource.end		= io_size - 1;
+
+	register_pci_controller(&mv_bus0_controller);
+
+	mv_io_base = io_base;
+	mv_io_size = io_size;
+}
+
+static struct resource mv_pci_io_mem1_resource = {
+	.name	= "MV64340 PCI1 IO MEM",
+	.flags	= IORESOURCE_IO
+};
+
+static struct resource mv_pci_mem1_resource = {
+	.name	= "MV64340 PCI1 MEM",
+	.flags	= IORESOURCE_MEM
+};
+
+extern struct pci_ops mv64340_bus1_pci_ops;
+
+static struct pci_controller mv_bus1_controller = {
+	.pci_ops	= &mv64340_bus1_pci_ops,
+	.mem_resource	= &mv_pci_mem1_resource,
+	.io_resource	= &mv_pci_io_mem1_resource,
+};
+
+static __init void ja_pci1_init(void)
+{
+	uint32_t mem0_base, mem0_size;
+	uint32_t io_base, io_size;
+
+	io_base = MV_READ(MV64340_PCI_1_IO_BASE_ADDR) << 16;
+	io_size = (MV_READ(MV64340_PCI_1_IO_SIZE) + 1) << 16;
+	mem0_base = MV_READ(MV64340_PCI_1_MEMORY0_BASE_ADDR) << 16;
+	mem0_size = (MV_READ(MV64340_PCI_1_MEMORY0_SIZE) + 1) << 16;
+
+	/*
+	 * Here we assume the I/O window of second bus to be contiguous with
+	 * the first.  A gap is no problem but would waste address space for
+	 * remapping the port space.
+	 */
+	mv_pci_io_mem1_resource.start	= mv_io_size;
+	mv_pci_io_mem1_resource.end	= mv_io_size + io_size - 1;
+	mv_pci_mem1_resource.start	= mem0_base;
+	mv_pci_mem1_resource.end	= mem0_base + mem0_size - 1;
+	mv_bus1_controller.mem_offset	= mem0_base;
+	mv_bus1_controller.io_offset	= 0;
+
+	ioport_resource.end		= io_base + io_size -mv_io_base - 1;
+
+	register_pci_controller(&mv_bus1_controller);
+
+	mv_io_size = io_base + io_size - mv_io_base;
+}
+
+static __init int __init ja_pci_init(void)
+{
+	unsigned long io_v_base;
+	uint32_t enable;
+
+	enable = ~MV_READ(MV64340_BASE_ADDR_ENABLE);
+
+	/*
+	 * We require at least one enabled I/O or PCI memory window or we
+	 * will ignore this PCI bus.  We ignore PCI windows 1, 2 and 3.
+	 */
+	if (enable & (0x01 <<  9) || enable & (0x01 << 10))
+		ja_pci0_init();
+
+	if (enable & (0x01 << 14) || enable & (0x01 << 15))
+		ja_pci1_init();
+
+	if (mv_io_size) {
+		io_v_base = (unsigned long) ioremap(mv_io_base, mv_io_size);
+		if (!io_v_base)
+			panic("Could not ioremap I/O port range");
+
+		set_io_port_base(io_v_base);
+	}
+
+	return 0;
+}
+
+arch_initcall(ja_pci_init);
+
+static int  __init momenco_jaguar_atx_setup(void)
 {
 	unsigned int tmpword;
 
@@ -230,10 +361,10 @@ static void __init momenco_jaguar_atx_setup(void)
 	 * initrd_below_start_ok = 1;
 	 */
 
-	/* do handoff reconfiguration */
-	PMON_v2_setup();
+	wire_stupidity_into_tlb();
 
-	/* shut down ethernet ports, just to be sure our memory doesn't get
+	/*
+	 * shut down ethernet ports, just to be sure our memory doesn't get
 	 * corrupted by random ethernet traffic.
 	 */
 	MV_WRITE(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(0), 0xff << 8);
@@ -242,21 +373,18 @@ static void __init momenco_jaguar_atx_setup(void)
 	MV_WRITE(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(0), 0xff << 8);
 	MV_WRITE(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(1), 0xff << 8);
 	MV_WRITE(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(2), 0xff << 8);
-	do {}
-	  while (MV_READ_DATA(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(0)) & 0xff);
-	do {}
-	  while (MV_READ_DATA(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(1)) & 0xff);
-	do {}
-	  while (MV_READ_DATA(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(2)) & 0xff);
-	do {}
-	  while (MV_READ_DATA(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(0)) & 0xff);
-	do {}
-	  while (MV_READ_DATA(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(1)) & 0xff);
-	do {}
-	  while (MV_READ_DATA(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(2)) & 0xff);
-	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(0), MV_READ_DATA(MV64340_ETH_PORT_SERIAL_CONTROL_REG(0)) & ~1);
-	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(1), MV_READ_DATA(MV64340_ETH_PORT_SERIAL_CONTROL_REG(1)) & ~1);
-	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(2), MV_READ_DATA(MV64340_ETH_PORT_SERIAL_CONTROL_REG(2)) & ~1);
+	while (MV_READ(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(0)) & 0xff);
+	while (MV_READ(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(1)) & 0xff);
+	while (MV_READ(MV64340_ETH_RECEIVE_QUEUE_COMMAND_REG(2)) & 0xff);
+	while (MV_READ(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(0)) & 0xff);
+	while (MV_READ(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(1)) & 0xff);
+	while (MV_READ(MV64340_ETH_TRANSMIT_QUEUE_COMMAND_REG(2)) & 0xff);
+	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(0),
+	         MV_READ(MV64340_ETH_PORT_SERIAL_CONTROL_REG(0)) & ~1);
+	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(1),
+	         MV_READ(MV64340_ETH_PORT_SERIAL_CONTROL_REG(1)) & ~1);
+	MV_WRITE(MV64340_ETH_PORT_SERIAL_CONTROL_REG(2),
+	         MV_READ(MV64340_ETH_PORT_SERIAL_CONTROL_REG(2)) & ~1);
 
 	/* Turn off the Bit-Error LED */
 	JAGUAR_FPGA_WRITE(0x80, CLR);
@@ -274,20 +402,20 @@ static void __init momenco_jaguar_atx_setup(void)
 	tmpword = JAGUAR_FPGA_READ(RESET_STATUS);
 	printk("Reset reason: 0x%x\n", tmpword);
 	switch (tmpword) {
-		case 0x1:
-			printk("  - Power-up reset\n");
-			break;
-		case 0x2:
-			printk("  - Push-button reset\n");
-			break;
-		case 0x8:
-			printk("  - Watchdog reset\n");
-			break;
-		case 0x10:
-			printk("  - JTAG reset\n");
-			break;
-		default:
-			printk("  - Unknown reset cause\n");
+	case 0x1:
+		printk("  - Power-up reset\n");
+		break;
+	case 0x2:
+		printk("  - Push-button reset\n");
+		break;
+	case 0x8:
+		printk("  - Watchdog reset\n");
+		break;
+	case 0x10:
+		printk("  - JTAG reset\n");
+		break;
+	default:
+		printk("  - Unknown reset cause\n");
 	}
 	reset_reason = tmpword;
 	JAGUAR_FPGA_WRITE(0xff, RESET_STATUS);
@@ -333,28 +461,8 @@ static void __init momenco_jaguar_atx_setup(void)
 
 	}
 #endif
-}
-
-early_initcall(momenco_jaguar_atx_setup);
-
-
-#ifndef CONFIG_MIPS64
-/* This needs to be one of the first initcalls, because no I/O port access
-   can work before this */
-static int io_base_ioremap(void)
-{
-	/* we're mapping PCI accesses from 0xc0000000 to 0xf0000000 */
-	void *io_remap_range = ioremap(0xc0000000, 0x30000000);
-
-	printk("*** io_base_ioremap\n");
-	if (!io_remap_range) {
-		panic("Could not ioremap I/O port range");
-	}
-	printk("io_remap_range set at 0x%08x\n", (uint32_t)io_remap_range);
-	set_io_port_base(io_remap_range - 0xc0000000);
 
 	return 0;
 }
 
-module_init(io_base_ioremap);
-#endif
+early_initcall(momenco_jaguar_atx_setup);

@@ -344,11 +344,21 @@ void __init build_clear_page(void)
 
 	if (cpu_has_prefetch) {
 		switch (current_cpu_data.cputype) {
+		case CPU_RM9000:
+			/*
+			 * As a workaround for erratum G105 which make the
+			 * PrepareForStore hint unusable we fall back to
+			 * StoreRetained on the RM9000.  Once it is known which
+			 * versions of the RM9000 we'll be able to condition-
+			 * alize this.
+			 */
+
 		case CPU_R10000:
 		case CPU_R12000:
 			pref_src_mode = Pref_LoadStreamed;
 			pref_dst_mode = Pref_StoreRetained;
 			break;
+
 		default:
 			pref_src_mode = Pref_LoadStreamed;
 			pref_dst_mode = Pref_PrepareForStore;

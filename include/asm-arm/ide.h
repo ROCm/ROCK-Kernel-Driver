@@ -26,6 +26,8 @@
 #define ide_default_io_base(i)		(0)
 #define ide_default_irq(b)		(0)
 
+#define ide_init_default_irq(base)	(0)
+
 #define __ide_mm_insw(port,addr,len)	readsw(port,addr,len)
 #define __ide_mm_insl(port,addr,len)	readsl(port,addr,len)
 #define __ide_mm_outsw(port,addr,len)	writesw(port,addr,len)

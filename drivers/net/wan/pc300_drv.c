@@ -370,7 +370,7 @@ static void tx_dma_buf_check(pc300_t * card, int ch)
 	ucshort first_bd = card->chan[ch].tx_first_bd;
 	ucshort next_bd = card->chan[ch].tx_next_bd;
 
-	printk("#CH%d: f_bd = %d(0x%08x), n_bd = %d(0x%08x)\n", ch,
+	printk("#CH%d: f_bd = %d(0x%08zx), n_bd = %d(0x%08zx)\n", ch,
 	       first_bd, TX_BD_ADDR(ch, first_bd),
 	       next_bd, TX_BD_ADDR(ch, next_bd));
 	for (i = first_bd,

@@ -29,7 +29,6 @@
 
 #include <asm/asm.h>
 #include <asm/bitops.h>
-#include <asm/pgalloc.h>
 #include <asm/sim.h>
 #include <asm/uaccess.h>
 #include <asm/ucontext.h>
@@ -137,7 +136,7 @@ static inline void *get_sigframe(struct k_sigaction *ka, struct pt_regs *regs,
  	sp -= 32;
 
 	/* This is the X/Open sanctioned signal stack switching.  */
-	if ((ka->sa.sa_flags & SA_ONSTACK) && ! on_sig_stack(sp))
+	if ((ka->sa.sa_flags & SA_ONSTACK) && (sas_ss_flags (sp) == 0))
 		sp = current->sas_ss_sp + current->sas_ss_size;
 
 	return (void *)((sp - frame_size) & ALMASK);

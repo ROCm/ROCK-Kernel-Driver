@@ -23,7 +23,6 @@
 #include <asm/mipsregs.h>
 #include <asm/stackframe.h>
 #include <asm/cacheops.h>
-#include <asm/processor.h>
 #include <asm/sibyte/board.h>
 
 #define C0_ERRCTL     $26             /* CP0: Error info */

@@ -16,5 +16,6 @@ extern void install_ipi(void);
 extern void setup_replication_mask(int);
 extern void replicate_kernel_text(int);
 extern pfn_t node_getfirstfree(cnodeid_t);
+extern void mlreset(void);
 
 #endif /* __ASM_SN_SN_PRIVATE_H */

@@ -45,6 +45,8 @@ static inline void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
                 *irq = 0;
 }
 
+#define ide_init_default_irq(base)	(0)
+
 /*
  * This registers the standard ports for this architecture with the IDE
  * driver.

@@ -1650,6 +1650,19 @@ sys32_ipc (u32 call, int first, int second, int third, u32 ptr, u32 fifth)
 	return err;
 }
 
+asmlinkage long sys32_shmat(int shmid, char __user *shmaddr,
+			  int shmflg, int32_t *addr)
+{
+	unsigned long raddr;
+	int err;
+
+	err = do_shmat(shmid, shmaddr, shmflg, &raddr);
+	if (err)
+		return err;
+
+	return put_user(raddr, addr);
+}
+
 struct sysctl_args32
 {
 	compat_caddr_t name;

@@ -46,7 +46,7 @@ static __inline__ int check_titan_htlink(void)
 {
         u32 val;
 
-        val = *(volatile u_int32_t *)(RM9000x2_HTLINK_REG);
+        val = *(volatile uint32_t *)(RM9000x2_HTLINK_REG);
         if (val & 0x00000020)
                 /* HT Link Initialization completed */
                 return 1;

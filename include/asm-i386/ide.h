@@ -59,29 +59,23 @@ static __inline__ unsigned long ide_default_io_base(int index)
 	}
 }
 
+#ifdef CONFIG_X86_PC9800
 static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_port,
 	 unsigned long ctrl_port, int *irq)
 {
 	unsigned long reg = data_port;
 	int i;
-#ifdef CONFIG_X86_PC9800
+
 	unsigned long increment = data_port == 0x640 ? 2 : 1;
-#endif
 
 	for (i = IDE_DATA_OFFSET; i <= IDE_STATUS_OFFSET; i++) {
 		hw->io_ports[i] = reg;
-#ifdef CONFIG_X86_PC9800
 		reg += increment;
-#else
-		reg += 1;
-#endif
 	}
 	if (ctrl_port) {
 		hw->io_ports[IDE_CONTROL_OFFSET] = ctrl_port;
-#ifdef CONFIG_X86_PC9800
 	} else if (data_port == 0x640) {
 		hw->io_ports[IDE_CONTROL_OFFSET] = 0x74c;
-#endif
 	} else {
 		hw->io_ports[IDE_CONTROL_OFFSET] = hw->io_ports[IDE_DATA_OFFSET] + 0x206;
 	}
@@ -89,21 +83,13 @@ static __inline__ void ide_init_hwif_ports(hw_regs_t *hw, unsigned long data_por
 		*irq = 0;
 	hw->io_ports[IDE_IRQ_OFFSET] = 0;
 }
+#endif
 
-static __inline__ void ide_init_default_hwifs(void)
-{
-#ifndef CONFIG_BLK_DEV_IDEPCI
-	hw_regs_t hw;
-	int index;
-
-	for(index = 0; index < MAX_HWIFS; index++) {
-		memset(&hw, 0, sizeof hw);
-		ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, NULL);
-		hw.irq = ide_default_irq(ide_default_io_base(index));
-		ide_register_hw(&hw, NULL);
-	}
-#endif /* CONFIG_BLK_DEV_IDEPCI */
-}
+#ifdef CONFIG_BLK_DEV_IDEPCI
+#define ide_init_default_irq(base)	(0)
+#else
+#define ide_init_default_irq(base)	ide_default_irq(base)
+#endif
 
 #include <asm-generic/ide_iops.h>
 

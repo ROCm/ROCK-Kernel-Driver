@@ -444,7 +444,8 @@ static int ibmtr_event(event_t event, int priority,
         link->state &= ~DEV_PRESENT;
         if (link->state & DEV_CONFIG) {
 	    /* set flag to bypass normal interrupt code */
-	    ((struct tok_info *)dev->priv)->sram_virt |= 1;
+	    struct tok_info *priv = netdev_priv(dev);
+	    priv->sram_virt |= 1;
 	    netif_device_detach(dev);
 	    ibmtr_release(link);
         }

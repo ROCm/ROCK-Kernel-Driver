@@ -124,7 +124,7 @@ enum {
 	Opt_broken_suid, Opt_err,
 };
 
-static match_table_t tokens = {
+static match_table_t __initdata tokens = {
 	{Opt_port, "port=%u"},
 	{Opt_rsize, "rsize=%u"},
 	{Opt_wsize, "wsize=%u"},

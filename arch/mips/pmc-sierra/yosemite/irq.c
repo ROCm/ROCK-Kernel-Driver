@@ -169,15 +169,15 @@ extern void jaguar_mailbox_irq(struct pt_regs *);
 asmlinkage void ll_ht_smp_irq_handler(int irq, struct pt_regs *regs)
 {
         u32 status;
-        status = *(volatile u_int32_t *)(IRQ_STATUS_REG_CPU0);
+        status = *(volatile uint32_t *)(IRQ_STATUS_REG_CPU0);
 
 	/* Ack all the bits that correspond to the interrupt sources */
 	if (status != 0)
-	        *(volatile u_int32_t *)(IRQ_STATUS_REG_CPU0) = IRQ_ACK_BITS;
+	        *(volatile uint32_t *)(IRQ_STATUS_REG_CPU0) = IRQ_ACK_BITS;
 
-	status = *(volatile u_int32_t *)(IRQ_STATUS_REG_CPU1);
+	status = *(volatile uint32_t *)(IRQ_STATUS_REG_CPU1);
 	if (status != 0)
-                *(volatile u_int32_t *)(IRQ_STATUS_REG_CPU1) = IRQ_ACK_BITS;
+                *(volatile uint32_t *)(IRQ_STATUS_REG_CPU1) = IRQ_ACK_BITS;
 
 #ifdef CONFIG_SMP
 	if (status == 0x2) {
@@ -193,27 +193,27 @@ asmlinkage void ll_ht_smp_irq_handler(int irq, struct pt_regs *regs)
          */
         switch (status) {
                 case 0x1000000:
-                        *(volatile u_int32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTA;
+                        *(volatile uint32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTA;
                         break;
                 case 0x2000000:
-                        *(volatile u_int32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTB;
+                        *(volatile uint32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTB;
                         break;
                 case 0x4000000:
-                        *(volatile u_int32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTC;
+                        *(volatile uint32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTC;
                         break;
                 case 0x8000000:
-                        *(volatile u_int32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTD;
+                        *(volatile uint32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTD;
                         break;
                 case 0x0000001:
                         /* PLX */
-                        *(volatile u_int32_t *)(HYPERTRANSPORT_EOI) = 0x20;
-                        *(volatile u_int32_t *)(IRQ_CLEAR_REG) = IRQ_ACK_BITS;
+                        *(volatile uint32_t *)(HYPERTRANSPORT_EOI) = 0x20;
+                        *(volatile uint32_t *)(IRQ_CLEAR_REG) = IRQ_ACK_BITS;
                         break;
                 case 0xf000000:
-                        *(volatile u_int32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTA;
-                        *(volatile u_int32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTB;
-                        *(volatile u_int32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTC;
-                        *(volatile u_int32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTD;
+                        *(volatile uint32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTA;
+                        *(volatile uint32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTB;
+                        *(volatile uint32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTC;
+                        *(volatile uint32_t *)(HYPERTRANSPORT_EOI) = HYPERTRANSPORT_INTD;
                         break;
         }
 #endif /* CONFIG_HT_LEVEL_TRIGGER */

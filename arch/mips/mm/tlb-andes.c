@@ -229,7 +229,7 @@ void __update_tlb(struct vm_area_struct * vma, unsigned long address, pte_t pte)
 	ptep = pte_offset_map(pmdp, address);
 	write_c0_entrylo0(pte_val(*ptep++) >> 6);
 	write_c0_entrylo1(pte_val(*ptep) >> 6);
-	write_c0_entryhi(address | (pid));
+	write_c0_entryhi(address | pid);
 	if (idx < 0) {
 		tlb_write_random();
 	} else {

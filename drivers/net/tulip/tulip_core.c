@@ -308,8 +308,8 @@ static void tulip_up(struct net_device *dev)
 	tp->dirty_rx = tp->dirty_tx = 0;
 
 	if (tp->flags & MC_HASH_ONLY) {
-		u32 addr_low = cpu_to_le32(get_unaligned((u32 *)dev->dev_addr));
-		u32 addr_high = cpu_to_le32(get_unaligned((u16 *)(dev->dev_addr+4)));
+		u32 addr_low = le32_to_cpu(get_unaligned((u32 *)dev->dev_addr));
+		u32 addr_high = le16_to_cpu(get_unaligned((u16 *)(dev->dev_addr+4)));
 		if (tp->chip_id == AX88140) {
 			outl(0, ioaddr + CSR13);
 			outl(addr_low,  ioaddr + CSR14);
@@ -1434,8 +1434,8 @@ static int __devinit tulip_init_one (struct pci_dev *pdev,
 		}
 	} else if (chip_idx == COMET) {
 		/* No need to read the EEPROM. */
-		put_unaligned(inl(ioaddr + 0xA4), (u32 *)dev->dev_addr);
-		put_unaligned(inl(ioaddr + 0xA8), (u16 *)(dev->dev_addr + 4));
+		put_unaligned(cpu_to_le32(inl(ioaddr + 0xA4)), (u32 *)dev->dev_addr);
+		put_unaligned(cpu_to_le16(inl(ioaddr + 0xA8)), (u16 *)(dev->dev_addr + 4));
 		for (i = 0; i < 6; i ++)
 			sum += dev->dev_addr[i];
 	} else {

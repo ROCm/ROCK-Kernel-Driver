@@ -60,6 +60,7 @@ need_resched:
 	sw	t0, TI_PRE_COUNT($28)
 	local_irq_enable t0
 	jal	schedule
+	sw	zero, TI_PRE_COUNT($28)
 	local_irq_disable t0
 	b	need_resched
 #endif

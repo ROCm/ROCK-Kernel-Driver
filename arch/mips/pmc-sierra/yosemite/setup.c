@@ -147,13 +147,13 @@ static int __init pmc_yosemite_setup(void)
 	add_memory_region(0x10000000, 0x10000000, BOOT_MEM_RAM);
 
 	/* Setup the HT controller */
-	val = *(volatile u_int32_t *)(HYPERTRANSPORT_CONFIG_REG);
+	val = *(volatile uint32_t *)(HYPERTRANSPORT_CONFIG_REG);
 	val |= HYPERTRANSPORT_ENABLE;
-        *(volatile u_int32_t *)(HYPERTRANSPORT_CONFIG_REG) = val;
+        *(volatile uint32_t *)(HYPERTRANSPORT_CONFIG_REG) = val;
 
         /* Set the BAR. Shifted mode */
-        *(volatile u_int32_t *)(HYPERTRANSPORT_BAR0_REG) = HYPERTRANSPORT_BAR0_ADDR;
-        *(volatile u_int32_t *)(HYPERTRANSPORT_SIZE0_REG) = HYPERTRANSPORT_SIZE0;
+        *(volatile uint32_t *)(HYPERTRANSPORT_BAR0_REG) = HYPERTRANSPORT_BAR0_ADDR;
+        *(volatile uint32_t *)(HYPERTRANSPORT_SIZE0_REG) = HYPERTRANSPORT_SIZE0;
 
 #ifdef CONFIG_PCI
 	ioport_resource.start = 0xe0000000;

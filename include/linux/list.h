@@ -610,9 +610,12 @@ static inline void hlist_add_before(struct hlist_node *n,
 static inline void hlist_add_after(struct hlist_node *n,
 					struct hlist_node *next)
 {
-	next->next	= n->next;
-	*(next->pprev)	= n;
-	n->next		= next;
+	next->next = n->next;
+	n->next = next;
+	next->pprev = &n->next;
+
+	if(next->next)
+		next->next->pprev  = &next->next;
 }
 
 #define hlist_entry(ptr, type, member) container_of(ptr,type,member)

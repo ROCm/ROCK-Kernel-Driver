@@ -27,4 +27,8 @@
 #define TO_MSPEC(x)		(MSPEC_BASE | ((x) & TO_PHYS_MASK))
 #define TO_HSPEC(x)		(HSPEC_BASE | ((x) & TO_PHYS_MASK))
 
+#define PAGE_OFFSET		CAC_BASE
+
+#define HIGHMEM_START		(~0UL)
+
 #endif /* _ASM_MACH_SPACES_H */

@@ -209,7 +209,7 @@ symbol		=	value
 #define ALSZ	7
 #define ALMASK	~7
 #endif
-#if (_MIPS_SIM == _MIPS_SIM_ABIN32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
+#if (_MIPS_SIM == _MIPS_SIM_NABI32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
 #define ALSZ	15
 #define ALMASK	~15
 #endif
@@ -237,7 +237,7 @@ symbol		=	value
 #define REG_SUBU	subu
 #define REG_ADDU	addu
 #endif
-#if (_MIPS_SIM == _MIPS_SIM_ABIN32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
+#if (_MIPS_SIM == _MIPS_SIM_NABI32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
 #define REG_S		sd
 #define REG_L		ld
 #define REG_SUBU	dsubu
@@ -386,7 +386,7 @@ symbol		=	value
 #define MFC0		mfc0
 #define MTC0		mtc0
 #endif
-#if (_MIPS_SIM == _MIPS_SIM_ABIN32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
+#if (_MIPS_SIM == _MIPS_SIM_NABI32) || (_MIPS_SIM == _MIPS_SIM_ABI64)
 #define MFC0		dmfc0
 #define MTC0		dmtc0
 #endif

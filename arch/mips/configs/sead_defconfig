@@ -22,6 +22,7 @@ CONFIG_SWAP=y
 # CONFIG_BSD_PROCESS_ACCT is not set
 CONFIG_SYSCTL=y
 CONFIG_LOG_BUF_SHIFT=14
+# CONFIG_HOTPLUG is not set
 # CONFIG_IKCONFIG is not set
 CONFIG_EMBEDDED=y
 CONFIG_KALLSYMS=y
@@ -50,7 +51,6 @@ CONFIG_IOSCHED_DEADLINE=y
 # CONFIG_MIPS_EV96100 is not set
 # CONFIG_MIPS_IVR is not set
 # CONFIG_LASAT is not set
-# CONFIG_HP_LASERJET is not set
 # CONFIG_MIPS_ITE8172 is not set
 # CONFIG_MIPS_ATLAS is not set
 # CONFIG_MIPS_MALTA is not set
@@ -115,7 +115,6 @@ CONFIG_CPU_HAS_SYNC=y
 # Bus options (PCI, PCMCIA, EISA, ISA, TC)
 #
 CONFIG_MMU=y
-# CONFIG_HOTPLUG is not set
 
 #
 # Executable file formats
@@ -183,16 +182,12 @@ CONFIG_BLK_DEV_INITRD=y
 #
 
 #
-# IEEE 1394 (FireWire) support (EXPERIMENTAL)
+# IEEE 1394 (FireWire) support
 #
 # CONFIG_IEEE1394 is not set
 
 #
 # I2O device support
-#
-
-#
-# Macintosh device drivers
 #
 
 #
@@ -204,6 +199,8 @@ CONFIG_BLK_DEV_INITRD=y
 # Amateur Radio support
 #
 # CONFIG_HAMRADIO is not set
+# CONFIG_NETPOLL is not set
+# CONFIG_NET_POLL_CONTROLLER is not set
 
 #
 # ISDN subsystem
@@ -272,11 +269,8 @@ CONFIG_SERIAL_8250_NR_UARTS=4
 CONFIG_SERIAL_CORE=y
 CONFIG_SERIAL_CORE_CONSOLE=y
 # CONFIG_UNIX98_PTYS is not set
-
-#
-# Mice
-#
-# CONFIG_BUSMOUSE is not set
+CONFIG_LEGACY_PTYS=y
+CONFIG_LEGACY_PTY_COUNT=256
 # CONFIG_QIC02_TAPE is not set
 
 #
@@ -288,7 +282,6 @@ CONFIG_SERIAL_CORE_CONSOLE=y
 # Watchdog Cards
 #
 # CONFIG_WATCHDOG is not set
-# CONFIG_NVRAM is not set
 # CONFIG_RTC is not set
 # CONFIG_GEN_RTC is not set
 # CONFIG_DTLK is not set
@@ -307,6 +300,10 @@ CONFIG_SERIAL_CORE_CONSOLE=y
 # I2C support
 #
 # CONFIG_I2C is not set
+
+#
+# Misc devices
+#
 
 #
 # Multimedia devices
@@ -390,6 +387,7 @@ CONFIG_RAMFS=y
 # CONFIG_ADFS_FS is not set
 # CONFIG_AFFS_FS is not set
 # CONFIG_HFS_FS is not set
+# CONFIG_HFSPLUS_FS is not set
 # CONFIG_BEFS_FS is not set
 # CONFIG_BFS_FS is not set
 # CONFIG_EFS_FS is not set

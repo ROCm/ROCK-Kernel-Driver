@@ -56,7 +56,7 @@ extern void (*board_time_init)(void);
 extern void au1x_time_init(void);
 extern void (*board_timer_setup)(struct irqaction *irq);
 extern void au1x_timer_setup(struct irqaction *irq);
-#if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_SOC_AU1500)
+#if defined(CONFIG_64BIT_PHYS_ADDR) && (defined(CONFIG_SOC_AU1500) || defined(CONFIG_SOC_AU1550))
 extern phys_t (*fixup_bigphys_addr)(phys_t phys_addr, phys_t size);
 static phys_t au1500_fixup_bigphys_addr(phys_t phys_addr, phys_t size);
 #endif
@@ -66,11 +66,46 @@ extern void au1xxx_timer_setup(struct irqaction *irq);
 static int __init au1x00_setup(void)
 {
 	char *argptr;
+	unsigned long prid, cpupll, bclk = 1;
 
 	/* Various early Au1000 Errata corrected by this */
 	set_c0_config(1<<19); /* Config[OD] */
 
 	board_setup();  /* board specific setup */
+
+	prid = read_c0_prid();
+	switch (prid)
+	{
+		case 0x00030100: printk("Au1000 DA "); bclk = 0; break;
+	 	case 0x00030201: printk("Au1000 HA "); bclk = 0; break;
+		case 0x00030202: printk("Au1000 HB "); bclk = 0; break;
+		case 0x00030203: printk("Au1000 HC "); break;
+		case 0x00030204: printk("Au1000 HD "); break;
+
+		case 0x01030200: printk("Au1500 AB "); break;
+		case 0x01030201: printk("Au1500 AC "); break;
+		case 0x01030202: printk("Au1500 AD "); break;
+
+		case 0x02030200: printk("Au1100 AB "); break;
+		case 0x02030201: printk("Au1100 BA "); break;
+		case 0x02030202: printk("Au1100 BC "); break;
+		case 0x02030203: printk("Au1100 BD "); break;
+		case 0x02030204: printk("Au1100 BE "); break;
+
+		case 0x03030200: printk("Au1550 AA "); break;
+
+		default: printk("Unknown Au1x00! "); bclk = 0; break;
+	}
+	cpupll = (au_readl(0xB1900060) & 0x3F) * 12;
+	printk("(PRId %08X) @ %dMHZ\n", prid, cpupll);
+
+	if (bclk)
+	{
+		/* Enable BCLK switching */
+		bclk = au_readl(0xB190003C);
+		au_writel(bclk | 0x60, 0xB190003C);
+		printk("BCLK switching enabled!\n");
+	}
 
 	argptr = prom_getcmdline();
 
@@ -122,7 +157,7 @@ static int __init au1x00_setup(void)
 	_machine_power_off = au1000_power_off;
 	board_time_init = au1xxx_time_init;
 	board_timer_setup = au1xxx_timer_setup;
-#if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_SOC_AU1500)
+#if defined(CONFIG_64BIT_PHYS_ADDR) && (defined(CONFIG_SOC_AU1500) || defined(CONFIG_SOC_AU1550))
 	fixup_bigphys_addr = au1500_fixup_bigphys_addr;
 #endif
 
@@ -173,7 +208,7 @@ static int __init au1x00_setup(void)
 
 early_initcall(au1x00_setup);
 
-#if defined(CONFIG_64BIT_PHYS_ADDR) && defined(CONFIG_SOC_AU1500)
+#if defined(CONFIG_64BIT_PHYS_ADDR) && (defined(CONFIG_SOC_AU1500) || defined(CONFIG_SOC_AU1550))
 /* This routine should be valid for all Au1500 based boards */
 static phys_t au1500_fixup_bigphys_addr(phys_t phys_addr, phys_t size)
 {

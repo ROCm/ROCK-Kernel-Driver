@@ -189,7 +189,11 @@ static u64 do_posix_clock_monotonic_gettime_parts(
 int do_posix_clock_monotonic_gettime(struct timespec *tp);
 int do_posix_clock_monotonic_settime(struct timespec *tp);
 static struct k_itimer *lock_timer(timer_t timer_id, unsigned long *flags);
-static inline void unlock_timer(struct k_itimer *timr, unsigned long flags);
+
+static inline void unlock_timer(struct k_itimer *timr, unsigned long flags)
+{
+	spin_unlock_irqrestore(&timr->it_lock, flags);
+}
 
 /*
  * Initialize everything, well, just everything in Posix clocks/timers ;)
@@ -551,11 +555,6 @@ static int good_timespec(const struct timespec *ts)
 			((unsigned) ts->tv_nsec >= NSEC_PER_SEC))
 		return 0;
 	return 1;
-}
-
-static inline void unlock_timer(struct k_itimer *timr, unsigned long flags)
-{
-	spin_unlock_irqrestore(&timr->it_lock, flags);
 }
 
 /*

@@ -33,7 +33,7 @@ static volatile int *lasat_int_status = NULL;
 static volatile int *lasat_int_mask = NULL;
 static volatile int lasat_int_mask_shift;
 
-extern asmlinkage void mipsIRQ(void);
+extern asmlinkage void lasatIRQ(void);
 
 void disable_lasat_irq(unsigned int irq_nr)
 {
@@ -112,7 +112,6 @@ static unsigned long get_int_status_200(void)
 
 void lasat_hw0_irqdispatch(struct pt_regs *regs)
 {
-	struct irqaction *action;
 	unsigned long int_status;
 	int irq;
 
@@ -141,7 +140,6 @@ void __init init_IRQ(void)
 		*lasat_int_mask = 0;
 		break;
 	case MACH_LASAT_200:
-		printk("**** MACH_LASAT_200 interrupt routines\n");
 		lasat_int_status = (void *)LASAT_INT_STATUS_REG_200;
 		lasat_int_mask = (void *)LASAT_INT_MASK_REG_200;
 		lasat_int_mask_shift = LASATINT_MASK_SHIFT_200;
@@ -153,7 +151,7 @@ void __init init_IRQ(void)
 	}
 
 	/* Now safe to set the exception vector. */
-	set_except_vector(0, mipsIRQ);
+	set_except_vector(0, lasatIRQ);
 
 	for (i = 0; i <= LASATINT_END; i++) {
 		irq_desc[i].status	= IRQ_DISABLED;

@@ -84,6 +84,11 @@ static inline void WRITECFG32(u32 addr, u32 data)
 	*(u32 *) (cfg_space + (addr & ~3)) = data;
 }
 
+int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+{
+	return dev->irq;
+}
+
 /*
  * Some checks before doing config cycles:
  * In PCI Device Mode, hide everything on bus 0 except the LDT host
@@ -194,10 +199,18 @@ struct pci_controller sb1250_controller = {
 	.io_resource	= &sb1250_io_resource
 };
 
-int __init pcibios_init(void)	xxx This needs to be called somehow ...
+static int __init sb1250_pcibios_init(void)
 {
 	uint32_t cmdreg;
 	uint64_t reg;
+	extern int pci_probe_only;
+
+	/* CFE will assign PCI resources */
+	pci_probe_only = 1;
+
+	/* set resource limit to avoid errors */
+	ioport_resource.end = 0x0000ffff;	/* 32MB reserved by sb1250 */
+	iomem_resource.end = 0xffffffff;	/* no HT support yet */
 
 	cfg_space =
 	    ioremap(A_PHYS_LDTPCI_CFG_MATCH_BITS, 16 * 1024 * 1024);
@@ -265,6 +278,7 @@ int __init pcibios_init(void)	xxx This needs to be called somehow ...
 #endif
 	return 0;
 }
+arch_initcall(sb1250_pcibios_init);
 
 struct pci_fixup pcibios_fixups[] = {
 	{0}

@@ -93,107 +93,6 @@ extern void counter0_irq(int irq, void *dev_id, struct pt_regs *regs);
 
 static spinlock_t irq_lock = SPIN_LOCK_UNLOCKED;
 
-static void setup_local_irq(unsigned int irq_nr, int type, int int_req)
-{
-	if (irq_nr > AU1000_MAX_INTR) return;
-	/* Config2[n], Config1[n], Config0[n] */
-	if (irq_nr > AU1000_LAST_INTC0_INT) {
-		switch (type) {
-			case INTC_INT_RISE_EDGE: /* 0:0:1 */
-				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
-				au_writel(1<<(irq_nr-32), IC1_CFG1CLR);
-				au_writel(1<<(irq_nr-32), IC1_CFG0SET);
-				break;
-			case INTC_INT_FALL_EDGE: /* 0:1:0 */
-				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
-				au_writel(1<<(irq_nr-32), IC1_CFG1SET);
-				au_writel(1<<(irq_nr-32), IC1_CFG0CLR);
-				break;
-			case INTC_INT_RISE_AND_FALL_EDGE: /* 0:1:1 */
-				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
-				au_writel(1<<(irq_nr-32), IC1_CFG1SET);
-				au_writel(1<<(irq_nr-32), IC1_CFG0SET);
-				break;
-			case INTC_INT_HIGH_LEVEL: /* 1:0:1 */
-				au_writel(1<<(irq_nr-32), IC1_CFG2SET);
-				au_writel(1<<(irq_nr-32), IC1_CFG1CLR);
-				au_writel(1<<(irq_nr-32), IC1_CFG0SET);
-				break;
-			case INTC_INT_LOW_LEVEL: /* 1:1:0 */
-				au_writel(1<<(irq_nr-32), IC1_CFG2SET);
-				au_writel(1<<(irq_nr-32), IC1_CFG1SET);
-				au_writel(1<<(irq_nr-32), IC1_CFG0CLR);
-				break;
-			case INTC_INT_DISABLED: /* 0:0:0 */
-				au_writel(1<<(irq_nr-32), IC1_CFG0CLR);
-				au_writel(1<<(irq_nr-32), IC1_CFG1CLR);
-				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
-				break;
-			default: /* disable the interrupt */
-				printk("unexpected int type %d (irq %d)\n", type, irq_nr);
-				au_writel(1<<(irq_nr-32), IC1_CFG0CLR);
-				au_writel(1<<(irq_nr-32), IC1_CFG1CLR);
-				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
-				return;
-		}
-		if (int_req) /* assign to interrupt request 1 */
-			au_writel(1<<(irq_nr-32), IC1_ASSIGNCLR);
-		else	     /* assign to interrupt request 0 */
-			au_writel(1<<(irq_nr-32), IC1_ASSIGNSET);
-		au_writel(1<<(irq_nr-32), IC1_SRCSET);
-		au_writel(1<<(irq_nr-32), IC1_MASKCLR);
-		au_writel(1<<(irq_nr-32), IC1_WAKECLR);
-	}
-	else {
-		switch (type) {
-			case INTC_INT_RISE_EDGE: /* 0:0:1 */
-				au_writel(1<<irq_nr, IC0_CFG2CLR);
-				au_writel(1<<irq_nr, IC0_CFG1CLR);
-				au_writel(1<<irq_nr, IC0_CFG0SET);
-				break;
-			case INTC_INT_FALL_EDGE: /* 0:1:0 */
-				au_writel(1<<irq_nr, IC0_CFG2CLR);
-				au_writel(1<<irq_nr, IC0_CFG1SET);
-				au_writel(1<<irq_nr, IC0_CFG0CLR);
-				break;
-			case INTC_INT_RISE_AND_FALL_EDGE: /* 0:1:1 */
-				au_writel(1<<irq_nr, IC0_CFG2CLR);
-				au_writel(1<<irq_nr, IC0_CFG1SET);
-				au_writel(1<<irq_nr, IC0_CFG0SET);
-				break;
-			case INTC_INT_HIGH_LEVEL: /* 1:0:1 */
-				au_writel(1<<irq_nr, IC0_CFG2SET);
-				au_writel(1<<irq_nr, IC0_CFG1CLR);
-				au_writel(1<<irq_nr, IC0_CFG0SET);
-				break;
-			case INTC_INT_LOW_LEVEL: /* 1:1:0 */
-				au_writel(1<<irq_nr, IC0_CFG2SET);
-				au_writel(1<<irq_nr, IC0_CFG1SET);
-				au_writel(1<<irq_nr, IC0_CFG0CLR);
-				break;
-			case INTC_INT_DISABLED: /* 0:0:0 */
-				au_writel(1<<irq_nr, IC0_CFG0CLR);
-				au_writel(1<<irq_nr, IC0_CFG1CLR);
-				au_writel(1<<irq_nr, IC0_CFG2CLR);
-				break;
-			default: /* disable the interrupt */
-				printk("unexpected int type %d (irq %d)\n", type, irq_nr);
-				au_writel(1<<irq_nr, IC0_CFG0CLR);
-				au_writel(1<<irq_nr, IC0_CFG1CLR);
-				au_writel(1<<irq_nr, IC0_CFG2CLR);
-				return;
-		}
-		if (int_req) /* assign to interrupt request 1 */
-			au_writel(1<<irq_nr, IC0_ASSIGNCLR);
-		else	     /* assign to interrupt request 0 */
-			au_writel(1<<irq_nr, IC0_ASSIGNSET);
-		au_writel(1<<irq_nr, IC0_SRCSET);
-		au_writel(1<<irq_nr, IC0_MASKCLR);
-		au_writel(1<<irq_nr, IC0_WAKECLR);
-	}
-	au_sync();
-}
-
 
 static unsigned int startup_irq(unsigned int irq_nr)
 {
@@ -409,6 +308,117 @@ void startup_match20_interrupt(void)
 }
 #endif
 
+static void setup_local_irq(unsigned int irq_nr, int type, int int_req)
+{
+	if (irq_nr > AU1000_MAX_INTR) return;
+	/* Config2[n], Config1[n], Config0[n] */
+	if (irq_nr > AU1000_LAST_INTC0_INT) {
+		switch (type) {
+			case INTC_INT_RISE_EDGE: /* 0:0:1 */
+				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG1CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG0SET);
+				irq_desc[irq_nr].handler = &rise_edge_irq_type;
+				break;
+			case INTC_INT_FALL_EDGE: /* 0:1:0 */
+				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG1SET);
+				au_writel(1<<(irq_nr-32), IC1_CFG0CLR);
+				irq_desc[irq_nr].handler = &fall_edge_irq_type;
+				break;
+			case INTC_INT_RISE_AND_FALL_EDGE: /* 0:1:1 */
+				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG1SET);
+				au_writel(1<<(irq_nr-32), IC1_CFG0SET);
+				irq_desc[irq_nr].handler = &either_edge_irq_type;
+				break;
+			case INTC_INT_HIGH_LEVEL: /* 1:0:1 */
+				au_writel(1<<(irq_nr-32), IC1_CFG2SET);
+				au_writel(1<<(irq_nr-32), IC1_CFG1CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG0SET);
+				irq_desc[irq_nr].handler = &level_irq_type;
+				break;
+			case INTC_INT_LOW_LEVEL: /* 1:1:0 */
+				au_writel(1<<(irq_nr-32), IC1_CFG2SET);
+				au_writel(1<<(irq_nr-32), IC1_CFG1SET);
+				au_writel(1<<(irq_nr-32), IC1_CFG0CLR);
+				irq_desc[irq_nr].handler = &level_irq_type;
+				break;
+			case INTC_INT_DISABLED: /* 0:0:0 */
+				au_writel(1<<(irq_nr-32), IC1_CFG0CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG1CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
+				break;
+			default: /* disable the interrupt */
+				printk("unexpected int type %d (irq %d)\n", type, irq_nr);
+				au_writel(1<<(irq_nr-32), IC1_CFG0CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG1CLR);
+				au_writel(1<<(irq_nr-32), IC1_CFG2CLR);
+				return;
+		}
+		if (int_req) /* assign to interrupt request 1 */
+			au_writel(1<<(irq_nr-32), IC1_ASSIGNCLR);
+		else	     /* assign to interrupt request 0 */
+			au_writel(1<<(irq_nr-32), IC1_ASSIGNSET);
+		au_writel(1<<(irq_nr-32), IC1_SRCSET);
+		au_writel(1<<(irq_nr-32), IC1_MASKCLR);
+		au_writel(1<<(irq_nr-32), IC1_WAKECLR);
+	}
+	else {
+		switch (type) {
+			case INTC_INT_RISE_EDGE: /* 0:0:1 */
+				au_writel(1<<irq_nr, IC0_CFG2CLR);
+				au_writel(1<<irq_nr, IC0_CFG1CLR);
+				au_writel(1<<irq_nr, IC0_CFG0SET);
+				irq_desc[irq_nr].handler = &rise_edge_irq_type;
+				break;
+			case INTC_INT_FALL_EDGE: /* 0:1:0 */
+				au_writel(1<<irq_nr, IC0_CFG2CLR);
+				au_writel(1<<irq_nr, IC0_CFG1SET);
+				au_writel(1<<irq_nr, IC0_CFG0CLR);
+				irq_desc[irq_nr].handler = &fall_edge_irq_type;
+				break;
+			case INTC_INT_RISE_AND_FALL_EDGE: /* 0:1:1 */
+				au_writel(1<<irq_nr, IC0_CFG2CLR);
+				au_writel(1<<irq_nr, IC0_CFG1SET);
+				au_writel(1<<irq_nr, IC0_CFG0SET);
+				irq_desc[irq_nr].handler = &either_edge_irq_type;
+				break;
+			case INTC_INT_HIGH_LEVEL: /* 1:0:1 */
+				au_writel(1<<irq_nr, IC0_CFG2SET);
+				au_writel(1<<irq_nr, IC0_CFG1CLR);
+				au_writel(1<<irq_nr, IC0_CFG0SET);
+				irq_desc[irq_nr].handler = &level_irq_type;
+				break;
+			case INTC_INT_LOW_LEVEL: /* 1:1:0 */
+				au_writel(1<<irq_nr, IC0_CFG2SET);
+				au_writel(1<<irq_nr, IC0_CFG1SET);
+				au_writel(1<<irq_nr, IC0_CFG0CLR);
+				irq_desc[irq_nr].handler = &level_irq_type;
+				break;
+			case INTC_INT_DISABLED: /* 0:0:0 */
+				au_writel(1<<irq_nr, IC0_CFG0CLR);
+				au_writel(1<<irq_nr, IC0_CFG1CLR);
+				au_writel(1<<irq_nr, IC0_CFG2CLR);
+				break;
+			default: /* disable the interrupt */
+				printk("unexpected int type %d (irq %d)\n", type, irq_nr);
+				au_writel(1<<irq_nr, IC0_CFG0CLR);
+				au_writel(1<<irq_nr, IC0_CFG1CLR);
+				au_writel(1<<irq_nr, IC0_CFG2CLR);
+				return;
+		}
+		if (int_req) /* assign to interrupt request 1 */
+			au_writel(1<<irq_nr, IC0_ASSIGNCLR);
+		else	     /* assign to interrupt request 0 */
+			au_writel(1<<irq_nr, IC0_ASSIGNSET);
+		au_writel(1<<irq_nr, IC0_SRCSET);
+		au_writel(1<<irq_nr, IC0_MASKCLR);
+		au_writel(1<<irq_nr, IC0_WAKECLR);
+	}
+	au_sync();
+}
+
 
 void __init init_IRQ(void)
 {
@@ -416,7 +426,9 @@ void __init init_IRQ(void)
 	unsigned long cp0_status;
 	au1xxx_irq_map_t *imp;
 	extern au1xxx_irq_map_t au1xxx_irq_map[];
+	extern au1xxx_irq_map_t au1xxx_ic0_map[];
 	extern int au1xxx_nr_irqs;
+	extern int au1xxx_ic0_nr_irqs;
 
 	cp0_status = read_c0_status();
 	memset(irq_desc, 0, sizeof(irq_desc));
@@ -424,45 +436,43 @@ void __init init_IRQ(void)
 
 	init_generic_irq();
 
-	for (i = 0; i <= AU1000_MAX_INTR; i++) {
-		/* default is active high, level interrupt */
-		setup_local_irq(i, INTC_INT_HIGH_LEVEL, 0);
-		irq_desc[i].handler = &level_irq_type;
+	/* Initialize interrupt controllers to a safe state.
+	*/
+	au_writel(0xffffffff, IC0_CFG0CLR);
+	au_writel(0xffffffff, IC0_CFG1CLR);
+	au_writel(0xffffffff, IC0_CFG2CLR);
+	au_writel(0xffffffff, IC0_MASKCLR);
+	au_writel(0xffffffff, IC0_ASSIGNSET);
+	au_writel(0xffffffff, IC0_WAKECLR);
+	au_writel(0xffffffff, IC0_SRCSET);
+	au_writel(0xffffffff, IC0_FALLINGCLR);
+	au_writel(0xffffffff, IC0_RISINGCLR);
+	au_writel(0x00000000, IC0_TESTBIT);
+
+	au_writel(0xffffffff, IC1_CFG0CLR);
+	au_writel(0xffffffff, IC1_CFG1CLR);
+	au_writel(0xffffffff, IC1_CFG2CLR);
+	au_writel(0xffffffff, IC1_MASKCLR);
+	au_writel(0xffffffff, IC1_ASSIGNSET);
+	au_writel(0xffffffff, IC1_WAKECLR);
+	au_writel(0xffffffff, IC1_SRCSET);
+	au_writel(0xffffffff, IC1_FALLINGCLR);
+	au_writel(0xffffffff, IC1_RISINGCLR);
+	au_writel(0x00000000, IC1_TESTBIT);
+
+	/* Initialize IC0, which is fixed per processor.
+	*/
+	imp = au1xxx_ic0_map;
+	for (i=0; i<au1xxx_ic0_nr_irqs; i++) {
+		setup_local_irq(imp->im_irq, imp->im_type, imp->im_request);
+		imp++;
 	}
 
 	/* Now set up the irq mapping for the board.
 	*/
 	imp = au1xxx_irq_map;
 	for (i=0; i<au1xxx_nr_irqs; i++) {
-
 		setup_local_irq(imp->im_irq, imp->im_type, imp->im_request);
-
-		switch (imp->im_type) {
-
-		case INTC_INT_HIGH_LEVEL:
-			irq_desc[imp->im_irq].handler = &level_irq_type;
-			break;
-
-		case INTC_INT_LOW_LEVEL:
-			irq_desc[imp->im_irq].handler = &level_irq_type;
-			break;
-
-		case INTC_INT_RISE_EDGE:
-			irq_desc[imp->im_irq].handler = &rise_edge_irq_type;
-			break;
-
-		case INTC_INT_FALL_EDGE:
-			irq_desc[imp->im_irq].handler = &fall_edge_irq_type;
-			break;
-
-		case INTC_INT_RISE_AND_FALL_EDGE:
-			irq_desc[imp->im_irq].handler = &either_edge_irq_type;
-			break;
-
-		default:
-			panic("Unknown au1xxx irq map");
-			break;
-		}
 		imp++;
 	}
 

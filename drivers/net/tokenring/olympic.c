@@ -259,6 +259,7 @@ static int __devinit olympic_probe(struct pci_dev *pdev, const struct pci_device
 	dev->get_stats=&olympic_get_stats ;
 	dev->set_mac_address=&olympic_set_mac_address ;  
 	SET_MODULE_OWNER(dev) ; 
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
 	pci_set_drvdata(pdev,dev) ; 
 	register_netdev(dev) ; 

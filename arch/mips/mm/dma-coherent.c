@@ -24,7 +24,7 @@ void *dma_alloc_noncoherent(struct device *dev, size_t size,
 	/* ignore region specifiers */
 	gfp &= ~(__GFP_DMA | __GFP_HIGHMEM);
 
-	if (dev == NULL || (*dev->dma_mask < 0xffffffff))
+	if (dev == NULL || (dev->coherent_dma_mask < 0xffffffff))
 		gfp |= GFP_DMA;
 	ret = (void *) __get_free_pages(gfp, get_order(size));
 
@@ -119,16 +119,16 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 
 EXPORT_SYMBOL(dma_unmap_sg);
 
-void dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle, size_t size,
-		enum dma_data_direction direction)
+void dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle,
+	size_t size, enum dma_data_direction direction)
 {
 	BUG_ON(direction == DMA_NONE);
 }
 
 EXPORT_SYMBOL(dma_sync_single_for_cpu);
 
-void dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle, size_t size,
-		enum dma_data_direction direction)
+void dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle,
+	size_t size, enum dma_data_direction direction)
 {
 	BUG_ON(direction == DMA_NONE);
 }
@@ -168,6 +168,13 @@ void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nele
 }
 
 EXPORT_SYMBOL(dma_sync_sg_for_device);
+
+int dma_mapping_error(dma_addr_t dma_addr)
+{
+	return 0;
+}
+
+EXPORT_SYMBOL(dma_mapping_error);
 
 int dma_supported(struct device *dev, u64 mask)
 {

@@ -153,7 +153,6 @@ void comet_timer(unsigned long data)
 {
 	struct net_device *dev = (struct net_device *)data;
 	struct tulip_private *tp = netdev_priv(dev);
-	long ioaddr = dev->base_addr;
 	int next_tick = 60*HZ;
 
 	if (tulip_debug > 1)

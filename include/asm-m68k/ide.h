@@ -74,13 +74,7 @@ static __inline__ void ide_init_hwif_ports(hw_regs_t *hw,
 		printk("ide_init_hwif_ports: must not be called\n");
 }
 
-/*
- * This registers the standard ports for this architecture with the IDE
- * driver.
- */
-static __inline__ void ide_init_default_hwifs(void)
-{
-}
+#define ide_init_default_irq(base)	(0)
 
 /*
  * Get rid of defs from io.h - ide has its private and conflicting versions

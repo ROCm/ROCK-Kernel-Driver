@@ -49,7 +49,6 @@
 #include <asm/system.h>
 
 extern asmlinkage void ocelot_handle_int(void);
-extern void mv64340_irq_init(void);
 extern void uart_irq_init(void);
 extern void cpci_irq_init(void);
 
@@ -79,7 +78,7 @@ void __init init_IRQ(void)
 	setup_irq(5, &cascade_fpga);
 	setup_irq(6, &cascade_mv64340);
 
-	mv64340_irq_init();
+	mv64340_irq_init(16);
 	uart_irq_init();
 	cpci_irq_init();
 

@@ -401,10 +401,9 @@ static struct request *cfq_next_request(request_queue_t *q)
 dispatch:
 		rq = list_entry_rq(cfqd->dispatch->next);
 
-		BUG_ON(q->last_merge == rq);
 		crq = RQ_DATA(rq);
 		if (crq)
-			BUG_ON(ON_MHASH(crq));
+			cfq_remove_merge_hints(q, crq);
 
 		return rq;
 	}

@@ -426,6 +426,7 @@ __again:
 			}
 
 			SET_MODULE_OWNER(dev);
+			SET_NETDEV_DEV(dev, &idev->dev);
 			pnp_cards++;
 
 			netdev_boot_setup_check(dev);
@@ -595,10 +596,8 @@ no_pnp:
 #endif
 
 	el3_cards++;
-#if !defined(__ISAPNP__) || defined(CONFIG_X86_PC9800)
 	lp->next_dev = el3_root_dev;
 	el3_root_dev = dev;
-#endif
 	return 0;
 
 out1:

@@ -203,34 +203,23 @@ static void setup_driver_defaults(ide_driver_t *driver);
 /*
  * Do not even *think* about calling this!
  */
-static void init_hwif_data (unsigned int index)
+static void init_hwif_data(ide_hwif_t *hwif, unsigned int index)
 {
 	unsigned int unit;
-	hw_regs_t hw;
-	ide_hwif_t *hwif = &ide_hwifs[index];
 
 	/* bulk initialize hwif & drive info with zeros */
 	memset(hwif, 0, sizeof(ide_hwif_t));
-	memset(&hw, 0, sizeof(hw_regs_t));
 
 	/* fill in any non-zero initial values */
-	hwif->index     = index;
-	ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, &hwif->irq);
-	memcpy(&hwif->hw, &hw, sizeof(hw));
-	memcpy(hwif->io_ports, hw.io_ports, sizeof(hw.io_ports));
-	hwif->noprobe	= !hwif->io_ports[IDE_DATA_OFFSET];
-#ifdef CONFIG_BLK_DEV_HD
-	if (hwif->io_ports[IDE_DATA_OFFSET] == HD_DATA)
-		hwif->noprobe = 1; /* may be overridden by ide_setup() */
-#endif /* CONFIG_BLK_DEV_HD */
+	hwif->index	= index;
 	hwif->major	= ide_hwif_to_major[index];
+
 	hwif->name[0]	= 'i';
 	hwif->name[1]	= 'd';
 	hwif->name[2]	= 'e';
 	hwif->name[3]	= '0' + index;
-	hwif->bus_state = BUSSTATE_ON;
-	hwif->reset_poll= NULL;
-	hwif->pre_reset = NULL;
+
+	hwif->bus_state	= BUSSTATE_ON;
 
 	hwif->atapi_dma = 0;		/* disable all atapi dma */ 
 	hwif->ultra_mask = 0x80;	/* disable all ultra */
@@ -265,6 +254,24 @@ static void init_hwif_data (unsigned int index)
 	}
 }
 
+static void init_hwif_default(ide_hwif_t *hwif, unsigned int index)
+{
+	hw_regs_t hw;
+
+	memset(&hw, 0, sizeof(hw_regs_t));
+
+	ide_init_hwif_ports(&hw, ide_default_io_base(index), 0, &hwif->irq);
+
+	memcpy(&hwif->hw, &hw, sizeof(hw));
+	memcpy(hwif->io_ports, hw.io_ports, sizeof(hw.io_ports));
+
+	hwif->noprobe = !hwif->io_ports[IDE_DATA_OFFSET];
+#ifdef CONFIG_BLK_DEV_HD
+	if (hwif->io_ports[IDE_DATA_OFFSET] == HD_DATA)
+		hwif->noprobe = 1;	/* may be overridden by ide_setup() */
+#endif
+}
+
 /*
  * init_ide_data() sets reasonable default values into all fields
  * of all instances of the hwifs and drives, but only on the first call.
@@ -285,6 +292,7 @@ static void init_hwif_data (unsigned int index)
 #define MAGIC_COOKIE 0x12345678
 static void __init init_ide_data (void)
 {
+	ide_hwif_t *hwif;
 	unsigned int index;
 	static unsigned long magic_cookie = MAGIC_COOKIE;
 
@@ -295,13 +303,21 @@ static void __init init_ide_data (void)
 	setup_driver_defaults(&idedefault_driver);
 
 	/* Initialise all interface structures */
-	for (index = 0; index < MAX_HWIFS; ++index)
-		init_hwif_data(index);
+	for (index = 0; index < MAX_HWIFS; ++index) {
+		hwif = &ide_hwifs[index];
+		init_hwif_data(hwif, index);
+		init_hwif_default(hwif, index);
+		hwif->irq = hwif->hw.irq =
+			ide_init_default_irq(hwif->io_ports[IDE_DATA_OFFSET]);
+	}
 
+/* OBSOLETE: still needed on arm26 and arm */
+#ifdef CONFIG_ARM
 	/* Add default hw interfaces */
 	initializing = 1;
 	ide_init_default_hwifs();
 	initializing = 0;
+#endif
 }
 
 /*
@@ -569,8 +585,6 @@ void ide_hwif_release_regions(ide_hwif_t *hwif)
 
 EXPORT_SYMBOL(ide_hwif_release_regions);
 
-extern void init_hwif_data(unsigned int index);
-
 /**
  *	ide_unregister		-	free an ide interface
  *	@index: index of interface (will change soon to a pointer)
@@ -750,7 +764,10 @@ void ide_unregister (unsigned int index)
 	}
 
 	old_hwif			= *hwif;
-	init_hwif_data(index);	/* restore hwif data to pristine status */
+
+	init_hwif_data(hwif, index);	/* restore hwif data to pristine status */
+	init_hwif_default(hwif, index);
+
 	hwif->hwgroup			= old_hwif.hwgroup;
 
 	hwif->gendev.parent		= old_hwif.gendev.parent;
@@ -952,8 +969,10 @@ int ide_register_hw (hw_regs_t *hw, ide_hwif_t **hwifp)
 found:
 	if (hwif->present)
 		ide_unregister(index);
-	else if (!hwif->hold)
-		init_hwif_data(index);
+	else if (!hwif->hold) {
+		init_hwif_data(hwif, index);
+		init_hwif_default(hwif, index);
+	}
 	if (hwif->present)
 		return -1;
 	memcpy(&hwif->hw, hw, sizeof(*hw));

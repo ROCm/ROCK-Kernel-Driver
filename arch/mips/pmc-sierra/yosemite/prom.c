@@ -169,7 +169,7 @@ int prom_setup_smp(void)
 int prom_boot_secondary(int cpu, unsigned long sp, unsigned long gp)
 {
         /* Clear the semaphore */
-        *(volatile u_int32_t *)(0xbb000a68) = 0x80000000;
+        *(volatile uint32_t *)(0xbb000a68) = 0x80000000;
 
         return 1;
 }

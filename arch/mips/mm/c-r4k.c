@@ -426,8 +426,7 @@ static void r4k_flush_icache_range(unsigned long start, unsigned long end)
  * least know the kernel address of the page so we can flush it
  * selectivly.
  */
-static void r4k_flush_icache_page(struct vm_area_struct *vma,
-	struct page *page)
+static void r4k_flush_icache_page(struct vm_area_struct *vma, struct page *page)
 {
 	/*
 	 * If there's no context yet, or the page isn't executable, no icache
@@ -478,6 +477,9 @@ static void r4k_dma_cache_wback_inv(unsigned long addr, unsigned long size)
 {
 	unsigned long end, a;
 
+	/* Catch bad driver code */
+	BUG_ON(size == 0);
+
 	if (cpu_has_subset_pcaches) {
 		unsigned long sc_lsize = current_cpu_data.scache.linesz;
 
@@ -524,6 +526,9 @@ static void r4k_dma_cache_wback_inv(unsigned long addr, unsigned long size)
 static void r4k_dma_cache_inv(unsigned long addr, unsigned long size)
 {
 	unsigned long end, a;
+
+	/* Catch bad driver code */
+	BUG_ON(size == 0);
 
 	if (cpu_has_subset_pcaches) {
 		unsigned long sc_lsize = current_cpu_data.scache.linesz;
@@ -787,7 +792,10 @@ static void __init probe_pcache(void)
 		c->dcache.ways = 4;
 		c->dcache.waybit = ffs(dcache_size / c->dcache.ways) - 1;
 
-		c->options |= MIPS_CPU_CACHE_CDEX_P | MIPS_CPU_PREFETCH;
+#if !defined(CONFIG_SMP) || !defined(RM9000_CDEX_SMP_WAR)
+		c->options |= MIPS_CPU_CACHE_CDEX_P;
+#endif
+		c->options |= MIPS_CPU_PREFETCH;
 		break;
 
 	default:

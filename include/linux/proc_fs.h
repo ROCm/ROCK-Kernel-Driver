@@ -26,9 +26,6 @@ enum {
 
 /* Finally, the dynamically allocatable proc entries are reserved: */
 
-#define PROC_DYNAMIC_FIRST 4096
-#define PROC_NDYNAMIC      16384
-
 #define PROC_SUPER_MAGIC 0x9fa0
 
 /*
@@ -53,7 +50,7 @@ typedef	int (write_proc_t)(struct file *file, const char __user *buffer,
 typedef int (get_info_t)(char *, char **, off_t, int);
 
 struct proc_dir_entry {
-	unsigned short low_ino;
+	unsigned int low_ino;
 	unsigned short namelen;
 	const char *name;
 	mode_t mode;
@@ -102,7 +99,7 @@ extern void remove_proc_entry(const char *name, struct proc_dir_entry *parent);
 
 extern struct vfsmount *proc_mnt;
 extern int proc_fill_super(struct super_block *,void *,int);
-extern struct inode * proc_get_inode(struct super_block *, int, struct proc_dir_entry *);
+extern struct inode *proc_get_inode(struct super_block *, unsigned int, struct proc_dir_entry *);
 
 extern int proc_match(int, const char *,struct proc_dir_entry *);
 

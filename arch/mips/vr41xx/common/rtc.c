@@ -259,7 +259,7 @@ void vr41xx_set_epoch_time(unsigned long time)
 	epoch_time = time;
 }
 
-void __init vr41xx_time_init(void)
+static void __init vr41xx_time_init(void)
 {
 	switch (current_cpu_data.cputype) {
 	case CPU_VR4111:
@@ -291,7 +291,7 @@ void __init vr41xx_time_init(void)
 	rtc_set_time = vr41xx_set_time;
 }
 
-void __init vr41xx_timer_setup(struct irqaction *irq)
+static void __init vr41xx_timer_setup(struct irqaction *irq)
 {
 	do_gettimeoffset = vr41xx_gettimeoffset;
 
@@ -308,4 +308,10 @@ void __init vr41xx_timer_setup(struct irqaction *irq)
 	write_rtc2(ELAPSEDTIME_INT, RTCINTREG);
 
 	setup_irq(ELAPSEDTIME_IRQ, irq);
+}
+
+void __init vr41xx_rtc_init(void)
+{
+	board_time_init = vr41xx_time_init;
+	board_timer_setup = vr41xx_timer_setup;
 }

@@ -44,7 +44,6 @@
 #endif
 
 #include "ds1603.h"
-#include "at93c.h"
 #include <asm/lasat/ds1603.h>
 #include <asm/lasat/picvue.h>
 #include <asm/lasat/eeprom.h>
@@ -126,12 +125,6 @@ static void lasat_timer_setup(struct irqaction *irq)
 	change_c0_status(ST0_IM, IE_IRQ0 | IE_IRQ5);
 }
 
-#define MIPS_CPU_TIMER_IRQ 7
-asmlinkage void lasat_timer_interrupt(struct pt_regs *regs)
-{
-	ll_timer_interrupt(MIPS_CPU_TIMER_IRQ, regs);
-}
-
 #define DYNAMIC_SERIAL_INIT
 #ifdef DYNAMIC_SERIAL_INIT
 void __init serial_init(void)
@@ -162,7 +155,7 @@ void __init serial_init(void)
 }
 #endif
 
-static void __init lasat_setup(void)
+static int __init lasat_setup(void)
 {
 	int i;
 	lasat_misc  = &lasat_misc_info[mips_machtype];
@@ -192,6 +185,8 @@ static void __init lasat_setup(void)
 	change_c0_status(ST0_BEV,0);
 
 	prom_printf("Lasat specific initialization complete\n");
+
+        return 0;
 }
 
 early_initcall(lasat_setup);

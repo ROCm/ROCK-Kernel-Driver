@@ -33,10 +33,6 @@
 #include <linux/init.h>
 
 #include <asm/mach-au1x00/au1000.h>
-//#include <asm/pb1500.h>
-#ifdef CONFIG_MIPS_PB1000
-#include <asm/mach-pb1x00/pb1000.h>
-#endif
 
 /*
  * Shortcut
@@ -46,7 +42,7 @@
 
 static char irq_tab_alchemy[][5] __initdata = {
  [11] = { -1, INTA, INTA, INTA, INTA },
- [12] = { -1, INTA, INTA, INTA, INTA }
+ [12] = { -1, INTA, INTA, INTA, INTA },
 #if defined( CONFIG_SOC_AU1550 )
  [13] = { -1, INTB, INTB, INTB, INTB }
 #endif
