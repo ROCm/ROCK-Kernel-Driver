@@ -117,7 +117,19 @@ static ide_pci_device_t generic_chipsets[] __devinitdata = {
 		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
 		.bootable	= ON_BOARD,
 		.extra		= 0,
-	},{ /*  9 removed was VIA_SATA,  10 */
+	},{	/* 9 */
+		.vendor		= PCI_VENDOR_ID_VIA,
+		.device		= PCI_DEVICE_ID_VIA_8237_SATA,
+		.name		= "VIA8237SATA",
+		.init_chipset	= init_chipset_generic,
+		.init_iops	= NULL,
+		.init_hwif	= init_hwif_generic,
+		.channels	= 2,
+		.autodma	= AUTODMA,
+		.enablebits	= {{0x00,0x00,0x00}, {0x00,0x00,0x00}},
+		.bootable	= OFF_BOARD,
+		.extra		= 0,
+	},{ /* 10 */
 		.vendor		= PCI_VENDOR_ID_TOSHIBA,
 		.device		= PCI_DEVICE_ID_TOSHIBA_PICCOLO,
 		.name 		= "Piccolo0102",
