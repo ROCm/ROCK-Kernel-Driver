@@ -289,9 +289,6 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 #endif
 #endif
                                                                                 
-	if (NULL == p)
-		goto error;
-
 #ifndef CONFIG_NET_CLS_ACT
 #ifdef CONFIG_NETFILTER
 	if (!nf_registered) {
@@ -305,8 +302,6 @@ int ingress_init(struct Qdisc *sch,struct rtattr *opt)
 #endif
 
 	DPRINTK("ingress_init(sch %p,[qdisc %p],opt %p)\n",sch,p,opt);
-	memset(p, 0, sizeof(*p));
-	p->filter_list = NULL;
 	p->q = &noop_qdisc;
 	return 0;
 error:
@@ -346,9 +341,6 @@ static void ingress_destroy(struct Qdisc *sch)
 		p->filter_list = tp->next;
 		tcf_destroy(tp);
 	}
-	memset(p, 0, sizeof(*p));
-	p->filter_list = NULL;
-
 #if 0
 /* for future use */
 	qdisc_destroy(p->q);

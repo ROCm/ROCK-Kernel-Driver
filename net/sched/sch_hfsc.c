@@ -1530,7 +1530,6 @@ hfsc_init_qdisc(struct Qdisc *sch, struct rtattr *opt)
 		return -EINVAL;
 	qopt = RTA_DATA(opt);
 
-	memset(q, 0, sizeof(struct hfsc_sched));
 	sch->stats_lock = &sch->dev->queue_lock;
 
 	q->defcls = qopt->defcls;
