@@ -954,6 +954,15 @@ config RAW_DRIVER
 	  Once bound, I/O against /dev/raw/rawN uses efficient zero-copy I/O. 
 	  See the raw(8) manpage for more details.
 
+config MAX_RAW_DEVS
+	int "Maximum number of RAW devices to support (1-8192)"
+	depends on RAW_DRIVER
+	default "256"
+	help
+	  The maximum number of RAW devices that are supported.
+	  Default is 256. Increase this number in case you need lots of
+	  raw devices.
+
 config HANGCHECK_TIMER
 	tristate "Hangcheck timer"
 	depends on X86_64 || X86
