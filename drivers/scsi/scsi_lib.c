@@ -954,6 +954,22 @@ static int scsi_init_io(struct scsi_cmnd *cmd)
 	return BLKPREP_KILL;
 }
 
+static int scsi_issue_flush_fn(request_queue_t *q, struct gendisk *disk,
+			       sector_t *error_sector)
+{
+	struct scsi_device *sdev = q->queuedata;
+	struct scsi_driver *drv;
+
+	if (sdev->sdev_state != SDEV_RUNNING)
+		return -ENXIO;
+
+	drv = *(struct scsi_driver **) disk->private_data;
+	if (drv->issue_flush)
+		return drv->issue_flush(&sdev->sdev_gendev, error_sector);
+
+	return -EOPNOTSUPP;
+}
+
 static int scsi_prep_fn(struct request_queue *q, struct request *req)
 {
 	struct scsi_device *sdev = q->queuedata;
@@ -1335,7 +1351,8 @@ struct request_queue *scsi_alloc_queue(struct scsi_device *sdev)
 	blk_queue_max_sectors(q, shost->max_sectors);
 	blk_queue_bounce_limit(q, scsi_calculate_bounce_limit(shost));
 	blk_queue_segment_boundary(q, shost->dma_boundary);
- 
+	blk_queue_issue_flush_fn(q, scsi_issue_flush_fn);
+
 	if (!shost->use_clustering)
 		clear_bit(QUEUE_FLAG_CLUSTER, &q->queue_flags);
 	return q;

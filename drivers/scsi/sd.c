@@ -113,6 +113,7 @@ static int sd_remove(struct device *);
 static void sd_shutdown(struct device *dev);
 static void sd_rescan(struct device *);
 static int sd_init_command(struct scsi_cmnd *);
+static int sd_issue_flush(struct device *, sector_t *);
 static void sd_read_capacity(struct scsi_disk *sdkp, char *diskname,
 		 struct scsi_request *SRpnt, unsigned char *buffer);
 
@@ -126,6 +127,7 @@ static struct scsi_driver sd_template = {
 	},
 	.rescan			= sd_rescan,
 	.init_command		= sd_init_command,
+	.issue_flush		= sd_issue_flush,
 };
 
 /* Device no to disk mapping:
@@ -674,6 +676,62 @@ static int sd_media_changed(struct gendisk *disk)
 not_present:
 	set_media_not_present(sdkp);
 	return 1;
+}
+
+static int sd_sync_cache(struct scsi_device *sdp)
+{
+	struct scsi_request *sreq;
+	int retries, res;
+
+	if (!scsi_device_online(sdp))
+		return -ENODEV;
+
+	sreq = scsi_allocate_request(sdp, GFP_KERNEL);
+	if (!sreq) {
+		printk("FAILED\n  No memory for request\n");
+		return -ENOMEM;
+	}
+
+	sreq->sr_data_direction = DMA_NONE;
+	for (retries = 3; retries > 0; --retries) {
+		unsigned char cmd[10] = { 0 };
+
+		cmd[0] = SYNCHRONIZE_CACHE;
+		/*
+		 * Leave the rest of the command zero to indicate
+		 * flush everything.
+		 */
+		scsi_wait_req(sreq, cmd, NULL, 0, SD_TIMEOUT, SD_MAX_RETRIES);
+		if (sreq->sr_result == 0)
+			break;
+	}
+
+	res = sreq->sr_result;
+	if (res) {
+		printk(KERN_WARNING "FAILED\n  status = %x, message = %02x, "
+				    "host = %d, driver = %02x\n  ",
+				    status_byte(res), msg_byte(res),
+				    host_byte(res), driver_byte(res));
+			if (driver_byte(res) & DRIVER_SENSE)
+				scsi_print_req_sense("sd", sreq);
+	}
+
+	scsi_release_request(sreq);
+	return res;
+}
+
+static int sd_issue_flush(struct device *dev, sector_t *error_sector)
+{
+	struct scsi_device *sdp = to_scsi_device(dev);
+	struct scsi_disk *sdkp = dev_get_drvdata(dev);
+
+	if (!sdkp)
+               return -ENODEV;
+
+	if (!sdkp->WCE)
+		return 0;
+
+	return sd_sync_cache(sdp);
 }
 
 static void sd_rescan(struct device *dev)
@@ -1503,52 +1561,17 @@ static void scsi_disk_release(struct kref *kref)
 static void sd_shutdown(struct device *dev)
 {
 	struct scsi_device *sdp = to_scsi_device(dev);
-	struct scsi_disk *sdkp;
-	struct scsi_request *sreq;
-	int retries, res;
+	struct scsi_disk *sdkp = dev_get_drvdata(dev);
 
-	sdkp = dev_get_drvdata(dev);
 	if (!sdkp)
-               return;         /* this can happen */
+		return;         /* this can happen */
 
-	if (!scsi_device_online(sdp) || !sdkp->WCE)
+	if (!sdkp->WCE)
 		return;
 
-	printk(KERN_NOTICE "Synchronizing SCSI cache for disk %s: ",
+	printk(KERN_NOTICE "Synchronizing SCSI cache for disk %s: \n",
 			sdkp->disk->disk_name);
-
-	sreq = scsi_allocate_request(sdp, GFP_KERNEL);
-	if (!sreq) {
-		printk("FAILED\n  No memory for request\n");
-		return;
-	}
-
-	sreq->sr_data_direction = DMA_NONE;
-	for (retries = 3; retries > 0; --retries) {
-		unsigned char cmd[10] = { 0 };
-
-		cmd[0] = SYNCHRONIZE_CACHE;
-		/*
-		 * Leave the rest of the command zero to indicate
-		 * flush everything.
-		 */
-		scsi_wait_req(sreq, cmd, NULL, 0, SD_TIMEOUT, SD_MAX_RETRIES);
-		if (sreq->sr_result == 0)
-			break;
-	}
-
-	res = sreq->sr_result;
-	if (res) {
-		printk(KERN_WARNING "FAILED\n  status = %x, message = %02x, "
-				    "host = %d, driver = %02x\n  ",
-				    status_byte(res), msg_byte(res),
-				    host_byte(res), driver_byte(res));
-			if (driver_byte(res) & DRIVER_SENSE)
-				scsi_print_req_sense("sd", sreq);
-	}
-	
-	scsi_release_request(sreq);
-	printk("\n");
+	sd_sync_cache(sdp);
 }	
 
 /**
