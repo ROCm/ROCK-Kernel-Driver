@@ -1,0 +1,47 @@
+Code by Ghozlane Toumi <gtoumi@messel.emse.fr>, documentation by
+Keith Owens <kaos@ocs.com.au>
+
+In addition to the normal config targets you can make
+
+  randconfig	random configuration.
+
+  allyes	reply 'y' to all options, maximal kernel.
+
+  allno		reply 'n' to all options, minimal kernel.
+
+  allmod	build everything as modules where possible.
+
+
+All random configurations will satisfy the config rules, that is, all
+configurations should be valid.  Any build errors indicate bugs in the
+config dependency rules or in the Makefiles.
+
+You can constrain the random configuration, e.g. you may want to force
+the use of modules or the absence of /proc or cramfs must be a module.
+If file .force_default exists then it is read to preset selected
+values, all other values will be randomly selected, subject to the
+config rules.  The syntax of .force_default is:
+
+CONFIG_foo=value
+  Force this value, for example CONFIG_MODULES=y, CONFIG_PROC_FS=n,
+  CONFIG_RAMFS=m.
+
+# CONFIG_foo is not set
+  Equivalent to CONFIG_foo=n, supported because this is the format used
+  in .config.  NOTE: The leading '#' is required.
+
+# list CONFIG_foo val1,val2,val3
+  Pick a value for CONFIG_foo from the list.  CONFIG_foo must be an int
+  or hex option.  NOTE: The leading '#' is required.
+
+# range CONFIG_foo min max
+  Pick a value for CONFIG_foo in the range min <=> max.  CONFIG_foo
+  must be an int option.  NOTE: The leading '#' is required.
+
+If you have repeated settings of the same option in .force_default then
+values take precedence over lists which take precedence over range.
+Within each group the last setting for an option is used.
+
+Answers "randomised" are bool(), tristate(), dep_tristate() and
+choice().  Unless specified in .force_default, int, hex, and string
+options use the default values from config.in.
