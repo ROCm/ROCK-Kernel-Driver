@@ -84,7 +84,7 @@ typedef sctp_disposition_t (sctp_state_fn_t) (const struct sctp_endpoint *,
 typedef void (sctp_timer_event_t) (unsigned long);
 typedef struct {
 	sctp_state_fn_t *fn;
-	char *name;
+	const char *name;
 } sctp_sm_table_entry_t;
 
 /* A naming convention of "sctp_sf_xxx" applies to all the state functions
@@ -176,9 +176,6 @@ sctp_state_fn_t sctp_sf_do_9_2_reshutack;
 sctp_state_fn_t sctp_sf_do_9_2_reshut;
 sctp_state_fn_t sctp_sf_do_9_2_shutack;
 
-sctp_state_fn_t lucky;
-sctp_state_fn_t other_stupid;
-
 /* Prototypes for timeout event state functions.  Not in use. */
 sctp_state_fn_t sctp_do_4_2_reinit;
 sctp_state_fn_t sctp_do_4_3_reecho;
@@ -193,9 +190,9 @@ sctp_state_fn_t sctp_addip_do_asconf_ack;
 
 /* Prototypes for utility support functions.  */
 __u8 sctp_get_chunk_type(struct sctp_chunk *chunk);
-sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t event_type,
-					    sctp_state_t state,
-					    sctp_subtype_t event_subtype);
+const sctp_sm_table_entry_t *sctp_sm_lookup_event(sctp_event_t,
+					    sctp_state_t,
+					    sctp_subtype_t);
 int sctp_chunk_iif(const struct sctp_chunk *);
 struct sctp_association *sctp_make_temp_asoc(const struct sctp_endpoint *,
 					     struct sctp_chunk *,
@@ -284,20 +281,13 @@ int sctp_side_effects(sctp_event_t event_type, sctp_subtype_t subtype,
                       int gfp);
 
 /* 2nd level prototypes */
-int
-sctp_cmd_interpreter(sctp_event_t event_type, sctp_subtype_t subtype,
-		     sctp_state_t state,
-		     struct sctp_endpoint *ep,
-		     struct sctp_association *asoc,
-		     void *event_arg,
-		     sctp_disposition_t status,
-		     sctp_cmd_seq_t *retval,
-		     int gfp);
+int sctp_cmd_interpreter(sctp_event_t, sctp_subtype_t, sctp_state_t,
+			 struct sctp_endpoint *, struct sctp_association *,
+			 void *event_arg, sctp_disposition_t,
+			 sctp_cmd_seq_t *retval, int gfp);
 
 
 int sctp_gen_sack(struct sctp_association *, int force, sctp_cmd_seq_t *);
-void sctp_do_TSNdup(struct sctp_association *, struct sctp_chunk *, long gap);
-
 void sctp_generate_t3_rtx_event(unsigned long peer);
 void sctp_generate_heartbeat_event(unsigned long peer);
 
@@ -311,7 +301,7 @@ struct sctp_packet *sctp_ootb_pkt_new(const struct sctp_association *,
 				      const struct sctp_chunk *);
 void sctp_ootb_pkt_free(struct sctp_packet *);
 
-sctp_cookie_param_t *
+struct sctp_cookie_param *
 sctp_pack_cookie(const struct sctp_endpoint *, const struct sctp_association *,
 		 const struct sctp_chunk *, int *cookie_len,
 		 const __u8 *, int addrs_len);
@@ -332,18 +322,18 @@ __u32 sctp_generate_tag(const struct sctp_endpoint *);
 __u32 sctp_generate_tsn(const struct sctp_endpoint *);
 
 /* 4th level prototypes */
-void sctp_param2sockaddr(union sctp_addr *addr, sctp_addr_param_t *,
+void sctp_param2sockaddr(union sctp_addr *addr, union sctp_addr_param *,
 			 __u16 port, int iif);
 int sctp_addr2sockaddr(const union sctp_params, union sctp_addr *);
-int sockaddr2sctp_addr(const union sctp_addr *, sctp_addr_param_t *);
+int sockaddr2sctp_addr(const union sctp_addr *, union sctp_addr_param *);
 
 /* Extern declarations for major data structures.  */
-sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t, sctp_state_t);
-extern sctp_sm_table_entry_t
+const sctp_sm_table_entry_t *sctp_chunk_event_lookup(sctp_cid_t, sctp_state_t);
+extern const sctp_sm_table_entry_t
 primitive_event_table[SCTP_NUM_PRIMITIVE_TYPES][SCTP_STATE_NUM_STATES];
-extern sctp_sm_table_entry_t
+extern const sctp_sm_table_entry_t
 other_event_table[SCTP_NUM_OTHER_TYPES][SCTP_STATE_NUM_STATES];
-extern sctp_sm_table_entry_t
+extern const sctp_sm_table_entry_t
 timeout_event_table[SCTP_NUM_TIMEOUT_TYPES][SCTP_STATE_NUM_STATES];
 extern sctp_timer_event_t *sctp_timer_events[SCTP_NUM_TIMEOUT_TYPES];
 

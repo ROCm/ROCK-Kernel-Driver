@@ -589,27 +589,17 @@ struct sctp_chunk *sctp_make_data_empty(struct sctp_association *asoc,
 struct sctp_chunk *sctp_make_sack(const struct sctp_association *asoc)
 {
 	struct sctp_chunk *retval;
-	sctp_sackhdr_t sack;
-	sctp_gap_ack_block_t gab;
-	int length;
+	struct sctp_sackhdr sack;
+	int len;
 	__u32 ctsn;
-	struct sctp_tsnmap_iter iter;
 	__u16 num_gabs, num_dup_tsns;
 	struct sctp_tsnmap *map = (struct sctp_tsnmap *)&asoc->peer.tsn_map;
 
 	ctsn = sctp_tsnmap_get_ctsn(map);
-	SCTP_DEBUG_PRINTK("sackCTSNAck sent is 0x%x.\n", ctsn);
+	SCTP_DEBUG_PRINTK("sackCTSNAck sent:  0x%x.\n", ctsn);
 
-	/* Count the number of Gap Ack Blocks.  */
-	num_gabs = 0;
-
-	if (sctp_tsnmap_has_gap(map)) {
-		sctp_tsnmap_iter_init(map, &iter);
-		while (sctp_tsnmap_next_gap_ack(map, &iter,
-						&gab.start, &gab.end))
-			num_gabs++;
-	}
-
+	/* How much room is needed in the chunk? */
+	num_gabs = sctp_tsnmap_num_gabs(map);
 	num_dup_tsns = sctp_tsnmap_num_dups(map);
 
 	/* Initialize the SACK header.  */
@@ -618,12 +608,12 @@ struct sctp_chunk *sctp_make_sack(const struct sctp_association *asoc)
 	sack.num_gap_ack_blocks     = htons(num_gabs);
 	sack.num_dup_tsns           = htons(num_dup_tsns);
 
-	length = sizeof(sack)
-		+ sizeof(sctp_gap_ack_block_t) * num_gabs
+	len = sizeof(sack)
+		+ sizeof(struct sctp_gap_ack_block) * num_gabs
 		+ sizeof(__u32) * num_dup_tsns;
 
 	/* Create the chunk.  */
-	retval = sctp_make_chunk(asoc, SCTP_CID_SACK, 0, length);
+	retval = sctp_make_chunk(asoc, SCTP_CID_SACK, 0, len);
 	if (!retval)
 		goto nodata;
 
@@ -662,21 +652,15 @@ struct sctp_chunk *sctp_make_sack(const struct sctp_association *asoc)
 	retval->subh.sack_hdr =
 		sctp_addto_chunk(retval, sizeof(sack), &sack);
 
-	/* Put the Gap Ack Blocks into the chunk.  */
-	if (num_gabs) {
-		sctp_tsnmap_iter_init(map, &iter);
-		while(sctp_tsnmap_next_gap_ack(map, &iter,
-					       &gab.start, &gab.end)) {
-			gab.start = htons(gab.start);
-			gab.end = htons(gab.end);
-			sctp_addto_chunk(retval, sizeof(sctp_gap_ack_block_t),
-					 &gab);
-		}
-	}
+	/* Add the gap ack block information.   */
+	if (num_gabs)
+		sctp_addto_chunk(retval, sizeof(__u32) * num_gabs,
+				 sctp_tsnmap_get_gabs(map));
 
-	/* Register the duplicates.  */
-	sctp_addto_chunk(retval, sizeof(__u32) * num_dup_tsns,
-			 sctp_tsnmap_get_dups(map));
+	/* Add the duplicate TSN information.  */
+	if (num_dup_tsns)
+		sctp_addto_chunk(retval, sizeof(__u32) * num_dup_tsns,
+				 sctp_tsnmap_get_dups(map));
 
 nodata:
 	return retval;
@@ -1275,14 +1259,14 @@ sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
 				      const __u8 *raw_addrs, int addrs_len)
 {
 	sctp_cookie_param_t *retval;
-	sctp_signed_cookie_t *cookie;
+	struct sctp_signed_cookie *cookie;
 	struct scatterlist sg;
 	int headersize, bodysize;
 	unsigned int keylen;
 	char *key;
 
 	headersize = sizeof(sctp_paramhdr_t) + SCTP_SECRET_SIZE;
-	bodysize = sizeof(sctp_cookie_t)
+	bodysize = sizeof(struct sctp_cookie)
 		+ ntohs(init_chunk->chunk_hdr->length) + addrs_len;
 
 	/* Pad out the cookie to a multiple to make the signature
@@ -1304,7 +1288,7 @@ sctp_cookie_param_t *sctp_pack_cookie(const struct sctp_endpoint *ep,
 	 * out on the network.
 	 */
 	memset(retval, 0x00, *cookie_len);
-	cookie = (sctp_signed_cookie_t *) retval->body;
+	cookie = (struct sctp_signed_cookie *) retval->body;
 
 	/* Set up the parameter header.  */
 	retval->p.type = SCTP_PARAM_STATE_COOKIE;
@@ -1351,26 +1335,26 @@ struct sctp_association *sctp_unpack_cookie(
 	int *error, struct sctp_chunk **errp)
 {
 	struct sctp_association *retval = NULL;
-	sctp_signed_cookie_t *cookie;
-	sctp_cookie_t *bear_cookie;
+	struct sctp_signed_cookie *cookie;
+	struct sctp_cookie *bear_cookie;
 	int headersize, bodysize, fixed_size;
 	__u8 digest[SCTP_SIGNATURE_SIZE];
 	struct scatterlist sg;
-	unsigned int keylen;
+	unsigned int keylen, len;
 	char *key;
 	sctp_scope_t scope;
 	struct sk_buff *skb = chunk->skb;
 
 	headersize = sizeof(sctp_chunkhdr_t) + SCTP_SECRET_SIZE;
 	bodysize = ntohs(chunk->chunk_hdr->length) - headersize;
-	fixed_size = headersize + sizeof(sctp_cookie_t);
+	fixed_size = headersize + sizeof(struct sctp_cookie);
 
 	/* Verify that the chunk looks like it even has a cookie.
 	 * There must be enough room for our cookie and our peer's
 	 * INIT chunk.
 	 */
-	if (ntohs(chunk->chunk_hdr->length) <
-	    (fixed_size + sizeof(sctp_chunkhdr_t)))
+	len = ntohs(chunk->chunk_hdr->length);
+	if (len < fixed_size + sizeof(struct sctp_chunkhdr))
 		goto malformed;
 
 	/* Verify that the cookie has been padded out. */
@@ -1454,7 +1438,7 @@ no_hmac:
 	retval->peer.port = ntohs(chunk->sctp_hdr->source);
 
 	/* Populate the association from the cookie.  */
-	retval->c = *bear_cookie;
+	memcpy(&retval->c, bear_cookie, sizeof(*bear_cookie));
 
 	if (sctp_assoc_set_bind_addr_from_cookie(retval, bear_cookie,
 						 GFP_ATOMIC) < 0) {
@@ -2022,7 +2006,7 @@ __u32 sctp_generate_tsn(const struct sctp_endpoint *ep)
  ********************************************************************/
 
 /* Convert from an SCTP IP parameter to a union sctp_addr.  */
-void sctp_param2sockaddr(union sctp_addr *addr, sctp_addr_param_t *param,
+void sctp_param2sockaddr(union sctp_addr *addr, union sctp_addr_param *param,
 			 __u16 port, int iif)
 {
 	switch(param->v4.param_hdr.type) {
@@ -2073,7 +2057,7 @@ int sctp_addr2sockaddr(union sctp_params p, union sctp_addr *sa)
 /* Convert a sockaddr_in to an IP address in an SCTP param.
  * Returns len if a valid conversion was possible.
  */
-int sockaddr2sctp_addr(const union sctp_addr *sa, sctp_addr_param_t *p)
+int sockaddr2sctp_addr(const union sctp_addr *sa, union sctp_addr_param *p)
 {
 	int len = 0;
 
