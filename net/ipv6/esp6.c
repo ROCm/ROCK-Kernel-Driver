@@ -302,8 +302,9 @@ int esp6_init_state(struct xfrm_state *x, void *args)
 {
 	struct esp_data *esp = NULL;
 
+	/* null auth and encryption can have zero length keys */
 	if (x->aalg) {
-		if (x->aalg->alg_key_len == 0 || x->aalg->alg_key_len > 512)
+		if (x->aalg->alg_key_len > 512)
 			goto error;
 	}
 	if (x->ealg == NULL)
