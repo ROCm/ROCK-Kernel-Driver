@@ -200,6 +200,7 @@ _GLOBAL(__clear_user)
 	.llong	8b,92b
 	.text
 
+/* r3 = dst, r4 = src, r5 = count */
 _GLOBAL(__strncpy_from_user)
 	addi	r6,r3,-1
 	addi	r4,r4,-1
@@ -222,14 +223,10 @@ _GLOBAL(__strncpy_from_user)
 	.llong	1b,99b
 	.text
 
-/* r3 = str, r4 = len (> 0), r5 = top (highest addr) */
+/* r3 = str, r4 = len (> 0) */
 _GLOBAL(__strnlen_user)
 	addi	r7,r3,-1
-	subf	r6,r7,r5	/* top+1 - str */
-	cmplw	0,r4,r6
-	bge	0f
-	mr	r6,r4
-0:	mtctr	r6		/* ctr = min(len, top - str) */
+	mtctr	r4		/* ctr = len */
 1:	lbzu	r0,1(r7)	/* get next byte */
 	cmpwi	0,r0,0
 	bdnzf	2,1b		/* loop if --ctr != 0 && byte != 0 */

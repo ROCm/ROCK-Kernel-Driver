@@ -24,8 +24,10 @@
  * For historical reasons, these macros are grossly misnamed.
  */
 
-#define KERNEL_DS	((mm_segment_t) { 0 })
-#define USER_DS		((mm_segment_t) { 1 })
+#define MAKE_MM_SEG(s)  ((mm_segment_t) { (s) })
+
+#define KERNEL_DS	MAKE_MM_SEG(0UL)
+#define USER_DS		MAKE_MM_SEG(0xf000000000000000UL)
 
 #define get_ds()	(KERNEL_DS)
 #define get_fs()	(current->thread.fs)
@@ -33,12 +35,25 @@
 
 #define segment_eq(a,b)	((a).seg == (b).seg)
 
-#define __kernel_ok (segment_eq(get_fs(), KERNEL_DS))
-#define __user_ok(addr,size) (((size) <= TASK_SIZE)&&((addr) <= TASK_SIZE-(size)))
-#define __access_ok(addr,size) (__kernel_ok || __user_ok((addr),(size)))
-#define access_ok(type,addr,size) __access_ok((unsigned long)(addr),(size))
+/*
+ * Use the alpha trick for checking ranges:
+ *
+ * Is a address valid? This does a straightforward calculation rather
+ * than tests.
+ *
+ * Address valid if:
+ *  - "addr" doesn't have any high-bits set
+ *  - AND "size" doesn't have any high-bits set
+ *  - AND "addr+size" doesn't have any high-bits set
+ *  - OR we are in kernel mode.
+ */
+#define __access_ok(addr,size,segment) \
+	(((segment).seg & (addr | size | (addr+size))) == 0)
 
-static inline int verify_area(int type, const void * addr, unsigned long size)
+#define access_ok(type,addr,size) \
+	__access_ok(((unsigned long)(addr)),(size),get_fs())
+
+static inline int verify_area(int type, const void *addr, unsigned long size)
 {
 	return access_ok(type,addr,size) ? 0 : -EFAULT;
 }
@@ -96,32 +111,32 @@ extern void sort_exception_table(void);
 
 extern long __put_user_bad(void);
 
-#define __put_user_nocheck(x,ptr,size)			\
-({							\
-	long __pu_err;					\
-	__put_user_size((x),(ptr),(size),__pu_err);	\
-	__pu_err;					\
-})
-
-#define __put_user_check(x,ptr,size)				\
+#define __put_user_nocheck(x,ptr,size)				\
 ({								\
-	long __pu_err = -EFAULT;				\
-	__typeof__(*(ptr)) *__pu_addr = (ptr);			\
-	if (access_ok(VERIFY_WRITE,__pu_addr,size))		\
-		__put_user_size((x),__pu_addr,(size),__pu_err);	\
+	long __pu_err;						\
+	__put_user_size((x),(ptr),(size),__pu_err,-EFAULT);	\
 	__pu_err;						\
 })
 
-#define __put_user_size(x,ptr,size,retval)			\
-do {								\
-	retval = 0;						\
-	switch (size) {						\
-	  case 1: __put_user_asm(x,ptr,retval,"stb"); break;	\
-	  case 2: __put_user_asm(x,ptr,retval,"sth"); break;	\
-	  case 4: __put_user_asm(x,ptr,retval,"stw"); break;	\
-	  case 8: __put_user_asm(x,ptr,retval,"std"); break; 	\
-	  default: __put_user_bad();				\
-	}							\
+#define __put_user_check(x,ptr,size)					\
+({									\
+	long __pu_err = -EFAULT;					\
+	__typeof__(*(ptr)) *__pu_addr = (ptr);				\
+	if (access_ok(VERIFY_WRITE,__pu_addr,size))			\
+		__put_user_size((x),__pu_addr,(size),__pu_err,-EFAULT);	\
+	__pu_err;							\
+})
+
+#define __put_user_size(x,ptr,size,retval,errret)			\
+do {									\
+	retval = 0;							\
+	switch (size) {							\
+	  case 1: __put_user_asm(x,ptr,retval,"stb",errret); break;	\
+	  case 2: __put_user_asm(x,ptr,retval,"sth",errret); break;	\
+	  case 4: __put_user_asm(x,ptr,retval,"stw",errret); break;	\
+	  case 8: __put_user_asm(x,ptr,retval,"std",errret); break; 	\
+	  default: __put_user_bad();					\
+	}								\
 } while (0)
 
 /*
@@ -129,7 +144,7 @@ do {								\
  * because we do not write to any memory gcc knows about, so there
  * are no aliasing issues.
  */
-#define __put_user_asm(x, addr, err, op)			\
+#define __put_user_asm(x, addr, err, op, errret)		\
 	__asm__ __volatile__(					\
 		"1:	"op" %1,0(%2)  	# put_user\n" 	 	\
 		"2:\n"						\
@@ -142,13 +157,13 @@ do {								\
 		"	.llong 1b,3b\n"				\
 		".previous"					\
 		: "=r"(err)					\
-		: "r"(x), "b"(addr), "i"(-EFAULT), "0"(err))
+		: "r"(x), "b"(addr), "i"(errret), "0"(err))
 
 
 #define __get_user_nocheck(x,ptr,size)				\
 ({								\
 	long __gu_err, __gu_val;				\
-	__get_user_size(__gu_val,(ptr),(size),__gu_err);	\
+	__get_user_size(__gu_val,(ptr),(size),__gu_err,-EFAULT);\
 	(x) = (__typeof__(*(ptr)))__gu_val;			\
 	__gu_err;						\
 })
@@ -158,26 +173,26 @@ do {								\
 	long __gu_err = -EFAULT, __gu_val = 0;				\
 	const __typeof__(*(ptr)) *__gu_addr = (ptr);			\
 	if (access_ok(VERIFY_READ,__gu_addr,size))			\
-		__get_user_size(__gu_val,__gu_addr,(size),__gu_err);	\
+		__get_user_size(__gu_val,__gu_addr,(size),__gu_err,-EFAULT);\
 	(x) = (__typeof__(*(ptr)))__gu_val;				\
 	__gu_err;							\
 })
 
 extern long __get_user_bad(void);
 
-#define __get_user_size(x,ptr,size,retval)			\
-do {								\
-	retval = 0;						\
-	switch (size) {						\
-	  case 1: __get_user_asm(x,ptr,retval,"lbz"); break;	\
-	  case 2: __get_user_asm(x,ptr,retval,"lhz"); break;	\
-	  case 4: __get_user_asm(x,ptr,retval,"lwz"); break;	\
-	  case 8: __get_user_asm(x,ptr,retval,"ld");  break;    \
-	  default: (x) = __get_user_bad();			\
-	}							\
+#define __get_user_size(x,ptr,size,retval,errret)			\
+do {									\
+	retval = 0;							\
+	switch (size) {							\
+	  case 1: __get_user_asm(x,ptr,retval,"lbz",errret); break;	\
+	  case 2: __get_user_asm(x,ptr,retval,"lhz",errret); break;	\
+	  case 4: __get_user_asm(x,ptr,retval,"lwz",errret); break;	\
+	  case 8: __get_user_asm(x,ptr,retval,"ld",errret);  break;	\
+	  default: (x) = __get_user_bad();				\
+	}								\
 } while (0)
 
-#define __get_user_asm(x, addr, err, op)		\
+#define __get_user_asm(x, addr, err, op, errret)	\
 	__asm__ __volatile__(				\
 		"1:	"op" %1,0(%2)	# get_user\n"  	\
 		"2:\n"					\
@@ -191,69 +206,97 @@ do {								\
 		"	.llong 1b,3b\n"			\
 		".previous"				\
 		: "=r"(err), "=r"(x)			\
-		: "b"(addr), "i"(-EFAULT), "0"(err))
+		: "b"(addr), "i"(errret), "0"(err))
 
 /* more complex routines */
 
-extern unsigned long __copy_tofrom_user(void *to, const void *from, unsigned long size);
+extern unsigned long __copy_tofrom_user(void *to, const void *from,
+					unsigned long size);
+
+/* XXX should zero destination if fault happened */
+static inline unsigned long
+__copy_from_user(void *to, const void __user *from, unsigned long n)
+{
+	if (__builtin_constant_p(n)) {
+		unsigned long ret;
+
+		switch (n) {
+		case 1:
+			__get_user_size(*(u8 *)to, from, 1, ret, 1);
+			return ret;
+		case 2:
+			__get_user_size(*(u16 *)to, from, 2, ret, 2);
+			return ret;
+		case 4:
+			__get_user_size(*(u32 *)to, from, 4, ret, 4);
+			return ret;
+		case 8:
+			__get_user_size(*(u64 *)to, from, 8, ret, 8);
+			return ret;
+		}
+	}
+	return __copy_tofrom_user(to, from, n);
+}
+
+static inline unsigned long
+__copy_to_user(void __user *to, const void *from, unsigned long n)
+{
+	if (__builtin_constant_p(n)) {
+		unsigned long ret;
+
+		switch (n) {
+		case 1:
+			__put_user_size(*(u8 *)from, (u8 *)to, 1, ret, 1);
+			return ret;
+		case 2:
+			__put_user_size(*(u16 *)from, (u16 *)to, 2, ret, 2);
+			return ret;
+		case 4:
+			__put_user_size(*(u32 *)from, (u32 *)to, 4, ret, 4);
+			return ret;
+		case 8:
+			__put_user_size(*(u64 *)from, (u64 *)to, 8, ret, 8);
+			return ret;
+		}
+	}
+	return __copy_tofrom_user(to, from, n);
+}
+
+#define __copy_in_user(to, from, size) \
+	__copy_tofrom_user((to), (from), (size))
 
 static inline unsigned long
 copy_from_user(void *to, const void *from, unsigned long n)
 {
-	unsigned long over;
-
-	if (access_ok(VERIFY_READ, from, n))
-		return __copy_tofrom_user(to, from, n);
-	if ((unsigned long)from < TASK_SIZE) {
-		over = (unsigned long)from + n - TASK_SIZE;
-		memset(to + over, 0, over);
-		return __copy_tofrom_user(to, from, n - over) + over;
-	}
+	if (likely(access_ok(VERIFY_READ, from, n)))
+		n = __copy_from_user(to, from, n);
 	return n;
 }
 
 static inline unsigned long
 copy_to_user(void *to, const void *from, unsigned long n)
 {
-	unsigned long over;
-
-	if (access_ok(VERIFY_WRITE, to, n))
-		return __copy_tofrom_user(to, from, n);
-	if ((unsigned long)to < TASK_SIZE) {
-		over = (unsigned long)to + n - TASK_SIZE;
-		return __copy_tofrom_user(to, from, n - over) + over;
-	}
+	if (likely(access_ok(VERIFY_WRITE, to, n)))
+		n = __copy_to_user(to, from, n);
 	return n;
 }
 
 static inline unsigned long
 copy_in_user(void *to, const void *from, unsigned long n)
 {
-        if (!access_ok(VERIFY_READ, from, n) ||
-	     !access_ok(VERIFY_WRITE, to, n))
-		return n;
-
-	return __copy_tofrom_user(to, from, n);
+	if (likely(access_ok(VERIFY_READ, from, n) &&
+	    access_ok(VERIFY_WRITE, to, n)))
+		n =__copy_tofrom_user(to, from, n);
+	return n;
 }
-
-#define __copy_from_user(to, from, size) \
-	__copy_tofrom_user((to), (from), (size))
-#define __copy_to_user(to, from, size) \
-	__copy_tofrom_user((to), (from), (size))
-#define __copy_in_user(to, from, size) \
-	__copy_tofrom_user((to), (from), (size))
 
 extern unsigned long __clear_user(void *addr, unsigned long size);
 
 static inline unsigned long
 clear_user(void *addr, unsigned long size)
 {
-	if (access_ok(VERIFY_WRITE, addr, size))
-		return __clear_user(addr, size);
-	if ((unsigned long)addr < TASK_SIZE) {
-		unsigned long over = (unsigned long)addr + size - TASK_SIZE;
-		return __clear_user(addr, size - over) + over;
-	}
+	if (likely(access_ok(VERIFY_WRITE, addr, size)))
+		size = __clear_user(addr, size);
 	return size;
 }
 
@@ -262,7 +305,7 @@ extern int __strncpy_from_user(char *dst, const char *src, long count);
 static inline long
 strncpy_from_user(char *dst, const char *src, long count)
 {
-	if (access_ok(VERIFY_READ, src, 1))
+	if (likely(access_ok(VERIFY_READ, src, 1)))
 		return __strncpy_from_user(dst, src, count);
 	return -EFAULT;
 }
@@ -272,24 +315,18 @@ strncpy_from_user(char *dst, const char *src, long count)
  *
  * Return 0 for error
  */
-
-extern int __strnlen_user(const char *str, long len, unsigned long top);
+extern int __strnlen_user(const char *str, long len);
 
 /*
  * Returns the length of the string at str (including the null byte),
  * or 0 if we hit a page we can't access,
  * or something > len if we didn't find a null byte.
- *
- * The `top' parameter to __strnlen_user is to make sure that
- * we can never overflow from the user area into kernel space.
  */
 static inline int strnlen_user(const char *str, long len)
 {
-	unsigned long top = __kernel_ok? ~0UL: TASK_SIZE - 1;
-
-	if ((unsigned long)str > top)
-		return 0;
-	return __strnlen_user(str, len, top);
+	if (likely(access_ok(VERIFY_READ, str, 1)))
+		return __strnlen_user(str, len);
+	return 0;
 }
 
 #define strlen_user(str)	strnlen_user((str), 0x7ffffffe)
