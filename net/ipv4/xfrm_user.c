@@ -1036,8 +1036,7 @@ static int __init xfrm_user_init(void)
 static void __exit xfrm_user_exit(void)
 {
 	xfrm_unregister_km(&netlink_mgr);
-
-	/* XXX need netlink_kernel_destroy XXX */
+	sock_release(xfrm_nl->socket);
 }
 
 module_init(xfrm_user_init);
