@@ -186,7 +186,7 @@ int tracer(int (*init_proc)(void *), void *sp)
 	unsigned long eip = 0;
 	int status, pid = 0, sig = 0, cont_type, tracing = 0, op = 0;
 	int last_index, proc_id = 0, n, err, old_tracing = 0, strace = 0;
-	int pt_syscall_parm, local_using_sysemu = 0;
+	int local_using_sysemu = 0;
 
 	signal(SIGPIPE, SIG_IGN);
 	setup_tracer_winch();
@@ -391,18 +391,14 @@ int tracer(int (*init_proc)(void *), void *sp)
 			}
 
 			local_using_sysemu = get_using_sysemu();
-			pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
 
-			if(tracing){
-				if(singlestepping(task))
-					cont_type = PTRACE_SINGLESTEP;
-				else cont_type = pt_syscall_parm;
-			}
-			else cont_type = PTRACE_CONT;
-
-			if((cont_type == PTRACE_CONT) && 
-			   (debugger_pid != -1) && strace)
+			if(tracing)
+				cont_type = SELECT_PTRACE_OPERATION(local_using_sysemu,
+				                                    singlestepping(task));
+			else if((debugger_pid != -1) && strace)
 				cont_type = PTRACE_SYSCALL;
+			else
+				cont_type = PTRACE_CONT;
 
 			if(ptrace(cont_type, pid, 0, sig) != 0){
 				tracer_panic("ptrace failed to continue "

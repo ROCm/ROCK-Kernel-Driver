@@ -140,15 +140,15 @@ void start_userspace(int cpu)
 
 void userspace(union uml_pt_regs *regs)
 {
-	int err, status, op, pt_syscall_parm, pid = userspace_pid[0];
+	int err, status, op, pid = userspace_pid[0];
 	int local_using_sysemu; /*To prevent races if using_sysemu changes under us.*/
 
 	restore_registers(regs);
 		
 	local_using_sysemu = get_using_sysemu();
 
-	pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
-	err = ptrace(pt_syscall_parm, pid, 0, 0);
+	op = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
+	err = ptrace(op, pid, 0, 0);
 
 	if(err)
 		panic("userspace - PTRACE_%s failed, errno = %d\n",
@@ -196,10 +196,8 @@ void userspace(union uml_pt_regs *regs)
 
 		/*Now we ended the syscall, so re-read local_using_sysemu.*/
 		local_using_sysemu = get_using_sysemu();
-		pt_syscall_parm = local_using_sysemu ? PTRACE_SYSEMU : PTRACE_SYSCALL;
 
-		op = singlestepping(NULL) ? PTRACE_SINGLESTEP :
-			pt_syscall_parm;
+		op = SELECT_PTRACE_OPERATION(local_using_sysemu, singlestepping(NULL));
 
 		err = ptrace(op, pid, 0, 0);
 		if(err)

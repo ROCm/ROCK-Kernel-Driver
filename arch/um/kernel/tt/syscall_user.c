@@ -62,6 +62,10 @@ void do_syscall(void *task, int pid, int local_using_sysemu)
 	   ((unsigned long *) PT_IP(proc_regs) <= &_etext))
 		tracer_panic("I'm tracing myself and I can't get out");
 
+	/* advanced sysemu mode set syscall number to -1 automatically */
+	if (local_using_sysemu==2)
+		return;
+
 	/* syscall number -1 in sysemu skips syscall restarting in host */
 	if(ptrace(PTRACE_POKEUSER, pid, PT_SYSCALL_NR_OFFSET, 
 		  local_using_sysemu ? -1 : __NR_getpid) < 0)

@@ -464,9 +464,9 @@ int singlestepping(void * t)
 		return(0);
 
 	if (task->thread.singlestep_syscall)
-		return(0);
+		return(1);
 
-	return 1;
+	return 2;
 }
 
 /*
