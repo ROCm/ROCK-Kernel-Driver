@@ -135,12 +135,10 @@ int page_referenced(struct page * page)
 		for (pc = page->pte.chain; pc; pc = pte_chain_next(pc)) {
 			int i;
 
-			for (i = NRPTE-1; i >= 0; i--) {
+			for (i = pte_chain_idx(pc); i < NRPTE; i++) {
 				pte_addr_t pte_paddr = pc->ptes[i];
 				pte_t *p;
 
-				if (!pte_paddr)
-					break;
 				p = rmap_ptep_map(pte_paddr);
 				if (ptep_test_and_clear_young(p))
 					referenced++;
@@ -245,7 +243,7 @@ void page_remove_rmap(struct page *page, pte_t *ptep)
 	} else {
 		struct pte_chain *start = page->pte.chain;
 		struct pte_chain *next;
-		int victim_i = -1;
+		int victim_i = pte_chain_idx(start);
 
 		for (pc = start; pc; pc = next) {
 			int i;
@@ -256,8 +254,6 @@ void page_remove_rmap(struct page *page, pte_t *ptep)
 			for (i = pte_chain_idx(pc); i < NRPTE; i++) {
 				pte_addr_t pa = pc->ptes[i];
 
-				if (victim_i == -1)
-					victim_i = i;
 				if (pa != pte_paddr)
 					continue;
 				pc->ptes[i] = start->ptes[victim_i];
@@ -389,7 +385,7 @@ int try_to_unmap(struct page * page)
 {
 	struct pte_chain *pc, *next_pc, *start;
 	int ret = SWAP_SUCCESS;
-	int victim_i = -1;
+	int victim_i;
 
 	/* This page should not be on the pageout lists. */
 	if (PageReserved(page))
@@ -413,6 +409,7 @@ int try_to_unmap(struct page * page)
 	}		
 
 	start = page->pte.chain;
+	victim_i = pte_chain_idx(start);
 	for (pc = start; pc; pc = next_pc) {
 		int i;
 
@@ -421,11 +418,6 @@ int try_to_unmap(struct page * page)
 			prefetch(next_pc);
 		for (i = pte_chain_idx(pc); i < NRPTE; i++) {
 			pte_addr_t pte_paddr = pc->ptes[i];
-
-			if (!pte_paddr)
-				continue;
-			if (victim_i == -1) 
-				victim_i = i;
 
 			switch (try_to_unmap_one(page, pte_paddr)) {
 			case SWAP_SUCCESS:
