@@ -191,7 +191,7 @@ usb_storage_bulk_transport(struct us_data *us, int direction,
 			unsigned char *buf;
 			unsigned int length;
 
-			buf = page_address(sg[i].page) + sg[i].offset;
+			buf = sg_address(sg[i]);
 			length = len-transferred;
 			if (length > sg[i].length)
 				length = sg[i].length;
@@ -261,7 +261,7 @@ us_copy_from_sgbuf(unsigned char *content, int len,
 		unsigned char *ptr;
 		unsigned int length, room;
 
-		ptr = page_address(sg[i].page) + sg[i].offset + *offset;
+		ptr = sg_address(sg[i]) + *offset;
 
 		room = sg[i].length - *offset;
 		length = len - transferred;
@@ -310,7 +310,7 @@ us_copy_to_sgbuf(unsigned char *buffer, int buflen,
 		unsigned char *ptr;
 		unsigned int length, room;
 
-		ptr = page_address(sg[i].page) + sg[i].offset + *offset;
+		ptr = sg_address(sg[i]) + *offset;
 
 		room = sg[i].length - *offset;
 		length = buflen - transferred;

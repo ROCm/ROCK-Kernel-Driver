@@ -283,13 +283,13 @@ void fill_inquiry_response(struct us_data *us, unsigned char *data,
 	if (us->srb->use_sg) {
 		sg = (struct scatterlist *)us->srb->request_buffer;
 		for (i=0; i<us->srb->use_sg; i++)
-			memset(page_address(sg[i].page) + sg[i].offset, 0, sg[i].length);
+			memset(sg_address(sg[i]), 0, sg[i].length);
 		for (i=0, transferred=0; 
 				i<us->srb->use_sg && transferred < len;
 				i++) {
 			amt = sg[i].length > len-transferred ? 
 					len-transferred : sg[i].length;
-			memcpy(page_address(sg[i].page) + sg[i].offset, data+transferred, amt);
+			memcpy(sg_address(sg[i]), data+transferred, amt);
 			transferred -= amt;
 		}
 	} else {

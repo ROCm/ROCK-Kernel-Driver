@@ -501,13 +501,13 @@ static void isd200_transfer( struct us_data *us, Scsi_Cmnd *srb )
                             sg[i].length) {
                                 result = isd200_transfer_partial(us, 
                                                                  srb->sc_data_direction,
-                                                                 page_address(sg[i].page) + sg[i].offset, 
+                                                                 sg_address(sg[i]), 
                                                                  sg[i].length);
                                 total_transferred += sg[i].length;
                         } else
                                 result = isd200_transfer_partial(us, 
                                                                  srb->sc_data_direction,                            
-                                                                 page_address(sg[i].page) + sg[i].offset, 
+                                                                 sg_address(sg[i]), 
                                                                  transfer_amount - total_transferred);
 
                         /* if we get an error, end the loop here */
@@ -1409,10 +1409,10 @@ void isd200_data_copy(Scsi_Cmnd *srb, char * src, int length)
 				/* transfer the lesser of the next buffer or the
 				 * remaining data */
 				if (len - total >= sg[i].length) {
-					memcpy(page_address(sg[i].page) + sg[i].offset, src + total, sg[i].length);
+					memcpy(sg_address(sg[i]), src + total, sg[i].length);
 					total += sg[i].length;
 				} else {
-					memcpy(page_address(sg[i].page) + sg[i].offset, src + total, len - total);
+					memcpy(sg_address(sg[i]), src + total, len - total);
 					total = len;
 				}
 			} 
