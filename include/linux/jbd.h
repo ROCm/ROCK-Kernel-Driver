@@ -1012,10 +1012,10 @@ extern int	cleanup_journal_tail(journal_t *);
 /* Debugging code only: */
 
 #define jbd_ENOSYS() \
-do {								      \
-	printk (KERN_ERR "JBD unimplemented function " __FUNCTION__); \
-	current->state = TASK_UNINTERRUPTIBLE;			      \
-	schedule();						      \
+do {								           \
+	printk (KERN_ERR "JBD unimplemented function %s\n", __FUNCTION__); \
+	current->state = TASK_UNINTERRUPTIBLE;			           \
+	schedule();						           \
 } while (1)
 
 /*
