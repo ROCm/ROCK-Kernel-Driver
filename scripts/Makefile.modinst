@@ -28,7 +28,7 @@ $(filter-out ../% /%,$(modules)):
 # Modules built outside just go into extra by default
 MOD_DIR ?= extra
 
-quiet_cmd_modules_install_extra = INSTALL $(obj-m:.o=.ko)
+quiet_cmd_modules_install_extra = INSTALL $@
       cmd_modules_install_extra = mkdir -p $(MODLIB)/$(MOD_DIR); \
 			    	  cp $@ $(MODLIB)/$(MOD_DIR)
 
