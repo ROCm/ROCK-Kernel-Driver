@@ -2369,11 +2369,16 @@ void ata_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 		do_clear = 1;
 	}
 
-	if (qc->waiting)
-		complete(qc->waiting);
+	if (qc->waiting) {
+		struct completion *waiting = qc->waiting;
+		qc->waiting = NULL;
+		complete(waiting);
+	}
 
 	if (likely(do_clear))
 		clear_bit(tag, &ap->qactive);
+
+	VPRINTK("EXIT\n");
 }
 
 /**
@@ -2614,7 +2619,7 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 	case ATA_PROT_ATAPI_DMA:
 		/* check status of DMA engine */
 		host_stat = ata_bmdma_status(ap);
-		VPRINTK("BUS_DMA (host_stat 0x%X)\n", host_stat);
+		VPRINTK("ata%u: host_stat 0x%X\n", ap->id, host_stat);
 
 		/* if it's not our irq... */
 		if (!(host_stat & ATA_DMA_INTR))
@@ -2635,7 +2640,8 @@ inline unsigned int ata_host_intr (struct ata_port *ap,
 		status = ata_chk_status(ap);
 		if (unlikely(status & ATA_BUSY))
 			goto idle_irq;
-		DPRINTK("BUS_NODATA (dev_stat 0x%X)\n", status);
+		DPRINTK("ata%u: protocol %d (dev_stat 0x%X)\n",
+			ap->id, qc->tf.protocol, status);
 
 		/* ack bmdma irq events */
 		ata_bmdma_ack_irq(ap);
