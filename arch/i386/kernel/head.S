@@ -235,12 +235,15 @@ is386:	movl $2,%ecx		# set MP
 	lidt idt_descr
 	ljmp $(__KERNEL_CS),$1f
 1:	movl $(__KERNEL_DS),%eax	# reload all the segment registers
-	movl %eax,%ds		# after changing gdt.
+	movl %eax,%ss			# after changing gdt.
+
+	movl $(__USER_DS),%eax		# DS/ES contains default USER segment
+	movl %eax,%ds
 	movl %eax,%es
+
+	xorl %eax,%eax			# Clear FS/GS and LDT
 	movl %eax,%fs
 	movl %eax,%gs
-	movl %eax,%ss
-	xorl %eax,%eax
 	lldt %ax
 	cld			# gcc2 wants the direction flag cleared at all times
 #ifdef CONFIG_SMP

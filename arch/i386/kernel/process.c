@@ -219,8 +219,8 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.ebx = (unsigned long) fn;
 	regs.edx = (unsigned long) arg;
 
-	regs.xds = __KERNEL_DS;
-	regs.xes = __KERNEL_DS;
+	regs.xds = __USER_DS;
+	regs.xes = __USER_DS;
 	regs.orig_eax = -1;
 	regs.eip = (unsigned long) kernel_thread_helper;
 	regs.xcs = __KERNEL_CS;
