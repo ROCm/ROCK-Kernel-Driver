@@ -167,16 +167,9 @@ runlist_element *ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 		rl = ntfs_malloc_nofs(PAGE_SIZE);
 		if (!rl)
 			return ERR_PTR(-ENOMEM);
-		rlpos = 0;
-		if (start_vcn) {
-			rl[0].vcn = 0;
-			rl[0].lcn = LCN_RL_NOT_MAPPED;
-			rl[0].length = start_vcn;
-			rlpos++;
-		}
-		rl[rlpos].vcn = start_vcn;
-		rl[rlpos].lcn = LCN_ENOENT;
-		rl[rlpos].length = 0;
+		rl[0].vcn = start_vcn;
+		rl[0].lcn = LCN_RL_NOT_MAPPED;
+		rl[0].length = 0;
 		return rl;
 	}
 	/* Take the lcnbmp lock for writing. */
@@ -405,14 +398,7 @@ runlist_element *ntfs_cluster_alloc(ntfs_volume *vol, const VCN start_vcn,
 				} else {
 					ntfs_debug("Adding new run, is first "
 							"run.");
-					rl[rlpos].vcn = 0;
-					if (start_vcn) {
-						rl[rlpos].lcn =
-							LCN_RL_NOT_MAPPED;
-						rl[rlpos].length = start_vcn;
-						rlpos++;
-						rl[rlpos].vcn = start_vcn;
-					}
+					rl[rlpos].vcn = start_vcn;
 				}
 				rl[rlpos].lcn = prev_lcn = lcn + bmp_pos;
 				rl[rlpos].length = prev_run_len = 1;
@@ -746,7 +732,7 @@ out:
 	/* Add runlist terminator element. */
 	if (likely(rl)) {
 		rl[rlpos].vcn = rl[rlpos - 1].vcn + rl[rlpos - 1].length;
-		rl[rlpos].lcn = LCN_ENOENT;
+		rl[rlpos].lcn = LCN_RL_NOT_MAPPED;
 		rl[rlpos].length = 0;
 	}
 	if (likely(page && !IS_ERR(page))) {
