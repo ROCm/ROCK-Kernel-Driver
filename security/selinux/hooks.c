@@ -2694,7 +2694,7 @@ static int selinux_socket_unix_may_send(struct socket *sock,
 static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 {
 	int err = 0;
-	u32 netif_perm, node_perm, node_sid;
+	u32 netif_perm, node_perm, node_sid, recv_perm = 0;
 	struct socket *sock;
 	struct inode *inode;
 	struct net_device *dev;
@@ -2735,11 +2735,13 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 	case SECCLASS_UDP_SOCKET:
 		netif_perm = NETIF__UDP_RECV;
 		node_perm = NODE__UDP_RECV;
+		recv_perm = UDP_SOCKET__RECV_MSG;
 		break;
 	
 	case SECCLASS_TCP_SOCKET:
 		netif_perm = NETIF__TCP_RECV;
 		node_perm = NODE__TCP_RECV;
+		recv_perm = TCP_SOCKET__RECV_MSG;
 		break;
 	
 	default:
@@ -2765,6 +2767,20 @@ static int selinux_socket_sock_rcv_skb(struct sock *sk, struct sk_buff *skb)
 		goto out;
 	
 	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE, node_perm, NULL, &ad);
+
+	if (recv_perm) {
+		u32 port_sid;
+
+		/* Fixme: make this more efficient */
+		err = security_port_sid(sk->sk_family, sk->sk_type,
+		                        sk->sk_protocol, ntohs(ad.u.net.sport),
+		                        &port_sid);
+		if (err)
+			goto out;
+
+		err = avc_has_perm(isec->sid, port_sid, isec->sclass,
+		                   recv_perm, NULL, &ad);
+	}
 
 out:	
 	return err;
@@ -2826,7 +2842,8 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
                                               int (*okfn)(struct sk_buff *))
 {
 	int err = NF_ACCEPT;
-	u32 netif_perm, node_perm, node_sid;
+	u32 netif_perm, node_perm, node_sid, send_perm = 0;
+	struct sock *sk;
 	struct socket *sock;
 	struct inode *inode;
 	struct iphdr *iph;
@@ -2837,10 +2854,11 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 	struct avc_audit_data ad;
 	struct net_device *dev = (struct net_device *)out;
 	
-	if (!skb->sk)
+	sk = skb->sk;
+	if (!sk)
 		goto out;
 		
-	sock = skb->sk->sk_socket;
+	sock = sk->sk_socket;
 	if (!sock)
 		goto out;
 		
@@ -2861,11 +2879,13 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 	case SECCLASS_UDP_SOCKET:
 		netif_perm = NETIF__UDP_SEND;
 		node_perm = NODE__UDP_SEND;
+		send_perm = UDP_SOCKET__SEND_MSG;
 		break;
 	
 	case SECCLASS_TCP_SOCKET:
 		netif_perm = NETIF__TCP_SEND;
 		node_perm = NODE__TCP_SEND;
+		send_perm = TCP_SOCKET__SEND_MSG;
 		break;
 	
 	default:
@@ -2892,6 +2912,25 @@ static unsigned int selinux_ip_postroute_last(unsigned int hooknum,
 	
 	err = avc_has_perm(isec->sid, node_sid, SECCLASS_NODE,
 	                   node_perm, NULL, &ad) ? NF_DROP : NF_ACCEPT;
+	if (err != NF_ACCEPT)
+		goto out;
+
+	if (send_perm) {
+		u32 port_sid;
+		
+		/* Fixme: make this more efficient */
+		err = security_port_sid(sk->sk_family,
+		                        sk->sk_type,
+		                        sk->sk_protocol,
+		                        ntohs(ad.u.net.dport),
+		                        &port_sid) ? NF_DROP : NF_ACCEPT;
+		if (err != NF_ACCEPT)
+			goto out;
+
+		err = avc_has_perm(isec->sid, port_sid, isec->sclass,
+		                   send_perm, NULL, &ad) ? NF_DROP : NF_ACCEPT;
+	}
+
 out:
 	return err;
 }
