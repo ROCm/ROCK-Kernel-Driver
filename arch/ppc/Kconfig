@@ -164,36 +164,7 @@ config CPU_FREQ
 
 	  If in doubt, say N.
 
-config CPU_FREQ_TABLE
-	bool
-	depends on CPU_FREQ
-	default y
-
-config CPU_FREQ_PROC_INTF
-	bool "/proc/cpufreq interface (DEPRECATED)"
-	depends on CPU_FREQ && PROC_FS
-	help
-	  This enables the /proc/cpufreq interface for controlling
-	  CPUFreq. Please note that it is recommended to use the sysfs
-	  interface instead (which is built automatically).
-	
-	  For details, take a look at linux/Documentation/cpufreq.
-	
-	  If in doubt, say N.
-
-config CPU_FREQ_24_API
-	bool "/proc/sys/cpu/ interface (2.4. / OLD)"
-	depends on CPU_FREQ
-	help
-	  This enables the /proc/sys/cpu/ sysctl interface for controlling
-	  CPUFreq, as known from the 2.4.-kernel patches for CPUFreq. 2.5
-	  uses a sysfs interface instead. Please note that some drivers do
-	  not work well with the 2.4. /proc/sys/cpu sysctl interface,
-	  so if in doubt, say N here.
-
-	  For details, take a look at linux/Documentation/cpufreq.
-
-	  If in doubt, say N.
+source "drivers/cpufreq/Kconfig"
 
 config CPU_FREQ_PMAC
 	bool "Support for Apple PowerBooks"
@@ -202,6 +173,11 @@ config CPU_FREQ_PMAC
 	  This adds support for frequency switching on Apple PowerBooks,
 	  this currently includes some models of iBook & Titanium
 	  PowerBook.
+
+config CPU_FREQ_TABLE
+	bool
+	depends on CPU_FREQ_PMAC
+	default y
 
 config PPC601_SYNC_FIX
 	bool "Workarounds for PPC601 bugs"
