@@ -272,6 +272,8 @@ static int multipath_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 	for (path=0; path<mddev->raid_disks; path++) 
 		if ((p=conf->multipaths+path)->rdev == NULL) {
 			p->rdev = rdev;
+			blk_queue_stack_limits(mddev->queue,
+					       rdev->bdev->bd_disk->queue);
 			conf->working_disks++;
 			rdev->raid_disk = path;
 			rdev->in_sync = 1;
@@ -409,6 +411,8 @@ static int multipath_run (mddev_t *mddev)
 
 		disk = conf->multipaths + disk_idx;
 		disk->rdev = rdev;
+		blk_queue_stack_limits(mddev->queue,
+				       rdev->bdev->bd_disk->queue);
 		if (!rdev->faulty) 
 			conf->working_disks++;
 	}

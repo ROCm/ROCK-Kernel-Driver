@@ -24,6 +24,7 @@ obj-$(CONFIG_NLS_CODEPAGE_932)	+= nls_cp932.o nls_sjis.o nls_euc-jp.o
 obj-$(CONFIG_NLS_CODEPAGE_936)	+= nls_cp936.o nls_gb2312.o
 obj-$(CONFIG_NLS_CODEPAGE_949)	+= nls_cp949.o nls_euc-kr.o
 obj-$(CONFIG_NLS_CODEPAGE_950)	+= nls_cp950.o nls_big5.o
+obj-$(CONFIG_NLS_CODEPAGE_1250) += nls_cp1250.o
 obj-$(CONFIG_NLS_CODEPAGE_1251)	+= nls_cp1251.o
 obj-$(CONFIG_NLS_CODEPAGE_1255)	+= nls_cp1255.o
 obj-$(CONFIG_NLS_ISO8859_1)	+= nls_iso8859-1.o

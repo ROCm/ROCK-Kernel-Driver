@@ -783,7 +783,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	BT_DBG("udev %p ifnum %d", udev, ifnum);
 
-	iface = &udev->actconfig->interface[0];
+	iface = udev->actconfig->interface[0];
 
 	/* Check our black list */
 	if (usb_match_id(intf, ignore_ids))
@@ -807,7 +807,7 @@ int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id *id)
 
 	ifn = min_t(unsigned int, udev->actconfig->desc.bNumInterfaces, HCI_MAX_IFACE_NUM);
 	for (i = 0; i < ifn; i++) {
-		iface = &udev->actconfig->interface[i];
+		iface = udev->actconfig->interface[i];
 		for (a = 0; a < iface->num_altsetting; a++) {
 			uif = &iface->altsetting[a];
 			for (e = 0; e < uif->desc.bNumEndpoints; e++) {

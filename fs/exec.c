@@ -341,6 +341,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	struct vm_area_struct *mpnt;
 	struct mm_struct *mm = current->mm;
 	int i;
+	long arg_size;
 
 #ifdef CONFIG_STACK_GROWSUP
 	/* Move the argument and environment strings to the bottom of the
@@ -375,6 +376,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	bprm->p = PAGE_SIZE * i - offset;
 	stack_base = STACK_TOP - current->rlim[RLIMIT_STACK].rlim_max;
 	mm->arg_start = stack_base;
+	arg_size = i << PAGE_SHIFT;
 
 	/* zero pages that were copied above */
 	while (i < MAX_ARG_PAGES)
@@ -382,6 +384,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 #else
 	stack_base = STACK_TOP - MAX_ARG_PAGES * PAGE_SIZE;
 	mm->arg_start = bprm->p + stack_base;
+	arg_size = STACK_TOP - (PAGE_MASK & (unsigned long) mm->arg_start);
 #endif
 
 	bprm->p += stack_base;
@@ -393,7 +396,7 @@ int setup_arg_pages(struct linux_binprm *bprm)
 	if (!mpnt)
 		return -ENOMEM;
 
-	if (security_vm_enough_memory((STACK_TOP - (PAGE_MASK & (unsigned long) bprm->p))>>PAGE_SHIFT)) {
+	if (security_vm_enough_memory(arg_size >> PAGE_SHIFT)) {
 		kmem_cache_free(vm_area_cachep, mpnt);
 		return -ENOMEM;
 	}

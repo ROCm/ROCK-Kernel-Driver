@@ -2236,6 +2236,10 @@ void sd_attrs_to_i_attrs( __u16 sd_attrs, struct inode *inode )
 			inode -> i_flags |= S_IMMUTABLE;
 		else
 			inode -> i_flags &= ~S_IMMUTABLE;
+		if( sd_attrs & REISERFS_APPEND_FL )
+			inode -> i_flags |= S_APPEND;
+		else
+			inode -> i_flags &= ~S_APPEND;
 		if( sd_attrs & REISERFS_NOATIME_FL )
 			inode -> i_flags |= S_NOATIME;
 		else

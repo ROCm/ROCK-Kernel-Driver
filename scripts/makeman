@@ -12,7 +12,7 @@ use strict;
 ##             $3 -- the filename which contained the sgmldoc output
 ##                     (I need this so I know which manpages to convert)
 
-my($LISTING);
+my($LISTING, $GENERATED, $INPUT, $OUTPUT, $front, $mode, $filename);
 
 if($ARGV[0] eq ""){
   die "Usage: makeman [convert | install] <dir> <file>\n";
@@ -32,8 +32,121 @@ if($ARGV[0] eq "convert"){
     s/typedef //;
 
     chomp;
-    print "Processing $_\n";
-    system("cd $ARGV[1]; docbook2man $_.sgml; gzip -f $_.9\n");
+    $filename = $_;
+    print "Processing $filename\n";
+
+    # Open the input file to extract the front matter, generate the man page,
+    # and open it, and the rearrange everything until it is happy
+    open INPUT, "< $ARGV[1]/$filename.sgml";
+    $front = "";
+    $mode = 0;
+    while(<INPUT>){
+      if(/.*ENDFRONTTAG.*/){
+	$mode = 0;
+      }
+
+      if($mode > 0){
+	s/<!-- //;
+	s/ -->//;
+	s/<bookinfo>//;
+	s/<\/bookinfo>//;
+	s/<docinfo>//;
+	s<\/docinfo>//;
+	s/^[ \t]*//;
+      }
+
+      if($mode == 2){
+	if(/<para>/){
+	}
+	elsif(/<\/para>/){
+	  $front = "$front.\\\" \n";
+	}
+	elsif(/<\/legalnotice>/){
+	  $mode = 1;
+	}
+	elsif(/^[ \t]*$/){
+	}
+	else{
+	  $front = "$front.\\\"     $_";
+	}
+      }
+
+      if($mode == 1){
+	if(/<title>(.*)<\/title>/){
+	  $front = "$front.\\\" This documentation was generated from the book titled \"$1\", which is part of the Linux kernel source.\n.\\\" \n";
+	}
+	elsif(/<legalnotice>/){
+	  $front = "$front.\\\" This documentation comes with the following legal notice:\n.\\\" \n";
+	  $mode = 2;
+	}
+
+	elsif(/<author>/){
+	  $front = "$front.\\\" Documentation by: ";
+	}
+	elsif(/<firstname>(.*)<\/firstname>/){
+	  $front = "$front$1 ";
+	}
+	elsif(/<surname>(.*)<\/surname>/){
+	  $front = "$front$1 ";
+	}
+	elsif(/<email>(.*)<\/email>/){
+	  $front = "$front($1)";
+	}
+	elsif(/\/author>/){
+	  $front = "$front\n";
+	}
+
+	elsif(/<copyright>/){
+	  $front = "$front.\\\" Documentation copyright: ";
+	}
+	elsif(/<holder>(.*)<\/holder>/){
+	  $front = "$front$1 ";
+	}
+	elsif(/<year>(.*)<\/year>/){
+	  $front = "$front$1 ";
+	}
+	elsif(/\/copyright>/){
+	  $front = "$front\n";
+	}
+
+	elsif(/^[ \t]*$/
+	      || /<affiliation>/
+	      || /<\/affiliation>/
+	      || /<address>/
+	      || /<\/address>/
+	      || /<authorgroup>/
+	      || /<\/authorgroup>/
+	      || /<\/legalnotice>/
+              || /<date>/
+              || /<\/date>/
+              || /<edition>/
+              || /<\/edition>/){
+	}
+	else{
+	  print "Unknown tag in manpage conversion: $_";
+	  }
+      }
+
+      if(/.*BEGINFRONTTAG.*/){
+	$mode = 1;
+      }
+    }
+    close INPUT;
+
+    system("cd $ARGV[1]; docbook2man $filename.sgml; mv $filename.9 /tmp/$$.9\n");
+    open GENERATED, "< /tmp/$$.9";
+    open OUTPUT, "> $ARGV[1]/$filename.9";
+
+    print OUTPUT "$front";
+    print OUTPUT ".\\\" For comments on the formatting of this manpage, please contact Michael Still <mikal\@stillhq.com>\n\n";
+    while(<GENERATED>){
+      print OUTPUT "$_";
+    }
+    close OUTPUT;
+    close GENERATED;
+
+    system("gzip -f $ARGV[1]/$filename.9\n");
+    unlink("/tmp/$filename.9");
   }
 }
 elsif($ARGV[0] eq "install"){

@@ -735,15 +735,6 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 
 	lo->lo_bio = lo->lo_biotail = NULL;
 
-	lo->lo_queue = blk_alloc_queue(GFP_KERNEL);
-	if (!lo->lo_queue) {
-		error = -ENOMEM;
-		fput(file);
-		goto out_putf;
-	}
-
-	disks[lo->lo_number]->queue = lo->lo_queue;
-
 	/*
 	 * set queue make_request_fn, and add limits based on lower level
 	 * device
@@ -857,7 +848,6 @@ static int loop_clr_fd(struct loop_device *lo, struct block_device *bdev)
 	filp->f_dentry->d_inode->i_mapping->gfp_mask = gfp;
 	lo->lo_state = Lo_unbound;
 	fput(filp);
-	blk_put_queue(lo->lo_queue);
 	/* This is safe: open() is still holding a reference. */
 	module_put(THIS_MODULE);
 	return 0;
@@ -1186,6 +1176,7 @@ int __init loop_init(void)
 	loop_dev = kmalloc(max_loop * sizeof(struct loop_device), GFP_KERNEL);
 	if (!loop_dev)
 		goto out_mem1;
+	memset(loop_dev, 0, max_loop * sizeof(struct loop_device));
 
 	disks = kmalloc(max_loop * sizeof(struct gendisk *), GFP_KERNEL);
 	if (!disks)
@@ -1202,7 +1193,12 @@ int __init loop_init(void)
 	for (i = 0; i < max_loop; i++) {
 		struct loop_device *lo = &loop_dev[i];
 		struct gendisk *disk = disks[i];
+
 		memset(lo, 0, sizeof(*lo));
+		lo->lo_queue = blk_alloc_queue(GFP_KERNEL);
+		if (!lo->lo_queue)
+			goto out_mem4;
+		disks[i]->queue = lo->lo_queue;
 		init_MUTEX(&lo->lo_ctl_mutex);
 		init_MUTEX_LOCKED(&lo->lo_sem);
 		init_MUTEX_LOCKED(&lo->lo_bh_mutex);
@@ -1220,6 +1216,10 @@ int __init loop_init(void)
 	printk(KERN_INFO "loop: loaded (max %d devices)\n", max_loop);
 	return 0;
 
+out_mem4:
+	while (i--)
+		blk_put_queue(loop_dev[i].lo_queue);
+	i = max_loop;
 out_mem3:
 	while (i--)
 		put_disk(disks[i]);
@@ -1237,6 +1237,7 @@ void loop_exit(void)
 	int i;
 
 	for (i = 0; i < max_loop; i++) {
+		blk_put_queue(loop_dev[i].lo_queue);
 		del_gendisk(disks[i]);
 		put_disk(disks[i]);
 	}

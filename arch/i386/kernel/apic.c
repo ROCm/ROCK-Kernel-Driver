@@ -52,6 +52,11 @@ void __init apic_intr_init(void)
 	/* IPI vectors for APIC spurious and error interrupts */
 	set_intr_gate(SPURIOUS_APIC_VECTOR, spurious_interrupt);
 	set_intr_gate(ERROR_APIC_VECTOR, error_interrupt);
+
+	/* thermal monitor LVT interrupt */
+#ifdef CONFIG_X86_MCE_P4THERMAL
+	set_intr_gate(THERMAL_APIC_VECTOR, thermal_interrupt);
+#endif
 }
 
 /* Using APIC to generate smp_local_timer_interrupt? */

@@ -67,6 +67,7 @@ pci_read_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 {
 	struct pci_dev *dev = to_pci_dev(container_of(kobj,struct device,kobj));
 	unsigned int size = 64;
+	loff_t init_off = off;
 
 	/* Several chips lock up trying to read undefined config space */
 	if (capable(CAP_SYS_ADMIN)) {
@@ -87,7 +88,7 @@ pci_read_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 	while (off & 3) {
 		unsigned char val;
 		pci_read_config_byte(dev, off, &val);
-		buf[off] = val;
+		buf[off - init_off] = val;
 		off++;
 		if (--size == 0)
 			break;
@@ -96,10 +97,10 @@ pci_read_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 	while (size > 3) {
 		unsigned int val;
 		pci_read_config_dword(dev, off, &val);
-		buf[off] = val & 0xff;
-		buf[off + 1] = (val >> 8) & 0xff;
-		buf[off + 2] = (val >> 16) & 0xff;
-		buf[off + 3] = (val >> 24) & 0xff;
+		buf[off - init_off] = val & 0xff;
+		buf[off - init_off + 1] = (val >> 8) & 0xff;
+		buf[off - init_off + 2] = (val >> 16) & 0xff;
+		buf[off - init_off + 3] = (val >> 24) & 0xff;
 		off += 4;
 		size -= 4;
 	}
@@ -107,7 +108,7 @@ pci_read_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 	while (size > 0) {
 		unsigned char val;
 		pci_read_config_byte(dev, off, &val);
-		buf[off] = val;
+		buf[off - init_off] = val;
 		off++;
 		--size;
 	}
@@ -120,6 +121,7 @@ pci_write_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 {
 	struct pci_dev *dev = to_pci_dev(container_of(kobj,struct device,kobj));
 	unsigned int size = count;
+	loff_t init_off = off;
 
 	if (off > 256)
 		return 0;
@@ -129,24 +131,24 @@ pci_write_config(struct kobject *kobj, char *buf, loff_t off, size_t count)
 	}
 
 	while (off & 3) {
-		pci_write_config_byte(dev, off, buf[off]);
+		pci_write_config_byte(dev, off, buf[off - init_off]);
 		off++;
 		if (--size == 0)
 			break;
 	}
 
 	while (size > 3) {
-		unsigned int val = buf[off];
-		val |= (unsigned int) buf[off + 1] << 8;
-		val |= (unsigned int) buf[off + 2] << 16;
-		val |= (unsigned int) buf[off + 3] << 24;
+		unsigned int val = buf[off - init_off];
+		val |= (unsigned int) buf[off - init_off + 1] << 8;
+		val |= (unsigned int) buf[off - init_off + 2] << 16;
+		val |= (unsigned int) buf[off - init_off + 3] << 24;
 		pci_write_config_dword(dev, off, val);
 		off += 4;
 		size -= 4;
 	}
 
 	while (size > 0) {
-		pci_write_config_byte(dev, off, buf[off]);
+		pci_write_config_byte(dev, off, buf[off - init_off]);
 		off++;
 		--size;
 	}
