@@ -8417,25 +8417,6 @@ asc_prt_driver_conf(struct Scsi_Host *shp, char *cp, int cplen)
         chip_scsi_id = boardp->dvc_var.adv_dvc_var.chip_scsi_id;
     }
 
-    if (boardp->flags & ASC_SELECT_QUEUE_DEPTHS) {
-        len = asc_prt_line(cp, leftlen, " queue_depth:");
-        ASC_PRT_NEXT();
-        for (i = 0; i <= ADV_MAX_TID; i++) {
-            if ((chip_scsi_id == i) ||
-                ((boardp->init_tidmask & ADV_TID_TO_TIDMASK(i)) == 0)) {
-                continue;
-            }
-            if (boardp->device[i] == NULL) {
-                continue;
-            }
-            len = asc_prt_line(cp, leftlen, " %X:%d",
-                i, boardp->device[i]->current_queue_depth);
-            ASC_PRT_NEXT();
-        }
-        len = asc_prt_line(cp, leftlen, "\n");
-        ASC_PRT_NEXT();
-    }
-
     return totlen;
 }
 

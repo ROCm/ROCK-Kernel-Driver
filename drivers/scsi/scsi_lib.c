@@ -35,7 +35,6 @@ struct scsi_host_sg_pool scsi_sg_pools[SG_MEMPOOL_NR] = {
 }; 	
 #undef SP
 
-struct scsi_core_data *scsi_core;
 
 /*
  * Function:    scsi_insert_special_cmd()
@@ -814,9 +813,10 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 		SCpnt = (Scsi_Cmnd *) req->special;
 		SRpnt = (Scsi_Request *) req->special;
 		
-		if( SRpnt->sr_magic == SCSI_REQ_MAGIC ) {
-			SCpnt = scsi_getset_command(SRpnt->sr_device,
-						    GFP_ATOMIC);
+		if (SRpnt->sr_magic == SCSI_REQ_MAGIC) {
+			if (SDpnt->device_busy >= SDpnt->queue_depth)
+				return BLKPREP_DEFER;
+			SCpnt = scsi_get_command(SRpnt->sr_device, GFP_ATOMIC);
 			if (!SCpnt)
 				return BLKPREP_DEFER;
 			scsi_init_cmd_from_req(SCpnt, SRpnt);
@@ -826,16 +826,14 @@ int scsi_prep_fn(struct request_queue *q, struct request *req)
 		/*
 		 * Now try and find a command block that we can use.
 		 */
-		if (req->special) {
-			SCpnt = (Scsi_Cmnd *) req->special;
-		} else {
-			SCpnt = scsi_getset_command(SDpnt, GFP_ATOMIC);
-		}
-		/*
-		 * if command allocation failure, wait a bit
-		 */
-		if (unlikely(!SCpnt))
-			return BLKPREP_DEFER;
+		if (!req->special) {
+			if (SDpnt->device_busy >= SDpnt->queue_depth)
+				return BLKPREP_DEFER;
+			SCpnt = scsi_get_command(SDpnt, GFP_ATOMIC);
+			if (unlikely(!SCpnt))
+				return BLKPREP_DEFER;
+		} else
+			SCpnt = req->special;
 		
 		/* pull a tag out of the request if we have one */
 		SCpnt->tag = req->tag;
@@ -1195,143 +1193,3 @@ void __exit scsi_exit_queue(void)
 		kmem_cache_destroy(sgp->slab);
 	}
 }
-
-/* -------------------------------------------------- */
-
-int scsi_create_cmdcache(struct scsi_core_data *scsi_core)
-{
-	if (!scsi_core)
-		return -EFAULT;
-
-	scsi_core->scsi_cmd_cache
-		= kmem_cache_create("scsi_cmd_cache",
-				    sizeof(struct scsi_cmnd), 0,
-				    SLAB_NO_REAP|SLAB_HWCACHE_ALIGN,NULL,NULL);
-	if (!scsi_core->scsi_cmd_cache)
-		return -ENOMEM;
-
-	scsi_core->scsi_cmd_dma_cache
-		= kmem_cache_create("scsi_cmd_cache(DMA)",
-				    sizeof(struct scsi_cmnd), 0,
-				    SLAB_NO_REAP|SLAB_HWCACHE_ALIGN
-				    |SLAB_CACHE_DMA,
-				    NULL,NULL);
-	if (!scsi_core->scsi_cmd_dma_cache) {
-		scsi_destroy_cmdcache(scsi_core);
-		return -ENOMEM;
-	}
-	return 0;
-} /* end scsi_create_cmdcache() */
-
-/* -------------------------------------------------- */
-
-int scsi_destroy_cmdcache(struct scsi_core_data *scsi_core)
-{
-	if (!scsi_core)
-		return -EFAULT;
-
-	if (scsi_core->scsi_cmd_cache &&
-	    kmem_cache_destroy(scsi_core->scsi_cmd_cache)) {
-		goto bail;
-	} else {
-		scsi_core->scsi_cmd_cache = NULL;
-	}
-
-	if (scsi_core->scsi_cmd_dma_cache &&
-	    kmem_cache_destroy(scsi_core->scsi_cmd_dma_cache)) {
-		goto bail;
-	} else {
-		scsi_core->scsi_cmd_dma_cache = NULL;
-	}
-		
-	return 0;
-bail:
-	printk(KERN_CRIT "Failed to free scsi command cache"
-	       " -- memory leak\n");
-	return -EFAULT;
-} /* end scsi_destroy_cmdcache() */
-
-/* -------------------------------------------------- */
-
-struct scsi_cmnd * scsi_get_command(struct Scsi_Host *host, int alloc_flags)
-{
-	unsigned long flags;
-	struct scsi_cmnd *cmd = NULL;
-	
-	if (!host)
-		return NULL;
-
-	if (host->unchecked_isa_dma) {
-		cmd = kmem_cache_alloc(scsi_core->scsi_cmd_dma_cache,
-				       alloc_flags);
-	} else {
-		cmd = kmem_cache_alloc(scsi_core->scsi_cmd_cache, alloc_flags);
-	}
-
-	if (!cmd) {
-		spin_lock_irqsave(&host->free_list_lock, flags);
-		if (!list_empty(&host->free_list)) {
-			cmd = list_entry(host->free_list.next,
-					 struct scsi_cmnd, list);
-			list_del_init(&cmd->list);
-		}
-		spin_unlock_irqrestore(&host->free_list_lock, flags);
-	}
-
-	return cmd;
-} /* end scsi_get_command() */
-
-/* -------------------------------------------------- */
-/* scsi_put_command: free a scsi_cmnd struct.
-   Note: the command must not belong to any lists!
-*/
-void scsi_put_command(struct scsi_cmnd *cmd)
-{
-	unsigned long flags;
-	struct Scsi_Host *host;
-	
-	if (!cmd)
-		return;
-
-	if (!cmd->device || !cmd->device->host) {
-		printk(KERN_NOTICE "Trying to free a command which"
-		       " doesn't belong to scsi core?!\n");
-		 /* Memory leak, but let the system survive for now --
-		    they'll get it eventually! */
-		return;
-	}
-
-	host = cmd->device->host;
-
-	spin_lock_irqsave(&host->free_list_lock, flags);
-	if (list_empty(&host->free_list)) {
-		list_add(&cmd->list, &host->free_list);
-		cmd = NULL;
-	}
-	spin_unlock_irqrestore(&host->free_list_lock, flags);
-
-	if (cmd) {
-		if (host->unchecked_isa_dma)
-			kmem_cache_free(scsi_core->scsi_cmd_dma_cache, cmd);
-		else
-			kmem_cache_free(scsi_core->scsi_cmd_cache, cmd);
-	}
-} /* end scsi_put_command() */
-
-/* -------------------------------------------------- */
-/* scsi_setup_command: This will do post-alloc init of the command.
-   We want to do as little as possible here.
-*/
-void scsi_setup_command(struct scsi_device *dev, struct scsi_cmnd *cmd)
-{
-	if (!cmd)
-		return;
-	memset(cmd, 0, sizeof(*cmd));
-	cmd->device = dev;
-	cmd->state = SCSI_STATE_UNUSED;
-	cmd->owner = SCSI_OWNER_NOBODY;
-	init_timer(&cmd->eh_timeout);
-	INIT_LIST_HEAD(&cmd->list);
-} /* end scsi_setup_command() */
-
-/* -------------------------------------------------- */

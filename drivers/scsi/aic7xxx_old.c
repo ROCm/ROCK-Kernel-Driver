@@ -4068,7 +4068,7 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
              * normal.
              */
 	    scsi_adjust_queue_depth(scb->cmd->device, MSG_SIMPLE_TAG,
-			    scb->cmd->device->new_queue_depth);
+			    scb->cmd->device->queue_depth);
             scb->tag_action = MSG_SIMPLE_Q_TAG;
             scb->hscb->control &= ~SCB_TAG_TYPE;
             scb->hscb->control |= MSG_SIMPLE_Q_TAG;

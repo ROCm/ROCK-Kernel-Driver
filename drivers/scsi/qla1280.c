@@ -1820,7 +1820,7 @@ qla1280_slave_configure(Scsi_Device * device)
 		/* device->queue_depth = 20; */
 		printk(KERN_INFO "scsi(%li:%d:%d:%d): Enabled tagged queuing, "
 		       "queue depth %d.\n", p->host_no, device->channel,
-		       device->id, device->lun, device->new_queue_depth);
+		       device->id, device->lun, device->queue_depth);
 	} else {
 		scsi_adjust_queue_depth(device, 0 /* TCQ off */, 3);
 	}

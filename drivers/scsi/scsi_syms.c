@@ -39,7 +39,6 @@ EXPORT_SYMBOL(scsi_unregister);
 EXPORT_SYMBOL(scsicam_bios_param);
 EXPORT_SYMBOL(scsi_partsize);
 EXPORT_SYMBOL(scsi_bios_ptable);
-EXPORT_SYMBOL(scsi_do_cmd);
 EXPORT_SYMBOL(scsi_ioctl);
 EXPORT_SYMBOL(print_command);
 EXPORT_SYMBOL(print_sense);
@@ -112,8 +111,3 @@ EXPORT_SYMBOL(scsi_delete_timer);
  * sysfs support
  */
 EXPORT_SYMBOL(shost_devclass);
-
-EXPORT_SYMBOL(scsi_get_command);
-EXPORT_SYMBOL(scsi_put_command);
-EXPORT_SYMBOL(scsi_setup_command);
-
