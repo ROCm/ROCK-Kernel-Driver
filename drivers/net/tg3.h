@@ -1817,6 +1817,37 @@ struct tg3_bufmgr_config {
 	u32		dma_high_water;
 };
 
+struct tg3_ethtool_stats {
+	/* Statistics maintained by Receive MAC. */
+	u64		rx_fragments;
+	u64		rx_ucast_packets;
+	u64		rx_bcast_packets;
+	u64		rx_fcs_errors;
+	u64		rx_xon_pause_rcvd;
+	u64		rx_xoff_pause_rcvd;
+	u64		rx_mac_ctrl_rcvd;
+	u64		rx_xoff_entered;
+	u64		rx_frame_too_long_errors;
+	u64		rx_jabbers;
+	u64		rx_undersize_packets;
+	u64		rx_in_length_errors;
+	u64		rx_out_length_errors;
+
+	/* Statistics maintained by Transmit MAC. */
+	u64		tx_xon_sent;
+	u64		tx_xoff_sent;
+	u64		tx_flow_control;
+	u64		tx_mac_errors;
+	u64		tx_single_collisions;
+	u64		tx_mult_collisions;
+	u64		tx_deferred;
+	u64		tx_excessive_collisions;
+	u64		tx_late_collisions;
+	u64		tx_ucast_packets;
+	u64		tx_mcast_packets;
+	u64		tx_bcast_packets;
+};
+
 struct tg3 {
 	/* begin "general, frequently-used members" cacheline section */
 
@@ -1880,6 +1911,9 @@ struct tg3 {
 	/* begin "everything else" cacheline(s) section */
 	struct net_device_stats		net_stats;
 	struct net_device_stats		net_stats_prev;
+	struct tg3_ethtool_stats	estats;
+	struct tg3_ethtool_stats	estats_prev;
+
 	unsigned long			phy_crc_errors;
 
 	u32				rx_offset;
@@ -1929,6 +1963,7 @@ struct tg3 {
 #define TG3_FLG2_TSO_CAPABLE		0x00000020
 #define TG3_FLG2_PHY_ADC_BUG		0x00000040
 #define TG3_FLG2_PHY_5704_A0_BUG	0x00000080
+#define TG3_FLG2_PHY_BER_BUG		0x00000100
 
 	u32				split_mode_max_reqs;
 #define SPLIT_MODE_5704_MAX_REQ		3
