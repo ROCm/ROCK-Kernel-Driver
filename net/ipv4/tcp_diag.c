@@ -29,6 +29,16 @@
 
 #include <linux/tcp_diag.h>
 
+struct tcpdiag_entry
+{
+	u32 *saddr;
+	u32 *daddr;
+	u16 sport;
+	u16 dport;
+	u16 family;
+	u16 userlocks;
+};
+
 static struct sock *tcpnl;
 
 
@@ -324,11 +334,11 @@ static int bitstring_match(const u32 *a1, const u32 *a2, int bits)
 }
 
 
-static int tcpdiag_bc_run(const void *bc, int len, struct sock *sk)
+static int tcpdiag_bc_run(const void *bc, int len,
+			  const struct tcpdiag_entry *entry)
 {
 	while (len > 0) {
 		int yes = 1;
-		struct inet_opt *inet = inet_sk(sk);
 		const struct tcpdiag_bc_op *op = bc;
 
 		switch (op->code) {
@@ -338,19 +348,19 @@ static int tcpdiag_bc_run(const void *bc, int len, struct sock *sk)
 			yes = 0;
 			break;
 		case TCPDIAG_BC_S_GE:
-			yes = inet->num >= op[1].no;
+			yes = entry->sport >= op[1].no;
 			break;
 		case TCPDIAG_BC_S_LE:
-			yes = inet->num <= op[1].no;
+			yes = entry->dport <= op[1].no;
 			break;
 		case TCPDIAG_BC_D_GE:
-			yes = ntohs(inet->dport) >= op[1].no;
+			yes = entry->dport >= op[1].no;
 			break;
 		case TCPDIAG_BC_D_LE:
-			yes = ntohs(inet->dport) <= op[1].no;
+			yes = entry->dport <= op[1].no;
 			break;
 		case TCPDIAG_BC_AUTO:
-			yes = !(sk->sk_userlocks & SOCK_BINDPORT_LOCK);
+			yes = !(entry->userlocks & SOCK_BINDPORT_LOCK);
 			break;
 		case TCPDIAG_BC_S_COND:
 		case TCPDIAG_BC_D_COND:
@@ -360,7 +370,7 @@ static int tcpdiag_bc_run(const void *bc, int len, struct sock *sk)
 
 			if (cond->port != -1 &&
 			    cond->port != (op->code == TCPDIAG_BC_S_COND ?
-					     inet->num : ntohs(inet->dport))) {
+					     entry->sport : entry->dport)) {
 				yes = 0;
 				break;
 			}
@@ -368,26 +378,14 @@ static int tcpdiag_bc_run(const void *bc, int len, struct sock *sk)
 			if (cond->prefix_len == 0)
 				break;
 
-#ifdef CONFIG_IPV6
-			if (sk->sk_family == AF_INET6) {
-				struct ipv6_pinfo *np = inet6_sk(sk);
-
-				if (op->code == TCPDIAG_BC_S_COND)
-					addr = (u32*)&np->rcv_saddr;
-				else
-					addr = (u32*)&np->daddr;
-			} else
-#endif
-			{
-				if (op->code == TCPDIAG_BC_S_COND)
-					addr = &inet->rcv_saddr;
-				else
-					addr = &inet->daddr;
-			}
+			if (op->code == TCPDIAG_BC_S_COND)
+				addr = entry->saddr;
+			else
+				addr = entry->daddr;
 
 			if (bitstring_match(addr, cond->addr, cond->prefix_len))
 				break;
-			if (sk->sk_family == AF_INET6 &&
+			if (entry->family == AF_INET6 &&
 			    cond->family == AF_INET) {
 				if (addr[0] == 0 && addr[1] == 0 &&
 				    addr[2] == htonl(0xffff) &&
@@ -472,8 +470,28 @@ static int tcpdiag_dump_sock(struct sk_buff *skb, struct sock *sk,
 	struct tcpdiagreq *r = NLMSG_DATA(cb->nlh);
 
 	if (cb->nlh->nlmsg_len > 4 + NLMSG_SPACE(sizeof(*r))) {
+		struct tcpdiag_entry entry;
 		struct rtattr *bc = (struct rtattr *)(r + 1);
-		if (!tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), sk))
+		struct inet_opt *inet = inet_sk(sk);
+
+		entry.family = sk->sk_family;
+#ifdef CONFIG_IPV6
+		if (entry.family == AF_INET6) {
+			struct ipv6_pinfo *np = inet6_sk(sk);
+
+			entry.saddr = np->rcv_saddr.s6_addr32;
+			entry.daddr = np->daddr.s6_addr32;
+		} else
+#endif
+		{
+			entry.saddr = &inet->rcv_saddr;
+			entry.daddr = &inet->daddr;
+		}
+		entry.sport = inet->num;
+		entry.dport = ntohs(inet->dport);
+		entry.userlocks = sk->sk_userlocks;
+
+		if (!tcpdiag_bc_run(RTA_DATA(bc), RTA_PAYLOAD(bc), &entry))
 			return 0;
 	}
 
