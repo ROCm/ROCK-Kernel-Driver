@@ -110,114 +110,116 @@ int eeh_unregister_notifier(struct notifier_block *nb);
 /* 
  * MMIO read/write operations with EEH support.
  */
-static inline u8 eeh_readb(const volatile void __iomem *addr) {
-	volatile u8 *vaddr = (volatile u8 __force *) addr;
-	u8 val = in_8(vaddr);
+static inline u8 eeh_readb(const volatile void __iomem *addr)
+{
+	u8 val = in_8(addr);
 	if (EEH_POSSIBLE_ERROR(val, u8))
 		return eeh_check_failure(addr, val);
 	return val;
 }
-static inline void eeh_writeb(u8 val, volatile void __iomem *addr) {
-	volatile u8 *vaddr = (volatile u8 __force *) addr;
-	out_8(vaddr, val);
+static inline void eeh_writeb(u8 val, volatile void __iomem *addr)
+{
+	out_8(addr, val);
 }
 
-static inline u16 eeh_readw(const volatile void __iomem *addr) {
-	volatile u16 *vaddr = (volatile u16 __force *) addr;
-	u16 val = in_le16(vaddr);
+static inline u16 eeh_readw(const volatile void __iomem *addr)
+{
+	u16 val = in_le16(addr);
 	if (EEH_POSSIBLE_ERROR(val, u16))
 		return eeh_check_failure(addr, val);
 	return val;
 }
-static inline void eeh_writew(u16 val, volatile void __iomem *addr) {
-	volatile u16 *vaddr = (volatile u16 __force *) addr;
-	out_le16(vaddr, val);
+static inline void eeh_writew(u16 val, volatile void __iomem *addr)
+{
+	out_le16(addr, val);
 }
-static inline u16 eeh_raw_readw(const volatile void __iomem *addr) {
-	volatile u16 *vaddr = (volatile u16 __force *) addr;
-	u16 val = in_be16(vaddr);
+static inline u16 eeh_raw_readw(const volatile void __iomem *addr)
+{
+	u16 val = in_be16(addr);
 	if (EEH_POSSIBLE_ERROR(val, u16))
 		return eeh_check_failure(addr, val);
 	return val;
 }
 static inline void eeh_raw_writew(u16 val, volatile void __iomem *addr) {
-	volatile u16 *vaddr = (volatile u16 __force *) addr;
+	volatile u16 __iomem *vaddr = (volatile u16 __iomem *) addr;
 	out_be16(vaddr, val);
 }
 
-static inline u32 eeh_readl(const volatile void __iomem *addr) {
-	volatile u32 *vaddr = (volatile u32 __force *) addr;
-	u32 val = in_le32(vaddr);
+static inline u32 eeh_readl(const volatile void __iomem *addr)
+{
+	u32 val = in_le32(addr);
 	if (EEH_POSSIBLE_ERROR(val, u32))
 		return eeh_check_failure(addr, val);
 	return val;
 }
-static inline void eeh_writel(u32 val, volatile void __iomem *addr) {
-	volatile u32 *vaddr = (volatile u32 __force *) addr;
-	out_le32(vaddr, val);
+static inline void eeh_writel(u32 val, volatile void __iomem *addr)
+{
+	out_le32(addr, val);
 }
-static inline u32 eeh_raw_readl(const volatile void __iomem *addr) {
-	volatile u32 *vaddr = (volatile u32 __force *) addr;
-	u32 val = in_be32(vaddr);
+static inline u32 eeh_raw_readl(const volatile void __iomem *addr)
+{
+	u32 val = in_be32(addr);
 	if (EEH_POSSIBLE_ERROR(val, u32))
 		return eeh_check_failure(addr, val);
 	return val;
 }
-static inline void eeh_raw_writel(u32 val, volatile void __iomem *addr) {
-	volatile u32 *vaddr = (volatile u32 __force *) addr;
-	out_be32(vaddr, val);
+static inline void eeh_raw_writel(u32 val, volatile void __iomem *addr)
+{
+	out_be32(addr, val);
 }
 
-static inline u64 eeh_readq(const volatile void __iomem *addr) {
-	volatile u64 *vaddr = (volatile u64 __force *) addr;
-	u64 val = in_le64(vaddr);
+static inline u64 eeh_readq(const volatile void __iomem *addr)
+{
+	u64 val = in_le64(addr);
 	if (EEH_POSSIBLE_ERROR(val, u64))
 		return eeh_check_failure(addr, val);
 	return val;
 }
-static inline void eeh_writeq(u64 val, volatile void __iomem *addr) {
-	volatile u64 *vaddr = (volatile u64 __force *) addr;
-	out_le64(vaddr, val);
+static inline void eeh_writeq(u64 val, volatile void __iomem *addr)
+{
+	out_le64(addr, val);
 }
-static inline u64 eeh_raw_readq(const volatile void __iomem *addr) {
-	volatile u64 *vaddr = (volatile u64 __force *) addr;
-	u64 val = in_be64(vaddr);
+static inline u64 eeh_raw_readq(const volatile void __iomem *addr)
+{
+	u64 val = in_be64(addr);
 	if (EEH_POSSIBLE_ERROR(val, u64))
 		return eeh_check_failure(addr, val);
 	return val;
 }
-static inline void eeh_raw_writeq(u64 val, volatile void __iomem *addr) {
-	volatile u64 *vaddr = (volatile u64 __force *) addr;
-	out_be64(vaddr, val);
+static inline void eeh_raw_writeq(u64 val, volatile void __iomem *addr)
+{
+	out_be64(addr, val);
 }
 
 #define EEH_CHECK_ALIGN(v,a) \
 	((((unsigned long)(v)) & ((a) - 1)) == 0)
 
-static inline void eeh_memset_io(volatile void __iomem *addr, int c, unsigned long n) {
-	void *vaddr = (void __force *) addr;
+static inline void eeh_memset_io(volatile void __iomem *addr, int c, unsigned long n)
+{
 	u32 lc = c;
 	lc |= lc << 8;
 	lc |= lc << 16;
 
-	while(n && !EEH_CHECK_ALIGN(vaddr, 4)) {
-		*((volatile u8 *)vaddr) = c;
-		vaddr = (void *)((unsigned long)vaddr + 1);
+	while(n && !EEH_CHECK_ALIGN(addr, 4)) {
+		*((volatile u8 *)addr) = c;
+		addr = (void *)((unsigned long)addr + 1);
 		n--;
 	}
 	while(n >= 4) {
-		*((volatile u32 *)vaddr) = lc;
-		vaddr = (void *)((unsigned long)vaddr + 4);
+		*((volatile u32 *)addr) = lc;
+		addr = (void *)((unsigned long)addr + 4);
 		n -= 4;
 	}
 	while(n) {
-		*((volatile u8 *)vaddr) = c;
-		vaddr = (void *)((unsigned long)vaddr + 1);
+		*((volatile u8 *)addr) = c;
+		addr = (void *)((unsigned long)addr + 1);
 		n--;
 	}
 	__asm__ __volatile__ ("sync" : : : "memory");
 }
-static inline void eeh_memcpy_fromio(void *dest, const volatile void __iomem *src, unsigned long n) {
+static inline void eeh_memcpy_fromio(void *dest, const volatile void __iomem *src,
+				     unsigned long n)
+{
 	void *vsrc = (void __force *) src;
 	void *destsave = dest;
 	unsigned long nsave = n;
@@ -254,7 +256,9 @@ static inline void eeh_memcpy_fromio(void *dest, const volatile void __iomem *sr
 	}
 }
 
-static inline void eeh_memcpy_toio(volatile void __iomem *dest, const void *src, unsigned long n) {
+static inline void eeh_memcpy_toio(volatile void __iomem *dest, const void *src,
+				   unsigned long n)
+{
 	void *vdest = (void __force *) dest;
 
 	while(n && (!EEH_CHECK_ALIGN(vdest, 4) || !EEH_CHECK_ALIGN(src, 4))) {
@@ -280,66 +284,75 @@ static inline void eeh_memcpy_toio(volatile void __iomem *dest, const void *src,
 
 #undef EEH_CHECK_ALIGN
 
-static inline u8 eeh_inb(unsigned long port) {
+static inline u8 eeh_inb(unsigned long port)
+{
 	u8 val;
 	if (!_IO_IS_VALID(port))
 		return ~0;
-	val = in_8((u8 *)(port+pci_io_base));
+	val = in_8((u8 __iomem *)(port+pci_io_base));
 	if (EEH_POSSIBLE_ERROR(val, u8))
 		return eeh_check_failure((void __iomem *)(port), val);
 	return val;
 }
 
-static inline void eeh_outb(u8 val, unsigned long port) {
+static inline void eeh_outb(u8 val, unsigned long port)
+{
 	if (_IO_IS_VALID(port))
-		out_8((u8 *)(port+pci_io_base), val);
+		out_8((u8 __iomem *)(port+pci_io_base), val);
 }
 
-static inline u16 eeh_inw(unsigned long port) {
+static inline u16 eeh_inw(unsigned long port)
+{
 	u16 val;
 	if (!_IO_IS_VALID(port))
 		return ~0;
-	val = in_le16((u16 *)(port+pci_io_base));
+	val = in_le16((u16 __iomem *)(port+pci_io_base));
 	if (EEH_POSSIBLE_ERROR(val, u16))
 		return eeh_check_failure((void __iomem *)(port), val);
 	return val;
 }
 
-static inline void eeh_outw(u16 val, unsigned long port) {
+static inline void eeh_outw(u16 val, unsigned long port)
+{
 	if (_IO_IS_VALID(port))
-		out_le16((u16 *)(port+pci_io_base), val);
+		out_le16((u16 __iomem *)(port+pci_io_base), val);
 }
 
-static inline u32 eeh_inl(unsigned long port) {
+static inline u32 eeh_inl(unsigned long port)
+{
 	u32 val;
 	if (!_IO_IS_VALID(port))
 		return ~0;
-	val = in_le32((u32 *)(port+pci_io_base));
+	val = in_le32((u32 __iomem *)(port+pci_io_base));
 	if (EEH_POSSIBLE_ERROR(val, u32))
 		return eeh_check_failure((void __iomem *)(port), val);
 	return val;
 }
 
-static inline void eeh_outl(u32 val, unsigned long port) {
+static inline void eeh_outl(u32 val, unsigned long port)
+{
 	if (_IO_IS_VALID(port))
-		out_le32((u32 *)(port+pci_io_base), val);
+		out_le32((u32 __iomem *)(port+pci_io_base), val);
 }
 
 /* in-string eeh macros */
-static inline void eeh_insb(unsigned long port, void * buf, int ns) {
-	_insb((u8 *)(port+pci_io_base), buf, ns);
+static inline void eeh_insb(unsigned long port, void * buf, int ns)
+{
+	_insb((u8 __iomem *)(port+pci_io_base), buf, ns);
 	if (EEH_POSSIBLE_ERROR((*(((u8*)buf)+ns-1)), u8))
 		eeh_check_failure((void __iomem *)(port), *(u8*)buf);
 }
 
-static inline void eeh_insw_ns(unsigned long port, void * buf, int ns) {
-	_insw_ns((u16 *)(port+pci_io_base), buf, ns);
+static inline void eeh_insw_ns(unsigned long port, void * buf, int ns)
+{
+	_insw_ns((u16 __iomem *)(port+pci_io_base), buf, ns);
 	if (EEH_POSSIBLE_ERROR((*(((u16*)buf)+ns-1)), u16))
 		eeh_check_failure((void __iomem *)(port), *(u16*)buf);
 }
 
-static inline void eeh_insl_ns(unsigned long port, void * buf, int nl) {
-	_insl_ns((u32 *)(port+pci_io_base), buf, nl);
+static inline void eeh_insl_ns(unsigned long port, void * buf, int nl)
+{
+	_insl_ns((u32 __iomem *)(port+pci_io_base), buf, nl);
 	if (EEH_POSSIBLE_ERROR((*(((u32*)buf)+nl-1)), u32))
 		eeh_check_failure((void __iomem *)(port), *(u32*)buf);
 }
