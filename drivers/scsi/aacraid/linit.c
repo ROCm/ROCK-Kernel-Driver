@@ -60,7 +60,7 @@
 #define AAC_DRIVERNAME	"aacraid"
 
 MODULE_AUTHOR("Red Hat Inc and Adaptec");
-MODULE_DESCRIPTION("Supports Dell PERC2, 2/Si, 3/Si, 3/Di, Adaptec 2120S, 2200S, 5400S, and HP NetRAID-4M devices. http://domsch.com/linux/ or http://linux.adaptec.com");
+MODULE_DESCRIPTION("Supports Dell PERC2, 2/Si, 3/Si, 3/Di, PERC 320/DC, Adaptec 2120S, 2200S, 5400S, and HP NetRAID-4M devices. http://domsch.com/linux/ or http://linux.adaptec.com");
 MODULE_LICENSE("GPL");
 MODULE_PARM(nondasd, "i");
 MODULE_PARM_DESC(nondasd, "Control scanning of hba for nondasd devices. 0=off, 1=on");
@@ -96,6 +96,7 @@ static struct aac_driver_ident aac_drivers[] = {
 	{ 0x9005, 0x0285, 0x9005, 0x0286, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec 2120S   ", 1 }, /* Adaptec 2120S (Crusader)*/
 	{ 0x9005, 0x0285, 0x9005, 0x0285, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec 2200S   ", 2 }, /* Adaptec 2200S (Vulcan)*/
 	{ 0x9005, 0x0285, 0x9005, 0x0287, aac_rx_init, "aacraid",  "ADAPTEC ", "Adaptec 2200S   ", 2 }, /* Adaptec 2200S (Vulcan-2m)*/
+	{ 0x9005, 0x0285, 0x1028, 0x0287, aac_rx_init, "percraid", "DELL    ", "PERCRAID        ", 2 }, /* Dell PERC 320/DC */
 	{ 0x1011, 0x0046, 0x9005, 0x0365, aac_sa_init, "aacraid",  "ADAPTEC ", "Adaptec 5400S   ", 4 }, /* Adaptec 5400S (Mustang)*/
 	{ 0x1011, 0x0046, 0x9005, 0x0364, aac_sa_init, "aacraid",  "ADAPTEC ", "AAC-364         ", 4 }, /* Adaptec 5400S (Mustang)*/
 	{ 0x1011, 0x0046, 0x9005, 0x1364, aac_sa_init, "percraid", "DELL    ", "PERCRAID        ", 4 }, /* Dell PERC2 "Quad Channel" */
