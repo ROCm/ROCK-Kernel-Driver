@@ -852,13 +852,6 @@ static ide_startstop_t start_request (ide_drive_t *drive, struct request *rq)
 		goto kill_rq;
 	}
 
-	/*
-	 * bail early if we've sent a device to sleep, however how to wake
-	 * this needs to be a masked flag.  FIXME for proper operations.
-	 */
-	if (drive->suspend_reset)
-		goto kill_rq;
-
 	block    = rq->sector;
 	if (blk_fs_request(rq) &&
 	    (drive->media == ide_disk || drive->media == ide_floppy)) {

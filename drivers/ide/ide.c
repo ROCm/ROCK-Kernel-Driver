@@ -1554,18 +1554,7 @@ int generic_ide_ioctl(struct file *file, struct block_device *bdev,
 			HWGROUP(drive)->busy = 1;
 			spin_unlock_irqrestore(&ide_lock, flags);
 			(void) ide_do_reset(drive);
-			if (drive->suspend_reset) {
-/*
- *				APM WAKE UP todo !!
- *				int nogoodpower = 1;
- *				while(nogoodpower) {
- *					check_power1() or check_power2()
- *					nogoodpower = 0;
- *				} 
- *				HWIF(drive)->multiproc(drive);
- */
-				return ioctl_by_bdev(bdev, BLKRRPART, 0);
-			}
+
 			return 0;
 		}
 
@@ -2133,7 +2122,6 @@ int ide_register_subdriver(ide_drive_t *drive, ide_driver_t *driver)
 		drive->dsc_overlap = (drive->next != drive && driver->supports_dsc_overlap);
 		drive->nice1 = 1;
 	}
-	drive->suspend_reset = 0;
 #ifdef CONFIG_PROC_FS
 	if (drive->driver != &idedefault_driver) {
 		ide_add_proc_entries(drive->proc, generic_subdriver_entries, drive);
