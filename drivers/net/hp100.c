@@ -1265,9 +1265,9 @@ static int hp100_init_rxpdl(struct net_device *dev,
 {
 	/* pdlptr is starting address for this pdl */
 
-	if (0 != (((unsigned) pdlptr) & 0xf))
-		printk("hp100: %s: Init rxpdl: Unaligned pdlptr 0x%x.\n",
-		       dev->name, (unsigned) pdlptr);
+	if (0 != (((unsigned long) pdlptr) & 0xf))
+		printk("hp100: %s: Init rxpdl: Unaligned pdlptr 0x%lx.\n",
+		       dev->name, (unsigned long) pdlptr);
 
 	ringptr->pdl = pdlptr + 1;
 	ringptr->pdl_paddr = virt_to_whatever(dev, pdlptr + 1);
@@ -1292,8 +1292,8 @@ static int hp100_init_txpdl(struct net_device *dev,
 			    register hp100_ring_t * ringptr,
 			    register u32 * pdlptr)
 {
-	if (0 != (((unsigned) pdlptr) & 0xf))
-		printk("hp100: %s: Init txpdl: Unaligned pdlptr 0x%x.\n", dev->name, (unsigned) pdlptr);
+	if (0 != (((unsigned long) pdlptr) & 0xf))
+		printk("hp100: %s: Init txpdl: Unaligned pdlptr 0x%lx.\n", dev->name, (unsigned long) pdlptr);
 
 	ringptr->pdl = pdlptr;	/* +1; */
 	ringptr->pdl_paddr = virt_to_whatever(dev, pdlptr);	/* +1 */
