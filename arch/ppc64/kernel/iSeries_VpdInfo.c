@@ -25,6 +25,7 @@
 /*   Ported to ppc64, August 20, 2001                                   */
 /* End Change Activity                                                  */
 /************************************************************************/
+#include <linux/config.h>
 #include <linux/init.h>
 #include <linux/pci.h>
 #include <asm/types.h>

@@ -29,8 +29,8 @@ static int button_pressed;
 static irqreturn_t power_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 	if (button_pressed == 0) {
-		wake_up(&powerd_wait);
 		button_pressed = 1;
+		wake_up(&powerd_wait);
 	}
 
 	/* FIXME: Check registers for status... */
@@ -86,10 +86,10 @@ again:
 	remove_wait_queue(&powerd_wait, &wait);
 
 	/* Ok, down we go... */
+	button_pressed = 0;
 	if (execve("/sbin/shutdown", argv, envp) < 0) {
 		printk("powerd: shutdown execution failed\n");
 		add_wait_queue(&powerd_wait, &wait);
-		button_pressed = 0;
 		goto again;
 	}
 	return 0;

@@ -14,8 +14,6 @@
  */
 
 #include <linux/module.h>
-
-#include <linux/config.h>
 #include <linux/init.h>
 #include <asm/proc_fs.h>
 #include <asm/delay.h>

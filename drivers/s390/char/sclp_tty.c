@@ -18,6 +18,7 @@
 #include <linux/slab.h>
 #include <linux/err.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <asm/uaccess.h>
 
 #include "ctrlchar.h"
@@ -337,8 +338,11 @@ sclp_tty_write_string(const unsigned char *str, int count)
 		if (sclp_ttybuf == NULL) {
 			while (list_empty(&sclp_tty_pages)) {
 				spin_unlock_irqrestore(&sclp_tty_lock, flags);
-				wait_event(sclp_tty_waitq,
-					   !list_empty(&sclp_tty_pages));
+				if (in_interrupt())
+					sclp_sync_wait();
+				else
+					wait_event(sclp_tty_waitq,
+						!list_empty(&sclp_tty_pages));
 				spin_lock_irqsave(&sclp_tty_lock, flags);
 			}
 			page = sclp_tty_pages.next;
@@ -366,7 +370,9 @@ sclp_tty_write_string(const unsigned char *str, int count)
 	} while (count > 0);
 	/* Setup timer to output current console buffer after 1/10 second */
 	if (sclp_ioctls.final_nl) {
-		if (sclp_ttybuf != NULL && !timer_pending(&sclp_tty_timer)) {
+		if (sclp_ttybuf != NULL &&
+		    sclp_chars_in_buffer(sclp_ttybuf) != 0 &&
+		    !timer_pending(&sclp_tty_timer)) {
 			init_timer(&sclp_tty_timer);
 			sclp_tty_timer.function = sclp_tty_timeout;
 			sclp_tty_timer.data = 0UL;
@@ -374,8 +380,14 @@ sclp_tty_write_string(const unsigned char *str, int count)
 			add_timer(&sclp_tty_timer);
 		}
 	} else {
-		__sclp_ttybuf_emit(sclp_ttybuf);
-		sclp_ttybuf = NULL;
+		if (sclp_ttybuf != NULL &&
+		    sclp_chars_in_buffer(sclp_ttybuf) != 0) {
+			buf = sclp_ttybuf;
+			sclp_ttybuf = NULL;
+			spin_unlock_irqrestore(&sclp_tty_lock, flags);
+			__sclp_ttybuf_emit(buf);
+			spin_lock_irqsave(&sclp_tty_lock, flags);
+		}
 	}
 	spin_unlock_irqrestore(&sclp_tty_lock, flags);
 }
@@ -471,7 +483,7 @@ sclp_tty_chars_in_buffer(struct tty_struct *tty)
 		count = sclp_chars_in_buffer(sclp_ttybuf);
 	list_for_each(l, &sclp_tty_outqueue) {
 		t = list_entry(l, struct sclp_buffer, list);
-		count += sclp_chars_in_buffer(sclp_ttybuf);
+		count += sclp_chars_in_buffer(t);
 	}
 	spin_unlock_irqrestore(&sclp_tty_lock, flags);
 	return count;
