@@ -44,6 +44,16 @@
 #define BUS_RESET_SETTLE_TIME   10*HZ
 #define HOST_RESET_SETTLE_TIME  10*HZ
 
+/* called with shost->host_lock held */
+void scsi_eh_wakeup(struct Scsi_Host *shost)
+{
+	if (shost->host_busy == shost->host_failed) {
+		up(shost->eh_wait);
+		SCSI_LOG_ERROR_RECOVERY(5,
+				printk("Waking error handler thread\n"));
+	}
+}
+
 /**
  * scsi_eh_scmd_add - add scsi cmd to error handling.
  * @scmd:	scmd to run eh on.
@@ -76,14 +86,8 @@ int scsi_eh_scmd_add(struct scsi_cmnd *scmd, int eh_flag)
 	list_add_tail(&scmd->eh_entry, &shost->eh_cmd_q);
 	shost->in_recovery = 1;
 	shost->host_failed++;
-	if (shost->host_busy == shost->host_failed) {
-		up(shost->eh_wait);
-		SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler"
-					  " thread\n"));
-	}
-
+	scsi_eh_wakeup(shost);
 	spin_unlock_irqrestore(shost->host_lock, flags);
-
 	return 1;
 }
 

@@ -52,10 +52,6 @@ struct scsi_target {
 };
 
 
-/* hosts.c */
-extern void scsi_host_busy_inc(struct Scsi_Host *, Scsi_Device *);
-extern void scsi_host_busy_dec_and_test(struct Scsi_Host *, Scsi_Device *);
-
 /* scsi.c */
 extern int scsi_dispatch_cmd(struct scsi_cmnd *cmd);
 extern int scsi_setup_command_freelist(struct Scsi_Host *shost);
@@ -77,11 +73,13 @@ extern void scsi_exit_devinfo(void);
 extern void scsi_times_out(struct scsi_cmnd *cmd);
 extern void scsi_error_handler(void *host);
 extern int scsi_decide_disposition(struct scsi_cmnd *cmd);
+extern void scsi_eh_wakeup(struct Scsi_Host *shost);
 extern int scsi_eh_scmd_add(struct scsi_cmnd *, int);
 
 /* scsi_lib.c */
 extern int scsi_maybe_unblock_host(struct scsi_device *sdev);
 extern void scsi_setup_cmd_retry(struct scsi_cmnd *cmd);
+extern void scsi_device_unbusy(struct scsi_device *sdev);
 extern int scsi_queue_insert(struct scsi_cmnd *cmd, int reason);
 extern void scsi_next_command(struct scsi_cmnd *cmd);
 extern void scsi_run_host_queues(struct Scsi_Host *shost);

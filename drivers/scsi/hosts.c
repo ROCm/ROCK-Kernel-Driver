@@ -289,29 +289,3 @@ void scsi_host_put(struct Scsi_Host *shost)
 	class_device_put(&shost->class_dev);
 	put_device(&shost->host_gendev);
 }
-
-void scsi_host_busy_inc(struct Scsi_Host *shost, Scsi_Device *sdev)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(shost->host_lock, flags);
-	shost->host_busy++;
-	sdev->device_busy++;
-	spin_unlock_irqrestore(shost->host_lock, flags);
-}
-
-void scsi_host_busy_dec_and_test(struct Scsi_Host *shost, Scsi_Device *sdev)
-{
-	unsigned long flags;
-
-	spin_lock_irqsave(shost->host_lock, flags);
-	shost->host_busy--;
-	if (shost->in_recovery && shost->host_failed &&
-	    (shost->host_busy == shost->host_failed))
-	{
-		up(shost->eh_wait);
-		SCSI_LOG_ERROR_RECOVERY(5, printk("Waking error handler"
-					  " thread\n"));
-	}
-	spin_unlock_irqrestore(shost->host_lock, flags);
-}

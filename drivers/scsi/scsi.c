@@ -733,16 +733,8 @@ void scsi_finish_command(struct scsi_cmnd *cmd)
 	struct scsi_device *sdev = cmd->device;
 	struct Scsi_Host *shost = sdev->host;
 	struct scsi_request *sreq;
-	unsigned long flags;
 
-	scsi_host_busy_dec_and_test(shost, sdev);
-
-	/*
-	 * XXX(hch): We really want a nice helper for this..
-	 */
-	spin_lock_irqsave(&sdev->sdev_lock, flags);
-	sdev->device_busy--;
-	spin_unlock_irqrestore(&sdev->sdev_lock, flags);
+	scsi_device_unbusy(sdev);
 
         /*
          * Clear the flags which say that the device/host is no longer
