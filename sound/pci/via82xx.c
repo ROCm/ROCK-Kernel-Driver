@@ -1641,14 +1641,6 @@ static int snd_via686_init_misc(via82xx_t *chip, int dev)
 		} else {
 			mpu_port[dev] = pci_resource_start(chip->pci, 2);
 		}
-		if (mpu_port[dev] >= 0x200 &&
-		    (chip->mpu_res = request_region(pci_resource_start(chip->pci, 2), 2,
-						    "VIA82xx MPU401")) != NULL) {
-			legacy |= VIA_FUNC_ENABLE_MIDI;
-		} else {
-			mpu_port[dev] = 0;
-			legacy &= ~VIA_FUNC_ENABLE_MIDI;
-		}
 	} else {
 		switch (mpu_port[dev]) {	/* force MIDI */
 		case 0x300:
