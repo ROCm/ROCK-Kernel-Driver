@@ -2432,6 +2432,28 @@ static void handle_stat1_irqs (struct net2280 *dev, u32 stat)
 			if ((tmp & (1 << DMA_SCATTER_GATHER_ENABLE)) == 0
 					|| (tmp & (1 << DMA_ENABLE)) == 0)
 				restart_dma (ep);
+#ifdef USE_DMA_CHAINING
+			else if (ep->desc->bEndpointAddress & USB_DIR_IN) {
+				struct net2280_request	*req;
+				u32			dmacount;
+
+				/* the descriptor at the head of the chain
+				 * may still have VALID_BIT clear; that's
+				 * used to trigger changing DMA_FIFO_VALIDATE
+				 * (affects automagic zlp writes).
+				 */
+				req = list_entry (ep->queue.next,
+						struct net2280_request, queue);
+				dmacount = req->td->dmacount;
+				dmacount &= __constant_cpu_to_le32 (
+						(1 << VALID_BIT)
+						| DMA_BYTE_COUNT_MASK);
+				if (dmacount && (dmacount & valid_bit) == 0) {
+					stop_dma (ep->dma);
+					restart_dma (ep);
+				}
+			}
+#endif
 		}
 		ep->irqs++;
 	}
