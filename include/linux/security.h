@@ -1917,7 +1917,7 @@ extern int mod_unreg_security	(const char *name, struct security_operations *ops
  * are just stubbed out, but a few must call the proper capable code.
  */
 
-static inline int security_scaffolding_startup (void)
+static inline int security_init(void)
 {
 	return 0;
 }
