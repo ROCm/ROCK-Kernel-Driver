@@ -14,6 +14,7 @@ config CPU_ARM610
 	depends on ARCH_RPC
 	select CPU_32v3
 	select CPU_CACHE_V3
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V3
 	select CPU_TLB_V3
 	help
@@ -29,6 +30,7 @@ config CPU_ARM710
 	default y if ARCH_CLPS7500
 	select CPU_32v3
 	select CPU_CACHE_V3
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V3
 	select CPU_TLB_V3
 	help
@@ -47,6 +49,7 @@ config CPU_ARM720T
 	select CPU_32v4
 	select CPU_ABRT_LV4T
 	select CPU_CACHE_V4
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WT
 	select CPU_TLB_V4WT
 	help
@@ -64,6 +67,7 @@ config CPU_ARM920T
 	select CPU_32v4
 	select CPU_ABRT_EV4T
 	select CPU_CACHE_V4WT
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WB
 	select CPU_TLB_V4WBI
 	help
@@ -84,6 +88,7 @@ config CPU_ARM922T
 	select CPU_32v4
 	select CPU_ABRT_EV4T
 	select CPU_CACHE_V4WT
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WB
 	select CPU_TLB_V4WBI
 	help
@@ -102,6 +107,7 @@ config CPU_ARM925T
 	select CPU_32v4
 	select CPU_ABRT_EV4T
 	select CPU_CACHE_V4WT
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WB
 	select CPU_TLB_V4WBI
  	help
@@ -119,6 +125,7 @@ config CPU_ARM926T
 	default y if ARCH_VERSATILE_PB
 	select CPU_32v5
 	select CPU_ABRT_EV5TJ
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WB
 	select CPU_TLB_V4WBI
 	help
@@ -136,6 +143,7 @@ config CPU_ARM1020
 	select CPU_32v5
 	select CPU_ABRT_EV4T
 	select CPU_CACHE_V4WT
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WB
 	select CPU_TLB_V4WBI
 	help
@@ -152,6 +160,7 @@ config CPU_ARM1020E
 	select CPU_32v5
 	select CPU_ABRT_EV4T
 	select CPU_CACHE_V4WT
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WB
 	select CPU_TLB_V4WBI
 	depends on n
@@ -162,6 +171,7 @@ config CPU_ARM1022
 	depends on ARCH_INTEGRATOR
 	select CPU_32v5
 	select CPU_ABRT_EV4T
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WB # can probably do better
 	select CPU_TLB_V4WBI
 	help
@@ -178,6 +188,7 @@ config CPU_ARM1026
 	depends on ARCH_INTEGRATOR
 	select CPU_32v5
 	select CPU_ABRT_EV5T # But need Jazelle, but EV5TJ ignores bit 10
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WB # can probably do better
 	select CPU_TLB_V4WBI
 	help
@@ -195,6 +206,7 @@ config CPU_SA110
 	select CPU_32v4 if !ARCH_RPC
 	select CPU_ABRT_EV4
 	select CPU_CACHE_V4WB
+	select CPU_CACHE_VIVT
 	select CPU_COPY_V4WB
 	select CPU_TLB_V4WB
 	help
@@ -214,6 +226,7 @@ config CPU_SA1100
 	select CPU_32v4
 	select CPU_ABRT_EV4
 	select CPU_CACHE_V4WB
+	select CPU_CACHE_VIVT
 	select CPU_TLB_V4WB
 	select CPU_MINICACHE
 
@@ -224,6 +237,7 @@ config CPU_XSCALE
 	default y
 	select CPU_32v5
 	select CPU_ABRT_EV5T
+	select CPU_CACHE_VIVT
 	select CPU_TLB_V4WBI
 	select CPU_MINICACHE
 
@@ -234,6 +248,7 @@ config CPU_V6
 	select CPU_32v6
 	select CPU_ABRT_EV6
 	select CPU_CACHE_V6
+	select CPU_CACHE_VIPT
 	select CPU_COPY_V6
 	select CPU_TLB_V6
 
@@ -284,6 +299,12 @@ config CPU_CACHE_V4WB
 	bool
 
 config CPU_CACHE_V6
+	bool
+
+config CPU_CACHE_VIVT
+	bool
+
+config CPU_CACHE_VIPT
 	bool
 
 # The copy-page model
