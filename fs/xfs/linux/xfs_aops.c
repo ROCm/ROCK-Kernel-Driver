@@ -1031,7 +1031,6 @@ count_page_state(
  * the page, we have to check the process flags first, if we
  * are already in a transaction or disk I/O during allocations
  * is off, we need to fail the writepage and redirty the page.
- * We also need to set PF_NOIO ourselves.
  */
 
 STATIC int
@@ -1067,7 +1066,7 @@ linvfs_writepage(
 	 * then mark the page dirty again and leave the page
 	 * as is.
 	 */
-	if ((current->flags & (PF_FSTRANS)) && need_trans)
+	if (PFLAGS_TEST_FSTRANS() && need_trans)
 		goto out_fail;
 
 	/*

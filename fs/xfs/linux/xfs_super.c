@@ -315,20 +315,14 @@ xfs_alloc_buftarg(
 	return btp;
 }
 
-STATIC __inline__ unsigned int gfp_mask(void)
-{
-	/* If we're not in a transaction, FS activity is ok */
-	if (current->flags & PF_FSTRANS) return GFP_NOFS;
-	return GFP_KERNEL;
-}
-
 STATIC struct inode *
 linvfs_alloc_inode(
 	struct super_block	*sb)
 {
 	vnode_t			*vp;
 
-	vp = (vnode_t *)kmem_cache_alloc(linvfs_inode_cachep, gfp_mask());
+	vp = (vnode_t *)kmem_cache_alloc(linvfs_inode_cachep, 
+                kmem_flags_convert(KM_SLEEP));
 	if (!vp)
 		return NULL;
 	return LINVFS_GET_IP(vp);
