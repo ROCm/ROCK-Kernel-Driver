@@ -347,6 +347,12 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 			goto err_unreg;
 		}
 
+		if (p.states[i].core_frequency > p.states[0].core_frequency) {
+			printk(KERN_DEBUG "P%u has larger frequency than P0, skipping\n", i);
+			p.states[i].core_frequency = 0;
+			continue;
+		}
+
 		if (extract_clock(p.states[i].control) != 
 		    (p.states[i].core_frequency * 1000)) {
 			printk(KERN_DEBUG "Invalid encoded frequency\n");
@@ -378,6 +384,8 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 		centrino_model->op_points[i].frequency = p.states[i].core_frequency * 1000;
 		if (cur_freq == centrino_model->op_points[i].frequency)
 			p.state = i;
+		if (!p.states[i].core_frequency)
+			centrino_model->op_points[i].frequency = CPUFREQ_ENTRY_INVALID;
 	}
 	centrino_model->op_points[p.state_count].frequency = CPUFREQ_TABLE_END;
 
