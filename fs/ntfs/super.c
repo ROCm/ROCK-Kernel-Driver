@@ -1555,7 +1555,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	if (sb_set_blocksize(sb, NTFS_BLOCK_SIZE) != NTFS_BLOCK_SIZE) {
 		if (!silent)
 			ntfs_error(sb, "Unable to set block size.");
-		goto set_blk_size_err_out_now;
+		goto err_out_now;
 	}
 
 	/* Get the size of the device in units of NTFS_BLOCK_SIZE bytes. */
@@ -1565,7 +1565,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	if (!(bh = read_ntfs_boot_sector(sb, silent))) {
 		if (!silent)
 			ntfs_error(sb, "Not an NTFS volume.");
-		goto set_blk_size_err_out_now;
+		goto err_out_now;
 	}
 	
 	/*
@@ -1579,7 +1579,7 @@ static int ntfs_fill_super(struct super_block *sb, void *opt, const int silent)
 	if (!result) {
 		if (!silent)
 			ntfs_error(sb, "Unsupported NTFS filesystem.");
-		goto set_blk_size_err_out_now;
+		goto err_out_now;
 	}
 
 	/* 
@@ -1750,10 +1750,7 @@ cond_iput_mft_ino_err_out_now:
 		printk("VFS: Busy inodes after umount. Self-destruct in 5 "
 				"seconds.  Have a nice day...\n");
 	}
-set_blk_size_err_out_now:
 	/* Errors at this stage are irrelevant. */
-	// FIXME: This should be done in fs/super.c::get_sb_bdev() itself! (AIA)
-	sb_set_blocksize(sb, sb->s_old_blocksize);
 err_out_now:
 	sb->u.generic_sbp = NULL;
 	kfree(vol);
@@ -1936,7 +1933,7 @@ static void __exit exit_ntfs_fs(void)
 }
 
 EXPORT_NO_SYMBOLS;
-MODULE_AUTHOR("Anton Altaparmakov <aia21@cam.ac.uk>");
+MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
 MODULE_DESCRIPTION("NTFS 1.2/3.x driver");
 MODULE_LICENSE("GPL");
 #ifdef DEBUG

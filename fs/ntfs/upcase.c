@@ -3,7 +3,7 @@
  *	      Part of the Linux-NTFS project.
  *
  * Copyright (C) 2001 Richard Russon <ntfs@flatcap.org>
- * Copyright (c) 2001 Anton Altaparmakov <aia21@cam.ac.uk>
+ * Copyright (c) 2001,2002 Anton Altaparmakov
  *
  * Modified for mkntfs inclusion 9 June 2001 by Anton Altaparmakov.
  * Modified for kernel inclusion 10 September 2001 by Anton Altparmakov.

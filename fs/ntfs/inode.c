@@ -1191,7 +1191,8 @@ void ntfs_read_inode_mount(struct inode *vi)
 				"for $MFT/$DATA. Driver bug or "
 				"corrupt $MFT. Run chkdsk.");
 		ntfs_debug("highest_vcn = 0x%Lx, last_vcn - 1 = 0x%Lx",
-				(long long)highest_vcn, (long long)last_vcn - 1);
+				(long long)highest_vcn,
+				(long long)last_vcn - 1);
 		goto put_err_out;
 	}
 	put_attr_search_ctx(ctx);
