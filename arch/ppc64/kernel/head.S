@@ -79,7 +79,7 @@
 _stext:
 _STATIC(__start)
 	b .__start_initialization_pSeries
-
+#ifdef CONFIG_PPC_ISERIES
 	/* At offset 0x20, there is a pointer to iSeries LPAR data.
 	 * This is required by the hypervisor */
 	. = 0x20
@@ -90,9 +90,7 @@ _STATIC(__start)
 	 * between physical addresses and absolute addresses) and
 	 * to the pidhash table (also used by the debugger) */
 	.llong msChunks-KERNELBASE
-#ifdef CONFIG_PPC_ISERIES
 	.llong pidhash-KERNELBASE
-#endif
 
 	/* Offset 0x38 - Pointer to start of embedded System.map */
 	.globl	embedded_sysmap_start
@@ -102,6 +100,7 @@ embedded_sysmap_start:
 	.globl	embedded_sysmap_end
 embedded_sysmap_end:
 	.llong	0
+#endif
 
 	/* Secondary processors spin on this value until it goes to 1. */
 	.globl  __secondary_hold_spinloop
@@ -365,11 +364,15 @@ __start_interupts:
 	 * point to itVpdAreas.  On pSeries native, this value is not used.
 	 */
 	. = 0x4000
-	.globl __end_interupts
+	.globl __end_interrupts
 	.globl __start_naca
 __end_interupts:
 __start_naca:
+#ifdef CONFIG_PPC_ISERIES
 	.llong itVpdAreas
+#else
+	.llong 0x0
+#endif
 	.llong 0x0
 	.llong 0x0
 	.llong paca
@@ -390,6 +393,7 @@ __start_stab:
 	.globl __end_stab
 __end_stab:
 
+#ifdef CONFIG_PPC_ISERIES
 	/*
 	 * The iSeries LPAR map is at this fixed address
 	 * so that the HvReleaseData structure can address
@@ -503,7 +507,7 @@ maskable_exception_exit:
 	mfspr	r21,SPRG1
 	mfspr	r20,SPRG2
 	rfid
-
+#endif
 /*
  * Data area reserved for FWNMI option.
  */
@@ -1217,7 +1221,7 @@ _GLOBAL(pseries_secondary_smp_init)
 #endif
 #endif
 	b 	1b			 /* Loop until told to go         */
-
+#ifdef CONFIG_PPC_ISERIES
 _GLOBAL(__start_initialization_iSeries)
 
 	LOADADDR(r1,init_thread_union)
@@ -1241,6 +1245,7 @@ _GLOBAL(__start_initialization_iSeries)
 	bl      .iSeries_fixup_klimit
 
 	b	.start_here_common
+#endif
 
 _GLOBAL(__start_initialization_pSeries)
 	mr	r31,r3			/* save parameters */
@@ -1248,9 +1253,6 @@ _GLOBAL(__start_initialization_pSeries)
 	mr	r29,r5
 	mr	r28,r6
 	mr	r27,r7
-	mr	r26,r8                  /* YABOOT: debug_print() routine */
-	mr	r25,r9                  /* YABOOT: debug_delay() routine */
-	mr	r24,r10                 /* YABOOT: debug_prom() routine */
 
 	bl	.enable_64b_mode
 
@@ -1295,9 +1297,6 @@ _GLOBAL(__start_initialization_pSeries)
 	mr	r5,r29
 	mr	r6,r28
 	mr	r7,r27
-	mr	r8,r26
-	mr	r9,r25
-	mr	r10,r24
 
 	bl	.prom_init
 

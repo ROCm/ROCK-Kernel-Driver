@@ -14,6 +14,8 @@
 #include <asm/page.h>
 #include <asm/bootinfo.h>
 
+#undef DEBUG
+
 void memmove(void *dst, void *im, int len);
 
 extern void *finddevice(const char *);
@@ -90,7 +92,9 @@ chrpboot(unsigned long a1, unsigned long a2, void *prom)
 	for(claim_addr = PROG_START; 
 	    claim_addr <= PROG_START * 8; 
 	    claim_addr += 0x100000) {
+#ifdef DEBUG
 		printf("    trying: 0x%08lx\n\r", claim_addr);
+#endif
 		dst = claim(claim_addr, uncompressed_size, 0);
 		if (dst != (void *)-1) break;
 	}
@@ -118,6 +122,7 @@ chrpboot(unsigned long a1, unsigned long a2, void *prom)
 	bi_recs = make_bi_recs((unsigned long)dst + vmlinux_end);
 
 	kernel_entry = (kernel_entry_t)dst;
+#ifdef DEBUG
 	printf( "kernel:\n\r"
 		"        entry addr = 0x%lx\n\r"
 		"        a1         = 0x%lx,\n\r"
@@ -126,6 +131,7 @@ chrpboot(unsigned long a1, unsigned long a2, void *prom)
 		"        bi_recs    = 0x%lx,\n\r",
 		(unsigned long)kernel_entry, a1, a2,
 		(unsigned long)prom, (unsigned long)bi_recs);
+#endif
 
 	kernel_entry( a1, a2, prom, bi_recs );
 

@@ -16,10 +16,6 @@
  */
 
 #if 0
-#define DEBUG_YABOOT
-#endif
-
-#if 0
 #define DEBUG_PROM
 #endif
 
@@ -32,22 +28,6 @@
 #include <linux/threads.h>
 #include <linux/spinlock.h>
 #include <linux/blk.h>
-
-#ifdef DEBUG_YABOOT
-#define call_yaboot(FUNC,...) \
-	do { \
-		if (FUNC) {					\
-			struct prom_t *_prom = PTRRELOC(&prom);	\
-			unsigned long prom_entry = _prom->entry;\
-			_prom->entry = (unsigned long)(FUNC);	\
-			enter_prom(__VA_ARGS__); 		\
-			_prom->entry = prom_entry;		\
-		}						\
-	} while (0)
-#else
-#define call_yaboot(FUNC,...) do { ; } while (0)
-#endif
-
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <asm/prom.h>
@@ -65,15 +45,13 @@
 #include <asm/bitops.h>
 #include <asm/naca.h>
 #include <asm/pci.h>
-#include "open_pic.h"
 #include <asm/bootinfo.h>
 #include <asm/ppcdebug.h>
+#include "open_pic.h"
 
 #ifdef CONFIG_FB
 #include <asm/linux_logo.h>
 #endif
-
-extern char _end[];
 
 /*
  * prom_init() is called very early on, before the kernel text
@@ -131,12 +109,7 @@ struct pci_intr_map {
 
 typedef unsigned long interpret_func(struct device_node *, unsigned long,
 				     int, int);
-#if 0
 static interpret_func interpret_pci_props;
-#endif
-static unsigned long interpret_pci_props(struct device_node *, unsigned long,
-					 int, int);
-
 static interpret_func interpret_isa_props;
 static interpret_func interpret_root_props;
 
@@ -156,9 +129,6 @@ struct prom_t prom = {
 	0,			/* version */
 	32,			/* encode_phys_size */
 	0			/* bi_rec pointer */
-#ifdef DEBUG_YABOOT
-	,NULL			/* yaboot */
-#endif
 };
 
 
@@ -170,9 +140,6 @@ extern struct rtas_t rtas;
 extern unsigned long klimit;
 extern unsigned long embedded_sysmap_end;
 extern struct lmb lmb;
-#ifdef CONFIG_MSCHUNKS
-extern struct msChunks msChunks;
-#endif /* CONFIG_MSCHUNKS */
 
 #define MAX_PHB 16 * 3  // 16 Towers * 3 PHBs/tower
 struct _of_tce_table of_tce_table[MAX_PHB + 1] = {{0, 0, 0}};
@@ -203,12 +170,6 @@ static struct bi_record * prom_bi_rec_verify(struct bi_record *);
 static unsigned long prom_bi_rec_reserve(unsigned long);
 static struct device_node *find_phandle(phandle);
 
-#ifdef CONFIG_MSCHUNKS
-static unsigned long prom_initialize_mschunks(unsigned long);
-#ifdef DEBUG_PROM
-void prom_dump_mschunks_mapping(void);
-#endif /* DEBUG_PROM */
-#endif /* CONFIG_MSCHUNKS */
 #ifdef DEBUG_PROM
 void prom_dump_lmb(void);
 #endif
@@ -216,8 +177,6 @@ void prom_dump_lmb(void);
 extern unsigned long reloc_offset(void);
 
 extern void enter_prom(void *dummy,...);
-
-void cacheable_memzero(void *, unsigned int);
 
 extern char cmd_line[512];	/* XXX */
 unsigned long dev_tree_size;
@@ -545,20 +504,6 @@ prom_initialize_lmb(unsigned long mem)
 	unsigned long lmb_base, lmb_size;
 	unsigned long num_regs, bytes_per_reg = (_prom->encode_phys_size*2)/8;
 
-#ifdef CONFIG_MSCHUNKS
-	unsigned long max_addr = 0;
-#if 1
-	/* Fix me: 630 3G-4G IO hack here... -Peter (PPPBBB) */
-	unsigned long io_base = 3UL<<30;
-	unsigned long io_size = 1UL<<30;
-	unsigned long have_630 = 1;	/* assume we have a 630 */
-
-#else
-	unsigned long io_base = <real io base here>;
-	unsigned long io_size = <real io size here>;
-#endif
-#endif /* CONFIG_MSCHUNKS */
-
 	lmb_init();
 
         for (node = 0; prom_next_node(&node); ) {
@@ -581,41 +526,16 @@ prom_initialize_lmb(unsigned long mem)
 				lmb_size = reg.addr64[i].size;
 			}
 
-#ifdef CONFIG_MSCHUNKS
-			if ( lmb_addrs_overlap(lmb_base,lmb_size,
-						io_base,io_size) ) {
-				/* If we really have dram here, then we don't
-			 	 * have a 630! -Peter
-			 	 */
-				have_630 = 0;
-			}
-#endif /* CONFIG_MSCHUNKS */
 			if ( lmb_add(lmb_base, lmb_size) < 0 )
 				prom_print(RELOC("Too many LMB's, discarding this one...\n"));
-#ifdef CONFIG_MSCHUNKS
-			else if ( max_addr < (lmb_base+lmb_size-1) )
-				max_addr = lmb_base+lmb_size-1;
-#endif /* CONFIG_MSCHUNKS */
 		}
 
 	}
-
-#ifdef CONFIG_MSCHUNKS
-	if ( have_630 && lmb_addrs_overlap(0,max_addr,io_base,io_size) )
-		lmb_add_io(io_base, io_size);
-#endif /* CONFIG_MSCHUNKS */
 
 	lmb_analyze();
 #ifdef DEBUG_PROM
 	prom_dump_lmb();
 #endif /* DEBUG_PROM */
-
-#ifdef CONFIG_MSCHUNKS
-	mem = prom_initialize_mschunks(mem);
-#ifdef DEBUG_PROM
-	prom_dump_mschunks_mapping();
-#endif /* DEBUG_PROM */
-#endif /* CONFIG_MSCHUNKS */
 
 	return mem;
 }
@@ -717,96 +637,6 @@ unsigned long prom_strtoul(const char *cp)
 
 	return result;
 }
-
-
-#ifdef CONFIG_MSCHUNKS
-static unsigned long
-prom_initialize_mschunks(unsigned long mem)
-{
-        unsigned long offset = reloc_offset();
-	struct lmb *_lmb  = PTRRELOC(&lmb);
-	struct msChunks *_msChunks = PTRRELOC(&msChunks);
-	unsigned long i, pchunk = 0;
-	unsigned long addr_range = _lmb->memory.size + _lmb->memory.iosize;
-	unsigned long chunk_size = _lmb->memory.lcd_size;
-
-
-	mem = msChunks_alloc(mem, addr_range / chunk_size, chunk_size);
-
-	/* First create phys -> abs mapping for memory/dram */
-	for (i=0; i < _lmb->memory.cnt ;i++) {
-		unsigned long base = _lmb->memory.region[i].base;
-		unsigned long size = _lmb->memory.region[i].size;
-		unsigned long achunk = addr_to_chunk(base);
-		unsigned long end_achunk = addr_to_chunk(base+size);
-
-		if(_lmb->memory.region[i].type != LMB_MEMORY_AREA)
-			continue;
-
-		_lmb->memory.region[i].physbase = chunk_to_addr(pchunk);
-		for (; achunk < end_achunk ;) {
-			PTRRELOC(_msChunks->abs)[pchunk++] = achunk++;
-		}
-	}
-
-#ifdef CONFIG_MSCHUNKS
-	/* Now create phys -> abs mapping for IO */
-	for (i=0; i < _lmb->memory.cnt ;i++) {
-		unsigned long base = _lmb->memory.region[i].base;
-		unsigned long size = _lmb->memory.region[i].size;
-		unsigned long achunk = addr_to_chunk(base);
-		unsigned long end_achunk = addr_to_chunk(base+size);
-
-		if(_lmb->memory.region[i].type != LMB_IO_AREA)
-			continue;
-
-		_lmb->memory.region[i].physbase = chunk_to_addr(pchunk);
-		for (; achunk < end_achunk ;) {
-			PTRRELOC(_msChunks->abs)[pchunk++] = achunk++;
-		}
-	}
-#endif /* CONFIG_MSCHUNKS */
-
-	return mem;
-}
-
-#ifdef DEBUG_PROM
-void
-prom_dump_mschunks_mapping(void)
-{
-        unsigned long offset = reloc_offset();
-	struct msChunks *_msChunks = PTRRELOC(&msChunks);
-	unsigned long chunk;
-
-        prom_print(RELOC("\nprom_dump_mschunks_mapping:\n"));
-        prom_print(RELOC("    msChunks.num_chunks         = 0x"));
-        prom_print_hex(_msChunks->num_chunks);
-	prom_print_nl();
-        prom_print(RELOC("    msChunks.chunk_size         = 0x"));
-        prom_print_hex(_msChunks->chunk_size);
-	prom_print_nl();
-        prom_print(RELOC("    msChunks.chunk_shift        = 0x"));
-        prom_print_hex(_msChunks->chunk_shift);
-	prom_print_nl();
-        prom_print(RELOC("    msChunks.chunk_mask         = 0x"));
-        prom_print_hex(_msChunks->chunk_mask);
-	prom_print_nl();
-        prom_print(RELOC("    msChunks.abs                = 0x"));
-        prom_print_hex(_msChunks->abs);
-	prom_print_nl();
-
-        prom_print(RELOC("    msChunks mapping:\n"));
-	for(chunk=0; chunk < _msChunks->num_chunks ;chunk++) {
-        	prom_print(RELOC("        phys 0x"));
-        	prom_print_hex(chunk);
-        	prom_print(RELOC(" -> abs 0x"));
-        	prom_print_hex(PTRRELOC(_msChunks->abs)[chunk]);
-		prom_print_nl();
-	}
-
-}
-#endif /* DEBUG_PROM */
-#endif /* CONFIG_MSCHUNKS */
 
 #ifdef DEBUG_PROM
 void
@@ -1213,26 +1043,28 @@ prom_hold_cpus(unsigned long mem)
 
 unsigned long __init
 prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
-	  unsigned long r6, unsigned long r7, yaboot_debug_t *yaboot)
+	  unsigned long r6, unsigned long r7)
 {
-	int chrp = 0;
 	unsigned long mem;
-	ihandle prom_mmu, prom_op, prom_root, prom_cpu;
+	ihandle prom_root, prom_cpu;
 	phandle cpu_pkg;
 	unsigned long offset = reloc_offset();
 	long l;
 	char *p, *d;
  	unsigned long phys;
         u32 getprop_rval;
-        struct naca_struct   *_naca = RELOC(naca);
+        struct naca_struct *_naca = RELOC(naca);
 	struct paca_struct *_xPaca = PTRRELOC(&paca[0]);
 	struct prom_t *_prom = PTRRELOC(&prom);
 
 	/* Default machine type. */
 	_naca->platform = PLATFORM_PSERIES;
+
+#if 0
 	/* Reset klimit to take into account the embedded system map */
 	if (RELOC(embedded_sysmap_end))
 		RELOC(klimit) = __va(PAGE_ALIGN(RELOC(embedded_sysmap_end)));
+#endif
 
 	/* Get a handle to the prom entry point before anything else */
 	_prom->entry = pp;
@@ -1241,32 +1073,9 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		RELOC(klimit) = PTRUNRELOC((unsigned long)_prom->bi_recs + _prom->bi_recs->data[1]);
 	}
 
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->dummy,offset>>32,offset&0xffffffff);
-	call_yaboot(yaboot->printf, RELOC("offset = 0x%08x%08x\n"), LONG_MSW(offset), LONG_LSW(offset));
-#endif
-
- 	/* Default */
- 	phys = KERNELBASE - offset;
-
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->printf, RELOC("phys = 0x%08x%08x\n"), LONG_MSW(phys), LONG_LSW(phys));
-#endif
-
-
-#ifdef DEBUG_YABOOT
-	_prom->yaboot = yaboot;
-	call_yaboot(yaboot->printf, RELOC("pp = 0x%08x%08x\n"), LONG_MSW(pp), LONG_LSW(pp));
-	call_yaboot(yaboot->printf, RELOC("prom = 0x%08x%08x\n"), LONG_MSW(_prom->entry), LONG_LSW(_prom->entry));
-#endif
-
 	/* First get a handle for the stdout device */
 	_prom->chosen = (ihandle)call_prom(RELOC("finddevice"), 1, 1,
 				       RELOC("/chosen"));
-
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->printf, RELOC("prom->chosen = 0x%08x%08x\n"), LONG_MSW(_prom->chosen), LONG_LSW(_prom->chosen));
-#endif
 
 	if ((long)_prom->chosen <= 0)
 		prom_exit();
@@ -1278,22 +1087,7 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 
         _prom->stdout = (ihandle)(unsigned long)getprop_rval;
 
-#ifdef DEBUG_YABOOT
-        if (_prom->stdout == 0) {
-	    call_yaboot(yaboot->printf, RELOC("prom->stdout = 0x%08x%08x\n"), LONG_MSW(_prom->stdout), LONG_LSW(_prom->stdout));
-        }
-
-	call_yaboot(yaboot->printf, RELOC("prom->stdout = 0x%08x%08x\n"), LONG_MSW(_prom->stdout), LONG_LSW(_prom->stdout));
-#endif
-
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->printf, RELOC("Location: 0x11\n"));
-#endif
-
 	mem = RELOC(klimit) - offset; 
-#ifdef DEBUG_YABOOT
-	call_yaboot(yaboot->printf, RELOC("Location: 0x11b\n"));
-#endif
 
 	/* Get the full OF pathname of the stdout device */
 	p = (char *) mem;
@@ -1310,34 +1104,6 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 		    &getprop_rval, sizeof(getprop_rval));
 	}
 	_prom->encode_phys_size = (getprop_rval==1) ? 32 : 64;
-
-#ifdef DEBUG_PROM
-	prom_print(RELOC("DRENG:    Detect OF version...\n"));
-#endif
-	/* Find the OF version */
-	prom_op = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/openprom"));
-	if (prom_op != (ihandle)-1) {
-		char model[64];
-		long sz;
-		sz = (long)call_prom(RELOC("getprop"), 4, 1, prom_op,
-				    RELOC("model"), model, 64);
-		if (sz > 0) {
-			char *c;
-			/* hack to skip the ibm chrp firmware # */
-			if ( strncmp(model,RELOC("IBM"),3) ) {
-				for (c = model; *c; c++)
-					if (*c >= '0' && *c <= '9') {
-						_prom->version = *c - '0';
-						break;
-					}
-			}
-			else
-				chrp = 1;
-		}
-	}
-	if (_prom->version >= 3)
-		prom_print(RELOC("OF Version 3 detected.\n"));
-
 
 	/* Determine which cpu is actually running right _now_ */
         if ((long)call_prom(RELOC("getprop"), 4, 1, _prom->chosen,
@@ -1408,35 +1174,9 @@ prom_init(unsigned long r3, unsigned long r4, unsigned long pp,
 	if (_naca->platform == PLATFORM_PSERIES)
 		prom_initialize_tce_table();
 
- 	if ((long) call_prom(RELOC("getprop"), 4, 1,
-				_prom->chosen,
-				RELOC("mmu"),
-				&getprop_rval,
-				sizeof(getprop_rval)) <= 0) {	
-		prom_print(RELOC(" no MMU found\n"));
-                prom_exit();
-	}
-
-	/* We assume the phys. address size is 3 cells */
-	RELOC(prom_mmu) = (ihandle)(unsigned long)getprop_rval;
-
-	if ((long)call_prom(RELOC("call-method"), 4, 4,
-				RELOC("translate"),
-				prom_mmu,
-				(void *)(KERNELBASE - offset),
-				(void *)1) != 0) {
-		prom_print(RELOC(" (translate failed) "));
-	} else {
-		prom_print(RELOC(" (translate ok) "));
-		phys = (unsigned long)_prom->args.rets[3];
-	}
-
-	/* If OpenFirmware version >= 3, then use quiesce call */
-	if (_prom->version >= 3) {
-		prom_print(RELOC("Calling quiesce ...\n"));
-		call_prom(RELOC("quiesce"), 0, 0);
-		phys = KERNELBASE - offset;
-	}
+	prom_print(RELOC("Calling quiesce ...\n"));
+	call_prom(RELOC("quiesce"), 0, 0);
+	phys = KERNELBASE - offset;
 
 	prom_print(RELOC("returning from prom_init\n"));
 	return phys;
@@ -1527,14 +1267,14 @@ check_display(unsigned long mem)
 					   RELOC(default_colors)[i*3+2]) != 0)
 				break;
 
-#ifdef CONFIG_FB
+#ifdef CONFIG_FRAMEBUFFER_CONSOLE
 		for (i = 0; i < LINUX_LOGO_COLORS; i++)
 			if (prom_set_color(ih, i + 32,
 					   RELOC(linux_logo_red)[i],
 					   RELOC(linux_logo_green)[i],
 					   RELOC(linux_logo_blue)[i]) != 0)
 				break;
-#endif /* CONFIG_FB */
+#endif /* CONFIG_FRAMEBUFFER_CONSOLE */
 
 		/*
 		 * If this display is the device that OF is using for stdout,

@@ -48,7 +48,7 @@ static __inline__ void clear_page(void *addr)
 	lines = naca->dCacheL1LinesPerPage;
 
 	__asm__ __volatile__(
-"  	mtctr  	%1\n\
+	"mtctr  	%1	# clear_page\n\
 1:      dcbz  	0,%0\n\
 	add	%0,%0,%3\n\
 	bdnz+	1b"

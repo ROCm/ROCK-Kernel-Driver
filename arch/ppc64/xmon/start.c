@@ -14,29 +14,13 @@
 #include <asm/page.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
-
-/* Transition to udbg isn't quite done yet...but very close. */
-#define USE_UDBG
-#ifdef USE_UDBG
 #include <asm/udbg.h>
-#endif
 
-#ifndef USE_UDBG
-static volatile unsigned char *sccc, *sccd;
-#endif
-unsigned long TXRDY, RXRDY;
 extern void xmon_printf(const char *fmt, ...);
 static int xmon_expect(const char *str, unsigned int timeout);
 
-#ifndef USE_UDBG
-static int console = 0;
-#endif
-static int via_modem = 0;
-/* static int xmon_use_sccb = 0;  --Unused */
-
 #define TB_SPEED	25000000
 
-extern void *comport1;
 static inline unsigned int readtb(void)
 {
 	unsigned int ret;
@@ -45,16 +29,10 @@ static inline unsigned int readtb(void)
 	return ret;
 }
 
-#ifndef USE_UDBG
-void buf_access(void)
+static void sysrq_handle_xmon(int key, struct pt_regs *pt_regs,
+			      struct tty_struct *tty) 
 {
-	sccd[3] &= ~0x80;	/* reset DLAB */
-}
-#endif
-
-static void sysrq_handle_xmon(int key, struct pt_regs *pt_regs, struct tty_struct *tty) 
-{
-  xmon(pt_regs);
+	xmon(pt_regs);
 }
 static struct sysrq_key_op sysrq_xmon_op = 
 {
@@ -68,50 +46,12 @@ xmon_map_scc(void)
 {
 	/* This maybe isn't the best place to register sysrq 'x' */
 	__sysrq_put_key_op('x', &sysrq_xmon_op);
-#ifndef USE_UDBG
-	/* should already be mapped by the kernel boot */
-	sccd = (volatile unsigned char *) (((unsigned long)comport1));
-	sccc = (volatile unsigned char *) (((unsigned long)comport1)+5);
-	TXRDY = 0x20;
-	RXRDY = 1;
-#endif
 }
-
-static int scc_initialized = 0;
-
-void xmon_init_scc(void);
-extern void pmu_poll(void);
 
 int
 xmon_write(void *handle, void *ptr, int nb)
 {
-#ifdef USE_UDBG
 	return udbg_write(ptr, nb);
-#else
-	char *p = ptr;
-	int i, c, ct;
-
-	if (!scc_initialized)
-		xmon_init_scc();
-	ct = 0;
-	for (i = 0; i < nb; ++i) {
-		while ((*sccc & TXRDY) == 0) {
-		}
-		c = p[i];
-		if (c == '\n' && !ct) {
-			c = '\r';
-			ct = 1;
-			--i;
-		} else {
-			if (console)
-				printk("%c", c);
-			ct = 0;
-		}
-		buf_access();
-		*sccd = c;
-	}
-	return i;
-#endif
 }
 
 int xmon_wants_key;
@@ -119,68 +59,15 @@ int xmon_wants_key;
 int
 xmon_read(void *handle, void *ptr, int nb)
 {
-#ifdef USE_UDBG
 	return udbg_read(ptr, nb);
-#else
-	char *p = ptr;
-	int i, c;
-
-	if (!scc_initialized)
-		xmon_init_scc();
-	for (i = 0; i < nb; ++i) {
-		do {
-			while ((*sccc & RXRDY) == 0)
-				;
-			buf_access();
-			c = *sccd;
-		} while (c == 0x11 || c == 0x13);
-		*p++ = c;
-	}
-	return i;
-#endif
 }
 
 int
 xmon_read_poll(void)
 {
-#ifdef USE_UDBG
 	return udbg_getc_poll();
-#else
-	if ((*sccc & RXRDY) == 0) {
-		return -1;
-	}
-	buf_access();
-	return *sccd;
-#endif
 }
  
-void
-xmon_init_scc()
-{
-#ifndef USE_UDBG
-	sccd[3] = 0x83; eieio();	/* LCR = 8N1 + DLAB */
-	sccd[0] = 12; eieio();		/* DLL = 9600 baud */
-	sccd[1] = 0; eieio();
-	sccd[2] = 0; eieio();		/* FCR = 0 */
-	sccd[3] = 3; eieio();		/* LCR = 8N1 */
-	sccd[1] = 0; eieio();		/* IER = 0 */
-#endif
-
-	scc_initialized = 1;
-	if (via_modem) {
-		for (;;) {
-			xmon_write(0, "ATE1V1\r", 7);
-			if (xmon_expect("OK", 5)) {
-				xmon_write(0, "ATA\r", 4);
-				if (xmon_expect("CONNECT", 40))
-					break;
-			}
-			xmon_write(0, "+++", 3);
-			xmon_expect("OK", 3);
-		}
-	}
-}
-
 void *xmon_stdin;
 void *xmon_stdout;
 void *xmon_stderr;

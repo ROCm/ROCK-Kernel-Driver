@@ -44,19 +44,9 @@ typedef __kernel_fsid_t __kernel_fsid_t32;
 })
 
 /* These are here to support 32-bit syscalls on a 64-bit kernel. */
-typedef int		__kernel_ptrdiff_t32;
-typedef int		__kernel_clock_t32;
-typedef int		__kernel_pid_t32;
 typedef unsigned short	__kernel_ipc_pid_t32;
-typedef unsigned int	__kernel_uid_t32;
-typedef unsigned int	__kernel_gid_t32;
-typedef unsigned int	__kernel_dev_t32;
-typedef unsigned int	__kernel_ino_t32;
-typedef unsigned int	__kernel_mode_t32;
 typedef unsigned int	__kernel_umode_t32;
-typedef short		__kernel_nlink_t32;
 typedef int		__kernel_daddr_t32;
-typedef int		__kernel_off_t32;
 typedef unsigned int	__kernel_caddr_t32;
 typedef int		__kernel_loff_t32;
 
@@ -88,8 +78,8 @@ typedef struct siginfo32 {
 
 		/* kill() */
 		struct {
-			__kernel_pid_t32 _pid;		/* sender's pid */
-			__kernel_uid_t32 _uid;		/* sender's uid */
+			compat_pid_t _pid;		/* sender's pid */
+			compat_uid_t _uid;		/* sender's uid */
 		} _kill;
 
 		/* POSIX.1b timers */
@@ -100,18 +90,18 @@ typedef struct siginfo32 {
 
 		/* POSIX.1b signals */
 		struct {
-			__kernel_pid_t32 _pid;		/* sender's pid */
-			__kernel_uid_t32 _uid;		/* sender's uid */
+			compat_pid_t _pid;		/* sender's pid */
+			compat_uid_t _uid;		/* sender's uid */
 			sigval_t32 _sigval;
 		} _rt;
 
 		/* SIGCHLD */
 		struct {
-			__kernel_pid_t32 _pid;		/* which child */
-			__kernel_uid_t32 _uid;		/* sender's uid */
+			compat_pid_t _pid;		/* which child */
+			compat_uid_t _uid;		/* sender's uid */
 			int _status;			/* exit code */
-			__kernel_clock_t32 _utime;
-			__kernel_clock_t32 _stime;
+			compat_clock_t _utime;
+			compat_clock_t _stime;
 		} _sigchld;
 
 		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS, SIGEMT */
@@ -164,30 +154,10 @@ typedef struct sigaltstack_32 {
 struct flock32 {
 	short l_type;
 	short l_whence;
-	__kernel_off_t32 l_start;
-	__kernel_off_t32 l_len;
-	__kernel_pid_t32 l_pid;
+	compat_off_t l_start;
+	compat_off_t l_len;
+	compat_pid_t l_pid;
 	short __unused;
-};
-
-struct stat32 {
-	__kernel_dev_t32   st_dev; /* 2 */
-	__kernel_ino_t32   st_ino; /* 4  */
-	__kernel_mode_t32  st_mode; /* 2  */
-	short   	   st_nlink; /* 2 */
-	__kernel_uid_t32   st_uid; /* 2 */
-	__kernel_gid_t32   st_gid; /* 2 */
-	__kernel_dev_t32   st_rdev; /* 2 */
-	__kernel_off_t32   st_size; /* 4 */
-	__kernel_off_t32   st_blksize; /* 4 */
-	__kernel_off_t32   st_blocks; /* 4 */
-	compat_time_t    st_atime; /* 4 */
-	unsigned int       __unused1; /* 4 */
-	compat_time_t    st_mtime; /* 4 */
-	unsigned int       __unused2; /* 4 */
-	compat_time_t    st_ctime; /* 4 */
-	unsigned int       __unused3; /* 4 */
-	unsigned int  __unused4[2]; /* 2*4 */
 };
 
 struct sigcontext32 {
