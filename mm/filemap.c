@@ -81,8 +81,6 @@ void __remove_from_page_cache(struct page *page)
 {
 	struct address_space *mapping = page->mapping;
 
-	BUG_ON(PageDirty(page) && !PageSwapCache(page));
-
 	radix_tree_delete(&mapping->page_tree, page->index);
 	list_del(&page->list);
 	page->mapping = NULL;

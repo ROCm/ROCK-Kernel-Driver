@@ -822,9 +822,6 @@ int __set_page_dirty_buffers(struct page *page)
 		goto out;
 	}
 
-	if (!PageUptodate(page))
-		buffer_error();
-
 	spin_lock(&mapping->private_lock);
 	if (page_has_buffers(page)) {
 		struct buffer_head *head = page_buffers(page);
