@@ -13,8 +13,14 @@
 #define PSMOUSE_CMD_RESET_BAT	0x02ff
 
 #define PSMOUSE_RET_BAT		0xaa
+#define PSMOUSE_RET_ID		0x00
 #define PSMOUSE_RET_ACK		0xfa
 #define PSMOUSE_RET_NAK		0xfe
+
+/* psmouse states */
+#define PSMOUSE_NEW_DEVICE	0
+#define PSMOUSE_ACTIVATED	1
+#define PSMOUSE_IGNORE		2
 
 struct psmouse {
 	void *private;
@@ -29,6 +35,7 @@ struct psmouse {
 	unsigned char type;
 	unsigned char model;
 	unsigned long last;
+	unsigned char state;
 	char acking;
 	volatile char ack;
 	char error;
@@ -36,16 +43,17 @@ struct psmouse {
 	char phys[32];
 };
 
-#define PSMOUSE_PS2	1
-#define PSMOUSE_PS2PP	2
-#define PSMOUSE_PS2TPP	3
-#define PSMOUSE_GENPS	4
-#define PSMOUSE_IMPS	5
-#define PSMOUSE_IMEX	6
-#define PSMOUSE_SYNAPTICS 7
+#define PSMOUSE_PS2		1
+#define PSMOUSE_PS2PP		2
+#define PSMOUSE_PS2TPP		3
+#define PSMOUSE_GENPS		4
+#define PSMOUSE_IMPS		5
+#define PSMOUSE_IMEX		6
+#define PSMOUSE_SYNAPTICS 	7
 
 int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command);
 
 extern int psmouse_smartscroll;
+extern unsigned int psmouse_resetafter;
 
 #endif /* _PSMOUSE_H */

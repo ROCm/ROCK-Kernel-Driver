@@ -60,6 +60,8 @@
  *
  */
 
+#include <linux/version.h>
+
 #if STREAMER_IOCTL && (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
 #include <asm/ioctl.h>
 #define IOCTL_PRINT_RX_BUFS   SIOCDEVPRIVATE

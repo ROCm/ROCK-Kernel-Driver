@@ -1,6 +1,9 @@
 /*
  * Synaptics TouchPad PS/2 mouse driver
  *
+ *   2003 Dmitry Torokhov <dtor@mail.ru>
+ *     Added support for pass-through port
+ *
  *   2003 Peter Osterlund <petero2@telia.com>
  *     Ported to 2.5 input device infrastructure.
  *
@@ -21,6 +24,7 @@
 
 #include <linux/module.h>
 #include <linux/input.h>
+#include <linux/serio.h>
 #include "psmouse.h"
 #include "synaptics.h"
 
@@ -71,7 +75,7 @@ static int synaptics_set_mode(struct psmouse *psmouse, unsigned char mode)
 
 	if (synaptics_special_cmd(psmouse, mode))
 		return -1;
-	param[0] = 0x14;
+	param[0] = SYN_PS_SET_MODE2;
 	if (psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE))
 		return -1;
 	return 0;
@@ -83,7 +87,7 @@ static int synaptics_reset(struct psmouse *psmouse)
 
 	if (psmouse_command(psmouse, r, PSMOUSE_CMD_RESET_BAT))
 		return -1;
-	if (r[0] == 0xAA && r[1] == 0x00)
+	if (r[0] == PSMOUSE_RET_BAT && r[1] == PSMOUSE_RET_ID)
 		return 0;
 	return -1;
 }
@@ -106,16 +110,25 @@ static int synaptics_model_id(struct psmouse *psmouse, unsigned long int *model_
  * Read the capability-bits from the touchpad
  * see also the SYN_CAP_* macros
  */
-static int synaptics_capability(struct psmouse *psmouse, unsigned long int *capability)
+static int synaptics_capability(struct psmouse *psmouse, unsigned long int *capability, unsigned long int *ext_cap)
 {
 	unsigned char cap[3];
 
 	if (synaptics_send_cmd(psmouse, SYN_QUE_CAPABILITIES, cap))
 		return -1;
 	*capability = (cap[0]<<16) | (cap[1]<<8) | cap[2];
-	if (SYN_CAP_VALID(*capability))
-		return 0;
-	return -1;
+	*ext_cap = 0;
+	if (!SYN_CAP_VALID(*capability))
+		return -1;
+
+	if (SYN_EXT_CAP_REQUESTS(*capability)) {
+		if (synaptics_send_cmd(psmouse, SYN_QUE_EXT_CAPAB, cap)) {
+			printk(KERN_ERR "Synaptics claims to have extended capabilities,"
+			       " but I'm not able to read them.");
+		} else
+			*ext_cap = (cap[0]<<16) | (cap[1]<<8) | cap[2];
+	}
+	return 0;
 }
 
 /*
@@ -134,19 +147,11 @@ static int synaptics_identify(struct psmouse *psmouse, unsigned long int *ident)
 	return -1;
 }
 
-static int synaptics_enable_device(struct psmouse *psmouse)
-{
-	if (psmouse_command(psmouse, NULL, PSMOUSE_CMD_ENABLE))
-		return -1;
-	return 0;
-}
-
 static void print_ident(struct synaptics_data *priv)
 {
 	printk(KERN_INFO "Synaptics Touchpad, model: %ld\n", SYN_ID_MODEL(priv->identity));
-	printk(KERN_INFO " Firware: %ld.%ld\n", SYN_ID_MAJOR(priv->identity),
+	printk(KERN_INFO " Firmware: %ld.%ld\n", SYN_ID_MAJOR(priv->identity),
 	       SYN_ID_MINOR(priv->identity));
-
 	if (SYN_MODEL_ROT180(priv->model_id))
 		printk(KERN_INFO " 180 degree mounted touchpad\n");
 	if (SYN_MODEL_PORTRAIT(priv->model_id))
@@ -159,12 +164,17 @@ static void print_ident(struct synaptics_data *priv)
 
 	if (SYN_CAP_EXTENDED(priv->capabilities)) {
 		printk(KERN_INFO " Touchpad has extended capability bits\n");
-		if (SYN_CAP_FOUR_BUTTON(priv->capabilities))
+		if (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap))
+			printk(KERN_INFO " -> %d multi-buttons, i.e. besides standard buttons\n",
+			       (int)(SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap)));
+		else if (SYN_CAP_FOUR_BUTTON(priv->capabilities))
 			printk(KERN_INFO " -> four buttons\n");
 		if (SYN_CAP_MULTIFINGER(priv->capabilities))
 			printk(KERN_INFO " -> multifinger detection\n");
 		if (SYN_CAP_PALMDETECT(priv->capabilities))
 			printk(KERN_INFO " -> palm detection\n");
+		if (SYN_CAP_PASS_THROUGH(priv->capabilities))
+			printk(KERN_INFO " -> pass-through port\n");
 	}
 }
 
@@ -172,6 +182,7 @@ static int query_hardware(struct psmouse *psmouse)
 {
 	struct synaptics_data *priv = psmouse->private;
 	int retries = 0;
+	int mode;
 
 	while ((retries++ < 3) && synaptics_reset(psmouse))
 		printk(KERN_ERR "synaptics reset failed\n");
@@ -180,17 +191,107 @@ static int query_hardware(struct psmouse *psmouse)
 		return -1;
 	if (synaptics_model_id(psmouse, &priv->model_id))
 		return -1;
-	if (synaptics_capability(psmouse, &priv->capabilities))
-		return -1;
-	if (synaptics_set_mode(psmouse, (SYN_BIT_ABSOLUTE_MODE |
-					 SYN_BIT_HIGH_RATE |
-					 SYN_BIT_DISABLE_GESTURE |
-					 SYN_BIT_W_MODE)))
+	if (synaptics_capability(psmouse, &priv->capabilities, &priv->ext_cap))
 		return -1;
 
-	synaptics_enable_device(psmouse);
+	mode = SYN_BIT_ABSOLUTE_MODE | SYN_BIT_HIGH_RATE;
+	if (SYN_ID_MAJOR(priv->identity) >= 4)
+		mode |= SYN_BIT_DISABLE_GESTURE;
+	if (SYN_CAP_EXTENDED(priv->capabilities))
+		mode |= SYN_BIT_W_MODE;
+	if (synaptics_set_mode(psmouse, mode))
+		return -1;
 
-	print_ident(priv);
+	return 0;
+}
+
+/*****************************************************************************
+ *	Synaptics pass-through PS/2 port support
+ ****************************************************************************/
+static int synaptics_pt_open(struct serio *port)
+{
+	return 0;
+}
+
+static void synaptics_pt_close(struct serio *port)
+{
+}
+
+static int synaptics_pt_write(struct serio *port, unsigned char c)
+{
+	struct psmouse *parent = port->driver;
+	char rate_param = SYN_PS_CLIENT_CMD; /* indicates that we want pass-through port */
+
+	if (synaptics_special_cmd(parent, c))
+		return -1;
+	if (psmouse_command(parent, &rate_param, PSMOUSE_CMD_SETRATE))
+		return -1;
+	return 0;
+}
+
+static inline int synaptics_is_pt_packet(unsigned char *buf)
+{
+	return (buf[0] & 0xFC) == 0x84 && (buf[3] & 0xCC) == 0xC4;
+}
+
+static void synaptics_pass_pt_packet(struct serio *ptport, unsigned char *packet)
+{
+	struct psmouse *child = ptport->private;
+
+	if (child) {
+		if (child->state == PSMOUSE_ACTIVATED) {
+			serio_interrupt(ptport, packet[1], 0, NULL);
+			serio_interrupt(ptport, packet[4], 0, NULL);
+			serio_interrupt(ptport, packet[5], 0, NULL);
+			if (child->type >= PSMOUSE_GENPS)
+				serio_interrupt(ptport, packet[2], 0, NULL);
+		} else if (child->state != PSMOUSE_IGNORE) {
+			serio_interrupt(ptport, packet[1], 0, NULL);
+		}
+	}
+}
+
+int synaptics_pt_init(struct psmouse *psmouse)
+{
+	struct synaptics_data *priv = psmouse->private;
+	struct serio *port;
+	struct psmouse *child;
+
+	if (psmouse->type != PSMOUSE_SYNAPTICS)
+		return -1;
+	if (!SYN_CAP_EXTENDED(priv->capabilities))
+		return -1;
+	if (!SYN_CAP_PASS_THROUGH(priv->capabilities))
+		return -1;
+
+	priv->ptport = port = kmalloc(sizeof(struct serio), GFP_KERNEL);
+	if (!port) {
+		printk(KERN_ERR "synaptics: not enough memory to allocate serio port\n");
+		return -1;
+	}
+
+	memset(port, 0, sizeof(struct serio));
+	port->type = SERIO_PS_PSTHRU;
+	port->name = "Synaptics pass-through";
+	port->phys = "synaptics-pt/serio0";
+	port->write = synaptics_pt_write;
+	port->open = synaptics_pt_open;
+	port->close = synaptics_pt_close;
+	port->driver = psmouse;
+
+	printk(KERN_INFO "serio: %s port at %s\n", port->name, psmouse->phys);
+	serio_register_slave_port(port);
+
+	/* adjust the touchpad to child's choice of protocol */
+	child = port->private;
+	if (child && child->type >= PSMOUSE_GENPS) {
+		if (synaptics_set_mode(psmouse, (SYN_BIT_ABSOLUTE_MODE |
+					 	 SYN_BIT_HIGH_RATE |
+					 	 SYN_BIT_DISABLE_GESTURE |
+						 SYN_BIT_FOUR_BYTE_CLIENT |
+					 	 SYN_BIT_W_MODE)))
+			printk(KERN_INFO "synaptics: failed to enable 4-byte guest protocol\n");
+	}
 
 	return 0;
 }
@@ -213,22 +314,27 @@ int synaptics_init(struct psmouse *psmouse)
 {
 	struct synaptics_data *priv;
 
+#ifndef CONFIG_MOUSE_PS2_SYNAPTICS
+	return -1;
+#endif
 	psmouse->private = priv = kmalloc(sizeof(struct synaptics_data), GFP_KERNEL);
 	if (!priv)
 		return -1;
 	memset(priv, 0, sizeof(struct synaptics_data));
 
-	priv->inSync = 1;
+	priv->out_of_sync = 0;
 
 	if (query_hardware(psmouse)) {
 		printk(KERN_ERR "Unable to query/initialize Synaptics hardware.\n");
 		goto init_fail;
 	}
 
+	print_ident(priv);
+
 	/*
 	 * The x/y limits are taken from the Synaptics TouchPad interfacing Guide,
 	 * which says that they should be valid regardless of the actual size of
-	 * the senser.
+	 * the sensor.
 	 */
 	set_bit(EV_ABS, psmouse->dev.evbit);
 	set_abs_params(&psmouse->dev, ABS_X, 1472, 5472, 0, 0);
@@ -243,7 +349,24 @@ int synaptics_init(struct psmouse *psmouse)
 	set_bit(BTN_RIGHT, psmouse->dev.keybit);
 	set_bit(BTN_FORWARD, psmouse->dev.keybit);
 	set_bit(BTN_BACK, psmouse->dev.keybit);
-
+	if (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap))
+		switch (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap) & ~0x01) {
+		default:
+			printk(KERN_ERR "This touchpad reports more than 8 multi-buttons, don't know how to handle.\n");
+		case 8:
+			set_bit(BTN_7, psmouse->dev.keybit);
+			set_bit(BTN_6, psmouse->dev.keybit);
+		case 6:
+			set_bit(BTN_5, psmouse->dev.keybit);
+			set_bit(BTN_4, psmouse->dev.keybit);
+		case 4:
+			set_bit(BTN_3, psmouse->dev.keybit);
+			set_bit(BTN_2, psmouse->dev.keybit);
+		case 2:
+			set_bit(BTN_1, psmouse->dev.keybit);
+			set_bit(BTN_0, psmouse->dev.keybit);
+			break;
+		}
 	clear_bit(EV_REL, psmouse->dev.evbit);
 	clear_bit(REL_X, psmouse->dev.relbit);
 	clear_bit(REL_Y, psmouse->dev.relbit);
@@ -259,42 +382,85 @@ void synaptics_disconnect(struct psmouse *psmouse)
 {
 	struct synaptics_data *priv = psmouse->private;
 
-	kfree(priv);
+	if (psmouse->type == PSMOUSE_SYNAPTICS && priv) {
+		synaptics_set_mode(psmouse, 0);
+		if (priv->ptport) {
+			serio_unregister_slave_port(priv->ptport);
+			kfree(priv->ptport);
+		}
+		kfree(priv);
+	}
 }
 
 /*****************************************************************************
  *	Functions to interpret the absolute mode packets
  ****************************************************************************/
 
-static void synaptics_parse_hw_state(struct synaptics_data *priv, struct synaptics_hw_state *hw)
+static void synaptics_parse_hw_state(unsigned char buf[], struct synaptics_data *priv, struct synaptics_hw_state *hw)
 {
-	unsigned char *buf = priv->proto_buf;
-
-	hw->x = (((buf[3] & 0x10) << 8) |
-		 ((buf[1] & 0x0f) << 8) |
-		 buf[4]);
-	hw->y = (((buf[3] & 0x20) << 7) |
-		 ((buf[1] & 0xf0) << 4) |
-		 buf[5]);
-
-	hw->z = buf[2];
-	hw->w = (((buf[0] & 0x30) >> 2) |
-		 ((buf[0] & 0x04) >> 1) |
-		 ((buf[3] & 0x04) >> 2));
-
-	hw->left  = (buf[0] & 0x01) ? 1 : 0;
-	hw->right = (buf[0] & 0x2) ? 1 : 0;
 	hw->up    = 0;
 	hw->down  = 0;
+	hw->b0    = 0;
+	hw->b1    = 0;
+	hw->b2    = 0;
+	hw->b3    = 0;
+	hw->b4    = 0;
+	hw->b5    = 0;
+	hw->b6    = 0;
+	hw->b7    = 0;
 
-	if (SYN_CAP_EXTENDED(priv->capabilities) &&
-	    (SYN_CAP_FOUR_BUTTON(priv->capabilities))) {
-		hw->up = ((buf[3] & 0x01)) ? 1 : 0;
-		if (hw->left)
-			hw->up = !hw->up;
-		hw->down = ((buf[3] & 0x02)) ? 1 : 0;
-		if (hw->right)
-			hw->down = !hw->down;
+	if (SYN_MODEL_NEWABS(priv->model_id)) {
+		hw->x = (((buf[3] & 0x10) << 8) |
+			 ((buf[1] & 0x0f) << 8) |
+			 buf[4]);
+		hw->y = (((buf[3] & 0x20) << 7) |
+			 ((buf[1] & 0xf0) << 4) |
+			 buf[5]);
+
+		hw->z = buf[2];
+		hw->w = (((buf[0] & 0x30) >> 2) |
+			 ((buf[0] & 0x04) >> 1) |
+			 ((buf[3] & 0x04) >> 2));
+
+		hw->left  = (buf[0] & 0x01) ? 1 : 0;
+		hw->right = (buf[0] & 0x02) ? 1 : 0;
+		if (SYN_CAP_EXTENDED(priv->capabilities) &&
+		    (SYN_CAP_FOUR_BUTTON(priv->capabilities))) {
+			hw->up = ((buf[3] & 0x01)) ? 1 : 0;
+			if (hw->left)
+				hw->up = !hw->up;
+			hw->down = ((buf[3] & 0x02)) ? 1 : 0;
+			if (hw->right)
+				hw->down = !hw->down;
+		}
+		if (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap) &&
+		    ((buf[3] & 2) ? !hw->right : hw->right)) {
+			switch (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap) & ~0x01) {
+			default:
+				; /* we did comment while initialising... */
+			case 8:
+				hw->b7 = ((buf[5] & 0x08)) ? 1 : 0;
+				hw->b6 = ((buf[4] & 0x08)) ? 1 : 0;
+			case 6:
+				hw->b5 = ((buf[5] & 0x04)) ? 1 : 0;
+				hw->b4 = ((buf[4] & 0x04)) ? 1 : 0;
+			case 4:
+				hw->b3 = ((buf[5] & 0x02)) ? 1 : 0;
+				hw->b2 = ((buf[4] & 0x02)) ? 1 : 0;
+			case 2:
+				hw->b1 = ((buf[5] & 0x01)) ? 1 : 0;
+				hw->b0 = ((buf[4] & 0x01)) ? 1 : 0;
+			}
+		}
+	} else {
+		hw->x = (((buf[1] & 0x1f) << 8) | buf[2]);
+		hw->y = (((buf[4] & 0x1f) << 8) | buf[5]);
+
+		hw->z = (((buf[0] & 0x30) << 2) | (buf[3] & 0x3F));
+		hw->w = (((buf[1] & 0x80) >> 4) | ((buf[0] & 0x04) >> 1));
+
+		hw->left  = (buf[0] & 0x01) ? 1 : 0;
+		hw->right = (buf[0] & 0x02) ? 1 : 0;
 	}
 }
 
@@ -307,7 +473,7 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 	struct synaptics_data *priv = psmouse->private;
 	struct synaptics_hw_state hw;
 
-	synaptics_parse_hw_state(priv, &hw);
+	synaptics_parse_hw_state(psmouse->packet, priv, &hw);
 
 	if (hw.z > 0) {
 		int w_ok = 0;
@@ -347,7 +513,24 @@ static void synaptics_process_packet(struct psmouse *psmouse)
 	input_report_key(dev, BTN_RIGHT,   hw.right);
 	input_report_key(dev, BTN_FORWARD, hw.up);
 	input_report_key(dev, BTN_BACK,    hw.down);
-
+	if (SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap))
+		switch(SYN_CAP_MULTI_BUTTON_NO(priv->ext_cap) & ~0x01) {
+		default:
+			; /* we did comment while initialising... */
+		case 8:
+			input_report_key(dev, BTN_7,       hw.b7);
+			input_report_key(dev, BTN_6,       hw.b6);
+		case 6:
+			input_report_key(dev, BTN_5,       hw.b5);
+			input_report_key(dev, BTN_4,       hw.b4);
+		case 4:
+			input_report_key(dev, BTN_3,       hw.b3);
+			input_report_key(dev, BTN_2,       hw.b2);
+		case 2:
+			input_report_key(dev, BTN_1,       hw.b1);
+			input_report_key(dev, BTN_0,       hw.b0);
+			break;
+		}
 	input_sync(dev);
 }
 
@@ -355,35 +538,59 @@ void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs)
 {
 	struct input_dev *dev = &psmouse->dev;
 	struct synaptics_data *priv = psmouse->private;
-	unsigned char *pBuf = priv->proto_buf;
-	unsigned char u = psmouse->packet[0];
+	unsigned char data = psmouse->packet[psmouse->pktcnt - 1];
+	int newabs = SYN_MODEL_NEWABS(priv->model_id);
 
 	input_regs(dev, regs);
 
-	pBuf[priv->proto_buf_tail++] = u;
-
-	/* check first byte */
-	if ((priv->proto_buf_tail == 1) && ((u & 0xC8) != 0x80)) {
-		priv->inSync = 0;
-		priv->proto_buf_tail = 0;
-		printk(KERN_WARNING "Synaptics driver lost sync at 1st byte\n");
-		return;
-	}
-
-	/* check 4th byte */
-	if ((priv->proto_buf_tail == 4) && ((u & 0xc8) != 0xc0)) {
-		priv->inSync = 0;
-		priv->proto_buf_tail = 0;
-		printk(KERN_WARNING "Synaptics driver lost sync at 4th byte\n");
-		return;
-	}
-
-	if (priv->proto_buf_tail >= 6) { /* Full packet received */
-		if (!priv->inSync) {
-			priv->inSync = 1;
-			printk(KERN_NOTICE "Synaptics driver resynced.\n");
+	switch (psmouse->pktcnt) {
+	case 1:
+		if (newabs ? ((data & 0xC8) != 0x80) : ((data & 0xC0) != 0xC0)) {
+			printk(KERN_WARNING "Synaptics driver lost sync at 1st byte\n");
+			goto bad_sync;
 		}
-		synaptics_process_packet(psmouse);
-		priv->proto_buf_tail = 0;
+		break;
+	case 2:
+		if (!newabs && ((data & 0x60) != 0x00)) {
+			printk(KERN_WARNING "Synaptics driver lost sync at 2nd byte\n");
+			goto bad_sync;
+		}
+		break;
+	case 4:
+		if (newabs ? ((data & 0xC8) != 0xC0) : ((data & 0xC0) != 0x80)) {
+			printk(KERN_WARNING "Synaptics driver lost sync at 4th byte\n");
+			goto bad_sync;
+		}
+		break;
+	case 5:
+		if (!newabs && ((data & 0x60) != 0x00)) {
+			printk(KERN_WARNING "Synaptics driver lost sync at 5th byte\n");
+			goto bad_sync;
+		}
+		break;
+	default:
+		if (psmouse->pktcnt >= 6) { /* Full packet received */
+			if (priv->out_of_sync) {
+				priv->out_of_sync = 0;
+				printk(KERN_NOTICE "Synaptics driver resynced.\n");
+			}
+
+			if (priv->ptport && synaptics_is_pt_packet(psmouse->packet))
+				synaptics_pass_pt_packet(priv->ptport, psmouse->packet);
+			else
+				synaptics_process_packet(psmouse);
+
+			psmouse->pktcnt = 0;
+		}
+		break;
+	}
+	return;
+
+ bad_sync:
+	priv->out_of_sync++;
+	psmouse->pktcnt = 0;
+	if (psmouse_resetafter > 0 && priv->out_of_sync	== psmouse_resetafter) {
+		psmouse->state = PSMOUSE_IGNORE;
+		serio_rescan(psmouse->serio);
 	}
 }

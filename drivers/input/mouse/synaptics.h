@@ -12,6 +12,7 @@
 
 extern void synaptics_process_byte(struct psmouse *psmouse, struct pt_regs *regs);
 extern int synaptics_init(struct psmouse *psmouse);
+extern int synaptics_pt_init(struct psmouse *psmouse);
 extern void synaptics_disconnect(struct psmouse *psmouse);
 
 /* synaptics queries */
@@ -22,12 +23,14 @@ extern void synaptics_disconnect(struct psmouse *psmouse);
 #define SYN_QUE_SERIAL_NUMBER_PREFIX	0x06
 #define SYN_QUE_SERIAL_NUMBER_SUFFIX	0x07
 #define SYN_QUE_RESOLUTION		0x08
+#define SYN_QUE_EXT_CAPAB		0x09
 
 /* synatics modes */
 #define SYN_BIT_ABSOLUTE_MODE		(1 << 7)
 #define SYN_BIT_HIGH_RATE		(1 << 6)
 #define SYN_BIT_SLEEP_MODE		(1 << 3)
 #define SYN_BIT_DISABLE_GESTURE		(1 << 2)
+#define SYN_BIT_FOUR_BYTE_CLIENT	(1 << 1)
 #define SYN_BIT_W_MODE			(1 << 0)
 
 /* synaptics model ID bits */
@@ -42,11 +45,14 @@ extern void synaptics_disconnect(struct psmouse *psmouse);
 
 /* synaptics capability bits */
 #define SYN_CAP_EXTENDED(c)		((c) & (1 << 23))
+#define SYN_CAP_PASS_THROUGH(c)		((c) & (1 << 7))
 #define SYN_CAP_SLEEP(c)		((c) & (1 << 4))
 #define SYN_CAP_FOUR_BUTTON(c)		((c) & (1 << 3))
 #define SYN_CAP_MULTIFINGER(c)		((c) & (1 << 1))
 #define SYN_CAP_PALMDETECT(c)		((c) & (1 << 0))
 #define SYN_CAP_VALID(c)		((((c) & 0x00ff00) >> 8) == 0x47)
+#define SYN_EXT_CAP_REQUESTS(c)		((((c) & 0x700000) >> 20) == 1)
+#define SYN_CAP_MULTI_BUTTON_NO(ec)	(((ec) & 0x00f000) >> 12)
 
 /* synaptics modes query bits */
 #define SYN_MODE_ABSOLUTE(m)		((m) & (1 << 7))
@@ -62,6 +68,10 @@ extern void synaptics_disconnect(struct psmouse *psmouse);
 #define SYN_ID_MINOR(i) 		(((i) >> 16) & 0xff)
 #define SYN_ID_IS_SYNAPTICS(i)		((((i) >> 8) & 0xff) == 0x47)
 
+/* synaptics special commands */
+#define SYN_PS_SET_MODE2		0x14
+#define SYN_PS_CLIENT_CMD		0x28
+
 /*
  * A structure to describe the state of the touchpad hardware (buttons and pad)
  */
@@ -75,21 +85,28 @@ struct synaptics_hw_state {
 	int right;
 	int up;
 	int down;
+	int b0;
+	int b1;
+	int b2;
+	int b3;
+	int b4;
+	int b5;
+	int b6;
+	int b7;
 };
 
 struct synaptics_data {
 	/* Data read from the touchpad */
 	unsigned long int model_id;		/* Model-ID */
 	unsigned long int capabilities; 	/* Capabilities */
+	unsigned long int ext_cap; 		/* Extended Capabilities */
 	unsigned long int identity;		/* Identification */
 
 	/* Data for normal processing */
-	unsigned char proto_buf[6];		/* Buffer for Packet */
-	unsigned char last_byte;		/* last received byte */
-	int inSync;				/* Packets in sync */
-	int proto_buf_tail;
-
+	unsigned int out_of_sync;		/* # of packets out of sync */
 	int old_w;				/* Previous w value */
+	
+	struct serio *ptport;			/* pass-through port */
 };
 
 #endif /* _SYNAPTICS_H */

@@ -166,8 +166,7 @@ void iforce_process_packet(struct iforce *iforce, u16 cmd, unsigned char *data, 
 		iforce->expect_packet = 0;
 		iforce->ecmd = cmd;
 		memcpy(iforce->edata, data, IFORCE_MAX_LENGTH);
-		if (waitqueue_active(&iforce->wait))
-			wake_up(&iforce->wait);
+		wake_up(&iforce->wait);
 	}
 #endif
 
@@ -264,7 +263,7 @@ int iforce_get_id_packet(struct iforce *iforce, char *packet)
 		set_current_state(TASK_INTERRUPTIBLE);
 		add_wait_queue(&iforce->wait, &wait);
 
-		if (usb_submit_urb(iforce->ctrl, GFP_KERNEL)) {
+		if (usb_submit_urb(iforce->ctrl, GFP_ATOMIC)) {
 			set_current_state(TASK_RUNNING);
 			remove_wait_queue(&iforce->wait, &wait);
 			return -1;
