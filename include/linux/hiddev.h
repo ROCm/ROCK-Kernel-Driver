@@ -129,7 +129,7 @@ struct hiddev_usage_ref {
  * Protocol version.
  */
 
-#define HID_VERSION		0x010002
+#define HID_VERSION		0x010003
 
 /*
  * IOCTLs (0x00 - 0x7f)
