@@ -1,6 +1,6 @@
 /*
  * 
- * linux/drivers/s390/net/qeth_main.c ($Revision: 1.77.2.16 $)
+ * linux/drivers/s390/net/qeth_main.c ($Revision: 1.77.2.17 $)
  *
  * Linux on zSeries OSA Express and HiperSockets support
  *
@@ -12,7 +12,7 @@
  *			  Frank Pavlic (pavlic@de.ibm.com) and
  *		 	  Thomas Spatzier <tspat@de.ibm.com>
  *
- *    $Revision: 1.77.2.16 $	 $Date: 2004/05/24 16:06:47 $
+ *    $Revision: 1.77.2.17 $	 $Date: 2004/06/02 07:35:20 $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -78,7 +78,7 @@ qeth_eyecatcher(void)
 #include "qeth_mpc.h"
 #include "qeth_fs.h"
 
-#define VERSION_QETH_C "$Revision: 1.77.2.16 $"
+#define VERSION_QETH_C "$Revision: 1.77.2.17 $"
 static const char *version = "qeth S/390 OSA-Express driver";
 
 /**
@@ -91,7 +91,8 @@ static debug_info_t *qeth_dbf_control = NULL;
 static debug_info_t *qeth_dbf_trace = NULL;
 static debug_info_t *qeth_dbf_sense = NULL;
 static debug_info_t *qeth_dbf_qerr = NULL;
-static char qeth_dbf_text_buf[255];
+
+DEFINE_PER_CPU(char[256], qeth_dbf_txt_buf);
 
 /**
  * some more definitions and declarations
