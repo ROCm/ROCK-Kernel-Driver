@@ -57,6 +57,7 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <linux/workqueue.h>
+#include <linux/suspend.h>
 
 #include <support/debug.h>
 #include <support/kmem.h>
@@ -1586,6 +1587,10 @@ pagebuf_daemon(
 
 	INIT_LIST_HEAD(&tmp);
 	do {
+		/* swsusp */
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
+
 		if (pbd_active == 1) {
 			del_timer(&pb_daemon_timer);
 			pb_daemon_timer.expires = jiffies +
