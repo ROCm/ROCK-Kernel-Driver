@@ -887,6 +887,7 @@ static int reload(struct dm_ioctl *param, struct dm_ioctl *user)
 		dm_table_put(t);
 		return r;
 	}
+	dm_table_put(t);	/* md will have taken its own reference */
 
 	set_disk_ro(dm_disk(md), (param->flags & DM_READONLY_FLAG));
 	dm_put(md);
