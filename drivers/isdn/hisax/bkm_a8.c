@@ -110,6 +110,12 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	writefifo(cs->hw.ax.base, cs->hw.ax.data_adr, 0x80, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
 
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
@@ -435,11 +441,7 @@ setup_sct_quadro(struct IsdnCard *card)
 
 	test_and_set_bit(HW_IPAC, &cs->HW_Flags);
 
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
-
+	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &BKM_card_msg;

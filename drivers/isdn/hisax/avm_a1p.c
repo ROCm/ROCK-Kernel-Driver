@@ -108,6 +108,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	spin_unlock_irqrestore(&avm_a1p_lock, flags);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static inline u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
@@ -275,10 +282,7 @@ setup_avm_a1_pcmcia(struct IsdnCard *card)
 	printk(KERN_INFO "AVM A1 PCMCIA: io 0x%x irq %d model %d version %d\n",
 				cs->hw.avm.cfg_reg, cs->irq, model, vers);
 
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &AVM_card_msg;

@@ -77,6 +77,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	write_fifo(cs->hw.avm.isacfifo, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
@@ -294,10 +301,7 @@ setup_avm_a1(struct IsdnCard *card)
 	       cs->hw.avm.hscx[0] + 32, cs->hw.avm.hscxfifo[0],
 	       cs->hw.avm.hscx[1] + 32, cs->hw.avm.hscxfifo[1]);
 
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &AVM_card_msg;

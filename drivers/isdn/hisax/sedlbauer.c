@@ -186,6 +186,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	writefifo(cs->hw.sedl.adr, cs->hw.sedl.isac, 0, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
 {
@@ -209,6 +216,13 @@ WriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
 {
 	writefifo(cs->hw.sedl.adr, cs->hw.sedl.isac, 0x80, data, size);
 }
+
+static struct dc_hw_ops ipac_dc_ops = {
+	.read_reg   = ReadISAC_IPAC,
+	.write_reg  = WriteISAC_IPAC,
+	.read_fifo  = ReadISACfifo_IPAC,
+	.write_fifo = WriteISACfifo_IPAC,
+};
 
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
@@ -751,10 +765,7 @@ ready:
 			cs->hw.sedl.hscx = cs->hw.sedl.cfg_reg + SEDL_IPAC_ANY_IPAC;
 		}
 		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
-		cs->readisac = &ReadISAC_IPAC;
-		cs->writeisac = &WriteISAC_IPAC;
-		cs->readisacfifo = &ReadISACfifo_IPAC;
-		cs->writeisacfifo = &WriteISACfifo_IPAC;
+		cs->dc_hw_ops = &ipac_dc_ops;
 		cs->irq_func = &sedlbauer_interrupt_ipac;
 
 		val = readreg(cs->hw.sedl.adr, cs->hw.sedl.isac, IPAC_ID);
@@ -762,10 +773,7 @@ ready:
 		reset_sedlbauer(cs);
 	} else {
 		/* ISAC_HSCX oder ISAC_ISAR */
-		cs->readisac = &ReadISAC;
-		cs->writeisac = &WriteISAC;
-		cs->readisacfifo = &ReadISACfifo;
-		cs->writeisacfifo = &WriteISACfifo;
+		cs->dc_hw_ops = &isac_ops;
 		if (cs->hw.sedl.chip == SEDL_CHIP_ISAC_ISAR) {
 			if (cs->hw.sedl.bus == SEDL_BUS_PCI) {
 				cs->hw.sedl.adr = cs->hw.sedl.cfg_reg +

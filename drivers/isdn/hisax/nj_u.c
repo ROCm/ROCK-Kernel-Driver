@@ -107,7 +107,7 @@ NETjet_U_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 			inittiger(cs);
 			initicc(cs);
 			/* Reenable all IRQ */
-			cs->writeisac(cs, ICC_MASK, 0);
+			NETjet_WriteIC(cs, ICC_MASK, 0);
 			return(0);
 		case CARD_TEST:
 			return(0);
@@ -224,10 +224,7 @@ setup_netjet_u(struct IsdnCard *card)
 		request_region(cs->hw.njet.base, bytecnt, "netspider-u isdn");
 	}
 	reset_netjet_u(cs);
-	cs->readisac  = &NETjet_ReadIC;
-	cs->writeisac = &NETjet_WriteIC;
-	cs->readisacfifo  = &NETjet_ReadICfifo;
-	cs->writeisacfifo = &NETjet_WriteICfifo;
+	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->BC_Send_Data = &netjet_fill_dma;
 	cs->cardmsg = &NETjet_U_card_msg;
 	cs->irq_func = &netjet_u_interrupt;

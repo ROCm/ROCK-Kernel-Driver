@@ -80,7 +80,7 @@ const char *enternow_pci_rev = "$Revision: 1.1.2.1 $";
 
 
 /* cs->readisac, macro rByteAMD */
-BYTE
+static BYTE
 ReadByteAmd7930(struct IsdnCardState *cs, BYTE offset)
 {
 	/* direktes Register */
@@ -95,7 +95,7 @@ ReadByteAmd7930(struct IsdnCardState *cs, BYTE offset)
 }
 
 /* cs->writeisac, macro wByteAMD */
-void
+static void
 WriteByteAmd7930(struct IsdnCardState *cs, BYTE offset, BYTE value)
 {
 	/* direktes Register */
@@ -109,6 +109,11 @@ WriteByteAmd7930(struct IsdnCardState *cs, BYTE offset, BYTE value)
 	}
 }
 
+
+static struct dc_hw_ops enternow_ops = {
+	.read_reg   = ReadByteAmd7930,
+	.write_reg  = WriteByteAmd7930,
+};
 
 void
 enpci_setIrqMask(struct IsdnCardState *cs, BYTE val) {
@@ -364,10 +369,7 @@ setup_enternow_pci(struct IsdnCard *card)
 	}
 	reset_enpci(cs);
 	cs->hw.njet.last_is0 = 0;
-        /* macro rByteAMD */
-        cs->readisac = &ReadByteAmd7930;
-        /* macro wByteAMD */
-        cs->writeisac = &WriteByteAmd7930;
+	cs->dc_hw_ops = &enternow_ops;
         cs->dc.amd7930.setIrqMask = &enpci_setIrqMask;
 
 	cs->BC_Send_Data = &netjet_fill_dma;

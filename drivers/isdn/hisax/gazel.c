@@ -175,6 +175,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	}
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static void
 ReadHSCXfifo(struct IsdnCardState *cs, int hscx, u_char * data, int size)
 {
@@ -681,10 +688,7 @@ setup_gazel(struct IsdnCard *card)
 		release_io_gazel(cs);
 		return (0);
 	}
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Gazel_card_msg;

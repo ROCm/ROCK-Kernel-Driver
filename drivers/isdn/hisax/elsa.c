@@ -210,6 +210,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	writefifo(cs->hw.elsa.ale, cs->hw.elsa.isac, 0, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
 {
@@ -233,6 +240,13 @@ WriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
 {
 	writefifo(cs->hw.elsa.ale, cs->hw.elsa.isac, 0x80, data, size);
 }
+
+static struct dc_hw_ops ipac_dc_ops = {
+	.read_reg   = ReadISAC_IPAC,
+	.write_reg  = WriteISAC_IPAC,
+	.read_fifo  = ReadISACfifo_IPAC,
+	.write_fifo = WriteISACfifo_IPAC,
+};
 
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
@@ -1169,18 +1183,12 @@ setup_elsa(struct IsdnCard *card)
 	cs->cardmsg = &Elsa_card_msg;
 	reset_elsa(cs);
 	if ((cs->subtyp == ELSA_QS1000PCI) || (cs->subtyp == ELSA_QS3000PCI) || (cs->subtyp == ELSA_PCMCIA_IPAC)) {
-		cs->readisac = &ReadISAC_IPAC;
-		cs->writeisac = &WriteISAC_IPAC;
-		cs->readisacfifo = &ReadISACfifo_IPAC;
-		cs->writeisacfifo = &WriteISACfifo_IPAC;
+		cs->dc_hw_ops = &ipac_dc_ops;
 		cs->irq_func = &elsa_interrupt_ipac;
 		val = readreg(cs->hw.elsa.ale, cs->hw.elsa.isac, IPAC_ID);
 		printk(KERN_INFO "Elsa: IPAC version %x\n", val);
 	} else {
-		cs->readisac = &ReadISAC;
-		cs->writeisac = &WriteISAC;
-		cs->readisacfifo = &ReadISACfifo;
-		cs->writeisacfifo = &WriteISACfifo;
+		cs->dc_hw_ops = &isac_ops;
 		cs->irq_func = &elsa_interrupt;
 		ISACVersion(cs, "Elsa:");
 		if (HscxVersion(cs, "Elsa:")) {

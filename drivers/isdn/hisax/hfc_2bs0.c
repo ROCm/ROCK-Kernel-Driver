@@ -448,7 +448,7 @@ mode_hfc(struct BCState *bcs, int mode, int bc)
 			break;
 	}
 	hfc_write_reg(cs, HFC_STATUS, cs->hw.hfc.ctmt, cs->hw.hfc.ctmt);
-	cs->writeisac(cs, ISAC_SPCR, cs->hw.hfc.isac_spcr);
+	cs->dc_hw_ops->write_reg(cs, ISAC_SPCR, cs->hw.hfc.isac_spcr);
 	if (mode == L1_MODE_HDLC)
 		hfc_clear_fifo(bcs);
 }

@@ -866,6 +866,13 @@ struct icc_chip {
 	u_char adf2;
 };
 
+struct dc_hw_ops {
+	u8     (*read_reg)   (struct IsdnCardState *, u8);
+	void   (*write_reg)  (struct IsdnCardState *, u8, u8);
+	void   (*read_fifo)  (struct IsdnCardState *, u8 *, int);
+	void   (*write_fifo) (struct IsdnCardState *, u8 *, int);
+};
+
 #define HW_IOM1			0
 #define HW_IPAC			1
 #define HW_ISAR			2
@@ -922,10 +929,7 @@ struct IsdnCardState {
 	u_char *status_read;
 	u_char *status_write;
 	u_char *status_end;
-	u_char (*readisac) (struct IsdnCardState *, u_char);
-	void   (*writeisac) (struct IsdnCardState *, u_char, u_char);
-	void   (*readisacfifo) (struct IsdnCardState *, u_char *, int);
-	void   (*writeisacfifo) (struct IsdnCardState *, u_char *, int);
+	struct dc_hw_ops *dc_hw_ops;
 	struct bc_hw_ops *bc_hw_ops;
 	void   (*BC_Send_Data) (struct BCState *);
 	int    (*cardmsg) (struct IsdnCardState *, int, void *);

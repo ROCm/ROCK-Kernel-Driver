@@ -120,6 +120,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	write_fifo_isac(cs->hw.teles0.membase, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
@@ -349,10 +356,7 @@ setup_teles0(struct IsdnCard *card)
 		release_io_teles0(cs);
 		return (0);
 	}
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Teles_card_msg;

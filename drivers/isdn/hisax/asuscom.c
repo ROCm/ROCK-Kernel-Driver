@@ -111,6 +111,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	writefifo(cs->hw.asus.adr, cs->hw.asus.isac, 0, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
 {
@@ -134,6 +141,13 @@ WriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
 {
 	writefifo(cs->hw.asus.adr, cs->hw.asus.isac, 0x80, data, size);
 }
+
+static struct dc_hw_ops ipac_dc_ops = {
+	.read_reg   = ReadISAC_IPAC,
+	.write_reg  = WriteISAC_IPAC,
+	.read_fifo  = ReadISACfifo_IPAC,
+	.write_fifo = WriteISACfifo_IPAC,
+};
 
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
@@ -404,10 +418,7 @@ setup_asuscom(struct IsdnCard *card)
 		cs->hw.asus.isac = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
 		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_IPAC_DATA;
 		test_and_set_bit(HW_IPAC, &cs->HW_Flags);
-		cs->readisac = &ReadISAC_IPAC;
-		cs->writeisac = &WriteISAC_IPAC;
-		cs->readisacfifo = &ReadISACfifo_IPAC;
-		cs->writeisacfifo = &WriteISACfifo_IPAC;
+		cs->dc_hw_ops = &ipac_dc_ops;
 		cs->irq_func = &asuscom_interrupt_ipac;
 		printk(KERN_INFO "Asus: IPAC version %x\n", val);
 	} else {
@@ -417,10 +428,7 @@ setup_asuscom(struct IsdnCard *card)
 		cs->hw.asus.hscx = cs->hw.asus.cfg_reg + ASUS_HSCX;
 		cs->hw.asus.u7 = cs->hw.asus.cfg_reg + ASUS_CTRL_U7;
 		cs->hw.asus.pots = cs->hw.asus.cfg_reg + ASUS_CTRL_POTS;
-		cs->readisac = &ReadISAC;
-		cs->writeisac = &WriteISAC;
-		cs->readisacfifo = &ReadISACfifo;
-		cs->writeisacfifo = &WriteISACfifo;
+		cs->dc_hw_ops = &isac_ops;
 		cs->irq_func = &asuscom_interrupt;
 		ISACVersion(cs, "ISDNLink:");
 		if (HscxVersion(cs, "ISDNLink:")) {

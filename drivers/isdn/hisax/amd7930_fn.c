@@ -77,13 +77,13 @@ LOBYTE(u16 w)
 static inline u8
 rByteAMD(struct IsdnCardState *cs, u8 reg)
 {
-	return cs->readisac(cs, reg);
+	return cs->dc_hw_ops->read_reg(cs, reg);
 }
 
 static inline void
 wByteAMD(struct IsdnCardState *cs, u8 reg, u8 val)
 {
-	cs->writeisac(cs, reg, val);
+	cs->dc_hw_ops->write_reg(cs, reg, val);
 }
 
 static void

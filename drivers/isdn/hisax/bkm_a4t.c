@@ -104,6 +104,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	writefifo(cs->hw.ax.isac_ale, cs->hw.ax.isac_adr, 0, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadJADE(struct IsdnCardState *cs, int jade, u_char offset)
 {
@@ -332,10 +339,7 @@ setup_bkm_a4t(struct IsdnCard *card)
 	       CardType[card->typ], cs->hw.ax.base, cs->irq);
 
 	reset_bkm(cs);
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &jade_ops;
 	cs->BC_Send_Data = &jade_fill_fifo;
 	cs->cardmsg = &BKM_card_msg;

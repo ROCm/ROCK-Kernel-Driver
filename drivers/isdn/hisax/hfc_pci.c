@@ -1473,10 +1473,6 @@ setup_hfcpci(struct IsdnCard *card)
 		return (0);	/* no valid card type */
 
 
-	cs->readisac = NULL;
-	cs->writeisac = NULL;
-	cs->readisacfifo = NULL;
-	cs->writeisacfifo = NULL;
 	cs->irq_func = &hfcpci_interrupt;
 	cs->irq_flags |= SA_SHIRQ;
 

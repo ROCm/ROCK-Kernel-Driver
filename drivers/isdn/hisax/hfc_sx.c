@@ -1285,10 +1285,6 @@ setup_hfcsx(struct IsdnCard *card)
 	} else
 		return (0);	/* no valid card type */
 
-	cs->readisac = NULL;
-	cs->writeisac = NULL;
-	cs->readisacfifo = NULL;
-	cs->writeisacfifo = NULL;
 	cs->irq_func = &hfcsx_interrupt;
 
 	cs->hw.hfcsx.timer.function = (void *) hfcsx_Timer;

@@ -166,6 +166,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char *data, int size)
 	writefifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, 0, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadISAC_IPAC(struct IsdnCardState *cs, u_char offset)
 {
@@ -189,6 +196,13 @@ WriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
 {
 	writefifo(cs->hw.diva.isac_adr, cs->hw.diva.isac, 0x80, data, size);
 }
+
+static struct dc_hw_ops ipac_dc_ops = {
+	.read_reg   = ReadISAC_IPAC,
+	.write_reg  = WriteISAC_IPAC,
+	.read_fifo  = ReadISACfifo_IPAC,
+	.write_fifo = WriteISACfifo_IPAC,
+};
 
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
@@ -235,6 +249,13 @@ MemWriteISACfifo_IPAC(struct IsdnCardState *cs, u_char * data, int size)
 		memwritereg(cs->hw.diva.cfg_reg, 0x80, *data++);
 }
 
+static struct dc_hw_ops mem_ipac_dc_ops = {
+	.read_reg   = MemReadISAC_IPAC,
+	.write_reg  = MemWriteISAC_IPAC,
+	.read_fifo  = MemReadISACfifo_IPAC,
+	.write_fifo = MemWriteISACfifo_IPAC,
+};
+
 static u_char
 MemReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
@@ -278,6 +299,13 @@ MemWriteISACfifo_IPACX(struct IsdnCardState *cs, u_char * data, int size)
 	while(size--)
 		memwritereg(cs->hw.diva.cfg_reg, 0, *data++);
 }
+
+static struct dc_hw_ops mem_ipacx_dc_ops = {
+	.read_reg   = MemReadISAC_IPACX,
+	.write_reg  = MemWriteISAC_IPACX,
+	.read_fifo  = MemReadISACfifo_IPACX,
+	.write_fifo = MemWriteISACfifo_IPACX,
+};
 
 static u_char
 MemReadHSCX_IPACX(struct IsdnCardState *cs, int hscx, u_char offset)
@@ -1083,28 +1111,19 @@ ready:
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &Diva_card_msg;
 	if (cs->subtyp == DIVA_IPAC_ISA) {
-		cs->readisac  = &ReadISAC_IPAC;
-		cs->writeisac = &WriteISAC_IPAC;
-		cs->readisacfifo  = &ReadISACfifo_IPAC;
-		cs->writeisacfifo = &WriteISACfifo_IPAC;
+		cs->dc_hw_ops = &ipac_dc_ops;
 		cs->irq_func = &diva_irq_ipac_isa;
 		val = readreg(cs->hw.diva.isac_adr, cs->hw.diva.isac, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);
 	} else if (cs->subtyp == DIVA_IPAC_PCI) {
-		cs->readisac  = &MemReadISAC_IPAC;
-		cs->writeisac = &MemWriteISAC_IPAC;
-		cs->readisacfifo  = &MemReadISACfifo_IPAC;
-		cs->writeisacfifo = &MemWriteISACfifo_IPAC;
+		cs->dc_hw_ops = &mem_ipac_dc_ops;
 		cs->bc_hw_ops = &mem_hscx_ops;
 		cs->BC_Send_Data = &Memhscx_fill_fifo;
 		cs->irq_func = &diva_irq_ipac_pci;
 		val = memreadreg(cs->hw.diva.cfg_reg, IPAC_ID);
 		printk(KERN_INFO "Diva: IPAC version %x\n", val);
 	} else if (cs->subtyp == DIVA_IPACX_PCI) {
-		cs->readisac  = &MemReadISAC_IPACX;
-		cs->writeisac = &MemWriteISAC_IPACX;
-		cs->readisacfifo  = &MemReadISACfifo_IPACX;
-		cs->writeisacfifo = &MemWriteISACfifo_IPACX;
+		cs->dc_hw_ops = &mem_ipacx_dc_ops;
 		cs->bc_hw_ops = &mem_ipacx_bc_ops;
 		cs->BC_Send_Data = &ipacx_fill_fifo;
 		cs->irq_func = &diva_irq_ipacx_pci;
@@ -1114,10 +1133,7 @@ ready:
 		cs->hw.diva.tl.function = (void *) diva_led_handler;
 		cs->hw.diva.tl.data = (long) cs;
 		init_timer(&cs->hw.diva.tl);
-		cs->readisac  = &ReadISAC;
-		cs->writeisac = &WriteISAC;
-		cs->readisacfifo  = &ReadISACfifo;
-		cs->writeisacfifo = &WriteISACfifo;
+		cs->dc_hw_ops = &isac_ops;
 		cs->irq_func = &diva_interrupt;
 		ISACVersion(cs, "Diva:");
 		if (HscxVersion(cs, "Diva:")) {

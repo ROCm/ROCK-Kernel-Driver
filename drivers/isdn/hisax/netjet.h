@@ -57,6 +57,8 @@ extern const char *CardType[];
 
 #define HDLC_FLAG_VALUE	0x7e
 
+extern struct dc_hw_ops netjet_dc_ops;
+
 u_char NETjet_ReadIC(struct IsdnCardState *cs, u_char offset);
 void NETjet_WriteIC(struct IsdnCardState *cs, u_char offset, u_char value);
 void NETjet_ReadICfifo(struct IsdnCardState *cs, u_char *data, int size);

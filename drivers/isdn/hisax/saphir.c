@@ -100,6 +100,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	writefifo(cs->hw.saphir.ale, cs->hw.saphir.isac, 0, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
@@ -177,7 +184,7 @@ static void
 SaphirWatchDog(struct IsdnCardState *cs)
 {
         /* 5 sec WatchDog, so read at least every 4 sec */
-	cs->readisac(cs, ISAC_RBCH);
+	ReadISAC(cs, ISAC_RBCH);
 	mod_timer(&cs->hw.saphir.timer, jiffies+1*HZ);
 }
 
@@ -288,10 +295,7 @@ setup_saphir(struct IsdnCard *card)
 		release_io_saphir(cs);
 		return (0);
 	}
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &saphir_card_msg;

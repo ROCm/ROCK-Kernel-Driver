@@ -226,10 +226,7 @@ setup_netjet_s(struct IsdnCard *card)
 		request_region(cs->hw.njet.base, bytecnt, "netjet-s isdn");
 	}
 	reset_netjet_s(cs);
-	cs->readisac  = &NETjet_ReadIC;
-	cs->writeisac = &NETjet_WriteIC;
-	cs->readisacfifo  = &NETjet_ReadICfifo;
-	cs->writeisacfifo = &NETjet_WriteICfifo;
+	cs->dc_hw_ops = &netjet_dc_ops;
 	cs->BC_Send_Data = &netjet_fill_dma;
 	cs->cardmsg = &NETjet_S_card_msg;
 	cs->irq_func = &netjet_s_interrupt;

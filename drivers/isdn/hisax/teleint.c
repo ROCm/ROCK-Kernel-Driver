@@ -139,6 +139,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	writefifo(cs->hw.hfc.addr | 1, cs->hw.hfc.addr, 0, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadHFC(struct IsdnCardState *cs, int data, u_char reg)
 {
@@ -324,10 +331,7 @@ setup_TeleInt(struct IsdnCard *card)
 	       cs->irq);
 
 	reset_TeleInt(cs);
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hfc_ops;
 	cs->cardmsg = &TeleInt_card_msg;
 	cs->irq_func = &TeleInt_interrupt;

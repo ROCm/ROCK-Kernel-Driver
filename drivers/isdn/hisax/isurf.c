@@ -64,6 +64,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	}
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 /* ISAR access routines
  * mode = 0 access with IRQ on
  * mode = 1 access with IRQ off
@@ -278,10 +285,7 @@ setup_isurf(struct IsdnCard *card)
 	cs->cardmsg = &ISurf_card_msg;
 	cs->irq_func = &isurf_interrupt;
 	cs->auxcmd = &isurf_auxcmd;
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bcs[0].hw.isar.reg = &cs->hw.isurf.isar_r;
 	cs->bcs[1].hw.isar.reg = &cs->hw.isurf.isar_r;
 	reset_isurf(cs, ISURF_RESET);

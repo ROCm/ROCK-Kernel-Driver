@@ -116,6 +116,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	outsb(cs->hw.avm.isac, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static inline u_int
 ReadHDLCPCI(struct IsdnCardState *cs, int chan, u_char offset)
 {
@@ -764,10 +771,7 @@ ready:
 		(cs->subtyp == AVM_FRITZ_PCI) ? "AVM Fritz!PCI" : "AVM Fritz!PnP",
 		cs->irq, cs->hw.avm.cfg_reg);
 
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->BC_Send_Data = &hdlc_fill_fifo;
 	cs->cardmsg = &AVM_card_msg;
 	cs->irq_func = &avm_pcipnp_interrupt;

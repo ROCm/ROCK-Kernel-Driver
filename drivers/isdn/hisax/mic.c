@@ -100,6 +100,13 @@ WriteISACfifo(struct IsdnCardState *cs, u_char * data, int size)
 	writefifo(cs->hw.mic.adr, cs->hw.mic.isac, 0, data, size);
 }
 
+static struct dc_hw_ops isac_ops = {
+	.read_reg   = ReadISAC,
+	.write_reg  = WriteISAC,
+	.read_fifo  = ReadISACfifo,
+	.write_fifo = WriteISACfifo,
+};
+
 static u_char
 ReadHSCX(struct IsdnCardState *cs, int hscx, u_char offset)
 {
@@ -233,10 +240,7 @@ setup_mic(struct IsdnCard *card)
 	       "mic: defined at 0x%x IRQ %d\n",
 	       cs->hw.mic.cfg_reg,
 	       cs->irq);
-	cs->readisac = &ReadISAC;
-	cs->writeisac = &WriteISAC;
-	cs->readisacfifo = &ReadISACfifo;
-	cs->writeisacfifo = &WriteISACfifo;
+	cs->dc_hw_ops = &isac_ops;
 	cs->bc_hw_ops = &hscx_ops;
 	cs->BC_Send_Data = &hscx_fill_fifo;
 	cs->cardmsg = &mic_card_msg;

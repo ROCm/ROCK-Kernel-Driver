@@ -74,25 +74,25 @@ ipacx_bc_write_reg(struct BCState *bcs, u8 addr, u8 val)
 static inline u8
 ipacx_read_reg(struct IsdnCardState *cs, u8 addr)
 {
-	return cs->readisac(cs, addr);
+	return cs->dc_hw_ops->read_reg(cs, addr);
 }
 
 static inline void
 ipacx_write_reg(struct IsdnCardState *cs, u8 addr, u8 val)
 {
-	cs->writeisac(cs, addr, val);
+	cs->dc_hw_ops->write_reg(cs, addr, val);
 }
 
 static inline void
 ipacx_read_fifo(struct IsdnCardState *cs, u8 *p, int len)
 {
-	return cs->readisacfifo(cs, p, len);
+	return cs->dc_hw_ops->read_fifo(cs, p, len);
 }
 
 static inline void
 ipacx_write_fifo(struct IsdnCardState *cs, u8 *p, int len)
 {
-	return cs->writeisacfifo(cs, p, len);
+	return cs->dc_hw_ops->write_fifo(cs, p, len);
 }
 //----------------------------------------------------------
 // Issue Layer 1 command to chip
