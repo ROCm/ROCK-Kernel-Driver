@@ -116,7 +116,7 @@ static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id
 	pci_read_config_byte(dev, VIA_AGPSEL, &reg);
 	/* Check if we are in AGP 2.0 compatability mode, if so it
 	 * will be picked up by via-agp.o */
-	if ((reg & (1<<1))==1)
+	if ((reg & (1<<1))!=0)
 		return -ENODEV;
 
 	printk (KERN_INFO PFX "Detected VIA KT400 AGP3 chipset\n");
