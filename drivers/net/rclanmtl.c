@@ -445,7 +445,7 @@ RCI2OSendPacket (struct net_device * dev, U32 InitiatorContext,
 		return RC_RTN_FREE_Q_EMPTY;
 	}
 
-	/* calc virual address of msg - virual already mapped to physical */
+	/* calc virtual address of msg - virtual already mapped to physical */
 	pMsg = (PU32) (pPab->pPci45LinBaseAddr + msgOffset);
 
 	size = FillI2OMsgSGLFromTCB (pMsg + 4, pTransCtrlBlock);
@@ -502,7 +502,7 @@ RCPostRecvBuffers (struct net_device * dev, PRCTCB pTransCtrlBlock)
 		dprintk ("RCPostRecvBuffers(): Inbound Free Q empty!\n");
 		return RC_RTN_FREE_Q_EMPTY;
 	}
-	/* calc virual address of msg - virual already mapped to physical */
+	/* calc virtual address of msg - virtual already mapped to physical */
 	pMsg = (PU32) (pPab->pPci45LinBaseAddr + msgOffset);
 
 	size = FillI2OMsgSGLFromTCB (pMsg + 4, pTransCtrlBlock);
@@ -677,7 +677,7 @@ RCGetLinkStatistics (struct net_device *dev,
 		return RC_RTN_FREE_Q_EMPTY;
 	}
 
-	/* calc virual address of msg - virual already mapped to physical */
+	/* calc virtual address of msg - virtual already mapped to physical */
 	pMsg = (PU32) (pPab->pPci45LinBaseAddr + msgOffset);
 
 /*dprintk("Get82558Stats - pMsg = 0x%08ulx, InQ msgOffset = 0x%08ulx\n", pMsg, msgOffset);*/
@@ -751,7 +751,7 @@ RCGetLinkStatus (struct net_device * dev, PU32 ReturnAddr,
 		return RC_RTN_FREE_Q_EMPTY;
 	}
 
-	/* calc virual address of msg - virual already mapped to physical */
+	/* calc virtual address of msg - virtual already mapped to physical */
 	pMsg = (PU32) (pPab->pPci45LinBaseAddr + msgOffset);
 /*dprintk("Get82558LinkStatus - pMsg = 0x%08ulx, InQ msgOffset = 0x%08ulx\n", pMsg, msgOffset);*/
 /*dprintk("Get82558LinkStatus - pMsg = 0x%08X, InQ msgOffset = 0x%08X\n", pMsg, msgOffset);*/
@@ -1452,7 +1452,7 @@ RCResetIOP (struct net_device * dev)
 	pMsg[7] = 0;
 	pMsg[8] = 1;		/*  return 1 byte */
 
-	/* virual pointer to return buffer - clear first two dwords */
+	/* virtual pointer to return buffer - clear first two dwords */
 	p32 = (volatile PU32) pPab->pLinOutMsgBlock;
 	p32[0] = 0;
 	p32[1] = 0;
@@ -1693,7 +1693,7 @@ SendI2OOutboundQInitMsg (PPAB pPab)
 		return RC_RTN_FREE_Q_EMPTY;
 	}
 
-	/* calc virual address of msg - virual already mapped to physical */
+	/* calc virtual address of msg - virtual already mapped to physical */
 	pMsg = (PU32) (pPab->pPci45LinBaseAddr + msgOffset);
 
 	dprintk
@@ -1711,7 +1711,7 @@ SendI2OOutboundQInitMsg (PPAB pPab)
 	/* phys address to return status - area right after PAB */
 	pMsg[7] = pPab->outMsgBlockPhyAddr;
 
-	/* virual pointer to return buffer - clear first two dwords */
+	/* virtual pointer to return buffer - clear first two dwords */
 	p32 = (PU32) pPab->pLinOutMsgBlock;
 	p32[0] = 0;
 
@@ -1779,7 +1779,7 @@ GetI2OStatus (PPAB pPab)
 		return RC_RTN_FREE_Q_EMPTY;
 	}
 
-	/* calc virual address of msg - virual already mapped to physical */
+	/* calc virtual address of msg - virtual already mapped to physical */
 	pMsg = (PU32) (pPab->pPci45LinBaseAddr + msgOffset);
 
 	pMsg[0] = NINE_WORD_MSG_SIZE | SGL_OFFSET_0;
@@ -1793,7 +1793,7 @@ GetI2OStatus (PPAB pPab)
 	pMsg[7] = 0;
 	pMsg[8] = 88;		/*  return 88 bytes */
 
-	/* virual pointer to return buffer - clear first two dwords */
+	/* virtual pointer to return buffer - clear first two dwords */
 	p32 = (volatile PU32) pPab->pLinOutMsgBlock;
 	p32[0] = 0;
 	p32[1] = 0;
@@ -1862,7 +1862,7 @@ SendEnableSysMsg (PPAB pPab)
 		return RC_RTN_FREE_Q_EMPTY;
 	}
 
-	/* calc virual address of msg - virual already mapped to physical */
+	/* calc virtual address of msg - virtual already mapped to physical */
 	pMsg = (PU32) (pPab->pPci45LinBaseAddr + msgOffset);
 
 	dprintk
@@ -1885,7 +1885,7 @@ SendEnableSysMsg (PPAB pPab)
 ** =========================================================================
 ** FillI2OMsgFromTCB()
 **
-** inputs   pMsgU32 - virual pointer (mapped to physical) of message frame
+** inputs   pMsgU32 - virtual pointer (mapped to physical) of message frame
 **          pXmitCntrlBlock - pointer to caller buffer control block.
 **
 ** fills in LAN SGL after Transaction Control Word or Bucket Count.
