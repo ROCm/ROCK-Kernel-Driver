@@ -28,10 +28,7 @@
 #define aac_phys_to_logical(x)  (x+1)
 #define aac_logical_to_phys(x)  (x?x-1:0)
 
-#define AAC_DETAILED_STATUS_INFO
-
-extern int nondasd;
-extern int paemode;
+/* #define AAC_DETAILED_STATUS_INFO */
 
 struct diskparm
 {
@@ -404,15 +401,15 @@ struct aac_init
 };
 
 enum aac_log_level {
-	LOG_INIT			= 10,
-	LOG_INFORMATIONAL		= 20,
-	LOG_WARNING			= 30,
-	LOG_LOW_ERROR			= 40,
-	LOG_MEDIUM_ERROR		= 50,
-	LOG_HIGH_ERROR			= 60,
-	LOG_PANIC			= 70,
-	LOG_DEBUG			= 80,
-	LOG_WINDBG_PRINT		= 90
+	LOG_AAC_INIT			= 10,
+	LOG_AAC_INFORMATIONAL		= 20,
+	LOG_AAC_WARNING			= 30,
+	LOG_AAC_LOW_ERROR		= 40,
+	LOG_AAC_MEDIUM_ERROR		= 50,
+	LOG_AAC_HIGH_ERROR		= 60,
+	LOG_AAC_PANIC			= 70,
+	LOG_AAC_DEBUG			= 80,
+	LOG_AAC_WINDBG_PRINT		= 90
 };
 
 #define FSAFS_NTC_GET_ADAPTER_FIB_CONTEXT	0x030b
@@ -841,7 +838,7 @@ struct aac_dev
 	 * lets break them out so we don't have to do an AND to check them
 	 */
 	u8			nondasd_support; 
-	u8			pae_support;
+	u8			dac_support;
 };
 
 #define AllocateAndMapFibSpace(dev, MapFibContext) \

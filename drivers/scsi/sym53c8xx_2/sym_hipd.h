@@ -69,11 +69,6 @@
  *        When this option is set, the driver will use a queue per 
  *        device and handle QUEUE FULL status requeuing internally.
  *
- *    SYM_OPT_SNIFF_INQUIRY
- *        When this option is set, the driver sniff out successful 
- *        INQUIRY response and performs negotiations accordingly.
- *        (set for Linux)
- *
  *    SYM_OPT_LIMIT_COMMAND_REORDERING
  *        When this option is set, the driver tries to limit tagged 
  *        command reordering to some reasonnable value.
@@ -82,7 +77,6 @@
 #if 0
 #define SYM_OPT_HANDLE_DIR_UNKNOWN
 #define SYM_OPT_HANDLE_DEVICE_QUEUEING
-#define SYM_OPT_SNIFF_INQUIRY
 #define SYM_OPT_LIMIT_COMMAND_REORDERING
 #endif
 
@@ -364,7 +358,6 @@ struct sym_trans {
 struct sym_tinfo {
 	struct sym_trans curr;
 	struct sym_trans goal;
-	struct sym_trans user;
 #ifdef	SYM_OPT_ANNOUNCE_TRANSFER_RATE
 	struct sym_trans prev;
 #endif
@@ -465,18 +458,7 @@ struct sym_tcb {
 	 */
 	u_char	usrflags;
 	u_short	usrtags;
-
-#ifdef	SYM_OPT_SNIFF_INQUIRY
-	/*
-	 *  Some minimal information from INQUIRY response.
-	 */
-	u32	cmdq_map[(SYM_CONF_MAX_LUN+31)/32];
-	u_char	inq_version;
-	u_char	inq_byte7;
-	u_char	inq_byte56;
-	u_char	inq_byte7_valid;
-#endif
-
+	struct scsi_device *sdev;
 };
 
 /*
@@ -1167,26 +1149,6 @@ void sym_clock(hcb_p np);
 #ifdef	SYM_OPT_ANNOUNCE_TRANSFER_RATE
 void sym_announce_transfer_rate(hcb_p np, int target);
 #endif
-
-/*
- *  Optionnaly, the driver may sniff inquiry data.
- */
-#ifdef	SYM_OPT_SNIFF_INQUIRY
-#define	INQ7_CMDQ	(0x02)
-#define	INQ7_SYNC	(0x10)
-#define	INQ7_WIDE16	(0x20)
-
-#define INQ56_CLOCKING	(3<<2)
-#define INQ56_ST_ONLY	(0<<2)
-#define INQ56_DT_ONLY	(1<<2)
-#define INQ56_ST_DT	(3<<2)
-
-void sym_update_trans_settings(hcb_p np, tcb_p tp);
-int  
-__sym_sniff_inquiry(hcb_p np, u_char tn, u_char ln,
-                    u_char *inq_data, int inq_len);
-#endif
-
 
 /*
  *  Build a scatter/gather entry.

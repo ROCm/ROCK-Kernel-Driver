@@ -181,7 +181,7 @@ int sr_media_change(struct cdrom_device_info *cdi, int slot)
 		return -EINVAL;
 	}
 
-	retval = scsi_ioctl(cd->device, SCSI_IOCTL_TEST_UNIT_READY, NULL);
+	retval = scsi_test_unit_ready(cd->device, SR_TIMEOUT, MAX_RETRIES);
 	if (retval) {
 		/* Unable to test, unit probably not ready.  This usually
 		 * means there is no disc in the drive.  Mark as changed,

@@ -761,7 +761,7 @@ void aac_printf(struct aac_dev *dev, u32 val)
 		length = 255;
 	if (cp[length] != 0)
 		cp[length] = 0;
-	if (level == LOG_HIGH_ERROR)
+	if (level == LOG_AAC_HIGH_ERROR)
 		printk(KERN_WARNING "aacraid:%s", cp);
 	else
 		printk(KERN_INFO "aacraid:%s", cp);

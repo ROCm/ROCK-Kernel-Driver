@@ -595,39 +595,6 @@ config HVCS
 	  which will also be compiled when this driver is built as a
 	  module.
 
-config QIC02_TAPE
-	tristate "QIC-02 tape support"
-	help
-	  If you have a non-SCSI tape drive like that, say Y.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called tpqic02.
-
-config QIC02_DYNCONF
-	bool "Do you want runtime configuration for QIC-02"
-	depends on QIC02_TAPE
-	help
-	  You can either configure this driver once and for all by editing a
-	  header file (<file:include/linux/tpqic02.h>), in which case you
-	  should say N, or you can fetch a program via anonymous FTP which is
-	  able to configure this driver during runtime.  The program to do
-	  this is called 'qic02conf' and it is part of the
-	  tpqic02-support-X.Y.tar.gz support package.
-
-	  If you want to use the qic02conf program, say Y.
-
-comment "Edit configuration parameters in ./include/linux/tpqic02.h!"
-	depends on QIC02_TAPE && !QIC02_DYNCONF
-
-comment "Setting runtime QIC-02 configuration is done with qic02conf"
-	depends on QIC02_TAPE && QIC02_DYNCONF
-
-comment "from the tpqic02-support package.  It is available at"
-	depends on QIC02_TAPE && QIC02_DYNCONF
-
-comment "metalab.unc.edu or ftp://titus.cfw.com/pub/Linux/util/"
-	depends on QIC02_TAPE && QIC02_DYNCONF
-
 source "drivers/char/ipmi/Kconfig"
 
 source "drivers/char/watchdog/Kconfig"

@@ -1809,11 +1809,9 @@ static int idedisk_attach(ide_drive_t *drive)
 	if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
 		printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n",
 			drive->name, drive->head);
-		ide_cacheflush_p(drive);
-		ide_unregister_subdriver(drive);
-		DRIVER(drive)->busy--;
-		goto failed;
-	}
+		drive->attach = 0;
+	} else
+		drive->attach = 1;
 	DRIVER(drive)->busy--;
 	g->minors = 1 << PARTN_BITS;
 	strcpy(g->devfs_name, drive->devfs_name);
@@ -1821,7 +1819,6 @@ static int idedisk_attach(ide_drive_t *drive)
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
 	set_capacity(g, current_capacity(drive));
 	g->fops = &idedisk_ops;
-	drive->attach = 1;
 	add_disk(g);
 	return 0;
 failed:

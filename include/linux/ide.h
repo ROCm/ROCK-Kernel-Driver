@@ -756,8 +756,8 @@ typedef struct ide_drive_s {
 					 *  2=48-bit doing 28-bit
 					 *  3=64-bit
 					 */
+	unsigned scsi		: 1;	/* 0=default, 1=ide-scsi emulation */
 
-	u8	scsi;		/* 0=default, 1=skip current ide-subdriver for ide-scsi emulation */
         u8	quirk_list;	/* considered quirky, set for a specific host */
         u8	suspend_reset;	/* drive suspend mode flag, soft-reset recovers */
         u8	init_speed;	/* transfer rate set at boot */

@@ -200,7 +200,7 @@ static void print_inquiry(unsigned char *inq_result)
  *     scsi_Device pointer, or NULL on failure.
  **/
 static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
-	       	uint channel, uint id, uint lun)
+	       	uint channel, uint id, uint lun, void *hostdata)
 {
 	struct scsi_device *sdev, *device;
 	unsigned long flags;
@@ -224,6 +224,8 @@ static struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *shost,
 	INIT_LIST_HEAD(&sdev->starved_entry);
 	spin_lock_init(&sdev->list_lock);
 
+	/* usually NULL and set by ->slave_alloc instead */
+	sdev->hostdata = hostdata;
 
 	/* if the device needs this changing, it may do so in the
 	 * slave_configure function */
@@ -697,7 +699,7 @@ static int scsi_add_lun(struct scsi_device *sdev, char *inq_result, int *bflags)
  **/
 static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 		uint channel, uint id, uint lun, int *bflagsp,
-		struct scsi_device **sdevp, int rescan)
+		struct scsi_device **sdevp, int rescan, void *hostdata)
 {
 	struct scsi_device *sdev;
 	struct scsi_request *sreq;
@@ -726,7 +728,7 @@ static int scsi_probe_and_add_lun(struct Scsi_Host *host,
 		}
 	}
 
-	sdev = scsi_alloc_sdev(host, channel, id, lun);
+	sdev = scsi_alloc_sdev(host, channel, id, lun, hostdata);
 	if (!sdev)
 		goto out;
 	sreq = scsi_allocate_request(sdev, GFP_ATOMIC);
@@ -874,7 +876,7 @@ static void scsi_sequential_lun_scan(struct Scsi_Host *shost, uint channel,
 	 */
 	for (lun = 1; lun < max_dev_lun; ++lun)
 		if ((scsi_probe_and_add_lun(shost, channel, id, lun,
-		      NULL, NULL, rescan) != SCSI_SCAN_LUN_PRESENT) &&
+		      NULL, NULL, rescan, NULL) != SCSI_SCAN_LUN_PRESENT) &&
 		    !sparse_lun)
 			return;
 }
@@ -1085,7 +1087,7 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 			int res;
 
 			res = scsi_probe_and_add_lun(sdev->host, sdev->channel,
-				sdev->id, lun, NULL, NULL, rescan);
+				sdev->id, lun, NULL, NULL, rescan, NULL);
 			if (res == SCSI_SCAN_NO_RESPONSE) {
 				/*
 				 * Got some results, but now none, abort.
@@ -1111,14 +1113,15 @@ static int scsi_report_lun_scan(struct scsi_device *sdev, int bflags,
 	return 0;
 }
 
-struct scsi_device *scsi_add_device(struct Scsi_Host *shost,
-				    uint channel, uint id, uint lun)
+struct scsi_device *__scsi_add_device(struct Scsi_Host *shost, uint channel,
+		uint id, uint lun, void *hostdata)
 {
 	struct scsi_device *sdev;
 	int res;
 
 	down(&shost->scan_mutex);
-	res = scsi_probe_and_add_lun(shost, channel, id, lun, NULL, &sdev, 1);
+	res = scsi_probe_and_add_lun(shost, channel, id, lun, NULL,
+				     &sdev, 1, hostdata);
 	if (res != SCSI_SCAN_LUN_PRESENT)
 		sdev = ERR_PTR(-ENODEV);
 	up(&shost->scan_mutex);
@@ -1178,7 +1181,7 @@ static void scsi_scan_target(struct Scsi_Host *shost, unsigned int channel,
 		 * Scan for a specific host/chan/id/lun.
 		 */
 		scsi_probe_and_add_lun(shost, channel, id, lun, NULL, NULL,
-				       rescan);
+				       rescan, NULL);
 		return;
 	}
 
@@ -1187,7 +1190,7 @@ static void scsi_scan_target(struct Scsi_Host *shost, unsigned int channel,
 	 * would not configure LUN 0 until all LUNs are scanned.
 	 */
 	res = scsi_probe_and_add_lun(shost, channel, id, 0, &bflags, &sdev,
-				     rescan);
+				     rescan, NULL);
 	if (res == SCSI_SCAN_LUN_PRESENT) {
 		if (scsi_report_lun_scan(sdev, bflags, rescan) != 0)
 			/*
@@ -1316,7 +1319,7 @@ struct scsi_device *scsi_get_host_dev(struct Scsi_Host *shost)
 {
 	struct scsi_device *sdev;
 
-	sdev = scsi_alloc_sdev(shost, 0, shost->this_id, 0);
+	sdev = scsi_alloc_sdev(shost, 0, shost->this_id, 0, NULL);
 	if (sdev) {
 		sdev->borken = 0;
 	}

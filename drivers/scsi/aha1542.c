@@ -1479,7 +1479,7 @@ static int aha1542_bus_reset(Scsi_Cmnd * SCpnt)
 	 * we are pretty desperate anyways.
 	 */
 	spin_unlock_irq(SCpnt->device->host->host_lock);
-	scsi_sleep(4 * HZ);
+	ssleep(4);
 	spin_lock_irq(SCpnt->device->host->host_lock);
 
 	WAIT(STATUS(SCpnt->device->host->io_port),
@@ -1543,7 +1543,7 @@ static int aha1542_host_reset(Scsi_Cmnd * SCpnt)
 	 * we are pretty desperate anyways.
 	 */
 	spin_unlock_irq(SCpnt->device->host->host_lock);
-	scsi_sleep(4 * HZ);
+	ssleep(4);
 	spin_lock_irq(SCpnt->device->host->host_lock);
 
 	WAIT(STATUS(SCpnt->device->host->io_port),

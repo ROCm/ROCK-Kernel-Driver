@@ -46,7 +46,7 @@ config AIC79XX_RESET_DELAY_MS
 
 config AIC79XX_BUILD_FIRMWARE
 	bool "Build Adapter Firmware with Kernel Build"
-	depends on SCSI_AIC79XX
+	depends on SCSI_AIC79XX && !PREVENT_FIRMWARE_BUILD
 	help
 	This option should only be enabled if you are modifying the firmware
 	source to the aic79xx driver and wish to have the generated firmware

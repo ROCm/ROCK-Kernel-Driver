@@ -49,10 +49,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#define SYM_VERSION "2.1.18j"
-#define SYM_DRIVER_NAME	"sym-" SYM_VERSION
-
 #include "sym_glue.h"
 #include "sym_nvram.h"
 
@@ -1042,27 +1038,10 @@ static int sym_prepare_setting(hcb_p np, struct sym_nvram *nvram)
 	for (i = 0 ; i < SYM_CONF_MAX_TARGET ; i++) {
 		tcb_p tp = &np->target[i];
 
-		tp->tinfo.user.scsi_version = tp->tinfo.curr.scsi_version= 2;
-		tp->tinfo.user.spi_version  = tp->tinfo.curr.spi_version = 2;
-		tp->tinfo.user.period = np->minsync;
-		tp->tinfo.user.offset = np->maxoffs;
-		tp->tinfo.user.width  = np->maxwide ? BUS_16_BIT : BUS_8_BIT;
 		tp->usrflags |= (SYM_DISC_ENABLED | SYM_TAGS_ENABLED);
 		tp->usrtags = SYM_SETUP_MAX_TAG;
 
 		sym_nvram_setup_target (np, i, nvram);
-
-		/*
-		 * Some single-ended devices may crash on receiving a
-		 * PPR negotiation attempt.  Only try PPR if we're in
-		 * LVD mode.
-		 */
-		if (np->features & FE_ULTRA3) {
-			tp->tinfo.user.options |= PPR_OPT_DT;
-			tp->tinfo.user.period = np->minsync_dt;
-			tp->tinfo.user.offset = np->maxoffs_dt;
-			tp->tinfo.user.spi_version = 3;
-		}
 
 		if (!tp->usrtags)
 			tp->usrflags &= ~SYM_TAGS_ENABLED;
@@ -1497,6 +1476,55 @@ static void sym_update_dmap_regs(hcb_p np)
 }
 #endif
 
+static void sym_check_goals(struct scsi_device *sdev)
+{
+	struct sym_hcb *np = ((struct host_data *)sdev->host->hostdata)->ncb;
+	struct sym_trans *st = &np->target[sdev->id].tinfo.goal;
+
+	/* here we enforce all the fiddly SPI rules */
+
+	if (!scsi_device_wide(sdev))
+		st->width = 0;
+
+	if (!scsi_device_sync(sdev)) {
+		st->options = 0;
+		st->period = 0;
+		st->offset = 0;
+		return;
+	}
+		
+	if (scsi_device_dt(sdev)) {
+		if (scsi_device_dt_only(sdev))
+			st->options |= PPR_OPT_DT;
+
+		if (st->offset == 0)
+			st->options &= ~PPR_OPT_DT;
+	} else {
+		st->options &= ~PPR_OPT_DT;
+	}
+
+	if (!(np->features & FE_ULTRA3))
+		st->options &= ~PPR_OPT_DT;
+
+	if (st->options & PPR_OPT_DT) {
+		/* all DT transfers must be wide */
+		st->width = 1;
+		if (st->offset > np->maxoffs_dt)
+			st->offset = np->maxoffs_dt;
+		if (st->period < np->minsync_dt)
+			st->period = np->minsync_dt;
+		if (st->period > np->maxsync_dt)
+			st->period = np->maxsync_dt;
+	} else {
+		if (st->offset > np->maxoffs)
+			st->offset = np->maxoffs;
+		if (st->period < np->minsync)
+			st->period = np->minsync;
+		if (st->period > np->maxsync)
+			st->period = np->maxsync;
+	}
+}		
+
 /*
  *  Prepare the next negotiation message if needed.
  *
@@ -1508,6 +1536,10 @@ static int sym_prepare_nego(hcb_p np, ccb_p cp, int nego, u_char *msgptr)
 {
 	tcb_p tp = &np->target[cp->target];
 	int msglen = 0;
+	struct scsi_device *sdev = tp->sdev;
+
+	if (likely(sdev))
+		sym_check_goals(sdev);
 
 	/*
 	 *  Early C1010 chips need a work-around for DT 
@@ -1518,19 +1550,21 @@ static int sym_prepare_nego(hcb_p np, ccb_p cp, int nego, u_char *msgptr)
 	/*
 	 *  negotiate using PPR ?
 	 */
-	if (tp->tinfo.goal.options & PPR_OPT_MASK)
+	if (scsi_device_dt(sdev)) {
 		nego = NS_PPR;
-	/*
-	 *  negotiate wide transfers ?
-	 */
-	else if (tp->tinfo.curr.width != tp->tinfo.goal.width)
-		nego = NS_WIDE;
-	/*
-	 *  negotiate synchronous transfers?
-	 */
-	else if (tp->tinfo.curr.period != tp->tinfo.goal.period ||
-		 tp->tinfo.curr.offset != tp->tinfo.goal.offset)
-		nego = NS_SYNC;
+	} else {
+		/*
+		 *  negotiate wide transfers ?
+		 */
+		if (tp->tinfo.curr.width != tp->tinfo.goal.width)
+			nego = NS_WIDE;
+		/*
+		 *  negotiate synchronous transfers?
+		 */
+		else if (tp->tinfo.curr.period != tp->tinfo.goal.period ||
+			 tp->tinfo.curr.offset != tp->tinfo.goal.offset)
+			nego = NS_SYNC;
+	}
 
 	switch (nego) {
 	case NS_SYNC:
@@ -3999,7 +4033,6 @@ int sym_compute_residual(hcb_p np, ccb_p cp)
 static int  
 sym_sync_nego_check(hcb_p np, int req, int target)
 {
-	tcb_p tp = &np->target[target];
 	u_char	chg, ofs, per, fak, div;
 
 	if (DEBUG_FLAGS & DEBUG_NEGO) {
@@ -4019,19 +4052,11 @@ sym_sync_nego_check(hcb_p np, int req, int target)
 	if (ofs) {
 		if (ofs > np->maxoffs)
 			{chg = 1; ofs = np->maxoffs;}
-		if (req) {
-			if (ofs > tp->tinfo.user.offset)
-				{chg = 1; ofs = tp->tinfo.user.offset;}
-		}
 	}
 
 	if (ofs) {
 		if (per < np->minsync)
 			{chg = 1; per = np->minsync;}
-		if (req) {
-			if (per < tp->tinfo.user.period)
-				{chg = 1; per = tp->tinfo.user.period;}
-		}
 	}
 
 	/*
@@ -4151,10 +4176,6 @@ sym_ppr_nego_check(hcb_p np, int req, int target)
 	}
 	if (!wide || !(np->features & FE_ULTRA3))
 		dt &= ~PPR_OPT_DT;
-	if (req) {
-		if (wide > tp->tinfo.user.width)
-			{chg = 1; wide = tp->tinfo.user.width;}
-	}
 
 	if (!(np->features & FE_U3EN))	/* Broken U3EN bit not supported */
 		dt &= ~PPR_OPT_DT;
@@ -4168,10 +4189,6 @@ sym_ppr_nego_check(hcb_p np, int req, int target)
 		}
 		else if (ofs > np->maxoffs)
 			{chg = 1; ofs = np->maxoffs;}
-		if (req) {
-			if (ofs > tp->tinfo.user.offset)
-				{chg = 1; ofs = tp->tinfo.user.offset;}
-		}
 	}
 
 	if (ofs) {
@@ -4181,10 +4198,6 @@ sym_ppr_nego_check(hcb_p np, int req, int target)
 		}
 		else if (per < np->minsync)
 			{chg = 1; per = np->minsync;}
-		if (req) {
-			if (per < tp->tinfo.user.period)
-				{chg = 1; per = tp->tinfo.user.period;}
-		}
 	}
 
 	/*
@@ -4286,7 +4299,6 @@ reject_it:
 static int  
 sym_wide_nego_check(hcb_p np, int req, int target)
 {
-	tcb_p tp = &np->target[target];
 	u_char	chg, wide;
 
 	if (DEBUG_FLAGS & DEBUG_NEGO) {
@@ -4305,10 +4317,6 @@ sym_wide_nego_check(hcb_p np, int req, int target)
 	if (wide > np->maxwide) {
 		chg = 1;
 		wide = np->maxwide;
-	}
-	if (req) {
-		if (wide > tp->tinfo.user.width)
-			{chg = 1; wide = tp->tinfo.user.width;}
 	}
 
 	if (DEBUG_FLAGS & DEBUG_NEGO) {

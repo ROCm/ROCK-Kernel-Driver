@@ -606,7 +606,7 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 {
 	struct ipv6_txoptions opt_space;
 	struct sockaddr_in6 * sin6 = (struct sockaddr_in6 *) msg->msg_name;
-	struct in6_addr *daddr;
+	struct in6_addr *daddr, *final_p = NULL, final;
 	struct inet_opt *inet = inet_sk(sk);
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct raw6_opt *raw_opt = raw6_sk(sk);
@@ -729,7 +729,9 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 	/* merge ip6_build_xmit from ip6_output */
 	if (opt && opt->srcrt) {
 		struct rt0_hdr *rt0 = (struct rt0_hdr *) opt->srcrt;
+		ipv6_addr_copy(&final, &fl.fl6_dst);
 		ipv6_addr_copy(&fl.fl6_dst, rt0->addr);
+		final_p = &final;
 	}
 
 	if (!fl.oif && ipv6_addr_is_multicast(&fl.fl6_dst))
@@ -738,6 +740,13 @@ static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,
 	err = ip6_dst_lookup(sk, &dst, &fl);
 	if (err)
 		goto out;
+	if (final_p)
+		ipv6_addr_copy(&fl.fl6_dst, final_p);
+
+	if ((err = xfrm_lookup(&dst, &fl, sk, 0)) < 0) {
+		dst_release(dst);
+		goto out;
+	}
 
 	if (hlimit < 0) {
 		if (ipv6_addr_is_multicast(&fl.fl6_dst))

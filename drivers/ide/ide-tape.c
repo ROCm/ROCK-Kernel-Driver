@@ -530,7 +530,6 @@ typedef struct os_dat_s {
  */
 #define IDETAPE_DEBUG_INFO		0
 #define IDETAPE_DEBUG_LOG		0
-#define IDETAPE_DEBUG_LOG_VERBOSE	0
 #define IDETAPE_DEBUG_BUGS		1
 
 /*
@@ -1260,70 +1259,6 @@ typedef struct {
  */
 static idetape_chrdev_t idetape_chrdevs[MAX_HWIFS * MAX_DRIVES];
 
-#if IDETAPE_DEBUG_LOG_VERBOSE
-
-/*
- * DO NOT REMOVE, BUILDING A VERBOSE DEBUG SCHEME FOR ATAPI
- */
-
-char *idetape_sense_key_verbose(u8 idetape_sense_key)
-{
-	switch (idetape_sense_key) {
-		default: {
-			char buf[22];
-			sprintf(buf, "IDETAPE_SENSE (0x%02x)", idetape_sense_key);
-			return(buf);
-		}
-
-	}
-}
-
-char *idetape_command_key_verbose(u8 idetape_command_key)
-{
-	switch (idetape_command_key) {
-		case IDETAPE_TEST_UNIT_READY_CMD:
-			return("TEST_UNIT_READY_CMD");
-		case IDETAPE_REWIND_CMD:
-			return("REWIND_CMD");
-		case IDETAPE_REQUEST_SENSE_CMD:
-			return("REQUEST_SENSE_CMD");
-		case IDETAPE_READ_CMD:
-			return("READ_CMD");
-		case IDETAPE_WRITE_CMD:
-			return("WRITE_CMD");
-		case IDETAPE_WRITE_FILEMARK_CMD:
-			return("WRITE_FILEMARK_CMD");
-		case IDETAPE_SPACE_CMD:
-			return("SPACE_CMD");
-		case IDETAPE_INQUIRY_CMD:
-			return("INQUIRY_CMD");
-		case IDETAPE_ERASE_CMD:
-			return("ERASE_CMD");
-		case IDETAPE_MODE_SENSE_CMD:
-			return("MODE_SENSE_CMD");
-		case IDETAPE_MODE_SELECT_CMD:
-			return("MODE_SELECT_CMD");
-		case IDETAPE_LOAD_UNLOAD_CMD:
-			return("LOAD_UNLOAD_CMD");
-		case IDETAPE_PREVENT_CMD:
-			return("PREVENT_CMD");
-		case IDETAPE_LOCATE_CMD:
-			return("LOCATE_CMD");
-		case IDETAPE_READ_POSITION_CMD:
-			return("READ_POSITION_CMD");
-		case IDETAPE_READ_BUFFER_CMD:
-			return("READ_BUFFER_CMD");
-		case IDETAPE_SET_SPEED_CMD:
-			return("SET_SPEED_CMD");
-		default: {
-				char buf[20];
-				sprintf(buf, "CMD (0x%02x)", idetape_command_key);
-				return(buf);
-			}
-	}
-}
-#endif /* IDETAPE_DEBUG_LOG_VERBOSE */
-
 /*
  *      Function declarations
  *
@@ -1507,15 +1442,6 @@ static void idetape_analyze_error (ide_drive_t *drive, idetape_request_sense_res
 			"asc = %x, ascq = %x\n",
 			pc->c[0], result->sense_key,
 			result->asc, result->ascq);
-#if IDETAPE_DEBUG_LOG_VERBOSE
-	if (tape->debug_level >= 1)
-		printk(KERN_INFO "ide-tape: pc = %s, sense key = %x, "
-			"asc = %x, ascq = %x\n",
-			idetape_command_key_verbose((byte) pc->c[0]),
-			result->sense_key,
-			result->asc,
-			result->ascq);
-#endif /* IDETAPE_DEBUG_LOG_VERBOSE */
 #endif /* IDETAPE_DEBUG_LOG */
 
 	/*

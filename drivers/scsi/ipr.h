@@ -1,7 +1,7 @@
 /*
  * ipr.h -- driver for IBM Power Linux RAID adapters
  *
- * Written By: Brian King, IBM Corporation
+ * Written By: Brian King <brking@us.ibm.com>, IBM Corporation
  *
  * Copyright (C) 2003, 2004 IBM Corporation
  *
@@ -19,6 +19,8 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
+ * Alan Cox <alan@redhat.com> - Removed several careless u32/dma_addr_t errors
+ *				that broke 64bit platforms.
  */
 
 #ifndef _IPR_H
@@ -27,6 +29,7 @@
 #include <linux/types.h>
 #include <linux/completion.h>
 #include <linux/list.h>
+#include <linux/kref.h>
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #ifdef CONFIG_KDB
@@ -36,8 +39,8 @@
 /*
  * Literals
  */
-#define IPR_DRIVER_VERSION "2.0.10"
-#define IPR_DRIVER_DATE "(June 7, 2004)"
+#define IPR_DRIVER_VERSION "2.0.11"
+#define IPR_DRIVER_DATE "(August 3, 2004)"
 
 /*
  * IPR_DBG_TRACE: Setting this to 1 will turn on some general function tracing
@@ -72,6 +75,8 @@
 #define IPR_SUBS_DEV_ID_5703	0x0278
 #define IPR_SUBS_DEV_ID_572E  0x02D3
 #define IPR_SUBS_DEV_ID_573D  0x02D4
+#define IPR_SUBS_DEV_ID_570F	0x02BD
+#define IPR_SUBS_DEV_ID_571B	0x02BE
 
 #define IPR_NAME				"ipr"
 
@@ -148,7 +153,6 @@
 #define	IPR_BUS_RESET					0x10
 #define IPR_ID_HOST_RR_Q				0xC4
 #define IPR_QUERY_IOA_CONFIG				0xC5
-#define IPR_ABORT_TASK					0xC7
 #define IPR_CANCEL_ALL_REQUESTS			0xCE
 #define IPR_HOST_CONTROLLED_ASYNC			0xCF
 #define	IPR_HCAM_CDB_OP_CODE_CONFIG_CHANGE	0x01
@@ -667,7 +671,7 @@ struct ipr_hcam {
 
 struct ipr_hostrcb {
 	struct ipr_hcam hcam;
-	u32 hostrcb_dma;
+	dma_addr_t hostrcb_dma;
 	struct list_head queue;
 };
 
@@ -850,7 +854,7 @@ struct ipr_ioa_cfg {
 	char cfg_table_start[8];
 #define IPR_CFG_TBL_START		"cfg"
 	struct ipr_config_table *cfg_table;
-	u32 cfg_table_dma;
+	dma_addr_t cfg_table_dma;
 
 	char resource_table_label[8];
 #define IPR_RES_TABLE_LABEL		"res_tbl"
@@ -861,12 +865,12 @@ struct ipr_ioa_cfg {
 	char ipr_hcam_label[8];
 #define IPR_HCAM_LABEL			"hcams"
 	struct ipr_hostrcb *hostrcb[IPR_NUM_HCAMS];
-	u32 hostrcb_dma[IPR_NUM_HCAMS];
+	dma_addr_t hostrcb_dma[IPR_NUM_HCAMS];
 	struct list_head hostrcb_free_q;
 	struct list_head hostrcb_pending_q;
 
 	u32 *host_rrq;
-	u32 host_rrq_dma;
+	dma_addr_t host_rrq_dma;
 #define IPR_HRRQ_REQ_RESP_HANDLE_MASK	0xfffffffc
 #define IPR_HRRQ_RESP_BIT_SET			0x00000002
 #define IPR_HRRQ_TOGGLE_BIT				0x00000001
@@ -905,7 +909,7 @@ struct ipr_ioa_cfg {
 	enum ipr_sdt_state sdt_state;
 
 	struct ipr_misc_cbs *vpd_cbs;
-	u32 vpd_cbs_dma;
+	dma_addr_t vpd_cbs_dma;
 
 	struct pci_pool *ipr_cmd_pool;
 
@@ -1029,7 +1033,7 @@ struct ipr_ioa_dump {
 }__attribute__((packed, aligned (4)));
 
 struct ipr_dump {
-	struct kobject kobj;
+	struct kref kref;
 	struct ipr_ioa_cfg *ioa_cfg;
 	struct ipr_driver_dump driver_dump;
 	struct ipr_ioa_dump ioa_dump;

@@ -449,9 +449,8 @@ enum {
 /* hd/ide ctl's that pass (arg) ptrs to user space are numbered 0x033n/0x033n */
 /* 0x330 is reserved - used to be HDIO_GETGEO_BIG */
 /* 0x331 is reserved - used to be HDIO_GETGEO_BIG_RAW */
-
-#define HDIO_SET_IDE_SCSI      0x0338
-#define HDIO_SET_SCSI_IDE      0x0339
+/* 0x338 is reserved - used to be HDIO_SET_IDE_SCSI */
+/* 0x339 is reserved - used to be HDIO_SET_SCSI_IDE */
 
 #define __NEW_HD_DRIVE_ID
 
