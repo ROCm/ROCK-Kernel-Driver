@@ -182,8 +182,9 @@ char testString[] = "LINUX\n";
  * mode when we do.  We switch back to 64b mode upon return.
  */
 
-static unsigned long __init
-call_prom(const char *service, int nargs, int nret, ...)
+#define PROM_ERROR	(0x00000000fffffffful)
+
+static unsigned long __init call_prom(const char *service, int nargs, int nret, ...)
 {
 	int i;
 	unsigned long offset = reloc_offset();
@@ -209,30 +210,7 @@ call_prom(const char *service, int nargs, int nret, ...)
 }
 
 
-static void __init
-prom_panic(const char *reason)
-{
-	unsigned long offset = reloc_offset();
-
-	prom_print(reason);
-	/* ToDo: should put up an SRC here */
-	call_prom(RELOC("exit"), 0, 0);
-
-	for (;;)			/* should never get here */
-		;
-}
-
-void __init
-prom_enter(void)
-{
-	unsigned long offset = reloc_offset();
-
-	call_prom(RELOC("enter"), 0, 0);
-}
-
-
-void __init
-prom_print(const char *msg)
+static void __init prom_print(const char *msg)
 {
 	const char *p, *q;
 	unsigned long offset = reloc_offset();
@@ -255,8 +233,8 @@ prom_print(const char *msg)
 	}
 }
 
-void
-prom_print_hex(unsigned long val)
+
+static void __init prom_print_hex(unsigned long val)
 {
         int i, nibbles = sizeof(val)*2;
         char buf[sizeof(val)*2+1];
@@ -271,15 +249,28 @@ prom_print_hex(unsigned long val)
 	prom_print(buf);
 }
 
-void
-prom_print_nl(void)
+
+static void __init prom_print_nl(void)
 {
 	unsigned long offset = reloc_offset();
 	prom_print(RELOC("\n"));
 }
 
-static int __init
-prom_next_node(phandle *nodep)
+
+static void __init prom_panic(const char *reason)
+{
+	unsigned long offset = reloc_offset();
+
+	prom_print(reason);
+	/* ToDo: should put up an SRC here */
+	call_prom(RELOC("exit"), 0, 0);
+
+	for (;;)			/* should never get here */
+		;
+}
+
+
+static int __init prom_next_node(phandle *nodep)
 {
 	phandle node;
 	unsigned long offset = reloc_offset();
@@ -520,7 +511,7 @@ prom_initialize_naca(unsigned long mem)
 static int iommu_force_on;
 int ppc64_iommu_off;
 
-static void early_cmdline_parse(void)
+static void __init early_cmdline_parse(void)
 {
 	unsigned long offset = reloc_offset();
 	char *opt;
@@ -549,6 +540,57 @@ static void early_cmdline_parse(void)
 	}
 #endif
 }
+
+#ifdef DEBUG_PROM
+void prom_dump_lmb(void)
+{
+        unsigned long i;
+        unsigned long offset = reloc_offset();
+	struct lmb *_lmb  = PTRRELOC(&lmb);
+
+        prom_print(RELOC("\nprom_dump_lmb:\n"));
+        prom_print(RELOC("    memory.cnt                  = 0x"));
+        prom_print_hex(_lmb->memory.cnt);
+	prom_print_nl();
+        prom_print(RELOC("    memory.size                 = 0x"));
+        prom_print_hex(_lmb->memory.size);
+	prom_print_nl();
+        for (i=0; i < _lmb->memory.cnt ;i++) {
+                prom_print(RELOC("    memory.region[0x"));
+		prom_print_hex(i);
+		prom_print(RELOC("].base       = 0x"));
+                prom_print_hex(_lmb->memory.region[i].base);
+		prom_print_nl();
+                prom_print(RELOC("                      .physbase = 0x"));
+                prom_print_hex(_lmb->memory.region[i].physbase);
+		prom_print_nl();
+                prom_print(RELOC("                      .size     = 0x"));
+                prom_print_hex(_lmb->memory.region[i].size);
+		prom_print_nl();
+        }
+
+	prom_print_nl();
+        prom_print(RELOC("    reserved.cnt                  = 0x"));
+        prom_print_hex(_lmb->reserved.cnt);
+	prom_print_nl();
+        prom_print(RELOC("    reserved.size                 = 0x"));
+        prom_print_hex(_lmb->reserved.size);
+	prom_print_nl();
+        for (i=0; i < _lmb->reserved.cnt ;i++) {
+                prom_print(RELOC("    reserved.region[0x"));
+		prom_print_hex(i);
+		prom_print(RELOC("].base       = 0x"));
+                prom_print_hex(_lmb->reserved.region[i].base);
+		prom_print_nl();
+                prom_print(RELOC("                      .physbase = 0x"));
+                prom_print_hex(_lmb->reserved.region[i].physbase);
+		prom_print_nl();
+                prom_print(RELOC("                      .size     = 0x"));
+                prom_print_hex(_lmb->reserved.region[i].size);
+		prom_print_nl();
+        }
+}
+#endif /* DEBUG_PROM */
 
 static unsigned long __init
 prom_initialize_lmb(unsigned long mem)
@@ -634,13 +676,15 @@ prom_instantiate_rtas(void)
 #endif
 	prom_rtas = (ihandle)call_prom(RELOC("finddevice"), 1, 1, RELOC("/rtas"));
 	if (prom_rtas != (ihandle) -1) {
-		int  rc; 
-		
-		if ((rc = call_prom(RELOC("getprop"), 
+		unsigned long x;
+		x = call_prom(RELOC("getprop"),
 				  4, 1, prom_rtas,
 				  RELOC("ibm,hypertas-functions"), 
 				  hypertas_funcs, 
-				  sizeof(hypertas_funcs))) > 0) {
+			      sizeof(hypertas_funcs));
+
+		if (x != PROM_ERROR) {
+			prom_print(RELOC("Hypertas detected, assuming LPAR !\n"));
 			_systemcfg->platform = PLATFORM_PSERIES_LPAR;
 		}
 
@@ -662,6 +706,7 @@ prom_instantiate_rtas(void)
 				struct lmb *_lmb  = PTRRELOC(&lmb);
 				rtas_region = min(_lmb->rmo_size, RTAS_INSTANTIATE_MAX);
 			}
+
 			_rtas->base = lmb_alloc_base(_rtas->size, PAGE_SIZE, rtas_region);
 
 			prom_print(RELOC(" at 0x"));
@@ -671,10 +716,10 @@ prom_instantiate_rtas(void)
 					      	1, 1, RELOC("/rtas"));
 			prom_print(RELOC("..."));
 
-			if ((long)call_prom(RELOC("call-method"), 3, 2,
+			if (call_prom(RELOC("call-method"), 3, 2,
 						      RELOC("instantiate-rtas"),
 						      prom_rtas,
-						      _rtas->base) >= 0) {
+						      _rtas->base) != PROM_ERROR) {
 				_rtas->entry = (long)_prom->args.rets[1];
 			}
 			RELOC(rtas_rmo_buf)
@@ -705,74 +750,9 @@ prom_instantiate_rtas(void)
 #endif
 }
 
-unsigned long prom_strtoul(const char *cp)
-{
-	unsigned long result = 0,value;
-
-	while (*cp) {
-		value = *cp-'0';
-		result = result*10 + value;
-		cp++;
-	} 
-
-	return result;
-}
-
-#ifdef DEBUG_PROM
-void
-prom_dump_lmb(void)
-{
-        unsigned long i;
-        unsigned long offset = reloc_offset();
-	struct lmb *_lmb  = PTRRELOC(&lmb);
-
-        prom_print(RELOC("\nprom_dump_lmb:\n"));
-        prom_print(RELOC("    memory.cnt                  = 0x"));
-        prom_print_hex(_lmb->memory.cnt);
-	prom_print_nl();
-        prom_print(RELOC("    memory.size                 = 0x"));
-        prom_print_hex(_lmb->memory.size);
-	prom_print_nl();
-        for (i=0; i < _lmb->memory.cnt ;i++) {
-                prom_print(RELOC("    memory.region[0x"));
-		prom_print_hex(i);
-		prom_print(RELOC("].base       = 0x"));
-                prom_print_hex(_lmb->memory.region[i].base);
-		prom_print_nl();
-                prom_print(RELOC("                      .physbase = 0x"));
-                prom_print_hex(_lmb->memory.region[i].physbase);
-		prom_print_nl();
-                prom_print(RELOC("                      .size     = 0x"));
-                prom_print_hex(_lmb->memory.region[i].size);
-		prom_print_nl();
-        }
-
-	prom_print_nl();
-        prom_print(RELOC("    reserved.cnt                  = 0x"));
-        prom_print_hex(_lmb->reserved.cnt);
-	prom_print_nl();
-        prom_print(RELOC("    reserved.size                 = 0x"));
-        prom_print_hex(_lmb->reserved.size);
-	prom_print_nl();
-        for (i=0; i < _lmb->reserved.cnt ;i++) {
-                prom_print(RELOC("    reserved.region[0x"));
-		prom_print_hex(i);
-		prom_print(RELOC("].base       = 0x"));
-                prom_print_hex(_lmb->reserved.region[i].base);
-		prom_print_nl();
-                prom_print(RELOC("                      .physbase = 0x"));
-                prom_print_hex(_lmb->reserved.region[i].physbase);
-		prom_print_nl();
-                prom_print(RELOC("                      .size     = 0x"));
-                prom_print_hex(_lmb->reserved.region[i].size);
-		prom_print_nl();
-        }
-}
-#endif /* DEBUG_PROM */
-
 
 #ifdef CONFIG_PMAC_DART
-static void prom_initialize_dart_table(void)
+static void __init prom_initialize_dart_table(void)
 {
 	unsigned long offset = reloc_offset();
 	extern unsigned long dart_tablebase;
@@ -798,7 +778,7 @@ static void prom_initialize_dart_table(void)
 }
 #endif /* CONFIG_PMAC_DART */
 
-static void prom_initialize_tce_table(void)
+static void __init prom_initialize_tce_table(void)
 {
 	phandle node;
 	ihandle phb_node;
@@ -854,13 +834,13 @@ static void prom_initialize_tce_table(void)
 
 		if (call_prom(RELOC("getprop"), 4, 1, node, 
 			     RELOC("tce-table-minalign"), &minalign, 
-			     sizeof(minalign)) < 0) {
+			     sizeof(minalign)) == PROM_ERROR) {
 			minalign = 0;
 		}
 
 		if (call_prom(RELOC("getprop"), 4, 1, node, 
 			     RELOC("tce-table-minsize"), &minsize, 
-			     sizeof(minsize)) < 0) {
+			     sizeof(minsize)) == PROM_ERROR) {
 			minsize = 4UL << 20;
 		}
 
@@ -929,7 +909,7 @@ static void prom_initialize_tce_table(void)
 		memset(path, 0, sizeof(path));
 		/* Call OF to setup the TCE hardware */
 		if (call_prom(RELOC("package-to-path"), 3, 1, node,
-                             path, sizeof(path)-1) <= 0) {
+                             path, sizeof(path)-1) == PROM_ERROR) {
                         prom_print(RELOC("package-to-path failed\n"));
                 } else {
                         prom_print(RELOC("opening PHB "));
@@ -982,8 +962,7 @@ static void prom_initialize_tce_table(void)
  *
  * -- Cort
  */
-static void
-prom_hold_cpus(unsigned long mem)
+static void __init prom_hold_cpus(unsigned long mem)
 {
 	unsigned long i;
 	unsigned int reg;
@@ -1093,7 +1072,7 @@ prom_hold_cpus(unsigned long mem)
 		path = (char *) mem;
 		memset(path, 0, 256);
 		if ((long) call_prom(RELOC("package-to-path"), 3, 1,
-				     node, path, 255) < 0)
+				     node, path, 255) == PROM_ERROR)
 			continue;
 
 #ifdef DEBUG_PROM
@@ -1239,8 +1218,7 @@ next:
 #endif
 }
 
-static void
-smt_setup(void)
+static void __init smt_setup(void)
 {
 	char *p, *q;
 	char my_smt_enabled = SMT_DYNAMIC;
@@ -1431,8 +1409,7 @@ static int __init prom_find_machine_type(void)
 	return PLATFORM_PSERIES;
 }
 
-static int
-prom_set_color(ihandle ih, int i, int r, int g, int b)
+static int __init prom_set_color(ihandle ih, int i, int r, int g, int b)
 {
 	unsigned long offset = reloc_offset();
 
@@ -1453,8 +1430,7 @@ prom_set_color(ihandle ih, int i, int r, int g, int b)
  * So we check whether we will need to open the display,
  * and if so, open it now.
  */
-static unsigned long __init
-check_display(unsigned long mem)
+static unsigned long __init check_display(unsigned long mem)
 {
 	phandle node;
 	ihandle ih;
@@ -1569,8 +1545,8 @@ check_display(unsigned long mem)
 }
 
 /* Return (relocated) pointer to this much memory: skips initrd if any. */
-static void *__make_room(unsigned long *mem_start, unsigned long *mem_end,
-			 unsigned long needed, unsigned long align)
+static void __init *__make_room(unsigned long *mem_start, unsigned long *mem_end,
+				unsigned long needed, unsigned long align)
 {
 	void *ret;
 	unsigned long offset = reloc_offset();
@@ -1735,8 +1711,7 @@ copy_device_tree(unsigned long mem_start)
 }
 
 /* Verify bi_recs are good */
-static struct bi_record *
-prom_bi_rec_verify(struct bi_record *bi_recs)
+static struct bi_record * __init prom_bi_rec_verify(struct bi_record *bi_recs)
 {
 	struct bi_record *first, *last;
 
@@ -1754,8 +1729,7 @@ prom_bi_rec_verify(struct bi_record *bi_recs)
 	return bi_recs;
 }
 
-static unsigned long
-prom_bi_rec_reserve(unsigned long mem)
+static unsigned long __init prom_bi_rec_reserve(unsigned long mem)
 {
 	unsigned long offset = reloc_offset();
 	struct prom_t *_prom = PTRRELOC(&prom);
