@@ -387,7 +387,7 @@ nfs_readpages(struct file *filp, struct address_space *mapping,
 			       is_sync ? readpage_sync_filler :
 					 readpage_async_filler,
 			       &desc);
-	if (!list_empty(pages)) {
+	while (!list_empty(pages)) {
 		struct page *page = list_entry(pages->prev, struct page, list);
 		list_del(&page->list);
 		page_cache_release(page);
