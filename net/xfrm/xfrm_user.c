@@ -200,7 +200,7 @@ static void copy_from_user_state(struct xfrm_state *x, struct xfrm_usersa_info *
 	x->props.replay_window = p->replay_window;
 	x->props.reqid = p->reqid;
 	x->props.family = p->family;
-	x->props.saddr = x->sel.saddr;
+	x->props.saddr = p->saddr;
 }
 
 static struct xfrm_state *xfrm_state_construct(struct xfrm_usersa_info *p,
@@ -296,6 +296,7 @@ static void copy_to_user_state(struct xfrm_state *x, struct xfrm_usersa_info *p)
 	memcpy(&p->lft, &x->lft, sizeof(p->lft));
 	memcpy(&p->curlft, &x->curlft, sizeof(p->curlft));
 	memcpy(&p->stats, &x->stats, sizeof(p->stats));
+	p->saddr = x->props.saddr;
 	p->mode = x->props.mode;
 	p->replay_window = x->props.replay_window;
 	p->reqid = x->props.reqid;
