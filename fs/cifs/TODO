@@ -18,6 +18,8 @@ c) multi-user mounts - multiplexed sessionsetups over single vc
 d) Kerberos/SPNEGO session setup support - (started)
 
 e) NTLMv2 authentication and MD5-HMAC signing SMB PDUs - (mostly implemented)
+	signing necessary for some Windows 2003 servers in domain 
+	controller mode.
 
 f) oplock support (ie safe CIFS distributed file caching) is not quite complete.
 In addition Directory entry caching relies on a 1 second timer, rather than 
@@ -52,7 +54,8 @@ file opens on top of each other by incrementing reference count rather
 than resending (helps reduce server resource utilization and avoid
 spurious oplock breaks).
 
-KNOWN BUGS (updated March 7, 2003)
+
+KNOWN BUGS (updated May 16, 2003)
 ====================================
 1) existing symbolic links (Windows reparse points) are recognized but
 can not be created remotely. They are implemented for Samba and those that
@@ -60,6 +63,11 @@ support the CIFS Unix extensions but Samba has a bug currently handling
 symlink text beginning with slash
 2) delete of file with read-only attribute set will fail (may be ok)
 3) mount helper syntax not quite matching man page
+4) follow_link and readdir code does not follow dfs junctions
+but recognizes them
+5) create of new files to FAT partitions on Windows servers can
+succeed but still return access denied (appears to be Windows 
+not client problem).  NTFS partitions do not have this problem.
 
 Misc testing to do
 =================
@@ -68,6 +76,6 @@ types.
 
 2) Run dbench
 
-3) Finish FSX testing on SMP now that we workaround the Samba bug
+3) Finish high stress fsx testing on SMP clients
 
 4) Additional performance testing and optimization
