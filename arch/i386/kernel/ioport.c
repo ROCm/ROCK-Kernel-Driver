@@ -84,15 +84,17 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int turn_on)
 		t->ts_io_bitmap = bitmap;
 	}
 
-	tss = init_tss + get_cpu();
-	if (bitmap)
-		tss->bitmap = IO_BITMAP_OFFSET;	/* Activate it in the TSS */
-
 	/*
 	 * do it in the per-thread copy and in the TSS ...
 	 */
 	set_bitmap(t->ts_io_bitmap, from, num, !turn_on);
-	set_bitmap(tss->io_bitmap, from, num, !turn_on);
+	tss = init_tss + get_cpu();
+	if (tss->bitmap == IO_BITMAP_OFFSET) { /* already active? */
+		set_bitmap(tss->io_bitmap, from, num, !turn_on);
+	} else {
+		memcpy(tss->io_bitmap, t->ts_io_bitmap, IO_BITMAP_BYTES);
+		tss->bitmap = IO_BITMAP_OFFSET;	/* Activate it in the TSS */
+	}
 	put_cpu();
 out:
 	return ret;
