@@ -16,8 +16,8 @@
 #include "ext2.h"
 #include <linux/quotaops.h>
 #include <linux/sched.h>
+#include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
-
 
 /*
  * ialloc.c contains the inodes allocation and deallocation routines
@@ -169,6 +169,13 @@ static void ext2_preread_inode(struct inode *inode)
 	unsigned long block;
 	struct buffer_head *bh;
 	struct ext2_group_desc * gdp;
+	struct backing_dev_info *bdi;
+
+	bdi = inode->i_mapping->backing_dev_info;
+	if (bdi_read_congested(bdi))
+		return;
+	if (bdi_write_congested(bdi))
+		return;
 
 	block_group = (inode->i_ino - 1) / EXT2_INODES_PER_GROUP(inode->i_sb);
 	gdp = ext2_get_group_desc(inode->i_sb, block_group, &bh);
