@@ -660,6 +660,61 @@ int nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
 	return err;
 }
 
+struct nfs4_closedata {
+	struct inode *inode;
+	struct nfs4_state *state;
+	struct nfs_closeargs arg;
+	struct nfs_closeres res;
+};
+
+static void nfs4_close_done(struct rpc_task *task)
+{
+	struct nfs4_closedata *calldata = (struct nfs4_closedata *)task->tk_calldata;
+	struct nfs4_state *state = calldata->state;
+	struct nfs4_state_owner *sp = state->owner;
+	struct nfs_server *server = NFS_SERVER(calldata->inode);
+
+        /* hmm. we are done with the inode, and in the process of freeing
+	 * the state_owner. we keep this around to process errors
+	 */
+	nfs4_increment_seqid(task->tk_status, sp);
+	switch (task->tk_status) {
+		case 0:
+			state->state = calldata->arg.open_flags;
+			memcpy(&state->stateid, &calldata->res.stateid,
+					sizeof(state->stateid));
+			break;
+		case -NFS4ERR_STALE_STATEID:
+		case -NFS4ERR_EXPIRED:
+			state->state = calldata->arg.open_flags;
+			nfs4_schedule_state_recovery(server->nfs4_state);
+			break;
+		default:
+			if (nfs4_async_handle_error(task, server) == -EAGAIN) {
+				rpc_restart_call(task);
+				return;
+			}
+	}
+	nfs4_put_open_state(state);
+	up(&sp->so_sema);
+	nfs4_put_state_owner(sp);
+	up_read(&server->nfs4_state->cl_sem);
+	kfree(calldata);
+}
+
+static inline int nfs4_close_call(struct rpc_clnt *clnt, struct nfs4_closedata *calldata)
+{
+	struct rpc_message msg = {
+		.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_CLOSE],
+		.rpc_argp = &calldata->arg,
+		.rpc_resp = &calldata->res,
+		.rpc_cred = calldata->state->owner->so_cred,
+	};
+	if (calldata->arg.open_flags != 0)
+		msg.rpc_proc = &nfs4_procedures[NFSPROC4_CLNT_OPEN_DOWNGRADE];
+	return rpc_call_async(clnt, &msg, 0, nfs4_close_done, calldata);
+}
+
 /* 
  * It is possible for data to be read/written from a mem-mapped file 
  * after the sys_close call (which hits the vfs layer as a flush).
@@ -671,104 +726,34 @@ int nfs4_do_setattr(struct nfs_server *server, struct nfs_fattr *fattr,
  *
  * NOTE: Caller must be holding the sp->so_owner semaphore!
  */
-static int _nfs4_do_close(struct inode *inode, struct nfs4_state *state) 
+int nfs4_do_close(struct inode *inode, struct nfs4_state *state, mode_t mode) 
 {
-	struct nfs4_state_owner *sp = state->owner;
-	int status = 0;
-	struct nfs_closeargs arg = {
-		.fh		= NFS_FH(inode),
-	};
-	struct nfs_closeres res;
-	struct rpc_message msg = {
-		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_CLOSE],
-		.rpc_argp	= &arg,
-		.rpc_resp	= &res,
-		.rpc_cred	= sp->so_cred,
-	};
+	struct nfs4_closedata *calldata;
+	int status;
 
-	if (test_bit(NFS_DELEGATED_STATE, &state->flags))
+	/* Tell caller we're done */
+	if (test_bit(NFS_DELEGATED_STATE, &state->flags)) {
+		state->state = mode;
 		return 0;
-	memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
+	}
+	calldata = (struct nfs4_closedata *)kmalloc(sizeof(*calldata), GFP_KERNEL);
+	if (calldata == NULL)
+		return -ENOMEM;
+	calldata->inode = inode;
+	calldata->state = state;
+	calldata->arg.fh = NFS_FH(inode);
 	/* Serialization for the sequence id */
-	arg.seqid = sp->so_seqid,
-	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, RPC_TASK_NOINTR);
-
-        /* hmm. we are done with the inode, and in the process of freeing
-	 * the state_owner. we keep this around to process errors
+	calldata->arg.seqid = state->owner->so_seqid;
+	calldata->arg.open_flags = mode;
+	memcpy(&calldata->arg.stateid, &state->stateid,
+			sizeof(calldata->arg.stateid));
+	status = nfs4_close_call(NFS_SERVER(inode)->client, calldata);
+	/*
+	 * Return -EINPROGRESS on success in order to indicate to the
+	 * caller that an asynchronous RPC call has been launched, and
+	 * that it will release the semaphores on completion.
 	 */
-	nfs4_increment_seqid(status, sp);
-	if (!status)
-		memcpy(&state->stateid, &res.stateid, sizeof(state->stateid));
-
-	return status;
-}
-
-int nfs4_do_close(struct inode *inode, struct nfs4_state *state) 
-{
-	struct nfs_server *server = NFS_SERVER(state->inode);
-	struct nfs4_exception exception = { };
-	int err;
-	do {
-		err = _nfs4_do_close(inode, state);
-		switch (err) {
-			case -NFS4ERR_STALE_STATEID:
-			case -NFS4ERR_EXPIRED:
-				nfs4_schedule_state_recovery(server->nfs4_state);
-				err = 0;
-			default:
-				state->state = 0;
-		}
-		err = nfs4_handle_exception(server, err, &exception);
-	} while (exception.retry);
-	return err;
-}
-
-static int _nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode) 
-{
-	struct nfs4_state_owner *sp = state->owner;
-	int status = 0;
-	struct nfs_closeargs arg = {
-		.fh		= NFS_FH(inode),
-		.seqid		= sp->so_seqid,
-		.open_flags	= mode,
-	};
-	struct nfs_closeres res;
-	struct rpc_message msg = {
-		.rpc_proc	= &nfs4_procedures[NFSPROC4_CLNT_OPEN_DOWNGRADE],
-		.rpc_argp	= &arg,
-		.rpc_resp	= &res,
-		.rpc_cred	= sp->so_cred,
-	};
-
-	if (test_bit(NFS_DELEGATED_STATE, &state->flags))
-		return 0;
-	memcpy(&arg.stateid, &state->stateid, sizeof(arg.stateid));
-	status = rpc_call_sync(NFS_SERVER(inode)->client, &msg, RPC_TASK_NOINTR);
-	nfs4_increment_seqid(status, sp);
-	if (!status)
-		memcpy(&state->stateid, &res.stateid, sizeof(state->stateid));
-
-	return status;
-}
-
-int nfs4_do_downgrade(struct inode *inode, struct nfs4_state *state, mode_t mode) 
-{
-	struct nfs_server *server = NFS_SERVER(state->inode);
-	struct nfs4_exception exception = { };
-	int err;
-	do {
-		err = _nfs4_do_downgrade(inode, state, mode);
-		switch (err) {
-			case -NFS4ERR_STALE_STATEID:
-			case -NFS4ERR_EXPIRED:
-				nfs4_schedule_state_recovery(server->nfs4_state);
-				err = 0;
-			default:
-				state->state = mode;
-		}
-		err = nfs4_handle_exception(server, err, &exception);
-	} while (exception.retry);
-	return err;
+	return (status == 0) ? -EINPROGRESS : status;
 }
 
 struct inode *
