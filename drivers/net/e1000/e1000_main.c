@@ -339,6 +339,10 @@ e1000_reset(struct e1000_adapter *adapter)
 	if(adapter->hw.mac_type >= e1000_82544)
 		E1000_WRITE_REG(&adapter->hw, WUC, 0);
 	e1000_init_hw(&adapter->hw);
+
+	/* Enable h/w to recognize an 802.1Q VLAN Ethernet packet */
+	E1000_WRITE_REG(&adapter->hw, VET, ETHERNET_IEEE_VLAN_TYPE);
+
 	e1000_reset_adaptive(&adapter->hw);
 	e1000_phy_get_info(&adapter->hw, &adapter->phy_info);
 }
@@ -2643,8 +2647,6 @@ e1000_vlan_rx_register(struct net_device *netdev, struct vlan_group *grp)
 
 	if(grp) {
 		/* enable VLAN tag insert/strip */
-
-		E1000_WRITE_REG(&adapter->hw, VET, ETHERNET_IEEE_VLAN_TYPE);
 
 		ctrl = E1000_READ_REG(&adapter->hw, CTRL);
 		ctrl |= E1000_CTRL_VME;
