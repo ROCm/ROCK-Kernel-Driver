@@ -197,9 +197,10 @@ rtas_extended_busy_delay_time(int status)
 		order = 5;	/* bound */
 
 	/* Use microseconds for reasonable accuracy */
-	for (ms = 1000; order > 0; order--)
-		ms = ms * 10;
-	return ms / (1000000/HZ); /* round down is fine */
+	for (ms=1; order > 0; order--)
+		ms *= 10;          
+
+	return ms; 
 }
 
 int
