@@ -109,14 +109,17 @@ static int snd_emu10k1_pcm_channel_alloc(emu10k1_pcm_t * epcm, int voices)
 		snd_emu10k1_voice_free(epcm->emu, epcm->voices[1]);
 		epcm->voices[1] = NULL;
 	}
-	if (voices == 1 && epcm->voices[0] != NULL)
-		return 0;		/* already allocated */
-	if (voices == 2 && epcm->voices[0] != NULL && epcm->voices[1] != NULL)
-		return 0;
-	if (voices > 1) {
-		if (epcm->voices[0] != NULL && epcm->voices[1] == NULL) {
-			snd_emu10k1_voice_free(epcm->emu, epcm->voices[0]);
-			epcm->voices[0] = NULL;
+	for (i = 0; i < voices; i++) {
+		if (epcm->voices[i] == NULL)
+			break;
+	}
+	if (i == voices)
+		return 0; /* already allocated */
+
+	for (i = 0; i < ARRAY_SIZE(epcm->voices); i++) {
+		if (epcm->voices[i]) {
+			snd_emu10k1_voice_free(epcm->emu, epcm->voices[i]);
+			epcm->voices[i] = NULL;
 		}
 	}
 	err = snd_emu10k1_voice_alloc(epcm->emu,

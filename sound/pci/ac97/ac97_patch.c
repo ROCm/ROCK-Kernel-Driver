@@ -1598,7 +1598,7 @@ static int alc655_iec958_route_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_
 	ac97_t *ac97 = snd_kcontrol_chip(kcontrol);
 
 	return ac97_update_bits_page(ac97, AC97_ALC650_MULTICH, 3 << 12,
-				     (unsigned short)ucontrol->value.enumerated.item[0],
+				     (unsigned short)ucontrol->value.enumerated.item[0] << 12,
 				     0);
 }
 
