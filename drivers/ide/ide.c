@@ -187,6 +187,8 @@ int noautodma = 0;
 int noautodma = 1;
 #endif
 
+static int noraid;
+
 EXPORT_SYMBOL(noautodma);
 
 /*
@@ -195,6 +197,12 @@ EXPORT_SYMBOL(noautodma);
 ide_hwif_t ide_hwifs[MAX_HWIFS];	/* master data repository */
 
 EXPORT_SYMBOL(ide_hwifs);
+
+/*
+ * The ide_probe_function takes too much time ...
+ */
+int ide_wait_ms = 5;
+EXPORT_SYMBOL(ide_wait_ms);
 
 extern ide_driver_t idedefault_driver;
 static void setup_driver_defaults(ide_driver_t *driver);
@@ -1731,6 +1739,18 @@ static int __init ide_setup(char *s)
 		return 1;
 	}
 #endif /* CONFIG_BLK_DEV_IDEPCI */
+
+	if (!strcmp(s, "ide=noraid")) {
+		noraid = 1;
+		return 1;
+	}
+
+	if (!strncmp(s, "idewait=", 8)) {
+		char* dummy;
+		ide_wait_ms = simple_strtol(s+8, &dummy, 10);
+		printk(KERN_INFO " : Wait for %i ms\n", ide_wait_ms);
+		return 1;
+	}
 
 	/*
 	 * Look for drive options:  "hdx="
