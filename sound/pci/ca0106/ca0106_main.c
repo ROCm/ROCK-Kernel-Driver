@@ -166,6 +166,7 @@ typedef struct {
 
 static ca0106_names_t ca0106_chip_names[] = {
 	 { 0x10021102, "AudigyLS [SB0310]"} , 
+	 { 0x10051102, "AudigyLS [SB0310b]"} , /* Unknown AudigyLS that also says SB0310 on it */
 	 { 0x10061102, "Live! 7.1 24bit [SB0410]"} , /* New Sound Blaster Live! 7.1 24bit. This does not have an AC97. 53SB041000001 */
 	 { 0x10071102, "Live! 7.1 24bit [SB0413]"} , /* New Dell Sound Blaster Live! 7.1 24bit. This does not have an AC97.  */
 	 { 0, "AudigyLS [Unknown]" }
@@ -995,9 +996,9 @@ static int __devinit snd_ca0106_create(snd_card_t *card,
   
 	if ((err = pci_enable_device(pci)) < 0)
 		return err;
-	if (pci_set_dma_mask(pci, 0x0fffffff) < 0 ||
-	    pci_set_consistent_dma_mask(pci, 0x0fffffff) < 0) {
-		printk(KERN_ERR "error to set 28bit mask DMA\n");
+	if (pci_set_dma_mask(pci, 0xffffffffUL) < 0 ||
+	    pci_set_consistent_dma_mask(pci, 0xffffffffUL) < 0) {
+		printk(KERN_ERR "error to set 32bit mask DMA\n");
 		pci_disable_device(pci);
 		return -ENXIO;
 	}
