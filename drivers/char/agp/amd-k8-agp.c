@@ -265,7 +265,7 @@ static void agp_x86_64_agp_enable(u32 mode)
 	/* If not enough, go to AGP v2 setup */
 	if (v3_devs<2) {
 		printk (KERN_INFO "AGP: Only %d devices found, not enough, trying AGPv2\n", v3_devs);
-		return agp_generic_agp_enable(mode);
+		return agp_generic_enable(mode);
 	} else {
 		printk (KERN_INFO "AGP: Enough AGPv3 devices found, setting up...\n");
 	}

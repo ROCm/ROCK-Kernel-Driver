@@ -186,7 +186,7 @@ static int __init via_generic_agp3_setup (struct pci_dev *pdev)
 	agp_bridge->num_aperture_sizes = 10;
 	agp_bridge->dev_private_data = NULL;
 	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->configure = via_configure_agp3;
 	agp_bridge->fetch_size = via_fetch_size_agp3;
 	agp_bridge->cleanup = via_cleanup_agp3;
@@ -248,7 +248,7 @@ static int __init via_generic_setup (struct pci_dev *pdev)
 	agp_bridge->cleanup = via_cleanup;
 	agp_bridge->tlb_flush = via_tlbflush;
 	agp_bridge->mask_memory = via_mask_memory;
-	agp_bridge->agp_enable = agp_generic_agp_enable;
+	agp_bridge->agp_enable = agp_generic_enable;
 	agp_bridge->cache_flush = global_cache_flush;
 	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
 	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
