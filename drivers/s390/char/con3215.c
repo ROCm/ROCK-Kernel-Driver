@@ -89,7 +89,7 @@ typedef struct _raw3215_info {
         int written;                  /* number of bytes in write requests */
 	devstat_t devstat;	      /* device status structure for do_IO */
 	struct tty_struct *tty;	      /* pointer to tty structure if present */
-	struct work_struct tqueue;      /* task queue to bottom half */
+	struct tasklet_struct tasklet;
 	raw3215_req *queued_read;     /* pointer to queued read requests */
 	raw3215_req *queued_write;    /* pointer to queued write requests */
 	wait_queue_head_t empty_wait; /* wait queue for flushing */
@@ -351,7 +351,7 @@ static void raw3215_tasklet(void *data)
 	s390irq_spin_lock_irqsave(raw->irq, flags);
         raw3215_mk_write_req(raw);
         raw3215_try_io(raw);
-        raw->flags &= ~RAW3215_BH_PENDING;
+	raw->flags &= ~RAW3215_BH_PENDING;
 	s390irq_spin_unlock_irqrestore(raw->irq, flags);
 	/* Check for pending message from raw3215_irq */
 	if (raw->message != NULL) {
@@ -369,16 +369,13 @@ static void raw3215_tasklet(void *data)
 }
 
 /*
- * Function to safely add raw3215_softint to tq_immediate.
- * The s390irq spinlock must be held.
  */
-static inline void raw3215_sched_bh(raw3215_info *raw)
+static inline void raw3215_sched_tasklet(raw3215_info *raw)
 {
-        if (raw->flags & RAW3215_BH_PENDING)
-                return;       /* already pending */
-        raw->flags |= RAW3215_BH_PENDING;
-	INIT_WORK(&raw->tqueue, raw3215_softint, raw);
-        schedule_work(&raw->tqueue);
+	if (raw->flags & RAW3215_BH_PENDING)
+		return;		/* already pending */
+	raw->flags |= RAW3215_BH_PENDING;
+	tasklet_hi_schedule(&raw->tasklet);
 }
 
 /*
@@ -421,7 +418,7 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 				"(dev %i, dev sts 0x%2x, sch sts 0x%2x)";
 			raw->msg_dstat = dstat;
 			raw->msg_cstat = cstat;
-                        raw3215_sched_bh(raw);
+			raw3215_sched_tasklet(raw);
 		}
 	}
         if (dstat & 0x01) { /* we got a unit exception */
@@ -438,7 +435,7 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 		raw3215_mk_read_req(raw);
                 if (MACHINE_IS_P390)
                         memset(raw->inbuf, 0, RAW3215_INBUF_SIZE);
-                raw3215_sched_bh(raw);
+ 		raw3215_sched_tasklet(raw);
 		break;
 	case 0x08:
 	case 0x0C:
@@ -512,7 +509,7 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 		    raw->queued_read == NULL) {
 			wake_up_interruptible(&raw->empty_wait);
 		}
-                raw3215_sched_bh(raw);
+ 		raw3215_sched_tasklet(raw);
 		break;
 	default:
 		/* Strange interrupt, I'll do my best to clean up */
@@ -532,7 +529,7 @@ static void raw3215_irq(int irq, void *int_parm, struct pt_regs *regs)
 			"(dev %i, dev sts 0x%2x, sch sts 0x%2x)";
 		raw->msg_dstat = dstat;
 		raw->msg_cstat = cstat;
-                raw3215_sched_bh(raw);
+ 		raw3215_sched_tasklet(raw);
 	}
 	return;
 }
@@ -868,7 +865,6 @@ static int tty3215_open(struct tty_struct *tty, struct file * filp)
 			kfree(raw);
 			return -ENOMEM;
 		}
-		INIT_WORK(&raw->tqueue, raw3215_softint, raw);
                 init_waitqueue_head(&raw->empty_wait);
 		raw3215[line] = raw;
 	}
@@ -1110,7 +1106,9 @@ void __init con3215_init(void)
 	/* Find the first console */
 	raw->irq = irq;
 	raw->flags |= RAW3215_FIXED;
-	INIT_WORK(&raw->tqueue, raw3215_softint, raw);
+	tasklet_init(&raw->tasklet, 
+		     (void (*)(unsigned long)) raw3215_tasklet,
+		     (unsigned long) raw);
         init_waitqueue_head(&raw->empty_wait);
 
 	/* Request the console irq */

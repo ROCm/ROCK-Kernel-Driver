@@ -226,7 +226,7 @@ fs3270_io(tub_t *tubp, ccw1_t *ccwp)
 }
 
 /*
- * fs3270_bh(tubp) -- Perform back-half processing
+ * fs3270_tasklet(tubp) -- Perform back-half processing
  */
 static void
 fs3270_tasklet(unsigned long data)
@@ -256,17 +256,18 @@ fs3270_tasklet(unsigned long data)
 }
 
 /*
- * fs3270_sched_bh(tubp) -- Schedule the back half
+ * fs3270_sched_tasklet(tubp) -- Schedule the back half
  * Irq lock must be held on entry and remains held on exit.
  */
 static void
-fs3270_sched_bh(tub_t *tubp)
+fs3270_sched_tasklet(tub_t *tubp)
 {
 	if (tubp->flags & TUB_BHPENDING)
 		return;
 	tubp->flags |= TUB_BHPENDING;
-	INIT_WORK(&tubp->tqueue, fs3270_bh, tubp);
-	schedule_work(&tubp->tqueue);
+	tasklet_init(&tubp->tasklet, fs3270_tasklet,
+		     (unsigned long) tubp);
+	tasklet_schedule(&tubp->tasklet);
 }
 
 /*
@@ -316,7 +317,7 @@ fs3270_int(tub_t *tubp, devstat_t *dsp)
 		tubp->flags &= ~TUB_WORKING;
 
 	if ((tubp->flags & TUB_WORKING) == 0)
-		fs3270_sched_bh(tubp);
+		fs3270_sched_tasklet(tubp);
 }
 
 /*
