@@ -165,7 +165,7 @@ static void e100_non_tx_background(unsigned long);
 /* Global Data structures and variables */
 char e100_copyright[] __devinitdata = "Copyright (c) 2002 Intel Corporation";
 
-#define E100_VERSION  "2.0.23-pre1"
+#define E100_VERSION  "2.0.23-pre2"
 
 #define E100_FULL_DRIVER_NAME 	"Intel(R) PRO/100 Fast Ethernet Adapter - Loadable driver, ver "
 
@@ -541,6 +541,7 @@ static inline void
 e100_set_intr_mask(struct e100_private *bdp)
 {
 	writeb(bdp->intr_mask, &bdp->scb->scb_cmd_hi);
+	readw(&(bdp->scb->scb_status)); /* flushes last write, read-safe */
 }
 
 static inline void
@@ -2206,6 +2207,12 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 	tcb = bdp->tcb_pool.data;
 	tcb += TCB_TO_USE(bdp->tcb_pool);
 
+	if (bdp->flags & USE_IPCB) {
+		tcb->tcbu.ipcb.ip_activation_high = IPCB_IP_ACTIVATION_DEFAULT;
+		tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCP_PACKET;
+		tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCPUDP_CHECKSUM_ENABLE;
+	}
+
 	tcb->tcb_hdr.cb_status = 0;
 	tcb->tcb_thrshld = bdp->tx_thld;
 	tcb->tcb_hdr.cb_cmd |= __constant_cpu_to_le16(CB_S_BIT);
@@ -2245,15 +2252,6 @@ e100_prepare_xmit_buff(struct e100_private *bdp, struct sk_buff *skb)
 			}
 
 			*chksum = e100_pseudo_hdr_csum(ip);
-		}
-
-	} else {
-		if (bdp->flags & USE_IPCB) {
-			tcb->tcbu.ipcb.ip_activation_high =
-				IPCB_IP_ACTIVATION_DEFAULT;
-			tcb->tcbu.ipcb.ip_schedule &= ~IPCB_TCP_PACKET;
-			tcb->tcbu.ipcb.ip_schedule &=
-				~IPCB_TCPUDP_CHECKSUM_ENABLE;
 		}
 	}
 
