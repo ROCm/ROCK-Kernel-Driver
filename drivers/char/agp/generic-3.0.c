@@ -18,7 +18,7 @@ struct agp_3_0_dev {
 	struct pci_dev *dev;
 };
 
-static int agp_3_0_dev_list_insert(struct list_head *head, struct list_head *new)
+static void agp_3_0_dev_list_insert(struct list_head *head, struct list_head *new)
 {
 	struct agp_3_0_dev *cur, *n = list_entry(new, struct agp_3_0_dev, list);
 	struct list_head *pos;
@@ -29,11 +29,9 @@ static int agp_3_0_dev_list_insert(struct list_head *head, struct list_head *new
 			break;
 	}
 	list_add_tail(new, pos);
-
-	return 0;
 }
 
-static int agp_3_0_dev_list_sort(struct agp_3_0_dev *list, unsigned int ndevs)
+static void agp_3_0_dev_list_sort(struct agp_3_0_dev *list, unsigned int ndevs)
 {
 	struct agp_3_0_dev *cur;
 	struct pci_dev *dev;
@@ -53,7 +51,6 @@ static int agp_3_0_dev_list_sort(struct agp_3_0_dev *list, unsigned int ndevs)
 		pos = pos->next;
 		agp_3_0_dev_list_insert(head, tmp);
 	}
-	return 0;
 }
 
 /* 
@@ -114,8 +111,7 @@ static int agp_3_0_isochronous_node_enable(struct agp_3_0_dev *dev_list, unsigne
 	 * transfers are enabled and consequently whether maxbw will mean
 	 * anything.
 	 */
-	if((ret = agp_3_0_dev_list_sort(dev_list, ndevs)) != 0)
-		goto free_and_exit;
+	agp_3_0_dev_list_sort(dev_list, ndevs);
 
 	pci_read_config_dword(td, agp_bridge->capndx + 0x0c, &tnistat);
 	pci_read_config_dword(td, agp_bridge->capndx+AGPSTAT, &tstatus);
@@ -288,7 +284,7 @@ get_out:
  * target by ndevs.  Distribute this many slots to each AGP 3.0 device,
  * giving any left over slots to the last device in dev_list.
  */
-static int agp_3_0_nonisochronous_node_enable(struct agp_3_0_dev *dev_list, unsigned int ndevs)
+static void agp_3_0_nonisochronous_node_enable(struct agp_3_0_dev *dev_list, unsigned int ndevs)
 {
 	struct agp_3_0_dev *cur;
 	struct list_head *head = &dev_list->list, *pos;
@@ -311,8 +307,6 @@ static int agp_3_0_nonisochronous_node_enable(struct agp_3_0_dev *dev_list, unsi
 		mcmd |= ((cdev == ndevs - 1) ? rem : mrq) << 24;
 		pci_write_config_dword(cur->dev, cur->capndx+AGPCMD, mcmd);
 	}
-
-	return 0;
 }
 
 /*
@@ -477,8 +471,7 @@ int agp_3_0_node_enable(u32 mode, u32 minor)
 		if((ret = agp_3_0_isochronous_node_enable(dev_list, ndevs)) != 0)
 			goto free_and_exit;
 	} else {
-		if((ret = agp_3_0_nonisochronous_node_enable(dev_list,ndevs)) != 0)
-			goto free_and_exit;
+		agp_3_0_nonisochronous_node_enable(dev_list,ndevs);
 	}
 
 	/*
