@@ -88,7 +88,6 @@ static int options[] = {-1, -1, -1, -1, -1, -1, -1, -1};
 #define PKT_BUF_SZ		1536
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/module.h>
 
 #include <linux/kernel.h>
@@ -2446,22 +2445,6 @@ static struct pci_driver eepro100_driver = {
 	.resume		= eepro100_resume,
 #endif /* CONFIG_PM */
 };
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,3,48)
-static int pci_module_init(struct pci_driver *pdev)
-{
-	int rc;
-
-	rc = pci_register_driver(pdev);
-	if (rc <= 0) {
-		printk(KERN_INFO "%s: No cards found, driver not installed.\n",
-			   pdev->name);
-		pci_unregister_driver(pdev);
-		return -ENODEV;
-	}
-	return 0;
-}
-#endif
 
 static int __init eepro100_init_module(void)
 {
