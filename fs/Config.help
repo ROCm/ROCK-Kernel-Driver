@@ -563,33 +563,36 @@ CONFIG_HPFS_FS
   say N.
 
 CONFIG_NTFS_FS
-  NTFS is the file system of Microsoft Windows NT. Say Y if you want
-  to get read access to files on NTFS partitions of your hard drive.
-  The Linux NTFS driver supports most of the mount options of the VFAT
-  driver, see <file:Documentation/filesystems/ntfs.txt>. Saying Y here
-  will give you read-only access to NTFS partitions.
+  NTFS is the file system of Microsoft Windows NT/2000/XP. For more
+  information see <file:Documentation/filesystems/ntfs.txt>. Saying Y
+  here would allow you to read from NTFS partitions.
 
-  This code is also available as a module ( = code which can be
+  This file system is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
   The module will be called ntfs.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_NTFS_RW
-  If you say Y here, you will (maybe) be able to write to NTFS file
-  systems as well as read from them. The read-write support in NTFS
-  is far from being complete and is not well tested. If you say Y
-  here, back up your NTFS volume first, since it will probably get
-  damaged. Also, download the Linux-NTFS project distribution from
-  Sourceforge at <http://linux-ntfs.sf.net/> and always run the
-  included ntfsfix utility after writing to an NTFS partition from
-  Linux to fix some of the damage done by the driver. You should run
-  ntfsfix _after_ unmounting the partition in Linux but _before_
-  rebooting into Windows. When Windows next boots, chkdsk will be
-  run automatically to fix the remaining damage.
-  Please note that write support is limited to Windows NT4 and
-  earlier versions.
+  If you are not using Windows NT/2000/XP in addition to Linux on your
+  computer it is safe to say N.
 
-  If unsure, say N.
+CONFIG_NTFS_DEBUG
+  If you are experiencing any problems with the NTFS file system, say
+  Y here. This will result in additional consistency checks to be
+  performed by the driver as well as additional debugging messages to
+  be written to the system log. Note that debugging messages are
+  disabled by default. To enable them, supply the option debug_msgs=1
+  at the kernel command line when booting the kernel or as an option
+  to insmod when loading the ntfs module. Once the driver is active,
+  you can enable debugging messages by doing (as root):
+    echo 1 > /proc/sys/fs/ntfs-debug
+  Replacing the "1" with "0" would disable debug messages.
+
+  If you leave debugging messages disabled, this results in little
+  overhead, but enabling debug messages results in very significant
+  slowdown of the system.
+
+  When reporting bugs, please try to have available a full dump of
+  debugging messages while the misbehaviour was occurring.
 
 CONFIG_SYSV_FS
   SCO, Xenix and Coherent are commercial Unix systems for Intel

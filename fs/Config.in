@@ -62,8 +62,9 @@ dep_mbool '  JFS statistics' CONFIG_JFS_STATISTICS $CONFIG_JFS_FS
 tristate 'Minix fs support' CONFIG_MINIX_FS
 
 tristate 'FreeVxFS file system support (VERITAS VxFS(TM) compatible)' CONFIG_VXFS_FS
+
 tristate 'NTFS file system support (read only)' CONFIG_NTFS_FS
-dep_mbool '  NTFS write support (DANGEROUS)' CONFIG_NTFS_RW $CONFIG_NTFS_FS $CONFIG_EXPERIMENTAL
+dep_mbool '  NTFS debugging support' CONFIG_NTFS_DEBUG $CONFIG_NTFS_FS
 
 tristate 'OS/2 HPFS file system support' CONFIG_HPFS_FS
 
