@@ -51,6 +51,22 @@ static spinlock_t scsi_host_list_lock = SPIN_LOCK_UNLOCKED;
 
 static int scsi_host_next_hn;		/* host_no for next new host */
 static int scsi_hosts_registered;	/* cnt of registered scsi hosts */
+static int scsi_ignore_no_error_handling = 0;
+
+#ifdef MODULE
+MODULE_PARM(scsi_ignore_no_error_handling, "i");
+#else
+static int __init
+scsi_ignore_no_error_handling_setup(char *str)
+{
+        scsi_ignore_no_error_handling = 1;
+
+        return 1;
+}
+        
+__setup("scsi_ignore_no_error_handling=", scsi_ignore_no_error_handling_setup);
+#endif
+
 
 /**
  * scsi_tp_for_each_host - call function for each scsi host off a template
@@ -345,6 +361,25 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	int gfp_mask;
 	DECLARE_MUTEX_LOCKED(sem);
 
+	/*
+	 * Determine host number. Check reserved first before allocating
+	 * new one
+	 */
+	hname = (shost_tp->proc_name) ?  shost_tp->proc_name : "";
+	hname_len = strlen(hname);
+
+        /* Check to see if this host has any error handling facilities */
+        if(shost_tp->eh_strategy_handler == NULL &&
+           shost_tp->eh_abort_handler == NULL &&
+           shost_tp->eh_device_reset_handler == NULL &&
+           shost_tp->eh_bus_reset_handler == NULL &&
+           shost_tp->eh_host_reset_handler == NULL) {
+                printk(KERN_ERR "ERROR: SCSI host `%s' has no error handling\nERROR: This is not a safe way to run your SCSI host\nERROR: The error handling must be added to this driver\n", hname);
+                if(!scsi_ignore_no_error_handling) {
+                        printk(KERN_ERR "ERROR: not attaching this host.\n\nERROR: to force attachment, boot with the scsi_ignore_no_error_handling flag");
+                        return NULL;
+                }
+        } 
 	gfp_mask = GFP_KERNEL;
 	if (shost_tp->unchecked_isa_dma && xtr_bytes)
 		gfp_mask |= __GFP_DMA;
@@ -356,13 +391,6 @@ struct Scsi_Host * scsi_register(Scsi_Host_Template *shost_tp, int xtr_bytes)
 	}
 
 	memset(shost, 0, sizeof(struct Scsi_Host) + xtr_bytes);
-
-	/*
-	 * Determine host number. Check reserved first before allocating
-	 * new one
-	 */
-	hname = (shost_tp->proc_name) ?  shost_tp->proc_name : "";
-	hname_len = strlen(hname);
 
 	if (hname_len)
 		list_for_each(lh, &scsi_host_hn_list) {
