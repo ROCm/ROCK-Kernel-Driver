@@ -91,7 +91,6 @@ xfs_lock_for_rename(
 	int			error;
 	int			i, j;
 	uint			lock_mode;
-	uint			lookup_flags;
 	int			diff_dirs = (dp1 != dp2);
 
 	ip2 = NULL;
@@ -123,11 +122,7 @@ xfs_lock_for_rename(
 		lock_mode = xfs_ilock_map_shared(dp2);
 	}
 
-	lookup_flags = DLF_IGET;
-	if (lock_mode == XFS_ILOCK_SHARED) {
-		lookup_flags |= DLF_LOCK_SHARED;
-	}
-	error = xfs_dir_lookup_int(XFS_ITOBHV(dp2), lookup_flags,
+	error = xfs_dir_lookup_int(XFS_ITOBHV(dp2), lock_mode,
 				   dentry2, &inum2, &ip2);
 	if (error == ENOENT) {		/* target does not need to exist. */
 		inum2 = 0;

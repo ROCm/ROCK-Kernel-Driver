@@ -1958,7 +1958,6 @@ xfs_lookup(
 	xfs_ino_t		e_inum;
 	int			error;
 	uint			lock_mode;
-	uint			lookup_flags;
 	vnode_t			*dir_vp;
 
 	dir_vp = BHV_TO_VNODE(dir_bdp);
@@ -1971,12 +1970,7 @@ xfs_lookup(
 		return XFS_ERROR(EIO);
 
 	lock_mode = xfs_ilock_map_shared(dp);
-
-	lookup_flags = DLF_IGET;
-	if (lock_mode == XFS_ILOCK_SHARED) {
-		lookup_flags |= DLF_LOCK_SHARED;
-	}
-	error = xfs_dir_lookup_int(dir_bdp, lookup_flags, dentry, &e_inum, &ip);
+	error = xfs_dir_lookup_int(dir_bdp, lock_mode, dentry, &e_inum, &ip);
 	if (error) {
 		xfs_iunlock_map_shared(dp, lock_mode);
 		return error;
