@@ -9,8 +9,14 @@
  *
  */
 
-#ifndef _isdn_v110_h_
-#define _isdn_v110_h_
+#ifndef ISDN_V110_H
+#define ISDN_V110_H
+
+struct isdn_v110 {
+  int               v110emu;             /* V.110 emulator-mode 0=none */
+  atomic_t          v110use;             /* Usage-Semaphore for stream */
+  isdn_v110_stream  *v110;               /* V.110 private data         */
+};
 
 /* 
  * isdn_v110_encode will take raw data and encode it using V.110 
@@ -23,7 +29,7 @@ extern struct sk_buff *isdn_v110_encode(isdn_v110_stream *, struct sk_buff *);
  */
 extern struct sk_buff *isdn_v110_decode(isdn_v110_stream *, struct sk_buff *);
 
-extern int isdn_v110_stat_callback(int, isdn_ctrl *);
+extern int isdn_v110_stat_callback(struct isdn_v110 *v110, isdn_ctrl *);
 extern void isdn_v110_close(isdn_v110_stream * v);
 
 #endif

@@ -281,8 +281,8 @@ isdn_net_bind_channel(isdn_net_local * lp, int idx)
 	cli();
 	lp->flags |= ISDN_NET_CONNECTED;
 	lp->isdn_slot = idx;
-	dev->rx_netdev[idx] = lp->netdev;
-	dev->st_netdev[idx] = lp->netdev;
+	isdn_slot_set_rx_netdev(lp->isdn_slot, lp->netdev);
+	isdn_slot_set_st_netdev(lp->isdn_slot, lp->netdev);
 	restore_flags(flags);
 }
 
@@ -306,8 +306,8 @@ isdn_net_unbind_channel(isdn_net_local * lp)
 		qdisc_reset(lp->netdev->dev.qdisc);
 	}
 	lp->dialstate = 0;
-	dev->rx_netdev[lp->isdn_slot] = NULL;
-	dev->st_netdev[lp->isdn_slot] = NULL;
+	isdn_slot_set_rx_netdev(lp->isdn_slot, NULL);
+	isdn_slot_set_st_netdev(lp->isdn_slot, NULL);
 	isdn_slot_free(lp->isdn_slot, ISDN_USAGE_NET);
 	lp->flags &= ~ISDN_NET_CONNECTED;
 	lp->isdn_slot = -1;
@@ -405,7 +405,7 @@ static void isdn_net_lp_disconnected(isdn_net_local *lp)
 int
 isdn_net_stat_callback(int idx, isdn_ctrl *c)
 {
-	isdn_net_dev *p = dev->st_netdev[idx];
+	isdn_net_dev *p = isdn_slot_st_netdev(idx);
 	int cmd = c->command;
 
 	if (p) {
@@ -491,7 +491,7 @@ isdn_net_stat_callback(int idx, isdn_ctrl *c)
 						if (lp->dialstate <= 6)
 							isdn_slot_set_usage(idx, isdn_slot_usage(idx) | ISDN_USAGE_OUTGOING);
 						else
-							dev->rx_netdev[idx] = p;
+							isdn_slot_set_rx_netdev(idx, p);
 						lp->dialstate = 0;
 						isdn_timer_ctrl(ISDN_TIMER_NETHANGUP, 1);
 						if (lp->p_encap == ISDN_NET_ENCAP_CISCOHDLCK)
@@ -696,7 +696,7 @@ isdn_net_dial(void)
 					sprintf(cmd.parm.setup.eazmsn, "%s",
 						isdn_slot_map_eaz2msn(lp->isdn_slot, lp->msn));
 					if (lp->isdn_slot >= 0) {
-						strcpy(dev->num[lp->isdn_slot], cmd.parm.setup.phone);
+						strcpy(isdn_slot_num(lp->isdn_slot), cmd.parm.setup.phone);
 						isdn_slot_set_usage(lp->isdn_slot, isdn_slot_usage(lp->isdn_slot) | ISDN_USAGE_OUTGOING);
 					}
 					printk(KERN_INFO "%s: dialing %d %s... %s\n", lp->name,
@@ -1859,7 +1859,7 @@ isdn_net_receive(struct net_device *ndev, struct sk_buff *skb)
 int
 isdn_net_rcv_skb(int idx, struct sk_buff *skb)
 {
-	isdn_net_dev *p = dev->rx_netdev[idx];
+	isdn_net_dev *p = isdn_slot_rx_netdev(idx);
 
 	if (p) {
 		isdn_net_local *lp = p->local;
@@ -2403,9 +2403,9 @@ p = dev->netdev;
 						isdn_slot_free(lp->isdn_slot,
 							 ISDN_USAGE_NET);
 					}
-					strcpy(dev->num[idx], nr);
+					strcpy(isdn_slot_num(idx), nr);
 					isdn_slot_set_usage(idx, (isdn_slot_usage(idx) & ISDN_USAGE_EXCLUSIVE) | ISDN_USAGE_NET);
-					dev->st_netdev[idx] = lp->netdev;
+					isdn_slot_set_st_netdev(idx, lp->netdev);
 					lp->isdn_slot = slot;
 					lp->ppp_slot = -1;
 					lp->flags |= ISDN_NET_CONNECTED;
@@ -3022,8 +3022,8 @@ isdn_net_getpeer(isdn_net_ioctl_phone *phone, isdn_net_ioctl_phone *peer)
 	idx = p->local->isdn_slot;
 	if (idx<0) return -ENOTCONN;
 	/* for pre-bound channels, we need this extra check */
-	if ( strncmp(dev->num[idx],"???",3) == 0 ) return -ENOTCONN;
-	strncpy(phone->phone,dev->num[idx],ISDN_MSNLEN);
+	if (strncmp(isdn_slot_num(idx),"???",3) == 0 ) return -ENOTCONN;
+	strncpy(phone->phone,isdn_slot_num(idx),ISDN_MSNLEN);
 	phone->outgoing=USG_OUTGOING(isdn_slot_usage(idx));
 	if ( copy_to_user(peer,phone,sizeof(*peer)) ) return -EFAULT;
 	return 0;

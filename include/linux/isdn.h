@@ -605,21 +605,11 @@ typedef struct isdn_devt {
 	infostruct        *infochain;                /* List of open info-devs.    */
 	wait_queue_head_t info_waitq;               /* Wait-Queue for isdninfo    */
 	struct timer_list timer;		       /* Misc.-function Timer       */
-	char              num[ISDN_MAX_CHANNELS][ISDN_MSNLEN];
-	/* Remote number of active ch.*/
-	int               m_idx[ISDN_MAX_CHANNELS];  /* Index for mdm....          */
 	driver            *drv[ISDN_MAX_DRIVERS];    /* Array of drivers           */
 	isdn_net_dev      *netdev;		       /* Linked list of net-if's    */
 	char              drvid[ISDN_MAX_DRIVERS][20];/* Driver-ID                 */
 	struct task_struct *profd;                   /* For iprofd                 */
 	modem             mdm;		       /* tty-driver-data            */
-	isdn_net_dev      *rx_netdev[ISDN_MAX_CHANNELS]; /* rx netdev-pointers     */
-	isdn_net_dev      *st_netdev[ISDN_MAX_CHANNELS]; /* stat netdev-pointers   */
-	ulong             ibytes[ISDN_MAX_CHANNELS]; /* Statistics incoming bytes  */
-	ulong             obytes[ISDN_MAX_CHANNELS]; /* Statistics outgoing bytes  */
-	int               v110emu[ISDN_MAX_CHANNELS];/* V.110 emulator-mode 0=none */
-	atomic_t          v110use[ISDN_MAX_CHANNELS];/* Usage-Semaphore for stream */
-	isdn_v110_stream  *v110[ISDN_MAX_CHANNELS];  /* V.110 private data         */
 	struct semaphore  sem;                       /* serialize list access*/
 	unsigned long     global_features;
 #ifdef CONFIG_DEVFS_FS

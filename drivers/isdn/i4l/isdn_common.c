@@ -44,11 +44,20 @@ MODULE_LICENSE("GPL");
 
 isdn_dev *dev;
 
-static struct {
-  int di;    /* driver index */
-  int ch;    /* channel index (per driver */
-  int usage; /* how is it used */
-} slot[ISDN_MAX_CHANNELS];
+struct isdn_slot {
+	int               di;                  /* driver index               */
+	int               ch;                  /* channel index (per driver) */
+	int               usage;               /* how is it used             */
+	char              num[ISDN_MSNLEN];    /* the current phone number   */
+	unsigned long     ibytes;              /* Statistics incoming bytes  */
+	unsigned long     obytes;              /* Statistics outgoing bytes  */
+	struct isdn_v110  iv110;               /* For V.110                  */
+	int               m_idx;               /* Index for mdm....          */
+	isdn_net_dev      *rx_netdev;          /* rx netdev-pointers         */
+	isdn_net_dev      *st_netdev;          /* stat netdev-pointers       */
+};
+
+static struct isdn_slot slot[ISDN_MAX_CHANNELS]; 
 
 static char *isdn_revision = "$Revision: 1.114.6.16 $";
 
@@ -324,7 +333,7 @@ isdn_receive_skb_callback(int di, int channel, struct sk_buff *skb)
 		return;
 	}
 	/* Update statistics */
-	dev->ibytes[i] += skb->len;
+	slot[i].ibytes += skb->len;
 	
 	/* First, try to deliver data to network-device */
 	if (isdn_net_rcv_skb(i, skb))
@@ -334,10 +343,10 @@ isdn_receive_skb_callback(int di, int channel, struct sk_buff *skb)
 	 * makes sense for async streams only, so it is
 	 * called after possible net-device delivery.
 	 */
-	if (dev->v110[i]) {
-		atomic_inc(&dev->v110use[i]);
-		skb = isdn_v110_decode(dev->v110[i], skb);
-		atomic_dec(&dev->v110use[i]);
+	if (slot[i].iv110.v110) {
+		atomic_inc(&slot[i].iv110.v110use);
+		skb = isdn_v110_decode(slot[i].iv110.v110, skb);
+		atomic_dec(&slot[i].iv110.v110use);
 		if (!skb)
 			return;
 	}
@@ -381,11 +390,11 @@ isdn_command(isdn_ctrl *cmd)
 			 * Layer-2 to transparent
 			 */
 				if (!(features & l2_feature)) {
-					dev->v110emu[idx] = l2prot;
+					slot[idx].iv110.v110emu = l2prot;
 					cmd->arg = (cmd->arg & 255) |
 						(ISDN_PROTO_L2_TRANS << 8);
 				} else
-					dev->v110emu[idx] = 0;
+					slot[idx].iv110.v110emu = 0;
 		}
 	}
 	return dev->drv[cmd->driver]->interface->command(cmd);
@@ -435,7 +444,7 @@ isdn_status_callback(isdn_ctrl * c)
 				return 0;
 			if (isdn_net_stat_callback(i, c))
 				return 0;
-			if (isdn_v110_stat_callback(i, c))
+			if (isdn_v110_stat_callback(&slot[i].iv110, c))
 				return 0;
 			if (isdn_tty_stat_callback(i, c))
 				return 0;
@@ -578,7 +587,7 @@ isdn_status_callback(isdn_ctrl * c)
 			/* Find any net-device, waiting for D-channel setup */
 			if (isdn_net_stat_callback(i, c))
 				break;
-			isdn_v110_stat_callback(i, c);
+			isdn_v110_stat_callback(&slot[i].iv110, c);
 			/* Find any ttyI, waiting for D-channel setup */
 			if (isdn_tty_stat_callback(i, c)) {
 				cmd.driver = di;
@@ -601,7 +610,7 @@ isdn_status_callback(isdn_ctrl * c)
 			/* Signal hangup to network-devices */
 			if (isdn_net_stat_callback(i, c))
 				break;
-			isdn_v110_stat_callback(i, c);
+			isdn_v110_stat_callback(&slot[i].iv110, c);
 			if (isdn_tty_stat_callback(i, c))
 				break;
 #ifdef CONFIG_ISDN_DIVERSION
@@ -623,7 +632,7 @@ isdn_status_callback(isdn_ctrl * c)
 			isdn_info_update();
 			if (isdn_net_stat_callback(i, c))
 				break;
-			isdn_v110_stat_callback(i, c);
+			isdn_v110_stat_callback(&slot[i].iv110, c);
 			if (isdn_tty_stat_callback(i, c))
 				break;
 			break;
@@ -642,7 +651,7 @@ isdn_status_callback(isdn_ctrl * c)
 			if (isdn_net_stat_callback(i, c))
 				break;
 #endif
-			isdn_v110_stat_callback(i, c);
+			isdn_v110_stat_callback(&slot[i].iv110, c);
 			if (isdn_tty_stat_callback(i, c))
 				break;
 			break;
@@ -914,7 +923,7 @@ isdn_statstr(void)
 	sprintf(p, "\nphone:\t");
 	p = istatbuf + strlen(istatbuf);
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		sprintf(p, "%s ", dev->num[i]);
+		sprintf(p, "%s ", isdn_slot_num(i));
 		p = istatbuf + strlen(istatbuf);
 	}
 	sprintf(p, "\n");
@@ -1071,8 +1080,8 @@ isdn_status_ioctl(struct inode *inode, struct file *file, uint cmd, ulong arg)
 					       sizeof(ulong) * ISDN_MAX_CHANNELS * 2)))
 				return ret;
 			for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-				put_user(dev->ibytes[i], p++);
-				put_user(dev->obytes[i], p++);
+				put_user(slot[i].ibytes, p++);
+				put_user(slot[i].obytes, p++);
 			}
 			return 0;
 		} else
@@ -1719,7 +1728,7 @@ isdn_map_eaz2msn(char *msn, int di)
 
 int
 isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
-		   int pre_dev,int pre_chan, char *msn)
+		   int pre_dev, int pre_chan, char *msn)
 {
 	int i;
 	ulong flags;
@@ -1786,14 +1795,14 @@ isdn_slot_free(int sl, int usage)
 	save_flags(flags);
 	cli();
 	if (!usage || (slot[sl].usage & ISDN_USAGE_MASK) == usage) {
-		strcpy(dev->num[sl], "???");
-		dev->ibytes[sl] = 0;
-		dev->obytes[sl] = 0;
+		strcpy(isdn_slot_num(sl), "???");
+		slot[sl].ibytes = 0;
+		slot[sl].obytes = 0;
 // 20.10.99 JIM, try to reinitialize v110 !
-		dev->v110emu[sl] = 0;
-		atomic_set(&(dev->v110use[sl]), 0);
-		isdn_v110_close(dev->v110[sl]);
-		dev->v110[sl] = NULL;
+		slot[sl].iv110.v110emu = 0;
+		atomic_set(&slot[sl].iv110.v110use, 0);
+		isdn_v110_close(slot[sl].iv110.v110);
+		slot[sl].iv110.v110 = NULL;
 // 20.10.99 JIM, try to reinitialize v110 !
 		isdn_slot_set_usage(sl, isdn_slot_usage(sl) & (ISDN_USAGE_NONE | ISDN_USAGE_EXCLUSIVE));
 		skb_queue_purge(&dev->drv[isdn_slot_driver(sl)]->rpqueue[isdn_slot_channel(sl)]);
@@ -1836,10 +1845,10 @@ isdn_slot_write(int sl, struct sk_buff *skb)
 
 	BUG_ON(sl < 0);
 
-	if (dev->v110[sl]) {
-		atomic_inc(&dev->v110use[sl]);
-		nskb = isdn_v110_encode(dev->v110[sl], skb);
-		atomic_dec(&dev->v110use[sl]);
+	if (slot[sl].iv110.v110) {
+		atomic_inc(&slot[sl].iv110.v110use);
+		nskb = isdn_v110_encode(slot[sl].iv110.v110, skb);
+		atomic_dec(&slot[sl].iv110.v110use);
 		if (!nskb)
 			return 0;
 		v110_ret = *((int *)nskb->data);
@@ -1878,11 +1887,11 @@ isdn_slot_write(int sl, struct sk_buff *skb)
 		}
 	}
 	if (ret > 0) {
-		dev->obytes[di] += ret;
-		if (dev->v110[sl]) {
-			atomic_inc(&dev->v110use[sl]);
-			dev->v110[sl]->skbuser++;
-			atomic_dec(&dev->v110use[sl]);
+		slot[sl].obytes += ret;
+		if (slot[sl].iv110.v110) {
+			atomic_inc(&slot[sl].iv110.v110use);
+			slot[sl].iv110.v110->skbuser++;
+			atomic_dec(&slot[sl].iv110.v110use);
 			/* For V.110 return unencoded data length */
 			ret = v110_ret;
 			/* if the complete frame was send we free the skb;
@@ -1891,7 +1900,7 @@ isdn_slot_write(int sl, struct sk_buff *skb)
 				dev_kfree_skb(skb);
 		}
 	} else
-		if (dev->v110[sl])
+		if (slot[sl].iv110.v110)
 			dev_kfree_skb(nskb);
 	return ret;
 }
@@ -2183,6 +2192,38 @@ isdn_slot_set_usage(int sl, int usage)
 	isdn_info_update();
 }
 
+void
+isdn_slot_set_rx_netdev(int sl, isdn_net_dev *nd)
+{
+	BUG_ON(sl < 0);
+
+	slot[sl].rx_netdev = nd;
+}
+
+isdn_net_dev *
+isdn_slot_rx_netdev(int sl)
+{
+	BUG_ON(sl < 0);
+
+	return slot[sl].rx_netdev;
+}
+
+void
+isdn_slot_set_st_netdev(int sl, isdn_net_dev *nd)
+{
+	BUG_ON(sl < 0);
+
+	slot[sl].rx_netdev = nd;
+}
+
+isdn_net_dev *
+isdn_slot_st_netdev(int sl)
+{
+	BUG_ON(sl < 0);
+
+	return slot[sl].st_netdev;
+}
+
 /*
  *****************************************************************************
  * And now the modules code.
@@ -2306,8 +2347,8 @@ static int __init isdn_init(void)
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 		slot[i].di = -1;
 		slot[i].ch = -1;
-		dev->m_idx[i] = -1;
-		strcpy(dev->num[i], "???");
+		slot[i].m_idx = -1;
+		strcpy(isdn_slot_num(i), "???");
 		init_waitqueue_head(&dev->mdm.info[i].open_wait);
 		init_waitqueue_head(&dev->mdm.info[i].close_wait);
 	}

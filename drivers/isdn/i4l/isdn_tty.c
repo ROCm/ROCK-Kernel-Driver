@@ -128,7 +128,7 @@ isdn_tty_readmodem(void)
 	modem_info *info;
 
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
-		if ((midx = dev->m_idx[i]) >= 0) {
+		if ((midx = isdn_slot_m_idx(i)) >= 0) {
 			info = &dev->mdm.info[midx];
 			if (info->online) {
 				r = 0;
@@ -182,7 +182,7 @@ isdn_tty_rcv_skb(int i, int di, int channel, struct sk_buff *skb)
 #endif
 	modem_info *info;
 
-	if ((midx = dev->m_idx[i]) < 0) {
+	if ((midx = isdn_slot_m_idx(i)) < 0) {
 		/* if midx is invalid, packet is not for tty */
 		return 0;
 	}
@@ -657,7 +657,7 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
 	} else {
 		info->isdn_slot = i;
-		dev->m_idx[i] = info->line;
+		isdn_slot_set_m_idx(i, info->line);
 		info->last_dir = 1;
 		strcpy(info->last_num, n);
 		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
@@ -683,7 +683,7 @@ isdn_tty_dial(char *n, modem_info * info, atemu * m)
 		cmd.parm.setup.si2 = m->mdmreg[REG_SI2];
 		info->dialing = 1;
 		info->emu.carrierwait = 0;
-		strcpy(dev->num[i], n);
+		strcpy(isdn_slot_num(i), n);
 		isdn_info_update();
 		isdn_slot_command(info->isdn_slot, ISDN_CMD_DIAL, &cmd);
 		isdn_timer_ctrl(ISDN_TIMER_CARRIER, 1);
@@ -754,7 +754,7 @@ isdn_tty_modem_hup(modem_info * info, int local)
 	isdn_slot_all_eaz(slot);
 	info->emu.mdmreg[REG_RINGCNT] = 0;
 	isdn_slot_free(slot, 0);
-	dev->m_idx[slot] = -1;
+	isdn_slot_set_m_idx(slot, -1);
 	info->isdn_slot = -1;
 }
 
@@ -847,7 +847,7 @@ isdn_tty_resume(char *id, modem_info * info, atemu * m)
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
 	} else {
 		info->isdn_slot = i;
-		dev->m_idx[i] = info->line;
+		isdn_slot_set_m_idx(i, info->line);
 		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		info->last_dir = 1;
 //		strcpy(info->last_num, n);
@@ -926,7 +926,7 @@ isdn_tty_send_msg(modem_info * info, atemu * m, char *msg)
 		isdn_tty_modem_result(RESULT_NO_DIALTONE, info);
 	} else {
 		info->isdn_slot = i;
-		dev->m_idx[i] = info->line;
+		isdn_slot_set_m_idx(i, info->line);
 		isdn_slot_set_usage(i, isdn_slot_usage(i) | ISDN_USAGE_OUTGOING);
 		info->last_dir = 1;
 		restore_flags(flags);
@@ -2210,8 +2210,8 @@ isdn_tty_find_icall(int di, int ch, setup_parm *setup)
 					wret = matchret;
 				if (!matchret) {                  /* EAZ is matching */
 					info->isdn_slot = idx;
-					dev->m_idx[idx] = info->line;
-					strcpy(dev->num[idx], nr);
+					isdn_slot_set_m_idx(idx, info->line);
+					strcpy(isdn_slot_num(idx), nr);
 					strcpy(info->emu.cpn, eaz);
 					info->emu.mdmreg[REG_SI1I] = si2bit[si1];
 					info->emu.mdmreg[REG_PLAN] = setup->plan;
@@ -2246,7 +2246,7 @@ isdn_tty_stat_callback(int i, isdn_ctrl *c)
 
 	if (i < 0)
 		return 0;
-	if ((mi = dev->m_idx[i]) >= 0) {
+	if ((mi = isdn_slot_m_idx(i)) >= 0) {
 		info = &dev->mdm.info[mi];
 		switch (c->command) {
                         case ISDN_STAT_CINF:
@@ -2682,7 +2682,7 @@ isdn_tty_modem_result(int code, modem_info * info)
 			    /* print CID, _before_ _every_ ring */
 			    if (!(m->mdmreg[REG_CIDONCE] & BIT_CIDONCE)) {
 				    isdn_tty_at_cout("\r\nCALLER NUMBER: ", info);
-				    isdn_tty_at_cout(dev->num[info->isdn_slot], info);
+				    isdn_tty_at_cout(isdn_slot_num(info->isdn_slot), info);
 				    if (m->mdmreg[REG_CDN] & BIT_CDN) {
 					    isdn_tty_at_cout("\r\nCALLED NUMBER: ", info);
 					    isdn_tty_at_cout(info->emu.cpn, info);
@@ -2711,7 +2711,7 @@ isdn_tty_modem_result(int code, modem_info * info)
 					    (m->mdmreg[REG_RINGCNT] == 1)) {
 						isdn_tty_at_cout("\r\n", info);
 						isdn_tty_at_cout("CALLER NUMBER: ", info);
-						isdn_tty_at_cout(dev->num[info->isdn_slot], info);
+						isdn_tty_at_cout(isdn_slot_num(info->isdn_slot), info);
 						if (m->mdmreg[REG_CDN] & BIT_CDN) {
 							isdn_tty_at_cout("\r\nCALLED NUMBER: ", info);
 							isdn_tty_at_cout(info->emu.cpn, info);
@@ -3223,7 +3223,7 @@ isdn_tty_cmd_ATA(modem_info * info)
 	if (info->msr & UART_MSR_RI) {
 		/* Accept incoming call */
 		info->last_dir = 0;
-		strcpy(info->last_num, dev->num[info->isdn_slot]);
+		strcpy(info->last_num, isdn_slot_num(info->isdn_slot));
 		m->mdmreg[REG_RINGCNT] = 0;
 		info->msr &= ~UART_MSR_RI;
 		l2 = m->mdmreg[REG_L2PROT];
@@ -3936,7 +3936,7 @@ isdn_tty_modem_escape(void)
 
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
 		if (USG_MODEM(isdn_slot_usage(i)))
-			if ((midx = dev->m_idx[i]) >= 0) {
+			if ((midx = isdn_slot_m_idx(i)) >= 0) {
 				modem_info *info = &dev->mdm.info[midx];
 				if (info->online) {
 					ton = 1;
