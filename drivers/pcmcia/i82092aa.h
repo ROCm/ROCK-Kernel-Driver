@@ -37,7 +37,6 @@ static int i82092aa_init(struct pcmcia_socket *socket);
 static int i82092aa_suspend(struct pcmcia_socket *socket);
 static int i82092aa_register_callback(struct pcmcia_socket *socket, void (*handler)(void *, unsigned int), void * info);
 static int i82092aa_inquire_socket(struct pcmcia_socket *socket, socket_cap_t *cap);
-static void i82092aa_proc_setup(struct pcmcia_socket *socket, struct proc_dir_entry *base);
 
 #endif
 

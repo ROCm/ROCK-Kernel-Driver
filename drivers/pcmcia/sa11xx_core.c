@@ -45,7 +45,6 @@
 #include <linux/timer.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
-#include <linux/proc_fs.h>
 #include <linux/version.h>
 #include <linux/interrupt.h>
 
@@ -615,9 +614,6 @@ sa1100_pcmcia_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *map
 	return 0;
 }
 
-
-#if defined(CONFIG_PROC_FS)
-
 struct bittbl {
 	unsigned int mask;
 	const char *name;
@@ -659,17 +655,16 @@ dump_bits(char **p, const char *prefix, unsigned int val, struct bittbl *bits, i
 	*p = b;
 }
 
-/* sa1100_pcmcia_proc_status()
+/* show_status()
  * ^^^^^^^^^^^^^^^^^^^^^^^^^^^
- * Implements the /proc/bus/pccard/??/status file.
+ * Implements the /sys/class/pcmcia_socket/??/status file.
  *
  * Returns: the number of characters added to the buffer
  */
-static int
-sa1100_pcmcia_proc_status(char *buf, char **start, off_t pos,
-			  int count, int *eof, void *data)
+static ssize_t show_status(struct class_device *class_dev, char *buf)
 {
-	struct sa1100_pcmcia_socket *skt = data;
+	struct sa1100_pcmcia_socket *skt = container_of(class_dev, 
+				struct sa1100_pcmcia_socket, socket.dev);
 	unsigned int clock = cpufreq_get(0);
 	unsigned long mecr = MECR;
 	char *p = buf;
@@ -701,29 +696,8 @@ sa1100_pcmcia_proc_status(char *buf, char **start, off_t pos,
 
 	return p-buf;
 }
+static CLASS_DEVICE_ATTR(status, S_IRUGO, show_status, NULL);
 
-/* sa1100_pcmcia_proc_setup()
- * ^^^^^^^^^^^^^^^^^^^^^^^^^^
- * Implements the proc_setup() operation for the in-kernel PCMCIA
- * service (formerly SS_ProcSetup in Card Services).
- *
- * Returns: 0 on success, -1 on error
- */
-static void
-sa1100_pcmcia_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
-{
-	struct proc_dir_entry *entry;
-
-	if ((entry = create_proc_entry("status", 0, base)) == NULL){
-		printk(KERN_ERR "unable to install \"status\" procfs entry\n");
-		return;
-	}
-	entry->read_proc = sa1100_pcmcia_proc_status;
-	entry->data = to_sa1100_socket(sock);
-}
-#else
-#define sa1100_pcmcia_proc_setup	NULL
-#endif  /* defined(CONFIG_PROC_FS) */
 
 static struct pccard_operations sa11xx_pcmcia_operations = {
 	.owner			= THIS_MODULE,
@@ -736,7 +710,6 @@ static struct pccard_operations sa11xx_pcmcia_operations = {
 	.set_socket		= sa1100_pcmcia_set_socket,
 	.set_io_map		= sa1100_pcmcia_set_io_map,
 	.set_mem_map		= sa1100_pcmcia_set_mem_map,
-	.proc_setup		= sa1100_pcmcia_proc_setup
 };
 
 int sa11xx_request_irqs(struct sa1100_pcmcia_socket *skt, struct pcmcia_irqs *irqs, int nr)
@@ -914,6 +887,8 @@ int sa11xx_drv_pcmcia_probe(struct device *dev, struct pcmcia_low_level *ops, in
 		WARN_ON(skt->socket.sock != i);
 
 		add_timer(&skt->poll_timer);
+
+		class_device_create_file(&skt->socket.dev, &class_device_attr_status);
 	}
 
 	dev_set_drvdata(dev, sinfo);

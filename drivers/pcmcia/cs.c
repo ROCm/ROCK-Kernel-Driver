@@ -281,24 +281,7 @@ static int init_socket(struct pcmcia_socket *s)
 	return s->ss_entry->init(s);
 }
 
-/*====================================================================*/
-
-#if defined(CONFIG_PROC_FS) && defined(PCMCIA_DEBUG)
-static int proc_read_clients(char *buf, char **start, off_t pos,
-			     int count, int *eof, void *data)
-{
-    struct pcmcia_socket *s = data;
-    client_handle_t c;
-    char *p = buf;
-
-    for (c = s->clients; c; c = c->next)
-	p += sprintf(p, "fn %x: '%s' [attr 0x%04x] [state 0x%04x]\n",
-		     c->Function, c->dev_info, c->Attributes, c->state);
-    return (p - buf);
-}
-#endif
-
-/*======================================================================
+/*====================================================================
 
     Low-level PC Card interface drivers need to register with Card
     Services using these calls.
@@ -388,20 +371,6 @@ static int pcmcia_add_socket(struct class_device *class_dev)
 	wait_for_completion(&socket->thread_done);
 	BUG_ON(!socket->thread);
 
-#ifdef CONFIG_PROC_FS
-	if (proc_pccard) {
-		char name[3];
-		sprintf(name, "%02d", socket->sock);
-		socket->proc = proc_mkdir(name, proc_pccard);
-		if (socket->proc)
-			socket->ss_entry->proc_setup(socket, socket->proc);
-#ifdef PCMCIA_DEBUG
-		if (socket->proc)
-			create_proc_read_entry("clients", 0, socket->proc,
-					       proc_read_clients, socket);
-#endif
-	}
-#endif
 	return 0;
 }
 
@@ -410,16 +379,6 @@ static void pcmcia_remove_socket(struct class_device *class_dev)
 	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 	client_t *client;
 
-#ifdef CONFIG_PROC_FS
-	if (proc_pccard) {
-		char name[3];
-		sprintf(name, "%02d", socket->sock);
-#ifdef PCMCIA_DEBUG
-		remove_proc_entry("clients", socket->proc);
-#endif
-		remove_proc_entry(name, proc_pccard);
-	}
-#endif
 	if (socket->thread) {
 		init_completion(&socket->thread_done);
 		socket->thread = NULL;

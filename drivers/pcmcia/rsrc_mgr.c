@@ -41,7 +41,6 @@
 #include <linux/slab.h>
 #include <linux/ioport.h>
 #include <linux/timer.h>
-#include <linux/proc_fs.h>
 #include <linux/pci.h>
 #include <asm/irq.h>
 #include <asm/io.h>

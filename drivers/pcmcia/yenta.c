@@ -394,10 +394,6 @@ static int yenta_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *
 	return 0;
 }
 
-static void yenta_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
-{
-	/* Not done yet */
-}
 
 static unsigned int yenta_events(struct yenta_socket *socket)
 {
@@ -803,7 +799,6 @@ static struct pccard_operations yenta_socket_operations = {
 	.set_socket		= yenta_set_socket,
 	.set_io_map		= yenta_set_io_map,
 	.set_mem_map		= yenta_set_mem_map,
-	.proc_setup		= yenta_proc_setup,
 };
 
 

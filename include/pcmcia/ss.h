@@ -139,7 +139,6 @@ struct pccard_operations {
 	int (*set_socket)(struct pcmcia_socket *sock, socket_state_t *state);
 	int (*set_io_map)(struct pcmcia_socket *sock, struct pccard_io_map *io);
 	int (*set_mem_map)(struct pcmcia_socket *sock, struct pccard_mem_map *mem);
-	void (*proc_setup)(struct pcmcia_socket *sock, struct proc_dir_entry *base);
 };
 
 /*
@@ -209,10 +208,6 @@ struct pcmcia_socket {
 
  	/* deprecated */
 	unsigned int			sock;		/* socket number */
-
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry		*proc;
-#endif
 
 	/* state thread */
 	struct semaphore		skt_sem;	/* protects socket h/w state */

@@ -74,7 +74,6 @@ static struct pccard_operations i82092aa_operations = {
 	.set_socket		= i82092aa_set_socket,
 	.set_io_map		= i82092aa_set_io_map,
 	.set_mem_map		= i82092aa_set_mem_map,
-	.proc_setup		= i82092aa_proc_setup,
 };
 
 /* The card can do upto 4 sockets, allocate a structure for each of them */
@@ -831,12 +830,6 @@ static int i82092aa_set_mem_map(struct pcmcia_socket *socket, struct pccard_mem_
 	leave("i82092aa_set_mem_map");
 	return 0;
 }
-
-static void i82092aa_proc_setup(struct pcmcia_socket *socket, struct proc_dir_entry *base)
-{
-	
-}
-/* Module stuff */
 
 static int i82092aa_module_init(void)
 {

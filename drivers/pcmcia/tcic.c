@@ -42,7 +42,6 @@
 #include <linux/timer.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/proc_fs.h>
 #include <linux/workqueue.h>
 #include <linux/device.h>
 
@@ -897,10 +896,6 @@ static int tcic_set_mem_map(struct pcmcia_socket *sock, struct pccard_mem_map *m
 
 /*====================================================================*/
 
-static void tcic_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
-{
-}
-
 static int tcic_init(struct pcmcia_socket *s)
 {
 	int i;
@@ -936,7 +931,6 @@ static struct pccard_operations tcic_operations = {
 	.set_socket	   = tcic_set_socket,
 	.set_io_map	   = tcic_set_io_map,
 	.set_mem_map	   = tcic_set_mem_map,
-	.proc_setup	   = tcic_proc_setup,
 };
 
 /*====================================================================*/

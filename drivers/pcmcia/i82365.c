@@ -45,7 +45,6 @@
 #include <linux/pci.h>
 #include <linux/ioport.h>
 #include <linux/delay.h>
-#include <linux/proc_fs.h>
 #include <linux/workqueue.h>
 #include <linux/interrupt.h>
 #include <linux/device.h>
@@ -168,9 +167,6 @@ struct i82365_socket {
     u_char		cs_irq, intr;
     void		(*handler)(void *info, u_int events);
     void		*info;
-#ifdef CONFIG_PROC_FS
-    struct proc_dir_entry *proc;
-#endif
     union {
 	cirrus_state_t		cirrus;
 	vg46x_state_t		vg46x;
@@ -1288,71 +1284,42 @@ static int i365_set_mem_map(u_short sock, struct pccard_mem_map *mem)
 /*======================================================================
 
     Routines for accessing socket information and register dumps via
-    /proc/bus/pccard/...
+    /sys/class/pcmcia_socket/...
     
 ======================================================================*/
 
-#ifdef CONFIG_PROC_FS
-
-static int proc_read_info(char *buf, char **start, off_t pos,
-			  int count, int *eof, void *data)
+static ssize_t show_info(struct class_device *class_dev, char *buf)
 {
-    struct i82365_socket *s = data;
-    char *p = buf;
-    p += sprintf(p, "type:     %s\npsock:    %d\n",
-		 pcic[s->type].name, s->psock);
-    return (p - buf);
+	struct i82365_socket *s = container_of(class_dev, struct i82365_socket, socket.dev);
+	return sprintf(buf, "type:     %s\npsock:    %d\n",
+		       pcic[s->type].name, s->psock);
 }
 
-static int proc_read_exca(char *buf, char **start, off_t pos,
-			  int count, int *eof, void *data)
+static ssize_t show_exca(struct class_device *class_dev, char *buf)
 {
-    u_short sock = (struct i82365_socket *)data - socket;
-    char *p = buf;
-    int i, top;
-    
-    u_long flags = 0;
-    ISA_LOCK(sock, flags);
-    top = 0x40;
-    for (i = 0; i < top; i += 4) {
-	if (i == 0x50) {
-	    p += sprintf(p, "\n");
-	    i = 0x100;
+	struct i82365_socket *s = container_of(class_dev, struct i82365_socket, socket.dev);
+	unsigned short sock;
+	int i;
+	ssize_t ret = 0;
+	unsigned long flags = 0;
+
+	sock = s->number;
+
+	ISA_LOCK(sock, flags);
+	for (i = 0; i < 0x40; i += 4) {
+		ret += sprintf(buf, "%02x %02x %02x %02x%s",
+			       i365_get(sock,i), i365_get(sock,i+1),
+			       i365_get(sock,i+2), i365_get(sock,i+3),
+			       ((i % 16) == 12) ? "\n" : " ");
+		buf += ret;
 	}
-	p += sprintf(p, "%02x %02x %02x %02x%s",
-		     i365_get(sock,i), i365_get(sock,i+1),
-		     i365_get(sock,i+2), i365_get(sock,i+3),
-		     ((i % 16) == 12) ? "\n" : " ");
-    }
-    ISA_UNLOCK(sock, flags);
-    return (p - buf);
+	ISA_UNLOCK(sock, flags);
+
+	return ret;
 }
 
-static void pcic_proc_setup(struct pcmcia_socket *sock, struct proc_dir_entry *base)
-{
-    struct i82365_socket *s = container_of(sock, struct i82365_socket, socket);
-
-    if (s->flags & IS_ALIVE)
-    	return;
-
-    create_proc_read_entry("info", 0, base, proc_read_info, s);
-    create_proc_read_entry("exca", 0, base, proc_read_exca, s);
-    s->proc = base;
-}
-
-static void pcic_proc_remove(u_short sock)
-{
-    struct proc_dir_entry *base = socket[sock].proc;
-    if (base == NULL) return;
-    remove_proc_entry("info", base);
-    remove_proc_entry("exca", base);
-}
-
-#else
-
-#define pcic_proc_setup NULL
-
-#endif /* CONFIG_PROC_FS */
+static CLASS_DEVICE_ATTR(exca, S_IRUGO, show_exca, NULL);
+static CLASS_DEVICE_ATTR(info, S_IRUGO, show_info, NULL);
 
 /*====================================================================*/
 
@@ -1453,7 +1420,6 @@ static struct pccard_operations pcic_operations = {
 	.set_socket		= pcic_set_socket,
 	.set_io_map		= pcic_set_io_map,
 	.set_mem_map		= pcic_set_mem_map,
-	.proc_setup		= pcic_proc_setup,
 };
 
 /*====================================================================*/
@@ -1526,6 +1492,9 @@ static int __init init_i82365(void)
     	poll_timer.expires = jiffies + poll_interval;
 	add_timer(&poll_timer);
     }
+
+    class_device_create_file(&socket[i].socket.dev, &class_device_attr_info);
+    class_device_create_file(&socket[i].socket.dev, &class_device_attr_exca);
     
     return 0;
     
@@ -1534,11 +1503,9 @@ static int __init init_i82365(void)
 static void __exit exit_i82365(void)
 {
     int i;
+
     for (i = 0; i < sockets; i++) {
 	    pcmcia_unregister_socket(&socket[i].socket);
-#ifdef CONFIG_PROC_FS
-	    pcic_proc_remove(i);
-#endif
     }
     platform_device_unregister(&i82365_device);
     if (poll_interval != 0)
