@@ -371,6 +371,10 @@ retry_programming:
 		resource.res.length = sizeof(struct acpi_resource);
 		resource.res.data.irq.edge_level = link->irq.edge_level;
 		resource.res.data.irq.active_high_low = link->irq.active_high_low;
+		if (link->irq.edge_level == ACPI_EDGE_SENSITIVE)
+			resource.res.data.irq.shared_exclusive = ACPI_EXCLUSIVE;
+		else
+			resource.res.data.irq.shared_exclusive = ACPI_SHARED;
 		resource.res.data.irq.number_of_interrupts = 1;
 		resource.res.data.irq.interrupts[0] = irq;
 		break;
@@ -381,6 +385,10 @@ retry_programming:
 		resource.res.data.extended_irq.producer_consumer = ACPI_CONSUMER;
 		resource.res.data.extended_irq.edge_level = link->irq.edge_level;
 		resource.res.data.extended_irq.active_high_low = link->irq.active_high_low;
+		if (link->irq.edge_level == ACPI_EDGE_SENSITIVE)
+			resource.res.data.irq.shared_exclusive = ACPI_EXCLUSIVE;
+		else
+			resource.res.data.irq.shared_exclusive = ACPI_SHARED;
 		resource.res.data.extended_irq.number_of_interrupts = 1;
 		resource.res.data.extended_irq.interrupts[0] = irq;
 		/* ignore resource_source, it's optional */

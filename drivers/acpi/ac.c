@@ -158,6 +158,7 @@ acpi_ac_add_fs (
 			acpi_ac_dir);
 		if (!acpi_device_dir(device))
 			return_VALUE(-ENODEV);
+		acpi_device_dir(device)->owner = THIS_MODULE;
 	}
 
 	/* 'state' [R] */
@@ -170,6 +171,7 @@ acpi_ac_add_fs (
 	else {
 		entry->proc_fops = &acpi_ac_fops;
 		entry->data = acpi_driver_data(device);
+		entry->owner = THIS_MODULE;
 	}
 
 	return_VALUE(0);
@@ -320,6 +322,7 @@ acpi_ac_init (void)
 	acpi_ac_dir = proc_mkdir(ACPI_AC_CLASS, acpi_root_dir);
 	if (!acpi_ac_dir)
 		return_VALUE(-ENODEV);
+	acpi_ac_dir->owner = THIS_MODULE;
 
 	result = acpi_bus_register_driver(&acpi_ac_driver);
 	if (result < 0) {
