@@ -144,6 +144,14 @@ config ACPI_PROCESSOR
 	  ACPI C2 and C3 processor states to save power, on systems that
 	  support it.
 
+config ACPI_HOTPLUG_CPU
+	bool "Processor Hotplug (EXPERIMENTAL)"
+	depends on ACPI_PROCESSOR && HOTPLUG_CPU && EXPERIMENTAL
+	depends on !IA64_SGI_SN
+	default n
+	 ---help---
+	 Select this option if your platform support physical CPU hotplug.
+
 config ACPI_THERMAL
 	tristate "Thermal Zone"
 	depends on ACPI_PROCESSOR
