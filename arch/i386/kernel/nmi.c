@@ -9,6 +9,8 @@
  *  Mikael Pettersson	: AMD K7 support for local APIC NMI watchdog.
  *  Mikael Pettersson	: Power Management for local APIC NMI watchdog.
  *  Mikael Pettersson	: Pentium 4 support for local APIC NMI watchdog.
+ *  Pavel Machek and
+ *  Mikael Pettersson	: PM converted to driver model. Disable/enable API.
  */
 
 #include <linux/config.h>
@@ -20,6 +22,7 @@
 #include <linux/interrupt.h>
 #include <linux/mc146818rtc.h>
 #include <linux/kernel_stat.h>
+#include <linux/module.h>
 
 #include <asm/smp.h>
 #include <asm/mtrr.h>
@@ -134,14 +137,18 @@ static int __init setup_nmi_watchdog(char *str)
 
 __setup("nmi_watchdog=", setup_nmi_watchdog);
 
-#ifdef CONFIG_PM
+/* nmi_active:
+ * +1: the lapic NMI watchdog is active, but can be disabled
+ *  0: the lapic NMI watchdog has not been set up, and cannot
+ *     be enabled
+ * -1: the lapic NMI watchdog is disabled, but can be enabled
+ */
+static int nmi_active;
 
-#include <linux/pm.h>
-
-struct pm_dev *nmi_pmdev;
-
-static void disable_apic_nmi_watchdog(void)
+void disable_lapic_nmi_watchdog(void)
 {
+	if (nmi_active <= 0)
+		return;
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
 		wrmsr(MSR_K7_EVNTSEL0, 0, 0);
@@ -158,46 +165,65 @@ static void disable_apic_nmi_watchdog(void)
 		}
 		break;
 	}
+	nmi_active = -1;
+	/* tell do_nmi() and others that we're not active any more */
+	nmi_watchdog = 0;
 }
 
-static int nmi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data)
+void enable_lapic_nmi_watchdog(void)
 {
-	switch (rqst) {
-	case PM_SUSPEND:
-		disable_apic_nmi_watchdog();
-		break;
-	case PM_RESUME:
+	if (nmi_active < 0) {
+		nmi_watchdog = NMI_LOCAL_APIC;
 		setup_apic_nmi_watchdog();
-		break;
 	}
+}
+
+#ifdef CONFIG_PM
+
+#include <linux/device.h>
+
+static int lapic_nmi_suspend(struct device *dev, u32 state, u32 level)
+{
+	if (level != SUSPEND_POWER_DOWN)
+		return 0;
+	disable_lapic_nmi_watchdog();
 	return 0;
 }
 
-struct pm_dev * set_nmi_pm_callback(pm_callback callback)
+static int lapic_nmi_resume(struct device *dev, u32 level)
 {
-	apic_pm_unregister(nmi_pmdev);
-	return apic_pm_register(PM_SYS_DEV, 0, callback);
+	if (level != RESUME_POWER_ON)
+		return 0;
+	enable_lapic_nmi_watchdog();
+	return 0;
 }
 
-void unset_nmi_pm_callback(struct pm_dev * dev)
+static struct device_driver lapic_nmi_driver = {
+	.name		= "lapic_nmi",
+	.bus		= &system_bus_type,
+	.resume		= lapic_nmi_resume,
+	.suspend	= lapic_nmi_suspend,
+};
+
+static struct sys_device device_lapic_nmi = {
+	.name		= "lapic_nmi",
+	.id		= 0,
+	.dev		= {
+		.name	= "lapic_nmi",
+		.driver	= &lapic_nmi_driver,
+		.parent = &device_lapic.dev,
+	},
+};
+
+static int __init init_lapic_nmi_devicefs(void)
 {
-	apic_pm_unregister(dev);
-	nmi_pmdev = apic_pm_register(PM_SYS_DEV, 0, nmi_pm_callback);
+	if (nmi_active == 0)
+		return 0;
+	driver_register(&lapic_nmi_driver);
+	return sys_device_register(&device_lapic_nmi);
 }
- 
-static void nmi_pm_init(void)
-{
-	if (!nmi_pmdev)
-		nmi_pmdev = apic_pm_register(PM_SYS_DEV, 0, nmi_pm_callback);
-}
-
-#define __pminit	/*empty*/
-
-#else	/* CONFIG_PM */
-
-static inline void nmi_pm_init(void) { }
-
-#define __pminit	__init
+/* must come after the local APIC's device_initcall() */
+late_initcall(init_lapic_nmi_devicefs);
 
 #endif	/* CONFIG_PM */
 
@@ -206,7 +232,7 @@ static inline void nmi_pm_init(void) { }
  * Original code written by Keith Owens.
  */
 
-static void __pminit clear_msr_range(unsigned int base, unsigned int n)
+static void clear_msr_range(unsigned int base, unsigned int n)
 {
 	unsigned int i;
 
@@ -214,7 +240,7 @@ static void __pminit clear_msr_range(unsigned int base, unsigned int n)
 		wrmsr(base+i, 0, 0);
 }
 
-static void __pminit setup_k7_watchdog(void)
+static void setup_k7_watchdog(void)
 {
 	unsigned int evntsel;
 
@@ -236,7 +262,7 @@ static void __pminit setup_k7_watchdog(void)
 	wrmsr(MSR_K7_EVNTSEL0, evntsel, 0);
 }
 
-static void __pminit setup_p6_watchdog(void)
+static void setup_p6_watchdog(void)
 {
 	unsigned int evntsel;
 
@@ -258,7 +284,7 @@ static void __pminit setup_p6_watchdog(void)
 	wrmsr(MSR_P6_EVNTSEL0, evntsel, 0);
 }
 
-static int __pminit setup_p4_watchdog(void)
+static int setup_p4_watchdog(void)
 {
 	unsigned int misc_enable, dummy;
 
@@ -288,7 +314,7 @@ static int __pminit setup_p4_watchdog(void)
 	return 1;
 }
 
-void __pminit setup_apic_nmi_watchdog (void)
+void setup_apic_nmi_watchdog (void)
 {
 	switch (boot_cpu_data.x86_vendor) {
 	case X86_VENDOR_AMD:
@@ -312,7 +338,7 @@ void __pminit setup_apic_nmi_watchdog (void)
 	default:
 		return;
 	}
-	nmi_pm_init();
+	nmi_active = 1;
 }
 
 static spinlock_t nmi_print_lock = SPIN_LOCK_UNLOCKED;
@@ -400,3 +426,7 @@ void nmi_watchdog_tick (struct pt_regs * regs)
 		wrmsr(nmi_perfctr_msr, -(cpu_khz/nmi_hz*1000), -1);
 	}
 }
+
+EXPORT_SYMBOL(nmi_watchdog);
+EXPORT_SYMBOL(disable_lapic_nmi_watchdog);
+EXPORT_SYMBOL(enable_lapic_nmi_watchdog);

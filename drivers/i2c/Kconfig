@@ -196,17 +196,6 @@ config I2C_CHARDEV
 	  <file:Documentation/modules.txt>.
 	  The module will be called i2c-dev.
 
-config I2C_PROC
-	tristate "I2C /proc interface (required for hardware sensors)"
-	depends on I2C && SYSCTL
-	help
-	  This provides support for i2c device entries in the /proc filesystem.
-	  The entries will be found in /proc/sys/dev/sensors.
-
-	  This code is also available as a module. If you want to compile
-	  it as a module, say M here and read <file:Documentation/modules.txt>.
-	  The module will be called i2c-proc.
-
 	source drivers/i2c/busses/Kconfig
 	source drivers/i2c/chips/Kconfig
 

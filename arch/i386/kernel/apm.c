@@ -218,6 +218,7 @@
 #include <linux/time.h>
 #include <linux/sched.h>
 #include <linux/pm.h>
+#include <linux/device.h>
 #include <linux/kernel.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -1237,6 +1238,9 @@ static int suspend(int vetoable)
 		}
 		printk(KERN_CRIT "apm: suspend was vetoed, but suspending anyway.\n");
 	}
+
+	device_suspend(3, SUSPEND_POWER_DOWN);
+
 	/* serialize with the timer interrupt */
 	write_seqlock_irq(&xtime_lock);
 
@@ -1257,6 +1261,7 @@ static int suspend(int vetoable)
 	if (err != APM_SUCCESS)
 		apm_error("suspend", err);
 	err = (err == APM_SUCCESS) ? 0 : -EIO;
+	device_resume(RESUME_POWER_ON);
 	pm_send_all(PM_RESUME, (void *)0);
 	queue_event(APM_NORMAL_RESUME, NULL);
  out:
@@ -1370,6 +1375,7 @@ static void check_events(void)
 				write_seqlock_irq(&xtime_lock);
 				set_time();
 				write_sequnlock_irq(&xtime_lock);
+				device_resume(RESUME_POWER_ON);
 				pm_send_all(PM_RESUME, (void *)0);
 				queue_event(event, NULL);
 			}
