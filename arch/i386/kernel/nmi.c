@@ -117,8 +117,12 @@ int __init check_nmi_watchdog (void)
 	/* FIXME: Only boot CPU is online at this stage.  Check CPUs
            as they come up. */
 	for (cpu = 0; cpu < NR_CPUS; cpu++) {
-		if (!cpu_online(cpu))
+#ifdef CONFIG_SMP
+		/* Check cpu_callin_map here because that is set
+		   after the timer is started. */
+		if (!cpu_isset(cpu, cpu_callin_map))
 			continue;
+#endif
 		if (nmi_count(cpu) - prev_nmi_count[cpu] <= 5) {
 			printk("CPU#%d: NMI appears to be stuck!\n", cpu);
 			nmi_active = 0;
