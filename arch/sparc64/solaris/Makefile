@@ -2,15 +2,12 @@
 # Makefile for the Solaris binary emulation.
 #
 
+USE_STANDARD_AS_RULE := true
+EXTRA_AFLAGS := -ansi
+
 ifeq ($(CONFIG_SOLARIS_EMUL),m)
-CPPFLAGS = $(MODFLAGS)
+  EXTRA_AFLAGS += $(MODFLAGS)
 endif
-
-.S.s:
-	$(CPP) $(AFLAGS) $(CPPFLAGS) -ansi $< -o $*.s
-
-.S.o:
-	$(CC) $(AFLAGS) $(CPPFLAGS) -ansi -c $< -o $*.o
 
 solaris-objs := entry64.o fs.o misc.o signal.o systbl.o socket.o \
 		ioctl.o ipc.o socksys.o timod.o

@@ -396,6 +396,7 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	struct rt_signal_frame32 *sf;
 	unsigned int psr;
 	unsigned pc, npc, fpu_save;
+	mm_segment_t old_fs;
 	sigset_t set;
 	sigset_t32 seta;
 	stack_t st;
@@ -453,7 +454,10 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 		
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
 	do_sigaltstack(&st, NULL, (unsigned long)sf);
+	set_fs(old_fs);
 	
 	switch (_NSIG_WORDS) {
 		case 4: set.sig[3] = seta.sig[6] + (((long)seta.sig[7]) << 32);
@@ -1031,6 +1035,7 @@ svr4_getcontext(svr4_ucontext_t *uc, struct pt_regs *regs)
 asmlinkage int svr4_setcontext(svr4_ucontext_t *c, struct pt_regs *regs)
 {
 	svr4_gregset_t  *gr;
+	mm_segment_t old_fs;
 	u32 pc, npc, psr;
 	sigset_t set;
 	svr4_sigset_t setv;
@@ -1086,7 +1091,10 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t *c, struct pt_regs *regs)
 		
 	/* It is more difficult to avoid calling this function than to
 	   call it and ignore errors.  */
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
 	do_sigaltstack(&st, NULL, regs->u_regs[UREG_I6]);
+	set_fs(old_fs);
 	
 	sigdelsetmask(&set, ~_BLOCKABLE);
 	spin_lock_irq(&current->sigmask_lock);
