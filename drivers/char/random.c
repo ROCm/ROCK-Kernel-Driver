@@ -1541,6 +1541,7 @@ static int __init rand_initialize(void)
 	clear_entropy_store(urandom_state);
 	init_std_data(random_state);
 	init_std_data(sec_random_state);
+	init_std_data(urandom_state);
 #ifdef CONFIG_SYSCTL
 	sysctl_init_random(random_state);
 #endif
