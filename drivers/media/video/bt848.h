@@ -282,12 +282,15 @@
 #define BT848_GPIO_DMA_CTL_FIFO_ENABLE (1<<0)
 
 #define BT848_I2C              0x110
+#define BT878_I2C_MODE         (1<<7)
+#define BT878_I2C_RATE         (1<<6)
+#define BT878_I2C_NOSTOP       (1<<5)
+#define BT878_I2C_NOSTART      (1<<4)
 #define BT848_I2C_DIV          (0xf<<4)
 #define BT848_I2C_SYNC         (1<<3)
 #define BT848_I2C_W3B	       (1<<2)
 #define BT848_I2C_SCL          (1<<1)
 #define BT848_I2C_SDA          (1<<0)
-
 
 #define BT848_RISC_STRT_ADD    0x114
 #define BT848_GPIO_OUT_EN      0x118
