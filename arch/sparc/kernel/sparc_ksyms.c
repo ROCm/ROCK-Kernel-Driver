@@ -164,8 +164,8 @@ EXPORT_SYMBOL(__cpu_number_map);
 EXPORT_SYMBOL(__cpu_logical_map);
 #endif
 
-EXPORT_SYMBOL(udelay);
-EXPORT_SYMBOL(ndelay);
+EXPORT_SYMBOL(__udelay);
+EXPORT_SYMBOL(__ndelay);
 EXPORT_SYMBOL(rtc_lock);
 EXPORT_SYMBOL(mostek_lock);
 EXPORT_SYMBOL(mstk48t02_regs);

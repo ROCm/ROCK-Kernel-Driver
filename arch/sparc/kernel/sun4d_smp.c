@@ -49,7 +49,6 @@ static int smp_highest_cpu;
 extern int smp_threads_ready;
 extern volatile unsigned long cpu_callin_map[NR_CPUS];
 extern struct cpuinfo_sparc cpu_data[NR_CPUS];
-extern unsigned long cpu_offset[NR_CPUS];
 extern unsigned char boot_cpu_id;
 extern int smp_activated;
 extern volatile int __cpu_number_map[NR_CPUS];
@@ -171,9 +170,6 @@ void __init smp4d_boot_cpus(void)
 
 	printk("Entering SMP Mode...\n");
 	
-	for (i = 0; i < NR_CPUS; i++)
-		cpu_offset[i] = (char *)&(cpu_data(i)) - (char *)&(cpu_data(0));
-		
 	if (boot_cpu_id)
 		current_set[0] = NULL;
 
@@ -426,9 +422,6 @@ void smp4d_message_pass(int target, int msg, unsigned long data, int wait)
 }
 
 extern void sparc_do_profile(unsigned long pc, unsigned long o7);
-
-#define prof_multiplier(__cpu)		cpu_data(__cpu).multiplier
-#define prof_counter(__cpu)		cpu_data(__cpu).counter
 
 void smp4d_percpu_timer_interrupt(struct pt_regs *regs)
 {

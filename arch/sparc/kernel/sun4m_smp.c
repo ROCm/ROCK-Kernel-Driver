@@ -44,7 +44,6 @@ extern unsigned long cpu_present_map;
 extern int smp_num_cpus;
 extern int smp_threads_ready;
 extern volatile unsigned long cpu_callin_map[NR_CPUS];
-extern unsigned long cpu_offset[NR_CPUS];
 extern unsigned char boot_cpu_id;
 extern int smp_activated;
 extern volatile int __cpu_number_map[NR_CPUS];
@@ -152,9 +151,7 @@ void __init smp4m_boot_cpus(void)
 	for (i = 0; !cpu_find_by_instance(i, NULL, &mid); i++)
 		cpu_present_map |= (1<<mid);
 
-	/* XXX cpu_offset is broken -Keith */
 	for(i=0; i < NR_CPUS; i++) {
-		cpu_offset[i] = (char *)&(cpu_data(i)) - (char *)&(cpu_data(0));
 		__cpu_number_map[i] = -1;
 		__cpu_logical_map[i] = -1;
 	}
@@ -408,9 +405,6 @@ void smp4m_cross_call_irq(void)
 }
 
 extern void sparc_do_profile(unsigned long pc, unsigned long o7);
-
-#define prof_multiplier(__cpu)		cpu_data(__cpu).multiplier
-#define prof_counter(__cpu)		cpu_data(__cpu).counter
 
 void smp4m_percpu_timer_interrupt(struct pt_regs *regs)
 {

@@ -32,6 +32,7 @@
 #include <asm/obio.h>
 #include <asm/mxcc.h>
 #include <asm/thread_info.h>
+#include <asm/param.h>
 
 #include <asm/asmmacro.h>
 
@@ -1808,36 +1809,37 @@ fpload:
 	retl
 	 nop
 
-	.globl	ndelay
-ndelay:
+	/* __ndelay and __udelay take two arguments:
+	 * 0 - nsecs or usecs to delay
+	 * 1 - per_cpu udelay_val (loops per jiffy)
+	 *
+	 * Note that ndelay gives HZ times higher resolution but has a 10ms
+	 * limit.  udelay can handle up to 1s.
+	 */
+	.globl	__ndelay
+__ndelay:
 	save	%sp, -STACKFRAME_SZ, %sp
 	mov	%i0, %o0
 	call	.umul
-	 mov	5, %o1
+	 mov	0x1ad, %o1		! 2**32 / (1 000 000 000 / HZ)
+	call	.umul
+	 mov	%i1, %o1		! udelay_val
 	ba	delay_continue
-	 nop
+	 mov	%o1, %o0		! >>32 later for better resolution
 
-	.globl	udelay
-udelay:
+	.globl	__udelay
+__udelay:
 	save	%sp, -STACKFRAME_SZ, %sp
 	mov	%i0, %o0
 	sethi	%hi(0x10c6), %o1
 	call	.umul
-	 or	%o1, %lo(0x10c6), %o1
-delay_continue:
-#ifndef CONFIG_SMP
-	sethi	%hi(loops_per_jiffy), %o3
+	 or	%o1, %lo(0x10c6), %o1	! 2**32 / 1 000 000
 	call	.umul
-	 ld	[%o3 + %lo(loops_per_jiffy)], %o1
-#else
-	GET_PROCESSOR_OFFSET(o4, o2)
-	set	cpu_data, %o3
+	 mov	%i1, %o1		! udelay_val
 	call	.umul
-	 ld	[%o3 + %o4], %o1
-#endif
-	call	.umul
-	 mov	100, %o0
+	 mov	HZ, %o0			! >>32 earlier for wider range
 
+delay_continue:
 	cmp	%o0, 0x0
 1:
 	bne	1b

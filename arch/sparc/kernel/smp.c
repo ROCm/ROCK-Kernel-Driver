@@ -20,11 +20,11 @@
 #include <linux/fs.h>
 #include <linux/seq_file.h>
 #include <linux/cache.h>
+#include <linux/delay.h>
 
 #include <asm/ptrace.h>
 #include <asm/atomic.h>
 
-#include <asm/delay.h>
 #include <asm/irq.h>
 #include <asm/page.h>
 #include <asm/pgalloc.h>
