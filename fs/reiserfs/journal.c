@@ -1925,13 +1925,20 @@ static int release_journal_dev( struct super_block *super,
     
     result = 0;
 	
-    if( journal -> j_dev_bd != NULL ) {
-	result = blkdev_put( journal -> j_dev_bd, BDEV_FS );
-	journal -> j_dev_bd = NULL;
-    }
+
     if( journal -> j_dev_file != NULL ) {
+	/*
+	 * journal block device was taken via filp_open
+	 */
 	result = filp_close( journal -> j_dev_file, NULL );
 	journal -> j_dev_file = NULL;
+	journal -> j_dev_bd = NULL;
+    } else if( journal -> j_dev_bd != NULL ) {
+	/*
+	 * journal block device was taken via bdget and blkdev_get
+	 */
+	result = blkdev_put( journal -> j_dev_bd, BDEV_FS );
+	journal -> j_dev_bd = NULL;
     }
     if( result != 0 ) {
 	reiserfs_warning("sh-457: release_journal_dev: Cannot release journal device: %i", result );
@@ -1966,6 +1973,9 @@ static int journal_init_dev( struct super_block *super,
 			printk( "sh-458: journal_init_dev: cannot init journal device\n '%s': %i", 
 				kdevname( jdev ), result );
 
+		else if (!kdev_same(jdev, super->s_dev)) {
+			set_blocksize(journal->j_dev_bd, super->s_blocksize);
+		}
 		return result;
 	}
 
@@ -1981,15 +1991,12 @@ static int journal_init_dev( struct super_block *super,
 		} else if( jdev_inode -> i_bdev == NULL ) {
 			printk( "journal_init_dev: bdev unintialized for '%s'", jdev_name );
 			result = -ENOMEM;
-		} else if( ( result = blkdev_get( jdev_inode -> i_bdev, 
-						  FMODE_READ | FMODE_WRITE,
-						  0, BDEV_FS ) ) != 0 ) {
-			printk( "journal_init_dev: Cannot load device '%s': %i", jdev_name,
-			     result );
-		} else
+		} else  {
 			/* ok */
 			SB_JOURNAL_DEV( super ) = 
 				to_kdev_t( jdev_inode -> i_bdev -> bd_dev );
+			set_blocksize(journal->j_dev_bd, super->s_blocksize);
+		}
 	} else {
 		result = PTR_ERR( journal -> j_dev_file );
 		journal -> j_dev_file = NULL;
