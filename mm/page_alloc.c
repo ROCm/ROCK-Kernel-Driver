@@ -613,7 +613,7 @@ void si_meminfo(struct sysinfo *val)
 	val->totalram = totalram_pages;
 	val->sharedram = 0;
 	val->freeram = nr_free_pages();
-	val->bufferram = atomic_read(&buffermem_pages);
+	val->bufferram = get_page_cache_size();
 #ifdef CONFIG_HIGHMEM
 	val->totalhigh = totalhigh_pages;
 	val->freehigh = nr_free_highpages();
