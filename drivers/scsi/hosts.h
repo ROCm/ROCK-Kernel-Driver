@@ -578,8 +578,7 @@ extern int scsi_unregister_host(Scsi_Host_Template *);
 extern struct Scsi_Host *scsi_host_get_next(struct Scsi_Host *);
 extern struct Scsi_Host *scsi_host_hn_get(unsigned short);
 extern void scsi_host_put(struct Scsi_Host *);
-extern void scsi_host_hn_init(char *);
-extern void scsi_host_hn_release(void);
+extern void scsi_host_init(void);
 
 /*
  * host_busy inc/dec/test functions

@@ -2550,10 +2550,7 @@ static void scsi_dump_status(int level)
 }
 #endif				/* CONFIG_PROC_FS */
 
-static char *scsihosts;
 static char *scsi_dev_flags;
-
-MODULE_PARM(scsihosts, "s");
 MODULE_PARM(scsi_dev_flags, "s");
 MODULE_PARM_DESC(scsi_dev_flags,
 	 "Given scsi_dev_flags=vendor:model:flags, add a black/white list"
@@ -2566,13 +2563,6 @@ MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
 
 #ifndef MODULE
-int __init scsi_setup(char *str)
-{
-	scsihosts = str;
-	return 1;
-}
-
-__setup("scsihosts=", scsi_setup);
 
 int __init setup_scsi_dev_flags(char *str)
 {
@@ -2598,7 +2588,6 @@ static int __init setup_scsi_default_dev_flags(char *str)
 __setup("scsi_default_dev_flags=", setup_scsi_default_dev_flags);
 
 #endif
-
 static void *scsi_pool_alloc(int gfp_mask, void *data)
 {
 	return kmem_cache_alloc(data, gfp_mask);
@@ -2733,8 +2722,7 @@ static int __init init_scsi(void)
 
         scsi_devfs_handle = devfs_mk_dir (NULL, "scsi", NULL);
 
-	scsi_host_hn_init(scsihosts);
-
+	scsi_host_init();
 	scsi_dev_info_list_init(scsi_dev_flags);
 
 	bus_register(&scsi_driverfs_bus_type);
@@ -2750,10 +2738,8 @@ static void __exit exit_scsi(void)
 	int i;
 
         devfs_unregister (scsi_devfs_handle);
-
 	scsi_dev_info_list_delete();
 
-	scsi_host_hn_release();
 
 #ifdef CONFIG_PROC_FS
 	/* No, we're not here anymore. Don't show the /proc/scsi files. */
