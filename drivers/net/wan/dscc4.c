@@ -592,6 +592,7 @@ static inline int dscc4_xpr_ack(struct dscc4_dev_priv *dpriv)
 	return (i >= 0 ) ? i : -EAGAIN;
 }
 
+#if 0
 static void dscc4_rx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
 	unsigned long flags;
@@ -606,6 +607,9 @@ static void dscc4_rx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	spin_unlock_irqrestore(&dpriv->pci_priv->lock, flags);
 }
 
+#endif
+
+#if 0
 static void dscc4_tx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 {
 	u16 i = 0;
@@ -625,6 +629,7 @@ static void dscc4_tx_reset(struct dscc4_dev_priv *dpriv, struct net_device *dev)
 	if (dscc4_do_action(dev, "Rdt") < 0)
 		printk(KERN_ERR "%s: Tx reset failed\n", dev->name);
 }
+#endif
 
 /* TODO: (ab)use this function to refill a completely depleted RX ring. */
 static inline void dscc4_rx_skb(struct dscc4_dev_priv *dpriv,
@@ -1092,7 +1097,6 @@ done:
 
 err_disable_scc_events:
 	scc_writel(0xffffffff, dpriv, dev, IMR);
-err_free_ring:
 	scc_patchl(PowerUp | Vis, 0, dpriv, dev, CCR0);
 	dscc4_release_ring(dpriv);
 err_out:
@@ -2006,6 +2010,7 @@ static int dscc4_hdlc_attach(hdlc_device *hdlc, unsigned short encoding,
 	return 0;
 }
 
+#ifndef MODULE
 static int __init dscc4_setup(char *str)
 {
 	int *args[] = { &debug, &quartz, NULL }, **p = args;
@@ -2016,6 +2021,7 @@ static int __init dscc4_setup(char *str)
 }
 
 __setup("dscc4.setup=", dscc4_setup);
+#endif
 
 static struct pci_device_id dscc4_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SIEMENS, PCI_DEVICE_ID_SIEMENS_DSCC4,
