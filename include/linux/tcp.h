@@ -210,6 +210,27 @@ enum tcp_congestion_algo {
 	TCP_BIC,
 };
 
+struct tcp_options_received {
+/*	PAWS/RTTM data	*/
+	long	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
+	__u32	ts_recent;	/* Time stamp to echo next		*/
+	__u32	rcv_tsval;	/* Time stamp value             	*/
+	__u32	rcv_tsecr;	/* Time stamp echo reply        	*/
+	char	saw_tstamp;	/* Saw TIMESTAMP on last packet		*/
+	char	tstamp_ok;	/* TIMESTAMP seen on SYN packet		*/
+	char	sack_ok;	/* SACK seen on SYN packet		*/
+	char	wscale_ok;	/* Wscale seen on SYN packet		*/
+	__u8	snd_wscale;	/* Window scaling received from sender	*/
+	__u8	rcv_wscale;	/* Window scaling to send to receiver	*/
+/*	SACKs data	*/
+	__u8	dsack;		/* D-SACK is scheduled			*/
+	__u8	eff_sacks;	/* Size of SACK array to send with next packet */
+	__u8	num_sacks;	/* Number of SACK blocks		*/
+	__u8	__pad;
+	__u16	user_mss;  	/* mss requested by user in ioctl */
+	__u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
+};
+
 struct tcp_sock {
 	/* inet_sock has to be the first member of tcp_sock */
 	struct inet_sock	inet;
@@ -262,22 +283,19 @@ struct tcp_sock {
 	__u32	pmtu_cookie;	/* Last pmtu seen by socket		*/
 	__u32	mss_cache;	/* Cached effective mss, not including SACKS */
 	__u16	mss_cache_std;	/* Like mss_cache, but without TSO */
-	__u16	mss_clamp;	/* Maximal mss, negotiated at connection setup */
 	__u16	ext_header_len;	/* Network protocol overhead (IP/IPv6 options) */
 	__u16	ext2_header_len;/* Options depending on route */
 	__u8	ca_state;	/* State of fast-retransmit machine 	*/
 	__u8	retransmits;	/* Number of unrecovered RTO timeouts.	*/
 
+	__u32	frto_highmark;	/* snd_nxt when RTO occurred */
 	__u8	reordering;	/* Packet reordering metric.		*/
 	__u8	frto_counter;	/* Number of new acks after RTO */
-	__u32	frto_highmark;	/* snd_nxt when RTO occurred */
 
 	__u8	adv_cong;	/* Using Vegas, Westwood, or BIC */
 	__u8	defer_accept;	/* User waits for some data after accept() */
-	/* one byte hole, try to pack */
 
 /* RTT measurement */
-	__u8	backoff;	/* backoff				*/
 	__u32	srtt;		/* smoothed round trip time << 3	*/
 	__u32	mdev;		/* medium deviation			*/
 	__u32	mdev_max;	/* maximal mdev for the last rtt period	*/
@@ -288,7 +306,15 @@ struct tcp_sock {
 	__u32	packets_out;	/* Packets which are "in flight"	*/
 	__u32	left_out;	/* Packets which leaved network	*/
 	__u32	retrans_out;	/* Retransmitted packets out		*/
+	__u8	backoff;	/* backoff				*/
+/*
+ *      Options received (usually on last packet, some only on SYN packets).
+ */
+	__u8	nonagle;	/* Disable Nagle algorithm?             */
+	__u8	keepalive_probes; /* num of allowed keep alive probes	*/
 
+	__u8	probes_out;	/* unanswered 0 window probes		*/
+	struct tcp_options_received rx_opt;
 
 /*
  *	Slow start and congestion control (see also Nagle, and Karn & Partridge)
@@ -314,40 +340,19 @@ struct tcp_sock {
 	__u32	write_seq;	/* Tail(+1) of data held in tcp send buffer */
 	__u32	pushed_seq;	/* Last pushed seq, required to talk to windows */
 	__u32	copied_seq;	/* Head of yet unread data		*/
-/*
- *      Options received (usually on last packet, some only on SYN packets).
- */
-	char	tstamp_ok,	/* TIMESTAMP seen on SYN packet		*/
-		wscale_ok,	/* Wscale seen on SYN packet		*/
-		sack_ok;	/* SACK seen on SYN packet		*/
-	char	saw_tstamp;	/* Saw TIMESTAMP on last packet		*/
-        __u8	snd_wscale;	/* Window scaling received from sender	*/
-        __u8	rcv_wscale;	/* Window scaling to send to receiver	*/
-	__u8	nonagle;	/* Disable Nagle algorithm?             */
-	__u8	keepalive_probes; /* num of allowed keep alive probes	*/
-
-/*	PAWS/RTTM data	*/
-        __u32	rcv_tsval;	/* Time stamp value             	*/
-        __u32	rcv_tsecr;	/* Time stamp echo reply        	*/
-        __u32	ts_recent;	/* Time stamp to echo next		*/
-        long	ts_recent_stamp;/* Time we stored ts_recent (for aging) */
 
 /*	SACKs data	*/
-	__u16	user_mss;  	/* mss requested by user in ioctl */
-	__u8	dsack;		/* D-SACK is scheduled			*/
-	__u8	eff_sacks;	/* Size of SACK array to send with next packet */
 	struct tcp_sack_block duplicate_sack[1]; /* D-SACK block */
 	struct tcp_sack_block selective_acks[4]; /* The SACKS themselves*/
 
 	__u32	window_clamp;	/* Maximal window to advertise		*/
 	__u32	rcv_ssthresh;	/* Current window clamp			*/
-	__u8	probes_out;	/* unanswered 0 window probes		*/
-	__u8	num_sacks;	/* Number of SACK blocks		*/
 	__u16	advmss;		/* Advertised MSS			*/
 
 	__u8	syn_retries;	/* num of allowed syn retries */
 	__u8	ecn_flags;	/* ECN status bits.			*/
 	__u16	prior_ssthresh; /* ssthresh saved at recovery start	*/
+	__u16	__pad1;
 	__u32	lost_out;	/* Lost packets			*/
 	__u32	sacked_out;	/* SACK'd packets			*/
 	__u32	fackets_out;	/* FACK'd packets			*/

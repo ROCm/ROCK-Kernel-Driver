@@ -264,6 +264,10 @@ static int open_low_hpage_segs(struct mm_struct *mm, u16 newsegs)
 				return -EBUSY;
 
 	mm->context.htlb_segs |= newsegs;
+
+	/* update the paca copy of the context struct */
+	get_paca()->context = mm->context;
+
 	/* the context change must make it to memory before the flush,
 	 * so that further SLB misses do the right thing. */
 	mb();

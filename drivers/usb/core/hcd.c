@@ -39,6 +39,7 @@
 #include <asm/scatterlist.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
+#include <asm/irq.h>
 #include <asm/byteorder.h>
 
 #include <linux/usb.h>

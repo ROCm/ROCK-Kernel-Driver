@@ -7,7 +7,12 @@
 #include <linux/ctype.h>
 #include <linux/pnp.h>
 #include <linux/pnpbios.h>
+
+#ifdef CONFIG_PCI
 #include <linux/pci.h>
+#else
+inline void pcibios_penalize_isa_irq(int irq) {}
+#endif /* CONFIG_PCI */
 
 #include "pnpbios.h"
 
