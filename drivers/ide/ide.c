@@ -2320,7 +2320,7 @@ int __init ide_init (void)
 	init_ide_data();
 
 #ifdef CONFIG_PROC_FS
-	proc_ide_root = proc_mkdir("ide", 0);
+	proc_ide_root = proc_mkdir("ide", NULL);
 #endif
 
 #ifdef CONFIG_BLK_DEV_ALI14XX

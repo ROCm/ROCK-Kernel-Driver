@@ -35,7 +35,7 @@
 #define DEFAULT_EXPIRE (HZ / 4)
  
 static void wq_sync_buffers(void *);
-static DECLARE_WORK(sync_wq, wq_sync_buffers, 0);
+static DECLARE_WORK(sync_wq, wq_sync_buffers, NULL);
  
 static struct timer_list sync_timer;
 static void timer_ping(unsigned long data);
@@ -425,7 +425,7 @@ static void increment_tail(struct oprofile_cpu_buffer * b)
  */
 static void sync_buffer(struct oprofile_cpu_buffer * cpu_buf)
 {
-	struct mm_struct * mm = 0;
+	struct mm_struct *mm = NULL;
 	struct task_struct * new;
 	unsigned long cookie = 0;
 	int in_kernel = 1;

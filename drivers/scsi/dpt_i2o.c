@@ -837,7 +837,7 @@ static void adpt_i2o_sys_shutdown(void)
 		kfree(p1);
 	}
 //	spin_unlock_irqrestore(&adpt_post_wait_lock, flags);
-	adpt_post_wait_queue = 0;
+	adpt_post_wait_queue = NULL;
 
 	 printk(KERN_INFO "Adaptec I2O controllers down.\n");
 }
