@@ -846,7 +846,7 @@ release_file(struct nfs4_file *fp)
 }	
 
 void
-release_open_state(struct nfs4_stateid *stp)
+release_open_state(struct nfs4_stateid *stp, struct nfsd4_close *cl)
 {
 	struct nfs4_stateowner *sop = stp->st_stateowner;
 	struct nfs4_file *fp = stp->st_file;
@@ -861,6 +861,7 @@ release_open_state(struct nfs4_stateid *stp)
 	 */
 	if (sop->so_confirmed && list_empty(&sop->so_peropenstate)) {
 		release_stateowner(sop);
+		cl->cl_stateowner = NULL;
 	}
 	/* unused nfs4_file's are releseed. XXX slab cache? */
 	if (list_empty(&fp->fi_perfile)) {
@@ -1573,7 +1574,7 @@ nfsd4_close(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nfsd4_clos
 	memcpy(&close->cl_stateid, &stp->st_stateid, sizeof(stateid_t));
 
 	/* release_open_state() calls nfsd_close() if needed */
-	release_open_state(stp);
+	release_open_state(stp,close);
 out:
 	up(&client_sema);
 	return status;
