@@ -1,6 +1,6 @@
 config 4xx
 	bool
-	depends on 40x
+	depends on 40x || 44x
 	default y
 
 menu "IBM 4xx options"
@@ -57,6 +57,23 @@ config WALNUT
 
 endchoice
 
+choice
+	prompt "Machine Type"
+	depends on 44x
+	default EBONY
+
+config EBONY
+	bool "Ebony"
+	help
+	  This option enables support for the IBM PPC440GP evaluation board.
+
+config OCOTEA
+	bool "Ocotea"
+	help
+	  This option enables support for the IBM PPC440GX evaluation board.
+
+endchoice
+
 config EP405PC
 	bool "EP405PC Support"
 	depends on EP405
@@ -68,6 +85,26 @@ config EP405PC
 config NP405H
 	bool
 	depends on ASH
+	default y
+
+config 440GP
+	bool
+	depends on EBONY
+	default y
+
+config 440GX
+	bool
+	depends on OCOTEA
+	default y
+
+config 440
+	bool
+	depends on 440GP
+	default y
+
+config 440A
+	bool
+	depends on 440GX
 	default y
 
 # All 405-based cores up until the 405GPR and 405EP have this errata.
@@ -82,9 +119,25 @@ config IBM405_ERR51
 	depends on 40x && !405GPR
 	default y
 
+
+config PIN_TLB
+	bool
+	depends on 44x
+	default y
+
+config BOOKE
+	bool
+	depends on 44x
+	default y
+
 config IBM_OCP
 	bool
-	depends on ASH || BEECH || CEDAR || CPCI405 || EP405 || REDWOOD_4 || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
+	depends on ASH || BEECH || CEDAR || CPCI405 || EBONY || EP405 || OCOTEA || REDWOOD_4 || REDWOOD_5 || REDWOOD_6 || SYCAMORE || WALNUT
+	default y
+
+config IBM_EMAC4
+	bool
+	depends on 440GX
 	default y
 
 config NP405L

@@ -107,7 +107,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 	bdnz	0b
 #endif
 
-#if !defined(CONFIG_440)
+#if !defined(CONFIG_44x)
 /*
  * On APUS (Amiga PowerPC cpu upgrade board), we don't know the
  * physical base address of RAM at compile time.
@@ -125,7 +125,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 	.align  1;				\
 	.long   0b;				\
 	.previous
-#else  /* CONFIG_440 */
+#else  /* CONFIG_44x */
 
 #define tophys(rd,rs)				\
 	mr	rd,rs
@@ -133,7 +133,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_601)
 #define tovirt(rd,rs)				\
 	mr	rd,rs
 
-#endif /* CONFIG_440 */
+#endif /* CONFIG_44x */
 
 /*
  * On 64-bit cpus, we use the rfid instruction instead of rfi, but

@@ -48,7 +48,7 @@
 #include <asm/smp.h>
 #include <asm/machdep.h>
 
-int map_page(unsigned long va, unsigned long pa, int flags);
+int map_page(unsigned long va, phys_addr_t pa, int flags);
 
 /* This function will allocate the requested contiguous pages and
  * map them into the kernel's vmalloc() space.  This is done so we
@@ -61,7 +61,8 @@ void *consistent_alloc(int gfp, size_t size, dma_addr_t *dma_handle)
 {
 	int order, err;
 	struct page *page, *free, *end;
-	unsigned long pa, flags, offset;
+	phys_addr_t pa;
+	unsigned long flags, offset;
 	struct vm_struct *area = NULL;
 	unsigned long va = 0;
 
