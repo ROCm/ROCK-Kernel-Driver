@@ -230,8 +230,8 @@ static ssize_t state_store(struct subsystem * subsys, const char * buf, size_t n
 	p = memchr(buf, '\n', n);
 	len = p ? p - buf : n;
 
-	for (s = &pm_states[state]; *s; s++, state++) {
-		if (!strncmp(buf, *s, len))
+	for (s = &pm_states[state]; state < PM_SUSPEND_MAX; s++, state++) {
+		if (*s && !strncmp(buf, *s, len))
 			break;
 	}
 	if (*s)
