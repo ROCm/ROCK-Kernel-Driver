@@ -213,6 +213,135 @@ static struct notifier_block i2o_reboot_notifier =
 
 static int verbose;
 
+#if BITS_PER_LONG == 64
+/**
+ *      i2o_context_list_add -	append an ptr to the context list and return a
+ *				matching context id.
+ *	@ptr: pointer to add to the context list
+ *	@c: controller to which the context list belong
+ *	returns context id, which could be used in the transaction context
+ *	field.
+ *
+ *	Because the context field in I2O is only 32-bit large, on 64-bit the
+ *	pointer is to large to fit in the context field. The i2o_context_list
+ *	functiones map pointers to context fields.
+ */
+u32 i2o_context_list_add(void *ptr, struct i2o_controller *c) {
+	u32 context = 1;
+	struct i2o_context_list_element **entry = &c->context_list;
+	struct i2o_context_list_element *element;
+	unsigned long flags;
+
+	spin_lock_irqsave(&c->context_list_lock, flags);
+	while(*entry && ((*entry)->flags & I2O_CONTEXT_LIST_USED)) {
+		if((*entry)->context >= context)
+			context = (*entry)->context + 1;
+		entry = &((*entry)->next);
+	}
+
+	if(!*entry) {
+		if(unlikely(!context)) {
+			spin_unlock_irqrestore(&c->context_list_lock, flags);
+			printk(KERN_EMERG "i2o_core: context list overflow\n");
+			return 0;
+		}
+
+		element = kmalloc(sizeof(struct i2o_context_list_element), GFP_KERNEL);
+		if(!element) {
+			printk(KERN_EMERG "i2o_core: could not allocate memory for context list element\n");
+			return 0;
+		}
+		element->context = context;
+		element->next = NULL;
+		*entry = element;
+	} else
+		element = *entry;
+
+	element->ptr = ptr;
+	element->flags = I2O_CONTEXT_LIST_USED;
+
+	spin_unlock_irqrestore(&c->context_list_lock, flags);
+	dprintk(KERN_DEBUG "i2o_core: add context to list %p -> %d\n", ptr, context);
+	return context;
+}
+
+/**
+ *      i2o_context_list_remove - remove a ptr from the context list and return
+ *				  the matching context id.
+ *	@ptr: pointer to be removed from the context list
+ *	@c: controller to which the context list belong
+ *	returns context id, which could be used in the transaction context
+ *	field.
+ */
+u32 i2o_context_list_remove(void *ptr, struct i2o_controller *c) {
+	struct i2o_context_list_element **entry = &c->context_list;
+	struct i2o_context_list_element *element;
+	u32 context;
+	unsigned long flags;
+
+	spin_lock_irqsave(&c->context_list_lock, flags);
+	while(*entry && ((*entry)->ptr != ptr))
+		entry = &((*entry)->next);
+
+	if(unlikely(!*entry)) {
+		spin_unlock_irqrestore(&c->context_list_lock, flags);
+		printk(KERN_WARNING "i2o_core: could not remove nonexistent ptr %p\n", ptr);
+		return 0;
+	}
+
+	element = *entry;
+
+	context = element->context;
+	element->ptr = NULL;
+	element->flags |= I2O_CONTEXT_LIST_DELETED;
+
+	spin_unlock_irqrestore(&c->context_list_lock, flags);
+	dprintk(KERN_DEBUG "i2o_core: markt as deleted in context list %p -> %d\n", ptr, context);
+	return context;
+}
+
+/**
+ *      i2o_context_list_get -	get a ptr from the context list and remove it
+ *				from the list.
+ *	@context: context id to which the pointer belong
+ *	@c: controller to which the context list belong
+ *	returns pointer to the matching context id
+ */
+void *i2o_context_list_get(u32 context, struct i2o_controller *c) {
+	struct i2o_context_list_element **entry = &c->context_list;
+	struct i2o_context_list_element *element;
+	void *ptr;
+	int count = 0;
+	unsigned long flags;
+
+	spin_lock_irqsave(&c->context_list_lock, flags);
+	while(*entry && ((*entry)->context != context)) {
+		entry = &((*entry)->next);
+		count ++;
+	}
+
+	if(unlikely(!*entry)) {
+		spin_unlock_irqrestore(&c->context_list_lock, flags);
+		printk(KERN_WARNING "i2o_core: context id %d not found\n", context);
+		return NULL;
+	}
+
+	element = *entry;
+	ptr = element->ptr;
+	if(count >= I2O_CONTEXT_LIST_MIN_LENGTH) {
+		*entry = (*entry)->next;
+		kfree(element);
+	} else {
+		element->ptr = NULL;
+		element->flags &= !I2O_CONTEXT_LIST_USED;
+	}
+
+	spin_unlock_irqrestore(&c->context_list_lock, flags);
+	dprintk(KERN_DEBUG "i2o_core: get ptr from context list %d -> %p\n", context, ptr);
+	return ptr;
+}
+#endif
+
 /*
  * I2O Core reply handler
  */
@@ -3551,6 +3680,10 @@ int __init i2o_pci_install(struct pci_dev *dev)
 	c->short_req = 0;
 	c->pdev = dev;
 
+#if BITS_PER_LONG == 64
+	c->context_list_lock = SPIN_LOCK_UNLOCKED;
+#endif
+
 	c->irq_mask = mem+0x34;
 	c->post_port = mem+0x40;
 	c->reply_port = mem+0x44;
@@ -3788,3 +3921,6 @@ EXPORT_SYMBOL(i2o_event_ack);
 EXPORT_SYMBOL(i2o_report_status);
 EXPORT_SYMBOL(i2o_dump_message);
 EXPORT_SYMBOL(i2o_get_class_name);
+EXPORT_SYMBOL(i2o_context_list_add);
+EXPORT_SYMBOL(i2o_context_list_get);
+EXPORT_SYMBOL(i2o_context_list_remove);
