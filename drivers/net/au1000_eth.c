@@ -33,7 +33,6 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/errno.h>
@@ -48,12 +47,13 @@
 #include <linux/skbuff.h>
 #include <linux/delay.h>
 #include <linux/crc32.h>
+
 #include <asm/mipsregs.h>
 #include <asm/irq.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
-
 #include <asm/au1000.h>
+
 #include "au1000_eth.h"
 
 #ifdef AU1000_ETH_DEBUG

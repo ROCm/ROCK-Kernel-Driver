@@ -12,35 +12,32 @@
  * most of a2025 and sunlance with the aim of merging them, so the 
  * common code was pretty obvious.
  */
+#include <linux/crc32.h>
+#include <linux/delay.h>
+#include <linux/dio.h>
+#include <linux/errno.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
 #include <linux/in.h>
+#include <linux/route.h>
 #include <linux/slab.h>
 #include <linux/string.h>
-#include <linux/delay.h>
-#include <linux/init.h>
-#include <linux/crc32.h>
+#include <linux/skbuff.h>
+/* Used for the temporal inet entries and routing */
+#include <linux/socket.h>
+
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/pgtable.h>
-#include <linux/errno.h>
-
-/* Used for the temporal inet entries and routing */
-#include <linux/socket.h>
-#include <linux/route.h>
-
-#include <linux/dio.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 
 #include "7990.h"
 
