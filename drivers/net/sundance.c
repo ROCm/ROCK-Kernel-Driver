@@ -573,6 +573,8 @@ static int __devinit sundance_probe1 (struct pci_dev *pdev,
 	np->mii_if.dev = dev;
 	np->mii_if.mdio_read = mdio_read;
 	np->mii_if.mdio_write = mdio_write;
+	np->mii_if.phy_id_mask = 0x1f;
+	np->mii_if.reg_num_mask = 0x1f;
 
 	/* The chip-specific entries in the device structure. */
 	dev->open = &netdev_open;
@@ -1550,27 +1552,25 @@ static int netdev_ethtool_ioctl(struct net_device *dev, void *useraddr)
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct netdev_private *np = dev->priv;
+	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	int rc;
 
-	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-		data->phy_id = ((struct netdev_private *)dev->priv)->phys[0] & 0x1f;
-		/* Fall Through */
+	if (!netif_running(dev))
+		return -EINVAL;
 
-	case SIOCGMIIREG:		/* Read MII PHY register. */
-		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
-		return 0;
+	if (cmd == SIOCETHTOOL)
+		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 
-	case SIOCSMIIREG:		/* Write MII PHY register. */
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
-		return 0;
-	default:
-		return -EOPNOTSUPP;
+	else {
+		spin_lock_irq(&np->lock);
+		rc = generic_mii_ioctl(dev, &np->mii_if, data, cmd);
+		spin_unlock_irq(&np->lock);
+		if (rc == 1)	/* don't care about duplex change, fix up rc */
+			rc = 0;
 	}
+
+	return rc;
 }
 
 static int netdev_close(struct net_device *dev)

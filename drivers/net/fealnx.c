@@ -559,6 +559,8 @@ static int __devinit fealnx_init_one(struct pci_dev *pdev,
 	np->mii.dev = dev;
 	np->mii.mdio_read = mdio_read;
 	np->mii.mdio_write = mdio_write;
+	np->mii.phy_id_mask = 0x1f;
+	np->mii.reg_num_mask = 0x1f;
 
 	ring_space = pci_alloc_consistent(pdev, RX_TOTAL_SIZE, &ring_dma);
 	if (!ring_space) {
@@ -1833,28 +1835,25 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 
 static int mii_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
+	struct netdev_private *np = dev->priv;
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *) & rq->ifr_data;
+	int rc;
 
-	switch (cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+	if (!netif_running(dev))
+		return -EINVAL;
 
-	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-		data->phy_id = ((struct netdev_private *) dev->priv)->phys[0] & 0x1f;
-		/* Fall Through */
+	if (cmd == SIOCETHTOOL)
+		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
 
-	case SIOCGMIIREG:		/* Read MII PHY register. */
-		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
-		return 0;
-
-	case SIOCSMIIREG:		/* Write MII PHY register. */
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
-		return 0;
-	default:
-		return -EOPNOTSUPP;
+	else {
+		spin_lock_irq(&np->lock);
+		rc = generic_mii_ioctl(dev, &np->mii, data, cmd);
+		spin_unlock_irq(&np->lock);
+		if (rc == 1)	/* don't care about duplex change, fix up rc */
+			rc = 0;
 	}
+
+	return rc;
 }
 
 

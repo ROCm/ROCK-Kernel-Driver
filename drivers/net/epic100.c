@@ -429,6 +429,8 @@ static int __devinit epic_init_one (struct pci_dev *pdev,
 	ep->mii.dev = dev;
 	ep->mii.mdio_read = mdio_read;
 	ep->mii.mdio_write = mdio_write;
+	ep->mii.phy_id_mask = 0x1f;
+	ep->mii.reg_num_mask = 0x1f;
 
 	ring_space = pci_alloc_consistent(pdev, TX_TOTAL_SIZE, &ring_dma);
 	if (!ring_space)
@@ -1426,63 +1428,36 @@ static int netdev_ethtool_ioctl (struct net_device *dev, void *useraddr)
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct epic_private *ep = dev->priv;
+	struct epic_private *np = dev->priv;
 	long ioaddr = dev->base_addr;
 	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	int rc;
 
-	switch(cmd) {
-	case SIOCETHTOOL:
-		return netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
-
-	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */
-		data->phy_id = ep->phys[0] & 0x1f;
-		/* Fall Through */
-
-	case SIOCGMIIREG:		/* Read MII PHY register. */
-		if (! netif_running(dev)) {
-			outl(0x0200, ioaddr + GENCTL);
-			outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
-		}
-		data->val_out = mdio_read(dev, data->phy_id & 0x1f, data->reg_num & 0x1f);
-#if 0					/* Just leave on if the ioctl() is ever used. */
-		if (! netif_running(dev)) {
-			outl(0x0008, ioaddr + GENCTL);
-			outl((inl(ioaddr + NVCTL) & ~0x483C) | 0x0000, ioaddr + NVCTL);
-		}
-#endif
-		return 0;
-
-	case SIOCSMIIREG:		/* Write MII PHY register. */
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-		if (! netif_running(dev)) {
-			outl(0x0200, ioaddr + GENCTL);
-			outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
-		}
-		if (data->phy_id == ep->phys[0]) {
-			u16 value = data->val_in;
-			switch (data->reg_num) {
-			case 0:
-				/* Check for autonegotiation on or reset. */
-				ep->mii.force_media = (value & 0x9000) ? 0 : 1;
-				if (ep->mii.force_media)
-					ep->mii.full_duplex = (value & 0x0100) ? 1 : 0;
-				break;
-			case 4: ep->mii.advertising = value; break;
-			}
-			/* Perhaps check_duplex(dev), depending on chip semantics. */
-		}
-		mdio_write(dev, data->phy_id & 0x1f, data->reg_num & 0x1f, data->val_in);
-#if 0					/* Leave on if the ioctl() is used. */
-		if (! netif_running(dev)) {
-			outl(0x0008, ioaddr + GENCTL);
-			outl((inl(ioaddr + NVCTL) & ~0x483C) | 0x0000, ioaddr + NVCTL);
-		}
-#endif
-		return 0;
-	default:
-		return -EOPNOTSUPP;
+	/* power-up, if interface is down */
+	if (! netif_running(dev)) {
+		outl(0x0200, ioaddr + GENCTL);
+		outl((inl(ioaddr + NVCTL) & ~0x003C) | 0x4800, ioaddr + NVCTL);
 	}
+
+	/* ethtool commands */
+	if (cmd == SIOCETHTOOL)
+		rc = netdev_ethtool_ioctl(dev, (void *) rq->ifr_data);
+
+	/* all other ioctls (the SIOC[GS]MIIxxx ioctls) */
+	else {
+		spin_lock_irq(&np->lock);
+		rc = generic_mii_ioctl(dev, &np->mii, data, cmd);
+		spin_unlock_irq(&np->lock);
+		if (rc == 1)	/* don't care about duplex change, fixup rc */
+			rc = 0;
+	}
+
+	/* power-down, if interface is down */
+	if (! netif_running(dev)) {
+		outl(0x0008, ioaddr + GENCTL);
+		outl((inl(ioaddr + NVCTL) & ~0x483C) | 0x0000, ioaddr + NVCTL);
+	}
+	return rc;
 }
 
 
