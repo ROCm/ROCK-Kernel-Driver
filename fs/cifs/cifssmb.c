@@ -916,34 +916,34 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	int bytes_returned = 0;
 	int len_of_str;
 
-        cFYI(1, ("Rename to File by handle"));
-        rc = smb_init(SMB_COM_TRANSACTION2, 15, pTcon, (void **) &pSMB,
-                      (void **) &pSMBr);
-        if (rc)
-                return rc;
+	cFYI(1, ("Rename to File by handle"));
+	rc = smb_init(SMB_COM_TRANSACTION2, 15, pTcon, (void **) &pSMB,
+			(void **) &pSMBr);
+	if (rc)
+		return rc;
 
-        pSMB->ParameterCount = 6;
-        pSMB->MaxSetupCount = 0;
-        pSMB->Reserved = 0;
-        pSMB->Flags = 0;
-        pSMB->Timeout = 0;
-        pSMB->Reserved2 = 0;
-        pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_sfi_req,
-                                     Fid) - 4;
-        pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
+	pSMB->ParameterCount = 6;
+	pSMB->MaxSetupCount = 0;
+	pSMB->Reserved = 0;
+	pSMB->Flags = 0;
+	pSMB->Timeout = 0;
+	pSMB->Reserved2 = 0;
+	pSMB->ParameterOffset = offsetof(struct smb_com_transaction2_sfi_req,
+				Fid) - 4;
+	pSMB->DataOffset = pSMB->ParameterOffset + pSMB->ParameterCount;
 
-        data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
+	data_offset = (char *) (&pSMB->hdr.Protocol) + pSMB->DataOffset;
 	rename_info = (struct set_file_rename *) data_offset;
-        pSMB->MaxParameterCount = cpu_to_le16(2);
-        pSMB->MaxDataCount = cpu_to_le16(1000); /* BB find max SMB PDU from sess */
-        pSMB->SetupCount = 1;
-        pSMB->Reserved3 = 0;
-        pSMB->SubCommand = cpu_to_le16(TRANS2_SET_FILE_INFORMATION);
-        pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount;
-        pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
-        pSMB->TotalParameterCount = pSMB->ParameterCount;
-        pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
-        pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
+	pSMB->MaxParameterCount = cpu_to_le16(2);
+	pSMB->MaxDataCount = cpu_to_le16(1000); /* BB find max SMB PDU from sess */
+	pSMB->SetupCount = 1;
+	pSMB->Reserved3 = 0;
+	pSMB->SubCommand = cpu_to_le16(TRANS2_SET_FILE_INFORMATION);
+	pSMB->ByteCount = 3 /* pad */  + pSMB->ParameterCount;
+	pSMB->ParameterCount = cpu_to_le16(pSMB->ParameterCount);
+	pSMB->TotalParameterCount = pSMB->ParameterCount;
+	pSMB->ParameterOffset = cpu_to_le16(pSMB->ParameterOffset);
+	pSMB->DataOffset = cpu_to_le16(pSMB->DataOffset);
 	/* construct random name ".cifs_tmp<inodenum><mid>" */
 	rename_info->overwrite = cpu_to_le32(1);
 	rename_info->root_fid  = 0;
@@ -968,11 +968,11 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	rc = SendReceive(xid, pTcon->ses, (struct smb_hdr *) pSMB,
                          (struct smb_hdr *) pSMBr, &bytes_returned, 0);
 	if (rc) {
-                cFYI(1,("Send error in Rename (by file handle) = %d", rc));
+		cFYI(1,("Send error in Rename (by file handle) = %d", rc));
 	}
 
 	if (pSMB)
-                cifs_buf_release(pSMB);
+		cifs_buf_release(pSMB);
 
 	/* Note: On -EAGAIN error only caller can retry on handle based calls
 		since file handle passed in no longer valid */

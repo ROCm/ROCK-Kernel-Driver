@@ -1,3 +1,7 @@
+Version 1.07
+------------
+Fix some small memory leaks in some unmount error paths.
+
 Version 1.06
 ------------
 Send NTCreateX with ATTR_POSIX if Linux/Unix extensions negotiated with server.
