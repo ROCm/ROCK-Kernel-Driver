@@ -246,8 +246,12 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 
 	/* Now, we do the remaining detection. */
 	if (kind < 0) {
-		if ((adm1021_read_value(new_client, ADM1021_REG_STATUS) & 0x03) != 0x00)
+		if ((adm1021_read_value(new_client, ADM1021_REG_STATUS) & 0x03) != 0x00
+		 || (adm1021_read_value(new_client, ADM1021_REG_CONFIG_R) & 0x3F) != 0x00
+		 || (adm1021_read_value(new_client, ADM1021_REG_CONV_RATE_R) & 0xF8) != 0x00) {
+			err = -ENODEV;
 			goto error1;
+		}
 	}
 
 	/* Determine the chip type. */
@@ -265,11 +269,14 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 		else if ((i == 0x4d) &&
 			 (adm1021_read_value(new_client, ADM1021_REG_DEV_ID) == 0x01))
 			kind = max1617a;
-		/* LM84 Mfr ID in a different place */
-		else if (adm1021_read_value(new_client, ADM1021_REG_CONV_RATE_R) == 0x00)
-			kind = lm84;
 		else if (i == 0x54)
 			kind = mc1066;
+		/* LM84 Mfr ID in a different place, and it has more unused bits */
+		else if (adm1021_read_value(new_client, ADM1021_REG_CONV_RATE_R) == 0x00
+		      && (kind == 0 /* skip extra detection */
+		       || ((adm1021_read_value(new_client, ADM1021_REG_CONFIG_R) & 0x7F) == 0x00
+			&& (adm1021_read_value(new_client, ADM1021_REG_STATUS) & 0xAB) == 0x00)))
+			kind = lm84;
 		else
 			kind = max1617;
 	}
@@ -305,7 +312,8 @@ static int adm1021_detect(struct i2c_adapter *adapter, int address, int kind)
 		goto error1;
 
 	/* Initialize the ADM1021 chip */
-	adm1021_init_client(new_client);
+	if (kind != lm84)
+		adm1021_init_client(new_client);
 
 	/* Register sysfs hooks */
 	device_create_file(&new_client->dev, &dev_attr_temp1_max);
