@@ -1,3 +1,8 @@
+2002-02-07  Uwe Bonnes  <bon@elektron.ikp.physik.tu-darmstadt.de>
+
+        * tulip_core (tulip_pci_tbl[]):
+        Add PCI id for comet tulip clone.
+
 2001-12-11  Jeff Garzik  <jgarzik@mandrakesoft.com>
 
 	* eeprom.c, timer.c, media.c, tulip_core.c:
