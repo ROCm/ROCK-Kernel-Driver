@@ -2591,7 +2591,7 @@ static int __init uhci_hcd_init(void)
 
 init_failed:
 	if (kmem_cache_destroy(uhci_up_cachep))
-		printk(KERN_WARN "uhci: not all urb_priv's were freed!\n");
+		warn("not all urb_priv's were freed!");
 
 up_failed:
 
@@ -2613,7 +2613,7 @@ static void __exit uhci_hcd_cleanup(void)
 	pci_unregister_driver(&uhci_pci_driver);
 	
 	if (kmem_cache_destroy(uhci_up_cachep))
-		printk(KERN_WARN "uhci: not all urb_priv's were freed!\n");
+		warn("not all urb_priv's were freed!");
 
 #ifdef CONFIG_PROC_FS
 	remove_proc_entry("driver/uhci", 0);
