@@ -21,12 +21,13 @@
 
 static struct Scsi_Host *mvme147_host = NULL;
 
-static void mvme147_intr (int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t mvme147_intr (int irq, void *dummy, struct pt_regs *fp)
 {
     if (irq == MVME147_IRQ_SCSI_PORT)
 	wd33c93_intr (mvme147_host);
     else
 	m147_pcc->dma_intr = 0x89;	/* Ack and enable ints */
+    return IRQ_HANDLED;
 }
 
 static int dma_setup (Scsi_Cmnd *cmd, int dir_in)

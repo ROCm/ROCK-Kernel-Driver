@@ -1267,10 +1267,10 @@ static void NCR5380_dma_complete( struct Scsi_Host *instance )
  *
  */
 
-static void NCR5380_intr (int irq, void *dev_id, struct pt_regs *regs)
+static irqreturn_t NCR5380_intr (int irq, void *dev_id, struct pt_regs *regs)
 {
     struct Scsi_Host *instance = first_instance;
-    int done = 1;
+    int done = 1, handled = 0;
     unsigned char basr;
 
     INT_PRINTK("scsi%d: NCR5380 irq triggered\n", HOSTNO);
@@ -1329,6 +1329,7 @@ static void NCR5380_intr (int irq, void *dev_id, struct pt_regs *regs)
 		(void) NCR5380_read(RESET_PARITY_INTERRUPT_REG);
 	    }
 	} /* if !(SELECTION || PARITY) */
+	handled = 1;
     } /* BASR & IRQ */
     else {
 	printk(KERN_NOTICE "scsi%d: interrupt without IRQ bit set in BASR, "
@@ -1342,6 +1343,7 @@ static void NCR5380_intr (int irq, void *dev_id, struct pt_regs *regs)
 	/* Put a call to NCR5380_main() on the queue... */
 	queue_main();
     }
+    return IRQ_RETVAL(handled);
 }
 
 #ifdef NCR5380_STATS

@@ -28,11 +28,12 @@
 static struct Scsi_Host *first_instance = NULL;
 static Scsi_Host_Template *gvp11_template;
 
-static void gvp11_intr (int irq, void *dummy, struct pt_regs *fp)
+static irqreturn_t gvp11_intr (int irq, void *dummy, struct pt_regs *fp)
 {
     unsigned long flags;
     unsigned int status;
     struct Scsi_Host *instance;
+    int handled = 0;
 
     for (instance = first_instance; instance &&
 	 instance->hostt == gvp11_template; instance = instance->next)
@@ -44,7 +45,9 @@ static void gvp11_intr (int irq, void *dummy, struct pt_regs *fp)
 	spin_lock_irqsave(&instance->host_lock, flags);
 	wd33c93_intr (instance);
 	spin_unlock_irqrestore(&instance->host_lock, flags);
+	handled = 1;
     }
+    return IRQ_RETVAL(handled);
 }
 
 static int gvp11_xfer_mask = 0;
