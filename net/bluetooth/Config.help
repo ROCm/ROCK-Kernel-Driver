@@ -10,7 +10,9 @@ CONFIG_BLUEZ
                BlueZ Core (HCI device and connection manager, scheduler)
                HCI Device drivers (interface to the hardware)
                L2CAP Module (L2CAP protocol)
+               RFCOMM Module (RFCOMM protocol)
                SCO Module (SCO links)
+               BNEP Module (BNEP protocol)
 
   Say Y here to enable Linux Bluetooth support and to build BlueZ Core
   layer.
@@ -30,6 +32,19 @@ CONFIG_BLUEZ_L2CAP
 
   Say Y here to compile L2CAP support into the kernel or say M to
   compile it as module (l2cap.o).
+
+RFCOMM protocol support
+CONFIG_BLUEZ_RFCOMM
+  RFCOMM provides connection oriented stream transport. RFCOMM
+  support is required for Dialup Networking, OBEX and other Bluetooth
+  applications.
+
+  Say Y here to compile RFCOMM support into the kernel or say M to
+  compile it as module (rfcomm.o).
+
+RFCOMM TTY emulation support
+CONFIG_RFCOMM_TTY
+  This options enables TTY emulation support for RFCOMM channels.
 
 SCO links support
 CONFIG_BLUEZ_SCO

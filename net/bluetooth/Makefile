@@ -14,6 +14,12 @@ ifeq ($(CONFIG_BLUEZ_BNEP),y)
 obj-y += bnep/bnep.o
 endif
 
+subdir-$(CONFIG_BLUEZ_RFCOMM) += rfcomm
+
+ifeq ($(CONFIG_BLUEZ_RFCOMM),y)
+obj-y += rfcomm/rfcomm.o
+endif
+
 bluez-objs	:= af_bluetooth.o hci_core.o hci_conn.o hci_event.o hci_sock.o lib.o syms.o
 
 include $(TOPDIR)/Rules.make
