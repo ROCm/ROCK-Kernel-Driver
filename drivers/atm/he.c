@@ -128,7 +128,7 @@ typedef void irqreturn_t;
 
 #include <linux/atm_he.h>
 
-#define hprintk(fmt,args...)	printk(KERN_ERR DEV_LABEL "%d: " fmt, he_dev->number, ##args)
+#define hprintk(fmt,args...)	printk(KERN_ERR DEV_LABEL "%d: " fmt, he_dev->number , ##args)
 
 #undef DEBUG
 #ifdef DEBUG
