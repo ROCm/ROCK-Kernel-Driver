@@ -119,9 +119,10 @@ you can't use it from the bus master.
 So why do we care about the physical address at all? We do need the physical
 address in some cases, it's just not very often in normal code.  The physical
 address is needed if you use memory mappings, for example, because the
-"remap_page_range()" mm function wants the physical address of the memory to
-be remapped (the memory management layer doesn't know about devices outside
-the CPU, so it shouldn't need to know about "bus addresses" etc). 
+"remap_pfn_range()" mm function wants the physical address of the memory to
+be remapped as measured in units of pages, a.k.a. the pfn (the memory
+management layer doesn't know about devices outside the CPU, so it
+shouldn't need to know about "bus addresses" etc).
 
 NOTE NOTE NOTE! The above is only one part of the whole equation. The above
 only talks about "real memory", that is, CPU memory (RAM). 
