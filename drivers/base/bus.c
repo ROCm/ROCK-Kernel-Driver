@@ -10,7 +10,8 @@
 #include <linux/device.h>
 #include <linux/module.h>
 #include <linux/errno.h>
-
+#include <linux/stat.h>
+#include "base.h"
 
 static LIST_HEAD(bus_driver_list);
 
@@ -103,10 +104,6 @@ void put_bus(struct bus_type * bus)
 	driverfs_remove_dir(&bus->driver_dir);
 	driverfs_remove_dir(&bus->device_dir);
 	driverfs_remove_dir(&bus->dir);
-
-	/* tell the driver it can go away now */
-	if (bus->release)
-		bus->release();
 }
 
 static int __init bus_init(void)
@@ -117,7 +114,6 @@ static int __init bus_init(void)
 
 subsys_initcall(bus_init);
 
-EXPORT_SYMBOL(bus_for_each_dev);
 EXPORT_SYMBOL(bus_add_device);
 EXPORT_SYMBOL(bus_remove_device);
 EXPORT_SYMBOL(bus_register);

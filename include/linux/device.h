@@ -63,6 +63,11 @@ struct bus_type {
 
 	list_t			node;
 	list_t			devices;
+	list_t			drivers;
+
+	struct driver_dir_entry	dir;
+	struct driver_dir_entry	device_dir;
+	struct driver_dir_entry	driver_dir;
 };
 
 
@@ -102,6 +107,7 @@ struct device {
 	atomic_t	refcount;	/* refcount to make sure the device
 					 * persists for the right amount of time */
 
+	struct bus_type	* bus;		/* type of bus device is on */
 	struct driver_dir_entry	dir;
 
 	struct device_driver *driver;	/* which driver has allocated this

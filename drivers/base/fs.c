@@ -68,6 +68,13 @@ void device_remove_dir(struct device * dev)
 		driverfs_remove_dir(&dev->dir);
 }
 
+int device_create_dir(struct driver_dir_entry * dir, struct driver_dir_entry * parent)
+{
+	INIT_LIST_HEAD(&dir->files);
+	dir->mode  = (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO);
+	return driverfs_create_dir(dir,parent);
+}
+
 /**
  * device_make_dir - create a driverfs directory
  * @name:	name of directory
@@ -87,23 +94,20 @@ int device_make_dir(struct device * dev)
 	int error;
 	int i;
 
-	INIT_LIST_HEAD(&dev->dir.files);
-	dev->dir.mode = (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO);
-	dev->dir.name = dev->bus_id;
-
 	if (dev->parent)
 		parent = &dev->parent->dir;
+	dev->dir.name = dev->bus_id;
 
-	if ((error = driverfs_create_dir(&dev->dir,parent)))
+	if ((error = device_create_dir(&dev->dir,parent)))
 		return error;
 
 	for (i = 0; (entry = *(device_default_files + i)); i++) {
 		if ((error = device_create_file(dev,entry))) {
 			device_remove_dir(dev);
-			return error;
+			break;
 		}
 	}
-	return 0;
+	return error;
 }
 
 EXPORT_SYMBOL(device_create_file);
