@@ -219,7 +219,7 @@ static ssize_t wait_on_page_writeback_range_wq(struct address_space *mapping,
 	struct pagevec pvec;
 	int nr_pages;
 	int ret = 0, done = 0;
-	pgoff_t index, curr = start;
+	pgoff_t index;
 
 	if (end < start)
 		return 0;
@@ -243,12 +243,9 @@ static ssize_t wait_on_page_writeback_range_wq(struct address_space *mapping,
 				spin_unlock_irq(&mapping->tree_lock);
 				continue;
 			}
-			curr = page->index;
 			spin_unlock_irq(&mapping->tree_lock);
 			ret = wait_on_page_writeback_wq(page, wait);
 			if (ret == -EIOCBRETRY) {
-				if (curr > end)
-printk(KERN_CRIT "retry with cur %ld ned %ld\n", curr, end);
 				done = 1;
 				break;
 			}
