@@ -61,8 +61,6 @@ obj-$(CONFIG_SANDPOINT)		+= i8259.o open_pic.o mpc10x_common.o \
 					pci_auto.o indirect_pci.o todc_time.o
 obj-$(CONFIG_SPRUCE)		+= cpc700_pic.o indirect_pci.o pci_auto.o \
 				   todc_time.o
-obj-$(CONFIG_ZX4500)		+= indirect_pci.o pci_auto.o mpc10x_common.o \
-					i8259.o open_pic.o
 obj-$(CONFIG_8260)		+= m8260_setup.o ppc8260_pic.o
 obj-$(CONFIG_BOOTX_TEXT)	+= btext.o
 

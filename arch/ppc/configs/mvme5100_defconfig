@@ -67,7 +67,6 @@ CONFIG_MVME5100=y
 # CONFIG_K2 is not set
 # CONFIG_PAL4 is not set
 # CONFIG_GEMINI is not set
-# CONFIG_ZX4500 is not set
 # CONFIG_MVME5100_IPMC761_PRESENT is not set
 # CONFIG_SMP is not set
 # CONFIG_PREEMPT is not set

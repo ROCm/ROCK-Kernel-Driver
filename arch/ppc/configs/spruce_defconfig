@@ -67,7 +67,6 @@ CONFIG_SPRUCE=y
 # CONFIG_K2 is not set
 # CONFIG_PAL4 is not set
 # CONFIG_GEMINI is not set
-# CONFIG_ZX4500 is not set
 # CONFIG_SPRUCE_BAUD_33M is not set
 # CONFIG_SMP is not set
 # CONFIG_PREEMPT is not set

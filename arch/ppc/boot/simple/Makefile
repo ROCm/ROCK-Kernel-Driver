@@ -101,12 +101,6 @@ ENTRYPOINT			:= 0x00800000
 MISC				:= misc-spruce.o
 TFTPIMAGE			:= /tftpboot/zImage.$(END)
 endif
-ifeq ($(CONFIG_ZX4500),y)
-ZIMAGE				:= zImage-STRIPELF
-ZIMAGEINITRD			:= zImage.initrd-STRIPELF
-END				:= zx4500
-TFTPIMAGE			:= /tftpboot/zImage.$(END)
-endif
 ifeq ($(CONFIG_SMP),y)
 TFTPIMAGE			+= .smp
 endif

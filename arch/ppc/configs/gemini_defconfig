@@ -67,7 +67,6 @@ CONFIG_PPC_STD_MMU=y
 # CONFIG_K2 is not set
 # CONFIG_PAL4 is not set
 CONFIG_GEMINI=y
-# CONFIG_ZX4500 is not set
 # CONFIG_SMP is not set
 # CONFIG_PREEMPT is not set
 CONFIG_ALTIVEC=y
