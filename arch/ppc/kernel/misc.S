@@ -188,8 +188,10 @@ _GLOBAL(do_cpu_ftr_fixups)
  * call_setup_cpu - call the setup_cpu function for this cpu
  * r3 = data offset, r24 = cpu number
  *
- * Don't change register layout, the setup function may rely
- * on r5 containing a relocated pointer to the current cpu spec.
+ * Setup function is called with:
+ *   r3 = data offset
+ *   r4 = CPU number
+ *   r5 = ptr to CPU spec (relocated)
  */
 _GLOBAL(call_setup_cpu)
 	addis	r5,r3,cur_cpu_spec@ha
@@ -200,7 +202,7 @@ _GLOBAL(call_setup_cpu)
 	lwz	r6,CPU_SPEC_SETUP(r5)
 	add	r6,r6,r3
 	mtctr	r6
-	mr	r3,r24
+	mr	r4,r24
 	bctr
 
 #ifndef CONFIG_PPC_ISERIES	/* iSeries version is in iSeries_misc.S */

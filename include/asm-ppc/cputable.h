@@ -29,6 +29,10 @@
 /* This structure can grow, it's real size is used by head.S code
  * via the mkdefs mecanism.
  */
+struct cpu_spec;
+
+typedef	void (*cpu_setup_t)(unsigned long offset, int cpu_nr, struct cpu_spec* spec);
+
 struct cpu_spec {
 	/* CPU is matched via (PVR & pvr_mask) == pvr_value */
 	unsigned int	pvr_mask;
@@ -45,7 +49,7 @@ struct cpu_spec {
 	/* this is called to initialize various CPU bits like L1 cache,
 	 * BHT, SPD, etc... from head.S before branching to identify_machine
 	 */
-	void		(*cpu_setup)(int cpu_nr);
+	cpu_setup_t	cpu_setup;
 };
 
 extern struct cpu_spec		cpu_specs[];
@@ -66,6 +70,9 @@ extern struct cpu_spec		*cur_cpu_spec[];
 #define CPU_FTR_HPTE_TABLE		0x00000200
 #define CPU_FTR_CAN_NAP			0x00000400
 #define CPU_FTR_L3CR			0x00000800
+#define CPU_FTR_L3_DISABLE_NAP		0x00001000
+#define CPU_FTR_NAP_DISABLE_L2_PR	0x00002000
+#define CPU_FTR_DUAL_PLL_750FX		0x00004000
 #define CPU_FTR_NO_DPM			0x00008000
 
 #ifdef __ASSEMBLY__

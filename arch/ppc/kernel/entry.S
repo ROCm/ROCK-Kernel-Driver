@@ -67,7 +67,21 @@ transfer_to_handler:
 	addi	r11,r1,STACK_FRAME_OVERHEAD
 	stw	r11,PT_REGS(r12)
 	b	3f
-2:	/* if from kernel, check for stack overflow */
+2:	/* if from kernel, check interrupted DOZE/NAP mode and
+         * check for stack overflow
+         */
+#ifdef CONFIG_6xx
+	mfspr	r11,SPRN_HID0
+	mtcr	r11
+BEGIN_FTR_SECTION
+	bt-	8,power_save_6xx_restore	/* Check DOZE */
+END_FTR_SECTION_IFSET(CPU_FTR_CAN_DOZE)
+BEGIN_FTR_SECTION
+	bt-	9,power_save_6xx_restore	/* Check NAP */
+END_FTR_SECTION_IFSET(CPU_FTR_CAN_NAP)
+#endif /* CONFIG_6xx */
+	.globl transfer_to_handler_cont
+transfer_to_handler_cont:
 	lwz	r11,THREAD_INFO-THREAD(r12)
 	cmplw	r1,r11			/* if r1 <= current->thread_info */
 	ble-	stack_ovf		/* then the kernel stack overflowed */

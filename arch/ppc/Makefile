@@ -43,6 +43,9 @@ head-$(CONFIG_4xx)		:= head_4xx.o
 head-$(CONFIG_440)		:= head_44x.o
 
 HEAD := arch/ppc/kernel/$(head-y)
+ifdef CONFIG_6xx
+  HEAD += arch/ppc/kernel/idle_6xx.o
+endif
 
 core-y				+= arch/ppc/kernel/ arch/ppc/platforms/ \
 				   arch/ppc/mm/ arch/ppc/lib/ arch/ppc/syslib/
