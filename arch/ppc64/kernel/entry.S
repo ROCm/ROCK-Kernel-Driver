@@ -574,25 +574,22 @@ do_work:
 	crandc	eq,cr1*4+eq,eq
 	bne	restore
 	/* here we are preempting the current task */
-1:	lis	r0,PREEMPT_ACTIVE@h
-	stw	r0,TI_PREEMPT(r9)
+1:
 #ifdef CONFIG_PPC_ISERIES
 	li	r0,1
 	stb	r0,PACAPROCENABLED(r13)
 #endif
 	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1		/* reenable interrupts */
-	bl	.schedule
+	bl	.preempt_schedule
 	mfmsr	r10
 	clrrdi	r9,r1,THREAD_SHIFT
 	rldicl	r10,r10,48,1	/* disable interrupts again */
-	li	r0,0
 	rotldi	r10,r10,16
 	mtmsrd	r10,1
 	ld	r4,TI_FLAGS(r9)
 	andi.	r0,r4,_TIF_NEED_RESCHED
 	bne	1b
-	stw	r0,TI_PREEMPT(r9)
 	b	restore
 
 user_work:
