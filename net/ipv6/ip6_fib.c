@@ -1179,14 +1179,14 @@ static int fib6_age(struct rt6_info *rt, void *arg)
 	 */
 
 	if (rt->rt6i_flags&RTF_EXPIRES && rt->rt6i_expires) {
-		if ((long)(now - rt->rt6i_expires) > 0) {
+		if (time_after(now, rt->rt6i_expires)) {
 			RT6_TRACE("expiring %p\n", rt);
 			return -1;
 		}
 		gc_args.more++;
 	} else if (rt->rt6i_flags & RTF_CACHE) {
 		if (atomic_read(&rt->u.dst.__refcnt) == 0 &&
-		    (long)(now - rt->u.dst.lastuse) >= gc_args.timeout) {
+		    time_after_eq(now, rt->u.dst.lastuse + gc_args.timeout)) {
 			RT6_TRACE("aging clone %p\n", rt);
 			return -1;
 		}

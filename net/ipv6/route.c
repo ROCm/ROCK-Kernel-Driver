@@ -565,7 +565,7 @@ static int ip6_dst_gc()
 	static unsigned long last_gc;
 	unsigned long now = jiffies;
 
-	if ((long)(now - last_gc) < ip6_rt_gc_min_interval &&
+	if (time_after(last_gc + ip6_rt_gc_min_interval, now) &&
 	    atomic_read(&ip6_dst_ops.entries) <= ip6_rt_max_size)
 		goto out;
 
