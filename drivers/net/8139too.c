@@ -110,6 +110,7 @@
 #include <linux/mii.h>
 #include <linux/completion.h>
 #include <linux/crc32.h>
+#include <linux/suspend.h>
 #include <asm/io.h>
 #include <asm/uaccess.h>
 
@@ -1597,6 +1598,9 @@ static int rtl8139_thread (void *data)
 		timeout = next_tick;
 		do {
 			timeout = interruptible_sleep_on_timeout (&tp->thr_wait, timeout);
+			/* make swsusp happy with our thread */
+			if (current->flags & PF_FREEZE)
+				refrigerator(PF_IOTHREAD);
 		} while (!signal_pending (current) && (timeout > 0));
 
 		if (signal_pending (current)) {

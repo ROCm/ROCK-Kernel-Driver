@@ -60,9 +60,10 @@ config COSA
 #
 # COMX drivers
 #
+# Not updated to 2.6.
 config COMX
 	tristate "MultiGate (COMX) synchronous serial boards support"
-	depends on WAN && (ISA || PCI)
+	depends on WAN && (ISA || PCI) && OBSOLETE
 	---help---
 	  Say Y if you want to use any board from the MultiGate (COMX) family.
 	  These boards are synchronous serial adapters for the PC,
