@@ -137,9 +137,9 @@ typedef struct journal_s	journal_t;	/* Journal control structure */
  */
 typedef struct journal_header_s
 {
-	__u32		h_magic;
-	__u32		h_blocktype;
-	__u32		h_sequence;
+	__be32		h_magic;
+	__be32		h_blocktype;
+	__be32		h_sequence;
 } journal_header_t;
 
 
@@ -148,8 +148,8 @@ typedef struct journal_header_s
  */
 typedef struct journal_block_tag_s
 {
-	__u32		t_blocknr;	/* The on-disk block number */
-	__u32		t_flags;	/* See below */
+	__be32		t_blocknr;	/* The on-disk block number */
+	__be32		t_flags;	/* See below */
 } journal_block_tag_t;
 
 /* 
@@ -159,7 +159,7 @@ typedef struct journal_block_tag_s
 typedef struct journal_revoke_header_s
 {
 	journal_header_t r_header;
-	int		 r_count;	/* Count of bytes used in the block */
+	__be32		 r_count;	/* Count of bytes used in the block */
 } journal_revoke_header_t;
 
 
@@ -180,35 +180,35 @@ typedef struct journal_superblock_s
 
 /* 0x000C */
 	/* Static information describing the journal */
-	__u32	s_blocksize;		/* journal device blocksize */
-	__u32	s_maxlen;		/* total blocks in journal file */
-	__u32	s_first;		/* first block of log information */
+	__be32	s_blocksize;		/* journal device blocksize */
+	__be32	s_maxlen;		/* total blocks in journal file */
+	__be32	s_first;		/* first block of log information */
 
 /* 0x0018 */
 	/* Dynamic information describing the current state of the log */
-	__u32	s_sequence;		/* first commit ID expected in log */
-	__u32	s_start;		/* blocknr of start of log */
+	__be32	s_sequence;		/* first commit ID expected in log */
+	__be32	s_start;		/* blocknr of start of log */
 
 /* 0x0020 */
 	/* Error value, as set by journal_abort(). */
-	__s32	s_errno;
+	__be32	s_errno;
 
 /* 0x0024 */
 	/* Remaining fields are only valid in a version-2 superblock */
-	__u32	s_feature_compat; 	/* compatible feature set */
-	__u32	s_feature_incompat; 	/* incompatible feature set */
-	__u32	s_feature_ro_compat; 	/* readonly-compatible feature set */
+	__be32	s_feature_compat; 	/* compatible feature set */
+	__be32	s_feature_incompat; 	/* incompatible feature set */
+	__be32	s_feature_ro_compat; 	/* readonly-compatible feature set */
 /* 0x0030 */
 	__u8	s_uuid[16];		/* 128-bit uuid for journal */
 
 /* 0x0040 */
-	__u32	s_nr_users;		/* Nr of filesystems sharing log */
+	__be32	s_nr_users;		/* Nr of filesystems sharing log */
 
-	__u32	s_dynsuper;		/* Blocknr of dynamic superblock copy*/
+	__be32	s_dynsuper;		/* Blocknr of dynamic superblock copy*/
 
 /* 0x0048 */
-	__u32	s_max_transaction;	/* Limit of journal blocks per trans.*/
-	__u32	s_max_trans_data;	/* Limit of data blocks per trans. */
+	__be32	s_max_transaction;	/* Limit of journal blocks per trans.*/
+	__be32	s_max_trans_data;	/* Limit of data blocks per trans. */
 
 /* 0x0050 */
 	__u32	s_padding[44];
