@@ -69,7 +69,9 @@ void generic_set_mtrr(unsigned int reg, unsigned long base,
 {
 	u32 cr0, cr4 = 0;
 	u32 deftype_lo, deftype_hi;
+	static spinlock_t set_atomicity_lock = SPIN_LOCK_UNLOCKED;
 
+	spin_lock(&set_atomicity_lock);
 	/*  Save value of CR4 and clear Page Global Enable (bit 7)  */
 	if ( cpu_has_pge ) {
 		cr4 = read_cr4();
@@ -112,6 +114,7 @@ void generic_set_mtrr(unsigned int reg, unsigned long base,
 	/*  Restore value of CR4  */
 	if ( cpu_has_pge )
 		write_cr4(cr4);
+	spin_unlock(&set_atomicity_lock);
 }
 
 int generic_validate_add_page(unsigned long base, unsigned long size, unsigned int type)
