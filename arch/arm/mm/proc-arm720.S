@@ -115,16 +115,6 @@ ENTRY(cpu_arm720_set_pgd)
 		mov	pc, lr
 
 /*
- * Function: arm720_flush_pmd(pmdp)
- *
- * Params  : r0 = Address to set
- *
- * Purpose : Set a PMD and flush it out of any WB cache
- */
-ENTRY(cpu_arm720_flush_pmd)
-		mov	pc, lr
-
-/*
  * Function: arm720_set_pte(pte_t *ptep, pte_t pte)
  * Params  : r0 = Address to set
  *	   : r1 = value to set
@@ -216,7 +206,6 @@ ENTRY(arm720_processor_functions)
 
 		/* pgtable */
 		.word	cpu_arm720_set_pgd
-		.word	cpu_arm720_flush_pmd
 		.word	cpu_arm720_set_pte
 
 		.size	arm720_processor_functions, . - arm720_processor_functions

@@ -247,7 +247,7 @@ alloc_init_page(unsigned long virt, unsigned long phys, unsigned int prot_l1, pg
 		pmdval = __pa(ptep) | prot_l1;
 		pmdp[0] = __pmd(pmdval);
 		pmdp[1] = __pmd(pmdval + 256 * sizeof(pte_t));
-		cpu_flush_pmd(pmdp);
+		flush_pmd_entry(pmdp);
 	}
 	ptep = pte_offset_kernel(pmdp, virt);
 

@@ -365,23 +365,6 @@ ENTRY(cpu_arm1020_set_pgd)
 	mov	pc, lr
         
 /*
- * cpu_arm1020_flush_pmd(pmdp)
- *
- * Set a level 1 translation table entry, and clean it out of
- * any caches such that the MMUs can load it correctly.
- *
- * pmdp: pointer to PMD entry
- */
-	.align	5
-ENTRY(cpu_arm1020_flush_pmd)
-#ifndef CONFIG_CPU_DCACHE_DISABLE
-	mcr	p15, 0, r0, c7, c10, 4
-	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry  (drain is done by TLB fns)
-#endif
-	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-	mov	pc, lr
-
-/*
  * cpu_arm1020_set_pte(ptep, pte)
  *
  * Set a PTE and flush it out
@@ -511,7 +494,6 @@ arm1020_processor_functions:
 
 	/* pgtable */
 	.word	cpu_arm1020_set_pgd
-	.word	cpu_arm1020_flush_pmd
 	.word	cpu_arm1020_set_pte
 
 	.size	arm1020_processor_functions, . - arm1020_processor_functions

@@ -94,10 +94,6 @@ extern struct processor {
 		 */
 		void (*set_pgd)(unsigned long pgd_phys, struct mm_struct *mm);
 		/*
-		 * Set a PMD (handling IMP bit 4)
-		 */
-		void (*flush_pmd)(pmd_t *pmdp);
-		/*
 		 * Set a PTE
 		 */
 		void (*set_pte)(pte_t *ptep, pte_t pte);
@@ -126,7 +122,6 @@ extern const struct processor sa110_processor_functions;
 #define cpu_icache_invalidate_page(vp)		processor.icache.invalidate_page(vp)
 
 #define cpu_set_pgd(pgd,mm)			processor.pgtable.set_pgd(pgd,mm)
-#define cpu_flush_pmd(pmdp)			processor.pgtable.flush_pmd(pmdp)
 #define cpu_set_pte(ptep, pte)			processor.pgtable.set_pte(ptep, pte)
 
 #define cpu_switch_mm(pgd,mm)			cpu_set_pgd(__virt_to_phys((unsigned long)(pgd)),mm)

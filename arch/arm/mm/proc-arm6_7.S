@@ -234,17 +234,6 @@ ENTRY(cpu_arm7_set_pgd)
 		mov	pc, lr
 
 /*
- * Function: arm6_flush_pmd(pmdp)
- *
- * Params  : r0 = Address to set
- *
- * Purpose : Set a PMD and flush it out of any WB cache
- */
-ENTRY(cpu_arm6_flush_pmd)
-ENTRY(cpu_arm7_flush_pmd)
-		mov	pc, lr
-
-/*
  * Function: arm6_7_set_pte(pte_t *ptep, pte_t pte)
  * Params  : r0 = Address to set
  *	   : r1 = value to set
@@ -346,7 +335,6 @@ ENTRY(arm6_processor_functions)
 
 		/* pgtable */
 		.word	cpu_arm6_set_pgd
-		.word	cpu_arm6_flush_pmd
 		.word	cpu_arm6_set_pte
 
 		.size	arm6_processor_functions, . - arm6_processor_functions
@@ -380,7 +368,6 @@ ENTRY(arm7_processor_functions)
 
 		/* pgtable */
 		.word	cpu_arm7_set_pgd
-		.word	cpu_arm7_flush_pmd
 		.word	cpu_arm7_set_pte
 
 		.size	arm7_processor_functions, . - arm7_processor_functions

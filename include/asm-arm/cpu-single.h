@@ -36,7 +36,6 @@
 #define cpu_icache_invalidate_range	__cpu_fn(CPU_NAME,_icache_invalidate_range)
 #define cpu_icache_invalidate_page	__cpu_fn(CPU_NAME,_icache_invalidate_page)
 #define cpu_set_pgd			__cpu_fn(CPU_NAME,_set_pgd)
-#define cpu_flush_pmd			__cpu_fn(CPU_NAME,_flush_pmd)
 #define cpu_set_pte			__cpu_fn(CPU_NAME,_set_pte)
 
 #ifndef __ASSEMBLY__
@@ -65,7 +64,6 @@ extern void cpu_icache_invalidate_range(unsigned long start, unsigned long end);
 extern void cpu_icache_invalidate_page(void *virt_page);
 
 extern void cpu_set_pgd(unsigned long pgd_phys, struct mm_struct *mm);
-extern void cpu_flush_pmd(pmd_t *pmdp);
 extern void cpu_set_pte(pte_t *ptep, pte_t pte);
 
 extern volatile void cpu_reset(unsigned long addr);

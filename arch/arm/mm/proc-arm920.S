@@ -368,20 +368,6 @@ ENTRY(cpu_arm920_set_pgd)
 	mov	pc, lr
 
 /*
- * cpu_arm920_flush_pmd(pmdp)
- *
- * Set a level 1 translation table entry, and clean it out of
- * any caches such that the MMUs can load it correctly.
- *
- * pmdp: pointer to PMD entry
- */
-	.align	5
-ENTRY(cpu_arm920_flush_pmd)
-	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
-	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
-	mov	pc, lr
-
-/*
  * cpu_arm920_set_pte(ptep, pte)
  *
  * Set a PTE and flush it out
@@ -499,7 +485,6 @@ arm920_processor_functions:
 
 	/* pgtable */
 	.word	cpu_arm920_set_pgd
-	.word	cpu_arm920_flush_pmd
 	.word	cpu_arm920_set_pte
 
 	.size	arm920_processor_functions, . - arm920_processor_functions
