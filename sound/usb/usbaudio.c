@@ -23,6 +23,19 @@
  *   You should have received a copy of the GNU General Public License
  *   along with this program; if not, write to the Free Software
  *   Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
+ *
+ *
+ *  NOTES:
+ *
+ *   - async unlink should be used for avoiding the sleep inside lock.
+ *     however, it causes oops by unknown reason on usb-uhci, and
+ *     disabled as default.  the feature is enabled by async_unlink=1
+ *     option (especially when preempt is used).
+ *   - the linked URBs would be preferred but not used so far because of
+ *     the instability of unlinking.
+ *   - type II is not supported properly.  there is no device which supports
+ *     this type *correctly*.  SB extigy looks as if it supports, but it's
+ *     indeed an AC3 stream packed in SPDIF frames (i.e. no real AC3 stream).
  */
 
 
@@ -56,6 +69,7 @@ static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card *
 static int vid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Vendor ID for this card */
 static int pid[SNDRV_CARDS] = { [0 ... (SNDRV_CARDS-1)] = -1 }; /* Product ID for this card */
 static int nrpacks = 4;		/* max. number of packets per urb */
+static int async_unlink = 0;
 
 MODULE_PARM(index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(index, "Index value for the USB audio adapter.");
@@ -75,21 +89,9 @@ MODULE_PARM_SYNTAX(pid, SNDRV_ENABLED ",allows:{{-1,0xffff}},base:16");
 MODULE_PARM(nrpacks, "i");
 MODULE_PARM_DESC(nrpacks, "Max. number of packets per URB.");
 MODULE_PARM_SYNTAX(nrpacks, SNDRV_ENABLED ",allows:{{2,10}}");
-
-
-/*
- * for using ASYNC unlink mode, define the following.
- * this will make the driver quicker response for request to STOP-trigger,
- * but it may cause oops by some unknown reason (bug of usb driver?),
- * so turning off might be sure.
- */
-/* #define SND_USE_ASYNC_UNLINK */
-
-#ifdef SND_USB_ASYNC_UNLINK
-#define UNLINK_FLAGS	URB_ASYNC_UNLINK
-#else
-#define UNLINK_FLAGS	0
-#endif
+MODULE_PARM(async_unlink, "i");
+MODULE_PARM_DESC(async_unlink, "Use async unlink mode.");
+MODULE_PARM_SYNTAX(async_unlink, SNDRV_BOOLEAN_TRUE_DESC);
 
 
 /*
@@ -617,42 +619,51 @@ static void snd_complete_sync_urb(struct urb *urb, struct pt_regs *regs)
  * unlink active urbs.
  * return the number of active urbs.
  */
-static int deactivate_urbs(snd_usb_substream_t *subs, int force)
+static int deactivate_urbs(snd_usb_substream_t *subs, int force, int can_sleep)
 {
 	unsigned int i;
-	int alive;
+	int alive, async;
 
 	subs->running = 0;
 
 	if (!force && subs->stream->chip->shutdown) /* to be sure... */
 		return 0;
 
-#ifndef SND_USB_ASYNC_UNLINK
-	if (in_interrupt())
+	async = !can_sleep && async_unlink;
+
+	if (! async && in_interrupt())
 		return 0;
-#endif
+
 	alive = 0;
 	for (i = 0; i < subs->nurbs; i++) {
 		if (test_bit(i, &subs->active_mask)) {
 			alive++;
-			if (! test_and_set_bit(i, &subs->unlink_mask))
-				usb_unlink_urb(subs->dataurb[i].urb);
+			if (! test_and_set_bit(i, &subs->unlink_mask)) {
+				struct urb *u = subs->dataurb[i].urb;
+				if (async)
+					u->transfer_flags |= URB_ASYNC_UNLINK;
+				else
+					u->transfer_flags &= ~URB_ASYNC_UNLINK;
+				usb_unlink_urb(u);
+			}
 		}
 	}
 	if (subs->syncpipe) {
 		for (i = 0; i < SYNC_URBS; i++) {
 			if (test_bit(i+16, &subs->active_mask)) {
 				alive++;
- 				if (! test_and_set_bit(i+16, &subs->unlink_mask))
-					usb_unlink_urb(subs->syncurb[i].urb);
+ 				if (! test_and_set_bit(i+16, &subs->unlink_mask)) {
+					struct urb *u = subs->syncurb[i].urb;
+					if (async)
+						u->transfer_flags |= URB_ASYNC_UNLINK;
+					else
+						u->transfer_flags &= ~URB_ASYNC_UNLINK;
+					usb_unlink_urb(u);
+				}
 			}
 		}
 	}
-#ifdef SND_USB_ASYNC_UNLINK
-	return alive;
-#else
-	return 0;
-#endif
+	return async ? alive : 0;
 }
 
 
@@ -702,7 +713,7 @@ static int start_urbs(snd_usb_substream_t *subs, snd_pcm_runtime_t *runtime)
 
  __error:
 	// snd_pcm_stop(subs->pcm_substream, SNDRV_PCM_STATE_XRUN);
-	deactivate_urbs(subs, 0);
+	deactivate_urbs(subs, 0, 0);
 	return -EPIPE;
 }
 
@@ -762,7 +773,7 @@ static int snd_usb_pcm_trigger(snd_pcm_substream_t *substream, int cmd)
 		err = start_urbs(subs, substream->runtime);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		err = deactivate_urbs(subs, 0);
+		err = deactivate_urbs(subs, 0, 0);
 		break;
 	default:
 		err = -EINVAL;
@@ -795,7 +806,8 @@ static void release_substream_urbs(snd_usb_substream_t *subs, int force)
 	int i;
 
 	/* stop urbs (to be sure) */
-	if (deactivate_urbs(subs, force) > 0)
+	deactivate_urbs(subs, force, 1);
+	if (async_unlink)
 		wait_clear_urbs(subs);
 
 	for (i = 0; i < MAX_URBS; i++)
@@ -914,7 +926,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 		}
 		u->urb->dev = subs->dev;
 		u->urb->pipe = subs->datapipe;
-		u->urb->transfer_flags = URB_ISO_ASAP | UNLINK_FLAGS;
+		u->urb->transfer_flags = URB_ISO_ASAP;
 		u->urb->number_of_packets = u->packets;
 		u->urb->context = u;
 		u->urb->complete = snd_usb_complete_callback(snd_complete_urb);
@@ -936,7 +948,7 @@ static int init_substream_urbs(snd_usb_substream_t *subs, unsigned int period_by
 			u->urb->transfer_buffer_length = nrpacks * 3;
 			u->urb->dev = subs->dev;
 			u->urb->pipe = subs->syncpipe;
-			u->urb->transfer_flags = URB_ISO_ASAP | UNLINK_FLAGS;
+			u->urb->transfer_flags = URB_ISO_ASAP;
 			u->urb->number_of_packets = u->packets;
 			u->urb->context = u;
 			u->urb->complete = snd_usb_complete_callback(snd_complete_sync_urb);
