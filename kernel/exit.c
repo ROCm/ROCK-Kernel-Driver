@@ -610,8 +610,7 @@ NORET_TYPE void do_exit(long code)
 	if (tsk->pid == 1)
 		panic("Attempted to kill init!");
 	tsk->flags |= PF_EXITING;
-	if (timer_pending(&tsk->real_timer))
-		del_timer_sync(&tsk->real_timer);
+	del_timer_sync(&tsk->real_timer);
 
 	if (unlikely(preempt_count()))
 		printk(KERN_INFO "note: %s[%d] exited with preempt_count %d\n",
