@@ -31,7 +31,7 @@
 #include <linux/cpu.h>
 #include <linux/unistd.h>
 #include <linux/serial.h>
-#include <linux/8250.h>
+#include <linux/serial_8250.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
@@ -901,7 +901,7 @@ static int __init set_preferred_console(void)
 	DBG("Found serial console at ttyS%d\n", offset);
 
 	if (spd) {
-		char opt[16];
+		static char __initdata opt[16];
 		sprintf(opt, "%d", *spd);
 		return add_preferred_console("ttyS", offset, opt);
 	} else
@@ -1123,8 +1123,8 @@ __setup("decr_overclock=", set_decr_overclock );
  */
 
 #define MAX_LEGACY_SERIAL_PORTS	8
-static struct old_serial_port	old_serial_ports[MAX_LEGACY_SERIAL_PORTS];
-static unsigned int		old_serial_count;
+static struct plat_serial8250_port serial_ports[MAX_LEGACY_SERIAL_PORTS+1];
+static unsigned int old_serial_count;
 
 void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
 {
@@ -1202,13 +1202,13 @@ void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
 			if (index >= old_serial_count)
 				old_serial_count = index + 1;
 			/* Check if there is a port who already claimed our slot */
-			if (old_serial_ports[index].port != 0) {
+			if (serial_ports[index].iobase != 0) {
 				/* if we still have some room, move it, else override */
 				if (old_serial_count < MAX_LEGACY_SERIAL_PORTS) {
 					DBG("Moved legacy port %d -> %d\n", index,
 					    old_serial_count);
-					old_serial_ports[old_serial_count++] =
-						old_serial_ports[index];
+					serial_ports[old_serial_count++] =
+						serial_ports[index];
 				} else {
 					DBG("Replacing legacy port %d\n", index);
 				}
@@ -1220,18 +1220,17 @@ void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
 			old_serial_count = index + 1;
 
 		/* Now fill the entry */
-		memset(&old_serial_ports[index], 0, sizeof(struct old_serial_port));
-		old_serial_ports[index].uart = 0;
-		old_serial_ports[index].baud_base = clk ? (*clk / 16) : BASE_BAUD;
-		old_serial_ports[index].port = reg->address;
-		old_serial_ports[index].irq = interrupts ? interrupts[0] : 0;
-		old_serial_ports[index].flags = ASYNC_BOOT_AUTOCONF;
+		memset(&serial_ports[index], 0, sizeof(struct plat_serial8250_port));
+		serial_ports[index].uartclk = clk ? *clk : BASE_BAUD * 16;
+		serial_ports[index].iobase = reg->address;
+		serial_ports[index].irq = interrupts ? interrupts[0] : 0;
+		serial_ports[index].flags = ASYNC_BOOT_AUTOCONF;
 
 		DBG("Added legacy port, index: %d, port: %x, irq: %d, clk: %d\n",
 		    index,
-		    old_serial_ports[index].port,
-		    old_serial_ports[index].irq,
-		    old_serial_ports[index].baud_base * 16);
+		    serial_ports[index].iobase,
+		    serial_ports[index].irq,
+		    serial_ports[index].uartclk);
 
 		/* Get phys address of IO reg for port 1 */
 		if (index != 0)
@@ -1279,19 +1278,21 @@ void __init generic_find_legacy_serial_ports(unsigned int *default_speed)
 	DBG(" <- generic_find_legacy_serial_port()\n");
 }
 
-struct old_serial_port *get_legacy_serial_ports(unsigned int *count)
+static struct platform_device serial_device = {
+	.name	= "serial8250",
+	.id	= 0,
+	.dev	= {
+		.platform_data = serial_ports,
+	},
+};
+
+static int __init serial_dev_init(void)
 {
-	*count = old_serial_count;
-	return old_serial_ports;
+	return platform_device_register(&serial_device);
 }
-#else
-struct old_serial_port *get_legacy_serial_ports(unsigned int *count)
-{
-	*count = 0;
-	return 0;
-}
+arch_initcall(serial_dev_init);
+
 #endif /* CONFIG_PPC_ISERIES */
-EXPORT_SYMBOL(get_legacy_serial_ports);
 
 int check_legacy_ioport(unsigned long base_port)
 {
