@@ -258,7 +258,7 @@ static void change_speed (unsigned int index)
 }
 
 
-int powernow_decode_bios (int maxfid, int startvid)
+static int powernow_decode_bios (int maxfid, int startvid)
 {
 	struct psb_s *psb;
 	struct pst_s *pst;
