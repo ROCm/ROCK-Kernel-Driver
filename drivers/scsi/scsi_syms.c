@@ -82,6 +82,8 @@ EXPORT_SYMBOL(scsi_end_request);
 
 EXPORT_SYMBOL(scsi_register_blocked_host);
 EXPORT_SYMBOL(scsi_deregister_blocked_host);
+EXPORT_SYMBOL(scsi_slave_attach);
+EXPORT_SYMBOL(scsi_slave_detach);
 
 /*
  * This symbol is for the highlevel drivers (e.g. sg) only.

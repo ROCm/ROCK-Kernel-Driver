@@ -2019,26 +2019,24 @@ int scsi_slave_attach(struct scsi_device *sdev)
 		/*
 		 * No one was attached.
 		 */
-		if ((sdev->host->hostt->slave_attach != NULL) &&
-		    (sdev->host->hostt->slave_attach(sdev) != 0)) {
-			printk(KERN_INFO "scsi: failed low level driver"
-			       " attach, some SCSI device might not be"
-			       " configured\n");
-			return 1;
-		}
-		if ((sdev->new_queue_depth == 0) &&
-		    (sdev->host->cmd_per_lun != 0))
-			scsi_adjust_queue_depth(sdev, 0,
-						sdev->host->cmd_per_lun);
 		scsi_build_commandblocks(sdev);
 		if (sdev->current_queue_depth == 0) {
 			printk(KERN_ERR "scsi: Allocation failure during"
 			       " attach, some SCSI devices might not be"
 			       " configured\n");
-			if (sdev->host->hostt->slave_detach != NULL)
-				sdev->host->hostt->slave_detach(sdev);
 			return 1;
 		}
+		if (sdev->host->hostt->slave_attach != NULL) {
+			if (sdev->host->hostt->slave_attach(sdev) != 0) {
+				printk(KERN_INFO "scsi: failed low level driver"
+				       " attach, some SCSI device might not be"
+				       " configured\n");
+				scsi_release_commandblocks(sdev);
+				return 1;
+			}
+		} else if (sdev->host->cmd_per_lun != 0)
+			scsi_adjust_queue_depth(sdev, 0,
+						sdev->host->cmd_per_lun);
 	}
 	return 0;
 }
