@@ -105,11 +105,11 @@ static int init_netconsole(void)
 
 	if(!configured) {
 		printk("netconsole: not configured, aborting\n");
-		return 1;
+		return -EINVAL;
 	}
 
 	if(netpoll_setup(&np))
-		return 1;
+		return -EINVAL;
 
 	register_console(&netconsole);
 	printk(KERN_INFO "netconsole: network logging started\n");
