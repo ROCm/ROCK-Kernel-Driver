@@ -50,13 +50,13 @@ static int x86_64_insert_memory(agp_memory * mem, off_t pg_start, int type)
 
 	/* gatt table should be empty. */
 	while (j < (pg_start + mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge->gatt_table[j]))
+		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[j]))
 			return -EBUSY;
 		j++;
 	}
 
 	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		global_cache_flush();
 		mem->is_flushed = TRUE;
 	}
 
@@ -227,130 +227,78 @@ static struct gatt_mask amd_8151_masks[] =
 	{.mask = 0x00000001, .type = 0}
 };
 
-
-/*
- * Try to configure an AGP v3 capable setup.
- * If we fail (typically because we don't have an AGP v3
- * card in the system) we fall back to the generic AGP v2
- * routines.
- */
-static void agp_x86_64_agp_enable(u32 mode)
-{
-	struct pci_dev *device = NULL;
-	u32 command, scratch; 
-	u8 cap_ptr;
-	u8 v3_devs=0;
-
-	/* FIXME: If 'mode' is x1/x2/x4 should we call the AGPv2 routines directly ?
-	 * Messy, as some AGPv3 cards can only do x4 as a minimum.
-	 */
-
-	/* PASS1: Count # of devs capable of AGPv3 mode. */
-	pci_for_each_dev(device) {
-		cap_ptr = pci_find_capability(device, PCI_CAP_ID_AGP);
-		if (cap_ptr != 0x00) {
-			pci_read_config_dword(device, cap_ptr, &scratch);
-			scratch &= (1<<20|1<<21|1<<22|1<<23);
-			scratch = scratch>>20;
-			/* AGP v3 capable ? */
-			if (scratch>=3) {
-				v3_devs++;
-				printk (KERN_INFO "AGP: Found AGPv3 capable device at %d:%d:%d\n",
-					device->bus->number, PCI_FUNC(device->devfn), PCI_SLOT(device->devfn));
-			} else {
-				printk (KERN_INFO "AGP: Meh. version %x AGP device found.\n", scratch);
-			}
-		}
-	}
-	/* If not enough, go to AGP v2 setup */
-	if (v3_devs<2) {
-		printk (KERN_INFO "AGP: Only %d devices found, not enough, trying AGPv2\n", v3_devs);
-		return agp_generic_enable(mode);
-	} else {
-		printk (KERN_INFO "AGP: Enough AGPv3 devices found, setting up...\n");
-	}
-
-
-	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &command);
-
-	command = agp_collect_device_status(mode, command);
-	command |= 0x100;
-
-	pci_write_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_COMMAND, command);
-
-	agp_device_command(command, 1);
-}
-
-
-static int __init amd_8151_setup (struct pci_dev *pdev)
-{
-	struct pci_dev *dev;
-	int i=0;
-
-	agp_bridge->masks = amd_8151_masks;
-	agp_bridge->aperture_sizes = (void *) amd_8151_sizes;
-	agp_bridge->size_type = U32_APER_SIZE;
-	agp_bridge->num_aperture_sizes = 7;
-	agp_bridge->dev_private_data = NULL;
-	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->configure = amd_8151_configure;
-	agp_bridge->fetch_size = amd_x86_64_fetch_size;
-	agp_bridge->cleanup = amd_8151_cleanup;
-	agp_bridge->tlb_flush = amd_x86_64_tlbflush;
-	agp_bridge->mask_memory = amd_8151_mask_memory;
-	agp_bridge->agp_enable = agp_x86_64_agp_enable;
-	agp_bridge->cache_flush = global_cache_flush;
-	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
-	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
-	agp_bridge->insert_memory = x86_64_insert_memory;
-	agp_bridge->remove_memory = agp_generic_remove_memory;
-	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge->free_by_type = agp_generic_free_by_type;
-	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge->suspend = agp_generic_suspend;
-	agp_bridge->resume = agp_generic_resume;
-	agp_bridge->cant_use_aperture = 0;
-
-
-	/* cache pci_devs of northbridges. */
-	pci_for_each_dev(dev) {
-		if (dev->bus->number==0 && PCI_FUNC(dev->devfn)==3 &&
-			(PCI_SLOT(dev->devfn) >=24) && (PCI_SLOT(dev->devfn) <=31)) {
-
-			hammers[i++] = dev;
-			nr_garts = i;
-			if (i==MAX_HAMMER_GARTS)
-				return 0;
-		}
-	}
-
-	return 0;
-}
+struct agp_bridge_data amd_8151_bridge = {
+	.masks			= amd_8151_masks,
+	.aperture_sizes		= (void *)amd_8151_sizes,
+	.size_type		= U32_APER_SIZE,
+	.num_aperture_sizes	= 7,
+	.configure		= amd_8151_configure,
+	.fetch_size		= amd_x86_64_fetch_size,
+	.cleanup		= amd_8151_cleanup,
+	.tlb_flush		= amd_x86_64_tlbflush,
+	.mask_memory		= amd_8151_mask_memory,
+	.agp_enable		= agp_generic_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= agp_generic_create_gatt_table,
+	.free_gatt_table	= agp_generic_free_gatt_table,
+	.insert_memory		= x86_64_insert_memory,
+	.remove_memory		= agp_generic_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.suspend		= agp_generic_suspend,
+	.resume			= agp_generic_resume,
+};
 
 static struct agp_driver amd_k8_agp_driver = {
 	.owner = THIS_MODULE,
 };
 
-static int __init agp_amdk8_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_amdk8_probe(struct pci_dev *pdev,
+				  const struct pci_device_id *ent)
 {
-	u8 cap_ptr = 0;
+	struct pci_dev *loop_dev;
+	u8 cap_ptr;
+	int i = 0;
 
-	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
-	if (cap_ptr == 0)
+	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
+	if (!cap_ptr)
 		return -ENODEV;
 
-	printk (KERN_INFO PFX "Detected Opteron/Athlon64 on-CPU GART\n");
+	printk(KERN_INFO PFX "Detected Opteron/Athlon64 on-CPU GART\n");
 
-	agp_bridge->dev = dev;
-	agp_bridge->capndx = cap_ptr;
+	amd_8151_bridge.dev = pdev;
+	amd_8151_bridge.capndx = cap_ptr;
 
 	/* Fill in the mode register */
-	pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode);
-	amd_8151_setup(dev);
-	amd_k8_agp_driver.dev = dev;
+	pci_read_config_dword(pdev,
+			amd_8151_bridge.capndx+PCI_AGP_STATUS,
+			&amd_8151_bridge.mode);
+
+	/* cache pci_devs of northbridges. */
+	pci_for_each_dev(loop_dev) {
+		if (loop_dev->bus->number == 0 &&
+		    PCI_FUNC(loop_dev->devfn) == 3 &&
+		    PCI_SLOT(loop_dev->devfn) >=24 &&
+		    PCI_SLOT(loop_dev->devfn) <=31) {
+			hammers[i++] = loop_dev;
+			nr_garts = i;
+			if (i == MAX_HAMMER_GARTS)
+				return 0;
+		}
+	}
+
+	memcpy(agp_bridge, &amd_8151_bridge, sizeof(struct agp_bridge_data));
+
+	amd_k8_agp_driver.dev = pdev;
 	agp_register_driver(&amd_k8_agp_driver);
 	return 0;
+}
+
+static void __exit agp_amdk8_remove(struct pci_dev *pdev)
+{
+	agp_unregister_driver(&amd_k8_agp_driver);
 }
 
 static struct pci_device_id agp_amdk8_pci_table[] __initdata = {
@@ -371,25 +319,17 @@ static struct __initdata pci_driver agp_amdk8_pci_driver = {
 	.name		= "agpgart-amd-k8",
 	.id_table	= agp_amdk8_pci_table,
 	.probe		= agp_amdk8_probe,
+	.remove		= agp_amdk8_remove,
 };
 
 /* Not static due to IOMMU code calling it early. */
 int __init agp_amdk8_init(void)
 {
-	int ret_val;
-
-	ret_val = pci_module_init(&agp_amdk8_pci_driver);
-	if (ret_val)
-		agp_bridge->type = NOT_SUPPORTED;
-
-	agp_bridge->type = AMD_8151;
-
-	return ret_val;
+	return pci_module_init(&agp_amdk8_pci_driver);
 }
 
 static void __exit agp_amdk8_cleanup(void)
 {
-	agp_unregister_driver(&amd_k8_agp_driver);
 	pci_unregister_driver(&agp_amdk8_pci_driver);
 }
 

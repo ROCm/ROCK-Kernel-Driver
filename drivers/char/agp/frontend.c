@@ -586,7 +586,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 	agp_file_private *priv = (agp_file_private *) file->private_data;
 	agp_kern_info kerninfo;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
 
 	if (agp_fe.backend_acquired != TRUE)
 		goto out_eperm;
@@ -619,7 +619,7 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
-		AGP_UNLOCK();
+		up(&(agp_fe.agp_mutex));
 		return 0;
 	}
 
@@ -634,20 +634,20 @@ static int agp_mmap(struct file *file, struct vm_area_struct *vma)
 					    size, vma->vm_page_prot)) {
 			goto out_again;
 		}
-		AGP_UNLOCK();
+		up(&(agp_fe.agp_mutex));
 		return 0;
 	}
 
 out_eperm:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return -EPERM;
 
 out_inval:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return -EINVAL;
 
 out_again:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return -EAGAIN;
 }
 
@@ -655,7 +655,7 @@ static int agp_release(struct inode *inode, struct file *file)
 {
 	agp_file_private *priv = (agp_file_private *) file->private_data;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
 
 	if (test_bit(AGP_FF_IS_CONTROLLER, &priv->access_flags)) {
 		agp_controller *controller;
@@ -675,7 +675,7 @@ static int agp_release(struct inode *inode, struct file *file)
 	}
 	agp_remove_file_private(priv);
 	kfree(priv);
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return 0;
 }
 
@@ -686,7 +686,7 @@ static int agp_open(struct inode *inode, struct file *file)
 	agp_client *client;
 	int rc = -ENXIO;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
 
 	if (minor != AGPGART_MINOR)
 		goto err_out;
@@ -711,13 +711,13 @@ static int agp_open(struct inode *inode, struct file *file)
 	}
 	file->private_data = (void *) priv;
 	agp_insert_file_private(priv);
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return 0;
 
 err_out_nomem:
 	rc = -ENOMEM;
 err_out:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return rc;
 }
 
@@ -965,7 +965,7 @@ static int agp_ioctl(struct inode *inode, struct file *file,
 	agp_file_private *curr_priv = (agp_file_private *) file->private_data;
 	int ret_val = -ENOTTY;
 
-	AGP_LOCK();
+	down(&(agp_fe.agp_mutex));
 
 	if ((agp_fe.current_controller == NULL) &&
 	    (cmd != AGPIOC_ACQUIRE)) {
@@ -1034,7 +1034,7 @@ static int agp_ioctl(struct inode *inode, struct file *file,
 	}
 
 ioctl_out:
-	AGP_UNLOCK();
+	up(&(agp_fe.agp_mutex));
 	return ret_val;
 }
 
@@ -1060,7 +1060,7 @@ static struct miscdevice agp_miscdev =
 int agp_frontend_initialize(void)
 {
 	memset(&agp_fe, 0, sizeof(struct agp_front_data));
-	AGP_LOCK_INIT();
+	sema_init(&(agp_fe.agp_mutex), 1);
 
 	if (misc_register(&agp_miscdev)) {
 		printk(KERN_ERR PFX "unable to get minor: %d\n", AGPGART_MINOR);

@@ -174,99 +174,55 @@ static struct aper_size_info_16 via_generic_agp3_sizes[11] =
 	{ 2048, 524288, 9, 1<<11}	/* 2GB <- Max supported */
 };
 
+struct agp_bridge_data via_generic_agp3_bridge = {
+	.type			= VIA_GENERIC,
+	.masks			= via_generic_masks,
+	.aperture_sizes		= (void *)via_generic_agp3_sizes,
+	.size_type		= U8_APER_SIZE,
+	.num_aperture_sizes	= 10,
+	.configure		= via_configure_agp3,
+	.fetch_size		= via_fetch_size_agp3,
+	.cleanup		= via_cleanup_agp3,
+	.tlb_flush		= via_tlbflush_agp3,
+	.mask_memory		= via_mask_memory,
+	.agp_enable		= agp_generic_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= agp_generic_create_gatt_table,
+	.free_gatt_table	= agp_generic_free_gatt_table,
+	.insert_memory		= agp_generic_insert_memory,
+	.remove_memory		= agp_generic_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.suspend		= agp_generic_suspend,
+	.resume			= agp_generic_resume,
+};
 
-static int __init via_generic_agp3_setup (struct pci_dev *pdev)
-{
-	agp_bridge->dev = pdev;
-	agp_bridge->type = VIA_GENERIC;
-	agp_bridge->masks = via_generic_masks;
-	agp_bridge->aperture_sizes = (void *) via_generic_agp3_sizes;
-	agp_bridge->size_type = U16_APER_SIZE;
-	agp_bridge->num_aperture_sizes = 10;
-	agp_bridge->dev_private_data = NULL;
-	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->agp_enable = agp_generic_enable;
-	agp_bridge->configure = via_configure_agp3;
-	agp_bridge->fetch_size = via_fetch_size_agp3;
-	agp_bridge->cleanup = via_cleanup_agp3;
-	agp_bridge->tlb_flush = via_tlbflush_agp3;
-	agp_bridge->mask_memory = via_mask_memory;
-	agp_bridge->cache_flush = global_cache_flush;
-	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
-	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
-	agp_bridge->insert_memory = agp_generic_insert_memory;
-	agp_bridge->remove_memory = agp_generic_remove_memory;
-	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge->free_by_type = agp_generic_free_by_type;
-	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge->suspend = agp_generic_suspend;
-	agp_bridge->resume = agp_generic_resume;
-	agp_bridge->cant_use_aperture = 0;
-	return 0;
-}
-
-
-static int __init via_generic_setup (struct pci_dev *pdev)
-{
-	/* Garg, there are KT400s with KT266 IDs. */
-	if (pdev->device == PCI_DEVICE_ID_VIA_8367_0) {
-
-		/* Is there a KT400 subsystem ? */
-		if (pdev->subsystem_device==PCI_DEVICE_ID_VIA_8377_0) {
-			u8 reg;
-
-			printk (KERN_INFO PFX "Found KT400 in disguise as a KT266.\n");
-
-			/* Check AGP compatibility mode. */
-			pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
-			if ((reg & (1<<1))==0)
-				return via_generic_agp3_setup(pdev);
-
-			/* Its in 2.0 mode, drop through. */
-		}
-	}
-
-	agp_bridge->masks = via_generic_masks;
-	agp_bridge->aperture_sizes = (void *) via_generic_sizes;
-	agp_bridge->size_type = U8_APER_SIZE;
-	agp_bridge->num_aperture_sizes = 7;
-	agp_bridge->dev_private_data = NULL;
-	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->configure = via_configure;
-	agp_bridge->fetch_size = via_fetch_size;
-	agp_bridge->cleanup = via_cleanup;
-	agp_bridge->tlb_flush = via_tlbflush;
-	agp_bridge->mask_memory = via_mask_memory;
-	agp_bridge->agp_enable = agp_generic_enable;
-	agp_bridge->cache_flush = global_cache_flush;
-	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
-	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
-	agp_bridge->insert_memory = agp_generic_insert_memory;
-	agp_bridge->remove_memory = agp_generic_remove_memory;
-	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge->free_by_type = agp_generic_free_by_type;
-	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge->suspend = agp_generic_suspend;
-	agp_bridge->resume = agp_generic_resume;
-	agp_bridge->cant_use_aperture = 0;
-	return 0;
-}
-
-
-/* The KT400 does magick to put the AGP bridge compliant with the same
- * standards version as the graphics card. */
-static int __init via_kt400_setup(struct pci_dev *pdev)
-{
-	u8 reg;
-	pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
-	/* Check AGP 2.0 compatibility mode. */
-	if ((reg & (1<<1))==0)
-		return via_generic_agp3_setup(pdev);
-	return via_generic_setup(pdev);
-}
-
+struct agp_bridge_data via_generic_bridge = {
+	.type			= VIA_GENERIC,
+	.masks			= via_generic_masks,
+	.aperture_sizes		= (void *)via_generic_sizes,
+	.size_type		= U8_APER_SIZE,
+	.num_aperture_sizes	= 7,
+	.configure		= via_configure,
+	.fetch_size		= via_fetch_size,
+	.cleanup		= via_cleanup,
+	.tlb_flush		= via_tlbflush,
+	.mask_memory		= via_mask_memory,
+	.agp_enable		= agp_generic_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= agp_generic_create_gatt_table,
+	.free_gatt_table	= agp_generic_free_gatt_table,
+	.insert_memory		= agp_generic_insert_memory,
+	.remove_memory		= agp_generic_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.suspend		= agp_generic_suspend,
+	.resume			= agp_generic_resume,
+};
 
 static struct agp_device_ids via_agp_device_ids[] __initdata =
 {
@@ -310,7 +266,7 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 
 	/* VT8361 */
 	{
-		.device_id	= PCI_DEVICE_ID_VIA_8361,	// 0x3112
+		.device_id	= PCI_DEVICE_ID_VIA_8361,
 		.chipset_name	= "Apollo KLE133",
 	},
 
@@ -353,7 +309,6 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_8377_0,
 		.chipset_name	= "Apollo Pro KT400",
-		.chipset_setup	= via_kt400_setup,
 	},
 
 	/* VT8604 / VT8605 / VT8603 / TwisterT
@@ -402,74 +357,88 @@ static struct agp_device_ids via_agp_device_ids[] __initdata =
 	/* P4M400 */
 	{
 		.device_id	= PCI_DEVICE_ID_VIA_P4M400,
-		.chipset_name	= "PM400",
+		.chipset_name	= "P4M400",
 	},
 
 	{ }, /* dummy final entry, always present */
 };
-
-
-/* scan table above for supported devices */
-static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
-{
-	int j=0;
-	struct agp_device_ids *devs;
-	
-	devs = via_agp_device_ids;
-
-	while (devs[j].chipset_name != NULL) {
-		if (pdev->device == devs[j].device_id) {
-			printk (KERN_INFO PFX "Detected VIA %s chipset\n", devs[j].chipset_name);
-			agp_bridge->type = VIA_GENERIC;
-
-			if (devs[j].chipset_setup != NULL)
-				return devs[j].chipset_setup(pdev);
-			else
-				return via_generic_setup(pdev);
-		}
-		j++;
-	}
-
-	/* try init anyway, if user requests it */
-	if (agp_try_unsupported) {
-		printk(KERN_WARNING PFX "Trying generic VIA routines"
-		       " for device id: %04x\n", pdev->device);
-		agp_bridge->type = VIA_GENERIC;
-		return via_generic_setup(pdev);
-	}
-
-	printk(KERN_ERR PFX "Unsupported VIA chipset (device id: %04x),"
-		" you might want to try agp_try_unsupported=1.\n", pdev->device);
-	return -ENODEV;
-}
-
 
 static struct agp_driver via_agp_driver = {
 	.owner = THIS_MODULE,
 };
 
 
-static int __init agp_via_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_via_probe(struct pci_dev *pdev,
+				const struct pci_device_id *ent)
 {
-	u8 cap_ptr = 0;
+	struct agp_device_ids *devs = via_agp_device_ids;
+	struct agp_bridge_data *bridge = &via_generic_bridge;
+	int j = 0;
+	u8 cap_ptr, reg;
 
-	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
-	if (cap_ptr == 0)
+	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
+	if (!cap_ptr)
 		return -ENODEV;
 
 	/* probe for known chipsets */
-	if (agp_lookup_host_bridge (dev) != -ENODEV) {
-		agp_bridge->dev = dev;
-		agp_bridge->capndx = cap_ptr;
-		/* Fill in the mode register */
-		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode);
-		via_agp_driver.dev = dev;
-		agp_register_driver(&via_agp_driver);
-		return 0;
+	for (j = 0; devs[j].chipset_name; j++) {
+		if (pdev->device == devs[j].device_id) {
+			printk (KERN_INFO PFX "Detected VIA %s chipset\n",
+					devs[j].chipset_name);
+			goto found;
+		}
 	}
-	return -ENODEV;	
-}
 
+	if (agp_try_unsupported) {
+		printk(KERN_ERR PFX 
+		    "Unsupported VIA chipset (device id: %04x),"
+		    " you might want to try agp_try_unsupported=1.\n",
+		    pdev->device);
+		return -ENODEV;
+	}
+
+	printk(KERN_WARNING PFX "Trying generic VIA routines"
+	       " for device id: %04x\n", pdev->device);
+
+found:
+	switch (pdev->device) {
+	case PCI_DEVICE_ID_VIA_8367_0:
+		/*
+		 * Garg, there are KT400s with KT266 IDs.
+		 */
+		/* Is there a KT400 subsystem ? */
+		if (pdev->subsystem_device != PCI_DEVICE_ID_VIA_8377_0)
+			break;
+		
+		printk(KERN_INFO PFX "Found KT400 in disguise as a KT266.\n");
+		/*FALLTHROUGH*/
+	case PCI_DEVICE_ID_VIA_8377_0:
+		/*
+		 * The KT400 does magick to put the AGP bridge compliant
+		 * with the same standards version as the graphics card.
+		 */
+		pci_read_config_byte(pdev, VIA_AGPSEL, &reg);
+		/* Check AGP 2.0 compatibility mode. */
+		if ((reg & (1<<1))==0) {
+			bridge = &via_generic_agp3_bridge;
+			break;
+		}
+	}
+
+
+	bridge->dev = pdev;
+	bridge->capndx = cap_ptr;
+
+	/* Fill in the mode register */
+	pci_read_config_dword(pdev,
+			bridge->capndx+PCI_AGP_STATUS, &bridge->mode);
+
+	memcpy(agp_bridge, bridge, sizeof(struct agp_bridge_data));
+
+	via_agp_driver.dev = pdev;
+	agp_register_driver(&via_agp_driver);
+	return 0;
+}
 
 static struct pci_device_id agp_via_pci_table[] __initdata = {
 	{
@@ -495,13 +464,7 @@ static struct __initdata pci_driver agp_via_pci_driver = {
 
 static int __init agp_via_init(void)
 {
-	int ret_val;
-
-	ret_val = pci_module_init(&agp_via_pci_driver);
-	if (ret_val)
-		agp_bridge->type = NOT_SUPPORTED;
-
-	return ret_val;
+	return pci_module_init(&agp_via_pci_driver);
 }
 
 

@@ -1,6 +1,6 @@
 /*
  * AGPGART driver.
- * Copyright (C) 2002 Dave Jones.
+ * Copyright (C) 2002-2003 Dave Jones.
  * Copyright (C) 1999 Jeff Hartmann.
  * Copyright (C) 1999 Precision Insight, Inc.
  * Copyright (C) 1999 Xi Graphics, Inc.
@@ -42,19 +42,19 @@ int agp_memory_reserved;
 
 /* 
  * Generic routines for handling agp_memory structures -
- * They use the basic page allocation routines to do the
- * brunt of the work.
+ * They use the basic page allocation routines to do the brunt of the work.
  */
 
 void agp_free_key(int key)
 {
-
 	if (key < 0)
 		return;
 
 	if (key < MAXKEY)
 		clear_bit(key, agp_bridge->key_list);
 }
+EXPORT_SYMBOL(agp_free_key);
+
 
 static int agp_get_key(void)
 {
@@ -67,6 +67,7 @@ static int agp_get_key(void)
 	}
 	return -1;
 }
+
 
 agp_memory *agp_create_memory(int scratch_pages)
 {
@@ -94,7 +95,16 @@ agp_memory *agp_create_memory(int scratch_pages)
 	new->num_scratch_pages = scratch_pages;
 	return new;
 }
+EXPORT_SYMBOL(agp_create_memory);
 
+/**
+ *	agp_free_memory - free memory associated with an agp_memory pointer.
+ *
+ *	@curr:		agp_memory pointer to be freed.
+ *
+ *	It is the only function that can be called when the backend is not owned
+ *	by the caller.  (So it can free memory on client death.)
+ */
 void agp_free_memory(agp_memory * curr)
 {
 	size_t i;
@@ -118,9 +128,21 @@ void agp_free_memory(agp_memory * curr)
 	vfree(curr->memory);
 	kfree(curr);
 }
+EXPORT_SYMBOL(agp_free_memory);
 
 #define ENTRIES_PER_PAGE		(PAGE_SIZE / sizeof(unsigned long))
 
+/**
+ *	agp_allocate_memory  -  allocate a group of pages of a certain type.
+ *
+ *	@page_count:	size_t argument of the number of pages
+ *	@type:	u32 argument of the type of memory to be allocated.  
+ *
+ *	Every agp bridge device will allow you to allocate AGP_NORMAL_MEMORY which
+ *	maps to physical ram.  Any other type is device dependent.
+ *
+ *	It returns NULL whenever memory is unavailable. 
+ */
 agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 {
 	int scratch_pages;
@@ -160,8 +182,11 @@ agp_memory *agp_allocate_memory(size_t page_count, u32 type)
 
 	return new;
 }
+EXPORT_SYMBOL(agp_allocate_memory);
+
 
 /* End - Generic routines for handling agp_memory structures */
+
 
 static int agp_return_size(void)
 {
@@ -197,6 +222,7 @@ static int agp_return_size(void)
 	return current_size;
 }
 
+
 int agp_num_entries(void)
 {
 	int num_entries;
@@ -230,9 +256,17 @@ int agp_num_entries(void)
 		num_entries = 0;
 	return num_entries;
 }
+EXPORT_SYMBOL_GPL(agp_num_entries);
 
-/* Routine to copy over information structure */
 
+/**
+ *	agp_copy_info  -  copy bridge state information
+ *
+ *	@info:		agp_kern_info pointer.  The caller should insure that this pointer is valid. 
+ *
+ *	This function copies information about the agp bridge device and the state of
+ *	the agp backend into an agp_kern_info pointer.
+ */
 int agp_copy_info(agp_kern_info * info)
 {
 	memset(info, 0, sizeof(agp_kern_info));
@@ -254,8 +288,11 @@ int agp_copy_info(agp_kern_info * info)
 	info->page_mask = ~0UL;
 	return 0;
 }
+EXPORT_SYMBOL(agp_copy_info);
+
 
 /* End - Routine to copy over information structure */
+
 
 /*
  * Routines for handling swapping of agp_memory into the GATT -
@@ -263,6 +300,15 @@ int agp_copy_info(agp_kern_info * info)
  * They call device specific routines to actually write to the GATT.
  */
 
+/**
+ *	agp_bind_memory  -  Bind an agp_memory structure into the GATT.
+ * 
+ *	@curr:		agp_memory pointer
+ *	@pg_start:	an offset into the graphics aperture translation table
+ *
+ *	It returns -EINVAL if the pointer == NULL.
+ *	It returns -EBUSY if the area of the table requested is already in use.
+ */
 int agp_bind_memory(agp_memory * curr, off_t pg_start)
 {
 	int ret_val;
@@ -272,7 +318,7 @@ int agp_bind_memory(agp_memory * curr, off_t pg_start)
 		return -EINVAL;
 	}
 	if (curr->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		agp_bridge->cache_flush();
 		curr->is_flushed = TRUE;
 	}
 	ret_val = agp_bridge->insert_memory(curr, pg_start, curr->type);
@@ -284,7 +330,17 @@ int agp_bind_memory(agp_memory * curr, off_t pg_start)
 	curr->pg_start = pg_start;
 	return 0;
 }
+EXPORT_SYMBOL(agp_bind_memory);
 
+
+/**
+ *	agp_unbind_memory  -  Removes an agp_memory structure from the GATT
+ * 
+ * @curr:	agp_memory pointer to be removed from the GATT.
+ * 
+ * It returns -EINVAL if this piece of agp_memory is not currently bound to
+ * the graphics aperture translation table or if the agp_memory pointer == NULL
+ */
 int agp_unbind_memory(agp_memory * curr)
 {
 	int ret_val;
@@ -304,6 +360,7 @@ int agp_unbind_memory(agp_memory * curr)
 	curr->pg_start = 0;
 	return 0;
 }
+EXPORT_SYMBOL(agp_unbind_memory);
 
 /* End - Routines for handling swapping of agp_memory into the GATT */
 
@@ -328,50 +385,44 @@ u32 agp_collect_device_status(u32 mode, u32 command)
 		pci_read_config_dword(device, agp + PCI_AGP_STATUS, &scratch);
 
 		/* adjust RQ depth */
-		command = ((command & ~0xff000000) |
-		     min_t(u32, (mode & 0xff000000),
-			 min_t(u32, (command & 0xff000000),
-			     (scratch & 0xff000000))));
+		command = ((command & ~AGPSTAT_RQ_DEPTH) |
+		     min_t(u32, (mode & AGPSTAT_RQ_DEPTH),
+			 min_t(u32, (command & AGPSTAT_RQ_DEPTH),
+			     (scratch & AGPSTAT_RQ_DEPTH))));
 
 		/* disable SBA if it's not supported */
-		if (!((command & 0x00000200) &&
-		      (scratch & 0x00000200) &&
-		      (mode & 0x00000200)))
-			command &= ~0x00000200;
+		if (!((command & AGPSTAT_SBA) && (scratch & AGPSTAT_SBA) && (mode & AGPSTAT_SBA)))
+			command &= ~AGPSTAT_SBA;
 
 		/* disable FW if it's not supported */
-		if (!((command & 0x00000010) &&
-		      (scratch & 0x00000010) &&
-		      (mode & 0x00000010)))
-			command &= ~0x00000010;
+		if (!((command & AGPSTAT_FW) && (scratch & AGPSTAT_FW) && (mode & AGPSTAT_FW)))
+			command &= ~AGPSTAT_FW;
 
-		if (!((command & 4) &&
-		      (scratch & 4) &&
-		      (mode & 4)))
-			command &= ~0x00000004;
+		/* Set speed */
+		if (!((command & AGPSTAT2_4X) && (scratch & AGPSTAT2_4X) && (mode & AGPSTAT2_4X)))
+			command &= ~AGPSTAT2_4X;
 
-		if (!((command & 2) &&
-		      (scratch & 2) &&
-		      (mode & 2)))
-			command &= ~0x00000002;
+		if (!((command & AGPSTAT2_2X) && (scratch & AGPSTAT2_2X) && (mode & AGPSTAT2_2X)))
+			command &= ~AGPSTAT2_2X;
 
-		if (!((command & 1) &&
-		      (scratch & 1) &&
-		      (mode & 1)))
-			command &= ~0x00000001;
+		if (!((command & AGPSTAT2_1X) && (scratch & AGPSTAT2_1X) && (mode & AGPSTAT2_1X)))
+			command &= ~AGPSTAT2_1X;
 	}
 
-	if (command & 4)
-		command &= ~3;	/* 4X */
+	/* Now we know what mode it should be, clear out the unwanted bits. */
+	if (command & AGPSTAT2_4X)
+		command &= ~(AGPSTAT2_1X | AGPSTAT2_2X);	/* 4X */
 
-	if (command & 2)
-		command &= ~5;	/* 2X (8X for AGP3.0) */
+	if (command & AGPSTAT2_2X)
+		command &= ~(AGPSTAT2_1X | AGPSTAT2_4X);	/* 2X */
 
-	if (command & 1)
-		command &= ~6;	/* 1X (4X for AGP3.0) */
+	if (command & AGPSTAT2_1X)
+		command &= ~(AGPSTAT2_2X | AGPSTAT2_4X);	/* 1Xf */
 
 	return command;
 }
+EXPORT_SYMBOL(agp_collect_device_status);
+
 
 void agp_device_command(u32 command, int agp_v3)
 {
@@ -392,6 +443,8 @@ void agp_device_command(u32 command, int agp_v3)
 		pci_write_config_dword(device, agp + PCI_AGP_COMMAND, command);
 	}
 }
+EXPORT_SYMBOL(agp_device_command);
+
 
 void agp_generic_enable(u32 mode)
 {
@@ -420,12 +473,14 @@ void agp_generic_enable(u32 mode)
 		      agp_bridge->capndx + PCI_AGP_STATUS, &command);
 
 	command = agp_collect_device_status(mode, command);
-	command |= 0x100;
+	command |= AGPSTAT_AGP_ENABLE;
 
 	pci_write_config_dword(agp_bridge->dev,
 		       agp_bridge->capndx + PCI_AGP_COMMAND, command);
 	agp_device_command(command, 0);
 }
+EXPORT_SYMBOL(agp_generic_enable);
+
 
 int agp_generic_create_gatt_table(void)
 {
@@ -482,17 +537,15 @@ int agp_generic_create_gatt_table(void)
 				i++;
 				switch (agp_bridge->size_type) {
 				case U8_APER_SIZE:
-					agp_bridge->current_size = A_IDX8();
+					agp_bridge->current_size = A_IDX8(agp_bridge);
 					break;
 				case U16_APER_SIZE:
-					agp_bridge->current_size = A_IDX16();
+					agp_bridge->current_size = A_IDX16(agp_bridge);
 					break;
 				case U32_APER_SIZE:
-					agp_bridge->current_size = A_IDX32();
+					agp_bridge->current_size = A_IDX32(agp_bridge);
 					break;
-					/* This case will never really 
-					 * happen. 
-					 */
+					/* This case will never really happen. */
 				case FIXED_APER_SIZE:
 				case LVL2_APER_SIZE:
 				default:
@@ -522,10 +575,11 @@ int agp_generic_create_gatt_table(void)
 
 	agp_bridge->gatt_table_real = (u32 *) table;
 	agp_gatt_table = (void *)table; 
-	CACHE_FLUSH();
+
+	agp_bridge->cache_flush();
 	agp_bridge->gatt_table = ioremap_nocache(virt_to_phys(table),
 					(PAGE_SIZE * (1 << page_order)));
-	CACHE_FLUSH();
+	agp_bridge->cache_flush();
 
 	if (agp_bridge->gatt_table == NULL) {
 		for (page = virt_to_page(table); page <= virt_to_page(table_end); page++)
@@ -543,16 +597,22 @@ int agp_generic_create_gatt_table(void)
 
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_create_gatt_table);
+
 
 int agp_generic_suspend(void)
 {
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_suspend);
+
 
 void agp_generic_resume(void)
 {
 	return;
 }
+EXPORT_SYMBOL(agp_generic_resume);
+
 
 int agp_generic_free_gatt_table(void)
 {
@@ -587,8 +647,7 @@ int agp_generic_free_gatt_table(void)
 
 	/* Do not worry about freeing memory, because if this is
 	 * called, then all agp memory is deallocated and removed
-	 * from the table.
-	 */
+	 * from the table. */
 
 	iounmap(agp_bridge->gatt_table);
 	table = (char *) agp_bridge->gatt_table_real;
@@ -600,6 +659,8 @@ int agp_generic_free_gatt_table(void)
 	free_pages((unsigned long) agp_bridge->gatt_table_real, page_order);
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_free_gatt_table);
+
 
 int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 {
@@ -647,14 +708,14 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	j = pg_start;
 
 	while (j < (pg_start + mem->page_count)) {
-		if (!PGE_EMPTY(agp_bridge->gatt_table[j])) {
+		if (!PGE_EMPTY(agp_bridge, agp_bridge->gatt_table[j])) {
 			return -EBUSY;
 		}
 		j++;
 	}
 
 	if (mem->is_flushed == FALSE) {
-		CACHE_FLUSH();
+		agp_bridge->cache_flush();
 		mem->is_flushed = TRUE;
 	}
 
@@ -665,6 +726,8 @@ int agp_generic_insert_memory(agp_memory * mem, off_t pg_start, int type)
 	agp_bridge->tlb_flush(mem);
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_insert_memory);
+
 
 int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
 {
@@ -684,11 +747,15 @@ int agp_generic_remove_memory(agp_memory * mem, off_t pg_start, int type)
 	agp_bridge->tlb_flush(mem);
 	return 0;
 }
+EXPORT_SYMBOL(agp_generic_remove_memory);
+
 
 agp_memory *agp_generic_alloc_by_type(size_t page_count, int type)
 {
 	return NULL;
 }
+EXPORT_SYMBOL(agp_generic_alloc_by_type);
+
 
 void agp_generic_free_by_type(agp_memory * curr)
 {
@@ -698,13 +765,13 @@ void agp_generic_free_by_type(agp_memory * curr)
 	agp_free_key(curr->key);
 	kfree(curr);
 }
+EXPORT_SYMBOL(agp_generic_free_by_type);
+
 
 /* 
  * Basic Page Allocation Routines -
- * These routines handle page allocation
- * and by default they reserve the allocated 
- * memory.  They also handle incrementing the
- * current_memory_agp value, Which is checked
+ * These routines handle page allocation and by default they reserve the allocated 
+ * memory.  They also handle incrementing the current_memory_agp value, Which is checked
  * against a maximum value.
  */
 
@@ -723,6 +790,8 @@ void *agp_generic_alloc_page(void)
 	atomic_inc(&agp_bridge->current_memory_agp);
 	return page_address(page);
 }
+EXPORT_SYMBOL(agp_generic_alloc_page);
+
 
 void agp_generic_destroy_page(void *addr)
 {
@@ -738,41 +807,39 @@ void agp_generic_destroy_page(void *addr)
 	free_page((unsigned long)addr);
 	atomic_dec(&agp_bridge->current_memory_agp);
 }
+EXPORT_SYMBOL(agp_generic_destroy_page);
 
 /* End Basic Page Allocation Routines */
 
+
+/** 
+ * agp_enable  -  initialise the agp point-to-point connection.
+ * 
+ * @mode:	agp mode register value to configure with.
+ */
 void agp_enable(u32 mode)
 {
 	if (agp_bridge->type == NOT_SUPPORTED)
 		return;
 	agp_bridge->agp_enable(mode);
 }
-
-EXPORT_SYMBOL(agp_free_memory);
-EXPORT_SYMBOL(agp_allocate_memory);
-EXPORT_SYMBOL(agp_copy_info);
-EXPORT_SYMBOL(agp_create_memory);
-EXPORT_SYMBOL(agp_bind_memory);
-EXPORT_SYMBOL(agp_unbind_memory);
-EXPORT_SYMBOL(agp_free_key);
 EXPORT_SYMBOL(agp_enable);
-EXPORT_SYMBOL(agp_bridge);
 
-EXPORT_SYMBOL(agp_generic_alloc_page);
-EXPORT_SYMBOL(agp_generic_destroy_page);
-EXPORT_SYMBOL(agp_generic_suspend);
-EXPORT_SYMBOL(agp_generic_resume);
-EXPORT_SYMBOL(agp_generic_enable);
-EXPORT_SYMBOL(agp_generic_create_gatt_table);
-EXPORT_SYMBOL(agp_generic_free_gatt_table);
-EXPORT_SYMBOL(agp_generic_insert_memory);
-EXPORT_SYMBOL(agp_generic_remove_memory);
-EXPORT_SYMBOL(agp_generic_alloc_by_type);
-EXPORT_SYMBOL(agp_generic_free_by_type);
+#ifdef CONFIG_SMP
+static void ipi_handler(void *null)
+{
+	flush_agp_cache();
+}
+#endif
+
+void global_cache_flush(void)
+{
+#ifdef CONFIG_SMP
+	if (on_each_cpu(ipi_handler, NULL, 1, 1) != 0)
+		panic(PFX "timed out waiting for the other CPUs!\n");
+#else
+	flush_agp_cache();
+#endif
+}
 EXPORT_SYMBOL(global_cache_flush);
-
-EXPORT_SYMBOL(agp_device_command);
-EXPORT_SYMBOL(agp_collect_device_status);
-
-EXPORT_SYMBOL_GPL(agp_num_entries);
 

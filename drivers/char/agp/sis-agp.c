@@ -86,164 +86,136 @@ static struct gatt_mask sis_generic_masks[] =
 	{.mask = 0x00000000, .type = 0}
 };
 
-static int __init sis_generic_setup (struct pci_dev *pdev)
-{
-	agp_bridge->masks = sis_generic_masks;
-	agp_bridge->aperture_sizes = (void *) sis_generic_sizes;
-	agp_bridge->size_type = U8_APER_SIZE;
-	agp_bridge->num_aperture_sizes = 7;
-	agp_bridge->dev_private_data = NULL;
-	agp_bridge->needs_scratch_page = FALSE;
-	agp_bridge->configure = sis_configure;
-	agp_bridge->fetch_size = sis_fetch_size;
-	agp_bridge->cleanup = sis_cleanup;
-	agp_bridge->tlb_flush = sis_tlbflush;
-	agp_bridge->mask_memory = sis_mask_memory;
-	agp_bridge->agp_enable = agp_generic_enable;
-	agp_bridge->cache_flush = global_cache_flush;
-	agp_bridge->create_gatt_table = agp_generic_create_gatt_table;
-	agp_bridge->free_gatt_table = agp_generic_free_gatt_table;
-	agp_bridge->insert_memory = agp_generic_insert_memory;
-	agp_bridge->remove_memory = agp_generic_remove_memory;
-	agp_bridge->alloc_by_type = agp_generic_alloc_by_type;
-	agp_bridge->free_by_type = agp_generic_free_by_type;
-	agp_bridge->agp_alloc_page = agp_generic_alloc_page;
-	agp_bridge->agp_destroy_page = agp_generic_destroy_page;
-	agp_bridge->suspend = agp_generic_suspend;
-	agp_bridge->resume = agp_generic_resume;
-	agp_bridge->cant_use_aperture = 0;
-
-	return 0;
-}
+struct agp_bridge_data sis_generic_bridge = {
+	.type			= SIS_GENERIC,
+	.masks			= sis_generic_masks,
+	.aperture_sizes 	= (void *)sis_generic_sizes,
+	.size_type		= U8_APER_SIZE,
+	.num_aperture_sizes	= 7,
+	.configure		= sis_configure,
+	.fetch_size		= sis_fetch_size,
+	.cleanup		= sis_cleanup,
+	.tlb_flush		= sis_tlbflush,
+	.mask_memory		= sis_mask_memory,
+	.agp_enable		= agp_generic_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= agp_generic_create_gatt_table,
+	.free_gatt_table	= agp_generic_free_gatt_table,
+	.insert_memory		= agp_generic_insert_memory,
+	.remove_memory		= agp_generic_remove_memory,
+	.alloc_by_type		= agp_generic_alloc_by_type,
+	.free_by_type		= agp_generic_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.suspend		= agp_generic_suspend,
+	.resume			= agp_generic_resume,
+};
 
 struct agp_device_ids sis_agp_device_ids[] __initdata =
 {
 	{
 		.device_id	= PCI_DEVICE_ID_SI_740,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "740",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_650,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "650",
 	},
 	{
 		.device_id  = PCI_DEVICE_ID_SI_651,
-		.chipset    = SIS_GENERIC,
 		.chipset_name   = "651",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_645,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "645",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_646,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "646",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_735,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "735",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_745,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "745",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_730,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "730",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_630,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "630",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_540,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "540",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_620,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "620",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_530,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "530",
 	},
 	{
 		.device_id	= PCI_DEVICE_ID_SI_550,
-		.chipset	= SIS_GENERIC,
 		.chipset_name	= "550",
 	},
 	{ }, /* dummy final entry, always present */
 };
 
-/* scan table above for supported devices */
-static int __init agp_lookup_host_bridge (struct pci_dev *pdev)
-{
-	int j=0;
-	struct agp_device_ids *devs;
-	
-	devs = sis_agp_device_ids;
-
-	while (devs[j].chipset_name != NULL) {
-		if (pdev->device == devs[j].device_id) {
-			printk (KERN_INFO PFX "Detected SiS %s chipset\n",
-				devs[j].chipset_name);
-			agp_bridge->type = devs[j].chipset;
-
-			if (devs[j].chipset_setup != NULL)
-				return devs[j].chipset_setup(pdev);
-			else
-				return sis_generic_setup(pdev);
-		}
-		j++;
-	}
-
-	/* try init anyway, if user requests it */
-	if (agp_try_unsupported) {
-		printk(KERN_WARNING PFX "Trying generic SiS routines"
-		       " for device id: %04x\n", pdev->device);
-		agp_bridge->type = SIS_GENERIC;
-		return sis_generic_setup(pdev);
-	}
-
-	printk(KERN_ERR PFX "Unsupported SiS chipset (device id: %04x),"
-		" you might want to try agp_try_unsupported=1.\n", pdev->device);
-	return -ENODEV;
-}
-
 static struct agp_driver sis_agp_driver = {
 	.owner = THIS_MODULE,
 };
 
-static int __init agp_sis_probe (struct pci_dev *dev, const struct pci_device_id *ent)
+static int __init agp_sis_probe(struct pci_dev *pdev,
+				const struct pci_device_id *ent)
 {
-	u8 cap_ptr = 0;
+	struct agp_device_ids *devs = sis_agp_device_ids;
+	u8 cap_ptr;
+	int j;
 
-	cap_ptr = pci_find_capability(dev, PCI_CAP_ID_AGP);
-	if (cap_ptr == 0)
+	cap_ptr = pci_find_capability(pdev, PCI_CAP_ID_AGP);
+	if (!cap_ptr)
 		return -ENODEV;
 
 	/* probe for known chipsets */
-	if (agp_lookup_host_bridge(dev) != -ENODEV) {
-		agp_bridge->dev = dev;
-		agp_bridge->capndx = cap_ptr;
-		/* Fill in the mode register */
-		pci_read_config_dword(agp_bridge->dev, agp_bridge->capndx+PCI_AGP_STATUS, &agp_bridge->mode);
-		sis_agp_driver.dev = dev;
-		agp_register_driver(&sis_agp_driver);
-		return 0;
+	for (j = 0; devs[j].chipset_name; j++) {
+		if (pdev->device == devs[j].device_id) {
+			printk(KERN_INFO PFX "Detected SiS %s chipset\n",
+					devs[j].chipset_name);
+			goto found;
+		}
 	}
-	return -ENODEV;
+
+	if (!agp_try_unsupported) {
+		printk(KERN_ERR PFX
+		    "Unsupported SiS chipset (device id: %04x),"
+		    " you might want to try agp_try_unsupported=1.\n",
+		    pdev->device);
+		return -ENODEV;
+	}
+
+	printk(KERN_WARNING PFX "Trying generic SiS routines"
+	       " for device id: %04x\n", pdev->device);
+
+found:
+	sis_generic_bridge.dev = pdev;
+	sis_generic_bridge.capndx = cap_ptr;
+
+	/* Fill in the mode register */
+	pci_read_config_dword(pdev, sis_generic_bridge.capndx+PCI_AGP_STATUS,
+			&sis_generic_bridge.mode);
+
+	memcpy(agp_bridge, &sis_generic_bridge,
+			sizeof(struct agp_bridge_data));
+	sis_agp_driver.dev = pdev;
+	agp_register_driver(&sis_agp_driver);
+	return 0;
 }
 
 static struct pci_device_id agp_sis_pci_table[] __initdata = {
@@ -268,13 +240,7 @@ static struct __initdata pci_driver agp_sis_pci_driver = {
 
 static int __init agp_sis_init(void)
 {
-	int ret_val;
-
-	ret_val = pci_module_init(&agp_sis_pci_driver);
-	if (ret_val)
-		agp_bridge->type = NOT_SUPPORTED;
-
-	return ret_val;
+	return pci_module_init(&agp_sis_pci_driver);
 }
 
 static void __exit agp_sis_cleanup(void)

@@ -34,24 +34,6 @@ extern struct agp_bridge_data *agp_bridge;
 
 #define PFX "agpgart: "
 
-#ifdef CONFIG_SMP
-static void ipi_handler(void *null)
-{
-	flush_agp_cache();
-}
-
-static void __attribute__((unused)) global_cache_flush(void)
-{
-	if (on_each_cpu(ipi_handler, NULL, 1, 1) != 0)
-		panic(PFX "timed out waiting for the other CPUs!\n");
-}
-#else
-static void global_cache_flush(void)
-{
-	flush_agp_cache();
-}
-#endif	/* !CONFIG_SMP */
-
 enum aper_size_type {
 	U8_APER_SIZE,
 	U16_APER_SIZE,
@@ -165,20 +147,17 @@ struct agp_bridge_data {
 #define MB(x)	(KB (KB (x)))
 #define GB(x)	(MB (KB (x)))
 
-#define CACHE_FLUSH	agp_bridge->cache_flush
 #define A_SIZE_8(x)	((struct aper_size_info_8 *) x)
 #define A_SIZE_16(x)	((struct aper_size_info_16 *) x)
 #define A_SIZE_32(x)	((struct aper_size_info_32 *) x)
 #define A_SIZE_LVL2(x)	((struct aper_size_info_lvl2 *) x)
 #define A_SIZE_FIX(x)	((struct aper_size_info_fixed *) x)
-#define A_IDX8()	(A_SIZE_8(agp_bridge->aperture_sizes) + i)
-#define A_IDX16()	(A_SIZE_16(agp_bridge->aperture_sizes) + i)
-#define A_IDX32()	(A_SIZE_32(agp_bridge->aperture_sizes) + i)
-#define A_IDXLVL2()	(A_SIZE_LVL2(agp_bridge->aperture_sizes) + i)
-#define A_IDXFIX()	(A_SIZE_FIX(agp_bridge->aperture_sizes) + i)
+#define A_IDX8(bridge)	(A_SIZE_8((bridge)->aperture_sizes) + i)
+#define A_IDX16(bridge)	(A_SIZE_16((bridge)->aperture_sizes) + i)
+#define A_IDX32(bridge)	(A_SIZE_32((bridge)->aperture_sizes) + i)
 #define MAXKEY		(4096 * 32)
 
-#define PGE_EMPTY(p)	(!(p) || (p) == (unsigned long) agp_bridge->scratch_page)
+#define PGE_EMPTY(b, p)	(!(p) || (p) == (unsigned long) (b)->scratch_page)
 
 /* intel register */
 #define INTEL_APBASE	0x10
@@ -358,6 +337,17 @@ struct agp_bridge_data {
 #define SVWRKS_POSTFLUSH	0x14
 #define SVWRKS_DIRFLUSH		0x0c
 
+/* NVIDIA registers */
+#define NVIDIA_0_APBASE		0x10
+#define NVIDIA_0_APSIZE		0x80
+#define NVIDIA_1_WBC		0xf0
+#define NVIDIA_2_GARTCTRL	0xd0
+#define NVIDIA_2_APBASE		0xd8
+#define NVIDIA_2_APLIMIT	0xdc
+#define NVIDIA_2_ATTBASE(i)	(0xe0 + (i) * 4)
+#define NVIDIA_3_APBASE		0x50
+#define NVIDIA_3_APLIMIT	0x54
+
 /* HP ZX1 SBA registers */
 #define HP_ZX1_CTRL		0x200
 #define HP_ZX1_IBASE		0x300
@@ -380,6 +370,14 @@ struct agp_driver {
 };
 
 
+/* Frontend routines. */
+int agp_frontend_initialize(void);
+void agp_frontend_cleanup(void);
+
+/* Backend routines. */
+int agp_register_driver (struct agp_driver *drv);
+int agp_unregister_driver(struct agp_driver *drv);
+
 /* Generic routines. */
 void agp_generic_enable(u32 mode);
 int agp_generic_create_gatt_table(void);
@@ -395,10 +393,29 @@ int agp_generic_suspend(void);
 void agp_generic_resume(void);
 void agp_free_key(int key);
 int agp_num_entries(void);
-int agp_register_driver (struct agp_driver *drv);
-int agp_unregister_driver(struct agp_driver *drv);
 u32 agp_collect_device_status(u32 mode, u32 command);
 void agp_device_command(u32 command, int agp_v3);
 int agp_3_0_node_enable(u32 mode, u32 minor);
+void global_cache_flush(void);
+
+/* Standard agp registers */
+#define AGPSTAT			0x4
+#define AGPCMD			0x8
+#define AGPNEPG			0x16
+
+#define AGP_MAJOR_VERSION_SHIFT	(20)
+#define AGP_MINOR_VERSION_SHIFT	(16)
+
+#define AGPSTAT_RQ_DEPTH	(0xff000000)
+
+#define AGPSTAT_ARQSZ_SHIFT	13
+
+#define AGPSTAT_AGP_ENABLE	(1<<8)
+#define AGPSTAT_SBA		(1<<9)
+
+#define AGPSTAT2_1X		(1<<0)
+#define AGPSTAT2_2X		(1<<1)
+#define AGPSTAT2_4X		(1<<2)
+#define AGPSTAT_FW		(1<<4)
 
 #endif				/* _AGP_BACKEND_PRIV_H */
