@@ -160,7 +160,7 @@ UNUSUAL_DEV(  0x04ce, 0x0002, 0x0074, 0x0074,
 UNUSUAL_DEV(  0x04da, 0x0901, 0x0100, 0x0200,
 		"Panasonic",
 		"LS-120 Camera",
-		US_SC_UFI, US_PR_CBI, NULL, 0),
+		US_SC_UFI, US_PR_DEVICE, NULL, 0),
 
 /* From Yukihiro Nakai, via zaitcev@yahoo.com.
  * This is needed for CB instead of CBI */
