@@ -1178,8 +1178,45 @@ L(mmu_init_not_mac):
 #ifdef CONFIG_SUN3X
 	is_not_sun3x(L(notsun3x))
 
+	/* oh, the pain..  We're gonna want the prom code after
+	 * starting the MMU, so we copy the mappings, translating
+	 * from 8k -> 4k pages as we go.
+	 */
+
+	/* copy maps from 0xfee00000 to 0xff000000 */
+	movel	#0xfee00000, %d0
+	moveq	#ROOT_INDEX_SHIFT, %d1
+	lsrl	%d1,%d0
+	mmu_get_root_table_entry	%d0
+
+	movel	#0xfee00000, %d0
+	moveq	#PTR_INDEX_SHIFT, %d1
+	lsrl	%d1,%d0
+	andl	#PTR_TABLE_SIZE-1, %d0
+	mmu_get_ptr_table_entry		%a0,%d0
+
+	movel	#0xfee00000, %d0
+	moveq	#PAGE_INDEX_SHIFT, %d1
+	lsrl	%d1,%d0
+	andl	#PAGE_TABLE_SIZE-1, %d0
+	mmu_get_page_table_entry	%a0,%d0
+
+	/* this is where the prom page table lives */	
+	movel	0xfefe00d4, %a1
+	movel	%a1@, %a1
+
+	movel	#((0x200000 >> 13)-1), %d1
+
+1:
+	movel	%a1@+, %d3
+	movel	%d3,%a0@+
+	addl	#0x1000,%d3
+	movel	%d3,%a0@+
+	
+	dbra	%d1,1b	
+		
 	/* setup tt1 for I/O */
-	mmu_map_tt	#1,#0x40000000,#0x40000000,#_PAGE_NOCACHE_S
+	mmu_map_tt	#1,#0x40000000,#0x40000000,#_PAGE_NOCACHE_S 
 	jbra	L(mmu_init_done)
 
 L(notsun3x):
@@ -1363,7 +1400,7 @@ L(mmu_fixup_done):
 	is_not_sun3x(1f)
 
 	/* enable copro */
-	oriw	#0x4000,0x61000000
+	oriw	#0x4000,0x61000000 
 1:
 #endif
 
@@ -3061,6 +3098,16 @@ func_start	serial_putc,%d0/%d1/%a0/%a1
 2:
 #endif
 
+#ifdef CONFIG_SUN3X
+	is_not_sun3x(2f) 
+	movel	%d0,-(%sp)
+	movel	0xFEFE0018,%a1
+	jbsr	(%a1)
+	addq	#4,%sp
+	jbra	L(serial_putc_done)
+2:	
+#endif
+	
 #ifdef CONFIG_Q40
 	is_not_q40(2f)
 	tst.l	%pc@(L(q40_do_debug))	/* only debug if requested */

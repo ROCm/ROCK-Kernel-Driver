@@ -7,7 +7,7 @@
  * CONTACTS
  *	E-mail regarding any portion of the Linux UDF file system should be
  *	directed to the development team mailing list (run by majordomo):
- *		linux_udf@hootie.lvld.hp.com
+ *		linux_udf@hpesjro.fc.hp.com
  *
  * COPYRIGHT
  *	This file is distributed under the terms of the GNU General Public
@@ -126,5 +126,5 @@ out:
  * symlinks can't do much...
  */
 struct address_space_operations udf_symlink_aops = {
-	readpage:			udf_symlink_filler,
+	readpage:		udf_symlink_filler,
 };

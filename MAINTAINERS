@@ -231,7 +231,7 @@ S:	Maintained
 CIRRUS LOGIC GENERIC FBDEV DRIVER
 P:	Jeff Garzik
 M:	jgarzik@mandrakesoft.com
-L:	linux-fbdev@vuser.vu.union.edu
+L:	linux-fbdev-devel@lists.sourceforge.net
 S:	Odd Fixes
 
 CIRRUS LOGIC CS4280/CS461x SOUNDDRIVER
@@ -804,9 +804,9 @@ S:	Maintained
 
 LOGICAL VOLUME MANAGER
 P:     Heinz Mauelshagen
-M:     linux-LVM@EZ-Darmstadt.Telekom.de
-L:     linux-LVM@msede.com
-W:     http://linux.msede.com/lvm
+M:     mge@sistina.de
+L:     linux-LVM@sistina.com
+W:     http://www.sistina.com/lvm
 S:     Maintained 
 
 M68K
@@ -1087,9 +1087,9 @@ W:	http://www.alarsen.net/linux/qnx4fs/
 S:	Maintained
 
 RAGE128 FRAMEBUFFER DISPLAY DRIVER
-P:	Brad Douglas
-M:	brad@neruo.com
-L:	linux-fbdev@vuser.vu.union.edu
+P:	Ani Joshi
+M:	ajoshi@shell.unixbox.com
+L:	linux-fbdev-devel@lists.sourceforge.net
 S:	Maintained
 
 RAYLINK/WEBGEAR 802.11 WIRELESS LAN DRIVER
@@ -1347,8 +1347,8 @@ P:	Ben Fennema
 M:	bfennema@falcon.csc.calpoly.edu
 P:	Dave Boynton
 M:	dave@trylinux.com
-L:	linux_udf@hootie.lvld.hp.com
-W:	http://www.trylinux.com/projects/udf/index.html
+L:	linux_udf@hpesjro.fc.hp.com
+W:	http://linux-udf.sourceforge.net
 S:	Maintained
 
 UMSDOS FILESYSTEM
@@ -1571,6 +1571,12 @@ P:	Pauline Middelink
 M:	middelin@polyware.nl
 W:	http://www.polyware.nl/~middelin/En/hobbies.html
 W:	http://www.polyware.nl/~middelin/hobbies.html
+S:	Maintained
+
+Bluetooth Subsystem (BlueZ)
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
 S:	Maintained
 
 THE REST

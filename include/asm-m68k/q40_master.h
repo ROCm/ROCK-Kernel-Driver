@@ -6,7 +6,7 @@
 #ifndef _Q40_MASTER_H
 #define _Q40_MASTER_H
 
-#include <asm/io.h>
+#include <asm/raw_io.h>
 
 
 #define q40_master_addr 0xff000000
@@ -17,6 +17,10 @@
 #define KEYCODE_REG         0x1c      /* value of received scancode  */
 #define DISPLAY_CONTROL_REG 0x18
 #define FRAME_CLEAR_REG     0x24
+#define LED_REG             0x30
+
+#define Q40_LED_ON()        master_outb(1,LED_REG)
+#define Q40_LED_OFF()       master_outb(0,LED_REG)
 
 #define INTERRUPT_REG       IIRQ_REG  /* "native" ints */
 #define KEY_IRQ_ENABLE_REG  0x08      /**/
@@ -35,13 +39,10 @@
 #endif
 #define EXT_ENABLE_REG      0x10      /* ... rest of the ISA ints ... */
 
-#if 0
-#define master_inb(_reg_)           (*(((unsigned char *)q40_master_addr)+_reg_))
-#define master_outb(_b_,_reg_)      (*(((unsigned char *)q40_master_addr)+_reg_)=(_b_))
-#else
-#define master_inb(_reg_)      native_inb((unsigned char *)q40_master_addr+_reg_)
-#define master_outb(_b_,_reg_)  native_outb(_b_,(unsigned char *)q40_master_addr+_reg_)
-#endif
+
+#define master_inb(_reg_)      in_8((unsigned char *)q40_master_addr+_reg_)
+#define master_outb(_b_,_reg_)  out_8((unsigned char *)q40_master_addr+_reg_,_b_)
+
 
 /* define some Q40 specific ints */
 #include "q40ints.h"

@@ -5,7 +5,7 @@
  *
  *		The Internet Protocol (IP) output module.
  *
- * Version:	$Id: ip_output.c,v 1.91 2001/03/29 06:25:55 davem Exp $
+ * Version:	$Id: ip_output.c,v 1.93 2001/06/01 14:59:31 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -499,7 +499,7 @@ static int ip_build_xmit_slow(struct sock *sk,
 	 *	Begin outputting the bytes.
 	 */
 
-	id = (sk ? sk->protinfo.af_inet.id++ : 0);
+	id = sk->protinfo.af_inet.id++;
 
 	do {
 		char *data;
@@ -848,6 +848,7 @@ int ip_fragment(struct sk_buff *skb, int (*output)(struct sk_buff*))
 		offset += len;
 
 #ifdef CONFIG_NETFILTER
+		skb2->nfmark = skb->nfmark;
 		/* Connection association is same as pre-frag packet */
 		skb2->nfct = skb->nfct;
 		nf_conntrack_get(skb2->nfct);

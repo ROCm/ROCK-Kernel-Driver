@@ -309,9 +309,9 @@ static unsigned int reject(struct sk_buff **pskb,
     		break;
 	case IPT_TCP_RESET:
 		send_reset(*pskb, hooknum == NF_IP_LOCAL_IN);
-		break;
 	case IPT_ICMP_ECHOREPLY:
 		/* Doesn't happen. */
+		break;
 	}
 
 	return NF_DROP;

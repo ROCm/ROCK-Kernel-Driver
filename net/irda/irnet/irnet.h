@@ -168,6 +168,23 @@
  *		(but PPP doesn't read the MTU value :-()
  *	o Declare hashbin HB_NOLOCK instead of HB_LOCAL to avoid
  *		disabling and enabling irq twice
+ *
+ * v6 - 31/05/01 - Jean II
+ *	o Print source address in Found, Discovery, Expiry & Request events
+ *	o Print requested source address in /proc/net/irnet
+ *	o Change control channel input. Allow multiple commands in one line.
+ *	o Add saddr command to change ap->rsaddr (and use that in IrDA)
+ *	---
+ *	o Make the IrDA connection procedure totally asynchronous.
+ *	  Heavy rewrite of the IAS query code and the whole connection
+ *	  procedure. Now, irnet_connect() no longer need to be called from
+ *	  a process context...
+ *	o Enable IrDA connect retries in ppp_irnet_send(). The good thing
+ *	  is that IrDA connect retries are directly driven by PPP LCP
+ *	  retries (we retry for each LCP packet), so that everything
+ *	  is transparently controlled from pppd lcp-max-configure.
+ *	o Add ttp_connect flag to prevent rentry on the connect procedure
+ *	o Test and fixups to eliminate side effects of retries
  */
 
 /***************************** INCLUDES *****************************/
@@ -181,6 +198,8 @@
 #include <linux/devfs_fs_kernel.h>
 #include <linux/netdevice.h>
 #include <linux/poll.h>
+#include <linux/config.h>
+#include <linux/ctype.h>	/* isspace() */
 #include <asm/uaccess.h>
 
 #include <linux/ppp_defs.h>
@@ -214,7 +233,7 @@
 
 /* PPP side of the business */
 #define BLOCK_WHEN_CONNECT	/* Block packets when connecting */
-#undef CONNECT_IN_SEND		/* Will crash hard your box... */
+#define CONNECT_IN_SEND		/* Retry IrDA connection procedure */
 #undef FLUSH_TO_PPP		/* Not sure about this one, let's play safe */
 #undef SECURE_DEVIRNET		/* Bah... */
 
@@ -249,9 +268,11 @@
 #define DEBUG_IRDA_SERV_INFO	0	/* various info */
 #define DEBUG_IRDA_SERV_ERROR	1	/* problems */
 #define DEBUG_IRDA_TCB_TRACE	0	/* IRDA IrTTP callbacks */
-#define DEBUG_IRDA_OCB_TRACE	0	/* IRDA other callbacks */
 #define DEBUG_IRDA_CB_INFO	0	/* various info */
 #define DEBUG_IRDA_CB_ERROR	1	/* problems */
+#define DEBUG_IRDA_OCB_TRACE	0	/* IRDA other callbacks */
+#define DEBUG_IRDA_OCB_INFO	0	/* various info */
+#define DEBUG_IRDA_OCB_ERROR	1	/* problems */
 
 #define DEBUG_ASSERT		0	/* Verify all assertions */
 
@@ -351,13 +372,15 @@ typedef struct irnet_socket
   /* ------------------------ IrTTP part ------------------------ */
   /* We create a pseudo "socket" over the IrDA tranport */
   int			ttp_open;	/* Set when IrTTP is ready */
+  int			ttp_connect;	/* Set when IrTTP is connecting */
   struct tsap_cb *	tsap;		/* IrTTP instance (the connection) */
 
   char			rname[NICKNAME_MAX_LEN + 1];
 					/* IrDA nickname of destination */
-  __u32			raddr;		/* Requested peer IrDA address */
-  __u32			saddr;		/* my local IrDA address */
+  __u32			rdaddr;		/* Requested peer IrDA address */
+  __u32			rsaddr;		/* Requested local IrDA address */
   __u32			daddr;		/* actual peer IrDA address */
+  __u32			saddr;		/* my local IrDA address */
   __u8			dtsap_sel;	/* Remote TSAP selector */
   __u8			stsap_sel;	/* Local TSAP selector */
 
@@ -374,17 +397,14 @@ typedef struct irnet_socket
   int			nslots;		/* Number of slots for discovery */
 
   struct iriap_cb *	iriap;		/* Used to query remote IAS */
-  wait_queue_head_t	query_wait;	/* Wait for the answer to a query */
-  struct ias_value *	ias_result;	/* Result of remote IAS query */
   int			errno;		/* status of the IAS query */
 
-  /* ---------------------- Optional parts ---------------------- */
-#ifdef INITIAL_DISCOVERY
-  /* Stuff used to dump discovery log */
+  /* -------------------- Discovery log part -------------------- */
+  /* Used by initial discovery on the control channel
+   * and by irnet_discover_daddr_and_lsap_sel() */
   struct irda_device_info *discoveries;	/* Copy of the discovery log */
   int			disco_index;	/* Last read in the discovery log */
   int			disco_number;	/* Size of the discovery log */
-#endif /* INITIAL_DISCOVERY */
 
 } irnet_socket;
 
@@ -411,8 +431,9 @@ typedef struct irnet_log
 {
   irnet_event	event;
   int		unit;
-  __u32		addr;
-  char		name[NICKNAME_MAX_LEN + 1];
+  __u32		saddr;
+  __u32		daddr;
+  char		name[NICKNAME_MAX_LEN + 1];	/* 21 + 1 */
 } irnet_log;
 
 /*

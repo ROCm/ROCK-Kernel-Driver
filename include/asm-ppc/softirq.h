@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.softirq.h 1.5 05/17/01 18:14:25 cort
+ * BK Id: SCCS/s.softirq.h 1.8 06/06/01 22:33:09 paulus
  */
 #ifdef __KERNEL__
 #ifndef __ASM_SOFTIRQ_H
@@ -8,8 +8,26 @@
 #include <asm/atomic.h>
 #include <asm/hardirq.h>
 
-#define local_bh_disable()	do { local_bh_count(smp_processor_id())++; barrier(); } while (0)
-#define local_bh_enable()	do { barrier(); local_bh_count(smp_processor_id())--; } while (0)
+#define local_bh_disable()			\
+do {						\
+	local_bh_count(smp_processor_id())++;	\
+	barrier();				\
+} while (0)
+
+#define __local_bh_enable()			\
+do {						\
+	barrier();				\
+	local_bh_count(smp_processor_id())--;	\
+} while (0)
+
+#define local_bh_enable()				\
+do {							\
+	if (!--local_bh_count(smp_processor_id())	\
+	    && softirq_pending(smp_processor_id())) {	\
+		do_softirq();				\
+		__sti();				\
+	}						\
+} while (0)
 
 #define in_softirq() (local_bh_count(smp_processor_id()) != 0)
 

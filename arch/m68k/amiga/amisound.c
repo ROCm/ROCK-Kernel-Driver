@@ -16,7 +16,7 @@
 #include <asm/system.h>
 #include <asm/amigahw.h>
 
-static u_short *snd_data = NULL;
+static unsigned short *snd_data = NULL;
 static const signed char sine_data[] = {
 	0,  39,  75,  103,  121,  127,  121,  103,  75,  39,
 	0, -39, -75, -103, -121, -127, -121, -103, -75, -39
@@ -28,7 +28,7 @@ static const signed char sine_data[] = {
      * device since it depends on htotal (for OCS/ECS/AGA)
      */
 
-volatile u_short amiga_audio_min_period = 124;	/* Default for pre-OCS */
+volatile unsigned short amiga_audio_min_period = 124; /* Default for pre-OCS */
 
 #define MAX_PERIOD	(65535)
 
@@ -37,9 +37,9 @@ volatile u_short amiga_audio_min_period = 124;	/* Default for pre-OCS */
      *	Current period (set by dmasound.c)
      */
 
-u_short amiga_audio_period = MAX_PERIOD;
+unsigned short amiga_audio_period = MAX_PERIOD;
 
-static u_long clock_constant;
+static unsigned long clock_constant;
 
 void __init amiga_init_sound(void)
 {
@@ -76,7 +76,7 @@ void amiga_mksound( unsigned int hz, unsigned int ticks )
 	del_timer( &sound_timer );
 
 	if (hz > 20 && hz < 32767) {
-		u_long period = (clock_constant / hz);
+		unsigned long period = (clock_constant / hz);
 
 		if (period < amiga_audio_min_period)
 			period = amiga_audio_min_period;
@@ -86,7 +86,7 @@ void amiga_mksound( unsigned int hz, unsigned int ticks )
 		/* setup pointer to data, period, length and volume */
 		custom.aud[2].audlc = snd_data;
 		custom.aud[2].audlen = sizeof(sine_data)/2;
-		custom.aud[2].audper = (u_short)period;
+		custom.aud[2].audper = (unsigned short)period;
 		custom.aud[2].audvol = 32; /* 50% of maxvol */
 	
 		if (ticks) {

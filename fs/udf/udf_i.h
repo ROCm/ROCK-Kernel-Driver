@@ -6,6 +6,7 @@
 #define UDF_I_LOCATION(X)	( UDF_I(X)->i_location )
 #define UDF_I_LENEATTR(X)	( UDF_I(X)->i_lenEAttr )
 #define UDF_I_LENALLOC(X)	( UDF_I(X)->i_lenAlloc )
+#define UDF_I_LENEXTENTS(X)	( UDF_I(X)->i_lenExtents )
 #define UDF_I_UNIQUE(X)		( UDF_I(X)->i_unique )
 #define UDF_I_ALLOCTYPE(X)	( UDF_I(X)->i_alloc_type )
 #define UDF_I_EXTENDED_FE(X)( UDF_I(X)->i_extended_fe )

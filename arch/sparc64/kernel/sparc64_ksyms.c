@@ -1,4 +1,4 @@
-/* $Id: sparc64_ksyms.c,v 1.107 2001/05/18 08:01:35 davem Exp $
+/* $Id: sparc64_ksyms.c,v 1.108 2001/06/05 03:39:50 davem Exp $
  * arch/sparc64/kernel/sparc64_ksyms.c: Sparc64 specific ksyms support.
  *
  * Copyright (C) 1996 David S. Miller (davem@caip.rutgers.edu)
@@ -24,6 +24,7 @@
 #include <asm/oplib.h>
 #include <asm/delay.h>
 #include <asm/system.h>
+#include <asm/auxio.h>
 #include <asm/pgtable.h>
 #include <asm/io.h>
 #include <asm/irq.h>
@@ -184,6 +185,9 @@ EXPORT_SYMBOL(__flush_dcache_page);
 EXPORT_SYMBOL(mostek_lock);
 EXPORT_SYMBOL(mstk48t02_regs);
 EXPORT_SYMBOL(request_fast_irq);
+#if CONFIG_SUN_AUXIO
+EXPORT_SYMBOL(auxio_register);
+#endif
 #if CONFIG_SBUS
 EXPORT_SYMBOL(sbus_root);
 EXPORT_SYMBOL(dma_chain);

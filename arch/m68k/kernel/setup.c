@@ -34,6 +34,10 @@
 #ifdef CONFIG_ATARI
 #include <asm/atarihw.h>
 #endif
+#ifdef CONFIG_SUN3X
+#include <asm/dvma.h>
+extern void sun_serial_setup(void);
+#endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
 #include <linux/blk.h>
@@ -106,6 +110,11 @@ int mach_sysrq_shift_mask = 0;
 char *mach_sysrq_xlate = NULL;
 #endif
 
+#if defined(CONFIG_ISA)
+int isa_type;
+int isa_sex;
+#endif
+
 extern int amiga_parse_bootinfo(const struct bi_record *);
 extern int atari_parse_bootinfo(const struct bi_record *);
 extern int mac_parse_bootinfo(const struct bi_record *);
@@ -137,7 +146,7 @@ static void __init m68k_parse_bootinfo(const struct bi_record *record)
 {
     while (record->tag != BI_LAST) {
 	int unknown = 0;
-	const u_long *data = record->data;
+	const unsigned long *data = record->data;
 	switch (record->tag) {
 	    case BI_MACHTYPE:
 	    case BI_CPUTYPE:
@@ -186,7 +195,7 @@ static void __init m68k_parse_bootinfo(const struct bi_record *record)
 	if (unknown)
 	    printk("m68k_parse_bootinfo: unknown tag 0x%04x ignored\n",
 		   record->tag);
-	record = (struct bi_record *)((u_long)record+record->size);
+	record = (struct bi_record *)((unsigned long)record+record->size);
     }
 
     m68k_realnum_memory = m68k_num_memory;
@@ -365,14 +374,44 @@ void __init setup_arch(char **cmdline_p)
 	if (MACH_IS_ATARI)
 		atari_stram_reserve_pages(availmem);
 #endif
+#ifdef CONFIG_SUN3X
+	if (MACH_IS_SUN3X) {
+		dvma_init();
+#ifdef CONFIG_SUN3X_ZS
+		sun_serial_setup();
+#endif
+	}
+#endif
+
 #endif /* !CONFIG_SUN3 */
+
 	paging_init();
+
+/* set ISA defs early as possible */
+#if defined(CONFIG_ISA)
+#if defined(CONFIG_Q40) 
+	if (MACH_IS_Q40) {
+	    isa_type = Q40_ISA;
+	    isa_sex = 0;
+	} 
+#elif defined(CONFIG_GG2)
+	if (MACH_IS_AMIGA && AMIGAHW_PRESENT(GG2_ISA)){
+	    isa_type = GG2_ISA;
+	    isa_sex = 0;
+	}
+#elif defined(CONFIG_AMIGA_PCMCIA)
+	if (MACH_IS_AMIGA && AMIGAHW_PRESENT(PCMCIA)){
+	    isa_type = AG_ISA;
+	    isa_sex = 1;
+	}
+#endif
+#endif
 }
 
 int get_cpuinfo(char * buffer)
 {
     const char *cpu, *mmu, *fpu;
-    u_long clockfreq, clockfactor;
+    unsigned long clockfreq, clockfactor;
 
 #define LOOP_CYCLES_68020	(8)
 #define LOOP_CYCLES_68030	(8)
@@ -447,7 +486,7 @@ int get_hardware_list(char *buffer)
 {
     int len = 0;
     char model[80];
-    u_long mem;
+    unsigned long mem;
     int i;
 
     if (mach_get_model)

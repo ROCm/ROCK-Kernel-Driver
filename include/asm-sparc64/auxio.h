@@ -1,4 +1,4 @@
-/* $Id: auxio.h,v 1.2 1999/09/21 14:39:25 davem Exp $
+/* $Id: auxio.h,v 1.3 2001/06/05 08:16:34 davem Exp $
  * auxio.h:  Definitions and code for the Auxiliary I/O register.
  *
  * Copyright (C) 1995 David S. Miller (davem@caip.rutgers.edu)
@@ -7,6 +7,7 @@
 #define _SPARC64_AUXIO_H
 
 #include <asm/system.h>
+#include <asm/io.h>
 
 /* FIXME: All of this should be checked for sun4u. It has /sbus/auxio, but
    I don't know whether it is the same and don't have a floppy */

@@ -72,7 +72,7 @@ static int rtc_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		unsigned char mon, day, hrs, min, sec, leap_yr;
 		unsigned int yrs;
 
-		if (!suser())
+		if (!capable(CAP_SYS_ADMIN))
 			return -EACCES;
 
 		if (copy_from_user(&rtc_tm, (struct rtc_time*)arg,

@@ -253,7 +253,7 @@ static int ftdi_sio_startup (struct usb_serial *serial)
 	
 	priv = serial->port->private = kmalloc(sizeof(struct ftdi_private), GFP_KERNEL);
 	if (!priv){
-		err(__FUNCTION__"- kmalloc(%d) failed.", sizeof(struct ftdi_private));
+		err(__FUNCTION__"- kmalloc(%Zd) failed.", sizeof(struct ftdi_private));
 		return -ENOMEM;
 	}
 
@@ -271,7 +271,7 @@ static int ftdi_8U232AM_startup (struct usb_serial *serial)
 
 	priv = serial->port->private = kmalloc(sizeof(struct ftdi_private), GFP_KERNEL);
 	if (!priv){
-		err(__FUNCTION__"- kmalloc(%d) failed.", sizeof(struct ftdi_private));
+		err(__FUNCTION__"- kmalloc(%Zd) failed.", sizeof(struct ftdi_private));
 		return -ENOMEM;
 	}
 

@@ -7,7 +7,7 @@
  * CONTACTS
  *  E-mail regarding any portion of the Linux UDF file system should be
  *  directed to the development team mailing list (run by majordomo):
- *    linux_udf@hootie.lvld.hp.com
+ *    linux_udf@hpesjro.fc.hp.com
  *
  * COPYRIGHT
  *  This file is distributed under the terms of the GNU General Public
@@ -119,8 +119,8 @@ static int udf_adinicb_commit_write(struct file *file, struct page *page, unsign
 }
 
 struct address_space_operations udf_adinicb_aops = {
-	readpage:			udf_adinicb_readpage,
-	writepage:			udf_adinicb_writepage,
+	readpage:		udf_adinicb_readpage,
+	writepage:		udf_adinicb_writepage,
 	sync_page:		block_sync_page,
 	prepare_write:		udf_adinicb_prepare_write,
 	commit_write:		udf_adinicb_commit_write,
@@ -208,7 +208,6 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 {
 	int result = -1;
 	struct buffer_head *bh = NULL;
-	Uint16 ident;
 	long_ad eaicb;
 	Uint8 *ea = NULL;
 
@@ -232,17 +231,28 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			if ( (result == verify_area(VERIFY_WRITE, (char *)arg, 32)) == 0)
 				result = copy_to_user((char *)arg, UDF_SB_VOLIDENT(inode->i_sb), 32);
 			return result;
+		case UDF_RELOCATE_BLOCKS:
+		{
+			long old, new;
 
+			if (!capable(CAP_SYS_ADMIN)) return -EACCES;
+			get_user(old, (long *)arg);
+			if ((result = udf_relocate_blocks(inode->i_sb, old, &new)) == 0)
+				result = put_user(new, (long *)arg);
+
+			return result;
+		}
 	}
 
 	/* ok, we need to read the inode */
-	bh = udf_read_ptagged(inode->i_sb, UDF_I_LOCATION(inode), 0, &ident);
+	bh = udf_tread(inode->i_sb,
+		udf_get_lb_pblock(inode->i_sb, UDF_I_LOCATION(inode), 0),
+		inode->i_sb->s_blocksize);
 
-	if (!bh || (ident != TID_FILE_ENTRY && ident != TID_EXTENDED_FILE_ENTRY))
+	if (!bh)
 	{
-		udf_debug("bread failed (ino=%ld) or ident (%d) != TID_(EXTENDED_)FILE_ENTRY",
-			inode->i_ino, ident);
-		return -EFAULT;
+		udf_debug("bread failed (inode=%ld)\n", inode->i_ino);
+		return -EIO;
 	}
 
 	if (UDF_I_EXTENDED_FE(inode) == 0)
@@ -277,7 +287,6 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			break;
 
 		default:
-			udf_debug("ino=%ld, cmd=%d\n", inode->i_ino, cmd);
 			break;
 	}
 
@@ -299,7 +308,8 @@ int udf_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
  */
 static int udf_release_file(struct inode * inode, struct file * filp)
 {
-	if (filp->f_mode & FMODE_WRITE) {
+	if (filp->f_mode & FMODE_WRITE)
+	{
 		lock_kernel();
 		udf_discard_prealloc(inode);
 		unlock_kernel();
@@ -322,21 +332,21 @@ static int udf_release_file(struct inode * inode, struct file * filp)
  */
 static int udf_open_file(struct inode * inode, struct file * filp)
 {
-	if ((inode->i_size & 0xFFFFFFFF00000000ULL) && !(filp->f_flags & O_LARGEFILE))
+	if ((inode->i_size & 0xFFFFFFFF80000000ULL) && !(filp->f_flags & O_LARGEFILE))
 		return -EFBIG;
 	return 0;
 }
 
 struct file_operations udf_file_operations = {
-	read:				generic_file_read,
-	ioctl:				udf_ioctl,
-	open:				udf_open_file,
-	mmap:				generic_file_mmap,
-	write:				udf_file_write,
-	release:			udf_release_file,
-	fsync:				udf_sync_file,
+	read:			generic_file_read,
+	ioctl:			udf_ioctl,
+	open:			udf_open_file,
+	mmap:			generic_file_mmap,
+	write:			udf_file_write,
+	release:		udf_release_file,
+	fsync:			udf_fsync_file,
 };
 
 struct inode_operations udf_file_inode_operations = {
-	truncate:			udf_truncate,
+	truncate:		udf_truncate,
 };

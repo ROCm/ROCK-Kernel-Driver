@@ -61,10 +61,6 @@ static __inline__ ide_ioreg_t ide_default_io_base(int index)
           return 0;
 }
 
-/*
- *  Can we do this in a generic manner??
- */
-
 
 /*
  * Set up a hw structure for a specified data port, control port and IRQ.
@@ -160,219 +156,64 @@ static __inline__ void ide_release_region (ide_ioreg_t from, unsigned int extent
 #define SUPPORT_VLB_SYNC 0
 
 /* this definition is used only on startup .. */
-#ifndef CONFIG_Q40
 #undef HD_DATA
 #define HD_DATA NULL
+
+
+/* get rid of defs from io.h - ide has its private and conflicting versions */
+#undef inb
+#undef inw
+#undef outb
+#undef outw
+#undef inb_p
+#undef outb_p
+#undef insw
+#undef outsw
+#undef insw_swapw
+#undef outsw_swapw
+
+/* 
+ * define IO method and translation,
+ * so far only Q40 has ide-if on ISA 
+*/
+#ifndef CONFIG_Q40
+
+#define ADDR_TRANS_B(_addr_) (_addr_)
+#define ADDR_TRANS_W(_addr_) (_addr_)
+
 #else
-#ifdef MACH_Q40_ONLY
-#undef HD_DATA
-#define HD_DATA ((ide_ioreg_t)0x1f0)
-#else
-#undef HD_DATA
-#define HD_DATA   (MACH_IS_Q40 ? (ide_ioreg_t)0x1f0 : 0)
-#endif
+
+#define ADDR_TRANS_B(_addr_) (MACH_IS_Q40 ? ((unsigned char *)Q40_ISA_IO_B(_addr_)) : (_addr_))
+#define ADDR_TRANS_W(_addr_) (MACH_IS_Q40 ? ((unsigned char *)Q40_ISA_IO_W(_addr_)) : (_addr_))
 #endif
 
+#define inb(p)     in_8(ADDR_TRANS_B(p))
+#define inb_p(p)     in_8(ADDR_TRANS_B(p))
+#define inw(p)     in_be16(ADDR_TRANS_W(p))
+#define outb(v,p)  out_8(ADDR_TRANS_B(p),v)
+#define outb_p(v,p)  out_8(ADDR_TRANS_B(p),v)
+#define outw(v,p)  out_be16(ADDR_TRANS_W(p),v)
+
+#define insw(port, buf, nr) raw_insw(ADDR_TRANS_W(port), buf, nr)
+#define outsw(port, buf, nr) raw_outsw(ADDR_TRANS_W(port), buf, nr)
 
 #define insl(data_reg, buffer, wcount) insw(data_reg, buffer, (wcount)<<1)
 #define outsl(data_reg, buffer, wcount) outsw(data_reg, buffer, (wcount)<<1)
 
-#ifdef CONFIG_Q40
-#ifdef MACH_Q40_ONLY
-#define ADDR_TRANS(_addr_) (Q40_ISA_IO_W(_addr_))
-#else
-#define ADDR_TRANS(_addr_) (MACH_IS_Q40 ? ((unsigned char *)Q40_ISA_IO_W(_addr_)) : (_addr_))
-#endif
-#else
-#define ADDR_TRANS(_addr_) (_addr_)
-#endif
 
-#define insw(port, buf, nr) ({				\
-	unsigned char *_port = (unsigned char *) ADDR_TRANS(port);	\
-	unsigned char *_buf = (buf);			\
-	int _nr = (nr);					\
-	unsigned long _tmp;				\
-							\
-	if (_nr & 15) {					\
-		_tmp = (_nr & 15) - 1;			\
-		asm volatile (				\
-			"1: movew %2@,%0@+; dbra %1,1b"	\
-			: "=a" (_buf), "=d" (_tmp)	\
-			: "a" (_port), "0" (_buf),	\
-			  "1" (_tmp));			\
-	}						\
-	if (_nr >> 4) {					\
-		_tmp = (_nr >> 4) - 1;			\
-		asm volatile (				\
-			"1: "				\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"movew %2@,%0@+; "		\
-			"dbra %1,1b"			\
-			: "=a" (_buf), "=d" (_tmp)	\
-			: "a" (_port), "0" (_buf),	\
-			  "1" (_tmp));			\
-	}						\
-})
-
-#define outsw(port, buf, nr) ({				\
-	unsigned char *_port = (unsigned char *) ADDR_TRANS(port);	\
-	unsigned char *_buf = (buf);			\
-	int _nr = (nr);					\
-	unsigned long _tmp;				\
-							\
-	if (_nr & 15) {					\
-		_tmp = (_nr & 15) - 1;			\
-		asm volatile (				\
-			"1: movew %0@+,%2@; dbra %1,1b"	\
-			: "=a" (_buf), "=d" (_tmp)	\
-			: "a" (_port), "0" (_buf),	\
-			  "1" (_tmp));			\
-	}						\
-	if (_nr >> 4) {					\
-		_tmp = (_nr >> 4) - 1;			\
-		asm volatile (				\
-			"1: "				\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"movew %0@+,%2@; "		\
-			"dbra %1,1b"	   		\
-			: "=a" (_buf), "=d" (_tmp)	\
-			: "a" (_port), "0" (_buf),	\
-			  "1" (_tmp));			\
-	}						\
-})
 
 #if defined(CONFIG_ATARI) || defined(CONFIG_Q40)
+
 #define insl_swapw(data_reg, buffer, wcount) \
     insw_swapw(data_reg, buffer, (wcount)<<1)
 #define outsl_swapw(data_reg, buffer, wcount) \
     outsw_swapw(data_reg, buffer, (wcount)<<1)
 
-#define insw_swapw(port, buf, nr) \
-    if ((nr) % 8) \
-	__asm__ __volatile__ \
-	       ("movel %0,%/a0; \
-		 movel %1,%/a1; \
-		 movel %2,%/d6; \
-		 subql #1,%/d6; \
-	       1:movew %/a0@,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a1@+; \
-		 dbra %/d6,1b" : \
-		: "g" (ADDR_TRANS(port)), "g" (buf), "g" (nr) \
-		: "d0", "a0", "a1", "d6"); \
-    else \
-	__asm__ __volatile__ \
-	       ("movel %0,%/a0; \
-		 movel %1,%/a1; \
-		 movel %2,%/d6; \
-		 lsrl  #3,%/d6; \
-		 subql #1,%/d6; \
-	       1:movew %/a0@,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a1@+; \
-		 movew %/a0@,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a1@+; \
-		 movew %/a0@,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a1@+; \
-		 movew %/a0@,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a1@+; \
-		 movew %/a0@,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a1@+; \
-		 movew %/a0@,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a1@+; \
-		 movew %/a0@,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a1@+; \
-		 movew %/a0@,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a1@+; \
-		 dbra %/d6,1b" : \
-		: "g" (ADDR_TRANS(port)), "g" (buf), "g" (nr) \
-		: "d0", "a0", "a1", "d6") 
+#define insw_swapw(port, buf, nr) raw_insw_swapw(ADDR_TRANS_W(port), buf, nr)
+#define outsw_swapw(port, buf, nr) raw_outsw_swapw(ADDR_TRANS_W(port),buf,nr)
 
+#endif /* CONFIG_ATARI || CONFIG_Q40 */
 
-#define outsw_swapw(port, buf, nr) \
-    if ((nr) % 8) \
-	__asm__ __volatile__ \
-	       ("movel %0,%/a0; \
-		 movel %1,%/a1; \
-		 movel %2,%/d6; \
-		 subql #1,%/d6; \
-	       1:movew %/a1@+,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a0@; \
-		 dbra %/d6,1b" : \
-		: "g" (ADDR_TRANS(port)), "g" (buf), "g" (nr) \
-		: "d0", "a0", "a1", "d6"); \
-    else \
-	__asm__ __volatile__ \
-	       ("movel %0,%/a0; \
-		 movel %1,%/a1; \
-		 movel %2,%/d6; \
-		 lsrl  #3,%/d6; \
-		 subql #1,%/d6; \
-	       1:movew %/a1@+,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a0@; \
-		 movew %/a1@+,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a0@; \
-		 movew %/a1@+,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a0@; \
-		 movew %/a1@+,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a0@; \
-		 movew %/a1@+,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a0@; \
-		 movew %/a1@+,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a0@; \
-		 movew %/a1@+,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a0@; \
-		 movew %/a1@+,%/d0; \
-		 rolw  #8,%/d0; \
-		 movew %/d0,%/a0@; \
-		 dbra %/d6,1b" : \
-		: "g" (ADDR_TRANS(port)), "g" (buf), "g" (nr) \
-		: "d0", "a0", "a1", "d6")
-
-#endif /* CONFIG_ATARI */
 
 #define T_CHAR          (0x0000)        /* char:  don't touch  */
 #define T_SHORT         (0x4000)        /* short: 12 -> 21     */
@@ -387,7 +228,15 @@ static __inline__ void ide_release_region (ide_ioreg_t from, unsigned int extent
 #define D_INT(cnt)      (T_INT   | (cnt))
 #define D_TEXT(cnt)     (T_TEXT  | (cnt))
 
-#if defined(CONFIG_AMIGA) || defined (CONFIG_MAC)
+/* Q40 and Atari have byteswapped IDE bus and since many interesting
+ * values in the identification string are text, chars and words they
+ * happened to be almost correct without swapping.. However *_capacity 
+ * is needed for drives over 8 GB. RZ */
+#if defined(CONFIG_Q40) || defined(CONFIG_ATARI)
+#define M68K_IDE_SWAPW  (MACH_IS_Q40 || MACH_IS_ATARI)
+#endif
+
+#if defined(CONFIG_AMIGA) || defined (CONFIG_MAC) || defined(M68K_IDE_SWAPW)
 static u_short driveid_types[] = {
 	D_SHORT(10),	/* config - vendor2 */
 	D_TEXT(20),	/* serial_no */
@@ -402,7 +251,7 @@ static u_short driveid_types[] = {
 	D_INT(1),	/* cur_capacity */
 	D_CHAR(2),	/* multsect - multsect_valid */
 	D_INT(1),	/* lba_capacity */
-	D_SHORT(194)	/* dma_1word - reservedyy */
+	D_SHORT(194)	/* dma_1word - reserved */
 };
 
 #define num_driveid_types       (sizeof(driveid_types)/sizeof(*driveid_types))
@@ -410,13 +259,19 @@ static u_short driveid_types[] = {
 
 static __inline__ void ide_fix_driveid(struct hd_driveid *id)
 {
-#if defined(CONFIG_AMIGA) || defined (CONFIG_MAC)
+#if defined(CONFIG_AMIGA) || defined (CONFIG_MAC) || defined(M68K_IDE_SWAPW)
    u_char *p = (u_char *)id;
    int i, j, cnt;
    u_char t;
 
-   if (!MACH_IS_AMIGA && !MACH_IS_MAC)
+   if (!MACH_IS_AMIGA && !MACH_IS_MAC && !MACH_IS_Q40 && !MACH_IS_ATARI)
    	return;
+#ifdef M68K_IDE_SWAPW
+   if (M68K_IDE_SWAPW)    /* fix bus byteorder first */
+      for (i=0; i < 512; i+=2) {
+	 t = p[i]; p[i] = p[i+1]; p[i+1] = t; 
+      }
+#endif
    for (i = 0; i < num_driveid_types; i++) {
       cnt = driveid_types[i] & T_MASK_COUNT;
       switch (driveid_types[i] & T_MASK_TYPE) {
@@ -425,28 +280,28 @@ static __inline__ void ide_fix_driveid(struct hd_driveid *id)
             break;
          case T_SHORT:
             for (j = 0; j < cnt; j++) {
-               t = p[0];
-               p[0] = p[1];
-               p[1] = t;
+	       t = p[0];
+	       p[0] = p[1];
+	       p[1] = t;
                p += 2;
             }
             break;
          case T_INT:
             for (j = 0; j < cnt; j++) {
-               t = p[0];
-               p[0] = p[3];
-               p[3] = t;
-               t = p[1];
-               p[1] = p[2];
-               p[2] = t;
+	       t = p[0];
+	       p[0] = p[3];
+	       p[3] = t;
+	       t = p[1];
+	       p[1] = p[2];
+	       p[2] = t;
                p += 4;
             }
             break;
          case T_TEXT:
             for (j = 0; j < cnt; j += 2) {
-               t = p[0];
-               p[0] = p[1];
-               p[1] = t;
+	       t = p[0];
+	       p[0] = p[1];
+	       p[1] = t;
                p += 2;
             }
             break;

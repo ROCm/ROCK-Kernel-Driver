@@ -25,7 +25,7 @@ void __br_write_lock (enum brlock_indices idx)
 	int i;
 
 	for (i = 0; i < smp_num_cpus; i++)
-		write_lock(__brlock_array[idx] + cpu_logical_map(i));
+		write_lock(&__brlock_array[cpu_logical_map(i)][idx]);
 }
 
 void __br_write_unlock (enum brlock_indices idx)
@@ -33,7 +33,7 @@ void __br_write_unlock (enum brlock_indices idx)
 	int i;
 
 	for (i = 0; i < smp_num_cpus; i++)
-		write_unlock(__brlock_array[idx] + cpu_logical_map(i));
+		write_unlock(&__brlock_array[cpu_logical_map(i)][idx]);
 }
 
 #else /* ! __BRLOCK_USE_ATOMICS */

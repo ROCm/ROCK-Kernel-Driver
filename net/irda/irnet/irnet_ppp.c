@@ -37,13 +37,15 @@ irnet_ctrl_write(irnet_socket *	ap,
 		 const char *	buf,
 		 size_t		count)
 {
-  char		command[5 + NICKNAME_MAX_LEN + 2];
-  int		length = count;
+  char		command[IRNET_MAX_COMMAND];
+  char *	start;		/* Current command beeing processed */
+  char *	next;		/* Next command to process */
+  int		length;		/* Length of current command */
 
   DENTER(CTRL_TRACE, "(ap=0x%X, count=%d)\n", (unsigned int) ap, count);
 
   /* Check for overflow... */
-  DABORT(count > (5 + NICKNAME_MAX_LEN + 1), -ENOMEM,
+  DABORT(count >= IRNET_MAX_COMMAND, -ENOMEM,
 	 CTRL_ERROR, "Too much data !!!\n");
 
   /* Get the data in the driver */
@@ -53,58 +55,110 @@ irnet_ctrl_write(irnet_socket *	ap,
       return -EFAULT;
     }
 
-  /* Strip out '\n' if needed, and safe terminate the string */
-  if(command[length - 1] == '\0')
-    length--;
-  if(command[length - 1] == '\n')
-    length--;
-  command[length] = '\0';
-  DEBUG(CTRL_INFO, "Command received is ``%s'' (%d-%d).\n",
-	command, length, count);
+  /* Safe terminate the string */
+  command[count] = '\0';
+  DEBUG(CTRL_INFO, "Command line received is ``%s'' (%d).\n",
+	command, count);
 
-  /* Check if we recognised the command */
-  /* First command : name */
-  if(!strncmp(command, "name", 4))
+  /* Check every commands in the command line */
+  next = command;
+  while(next != NULL)
     {
-      /* Copy the name only if is included and not "any" */
-      if((length > 5) && (strcmp(command + 5, "any")))
+      /* Look at the next command */
+      start = next;
+
+      /* Scrap whitespaces before the command */
+      while(isspace(*start))
+	start++;
+
+      /* ',' is our command separator */
+      next = strchr(start, ',');
+      if(next)
 	{
-	  /* Copy the name for later reuse (including the '/0') */
-	  memcpy(ap->rname, command + 5, length - 5 + 1);
+	  *next = '\0';			/* Terminate command */
+	  length = next - start;	/* Length */
+	  next++;			/* Skip the '\0' */
 	}
       else
-	ap->rname[0] = '\0';
-      DEXIT(CTRL_TRACE, " - rname = ``%s''\n", ap->rname);
-      return(count);
-    }
+	length = strlen(start);
 
-  /* Second command : addr */
-  if(!strncmp(command, "addr", 4))
-    {
-      /* Copy the address only if is included and not "any" */
-      if((length > 5) && (strcmp(command + 5, "any")))
+      DEBUG(CTRL_INFO, "Found command ``%s'' (%d).\n", start, length);
+
+      /* Check if we recognised one of the known command
+       * We can't use "switch" with strings, so hack with "continue" */
+      
+      /* First command : name -> Requested IrDA nickname */
+      if(!strncmp(start, "name", 4))
 	{
-	  char *	endp;
-	  __u32		daddr;
+	  /* Copy the name only if is included and not "any" */
+	  if((length > 5) && (strcmp(start + 5, "any")))
+	    {
+	      /* Strip out trailing whitespaces */
+	      while(isspace(start[length - 1]))
+		length--;
 
-	  /* Convert argument to a number (last arg is the base) */
-	  daddr = simple_strtoul(command + 5, &endp, 16);
-	  /* Has it worked  ? (endp should be command + count) */
-	  DABORT(endp <= (command + 5), -EINVAL,
-		 CTRL_ERROR, "Invalid address.\n");
-	  /* Save it */
-	  ap->raddr = daddr;
+	      /* Copy the name for later reuse */
+	      memcpy(ap->rname, start + 5, length - 5);
+	      ap->rname[length - 5] = '\0';
+	    }
+	  else
+	    ap->rname[0] = '\0';
+	  DEBUG(CTRL_INFO, "Got rname = ``%s''\n", ap->rname);
+
+	  /* Restart the loop */
+	  continue;
 	}
-      else
-	ap->raddr = DEV_ADDR_ANY;
-      DEXIT(CTRL_TRACE, " - raddr = %08x\n", ap->raddr);
-      return(count);
+
+      /* Second command : addr, daddr -> Requested IrDA destination address
+       * Also process : saddr -> Requested IrDA source address */
+      if((!strncmp(start, "addr", 4)) ||
+	 (!strncmp(start, "daddr", 5)) ||
+	 (!strncmp(start, "saddr", 5)))
+	{
+	  __u32		addr = DEV_ADDR_ANY;
+
+	  /* Copy the address only if is included and not "any" */
+	  if((length > 5) && (strcmp(start + 5, "any")))
+	    {
+	      char *	begp = start + 5;
+	      char *	endp;
+
+	      /* Scrap whitespaces before the command */
+	      while(isspace(*begp))
+		begp++;
+
+	      /* Convert argument to a number (last arg is the base) */
+	      addr = simple_strtoul(begp, &endp, 16);
+	      /* Has it worked  ? (endp should be start + length) */
+	      DABORT(endp <= (start + 5), -EINVAL,
+		     CTRL_ERROR, "Invalid address.\n");
+	    }
+	  /* Which type of address ? */
+	  if(start[0] == 's')
+	    {
+	      /* Save it */
+	      ap->rsaddr = addr;
+	      DEBUG(CTRL_INFO, "Got rsaddr = %08x\n", ap->rsaddr);
+	    }
+	  else
+	    {
+	      /* Save it */
+	      ap->rdaddr = addr;
+	      DEBUG(CTRL_INFO, "Got rdaddr = %08x\n", ap->rdaddr);
+	    }
+
+	  /* Restart the loop */
+	  continue;
+	}
+
+      /* Other possible command : connect N (number of retries) */
+
+      /* No command matched -> Failed... */
+      DABORT(1, -EINVAL, CTRL_ERROR, "Not a recognised IrNET command.\n");
     }
 
-  /* Other possible command : connect N (number of retries) */
-
-  /* Failed... */
-  DABORT(1, -EINVAL, CTRL_ERROR, "Not a recognised IrNET command.\n");
+  /* Success : we have parsed all commands successfully */
+  return(count);
 }
 
 #ifdef INITIAL_DISCOVERY
@@ -157,9 +211,10 @@ irnet_read_discovery_log(irnet_socket *	ap,
   if(ap->disco_index < ap->disco_number)
     {
       /* Write an event */
-      sprintf(event, "Found %08x (%s)\n",
+      sprintf(event, "Found %08x (%s) behind %08x\n",
 	      ap->discoveries[ap->disco_index].daddr,
-	      ap->discoveries[ap->disco_index].info);
+	      ap->discoveries[ap->disco_index].info,
+	      ap->discoveries[ap->disco_index].saddr);
       DEBUG(CTRL_INFO, "Writing discovery %d : %s\n",
 	    ap->disco_index, ap->discoveries[ap->disco_index].info);
 
@@ -256,53 +311,56 @@ irnet_ctrl_read(irnet_socket *	ap,
   switch(irnet_events.log[ap->event_index].event)
     {
     case IRNET_DISCOVER:
-      sprintf(event, "Discovered %08x (%s)\n",
-	      irnet_events.log[ap->event_index].addr,
-	      irnet_events.log[ap->event_index].name);
+      sprintf(event, "Discovered %08x (%s) behind %08x\n",
+	      irnet_events.log[ap->event_index].daddr,
+	      irnet_events.log[ap->event_index].name,
+	      irnet_events.log[ap->event_index].saddr);
       break;
     case IRNET_EXPIRE:
-      sprintf(event, "Expired %08x (%s)\n",
-	      irnet_events.log[ap->event_index].addr,
-	      irnet_events.log[ap->event_index].name);
+      sprintf(event, "Expired %08x (%s) behind %08x\n",
+	      irnet_events.log[ap->event_index].daddr,
+	      irnet_events.log[ap->event_index].name,
+	      irnet_events.log[ap->event_index].saddr);
       break;
     case IRNET_CONNECT_TO:
       sprintf(event, "Connected to %08x (%s) on ppp%d\n",
-	      irnet_events.log[ap->event_index].addr,
+	      irnet_events.log[ap->event_index].daddr,
 	      irnet_events.log[ap->event_index].name,
 	      irnet_events.log[ap->event_index].unit);
       break;
     case IRNET_CONNECT_FROM:
       sprintf(event, "Connection from %08x (%s) on ppp%d\n",
-	      irnet_events.log[ap->event_index].addr,
+	      irnet_events.log[ap->event_index].daddr,
 	      irnet_events.log[ap->event_index].name,
 	      irnet_events.log[ap->event_index].unit);
       break;
     case IRNET_REQUEST_FROM:
-      sprintf(event, "Request from %08x (%s)\n",
-	      irnet_events.log[ap->event_index].addr,
-	      irnet_events.log[ap->event_index].name);
+      sprintf(event, "Request from %08x (%s) behind %08x\n",
+	      irnet_events.log[ap->event_index].daddr,
+	      irnet_events.log[ap->event_index].name,
+	      irnet_events.log[ap->event_index].saddr);
       break;
     case IRNET_NOANSWER_FROM:
       sprintf(event, "No-answer from %08x (%s) on ppp%d\n",
-	      irnet_events.log[ap->event_index].addr,
+	      irnet_events.log[ap->event_index].daddr,
 	      irnet_events.log[ap->event_index].name,
 	      irnet_events.log[ap->event_index].unit);
       break;
     case IRNET_BLOCKED_LINK:
       sprintf(event, "Blocked link with %08x (%s) on ppp%d\n",
-	      irnet_events.log[ap->event_index].addr,
+	      irnet_events.log[ap->event_index].daddr,
 	      irnet_events.log[ap->event_index].name,
 	      irnet_events.log[ap->event_index].unit);
       break;
     case IRNET_DISCONNECT_FROM:
       sprintf(event, "Disconnection from %08x (%s) on ppp%d\n",
-	      irnet_events.log[ap->event_index].addr,
+	      irnet_events.log[ap->event_index].daddr,
 	      irnet_events.log[ap->event_index].name,
 	      irnet_events.log[ap->event_index].unit);
       break;
     case IRNET_DISCONNECT_TO:
       sprintf(event, "Disconnected to %08x (%s)\n",
-	      irnet_events.log[ap->event_index].addr,
+	      irnet_events.log[ap->event_index].daddr,
 	      irnet_events.log[ap->event_index].name);
       break;
     default:
@@ -794,11 +852,9 @@ ppp_irnet_send(struct ppp_channel *	chan,
     {
 #ifdef CONNECT_IN_SEND
       /* Let's try to connect one more time... */
-      /* Note : we won't connect fully yet, but we should be ready for
-       * next packet... */
-      /* Note : we can't do that, we need to have a process context to
-       * go through interruptible_sleep_on() in irnet_find_lsap_sel()
-       * We need to find another way... */
+      /* Note : we won't be connected after this call, but we should be
+       * ready for next packet... */
+      /* If we are already connecting, this will fail */
       irda_irnet_connect(self);
 #endif /* CONNECT_IN_SEND */
 

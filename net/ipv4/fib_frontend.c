@@ -5,7 +5,7 @@
  *
  *		IPv4 Forwarding Information Base: FIB frontend.
  *
- * Version:	$Id: fib_frontend.c,v 1.24 2001/05/13 18:14:46 davem Exp $
+ * Version:	$Id: fib_frontend.c,v 1.25 2001/05/29 22:16:25 davem Exp $
  *
  * Authors:	Alexey Kuznetsov, <kuznet@ms2.inr.ac.ru>
  *
@@ -236,8 +236,7 @@ int fib_validate_source(u32 src, u32 dst, u8 tos, int oif,
 	if (res.type != RTN_UNICAST)
 		goto e_inval_res;
 	*spec_dst = FIB_RES_PREFSRC(res);
-	if (itag)
-		fib_combine_itag(itag, &res);
+	fib_combine_itag(itag, &res);
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 	if (FIB_RES_DEV(res) == dev || res.fi->fib_nhs > 1)
 #else

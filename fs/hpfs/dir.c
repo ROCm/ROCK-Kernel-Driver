@@ -212,7 +212,7 @@ struct dentry *hpfs_lookup(struct inode *dir, struct dentry *dentry)
 	hpfs_lock_iget(dir->i_sb, de->directory || (de->ea_size && dir->i_sb->s_hpfs_eas) ? 1 : 2);
 	if (!(result = iget(dir->i_sb, ino))) {
 		hpfs_unlock_iget(dir->i_sb);
-		hpfs_error(result->i_sb, "hpfs_lookup: can't get inode");
+		hpfs_error(dir->i_sb, "hpfs_lookup: can't get inode");
 		goto bail1;
 	}
 	if (!de->directory) result->i_hpfs_parent_dir = dir->i_ino;

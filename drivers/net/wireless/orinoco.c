@@ -1,4 +1,4 @@
-/* orinoco.c 0.05	- (formerly known as dldwd_cs.c and orinoco_cs.c)
+/* orinoco.c 0.06	- (formerly known as dldwd_cs.c and orinoco_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -144,10 +144,32 @@
  *	  (note : the memcmp bug was mine - fixed)
  *	o Remove set_retry stuff, no firmware support it (bloat--).
  *
+ * v0.05d -> v0.06 - 25/5/2001 - Jean II
+ *		Original patch from "Hong Lin" <alin@redhat.com>,
+ *		"Ian Kinner" <ikinner@redhat.com>
+ *		and "David Smith" <dsmith@redhat.com>
+ *	o Init of priv->tx_rate_ctrl in firmware specific section.
+ *	o Prism2/Symbol rate, upto should be 0xF and not 0x15. Doh !
+ *	o Spectrum card always need cor_reset (for every reset)
+ *	o Fix cor_reset to not loose bit 7 in the register
+ *	o flush_stale_links to remove zombie Pcmcia instances
+ *	o Ack previous hermes event before reset
+ *		Me (with my little hands)
+ *	o Allow orinoco.c to call cor_reset via priv->card_reset_handler
+ *	o Add priv->need_card_reset to toggle this feature
+ *	o Fix various buglets when setting WEP in Symbol firmware
+ *	  Now, encryption is fully functional on Symbol cards. Youpi !
+ *
+ * v0.06 -> v0.06b - 25/5/2001 - Jean II
+ *	o IBSS on Symbol use port_mode = 4. Please don't ask...
+ *
+ * v0.06b -> v0.06c - 29/5/2001 - Jean II
+ *	o Show first spy address in /proc/net/wireless for IBSS mode as well
+ *
  * TODO - Jean II
  *	o inline functions (lot's of candidate, need to reorder code)
  *	o Test PrismII/Symbol cards & firmware versions
- *	o Mini-PCI support
+ *	o Mini-PCI support (some people have reported success - JII)
  */
 
 #include <linux/module.h>
@@ -180,7 +202,7 @@
 #include "hermes.h"
 #include "orinoco.h"
 
-static char *version = "orinoco.c 0.05d (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char *version = "orinoco.c 0.06c (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 /* Level of debugging. Used in the macros in orinoco.h */
 #ifdef ORINOCO_DEBUG
@@ -369,7 +391,11 @@ set_port_type(dldwd_priv_t *priv)
 			priv->port_type = 3;
 			priv->allow_ibss = 0;
 		} else {
-			priv->port_type = 1;
+			/* Symbol is different here */
+			if (priv->firmware_type == FIRMWARE_TYPE_SYMBOL)
+				priv->port_type = 4;
+			else
+				priv->port_type = 1;
 			priv->allow_ibss = 1;
 		}
 		break;
@@ -441,10 +467,15 @@ dldwd_reset(dldwd_priv_t *priv)
 
 	TRACE_ENTER(priv->ndev.name);
 
+	/* Stop other people bothering us */
 	dldwd_lock(priv);
-
 	__dldwd_stop_irqs(priv);
 
+	/* Check if we need a card reset */
+	if((priv->need_card_reset) && (priv->card_reset_handler != NULL))
+		priv->card_reset_handler(priv);
+
+	/* Do standard firmware reset if we can */
 	err = __dldwd_hw_reset(priv);
 	if (err)
 		goto out;
@@ -594,7 +625,8 @@ static int __dldwd_hw_setup_wep(dldwd_priv_t *priv)
 {
 	hermes_t *hw = &priv->hw;
 	int err = 0;
-	int	extra_wep_flag = 0;
+	int	master_wep_flag;
+	int	auth_flag;
 
 	switch (priv->firmware_type) {
 	case FIRMWARE_TYPE_LUCENT: /* Lucent style WEP */
@@ -614,24 +646,29 @@ static int __dldwd_hw_setup_wep(dldwd_priv_t *priv)
 
 	case FIRMWARE_TYPE_PRISM2: /* Prism II style WEP */
 	case FIRMWARE_TYPE_SYMBOL: /* Symbol style WEP */
+		master_wep_flag = 0;		/* Off */
 		if (priv->wep_on) {
 			char keybuf[LARGE_KEY_SIZE+1];
 			int keylen;
 			int i;
-			
+
+			/* Fudge around firmware weirdness */
+			keylen = priv->keys[priv->tx_key].len;
+
 			/* Write all 4 keys */
 			for(i = 0; i < MAX_KEYS; i++) {
-				keylen = priv->keys[i].len;
-				keybuf[keylen] = '\0';
-				memcpy(keybuf, priv->keys[i].data, keylen);
+				memset(keybuf, 0, sizeof(keybuf));
+				memcpy(keybuf, priv->keys[i].data,
+				       priv->keys[i].len);
 				err = hermes_write_ltv(hw, USER_BAP,
 						       HERMES_RID_CNF_PRISM2_KEY0 + i,
-						       HERMES_BYTES_TO_RECLEN(keylen + 1),
-						       &keybuf);
+						       HERMES_BYTES_TO_RECLEN(keylen),
+						       keybuf);
 				if (err)
 					return err;
 			}
 
+			/* Write the index of the key used in transmission */
 			err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_PRISM2_TX_KEY,
 						   priv->tx_key);
 			if (err)
@@ -642,30 +679,29 @@ static int __dldwd_hw_setup_wep(dldwd_priv_t *priv)
 			if (priv->firmware_type == FIRMWARE_TYPE_SYMBOL) {
 				/* Symbol cards : set the authentication :
 				 * 0 -> no encryption, 1 -> open,
-				 * 2 -> shared key, 3 -> shared key 128bit */
-				if(priv->wep_restrict) {
-					if(priv->keys[priv->tx_key].len >
-					   SMALL_KEY_SIZE)
-						extra_wep_flag = 3;
-					else
-						extra_wep_flag = 2;
-				} else
-					extra_wep_flag = 1;
-				err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_SYMBOL_AUTH_TYPE, priv->wep_restrict);
+				 * 2 -> shared key
+				 * 3 -> shared key 128 -> AP only */
+				if(priv->wep_restrict)
+					auth_flag = 2;
+				else
+					auth_flag = 1;
+				err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_SYMBOL_AUTH_TYPE, auth_flag);
 				if (err)
 					return err;
+				/* Master WEP setting is always 3 */
+				master_wep_flag = 3;
 			} else {
 				/* Prism2 card : we need to modify master
 				 * WEP setting */
 				if(priv->wep_restrict)
-					extra_wep_flag = 2;
+					master_wep_flag = 3;
 				else
-					extra_wep_flag = 0;
+					master_wep_flag = 1;
 			}
 		}
 		
 		/* Master WEP setting : on/off */
-		err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_PRISM2_WEP_ON, (priv->wep_on | extra_wep_flag));
+		err = hermes_write_wordrec(hw, USER_BAP, HERMES_RID_CNF_PRISM2_WEP_ON, master_wep_flag);
 		if (err)
 			return err;	
 		break;
@@ -1182,9 +1218,11 @@ dldwd_init(struct net_device *dev)
 	
 	dldwd_lock(priv);
 
+	/* Do standard firmware reset */
 	err = hermes_reset(hw);
 	if (err != 0) {
-		printk(KERN_ERR "%s: failed to reset hardware\n", dev->name);
+		printk(KERN_ERR "%s: failed to reset hardware (err = %d)\n",
+		       dev->name, err);
 		goto out;
 	}
 	
@@ -1209,6 +1247,8 @@ dldwd_init(struct net_device *dev)
 		/* Lucent MAC : 00:60:1D:* & 00:02:2D:* */
 
 		priv->firmware_type = FIRMWARE_TYPE_LUCENT;
+		priv->tx_rate_ctrl = 0x3;	/* 11 Mb/s auto */
+		priv->need_card_reset = 0;
 		priv->broken_reset = 0;
 		priv->broken_allocate = 0;
 		priv->has_port3 = 1;		/* Still works in 7.28 */
@@ -1229,6 +1269,8 @@ dldwd_init(struct net_device *dev)
 		/* Some D-Link cards report vendor 0x02... */
 
 		priv->firmware_type = FIRMWARE_TYPE_PRISM2;
+		priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
+		priv->need_card_reset = 0;
 		priv->broken_reset = 0;
 		priv->broken_allocate = 0;
 		priv->has_port3 = 1;
@@ -1248,9 +1290,12 @@ dldwd_init(struct net_device *dev)
 			/* Intel MAC : 00:02:B3:* */
 			/* 3Com MAC : 00:50:DA:* */
 
-			/* FIXME : probably need to use SYMBOL_***ARY_VER
-			 * to get proper firmware version */
+			/* FIXME : we need to get Symbol firmware revision.
+			 * I tried to use SYMBOL_***ARY_VER, but it didn't
+			 * returned anything proper... */
 			priv->firmware_type = FIRMWARE_TYPE_SYMBOL;
+			priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
+			priv->need_card_reset = 1;
 			priv->broken_reset = 0;
 			priv->broken_allocate = 1;
 			priv->has_port3 = 1;
@@ -1268,6 +1313,8 @@ dldwd_init(struct net_device *dev)
 		/* To check - Should cover Samsung & Compaq */
 
 		priv->firmware_type = FIRMWARE_TYPE_PRISM2;
+		priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
+		priv->need_card_reset = 0;
 		priv->broken_reset = 0;
 		priv->broken_allocate = 0;
 		priv->has_port3 = 1;
@@ -1284,6 +1331,8 @@ dldwd_init(struct net_device *dev)
 		/* D-Link MAC : 00:40:05:* */
 
 		priv->firmware_type = FIRMWARE_TYPE_PRISM2;
+		priv->tx_rate_ctrl = 0xF;	/* 11 Mb/s auto */
+		priv->need_card_reset = 0;
 		priv->broken_reset = 0;
 		priv->broken_allocate = 0;
 		priv->has_port3 = 1;
@@ -1300,6 +1349,8 @@ dldwd_init(struct net_device *dev)
 		vendor_str = "UNKNOWN";
 
 		priv->firmware_type = 0;
+		priv->tx_rate_ctrl = 0x3;		/* Hum... */
+		priv->need_card_reset = 0;
 		priv->broken_reset = 0;
 		priv->broken_allocate = 0;
 		priv->has_port3 = 0;
@@ -1314,7 +1365,7 @@ dldwd_init(struct net_device *dev)
 	printk(KERN_INFO "%s: Firmware ID %02X vendor 0x%x (%s) version %d.%02d\n",
 	       dev->name, priv->firmware_info.id, priv->firmware_info.vendor,
 	       vendor_str, priv->firmware_info.major, priv->firmware_info.minor);
-	
+
 	if (priv->has_port3)
 		printk(KERN_INFO "%s: Ad-hoc demo mode supported.\n", dev->name);
 	if (priv->has_ibss)
@@ -1393,9 +1444,6 @@ dldwd_init(struct net_device *dev)
 		goto out;
 	}
 
-	/* Set initial bitrate control*/
-	priv->tx_rate_ctrl = 3;
-
 	/* Power management setup */
 	if (priv->has_pm) {
 		priv->pm_on = 0;
@@ -1466,7 +1514,7 @@ dldwd_get_wireless_stats(struct net_device *dev)
 
 	dldwd_lock(priv);
 
-	if (priv->port_type == 3) {
+	if (priv->iw_mode == IW_MODE_ADHOC) {
 		memset(&wstats->qual, 0, sizeof(wstats->qual));
 #ifdef WIRELESS_SPY
 		/* If a spy address is defined, we report stats of the
@@ -1709,7 +1757,7 @@ static int dldwd_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq)
 {
 	dldwd_priv_t *priv = dev->priv;
 	int err = 0;
-	int ptype;
+	int mode;
 	struct iw_range range;
 	int numrates;
 	int i, k;
@@ -1723,7 +1771,7 @@ static int dldwd_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq)
 	rrq->length = sizeof(range);
 
 	dldwd_lock(priv);
-	ptype = priv->port_type;
+	mode = priv->iw_mode;
 	dldwd_unlock(priv);
 
 	memset(&range, 0, sizeof(range));
@@ -1755,7 +1803,7 @@ static int dldwd_ioctl_getiwrange(struct net_device *dev, struct iw_point *rrq)
 
 	range.sensitivity = 3;
 
-	if ((ptype == 3) && (priv->spy_number == 0)){
+	if ((mode == IW_MODE_ADHOC) && (priv->spy_number == 0)){
 		/* Quality stats meaningless in ad-hoc mode */
 		range.max_qual.qual = 0;
 		range.max_qual.level = 0;
@@ -2253,7 +2301,7 @@ static int dldwd_ioctl_setrate(struct net_device *dev, struct iw_param *rrq)
 		switch(brate) {
 		case 0:
 			fixed = 0x0;
-			upto = 0x15;
+			upto = 0xF;
 			break;
 		case 2:
 			fixed = 0x1;
@@ -2269,7 +2317,7 @@ static int dldwd_ioctl_setrate(struct net_device *dev, struct iw_param *rrq)
 			break;
 		case 22:
 			fixed = 0x8;
-			upto = 0x15;
+			upto = 0xF;
 			break;
 		default:
 			fixed = 0x0;
@@ -2881,6 +2929,7 @@ dldwd_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		if (wrq->u.data.pointer) {
 			struct iw_priv_args privtab[] = {
 				{ SIOCDEVPRIVATE + 0x0, 0, 0, "force_reset" },
+				{ SIOCDEVPRIVATE + 0x1, 0, 0, "card_reset" },
 				{ SIOCDEVPRIVATE + 0x2,
 				  IW_PRIV_TYPE_INT | IW_PRIV_SIZE_FIXED | 1,
 				  0, "set_port3" },
@@ -2914,6 +2963,20 @@ dldwd_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		}
 		
 		printk(KERN_DEBUG "%s: Forcing reset!\n", dev->name);
+		dldwd_reset(priv);
+		break;
+
+	case SIOCDEVPRIVATE + 0x1: /* card_reset */
+		DEBUG(1, "%s: SIOCDEVPRIVATE + 0x1 (card_reset)\n",
+		      dev->name);
+		if (! capable(CAP_NET_ADMIN)) {
+			err = -EPERM;
+			break;
+		}
+		
+		printk(KERN_DEBUG "%s: Forcing card reset!\n", dev->name);
+		if(priv->card_reset_handler != NULL)
+			priv->card_reset_handler(priv);
 		dldwd_reset(priv);
 		break;
 
@@ -3495,6 +3558,7 @@ dldwd_setup(dldwd_priv_t* priv)
 	ndev->priv = priv;
 
 	/* Setup up default routines */
+	priv->card_reset_handler = NULL;	/* Caller may override */
 	ndev->init = dldwd_init;
 	ndev->open = NULL;		/* Caller *must* override */
 	ndev->stop = NULL;

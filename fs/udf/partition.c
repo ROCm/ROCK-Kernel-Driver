@@ -7,7 +7,7 @@
  * CONTACTS
  *      E-mail regarding any portion of the Linux UDF file system should be
  *      directed to the development team mailing list (run by majordomo):
- *              linux_udf@hootie.lvld.hp.com
+ *              linux_udf@hpesjro.fc.hp.com
  *
  * COPYRIGHT
  *      This file is distributed under the terms of the GNU General Public
@@ -74,7 +74,7 @@ Uint32 udf_get_pblock_virt15(struct super_block *sb, Uint32 block, Uint16 partit
 		index = UDF_SB_TYPEVIRT(sb,partition).s_start_offset / sizeof(Uint32) + block;
 	}
 
-	loc = udf_locked_block_map(UDF_SB_VAT(sb), newblock);
+	loc = udf_block_map(UDF_SB_VAT(sb), newblock);
 
 	if (!(bh = bread(sb->s_dev, loc, sb->s_blocksize)))
 	{
@@ -103,135 +103,123 @@ inline Uint32 udf_get_pblock_virt20(struct super_block *sb, Uint32 block, Uint16
 
 Uint32 udf_get_pblock_spar15(struct super_block *sb, Uint32 block, Uint16 partition, Uint32 offset)
 {
-	Uint32 packet = (block + offset) >> UDF_SB_TYPESPAR(sb,partition).s_spar_pshift;
-	Uint32 index = 0;
-
-	if (UDF_SB_TYPESPAR(sb,partition).s_spar_indexsize == 8)
-		index = UDF_SB_TYPESPAR(sb,partition).s_spar_remap.s_spar_remap8[packet];
-	else if (UDF_SB_TYPESPAR(sb,partition).s_spar_indexsize == 16)
-		index = UDF_SB_TYPESPAR(sb,partition).s_spar_remap.s_spar_remap16[packet];
-	else if (UDF_SB_TYPESPAR(sb,partition).s_spar_indexsize == 32)
-		index = UDF_SB_TYPESPAR(sb,partition).s_spar_remap.s_spar_remap32[packet];
-
-	if (index == ((1 << UDF_SB_TYPESPAR(sb,partition).s_spar_indexsize)-1))
-		return UDF_SB_PARTROOT(sb,partition) + block + offset;
-
-	packet = UDF_SB_TYPESPAR(sb,partition).s_spar_map[index];
-	return packet + ((block + offset) & ((1 << UDF_SB_TYPESPAR(sb,partition).s_spar_pshift)-1));
-}
-
-void udf_fill_spartable(struct super_block *sb, struct udf_sparing_data *sdata, int partlen)
-{
-	Uint16 ident;
-	Uint32 spartable;
 	int i;
-	struct buffer_head *bh;
-	struct SparingTable *st;
+	struct SparingTable *st = NULL;
+	Uint32 packet = (block + offset) & ~(UDF_SB_TYPESPAR(sb,partition).s_packet_len - 1);
 
 	for (i=0; i<4; i++)
 	{
-		if (!(spartable = sdata->s_spar_loc[i]))
-			continue;
-
-		bh = udf_read_tagged(sb, spartable, spartable, &ident);
-
-		if (!bh)
+		if (UDF_SB_TYPESPAR(sb,partition).s_spar_map[i] != NULL)
 		{
-			sdata->s_spar_loc[i] = 0;
-			continue;
+			st = (struct SparingTable *)UDF_SB_TYPESPAR(sb,partition).s_spar_map[i]->b_data;
+			break;
 		}
+	}
 
-		if (ident == 0)
+	if (st)
+	{
+		for (i=0; i<st->reallocationTableLen; i++)
 		{
-			st = (struct SparingTable *)bh->b_data;
-			if (!strncmp(st->sparingIdent.ident, UDF_ID_SPARING, strlen(UDF_ID_SPARING)))
+			if (le32_to_cpu(st->mapEntry[i].origLocation) >= 0xFFFFFFF0)
+				break;
+			else if (le32_to_cpu(st->mapEntry[i].origLocation) == packet)
 			{
-				SparingEntry *se;
-				Uint16 rtl = le16_to_cpu(st->reallocationTableLen);
-				int index;
+				return le32_to_cpu(st->mapEntry[i].mappedLocation) +
+					((block + offset) & (UDF_SB_TYPESPAR(sb,partition).s_packet_len - 1));
+			}
+			else if (le32_to_cpu(st->mapEntry[i].origLocation) > packet)
+				break;
+		}
+	}
+	return UDF_SB_PARTROOT(sb,partition) + block + offset;
+}
 
-				if (!sdata->s_spar_map)
+int udf_relocate_blocks(struct super_block *sb, long old_block, long *new_block)
+{
+	struct udf_sparing_data *sdata;
+	struct SparingTable *st = NULL;
+	SparingEntry mapEntry;
+	Uint32 packet;
+	int i, j, k, l;
+
+	for (i=0; i<UDF_SB_NUMPARTS(sb); i++)
+	{
+		if (old_block > UDF_SB_PARTROOT(sb,i) &&
+		    old_block < UDF_SB_PARTROOT(sb,i) + UDF_SB_PARTLEN(sb,i))
+		{
+			sdata = &UDF_SB_TYPESPAR(sb,i);
+			packet = (old_block - UDF_SB_PARTROOT(sb,i)) & ~(sdata->s_packet_len - 1);
+
+			for (j=0; j<4; j++)
+			{
+				if (UDF_SB_TYPESPAR(sb,i).s_spar_map[j] != NULL)
 				{
-					int num = 1, mapsize;
-					sdata->s_spar_indexsize = 8;
-					while (rtl*sizeof(Uint32) >= (1 << sdata->s_spar_indexsize))
-					{
-						num ++;
-						sdata->s_spar_indexsize <<= 1;
-					}
-					mapsize = (rtl * sizeof(Uint32)) +
-						((partlen/(1 << sdata->s_spar_pshift)) * sizeof(Uint8) * num);
-					sdata->s_spar_map = kmalloc(mapsize, GFP_KERNEL);
-					if (!sdata->s_spar_map) {
-						printk("couldnt allocate UDF s_spar_map!\n");
-						return;
-					}
-					sdata->s_spar_remap.s_spar_remap32 = &sdata->s_spar_map[rtl];
-					memset(sdata->s_spar_map, 0xFF, mapsize);
-				}
-
-				index = sizeof(struct SparingTable);
-				for (i=0; i<rtl; i++)
-				{
-					if (index > sb->s_blocksize)
-					{
-						udf_release_data(bh);
-						bh = udf_tread(sb, ++spartable, sb->s_blocksize);
-						if (!bh)
-						{
-							sdata->s_spar_loc[i] = 0;
-							continue;
-						}
-						index = 0;
-					}
-					se = (SparingEntry *)&(bh->b_data[index]);
-					index += sizeof(SparingEntry);
-
-					if (sdata->s_spar_map[i] == 0xFFFFFFFF)
-						sdata->s_spar_map[i] = le32_to_cpu(se->mappedLocation);
-					else if (sdata->s_spar_map[i] != le32_to_cpu(se->mappedLocation))
-					{
-						udf_debug("Found conflicting Sparing Data (%d vs %d for entry %d)\n",
-							sdata->s_spar_map[i], le32_to_cpu(se->mappedLocation), i);
-					}
-
-					if (le32_to_cpu(se->origLocation) < 0xFFFFFFF0)
-					{
-						int packet = le32_to_cpu(se->origLocation) >> sdata->s_spar_pshift;
-						if (sdata->s_spar_indexsize == 8)
-						{
-							if (sdata->s_spar_remap.s_spar_remap8[packet] == 0xFF)
-								sdata->s_spar_remap.s_spar_remap8[packet] = i;
-							else if (sdata->s_spar_remap.s_spar_remap8[packet] != i)
-							{
-								udf_debug("Found conflicting Sparing Data (%d vs %d)\n",
-									sdata->s_spar_remap.s_spar_remap8[packet], i);
-							}
-						}
-						else if (sdata->s_spar_indexsize == 16)
-						{
-							if (sdata->s_spar_remap.s_spar_remap16[packet] == 0xFFFF)
-								sdata->s_spar_remap.s_spar_remap16[packet] = i;
-							else if (sdata->s_spar_remap.s_spar_remap16[packet] != i)
-							{
-								udf_debug("Found conflicting Sparing Data (%d vs %d)\n",
-									sdata->s_spar_remap.s_spar_remap16[packet], i);
-							}
-						}
-						else if (sdata->s_spar_indexsize == 32)
-						{
-							if (sdata->s_spar_remap.s_spar_remap32[packet] == 0xFFFFFFFF)
-								sdata->s_spar_remap.s_spar_remap32[packet] = i;
-							else if (sdata->s_spar_remap.s_spar_remap32[packet] != i)
-							{
-								udf_debug("Found conflicting Sparing Data (%d vs %d)\n",
-									sdata->s_spar_remap.s_spar_remap32[packet], i);
-							}
-						}
-					}
+					st = (struct SparingTable *)sdata->s_spar_map[j]->b_data;
+					break;
 				}
 			}
+
+			if (!st)
+				return 1;
+
+			for (k=0; k<st->reallocationTableLen; k++)
+			{
+				if (le32_to_cpu(st->mapEntry[k].origLocation) == 0xFFFFFFFF)
+				{
+					for (; j<4; j++)
+					{
+						if (sdata->s_spar_map[j])
+						{
+							st = (struct SparingTable *)sdata->s_spar_map[j]->b_data;
+							st->mapEntry[k].origLocation = cpu_to_le32(packet);
+							udf_update_tag((char *)st, sizeof(struct SparingTable) + st->reallocationTableLen * sizeof(SparingEntry));
+							mark_buffer_dirty(sdata->s_spar_map[j]);
+						}
+					}
+					*new_block = le32_to_cpu(st->mapEntry[k].mappedLocation) +
+						((old_block - UDF_SB_PARTROOT(sb,i)) & (sdata->s_packet_len - 1));
+					return 0;
+				}
+				else if (le32_to_cpu(st->mapEntry[k].origLocation) == packet)
+				{
+					*new_block = le32_to_cpu(st->mapEntry[k].mappedLocation) +
+						((old_block - UDF_SB_PARTROOT(sb,i)) & (sdata->s_packet_len - 1));
+					return 0;
+				}
+				else if (le32_to_cpu(st->mapEntry[k].origLocation) > packet)
+					break;
+			}
+			for (l=k; l<st->reallocationTableLen; l++)
+			{
+				if (le32_to_cpu(st->mapEntry[l].origLocation) == 0xFFFFFFFF)
+				{
+					for (; j<4; j++)
+					{
+						if (sdata->s_spar_map[j])
+						{
+							st = (struct SparingTable *)sdata->s_spar_map[j]->b_data;
+							mapEntry = st->mapEntry[l];
+							mapEntry.origLocation = cpu_to_le32(packet);
+							memmove(&st->mapEntry[k+1], &st->mapEntry[k], (l-k)*sizeof(SparingEntry));
+							st->mapEntry[k] = mapEntry;
+							udf_update_tag((char *)st, sizeof(struct SparingTable) + st->reallocationTableLen * sizeof(SparingEntry));
+							mark_buffer_dirty(sdata->s_spar_map[j]);
+						}
+					}
+					*new_block = le32_to_cpu(st->mapEntry[k].mappedLocation) +
+						((old_block - UDF_SB_PARTROOT(sb,i)) & (sdata->s_packet_len - 1));
+					return 0;
+				}
+			}
+			return 1;
 		}
-		udf_release_data(bh);
 	}
+	if (i == UDF_SB_NUMPARTS(sb))
+	{
+		/* outside of partitions */
+		/* for now, fail =) */
+		return 1;
+	}
+
+	return 0;
 }

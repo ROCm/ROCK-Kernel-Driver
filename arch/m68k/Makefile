@@ -110,8 +110,8 @@ SUBDIRS := $(SUBDIRS) arch/m68k/bvme6000
 endif
 
 ifdef CONFIG_SUN3X
-CORE_FILES := $(CORE_FILES) arch/m68k/sun3x/sun3x.o
-SUBDIRS := $(SUBDIRS) arch/m68k/sun3x
+CORE_FILES := $(CORE_FILES) arch/m68k/sun3x/sun3x.o arch/m68k/sun3/sun3.o
+SUBDIRS := $(SUBDIRS) arch/m68k/sun3x arch/m68k/sun3
 endif
 
 ifdef CONFIG_SUN3

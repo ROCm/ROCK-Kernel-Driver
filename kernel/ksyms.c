@@ -140,6 +140,7 @@ EXPORT_SYMBOL(iput);
 EXPORT_SYMBOL(force_delete);
 EXPORT_SYMBOL(follow_up);
 EXPORT_SYMBOL(follow_down);
+EXPORT_SYMBOL(lookup_mnt);
 EXPORT_SYMBOL(path_init);
 EXPORT_SYMBOL(path_walk);
 EXPORT_SYMBOL(path_release);
@@ -535,6 +536,9 @@ EXPORT_SYMBOL(remove_bh);
 EXPORT_SYMBOL(tasklet_init);
 EXPORT_SYMBOL(tasklet_kill);
 EXPORT_SYMBOL(__run_task_queue);
+EXPORT_SYMBOL(do_softirq);
+EXPORT_SYMBOL(tasklet_schedule);
+EXPORT_SYMBOL(tasklet_hi_schedule);
 
 /* init task, for moving kthread roots - ought to export a function ?? */
 

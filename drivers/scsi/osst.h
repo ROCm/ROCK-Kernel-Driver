@@ -1,5 +1,5 @@
 /*
- *	$Header: /home/cvsroot/Driver/osst.h,v 1.9 2000/10/08 03:09:43 riede Exp $
+ *	$Header: /home/cvsroot/Driver/osst.h,v 1.11 2001/01/26 01:54:49 riede Exp $
  */
 
 #include <asm/byteorder.h>
@@ -440,7 +440,8 @@ typedef struct os_aux_s {
          * Linux specific fields:
          */
          __u32          next_mark_ppos;         /* when known, points to next marker */
-         __u8           linux_specific[28];
+	 __u32		last_mark_lbn;		/* storing log_blk_num of last mark is extends ADR spec */
+         __u8           linux_specific[24];
 
         __u8            reserved_256_511[256];
 } os_aux_t;
@@ -581,6 +582,8 @@ typedef struct {
   int min_block;
   int max_block;
   int recover_count;            /* from tape opening */
+  int write_count;
+  int read_count;
   int recover_erreg;            /* from last status call */
   /*
    * OnStream specific data
@@ -588,8 +591,9 @@ typedef struct {
   int	   os_fw_rev;			       /* the firmware revision * 10000 */
   unsigned char  raw;                          /* flag OnStream raw access (32.5KB block size) */
   unsigned char  poll;                         /* flag that this drive needs polling (IDE|firmware) */
-  unsigned char  logical_blk_in_buffer;	       /* flag that the block as per logical_blk_num
+  unsigned char  frame_in_buffer;	       /* flag that the frame as per frame_seq_number
 						* has been read into STp->buffer and is valid */
+  int      frame_seq_number;                   /* logical frame number */
   int      logical_blk_num;                    /* logical block number */
   unsigned first_frame_position;               /* physical frame to be transfered to/from host */
   unsigned last_frame_position;                /* physical frame to be transferd to/from tape */
@@ -607,6 +611,7 @@ typedef struct {
   int      filemark_cnt;
   int      first_mark_ppos;
   int      last_mark_ppos;
+  int      last_mark_lbn;			/* storing log_blk_num of last mark is extends ADR spec */
   int      first_data_ppos;
   int      eod_frame_ppos;
   int      eod_frame_lfa;

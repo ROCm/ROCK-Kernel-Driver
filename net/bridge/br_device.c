@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_device.c,v 1.3 2000/03/01 02:58:09 davem Exp $
+ *	$Id: br_device.c,v 1.4 2001/06/01 09:28:28 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -56,17 +56,17 @@ static int __br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 	dest = skb->data;
 
 	if (dest[0] & 1) {
-		br_flood(br, skb, 0);
+		br_flood_deliver(br, skb, 0);
 		return 0;
 	}
 
 	if ((dst = br_fdb_get(br, dest)) != NULL) {
-		br_forward(dst->dst, skb);
+		br_deliver(dst->dst, skb);
 		br_fdb_put(dst);
 		return 0;
 	}
 
-	br_flood(br, skb, 0);
+	br_flood_deliver(br, skb, 0);
 	return 0;
 }
 

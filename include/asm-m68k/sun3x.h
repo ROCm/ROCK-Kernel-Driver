@@ -15,6 +15,9 @@
 #define SUN3X_VIDEO_P4ID  0x50300000
 #define SUN3X_ESP_BASE	  0x66000000
 #define SUN3X_ESP_DMA	  0x66001000
+#define SUN3X_FDC         0x6e000000
+#define SUN3X_FDC_FCR     0x6e000400
+#define SUN3X_FDC_FVR     0x6e000800
 
 /* some NVRAM addresses */
 #define SUN3X_EEPROM_CONS 	(SUN3X_EEPROM + 0x1f)

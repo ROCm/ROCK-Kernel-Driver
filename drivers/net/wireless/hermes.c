@@ -32,9 +32,10 @@ static const char *version = "hermes.c: 12 Dec 2000 David Gibson <hermes@gibson.
 
 #include "hermes.h"
 
+/* These are maximum timeouts. Most often, card wil react much faster */
 #define CMD_BUSY_TIMEOUT (100) /* In iterations of ~1us */
 #define CMD_INIT_TIMEOUT (50000) /* in iterations of ~10us */
-#define CMD_COMPL_TIMEOUT (10000) /* in iterations of ~10us */
+#define CMD_COMPL_TIMEOUT (20000) /* in iterations of ~10us */
 #define ALLOC_COMPL_TIMEOUT (1000) /* in iterations of ~10us */
 #define BAP_BUSY_TIMEOUT (500) /* In iterations of ~1us */
 #define BAP_ERROR_RETRY (10) /* How many times to retry a BAP seek when there is an error */
@@ -140,6 +141,12 @@ int hermes_reset(hermes_t *hw)
 	
 	/* No need to explicitly handle the timeout - hermes_issue_cmd() will
 	   probably return -EBUSY */
+
+	/* According to the documentation, EVSTAT may contain
+	   obsolete event occurrence information.  We have to acknowledge
+	   it by writing EVACK. */
+	reg = hermes_read_regn(hw, EVSTAT);
+	hermes_write_regn(hw, EVACK, reg);
 
 	/* We don't use hermes_docmd_wait here, because the reset wipes
 	   the magic constant in SWSUPPORT0 away, and it gets confused */
@@ -323,8 +330,10 @@ static int hermes_bap_seek(hermes_t *hw, int bap, uint16_t id, uint16_t offset)
 		reg = hermes_read_reg(hw, oreg);
 	}
 
-	if (reg & HERMES_OFFSET_BUSY)
+	if (reg & HERMES_OFFSET_BUSY) {
+		DEBUG(0,"hermes_bap_seek: returning ETIMEDOUT...\n");
 		return -ETIMEDOUT;
+	}
 
 	/* For some reason, seeking the BAP seems to randomly fail somewhere
 	   (firmware bug?). We retry a few times before giving up. */

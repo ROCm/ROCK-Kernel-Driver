@@ -343,6 +343,16 @@ static int try_to_unuse(unsigned int type)
 
 	while (1) {
 		/*
+		 * The algorithm is inefficient but seldomly used
+		 * and probably not worth fixing.
+		 *
+		 * Make sure that we aren't completely killing
+		 * interactive performance.
+		 */
+		if (current->need_resched)
+			schedule();
+			
+		/*
 		 * Find a swap page in use and read it in.
 		 */
 		swap_device_lock(si);

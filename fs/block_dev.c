@@ -595,14 +595,15 @@ int check_disk_change(kdev_t dev)
 
 int ioctl_by_bdev(struct block_device *bdev, unsigned cmd, unsigned long arg)
 {
-	kdev_t rdev = to_kdev_t(bdev->bd_dev);
 	struct inode inode_fake;
 	int res;
 	mm_segment_t old_fs = get_fs();
 
 	if (!bdev->bd_op->ioctl)
 		return -EINVAL;
-	inode_fake.i_rdev=rdev;
+	memset(&inode_fake, 0, sizeof(inode_fake));
+	inode_fake.i_rdev = to_kdev_t(bdev->bd_dev);
+	inode_fake.i_bdev = bdev;
 	init_waitqueue_head(&inode_fake.i_wait);
 	set_fs(KERNEL_DS);
 	res = bdev->bd_op->ioctl(&inode_fake, NULL, cmd, arg);

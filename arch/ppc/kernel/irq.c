@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.irq.c 1.23 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.irq.c 1.26 06/06/01 22:33:09 paulus
  */
 /*
  *  arch/ppc/kernel/irq.c
@@ -551,6 +551,9 @@ int do_IRQ(struct pt_regs *regs)
 	ppc_irq_dispatch_handler( regs, irq );
 out:	
         hardirq_exit( cpu );
+
+	if (softirq_pending(cpu))
+		do_softirq();
 	return 1; /* lets ret_from_int know we can do checks */
 }
 

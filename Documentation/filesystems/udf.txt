@@ -1,10 +1,10 @@
 *
 * ./Documentation/filesystems/udf.txt
 *
-UDF Filesystem version 0.9.1
+UDF Filesystem version 0.9.4
 
 If you encounter problems with reading UDF discs using this driver,
-please report them to linux_udf@hootie.lvld.hp.com, which is the
+please report them to linux_udf@hpesjro.fc.hp.com, which is the
 developer's list.
 
 Write support requires a block driver which supports writing. The current
@@ -23,7 +23,8 @@ The following mount options are supported:
 	noadinicb	Don't embed data in the inode
 	shortad		Use short ad's
 	longad		Use long ad's (default)
-	strict		Set strict conformance (unused)
+	strict		Set strict conformance
+	iocharset=	Set the NLS character set
 
 The remaining are for debugging and disaster recovery:
 

@@ -5,7 +5,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_forward.c,v 1.2 2000/02/21 15:51:33 davem Exp $
+ *	$Id: br_forward.c,v 1.3 2001/06/01 09:28:28 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -18,9 +18,10 @@
 #include <linux/inetdevice.h>
 #include <linux/skbuff.h>
 #include <linux/if_bridge.h>
+#include <linux/netfilter_bridge.h>
 #include "br_private.h"
 
-static inline int should_forward(struct net_bridge_port *p, struct sk_buff *skb)
+static inline int should_deliver(struct net_bridge_port *p, struct sk_buff *skb)
 {
 	if (skb->dev == p->dev ||
 	    p->state != BR_STATE_FORWARDING)
@@ -29,16 +30,51 @@ static inline int should_forward(struct net_bridge_port *p, struct sk_buff *skb)
 	return 1;
 }
 
+static int __br_forward_finish(struct sk_buff *skb)
+{
+	NF_HOOK(PF_BRIDGE, NF_BR_POST_ROUTING, skb, NULL, skb->dev,
+			dev_queue_xmit);
+
+	return 0;
+}
+
+static void __br_deliver(struct net_bridge_port *to, struct sk_buff *skb)
+{
+	struct net_device *indev;
+
+	indev = skb->dev;
+	skb->dev = to->dev;
+
+	NF_HOOK(PF_BRIDGE, NF_BR_LOCAL_OUT, skb, indev, skb->dev,
+			__br_forward_finish);
+}
+
 static void __br_forward(struct net_bridge_port *to, struct sk_buff *skb)
 {
+	struct net_device *indev;
+
+	indev = skb->dev;
 	skb->dev = to->dev;
-	dev_queue_xmit(skb);
+
+	NF_HOOK(PF_BRIDGE, NF_BR_FORWARD, skb, indev, skb->dev,
+			__br_forward_finish);
+}
+
+/* called under bridge lock */
+void br_deliver(struct net_bridge_port *to, struct sk_buff *skb)
+{
+	if (should_deliver(to, skb)) {
+		__br_deliver(to, skb);
+		return;
+	}
+
+	kfree_skb(skb);
 }
 
 /* called under bridge lock */
 void br_forward(struct net_bridge_port *to, struct sk_buff *skb)
 {
-	if (should_forward(to, skb)) {
+	if (should_deliver(to, skb)) {
 		__br_forward(to, skb);
 		return;
 	}
@@ -47,7 +83,8 @@ void br_forward(struct net_bridge_port *to, struct sk_buff *skb)
 }
 
 /* called under bridge lock */
-void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone)
+static void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone,
+	void (*__packet_hook)(struct net_bridge_port *p, struct sk_buff *skb))
 {
 	struct net_bridge_port *p;
 	struct net_bridge_port *prev;
@@ -67,7 +104,7 @@ void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone)
 
 	p = br->port_list;
 	while (p != NULL) {
-		if (should_forward(p, skb)) {
+		if (should_deliver(p, skb)) {
 			if (prev != NULL) {
 				struct sk_buff *skb2;
 
@@ -77,7 +114,7 @@ void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone)
 					return;
 				}
 
-				__br_forward(prev, skb2);
+				__packet_hook(prev, skb2);
 			}
 
 			prev = p;
@@ -87,9 +124,21 @@ void br_flood(struct net_bridge *br, struct sk_buff *skb, int clone)
 	}
 
 	if (prev != NULL) {
-		__br_forward(prev, skb);
+		__packet_hook(prev, skb);
 		return;
 	}
 
 	kfree_skb(skb);
+}
+
+/* called under bridge lock */
+void br_flood_deliver(struct net_bridge *br, struct sk_buff *skb, int clone)
+{
+	br_flood(br, skb, clone, __br_deliver);
+}
+
+/* called under bridge lock */
+void br_flood_forward(struct net_bridge *br, struct sk_buff *skb, int clone)
+{
+	br_flood(br, skb, clone, __br_forward);
 }

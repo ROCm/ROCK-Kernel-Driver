@@ -32,11 +32,7 @@
 #include <asm/atari_stram.h>
 #endif
 
-static unsigned long totalram_pages;
-
-#ifdef CONFIG_SUN3
-void mmu_emu_reserve_pages(unsigned long max_page);
-#endif
+unsigned long totalram_pages = 0;
 
 int do_check_pgt_cache(int low, int high)
 {
@@ -86,7 +82,7 @@ unsigned long empty_zero_page;
 void show_mem(void)
 {
     unsigned long i;
-    int free = 0, total = 0, reserved = 0, nonshared = 0, shared = 0;
+    int free = 0, total = 0, reserved = 0, shared = 0;
     int cached = 0;
 
     printk("\nMem-info:\n");
@@ -101,15 +97,12 @@ void show_mem(void)
 	    cached++;
 	else if (!page_count(mem_map+i))
 	    free++;
-	else if (page_count(mem_map+i) == 1)
-	    nonshared++;
 	else
 	    shared += page_count(mem_map+i) - 1;
     }
     printk("%d pages of RAM\n",total);
     printk("%d free pages\n",free);
     printk("%d reserved pages\n",reserved);
-    printk("%d pages nonshared\n",nonshared);
     printk("%d pages shared\n",shared);
     printk("%d pages swap cached\n",cached);
     printk("%ld pages in page table cache\n",pgtable_cache_size);
@@ -137,17 +130,11 @@ void __init mem_init(void)
 
 #ifdef CONFIG_ATARI
 	if (MACH_IS_ATARI)
-		atari_stram_reserve_pages( start_mem );
-#endif
-
-#ifdef CONFIG_SUN3
-	/* reserve rom pages */
-	mmu_emu_reserve_pages(max_mapnr);
+		atari_stram_mem_init_hook();
 #endif
 
 	/* this will put all memory onto the freelists */
 	totalram_pages = free_all_bootmem();
-	printk("tp:%ld\n", totalram_pages);
 
 	for (tmp = PAGE_OFFSET ; tmp < (unsigned long)high_memory; tmp += PAGE_SIZE) {
 #if 0
@@ -201,13 +188,15 @@ void __init mem_init(void)
 #ifdef CONFIG_BLK_DEV_INITRD
 void free_initrd_mem(unsigned long start, unsigned long end)
 {
+	int pages = 0;
 	for (; start < end; start += PAGE_SIZE) {
 		ClearPageReserved(virt_to_page(start));
 		set_page_count(virt_to_page(start), 1);
 		free_page(start);
 		totalram_pages++;
+		pages++;
 	}
-	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
+	printk ("Freeing initrd memory: %dk freed\n", pages);
 }
 #endif
 
@@ -220,15 +209,8 @@ void si_meminfo(struct sysinfo *val)
     val->sharedram = 0;
     val->freeram = nr_free_pages();
     val->bufferram = atomic_read(&buffermem_pages);
-    while (i-- > 0) {
-	if (PageReserved(mem_map+i))
-	    continue;
-	val->totalram++;
-	if (!page_count(mem_map+i))
-	    continue;
-	val->sharedram += page_count(mem_map+i) - 1;
-    }
     val->totalhigh = 0;
     val->freehigh = 0;
+    val->mem_unit = PAGE_SIZE;
     return;
 }

@@ -39,6 +39,7 @@ void __bad_pmd(pgd_t *pgd)
 	pgd_set(pgd, (pmd_t *)BAD_PAGETABLE);
 }
 
+#if 0
 pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
 {
 	pte_t *pte;
@@ -63,7 +64,9 @@ pte_t *get_pte_slow(pmd_t *pmd, unsigned long offset)
 	}
 	return (pte_t *)__pmd_page(*pmd) + offset;
 }
+#endif
 
+#if 0
 pmd_t *get_pmd_slow(pgd_t *pgd, unsigned long offset)
 {
 	pmd_t *pmd;
@@ -84,7 +87,7 @@ pmd_t *get_pmd_slow(pgd_t *pgd, unsigned long offset)
 	}
 	return (pmd_t *)__pgd_page(*pgd) + offset;
 }
-
+#endif
 
 /* ++andreas: {get,free}_pointer_table rewritten to use unused fields from
    struct page instead of separately kmalloced struct.  Stolen from
@@ -245,6 +248,10 @@ unsigned long mm_vtop(unsigned long vaddr)
 		}
 		voff -= m68k_memory[i].size;
 	} while (++i < m68k_num_memory);
+
+	/* As a special case allow `__pa(high_memory)'.  */
+	if (voff == 0)
+		return m68k_memory[i-1].addr + m68k_memory[i-1].size;
 
 	/* As a special case allow `__pa(high_memory)'.  */
 	if (voff == 0)
@@ -454,16 +461,21 @@ unsigned long mm_ptov (unsigned long paddr)
 			      ".chip 68k"		\
 			      : : "a" (paddr))
 
-/* push and invalidate page in both caches */
+/* push and invalidate page in both caches, must disable ints
+ * to avoid invalidating valid data */
 #define	pushcl040(paddr)			\
-	do { push040(paddr);			\
+	do { unsigned long flags;               \
+             save_flags(flags);                 \
+	     cli();                             \
+             push040(paddr);			\
 	     if (CPU_IS_060) clear040(paddr);	\
+	     restore_flags(flags);              \
 	} while(0)
 
 /* push page in both caches, invalidate in i-cache */
+/* RZ: cpush %bc DOES invalidate %ic, regardless of DPI */
 #define	pushcli040(paddr)			\
 	do { push040(paddr);			\
-	     if (CPU_IS_060) cleari040(paddr);	\
 	} while(0)
 
 

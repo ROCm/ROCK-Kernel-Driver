@@ -28,6 +28,7 @@
 #include <linux/locks.h>
 #include <linux/fat_cvf.h>
 #include <linux/slab.h>
+#include <linux/bitops.h>
 #include <linux/smp_lock.h>
 
 #include "msbuffer.h"

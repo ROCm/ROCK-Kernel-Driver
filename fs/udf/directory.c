@@ -7,7 +7,7 @@
  * CONTACTS
  *	E-mail regarding any portion of the Linux UDF file system should be
  *	directed to the development team mailing list (run by majordomo):
- *		linux_udf@hootie.lvld.hp.com
+ *		linux_udf@hpesjro.fc.hp.com
  *
  * COPYRIGHT
  *	This file is distributed under the terms of the GNU General Public
@@ -92,7 +92,8 @@ udf_fileident_read(struct inode *dir, loff_t *nf_pos,
 	Uint32 *offset, struct buffer_head **bh)
 {
 	struct FileIdentDesc *fi;
-	int block;
+	int i, num, block;
+	struct buffer_head * tmp, * bha[16];
 
 	fibh->soffset = fibh->eoffset;
 
@@ -119,6 +120,28 @@ udf_fileident_read(struct inode *dir, loff_t *nf_pos,
 		if (!(fibh->sbh = fibh->ebh = udf_tread(dir->i_sb, block, dir->i_sb->s_blocksize)))
 			return NULL;
 		fibh->soffset = fibh->eoffset = 0;
+
+		if (!(*offset & ((16 >> (dir->i_sb->s_blocksize_bits - 9))-1)))
+		{
+			i = 16 >> (dir->i_sb->s_blocksize_bits - 9);
+			if (i+*offset > (*elen >> dir->i_sb->s_blocksize_bits))
+				i = (*elen >> dir->i_sb->s_blocksize_bits)-*offset;
+			for (num=0; i>0; i--)
+			{
+				block = udf_get_lb_pblock(dir->i_sb, *eloc, *offset+i);
+				tmp = udf_tgetblk(dir->i_sb, block, dir->i_sb->s_blocksize);
+				if (tmp && !buffer_uptodate(tmp) && !buffer_locked(tmp))
+					bha[num++] = tmp;
+				else
+					brelse(tmp);
+			}
+			if (num)
+			{
+				ll_rw_block(READA, num, bha);
+				for (i=0; i<num; i++)
+					brelse(bha[i]);
+			}
+		}
 	}
 	else if (fibh->sbh != fibh->ebh)
 	{

@@ -2060,44 +2060,32 @@ static int __init fbcon_show_logo( void )
     if (!fb)
 	return 0;
 	
-    /* Set colors if visual is PSEUDOCOLOR and we have enough colors, or for
-     * DIRECTCOLOR */
-    if ((p->visual == FB_VISUAL_PSEUDOCOLOR && depth >= 4) ||
-	p->visual == FB_VISUAL_DIRECTCOLOR) {
-	int is_truecolor = (p->visual == FB_VISUAL_DIRECTCOLOR);
-	int use_256 = (!is_truecolor && depth >= 8) ||
-		      (is_truecolor && depth >= 24);
-	int first_col = use_256 ? 32 : depth > 4 ? 16 : 0;
-	int num_cols = use_256 ? LINUX_LOGO_COLORS : 16;
-	unsigned char *red, *green, *blue;
-	
-	if (use_256) {
-	    red   = linux_logo_red;
-	    green = linux_logo_green;
-	    blue  = linux_logo_blue;
-	}
-	else {
-	    red   = linux_logo16_red;
-	    green = linux_logo16_green;
-	    blue  = linux_logo16_blue;
-	}
-
-	for( i = 0; i < num_cols; i += n ) {
-	    n = num_cols - i;
+    /*
+     * Set colors if visual is PSEUDOCOLOR and we have enough colors, or for
+     * DIRECTCOLOR
+     * We don't have to set the colors for the 16-color logo, since that logo
+     * uses the standard VGA text console palette
+     */
+    if ((p->visual == FB_VISUAL_PSEUDOCOLOR && depth >= 8) ||
+	(p->visual == FB_VISUAL_DIRECTCOLOR && depth >= 24))
+	for (i = 0; i < LINUX_LOGO_COLORS; i += n) {
+	    n = LINUX_LOGO_COLORS - i;
 	    if (n > 16)
 		/* palette_cmap provides space for only 16 colors at once */
 		n = 16;
-	    palette_cmap.start = first_col + i;
+	    palette_cmap.start = 32 + i;
 	    palette_cmap.len   = n;
 	    for( j = 0; j < n; ++j ) {
-		palette_cmap.red[j]   = (red[i+j] << 8) | red[i+j];
-		palette_cmap.green[j] = (green[i+j] << 8) | green[i+j];
-		palette_cmap.blue[j]  = (blue[i+j] << 8) | blue[i+j];
+		palette_cmap.red[j]   = (linux_logo_red[i+j] << 8) |
+					linux_logo_red[i+j];
+		palette_cmap.green[j] = (linux_logo_green[i+j] << 8) |
+					linux_logo_green[i+j];
+		palette_cmap.blue[j]  = (linux_logo_blue[i+j] << 8) |
+					linux_logo_blue[i+j];
 	    }
 	    p->fb_info->fbops->fb_set_cmap(&palette_cmap, 1, fg_console,
 					   p->fb_info);
 	}
-    }
 	
     if (depth >= 8) {
 	logo = linux_logo;
@@ -2155,15 +2143,15 @@ static int __init fbcon_show_logo( void )
 		    }
 		}
 	    }
-	    else if (depth >= 15 && depth <= 23) {
-	        /* have 5..7 bits per color, using 16 color image */
+	    else if (depth >= 12 && depth <= 23) {
+	        /* have 4..7 bits per color, using 16 color image */
 		unsigned int pix;
 		src = linux_logo16;
 		bdepth = (depth+7)/8;
 		for( y1 = 0; y1 < LOGO_H; y1++ ) {
 		    dst = fb + y1*line + x*bdepth;
 		    for( x1 = 0; x1 < LOGO_W/2; x1++, src++ ) {
-			pix = (*src >> 4) | 0x10; /* upper nibble */
+			pix = *src >> 4; /* upper nibble */
 			val = (pix << redshift) |
 			      (pix << greenshift) |
 			      (pix << blueshift);
@@ -2173,7 +2161,7 @@ static int __init fbcon_show_logo( void )
 			for( i = bdepth-1; i >= 0; --i )
 #endif
 			    fb_writeb (val >> (i*8), dst++);
-			pix = (*src & 0x0f) | 0x10; /* lower nibble */
+			pix = *src & 0x0f; /* lower nibble */
 			val = (pix << redshift) |
 			      (pix << greenshift) |
 			      (pix << blueshift);
@@ -2297,16 +2285,13 @@ static int __init fbcon_show_logo( void )
 		}
 	    }
 	
-	    /* fill remaining planes
-	     * special case for logo_depth == 4: we used color registers 16..31,
-	     * so fill plane 4 with 1 bits instead of 0 */
+	    /* fill remaining planes */
 	    if (depth > logo_depth) {
 		for( y1 = 0; y1 < LOGO_H; y1++ ) {
 		    for( x1 = 0; x1 < LOGO_LINE; x1++ ) {
 			dst = fb + y1*line + MAP_X(x/8+x1) + logo_depth*plane;
 			for( i = logo_depth; i < depth; i++, dst += plane )
-			    *dst = (i == logo_depth && logo_depth == 4)
-				   ? 0xff : 0x00;
+			    *dst = 0x00;
 		    }
 		}
 	    }

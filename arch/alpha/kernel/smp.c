@@ -682,6 +682,9 @@ smp_percpu_timer_interrupt(struct pt_regs *regs)
 
 		data->prof_counter = data->prof_multiplier;
 		irq_exit(cpu, RTC_IRQ);
+
+		if (softirq_pending(cpu))
+			do_softirq();
 	}
 }
 

@@ -80,6 +80,22 @@ static inline timestamp lets_to_cpu(timestamp in)
 	return out;
 }
 
+static inline short_ad lesa_to_cpu(short_ad in)
+{
+	short_ad out;
+	out.extLength = le32_to_cpu(in.extLength);
+	out.extPosition = le32_to_cpu(in.extPosition);
+	return out;
+}
+
+static inline short_ad cpu_to_lesa(short_ad in)
+{
+	short_ad out;
+	out.extLength = cpu_to_le32(in.extLength);
+	out.extPosition = cpu_to_le32(in.extPosition);
+	return out;
+}
+
 static inline long_ad lela_to_cpu(long_ad in)
 {
 	long_ad out;

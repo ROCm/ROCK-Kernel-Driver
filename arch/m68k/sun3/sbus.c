@@ -12,8 +12,12 @@
 #include <linux/types.h>
 #include <linux/init.h>
 
+extern void rs_init(void);
+
 void __init sbus_init(void)
 {
+
+	rs_init();
 
 }
 

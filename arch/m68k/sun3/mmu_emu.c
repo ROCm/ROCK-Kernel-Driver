@@ -29,6 +29,7 @@
 extern void prom_reboot (char *) __attribute__ ((__noreturn__));
 
 #undef DEBUG_MMU_EMU
+#define DEBUG_PROM_MAPS
 
 /*
 ** Defines
@@ -157,9 +158,12 @@ void mmu_emu_init(unsigned long bootmem_end)
 	j = 0;
 	for (num=0, seg=0x0F800000; seg<0x10000000; seg+=16*PAGE_SIZE) {
 		if (sun3_get_segmap (seg) != SUN3_INVALID_PMEG) {
-#ifdef DEBUG_MMU_EMU
-			printk ("mapped:");
-			print_pte_vaddr (seg);
+#ifdef DEBUG_PROM_MAPS
+			for(i = 0; i < 16; i++) {
+				printk ("mapped:");
+				print_pte_vaddr (seg + (i*PAGE_SIZE));
+				break;
+			}
 #endif
 			// the lowest mapping here is the end of our
 			// vmalloc region
@@ -174,7 +178,7 @@ void mmu_emu_init(unsigned long bootmem_end)
 	}
 
 	
-	sun3_dvma_init();
+	dvma_init();
 	
 	
 	/* blank everything below the kernel, and we've got the base

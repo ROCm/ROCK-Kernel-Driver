@@ -68,12 +68,12 @@ struct dentry {
 	unsigned int d_flags;
 	struct inode  * d_inode;	/* Where the name belongs to - NULL is negative */
 	struct dentry * d_parent;	/* parent directory */
-	struct list_head d_vfsmnt;
 	struct list_head d_hash;	/* lookup hash list */
 	struct list_head d_lru;		/* d_count = 0 LRU list */
 	struct list_head d_child;	/* child of parent list */
 	struct list_head d_subdirs;	/* our children */
 	struct list_head d_alias;	/* inode alias list */
+	int d_mounted;
 	struct qstr d_name;
 	unsigned long d_time;		/* used by d_revalidate */
 	struct dentry_operations  *d_op;
@@ -265,9 +265,10 @@ extern void dput(struct dentry *);
 
 static __inline__ int d_mountpoint(struct dentry *dentry)
 {
-	return !list_empty(&dentry->d_vfsmnt);
+	return dentry->d_mounted;
 }
 
+extern struct vfsmount *lookup_mnt(struct vfsmount *, struct dentry *);
 #endif /* __KERNEL__ */
 
 #endif	/* __LINUX_DCACHE_H */

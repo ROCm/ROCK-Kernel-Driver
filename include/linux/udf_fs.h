@@ -16,7 +16,7 @@
  * CONTACTS
  *	E-mail regarding any portion of the Linux UDF file system should be
  *	directed to the development team mailing list (run by majordomo):
- *		linux_udf@hootie.lvld.hp.com
+ *		linux_udf@hpesjro.fc.hp.com
  *
  * COPYRIGHT
  *	This file is distributed under the terms of the GNU General Public
@@ -35,10 +35,20 @@
 #define _LINUX_UDF_FS_H
 
 #define UDF_PREALLOCATE
-#define UDF_DEFAULT_PREALLOC_BLOCKS		8
+#define UDF_DEFAULT_PREALLOC_BLOCKS	8
 
-#define UDFFS_DATE		"2000/02/29"
-#define UDFFS_VERSION	"0.9.1"
+#define UDFFS_DATE			"2001/06/06"
+#define UDFFS_VERSION			"0.9.4"
+
+#if !defined(UDFFS_RW)
+
+#if defined(CONFIG_UDF_RW)
+#define UDFFS_RW			1
+#else /* !defined(CONFIG_UDF_RW) */
+#define UDFFS_RW			0
+#endif /* defined(CONFIG_UDF_RW) */
+
+#endif /* !defined(UDFFS_RW) */
 
 #define UDFFS_DEBUG
 

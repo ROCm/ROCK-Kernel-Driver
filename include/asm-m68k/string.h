@@ -80,8 +80,9 @@ static inline char * strchr(const char * s, int c)
   return( (char *) s);
 }
 
+#if 0
 #define __HAVE_ARCH_STRPBRK
-static inline char * strpbrk(const char * cs,const char * ct)
+extern inline char * strpbrk(const char * cs,const char * ct)
 {
   const char *sc1,*sc2;
   
@@ -91,7 +92,9 @@ static inline char * strpbrk(const char * cs,const char * ct)
 	return((char *) sc1);
   return( NULL );
 }
+#endif
 
+#if 0
 #define __HAVE_ARCH_STRSPN
 static inline size_t strspn(const char *s, const char *accept)
 {
@@ -112,9 +115,11 @@ static inline size_t strspn(const char *s, const char *accept)
 
   return count;
 }
+#endif
 
+#if 0
 #define __HAVE_ARCH_STRTOK
-static inline char * strtok(char * s,const char * ct)
+extern inline char * strtok(char * s,const char * ct)
 {
   char *sbegin, *send;
   
@@ -133,6 +138,7 @@ static inline char * strtok(char * s,const char * ct)
   ___strtok = send;
   return (sbegin);
 }
+#endif
 
 /* strstr !! */
 
@@ -318,7 +324,7 @@ static inline void * __memset_page(void * s,int c,size_t count)
 #ifdef CPU_M68040_OR_M68060_ONLY
 
   if (((unsigned long) s) & 0x0f)
-	  memset(s, c, count);
+	  __memset_g(s, c, count);
   else{
 	  *((unsigned long *)(s))++ = data;
 	  *((unsigned long *)(s))++ = data;
@@ -356,6 +362,8 @@ static inline void * __memset_page(void * s,int c,size_t count)
   return xs;
 }
 
+extern void *memset(void *,int,__kernel_size_t);
+
 #define __memset_const(s,c,count) \
 ((count==PAGE_SIZE) ? \
   __memset_page((s),(c),(count)) : \
@@ -364,7 +372,7 @@ static inline void * __memset_page(void * s,int c,size_t count)
 #define memset(s, c, count) \
 (__builtin_constant_p(count) ? \
  __memset_const((s),(c),(count)) : \
- memset((s),(c),(count)))
+ __memset_g((s),(c),(count)))
 
 #define __HAVE_ARCH_MEMCPY
 /*
@@ -541,5 +549,15 @@ static inline void * memmove(void * dest,const void * src, size_t n)
 (__builtin_constant_p(n) ? \
  __builtin_memcmp((cs),(ct),(n)) : \
  memcmp((cs),(ct),(n)))
+
+#define __HAVE_ARCH_MEMCHR
+extern inline void * memchr(const void * cs, int c, size_t count) {
+	/* Someone else can optimize this, I don't care - tonym@mac.linux-m68k.org */
+	unsigned char *ret = (unsigned char *)cs;
+	for(;count>0;count--,ret++)
+		if(*ret == c) return ret;
+
+	return NULL;
+}
 
 #endif /* _M68K_STRING_H_ */

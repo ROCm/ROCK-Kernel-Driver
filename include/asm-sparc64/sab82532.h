@@ -1,4 +1,4 @@
-/* $Id: sab82532.h,v 1.6 2000/04/13 07:22:35 ecd Exp $
+/* $Id: sab82532.h,v 1.7 2001/05/23 23:09:10 ecd Exp $
  * sab82532.h: Register Definitions for the Siemens SAB82532 DUSCC
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -9,6 +9,7 @@
 
 #include <linux/types.h>
 #include <linux/serial.h>
+#include <linux/circ_buf.h>
 
 struct sab82532_async_rd_regs {
 	u8	rfifo[0x20];	/* Receive FIFO				*/
@@ -150,7 +151,7 @@ struct sab82532 {
 	int				 close_delay;
 	unsigned short			 closing_wait;
 	unsigned short			 closing_wait2;
-	int				 all_sent;
+	unsigned long			 irqflags;
 	int				 is_console;
 	unsigned char			 interrupt_mask0;
 	unsigned char			 interrupt_mask1;
@@ -166,10 +167,7 @@ struct sab82532 {
 	int				 blocked_open;
 	long				 session;
 	long				 pgrp;
-	unsigned char			*xmit_buf;
-	int				 xmit_head;
-	int				 xmit_tail;
-	int				 xmit_cnt;
+	struct circ_buf			 xmit;
 	struct tq_struct		 tqueue;
 	struct tq_struct		 tqueue_hangup;
 	struct async_icount		 icount;
@@ -181,6 +179,11 @@ struct sab82532 {
 	struct sab82532			*next;
 	struct sab82532			*prev;
 };
+
+
+/* irqflags bits */
+#define SAB82532_ALLS			0x00000001
+#define SAB82532_XPR			0x00000002
 
 
 /* RFIFO Status Byte */

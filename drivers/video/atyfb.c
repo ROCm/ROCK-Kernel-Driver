@@ -3213,7 +3213,7 @@ static struct {
 static void atyfb_save_palette(struct fb_info *fb, int enter)
 {
 	struct fb_info_aty *info = (struct fb_info_aty *)fb;
-	int i, tmp, scale;
+	int i, tmp;
 
 	for (i = 0; i < 256; i++) {
 		tmp = aty_ld_8(DAC_CNTL, info) & 0xfc;
@@ -3225,14 +3225,11 @@ static void atyfb_save_palette(struct fb_info *fb, int enter)
 		aty_st_8(DAC_CNTL, tmp, info);
 		aty_st_8(DAC_MASK, 0xff, info);
 
-		scale = ((Gx != GX_CHIP_ID) && (Gx != CX_CHIP_ID) &&
-			(info->current_par.crtc.bpp == 16)) ? 3 : 0;
-		writeb(i << scale, &info->aty_cmap_regs->rindex);
-
+		writeb(i, &info->aty_cmap_regs->rindex);
 		atyfb_save.r[enter][i] = readb(&info->aty_cmap_regs->lut);
 		atyfb_save.g[enter][i] = readb(&info->aty_cmap_regs->lut);
 		atyfb_save.b[enter][i] = readb(&info->aty_cmap_regs->lut);
-		writeb(i << scale, &info->aty_cmap_regs->windex);
+		writeb(i, &info->aty_cmap_regs->windex);
 		writeb(atyfb_save.r[1-enter][i], &info->aty_cmap_regs->lut);
 		writeb(atyfb_save.g[1-enter][i], &info->aty_cmap_regs->lut);
 		writeb(atyfb_save.b[1-enter][i], &info->aty_cmap_regs->lut);

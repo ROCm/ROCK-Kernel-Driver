@@ -1,4 +1,4 @@
-/* $Id: amd7930.c,v 1.26 2001/02/13 01:16:59 davem Exp $
+/* $Id: amd7930.c,v 1.27 2001/05/21 01:25:22 davem Exp $
  * drivers/sbus/audio/amd7930.c
  *
  * Copyright (C) 1996,1997 Thomas K. Dyas (tdyas@eden.rutgers.edu)
@@ -107,7 +107,7 @@ static __u8  mulaw2bilinear(__u8 data);
 static __u8  linear2mulaw(__u16 data);
 static __u16 mulaw2linear(__u8 data);
 
-#if defined (AMD79C30_ISDN) && defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff 
+#if defined (AMD79C30_ISDN)
 #include "../../isdn/hisax/hisax.h"
 #include "../../isdn/hisax/isdnl1.h"
 #include "../../isdn/hisax/foreign.h"
@@ -1131,7 +1131,7 @@ static int amd7930_ioctl(struct inode * inode, struct file * file,
  *
  */
 
-#if defined (AMD79C30_ISDN) && defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff 
+#if defined (AMD79C30_ISDN)
 static int amd7930_get_irqnum(int dev)
 {
 	struct amd7930_info *info;
@@ -1659,9 +1659,8 @@ static int amd7930_attach(struct sparcaudio_driver *drv, int node,
 	return 0;
 }
 
-#ifdef MODULE
 /* Detach from an amd7930 chip given the device structure. */
-static void amd7930_detach(struct sparcaudio_driver *drv)
+static void __exit amd7930_detach(struct sparcaudio_driver *drv)
 {
 	struct amd7930_info *info = (struct amd7930_info *)drv->private;
 
@@ -1672,14 +1671,9 @@ static void amd7930_detach(struct sparcaudio_driver *drv)
 	sbus_iounmap(info->regs, info->regs_size);
 	kfree(drv->private);
 }
-#endif
 
 /* Probe for the amd7930 chip and then attach the driver. */
-#ifdef MODULE
-int init_module(void)
-#else
-int __init amd7930_init(void)
-#endif
+static int __init amd7930_init(void)
 {
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev;
@@ -1710,8 +1704,7 @@ int __init amd7930_init(void)
 	return (num_drivers > 0) ? 0 : -EIO;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit amd7930_exit(void)
 {
 	register int i;
 
@@ -1720,8 +1713,9 @@ void cleanup_module(void)
 		num_drivers--;
 	}
 }
-#endif
 
+module_init(amd7930_init);
+module_exit(amd7930_exit);
 
 /*************************************************************/
 /*                 Audio format conversion                   */

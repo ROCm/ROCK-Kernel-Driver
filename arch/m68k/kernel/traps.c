@@ -72,6 +72,12 @@ asm(".text\n"
  */
 void __init base_trap_init(void)
 {
+	if(MACH_IS_SUN3X) {
+		extern e_vector *sun3x_prom_vbr;
+
+		__asm__ volatile ("movec %%vbr, %0" : "=r" ((void*)sun3x_prom_vbr));
+	}
+	
 	/* setup the exception vector table */
 	__asm__ volatile ("movec %0,%%vbr" : : "r" ((void*)vectors));
 
@@ -245,9 +251,12 @@ static inline void access_error060 (struct frame *fp)
 #endif /* CONFIG_M68060 */
 
 #if defined (CONFIG_M68040)
-static inline unsigned long probe040(int iswrite, unsigned long addr)
+static inline unsigned long probe040(int iswrite, unsigned long addr, int wbs)
 {
 	unsigned long mmusr;
+	mm_segment_t old_fs = get_fs();
+
+	set_fs(MAKE_MM_SEG(wbs));
 
 	asm volatile (".chip 68040");
 
@@ -260,6 +269,8 @@ static inline unsigned long probe040(int iswrite, unsigned long addr)
 
 	asm volatile (".chip 68k");
 
+	set_fs(old_fs); 
+
 	return mmusr;
 }
 
@@ -267,7 +278,9 @@ static inline int do_040writeback1(unsigned short wbs, unsigned long wba,
 				   unsigned long wbd)
 {
 	int res = 0;
+	mm_segment_t old_fs = get_fs();
 
+	/* set_fs can not be moved, otherwise put_user() may oops */
 	set_fs(MAKE_MM_SEG(wbs));
 
 	switch (wbs & WBSIZ_040) {
@@ -282,6 +295,10 @@ static inline int do_040writeback1(unsigned short wbs, unsigned long wba,
 		break;
 	}
 
+	/* set_fs can not be moved, otherwise put_user() may oops */
+	set_fs(old_fs); 
+	
+
 #ifdef DEBUG
 	printk("do_040writeback1, res=%d\n",res);
 #endif
@@ -293,10 +310,12 @@ static inline int do_040writeback1(unsigned short wbs, unsigned long wba,
  * to that exception is discarded, set a few bits in the old frame 
  * to simulate what it should look like
  */
-static inline void fix_xframe040(struct frame *fp, unsigned short wbs)
+static inline void fix_xframe040(struct frame *fp, unsigned long wba, unsigned short wbs)
 {
-	fp->un.fmt7.faddr = current->thread.faddr;
+	fp->un.fmt7.faddr = wba;
 	fp->un.fmt7.ssw = wbs & 0xff;
+	if (wba != current->thread.faddr)
+	    fp->un.fmt7.ssw |= MA_040;
 }
 
 static inline void do_040writebacks(struct frame *fp)
@@ -312,7 +331,7 @@ static inline void do_040writebacks(struct frame *fp)
 		res = do_040writeback1(fp->un.fmt7.wb2s, fp->un.fmt7.wb2a,
 				       fp->un.fmt7.wb2d);
 		if (res)
-			fix_xframe040(fp, fp->un.fmt7.wb2s);
+			fix_xframe040(fp, fp->un.fmt7.wb2a, fp->un.fmt7.wb2s);
 		else 
 			fp->un.fmt7.wb2s = 0;
 	}
@@ -322,7 +341,14 @@ static inline void do_040writebacks(struct frame *fp)
 		res = do_040writeback1(fp->un.fmt7.wb3s, fp->un.fmt7.wb3a,
 				       fp->un.fmt7.wb3d);
 		if (res)
-			fix_xframe040(fp, fp->un.fmt7.wb3s);
+		    {
+			fix_xframe040(fp, fp->un.fmt7.wb3a, fp->un.fmt7.wb3s);
+
+			fp->un.fmt7.wb2s = fp->un.fmt7.wb3s;
+			fp->un.fmt7.wb3s &= (~WBV_040);
+			fp->un.fmt7.wb2a = fp->un.fmt7.wb3a;
+			fp->un.fmt7.wb2d = fp->un.fmt7.wb3d;
+		    }
 		else
 			fp->un.fmt7.wb3s = 0;
 	}
@@ -339,19 +365,15 @@ static inline void do_040writebacks(struct frame *fp)
  */
 asmlinkage void berr_040cleanup(struct frame *fp)
 {
-	mm_segment_t old_fs = get_fs();
-
 	fp->un.fmt7.wb2s &= ~4;
 	fp->un.fmt7.wb3s &= ~4;
 
 	do_040writebacks(fp);
-	set_fs(old_fs);
 }
 
 static inline void access_error040(struct frame *fp)
 {
 	unsigned short ssw = fp->un.fmt7.ssw;
-	mm_segment_t old_fs = get_fs();
 	unsigned long mmusr;
 
 #ifdef DEBUG
@@ -374,9 +396,8 @@ static inline void access_error040(struct frame *fp)
 		if (ssw & MA_040)
 			addr = (addr + 7) & -8;
 
-		set_fs(MAKE_MM_SEG(ssw));
 		/* MMU error, get the MMUSR info for this access */
-		mmusr = probe040(!(ssw & RW_040), addr);
+		mmusr = probe040(!(ssw & RW_040), addr, ssw);
 #ifdef DEBUG
 		printk("mmusr = %lx\n", mmusr);
 #endif
@@ -386,8 +407,12 @@ static inline void access_error040(struct frame *fp)
 			__flush_tlb040_one(addr);
 			errorcode = 0;
 		}
-		if (!(ssw & RW_040))
+
+		/* despite what documentation seems to say, RMW 
+		 * accesses have always both the LK and RW bits set */
+		if (!(ssw & RW_040) || (ssw & LK_040))
 			errorcode |= 2;
+
 		if (do_page_fault(&fp->ptregs, addr, errorcode)) {
 #ifdef DEBUG
 		        printk("do_page_fault() !=0 \n");
@@ -415,7 +440,6 @@ static inline void access_error040(struct frame *fp)
 	}
 
 	do_040writebacks(fp);
-	set_fs(old_fs);
 }
 #endif /* CONFIG_M68040 */
 

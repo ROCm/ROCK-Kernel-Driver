@@ -51,6 +51,8 @@
  * One-shot DMA control registers
  */
 
+#define PSC_MYSTERY	0x804
+
 #define PSC_CTL_BASE	0xC00
 
 #define PSC_SCSI_CTL	0xC00
@@ -70,6 +72,9 @@
 #define PSC_ADDR_BASE	0x1000
 #define PSC_LEN_BASE	0x1004
 #define PSC_CMD_BASE	0x1008
+
+#define PSC_SET0	0x00
+#define PSC_SET1	0x10
 
 #define PSC_SCSI_ADDR	0x1000 	/* confirmed */
 #define PSC_SCSI_LEN	0x1004 	/* confirmed */

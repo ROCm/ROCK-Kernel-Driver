@@ -5,6 +5,7 @@
  */
 
 #include <linux/types.h>
+#include <linux/kd.h>
 #include <linux/init.h>
 #include <linux/sched.h>
 #include <linux/kernel_stat.h>
@@ -15,6 +16,8 @@
 #include <asm/system.h>
 #include <asm/traps.h>
 #include <asm/sun3x.h>
+#include <asm/sun3ints.h>
+#include <asm/rtc.h>
 
 #include "time.h"
 
@@ -33,6 +36,7 @@
 #define C_CALIB   0x1f
 
 #define BCD_TO_BIN(val) (((val)&15) + ((val)>>4)*10)
+#define BIN_TO_BCD(val) (((val/10) << 4) | (val % 10))
 
 /* Read the Mostek */
 void sun3x_gettod (int *yearp, int *monp, int *dayp,
@@ -45,7 +49,7 @@ void sun3x_gettod (int *yearp, int *monp, int *dayp,
 
     /* Read values */
     *yearp = BCD_TO_BIN(*(eeprom + M_YEAR));
-    *monp  = BCD_TO_BIN(*(eeprom + M_MONTH));
+    *monp  = BCD_TO_BIN(*(eeprom + M_MONTH)) +1;
     *dayp  = BCD_TO_BIN(*(eeprom + M_DATE));
     *hourp = BCD_TO_BIN(*(eeprom + M_HOUR));
     *minp  = BCD_TO_BIN(*(eeprom + M_MIN));
@@ -55,6 +59,40 @@ void sun3x_gettod (int *yearp, int *monp, int *dayp,
     *(eeprom + M_CONTROL) &= ~C_READ;
 }
 
+int sun3x_hwclk(int set, struct hwclk_time *t)
+{
+	volatile struct mostek_dt *h = 
+		(unsigned char *)(SUN3X_EEPROM+M_CONTROL);
+	unsigned long flags;
+
+	save_and_cli(flags);
+	
+	if(set) {
+		h->csr |= C_WRITE;
+		h->sec = BIN_TO_BCD(t->sec);
+		h->min = BIN_TO_BCD(t->min);
+		h->hour = BIN_TO_BCD(t->hour);
+		h->wday = BIN_TO_BCD(t->wday);
+		h->mday = BIN_TO_BCD(t->day);
+		h->month = BIN_TO_BCD(t->mon);
+		h->year = BIN_TO_BCD(t->year);
+		h->csr &= ~C_WRITE;
+	} else {
+		h->csr |= C_READ;
+		t->sec = BCD_TO_BIN(h->sec);
+		t->min = BCD_TO_BIN(h->min);
+		t->hour = BCD_TO_BIN(h->hour);
+		t->wday = BCD_TO_BIN(h->wday);
+		t->day = BCD_TO_BIN(h->mday);
+		t->mon = BCD_TO_BIN(h->month);
+		t->year = BCD_TO_BIN(h->year);
+		h->csr &= ~C_READ;
+	}
+
+	restore_flags(flags);
+
+	return 0;
+}
 /* Not much we can do here */
 unsigned long sun3x_gettimeoffset (void)
 {
@@ -74,9 +112,12 @@ static void sun3x_timer_tick(int irq, void *dev_id, struct pt_regs *regs)
 
 void __init sun3x_sched_init(void (*vector)(int, void *, struct pt_regs *))
 {
-    sys_request_irq(5, sun3x_timer_tick, IRQ_FLG_STD, "timer tick", vector);
+	
+	sun3_disable_interrupts();
+	
 
     /* Pulse enable low to get the clock started */
-    disable_irq(5);
-    enable_irq(5);
+	sun3_disable_irq(5);
+	sun3_enable_irq(5);
+	sun3_enable_interrupts();
 }

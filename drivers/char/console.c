@@ -103,8 +103,6 @@
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 
-#include <asm/linux_logo.h>
-
 #include "console_macros.h"
 
 

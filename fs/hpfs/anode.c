@@ -161,6 +161,7 @@ secno hpfs_add_sector_to_btree(struct super_block *s, secno node, int fnod, unsi
 	if ((a == node && fnod) || na == -1) return se;
 	c2 = 0;
 	while (up != -1) {
+		struct anode *new_anode;
 		if (s->s_hpfs_chk)
 			if (hpfs_stop_cycles(s, up, &c1, &c2, "hpfs_add_sector_to_btree #2")) return -1;
 		if (up != node || !fnod) {
@@ -194,7 +195,8 @@ secno hpfs_add_sector_to_btree(struct super_block *s, secno node, int fnod, unsi
 		mark_buffer_dirty(bh);
 		brelse(bh);
 		a = na;
-		if ((anode = hpfs_alloc_anode(s, a, &na, &bh))) {
+		if ((new_anode = hpfs_alloc_anode(s, a, &na, &bh))) {
+			anode = new_anode;
 			/*anode->up = up != -1 ? up : ra;*/
 			anode->btree.internal = 1;
 			anode->btree.n_used_nodes = 1;
@@ -282,7 +284,7 @@ void hpfs_remove_btree(struct super_block *s, struct bplus_header *btree)
 		if (s->s_hpfs_chk)
 			if (hpfs_stop_cycles(s, ano, &d1, &d2, "hpfs_remove_btree #1"))
 				return;
-		anode = hpfs_map_anode(s, ano, &bh);
+		if (!(anode = hpfs_map_anode(s, ano, &bh))) return;
 		btree1 = &anode->btree;
 		level++;
 		pos = 0;
@@ -291,14 +293,14 @@ void hpfs_remove_btree(struct super_block *s, struct bplus_header *btree)
 		hpfs_free_sectors(s, btree1->u.external[i].disk_secno, btree1->u.external[i].length);
 	go_up:
 	if (!level) return;
+	brelse(bh);
 	if (s->s_hpfs_chk)
 		if (hpfs_stop_cycles(s, ano, &c1, &c2, "hpfs_remove_btree #2")) return;
-	brelse(bh);
 	hpfs_free_sectors(s, ano, 1);
 	oano = ano;
 	ano = anode->up;
 	if (--level) {
-		anode = hpfs_map_anode(s, ano, &bh);
+		if (!(anode = hpfs_map_anode(s, ano, &bh))) return;
 		btree1 = &anode->btree;
 	} else btree1 = btree;
 	for (i = 0; i < btree1->n_used_nodes; i++) {

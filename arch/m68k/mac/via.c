@@ -410,8 +410,6 @@ void via1_irq(int irq, void *dev_id, struct pt_regs *regs)
 	int irq_bit, i;
 	unsigned char events, mask;
 
-	irq -= VEC_SPUR;
-
 	mask = via1[vIER] & 0x7F;
 	if (!(events = via1[vIFR] & mask)) return;
 
@@ -423,6 +421,7 @@ void via1_irq(int irq, void *dev_id, struct pt_regs *regs)
 			via1[vIER] = irq_bit | 0x80;
 		}
 
+#if 0 /* freakin' pmu is doing weird stuff */
 	if (!oss_present) {
 		/* This (still) seems to be necessary to get IDE
 		   working.  However, if you enable VBL interrupts,
@@ -435,14 +434,13 @@ void via1_irq(int irq, void *dev_id, struct pt_regs *regs)
 		mac_do_irq_list(IRQ_MAC_NUBUS, regs);
 		via_irq_enable(IRQ_MAC_NUBUS);
 	}
+#endif
 }
 
 void via2_irq(int irq, void *dev_id, struct pt_regs *regs)
 {
 	int irq_bit, i;
 	unsigned char events, mask;
-
-	irq -= VEC_SPUR;
 
 	mask = via2[gIER] & 0x7F;
 	if (!(events = via2[gIFR] & mask)) return;

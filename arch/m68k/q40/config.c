@@ -13,11 +13,9 @@
  */
 
 #include <linux/config.h>
-#include <stdarg.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/kd.h>
 #include <linux/tty.h>
 #include <linux/console.h>
 #include <linux/linkage.h>
@@ -25,6 +23,7 @@
 #include <linux/major.h>
 #include <linux/serial_reg.h>
 
+#include <asm/io.h>
 #include <asm/rtc.h>
 #include <asm/bootinfo.h>
 #include <asm/system.h>
@@ -32,6 +31,7 @@
 #include <asm/setup.h>
 #include <asm/irq.h>
 #include <asm/traps.h>
+#include <asm/rtc.h>
 #include <asm/machdep.h>
 #include <asm/q40_master.h>
 #include <asm/keyboard.h>
@@ -39,6 +39,8 @@
 extern void floppy_eject(void);
 extern void floppy_setup(char *str, int *ints);
 
+extern int q40kbd_translate(unsigned char scancode, unsigned char *keycode,
+			    char raw_mode);
 extern void q40_process_int (int level, struct pt_regs *regs);
 extern void (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);  /* added just for debugging */
 extern void q40_init_IRQ (void);
@@ -50,16 +52,17 @@ static void q40_get_model(char *model);
 static int  q40_get_hardware_list(char *buffer);
 extern int  q40_request_irq(unsigned int irq, void (*handler)(int, void *, struct pt_regs *), unsigned long flags, const char *devname, void *dev_id);
 extern void q40_sched_init(void (*handler)(int, void *, struct pt_regs *));
-extern int  q40_keyb_init(void);
-extern int  q40_kbdrate (struct kbd_repeat *);
+
 extern unsigned long q40_gettimeoffset (void);
 extern void q40_gettod (int *year, int *mon, int *day, int *hour,
                            int *min, int *sec);
 extern int q40_hwclk (int, struct hwclk_time *);
 extern int q40_set_clock_mmss (unsigned long);
 extern void q40_reset (void);
+void q40_halt(void);
 extern void q40_waitbut(void);
 void q40_set_vectors (void);
+
 extern void (*kd_mksound)(unsigned int, unsigned int);
 void q40_mksound(unsigned int /*freq*/, unsigned int /*ticks*/ );
 
@@ -67,15 +70,8 @@ extern char *saved_command_line;
 extern char m68k_debug_device[];
 static void q40_mem_console_write(struct console *co, const char *b,
 				    unsigned int count);
-#if 0
-extern int ql_ticks=0;
-extern int sound_ticks=0;
-#endif
 
 extern int ql_ticks;
-
-static unsigned char bcd2bin (unsigned char b);
-static unsigned char bin2bcd (unsigned char b);
 
 static int q40_wait_key(struct console *co){return 0;}
 static struct console q40_console_driver = {
@@ -90,11 +86,13 @@ static struct console q40_console_driver = {
 extern char *q40_mem_cptr; /*=(char *)0xff020000;*/
 static int _cpleft;
 
+#if 0
 int q40_kbd_translate(unsigned char keycode, unsigned char *keycodep, char raw_mode)
 {
         *keycodep = keycode;
         return 1;
 }
+#endif
 
 static void q40_mem_console_write(struct console *co, const char *s,
 				  unsigned int count)
@@ -130,13 +128,36 @@ int q40_kbdrate (struct kbd_repeat *k)
 }
 #endif
 
+static int halted=0;
+
+#ifdef CONFIG_HEARTBEAT
+static void q40_heartbeat(int on)
+{
+  if (halted) return;
+
+  if (on)
+    Q40_LED_ON();
+  else
+    Q40_LED_OFF();
+}
+#endif
+
 void q40_reset()
 {
-
+        halted=1;
         printk ("\n\n*******************************************\n"
 		"Called q40_reset : press the RESET button!! \n"
 		"*******************************************\n");
-	
+	Q40_LED_ON();
+	while(1) ;
+}
+void q40_halt()
+{
+        halted=1;
+        printk ("\n\n*******************\n"
+		    "  Called q40_halt\n"
+		    "*******************\n");
+	Q40_LED_ON();
 	while(1) ;
 }
 
@@ -202,17 +223,17 @@ void q40_disable_irqs(void)
 
 void __init config_q40(void)
 {
-    mach_sched_init      = q40_sched_init;           /* ok */
-    /*mach_kbdrate         = q40_kbdrate;*/          /* unneeded ?*/
-    mach_keyb_init       = q40_keyb_init;            /* OK */
-    mach_kbd_translate   = q40_kbd_translate;
+    mach_sched_init      = q40_sched_init;
+
+    mach_keyb_init       = q40kbd_init_hw;
+    mach_kbd_translate   = q40kbd_translate;
     mach_init_IRQ        = q40_init_IRQ;   
     mach_gettimeoffset   = q40_gettimeoffset; 
     mach_gettod  	 = q40_gettod;
     mach_hwclk           = q40_hwclk; 
     mach_set_clock_mmss	 = q40_set_clock_mmss;
-/*  mach_mksound         = q40_mksound; */
-    mach_reset		 = q40_reset;           /* use reset button instead !*/
+
+    mach_reset		 = q40_reset;
     mach_free_irq	 = q40_free_irq; 
     mach_process_int	 = q40_process_int;
     mach_get_irq_list	 = q40_get_irq_list;
@@ -220,26 +241,28 @@ void __init config_q40(void)
     enable_irq		 = q40_enable_irq;
     disable_irq          = q40_disable_irq;
     mach_default_handler = &q40_sys_default_handler;
-    mach_get_model       = q40_get_model; /* no use..*/
-    mach_get_hardware_list = q40_get_hardware_list; /* no use */
+    mach_get_model       = q40_get_model;
+    mach_get_hardware_list = q40_get_hardware_list;
     kd_mksound             = q40_mksound;
-    /*mach_kbd_leds        = q40kbd_leds;*/
+
 #ifdef CONFIG_MAGIC_SYSRQ
     mach_sysrq_key       = 0x54;
 #endif
-    conswitchp = &dummy_con;
-#if 0 /*def CONFIG_BLK_DEV_FD*/
-    mach_floppy_setup    = floppy_setup;
-    mach_floppy_eject    = floppy_eject;
-    /**/
+#ifdef CONFIG_HEARTBEAT
+    mach_heartbeat = q40_heartbeat;
 #endif
+    mach_halt = q40_halt;
+    conswitchp = &dummy_con;
 
+    /* disable a few things that SMSQ might have left enabled */
     q40_disable_irqs();
-    mach_max_dma_address = 32*1024*1024;   /* no DMA at all, but ide-scsi requires it.. */
 
+    /* no DMA at all, but ide-scsi requires it.. make sure
+     * all physical RAM fits into the boundary - otherwise 
+     * allocator may play costly and useless tricks */
+    mach_max_dma_address = 1024*1024*1024;   
 
-/* useful for early debugging stages - writes kernel messages into SRAM */
-
+    /* useful for early debugging stages - writes kernel messages into SRAM */
     if (!strncmp( m68k_debug_device,"mem",3 ))
       {
 	/*printk("using NVRAM debug, q40_mem_cptr=%p\n",q40_mem_cptr);*/
@@ -252,109 +275,24 @@ void __init config_q40(void)
 
 int q40_parse_bootinfo(const struct bi_record *rec)
 {
-  return 1;  /* unknown */
+  return 1;
 }
 
-#if 0
-#define DAC_LEFT  ((unsigned char *)0xff008000)
-#define DAC_RIGHT ((unsigned char *)0xff008004)
-void q40_mksound(unsigned int hz, unsigned int ticks)
+
+static inline unsigned char bcd2bin (unsigned char b)
 {
-  /* for now ignore hz, except that hz==0 switches off sound */
-  /* simply alternate the ampl 0-255-0-.. at 200Hz */
-  if (hz==0)
-    {
-      if (sound_ticks)
-	sound_ticks=1; /* atomic - no irq spinlock used */
-
-      *DAC_LEFT=0;
-      *DAC_RIGHT=0;
-
-      return;
-    }
-  /* sound itself is done in q40_timer_int */
-  if (sound_ticks == 0) sound_ticks=1000; /* pretty long beep */
-  sound_ticks=ticks<<1;
+	return ((b>>4)*10 + (b&15));
 }
 
-static void (*q40_timer_routine)(int, void *, struct pt_regs *);
-static short rtc_oldsecs=0;
-unsigned rtc_irq_flags=0;
-unsigned rtc_irq_ctrl=0;
-
-static void q40_timer_int (int irq, void *dev_id, struct pt_regs *fp)
+static inline unsigned char bin2bcd (unsigned char b)
 {
-#if (HZ==10000)
-    master_outb(-1,SAMPLE_CLEAR_REG);
-#else /* must be 50 or 100 */
-    master_outb(-1,FRAME_CLEAR_REG);
-#endif
-
-#if (HZ==100)
-    ql_ticks = ql_ticks ? 0 : 1;
-    if (sound_ticks)
-      {
-	unsigned char sval=(sound_ticks & 1) ? 0 : 255;
-	sound_ticks--;
-	*DAC_LEFT=sval;
-	*DAC_RIGHT=sval;
-      }
-#ifdef CONFIG_Q40RTC
-    if (rtc_irq_ctrl && (rtc_oldsecs != RTC_SECS))
-      {
-	rtc_oldsecs = RTC_SECS;
-	rtc_irq_flags = RTC_UIE;
-	rtc_interrupt();
-      }
-#endif
-    if (ql_ticks) return;
-#endif
-    q40_timer_routine(irq, dev_id, fp);
+	return (((b/10)*16) + (b%10));
 }
-#endif
 
-#if 0
-extern void (*q40_timer_routine)(int, void *, struct pt_regs *);
-extern void q40_timer_int();
-
-void q40_sched_init (void (*timer_routine)(int, void *, struct pt_regs *))
-{
-    int timer_irq;
-
-    q40_timer_routine = timer_routine;
-
-#if (HZ==10000)
-    timer_irq=Q40_IRQ_TIMER;
-#else
-    timer_irq=Q40_IRQ_FRAME;
-#endif
-
-    /*printk("registering sched/timer IRQ %d\n", timer_irq);*/
-
-    if (request_irq(timer_irq, q40_timer_int, 0,
-				"timer", q40_timer_int))
-	panic ("Couldn't register timer int");
-
-#if (HZ==10000)
-    master_outb(SAMPLE_LOW,SAMPLE_RATE_REG);
-    master_outb(-1,SAMPLE_CLEAR_REG);
-    master_outb(1,SAMPLE_ENABLE_REG);
-#else
-    master_outb(-1,FRAME_CLEAR_REG);   /* not necessary ? */
-#if (HZ==100)
-    master_outb( 1,FRAME_RATE_REG);
-#endif
-#endif
-}
-#endif
 
 unsigned long q40_gettimeoffset (void)
 {
-#if (HZ==100)
     return 5000*(ql_ticks!=0);
-#else
-    return 0;
-#endif
 }
 
 extern void q40_gettod (int *year, int *mon, int *day, int *hour,
@@ -362,7 +300,7 @@ extern void q40_gettod (int *year, int *mon, int *day, int *hour,
 {
 	RTC_CTRL |= RTC_READ;
 	*year = bcd2bin (RTC_YEAR);
-	*mon = bcd2bin (RTC_MNTH)-1;
+	*mon = bcd2bin (RTC_MNTH);
 	*day = bcd2bin (RTC_DATE);
 	*hour = bcd2bin (RTC_HOUR);
 	*min = bcd2bin (RTC_MINS);
@@ -371,15 +309,6 @@ extern void q40_gettod (int *year, int *mon, int *day, int *hour,
 
 }
 
-static unsigned char bcd2bin (unsigned char b)
-{
-	return ((b>>4)*10 + (b&15));
-}
-
-static unsigned char bin2bcd (unsigned char b)
-{
-	return (((b/10)*16) + (b%10));
-}
 
 
 /*
@@ -439,8 +368,6 @@ int q40_hwclk(int op, struct hwclk_time *t)
 /*
  * Set the minutes and seconds from seconds value 'nowtime'.  Fail if
  * clock is out by > 30 minutes.  Logic lifted from atari code.
- * Algorithm is to wait for the 10ms register to change, and then to
- * wait a short while, and then set it.
  */
 
 int q40_set_clock_mmss (unsigned long nowtime)
@@ -469,18 +396,3 @@ int q40_set_clock_mmss (unsigned long nowtime)
 	return retval;
 }
 
-extern void q40kbd_init_hw(void);
-
-int q40_keyb_init (void)
-{
-        q40kbd_init_hw();
-	return 0;
-}
-
-#if 0
-/* dummy to cause */
-void q40_slow_io()
-{
-  return;
-}
-#endif

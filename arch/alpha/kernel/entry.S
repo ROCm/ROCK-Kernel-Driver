@@ -31,7 +31,7 @@
 #define TASK_STATE		0
 #define TASK_FLAGS		8
 #define TASK_SIGPENDING		16
-#define TASK_ADDR_LIMIT		24	
+#define TASK_ADDR_LIMIT		24
 #define TASK_EXEC_DOMAIN	32
 #define TASK_NEED_RESCHED	40
 #define TASK_PTRACE		48
@@ -576,13 +576,15 @@ entSys:
 .align 3
 ret_from_sys_call:
 	cmovne	$26,0,$19		/* $19 = 0 => non-restartable */
+#ifdef CONFIG_SMP
 	ldl	$3,TASK_PROCESSOR($8)
-	lda	$4,irq_stat		/* softirq_active */
 	sll	$3,L1_CACHE_SHIFT,$3
+#endif
+	lda	$4,irq_stat
+#ifdef CONFIG_SMP
 	addq	$3,$4,$4
-	ldq	$4,0($4)		/* softirq_active[32] + softirq_mask[32] */
-	sll	$4,32,$3
-	and	$4,$3,$4
+#endif
+	ldq	$4,0($4)		/* __softirq_pending */
 	bne	$4,handle_softirq
 ret_from_softirq:
 	ldq	$0,SP_OFF($30)

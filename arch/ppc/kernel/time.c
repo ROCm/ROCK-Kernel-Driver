@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.time.c 1.15 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.time.c 1.18 06/06/01 22:33:09 paulus
  */
 /*
  * Common time routines among all ppc machines.
@@ -210,6 +210,10 @@ int timer_interrupt(struct pt_regs * regs)
 		ppc_md.heartbeat();
 	
 	hardirq_exit(cpu);
+
+	if (softirq_pending(cpu))
+		do_softirq();
+
 	return 1; /* lets ret_from_int know we can do checks */
 }
 

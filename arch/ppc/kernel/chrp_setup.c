@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.chrp_setup.c 1.17 05/17/01 18:14:21 cort
+ * BK Id: SCCS/s.chrp_setup.c 1.20 06/05/01 21:22:02 paulus
  */
 /*
  *  linux/arch/ppc/kernel/setup.c
@@ -204,13 +204,10 @@ static void __init sio_fixup_irq(const char *name, u8 device, u8 level,
 	active = sio_read(0x30);
 	level0 = sio_read(0x70);
 	type0 = sio_read(0x71);
-	printk("sio: %s irq level %d, type %d, %sactive: ", name, level0,
-	       type0, !active ? "in" : "");
-	if (level0 == level && type0 == type && active)
-		printk("OK\n");
-	else {
-		printk("remapping to level %d, type %d, active\n", level,
-		       type);
+	if (level0 != level || type0 != type || !active) {
+		printk(KERN_WARNING "sio: %s irq level %d, type %d, %sactive: "
+		       "remapping to level %d, type %d, active\n",
+		       name, level0, type0, !active ? "in" : "", level, type);
 		sio_write(0x01, 0x30);
 		sio_write(level, 0x70);
 		sio_write(type, 0x71);

@@ -5,10 +5,9 @@
 #include <linux/threads.h>
 #include <linux/irq.h>
 
-/* entry.S is sensitive to the offsets of these fields */
+/* assembly code in softirq.h is sensitive to the offsets of these fields */
 typedef struct {
-	unsigned int __softirq_active;
-	unsigned int __softirq_mask;
+	unsigned int __softirq_pending;
 	unsigned int __local_irq_count;
 	unsigned int __local_bh_count;
 	unsigned int __syscall_count;

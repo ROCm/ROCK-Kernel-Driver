@@ -17,8 +17,8 @@
 #ifndef _M68K_AMIGAYLE_H_
 #define _M68K_AMIGAYLE_H_
 
+#include <linux/types.h>
 #include <asm/amigahw.h>
-#include <asm/io.h>
 
 /* memory layout */
 
@@ -59,11 +59,13 @@ struct GAYLE {
 
 #define gayle_attribute ((volatile u_char *)(GAYLE_ATTRIBUTE))
 
+#if 0
 #define gayle_inb(a) readb( GAYLE_IO+(a)+(((a)&1)*GAYLE_ODD) )
 #define gayle_outb(v,a) writeb( v, GAYLE_IO+(a)+(((a)&1)*GAYLE_ODD) )
 
 #define gayle_inw(a) readw( GAYLE_IO+(a) )
 #define gayle_outw(v,a) writew( v, GAYLE_IO+(a) )
+#endif
 
 /* GAYLE_CARDSTATUS bit def */
 

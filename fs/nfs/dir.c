@@ -753,6 +753,8 @@ static int nfs_rmdir(struct inode *dir, struct dentry *dentry)
 
 	nfs_zap_caches(dir);
 	error = NFS_PROTO(dir)->rmdir(dir, &dentry->d_name);
+	if (!error)
+		dentry->d_inode->i_nlink = 0;
 
 	return error;
 }
@@ -870,6 +872,8 @@ static int nfs_safe_remove(struct dentry *dentry)
 	error = NFS_PROTO(dir)->remove(dir, &dentry->d_name);
 	if (error < 0)
 		goto out;
+	if (inode)
+		inode->i_nlink--;
 
  out_delete:
 	/*

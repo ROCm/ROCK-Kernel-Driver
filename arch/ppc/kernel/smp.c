@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.smp.c 1.23 05/17/01 18:14:22 cort
+ * BK Id: SCCS/s.smp.c 1.25 05/23/01 00:38:42 cort
  */
 /*
  * Smp support for ppc.
@@ -670,12 +670,12 @@ smp_gemini_probe(void)
 static void
 smp_gemini_kick_cpu(int nr)
 {
-	openpic_init_processor( 1<<i );
+	openpic_init_processor( 1<<nr );
 	openpic_init_processor( 0 );
 }
 
 static void
-smp_gemini_setup_cpu(void)
+smp_gemini_setup_cpu(int cpu_nr)
 {
 	if (OpenPIC_Addr)
 		do_openpic_setup_cpu();

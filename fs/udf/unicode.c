@@ -14,7 +14,7 @@
  * CONTACTS
  *	E-mail regarding any portion of the Linux UDF file system should be
  *	directed to the development team's mailing list (run by majordomo):
- *		linux_udf@hootie.lvld.hp.com
+ *		linux_udf@hpesjro.fc.hp.com
  *
  * COPYRIGHT
  *	This file is distributed under the terms of the GNU General Public
@@ -27,7 +27,9 @@
 #ifdef __KERNEL__
 #include <linux/kernel.h>
 #include <linux/string.h>	/* for memset */
+#include <linux/nls.h>
 #include <linux/udf_fs.h>
+#include "udf_sb.h"
 #else
 #include <string.h>
 #endif
@@ -127,7 +129,7 @@ int udf_build_ustr_exact(struct ustr *dest, dstring *ptr, int exactsize)
 }
 
 /*
- * udf_ocu_to_udf8
+ * udf_ocu_to_utf8
  *
  * PURPOSE
  *	Convert OSTA Compressed Unicode to the UTF-8 equivalent.
@@ -327,7 +329,88 @@ error_out:
 }
 
 #ifdef __KERNEL__
-int udf_get_filename(Uint8 *sname, Uint8 *dname, int flen)
+int udf_CS0toNLS(struct nls_table *nls, struct ustr *utf_o, struct ustr *ocu_i)
+{
+	Uint8 *ocu;
+	Uint32 c;
+	Uint8 cmp_id, ocu_len;
+	int i;
+
+	ocu = ocu_i->u_name;
+
+	ocu_len = ocu_i->u_len;
+	cmp_id = ocu_i->u_cmpID;
+	utf_o->u_len = 0;
+
+	if (ocu_len == 0)
+	{
+		memset(utf_o, 0, sizeof(struct ustr));
+		utf_o->u_cmpID = 0;
+		utf_o->u_len = 0;
+		return 0;
+	}
+
+	if ((cmp_id != 8) && (cmp_id != 16))
+	{
+		printk(KERN_ERR "udf: unknown compression code (%d) stri=%s\n", cmp_id, ocu_i->u_name);
+		return 0;
+	}
+
+	for (i = 0; (i < ocu_len) && (utf_o->u_len <= (UDF_NAME_LEN-3)) ;)
+	{
+		/* Expand OSTA compressed Unicode to Unicode */
+		c = ocu[i++];
+		if (cmp_id == 16)
+			c = (c << 8) | ocu[i++];
+
+		utf_o->u_len += nls->uni2char(c, &utf_o->u_name[utf_o->u_len], 
+			UDF_NAME_LEN - utf_o->u_len);
+	}
+	utf_o->u_cmpID=8;
+	utf_o->u_hash=0L;
+	utf_o->padding=0;
+
+	return utf_o->u_len;
+}
+
+int udf_NLStoCS0(struct nls_table *nls, dstring *ocu, struct ustr *uni, int length)
+{
+	unsigned len, i, max_val;
+	Uint16 uni_char;
+	int uni_cnt;
+	int u_len = 0;
+
+	memset(ocu, 0, sizeof(dstring) * length);
+	ocu[0] = 8;
+	max_val = 0xffU;
+
+try_again:
+	uni_char = 0U;
+	uni_cnt = 0U;
+	for (i = 0U; i < uni->u_len; i++)
+	{
+		len = nls->char2uni(&uni->u_name[i], uni->u_len-i, &uni_char);
+
+		if (len == 2 && max_val == 0xff)
+		{
+			max_val = 0xffffU;
+			ocu[0] = (Uint8)0x10U;
+			goto try_again;
+		}
+		
+		if (max_val == 0xffffU)
+		{
+			ocu[++u_len] = (Uint8)(uni_char >> 8);
+			i++;
+		}
+		ocu[++u_len] = (Uint8)(uni_char & 0xffU);
+	}
+
+	ocu[length - 1] = (Uint8)u_len + 1;
+	return u_len + 1;
+}
+
+int udf_get_filename(struct super_block *sb, Uint8 *sname, Uint8 *dname, int flen)
 {
 	struct ustr filename, unifilename;
 	int len;
@@ -337,11 +420,24 @@ int udf_get_filename(Uint8 *sname, Uint8 *dname, int flen)
 		return 0;
 	}
 
-	if (!udf_CS0toUTF8(&filename, &unifilename) )
+	if (UDF_QUERY_FLAG(sb, UDF_FLAG_UTF8))
 	{
-		udf_debug("Failed in udf_get_filename: sname = %s\n", sname);
-		return 0;
+		if (!udf_CS0toUTF8(&filename, &unifilename) )
+		{
+			udf_debug("Failed in udf_get_filename: sname = %s\n", sname);
+			return 0;
+		}
 	}
+	else if (UDF_QUERY_FLAG(sb, UDF_FLAG_NLS_MAP))
+	{
+		if (!udf_CS0toNLS(UDF_SB(sb)->s_nls_map, &filename, &unifilename) )
+		{
+			udf_debug("Failed in udf_get_filename: sname = %s\n", sname);
+			return 0;
+		}
+	}
+	else
+		return 0;
 
 	if ((len = udf_translate_to_linux(dname, filename.u_name, filename.u_len,
 		unifilename.u_name, unifilename.u_len)))

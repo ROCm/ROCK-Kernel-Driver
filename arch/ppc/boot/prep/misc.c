@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.misc.c 1.8 05/18/01 06:20:29 patch
+ * BK Id: SCCS/s.misc.c 1.10 06/05/01 20:20:05 paulus
  */
 /*
  * misc.c
@@ -393,7 +393,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	{
 		struct bi_record *rec;
 	    
-		rec = (struct bi_record *)PAGE_ALIGN(zimage_size);
+		rec = (struct bi_record *)_ALIGN((unsigned long)(zimage_size)+(1<<20)-1,(1<<20));
 	    
 		rec->tag = BI_FIRST;
 		rec->size = sizeof(struct bi_record);
@@ -406,8 +406,8 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 	    
 		rec->tag = BI_MACHTYPE;
 		rec->data[0] = _MACH_prep;
-		rec->data[1] = 1;
-		rec->size = sizeof(struct bi_record) + sizeof(unsigned long);
+		rec->data[1] = 0;
+		rec->size = sizeof(struct bi_record) + 2 * sizeof(unsigned long);
 		rec = (struct bi_record *)((unsigned long)rec + rec->size);
 	    
 		rec->tag = BI_CMD_LINE;

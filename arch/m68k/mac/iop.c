@@ -51,9 +51,6 @@
  *   IOP hasn't died.
  * o Some of the IOP manager routines need better error checking and
  *   return codes. Nothing major, just prettying up.
- *
- * + share the stuff you were smoking when you wrote the iop_get_proc_info()
- *   for case when CONFIG_PROC_FS is undefined.
  */
 
 /*
@@ -129,9 +126,6 @@ int iop_scc_present,iop_ism_present;
 
 #ifdef CONFIG_PROC_FS
 static int iop_get_proc_info(char *, char **, off_t, int);
-#else
-/* What the bloody hell is THAT ??? */
-static int iop_get_proc_info(char *, char **, off_t, int) {}
 #endif /* CONFIG_PROC_FS */
 
 /* structure for tracking channel listeners */
@@ -307,7 +301,11 @@ void __init iop_init(void)
 		iop_listeners[IOP_NUM_ISM][i].handler = NULL;
 	}
 
-	create_proc_info_entry("mac_iop",0,0,iop_get_proc_info);
+#if 0	/* Crashing in 2.4 now, not yet sure why.   --jmt */
+#ifdef CONFIG_PROC_FS
+	create_proc_info_entry("mac_iop", 0, &proc_root, iop_get_proc_info);
+#endif
+#endif
 }
 
 /*

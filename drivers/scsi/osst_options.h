@@ -8,7 +8,7 @@
    Changed (and renamed) for OnStream SCSI drives garloff@suse.de
    2000-06-21
 
-   $Header: /home/cvsroot/Driver/osst_options.h,v 1.4 2000/06/26 01:44:01 riede Exp $
+   $Header: /home/cvsroot/Driver/osst_options.h,v 1.5 2001/01/07 22:19:15 riede Exp $
 */
 
 #ifndef _OSST_OPTIONS_H
@@ -24,7 +24,7 @@
    because of buffered reads. Should be set to zero to support also drives
    that can't space backwards over records. NOTE: The tape will be
    spaced backwards over an "accidentally" crossed filemark in any case. */
-#define OSST_IN_FILE_POS 0
+#define OSST_IN_FILE_POS 1
 
 /* The tape driver buffer size in kilobytes. */
 /* Don't change, as this is the HW blocksize */
@@ -33,7 +33,13 @@
 /* The number of kilobytes of data in the buffer that triggers an
    asynchronous write in fixed block mode. See also OSST_ASYNC_WRITES
    below. */
-#define OSST_WRITE_THRESHOLD_BLOCKS 30
+#define OSST_WRITE_THRESHOLD_BLOCKS 32
+
+/* OSST_EOM_RESERVE defines the number of frames are kept in reserve for
+ *  * write error recovery when writing near end of medium. ENOSPC is returned
+ *   * when write() is called and the tape write position is within this number
+ *    * of blocks from the tape capacity. */
+#define OSST_EOM_RESERVE 300
 
 /* The maximum number of tape buffers the driver allocates. The number
    is also constrained by the number of drives detected. Determines the
@@ -64,7 +70,7 @@
 
 /* If OSST_BUFFER_WRITES is non-zero, writes in fixed block mode are
    buffered until the driver buffer is full or asynchronous write is
-   triggered. May make detection of End-Of-Medium early enough fail. */
+   triggered. */
 #define OSST_BUFFER_WRITES 1
 
 /* If OSST_ASYNC_WRITES is non-zero, the SCSI write command may be started

@@ -1,4 +1,4 @@
-# $Id: config.in,v 1.143 2001/05/20 05:14:46 davem Exp $
+# $Id: config.in,v 1.144 2001/06/01 08:12:10 davem Exp $
 # For a description of the syntax of this configuration file,
 # see the Configure script.
 #
@@ -346,6 +346,10 @@ fi
 endmenu
 
 source drivers/usb/Config.in
+
+if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
+   source net/bluetooth/Config.in
+fi
 
 mainmenu_option next_comment
 comment 'Watchdog'

@@ -135,12 +135,13 @@ extern inline int pmd_none2 (pmd_t *pmd) { return !pmd_val (*pmd); }
 extern inline int pmd_bad2 (pmd_t *pmd) { return 0; }
 #define pmd_bad(pmd) pmd_bad2(&(pmd))
 extern inline int pmd_present2 (pmd_t *pmd) { return pmd_val (*pmd) & SUN3_PMD_VALID; }
-#define pmd_present(pmd) pmd_present2(&(pmd))
+/* #define pmd_present(pmd) pmd_present2(&(pmd)) */
+#define pmd_present(pmd) (!pmd_none2(&(pmd)))
 extern inline void pmd_clear (pmd_t *pmdp) { pmd_val (*pmdp) = 0; }
 
 extern inline int pgd_none (pgd_t pgd) { return 0; }
 extern inline int pgd_bad (pgd_t pgd) { return 0; }
-extern inline int pgd_present (pgd_t pgd) { return 0; }
+extern inline int pgd_present (pgd_t pgd) { return 1; }
 extern inline void pgd_clear (pgd_t *pgdp) {}
 
 

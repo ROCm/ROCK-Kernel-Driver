@@ -133,6 +133,7 @@ extern void oom_kill(void);
 extern void __delete_from_swap_cache(struct page *page);
 extern void delete_from_swap_cache(struct page *page);
 extern void delete_from_swap_cache_nolock(struct page *page);
+extern void free_page_and_swap_cache(struct page *page);
 
 /* linux/mm/swapfile.c */
 extern unsigned int nr_swapfiles;

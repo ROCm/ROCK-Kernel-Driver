@@ -1,4 +1,4 @@
-/* $Id: pci_schizo.c,v 1.16 2001/05/15 08:54:30 davem Exp $
+/* $Id: pci_schizo.c,v 1.17 2001/06/04 23:20:32 ecd Exp $
  * pci_schizo.c: SCHIZO specific PCI controller support.
  *
  * Copyright (C) 2001 David S. Miller (davem@redhat.com)
@@ -339,23 +339,28 @@ static int __init schizo_ino_to_pil(struct pci_dev *pdev, unsigned int ino)
 	if (ret == 0 && pdev == NULL) {
 		ret = 1;
 	} else if (ret == 0) {
-		switch ((pdev->class >> 16) & 0x0f) {
+		switch ((pdev->class >> 16) & 0xff) {
 		case PCI_BASE_CLASS_STORAGE:
 			ret = 4;
+			break;
 
 		case PCI_BASE_CLASS_NETWORK:
 			ret = 6;
+			break;
 
 		case PCI_BASE_CLASS_DISPLAY:
 			ret = 9;
+			break;
 
 		case PCI_BASE_CLASS_MULTIMEDIA:
 		case PCI_BASE_CLASS_MEMORY:
 		case PCI_BASE_CLASS_BRIDGE:
 			ret = 10;
+			break;
 
 		default:
 			ret = 1;
+			break;
 		};
 	}
 

@@ -1,7 +1,7 @@
 /*
  * arch/m68k/q40/q40ints.c
  *
- * Copyright (C) 1999 Richard Zidlicky
+ * Copyright (C) 1999,2001 Richard Zidlicky
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file COPYING in the main directory of this archive
@@ -44,7 +44,7 @@ extern int ints_inited;
 void q40_irq2_handler (int, void *, struct pt_regs *fp);
 
 
-extern void (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);  /* added just for debugging */
+extern void (*q40_sys_default_handler[]) (int, void *, struct pt_regs *);
 
 static void q40_defhand (int irq, void *dev_id, struct pt_regs *fp);
 static void sys_default_handler(int lev, void *dev_id, struct pt_regs *regs);
@@ -97,9 +97,9 @@ void q40_init_IRQ (void)
 	sys_request_irq(IRQ2,q40_irq2_handler, 0, "q40 ISA and master chip", NULL);
 
 	/* now enable some ints.. */
-	master_outb(1,EXT_ENABLE_REG);  /* hm, aint that too early? */
+	master_outb(1,EXT_ENABLE_REG);  /* ISA IRQ 5-15 */
 
-	/* would be spurious ints by now, q40kbd_init_hw() does that */
+	/* make sure keyboard IRQ is disabled */
 	master_outb(0,KEY_IRQ_ENABLE_REG);
 }
 
@@ -139,7 +139,7 @@ int q40_request_irq(unsigned int irq,
 	    if (dev_id==NULL)
 		  {
 		printk("WARNING: dev_id == NULL in request_irq\n");
-		dev_id=1;
+		dev_id=(void*)1;
 	      }
 	    irq_tab[irq].handler = handler;
 	    irq_tab[irq].flags   = flags;
@@ -202,7 +202,8 @@ void q40_process_int (int level, struct pt_regs *fp)
 /* 
  * this stuff doesn't really belong here..
 */
-int ql_ticks=0;
+
+int ql_ticks=0;              /* 200Hz ticks since last jiffie */
 static int sound_ticks=0;
 
 #define SVOL 45
@@ -214,7 +215,7 @@ void q40_mksound(unsigned int hz, unsigned int ticks)
   if (hz==0)
     {
       if (sound_ticks)
-	sound_ticks=1; /* atomic - no irq spinlock used */
+	sound_ticks=1;
 
       *DAC_LEFT=128;
       *DAC_RIGHT=128;
@@ -227,14 +228,9 @@ void q40_mksound(unsigned int hz, unsigned int ticks)
 }
 
 static void (*q40_timer_routine)(int, void *, struct pt_regs *);
-static short rtc_oldsecs=0;
-unsigned rtc_irq_flags=0;
-unsigned rtc_irq_ctrl=0;
 
 static void q40_timer_int (int irq, void * dev, struct pt_regs * regs)
 {
-
-  
 #if (HZ==100)
     ql_ticks = ql_ticks ? 0 : 1;
     if (sound_ticks)
@@ -244,12 +240,12 @@ static void q40_timer_int (int irq, void * dev, struct pt_regs * regs)
 	*DAC_LEFT=sval;
 	*DAC_RIGHT=sval;
       }
-#ifdef CONFIG_Q40RTC
-    if (rtc_irq_ctrl && (rtc_oldsecs != RTC_SECS))
+#if defined(CONFIG_Q40RTC) || defined(CONFIG_GEN_RTC)
+    if (gen_rtc_irq_ctrl && (q40rtc_oldsecs != RTC_SECS))
       {
-	rtc_oldsecs = RTC_SECS;
-	rtc_irq_flags = RTC_UIE;
-	rtc_interrupt();
+	q40rtc_oldsecs = RTC_SECS;
+	gen_rtc_irq_flags = RTC_UIE;
+	gen_rtc_interrupt(0);
       }
 #endif
     if (ql_ticks) return;
@@ -322,16 +318,14 @@ static struct IRQ_TABLE eirqs[]={
 static int ccleirq=60;    /* ISA dev IRQ's*/
 /*static int cclirq=60;*/     /* internal */
 
-/* FIX: add shared ints,mask,unmask,probing.... */
-
+/* FIXME: add shared ints,mask,unmask,probing.... */
 
 #define IRQ_INPROGRESS 1
 /*static unsigned short saved_mask;*/
 static int do_tint=0;
 
 #define DEBUG_Q40INT
-#define IP_USE_DISABLE /* would be nice, but crashes ???? */
-/*static int dd_count=0;*/
+/*#define IP_USE_DISABLE *//* would be nice, but crashes ???? */
 
 static int mext_disabled=0;  /* ext irq disabled by master chip? */
 static int aliased_irq=0;  /* how many times inside handler ?*/
@@ -404,40 +398,36 @@ void q40_irq2_handler (int vec, void *devname, struct pt_regs *fp)
 		    if ( disabled ) 
 		      {
 #ifdef IP_USE_DISABLE
-		  if (irq>4){
-		    disabled=0;
-		    /*dd_count--;*/
-		    enable_irq(irq);}
+			if (irq>4){
+			  disabled=0;
+			  enable_irq(irq);}
 #else
-		  disabled=0;
+			disabled=0;
 			/*printk("reenabling irq %d\n",irq); */
-#if 0
-		  fp->sr = ((fp->sr) & (~0x700)); /* unneeded ?! */
-#endif
 #endif
 		      }
 	      goto repeat;  /* return;  */
 		  }
 	      }
-      if (mer && ccleirq>0 && !aliased_irq) 
+	    if (mer && ccleirq>0 && !aliased_irq) 
 	      printk("ISA interrupt from unknown source? EIRQ_REG = %x\n",mer),ccleirq--;
 	  } 
  iirq:
-  mir=master_inb(IIRQ_REG);
-  if (mir&IRQ_FRAME_MASK) 
+	mir=master_inb(IIRQ_REG);
+	if (mir&IRQ_FRAME_MASK) 
 	  {
-      do_tint++;
-      master_outb(-1,FRAME_CLEAR_REG);
-    }
-  for(;do_tint>0;do_tint--) 
-	      {
-      irq_tab[Q40_IRQ_FRAME].count++;
-      irq_tab[Q40_IRQ_FRAME].handler(Q40_IRQ_FRAME,irq_tab[Q40_IRQ_FRAME].dev_id,fp);    
-    }
-  if (mir&IRQ_KEYB_MASK) /* may handle it even if actually disabled*/
-		      {
-      irq_tab[Q40_IRQ_KEYBOARD].count++;
-      irq_tab[Q40_IRQ_KEYBOARD].handler(Q40_IRQ_KEYBOARD,irq_tab[Q40_IRQ_KEYBOARD].dev_id,fp);
+	    do_tint++;
+	    master_outb(-1,FRAME_CLEAR_REG);
+	  }
+	for(;do_tint>0;do_tint--) 
+	  {
+	    irq_tab[Q40_IRQ_FRAME].count++;
+	    irq_tab[Q40_IRQ_FRAME].handler(Q40_IRQ_FRAME,irq_tab[Q40_IRQ_FRAME].dev_id,fp);    
+	  }
+	if (mir&IRQ_KEYB_MASK) /* may handle it even if actually disabled*/
+	  {
+	    irq_tab[Q40_IRQ_KEYBOARD].count++;
+	    irq_tab[Q40_IRQ_KEYBOARD].handler(Q40_IRQ_KEYBOARD,irq_tab[Q40_IRQ_KEYBOARD].dev_id,fp);
 	  }
 }
 
@@ -499,7 +489,7 @@ void q40_enable_irq (unsigned int irq)
 void q40_disable_irq (unsigned int irq)
 {
   /* disable ISA iqs : only do something if the driver has been
-  * verified to be Q40 "compatible" - right now only IDE
+  * verified to be Q40 "compatible" - right now IDE, NE2K
   * Any driver should not attempt to sleep accross disable_irq !!
   */
 

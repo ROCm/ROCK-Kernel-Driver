@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.17 05/21/01 00:48:24 cort
+# BK Id: SCCS/s.Makefile 1.19 05/26/01 14:48:14 paulus
 #
 #
 # Makefile for the linux kernel.
@@ -32,7 +32,7 @@ O_TARGET := kernel.o
 export-objs			:= ppc_ksyms.o prep_setup.o 
 
 obj-y				:= entry.o traps.o irq.o idle.o time.o misc.o \
-					process.o signal.o bitops.o ptrace.o \
+					process.o signal.o ptrace.o \
 					ppc_htab.o semaphore.o syscalls.o  \
 					align.o setup.o
 obj-$(CONFIG_MODULES)		+= ppc_ksyms.o

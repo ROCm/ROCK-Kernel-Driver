@@ -9,6 +9,6 @@
 
 O_TARGET := sun3x.o
 
-obj-y		:= config.o time.o dvma.o sbus.o
+obj-y		:= config.o time.o dvma.o prom.o
 
 include $(TOPDIR)/Rules.make

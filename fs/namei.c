@@ -351,22 +351,17 @@ int follow_up(struct vfsmount **mnt, struct dentry **dentry)
 
 static inline int __follow_down(struct vfsmount **mnt, struct dentry **dentry)
 {
-	struct list_head *p;
+	struct vfsmount *mounted;
+
 	spin_lock(&dcache_lock);
-	p = (*dentry)->d_vfsmnt.next;
-	while (p != &(*dentry)->d_vfsmnt) {
-		struct vfsmount *tmp;
-		tmp = list_entry(p, struct vfsmount, mnt_clash);
-		if (tmp->mnt_parent == *mnt) {
-			*mnt = mntget(tmp);
-			spin_unlock(&dcache_lock);
-			mntput(tmp->mnt_parent);
-			/* tmp holds the mountpoint, so... */
-			dput(*dentry);
-			*dentry = dget(tmp->mnt_root);
-			return 1;
-		}
-		p = p->next;
+	mounted = lookup_mnt(*mnt, *dentry);
+	if (mounted) {
+		*mnt = mntget(mounted);
+		spin_unlock(&dcache_lock);
+		dput(*dentry);
+		mntput(mounted->mnt_parent);
+		*dentry = dget(mounted->mnt_root);
+		return 1;
 	}
 	spin_unlock(&dcache_lock);
 	return 0;

@@ -23,8 +23,8 @@
 
 struct ciabase {
 	volatile struct CIA *cia;
-	u_char icr_mask, icr_data;
-	u_short int_mask;
+	unsigned char icr_mask, icr_data;
+	unsigned short int_mask;
 	int handler_irq, cia_irq, server_irq;
 	char *name;
 	irq_handler_t irq_list[CIA_IRQS];
@@ -46,7 +46,7 @@ struct ciabase {
 
 unsigned char cia_set_irq(struct ciabase *base, unsigned char mask)
 {
-	u_char old;
+	unsigned char old;
 
 	old = (base->icr_data |= base->cia->icr);
 	if (mask & CIA_ICR_SETCLR)
@@ -65,7 +65,7 @@ unsigned char cia_set_irq(struct ciabase *base, unsigned char mask)
 
 unsigned char cia_able_irq(struct ciabase *base, unsigned char mask)
 {
-	u_char old, tmp;
+	unsigned char old, tmp;
 	int i;
 
 	old = base->icr_mask;
@@ -91,7 +91,7 @@ int cia_request_irq(struct ciabase *base, unsigned int irq,
                     void (*handler)(int, void *, struct pt_regs *),
                     unsigned long flags, const char *devname, void *dev_id)
 {
-	u_char mask;
+	unsigned char mask;
 
 	base->irq_list[irq].handler = handler;
 	base->irq_list[irq].flags   = flags;

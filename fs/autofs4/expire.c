@@ -66,19 +66,11 @@ resume:
    non-busy mounts */
 static int check_vfsmnt(struct vfsmount *mnt, struct dentry *dentry)
 {
-	int ret = 0;
-	struct list_head *tmp;
+	int ret = dentry->d_mounted;
+	struct vfsmount *vfs = lookup_mnt(mnt, dentry);
 
-	list_for_each(tmp, &dentry->d_vfsmnt) {
-		struct vfsmount *vfs = list_entry(tmp, struct vfsmount, 
-						  mnt_clash);
-		DPRINTK(("check_vfsmnt: mnt=%p, dentry=%p, tmp=%p, vfs=%p\n",
-			 mnt, dentry, tmp, vfs));
-		if (vfs->mnt_parent != mnt || /* don't care about busy-ness of other namespaces */
-		    !is_vfsmnt_tree_busy(vfs))
-			ret++;
-	}
-
+	if (vfs && is_vfsmnt_tree_busy(vfs))
+		ret--;
 	DPRINTK(("check_vfsmnt: ret=%d\n", ret));
 	return ret;
 }

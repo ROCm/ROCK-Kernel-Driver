@@ -1,22 +1,57 @@
 /*
- * Q40 Architecture specific parts of the Floppy driver
+ * Implementation independent bits of the Floppy driver.
+ *
+ * much of this file is derived from what was originally the Q40 floppy driver.
  *
  * This file is subject to the terms and conditions of the GNU General Public
  * License.  See the file "COPYING" in the main directory of this archive
  * for more details.
  *
- * Copyright (C) 1999
+ * Copyright (C) 1999, 2000, 2001
+ *
+ * Sun3x support added 2/4/2000 Sam Creasey (sammy@oh.verio.com)
+ *
  */
 
 #include <asm/io.h>
 
 #include <linux/vmalloc.h>
 
-
 asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs);
+
+/* constants... */
 
 #undef MAX_DMA_ADDRESS
 #define MAX_DMA_ADDRESS   0x00  /* nothing like that */
+
+
+/*
+ * Again, the CMOS information doesn't work on m68k..
+ */
+#define FLOPPY0_TYPE (MACH_IS_Q40 ? 6 : 4)
+#define FLOPPY1_TYPE 0
+
+#define FLOPPY_MOTOR_MASK 0xf0
+
+
+/* basically PC init + set use_virtual_dma */
+#define  FDC1 m68k_floppy_init()
+static int FDC2 = -1;
+
+
+#define N_FDC 1
+#define N_DRIVE 8
+
+
+/* vdma globals adapted from asm-i386/floppy.h */
+
+static int virtual_dma_count=0;
+static int virtual_dma_residue=0;
+static char *virtual_dma_addr=0;
+static int virtual_dma_mode=0;
+static int doing_pdma=0;
+
+#include <asm/sun3xflop.h>
 
 extern spinlock_t  dma_spin_lock;
 
@@ -33,23 +68,46 @@ static __inline__ void release_dma_lock(unsigned long flags)
 }
 
 
+static __inline__ unsigned char fd_inb(int port)
+{
+	if(MACH_IS_Q40)
+		return inb_p(port);
+	else if(MACH_IS_SUN3X)
+		return sun3x_82072_fd_inb(port);
+}
 
-#define fd_inb(port)			inb_p(port)
-#define fd_outb(port,value)		outb_p(port,value)
+static __inline__ void fd_outb(unsigned char value, int port)
+{
+	if(MACH_IS_Q40)
+		outb_p(value, port);
+	else if(MACH_IS_SUN3X)
+		sun3x_82072_fd_outb(value, port);
+}
 
+
+static int fd_request_irq(void)
+{
+	if(MACH_IS_Q40)
+		return request_irq(FLOPPY_IRQ, floppy_hardint,SA_INTERRUPT,
+						   "floppy", NULL);
+	else if(MACH_IS_SUN3X) 
+		return sun3xflop_request_irq();
+	
+}
+
+static void fd_free_irq(void)
+{
+	if(MACH_IS_Q40)
+		free_irq(FLOPPY_IRQ, NULL);
+}
 
 #define fd_request_dma()        vdma_request_dma(FLOPPY_DMA,"floppy")
-/*#define fd_free_dma()           */
-
-
 #define fd_get_dma_residue()    vdma_get_dma_residue(FLOPPY_DMA)
 #define fd_dma_mem_alloc(size)	vdma_mem_alloc(size)
 #define fd_dma_setup(addr, size, mode, io) vdma_dma_setup(addr, size, mode, io)
 
-
 #define fd_enable_irq()           /* nothing... */
 #define fd_disable_irq()          /* nothing... */
-#define fd_free_irq()		free_irq(FLOPPY_IRQ, NULL)
 
 #define fd_free_dma()             /* nothing */
 
@@ -60,62 +118,71 @@ static __inline__ void release_dma_lock(unsigned long flags)
 #define DMA_MODE_WRITE 0x48
 
 
-static int q40_floppy_init(void)
+static int m68k_floppy_init(void)
 {
   use_virtual_dma =1;
-  /* FLOPPY_IRQ=6; */
-
+  can_use_virtual_dma = 1;
+ 
+  
   if (MACH_IS_Q40)  
-    return 0x3f0;
+	  return 0x3f0;
+  else if(MACH_IS_SUN3X)
+	  return sun3xflop_init();
   else
     return -1;
 }
 
 
-
-
-/*
- * Again, the CMOS information doesn't work on the Q40..
- */
-#define FLOPPY0_TYPE 6
-#define FLOPPY1_TYPE 0
-
-
-
-
-#define FLOPPY_MOTOR_MASK 0xf0
-
-
-
-
-/* basically PC init + set use_virtual_dma */
-#define  FDC1 q40_floppy_init()
-static int FDC2 = -1;
-
-
-#define N_FDC 1
-#define N_DRIVE 8
-
-
-
-/* vdma stuff adapted from asm-i386/floppy.h */
-
-static int virtual_dma_count=0;
-static int virtual_dma_residue=0;
-static char *virtual_dma_addr=0;
-static int virtual_dma_mode=0;
-static int doing_pdma=0;
-
-
-
-static int fd_request_irq(void)
+static int vdma_request_dma(unsigned int dmanr, const char * device_id)
 {
-  return request_irq(FLOPPY_IRQ, floppy_hardint,SA_INTERRUPT,
-						   "floppy", NULL);
+	return 0;
 }
 
-/*#define SLOW_DOWN do{outb(0,0x80);}while(0)*/
-#define SLOW_DOWN do{int count=1;do{if(!jiffies)break;}while(count-->0);}while(0)
+
+static int vdma_get_dma_residue(unsigned int dummy)
+{
+	return virtual_dma_count + virtual_dma_residue;
+}
+
+
+static unsigned long vdma_mem_alloc(unsigned long size)
+{
+	return (unsigned long) vmalloc(size);
+
+}
+
+static void _fd_dma_mem_free(unsigned long addr, unsigned long size)
+{
+        vfree((void *)addr);
+}
+#define fd_dma_mem_free(addr,size) _fd_dma_mem_free(addr, size)
+
+
+/* choose_dma_mode ???*/
+
+static int vdma_dma_setup(char *addr, unsigned long size, int mode, int io)
+{
+	doing_pdma = 1;
+	virtual_dma_port = (MACH_IS_Q40 ? io : 0);
+	virtual_dma_mode = (mode  == DMA_MODE_WRITE);
+	virtual_dma_addr = addr;
+	virtual_dma_count = size;
+	virtual_dma_residue = 0;
+	return 0;
+}
+
+
+
+static void fd_disable_dma(void)
+{
+	doing_pdma = 0;
+	virtual_dma_residue += virtual_dma_count;
+	virtual_dma_count=0;
+}
+
+
+
+/* this is the only truly Q40 specific function */
 
 asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 {
@@ -185,55 +252,6 @@ asmlinkage void floppy_hardint(int irq, void *dev_id, struct pt_regs * regs)
 	if(!virtual_dma_count)
 		dma_wait++;
 #endif
-}
-
-
-
-static int vdma_request_dma(unsigned int dmanr, const char * device_id)
-{
-	return 0;
-}
-
-
-static int vdma_get_dma_residue(unsigned int dummy)
-{
-	return virtual_dma_count + virtual_dma_residue;
-}
-
-
-static unsigned long vdma_mem_alloc(unsigned long size)
-{
-	return (unsigned long) vmalloc(size);
-
-}
-
-static void _fd_dma_mem_free(unsigned long addr, unsigned long size)
-{
-        vfree((void *)addr);
-}
-#define fd_dma_mem_free(addr,size) _fd_dma_mem_free(addr, size)
-
-
-/* choose_dma_mode ???*/
-
-static int vdma_dma_setup(char *addr, unsigned long size, int mode, int io)
-{
-	doing_pdma = 1;
-	virtual_dma_port = io;
-	virtual_dma_mode = (mode  == DMA_MODE_WRITE);
-	virtual_dma_addr = addr;
-	virtual_dma_count = size;
-	virtual_dma_residue = 0;
-	return 0;
-}
-
-
-
-static void fd_disable_dma(void)
-{
-	doing_pdma = 0;
-	virtual_dma_residue += virtual_dma_count;
-	virtual_dma_count=0;
 }
 
 

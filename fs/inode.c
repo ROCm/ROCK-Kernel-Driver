@@ -1044,6 +1044,8 @@ void iput(struct inode *inode)
 				inode->i_state|=I_FREEING;
 				inodes_stat.nr_inodes--;
 				spin_unlock(&inode_lock);
+				if (inode->i_data.nrpages)
+					truncate_inode_pages(&inode->i_data, 0);
 				clear_inode(inode);
 			}
 		}

@@ -105,14 +105,14 @@ extern inline void flush_cache_page(struct vm_area_struct *vma,
 }
 
 /* Push the page at kernel virtual address and clear the icache */
+/* RZ: use cpush %bc instead of cpush %dc, cinv %ic */
 #define flush_page_to_ram(page) __flush_page_to_ram((unsigned long) page_address(page))
 extern inline void __flush_page_to_ram(unsigned long address)
 {
 	if (CPU_IS_040_OR_060) {
 		__asm__ __volatile__("nop\n\t"
 				     ".chip 68040\n\t"
-				     "cpushp %%dc,(%0)\n\t"
-				     "cinvp %%ic,(%0)\n\t"
+				     "cpushp %%bc,(%0)\n\t"
 				     ".chip 68k"
 				     : : "a" (__pa((void *)address)));
 	} else {
@@ -128,6 +128,7 @@ extern inline void __flush_page_to_ram(unsigned long address)
 #define flush_dcache_page(page)			do { } while (0)
 
 /* Push n pages at kernel virtual address and clear the icache */
+/* RZ: use cpush %bc instead of cpush %dc, cinv %ic */
 extern inline void flush_icache_range (unsigned long address,
 				       unsigned long endaddr)
 {
@@ -137,8 +138,7 @@ extern inline void flush_icache_range (unsigned long address,
 		while (--n >= 0) {
 			__asm__ __volatile__("nop\n\t"
 					     ".chip 68040\n\t"
-					     "cpushp %%dc,(%0)\n\t"
-					     "cinvp %%ic,(%0)\n\t"
+					     "cpushp %%bc,(%0)\n\t"
 					     ".chip 68k"
 					     : : "a" (virt_to_phys((void *)address)));
 			address += PAGE_SIZE;

@@ -4,42 +4,62 @@
 #include <linux/kernel.h>
 #include <linux/mm.h>
 #include <linux/bootmem.h>
+#include <linux/list.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 #include <asm/sun3mmu.h>
 #include <asm/dvma.h>
 
-unsigned long dvma_next_free = DVMA_START;
-unsigned long dvma_region_end = DVMA_START + (DVMA_RESERVED_PMEGS * SUN3_PMEG_SIZE);
 
+static unsigned long ptelist[120];
 
-/* reserve such dma memory as we see fit */
-void sun3_dvma_init(void)
+inline unsigned long dvma_page(unsigned long kaddr, unsigned long vaddr)
 {
-	unsigned long dvma_phys_start;
+	unsigned long pte;
+	unsigned long j;
+	pte_t ptep;
 	
-	dvma_phys_start = (sun3_get_pte(DVMA_START) & 
-			   SUN3_PAGE_PGNUM_MASK);
-	dvma_phys_start <<= PAGE_SHIFT;
-	
-	reserve_bootmem(dvma_phys_start,
-			(DVMA_RESERVED_PMEGS * SUN3_PMEG_SIZE));
+	j = *(volatile unsigned long *)kaddr;
+	*(volatile unsigned long *)kaddr = j;
+
+	ptep = __mk_pte(kaddr, PAGE_KERNEL);
+	pte = pte_val(ptep);
+//		printk("dvma_remap: addr %lx -> %lx pte %08lx len %x\n", 
+//		       kaddr, vaddr, pte, len);
+	if(ptelist[(vaddr & 0xff000) >> PAGE_SHIFT] != pte) {
+		sun3_put_pte(vaddr, pte);
+		ptelist[(vaddr & 0xff000) >> PAGE_SHIFT] = pte;
+	}
+
+	return (vaddr + (kaddr & ~PAGE_MASK));
 
 }
 
-/* get needed number of free dma pages, or panic if not enough */
-
-void *sun3_dvma_malloc(int len)
+int dvma_map_iommu(unsigned long kaddr, unsigned long baddr, 
+			      int len)
 {
+
+	unsigned long end;
 	unsigned long vaddr;
 
-       	if((dvma_next_free + len) > dvma_region_end) 
-		panic("sun3_dvma_malloc: out of dvma pages");
+	vaddr = dvma_btov(baddr);
+
+	end = vaddr + len;
 	
-	vaddr = dvma_next_free;
-	dvma_next_free = DVMA_ALIGN(dvma_next_free + len);
+	while(vaddr < end) {
+		dvma_page(kaddr, vaddr);
+		kaddr += PAGE_SIZE;
+		vaddr += PAGE_SIZE;
+	}
 
-	return (void *)vaddr;
+	return 0;
+
 }
-     
 
+void sun3_dvma_init(void)
+{
+
+	memset(ptelist, 0, sizeof(ptelist));
+
+
+}

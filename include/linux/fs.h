@@ -204,15 +204,22 @@ extern void update_atime (struct inode *);
 
 extern void buffer_init(unsigned long);
 extern void inode_init(unsigned long);
+extern void mnt_init(unsigned long);
 
 /* bh state bits */
-#define BH_Uptodate	0	/* 1 if the buffer contains valid data */
-#define BH_Dirty	1	/* 1 if the buffer is dirty */
-#define BH_Lock		2	/* 1 if the buffer is locked */
-#define BH_Req		3	/* 0 if the buffer has been invalidated */
-#define BH_Mapped	4	/* 1 if the buffer has a disk mapping */
-#define BH_New		5	/* 1 if the buffer is new and not yet written out */
-#define BH_Protected	6	/* 1 if the buffer is protected */
+enum bh_state_bits {
+	BH_Uptodate,	/* 1 if the buffer contains valid data */
+	BH_Dirty,	/* 1 if the buffer is dirty */
+	BH_Lock,	/* 1 if the buffer is locked */
+	BH_Req,		/* 0 if the buffer has been invalidated */
+	BH_Mapped,	/* 1 if the buffer has a disk mapping */
+	BH_New,		/* 1 if the buffer is new and not yet written out */
+	BH_Protected,	/* 1 if the buffer is protected */
+
+	BH_PrivateStart,/* not a state bit, but the first bit available
+			 * for private allocation by other entities
+			 */
+};
 
 /*
  * Try to keep the most commonly used fields in single cache lines (16

@@ -212,6 +212,8 @@ int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 				return 0;
 		}
 		else if (!strcmp(p, "case")) {
+			if (!rhs || !*rhs)
+				return 0;
 			if (!strcmp(rhs, "lower"))
 				*lowercase = 1;
 			else if (!strcmp(rhs, "asis"))
@@ -220,6 +222,8 @@ int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 				return 0;
 		}
 		else if (!strcmp(p, "conv")) {
+			if (!rhs || !*rhs)
+				return 0;
 			if (!strcmp(rhs, "binary"))
 				*conv = CONV_BINARY;
 			else if (!strcmp(rhs, "text"))
@@ -230,6 +234,8 @@ int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 				return 0;
 		}
 		else if (!strcmp(p, "check")) {
+			if (!rhs || !*rhs)
+				return 0;
 			if (!strcmp(rhs, "none"))
 				*chk = 0;
 			else if (!strcmp(rhs, "normal"))
@@ -240,6 +246,8 @@ int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 				return 0;
 		}
 		else if (!strcmp(p, "errors")) {
+			if (!rhs || !*rhs)
+				return 0;
 			if (!strcmp(rhs, "continue"))
 				*errs = 0;
 			else if (!strcmp(rhs, "remount-ro"))
@@ -250,6 +258,8 @@ int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 				return 0;
 		}
 		else if (!strcmp(p, "eas")) {
+			if (!rhs || !*rhs)
+				return 0;
 			if (!strcmp(rhs, "no"))
 				*eas = 0;
 			else if (!strcmp(rhs, "ro"))
@@ -260,6 +270,8 @@ int parse_opts(char *opts, uid_t *uid, gid_t *gid, umode_t *umask,
 				return 0;
 		}
 		else if (!strcmp(p, "chkdsk")) {
+			if (!rhs || !*rhs)
+				return 0;
 			if (!strcmp(rhs, "no"))
 				*chkdsk = 0;
 			else if (!strcmp(rhs, "errors"))

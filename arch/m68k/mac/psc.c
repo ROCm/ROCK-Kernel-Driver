@@ -139,7 +139,6 @@ void psc_irq(int irq, void *dev_id, struct pt_regs *regs)
 	int irq_bit,i;
 	unsigned char events;
 
-	irq -= VEC_SPUR;
 	base_irq = irq << 3;
 
 #ifdef DEBUG_IRQS

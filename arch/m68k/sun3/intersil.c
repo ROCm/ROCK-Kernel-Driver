@@ -11,9 +11,9 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/kd.h>
 
 #include <asm/system.h>
+#include <asm/rtc.h>
 #include <asm/intersil.h>
 
 
@@ -30,7 +30,7 @@ unsigned long sun3_gettimeoffset(void)
 void sun3_gettod (int *yearp, int *monp, int *dayp,
                    int *hourp, int *minp, int *secp)
 {
-	u_char wday;
+	unsigned char wday;
 	volatile struct intersil_dt* todintersil;
 	unsigned long flags;
 

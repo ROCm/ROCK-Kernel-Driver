@@ -50,70 +50,50 @@ static struct softirq_action softirq_vec[32] __cacheline_aligned;
 asmlinkage void do_softirq()
 {
 	int cpu = smp_processor_id();
-	__u32 active, mask;
+	__u32 pending;
+
+	if (in_interrupt())
+		return;
 
 	local_irq_disable();
-	if (in_interrupt())
-		goto out;
 
-	local_bh_disable();
+	pending = softirq_pending(cpu);
 
-	mask = softirq_mask(cpu);
-	active = softirq_active(cpu) & mask;
-
-	if (active) {
+	if (pending) {
 		struct softirq_action *h;
 
+		local_bh_disable();
 restart:
-		/* Reset active bitmask before enabling irqs */
-		softirq_active(cpu) &= ~active;
+		/* Reset the pending bitmask before enabling irqs */
+		softirq_pending(cpu) = 0;
 
 		local_irq_enable();
 
 		h = softirq_vec;
 
 		do {
-			if (active & 1)
+			if (pending & 1)
 				h->action(h);
 			h++;
-			active >>= 1;
-		} while (active);
+			pending >>= 1;
+		} while (pending);
 
 		local_irq_disable();
 
-		active = softirq_active(cpu) & mask;
-		if (active)
-			goto retry;
+		pending = softirq_pending(cpu);
+		if (pending)
+			goto restart;
+		__local_bh_enable();
 	}
 
-	__local_bh_enable();
-out:
-
-	/* Leave with locally disabled hard irqs. It is critical to close
-	 * window for infinite recursion, while we help local bh count,
-	 * it protected us. Now we are defenceless.
-	 */
-	return;
-
-retry:
-	goto restart;
+	local_irq_enable();
 }
 
 
-static spinlock_t softirq_mask_lock = SPIN_LOCK_UNLOCKED;
-
 void open_softirq(int nr, void (*action)(struct softirq_action*), void *data)
 {
-	unsigned long flags;
-	int i;
-
-	spin_lock_irqsave(&softirq_mask_lock, flags);
 	softirq_vec[nr].data = data;
 	softirq_vec[nr].action = action;
-
-	for (i=0; i<NR_CPUS; i++)
-		softirq_mask(i) |= (1<<nr);
-	spin_unlock_irqrestore(&softirq_mask_lock, flags);
 }
 
 

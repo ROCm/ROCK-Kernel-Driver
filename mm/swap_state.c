@@ -145,6 +145,30 @@ void delete_from_swap_cache(struct page *page)
 	UnlockPage(page);
 }
 
+/* 
+ * Perform a free_page(), also freeing any swap cache associated with
+ * this page if it is the last user of the page. Can not do a lock_page,
+ * as we are holding the page_table_lock spinlock.
+ */
+void free_page_and_swap_cache(struct page *page)
+{
+	/* 
+	 * If we are the only user, then try to free up the swap cache. 
+	 * 
+	 * Its ok to check for PageSwapCache without the page lock
+	 * here because we are going to recheck again inside 
+	 * exclusive_swap_page() _with_ the lock. 
+	 * 					- Marcelo
+	 */
+	if (PageSwapCache(page) && !TryLockPage(page)) {
+		if (exclusive_swap_page(page))
+			delete_from_swap_cache_nolock(page);
+		UnlockPage(page);
+	}
+	page_cache_release(page);
+}
+
+
 /*
  * Lookup a swap entry in the swap cache. A found page will be returned
  * unlocked and with its refcount incremented - we rely on the kernel

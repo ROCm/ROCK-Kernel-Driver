@@ -1,5 +1,5 @@
 /*
- * BK Id: SCCS/s.prom.c 1.20 05/23/01 00:38:42 cort
+ * BK Id: SCCS/s.prom.c 1.23 06/06/01 22:49:01 paulus
  */
 /*
  * Procedures for interfacing to the Open Firmware PROM on
@@ -42,9 +42,11 @@
 /*
  * Properties whose value is longer than this get excluded from our
  * copy of the device tree.  This way we don't waste space storing
- * things like "driver,AAPL,MacOS,PowerPC" properties.
+ * things like "driver,AAPL,MacOS,PowerPC" properties.  But this value
+ * does need to be big enough to ensure that we don't lose things
+ * like the interrupt-map property on a PCI-PCI bridge.
  */
-#define MAX_PROPERTY_LENGTH	1024
+#define MAX_PROPERTY_LENGTH	4096
 
 struct prom_args {
 	const char *service;
@@ -670,15 +672,15 @@ prom_init(int r3, int r4, prom_entry pp)
 	prom_alloc_htab();
 #endif
 
-#ifdef CONFIG_SMP
-	prom_hold_cpus(mem);
-#endif
-
 	mem = check_display(mem);
 
 	prom_print(RELOC("copying OF device tree..."));
 	mem = copy_device_tree(mem, mem + (1<<20));
 	prom_print(RELOC("done\n"));
+
+#ifdef CONFIG_SMP
+	prom_hold_cpus(mem);
+#endif
 
 	RELOC(klimit) = (char *) (mem - offset);
 
@@ -1190,7 +1192,7 @@ finish_device_tree(void)
 	if ((_machine == _MACH_chrp) || (boot_infos == 0 && pmac_newworld))
 		use_of_interrupt_tree = 1;
 
-	mem = finish_node(allnodes, mem, NULL, 0, 0);
+	mem = finish_node(allnodes, mem, NULL, 1, 1);
 	dev_tree_size = mem - (unsigned long) allnodes;
 	klimit = (char *) mem;
 }
@@ -1225,10 +1227,7 @@ finish_node(struct device_node *np, unsigned long mem_start,
 
 	np->name = get_property(np, "name", 0);
 	np->type = get_property(np, "device_type", 0);
-#if 0
-	np->n_addr_cells = naddrc;
-	np->n_size_cells = nsizec;
-#endif
+
 	/* get the device addresses and interrupts */
 	if (ifunc != NULL) {
 		mem_start = ifunc(np, mem_start, naddrc, nsizec);
@@ -1244,16 +1243,6 @@ finish_node(struct device_node *np, unsigned long mem_start,
 	ip = (int *) get_property(np, "#size-cells", 0);
 	if (ip != NULL)
 		nsizec = *ip;
-#if 0
-	if (np->parent == NULL) {
-		/*
-		 * Set the n_addr/size_cells on the root to its
-		 * own values, rather than 0.
-		 */
-		np->n_addr_cells = naddrc;
-		np->n_size_cells = nsizec;
-	}
-#endif	
 
 	/* the f50 sets the name to 'display' and 'compatible' to what we
 	 * expect for the name -- Cort
@@ -1479,7 +1468,8 @@ prom_n_addr_cells(struct device_node* np)
 		if (ip != NULL)
 			return *ip;
 	} while(np->parent);
-	return 0;
+	/* No #address-cells property for the root node, default to 1 */
+	return 1;
 }
 
 int
@@ -1493,7 +1483,8 @@ prom_n_size_cells(struct device_node* np)
 		if (ip != NULL)
 			return *ip;
 	} while(np->parent);
-	return 0;
+	/* No #size-cells property for the root node, default to 1 */
+	return 1;
 }
 
 __init
@@ -1980,7 +1971,7 @@ get_property(struct device_node *np, const char *name, int *lenp)
 	struct property *pp;
 
 	for (pp = np->properties; pp != 0; pp = pp->next) {
-		if (name && strcmp(pp->name, name) == 0) {
+		if (pp->name != NULL && strcmp(pp->name, name) == 0) {
 			if (lenp != 0)
 				*lenp = pp->length;
 			return pp->value;

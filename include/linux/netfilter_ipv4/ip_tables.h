@@ -300,14 +300,14 @@ ipt_get_target(struct ipt_entry *e)
 ({						\
 	unsigned int __i;			\
 	int __ret = 0;				\
-	struct ipt_entry_match *__m;		\
+	struct ipt_entry_match *__match;	\
 						\
 	for (__i = sizeof(struct ipt_entry);	\
 	     __i < (e)->target_offset;		\
-	     __i += __m->u.match_size) {	\
-		__m = (void *)(e) + __i;	\
+	     __i += __match->u.match_size) {	\
+		__match = (void *)(e) + __i;	\
 						\
-		__ret = fn(__m , ## args);	\
+		__ret = fn(__match , ## args);	\
 		if (__ret != 0)			\
 			break;			\
 	}					\
@@ -319,12 +319,12 @@ ipt_get_target(struct ipt_entry *e)
 ({								\
 	unsigned int __i;					\
 	int __ret = 0;						\
-	struct ipt_entry *__e;					\
+	struct ipt_entry *__entry;				\
 								\
-	for (__i = 0; __i < (size); __i += __e->next_offset) {	\
-		__e = (void *)(entries) + __i;			\
+	for (__i = 0; __i < (size); __i += __entry->next_offset) { \
+		__entry = (void *)(entries) + __i;		\
 								\
-		__ret = fn(__e , ## args);			\
+		__ret = fn(__entry , ## args);			\
 		if (__ret != 0)					\
 			break;					\
 	}							\

@@ -19,7 +19,7 @@
 #include <asm/amipcmcia.h>
 
 /* gayle config byte for program voltage and access speed */
-static u_char cfg_byte = GAYLE_CFG_0V|GAYLE_CFG_150NS;
+static unsigned char cfg_byte = GAYLE_CFG_0V|GAYLE_CFG_150NS;
 
 void pcmcia_reset(void)
 {
@@ -64,7 +64,7 @@ int pcmcia_copy_tuple(unsigned char tuple_id, void *tuple, int max_len)
 
 void pcmcia_program_voltage(int voltage)
 {
-	u_char v;
+	unsigned char v;
 
 	switch (voltage) {
 	case PCMCIA_0V:
@@ -87,7 +87,7 @@ void pcmcia_program_voltage(int voltage)
 
 void pcmcia_access_speed(int speed)
 {
-	u_char s;
+	unsigned char s;
 
 	if (speed <= PCMCIA_SPEED_100NS)
 		s = GAYLE_CFG_100NS;

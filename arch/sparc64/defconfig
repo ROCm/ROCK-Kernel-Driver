@@ -663,6 +663,19 @@ CONFIG_USB_SERIAL_OMNINET=m
 CONFIG_USB_RIO500=m
 
 #
+# Bluetooth support
+#
+CONFIG_BLUEZ=m
+CONFIG_BLUEZ_L2CAP=m
+
+#
+# Bluetooth device drivers
+#
+CONFIG_BLUEZ_HCIUSB=m
+CONFIG_BLUEZ_HCIUART=m
+CONFIG_BLUEZ_HCIEMU=m
+
+#
 # Watchdog
 #
 # CONFIG_SOFT_WATCHDOG is not set

@@ -900,9 +900,6 @@ extern unsigned char linux_logo_green[];
 extern unsigned char linux_logo_blue[];
 extern unsigned char linux_logo[];
 extern unsigned char linux_logo_bw[];
-extern unsigned char linux_logo16_red[];
-extern unsigned char linux_logo16_green[];
-extern unsigned char linux_logo16_blue[];
 extern unsigned char linux_logo16[];
 
 #endif

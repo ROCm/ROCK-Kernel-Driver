@@ -1,4 +1,4 @@
-/* $Id: dbri.c,v 1.25 2001/02/13 01:16:59 davem Exp $
+/* $Id: dbri.c,v 1.26 2001/05/21 01:25:22 davem Exp $
  * drivers/sbus/audio/dbri.c
  *
  * Copyright (C) 1997 Rudolf Koenig (rfkoenig@immd4.informatik.uni-erlangen.de)
@@ -61,7 +61,7 @@
 #include <asm/audioio.h>
 #include "dbri.h"
 
-#if defined(DBRI_ISDN) && defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff
+#if defined(DBRI_ISDN)
 #include "../../isdn/hisax/hisax.h"
 #include "../../isdn/hisax/isdnl1.h"
 #include "../../isdn/hisax/foreign.h"
@@ -2227,7 +2227,7 @@ void dbri_brecv(int dev, unsigned int chan,
        recv_on_pipe(dbri, 8+chan, buffer, size, callback, callback_arg);
 }
 
-#if defined(DBRI_ISDN) && defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff
+#if defined(DBRI_ISDN)
 struct foreign_interface dbri_foreign_interface = {
         dbri_get_irqnum,
         dbri_get_liu_state,
@@ -2336,11 +2336,7 @@ static int dbri_attach(struct sparcaudio_driver *drv,
 }
 
 /* Probe for the dbri chip and then attach the driver. */
-#ifdef MODULE
-int init_module(void)
-#else
-int __init dbri_init(void)
-#endif
+static int __init dbri_init(void)
 {
 	struct sbus_bus *sbus;
 	struct sbus_dev *sdev;
@@ -2368,8 +2364,7 @@ int __init dbri_init(void)
 	return (num_drivers > 0) ? 0 : -EIO;
 }
 
-#ifdef MODULE
-void cleanup_module(void)
+static void __exit dbri_exit(void)
 {
         register int i;
 
@@ -2379,8 +2374,9 @@ void cleanup_module(void)
                 num_drivers--;
         }
 }
-#endif
 
+module_init(dbri_init);
+module_exit(dbri_exit);
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

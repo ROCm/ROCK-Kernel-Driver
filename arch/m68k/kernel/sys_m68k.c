@@ -267,7 +267,8 @@ asmlinkage int sys_ioperm(unsigned long from, unsigned long num, int on)
   return -ENOSYS;
 }
 
-/* Convert virtual address VADDR to physical address PADDR */
+
+/* Convert virtual (user) address VADDR to physical address PADDR */
 #define virt_to_phys_040(vaddr)						\
 ({									\
   unsigned long _mmusr, _paddr;						\
@@ -447,6 +448,12 @@ cache_flush_060 (unsigned long addr, int scope, int cache, unsigned long len)
 {
   unsigned long paddr, i;
 
+  /*
+   * 68060 manual says: 
+   *  cpush %dc : flush DC, remains valid (with our %cacr setup)
+   *  cpush %ic : invalidate IC
+   *  cpush %bc : flush DC + invalidate IC
+   */
   switch (scope)
     {
     case FLUSH_SCOPE_ALL:
@@ -455,20 +462,17 @@ cache_flush_060 (unsigned long addr, int scope, int cache, unsigned long len)
 	case FLUSH_CACHE_DATA:
 	  __asm__ __volatile__ (".chip 68060\n\t"
 				"cpusha %dc\n\t"
-				"cinva %dc\n\t"
 				".chip 68k");
 	  break;
 	case FLUSH_CACHE_INSN:
 	  __asm__ __volatile__ (".chip 68060\n\t"
 				"cpusha %ic\n\t"
-				"cinva %ic\n\t"
 				".chip 68k");
 	  break;
 	default:
 	case FLUSH_CACHE_BOTH:
 	  __asm__ __volatile__ (".chip 68060\n\t"
 				"cpusha %bc\n\t"
-				"cinva %bc\n\t"
 				".chip 68k");
 	  break;
 	}
@@ -506,14 +510,12 @@ cache_flush_060 (unsigned long addr, int scope, int cache, unsigned long len)
 	    case FLUSH_CACHE_DATA:
 	      __asm__ __volatile__ (".chip 68060\n\t"
 				    "cpushl %%dc,(%0)\n\t"
-				    "cinvl %%dc,(%0)\n\t"
 				    ".chip 68k"
 				    : : "a" (paddr));
 	      break;
 	    case FLUSH_CACHE_INSN:
 	      __asm__ __volatile__ (".chip 68060\n\t"
 				    "cpushl %%ic,(%0)\n\t"
-				    "cinvl %%ic,(%0)\n\t"
 				    ".chip 68k"
 				    : : "a" (paddr));
 	      break;
@@ -521,7 +523,6 @@ cache_flush_060 (unsigned long addr, int scope, int cache, unsigned long len)
 	    case FLUSH_CACHE_BOTH:
 	      __asm__ __volatile__ (".chip 68060\n\t"
 				    "cpushl %%bc,(%0)\n\t"
-				    "cinvl %%bc,(%0)\n\t"
 				    ".chip 68k"
 				    : : "a" (paddr));
 	      break;
@@ -568,14 +569,12 @@ cache_flush_060 (unsigned long addr, int scope, int cache, unsigned long len)
 	    case FLUSH_CACHE_DATA:
 	      __asm__ __volatile__ (".chip 68060\n\t"
 				    "cpushp %%dc,(%0)\n\t"
-				    "cinvp %%dc,(%0)\n\t"
 				    ".chip 68k"
 				    : : "a" (paddr));
 	      break;
 	    case FLUSH_CACHE_INSN:
 	      __asm__ __volatile__ (".chip 68060\n\t"
 				    "cpushp %%ic,(%0)\n\t"
-				    "cinvp %%ic,(%0)\n\t"
 				    ".chip 68k"
 				    : : "a" (paddr));
 	      break;
@@ -583,7 +582,6 @@ cache_flush_060 (unsigned long addr, int scope, int cache, unsigned long len)
 	    case FLUSH_CACHE_BOTH:
 	      __asm__ __volatile__ (".chip 68060\n\t"
 				    "cpushp %%bc,(%0)\n\t"
-				    "cinvp %%bc,(%0)\n\t"
 				    ".chip 68k"
 				    : : "a" (paddr));
 	      break;
@@ -607,13 +605,14 @@ sys_cacheflush (unsigned long addr, int scope, int cache, unsigned long len)
 		goto out;
 
 	if (scope == FLUSH_SCOPE_ALL) {
-		/* Only the superuser may flush the whole cache. */
+		/* Only the superuser may explicitly flush the whole cache. */
 		ret = -EPERM;
 		if (!capable(CAP_SYS_ADMIN))
 			goto out;
 	} else {
-		/* Verify that the specified address region actually belongs to
-		 * this process.
+		/*
+		 * Verify that the specified address region actually belongs
+		 * to this process.
 		 */
 		vma = find_vma (current->mm, addr);
 		ret = -EINVAL;
@@ -652,10 +651,21 @@ sys_cacheflush (unsigned long addr, int scope, int cache, unsigned long len)
 		}
 		ret = 0;
 		goto out;
-	} else if (CPU_IS_040) {
+	} else {
+	    /*
+	     * 040 or 060: don't blindly trust 'scope', someone could
+	     * try to flush a few megs of memory.
+	     */
+
+	    if (len>=3*PAGE_SIZE && scope<FLUSH_SCOPE_PAGE)
+	        scope=FLUSH_SCOPE_PAGE;
+	    if (len>=10*PAGE_SIZE && scope<FLUSH_SCOPE_ALL)
+	        scope=FLUSH_SCOPE_ALL;
+	    if (CPU_IS_040) {
 		ret = cache_flush_040 (addr, scope, cache, len);
-	} else if (CPU_IS_060) {
+	    } else if (CPU_IS_060) {
 		ret = cache_flush_060 (addr, scope, cache, len);
+	    }
 	}
 out:
 	unlock_kernel();

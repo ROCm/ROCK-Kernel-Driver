@@ -2349,6 +2349,28 @@ struct parport *parport_pc_probe_port (unsigned long int base,
 	return p;
 }
 
+void parport_pc_unregister_port (struct parport *p)
+{
+	struct parport_pc_private *priv = p->private_data;
+	struct parport_operations *ops = p->ops;
+	if (p->dma != PARPORT_DMA_NONE)
+		free_dma(p->dma);
+	if (p->irq != PARPORT_IRQ_NONE)
+		free_irq(p->irq, p);
+	release_region(p->base, 3);
+	if (p->size > 3)
+		release_region(p->base + 3, p->size - 3);
+	if (p->modes & PARPORT_MODE_ECP)
+		release_region(p->base_hi, 3);
+	parport_proc_unregister(p);
+	if (priv->dma_buf)
+		pci_free_consistent(priv->dev, PAGE_SIZE,
+				    priv->dma_buf,
+				    priv->dma_handle);
+	kfree (p->private_data);
+	parport_unregister_port(p);
+	kfree (ops); /* hope no-one cached it */
+}
 
 #ifdef CONFIG_PCI
 /* Via support maintained by Jeff Garzik <jgarzik@mandrakesoft.com> */
@@ -2816,6 +2838,7 @@ int __init parport_pc_init (int *io, int *io_hi, int *irq, int *dma)
 
 /* Exported symbols. */
 EXPORT_SYMBOL (parport_pc_probe_port);
+EXPORT_SYMBOL (parport_pc_unregister_port);
 
 #ifdef MODULE
 static int io[PARPORT_PC_MAX_PORTS+1] = { [0 ... PARPORT_PC_MAX_PORTS] = 0 };
@@ -2883,27 +2906,9 @@ void cleanup_module(void)
 
 	while (p) {
 		tmp = p->next;
-		if (p->modes & PARPORT_MODE_PCSPP) { 
-			struct parport_pc_private *priv = p->private_data;
-			struct parport_operations *ops = p->ops;
-			if (p->dma != PARPORT_DMA_NONE)
-				free_dma(p->dma);
-			if (p->irq != PARPORT_IRQ_NONE)
-				free_irq(p->irq, p);
-			release_region(p->base, 3);
-			if (p->size > 3)
-				release_region(p->base + 3, p->size - 3);
-			if (p->modes & PARPORT_MODE_ECP)
-				release_region(p->base_hi, 3);
-			parport_proc_unregister(p);
-			if (priv->dma_buf)
-				pci_free_consistent(priv->dev, PAGE_SIZE,
-						    priv->dma_buf,
-						    priv->dma_handle);
-			kfree (p->private_data);
-			parport_unregister_port(p);
-			kfree (ops); /* hope no-one cached it */
-		}
+		if (p->modes & PARPORT_MODE_PCSPP)
+			parport_pc_unregister_port (p);
+
 		p = tmp;
 	}
 }

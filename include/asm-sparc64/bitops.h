@@ -1,4 +1,4 @@
-/* $Id: bitops.h,v 1.33 2001/04/24 01:09:12 davem Exp $
+/* $Id: bitops.h,v 1.34 2001/05/27 00:09:29 davem Exp $
  * bitops.h: Bit string operations on the V9.
  *
  * Copyright 1996, 1997 David S. Miller (davem@caip.rutgers.edu)
@@ -20,13 +20,46 @@ extern long ___test_and_change_bit(unsigned long nr, volatile void *addr);
 #define clear_bit(nr,addr)		((void)___test_and_clear_bit(nr,addr))
 #define change_bit(nr,addr)		((void)___test_and_change_bit(nr,addr))
 
-/* "non-atomic" versions, nothing special for now... */
-#define __set_bit(X,Y)		set_bit(X,Y)
-#define __clear_bit(X,Y)	clear_bit(X,Y)
-#define __change_bit(X,Y)	change_bit(X,Y)
-#define __test_and_set_bit(X,Y)		test_and_set_bit(X,Y)
-#define __test_and_clear_bit(X,Y)	test_and_clear_bit(X,Y)
-#define __test_and_change_bit(X,Y)	test_and_change_bit(X,Y)
+/* "non-atomic" versions... */
+#define __set_bit(X,Y)					\
+do {	unsigned long __nr = (X);			\
+	long *__m = ((long *) (Y)) + (__nr >> 6);	\
+	*__m |= (1UL << (__nr & 63));			\
+} while (0)
+#define __clear_bit(X,Y)				\
+do {	unsigned long __nr = (X);			\
+	long *__m = ((long *) (Y)) + (__nr >> 6);	\
+	*__m &= ~(1UL << (__nr & 63));			\
+} while (0)
+#define __change_bit(X,Y)				\
+do {	unsigned long __nr = (X);			\
+	long *__m = ((long *) (Y)) + (__nr >> 6);	\
+	*__m ^= (1UL << (__nr & 63));			\
+} while (0)
+#define __test_and_set_bit(X,Y)				\
+({	unsigned long __nr = (X);			\
+	long *__m = ((long *) (Y)) + (__nr >> 6);	\
+	long __old = *__m;				\
+	long __mask = (1UL << (__nr & 63));		\
+	*__m = (__old | __mask);			\
+	((__old & __mask) != 0);			\
+})
+#define __test_and_clear_bit(X,Y)			\
+({	unsigned long __nr = (X);			\
+	long *__m = ((long *) (Y)) + (__nr >> 6);	\
+	long __old = *__m;				\
+	long __mask = (1UL << (__nr & 63));		\
+	*__m = (__old & ~__mask);			\
+	((__old & __mask) != 0);			\
+})
+#define __test_and_change_bit(X,Y)			\
+({	unsigned long __nr = (X);			\
+	long *__m = ((long *) (Y)) + (__nr >> 6);	\
+	long __old = *__m;				\
+	long __mask = (1UL << (__nr & 63));		\
+	*__m = (__old ^ __mask);			\
+	((__old & __mask) != 0);			\
+})
 
 #define smp_mb__before_clear_bit()	do { } while(0)
 #define smp_mb__after_clear_bit()	do { } while(0)

@@ -1,4 +1,4 @@
-/* $Id: irq.c,v 1.100 2001/04/24 01:09:12 davem Exp $
+/* $Id: irq.c,v 1.101 2001/06/04 06:50:18 ecd Exp $
  * irq.c: UltraSparc IRQ handling/init/registry.
  *
  * Copyright (C) 1997  David S. Miller  (davem@caip.rutgers.edu)
@@ -783,6 +783,8 @@ void handler_irq(int irq, struct pt_regs *regs)
 		unsigned char flags = bp->flags;
 
 		nbp = __bucket(bp->irq_chain);
+		bp->irq_chain = 0;
+
 		if ((flags & IBF_ACTIVE) != 0) {
 #ifdef CONFIG_PCI
 			if ((flags & IBF_DMA_SYNC) != 0) {

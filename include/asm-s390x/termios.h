@@ -63,6 +63,7 @@ struct termio {
 #define N_IRDA		11	/* Linux IR - http://irda.sourceforge.net/ */
 #define N_SMSBLOCK	12	/* SMS block mode - for talking to GSM data cards about SMS messages */
 #define N_HDLC         13	/* synchronous HDLC */
+#define N_BT		15	/* bluetooth */
 
 #ifdef __KERNEL__
 

@@ -177,6 +177,7 @@ DRIVERS-$(CONFIG_I2C) += drivers/i2c/i2c.o
 DRIVERS-$(CONFIG_PHONE) += drivers/telephony/telephony.o
 DRIVERS-$(CONFIG_ACPI) += drivers/acpi/acpi.o
 DRIVERS-$(CONFIG_MD) += drivers/md/mddev.o
+DRIVERS-$(CONFIG_BLUEZ) += drivers/bluetooth/bluetooth.o
 
 DRIVERS := $(DRIVERS-y)
 

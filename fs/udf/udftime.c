@@ -105,6 +105,8 @@ udf_stamp_to_time(time_t *dest, long *dest_usec, timestamp src)
 		offset = src.typeAndTimezone << 4;
 		/* sign extent offset */
 		offset = (offset >> 4);
+		if (offset == -2047) /* unspecified offset */
+			offset = 0;
 	}
 	else
 		offset = 0;

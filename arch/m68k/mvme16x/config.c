@@ -17,7 +17,6 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/kd.h>
 #include <linux/tty.h>
 #include <linux/console.h>
 #include <linux/linkage.h>
@@ -30,11 +29,10 @@
 #include <asm/setup.h>
 #include <asm/irq.h>
 #include <asm/traps.h>
+#include <asm/rtc.h>
 #include <asm/machdep.h>
 #include <asm/mvme16xhw.h>
 
-int atari_SCC_reset_done = 1;		/* So SCC doesn't get reset */
-u_long atari_mch_cookie = 0;
 extern t_bdid mvme_bdid;
 
 static MK48T08ptr_t volatile rtc = (MK48T08ptr_t)MVME_RTC_BASE;

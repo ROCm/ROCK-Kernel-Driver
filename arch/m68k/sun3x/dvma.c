@@ -2,21 +2,31 @@
  * Virtual DMA allocation
  *
  * (C) 1999 Thomas Bogendoerfer (tsbogend@alpha.franken.de) 
+ *
+ * 11/26/2000 -- disabled the existing code because it didn't work for 
+ * me in 2.4.  Replaced with a significantly more primitive version 
+ * similar to the sun3 code.  the old functionality was probably more 
+ * desirable, but....   -- Sam Creasey (sammy@oh.verio.com)
+ *
  */
 
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/bitops.h>
 #include <linux/mm.h>
+#include <linux/bootmem.h>
+#include <linux/slab.h>
+#include <linux/vmalloc.h>
 
 #include <asm/sun3x.h>
 #include <asm/dvma.h>
 #include <asm/io.h>
 #include <asm/page.h>
+#include <asm/pgtable.h>
+#include <asm/pgalloc.h>
 
 /* IOMMU support */
 
-#define IOMMU_ENTRIES		   2048
 #define IOMMU_ADDR_MASK            0x03ffe000
 #define IOMMU_CACHE_INHIBIT        0x00000040
 #define IOMMU_FULL_BLOCK           0x00000020
@@ -28,135 +38,170 @@
 #define IOMMU_DT_VALID             0x00000001
 #define IOMMU_DT_BAD               0x00000002
 
-#define DVMA_PAGE_SHIFT	13
-#define DVMA_PAGE_SIZE	(1UL << DVMA_PAGE_SHIFT)
-#define DVMA_PAGE_MASK	(~(DVMA_PAGE_SIZE-1))
-
 
 static volatile unsigned long *iommu_pte = (unsigned long *)SUN3X_IOMMU;
-static unsigned long iommu_use[IOMMU_ENTRIES];
-static unsigned long iommu_bitmap[IOMMU_ENTRIES/32];
 
 
 #define dvma_entry_paddr(index) 	(iommu_pte[index] & IOMMU_ADDR_MASK)
 #define dvma_entry_vaddr(index,paddr) 	((index << DVMA_PAGE_SHIFT) |  \
 					 (paddr & (DVMA_PAGE_SIZE-1)))
+#if 0
+#define dvma_entry_set(index,addr)	(iommu_pte[index] =            \
+					    (addr & IOMMU_ADDR_MASK) | \
+				             IOMMU_DT_VALID | IOMMU_CACHE_INHIBIT)
+#else
 #define dvma_entry_set(index,addr)	(iommu_pte[index] =            \
 					    (addr & IOMMU_ADDR_MASK) | \
 				             IOMMU_DT_VALID)
+#endif
 #define dvma_entry_clr(index)		(iommu_pte[index] = IOMMU_DT_INVALID)
-#define dvma_entry_use(index)		(iommu_use[index])
-#define dvma_entry_inc(index)		(iommu_use[index]++)
-#define dvma_entry_dec(index)		(iommu_use[index]--)
 #define dvma_entry_hash(addr)		((addr >> DVMA_PAGE_SHIFT) ^ \
 					 ((addr & 0x03c00000) >>     \
 						(DVMA_PAGE_SHIFT+4)))
-#define dvma_map			iommu_bitmap
-#define dvma_map_size			(IOMMU_ENTRIES/2)
-#define dvma_slow_offset		(IOMMU_ENTRIES/2)
-#define dvma_is_slow(addr)		((addr) & 		      \
-					 (dvma_slow_offset << DVMA_PAGE_SHIFT))
 
-static int fixed_dvma;
+#undef DEBUG
 
-void __init dvma_init(void)
+#ifdef DEBUG
+/* code to print out a dvma mapping for debugging purposes */
+void dvma_print (unsigned long dvma_addr)
 {
-    unsigned long tmp;
 
-    if ((unsigned long)high_memory < (IOMMU_ENTRIES << DVMA_PAGE_SHIFT)) {
-	printk ("Sun3x fixed DVMA mapping\n");
-	fixed_dvma = 1;
-	for (tmp = 0; tmp < (unsigned long)high_memory; tmp += DVMA_PAGE_SIZE)
-	dvma_entry_set (tmp >> DVMA_PAGE_SHIFT, virt_to_phys((void *)tmp));
-	fixed_dvma = 1;
-    } else {
-	printk ("Sun3x variable DVMA mapping\n");
-	for (tmp = 0; tmp < IOMMU_ENTRIES; tmp++)
-	    dvma_entry_clr (tmp);
-	fixed_dvma = 0;
-    }
+        unsigned long index;
+
+        index = dvma_addr >> DVMA_PAGE_SHIFT;
+
+        printk("idx %lx dvma_addr %08lx paddr %08lx\n", index, dvma_addr,
+               dvma_entry_paddr(index));
+
+
+}
+#endif
+
+
+/* create a virtual mapping for a page assigned within the IOMMU
+   so that the cpu can reach it easily */
+inline int dvma_map_cpu(unsigned long kaddr, 
+			       unsigned long vaddr, int len)
+{
+	pgd_t *pgd;
+	unsigned long end;
+	int ret = 0;
+
+	kaddr &= PAGE_MASK;
+	vaddr &= PAGE_MASK;
+
+	end = PAGE_ALIGN(vaddr + len);
+
+#ifdef DEBUG
+	printk("dvma: mapping kern %08lx to virt %08lx\n",
+	       kaddr, vaddr);
+#endif
+	pgd = pgd_offset_k(vaddr);
+	
+	do {
+		pmd_t *pmd;
+		unsigned long end2;
+
+		if((pmd = pmd_alloc_kernel(pgd, vaddr)) == NULL) {
+			ret = -ENOMEM;
+			goto out;
+		}
+
+		if((end & PGDIR_MASK) > (vaddr & PGDIR_MASK)) 
+			end2 = (vaddr + (PGDIR_SIZE-1)) & PGDIR_MASK;
+		else
+			end2 = end;
+
+		do {
+			pte_t *pte;
+			unsigned long end3;
+
+			if((pte = pte_alloc_kernel(pmd, vaddr)) == NULL) {
+				ret = -ENOMEM;
+				goto out;
+			}
+
+			if((end2 & PMD_MASK) > (vaddr & PMD_MASK)) 
+				end3 = (vaddr + (PMD_SIZE-1)) & PMD_MASK;
+			else
+				end3 = end2;
+
+			do {
+#ifdef DEBUG
+				printk("mapping %08lx phys to %08lx\n",
+				       __pa(kaddr), vaddr);
+#endif
+				set_pte(pte, __mk_pte(kaddr, PAGE_KERNEL));
+				pte++;
+				kaddr += PAGE_SIZE;
+				vaddr += PAGE_SIZE;
+			} while(vaddr < end3);
+			
+		} while(vaddr < end2);
+
+	} while(vaddr < end);
+	
+	flush_tlb_all();
+
+ out:
+	return ret;
 }
 
-unsigned long dvma_slow_alloc (unsigned long paddr, int npages)
-{
-    int scan, base;
-    
-    scan = 0;
-    for (;;) {
-	scan = find_next_zero_bit(dvma_map, dvma_map_size, scan);
-	if ((base = scan) + npages > dvma_map_size) {
-	    printk ("dvma_slow_alloc failed for %d pages\n",npages);
-	    return 0;
-	}
-	for  (;;) {
-	    if (scan >= base + npages) goto found;
-	    if (test_bit(scan, dvma_map)) break;
-	    scan++;
-	}
-    }
 
-found:
-    for (scan = base; scan < base+npages; scan++) {
-	dvma_entry_set(scan+dvma_slow_offset, paddr);
-	paddr += DVMA_PAGE_SIZE;
-	set_bit(scan, dvma_map);
-    }
-    return (dvma_entry_vaddr((base+dvma_slow_offset),paddr));
+inline int dvma_map_iommu(unsigned long kaddr, unsigned long baddr,
+				 int len) 
+{
+	unsigned long end, index;
+
+	index = baddr >> DVMA_PAGE_SHIFT;
+	end = ((baddr+len) >> DVMA_PAGE_SHIFT);
+	
+	if(len & ~DVMA_PAGE_MASK)
+		end++;
+
+	for(; index < end ; index++) {
+//		if(dvma_entry_use(index))
+//			BUG();
+//		printk("mapping pa %lx to ba %lx\n", __pa(kaddr), index << DVMA_PAGE_SHIFT);
+
+		dvma_entry_set(index, __pa(kaddr));
+
+		iommu_pte[index] |= IOMMU_FULL_BLOCK;
+//		dvma_entry_inc(index);
+		
+		kaddr += DVMA_PAGE_SIZE;
+	}
+
+#ifdef DEBUG	
+	for(index = (baddr >> DVMA_PAGE_SHIFT); index < end; index++) 
+		dvma_print(index << DVMA_PAGE_SHIFT);
+#endif
+	return 0;
+
 }
 
-unsigned long dvma_alloc (unsigned long paddr, unsigned long size)
+void dvma_unmap_iommu(unsigned long baddr, int len)
 {
-    int index;
-    int pages = ((paddr & ~DVMA_PAGE_MASK) + size + (DVMA_PAGE_SIZE-1)) >>
-		DVMA_PAGE_SHIFT;
 
-    if (fixed_dvma)
-	return ((unsigned long)phys_to_virt (paddr));
-
-    if (pages > 1) /* multi page, allocate from slow pool */
-	return dvma_slow_alloc (paddr, pages);
-    
-    index = dvma_entry_hash (paddr);
-
-    if (dvma_entry_use(index)) {
-	if (dvma_entry_paddr(index) == (paddr & DVMA_PAGE_MASK)) {
-	    dvma_entry_inc(index);
-	    return dvma_entry_vaddr(index,paddr);
+	int index, end;
+	
+	
+	index = baddr >> DVMA_PAGE_SHIFT;
+	end = (DVMA_PAGE_ALIGN(baddr+len) >> DVMA_PAGE_SHIFT);
+	
+	for(; index < end ; index++) {
+#ifdef DEBUG
+		printk("freeing bus mapping %08x\n", index << DVMA_PAGE_SHIFT);
+#endif
+#if 0
+		if(!dvma_entry_use(index)) 
+			printk("dvma_unmap freeing unused entry %04x\n",
+			       index);
+		else
+			dvma_entry_dec(index);
+#endif
+		dvma_entry_clr(index);
 	}
-	/* collision, allocate from slow pool */
-	return dvma_slow_alloc (paddr, pages);
-    }
-    
-    dvma_entry_set(index,paddr); 
-    dvma_entry_inc(index);
-    return dvma_entry_vaddr(index,paddr);
+
 }
 
-void dvma_free (unsigned long dvma_addr, unsigned long size)
-{
-    int npages;
-    int index;
-    
-    if (fixed_dvma)
-	return;
-
-    if (!dvma_is_slow(dvma_addr)) {
-	index = (dvma_addr >> DVMA_PAGE_SHIFT);
-	if (dvma_entry_use(index) == 0) {
-	    printk ("dvma_free: %lx entry already free\n",dvma_addr);
-	    return;
-	}
-        dvma_entry_dec(index);
-	if (dvma_entry_use(index) == 0)
-	    dvma_entry_clr(index);
-	return;
-    }
-
-    /* free in slow pool */
-    npages = ((dvma_addr & ~DVMA_PAGE_MASK) + size + (DVMA_PAGE_SIZE-1)) >>
-	    DVMA_PAGE_SHIFT;
-    for (index = (dvma_addr >> DVMA_PAGE_SHIFT); npages--; index++) {
-	dvma_entry_clr(index);
-	clear_bit (index,dvma_map);
-    }
-}

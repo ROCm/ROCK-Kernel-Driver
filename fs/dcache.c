@@ -616,7 +616,7 @@ struct dentry * d_alloc(struct dentry * parent, const struct qstr *name)
 	dentry->d_name.hash = name->hash;
 	dentry->d_op = NULL;
 	dentry->d_fsdata = NULL;
-	INIT_LIST_HEAD(&dentry->d_vfsmnt);
+	dentry->d_mounted = 0;
 	INIT_LIST_HEAD(&dentry->d_hash);
 	INIT_LIST_HEAD(&dentry->d_lru);
 	INIT_LIST_HEAD(&dentry->d_subdirs);
@@ -1283,6 +1283,7 @@ void __init vfs_caches_init(unsigned long mempages)
 
 	dcache_init(mempages);
 	inode_init(mempages);
+	mnt_init(mempages);
 	bdev_cache_init();
 	cdev_cache_init();
 }

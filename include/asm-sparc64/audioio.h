@@ -428,8 +428,6 @@ extern int register_sparcaudio_driver(struct sparcaudio_driver *, int);
 extern int unregister_sparcaudio_driver(struct sparcaudio_driver *, int);
 extern void sparcaudio_output_done(struct sparcaudio_driver *, int);
 extern void sparcaudio_input_done(struct sparcaudio_driver *, int);
-extern int amd7930_init(void);
-extern int cs4231_init(void);
 
 #endif
 

@@ -282,6 +282,7 @@ cbq_classify(struct sk_buff *skb, struct Qdisc *sch)
 		case TC_POLICE_SHOT:
 			return NULL;
 		default:
+			break;
 		}
 #endif
 		if (cl->level == 0)

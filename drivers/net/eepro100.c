@@ -470,7 +470,7 @@ struct speedo_private {
 	struct timer_list timer;			/* Media selection timer. */
 	struct speedo_mc_block *mc_setup_head;/* Multicast setup frame list head. */
 	struct speedo_mc_block *mc_setup_tail;/* Multicast setup frame list tail. */
-	int in_interrupt;					/* Word-aligned dev->interrupt */
+	long in_interrupt;					/* Word-aligned dev->interrupt */
 	unsigned char acpi_pwr;
 	signed char rx_mode;					/* Current PROMISC/ALLMULTI setting. */
 	unsigned int tx_full:1;				/* The Tx queue is full. */

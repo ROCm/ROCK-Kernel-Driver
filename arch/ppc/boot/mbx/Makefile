@@ -1,4 +1,4 @@
-# BK Id: SCCS/s.Makefile 1.5 05/18/01 06:20:29 patch
+# BK Id: SCCS/s.Makefile 1.7 06/05/01 20:20:05 paulus
 #
 #
 # arch/ppc/mbxboot/Makefile
@@ -87,13 +87,21 @@ zvmlinux.initrd: $(OBJECTS) $(LIBS) ../images/vmlinux.gz
 	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
 		--add-section=initrd=../images/ramdisk.image.gz \
 		--add-section=image=../images/vmlinux.gz \
-		$@.tmp ../images/$@.mbx
+		$@.tmp ../images/$@.embedded
 
 zImage: zvmlinux
-	ln -sf zvmlinux.mbx ../images/zImage.mbx
+ifeq ($(CONFIG_RPXCLASSIC),y)
+	dd if=../images/zvmlinux.embedded of=../images/zImage.embedded bs=65536 skip=1
+else
+	ln -sf ../images/zvmlinux.embedded ../images/zImage.embedded
+endif
 
 zImage.initrd: zvmlinux.initrd
-	ln -sf zvmlinux.initrd.mbx ../images/zImage.initrd.mbx
+ifeq ($(CONFIG_RPXCLASSIC),y)
+	dd if=../images/zvmlinux.initrd.embedded of=../images/zImage.initrd.embedded bs=65536 skip=1
+else
+	ln -sf ../images/zvmlinux.initrd.embedded ../images/zImage.initrd.embedded
+endif
 
 zvmlinux: $(OBJECTS) $(LIBS) ../images/vmlinux.gz
 #
@@ -114,14 +122,14 @@ zvmlinux: $(OBJECTS) $(LIBS) ../images/vmlinux.gz
 	$(LD) $(ZLINKFLAGS) -o $@.tmp $(OBJECTS) $(LIBS)
 	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
 		--add-section=image=../images/vmlinux.gz \
-		$@.tmp ../images/$@.mbx
-# Remove zvmlinux and zvmlinux.temp, we have ../images/zvmlinux.mbx
+		$@.tmp ../images/$@.embedded
+# Remove zvmlinux and zvmlinux.temp, we have ../images/zvmlinux.embedded
 	rm -f $@.tmp $@
 
 znetboot : zImage
-	cp ../images/zImage.mbx $(TFTPIMAGE)
+	cp ../images/zImage.embedded $(TFTPIMAGE)
 
 znetboot.initrd : zImage.initrd
-	cp ../images/zImage.initrd.mbx $(TFTPIMAGE)
+	cp ../images/zImage.initrd.embedded $(TFTPIMAGE)
 
 include $(TOPDIR)/Rules.make 

@@ -13,7 +13,6 @@
 #define IRNET_IRDA_H
 
 /***************************** INCLUDES *****************************/
-#include <linux/config.h>
 /* Please add other headers in irnet.h */
 
 #include "irnet.h"		/* Module global include */
@@ -69,12 +68,21 @@ static void
 	irnet_post_event(irnet_socket *,
 			 irnet_event,
 			 __u32,
+			 __u32,
 			 char *);
 /* ----------------------- IRDA SUBROUTINES ----------------------- */
 static inline int
 	irnet_open_tsap(irnet_socket *);
-static int
+static inline __u8
+	irnet_ias_to_tsap(irnet_socket *,
+			  int,
+			  struct ias_value *);
+static inline int
 	irnet_find_lsap_sel(irnet_socket *);
+static inline int
+	irnet_connect_tsap(irnet_socket *);
+static inline int
+	irnet_discover_next_daddr(irnet_socket *);
 static inline int
 	irnet_discover_daddr_and_lsap_sel(irnet_socket *);
 static inline int
@@ -135,6 +143,11 @@ static void
 			       __u16,
 			       struct ias_value *,
 			       void *);
+static void
+	irnet_discovervalue_confirm(int,
+				    __u16, 
+				    struct ias_value *,
+				    void *);
 #ifdef DISCOVERY_EVENTS
 static void
 	irnet_discovery_indication(discovery_t *,

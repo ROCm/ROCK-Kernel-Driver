@@ -1,0 +1,16 @@
+#
+# Bluetooth configuration
+#
+
+if [ "$CONFIG_NET" != "n" ]; then
+   mainmenu_option next_comment
+   comment 'Bluetooth support'
+   dep_tristate 'Bluetooth subsystem support' CONFIG_BLUEZ $CONFIG_NET
+
+   if [ "$CONFIG_BLUEZ" != "n" ]; then
+      dep_tristate 'L2CAP protocol support' CONFIG_BLUEZ_L2CAP $CONFIG_BLUEZ
+      source drivers/bluetooth/Config.in
+   fi
+   endmenu
+fi
+

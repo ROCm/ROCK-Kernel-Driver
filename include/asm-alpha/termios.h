@@ -82,6 +82,7 @@ struct termio {
 #define N_SMSBLOCK	12	/* SMS block mode - for talking to GSM data cards about SMS messages */
 #define N_HDLC		13	/* synchronous HDLC */
 #define N_SYNC_PPP	14
+#define N_HCI		15  /* Bluetooth HCI UART */
 
 #ifdef __KERNEL__
 /*	eof=^D		eol=\0		eol2=\0		erase=del

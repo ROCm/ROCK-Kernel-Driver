@@ -1,4 +1,4 @@
-/* orinoco_cs.c 0.05	- (formerly known as dldwd_cs.c)
+/* orinoco_cs.c 0.06	- (formerly known as dldwd_cs.c)
  *
  * A driver for "Hermes" chipset based PCMCIA wireless adaptors, such
  * as the Lucent WavelanIEEE/Orinoco cards and their OEM (Cabletron/
@@ -50,7 +50,7 @@ typedef struct dldwd_card {
 	struct dldwd_priv  priv;
 } dldwd_card_t;
 
-static char *version = "orinoco_cs.c 0.05 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
+static char *version = "orinoco_cs.c 0.06 (David Gibson <hermes@gibson.dropbear.id.au> and others)";
 
 /*====================================================================*/
 
@@ -166,6 +166,70 @@ dldwd_cs_stop(struct net_device *dev)
 	return 0;
 }
 
+/*
+ * Do a soft reset of the Pcmcia card using the Configuration Option Register
+ * Can't do any harm, and actually may do some good on some cards...
+ * In fact, this seem necessary for Spectrum cards...
+ */
+static int
+dldwd_cs_cor_reset(dldwd_priv_t *priv)
+{
+	dldwd_card_t* card = (dldwd_card_t *)priv->card;
+	dev_link_t *link = &card->link;
+	conf_reg_t reg;
+	u_long default_cor; 
+
+	TRACE_ENTER(priv->ndev.name);
+
+	/* Doing it if hardware is gone is guaranteed crash */
+	if(!priv->hw_ready)
+		return(0);
+
+	/* Save original COR value */
+	reg.Function = 0;
+	reg.Action = CS_READ;
+	reg.Offset = CISREG_COR;
+	reg.Value = 0;
+	CardServices(AccessConfigurationRegister, link->handle, &reg);
+	default_cor = reg.Value;
+
+	DEBUG(2, "dldwd : dldwd_cs_cor_reset() : cor=0x%lX\n", default_cor);
+
+	/* Soft-Reset card */
+	reg.Action = CS_WRITE;
+	reg.Offset = CISREG_COR;
+	reg.Value = (default_cor | COR_SOFT_RESET);
+	CardServices(AccessConfigurationRegister, link->handle, &reg);
+
+	/* Wait until the card has acknowledged our reset */
+	mdelay(1);
+
+	/* Restore original COR configuration index */
+	reg.Value = (default_cor & ~COR_SOFT_RESET);
+	CardServices(AccessConfigurationRegister, link->handle, &reg);
+
+	/* Wait until the card has finished restarting */
+	mdelay(1);
+
+	TRACE_EXIT(priv->ndev.name);
+
+	return(0);
+}
+
+/* Remove zombie instances (card removed, detach pending) */
+static void
+flush_stale_links(void)
+{
+	dev_link_t *link, *next;
+	TRACE_ENTER("dldwd");
+	for (link = dev_list; link; link = next) {
+		next = link->next;
+		if (link->state & DEV_STALE_LINK)
+			dldwd_cs_detach(link);
+	}
+	TRACE_EXIT("dldwd");
+}
+
 /*======================================================================
   dldwd_cs_attach() creates an "instance" of the driver, allocating
   local data structures for one device.  The device is registered
@@ -187,6 +251,8 @@ dldwd_cs_attach(void)
 	int ret, i;
 
 	TRACE_ENTER("dldwd");
+	/* A bit of cleanup */
+	flush_stale_links();
 
 	/* Allocate space for private device-specific data */
 	card = kmalloc(sizeof(*card), GFP_KERNEL);
@@ -237,6 +303,7 @@ dldwd_cs_attach(void)
 	/* Overrides */
 	ndev->open = dldwd_cs_open;
 	ndev->stop = dldwd_cs_stop;
+	priv->card_reset_handler = dldwd_cs_cor_reset;
 
 	/* Register with Card Services */
 	link->next = dev_list;
@@ -319,45 +386,6 @@ dldwd_cs_detach(dev_link_t * link)
  out:
 	TRACE_EXIT("dldwd");
 }				/* dldwd_cs_detach */
-
-/*
- * Do a soft reset of the Pcmcia card using the Configuration Option Register
- * Can't do any harm, and actually may do some good on some cards...
- */
-static int
-dldwd_cs_cor_reset(dev_link_t *link)
-{
-	conf_reg_t reg;
-	u_long default_cor; 
-
-	/* Save original COR value */
-	reg.Function = 0;
-	reg.Action = CS_READ;
-	reg.Offset = CISREG_COR;
-	reg.Value = 0;
-	CardServices(AccessConfigurationRegister, link->handle, &reg);
-	default_cor = reg.Value;
-
-	DEBUG(2, "dldwd : dldwd_cs_cor_reset() : cor=0x%lX\n", default_cor);
-
-	/* Soft-Reset card */
-	reg.Action = CS_WRITE;
-	reg.Offset = CISREG_COR;
-	reg.Value = (default_cor | COR_SOFT_RESET);
-	CardServices(AccessConfigurationRegister, link->handle, &reg);
-
-	/* Wait until the card has acknowledged our reset */
-	mdelay(1);
-
-	/* Restore original COR configuration index */
-	reg.Value = (default_cor & COR_CONFIG_MASK);
-	CardServices(AccessConfigurationRegister, link->handle, &reg);
-
-	/* Wait until the card has finished restarting */
-	mdelay(1);
-
-	return(0);
-}
 
 /*======================================================================
   dldwd_cs_config() is scheduled to run after a CARD_INSERTION event
@@ -556,10 +584,6 @@ dldwd_cs_config(dev_link_t * link)
 	ndev->base_addr = link->io.BasePort1;
 	ndev->irq = link->irq.AssignedIRQ;
 
-	/* Do a Pcmcia soft reset of the card (optional) */
-	if(reset_cor)
-		dldwd_cs_cor_reset(link);
-
 	/* register_netdev will give us an ethX name */
 	ndev->name[0] = '\0';
 	/* Tell the stack we exist */
@@ -586,9 +610,6 @@ dldwd_cs_config(dev_link_t * link)
 		       link->io.BasePort2 + link->io.NumPorts2 - 1);
 	printk("\n");
 
-	/* Allow /proc & ioctls to act */
-	priv->hw_ready = 1;
-	
 	/* And give us the proc nodes for debugging */
 	if (dldwd_proc_dev_init(priv) != 0) {
 		printk(KERN_ERR "orinoco_cs: Failed to create /proc node for %s\n",
@@ -599,6 +620,13 @@ dldwd_cs_config(dev_link_t * link)
 	/* Note to myself : this replace MOD_INC_USE_COUNT/MOD_DEC_USE_COUNT */
 	SET_MODULE_OWNER(ndev);
 	
+	/* Allow cor_reset, /proc & ioctls to act */
+	priv->hw_ready = 1;
+	
+	/* Do a Pcmcia soft reset of the card (optional) */
+	if(reset_cor)
+		dldwd_cs_cor_reset(priv);
+
 	/*
 	   At this point, the dev_node_t structure(s) need to be
 	   initialized and arranged in a linked list at link->dev.

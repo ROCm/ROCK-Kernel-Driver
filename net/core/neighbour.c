@@ -308,7 +308,7 @@ struct neighbour * neigh_create(struct neigh_table *tbl, const void *pkey,
 	}
 
 	/* Device specific setup. */
-	if (n->parms && n->parms->neigh_setup &&
+	if (n->parms->neigh_setup &&
 	    (error = n->parms->neigh_setup(n)) < 0) {
 		neigh_release(n);
 		return ERR_PTR(error);

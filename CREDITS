@@ -1356,13 +1356,15 @@ N: Dave Jones
 E: davej@suse.de
 W: http://www.suse.de/~davej
 D: Moved PCI bridge tuning to userspace (Powertweak).
-D: Centaur/IDT Winchip/Winchip 2 tweaks.
+D: Various x86 (& clones) setup code hacking.
 D: AFFS fixes for 2.3.x
-D: Misc clean ups and other random hacking.
-S: 28, Laura Street,
-S: Treforest, Pontypridd,
-S: Mid Glamorgan, CF37 1NW,
-S: Wales, United Kingdom
+D: Various Janitorial hacks. (kernel-janitor.sourceforge.net)
+S: c/o SuSE Linux UK Ltd
+S: The Kinetic Centre
+S: Theobald Street
+S: Borehamwood
+S: Herts, WD6 4PJ
+S: United Kingdom
 
 N: Ani Joshi
 E: ajoshi@shell.unixbox.com
@@ -1517,6 +1519,17 @@ S: 7170 Warden Avenue, Unit 2
 S: Markham, Ontario
 S: L3R 8B2
 S: Canada
+
+N: Maxim Krasnyansky
+E: maxk@qualcomm.com
+W: http://vtun.sf.net
+W: http://bluez.sf.net
+D: Author of the Universal TUN/TAP driver
+D: Author of the Linux Bluetooth Subsystem (BlueZ)
+D: Various other kernel patches, cleanups and fixes
+S: 2213 La Terrace Circle
+S: San Jose, CA 95123
+S: USA
 
 N: Andreas S. Krebs
 E: akrebs@altavista.net

@@ -19,23 +19,23 @@
    __constant_test_and_set_bit(nr, vaddr) : \
    __generic_test_and_set_bit(nr, vaddr))
 
-extern __inline__ int __constant_test_and_set_bit(int nr,void * vaddr)
+extern __inline__ int __constant_test_and_set_bit(int nr,volatile void * vaddr)
 {
 	char retval;
 
-	__asm__ __volatile__ ("bset %1,%2; sne %0"
-	     : "=d" (retval)
-	     : "di" (nr & 7), "m" (((char *)vaddr)[(nr^31) >> 3]));
+	__asm__ __volatile__ ("bset %2,%1; sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)vaddr)[(nr^31) >> 3])
+	     : "di" (nr & 7));
 
 	return retval;
 }
 
-extern __inline__ int __generic_test_and_set_bit(int nr,void * vaddr)
+extern __inline__ int __generic_test_and_set_bit(int nr,volatile void * vaddr)
 {
 	char retval;
 
 	__asm__ __volatile__ ("bfset %2@{%1:#1}; sne %0"
-	     : "=d" (retval) : "d" (nr^31), "a" (vaddr));
+	     : "=d" (retval) : "d" (nr^31), "a" (vaddr) : "memory");
 
 	return retval;
 }
@@ -45,16 +45,16 @@ extern __inline__ int __generic_test_and_set_bit(int nr,void * vaddr)
    __constant_set_bit(nr, vaddr) : \
    __generic_set_bit(nr, vaddr))
 
-extern __inline__ void __constant_set_bit(int nr, void * vaddr)
+extern __inline__ void __constant_set_bit(int nr, volatile void * vaddr)
 {
-	__asm__ __volatile__ ("bset %0,%1"
-	     : : "di" (nr & 7), "m" (((char *)vaddr)[(nr^31) >> 3]));
+	__asm__ __volatile__ ("bset %1,%0"
+	     : "+m" (((volatile char *)vaddr)[(nr^31) >> 3]) : "di" (nr & 7));
 }
 
-extern __inline__ void __generic_set_bit(int nr, void * vaddr)
+extern __inline__ void __generic_set_bit(int nr, volatile void * vaddr)
 {
 	__asm__ __volatile__ ("bfset %1@{%0:#1}"
-	     : : "d" (nr^31), "a" (vaddr));
+	     : : "d" (nr^31), "a" (vaddr) : "memory");
 }
 
 #define test_and_clear_bit(nr,vaddr) \
@@ -62,23 +62,23 @@ extern __inline__ void __generic_set_bit(int nr, void * vaddr)
    __constant_test_and_clear_bit(nr, vaddr) : \
    __generic_test_and_clear_bit(nr, vaddr))
 
-extern __inline__ int __constant_test_and_clear_bit(int nr, void * vaddr)
+extern __inline__ int __constant_test_and_clear_bit(int nr, volatile void * vaddr)
 {
 	char retval;
 
-	__asm__ __volatile__ ("bclr %1,%2; sne %0"
-	     : "=d" (retval)
-	     : "di" (nr & 7), "m" (((char *)vaddr)[(nr^31) >> 3]));
+	__asm__ __volatile__ ("bclr %2,%1; sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)vaddr)[(nr^31) >> 3])
+	     : "di" (nr & 7));
 
 	return retval;
 }
 
-extern __inline__ int __generic_test_and_clear_bit(int nr, void * vaddr)
+extern __inline__ int __generic_test_and_clear_bit(int nr, volatile void * vaddr)
 {
 	char retval;
 
 	__asm__ __volatile__ ("bfclr %2@{%1:#1}; sne %0"
-	     : "=d" (retval) : "d" (nr^31), "a" (vaddr));
+	     : "=d" (retval) : "d" (nr^31), "a" (vaddr) : "memory");
 
 	return retval;
 }
@@ -94,16 +94,16 @@ extern __inline__ int __generic_test_and_clear_bit(int nr, void * vaddr)
    __constant_clear_bit(nr, vaddr) : \
    __generic_clear_bit(nr, vaddr))
 
-extern __inline__ void __constant_clear_bit(int nr, void * vaddr)
+extern __inline__ void __constant_clear_bit(int nr, volatile void * vaddr)
 {
-	__asm__ __volatile__ ("bclr %0,%1"
-	     : : "di" (nr & 7), "m" (((char *)vaddr)[(nr^31) >> 3]));
+	__asm__ __volatile__ ("bclr %1,%0"
+	     : "+m" (((volatile char *)vaddr)[(nr^31) >> 3]) : "di" (nr & 7));
 }
 
-extern __inline__ void __generic_clear_bit(int nr, void * vaddr)
+extern __inline__ void __generic_clear_bit(int nr, volatile void * vaddr)
 {
 	__asm__ __volatile__ ("bfclr %1@{%0:#1}"
-	     : : "d" (nr^31), "a" (vaddr));
+	     : : "d" (nr^31), "a" (vaddr) : "memory");
 }
 
 #define test_and_change_bit(nr,vaddr) \
@@ -111,23 +111,26 @@ extern __inline__ void __generic_clear_bit(int nr, void * vaddr)
    __constant_test_and_change_bit(nr, vaddr) : \
    __generic_test_and_change_bit(nr, vaddr))
 
-extern __inline__ int __constant_test_and_change_bit(int nr, void * vaddr)
+#define __test_and_change_bit(nr,vaddr) test_and_change_bit(nr,vaddr)
+#define __change_bit(nr,vaddr) change_bit(nr,vaddr)
+
+extern __inline__ int __constant_test_and_change_bit(int nr, volatile void * vaddr)
 {
 	char retval;
 
-	__asm__ __volatile__ ("bchg %1,%2; sne %0"
-	     : "=d" (retval)
-	     : "di" (nr & 7), "m" (((char *)vaddr)[(nr^31) >> 3]));
+	__asm__ __volatile__ ("bchg %2,%1; sne %0"
+	     : "=d" (retval), "+m" (((volatile char *)vaddr)[(nr^31) >> 3])
+	     : "di" (nr & 7));
 
 	return retval;
 }
 
-extern __inline__ int __generic_test_and_change_bit(int nr, void * vaddr)
+extern __inline__ int __generic_test_and_change_bit(int nr, volatile void * vaddr)
 {
 	char retval;
 
 	__asm__ __volatile__ ("bfchg %2@{%1:#1}; sne %0"
-	     : "=d" (retval) : "d" (nr^31), "a" (vaddr));
+	     : "=d" (retval) : "d" (nr^31), "a" (vaddr) : "memory");
 
 	return retval;
 }
@@ -137,21 +140,21 @@ extern __inline__ int __generic_test_and_change_bit(int nr, void * vaddr)
    __constant_change_bit(nr, vaddr) : \
    __generic_change_bit(nr, vaddr))
 
-extern __inline__ void __constant_change_bit(int nr, void * vaddr)
+extern __inline__ void __constant_change_bit(int nr, volatile void * vaddr)
 {
-	__asm__ __volatile__ ("bchg %0,%1"
-	     : : "di" (nr & 7), "m" (((char *)vaddr)[(nr^31) >> 3]));
+	__asm__ __volatile__ ("bchg %1,%0"
+	     : "+m" (((volatile char *)vaddr)[(nr^31) >> 3]) : "di" (nr & 7));
 }
 
-extern __inline__ void __generic_change_bit(int nr, void * vaddr)
+extern __inline__ void __generic_change_bit(int nr, volatile void * vaddr)
 {
 	__asm__ __volatile__ ("bfchg %1@{%0:#1}"
-	     : : "d" (nr^31), "a" (vaddr));
+	     : : "d" (nr^31), "a" (vaddr) : "memory");
 }
 
-extern __inline__ int test_bit(int nr, const void * vaddr)
+extern __inline__ int test_bit(int nr, const volatile void * vaddr)
 {
-	return ((1UL << (nr & 31)) & (((const unsigned int *) vaddr)[nr >> 5])) != 0;
+	return ((1UL << (nr & 31)) & (((const volatile unsigned int *) vaddr)[nr >> 5])) != 0;
 }
 
 extern __inline__ int find_first_zero_bit(void * vaddr, unsigned size)
@@ -228,7 +231,7 @@ extern __inline__ int ffs(int x)
 {
 	int cnt;
 
-	asm ("bfffo %1{#0:#0},%0" : "=d" (cnt) : "dm" (x & -x));
+	__asm__ __volatile__("bfffo %1{#0:#0},%0" : "=d" (cnt) : "dm" (x & -x));
 
 	return 32 - cnt;
 }
@@ -268,12 +271,12 @@ minix_find_first_zero_bit (const void *vaddr, unsigned size)
 }
 
 extern __inline__ int
-minix_test_and_set_bit (int nr, void *vaddr)
+minix_test_and_set_bit (int nr, volatile void *vaddr)
 {
 	char retval;
 
 	__asm__ __volatile__ ("bfset %2{%1:#1}; sne %0"
-	     : "=d" (retval) : "d" (nr^15), "m" (*(char *)vaddr));
+	     : "=d" (retval) : "d" (nr^15), "m" (*(volatile char *)vaddr) : "memory");
 
 	return retval;
 }
@@ -281,50 +284,50 @@ minix_test_and_set_bit (int nr, void *vaddr)
 #define minix_set_bit(nr,addr)	((void)minix_test_and_set_bit(nr,addr))
 
 extern __inline__ int
-minix_test_and_clear_bit (int nr, void *vaddr)
+minix_test_and_clear_bit (int nr, volatile void *vaddr)
 {
 	char retval;
 
 	__asm__ __volatile__ ("bfclr %2{%1:#1}; sne %0"
-	     : "=d" (retval) : "d" (nr^15), "m" (*(char *) vaddr));
+	     : "=d" (retval) : "d" (nr^15), "m" (*(volatile char *) vaddr) : "memory");
 
 	return retval;
 }
 
 extern __inline__ int
-minix_test_bit (int nr, const void *vaddr)
+minix_test_bit (int nr, const volatile void *vaddr)
 {
-	return ((1U << (nr & 15)) & (((const unsigned short *) vaddr)[nr >> 4])) != 0;
+	return ((1U << (nr & 15)) & (((const volatile unsigned short *) vaddr)[nr >> 4])) != 0;
 }
 
 /* Bitmap functions for the ext2 filesystem. */
 
 extern __inline__ int
-ext2_set_bit (int nr, void *vaddr)
+ext2_set_bit (int nr, volatile void *vaddr)
 {
 	char retval;
 
 	__asm__ __volatile__ ("bfset %2{%1,#1}; sne %0"
-	     : "=d" (retval) : "d" (nr^7), "m" (*(char *) vaddr));
+	     : "=d" (retval) : "d" (nr^7), "m" (*(volatile char *) vaddr) : "memory");
 
 	return retval;
 }
 
 extern __inline__ int
-ext2_clear_bit (int nr, void *vaddr)
+ext2_clear_bit (int nr, volatile void *vaddr)
 {
 	char retval;
 
 	__asm__ __volatile__ ("bfclr %2{%1,#1}; sne %0"
-	     : "=d" (retval) : "d" (nr^7), "m" (*(char *) vaddr));
+	     : "=d" (retval) : "d" (nr^7), "m" (*(volatile char *) vaddr) : "memory");
 
 	return retval;
 }
 
 extern __inline__ int
-ext2_test_bit (int nr, const void *vaddr)
+ext2_test_bit (int nr, const volatile void *vaddr)
 {
-	return ((1U << (nr & 7)) & (((const unsigned char *) vaddr)[nr >> 3])) != 0;
+	return ((1U << (nr & 7)) & (((const volatile unsigned char *) vaddr)[nr >> 3])) != 0;
 }
 
 extern __inline__ int

@@ -268,7 +268,7 @@ void gunzip(void *dst, int dstlen, unsigned char *src, int *lenp)
 	s.zfree = zfree;
 	r = inflateInit2(&s, -MAX_WBITS);
 	if (r != Z_OK) {
-		puts("inflateInit2 returned %d\n");
+		puts("inflateInit2 returned "); puthex(r); puts("\n");
 		exit();
 	}
 	s.next_in = src + i;
@@ -277,7 +277,7 @@ void gunzip(void *dst, int dstlen, unsigned char *src, int *lenp)
 	s.avail_out = dstlen;
 	r = inflate(&s, Z_FINISH);
 	if (r != Z_OK && r != Z_STREAM_END) {
-		puts("inflate returned %d\n");
+		puts("inflate returned "); puthex(r); puts("\n");
 		exit();
 	}
 	*lenp = s.next_out - (unsigned char *) dst;

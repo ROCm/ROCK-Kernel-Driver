@@ -5,7 +5,7 @@
  *
  *		Implementation of the Transmission Control Protocol(TCP).
  *
- * Version:	$Id: tcp_input.c,v 1.231 2001/05/22 05:15:16 davem Exp $
+ * Version:	$Id: tcp_input.c,v 1.232 2001/05/24 22:32:49 davem Exp $
  *
  * Authors:	Ross Biro, <bir7@leland.Stanford.Edu>
  *		Fred N. van Kempen, <waltje@uWalt.NL.Mugnet.ORG>
@@ -2611,10 +2611,10 @@ queue_and_out:
 	if (!after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt)) {
 		/* A retransmit, 2nd most common case.  Force an immediate ack. */
 		NET_INC_STATS_BH(DelayedACKLost);
-		tcp_enter_quickack_mode(tp);
 		tcp_dsack_set(tp, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq);
 
 out_of_window:
+		tcp_enter_quickack_mode(tp);
 		tcp_schedule_ack(tp);
 drop:
 		__kfree_skb(skb);

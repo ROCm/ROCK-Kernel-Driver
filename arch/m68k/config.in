@@ -55,8 +55,8 @@ bool 'HP9000/300 support' CONFIG_HP300
 if [ "$CONFIG_HP300" = "y" ]; then
    bool '  DIO bus support' CONFIG_DIO
 fi
-bool 'Sun3 support' CONFIG_SUN3
 bool 'Sun3x support' CONFIG_SUN3X
+bool 'Sun3 support' CONFIG_SUN3
   
 bool 'Q40/Q60 support' CONFIG_Q40
 
@@ -112,7 +112,7 @@ if [ "$CONFIG_ATARI" = "y" ]; then
    bool 'Support for ST-RAM as swap space' CONFIG_STRAM_SWAP
    bool 'ST-RAM statistics in /proc' CONFIG_STRAM_PROC
 fi
-if [ "$CONFIG_AMIGA" = "y" -o "$CONFIG_ATARI" = "y" ]; then
+if [ "$CONFIG_AMIGA" = "y" -o "$CONFIG_ATARI" = "y" -o "$CONFIG_Q40" = "y" ]; then
    bool 'Use power LED as a heartbeat' CONFIG_HEARTBEAT
 else
   if [ "$CONFIG_HP300" = "y" ]; then
@@ -142,12 +142,16 @@ if [ "$CONFIG_EXPERIMENTAL" = "y" ]; then
    fi
    dep_tristate '  Parallel printer support' CONFIG_PRINTER $CONFIG_PARPORT
    if [ "$CONFIG_PRINTER" != "n" ]; then
-      bool '    Support IEEE1284 status readback' CONFIG_PRINTER_READBACK
+      bool '    Support IEEE1284 status readback' CONFIG_PARPORT_1284
    fi
 fi
 
 source drivers/pci/Config.in
 source drivers/zorro/Config.in
+
+if [ "$CONFIG_Q40" = "y" ]; then
+source drivers/pnp/Config.in
+fi
 
 endmenu
 
@@ -264,11 +268,11 @@ if [ "$CONFIG_SCSI" != "n" ]; then
    fi
 
    if [ "$CONFIG_SUN3" = "y" ]; then
-	dep_tristate 'Sun3 NCR5380 SCSI' CONFIG_SUN3_SCSI $CONFIG_SCSI
+	dep_tristate 'Sun3 NCR5380 OBIO SCSI' CONFIG_SUN3_SCSI $CONFIG_SCSI
    fi
 
    if [ "$CONFIG_SUN3X" = "y" ]; then
-      bool 'ESP SCSI driver' CONFIG_SUN3X_ESP
+      bool 'Sun3x ESP SCSI' CONFIG_SUN3X_ESP
    fi
 
    endmenu
@@ -338,6 +342,9 @@ if [ "$CONFIG_NET" = "y" ]; then
       if [ "$CONFIG_SUN3" = "y" -o "$CONFIG_SUN3X" = "y" ]; then
 	tristate '  Sun3/Sun3x on-board LANCE support' CONFIG_SUN3LANCE
       fi
+      if [ "$CONFIG_SUN3" = "y" ]; then
+	tristate '  Sun3 on-board Intel 82586 support' CONFIG_SUN3_82586
+      fi
       if [ "$CONFIG_HP300" = "y" ]; then
 	 bool '  HP on-board LANCE support' CONFIG_HPLANCE
       fi
@@ -367,7 +374,6 @@ fi
 if [ "$CONFIG_SERIAL_EXTENDED" = "y" ]; then
    bool '    Support more than 4 serial ports' CONFIG_SERIAL_MANY_PORTS
    bool '    Support for sharing serial interrupts' CONFIG_SERIAL_SHARE_IRQ
-#   bool '    Autodetect IRQ - do not yet enable !!' CONFIG_SERIAL_DETECT_IRQ
    bool '    Support special multiport boards' CONFIG_SERIAL_MULTIPORT
    bool '    Support the Bell Technologies HUB6 card' CONFIG_HUB6
 fi
@@ -451,16 +457,16 @@ if [ "$CONFIG_SUN3" = "y" -o "$CONFIG_SUN3X" = "y" ]; then
 else
    define_bool CONFIG_SUN3X_ZS n
 fi
-dep_bool '  Sun keyboard support' CONFIG_SUN_KEYBOARD $CONFIG_SUN3X_ZS
-dep_bool '  Sun mouse support' CONFIG_SUN_MOUSE $CONFIG_SUN3X_ZS
-if [ "$CONFIG_SUN_MOUSE" = "y" ]; then
-   define_bool CONFIG_BUSMOUSE y
-fi
 if [ "$CONFIG_SUN3X_ZS" = "y" ]; then
+   define_bool CONFIG_SUN_KEYBOARD y
+   define_bool CONFIG_SUN_MOUSE y
+   define_bool CONFIG_BUSMOUSE y
    define_bool CONFIG_SBUS y
    define_bool CONFIG_SBUSCHAR y
    define_bool CONFIG_SUN_SERIAL y
 else
+   define_bool CONFIG_SUN_KEYBOARD n
+   define_bool CONFIG_SUN_MOUSE n
    define_bool CONFIG_SBUS n
 fi
 
@@ -508,9 +514,6 @@ else
    else
       bool 'Generic /dev/rtc emulation' CONFIG_GEN_RTC
    fi
-fi
-if [ "$CONFIG_Q40" = "y" ]; then
-  bool 'Q40 Real Time Clock Support' CONFIG_Q40RTC
 fi
 bool 'Unix98 PTY support' CONFIG_UNIX98_PTYS
 if [ "$CONFIG_UNIX98_PTYS" = "y" ]; then

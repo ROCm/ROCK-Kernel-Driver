@@ -6,7 +6,7 @@
  * CONTACTS
  *	E-mail regarding any portion of the Linux UDF file system should be
  *	directed to the development team mailing list (run by majordomo):
- *		linux_udf@hootie.lvld.hp.com
+ *		linux_udf@hpesjro.fc.hp.com
  *
  * COPYRIGHT
  *	This file is distributed under the terms of the GNU General Public
@@ -17,6 +17,10 @@
 
 #if !defined(_LINUX_UDF_FS_SB_H)
 #define _LINUX_UDF_FS_SB_H
+
+#ifndef LINUX_VERSION_CODE
+#include <linux/version.h>
+#endif
 
 #pragma pack(1)
 
@@ -29,16 +33,8 @@
 
 struct udf_sparing_data
 {
-	__u32	s_spar_loc[4];
-	__u8	s_spar_pshift;
-	__u8	s_spar_indexsize;
-	__u32	*s_spar_map;
-	union
-	{
-		__u8	*s_spar_remap8;
-		__u16	*s_spar_remap16;
-		__u32	*s_spar_remap32;
-	} s_spar_remap;
+	__u16	s_packet_len;
+	struct buffer_head *s_spar_map[4];
 };
 
 struct udf_virtual_data
@@ -47,18 +43,26 @@ struct udf_virtual_data
 	__u16	s_start_offset;
 };
 
+struct udf_bitmap
+{
+	__u32			s_extLength;
+	__u32			s_extPosition;
+	__u16			s_nr_groups;
+	struct buffer_head 	**s_block_bitmap;
+};
+
 struct udf_part_map
 {
 	union
 	{
-		__u32			bitmap;
-		struct inode	*table;
-	}		s_uspace;
+		struct udf_bitmap	*s_bitmap;
+		struct inode		*s_table;
+	} s_uspace;
 	union
 	{
-		__u32			bitmap;
-		struct inode	*table;
-	}		s_fspace;
+		struct udf_bitmap	*s_bitmap;
+		struct inode		*s_table;
+	} s_fspace;
 	__u32	s_partition_root;
 	__u32	s_partition_len;
 	__u16	s_partition_type;
@@ -77,43 +81,42 @@ struct udf_part_map
 
 struct udf_sb_info
 {
-	struct udf_part_map *s_partmaps;
-	__u8  s_volident[32];
+	struct udf_part_map	*s_partmaps;
+	__u8			s_volident[32];
 
 	/* Overall info */
-	__u16 s_partitions;
-	__u16 s_partition;
+	__u16			s_partitions;
+	__u16			s_partition;
 
 	/* Sector headers */
-	__u32 s_session;
-	__u32 s_anchor[4];
-	__u32 s_lastblock;
+	__u32			s_session;
+	__u32			s_anchor[4];
+	__u32			s_lastblock;
 
-	struct buffer_head *s_lvidbh;
-
-	__u16 s_loaded_block_bitmaps;
-	__u32 s_block_bitmap_number[UDF_MAX_BLOCK_LOADED];
-	struct buffer_head *s_block_bitmap[UDF_MAX_BLOCK_LOADED];
+	struct buffer_head	*s_lvidbh;
 
 	/* Default permissions */
-	mode_t s_umask;
-	gid_t s_gid;
-	uid_t s_uid;
+	mode_t			s_umask;
+	gid_t			s_gid;
+	uid_t			s_uid;
 
 	/* Root Info */
-	time_t s_recordtime;
+	time_t			s_recordtime;
 
 	/* Fileset Info */
-	__u16 s_serialnum;
+	__u16			s_serialnum;
 
 	/* highest UDF revision we have recorded to this media */
-	__u16 s_udfrev;
+	__u16			s_udfrev;
 
 	/* Miscellaneous flags */
-	__u32 s_flags;
+	__u32			s_flags;
+
+	/* Encoding info */
+	struct nls_table	*s_nls_map;
 
 	/* VAT inode */
-	struct inode    *s_vat;
+	struct inode		*s_vat;
 };
 
 #endif /* !defined(_LINUX_UDF_FS_SB_H) */

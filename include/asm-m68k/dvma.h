@@ -11,17 +11,37 @@
 
 #include <linux/config.h>
 
+#define DVMA_PAGE_SHIFT	13
+#define DVMA_PAGE_SIZE	(1UL << DVMA_PAGE_SHIFT)
+#define DVMA_PAGE_MASK	(~(DVMA_PAGE_SIZE-1))
+#define DVMA_PAGE_ALIGN(addr)	(((addr)+DVMA_PAGE_SIZE-1)&DVMA_PAGE_MASK)
+
+extern void dvma_init(void);	
+extern int dvma_map_iommu(unsigned long kaddr, unsigned long baddr, 
+			  int len);
+
+#define dvma_malloc(x) dvma_malloc_align(x, 0)
+#define dvma_map(x, y) dvma_map_align(x, y, 0)
+
+extern unsigned long dvma_map_align(unsigned long kaddr, int len, 
+			    int align);
+extern void *dvma_malloc_align(unsigned long len, unsigned long align);
+
+extern void dvma_unmap(void *baddr);
+extern void dvma_free(void *vaddr);
+
+
 #ifdef CONFIG_SUN3
 /* sun3 dvma page support */
-
-#define DVMA_RESERVED_PMEGS 2 /* 256k of dvma */
 
 /* memory and pmegs potentially reserved for dvma */
 #define DVMA_PMEG_START 10
 #define DVMA_PMEG_END 16
-#define DVMA_START 0xff00000
-#define DVMA_END 0xffe0000
+#define DVMA_START 0xf00000
+#define DVMA_END 0xfe0000
 #define DVMA_SIZE (DVMA_END-DVMA_START)
+#define IOMMU_TOTAL_ENTRIES 128
+#define IOMMU_ENTRIES 120
 
 /* empirical kludge -- dvma regions only seem to work right on 0x10000 
    byte boundries */
@@ -29,14 +49,39 @@
 #define DVMA_ALIGN(addr) (((addr)+DVMA_REGION_SIZE-1) & \
                          ~(DVMA_REGION_SIZE-1))
 
-
 /* virt <-> phys conversions */
-#define sun3_dvma_vtop(x) ((unsigned long)(x) & 0xffffff)
-#define sun3_dvma_ptov(x) ((unsigned long)(x) | 0xf000000)
+#define dvma_vtop(x) ((unsigned long)(x) & 0xffffff)
+#define dvma_ptov(x) ((unsigned long)(x) | 0xf000000)
+#define dvma_vtob(x) dvma_vtop(x)
+#define dvma_btov(x) dvma_ptov(x)
 
-extern void sun3_dvma_init(void);	
-extern void *sun3_dvma_malloc(int len);
+extern inline int dvma_map_cpu(unsigned long kaddr, unsigned long vaddr, int len)
+{
+	return 0;
+}
+
+extern unsigned long dvma_page(unsigned long kaddr, unsigned long vaddr);
+
 #else /* Sun3x */
+
+/* sun3x dvma page support */
+
+#define DVMA_START 0x0
+#define DVMA_END 0xf00000
+#define DVMA_SIZE (DVMA_END-DVMA_START)
+#define IOMMU_TOTAL_ENTRIES	   2048
+/* the prom takes the top meg */
+#define IOMMU_ENTRIES              (IOMMU_TOTAL_ENTRIES - 0x80)
+
+#define dvma_vtob(x) ((unsigned long)(x) & 0x00ffffff)
+#define dvma_btov(x) ((unsigned long)(x) | 0xff000000)
+
+extern int dvma_map_cpu(unsigned long kaddr, unsigned long vaddr, int len);
+
+
+
+/* everything below this line is specific to dma used for the onboard 
+   ESP scsi on sun3x */
 
 /* Structure to describe the current status of DMA registers on the Sparc */
 struct sparc_dma_registers {
@@ -188,7 +233,7 @@ extern struct Linux_SBus_DMA *dma_chain;
 	dma->running = 0;                                                  \
 } while(0)
 
-extern unsigned long dvma_alloc (unsigned long, unsigned long);
-extern void dvma_free (unsigned long, unsigned long);
+
 #endif /* !CONFIG_SUN3 */
+
 #endif /* !(__M68K_DVMA_H) */

@@ -16,7 +16,6 @@
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/kd.h>
 #include <linux/tty.h>
 #include <linux/console.h>
 #include <linux/init.h>
@@ -31,6 +30,7 @@
 #include <asm/amigahw.h>
 #include <asm/amigaints.h>
 #include <asm/irq.h>
+#include <asm/rtc.h>
 #include <asm/keyboard.h>
 #include <asm/machdep.h>
 #include <asm/io.h>

@@ -7,7 +7,7 @@
  * CONTACTS
  *	E-mail regarding any portion of the Linux UDF file system should be
  *	directed to the development team mailing list (run by majordomo):
- *		linux_udf@hootie.lvld.hp.com
+ *		linux_udf@hpesjro.fc.hp.com
  *
  * COPYRIGHT
  *	This file is distributed under the terms of the GNU General Public
@@ -65,6 +65,15 @@ udf64_high32(Uint64 indat)
 }
 
 #if defined(__linux__) && defined(__KERNEL__)
+
+extern struct buffer_head *
+udf_tgetblk(struct super_block *sb, int block, int size)
+{
+	if (UDF_QUERY_FLAG(sb, UDF_FLAG_VARCONV))
+		return getblk(sb->s_dev, udf_fixed_to_variable(block), size);
+	else
+		return getblk(sb->s_dev, block, size);
+}
 
 extern struct buffer_head *
 udf_tread(struct super_block *sb, int block, int size)
@@ -309,7 +318,7 @@ udf_read_tagged(struct super_block *sb, Uint32 block, Uint32 location, Uint16 *i
 
 	if ( location != le32_to_cpu(tag_p->tagLocation) )
 	{
-		udf_debug("location mismatch block %d, tag %d != %d\n",
+		udf_debug("location mismatch block %u, tag %u != %u\n",
 			block, le32_to_cpu(tag_p->tagLocation), location);
 		goto error_out;
 	}
@@ -424,32 +433,35 @@ udf_read_tagged_data(char *buffer, int size, int fd, int block, int offset)
 
 	if ( size < udf_blocksize )
 	{
-		udf_errno=3;
+		udf_errno = 3;
 		return -1;
 	}
-	udf_errno=0;
+	udf_errno = 0;
 	
-	offs=(long)block * udf_blocksize;
-	if ( lseek(fd, offs, SEEK_SET) != offs ) {
-		udf_errno=4;
+	offs = (long)block * udf_blocksize;
+	if ( lseek(fd, offs, SEEK_SET) != offs )
+	{
+		udf_errno = 4;
 		return -1;
 	}
 
-	i=read(fd, buffer, udf_blocksize);
-	if ( i < udf_blocksize ) {
-		udf_errno=5;
+	i = read(fd, buffer, udf_blocksize);
+	if ( i < udf_blocksize )
+	{
+		udf_errno = 5;
 		return -1;
 	}
 
 	tag_p = (tag *)(buffer);
 
 	/* Verify the tag location */
-	if ((block-offset) != tag_p->tagLocation) {
+	if ((block-offset) != tag_p->tagLocation)
+	{
 #ifdef __KERNEL__
 		printk(KERN_ERR "udf: location mismatch block %d, tag %d\n",
 			block, tag_p->tagLocation);
 #else
-		udf_errno=6;
+		udf_errno = 6;
 #endif
 		goto error_out;
 	}
@@ -460,35 +472,38 @@ udf_read_tagged_data(char *buffer, int size, int fd, int block, int offset)
 		checksum += (Uint8)(buffer[i]);
 	for (i = 5; i < 16; i++)
 		checksum += (Uint8)(buffer[i]);
-	if (checksum != tag_p->tagChecksum) {
+	if (checksum != tag_p->tagChecksum)
+	{
 #ifdef __KERNEL__
 		printk(KERN_ERR "udf: tag checksum failed\n");
 #else
-		udf_errno=7;
+		udf_errno = 7;
 #endif
 		goto error_out;
 	}
 
 	/* Verify the tag version */
-	if (tag_p->descVersion != 0x0002U) {
+	if (tag_p->descVersion != 0x0002U)
+	{
 #ifdef __KERNEL__
 		printk(KERN_ERR "udf: tag version 0x%04x != 0x0002U\n",
 			tag_p->descVersion);
 #else
-		udf_errno=8;
+		udf_errno = 8;
 #endif
 		goto error_out;
 	}
 
 	/* Verify the descriptor CRC */
-	if (tag_p->descCRC == udf_crc(buffer + 16, tag_p->descCRCLength, 0)) {
-		udf_errno=0;
+	if (tag_p->descCRC == udf_crc(buffer + 16, tag_p->descCRCLength, 0))
+	{
+		udf_errno = 0;
 		return 0;
 	}
 #ifdef __KERNEL__
 	printk(KERN_ERR "udf: crc failure in udf_read_tagged\n");
 #else
-	udf_errno=9;
+	udf_errno = 9;
 #endif
 
 error_out:

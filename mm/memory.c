@@ -274,7 +274,7 @@ static inline int free_pte(pte_t pte)
 		 */
 		if (pte_dirty(pte) && page->mapping)
 			set_page_dirty(page);
-		page_cache_release(page);
+		free_page_and_swap_cache(page);
 		return 1;
 	}
 	swap_free(pte_to_swp_entry(pte));
@@ -870,24 +870,6 @@ static inline void break_cow(struct vm_area_struct * vma, struct page *	old_page
 	flush_cache_page(vma, address);
 	establish_pte(vma, address, page_table, pte_mkwrite(pte_mkdirty(mk_pte(new_page, vma->vm_page_prot))));
 }
-
-/*
- * Work out if there are any other processes sharing this
- * swap cache page. Never mind the buffers.
- */
-static inline int exclusive_swap_page(struct page *page)
-{
-	unsigned int count;
-
-	if (!PageLocked(page))
-		BUG();
-	if (!PageSwapCache(page))
-		return 0;
-	count = page_count(page) - !!page->buffers;	/*  2: us + swap cache */
-	count += swap_count(page);			/* +1: just swap cache */
-	return count == 3;				/* =3: total */
-}
-
 
 /*
  * This routine handles present pages, when users try to write

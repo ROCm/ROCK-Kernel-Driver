@@ -89,7 +89,7 @@ struct linux_bootargs_v2 {
 	int *fd_stdout;
 };
 
-#ifdef CONFIG_SUN3
+#if defined(CONFIG_SUN3) || defined(CONFIG_SUN3X)
 struct linux_romvec {
 	char		*pv_initsp;		
 	int		(*pv_startmon)(void);
@@ -173,12 +173,15 @@ struct linux_romvec {
 						
 	void		(*pv_halt)(void);	
 	unsigned char	*pv_memorybitmap;	
+
+#ifdef CONFIG_SUN3
 	void		(*pv_setctxt)(int ctxt, char *va, int pmeg);
 	void		(*pv_vector_cmd)(void);	
 	int		dummy1z;
 	int		dummy2z;
 	int		dummy3z;
 	int		dummy4z;
+#endif
 };
 #else
 /* The top level PROM vector. */

@@ -12,7 +12,7 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  *  GNU General Public License for more details.
  *
- *  $Id: if_tun.h,v 1.1 2000/08/23 05:59:28 davem Exp $
+ *  $Id: if_tun.h,v 1.2 2001/06/01 18:39:47 davem Exp $
  */
 
 #ifndef __IF_TUN_H
@@ -32,15 +32,18 @@
 #endif
 
 struct tun_struct {
-	char 			name[8];
+	char 			*name;
 	unsigned long 		flags;
+	int			attached;
+	uid_t			owner;
 
-	struct fasync_struct    *fasync;
 	wait_queue_head_t	read_wait;
+	struct sk_buff_head	readq;
 
 	struct net_device	dev;
-	struct sk_buff_head	txq;
-        struct net_device_stats	stats;
+	struct net_device_stats	stats;
+
+	struct fasync_struct    *fasync;
 
 #ifdef TUN_DEBUG	
 	int debug;
@@ -53,14 +56,8 @@ struct tun_struct {
 
 #endif /* __KERNEL__ */
 
-/* Number of devices */
-#define TUN_MAX_DEV	255
-
-/* TX queue size */
-#define TUN_TXQ_SIZE	10
-
-/* Max frame size */
-#define TUN_MAX_FRAME	4096
+/* Read queue size */
+#define TUN_READQ_SIZE	10
 
 /* TUN device flags */
 #define TUN_TUN_DEV 	0x0001	
@@ -70,22 +67,25 @@ struct tun_struct {
 #define TUN_FASYNC	0x0010
 #define TUN_NOCHECKSUM	0x0020
 #define TUN_NO_PI	0x0040
-
-#define TUN_IFF_SET	0x1000
+#define TUN_ONE_QUEUE	0x0080
+#define TUN_PERSIST 	0x0100	
 
 /* Ioctl defines */
-#define TUNSETNOCSUM (('T'<< 8) | 200) 
-#define TUNSETDEBUG  (('T'<< 8) | 201) 
-#define TUNSETIFF    (('T'<< 8) | 202) 
+#define TUNSETNOCSUM  _IOW('T', 200, int) 
+#define TUNSETDEBUG   _IOW('T', 201, int) 
+#define TUNSETIFF     _IOW('T', 202, int) 
+#define TUNSETPERSIST _IOW('T', 203, int) 
+#define TUNSETOWNER   _IOW('T', 204, int)
 
 /* TUNSETIFF ifr flags */
 #define IFF_TUN		0x0001
 #define IFF_TAP		0x0002
 #define IFF_NO_PI	0x1000
+#define IFF_ONE_QUEUE	0x2000
 
 struct tun_pi {
-   unsigned short flags;
-   unsigned short proto;
+	unsigned short flags;
+	unsigned short proto;
 };
 #define TUN_PKT_STRIP	0x0001
 

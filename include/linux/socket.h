@@ -156,6 +156,7 @@ struct ucred {
 #define AF_IRDA		23	/* IRDA sockets			*/
 #define AF_PPPOX	24	/* PPPoX sockets		*/
 #define AF_WANPIPE	25	/* Wanpipe API Sockets */
+#define AF_BLUETOOTH	31	/* Bluetooth sockets 		*/
 #define AF_MAX		32	/* For now.. */
 
 /* Protocol families, same as address families. */
@@ -186,6 +187,7 @@ struct ucred {
 #define PF_IRDA		AF_IRDA
 #define PF_PPPOX	AF_PPPOX
 #define PF_WANPIPE	AF_WANPIPE
+#define PF_BLUETOOTH	AF_BLUETOOTH
 #define PF_MAX		AF_MAX
 
 /* Maximum queue length specifiable by listen.  */

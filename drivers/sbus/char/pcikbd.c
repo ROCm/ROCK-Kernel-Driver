@@ -1,4 +1,4 @@
-/* $Id: pcikbd.c,v 1.54 2001/05/11 07:46:28 davem Exp $
+/* $Id: pcikbd.c,v 1.57 2001/06/03 13:41:13 ecd Exp $
  * pcikbd.c: Ultra/AX PC keyboard support.
  *
  * Copyright (C) 1997  Eddie C. Dost  (ecd@skynet.be)
@@ -54,6 +54,7 @@
 static int pcikbd_mrcoffee = 0;
 #else
 #define pcikbd_mrcoffee 0
+extern void (*prom_keyboard)(void);
 #endif
 
 static unsigned long pcikbd_iobase = 0;
@@ -65,6 +66,9 @@ static volatile unsigned char acknowledge = 0;
 static volatile unsigned char resend = 0;
 
 static spinlock_t pcikbd_lock = SPIN_LOCK_UNLOCKED;
+
+static void pcikbd_write(int address, int data);
+static int pcikbd_wait_for_input(void);
 
 unsigned char pckbd_read_mask = KBD_STAT_OBF;
 
@@ -239,7 +243,7 @@ int pcikbd_getkeycode(unsigned int scancode)
 		e0_keys[scancode - 128];
 }
 
-int do_acknowledge(unsigned char scancode)
+static int do_acknowledge(unsigned char scancode)
 {
 	if(reply_expected) {
 		if(scancode == KBD_REPLY_ACK) {
@@ -255,10 +259,87 @@ int do_acknowledge(unsigned char scancode)
 	return 1;
 }
 
+#ifdef __sparc_v9__
+static void pcikbd_enter_prom(void)
+{
+	pcikbd_write(KBD_DATA_REG, KBD_CMD_DISABLE);
+	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
+		printk("Prom Enter: Disable keyboard: no ACK\n");
+
+	/* Disable PC scancode translation */
+	pcikbd_write(KBD_CNTL_REG, KBD_CCMD_WRITE_MODE);
+	pcikbd_write(KBD_DATA_REG, KBD_MODE_SYS);
+	pcikbd_write(KBD_DATA_REG, KBD_CMD_ENABLE);
+	if (pcikbd_wait_for_input() != KBD_REPLY_ACK)
+		printk("Prom Enter: Enable Keyboard: no ACK\n");
+}
+#endif
+
+static void ctrl_break(void)
+{
+	extern int stop_a_enabled;
+	unsigned long timeout;
+	int status, data;
+	int mode;
+
+	if (!stop_a_enabled)
+		return;
+
+	pcikbd_write(KBD_DATA_REG, KBD_CMD_DISABLE);
+	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
+		printk("Prom Enter: Disable keyboard: no ACK\n");
+
+	/* Save current mode register settings */
+	pcikbd_write(KBD_CNTL_REG, KBD_CCMD_READ_MODE);
+	if ((mode = pcikbd_wait_for_input()) == -1)
+		printk("Prom Enter: Read Mode: no ACK\n");
+
+	/* Disable PC scancode translation */
+	pcikbd_write(KBD_CNTL_REG, KBD_CCMD_WRITE_MODE);
+	pcikbd_write(KBD_DATA_REG, mode & ~(KBD_MODE_KCC));
+	pcikbd_write(KBD_DATA_REG, KBD_CMD_ENABLE);
+	if (pcikbd_wait_for_input() != KBD_REPLY_ACK)
+		printk("Prom Enter: Enable Keyboard: no ACK\n");
+
+	/* Drop into OBP.
+	 * Note that we must flush the user windows
+	 * first before giving up control.
+	 */
+        flush_user_windows();
+	prom_cmdline();
+
+	/* Read prom's key up event (use short timeout) */
+	do {
+		timeout = 10;
+		do {
+			mdelay(1);
+			status = pcikbd_inb(pcikbd_iobase + KBD_STATUS_REG);
+			if (!(status & KBD_STAT_OBF))
+				continue;
+			data = pcikbd_inb(pcikbd_iobase + KBD_DATA_REG);
+			if (status & (KBD_STAT_GTO | KBD_STAT_PERR))
+				continue;
+			break;
+		} while (--timeout > 0);
+	} while (timeout > 0);
+
+	/* Reenable PC scancode translation */
+	pcikbd_write(KBD_DATA_REG, KBD_CMD_DISABLE);
+	if(pcikbd_wait_for_input() != KBD_REPLY_ACK)
+		printk("Prom Leave: Disable keyboard: no ACK\n");
+
+	pcikbd_write(KBD_CNTL_REG, KBD_CCMD_WRITE_MODE);
+	pcikbd_write(KBD_DATA_REG, mode);
+	pcikbd_write(KBD_DATA_REG, KBD_CMD_ENABLE);
+	if (pcikbd_wait_for_input() != KBD_REPLY_ACK)
+		printk("Prom Enter: Enable Keyboard: no ACK\n");
+}
+
 int pcikbd_translate(unsigned char scancode, unsigned char *keycode,
 		     char raw_mode)
 {
 	static int prev_scancode = 0;
+	int down = scancode & 0x80 ? 0 : 1;
 
 	if (scancode == 0xe0 || scancode == 0xe1) {
 		prev_scancode = scancode;
@@ -297,6 +378,18 @@ int pcikbd_translate(unsigned char scancode, unsigned char *keycode,
 
 	} else
 		*keycode = scancode;
+
+	if (*keycode == E0_BREAK) {
+		if (down)
+			return 0;
+
+		/* Handle ctrl-break event */
+		ctrl_break();
+
+		/* Send ctrl up event to the keyboard driver */
+		*keycode = 0x1d;
+	}
+
 	return 1;
 }
 
@@ -338,10 +431,10 @@ static int send_data(unsigned char data)
 	int retries = 3;
 	unsigned long flags;
 
-	spin_lock_irqsave(&pcikbd_lock, flags);
-
 	do {
 		unsigned long timeout = 1000;
+
+		spin_lock_irqsave(&pcikbd_lock, flags);
 
 		kb_wait();
 
@@ -350,24 +443,23 @@ static int send_data(unsigned char data)
 		reply_expected = 1;
 
 		pcikbd_outb(data, pcikbd_iobase + KBD_DATA_REG);
+
+		spin_unlock_irqrestore(&pcikbd_lock, flags);
+
 		do {
 			if (acknowledge)
-				goto out_ack;
+				return 1;
 			if (resend)
 				break;
 			mdelay(1);
 		} while (--timeout);
+
 		if (timeout == 0)
-			goto out_timeout;
+			break;
+
 	} while (retries-- > 0);
 
-out_timeout:
-	spin_unlock_irqrestore(&pcikbd_lock, flags);
 	return 0;
-
-out_ack:
-	spin_unlock_irqrestore(&pcikbd_lock, flags);
-	return 1;
 }
 
 void pcikbd_leds(unsigned char leds)
@@ -378,7 +470,7 @@ void pcikbd_leds(unsigned char leds)
 		send_data(KBD_CMD_ENABLE);
 }
 
-static int __init pcikbd_wait_for_input(void)
+static int pcikbd_wait_for_input(void)
 {
 	int status, data;
 	unsigned long timeout = 1000;
@@ -401,7 +493,7 @@ static int __init pcikbd_wait_for_input(void)
 	return -1;
 }
 
-static void __init pcikbd_write(int address, int data)
+static void pcikbd_write(int address, int data)
 {
 	int status;
 
@@ -664,6 +756,8 @@ ebus_done:
 	kd_mksound = pcikbd_kd_mksound;
 	printk("8042(speaker): iobase[%016lx]%s\n", pcibeep_iobase,
 	       edev ? "" : " (forced)");
+
+	prom_keyboard = pcikbd_enter_prom;
 #endif
 
 	disable_irq(pcikbd_irq);

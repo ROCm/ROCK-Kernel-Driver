@@ -265,12 +265,9 @@ out_unlock:
 	return !count;
 }
 
-/*
- * N.B. This function returns only 0 or 1.  Return values != 1 from
- * the lower level routines result in continued processing.
- */
-#define SWAP_SHIFT 5
-#define SWAP_MIN 8
+#define SWAP_MM_SHIFT	2
+#define SWAP_SHIFT	5
+#define SWAP_MIN	8
 
 static inline int swap_amount(struct mm_struct *mm)
 {
@@ -283,7 +280,7 @@ static inline int swap_amount(struct mm_struct *mm)
 	return nr;
 }
 
-static int swap_out(unsigned int priority, int gfp_mask)
+static void swap_out(unsigned int priority, int gfp_mask)
 {
 	int counter;
 	int retval = 0;
@@ -294,7 +291,7 @@ static int swap_out(unsigned int priority, int gfp_mask)
 		retval = swap_out_mm(mm, swap_amount(mm));
 
 	/* Then, look at the other mm's */
-	counter = (mmlist_nr << SWAP_SHIFT) >> priority;
+	counter = (mmlist_nr << SWAP_MM_SHIFT) >> priority;
 	do {
 		struct list_head *p;
 
@@ -316,11 +313,10 @@ static int swap_out(unsigned int priority, int gfp_mask)
 		retval |= swap_out_mm(mm, swap_amount(mm));
 		mmput(mm);
 	} while (--counter >= 0);
-	return retval;
+	return;
 
 empty:
 	spin_unlock(&mmlist_lock);
-	return 0;
 }
 
 
@@ -774,6 +770,8 @@ int inactive_shortage(void)
 			int zone_shortage;
 			zone_t *zone = pgdat->node_zones+ i;
 
+			if (!zone->size)
+				continue;
 			zone_shortage = zone->pages_high;
 			zone_shortage -= zone->inactive_dirty_pages;
 			zone_shortage -= zone->inactive_clean_pages;
@@ -825,12 +823,12 @@ static int refill_inactive(unsigned int gfp_mask, int user)
 				return 1;
 		}
 
+		/* Walk the VM space for a bit.. */
+		swap_out(DEF_PRIORITY, gfp_mask);
+
 		count -= refill_inactive_scan(DEF_PRIORITY, count);
 		if (count <= 0)
 			goto done;
-
-		/* If refill_inactive_scan failed, try to page stuff out.. */
-		swap_out(DEF_PRIORITY, gfp_mask);
 
 		if (--maxtry <= 0)
 				return 0;

@@ -187,7 +187,7 @@ void mac_debug_console_write (struct console *co, const char *str,
 
 
 
-/* Mac: loops_per_sec min. 1900000 ^= .5 us; MFPDELAY was 0.6 us*/
+/* Mac: loops_per_jiffy min. 19000 ^= .5 us; MFPDELAY was 0.6 us*/
 
 #define uSEC 1
 
@@ -286,9 +286,9 @@ int mac_scca_console_wait_key(struct console *co)
 		barrier();				\
     } while(0)
 
-/* loops_per_sec isn't initialized yet, so we can't use udelay(). This does a
+/* loops_per_jiffy isn't initialized yet, so we can't use udelay(). This does a
  * delay of ~ 60us. */
-/* Mac: loops_per_sec min. 1900000 ^= .5 us; MFPDELAY was 0.6 us*/
+/* Mac: loops_per_jiffy min. 19000 ^= .5 us; MFPDELAY was 0.6 us*/
 #define LONG_DELAY()				\
     do {					\
 	int i;					\

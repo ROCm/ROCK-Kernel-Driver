@@ -1,3 +1,9 @@
+2001-06-05  Tim Waugh  <twaugh@redhat.com>
+
+	* parport_pc.c (parport_pc_unregister_port): New exported function.
+	Do the opposite of parport_pc_probe_port.
+	(cleanup_module): Use it.
+
 2001-05-22  Juan Quintela  <quintela@mandrakesoft.com>
 
 	* parport_amiga.c: Set printk levels.

@@ -4,7 +4,7 @@
  *	Authors:
  *	Lennert Buytenhek		<buytenh@gnu.org>
  *
- *	$Id: br_private.h,v 1.5 2001/02/05 06:03:47 davem Exp $
+ *	$Id: br_private.h,v 1.6 2001/06/01 09:28:28 davem Exp $
  *
  *	This program is free software; you can redistribute it and/or
  *	modify it under the terms of the GNU General Public License
@@ -141,11 +141,16 @@ extern void br_fdb_insert(struct net_bridge *br,
 		   int is_local);
 
 /* br_forward.c */
+extern void br_deliver(struct net_bridge_port *to,
+		struct sk_buff *skb);
 extern void br_forward(struct net_bridge_port *to,
 		struct sk_buff *skb);
-extern void br_flood(struct net_bridge *br,
-	      struct sk_buff *skb,
-	      int clone);
+extern void br_flood_deliver(struct net_bridge *br,
+		      struct sk_buff *skb,
+		      int clone);
+extern void br_flood_forward(struct net_bridge *br,
+		      struct sk_buff *skb,
+		      int clone);
 
 /* br_if.c */
 extern int br_add_bridge(char *name);

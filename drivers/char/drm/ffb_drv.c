@@ -1,4 +1,4 @@
-/* $Id: ffb_drv.c,v 1.12 2001/04/14 01:12:03 davem Exp $
+/* $Id: ffb_drv.c,v 1.14 2001/05/24 12:01:47 davem Exp $
  * ffb_drv.c: Creator/Creator3D direct rendering driver.
  *
  * Copyright (C) 2000 David S. Miller (davem@redhat.com)
@@ -719,9 +719,19 @@ static int ffb_lock(struct inode *inode, struct file *filp, unsigned int cmd, un
 	current->state = TASK_RUNNING;
 	remove_wait_queue(&dev->lock.lock_queue, &entry);
 
-        if (!ret &&
-	    (dev->last_context != lock.context))
-		ffb_context_switch(dev, dev->last_context, lock.context);
+        if (!ret) {
+		sigemptyset(&dev->sigmask);
+		sigaddset(&dev->sigmask, SIGSTOP);
+		sigaddset(&dev->sigmask, SIGTSTP);
+		sigaddset(&dev->sigmask, SIGTTIN);
+		sigaddset(&dev->sigmask, SIGTTOU);
+		dev->sigdata.context = lock.context;
+		dev->sigdata.lock = dev->lock.hw_lock;
+		block_all_signals(drm_notifier, &dev->sigdata, &dev->sigmask);
+
+		if (dev->last_context != lock.context)
+			ffb_context_switch(dev, dev->last_context, lock.context);
+	}
 
         DRM_DEBUG("%d %s\n", lock.context, ret ? "interrupted" : "has lock");
 
@@ -770,6 +780,7 @@ int ffb_unlock(struct inode *inode, struct file *filp, unsigned int cmd, unsigne
 
 	wake_up_interruptible(&dev->lock.lock_queue);
 	
+	unblock_all_signals();
 	return 0;
 }
 

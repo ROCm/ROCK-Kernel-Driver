@@ -22,13 +22,8 @@
 #define IRNET_MAJOR	10	/* Misc range */
 #define IRNET_MINOR	187	/* Official allocation */
 
-#ifdef LINKNAME_IOCTL
-/* Compatibility with old ppp drivers
- * Should be defined in <linux/if_ppp.h> */
-#ifndef PPPIOCSLINKNAME
-#define PPPIOCSLINKNAME	_IOW('t', 74, struct ppp_option_data)
-#endif /* PPPIOCSLINKNAME */
-#endif /* LINKNAME_IOCTL */
+/* IrNET control channel stuff */
+#define IRNET_MAX_COMMAND	256	/* Max length of a command line */
 
 /* PPP hardcore stuff */
 

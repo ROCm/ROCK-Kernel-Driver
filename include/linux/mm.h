@@ -10,6 +10,7 @@
 #include <linux/string.h>
 #include <linux/list.h>
 #include <linux/mmzone.h>
+#include <linux/swap.h>
 
 extern unsigned long max_mapnr;
 extern unsigned long num_physpages;
@@ -426,6 +427,23 @@ extern void mem_init(void);
 extern void show_mem(void);
 extern void si_meminfo(struct sysinfo * val);
 extern void swapin_readahead(swp_entry_t);
+
+/*
+ * Work out if there are any other processes sharing this
+ * swap cache page. Never mind the buffers.
+ */
+static inline int exclusive_swap_page(struct page *page)
+{
+	unsigned int count;
+
+	if (!PageLocked(page))
+		BUG();
+	if (!PageSwapCache(page))
+		return 0;
+	count = page_count(page) - !!page->buffers;	/*  2: us + swap cache */
+	count += swap_count(page);			/* +1: just swap cache */
+	return count == 3;				/* =3: total */
+}
 
 /* mmap.c */
 extern void lock_vma_mappings(struct vm_area_struct *);

@@ -12,10 +12,10 @@
 
 #include <linux/types.h>
 #include <linux/mc146818rtc.h>
-#include <linux/kd.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
 
+#include <asm/rtc.h>
 
 void __init
 atari_sched_init(void (*timer_routine)(int, void *, struct pt_regs *))

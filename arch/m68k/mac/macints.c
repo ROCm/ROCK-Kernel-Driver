@@ -129,8 +129,12 @@
 #include <asm/macintosh.h>
 #include <asm/mac_via.h>
 #include <asm/mac_psc.h>
+#include <asm/hwtest.h>
 
 #include <asm/macints.h>
+
+#define DEBUG_SPURIOUS
+#define SHUTUP_SONIC
 
 /*
  * The mac_irq_list array is an array of linked lists of irq_node_t nodes.
@@ -232,6 +236,17 @@ void mac_init_IRQ(void)
 	}
 
 	scc_mask = 0;
+
+	/* Make sure the SONIC interrupt is cleared or things get ugly */
+#ifdef SHUTUP_SONIC
+	printk("Killing onboard sonic... ");
+	/* This address should hopefully be mapped already */
+	if (hwreg_present((void*)(0x50f0a000))) {
+		*(long *)(0x50f0a014) = 0x7fffL;
+		*(long *)(0x50f0a010) = 0L;
+	}
+	printk("Done.\n");
+#endif /* SHUTUP_SONIC */
 
 	/* 
 	 * Now register the handlers for the the master IRQ handlers
@@ -627,9 +642,7 @@ int mac_get_irq_list (char *buf)
 void mac_default_handler(int irq, void *dev_id, struct pt_regs *regs)
 {
 #ifdef DEBUG_SPURIOUS
-	if (console_loglevel > 6) {
-		printk("Unexpected IRQ %d on device %p\n", irq, dev_id);
-	}
+	printk("Unexpected IRQ %d on device %p\n", irq, dev_id);
 #endif
 }
 

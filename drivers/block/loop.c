@@ -651,8 +651,8 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file, kdev_t dev,
 	inode->i_mapping->gfp_mask = GFP_BUFFER;
 
 	bs = 0;
-	if (blksize_size[MAJOR(inode->i_rdev)])
-		bs = blksize_size[MAJOR(inode->i_rdev)][MINOR(inode->i_rdev)];
+	if (blksize_size[MAJOR(lo_device)])
+		bs = blksize_size[MAJOR(lo_device)][MINOR(lo_device)];
 	if (!bs)
 		bs = BLOCK_SIZE;
 

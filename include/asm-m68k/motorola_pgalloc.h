@@ -21,6 +21,22 @@ extern pmd_t *get_pmd_slow(pgd_t *pgd, unsigned long offset);
 extern pmd_t *get_pointer_table(void);
 extern int free_pointer_table(pmd_t *);
 
+
+extern inline void flush_tlb_kernel_page(unsigned long addr)
+{
+	if (CPU_IS_040_OR_060) {
+		mm_segment_t old_fs = get_fs();
+		set_fs(KERNEL_DS);
+		__asm__ __volatile__(".chip 68040\n\t"
+				     "pflush (%0)\n\t"
+				     ".chip 68k"
+				     : : "a" (addr));
+		set_fs(old_fs);
+	} else
+		__asm__ __volatile__("pflush #4,#4,(%0)" : : "a" (addr));
+}
+
+
 extern inline pte_t *get_pte_fast(void)
 {
 	unsigned long *ret;
@@ -33,6 +49,29 @@ extern inline pte_t *get_pte_fast(void)
 	}
 	return (pte_t *)ret;
 }
+#define pte_alloc_one_fast(mm,addr)  get_pte_fast()
+
+static inline pte_t *pte_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+ 	pte_t *pte;
+
+	pte = (pte_t *) __get_free_page(GFP_KERNEL);
+	if (pte) {
+	         clear_page(pte);
+		 __flush_page_to_ram((unsigned long)pte);
+		 flush_tlb_kernel_page((unsigned long)pte);
+		 nocache_page((unsigned long)pte);
+		}
+
+	return pte;
+}
+
+
+extern __inline__ pmd_t *pmd_alloc_one(struct mm_struct *mm, unsigned long address)
+{
+        return get_pointer_table();
+}
+
 
 extern inline void free_pte_fast(pte_t *pte)
 {
@@ -59,6 +98,7 @@ extern inline pmd_t *get_pmd_fast(void)
 	}
 	return (pmd_t *)ret;
 }
+#define pmd_alloc_one_fast(mm,addr) get_pmd_fast()
 
 extern inline void free_pmd_fast(pmd_t *pmd)
 {
@@ -94,46 +134,11 @@ extern inline void pte_free(pte_t *pte)
 	free_pte_fast(pte);
 }
 
-extern inline pte_t *pte_alloc(pmd_t *pmd, unsigned long address)
-{
-	address = (address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1);
-	if (pmd_none(*pmd)) {
-		pte_t *page = get_pte_fast();
-
-		if (!page)
-			return get_pte_slow(pmd, address);
-		pmd_set(pmd,page);
-		return page + address;
-	}
-	if (pmd_bad(*pmd)) {
-		__bad_pte(pmd);
-		return NULL;
-	}
-	return (pte_t *)__pmd_page(*pmd) + address;
-}
-
 extern inline void pmd_free(pmd_t *pmd)
 {
 	free_pmd_fast(pmd);
 }
 
-extern inline pmd_t *pmd_alloc(pgd_t *pgd, unsigned long address)
-{
-	address = (address >> PMD_SHIFT) & (PTRS_PER_PMD - 1);
-	if (pgd_none(*pgd)) {
-		pmd_t *page = get_pmd_fast();
-
-		if (!page)
-			return get_pmd_slow(pgd, address);
-		pgd_set(pgd, page);
-		return page + address;
-	}
-	if (pgd_bad(*pgd)) {
-		__bad_pmd(pgd);
-		return NULL;
-	}
-	return (pmd_t *)__pgd_page(*pgd) + address;
-}
 
 extern inline void pte_free_kernel(pte_t *pte)
 {
@@ -142,7 +147,7 @@ extern inline void pte_free_kernel(pte_t *pte)
 
 extern inline pte_t *pte_alloc_kernel(pmd_t *pmd, unsigned long address)
 {
-	return pte_alloc(pmd, address);
+	return pte_alloc(&init_mm,pmd, address);
 }
 
 extern inline void pmd_free_kernel(pmd_t *pmd)
@@ -152,7 +157,7 @@ extern inline void pmd_free_kernel(pmd_t *pmd)
 
 extern inline pmd_t *pmd_alloc_kernel(pgd_t *pgd, unsigned long address)
 {
-	return pmd_alloc(pgd, address);
+	return pmd_alloc(&init_mm,pgd, address);
 }
 
 extern inline void pgd_free(pgd_t *pgd)
@@ -167,6 +172,11 @@ extern inline pgd_t *pgd_alloc(struct mm_struct *mm)
 		pgd = (pgd_t *)get_pointer_table();
 	return pgd;
 }
+
+
+#define pmd_populate(MM, PMD, PTE)	pmd_set(PMD, PTE)
+#define pgd_populate(MM, PGD, PMD)	pgd_set(PGD, PMD)
+
 
 extern int do_check_pgt_cache(int, int);
 
@@ -238,19 +248,6 @@ static inline void flush_tlb_range(struct mm_struct *mm,
 		__flush_tlb();
 }
 
-extern inline void flush_tlb_kernel_page(unsigned long addr)
-{
-	if (CPU_IS_040_OR_060) {
-		mm_segment_t old_fs = get_fs();
-		set_fs(KERNEL_DS);
-		__asm__ __volatile__(".chip 68040\n\t"
-				     "pflush (%0)\n\t"
-				     ".chip 68k"
-				     : : "a" (addr));
-		set_fs(old_fs);
-	} else
-		__asm__ __volatile__("pflush #4,#4,(%0)" : : "a" (addr));
-}
 
 extern inline void flush_tlb_pgtables(struct mm_struct *mm,
 				      unsigned long start, unsigned long end)

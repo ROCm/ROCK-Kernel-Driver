@@ -44,6 +44,8 @@ typedef dldwd_key_t dldwd_keys_t[MAX_KEYS];
 
 typedef struct dldwd_priv {
 	void* card;	/* Pointer to card dependant structure */
+	/* card dependant extra reset code (i.e. bus/interface specific */
+	int (*card_reset_handler)(struct dldwd_priv *);
 
 	spinlock_t lock;
 	long state;
@@ -72,7 +74,7 @@ typedef struct dldwd_priv {
 	int has_mwo;
 	int has_pm;
 	int has_preamble;
-	int broken_reset, broken_allocate;
+	int need_card_reset, broken_reset, broken_allocate;
 	uint16_t channel_mask;
 
 	/* Current configuration */

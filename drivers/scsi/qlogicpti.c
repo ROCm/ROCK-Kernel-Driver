@@ -819,7 +819,8 @@ int __init qlogicpti_detect(Scsi_Host_Template *tpnt)
 			/* Is this a red snapper? */
 			if (strcmp(sdev->prom_name, "ptisp") &&
 			    strcmp(sdev->prom_name, "PTI,ptisp") &&
-			    strcmp(sdev->prom_name, "QLGC,isp"))
+			    strcmp(sdev->prom_name, "QLGC,isp") &&
+			    strcmp(sdev->prom_name, "SUNW,isp"))
 				continue;
 
 			/* Sometimes Antares cards come up not completely

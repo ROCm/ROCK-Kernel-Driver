@@ -20,7 +20,7 @@
  *	license in recognition of the original copyright.
  *				-- Alan Cox.
  *
- *	$Id: ipfwadm_core.c,v 1.4 2000/07/26 01:04:21 davem Exp $
+ *	$Id: ipfwadm_core.c,v 1.5 2001/06/01 14:56:53 davem Exp $
  *
  *	Ported from BSD to Linux,
  *		Alan Cox 22/Nov/1994.
@@ -515,7 +515,7 @@ int ip_fw_chk(struct iphdr *ip, struct net_device *rif, __u16 *redirport,
 			}
 			continue;	/* Mismatch */
 
-		ifa_ok:
+		ifa_ok:;
 		}
 
 		/*

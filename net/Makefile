@@ -7,7 +7,7 @@
 
 O_TARGET :=	network.o
 
-mod-subdirs :=	ipv4/netfilter ipv6/netfilter ipx irda atm netlink sched
+mod-subdirs :=	ipv4/netfilter ipv6/netfilter ipx irda bluetooth atm netlink sched
 export-objs :=	netsyms.o
 
 subdir-y :=	core ethernet
@@ -40,6 +40,7 @@ subdir-$(CONFIG_NETROM)		+= netrom
 subdir-$(CONFIG_ROSE)		+= rose
 subdir-$(CONFIG_AX25)		+= ax25
 subdir-$(CONFIG_IRDA)		+= irda
+subdir-$(CONFIG_BLUEZ)		+= bluetooth
 subdir-$(CONFIG_SUNRPC)		+= sunrpc
 subdir-$(CONFIG_ATM)		+= atm
 subdir-$(CONFIG_DECNET)		+= decnet

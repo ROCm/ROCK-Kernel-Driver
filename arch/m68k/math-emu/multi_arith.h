@@ -329,7 +329,7 @@ extern inline int fp_addmant(struct fp_ext *dest, struct fp_ext *src)
 	int carry;
 
 	/* we assume here, gcc only insert move and a clr instr */
-	asm volatile ("add.b %1,%0" : "=d,=g" (dest->lowmant)
+	asm volatile ("add.b %1,%0" : "=d,g" (dest->lowmant)
 		: "g,d" (src->lowmant), "0,0" (dest->lowmant));
 	asm volatile ("addx.l %1,%0" : "=d" (dest->mant.m32[1])
 		: "d" (src->mant.m32[1]), "0" (dest->mant.m32[1]));
@@ -360,7 +360,7 @@ extern inline int fp_addcarry(struct fp_ext *reg)
 extern inline void fp_submant(struct fp_ext *dest, struct fp_ext *src1, struct fp_ext *src2)
 {
 	/* we assume here, gcc only insert move and a clr instr */
-	asm volatile ("sub.b %1,%0" : "=d,=g" (dest->lowmant)
+	asm volatile ("sub.b %1,%0" : "=d,g" (dest->lowmant)
 		: "g,d" (src2->lowmant), "0,0" (src1->lowmant));
 	asm volatile ("subx.l %1,%0" : "=d" (dest->mant.m32[1])
 		: "d" (src2->mant.m32[1]), "0" (src1->mant.m32[1]));
@@ -383,7 +383,7 @@ extern inline void fp_submant(struct fp_ext *dest, struct fp_ext *src1, struct f
 })
 #define fp_addx96(dest, src) ({						\
 	/* we assume here, gcc only insert move and a clr instr */	\
-	asm volatile ("add.l %1,%0" : "=d,=g" (dest->m32[2])		\
+	asm volatile ("add.l %1,%0" : "=d,g" (dest->m32[2])		\
 		: "g,d" (temp.m32[1]), "0,0" (dest->m32[2]));		\
 	asm volatile ("addx.l %1,%0" : "=d" (dest->m32[1])		\
 		: "d" (temp.m32[0]), "0" (dest->m32[1]));		\

@@ -11,8 +11,39 @@
 
 #define local_bh_disable()	cpu_bh_disable(smp_processor_id())
 #define __local_bh_enable()	__cpu_bh_enable(smp_processor_id())
-#define local_bh_enable()	do { if (!--local_bh_count(smp_processor_id()) && softirq_pending(smp_processor_id())) { do_softirq(); __sti(); } } while (0)
+#define __cpu_raise_softirq(cpu,nr) set_bit((nr), &softirq_pending(cpu));
+#define raise_softirq(nr) __cpu_raise_softirq(smp_processor_id(), (nr))
 
 #define in_softirq() (local_bh_count(smp_processor_id()) != 0)
+
+/*
+ * NOTE: this assembly code assumes:
+ *
+ *    (char *)&local_bh_count - 8 == (char *)&softirq_pending
+ *
+ * If you change the offsets in irq_stat then you have to
+ * update this code as well.
+ */
+#define local_bh_enable()						\
+do {									\
+	unsigned int *ptr = &local_bh_count(smp_processor_id());	\
+									\
+	if (!--*ptr)							\
+		__asm__ __volatile__ (					\
+			"cmpl $0, -8(%0);"				\
+			"jnz 2f;"					\
+			"1:;"						\
+									\
+			".section .text.lock,\"ax\";"			\
+			"2: pushl %%eax; pushl %%ecx; pushl %%edx;"	\
+			"call do_softirq;"				\
+			"popl %%edx; popl %%ecx; popl %%eax;"		\
+			"jmp 1b;"					\
+			".previous;"					\
+									\
+		: /* no output */					\
+		: "r" (ptr)						\
+		/* no registers clobbered */ );				\
+} while (0)
 
 #endif	/* __ASM_SOFTIRQ_H */

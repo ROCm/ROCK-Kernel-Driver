@@ -2,7 +2,6 @@
  * Miscellaneous Mac68K-specific stuff 
  */
 
-#include <stdarg.h>
 #include <linux/config.h>
 #include <linux/types.h>
 #include <linux/errno.h>
@@ -12,7 +11,7 @@
 #include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/time.h>
-#include <linux/kd.h>
+
 #include <linux/mm.h>
 
 #include <linux/adb.h>
@@ -21,6 +20,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
+#include <asm/rtc.h>
 #include <asm/system.h>
 #include <asm/segment.h>
 #include <asm/setup.h>

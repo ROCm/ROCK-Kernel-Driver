@@ -1,4 +1,4 @@
-/* $Id: cs4231.c,v 1.45 2001/03/23 08:16:13 davem Exp $
+/* $Id: cs4231.c,v 1.46 2001/05/21 01:25:22 davem Exp $
  * drivers/sbus/audio/cs4231.c
  *
  * Copyright 1996, 1997, 1998, 1999 Derrick J Brashear (shadow@andrew.cmu.edu)
@@ -35,7 +35,7 @@
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/sbus.h>
-#if defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE > 0x200ff && defined(CONFIG_PCI)
+#ifdef CONFIG_PCI
 #define EB4231_SUPPORT
 #include <asm/ebus.h>
 #include <asm/pbm.h>
@@ -2178,9 +2178,6 @@ static struct sparcaudio_operations eb4231_ops = {
 static int cs4231_attach(struct sparcaudio_driver *drv, 
 			 struct sbus_dev *sdev)
 {
-#if defined (LINUX_VERSION_CODE) && LINUX_VERSION_CODE < 0x20100
-        struct linux_prom_irqs irq;
-#endif
         struct cs4231_chip *cs4231_chip;
         int err;
 
@@ -2367,12 +2364,32 @@ static int __init ebus_cs4231_p(struct linux_ebus_device *edev)
 }
 #endif
 
-/* Probe for the cs4231 chip and then attach the driver. */
-#ifdef MODULE
-int init_module(void)
-#else
-int __init cs4231_init(void)
+/* Detach from an cs4231 chip given the device structure. */
+static void __exit cs4231_detach(struct sparcaudio_driver *drv)
+{
+	struct cs4231_chip *cs4231_chip = (struct cs4231_chip *) drv->private;
+
+	cs4231_disable_interrupts(drv);
+	unregister_sparcaudio_driver(drv, 1);
+	disable_irq(cs4231_chip->irq);
+	free_irq(cs4231_chip->irq, drv);
+	if (!(cs4231_chip->status & CS_STATUS_IS_EBUS)) {
+		sbus_iounmap(cs4231_chip->regs, cs4231_chip->regs_size);
+	} else {
+#ifdef EB4231_SUPPORT
+		iounmap(cs4231_chip->regs);
+		iounmap(cs4231_chip->eb2p);
+		iounmap(cs4231_chip->eb2c);
+		disable_irq(cs4231_chip->irq2);
+		free_irq(cs4231_chip->irq2, drv);
 #endif
+	}
+	kfree(drv->private);
+}
+
+
+/* Probe for the cs4231 chip and then attach the driver. */
+static int __init cs4231_init(void)
 {
         struct sbus_bus *sbus;
         struct sbus_dev *sdev;
@@ -2414,31 +2431,7 @@ int __init cs4231_init(void)
         return (num_drivers > 0) ? 0 : -EIO;
 }
 
-#ifdef MODULE
-/* Detach from an cs4231 chip given the device structure. */
-static void cs4231_detach(struct sparcaudio_driver *drv)
-{
-        struct cs4231_chip *cs4231_chip = (struct cs4231_chip *) drv->private;
-
-	cs4231_disable_interrupts(drv);
-        unregister_sparcaudio_driver(drv, 1);
-        disable_irq(cs4231_chip->irq);
-        free_irq(cs4231_chip->irq, drv);
-        if (!(cs4231_chip->status & CS_STATUS_IS_EBUS)) {
-                sbus_iounmap(cs4231_chip->regs, cs4231_chip->regs_size);
-        } else {
-#ifdef EB4231_SUPPORT
-                iounmap(cs4231_chip->regs);
-                iounmap(cs4231_chip->eb2p);
-                iounmap(cs4231_chip->eb2c);
-                disable_irq(cs4231_chip->irq2);
-                free_irq(cs4231_chip->irq2, drv);
-#endif
-        }
-        kfree(drv->private);
-}
-
-void cleanup_module(void)
+static void __exit cs4231_exit(void)
 {
         register int i;
 
@@ -2447,8 +2440,9 @@ void cleanup_module(void)
                 num_drivers--;
         }
 }
-#endif
 
+module_init(cs4231_init);
+module_exit(cs4231_exit);
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.
  * Emacs will notice this stuff at the end of the file and automatically

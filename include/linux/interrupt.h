@@ -74,17 +74,6 @@ struct softirq_action
 asmlinkage void do_softirq(void);
 extern void open_softirq(int nr, void (*action)(struct softirq_action*), void *data);
 
-/* Locally cached atomic variables are cheaper than cli/sti */
-static inline void __cpu_raise_softirq(int cpu, int nr)
-{
-	set_bit(nr, &softirq_active(cpu));
-}
-
-static inline void raise_softirq(int nr)
-{
-	__cpu_raise_softirq(smp_processor_id(), nr);
-}
-
 extern void softirq_init(void);
 
 
