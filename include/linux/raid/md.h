@@ -69,7 +69,6 @@ extern mdk_thread_t * md_register_thread (void (*run) (mddev_t *mddev),
 extern void md_unregister_thread (mdk_thread_t *thread);
 extern void md_wakeup_thread(mdk_thread_t *thread);
 extern void md_check_recovery(mddev_t *mddev);
-extern void md_interrupt_thread (mdk_thread_t *thread);
 extern void md_write_start(mddev_t *mddev);
 extern void md_write_end(mddev_t *mddev);
 extern void md_handle_safemode(mddev_t *mddev);

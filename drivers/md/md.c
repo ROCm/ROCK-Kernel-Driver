@@ -2895,7 +2895,7 @@ mdk_thread_t *md_register_thread(void (*run) (mddev_t *), mddev_t *mddev,
 	return thread;
 }
 
-void md_interrupt_thread(mdk_thread_t *thread)
+static void md_interrupt_thread(mdk_thread_t *thread)
 {
 	if (!thread->tsk) {
 		MD_BUG();
@@ -3797,6 +3797,5 @@ EXPORT_SYMBOL(md_register_thread);
 EXPORT_SYMBOL(md_unregister_thread);
 EXPORT_SYMBOL(md_wakeup_thread);
 EXPORT_SYMBOL(md_print_devices);
-EXPORT_SYMBOL(md_interrupt_thread);
 EXPORT_SYMBOL(md_check_recovery);
 MODULE_LICENSE("GPL");
