@@ -115,7 +115,8 @@ int __pnp_add_device(struct pnp_dev *dev)
 	int error = 0;
 	pnp_name_device(dev);
 	pnp_fixup_device(dev);
-	strcpy(dev->dev.name,dev->name);
+	strncpy(dev->dev.name,dev->name,DEVICE_NAME_SIZE-1);
+	dev->dev.name[DEVICE_NAME_SIZE-1] = '\0';
 	dev->dev.bus = &pnp_bus_type;
 	dev->dev.release = &pnp_release_device;
 	error = device_register(&dev->dev);
