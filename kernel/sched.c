@@ -2990,10 +2990,9 @@ asmlinkage long sys_sched_yield(void)
 
 	/*
 	 * Since we are going to call schedule() anyway, there's
-	 * no need to preempt:
+	 * no need to preempt or enable interrupts:
 	 */
 	_raw_spin_unlock(&rq->lock);
-	local_irq_enable();
 	preempt_enable_no_resched();
 
 	schedule();
