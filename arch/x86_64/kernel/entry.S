@@ -402,9 +402,9 @@ ENTRY(stub_rt_sigreturn)
 /* 0(%rsp): interrupt number */ 
 	.macro interrupt func
 	CFI_STARTPROC	simple
-	CFI_DEF_CFA	rsp,(SS-ORIG_RAX)
-	CFI_OFFSET	rsp,(RSP-SS)
-	CFI_OFFSET	rip,(RIP-SS)
+	CFI_DEF_CFA	rsp,(SS-RDI)
+	CFI_REL_OFFSET	rsp,(RSP-ORIG_RAX)
+	CFI_REL_OFFSET	rip,(RIP-ORIG_RAX)
 	cld
 #ifdef CONFIG_DEBUG_INFO
 	SAVE_ALL	
@@ -805,6 +805,8 @@ ENTRY(debug)
 	paranoidentry do_debug
 	/* switch back to process stack to restore the state ptrace touched */
 	movq %rax,%rsp	
+	testl $3,CS(%rsp)
+	jnz   paranoid_userspace	
 	jmp paranoid_exit
 	CFI_ENDPROC
 
@@ -816,8 +818,6 @@ ENTRY(nmi)
 	paranoidentry do_nmi
 	/* ebx:	no swapgs flag */
 paranoid_exit:
-	testl $3,CS(%rsp)
-	jnz   paranoid_userspace	
 	testl %ebx,%ebx				/* swapgs needed? */
 	jnz paranoid_restore
 paranoid_swapgs:	
@@ -870,6 +870,8 @@ ENTRY(double_fault)
 	CFI_STARTPROC
 	paranoidentry do_double_fault
 	movq %rax,%rsp
+	testl $3,CS(%rsp)
+	jnz paranoid_userspace		
 	jmp paranoid_exit
 	CFI_ENDPROC
 
@@ -884,6 +886,8 @@ ENTRY(stack_segment)
 	CFI_STARTPROC
 	paranoidentry do_stack_segment
 	movq %rax,%rsp
+	testl $3,CS(%rsp)
+	jnz paranoid_userspace
 	jmp paranoid_exit
 	CFI_ENDPROC
 
