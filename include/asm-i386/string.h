@@ -291,7 +291,7 @@ extern void __struct_cpy_bug (void);
 #define struct_cpy(x,y) 			\
 ({						\
 	if (sizeof(*(x)) != sizeof(*(y))) 	\
-		__struct_cpy_bug;		\
+		__struct_cpy_bug();		\
 	memcpy(x, y, sizeof(*(x)));		\
 })
 
