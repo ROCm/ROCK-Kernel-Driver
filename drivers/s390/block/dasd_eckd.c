@@ -7,7 +7,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.59 $
+ * $Revision: 1.61 $
  */
 
 #include <linux/config.h>
@@ -505,11 +505,13 @@ dasd_eckd_check_characteristics(struct dasd_device *device)
 			"sizes of configuration data mismatch"
 			"%d (read) vs %ld (expected)",
 			conf_len, sizeof (struct dasd_eckd_confdata));
+
+		kfree(conf_data); /* allocated by read_conf_data() */
 		return 0;	/* no errror */
 	}
 	memcpy(&private->conf_data, conf_data,
 	       sizeof (struct dasd_eckd_confdata));
-
+	kfree(conf_data); /* allocated by read_conf_data() */
 	return 0;
 }
 
