@@ -402,7 +402,7 @@ asmlinkage int solaris_procids(int cmd, s32 pid, s32 pgid)
 			   Solaris setpgrp and setsid? */
 			ret = sys_setpgid(0, 0);
 			if (ret) return ret;
-			current->signal->tty = NULL;
+			current->tty = NULL;
 			return process_group(current);
 		}
 	case 2: /* getsid */
