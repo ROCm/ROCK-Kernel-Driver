@@ -482,6 +482,7 @@ fault_vector_11:
 	 */
 
 #define CLONE_VM 0x100	/* Must agree with <linux/sched.h> */
+#define CLONE_UNTRACED 0x00800000
 
 	.export __kernel_thread, code
 	.import do_fork
@@ -497,7 +498,8 @@ __kernel_thread:
 #endif
 	STREG	%r26, PT_GR26(%r1)  /* Store function & argument for child */
 	STREG	%r25, PT_GR25(%r1)
-	ldo	CLONE_VM(%r0), %r26   /* Force CLONE_VM since only init_mm */
+	ldil	L%CLONE_UNTRACED, %r26
+	ldo	CLONE_VM(%r26), %r26   /* Force CLONE_VM since only init_mm */
 	or	%r26, %r24, %r26      /* will have kernel mappings.	 */
 	copy	%r0, %r25
 	bl	do_fork_FIXME_NOW_RETURNS_TASK_STRUCT, %r2

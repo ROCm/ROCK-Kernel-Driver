@@ -152,7 +152,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 
 	{
 	register long retval __asm__ ("d0");
-	register long clone_arg __asm__ ("d1") = flags | CLONE_VM;
+	register long clone_arg __asm__ ("d1") = flags | CLONE_VM | CLONE_UNTRACED;
 
 	retval = __NR_clone;
 	__asm__ __volatile__

@@ -120,7 +120,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 {	/* Don't use this in BL=1(cli).  Or else, CPU resets! */
 	register unsigned long __sc0 __asm__ ("r0");
 	register unsigned long __sc3 __asm__ ("r3") = __NR_clone;
-	register unsigned long __sc4 __asm__ ("r4") = (long) flags | CLONE_VM;
+	register unsigned long __sc4 __asm__ ("r4") = (long) flags | CLONE_VM | CLONE_UNTRACED;
 	register unsigned long __sc5 __asm__ ("r5") = 0;
 	register unsigned long __sc8 __asm__ ("r8") = (long) arg;
 	register unsigned long __sc9 __asm__ ("r9") = (long) fn;
