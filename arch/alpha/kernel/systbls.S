@@ -216,7 +216,8 @@ sys_call_table:
 	.quad alpha_ni_syscall
 	.quad alpha_ni_syscall
 	.quad alpha_ni_syscall
-	.quad osf_swapon
+	/* The OSF swapon has two extra arguments, but we ignore them.  */
+	.quad sys_swapon
 	.quad sys_msgctl			/* 200 */
 	.quad sys_msgget
 	.quad sys_msgrcv
@@ -324,10 +325,10 @@ sys_call_table:
 	.quad sys_old_adjtimex
 	.quad sys_swapoff
 	.quad sys_getdents			/* 305 */
-	.quad alpha_create_module
+	.quad sys_ni_syscall			/* 306: old create_module */
 	.quad sys_init_module
 	.quad sys_delete_module
-	.quad sys_get_kernel_syms
+	.quad sys_ni_syscall			/* 309: old get_kernel_syms */
 	.quad sys_syslog			/* 310 */
 	.quad sys_reboot
 	.quad sys_clone
@@ -365,7 +366,7 @@ sys_call_table:
 	.quad sys_getresuid
 	.quad sys_pciconfig_read		/* 345 */
 	.quad sys_pciconfig_write
-	.quad sys_query_module
+	.quad sys_ni_syscall			/* 347: old query_module */
 	.quad sys_prctl
 	.quad sys_pread64
 	.quad sys_pwrite64			/* 350 */
@@ -423,7 +424,13 @@ sys_call_table:
 	.quad sys_io_cancel
 	.quad sys_ni_syscall			/* 403, sys_alloc_hugepages */
 	.quad sys_ni_syscall			/* 404, sys_free_hugepages */
-	.quad sys_exit_group
+	.quad sys_exit_group			/* 405 */
+	.quad sys_lookup_dcookie
+	.quad sys_epoll_create
+	.quad sys_epoll_ctl
+	.quad sys_epoll_wait
+	.quad sys_remap_file_pages		/* 410 */
+	.quad sys_set_tid_address
 
 	.size sys_call_table, . - sys_call_table
 	.type sys_call_table, @object

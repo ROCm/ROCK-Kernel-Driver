@@ -235,24 +235,24 @@ static int cardbus_resume (struct pci_dev *dev)
 
 
 static struct pci_device_id cardbus_table [] __devinitdata = { {
-	class:		PCI_CLASS_BRIDGE_CARDBUS << 8,
-	class_mask:	~0,
+	.class		= PCI_CLASS_BRIDGE_CARDBUS << 8,
+	.class_mask	= ~0,
 
-	vendor:		PCI_ANY_ID,
-	device:		PCI_ANY_ID,
-	subvendor:	PCI_ANY_ID,
-	subdevice:	PCI_ANY_ID,
+	.vendor		= PCI_ANY_ID,
+	.device		= PCI_ANY_ID,
+	.subvendor	= PCI_ANY_ID,
+	.subdevice	= PCI_ANY_ID,
 }, { /* all zeroes */ }
 };
 MODULE_DEVICE_TABLE(pci, cardbus_table);
 
 static struct pci_driver pci_cardbus_driver = {
-	name:		"cardbus",
-	id_table:	cardbus_table,
-	probe:		cardbus_probe,
-	remove:		__devexit_p(cardbus_remove),
-	suspend:	cardbus_suspend,
-	resume:		cardbus_resume,
+	.name		= "cardbus",
+	.id_table	= cardbus_table,
+	.probe		= cardbus_probe,
+	.remove		= __devexit_p(cardbus_remove),
+	.suspend	= cardbus_suspend,
+	.resume		= cardbus_resume,
 };
 
 static int __init pci_socket_init(void)

@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: os-linux.h,v 1.19 2002/05/20 14:56:38 dwmw2 Exp $
+ * $Id: os-linux.h,v 1.21 2002/11/12 09:44:30 dwmw2 Exp $
  *
  */
 
@@ -49,11 +49,19 @@
 #define JFFS2_F_I_RDEV_MAJ(f) (MAJOR(to_kdev_t(OFNI_EDONI_2SFFJ(f)->i_rdev)))
 #endif
 
+/* Hmmm. P'raps generic code should only ever see versions of signal
+   functions which do the locking automatically? */
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,40)
+#define current_sig_lock current->sigmask_lock
+#else
+#define current_sig_lock current->sig->siglock
+#endif
+
 static inline void jffs2_init_inode_info(struct jffs2_inode_info *f)
 {
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2)
 	f->highest_version = 0;
-	f->fraglist = NULL;
+	f->fragtree = RB_ROOT;
 	f->metadata = NULL;
 	f->dents = NULL;
 	f->flags = 0;

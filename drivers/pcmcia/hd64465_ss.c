@@ -240,13 +240,13 @@ static void hs_end_irq(unsigned int irq)
 
 
 static struct hw_interrupt_type hd64465_ss_irq_type = {
-	typename:	"PCMCIA-IRQ",
-	startup:	hs_startup_irq,
-	shutdown:	hs_shutdown_irq,
-	enable:		hs_enable_irq,
-	disable:	hs_disable_irq,
-	ack:		hs_mask_and_ack_irq,
-	end:		hs_end_irq
+	.typename	= "PCMCIA-IRQ",
+	.startup	= hs_startup_irq,
+	.shutdown	= hs_shutdown_irq,
+	.enable		= hs_enable_irq,
+	.disable	= hs_disable_irq,
+	.ack		= hs_mask_and_ack_irq,
+	.end		= hs_end_irq
 };
 
 /* 

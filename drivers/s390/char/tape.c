@@ -199,10 +199,10 @@ typedef struct {
 
 static struct file_operations tape_proc_devices_file_ops =
 {
-	owner:THIS_MODULE,
-	read:tape_proc_devices_read,	/* read */
-	open:tape_proc_devices_open,	/* open */
-	release:tape_proc_devices_release,	/* close */
+	.owner = THIS_MODULE,
+	.read = tape_proc_devices_read,	/* read */
+	.open = tape_proc_devices_open,	/* open */
+	.release = tape_proc_devices_release,	/* close */
 };
 
 /* 

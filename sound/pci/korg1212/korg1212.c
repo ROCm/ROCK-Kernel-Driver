@@ -20,11 +20,13 @@
  */
 
 #include <sound/driver.h>
-#include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/pci.h>
 #include <linux/slab.h>
+#include <linux/wait.h>
+
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -32,6 +34,8 @@
 #include <sound/pcm_params.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
+
+#include <asm/io.h>
 
 // ----------------------------------------------------------------------------
 // Debug Stuff
@@ -403,8 +407,13 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 MODULE_AUTHOR("Haroldo Gamal <gamal@alternex.com.br>");
 
 static struct pci_device_id snd_korg1212_ids[] __devinitdata = {
-	{ 0x10b5, 0x906d, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },
-	{ 0, }
+	{
+		.vendor	   = 0x10b5,
+		.device	   = 0x906d,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID,
+	},
+	{ 0, },
 };
 
 static char* stateName[] = {
@@ -2305,10 +2314,10 @@ static void __devexit snd_korg1212_remove(struct pci_dev *pci)
 }
 
 static struct pci_driver driver = {
-	.name = "korg1212",
+	.name	  = "korg1212",
 	.id_table = snd_korg1212_ids,
-	.probe = snd_korg1212_probe,
-	.remove = __devexit_p(snd_korg1212_remove),
+	.probe	  = snd_korg1212_probe,
+	.remove	  = __devexit_p(snd_korg1212_remove),
 };
 
 static int __init alsa_card_korg1212_init(void)

@@ -18,6 +18,8 @@
 #include <linux/config.h>	/* for CONFIG_SCSI_LOGGING */
 #include <linux/devfs_fs_kernel.h>
 #include <linux/proc_fs.h>
+#include <linux/init.h>
+
 
 /*
  * Some of the public constants are being moved to this file.
@@ -516,6 +518,13 @@ static inline void scsi_exit_procfs(void) { };
 static inline void scsi_proc_host_add(struct Scsi_Host *);
 static inline void scsi_proc_host_rm(struct Scsi_Host *);
 #endif /* CONFIG_PROC_FS */
+
+/*
+ * Prototypes for functions in scsi_scan.c
+ */
+extern struct scsi_device *scsi_alloc_sdev(struct Scsi_Host *,
+			uint, uint, uint);
+extern void scsi_free_sdev(struct scsi_device *);
 
 /*
  * Prototypes for functions in constants.c

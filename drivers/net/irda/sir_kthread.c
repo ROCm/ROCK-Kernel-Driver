@@ -19,7 +19,6 @@
 #include <linux/smp_lock.h>
 #include <linux/completion.h>
 #include <linux/delay.h>
-#include <linux/sched.h>
 
 #include <net/irda/irda.h>
 

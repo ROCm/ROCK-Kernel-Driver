@@ -1,0 +1,260 @@
+/*  Kernel module help for PPC.
+    Copyright (C) 2001 Rusty Russell.
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+*/
+#include <linux/module.h>
+#include <linux/elf.h>
+#include <linux/vmalloc.h>
+#include <linux/fs.h>
+#include <linux/string.h>
+#include <linux/kernel.h>
+
+#if 0
+#define DEBUGP printk
+#else
+#define DEBUGP(fmt , ...)
+#endif
+
+void *module_alloc(unsigned long size)
+{
+	if (size == 0)
+		return NULL;
+	return vmalloc(size);
+}
+
+/* Free memory returned from module_alloc */
+void module_free(struct module *mod, void *module_region)
+{
+	vfree(module_region);
+	/* FIXME: If module_region == mod->init_region, trim exception
+           table entries. */
+}
+
+/* Count how many different relocations (different symbol, different
+   addend) */
+static unsigned int count_relocs(const Elf32_Rela *rela, unsigned int num)
+{
+	unsigned int i, j, ret = 0;
+
+	/* Sure, this is order(n^2), but it's usually short, and not
+           time critical */
+	for (i = 0; i < num; i++) {
+		for (j = 0; j < i; j++) {
+			/* If this addend appeared before, it's
+                           already been counted */
+			if (ELF32_R_SYM(rela[i].r_info)
+			    == ELF32_R_SYM(rela[j].r_info)
+			    && rela[i].r_addend == rela[j].r_addend)
+				break;
+		}
+		if (j == i) ret++;
+	}
+	return ret;
+}
+
+/* Get the potential trampolines size required of the init and
+   non-init sections */
+static unsigned long get_plt_size(const Elf32_Ehdr *hdr,
+				  const Elf32_Shdr *sechdrs,
+				  const char *secstrings,
+				  int is_init)
+{
+	unsigned long ret = 0;
+	unsigned i;
+
+	/* Everything marked ALLOC (this includes the exported
+           symbols) */
+	for (i = 1; i < hdr->e_shnum; i++) {
+		/* If it's called *.init*, and we're not init, we're
+                   not interested */
+		if ((strstr(secstrings + sechdrs[i].sh_name, ".init") != 0)
+		    != is_init)
+			continue;
+
+		if (sechdrs[i].sh_type == SHT_RELA) {
+			DEBUGP("Found relocations in section %u\n", i);
+			DEBUGP("Ptr: %p.  Number: %u\n",
+			       (void *)hdr + sechdrs[i].sh_offset,
+			       sechdrs[i].sh_size / sizeof(Elf32_Rela));
+			ret += count_relocs((void *)hdr
+					     + sechdrs[i].sh_offset,
+					     sechdrs[i].sh_size
+					     / sizeof(Elf32_Rela))
+				* sizeof(struct ppc_plt_entry);
+		}
+	}
+
+	return ret;
+}
+
+long module_core_size(const Elf32_Ehdr *hdr,
+		      const Elf32_Shdr *sechdrs,
+		      const char *secstrings,
+		      struct module *module)
+{
+	module->arch.core_plt_offset = module->core_size;
+	return module->core_size + get_plt_size(hdr, sechdrs, secstrings, 0);
+}
+
+long module_init_size(const Elf32_Ehdr *hdr,
+		      const Elf32_Shdr *sechdrs,
+		      const char *secstrings,
+		      struct module *module)
+{
+	module->arch.init_plt_offset = module->init_size;
+	return module->init_size + get_plt_size(hdr, sechdrs, secstrings, 1);
+}
+
+int apply_relocate(Elf32_Shdr *sechdrs,
+		   const char *strtab,
+		   unsigned int symindex,
+		   unsigned int relsec,
+		   struct module *module)
+{
+	printk(KERN_ERR "%s: Non-ADD RELOCATION unsupported\n",
+	       module->name);
+	return -ENOEXEC;
+}
+
+static inline int entry_matches(struct ppc_plt_entry *entry, Elf32_Addr val)
+{
+	if (entry->jump[0] == 0x3d600000 + ((val + 0x8000) >> 16)
+	    && entry->jump[1] == 0x396b0000 + (val & 0xffff))
+		return 1;
+	return 0;
+}
+
+/* Set up a trampoline in the PLT to bounce us to the distant function */
+static uint32_t do_plt_call(void *location, Elf32_Addr val, struct module *mod)
+{
+	struct ppc_plt_entry *entry;
+
+	DEBUGP("Doing plt for %u\n", (unsigned int)location);
+	/* Init, or core PLT? */
+	if (location >= mod->module_core
+	    && location < mod->module_core + mod->arch.core_plt_offset)
+		entry = mod->module_core + mod->arch.core_plt_offset;
+	else
+		entry = mod->module_init + mod->arch.init_plt_offset;
+
+	/* Find this entry, or if that fails, the next avail. entry */
+	while (entry->jump[0]) {
+		if (entry_matches(entry, val)) return (uint32_t)entry;
+		entry++;
+	}
+
+	/* Stolen from Paul Mackerras as well... */
+	entry->jump[0] = 0x3d600000+((val+0x8000)>>16);	/* lis r11,sym@ha */
+	entry->jump[1] = 0x396b0000 + (val&0xffff);	/* addi r11,r11,sym@l*/
+	entry->jump[2] = 0x7d6903a6;			/* mtctr r11 */
+	entry->jump[3] = 0x4e800420;			/* bctr */
+
+	return (uint32_t)entry;
+}
+
+int apply_relocate_add(Elf32_Shdr *sechdrs,
+		       const char *strtab,
+		       unsigned int symindex,
+		       unsigned int relsec,
+		       struct module *module)
+{
+	unsigned int i;
+	Elf32_Rela *rela = (void *)sechdrs[relsec].sh_offset;
+	Elf32_Sym *sym;
+	uint32_t *location;
+	uint32_t value;
+
+	DEBUGP("Applying ADD relocate section %u to %u\n", relsec,
+	       sechdrs[relsec].sh_info);
+	for (i = 0; i < sechdrs[relsec].sh_size / sizeof(*rela); i++) {
+		/* This is where to make the change */
+		location = (void *)sechdrs[sechdrs[relsec].sh_info].sh_offset
+			+ rela[i].r_offset;
+		/* This is the symbol it is referring to */
+		sym = (Elf32_Sym *)sechdrs[symindex].sh_offset
+			+ ELF32_R_SYM(rela[i].r_info);
+		if (!sym->st_value) {
+			printk(KERN_WARNING "%s: Unknown symbol %s\n",
+			       module->name, strtab + sym->st_name);
+			return -ENOENT;
+		}
+		/* `Everything is relative'. */
+		value = sym->st_value + rela[i].r_addend;
+
+		switch (ELF32_R_TYPE(rela[i].r_info)) {
+		case R_PPC_ADDR32:
+			/* Simply set it */
+			*(uint32_t *)location = value;
+			break;
+
+		case R_PPC_ADDR16_LO:
+			/* Low half of the symbol */
+			*(uint16_t *)location = value;
+			break;
+			
+		case R_PPC_ADDR16_HA:
+			/* Sign-adjusted lower 16 bits: PPC ELF ABI says:
+			   (((x >> 16) + ((x & 0x8000) ? 1 : 0))) & 0xFFFF.
+			   This is the same, only sane.
+			 */
+			*(uint16_t *)location = (value + 0x8000) >> 16;
+			break;
+
+		case R_PPC_REL24:
+			if ((int)(value - (uint32_t)location) < -0x02000000
+			    || (int)(value - (uint32_t)location) >= 0x02000000)
+				value = do_plt_call(location, value, module);
+
+			/* Only replace bits 2 through 26 */
+			DEBUGP("REL24 value = %08X. location = %08X\n",
+			       value, (uint32_t)location);
+			DEBUGP("Location before: %08X.\n",
+			       *(uint32_t *)location);
+			*(uint32_t *)location 
+				= (*(uint32_t *)location & ~0x03fffffc)
+				| ((value - (uint32_t)location)
+				   & 0x03fffffc);
+			DEBUGP("Location after: %08X.\n",
+			       *(uint32_t *)location);
+			DEBUGP("ie. jump to %08X+%08X = %08X\n",
+			       *(uint32_t *)location & 0x03fffffc,
+			       (uint32_t)location,
+			       (*(uint32_t *)location & 0x03fffffc)
+			       + (uint32_t)location);
+			break;
+
+		case R_PPC_REL32:
+			/* 32-bit relative jump. */
+			*(uint32_t *)location = value - (uint32_t)location;
+			break;
+
+		default:
+			printk("%s: unknown ADD relocation: %u\n",
+			       module->name,
+			       ELF32_R_TYPE(rela[i].r_info));
+			return -ENOEXEC;
+		}
+	}
+	return 0;
+}
+
+/* FIXME: Sort exception table --RR */
+int module_finalize(const Elf_Ehdr *hdr,
+		    const Elf_Shdr *sechdrs,
+		    struct module *me)
+{
+	return 0;
+}

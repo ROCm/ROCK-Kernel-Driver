@@ -366,17 +366,12 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 	 */
 	sh->checksum = htonl(crc32);
 
+	/* FIXME:  Delete the rest of this switch statement once phase 2
+	 * of address selection (ipv6 support) drops in.
+	 */
 	switch (transport->ipaddr.sa.sa_family) {
-	case AF_INET:
-		inet_sk(sk)->daddr = transport->ipaddr.v4.sin_addr.s_addr;
-		break;
-
 	case AF_INET6:
 		SCTP_V6(inet6_sk(sk)->daddr = transport->ipaddr.v6.sin6_addr;)
-		break;
-
-	default:
-		/* This is bogus address type, just bail. */
 		break;
 	};
 
@@ -430,10 +425,12 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 
 	dst = transport->dst;
 	if (!dst || dst->obsolete) {
-		sctp_transport_route(transport, NULL);
+		sctp_transport_route(transport, NULL, sctp_sk(sk));
 	}
 
 	nskb->dst = dst_clone(transport->dst);
+	if (!nskb->dst)
+		goto no_route;
 
 	SCTP_DEBUG_PRINTK("***sctp_transmit_packet*** skb length %d\n",
 			  nskb->len);
@@ -441,6 +438,11 @@ int sctp_packet_transmit(sctp_packet_t *packet)
 out:
 	packet->size = SCTP_IP_OVERHEAD;
 	return err;
+no_route:
+	kfree_skb(nskb);
+	IP_INC_STATS_BH(IpOutNoRoutes);
+	err = -EHOSTUNREACH;
+	goto out;
 }
 
 /********************************************************************

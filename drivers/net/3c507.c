@@ -32,9 +32,6 @@
 static const char version[] =
 	DRV_NAME ".c:v" DRV_VERSION " " DRV_RELDATE " Donald Becker (becker@scyld.com)\n";
 
-
-#include <linux/module.h>
-
 /*
   Sources:
 	This driver wouldn't have been written with the availability of the
@@ -46,8 +43,8 @@ static const char version[] =
 	info that the casual reader might think that it documents the i82586 :-<.
 */
 
+#include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -56,20 +53,18 @@ static const char version[] =
 #include <linux/string.h>
 #include <linux/spinlock.h>
 #include <linux/ethtool.h>
-
-#include <asm/uaccess.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/errno.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 
+#include <asm/bitops.h>
+#include <asm/dma.h>
+#include <asm/io.h>
+#include <asm/system.h>
+#include <asm/uaccess.h>
 
 /* use 0 for production, 1 for verification, 2..7 for debug */
 #ifndef NET_DEBUG

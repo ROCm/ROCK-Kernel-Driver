@@ -29,18 +29,18 @@ static const char version[] =
 	"wd.c:v1.10 9/23/94 Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/string.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/delay.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+
 #include <asm/io.h>
 #include <asm/system.h>
 
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
 #include "8390.h"
 
 /* A zero-terminated list of I/O addresses to be probed. */

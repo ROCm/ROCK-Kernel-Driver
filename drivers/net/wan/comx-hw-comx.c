@@ -49,12 +49,12 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/types.h>
-#include <linux/sched.h>
 #include <linux/netdevice.h>
 #include <linux/proc_fs.h>
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+
 #include <asm/uaccess.h>
 #include <asm/io.h>
 

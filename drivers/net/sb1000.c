@@ -35,13 +35,12 @@
 static char version[] = "sb1000.c:v1.1.2 6/01/98 (fventuri@mediaone.net)\n";
 
 #include <linux/module.h>
-
 #include <linux/version.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/interrupt.h>
 #include <linux/errno.h>
+#include <linux/if_cablemodem.h> /* for SIOGCM/SIOSCM stuff */
 #include <linux/in.h>
 #include <linux/slab.h>
 #include <linux/ioport.h>
@@ -49,17 +48,13 @@ static char version[] = "sb1000.c:v1.1.2 6/01/98 (fventuri@mediaone.net)\n";
 #include <linux/if_arp.h>
 #include <linux/skbuff.h>
 #include <linux/delay.h>	/* for udelay() */
-#include <asm/processor.h>
-
-#include <asm/bitops.h>
-#include <asm/io.h>
-#include <asm/uaccess.h>
 #include <linux/etherdevice.h>
 #include <linux/isapnp.h>
 
-/* for SIOGCM/SIOSCM stuff */
-
-#include <linux/if_cablemodem.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
+#include <asm/processor.h>
+#include <asm/uaccess.h>
 
 #ifdef SB1000_DEBUG
 int sb1000_debug = SB1000_DEBUG;

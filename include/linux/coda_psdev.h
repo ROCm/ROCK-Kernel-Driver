@@ -47,13 +47,13 @@ int venus_close(struct super_block *sb, struct ViceFid *fid, int flags,
 int venus_open(struct super_block *sb, struct ViceFid *fid,
 		int flags, struct file **f);
 int venus_mkdir(struct super_block *sb, struct ViceFid *dirfid, 
-			  const char *name, int length, 
-			  struct ViceFid *newfid, struct coda_vattr *attrs);
+		const char *name, int length, 
+		struct ViceFid *newfid, struct coda_vattr *attrs);
 int venus_create(struct super_block *sb, struct ViceFid *dirfid, 
-		    const char *name, int length, int excl, int mode, int rdev,
-		    struct ViceFid *newfid, struct coda_vattr *attrs) ;
+		 const char *name, int length, int excl, int mode, dev_t rdev,
+		 struct ViceFid *newfid, struct coda_vattr *attrs) ;
 int venus_rmdir(struct super_block *sb, struct ViceFid *dirfid, 
-		    const char *name, int length);
+		const char *name, int length);
 int venus_remove(struct super_block *sb, struct ViceFid *dirfid, 
 		 const char *name, int length);
 int venus_readlink(struct super_block *sb, struct ViceFid *fid, 

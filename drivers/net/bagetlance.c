@@ -15,24 +15,20 @@
 static char *version = "bagetlance.c: v1.1 11/10/98\n";
 
 #include <linux/module.h>
-
 #include <linux/stddef.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
-
-#include <asm/irq.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 
+#include <asm/irq.h>
+#include <asm/bitops.h>
+#include <asm/io.h>
 #include <asm/baget/baget.h>
 
 #define BAGET_LANCE_IRQ  BAGET_IRQ_MASK(0xdf)

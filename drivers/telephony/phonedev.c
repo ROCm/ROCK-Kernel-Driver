@@ -135,8 +135,8 @@ void phone_unregister_device(struct phone_device *pfd)
 
 static struct file_operations phone_fops =
 {
-	owner:		THIS_MODULE,
-	open:		phone_open,
+	.owner		= THIS_MODULE,
+	.open		= phone_open,
 };
 
 /*

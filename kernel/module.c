@@ -37,21 +37,6 @@
 #define DEBUGP(fmt , a...)
 #endif
 
-extern const struct exception_table_entry __start___ex_table[];
-extern const struct exception_table_entry __stop___ex_table[];
-extern const struct kernel_symbol __start___ksymtab[];
-extern const struct kernel_symbol __stop___ksymtab[];
-
-/* Protects extables and symbol tables */
-spinlock_t modlist_lock = SPIN_LOCK_UNLOCKED;
-
-/* The exception and symbol tables: start with kernel only. */
-LIST_HEAD(extables);
-static LIST_HEAD(symbols);
-
-static struct exception_table kernel_extable;
-static struct kernel_symbol_group kernel_symbols;
-
 /* List of modules, protected by module_mutex */
 static DECLARE_MUTEX(module_mutex);
 LIST_HEAD(modules); /* FIXME: Accessed w/o lock on oops by some archs */
@@ -607,20 +592,26 @@ static void *copy_section(const char *name,
 {
 	void *dest;
 	unsigned long *use;
+	unsigned long max;
 
 	/* Only copy to init section if there is one */
 	if (strstr(name, ".init") && mod->module_init) {
 		dest = mod->module_init;
 		use = &used->init_size;
+		max = mod->init_size;
 	} else {
 		dest = mod->module_core;
 		use = &used->core_size;
+		max = mod->core_size;
 	}
 
 	/* Align up */
 	*use = ALIGN(*use, sechdr->sh_addralign);
 	dest += *use;
 	*use += sechdr->sh_size;
+
+	if (*use > max)
+		return ERR_PTR(-ENOEXEC);
 
 	/* May not actually be in the file (eg. bss). */
 	if (sechdr->sh_type != SHT_NOBITS)
@@ -788,9 +779,10 @@ static void simplify_symbols(Elf_Shdr *sechdrs,
 /* Get the total allocation size of the init and non-init sections */
 static struct sizes get_sizes(const Elf_Ehdr *hdr,
 			      const Elf_Shdr *sechdrs,
-			      const char *secstrings)
+			      const char *secstrings,
+			      unsigned long common_length)
 {
-	struct sizes ret = { 0, 0 };
+	struct sizes ret = { 0, common_length };
 	unsigned i;
 
 	/* Everything marked ALLOC (this includes the exported
@@ -898,6 +890,11 @@ static struct module *load_module(void *umod,
 			DEBUGP("Exception table found in section %u\n", i);
 			exindex = i;
 		}
+#ifdef CONFIG_KALLSYMS
+		/* symbol and string tables for decoding later. */
+		if (sechdrs[i].sh_type == SHT_SYMTAB || i == hdr->e_shstrndx)
+			sechdrs[i].sh_flags |= SHF_ALLOC;
+#endif
 #ifndef CONFIG_MODULE_UNLOAD
 		/* Don't load .exit sections */
 		if (strstr(secstrings+sechdrs[i].sh_name, ".exit"))
@@ -943,10 +940,9 @@ static struct module *load_module(void *umod,
 	mod->live = 0;
 	module_unload_init(mod);
 
-	/* How much space will we need?  (Common area in core) */
-	sizes = get_sizes(hdr, sechdrs, secstrings);
+	/* How much space will we need?  (Common area in first) */
 	common_length = read_commons(hdr, &sechdrs[symindex]);
-	sizes.core_size += common_length;
+	sizes = get_sizes(hdr, sechdrs, secstrings, common_length);
 
 	/* Set these up, and allow archs to manipulate them. */
 	mod->core_size = sizes.core_size;
@@ -973,7 +969,7 @@ static struct module *load_module(void *umod,
 	mod->module_core = ptr;
 
 	ptr = module_alloc(mod->init_size);
-	if (!ptr) {
+	if (!ptr && mod->init_size) {
 		err = -ENOMEM;
 		goto free_core;
 	}
@@ -1026,6 +1022,11 @@ static struct module *load_module(void *umod,
 			goto cleanup;
 	}
 
+#ifdef CONFIG_KALLSYMS
+	mod->symtab = (void *)sechdrs[symindex].sh_offset;
+	mod->num_syms = sechdrs[symindex].sh_size / sizeof(Elf_Sym);
+	mod->strtab = (void *)sechdrs[strindex].sh_offset;
+#endif
 	err = module_finalize(hdr, sechdrs, mod);
 	if (err < 0)
 		goto cleanup;
@@ -1129,7 +1130,7 @@ sys_init_module(void *umod,
 
 	/* Now it's a first class citizen! */
 	spin_lock_irq(&modlist_lock);
-	list_add(&mod->symbols.list, &kernel_symbols.list);
+	list_add_tail(&mod->symbols.list, &symbols);
 	spin_unlock_irq(&modlist_lock);
 	list_add(&mod->list, &modules);
 
@@ -1141,9 +1142,82 @@ sys_init_module(void *umod,
 	return 0;
 }
 
-/* Called by the /proc file system to return a current list of
-   modules.  Al Viro came up with this interface as an "improvement".
-   God save us from any more such interface improvements. */
+#ifdef CONFIG_KALLSYMS
+static inline int inside_init(struct module *mod, unsigned long addr)
+{
+	if (mod->module_init
+	    && (unsigned long)mod->module_init <= addr
+	    && (unsigned long)mod->module_init + mod->init_size > addr)
+		return 1;
+	return 0;
+}
+
+static inline int inside_core(struct module *mod, unsigned long addr)
+{
+	if ((unsigned long)mod->module_core <= addr
+	    && (unsigned long)mod->module_core + mod->core_size > addr)
+		return 1;
+	return 0;
+}
+
+static const char *get_ksymbol(struct module *mod,
+			       unsigned long addr,
+			       unsigned long *size,
+			       unsigned long *offset)
+{
+	unsigned int i, next = 0, best = 0;
+
+	/* Scan for closest preceeding symbol, and next symbol. (ELF
+           starts real symbols at 1). */
+	for (i = 1; i < mod->num_syms; i++) {
+		if (mod->symtab[i].st_shndx == SHN_UNDEF)
+			continue;
+
+		if (mod->symtab[i].st_value <= addr
+		    && mod->symtab[i].st_value > mod->symtab[best].st_value)
+			best = i;
+		if (mod->symtab[i].st_value > addr
+		    && mod->symtab[i].st_value < mod->symtab[next].st_value)
+			next = i;
+	}
+
+	if (!best)
+		return NULL;
+
+	if (!next) {
+		/* Last symbol?  It ends at the end of the module then. */
+		if (inside_core(mod, addr))
+			*size = mod->module_core+mod->core_size - (void*)addr;
+		else
+			*size = mod->module_init+mod->init_size - (void*)addr;
+	} else
+		*size = mod->symtab[next].st_value - addr;
+
+	*offset = addr - mod->symtab[best].st_value;
+	return mod->strtab + mod->symtab[best].st_name;
+}
+
+/* For kallsyms to ask for address resolution.  NULL means not found.
+   We don't lock, as this is used for oops resolution and races are a
+   lesser concern. */
+const char *module_address_lookup(unsigned long addr,
+				  unsigned long *size,
+				  unsigned long *offset,
+				  char **modname)
+{
+	struct module *mod;
+
+	list_for_each_entry(mod, &modules, list) {
+		if (inside_core(mod, addr) || inside_init(mod, addr)) {
+			*modname = mod->name;
+			return get_ksymbol(mod, addr, size, offset);
+		}
+	}
+	return NULL;
+}
+#endif /* CONFIG_KALLSYMS */
+
+/* Called by the /proc file system to return a list of modules. */
 static void *m_start(struct seq_file *m, loff_t *pos)
 {
 	struct list_head *i;
@@ -1187,19 +1261,6 @@ struct seq_operations modules_op = {
 	.stop	= m_stop,
 	.show	= m_show
 };
-
-void __init extable_init(void)
-{
-	/* Add kernel symbols to symbol table */
-	kernel_symbols.num_syms = (__stop___ksymtab - __start___ksymtab);
-	kernel_symbols.syms = __start___ksymtab;
-	list_add(&kernel_symbols.list, &symbols);
-
-	/* Add kernel exception table to exception tables */
-	kernel_extable.num_entries = (__stop___ex_table -__start___ex_table);
-	kernel_extable.entry = __start___ex_table;
-	list_add(&kernel_extable.list, &extables);
-}
 
 /* Obsolete lvalue for broken code which asks about usage */
 int module_dummy_usage = 1;

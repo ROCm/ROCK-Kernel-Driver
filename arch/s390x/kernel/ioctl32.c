@@ -1024,6 +1024,8 @@ out:
 static void ioctl32_insert(struct ioctl32_list *entry)
 {
 	int hash = ioctl32_hash(entry->handler.cmd);
+
+	entry->next = 0;
 	if (!ioctl32_hash_table[hash])
 		ioctl32_hash_table[hash] = entry;
 	else {
@@ -1032,8 +1034,49 @@ static void ioctl32_insert(struct ioctl32_list *entry)
 		while (l->next)
 			l = l->next;
 		l->next = entry;
-		entry->next = 0;
 	}
+}
+
+int register_ioctl32_conversion(unsigned int cmd,
+				int (*handler)(unsigned int, unsigned int,
+					       unsigned long, struct file *))
+{
+	struct ioctl32_list *l, *new;
+	int hash;
+
+	hash = ioctl32_hash(cmd);
+	for (l = ioctl32_hash_table[hash]; l != NULL; l = l->next)
+		if (l->handler.cmd == cmd)
+			return -EBUSY;
+	new = kmalloc(sizeof(struct ioctl32_list), GFP_KERNEL);
+	if (new == NULL)
+		return -ENOMEM;
+	new->handler.cmd = cmd;
+	new->handler.function = (void *) handler;
+	ioctl32_insert(new);
+	return 0;
+}
+
+int unregister_ioctl32_conversion(unsigned int cmd)
+{
+	struct ioctl32_list *p, *l;
+	int hash;
+
+	hash = ioctl32_hash(cmd);
+	p = NULL;
+	for (l = ioctl32_hash_table[hash]; l != NULL; l = l->next) {
+		if (l->handler.cmd == cmd)
+			break;
+		p = l;
+	}
+	if (l == NULL)
+		return -ENOENT;
+	if (p == NULL)
+		ioctl32_hash_table[hash] = l->next;
+	else
+		p->next = l->next;
+	kfree(l);
+	return 0;
 }
 
 static int __init init_ioctl32(void)

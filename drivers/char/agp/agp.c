@@ -1150,6 +1150,14 @@ static struct {
 		.chipset_setup	= via_generic_setup
 	},
 	{
+		.device_id	= PCI_DEVICE_ID_VIA_8377_0,
+		.vendor_id	= PCI_VENDOR_ID_VIA,
+		.chipset	= VIA_APOLLO_KT400,
+		.vendor_name	= "Via",
+		.chipset_name	= "Apollo Pro KT400",
+		.chipset_setup	= via_generic_setup
+	},
+	{
 		.device_id	= PCI_DEVICE_ID_VIA_8653_0,
 		.vendor_id	= PCI_VENDOR_ID_VIA,
 		.chipset	= VIA_APOLLO_PRO,

@@ -244,7 +244,6 @@ static int vortex_debug = 1;
 #include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/errno.h>
@@ -260,6 +259,7 @@ static int vortex_debug = 1;
 #include <linux/skbuff.h>
 #include <linux/ethtool.h>
 #include <linux/highmem.h>
+
 #include <asm/irq.h>			/* For NR_IRQS only. */
 #include <asm/bitops.h>
 #include <asm/io.h>

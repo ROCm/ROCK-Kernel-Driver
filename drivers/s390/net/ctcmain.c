@@ -2865,17 +2865,17 @@ static ssize_t ctc_stat_read(struct file *file, char *buf, size_t count,
 }
 
 static struct file_operations ctc_stat_fops = {
-	read:    ctc_stat_read,
-	write:   ctc_stat_write,
-	open:    ctc_stat_open,
-	release: ctc_stat_close,
+	.read    = ctc_stat_read,
+	.write   = ctc_stat_write,
+	.open    = ctc_stat_open,
+	.release = ctc_stat_close,
 };
 
 static struct file_operations ctc_ctrl_fops = {
-	read:    ctc_ctrl_read,
-	write:   ctc_ctrl_write,
-	open:    ctc_ctrl_open,
-	release: ctc_ctrl_close,
+	.read    = ctc_ctrl_read,
+	.write   = ctc_ctrl_write,
+	.open    = ctc_ctrl_open,
+	.release = ctc_ctrl_close,
 };
 
 static struct proc_dir_entry *ctc_dir = NULL;

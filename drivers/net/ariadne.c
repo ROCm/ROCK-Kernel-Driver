@@ -38,7 +38,6 @@
 #include <linux/module.h>
 #include <linux/stddef.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/ioport.h>
@@ -48,12 +47,11 @@
 #include <linux/interrupt.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
+#include <linux/zorro.h>
 
 #include <asm/bitops.h>
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>
-#include <linux/zorro.h>
-
 #include <asm/irq.h>
 
 #include "ariadne.h"

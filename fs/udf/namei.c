@@ -669,7 +669,7 @@ static int udf_create(struct inode *dir, struct dentry *dentry, int mode)
 	return 0;
 }
 
-static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, int rdev)
+static int udf_mknod(struct inode * dir, struct dentry * dentry, int mode, dev_t rdev)
 {
 	struct inode * inode;
 	struct udf_fileident_bh fibh;
@@ -882,7 +882,6 @@ static int udf_rmdir(struct inode * dir, struct dentry * dentry)
 	mark_inode_dirty(inode);
 	dir->i_nlink --;
 	inode->i_ctime = dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-	UDF_I_UCTIME(inode) = UDF_I_UCTIME(dir) = UDF_I_UMTIME(dir) = CURRENT_UTIME;
 	mark_inode_dirty(dir);
 
 end_rmdir:
@@ -926,7 +925,6 @@ static int udf_unlink(struct inode * dir, struct dentry * dentry)
 	if (retval)
 		goto end_unlink;
 	dir->i_ctime = dir->i_mtime = CURRENT_TIME;
-	UDF_I_UCTIME(dir) = UDF_I_UMTIME(dir) = CURRENT_UTIME;
 	mark_inode_dirty(dir);
 	inode->i_nlink--;
 	mark_inode_dirty(inode);
@@ -1157,7 +1155,6 @@ static int udf_link(struct dentry * old_dentry, struct inode * dir,
 	udf_release_data(fibh.sbh);
 	inode->i_nlink ++;
 	inode->i_ctime = CURRENT_TIME;
-	UDF_I_UCTIME(inode) = CURRENT_UTIME;
 	mark_inode_dirty(inode);
 	atomic_inc(&inode->i_count);
 	d_instantiate(dentry, inode);
@@ -1251,7 +1248,6 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 	 * rename.
 	 */
 	old_inode->i_ctime = CURRENT_TIME;
-	UDF_I_UCTIME(old_inode) = CURRENT_UTIME;
 	mark_inode_dirty(old_inode);
 
 	/*
@@ -1270,11 +1266,9 @@ static int udf_rename (struct inode * old_dir, struct dentry * old_dentry,
 	{
 		new_inode->i_nlink--;
 		new_inode->i_ctime = CURRENT_TIME;
-		UDF_I_UCTIME(new_inode) = CURRENT_UTIME;
 		mark_inode_dirty(new_inode);
 	}
 	old_dir->i_ctime = old_dir->i_mtime = CURRENT_TIME;
-	UDF_I_UCTIME(old_dir) = UDF_I_UMTIME(old_dir) = CURRENT_UTIME;
 	mark_inode_dirty(old_dir);
 
 	if (dir_fi)

@@ -249,16 +249,18 @@ setup_memory(void *kernel_end)
 #ifdef CONFIG_BLK_DEV_INITRD
 	initrd_start = INITRD_START;
 	if (initrd_start) {
+		extern void *move_initrd(unsigned long);
+
 		initrd_end = initrd_start+INITRD_SIZE;
 		printk("Initial ramdisk at: 0x%p (%lu bytes)\n",
 		       (void *) initrd_start, INITRD_SIZE);
 
 		if ((void *)initrd_end > phys_to_virt(PFN_PHYS(max_low_pfn))) {
-			printk("initrd extends beyond end of memory "
-			       "(0x%08lx > 0x%p)\ndisabling initrd\n",
-			       initrd_end,
-			       phys_to_virt(PFN_PHYS(max_low_pfn)));
-			initrd_start = initrd_end = 0;
+			if (!move_initrd(PFN_PHYS(max_low_pfn)))
+				printk("initrd extends beyond end of memory "
+				       "(0x%08lx > 0x%p)\ndisabling initrd\n",
+				       initrd_end,
+				       phys_to_virt(PFN_PHYS(max_low_pfn)));
 		} else {
 			reserve_bootmem_node(NODE_DATA(KVADDR_TO_NID(initrd_start)),
 					     virt_to_phys((void *)initrd_start),

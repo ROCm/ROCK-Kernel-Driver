@@ -20,7 +20,6 @@ DRV_NAME ".c v" DRV_VERSION " 1/1/99 Elmer Joandi, elmer@ylenurme.ee.\n";
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/ptrace.h>
 #include <linux/slab.h>
 #include <linux/string.h>
@@ -28,18 +27,11 @@ DRV_NAME ".c v" DRV_VERSION " 1/1/99 Elmer Joandi, elmer@ylenurme.ee.\n";
 #include <linux/interrupt.h>
 #include <linux/in.h>
 #include <linux/ethtool.h>
-
-#include <asm/uaccess.h>
-#include <asm/io.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
-
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -54,8 +46,12 @@ DRV_NAME ".c v" DRV_VERSION " 1/1/99 Elmer Joandi, elmer@ylenurme.ee.\n";
 #endif
 #include <pcmcia/ds.h>
 
-#include "../aironet4500.h"
+#include <asm/uaccess.h>
+#include <asm/io.h>
+#include <asm/system.h>
+#include <asm/bitops.h>
 
+#include "../aironet4500.h"
 
 static u_int irq_mask = 0x5eF8;
 static int 	awc_ports[] = {0x140,0x100,0xc0, 0x80 };

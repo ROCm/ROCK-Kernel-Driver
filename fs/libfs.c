@@ -70,7 +70,7 @@ loff_t dcache_dir_lseek(struct file *file, loff_t offset, int origin)
 			while (n && p != &file->f_dentry->d_subdirs) {
 				struct dentry *next;
 				next = list_entry(p, struct dentry, d_child);
-				if (!list_empty(&next->d_hash) && next->d_inode)
+				if (!d_unhashed(next) && next->d_inode)
 					n--;
 				p = p->next;
 			}
@@ -127,7 +127,7 @@ int dcache_readdir(struct file * filp, void * dirent, filldir_t filldir)
 			for (p=q->next; p != &dentry->d_subdirs; p=p->next) {
 				struct dentry *next;
 				next = list_entry(p, struct dentry, d_child);
-				if (list_empty(&next->d_hash) || !next->d_inode)
+				if (d_unhashed(next) || !next->d_inode)
 					continue;
 
 				spin_unlock(&dcache_lock);
@@ -322,4 +322,15 @@ int simple_commit_write(struct file *file, struct page *page,
 		inode->i_size = pos;
 	set_page_dirty(page);
 	return 0;
+}
+
+/*
+ * Print device name (in decimal, hexadecimal or symbolic)
+ * Note: returns pointer to static data!
+ */
+const char * kdevname(kdev_t dev)
+{
+	static char buffer[32];
+	sprintf(buffer, "%02x:%02x", major(dev), minor(dev));
+	return buffer;
 }

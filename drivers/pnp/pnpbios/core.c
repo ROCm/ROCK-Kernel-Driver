@@ -1293,29 +1293,29 @@ static int pnpbios_disable_resources(struct pnp_dev *dev)
 	struct pnp_cfg * config = kmalloc(sizeof(struct pnp_cfg), GFP_KERNEL);
 	/* first we need to set everything to a disabled value */
 	struct pnp_port	port = {
-	max:	0,
-	min:	0,
-	align:	0,
-	size:	0,
-	flags:	0,
-	pad:	0,
+	.max	= 0,
+	.min	= 0,
+	.align	= 0,
+	.size	= 0,
+	.flags	= 0,
+	.pad	= 0,
 	};
 	struct pnp_mem	mem = {
-	max:	0,
-	min:	0,
-	align:	0,
-	size:	0,
-	flags:	0,
-	pad:	0,
+	.max	= 0,
+	.min	= 0,
+	.align	= 0,
+	.size	= 0,
+	.flags	= 0,
+	.pad	= 0,
 	};
 	struct pnp_dma	dma = {
-	map:	0,
-	flags:	0,
+	.map	= 0,
+	.flags	= 0,
 	};
 	struct pnp_irq	irq = {
-	map:	0,
-	flags:	0,
-	pad:	0,
+	.map	= 0,
+	.flags	= 0,
+	.pad	= 0,
 	};
 	int i;
 	struct pnp_dev_node_info node_info;
@@ -1358,10 +1358,10 @@ static int pnpbios_disable_resources(struct pnp_dev *dev)
 /* PnP Layer support */
 
 static struct pnp_protocol pnpbios_protocol = {
-	name:	"Plug and Play BIOS",
-	get:	pnpbios_get_resources,
-	set:	pnpbios_set_resources,
-	disable:pnpbios_disable_resources,
+	.name	= "Plug and Play BIOS",
+	.get	= pnpbios_get_resources,
+	.set	= pnpbios_set_resources,
+	.disable = pnpbios_disable_resources,
 };
 
 static int inline insert_device(struct pnp_dev *dev)

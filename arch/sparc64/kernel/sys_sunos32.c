@@ -52,6 +52,9 @@
 #include <linux/time.h>
 #include <linux/personality.h>
 
+/* For SOCKET_I */
+#include <net/sock.h>
+
 /* Use this to get at 32-bit user passed pointers. */
 #define A(__x)				\
 ({	unsigned long __ret;		\

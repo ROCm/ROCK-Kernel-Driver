@@ -584,7 +584,7 @@ int afs_rxvl_get_entry_by_id_async2(afs_async_op_t *op,
 #endif
 
 		/* success */
-		entry->ctime = CURRENT_TIME;
+		entry->ctime = get_seconds();
 		ret = 0;
 		goto done;
 	}

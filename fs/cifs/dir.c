@@ -271,7 +271,7 @@ cifs_d_revalidate(struct dentry *direntry, int flags)
 		     ("In cifs_d_revalidate, name = %s and inode = 0x%p with count %d with time %ld and dentry 0x%p with time %ld\n",
 		      direntry->d_name.name, direntry->d_inode,
 		      direntry->d_inode->i_count.counter,
-		      direntry->d_inode->i_atime, direntry, direntry->d_time));
+		      direntry->d_inode->i_atime.tv_sec, direntry, direntry->d_time));
 		if (cifs_revalidate(direntry)) {
 			/* unlock_kernel(); */
 			return 0;

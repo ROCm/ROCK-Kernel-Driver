@@ -70,24 +70,18 @@ earlier 3Com products.
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
-#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
 #include <linux/in.h>
 #include <linux/delay.h>
-#include <asm/io.h>
-#include <asm/system.h>
-#include <asm/bitops.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 #include <linux/if_arp.h>
 #include <linux/ioport.h>
 #include <linux/ethtool.h>
-#include <asm/uaccess.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -97,6 +91,11 @@ earlier 3Com products.
 #include <pcmcia/ciscode.h>
 #include <pcmcia/ds.h>
 #include <pcmcia/mem_op.h>
+
+#include <asm/uaccess.h>
+#include <asm/io.h>
+#include <asm/system.h>
+#include <asm/bitops.h>
 
 /*====================================================================*/
 

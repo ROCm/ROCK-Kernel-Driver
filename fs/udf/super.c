@@ -800,7 +800,8 @@ udf_load_pvoldesc(struct super_block *sb, struct buffer_head *bh)
 		udf_debug("recording time %ld/%ld, %04u/%02u/%02u %02u:%02u (%x)\n",
 			recording, recording_usec,
 			ts.year, ts.month, ts.day, ts.hour, ts.minute, ts.typeAndTimezone);
-		UDF_SB_RECORDTIME(sb) = recording;
+		UDF_SB_RECORDTIME(sb).tv_sec = recording;
+		UDF_SB_RECORDTIME(sb).tv_nsec = recording_usec * 1000;
 	}
 
 	if ( !udf_build_ustr(&instr, pvoldesc->volIdent, 32) )
@@ -1339,7 +1340,7 @@ static void udf_open_lvid(struct super_block *sb)
 
 		UDF_SB_LVIDIU(sb)->impIdent.identSuffix[0] = UDF_OS_CLASS_UNIX;
 		UDF_SB_LVIDIU(sb)->impIdent.identSuffix[1] = UDF_OS_ID_LINUX;
-		if (udf_time_to_stamp(&cpu_time, get_seconds(), CURRENT_UTIME))
+		if (udf_time_to_stamp(&cpu_time, CURRENT_TIME))
 			UDF_SB_LVID(sb)->recordingDateAndTime = cpu_to_lets(cpu_time);
 		UDF_SB_LVID(sb)->integrityType = LVID_INTEGRITY_TYPE_OPEN;
 
@@ -1367,7 +1368,7 @@ static void udf_close_lvid(struct super_block *sb)
 
 		UDF_SB_LVIDIU(sb)->impIdent.identSuffix[0] = UDF_OS_CLASS_UNIX;
 		UDF_SB_LVIDIU(sb)->impIdent.identSuffix[1] = UDF_OS_ID_LINUX;
-		if (udf_time_to_stamp(&cpu_time, get_seconds(), CURRENT_UTIME))
+		if (udf_time_to_stamp(&cpu_time, CURRENT_TIME))
 			UDF_SB_LVID(sb)->recordingDateAndTime = cpu_to_lets(cpu_time);
 		if (UDF_MAX_WRITE_VERSION > le16_to_cpu(UDF_SB_LVIDIU(sb)->maxUDFWriteRev))
 			UDF_SB_LVIDIU(sb)->maxUDFWriteRev = cpu_to_le16(UDF_MAX_WRITE_VERSION);
@@ -1536,7 +1537,7 @@ static int udf_fill_super(struct super_block *sb, void *options, int silent)
 	if (!silent)
 	{
 		timestamp ts;
-		udf_time_to_stamp(&ts, UDF_SB_RECORDTIME(sb), 0);
+		udf_time_to_stamp(&ts, UDF_SB_RECORDTIME(sb));
 		udf_info("UDF %s (%s) Mounting volume '%s', timestamp %04u/%02u/%02u %02u:%02u (%x)\n",
 			UDFFS_VERSION, UDFFS_DATE,
 			UDF_SB_VOLIDENT(sb), ts.year, ts.month, ts.day, ts.hour, ts.minute,

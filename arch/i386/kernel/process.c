@@ -35,6 +35,7 @@
 #include <linux/init.h>
 #include <linux/mc146818rtc.h>
 #include <linux/module.h>
+#include <linux/kallsyms.h>
 
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
@@ -225,7 +226,7 @@ int kernel_thread(int (*fn)(void *), void * arg, unsigned long flags)
 	regs.eflags = 0x286;
 
 	/* Ok, create the new process.. */
-	p = do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL);
+	p = do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -287,7 +288,7 @@ int copy_thread(int nr, unsigned long clone_flags, unsigned long esp,
 	struct_cpy(childregs, regs);
 	childregs->eax = 0;
 	childregs->esp = esp;
-	p->user_tid = NULL;
+	p->set_child_tid = p->clear_child_tid = NULL;
 
 	p->thread.esp = (unsigned long) childregs;
 	p->thread.esp0 = (unsigned long) (childregs+1);
@@ -502,7 +503,7 @@ asmlinkage int sys_fork(struct pt_regs regs)
 {
 	struct task_struct *p;
 
-	p = do_fork(SIGCHLD, regs.esp, &regs, 0, NULL);
+	p = do_fork(SIGCHLD, regs.esp, &regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -511,14 +512,15 @@ asmlinkage int sys_clone(struct pt_regs regs)
 	struct task_struct *p;
 	unsigned long clone_flags;
 	unsigned long newsp;
-	int *user_tid;
+	int *parent_tidptr, *child_tidptr;
 
 	clone_flags = regs.ebx;
 	newsp = regs.ecx;
-	user_tid = (int *)regs.edx;
+	parent_tidptr = (int *)regs.edx;
+	child_tidptr = (int *)regs.edi;
 	if (!newsp)
 		newsp = regs.esp;
-	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, user_tid);
+	p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, parent_tidptr, child_tidptr);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 
@@ -536,7 +538,7 @@ asmlinkage int sys_vfork(struct pt_regs regs)
 {
 	struct task_struct *p;
 
-	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.esp, &regs, 0, NULL);
+	p = do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.esp, &regs, 0, NULL, NULL);
 	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
 }
 

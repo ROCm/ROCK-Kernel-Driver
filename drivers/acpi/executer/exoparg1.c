@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg1 - AML execution - opcodes with 1 argument
- *              $Revision: 145 $
+ *              $Revision: 146 $
  *
  *****************************************************************************/
 
@@ -345,12 +345,6 @@ acpi_ex_opcode_1A_1T_1R (
 				 * return FALSE
 				 */
 				return_desc->integer.value = 0;
-
-				/*
-				 * Must delete the result descriptor since there is no reference
-				 * being returned
-				 */
-				acpi_ut_remove_reference (operand[1]);
 				goto cleanup;
 			}
 
@@ -388,6 +382,8 @@ acpi_ex_opcode_1A_1T_1R (
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
 		}
+
+		/* It is possible that the Store already produced a return object */
 
 		if (!walk_state->result_obj) {
 			/*

@@ -11,10 +11,9 @@ static char version[] =
         "sunqe.c:v2.9 9/11/99 David S. Miller (davem@redhat.com)\n";
 
 #include <linux/module.h>
-
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
+#include <linux/errno.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
 #include <linux/ioport.h>
@@ -24,14 +23,15 @@ static char version[] =
 #include <linux/delay.h>
 #include <linux/init.h>
 #include <linux/crc32.h>
+#include <linux/netdevice.h>
+#include <linux/etherdevice.h>
+#include <linux/skbuff.h>
 
 #include <asm/system.h>
 #include <asm/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
-#include <linux/errno.h>
 #include <asm/byteorder.h>
-
 #include <asm/idprom.h>
 #include <asm/sbus.h>
 #include <asm/openprom.h>
@@ -39,10 +39,6 @@ static char version[] =
 #include <asm/auxio.h>
 #include <asm/pgtable.h>
 #include <asm/irq.h>
-
-#include <linux/netdevice.h>
-#include <linux/etherdevice.h>
-#include <linux/skbuff.h>
 
 #include "sunqe.h"
 

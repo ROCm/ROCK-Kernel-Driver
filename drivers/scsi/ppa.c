@@ -38,16 +38,11 @@ typedef struct {
 } ppa_struct;
 
 #define PPA_EMPTY	\
-{	dev:		NULL,		\
-	base:		-1,		\
-	mode:		PPA_AUTODETECT,	\
-	host:		-1,		\
-	cur_cmd:	NULL,		\
-	ppa_tq:		{ func: ppa_interrupt },	\
-	jstart:		0,		\
-	recon_tmo:      PPA_RECON_TMO,	\
-	failed:		0,		\
-	p_busy:		0		\
+{	.base		= -1,		\
+	.mode		= PPA_AUTODETECT,	\
+	.host		= -1,		\
+	.ppa_tq		= { .func = ppa_interrupt },	\
+	.recon_tmo      = PPA_RECON_TMO,	\
 }
 
 #include  "ppa.h"

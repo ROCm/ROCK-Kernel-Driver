@@ -24,6 +24,7 @@
 #include <linux/stat.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/interrupt.h>
 
 #include "scsi.h"
 #include "hosts.h"
@@ -1931,14 +1932,11 @@ static void esp_dump_state(struct esp *esp)
 	ESPLOG(("\n"));
 }
 
-/* Abort a command. */
+/* Abort a command.  The host_lock is acquired by caller. */
 static int esp_abort(Scsi_Cmnd *SCptr)
 {
 	struct esp *esp = (struct esp *) SCptr->host->hostdata;
-	unsigned long flags;
 	int don;
-
-	spin_lock_irqsave(esp->ehost->host_lock, flags);
 
 	ESPLOG(("esp%d: Aborting command\n", esp->esp_id));
 	esp_dump_state(esp);
@@ -1954,7 +1952,6 @@ static int esp_abort(Scsi_Cmnd *SCptr)
 		esp->msgout_len = 1;
 		esp->msgout_ctr = 0;
 		esp_cmd(esp, ESP_CMD_SATN);
-		spin_unlock_irqrestore(esp->ehost->host_lock, flags);
 		return SUCCESS;
 	}
 
@@ -1983,7 +1980,6 @@ static int esp_abort(Scsi_Cmnd *SCptr)
 				if (don)
 					ESP_INTSON(esp->dregs);
 
-				spin_unlock_irqrestore(esp->ehost->host_lock, flags);
 				return SUCCESS;
 			}
 		}
@@ -1997,7 +1993,6 @@ static int esp_abort(Scsi_Cmnd *SCptr)
 	if (esp->current_SC) {
 		if (don)
 			ESP_INTSON(esp->dregs);
-		spin_unlock_irqrestore(esp->ehost->host_lock, flags);
 		return FAILED;
 	}
 
@@ -2010,7 +2005,7 @@ static int esp_abort(Scsi_Cmnd *SCptr)
 
 	if (don)
 		ESP_INTSON(esp->dregs);
-	spin_unlock_irqrestore(esp->ehost->host_lock, flags);
+
 	return FAILED;
 }
 
@@ -2067,17 +2062,20 @@ static int esp_do_resetbus(struct esp *esp)
 
 /* Reset ESP chip, reset hanging bus, then kill active and
  * disconnected commands for targets without soft reset.
+ *
+ * The host_lock is acquired by caller.
  */
 static int esp_reset(Scsi_Cmnd *SCptr)
 {
 	struct esp *esp = (struct esp *) SCptr->host->hostdata;
-	unsigned long flags;
 
-	spin_lock_irqsave(esp->ehost->host_lock, flags);
 	(void) esp_do_resetbus(esp);
-	spin_unlock_irqrestore(esp->ehost->host_lock, flags);
+
+	spin_unlock_irq(esp->ehost->host_lock);
 
 	wait_event(esp->reset_queue, (esp->resetting_bus == 0));
+
+	spin_lock_irq(esp->ehost->host_lock);
 
 	return SUCCESS;
 }

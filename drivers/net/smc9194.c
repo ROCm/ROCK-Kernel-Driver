@@ -60,7 +60,6 @@ static const char version[] =
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
 #include <linux/interrupt.h>
@@ -70,15 +69,16 @@ static const char version[] =
 #include <linux/string.h>
 #include <linux/init.h>
 #include <linux/crc32.h>
-#include <asm/bitops.h>
-#include <asm/io.h>
 #include <linux/errno.h>
-
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
 #include <linux/skbuff.h>
 
+#include <asm/bitops.h>
+#include <asm/io.h>
+
 #include "smc9194.h"
+
 /*------------------------------------------------------------------------
  .
  . Configuration options, for the experienced user to change.

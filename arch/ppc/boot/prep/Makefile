@@ -27,10 +27,6 @@ LIBS 				= $(common)/lib.a $(bootlib)/lib.a
 boot-y				:= head.o misc.o
 boot-$(CONFIG_VGA_CONSOLE)	+= vreset.o kbd.o
 
-EXTRA_TARGETS			:= $(boot-y) ../simple/legacy.o
-
-include $(TOPDIR)/Rules.make
-
 boot := arch/ppc/boot
 common := $(boot)/common
 utils := $(boot)/utils
@@ -43,8 +39,6 @@ OBJS	:= $(addprefix $(obj)/,$(boot-y)) $(simple)/legacy.o
 
 # Tools
 MKPREP				:= $(utils)/mkprep
-SIZE				:= $(utils)/size
-OFFSET				:= $(utils)/offset
 
 # Extra include search dirs
 CFLAGS_kbd.o			+= -Idrivers/char
@@ -55,8 +49,8 @@ zImage.initrd: $(images)/zImage.initrd.prep
 $(obj)/dummy.o: $(common)/dummy.c
 	$(CC) -c -o $@ $(common)/dummy.c
 
-$(images)/zImage.prep: $(OBJS) $(LIBS) $(boot)/ld.script \
-		$(images)/vmlinux.gz $(obj)/dummy.o
+$(images)/zImage.prep: $(OBJS) $(LIBS) $(boot)/ld.script $(images)/vmlinux.gz \
+		$(obj)/dummy.o $(MKPREP)
 	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
 		--add-section=.image=$(images)/vmlinux.gz \
 		--set-section-flags=.image=contents,alloc,load,readonly,data \
@@ -68,7 +62,7 @@ $(images)/zImage.prep: $(OBJS) $(LIBS) $(boot)/ld.script \
 	rm -f $(obj)/zImage
 
 $(images)/zImage.initrd.prep: $(OBJS) $(LIBS) $(boot)/ld.script \
-		$(images)/vmlinux.gz $(obj)/dummy.o
+		$(images)/vmlinux.gz $(obj)/dummy.o $(MKPREP)
 	$(OBJCOPY) $(OBJCOPY_ARGS) -R .comment \
 		--add-section=.ramdisk=$(images)/ramdisk.image.gz \
 		--set-section-flags=.ramdisk=contents,alloc,load,readonly,data \

@@ -160,13 +160,13 @@ static int osst_dev_max;
 
 struct Scsi_Device_Template osst_template =
 {
-       module:		THIS_MODULE,
-       list:		LIST_HEAD_INIT(osst_template.list),
-       name:		"OnStream tape",
-       tag:		"osst",
-       scsi_type:	TYPE_TAPE,
-       attach:		osst_attach,
-       detach:		osst_detach
+       .module		= THIS_MODULE,
+       .list		= LIST_HEAD_INIT(osst_template.list),
+       .name		= "OnStream tape",
+       .tag		= "osst",
+       .scsi_type	= TYPE_TAPE,
+       .attach		= osst_attach,
+       .detach		= osst_detach
 };
 
 static int osst_int_ioctl(OS_Scsi_Tape *STp, Scsi_Request ** aSRpnt, unsigned int cmd_in,unsigned long arg);
@@ -5354,12 +5354,12 @@ __setup("osst=", osst_setup);
 
 
 static struct file_operations osst_fops = {
-	read:		osst_read,
-	write:		osst_write,
-	ioctl:		osst_ioctl,
-	open:		os_scsi_tape_open,
-	flush:		os_scsi_tape_flush,
-	release:	os_scsi_tape_close,
+	.read		= osst_read,
+	.write		= osst_write,
+	.ioctl		= osst_ioctl,
+	.open		= os_scsi_tape_open,
+	.flush		= os_scsi_tape_flush,
+	.release	= os_scsi_tape_close,
 };
 
 static int osst_supports(Scsi_Device * SDp)

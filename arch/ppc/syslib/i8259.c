@@ -1,9 +1,6 @@
-#include <linux/stddef.h>
 #include <linux/init.h>
-#include <linux/irq.h>
 #include <linux/ioport.h>
-#include <linux/sched.h>
-#include <linux/signal.h>
+#include <linux/interrupt.h>
 #include <asm/io.h>
 #include <asm/i8259.h>
 

@@ -8,7 +8,7 @@
  *
  */
 
-#define DEBUG 0
+#undef DEBUG
 
 #include <linux/device.h>
 #include <linux/module.h>
@@ -38,7 +38,7 @@ int device_suspend(u32 state, u32 level)
 	down(&device_sem);
 	list_for_each(node,&global_device_list) {
 		struct device * dev = to_dev(node);
-		if (device_present(dev) && dev->driver && dev->driver->suspend) {
+		if (dev->driver && dev->driver->suspend) {
 			pr_debug("suspending device %s\n",dev->name);
 			error = dev->driver->suspend(dev,state,level);
 			if (error)
@@ -64,7 +64,7 @@ void device_resume(u32 level)
 	down(&device_sem);
 	list_for_each_prev(node,&global_device_list) {
 		struct device * dev = to_dev(node);
-		if (device_present(dev) && dev->driver && dev->driver->resume) {
+		if (dev->driver && dev->driver->resume) {
 			pr_debug("resuming device %s\n",dev->name);
 			dev->driver->resume(dev,level);
 		}
@@ -86,7 +86,7 @@ void device_shutdown(void)
 	down(&device_sem);
 	list_for_each(entry,&global_device_list) {
 		struct device * dev = to_dev(entry);
-		if (device_present(dev) && dev->driver && dev->driver->shutdown) {
+		if (dev->driver && dev->driver->shutdown) {
 			pr_debug("shutting down %s\n",dev->name);
 			dev->driver->shutdown(dev);
 		}

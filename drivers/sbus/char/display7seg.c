@@ -197,6 +197,7 @@ ebus_done:
 	if (0 != iTmp) {
 		printk("%s: unable to acquire miscdevice minor %i\n",
 		       D7S_DEVNAME, D7S_MINOR);
+		iounmap(d7s_regs);
 		return iTmp;
 	}
 

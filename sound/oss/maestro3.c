@@ -137,15 +137,17 @@
 #include <linux/soundcard.h>
 #include <linux/pci.h>
 #include <linux/vmalloc.h>
-#include <asm/io.h>
-#include <asm/dma.h>
 #include <linux/init.h>
+#include <linux/interrupt.h>
 #include <linux/poll.h>
 #include <linux/reboot.h>
-#include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <linux/spinlock.h>
 #include <linux/ac97_codec.h>
+#include <linux/wait.h>
+
+#include <asm/io.h>
+#include <asm/dma.h>
+#include <asm/uaccess.h>
 
  /*
   * for crizappy mmap()
@@ -320,15 +322,15 @@ static char *card_names[] = {
 #define PCI_VENDOR_ESS      0x125D
 #endif
 
-#define M3_DEVICE(DEV, TYPE)                \
-{                                           \
-vendor: PCI_VENDOR_ESS,                     \
-device: DEV,                                \
-subvendor: PCI_ANY_ID,                      \
-subdevice: PCI_ANY_ID,                      \
-class:  PCI_CLASS_MULTIMEDIA_AUDIO << 8,    \
-class_mask: 0xffff << 8,                    \
-driver_data: TYPE,                          \
+#define M3_DEVICE(DEV, TYPE)			\
+{						\
+.vendor	     = PCI_VENDOR_ESS,			\
+.device	     = DEV,				\
+.subvendor   = PCI_ANY_ID,			\
+.subdevice   = PCI_ANY_ID,			\
+.class	     = PCI_CLASS_MULTIMEDIA_AUDIO << 8,	\
+.class_mask  = 0xffff << 8,			\
+.driver_data = TYPE,				\
 }
 
 static struct pci_device_id m3_id_table[] __initdata = {
@@ -381,7 +383,9 @@ static int m3_notifier(struct notifier_block *nb, unsigned long event, void *buf
 static int m3_suspend(struct pci_dev *pci_dev, u32 state);
 static void check_suspend(struct m3_card *card);
 
-struct notifier_block m3_reboot_nb = {m3_notifier, NULL, 0};
+struct notifier_block m3_reboot_nb = {
+	.notifier_call = m3_notifier,
+};
 
 static void m3_outw(struct m3_card *card,
         u16 value, unsigned long reg)
@@ -2179,11 +2183,11 @@ static int m3_ioctl_mixdev(struct inode *inode, struct file *file, unsigned int 
 }
 
 static struct file_operations m3_mixer_fops = {
-    owner:          THIS_MODULE,
-    llseek:         no_llseek,
-    ioctl:          m3_ioctl_mixdev,
-    open:           m3_open_mixdev,
-    release:        m3_release_mixdev,
+	.owner	 = THIS_MODULE,
+	.llseek  = no_llseek,
+	.ioctl	 = m3_ioctl_mixdev,
+	.open	 = m3_open_mixdev,
+	.release = m3_release_mixdev,
 };
 
 void remote_codec_config(int io, int isremote)
@@ -2559,15 +2563,15 @@ static void m3_enable_ints(struct m3_card *card)
 }
 
 static struct file_operations m3_audio_fops = {
-    owner:      THIS_MODULE,
-    llseek:     &no_llseek,
-    read:       &m3_read,
-    write:      &m3_write,
-    poll:       &m3_poll,
-    ioctl:      &m3_ioctl,
-    mmap:       &m3_mmap,
-    open:       &m3_open,
-    release:    &m3_release,
+	.owner	 = THIS_MODULE,
+	.llseek	 = no_llseek,
+	.read	 = m3_read,
+	.write	 = m3_write,
+	.poll	 = m3_poll,
+	.ioctl	 = m3_ioctl,
+	.mmap	 = m3_mmap,
+	.open	 = m3_open,
+	.release = m3_release,
 };
 
 #ifdef CONFIG_PM
@@ -2925,12 +2929,12 @@ MODULE_PARM(external_amp,"i");
 MODULE_PARM(gpio_pin, "i");
 
 static struct pci_driver m3_pci_driver = {
-    name:       "ess_m3_audio",
-    id_table:   m3_id_table,
-    probe:      m3_probe,
-    remove:     m3_remove,
-    suspend:    m3_suspend,
-    resume:     m3_resume,
+	.name	  = "ess_m3_audio",
+	.id_table = m3_id_table,
+	.probe	  = m3_probe,
+	.remove	  = m3_remove,
+	.suspend  = m3_suspend,
+	.resume	  = m3_resume,
 };
 
 static int __init m3_init_module(void)

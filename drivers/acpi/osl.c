@@ -525,7 +525,7 @@ acpi_os_queue_exec (
 	if (!dpc || !dpc->function)
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Executing function [%p(%p)].\n", dpc->function, dpc->context));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Executing function [%p(%p)].\n", dpc->function, dpc->context));
 
 	dpc->function(dpc->context);
 
@@ -549,7 +549,7 @@ acpi_os_schedule_exec (
 		return_VOID;
 	}
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Creating new thread to run function [%p(%p)].\n", dpc->function, dpc->context));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Creating new thread to run function [%p(%p)].\n", dpc->function, dpc->context));
 
 	thread_pid = kernel_thread(acpi_os_queue_exec, dpc,
 		(CLONE_FS | CLONE_FILES | SIGCHLD));
@@ -571,7 +571,7 @@ acpi_os_queue_for_execution(
 
 	ACPI_FUNCTION_TRACE ("os_queue_for_execution");
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Scheduling function [%p(%p)] for deferred execution.\n", function, context));
+	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "Scheduling function [%p(%p)] for deferred execution.\n", function, context));
 
 	if (!function)
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
@@ -657,7 +657,7 @@ acpi_os_create_semaphore(
 
 	*handle = (acpi_handle*)sem;
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Creating semaphore[%p|%d].\n", *handle, initial_units));
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Creating semaphore[%p|%d].\n", *handle, initial_units));
 
 	return_ACPI_STATUS (AE_OK);
 }
@@ -681,7 +681,7 @@ acpi_os_delete_semaphore(
 	if (!sem)
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Deleting semaphore[%p].\n", handle));
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Deleting semaphore[%p].\n", handle));
 
 	acpi_os_free(sem); sem =  NULL;
 
@@ -716,7 +716,7 @@ acpi_os_wait_semaphore(
 	if (units > 1)
 		return_ACPI_STATUS (AE_SUPPORT);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Waiting for semaphore[%p|%d|%d]\n", handle, units, timeout));
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Waiting for semaphore[%p|%d|%d]\n", handle, units, timeout));
 
 	if (in_atomic())
 		timeout = 0;
@@ -740,9 +740,7 @@ acpi_os_wait_semaphore(
 		 * ------------------
 		 */
 		case ACPI_WAIT_FOREVER:
-		ret = down_interruptible(sem);
-		if (ret < 0)
-			status = AE_ERROR;
+		down(sem);
 		break;
 
 		/*
@@ -763,16 +761,17 @@ acpi_os_wait_semaphore(
 			}
 	
 			if (ret != 0)
-			 status = AE_TIME;
-			}
+				status = AE_TIME;
+		}
 		break;
 	}
 
 	if (ACPI_FAILURE(status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Failed to acquire semaphore[%p|%d|%d]\n", handle, units, timeout));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Failed to acquire semaphore[%p|%d|%d], %s\n", 
+			handle, units, timeout, acpi_format_exception(status)));
 	}
 	else {
-		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Acquired semaphore[%p|%d|%d]\n", handle, units, timeout));
+		ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Acquired semaphore[%p|%d|%d]\n", handle, units, timeout));
 	}
 
 	return_ACPI_STATUS (status);
@@ -797,7 +796,7 @@ acpi_os_signal_semaphore(
 	if (units > 1)
 		return_ACPI_STATUS (AE_SUPPORT);
 
-	ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "Signaling semaphore[%p|%d]\n", handle, units));
+	ACPI_DEBUG_PRINT ((ACPI_DB_MUTEX, "Signaling semaphore[%p|%d]\n", handle, units));
 
 	up(sem);
 

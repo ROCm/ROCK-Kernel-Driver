@@ -177,11 +177,11 @@ static inline void snd_power_change_state(snd_card_t *card, unsigned int state)
 	wake_up(&card->power_sleep);
 }
 #else
-#define snd_power_lock(card) do { ; } while (0)
-#define snd_power_unlock(card) do { ; } while (0)
-#define snd_power_wait(card) do { ; } while (0)
-#define snd_power_get_state(card) SNDRV_CTL_POWER_D0
-#define snd_power_change_state(card, state) do { ; } while (0)
+#define snd_power_lock(card)		do { (void)(card); } while (0)
+#define snd_power_unlock(card)		do { (void)(card); } while (0)
+#define snd_power_wait(card)		do { (void)(card); } while (0)
+#define snd_power_get_state(card)	SNDRV_CTL_POWER_D0
+#define snd_power_change_state(card, state)	do { (void)(card); } while (0)
 #endif
 
 /* device.c */

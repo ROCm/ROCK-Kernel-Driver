@@ -52,13 +52,13 @@ sys_call_table32:
 /*150*/	.word sys_nis_syscall, sys_nis_syscall, sys_nis_syscall, sys_poll, sys_getdents64
 	.word sys32_fcntl64, sys_security, sys32_statfs, sys32_fstatfs, sys_oldumount
 /*160*/	.word sys32_sched_setaffinity, sys32_sched_getaffinity, sys_getdomainname, sys_setdomainname, sys_nis_syscall
-	.word sys_quotactl, sys_nis_syscall, sys32_mount, sys_ustat, sys_setxattr
+	.word sys_quotactl, sys_set_tid_address, sys32_mount, sys_ustat, sys_setxattr
 /*170*/	.word sys_lsetxattr, sys_fsetxattr, sys_getxattr, sys_lgetxattr, sys32_getdents
 	.word sys_setsid, sys_fchdir, sys_fgetxattr, sys_listxattr, sys_llistxattr
 /*180*/	.word sys_flistxattr, sys_removexattr, sys_lremovexattr, sys32_sigpending, sys_ni_syscall
 	.word sys_setpgid, sys_fremovexattr, sys_tkill, sys_exit_group, sparc64_newuname
-/*190*/	.word sys32_init_module, sparc64_personality, sys_remap_file_pages, sys_nis_syscall, sys_nis_syscall
-	.word sys_nis_syscall, sys_nis_syscall, sys_getppid, sys32_sigaction, sys_sgetmask
+/*190*/	.word sys32_init_module, sparc64_personality, sys_remap_file_pages, sys_epoll_create, sys_epoll_ctl
+	.word sys_epoll_wait, sys_nis_syscall, sys_getppid, sys32_sigaction, sys_sgetmask
 /*200*/	.word sys_ssetmask, sys_sigsuspend, sys32_newlstat, sys_uselib, old32_readdir
 	.word sys32_readahead, sys32_socketcall, sys_syslog, sys_lookup_dcookie, sys_nis_syscall
 /*210*/	.word sys_nis_syscall, sys_nis_syscall, sys_waitpid, sys_swapoff, sys32_sysinfo
@@ -111,13 +111,13 @@ sys_call_table:
 /*150*/	.word sys_getsockname, sys_nis_syscall, sys_nis_syscall, sys_poll, sys_getdents64
 	.word sys_nis_syscall, sys_security, sys_statfs, sys_fstatfs, sys_oldumount
 /*160*/	.word sys_sched_setaffinity, sys_sched_getaffinity, sys_getdomainname, sys_setdomainname, sys_utrap_install
-	.word sys_quotactl, sys_nis_syscall, sys_mount, sys_ustat, sys_setxattr
+	.word sys_quotactl, sys_set_tid_address, sys_mount, sys_ustat, sys_setxattr
 /*170*/	.word sys_lsetxattr, sys_fsetxattr, sys_getxattr, sys_lgetxattr, sys_getdents
 	.word sys_setsid, sys_fchdir, sys_fgetxattr, sys_listxattr, sys_llistxattr
 /*180*/	.word sys_flistxattr, sys_removexattr, sys_lremovexattr, sys_nis_syscall, sys_ni_syscall
 	.word sys_setpgid, sys_fremovexattr, sys_tkill, sys_exit_group, sparc64_newuname
-/*190*/	.word sys_init_module, sparc64_personality, sys_remap_file_pages, sys_nis_syscall, sys_nis_syscall
-	.word sys_nis_syscall, sys_nis_syscall, sys_getppid, sys_nis_syscall, sys_sgetmask
+/*190*/	.word sys_init_module, sparc64_personality, sys_remap_file_pages, sys_epoll_create, sys_epoll_ctl
+	.word sys_epoll_wait, sys_nis_syscall, sys_getppid, sys_nis_syscall, sys_sgetmask
 /*200*/	.word sys_ssetmask, sys_nis_syscall, sys_newlstat, sys_uselib, sys_nis_syscall
 	.word sys_readahead, sys_socketcall, sys_syslog, sys_lookup_dcookie, sys_nis_syscall
 /*210*/	.word sys_nis_syscall, sys_nis_syscall, sys_waitpid, sys_swapoff, sys_sysinfo

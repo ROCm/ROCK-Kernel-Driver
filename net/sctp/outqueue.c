@@ -678,7 +678,7 @@ int sctp_flush_outqueue(sctp_outqueue_t *q, int rtx_timeout)
 
 		if (!new_transport) {
 			new_transport = asoc->peer.active_path;
-		} else if (!new_transport->state.active) {
+		} else if (!new_transport->active) {
 			/* If the chunk is Heartbeat, send it to
 			 * chunk->transport, even it's inactive.
 			 */
@@ -835,7 +835,7 @@ int sctp_flush_outqueue(sctp_outqueue_t *q, int rtx_timeout)
 			 */
 			new_transport = chunk->transport;
 			if (new_transport == NULL ||
-			    !new_transport->state.active)
+			    !new_transport->active)
 				new_transport = asoc->peer.active_path;
 
 			/* Change packets if necessary.  */
@@ -1404,7 +1404,7 @@ static void sctp_check_transmitted(sctp_outqueue_t *q,
 			/* Mark the destination transport address as
 			 * active if it is not so marked.
 			 */
-			if (!transport->state.active) {
+			if (!transport->active) {
 				sctp_assoc_control_transport(
 					transport->asoc,
 					transport,

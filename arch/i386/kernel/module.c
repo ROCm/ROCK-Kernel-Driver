@@ -25,7 +25,7 @@
 #if 0
 #define DEBUGP printk
 #else
-#define DEBUGP(fmt , ...)
+#define DEBUGP(fmt...)
 #endif
 
 void *module_alloc(unsigned long size)

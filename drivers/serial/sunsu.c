@@ -1028,8 +1028,8 @@ static void sunsu_autoconfig(struct uart_sunsu_port *up)
 	struct linux_ebus_device *dev = 0;
 	struct linux_ebus *ebus;
 #ifdef CONFIG_SPARC64
-	struct isa_bridge *isa_br;
-	struct isa_device *isa_dev;
+	struct sparc_isa_bridge *isa_br;
+	struct sparc_isa_device *isa_dev;
 #endif
 #ifndef CONFIG_SPARC64
 	struct linux_prom_registers reg0;

@@ -242,7 +242,7 @@ callback_init(void * kernel_end)
 	if (alpha_using_srm) {
 		static struct vm_struct console_remap_vm;
 		unsigned long vaddr = VMALLOC_START;
-		long i, j;
+		unsigned long i, j;
 
 		/* Set up the third level PTEs and update the virtual
 		   addresses of the CRB entries.  */
@@ -357,18 +357,23 @@ mem_init(void)
 #endif /* CONFIG_DISCONTIGMEM */
 
 void
-free_initmem (void)
+free_reserved_mem(void *start, void *end)
 {
-	extern char __init_begin, __init_end;
-	unsigned long addr;
-
-	addr = (unsigned long)(&__init_begin);
-	for (; addr < (unsigned long)(&__init_end); addr += PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(addr));
-		set_page_count(virt_to_page(addr), 1);
-		free_page(addr);
+	void *__start = start;
+	for (; __start < end; __start += PAGE_SIZE) {
+		ClearPageReserved(virt_to_page(__start));
+		set_page_count(virt_to_page(__start), 1);
+		free_page((long)__start);
 		totalram_pages++;
 	}
+}
+
+void
+free_initmem(void)
+{
+	extern char __init_begin, __init_end;
+
+	free_reserved_mem(&__init_begin, &__init_end);
 	printk ("Freeing unused kernel memory: %ldk freed\n",
 		(&__init_end - &__init_begin) >> 10);
 }
@@ -377,13 +382,7 @@ free_initmem (void)
 void
 free_initrd_mem(unsigned long start, unsigned long end)
 {
-	unsigned long __start = start;
-	for (; start < end; start += PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(start));
-		set_page_count(virt_to_page(start), 1);
-		free_page(start);
-		totalram_pages++;
-	}
-	printk ("Freeing initrd memory: %ldk freed\n", (end - __start) >> 10);
+	free_reserved_mem((void *)start, (void *)end);
+	printk ("Freeing initrd memory: %ldk freed\n", (end - start) >> 10);
 }
 #endif

@@ -234,27 +234,19 @@ static int nocrypt(struct crypto_tfm *tfm,
 
 int crypto_init_cipher_flags(struct crypto_tfm *tfm, u32 flags)
 {
-	struct crypto_alg *alg = tfm->__crt_alg;
 	u32 mode = flags & CRYPTO_TFM_MODE_MASK;
 	
 	tfm->crt_cipher.cit_mode = mode ? mode : CRYPTO_TFM_MODE_ECB;
-	
-	if (alg->cra_cipher.cia_ivsize && mode != CRYPTO_TFM_MODE_ECB) {
-		tfm->crt_cipher.cit_iv =
-			kmalloc(alg->cra_cipher.cia_ivsize, GFP_KERNEL);
-		if (tfm->crt_cipher.cit_iv == NULL)
-			return -ENOMEM;
-	} else
-		tfm->crt_cipher.cit_iv = NULL;
-
 	if (flags & CRYPTO_TFM_REQ_WEAK_KEY)
 		tfm->crt_flags = CRYPTO_TFM_REQ_WEAK_KEY;
 	
 	return 0;
 }
 
-void crypto_init_cipher_ops(struct crypto_tfm *tfm)
+int crypto_init_cipher_ops(struct crypto_tfm *tfm)
 {
+	int ret = 0;
+	struct crypto_alg *alg = tfm->__crt_alg;
 	struct cipher_tfm *ops = &tfm->crt_cipher;
 
 	ops->cit_setkey = setkey;
@@ -283,4 +275,20 @@ void crypto_init_cipher_ops(struct crypto_tfm *tfm)
 	default:
 		BUG();
 	}
+	
+	if (alg->cra_cipher.cia_ivsize &&
+	    ops->cit_mode != CRYPTO_TFM_MODE_ECB) {
+	    	
+	    	ops->cit_iv = kmalloc(alg->cra_cipher.cia_ivsize, GFP_KERNEL);
+		if (ops->cit_iv == NULL)
+			ret = -ENOMEM;
+	}
+	
+	return ret;
+}
+
+void crypto_exit_cipher_ops(struct crypto_tfm *tfm)
+{
+	if (tfm->crt_cipher.cit_iv)
+		kfree(tfm->crt_cipher.cit_iv);
 }

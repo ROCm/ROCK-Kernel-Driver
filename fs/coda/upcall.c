@@ -310,8 +310,8 @@ int venus_rename(struct super_block *sb, struct ViceFid *old_fid,
 }
 
 int venus_create(struct super_block *sb, struct ViceFid *dirfid, 
-		    const char *name, int length, int excl, int mode, int rdev,
-		    struct ViceFid *newfid, struct coda_vattr *attrs) 
+		 const char *name, int length, int excl, int mode, dev_t rdev,
+		 struct ViceFid *newfid, struct coda_vattr *attrs) 
 {
         union inputArgs *inp;
         union outputArgs *outp;

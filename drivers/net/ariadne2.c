@@ -21,7 +21,6 @@
 
 #include <linux/module.h>
 #include <linux/kernel.h>
-#include <linux/sched.h>
 #include <linux/errno.h>
 #include <linux/init.h>
 #include <linux/delay.h>
@@ -30,7 +29,6 @@
 #include <linux/zorro.h>
 
 #include <asm/system.h>
-
 #include <asm/irq.h>
 #include <asm/amigaints.h>
 #include <asm/amigahw.h>

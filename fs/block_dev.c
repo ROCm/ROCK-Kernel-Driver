@@ -567,6 +567,7 @@ static int do_open(struct block_device *bdev, struct inode *inode, struct file *
 	lock_kernel();
 	disk = get_gendisk(bdev->bd_dev, &part);
 	if (!disk) {
+		unlock_kernel();
 		bdput(bdev);
 		return ret;
 	}

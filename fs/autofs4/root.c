@@ -418,7 +418,7 @@ static int autofs4_dir_rmdir(struct inode *dir, struct dentry *dentry)
 		unlock_kernel();
 		return -ENOTEMPTY;
 	}
-	list_del_init(&dentry->d_hash);
+	__d_drop(dentry);
 	spin_unlock(&dcache_lock);
 
 	dput(ino->dentry);

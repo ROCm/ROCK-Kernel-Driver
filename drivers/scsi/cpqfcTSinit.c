@@ -31,20 +31,21 @@
 
 #define LinuxVersionCode(v, p, s) (((v)<<16)+((p)<<8)+(s))
 
+#include <linux/config.h>  
+#include <linux/interrupt.h>  
+#include <linux/module.h>
+#include <linux/version.h> 
 #include <linux/blk.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
-#include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/timer.h>
 #include <linux/init.h>
 #include <linux/ioport.h>  // request_region() prototype
-#include <linux/vmalloc.h> // ioremap()
-//#if LINUX_VERSION_CODE >= LinuxVersionCode(2,4,7)
 #include <linux/completion.h>
-//#endif
+
 #ifdef __alpha__
 #define __KERNEL_SYSCALLS__
 #endif
@@ -61,10 +62,6 @@
 #include "cpqfcTStrigger.h"
 
 #include "cpqfcTS.h"
-
-#include <linux/config.h>  
-#include <linux/module.h>
-#include <linux/version.h> 
 
 /* Embedded module documentation macros - see module.h */
 MODULE_AUTHOR("Compaq Computer Corporation");

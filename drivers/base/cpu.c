@@ -48,7 +48,7 @@ int __init register_cpu(struct cpu *cpu, int num, struct node *root)
 
 static int __init register_cpu_type(void)
 {
-	driver_register(&cpu_driver);
-	return devclass_register(&cpu_devclass);
+	devclass_register(&cpu_devclass);
+	return driver_register(&cpu_driver);
 }
 postcore_initcall(register_cpu_type);

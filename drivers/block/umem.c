@@ -544,7 +544,6 @@ static void process_page(unsigned long data)
 
 	while(return_bio) {
 		struct bio *bio = return_bio;
-		int bytes = bio->bi_size;
 
 		return_bio = bio->bi_next;
 		bio->bi_next = NULL;

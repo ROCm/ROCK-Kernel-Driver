@@ -299,14 +299,14 @@ static int __init do_symlink(void)
 }
 
 static __initdata int (*actions[])(void) = {
-	[Start]		do_start,
-	[Collect]	do_collect,
-	[GotHeader]	do_header,
-	[SkipIt]	do_skip,
-	[GotName]	do_name,
-	[CopyFile]	do_copy,
-	[GotSymlink]	do_symlink,
-	[Reset]		do_reset,
+	[Start]		= do_start,
+	[Collect]	= do_collect,
+	[GotHeader]	= do_header,
+	[SkipIt]	= do_skip,
+	[GotName]	= do_name,
+	[CopyFile]	= do_copy,
+	[GotSymlink]	= do_symlink,
+	[Reset]		= do_reset,
 };
 
 static int __init write_buffer(char *buf, unsigned len)

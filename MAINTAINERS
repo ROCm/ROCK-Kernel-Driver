@@ -204,6 +204,14 @@ M:	Juergen Fischer <fischer@norbit.de>
 L:	linux-scsi@vger.kernel.org
 S:	Maintained
 
+ALPHA PORT
+P:	Richard Henderson
+M:	rth@twiddle.net
+S:	Odd Fixes for 2.4; Maintained for 2.5.
+P:	Ivan Kokshaysky
+M:	ink@jurassic.park.msu.ru
+S:	Maintained for 2.4; PCI support for 2.5.
+
 APM DRIVER
 P:	Stephen Rothwell
 M:	sfr@canb.auug.org.au
@@ -411,6 +419,15 @@ P:	Bjorn Wesen
 M:	bjornw@axis.com
 L:	dev-etrax@axis.com
 W:	http://developer.axis.com
+S:	Maintained
+
+CRYPTO API
+P:	James Morris
+M:	jmorris@intercode.com.au
+P:	David S. Miller
+M:	davem@redhat.com
+W	http://samba.org/~jamesm/crypto/
+L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
 CYBERPRO FB DRIVER

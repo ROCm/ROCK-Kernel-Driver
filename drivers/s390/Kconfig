@@ -257,24 +257,30 @@ config TN3215_CONSOLE
 	  Include support for using an IBM 3215 line-mode terminal as a
 	  Linux system console.
 
-config HWC
-	bool "Support for HWC line mode terminal"
+config SCLP
+	bool "Support for SCLP"
 	help
-	  Include support for IBM HWC line-mode terminals.
+	  Include support for the SCLP interface to the service element.
 
-config HWC_CONSOLE
-	bool "console on HWC line mode terminal"
-	depends on HWC
+config SCLP_TTY
+	bool "Support for SCLP line mode terminal"
+	depends on SCLP
+	help
+	  Include support for IBM SCLP line-mode terminals.
+
+config SCLP_CONSOLE
+	bool "Support for console on SCLP line mode terminal"
+	depends on SCLP_TTY
 	help
 	  Include support for using an IBM HWC line-mode terminal as the Linux
 	  system console.
 
-config HWC_CPI
+config SCLP_CPI
 	tristate "Control-Program Identification"
-	depends on HWC
+	depends on SCLP
 	help
 	  This option enables the hardware console interface for system
-	  identification This is commonly used for workload management and
+	  identification. This is commonly used for workload management and
 	  gives you a nice name for the system on the service element.
 	  Please select this option as a module since built-in operation is
 	  completely untested.

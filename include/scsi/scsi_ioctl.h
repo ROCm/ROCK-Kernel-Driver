@@ -17,6 +17,8 @@
 
 #ifdef __KERNEL__
 
+struct scsi_device;
+
 /*
  * Structures used for scsi_ioctl et al.
  */
@@ -33,19 +35,15 @@ typedef struct scsi_idlun {
 } Scsi_Idlun;
 
 /* Fibre Channel WWN, port_id struct */
-typedef struct scsi_fctargaddress
-{
+typedef struct scsi_fctargaddress {
 	__u32 host_port_id;
 	unsigned char host_wwn[8]; // include NULL term.
 } Scsi_FCTargAddress;
 
-extern int scsi_ioctl (Scsi_Device *dev, int cmd, void *arg);
-extern int kernel_scsi_ioctl (Scsi_Device *dev, int cmd, void *arg);
-extern int scsi_ioctl_send_command(Scsi_Device *dev,
-				   Scsi_Ioctl_Command *arg);
+extern int scsi_ioctl(struct scsi_device *, int, void *);
+extern int kernel_scsi_ioctl(struct scsi_device *, int , void *);
+extern int scsi_ioctl_send_command(struct scsi_device *,
+				   struct scsi_ioctl_command *);
 
-#endif
-
-#endif
-
-
+#endif /* __KERNEL__ */
+#endif /* _SCSI_IOCTL_H */

@@ -1621,10 +1621,6 @@ static void autorun_array(mddev_t *mddev)
 	err = do_md_run (mddev);
 	if (err) {
 		printk(KERN_WARNING "md :do_md_run() returned %d\n", err);
-		/*
-		 * prevent the writeback of an unrunnable array
-		 */
-		mddev->sb_dirty = 0;
 		do_md_stop (mddev, 0);
 	}
 }
@@ -2354,11 +2350,11 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			 * we have to clean up the mess if
 			 * the array cannot be run for some
 			 * reason ...
+			 * ->pers will not be set, to superblock will
+			 * not be updated.
 			 */
-			if (err) {
-				mddev->sb_dirty = 0;
+			if (err)
 				do_md_stop (mddev, 0);
-			}
 			goto done_unlock;
 		}
 

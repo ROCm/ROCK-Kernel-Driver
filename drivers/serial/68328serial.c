@@ -1682,12 +1682,12 @@ void m68328_console_write (struct console *co, const char *str,
 
 
 static struct console m68328_driver = {
-	name:		"ttyS",
-	write:		m68328_console_write,
-	device:		m68328_console_device,
-	setup:		m68328_console_setup,
-	flags:		CON_PRINTBUFFER,
-	index:		-1,
+	.name		= "ttyS",
+	.write		= m68328_console_write,
+	.device		= m68328_console_device,
+	.setup		= m68328_console_setup,
+	.flags		= CON_PRINTBUFFER,
+	.index		= -1,
 };
 
 

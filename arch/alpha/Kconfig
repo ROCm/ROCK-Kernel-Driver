@@ -806,6 +806,8 @@ if PCI
 source "drivers/message/fusion/Kconfig"
 endif
 
+source "drivers/ieee1394/Kconfig"
+
 source "net/Kconfig"
 
 
