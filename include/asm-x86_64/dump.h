@@ -56,6 +56,14 @@ struct __dump_header_asm {
 static inline void get_current_regs(struct pt_regs *regs)
 {
 	unsigned seg;
+	__asm__ __volatile__("movq %%r15,%0" : "=m"(regs->r15));
+	__asm__ __volatile__("movq %%r14,%0" : "=m"(regs->r14));
+	__asm__ __volatile__("movq %%r13,%0" : "=m"(regs->r13));
+	__asm__ __volatile__("movq %%r12,%0" : "=m"(regs->r12));
+	__asm__ __volatile__("movq %%r11,%0" : "=m"(regs->r11));
+	__asm__ __volatile__("movq %%r10,%0" : "=m"(regs->r10));
+	__asm__ __volatile__("movq %%r9,%0" : "=m"(regs->r9));
+	__asm__ __volatile__("movq %%r8,%0" : "=m"(regs->r8));
 	__asm__ __volatile__("movq %%rbx,%0" : "=m"(regs->rbx));
 	__asm__ __volatile__("movq %%rcx,%0" : "=m"(regs->rcx));
 	__asm__ __volatile__("movq %%rdx,%0" : "=m"(regs->rdx));
