@@ -360,10 +360,13 @@ static int parse_options(ntfs_volume *vol, char *opt)
 	int use_utf8 = -1;	/* If no NLS specified and loading the default
 				   NLS failed use utf8. */
 	int mft_zone_mul = -1;	/* 1 */
+	char *opts = opt;
 
 	if (!opt)
 		goto done;
-	for (opt = strtok(opt, ","); opt; opt = strtok(NULL, ",")) {
+	while ((opt = strsep(&opts, ",")) != NULL) {
+		if (!*opt)
+			continue;
 		if ((value = strchr(opt, '=')) != NULL)
 			*value ++= '\0';
 		if (strcmp(opt, "uid") == 0) {
