@@ -76,7 +76,7 @@ static int sci_request_irq(struct sci_port *port);
 static void sci_free_irq(struct sci_port *port);
 static int sci_init_drivers(void);
 
-static struct tty_driver sci_driver;
+static struct tty_driver *sci_driver;
 
 static struct sci_port sci_ports[SCI_NPORTS] = SCI_INIT;
 
@@ -972,6 +972,27 @@ static int sci_read_proc(char *page, char **start, off_t off, int count,
 }
 #endif
 
+static struct tty_operations sci_ops = {
+	.open	= sci_open,
+	.close = gs_close,
+	.write = gs_write,
+	.put_char = gs_put_char,
+	.flush_chars = gs_flush_chars,
+	.write_room = gs_write_room,
+	.chars_in_buffer = gs_chars_in_buffer,
+	.flush_buffer = gs_flush_buffer,
+	.ioctl = sci_ioctl,
+	.throttle = sci_throttle,
+	.unthrottle = sci_unthrottle,
+	.set_termios = gs_set_termios,
+	.stop = gs_stop,
+	.start = gs_start,
+	.hangup = gs_hangup,
+#ifdef CONFIG_PROC_FS
+	.read_proc = sci_read_proc,
+#endif
+};
+
 /* ********************************************************************** *
  *                    Here are the initialization routines.               *
  * ********************************************************************** */
@@ -980,45 +1001,27 @@ static int sci_init_drivers(void)
 {
 	int error;
 	struct sci_port *port;
+	sci_driver = alloc_tty_driver(SCI_NPORTS);
+	if (!sci_driver)
+		return -ENOMEM;
 
-	memset(&sci_driver, 0, sizeof(sci_driver));
-	sci_driver.magic = TTY_DRIVER_MAGIC;
-	sci_driver.owner = THIS_MODULE;
-	sci_driver.driver_name = "sci";
-	sci_driver.name = "ttySC";
-	sci_driver.devfs_name = "ttsc/";
-	sci_driver.major = SCI_MAJOR;
-	sci_driver.minor_start = SCI_MINOR_START;
-	sci_driver.num = SCI_NPORTS;
-	sci_driver.type = TTY_DRIVER_TYPE_SERIAL;
-	sci_driver.subtype = SERIAL_TYPE_NORMAL;
-	sci_driver.init_termios = tty_std_termios;
-	sci_driver.init_termios.c_cflag =
+	sci_driver->owner = THIS_MODULE;
+	sci_driver->driver_name = "sci";
+	sci_driver->name = "ttySC";
+	sci_driver->devfs_name = "ttsc/";
+	sci_driver->major = SCI_MAJOR;
+	sci_driver->minor_start = SCI_MINOR_START;
+	sci_driver->type = TTY_DRIVER_TYPE_SERIAL;
+	sci_driver->subtype = SERIAL_TYPE_NORMAL;
+	sci_driver->init_termios = tty_std_termios;
+	sci_driver->init_termios.c_cflag =
 		B9600 | CS8 | CREAD | HUPCL | CLOCAL | CRTSCTS;
-	sci_driver.flags = TTY_DRIVER_REAL_RAW;
-
-	sci_driver.open	= sci_open;
-	sci_driver.close = gs_close;
-	sci_driver.write = gs_write;
-	sci_driver.put_char = gs_put_char;
-	sci_driver.flush_chars = gs_flush_chars;
-	sci_driver.write_room = gs_write_room;
-	sci_driver.chars_in_buffer = gs_chars_in_buffer;
-	sci_driver.flush_buffer = gs_flush_buffer;
-	sci_driver.ioctl = sci_ioctl;
-	sci_driver.throttle = sci_throttle;
-	sci_driver.unthrottle = sci_unthrottle;
-	sci_driver.set_termios = gs_set_termios;
-	sci_driver.stop = gs_stop;
-	sci_driver.start = gs_start;
-	sci_driver.hangup = gs_hangup;
-#ifdef CONFIG_PROC_FS
-	sci_driver.read_proc = sci_read_proc;
-#endif
-
-	if ((error = tty_register_driver(&sci_driver))) {
+	sci_driver->flags = TTY_DRIVER_REAL_RAW;
+	tty_set_operations(sci_driver, &sci_ops);
+	if ((error = tty_register_driver(sci_driver))) {
 		printk(KERN_ERR "sci: Couldn't register SCI driver, error = %d\n",
 		       error);
+		put_tty_driver(sci_driver);
 		return 1;
 	}
 
@@ -1101,7 +1104,8 @@ module_init(sci_init);
 
 void cleanup_module(void)
 {
-	tty_unregister_driver(&sci_driver);
+	tty_unregister_driver(sci_driver);
+	put_tty_driver(sci_driver);
 }
 
 #include "generic_serial.c"
@@ -1121,7 +1125,7 @@ static void serial_console_write(struct console *co, const char *s,
 static struct tty_driver *serial_console_device(struct console *c, int *index)
 {
 	*index = c->index;
-	return &sci_driver;
+	return sci_driver;
 }
 
 /*
