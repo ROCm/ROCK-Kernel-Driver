@@ -29,7 +29,7 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#define ZFCP_AUX_REVISION "$Revision: 1.144 $"
+#define ZFCP_AUX_REVISION "$Revision: 1.145 $"
 
 #include "zfcp_ext.h"
 
@@ -45,6 +45,13 @@ static int __init  zfcp_module_init(void);
 static void zfcp_ns_gid_pn_handler(unsigned long);
 
 /* miscellaneous */
+static inline int zfcp_sg_list_alloc(struct zfcp_sg_list *, size_t);
+static inline void zfcp_sg_list_free(struct zfcp_sg_list *);
+static inline int zfcp_sg_list_copy_from_user(struct zfcp_sg_list *,
+					      void __user *, size_t);
+static inline int zfcp_sg_list_copy_to_user(void __user *,
+					    struct zfcp_sg_list *, size_t);
+
 static int zfcp_cfdc_dev_ioctl(struct inode *, struct file *,
 	unsigned int, unsigned long);
 
@@ -337,10 +344,7 @@ zfcp_module_init(void)
 	if (zfcp_device_setup(device))
 		zfcp_init_device_configure();
 
-	init_waitqueue_head(&zfcp_callbacks.wq);
-
 	goto out;
-
 
  out_ccw_register:
 	misc_deregister(&zfcp_cfdc_misc);
@@ -559,7 +563,7 @@ zfcp_cfdc_dev_ioctl(struct inode *inode, struct file *file,
  * elements of the scatter-gather list. The maximum size of a single element
  * in the scatter-gather list is PAGE_SIZE.
  */
-int
+static inline int
 zfcp_sg_list_alloc(struct zfcp_sg_list *sg_list, size_t size)
 {
 	struct scatterlist *sg;
@@ -607,7 +611,7 @@ zfcp_sg_list_alloc(struct zfcp_sg_list *sg_list, size_t size)
  * Memory for each element in the scatter-gather list is freed.
  * Finally sg_list->sg is freed itself and sg_list->count is reset.
  */
-void
+static inline void
 zfcp_sg_list_free(struct zfcp_sg_list *sg_list)
 {
 	struct scatterlist *sg;
@@ -652,7 +656,7 @@ zfcp_sg_size(struct scatterlist *sg, unsigned int sg_count)
  * @size: number of bytes to be copied
  * Return: 0 on success, -EFAULT if copy_from_user fails.
  */
-int
+static inline int
 zfcp_sg_list_copy_from_user(struct zfcp_sg_list *sg_list,
 			    void __user *user_buffer,
                             size_t size)
@@ -690,7 +694,7 @@ zfcp_sg_list_copy_from_user(struct zfcp_sg_list *sg_list,
  * @size: number of bytes to be copied
  * Return: 0 on success, -EFAULT if copy_to_user fails
  */
-int
+static inline int
 zfcp_sg_list_copy_to_user(void __user  *user_buffer,
 			  struct zfcp_sg_list *sg_list,
                           size_t size)
@@ -1418,8 +1422,6 @@ zfcp_port_enqueue(struct zfcp_adapter *adapter, wwn_t wwpn, u32 status,
 
 	zfcp_adapter_get(adapter);
 
-	zfcp_cb_port_add(port);
-
 	return port;
 }
 
@@ -1646,8 +1648,6 @@ zfcp_fsf_incoming_els(struct zfcp_fsf_req *fsf_req)
 		zfcp_fsf_incoming_els_rscn(adapter, status_buffer);
 	else
 		zfcp_fsf_incoming_els_unknown(adapter, status_buffer);
-
-	zfcp_cb_incoming_els(adapter, status_buffer->payload);
 }
 
 
@@ -1974,161 +1974,4 @@ zfcp_handle_els_rjt(u32 sq, struct zfcp_ls_rjt_par *rjt_par)
 	return ret;
 }
 
-
 #undef ZFCP_LOG_AREA
-
-/****************************************************************/
-/******* HBA API Support related Functions  *********************/
-/****************************************************************/
-#define ZFCP_LOG_AREA                   ZFCP_LOG_AREA_FC
-
-struct zfcp_callbacks zfcp_callbacks = { };
-
-/**
- * zfcp_register_callbacks - register callbacks for event handling in HBA API
- * @callbacks: set of callback functions to be registered
- */
-void
-zfcp_register_callbacks(struct zfcp_callbacks *callbacks)
-{
-	zfcp_callbacks.incoming_els = callbacks->incoming_els;
-	zfcp_callbacks.link_down = callbacks->link_down;
-	zfcp_callbacks.link_up = callbacks->link_up;
-	zfcp_callbacks.adapter_add = callbacks->adapter_add;
-	zfcp_callbacks.port_add = callbacks->port_add;
-	zfcp_callbacks.unit_add = callbacks->unit_add;
-}
-
-/**
- * zfcp_unregister_callbacks - deregister callbacks for event handling
- */
-void
-zfcp_unregister_callbacks(void)
-{
-	zfcp_callbacks.incoming_els = NULL;
-	zfcp_callbacks.link_down = NULL;
-	zfcp_callbacks.link_up = NULL;
-	zfcp_callbacks.adapter_add = NULL;
-	zfcp_callbacks.port_add = NULL;
-	zfcp_callbacks.unit_add = NULL;
-
-	/* wait until all callbacks returned */
-	wait_event(zfcp_callbacks.wq,
-		   atomic_read(&zfcp_callbacks.refcount) == 0);
-}
-
-/**
- * zfcp_cb_incoming_els - make callback for incoming els
- * @adpater: adapter where ELS was received
- * @payload: received ELS payload
- */
-void
-zfcp_cb_incoming_els(struct zfcp_adapter *adapter, void *payload)
-{
-	zfcp_cb_incoming_els_t cb;
-
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.incoming_els;
-	if (cb)
-		cb(adapter, payload);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_link_down - make callback for link down event
- * @adapter: adapter where link down occurred
- */
-void
-zfcp_cb_link_down(struct zfcp_adapter *adapter)
-{
-	zfcp_cb_link_down_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.link_down;
-	if (cb)
-		cb(adapter);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_link_up - make callback for link up event
- * @adapter: adapter where link up occurred
- */
-void
-zfcp_cb_link_up(struct zfcp_adapter *adapter)
-{
-	zfcp_cb_link_up_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.link_up;
-	if (cb)
-		cb(adapter);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_adapter_add - make callback for adapter add event
- * @adapter: adapter which was added/activated
- */
-void
-zfcp_cb_adapter_add(struct zfcp_adapter *adapter)
-{
-	zfcp_cb_adapter_add_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.adapter_add;
-	if (cb)
-		cb(adapter);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_port_add - make callback for port add event
- * @port: port which was added
- */
-void
-zfcp_cb_port_add(struct zfcp_port *port)
-{
-	zfcp_cb_port_add_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.port_add;
-	if (cb)
-		cb(port);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-/**
- * zfcp_cb_unit_add - make callback for unit add event
- * @unit: unit which was added
- */
-void
-zfcp_cb_unit_add(struct zfcp_unit *unit)
-{
-	zfcp_cb_unit_add_t cb;
-	atomic_inc(&zfcp_callbacks.refcount);
-	cb = zfcp_callbacks.unit_add;
-	if (cb)
-		cb(unit);
-	if (atomic_dec_return(&zfcp_callbacks.refcount) == 0)
-		wake_up(&zfcp_callbacks.wq);
-}
-
-#undef ZFCP_LOG_AREA
-
-EXPORT_SYMBOL(zfcp_sg_list_alloc);
-EXPORT_SYMBOL(zfcp_sg_list_free);
-EXPORT_SYMBOL(zfcp_sg_size);
-EXPORT_SYMBOL(zfcp_sg_list_copy_from_user);
-EXPORT_SYMBOL(zfcp_sg_list_copy_to_user);
-EXPORT_SYMBOL(zfcp_get_unit_by_lun);
-EXPORT_SYMBOL(zfcp_get_port_by_wwpn);
-EXPORT_SYMBOL(zfcp_get_port_by_did);
-EXPORT_SYMBOL(zfcp_get_adapter_by_busid);
-EXPORT_SYMBOL(zfcp_register_callbacks);
-EXPORT_SYMBOL(zfcp_unregister_callbacks);
-EXPORT_SYMBOL(zfcp_port_enqueue);
-EXPORT_SYMBOL(zfcp_unit_enqueue);
-EXPORT_SYMBOL(zfcp_unit_dequeue);
-EXPORT_SYMBOL(zfcp_check_ct_response);
