@@ -374,7 +374,7 @@ static struct ata_pci_device chipset __initdata = {
 	init_chipset: pci_init_cs5530,
 	init_channel: ide_init_cs5530,
 	bootable: ON_BOARD,
-	flags: ATA_F_DMA
+	flags: ATA_F_DMA | ATA_F_FDMA
 };
 
 int __init init_cs5530(void)

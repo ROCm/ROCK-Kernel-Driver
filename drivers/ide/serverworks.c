@@ -679,7 +679,8 @@ static struct ata_pci_device chipsets[] __initdata = {
 		init_chipset: svwks_init_chipset,
 		ata66_check: svwks_ata66_check,
 		init_channel: ide_init_svwks,
-		bootable: ON_BOARD
+		bootable: ON_BOARD,
+		flags: ATA_F_SIMPLEX
 	},
 };
 
