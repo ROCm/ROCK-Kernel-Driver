@@ -318,8 +318,11 @@ static int __init i2c_ioc_init(void)
 
 	ret = i2c_bit_add_bus(&ioc_ops);
 
-	if (ret >= 0)
-		misc_register(&rtc_dev);
+	if (ret >= 0){
+		ret = misc_register(&rtc_dev);
+		if(ret < 0)
+			i2c_bit_del_bus(&ioc_ops);
+	}
 
 	return ret;
 }
