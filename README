@@ -190,8 +190,6 @@ COMPILING the kernel:
 
  - If you configured any of the parts of the kernel as `modules', you
    will have to do "make modules" followed by "make modules_install".
-   Read Documentation/modules.txt for more information.  For example,
-   an explanation of how to use the modules is included there.
 
  - Keep a backup kernel handy in case something goes wrong.  This is 
    especially true for the development releases, since each new release
