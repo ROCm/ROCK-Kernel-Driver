@@ -74,49 +74,42 @@ bad:
 	return 0;
 }
 
-static int ipv6_clear_mutable_options(struct sk_buff *skb,
-				      unsigned int hdr_len)
+static int ipv6_clear_mutable_options(struct ipv6hdr *iph, int len)
 {
-	u16 offset = sizeof(struct ipv6hdr);
-	struct ipv6_opt_hdr *exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
-	u8 nexthdr = skb->nh.ipv6h->nexthdr;
+	union {
+		struct ipv6hdr *iph;
+		struct ipv6_opt_hdr *opth;
+		struct ipv6_rt_hdr *rth;
+		char *raw;
+	} exthdr = { .iph = iph };
+	char *end = exthdr.raw + len;
+	int nexthdr = iph->nexthdr;
 
-	while (offset + 1 <= hdr_len) {
+	exthdr.iph++;
 
+	while (exthdr.raw < end) {
 		switch (nexthdr) {
-
 		case NEXTHDR_HOP:
-			offset += ipv6_optlen(exthdr);
-			if (!zero_out_mutable_opts(exthdr)) {
-				LIMIT_NETDEBUG(
-				printk(KERN_WARNING "overrun hopopts\n")); 
+		case NEXTHDR_DEST:
+			if (!zero_out_mutable_opts(exthdr.opth)) {
+				LIMIT_NETDEBUG(printk(
+					KERN_WARNING "overrun %sopts\n",
+					nexthdr == NEXTHDR_HOP ?
+						"hop" : "dest"));
 				return -EINVAL;
 			}
-			nexthdr = exthdr->nexthdr;
-			exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
 			break;
 
 		case NEXTHDR_ROUTING:
-			offset += ipv6_optlen(exthdr);
-			((struct ipv6_rt_hdr*)exthdr)->segments_left = 0; 
-			nexthdr = exthdr->nexthdr;
-			exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
-			break;
-
-		case NEXTHDR_DEST:
-			offset += ipv6_optlen(exthdr);
-			if (!zero_out_mutable_opts(exthdr))  {
-				LIMIT_NETDEBUG(
-					printk(KERN_WARNING "overrun destopt\n")); 
-				return -EINVAL;
-			}
-			nexthdr = exthdr->nexthdr;
-			exthdr = (struct ipv6_opt_hdr*)(skb->nh.raw + offset);
+			exthdr.rth->segments_left = 0; 
 			break;
 
 		default :
 			return 0;
 		}
+
+		nexthdr = exthdr.opth->nexthdr;
+		exthdr.raw += ipv6_optlen(exthdr.opth);
 	}
 
 	return 0;
@@ -175,7 +168,7 @@ int ah6_output(struct sk_buff **pskb)
 		(*pskb)->nh.ipv6h = (struct ipv6hdr*)skb_push(*pskb, x->props.header_len);
 		iph->payload_len = htons((*pskb)->len - sizeof(struct ipv6hdr));
 		memcpy((*pskb)->nh.ipv6h, iph, hdr_len);
-		err = ipv6_clear_mutable_options(*pskb, hdr_len);
+		err = ipv6_clear_mutable_options((*pskb)->nh.ipv6h, hdr_len);
 		if (err)
 			goto error_free_iph;
 
@@ -283,7 +276,7 @@ int ah6_input(struct xfrm_state *x, struct xfrm_decap_state *decap, struct sk_bu
 	if (!tmp_hdr)
 		goto out;
 	memcpy(tmp_hdr, skb->nh.raw, hdr_len);
-	if (ipv6_clear_mutable_options(skb, hdr_len))
+	if (ipv6_clear_mutable_options(skb->nh.ipv6h, hdr_len))
 		goto out;
 	skb->nh.ipv6h->priority    = 0;
 	skb->nh.ipv6h->flow_lbl[0] = 0;
