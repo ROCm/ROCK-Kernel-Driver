@@ -318,30 +318,6 @@ static inline struct kiocb *siocb_to_kiocb(struct sock_iocb *si)
 	return container_of((void *)si, struct kiocb, private);
 }
 
-/* sock_iocb: used to kick off async processing of socket ios */
-struct sock_iocb {
-	struct list_head	list;
-
-	int			flags;
-	int			size;
-	struct socket		*sock;
-	struct sock		*sk;
-	struct msghdr		*msg, async_msg;
-	struct iovec		async_iov;
-	struct scm_cookie	*scm, async_scm;
-};
-
-static inline struct sock_iocb *kiocb_to_siocb(struct kiocb *iocb)
-{
-	BUG_ON(sizeof(struct sock_iocb) > KIOCB_PRIVATE_SIZE);
-	return (struct sock_iocb *)iocb->private;
-}
-
-static inline struct kiocb *siocb_to_kiocb(struct sock_iocb *si)
-{
-	return container_of((void *)si, struct kiocb, private);
-}
-
 /* Used by processes to "lock" a socket state, so that
  * interrupts and bottom half handlers won't change it
  * from under us. It essentially blocks any incoming

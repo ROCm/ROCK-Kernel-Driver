@@ -117,7 +117,7 @@ static ssize_t sock_sendpage(struct file *file, struct page *page,
 
 static struct file_operations socket_file_ops = {
 	.llseek =	no_llseek,
-	.aio_read =		sock_aio_read,
+	.aio_read =	sock_aio_read,
 	.aio_write =	sock_aio_write,
 	.poll =		sock_poll,
 	.ioctl =	sock_ioctl,
@@ -541,7 +541,7 @@ int sock_sendmsg(struct socket *sock, struct msghdr *msg, int size)
 	struct kiocb iocb;
 	int ret;
 
-        init_sync_kiocb(&iocb, NULL);
+	init_sync_kiocb(&iocb, NULL);
 	ret = __sock_sendmsg(&iocb, sock, msg, size);
 	if (-EIOCBQUEUED == ret)
 		ret = wait_on_sync_kiocb(&iocb);
