@@ -1512,7 +1512,7 @@ xfs_dir2_node_addname_int(
 	 * If we don't have a data block, we need to allocate one and make
 	 * the freespace entries refer to it.
 	 */
-	if (dbno == -1) {
+	if (unlikely(dbno == -1)) {
 		/*
 		 * Not allowed to allocate, return failure.
 		 */
@@ -1521,7 +1521,7 @@ xfs_dir2_node_addname_int(
 			 * Drop the freespace buffer unless it came from our
 			 * caller.
 			 */
-			if (fblk == NULL || fblk->bp == NULL)
+			if ((fblk == NULL || fblk->bp == NULL) && fbp != NULL)
 				xfs_da_buf_done(fbp);
 			return XFS_ERROR(ENOSPC);
 		}
@@ -1535,7 +1535,7 @@ xfs_dir2_node_addname_int(
 			 * Drop the freespace buffer unless it came from our
 			 * caller.
 			 */
-			if (fblk == NULL || fblk->bp == NULL)
+			if ((fblk == NULL || fblk->bp == NULL) && fbp != NULL)
 				xfs_da_buf_done(fbp);
 			return error;
 		}
@@ -1552,7 +1552,7 @@ xfs_dir2_node_addname_int(
 				fblk->bp = NULL;
 			fbno = XFS_DIR2_DB_TO_FDB(mp, dbno);
 			if ((error = xfs_da_read_buf(tp, dp,
-					XFS_DIR2_DB_TO_DA(mp, fbno), -1, &fbp,
+					XFS_DIR2_DB_TO_DA(mp, fbno), -2, &fbp,
 					XFS_DATA_FORK))) {
 				xfs_da_buf_done(dbp);
 				return error;
@@ -1659,16 +1659,17 @@ xfs_dir2_node_addname_int(
 		 * If just checking, we succeeded.
 		 */
 		if (args->justcheck) {
-			if (fblk == NULL || fblk->bp == NULL)
+			if ((fblk == NULL || fblk->bp == NULL) && fbp != NULL)
 				xfs_da_buf_done(fbp);
 			return 0;
 		}
 		/*
 		 * Read the data block in.
 		 */
-		if ((error = xfs_da_read_buf(tp, dp, XFS_DIR2_DB_TO_DA(mp, dbno),
+		if (unlikely(
+		    error = xfs_da_read_buf(tp, dp, XFS_DIR2_DB_TO_DA(mp, dbno),
 				-1, &dbp, XFS_DATA_FORK))) {
-			if (fblk == NULL || fblk->bp == NULL)
+			if ((fblk == NULL || fblk->bp == NULL) && fbp != NULL)
 				xfs_da_buf_done(fbp);
 			return error;
 		}
@@ -1723,7 +1724,7 @@ xfs_dir2_node_addname_int(
 	/*
 	 * If the caller didn't hand us the freespace block, drop it.
 	 */
-	if (fblk == NULL || fblk->bp == NULL)
+	if ((fblk == NULL || fblk->bp == NULL) && fbp != NULL)
 		xfs_da_buf_done(fbp);
 	/*
 	 * Return the data block and offset in args, then drop the data block.
@@ -1951,9 +1952,17 @@ xfs_dir2_node_trim_free(
 	/*
 	 * Read the freespace block.
 	 */
-	if ((error = xfs_da_read_buf(tp, dp, (xfs_dablk_t)fo, -1, &bp,
+	if (unlikely(error = xfs_da_read_buf(tp, dp, (xfs_dablk_t)fo, -2, &bp,
 			XFS_DATA_FORK))) {
 		return error;
+	}
+
+	/*
+	 * There can be holes in freespace.  If fo is a hole, there's
+	 * nothing to do.
+	 */
+	if (bp == NULL) {
+		return 0;
 	}
 	free = bp->data;
 	ASSERT(INT_GET(free->hdr.magic, ARCH_CONVERT) == XFS_DIR2_FREE_MAGIC);
