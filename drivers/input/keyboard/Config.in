@@ -1,0 +1,18 @@
+#
+# Input core configuration
+#
+
+bool 'Keyboards' CONFIG_INPUT_KEYBOARD
+
+dep_tristate '  AT keyboard support' CONFIG_KEYBOARD_ATKBD $CONFIG_INPUT $CONFIG_INPUT_KEYBOARD $CONFIG_SERIO
+dep_tristate '  Sun Type 4 and Type 5 keyboard support' CONFIG_KEYBOARD_SUNKBD $CONFIG_INPUT $CONFIG_INPUT_KEYBOARD $CONFIG_SERIO
+dep_tristate '  PS/2 to Serial converter support' CONFIG_KEYBOARD_PS2SERKBD $CONFIG_INPUT $CONFIG_INPUT_KEYBOARD $CONFIG_SERIO
+dep_tristate '  XT Keyboard support' CONFIG_KEYBOARD_XTKBD $CONFIG_INPUT $CONFIG_INPUT_KEYBOARD $CONFIG_SERIO
+
+if [ "$CONFIG_SH_DREAMCAST" = "y" ]; then
+   dep_tristate '  Maple bus keyboard support' CONFIG_KEYBOARD_MAPLE $CONFIG_INPUT $CONFIG_INPUT_KEYBOARD $CONFIG_MAPLE
+fi
+
+if [ "$CONFIG_AMIGA" = "y" ]; then
+   dep_tristate '  Amiga keyboard' CONFIG_KEYBOARD_AMIGA $CONFIG_INPUT $CONFIG_INPUT_KEYBOARD
+fi

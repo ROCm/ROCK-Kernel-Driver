@@ -1,0 +1,16 @@
+CONFIG_INPUT_TOUCHSCREEN
+  Say Y here, and a list of supported touchscreens will be displayed.
+  This option doesn't affect the kernel.
+
+  If unsure, say Y.
+
+CONFIG_TOUCHSCREEN_GUNZE
+  Say Y here if you have the Gunze AHL-51 touchscreen connected to
+  your system.
+
+  If unsure, say N.
+
+  This driver is also available as a module ( = code which can be
+  inserted in and removed from the running kernel whenever you want).
+  The module will be called gunze.o. If you want to compile it as a
+  module, say M here and read <file:Documentation/modules.txt>.

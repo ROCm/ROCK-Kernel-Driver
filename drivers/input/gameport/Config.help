@@ -43,13 +43,13 @@ CONFIG_GAMEPORT_EMU10K1
   The module will be called emu10k1-gp.o. If you want to compile it as
   a module, say M here and read <file:Documentation/modules.txt>.
 
-CONFIG_GAMEPORT_PCIGAME
-  Say Y here if you have an Aureal Vortex 1 or 2 or a Trident
-  4DWave NX or DX card and want to use its gameport.
+CONFIG_GAMEPORT_VORTEX
+  Say Y here if you have an Aureal Vortex 1 or 2  card and want
+  to use its gameport.
 
   This driver is also available as a module ( = code which can be
   inserted in and removed from the running kernel whenever you want).
-  The module will be called pcigame.o. If you want to compile it as a
+  The module will be called vortex.o. If you want to compile it as a
   module, say M here and read <file:Documentation/modules.txt>.
 
 CONFIG_GAMEPORT_CS461X

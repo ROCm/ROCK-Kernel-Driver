@@ -6,20 +6,34 @@ mainmenu_option next_comment
 comment 'Input device support'
 
 tristate 'Input core support' CONFIG_INPUT
+
+comment 'Userland interfaces'
 dep_tristate '  Keyboard interface' CONFIG_INPUT_KEYBDEV $CONFIG_INPUT
 dep_tristate '  Mouse interface' CONFIG_INPUT_MOUSEDEV $CONFIG_INPUT
+dep_mbool '    Provide legacy /dev/psaux device' CONFIG_INPUT_MOUSEDEV_PSAUX $CONFIG_INPUT
 if [ "$CONFIG_INPUT_MOUSEDEV" != "n" ]; then
    int '   Horizontal screen resolution' CONFIG_INPUT_MOUSEDEV_SCREEN_X 1024
    int '   Vertical screen resolution' CONFIG_INPUT_MOUSEDEV_SCREEN_Y 768
 fi
 dep_tristate '  Joystick interface' CONFIG_INPUT_JOYDEV $CONFIG_INPUT
+dep_tristate '  Touchscreen interface' CONFIG_INPUT_TSDEV $CONFIG_INPUT
+if [ "$CONFIG_INPUT_TSDEV" != "n" ]; then
+   int '   Horizontal screen resolution' CONFIG_INPUT_TSDEV_SCREEN_X 240
+   int '   Vertical screen resolution' CONFIG_INPUT_TSDEV_SCREEN_Y 320 
+fi
 dep_tristate '  Event interface' CONFIG_INPUT_EVDEV $CONFIG_INPUT
+dep_tristate '  Event debugging' CONFIG_INPUT_EVBUG $CONFIG_INPUT
 
+comment 'Input I/O drivers'
 source drivers/input/gameport/Config.in
 source drivers/input/serio/Config.in
 
+comment 'Input Device Drivers'
 if [ "$CONFIG_INPUT" != "n" ]; then
+   source drivers/input/keyboard/Config.in
+   source drivers/input/mouse/Config.in
    source drivers/input/joystick/Config.in
+   source drivers/input/touchscreen/Config.in
 fi
 
 endmenu
