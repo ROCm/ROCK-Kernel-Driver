@@ -4335,7 +4335,7 @@ int __init floppy_init(void)
 		if (FDCS->address == -1)
 			continue;
 		FDCS->rawcmd = 2;
-		if (user_reset_fdc(-1,FD_RESET_ALWAYS,0)){
+		if (user_reset_fdc(-1,FD_RESET_ALWAYS,0) && user_reset_fdc(-1,FD_RESET_ALWAYS,0)){
  			/* free ioports reserved by floppy_grab_irq_and_dma() */
  			release_region(FDCS->address+2, 4);
  			release_region(FDCS->address+7, 1);
