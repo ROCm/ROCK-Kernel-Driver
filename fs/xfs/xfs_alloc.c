@@ -1768,6 +1768,18 @@ xfs_free_ag_extent(
 			(haveright ? "right" : "none"),
 		agno, bno, len, isfl);
 
+	/*
+	 * Since blocks move to the free list without the coordination
+	 * used in xfs_bmap_finish, we can't allow block to be available
+	 * for reallocation and non-transaction writing (user data)
+	 * until we know that the transaction that moved it to the free
+	 * list is permanently on disk.  We track the blocks by declaring 
+	 * these blocks as "busy"; the busy list is maintained on a per-ag 
+	 * basis and each transaction records which entries should be removed 
+	 * when the iclog commits to disk.  If a busy block is allocated,
+	 * the iclog is pushed up to the LSN that freed the block.
+	 */
+	xfs_alloc_mark_busy(tp, agno, bno, len);
 	return 0;
 
  error0:
@@ -2102,9 +2114,8 @@ xfs_alloc_put_freelist(
 
 	agf = XFS_BUF_TO_AGF(agbp);
 	mp = tp->t_mountp;
-
-	if (!agflbp && (error = xfs_alloc_read_agfl(mp, tp,
-			INT_GET(agf->agf_seqno, ARCH_CONVERT), &agflbp)))
+	if (!agflbp &&
+	    (error = xfs_alloc_read_agfl(mp, tp, agf->agf_seqno, &agflbp)))
 		return error;
 	agfl = XFS_BUF_TO_AGFL(agflbp);
 	INT_MOD(agf->agf_fllast, ARCH_CONVERT, 1);
@@ -2123,19 +2134,6 @@ xfs_alloc_put_freelist(
 		(int)((xfs_caddr_t)blockp - (xfs_caddr_t)agfl),
 		(int)((xfs_caddr_t)blockp - (xfs_caddr_t)agfl +
 			sizeof(xfs_agblock_t) - 1));
-	/*
-	 * Since blocks move to the free list without the coordination
-	 * used in xfs_bmap_finish, we can't allow block to be available
-	 * for reallocation and non-transaction writing (user data)
-	 * until we know that the transaction that moved it to the free
-	 * list is permanently on disk.	 We track the blocks by declaring
-	 * these blocks as "busy"; the busy list is maintained on a per-ag
-	 * basis and each transaction records which entries should be removed
-	 * when the iclog commits to disk.  If a busy block is allocated,
-	 * the iclog is pushed up to the LSN that freed the block.
-	 */
-	xfs_alloc_mark_busy(tp, INT_GET(agf->agf_seqno, ARCH_CONVERT), bno, 1);
-
 	return 0;
 }
 
