@@ -382,31 +382,22 @@ static void put_anon_dev(kdev_t dev);
  *	remove_super	-	makes superblock unreachable
  *	@s:	superblock in question
  *
- *	Removes superblock from the lists, unlocks it, drop the reference
- *	and releases the hosting device.  @s should have no active
- *	references by that time and after remove_super() it's essentially
- *	in rundown mode - all remaining references are temporary, no new
- *	reference of any sort are going to appear and all holders of
- *	temporary ones will eventually drop them.  At that point superblock
- *	itself will be destroyed; all its contents is already gone.
+ *	Removes superblock from the lists, unlocks it and drop the reference
+ *	@s should have no active references by that time and after
+ *	remove_super() it's essentially	in rundown mode - all remaining
+ *	references are temporary, no new reference of any sort are going
+ *	to appear and all holders of temporary ones will eventually drop them.
+ *	At that point superblock itself will be destroyed; all its contents
+ *	is already gone.
  */
 static void remove_super(struct super_block *s)
 {
-	kdev_t dev = s->s_dev;
-	struct block_device *bdev = s->s_bdev;
-	struct file_system_type *fs = s->s_type;
-
 	spin_lock(&sb_lock);
 	list_del(&s->s_list);
 	list_del(&s->s_instances);
 	spin_unlock(&sb_lock);
 	up_write(&s->s_umount);
 	put_super(s);
-	put_filesystem(fs);
-	if (bdev)
-		blkdev_put(bdev, BDEV_FS);
-	else
-		put_anon_dev(dev);
 }
 
 struct vfsmount *alloc_vfsmnt(char *name);
@@ -822,6 +813,8 @@ void kill_super(struct super_block *sb)
 	struct dentry *root = sb->s_root;
 	struct file_system_type *fs = sb->s_type;
 	struct super_operations *sop = sb->s_op;
+	kdev_t dev = sb->s_dev;
+	struct block_device *bdev = sb->s_bdev;
 
 	if (!deactivate_super(sb))
 		return;
@@ -857,6 +850,11 @@ void kill_super(struct super_block *sb)
 		unlock_super(sb);
 	}
 	remove_super(sb);
+	if (bdev)
+		blkdev_put(bdev, BDEV_FS);
+	else
+		put_anon_dev(dev);
+	put_filesystem(fs);
 }
 
 struct vfsmount *kern_mount(struct file_system_type *type)
