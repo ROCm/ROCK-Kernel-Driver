@@ -7,7 +7,7 @@
  *
  * For licensing information, see the file 'LICENCE' in this directory.
  *
- * $Id: writev.c,v 1.2 2002/05/20 14:56:39 dwmw2 Exp $
+ * $Id: writev.c,v 1.3 2002/08/08 08:35:21 dwmw2 Exp $
  *
  */
 
@@ -28,7 +28,7 @@ static inline int mtd_fake_writev(struct mtd_info *mtd, const struct iovec *vecs
 	for (i=0; i<count; i++) {
 		if (!vecs[i].iov_len)
 			continue;
-		mtd->write(mtd, to, vecs[i].iov_len, &thislen, vecs[i].iov_base);
+		ret = mtd->write(mtd, to, vecs[i].iov_len, &thislen, vecs[i].iov_base);
 		totlen += thislen;
 		if (ret || thislen != vecs[i].iov_len)
 			break;
