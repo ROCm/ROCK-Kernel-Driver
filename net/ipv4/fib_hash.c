@@ -256,32 +256,14 @@ fn_hash_lookup(struct fib_table *tb, const struct flowi *flp, struct fib_result 
 
 		head = &fz->fz_hash[fn_hash(k, fz)];
 		hlist_for_each_entry(f, node, head, fn_hash) {
-			struct fib_alias *fa;
-
 			if (f->fn_key != k)
 				continue;
 
-			list_for_each_entry(fa, &f->fn_alias, fa_list) {
-				if (fa->fa_tos &&
-				    fa->fa_tos != flp->fl4_tos)
-					continue;
-				if (fa->fa_scope < flp->fl4_scope)
-					continue;
-
-				fa->fa_state |= FA_S_ACCESSED;
-
-				err = fib_semantic_match(fa->fa_type,
-							 fa->fa_info,
-							 flp, res);
-				if (err == 0) {
-					res->type = fa->fa_type;
-					res->scope = fa->fa_scope;
-					res->prefixlen = fz->fz_order;
-					goto out;
-				}
-				if (err < 0)
-					goto out;
-			}
+			err = fib_semantic_match(&f->fn_alias,
+						 flp, res,
+						 fz->fz_order);
+			if (err <= 0)
+				goto out;
 		}
 	}
 	err = 1;

@@ -17,8 +17,9 @@ struct fib_alias {
 #define FA_S_ACCESSED	0x01
 
 /* Exported by fib_semantics.c */
-extern int fib_semantic_match(int type, struct fib_info *,
-			      const struct flowi *, struct fib_result *);
+extern int fib_semantic_match(struct list_head *head,
+			      const struct flowi *flp,
+			      struct fib_result *res, int prefixlen);
 extern void fib_release_info(struct fib_info *);
 extern struct fib_info *fib_create_info(const struct rtmsg *r,
 					struct kern_rta *rta,
