@@ -18,6 +18,7 @@
 #include <linux/blk.h>
 #include <asm/io.h>
 #include <linux/parport.h>
+#include <linux/workqueue.h>
 #include "sd.h"
 #include "hosts.h"
 int ppa_release(struct Scsi_Host *);
@@ -42,7 +43,7 @@ typedef struct {
 	mode:		PPA_AUTODETECT,	\
 	host:		-1,		\
 	cur_cmd:	NULL,		\
-	ppa_tq:		{ routine: ppa_interrupt },	\
+	ppa_tq:		{ func: ppa_interrupt },	\
 	jstart:		0,		\
 	recon_tmo:      PPA_RECON_TMO,	\
 	failed:		0,		\
@@ -800,7 +801,6 @@ static void ppa_interrupt(void *data)
     }
     if (ppa_engine(tmp, cmd)) {
 	tmp->ppa_tq.data = (void *) tmp;
-	tmp->ppa_tq.sync = 0;
 	schedule_delayed_work(&tmp->ppa_tq, 1);
 	return;
     }
@@ -985,7 +985,6 @@ int ppa_queuecommand(Scsi_Cmnd * cmd, void (*done) (Scsi_Cmnd *))
     ppa_pb_claim(host_no);
 
     ppa_hosts[host_no].ppa_tq.data = ppa_hosts + host_no;
-    ppa_hosts[host_no].ppa_tq.sync = 0;
     schedule_work(&ppa_hosts[host_no].ppa_tq);
 
     return 0;
