@@ -42,6 +42,9 @@
 /*
  */
 
+/* ignore error from controls - for debugging */
+/* #define IGNORE_CTL_ERROR */
+
 typedef struct usb_mixer_build mixer_build_t;
 typedef struct usb_audio_term usb_audio_term_t;
 typedef struct usb_mixer_elem_info usb_mixer_elem_info_t;
@@ -279,8 +282,10 @@ static int get_ctl_value(usb_mixer_elem_info_t *cval, int request, int validx, i
 			    request,
 			    USB_RECIP_INTERFACE | USB_TYPE_CLASS | USB_DIR_IN,
 			    validx, cval->ctrlif | (cval->id << 8),
-			    buf, val_len, HZ) < 0)
+			    buf, val_len, HZ) < 0) {
+		snd_printdd(KERN_ERR "cannot get ctl value: req = 0x%x, idx = 0x%x, val = 0x%x, type = %d\n", request, validx, cval->ctrlif | (cval->id << 8), cval->val_type);
 		return -EINVAL;
+	}
 	*value_ret = convert_signed_value(cval, snd_usb_combine_bytes(buf, val_len));
 	return 0;
 }
@@ -549,6 +554,39 @@ static void usb_mixer_elem_free(snd_kcontrol_t *kctl)
  * interface to ALSA control for feature/mixer units
  */
 
+/*
+ * retrieve the minimum and maximum values for the specified control
+ */
+static int get_min_max(usb_mixer_elem_info_t *cval)
+{
+	/* for failsafe */
+	cval->min = 0;
+	cval->max = 1;
+
+	if (cval->val_type == USB_MIXER_BOOLEAN ||
+	    cval->val_type == USB_MIXER_INV_BOOLEAN) {
+		cval->initialized = 1;
+	} else {
+		int minchn = 0;
+		if (cval->cmask) {
+			int i;
+			for (i = 0; i < MAX_CHANNELS; i++)
+				if (cval->cmask & (1 << i)) {
+					minchn = i + 1;
+					break;
+				}
+		}
+		if (get_ctl_value(cval, GET_MAX, (cval->control << 8) | minchn, &cval->max) < 0 ||
+		    get_ctl_value(cval, GET_MIN, (cval->control << 8) | minchn, &cval->min) < 0) {
+			snd_printd(KERN_ERR "%d:%d: cannot get min/max values for control %d (id %d)\n", cval->id, cval->ctrlif, cval->control, cval->id);
+			return -EINVAL;
+		}
+		cval->initialized = 1;
+	}
+	return 0;
+}
+
+
 /* get a feature/mixer unit info */
 static int mixer_ctl_feature_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {	
@@ -565,23 +603,8 @@ static int mixer_ctl_feature_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t 
 		uinfo->value.integer.min = 0;
 		uinfo->value.integer.max = 1;
 	} else {
-		if (! cval->initialized) {
-			int minchn = 0;
-			if (cval->cmask) {
-				int i;
-				for (i = 0; i < MAX_CHANNELS; i++)
-					if (cval->cmask & (1 << i)) {
-						minchn = i + 1;
-						break;
-					}
-			}
-			if (get_ctl_value(cval, GET_MAX, (cval->control << 8) | minchn, &cval->max) < 0 ||
-			    get_ctl_value(cval, GET_MIN, (cval->control << 8) | minchn, &cval->min) < 0) {
-				snd_printd(KERN_ERR "%d:%d: cannot get min/max values for control %d (id %d)\n", cval->id, cval->ctrlif, cval->control, cval->id);
-				return -EINVAL;
-			}
-			cval->initialized = 1;
-		}
+		if (! cval->initialized)
+			get_min_max(cval);
 		uinfo->value.integer.min = 0;
 		uinfo->value.integer.max = cval->max - cval->min;
 	}
@@ -599,6 +622,12 @@ static int mixer_ctl_feature_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 		for (c = 0; c < MAX_CHANNELS; c++) {
 			if (cval->cmask & (1 << c)) {
 				err = get_cur_mix_value(cval, c + 1, &val);
+#ifdef IGNORE_CTL_ERROR
+				if (err < 0) {
+					ucontrol->value.integer.value[0] = cval->min;
+					return 0;
+				}
+#endif
 				if (err < 0) {
 					snd_printd(KERN_ERR "cannot get current value for control %d ch %d: err = %d\n", cval->control, c + 1, err);
 					return err;
@@ -611,6 +640,12 @@ static int mixer_ctl_feature_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 	} else {
 		/* master channel */
 		err = get_cur_mix_value(cval, 0, &val);
+#ifdef IGNORE_CTL_ERROR
+		if (err < 0) {
+			ucontrol->value.integer.value[0] = cval->min;
+			return 0;
+		}
+#endif
 		if (err < 0) {
 			snd_printd(KERN_ERR "cannot get current value for control %d master ch: err = %d\n", cval->control, err);
 			return err;
@@ -633,6 +668,10 @@ static int mixer_ctl_feature_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 		for (c = 0; c < MAX_CHANNELS; c++) {
 			if (cval->cmask & (1 << c)) {
 				err = get_cur_mix_value(cval, c + 1, &oval);
+#ifdef IGNORE_CTL_ERROR
+				if (err < 0)
+					return 0;
+#endif
 				if (err < 0)
 					return err;
 				val = ucontrol->value.integer.value[cnt];
@@ -647,6 +686,10 @@ static int mixer_ctl_feature_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t 
 	} else {
 		/* master channel */
 		err = get_cur_mix_value(cval, 0, &oval);
+#ifdef IGNORE_CTL_ERROR
+		if (err < 0)
+			return 0;
+#endif
 		if (err < 0)
 			return err;
 		val = ucontrol->value.integer.value[0];
@@ -680,7 +723,6 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 	int nameid = desc[desc[0] - 1];
 	snd_kcontrol_t *kctl;
 	usb_mixer_elem_info_t *cval;
-	int minchn = 0;
 
 	control++; /* change from zero-based to 1-based value */
 
@@ -705,26 +747,13 @@ static void build_feature_ctl(mixer_build_t *state, unsigned char *desc,
 	else {
 		int i, c = 0;
 		for (i = 0; i < 16; i++)
-			if (ctl_mask & (1 << i)) {
-				if (! minchn)
-					minchn = i + 1;
+			if (ctl_mask & (1 << i))
 				c++;
-			}
 		cval->channels = c;
 	}
 
 	/* get min/max values */
-	if (cval->val_type == USB_MIXER_BOOLEAN ||
-	    cval->val_type == USB_MIXER_INV_BOOLEAN) {
-		cval->max = 1;
-		cval->initialized = 1;
-	} else {
-		if (get_ctl_value(cval, GET_MAX, (cval->control << 8) | minchn, &cval->max) < 0 ||
-		    get_ctl_value(cval, GET_MIN, (cval->control << 8) | minchn, &cval->min) < 0)
-			snd_printd(KERN_ERR "%d:%d: cannot get min/max values for control %d (id %d)\n", cval->id, cval->ctrlif, control, unitid);
-		else
-			cval->initialized = 1;
-	}
+	get_min_max(cval);
 
 	kctl = snd_ctl_new1(&usb_feature_unit_ctl, cval);
 	if (! kctl) {
@@ -860,7 +889,6 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 	int i, len;
 	snd_kcontrol_t *kctl;
 	usb_audio_term_t iterm;
-	int minchn = 0;
 
 	cval = snd_magic_kcalloc(usb_mixer_elem_info_t, 0, GFP_KERNEL);
 	if (! cval)
@@ -878,17 +906,11 @@ static void build_mixer_unit_ctl(mixer_build_t *state, unsigned char *desc,
 		if (check_matrix_bitmap(desc + 9 + num_ins, in_ch, i, num_outs)) {
 			cval->cmask |= (1 << i);
 			cval->channels++;
-			if (! minchn)
-				minchn = i + 1;
 		}
 	}
 
 	/* get min/max values */
-	if (get_ctl_value(cval, GET_MAX, (cval->control << 8) | minchn, &cval->max) < 0 ||
-	    get_ctl_value(cval, GET_MIN, (cval->control << 8) | minchn, &cval->min) < 0)
-		snd_printd(KERN_ERR "cannot get min/max values for mixer (id %d)\n", unitid);
-	else
-		cval->initialized = 1;
+	get_min_max(cval);
 
 	kctl = snd_ctl_new1(&usb_feature_unit_ctl, cval);
 	if (! kctl) {
@@ -944,6 +966,12 @@ static int mixer_ctl_procunit_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	int err, val;
 
 	err = get_cur_ctl_value(cval, cval->control, &val);
+#ifdef IGNORE_CTL_ERROR
+	if (err < 0) {
+		ucontrol->value.integer.value[0] = cval->min;
+		return 0;
+	}
+#endif
 	if (err < 0)
 		return err;
 	val = get_relative_value(cval, val);
@@ -958,6 +986,10 @@ static int mixer_ctl_procunit_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	int val, oval, err;
 
 	err = get_cur_ctl_value(cval, cval->control, &oval);
+#ifdef IGNORE_CTL_ERROR
+	if (err < 0)
+		return 0;
+#endif
 	if (err < 0)
 		return err;
 	val = ucontrol->value.integer.value[0];
@@ -1099,13 +1131,7 @@ static int build_audio_procunit(mixer_build_t *state, int unitid, unsigned char 
 		cval->channels = 1;
 
 		/* get min/max values */
-		if (get_ctl_value(cval, GET_MAX, cval->control, &cval->max) < 0 ||
-		    get_ctl_value(cval, GET_MIN, cval->control, &cval->min) < 0)
-			snd_printd(KERN_ERR "cannot get min/max values for proc/ext control=%d, id=%d\n", cval->control, unitid);
-		else if (cval->max <= cval->min)
-			snd_printd(KERN_ERR "invalid min/max values (%d/%d) for proc/ext unit control=%d, id=%d\n", cval->min, cval->max, cval->control, unitid);
-		else
-			cval->initialized = 1;
+		get_min_max(cval);
 
 		kctl = snd_ctl_new1(&mixer_procunit_ctl, cval);
 		if (! kctl) {
@@ -1183,6 +1209,12 @@ static int mixer_ctl_selector_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	int val, err;
 
 	err = get_cur_ctl_value(cval, 0, &val);
+#ifdef IGNORE_CTL_ERROR
+	if (err < 0) {
+		ucontrol->value.enumerated.item[0] = 0;
+		return 0;
+	}
+#endif
 	if (err < 0)
 		return err;
 	val = get_relative_value(cval, val);
@@ -1197,6 +1229,10 @@ static int mixer_ctl_selector_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t
 	int val, oval, err;
 
 	err = get_cur_ctl_value(cval, 0, &oval);
+#ifdef IGNORE_CTL_ERROR
+	if (err < 0)
+		return 0;
+#endif
 	if (err < 0)
 		return err;
 	val = ucontrol->value.enumerated.item[0];
