@@ -1062,9 +1062,9 @@ static struct file_operations agp_fops =
 
 static struct miscdevice agp_miscdev =
 {
-	AGPGART_MINOR,
-	"agpgart",
-	&agp_fops
+	.minor	= AGPGART_MINOR,
+	.name	= "agpgart",
+	.fops	= &agp_fops
 };
 
 int __init agp_frontend_initialize(void)
