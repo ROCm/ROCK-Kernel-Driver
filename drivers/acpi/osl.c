@@ -249,7 +249,7 @@ acpi_find_dsdt_initrd(void)
 
 		/* Search for the start signature */
 		while (data < (char *)initrd_end - sizeof(signature) - 4) {
-			if (!memcmp(data, signature, sizeof(signature) - 1)) {
+			if (!memcmp(data, signature, sizeof(signature))) {
 				data += sizeof(signature);
 				if (!memcmp(data, "DSDT", 4))
 					dsdt_start = data;
