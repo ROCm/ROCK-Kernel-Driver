@@ -43,6 +43,7 @@ static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;	/* Index 0-MAX */
 static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static int ac97_clock[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 48000};
+static char *ac97_quirk[SNDRV_CARDS];
 static int spdif_aclink[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = 1};
 
 module_param_array(index, int, NULL, 0444);
@@ -53,6 +54,8 @@ module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "Enable audio part of ATI IXP controller.");
 module_param_array(ac97_clock, int, NULL, 0444);
 MODULE_PARM_DESC(ac97_clock, "AC'97 codec clock (default 48000Hz).");
+module_param_array(ac97_quirk, charp, NULL, 0444);
+MODULE_PARM_DESC(ac97_quirk, "AC'97 workaround for strange hardware.");
 module_param_array(spdif_aclink, bool, NULL, 0444);
 MODULE_PARM_DESC(spdif_aclink, "S/PDIF over AC-link.");
 
@@ -630,21 +633,20 @@ static snd_pcm_uframes_t snd_atiixp_pcm_pointer(snd_pcm_substream_t *substream)
 	snd_pcm_runtime_t *runtime = substream->runtime;
 	atiixp_dma_t *dma = (atiixp_dma_t *)runtime->private_data;
 	unsigned int curptr;
+	int timeout = 1000;
 
-	spin_lock(&chip->reg_lock);
-	curptr = readl(chip->remap_addr + dma->ops->dt_cur);
-	if (curptr < dma->buf_addr) {
-		snd_printdd("curptr = %x, base = %x\n", curptr, dma->buf_addr);
-		curptr = 0;
-	} else {
+	while (timeout--) {
+		curptr = readl(chip->remap_addr + dma->ops->dt_cur);
+		if (curptr < dma->buf_addr)
+			continue;
 		curptr -= dma->buf_addr;
-		if (curptr >= dma->buf_bytes) {
-			snd_printdd("curptr = %x, size = %x\n", curptr, dma->buf_bytes);
-			curptr = 0;
-		}
+		if (curptr >= dma->buf_bytes)
+			continue;
+		return bytes_to_frames(runtime, curptr);
 	}
-	spin_unlock(&chip->reg_lock);
-	return bytes_to_frames(runtime, curptr);
+	snd_printd("atiixp: invalid DMA pointer read 0x%x (buf=%x)\n",
+		   readl(chip->remap_addr + dma->ops->dt_cur), dma->buf_addr);
+	return 0;
 }
 
 /*
@@ -1329,7 +1331,11 @@ static irqreturn_t snd_atiixp_interrupt(int irq, void *dev_id, struct pt_regs *r
  * ac97 mixer section
  */
 
-static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
+static struct ac97_quirk ac97_quirks[] __devinitdata = {
+	{ } /* terminator */
+};
+
+static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock, const char *quirk_override)
 {
 	ac97_bus_t *pbus;
 	ac97_template_t ac97;
@@ -1376,7 +1382,7 @@ static int __devinit snd_atiixp_mixer_new(atiixp_t *chip, int clock)
 		return -ENODEV;
 	}
 
-	/* snd_ac97_tune_hardware(chip->ac97, ac97_quirks); */
+	snd_ac97_tune_hardware(chip->ac97[0], ac97_quirks, quirk_override);
 
 	return 0;
 }
@@ -1569,7 +1575,7 @@ static int __devinit snd_atiixp_probe(struct pci_dev *pci,
 
 	chip->spdif_over_aclink = spdif_aclink[dev];
 
-	if ((err = snd_atiixp_mixer_new(chip, ac97_clock[dev])) < 0)
+	if ((err = snd_atiixp_mixer_new(chip, ac97_clock[dev], ac97_quirk[dev])) < 0)
 		goto __error;
 
 	if ((err = snd_atiixp_pcm_new(chip)) < 0)

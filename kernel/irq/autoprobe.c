@@ -137,6 +137,7 @@ unsigned int probe_irq_mask(unsigned long val)
 
 	return mask & val;
 }
+EXPORT_SYMBOL(probe_irq_mask);
 
 /**
  *	probe_irq_off	- end an interrupt autodetect

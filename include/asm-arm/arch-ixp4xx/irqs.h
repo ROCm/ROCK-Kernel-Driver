@@ -48,14 +48,6 @@
 #define IRQ_IXP4XX_GPIO12	29
 #define IRQ_IXP4XX_SW_INT1	30
 #define IRQ_IXP4XX_SW_INT2	31
-
-#ifndef	CONFIG_CPU_IXP46X
-#define NR_IRQS			32
-#else
-
-/*
- * IXP465 adds new sources
- */
 #define IRQ_IXP4XX_USB_HOST	32
 #define IRQ_IXP4XX_I2C		33
 #define IRQ_IXP4XX_SSP		34
@@ -67,6 +59,12 @@
 #define IRQ_IXP4XX_MCU_ECC	61
 #define IRQ_IXP4XX_EXP_PE	62
 
+/*
+ * Only first 32 sources are valid if running on IXP42x systems
+ */
+#ifndef	CONFIG_CPU_IXP46X
+#define NR_IRQS			32
+#else
 #define NR_IRQS			64
 #endif
 

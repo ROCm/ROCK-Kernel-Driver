@@ -58,7 +58,7 @@ static int zr36050_codecs = 0;
 /* debugging is available via module parameter */
 
 static int debug = 0;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0-4)");
 
 #define dprintk(num, format, args...) \

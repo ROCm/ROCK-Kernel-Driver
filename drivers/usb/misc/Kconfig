@@ -32,26 +32,6 @@ config USB_EMI26
 	  To compile this driver as a module, choose M here: the
 	  module will be called emi26.
 
-config USB_TIGL
-	tristate "Texas Instruments Graph Link USB (aka SilverLink) cable support"
-	depends on USB
-	---help---
-	  If you own a Texas Instruments graphing calculator and use a 
-	  TI-GRAPH LINK USB cable (aka SilverLink), then you might be 
-	  interested in this driver.
-
-	  If you enable this driver, you will be able to communicate with
-	  your calculator through a set of device nodes under /dev.
-
-	  To compile this driver as a module, choose M here: the
-	  module will be called tiglusb.
-
-	  If you don't know what the SilverLink cable is or what a Texas
-	  Instruments graphing calculator is, then you probably don't need this
-	  driver.
-
-	  If unsure, say N.
-
 config USB_AUERSWALD
 	tristate "USB Auerswald ISDN support (EXPERIMENTAL)"
 	depends on USB && EXPERIMENTAL
@@ -143,11 +123,24 @@ config USB_PHIDGETSERVO
 	  To compile this driver as a module, choose M here: the
 	  module will be called phidgetservo.
 
+config USB_IDMOUSE
+	tristate "Siemens ID USB Mouse Fingerprint sensor support"
+	depends on USB
+	help
+	  Say Y here if you want to use the fingerprint sensor on
+	  the Siemens ID Mouse. There is also a Siemens ID Mouse
+	  _Professional_, which has not been tested with this driver,
+	  but uses the same sensor and may therefore work.
+
+	  This driver creates an entry "/dev/idmouseX" or "/dev/usb/idmouseX",
+	  which can be used by, e.g.,"cat /dev/idmouse0 > fingerprint.pnm".
+
+	  See also <http://www.fs.tum.de/~echtler/idmouse/>.
+
 config USB_TEST
 	tristate "USB testing driver (DEVELOPMENT)"
 	depends on USB && USB_DEVICEFS && EXPERIMENTAL
 	help
-
 	  This driver is for testing host controller software.  It is used
 	  with specialized device firmware for regression and stress testing,
 	  to help prevent problems from cropping up with "real" drivers.

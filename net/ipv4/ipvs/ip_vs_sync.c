@@ -119,11 +119,11 @@ struct ip_vs_sync_buff {
 
 /* the sync_buff list head and the lock */
 static LIST_HEAD(ip_vs_sync_queue);
-static spinlock_t ip_vs_sync_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(ip_vs_sync_lock);
 
 /* current sync_buff for accepting new conn entries */
 static struct ip_vs_sync_buff   *curr_sb = NULL;
-static spinlock_t curr_sb_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(curr_sb_lock);
 
 /* ipvs sync daemon state */
 volatile int ip_vs_sync_state = IP_VS_STATE_NONE;

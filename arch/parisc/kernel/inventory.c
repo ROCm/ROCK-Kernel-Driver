@@ -518,7 +518,7 @@ add_system_map_addresses(struct parisc_device *dev, int num_addrs,
 }
 
 /**
- * do_system_map_inventory - Retrieve firmware devices via SYSTEM_MAP.
+ * system_map_inventory - Retrieve firmware devices via SYSTEM_MAP.
  *
  * This function attempts to retrieve and register all the devices firmware
  * knows about via the SYSTEM_MAP PDC call.
@@ -528,16 +528,18 @@ static void __init system_map_inventory(void)
 	int i;
 	long status = PDC_OK;
     
-	for (i = 0; status != PDC_BAD_PROC && status != PDC_NE_MOD; i++) {
+	for (i = 0; i < 256; i++) {
 		struct parisc_device *dev;
 		struct pdc_system_map_mod_info module_result;
 		struct pdc_module_path module_path;
 
 		status = pdc_system_map_find_mods(&module_result,
 				&module_path, i);
+		if ((status == PDC_BAD_PROC) || (status == PDC_NE_MOD))
+			break;
 		if (status != PDC_OK)
 			continue;
-		
+
 		dev = alloc_pa_dev(module_result.mod_addr, &module_path.path);
 		if (!dev)
 			continue;
@@ -584,9 +586,9 @@ void __init do_memory_inventory(void)
 
 void __init do_device_inventory(void)
 {
-	extern void parisc_generic_device_register(void);
-
 	printk(KERN_INFO "Searching for devices...\n");
+
+	init_parisc_bus();
 
 	switch (pdc_type) {
 
@@ -605,7 +607,6 @@ void __init do_device_inventory(void)
 	default:
 		panic("Unknown PDC type!\n");
 	}
-	parisc_generic_device_register();
 	printk(KERN_INFO "Found devices:\n");
 	print_parisc_devices();
 }

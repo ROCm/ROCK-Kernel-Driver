@@ -43,7 +43,7 @@
 static struct hlist_head kprobe_table[KPROBE_TABLE_SIZE];
 
 unsigned int kprobe_cpu = NR_CPUS;
-static spinlock_t kprobe_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(kprobe_lock);
 
 /* Locks kprobe: irqs must be disabled */
 void lock_kprobes(void)

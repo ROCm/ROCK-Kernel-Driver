@@ -55,6 +55,11 @@ flush_data_cache(void)
 {
 	on_each_cpu((void (*)(void *))flush_data_cache_local, NULL, 1, 1);
 }
+void 
+flush_instruction_cache(void)
+{
+	on_each_cpu((void (*)(void *))flush_instruction_cache_local, NULL, 1, 1);
+}
 #endif
 
 void
@@ -326,4 +331,36 @@ void clear_user_page_asm(void *page, unsigned long vaddr)
 	purge_tlb_start();
 	__clear_user_page_asm(page, vaddr);
 	purge_tlb_end();
+}
+
+#define FLUSH_THRESHOLD 0x80000 /* 0.5MB */
+int parisc_cache_flush_threshold = FLUSH_THRESHOLD;
+
+void parisc_setup_cache_timing(void)
+{
+	unsigned long rangetime, alltime;
+	extern char _text;	/* start of kernel code, defined by linker */
+	extern char _end;	/* end of BSS, defined by linker */
+	unsigned long size;
+
+	alltime = mfctl(16);
+	flush_data_cache();
+	alltime = mfctl(16) - alltime;
+
+	size = (unsigned long)(&_end - _text);
+	rangetime = mfctl(16);
+	flush_kernel_dcache_range((unsigned long)&_text, size);
+	rangetime = mfctl(16) - rangetime;
+
+	printk(KERN_DEBUG "Whole cache flush %lu cycles, flushing %lu bytes %lu cycles\n",
+		alltime, size, rangetime);
+
+	/* Racy, but if we see an intermediate value, it's ok too... */
+	parisc_cache_flush_threshold = size * alltime / rangetime;
+
+	parisc_cache_flush_threshold = (parisc_cache_flush_threshold + L1_CACHE_BYTES - 1) &~ (L1_CACHE_BYTES - 1); 
+	if (!parisc_cache_flush_threshold)
+		parisc_cache_flush_threshold = FLUSH_THRESHOLD;
+
+	printk("Setting cache flush threshold to %x (%d CPUs online)\n", parisc_cache_flush_threshold, num_online_cpus());
 }

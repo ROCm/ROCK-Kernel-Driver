@@ -94,7 +94,6 @@ static struct
 
 static struct ip6t_table packet_filter = {
 	.name		= "filter",
-	.table		= &initial_table.repl,
 	.valid_hooks	= FILTER_VALID_HOOKS,
 	.lock		= RW_LOCK_UNLOCKED,
 	.me		= THIS_MODULE,
@@ -172,7 +171,7 @@ static int __init init(void)
 	initial_table.entries[1].target.verdict = -forward - 1;
 
 	/* Register table */
-	ret = ip6t_register_table(&packet_filter);
+	ret = ip6t_register_table(&packet_filter, &initial_table.repl);
 	if (ret < 0)
 		return ret;
 

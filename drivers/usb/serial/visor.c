@@ -734,9 +734,7 @@ static int palm_os_3_probe (struct usb_serial *serial, const struct usb_device_i
 	if (retval == sizeof(*connection_info)) {
 	        connection_info = (struct visor_connection_info *)transfer_buffer;
 
-		le16_to_cpus(&connection_info->num_ports);
-		num_ports = connection_info->num_ports;
-
+		num_ports = le16_to_cpu(connection_info->num_ports);
 		for (i = 0; i < num_ports; ++i) {
 			switch (connection_info->connections[i].port_function_id) {
 				case VISOR_FUNCTION_GENERIC:
@@ -926,8 +924,8 @@ static int treo_attach (struct usb_serial *serial)
 
 	/* Only do this endpoint hack for the Handspring devices with
 	 * interrupt in endpoints, which for now are the Treo devices. */
-	if (!((serial->dev->descriptor.idVendor == HANDSPRING_VENDOR_ID) ||
-	      (serial->dev->descriptor.idVendor == KYOCERA_VENDOR_ID)) ||
+	if (!((le16_to_cpu(serial->dev->descriptor.idVendor) == HANDSPRING_VENDOR_ID) ||
+	      (le16_to_cpu(serial->dev->descriptor.idVendor) == KYOCERA_VENDOR_ID)) ||
 	    (serial->num_interrupt_in == 0))
 		goto generic_startup;
 

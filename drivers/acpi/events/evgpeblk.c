@@ -925,7 +925,7 @@ acpi_ev_create_gpe_block (
 
 	/*
 	 * Runtime option: Should Wake GPEs be enabled at runtime?  The default
-	 * is No,they should only be enabled just as the machine goes to sleep.
+	 * is No, they should only be enabled just as the machine goes to sleep.
 	 */
 	if (acpi_gbl_leave_wake_gpes_disabled) {
 		/*

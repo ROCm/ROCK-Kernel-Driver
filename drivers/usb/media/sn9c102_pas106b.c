@@ -2,7 +2,7 @@
  * Plug-in for PAS106B image sensor connected to the SN9C10x PC Camera     *
  * Controllers                                                             *
  *                                                                         *
- * Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>       *
+ * Copyright (C) 2004-2005 by Luca Risolia <luca.risolia@studio.unibo.it>  *
  *                                                                         *
  * This program is free software; you can redistribute it and/or modify    *
  * it under the terms of the GNU General Public License as published by    *
@@ -96,11 +96,6 @@ static int pas106b_get_ctrl(struct sn9c102_device* cam,
 			return -EIO;
 		ctrl->value &= 0xf8;
 		return 0;
-	case SN9C102_V4L2_CID_DAC_SIGN:
-		if ((ctrl->value = sn9c102_i2c_read(cam, 0x07)) < 0)
-			return -EIO;
-		ctrl->value &= 0x01;
-		return 0;
 	default:
 		return -EINVAL;
 	}
@@ -136,13 +131,6 @@ static int pas106b_set_ctrl(struct sn9c102_device* cam,
 	case SN9C102_V4L2_CID_DAC_MAGNITUDE:
 		err += sn9c102_i2c_write(cam, 0x08, ctrl->value << 3);
 		break;
-	case SN9C102_V4L2_CID_DAC_SIGN:
-		{
-			int r;
-			err += (r = sn9c102_i2c_read(cam, 0x07)) < 0 ? r : 0;
-			err += sn9c102_i2c_write(cam, 0x07, r | ctrl->value);
-		}
-		break;
 	default:
 		return -EINVAL;
 	}
@@ -167,13 +155,27 @@ static int pas106b_set_crop(struct sn9c102_device* cam,
 }
 
 
+static int pas106b_set_pix_format(struct sn9c102_device* cam, 
+                                  const struct v4l2_pix_format* pix)
+{
+	int err = 0;
+
+	if (pix->pixelformat == V4L2_PIX_FMT_SN9C10X)
+		err += sn9c102_write_reg(cam, 0x2c, 0x17);
+	else
+		err += sn9c102_write_reg(cam, 0x20, 0x17);
+
+	return err;
+}
+
+
 static struct sn9c102_sensor pas106b = {
 	.name = "PAS106B",
 	.maintainer = "Luca Risolia <luca.risolia@studio.unibo.it>",
+	.sysfs_ops = SN9C102_I2C_READ | SN9C102_I2C_WRITE,
 	.frequency = SN9C102_I2C_400KHZ | SN9C102_I2C_100KHZ,
 	.interface = SN9C102_I2C_2WIRES,
-	.slave_read_id = 0x40,
-	.slave_write_id = 0x40,
+	.i2c_slave_id = 0x40,
 	.init = &pas106b_init,
 	.qctrl = {
 		{
@@ -182,7 +184,7 @@ static struct sn9c102_sensor pas106b = {
 			.name = "exposure",
 			.minimum = 0x125,
 			.maximum = 0xfff,
-			.step = 0x01,
+			.step = 0x001,
 			.default_value = 0x140,
 			.flags = 0,
 		},
@@ -246,16 +248,6 @@ static struct sn9c102_sensor pas106b = {
 			.default_value = 0x01,
 			.flags = 0,
 		},
-		{
-			.id = SN9C102_V4L2_CID_DAC_SIGN,
-			.type = V4L2_CTRL_TYPE_BOOLEAN,
-			.name = "DAC sign",
-			.minimum = 0x00,
-			.maximum = 0x01,
-			.step = 0x01,
-			.default_value = 0x00,
-			.flags = 0,
-		},
 	},
 	.get_ctrl = &pas106b_get_ctrl,
 	.set_ctrl = &pas106b_set_ctrl,
@@ -279,7 +271,8 @@ static struct sn9c102_sensor pas106b = {
 		.height = 288,
 		.pixelformat = V4L2_PIX_FMT_SBGGR8,
 		.priv = 8, /* we use this field as 'bits per pixel' */
-	}
+	},
+	.set_pix_format = &pas106b_set_pix_format
 };
 
 

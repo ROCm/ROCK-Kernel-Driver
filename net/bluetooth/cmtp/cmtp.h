@@ -120,7 +120,6 @@ int  cmtp_attach_device(struct cmtp_session *session);
 void cmtp_detach_device(struct cmtp_session *session);
 
 void cmtp_recv_capimsg(struct cmtp_session *session, struct sk_buff *skb);
-void cmtp_send_capimsg(struct cmtp_session *session, struct sk_buff *skb);
 
 static inline void cmtp_schedule(struct cmtp_session *session)
 {

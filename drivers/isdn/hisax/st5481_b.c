@@ -274,7 +274,7 @@ static int st5481_setup_b_out(struct st5481_bcs *bcs)
 	endpoint = &altsetting->endpoint[EP_B1_OUT - 1 + bcs->channel * 2];
 
 	DBG(4,"endpoint address=%02x,packet size=%d",
-	    endpoint->desc.bEndpointAddress, endpoint->desc.wMaxPacketSize);
+	    endpoint->desc.bEndpointAddress, le16_to_cpu(endpoint->desc.wMaxPacketSize));
 
 	// Allocate memory for 8000bytes/sec + extra bytes if underrun
 	return st5481_setup_isocpipes(b_out->urb, dev, 

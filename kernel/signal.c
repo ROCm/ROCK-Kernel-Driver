@@ -375,8 +375,8 @@ void __exit_signal(struct task_struct *tsk)
 		 * We won't ever get here for the group leader, since it
 		 * will have been the last reference on the signal_struct.
 		 */
-		sig->utime += tsk->utime;
-		sig->stime += tsk->stime;
+		sig->utime = cputime_add(sig->utime, tsk->utime);
+		sig->stime = cputime_add(sig->stime, tsk->stime);
 		sig->min_flt += tsk->min_flt;
 		sig->maj_flt += tsk->maj_flt;
 		sig->nvcsw += tsk->nvcsw;
@@ -587,15 +587,15 @@ void signal_wake_up(struct task_struct *t, int resume)
 	set_tsk_thread_flag(t, TIF_SIGPENDING);
 
 	/*
-	 * If resume is set, we want to wake it up in the TASK_STOPPED case.
-	 * We don't check for TASK_STOPPED because there is a race with it
+	 * For SIGKILL, we want to wake it up in the stopped/traced case.
+	 * We don't check t->state here because there is a race with it
 	 * executing another processor and just now entering stopped state.
-	 * By calling wake_up_process any time resume is set, we ensure
-	 * the process will wake up and handle its stop or death signal.
+	 * By using wake_up_state, we ensure the process will wake up and
+	 * handle its death signal.
 	 */
 	mask = TASK_INTERRUPTIBLE;
 	if (resume)
-		mask |= TASK_STOPPED;
+		mask |= TASK_STOPPED | TASK_TRACED;
 	if (!wake_up_state(t, mask))
 		kick_process(t);
 }
@@ -935,11 +935,11 @@ __group_complete_signal(int sig, struct task_struct *p)
 
 	/*
 	 * Don't bother traced and stopped tasks (but
-	 * SIGKILL will punch through stopped state)
+	 * SIGKILL will punch through that).
 	 */
-	mask = TASK_TRACED;
-	if (sig != SIGKILL)
-		mask |= TASK_STOPPED;
+	mask = TASK_STOPPED | TASK_TRACED;
+	if (sig == SIGKILL)
+		mask = 0;
 
 	/*
 	 * Now find a thread we can wake up to take the signal off the queue.
@@ -1456,8 +1456,7 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	unsigned long flags;
 	struct sighand_struct *psig;
 
-	if (sig == -1)
-		BUG();
+	BUG_ON(sig == -1);
 
  	/* do_notify_parent_cldstop should have been called instead.  */
  	BUG_ON(tsk->state & (TASK_STOPPED|TASK_TRACED));
@@ -1471,8 +1470,10 @@ void do_notify_parent(struct task_struct *tsk, int sig)
 	info.si_uid = tsk->uid;
 
 	/* FIXME: find out whether or not this is supposed to be c*time. */
-	info.si_utime = tsk->utime + tsk->signal->utime;
-	info.si_stime = tsk->stime + tsk->signal->stime;
+	info.si_utime = cputime_to_jiffies(cputime_add(tsk->utime,
+						       tsk->signal->utime));
+	info.si_stime = cputime_to_jiffies(cputime_add(tsk->stime,
+						       tsk->signal->stime));
 
 	info.si_status = tsk->exit_code & 0x7f;
 	if (tsk->exit_code & 0x80)
@@ -1528,8 +1529,8 @@ do_notify_parent_cldstop(struct task_struct *tsk, struct task_struct *parent,
 	info.si_uid = tsk->uid;
 
 	/* FIXME: find out whether or not this is supposed to be c*time. */
-	info.si_utime = tsk->utime;
-	info.si_stime = tsk->stime;
+	info.si_utime = cputime_to_jiffies(tsk->utime);
+	info.si_stime = cputime_to_jiffies(tsk->stime);
 
  	info.si_code = why;
  	switch (why) {
@@ -1587,7 +1588,9 @@ static void ptrace_stop(int exit_code, int nostop_code, siginfo_t *info)
 	read_lock(&tasklist_lock);
 	if (likely(current->ptrace & PT_PTRACED) &&
 	    likely(current->parent != current->real_parent ||
-		   !(current->ptrace & PT_ATTACHED))) {
+		   !(current->ptrace & PT_ATTACHED)) &&
+	    (likely(current->parent->signal != current->signal) ||
+	     !unlikely(current->signal->flags & SIGNAL_GROUP_EXIT))) {
 		do_notify_parent_cldstop(current, current->parent,
 					 CLD_TRAPPED);
 		read_unlock(&tasklist_lock);

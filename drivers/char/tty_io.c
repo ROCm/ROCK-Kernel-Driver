@@ -249,7 +249,7 @@ static void tty_set_termios_ldisc(struct tty_struct *tty, int num)
  *	callers who will do ldisc lookups and cannot sleep.
  */
  
-static spinlock_t tty_ldisc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(tty_ldisc_lock);
 static DECLARE_WAIT_QUEUE_HEAD(tty_ldisc_wait);
 static struct tty_ldisc tty_ldiscs[NR_LDISCS];	/* line disc dispatch table	*/
 
@@ -327,7 +327,7 @@ void tty_ldisc_put(int disc)
 	
 EXPORT_SYMBOL_GPL(tty_ldisc_put);
 
-void tty_ldisc_assign(struct tty_struct *tty, struct tty_ldisc *ld)
+static void tty_ldisc_assign(struct tty_struct *tty, struct tty_ldisc *ld)
 {
 	tty->ldisc = *ld;
 	tty->ldisc.refcount = 0;
@@ -583,7 +583,7 @@ restart:
 /*
  * This routine returns a tty driver structure, given a device number
  */
-struct tty_driver *get_tty_driver(dev_t device, int *index)
+static struct tty_driver *get_tty_driver(dev_t device, int *index)
 {
 	struct tty_driver *p;
 
@@ -690,7 +690,7 @@ static struct file_operations hung_up_tty_fops = {
 	.release	= tty_release,
 };
 
-static spinlock_t redirect_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(redirect_lock);
 static struct file *redirect;
 
 /**
@@ -744,7 +744,7 @@ EXPORT_SYMBOL_GPL(tty_ldisc_flush);
  * but doesn't hold any locks, so we need to make sure we have the appropriate
  * locks for what we're doing..
  */
-void do_tty_hangup(void *data)
+static void do_tty_hangup(void *data)
 {
 	struct tty_struct *tty = (struct tty_struct *) data;
 	struct file * cons_filp = NULL;
@@ -2521,28 +2521,6 @@ static void flush_to_ldisc(void *private_)
 	disc->receive_buf(tty, cp, fp, count);
 out:
 	tty_ldisc_deref(disc);
-}
-
-/*
- *	Call the ldisc flush directly from a driver. This function may
- *	return an error and need retrying by the user.
- */
-
-int tty_push_data(struct tty_struct *tty, unsigned char *cp, unsigned char *fp, int count)
-{
-	int ret = 0;
-	struct tty_ldisc *disc;
-	
-	disc = tty_ldisc_ref(tty);
-	if(test_bit(TTY_DONT_FLIP, &tty->flags))
-		ret = -EAGAIN;
-	else if(disc == NULL)
-		ret = -EIO;
-	else
-		disc->receive_buf(tty, cp, fp, count);
-	tty_ldisc_deref(disc);
-	return ret;
-	
 }
 
 /*

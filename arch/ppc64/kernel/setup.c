@@ -1345,6 +1345,7 @@ early_param("xmon", early_xmon);
 
 void cpu_die(void)
 {
+	idle_task_exit();
 	if (ppc_md.cpu_die)
 		ppc_md.cpu_die();
 	local_irq_disable();

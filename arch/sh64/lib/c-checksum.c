@@ -136,7 +136,7 @@ unsigned int csum_partial(const unsigned char *buff, int len, unsigned int sum)
 
 /* Copy while checksumming, otherwise like csum_partial.  */
 unsigned int
-csum_partial_copy(const char *src, char *dst, int len, unsigned int sum)
+csum_partial_copy(const unsigned char *src, unsigned char *dst, int len, unsigned int sum)
 {
 	sum = csum_partial(src, len, sum);
 	memcpy(dst, src, len);
@@ -147,7 +147,7 @@ csum_partial_copy(const char *src, char *dst, int len, unsigned int sum)
 /* Copy from userspace and compute checksum.  If we catch an exception
    then zero the rest of the buffer.  */
 unsigned int
-csum_partial_copy_from_user(const char *src, char *dst, int len,
+csum_partial_copy_from_user(const unsigned char *src, unsigned char *dst, int len,
 			    unsigned int sum, int *err_ptr)
 {
 	int missing;
@@ -168,7 +168,7 @@ csum_partial_copy_from_user(const char *src, char *dst, int len,
 
 /* Copy to userspace and compute checksum.  */
 unsigned int
-csum_partial_copy_to_user(const char *src, char *dst, int len,
+csum_partial_copy_to_user(const unsigned char *src, unsigned char *dst, int len,
 			  unsigned int sum, int *err_ptr)
 {
 	sum = csum_partial(src, len, sum);
@@ -221,7 +221,7 @@ unsigned int csum_tcpudp_nofold(unsigned long saddr,
 
 // Post SIM:
 unsigned int
-csum_partial_copy_nocheck(const char *src, char *dst, int len, unsigned int sum)
+csum_partial_copy_nocheck(const unsigned char *src, unsigned char *dst, int len, unsigned int sum)
 {
 	//  unsigned dummy;
 	pr_debug("csum_partial_copy_nocheck src %p dst %p len %d\n", src, dst,

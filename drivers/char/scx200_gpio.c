@@ -23,7 +23,7 @@ MODULE_DESCRIPTION("NatSemi SCx200 GPIO Pin Driver");
 MODULE_LICENSE("GPL");
 
 static int major = 0;		/* default to dynamic major */
-MODULE_PARM(major, "i");
+module_param(major, int, 0);
 MODULE_PARM_DESC(major, "Major device number");
 
 static ssize_t scx200_gpio_write(struct file *file, const char __user *data, 

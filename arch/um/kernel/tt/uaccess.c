@@ -6,7 +6,7 @@
 #include "linux/sched.h"
 #include "asm/uaccess.h"
 
-int copy_from_user_tt(void *to, const void *from, int n)
+int copy_from_user_tt(void *to, const void __user *from, int n)
 {
 	if(!access_ok_tt(VERIFY_READ, from, n))
 		return(n);
@@ -15,7 +15,7 @@ int copy_from_user_tt(void *to, const void *from, int n)
 				   &current->thread.fault_catcher));
 }
 
-int copy_to_user_tt(void *to, const void *from, int n)
+int copy_to_user_tt(void __user *to, const void *from, int n)
 {
 	if(!access_ok_tt(VERIFY_WRITE, to, n))
 		return(n);
@@ -24,7 +24,7 @@ int copy_to_user_tt(void *to, const void *from, int n)
 				 &current->thread.fault_catcher));
 }
 
-int strncpy_from_user_tt(char *dst, const char *src, int count)
+int strncpy_from_user_tt(char *dst, const char __user *src, int count)
 {
 	int n;
 
@@ -38,14 +38,14 @@ int strncpy_from_user_tt(char *dst, const char *src, int count)
 	return(n);
 }
 
-int __clear_user_tt(void *mem, int len)
+int __clear_user_tt(void __user *mem, int len)
 {
 	return(__do_clear_user(mem, len,
 			       &current->thread.fault_addr,
 			       &current->thread.fault_catcher));
 }
 
-int clear_user_tt(void *mem, int len)
+int clear_user_tt(void __user *mem, int len)
 {
 	if(!access_ok_tt(VERIFY_WRITE, mem, len))
 		return(len);
@@ -54,7 +54,7 @@ int clear_user_tt(void *mem, int len)
 			       &current->thread.fault_catcher));
 }
 
-int strnlen_user_tt(const void *str, int len)
+int strnlen_user_tt(const void __user *str, int len)
 {
 	return(__do_strnlen_user(str, len,
 				 &current->thread.fault_addr,

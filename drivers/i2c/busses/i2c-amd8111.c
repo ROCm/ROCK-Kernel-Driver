@@ -332,7 +332,7 @@ static struct i2c_algorithm smbus_algorithm = {
 
 
 static struct pci_device_id amd8111_ids[] = {
-	{ 0x1022, 0x746a, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0 },
+	{ PCI_DEVICE(PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_8111_SMBUS2) },
 	{ 0, }
 };
 

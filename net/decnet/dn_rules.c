@@ -68,7 +68,7 @@ static struct dn_fib_rule default_rule = {
 };
 
 static struct dn_fib_rule *dn_fib_rules = &default_rule;
-static rwlock_t dn_fib_rules_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(dn_fib_rules_lock);
 
 
 int dn_fib_rtm_delrule(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
@@ -88,7 +88,7 @@ int dn_fib_rtm_delrule(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 #endif
 			(!rtm->rtm_type || rtm->rtm_type == r->r_action) &&
 			(!rta[RTA_PRIORITY-1] || memcmp(RTA_DATA(rta[RTA_PRIORITY-1]), &r->r_preference, 4) == 0) &&
-			(!rta[RTA_IIF-1] || strcmp(RTA_DATA(rta[RTA_IIF-1]), r->r_ifname) == 0) &&
+			(!rta[RTA_IIF-1] || rtattr_strcmp(rta[RTA_IIF-1], r->r_ifname) == 0) &&
 			(!rtm->rtm_table || (r && rtm->rtm_table == r->r_table))) {
 
 			err = -EPERM;
@@ -170,8 +170,7 @@ int dn_fib_rtm_newrule(struct sk_buff *skb, struct nlmsghdr *nlh, void *arg)
 	new_r->r_table = table_id;
 	if (rta[RTA_IIF-1]) {
 		struct net_device *dev;
-		memcpy(new_r->r_ifname, RTA_DATA(rta[RTA_IIF-1]), IFNAMSIZ);
-		new_r->r_ifname[IFNAMSIZ-1] = 0;
+		rtattr_strlcpy(new_r->r_ifname, rta[RTA_IIF-1], IFNAMSIZ);
 		new_r->r_ifindex = -1;
 		dev = dev_get_by_name(new_r->r_ifname);
 		if (dev) {

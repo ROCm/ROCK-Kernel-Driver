@@ -73,7 +73,7 @@ static char version[] =
 static int macaddr[6];
 
 /* accept MAC address of the form macaddr=0x08,0x00,0x20,0x30,0x40,0x50 */
-MODULE_PARM(macaddr, "6i");
+module_param_array(macaddr, int, NULL, 0);
 MODULE_PARM_DESC(macaddr, "Happy Meal MAC address to set");
 MODULE_LICENSE("GPL");
 

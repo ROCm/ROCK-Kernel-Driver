@@ -197,14 +197,14 @@ static struct i2c_client client_template =
 	.name		= "SAB3036",
 };
 
-int __init
+static int __init
 tuner3036_init(void)
 {
 	i2c_add_driver(&i2c_driver_tuner);
 	return 0;
 }
 
-void __exit
+static void __exit
 tuner3036_exit(void)
 {
 	i2c_del_driver(&i2c_driver_tuner);
@@ -214,7 +214,7 @@ MODULE_DESCRIPTION("SAB3036 tuner driver");
 MODULE_AUTHOR("Philip Blundell <philb@gnu.org>");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug,"i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug,"Enable debugging output");
 
 module_init(tuner3036_init);

@@ -73,7 +73,7 @@ static struct sock *mroute_socket;
    Note that the changes are semaphored via rtnl_lock.
  */
 
-static rwlock_t mrt_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(mrt_lock);
 
 /*
  *	Multicast router control variables
@@ -93,7 +93,7 @@ static struct mfc_cache *mfc_unres_queue;		/* Queue of unresolved entries */
 static atomic_t cache_resolve_queue_len;		/* Size of unresolved	*/
 
 /* Special spinlock for queue of unresolved entries */
-static spinlock_t mfc_unres_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(mfc_unres_lock);
 
 /* We return to original Alan's scheme. Hash table of resolved
    entries is changed only in process context and protected

@@ -489,7 +489,7 @@ asmlinkage long sys_get_mempolicy(int __user *policy,
 
 	if (flags & ~(unsigned long)(MPOL_F_NODE|MPOL_F_ADDR))
 		return -EINVAL;
-	if (nmask != NULL && maxnode < numnodes)
+	if (nmask != NULL && maxnode < MAX_NUMNODES)
 		return -EINVAL;
 	if (flags & MPOL_F_ADDR) {
 		down_read(&mm->mmap_sem);

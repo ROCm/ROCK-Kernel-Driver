@@ -22,27 +22,17 @@
 #endif
 		.endm
 
-.outsw_bad_alignment:
-		adr	r0, .outsw_bad_align_msg
-		mov	r2, lr
-		b	panic
-.outsw_bad_align_msg:
-		.asciz	"outsw: bad buffer alignment (0x%p, lr=0x%08lX)\n"
-		.align
-
-.outsw_align:	tst	r1, #1
-		bne	.outsw_bad_alignment
+.outsw_align:	movs	ip, r1, lsl #31
+		bne	.outsw_noalign
 
 		ldrh	r3, [r1], #2
+		sub	r2, r2, #1
 		strh	r3, [r0]
 
-		subs	r2, r2, #1
-		RETINSTR(moveq, pc, lr)
-
 ENTRY(__raw_writesw)
-		teq	r2, #0		@ do we have to check for the zero len?
+		teq	r2, #0
 		moveq	pc, lr
-		tst	r1, #3
+		ands	r3, r1, #3
 		bne	.outsw_align
 
 		stmfd	sp!, {r4, r5, lr}
@@ -51,15 +41,12 @@ ENTRY(__raw_writesw)
 		bmi	.no_outsw_8
 
 .outsw_8_lp:	ldmia	r1!, {r3, r4, r5, ip}
+		subs	r2, r2, #8
 		outword	r3
 		outword	r4
 		outword	r5
 		outword	ip
-		subs	r2, r2, #8
 		bpl	.outsw_8_lp
-
-		tst	r2, #7
-		LOADREGS(eqfd, sp!, {r4, r5, pc})
 
 .no_outsw_8:	tst	r2, #4
 		beq	.no_outsw_4
@@ -68,14 +55,41 @@ ENTRY(__raw_writesw)
 		outword	r3
 		outword	ip
 
-.no_outsw_4:	tst	r2, #2
-		beq	.no_outsw_2
+.no_outsw_4:	movs	r2, r2, lsl #31
+		bcc	.no_outsw_2
 
 		ldr	r3, [r1], #4
 		outword	r3
 
-.no_outsw_2:	tst	r2, #1
-		ldrneh	r3, [r1]
+.no_outsw_2:	ldrneh	r3, [r1]
 		strneh	r3, [r0]
 
-		LOADREGS(fd, sp!, {r4, r5, pc})
+		ldmfd	sp!, {r4, r5, pc}
+
+#ifdef __ARMEB__
+#define pull_hbyte0	lsl #8
+#define push_hbyte1	lsr #24
+#else
+#define pull_hbyte0	lsr #24
+#define push_hbyte1	lsl #8
+#endif
+
+.outsw_noalign:	ldr	r3, [r1, -r3]!
+		subcs	r2, r2, #1
+		bcs	2f
+		subs	r2, r2, #2
+		bmi	3f
+
+1:		mov	ip, r3, lsr #8
+		strh	ip, [r0]
+2:		mov	ip, r3, pull_hbyte0
+		ldr	r3, [r1, #4]!
+		subs	r2, r2, #2
+		orr	ip, ip, r3, push_hbyte1
+		strh	ip, [r0]
+		bpl	2b
+
+3:		tst	r2, #1
+2:		movne	ip, r3, lsr #8
+		strneh	ip, [r0]
+		mov	pc, lr

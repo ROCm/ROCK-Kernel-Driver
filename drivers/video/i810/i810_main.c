@@ -2002,20 +2002,20 @@ int __init i810fb_init(void)
 	return pci_register_driver(&i810fb_driver);
 }
 
-module_param(vram, int, 4);
+module_param(vram, int, 0);
 MODULE_PARM_DESC(vram, "System RAM to allocate to framebuffer in MiB" 
 		 " (default=4)");
 module_param(voffset, int, 0);
 MODULE_PARM_DESC(voffset, "at what offset to place start of framebuffer "
                  "memory (0 to maximum aperture size), in MiB (default = 48)");
-module_param(bpp, int, 8);
+module_param(bpp, int, 0);
 MODULE_PARM_DESC(bpp, "Color depth for display in bits per pixel"
 		 " (default = 8)");
-module_param(xres, int, 640);
+module_param(xres, int, 0);
 MODULE_PARM_DESC(xres, "Horizontal resolution in pixels (default = 640)");
-module_param(yres, int, 480);
+module_param(yres, int, 0);
 MODULE_PARM_DESC(yres, "Vertical resolution in scanlines (default = 480)");
-module_param(vyres,int, 480);
+module_param(vyres,int, 0);
 MODULE_PARM_DESC(vyres, "Virtual vertical resolution in scanlines"
 		 " (default = 480)");
 module_param(hsync1, int, 0);

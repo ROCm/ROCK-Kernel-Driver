@@ -9,8 +9,6 @@
  *      Copyright (C) 1995  Linus Torvalds
  */
 
-/* $Id$ */
-
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>
@@ -19,6 +17,7 @@
 #include <linux/swap.h>
 #include <linux/highmem.h>
 #include <linux/bitops.h>
+#include <linux/nodemask.h>
 #include <asm/types.h>
 #include <asm/processor.h>
 #include <asm/page.h>
@@ -153,7 +152,7 @@ int __init reservedpages_count(void)
 	int reservedpages, nid, i;
 
 	reservedpages = 0;
-	for (nid = 0 ; nid < numnodes ; nid++)
+	for_each_online_node(nid)
 		for (i = 0 ; i < MAX_LOW_PFN(nid) - START_PFN(nid) ; i++)
 			if (PageReserved(NODE_DATA(nid)->node_mem_map + i))
 				reservedpages++;
@@ -174,7 +173,7 @@ void __init mem_init(void)
 #endif
 
 	num_physpages = 0;
-	for (nid = 0 ; nid < numnodes ; nid++)
+	for_each_online_node(nid)
 		num_physpages += MAX_LOW_PFN(nid) - START_PFN(nid) + 1;
 
 	num_physpages -= hole_pages;
@@ -193,7 +192,7 @@ void __init mem_init(void)
 	memset(empty_zero_page, 0, PAGE_SIZE);
 
 	/* this will put all low memory onto the freelists */
-	for (nid = 0 ; nid < numnodes ; nid++)
+	for_each_online_node(nid)
 		totalram_pages += free_all_bootmem_node(NODE_DATA(nid));
 
 	reservedpages = reservedpages_count() - hole_pages;

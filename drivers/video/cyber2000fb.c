@@ -94,7 +94,7 @@ struct cfb_info {
 
 static char default_font_storage[40];
 static char *default_font = "Acorn8x8";
-MODULE_PARM(default_font, "s");
+module_param(default_font, charp, 0);
 MODULE_PARM_DESC(default_font, "Default font name");
 
 /*

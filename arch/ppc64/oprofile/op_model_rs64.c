@@ -119,7 +119,7 @@ static void rs64_cpu_setup(void *unused)
 
 	mmcr0 |= MMCR0_FCM1|MMCR0_PMXE|MMCR0_FCECE;
 	/* Only applies to POWER3, but should be safe on RS64 */
-	mmcr0 |= MMCR0_PMC1INTCONTROL|MMCR0_PMCNINTCONTROL;
+	mmcr0 |= MMCR0_PMC1CE|MMCR0_PMCjCE;
 	mtspr(SPRN_MMCR0, mmcr0);
 
 	dbg("setup on cpu %d, mmcr0 %lx\n", smp_processor_id(),

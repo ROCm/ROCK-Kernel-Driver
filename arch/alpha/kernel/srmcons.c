@@ -179,7 +179,7 @@ srmcons_get_private_struct(struct srmcons_private **ps)
 		}
 
 		srmconsp->tty = NULL;
-		srmconsp->lock = SPIN_LOCK_UNLOCKED;
+		spin_lock_init(&srmconsp->lock);
 		init_timer(&srmconsp->timer);
 
 		*ps = srmconsp;

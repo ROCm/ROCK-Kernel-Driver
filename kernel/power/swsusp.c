@@ -420,7 +420,7 @@ struct highmem_page {
 	struct highmem_page *next;
 };
 
-struct highmem_page *highmem_copy = NULL;
+static struct highmem_page *highmem_copy;
 
 static int save_highmem_zone(struct zone *zone)
 {
@@ -753,11 +753,11 @@ static int swsusp_alloc(void)
 		return -ENOSPC;
 
 	if ((error = alloc_pagedir())) {
-		pr_debug("suspend: Allocating pagedir failed.\n");
+		printk(KERN_ERR "suspend: Allocating pagedir failed.\n");
 		return error;
 	}
 	if ((error = alloc_image_pages())) {
-		pr_debug("suspend: Allocating image pages failed.\n");
+		printk(KERN_ERR "suspend: Allocating image pages failed.\n");
 		swsusp_free();
 		return error;
 	}
@@ -767,7 +767,7 @@ static int swsusp_alloc(void)
 	return 0;
 }
 
-int suspend_prepare_image(void)
+static int suspend_prepare_image(void)
 {
 	int error;
 
@@ -843,11 +843,22 @@ int swsusp_suspend(void)
 	if ((error = arch_prepare_suspend()))
 		return error;
 	local_irq_disable();
+	/* At this point, device_suspend() has been called, but *not*
+	 * device_power_down(). We *must* device_power_down() now.
+	 * Otherwise, drivers for some devices (e.g. interrupt controllers)
+	 * become desynchronized with the actual state of the hardware
+	 * at resume time, and evil weirdness ensues.
+	 */
+	if ((error = device_power_down(PMSG_FREEZE))) {
+		local_irq_enable();
+		return error;
+	}
 	save_processor_state();
 	error = swsusp_arch_suspend();
 	/* Restore control flow magically appears here */
 	restore_processor_state();
 	restore_highmem();
+	device_power_up();
 	local_irq_enable();
 	return error;
 }
@@ -867,6 +878,7 @@ int swsusp_resume(void)
 {
 	int error;
 	local_irq_disable();
+	device_power_down(PMSG_FREEZE);
 	/* We'll ignore saved state, but this gets preempt count (etc) right */
 	save_processor_state();
 	error = swsusp_arch_resume();
@@ -876,6 +888,7 @@ int swsusp_resume(void)
 	BUG_ON(!error);
 	restore_processor_state();
 	restore_highmem();
+	device_power_up();
 	local_irq_enable();
 	return error;
 }
@@ -1037,12 +1050,12 @@ static int submit(int rw, pgoff_t page_off, void * page)
 	return error;
 }
 
-int bio_read_page(pgoff_t page_off, void * page)
+static int bio_read_page(pgoff_t page_off, void * page)
 {
 	return submit(READ, page_off, page);
 }
 
-int bio_write_page(pgoff_t page_off, void * page)
+static int bio_write_page(pgoff_t page_off, void * page)
 {
 	return submit(WRITE, page_off, page);
 }
@@ -1159,7 +1172,7 @@ static int __init read_pagedir(void)
 		return -ENOMEM;
 	pagedir_nosave = (struct pbe *)addr;
 
-	pr_debug("pmdisk: Reading pagedir (%d Pages)\n",n);
+	pr_debug("swsusp: Reading pagedir (%d Pages)\n",n);
 
 	for (i = 0; i < n && !error; i++, addr += PAGE_SIZE) {
 		unsigned long offset = swp_offset(swsusp_info.pagedir[i]);

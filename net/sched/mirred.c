@@ -46,13 +46,13 @@
 #define MY_TAB_MASK     (MY_TAB_SIZE - 1)
 static u32 idx_gen;
 static struct tcf_mirred *tcf_mirred_ht[MY_TAB_SIZE];
-static rwlock_t mirred_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(mirred_lock);
 
 /* ovewrride the defaults */
-#define tcf_st  tcf_mirred
-#define tc_st  tc_mirred
-#define tcf_t_lock   mirred_lock
-#define tcf_ht tcf_mirred_ht
+#define tcf_st		tcf_mirred
+#define tc_st		tc_mirred
+#define tcf_t_lock	mirred_lock
+#define tcf_ht		tcf_mirred_ht
 
 #define CONFIG_NET_ACT_INIT 1
 #include <net/pkt_act.h>
@@ -61,10 +61,8 @@ static inline int
 tcf_mirred_release(struct tcf_mirred *p, int bind)
 {
 	if (p) {
-		if (bind) {
+		if (bind)
 			p->bindcnt--;
-		}
-
 		p->refcnt--;
 		if(!p->bindcnt && p->refcnt <= 0) {
 			dev_put(p->dev);
@@ -72,46 +70,32 @@ tcf_mirred_release(struct tcf_mirred *p, int bind)
 			return 1;
 		}
 	}
-
 	return 0;
 }
 
 static int
-tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int ovr, int bind)
+tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,
+                int ovr, int bind)
 {
 	struct rtattr *tb[TCA_MIRRED_MAX];
 	struct tc_mirred *parm;
 	struct tcf_mirred *p;
 	struct net_device *dev = NULL;
-	int size = sizeof (*p), new = 0;
+	int ret = 0;
+	int ok_push = 0;
 
+	if (rta == NULL || rtattr_parse_nested(tb, TCA_MIRRED_MAX, rta) < 0)
+		return -EINVAL;
 
-	if (rtattr_parse(tb, TCA_MIRRED_MAX, RTA_DATA(rta), RTA_PAYLOAD(rta)) < 0) {
-		DPRINTK("tcf_mirred_init BUG in user space couldnt parse properly\n");
-		return -1;
-	}
-
-	if (NULL == a || NULL == tb[TCA_MIRRED_PARMS - 1]) {
-		DPRINTK("BUG: tcf_mirred_init called with NULL params\n");
-		return -1;
-	}
-
-	parm = RTA_DATA(tb[TCA_MIRRED_PARMS - 1]);
-
-	p = tcf_hash_check(parm, a, ovr, bind);
-	if (NULL == p) { /* new */
-		p = tcf_hash_create(parm,est,a,size,ovr,bind);
-		new = 1;
-		if (NULL == p)
-			return -1;
-	}
+	if (tb[TCA_MIRRED_PARMS-1] == NULL ||
+	    RTA_PAYLOAD(tb[TCA_MIRRED_PARMS-1]) < sizeof(*parm))
+		return -EINVAL;
+	parm = RTA_DATA(tb[TCA_MIRRED_PARMS-1]);
 
 	if (parm->ifindex) {
-		dev = dev_get_by_index(parm->ifindex);
-		if (NULL == dev) {
-			printk("BUG: tcf_mirred_init called with bad device\n");
-			return -1;
-		}
+		dev = __dev_get_by_index(parm->ifindex);
+		if (dev == NULL)
+			return -ENODEV;
 		switch (dev->type) {
 			case ARPHRD_TUNNEL:
 			case ARPHRD_TUNNEL6:
@@ -119,44 +103,56 @@ tcf_mirred_init(struct rtattr *rta, struct rtattr *est, struct tc_action *a,int 
 			case ARPHRD_IPGRE:
 			case ARPHRD_VOID:
 			case ARPHRD_NONE:
-				p->ok_push = 0;
+				ok_push = 0;
 				break;
 			default:
-				p->ok_push = 1;
+				ok_push = 1;
 				break;
 		}
+	}
+
+	p = tcf_hash_check(parm->index, a, ovr, bind);
+	if (p == NULL) {
+		if (!parm->ifindex)
+			return -EINVAL;
+		p = tcf_hash_create(parm->index, est, a, sizeof(*p), ovr, bind);
+		if (p == NULL)
+			return -ENOMEM;
+		ret = ACT_P_CREATED;
 	} else {
-		if (new) {
-			kfree(p);
-			return -1;
-		}	
-	}
-
-	if (new || ovr) {
-		spin_lock(&p->lock);
-		p->action = parm->action;
-		p->eaction = parm->eaction;
-		if (parm->ifindex) {
-			p->ifindex = parm->ifindex;
-			if (ovr)
-				dev_put(p->dev);
-			p->dev = dev;
+		if (!ovr) {
+			tcf_mirred_release(p, bind);
+			return -EEXIST;
 		}
-		spin_unlock(&p->lock);
 	}
 
+	spin_lock_bh(&p->lock);
+	p->action = parm->action;
+	p->eaction = parm->eaction;
+	if (parm->ifindex) {
+		p->ifindex = parm->ifindex;
+		if (ret != ACT_P_CREATED)
+			dev_put(p->dev);
+		p->dev = dev;
+		dev_hold(dev);
+		p->ok_push = ok_push;
+	}
+	spin_unlock_bh(&p->lock);
+	if (ret == ACT_P_CREATED)
+		tcf_hash_insert(p);
 
-	DPRINTK(" tcf_mirred_init index %d action %d eaction %d device %s ifndex %d\n",parm->index,parm->action,parm->eaction,dev->name,parm->ifindex);
-	return new;
-
+	DPRINTK("tcf_mirred_init index %d action %d eaction %d device %s "
+	        "ifindex %d\n", parm->index, parm->action, parm->eaction,
+	        dev->name, parm->ifindex);
+	return ret;
 }
 
 static int
 tcf_mirred_cleanup(struct tc_action *a, int bind)
 {
-	struct tcf_mirred *p;
-	p = PRIV(a,mirred);
-	if (NULL != p)
+	struct tcf_mirred *p = PRIV(a, mirred);
+
+	if (p != NULL)
 		return tcf_mirred_release(p, bind);
 	return 0;
 }
@@ -164,70 +160,52 @@ tcf_mirred_cleanup(struct tc_action *a, int bind)
 static int
 tcf_mirred(struct sk_buff **pskb, struct tc_action *a)
 {
-	struct tcf_mirred *p;
+	struct tcf_mirred *p = PRIV(a, mirred);
 	struct net_device *dev;
 	struct sk_buff *skb2 = NULL;
 	struct sk_buff *skb = *pskb;
-	__u32 at = G_TC_AT(skb->tc_verd);
-
-	if (NULL == a) {
-		if (net_ratelimit())
-			printk("BUG: tcf_mirred called with NULL action!\n");
-		return -1;
-	}
-
-	p = PRIV(a,mirred);
-
-	if (NULL == p) {
-		if (net_ratelimit())
-			printk("BUG: tcf_mirred called with NULL params\n");
-		return -1;
-	}
+	u32 at = G_TC_AT(skb->tc_verd);
 
 	spin_lock(&p->lock);
 
-       	dev = p->dev;
+	dev = p->dev;
 	p->tm.lastuse = jiffies;
 
-	if (NULL == dev || !(dev->flags&IFF_UP) ) {
+	if (!(dev->flags&IFF_UP) ) {
 		if (net_ratelimit())
 			printk("mirred to Houston: device %s is gone!\n",
-					dev?dev->name:"");
+			       dev->name);
 bad_mirred:
-		if (NULL != skb2)
+		if (skb2 != NULL)
 			kfree_skb(skb2);
 		p->qstats.overlimits++;
 		p->bstats.bytes += skb->len;
 		p->bstats.packets++;
 		spin_unlock(&p->lock);
 		/* should we be asking for packet to be dropped?
-		 * may make sense for redirect case only 
+		 * may make sense for redirect case only
 		*/
 		return TC_ACT_SHOT;
-	} 
+	}
 
 	skb2 = skb_clone(skb, GFP_ATOMIC);
-	if (skb2 == NULL) {
+	if (skb2 == NULL)
 		goto bad_mirred;
-	}
-	if (TCA_EGRESS_MIRROR != p->eaction &&
-		TCA_EGRESS_REDIR != p->eaction) {
+	if (p->eaction != TCA_EGRESS_MIRROR && p->eaction != TCA_EGRESS_REDIR) {
 		if (net_ratelimit())
-			printk("tcf_mirred unknown action %d\n",p->eaction);
+			printk("tcf_mirred unknown action %d\n", p->eaction);
 		goto bad_mirred;
 	}
 
 	p->bstats.bytes += skb2->len;
 	p->bstats.packets++;
-	if ( !(at & AT_EGRESS)) {
-		if (p->ok_push) {
+	if (!(at & AT_EGRESS))
+		if (p->ok_push)
 			skb_push(skb2, skb2->dev->hard_header_len);
-		}
-	}
 
 	/* mirror is always swallowed */
-	if (TCA_EGRESS_MIRROR != p->eaction)
-		skb2->tc_verd = SET_TC_FROM(skb2->tc_verd,at);
+	if (p->eaction != TCA_EGRESS_MIRROR)
+		skb2->tc_verd = SET_TC_FROM(skb2->tc_verd, at);
 
 	skb2->dev = dev;
 	skb2->input_dev = skb->dev;
@@ -237,18 +215,12 @@ bad_mirred:
 }
 
 static int
-tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
+tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a, int bind, int ref)
 {
 	unsigned char *b = skb->tail;
 	struct tc_mirred opt;
-	struct tcf_mirred *p;
+	struct tcf_mirred *p = PRIV(a, mirred);
 	struct tcf_t t;
-
-	p = PRIV(a,mirred);
-	if (NULL == p) {
-		printk("BUG: tcf_mirred_dump called with NULL params\n");
-		goto rtattr_failure;
-	}
 
 	opt.index = p->index;
 	opt.action = p->action;
@@ -256,12 +228,13 @@ tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 	opt.bindcnt = p->bindcnt - bind;
 	opt.eaction = p->eaction;
 	opt.ifindex = p->ifindex;
-	DPRINTK(" tcf_mirred_dump index %d action %d eaction %d ifndex %d\n",p->index,p->action,p->eaction,p->ifindex);
-	RTA_PUT(skb, TCA_MIRRED_PARMS, sizeof (opt), &opt);
+	DPRINTK("tcf_mirred_dump index %d action %d eaction %d ifindex %d\n",
+	         p->index, p->action, p->eaction, p->ifindex);
+	RTA_PUT(skb, TCA_MIRRED_PARMS, sizeof(opt), &opt);
 	t.install = jiffies_to_clock_t(jiffies - p->tm.install);
 	t.lastuse = jiffies_to_clock_t(jiffies - p->tm.lastuse);
 	t.expires = jiffies_to_clock_t(p->tm.expires);
-	RTA_PUT(skb, TCA_MIRRED_TM, sizeof (t), &t);
+	RTA_PUT(skb, TCA_MIRRED_TM, sizeof(t), &t);
 	return skb->len;
 
       rtattr_failure:
@@ -270,7 +243,6 @@ tcf_mirred_dump(struct sk_buff *skb, struct tc_action *a,int bind, int ref)
 }
 
 static struct tc_action_ops act_mirred_ops = {
-	.next		=	NULL,
 	.kind		=	"mirred",
 	.type		=	TCA_ACT_MIRRED,
 	.capab		=	TCA_CAP_NONE,
@@ -287,7 +259,6 @@ MODULE_AUTHOR("Jamal Hadi Salim(2002)");
 MODULE_DESCRIPTION("Device Mirror/redirect actions");
 MODULE_LICENSE("GPL");
 
-
 static int __init
 mirred_init_module(void)
 {
@@ -303,4 +274,3 @@ mirred_cleanup_module(void)
 
 module_init(mirred_init_module);
 module_exit(mirred_cleanup_module);
-

@@ -31,9 +31,9 @@
 
 struct file_system_type reiserfs_fs_type;
 
-const char reiserfs_3_5_magic_string[] = REISERFS_SUPER_MAGIC_STRING;
-const char reiserfs_3_6_magic_string[] = REISER2FS_SUPER_MAGIC_STRING;
-const char reiserfs_jr_magic_string[] = REISER2FS_JR_SUPER_MAGIC_STRING;
+static const char reiserfs_3_5_magic_string[] = REISERFS_SUPER_MAGIC_STRING;
+static const char reiserfs_3_6_magic_string[] = REISER2FS_SUPER_MAGIC_STRING;
+static const char reiserfs_jr_magic_string[] = REISER2FS_JR_SUPER_MAGIC_STRING;
 
 int is_reiserfs_3_5 (struct reiserfs_super_block * rs)
 {
@@ -106,7 +106,7 @@ static void reiserfs_write_super_lockfs (struct super_block * s)
   reiserfs_write_unlock(s);
 }
 
-void reiserfs_unlockfs(struct super_block *s) {
+static void reiserfs_unlockfs(struct super_block *s) {
   reiserfs_allow_writes(s) ;
 }
 
@@ -561,7 +561,7 @@ static ssize_t reiserfs_quota_write(struct super_block *, int, const char *, siz
 static ssize_t reiserfs_quota_read(struct super_block *, int, char *, size_t, loff_t);
 #endif
 
-struct super_operations reiserfs_sops = 
+static struct super_operations reiserfs_sops =
 {
   .alloc_inode = reiserfs_alloc_inode,
   .destroy_inode = reiserfs_destroy_inode,
@@ -1284,24 +1284,6 @@ static int read_old_bitmaps (struct super_block * s)
   return 0;
 }
 
-void check_bitmap (struct super_block * s)
-{
-  int i = 0;
-  int free = 0;
-  char * buf;
-
-  while (i < SB_BLOCK_COUNT (s)) {
-    buf = SB_AP_BITMAP (s)[i / (s->s_blocksize * 8)].bh->b_data;
-    if (!reiserfs_test_le_bit (i % (s->s_blocksize * 8), buf))
-      free ++;
-    i ++;
-  }
-
-  if (free != SB_FREE_BLOCKS (s))
-    reiserfs_warning (s,"vs-4000: check_bitmap: %d free blocks, must be %d",
-		      free, SB_FREE_BLOCKS (s));
-}
-
 static int read_super_block (struct super_block * s, int offset)
 {
     struct buffer_head * bh;
@@ -1429,7 +1411,7 @@ static int reread_meta_blocks(struct super_block *s) {
 // FIXME: we look for only one name in a directory. If tea and yura
 // bith have the same value - we ask user to send report to the
 // mailing list
-__u32 find_hash_out (struct super_block * s)
+static __u32 find_hash_out (struct super_block * s)
 {
     int retval;
     struct inode * inode;
@@ -1560,7 +1542,7 @@ static hashf_t hash_function (struct super_block * s)
 }
 
 // this is used to set up correct value for old partitions
-int function2code (hashf_t func)
+static int function2code (hashf_t func)
 {
     if (func == keyed_hash)
 	return TEA_HASH;
@@ -1799,7 +1781,7 @@ static int reiserfs_fill_super (struct super_block * s, void * data, int silent)
     reiserfs_proc_info_init( s );
 
     init_waitqueue_head (&(sbi->s_wait));
-    sbi->bitmap_lock = SPIN_LOCK_UNLOCKED;
+    spin_lock_init(&sbi->bitmap_lock);
 
     return (0);
 

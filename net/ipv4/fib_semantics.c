@@ -47,7 +47,7 @@
 
 #define FSprintk(a...)
 
-static rwlock_t fib_info_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(fib_info_lock);
 static struct hlist_head *fib_info_hash;
 static struct hlist_head *fib_info_laddrhash;
 static unsigned int fib_hash_size;
@@ -59,7 +59,7 @@ static struct hlist_head fib_info_devhash[DEVINDEX_HASHSIZE];
 
 #ifdef CONFIG_IP_ROUTE_MULTIPATH
 
-static spinlock_t fib_multipath_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(fib_multipath_lock);
 
 #define for_nexthops(fi) { int nhsel; const struct fib_nh * nh; \
 for (nhsel=0, nh = (fi)->fib_nh; nhsel < (fi)->fib_nhs; nh++, nhsel++)

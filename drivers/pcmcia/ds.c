@@ -1,35 +1,17 @@
-/*======================================================================
-
-    PC Card Driver Services
-    
-    ds.c 1.112 2001/10/13 00:08:28
-    
-    The contents of this file are subject to the Mozilla Public
-    License Version 1.1 (the "License"); you may not use this file
-    except in compliance with the License. You may obtain a copy of
-    the License at http://www.mozilla.org/MPL/
-
-    Software distributed under the License is distributed on an "AS
-    IS" basis, WITHOUT WARRANTY OF ANY KIND, either express or
-    implied. See the License for the specific language governing
-    rights and limitations under the License.
-
-    The initial developer of the original code is David A. Hinds
-    <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
-    are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
-
-    Alternatively, the contents of this file may be used under the
-    terms of the GNU General Public License version 2 (the "GPL"), in
-    which case the provisions of the GPL are applicable instead of the
-    above.  If you wish to allow the use of your version of this file
-    only under the terms of the GPL and not to allow others to use
-    your version of this file under the MPL, indicate your decision
-    by deleting the provisions above and replace them with the notice
-    and other provisions required by the GPL.  If you do not delete
-    the provisions above, a recipient may use your version of this
-    file under either the MPL or the GPL.
-    
-======================================================================*/
+/*
+ * ds.c -- 16-bit PCMCIA core support
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ *
+ * The initial developer of the original code is David A. Hinds
+ * <dahinds@users.sourceforge.net>.  Portions created by David A. Hinds
+ * are Copyright (C) 1999 David A. Hinds.  All Rights Reserved.
+ *
+ * (C) 1999		David A. Hinds
+ * (C) 2003 - 2004	Dominik Brodowski
+ */
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -51,6 +33,7 @@
 #include <linux/pci.h>
 #include <linux/list.h>
 #include <linux/delay.h>
+#include <linux/kref.h>
 #include <linux/workqueue.h>
 
 #include <asm/atomic.h>
@@ -72,7 +55,7 @@
 
 MODULE_AUTHOR("David Hinds <dahinds@users.sourceforge.net>");
 MODULE_DESCRIPTION("PCMCIA Driver Services");
-MODULE_LICENSE("Dual MPL/GPL");
+MODULE_LICENSE("GPL");
 
 #ifdef DEBUG
 int ds_pc_debug;
@@ -89,13 +72,6 @@ module_param_named(pc_debug, ds_pc_debug, int, 0644);
 
 /*====================================================================*/
 
-typedef struct socket_bind_t {
-    struct pcmcia_driver	*driver;
-    u_char		function;
-    dev_link_t		*instance;
-    struct socket_bind_t *next;
-} socket_bind_t;
-
 /* Device user information */
 #define MAX_EVENTS	32
 #define USER_MAGIC	0x7ea4
@@ -111,16 +87,22 @@ typedef struct user_info_t {
 
 /* Socket state information */
 struct pcmcia_bus_socket {
-	atomic_t		refcount;
-	client_handle_t		handle;
+	struct kref		refcount;
+	struct pcmcia_callback	callback;
 	int			state;
 	user_info_t		*user;
 	int			req_pending, req_result;
 	wait_queue_head_t	queue, request;
-	struct work_struct	removal;
-	socket_bind_t		*bind;
 	struct pcmcia_socket	*parent;
+
+	/* the PCMCIA devices connected to this socket (normally one, more
+	 * for multifunction devices: */
+	struct list_head	devices_list;
+	u8			device_count; /* the number of devices, used
+					       * only internally and subject
+					       * to incorrectness and change */
 };
+static spinlock_t pcmcia_dev_list_lock;
 
 #define DS_SOCKET_PRESENT		0x01
 #define DS_SOCKET_BUSY			0x02
@@ -129,88 +111,13 @@ struct pcmcia_bus_socket {
 
 /*====================================================================*/
 
-/* Device driver ID passed to Card Services */
-static dev_info_t dev_info = "Driver Services";
-
 static int major_dev = -1;
+
+static int unbind_request(struct pcmcia_bus_socket *s);
 
 /*====================================================================*/
 
 /* code which was in cs.c before */
-
-/*======================================================================
-
-    Bind_device() associates a device driver with a particular socket.
-    It is normally called by Driver Services after it has identified
-    a newly inserted card.  An instance of that driver will then be
-    eligible to register as a client of this socket.
-    
-======================================================================*/
-
-static int pcmcia_bind_device(bind_req_t *req)
-{
-	client_t *client;
-	struct pcmcia_socket *s;
-
-	s = req->Socket;
-	if (!s)
-		return CS_BAD_SOCKET;
-
-	client = (client_t *) kmalloc(sizeof(client_t), GFP_KERNEL);
-	if (!client) 
-		return CS_OUT_OF_RESOURCE;
-	memset(client, '\0', sizeof(client_t));
-	client->client_magic = CLIENT_MAGIC;
-	strlcpy(client->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
-	client->Socket = s;
-	client->Function = req->Function;
-	client->state = CLIENT_UNBOUND;
-	client->next = s->clients;
-	s->clients = client;
-	ds_dbg(1, "%s: bind_device(): client 0x%p, dev %s\n",
-		cs_socket_name(client->Socket), client, client->dev_info);
-	return CS_SUCCESS;
-} /* bind_device */
-
-
-/*======================================================================
-
-    Bind_mtd() associates a device driver with a particular memory
-    region.  It is normally called by Driver Services after it has
-    identified a memory device type.  An instance of the corresponding
-    driver will then be able to register to control this region.
-    
-======================================================================*/
-
-static int pcmcia_bind_mtd(mtd_bind_t *req)
-{
-	struct pcmcia_socket *s;
-	memory_handle_t region;
-
-	s = req->Socket;
-	if (!s)
-		return CS_BAD_SOCKET;
-    
-	if (req->Attributes & REGION_TYPE_AM)
-		region = s->a_region;
-	else
-		region = s->c_region;
-
-	while (region) {
-		if (region->info.CardOffset == req->CardOffset) 
-			break;
-		region = region->info.next;
-	}
-	if (!region || (region->mtd != NULL))
-		return CS_BAD_OFFSET;
-	strlcpy(region->dev_info, (char *)req->dev_info, DEV_NAME_LEN);
-
-	ds_dbg(1, "%s: bind_mtd: attr 0x%x, offset 0x%x, dev %s\n",
-	      cs_socket_name(s), req->Attributes, req->CardOffset,
-	      (char *)req->dev_info);
-	return CS_SUCCESS;
-} /* bind_mtd */
-
 
 /* String tables for error messages */
 
@@ -314,8 +221,10 @@ int pcmcia_report_error(client_handle_t handle, error_info_t *err)
 
 	if (CHECK_HANDLE(handle))
 		printk(KERN_NOTICE);
-	else
-		printk(KERN_NOTICE "%s: ", handle->dev_info);
+	else {
+		struct pcmcia_device *p_dev = handle_to_pdev(handle);
+		printk(KERN_NOTICE "%s: ", p_dev->dev.bus_id);
+	}
 
 	for (i = 0; i < ARRAY_SIZE(service_table); i++)
 		if (service_table[i].key == err->func)
@@ -353,22 +262,22 @@ EXPORT_SYMBOL(cs_error);
 static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info);
 static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr);
 
-static void pcmcia_put_bus_socket(struct pcmcia_bus_socket *s)
+static void pcmcia_release_bus_socket(struct kref *refcount)
 {
-	if (atomic_dec_and_test(&s->refcount))
-		kfree(s);
+	struct pcmcia_bus_socket *s = container_of(refcount, struct pcmcia_bus_socket, refcount);
+	pcmcia_put_socket(s->parent);
+	kfree(s);
 }
 
-static struct pcmcia_bus_socket *pcmcia_get_bus_socket(int nr)
+static void pcmcia_put_bus_socket(struct pcmcia_bus_socket *s)
 {
-	struct pcmcia_bus_socket *s;
+	kref_put(&s->refcount, pcmcia_release_bus_socket);
+}
 
-	s = get_socket_info_by_nr(nr);
-	if (s) {
-		WARN_ON(atomic_read(&s->refcount) == 0);
-		atomic_inc(&s->refcount);
-	}
-	return s;
+static struct pcmcia_bus_socket *pcmcia_get_bus_socket(struct pcmcia_bus_socket *s)
+{
+	kref_get(&s->refcount);
+	return (s);
 }
 
 /**
@@ -381,8 +290,8 @@ int pcmcia_register_driver(struct pcmcia_driver *driver)
 	if (!driver)
 		return -EINVAL;
 
- 	driver->use_count = 0;
 	driver->drv.bus = &pcmcia_bus_type;
+	driver->drv.owner = driver->owner;
 
 	return driver_register(&driver->drv);
 }
@@ -403,10 +312,16 @@ static struct proc_dir_entry *proc_pccard = NULL;
 static int proc_read_drivers_callback(struct device_driver *driver, void *d)
 {
 	char **p = d;
-	struct pcmcia_driver *p_dev = container_of(driver, 
+	struct pcmcia_driver *p_drv = container_of(driver,
 						   struct pcmcia_driver, drv);
 
-	*p += sprintf(*p, "%-24.24s 1 %d\n", driver->name, p_dev->use_count);
+	*p += sprintf(*p, "%-24.24s 1 %d\n", p_drv->drv.name,
+#ifdef CONFIG_MODULE_UNLOAD
+		      (p_drv->owner) ? module_refcount(p_drv->owner) : 1
+#else
+		      1
+#endif
+	);
 	d = (void *) p;
 
 	return 0;
@@ -423,6 +338,31 @@ static int proc_read_drivers(char *buf, char **start, off_t pos,
 	return (p - buf);
 }
 #endif
+
+/* pcmcia_device handling */
+
+static struct pcmcia_device * pcmcia_get_dev(struct pcmcia_device *p_dev)
+{
+	struct device *tmp_dev;
+	tmp_dev = get_device(&p_dev->dev);
+	if (!tmp_dev)
+		return NULL;
+	return to_pcmcia_dev(tmp_dev);
+}
+
+static void pcmcia_put_dev(struct pcmcia_device *p_dev)
+{
+	put_device(&p_dev->dev);
+}
+
+static void pcmcia_release_dev(struct device *dev)
+{
+	struct pcmcia_device *p_dev = to_pcmcia_dev(dev);
+	ds_dbg(1, "releasing dev %p\n", p_dev);
+	pcmcia_put_bus_socket(p_dev->socket->pcmcia);
+	kfree(p_dev);
+}
+
 
 /*======================================================================
 
@@ -471,157 +411,328 @@ static int handle_request(struct pcmcia_bus_socket *s, event_t event)
     return CS_SUCCESS;
 }
 
-static void handle_removal(void *data)
-{
-    struct pcmcia_bus_socket *s = data;
-    handle_event(s, CS_EVENT_CARD_REMOVAL);
-    s->state &= ~DS_SOCKET_REMOVAL_PENDING;
-}
-
 /*======================================================================
 
     The card status event handler.
     
 ======================================================================*/
 
-static int ds_event(event_t event, int priority,
-		    event_callback_args_t *args)
+struct send_event_data {
+	struct pcmcia_socket *skt;
+	event_t event;
+	int priority;
+};
+
+static int send_event_callback(struct device *dev, void * _data)
 {
-    struct pcmcia_bus_socket *s;
+	struct pcmcia_device *p_dev = to_pcmcia_dev(dev);
+	struct send_event_data *data = _data;
 
-    ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
-	  event, priority, args->client_handle);
-    s = args->client_data;
+	/* we get called for all sockets, but may only pass the event
+	 * for drivers _on the affected socket_ */
+	if (p_dev->socket != data->skt)
+		return 0;
+
+	if (p_dev->client.state & (CLIENT_UNBOUND|CLIENT_STALE))
+		return 0;
+
+	if (p_dev->client.EventMask & data->event)
+		return EVENT(&p_dev->client, data->event, data->priority);
+
+	return 0;
+}
+
+static int send_event(struct pcmcia_socket *s, event_t event, int priority)
+{
+	int ret = 0;
+	struct send_event_data private;
+	struct pcmcia_bus_socket *skt = pcmcia_get_bus_socket(s->pcmcia);
+
+	if (!skt)
+		return 0;
+
+	private.skt = s;
+	private.event = event;
+	private.priority = priority;
+
+	ret = bus_for_each_dev(&pcmcia_bus_type, NULL, &private, send_event_callback);
+
+	pcmcia_put_bus_socket(skt);
+	return ret;
+} /* send_event */
+
+
+/* Normally, the event is passed to individual drivers after
+ * informing userspace. Only for CS_EVENT_CARD_REMOVAL this
+ * is inversed to maintain historic compatibility.
+ */
+
+static int ds_event(struct pcmcia_socket *skt, event_t event, int priority)
+{
+	struct pcmcia_bus_socket *s = skt->pcmcia;
+	int ret = 0;
+
+	ds_dbg(1, "ds_event(0x%06x, %d, 0x%p)\n",
+	       event, priority, s);
     
-    switch (event) {
-	
-    case CS_EVENT_CARD_REMOVAL:
-	s->state &= ~DS_SOCKET_PRESENT;
-	if (!(s->state & DS_SOCKET_REMOVAL_PENDING)) {
-		s->state |= DS_SOCKET_REMOVAL_PENDING;
-		schedule_delayed_work(&s->removal,  HZ/10);
-	}
-	break;
-	
-    case CS_EVENT_CARD_INSERTION:
-	s->state |= DS_SOCKET_PRESENT;
-	handle_event(s, event);
-	break;
+	switch (event) {
 
-    case CS_EVENT_EJECTION_REQUEST:
-	return handle_request(s, event);
-	break;
+	case CS_EVENT_CARD_REMOVAL:
+		s->state &= ~DS_SOCKET_PRESENT;
+	    	send_event(skt, event, priority);
+		unbind_request(s);
+		handle_event(s, event);
+		break;
 	
-    default:
-	handle_event(s, event);
-	break;
+	case CS_EVENT_CARD_INSERTION:
+		s->state |= DS_SOCKET_PRESENT;
+		handle_event(s, event);
+		send_event(skt, event, priority);
+		break;
+
+	case CS_EVENT_EJECTION_REQUEST:
+		ret = handle_request(s, event);
+		if (ret)
+			break;
+		ret = send_event(skt, event, priority);
+		break;
+
+	default:
+		handle_event(s, event);
+		send_event(skt, event, priority);
+		break;
     }
 
     return 0;
 } /* ds_event */
 
-/*======================================================================
-
-    bind_mtd() connects a memory region with an MTD client.
-    
-======================================================================*/
-
-static int bind_mtd(struct pcmcia_bus_socket *bus_sock, mtd_info_t *mtd_info)
-{
-    mtd_bind_t bind_req;
-    int ret;
-
-    bind_req.dev_info = &mtd_info->dev_info;
-    bind_req.Attributes = mtd_info->Attributes;
-    bind_req.Socket = bus_sock->parent;
-    bind_req.CardOffset = mtd_info->CardOffset;
-    ret = pcmcia_bind_mtd(&bind_req);
-    if (ret != CS_SUCCESS) {
-	cs_error(NULL, BindMTD, ret);
-	printk(KERN_NOTICE "ds: unable to bind MTD '%s' to socket %d"
-	       " offset 0x%x\n",
-	       (char *)bind_req.dev_info, bus_sock->parent->sock, bind_req.CardOffset);
-	return -ENODEV;
-    }
-    return 0;
-} /* bind_mtd */
 
 /*======================================================================
+
+    bind_request() and bind_device() are merged by now. Register_client()
+    is called right at the end of bind_request(), during the driver's
+    ->attach() call. Individual descriptions:
 
     bind_request() connects a socket to a particular client driver.
     It looks up the specified device ID in the list of registered
     drivers, binds it to the socket, and tries to create an instance
     of the device.  unbind_request() deletes a driver instance.
     
+    Bind_device() associates a device driver with a particular socket.
+    It is normally called by Driver Services after it has identified
+    a newly inserted card.  An instance of that driver will then be
+    eligible to register as a client of this socket.
+
+    Register_client() uses the dev_info_t handle to match the
+    caller with a socket.  The driver must have already been bound
+    to a socket with bind_device() -- in fact, bind_device()
+    allocates the client structure that will be used.
+
 ======================================================================*/
 
 static int bind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
 {
-    struct pcmcia_driver *driver;
-    socket_bind_t *b;
-    bind_req_t bind_req;
-    int ret;
+	struct pcmcia_driver *p_drv;
+	struct pcmcia_device *p_dev, *tmp_dev;
+	unsigned long flags;
+	int ret = 0;
 
-    if (!s)
-	    return -EINVAL;
+	s = pcmcia_get_bus_socket(s);
+	if (!s)
+		return -EINVAL;
 
-    ds_dbg(2, "bind_request(%d, '%s')\n", s->parent->sock,
-	  (char *)bind_info->dev_info);
-    driver = get_pcmcia_driver(&bind_info->dev_info);
-    if (!driver)
-	    return -EINVAL;
+	ds_dbg(2, "bind_request(%d, '%s')\n", s->parent->sock,
+	       (char *)bind_info->dev_info);
 
-    for (b = s->bind; b; b = b->next)
-	if ((driver == b->driver) &&
-	    (bind_info->function == b->function))
-	    break;
-    if (b != NULL) {
-	bind_info->instance = b->instance;
-	return -EBUSY;
-    }
-
-    if (!try_module_get(driver->owner))
-	    return -EINVAL;
-
-    bind_req.Socket = s->parent;
-    bind_req.Function = bind_info->function;
-    bind_req.dev_info = (dev_info_t *) driver->drv.name;
-    ret = pcmcia_bind_device(&bind_req);
-    if (ret != CS_SUCCESS) {
-	cs_error(NULL, BindDevice, ret);
-	printk(KERN_NOTICE "ds: unable to bind '%s' to socket %d\n",
-	       (char *)dev_info, s->parent->sock);
-	module_put(driver->owner);
-	return -ENODEV;
-    }
-
-    /* Add binding to list for this socket */
-    driver->use_count++;
-    b = kmalloc(sizeof(socket_bind_t), GFP_KERNEL);
-    if (!b) 
-    {
-    	driver->use_count--;
-	module_put(driver->owner);
-	return -ENOMEM;    
-    }
-    b->driver = driver;
-    b->function = bind_info->function;
-    b->instance = NULL;
-    b->next = s->bind;
-    s->bind = b;
-    
-    if (driver->attach) {
-	b->instance = driver->attach();
-	if (b->instance == NULL) {
-	    printk(KERN_NOTICE "ds: unable to create instance "
-		   "of '%s'!\n", (char *)bind_info->dev_info);
-	    module_put(driver->owner);
-	    return -ENODEV;
+	p_drv = get_pcmcia_driver(&bind_info->dev_info);
+	if (!p_drv) {
+		ret = -EINVAL;
+		goto err_put;
 	}
-    }
-    
-    return 0;
+
+	if (!try_module_get(p_drv->owner)) {
+		ret = -EINVAL;
+		goto err_put_driver;
+	}
+
+	/* Currently, the userspace pcmcia cardmgr detects pcmcia devices.
+	 * Here this information is translated into a kernel
+	 * struct pcmcia_device.
+	 */
+
+	p_dev = kmalloc(sizeof(struct pcmcia_device), GFP_KERNEL);
+	if (!p_dev) {
+		ret = -ENOMEM;
+		goto err_put_module;
+	}
+	memset(p_dev, 0, sizeof(struct pcmcia_device));
+
+	p_dev->socket = s->parent;
+	p_dev->device_no = (s->device_count++);
+	p_dev->func   = bind_info->function;
+
+	p_dev->dev.bus = &pcmcia_bus_type;
+	p_dev->dev.parent = s->parent->dev.dev;
+	p_dev->dev.release = pcmcia_release_dev;
+	sprintf (p_dev->dev.bus_id, "%d.%d", p_dev->socket->sock, p_dev->device_no);
+	p_dev->dev.driver = &p_drv->drv;
+
+	/* compat */
+	p_dev->client.client_magic = CLIENT_MAGIC;
+	p_dev->client.Socket = s->parent;
+	p_dev->client.Function = bind_info->function;
+	p_dev->client.state = CLIENT_UNBOUND;
+
+	ret = device_register(&p_dev->dev);
+	if (ret) {
+		kfree(p_dev);
+		goto err_put_module;
+	}
+
+	/* Add to the list in pcmcia_bus_socket, but only if no device
+	 * with the same func _and_ driver exists */
+	spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
+	list_for_each_entry(tmp_dev, &s->devices_list, socket_device_list) {
+		if ((tmp_dev->func == bind_info->function) &&
+		    (tmp_dev->dev.driver == p_dev->dev.driver)){
+			spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+			bind_info->instance = tmp_dev->instance;
+			ret = -EBUSY;
+			goto err_unregister;
+		}
+	}
+	list_add_tail(&p_dev->socket_device_list, &s->devices_list);
+	spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+
+	if (p_drv->attach) {
+		p_dev->instance = p_drv->attach();
+		if ((!p_dev->instance) || (p_dev->client.state & CLIENT_UNBOUND)) {
+			printk(KERN_NOTICE "ds: unable to create instance "
+			       "of '%s'!\n", (char *)bind_info->dev_info);
+			ret = -ENODEV;
+			goto err_unregister;
+		}
+	}
+
+	put_driver(&p_drv->drv);
+
+	return 0;
+
+ err_unregister:
+	device_unregister(&p_dev->dev);
+	module_put(p_drv->owner);
+	put_driver(&p_drv->drv);
+	return (ret);
+
+ err_put_module:
+	module_put(p_drv->owner);
+ err_put_driver:
+	put_driver(&p_drv->drv);
+ err_put:
+	pcmcia_put_bus_socket(s);
+	return (ret);
 } /* bind_request */
+
+int pcmcia_register_client(client_handle_t *handle, client_reg_t *req)
+{
+	client_t *client = NULL;
+	struct pcmcia_socket *s;
+	struct pcmcia_bus_socket *skt = NULL;
+	struct pcmcia_device *p_dev = NULL;
+
+	/* Look for unbound client with matching dev_info */
+	down_read(&pcmcia_socket_list_rwsem);
+	list_for_each_entry(s, &pcmcia_socket_list, socket_list) {
+		unsigned long flags;
+
+		if (s->state & SOCKET_CARDBUS)
+			continue;
+
+		skt = s->pcmcia;
+		if (!skt)
+			continue;
+		skt = pcmcia_get_bus_socket(skt);
+		if (!skt)
+			continue;
+		spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
+		list_for_each_entry(p_dev, &skt->devices_list, socket_device_list) {
+			struct pcmcia_driver *p_drv;
+			p_dev = pcmcia_get_dev(p_dev);
+			if (!p_dev)
+				continue;
+			if ((!p_dev->client.state & CLIENT_UNBOUND) ||
+			    (!p_dev->dev.driver)) {
+				pcmcia_put_dev(p_dev);
+				continue;
+			}
+			p_drv = to_pcmcia_drv(p_dev->dev.driver);
+			if (!strncmp(p_drv->drv.name, (char *)req->dev_info, DEV_NAME_LEN)) {
+				client = &p_dev->client;
+				spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+				goto found;
+			}
+			pcmcia_put_dev(p_dev);
+		}
+		spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+		pcmcia_put_bus_socket(skt);
+	}
+ found:
+	up_read(&pcmcia_socket_list_rwsem);
+	if (!p_dev || !client)
+		return -ENODEV;
+
+	pcmcia_put_bus_socket(skt); /* safe, as we already hold a reference from bind_device */
+
+	/*
+	 * Prevent this racing with a card insertion.
+	 */
+	down(&s->skt_sem);
+	*handle = client;
+	client->state &= ~CLIENT_UNBOUND;
+	client->Socket = s;
+	client->EventMask = req->EventMask;
+	client->event_handler = req->event_handler;
+	client->event_callback_args = req->event_callback_args;
+	client->event_callback_args.client_handle = client;
+
+	if (s->state & SOCKET_CARDBUS)
+		client->state |= CLIENT_CARDBUS;
+
+	if ((!(s->state & SOCKET_CARDBUS)) && (s->functions == 0) &&
+	    (client->Function != BIND_FN_ALL)) {
+		cistpl_longlink_mfc_t mfc;
+		if (pccard_read_tuple(s, client->Function, CISTPL_LONGLINK_MFC, &mfc)
+		    == CS_SUCCESS)
+			s->functions = mfc.nfn;
+		else
+			s->functions = 1;
+		s->config = kmalloc(sizeof(config_t) * s->functions,
+				    GFP_KERNEL);
+		if (!s->config)
+			goto out_no_resource;
+		memset(s->config, 0, sizeof(config_t) * s->functions);
+	}
+
+	ds_dbg(1, "register_client(): client 0x%p, dev %s\n",
+	       client, p_dev->dev.bus_id);
+	if (client->EventMask & CS_EVENT_REGISTRATION_COMPLETE)
+		EVENT(client, CS_EVENT_REGISTRATION_COMPLETE, CS_EVENT_PRI_LOW);
+
+	if ((s->state & (SOCKET_PRESENT|SOCKET_CARDBUS)) == SOCKET_PRESENT) {
+		if (client->EventMask & CS_EVENT_CARD_INSERTION)
+			EVENT(client, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
+	}
+
+	up(&s->skt_sem);
+	return CS_SUCCESS;
+
+ out_no_resource:
+	up(&s->skt_sem);
+	pcmcia_put_dev(p_dev);
+	return CS_OUT_OF_RESOURCE;
+} /* register_client */
+EXPORT_SYMBOL(pcmcia_register_client);
+
 
 /*====================================================================*/
 
@@ -629,96 +740,164 @@ extern struct pci_bus *pcmcia_lookup_bus(struct pcmcia_socket *s);
 
 static int get_device_info(struct pcmcia_bus_socket *s, bind_info_t *bind_info, int first)
 {
-    socket_bind_t *b;
-    dev_node_t *node;
+	dev_node_t *node;
+	struct pcmcia_device *p_dev;
+	unsigned long flags;
+	int ret = 0;
 
 #ifdef CONFIG_CARDBUS
-    /*
-     * Some unbelievably ugly code to associate the PCI cardbus
-     * device and its driver with the PCMCIA "bind" information.
-     */
-    {
-	struct pci_bus *bus;
+	/*
+	 * Some unbelievably ugly code to associate the PCI cardbus
+	 * device and its driver with the PCMCIA "bind" information.
+	 */
+	{
+		struct pci_bus *bus;
 
-	bus = pcmcia_lookup_bus(s->parent);
-	if (bus) {
-	    	struct list_head *list;
-		struct pci_dev *dev = NULL;
-		
-		list = bus->devices.next;
-		while (list != &bus->devices) {
-			struct pci_dev *pdev = pci_dev_b(list);
-			list = list->next;
+		bus = pcmcia_lookup_bus(s->parent);
+		if (bus) {
+			struct list_head *list;
+			struct pci_dev *dev = NULL;
 
-			if (first) {
-				dev = pdev;
-				break;
+			list = bus->devices.next;
+			while (list != &bus->devices) {
+				struct pci_dev *pdev = pci_dev_b(list);
+				list = list->next;
+
+				if (first) {
+					dev = pdev;
+					break;
+				}
+
+				/* Try to handle "next" here some way? */
 			}
-
-			/* Try to handle "next" here some way? */
-		}
-		if (dev && dev->driver) {
-			strlcpy(bind_info->name, dev->driver->name, DEV_NAME_LEN);
-			bind_info->major = 0;
-			bind_info->minor = 0;
-			bind_info->next = NULL;
-			return 0;
+			if (dev && dev->driver) {
+				strlcpy(bind_info->name, dev->driver->name, DEV_NAME_LEN);
+				bind_info->major = 0;
+				bind_info->minor = 0;
+				bind_info->next = NULL;
+				return 0;
+			}
 		}
 	}
-    }
 #endif
 
-    for (b = s->bind; b; b = b->next)
-	if ((strcmp((char *)b->driver->drv.name,
-		    (char *)bind_info->dev_info) == 0) &&
-	    (b->function == bind_info->function))
-	    break;
-    if (b == NULL) return -ENODEV;
-    if ((b->instance == NULL) ||
-	(b->instance->state & DEV_CONFIG_PENDING))
-	return -EAGAIN;
-    if (first)
-	node = b->instance->dev;
-    else
-	for (node = b->instance->dev; node; node = node->next)
-	    if (node == bind_info->next) break;
-    if (node == NULL) return -ENODEV;
+	spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
+	list_for_each_entry(p_dev, &s->devices_list, socket_device_list) {
+		if (p_dev->func == bind_info->function) {
+			p_dev = pcmcia_get_dev(p_dev);
+			if (!p_dev)
+				continue;
+			goto found;
+		}
+	}
+	spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+	return -ENODEV;
 
-    strlcpy(bind_info->name, node->dev_name, DEV_NAME_LEN);
-    bind_info->major = node->major;
-    bind_info->minor = node->minor;
-    bind_info->next = node->next;
-    
-    return 0;
+ found:
+	spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+
+	if ((!p_dev->instance) ||
+	    (p_dev->instance->state & DEV_CONFIG_PENDING)) {
+		ret = -EAGAIN;
+		goto err_put;
+	}
+
+	if (first)
+		node = p_dev->instance->dev;
+	else
+		for (node = p_dev->instance->dev; node; node = node->next)
+			if (node == bind_info->next)
+				break;
+	if (!node) {
+		ret = -ENODEV;
+		goto err_put;
+	}
+
+	strlcpy(bind_info->name, node->dev_name, DEV_NAME_LEN);
+	bind_info->major = node->major;
+	bind_info->minor = node->minor;
+	bind_info->next = node->next;
+
+ err_put:
+	pcmcia_put_dev(p_dev);
+	return (ret);
 } /* get_device_info */
 
 /*====================================================================*/
 
-static int unbind_request(struct pcmcia_bus_socket *s, bind_info_t *bind_info)
+/* unbind _all_ devices attached to a given pcmcia_bus_socket. The
+ * drivers have been called with EVENT_CARD_REMOVAL before.
+ */
+static int unbind_request(struct pcmcia_bus_socket *s)
 {
-    socket_bind_t **b, *c;
+	struct pcmcia_device	*p_dev;
+	struct pcmcia_driver	*p_drv;
+	unsigned long		flags;
 
-    ds_dbg(2, "unbind_request(%d, '%s')\n", s->parent->sock,
-	  (char *)bind_info->dev_info);
-    for (b = &s->bind; *b; b = &(*b)->next)
-	if ((strcmp((char *)(*b)->driver->drv.name,
-		    (char *)bind_info->dev_info) == 0) &&
-	    ((*b)->function == bind_info->function))
-	    break;
-    if (*b == NULL)
-	return -ENODEV;
-    
-    c = *b;
-    c->driver->use_count--;
-    if (c->driver->detach) {
-	if (c->instance)
-	    c->driver->detach(c->instance);
-    }
-    module_put(c->driver->owner);
-    *b = c->next;
-    kfree(c);
-    return 0;
+	ds_dbg(2, "unbind_request(%d)\n", s->parent->sock);
+
+	s->device_count = 0;
+
+	for (;;) {
+		/* unregister all pcmcia_devices registered with this socket*/
+		spin_lock_irqsave(&pcmcia_dev_list_lock, flags);
+		if (list_empty(&s->devices_list)) {
+			spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+ 			return 0;
+		}
+		p_dev = list_entry((&s->devices_list)->next, struct pcmcia_device, socket_device_list);
+		list_del(&p_dev->socket_device_list);
+		p_dev->client.state |= CLIENT_STALE;
+		spin_unlock_irqrestore(&pcmcia_dev_list_lock, flags);
+
+		/* detach the "instance" */
+		p_drv = to_pcmcia_drv(p_dev->dev.driver);
+		if (p_drv) {
+			if ((p_drv->detach) && (p_dev->instance))
+				p_drv->detach(p_dev->instance);
+			module_put(p_drv->owner);
+		}
+
+		device_unregister(&p_dev->dev);
+	}
+
+	return 0;
 } /* unbind_request */
+
+int pcmcia_deregister_client(client_handle_t handle)
+{
+	struct pcmcia_socket *s;
+	int i;
+	struct pcmcia_device *p_dev = handle_to_pdev(handle);
+
+	if (CHECK_HANDLE(handle))
+		return CS_BAD_HANDLE;
+
+	s = SOCKET(handle);
+	ds_dbg(1, "deregister_client(%p)\n", handle);
+
+	if (handle->state & (CLIENT_IRQ_REQ|CLIENT_IO_REQ|CLIENT_CONFIG_LOCKED))
+		goto warn_out;
+	for (i = 0; i < MAX_WIN; i++)
+		if (handle->state & CLIENT_WIN_REQ(i))
+			goto warn_out;
+
+	if (handle->state & CLIENT_STALE) {
+		handle->client_magic = 0;
+		handle->state &= ~CLIENT_STALE;
+		pcmcia_put_dev(p_dev);
+	} else {
+		handle->state = CLIENT_UNBOUND;
+		handle->event_handler = NULL;
+	}
+
+	return CS_SUCCESS;
+ warn_out:
+	printk(KERN_WARNING "ds: deregister_client was called too early.\n");
+	return CS_IN_USE;
+} /* deregister_client */
+EXPORT_SYMBOL(pcmcia_deregister_client);
+
 
 /*======================================================================
 
@@ -734,19 +913,27 @@ static int ds_open(struct inode *inode, struct file *file)
 
     ds_dbg(0, "ds_open(socket %d)\n", i);
 
-    s = pcmcia_get_bus_socket(i);
+    s = get_socket_info_by_nr(i);
+    if (!s)
+	    return -ENODEV;
+    s = pcmcia_get_bus_socket(s);
     if (!s)
 	    return -ENODEV;
 
     if ((file->f_flags & O_ACCMODE) != O_RDONLY) {
-	if (s->state & DS_SOCKET_BUSY)
-	    return -EBUSY;
+	    if (s->state & DS_SOCKET_BUSY) {
+		    pcmcia_put_bus_socket(s);
+		    return -EBUSY;
+	    }
 	else
 	    s->state |= DS_SOCKET_BUSY;
     }
     
     user = kmalloc(sizeof(user_info_t), GFP_KERNEL);
-    if (!user) return -ENOMEM;
+    if (!user) {
+	    pcmcia_put_bus_socket(s);
+	    return -ENOMEM;
+    }
     user->event_tail = user->event_head = 0;
     user->next = s->user;
     user->user_magic = USER_MAGIC;
@@ -883,8 +1070,6 @@ static u_int ds_poll(struct file *file, poll_table *wait)
 /*====================================================================*/
 
 extern int pcmcia_adjust_resource_info(adjust_t *adj);
-extern int pccard_get_next_region(struct pcmcia_socket *s, region_info_t *rgn);
-extern int pccard_get_first_region(struct pcmcia_socket *s, region_info_t *rgn);
 
 static int ds_ioctl(struct inode * inode, struct file * file,
 		    u_int cmd, u_long arg)
@@ -893,7 +1078,7 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     void __user *uarg = (char __user *)arg;
     u_int size;
     int ret, err;
-    ds_ioctl_arg_t buf;
+    ds_ioctl_arg_t *buf;
     user_info_t *user;
 
     ds_dbg(2, "ds_ioctl(socket %d, %#x, %#lx)\n", iminor(inode), cmd, arg);
@@ -927,54 +1112,58 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	    return err;
 	}
     }
+    buf = kmalloc(sizeof(ds_ioctl_arg_t), GFP_KERNEL);
+    if (!buf)
+	return -ENOMEM;
     
     err = ret = 0;
     
-    if (cmd & IOC_IN) __copy_from_user((char *)&buf, uarg, size);
+    if (cmd & IOC_IN) __copy_from_user((char *)buf, uarg, size);
     
     switch (cmd) {
     case DS_ADJUST_RESOURCE_INFO:
-	ret = pcmcia_adjust_resource_info(&buf.adjust);
+	ret = pcmcia_adjust_resource_info(&buf->adjust);
 	break;
     case DS_GET_CARD_SERVICES_INFO:
-	ret = pcmcia_get_card_services_info(&buf.servinfo);
+	ret = pcmcia_get_card_services_info(&buf->servinfo);
 	break;
     case DS_GET_CONFIGURATION_INFO:
-	if (buf.config.Function && 
-	   (buf.config.Function >= s->parent->functions))
+	if (buf->config.Function &&
+	   (buf->config.Function >= s->parent->functions))
 	    ret = CS_BAD_ARGS;
 	else
-	    ret = pccard_get_configuration_info(s->parent, buf.config.Function, &buf.config);
+	    ret = pccard_get_configuration_info(s->parent,
+			buf->config.Function, &buf->config);
 	break;
     case DS_GET_FIRST_TUPLE:
 	pcmcia_validate_mem(s->parent);
-	ret = pccard_get_first_tuple(s->parent, BIND_FN_ALL, &buf.tuple);
+	ret = pccard_get_first_tuple(s->parent, BIND_FN_ALL, &buf->tuple);
 	break;
     case DS_GET_NEXT_TUPLE:
-	ret = pccard_get_next_tuple(s->parent, BIND_FN_ALL, &buf.tuple);
+	ret = pccard_get_next_tuple(s->parent, BIND_FN_ALL, &buf->tuple);
 	break;
     case DS_GET_TUPLE_DATA:
-	buf.tuple.TupleData = buf.tuple_parse.data;
-	buf.tuple.TupleDataMax = sizeof(buf.tuple_parse.data);
-	ret = pccard_get_tuple_data(s->parent, &buf.tuple);
+	buf->tuple.TupleData = buf->tuple_parse.data;
+	buf->tuple.TupleDataMax = sizeof(buf->tuple_parse.data);
+	ret = pccard_get_tuple_data(s->parent, &buf->tuple);
 	break;
     case DS_PARSE_TUPLE:
-	buf.tuple.TupleData = buf.tuple_parse.data;
-	ret = pccard_parse_tuple(&buf.tuple, &buf.tuple_parse.parse);
+	buf->tuple.TupleData = buf->tuple_parse.data;
+	ret = pccard_parse_tuple(&buf->tuple, &buf->tuple_parse.parse);
 	break;
     case DS_RESET_CARD:
 	ret = pccard_reset_card(s->parent);
 	break;
     case DS_GET_STATUS:
-	if (buf.status.Function && 
-	   (buf.status.Function >= s->parent->functions))
+	if (buf->status.Function &&
+	   (buf->status.Function >= s->parent->functions))
 	    ret = CS_BAD_ARGS;
 	else
-	ret = pccard_get_status(s->parent, buf.status.Function, &buf.status);
+	ret = pccard_get_status(s->parent, buf->status.Function, &buf->status);
 	break;
     case DS_VALIDATE_CIS:
 	pcmcia_validate_mem(s->parent);
-	ret = pccard_validate_cis(s->parent, BIND_FN_ALL, &buf.cisinfo);
+	ret = pccard_validate_cis(s->parent, BIND_FN_ALL, &buf->cisinfo);
 	break;
     case DS_SUSPEND_CARD:
 	ret = pcmcia_suspend_card(s->parent);
@@ -989,49 +1178,64 @@ static int ds_ioctl(struct inode * inode, struct file * file,
 	err = pcmcia_insert_card(s->parent);
 	break;
     case DS_ACCESS_CONFIGURATION_REGISTER:
-	if ((buf.conf_reg.Action == CS_WRITE) && !capable(CAP_SYS_ADMIN))
-	    return -EPERM;
-	if (buf.conf_reg.Function && 
-	   (buf.conf_reg.Function >= s->parent->functions))
+	if ((buf->conf_reg.Action == CS_WRITE) && !capable(CAP_SYS_ADMIN)) {
+	    err = -EPERM;
+	    goto free_out;
+	}
+	if (buf->conf_reg.Function &&
+	   (buf->conf_reg.Function >= s->parent->functions))
 	    ret = CS_BAD_ARGS;
 	else
-	    ret = pccard_access_configuration_register(s->parent, buf.conf_reg.Function, &buf.conf_reg);
+	    ret = pccard_access_configuration_register(s->parent,
+			buf->conf_reg.Function, &buf->conf_reg);
 	break;
     case DS_GET_FIRST_REGION:
-        ret = pccard_get_first_region(s->parent, &buf.region);
-	break;
     case DS_GET_NEXT_REGION:
-	ret = pccard_get_next_region(s->parent, &buf.region);
+    case DS_BIND_MTD:
+	if (!capable(CAP_SYS_ADMIN)) {
+		err = -EPERM;
+		goto free_out;
+	} else {
+		static int printed = 0;
+		if (!printed) {
+			printk(KERN_WARNING "2.6. kernels use pcmciamtd instead of memory_cs.c and do not require special\n");
+			printk(KERN_WARNING "MTD handling any more.\n");
+			printed++;
+		}
+	}
+	ret = -EINVAL;
+	goto free_out;
 	break;
     case DS_GET_FIRST_WINDOW:
-	ret = pcmcia_get_window(s->parent, &buf.win_info.handle, 0, &buf.win_info.window);
+	ret = pcmcia_get_window(s->parent, &buf->win_info.handle, 0,
+			&buf->win_info.window);
 	break;
     case DS_GET_NEXT_WINDOW:
-	ret = pcmcia_get_window(s->parent, &buf.win_info.handle, buf.win_info.handle->index + 1, &buf.win_info.window);
+	ret = pcmcia_get_window(s->parent, &buf->win_info.handle,
+			buf->win_info.handle->index + 1, &buf->win_info.window);
 	break;
     case DS_GET_MEM_PAGE:
-	ret = pcmcia_get_mem_page(buf.win_info.handle,
-			   &buf.win_info.map);
+	ret = pcmcia_get_mem_page(buf->win_info.handle,
+			   &buf->win_info.map);
 	break;
     case DS_REPLACE_CIS:
-	ret = pcmcia_replace_cis(s->parent, &buf.cisdump);
+	ret = pcmcia_replace_cis(s->parent, &buf->cisdump);
 	break;
     case DS_BIND_REQUEST:
-	if (!capable(CAP_SYS_ADMIN)) return -EPERM;
-	err = bind_request(s, &buf.bind_info);
+	if (!capable(CAP_SYS_ADMIN)) {
+		err = -EPERM;
+		goto free_out;
+	}
+	err = bind_request(s, &buf->bind_info);
 	break;
     case DS_GET_DEVICE_INFO:
-	err = get_device_info(s, &buf.bind_info, 1);
+	err = get_device_info(s, &buf->bind_info, 1);
 	break;
     case DS_GET_NEXT_DEVICE:
-	err = get_device_info(s, &buf.bind_info, 0);
+	err = get_device_info(s, &buf->bind_info, 0);
 	break;
     case DS_UNBIND_REQUEST:
-	err = unbind_request(s, &buf.bind_info);
-	break;
-    case DS_BIND_MTD:
-	if (!capable(CAP_SYS_ADMIN)) return -EPERM;
-	err = bind_mtd(s, &buf.mtd_info);
+	err = 0;
 	break;
     default:
 	err = -EINVAL;
@@ -1059,11 +1263,12 @@ static int ds_ioctl(struct inode * inode, struct file * file,
     }
 
     if (cmd & IOC_OUT) {
-        if (__copy_to_user(uarg, (char *)&buf, size))
+        if (__copy_to_user(uarg, (char *)buf, size))
             err = -EFAULT;
     }
 
-
+free_out:
+    kfree(buf);
     return err;
 } /* ds_ioctl */
 
@@ -1081,9 +1286,7 @@ static struct file_operations ds_fops = {
 
 static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 {
-	struct pcmcia_socket *socket = class_dev->class_data;
-	client_reg_t client_reg;
-	bind_req_t bind;
+	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 	struct pcmcia_bus_socket *s;
 	int ret;
 
@@ -1091,7 +1294,16 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 	if(!s)
 		return -ENOMEM;
 	memset(s, 0, sizeof(struct pcmcia_bus_socket));
-	atomic_set(&s->refcount, 1);
+
+	/* get reference to parent socket */
+	s->parent = pcmcia_get_socket(socket);
+	if (!s->parent) {
+		printk(KERN_ERR "PCMCIA obtaining reference to socket %p failed\n", socket);
+		kfree (s);
+		return -ENODEV;
+	}
+
+	kref_init(&s->refcount);
     
 	/*
 	 * Ugly. But we want to wait for the socket threads to have started up.
@@ -1101,40 +1313,20 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 
 	init_waitqueue_head(&s->queue);
 	init_waitqueue_head(&s->request);
-
-	/* initialize data */
-	INIT_WORK(&s->removal, handle_removal, s);
-	s->parent = socket;
+	INIT_LIST_HEAD(&s->devices_list);
 
 	/* Set up hotline to Card Services */
-	client_reg.dev_info = bind.dev_info = &dev_info;
-
-	bind.Socket = socket;
-	bind.Function = BIND_FN_ALL;
-	ret = pcmcia_bind_device(&bind);
-	if (ret != CS_SUCCESS) {
-		cs_error(NULL, BindDevice, ret);
-		kfree(s);
-		return -EINVAL;
-	}
-
-	client_reg.Attributes = INFO_MASTER_CLIENT;
-	client_reg.EventMask =
-		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
-		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
-		CS_EVENT_EJECTION_REQUEST | CS_EVENT_INSERTION_REQUEST |
-		CS_EVENT_PM_SUSPEND | CS_EVENT_PM_RESUME;
-	client_reg.event_handler = &ds_event;
-	client_reg.Version = 0x0210;
-	client_reg.event_callback_args.client_data = s;
-	ret = pcmcia_register_client(&s->handle, &client_reg);
-	if (ret != CS_SUCCESS) {
-		cs_error(NULL, RegisterClient, ret);
-		kfree(s);
-		return -EINVAL;
-	}
-
+	s->callback.owner = THIS_MODULE;
+	s->callback.event = &ds_event;
 	socket->pcmcia = s;
+
+	ret = pccard_register_pcmcia(socket, &s->callback);
+	if (ret) {
+		printk(KERN_ERR "PCMCIA registration PCCard core failed for socket %p\n", socket);
+		pcmcia_put_bus_socket(s);
+		socket->pcmcia = NULL;
+		return (ret);
+	}
 
 	return 0;
 }
@@ -1142,14 +1334,12 @@ static int __devinit pcmcia_bus_add_socket(struct class_device *class_dev)
 
 static void pcmcia_bus_remove_socket(struct class_device *class_dev)
 {
-	struct pcmcia_socket *socket = class_dev->class_data;
+	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 
 	if (!socket || !socket->pcmcia)
 		return;
 
-	flush_scheduled_work();
-
-	pcmcia_deregister_client(socket->pcmcia->handle);
+	pccard_register_pcmcia(socket, NULL);
 
 	socket->pcmcia->state |= DS_SOCKET_DEAD;
 	pcmcia_put_bus_socket(socket->pcmcia);
@@ -1176,6 +1366,8 @@ EXPORT_SYMBOL(pcmcia_bus_type);
 static int __init init_pcmcia_bus(void)
 {
 	int i;
+
+	spin_lock_init(&pcmcia_dev_list_lock);
 
 	bus_register(&pcmcia_bus_type);
 	class_interface_register(&pcmcia_bus_interface);
@@ -1232,33 +1424,18 @@ static struct pcmcia_bus_socket * get_socket_info_by_nr(unsigned int nr)
 
 /* backwards-compatible accessing of driver --- by name! */
 
-struct cmp_data {
-	void *dev_info;
-	struct pcmcia_driver *drv;
-};
-
-static int cmp_drv_callback(struct device_driver *drv, void *data)
-{
-	struct cmp_data *cmp = data;
-	if (strncmp((char *)cmp->dev_info, (char *)drv->name,
-		    DEV_NAME_LEN) == 0) {
-		cmp->drv = container_of(drv, struct pcmcia_driver, drv);
-		return -EINVAL;
-	}
-	return 0;
-}
-
 static struct pcmcia_driver * get_pcmcia_driver (dev_info_t *dev_info)
 {
-	int ret;
-	struct cmp_data cmp = {
-		.dev_info = dev_info,
-	};
-	
-	ret = bus_for_each_drv(&pcmcia_bus_type, NULL, &cmp, cmp_drv_callback);
-	if (ret)
-		return cmp.drv;
-	return NULL;
+	struct device_driver *drv;
+	struct pcmcia_driver *p_drv;
+
+	drv = driver_find((char *) dev_info, &pcmcia_bus_type);
+	if (!drv)
+		return NULL;
+
+	p_drv = container_of(drv, struct pcmcia_driver, drv);
+
+	return (p_drv);
 }
 
 MODULE_ALIAS("ds");

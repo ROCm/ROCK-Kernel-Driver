@@ -103,7 +103,7 @@ struct frag_queue
 #define IP6Q_HASHSZ	64
 
 static struct frag_queue *ip6_frag_hash[IP6Q_HASHSZ];
-static rwlock_t ip6_frag_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ip6_frag_lock);
 static u32 ip6_frag_hash_rnd;
 static LIST_HEAD(ip6_frag_lru_list);
 int ip6_frag_nqueues = 0;

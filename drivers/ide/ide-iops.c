@@ -576,7 +576,7 @@ int ide_wait_stat (ide_startstop_t *startstop, ide_drive_t *drive, u8 good, u8 b
 					break;
 
 				local_irq_restore(flags);
-				*startstop = DRIVER(drive)->error(drive, "status timeout", stat);
+				*startstop = ide_error(drive, "status timeout", stat);
 				return 1;
 			}
 		}
@@ -594,7 +594,7 @@ int ide_wait_stat (ide_startstop_t *startstop, ide_drive_t *drive, u8 good, u8 b
 		if (OK_STAT((stat = hwif->INB(IDE_STATUS_REG)), good, bad))
 			return 0;
 	}
-	*startstop = DRIVER(drive)->error(drive, "status error", stat);
+	*startstop = ide_error(drive, "status error", stat);
 	return 1;
 }
 

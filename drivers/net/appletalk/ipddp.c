@@ -289,7 +289,7 @@ static int ipddp_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 static struct net_device *dev_ipddp;
 
 MODULE_LICENSE("GPL");
-MODULE_PARM(ipddp_mode, "i");
+module_param(ipddp_mode, int, 0);
 
 static int __init ipddp_init_module(void)
 {

@@ -101,8 +101,8 @@ void emu10k1_set_control_gpr(struct emu10k1_card *card, int addr, s32 val, int f
 #define VOLCTRL_STEP_SIZE        5
 
 //An internal function for setting OSS mixer controls.
-void emu10k1_set_oss_vol(struct emu10k1_card *card, int oss_mixer,
-			 unsigned int left, unsigned int right)
+static void emu10k1_set_oss_vol(struct emu10k1_card *card, int oss_mixer,
+				unsigned int left, unsigned int right)
 {
 	extern char volume_params[SOUND_MIXER_NRDEVICES];
 

@@ -10,6 +10,7 @@
 #include <linux/hugetlb.h>
 #include <linux/cpumask.h>
 #include <linux/topology.h>
+#include <linux/nodemask.h>
 
 static struct sysdev_class node_class = {
 	set_kset_name("node"),
@@ -120,7 +121,7 @@ static ssize_t node_read_distance(struct sys_device * dev, char * buf)
 	/* buf currently PAGE_SIZE, need ~4 chars per node */
 	BUILD_BUG_ON(MAX_NUMNODES*4 > PAGE_SIZE/2);
 
-	for (i = 0; i < numnodes; i++)
+	for_each_online_node(i)
 		len += sprintf(buf + len, "%s%d", i ? " " : "", node_distance(nid, i));
 
 	len += sprintf(buf + len, "\n");

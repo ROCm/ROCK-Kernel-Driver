@@ -66,6 +66,9 @@
 #define URB_ZERO_PACKET 0
 #endif
 
+static int ignore = 0;
+static int reset = 0;
+
 #ifdef CONFIG_BT_HCIUSB_SCO
 static int isoc = 2;
 #endif
@@ -193,7 +196,7 @@ static int hci_usb_intr_rx_submit(struct hci_usb *husb)
 
 	BT_DBG("%s", husb->hdev->name);
 
-	size = husb->intr_in_ep->desc.wMaxPacketSize;
+	size = le16_to_cpu(husb->intr_in_ep->desc.wMaxPacketSize);
 
 	buf = kmalloc(size, GFP_ATOMIC);
 	if (!buf)
@@ -268,7 +271,7 @@ static int hci_usb_isoc_rx_submit(struct hci_usb *husb)
 	int err, mtu, size;
 	void *buf;
 
-	mtu  = husb->isoc_in_ep->desc.wMaxPacketSize;
+	mtu  = le16_to_cpu(husb->isoc_in_ep->desc.wMaxPacketSize);
 	size = mtu * HCI_MAX_ISOC_FRAMES;
 
 	buf = kmalloc(size, GFP_ATOMIC);
@@ -525,7 +528,7 @@ static inline int hci_usb_send_isoc(struct hci_usb *husb, struct sk_buff *skb)
 	urb->transfer_buffer = skb->data;
 	urb->transfer_buffer_length = skb->len;
 
-	__fill_isoc_desc(urb, skb->len, husb->isoc_out_ep->desc.wMaxPacketSize);
+	__fill_isoc_desc(urb, skb->len, le16_to_cpu(husb->isoc_out_ep->desc.wMaxPacketSize));
 
 	_urb->priv = skb;
 	return __tx_submit(husb, _urb);
@@ -827,7 +830,7 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 			id = match;
 	}
 
-	if (id->driver_info & HCI_IGNORE)
+	if (ignore || id->driver_info & HCI_IGNORE)
 		return -ENODEV;
 
 	if (intf->cur_altsetting->desc.bInterfaceNumber > 0)
@@ -897,10 +900,10 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 
 				switch (ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
 				case USB_ENDPOINT_XFER_ISOC:
-					if (ep->desc.wMaxPacketSize < size ||
+					if (le16_to_cpu(ep->desc.wMaxPacketSize) < size ||
 							uif->desc.bAlternateSetting != isoc)
 						break;
-					size = ep->desc.wMaxPacketSize;
+					size = le16_to_cpu(ep->desc.wMaxPacketSize);
 
 					isoc_alts = uif->desc.bAlternateSetting;
 
@@ -963,7 +966,7 @@ static int hci_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 
 	hdev->owner = THIS_MODULE;
 
-	if (id->driver_info & HCI_RESET)
+	if (reset || id->driver_info & HCI_RESET)
 		set_bit(HCI_QUIRK_RESET_ON_INIT, &hdev->quirks);
 
 	if (hci_register_dev(hdev) < 0) {
@@ -1035,6 +1038,12 @@ static void __exit hci_usb_exit(void)
 
 module_init(hci_usb_init);
 module_exit(hci_usb_exit);
+
+module_param(ignore, bool, 0644);
+MODULE_PARM_DESC(ignore, "Ignore devices from the matching table");
+
+module_param(reset, bool, 0644);
+MODULE_PARM_DESC(reset, "Send HCI reset command on initialization");
 
 #ifdef CONFIG_BT_HCIUSB_SCO
 module_param(isoc, int, 0644);

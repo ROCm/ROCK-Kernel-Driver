@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -239,6 +239,12 @@ static void mthca_eq_int(struct mthca_dev *dev, struct mthca_eq *eq)
 	while (next_eqe_sw(eq)) {
 		int set_ci = 0;
 		eqe = get_eqe(eq, eq->cons_index);
+
+		/*
+		 * Make sure we read EQ entry contents after we've
+		 * checked the ownership bit.
+		 */
+		rmb();
 
 		switch (eqe->type) {
 		case MTHCA_EVENT_TYPE_COMP:

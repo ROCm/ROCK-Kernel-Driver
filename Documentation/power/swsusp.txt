@@ -15,6 +15,9 @@ From kernel/suspend.c:
  * If you change kernel command line between suspend and resume...
  *			        ...prepare for nasty fsck or worse.
  *
+ * If you change your hardware while system is suspended...
+ *			        ...well, it was not good idea.
+ *
  * (*) suspend/resume support is needed to make it safe.
 
 You need to append resume=/dev/your_swap_partition to kernel command
@@ -183,3 +186,50 @@ firmware: tell bios to save state itself [needs BIOS-specific suspend
 
 "platform" is actually right thing to do, but "shutdown" is most
 reliable.
+
+Q: I do not understand why you have such strong objections to idea of
+selective suspend.
+
+A: Do selective suspend during runtime power managment, that's okay. But
+its useless for suspend-to-disk. (And I do not see how you could use
+it for suspend-to-ram, I hope you do not want that).
+
+Lets see, so you suggest to
+
+* SUSPEND all but swap device and parents
+* Snapshot
+* Write image to disk
+* SUSPEND swap device and parents
+* Powerdown
+
+Oh no, that does not work, if swap device or its parents uses DMA,
+you've corrupted data. You'd have to do
+
+* SUSPEND all but swap device and parents
+* FREEZE swap device and parents
+* Snapshot
+* UNFREEZE swap device and parents
+* Write
+* SUSPEND swap device and parents
+
+Which means that you still need that FREEZE state, and you get more
+complicated code. (And I have not yet introduce details like system
+devices).
+
+Q: There don't seem to be any generally useful behavioral
+distinctions between SUSPEND and FREEZE.
+
+A: Doing SUSPEND when you are asked to do FREEZE is always correct,
+but it may be unneccessarily slow. If you want USB to stay simple,
+slowness may not matter to you. It can always be fixed later.
+
+For devices like disk it does matter, you do not want to spindown for
+FREEZE.
+
+Q: After resuming, system is paging heavilly, leading to very bad interactivity.
+
+A: Try running
+
+cat `cat /proc/[0-9]*/maps | grep / | sed 's:.* /:/:' | sort -u` > /dev/null
+
+after resume. swapoff -a; swapon -a may also be usefull.

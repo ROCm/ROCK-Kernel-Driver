@@ -91,6 +91,7 @@ static unsigned int *dart;
 static unsigned int dart_emptyval;
 
 static struct iommu_table iommu_table_u3;
+static int iommu_table_u3_inited;
 static int dart_dirty;
 
 #define DBG(...)
@@ -192,7 +193,6 @@ static int dart_init(struct device_node *dart_node)
 	unsigned int regword;
 	unsigned int i;
 	unsigned long tmp;
-	struct page *p;
 
 	if (dart_tablebase == 0 || dart_tablesize == 0) {
 		printk(KERN_INFO "U3-DART: table not allocated, using direct DMA\n");
@@ -209,16 +209,15 @@ static int dart_init(struct device_node *dart_node)
 	 * that to work around what looks like a problem with the HT bridge
 	 * prefetching into invalid pages and corrupting data
 	 */
-	tmp = __get_free_pages(GFP_ATOMIC, 1);
-	if (tmp == 0)
-		panic("U3-DART: Cannot allocate spare page !");
-	dart_emptyval = DARTMAP_VALID |
-		((virt_to_abs(tmp) >> PAGE_SHIFT) & DARTMAP_RPNMASK);
+	tmp = lmb_alloc(PAGE_SIZE, PAGE_SIZE);
+	if (!tmp)
+		panic("U3-DART: Cannot allocate spare page!");
+	dart_emptyval = DARTMAP_VALID | ((tmp >> PAGE_SHIFT) & DARTMAP_RPNMASK);
 
 	/* Map in DART registers. FIXME: Use device node to get base address */
 	dart = ioremap(DART_BASE, 0x7000);
 	if (dart == NULL)
-		panic("U3-DART: Cannot map registers !");
+		panic("U3-DART: Cannot map registers!");
 
 	/* Set initial control register contents: table base, 
 	 * table size and enable bit
@@ -227,7 +226,6 @@ static int dart_init(struct device_node *dart_node)
 		((dart_tablebase >> PAGE_SHIFT) << DARTCNTL_BASE_SHIFT) |
 		(((dart_tablesize >> PAGE_SHIFT) & DARTCNTL_SIZE_MASK)
 				 << DARTCNTL_SIZE_SHIFT);
-	p = virt_to_page(dart_tablebase);
 	dart_vbase = ioremap(virt_to_abs(dart_tablebase), dart_tablesize);
 
 	/* Fill initial table */
@@ -240,35 +238,67 @@ static int dart_init(struct device_node *dart_node)
 	/* Invalidate DART to get rid of possible stale TLBs */
 	dart_tlb_invalidate_all();
 
-	iommu_table_u3.it_busno = 0;
-	
-	/* Units of tce entries */
-	iommu_table_u3.it_offset = 0;
-	
-	/* Set the tce table size - measured in pages */
-	iommu_table_u3.it_size = dart_tablesize >> PAGE_SHIFT;
-
-	/* Initialize the common IOMMU code */
-	iommu_table_u3.it_base = (unsigned long)dart_vbase;
-	iommu_table_u3.it_index = 0;
-	iommu_table_u3.it_blocksize = 1;
-	iommu_table_u3.it_entrysize = sizeof(u32);
-	iommu_init_table(&iommu_table_u3);
-
-	/* Reserve the last page of the DART to avoid possible prefetch
-	 * past the DART mapped area
-	 */
-	set_bit(iommu_table_u3.it_mapsize - 1, iommu_table_u3.it_map);
-
 	printk(KERN_INFO "U3/CPC925 DART IOMMU initialized\n");
 
 	return 0;
 }
 
-void iommu_setup_u3(void)
+static void iommu_table_u3_setup(void)
 {
-	struct pci_controller *phb, *tmp;
-	struct pci_dev *dev = NULL;
+	iommu_table_u3.it_busno = 0;
+	iommu_table_u3.it_offset = 0;
+	/* it_size is in number of entries */
+	iommu_table_u3.it_size = dart_tablesize / sizeof(u32);
+
+	/* Initialize the common IOMMU code */
+	iommu_table_u3.it_base = (unsigned long)dart_vbase;
+	iommu_table_u3.it_index = 0;
+	iommu_table_u3.it_blocksize = 1;
+	iommu_init_table(&iommu_table_u3);
+
+	/* Reserve the last page of the DART to avoid possible prefetch
+	 * past the DART mapped area
+	 */
+	set_bit(iommu_table_u3.it_size - 1, iommu_table_u3.it_map);
+}
+
+static void iommu_dev_setup_u3(struct pci_dev *dev)
+{
+	struct device_node *dn;
+
+	/* We only have one iommu table on the mac for now, which makes
+	 * things simple. Setup all PCI devices to point to this table
+	 *
+	 * We must use pci_device_to_OF_node() to make sure that
+	 * we get the real "final" pointer to the device in the
+	 * pci_dev sysdata and not the temporary PHB one
+	 */
+	dn = pci_device_to_OF_node(dev);
+
+	if (dn)
+		dn->iommu_table = &iommu_table_u3;
+}
+
+static void iommu_bus_setup_u3(struct pci_bus *bus)
+{
+	struct device_node *dn;
+
+	if (!iommu_table_u3_inited) {
+		iommu_table_u3_inited = 1;
+		iommu_table_u3_setup();
+	}
+
+	dn = pci_bus_to_OF_node(bus);
+
+	if (dn)
+		dn->iommu_table = &iommu_table_u3;
+}
+
+static void iommu_dev_setup_null(struct pci_dev *dev) { }
+static void iommu_bus_setup_null(struct pci_bus *bus) { }
+
+void iommu_init_early_u3(void)
+{
 	struct device_node *dn;
 
 	/* Find the DART in the device-tree */
@@ -282,30 +312,22 @@ void iommu_setup_u3(void)
 	ppc_md.tce_flush = dart_flush;
 
 	/* Initialize the DART HW */
-	if (dart_init(dn))
-		return;
+	if (dart_init(dn)) {
+		/* If init failed, use direct iommu and null setup functions */
+		ppc_md.iommu_dev_setup = iommu_dev_setup_null;
+		ppc_md.iommu_bus_setup = iommu_bus_setup_null;
 
-	/* Setup pci_dma ops */
-	pci_iommu_init();
+		/* Setup pci_dma ops */
+		pci_direct_iommu_init();
+	} else {
+		ppc_md.iommu_dev_setup = iommu_dev_setup_u3;
+		ppc_md.iommu_bus_setup = iommu_bus_setup_u3;
 
-	/* We only have one iommu table on the mac for now, which makes
-	 * things simple. Setup all PCI devices to point to this table
-	 */
-	for_each_pci_dev(dev) {
-		/* We must use pci_device_to_OF_node() to make sure that
-		 * we get the real "final" pointer to the device in the
-		 * pci_dev sysdata and not the temporary PHB one
-		 */
-		struct device_node *dn = pci_device_to_OF_node(dev);
-		if (dn)
-			dn->iommu_table = &iommu_table_u3;
-	}
-	/* We also make sure we set all PHBs ... */
-	list_for_each_entry_safe(phb, tmp, &hose_list, list_node) {
-		dn = (struct device_node *)phb->arch_data;
-		dn->iommu_table = &iommu_table_u3;
+		/* Setup pci_dma ops */
+		pci_iommu_init();
 	}
 }
+
 
 void __init alloc_u3_dart_table(void)
 {

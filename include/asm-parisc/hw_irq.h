@@ -12,6 +12,6 @@
  *	<tomsoft@informatik.tu-chemnitz.de>
  */
 
-#include <asm/irq.h>
+extern void hw_resend_irq(struct hw_interrupt_type *, unsigned int);
 
 #endif

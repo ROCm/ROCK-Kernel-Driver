@@ -22,6 +22,8 @@
 #include <linux/init.h>
 #include <linux/cpufreq.h>
 #include <linux/config.h>
+#include <linux/delay.h>
+#include <linux/compiler.h>
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI
 #include <linux/acpi.h>
@@ -31,6 +33,8 @@
 #include <asm/msr.h>
 #include <asm/processor.h>
 #include <asm/cpufeature.h>
+
+#include "speedstep-est-common.h"
 
 #define PFX		"speedstep-centrino: "
 #define MAINTAINER	"Jeremy Fitzhardinge <jeremy@goop.org>"
@@ -71,8 +75,10 @@ struct cpu_model
 static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_id *x);
 
 /* Operating points for current CPU */
-static struct cpu_model *centrino_model;
-static const struct cpu_id *centrino_cpu;
+static struct cpu_model *centrino_model[NR_CPUS];
+static const struct cpu_id *centrino_cpu[NR_CPUS];
+
+static struct cpufreq_driver centrino_driver;
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_TABLE
 
@@ -239,7 +245,7 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 
 	if (model->cpu_id == NULL) {
 		/* No match at all */
-		printk(KERN_INFO PFX "no support for CPU model \"%s\": "
+		dprintk(KERN_INFO PFX "no support for CPU model \"%s\": "
 		       "send /proc/cpuinfo to " MAINTAINER "\n",
 		       cpu->x86_model_id);
 		return -ENOENT;
@@ -247,15 +253,15 @@ static int centrino_cpu_init_table(struct cpufreq_policy *policy)
 
 	if (model->op_points == NULL) {
 		/* Matched a non-match */
-		printk(KERN_INFO PFX "no table support for CPU model \"%s\": \n",
+		dprintk(KERN_INFO PFX "no table support for CPU model \"%s\": \n",
 		       cpu->x86_model_id);
 #ifndef CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI
-		printk(KERN_INFO PFX "try compiling with CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI enabled\n");
+		dprintk(KERN_INFO PFX "try compiling with CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI enabled\n");
 #endif
 		return -ENOENT;
 	}
 
-	centrino_model = model;
+	centrino_model[policy->cpu] = model;
 
 	dprintk("found \"%s\": max frequency: %dkHz\n",
 	       model->model_name, model->max_freq);
@@ -277,7 +283,7 @@ static int centrino_verify_cpu_id(const struct cpuinfo_x86 *c, const struct cpu_
 }
 
 /* To be called only after centrino_model is initialized */
-static unsigned extract_clock(unsigned msr)
+static unsigned extract_clock(unsigned msr, unsigned int cpu, int failsafe)
 {
 	int i;
 
@@ -286,28 +292,32 @@ static unsigned extract_clock(unsigned msr)
 	 * for centrino, as some DSDTs are buggy.
 	 * Ideally, this can be done using the acpi_data structure.
 	 */
-	if ((centrino_cpu == &cpu_ids[CPU_BANIAS]) ||
-	    (centrino_cpu == &cpu_ids[CPU_DOTHAN_A1]) ||
-	    (centrino_cpu == &cpu_ids[CPU_DOTHAN_B0])) {
+	if ((centrino_cpu[cpu] == &cpu_ids[CPU_BANIAS]) ||
+	    (centrino_cpu[cpu] == &cpu_ids[CPU_DOTHAN_A1]) ||
+	    (centrino_cpu[cpu] == &cpu_ids[CPU_DOTHAN_B0])) {
 		msr = (msr >> 8) & 0xff;
 		return msr * 100000;
 	}
 
-	if ((!centrino_model) || (!centrino_model->op_points))
+	if ((!centrino_model[cpu]) || (!centrino_model[cpu]->op_points))
 		return 0;
 
 	msr &= 0xffff;
-	for (i=0;centrino_model->op_points[i].frequency != CPUFREQ_TABLE_END; i++) {
-		if (msr == centrino_model->op_points[i].index)
-		return centrino_model->op_points[i].frequency;
+	for (i=0;centrino_model[cpu]->op_points[i].frequency != CPUFREQ_TABLE_END; i++) {
+		if (msr == centrino_model[cpu]->op_points[i].index)
+			return centrino_model[cpu]->op_points[i].frequency;
 	}
-	return 0;
+	if (failsafe)
+		return centrino_model[cpu]->op_points[i-1].frequency;
+	else
+		return 0;
 }
 
 /* Return the current CPU frequency in kHz */
 static unsigned int get_cur_freq(unsigned int cpu)
 {
 	unsigned l, h;
+	unsigned clock_freq;
 	cpumask_t saved_mask;
 
 	saved_mask = current->cpus_allowed;
@@ -316,8 +326,21 @@ static unsigned int get_cur_freq(unsigned int cpu)
 		return 0;
 
 	rdmsr(MSR_IA32_PERF_STATUS, l, h);
+	clock_freq = extract_clock(l, cpu, 0);
+
+	if (unlikely(clock_freq == 0)) {
+		/*
+		 * On some CPUs, we can see transient MSR values (which are
+		 * not present in _PSS), while CPU is doing some automatic
+		 * P-state transition (like TM2). Get the last freq set 
+		 * in PERF_CTL.
+		 */
+		rdmsr(MSR_IA32_PERF_CTL, l, h);
+		clock_freq = extract_clock(l, cpu, 1);
+	}
+
 	set_cpus_allowed(current, saved_mask);
-	return extract_clock(l);
+	return clock_freq;
 }
 
 
@@ -339,6 +362,7 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 	struct acpi_object_list		arg_list = {1, &arg0};
 	unsigned long			cur_freq;
 	int				result = 0, i;
+	unsigned int			cpu = policy->cpu;
 
 	/* _PDC settings */
 	arg0.buffer.length = 12;
@@ -350,8 +374,8 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 	p.pdc = &arg_list;
 
 	/* register with ACPI core */
-	if (acpi_processor_register_performance(&p, policy->cpu)) {
-		printk(KERN_INFO PFX "obtaining ACPI data failed\n");
+	if (acpi_processor_register_performance(&p, cpu)) {
+		dprintk(KERN_INFO PFX "obtaining ACPI data failed\n");
 		return -EIO;
 	}
 
@@ -392,49 +416,49 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 		}
 	}
 
-	centrino_model = kmalloc(sizeof(struct cpu_model), GFP_KERNEL);
-	if (!centrino_model) {
+	centrino_model[cpu] = kmalloc(sizeof(struct cpu_model), GFP_KERNEL);
+	if (!centrino_model[cpu]) {
 		result = -ENOMEM;
 		goto err_unreg;
 	}
-	memset(centrino_model, 0, sizeof(struct cpu_model));
+	memset(centrino_model[cpu], 0, sizeof(struct cpu_model));
 
-	centrino_model->model_name=NULL;
-	centrino_model->max_freq = p.states[0].core_frequency * 1000;
-	centrino_model->op_points =  kmalloc(sizeof(struct cpufreq_frequency_table) *
+	centrino_model[cpu]->model_name=NULL;
+	centrino_model[cpu]->max_freq = p.states[0].core_frequency * 1000;
+	centrino_model[cpu]->op_points =  kmalloc(sizeof(struct cpufreq_frequency_table) *
 					     (p.state_count + 1), GFP_KERNEL);
-        if (!centrino_model->op_points) {
+        if (!centrino_model[cpu]->op_points) {
                 result = -ENOMEM;
                 goto err_kfree;
         }
 
         for (i=0; i<p.state_count; i++) {
-		centrino_model->op_points[i].index = p.states[i].control;
-		centrino_model->op_points[i].frequency = p.states[i].core_frequency * 1000;
+		centrino_model[cpu]->op_points[i].index = p.states[i].control;
+		centrino_model[cpu]->op_points[i].frequency = p.states[i].core_frequency * 1000;
 		dprintk("adding state %i with frequency %u and control value %04x\n", 
-			i, centrino_model->op_points[i].frequency, centrino_model->op_points[i].index);
+			i, centrino_model[cpu]->op_points[i].frequency, centrino_model[cpu]->op_points[i].index);
 	}
-	centrino_model->op_points[p.state_count].frequency = CPUFREQ_TABLE_END;
+	centrino_model[cpu]->op_points[p.state_count].frequency = CPUFREQ_TABLE_END;
 
-	cur_freq = get_cur_freq(policy->cpu);
+	cur_freq = get_cur_freq(cpu);
 
 	for (i=0; i<p.state_count; i++) {
 		if (!p.states[i].core_frequency) {
 			dprintk("skipping state %u\n", i);
-			centrino_model->op_points[i].frequency = CPUFREQ_ENTRY_INVALID;
+			centrino_model[cpu]->op_points[i].frequency = CPUFREQ_ENTRY_INVALID;
 			continue;
 		}
 		
-		if (extract_clock(centrino_model->op_points[i].index) !=
-		    (centrino_model->op_points[i].frequency)) {
+		if (extract_clock(centrino_model[cpu]->op_points[i].index, cpu, 0) !=
+		    (centrino_model[cpu]->op_points[i].frequency)) {
 			dprintk("Invalid encoded frequency (%u vs. %u)\n",
-				extract_clock(centrino_model->op_points[i].index),
-				centrino_model->op_points[i].frequency);
+				extract_clock(centrino_model[cpu]->op_points[i].index, cpu, 0),
+				centrino_model[cpu]->op_points[i].frequency);
 			result = -EINVAL;
 			goto err_kfree_all;
 		}
 
-		if (cur_freq == centrino_model->op_points[i].frequency)
+		if (cur_freq == centrino_model[cpu]->op_points[i].frequency)
 			p.state = i;
 	}
 
@@ -444,12 +468,12 @@ static int centrino_cpu_init_acpi(struct cpufreq_policy *policy)
 	return 0;
 
  err_kfree_all:
-	kfree(centrino_model->op_points);
+	kfree(centrino_model[cpu]->op_points);
  err_kfree:
-	kfree(centrino_model);
+	kfree(centrino_model[cpu]);
  err_unreg:
-	acpi_processor_unregister_performance(&p, policy->cpu);
-	printk(KERN_INFO PFX "invalid ACPI data\n");
+	acpi_processor_unregister_performance(&p, cpu);
+	dprintk(KERN_INFO PFX "invalid ACPI data\n");
 	return (result);
 }
 #else
@@ -473,14 +497,18 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 			break;
 
 	if (i != N_IDS)
-		centrino_cpu = &cpu_ids[i];
+		centrino_cpu[policy->cpu] = &cpu_ids[i];
+
+	if (is_const_loops_cpu(policy->cpu)) {
+		centrino_driver.flags |= CPUFREQ_CONST_LOOPS;
+	}
 
 	if (centrino_cpu_init_acpi(policy)) {
 		if (policy->cpu != 0)
 			return -ENODEV;
 
-		if (!centrino_cpu) {
-			printk(KERN_INFO PFX "found unsupported CPU with "
+		if (!centrino_cpu[policy->cpu]) {
+			dprintk(KERN_INFO PFX "found unsupported CPU with "
 			"Enhanced SpeedStep: send /proc/cpuinfo to "
 			MAINTAINER "\n");
 			return -ENODEV;
@@ -516,32 +544,34 @@ static int centrino_cpu_init(struct cpufreq_policy *policy)
 
 	dprintk("centrino_cpu_init: cur=%dkHz\n", policy->cur);
 
-	ret = cpufreq_frequency_table_cpuinfo(policy, centrino_model->op_points);
+	ret = cpufreq_frequency_table_cpuinfo(policy, centrino_model[policy->cpu]->op_points);
 	if (ret)
 		return (ret);
 
-	cpufreq_frequency_table_get_attr(centrino_model->op_points, policy->cpu);
+	cpufreq_frequency_table_get_attr(centrino_model[policy->cpu]->op_points, policy->cpu);
 
 	return 0;
 }
 
 static int centrino_cpu_exit(struct cpufreq_policy *policy)
 {
-	if (!centrino_model)
+	unsigned int cpu = policy->cpu;
+
+	if (!centrino_model[cpu])
 		return -ENODEV;
 
-	cpufreq_frequency_table_put_attr(policy->cpu);
+	cpufreq_frequency_table_put_attr(cpu);
 
 #ifdef CONFIG_X86_SPEEDSTEP_CENTRINO_ACPI
-	if (!centrino_model->model_name) {
+	if (!centrino_model[cpu]->model_name) {
 		dprintk("unregistering and freeing ACPI data\n");
-		acpi_processor_unregister_performance(&p, policy->cpu);
-		kfree(centrino_model->op_points);
-		kfree(centrino_model);
+		acpi_processor_unregister_performance(&p, cpu);
+		kfree(centrino_model[cpu]->op_points);
+		kfree(centrino_model[cpu]);
 	}
 #endif
 
-	centrino_model = NULL;
+	centrino_model[cpu] = NULL;
 
 	return 0;
 }
@@ -555,7 +585,7 @@ static int centrino_cpu_exit(struct cpufreq_policy *policy)
  */
 static int centrino_verify (struct cpufreq_policy *policy)
 {
-	return cpufreq_frequency_table_verify(policy, centrino_model->op_points);
+	return cpufreq_frequency_table_verify(policy, centrino_model[policy->cpu]->op_points);
 }
 
 /**
@@ -571,12 +601,12 @@ static int centrino_target (struct cpufreq_policy *policy,
 			    unsigned int relation)
 {
 	unsigned int    newstate = 0;
-	unsigned int	msr, oldmsr, h;
+	unsigned int	msr, oldmsr, h, cpu = policy->cpu;
 	struct cpufreq_freqs	freqs;
 	cpumask_t		saved_mask;
 	int			retval;
 
-	if (centrino_model == NULL)
+	if (centrino_model[cpu] == NULL)
 		return -ENODEV;
 
 	/*
@@ -585,18 +615,18 @@ static int centrino_target (struct cpufreq_policy *policy,
 	 */
 	saved_mask = current->cpus_allowed;
 	set_cpus_allowed(current, policy->cpus);
-	if (smp_processor_id() != policy->cpu) {
+	if (!cpu_isset(smp_processor_id(), policy->cpus)) {
 		dprintk("couldn't limit to CPUs in this domain\n");
 		return(-EAGAIN);
 	}
 
-	if (cpufreq_frequency_table_target(policy, centrino_model->op_points, target_freq,
+	if (cpufreq_frequency_table_target(policy, centrino_model[cpu]->op_points, target_freq,
 					   relation, &newstate)) {
 		retval = -EINVAL;
 		goto migrate_end;
 	}
 
-	msr = centrino_model->op_points[newstate].index;
+	msr = centrino_model[cpu]->op_points[newstate].index;
 	rdmsr(MSR_IA32_PERF_CTL, oldmsr, h);
 
 	if (msr == (oldmsr & 0xffff)) {
@@ -605,9 +635,9 @@ static int centrino_target (struct cpufreq_policy *policy,
 		goto migrate_end;
 	}
 
-	freqs.cpu = policy->cpu;
-	freqs.old = extract_clock(oldmsr);
-	freqs.new = extract_clock(msr);
+	freqs.cpu = cpu;
+	freqs.old = extract_clock(oldmsr, cpu, 0);
+	freqs.new = extract_clock(msr, cpu, 0);
 
 	dprintk("target=%dkHz old=%d new=%d msr=%04x\n",
 		target_freq, freqs.old, freqs.new, msr);

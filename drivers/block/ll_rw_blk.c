@@ -1438,6 +1438,7 @@ static int blk_init_free_list(request_queue_t *q)
 	struct request_list *rl = &q->rq;
 
 	rl->count[READ] = rl->count[WRITE] = 0;
+	rl->starved[READ] = rl->starved[WRITE] = 0;
 	init_waitqueue_head(&rl->wait[READ]);
 	init_waitqueue_head(&rl->wait[WRITE]);
 	init_waitqueue_head(&rl->drain);
@@ -1618,6 +1619,22 @@ void ioc_set_batching(request_queue_t *q, struct io_context *ioc)
 	ioc->last_waited = jiffies;
 }
 
+static void __freed_request(request_queue_t *q, int rw)
+{
+	struct request_list *rl = &q->rq;
+
+	if (rl->count[rw] < queue_congestion_off_threshold(q))
+		clear_queue_congested(q, rw);
+
+	if (rl->count[rw] + 1 <= q->nr_requests) {
+		smp_mb();
+		if (waitqueue_active(&rl->wait[rw]))
+			wake_up(&rl->wait[rw]);
+
+		blk_clear_queue_full(q, rw);
+	}
+}
+
 /*
  * A request has just been released.  Account for it, update the full and
  * congestion status, wake up any waiters.   Called under q->queue_lock.
@@ -1627,17 +1644,17 @@ static void freed_request(request_queue_t *q, int rw)
 	struct request_list *rl = &q->rq;
 
 	rl->count[rw]--;
-	if (rl->count[rw] < queue_congestion_off_threshold(q))
-		clear_queue_congested(q, rw);
-	if (rl->count[rw]+1 <= q->nr_requests) {
+
+	__freed_request(q, rw);
+
+	if (unlikely(rl->starved[rw ^ 1]))
+		__freed_request(q, rw ^ 1);
+
+	if (!rl->count[READ] && !rl->count[WRITE]) {
 		smp_mb();
-		if (waitqueue_active(&rl->wait[rw]))
-			wake_up(&rl->wait[rw]);
-		blk_clear_queue_full(q, rw);
+		if (unlikely(waitqueue_active(&rl->drain)))
+			wake_up(&rl->drain);
 	}
-	if (unlikely(waitqueue_active(&rl->drain)) &&
-	    !rl->count[READ] && !rl->count[WRITE])
-		wake_up(&rl->drain);
 }
 
 #define blkdev_free_rq(list) list_entry((list)->next, struct request, queuelist)
@@ -1669,8 +1686,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 
 	switch (elv_may_queue(q, rw)) {
 		case ELV_MQUEUE_NO:
-			spin_unlock_irq(q->queue_lock);
-			goto out;
+			goto rq_starved;
 		case ELV_MQUEUE_MAY:
 			break;
 		case ELV_MQUEUE_MUST:
@@ -1688,6 +1704,7 @@ static struct request *get_request(request_queue_t *q, int rw, int gfp_mask)
 
 get_rq:
 	rl->count[rw]++;
+	rl->starved[rw] = 0;
 	if (rl->count[rw] >= queue_congestion_on_threshold(q))
 		set_queue_congested(q, rw);
 	spin_unlock_irq(q->queue_lock);
@@ -1703,6 +1720,18 @@ get_rq:
 		 */
 		spin_lock_irq(q->queue_lock);
 		freed_request(q, rw);
+
+		/*
+		 * in the very unlikely event that allocation failed and no
+		 * requests for this direction was pending, mark us starved
+		 * so that freeing of a request in the other direction will
+		 * notice us. another possible fix would be to split the
+		 * rq mempool into READ and WRITE
+		 */
+rq_starved:
+		if (unlikely(rl->count[rw] == 0))
+			rl->starved[rw] = 1;
+
 		spin_unlock_irq(q->queue_lock);
 		goto out;
 	}

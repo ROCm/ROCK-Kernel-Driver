@@ -724,13 +724,16 @@ static int dabusb_probe (struct usb_interface *intf,
 	pdabusb_t s;
 
 	dbg("dabusb: probe: vendor id 0x%x, device id 0x%x ifnum:%d",
-	  usbdev->descriptor.idVendor, usbdev->descriptor.idProduct, intf->altsetting->desc.bInterfaceNumber);
+	    le16_to_cpu(usbdev->descriptor.idVendor),
+	    le16_to_cpu(usbdev->descriptor.idProduct),
+	    intf->altsetting->desc.bInterfaceNumber);
 
 	/* We don't handle multiple configurations */
 	if (usbdev->descriptor.bNumConfigurations != 1)
 		return -ENODEV;
 
-	if (intf->altsetting->desc.bInterfaceNumber != _DABUSB_IF && usbdev->descriptor.idProduct == 0x9999)
+	if (intf->altsetting->desc.bInterfaceNumber != _DABUSB_IF &&
+	    le16_to_cpu(usbdev->descriptor.idProduct) == 0x9999)
 		return -ENODEV;
 
 
@@ -746,7 +749,7 @@ static int dabusb_probe (struct usb_interface *intf,
 		err("reset_configuration failed");
 		goto reject;
 	}
-	if (usbdev->descriptor.idProduct == 0x2131) {
+	if (le16_to_cpu(usbdev->descriptor.idProduct) == 0x2131) {
 		dabusb_loadmem (s, NULL);
 		goto reject;
 	}

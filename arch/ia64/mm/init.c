@@ -432,7 +432,6 @@ virtual_memmap_init (u64 start, u64 end, void *arg)
 	struct page *map_start, *map_end;
 
 	args = (struct memmap_init_callback_data *) arg;
-
 	map_start = vmem_map + (__pa(start) >> PAGE_SHIFT);
 	map_end   = vmem_map + (__pa(end) >> PAGE_SHIFT);
 

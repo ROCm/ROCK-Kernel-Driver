@@ -57,7 +57,7 @@ MODULE_LICENSE("GPL");
 #include <linux/video_encoder.h>
 
 static int debug = 0;
-MODULE_PARM(debug, "i");
+module_param(debug, int, 0);
 MODULE_PARM_DESC(debug, "Debug level (0-1)");
 
 #define dprintk(num, format, args...) \

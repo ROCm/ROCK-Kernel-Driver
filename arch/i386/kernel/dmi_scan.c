@@ -104,6 +104,11 @@ static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 	u8 buf[15];
 	char __iomem *p, *q;
 
+	/*
+	 * no iounmap() for that ioremap(); it would be a no-op, but it's
+	 * so early in setup that sucker gets confused into doing what
+	 * it shouldn't if we actually call it.
+	 */
 	for (p = q = ioremap(0xF0000, 0x10000); q < p + 0x10000; q += 16) {
 		memcpy_fromio(buf, q, 15);
 		if(memcmp(buf, "_DMI_", 5)==0 && dmi_checksum(buf))
@@ -125,13 +130,10 @@ static int __init dmi_iterate(void (*decode)(struct dmi_header *))
 				num, len));
 			dmi_printk((KERN_INFO "DMI table at 0x%08X.\n",
 				base));
-			if(dmi_table(base,len, num, decode)==0) {
-				iounmap(p);
+			if(dmi_table(base,len, num, decode)==0)
 				return 0;
-			}
 		}
 	}
-	iounmap(p);
 	return -1;
 }
 

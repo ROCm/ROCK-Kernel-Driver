@@ -874,19 +874,19 @@ static int __initdata cddma = -1;
 static int __initdata opl4 = 0;
 static int __initdata joystick = 0;
 
-MODULE_PARM(mpu_io, "i");
-MODULE_PARM(mpu_irq, "i");
-MODULE_PARM(io,"i");
-MODULE_PARM(dma,"i");
-MODULE_PARM(dma16,"i");
-MODULE_PARM(irq,"i");
-MODULE_PARM(cdtype,"i");
-MODULE_PARM(cdirq,"i");
-MODULE_PARM(cdport,"i");
-MODULE_PARM(cddma,"i");
-MODULE_PARM(opl4,"i");
-MODULE_PARM(joystick,"i");
-MODULE_PARM(debug,"i");
+module_param(mpu_io, int, 0);
+module_param(mpu_irq, int, 0);
+module_param(io, int, 0);
+module_param(dma, int, 0);
+module_param(dma16, int, 0);
+module_param(irq, int, 0);
+module_param(cdtype, int, 0);
+module_param(cdirq, int, 0);
+module_param(cdport, int, 0);
+module_param(cddma, int, 0);
+module_param(opl4, int, 0);
+module_param(joystick, bool, 0);
+module_param(debug, bool, 0644);
 
 static int __initdata dma_map[2][8] =
 {

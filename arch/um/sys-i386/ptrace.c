@@ -3,6 +3,8 @@
  * Licensed under the GPL
  */
 
+#include <linux/config.h>
+#include <linux/compiler.h>
 #include "linux/sched.h"
 #include "asm/elf.h"
 #include "asm/ptrace.h"
@@ -22,7 +24,7 @@ int is_syscall(unsigned long addr)
 	unsigned short instr;
 	int n;
 
-	n = copy_from_user(&instr, (void *) addr, sizeof(instr));
+	n = copy_from_user(&instr, (void __user *) addr, sizeof(instr));
 	if(n){
 		printk("is_syscall : failed to read instruction from 0x%lx\n",
 		       addr);
@@ -175,12 +177,12 @@ static inline unsigned long twd_fxsr_to_i387( struct i387_fxsave_struct *fxsave 
  */
 
 #ifdef CONFIG_MODE_TT
-static inline int convert_fxsr_to_user_tt(struct _fpstate *buf, 
+static inline int convert_fxsr_to_user_tt(struct _fpstate __user *buf,
 					  struct pt_regs *regs)
 {
 	struct i387_fxsave_struct *fxsave = SC_FXSR_ENV(PT_REGS_SC(regs));
 	unsigned long env[7];
-	struct _fpreg *to;
+	struct _fpreg __user *to;
 	struct _fpxreg *from;
 	int i;
 
@@ -205,7 +207,7 @@ static inline int convert_fxsr_to_user_tt(struct _fpstate *buf,
 }
 #endif
 
-static inline int convert_fxsr_to_user(struct _fpstate *buf, 
+static inline int convert_fxsr_to_user(struct _fpstate __user *buf,
 				       struct pt_regs *regs)
 {
 	return(CHOOSE_MODE(convert_fxsr_to_user_tt(buf, regs), 0));
@@ -213,12 +215,12 @@ static inline int convert_fxsr_to_user(struct _fpstate *buf,
 
 #ifdef CONFIG_MODE_TT
 static inline int convert_fxsr_from_user_tt(struct pt_regs *regs,
-					    struct _fpstate *buf)
+					    struct _fpstate __user *buf)
 {
 	struct i387_fxsave_struct *fxsave = SC_FXSR_ENV(PT_REGS_SC(regs));
 	unsigned long env[7];
 	struct _fpxreg *to;
-	struct _fpreg *from;
+	struct _fpreg __user *from;
 	int i;
 
 	if ( __copy_from_user( env, buf, 7 * sizeof(long) ) )
@@ -244,7 +246,7 @@ static inline int convert_fxsr_from_user_tt(struct pt_regs *regs,
 #endif
 
 static inline int convert_fxsr_from_user(struct pt_regs *regs, 
-					 struct _fpstate *buf)
+					 struct _fpstate __user *buf)
 {
 	return(CHOOSE_MODE(convert_fxsr_from_user_tt(regs, buf), 0));
 }
@@ -253,7 +255,7 @@ int get_fpregs(unsigned long buf, struct task_struct *child)
 {
 	int err;
 
-	err = convert_fxsr_to_user((struct _fpstate *) buf, 
+	err = convert_fxsr_to_user((struct _fpstate __user *) buf,
 				   &child->thread.regs);
 	if(err) return(-EFAULT);
 	else return(0);
@@ -264,7 +266,7 @@ int set_fpregs(unsigned long buf, struct task_struct *child)
 	int err;
 
 	err = convert_fxsr_from_user(&child->thread.regs, 
-				     (struct _fpstate *) buf);
+				     (struct _fpstate __user *) buf);
 	if(err) return(-EFAULT);
 	else return(0);
 }
@@ -276,7 +278,7 @@ int get_fpxregs_tt(unsigned long buf, struct task_struct *tsk)
 	struct i387_fxsave_struct *fxsave = SC_FXSR_ENV(PT_REGS_SC(regs));
 	int err;
 
-	err = __copy_to_user((void *) buf, fxsave,
+	err = __copy_to_user((void __user *) buf, fxsave,
 			     sizeof(struct user_fxsr_struct));
 	if(err) return -EFAULT;
 	else return 0;
@@ -295,7 +297,7 @@ int set_fpxregs_tt(unsigned long buf, struct task_struct *tsk)
 	struct i387_fxsave_struct *fxsave = SC_FXSR_ENV(PT_REGS_SC(regs));
 	int err;
 
-	err = __copy_from_user(fxsave, (void *) buf,
+	err = __copy_from_user(fxsave, (void __user *) buf,
 			       sizeof(struct user_fxsr_struct) );
 	if(err) return -EFAULT;
 	else return 0;

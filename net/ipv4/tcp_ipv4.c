@@ -568,7 +568,7 @@ static int __tcp_v4_check_established(struct sock *sk, __u16 lport,
 		tw = (struct tcp_tw_bucket *)sk2;
 
 		if (TCP_IPV4_TW_MATCH(sk2, acookie, saddr, daddr, ports, dif)) {
-			struct tcp_opt *tp = tcp_sk(sk);
+			struct tcp_sock *tp = tcp_sk(sk);
 
 			/* With PAWS, it is safe from the viewpoint
 			   of data integrity. Even without PAWS it
@@ -744,7 +744,7 @@ out:
 int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 {
 	struct inet_sock *inet = inet_sk(sk);
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct sockaddr_in *usin = (struct sockaddr_in *)uaddr;
 	struct rtable *rt;
 	u32 daddr, nexthop;
@@ -867,7 +867,7 @@ static __inline__ u32 tcp_v4_synq_hash(u32 raddr, u16 rport, u32 rnd)
 	return (jhash_2words(raddr, (u32) rport, rnd) & (TCP_SYNQ_HSIZE - 1));
 }
 
-static struct open_request *tcp_v4_search_req(struct tcp_opt *tp,
+static struct open_request *tcp_v4_search_req(struct tcp_sock *tp,
 					      struct open_request ***prevp,
 					      __u16 rport,
 					      __u32 raddr, __u32 laddr)
@@ -893,7 +893,7 @@ static struct open_request *tcp_v4_search_req(struct tcp_opt *tp,
 
 static void tcp_v4_synq_add(struct sock *sk, struct open_request *req)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct tcp_listen_opt *lopt = tp->listen_opt;
 	u32 h = tcp_v4_synq_hash(req->af.v4_req.rmt_addr, req->rmt_port, lopt->hash_rnd);
 
@@ -918,7 +918,7 @@ static inline void do_pmtu_discovery(struct sock *sk, struct iphdr *iph,
 {
 	struct dst_entry *dst;
 	struct inet_sock *inet = inet_sk(sk);
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 
 	/* We are not interested in TCP_LISTEN and open_requests (SYN-ACKs
 	 * send out by Linux are always <576bytes so they should go through
@@ -979,7 +979,7 @@ void tcp_v4_err(struct sk_buff *skb, u32 info)
 {
 	struct iphdr *iph = (struct iphdr *)skb->data;
 	struct tcphdr *th = (struct tcphdr *)(skb->data + (iph->ihl << 2));
-	struct tcp_opt *tp;
+	struct tcp_sock *tp;
 	struct inet_sock *inet;
 	int type = skb->h.icmph->type;
 	int code = skb->h.icmph->code;
@@ -1393,7 +1393,7 @@ struct or_calltable or_ipv4 = {
 
 int tcp_v4_conn_request(struct sock *sk, struct sk_buff *skb)
 {
-	struct tcp_opt tp;
+	struct tcp_sock tp;
 	struct open_request *req;
 	__u32 saddr = skb->nh.iph->saddr;
 	__u32 daddr = skb->nh.iph->daddr;
@@ -1550,7 +1550,7 @@ struct sock *tcp_v4_syn_recv_sock(struct sock *sk, struct sk_buff *skb,
 				  struct dst_entry *dst)
 {
 	struct inet_sock *newinet;
-	struct tcp_opt *newtp;
+	struct tcp_sock *newtp;
 	struct sock *newsk;
 
 	if (sk_acceptq_is_full(sk))
@@ -1602,7 +1602,7 @@ static struct sock *tcp_v4_hnd_req(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcphdr *th = skb->h.th;
 	struct iphdr *iph = skb->nh.iph;
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct sock *nsk;
 	struct open_request **prev;
 	/* Find possible connection requests. */
@@ -1972,7 +1972,7 @@ static void v4_addr2sockaddr(struct sock *sk, struct sockaddr * uaddr)
 int tcp_v4_remember_stamp(struct sock *sk)
 {
 	struct inet_sock *inet = inet_sk(sk);
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 	struct rtable *rt = (struct rtable *)__sk_dst_get(sk);
 	struct inet_peer *peer = NULL;
 	int release_it = 0;
@@ -2040,7 +2040,7 @@ struct tcp_func ipv4_specific = {
  */
 static int tcp_v4_init_sock(struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 
 	skb_queue_head_init(&tp->out_of_order_queue);
 	tcp_init_xmit_timers(sk);
@@ -2082,7 +2082,7 @@ static int tcp_v4_init_sock(struct sock *sk)
 
 int tcp_v4_destroy_sock(struct sock *sk)
 {
-	struct tcp_opt *tp = tcp_sk(sk);
+	struct tcp_sock *tp = tcp_sk(sk);
 
 	tcp_clear_xmit_timers(sk);
 
@@ -2131,7 +2131,7 @@ static inline struct tcp_tw_bucket *tw_next(struct tcp_tw_bucket *tw)
 
 static void *listening_get_next(struct seq_file *seq, void *cur)
 {
-	struct tcp_opt *tp;
+	struct tcp_sock *tp;
 	struct hlist_node *node;
 	struct sock *sk = cur;
 	struct tcp_iter_state* st = seq->private;
@@ -2220,7 +2220,10 @@ static void *established_get_first(struct seq_file *seq)
 		struct sock *sk;
 		struct hlist_node *node;
 		struct tcp_tw_bucket *tw;
-	       
+
+		/* We can reschedule _before_ having picked the target: */
+		cond_resched_softirq();
+
 		read_lock(&tcp_ehash[st->bucket].lock);
 		sk_for_each(sk, node, &tcp_ehash[st->bucket].chain) {
 			if (sk->sk_family != st->family) {
@@ -2267,6 +2270,10 @@ get_tw:
 		}
 		read_unlock(&tcp_ehash[st->bucket].lock);
 		st->state = TCP_SEQ_STATE_ESTABLISHED;
+
+		/* We can reschedule between buckets: */
+		cond_resched_softirq();
+
 		if (++st->bucket < tcp_ehash_size) {
 			read_lock(&tcp_ehash[st->bucket].lock);
 			sk = sk_head(&tcp_ehash[st->bucket].chain);
@@ -2368,7 +2375,7 @@ static void tcp_seq_stop(struct seq_file *seq, void *v)
 	switch (st->state) {
 	case TCP_SEQ_STATE_OPENREQ:
 		if (v) {
-			struct tcp_opt *tp = tcp_sk(st->syn_wait_sk);
+			struct tcp_sock *tp = tcp_sk(st->syn_wait_sk);
 			read_unlock_bh(&tp->syn_wait_lock);
 		}
 	case TCP_SEQ_STATE_LISTENING:
@@ -2473,7 +2480,7 @@ static void get_tcp4_sock(struct sock *sp, char *tmpbuf, int i)
 {
 	int timer_active;
 	unsigned long timer_expires;
-	struct tcp_opt *tp = tcp_sk(sp);
+	struct tcp_sock *tp = tcp_sk(sp);
 	struct inet_sock *inet = inet_sk(sp);
 	unsigned int dest = inet->daddr;
 	unsigned int src = inet->rcv_saddr;

@@ -199,19 +199,6 @@ void skb_free_datagram(struct sock *sk, struct sk_buff *skb)
 	kfree_skb(skb);
 }
 
-/*
- *	Copy a datagram to a linear buffer.
- */
-int skb_copy_datagram(const struct sk_buff *skb, int offset, char __user *to, int size)
-{
-	struct iovec iov = {
-		.iov_base = to,
-		.iov_len =size,
-	};
-
-	return skb_copy_datagram_iovec(skb, offset, &iov, size);
-}
-
 /**
  *	skb_copy_datagram_iovec - Copy a datagram to an iovec.
  *	@skb - buffer to copy
@@ -296,8 +283,9 @@ fault:
 	return -EFAULT;
 }
 
-int skb_copy_and_csum_datagram(const struct sk_buff *skb, int offset,
-			       u8 __user *to, int len, unsigned int *csump)
+static int skb_copy_and_csum_datagram(const struct sk_buff *skb, int offset,
+				      u8 __user *to, int len,
+				      unsigned int *csump)
 {
 	int start = skb_headlen(skb);
 	int pos = 0;
@@ -489,7 +477,6 @@ unsigned int datagram_poll(struct file *file, struct socket *sock,
 
 EXPORT_SYMBOL(datagram_poll);
 EXPORT_SYMBOL(skb_copy_and_csum_datagram_iovec);
-EXPORT_SYMBOL(skb_copy_datagram);
 EXPORT_SYMBOL(skb_copy_datagram_iovec);
 EXPORT_SYMBOL(skb_free_datagram);
 EXPORT_SYMBOL(skb_recv_datagram);

@@ -10,8 +10,10 @@ pcmcia_core-y					+= cs.o cistpl.o rsrc_mgr.o socket_sysfs.o
 pcmcia_core-$(CONFIG_CARDBUS)			+= cardbus.o
 obj-$(CONFIG_PCCARD)				+= pcmcia_core.o
 
-pcmcia-y					+= ds.o bulkmem.o pcmcia_compat.o
+pcmcia-y					+= ds.o pcmcia_compat.o
 obj-$(CONFIG_PCMCIA)				+= pcmcia.o
+
+obj-$(CONFIG_PCCARD_NONSTATIC)			+= rsrc_nonstatic.o
 
 
 # socket drivers
@@ -46,4 +48,5 @@ sa1100_cs-$(CONFIG_SA1100_SIMPAD)		+= sa1100_simpad.o
 
 pxa2xx_cs-$(CONFIG_ARCH_LUBBOCK)		+= pxa2xx_lubbock.o sa1111_generic.o
 pxa2xx_cs-$(CONFIG_MACH_MAINSTONE)		+= pxa2xx_mainstone.o
+pxa2xx_cs-$(CONFIG_PXA_SHARPSL)			+= pxa2xx_sharpsl.o
 

@@ -21,28 +21,28 @@
 
 #include <asm/io.h>
 #include <asm/hardware.h>
-#include <asm/irq.h>
 
 #include "gsc.h"
 
 #define WAX_GSC_IRQ	7	/* Hardcoded Interrupt for GSC */
 #define WAX_GSC_NMI_IRQ	29
 
-static int wax_choose_irq(struct parisc_device *dev)
+static void wax_choose_irq(struct parisc_device *dev, void *ctrl)
 {
-	int irq = -1;
+	int irq;
 
 	switch (dev->id.sversion) {
-		case 0x73:	irq = 30; break; /* HIL */
-		case 0x8c:	irq = 25; break; /* RS232 */
-		case 0x90:	irq = 21; break; /* WAX EISA BA */
+		case 0x73:	irq =  1; break; /* HIL */
+		case 0x8c:	irq =  6; break; /* RS232 */
+		case 0x90:	irq = 10; break; /* WAX EISA BA */
+		default:	return;		 /* Unknown */
 	}
 
-	return irq;
+	gsc_asic_assign_irq(ctrl, irq, &dev->irq);
 }
 
 static void __init
-wax_init_irq(struct busdevice *wax)
+wax_init_irq(struct gsc_asic *wax)
 {
 	unsigned long base = wax->hpa;
 
@@ -50,7 +50,7 @@ wax_init_irq(struct busdevice *wax)
 	gsc_writel(0x00000000, base+OFFSET_IMR);
 
 	/* clear pending interrupts */
-	(volatile u32) gsc_readl(base+OFFSET_IRR);
+	gsc_readl(base+OFFSET_IRR);
 
 	/* We're not really convinced we want to reset the onboard
          * devices. Firmware does it for us...
@@ -69,11 +69,12 @@ wax_init_irq(struct busdevice *wax)
 int __init
 wax_init_chip(struct parisc_device *dev)
 {
-	struct busdevice *wax;
+	struct gsc_asic *wax;
+	struct parisc_device *parent;
 	struct gsc_irq gsc_irq;
-	int irq, ret;
+	int ret;
 
-	wax = kmalloc(sizeof(struct busdevice), GFP_KERNEL);
+	wax = kmalloc(sizeof(*wax), GFP_KERNEL);
 	if (!wax)
 		return -ENOMEM;
 
@@ -87,40 +88,37 @@ wax_init_chip(struct parisc_device *dev)
 	wax_init_irq(wax);
 
 	/* the IRQ wax should use */
-	irq = gsc_claim_irq(&gsc_irq, WAX_GSC_IRQ);
-	if (irq < 0) {
+	dev->irq = gsc_claim_irq(&gsc_irq, WAX_GSC_IRQ);
+	if (dev->irq < 0) {
 		printk(KERN_ERR "%s(): cannot get GSC irq\n",
 				__FUNCTION__);
 		kfree(wax);
 		return -EBUSY;
 	}
 
-	ret = request_irq(gsc_irq.irq, busdev_barked, 0, "wax", wax);
+	wax->eim = ((u32) gsc_irq.txn_addr) | gsc_irq.txn_data;
+
+	ret = request_irq(gsc_irq.irq, gsc_asic_intr, 0, "wax", wax);
 	if (ret < 0) {
 		kfree(wax);
 		return ret;
 	}
 
-	/* Save this for debugging later */
-	wax->parent_irq = gsc_irq.irq;
-	wax->eim = ((u32) gsc_irq.txn_addr) | gsc_irq.txn_data;
-
 	/* enable IRQ's for devices below WAX */
 	gsc_writel(wax->eim, wax->hpa + OFFSET_IAR);
 
 	/* Done init'ing, register this driver */
-	ret = gsc_common_irqsetup(dev, wax);
+	ret = gsc_common_setup(dev, wax);
 	if (ret) {
 		kfree(wax);
 		return ret;
 	}
 
-	fixup_child_irqs(dev, wax->busdev_region->data.irqbase,
-			wax_choose_irq);
+	gsc_fixup_irqs(dev, wax, wax_choose_irq);
 	/* On 715-class machines, Wax EISA is a sibling of Wax, not a child. */
-	if (dev->parent->id.hw_type != HPHW_IOA) {
-		fixup_child_irqs(dev->parent, wax->busdev_region->data.irqbase,
-				wax_choose_irq);
+	parent = parisc_parent(dev);
+	if (parent->id.hw_type != HPHW_IOA) {
+		gsc_fixup_irqs(parent, wax, wax_choose_irq);
 	}
 
 	return ret;

@@ -43,13 +43,6 @@ static unsigned int normal_isa[] = { I2C_CLIENT_ISA_END };
 /* Insmod parameters */
 SENSORS_INSMOD_1(eeprom);
 
-static int checksum = 0;
-module_param(checksum, bool, 0);
-MODULE_PARM_DESC(checksum, "Only accept eeproms whose checksum is correct");
-
-
-/* EEPROM registers */
-#define EEPROM_REG_CHECKSUM	0x3f
 
 /* Size of EEPROM in bytes */
 #define EEPROM_SIZE		256
@@ -84,8 +77,6 @@ static struct i2c_driver eeprom_driver = {
 	.attach_adapter	= eeprom_attach_adapter,
 	.detach_client	= eeprom_detach_client,
 };
-
-static int eeprom_id;
 
 static void eeprom_update_client(struct i2c_client *client, u8 slice)
 {
@@ -168,21 +159,18 @@ static int eeprom_attach_adapter(struct i2c_adapter *adapter)
 /* This function is called by i2c_detect */
 int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 {
-	int i, cs;
 	struct i2c_client *new_client;
 	struct eeprom_data *data;
 	int err = 0;
 
-	/* Make sure we aren't probing the ISA bus!! This is just a safety check
-	   at this moment; i2c_detect really won't call us. */
-#ifdef DEBUG
-	if (i2c_is_isa_adapter(adapter)) {
-		dev_dbg(&adapter->dev, " eeprom_detect called for an ISA bus adapter?!?\n");
-		return 0;
-	}
-#endif
-
-	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_BYTE_DATA))
+	/* There are three ways we can read the EEPROM data:
+	   (1) I2C block reads (faster, but unsupported by most adapters)
+	   (2) Consecutive byte reads (100% overhead)
+	   (3) Regular byte data reads (200% overhead)
+	   The third method is not implemented by this driver because all
+	   known adapters support at least the second. */
+	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_READ_BYTE_DATA
+					    | I2C_FUNC_SMBUS_BYTE))
 		goto exit;
 
 	/* OK. For now, we presume we have a valid client. We now create the
@@ -205,37 +193,27 @@ int eeprom_detect(struct i2c_adapter *adapter, int address, int kind)
 	/* prevent 24RF08 corruption */
 	i2c_smbus_write_quick(new_client, 0);
 
-	/* Now, we do the remaining detection. It is not there, unless you force
-	   the checksum to work out. */
-	if (checksum) {
-		cs = 0;
-		for (i = 0; i <= 0x3e; i++)
-			cs += i2c_smbus_read_byte_data(new_client, i);
-		cs &= 0xff;
-		if (i2c_smbus_read_byte_data (new_client, EEPROM_REG_CHECKSUM) != cs)
-			goto exit_kfree;
-	}
-
-	data->nature = UNKNOWN;
-	/* Detect the Vaio nature of EEPROMs.
-	   We use the "PCG-" prefix as the signature. */
-	if (address == 0x57) {
-		if (i2c_smbus_read_byte_data(new_client, 0x80) == 'P' && 
-		    i2c_smbus_read_byte_data(new_client, 0x81) == 'C' && 
-		    i2c_smbus_read_byte_data(new_client, 0x82) == 'G' &&
-		    i2c_smbus_read_byte_data(new_client, 0x83) == '-')
-			data->nature = VAIO;
-	}
-
 	/* Fill in the remaining client fields */
-	strncpy(new_client->name, "eeprom", I2C_NAME_SIZE);
-	new_client->id = eeprom_id++;
+	strlcpy(new_client->name, "eeprom", I2C_NAME_SIZE);
 	data->valid = 0;
 	init_MUTEX(&data->update_lock);
+	data->nature = UNKNOWN;
 
 	/* Tell the I2C layer a new client has arrived */
 	if ((err = i2c_attach_client(new_client)))
 		goto exit_kfree;
+
+	/* Detect the Vaio nature of EEPROMs.
+	   We use the "PCG-" prefix as the signature. */
+	if (address == 0x57) {
+		if (i2c_smbus_read_byte_data(new_client, 0x80) == 'P'
+		 && i2c_smbus_read_byte(new_client) == 'C'
+		 && i2c_smbus_read_byte(new_client) == 'G'
+		 && i2c_smbus_read_byte(new_client) == '-')
+			dev_info(&new_client->dev, "Vaio EEPROM detected, "
+				"enabling password protection\n");
+			data->nature = VAIO;
+	}
 
 	/* create the sysfs eeprom file */
 	sysfs_create_bin_file(&new_client->dev.kobj, &eeprom_attr);

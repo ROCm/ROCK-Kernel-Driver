@@ -100,7 +100,7 @@ static inline pte_t *alloc_one_pte_map(struct mm_struct *mm, unsigned long addr)
 
 static int
 move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
-		unsigned long new_addr)
+		struct vm_area_struct *new_vma, unsigned long new_addr)
 {
 	struct address_space *mapping = NULL;
 	struct mm_struct *mm = vma->vm_mm;
@@ -116,6 +116,9 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 		 */
 		mapping = vma->vm_file->f_mapping;
 		spin_lock(&mapping->i_mmap_lock);
+		if (new_vma->vm_truncate_count &&
+		    new_vma->vm_truncate_count != vma->vm_truncate_count)
+			new_vma->vm_truncate_count = 0;
 	}
 	spin_lock(&mm->page_table_lock);
 
@@ -162,8 +165,8 @@ move_one_page(struct vm_area_struct *vma, unsigned long old_addr,
 }
 
 static unsigned long move_page_tables(struct vm_area_struct *vma,
-		unsigned long new_addr, unsigned long old_addr,
-		unsigned long len)
+		unsigned long old_addr, struct vm_area_struct *new_vma,
+		unsigned long new_addr, unsigned long len)
 {
 	unsigned long offset;
 
@@ -175,7 +178,8 @@ static unsigned long move_page_tables(struct vm_area_struct *vma,
 	 * only a few pages.. This also makes error recovery easier.
 	 */
 	for (offset = 0; offset < len; offset += PAGE_SIZE) {
-		if (move_one_page(vma, old_addr+offset, new_addr+offset) < 0)
+		if (move_one_page(vma, old_addr + offset,
+				new_vma, new_addr + offset) < 0)
 			break;
 		cond_resched();
 	}
@@ -206,14 +210,14 @@ static unsigned long move_vma(struct vm_area_struct *vma,
 	if (!new_vma)
 		return -ENOMEM;
 
-	moved_len = move_page_tables(vma, new_addr, old_addr, old_len);
+	moved_len = move_page_tables(vma, old_addr, new_vma, new_addr, old_len);
 	if (moved_len < old_len) {
 		/*
 		 * On error, move entries back from new area to old,
 		 * which will succeed since page tables still there,
 		 * and then proceed to unmap new area instead of old.
 		 */
-		move_page_tables(new_vma, old_addr, new_addr, moved_len);
+		move_page_tables(new_vma, new_addr, vma, old_addr, moved_len);
 		vma = new_vma;
 		old_len = new_len;
 		old_addr = new_addr;

@@ -403,7 +403,7 @@ vmlogrdr_open (struct inode *inode, struct file *filp)
 		goto not_connected;
 	}
 
-	return 0;
+ 	return nonseekable_open(inode, filp);
 
 not_connected:
 	iucv_unregister_program(logptr->iucv_handle);

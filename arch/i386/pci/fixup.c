@@ -227,10 +227,7 @@ DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, PCI_ANY_ID, pci_fixup_transparent_
  */
 static void __init pci_fixup_nforce2(struct pci_dev *dev)
 {
-	u32 val, fixed_val;
-	u8 rev;
-
-	pci_read_config_byte(dev, PCI_REVISION_ID, &rev);
+	u32 val;
 
 	/*
 	 * Chip  Old value   New value
@@ -240,17 +237,14 @@ static void __init pci_fixup_nforce2(struct pci_dev *dev)
 	 * Northbridge chip version may be determined by
 	 * reading the PCI revision ID (0xC1 or greater is C18D).
 	 */
-	fixed_val = rev < 0xC1 ? 0x1F01FF01 : 0x9F01FF01;
-
 	pci_read_config_dword(dev, 0x6c, &val);
 
 	/*
-	 * Apply fixup only if C1 Halt Disconnect is enabled
-	 * (bit28) because it is not supported on some boards.
+	 * Apply fixup if needed, but don't touch disconnect state
 	 */
-	if ((val & (1 << 28)) && val != fixed_val) {
+	if ((val & 0x00FF0000) != 0x00010000) {
 		printk(KERN_WARNING "PCI: nForce2 C1 Halt Disconnect fixup\n");
-		pci_write_config_dword(dev, 0x6c, fixed_val);
+		pci_write_config_dword(dev, 0x6c, (val & 0xFF00FFFF) | 0x00010000);
 	}
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_NVIDIA, PCI_DEVICE_ID_NVIDIA_NFORCE2, pci_fixup_nforce2);
@@ -282,7 +276,7 @@ static int quirk_pcie_aspm_write(struct pci_bus *bus, unsigned int devfn, int wh
 	return raw_pci_ops->write(0, bus->number, devfn, where, size, value);
 }
 
-struct pci_ops quirk_pcie_aspm_ops = {
+static struct pci_ops quirk_pcie_aspm_ops = {
 	.read = quirk_pcie_aspm_read,
 	.write = quirk_pcie_aspm_write,
 };
@@ -295,7 +289,7 @@ struct pci_ops quirk_pcie_aspm_ops = {
  * the root port in an array for fast indexing. Replace the bus ops
  * with the modified one.
  */
-void pcie_rootport_aspm_quirk(struct pci_dev *pdev)
+static void pcie_rootport_aspm_quirk(struct pci_dev *pdev)
 {
 	int cap_base, i;
 	struct pci_bus  *pbus;

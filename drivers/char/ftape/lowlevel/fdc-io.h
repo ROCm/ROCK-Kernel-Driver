@@ -210,7 +210,6 @@ typedef struct {
 extern volatile fdc_mode_enum fdc_mode;
 extern int fdc_setup_error;	/* outdated ??? */
 extern wait_queue_head_t ftape_wait_intr;
-extern int ftape_motor;		/* fdc motor line state */
 extern volatile int ftape_current_cylinder; /* track nr FDC thinks we're on */
 extern volatile __u8 fdc_head;	/* FDC head */
 extern volatile __u8 fdc_cyl;	/* FDC track */
@@ -231,15 +230,11 @@ extern void fdc_catch_stray_interrupts(int count);
 extern int fdc_ready_wait(unsigned int timeout);
 extern int fdc_command(const __u8 * cmd_data, int cmd_len);
 extern int fdc_result(__u8 * res_data, int res_len);
-extern int fdc_issue_command(const __u8 * out_data, int out_count,
-			     __u8 * in_data, int in_count);
 extern int fdc_interrupt_wait(unsigned int time);
-extern int fdc_set_seek_rate(int seek_rate);
 extern int fdc_seek(int track);
 extern int fdc_sense_drive_status(int *st3);
 extern void fdc_motor(int motor);
 extern void fdc_reset(void);
-extern int fdc_recalibrate(void);
 extern void fdc_disable(void);
 extern int fdc_fifo_threshold(__u8 threshold,
 			      int *fifo_state, int *lock_state, int *fifo_thr);

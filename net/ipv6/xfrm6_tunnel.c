@@ -72,7 +72,7 @@ struct xfrm6_tunnel_spi {
 # define XFRM6_TUNNEL_SPI_MAGIC 0xdeadbeef
 #endif
 
-static rwlock_t xfrm6_tunnel_spi_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(xfrm6_tunnel_spi_lock);
 
 static u32 xfrm6_tunnel_spi;
 

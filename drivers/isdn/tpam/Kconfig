@@ -11,5 +11,5 @@ config ISDN_DRV_TPAM
 	  to be downloaded into the card using a utility which is distributed
 	  separately from the Auvertech's web site: <http://www.auvertech.fr/>.
 
-	  Please redirect all support questions to support@auvertech.fr.
+	  Please redirect all support questions to <support@auvertech.fr>.
 

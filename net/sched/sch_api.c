@@ -131,7 +131,7 @@ static int tclass_notify(struct sk_buff *oskb, struct nlmsghdr *n,
  */
 
 /* Protects list of registered TC modules. It is pure SMP lock. */
-static rwlock_t qdisc_mod_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(qdisc_mod_lock);
 
 
 /************************************************
@@ -407,8 +407,9 @@ qdisc_create(struct net_device *dev, u32 handle, struct rtattr **tca, int *errp)
 	ops = qdisc_lookup_ops(kind);
 #ifdef CONFIG_KMOD
 	if (ops==NULL && tca[TCA_KIND-1] != NULL) {
-		if (RTA_PAYLOAD(kind) <= IFNAMSIZ) {
-			request_module("sch_%s", (char*)RTA_DATA(kind));
+		char name[IFNAMSIZ];
+		if (rtattr_strlcpy(name, kind, IFNAMSIZ) < IFNAMSIZ) {
+			request_module("sch_%s", name);
 			ops = qdisc_lookup_ops(kind);
 		}
 	}

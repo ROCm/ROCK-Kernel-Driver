@@ -148,7 +148,7 @@ static ssize_t usbdev_read(struct file *file, char __user *buf, size_t nbytes, l
 			/* The descriptor may claim to be longer than it
 			 * really is.  Here is the actual allocated length. */
 			unsigned alloclen =
-				dev->config[i].desc.wTotalLength;
+				le16_to_cpu(dev->config[i].desc.wTotalLength);
 
 			len = length - (*ppos - pos);
 			if (len > nbytes)
@@ -807,7 +807,7 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 {
 	struct usbdevfs_urb uurb;
 	struct usbdevfs_iso_packet_desc *isopkt = NULL;
-	struct usb_endpoint_descriptor *ep_desc;
+	struct usb_host_endpoint *ep;
 	struct async *as;
 	struct usb_ctrlrequest *dr = NULL;
 	unsigned int u, totlen, isofrmlen;
@@ -828,14 +828,17 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 		if ((ret = checkintf(ps, ifnum)))
 			return ret;
 	}
+	if ((uurb.endpoint & ~USB_ENDPOINT_DIR_MASK) != 0)
+		ep = ps->dev->ep_in [uurb.endpoint & USB_ENDPOINT_NUMBER_MASK];
+	else
+		ep = ps->dev->ep_out [uurb.endpoint & USB_ENDPOINT_NUMBER_MASK];
+	if (!ep)
+		return -ENOENT;
 	switch(uurb.type) {
 	case USBDEVFS_URB_TYPE_CONTROL:
-		if ((uurb.endpoint & ~USB_ENDPOINT_DIR_MASK) != 0) {
-			if (!(ep_desc = usb_epnum_to_ep_desc(ps->dev, uurb.endpoint)))
-				return -ENOENT;
-			if ((ep_desc->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) != USB_ENDPOINT_XFER_CONTROL)
-				return -EINVAL;
-		}
+		if ((ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+				!= USB_ENDPOINT_XFER_CONTROL)
+			return -EINVAL;
 		/* min 8 byte setup packet, max arbitrary */
 		if (uurb.buffer_length < 8 || uurb.buffer_length > PAGE_SIZE)
 			return -EINVAL;
@@ -864,6 +867,12 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 		break;
 
 	case USBDEVFS_URB_TYPE_BULK:
+		switch (ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) {
+		case USB_ENDPOINT_XFER_CONTROL:
+		case USB_ENDPOINT_XFER_ISOC:
+			return -EINVAL;
+		/* allow single-shot interrupt transfers, at bogus rates */
+		}
 		uurb.number_of_packets = 0;
 		if (uurb.buffer_length > MAX_USBFS_BUFFER_SIZE)
 			return -EINVAL;
@@ -875,9 +884,10 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 		/* arbitrary limit */
 		if (uurb.number_of_packets < 1 || uurb.number_of_packets > 128)
 			return -EINVAL;
-		if (!(ep_desc = usb_epnum_to_ep_desc(ps->dev, uurb.endpoint)))
-			return -ENOENT;
-		interval = 1 << min (15, ep_desc->bInterval - 1);
+		if ((ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+				!= USB_ENDPOINT_XFER_ISOC)
+			return -EINVAL;
+		interval = 1 << min (15, ep->desc.bInterval - 1);
 		isofrmlen = sizeof(struct usbdevfs_iso_packet_desc) * uurb.number_of_packets;
 		if (!(isopkt = kmalloc(isofrmlen, GFP_KERNEL)))
 			return -ENOMEM;
@@ -901,12 +911,13 @@ static int proc_submiturb(struct dev_state *ps, void __user *arg)
 
 	case USBDEVFS_URB_TYPE_INTERRUPT:
 		uurb.number_of_packets = 0;
-		if (!(ep_desc = usb_epnum_to_ep_desc(ps->dev, uurb.endpoint)))
-			return -ENOENT;
+		if ((ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+				!= USB_ENDPOINT_XFER_INT)
+			return -EINVAL;
 		if (ps->dev->speed == USB_SPEED_HIGH)
-			interval = 1 << min (15, ep_desc->bInterval - 1);
+			interval = 1 << min (15, ep->desc.bInterval - 1);
 		else
-			interval = ep_desc->bInterval;
+			interval = ep->desc.bInterval;
 		if (uurb.buffer_length > MAX_USBFS_BUFFER_SIZE)
 			return -EINVAL;
 		if (!access_ok((uurb.endpoint & USB_DIR_IN) ? VERIFY_WRITE : VERIFY_READ, uurb.buffer, uurb.buffer_length))
@@ -1110,12 +1121,13 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 	int			retval = 0;
 	struct usb_interface    *intf = NULL;
 	struct usb_driver       *driver = NULL;
+	int			i;
 
 	/* get input parameters and alloc buffer */
 	if (copy_from_user(&ctrl, arg, sizeof (ctrl)))
 		return -EFAULT;
 	if ((size = _IOC_SIZE (ctrl.ioctl_code)) > 0) {
-		if ((buf = kmalloc (size, GFP_KERNEL)) == 0)
+		if ((buf = kmalloc (size, GFP_KERNEL)) == NULL)
 			return -ENOMEM;
 		if ((_IOC_DIR(ctrl.ioctl_code) & _IOC_WRITE)) {
 			if (copy_from_user (buf, ctrl.data, size)) {
@@ -1141,6 +1153,16 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 
 	/* disconnect kernel driver from interface */
 	case USBDEVFS_DISCONNECT:
+
+		/* don't allow the user to unbind the hub driver from
+		 * a hub with children to manage */
+		for (i = 0; i < ps->dev->maxchild; ++i) {
+			if (ps->dev->children[i])
+				retval = -EBUSY;
+		}
+		if (retval)
+			break;
+
 		down_write(&usb_bus_type.subsys.rwsem);
 		if (intf->dev.driver) {
 			driver = to_usb_driver(intf->dev.driver);
@@ -1165,7 +1187,7 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 		down_read(&usb_bus_type.subsys.rwsem);
 		if (intf->dev.driver)
 			driver = to_usb_driver(intf->dev.driver);
-		if (driver == 0 || driver->ioctl == 0) {
+		if (driver == NULL || driver->ioctl == NULL) {
 			retval = -ENOTTY;
 		} else {
 			retval = driver->ioctl (intf, ctrl.ioctl_code, buf);
@@ -1181,7 +1203,7 @@ static int proc_ioctl (struct dev_state *ps, void __user *arg)
 			&& size > 0
 			&& copy_to_user (ctrl.data, buf, size) != 0)
 		retval = -EFAULT;
-	if (buf != 0)
+	if (buf != NULL)
 		kfree (buf);
 	return retval;
 }

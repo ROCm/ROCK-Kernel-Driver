@@ -283,25 +283,6 @@ void mca_set_adapter_name(int slot, char* name)
 EXPORT_SYMBOL(mca_set_adapter_name);
 
 /**
- *	mca_get_adapter_name - get the adapter description
- *	@slot:	slot to query
- *
- *	Return the adapter description if set. If it has not been
- *	set or the slot is out range then return NULL.
- */
-
-char *mca_get_adapter_name(int slot)
-{
-	struct mca_device *mca_dev = mca_find_device_by_slot(slot);
-
-	if(!mca_dev)
-		return NULL;
-
-	return mca_device_get_name(mca_dev);
-}
-EXPORT_SYMBOL(mca_get_adapter_name);
-
-/**
  *	mca_is_adapter_used - check if claimed by driver
  *	@slot:	slot to check
  *
@@ -365,43 +346,3 @@ void mca_mark_as_unused(int slot)
 }
 EXPORT_SYMBOL(mca_mark_as_unused);
 
-/**
- *	mca_isadapter - check if the slot holds an adapter
- *	@slot:	slot to query
- *
- *	Returns zero if the slot does not hold an adapter, non zero if
- *	it does.
- */
-
-int mca_isadapter(int slot)
-{
-	struct mca_device *mca_dev = mca_find_device_by_slot(slot);
-	enum MCA_AdapterStatus status;
-
-	if(!mca_dev)
-		return 0;
-
-	status = mca_device_status(mca_dev);
-
-	return status == MCA_ADAPTER_NORMAL
-		|| status == MCA_ADAPTER_DISABLED;
-}
-EXPORT_SYMBOL(mca_isadapter);
-
-/**
- *	mca_isenabled - check if the slot holds an enabled adapter
- *	@slot:	slot to query
- *
- *	Returns a non zero value if the slot holds an enabled adapter
- *	and zero for any other case.
- */
-
-int mca_isenabled(int slot)
-{
-	struct mca_device *mca_dev = mca_find_device_by_slot(slot);
-
-	if(!mca_dev)
-		return 0;
-
-	return mca_device_status(mca_dev) == MCA_ADAPTER_NORMAL;
-}

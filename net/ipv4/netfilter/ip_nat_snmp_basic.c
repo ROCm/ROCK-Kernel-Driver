@@ -65,7 +65,7 @@ MODULE_DESCRIPTION("Basic SNMP Application Layer Gateway");
 #define NOCT1(n) (u_int8_t )((n) & 0xff)
 
 static int debug;
-static spinlock_t snmp_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(snmp_lock);
 
 /* 
  * Application layer address mapping mimics the NAT mapping, but 

@@ -386,8 +386,10 @@ int avtab_read(struct avtab *a, void *fp, u32 config)
 		goto bad;
 	}
 	for (i = 0; i < nel; i++) {
-		if (avtab_read_item(fp, &avdatum, &avkey))
+		if (avtab_read_item(fp, &avdatum, &avkey)) {
+			rc = -EINVAL;
 			goto bad;
+		}
 		rc = avtab_insert(a, &avkey, &avdatum);
 		if (rc) {
 			if (rc == -ENOMEM)

@@ -33,7 +33,6 @@
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/interrupt.h>
-#include <linux/suspend.h>
 #include <linux/in.h>
 #include <linux/bitops.h>
 #include <asm/io.h>
@@ -246,36 +245,36 @@ MODULE_DESCRIPTION("Support for Cisco/Aironet 802.11 wireless ethernet \
 		   for PCMCIA when used with airo_cs.");
 MODULE_LICENSE("Dual BSD/GPL");
 MODULE_SUPPORTED_DEVICE("Aironet 4500, 4800 and Cisco 340/350");
-MODULE_PARM(io,"1-4i");
-MODULE_PARM(irq,"1-4i");
-MODULE_PARM(basic_rate,"i");
-MODULE_PARM(rates,"1-8i");
-MODULE_PARM(ssids,"1-3s");
-MODULE_PARM(auto_wep,"i");
+module_param_array(io, int, NULL, 0);
+module_param_array(irq, int, NULL, 0);
+module_param(basic_rate, int, 0);
+module_param_array(rates, int, NULL, 0);
+module_param_array(ssids, charp, NULL, 0);
+module_param(auto_wep, int, 0);
 MODULE_PARM_DESC(auto_wep, "If non-zero, the driver will keep looping through \
 the authentication options until an association is made.  The value of \
 auto_wep is number of the wep keys to check.  A value of 2 will try using \
 the key at index 0 and index 1.");
-MODULE_PARM(aux_bap,"i");
+module_param(aux_bap, int, 0);
 MODULE_PARM_DESC(aux_bap, "If non-zero, the driver will switch into a mode \
 than seems to work better for older cards with some older buses.  Before \
 switching it checks that the switch is needed.");
-MODULE_PARM(maxencrypt, "i");
+module_param(maxencrypt, int, 0);
 MODULE_PARM_DESC(maxencrypt, "The maximum speed that the card can do \
 encryption.  Units are in 512kbs.  Zero (default) means there is no limit. \
 Older cards used to be limited to 2mbs (4).");
-MODULE_PARM(adhoc, "i");
+module_param(adhoc, int, 0);
 MODULE_PARM_DESC(adhoc, "If non-zero, the card will start in adhoc mode.");
-MODULE_PARM(probe, "i");
+module_param(probe, int, 0);
 MODULE_PARM_DESC(probe, "If zero, the driver won't start the card.");
 
-MODULE_PARM(proc_uid, "i");
+module_param(proc_uid, int, 0);
 MODULE_PARM_DESC(proc_uid, "The uid that the /proc files will belong to.");
-MODULE_PARM(proc_gid, "i");
+module_param(proc_gid, int, 0);
 MODULE_PARM_DESC(proc_gid, "The gid that the /proc files will belong to.");
-MODULE_PARM(airo_perm, "i");
+module_param(airo_perm, int, 0);
 MODULE_PARM_DESC(airo_perm, "The permission bits of /proc/[driver/]aironet.");
-MODULE_PARM(proc_perm, "i");
+module_param(proc_perm, int, 0);
 MODULE_PARM_DESC(proc_perm, "The permission bits of the files in /proc");
 
 /* This is a kind of sloppy hack to get this information to OUT4500 and
@@ -2697,7 +2696,8 @@ int reset_card( struct net_device *dev , int lock) {
 }
 
 struct net_device *_init_airo_card( unsigned short irq, int port,
-				    int is_pcmcia, struct pci_dev *pci )
+				    int is_pcmcia, struct pci_dev *pci,
+				    struct device *dmdev )
 {
 	struct net_device *dev;
 	struct airo_info *ai;
@@ -2759,10 +2759,8 @@ struct net_device *_init_airo_card( unsigned short irq, int port,
 	dev->irq = irq;
 	dev->base_addr = port;
 
-	/* what is with PCMCIA ??? */
-	if (pci) {
-		SET_NETDEV_DEV(dev, &pci->dev);
-	}
+	SET_NETDEV_DEV(dev, dmdev);
+
 
 	if (test_bit(FLAG_MPI,&ai->flags))
 		reset_card (dev, 1);
@@ -2844,9 +2842,10 @@ err_out_free:
 	return NULL;
 }
 
-struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia )
+struct net_device *init_airo_card( unsigned short irq, int port, int is_pcmcia,
+				  struct device *dmdev)
 {
-	return _init_airo_card ( irq, port, is_pcmcia, NULL);
+	return _init_airo_card ( irq, port, is_pcmcia, NULL, dmdev);
 }
 
 EXPORT_SYMBOL(init_airo_card);
@@ -2918,8 +2917,7 @@ static int airo_thread(void *data) {
 			flush_signals(current);
 
 		/* make swsusp happy with our thread */
-		if (current->flags & PF_FREEZE)
-			refrigerator(PF_FREEZE);
+		try_to_freeze(PF_FREEZE);
 
 		if (test_bit(JOB_DIE, &ai->flags))
 			break;
@@ -5455,9 +5453,9 @@ static int __devinit airo_pci_probe(struct pci_dev *pdev,
 	pci_set_master(pdev);
 
 	if (pdev->device == 0x5000 || pdev->device == 0xa504)
-			dev = _init_airo_card(pdev->irq, pdev->resource[0].start, 0, pdev);
+			dev = _init_airo_card(pdev->irq, pdev->resource[0].start, 0, pdev, &pdev->dev);
 	else
-			dev = _init_airo_card(pdev->irq, pdev->resource[2].start, 0, pdev);
+			dev = _init_airo_card(pdev->irq, pdev->resource[2].start, 0, pdev, &pdev->dev);
 	if (!dev)
 		return -ENODEV;
 
@@ -5559,7 +5557,7 @@ static int __init airo_init_module( void )
 		printk( KERN_INFO
 			"airo:  Trying to configure ISA adapter at irq=%d io=0x%x\n",
 			irq[i], io[i] );
-		if (init_airo_card( irq[i], io[i], 0 ))
+		if (init_airo_card( irq[i], io[i], 0, NULL ))
 			have_isa_dev = 1;
 	}
 

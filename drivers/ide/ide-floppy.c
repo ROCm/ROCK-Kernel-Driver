@@ -1640,7 +1640,7 @@ static int idefloppy_get_format_progress(ide_drive_t *drive, int __user *arg)
 }
 
 /*
- *	Return the current floppy capacity to ide.c.
+ *	Return the current floppy capacity.
  */
 static sector_t idefloppy_capacity (ide_drive_t *drive)
 {
@@ -2034,7 +2034,7 @@ static int idefloppy_media_changed(struct gendisk *disk)
 static int idefloppy_revalidate_disk(struct gendisk *disk)
 {
 	ide_drive_t *drive = disk->private_data;
-	set_capacity(disk, current_capacity(drive));
+	set_capacity(disk, idefloppy_capacity(drive));
 	return 0;
 }
 

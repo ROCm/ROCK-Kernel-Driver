@@ -184,9 +184,8 @@ need_resched:
 	jz restore_all
 	testl $IF_MASK,EFLAGS(%esp)     # interrupts off (exception path) ?
 	jz restore_all
-	movl $PREEMPT_ACTIVE,TI_preempt_count(%ebp)
 	sti
-	call schedule
+	call preempt_schedule
 	cli
 	movl $0,TI_preempt_count(%ebp)
 	jmp need_resched

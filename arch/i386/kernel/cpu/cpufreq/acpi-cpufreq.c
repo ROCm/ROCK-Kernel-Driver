@@ -38,6 +38,8 @@
 #include <linux/acpi.h>
 #include <acpi/processor.h>
 
+#include "speedstep-est-common.h"
+
 #define dprintk(msg...) cpufreq_debug_printk(CPUFREQ_DEBUG_DRIVER, "acpi-cpufreq", msg)
 
 MODULE_AUTHOR("Paul Diefenbaugh, Dominik Brodowski");
@@ -48,10 +50,12 @@ MODULE_LICENSE("GPL");
 struct cpufreq_acpi_io {
 	struct acpi_processor_performance	acpi_data;
 	struct cpufreq_frequency_table		*freq_table;
+	unsigned int				resume;
 };
 
 static struct cpufreq_acpi_io	*acpi_io_data[NR_CPUS];
 
+static struct cpufreq_driver acpi_cpufreq_driver;
 
 static int
 acpi_processor_write_port(
@@ -119,9 +123,14 @@ acpi_processor_set_performance (
 	}
 	
 	if (state == data->acpi_data.state) {
-		dprintk("Already at target state (P%d)\n", state);
-		retval = 0;
-		goto migrate_end;
+		if (unlikely(data->resume)) {
+			dprintk("Called after resume, resetting to P%d\n", state);
+			data->resume = 0;
+		} else {
+			dprintk("Already at target state (P%d)\n", state);
+			retval = 0;
+			goto migrate_end;
+		}
 	}
 
 	dprintk("Transitioning from P%d to P%d\n",
@@ -368,6 +377,10 @@ acpi_cpufreq_cpu_init (
 	if (result)
 		goto err_free;
 
+	if (is_const_loops_cpu(cpu)) {
+		acpi_cpufreq_driver.flags |= CPUFREQ_CONST_LOOPS;
+	}
+
 	/* capability check */
 	if (data->acpi_data.state_count <= 1) {
 		dprintk("No P-States\n");
@@ -462,6 +475,20 @@ acpi_cpufreq_cpu_exit (
 	return (0);
 }
 
+static int
+acpi_cpufreq_resume (
+	struct cpufreq_policy   *policy)
+{
+	struct cpufreq_acpi_io *data = acpi_io_data[policy->cpu];
+
+
+	dprintk("acpi_cpufreq_resume\n");
+
+	data->resume = 1;
+
+	return (0);
+}
+
 
 static struct freq_attr* acpi_cpufreq_attr[] = {
 	&cpufreq_freq_attr_scaling_available_freqs,
@@ -473,6 +500,7 @@ static struct cpufreq_driver acpi_cpufreq_driver = {
 	.target 	= acpi_cpufreq_target,
 	.init		= acpi_cpufreq_cpu_init,
 	.exit		= acpi_cpufreq_cpu_exit,
+	.resume		= acpi_cpufreq_resume,
 	.name		= "acpi-cpufreq",
 	.owner		= THIS_MODULE,
 	.attr           = acpi_cpufreq_attr,

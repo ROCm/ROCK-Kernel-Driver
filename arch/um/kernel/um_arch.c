@@ -17,6 +17,7 @@
 #include "linux/sysrq.h"
 #include "linux/seq_file.h"
 #include "linux/delay.h"
+#include "linux/module.h"
 #include "asm/page.h"
 #include "asm/pgtable.h"
 #include "asm/ptrace.h"
@@ -156,6 +157,8 @@ static int __init uml_version_setup(char *line, int *add)
 {
 	printf("%s\n", system_utsname.release);
 	exit(0);
+
+	return 0;
 }
 
 __uml_setup("--version", uml_version_setup,
@@ -195,7 +198,7 @@ __uml_setup("ncpus=", uml_ncpus_setup,
 );
 #endif
 
-int force_tt = 0;
+static int force_tt = 0;
 
 #if defined(CONFIG_MODE_TT) && defined(CONFIG_MODE_SKAS)
 #define DEFAULT_TT 0
@@ -256,6 +259,8 @@ static int __init Usage(char *line, int *add)
  		p++;
  	}
 	exit(0);
+
+	return 0;
 }
 
 __uml_setup("--help", Usage,
@@ -314,6 +319,14 @@ int linux_main(int argc, char **argv)
 	if(have_root == 0) add_arg(saved_command_line, DEFAULT_COMMAND_LINE);
 
 	mode_tt = force_tt ? 1 : !can_do_skas();
+#ifndef CONFIG_MODE_TT
+	if (mode_tt) {
+		/*Since CONFIG_MODE_TT is #undef'ed, force_tt cannot be 1. So,
+		 * can_do_skas() returned 0, and the message is correct. */
+		printf("Support for TT mode is disabled, and no SKAS support is present on the host.\n");
+		exit(1);
+	}
+#endif
 	uml_start = CHOOSE_MODE_PROC(set_task_sizes_tt, set_task_sizes_skas, 0,
 				     &host_task_size, &task_size);
 

@@ -84,9 +84,15 @@ static char *_rioinit_c_sccs_ = "@(#)rioinit.c	1.3";
 #undef bcopy
 #define bcopy rio_pcicopy
 
-int
-RIOPCIinit(struct rio_info *p, int Mode);
+int RIOPCIinit(struct rio_info *p, int Mode);
 
+#if 0
+static void RIOAllocateInterrupts(struct rio_info *);
+static int RIOReport(struct rio_info *);
+static void RIOStopInterrupts(struct rio_info *, int, int);
+#endif
+
+static int RIOScrub(int, BYTE *, int);
 
 #if 0
 extern int	rio_intr();
@@ -1116,7 +1122,7 @@ int		slot;
 ** Call with op not zero, and the RAM will be read and compated with val[op-1]
 ** to check that the data from the previous phase was retained.
 */
-int
+static int
 RIOScrub(op, ram, size)
 int		op;
 BYTE *	ram;
@@ -1262,7 +1268,8 @@ int		size;
 ** and force into polled mode if told to. Patch up the
 ** interrupt vector & salute The Queen when you've done.
 */
-void
+#if 0
+static void
 RIOAllocateInterrupts(p)
 struct rio_info *	p;
 {
@@ -1301,7 +1308,7 @@ struct rio_info *	p;
 ** new-fangled interrupt thingies. Set everything up to just
 ** poll.
 */
-void
+static void
 RIOStopInterrupts(p, Reason, Host)
 struct rio_info *	p;
 int	Reason;
@@ -1360,7 +1367,6 @@ int	Host;
 	}
 }
 
-#if 0
 /*
 ** This function is called at init time to setup the data structures.
 */
@@ -1444,7 +1450,7 @@ struct rio_info	* p;
 				}
 				RIODefaultName(p, HostP, rup);
 			}
-			HostP->UnixRups[rup].RupLock = SPIN_LOCK_UNLOCKED;
+			spin_lock_init(&HostP->UnixRups[rup].RupLock);
 		}
 	}
 }
@@ -1476,7 +1482,8 @@ uint			UnitId;
 #define RIO_RELEASE	"Linux"
 #define RELEASE_ID	"1.0"
 
-int
+#if 0
+static int
 RIOReport(p)
 struct rio_info *	p;
 {
@@ -1500,41 +1507,7 @@ struct rio_info *	p;
 	}
 	return 0;
 }
-
-/*
-** This function returns release/version information as used by ioctl() calls
-** It returns a MAX_VERSION_LEN byte string, null terminated.
-*/
-char *
-OLD_RIOVersid( void )
-{
-	static char	Info[MAX_VERSION_LEN];
-	char *	RIORelease = RIO_RELEASE;
-	char *	cp;
-	int		ct = 0;
-
-	for ( ct=0; RIORelease[ct] && ct<MAX_VERSION_LEN; ct++ )
-		Info[ct] = RIORelease[ct];
-	if ( ct>=MAX_VERSION_LEN ) {
-		Info[MAX_VERSION_LEN-1] = '\0';
-		return Info;
-	}
-	Info[ct++]=' ';
-	if ( ct>=MAX_VERSION_LEN ) {
-		Info[MAX_VERSION_LEN-1] = '\0';
-		return Info;
-	}
-
-	cp="";	/* Fill the RCS Id here */
-
-	while ( *cp && ct<MAX_VERSION_LEN )
-		Info[ct++] = *cp++;
-	if ( ct<MAX_VERSION_LEN-1 )
-		Info[ct] = '\0';
-	Info[MAX_VERSION_LEN-1] = '\0';
-	return Info;
-}
-
+#endif
 
 static struct rioVersion	stVersion;
 

@@ -57,6 +57,7 @@ char *ircomm_state[] = {
 	"IRCOMM_CONN",
 };
 
+#ifdef CONFIG_IRDA_DEBUG
 static char *ircomm_event[] = {
 	"IRCOMM_CONNECT_REQUEST",
         "IRCOMM_CONNECT_RESPONSE",
@@ -75,6 +76,7 @@ static char *ircomm_event[] = {
         "IRCOMM_CONTROL_REQUEST",
         "IRCOMM_CONTROL_INDICATION",
 };
+#endif /* CONFIG_IRDA_DEBUG */
 
 static int (*state[])(struct ircomm_cb *self, IRCOMM_EVENT event,
 		      struct sk_buff *skb, struct ircomm_info *info) = 

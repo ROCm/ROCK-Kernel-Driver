@@ -31,6 +31,7 @@
 #include <linux/spinlock.h>
 #include <linux/preempt.h>
 #include <asm/kdebug.h>
+#include <asm/desc.h>
 
 /* kprobe_status settings */
 #define KPROBE_HIT_ACTIVE	0x00000001
@@ -86,15 +87,26 @@ static inline void prepare_singlestep(struct kprobe *p, struct pt_regs *regs)
  * Interrupts are disabled on entry as trap3 is an interrupt gate and they
  * remain disabled thorough out this function.
  */
-static inline int kprobe_handler(struct pt_regs *regs)
+static int kprobe_handler(struct pt_regs *regs)
 {
 	struct kprobe *p;
 	int ret = 0;
-	u8 *addr = (u8 *) (regs->eip - 1);
+	kprobe_opcode_t *addr = NULL;
+	unsigned long *lp;
 
 	/* We're in an interrupt, but this is clear and BUG()-safe. */
 	preempt_disable();
-
+	/* Check if the application is using LDT entry for its code segment and
+	 * calculate the address by reading the base address from the LDT entry.
+	 */
+	if ((regs->xcs & 4) && (current->mm)) {
+		lp = (unsigned long *) ((unsigned long)((regs->xcs >> 3) * 8)
+					+ (char *) current->mm->context.ldt);
+		addr = (kprobe_opcode_t *) (get_desc_base(lp) + regs->eip -
+						sizeof(kprobe_opcode_t));
+	} else {
+		addr = (kprobe_opcode_t *)(regs->eip - sizeof(kprobe_opcode_t));
+	}
 	/* Check we're not actually recursing */
 	if (kprobe_running()) {
 		/* We *are* holding lock here, so this is safe.

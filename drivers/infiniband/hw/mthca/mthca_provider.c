@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2004 Topspin Communications.  All rights reserved.
+ * Copyright (c) 2004, 2005 Topspin Communications.  All rights reserved.
  *
  * This software is available to you under a choice of one of two
  * licenses.  You may choose to be licensed under the terms of the GNU
@@ -119,6 +119,7 @@ static int mthca_query_port(struct ib_device *ibdev,
 	props->sm_lid            = be16_to_cpup((u16 *) (out_mad->data + 18));
 	props->sm_sl             = out_mad->data[36] & 0xf;
 	props->state             = out_mad->data[32] & 0xf;
+	props->phys_state        = out_mad->data[33] >> 4;
 	props->port_cap_flags    = be32_to_cpup((u32 *) (out_mad->data + 20));
 	props->gid_tbl_len       = to_mdev(ibdev)->limits.gid_table_len;
 	props->pkey_tbl_len      = to_mdev(ibdev)->limits.pkey_table_len;

@@ -48,8 +48,9 @@ struct module;
 
 struct module_attribute {
         struct attribute attr;
-        ssize_t (*show)(struct module *, char *);
-        ssize_t (*store)(struct module *, const char *, size_t count);
+        ssize_t (*show)(struct module_attribute *, struct module *, char *);
+        ssize_t (*store)(struct module_attribute *, struct module *,
+			 const char *, size_t count);
 };
 
 struct module_kobject
@@ -206,10 +207,6 @@ void *__symbol_get_gpl(const char *symbol);
 
 #endif
 
-/* We don't mangle the actual symbol anymore, so no need for
- * special casing EXPORT_SYMBOL_NOVERS.  FIXME: Deprecated */
-#define EXPORT_SYMBOL_NOVERS(sym) EXPORT_SYMBOL(sym)
-
 struct module_ref
 {
 	local_t count;
@@ -226,18 +223,18 @@ enum module_state
 #define MODULE_SECT_NAME_LEN 32
 struct module_sect_attr
 {
-	struct attribute attr;
+	struct module_attribute mattr;
 	char name[MODULE_SECT_NAME_LEN];
 	unsigned long address;
 };
 
-struct module_sections
+struct module_sect_attrs
 {
-	struct kobject kobj;
+	struct attribute_group grp;
 	struct module_sect_attr attrs[0];
 };
 
-struct param_kobject;
+struct module_param_attrs;
 
 struct module
 {
@@ -250,8 +247,8 @@ struct module
 	char name[MODULE_NAME_LEN];
 
 	/* Sysfs stuff. */
-	struct module_kobject *mkobj;
-	struct param_kobject *params_kobject;
+	struct module_kobject mkobj;
+	struct module_param_attrs *param_attrs;
 
 	/* Exported symbols */
 	const struct kernel_symbol *syms;
@@ -312,7 +309,7 @@ struct module
 	char *strtab;
 
 	/* Section attributes */
-	struct module_sections *sect_attrs;
+	struct module_sect_attrs *sect_attrs;
 #endif
 
 	/* Per-cpu data. */
@@ -449,7 +446,6 @@ void module_remove_driver(struct device_driver *);
 #else /* !CONFIG_MODULES... */
 #define EXPORT_SYMBOL(sym)
 #define EXPORT_SYMBOL_GPL(sym)
-#define EXPORT_SYMBOL_NOVERS(sym)
 
 /* Given an address, look for it in the exception tables. */
 static inline const struct exception_table_entry *

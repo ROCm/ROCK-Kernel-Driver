@@ -6,7 +6,7 @@ menu "Block devices"
 
 config BLK_DEV_FD
 	tristate "Normal floppy disk support"
-	depends on (!ARCH_S390 && !M68K && !IA64) || Q40 || (SUN3X && BROKEN)
+	depends on (!ARCH_S390 && !M68K && !IA64 && !USERMODE) || Q40 || (SUN3X && BROKEN)
 	---help---
 	  If you want to use the floppy disk drive(s) of your PC under Linux,
 	  say Y. Information about this driver, especially important for IBM
@@ -170,7 +170,7 @@ config CISS_SCSI_TAPE
 	help
 	  When enabled (Y), this option allows SCSI tape drives and SCSI medium
 	  changers (tape robots) to be accessed via a Compaq 5xxx array 
-	  controller.  (See Documentation/cciss.txt for more details.)
+	  controller.  (See <file:Documentation/cciss.txt> for more details.)
 
 	  "SCSI support" and "SCSI tape support" must also be enabled for this 
 	  option to work.
@@ -196,7 +196,7 @@ config BLK_DEV_UMEM
 	---help---
 	  Saying Y here will include support for the MM5415 family of
 	  battery backed (Non-volatile) RAM cards.
-	  http://www.umem.com/
+	  <http://www.umem.com/>
 
 	  The cards appear as block devices that can be partitioned into
 	  as many as 15 partitions.
@@ -207,6 +207,56 @@ config BLK_DEV_UMEM
 	  The umem driver has not yet been allocated a MAJOR number, so
 	  one is chosen dynamically.  Use "devfs" or look in /proc/devices
 	  for the device number
+
+config BLK_DEV_UBD
+	bool "Virtual block device"
+	depends on USERMODE
+	---help---
+          The User-Mode Linux port includes a driver called UBD which will let
+          you access arbitrary files on the host computer as block devices.
+          Unless you know that you do not need such virtual block devices say
+          Y here.
+
+config BLK_DEV_UBD_SYNC
+	bool "Always do synchronous disk IO for UBD"
+	depends on BLK_DEV_UBD
+	---help---
+	  Writes to the virtual block device are not immediately written to the
+	  host's disk; this may cause problems if, for example, the User-Mode
+	  Linux 'Virtual Machine' uses a journalling filesystem and the host
+	  computer crashes.
+
+          Synchronous operation (i.e. always writing data to the host's disk
+          immediately) is configurable on a per-UBD basis by using a special
+          kernel command line option.  Alternatively, you can say Y here to
+          turn on synchronous operation by default for all block devices.
+
+          If you're running a journalling file system (like reiserfs, for
+          example) in your virtual machine, you will want to say Y here.  If
+          you care for the safety of the data in your virtual machine, Y is a
+          wise choice too.  In all other cases (for example, if you're just
+          playing around with User-Mode Linux) you can choose N.
+
+config BLK_DEV_COW_COMMON
+	bool
+	default BLK_DEV_UBD
+
+config MMAPPER
+	tristate "Example IO memory driver (BROKEN)"
+	depends on USERMODE && BROKEN
+	---help---
+          The User-Mode Linux port can provide support for IO Memory
+          emulation with this option.  This allows a host file to be
+          specified as an I/O region on the kernel command line. That file
+          will be mapped into UML's kernel address space where a driver can
+          locate it and do whatever it wants with the memory, including
+          providing an interface to it for UML processes to use.
+
+          For more information, see
+          <http://user-mode-linux.sourceforge.net/iomem.html>.
+
+          If you'd like to be able to provide a simulated IO port space for
+          User-Mode Linux processes, say Y.  If unsure, say N.
 
 config BLK_DEV_LOOP
 	tristate "Loopback device support"
@@ -359,34 +409,53 @@ config BLK_DEV_INITRD
 	  for details.
 
 config INITRAMFS_SOURCE
-	string "Source directory of cpio_list"
+	string "Initramfs source file(s)"
 	default ""
 	help
-	  This can be set to either a directory containing files, etc to be
-	  included in the initramfs archive, or a file containing newline
-	  separated entries.
+	  This can be either a single cpio archive with a .cpio suffix or a
+	  space-separated list of directories and files for building the
+	  initramfs image.  A cpio archive should contain a filesystem archive
+	  to be used as an initramfs image.  Directories should contain a
+	  filesystem layout to be included in the initramfs image.  Files
+	  should contain entries according to the format described by the
+	  "usr/gen_init_cpio" program in the kernel tree.
 
-	  If it is a file, it should be in the following format:
-	    # a comment
-	    file <name> <location> <mode> <uid> <gid>
-	    dir <name> <mode> <uid> <gid>
-	    nod <name> <mode> <uid> <gid> <dev_type> <maj> <min>
+	  When multiple directories and files are specified then the
+	  initramfs image will be the aggregate of all of them.
 
-	  Where:
-	    <name>      name of the file/dir/nod in the archive
-	    <location>  location of the file in the current filesystem
-	    <mode>      mode/permissions of the file
-	    <uid>       user id (0=root)
-	    <gid>       group id (0=root)
-	    <dev_type>  device type (b=block, c=character)
-	    <maj>       major number of nod
-	    <min>       minor number of nod
+	  See <file:Documentation/early-userspace/README for more details.
 
 	  If you are not sure, leave it blank.
 
+config INITRAMFS_ROOT_UID
+	int "User ID to map to 0 (user root)"
+	depends on INITRAMFS_SOURCE!=""
+	default "0"
+	help
+	  This setting is only meaningful if the INITRAMFS_SOURCE is
+	  contains a directory.  Setting this user ID (UID) to something
+	  other than "0" will cause all files owned by that UID to be
+	  owned by user root in the initial ramdisk image.
+
+	  If you are not sure, leave it set to "0".
+
+config INITRAMFS_ROOT_GID
+	int "Group ID to map to 0 (group root)"
+	depends on INITRAMFS_SOURCE!=""
+	default "0"
+	help
+	  This setting is only meaningful if the INITRAMFS_SOURCE is
+	  contains a directory.  Setting this group ID (GID) to something
+	  other than "0" will cause all files owned by that GID to be
+	  owned by group root in the initial ramdisk image.
+
+	  If you are not sure, leave it set to "0".
+
+#XXX - it makes sense to enable this only for 32-bit subarch's, not for x86_64
+#for instance.
 config LBD
 	bool "Support for Large Block Devices"
-	depends on X86 || MIPS32 || PPC32 || ARCH_S390_31 || SUPERH
+	depends on X86 || MIPS32 || PPC32 || ARCH_S390_31 || SUPERH || USERMODE
 	help
 	  Say Y here if you want to attach large (bigger than 2TB) discs to
 	  your machine, or if you want to have a raid or loopback device
@@ -394,6 +463,7 @@ config LBD
 
 config CDROM_PKTCDVD
 	tristate "Packet writing on CD/DVD media"
+	depends on !USERMODE
 	help
 	  If you have a CDROM drive that supports packet writing, say Y to
 	  include preliminary support. It should work with any MMC/Mt Fuji
@@ -428,5 +498,12 @@ config CDROM_PKTCDVD_WCACHE
 source "drivers/s390/block/Kconfig"
 
 source "drivers/block/Kconfig.iosched"
+
+config ATA_OVER_ETH
+	tristate "ATA over Ethernet support"
+	depends on NET
+	help
+	This driver provides Support for ATA over Ethernet block
+	devices like the Coraid EtherDrive (R) Storage Blade.
 
 endmenu

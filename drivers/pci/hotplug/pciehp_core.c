@@ -33,7 +33,6 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/proc_fs.h>
-#include <linux/miscdevice.h>
 #include <linux/slab.h>
 #include <linux/workqueue.h>
 #include <linux/pci.h>
@@ -41,6 +40,7 @@
 #include <asm/uaccess.h>
 #include "pciehp.h"
 #include "pciehprm.h"
+#include <linux/interrupt.h>
 
 /* Global variables */
 int pciehp_debug;
@@ -347,7 +347,7 @@ static int get_cur_bus_speed(struct hotplug_slot *hotplug_slot, enum pci_bus_spe
 	return 0;
 }
 
-static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+static int pciehp_probe(struct pcie_device *dev, const struct pcie_port_service_id *id)
 {
 	int rc;
 	struct controller *ctrl;
@@ -355,7 +355,9 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	int first_device_num = 0 ;	/* first PCI device number supported by this PCIE */  
 	int num_ctlr_slots;		/* number of slots supported by this HPC */
 	u8 value;
-
+	struct pci_dev *pdev;
+	
+	dbg("%s: Called by hp_drv\n", __FUNCTION__);
 	ctrl = kmalloc(sizeof(*ctrl), GFP_KERNEL);
 	if (!ctrl) {
 		err("%s : out of memory\n", __FUNCTION__);
@@ -364,8 +366,10 @@ static int pcie_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	memset(ctrl, 0, sizeof(struct controller));
 
 	dbg("%s: DRV_thread pid = %d\n", __FUNCTION__, current->pid);
+	
+	pdev = dev->port;
 
-	rc = pcie_init(ctrl, pdev,
+	rc = pcie_init(ctrl, dev,
 		(php_intr_callback_t) pciehp_handle_attention_button,
 		(php_intr_callback_t) pciehp_handle_switch_change,
 		(php_intr_callback_t) pciehp_handle_presence_change,
@@ -563,32 +567,52 @@ static void __exit unload_pciehpd(void)
 
 }
 
+int hpdriver_context = 0;
 
-static struct pci_device_id pcied_pci_tbl[] = {
-	{
-	.class =        ((PCI_CLASS_BRIDGE_PCI << 8) | 0x00),
-	.class_mask =	~0,
-	.vendor =       PCI_ANY_ID,
-	.device =       PCI_ANY_ID,
-	.subvendor =    PCI_ANY_ID,
-	.subdevice =    PCI_ANY_ID,
-	},
-	
-	{ /* end: all zeroes */ }
+static void pciehp_remove (struct pcie_device *device)
+{
+	printk("%s ENTRY\n", __FUNCTION__);	
+	printk("%s -> Call free_irq for irq = %d\n",  
+		__FUNCTION__, device->irq);
+	free_irq(device->irq, &hpdriver_context);
+}
+
+#ifdef CONFIG_PM
+static int pciehp_suspend (struct pcie_device *dev, u32 state)
+{
+	printk("%s ENTRY\n", __FUNCTION__);	
+	return 0;
+}
+
+static int pciehp_resume (struct pcie_device *dev)
+{
+	printk("%s ENTRY\n", __FUNCTION__);	
+	return 0;
+}
+#endif
+
+static struct pcie_port_service_id port_pci_ids[] = { { 
+	.vendor = PCI_ANY_ID, 
+	.device = PCI_ANY_ID,
+	.port_type = PCIE_RC_PORT, 
+	.service_type = PCIE_PORT_SERVICE_HP,
+	.driver_data =	0, 
+	}, { /* end: all zeroes */ }
 };
+static const char device_name[] = "hpdriver";
 
-MODULE_DEVICE_TABLE(pci, pcied_pci_tbl);
+static struct pcie_port_service_driver hpdriver_portdrv = {
+	.name		= (char *)device_name,
+	.id_table	= &port_pci_ids[0],
 
+	.probe		= pciehp_probe,
+	.remove		= pciehp_remove,
 
-
-static struct pci_driver pcie_driver = {
-	.name		=	PCIE_MODULE_NAME,
-	.id_table	=	pcied_pci_tbl,
-	.probe		=	pcie_probe,
-	/* remove:	pcie_remove_one, */
+#ifdef	CONFIG_PM
+	.suspend	= pciehp_suspend,
+	.resume		= pciehp_resume,
+#endif	/* PM */
 };
-
-
 
 static int __init pcied_init(void)
 {
@@ -604,9 +628,11 @@ static int __init pcied_init(void)
 
 	retval = pciehprm_init(PCI);
 	if (!retval) {
-		retval = pci_register_driver(&pcie_driver);
-		dbg("pci_register_driver = %d\n", retval);
-		info(DRIVER_DESC " version: " DRIVER_VERSION "\n");
+ 		retval = pcie_port_service_register(&hpdriver_portdrv);
+ 		dbg("pcie_port_service_register = %d\n", retval);
+  		info(DRIVER_DESC " version: " DRIVER_VERSION "\n");
+ 		if (retval)
+ 		   dbg("%s: Failure to register service\n", __FUNCTION__);
 	}
 
 error_hpc_init:
@@ -626,8 +652,8 @@ static void __exit pcied_cleanup(void)
 
 	pciehprm_cleanup();
 
-	dbg("pci_unregister_driver\n");
-	pci_unregister_driver(&pcie_driver);
+	dbg("pcie_port_service_unregister\n");
+	pcie_port_service_unregister(&hpdriver_portdrv);
 
 	info(DRIVER_DESC " version: " DRIVER_VERSION " unloaded\n");
 }

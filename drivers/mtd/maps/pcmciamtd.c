@@ -800,7 +800,6 @@ static dev_link_t *pcmciamtd_attach(void)
 
 	/* Register with Card Services */
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
 		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
@@ -854,35 +853,7 @@ static void __exit exit_pcmciamtd(void)
 {
 	DEBUG(1, DRIVER_DESC " unloading");
 	pcmcia_unregister_driver(&pcmciamtd_driver);
-
-	while(dev_list) {
-		dev_link_t *link = dev_list;
-
-		dev_list = link->next;
-		if (link) {
-			struct pcmciamtd_dev *dev = link->priv;
-			
- 			if(dev) {
-				if(link->state & DEV_PRESENT) {
-					if (!(link->state & DEV_STALE_LINK)) {
-						pcmciamtd_detach(link);
-					}
-					link->state &= ~DEV_PRESENT;
-					if(dev->mtd_info) {
-						del_mtd_device(dev->mtd_info);
-						info("mtd%d: Removed",
-						     dev->mtd_info->index);
-					}
-				}
-				if(dev->mtd_info) {
-					DEBUG(2, "Destroying map for mtd%d",
-					      dev->mtd_info->index);
-					map_destroy(dev->mtd_info);
-				}
-				kfree(dev);
-			}
-		}
-	}
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_pcmciamtd);

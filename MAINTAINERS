@@ -287,6 +287,11 @@ P:	Dave Gilbert
 M:	linux@treblig.org
 S:	Maintained
 
+ARM/CORGI MACHINE SUPPORT
+P:	Richard Purdie
+M:	rpurdie@rpsys.net
+S:	Maintained
+
 ARM/PLEB SUPPORT
 P:	Peter Chubb
 M:	pleb@gelato.unsw.edu.au
@@ -341,6 +346,12 @@ L:	acpi4asus-user@lists.sourceforge.net
 W:	http://sourceforge.net/projects/acpi4asus
 W:	http://julien.lerouge.free.fr
 S:	Maintained
+
+ATA OVER ETHERNET DRIVER
+P:	Ed L. Cashin
+M:	ecashin@coraid.com
+W:	http://www.coraid.com/support/linux
+S:	Supported
 
 ATM
 P:	Chas Williams
@@ -564,7 +575,7 @@ S:	Maintained
 CPU FREQUENCY DRIVERS
 P:	Dave Jones
 M:	davej@codemonkey.org.uk
-L:	cpufreq@www.linux.org.uk
+L:	cpufreq@lists.linux.org.uk
 W:	http://www.codemonkey.org.uk/projects/cpufreq/
 S:	Maintained
 
@@ -719,8 +730,8 @@ W:	http://www.win.tue.nl/~aeb/partitions/partition_types-1.html
 S:	Maintained
 
 DISKQUOTA:
-P:	Marco van Wieringen
-M:	mvw@planets.elm.net
+P:	Jan Kara
+M:	jack@suse.cz
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
@@ -972,6 +983,11 @@ P:	Oliver Neukum
 M:	oliver@neukum.name
 S:	Maintained
 
+HUGETLB FILESYSTEM
+P:	William Irwin
+M:	wli@holomorphy.com
+S:	Maintained
+
 I2C AND SENSORS DRIVERS
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
@@ -1007,8 +1023,8 @@ W:	http://www.kernelconcepts.de/
 S:	Maintained
 
 IA64 (Itanium) PLATFORM
-P:	David Mosberger-Tang
-M:	davidm@hpl.hp.com
+P:	Tony Luck
+M:	tony.luck@intel.com
 L:	linux-ia64@vger.kernel.org
 W:	http://www.ia64-linux.org/
 S:	Maintained
@@ -1169,13 +1185,6 @@ P:	John Ronciak
 M:	john.ronciak@intel.com
 W:	http://sourceforge.net/projects/e1000/
 S:	Supported
-
-INTERMEZZO FILE SYSTEM
-P:	Cluster File Systems	
-M:	intermezzo-devel@lists.sf.net
-W:	http://www.inter-mezzo.org/
-L:	intermezzo-discuss@lists.sourceforge.net
-S:	Maintained
 
 IOC3 DRIVER
 P:	Ralf Baechle
@@ -1742,7 +1751,6 @@ S:	Supported
 PCI HOTPLUG CORE
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
-M:	gregkh@us.ibm.com
 S:	Supported
 
 PCI HOTPLUG COMPAQ DRIVER
@@ -1871,9 +1879,7 @@ L:	linux-hams@vger.kernel.org
 S:	Maintained
 
 RISCOM8 DRIVER
-P:	Dmitry Gorodchanin
-L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Orphan
 
 RTLINUX  REALTIME  LINUX
 P:	Victor Yodaiken
@@ -1982,6 +1988,20 @@ L:	linux-visws-devel@lists.sf.net
 W:	http://linux-visws.sf.net
 S:	Maintained for 2.6.
 
+SIMTEC EB110ATX (Chalice CATS)
+P:	Ben Dooks
+P:	Vincent Sanders
+M:	support@simtec.co.uk
+W:	http://www.simtec.co.uk/products/EB110ATX/
+S:	Supported
+
+SIMTEC EB2410ITX (BAST)
+P:	Ben Dooks
+P:	Vincent Sanders
+M:	support@simtec.co.uk
+W:	http://www.simtec.co.uk/products/EB2410ITX/
+S:	Supported
+
 SIS 5513 IDE CONTROLLER DRIVER
 P:	Lionel Bouton
 M:	Lionel.Bouton@inet6.fr
@@ -2073,6 +2093,13 @@ L:	sparclinux@vger.kernel.org
 L:	ultralinux@vger.kernel.org
 S:	Maintained
 
+SHARP LH SUPPORT (LH7952X & LH7A40X)
+P:	Marc Singer
+M:	elf@buici.com
+W:	http://projects.buici.com/arm
+L:	linux-arm-kernel@lists.arm.linux.org.uk
+S:	Maintained
+
 SPARC (sparc32):
 P:	William L. Irwin
 M:	wli@holomorphy.com
@@ -2082,7 +2109,6 @@ S:	Maintained
 SPECIALIX IO8+ MULTIPORT SERIAL CARD DRIVER
 P:	Roger Wolff
 M:	R.E.Wolff@BitWizard.nl
-M:	io8-linux@specialix.co.uk
 L:	linux-kernel@vger.kernel.org ?
 S:	Supported
 
@@ -2237,13 +2263,6 @@ P:	Ben Fennema
 M:	bfennema@falcon.csc.calpoly.edu
 L:	linux_udf@hpesjro.fc.hp.com
 W:	http://linux-udf.sourceforge.net
-S:	Maintained
-
-UMSDOS FILESYSTEM
-P:	Matija Nalis
-M:	Matija Nalis <mnalis-umsdos@voyager.hr>
-L:	linux-kernel@vger.kernel.org
-W:	http://linux.voyager.hr/umsdos/
 S:	Maintained
 
 UNIFORM CDROM DRIVER

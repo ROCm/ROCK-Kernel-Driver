@@ -104,23 +104,6 @@ out:
 	return error;
 }
 
-/* Create a new SCTP_bind_addr from nothing.  */
-struct sctp_bind_addr *sctp_bind_addr_new(int gfp)
-{
-	struct sctp_bind_addr *retval;
-
-	retval = t_new(struct sctp_bind_addr, gfp);
-	if (!retval)
-		goto nomem;
-
-	sctp_bind_addr_init(retval, 0);
-	retval->malloced = 1;
-	SCTP_DBG_OBJCNT_INC(bind_addr);
-
-nomem:
-	return retval;
-}
-
 /* Initialize the SCTP_bind_addr structure for either an endpoint or
  * an association.
  */

@@ -59,9 +59,6 @@
 #include "sr.h"
 
 
-MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
-
-
 #define SR_DISKS	256
 
 #define MAX_RETRIES	3

@@ -81,7 +81,7 @@
 #include <linux/netfilter_ipv4.h>
 
 struct hlist_head raw_v4_htable[RAWV4_HTABLE_SIZE];
-rwlock_t raw_v4_lock = RW_LOCK_UNLOCKED;
+DEFINE_RWLOCK(raw_v4_lock);
 
 static void raw_v4_hash(struct sock *sk)
 {
@@ -135,7 +135,7 @@ static __inline__ int icmp_filter(struct sock *sk, struct sk_buff *skb)
 
 	type = skb->h.icmph->type;
 	if (type < 32) {
-		__u32 data = raw4_sk(sk)->filter.data;
+		__u32 data = raw_sk(sk)->filter.data;
 
 		return ((1 << type) & data) != 0;
 	}
@@ -615,9 +615,10 @@ out:	return err ? err : copied;
 
 static int raw_init(struct sock *sk)
 {
-	struct raw_opt *tp = raw4_sk(sk);
+	struct raw_sock *rp = raw_sk(sk);
+
 	if (inet_sk(sk)->num == IPPROTO_ICMP)
-		memset(&tp->filter, 0, sizeof(tp->filter));
+		memset(&rp->filter, 0, sizeof(rp->filter));
 	return 0;
 }
 
@@ -625,7 +626,7 @@ static int raw_seticmpfilter(struct sock *sk, char __user *optval, int optlen)
 {
 	if (optlen > sizeof(struct icmp_filter))
 		optlen = sizeof(struct icmp_filter);
-	if (copy_from_user(&raw4_sk(sk)->filter, optval, optlen))
+	if (copy_from_user(&raw_sk(sk)->filter, optval, optlen))
 		return -EFAULT;
 	return 0;
 }
@@ -643,7 +644,7 @@ static int raw_geticmpfilter(struct sock *sk, char __user *optval, int __user *o
 		len = sizeof(struct icmp_filter);
 	ret = -EFAULT;
 	if (put_user(len, optlen) ||
-	    copy_to_user(optval, &raw4_sk(sk)->filter, len))
+	    copy_to_user(optval, &raw_sk(sk)->filter, len))
 		goto out;
 	ret = 0;
 out:	return ret;

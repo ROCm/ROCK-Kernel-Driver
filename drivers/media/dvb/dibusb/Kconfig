@@ -6,7 +6,7 @@ config DVB_DIBUSB
 	select DVB_DIB3000MC
 	help
 	  Support for USB 1.1 and 2.0 DVB-T devices based on reference designs made by
-	  DiBcom (http://www.dibcom.fr).
+	  DiBcom (<http://www.dibcom.fr>).
 
 	  Devices supported by this driver:
 
@@ -27,7 +27,7 @@ config DVB_DIBUSB
 	  These devices can be understood as budget ones, they "only" deliver
 	  (a part of) the MPEG2 transport stream.
 
-	  A firmware is needed to get the device working. See Documentation/dvb/README.dibusb
+	  A firmware is needed to get the device working. See <file:Documentation/dvb/README.dibusb>
 	  details.
 
 	  Say Y if you own such a device and want to use it. You should build it as

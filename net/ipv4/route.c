@@ -582,7 +582,7 @@ static void rt_run_flush(unsigned long dummy)
 	}
 }
 
-static spinlock_t rt_flush_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rt_flush_lock);
 
 void rt_cache_flush(int delay)
 {
@@ -901,7 +901,7 @@ restart:
 
 void rt_bind_peer(struct rtable *rt, int create)
 {
-	static spinlock_t rt_peer_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(rt_peer_lock);
 	struct inet_peer *peer;
 
 	peer = inet_getpeer(rt->rt_dst, create);
@@ -925,7 +925,7 @@ void rt_bind_peer(struct rtable *rt, int create)
  */
 static void ip_select_fb_ident(struct iphdr *iph)
 {
-	static spinlock_t ip_fb_id_lock = SPIN_LOCK_UNLOCKED;
+	static DEFINE_SPINLOCK(ip_fb_id_lock);
 	static u32 ip_fallback_id;
 	u32 salt;
 

@@ -161,7 +161,7 @@ static const unsigned int txConfLoop   = 0x01; /* Loopback mode */
 
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KERN_DEBUG args)
 static char *version =
 "netwave_cs.c 0.3.0 Thu Jul 17 14:36:02 1997 (John Markus Bjørndalen)\n";
@@ -190,16 +190,9 @@ static u_int  scramble_key = 0x0;
  */
 static int mem_speed;
 
-/* Bit map of interrupts to choose from */
-/* This means pick from 15, 14, 12, 11, 10, 9, 7, 5, 4, and 3 */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4] = { -1 };
-
-MODULE_PARM(domain, "i");
-MODULE_PARM(scramble_key, "i");
-MODULE_PARM(mem_speed, "i");
-MODULE_PARM(irq_mask, "i");
-MODULE_PARM(irq_list, "1-4i");
+module_param(domain, int, 0);
+module_param(scramble_key, int, 0);
+module_param(mem_speed, int, 0);
 
 /*====================================================================*/
 
@@ -438,7 +431,7 @@ static dev_link_t *netwave_attach(void)
     dev_link_t *link;
     struct net_device *dev;
     netwave_private *priv;
-    int i, ret;
+    int ret;
     
     DEBUG(0, "netwave_attach()\n");
     
@@ -459,12 +452,7 @@ static dev_link_t *netwave_attach(void)
     
     /* Interrupt setup */
     link->irq.Attributes = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID|IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     link->irq.Handler = &netwave_interrupt;
     
     /* General socket configuration */
@@ -503,7 +491,6 @@ static dev_link_t *netwave_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
 	CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -1073,6 +1060,8 @@ static void netwave_pcmcia_config(dev_link_t *link) {
 
     dev->irq = link->irq.AssignedIRQ;
     dev->base_addr = link->io.BasePort1;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
+
     if (register_netdev(dev) != 0) {
 	printk(KERN_DEBUG "netwave_cs: register_netdev() failed\n");
 	goto failed;
@@ -1696,9 +1685,7 @@ static int __init init_netwave_cs(void)
 static void __exit exit_netwave_cs(void)
 {
 	pcmcia_unregister_driver(&netwave_driver);
-
-	if (dev_list != NULL)	/* Critical situation */
-		printk("netwave_cs: devices remaining when removing module\n");
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_netwave_cs);

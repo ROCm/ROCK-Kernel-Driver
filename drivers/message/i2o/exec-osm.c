@@ -31,6 +31,8 @@
 #include <linux/i2o.h>
 #include <linux/delay.h>
 
+#define OSM_NAME "exec-osm"
+
 struct i2o_driver i2o_exec_driver;
 
 static int i2o_exec_lct_notify(struct i2o_controller *c, u32 change_ind);
@@ -236,7 +238,8 @@ static int i2o_msg_post_wait_complete(struct i2o_controller *c, u32 m,
 
 				dev = &c->pdev->dev;
 
-				pr_debug("timedout reply received!\n");
+				pr_debug("%s: timedout reply received!\n",
+					 c->name);
 				i2o_dma_free(dev, &wait->dma);
 				i2o_exec_wait_free(wait);
 				rc = -1;
@@ -250,7 +253,7 @@ static int i2o_msg_post_wait_complete(struct i2o_controller *c, u32 m,
 
 	spin_unlock(&lock);
 
-	pr_debug("i2o: Bogus reply in POST WAIT (tr-context: %08x)!\n",
+	pr_debug("%s: Bogus reply in POST WAIT (tr-context: %08x)!\n", c->name,
 		 context);
 
 	return -1;
@@ -378,8 +381,8 @@ static int i2o_exec_reply(struct i2o_controller *c, u32 m,
  */
 static void i2o_exec_event(struct i2o_event *evt)
 {
-	printk(KERN_INFO "Event received from device: %d\n",
-	       evt->i2o_dev->lct_data.tid);
+	osm_info("Event received from device: %d\n",
+		 evt->i2o_dev->lct_data.tid);
 	kfree(evt);
 };
 
@@ -468,7 +471,7 @@ static int i2o_exec_lct_notify(struct i2o_controller *c, u32 change_ind)
 
 /* Exec OSM driver struct */
 struct i2o_driver i2o_exec_driver = {
-	.name = "exec-osm",
+	.name = OSM_NAME,
 	.reply = i2o_exec_reply,
 	.event = i2o_exec_event,
 	.classes = i2o_exec_class_id,

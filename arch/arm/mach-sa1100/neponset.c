@@ -211,8 +211,8 @@ static int neponset_resume(struct device *dev, u32 level)
 }
 
 #else
-#define	neponset_suspend	NULL
-#define	neponset_resume	NULL
+#define neponset_suspend NULL
+#define neponset_resume  NULL
 #endif
 
 static struct device_driver neponset_device_driver = {

@@ -51,7 +51,7 @@ MODULE_DESCRIPTION("Kernel driver for Eicon DIVA Server cards");
 MODULE_AUTHOR("Cytronics & Melware, Eicon Networks");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(dbgmask, "i");
+module_param(dbgmask, int, 0);
 MODULE_PARM_DESC(dbgmask, "initial debug mask");
 
 static char *DRIVERNAME =

@@ -26,7 +26,6 @@
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
 #include <asm/pgtable.h>
-#include <asm/domain.h>
 #include <asm/page.h>
 #include <asm/ptrace.h>
 #include "proc-macros.S"
@@ -595,17 +594,9 @@ ENTRY(cpu_xscale_set_pte)
 
 	.type	__xscale_setup, #function
 __xscale_setup:
-	mov	r0, #PSR_F_BIT|PSR_I_BIT|SVC_MODE
-	msr	cpsr_c, r0
 	mcr	p15, 0, ip, c7, c7, 0		@ invalidate I, D caches & BTB
 	mcr	p15, 0, ip, c7, c10, 4		@ Drain Write (& Fill) Buffer
 	mcr	p15, 0, ip, c8, c7, 0		@ invalidate I, D TLBs
-	mcr	p15, 0, r4, c2, c0, 0		@ load page table pointer
-	mov	r0, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
-		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
-		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
-		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
-	mcr	p15, 0, r0, c3, c0, 0		@ load domain access register
 #ifdef CONFIG_IWMMXT
 	mov	r0, #0				@ initially disallow access to CP0/CP1
 #else
@@ -615,12 +606,25 @@ __xscale_setup:
 	orr	r0, r0, #1 << 13		@ Its undefined whether this
 	mcr	p15, 0, r0, c15, c1, 0		@ affects USR or SVC modes
 	mrc	p15, 0, r0, c1, c0, 0		@ get control register
-	bic	r0, r0, #0x0200			@ .... ..R. .... ....
-	bic	r0, r0, #0x0002			@ .... .... .... ..A.
-	orr	r0, r0, #0x0005			@ .... .... .... .C.M
-	orr	r0, r0, #0x3900			@ ..VI Z..S .... ....
+	ldr	r5, xscale_cr1_clear
+	bic	r0, r0, r5
+	ldr	r5, xscale_cr1_set
+	orr	r0, r0, r5
 	mov	pc, lr
 	.size	__xscale_setup, . - __xscale_setup
+
+	/*
+	 *  R
+	 * .RVI ZFRS BLDP WCAM
+	 * ..11 1.01 .... .101
+	 * 
+	 */
+	.type	xscale_cr1_clear, #object
+	.type	xscale_cr1_set, #object
+xscale_cr1_clear:
+	.word	0x3b07
+xscale_cr1_set:
+	.word	0x3905
 
 	__INITDATA
 
@@ -754,8 +758,8 @@ __8032x_proc_info:
 
 	.type	__8033x_proc_info,#object
 __8033x_proc_info:
-	.long	0x69054090
-	.long	0xffffffb0
+	.long	0x69054010
+	.long	0xffffff30
 	.long   PMD_TYPE_SECT | \
 		PMD_SECT_BUFFERABLE | \
 		PMD_SECT_CACHEABLE | \

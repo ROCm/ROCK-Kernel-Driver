@@ -84,6 +84,7 @@ config EQUALIZER
 config TUN
 	tristate "Universal TUN/TAP device driver support"
 	depends on NETDEVICES
+	select CRC32
 	---help---
 	  TUN/TAP provides packet reception and transmission for user space
 	  programs.  It can be viewed as a simple Point-to-Point or Ethernet
@@ -691,6 +692,7 @@ config ELMC_II
 config VORTEX
 	tristate "3c590/3c900 series (592/595/597) \"Vortex/Boomerang\" support"
 	depends on NET_VENDOR_3COM && (PCI || EISA)
+	select MII
 	---help---
 	  This option enables driver support for a large number of 10mbps and
 	  10/100mbps EISA, PCI and PCMCIA 3Com network cards:
@@ -1411,13 +1413,13 @@ config E100
 
 	  Use the above information and the Adapter & Driver ID Guide at:
 
-	  http://support.intel.com/support/network/adapter/pro100/21397.htm
+	  <http://support.intel.com/support/network/adapter/pro100/21397.htm>
 
           to identify the adapter.
 
 	  For the latest Intel PRO/100 network driver for Linux, see:
 
-	  http://appsr.intel.com/scripts-df/support_intel.asp
+	  <http://appsr.intel.com/scripts-df/support_intel.asp>
 
 	  More specific information on configuring the driver is in 
 	  <file:Documentation/networking/e100.txt>.
@@ -1658,7 +1660,7 @@ config TLAN
 	  <file:Documentation/networking/net-modules.txt>. The module
 	  will be called tlan.
 
-	  Please email feedback to  torben.mathiasen@compaq.com.
+	  Please email feedback to <torben.mathiasen@compaq.com>.
 
 config VIA_RHINE
 	tristate "VIA Rhine support"
@@ -2048,14 +2050,14 @@ config SK98LIN
 	  The dual link adapters support link-failover and dual port features.
 	  Both Marvell Yukon and SysKonnect SK-98xx/SK-95xx adapters support 
 	  the scatter-gather functionality with sendfile(). Please refer to 
-	  Documentation/networking/sk98lin.txt for more information about
+	  <file:Documentation/networking/sk98lin.txt> for more information about
 	  optional driver parameters.
 	  Questions concerning this driver may be addressed to:
-	      linux@syskonnect.de
+	      <linux@syskonnect.de>
 	  
 	  If you want to compile this driver as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read Documentation/kbuild/modules.txt. The module will
+	  say M here and read <file:Documentation/kbuild/modules.txt>. The module will
 	  be called sk98lin. This is recommended.
 
 config VIA_VELOCITY
@@ -2264,7 +2266,7 @@ config SKFP
 	  the driver.
 
 	  Questions concerning this driver can be addressed to:
-	  linux@syskonnect.de
+	  <linux@syskonnect.de>
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called skfp.  This is recommended.
@@ -2460,7 +2462,7 @@ config PPPOE
 
 	  This driver requires the latest version of pppd from the CVS
 	  repository at cvs.samba.org.  Alternatively, see the 
-	  RoaringPenguin package (http://www.roaringpenguin.com/pppoe)
+	  RoaringPenguin package (<http://www.roaringpenguin.com/pppoe>)
 	  which contains instruction on how to use this driver (under 
 	  the heading "Kernel mode PPPoE").
 
@@ -2588,5 +2590,5 @@ config NETCONSOLE
 	depends on NETDEVICES && EXPERIMENTAL
 	---help---
 	If you want to log kernel messages over the network, enable this.
-	See Documentation/networking/netconsole.txt for details.
+	See <file:Documentation/networking/netconsole.txt> for details.
 

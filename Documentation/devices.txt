@@ -2563,6 +2563,7 @@ Your cooperation is appreciated.
 		128 = /dev/usb/brlvgr0	First Braille Voyager device
 		    ...
 		131 = /dev/usb/brlvgr3	Fourth Braille Voyager device
+		132 = /dev/usb/idmouse	ID Mouse (fingerprint scanner) device
 		144 = /dev/usb/lcd	USB LCD device
 		160 = /dev/usb/legousbtower0	1st USB Legotower device
 		    ...

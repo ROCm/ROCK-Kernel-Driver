@@ -65,7 +65,7 @@ extern struct neigh_table dn_neigh_table;
  */
 dn_address decnet_address = 0;
 
-static rwlock_t dndev_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(dndev_lock);
 static struct net_device *decnet_default_device;
 static struct notifier_block *dnaddr_chain;
 
@@ -662,7 +662,7 @@ static int dn_dev_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh, void *a
 	for(ifap = &dn_db->ifa_list; (ifa=*ifap) != NULL; ifap = &ifa->ifa_next) {
 		void *tmp = rta[IFA_LOCAL-1];
 		if ((tmp && memcmp(RTA_DATA(tmp), &ifa->ifa_local, 2)) ||
-				(rta[IFA_LABEL-1] && strcmp(RTA_DATA(rta[IFA_LABEL-1]), ifa->ifa_label)))
+		    (rta[IFA_LABEL-1] && rtattr_strcmp(rta[IFA_LABEL-1], ifa->ifa_label)))
 			continue;
 
 		dn_dev_del_ifa(dn_db, ifap, 1);
@@ -705,7 +705,7 @@ static int dn_dev_rtm_newaddr(struct sk_buff *skb, struct nlmsghdr *nlh, void *a
 	ifa->ifa_scope = ifm->ifa_scope;
 	ifa->ifa_dev = dn_db;
 	if (rta[IFA_LABEL-1])
-		memcpy(ifa->ifa_label, RTA_DATA(rta[IFA_LABEL-1]), IFNAMSIZ);
+		rtattr_strlcpy(ifa->ifa_label, rta[IFA_LABEL-1], IFNAMSIZ);
 	else
 		memcpy(ifa->ifa_label, dev->name, IFNAMSIZ);
 

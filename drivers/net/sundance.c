@@ -188,10 +188,10 @@ MODULE_AUTHOR("Donald Becker <becker@scyld.com>");
 MODULE_DESCRIPTION("Sundance Alta Ethernet driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(debug, "i");
-MODULE_PARM(rx_copybreak, "i");
-MODULE_PARM(media, "1-" __MODULE_STRING(MAX_UNITS) "s");
-MODULE_PARM(flowctrl, "i");
+module_param(debug, int, 0);
+module_param(rx_copybreak, int, 0);
+module_param_array(media, charp, NULL, 0);
+module_param(flowctrl, int, 0);
 MODULE_PARM_DESC(debug, "Sundance Alta debug level (0-5)");
 MODULE_PARM_DESC(rx_copybreak, "Sundance Alta copy breakpoint for copy-only-tiny-frames");
 MODULE_PARM_DESC(flowctrl, "Sundance Alta flow control [0|1]");

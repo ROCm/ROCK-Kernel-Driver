@@ -20,7 +20,7 @@ config ACPI
 	  kernel by about 70K.
 
 	  Linux ACPI provides a robust functional replacement for several 
-	  legacy configuration and power management intefaces, including 
+	  legacy configuration and power management interfaces, including
 	  the Plug-and-Play BIOS specification (PnP BIOS), the 
 	  MultiProcessor Specification (MPS), and the Advanced Power 
 	  Management (APM) specification.  If both ACPI and APM support 
@@ -209,8 +209,8 @@ config ACPI_IBM
 	  This is a Linux ACPI driver for the IBM ThinkPad laptops. It adds
 	  support for Fn-Fx key combinations, Bluetooth control, video
 	  output switching, ThinkLight control, UltraBay eject and more.
-	  For more information about this driver see Documentation/ibm-acpi.txt
-	  and http://ibm-acpi.sf.net/ .
+	  For more information about this driver see <file:Documentation/ibm-acpi.txt>
+	  and <http://ibm-acpi.sf.net/> .
 
 	  If you have an IBM ThinkPad laptop, say Y or M here.
 

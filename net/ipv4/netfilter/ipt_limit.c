@@ -29,7 +29,7 @@ MODULE_DESCRIPTION("iptables rate limit match");
  * see net/sched/sch_tbf.c in the linux source tree
  */
 
-static spinlock_t limit_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(limit_lock);
 
 /* Rusty: This is my (non-mathematically-inclined) understanding of
    this algorithm.  The `average rate' in jiffies becomes your initial

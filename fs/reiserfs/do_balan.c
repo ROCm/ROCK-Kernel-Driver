@@ -1382,7 +1382,7 @@ static int check_before_balancing (struct tree_balance * tb)
 }
 
 
-void check_after_balance_leaf (struct tree_balance * tb)
+static void check_after_balance_leaf (struct tree_balance * tb)
 {
     if (tb->lnum[0]) {
 	if (B_FREE_SPACE (tb->L[0]) != 
@@ -1422,14 +1422,14 @@ void check_after_balance_leaf (struct tree_balance * tb)
 }
 
 
-void check_leaf_level (struct tree_balance * tb)
+static void check_leaf_level (struct tree_balance * tb)
 {
   check_leaf (tb->L[0]);
   check_leaf (tb->R[0]);
   check_leaf (PATH_PLAST_BUFFER (tb->tb_path));
 }
 
-void check_internal_levels (struct tree_balance * tb)
+static void check_internal_levels (struct tree_balance * tb)
 {
   int h;
 

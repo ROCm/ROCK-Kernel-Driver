@@ -38,10 +38,24 @@ void __ptrace_link(task_t *child, task_t *new_parent)
 	SET_LINKS(child);
 }
  
-static inline int pending_resume_signal(struct sigpending *pending)
+/*
+ * Turn a tracing stop into a normal stop now, since with no tracer there
+ * would be no way to wake it up with SIGCONT or SIGKILL.  If there was a
+ * signal sent that would resume the child, but didn't because it was in
+ * TASK_TRACED, resume it now.
+ * Requires that irqs be disabled.
+ */
+void ptrace_untrace(task_t *child)
 {
-#define M(sig) (1UL << ((sig)-1))
-	return sigtestsetmask(&pending->signal, M(SIGCONT) | M(SIGKILL));
+	spin_lock(&child->sighand->siglock);
+	if (child->state == TASK_TRACED) {
+		if (child->signal->flags & SIGNAL_STOP_STOPPED) {
+			child->state = TASK_STOPPED;
+		} else {
+			signal_wake_up(child, 1);
+		}
+	}
+	spin_unlock(&child->sighand->siglock);
 }
 
 /*
@@ -55,29 +69,15 @@ void __ptrace_unlink(task_t *child)
 	if (!child->ptrace)
 		BUG();
 	child->ptrace = 0;
-	if (list_empty(&child->ptrace_list))
-		return;
-	list_del_init(&child->ptrace_list);
-	REMOVE_LINKS(child);
-	child->parent = child->real_parent;
-	SET_LINKS(child);
-
-	if (child->state == TASK_TRACED) {
-		/*
-		 * Turn a tracing stop into a normal stop now,
-		 * since with no tracer there would be no way
-		 * to wake it up with SIGCONT or SIGKILL.
-		 * If there was a signal sent that would resume the child,
-		 * but didn't because it was in TASK_TRACED, resume it now.
-		 */
-		spin_lock(&child->sighand->siglock);
-		child->state = TASK_STOPPED;
-		if (pending_resume_signal(&child->pending) ||
-		    pending_resume_signal(&child->signal->shared_pending)) {
-			signal_wake_up(child, 1);
-		}
-		spin_unlock(&child->sighand->siglock);
+	if (!list_empty(&child->ptrace_list)) {
+		list_del_init(&child->ptrace_list);
+		REMOVE_LINKS(child);
+		child->parent = child->real_parent;
+		SET_LINKS(child);
 	}
+
+	if (child->state == TASK_TRACED)
+		ptrace_untrace(child);
 }
 
 /*
@@ -319,18 +319,33 @@ static int ptrace_setoptions(struct task_struct *child, long data)
 
 static int ptrace_getsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
-	if (child->last_siginfo == NULL)
-		return -EINVAL;
-	return copy_siginfo_to_user(data, child->last_siginfo);
+	siginfo_t lastinfo;
+
+	spin_lock_irq(&child->sighand->siglock);
+	if (likely(child->last_siginfo != NULL)) {
+		memcpy(&lastinfo, child->last_siginfo, sizeof (siginfo_t));
+		spin_unlock_irq(&child->sighand->siglock);
+		return copy_siginfo_to_user(data, &lastinfo);
+	}
+	spin_unlock_irq(&child->sighand->siglock);
+	return -EINVAL;
 }
 
 static int ptrace_setsiginfo(struct task_struct *child, siginfo_t __user * data)
 {
-	if (child->last_siginfo == NULL)
-		return -EINVAL;
-	if (copy_from_user(child->last_siginfo, data, sizeof (siginfo_t)) != 0)
+	siginfo_t newinfo;
+
+	if (copy_from_user(&newinfo, data, sizeof (siginfo_t)) != 0)
 		return -EFAULT;
-	return 0;
+
+	spin_lock_irq(&child->sighand->siglock);
+	if (likely(child->last_siginfo != NULL)) {
+		memcpy(child->last_siginfo, &newinfo, sizeof (siginfo_t));
+		spin_unlock_irq(&child->sighand->siglock);
+		return 0;
+	}
+	spin_unlock_irq(&child->sighand->siglock);
+	return -EINVAL;
 }
 
 int ptrace_request(struct task_struct *child, long request,

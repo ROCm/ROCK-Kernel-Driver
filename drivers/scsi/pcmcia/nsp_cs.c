@@ -72,21 +72,13 @@ MODULE_LICENSE("GPL");
 /*====================================================================*/
 /* Parameters that can be set with 'insmod' */
 
-static unsigned int irq_mask = 0xffff;
-MODULE_PARM     (irq_mask, "i");
-MODULE_PARM_DESC(irq_mask, "IRQ mask bits (default: 0xffff)");
-
-static int       irq_list[4] = { -1 };
-MODULE_PARM     (irq_list, "1-4i");
-MODULE_PARM_DESC(irq_list, "Use specified IRQ number. (default: auto select)");
-
 static int       nsp_burst_mode = BURST_MEM32;
-MODULE_PARM     (nsp_burst_mode, "i");
+module_param(nsp_burst_mode, int, 0);
 MODULE_PARM_DESC(nsp_burst_mode, "Burst transfer mode (0=io8, 1=io32, 2=mem32(default))");
 
 /* Release IO ports after configuration? */
 static int       free_ports = 0;
-MODULE_PARM     (free_ports, "i");
+module_param(free_ports, bool, 0);
 MODULE_PARM_DESC(free_ports, "Release IO ports after configuration? (default: 0 (=no))");
 
 /* /usr/src/linux/drivers/scsi/hosts.h */
@@ -1625,7 +1617,7 @@ static dev_link_t *nsp_cs_attach(void)
 	scsi_info_t  *info;
 	client_reg_t  client_reg;
 	dev_link_t   *link;
-	int	      ret, i;
+	int	      ret;
 	nsp_hw_data  *data = &nsp_data_base;
 
 	nsp_dbg(NSP_DEBUG_INIT, "in");
@@ -1647,14 +1639,7 @@ static dev_link_t *nsp_cs_attach(void)
 
 	/* Interrupt setup */
 	link->irq.Attributes	 = IRQ_TYPE_EXCLUSIVE | IRQ_HANDLE_PRESENT;
-	link->irq.IRQInfo1	 = IRQ_INFO2_VALID    | IRQ_LEVEL_ID;
-	if (irq_list[0] == -1) {
-		link->irq.IRQInfo2 = irq_mask;
-	} else {
-		for (i = 0; i < 4; i++) {
-			link->irq.IRQInfo2 |= BIT(irq_list[i]);
-		}
-	}
+	link->irq.IRQInfo1	 = IRQ_LEVEL_ID;
 
 	/* Interrupt handler */
 	link->irq.Handler	 = &nspintr;
@@ -1672,7 +1657,6 @@ static dev_link_t *nsp_cs_attach(void)
 	link->next               = dev_list;
 	dev_list                 = link;
 	client_reg.dev_info	 = &dev_info;
-	client_reg.Attributes	 = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask	 =
 		CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 		CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET	|
@@ -2194,10 +2178,9 @@ static void __exit nsp_cs_exit(void)
 
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,68))
 	pcmcia_unregister_driver(&nsp_driver);
+	BUG_ON(dev_list != NULL);
 #else
 	unregister_pcmcia_driver(&dev_info);
-#endif
-
 	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL) {
 		if (dev_list->state & DEV_CONFIG) {
@@ -2205,6 +2188,7 @@ static void __exit nsp_cs_exit(void)
 		}
 		nsp_cs_detach(dev_list);
 	}
+#endif
 }
 
 

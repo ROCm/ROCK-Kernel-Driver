@@ -68,18 +68,11 @@ static char *version = "serial_cs.c 1.134 2002/05/04 05:48:53 (David Hinds)";
 
 /* Parameters that can be set with 'insmod' */
 
-/* Bit map of interrupts to choose from */
-static u_int irq_mask = 0xdeb8;
-static int irq_list[4];
-static unsigned int irq_list_count;
-
 /* Enable the speaker? */
 static int do_sound = 1;
 /* Skip strict UART tests? */
 static int buggy_uart;
 
-module_param(irq_mask, uint, 0444);
-module_param_array(irq_list, int, &irq_list_count, 0444);
 module_param(do_sound, int, 0444);
 module_param(buggy_uart, int, 0444);
 
@@ -205,7 +198,7 @@ static dev_link_t *serial_attach(void)
 	struct serial_info *info;
 	client_reg_t client_reg;
 	dev_link_t *link;
-	int i, ret;
+	int ret;
 
 	DEBUG(0, "serial_attach()\n");
 
@@ -220,12 +213,7 @@ static dev_link_t *serial_attach(void)
 	link->io.Attributes1 = IO_DATA_PATH_WIDTH_8;
 	link->io.NumPorts1 = 8;
 	link->irq.Attributes = IRQ_TYPE_EXCLUSIVE;
-	link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-	if (irq_list_count == 0)
-		link->irq.IRQInfo2 = irq_mask;
-	else
-		for (i = 0; i < irq_list_count; i++)
-			link->irq.IRQInfo2 |= 1 << irq_list[i];
+	link->irq.IRQInfo1 = IRQ_LEVEL_ID;
 	link->conf.Attributes = CONF_ENABLE_IRQ;
 	if (do_sound) {
 		link->conf.Attributes |= CONF_ENABLE_SPKR;
@@ -237,7 +225,6 @@ static dev_link_t *serial_attach(void)
 	link->next = dev_list;
 	dev_list = link;
 	client_reg.dev_info = &dev_info;
-	client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
 	client_reg.EventMask =
 	    CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	    CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -749,10 +736,7 @@ static int __init init_serial_cs(void)
 static void __exit exit_serial_cs(void)
 {
 	pcmcia_unregister_driver(&serial_cs_driver);
-
-	/* XXX: this really needs to move into generic code.. */
-	while (dev_list != NULL)
-		serial_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_serial_cs);

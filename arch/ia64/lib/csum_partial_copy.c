@@ -105,8 +105,8 @@ out:
 extern unsigned long do_csum(const unsigned char *, long);
 
 static unsigned int
-do_csum_partial_copy_from_user (const char __user *src, char *dst, int len,
-				unsigned int psum, int *errp)
+do_csum_partial_copy_from_user (const unsigned char __user *src, unsigned char *dst,
+				int len, unsigned int psum, int *errp)
 {
 	unsigned long result;
 
@@ -129,8 +129,8 @@ do_csum_partial_copy_from_user (const char __user *src, char *dst, int len,
 }
 
 unsigned int
-csum_partial_copy_from_user (const char __user *src, char *dst, int len,
-			     unsigned int sum, int *errp)
+csum_partial_copy_from_user (const unsigned char __user *src, unsigned char *dst,
+			     int len, unsigned int sum, int *errp)
 {
 	if (!access_ok(VERIFY_READ, src, len)) {
 		*errp = -EFAULT;
@@ -142,7 +142,8 @@ csum_partial_copy_from_user (const char __user *src, char *dst, int len,
 }
 
 unsigned int
-csum_partial_copy_nocheck(const char __user *src, char *dst, int len, unsigned int sum)
+csum_partial_copy_nocheck(const unsigned char __user *src, unsigned char *dst,
+			  int len, unsigned int sum)
 {
 	return do_csum_partial_copy_from_user(src, dst, len, sum, NULL);
 }

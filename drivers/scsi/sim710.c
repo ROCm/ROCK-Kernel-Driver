@@ -53,7 +53,7 @@ MODULE_AUTHOR("Richard Hirst");
 MODULE_DESCRIPTION("Simple NCR53C710 driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(sim710, "s");
+module_param(sim710, charp, 0);
 
 #ifdef MODULE
 #define ARG_SEP ' '

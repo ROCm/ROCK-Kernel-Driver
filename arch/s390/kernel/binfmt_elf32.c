@@ -197,12 +197,13 @@ MODULE_AUTHOR("Gerhard Tonn <ton@de.ibm.com>");
 #undef MODULE_DESCRIPTION
 #undef MODULE_AUTHOR
 
-#define jiffies_to_timeval jiffies_to_compat_timeval
+#undef cputime_to_timeval
+#define cputime_to_timeval cputime_to_compat_timeval
 static __inline__ void
-jiffies_to_compat_timeval(unsigned long jiffies, struct compat_timeval *value)
+cputime_to_compat_timeval(const cputime_t cputime, struct compat_timeval *value)
 {
-	value->tv_usec = (jiffies % HZ) * (1000000L / HZ);
-	value->tv_sec = jiffies / HZ;
+	value->tv_usec = cputime % 1000000;
+	value->tv_sec = cputime / 1000000;
 }
 
 #include "../../../fs/binfmt_elf.c"

@@ -136,7 +136,7 @@ restart:
 	return NULL;
 }
 
-void quota_sync_sb(struct super_block *sb, int type)
+static void quota_sync_sb(struct super_block *sb, int type)
 {
 	int cnt;
 	struct inode *discard[MAXQUOTAS];

@@ -306,7 +306,7 @@ static void ali1563_enable(struct pci_dev * dev)
 	pci_write_config_word(dev,ALI1563_SMBBA,ctrl);
 }
 
-static int __init ali1563_setup(struct pci_dev * dev)
+static int __devinit ali1563_setup(struct pci_dev * dev)
 {
 	u16 ctrl;
 
@@ -362,7 +362,7 @@ static struct i2c_adapter ali1563_adapter = {
 	.algo	= &ali1563_algorithm,
 };
 
-static int __init ali1563_probe(struct pci_dev * dev,
+static int __devinit ali1563_probe(struct pci_dev * dev,
 				const struct pci_device_id * id_table)
 {
 	int error;
@@ -378,19 +378,14 @@ static int __init ali1563_probe(struct pci_dev * dev,
 	return error;
 }
 
-static void __exit ali1563_remove(struct pci_dev * dev)
+static void __devexit ali1563_remove(struct pci_dev * dev)
 {
 	i2c_del_adapter(&ali1563_adapter);
 	ali1563_shutdown(dev);
 }
 
 static struct pci_device_id __devinitdata ali1563_id_table[] = {
-	{
-		.vendor		= PCI_VENDOR_ID_AL,
-		.device		= PCI_DEVICE_ID_AL_M1563,
-		.subvendor	= PCI_ANY_ID,
-		.subdevice	= PCI_ANY_ID,
-	},
+	{ PCI_DEVICE(PCI_VENDOR_ID_AL, PCI_DEVICE_ID_AL_M1563) },
 	{},
 };
 
@@ -400,7 +395,7 @@ static struct pci_driver ali1563_pci_driver = {
  	.name		= "ali1563_i2c",
 	.id_table	= ali1563_id_table,
  	.probe		= ali1563_probe,
-	.remove		= ali1563_remove,
+	.remove		= __devexit_p(ali1563_remove),
 };
 
 static int __init ali1563_init(void)

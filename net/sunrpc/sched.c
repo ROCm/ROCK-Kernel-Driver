@@ -18,7 +18,6 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/spinlock.h>
-#include <linux/suspend.h>
 
 #include <linux/sunrpc/clnt.h>
 #include <linux/sunrpc/xprt.h>
@@ -72,7 +71,7 @@ static struct workqueue_struct *rpciod_workqueue;
 /*
  * Spinlock for other critical sections of code.
  */
-static spinlock_t rpc_sched_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(rpc_sched_lock);
 
 /*
  * Disable the timer for a given RPC task. Should be called with

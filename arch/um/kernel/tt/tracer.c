@@ -84,6 +84,7 @@ void tracer_panic(char *format, ...)
 
 	va_start(ap, format);
 	vprintf(format, ap);
+	va_end(ap);
 	printf("\n");
 	while(1) pause();
 }
@@ -312,6 +313,15 @@ int tracer(int (*init_proc)(void *), void *sp)
 				sig = 0;
 				op = do_proc_op(task, proc_id);
 				switch(op){
+				/*
+				 * This is called when entering user mode; after
+				 * this, we start intercepting syscalls.
+				 *
+				 * In fact, a process is started in kernel mode,
+				 * so with is_tracing() == 0 (and that is reset
+				 * when executing syscalls, since UML kernel has
+				 * the right to do syscalls);
+				 */
 				case OP_TRACE_ON:
 					arch_leave_kernel(task, pid);
 					tracing = 1;
@@ -346,6 +356,11 @@ int tracer(int (*init_proc)(void *), void *sp)
 					continue;
 				}
 				tracing = 0;
+				/* local_using_sysemu has been already set
+				 * below, since if we are here, is_tracing() on
+				 * the traced task was 1, i.e. the process had
+				 * already run through one iteration of the
+				 * loop which executed a OP_TRACE_ON request.*/
 				do_syscall(task, pid, local_using_sysemu);
 				sig = SIGUSR2;
 				break;

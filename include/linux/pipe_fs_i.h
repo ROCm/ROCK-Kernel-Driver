@@ -7,13 +7,22 @@
 
 struct pipe_buffer {
 	struct page *page;
-	unsigned short offset, len;
+	unsigned int offset, len;
+	struct pipe_buf_operations *ops;
+};
+
+struct pipe_buf_operations {
+	int can_merge;
+	void * (*map)(struct file *, struct pipe_inode_info *, struct pipe_buffer *);
+	void (*unmap)(struct pipe_inode_info *, struct pipe_buffer *);
+	void (*release)(struct pipe_inode_info *, struct pipe_buffer *);
 };
 
 struct pipe_inode_info {
 	wait_queue_head_t wait;
 	unsigned int nrbufs, curbuf;
 	struct pipe_buffer bufs[PIPE_BUFFERS];
+	struct page *tmp_page;
 	unsigned int start;
 	unsigned int readers;
 	unsigned int writers;

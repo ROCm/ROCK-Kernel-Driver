@@ -162,7 +162,7 @@ static void acpi_processor_idle (void)
 	int			sleep_ticks = 0;
 	u32			t1, t2 = 0;
 
-	pr = processors[smp_processor_id()];
+	pr = processors[_smp_processor_id()];
 	if (!pr)
 		return;
 
@@ -838,12 +838,12 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 	if (!pr)
 		goto end;
 
-	seq_printf(seq, "active state:            C%d\n"
+	seq_printf(seq, "active state:            C%zd\n"
 			"max_cstate:              C%d\n"
 			"bus master activity:     %08x\n",
 			pr->power.state ? pr->power.state - pr->power.states : 0,
 			max_cstate,
-			pr->power.bm_activity);
+			(unsigned)pr->power.bm_activity);
 
 	seq_puts(seq, "states:\n");
 
@@ -872,14 +872,14 @@ static int acpi_processor_power_seq_show(struct seq_file *seq, void *offset)
 		}
 
 		if (pr->power.states[i].promotion.state)
-			seq_printf(seq, "promotion[C%d] ",
+			seq_printf(seq, "promotion[C%zd] ",
 				(pr->power.states[i].promotion.state -
 				 pr->power.states));
 		else
 			seq_puts(seq, "promotion[--] ");
 
 		if (pr->power.states[i].demotion.state)
-			seq_printf(seq, "demotion[C%d] ",
+			seq_printf(seq, "demotion[C%zd] ",
 				(pr->power.states[i].demotion.state -
 				 pr->power.states));
 		else

@@ -61,7 +61,7 @@ typedef enum xena_max_outstanding_splits {
 #define	INTR_DBG	4
 
 /* Global variable that defines the present debug level of the driver. */
-int debug_level = ERR_DBG;	/* Default level. */
+static int debug_level = ERR_DBG;	/* Default level. */
 
 /* DEBUG message print. */
 #define DBG_PRINT(dbg_level, args...)  if(!(debug_level<dbg_level)) printk(args)
@@ -583,7 +583,7 @@ typedef struct mac_info {
 
 /* tx side stuff */
 	/* logical pointer of start of each Tx FIFO */
-	TxFIFO_element_t *tx_FIFO_start[MAX_TX_FIFOS];
+	TxFIFO_element_t __iomem *tx_FIFO_start[MAX_TX_FIFOS];
 
 /* Current offset within tx_FIFO_start, where driver would write new Tx frame*/
 	tx_curr_put_info_t tx_curr_put_info[MAX_TX_FIFOS];
@@ -623,8 +623,8 @@ typedef struct s2io_nic {
 	macaddr_t pre_mac_addr[MAX_MAC_SUPPORTED];
 
 	struct net_device_stats stats;
-	caddr_t bar0;
-	caddr_t bar1;
+	void __iomem *bar0;
+	void __iomem *bar1;
 	struct config_param config;
 	mac_info_t mac_control;
 	int high_dma_flag;
@@ -736,19 +736,18 @@ typedef struct s2io_nic {
 
 /*  OS related system calls */
 #ifndef readq
-static inline u64 readq(void *addr)
+static inline u64 readq(void __iomem *addr)
 {
-	u64 ret = 0;
-	ret = readl(addr + 4);
-	(u64) ret <<= 32;
-	(u64) ret |= readl(addr);
+	u64 ret = readl(addr + 4);
+	ret <<= 32;
+	ret |= readl(addr);
 
 	return ret;
 }
 #endif
 
 #ifndef writeq
-static inline void writeq(u64 val, void *addr)
+static inline void writeq(u64 val, void __iomem *addr)
 {
 	writel((u32) (val), addr);
 	writel((u32) (val >> 32), (addr + 4));
@@ -762,7 +761,7 @@ static inline void writeq(u64 val, void *addr)
  */
 #define UF	1
 #define LF	2
-static inline void SPECIAL_REG_WRITE(u64 val, void *addr, int order)
+static inline void SPECIAL_REG_WRITE(u64 val, void __iomem *addr, int order)
 {
 	if (order == LF) {
 		writel((u32) (val), addr);

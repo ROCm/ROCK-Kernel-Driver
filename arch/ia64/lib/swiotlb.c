@@ -61,9 +61,8 @@ static char *io_tlb_start, *io_tlb_end;
 /*
  * The number of IO TLB blocks (in groups of 64) betweeen io_tlb_start and
  * io_tlb_end.  This is command line adjustable via setup_io_tlb_npages.
- * Default to 64MB.
  */
-static unsigned long io_tlb_nslabs = 32768;
+static unsigned long io_tlb_nslabs;
 
 /*
  * When the IOMMU overflows we return a fallback buffer. This sets the size.
@@ -113,9 +112,14 @@ __setup("swiotlb=", setup_io_tlb_npages);
  * structures for the software IO TLB used to implement the PCI DMA API.
  */
 void
-swiotlb_init(void)
+swiotlb_init_with_default_size (size_t default_size)
 {
 	unsigned long i;
+
+	if (!io_tlb_nslabs) {
+		io_tlb_nslabs = (default_size >> PAGE_SHIFT);
+		io_tlb_nslabs = ALIGN(io_tlb_nslabs, IO_TLB_SEGSIZE);
+	}
 
 	/*
 	 * Get IO TLB memory from the low pages
@@ -143,6 +147,12 @@ swiotlb_init(void)
 	io_tlb_overflow_buffer = alloc_bootmem_low(io_tlb_overflow);
 	printk(KERN_INFO "Placing software IO TLB between 0x%lx - 0x%lx\n",
 	       virt_to_phys(io_tlb_start), virt_to_phys(io_tlb_end));
+}
+
+void
+swiotlb_init (void)
+{
+	swiotlb_init_with_default_size(64 * (1<<20));	/* default to 64MB */
 }
 
 static inline int
@@ -347,8 +357,8 @@ swiotlb_alloc_coherent(struct device *hwdev, size_t size,
 
 	/* Confirm address can be DMA'd by device */
 	if (address_needs_mapping(hwdev, dev_addr)) {
-		printk("hwdev DMA mask = 0x%016lx, dev_addr = 0x%016lx\n",
-		       *hwdev->dma_mask, dev_addr);
+		printk("hwdev DMA mask = 0x%016Lx, dev_addr = 0x%016lx\n",
+		       (unsigned long long)*hwdev->dma_mask, dev_addr);
 		panic("swiotlb_alloc_coherent: allocated memory is out of "
 		      "range for device");
 	}

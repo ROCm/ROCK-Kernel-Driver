@@ -354,7 +354,7 @@ config MTD_CFI_FLAGADM
 	tristate "CFI Flash device mapping on FlagaDM"
 	depends on PPC32 && 8xx && MTD_CFI
 	help
-	  Mapping for the Flaga digital module. If you don´t have one, ignore
+	  Mapping for the Flaga digital module. If you don't have one, ignore
 	  this setting.
 
 config MTD_BEECH
@@ -417,7 +417,7 @@ config MTD_CSTM_MIPS_IXX
 	tristate "Flash chip mapping on ITE QED-4N-S01B, Globespan IVR or custom board"
 	depends on MIPS && MTD_CFI && MTD_JEDECPROBE && MTD_PARTITIONS
 	help
-	  This provides a mapping driver for the Integrated Tecnology
+	  This provides a mapping driver for the Integrated Technology
 	  Express, Inc (ITE) QED-4N-S01B eval board and the Globespan IVR
 	  Reference Board. It provides the necessary addressing, length,
 	  buswidth, vpp code and addition setup of the flash device for

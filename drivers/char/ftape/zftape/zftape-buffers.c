@@ -87,13 +87,6 @@ int zft_vmalloc_once(void *new, size_t size)
 	TRACE_ABORT(0, ft_t_noise,
 		    "allocated buffer @ %p, %d bytes", *(void **)new, size);
 }
-int zft_vcalloc_always(void *new, size_t size)
-{
-	TRACE_FUN(ft_t_flow);
-
-	zft_vfree(new, size);
-	TRACE_EXIT zft_vcalloc_once(new, size);
-}
 int zft_vmalloc_always(void *new, size_t size)
 {
 	TRACE_FUN(ft_t_flow);

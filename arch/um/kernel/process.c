@@ -13,14 +13,10 @@
 #include <setjmp.h>
 #include <sys/time.h>
 #include <sys/ptrace.h>
-#include <linux/ptrace.h>
 #include <sys/wait.h>
 #include <sys/mman.h>
-#include <asm/ptrace.h>
-#include <asm/sigcontext.h>
 #include <asm/unistd.h>
 #include <asm/page.h>
-#include <asm/user.h>
 #include "user_util.h"
 #include "kern_util.h"
 #include "user.h"
@@ -28,6 +24,7 @@
 #include "signal_kern.h"
 #include "signal_user.h"
 #include "sysdep/ptrace.h"
+#include "sysdep/ptrace_user.h"
 #include "sysdep/sigcontext.h"
 #include "irq_user.h"
 #include "ptrace_user.h"
@@ -40,6 +37,7 @@
 #ifdef UML_CONFIG_MODE_SKAS
 #include "skas.h"
 #include "skas_ptrace.h"
+#include "registers.h"
 #endif
 
 void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int))
@@ -330,7 +328,7 @@ void __init check_ptrace(void)
 		CATCH_EINTR(n = waitpid(pid, &status, WUNTRACED));
 		if(n < 0)
 			panic("check_ptrace : wait failed, errno = %d", errno);
-		if(!WIFSTOPPED(status) || (WSTOPSIG(status) != (SIGTRAP + 0x80)))
+		if(!WIFSTOPPED(status) || (WSTOPSIG(status) != SIGTRAP + 0x80))
 			panic("check_ptrace : expected SIGTRAP + 0x80, "
 			      "got status = %d", status);
 		
@@ -373,9 +371,9 @@ void forward_pending_sigio(int target)
 		kill(target, SIGIO);
 }
 
-int can_do_skas(void)
-{
 #ifdef UML_CONFIG_MODE_SKAS
+static inline int check_skas3_ptrace_support(void)
+{
 	struct ptrace_faultinfo fi;
 	void *stack;
 	int pid, n, ret = 1;
@@ -384,29 +382,46 @@ int can_do_skas(void)
 	pid = start_ptraced_child(&stack);
 
 	n = ptrace(PTRACE_FAULTINFO, pid, 0, &fi);
-	if(n < 0){
+	if (n < 0) {
 		if(errno == EIO)
 			printf("not found\n");
-		else printf("No (unexpected errno - %d)\n", errno);
+		else {
+			perror("not found");
+		}
 		ret = 0;
+	} else {
+		printf("found\n");
 	}
-	else printf("found\n");
 
 	init_registers(pid);
 	stop_ptraced_child(pid, stack, 1, 1);
 
+	return(ret);
+}
+
+int can_do_skas(void)
+{
+	int ret = 1;
+
 	printf("Checking for /proc/mm...");
-	if(os_access("/proc/mm", OS_ACC_W_OK) < 0){
+	if (os_access("/proc/mm", OS_ACC_W_OK) < 0) {
 		printf("not found\n");
 		ret = 0;
+		goto out;
+	} else {
+		printf("found\n");
 	}
-	else printf("found\n");
 
-	return(ret);
-#else
-	return(0);
-#endif
+	ret = check_skas3_ptrace_support();
+out:
+	return ret;
 }
+#else
+int can_do_skas(void)
+{
+	return(0);
+}
+#endif
 
 /*
  * Overrides for Emacs so that we follow Linus's tabbing style.

@@ -37,8 +37,6 @@ struct vtimer_queue {
 	__u64 idle;		  /* temp var for idle */
 };
 
-void set_vtimer(__u64 expires);
-
 extern void init_virt_timer(struct vtimer_list *timer);
 extern void add_virt_timer(void *new);
 extern void add_virt_timer_periodic(void *new);

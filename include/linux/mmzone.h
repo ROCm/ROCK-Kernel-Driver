@@ -22,7 +22,6 @@
 
 struct free_area {
 	struct list_head	free_list;
-	unsigned long		*map;
 	unsigned long		nr_free;
 };
 
@@ -272,7 +271,6 @@ typedef struct pglist_data {
 #define node_present_pages(nid)	(NODE_DATA(nid)->node_present_pages)
 #define node_spanned_pages(nid)	(NODE_DATA(nid)->node_spanned_pages)
 
-extern int numnodes;
 extern struct pglist_data *pgdat_list;
 
 void __get_zone_counts(unsigned long *active, unsigned long *inactive,
@@ -375,7 +373,7 @@ int lower_zone_protection_sysctl_handler(struct ctl_table *, int, struct file *,
 
 #include <linux/topology.h>
 /* Returns the number of the current Node. */
-#define numa_node_id()		(cpu_to_node(smp_processor_id()))
+#define numa_node_id()		(cpu_to_node(_smp_processor_id()))
 
 #ifndef CONFIG_DISCONTIGMEM
 

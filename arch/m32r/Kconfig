@@ -14,7 +14,7 @@ config SBUS
 
 config UID16
 	bool
-	default y
+	default n
 
 config GENERIC_ISA_DMA
 	bool

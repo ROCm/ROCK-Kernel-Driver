@@ -40,7 +40,7 @@
 #include <net/lapb.h>
 
 static struct list_head lapb_list = LIST_HEAD_INIT(lapb_list);
-static rwlock_t lapb_list_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(lapb_list_lock);
 
 /*
  *	Free an allocated lapb control block. 

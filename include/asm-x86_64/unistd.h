@@ -298,8 +298,9 @@ __SYSCALL(__NR_utime, sys_utime)
 #define __NR_mknod                             133
 __SYSCALL(__NR_mknod, sys_mknod)
 
+/* Only needed for a.out */
 #define __NR_uselib                            134
-__SYSCALL(__NR_uselib, sys_uselib)
+__SYSCALL(__NR_uselib, sys_ni_syscall)
 #define __NR_personality                       135
 __SYSCALL(__NR_personality, sys_personality)
 
@@ -556,8 +557,14 @@ __SYSCALL(__NR_mq_getsetattr, sys_mq_getsetattr)
 __SYSCALL(__NR_kexec_load, sys_ni_syscall)
 #define __NR_waitid		247
 __SYSCALL(__NR_waitid, sys_waitid)
+#define __NR_add_key		248
+__SYSCALL(__NR_add_key, sys_add_key)
+#define __NR_request_key	249
+__SYSCALL(__NR_request_key, sys_request_key)
+#define __NR_keyctl		250
+__SYSCALL(__NR_keyctl, sys_keyctl)
 
-#define __NR_syscall_max __NR_waitid
+#define __NR_syscall_max __NR_keyctl
 #ifndef __NO_STUBS
 
 /* user-visible error numbers are in the range -1 - -4095 */
@@ -724,7 +731,7 @@ static inline long dup(unsigned int fd)
 }
 
 /* implemented in asm in arch/x86_64/kernel/entry.S */
-extern long execve(char *, char **, char **);
+extern int execve(const char *, char * const *, char * const *);
 
 static inline long open(const char * filename, int flags, int mode)
 {

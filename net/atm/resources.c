@@ -24,7 +24,7 @@
 
 
 LIST_HEAD(atm_devs);
-spinlock_t atm_dev_lock = SPIN_LOCK_UNLOCKED;
+DEFINE_SPINLOCK(atm_dev_lock);
 
 static struct atm_dev *__alloc_atm_dev(const char *type)
 {

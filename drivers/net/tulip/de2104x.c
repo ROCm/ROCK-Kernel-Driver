@@ -59,7 +59,7 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION(DRV_VERSION);
 
 static int debug = -1;
-MODULE_PARM (debug, "i");
+module_param (debug, int, 0);
 MODULE_PARM_DESC (debug, "de2104x bitmapped message enable number");
 
 /* Set the copy breakpoint for the copy-only-tiny-buffer Rx structure. */
@@ -70,7 +70,7 @@ static int rx_copybreak = 1518;
 #else
 static int rx_copybreak = 100;
 #endif
-MODULE_PARM (rx_copybreak, "i");
+module_param (rx_copybreak, int, 0);
 MODULE_PARM_DESC (rx_copybreak, "de2104x Breakpoint at which Rx packets are copied");
 
 #define PFX			DRV_NAME ": "

@@ -723,7 +723,6 @@ typedef struct ide_drive_s {
 	unsigned scsi		: 1;	/* 0=default, 1=ide-scsi emulation */
 
         u8	quirk_list;	/* considered quirky, set for a specific host */
-        u8	suspend_reset;	/* drive suspend mode flag, soft-reset recovers */
         u8	init_speed;	/* transfer rate set at boot */
         u8	pio_speed;      /* unused by core, used by some drivers for fallback from DMA */
         u8	current_speed;	/* current transfer rate set */
@@ -1097,9 +1096,8 @@ typedef struct ide_driver_s {
 	int		(*cleanup)(ide_drive_t *);
 	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, sector_t);
 	int		(*end_request)(ide_drive_t *, int, int);
-	u8		(*sense)(ide_drive_t *, const char *, u8);
-	ide_startstop_t	(*error)(ide_drive_t *, const char *, u8);
-	ide_startstop_t	(*abort)(ide_drive_t *, const char *);
+	ide_startstop_t	(*error)(ide_drive_t *, struct request *rq, u8, u8);
+	ide_startstop_t	(*abort)(ide_drive_t *, struct request *rq);
 	int		(*ioctl)(ide_drive_t *, struct inode *, struct file *, unsigned int, unsigned long);
 	void		(*pre_reset)(ide_drive_t *);
 	sector_t	(*capacity)(ide_drive_t *);
@@ -1147,12 +1145,7 @@ extern void ide_set_handler (ide_drive_t *drive, ide_handler_t *handler, unsigne
  */
 extern void ide_execute_command(ide_drive_t *, task_ioreg_t cmd, ide_handler_t *, unsigned int, ide_expiry_t *);
 
-/*
- * Error reporting, in human readable form (luxurious, but a memory hog).
- *
- * (drive, msg, status)
- */
-byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat);
+ide_startstop_t __ide_error(ide_drive_t *, struct request *, u8, u8);
 
 /*
  * ide_error() takes action based on the error returned by the controller.
@@ -1161,6 +1154,8 @@ byte ide_dump_status (ide_drive_t *drive, const char *msg, byte stat);
  * (drive, msg, status)
  */
 ide_startstop_t ide_error (ide_drive_t *drive, const char *msg, byte stat);
+
+ide_startstop_t __ide_abort(ide_drive_t *, struct request *);
 
 /*
  * Abort a running command on the controller triggering the abort
@@ -1190,11 +1185,6 @@ extern void ide_fixstring(u8 *, const int, const int);
  * (startstop, drive, good, bad, timeout)
  */
 extern int ide_wait_stat(ide_startstop_t *, ide_drive_t *, u8, u8, unsigned long);
-
-/*
- * Return the current idea about the total capacity of this drive.
- */
-extern sector_t current_capacity (ide_drive_t *drive);
 
 /*
  * Start a reset operation for an IDE interface.
@@ -1258,8 +1248,6 @@ extern int ide_do_drive_cmd(ide_drive_t *, struct request *, ide_action_t);
  * (ide_drive_t *drive, u8 stat, u8 err)
  */
 extern void ide_end_drive_cmd(ide_drive_t *, u8, u8);
-
-extern void try_to_flush_leftover_data(ide_drive_t *);
 
 /*
  * Issue ATA command and wait for completion.
@@ -1453,12 +1441,12 @@ int __ide_dma_good_drive(ide_drive_t *);
 int ide_use_dma(ide_drive_t *);
 int __ide_dma_off(ide_drive_t *);
 void ide_dma_verbose(ide_drive_t *);
+ide_startstop_t ide_dma_intr(ide_drive_t *);
 
 #ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 extern int ide_build_sglist(ide_drive_t *, struct request *);
 extern int ide_build_dmatable(ide_drive_t *, struct request *);
 extern void ide_destroy_dmatable(ide_drive_t *);
-extern ide_startstop_t ide_dma_intr(ide_drive_t *);
 extern int ide_release_dma(ide_hwif_t *);
 extern void ide_setup_dma(ide_hwif_t *, unsigned long, unsigned int);
 
@@ -1511,7 +1499,8 @@ extern int ide_dma_enable(ide_drive_t *drive);
 extern char *ide_xfer_verbose(u8 xfer_rate);
 extern void ide_toggle_bounce(ide_drive_t *drive, int on);
 extern int ide_set_xfer_rate(ide_drive_t *drive, u8 rate);
-extern byte ide_dump_atapi_status(ide_drive_t *drive, const char *msg, byte stat);
+
+u8 ide_dump_status(ide_drive_t *, const char *, u8);
 
 typedef struct ide_pio_timings_s {
 	int	setup_time;	/* Address setup (ns) minimum */

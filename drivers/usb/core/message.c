@@ -209,7 +209,7 @@ static void sg_clean (struct usb_sg_request *io)
 		kfree (io->urbs);
 		io->urbs = NULL;
 	}
-	if (io->dev->dev.dma_mask != 0)
+	if (io->dev->dev.dma_mask != NULL)
 		usb_buffer_unmap_sg (io->dev, io->pipe, io->sg, io->nents);
 	io->dev = NULL;
 }
@@ -334,7 +334,7 @@ int usb_sg_init (
 	/* not all host controllers use DMA (like the mainstream pci ones);
 	 * they can use PIO (sl811) or be software over another transport.
 	 */
-	dma = (dev->dev.dma_mask != 0);
+	dma = (dev->dev.dma_mask != NULL);
 	if (dma)
 		io->entries = usb_buffer_map_sg (dev, pipe, sg, nents);
 	else
@@ -796,13 +796,8 @@ int usb_get_device_descriptor(struct usb_device *dev, unsigned int size)
 		return -ENOMEM;
 
 	ret = usb_get_descriptor(dev, USB_DT_DEVICE, 0, desc, size);
-	if (ret >= 0) {
-		le16_to_cpus(&desc->bcdUSB);
-		le16_to_cpus(&desc->idVendor);
-		le16_to_cpus(&desc->idProduct);
-		le16_to_cpus(&desc->bcdDevice);
+	if (ret >= 0) 
 		memcpy(&dev->descriptor, desc, size);
-	}
 	kfree(desc);
 	return ret;
 }
@@ -918,16 +913,21 @@ int usb_clear_halt(struct usb_device *dev, int pipe)
  */
 void usb_disable_endpoint(struct usb_device *dev, unsigned int epaddr)
 {
-	if (dev && dev->bus && dev->bus->op && dev->bus->op->disable)
-		dev->bus->op->disable(dev, epaddr);
-	else {
-		unsigned int epnum = epaddr & USB_ENDPOINT_NUMBER_MASK;
+	unsigned int epnum = epaddr & USB_ENDPOINT_NUMBER_MASK;
+	struct usb_host_endpoint *ep;
 
-		if (usb_endpoint_out(epaddr))
-			dev->epmaxpacketout[epnum] = 0;
-		else
-			dev->epmaxpacketin[epnum] = 0;
+	if (!dev)
+		return;
+
+	if (usb_endpoint_out(epaddr)) {
+		ep = dev->ep_out[epnum];
+		dev->ep_out[epnum] = NULL;
+	} else {
+		ep = dev->ep_in[epnum];
+		dev->ep_in[epnum] = NULL;
 	}
+	if (ep && dev->bus && dev->bus->op && dev->bus->op->disable)
+		dev->bus->op->disable(dev, ep);
 }
 
 /**
@@ -1002,27 +1002,27 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 /*
  * usb_enable_endpoint - Enable an endpoint for USB communications
  * @dev: the device whose interface is being enabled
- * @epd: pointer to the endpoint descriptor
+ * @ep: the endpoint
  *
- * Resets the endpoint toggle and stores its maxpacket value.
+ * Resets the endpoint toggle, and sets dev->ep_{in,out} pointers.
  * For control endpoints, both the input and output sides are handled.
  */
-void usb_enable_endpoint(struct usb_device *dev,
-		struct usb_endpoint_descriptor *epd)
+static void
+usb_enable_endpoint(struct usb_device *dev, struct usb_host_endpoint *ep)
 {
-	int maxsize = epd->wMaxPacketSize;
-	unsigned int epaddr = epd->bEndpointAddress;
+	unsigned int epaddr = ep->desc.bEndpointAddress;
 	unsigned int epnum = epaddr & USB_ENDPOINT_NUMBER_MASK;
-	int is_control = ((epd->bmAttributes & USB_ENDPOINT_XFERTYPE_MASK) ==
-				USB_ENDPOINT_XFER_CONTROL);
+	int is_control;
 
+	is_control = ((ep->desc.bmAttributes & USB_ENDPOINT_XFERTYPE_MASK)
+			== USB_ENDPOINT_XFER_CONTROL);
 	if (usb_endpoint_out(epaddr) || is_control) {
 		usb_settoggle(dev, epnum, 1, 0);
-		dev->epmaxpacketout[epnum] = maxsize;
+		dev->ep_out[epnum] = ep;
 	}
 	if (!usb_endpoint_out(epaddr) || is_control) {
 		usb_settoggle(dev, epnum, 0, 0);
-		dev->epmaxpacketin[epnum] = maxsize;
+		dev->ep_in[epnum] = ep;
 	}
 }
 
@@ -1040,7 +1040,7 @@ void usb_enable_interface(struct usb_device *dev,
 	int i;
 
 	for (i = 0; i < alt->desc.bNumEndpoints; ++i)
-		usb_enable_endpoint(dev, &alt->endpoint[i].desc);
+		usb_enable_endpoint(dev, &alt->endpoint[i]);
 }
 
 /**

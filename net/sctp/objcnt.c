@@ -62,7 +62,7 @@ SCTP_DBG_OBJCNT(datamsg);
 /* An array to make it easy to pretty print the debug information
  * to the proc fs.
  */
-sctp_dbg_objcnt_entry_t sctp_dbg_objcnt[] = {
+static sctp_dbg_objcnt_entry_t sctp_dbg_objcnt[] = {
 	SCTP_DBG_OBJCNT_ENTRY(sock),
 	SCTP_DBG_OBJCNT_ENTRY(ep),
 	SCTP_DBG_OBJCNT_ENTRY(assoc),

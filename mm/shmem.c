@@ -189,7 +189,7 @@ static struct backing_dev_info shmem_backing_dev_info = {
 };
 
 static LIST_HEAD(shmem_swaplist);
-static spinlock_t shmem_swaplist_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(shmem_swaplist_lock);
 
 static void shmem_free_blocks(struct inode *inode, long pages)
 {

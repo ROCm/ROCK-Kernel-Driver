@@ -51,7 +51,7 @@
  */
 
 /* Initialize datamsg from memory. */
-void sctp_datamsg_init(struct sctp_datamsg *msg)
+static void sctp_datamsg_init(struct sctp_datamsg *msg)
 {
 	atomic_set(&msg->refcnt, 1);
 	msg->send_failed = 0;
@@ -62,7 +62,7 @@ void sctp_datamsg_init(struct sctp_datamsg *msg)
 }
 
 /* Allocate and initialize datamsg. */
-struct sctp_datamsg *sctp_datamsg_new(int gfp)
+SCTP_STATIC struct sctp_datamsg *sctp_datamsg_new(int gfp)
 {
 	struct sctp_datamsg *msg;
 	msg = kmalloc(sizeof(struct sctp_datamsg), gfp);
@@ -124,7 +124,7 @@ static void sctp_datamsg_destroy(struct sctp_datamsg *msg)
 }
 
 /* Hold a reference. */
-void sctp_datamsg_hold(struct sctp_datamsg *msg)
+static void sctp_datamsg_hold(struct sctp_datamsg *msg)
 {
 	atomic_inc(&msg->refcnt);
 }
@@ -151,7 +151,7 @@ void sctp_datamsg_track(struct sctp_chunk *chunk)
 }
 
 /* Assign a chunk to this datamsg. */
-void sctp_datamsg_assign(struct sctp_datamsg *msg, struct sctp_chunk *chunk)
+static void sctp_datamsg_assign(struct sctp_datamsg *msg, struct sctp_chunk *chunk)
 {
 	sctp_datamsg_hold(msg);
 	chunk->msg = msg;

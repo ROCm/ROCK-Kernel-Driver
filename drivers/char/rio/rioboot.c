@@ -80,6 +80,8 @@ static char *_rioboot_c_sccs_ = "@(#)rioboot.c	1.3";
 #include "cmdblk.h"
 #include "route.h"
 
+static int RIOBootComplete( struct rio_info *p, struct Host *HostP, uint Rup, struct PktCmd *PktCmdP );
+
 static uchar
 RIOAtVec2Ctrl[] =
 {
@@ -580,14 +582,14 @@ register struct DownLoad *rbp;
 			HostP->UnixRups[RupN].RupP		= &HostP->RupP[RupN];
 			HostP->UnixRups[RupN].Id		  = RupN+1;
 			HostP->UnixRups[RupN].BaseSysPort = NO_PORT;
-			HostP->UnixRups[RupN].RupLock = SPIN_LOCK_UNLOCKED;
+			spin_lock_init(&HostP->UnixRups[RupN].RupLock);
 		}
 
 		for ( RupN = 0; RupN<LINKS_PER_UNIT; RupN++ ) {
 			HostP->UnixRups[RupN+MAX_RUP].RupP	= &HostP->LinkStrP[RupN].rup;
 			HostP->UnixRups[RupN+MAX_RUP].Id  = 0;
 			HostP->UnixRups[RupN+MAX_RUP].BaseSysPort = NO_PORT;
-			HostP->UnixRups[RupN+MAX_RUP].RupLock = SPIN_LOCK_UNLOCKED;
+			spin_lock_init(&HostP->UnixRups[RupN+MAX_RUP].RupLock);
 		}
 
 		/*
@@ -802,7 +804,7 @@ struct PKT *PacketP;
 ** If booted by an RTA, HostP->Mapping[Rup].RtaUniqueNum is the booting RTA.
 ** RtaUniq is the booted RTA.
 */
-int RIOBootComplete( struct rio_info *p, struct Host *HostP, uint Rup, struct PktCmd *PktCmdP )
+static int RIOBootComplete( struct rio_info *p, struct Host *HostP, uint Rup, struct PktCmd *PktCmdP )
 {
 	struct Map	*MapP = NULL;
 	struct Map	*MapP2 = NULL;

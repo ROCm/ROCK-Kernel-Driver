@@ -306,7 +306,7 @@ static void free_rb_tree_fname(struct rb_root *root)
 }
 
 
-struct dir_private_info *create_dir_info(loff_t pos)
+static struct dir_private_info *create_dir_info(loff_t pos)
 {
 	struct dir_private_info *p;
 

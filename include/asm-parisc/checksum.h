@@ -23,13 +23,15 @@ extern unsigned int csum_partial(const unsigned char *, int, unsigned int);
  * Here even more important to align src and dst on a 32-bit (or even
  * better 64-bit) boundary
  */
-extern unsigned int csum_partial_copy_nocheck(const char *, char *, int, unsigned int);
+extern unsigned int csum_partial_copy_nocheck(const unsigned char *, unsigned char *,
+					      int, unsigned int);
 
 /*
  * this is a new version of the above that records errors it finds in *errp,
  * but continues and zeros the rest of the buffer.
  */
-extern unsigned int csum_partial_copy_from_user(const char *src, char *dst, int len, unsigned int sum, int *errp);
+extern unsigned int csum_partial_copy_from_user(const unsigned char *src, unsigned char *dst,
+						int len, unsigned int sum, int *errp);
 
 /*
  *	Optimized for IP headers, which always checksum on 4 octet boundaries.
@@ -191,8 +193,8 @@ static __inline__ unsigned short int csum_ipv6_magic(struct in6_addr *saddr,
  *	Copy and checksum to user
  */
 #define HAVE_CSUM_COPY_USER
-static __inline__ unsigned int csum_and_copy_to_user (const char *src, 
-						      char __user *dst,
+static __inline__ unsigned int csum_and_copy_to_user (const unsigned char *src,
+						      unsigned char __user *dst,
 						      int len, int sum, 
 						      int *err_ptr)
 {

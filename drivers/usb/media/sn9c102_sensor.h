@@ -1,7 +1,7 @@
 /***************************************************************************
  * API for image sensors connected to the SN9C10x PC Camera Controllers    *
  *                                                                         *
- * Copyright (C) 2004 by Luca Risolia <luca.risolia@studio.unibo.it>       *
+ * Copyright (C) 2004-2005 by Luca Risolia <luca.risolia@studio.unibo.it>  *
  *                                                                         *
  * This program is free software; you can redistribute it and/or modify    *
  * it under the terms of the GNU General Public License as published by    *
@@ -62,6 +62,8 @@ struct sn9c102_sensor;
    ahead.
    Functions must return 0 on success, the appropriate error otherwise.
 */
+extern int sn9c102_probe_hv7131d(struct sn9c102_device* cam);
+extern int sn9c102_probe_mi0343(struct sn9c102_device* cam);
 extern int sn9c102_probe_pas106b(struct sn9c102_device* cam);
 extern int sn9c102_probe_pas202bcb(struct sn9c102_device* cam);
 extern int sn9c102_probe_tas5110c1b(struct sn9c102_device* cam);
@@ -74,8 +76,10 @@ extern int sn9c102_probe_tas5130d1b(struct sn9c102_device* cam);
 */
 #define SN9C102_SENSOR_TABLE                                                  \
 static int (*sn9c102_sensor_table[])(struct sn9c102_device*) = {              \
+	&sn9c102_probe_mi0343, /* strong detection based on SENSOR ids */     \
 	&sn9c102_probe_pas106b, /* strong detection based on SENSOR ids */    \
 	&sn9c102_probe_pas202bcb, /* strong detection based on SENSOR ids */  \
+	&sn9c102_probe_hv7131d, /* strong detection based on SENSOR ids */    \
 	&sn9c102_probe_tas5110c1b, /* detection based on USB pid/vid */       \
 	&sn9c102_probe_tas5130d1b, /* detection based on USB pid/vid */       \
 	NULL,                                                                 \
@@ -97,7 +101,7 @@ static const struct usb_device_id sn9c102_id_table[] = {                      \
 	{ USB_DEVICE(0x0c45, 0x6025), }, /* TAS5130D1B and TAS5110C1B */      \
 	{ USB_DEVICE(0x0c45, 0x6028), }, /* PAS202BCB */                      \
 	{ USB_DEVICE(0x0c45, 0x6029), }, /* PAS106B */                        \
-	{ USB_DEVICE(0x0c45, 0x602a), }, /* HV7131[D|E1] */                   \
+	{ USB_DEVICE(0x0c45, 0x602a), }, /* HV7131D */                        \
 	{ USB_DEVICE(0x0c45, 0x602b), }, /* MI-0343 */                        \
 	{ USB_DEVICE(0x0c45, 0x602c), }, /* OV7620 */                         \
 	{ USB_DEVICE(0x0c45, 0x6030), }, /* MI03x */                          \
@@ -147,15 +151,23 @@ extern int sn9c102_i2c_try_read(struct sn9c102_device*,struct sn9c102_sensor*,
                                 u8 address);
 
 /*
-   This must be used if and only if the sensor doesn't implement the standard
-   I2C protocol. There a number of good reasons why you must use the 
-   single-byte versions of this function: do not abuse. It writes n bytes, 
-   from data0 to datan, (registers 0x09 - 0x09+n of SN9C10X chip).
+   These must be used if and only if the sensor doesn't implement the standard
+   I2C protocol. There are a number of good reasons why you must use the 
+   single-byte versions of these functions: do not abuse. The first function
+   writes n bytes, from data0 to datan, to registers 0x09 - 0x09+n of SN9C10X
+   chip. The second one programs the registers 0x09 and 0x10 with data0 and
+   data1, and places the n bytes read from the sensor register table in the
+   buffer pointed by 'buffer'. Both the functions return -1 on error; the write
+   version returns 0 on success, while the read version returns the first read
+   byte.
 */
 extern int sn9c102_i2c_try_raw_write(struct sn9c102_device* cam,
                                      struct sn9c102_sensor* sensor, u8 n, 
                                      u8 data0, u8 data1, u8 data2, u8 data3,
                                      u8 data4, u8 data5);
+extern int sn9c102_i2c_try_raw_read(struct sn9c102_device* cam,
+                                    struct sn9c102_sensor* sensor, u8 data0,
+                                    u8 data1, u8 n, u8 buffer[]);
 
 /* To be used after the sensor struct has been attached to the camera struct */
 extern int sn9c102_i2c_write(struct sn9c102_device*, u8 address, u8 value);
@@ -166,15 +178,20 @@ extern int sn9c102_write_reg(struct sn9c102_device*, u8 value, u16 index);
 extern int sn9c102_pread_reg(struct sn9c102_device*, u16 index);
 
 /*
-   NOTE: there are no debugging functions here. To uniform the output you must
-   use the dev_info()/dev_warn()/dev_err() macros defined in device.h, already
-   included here, the argument being the struct device 'dev' of the sensor
-   structure. Do NOT use these macros before the sensor is attached or the
-   kernel will crash! However you should not need to notify the user about
+   NOTE: there are no exported debugging functions. To uniform the output you
+   must use the dev_info()/dev_warn()/dev_err() macros defined in device.h,
+   already included here, the argument being the struct device 'dev' of the
+   sensor structure. Do NOT use these macros before the sensor is attached or
+   the kernel will crash! However, you should not need to notify the user about
    common errors or other messages, since this is done by the master module.
 */
 
 /*****************************************************************************/
+
+enum sn9c102_i2c_sysfs_ops {
+	SN9C102_I2C_READ = 0x01,
+	SN9C102_I2C_WRITE = 0x02,
+};
 
 enum sn9c102_i2c_frequency { /* sensors may support both the frequencies */
 	SN9C102_I2C_100KHZ = 0x01,
@@ -186,12 +203,12 @@ enum sn9c102_i2c_interface {
 	SN9C102_I2C_3WIRES,
 };
 
-#define SN9C102_I2C_SLAVEID_FICTITIOUS 0xff
-#define SN9C102_I2C_SLAVEID_UNAVAILABLE 0x00
-
 struct sn9c102_sensor {
 	char name[32], /* sensor name */
 	     maintainer[64]; /* name of the mantainer <email> */
+
+	/* Supported operations through the 'sysfs' interface */
+	enum sn9c102_i2c_sysfs_ops sysfs_ops;
 
 	/*
 	   These sensor capabilities must be provided if the SN9C10X controller
@@ -202,10 +219,10 @@ struct sn9c102_sensor {
 	enum sn9c102_i2c_interface interface;
 
 	/*
-	   These identifiers must be provided if the image sensor implements
+	   This identifier must be provided if the image sensor implements
 	   the standard I2C protocol.
 	*/
-	u8 slave_read_id, slave_write_id; /* reg. 0x09 */
+	u8 i2c_slave_id; /* reg. 0x09 */
 
 	/*
 	   NOTE: Where not noted,most of the functions below are not mandatory.
@@ -215,7 +232,7 @@ struct sn9c102_sensor {
 
 	int (*init)(struct sn9c102_device* cam);
 	/*
-	   This function is called after the sensor has been attached. 
+	   This function will be called after the sensor has been attached. 
 	   It should be used to initialize the sensor only, but may also
 	   configure part of the SN9C10X chip if necessary. You don't need to
 	   setup picture settings like brightness, contrast, etc.. here, if
@@ -315,6 +332,14 @@ struct sn9c102_sensor {
 	           matches the RGB bayer sequence (i.e. BGBGBG...GRGRGR).
 	*/
 
+	int (*set_pix_format)(struct sn9c102_device* cam,
+	                      const struct v4l2_pix_format* pix);
+	/*
+	   To be called on VIDIOC_S_FMT, when switching from the SBGGR8 to
+	   SN9C10X pixel format or viceversa. On error return the corresponding
+	   error code without rolling back.
+	*/
+
 	const struct device* dev;
 	/*
 	   This is the argument for dev_err(), dev_info() and dev_warn(). It
@@ -341,7 +366,8 @@ struct sn9c102_sensor {
 
 /* Private ioctl's for control settings supported by some image sensors */
 #define SN9C102_V4L2_CID_DAC_MAGNITUDE V4L2_CID_PRIVATE_BASE
-#define SN9C102_V4L2_CID_DAC_SIGN V4L2_CID_PRIVATE_BASE + 1
-#define SN9C102_V4L2_CID_GREEN_BALANCE V4L2_CID_PRIVATE_BASE + 2
+#define SN9C102_V4L2_CID_GREEN_BALANCE V4L2_CID_PRIVATE_BASE + 1
+#define SN9C102_V4L2_CID_RESET_LEVEL V4L2_CID_PRIVATE_BASE + 2
+#define SN9C102_V4L2_CID_PIXEL_BIAS_VOLTAGE V4L2_CID_PRIVATE_BASE + 3
 
 #endif /* _SN9C102_SENSOR_H_ */

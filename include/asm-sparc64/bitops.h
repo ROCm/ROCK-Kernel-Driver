@@ -223,7 +223,8 @@ extern unsigned long find_next_bit(const unsigned long *, unsigned long,
  * on Linus's ALPHA routines, which are pretty portable BTW.
  */
 
-extern unsigned long find_next_zero_bit(unsigned long *, unsigned long, unsigned long);
+extern unsigned long find_next_zero_bit(const unsigned long *,
+					unsigned long, unsigned long);
 
 #define find_first_zero_bit(addr, size) \
         find_next_zero_bit((addr), (size), 0)

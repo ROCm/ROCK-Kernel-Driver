@@ -119,7 +119,7 @@ config PARIDE_BPCK
 	  before 1999 were Series 5) Series 5 drives will NOT always have the
 	  Series noted on the bottom of the drive. Series 6 drivers will.
 
-	  In other words, if your BACKPACK drive dosen't say "Series 6" on the
+	  In other words, if your BACKPACK drive doesn't say "Series 6" on the
 	  bottom, enable this option.
 
 	  If you chose to build PARIDE support into your kernel, you may

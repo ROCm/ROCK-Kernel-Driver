@@ -896,7 +896,7 @@ static struct video_device pms_template=
 	.fops           = &pms_fops,
 };
 
-struct pms_device pms_device;
+static struct pms_device pms_device;
 
 
 /*
@@ -1036,9 +1036,9 @@ static int __init init_pms_cards(void)
 	return video_register_device((struct video_device *)&pms_device, VFL_TYPE_GRABBER, video_nr);
 }
 
-MODULE_PARM(io_port,"i");
-MODULE_PARM(mem_base,"i");
-MODULE_PARM(video_nr,"i");
+module_param(io_port, int, 0);
+module_param(mem_base, int, 0);
+module_param(video_nr, int, 0);
 MODULE_LICENSE("GPL");
 
 

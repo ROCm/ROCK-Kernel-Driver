@@ -43,8 +43,10 @@
 
 #include <net/checksum.h>
 
+static int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr);
+
 /* Big ac list lock for all the sockets */
-static rwlock_t ipv6_sk_ac_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(ipv6_sk_ac_lock);
 
 /* XXX ip6_addr_match() and ip6_onlink() really belong in net/core.c */
 
@@ -413,7 +415,7 @@ int __ipv6_dev_ac_dec(struct inet6_dev *idev, struct in6_addr *addr)
 	return 0;
 }
 
-int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
+static int ipv6_dev_ac_dec(struct net_device *dev, struct in6_addr *addr)
 {
 	int ret;
 	struct inet6_dev *idev = in6_dev_get(dev);

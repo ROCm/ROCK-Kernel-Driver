@@ -101,7 +101,6 @@ extern buffer_struct *ftape_next_buffer (ft_buffer_queue_t pos);
 extern buffer_struct *ftape_get_buffer  (ft_buffer_queue_t pos);
 extern int            ftape_buffer_id   (ft_buffer_queue_t pos);
 extern void           ftape_reset_buffer(void);
-extern int  ftape_read_id(void);
 extern void ftape_tape_parameters(__u8 drive_configuration);
 extern int  ftape_wait_segment(buffer_state_enum state);
 extern int  ftape_dumb_stop(void);

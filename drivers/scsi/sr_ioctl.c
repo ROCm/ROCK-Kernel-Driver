@@ -29,6 +29,9 @@
  * It is off by default and can be turned on with this module parameter */
 static int xa_test = 0;
 
+module_param(xa_test, int, S_IRUGO | S_IWUSR);
+
+
 #define IOCTL_RETRIES 3
 
 /* ATAPI drives don't have a SCMD_PLAYAUDIO_TI command.  When these drives

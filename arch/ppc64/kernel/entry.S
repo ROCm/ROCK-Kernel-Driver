@@ -54,8 +54,8 @@ exception_marker:
 
 #undef SHOW_SYSCALLS
 
-	.globl SystemCall_common
-SystemCall_common:
+	.globl system_call_common
+system_call_common:
 	andi.	r10,r12,MSR_PR
 	mr	r10,r1
 	addi	r1,r1,-INT_FRAME_SIZE
@@ -100,7 +100,7 @@ SystemCall_common:
 	cmpdi	cr1,r0,0x5555		/* syscall 0x5555 */
 	andi.	r10,r12,MSR_PR		/* from kernel */
 	crand	4*cr0+eq,4*cr1+eq,4*cr0+eq
-	beq	HardwareInterrupt_entry
+	beq	hardware_interrupt_entry
 	lbz	r10,PACAPROCENABLED(r13)
 	std	r10,SOFTE(r1)
 #endif
@@ -574,25 +574,22 @@ do_work:
 	crandc	eq,cr1*4+eq,eq
 	bne	restore
 	/* here we are preempting the current task */
-1:	lis	r0,PREEMPT_ACTIVE@h
-	stw	r0,TI_PREEMPT(r9)
+1:
 #ifdef CONFIG_PPC_ISERIES
 	li	r0,1
 	stb	r0,PACAPROCENABLED(r13)
 #endif
 	ori	r10,r10,MSR_EE
 	mtmsrd	r10,1		/* reenable interrupts */
-	bl	.schedule
+	bl	.preempt_schedule
 	mfmsr	r10
 	clrrdi	r9,r1,THREAD_SHIFT
 	rldicl	r10,r10,48,1	/* disable interrupts again */
-	li	r0,0
 	rotldi	r10,r10,16
 	mtmsrd	r10,1
 	ld	r4,TI_FLAGS(r9)
 	andi.	r0,r4,_TIF_NEED_RESCHED
 	bne	1b
-	stw	r0,TI_PREEMPT(r9)
 	b	restore
 
 user_work:

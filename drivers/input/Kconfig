@@ -32,7 +32,7 @@ config INPUT_MOUSEDEV
 	  Say Y here if you want your mouse to be accessible as char devices
 	  13:32+ - /dev/input/mouseX and 13:63 - /dev/input/mice as an
 	  emulated IntelliMouse Explorer PS/2 mouse. That way, all user space
-	  programs (includung SVGAlib, GPM and X) will be able to use your
+	  programs (including SVGAlib, GPM and X) will be able to use your
 	  mouse.
 
 	  If unsure, say Y.

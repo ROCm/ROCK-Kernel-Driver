@@ -18,9 +18,29 @@ config ARCH_PXA_IDP
 	bool "Accelent Xscale IDP"
 	select PXA25x
 
+config PXA_SHARPSL
+	bool "SHARP SL-C7xx Models (Corgi, Shepherd and Husky)"
+	select PXA25x
+	help
+	  Say Y here if you intend to run this kernel on a
+	  Sharp SL-C700 (Corgi), SL-C750 (Shepherd) or a
+	  Sharp SL-C760 (Husky) handheld computer.
+
 endchoice
 
 endmenu
+
+config MACH_CORGI
+	bool "Enable Sharp SL-C700 (Corgi) Support"
+	depends PXA_SHARPSL
+
+config MACH_SHEPHERD
+	bool "Enable Sharp SL-C750 (Shepherd) Support"
+	depends PXA_SHARPSL
+
+config MACH_HUSKY
+	bool "Enable Sharp SL-C760 (Husky) Support"
+	depends PXA_SHARPSL
 
 config PXA25x
 	bool

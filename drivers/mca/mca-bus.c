@@ -34,7 +34,7 @@
 /* Very few machines have more than one MCA bus.  However, there are
  * those that do (Voyager 35xx/5xxx), so we do it this way for future
  * expansion.  None that I know have more than 2 */
-struct mca_bus *mca_root_busses[MAX_MCA_BUSSES];
+static struct mca_bus *mca_root_busses[MAX_MCA_BUSSES];
 
 #define MCA_DEVINFO(i,s) { .pos = i, .name = s }
 

@@ -59,13 +59,12 @@ struct fw_filter
 #ifdef CONFIG_NET_CLS_IND
 	char			indev[IFNAMSIZ];
 #endif /* CONFIG_NET_CLS_IND */
-#ifdef CONFIG_NET_CLS_ACT
-	struct tc_action        *action;
-#else /* CONFIG_NET_CLS_ACT */
-#ifdef CONFIG_NET_CLS_POLICE
-	struct tcf_police	*police;
-#endif /* CONFIG_NET_CLS_POLICE */
-#endif /* CONFIG_NET_CLS_ACT */
+	struct tcf_exts		exts;
+};
+
+static struct tcf_ext_map fw_ext_map = {
+	.action = TCA_FW_ACT,
+	.police = TCA_FW_POLICE
 };
 
 static __inline__ int fw_hash(u32 handle)
@@ -78,6 +77,7 @@ static int fw_classify(struct sk_buff *skb, struct tcf_proto *tp,
 {
 	struct fw_head *head = (struct fw_head*)tp->root;
 	struct fw_filter *f;
+	int r;
 #ifdef CONFIG_NETFILTER
 	u32 id = skb->nfmark;
 #else
@@ -92,20 +92,11 @@ static int fw_classify(struct sk_buff *skb, struct tcf_proto *tp,
 				if (!tcf_match_indev(skb, f->indev))
 					continue;
 #endif /* CONFIG_NET_CLS_IND */
-#ifdef CONFIG_NET_CLS_ACT
-				if (f->action) {
-					int act_res = tcf_action_exec(skb, f->action, res);
-					if (act_res >= 0)
-						return act_res;
+				r = tcf_exts_exec(skb, &f->exts, res);
+				if (r < 0)
 					continue;
-				}
-#else /* CONFIG_NET_CLS_ACT */
-#ifdef CONFIG_NET_CLS_POLICE
-				if (f->police)
-					return tcf_police(skb, f->police);
-#endif /* CONFIG_NET_CLS_POLICE */
-#endif /* CONFIG_NET_CLS_ACT */
-				return 0;
+
+				return r;
 			}
 		}
 	} else {
@@ -144,6 +135,14 @@ static int fw_init(struct tcf_proto *tp)
 	return 0;
 }
 
+static inline void
+fw_delete_filter(struct tcf_proto *tp, struct fw_filter *f)
+{
+	tcf_unbind_filter(tp, &f->res);
+	tcf_exts_destroy(tp, &f->exts);
+	kfree(f);
+}
+
 static void fw_destroy(struct tcf_proto *tp)
 {
 	struct fw_head *head = (struct fw_head*)xchg(&tp->root, NULL);
@@ -156,18 +155,7 @@ static void fw_destroy(struct tcf_proto *tp)
 	for (h=0; h<256; h++) {
 		while ((f=head->ht[h]) != NULL) {
 			head->ht[h] = f->next;
-			tcf_unbind_filter(tp, &f->res);
-#ifdef CONFIG_NET_CLS_ACT
-			if (f->action)
-				tcf_action_destroy(f->action, TCA_ACT_UNBIND);
-#else /* CONFIG_NET_CLS_ACT */
-#ifdef CONFIG_NET_CLS_POLICE
-			if (f->police)
-				tcf_police_release(f->police, TCA_ACT_UNBIND);
-#endif /* CONFIG_NET_CLS_POLICE */
-#endif /* CONFIG_NET_CLS_ACT */
-
-			kfree(f);
+			fw_delete_filter(tp, f);
 		}
 	}
 	kfree(head);
@@ -187,16 +175,7 @@ static int fw_delete(struct tcf_proto *tp, unsigned long arg)
 			tcf_tree_lock(tp);
 			*fp = f->next;
 			tcf_tree_unlock(tp);
-			tcf_unbind_filter(tp, &f->res);
-#ifdef CONFIG_NET_CLS_ACT
-			if (f->action)
-				tcf_action_destroy(f->action,TCA_ACT_UNBIND);
-#else /* CONFIG_NET_CLS_ACT */
-#ifdef CONFIG_NET_CLS_POLICE
-			tcf_police_release(f->police,TCA_ACT_UNBIND);
-#endif /* CONFIG_NET_CLS_POLICE */
-#endif /* CONFIG_NET_CLS_ACT */
-			kfree(f);
+			fw_delete_filter(tp, f);
 			return 0;
 		}
 	}
@@ -208,8 +187,14 @@ static int
 fw_change_attrs(struct tcf_proto *tp, struct fw_filter *f,
 	struct rtattr **tb, struct rtattr **tca, unsigned long base)
 {
-	int err = -EINVAL;
+	struct tcf_exts e;
+	int err;
 
+	err = tcf_exts_validate(tp, tb, tca[TCA_RATE-1], &e, &fw_ext_map);
+	if (err < 0)
+		return err;
+
+	err = -EINVAL;
 	if (tb[TCA_FW_CLASSID-1]) {
 		if (RTA_PAYLOAD(tb[TCA_FW_CLASSID-1]) != sizeof(u32))
 			goto errout;
@@ -225,33 +210,11 @@ fw_change_attrs(struct tcf_proto *tp, struct fw_filter *f,
 	}
 #endif /* CONFIG_NET_CLS_IND */
 
-#ifdef CONFIG_NET_CLS_ACT
-	if (tb[TCA_FW_POLICE-1]) {
-		err = tcf_change_act_police(tp, &f->action, tb[TCA_FW_POLICE-1],
-			tca[TCA_RATE-1]);
-		if (err < 0)
-			goto errout;
-	}
+	tcf_exts_change(tp, &f->exts, &e);
 
-	if (tb[TCA_FW_ACT-1]) {
-		err = tcf_change_act(tp, &f->action, tb[TCA_FW_ACT-1],
-			tca[TCA_RATE-1]);
-		if (err < 0)
-			goto errout;
-	}
-#else /* CONFIG_NET_CLS_ACT */
-#ifdef CONFIG_NET_CLS_POLICE
-	if (tb[TCA_FW_POLICE-1]) {
-		err = tcf_change_police(tp, &f->police, tb[TCA_FW_POLICE-1],
-			tca[TCA_RATE-1]);
-		if (err < 0)
-			goto errout;
-	}
-#endif /* CONFIG_NET_CLS_POLICE */
-#endif /* CONFIG_NET_CLS_ACT */
-
-	err = 0;
+	return 0;
 errout:
+	tcf_exts_destroy(tp, &e);
 	return err;
 }
 
@@ -269,7 +232,7 @@ static int fw_change(struct tcf_proto *tp, unsigned long base,
 	if (!opt)
 		return handle ? -EINVAL : 0;
 
-	if (rtattr_parse(tb, TCA_FW_MAX, RTA_DATA(opt), RTA_PAYLOAD(opt)) < 0)
+	if (rtattr_parse_nested(tb, TCA_FW_MAX, opt) < 0)
 		return -EINVAL;
 
 	if (f != NULL) {
@@ -357,15 +320,7 @@ static int fw_dump(struct tcf_proto *tp, unsigned long fh,
 
 	t->tcm_handle = f->id;
 
-	if (!f->res.classid
-#ifdef CONFIG_NET_CLS_ACT
-		&& !f->action
-#else
-#ifdef CONFIG_NET_CLS_POLICE
-		&& !f->police
-#endif
-#endif
-		)
+	if (!f->res.classid && !tcf_exts_is_available(&f->exts))
 		return skb->len;
 
 	rta = (struct rtattr*)b;
@@ -377,29 +332,15 @@ static int fw_dump(struct tcf_proto *tp, unsigned long fh,
 	if (strlen(f->indev))
 		RTA_PUT(skb, TCA_FW_INDEV, IFNAMSIZ, f->indev);
 #endif /* CONFIG_NET_CLS_IND */
-#ifdef CONFIG_NET_CLS_ACT
-	if (tcf_dump_act(skb, f->action, TCA_FW_ACT, TCA_FW_POLICE) < 0)
+
+	if (tcf_exts_dump(skb, &f->exts, &fw_ext_map) < 0)
 		goto rtattr_failure;
-#else /* CONFIG_NET_CLS_ACT */
-#ifdef CONFIG_NET_CLS_POLICE
-	if (tcf_dump_police(skb, f->police, TCA_FW_POLICE) < 0)
-		goto rtattr_failure;
-#endif /* CONFIG_NET_CLS_POLICE */
-#endif /* CONFIG_NET_CLS_ACT */
 
 	rta->rta_len = skb->tail - b;
-#ifdef CONFIG_NET_CLS_ACT
-	if (f->action && f->action->type == TCA_OLD_COMPAT) {
-		if (tcf_action_copy_stats(skb,f->action))
-			goto rtattr_failure;
-	}
-#else /* CONFIG_NET_CLS_ACT */
-#ifdef CONFIG_NET_CLS_POLICE
-	if (f->police)
-		if (tcf_police_dump_stats(skb, f->police) < 0)
-			goto rtattr_failure;
-#endif /* CONFIG_NET_CLS_POLICE */
-#endif /* CONFIG_NET_CLS_ACT */
+
+	if (tcf_exts_dump_stats(skb, &f->exts, &fw_ext_map) < 0)
+		goto rtattr_failure;
+
 	return skb->len;
 
 rtattr_failure:

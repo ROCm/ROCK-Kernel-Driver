@@ -48,7 +48,7 @@
  */
 #define EFI_RTC_EPOCH		1998
 
-static spinlock_t efi_rtc_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(efi_rtc_lock);
 
 static int efi_rtc_ioctl(struct inode *inode, struct file *file,
 		     unsigned int cmd, unsigned long arg);

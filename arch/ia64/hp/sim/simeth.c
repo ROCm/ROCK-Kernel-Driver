@@ -286,7 +286,7 @@ static __inline__ int dev_is_ethdev(struct net_device *dev)
 static int
 simeth_device_event(struct notifier_block *this,unsigned long event, void *ptr)
 {
-	struct net_device *dev = (struct net_device *)ptr;
+	struct net_device *dev = ptr;
 	struct simeth_local *local;
 	struct in_device *in_dev;
 	struct in_ifaddr **ifap = NULL;
@@ -382,7 +382,7 @@ frame_print(unsigned char *from, unsigned char *frame, int len)
 static int
 simeth_tx(struct sk_buff *skb, struct net_device *dev)
 {
-	struct simeth_local *local = (struct simeth_local *)dev->priv;
+	struct simeth_local *local = dev->priv;
 
 #if 0
 	/* ensure we have at least ETH_ZLEN bytes (min frame size) */
@@ -446,7 +446,7 @@ simeth_rx(struct net_device *dev)
 	int			len;
 	int			rcv_count = SIMETH_RECV_MAX;
 
-	local = (struct simeth_local *)dev->priv;
+	local = dev->priv;
 	/*
 	 * the loop concept has been borrowed from other drivers
 	 * looks to me like it's a throttling thing to avoid pushing to many
@@ -515,7 +515,7 @@ simeth_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 static struct net_device_stats *
 simeth_get_stats(struct net_device *dev)
 {
-	struct simeth_local  *local = (struct simeth_local *) dev->priv;
+	struct simeth_local *local = dev->priv;
 
 	return &local->stats;
 }

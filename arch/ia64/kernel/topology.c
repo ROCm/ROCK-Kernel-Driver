@@ -18,6 +18,7 @@
 #include <linux/node.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
+#include <linux/nodemask.h>
 #include <asm/mmzone.h>
 #include <asm/numa.h>
 #include <asm/cpu.h>
@@ -68,7 +69,8 @@ static int __init topology_init(void)
 	}
 	memset(sysfs_nodes, 0, sizeof(struct node) * MAX_NUMNODES);
 
-	for (i = 0; i < numnodes; i++)
+	/* MCD - Do we want to register all ONLINE nodes, or all POSSIBLE nodes? */
+	for_each_online_node(i)
 		if ((err = register_node(&sysfs_nodes[i], i, 0)))
 			goto out;
 #endif

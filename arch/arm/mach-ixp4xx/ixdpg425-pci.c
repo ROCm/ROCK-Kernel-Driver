@@ -13,6 +13,7 @@
  *
  */
 
+#include <linux/kernel.h>
 #include <linux/pci.h>
 #include <linux/init.h>
 

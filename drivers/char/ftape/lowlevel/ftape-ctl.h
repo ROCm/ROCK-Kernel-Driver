@@ -158,6 +158,5 @@ extern void ftape_calc_timeouts(unsigned int qic_std,
 				 unsigned int data_rate,
 				 unsigned int tape_len);
 extern int  ftape_calibrate_data_rate(unsigned int qic_std);
-extern int  ftape_init_drive(void);
 extern const ftape_info *ftape_get_status(void);
 #endif

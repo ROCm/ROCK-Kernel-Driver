@@ -128,6 +128,9 @@ static char *quotatypes[] = INITQFNAMES;
 static struct quota_format_type *quota_formats;	/* List of registered formats */
 static struct quota_module_name module_names[] = INIT_QUOTA_MODULE_NAMES;
 
+/* SLAB cache for dquot structures */
+static kmem_cache_t *dquot_cachep;
+
 int register_quota_format(struct quota_format_type *fmt)
 {
 	spin_lock(&dq_list_lock);
@@ -199,7 +202,7 @@ static void put_quota_format(struct quota_format_type *fmt)
 
 static LIST_HEAD(inuse_list);
 static LIST_HEAD(free_dquots);
-unsigned int dq_hash_bits, dq_hash_mask;
+static unsigned int dq_hash_bits, dq_hash_mask;
 static struct hlist_head *dquot_hash;
 
 struct dqstats dqstats;
@@ -1780,9 +1783,6 @@ static ctl_table sys_table[] = {
 	},
 	{ .ctl_name = 0 },
 };
-
-/* SLAB cache for dquot structures */
-kmem_cache_t *dquot_cachep;
 
 static int __init dquot_init(void)
 {

@@ -321,7 +321,7 @@ config SERIAL_UART00
 	select SERIAL_CORE
 	help
 	  Say Y here if you want to use the hard logic uart on Excalibur. This
-	  driver also supports soft logic implentations of this uart core.
+	  driver also supports soft logic implementations of this uart core.
 
 config SERIAL_UART00_CONSOLE
 	bool "Support for console on Excalibur serial port"
@@ -337,6 +337,20 @@ config SERIAL_UART00_CONSOLE
 	  "console=ttyS1". (Try "man bootparam" or see the documentation of
 	  your boot loader (lilo or loadlin) about how to pass options to the
 	  kernel at boot time.)
+
+config SERIAL_MPSC
+	bool "Marvell MPSC serial port support"
+	depends on PPC32 && MV64X60
+	select SERIAL_CORE
+	help
+	  Say Y here if you want to use the Marvell MPSC serial controller.
+
+config SERIAL_MPSC_CONSOLE
+	bool "Support for console on Marvell MPSC serial port"
+	depends on SERIAL_MPSC
+	select SERIAL_CORE_CONSOLE
+	help
+	  Say Y here if you want to support a serial console on a Marvell MPSC.
 
 config SERIAL_PXA
 	bool "PXA serial port support"
@@ -515,7 +529,6 @@ config SERIAL_IP22_ZILOG_CONSOLE
 	bool "Console on IP22 Zilog8530 serial port"
 	depends on SERIAL_IP22_ZILOG=y
 	select SERIAL_CORE_CONSOLE
-	help
 
 config V850E_UART
 	bool "NEC V850E on-chip UART support"
@@ -627,7 +640,7 @@ config SERIAL_LH7A40X
 	  Sharp LH7A40X series CPUs.  Choose Y or M.
 
 config SERIAL_LH7A40X_CONSOLE
-	bool "Support for connsole on Sharp LH7A40X serial port"
+	bool "Support for console on Sharp LH7A40X serial port"
 	depends on SERIAL_LH7A40X=y
 	select SERIAL_CORE_CONSOLE
 	help

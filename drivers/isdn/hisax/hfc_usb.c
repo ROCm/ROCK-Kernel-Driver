@@ -1360,9 +1360,10 @@ static int hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 //	usb_show_device_descriptor(&dev->descriptor);
 //	usb_show_interface_descriptor(&iface->desc);
 	vend_idx=0xffff;
-	for(i=0;vdata[i].vendor;i++)
-	{
-		if(dev->descriptor.idVendor==vdata[i].vendor && dev->descriptor.idProduct==vdata[i].prod_id) vend_idx=i;
+	for(i=0;vdata[i].vendor;i++) {
+		if (le16_to_cpu(dev->descriptor.idVendor) == vdata[i].vendor && 
+		    le16_to_cpu(dev->descriptor.idProduct) == vdata[i].prod_id)
+			vend_idx = i;
 	}
 	
 
@@ -1491,7 +1492,7 @@ static int hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 						case USB_ENDPOINT_XFER_INT:
 							context->fifos[cidx].pipe = usb_rcvintpipe(dev, ep->desc.bEndpointAddress);
 							context->fifos[cidx].usb_transfer_mode = USB_INT;
-							packet_size = ep->desc.wMaxPacketSize; // remember max packet size
+							packet_size = le16_to_cpu(ep->desc.wMaxPacketSize); // remember max packet size
 #ifdef VERBOSE_USB_DEBUG
 							printk (KERN_INFO "HFC-USB: Interrupt-In Endpoint found %d ms(idx:%d cidx:%d)!\n",
 								ep->desc.bInterval, idx, cidx);
@@ -1503,7 +1504,7 @@ static int hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 							else
 								context->fifos[cidx].pipe = usb_sndbulkpipe(dev, ep->desc.bEndpointAddress);
 							context->fifos[cidx].usb_transfer_mode = USB_BULK;
-							packet_size = ep->desc.wMaxPacketSize; // remember max packet size
+							packet_size = le16_to_cpu(ep->desc.wMaxPacketSize); // remember max packet size
 #ifdef VERBOSE_USB_DEBUG
 							printk (KERN_INFO "HFC-USB: Bulk Endpoint found (idx:%d cidx:%d)!\n",
 								idx, cidx);
@@ -1515,7 +1516,7 @@ static int hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 							else
 								context->fifos[cidx].pipe = usb_sndisocpipe(dev, ep->desc.bEndpointAddress);
 							context->fifos[cidx].usb_transfer_mode = USB_ISOC;
-							iso_packet_size = ep->desc.wMaxPacketSize; // remember max packet size
+							iso_packet_size = le16_to_cpu(ep->desc.wMaxPacketSize); // remember max packet size
 #ifdef VERBOSE_USB_DEBUG
 							printk (KERN_INFO "HFC-USB: ISO Endpoint found (idx:%d cidx:%d)!\n",
 								idx, cidx);
@@ -1528,7 +1529,7 @@ static int hfc_usb_probe(struct usb_interface *intf, const struct usb_device_id 
 					if (context->fifos[cidx].pipe) {
 						context->fifos[cidx].fifonum = cidx;
 						context->fifos[cidx].hfc = context;
-						context->fifos[cidx].usb_packet_maxlen = ep->desc.wMaxPacketSize;
+						context->fifos[cidx].usb_packet_maxlen = le16_to_cpu(ep->desc.wMaxPacketSize);
 						context->fifos[cidx].intervall = ep->desc.bInterval;
 						context->fifos[cidx].skbuff = NULL;
 #ifdef VERBOSE_USB_DEBUG

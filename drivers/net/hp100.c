@@ -224,9 +224,9 @@ static int hp100_rx_ratio = HP100_DEFAULT_RX_RATIO;
 static int hp100_priority_tx = HP100_DEFAULT_PRIORITY_TX;
 static int hp100_mode = 1;
 
-MODULE_PARM(hp100_rx_ratio, "1i");
-MODULE_PARM(hp100_priority_tx, "1i");
-MODULE_PARM(hp100_mode, "1i");
+module_param(hp100_rx_ratio, int, 0);
+module_param(hp100_priority_tx, int, 0);
+module_param(hp100_mode, int, 0);
 
 /*
  *  prototypes
@@ -3005,7 +3005,7 @@ MODULE_DESCRIPTION("HP CASCADE Architecture Driver for 100VG-AnyLan Network Adap
 #define HP100_DEVICES 5
 /* Parameters set by insmod */
 static int hp100_port[HP100_DEVICES] = { 0, [1 ... (HP100_DEVICES-1)] = -1 };
-MODULE_PARM(hp100_port, "1-" __MODULE_STRING(HP100_DEVICES) "i");
+module_param_array(hp100_port, int, NULL, 0);
 
 /* List of devices */
 static struct net_device *hp100_devlist[HP100_DEVICES];

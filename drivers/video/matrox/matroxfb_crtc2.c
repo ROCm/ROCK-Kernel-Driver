@@ -21,7 +21,7 @@
 
 static int mem = 8192;
 
-MODULE_PARM(mem, "i");
+module_param(mem, int, 0);
 MODULE_PARM_DESC(mem, "Memory size reserved for dualhead (default=8MB)");
 
 /* **************************************************** */

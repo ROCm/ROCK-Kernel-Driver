@@ -56,13 +56,18 @@
 
 #define __LC_RETURN_PSW                 0x200
 
-#define __LC_IRB			0x210
-
-#define __LC_DIAG44_OPCODE		0x250
-
 #define __LC_SAVE_AREA                  0xC00
 
 #ifndef __s390x__
+#define __LC_IRB			0x208
+#define __LC_SYNC_ENTER_TIMER		0x248
+#define __LC_ASYNC_ENTER_TIMER		0x250
+#define __LC_EXIT_TIMER			0x258
+#define __LC_LAST_UPDATE_TIMER		0x260
+#define __LC_USER_TIMER			0x268
+#define __LC_SYSTEM_TIMER		0x270
+#define __LC_LAST_UPDATE_CLOCK		0x278
+#define __LC_STEAL_CLOCK		0x280
 #define __LC_KERNEL_STACK               0xC40
 #define __LC_THREAD_INFO		0xC44
 #define __LC_ASYNC_STACK                0xC48
@@ -76,6 +81,16 @@
 #define __LC_CURRENT			0xC90
 #define __LC_INT_CLOCK			0xC98
 #else /* __s390x__ */
+#define __LC_IRB			0x210
+#define __LC_SYNC_ENTER_TIMER		0x250
+#define __LC_ASYNC_ENTER_TIMER		0x258
+#define __LC_EXIT_TIMER			0x260
+#define __LC_LAST_UPDATE_TIMER		0x268
+#define __LC_USER_TIMER			0x270
+#define __LC_SYSTEM_TIMER		0x278
+#define __LC_LAST_UPDATE_CLOCK		0x280
+#define __LC_STEAL_CLOCK		0x288
+#define __LC_DIAG44_OPCODE		0x290
 #define __LC_KERNEL_STACK               0xD40
 #define __LC_THREAD_INFO		0xD48
 #define __LC_ASYNC_STACK                0xD50
@@ -87,7 +102,7 @@
 #define __LC_IPLDEV                     0xDB8
 #define __LC_JIFFY_TIMER		0xDC0
 #define __LC_CURRENT			0xDD8
-#define __LC_INT_CLOCK			0xDe8
+#define __LC_INT_CLOCK			0xDE8
 #endif /* __s390x__ */
 
 #define __LC_PANIC_MAGIC                0xE00
@@ -169,7 +184,15 @@ struct _lowcore
 
         psw_t        return_psw;               /* 0x200 */
 	__u8	     irb[64];		       /* 0x208 */
-	__u8         pad8[0xc00-0x248];        /* 0x248 */
+	__u64        sync_enter_timer;         /* 0x248 */
+	__u64        async_enter_timer;        /* 0x250 */
+	__u64        exit_timer;               /* 0x258 */
+	__u64        last_update_timer;        /* 0x260 */
+	__u64        user_timer;               /* 0x268 */
+	__u64        system_timer;             /* 0x270 */
+	__u64        last_update_clock;        /* 0x278 */
+	__u64        steal_clock;              /* 0x280 */
+	__u8         pad8[0xc00-0x288];        /* 0x288 */
 
         /* System info area */
 	__u32        save_area[16];            /* 0xc00 */
@@ -250,8 +273,16 @@ struct _lowcore
 	psw_t        io_new_psw;               /* 0x1f0 */
         psw_t        return_psw;               /* 0x200 */
 	__u8	     irb[64];		       /* 0x210 */
-	__u32        diag44_opcode;            /* 0x250 */
-        __u8         pad8[0xc00-0x254];        /* 0x254 */
+	__u64        sync_enter_timer;         /* 0x250 */
+	__u64        async_enter_timer;        /* 0x258 */
+	__u64        exit_timer;               /* 0x260 */
+	__u64        last_update_timer;        /* 0x268 */
+	__u64        user_timer;               /* 0x270 */
+	__u64        system_timer;             /* 0x278 */
+	__u64        last_update_clock;        /* 0x280 */
+	__u64        steal_clock;              /* 0x288 */
+	__u32        diag44_opcode;            /* 0x290 */
+        __u8         pad8[0xc00-0x294];        /* 0x294 */
         /* System info area */
 	__u64        save_area[16];            /* 0xc00 */
         __u8         pad9[0xd40-0xc80];        /* 0xc80 */

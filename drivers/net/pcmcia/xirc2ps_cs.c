@@ -220,7 +220,7 @@ static char *if_names[] = { "Auto", "10BaseT", "10Base2", "AUI", "100BaseT" };
  */
 #ifdef PCMCIA_DEBUG
 static int pc_debug = PCMCIA_DEBUG;
-MODULE_PARM(pc_debug, "i");
+module_param(pc_debug, int, 0);
 #define DEBUG(n, args...) if (pc_debug>(n)) printk(KDBG_XIRC args)
 #else
 #define DEBUG(n, args...)
@@ -255,11 +255,8 @@ MODULE_PARM(pc_debug, "i");
 MODULE_DESCRIPTION("Xircom PCMCIA ethernet driver");
 MODULE_LICENSE("Dual MPL/GPL");
 
-#define INT_MODULE_PARM(n, v) static int n = v; MODULE_PARM(n, "i")
+#define INT_MODULE_PARM(n, v) static int n = v; module_param(n, int, 0)
 
-static int irq_list[4] = { -1 };
-MODULE_PARM(irq_list, "1-4i");
-INT_MODULE_PARM(irq_mask,	0xdeb8);
 INT_MODULE_PARM(if_port,	0);
 INT_MODULE_PARM(full_duplex,	0);
 INT_MODULE_PARM(do_sound, 	1);
@@ -627,7 +624,6 @@ xirc2ps_attach(void)
     link->next = dev_list;
     dev_list = link;
     client_reg.dev_info = &dev_info;
-    client_reg.Attributes = INFO_IO_CLIENT | INFO_CARD_SHARE;
     client_reg.EventMask =
 	CS_EVENT_CARD_INSERTION | CS_EVENT_CARD_REMOVAL |
 	CS_EVENT_RESET_PHYSICAL | CS_EVENT_CARD_RESET |
@@ -922,13 +918,7 @@ xirc2ps_config(dev_link_t * link)
     link->io.IOAddrLines =10;
     link->io.Attributes1 = IO_DATA_PATH_WIDTH_16;
     link->irq.Attributes = IRQ_HANDLE_PRESENT;
-    link->irq.IRQInfo1 = IRQ_INFO2_VALID | IRQ_LEVEL_ID;
-    if (irq_list[0] == -1)
-	link->irq.IRQInfo2 = irq_mask;
-    else {
-	for (i = 0; i < 4; i++)
-	    link->irq.IRQInfo2 |= 1 << irq_list[i];
-    }
+    link->irq.IRQInfo1 = IRQ_LEVEL_ID;
     if (local->modem) {
 	int pass;
 
@@ -1121,6 +1111,7 @@ xirc2ps_config(dev_link_t * link)
 
     link->dev = &local->node;
     link->state &= ~DEV_CONFIG_PENDING;
+    SET_NETDEV_DEV(dev, &handle_to_dev(handle));
 
     if ((err=register_netdev(dev))) {
 	printk(KNOT_XIRC "register_netdev() failed\n");
@@ -2016,9 +2007,7 @@ static void __exit
 exit_xirc2ps_cs(void)
 {
 	pcmcia_unregister_driver(&xirc2ps_cs_driver);
-
-	while (dev_list)
-		xirc2ps_detach(dev_list);
+	BUG_ON(dev_list != NULL);
 }
 
 module_init(init_xirc2ps_cs);
@@ -2027,23 +2016,17 @@ module_exit(exit_xirc2ps_cs);
 #ifndef MODULE
 static int __init setup_xirc2ps_cs(char *str)
 {
-	/* irq, irq_mask, if_port, full_duplex, do_sound, lockup_hack
-	 * [,irq2 [,irq3 [,irq4]]]
+	/* if_port, full_duplex, do_sound, lockup_hack
 	 */
 	int ints[10] = { -1 };
 
 	str = get_options(str, 9, ints);
 
 #define MAYBE_SET(X,Y) if (ints[0] >= Y && ints[Y] != -1) { X = ints[Y]; }
-	MAYBE_SET(irq_list[0], 1);
-	MAYBE_SET(irq_mask, 2);
 	MAYBE_SET(if_port, 3);
 	MAYBE_SET(full_duplex, 4);
 	MAYBE_SET(do_sound, 5);
 	MAYBE_SET(lockup_hack, 6);
-	MAYBE_SET(irq_list[1], 7);
-	MAYBE_SET(irq_list[2], 8);
-	MAYBE_SET(irq_list[3], 9);
 #undef  MAYBE_SET
 
 	return 0;

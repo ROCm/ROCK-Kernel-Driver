@@ -59,12 +59,12 @@ static hubreg_t get_region(cnodeid_t cnode)
 
 static hubreg_t region_mask;
 
-static void gen_region_mask(hubreg_t *region_mask, int maxnodes)
+static void gen_region_mask(hubreg_t *region_mask)
 {
 	cnodeid_t cnode;
 
 	(*region_mask) = 0;
-	for (cnode = 0; cnode < maxnodes; cnode++) {
+	for_each_online_node(cnode) {
 		(*region_mask) |= 1ULL << get_region(cnode);
 	}
 }
@@ -120,7 +120,7 @@ static int __init compute_node_distance(nasid_t nasid_a, nasid_t nasid_b)
 	int port;
 
 	/* Figure out which routers nodes in question are connected to */
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for_each_online_node(cnode) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
 
 		if (nasid == -1) continue;
@@ -187,9 +187,9 @@ static void __init init_topology_matrix(void)
 		for (col = 0; col < MAX_COMPACT_NODES; col++)
 			__node_distances[row][col] = -1;
 
-	for (row = 0; row < numnodes; row++) {
+	for_each_online_node(row) {
 		nasid = COMPACT_TO_NASID_NODEID(row);
-		for (col = 0; col < numnodes; col++) {
+		for_each_online_node(col) {
 			nasid2 = COMPACT_TO_NASID_NODEID(col);
 			__node_distances[row][col] =
 				compute_node_distance(nasid, nasid2);
@@ -210,17 +210,17 @@ static void __init dump_topology(void)
 	printk("************** Topology ********************\n");
 
 	printk("    ");
-	for (col = 0; col < numnodes; col++)
+	for_each_online_node(col)
 		printk("%02d ", col);
 	printk("\n");
-	for (row = 0; row < numnodes; row++) {
+	for_each_online_node(row) {
 		printk("%02d  ", row);
-		for (col = 0; col < numnodes; col++)
+		for_each_online_node(col)
 			printk("%2d ", node_distance(row, col));
 		printk("\n");
 	}
 
-	for (cnode = 0; cnode < numnodes; cnode++) {
+	for_each_online_node(cnode) {
 		nasid = COMPACT_TO_NASID_NODEID(cnode);
 
 		if (nasid == -1) continue;
@@ -363,14 +363,14 @@ static void __init mlreset(void)
 	init_topology_matrix();
 	dump_topology();
 
-	gen_region_mask(&region_mask, numnodes);
+	gen_region_mask(&region_mask);
 
-	setup_replication_mask(numnodes);
+	setup_replication_mask();
 
 	/*
 	 * Set all nodes' calias sizes to 8k
 	 */
-	for (i = 0; i < numnodes; i++) {
+	for_each_online_node(i) {
 		nasid_t nasid;
 
 		nasid = COMPACT_TO_NASID_NODEID(i);
@@ -407,7 +407,7 @@ static void __init szmem(void)
 
 	num_physpages = 0;
 
-	for (node = 0; node < numnodes; node++) {
+	for_each_online_node(node) {
 		ignore = nodebytes = 0;
 		for (slot = 0; slot < MAX_MEM_SLOTS; slot++) {
 			slot_psize = slot_psize_compute(node, slot);
@@ -489,7 +489,7 @@ void __init prom_meminit(void)
 	szmem();
 
 	for (node = 0; node < MAX_COMPACT_NODES; node++) {
-		if (node < numnodes) {
+		if (node_online(node)) {
 			node_mem_init(node);
 			continue;
 		}
@@ -513,7 +513,7 @@ void __init paging_init(void)
 
 	pagetable_init();
 
-	for (node = 0; node < numnodes; node++) {
+	for_each_online_node(node) {
 		pfn_t start_pfn = slot_getbasepfn(node, 0);
 		pfn_t end_pfn = node_getmaxclick(node) + 1;
 
@@ -533,7 +533,7 @@ void __init mem_init(void)
 
 	high_memory = (void *) __va(num_physpages << PAGE_SHIFT);
 
-	for (node = 0; node < numnodes; node++) {
+	for_each_online_node(node) {
 		unsigned slot, numslots;
 		struct page *end, *p;
 	

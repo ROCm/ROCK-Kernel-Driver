@@ -749,7 +749,7 @@ struct sym_ccb {
 	/*
 	 *  Pointer to CAM ccb and related stuff.
 	 */
-	cam_ccb_p cam_ccb;	/* CAM scsiio ccb		*/
+	struct scsi_cmnd *cam_ccb;	/* CAM scsiio ccb		*/
 	u8	cdb_buf[16];	/* Copy of CDB			*/
 	u8	*sns_bbuf;	/* Bounce buffer for sense data	*/
 #ifndef	SYM_SNS_BBUF_LEN
@@ -796,10 +796,6 @@ struct sym_ccb {
 	/*
 	 *  Other fields.
 	 */
-#ifdef	SYM_OPT_HANDLE_IO_TIMEOUT
-	SYM_QUEHEAD tmo_linkq;	/* Optional timeout handling	*/
-	u_int	tmo_clock;	/* (link and dealine value)	*/
-#endif
 	u32	ccb_ba;		/* BUS address of this CCB	*/
 	u_short	tag;		/* Tag for this transfer	*/
 				/*  NO_TAG means no tag		*/
@@ -946,8 +942,8 @@ struct sym_hcb {
 	struct sym_fwa_ba fwa_bas;	/* Useful SCRIPTA bus addresses	*/
 	struct sym_fwb_ba fwb_bas;	/* Useful SCRIPTB bus addresses	*/
 	struct sym_fwz_ba fwz_bas;	/* Useful SCRIPTZ bus addresses	*/
-	void		(*fw_setup)(hcb_p np, struct sym_fw *fw);
-	void		(*fw_patch)(hcb_p np);
+	void		(*fw_setup)(struct sym_hcb *np, struct sym_fw *fw);
+	void		(*fw_patch)(struct sym_hcb *np);
 	char		*fw_name;
 
 	/*
@@ -1025,15 +1021,6 @@ struct sym_hcb {
 #ifdef SYM_OPT_HANDLE_DEVICE_QUEUEING
 	SYM_QUEHEAD	dummy_ccbq;
 #endif
-	/*
-	 *  Optional handling of IO timeouts.
-	 */
-#ifdef	SYM_OPT_HANDLE_IO_TIMEOUT
-	SYM_QUEHEAD tmo0_ccbq;
-	SYM_QUEHEAD *tmo_ccbq;	/* [2*SYM_TIMEOUT_ORDER_MAX] */
-	u_int	tmo_clock;
-	u_int	tmo_actq;
-#endif
 
 	/*
 	 *  IMMEDIATE ARBITRATION (IARB) control.
@@ -1082,54 +1069,39 @@ struct sym_hcb {
  *  FIRMWARES (sym_fw.c)
  */
 struct sym_fw * sym_find_firmware(struct sym_pci_chip *chip);
-void sym_fw_bind_script (hcb_p np, u32 *start, int len);
+void sym_fw_bind_script (struct sym_hcb *np, u32 *start, int len);
 
 /*
  *  Driver methods called from O/S specific code.
  */
 char *sym_driver_name(void);
 void sym_print_xerr(ccb_p cp, int x_status);
-int sym_reset_scsi_bus(hcb_p np, int enab_int);
+int sym_reset_scsi_bus(struct sym_hcb *np, int enab_int);
 struct sym_pci_chip *
 sym_lookup_pci_chip_table (u_short device_id, u_char revision);
-void sym_put_start_queue(hcb_p np, ccb_p cp);
+void sym_put_start_queue(struct sym_hcb *np, ccb_p cp);
 #ifdef SYM_OPT_HANDLE_DEVICE_QUEUEING
-void sym_start_next_ccbs(hcb_p np, lcb_p lp, int maxn);
+void sym_start_next_ccbs(struct sym_hcb *np, lcb_p lp, int maxn);
 #endif
-void sym_start_up (hcb_p np, int reason);
-void sym_interrupt (hcb_p np);
-void sym_flush_comp_queue(hcb_p np, int cam_status);
-int sym_clear_tasks(hcb_p np, int cam_status, int target, int lun, int task);
-ccb_p sym_get_ccb (hcb_p np, u_char tn, u_char ln, u_char tag_order);
-void sym_free_ccb (hcb_p np, ccb_p cp);
-lcb_p sym_alloc_lcb (hcb_p np, u_char tn, u_char ln);
-int sym_queue_scsiio(hcb_p np, cam_scsiio_p csio, ccb_p cp);
-int sym_abort_scsiio(hcb_p np, cam_ccb_p ccb, int timed_out);
-int sym_abort_ccb(hcb_p np, ccb_p cp, int timed_out);
-int sym_reset_scsi_target(hcb_p np, int target);
-void sym_hcb_free(hcb_p np);
-int sym_hcb_attach(hcb_p np, struct sym_fw *fw, struct sym_nvram *nvram);
-
-/*
- *  Optionnaly, the driver may handle IO timeouts.
- */
-#ifdef	SYM_OPT_HANDLE_IO_TIMEOUT
-int sym_abort_ccb(hcb_p np, ccb_p cp, int timed_out);
-void sym_timeout_ccb(hcb_p np, ccb_p cp, u_int ticks);
-static void __inline sym_untimeout_ccb(hcb_p np, ccb_p cp)
-{
-	sym_remque(&cp->tmo_linkq);
-	sym_insque_head(&cp->tmo_linkq, &np->tmo0_ccbq);
-}
-void sym_clock(hcb_p np);
-#endif	/* SYM_OPT_HANDLE_IO_TIMEOUT */
+void sym_start_up (struct sym_hcb *np, int reason);
+void sym_interrupt (struct sym_hcb *np);
+int sym_clear_tasks(struct sym_hcb *np, int cam_status, int target, int lun, int task);
+ccb_p sym_get_ccb (struct sym_hcb *np, u_char tn, u_char ln, u_char tag_order);
+void sym_free_ccb (struct sym_hcb *np, ccb_p cp);
+lcb_p sym_alloc_lcb (struct sym_hcb *np, u_char tn, u_char ln);
+int sym_queue_scsiio(struct sym_hcb *np, struct scsi_cmnd *csio, ccb_p cp);
+int sym_abort_scsiio(struct sym_hcb *np, struct scsi_cmnd *ccb, int timed_out);
+int sym_abort_ccb(struct sym_hcb *np, ccb_p cp, int timed_out);
+int sym_reset_scsi_target(struct sym_hcb *np, int target);
+void sym_hcb_free(struct sym_hcb *np);
+int sym_hcb_attach(struct sym_hcb *np, struct sym_fw *fw, struct sym_nvram *nvram);
 
 /*
  *  Optionnaly, the driver may provide a function
  *  to announce transfer rate changes.
  */
 #ifdef	SYM_OPT_ANNOUNCE_TRANSFER_RATE
-void sym_announce_transfer_rate(hcb_p np, int target);
+void sym_announce_transfer_rate(struct sym_hcb *np, int target);
 #endif
 
 /*
@@ -1153,9 +1125,9 @@ do {									\
 	(data)->size = cpu_to_scr((((badd) >> 8) & 0xff000000) + len);	\
 } while (0)
 #elif SYM_CONF_DMA_ADDRESSING_MODE == 2
-int sym_lookup_dmap(hcb_p np, u32 h, int s);
+int sym_lookup_dmap(struct sym_hcb *np, u32 h, int s);
 static __inline void 
-sym_build_sge(hcb_p np, struct sym_tblmove *data, u64 badd, int len)
+sym_build_sge(struct sym_hcb *np, struct sym_tblmove *data, u64 badd, int len)
 {
 	u32 h = (badd>>32);
 	int s = (h&SYM_DMAP_MASK);

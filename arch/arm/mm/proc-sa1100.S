@@ -20,7 +20,6 @@
 #include <linux/linkage.h>
 #include <linux/init.h>
 #include <asm/assembler.h>
-#include <asm/domain.h>
 #include <asm/constants.h>
 #include <asm/procinfo.h>
 #include <asm/hardware.h>
@@ -210,23 +209,30 @@ ENTRY(cpu_sa1100_set_pte)
 
 	.type	__sa1100_setup, #function
 __sa1100_setup:
-	mov	r10, #0
-	mcr	p15, 0, r10, c7, c7		@ invalidate I,D caches on v4
-	mcr	p15, 0, r10, c7, c10, 4		@ drain write buffer on v4
-	mcr	p15, 0, r10, c8, c7		@ invalidate I,D TLBs on v4
-	mov	r0, #(domain_val(DOMAIN_USER, DOMAIN_MANAGER) | \
-		      domain_val(DOMAIN_KERNEL, DOMAIN_MANAGER) | \
-		      domain_val(DOMAIN_TABLE, DOMAIN_MANAGER) | \
-		      domain_val(DOMAIN_IO, DOMAIN_CLIENT))
-	mcr	p15, 0, r0, c3, c0		@ load domain access register
-	mcr	p15, 0, r4, c2, c0		@ load page table pointer
+	mov	r0, #0
+	mcr	p15, 0, r0, c7, c7		@ invalidate I,D caches on v4
+	mcr	p15, 0, r0, c7, c10, 4		@ drain write buffer on v4
+	mcr	p15, 0, r0, c8, c7		@ invalidate I,D TLBs on v4
 	mrc	p15, 0, r0, c1, c0		@ get control register v4
-	bic	r0, r0, #0x0e00			@ ..VI ZFRS BLDP WCAM
-	bic	r0, r0, #0x0002			@ .... 000. .... ..0.
-	orr	r0, r0, #0x003d
-	orr	r0, r0, #0x3100			@ ..11 ...1 ..11 11.1
+	ldr	r5, sa1100_cr1_clear
+	bic	r0, r0, r5
+	ldr	r5, sa1100_cr1_set
+	orr	r0, r0, r5
 	mov	pc, lr
 	.size	__sa1100_setup, . - __sa1100_setup
+
+	/*
+	 *  R
+	 * .RVI ZFRS BLDP WCAM
+	 * ..11 0001 ..11 1101
+	 * 
+	 */
+	.type	sa1100_cr1_clear, #object
+	.type	sa1100_cr1_set, #object
+sa1100_cr1_clear:
+	.word	0x3f3f
+sa1100_cr1_set:
+	.word	0x313d
 
 	__INITDATA
 

@@ -49,7 +49,7 @@
 static struct tcf_proto_ops *tcf_proto_base;
 
 /* Protects list of registered TC modules. It is pure SMP lock. */
-static rwlock_t cls_mod_lock = RW_LOCK_UNLOCKED;
+static DEFINE_RWLOCK(cls_mod_lock);
 
 /* Find classifier type by string name */
 
@@ -130,21 +130,30 @@ static __inline__ u32 tcf_auto_prio(struct tcf_proto *tp)
 
 static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 {
-	struct rtattr **tca = arg;
-	struct tcmsg *t = NLMSG_DATA(n);
-	u32 protocol = TC_H_MIN(t->tcm_info);
-	u32 prio = TC_H_MAJ(t->tcm_info);
-	u32 nprio = prio;
-	u32 parent = t->tcm_parent;
+	struct rtattr **tca;
+	struct tcmsg *t;
+	u32 protocol;
+	u32 prio;
+	u32 nprio;
+	u32 parent;
 	struct net_device *dev;
 	struct Qdisc  *q;
 	struct tcf_proto **back, **chain;
-	struct tcf_proto *tp = NULL;
+	struct tcf_proto *tp;
 	struct tcf_proto_ops *tp_ops;
 	struct Qdisc_class_ops *cops;
-	unsigned long cl = 0;
+	unsigned long cl;
 	unsigned long fh;
 	int err;
+
+replay:
+	tca = arg;
+	t = NLMSG_DATA(n);
+	protocol = TC_H_MIN(t->tcm_info);
+	prio = TC_H_MAJ(t->tcm_info);
+	nprio = prio;
+	parent = t->tcm_parent;
+	cl = 0;
 
 	if (prio == 0) {
 		/* If no priority is given, user wants we allocated it. */
@@ -211,19 +220,29 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 		err = -ENOBUFS;
 		if ((tp = kmalloc(sizeof(*tp), GFP_KERNEL)) == NULL)
 			goto errout;
+		err = -EINVAL;
 		tp_ops = tcf_proto_lookup_ops(tca[TCA_KIND-1]);
-#ifdef CONFIG_KMOD
-		if (tp_ops==NULL && tca[TCA_KIND-1] != NULL) {
-			struct rtattr *kind = tca[TCA_KIND-1];
-
-			if (RTA_PAYLOAD(kind) <= IFNAMSIZ) {
-				request_module("cls_%s", (char*)RTA_DATA(kind));
-				tp_ops = tcf_proto_lookup_ops(kind);
-			}
-		}
-#endif
 		if (tp_ops == NULL) {
-			err = -EINVAL;
+#ifdef CONFIG_KMOD
+			struct rtattr *kind = tca[TCA_KIND-1];
+			char name[IFNAMSIZ];
+
+			if (kind != NULL &&
+			    rtattr_strlcpy(name, kind, IFNAMSIZ) < IFNAMSIZ) {
+				rtnl_unlock();
+				request_module("cls_%s", name);
+				rtnl_lock();
+				tp_ops = tcf_proto_lookup_ops(kind);
+				/* We dropped the RTNL semaphore in order to
+				 * perform the module load.  So, even if we
+				 * succeeded in loading the module we have to
+				 * replay the request.  We indicate this using
+				 * -EAGAIN.
+				 */
+				if (tp_ops != NULL)
+					err = -EAGAIN;
+			}
+#endif
 			kfree(tp);
 			goto errout;
 		}
@@ -293,6 +312,9 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 errout:
 	if (cl)
 		cops->put(q, cl);
+	if (err == -EAGAIN)
+		/* Replay the request. */
+		goto replay;
 	return err;
 }
 
@@ -439,6 +461,154 @@ out:
 	return skb->len;
 }
 
+void
+tcf_exts_destroy(struct tcf_proto *tp, struct tcf_exts *exts)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	if (exts->action) {
+		tcf_action_destroy(exts->action, TCA_ACT_UNBIND);
+		exts->action = NULL;
+	}
+#elif defined CONFIG_NET_CLS_POLICE
+	if (exts->police) {
+		tcf_police_release(exts->police, TCA_ACT_UNBIND);
+		exts->police = NULL;
+	}
+#endif
+}
+
+
+int
+tcf_exts_validate(struct tcf_proto *tp, struct rtattr **tb,
+	          struct rtattr *rate_tlv, struct tcf_exts *exts,
+	          struct tcf_ext_map *map)
+{
+	memset(exts, 0, sizeof(*exts));
+	
+#ifdef CONFIG_NET_CLS_ACT
+	int err;
+	struct tc_action *act;
+
+	if (map->police && tb[map->police-1]) {
+		act = tcf_action_init_1(tb[map->police-1], rate_tlv, "police",
+			TCA_ACT_NOREPLACE, TCA_ACT_BIND, &err);
+		if (act == NULL)
+			return err;
+
+		act->type = TCA_OLD_COMPAT;
+		exts->action = act;
+	} else if (map->action && tb[map->action-1]) {
+		act = tcf_action_init(tb[map->action-1], rate_tlv, NULL,
+			TCA_ACT_NOREPLACE, TCA_ACT_BIND, &err);
+		if (act == NULL)
+			return err;
+
+		exts->action = act;
+	}
+#elif defined CONFIG_NET_CLS_POLICE
+	if (map->police && tb[map->police-1]) {
+		struct tcf_police *p;
+		
+		p = tcf_police_locate(tb[map->police-1], rate_tlv);
+		if (p == NULL)
+			return -EINVAL;
+
+		exts->police = p;
+	} else if (map->action && tb[map->action-1])
+		return -EOPNOTSUPP;
+#else
+	if ((map->action && tb[map->action-1]) ||
+	    (map->police && tb[map->police-1]))
+		return -EOPNOTSUPP;
+#endif
+
+	return 0;
+}
+
+void
+tcf_exts_change(struct tcf_proto *tp, struct tcf_exts *dst,
+	        struct tcf_exts *src)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	if (src->action) {
+		struct tc_action *act;
+		tcf_tree_lock(tp);
+		act = xchg(&dst->action, src->action);
+		tcf_tree_unlock(tp);
+		if (act)
+			tcf_action_destroy(act, TCA_ACT_UNBIND);
+	}
+#elif defined CONFIG_NET_CLS_POLICE
+	if (src->police) {
+		struct tcf_police *p;
+		tcf_tree_lock(tp);
+		p = xchg(&dst->police, src->police);
+		tcf_tree_unlock(tp);
+		if (p)
+			tcf_police_release(p, TCA_ACT_UNBIND);
+	}
+#endif
+}
+
+int
+tcf_exts_dump(struct sk_buff *skb, struct tcf_exts *exts,
+	      struct tcf_ext_map *map)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	if (map->action && exts->action) {
+		/*
+		 * again for backward compatible mode - we want
+		 * to work with both old and new modes of entering
+		 * tc data even if iproute2  was newer - jhs
+		 */
+		struct rtattr * p_rta = (struct rtattr*) skb->tail;
+
+		if (exts->action->type != TCA_OLD_COMPAT) {
+			RTA_PUT(skb, map->action, 0, NULL);
+			if (tcf_action_dump(skb, exts->action, 0, 0) < 0)
+				goto rtattr_failure;
+			p_rta->rta_len = skb->tail - (u8*)p_rta;
+		} else if (map->police) {
+			RTA_PUT(skb, map->police, 0, NULL);
+			if (tcf_action_dump_old(skb, exts->action, 0, 0) < 0)
+				goto rtattr_failure;
+			p_rta->rta_len = skb->tail - (u8*)p_rta;
+		}
+	}
+#elif defined CONFIG_NET_CLS_POLICE
+	if (map->police && exts->police) {
+		struct rtattr * p_rta = (struct rtattr*) skb->tail;
+
+		RTA_PUT(skb, map->police, 0, NULL);
+
+		if (tcf_police_dump(skb, exts->police) < 0)
+			goto rtattr_failure;
+
+		p_rta->rta_len = skb->tail - (u8*)p_rta;
+	}
+#endif
+	return 0;
+rtattr_failure: __attribute__ ((unused))
+	return -1;
+}
+
+int
+tcf_exts_dump_stats(struct sk_buff *skb, struct tcf_exts *exts,
+	            struct tcf_ext_map *map)
+{
+#ifdef CONFIG_NET_CLS_ACT
+	if (exts->action)
+		if (tcf_action_copy_stats(skb, exts->action) < 0)
+			goto rtattr_failure;
+#elif defined CONFIG_NET_CLS_POLICE
+	if (exts->police)
+		if (tcf_police_dump_stats(skb, exts->police) < 0)
+			goto rtattr_failure;
+#endif
+	return 0;
+rtattr_failure: __attribute__ ((unused))
+	return -1;
+}
 
 static int __init tc_filter_init(void)
 {
@@ -461,3 +631,8 @@ subsys_initcall(tc_filter_init);
 
 EXPORT_SYMBOL(register_tcf_proto_ops);
 EXPORT_SYMBOL(unregister_tcf_proto_ops);
+EXPORT_SYMBOL(tcf_exts_validate);
+EXPORT_SYMBOL(tcf_exts_destroy);
+EXPORT_SYMBOL(tcf_exts_change);
+EXPORT_SYMBOL(tcf_exts_dump);
+EXPORT_SYMBOL(tcf_exts_dump_stats);

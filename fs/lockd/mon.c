@@ -19,7 +19,7 @@
 
 static struct rpc_clnt *	nsm_create(void);
 
-extern struct rpc_program	nsm_program;
+static struct rpc_program	nsm_program;
 
 /*
  * Local NSM state
@@ -237,7 +237,7 @@ static struct rpc_version *	nsm_version[] = {
 
 static struct rpc_stat		nsm_stats;
 
-struct rpc_program		nsm_program = {
+static struct rpc_program	nsm_program = {
 		.name		= "statd",
 		.number		= SM_PROGRAM,
 		.nrvers		= sizeof(nsm_version)/sizeof(nsm_version[0]),

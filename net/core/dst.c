@@ -32,7 +32,7 @@ static struct dst_entry 	*dst_garbage_list;
 #if RT_CACHE_DEBUG >= 2 
 static atomic_t			 dst_total = ATOMIC_INIT(0);
 #endif
-static spinlock_t		 dst_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(dst_lock);
 
 static unsigned long dst_gc_timer_expires;
 static unsigned long dst_gc_timer_inc = DST_GC_MAX;
@@ -264,7 +264,7 @@ static int dst_dev_event(struct notifier_block *this, unsigned long event, void 
 	return NOTIFY_DONE;
 }
 
-struct notifier_block dst_dev_notifier = {
+static struct notifier_block dst_dev_notifier = {
 	.notifier_call	= dst_dev_event,
 };
 

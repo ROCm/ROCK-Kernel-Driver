@@ -231,18 +231,20 @@ static void __init sbus_bus_ranges_init(int parent_node, struct sbus_bus *sbus)
 		return;
 	}
 	sbus->num_sbus_ranges = len / sizeof(struct linux_prom_ranges);
+#ifdef CONFIG_SPARC32
 	if (sparc_cpu_model == sun4d) {
 		struct linux_prom_ranges iounit_ranges[PROMREG_MAX];
 		int num_iounit_ranges;
 
-	len = prom_getproperty(parent_node, "ranges",
-				(char *) iounit_ranges,
-				sizeof (iounit_ranges));
+		len = prom_getproperty(parent_node, "ranges",
+				       (char *) iounit_ranges,
+				       sizeof (iounit_ranges));
 		if (len != -1) {
 			num_iounit_ranges = (len/sizeof(struct linux_prom_ranges));
 			prom_adjust_ranges (sbus->sbus_ranges, sbus->num_sbus_ranges, iounit_ranges, num_iounit_ranges);
 		}
 	}
+#endif
 }
 
 static void __init __apply_ranges_to_regs(struct linux_prom_ranges *ranges,
