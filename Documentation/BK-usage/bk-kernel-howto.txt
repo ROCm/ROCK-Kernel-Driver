@@ -273,3 +273,11 @@ these two examples:
 A tag is just an alias for a specific changeset... and since changesets
 are ordered, a tag is thus a marker for a specific point in time (or
 specific state of the tree).
+
+
+3) Is there an easy way to generate One Big Patch versus mainline,
+   for my long-lived kernel branch?
+A. Yes.  This requires BK 3.x, though.
+
+	bk export -tpatch -r`bk repogca bk://linux.bkbits.net/linux-2.5`,+
+
