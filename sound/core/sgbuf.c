@@ -85,7 +85,7 @@ void *snd_malloc_sgbuf_pages(struct pci_dev *pci, size_t size, struct snd_dma_bu
 	}
 
 	sgbuf->size = size;
-	dmab->area = vmap(sgbuf->page_table, sgbuf->pages);
+	dmab->area = vmap(sgbuf->page_table, sgbuf->pages, VM_MAP, PAGE_KERNEL);
 	if (! dmab->area)
 		goto _failed;
 	return dmab->area;

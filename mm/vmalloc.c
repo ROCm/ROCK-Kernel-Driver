@@ -308,7 +308,7 @@ void __vunmap(void *addr, int deallocate_pages)
  *
  *	@addr:		memory base address
  *
- *	Free the virtually continguos memory area starting at @addr, as
+ *	Free the virtually contiguous memory area starting at @addr, as
  *	obtained from vmalloc(), vmalloc_32() or __vmalloc().
  *
  *	May not be called in interrupt context.
@@ -324,7 +324,7 @@ void vfree(void *addr)
  *
  *	@addr:		memory base address
  *
- *	Free the virtually continguos memory area starting at @addr,
+ *	Free the virtually contiguous memory area starting at @addr,
  *	which was created from the page array passed to vmap().
  *
  *	May not be called in interrupt context.
@@ -336,25 +336,28 @@ void vunmap(void *addr)
 }
 
 /**
- *	vmap  -  map an array of pages into virtually continguos space
+ *	vmap  -  map an array of pages into virtually contiguous space
  *
  *	@pages:		array of page pointers
  *	@count:		number of pages to map
+ *	@flags:		vm_area->flags
+ *	@prot:		page protection for the mapping
  *
- *	Maps @count pages from @pages into continguos kernel virtual
+ *	Maps @count pages from @pages into contiguous kernel virtual
  *	space.
  */
-void *vmap(struct page **pages, unsigned int count)
+void *vmap(struct page **pages, unsigned int count,
+		unsigned long flags, pgprot_t prot)
 {
 	struct vm_struct *area;
 
 	if (count > num_physpages)
 		return NULL;
 
-	area = get_vm_area((count << PAGE_SHIFT), VM_MAP);
+	area = get_vm_area((count << PAGE_SHIFT), flags);
 	if (!area)
 		return NULL;
-	if (map_vm_area(area, PAGE_KERNEL, &pages)) {
+	if (map_vm_area(area, prot, &pages)) {
 		vunmap(area->addr);
 		return NULL;
 	}
@@ -363,14 +366,14 @@ void *vmap(struct page **pages, unsigned int count)
 }
 
 /**
- *	__vmalloc  -  allocate virtually continguos memory
+ *	__vmalloc  -  allocate virtually contiguous memory
  *
  *	@size:		allocation size
  *	@gfp_mask:	flags for the page level allocator
  *	@prot:		protection mask for the allocated pages
  *
  *	Allocate enough pages to cover @size from the page level
- *	allocator with @gfp_mask flags.  Map them into continguos
+ *	allocator with @gfp_mask flags.  Map them into contiguous
  *	kernel virtual space, using a pagetable protection of @prot.
  */
 void *__vmalloc(unsigned long size, int gfp_mask, pgprot_t prot)
@@ -418,12 +421,12 @@ fail:
 }
 
 /**
- *	vmalloc  -  allocate virtually continguos memory
+ *	vmalloc  -  allocate virtually contiguous memory
  *
  *	@size:		allocation size
  *
  *	Allocate enough pages to cover @size from the page level
- *	allocator and map them into continguos kernel virtual space.
+ *	allocator and map them into contiguous kernel virtual space.
  *
  *	For tight cotrol over page level allocator and protection flags
  *	use __vmalloc() instead.
@@ -434,12 +437,12 @@ void *vmalloc(unsigned long size)
 }
 
 /**
- *	vmalloc_32  -  allocate virtually continguos memory (32bit addressable)
+ *	vmalloc_32  -  allocate virtually contiguous memory (32bit addressable)
  *
  *	@size:		allocation size
  *
  *	Allocate enough 32bit PA addressable pages to cover @size from the
- *	page level allocator and map them into continguos kernel virtual space.
+ *	page level allocator and map them into contiguous kernel virtual space.
  */
 void *vmalloc_32(unsigned long size)
 {
