@@ -229,7 +229,7 @@ static int filldir64(void * __buf, const char * name, int namlen, loff_t offset,
 		goto efault;
 	if (copy_to_user(dirent->d_name, name, namlen))
 		goto efault;
-	if (put_user(0, dirent->d_name + namlen))
+	if (__put_user(0, dirent->d_name + namlen))
 		goto efault;
 	((char *) dirent) += reclen;
 	buf->current_dir = dirent;
@@ -247,7 +247,7 @@ asmlinkage long sys_getdents64(unsigned int fd, void * dirent, unsigned int coun
 	int error;
 
 	error = -EFAULT;
-	if (!access_ok(VERIFY_WRITE, dirent, sizeof(struct linux_dirent64)))
+	if (!access_ok(VERIFY_WRITE, dirent, count))
 		goto out;
 
 	error = -EBADF;
