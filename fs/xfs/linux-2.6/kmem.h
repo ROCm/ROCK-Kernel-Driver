@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -32,31 +32,33 @@
 #ifndef __XFS_SUPPORT_KMEM_H__
 #define __XFS_SUPPORT_KMEM_H__
 
-#include <linux/mm.h>
-#include <linux/highmem.h>
 #include <linux/slab.h>
-#include <linux/vmalloc.h>
+#include <linux/sched.h>
+#include <linux/mm.h>
 
 /*
- * Cutoff point to use vmalloc instead of kmalloc.
+ * memory management routines
  */
-#define MAX_SLAB_SIZE	0x20000
-
-/*
- * XFS uses slightly different names for these due to the
- * IRIX heritage.
- */
-#define	kmem_zone	kmem_cache_s
-#define kmem_zone_t	kmem_cache_t
-
 #define KM_SLEEP	0x0001
 #define KM_NOSLEEP	0x0002
 #define KM_NOFS		0x0004
-#define KM_MAYFAIL	0x0005
+#define KM_MAYFAIL	0x0008
+
+#define	kmem_zone	kmem_cache_s
+#define kmem_zone_t	kmem_cache_t
 
 typedef unsigned long xfs_pflags_t;
 
+#define PFLAGS_TEST_NOIO()              (current->flags & PF_NOIO)
 #define PFLAGS_TEST_FSTRANS()           (current->flags & PF_FSTRANS)
+
+#define PFLAGS_SET_NOIO() do {		\
+	current->flags |= PF_NOIO;	\
+} while (0)
+
+#define PFLAGS_CLEAR_NOIO() do {	\
+	current->flags &= ~PF_NOIO;	\
+} while (0)
 
 /* these could be nested, so we save state */
 #define PFLAGS_SET_FSTRANS(STATEP) do {	\
@@ -79,8 +81,7 @@ typedef unsigned long xfs_pflags_t;
 	*(NSTATEP) = *(OSTATEP);	\
 } while (0)
 
-static __inline unsigned int
-kmem_flags_convert(int flags)
+static __inline unsigned int kmem_flags_convert(int flags)
 {
 	int lflags;
 
@@ -100,54 +101,9 @@ kmem_flags_convert(int flags)
 		/* avoid recusive callbacks to filesystem during transactions */
 		if (PFLAGS_TEST_FSTRANS() || (flags & KM_NOFS))
 			lflags &= ~__GFP_FS;
-
-		if (!(flags & KM_MAYFAIL))
-			lflags |= __GFP_NOFAIL;
 	}
-
-	return lflags;
-}
-
-static __inline void *
-kmem_alloc(size_t size, int flags)
-{
-	if (unlikely(MAX_SLAB_SIZE < size))
-		/* Avoid doing filesystem sensitive stuff to get this */
-		return __vmalloc(size, kmem_flags_convert(flags), PAGE_KERNEL);
-	return kmalloc(size, kmem_flags_convert(flags));
-}
-
-static __inline void *
-kmem_zalloc(size_t size, int flags)
-{
-	void *ptr = kmem_alloc(size, flags);
-	if (likely(ptr != NULL))
-		memset(ptr, 0, size);
-	return ptr;
-}
-
-static __inline void
-kmem_free(void *ptr, size_t size)
-{
-	if (unlikely((unsigned long)ptr < VMALLOC_START ||
-		     (unsigned long)ptr >= VMALLOC_END))
-		kfree(ptr);
-	else
-		vfree(ptr);
-}
-
-static __inline void *
-kmem_realloc(void *ptr, size_t newsize, size_t oldsize, int flags)
-{
-	void *new = kmem_alloc(newsize, flags);
-
-	if (likely(ptr != NULL)) {
-		if (likely(new != NULL))
-			memcpy(new, ptr, min(oldsize, newsize));
-		kmem_free(ptr, oldsize);
-	}
-
-	return new;
+        
+        return lflags;
 }
 
 static __inline kmem_zone_t *
@@ -156,26 +112,32 @@ kmem_zone_init(int size, char *zone_name)
 	return kmem_cache_create(zone_name, size, 0, 0, NULL, NULL);
 }
 
-static __inline void *
-kmem_zone_alloc(kmem_zone_t *zone, int flags)
-{
-	return kmem_cache_alloc(zone, kmem_flags_convert(flags));
-}
-
-static __inline void *
-kmem_zone_zalloc(kmem_zone_t *zone, int flags)
-{
-	void *ptr = kmem_zone_alloc(zone, flags);
-	if (likely(ptr != NULL))
-		memset(ptr, 0, kmem_cache_size(zone));
-	return ptr;
-}
-
 static __inline void
 kmem_zone_free(kmem_zone_t *zone, void *ptr)
 {
 	kmem_cache_free(zone, ptr);
 }
+
+static __inline void
+kmem_zone_destroy(kmem_zone_t *zone)
+{
+	if (zone && kmem_cache_destroy(zone))
+		BUG();
+}
+
+static __inline int
+kmem_zone_shrink(kmem_zone_t *zone)
+{
+	return kmem_cache_shrink(zone);
+}
+
+extern void	    *kmem_zone_zalloc(kmem_zone_t *, int);
+extern void	    *kmem_zone_alloc(kmem_zone_t *, int);
+
+extern void	    *kmem_alloc(size_t, int);
+extern void	    *kmem_realloc(void *, size_t, size_t, int);
+extern void	    *kmem_zalloc(size_t, int);
+extern void         kmem_free(void *, size_t);
 
 typedef struct shrinker *kmem_shaker_t;
 typedef int (*kmem_shake_func_t)(int, unsigned int);
