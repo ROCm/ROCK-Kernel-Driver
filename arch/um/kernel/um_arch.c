@@ -14,6 +14,7 @@
 #include "linux/bootmem.h"
 #include "linux/spinlock.h"
 #include "linux/utsname.h"
+#include "linux/console.h"
 #include "linux/sysrq.h"
 #include "linux/seq_file.h"
 #include "linux/delay.h"
@@ -300,6 +301,7 @@ static void __init uml_postsetup(void)
 /* Set during early boot */
 unsigned long brk_start;
 unsigned long end_iomem;
+EXPORT_SYMBOL(end_iomem);
 
 #define MIN_VMALLOC (32 * 1024 * 1024)
 
@@ -419,6 +421,8 @@ static struct notifier_block panic_exit_notifier = {
 	.priority 		= 0
 };
 
+extern int console_use_vt; /* FIXME */
+
 void __init setup_arch(char **cmdline_p)
 {
 	notifier_chain_register(&panic_notifier_list, &panic_exit_notifier);
@@ -426,6 +430,9 @@ void __init setup_arch(char **cmdline_p)
  	strcpy(command_line, saved_command_line);
  	*cmdline_p = command_line;
 	setup_hostinfo();
+#if defined(CONFIG_DUMMY_CONSOLE)
+	conswitchp = &dummy_con;
+#endif  
 }
 
 void __init check_bugs(void)

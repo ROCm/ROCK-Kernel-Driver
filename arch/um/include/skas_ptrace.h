@@ -6,6 +6,7 @@
 #ifndef __SKAS_PTRACE_H
 #define __SKAS_PTRACE_H
 
+#ifndef PTRACE_FAULTINFO
 struct ptrace_faultinfo {
 	int is_write;
 	unsigned long addr;
@@ -21,6 +22,7 @@ struct ptrace_ldt {
 #define PTRACE_SIGPENDING 53
 #define PTRACE_LDT 54
 #define PTRACE_SWITCH_MM 55
+#endif
 
 #endif
 

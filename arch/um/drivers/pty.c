@@ -58,7 +58,8 @@ int pts_open(int input, int output, int primary, void *d, char **dev_out)
 	dev = ptsname(fd);
 	sprintf(data->dev_name, "%s", dev);
 	*dev_out = data->dev_name;
-	if(data->announce) (*data->announce)(dev, data->dev);
+	if (data->announce)
+		(*data->announce)(dev, data->dev);
 	return(fd);
 }
 

@@ -148,6 +148,18 @@ void setup_machinename(char *machine_out)
 
 	uname(&host);
 	strcpy(machine_out, host.machine);
+	/*
+	 * Pretend to be a i586 machine.
+	 *
+	 * This is a temporary workaround for several problems
+	 * triggered by the fact that the current 2.6 uml kernel
+	 * lacks a few system calls required for TLS/NPTL support,
+	 * whereas glibc expects these syscalls being present
+	 * unconditionally when the kernel version is 2.6.x.
+	 *
+	 */
+	if (0 == strcmp(machine_out,"i686"))
+		strcpy(machine_out,"i586");
 }
 
 char host_info[(_UTSNAME_LENGTH + 1) * 4 + _UTSNAME_NODENAME_LENGTH + 1];
