@@ -297,64 +297,46 @@ static inline long put_tv32(struct compat_timeval *o, struct timeval *i)
  */
 asmlinkage long sys32_ipc(u32 call, int first, int second, int third, u32 ptr)
 {
-	if(call >> 16) /* hack for backward compatibility */
+	if (call >> 16)		/* hack for backward compatibility */
 		return -EINVAL;
 
 	call &= 0xffff;
 
-	if (call <= SEMTIMEDOP)
-		switch (call) {
-		case SEMTIMEDOP:
-			if (third)
-				return compat_sys_semtimedop(first,
-						compat_ptr(ptr), second,
-						compat_ptr(third));
-			/* else fall through for normal semop() */
-		case SEMOP:
-			/* struct sembuf is the same on 32 and 64bit :)) */
-			return sys_semtimedop (first, compat_ptr(ptr),
-					      second, NULL);
-		case SEMGET:
-			return sys_semget (first, second, third);
-		case SEMCTL:
-			return compat_sys_semctl (first, second, third,
-						 compat_ptr(ptr));
-		default:
-			return -EINVAL;
-		};
-	if (call <= MSGCTL) 
-		switch (call) {
-		case MSGSND:
-			return compat_sys_msgsnd (first, second, third,
-						compat_ptr(ptr));
-		case MSGRCV:
-			return compat_sys_msgrcv (first, second, 0, third,
-					       0, compat_ptr(ptr));
-		case MSGGET:
-			return sys_msgget ((key_t) first, second);
-		case MSGCTL:
-			return compat_sys_msgctl (first, second,
-						compat_ptr(ptr));
-		default:
-			return -EINVAL;
-		}
-	if (call <= SHMCTL) 
-		switch (call) {
-		case SHMAT:
-			return compat_sys_shmat (first, second, third,
-						0, compat_ptr(ptr));
-		case SHMDT: 
-			return sys_shmdt(compat_ptr(ptr));
-		case SHMGET:
-			return sys_shmget(first, second, third);
-		case SHMCTL:
-			return compat_sys_shmctl(first, second,
-						compat_ptr(ptr));
-		default:
-			return -EINVAL;
-		}
+	switch (call) {
+	case SEMTIMEDOP:
+		return compat_sys_semtimedop(first, compat_ptr(ptr),
+					     second, compat_ptr(third));
+	case SEMOP:
+		/* struct sembuf is the same on 32 and 64bit :)) */
+		return sys_semtimedop(first, compat_ptr(ptr),
+				      second, NULL);
+	case SEMGET:
+		return sys_semget(first, second, third);
+	case SEMCTL:
+		return compat_sys_semctl(first, second, third,
+					 compat_ptr(ptr));
+	case MSGSND:
+		return compat_sys_msgsnd(first, second, third,
+					 compat_ptr(ptr));
+	case MSGRCV:
+		return compat_sys_msgrcv(first, second, 0, third,
+					 0, compat_ptr(ptr));
+	case MSGGET:
+		return sys_msgget((key_t) first, second);
+	case MSGCTL:
+		return compat_sys_msgctl(first, second, compat_ptr(ptr));
+	case SHMAT:
+		return compat_sys_shmat(first, second, third,
+					0, compat_ptr(ptr));
+	case SHMDT:
+		return sys_shmdt(compat_ptr(ptr));
+	case SHMGET:
+		return sys_shmget(first, second, third);
+	case SHMCTL:
+		return compat_sys_shmctl(first, second, compat_ptr(ptr));
+	}
 
-	return -EINVAL;
+	return -ENOSYS;
 }
 
 asmlinkage long sys32_truncate64(const char * path, unsigned long high, unsigned long low)
