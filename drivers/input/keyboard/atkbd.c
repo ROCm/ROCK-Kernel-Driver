@@ -202,7 +202,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		atkbd->resend = 1;
 		goto out;
 	}
-	
+
 	if (!flags && data == ATKBD_RET_ACK)
 		atkbd->resend = 0;
 #endif
@@ -276,7 +276,7 @@ static irqreturn_t atkbd_interrupt(struct serio *serio, unsigned char data,
 		case ATKBD_KEY_UNKNOWN:
 			printk(KERN_WARNING "atkbd.c: Unknown key %s (%s set %d, code %#x on %s).\n",
 				atkbd->release ? "released" : "pressed",
-				atkbd->translated ? "translated" : "raw", 
+				atkbd->translated ? "translated" : "raw",
 				atkbd->set, code, serio->phys);
 			if (atkbd->translated && atkbd->set == 2 && code == 0x7a)
 				printk(KERN_WARNING "atkbd.c: This is an XFree86 bug. It shouldn't access"
@@ -353,7 +353,7 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 	if (receive && param)
 		for (i = 0; i < receive; i++)
 			atkbd->cmdbuf[(receive - 1) - i] = param[i];
-	
+
 	if (command & 0xff)
 		if (atkbd_sendbyte(atkbd, command & 0xff))
 			return (atkbd->cmdcnt = 0) - 1;
@@ -373,7 +373,7 @@ static int atkbd_command(struct atkbd *atkbd, unsigned char *param, int command)
 			atkbd->cmdcnt = 0;
 			break;
 		}
-	
+
 		udelay(1);
 	}
 
@@ -466,7 +466,7 @@ static int atkbd_probe(struct atkbd *atkbd)
  */
 
 	if (atkbd_reset)
-		if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT)) 
+		if (atkbd_command(atkbd, NULL, ATKBD_CMD_RESET_BAT))
 			printk(KERN_WARNING "atkbd.c: keyboard reset failed on %s\n", atkbd->serio->phys);
 
 /*
@@ -529,7 +529,7 @@ static int atkbd_set_3(struct atkbd *atkbd)
 		return 3;
 	}
 
-	if (atkbd_set != 2) 
+	if (atkbd_set != 2)
 		if (!atkbd_command(atkbd, param, ATKBD_CMD_OK_GETID)) {
 			atkbd->id = param[0] << 8 | param[1];
 			return 2;
@@ -541,7 +541,7 @@ static int atkbd_set_3(struct atkbd *atkbd)
 			return 4;
 	}
 
-	if (atkbd_set != 3) 
+	if (atkbd_set != 3)
 		return 2;
 
 	param[0] = 3;
@@ -637,7 +637,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 
 	switch (serio->type & SERIO_TYPE) {
 
-		case SERIO_8042_XL: 
+		case SERIO_8042_XL:
 			atkbd->translated = 1;
 		case SERIO_8042:
 			if (serio->write)
@@ -650,7 +650,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 			kfree(atkbd);
 			return;
 	}
-			
+
 	if (atkbd->write) {
 		atkbd->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_LED) | BIT(EV_REP);
 		atkbd->dev.ledbit[0] = BIT(LED_NUML) | BIT(LED_CAPSL) | BIT(LED_SCROLLL);
@@ -687,7 +687,7 @@ static void atkbd_connect(struct serio *serio, struct serio_dev *dev)
 			kfree(atkbd);
 			return;
 		}
-		
+
 		atkbd->set = atkbd_set_3(atkbd);
 		atkbd_enable(atkbd);
 
