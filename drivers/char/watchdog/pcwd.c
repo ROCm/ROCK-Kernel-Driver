@@ -56,6 +56,7 @@
 #include <linux/watchdog.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/reboot.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -201,7 +202,8 @@ void pcwd_showprevstate(void)
 
 		if (card_status & WD_T110) {
 			printk("pcwd: Card senses a CPU Overheat.  Panicking!\n");
-			panic("pcwd: CPU Overheat.\n");
+			printk("pcwd: CPU Overheat.\n");
+			machine_power_off();
 		}
 
 		if ((!(card_status & WD_WDRST)) &&
@@ -213,7 +215,8 @@ void pcwd_showprevstate(void)
 
 		if (card_status & 0x04) {
 			printk("pcwd: Card senses a CPU Overheat.  Panicking!\n");
-			panic("pcwd: CPU Overheat.\n");
+			printk("pcwd: CPU Overheat.\n");
+			machine_power_off();
 		}
 
 		if ((!(card_status & 0x01)) &&
