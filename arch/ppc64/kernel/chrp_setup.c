@@ -267,6 +267,7 @@ chrp_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.restart        = rtas_restart;
 	ppc_md.power_off      = rtas_power_off;
 	ppc_md.halt           = rtas_halt;
+	ppc_md.panic          = rtas_os_term;
 
 	ppc_md.get_boot_time  = pSeries_get_boot_time;
 	ppc_md.get_rtc_time   = pSeries_get_rtc_time;

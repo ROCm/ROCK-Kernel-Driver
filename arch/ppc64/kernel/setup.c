@@ -26,6 +26,7 @@
 #include <linux/tty.h>
 #include <linux/root_dev.h>
 #include <linux/cpu.h>
+#include <linux/notifier.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/processor.h>
@@ -93,6 +94,13 @@ unsigned long SYSRQ_KEY;
 #endif /* CONFIG_MAGIC_SYSRQ */
 
 struct machdep_calls ppc_md;
+
+static int ppc64_panic_event(struct notifier_block *, unsigned long, void *);
+
+static struct notifier_block ppc64_panic_block = {
+	notifier_call: ppc64_panic_event,
+	priority: INT_MIN /* may not return; must be done last */
+};
 
 /*
  * Perhaps we can put the pmac screen_info[] here
@@ -318,6 +326,14 @@ EXPORT_SYMBOL(machine_halt);
 
 unsigned long ppc_proc_freq;
 unsigned long ppc_tb_freq;
+
+static int ppc64_panic_event(struct notifier_block *this,
+                             unsigned long event, void *ptr)
+{
+	ppc_md.panic((char *)ptr);  /* May not return */
+	return NOTIFY_DONE;
+}
+
 
 #ifdef CONFIG_SMP
 DEFINE_PER_CPU(unsigned int, pvr);
@@ -604,6 +620,9 @@ void __init setup_arch(char **cmdline_p)
 
 	/* reboot on panic */
 	panic_timeout = 180;
+
+	if (ppc_md.panic)
+		notifier_chain_register(&panic_notifier_list, &ppc64_panic_block);
 
 	init_mm.start_code = PAGE_OFFSET;
 	init_mm.end_code = (unsigned long) _etext;
