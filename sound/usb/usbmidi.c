@@ -49,6 +49,11 @@
 #include <sound/rawmidi.h>
 #include "usbaudio.h"
 
+MODULE_AUTHOR("Clemens Ladisch <tiwai@suse.de>");
+MODULE_DESCRIPTION("USB Audio/MIDI helper module");
+MODULE_LICENSE("GPL");
+
+
 struct usb_ms_header_descriptor {
 	__u8  bLength;
 	__u8  bDescriptorType;
@@ -1260,3 +1265,8 @@ int snd_usb_create_midi_interface(snd_usb_audio_t* chip,
 		snd_usbmidi_input_start_ep(umidi->endpoints[i].in);
 	return 0;
 }
+
+EXPORT_SYMBOL(snd_usb_create_midi_interface);
+EXPORT_SYMBOL(snd_usbmidi_input_stop);
+EXPORT_SYMBOL(snd_usbmidi_input_start);
+EXPORT_SYMBOL(snd_usbmidi_disconnect);

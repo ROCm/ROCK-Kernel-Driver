@@ -1118,6 +1118,16 @@ Module parameters
 
     This module supports up to 8 cards, autoprobe and hotplugging.
 
+  Module snd-usb-usx2y
+  --------------------
+
+    Module for Tascam USB US-122, US-224 and US-428 devices.
+
+    This module supports up to 8 cards, autoprobe and hotplugging.
+
+    Note: you need to load the firmware via usx2yloader utility included
+          in alsa-tools and alsa-firmware packages.
+
   Module snd-via82xx
   ------------------
 
