@@ -312,7 +312,7 @@ static int rh_string (
  	// id 3 == vendor description
 	} else if (id == 3) {
                 sprintf (buf, "%s %s %s", UTS_SYSNAME, UTS_RELEASE,
-			hcd->description);
+			hcd->driver->description);
 
 	// unsupported IDs --> "protocol stall"
 	} else
@@ -676,6 +676,8 @@ void usb_bus_init (struct usb_bus *bus)
 	bus->bandwidth_isoc_reqs = 0;
 
 	INIT_LIST_HEAD (&bus->bus_list);
+
+	class_device_initialize(&bus->class_dev);
 }
 EXPORT_SYMBOL (usb_bus_init);
 
@@ -734,7 +736,7 @@ int usb_register_bus(struct usb_bus *bus)
 	snprintf(bus->class_dev.class_id, BUS_ID_SIZE, "usb%d", busnum);
 	bus->class_dev.class = &usb_host_class;
 	bus->class_dev.dev = bus->controller;
-	retval = class_device_register(&bus->class_dev);
+	retval = class_device_add(&bus->class_dev);
 	if (retval) {
 		clear_bit(busnum, busmap.busmap);
 		up(&usb_bus_list_lock);
@@ -1430,12 +1432,8 @@ EXPORT_SYMBOL (usb_bus_start_enum);
 
 /*
  * usb_hcd_operations - adapts usb_bus framework to HCD framework (bus glue)
- *
- * When registering a USB bus through the HCD framework code, use this
- * usb_operations vector.  The PCI glue layer does so automatically; only
- * bus glue for non-PCI system busses will need to use this.
  */
-struct usb_operations usb_hcd_operations = {
+static struct usb_operations usb_hcd_operations = {
 	.get_frame_number =	hcd_get_frame_number,
 	.submit_urb =		hcd_submit_urb,
 	.unlink_urb =		hcd_unlink_urb,
@@ -1447,7 +1445,6 @@ struct usb_operations usb_hcd_operations = {
 	.hub_resume =		hcd_hub_resume,
 #endif
 };
-EXPORT_SYMBOL (usb_hcd_operations);
 
 /*-------------------------------------------------------------------------*/
 
@@ -1549,11 +1546,51 @@ EXPORT_SYMBOL (usb_hc_died);
 
 /*-------------------------------------------------------------------------*/
 
-void usb_hcd_release(struct usb_bus *bus)
+static void hcd_release (struct usb_bus *bus)
 {
 	struct usb_hcd *hcd;
 
-	hcd = container_of (bus, struct usb_hcd, self);
+	hcd = container_of(bus, struct usb_hcd, self);
 	kfree(hcd);
 }
-EXPORT_SYMBOL (usb_hcd_release);
+
+/**
+ * usb_create_hcd - create and initialize an HCD structure
+ * @driver: HC driver that will use this hcd
+ * Context: !in_interrupt()
+ *
+ * Allocate a struct usb_hcd, with extra space at the end for the
+ * HC driver's private data.  Initialize the generic members of the
+ * hcd structure.
+ *
+ * If memory is unavailable, returns NULL.
+ */
+struct usb_hcd *usb_create_hcd (const struct hc_driver *driver)
+{
+	struct usb_hcd *hcd;
+
+	hcd = kcalloc(1, sizeof(*hcd) + driver->hcd_priv_size, GFP_KERNEL);
+	if (!hcd)
+		return NULL;
+
+	usb_bus_init(&hcd->self);
+	hcd->self.op = &usb_hcd_operations;
+	hcd->self.hcpriv = hcd;
+	hcd->self.release = &hcd_release;
+
+	init_timer(&hcd->rh_timer);
+
+	hcd->driver = driver;
+	hcd->product_desc = (driver->product_desc) ? driver->product_desc :
+			"USB Host Controller";
+	hcd->state = USB_STATE_HALT;
+
+	return hcd;
+}
+EXPORT_SYMBOL (usb_create_hcd);
+
+void usb_put_hcd (struct usb_hcd *hcd)
+{
+	usb_bus_put(&hcd->self);
+}
+EXPORT_SYMBOL (usb_put_hcd);
