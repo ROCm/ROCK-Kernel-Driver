@@ -213,8 +213,17 @@ dc390_dma_intr (struct dc390_acb* pACB)
 }
 #endif
 
+
+static void __inline__
+dc390_InvalidCmd(struct dc390_acb* pACB)
+{
+	if (pACB->pActiveDCB->pActiveSRB->SRBState & (SRB_START_ | SRB_MSGOUT))
+		DC390_write8(ScsiCmd, CLEAR_FIFO_CMD);
+}
+
+
 static irqreturn_t __inline__
-DC390_Interrupt( int irq, void *dev_id, struct pt_regs *regs)
+DC390_Interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
     struct dc390_acb *pACB, *pACB2;
     struct dc390_dcb *pDCB;
@@ -594,7 +603,7 @@ dc390_MsgIn_reject (struct dc390_acb* pACB, struct dc390_srb* pSRB)
 }
 
 /* abort command */
-static void __inline__
+static void
 dc390_EnableMsgOut_Abort ( struct dc390_acb* pACB, struct dc390_srb* pSRB )
 {
     pSRB->MsgOutBuf[0] = ABORT; 
@@ -1333,6 +1342,35 @@ dc390_add_dev (struct dc390_acb* pACB, struct dc390_dcb* pDCB, PSCSI_INQDATA ptr
 }
 
 
+static void __inline__
+dc390_RequestSense(struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB)
+{
+	struct scsi_cmnd *pcmd;
+
+	pcmd = pSRB->pcmd;
+
+	REMOVABLEDEBUG(printk(KERN_INFO "DC390: RequestSense(Cmd %02x, Id %02x, LUN %02x)\n",\
+			      pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN));
+
+	pSRB->SRBFlag |= AUTO_REQSENSE;
+	pSRB->SavedSGCount = pcmd->use_sg;
+	pSRB->SavedTotXLen = pSRB->TotalXferredLen;
+	pSRB->AdaptStatus = 0;
+	pSRB->TargetStatus = 0; /* CHECK_CONDITION<<1; */
+
+	/* We are called from SRBdone, original PCI mapping has been removed
+	 * already, new one is set up from StartSCSI */
+	pSRB->SGIndex = 0;
+
+	pSRB->TotalXferredLen = 0;
+	pSRB->SGToBeXferLen = 0;
+	if (dc390_StartSCSI(pACB, pDCB, pSRB)) {
+		dc390_Going_to_Waiting(pDCB, pSRB);
+		dc390_waiting_timer(pACB, HZ/5);
+	}
+}
+
+
 static void
 dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB )
 {
@@ -1661,52 +1699,4 @@ dc390_ScsiRstDetect( struct dc390_acb* pACB )
 	dc390_Waiting_process( pACB );
     }
     return;
-}
-
-
-static void __inline__
-dc390_RequestSense( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB )
-{
-    struct scsi_cmnd *pcmd;
-
-    pcmd = pSRB->pcmd;
-
-    REMOVABLEDEBUG(printk (KERN_INFO "DC390: RequestSense (Cmd %02x, Id %02x, LUN %02x)\n",\
-	    pcmd->cmnd[0], pDCB->TargetID, pDCB->TargetLUN));
-
-    pSRB->SRBFlag |= AUTO_REQSENSE;
-    //pSRB->Segment0[0] = (u32) pSRB->CmdBlock[0];
-    //pSRB->Segment0[1] = (u32) pSRB->CmdBlock[4];
-    //pSRB->Segment1[0] = ((u32)(pcmd->cmd_len) << 8) + pSRB->SGcount;
-    //pSRB->Segment1[1] = pSRB->TotalXferredLen;
-    pSRB->SavedSGCount = pcmd->use_sg;
-    pSRB->SavedTotXLen = pSRB->TotalXferredLen;
-    pSRB->AdaptStatus = 0;
-    pSRB->TargetStatus = 0; /* CHECK_CONDITION<<1; */
-
-    /* We are called from SRBdone, original PCI mapping has been removed
-     * already, new one is set up from StartSCSI */
-    pSRB->SGIndex = 0;
-
-    //pSRB->CmdBlock[0] = REQUEST_SENSE;
-    //pSRB->CmdBlock[1] = pDCB->TargetLUN << 5;
-    //(u16) pSRB->CmdBlock[2] = 0;
-    //(u16) pSRB->CmdBlock[4] = sizeof(pcmd->sense_buffer);
-    //pSRB->ScsiCmdLen = 6;
-
-    pSRB->TotalXferredLen = 0;
-    pSRB->SGToBeXferLen = 0;
-    if( dc390_StartSCSI( pACB, pDCB, pSRB ) ) {
-	dc390_Going_to_Waiting ( pDCB, pSRB );
-	dc390_waiting_timer (pACB, HZ/5);
-    }
-}
-
-
-
-static void __inline__
-dc390_InvalidCmd( struct dc390_acb* pACB )
-{
-    if( pACB->pActiveDCB->pActiveSRB->SRBState & (SRB_START_+SRB_MSGOUT) )
-	DC390_write8 (ScsiCmd, CLEAR_FIFO_CMD);
 }
