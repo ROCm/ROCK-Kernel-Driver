@@ -219,7 +219,6 @@ struct sk_buff {
 	} nh;
 
 	union {
-	  	struct ethhdr	*ethernet;
 	  	unsigned char 	*raw;
 	} mac;
 
