@@ -69,7 +69,7 @@ void show_mem(void)
                 else if (PageSwapCache(mem_map+i))
                         cached++;
                 else if (page_count(mem_map+i))
-                        shared += atomic_read(&mem_map[i].count) - 1;
+                        shared += page_count(mem_map+i) - 1;
         }
         printk("%d pages of RAM\n",total);
         printk("%d reserved pages\n",reserved);
