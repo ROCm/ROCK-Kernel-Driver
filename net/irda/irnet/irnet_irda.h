@@ -69,7 +69,8 @@ static void
 			 irnet_event,
 			 __u32,
 			 __u32,
-			 char *);
+			 char *,
+			 __u16);
 /* ----------------------- IRDA SUBROUTINES ----------------------- */
 static inline int
 	irnet_open_tsap(irnet_socket *);
