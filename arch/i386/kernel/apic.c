@@ -690,8 +690,22 @@ static int __init detect_init_APIC (void)
 		goto no_apic;
 	}
 
-	if (!cpu_has_apic)
-		goto no_apic;
+	if (!cpu_has_apic) {
+		/*
+		 * Some BIOSes disable the local APIC in the
+		 * APIC_BASE MSR. This can only be done in
+		 * software for Intel P6 and AMD K7 (Model > 1).
+		 */
+		rdmsr(MSR_IA32_APICBASE, l, h);
+		if (!(l & MSR_IA32_APICBASE_ENABLE)) {
+			apic_printk(APIC_VERBOSE, "Local APIC disabled "
+					"by BIOS -- reenabling.\n");
+			l &= ~MSR_IA32_APICBASE_BASE;
+			l |= MSR_IA32_APICBASE_ENABLE | APIC_DEFAULT_PHYS_BASE;
+			wrmsr(MSR_IA32_APICBASE, l, h);
+			enabled_via_apicbase = 1;
+		}
+	}
 	/*
 	 * The APIC feature bit should now be enabled
 	 * in `cpuid'
