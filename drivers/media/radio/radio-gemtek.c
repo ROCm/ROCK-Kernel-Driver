@@ -269,13 +269,13 @@ static int __init gemtek_init(void)
 	printk(KERN_INFO "GemTek Radio Card driver.\n");
 
 	spin_lock_init(&lock);
- 	/* mute card - prevents noisy bootups */
-	outb(0x10, io);
-	udelay(5);
-	gemtek_unit.muted = 1;
 
 	/* this is _maybe_ unnecessary */
 	outb(0x01, io);
+
+ 	/* mute card - prevents noisy bootups */
+	gemtek_unit.muted = 0;
+	gemtek_mute(&gemtek_unit);
 
 	return 0;
 }
