@@ -651,10 +651,14 @@ int blkdev_put(struct block_device *bdev, int kind)
 
 	down(&bdev->bd_sem);
 	lock_kernel();
-	if (kind == BDEV_FILE)
+	switch (kind) {
+	case BDEV_FILE:
 		__block_fsync(bd_inode);
-	else if (kind == BDEV_FS)
+		break;
+	case BDEV_FS:
 		fsync_no_super(bdev);
+		break;
+	}
 	if (!--bdev->bd_openers)
 		kill_bdev(bdev);
 	if (bdev->bd_op->release)

@@ -2,9 +2,11 @@
  *
  * Hardware accelerated Matrox Millennium I, II, Mystique, G100, G200 and G400
  *
- * (c) 1998,1999,2000 Petr Vandrovec <vandrove@vc.cvut.cz>
+ * (c) 1998,1999,2000,2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.54 2001/09/09
+ * Portions Copyright (c) 2001 Matrox Graphics Inc.
+ *
+ * Version: 1.62 2001/11/29
  *
  * MTRR stuff: 1998 Tom Rini <trini@kernel.crashing.org>
  *
@@ -218,7 +220,7 @@ int matroxfb_PLL_calcclock(const struct matrox_pll_features* pll, unsigned int f
 	return bestvco;
 }
 
-int matroxfb_vgaHWinit(CPMINFO struct matrox_hw_state* hw, struct my_timming* m, struct display* p) {
+int matroxfb_vgaHWinit(WPMINFO struct my_timming* m, struct display* p) {
 	unsigned int hd, hs, he, hbe, ht;
 	unsigned int vd, vs, ve, vt;
 	unsigned int wd;
@@ -226,6 +228,7 @@ int matroxfb_vgaHWinit(CPMINFO struct matrox_hw_state* hw, struct my_timming* m,
 	int i;
 	int text = p->type == FB_TYPE_TEXT;
 	int fwidth;
+	struct matrox_hw_state * const hw = &ACCESS_FBINFO(hw);
 
 	if (text) {
 		fwidth = fontwidth(p);
@@ -416,8 +419,9 @@ int matroxfb_vgaHWinit(CPMINFO struct matrox_hw_state* hw, struct my_timming* m,
 	return 0;
 };
 
-void matroxfb_vgaHWrestore(WPMINFO struct matrox_hw_state* hw, struct matrox_hw_state* oldhw) {
+void matroxfb_vgaHWrestore(WPMINFO2) {
 	int i;
+	struct matrox_hw_state * const hw = &ACCESS_FBINFO(hw);
 	CRITFLAGS
 
 	DBG("vgaHWrestore")
@@ -643,6 +647,354 @@ int matroxfb_fastfont_tryset(WPMINFO struct display* p) {
 	return 1;
 }
 
+static void get_pins(unsigned char* pins, struct matrox_bios* bd) {
+	unsigned int b0 = readb(pins);
+	
+	if (b0 == 0x2E && readb(pins+1) == 0x41) {
+		unsigned int pins_len = readb(pins+2);
+		unsigned int i;
+		unsigned char cksum;
+		unsigned char* dst = bd->pins;
+
+		if (pins_len < 3 || pins_len > 128) {
+			return;
+		}
+		*dst++ = 0x2E;
+		*dst++ = 0x41;
+		*dst++ = pins_len;
+		cksum = 0x2E + 0x41 + pins_len;
+		for (i = 3; i < pins_len; i++) {
+			cksum += *dst++ = readb(pins+i);
+		}
+		if (cksum) {
+			return;
+		}
+		bd->pins_len = pins_len;
+	} else if (b0 == 0x40 && readb(pins+1) == 0x00) {
+		unsigned int i;
+		unsigned char* dst = bd->pins;
+
+		*dst++ = 0x40;
+		*dst++ = 0;
+		for (i = 2; i < 0x40; i++) {
+			*dst++ = readb(pins+i);
+		}
+		bd->pins_len = 0x40;
+	}
+}
+
+static void get_bios_version(unsigned char* vbios, struct matrox_bios* bd) {
+	unsigned int pcir_offset;
+	
+	pcir_offset = readb(vbios + 24) | (readb(vbios + 25) << 8);
+	if (pcir_offset >= 26 && pcir_offset < 0xFFE0 &&
+	    readb(vbios + pcir_offset    ) == 'P' &&
+	    readb(vbios + pcir_offset + 1) == 'C' &&
+	    readb(vbios + pcir_offset + 2) == 'I' &&
+	    readb(vbios + pcir_offset + 3) == 'R') {
+		unsigned char h;
+
+		h = readb(vbios + pcir_offset + 0x12);
+		bd->version.vMaj = (h >> 4) & 0xF;
+		bd->version.vMin = h & 0xF;
+		bd->version.vRev = readb(vbios + pcir_offset + 0x13);
+	} else {
+		unsigned char h;
+
+		h = readb(vbios + 5);
+		bd->version.vMaj = (h >> 4) & 0xF;
+		bd->version.vMin = h & 0xF;
+		bd->version.vRev = 0;
+	}
+}
+
+static void get_bios_output(unsigned char* vbios, struct matrox_bios* bd) {
+	unsigned char b;
+	
+	b = readb(vbios + 0x7FF1);
+	if (b == 0xFF) {
+		b = 0;
+	}
+	bd->output.state = b;
+}
+
+static void get_bios_tvout(unsigned char* vbios, struct matrox_bios* bd) {
+	unsigned int i;
+	
+	/* Check for 'IBM .*(V....TVO' string - it means TVO BIOS */
+	bd->output.tvout = 0;
+	if (readb(vbios + 0x1D) != 'I' ||
+	    readb(vbios + 0x1E) != 'B' ||
+	    readb(vbios + 0x1F) != 'M' ||
+	    readb(vbios + 0x20) != ' ') {
+	    	return;
+	}
+	for (i = 0x2D; i < 0x2D + 128; i++) {
+		unsigned char b = readb(vbios + i);
+		
+		if (b == '(' && readb(vbios + i + 1) == 'V') {
+			if (readb(vbios + i + 6) == 'T' &&
+			    readb(vbios + i + 7) == 'V' &&
+			    readb(vbios + i + 8) == 'O') {
+				bd->output.tvout = 1;
+			}
+			return;
+		}
+		if (b == 0)
+			break;
+	}
+}
+
+static void parse_bios(unsigned char* vbios, struct matrox_bios* bd) {
+	unsigned int pins_offset;
+	
+	if (readb(vbios) != 0x55 || readb(vbios + 1) != 0xAA) {
+		return;
+	}
+	bd->bios_valid = 1;
+	get_bios_version(vbios, bd);
+	get_bios_output(vbios, bd);
+	get_bios_tvout(vbios, bd);
+	pins_offset = readb(vbios + 0x7FFC) | (readb(vbios + 0x7FFD) << 8);
+	if (pins_offset <= 0xFF80) {
+		get_pins(vbios + pins_offset, bd);
+	}
+}
+
+#define get_u16(x) (le16_to_cpu(get_unaligned((__u16*)(x))))
+#define get_u32(x) (le32_to_cpu(get_unaligned((__u32*)(x))))
+static int parse_pins1(WPMINFO const struct matrox_bios* bd) {
+	unsigned int maxdac;
+
+	switch (bd->pins[22]) {
+		case 0:		maxdac = 175000; break;
+		case 1:		maxdac = 220000; break;
+		default:	maxdac = 240000; break;
+	}
+	if (get_u16(bd->pins + 24)) {
+		maxdac = get_u16(bd->pins + 24) * 10;
+	}
+	MINFO->limits.pixel.vcomax = maxdac;
+	MINFO->values.pll.system = get_u16(bd->pins + 28) ? get_u16(bd->pins + 28) * 10 : 50000;
+	/* ignore 4MB, 8MB, module clocks */
+	MINFO->features.pll.ref_freq = 14318;
+	MINFO->values.reg.mctlwtst	= 0x00030101;
+	return 0;
+}
+
+static void default_pins1(WPMINFO2) {
+	/* Millennium */
+	MINFO->limits.pixel.vcomax	= 220000;
+	MINFO->values.pll.system	=  50000;
+	MINFO->features.pll.ref_freq	=  14318;
+	MINFO->values.reg.mctlwtst	= 0x00030101;
+}
+
+static int parse_pins2(WPMINFO const struct matrox_bios* bd) {
+	MINFO->limits.pixel.vcomax	=
+	MINFO->limits.system.vcomax	= (bd->pins[41] == 0xFF) ? 230000 : ((bd->pins[41] + 100) * 1000);
+	MINFO->values.reg.mctlwtst	= ((bd->pins[51] & 0x01) ? 0x00000001 : 0) |
+					  ((bd->pins[51] & 0x02) ? 0x00000100 : 0) |
+					  ((bd->pins[51] & 0x04) ? 0x00010000 : 0) |
+					  ((bd->pins[51] & 0x08) ? 0x00020000 : 0);
+	MINFO->values.pll.system	= (bd->pins[43] == 0xFF) ? 50000 : ((bd->pins[43] + 100) * 1000);
+	MINFO->features.pll.ref_freq	= 14318;
+	return 0;
+}
+
+static void default_pins2(WPMINFO2) {
+	/* Millennium II, Mystique */
+	MINFO->limits.pixel.vcomax	=
+	MINFO->limits.system.vcomax	= 230000;
+	MINFO->values.reg.mctlwtst	= 0x00030101;
+	MINFO->values.pll.system	=  50000;
+	MINFO->features.pll.ref_freq	=  14318;
+}
+
+static int parse_pins3(WPMINFO const struct matrox_bios* bd) {
+	MINFO->limits.pixel.vcomax	=
+	MINFO->limits.system.vcomax	= (bd->pins[36] == 0xFF) ? 230000			: ((bd->pins[36] + 100) * 1000);
+	MINFO->values.reg.mctlwtst	= get_u32(bd->pins + 48) == 0xFFFFFFFF ? 0x01250A21	: get_u32(bd->pins + 48);
+	/* memory config */
+	MINFO->values.reg.memrdbk	= ((bd->pins[57] << 21) & 0x1E000000) |
+					  ((bd->pins[57] << 22) & 0x00C00000) |
+					  ((bd->pins[56] <<  1) & 0x000001E0) |
+					  ( bd->pins[56]        & 0x0000000F);
+	MINFO->values.reg.opt		= (bd->pins[54] & 7) << 10;
+	MINFO->values.reg.opt2		= bd->pins[58] << 12;
+	MINFO->features.pll.ref_freq	= (bd->pins[52] & 0x20) ? 14318 : 27000;
+	return 0;
+}
+
+static void default_pins3(WPMINFO2) {
+	/* G100, G200 */
+	MINFO->limits.pixel.vcomax	=
+	MINFO->limits.system.vcomax	= 230000;
+	MINFO->values.reg.mctlwtst	= 0x01250A21;
+	MINFO->values.reg.memrdbk	= 0x00000000;
+	MINFO->values.reg.opt		= 0x00000C00;
+	MINFO->values.reg.opt2		= 0x00000000;
+	MINFO->features.pll.ref_freq	=  27000;
+}
+
+static int parse_pins4(WPMINFO const struct matrox_bios* bd) {
+	MINFO->limits.pixel.vcomax	= (bd->pins[ 39] == 0xFF) ? 230000			: bd->pins[ 39] * 4000;
+	MINFO->limits.system.vcomax	= (bd->pins[ 38] == 0xFF) ? MINFO->limits.pixel.vcomax	: bd->pins[ 38] * 4000;
+	MINFO->values.reg.mctlwtst	= get_u32(bd->pins + 71);
+	MINFO->values.reg.memrdbk	= ((bd->pins[87] << 21) & 0x1E000000) |
+					  ((bd->pins[87] << 22) & 0x00C00000) |
+					  ((bd->pins[86] <<  1) & 0x000001E0) |
+					  ( bd->pins[86]        & 0x0000000F);
+	MINFO->values.reg.opt		= ((bd->pins[53] << 15) & 0x00400000) |
+					  ((bd->pins[53] << 22) & 0x10000000) |
+					  ((bd->pins[53] << 10) & 0x00001C00);
+	MINFO->values.reg.opt3		= get_u32(bd->pins + 67);
+	MINFO->values.pll.system	= (bd->pins[ 65] == 0xFF) ? 200000 			: bd->pins[ 65] * 4000;
+	MINFO->features.pll.ref_freq	= (bd->pins[ 92] & 0x01) ? 14318 : 27000;
+	return 0;
+}
+
+static void default_pins4(WPMINFO2) {
+	/* G400 */
+	MINFO->limits.pixel.vcomax	=
+	MINFO->limits.system.vcomax	= 252000;
+	MINFO->values.reg.mctlwtst	= 0x04A450A1;
+	MINFO->values.reg.memrdbk	= 0x000000E7;
+	MINFO->values.reg.opt		= 0x10000400;
+	MINFO->values.reg.opt3		= 0x0190A419;
+	MINFO->values.pll.system	= 200000;
+	MINFO->features.pll.ref_freq	= 27000;
+}
+
+static int parse_pins5(WPMINFO const struct matrox_bios* bd) {
+	unsigned int mult;
+	
+	mult = bd->pins[4]?8000:6000;
+	
+	MINFO->limits.pixel.vcomax	= (bd->pins[ 38] == 0xFF) ? 600000			: bd->pins[ 38] * mult;
+	MINFO->limits.system.vcomax	= (bd->pins[ 36] == 0xFF) ? MINFO->limits.pixel.vcomax	: bd->pins[ 39] * mult;
+	MINFO->limits.video.vcomax	= (bd->pins[ 37] == 0xFF) ? MINFO->limits.system.vcomax	: bd->pins[ 37] * mult;
+	MINFO->limits.pixel.vcomin	= (bd->pins[123] == 0xFF) ? 256000			: bd->pins[123] * mult;
+	MINFO->limits.system.vcomin	= (bd->pins[121] == 0xFF) ? MINFO->limits.pixel.vcomin	: bd->pins[121] * mult;
+	MINFO->limits.video.vcomin	= (bd->pins[122] == 0xFF) ? MINFO->limits.system.vcomin	: bd->pins[122] * mult;
+	MINFO->values.pll.system	=
+	MINFO->values.pll.video		= (bd->pins[ 92] == 0xFF) ? 284000			: bd->pins[ 92] * 4000;
+	MINFO->values.reg.opt		= get_u32(bd->pins+ 48);
+	MINFO->values.reg.opt2		= get_u32(bd->pins+ 52);
+	MINFO->values.reg.opt3		= get_u32(bd->pins+ 94);
+	MINFO->values.reg.mctlwtst	= get_u32(bd->pins+ 98);
+	MINFO->values.reg.memmisc	= get_u32(bd->pins+102);
+	MINFO->values.reg.memrdbk	= get_u32(bd->pins+106);
+	MINFO->features.pll.ref_freq	= (bd->pins[110] & 0x01) ? 14318 : 27000;
+	MINFO->values.memory.ddr	= (bd->pins[114] & 0x60) == 0x20;
+	MINFO->values.memory.dll	= (bd->pins[115] & 0x02) != 0;
+	MINFO->values.memory.emrswen	= (bd->pins[115] & 0x01) != 0;
+	MINFO->values.reg.maccess	= MINFO->values.memory.emrswen ? 0x00004000 : 0x00000000;
+	if (bd->pins[115] & 4) {
+		MINFO->values.reg.mctlwtst_core = MINFO->values.reg.mctlwtst;
+	} else {
+		u_int32_t wtst_xlat[] = { 0, 1, 5, 6, 7, 5, 2, 3 };
+		MINFO->values.reg.mctlwtst_core = (MINFO->values.reg.mctlwtst & ~7) |
+		                                  wtst_xlat[MINFO->values.reg.mctlwtst & 7];
+	}
+	return 0;
+}
+
+static void default_pins5(WPMINFO2) {
+	/* Mine 16MB G450 with SDRAM DDR */
+	MINFO->limits.pixel.vcomax	=
+	MINFO->limits.system.vcomax	=
+	MINFO->limits.video.vcomax	= 600000;
+	MINFO->limits.pixel.vcomin	=
+	MINFO->limits.system.vcomin	=
+	MINFO->limits.video.vcomin	= 256000;
+	MINFO->values.pll.system	=
+	MINFO->values.pll.video		= 284000;
+	MINFO->values.reg.opt		= 0x404A1160;
+	MINFO->values.reg.opt2		= 0x0000AC00;
+	MINFO->values.reg.opt3		= 0x0090A409;
+	MINFO->values.reg.mctlwtst_core	=
+	MINFO->values.reg.mctlwtst	= 0x0C81462B;
+	MINFO->values.reg.memmisc	= 0x80000004;
+	MINFO->values.reg.memrdbk	= 0x01001103;
+	MINFO->features.pll.ref_freq	= 27000;
+	MINFO->values.memory.ddr	= 1;
+	MINFO->values.memory.dll	= 1;
+	MINFO->values.memory.emrswen	= 1;
+	MINFO->values.reg.maccess	= 0x00004000;
+}
+
+static int matroxfb_set_limits(WPMINFO const struct matrox_bios* bd) {
+	unsigned int pins_version;
+	static const unsigned int pinslen[] = { 64, 64, 64, 128, 128 };
+
+	switch (ACCESS_FBINFO(chip)) {
+		case MGA_2064:	default_pins1(PMINFO2); break;
+		case MGA_2164:
+		case MGA_1064:
+		case MGA_1164:	default_pins2(PMINFO2); break;
+		case MGA_G100:
+		case MGA_G200:	default_pins3(PMINFO2); break;
+		case MGA_G400:	default_pins4(PMINFO2); break;
+		case MGA_G450:
+		case MGA_G550:	default_pins5(PMINFO2); break;
+	}
+	if (!bd->bios_valid) {
+		printk(KERN_INFO "matroxfb: Your Matrox device does not have BIOS\n");
+		return -1;
+	}
+	if (bd->pins_len < 64) {
+		printk(KERN_INFO "matroxfb: BIOS on your Matrox device does not contain powerup info\n");
+		return -1;
+	}
+	if (bd->pins[0] == 0x2E && bd->pins[1] == 0x41) {
+		pins_version = bd->pins[5];
+		if (pins_version < 2 || pins_version > 5) {
+			printk(KERN_INFO "matroxfb: Unknown version (%u) of powerup info\n", pins_version);
+			return -1;
+		}
+	} else {
+		pins_version = 1;
+	}
+	if (bd->pins_len != pinslen[pins_version - 1]) {
+		printk(KERN_INFO "matroxfb: Invalid powerup info\n");
+		return -1;
+	}
+	switch (pins_version) {
+		case 1:
+			return parse_pins1(PMINFO bd);
+		case 2:
+			return parse_pins2(PMINFO bd);
+		case 3:
+			return parse_pins3(PMINFO bd);
+		case 4:
+			return parse_pins4(PMINFO bd);
+		case 5:
+			return parse_pins5(PMINFO bd);
+		default:
+			printk(KERN_DEBUG "matroxfb: Powerup info version %u is not yet supported\n", pins_version);
+			return -1;
+	}
+}
+
+void matroxfb_read_pins(WPMINFO2) {
+	u32 opt;
+	u32 biosbase;
+	u32 fbbase;
+	struct pci_dev* pdev = ACCESS_FBINFO(pcidev);
+	
+	memset(&ACCESS_FBINFO(bios), 0, sizeof(ACCESS_FBINFO(bios)));
+	pci_read_config_dword(pdev, PCI_OPTION_REG, &opt);
+	pci_write_config_dword(pdev, PCI_OPTION_REG, opt | PCI_OPTION_ENABLE_ROM);
+	pci_read_config_dword(pdev, PCI_ROM_ADDRESS, &biosbase);
+	pci_read_config_dword(pdev, ACCESS_FBINFO(devflags.fbResource), &fbbase);
+	pci_write_config_dword(pdev, PCI_ROM_ADDRESS, (fbbase & PCI_ROM_ADDRESS_MASK) | PCI_ROM_ADDRESS_ENABLE);
+	parse_bios(vaddr_va(ACCESS_FBINFO(video).vbase), &ACCESS_FBINFO(bios));
+	pci_write_config_dword(pdev, PCI_ROM_ADDRESS, biosbase);
+	pci_write_config_dword(pdev, PCI_OPTION_REG, opt);
+	matroxfb_set_limits(PMINFO &ACCESS_FBINFO(bios));
+}
+
 EXPORT_SYMBOL(matroxfb_DAC_in);
 EXPORT_SYMBOL(matroxfb_DAC_out);
 EXPORT_SYMBOL(matroxfb_var2my);
@@ -657,6 +1009,7 @@ EXPORT_SYMBOL(matroxfb_fastfont_tryset);	/* accel */
 EXPORT_SYMBOL(matroxfb_fastfont_init);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_vgaHWinit);		/* DAC1064, Ti3026 */
 EXPORT_SYMBOL(matroxfb_vgaHWrestore);		/* DAC1064, Ti3026 */
+EXPORT_SYMBOL(matroxfb_read_pins);
 
 MODULE_AUTHOR("(c) 1999-2001 Petr Vandrovec <vandrove@vc.cvut.cz>");
 MODULE_DESCRIPTION("Miscellaneous support for Matrox video cards");

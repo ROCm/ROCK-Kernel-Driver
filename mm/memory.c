@@ -90,7 +90,7 @@ void __free_pte(pte_t pte)
  */
 static inline void free_one_pmd(pmd_t * dir)
 {
-	pte_t * pte;
+	struct page *pte;
 
 	if (pmd_none(*dir))
 		return;
@@ -99,7 +99,7 @@ static inline void free_one_pmd(pmd_t * dir)
 		pmd_clear(dir);
 		return;
 	}
-	pte = pte_offset(dir, 0);
+	pte = pmd_page(*dir);
 	pmd_clear(dir);
 	pte_free(pte);
 }
@@ -125,18 +125,6 @@ static inline void free_one_pgd(pgd_t * dir)
 	pmd_free(pmd);
 }
 
-/* Low and high watermarks for page table cache.
-   The system should try to have pgt_water[0] <= cache elements <= pgt_water[1]
- */
-int pgt_cache_water[2] = { 25, 50 };
-
-/* Returns the number of pages freed */
-int check_pgt_cache(void)
-{
-	return do_check_pgt_cache(pgt_cache_water[0], pgt_cache_water[1]);
-}
-
-
 /*
  * This function clears all user-level page tables of a process - this
  * is needed by execve(), so that old pages aren't in the way.
@@ -152,11 +140,59 @@ void clear_page_tables(struct mm_struct *mm, unsigned long first, int nr)
 		page_dir++;
 	} while (--nr);
 	spin_unlock(&mm->page_table_lock);
-
-	/* keep the page table cache within bounds */
-	check_pgt_cache();
 }
 
+pte_t * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
+{
+	if (!pmd_present(*pmd)) {
+		struct page *new;
+
+		spin_unlock(&mm->page_table_lock);
+		new = pte_alloc_one(mm, address);
+		spin_lock(&mm->page_table_lock);
+		if (!new)
+			return NULL;
+
+		/*
+		 * Because we dropped the lock, we should re-check the
+		 * entry, as somebody else could have populated it..
+		 */
+		if (pmd_present(*pmd)) {
+			pte_free(new);
+			goto out;
+		}
+		pmd_populate(mm, pmd, new);
+	}
+out:
+	if (pmd_present(*pmd))
+		return pte_offset_map(pmd, address);
+	return NULL;
+}
+
+pte_t * pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
+{
+	if (!pmd_present(*pmd)) {
+		pte_t *new;
+
+		spin_unlock(&mm->page_table_lock);
+		new = pte_alloc_one_kernel(mm, address);
+		spin_lock(&mm->page_table_lock);
+		if (!new)
+			return NULL;
+
+		/*
+		 * Because we dropped the lock, we should re-check the
+		 * entry, as somebody else could have populated it..
+		 */
+		if (pmd_present(*pmd)) {
+			pte_free_kernel(new);
+			goto out;
+		}
+		pmd_populate_kernel(mm, pmd, new);
+	}
+out:
+	return pte_offset_kernel(pmd, address);
+}
 #define PTE_TABLE_MASK	((PTRS_PER_PTE-1) * sizeof(pte_t))
 #define PMD_TABLE_MASK	((PTRS_PER_PMD-1) * sizeof(pmd_t))
 
@@ -169,7 +205,7 @@ void clear_page_tables(struct mm_struct *mm, unsigned long first, int nr)
  *         variable count and make things faster. -jj
  *
  * dst->page_table_lock is held on entry and exit,
- * but may be dropped within pmd_alloc() and pte_alloc().
+ * but may be dropped within pmd_alloc() and pte_alloc_map().
  */
 int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 			struct vm_area_struct *vma)
@@ -177,7 +213,7 @@ int copy_page_range(struct mm_struct *dst, struct mm_struct *src,
 	pgd_t * src_pgd, * dst_pgd;
 	unsigned long address = vma->vm_start;
 	unsigned long end = vma->vm_end;
-	unsigned long cow = (vma->vm_flags & (VM_SHARED | VM_WRITE)) == VM_WRITE;
+	unsigned long cow = (vma->vm_flags & (VM_SHARED | VM_MAYWRITE)) == VM_MAYWRITE;
 
 	src_pgd = pgd_offset(src, address)-1;
 	dst_pgd = pgd_offset(dst, address)-1;
@@ -221,12 +257,11 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 				goto cont_copy_pmd_range;
 			}
 
-			src_pte = pte_offset(src_pmd, address);
-			dst_pte = pte_alloc(dst, dst_pmd, address);
+			dst_pte = pte_alloc_map(dst, dst_pmd, address);
 			if (!dst_pte)
 				goto nomem;
-
 			spin_lock(&src->page_table_lock);			
+			src_pte = pte_offset_map_nested(src_pmd, address);
 			do {
 				pte_t pte = *src_pte;
 				struct page *ptepage;
@@ -245,7 +280,7 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 					goto cont_copy_pte_range;
 
 				/* If it's a COW mapping, write protect it both in the parent and the child */
-				if (cow) {
+				if (cow && pte_write(pte)) {
 					ptep_set_wrprotect(src_pte);
 					pte = *src_pte;
 				}
@@ -259,11 +294,16 @@ skip_copy_pte_range:		address = (address + PMD_SIZE) & PMD_MASK;
 
 cont_copy_pte_range:		set_pte(dst_pte, pte);
 cont_copy_pte_range_noset:	address += PAGE_SIZE;
-				if (address >= end)
+				if (address >= end) {
+					pte_unmap_nested(src_pte);
+					pte_unmap(dst_pte);
 					goto out_unlock;
+				}
 				src_pte++;
 				dst_pte++;
 			} while ((unsigned long)src_pte & PTE_TABLE_MASK);
+			pte_unmap_nested(src_pte-1);
+			pte_unmap(dst_pte-1);
 			spin_unlock(&src->page_table_lock);
 		
 cont_copy_pmd_range:	src_pmd++;
@@ -292,7 +332,7 @@ static inline void forget_pte(pte_t page)
 static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long address, unsigned long size)
 {
 	unsigned long offset;
-	pte_t * ptep;
+	pte_t *ptep;
 	int freed = 0;
 
 	if (pmd_none(*pmd))
@@ -302,7 +342,7 @@ static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long ad
 		pmd_clear(pmd);
 		return 0;
 	}
-	ptep = pte_offset(pmd, address);
+	ptep = pte_offset_map(pmd, address);
 	offset = address & ~PMD_MASK;
 	if (offset + size > PMD_SIZE)
 		size = PMD_SIZE - offset;
@@ -322,6 +362,7 @@ static inline int zap_pte_range(mmu_gather_t *tlb, pmd_t * pmd, unsigned long ad
 			pte_clear(ptep);
 		}
 	}
+	pte_unmap(ptep-1);
 
 	return freed;
 }
@@ -415,11 +456,16 @@ static struct page * follow_page(struct mm_struct *mm, unsigned long address, in
 	if (pmd_none(*pmd) || pmd_bad(*pmd))
 		goto out;
 
-	ptep = pte_offset(pmd, address);
-	if (!ptep)
+	preempt_disable();
+	ptep = pte_offset_map(pmd, address);
+	if (!ptep) {
+		preempt_enable();
 		goto out;
+	}
 
 	pte = *ptep;
+	pte_unmap(ptep);
+	preempt_enable();
 	if (pte_present(pte)) {
 		if (!write ||
 		    (pte_write(pte) && pte_dirty(pte)))
@@ -446,20 +492,25 @@ static inline struct page * get_page_map(struct page *page)
 int get_user_pages(struct task_struct *tsk, struct mm_struct *mm, unsigned long start,
 		int len, int write, int force, struct page **pages, struct vm_area_struct **vmas)
 {
-	int i = 0;
+	int i;
+	unsigned int flags;
+
+	/* 
+	 * Require read or write permissions.
+	 * If 'force' is set, we only require the "MAY" flags.
+	 */
+	flags = write ? (VM_WRITE | VM_MAYWRITE) : (VM_READ | VM_MAYREAD);
+	flags &= force ? (VM_MAYREAD | VM_MAYWRITE) : (VM_READ | VM_WRITE);
+	i = 0;
+	
 
 	do {
 		struct vm_area_struct *	vma;
 
 		vma = find_extend_vma(mm, start);
 
-		if ( !vma ||
-		    (!force &&
-		     	((write && (!(vma->vm_flags & VM_WRITE))) ||
-		    	 (!write && (!(vma->vm_flags & VM_READ))) ) )) {
-			if (i) return i;
-			return -EFAULT;
-		}
+		if ( !vma || !(flags & vma->vm_flags) )
+			return i ? : -EFAULT;
 
 		spin_lock(&mm->page_table_lock);
 		do {
@@ -748,10 +799,11 @@ static inline int zeromap_pmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned 
 	if (end > PGDIR_SIZE)
 		end = PGDIR_SIZE;
 	do {
-		pte_t * pte = pte_alloc(mm, pmd, address);
+		pte_t * pte = pte_alloc_map(mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		zeromap_pte_range(pte, address, end - address, prot);
+		pte_unmap(pte);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address && (address < end));
@@ -828,10 +880,11 @@ static inline int remap_pmd_range(struct mm_struct *mm, pmd_t * pmd, unsigned lo
 		end = PGDIR_SIZE;
 	phys_addr -= address;
 	do {
-		pte_t * pte = pte_alloc(mm, pmd, address);
+		pte_t * pte = pte_alloc_map(mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		remap_pte_range(pte, address, end - address, address + phys_addr, prot);
+		pte_unmap(pte);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address && (address < end));
@@ -917,7 +970,7 @@ static inline void break_cow(struct vm_area_struct * vma, struct page * new_page
  * with the page_table_lock released.
  */
 static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
-	unsigned long address, pte_t *page_table, pte_t pte)
+	unsigned long address, pte_t *page_table, pmd_t *pmd, pte_t pte)
 {
 	struct page *old_page, *new_page;
 
@@ -931,10 +984,12 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		if (reuse) {
 			flush_cache_page(vma, address);
 			establish_pte(vma, address, page_table, pte_mkyoung(pte_mkdirty(pte_mkwrite(pte))));
+			pte_unmap(page_table);
 			spin_unlock(&mm->page_table_lock);
 			return 1;	/* Minor fault */
 		}
 	}
+	pte_unmap(page_table);
 
 	/*
 	 * Ok, we need to copy. Oh, well..
@@ -951,6 +1006,7 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 	 * Re-check the pte - we dropped the lock
 	 */
 	spin_lock(&mm->page_table_lock);
+	page_table = pte_offset_map(pmd, address);
 	if (pte_same(*page_table, pte)) {
 		if (PageReserved(old_page))
 			++mm->rss;
@@ -960,12 +1016,14 @@ static int do_wp_page(struct mm_struct *mm, struct vm_area_struct * vma,
 		/* Free the old page.. */
 		new_page = old_page;
 	}
+	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 	page_cache_release(new_page);
 	page_cache_release(old_page);
 	return 1;	/* Minor fault */
 
 bad_wp_page:
+	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 	printk("do_wp_page: bogus page at address %08lx (page 0x%lx)\n",address,(unsigned long)old_page);
 	return -1;
@@ -1086,13 +1144,14 @@ void swapin_readahead(swp_entry_t entry)
  */
 static int do_swap_page(struct mm_struct * mm,
 	struct vm_area_struct * vma, unsigned long address,
-	pte_t * page_table, pte_t orig_pte, int write_access)
+	pte_t *page_table, pmd_t *pmd, pte_t orig_pte, int write_access)
 {
 	struct page *page;
 	swp_entry_t entry = pte_to_swp_entry(orig_pte);
 	pte_t pte;
 	int ret = 1;
 
+	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 	page = lookup_swap_cache(entry);
 	if (!page) {
@@ -1105,7 +1164,9 @@ static int do_swap_page(struct mm_struct * mm,
 			 */
 			int retval;
 			spin_lock(&mm->page_table_lock);
+			page_table = pte_offset_map(pmd, address);
 			retval = pte_same(*page_table, orig_pte) ? -1 : 1;
+			pte_unmap(page_table);
 			spin_unlock(&mm->page_table_lock);
 			return retval;
 		}
@@ -1121,7 +1182,9 @@ static int do_swap_page(struct mm_struct * mm,
 	 * released the page table lock.
 	 */
 	spin_lock(&mm->page_table_lock);
+	page_table = pte_offset_map(pmd, address);
 	if (!pte_same(*page_table, orig_pte)) {
+		pte_unmap(page_table);
 		spin_unlock(&mm->page_table_lock);
 		unlock_page(page);
 		page_cache_release(page);
@@ -1146,6 +1209,7 @@ static int do_swap_page(struct mm_struct * mm,
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, address, pte);
+	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 	return ret;
 }
@@ -1155,7 +1219,7 @@ static int do_swap_page(struct mm_struct * mm,
  * spinlock held to protect against concurrent faults in
  * multithreaded programs. 
  */
-static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma, pte_t *page_table, int write_access, unsigned long addr)
+static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma, pte_t *page_table, pmd_t *pmd, int write_access, unsigned long addr)
 {
 	pte_t entry;
 
@@ -1167,6 +1231,7 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		struct page *page;
 
 		/* Allocate our own private page. */
+		pte_unmap(page_table);
 		spin_unlock(&mm->page_table_lock);
 
 		page = alloc_page(GFP_HIGHUSER);
@@ -1175,7 +1240,10 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		clear_user_highpage(page, addr);
 
 		spin_lock(&mm->page_table_lock);
+		page_table = pte_offset_map(pmd, addr);
+
 		if (!pte_none(*page_table)) {
+			pte_unmap(page_table);
 			page_cache_release(page);
 			spin_unlock(&mm->page_table_lock);
 			return 1;
@@ -1187,6 +1255,7 @@ static int do_anonymous_page(struct mm_struct * mm, struct vm_area_struct * vma,
 	}
 
 	set_pte(page_table, entry);
+	pte_unmap(page_table);
 
 	/* No need to invalidate - it was non-present before */
 	update_mmu_cache(vma, addr, entry);
@@ -1210,13 +1279,14 @@ no_mem:
  * spinlock held. Exit with the spinlock released.
  */
 static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
-	unsigned long address, int write_access, pte_t *page_table)
+	unsigned long address, int write_access, pte_t *page_table, pmd_t *pmd)
 {
 	struct page * new_page;
 	pte_t entry;
 
 	if (!vma->vm_ops || !vma->vm_ops->nopage)
-		return do_anonymous_page(mm, vma, page_table, write_access, address);
+		return do_anonymous_page(mm, vma, page_table, pmd, write_access, address);
+	pte_unmap(page_table);
 	spin_unlock(&mm->page_table_lock);
 
 	new_page = vma->vm_ops->nopage(vma, address & PAGE_MASK, 0);
@@ -1242,6 +1312,8 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 	}
 
 	spin_lock(&mm->page_table_lock);
+	page_table = pte_offset_map(pmd, address);
+
 	/*
 	 * This silly early PAGE_DIRTY setting removes a race
 	 * due to the bad i386 page protection. But it's valid
@@ -1261,8 +1333,10 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
 		if (write_access)
 			entry = pte_mkwrite(pte_mkdirty(entry));
 		set_pte(page_table, entry);
+		pte_unmap(page_table);
 	} else {
 		/* One of our sibling threads was faster, back out. */
+		pte_unmap(page_table);
 		page_cache_release(new_page);
 		spin_unlock(&mm->page_table_lock);
 		return 1;
@@ -1297,7 +1371,7 @@ static int do_no_page(struct mm_struct * mm, struct vm_area_struct * vma,
  */
 static inline int handle_pte_fault(struct mm_struct *mm,
 	struct vm_area_struct * vma, unsigned long address,
-	int write_access, pte_t * pte)
+	int write_access, pte_t *pte, pmd_t *pmd)
 {
 	pte_t entry;
 
@@ -1309,18 +1383,19 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 		 * drop the lock.
 		 */
 		if (pte_none(entry))
-			return do_no_page(mm, vma, address, write_access, pte);
-		return do_swap_page(mm, vma, address, pte, entry, write_access);
+			return do_no_page(mm, vma, address, write_access, pte, pmd);
+		return do_swap_page(mm, vma, address, pte, pmd, entry, write_access);
 	}
 
 	if (write_access) {
 		if (!pte_write(entry))
-			return do_wp_page(mm, vma, address, pte, entry);
+			return do_wp_page(mm, vma, address, pte, pmd, entry);
 
 		entry = pte_mkdirty(entry);
 	}
 	entry = pte_mkyoung(entry);
 	establish_pte(vma, address, pte, entry);
+	pte_unmap(pte);
 	spin_unlock(&mm->page_table_lock);
 	return 1;
 }
@@ -1345,9 +1420,9 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	pmd = pmd_alloc(mm, pgd, address);
 
 	if (pmd) {
-		pte_t * pte = pte_alloc(mm, pmd, address);
+		pte_t * pte = pte_alloc_map(mm, pmd, address);
 		if (pte)
-			return handle_pte_fault(mm, vma, address, write_access, pte);
+			return handle_pte_fault(mm, vma, address, write_access, pte, pmd);
 	}
 	spin_unlock(&mm->page_table_lock);
 	return -1;
@@ -1366,62 +1441,23 @@ pmd_t *__pmd_alloc(struct mm_struct *mm, pgd_t *pgd, unsigned long address)
 {
 	pmd_t *new;
 
-	/* "fast" allocation can happen without dropping the lock.. */
-	new = pmd_alloc_one_fast(mm, address);
-	if (!new) {
-		spin_unlock(&mm->page_table_lock);
-		new = pmd_alloc_one(mm, address);
-		spin_lock(&mm->page_table_lock);
-		if (!new)
-			return NULL;
+	spin_unlock(&mm->page_table_lock);
+	new = pmd_alloc_one(mm, address);
+	spin_lock(&mm->page_table_lock);
+	if (!new)
+		return NULL;
 
-		/*
-		 * Because we dropped the lock, we should re-check the
-		 * entry, as somebody else could have populated it..
-		 */
-		if (!pgd_none(*pgd)) {
-			pmd_free(new);
-			goto out;
-		}
+	/*
+	 * Because we dropped the lock, we should re-check the
+	 * entry, as somebody else could have populated it..
+	 */
+	if (pgd_present(*pgd)) {
+		pmd_free(new);
+		goto out;
 	}
 	pgd_populate(mm, pgd, new);
 out:
 	return pmd_offset(pgd, address);
-}
-
-/*
- * Allocate the page table directory.
- *
- * We've already handled the fast-path in-line, and we own the
- * page table lock.
- */
-pte_t *pte_alloc(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
-{
-	if (pmd_none(*pmd)) {
-		pte_t *new;
-
-		/* "fast" allocation can happen without dropping the lock.. */
-		new = pte_alloc_one_fast(mm, address);
-		if (!new) {
-			spin_unlock(&mm->page_table_lock);
-			new = pte_alloc_one(mm, address);
-			spin_lock(&mm->page_table_lock);
-			if (!new)
-				return NULL;
-
-			/*
-			 * Because we dropped the lock, we should re-check the
-			 * entry, as somebody else could have populated it..
-			 */
-			if (!pmd_none(*pmd)) {
-				pte_free(new);
-				goto out;
-			}
-		}
-		pmd_populate(mm, pmd, new);
-	}
-out:
-	return pte_offset(pmd, address);
 }
 
 int make_pages_present(unsigned long addr, unsigned long end)
@@ -1439,4 +1475,29 @@ int make_pages_present(unsigned long addr, unsigned long end)
 	ret = get_user_pages(current, current->mm, addr,
 			len, write, 0, NULL, NULL);
 	return ret == len ? 0 : -1;
+}
+
+/* 
+ * Map a vmalloc()-space virtual address to the physical page.
+ */
+struct page * vmalloc_to_page(unsigned long addr)
+{
+	struct page *page = NULL;
+	pgd_t *pgd = pgd_offset_k(addr);
+	pmd_t *pmd;
+	pte_t *ptep, pte;
+  
+	if (!pgd_none(*pgd)) {
+		pmd = pmd_offset(pgd, addr);
+		if (!pmd_none(*pmd)) {
+			preempt_disable();
+			ptep = pte_offset_map(pmd, addr);
+			pte = *ptep;
+			if (pte_present(pte))
+				page = pte_page(pte);
+			pte_unmap(ptep);
+			preempt_enable();
+		}
+	}
+	return page;
 }

@@ -53,6 +53,7 @@
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #define SNDRV_GET_ID
 #include <sound/initval.h>
@@ -89,13 +90,13 @@ MODULE_PARM_DESC(snd_id, "ID string for MotuMTPAV MIDI.");
 MODULE_PARM_SYNTAX(snd_id, SNDRV_ID_DESC);
 MODULE_PARM(snd_port, "l");
 MODULE_PARM_DESC(snd_port, "Parallel port # for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(snd_port, "allows:{{0x378},{0x278}},dialog:list");
+MODULE_PARM_SYNTAX(snd_port, SNDRV_ENABLED ",allows:{{0x378},{0x278}},dialog:list");
 MODULE_PARM(snd_irq, "i");
 MODULE_PARM_DESC(snd_irq, "Parallel IRQ # for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(snd_irq,  "allows:{{7},{5}},dialog:list");
+MODULE_PARM_SYNTAX(snd_irq,  SNDRV_ENABLED ",allows:{{7},{5}},dialog:list");
 MODULE_PARM(snd_hwports, "i");
 MODULE_PARM_DESC(snd_hwports, "Hardware ports # for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(snd_hwports, "allows:{{1,8}},dialog:list");
+MODULE_PARM_SYNTAX(snd_hwports, SNDRV_ENABLED ",allows:{{1,8}},dialog:list");
 
 /*
  *      defines
@@ -712,7 +713,7 @@ static void free_mtpav(mtpav_t * crd)
 		free_irq(crd->irq, (void *)crd);
 	if (crd->res_port) {
 		release_resource(crd->res_port);
-		kfree(crd->res_port);
+		kfree_nocheck(crd->res_port);
 	}
 	if (crd != NULL)
 		kfree(crd);

@@ -4,7 +4,9 @@
  *
  * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.52 2001/05/25
+ * Portions Copyright (c) 2001 Matrox Graphics Inc.
+ *
+ * Version: 1.62 2001/11/29
  *
  */
 
@@ -402,43 +404,35 @@ static int matroxfb_dh_set_var(struct fb_var_screeninfo* var, int con,
 		info->changevar(con);
 	if (con == m2info->currcon) {
 		struct my_timming mt;
-		struct matrox_hw_state* hw;
-		struct matrox_hw_state* ohw;
 		unsigned int pos;
 
 		matroxfb_var2my(var, &mt);
 		/* CRTC2 delay */
 		mt.delay = 34;
 
-		hw = ACCESS_FBINFO(newhw);
-		ohw = ACCESS_FBINFO(currenthw);
-
-		/* copy last setting... */
-		memcpy(hw, ohw, sizeof(*hw));
-
 		pos = (var->yoffset * var->xres_virtual + var->xoffset) * var->bits_per_pixel >> 3;
 		pos += m2info->video.offbase;
-		DAC1064_global_init(PMINFO hw);
+		DAC1064_global_init(PMINFO2);
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
 			if (ACCESS_FBINFO(primout))
-				ACCESS_FBINFO(primout)->compute(MINFO, &mt, hw);
+				ACCESS_FBINFO(primout)->compute(MINFO, &mt);
 		}
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 			down_read(&ACCESS_FBINFO(altout.lock));
 			if (ACCESS_FBINFO(altout.output))
-				ACCESS_FBINFO(altout.output)->compute(ACCESS_FBINFO(altout.device), &mt, hw);
+				ACCESS_FBINFO(altout.output)->compute(ACCESS_FBINFO(altout.device), &mt);
 			up_read(&ACCESS_FBINFO(altout.lock));
 		}
 		matroxfb_dh_restore(m2info, &mt, p, mode, pos);
-		DAC1064_global_restore(PMINFO hw);
+		DAC1064_global_restore(PMINFO2);
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
 			if (ACCESS_FBINFO(primout))
-				ACCESS_FBINFO(primout)->program(MINFO, hw);
+				ACCESS_FBINFO(primout)->program(MINFO);
 		}
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_SECONDARY) {
 			down_read(&ACCESS_FBINFO(altout.lock));
 			if (ACCESS_FBINFO(altout.output))
-				ACCESS_FBINFO(altout.output)->program(ACCESS_FBINFO(altout.device), hw);
+				ACCESS_FBINFO(altout.output)->program(ACCESS_FBINFO(altout.device));
 			up_read(&ACCESS_FBINFO(altout.lock));
 		}
 		if (ACCESS_FBINFO(output.sh) & MATROXFB_OUTPUT_CONN_PRIMARY) {
@@ -693,7 +687,7 @@ static int matroxfb_dh_regit(CPMINFO struct matroxfb_dh_fb_info* m2info) {
 
 	strcpy(m2info->fbcon.modename, "MATROX CRTC2");
 	m2info->fbcon.changevar = NULL;
-	m2info->fbcon.node = -1;
+	m2info->fbcon.node = NODEV;
 	m2info->fbcon.fbops = &matroxfb_dh_ops;
 	m2info->fbcon.disp = d;
 	m2info->fbcon.switch_con = &matroxfb_dh_switch;

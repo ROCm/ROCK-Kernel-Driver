@@ -28,8 +28,10 @@
 #error "Enable the OSS soundcore multiplexer (CONFIG_SOUND) in the kernel."
 #endif
 
-#include <sound/core.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/time.h>
+#include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/info.h>
 #include <linux/sound.h>

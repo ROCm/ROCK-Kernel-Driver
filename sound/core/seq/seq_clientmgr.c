@@ -24,6 +24,7 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <linux/kmod.h>
@@ -540,6 +541,8 @@ static int snd_seq_deliver_single_event(client_t *client,
 	int result = -ENOENT;
 	int direct, quoted = 0;
 
+	direct = snd_seq_ev_is_direct(event);
+
 	dest = get_event_dest_client(event, filter);
 	if (dest == NULL)
 		goto __skip;
@@ -553,8 +556,6 @@ static int snd_seq_deliver_single_event(client_t *client,
 		goto __skip;
 	}
 		
-	direct = snd_seq_ev_is_direct(event);
-
 	/* expand the quoted event */
 	if (event->type == SNDRV_SEQ_EVENT_KERNEL_QUOTE) {
 		quoted = 1;
@@ -587,7 +588,7 @@ static int snd_seq_deliver_single_event(client_t *client,
 	if (dest)
 		snd_seq_client_unlock(dest);
 
-	if (result < 0) {
+	if (result < 0 && !direct) {
 		if (quoted) {
 			/* return directly to the original source */
 			dest = snd_seq_client_use_ptr(event->source.client);

@@ -393,11 +393,10 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	return res;
 }
 		
-static inline void statm_pte_range(pmd_t * pmd, unsigned long address, unsigned long size,
-	int * pages, int * shared, int * dirty, int * total)
+static inline void statm_pte_range(pmd_t * pmd, unsigned long address, unsigned long size, int * pages, int * shared, int * dirty, int * total)
 {
-	pte_t * pte;
-	unsigned long end;
+	unsigned long end, pmd_end;
+	pte_t *pte;
 
 	if (pmd_none(*pmd))
 		return;
@@ -406,11 +405,12 @@ static inline void statm_pte_range(pmd_t * pmd, unsigned long address, unsigned 
 		pmd_clear(pmd);
 		return;
 	}
-	pte = pte_offset(pmd, address);
-	address &= ~PMD_MASK;
+	preempt_disable();
+	pte = pte_offset_map(pmd, address);
 	end = address + size;
-	if (end > PMD_SIZE)
-		end = PMD_SIZE;
+	pmd_end = (address + PMD_SIZE) & PMD_MASK;
+	if (end > pmd_end)
+		end = pmd_end;
 	do {
 		pte_t page = *pte;
 		struct page *ptpage;
@@ -431,6 +431,8 @@ static inline void statm_pte_range(pmd_t * pmd, unsigned long address, unsigned 
 		if (page_count(pte_page(page)) > 1)
 			++*shared;
 	} while (address < end);
+	pte_unmap(pte - 1);
+	preempt_enable();
 }
 
 static inline void statm_pmd_range(pgd_t * pgd, unsigned long address, unsigned long size,

@@ -97,6 +97,8 @@ static inline void wait_on_page(struct page * page)
 		___wait_on_page(page);
 }
 
+extern void wake_up_page(struct page *);
+
 extern struct page * grab_cache_page (struct address_space *, unsigned long);
 extern struct page * grab_cache_page_nowait (struct address_space *, unsigned long);
 

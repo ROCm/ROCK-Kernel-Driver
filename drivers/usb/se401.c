@@ -40,6 +40,7 @@ static const char version[] = "0.23";
 #include <asm/io.h>
 #include <asm/semaphore.h>
 #include <linux/wrapper.h>
+#include <linux/mm.h>
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(2, 3, 0)
 #define virt_to_page(arg)	MAP_NR(arg)
@@ -80,43 +81,7 @@ static struct usb_driver se401_driver;
  *
  * Memory management
  *
- * This is a shameless copy from the USB-cpia driver (linux kernel
- * version 2.3.29 or so, I have no idea what this code actually does ;).
- * Actually it seems to be a copy of a shameless copy of the bttv-driver.
- * Or that is a copy of a shameless copy of ... (To the powers: is there
- * no generic kernel-function to do this sort of stuff?)
- *
- * Yes, it was a shameless copy from the bttv-driver. IIRC, Alan says
- * there will be one, but apparentely not yet -jerdfelt
- *
- * So I copied it again for the ov511 driver -claudio
- *
- * Same for the se401 driver -Jeroen
  **********************************************************************/
-
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-static inline unsigned long uvirt_to_kva(pgd_t *pgd, unsigned long adr)
-{
-	unsigned long ret = 0UL;
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-
-	if (!pgd_none(*pgd)) {
-		pmd = pmd_offset(pgd, adr);
-		if (!pmd_none(*pmd)) {
-			ptep = pte_offset(pmd, adr);
-			pte = *ptep;
-			if (pte_present(pte)) {
-				ret = (unsigned long) page_address(pte_page(pte));
-				ret |= (adr & (PAGE_SIZE - 1));
-			}
-		}
-	}
-
-	return ret;
-}
 
 /* Here we want the physical address of the memory.
  * This is used when initializing the contents of the
@@ -127,7 +92,7 @@ static inline unsigned long kvirt_to_pa(unsigned long adr)
 	unsigned long va, kva, ret;
 
 	va = VMALLOC_VMADDR(adr);
-	kva = uvirt_to_kva(pgd_offset_k(va), va);
+	kva = page_address(vmalloc_to_page(va));
 	ret = __pa(kva);
 	return ret;
 }

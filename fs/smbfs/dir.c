@@ -82,8 +82,7 @@ smb_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		filp->f_pos = 1;
 		/* fallthrough */
 	case 1:
-		if (filldir(dirent, "..", 2, 1,
-			    dentry->d_parent->d_inode->i_ino, DT_DIR) < 0)
+		if (filldir(dirent, "..", 2, 1, parent_ino(dentry), DT_DIR) < 0)
 			goto out;
 		filp->f_pos = 2;
 	}

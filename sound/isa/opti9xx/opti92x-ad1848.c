@@ -22,11 +22,18 @@
     Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307 USA
 */
 
+
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#ifndef LINUX_ISAPNP_H
+#include <linux/isapnp.h>
+#define isapnp_card pci_bus
+#define isapnp_dev pci_dev
+#endif
 #include <sound/core.h>
 #ifdef CS4231
 #include <sound/cs4231.h>
@@ -1021,7 +1028,7 @@ static int snd_opti93x_playback_prepare(snd_pcm_substream_t * substream)
 		OPTi93X_PLAYBACK_ENABLE | OPTi93X_PLAYBACK_PIO,
 		~(OPTi93X_PLAYBACK_ENABLE | OPTi93X_PLAYBACK_PIO));
 
-	snd_dma_program(chip->dma1, runtime->dma_area, size,
+	snd_dma_program(chip->dma1, runtime->dma_addr, size,
 		DMA_MODE_WRITE | DMA_AUTOINIT);
 
 	format = snd_opti93x_get_freq(runtime->rate);
@@ -1054,7 +1061,7 @@ static int snd_opti93x_capture_prepare(snd_pcm_substream_t *substream)
 		OPTi93X_CAPTURE_ENABLE | OPTi93X_CAPTURE_PIO,
 		(unsigned char)~(OPTi93X_CAPTURE_ENABLE | OPTi93X_CAPTURE_PIO));
 
-	snd_dma_program(chip->dma2, runtime->dma_area, size,
+	snd_dma_program(chip->dma2, runtime->dma_addr, size,
 		DMA_MODE_READ | DMA_AUTOINIT);
 
 	format = snd_opti93x_get_freq(runtime->rate);
@@ -1243,7 +1250,7 @@ static int snd_opti93x_free(opti93x_t *chip)
 {
 	if (chip->res_port) {
 		release_resource(chip->res_port);
-		kfree(chip->res_port);
+		kfree_nocheck(chip->res_port);
 	}
 	if (chip->dma1 >= 0) {
 		disable_dma(chip->dma1);
@@ -1377,7 +1384,7 @@ int snd_opti93x_pcm(opti93x_t *codec, int device, snd_pcm_t **rpcm)
 
 	strcpy(pcm->name, snd_opti93x_chip_id(codec));
 
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, codec->dma1 > 3 || codec->dma2 > 3 ? 128*1024 : 64*1024, GFP_KERNEL|GFP_DMA);
+	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, codec->dma1 > 3 || codec->dma2 > 3 ? 128*1024 : 64*1024);
 
 	codec->pcm = pcm;
 	if (rpcm)
@@ -1889,7 +1896,7 @@ static void snd_card_opti9xx_free(snd_card_t *card)
 #endif	/* __ISAPNP__ */
 		if (chip->res_mc_base) {
 			release_resource(chip->res_mc_base);
-			kfree(chip->res_mc_base);
+			kfree_nocheck(chip->res_mc_base);
 		}
 	}
 }

@@ -29,6 +29,7 @@
 #include <linux/delay.h>
 #include <linux/interrupt.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -1256,11 +1257,11 @@ snd_nm256_peek_for_sig(nm256_t *chip)
  * APM event handler, so the card is properly reinitialized after a power
  * event.
  */
-static void nm256_suspend(nm256_t *chip, int can_schedule)
+static void nm256_suspend(nm256_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card, can_schedule);
+	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		goto __skip;
 
@@ -1271,11 +1272,11 @@ static void nm256_suspend(nm256_t *chip, int can_schedule)
       	snd_power_unlock(card);
 }
 
-static void nm256_resume(nm256_t *chip, int can_schedule)
+static void nm256_resume(nm256_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card, can_schedule);
+	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
 		goto __skip;
 
@@ -1295,25 +1296,25 @@ static void nm256_resume(nm256_t *chip, int can_schedule)
 static int snd_nm256_suspend(struct pci_dev *dev, u32 state)
 {
 	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(dev), return -ENXIO);
-	nm256_suspend(chip, 0);
+	nm256_suspend(chip);
 	return 0;
 }
 static int snd_nm256_resume(struct pci_dev *dev)
 {
 	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(dev), return -ENXIO);
-	nm256_resume(chip, 0);
+	nm256_resume(chip);
 	return 0;
 }
 #else
 static void snd_nm256_suspend(struct pci_dev *dev)
 {
 	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(dev), return);
-	nm256_suspend(chip, 0);
+	nm256_suspend(chip);
 }
 static void snd_nm256_resume(struct pci_dev *dev)
 {
 	nm256_t *chip = snd_magic_cast(nm256_t, pci_get_drvdata(dev), return);
-	nm256_resume(chip, 0);
+	nm256_resume(chip);
 }
 #endif
 
@@ -1325,11 +1326,11 @@ static int snd_nm256_set_power_state(snd_card_t *card, unsigned int power_state)
 	case SNDRV_CTL_POWER_D0:
 	case SNDRV_CTL_POWER_D1:
 	case SNDRV_CTL_POWER_D2:
-		nm256_resume(chip, 1);
+		nm256_resume(chip);
 		break;
 	case SNDRV_CTL_POWER_D3hot:
 	case SNDRV_CTL_POWER_D3cold:
-		nm256_suspend(chip, 1);
+		nm256_suspend(chip);
 		break;
 	default:
 		return -EINVAL;
@@ -1354,11 +1355,11 @@ static int snd_nm256_free(nm256_t *chip)
 		iounmap((void *) chip->buffer);
 	if (chip->res_cport) {
 		release_resource(chip->res_cport);
-		kfree(chip->res_cport);
+		kfree_nocheck(chip->res_cport);
 	}
 	if (chip->res_buffer) {
 		release_resource(chip->res_buffer);
-		kfree(chip->res_buffer);
+		kfree_nocheck(chip->res_buffer);
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void*)chip);

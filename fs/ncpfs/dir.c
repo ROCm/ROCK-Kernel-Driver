@@ -411,8 +411,7 @@ static int ncp_readdir(struct file *filp, void *dirent, filldir_t filldir)
 		filp->f_pos = 1;
 	}
 	if (filp->f_pos == 1) {
-		if (filldir(dirent, "..", 2, 1,
-				dentry->d_parent->d_inode->i_ino, DT_DIR))
+		if (filldir(dirent, "..", 2, 1, parent_ino(dentry), DT_DIR))
 			goto out;
 		filp->f_pos = 2;
 	}

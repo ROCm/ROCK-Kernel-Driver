@@ -21,6 +21,8 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/minors.h>
 #include <sound/pcm.h>
@@ -376,6 +378,9 @@ static void snd_pcm_substream_proc_status_read(snd_info_entry_t *entry, snd_info
 	snd_iprintf(buffer, "delay       : %ld\n", status.delay);
 	snd_iprintf(buffer, "avail       : %ld\n", status.avail);
 	snd_iprintf(buffer, "avail_max   : %ld\n", status.avail_max);
+	snd_iprintf(buffer, "-----\n");
+	snd_iprintf(buffer, "hw_ptr      : %ld\n", runtime->status->hw_ptr);
+	snd_iprintf(buffer, "appl_ptr    : %ld\n", runtime->control->appl_ptr);
 }
 
 static int snd_pcm_stream_proc_init(snd_pcm_str_t *pstr)
@@ -565,7 +570,7 @@ static int snd_pcm_new_stream(snd_pcm_t *pcm,
 			return err;
 		}
 		substream->dma_type = SNDRV_PCM_DMA_TYPE_ISA;
-		substream->dma_private = (void *)(unsigned long)GFP_KERNEL;
+		substream->dma_private = NULL;
 		spin_lock_init(&substream->timer_lock);
 		prev = substream;
 	}

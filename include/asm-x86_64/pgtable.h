@@ -289,7 +289,6 @@ extern void __handle_bad_pmd_kernel(pmd_t * pmd);
  * Permanent address of a page. Obviously must never be
  * called on a highmem page.
  */
-#define page_address(page) ((page)->virtual)
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))	/* FIXME: is this
 						   right? */
 #define pte_page(x) (mem_map+((unsigned long)((pte_val(x) >> PAGE_SHIFT))))

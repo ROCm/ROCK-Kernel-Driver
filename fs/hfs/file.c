@@ -293,7 +293,6 @@ static inline int xlate_from_user(char *data, const char *buf, int count)
 hfs_s32 hfs_do_read(struct inode *inode, struct hfs_fork * fork, hfs_u32 pos,
 		    char * buf, hfs_u32 count)
 {
-	kdev_t dev = inode->i_dev;
 	hfs_s32 size, chars, offset, block, blocks, read = 0;
 	int bhrequest, uptodate;
 	int convert = HFS_I(inode)->convert;

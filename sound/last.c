@@ -23,8 +23,6 @@
 #include <sound/driver.h>
 #include <sound/core.h>
 
-#ifndef MODULE
-
 static int __init alsa_sound_last_init(void)
 {
 	int idx, ok = 0;
@@ -40,6 +38,4 @@ static int __init alsa_sound_last_init(void)
 	return 0;
 }
 
-module_init(alsa_sound_last_init)
-
-#endif /* MODULE */
+__initcall(alsa_sound_last_init);

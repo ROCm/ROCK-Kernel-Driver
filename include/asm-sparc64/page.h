@@ -30,6 +30,9 @@ extern void do_BUG(const char *file, int line);
 
 #define PAGE_BUG(page)	BUG()
 
+/* Sparc64 is slow at multiplication, we prefer to use some extra space. */
+#define WANT_PAGE_VIRTUAL 1
+
 extern void _clear_page(void *page);
 #define clear_page(X)	_clear_page((void *)(X))
 extern void clear_user_page(void *page, unsigned long vaddr);

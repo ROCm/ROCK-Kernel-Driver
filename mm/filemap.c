@@ -740,6 +740,67 @@ static int read_cluster_nonblocking(struct file * file, unsigned long offset,
 	return 0;
 }
 
+/*
+ * Knuth recommends primes in approximately golden ratio to the maximum
+ * integer representable by a machine word for multiplicative hashing.
+ * Chuck Lever verified the effectiveness of this technique:
+ * http://www.citi.umich.edu/techreports/reports/citi-tr-00-1.pdf
+ *
+ * These primes are chosen to be bit-sparse, that is operations on
+ * them can use shifts and additions instead of multiplications for
+ * machines where multiplications are slow.
+ */
+#if BITS_PER_LONG == 32
+/* 2^31 + 2^29 - 2^25 + 2^22 - 2^19 - 2^16 + 1 */
+#define GOLDEN_RATIO_PRIME 0x9e370001UL
+#elif BITS_PER_LONG == 64
+/*  2^63 + 2^61 - 2^57 + 2^54 - 2^51 - 2^18 + 1 */
+#define GOLDEN_RATIO_PRIME 0x9e37fffffffc0001UL
+#else
+#error Define GOLDEN_RATIO_PRIME for your wordsize.
+#endif
+
+/*
+ * In order to wait for pages to become available there must be
+ * waitqueues associated with pages. By using a hash table of
+ * waitqueues where the bucket discipline is to maintain all
+ * waiters on the same queue and wake all when any of the pages
+ * become available, and for the woken contexts to check to be
+ * sure the appropriate page became available, this saves space
+ * at a cost of "thundering herd" phenomena during rare hash
+ * collisions.
+ */
+static inline wait_queue_head_t *page_waitqueue(struct page *page)
+{
+	const zone_t *zone = page_zone(page);
+	wait_queue_head_t *wait = zone->wait_table;
+	unsigned long hash = (unsigned long)page;
+
+#if BITS_PER_LONG == 64
+	/*  Sigh, gcc can't optimise this alone like it does for 32 bits. */
+	unsigned long n = hash;
+	n <<= 18;
+	hash -= n;
+	n <<= 33;
+	hash -= n;
+	n <<= 3;
+	hash += n;
+	n <<= 3;
+	hash -= n;
+	n <<= 4;
+	hash += n;
+	n <<= 2;
+	hash += n;
+#else
+	/* On some cpus multiply is faster, on others gcc will do shifts */
+	hash *= GOLDEN_RATIO_PRIME;
+#endif
+
+	hash >>= zone->wait_table_shift;
+
+	return &wait[hash];
+}
+
 /* 
  * Wait for a page to get unlocked.
  *
@@ -749,10 +810,11 @@ static int read_cluster_nonblocking(struct file * file, unsigned long offset,
  */
 void ___wait_on_page(struct page *page)
 {
+	wait_queue_head_t *waitqueue = page_waitqueue(page);
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
 
-	add_wait_queue(&page->wait, &wait);
+	add_wait_queue(waitqueue, &wait);
 	do {
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 		if (!PageLocked(page))
@@ -760,19 +822,23 @@ void ___wait_on_page(struct page *page)
 		sync_page(page);
 		schedule();
 	} while (PageLocked(page));
-	tsk->state = TASK_RUNNING;
-	remove_wait_queue(&page->wait, &wait);
+	__set_task_state(tsk, TASK_RUNNING);
+	remove_wait_queue(waitqueue, &wait);
 }
 
+/*
+ * Unlock the page and wake up sleepers in ___wait_on_page.
+ */
 void unlock_page(struct page *page)
 {
+	wait_queue_head_t *waitqueue = page_waitqueue(page);
 	clear_bit(PG_launder, &(page)->flags);
 	smp_mb__before_clear_bit();
 	if (!test_and_clear_bit(PG_locked, &(page)->flags))
 		BUG();
 	smp_mb__after_clear_bit(); 
-	if (waitqueue_active(&(page)->wait))
-	wake_up(&(page)->wait);
+	if (waitqueue_active(waitqueue))
+		wake_up_all(waitqueue);
 }
 
 /*
@@ -781,10 +847,11 @@ void unlock_page(struct page *page)
  */
 static void __lock_page(struct page *page)
 {
+	wait_queue_head_t *waitqueue = page_waitqueue(page);
 	struct task_struct *tsk = current;
 	DECLARE_WAITQUEUE(wait, tsk);
 
-	add_wait_queue_exclusive(&page->wait, &wait);
+	add_wait_queue_exclusive(waitqueue, &wait);
 	for (;;) {
 		set_task_state(tsk, TASK_UNINTERRUPTIBLE);
 		if (PageLocked(page)) {
@@ -794,10 +861,15 @@ static void __lock_page(struct page *page)
 		if (!TryLockPage(page))
 			break;
 	}
-	tsk->state = TASK_RUNNING;
-	remove_wait_queue(&page->wait, &wait);
+	__set_task_state(tsk, TASK_RUNNING);
+	remove_wait_queue(waitqueue, &wait);
 }
-	
+
+void wake_up_page(struct page *page)
+{
+	wake_up(page_waitqueue(page));
+}
+EXPORT_SYMBOL(wake_up_page);
 
 /*
  * Get an exclusive lock on the page, optimistically
@@ -1974,7 +2046,7 @@ page_not_uptodate:
 /* Called with mm->page_table_lock held to protect against other
  * threads/the swapper from ripping pte's out from under us.
  */
-static inline int filemap_sync_pte(pte_t * ptep, struct vm_area_struct *vma,
+static inline int filemap_sync_pte(pte_t *ptep, pmd_t *pmdp, struct vm_area_struct *vma,
 	unsigned long address, unsigned int flags)
 {
 	pte_t pte = *ptep;
@@ -1990,11 +2062,10 @@ static inline int filemap_sync_pte(pte_t * ptep, struct vm_area_struct *vma,
 }
 
 static inline int filemap_sync_pte_range(pmd_t * pmd,
-	unsigned long address, unsigned long size, 
-	struct vm_area_struct *vma, unsigned long offset, unsigned int flags)
+	unsigned long address, unsigned long end, 
+	struct vm_area_struct *vma, unsigned int flags)
 {
-	pte_t * pte;
-	unsigned long end;
+	pte_t *pte;
 	int error;
 
 	if (pmd_none(*pmd))
@@ -2004,27 +2075,26 @@ static inline int filemap_sync_pte_range(pmd_t * pmd,
 		pmd_clear(pmd);
 		return 0;
 	}
-	pte = pte_offset(pmd, address);
-	offset += address & PMD_MASK;
-	address &= ~PMD_MASK;
-	end = address + size;
-	if (end > PMD_SIZE)
-		end = PMD_SIZE;
+	pte = pte_offset_map(pmd, address);
+	if ((address & PMD_MASK) != (end & PMD_MASK))
+		end = (address & PMD_MASK) + PMD_SIZE;
 	error = 0;
 	do {
-		error |= filemap_sync_pte(pte, vma, address + offset, flags);
+		error |= filemap_sync_pte(pte, pmd, vma, address, flags);
 		address += PAGE_SIZE;
 		pte++;
 	} while (address && (address < end));
+
+	pte_unmap(pte - 1);
+
 	return error;
 }
 
 static inline int filemap_sync_pmd_range(pgd_t * pgd,
-	unsigned long address, unsigned long size, 
+	unsigned long address, unsigned long end, 
 	struct vm_area_struct *vma, unsigned int flags)
 {
 	pmd_t * pmd;
-	unsigned long offset, end;
 	int error;
 
 	if (pgd_none(*pgd))
@@ -2035,14 +2105,11 @@ static inline int filemap_sync_pmd_range(pgd_t * pgd,
 		return 0;
 	}
 	pmd = pmd_offset(pgd, address);
-	offset = address & PGDIR_MASK;
-	address &= ~PGDIR_MASK;
-	end = address + size;
-	if (end > PGDIR_SIZE)
-		end = PGDIR_SIZE;
+	if ((address & PGDIR_MASK) != (end & PGDIR_MASK))
+		end = (address & PGDIR_MASK) + PGDIR_SIZE;
 	error = 0;
 	do {
-		error |= filemap_sync_pte_range(pmd, address, end - address, vma, offset, flags);
+		error |= filemap_sync_pte_range(pmd, address, end, vma, flags);
 		address = (address + PMD_SIZE) & PMD_MASK;
 		pmd++;
 	} while (address && (address < end));
@@ -2062,11 +2129,11 @@ int filemap_sync(struct vm_area_struct * vma, unsigned long address,
 	spin_lock(&vma->vm_mm->page_table_lock);
 
 	dir = pgd_offset(vma->vm_mm, address);
-	flush_cache_range(vma, end - size, end);
+	flush_cache_range(vma, address, end);
 	if (address >= end)
 		BUG();
 	do {
-		error |= filemap_sync_pmd_range(dir, address, end - address, vma, flags);
+		error |= filemap_sync_pmd_range(dir, address, end, vma, flags);
 		address = (address + PGDIR_SIZE) & PGDIR_MASK;
 		dir++;
 	} while (address && (address < end));

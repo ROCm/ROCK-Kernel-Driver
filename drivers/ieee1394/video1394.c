@@ -173,36 +173,11 @@ static struct hpsb_highlevel *hl_handle = NULL;
  * defined way to get at the kernel page tables.
  */
 
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-static inline unsigned long uvirt_to_kva(pgd_t *pgd, unsigned long adr)
-{
-        unsigned long ret = 0UL;
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-  
-	if (!pgd_none(*pgd)) {
-                pmd = pmd_offset(pgd, adr);
-                if (!pmd_none(*pmd)) {
-                        ptep = pte_offset(pmd, adr);
-                        pte = *ptep;
-                        if(pte_present(pte)) {
-				ret = (unsigned long) 
-					page_address(pte_page(pte));
-                                ret |= (adr & (PAGE_SIZE - 1));
-			}
-                }
-        }
-        MDEBUG(printk("uv2kva(%lx-->%lx)", adr, ret));
-	return ret;
-}
-
 static inline unsigned long uvirt_to_bus(unsigned long adr) 
 {
         unsigned long kva, ret;
 
-        kva = uvirt_to_kva(pgd_offset(current->mm, adr), adr);
+        kva = page_address(vmalloc_to_page(adr));
 	ret = virt_to_bus((void *)kva);
         MDEBUG(printk("uv2b(%lx-->%lx)", adr, ret));
         return ret;
@@ -213,7 +188,7 @@ static inline unsigned long kvirt_to_bus(unsigned long adr)
         unsigned long va, kva, ret;
 
         va = VMALLOC_VMADDR(adr);
-        kva = uvirt_to_kva(pgd_offset_k(va), va);
+	kva = page_address(vmalloc_to_page(va));
 	ret = virt_to_bus((void *)kva);
         MDEBUG(printk("kv2b(%lx-->%lx)", adr, ret));
         return ret;
@@ -228,7 +203,7 @@ static inline unsigned long kvirt_to_pa(unsigned long adr)
         unsigned long va, kva, ret;
 
         va = VMALLOC_VMADDR(adr);
-        kva = uvirt_to_kva(pgd_offset_k(va), va);
+	kva = page_address(vmalloc_to_page(va));
 	ret = __pa(kva);
         MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
         return ret;

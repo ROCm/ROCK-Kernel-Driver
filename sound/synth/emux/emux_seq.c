@@ -21,6 +21,7 @@
 
 #define __NO_VERSION__
 #include "emux_voice.h"
+#include <linux/slab.h>
 
 
 /* Prototypes for static functions */

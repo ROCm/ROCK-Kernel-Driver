@@ -27,6 +27,7 @@
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -835,8 +836,8 @@ snd_rme96_setinputtype(rme96_t *rme96,
 			RME96_WCR_INP_1;
 		break;
 	case RME96_INPUT_XLR:
-		if (rme96->pci->device != PCI_DEVICE_ID_DIGI96_8_PAD_OR_PST ||
-		    rme96->pci->device != PCI_DEVICE_ID_DIGI96_8_PRO ||
+		if ((rme96->pci->device != PCI_DEVICE_ID_DIGI96_8_PAD_OR_PST &&
+		     rme96->pci->device != PCI_DEVICE_ID_DIGI96_8_PRO) ||
 		    (rme96->pci->device == PCI_DEVICE_ID_DIGI96_8_PAD_OR_PST &&
 		     rme96->rev > 4))
 		{
@@ -1561,7 +1562,7 @@ snd_rme96_free(void *private_data)
 	}
 	if (rme96->res_port != NULL) {
 		release_resource(rme96->res_port);
-		kfree(rme96->res_port);
+		kfree_nocheck(rme96->res_port);
 		rme96->res_port = NULL;
 	}
 }

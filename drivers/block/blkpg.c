@@ -205,7 +205,7 @@ int blk_ioctl(kdev_t dev, unsigned int cmd, unsigned long arg)
 	request_queue_t *q;
 	struct gendisk *g;
 	u64 ullval = 0;
-	int intval, *iptr;
+	int intval;
 	unsigned short usval;
 
 	if (kdev_none(dev))

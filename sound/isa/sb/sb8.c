@@ -21,6 +21,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/sb.h>
 #include <sound/opl3.h>
@@ -89,7 +90,7 @@ static void snd_sb8_free(snd_card_t *card)
 		return;
 	if (acard->fm_res) {
 		release_resource(acard->fm_res);
-		kfree(acard->fm_res);
+		kfree_nocheck(acard->fm_res);
 	}
 }
 

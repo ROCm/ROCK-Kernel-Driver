@@ -23,6 +23,7 @@
 #include <asm/dma.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/ad1816a.h>
 
@@ -240,7 +241,7 @@ static int snd_ad1816a_playback_prepare(snd_pcm_substream_t *substream)
 	snd_ad1816a_out_mask(chip, AD1816A_PLAYBACK_CONFIG,
 		AD1816A_PLAYBACK_ENABLE | AD1816A_PLAYBACK_PIO, 0x00);
 
-	snd_dma_program(chip->dma1, runtime->dma_area, size,
+	snd_dma_program(chip->dma1, runtime->dma_addr, size,
 			DMA_MODE_WRITE | DMA_AUTOINIT);
 
 	snd_ad1816a_write(chip, AD1816A_PLAYBACK_SAMPLE_RATE, runtime->rate);
@@ -269,7 +270,7 @@ static int snd_ad1816a_capture_prepare(snd_pcm_substream_t *substream)
 	snd_ad1816a_out_mask(chip, AD1816A_CAPTURE_CONFIG,
 		AD1816A_CAPTURE_ENABLE | AD1816A_CAPTURE_PIO, 0x00);
 
-	snd_dma_program(chip->dma2, runtime->dma_area, size,
+	snd_dma_program(chip->dma2, runtime->dma_addr, size,
 			DMA_MODE_READ | DMA_AUTOINIT);
 
 	snd_ad1816a_write(chip, AD1816A_CAPTURE_SAMPLE_RATE, runtime->rate);
@@ -446,6 +447,7 @@ static int snd_ad1816a_playback_open(snd_pcm_substream_t *substream)
 	runtime->hw = snd_ad1816a_playback;
 	snd_pcm_limit_isa_dma_size(chip->dma1, &runtime->hw.buffer_bytes_max);
 	snd_pcm_limit_isa_dma_size(chip->dma1, &runtime->hw.period_bytes_max);
+	chip->playback_substream = substream;
 	return 0;
 }
 
@@ -461,6 +463,7 @@ static int snd_ad1816a_capture_open(snd_pcm_substream_t *substream)
 	runtime->hw = snd_ad1816a_capture;
 	snd_pcm_limit_isa_dma_size(chip->dma2, &runtime->hw.buffer_bytes_max);
 	snd_pcm_limit_isa_dma_size(chip->dma2, &runtime->hw.period_bytes_max);
+	chip->capture_substream = substream;
 	return 0;
 }
 
@@ -531,7 +534,7 @@ static int snd_ad1816a_free(ad1816a_t *chip)
 {
 	if (chip->res_port) {
 		release_resource(chip->res_port);
-		kfree(chip->res_port);
+		kfree_nocheck(chip->res_port);
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *) chip);
@@ -673,7 +676,7 @@ int snd_ad1816a_pcm(ad1816a_t *chip, int device, snd_pcm_t **rpcm)
 	strcpy(pcm->name, snd_ad1816a_chip_id(chip));
 	snd_ad1816a_init(chip);
 
-	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024, GFP_KERNEL|GFP_DMA);
+	snd_pcm_lib_preallocate_isa_pages_for_all(pcm, 64*1024, chip->dma1 > 3 || chip->dma2 > 3 ? 128*1024 : 64*1024);
 
 	chip->pcm = pcm;
 	if (rpcm)
@@ -892,26 +895,26 @@ static int snd_ad1816a_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_
 
 static snd_kcontrol_new_t snd_ad1816a_controls[] = {
 AD1816A_DOUBLE("Master Playback Switch", AD1816A_MASTER_ATT, 15, 7, 1, 1),
-AD1816A_DOUBLE("Master Playback Volume", AD1816A_MASTER_ATT, 8, 0, 31, 0),
+AD1816A_DOUBLE("Master Playback Volume", AD1816A_MASTER_ATT, 8, 0, 31, 1),
 AD1816A_DOUBLE("PCM Playback Switch", AD1816A_VOICE_ATT, 15, 7, 1, 1),
-AD1816A_DOUBLE("PCM Playback Volume", AD1816A_VOICE_ATT, 8, 0, 63, 0),
+AD1816A_DOUBLE("PCM Playback Volume", AD1816A_VOICE_ATT, 8, 0, 63, 1),
 AD1816A_DOUBLE("Line Playback Switch", AD1816A_LINE_GAIN_ATT, 15, 7, 1, 1),
-AD1816A_DOUBLE("Line Playback Volume", AD1816A_LINE_GAIN_ATT, 8, 0, 31, 0),
+AD1816A_DOUBLE("Line Playback Volume", AD1816A_LINE_GAIN_ATT, 8, 0, 31, 1),
 AD1816A_DOUBLE("CD Playback Switch", AD1816A_CD_GAIN_ATT, 15, 7, 1, 1),
-AD1816A_DOUBLE("CD Playback Volume", AD1816A_CD_GAIN_ATT, 8, 0, 31, 0),
+AD1816A_DOUBLE("CD Playback Volume", AD1816A_CD_GAIN_ATT, 8, 0, 31, 1),
 AD1816A_DOUBLE("Synth Playback Switch", AD1816A_SYNTH_GAIN_ATT, 15, 7, 1, 1),
-AD1816A_DOUBLE("Synth Playback Volume", AD1816A_SYNTH_GAIN_ATT, 8, 0, 31, 0),
+AD1816A_DOUBLE("Synth Playback Volume", AD1816A_SYNTH_GAIN_ATT, 8, 0, 31, 1),
 AD1816A_DOUBLE("FM Playback Switch", AD1816A_FM_ATT, 15, 7, 1, 1),
-AD1816A_DOUBLE("FM Playback Volume", AD1816A_FM_ATT, 8, 0, 63, 0),
+AD1816A_DOUBLE("FM Playback Volume", AD1816A_FM_ATT, 8, 0, 63, 1),
 AD1816A_SINGLE("Mic Playback Switch", AD1816A_MIC_GAIN_ATT, 15, 1, 1),
-AD1816A_SINGLE("Mic Playback Volume", AD1816A_MIC_GAIN_ATT, 8, 63, 0),
+AD1816A_SINGLE("Mic Playback Volume", AD1816A_MIC_GAIN_ATT, 8, 63, 1),
 AD1816A_SINGLE("Mic Boost", AD1816A_MIC_GAIN_ATT, 14, 1, 0),
 AD1816A_DOUBLE("Video Playback Switch", AD1816A_VID_GAIN_ATT, 15, 7, 1, 1),
-AD1816A_DOUBLE("Video Playback Volume", AD1816A_VID_GAIN_ATT, 8, 0, 31, 0),
+AD1816A_DOUBLE("Video Playback Volume", AD1816A_VID_GAIN_ATT, 8, 0, 31, 1),
 AD1816A_SINGLE("Phone Capture Switch", AD1816A_PHONE_IN_GAIN_ATT, 15, 1, 1),
-AD1816A_SINGLE("Phone Capture Volume", AD1816A_PHONE_IN_GAIN_ATT, 0, 31, 0),
+AD1816A_SINGLE("Phone Capture Volume", AD1816A_PHONE_IN_GAIN_ATT, 0, 15, 1),
 AD1816A_SINGLE("Phone Playback Switch", AD1816A_PHONE_OUT_ATT, 7, 1, 1),
-AD1816A_SINGLE("Phone Playback Volume", AD1816A_PHONE_OUT_ATT, 0, 31, 0),
+AD1816A_SINGLE("Phone Playback Volume", AD1816A_PHONE_OUT_ATT, 0, 31, 1),
 {
 	iface: SNDRV_CTL_ELEM_IFACE_MIXER,
 	name: "Capture Source",

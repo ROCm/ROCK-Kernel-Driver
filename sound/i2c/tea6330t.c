@@ -22,6 +22,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/tea6330t.h>
 

@@ -21,13 +21,14 @@
   
 #define __NO_VERSION__
 #include <sound/driver.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include "pcm_plugin.h"
 
 #define SHIFT	11
 #define BITS	(1<<SHIFT)
-#define MASK	(BITS-1)
+#define R_MASK	(BITS-1)
 
 /*
  *  Basic rate conversion plugin
@@ -108,19 +109,19 @@ static void resample_expand(snd_pcm_plugin_t *plugin,
 		dst_step = dst_channels[channel].area.step / 8;
 		src_frames1 = src_frames;
 		dst_frames1 = dst_frames;
-		if (pos & ~MASK) {
+		if (pos & ~R_MASK) {
 			get_s16_end = &&after_get1;
 			goto *get;
 		after_get1:
-			pos &= MASK;
+			pos &= R_MASK;
 			S1 = S2;
 			S2 = sample;
 			src += src_step;
-			src_frames--;
+			src_frames1--;
 		}
 		while (dst_frames1-- > 0) {
-			if (pos & ~MASK) {
-				pos &= MASK;
+			if (pos & ~R_MASK) {
+				pos &= R_MASK;
 				S1 = S2;
 				if (src_frames1-- > 0) {
 					get_s16_end = &&after_get2;
@@ -203,8 +204,8 @@ static void resample_shrink(snd_pcm_plugin_t *plugin,
 				S2 = sample;
 				src += src_step;
 			}
-			if (pos & ~MASK) {
-				pos &= MASK;
+			if (pos & ~R_MASK) {
+				pos &= R_MASK;
 				val = S1 + ((S2 - S1) * (signed int)pos) / BITS;
 				if (val < -32768)
 					val = -32768;

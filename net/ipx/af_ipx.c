@@ -1920,6 +1920,7 @@ static int ipx_create(struct socket *sock, int protocol)
 			ipx = ipx_sk(sk) = kmalloc(sizeof(*ipx), GFP_KERNEL);
 			if (!ipx)
 				goto outsk;
+			memset(ipx, 0, sizeof(*ipx));
                         sock->ops = &ipx_dgram_ops;
                         break;
 

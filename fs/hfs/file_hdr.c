@@ -592,8 +592,7 @@ hfs_did_done:
 		if (p) {
 			left -= copy_to_user(buf, p + offset, left);
 		} else if (fork) {
-			left = hfs_do_read(inode, fork, offset, buf, left,
-					   filp->f_reada != 0);
+			left = hfs_do_read(inode, fork, offset, buf, left);
 			if (left > 0) {
 				filp->f_reada = 1;
 			} else if (!read) {

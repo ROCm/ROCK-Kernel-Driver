@@ -20,8 +20,8 @@
  */
 
 #include <sound/driver.h>
-#include <linux/reboot.h>
 #include <linux/init.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/ymfpci.h>
 #include <sound/mpu401.h>
@@ -47,7 +47,6 @@ static char *snd_id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;	/* ID for this card */
 static int snd_enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;	/* Enable this card */
 static long snd_fm_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
 static long snd_mpu_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1};
-static long snd_joystick_port[SNDRV_CARDS] = {[0 ... (SNDRV_CARDS - 1)] = -1 };
 
 MODULE_PARM(snd_index, "1-" __MODULE_STRING(SNDRV_CARDS) "i");
 MODULE_PARM_DESC(snd_index, "Index value for the Yamaha DS-XG PCI soundcard.");
@@ -64,9 +63,6 @@ MODULE_PARM_SYNTAX(snd_mpu_port, SNDRV_ENABLED);
 MODULE_PARM(snd_fm_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
 MODULE_PARM_DESC(snd_fm_port, "FM OPL-3 Port.");
 MODULE_PARM_SYNTAX(snd_fm_port, SNDRV_ENABLED);
-MODULE_PARM(snd_joystick_port, "1-" __MODULE_STRING(SNDRV_CARDS) "l");
-MODULE_PARM_DESC(snd_joystick_port, "Joystick Port.");
-MODULE_PARM_SYNTAX(snd_joystick_port, SNDRV_ENABLED);
 
 static struct pci_device_id snd_ymfpci_ids[] __devinitdata = {
         { 0x1073, 0x0004, PCI_ANY_ID, PCI_ANY_ID, 0, 0, 0, },   /* YMF724 */
@@ -133,15 +129,6 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 			pci_write_config_word(pci, PCIR_DSXG_MPU401BASE, snd_mpu_port[dev]);
 			snd_printd("MPU401 supported on 0x%lx\n", snd_mpu_port[dev]);
 		}
-		if (snd_joystick_port[dev] < 0)
-			snd_joystick_port[dev] = pci_resource_start(pci, 2);
-		else if (check_region(snd_joystick_port[dev], 4))
-			snd_joystick_port[dev] = -1;
-		if (snd_joystick_port[dev] >= 0) {
-			snd_printd("joystick supported on 0x%lx\n", snd_joystick_port[dev]);
-			legacy_ctrl |= 4;
-			pci_write_config_word(pci, PCIR_DSXG_JOYBASE, snd_joystick_port[dev]);
-		}
 	} else {
 		switch (snd_fm_port[dev]) {
 		case 0x388: legacy_ctrl2 |= 0; break;
@@ -170,29 +157,15 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 			legacy_ctrl2 &= ~(3 << 4);
 			snd_mpu_port[dev] = -1;
 		}
-		switch (snd_joystick_port[dev]) {
-		case 0x201: legacy_ctrl2 |= 0 << 6; break;
-		case 0x202: legacy_ctrl2 |= 1 << 6; break;
-		case 0x204: legacy_ctrl2 |= 2 << 6; break;
-		case 0x205: legacy_ctrl2 |= 3 << 6; break;
-		default: snd_joystick_port[dev] = -1; break;
-		}
-		if (snd_joystick_port[dev] > 0 && check_region(snd_joystick_port[dev], 2) == 0) {
-			legacy_ctrl |= 4;
-			snd_printd("joystick supported on 0x%lx\n", snd_joystick_port[dev]);
-		} else {
-			legacy_ctrl2 &= ~(3 << 6);
-			snd_joystick_port[dev] = -1;
-		}
 	}
 	if (snd_mpu_port[dev] > 0) {
 		legacy_ctrl |= 0x10; /* MPU401 irq enable */
 		legacy_ctrl2 |= 1 << 15; /* IMOD */
 	}
 	pci_read_config_word(pci, PCIR_DSXG_LEGACY, &old_legacy_ctrl);
-	snd_printdd("legacy_ctrl = 0x%x\n", legacy_ctrl);
+	//snd_printdd("legacy_ctrl = 0x%x\n", legacy_ctrl);
 	pci_write_config_word(pci, PCIR_DSXG_LEGACY, legacy_ctrl);
-	snd_printdd("legacy_ctrl2 = 0x%x\n", legacy_ctrl2);
+	//snd_printdd("legacy_ctrl2 = 0x%x\n", legacy_ctrl2);
 	pci_write_config_word(pci, PCIR_DSXG_ELEGACY, legacy_ctrl2);
 	if ((err = snd_ymfpci_create(card, pci,
 				     old_legacy_ctrl,
@@ -224,8 +197,10 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 		if ((err = snd_mpu401_uart_new(card, 0, MPU401_HW_YMFPCI,
 					       snd_mpu_port[dev], 0,
 					       pci->irq, 0, &chip->rawmidi)) < 0) {
-			snd_card_free(card);
-			return err;
+			printk(KERN_INFO "ymfpci: cannot initialize MPU401 at 0x%lx, skipping...\n", snd_mpu_port[dev]);
+		} else {
+			legacy_ctrl &= ~0x10; /* disable MPU401 irq */
+			pci_write_config_word(pci, PCIR_DSXG_LEGACY, legacy_ctrl);
 		}
 	}
 	if (snd_fm_port[dev] > 0) {
@@ -233,13 +208,15 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 					   snd_fm_port[dev],
 					   snd_fm_port[dev] + 2,
 					   OPL3_HW_OPL3, 0, &opl3)) < 0) {
+			printk(KERN_INFO "ymfpci: cannot initialize FM OPL3 at 0x%lx, skipping...\n", snd_fm_port[dev]);
+		} else if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
 			snd_card_free(card);
+			snd_printk("cannot create opl3 hwdep\n");
 			return err;
 		}
-		if ((err = snd_opl3_hwdep_new(opl3, 0, 1, NULL)) < 0) {
-			snd_card_free(card);
-			return err;
-		}
+	}
+	if ((err = snd_ymfpci_joystick(chip)) < 0) {
+		printk(KERN_INFO "ymfpci: cannot initialize joystick, skipping...\n");
 	}
 	strcpy(card->driver, str);
 	sprintf(card->shortname, "Yamaha DS-XG PCI (%s)", str);
@@ -262,25 +239,25 @@ static int __devinit snd_card_ymfpci_probe(struct pci_dev *pci,
 static int snd_card_ymfpci_suspend(struct pci_dev *pci, u32 state)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_ymfpci_suspend(chip, 0);
+	snd_ymfpci_suspend(chip);
 	return 0;
 }
 static int snd_card_ymfpci_resume(struct pci_dev *pci)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return -ENXIO);
-	snd_ymfpci_resume(chip, 0);
+	snd_ymfpci_resume(chip);
 	return 0;
 }
 #else
 static void snd_card_ymfpci_suspend(struct pci_dev *pci)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return);
-	snd_ymfpci_suspend(chip, 0);
+	snd_ymfpci_suspend(chip);
 }
 static void snd_card_ymfpci_resume(struct pci_dev *pci)
 {
 	ymfpci_t *chip = snd_magic_cast(ymfpci_t, pci_get_drvdata(pci), return);
-	snd_ymfpci_resume(chip, 0);
+	snd_ymfpci_resume(chip);
 }
 #endif
 #endif

@@ -52,7 +52,7 @@ int dcache_readdir(struct file * filp, void * dirent, filldir_t filldir)
 			filp->f_pos++;
 			/* fallthrough */
 		case 1:
-			if (filldir(dirent, "..", 2, i, dentry->d_parent->d_inode->i_ino, DT_DIR) < 0)
+			if (filldir(dirent, "..", 2, i, parent_ino(dentry), DT_DIR) < 0)
 				break;
 			i++;
 			filp->f_pos++;

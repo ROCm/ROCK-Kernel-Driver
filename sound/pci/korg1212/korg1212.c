@@ -23,6 +23,7 @@
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/info.h>
 #include <sound/control.h>
@@ -165,9 +166,11 @@ typedef enum {
 
 #define K1212_CHANNELS     	16
 #define K1212_FRAME_SIZE        (sizeof(KorgAudioFrame))
+#define K1212_MAX_SAMPLES	(kPlayBufferFrames*kNumBuffers)
+#define K1212_PERIODS		(K1212_BUF_SIZE/K1212_BLOCK_SIZE)
+#define K1212_PERIOD_BYTES	(K1212_BLOCK_SIZE)
 #define K1212_BLOCK_SIZE        (K1212_FRAME_SIZE*kPlayBufferFrames)
 #define K1212_BUF_SIZE          (K1212_BLOCK_SIZE*kNumBuffers)
-#define K1212_MAX_SAMPLES	(kPlayBufferFrames*kNumBuffers)
 
 #define k1212MinADCSens     0x7f
 #define k1212MaxADCSens     0x00
@@ -273,7 +276,7 @@ typedef struct KorgSharedBuffer {
    KorgAudioBuffer   playDataBufs[kNumBuffers];
    KorgAudioBuffer   recordDataBufs[kNumBuffers];
 #endif
-   u16               volumeData[kAudioChannels];
+   short             volumeData[kAudioChannels];
    u32               cardCommand;
    u16               routeData [kAudioChannels];
    u32               AdatTimeCode;                 // ADAT timecode value
@@ -1060,7 +1063,7 @@ static void snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs *regs)
         switch (doorbellValue) {
                 case K1212_DB_DSPDownloadDone:
 #ifdef DEBUG
-                        PRINTK("DEBUG: IRQ count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
+                        PRINTK("DEBUG: IRQ DNLD count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
 #endif
                         if (korg1212->cardState == K1212_STATE_DSP_IN_PROCESS) {
                                         snd_korg1212_setCardState(korg1212, K1212_STATE_DSP_COMPLETE);
@@ -1073,7 +1076,7 @@ static void snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                 // ------------------------------------------------------------------------
                 case K1212_ISRCODE_DMAERROR:
 #ifdef DEBUG
-                        PRINTK("DEBUG: IRQ count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
+                        PRINTK("DEBUG: IRQ DMAE count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
 #endif
                         writel(0, &korg1212->sharedBufferPtr->cardCommand);
                         break;
@@ -1084,12 +1087,16 @@ static void snd_korg1212_interrupt(int irq, void *dev_id, struct pt_regs *regs)
                 // ------------------------------------------------------------------------
                 case K1212_ISRCODE_CARDSTOPPED:
 #ifdef DEBUG
-                        PRINTK("DEBUG: IRQ count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
+                        PRINTK("DEBUG: IRQ CSTP count - %ld, %x, [%s].\n", korg1212->irqcount, doorbellValue, stateName[korg1212->cardState]);
 #endif
                         writel(0, &korg1212->sharedBufferPtr->cardCommand);
                         break;
 
                 default:
+#ifdef XDEBUG
+                        PRINTK("DEBUG: IRQ DFLT count - %ld, %x, cpos=%d [%s].\n", korg1212->irqcount, doorbellValue, 
+				korg1212->currentBuffer, stateName[korg1212->cardState]);
+#endif
                         if ((korg1212->cardState > K1212_STATE_SETUP) || korg1212->idleMonitorOn) {
                                 korg1212->currentBuffer++;
 
@@ -1157,10 +1164,10 @@ static snd_pcm_hardware_t snd_korg1212_playback_info =
         channels_min:        K1212_CHANNELS,
         channels_max:        K1212_CHANNELS,
         buffer_bytes_max:    K1212_BUF_SIZE,
-        period_bytes_min:    K1212_BLOCK_SIZE,
-        period_bytes_max:    K1212_BLOCK_SIZE,
-        periods_min:         K1212_BUF_SIZE / K1212_BLOCK_SIZE,
-        periods_max:         K1212_BUF_SIZE / K1212_BLOCK_SIZE,
+        period_bytes_min:    K1212_PERIOD_BYTES,
+        period_bytes_max:    K1212_PERIOD_BYTES,
+        periods_min:         K1212_PERIODS,
+        periods_max:         K1212_PERIODS,
         fifo_size:           0,
 };
 
@@ -1177,10 +1184,10 @@ static snd_pcm_hardware_t snd_korg1212_capture_info =
         channels_min:        K1212_CHANNELS,
         channels_max:        K1212_CHANNELS,
         buffer_bytes_max:    K1212_BUF_SIZE,
-        period_bytes_min:    K1212_BLOCK_SIZE,
-        period_bytes_max:    K1212_BLOCK_SIZE,
-        periods_min:         K1212_BUF_SIZE / K1212_BLOCK_SIZE,
-        periods_max:         K1212_BUF_SIZE / K1212_BLOCK_SIZE,
+        period_bytes_min:    K1212_PERIOD_BYTES,
+        period_bytes_max:    K1212_PERIOD_BYTES,
+        periods_min:         K1212_PERIODS,
+        periods_max:         K1212_PERIODS,
         fifo_size:           0,
 };
 
@@ -1195,7 +1202,7 @@ static void snd_korg1212_free_pcm(snd_pcm_t *pcm)
         korg1212->pcm16 = NULL;
 }
 
-static unsigned int period_bytes[] = { K1212_BLOCK_SIZE };
+static unsigned int period_bytes[] = { K1212_PERIOD_BYTES };
 
 #define PERIOD_BYTES sizeof(period_bytes) / sizeof(period_bytes[0])
 
@@ -1226,7 +1233,7 @@ static int snd_korg1212_playback_open(snd_pcm_substream_t *substream)
 	runtime->dma_bytes = K1212_BUF_SIZE;
 
         korg1212->playback_substream = substream;
-        korg1212->periodsize = K1212_BLOCK_SIZE;
+        korg1212->periodsize = K1212_PERIODS;
 
         spin_unlock_irqrestore(&korg1212->lock, flags);
 
@@ -1256,7 +1263,7 @@ static int snd_korg1212_capture_open(snd_pcm_substream_t *substream)
 	runtime->dma_bytes = K1212_BUF_SIZE;
 
         korg1212->capture_substream = substream;
-        korg1212->periodsize = K1212_BLOCK_SIZE;
+        korg1212->periodsize = K1212_PERIODS;
 
         spin_unlock_irqrestore(&korg1212->lock, flags);
 
@@ -1383,7 +1390,7 @@ static int snd_korg1212_prepare(snd_pcm_substream_t *substream)
 
         snd_korg1212_SetupForPlay(korg1212);
 
-        korg1212->currentBuffer = kNumBuffers;
+        korg1212->currentBuffer = -1;
 
         spin_unlock_irqrestore(&korg1212->lock, flags);
         return 0;
@@ -1395,7 +1402,7 @@ static int snd_korg1212_trigger(snd_pcm_substream_t *substream,
         korg1212_t *korg1212 = _snd_pcm_substream_chip(substream);
 
 #ifdef DEBUG
-		PRINTK("DEBUG: snd_korg1212_trigger [%s]\n", stateName[korg1212->cardState]);
+		PRINTK("DEBUG: snd_korg1212_trigger [%s] cmd=%d\n", stateName[korg1212->cardState], cmd);
 #endif
 
         switch (cmd) {
@@ -1418,7 +1425,12 @@ static int snd_korg1212_trigger(snd_pcm_substream_t *substream,
 static snd_pcm_uframes_t snd_korg1212_pointer(snd_pcm_substream_t *substream)
 {
         korg1212_t *korg1212 = _snd_pcm_substream_chip(substream);
-        snd_pcm_uframes_t pos = korg1212->currentBuffer * kPlayBufferFrames;
+        snd_pcm_uframes_t pos;
+
+	if (korg1212->currentBuffer < 0)
+		return 0;
+
+	pos = korg1212->currentBuffer * kPlayBufferFrames;
 
 #ifdef XDEBUG
 		PRINTK("DEBUG: snd_korg1212_pointer [%s] %ld\n", stateName[korg1212->cardState], pos);
@@ -1515,15 +1527,8 @@ static snd_pcm_ops_t snd_korg1212_capture_ops = {
 
 static int snd_korg1212_control_phase_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
-        static char * texts[] = { "Inverted", "Mute", "Not Inverted" };
-
-	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
-	uinfo->count = kAudioChannels;
-	uinfo->value.enumerated.items = 3;
-	if (uinfo->value.enumerated.item > 2) {
-		uinfo->value.enumerated.item = 2;
-	}
-	strcpy(uinfo->value.enumerated.name, texts[uinfo->value.enumerated.item]);
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	uinfo->count = (kcontrol->private_value >= 8) ? 2 : 1;
 	return 0;
 }
 
@@ -1531,12 +1536,14 @@ static int snd_korg1212_control_phase_get(snd_kcontrol_t *kcontrol, snd_ctl_elem
 {
 	korg1212_t *korg1212 = _snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
-        int i;
+	int i = kcontrol->private_value;
 
 	spin_lock_irqsave(&korg1212->lock, flags);
 
-        for (i=0; i<kAudioChannels; i++)
-                u->value.enumerated.item[i] = korg1212->volumePhase[i] + 1;
+        u->value.integer.value[0] = korg1212->volumePhase[i];
+
+	if (i >= 8) 
+        	u->value.integer.value[1] = korg1212->volumePhase[i+1];
 
         spin_unlock_irqrestore(&korg1212->lock, flags);
 
@@ -1552,13 +1559,30 @@ static int snd_korg1212_control_phase_put(snd_kcontrol_t *kcontrol, snd_ctl_elem
 
 	spin_lock_irqsave(&korg1212->lock, flags);
 
-        for (i=0; i<kAudioChannels; i++)
-                if (u->value.integer.value[i] != korg1212->volumePhase[i]) {
-                        korg1212->volumePhase[i] = u->value.enumerated.item[i] - 1;
-			val = u->value.integer.value[i] * korg1212->volumePhase[i];
-                        korg1212->sharedBufferPtr->volumeData[i] = val;
-                        change = 1;
-                }
+	i = kcontrol->private_value;
+
+	korg1212->volumePhase[i] = u->value.integer.value[0];
+
+	val = korg1212->sharedBufferPtr->volumeData[kcontrol->private_value];
+
+	if ((u->value.integer.value[0] > 0) != (val < 0)) {
+		val = abs(val) * (korg1212->volumePhase[i] > 0 ? -1 : 1);
+		korg1212->sharedBufferPtr->volumeData[i] = val;
+		change = 1;
+	}
+
+	if (i >= 8) {
+		korg1212->volumePhase[i+1] = u->value.integer.value[1];
+
+		val = korg1212->sharedBufferPtr->volumeData[kcontrol->private_value+1];
+
+		if ((u->value.integer.value[1] > 0) != (val < 0)) {
+			val = abs(val) * (korg1212->volumePhase[i+1] > 0 ? -1 : 1);
+			korg1212->sharedBufferPtr->volumeData[i+1] = val;
+			change = 1;
+		}
+	}
+
 	spin_unlock_irqrestore(&korg1212->lock, flags);
 
         return change;
@@ -1567,7 +1591,7 @@ static int snd_korg1212_control_phase_put(snd_kcontrol_t *kcontrol, snd_ctl_elem
 static int snd_korg1212_control_volume_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
         uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
-        uinfo->count = kAudioChannels;
+	uinfo->count = (kcontrol->private_value >= 8) ? 2 : 1;
         uinfo->value.integer.min = k1212MinVolume;
 	uinfo->value.integer.max = k1212MaxVolume;
         return 0;
@@ -1581,8 +1605,11 @@ static int snd_korg1212_control_volume_get(snd_kcontrol_t *kcontrol, snd_ctl_ele
 
 	spin_lock_irqsave(&korg1212->lock, flags);
 
-        for (i=0; i<kAudioChannels; i++)
-                u->value.integer.value[i] = korg1212->sharedBufferPtr->volumeData[i] & 0x7fff;
+	i = kcontrol->private_value;
+        u->value.integer.value[0] = abs(korg1212->sharedBufferPtr->volumeData[i]);
+
+	if (i >= 8) 
+                u->value.integer.value[1] = abs(korg1212->sharedBufferPtr->volumeData[i+1]);
 
         spin_unlock_irqrestore(&korg1212->lock, flags);
 
@@ -1599,12 +1626,24 @@ static int snd_korg1212_control_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_ele
 
 	spin_lock_irqsave(&korg1212->lock, flags);
 
-        for (i=0; i<kAudioChannels; i++)
-                if (u->value.integer.value[i] != (korg1212->sharedBufferPtr->volumeData[i] & 0x7fff)) {
-			val = u->value.integer.value[i] * korg1212->volumePhase[i];
-                        korg1212->sharedBufferPtr->volumeData[i] = val;
-                        change = 1;
-                }
+	i = kcontrol->private_value;
+
+	if (u->value.integer.value[0] != abs(korg1212->sharedBufferPtr->volumeData[i])) {
+		val = korg1212->volumePhase[i] > 0 ? -1 : 1;
+		val *= u->value.integer.value[0];
+		korg1212->sharedBufferPtr->volumeData[i] = val;
+		change = 1;
+	}
+
+	if (i >= 8) {
+		if (u->value.integer.value[1] != abs(korg1212->sharedBufferPtr->volumeData[i+1])) {
+			val = korg1212->volumePhase[i+1] > 0 ? -1 : 1;
+			val *= u->value.integer.value[1];
+			korg1212->sharedBufferPtr->volumeData[i+1] = val;
+			change = 1;
+		}
+	}
+
 	spin_unlock_irqrestore(&korg1212->lock, flags);
 
         return change;
@@ -1613,7 +1652,7 @@ static int snd_korg1212_control_volume_put(snd_kcontrol_t *kcontrol, snd_ctl_ele
 static int snd_korg1212_control_route_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t * uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
-	uinfo->count = kAudioChannels;
+	uinfo->count = (kcontrol->private_value >= 8) ? 2 : 1;
 	uinfo->value.enumerated.items = kAudioChannels;
 	if (uinfo->value.enumerated.item > kAudioChannels-1) {
 		uinfo->value.enumerated.item = kAudioChannels-1;
@@ -1630,8 +1669,11 @@ static int snd_korg1212_control_route_get(snd_kcontrol_t *kcontrol, snd_ctl_elem
 
 	spin_lock_irqsave(&korg1212->lock, flags);
 
-        for (i=0; i<kAudioChannels; i++)
-                u->value.enumerated.item[i] = korg1212->sharedBufferPtr->routeData[i];
+	i = kcontrol->private_value;
+	u->value.enumerated.item[0] = korg1212->sharedBufferPtr->routeData[i];
+
+	if (i >= 8) 
+		u->value.enumerated.item[1] = korg1212->sharedBufferPtr->routeData[i+1];
 
         spin_unlock_irqrestore(&korg1212->lock, flags);
 
@@ -1642,16 +1684,24 @@ static int snd_korg1212_control_route_put(snd_kcontrol_t *kcontrol, snd_ctl_elem
 {
 	korg1212_t *korg1212 = _snd_kcontrol_chip(kcontrol);
 	unsigned long flags;
-        int change = 0;
-        int i;
+        int change = 0, i;
 
 	spin_lock_irqsave(&korg1212->lock, flags);
 
-        for (i=0; i<kAudioChannels; i++)
-                if (u->value.enumerated.item[i] != korg1212->sharedBufferPtr->volumeData[i]) {
-                        korg1212->sharedBufferPtr->routeData[i] = u->value.enumerated.item[i];
-                        change = 1;
-                }
+	i = kcontrol->private_value;
+
+	if (u->value.enumerated.item[0] != korg1212->sharedBufferPtr->volumeData[i]) {
+		korg1212->sharedBufferPtr->routeData[i] = u->value.enumerated.item[0];
+		change = 1;
+	}
+
+	if (i >= 8) {
+		if (u->value.enumerated.item[1] != korg1212->sharedBufferPtr->volumeData[i+1]) {
+			korg1212->sharedBufferPtr->routeData[i+1] = u->value.enumerated.item[1];
+			change = 1;
+		}
+	}
+
 	spin_unlock_irqrestore(&korg1212->lock, flags);
 
         return change;
@@ -1661,8 +1711,8 @@ static int snd_korg1212_control_analog_info(snd_kcontrol_t *kcontrol, snd_ctl_el
 {
         uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
         uinfo->count = 2;
-        uinfo->value.integer.min = k1212MinADCSens;
-	uinfo->value.integer.max = k1212MaxADCSens;
+        uinfo->value.integer.min = k1212MaxADCSens;
+	uinfo->value.integer.max = k1212MinADCSens;
         return 0;
 }
 
@@ -1746,8 +1796,41 @@ static int snd_korg1212_control_sync_put(snd_kcontrol_t * kcontrol, snd_ctl_elem
 	return change;
 }
 
+#define MON_MIXER(ord,c_name)									\
+        {											\
+                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,	\
+                iface:          SNDRV_CTL_ELEM_IFACE_MIXER,					\
+                name:		c_name " Monitor Volume",						\
+                info:		snd_korg1212_control_volume_info,				\
+                get:		snd_korg1212_control_volume_get,				\
+                put:		snd_korg1212_control_volume_put,				\
+		private_value:	ord,								\
+        },                                                                                      \
+        {											\
+                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,	\
+                iface:          SNDRV_CTL_ELEM_IFACE_MIXER,					\
+                name:		c_name " Monitor Route",						\
+                info:		snd_korg1212_control_route_info,				\
+                get:		snd_korg1212_control_route_get,					\
+                put:		snd_korg1212_control_route_put,					\
+		private_value:	ord,								\
+        },                                                                                      \
+        {											\
+                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,	\
+                iface:          SNDRV_CTL_ELEM_IFACE_PCM,					\
+                name:		c_name " Monitor Phase Invert",						\
+                info:		snd_korg1212_control_phase_info,				\
+                get:		snd_korg1212_control_phase_get,					\
+                put:		snd_korg1212_control_phase_put,					\
+		private_value:	ord,								\
+        }
+
 static snd_kcontrol_new_t snd_korg1212_controls[] = {
-        {
+        MON_MIXER(8, "Analog"),
+	MON_MIXER(10, "SPDIF"), 
+        MON_MIXER(0, "ADAT-1"), MON_MIXER(1, "ADAT-2"), MON_MIXER(2, "ADAT-3"), MON_MIXER(3, "ADAT-4"),
+        MON_MIXER(4, "ADAT-5"), MON_MIXER(5, "ADAT-6"), MON_MIXER(6, "ADAT-7"), MON_MIXER(7, "ADAT-8"),
+	{
                 access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,
                 iface:          SNDRV_CTL_ELEM_IFACE_PCM,
                 name:		"Sync Source",
@@ -1758,31 +1841,7 @@ static snd_kcontrol_new_t snd_korg1212_controls[] = {
         {
                 access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,
                 iface:          SNDRV_CTL_ELEM_IFACE_MIXER,
-                name:		"Monitor Volume",
-                info:		snd_korg1212_control_volume_info,
-                get:		snd_korg1212_control_volume_get,
-                put:		snd_korg1212_control_volume_put,
-        },
-        {
-                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,
-                iface:          SNDRV_CTL_ELEM_IFACE_PCM,
-                name:		"Monitor Phase",
-                info:		snd_korg1212_control_phase_info,
-                get:		snd_korg1212_control_phase_get,
-                put:		snd_korg1212_control_phase_put,
-        },
-        {
-                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,
-                iface:          SNDRV_CTL_ELEM_IFACE_MIXER,
-                name:		"Monitor Route",
-                info:		snd_korg1212_control_route_info,
-                get:		snd_korg1212_control_route_get,
-                put:		snd_korg1212_control_route_put,
-        },
-        {
-                access:		SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_WRITE,
-                iface:          SNDRV_CTL_ELEM_IFACE_MIXER,
-                name:		"ADC Sensibility",
+                name:		"ADC Attenuation",
                 info:		snd_korg1212_control_analog_info,
                 get:		snd_korg1212_control_analog_get,
                 put:		snd_korg1212_control_analog_put,
@@ -1867,7 +1926,7 @@ static int __init snd_korg1212_create(korg1212_t *korg1212)
         korg1212->rightADCInSens = k1212MaxADCSens;
 
         for (i=0; i<kAudioChannels; i++)
-                korg1212->volumePhase[i] = 1;
+                korg1212->volumePhase[i] = 0;
 
         if ((err = pci_enable_device(pci)) < 0)
                 return err;
@@ -2117,17 +2176,17 @@ snd_korg1212_free(void *private_data)
         }
         if (korg1212->res_iomem != NULL) {
                 release_resource(korg1212->res_iomem);
-                kfree(korg1212->res_iomem);
+                kfree_nocheck(korg1212->res_iomem);
                 korg1212->res_iomem = NULL;
         }
         if (korg1212->res_ioport != NULL) {
                 release_resource(korg1212->res_ioport);
-                kfree(korg1212->res_ioport);
+                kfree_nocheck(korg1212->res_ioport);
                 korg1212->res_ioport = NULL;
         }
         if (korg1212->res_iomem2 != NULL) {
                 release_resource(korg1212->res_iomem2);
-                kfree(korg1212->res_iomem2);
+                kfree_nocheck(korg1212->res_iomem2);
                 korg1212->res_iomem2 = NULL;
         }
 

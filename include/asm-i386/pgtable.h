@@ -264,11 +264,7 @@ extern unsigned long pg0[1024];
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
 #define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) != _KERNPG_TABLE)
 
-/*
- * Permanent address of a page. Obviously must never be
- * called on a highmem page.
- */
-#define page_address(page) ((page)->virtual)
+
 #define pages_to_mb(x) ((x) >> (20-PAGE_SHIFT))
 
 /*
@@ -316,8 +312,11 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 
 #define page_pte(page) page_pte_prot(page, __pgprot(0))
 
-#define pmd_page(pmd) \
+#define pmd_page_kernel(pmd) \
 ((unsigned long) __va(pmd_val(pmd) & PAGE_MASK))
+
+#define pmd_page(pmd) \
+	(mem_map + (pmd_val(pmd) >> PAGE_SHIFT))
 
 /* to find an entry in a page-table-directory. */
 #define pgd_index(address) ((address >> PGDIR_SHIFT) & (PTRS_PER_PGD-1))
@@ -335,8 +334,14 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
 /* Find an entry in the third-level page table.. */
 #define __pte_offset(address) \
 		((address >> PAGE_SHIFT) & (PTRS_PER_PTE - 1))
-#define pte_offset(dir, address) ((pte_t *) pmd_page(*(dir)) + \
-			__pte_offset(address))
+#define pte_offset_kernel(dir, address) \
+	((pte_t *) pmd_page_kernel(*(dir)) +  __pte_offset(address))
+#define pte_offset_map(dir, address) \
+	((pte_t *)kmap_atomic(pmd_page(*(dir)),KM_PTE0) + __pte_offset(address))
+#define pte_offset_map_nested(dir, address) \
+	((pte_t *)kmap_atomic(pmd_page(*(dir)),KM_PTE1) + __pte_offset(address))
+#define pte_unmap(pte) kunmap_atomic(pte, KM_PTE0)
+#define pte_unmap_nested(pte) kunmap_atomic(pte, KM_PTE1)
 
 /*
  * The i386 doesn't have any external MMU info: the kernel page

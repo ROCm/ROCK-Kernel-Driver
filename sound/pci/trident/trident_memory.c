@@ -26,6 +26,7 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/io.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/trident.h>
 
@@ -64,6 +65,7 @@
 #define get_aligned_page(offset)	((offset) >> 13)
 #define aligned_page_offset(page)	((page) << 13)
 #define page_to_ptr(trident,page)	__tlb_to_ptr(trident, (page) << 1)
+#define page_to_addr(trident,page)	__tlb_to_addr(trident, (page) << 1)
 
 /* fill TLB entries -- we need to fill two entries */
 static inline void set_tlb_bus(trident_t *trident, int page, unsigned long ptr, dma_addr_t addr)

@@ -103,6 +103,8 @@ static int convert_memcpy(char *output, int olen,
 			  struct nls_table *nls_from,
 			  struct nls_table *nls_to)
 {
+	if (olen < ilen)
+		return -ENAMETOOLONG;
 	memcpy(output, input, ilen);
 	return ilen;
 }
@@ -126,20 +128,21 @@ static int convert_cp(char *output, int olen,
 		/* convert by changing to unicode and back to the new cp */
 		n = nls_from->char2uni((unsigned char *)input, ilen, &ch);
 		if (n < 0)
-			goto out;
+			goto fail;
 		input += n;
 		ilen -= n;
 
 		n = nls_to->uni2char(ch, output, olen);
 		if (n < 0)
-			goto out;
+			goto fail;
 		output += n;
 		olen -= n;
 
 		len += n;
 	}
-out:
 	return len;
+fail:
+	return n;
 }
 
 static int setcodepage(struct nls_table **p, char *name)
@@ -214,11 +217,17 @@ smb_encode_smb_length(__u8 * p, __u32 len)
  * smb_build_path: build the path to entry and name storing it in buf.
  * The path returned will have the trailing '\0'.
  */
-static int smb_build_path(struct smb_sb_info *server, char * buf,
+static int smb_build_path(struct smb_sb_info *server, char * buf, int maxlen,
 			  struct dentry * entry, struct qstr * name)
 {
 	char *path = buf;
 	int len;
+
+	if (maxlen < 2)
+		return -ENAMETOOLONG;
+
+	if (maxlen > SMB_MAXNAMELEN + 1)
+		maxlen = SMB_MAXNAMELEN + 1;
 
 	if (entry == NULL)
 		goto test_name_and_out;
@@ -226,65 +235,84 @@ static int smb_build_path(struct smb_sb_info *server, char * buf,
 	/*
 	 * If IS_ROOT, we have to do no walking at all.
 	 */
-	if (IS_ROOT(entry)) {
-		*(path++) = '\\';
-		if (name != NULL)
-			goto name_and_out;
-		goto out;
+	if (IS_ROOT(entry) && !name) {
+		*path++ = '\\';
+		*path++ = '\0';
+		return 2;
 	}
 
 	/*
 	 * Build the path string walking the tree backward from end to ROOT
 	 * and store it in reversed order [see reverse_string()]
 	 */
-	for (;;) {
-		if (entry->d_name.len > SMB_MAXNAMELEN)
-			return -ENAMETOOLONG;
-		if (path - buf + entry->d_name.len > SMB_MAXPATHLEN)
+	while (!IS_ROOT(entry)) {
+		if (maxlen < 3)
 			return -ENAMETOOLONG;
 
-		len = server->convert(path, SMB_MAXNAMELEN, 
+		len = server->convert(path, maxlen-2, 
 				      entry->d_name.name, entry->d_name.len,
 				      server->local_nls, server->remote_nls);
+		if (len < 0)
+			return len;
 		reverse_string(path, len);
 		path += len;
-
-		*(path++) = '\\';
+		*path++ = '\\';
+		maxlen -= len+1;
 
 		entry = entry->d_parent;
-
 		if (IS_ROOT(entry))
 			break;
 	}
-
 	reverse_string(buf, path-buf);
 
+	/* maxlen is at least 1 */
 test_name_and_out:
-	if (name != NULL) {
-		*(path++) = '\\';
-name_and_out:
-		len = server->convert(path, SMB_MAXNAMELEN, 
+	if (name) {
+		if (maxlen < 3)
+			return -ENAMETOOLONG;
+		*path++ = '\\';
+		len = server->convert(path, maxlen-2, 
 				      name->name, name->len,
 				      server->local_nls, server->remote_nls);
+		if (len < 0)
+			return len;
 		path += len;
+		maxlen -= len+1;
 	}
-out:
-	*(path++) = '\0';
-	return (path-buf);
+	/* maxlen is at least 1 */
+	*path++ = '\0';
+	return path-buf;
 }
 
-static int smb_encode_path(struct smb_sb_info *server, char *buf,
+static int smb_encode_path(struct smb_sb_info *server, char *buf, int maxlen,
 			   struct dentry *dir, struct qstr *name)
 {
 	int result;
 
-	result = smb_build_path(server, buf, dir, name);
+	result = smb_build_path(server, buf, maxlen, dir, name);
 	if (result < 0)
 		goto out;
 	if (server->opt.protocol <= SMB_PROTOCOL_COREPLUS)
 		str_upper(buf, result);
 out:
 	return result;
+}
+
+static int smb_simple_encode_path(struct smb_sb_info *server, char **p,
+			  struct dentry * entry, struct qstr * name)
+{
+	char *s = *p;
+	int res;
+	int maxlen = ((char *)server->packet + server->packet_size) - s;
+
+	if (!maxlen)
+		return -ENAMETOOLONG;
+	*s++ = 4;
+	res = smb_encode_path(server, s, maxlen-1, entry, name);
+	if (res < 0)
+		return res;
+	*p = s + res;
+	return 0;
 }
 
 /* The following are taken directly from msdos-fs */
@@ -966,12 +994,9 @@ smb_proc_open(struct smb_sb_info *server, struct dentry *dentry, int wish)
 	p = smb_setup_header(server, SMBopen, 2, 0);
 	WSET(server->packet, smb_vwv0, mode);
 	WSET(server->packet, smb_vwv1, aSYSTEM | aHIDDEN | aDIR);
-	*p++ = 4;
-	res = smb_encode_path(server, p, dentry, NULL);
+	res = smb_simple_encode_path(server, &p, dentry, NULL);
 	if (res < 0)
 		goto out;
-	p += res;
-
 	smb_setup_bcc(server, p);
 
 	res = smb_request_ok(server, SMBopen, 7, 0);
@@ -1243,11 +1268,9 @@ smb_proc_create(struct dentry *dentry, __u16 attr, time_t ctime, __u16 *fileid)
 	p = smb_setup_header(server, SMBcreate, 3, 0);
 	WSET(server->packet, smb_vwv0, attr);
 	DSET(server->packet, smb_vwv1, utc2local(server, ctime));
-	*p++ = 4;
-	result = smb_encode_path(server, p, dentry, NULL);
+	result = smb_simple_encode_path(server, &p, dentry, NULL);
 	if (result < 0)
 		goto out;
-	p += result;
 	smb_setup_bcc(server, p);
 
 	result = smb_request_ok(server, SMBcreate, 1, 0);
@@ -1276,19 +1299,12 @@ smb_proc_mv(struct dentry *old_dentry, struct dentry *new_dentry)
       retry:
 	p = smb_setup_header(server, SMBmv, 1, 0);
 	WSET(server->packet, smb_vwv0, aSYSTEM | aHIDDEN | aDIR);
-
-	*p++ = 4;
-	result = smb_encode_path(server, p, old_dentry, NULL);
+	result = smb_simple_encode_path(server, &p, old_dentry, NULL);
 	if (result < 0)
 		goto out;
-	p += result;
-
-	*p++ = 4;
-	result = smb_encode_path(server, p, new_dentry, NULL);
+	result = smb_simple_encode_path(server, &p, new_dentry, NULL);
 	if (result < 0)
 		goto out;
-	p += result;
-
 	smb_setup_bcc(server, p);
 
 	if ((result = smb_request_ok(server, SMBmv, 0, 0)) < 0) {
@@ -1316,11 +1332,9 @@ smb_proc_generic_command(struct dentry *dentry, __u8 command)
 
       retry:
 	p = smb_setup_header(server, command, 0, 0);
-	*p++ = 4;
-	result = smb_encode_path(server, p, dentry, NULL);
+	result = smb_simple_encode_path(server, &p, dentry, NULL);
 	if (result < 0)
 		goto out;
-	p += result;
 	smb_setup_bcc(server, p);
 
 	result = smb_request_ok(server, command, 0, 0);
@@ -1386,11 +1400,9 @@ smb_proc_unlink(struct dentry *dentry)
       retry:
 	p = smb_setup_header(server, SMBunlink, 1, 0);
 	WSET(server->packet, smb_vwv0, aSYSTEM | aHIDDEN);
-	*p++ = 4;
-	result = smb_encode_path(server, p, dentry, NULL);
+	result = smb_simple_encode_path(server, &p, dentry, NULL);
 	if (result < 0)
 		goto out;
-	p += result;
 	smb_setup_bcc(server, p);
 
 	if ((result = smb_request_ok(server, SMBunlink, 0, 0)) < 0) {
@@ -1590,8 +1602,7 @@ smb_proc_readdir_short(struct file *filp, void *dirent, filldir_t filldir,
 	struct smb_sb_info *server = server_from_dentry(dir);
 	struct qstr qname;
 	struct smb_fattr fattr;
-
-	unsigned char *p;
+	char *p;
 	int result;
 	int i, first, entries_seen, entries;
 	int entries_asked = (server->opt.max_xmit - 100) / SMB_DIRINFO_SIZE;
@@ -1613,17 +1624,16 @@ smb_proc_readdir_short(struct file *filp, void *dirent, filldir_t filldir,
 		p = smb_setup_header(server, SMBsearch, 2, 0);
 		WSET(server->packet, smb_vwv0, entries_asked);
 		WSET(server->packet, smb_vwv1, aDIR);
-		*p++ = 4;
 		if (first == 1) {
-			result = smb_encode_path(server, p, dir, &mask);
+			result = smb_simple_encode_path(server, &p, dir, &mask);
 			if (result < 0)
 				goto unlock_return;
-			p += result;
 			*p++ = 5;
 			WSET(p, 0, 0);
 			p += 2;
 			first = 0;
 		} else {
+			*p++ = 4;
 			*p++ = 0;
 			*p++ = 5;
 			WSET(p, 0, SMB_STATUS_SIZE);
@@ -1862,7 +1872,7 @@ smb_proc_readdir_long(struct file *filp, void *dirent, filldir_t filldir,
 	 */
 	mask = param + 12;
 
-	mask_len = smb_encode_path(server, mask, dir, &star);
+	mask_len = smb_encode_path(server, mask, SMB_MAXNAMELEN+1, dir, &star);
 	if (mask_len < 0) {
 		result = mask_len;
 		goto unlock_return;
@@ -2069,7 +2079,7 @@ smb_proc_getattr_ff(struct smb_sb_info *server, struct dentry *dentry,
 	int mask_len, result;
 
 retry:
-	mask_len = smb_encode_path(server, mask, dentry, NULL);
+	mask_len = smb_encode_path(server, mask, SMB_MAXNAMELEN+1, dentry, NULL);
 	if (mask_len < 0) {
 		result = mask_len;
 		goto out;
@@ -2147,11 +2157,9 @@ smb_proc_getattr_core(struct smb_sb_info *server, struct dentry *dir,
 
       retry:
 	p = smb_setup_header(server, SMBgetatr, 0, 0);
-	*p++ = 4;
-	result = smb_encode_path(server, p, dir, NULL);
+	result = smb_simple_encode_path(server, &p, dir, NULL);
 	if (result < 0)
 		goto out;
-	p += result;
 	smb_setup_bcc(server, p);
 
 	if ((result = smb_request_ok(server, SMBgetatr, 10, 0)) < 0)
@@ -2197,7 +2205,7 @@ smb_proc_getattr_trans2(struct smb_sb_info *server, struct dentry *dir,
       retry:
 	WSET(param, 0, 1);	/* Info level SMB_INFO_STANDARD */
 	DSET(param, 2, 0);
-	result = smb_encode_path(server, param + 6, dir, NULL);
+	result = smb_encode_path(server, param+6, SMB_MAXNAMELEN+1, dir, NULL);
 	if (result < 0)
 		goto out;
 	p = param + 6 + result;
@@ -2344,11 +2352,9 @@ smb_proc_setattr_core(struct smb_sb_info *server, struct dentry *dentry,
 	WSET(server->packet, smb_vwv5, 0);
 	WSET(server->packet, smb_vwv6, 0);
 	WSET(server->packet, smb_vwv7, 0);
-	*p++ = 4;
-	result = smb_encode_path(server, p, dentry, NULL);
+	result = smb_simple_encode_path(server, &p, dentry, NULL);
 	if (result < 0)
 		goto out;
-	p += result;
 	*p++ = 4;
 	*p++ = 0;
 	smb_setup_bcc(server, p);
@@ -2445,7 +2451,7 @@ smb_proc_setattr_trans2(struct smb_sb_info *server,
       retry:
 	WSET(param, 0, 1);	/* Info level SMB_INFO_STANDARD */
 	DSET(param, 2, 0);
-	result = smb_encode_path(server, param + 6, dir, NULL);
+	result = smb_encode_path(server, param+6, SMB_MAXNAMELEN+1, dir, NULL);
 	if (result < 0)
 		goto out;
 	p = param + 6 + result;

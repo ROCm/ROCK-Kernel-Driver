@@ -50,6 +50,7 @@
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/pcm.h>
@@ -1330,23 +1331,23 @@ static int snd_es1938_free(es1938_t *chip)
 #endif
 	if (chip->res_io_port) {
 		release_resource(chip->res_io_port);
-		kfree(chip->res_io_port);
+		kfree_nocheck(chip->res_io_port);
 	}
 	if (chip->res_sb_port) {
 		release_resource(chip->res_sb_port);
-		kfree(chip->res_sb_port);
+		kfree_nocheck(chip->res_sb_port);
 	}
 	if (chip->res_vc_port) {
 		release_resource(chip->res_vc_port);
-		kfree(chip->res_vc_port);
+		kfree_nocheck(chip->res_vc_port);
 	}
 	if (chip->res_mpu_port) {
 		release_resource(chip->res_mpu_port);
-		kfree(chip->res_mpu_port);
+		kfree_nocheck(chip->res_mpu_port);
 	}
 	if (chip->res_game_port) {
 		release_resource(chip->res_game_port);
-		kfree(chip->res_game_port);
+		kfree_nocheck(chip->res_game_port);
 	}
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void *)chip);

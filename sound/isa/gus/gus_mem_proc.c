@@ -21,6 +21,7 @@
 
 #define __NO_VERSION__
 #include <sound/driver.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/gus.h>
 #include <sound/info.h>

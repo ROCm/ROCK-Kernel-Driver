@@ -30,6 +30,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/time.h>
 #include <sound/core.h>
 #include <sound/timer.h>
 #include <sound/info.h>

@@ -36,6 +36,7 @@
 #include <linux/delay.h>
 #include <linux/pm.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/info.h>
@@ -48,7 +49,7 @@
  */
 
 #if 0
-#define ACCEPT_VALID		/* REQUIRED ONLY FOR OSS EMULATION */
+#define SND_CONFIG_CS46XX_ACCEPT_VALID		/* REQUIRED ONLY FOR OSS EMULATION */
 #endif
 
 #define CS46XX_BA0_SIZE		0x1000
@@ -1048,7 +1049,7 @@ static void snd_cs46xx_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static snd_pcm_hardware_t snd_cs46xx_playback =
 {
 	info:			(SNDRV_PCM_INFO_MMAP |
-#ifdef ACCEPT_VALID
+#ifdef SND_CONFIG_CS46XX_ACCEPT_VALID
 				/* NOT TRUE!!! OSS REQUIRES IT */
 				 SNDRV_PCM_INFO_MMAP_VALID | 
 #endif
@@ -1074,7 +1075,7 @@ static snd_pcm_hardware_t snd_cs46xx_playback =
 static snd_pcm_hardware_t snd_cs46xx_capture =
 {
 	info:			(SNDRV_PCM_INFO_MMAP |
-#ifdef ACCEPT_VALID
+#ifdef SND_CONFIG_CS46XX_ACCEPT_VALID
 				 /* NOT TRUE!!! OSS REQUIRES IT */
 				 SNDRV_PCM_INFO_MMAP_VALID |
 #endif
@@ -1652,7 +1653,7 @@ static int snd_cs46xx_free(cs46xx_t *chip)
 			iounmap((void *) region->remap_addr);
 		if (region->resource) {
 			release_resource(region->resource);
-			kfree(region->resource);
+			kfree_nocheck(region->resource);
 		}
 	}
 	if (chip->irq >= 0)
@@ -2079,11 +2080,11 @@ static struct cs_card_type __initdata cards[] = {
  * APM support
  */
 #ifdef CONFIG_PM
-void snd_cs46xx_suspend(cs46xx_t *chip, int can_schedule)
+void snd_cs46xx_suspend(cs46xx_t *chip)
 {
 	snd_card_t *card = chip->card;
 
-	snd_power_lock(card, can_schedule);
+	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D3hot)
 		goto __skip;
 	snd_pcm_suspend_all(chip->pcm);
@@ -2095,12 +2096,12 @@ void snd_cs46xx_suspend(cs46xx_t *chip, int can_schedule)
       	snd_power_unlock(card);
 }
 
-void snd_cs46xx_resume(cs46xx_t *chip, int can_schedule)
+void snd_cs46xx_resume(cs46xx_t *chip)
 {
 	snd_card_t *card = chip->card;
 	int amp_saved;
 
-	snd_power_lock(card, can_schedule);
+	snd_power_lock(card);
 	if (card->power_state == SNDRV_CTL_POWER_D0)
 		goto __skip;
 
@@ -2143,11 +2144,11 @@ static int snd_cs46xx_set_power_state(snd_card_t *card, unsigned int power_state
 	case SNDRV_CTL_POWER_D0:
 	case SNDRV_CTL_POWER_D1:
 	case SNDRV_CTL_POWER_D2:
-		snd_cs46xx_resume(chip, 1);
+		snd_cs46xx_resume(chip);
 		break;
 	case SNDRV_CTL_POWER_D3hot:
 	case SNDRV_CTL_POWER_D3cold:
-		snd_cs46xx_suspend(chip, 1);
+		snd_cs46xx_suspend(chip);
 		break;
 	default:
 		return -EINVAL;

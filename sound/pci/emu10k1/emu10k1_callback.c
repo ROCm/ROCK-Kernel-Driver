@@ -24,7 +24,7 @@
 
 /* voice status */
 enum {
-	V_OFF=0, V_RELEASED, V_PLAYING, V_END
+	V_FREE=0, V_OFF, V_RELEASED, V_PLAYING, V_END
 };
 
 /* Keeps track of what we are finding */
@@ -235,8 +235,9 @@ lookup_voices(snd_emux_t *emu, emu10k1_t *hw, best_voice_t *best, int active_onl
 			if (vp->ch < 0) {
 				if (active_only)
 					continue;
-			}
-			bp = best + V_OFF;
+				bp = best + V_FREE;
+			} else
+				bp = best + V_OFF;
 		}
 		else if (state == SNDRV_EMUX_ST_RELEASED ||
 			 state == SNDRV_EMUX_ST_PENDING) {
@@ -255,7 +256,7 @@ lookup_voices(snd_emux_t *emu, emu10k1_t *hw, best_voice_t *best, int active_onl
 			continue;
 
 		/* check if sample is finished playing (non-looping only) */
-		if (bp != best + V_OFF &&
+		if (bp != best + V_OFF && bp != best + V_FREE &&
 		    (vp->reg.sample_mode & SNDRV_SFNT_SAMPLE_SINGLESHOT)) {
 			val = snd_emu10k1_ptr_read(hw, CCCA_CURRADDR, vp->ch);
 			if (val >= vp->reg.loopstart)

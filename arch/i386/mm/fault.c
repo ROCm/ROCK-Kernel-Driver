@@ -320,12 +320,20 @@ no_context:
 	asm("movl %%cr3,%0":"=r" (page));
 	page = ((unsigned long *) __va(page))[address >> 22];
 	printk(KERN_ALERT "*pde = %08lx\n", page);
+	/*
+	 * We must not directly access the pte in the highpte
+	 * case, the page table might be allocated in highmem.
+	 * And lets rather not kmap-atomic the pte, just in case
+	 * it's allocated already.
+	 */
+#ifndef CONFIG_HIGHPTE
 	if (page & 1) {
 		page &= PAGE_MASK;
 		address &= 0x003ff000;
 		page = ((unsigned long *) __va(page))[address >> PAGE_SHIFT];
 		printk(KERN_ALERT "*pte = %08lx\n", page);
 	}
+#endif
 	die("Oops", regs, error_code);
 	bust_spinlocks(0);
 	do_exit(SIGKILL);
@@ -395,7 +403,7 @@ vmalloc_fault:
 			goto no_context;
 		set_pmd(pmd, *pmd_k);
 
-		pte_k = pte_offset(pmd_k, address);
+		pte_k = pte_offset_kernel(pmd_k, address);
 		if (!pte_present(*pte_k))
 			goto no_context;
 		return;

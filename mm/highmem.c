@@ -20,6 +20,7 @@
 #include <linux/pagemap.h>
 #include <linux/mempool.h>
 #include <linux/blkdev.h>
+#include <asm/pgalloc.h>
 
 static mempool_t *page_pool, *isa_page_pool;
 
@@ -378,7 +379,7 @@ void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig)
 		/*
 		 * is destination page below bounce pfn?
 		 */
-		if ((page - page->zone->zone_mem_map) + (page->zone->zone_start_paddr >> PAGE_SHIFT) < pfn)
+		if ((page - page_zone(page)->zone_mem_map) + (page_zone(page)->zone_start_paddr >> PAGE_SHIFT) < pfn)
 			continue;
 
 		/*
@@ -445,3 +446,19 @@ void create_bounce(unsigned long pfn, int gfp, struct bio **bio_orig)
 	bio->bi_private = *bio_orig;
 	*bio_orig = bio;
 }
+
+#if CONFIG_DEBUG_HIGHMEM
+void check_highmem_ptes(void)
+{
+	int idx, type;
+
+	for (type = 0; type < KM_TYPE_NR; type++) {
+		idx = type + KM_TYPE_NR*smp_processor_id();
+		if (!pte_none(*(kmap_pte-idx))) {
+			printk("scheduling with KM_TYPE %d held!\n", type);
+			BUG();
+		}
+	}
+}
+#endif
+

@@ -1,5 +1,5 @@
 /*
- * USB Skeleton driver - 0.6
+ * USB Skeleton driver - 0.7
  *
  * Copyright (c) 2001 Greg Kroah-Hartman (greg@kroah.com)
  *
@@ -22,6 +22,9 @@
  *
  * History:
  *
+ * 2002_02_12 - 0.7 - zero out dev in probe function for devices that do
+ *			not have both a bulk in and bulk out endpoint.
+ *			Thanks to Holger Waechtler for the fix.
  * 2001_11_05 - 0.6 - fix minor locking problem in skel_disconnect.
  *			Thanks to Pete Zaitcev for the fix.
  * 2001_09_04 - 0.5 - fix devfs bug in skel_disconnect. Thanks to wim delvaux
@@ -542,6 +545,7 @@ static void * skel_probe(struct usb_device *udev, unsigned int ifnum, const stru
 		err ("Out of memory");
 		goto exit;
 	}
+	memset (dev, 0x00, sizeof (*dev));
 	minor_table[minor] = dev;
 
 	interface = &udev->actconfig->interface[ifnum];

@@ -118,30 +118,6 @@ static inline int meye_emptyq(struct meye_queue *queue, int *elem) {
 #define MDEBUG(x)	do {} while (0)
 /* #define MDEBUG(x)	x */
 
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-static inline unsigned long uvirt_to_kva(pgd_t *pgd, unsigned long adr) {
-        unsigned long ret = 0UL;
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-  
-	if (!pgd_none(*pgd)) {
-                pmd = pmd_offset(pgd, adr);
-                if (!pmd_none(*pmd)) {
-                        ptep = pte_offset(pmd, adr);
-                        pte = *ptep;
-                        if(pte_present(pte)) {
-				ret = (unsigned long)page_address(pte_page(pte));
-				ret |= (adr & (PAGE_SIZE - 1));
-				
-			}
-                }
-        }
-        MDEBUG(printk("uv2kva(%lx-->%lx)\n", adr, ret));
-	return ret;
-}
-
 /* Here we want the physical address of the memory.
  * This is used when initializing the contents of the
  * area and marking the pages as reserved.
@@ -150,7 +126,7 @@ static inline unsigned long kvirt_to_pa(unsigned long adr) {
         unsigned long va, kva, ret;
 
         va = VMALLOC_VMADDR(adr);
-        kva = uvirt_to_kva(pgd_offset_k(va), va);
+        kva = page_address(vmalloc_to_page(va));
 	ret = __pa(kva);
         MDEBUG(printk("kv2pa(%lx-->%lx)\n", adr, ret));
         return ret;

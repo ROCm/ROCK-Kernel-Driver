@@ -47,6 +47,7 @@
 #include <sound/driver.h>
 #include <asm/io.h>
 #include <linux/init.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
@@ -602,7 +603,7 @@ static int __devinit snd_card_als4k_probe(struct pci_dev *pci,
 			    sizeof( snd_card_als4000_t ) );
 	if (card == NULL) {
 		release_resource(res_gcr_port);
-		kfree(res_gcr_port);
+		kfree_nocheck(res_gcr_port);
 		return -ENOMEM;
 	}
 
@@ -619,7 +620,7 @@ static int __devinit snd_card_als4k_probe(struct pci_dev *pci,
 				    SB_HW_ALS4000,
 				    &chip)) < 0) {
 		release_resource(res_gcr_port);
-		kfree(res_gcr_port);
+		kfree_nocheck(res_gcr_port);
 		snd_card_free(card);
 		return err;
 	}

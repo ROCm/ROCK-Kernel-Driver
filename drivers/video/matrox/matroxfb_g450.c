@@ -4,7 +4,9 @@
  *
  * (c) 1998-2001 Petr Vandrovec <vandrove@vc.cvut.cz>
  *
- * Version: 1.51 2001/01/19
+ * Portions Copyright (c) 2001 Matrox Graphics Inc.
+ *
+ * Version: 1.62 2001/11/29
  *
  * See matroxfb_base.c for contributors.
  *
@@ -13,117 +15,26 @@
 #include "matroxfb_g450.h"
 #include "matroxfb_misc.h"
 #include "matroxfb_DAC1064.h"
+#include "g450_pll.h"
 #include <linux/matroxfb.h>
 #include <asm/uaccess.h>
 
-static int matroxfb_g450_get_reg(WPMINFO int reg) {
-	int val;
-	unsigned long flags;
-
-	matroxfb_DAC_lock_irqsave(flags);
-	val = matroxfb_DAC_in(PMINFO reg);
-	matroxfb_DAC_unlock_irqrestore(flags);
-	return val;
-}
-
-static int matroxfb_g450_set_reg(WPMINFO int reg, int val) {
-	unsigned long flags;
-
-	matroxfb_DAC_lock_irqsave(flags);
-	matroxfb_DAC_out(PMINFO reg, val);
-	matroxfb_DAC_unlock_irqrestore(flags);
+static int matroxfb_g450_compute(void* md, struct my_timming* mt) {
+#define m2info ((struct matroxfb_g450_info*)md)
+#define minfo (m2info->primary_dev)
+	ACCESS_FBINFO(hw).vidclk = mt->pixclock;
+#undef minfo
+#undef m2info
 	return 0;
 }
 
-static const struct matrox_pll_features maven_pll = {
-	110000,
-	27000,
-	4, 127,
-	2, 31,
-	3
-};
-
-static const struct matrox_pll_features g550_pll = {
-	135000,
-	27000,
-	4, 127,
-	0, 9,
-	3
-};
-
-static void DAC1064_calcclock(unsigned int freq, unsigned int fmax,
-		unsigned int* in, unsigned int* feed, unsigned int* post,
-		unsigned int timmings) {
-	unsigned int fvco;
-	unsigned int p;
-
-	switch (timmings) {
-		default:
-			fvco = matroxfb_PLL_calcclock(&maven_pll, freq, fmax, in, feed, &p);
-			/* 0 => 100 ... 275 MHz
-		           1 => 243 ... 367 MHz
-		           2 => 320 ... 475 MHz
-		           3 => 453 ... 556 MHz
-		           4 => 540 ... 594 MHz
-		           5 => 588 ... 621 MHz
-		           6 => 626 ... 637 MHz
-		           7 => 631 ... 642 MHz
-
-		           As you can see, never choose frequency > 621 MHz, there is unavailable gap...
-		           Just to be sure, currently driver uses 110 ... 500 MHz range.
-		         */
-			if (fvco <= 260000)
-				;
-			else if (fvco <= 350000)
-				p |= 0x08;
-			else if (fvco <= 460000)
-				p |= 0x10;
-			else if (fvco <= 550000)
-				p |= 0x18;
-			else if (fvco <= 590000)
-				p |= 0x20;
-			else
-				p |= 0x28;
-			break;
-		case 1:
-			fvco = matroxfb_PLL_calcclock(&g550_pll, freq, fmax, in, feed, &p);
-			/* p |= 0x00; */
-			break;
-	}
-	*post = p;
-	return;
-}
-
-static inline int matroxfb_g450_compute_timming(struct matroxfb_g450_info* m2info,
-		struct my_timming* mt,
-		struct mavenregs* m) {
-	unsigned int a, b, c;
-
-	DAC1064_calcclock(mt->pixclock, 300000, &a, &b, &c, m2info->timmings);
-	m->regs[0x80] = a;
-	m->regs[0x81] = b;
-	m->regs[0x82] = c;
-	printk(KERN_DEBUG "PLL: %02X %02X %02X\n", a, b, c);
+static int matroxfb_g450_program(void* md) {
+#define m2info ((struct matroxfb_g450_info*)md)
+#define minfo (m2info->primary_dev)
+	matroxfb_g450_setclk(PMINFO ACCESS_FBINFO(hw).vidclk, M_VIDEO_PLL);
+#undef minfo
+#undef m2info	
 	return 0;
-}
-
-static inline int matroxfb_g450_program_timming(struct matroxfb_g450_info* m2info, const struct mavenregs* m) {
-	MINFO_FROM(m2info->primary_dev);
-
-	matroxfb_g450_set_reg(PMINFO M1064_XPIXPLL2M, m->regs[0x81]);
-	matroxfb_g450_set_reg(PMINFO M1064_XPIXPLL2N, m->regs[0x80]);
-	matroxfb_g450_set_reg(PMINFO M1064_XPIXPLL2P, m->regs[0x82]);
-	return 0;
-}
-
-/******************************************************/
-
-static int matroxfb_g450_compute(void* md, struct my_timming* mt, struct matrox_hw_state* mr) {
-	return matroxfb_g450_compute_timming(md, mt, &mr->maven);
-}
-
-static int matroxfb_g450_program(void* md, const struct matrox_hw_state* mr) {
-	return matroxfb_g450_program_timming(md, &mr->maven);
 }
 
 static int matroxfb_g450_start(void* md) {
@@ -191,7 +102,7 @@ static void matroxfb_g450_shutdown(struct matroxfb_g450_info* m2info) {
 static void* matroxfb_g450_probe(struct matrox_fb_info* minfo) {
 	struct matroxfb_g450_info* m2info;
 
-	/* hardware is not G450 incapable... */
+	/* hardware is not G450... */
 	if (!ACCESS_FBINFO(devflags.g450dac))
 		return NULL;
 	m2info = (struct matroxfb_g450_info*)kmalloc(sizeof(*m2info), GFP_KERNEL);
@@ -201,11 +112,6 @@ static void* matroxfb_g450_probe(struct matrox_fb_info* minfo) {
 	}
 	memset(m2info, 0, sizeof(*m2info));
 	m2info->primary_dev = MINFO;
-	if (ACCESS_FBINFO(devflags.g550dac)) {
-		m2info->timmings = 1;
-	} else {
-		m2info->timmings = 0;
-	}
 	if (matroxfb_g450_connect(m2info)) {
 		kfree(m2info);
 		printk(KERN_ERR "matroxfb_g450: G450 DAC failed to initialize\n");

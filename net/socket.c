@@ -280,6 +280,15 @@ static struct inode *sock_alloc_inode(struct super_block *sb)
 	if (!ei)
 		return NULL;
 	init_waitqueue_head(&ei->socket.wait);
+	
+	ei->socket.fasync_list = NULL;
+	ei->socket.state = SS_UNCONNECTED;
+	ei->socket.flags = 0;
+	ei->socket.ops = NULL;
+	ei->socket.sk = NULL;
+	ei->socket.file = NULL;
+	ei->socket.passcred = 0;
+
 	return &ei->vfs_inode;
 }
 
@@ -494,13 +503,6 @@ struct socket *sock_alloc(void)
 	inode->i_sock = 1;
 	inode->i_uid = current->fsuid;
 	inode->i_gid = current->fsgid;
-
-	sock->fasync_list = NULL;
-	sock->state = SS_UNCONNECTED;
-	sock->flags = 0;
-	sock->ops = NULL;
-	sock->sk = NULL;
-	sock->file = NULL;
 
 	sockets_in_use[smp_processor_id()].counter++;
 	return sock;

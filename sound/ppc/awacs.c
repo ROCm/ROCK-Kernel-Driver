@@ -357,9 +357,11 @@ snd_pmac_awacs_init(pmac_t *chip)
 		snd_pmac_awacs_write_reg(chip, 7, 0);
 	}
 
+#ifdef CONFIG_PMAC_PBOOK
 	/* Recalibrate chip */
 	if (chip->model == PMAC_SCREAMER)
 		screamer_recalibrate(chip);
+#endif
 
 	if (chip->model <= PMAC_SCREAMER && chip->revision == 0) {
 		chip->revision =

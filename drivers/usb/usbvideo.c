@@ -26,6 +26,7 @@
 #include <linux/wrapper.h>
 #include <linux/init.h>
 #include <linux/spinlock.h>
+#include <linux/mm.h>
 
 #include <asm/io.h>
 
@@ -60,30 +61,6 @@ static int usbvideo_default_procfs_write_proc(
 
 #define MDEBUG(x)	do { } while(0)		/* Debug memory management */
 
-/* Given PGD from the address space's page table, return the kernel
- * virtual mapping of the physical memory mapped at ADR.
- */
-unsigned long usbvideo_uvirt_to_kva(pgd_t *pgd, unsigned long adr)
-{
-	unsigned long ret = 0UL;
-	pmd_t *pmd;
-	pte_t *ptep, pte;
-
-	if (!pgd_none(*pgd)) {
-		pmd = pmd_offset(pgd, adr);
-		if (!pmd_none(*pmd)) {
-			ptep = pte_offset(pmd, adr);
-			pte = *ptep;
-			if (pte_present(pte)) {
-				ret = (unsigned long) page_address(pte_page(pte));
-				ret |= (adr & (PAGE_SIZE-1));
-			}
-		}
-	}
-	MDEBUG(printk("uv2kva(%lx-->%lx)", adr, ret));
-	return ret;
-}
-
 /*
  * Here we want the physical address of the memory.
  * This is used when initializing the contents of the
@@ -94,7 +71,7 @@ unsigned long usbvideo_kvirt_to_pa(unsigned long adr)
 	unsigned long va, kva, ret;
 
 	va = VMALLOC_VMADDR(adr);
-	kva = usbvideo_uvirt_to_kva(pgd_offset_k(va), va);
+	kva = page_address(vmalloc_to_page(va));
 	ret = __pa(kva);
 	MDEBUG(printk("kv2pa(%lx-->%lx)", adr, ret));
 	return ret;

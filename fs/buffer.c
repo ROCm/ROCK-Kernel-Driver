@@ -2115,8 +2115,7 @@ int generic_direct_IO(int rw, struct inode * inode, struct kiobuf * iobuf, unsig
  * of kiobuf structs (much like a user-space iovec list).
  *
  * The kiobuf must already be locked for IO.  IO is submitted
- * asynchronously: you need to check page->locked, page->uptodate, and
- * maybe wait on page->wait.
+ * asynchronously: you need to check page->locked and page->uptodate.
  *
  * It is up to the caller to make sure that there are enough blocks
  * passed in to completely map the iobufs to disk.
@@ -2173,8 +2172,8 @@ int brw_kiovec(int rw, int nr, struct kiobuf *iovec[], kdev_t dev, sector_t b[],
 /*
  * Start I/O on a page.
  * This function expects the page to be locked and may return
- * before I/O is complete. You then have to check page->locked,
- * page->uptodate, and maybe wait on page->wait.
+ * before I/O is complete. You then have to check page->locked
+ * and page->uptodate.
  *
  * brw_page() is SMP-safe, although it's being called with the
  * kernel lock held - but the code is ready.

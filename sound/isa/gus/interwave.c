@@ -26,6 +26,12 @@
 #include <asm/dma.h>
 #include <linux/delay.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#ifndef LINUX_ISAPNP_H
+#include <linux/isapnp.h>
+#define isapnp_card pci_bus
+#define isapnp_dev pci_dev
+#endif
 #include <sound/core.h>
 #include <sound/gus.h>
 #include <sound/cs4231.h>
@@ -688,7 +694,7 @@ static void snd_interwave_free(snd_card_t *card)
 #ifdef SNDRV_STB
 	if (iwcard->i2c_res) {
 		release_resource(iwcard->i2c_res);
-		kfree(iwcard->i2c_res);
+		kfree_nocheck(iwcard->i2c_res);
 	}
 #endif
 	if (iwcard->irq >= 0)

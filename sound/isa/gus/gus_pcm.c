@@ -28,6 +28,7 @@
 #define __NO_VERSION__
 #include <sound/driver.h>
 #include <asm/dma.h>
+#include <linux/slab.h>
 #include <sound/core.h>
 #include <sound/control.h>
 #include <sound/gus.h>
@@ -93,6 +94,7 @@ static int snd_gf1_pcm_block_change(snd_pcm_substream_t * substream,
 		block.cmd |= SNDRV_GF1_DMA_16BIT;
 	block.addr = addr & ~31;
 	block.buffer = runtime->dma_area + offset;
+	block.buf_addr = runtime->dma_addr + offset;
 	block.count = count;
 	block.private_data = pcmp;
 	block.ack = snd_gf1_pcm_block_change_ack;
@@ -570,7 +572,7 @@ static int snd_gf1_pcm_capture_prepare(snd_pcm_substream_t * substream)
 	snd_gf1_i_write8(gus, SNDRV_GF1_GB_RECORD_RATE, runtime->rate_den - 2);
 	snd_gf1_i_write8(gus, SNDRV_GF1_GB_REC_DMA_CONTROL, 0);	/* disable sampling */
 	snd_gf1_i_look8(gus, SNDRV_GF1_GB_REC_DMA_CONTROL);	/* Sampling Control Register */
-	snd_dma_program(gus->gf1.dma2, &runtime->dma_area, gus->c_period_size, DMA_MODE_READ);
+	snd_dma_program(gus->gf1.dma2, runtime->dma_addr, gus->c_period_size, DMA_MODE_READ);
 	return 0;
 }
 
@@ -860,7 +862,7 @@ int snd_gf1_pcm_new(snd_gus_card_t * gus, int pcm_dev, int control_index, snd_pc
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &snd_gf1_pcm_playback_ops);
 
 	for (substream = pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream; substream; substream = substream->next)
-		snd_pcm_lib_preallocate_isa_pages(substream, 64*1024, gus->gf1.dma1 > 3 ? 128*1024 : 64*1024, GFP_KERNEL|GFP_DMA);
+		snd_pcm_lib_preallocate_isa_pages(substream, 64*1024, gus->gf1.dma1 > 3 ? 128*1024 : 64*1024);
 	
 	pcm->info_flags = 0;
 	pcm->dev_subclass = SNDRV_PCM_SUBCLASS_GENERIC_MIX;
@@ -868,7 +870,7 @@ int snd_gf1_pcm_new(snd_gus_card_t * gus, int pcm_dev, int control_index, snd_pc
 		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &snd_gf1_pcm_capture_ops);
 		if (gus->gf1.dma2 == gus->gf1.dma1)
 			pcm->info_flags |= SNDRV_PCM_INFO_HALF_DUPLEX;
-		snd_pcm_lib_preallocate_isa_pages(pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream, 64*1024, gus->gf1.dma2 > 3 ? 128*1024 : 64*1024, GFP_KERNEL|GFP_DMA);
+		snd_pcm_lib_preallocate_isa_pages(pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream, 64*1024, gus->gf1.dma2 > 3 ? 128*1024 : 64*1024);
 	}
 	strcpy(pcm->name, pcm->id);
 	if (gus->interwave) {

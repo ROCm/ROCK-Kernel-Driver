@@ -754,7 +754,7 @@ inline int _fh_update(struct dentry *dentry, struct svc_export *exp,
 		*maxsize = 2;
 		return 1;
 	}
-	*datap++ = ino_t_to_u32(dentry->d_parent->d_inode->i_ino);
+	*datap++ = ino_t_to_u32(parent_ino(dentry));
 	*maxsize = 3;
 	return 2;
 }
@@ -814,7 +814,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		fhp->fh_handle.ofh_dev =  htonl((major(exp->ex_dev)<<16)| minor(exp->ex_dev));
 		fhp->fh_handle.ofh_xdev = fhp->fh_handle.ofh_dev;
 		fhp->fh_handle.ofh_xino = ino_t_to_u32(exp->ex_ino);
-		fhp->fh_handle.ofh_dirino = ino_t_to_u32(dentry->d_parent->d_inode->i_ino);
+		fhp->fh_handle.ofh_dirino = ino_t_to_u32(parent_ino(dentry));
 		if (inode)
 			_fh_update_old(dentry, exp, &fhp->fh_handle);
 	} else {

@@ -7,6 +7,7 @@
 #include <linux/config.h>
 #include <linux/spinlock.h>
 #include <linux/list.h>
+#include <linux/wait.h>
 
 /*
  * Free memory management - zoned buddy allocator.
@@ -46,6 +47,35 @@ typedef struct zone_struct {
 	 * free areas of different sizes
 	 */
 	free_area_t		free_area[MAX_ORDER];
+
+	/*
+	 * wait_table		-- the array holding the hash table
+	 * wait_table_size	-- the size of the hash table array
+	 * wait_table_shift	-- wait_table_size
+	 * 				== BITS_PER_LONG (1 << wait_table_bits)
+	 *
+	 * The purpose of all these is to keep track of the people
+	 * waiting for a page to become available and make them
+	 * runnable again when possible. The trouble is that this
+	 * consumes a lot of space, especially when so few things
+	 * wait on pages at a given time. So instead of using
+	 * per-page waitqueues, we use a waitqueue hash table.
+	 *
+	 * The bucket discipline is to sleep on the same queue when
+	 * colliding and wake all in that wait queue when removing.
+	 * When something wakes, it must check to be sure its page is
+	 * truly available, a la thundering herd. The cost of a
+	 * collision is great, but given the expected load of the
+	 * table, they should be so rare as to be outweighed by the
+	 * benefits from the saved space.
+	 *
+	 * __wait_on_page() and unlock_page() in mm/filemap.c, are the
+	 * primary users of these fields, and in mm/page_alloc.c
+	 * free_area_init_core() performs the initialization of them.
+	 */
+	wait_queue_head_t	* wait_table;
+	unsigned long		wait_table_size;
+	unsigned long		wait_table_shift;
 
 	/*
 	 * Discontig memory support fields.
@@ -132,10 +162,14 @@ extern pg_data_t contig_page_data;
 
 #define NODE_DATA(nid)		(&contig_page_data)
 #define NODE_MEM_MAP(nid)	mem_map
+#define MAX_NR_NODES		1
 
 #else /* !CONFIG_DISCONTIGMEM */
 
 #include <asm/mmzone.h>
+
+/* page->zone is currently 8 bits ... */
+#define MAX_NR_NODES		(255 / MAX_NR_ZONES)
 
 #endif /* !CONFIG_DISCONTIGMEM */
 

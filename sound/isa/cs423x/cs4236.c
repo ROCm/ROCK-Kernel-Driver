@@ -21,6 +21,12 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/slab.h>
+#ifndef LINUX_ISAPNP_H
+#include <linux/isapnp.h>
+#define isapnp_card pci_bus
+#define isapnp_dev pci_dev
+#endif
 #include <sound/core.h>
 #include <sound/cs4231.h>
 #include <sound/mpu401.h>
@@ -387,7 +393,7 @@ static void snd_card_cs4236_free(snd_card_t *card)
 #endif
 		if (acard->res_sb_port) {
 			release_resource(acard->res_sb_port);
-			kfree(acard->res_sb_port);
+			kfree_nocheck(acard->res_sb_port);
 		}
 	}
 }

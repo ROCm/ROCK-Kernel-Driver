@@ -788,7 +788,7 @@ void __init trap_init_f00f_bug(void)
 	page = (unsigned long) vmalloc(PAGE_SIZE);
 	pgd = pgd_offset(&init_mm, page);
 	pmd = pmd_offset(pgd, page);
-	pte = pte_offset(pmd, page);
+	pte = pte_offset_kernel(pmd, page);
 	__free_page(pte_page(*pte));
 	*pte = mk_pte_phys(__pa(&idt_table), PAGE_KERNEL_RO);
 	/*

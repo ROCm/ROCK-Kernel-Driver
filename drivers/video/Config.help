@@ -381,8 +381,8 @@ CONFIG_FB_MATROX
   Say Y here if you have a Matrox Millennium, Matrox Millennium II,
   Matrox Mystique, Matrox Mystique 220, Matrox Productiva G100, Matrox
   Mystique G200, Matrox Millennium G200, Matrox Marvel G200 video,
-  Matrox G400 or G450 card in your box. At this time, support for the
-  G100 is untested and support for G450 is highly experimental.
+  Matrox G400, G450 or G550 card in your box. At this time, support for 
+  the G-series digital output is almost non-existant.
 
   This driver is also available as a module ( = code which can be
   inserted and removed from the running kernel whenever you want).
@@ -408,7 +408,7 @@ CONFIG_FB_MATROX_MYSTIQUE
   different from 8.
 
 CONFIG_FB_MATROX_G100
-  Say Y here if you have a Matrox G100, G200, G400 or G450 based
+  Say Y here if you have a Matrox G100, G200, G400, G450 or G550 based
   video card. If you select "Advanced lowlevel driver options", you
   should check 8 bpp packed pixel, 16 bpp packed pixel, 24 bpp packed
   pixel and 32 bpp packed pixel. You can also use font widths
@@ -418,6 +418,10 @@ CONFIG_FB_MATROX_G100
   "I2C support" and "I2C bit-banging support" in the character devices
   section, and then to "Matrox I2C support" and "G400 second head
   support" here in the framebuffer section.
+  
+  If you have G550, you must also compile support for G450/G550 secondary
+  head into kernel, otherwise picture will be shown only on output you
+  are probably not using...
 
 CONFIG_FB_MATROX_I2C
   This drivers creates I2C buses which are needed for accessing the
@@ -462,7 +466,8 @@ CONFIG_FB_MATROX_MAVEN
 
 CONFIG_FB_MATROX_G450
   Say Y or M here if you want to use a secondary head (meaning two
-  monitors in parallel) on G450.
+  monitors in parallel) on G450, or if you are using analog output
+  of G550.
 
   If you compile it as module, two modules are created,
   matroxfb_crtc2.o and matroxfb_g450.o. Both modules are needed if you

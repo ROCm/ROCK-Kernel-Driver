@@ -30,7 +30,7 @@ static inline void free_area_pte(pmd_t * pmd, unsigned long address, unsigned lo
 		pmd_clear(pmd);
 		return;
 	}
-	pte = pte_offset(pmd, address);
+	pte = pte_offset_kernel(pmd, address);
 	address &= ~PMD_MASK;
 	end = address + size;
 	if (end > PMD_SIZE)
@@ -125,7 +125,7 @@ static inline int alloc_area_pmd(pmd_t * pmd, unsigned long address, unsigned lo
 	if (end > PGDIR_SIZE)
 		end = PGDIR_SIZE;
 	do {
-		pte_t * pte = pte_alloc(&init_mm, pmd, address);
+		pte_t * pte = pte_alloc_kernel(&init_mm, pmd, address);
 		if (!pte)
 			return -ENOMEM;
 		if (alloc_area_pte(pte, address, end - address, gfp_mask, prot))
