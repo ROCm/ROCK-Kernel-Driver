@@ -47,6 +47,7 @@
 #include <linux/sched.h>
 #include <linux/fs.h>
 #include <linux/stat.h>
+#include <linux/pci.h>
 #include <linux/errno.h>
 #include <linux/file.h>
 #include <linux/ioctl.h>
@@ -55,6 +56,7 @@
 #include <linux/blkpg.h>
 #include <linux/slab.h>
 #include <linux/hdreg.h>
+#include <linux/spinlock.h>
 
 #include <linux/notifier.h>
 #include <linux/reboot.h>
@@ -78,9 +80,9 @@
 
 //#define DRIVERDEBUG
 #ifdef DRIVERDEBUG
-#define DEBUG( s )
+#define DEBUG( s ) printk( s )
 #else
-#define DEBUG( s ) printk( s ) 
+#define DEBUG( s )
 #endif
 
 /*
@@ -508,7 +510,13 @@ static void i2o_block_reply(struct i2o_handler *h, struct i2o_controller *c, str
 	u32 *m = (u32 *)msg;
 	u8 unit = (m[2]>>8)&0xF0;	/* low 4 bits are partition */
 	struct i2ob_device *dev = &i2ob_dev[(unit&0xF0)];
-	
+
+	/*
+	 *	Pull the lock over ready
+	 */	
+	 
+	spin_lock_prefetch(&io_request_lock);
+		
 	/*
 	 * FAILed message
 	 */
@@ -1140,7 +1148,7 @@ static int i2ob_ioctl(struct inode *inode, struct file *file,
 	dev = &i2ob_dev[minor];
 	switch (cmd) {
 		case BLKGETSIZE:
-			return put_user(i2ob[minor].nr_sects, (unsigned long *) arg);
+			return put_user(i2ob[minor].nr_sects, (long *) arg);
 		case BLKGETSIZE64:
 			return put_user((u64)i2ob[minor].nr_sects << 9, (u64 *)arg);
 
@@ -1196,6 +1204,9 @@ static int i2ob_release(struct inode *inode, struct file *file)
 	 */
 	if(!dev->i2odev)
 		return 0;
+
+	/* Sync the device so we don't get errors */
+	fsync_dev(inode->i_rdev);
 
 	if (dev->refcnt <= 0)
 		printk(KERN_ALERT "i2ob_release: refcount(%d) <= 0\n", dev->refcnt);
@@ -1742,29 +1753,9 @@ void i2ob_del_device(struct i2o_controller *c, struct i2o_device *d)
 	spin_unlock_irqrestore(&io_request_lock, flags);
 
 	/*
-	 * Sync the device...this will force all outstanding I/Os
-	 * to attempt to complete, thus causing error messages.
-	 * We have to do this as the user could immediatelly create
-	 * a new volume that gets assigned the same minor number.
-	 * If there are still outstanding writes to the device,
-	 * that could cause data corruption on the new volume!
-	 *
-	 * The truth is that deleting a volume that you are currently
-	 * accessing will do _bad things_ to your system.  This 
-	 * handler will keep it from crashing, but must probably 
-	 * you'll have to do a 'reboot' to get the system running
-	 * properly.  Deleting disks you are using is dumb.  
-	 * Umount them first and all will be good!
-	 *
-	 * It's not this driver's job to protect the system from
-	 * dumb user mistakes :)
-	 */
-	if(i2ob_dev[unit].refcnt)
-		fsync_dev(MKDEV(MAJOR_NR,unit));
-
-	/*
 	 * Decrease usage count for module
 	 */	
+
 	while(i2ob_dev[unit].refcnt--)
 		MOD_DEC_USE_COUNT;
 
@@ -1986,10 +1977,11 @@ int i2o_block_init(void)
 EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Red Hat Software");
 MODULE_DESCRIPTION("I2O Block Device OSM");
+MODULE_LICENSE("GPL");
+
 
 void cleanup_module(void)
 {
-	struct gendisk *gdp;
 	int i;
 	
 	if(evt_running) {

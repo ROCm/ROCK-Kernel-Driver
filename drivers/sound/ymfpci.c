@@ -66,10 +66,13 @@
  * I do not believe in debug levels as I never can guess what
  * part of the code is going to be problematic in the future.
  * Don't forget to run your klogd with -c 8.
+ *
+ * Example (do not remove):
+ * #define YMFDBG(fmt, arg...)  do{ printk(KERN_DEBUG fmt, ##arg); }while(0)
  */
-/* #define YMFDBG(fmt, arg...)  do{ printk(KERN_DEBUG fmt, ##arg); }while(0) */
-#define YMFDBGW(fmt, arg...)  /* */
-#define YMFDBGI(fmt, arg...)  /* */
+#define YMFDBGW(fmt, arg...)  /* */	/* write counts */
+#define YMFDBGI(fmt, arg...)  /* */	/* interrupts */
+#define YMFDBGX(fmt, arg...)  /* */	/* ioctl */
 
 static int ymf_playback_trigger(ymfpci_t *unit, struct ymf_pcm *ypcm, int cmd);
 static void ymf_capture_trigger(ymfpci_t *unit, struct ymf_pcm *ypcm, int cmd);
@@ -330,7 +333,7 @@ static int prog_dmabuf(struct ymf_state *state, int rec)
 	int w_16;
 	unsigned bufsize;
 	unsigned long flags;
-	int redzone;
+	int redzone, redfrags;
 	int ret;
 
 	w_16 = ymf_pcm_format_width(state->format.format) == 16;
@@ -352,36 +355,27 @@ static int prog_dmabuf(struct ymf_state *state, int rec)
 	 * Import what Doom might have set with SNDCTL_DSP_SETFRAGMENT.
 	 */
 	bufsize = PAGE_SIZE << dmabuf->buforder;
-	/* lets hand out reasonable big ass buffers by default */
-	dmabuf->fragshift = (dmabuf->buforder + PAGE_SHIFT -2);
+	/* By default we give 4 big buffers. */
+	dmabuf->fragshift = (dmabuf->buforder + PAGE_SHIFT - 2);
 	if (dmabuf->ossfragshift > 3 &&
 	    dmabuf->ossfragshift < dmabuf->fragshift) {
+		/* If OSS set smaller fragments, give more smaller buffers. */
 		dmabuf->fragshift = dmabuf->ossfragshift;
 	}
-	dmabuf->numfrag = bufsize >> dmabuf->fragshift;
-	while (dmabuf->numfrag < 4 && dmabuf->fragshift > 3) {
-		dmabuf->fragshift--;
-		dmabuf->numfrag = bufsize >> dmabuf->fragshift;
-	}
 	dmabuf->fragsize = 1 << dmabuf->fragshift;
+
+	dmabuf->numfrag = bufsize >> dmabuf->fragshift;
 	dmabuf->dmasize = dmabuf->numfrag << dmabuf->fragshift;
 
-	if (dmabuf->ossmaxfrags >= 2 && dmabuf->ossmaxfrags < dmabuf->numfrag) {
-		dmabuf->numfrag = dmabuf->ossmaxfrags;
-		dmabuf->dmasize = dmabuf->numfrag << dmabuf->fragshift;
-
+	if (dmabuf->ossmaxfrags >= 2) {
 		redzone = ymf_calc_lend(state->format.rate);
-		redzone <<= (state->format.shift + 1);
-		if (dmabuf->dmasize < redzone*3) {
-			/*
-			 * The driver works correctly with minimum dmasize
-			 * of redzone*2, but it produces stoppage and clicks.
-			 * So, make it little larger for smoother sound.
-			 * XXX Make dmasize a wholy divisible by fragsize.
-			 */
-//			printk(KERN_ERR "ymfpci: dmasize=%d < redzone=%d * 3\n",
-//			    dmabuf->dmasize, redzone);
-			dmabuf->dmasize = redzone*3;
+		redzone <<= state->format.shift;
+		redzone *= 3;
+		redfrags = (redzone + dmabuf->fragsize-1) >> dmabuf->fragshift;
+
+		if (dmabuf->ossmaxfrags + redfrags < dmabuf->numfrag) {
+			dmabuf->numfrag = dmabuf->ossmaxfrags + redfrags;
+			dmabuf->dmasize = dmabuf->numfrag << dmabuf->fragshift;
 		}
 	}
 
@@ -1440,7 +1434,7 @@ ymf_write(struct file *file, const char *buffer, size_t count, loff_t *ppos)
 	set_current_state(TASK_RUNNING);
 	remove_wait_queue(&dmabuf->wait, &waita);
 
-	YMFDBGW("ymf_write: dmabuf.count %d\n", dmabuf->count);
+	YMFDBGW("ymf_write: ret %d dmabuf.count %d\n", ret, dmabuf->count);
 	return ret;
 }
 
@@ -1794,6 +1788,7 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 	case SNDCTL_DSP_SETSYNCRO:
 	case SOUND_PCM_WRITE_FILTER:
 	case SOUND_PCM_READ_FILTER:
+		YMFDBGX("ymf_ioctl: cmd 0x%x unsupported\n", cmd);
 		return -ENOTTY;
 
 	default:
@@ -1802,7 +1797,8 @@ static int ymf_ioctl(struct inode *inode, struct file *file,
 		 * or perhaps they expect "universal" ioctls,
 		 * for instance we get SNDCTL_TMR_CONTINUE here.
 		 */
-		 break;
+		YMFDBGX("ymf_ioctl: cmd 0x%x unknown\n", cmd);
+		break;
 	}
 	return -ENOTTY;
 }

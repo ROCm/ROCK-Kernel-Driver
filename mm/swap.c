@@ -48,7 +48,7 @@ pager_daemon_t pager_daemon = {
  * called on a page which is not on any of the lists, the
  * page is left alone.
  */
-void deactivate_page_nolock(struct page * page)
+static inline void deactivate_page_nolock(struct page * page)
 {
 	if (PageActive(page)) {
 		del_page_from_active_list(page);
@@ -66,7 +66,7 @@ void deactivate_page(struct page * page)
 /*
  * Move an inactive page to the active list.
  */
-void activate_page_nolock(struct page * page)
+static inline void activate_page_nolock(struct page * page)
 {
 	if (PageInactive(page)) {
 		del_page_from_inactive_list(page);

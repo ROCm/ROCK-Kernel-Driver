@@ -41,6 +41,7 @@
 #include <linux/timer.h>
 #include <linux/delay.h>
 #include <linux/proc_fs.h>
+#include <linux/prefetch.h>
 #include <asm/dma.h>
 #include <asm/system.h>
 #include <asm/io.h>
@@ -152,7 +153,9 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 	Scsi_Cmnd *current_command;
 	u32 *m = (u32 *)msg;
 	u8 as,ds,st;
-	
+
+	spin_lock_prefetch(&io_request_lock);		
+
 	if(m[0] & (1<<13))
 	{
 		printk("IOP fail.\n");
@@ -201,7 +204,9 @@ static void i2o_scsi_reply(struct i2o_handler *h, struct i2o_controller *c, stru
 		}
 		return;
 	}
-			
+	
+	prefetchw(&queue_depth);
+		
 	
 	/*
 	 *	Low byte is device status, next is adapter status,
@@ -548,6 +553,11 @@ int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	 
 	host = SCpnt->host;
 	hostdata = (struct i2o_scsi_host *)host->hostdata;
+	 
+	c = hostdata->controller;
+	prefetch(c);
+	prefetchw(&queue_depth);
+
 	SCpnt->scsi_done = done;
 	
 	if(SCpnt->target > 15)
@@ -575,7 +585,6 @@ int i2o_scsi_queuecommand(Scsi_Cmnd * SCpnt, void (*done) (Scsi_Cmnd *))
 	
 	dprintk(("Real scsi messages.\n"));
 
-	c = hostdata->controller;
 	
 	/*
 	 *	Obtain an I2O message. Right now we _have_ to obtain one
@@ -906,6 +915,8 @@ int i2o_scsi_bios_param(Disk * disk, kdev_t dev, int *ip)
 }
 
 MODULE_AUTHOR("Red Hat Software");
+MODULE_LICENSE("GPL");
+
 
 static Scsi_Host_Template driver_template = I2OSCSI;
 

@@ -219,7 +219,11 @@ int __init i2o_pci_install(struct pci_dev *dev)
 		printk(KERN_INFO "I2O: MTRR workaround for Intel i960 processor\n"); 
 		c->bus.pci.mtrr_reg1 =	mtrr_add(c->mem_phys, 65536, MTRR_TYPE_UNCACHABLE, 1);
 		if(c->bus.pci.mtrr_reg1< 0)
+		{
 			printk(KERN_INFO "i2o_pci: Error in setting MTRR_TYPE_UNCACHABLE\n");
+			mtrr_del(c->bus.pci.mtrr_reg0, c->mem_phys, size);
+			c->bus.pci.mtrr_reg0 = -1;
+		}
 	}
 
 #endif
@@ -277,6 +281,14 @@ int __init i2o_pci_scan(void)
 	{
 		if((dev->class>>8)!=PCI_CLASS_INTELLIGENT_I2O)
 			continue;
+		if(dev->vendor == PCI_VENDOR_ID_DPT)
+		{
+			if(dev->device == 0xA501 || dev->device == 0xA511)
+			{
+				printk(KERN_INFO "i2o: Skipping Adaptec/DPT I2O raid with preferred native driver.\n");
+				continue;
+			}
+		}
 		if((dev->class&0xFF)>1)
 		{
 			printk(KERN_INFO "i2o: I2O Controller found but does not support I2O 1.5 (skipping).\n");
@@ -367,6 +379,8 @@ EXPORT_SYMBOL(i2o_pci_core_detach);
 
 MODULE_AUTHOR("Red Hat Software");
 MODULE_DESCRIPTION("I2O PCI Interface");
+MODULE_LICENSE("GPL");
+
 
 #else
 void __init i2o_pci_init(void)

@@ -78,9 +78,9 @@ static dpt_sig_S DPTI_sig = {
 	{'d', 'P', 't', 'S', 'i', 'G'}, SIG_VERSION,
 #ifdef __i386__
 	PROC_INTEL, PROC_386 | PROC_486 | PROC_PENTIUM | PROC_SEXIUM,
-#elif defined __ia64__
+#elif defined(__ia64__)
 	PROC_INTEL, PROC_IA64,
-#elif define __sparc__
+#elif defined(__sparc__)
 	PROC_ULTRASPARC,
 #elif defined(__alpha__)
 	PROC_ALPHA ,
@@ -1152,12 +1152,12 @@ static int adpt_i2o_post_wait(adpt_hba* pHba, u32* msg, int len, int timeout)
 	timeout *= HZ;
 	if((status = adpt_i2o_post_this(pHba, msg, len)) == 0){
 		if(!timeout){
-			current->state = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 			spin_unlock_irq(&io_request_lock);
 			schedule();
 			spin_lock_irq(&io_request_lock);
 		} else {
-			current->state = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 			spin_unlock_irq(&io_request_lock);
 			schedule_timeout(timeout*HZ);
 			spin_lock_irq(&io_request_lock);
@@ -1799,11 +1799,11 @@ static int adpt_system_info(void *buffer)
 
 #if defined __i386__ 
 	adpt_i386_info(&si);
-#elif defined __ia64__
+#elif defined (__ia64__)
 	adpt_ia64_info(&si);
-#elif define __sparc__
+#elif defined(__sparc__)
 	adpt_sparc_info(&si);
-#elif defined __alpha__ 
+#elif defined (__alpha__)
 	adpt_alpha_info(&si);
 #else
 	si.processorType = 0xff ;

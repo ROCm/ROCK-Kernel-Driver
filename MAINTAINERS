@@ -1693,6 +1693,12 @@ M:	jpr@f6fbb.org
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 
+YMFPCI YAMAHA PCI SOUND
+P:	Pete Zaitcev
+M:	zaitcev@yahoo.com
+L:	linux-kernel@vger.kernel.org
+S:	Maintained
+
 Z85230 SYNCHRONOUS DRIVER
 P:	Alan Cox
 M:	alan@redhat.com

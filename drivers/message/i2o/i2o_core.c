@@ -246,8 +246,8 @@ static void i2o_core_reply(struct i2o_handler *h, struct i2o_controller *c,
 
                 /* Release the preserved msg by resubmitting it as a NOP */
 
-		preserved_msg[0] = THREE_WORD_MSG_SIZE | SGL_OFFSET_0;
-		preserved_msg[1] = I2O_CMD_UTIL_NOP << 24 | HOST_TID << 12 | 0;
+		preserved_msg[0] = cpu_to_le32(THREE_WORD_MSG_SIZE | SGL_OFFSET_0);
+		preserved_msg[1] = cpu_to_le32(I2O_CMD_UTIL_NOP << 24 | HOST_TID << 12 | 0);
 		preserved_msg[2] = 0;
 		i2o_post_message(c, msg[7]);
 
@@ -606,7 +606,10 @@ int i2o_delete_controller(struct i2o_controller *c)
 			up(&i2o_configuration_lock);
 
 			if(c->page_frame)
+			{
+				pci_unmap_single(c->pdev, c->page_frame_map, MSG_POOL_SIZE, PCI_DMA_FROMDEVICE);
 				kfree(c->page_frame);
+			}
 			if(c->hrt)
 				kfree(c->hrt);
 			if(c->lct)
@@ -1180,8 +1183,20 @@ void i2o_run_queue(struct i2o_controller *c)
 	while(mv!=0xFFFFFFFF)
 	{
 		struct i2o_handler *i;
-		m=(struct i2o_message *)bus_to_virt(mv);
+		/* Map the message from the page frame map to kernel virtual */
+		m=(struct i2o_message *)(mv - (unsigned long)c->page_frame_map + (unsigned long)c->page_frame);
 		msg=(u32*)m;
+
+		/*
+	 	 *	Ensure this message is seen coherently but cachably by
+		 *	the processor 
+	 	 */
+
+		pci_dma_sync_single(c->pdev, c->page_frame_map, MSG_FRAME_SIZE, PCI_DMA_FROMDEVICE);
+	
+		/*
+		 *	Despatch it
+	 	 */
 
 		i=i2o_handlers[m->initiator_context&(MAX_I2O_MODULES-1)];
 		if(i && i->reply)
@@ -1985,7 +2000,7 @@ static int i2o_systab_send(struct i2o_controller *iop)
 	msg[0] = I2O_MESSAGE_SIZE(12) | SGL_OFFSET_6;
 	msg[1] = I2O_CMD_SYS_TAB_SET<<24 | HOST_TID<<12 | ADAPTER_TID;
 	msg[3] = 0;
-	msg[4] = (0<<16) | ((iop->unit+2) << 12); /* Host 0 IOP ID (unit + 2) */
+	msg[4] = (0<<16) | ((iop->unit+2) );      /* Host 0 IOP ID (unit + 2) */
 	msg[5] = 0;                               /* Segment 0 */
 
 	/* 
@@ -2258,11 +2273,21 @@ int i2o_post_outbound_messages(struct i2o_controller *c)
 
 	c->page_frame = kmalloc(MSG_POOL_SIZE, GFP_KERNEL);
 	if(c->page_frame==NULL) {
-		printk(KERN_CRIT "%s: Outbound Q initialize failed; out of memory.\n",
+		printk(KERN_ERR "%s: Outbound Q initialize failed; out of memory.\n",
 			c->name);
 		return -ENOMEM;
 	}
-	m=virt_to_bus(c->page_frame);
+
+	c->page_frame_map = pci_map_single(c->pdev, c->page_frame, MSG_POOL_SIZE, PCI_DMA_FROMDEVICE);
+
+	if(c->page_frame_map == 0)
+	{
+		kfree(c->page_frame);
+		printk(KERN_ERR "%s: Unable to map outbound queue.\n", c->name);
+		return -ENOMEM;
+	}
+
+	m = c->page_frame_map;
 
 	/* Post frames */
 
@@ -3427,6 +3452,8 @@ EXPORT_SYMBOL(i2o_get_class_name);
 
 MODULE_AUTHOR("Red Hat Software");
 MODULE_DESCRIPTION("I2O Core");
+MODULE_LICENSE("GPL");
+
 
 
 int init_module(void)

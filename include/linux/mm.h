@@ -279,6 +279,7 @@ typedef struct page {
 #define PG_checked		12	/* kill me in 2.5.<early>. */
 #define PG_arch_1		13
 #define PG_reserved		14
+#define PG_launder		15	/* written out by VM pressure.. */
 
 /* Make it prettier to test the above... */
 #define Page_Uptodate(page)	test_bit(PG_uptodate, &(page)->flags)
@@ -292,6 +293,8 @@ typedef struct page {
 #define TryLockPage(page)	test_and_set_bit(PG_locked, &(page)->flags)
 #define PageChecked(page)	test_bit(PG_checked, &(page)->flags)
 #define SetPageChecked(page)	set_bit(PG_checked, &(page)->flags)
+#define PageLaunder(page)	test_bit(PG_launder, &(page)->flags)
+#define SetPageLaunder(page)	set_bit(PG_launder, &(page)->flags)
 
 extern void __set_page_dirty(struct page *);
 
@@ -308,6 +311,7 @@ static inline void set_page_dirty(struct page * page)
  * parallel wait_on_page).
  */
 #define UnlockPage(page)	do { \
+					clear_bit(PG_launder, &(page)->flags); \
 					smp_mb__before_clear_bit(); \
 					if (!test_and_clear_bit(PG_locked, &(page)->flags)) BUG(); \
 					smp_mb__after_clear_bit(); \
@@ -550,17 +554,16 @@ extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 #define __GFP_IO	0x40	/* Can start low memory physical IO? */
 #define __GFP_HIGHIO	0x80	/* Can start high mem physical IO? */
 #define __GFP_FS	0x100	/* Can call down to low-level FS? */
-#define __GFP_WAITBUF	0x200	/* Can we wait for buffers to complete? */
 
 #define GFP_NOHIGHIO	(__GFP_HIGH | __GFP_WAIT | __GFP_IO)
 #define GFP_NOIO	(__GFP_HIGH | __GFP_WAIT)
-#define GFP_NOFS	(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_WAITBUF)
+#define GFP_NOFS	(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO)
 #define GFP_ATOMIC	(__GFP_HIGH)
-#define GFP_USER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_WAITBUF | __GFP_FS)
-#define GFP_HIGHUSER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_WAITBUF | __GFP_FS | __GFP_HIGHMEM)
-#define GFP_KERNEL	(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_WAITBUF | __GFP_FS)
-#define GFP_NFS		(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_WAITBUF | __GFP_FS)
-#define GFP_KSWAPD	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_WAITBUF | __GFP_FS)
+#define GFP_USER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
+#define GFP_HIGHUSER	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS | __GFP_HIGHMEM)
+#define GFP_KERNEL	(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
+#define GFP_NFS		(__GFP_HIGH | __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
+#define GFP_KSWAPD	(             __GFP_WAIT | __GFP_IO | __GFP_HIGHIO | __GFP_FS)
 
 /* Flag - indicates that the buffer will be suitable for DMA.  Ignored on some
    platforms, used as appropriate on others */

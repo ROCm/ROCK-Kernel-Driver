@@ -299,14 +299,13 @@ static char* bus_strings[] =
 
 static spinlock_t i2o_proc_lock = SPIN_LOCK_UNLOCKED;
 
-int i2o_proc_read_hrt(char *buf, char **start, off_t offset, int len, 
+int i2o_proc_read_hrt(char *buf, char **start, off_t offset, int count, 
 		      int *eof, void *data)
 {
 	struct i2o_controller *c = (struct i2o_controller *)data;
 	i2o_hrt *hrt = (i2o_hrt *)c->hrt;
 	u32 bus;
-	int count;
-	int i;
+	int len, i;
 
 	spin_lock(&i2o_proc_lock);
 
@@ -320,9 +319,7 @@ int i2o_proc_read_hrt(char *buf, char **start, off_t offset, int len,
 		return len;
 	}
 
-	count = hrt->num_entries;
-
-	if((count * hrt->entry_len + 8) > 2048) {
+	if((hrt->num_entries * hrt->entry_len + 8) > 2048) {
 		printk(KERN_WARNING "i2o_proc: HRT does not fit into buffer\n");
 		len += sprintf(buf+len,
 			       "HRT table too big to fit in buffer.\n");
@@ -331,9 +328,9 @@ int i2o_proc_read_hrt(char *buf, char **start, off_t offset, int len,
 	}
 	
 	len += sprintf(buf+len, "HRT has %d entries of %d bytes each.\n",
-		       count, hrt->entry_len << 2);
+		       hrt->num_entries, hrt->entry_len << 2);
 
-	for(i = 0; i < count; i++)
+	for(i = 0; i < hrt->num_entries && len < count; i++)
 	{
 		len += sprintf(buf+len, "Entry %d:\n", i);
 		len += sprintf(buf+len, "   Adapter ID: %0#10x\n", 
@@ -3297,7 +3294,7 @@ void i2o_proc_remove_device(struct i2o_device *dev)
 void i2o_proc_dev_del(struct i2o_controller *c, struct i2o_device *d)
 {
 #ifdef DRIVERDEBUG
-	printk(KERN_INFO, "Deleting device %d from iop%d\n", 
+	printk(KERN_INFO "Deleting device %d from iop%d\n", 
 		d->lct_data.tid, c->unit);
 #endif
 
@@ -3365,6 +3362,7 @@ int __init i2o_proc_init(void)
 
 MODULE_AUTHOR("Deepak Saxena");
 MODULE_DESCRIPTION("I2O procfs Handler");
+MODULE_LICENSE("GPL");
 
 static void __exit i2o_proc_exit(void)
 {

@@ -1,5 +1,5 @@
 /*
- *	drivers/message/i2o/i2o_lan.c
+ *	drivers/i2o/i2o_lan.c
  *
  * 	I2O LAN CLASS OSM 		May 26th 2000
  *
@@ -1564,6 +1564,8 @@ EXPORT_NO_SYMBOLS;
 
 MODULE_AUTHOR("University of Helsinki, Department of Computer Science");
 MODULE_DESCRIPTION("I2O Lan OSM");
+MODULE_LICENSE("GPL");
+
 
 MODULE_PARM(max_buckets_out, "1-" __MODULE_STRING(I2O_LAN_MAX_BUCKETS_OUT) "i");
 MODULE_PARM_DESC(max_buckets_out, "Total number of buckets to post (1-)");

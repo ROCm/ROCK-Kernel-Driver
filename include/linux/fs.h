@@ -214,7 +214,8 @@ enum bh_state_bits {
 	BH_Mapped,	/* 1 if the buffer has a disk mapping */
 	BH_New,		/* 1 if the buffer is new and not yet written out */
 	BH_Async,	/* 1 if the buffer is under end_buffer_io_async I/O */
-	BH_Wait_IO,	/* 1 if we should throttle on this buffer */
+	BH_Wait_IO,	/* 1 if we should write out this buffer */
+	BH_launder,	/* 1 if we should throttle on this buffer */
 
 	BH_PrivateStart,/* not a state bit, but the first bit available
 			 * for private allocation by other entities

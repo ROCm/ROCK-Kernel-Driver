@@ -1159,6 +1159,7 @@ EXPORT_NO_SYMBOLS;
  */
 MODULE_AUTHOR("Anton Altaparmakov <aia21@cus.cam.ac.uk>");
 MODULE_DESCRIPTION("Linux NTFS driver");
+MODULE_LICENSE("GPL");
 #ifdef DEBUG
 MODULE_PARM(ntdebug, "i");
 MODULE_PARM_DESC(ntdebug, "Debug level");

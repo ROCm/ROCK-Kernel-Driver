@@ -242,7 +242,7 @@ static struct page * balance_classzone(zone_t * classzone, unsigned int gfp_mask
 	current->allocation_order = order;
 	current->flags |= PF_MEMALLOC | PF_FREE_PAGES;
 
-	__freed = try_to_free_pages(gfp_mask, order);
+	__freed = try_to_free_pages(classzone, gfp_mask, order);
 
 	current->flags &= ~(PF_MEMALLOC | PF_FREE_PAGES);
 
@@ -467,20 +467,23 @@ unsigned int nr_free_buffer_pages (void)
 {
 	pg_data_t *pgdat = pgdat_list;
 	unsigned int sum = 0;
-	zonelist_t *zonelist;
-	zone_t **zonep, *zone;
 
 	do {
-		zonelist = pgdat->node_zonelists + (GFP_USER & GFP_ZONEMASK);
-		zonep = zonelist->zones;
+		zonelist_t *zonelist = pgdat->node_zonelists + (GFP_USER & GFP_ZONEMASK);
+		zone_t **zonep = zonelist->zones;
+		zone_t *zone;
 
-		for (zone = *zonep++; zone; zone = *zonep++)
-			sum += zone->free_pages;
+		for (zone = *zonep++; zone; zone = *zonep++) {
+			unsigned long size = zone->size;
+			unsigned long high = zone->pages_high;
+			if (size > high)
+				sum += size - high;
+		}
 
 		pgdat = pgdat->node_next;
 	} while (pgdat);
 
-	return sum + nr_active_pages + nr_inactive_pages;
+	return sum;
 }
 
 #if CONFIG_HIGHMEM
@@ -496,6 +499,8 @@ unsigned int nr_free_highpages (void)
 	return pages;
 }
 #endif
+
+#define K(x) ((x) << (PAGE_SHIFT-10))
 
 /*
  * Show free area list (used inside shift_scroll-lock stuff)
@@ -519,21 +524,17 @@ void show_free_areas_core(pg_data_t *pgdat)
 			printk("Zone:%s freepages:%6lukB min:%6luKB low:%6lukB " 
 				       "high:%6lukB\n", 
 					zone->name,
-					(zone->free_pages)
-					<< ((PAGE_SHIFT-10)),
-					zone->pages_min
-					<< ((PAGE_SHIFT-10)),
-					zone->pages_low
-					<< ((PAGE_SHIFT-10)),
-					zone->pages_high
-					<< ((PAGE_SHIFT-10)));
+					K(zone->free_pages),
+					K(zone->pages_min),
+					K(zone->pages_low),
+					K(zone->pages_high));
 			
 		tmpdat = tmpdat->node_next;
 	}
 
 	printk("Free pages:      %6dkB (%6dkB HighMem)\n",
-		nr_free_pages() << (PAGE_SHIFT-10),
-		nr_free_highpages() << (PAGE_SHIFT-10));
+		K(nr_free_pages()),
+		K(nr_free_highpages()));
 
 	printk("( Active: %d, inactive: %d, free: %d )\n",
 	       nr_active_pages,
@@ -564,7 +565,7 @@ void show_free_areas_core(pg_data_t *pgdat)
 			}
 			spin_unlock_irqrestore(&zone->lock, flags);
 		}
-		printk("= %lukB)\n", total * (PAGE_SIZE>>10));
+		printk("= %lukB)\n", K(total));
 	}
 
 #ifdef SWAP_CACHE_INFO

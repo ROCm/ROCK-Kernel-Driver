@@ -961,5 +961,6 @@ void cleanup_module(void)
 EXPORT_NO_SYMBOLS;
 MODULE_AUTHOR("Red Hat Software");
 MODULE_DESCRIPTION("I2O Configuration");
+MODULE_LICENSE("GPL");
 
 #endif

@@ -26,7 +26,7 @@ static inline void lock_buffer(struct buffer_head * bh)
 		__wait_on_buffer(bh);
 }
 
-extern void unlock_buffer(struct buffer_head *bh);
+extern void FASTCALL(unlock_buffer(struct buffer_head *bh));
 
 /*
  * super-block locking. Again, interrupts may only unlock

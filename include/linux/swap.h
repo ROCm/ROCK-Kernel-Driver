@@ -102,15 +102,13 @@ extern void FASTCALL(__lru_cache_del(struct page *));
 extern void FASTCALL(lru_cache_del(struct page *));
 
 extern void FASTCALL(deactivate_page(struct page *));
-extern void FASTCALL(deactivate_page_nolock(struct page *));
 extern void FASTCALL(activate_page(struct page *));
-extern void FASTCALL(activate_page_nolock(struct page *));
 
 extern void swap_setup(void);
 
 /* linux/mm/vmscan.c */
 extern wait_queue_head_t kswapd_wait;
-extern int FASTCALL(try_to_free_pages(unsigned int, unsigned int));
+extern int FASTCALL(try_to_free_pages(zone_t *, unsigned int, unsigned int));
 
 /* linux/mm/page_io.c */
 extern void rw_swap_page(int, struct page *);

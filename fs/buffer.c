@@ -112,15 +112,16 @@ union bdflush_param {
 		int dummy5;	/* unused */
 	} b_un;
 	unsigned int data[N_PARAM];
-} bdf_prm = {{30, 64, 64, 256, 5*HZ, 30*HZ, 60, 0, 0}};
+} bdf_prm = {{40, 0, 0, 0, 5*HZ, 30*HZ, 60, 0, 0}};
 
 /* These are the min and max parameter values that we will allow to be assigned */
 int bdflush_min[N_PARAM] = {  0,  10,    5,   25,  0,   1*HZ,   0, 0, 0};
 int bdflush_max[N_PARAM] = {100,50000, 20000, 20000,10000*HZ, 6000*HZ, 100, 0, 0};
 
-inline void unlock_buffer(struct buffer_head *bh)
+void unlock_buffer(struct buffer_head *bh)
 {
 	clear_bit(BH_Wait_IO, &bh->b_state);
+	clear_bit(BH_launder, &bh->b_state);
 	clear_bit(BH_Lock, &bh->b_state);
 	smp_mb__after_clear_bit();
 	if (waitqueue_active(&bh->b_wait))
@@ -2331,29 +2332,40 @@ static int grow_buffers(kdev_t dev, unsigned long block, int size)
 	return 1;
 }
 
-static int sync_page_buffers(struct buffer_head *bh, unsigned int gfp_mask)
+static int sync_page_buffers(struct buffer_head *head, unsigned int gfp_mask)
 {
-	struct buffer_head * p = bh;
-	int tryagain = 1;
+	struct buffer_head * bh = head;
+	int tryagain = 0;
 
 	do {
-		if (buffer_dirty(p) || buffer_locked(p)) {
-			if (test_and_set_bit(BH_Wait_IO, &p->b_state)) {
-				if (buffer_dirty(p)) {
-					ll_rw_block(WRITE, 1, &p);
-					tryagain = 0;
-				} else if (buffer_locked(p)) {
-					if (gfp_mask & __GFP_WAITBUF) {
-						wait_on_buffer(p);
-						tryagain = 1;
-					} else
-						tryagain = 0;
-				}
-			} else
-				tryagain = 0;
+		if (!buffer_dirty(bh) && !buffer_locked(bh))
+			continue;
+
+		/* Don't start IO first time around.. */
+		if (!test_and_set_bit(BH_Wait_IO, &bh->b_state))
+			continue;
+
+		/* Second time through we start actively writing out.. */
+		if (test_and_set_bit(BH_Lock, &bh->b_state)) {
+			if (!test_bit(BH_launder, &bh->b_state))
+				continue;
+			wait_on_buffer(bh);
+			tryagain = 1;
+			continue;
 		}
-		p = p->b_this_page;
-	} while (p != bh);
+
+		if (!atomic_set_buffer_clean(bh)) {
+			unlock_buffer(bh);
+			continue;
+		}
+
+		__mark_buffer_clean(bh);
+		get_bh(bh);
+		set_bit(BH_launder, &bh->b_state);
+		bh->b_end_io = end_buffer_io_sync;
+		submit_bh(WRITE, bh);
+		tryagain = 0;
+	} while ((bh = bh->b_this_page) != head);
 
 	return tryagain;
 }
