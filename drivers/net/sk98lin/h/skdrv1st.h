@@ -2,8 +2,8 @@
  *
  * Name:	skdrv1st.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.15 $
- * Date:	$Date: 2003/07/17 14:54:09 $
+ * Version:	$Revision: 1.1 $
+ * Date:	$Date: 2003/07/21 07:22:43 $
  * Purpose:	First header file for driver and all other modules
  *
  ******************************************************************************/
@@ -26,6 +26,9 @@
  * History:
  *
  *	$Log: skdrv1st.h,v $
+ *	Revision 1.1  2003/07/21 07:22:43  rroesler
+ *	Fix: Re-Enter after CVS crash
+ *	
  *	Revision 1.15  2003/07/17 14:54:09  rroesler
  *	Fix: Corrected SK_PNMI_READ macros to copy right amount of bytes
  *	
@@ -107,9 +110,6 @@
 #ifndef __INC_SKDRV1ST_H
 #define __INC_SKDRV1ST_H
 
-/* Check kernel version */
-#include <linux/version.h>
-
 typedef struct s_AC	SK_AC;
 
 /* Set card versions */
@@ -135,7 +135,6 @@ typedef struct s_AC	SK_AC;
 #error You must compile this driver with "-O".
 #endif
 
-#include <linux/version.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/string.h>

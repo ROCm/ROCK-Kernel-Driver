@@ -24,10 +24,7 @@ config CD_NO_IDESCSI
 	  file drivers/cdrom/{driver_name}.h where you can define your
 	  interface parameters and switch some internal goodies.
 
-	  All these CD-ROM drivers are also usable as a module ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want). If you want to compile them as module, say M instead of Y and
-	  read <file:Documentation/modules.txt>.
+	  To compile these CD-ROM drivers as a module, choose M instead of Y.
 
 	  If you want to use any of these CD-ROM drivers, you also have to
 	  answer Y or M to "ISO 9660 CD-ROM file system support" below (this
@@ -49,10 +46,8 @@ config AZTCD
 	  file system support" below, because that's the file system used on
 	  CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called aztcd.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called aztcd.
 
 config GSCD
 	tristate "Goldstar R420 CDROM support"
@@ -67,10 +62,8 @@ config GSCD
 	  file system support" below, because that's the file system used on
 	  CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called gscd.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called gscd.
 
 config SBPCD
 	tristate "Matsushita/Panasonic/Creative, Longshine, TEAC CDROM support"
@@ -107,10 +100,8 @@ config SBPCD
 	  file system support" below, because that's the file system used on
 	  CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sbpcd.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sbpcd.
 
 config MCD
 	tristate "Mitsumi (standard) [no XA/Multisession] CDROM support"
@@ -132,10 +123,8 @@ config MCD
 	  file system support" below, because that's the file system used on
 	  CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mcd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called mcd.
 
 config MCD_IRQ
 	int "MCD IRQ"
@@ -173,10 +162,8 @@ config MCDX
 	  file system support" below, because that's the file system used on
 	  CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called mcdx. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called mcdx.
 
 config OPTCD
 	tristate "Optics Storage DOLPHIN 8000AT CDROM support"
@@ -192,10 +179,8 @@ config OPTCD
 	  file system support" below, because that's the file system used on
 	  CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called optcd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called optcd.
 
 config CM206
 	tristate "Philips/LMS CM206 CDROM support"
@@ -209,10 +194,8 @@ config CM206
 	  file system support" below, because that's the file system used on
 	  CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cm206. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called cm206.
 
 config SJCD
 	tristate "Sanyo CDR-H94A CDROM support"
@@ -223,10 +206,8 @@ config SJCD
 	  "ISO 9660 CD-ROM file system support" below, because that's the
 	  file system used on CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sjcd. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sjcd.
 
 config ISP16_CDI
 	tristate "ISP16/MAD16/Mozart soft configurable cdrom interface support"
@@ -238,10 +219,8 @@ config ISP16_CDI
 	  to a driver for the particular cdrom drive you have attached to the
 	  card. Read <file:Documentation/cdrom/isp16> for details.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called isp16. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called isp16.
 
 config CDU31A
 	tristate "Sony CDU31A/CDU33A CDROM support"
@@ -260,14 +239,12 @@ config CDU31A
 	  file system support" below, because that's the file system used on
 	  CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called cdu31a.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called cdu31a.
 
 config CDU535
 	tristate "Sony CDU535 CDROM support"
-	depends on CD_NO_IDESCSI && BROKEN_ON_SMP
+	depends on CD_NO_IDESCSI
 	---help---
 	  This is the driver for the older Sony CDU-535 and CDU-531 CD-ROM
 	  drives. Please read the file <file:Documentation/cdrom/sonycd535>.
@@ -276,9 +253,7 @@ config CDU535
 	  file system support" below, because that's the file system used on
 	  CD-ROMs.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called sonycd535. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sonycd535.
 
 endmenu

@@ -520,7 +520,8 @@ static struct page *buffered_rmqueue(struct zone *zone, int order, int cold)
  *
  * Herein lies the mysterious "incremental min".  That's the
  *
- *	min += z->pages_low;
+ *	local_low = z->pages_low;
+ *	min += local_low;
  *
  * thing.  The intent here is to provide additional protection to low zones for
  * allocation requests which _could_ use higher zones.  So a GFP_HIGHMEM
@@ -538,10 +539,11 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	unsigned long min;
 	struct zone **zones, *classzone;
 	struct page *page;
+	struct reclaim_state reclaim_state;
+	struct task_struct *p = current;
 	int i;
 	int cold;
 	int do_retry;
-	struct reclaim_state reclaim_state;
 
 	might_sleep_if(wait);
 
@@ -558,8 +560,17 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	min = 1UL << order;
 	for (i = 0; zones[i] != NULL; i++) {
 		struct zone *z = zones[i];
+		unsigned long local_low;
 
-		min += z->pages_low;
+		/*
+		 * This is the fabled 'incremental min'. We let real-time tasks
+		 * dip their real-time paws a little deeper into reserves.
+		 */
+		local_low = z->pages_low;
+		if (rt_task(p))
+			local_low >>= 1;
+		min += local_low;
+
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
 			page = buffered_rmqueue(z, order, cold);
@@ -582,6 +593,8 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 		local_min = z->pages_min;
 		if (gfp_mask & __GFP_HIGH)
 			local_min >>= 2;
+		if (rt_task(p))
+			local_min >>= 1;
 		min += local_min;
 		if (z->free_pages >= min ||
 				(!wait && z->free_pages >= z->pages_high)) {
@@ -595,7 +608,7 @@ __alloc_pages(unsigned int gfp_mask, unsigned int order,
 	/* here we're in the low on memory slow path */
 
 rebalance:
-	if ((current->flags & (PF_MEMALLOC | PF_MEMDIE)) && !in_interrupt()) {
+	if ((p->flags & (PF_MEMALLOC | PF_MEMDIE)) && !in_interrupt()) {
 		/* go through the zonelist yet again, ignoring mins */
 		for (i = 0; zones[i] != NULL; i++) {
 			struct zone *z = zones[i];
@@ -611,14 +624,14 @@ rebalance:
 	if (!wait)
 		goto nopage;
 
-	current->flags |= PF_MEMALLOC;
+	p->flags |= PF_MEMALLOC;
 	reclaim_state.reclaimed_slab = 0;
-	current->reclaim_state = &reclaim_state;
+	p->reclaim_state = &reclaim_state;
 
 	try_to_free_pages(classzone, gfp_mask, order);
 
-	current->reclaim_state = NULL;
-	current->flags &= ~PF_MEMALLOC;
+	p->reclaim_state = NULL;
+	p->flags &= ~PF_MEMALLOC;
 
 	/* go through the zonelist yet one more time */
 	min = 1UL << order;
@@ -658,7 +671,7 @@ nopage:
 	if (!(gfp_mask & __GFP_NOWARN)) {
 		printk("%s: page allocation failure."
 			" order:%d, mode:0x%x\n",
-			current->comm, order, gfp_mask);
+			p->comm, order, gfp_mask);
 	}
 	return NULL;
 got_pg:

@@ -35,7 +35,7 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/processor.h>
+#include <asm/reg.h>
 #include <asm/xmon.h>
 #ifdef CONFIG_PMAC_BACKLIGHT
 #include <asm/backlight.h>
@@ -95,14 +95,19 @@ void die(const char * str, struct pt_regs * fp, long err)
 }
 
 void
-_exception(int signr, struct pt_regs *regs)
+_exception(int signr, struct pt_regs *regs, int code, unsigned long addr)
 {
-	if (!user_mode(regs))
-	{
+	siginfo_t info;
+
+	if (!user_mode(regs)) {
 		debugger(regs);
 		die("Exception in kernel mode", regs, signr);
 	}
-	force_sig(signr, current);
+	info.si_signo = signr;
+	info.si_errno = 0;
+	info.si_code = code;
+	info.si_addr = (void *) addr;
+	force_sig_info(signr, &info, current);
 }
 
 /*
@@ -154,12 +159,40 @@ static inline int check_io_access(struct pt_regs *regs)
 	return 0;
 }
 
+#if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
+/* On 4xx, the reason for the machine check or program exception
+   is in the ESR. */
+#define get_reason(regs)	((regs)->dsisr)
+#define REASON_FP		0
+#define REASON_ILLEGAL		ESR_PIL
+#define REASON_PRIVILEGED	ESR_PPR
+#define REASON_TRAP		ESR_PTR
+
+/* single-step stuff */
+#define single_stepping(regs)	(current->thread.dbcr0 & DBCR0_IC)
+#define clear_single_step(regs)	(current->thread.dbcr0 &= ~DBCR0_IC)
+
+#else
+/* On non-4xx, the reason for the machine check or program
+   exception is in the MSR. */
+#define get_reason(regs)	((regs)->msr)
+#define REASON_FP		0x100000
+#define REASON_ILLEGAL		0x80000
+#define REASON_PRIVILEGED	0x40000
+#define REASON_TRAP		0x20000
+
+#define single_stepping(regs)	((regs)->msr & MSR_SE)
+#define clear_single_step(regs)	((regs)->msr &= ~MSR_SE)
+#endif
+
 void
 MachineCheckException(struct pt_regs *regs)
 {
+	unsigned long reason = get_reason(regs);
+
 	if (user_mode(regs)) {
 		regs->msr |= MSR_RI;
-		_exception(SIGSEGV, regs);
+		_exception(SIGBUS, regs, BUS_ADRERR, regs->nip);
 		return;
 	}
 
@@ -178,10 +211,18 @@ MachineCheckException(struct pt_regs *regs)
 	if (check_io_access(regs))
 		return;
 
-#ifndef CONFIG_4xx
-	printk(KERN_CRIT "Machine check in kernel mode.\n");
-	printk(KERN_CRIT "Caused by (from SRR1=%lx): ", regs->msr);
-	switch (regs->msr & 0x601F0000) {
+#ifdef CONFIG_4xx
+	if (reason & ESR_IMCP) {
+		printk("Instruction");
+		mtspr(SPRN_ESR, reason & ~ESR_IMCP);
+	} else
+		printk("Data");
+	printk(" machine check in kernel mode.\n");
+
+#else /* !CONFIG_4xx */
+	printk("Machine check in kernel mode.\n");
+	printk("Caused by (from SRR1=%lx): ", reason);
+	switch (reason & 0x601F0000) {
 	case 0x80000:
 		printk("Machine check signal\n");
 		break;
@@ -208,15 +249,6 @@ MachineCheckException(struct pt_regs *regs)
 	default:
 		printk("Unknown values in msr\n");
 	}
-
-#else /* CONFIG_4xx */
-	/* Note that the ESR gets stored in regs->dsisr on 4xx. */
-	if (regs->dsisr & ESR_MCI) {
-		printk(KERN_CRIT "Instruction");
-		mtspr(SPRN_ESR, regs->dsisr & ~ESR_MCI);
-	} else
-		printk(KERN_CRIT "Data");
-	printk(" machine check in kernel mode.\n");
 #endif /* CONFIG_4xx */
 
 	debugger(regs);
@@ -238,7 +270,7 @@ UnknownException(struct pt_regs *regs)
 {
 	printk("Bad trap at PC: %lx, MSR: %lx, vector=%lx    %s\n",
 	       regs->nip, regs->msr, regs->trap, print_tainted());
-	_exception(SIGTRAP, regs);
+	_exception(SIGTRAP, regs, 0, 0);
 }
 
 void
@@ -246,13 +278,13 @@ InstructionBreakpoint(struct pt_regs *regs)
 {
 	if (debugger_iabr_match(regs))
 		return;
-	_exception(SIGTRAP, regs);
+	_exception(SIGTRAP, regs, TRAP_BRKPT, 0);
 }
 
 void
 RunModeException(struct pt_regs *regs)
 {
-	_exception(SIGTRAP, regs);
+	_exception(SIGTRAP, regs, 0, 0);
 }
 
 /* Illegal instruction emulation support.  Originally written to
@@ -271,17 +303,17 @@ RunModeException(struct pt_regs *regs)
 static int
 emulate_instruction(struct pt_regs *regs)
 {
-	uint    instword;
-	uint    rd;
-	uint    retval;
+	u32 instword;
+	u32 rd;
+	int retval;
 
-	retval = EINVAL;
+	retval = -EINVAL;
 
 	if (!user_mode(regs))
 		return retval;
 	CHECK_FULL_REGS(regs);
 
-	if (get_user(instword, (uint __user *)(regs->nip)))
+	if (get_user(instword, (u32 __user *)(regs->nip)))
 		return -EFAULT;
 
 	/* Emulate the mfspr rD, PVR.
@@ -290,10 +322,23 @@ emulate_instruction(struct pt_regs *regs)
 		rd = (instword >> 21) & 0x1f;
 		regs->gpr[rd] = mfspr(PVR);
 		retval = 0;
-	}
-	if (retval == 0)
 		regs->nip += 4;
-	return(retval);
+	}
+	return retval;
+}
+
+/*
+ * After we have successfully emulated an instruction, we have to
+ * check if the instruction was being single-stepped, and if so,
+ * pretend we got a single-step exception.  This was pointed out
+ * by Kumar Gala.  -- paulus
+ */
+static void emulate_single_step(struct pt_regs *regs)
+{
+	if (single_stepping(regs)) {
+		clear_single_step(regs);
+		_exception(SIGTRAP, regs, TRAP_TRACE, 0);
+	}
 }
 
 /*
@@ -349,29 +394,47 @@ check_bug_trap(struct pt_regs *regs)
 void
 ProgramCheckException(struct pt_regs *regs)
 {
-	int errcode;
-
-#if defined(CONFIG_4xx)
-	unsigned int esr = regs->dsisr;
-	int isbpt = esr & ESR_PTR;
+	unsigned int reason = get_reason(regs);
 	extern int do_mathemu(struct pt_regs *regs);
 
 #ifdef CONFIG_MATH_EMULATION
-	if (!isbpt && do_mathemu(regs) == 0)
-		return;
-#endif /* CONFIG_MATH_EMULATION */
-
-#else /* ! CONFIG_4xx */
-	int isbpt = regs->msr & 0x20000;
-
-	if (regs->msr & 0x100000) {
-		/* IEEE FP exception */
-		_exception(SIGFPE, regs);
+	/* (reason & REASON_ILLEGAL) would be the obvious thing here,
+	 * but there seems to be a hardware bug on the 405GP (RevD)
+	 * that means ESR is sometimes set incorrectly - either to
+	 * ESR_DST (!?) or 0.  In the process of chasing this with the
+	 * hardware people - not sure if it can happen on any illegal
+	 * instruction or only on FP instructions, whether there is a
+	 * pattern to occurences etc. -dgibson 31/Mar/2003 */
+	if (!(reason & REASON_TRAP) && do_mathemu(regs) == 0) {
+		emulate_single_step(regs);
 		return;
 	}
-#endif /* ! CONFIG_4xx */
+#endif /* CONFIG_MATH_EMULATION */
 
-	if (isbpt) {
+	if (reason & REASON_FP) {
+		/* IEEE FP exception */
+		int code = 0;
+		u32 fpscr;
+
+		if (regs->msr & MSR_FP)
+			giveup_fpu(current);
+		fpscr = current->thread.fpscr;
+		fpscr &= fpscr << 22;	/* mask summary bits with enables */
+		if (fpscr & FPSCR_VX)
+			code = FPE_FLTINV;
+		else if (fpscr & FPSCR_OX)
+			code = FPE_FLTOVF;
+		else if (fpscr & FPSCR_UX)
+			code = FPE_FLTUND;
+		else if (fpscr & FPSCR_ZX)
+			code = FPE_FLTDIV;
+		else if (fpscr & FPSCR_XX)
+			code = FPE_FLTRES;
+		_exception(SIGFPE, regs, code, regs->nip);
+		return;
+	}
+
+	if (reason & REASON_TRAP) {
 		/* trap exception */
 		if (debugger_bpt(regs))
 			return;
@@ -379,17 +442,21 @@ ProgramCheckException(struct pt_regs *regs)
 			regs->nip += 4;
 			return;
 		}
-		_exception(SIGTRAP, regs);
+		_exception(SIGTRAP, regs, TRAP_BRKPT, 0);
 		return;
 	}
 
-	/* Try to emulate it if we should. */
-	if ((errcode = emulate_instruction(regs))) {
-		if (errcode == -EFAULT)
-			_exception(SIGBUS, regs);
-		else
-			_exception(SIGILL, regs);
+	if (reason & REASON_PRIVILEGED) {
+		/* Try to emulate it if we should. */
+		if (emulate_instruction(regs) == 0) {
+			emulate_single_step(regs);
+			return;
+		}
+		_exception(SIGILL, regs, ILL_PRVOPC, regs->nip);
+		return;
 	}
+
+	_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
 }
 
 void
@@ -398,7 +465,7 @@ SingleStepException(struct pt_regs *regs)
 	regs->msr &= ~MSR_SE;  /* Turn off 'trace' bit */
 	if (debugger_sstep(regs))
 		return;
-	_exception(SIGTRAP, regs);
+	_exception(SIGTRAP, regs, TRAP_TRACE, 0);
 }
 
 void
@@ -414,12 +481,12 @@ AlignmentException(struct pt_regs *regs)
 	if (fixed == -EFAULT) {
 		/* fixed == -EFAULT means the operand address was bad */
 		if (user_mode(regs))
-			force_sig(SIGSEGV, current);
+			_exception(SIGSEGV, regs, SEGV_ACCERR, regs->dar);
 		else
 			bad_page_fault(regs, regs->dar, SIGSEGV);
 		return;
 	}
-	_exception(SIGBUS, regs);
+	_exception(SIGBUS, regs, BUS_ADRALN, regs->dar);
 }
 
 void
@@ -470,16 +537,17 @@ SoftwareEmulation(struct pt_regs *regs)
 #endif
 	if (errcode) {
 		if (errcode > 0)
-			_exception(SIGFPE, regs);
+			_exception(SIGFPE, regs, 0, 0);
 		else if (errcode == -EFAULT)
-			_exception(SIGSEGV, regs);
+			_exception(SIGSEGV, regs, 0, 0);
 		else
-			_exception(SIGILL, regs);
-	}
+			_exception(SIGILL, regs, ILL_ILLOPC, regs->nip);
+	} else
+		emulate_single_step(regs);
 }
 #endif /* CONFIG_8xx */
 
-#if defined(CONFIG_4xx)
+#if defined(CONFIG_4xx) || defined(CONFIG_BOOKE)
 
 void DebugException(struct pt_regs *regs, unsigned long debug_status)
 {
@@ -487,7 +555,7 @@ void DebugException(struct pt_regs *regs, unsigned long debug_status)
 	if (debug_status & DBSR_TIE) {		/* trap instruction*/
 		if (!user_mode(regs) && debugger_bpt(regs))
 			return;
-		_exception(SIGTRAP, regs);
+		_exception(SIGTRAP, regs, 0, 0);
 
 	}
 #endif
@@ -495,10 +563,10 @@ void DebugException(struct pt_regs *regs, unsigned long debug_status)
 		if (!user_mode(regs) && debugger_sstep(regs))
 			return;
 		current->thread.dbcr0 &= ~DBCR0_IC;
-		_exception(SIGTRAP, regs);
+		_exception(SIGTRAP, regs, TRAP_TRACE, 0);
 	}
 }
-#endif /* CONFIG_4xx */
+#endif /* CONFIG_4xx || CONFIG_BOOKE */
 
 #if !defined(CONFIG_TAU_INT)
 void
@@ -508,6 +576,17 @@ TAUException(struct pt_regs *regs)
 	       regs->nip, regs->msr, regs->trap, print_tainted());
 }
 #endif /* CONFIG_INT_TAU */
+
+#ifdef CONFIG_ALTIVEC
+void
+AltivecAssistException(struct pt_regs *regs)
+{
+	if (regs->msr & MSR_VEC)
+		giveup_altivec(current);
+	/* XXX quick hack for now: set the non-Java bit in the VSCR */
+	current->thread.vscr.u[3] |= 0x10000;
+}
+#endif /* CONFIG_ALTIVEC */
 
 void __init trap_init(void)
 {

@@ -185,8 +185,6 @@ lasi_init_chip(struct parisc_device *dev)
 	lasi->version = gsc_readl(lasi->hpa + LASI_VER) & 0xf;
 	printk(KERN_INFO "%s version %d at 0x%lx found.\n",
 		lasi->name, lasi->version, lasi->hpa);
-	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s version %d",
-		 lasi->name, lasi->version);
 
 	/* initialize the chassis LEDs really early */ 
 	lasi_led_init(lasi->hpa);

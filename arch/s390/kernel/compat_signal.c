@@ -563,6 +563,10 @@ handle_signal32(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 	if (regs->trap == __LC_SVC_OLD_PSW) {
 		/* If so, check system call restarting.. */
 		switch (regs->gprs[2]) {
+			case -ERESTART_RESTARTBLOCK:
+				current_thread_info()->restart_block.fn =
+					do_no_restart_syscall;
+				clear_thread_flag(TIF_RESTART_SVC);
 			case -ERESTARTNOHAND:
 				regs->gprs[2] = -EINTR;
 				break;
@@ -575,7 +579,7 @@ handle_signal32(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 			/* fallthrough */
 			case -ERESTARTNOINTR:
 				regs->gprs[2] = regs->orig_gpr2;
-				regs->psw.addr -= 2;
+				regs->psw.addr -= regs->ilc;
 		}
 	}
 
@@ -637,7 +641,12 @@ int do_signal32(struct pt_regs *regs, sigset_t *oldset)
 		    regs->gprs[2] == -ERESTARTSYS ||
 		    regs->gprs[2] == -ERESTARTNOINTR) {
 			regs->gprs[2] = regs->orig_gpr2;
-			regs->psw.addr -= 2;
+			regs->psw.addr -= regs->ilc;
+		}
+		/* Restart the system call with a new system call number */
+		if (regs->gprs[2] == -ERESTART_RESTARTBLOCK) {
+			regs->gprs[2] = __NR_restart_syscall;
+			set_thread_flag(TIF_RESTART_SVC);
 		}
 	}
 	return 0;

@@ -1,10 +1,10 @@
-/* $Id: divasi.c,v 1.1.2.7 2001/05/01 15:48:05 armin Exp $
+/* $Id: divasi.c,v 1.25 2003/09/09 06:46:29 schindler Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * User Mode IDI Interface 
  *
- * Copyright 2000-2002 by Armin Schindler (mac@melware.de)
- * Copyright 2000-2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de)
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -19,7 +19,6 @@
 #include <linux/poll.h>
 #include <linux/proc_fs.h>
 #include <linux/skbuff.h>
-#include <linux/vmalloc.h>
 #include <linux/devfs_fs_kernel.h>
 
 #include "platform.h"
@@ -28,27 +27,27 @@
 #include "um_xdi.h"
 #include "um_idi.h"
 
-static char *main_revision = "$Revision: 1.1.2.7 $";
+static char *main_revision = "$Revision: 1.25 $";
 
-static int major = 242;
+static int major;
 
 MODULE_DESCRIPTION("User IDI Interface for Eicon ISDN cards");
 MODULE_AUTHOR("Cytronics & Melware, Eicon Networks");
 MODULE_SUPPORTED_DEVICE("DIVA card driver");
 MODULE_LICENSE("GPL");
-MODULE_PARM(major, "i");
-MODULE_PARM_DESC(major, "Major number for /dev/DivasIDI");
 
 typedef struct _diva_um_idi_os_context {
 	wait_queue_head_t read_wait;
 	wait_queue_head_t close_wait;
 	struct timer_list diva_timer_id;
 	int aborted;
+	int adapter_nr;
 } diva_um_idi_os_context_t;
 
 static char *DRIVERNAME = "Eicon DIVA - User IDI (http://www.melware.net)";
 static char *DRIVERLNAME = "diva_idi";
-char *DRIVERRELEASE = "2.0";
+static char *DEVNAME = "DivasIDI";
+char *DRIVERRELEASE_IDI = "2.0";
 
 extern int idifunc_init(void);
 extern void idifunc_finit(void);
@@ -83,32 +82,9 @@ static int remove_entity(void *entity);
 static void diva_um_timer_function(unsigned long data);
 
 /*
- * malloc
- */
-void *diva_os_malloc(unsigned long flags, unsigned long size)
-{
-	void *ret = NULL;
-
-	if (size) {
-		ret = (void *) vmalloc((unsigned int) size);
-	}
-	return (ret);
-}
-
-/*
- * free
- */
-void diva_os_free(unsigned long unused, void *ptr)
-{
-	if (ptr) {
-		vfree(ptr);
-	}
-}
-
-/*
  * proc entry
  */
-extern struct proc_dir_entry *proc_net_isdn_eicon;
+extern struct proc_dir_entry *proc_net_eicon;
 static struct proc_dir_entry *um_idi_proc_entry = NULL;
 
 static int
@@ -120,10 +96,11 @@ um_idi_proc_read(char *page, char **start, off_t off, int count, int *eof,
 
 	len += sprintf(page + len, "%s\n", DRIVERNAME);
 	len += sprintf(page + len, "name     : %s\n", DRIVERLNAME);
-	len += sprintf(page + len, "release  : %s\n", DRIVERRELEASE);
+	len += sprintf(page + len, "release  : %s\n", DRIVERRELEASE_IDI);
 	strcpy(tmprev, main_revision);
 	len += sprintf(page + len, "revision : %s\n", getrev(tmprev));
 	len += sprintf(page + len, "build    : %s\n", DIVA_BUILD);
+	len += sprintf(page + len, "major    : %d\n", major);
 
 	if (off + count >= len)
 		*eof = 1;
@@ -137,7 +114,7 @@ static int DIVA_INIT_FUNCTION create_um_idi_proc(void)
 {
 	um_idi_proc_entry = create_proc_entry(DRIVERLNAME,
 					      S_IFREG | S_IRUGO | S_IWUSR,
-					      proc_net_isdn_eicon);
+					      proc_net_eicon);
 	if (!um_idi_proc_entry)
 		return (0);
 
@@ -150,7 +127,7 @@ static int DIVA_INIT_FUNCTION create_um_idi_proc(void)
 static void remove_um_idi_proc(void)
 {
 	if (um_idi_proc_entry) {
-		remove_proc_entry(DRIVERLNAME, proc_net_isdn_eicon);
+		remove_proc_entry(DRIVERLNAME, proc_net_eicon);
 		um_idi_proc_entry = NULL;
 	}
 }
@@ -167,20 +144,20 @@ static struct file_operations divas_idi_fops = {
 
 static void divas_idi_unregister_chrdev(void)
 {
-	devfs_remove("DivasIDI");
-	unregister_chrdev(major, "DivasIDI");
+	devfs_remove(DEVNAME);
+	unregister_chrdev(major, DEVNAME);
 }
 
 static int DIVA_INIT_FUNCTION divas_idi_register_chrdev(void)
 {
-	if (register_chrdev(major, "DivasIDI", &divas_idi_fops))
+	if ((major = register_chrdev(0, DEVNAME, &divas_idi_fops)) < 0)
 	{
 		printk(KERN_ERR "%s: failed to create /dev entry.\n",
 		       DRIVERLNAME);
 		return (0);
 	}
+	devfs_mk_cdev(MKDEV(major, 0), S_IFCHR|S_IRUSR|S_IWUSR, DEVNAME);
 
-	devfs_mk_cdev(MKDEV(major, 0), S_IFCHR|S_IRUSR|S_IWUSR, "DivasIDI");
 	return (1);
 }
 
@@ -193,10 +170,9 @@ static int DIVA_INIT_FUNCTION divasi_init(void)
 	int ret = 0;
 
 	printk(KERN_INFO "%s\n", DRIVERNAME);
-	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE);
+	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE_IDI);
 	strcpy(tmprev, main_revision);
-	printk("%s  Build: %s Major: %d\n", getrev(tmprev), DIVA_BUILD,
-	       major);
+	printk("%s  Build: %s\n", getrev(tmprev), DIVA_BUILD);
 
 	if (!divas_idi_register_chrdev()) {
 		ret = -EIO;
@@ -219,6 +195,7 @@ static int DIVA_INIT_FUNCTION divasi_init(void)
 		ret = -EIO;
 		goto out;
 	}
+	printk(KERN_INFO "%s: started with major %d\n", DRIVERLNAME, major);
 
       out:
 	return (ret);
@@ -330,6 +307,7 @@ static int um_idi_open_adapter(struct file *file, int adapter_nr)
 	p_os->diva_timer_id.function = (void *) diva_um_timer_function;
 	p_os->diva_timer_id.data = (unsigned long) p_os;
 	p_os->aborted = 0;
+	p_os->adapter_nr = adapter_nr;
 	return (1);
 }
 
@@ -432,13 +410,22 @@ static int um_idi_open(struct inode *inode, struct file *file)
 
 static int um_idi_release(struct inode *inode, struct file *file)
 {
-	unsigned int adapter_nr = iminor(inode);
+	diva_um_idi_os_context_t *p_os;
+	unsigned int adapter_nr;
 	int ret = 0;
 
 	if (!(file->private_data)) {
 		ret = -ENODEV;
 		goto out;
 	}
+
+	if (!(p_os =
+		(diva_um_idi_os_context_t *) diva_um_id_get_os_context(file->private_data))) {
+		ret = -ENODEV;
+		goto out;
+	}
+
+	adapter_nr = p_os->adapter_nr;
 
 	if ((ret = remove_entity(file->private_data))) {
 		goto out;

@@ -17,6 +17,11 @@
  * See http://ftdi-usb-sio.sourceforge.net for upto date testing info
  *	and extra documentation
  *
+ * (21/Sep/2003) Ian Abbott
+ *      Added VID/PID for Omnidirectional Control Technology US101 USB to
+ *      RS-232 adapter (also rebadged as Dick Smith Electronics XH6381).
+ *      VID/PID supplied by Donald Gordon.
+ *
  * (19/Aug/2003) Ian Abbott
  *      Freed urb's transfer buffer in write bulk callback.
  *      Omitted some paranoid checks in write bulk callback that don't matter.
@@ -334,6 +339,7 @@ static struct usb_device_id id_table_8U232AM [] = {
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2803_7_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2803_8_PID, 0, 0x3ff) },
 	{ USB_DEVICE_VER(IDTECH_VID, IDTECH_IDT1221U_PID, 0, 0x3ff) },
+	{ USB_DEVICE_VER(OCT_VID, OCT_US101_PID, 0, 0x3ff) },
 	{ }						/* Terminating entry */
 };
 
@@ -406,6 +412,7 @@ static struct usb_device_id id_table_FT232BM [] = {
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2803_7_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(SEALEVEL_VID, SEALEVEL_2803_8_PID, 0x400, 0xffff) },
 	{ USB_DEVICE_VER(IDTECH_VID, IDTECH_IDT1221U_PID, 0x400, 0xffff) },
+	{ USB_DEVICE_VER(OCT_VID, OCT_US101_PID, 0x400, 0xffff) },
 	{ }						/* Terminating entry */
 };
 
@@ -491,6 +498,7 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2803_7_PID) },
 	{ USB_DEVICE(SEALEVEL_VID, SEALEVEL_2803_8_PID) },
 	{ USB_DEVICE(IDTECH_VID, IDTECH_IDT1221U_PID) },
+	{ USB_DEVICE(OCT_VID, OCT_US101_PID) },
 	{ USB_DEVICE_VER(FTDI_VID, FTDI_HE_TIRA1_PID, 0x400, 0xffff) },
 	{ USB_DEVICE(FTDI_VID, FTDI_USB_UIRT_PID) },
 	{ }						/* Terminating entry */

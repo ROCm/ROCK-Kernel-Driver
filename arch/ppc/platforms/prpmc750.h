@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/platforms/prpmc750.h
- * 
+ *
  * Definitions for Motorola PrPMC750 board support
  *
  * Author: Matt Porter <mporter@mvista.com>

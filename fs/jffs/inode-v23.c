@@ -139,7 +139,7 @@ static int jffs_fill_super(struct super_block *sb, void *data, int silent)
 
 	c->thread_pid = kernel_thread (jffs_garbage_collect_thread, 
 				        (void *) c, 
-				        CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+				        CLONE_KERNEL);
 	D1(printk(KERN_NOTICE "JFFS: GC thread pid=%d.\n", (int) c->thread_pid));
 
 	D1(printk(KERN_NOTICE "JFFS: Successfully mounted device %s.\n",
@@ -1734,7 +1734,7 @@ jffs_read_inode(struct inode *inode)
 		   the device should be read from the flash memory and then
 		   added to the inode's i_rdev member.  */
 		u16 val;
-		jffs_read_data(f, (char *)val, 0, 2);
+		jffs_read_data(f, (char *)&val, 0, 2);
 		init_special_inode(inode, inode->i_mode,
 			old_decode_dev(val));
 	}

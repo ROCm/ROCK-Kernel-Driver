@@ -16,13 +16,24 @@
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/pagemap.h>
+#include <linux/mount.h>
+#include <linux/namei.h>
+#include <linux/namespace.h>
+#include "super.h"
+#include "cell.h"
 #include "volume.h"
 #include "vnode.h"
 #include "internal.h"
 
 
-static struct dentry *afs_mntpt_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *);
+static struct dentry *afs_mntpt_lookup(struct inode *dir,
+				       struct dentry *dentry,
+				       struct nameidata *nd);
 static int afs_mntpt_open(struct inode *inode, struct file *file);
+
+#ifdef AFS_AUTOMOUNT_SUPPORT
+static int afs_mntpt_follow_link(struct dentry *dentry, struct nameidata *nd);
+#endif
 
 struct file_operations afs_mntpt_file_operations = {
 	.open		= afs_mntpt_open,
@@ -30,9 +41,26 @@ struct file_operations afs_mntpt_file_operations = {
 
 struct inode_operations afs_mntpt_inode_operations = {
 	.lookup		= afs_mntpt_lookup,
+#ifdef AFS_AUTOMOUNT_SUPPORT
+	.follow_link	= afs_mntpt_follow_link,
+#endif
 	.readlink	= page_readlink,
 	.getattr	= afs_inode_getattr,
 };
+
+#ifdef AFS_AUTOMOUNT_SUPPORT
+static LIST_HEAD(afs_vfsmounts);
+
+static void afs_mntpt_expiry_timed_out(struct afs_timer *timer);
+
+struct afs_timer_ops afs_mntpt_expiry_timer_ops = {
+	.timed_out	= afs_mntpt_expiry_timed_out,
+};
+
+struct afs_timer afs_mntpt_expiry_timer;
+
+unsigned long afs_mntpt_expiry_timeout = 20;
+#endif
 
 /*****************************************************************************/
 /*
@@ -93,8 +121,17 @@ int afs_mntpt_check_symlink(afs_vnode_t *vnode)
 /*
  * no valid lookup procedure on this sort of dir
  */
-static struct dentry *afs_mntpt_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
+static struct dentry *afs_mntpt_lookup(struct inode *dir,
+				       struct dentry *dentry,
+				       struct nameidata *nd)
 {
+	kenter("%p,%p{%p{%s},%s}",
+	       dir,
+	       dentry,
+	       dentry->d_parent,
+	       dentry->d_parent ? dentry->d_parent->d_name.name : (const unsigned char*)"",
+	       dentry->d_name.name);
+
 	return ERR_PTR(-EREMOTE);
 } /* end afs_mntpt_lookup() */
 
@@ -104,5 +141,146 @@ static struct dentry *afs_mntpt_lookup(struct inode *dir, struct dentry *dentry,
  */
 static int afs_mntpt_open(struct inode *inode, struct file *file)
 {
+	kenter("%p,%p{%p{%s},%s}",
+	       inode, file,
+	       file->f_dentry->d_parent,
+	       file->f_dentry->d_parent ? file->f_dentry->d_parent->d_name.name : (const unsigned char*)"",
+	       file->f_dentry->d_name.name);
+
 	return -EREMOTE;
 } /* end afs_mntpt_open() */
+
+#ifdef AFS_AUTOMOUNT_SUPPORT
+/*****************************************************************************/
+/*
+ * create a vfsmount to be automounted
+ */
+static struct vfsmount *afs_mntpt_do_automount(struct dentry *mntpt)
+{
+	struct afs_super_info *super;
+	struct vfsmount *mnt;
+	struct page *page = NULL;
+	size_t size;
+	char *buf, *devname = NULL, *options = NULL;
+	int ret;
+
+	kenter("{%s}", mntpt->d_name.name);
+
+	BUG_ON(!mntpt->d_inode);
+
+	ret = -EINVAL;
+	size = mntpt->d_inode->i_size;
+	if (size > PAGE_SIZE - 1)
+		goto error;
+
+	ret = -ENOMEM;
+	devname = (char *) get_zeroed_page(GFP_KERNEL);
+	if (!devname)
+		goto error;
+
+	options = (char *) get_zeroed_page(GFP_KERNEL);
+	if (!options)
+		goto error;
+
+	/* read the contents of the AFS special symlink */
+	page = read_cache_page(mntpt->d_inode->i_mapping,
+			       0,
+			       (filler_t*)mntpt->d_inode->i_mapping->a_ops->readpage,
+			       NULL);
+	if (IS_ERR(page)) {
+		ret = PTR_ERR(page);
+		goto error;
+	}
+
+	ret = -EIO;
+	wait_on_page_locked(page);
+	if (!PageUptodate(page) || PageError(page))
+		goto error;
+
+	buf = kmap(page);
+	memcpy(devname, buf, size);
+	kunmap(page);
+	page_cache_release(page);
+	page = NULL;
+
+	/* work out what options we want */
+	super = AFS_FS_S(mntpt->d_sb);
+	memcpy(options, "cell=", 5);
+	strcpy(options + 5, super->volume->cell->name);
+	if (super->volume->type == AFSVL_RWVOL)
+		strcat(options,",rwpath");
+
+	/* try and do the mount */
+	kdebug("--- attempting mount %s -o %s ---", devname, options);
+	mnt = do_kern_mount("afs", 0, devname, options);
+	kdebug("--- mount result %p ---", mnt);
+
+	free_page((unsigned long)devname);
+	free_page((unsigned long)options);
+	kleave(" = %p",mnt);
+	return mnt;
+
+ error:
+	if (page)
+		page_cache_release(page);
+	if (devname)
+		free_page((unsigned long)devname);
+	if (options)
+		free_page((unsigned long)options);
+	kleave(" = %d",ret);
+	return ERR_PTR(ret);
+} /* end afs_mntpt_do_automount() */
+
+/*****************************************************************************/
+/*
+ * follow a link from a mountpoint directory, thus causing it to be mounted
+ */
+static int afs_mntpt_follow_link(struct dentry *dentry, struct nameidata *nd)
+{
+	struct nameidata newnd;
+	struct vfsmount *newmnt;
+	int err;
+
+	kenter("%p{%s},{%s:%p{%s}}",
+	       dentry,
+	       dentry->d_name.name,
+	       nd->mnt->mnt_devname,
+	       dentry,
+	       nd->dentry->d_name.name);
+
+	newmnt = afs_mntpt_do_automount(dentry);
+	if (IS_ERR(newmnt))
+		return PTR_ERR(newmnt);
+
+	struct_cpy(&newnd,nd);
+	newnd.dentry = dentry;
+	err = do_add_mount(newmnt, &newnd, 0, &afs_vfsmounts);
+
+	if (!err) {
+		path_release(nd);
+		mntget(newmnt);
+		nd->mnt = newmnt;
+		dget(newmnt->mnt_root);
+		nd->dentry = newmnt->mnt_root;
+	}
+
+	kleave(" = %d", err);
+	return err;
+} /* end afs_mntpt_follow_link() */
+
+/*****************************************************************************/
+/*
+ * handle mountpoint expiry timer going off
+ */
+static void afs_mntpt_expiry_timed_out(struct afs_timer *timer)
+{
+	kenter("");
+
+	mark_mounts_for_expiry(&afs_vfsmounts);
+
+	afs_kafstimod_add_timer(&afs_mntpt_expiry_timer,
+				afs_mntpt_expiry_timeout * HZ);
+
+	kleave("");
+} /* end afs_mntpt_expiry_timed_out() */
+#endif

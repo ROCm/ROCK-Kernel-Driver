@@ -228,6 +228,10 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 	unsigned long vm_flags, nstart, end, tmp;
 	struct vm_area_struct * vma, * next, * prev;
 	int error = -EINVAL;
+	const int grows = prot & (PROT_GROWSDOWN|PROT_GROWSUP);
+	prot &= ~(PROT_GROWSDOWN|PROT_GROWSUP);
+	if (grows == (PROT_GROWSDOWN|PROT_GROWSUP)) /* can't be both */
+		return -EINVAL;
 
 	if (start & ~PAGE_MASK)
 		return -EINVAL;
@@ -246,8 +250,26 @@ do_mprotect(struct mm_struct *mm, unsigned long start, size_t len,
 
 	vma = find_vma_prev(mm, start, &prev);
 	error = -ENOMEM;
-	if (!vma || vma->vm_start > start)
+	if (!vma)
 		goto out;
+	if (unlikely(grows & PROT_GROWSDOWN)) {
+		if (vma->vm_start >= end)
+			goto out;
+		start = vma->vm_start;
+		error = -EINVAL;
+		if (!(vma->vm_flags & VM_GROWSDOWN))
+			goto out;
+	}
+	else {
+		if (vma->vm_start > start)
+			goto out;
+		if (unlikely(grows & PROT_GROWSUP)) {
+			end = vma->vm_end;
+			error = -EINVAL;
+			if (!(vma->vm_flags & VM_GROWSUP))
+				goto out;
+		}
+	}
 
 	for (nstart = start ; ; ) {
 		unsigned int newflags;

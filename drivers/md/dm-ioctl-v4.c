@@ -401,7 +401,7 @@ static int list_devices(struct dm_ioctl *param, size_t param_size)
 				old_nl->next = (uint32_t) ((void *) nl -
 							   (void *) old_nl);
 			disk = dm_disk(hc->md);
-			nl->dev = MKDEV(disk->major, disk->first_minor);
+			nl->dev = huge_encode_dev(MKDEV(disk->major, disk->first_minor));
 			nl->next = 0;
 			strcpy(nl->name, hc->name);
 
@@ -445,7 +445,7 @@ static int __dev_status(struct mapped_device *md, struct dm_ioctl *param)
 	if (!bdev)
 		return -ENXIO;
 
-	param->dev = MKDEV(disk->major, disk->first_minor);
+	param->dev = huge_encode_dev(MKDEV(disk->major, disk->first_minor));
 
 	/*
 	 * Yes, this will be out of date by the time it gets back
@@ -481,7 +481,7 @@ static int dev_create(struct dm_ioctl *param, size_t param_size)
 		return r;
 
 	if (param->flags & DM_PERSISTENT_DEV_FLAG)
-		r = dm_create_with_minor(MINOR(param->dev), &md);
+		r = dm_create_with_minor(MINOR(huge_decode_dev(param->dev)), &md);
 	else
 		r = dm_create(&md);
 
@@ -700,12 +700,76 @@ static int dev_status(struct dm_ioctl *param, size_t param_size)
 }
 
 /*
+ * Build up the status struct for each target
+ */
+static void retrieve_status(struct dm_table *table,
+			    struct dm_ioctl *param, size_t param_size)
+{
+	unsigned int i, num_targets;
+	struct dm_target_spec *spec;
+	char *outbuf, *outptr;
+	status_type_t type;
+	size_t remaining, len, used = 0;
+
+	outptr = outbuf = get_result_buffer(param, param_size, &len);
+
+	if (param->flags & DM_STATUS_TABLE_FLAG)
+		type = STATUSTYPE_TABLE;
+	else
+		type = STATUSTYPE_INFO;
+
+	/* Get all the target info */
+	num_targets = dm_table_get_num_targets(table);
+	for (i = 0; i < num_targets; i++) {
+		struct dm_target *ti = dm_table_get_target(table, i);
+
+		remaining = len - (outptr - outbuf);
+		if (remaining < sizeof(struct dm_target_spec)) {
+			param->flags |= DM_BUFFER_FULL_FLAG;
+			break;
+		}
+
+		spec = (struct dm_target_spec *) outptr;
+
+		spec->status = 0;
+		spec->sector_start = ti->begin;
+		spec->length = ti->len;
+		strncpy(spec->target_type, ti->type->name,
+			sizeof(spec->target_type));
+
+		outptr += sizeof(struct dm_target_spec);
+		remaining = len - (outptr - outbuf);
+
+		/* Get the status/table string from the target driver */
+		if (ti->type->status) {
+			if (ti->type->status(ti, type, outptr, remaining)) {
+				param->flags |= DM_BUFFER_FULL_FLAG;
+				break;
+			}
+		} else
+			outptr[0] = '\0';
+
+		outptr += strlen(outptr) + 1;
+		used = param->data_start + (outptr - outbuf);
+
+		align_ptr(outptr);
+		spec->next = outptr - outbuf;
+	}
+
+	if (used)
+		param->data_size = used;
+
+	param->target_count = num_targets;
+}
+
+/*
  * Wait for a device to report an event
  */
 static int dev_wait(struct dm_ioctl *param, size_t param_size)
 {
 	int r;
 	struct mapped_device *md;
+	struct dm_table *table;
 	DECLARE_WAITQUEUE(wq, current);
 
 	md = find_device(param);
@@ -728,7 +792,16 @@ static int dev_wait(struct dm_ioctl *param, size_t param_size)
 	 * him and save an ioctl.
 	 */
 	r = __dev_status(md, param);
+	if (r)
+		goto out;
 
+	table = dm_get_table(md);
+	if (table) {
+		retrieve_status(table, param, param_size);
+		dm_table_put(table);
+	}
+
+ out:
 	dm_put(md);
 	return r;
 }
@@ -817,6 +890,8 @@ static int table_load(struct dm_ioctl *param, size_t param_size)
 		return -ENXIO;
 	}
 
+	if (hc->new_map)
+		dm_table_put(hc->new_map);
 	hc->new_map = t;
 	param->flags |= DM_INACTIVE_PRESENT_FLAG;
 
@@ -886,7 +961,7 @@ static void retrieve_deps(struct dm_table *table,
 	count = 0;
 	list_for_each(tmp, dm_table_get_devices(table)) {
 		struct dm_dev *dd = list_entry(tmp, struct dm_dev, list);
-		deps->dev[count++] = dd->bdev->bd_dev;
+		deps->dev[count++] = huge_encode_dev(dd->bdev->bd_dev);
 	}
 
 	param->data_size = param->data_start + needed;
@@ -915,69 +990,6 @@ static int table_deps(struct dm_ioctl *param, size_t param_size)
  out:
 	dm_put(md);
 	return r;
-}
-
-/*
- * Build up the status struct for each target
- */
-static void retrieve_status(struct dm_table *table,
-			    struct dm_ioctl *param, size_t param_size)
-{
-	unsigned int i, num_targets;
-	struct dm_target_spec *spec;
-	char *outbuf, *outptr;
-	status_type_t type;
-	size_t remaining, len, used = 0;
-
-	outptr = outbuf = get_result_buffer(param, param_size, &len);
-
-	if (param->flags & DM_STATUS_TABLE_FLAG)
-		type = STATUSTYPE_TABLE;
-	else
-		type = STATUSTYPE_INFO;
-
-	/* Get all the target info */
-	num_targets = dm_table_get_num_targets(table);
-	for (i = 0; i < num_targets; i++) {
-		struct dm_target *ti = dm_table_get_target(table, i);
-
-		remaining = len - (outptr - outbuf);
-		if (remaining < sizeof(struct dm_target_spec)) {
-			param->flags |= DM_BUFFER_FULL_FLAG;
-			break;
-		}
-
-		spec = (struct dm_target_spec *) outptr;
-
-		spec->status = 0;
-		spec->sector_start = ti->begin;
-		spec->length = ti->len;
-		strncpy(spec->target_type, ti->type->name,
-			sizeof(spec->target_type));
-
-		outptr += sizeof(struct dm_target_spec);
-		remaining = len - (outptr - outbuf);
-
-		/* Get the status/table string from the target driver */
-		if (ti->type->status) {
-			if (ti->type->status(ti, type, outptr, remaining)) {
-				param->flags |= DM_BUFFER_FULL_FLAG;
-				break;
-			}
-		} else
-			outptr[0] = '\0';
-
-		outptr += strlen(outptr) + 1;
-		used = param->data_start + (outptr - outbuf);
-
-		align_ptr(outptr);
-		spec->next = outptr - outbuf;
-	}
-
-	if (used)
-		param->data_size = used;
-
-	param->target_count = num_targets;
 }
 
 /*

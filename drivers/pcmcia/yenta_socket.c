@@ -248,10 +248,6 @@ static int yenta_set_socket(struct pcmcia_socket *sock, socket_state_t *state)
 	struct yenta_socket *socket = container_of(sock, struct yenta_socket, socket);
 	u16 bridge;
 
-	if (state->flags & SS_DEBOUNCED) {
-		/* The insertion debounce period has ended.  Clear any pending insertion events */
-		state->flags &= ~SS_DEBOUNCED;		/* SS_DEBOUNCED is oneshot */
-	}
 	yenta_set_power(socket, state);
 	socket->io_irq = state->io_irq;
 	bridge = config_readw(socket, CB_BRIDGE_CONTROL) & ~(CB_BRIDGE_CRST | CB_BRIDGE_INTR);
@@ -937,7 +933,7 @@ static int yenta_dev_suspend (struct pci_dev *dev, u32 state)
 	struct yenta_socket *socket = pci_get_drvdata(dev);
 	int ret;
 
-	ret = pcmcia_socket_dev_suspend(&dev->dev, state, SUSPEND_SAVE_STATE);
+	ret = pcmcia_socket_dev_suspend(&dev->dev, state);
 
 	if (socket) {
 		if (socket->type && socket->type->save_state)
@@ -969,7 +965,7 @@ static int yenta_dev_resume (struct pci_dev *dev)
 			socket->type->restore_state(socket);
 	}
 
-	return pcmcia_socket_dev_resume(&dev->dev, RESUME_RESTORE_STATE);
+	return pcmcia_socket_dev_resume(&dev->dev);
 }
 
 

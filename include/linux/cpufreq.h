@@ -60,6 +60,13 @@ struct cpufreq_cpuinfo {
 	unsigned int		transition_latency; /* in 10^(-9) s */
 };
 
+struct cpufreq_real_policy {
+	unsigned int		min;    /* in kHz */
+	unsigned int		max;    /* in kHz */
+        unsigned int		policy; /* see above */
+	struct cpufreq_governor	*governor; /* see below */
+};
+
 struct cpufreq_policy {
 	unsigned int		cpu;    /* cpu nr */
 	struct cpufreq_cpuinfo	cpuinfo;/* see above */
@@ -73,6 +80,8 @@ struct cpufreq_policy {
 
  	struct semaphore	lock;   /* CPU ->setpolicy or ->target may
 					   only be called once a time */
+
+	struct cpufreq_real_policy	user_policy;
 
 	struct kobject		kobj;
 	struct completion	kobj_unregister;
@@ -217,6 +226,7 @@ struct freq_attr {
  *********************************************************************/
 int cpufreq_set_policy(struct cpufreq_policy *policy);
 int cpufreq_get_policy(struct cpufreq_policy *policy, unsigned int cpu);
+int cpufreq_update_policy(unsigned int cpu);
 
 /* the proc_intf.c needs this */
 int cpufreq_parse_governor (char *str_governor, unsigned int *policy, struct cpufreq_governor **governor);
@@ -290,7 +300,7 @@ enum {
 #ifdef CONFIG_CPU_FREQ_DEFAULT_GOV_PERFORMANCE
 extern struct cpufreq_governor cpufreq_gov_performance;
 #define CPUFREQ_DEFAULT_GOVERNOR	&cpufreq_gov_performance
-#elif CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE
+#elif defined(CONFIG_CPU_FREQ_DEFAULT_GOV_USERSPACE)
 extern struct cpufreq_governor cpufreq_gov_userspace;
 #define CPUFREQ_DEFAULT_GOVERNOR	&cpufreq_gov_userspace
 #endif

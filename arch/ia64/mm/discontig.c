@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000 Silicon Graphics, Inc.  All rights reserved.
+ * Copyright (c) 2000, 2003 Silicon Graphics, Inc.  All rights reserved.
  * Copyright (c) 2001 Intel Corp.
  * Copyright (c) 2001 Tony Luck <tony.luck@intel.com>
  * Copyright (c) 2002 NEC Corp.
@@ -12,10 +12,13 @@
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
+#include <linux/swap.h>
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
 #include <linux/acpi.h>
 #include <linux/efi.h>
+#include <asm/pgalloc.h>
+#include <asm/meminit.h>
 
 
 /*
@@ -27,9 +30,6 @@ static struct ia64_node_data	*node_data[NR_NODES];
 static long			boot_pg_data[8*NR_NODES+sizeof(pg_data_t)]  __initdata;
 static pg_data_t		*pg_data_ptr[NR_NODES] __initdata;
 static bootmem_data_t		bdata[NR_NODES][NR_BANKS_PER_NODE+1] __initdata;
-
-extern int  filter_rsvd_memory (unsigned long start, unsigned long end, void *arg);
-
 /*
  * Return the compact node number of this cpu. Used prior to
  * setting up the cpu_data area.
@@ -198,7 +198,7 @@ allocate_pernode_structures(void)
 		pgdat->pgdat_next = new_pgdat_list;
 		new_pgdat_list = pgdat;
 	}
-	
+
 	memcpy(node_data[mynode]->pg_data_ptrs, pg_data_ptr, sizeof(pg_data_ptr));
 	memcpy(node_data[mynode]->node_data_ptrs, node_data, sizeof(node_data));
 
@@ -209,10 +209,11 @@ allocate_pernode_structures(void)
  * Called early in boot to setup the boot memory allocator, and to
  * allocate the node-local pg_data & node-directory data structures..
  */
-void __init
-discontig_mem_init(void)
+void __init find_memory(void)
 {
 	int	node;
+
+	reserve_memory();
 
 	if (numnodes == 0) {
 		printk(KERN_ERR "node info missing!\n");
@@ -232,6 +233,8 @@ discontig_mem_init(void)
         efi_memmap_walk(filter_rsvd_memory, discontig_free_bootmem_node);
 	discontig_reserve_bootmem();
 	allocate_pernode_structures();
+
+	find_initrd();
 }
 
 /*
@@ -242,8 +245,8 @@ discontig_mem_init(void)
  *	  the per-bank mem_map entries.
  *	- fix the page struct "virtual" pointers. These are bank specific
  *	  values that the paging system doesn't understand.
- *	- replicate the nodedir structure to other nodes	
- */ 
+ *	- replicate the nodedir structure to other nodes
+ */
 
 void __init
 discontig_paging_init(void)
@@ -305,3 +308,71 @@ discontig_paging_init(void)
 		}
 }
 
+void show_mem(void)
+{
+	int i, reserved = 0;
+	int shared = 0, cached = 0;
+	pg_data_t *pgdat;
+
+	printk("Mem-info:\n");
+	show_free_areas();
+	printk("Free swap:       %6dkB\n", nr_swap_pages<<(PAGE_SHIFT-10));
+	for_each_pgdat(pgdat) {
+		printk("Node ID: %d\n", pgdat->node_id);
+		for(i = 0; i < pgdat->node_spanned_pages; i++) {
+			if (PageReserved(pgdat->node_mem_map+i))
+				reserved++;
+			else if (PageSwapCache(pgdat->node_mem_map+i))
+				cached++;
+			else if (page_count(pgdat->node_mem_map+i))
+				shared += page_count(pgdat->node_mem_map+i)-1;
+		}
+		printk("\t%ld pages of RAM\n", pgdat->node_present_pages);
+		printk("\t%d reserved pages\n", reserved);
+		printk("\t%d pages shared\n", shared);
+		printk("\t%d pages swap cached\n", cached);
+	}
+	printk("Total of %ld pages in page table cache\n", pgtable_cache_size);
+	printk("%d free buffer pages\n", nr_free_buffer_pages());
+}
+
+/*
+ * efi_memmap_walk() knows nothing about layout of memory across nodes. Find
+ * out to which node a block of memory belongs.  Ignore memory that we cannot
+ * identify, and split blocks that run across multiple nodes.
+ *
+ * Take this opportunity to round the start address up and the end address
+ * down to page boundaries.
+ */
+void call_pernode_memory(unsigned long start, unsigned long end, void *arg)
+{
+	unsigned long rs, re;
+	void (*func)(unsigned long, unsigned long, int, int);
+	int i;
+
+	start = PAGE_ALIGN(start);
+	end &= PAGE_MASK;
+	if (start >= end)
+		return;
+
+	func = arg;
+
+	if (!num_memblks) {
+		/*
+		 * This machine doesn't have SRAT, so call func with
+		 * nid=0, bank=0.
+		 */
+		if (start < end)
+			(*func)(start, end - start, 0, 0);
+		return;
+	}
+
+	for (i = 0; i < num_memblks; i++) {
+		rs = max(start, node_memblk[i].start_paddr);
+		re = min(end, node_memblk[i].start_paddr+node_memblk[i].size);
+
+		if (rs < re)
+			(*func)(rs, re-rs, node_memblk[i].nid,
+				node_memblk[i].bank);
+	}
+}

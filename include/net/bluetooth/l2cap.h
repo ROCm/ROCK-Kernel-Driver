@@ -220,6 +220,7 @@ struct l2cap_pinfo {
 	__u32		link_mode;
 
 	__u8		conf_state;
+	__u8		conf_retry;
 	__u16		conf_mtu;
 
 	__u8		ident;
@@ -234,6 +235,7 @@ struct l2cap_pinfo {
 #define L2CAP_CONF_REQ_SENT    0x01
 #define L2CAP_CONF_INPUT_DONE  0x02
 #define L2CAP_CONF_OUTPUT_DONE 0x04
+#define L2CAP_CONF_MAX_RETRIES 2
 
 void l2cap_load(void);
 

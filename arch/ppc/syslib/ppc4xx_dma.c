@@ -41,10 +41,10 @@ ppc_dma_ch_t dma_channels[MAX_405GP_DMA_CHANNELS];
 /*
  * Configures a DMA channel, including the peripheral bus width, if a
  * peripheral is attached to the channel, the polarity of the DMAReq and
- * DMAAck signals, etc.  This information should really be setup by the boot 
+ * DMAAck signals, etc.  This information should really be setup by the boot
  * code, since most likely the configuration won't change dynamically.
  * If the kernel has to call this function, it's recommended that it's
- * called from platform specific init code.  The driver should not need to 
+ * called from platform specific init code.  The driver should not need to
  * call this function.
  */
 int hw_init_dma_channel(unsigned int dmanr,  ppc_dma_ch_t *p_init)
@@ -75,9 +75,9 @@ int hw_init_dma_channel(unsigned int dmanr,  ppc_dma_ch_t *p_init)
      * new value.
      */
 
-    control |= ( 
+    control |= (
                 SET_DMA_CIE_ENABLE(p_init->int_enable) | /* interrupt enable         */
-                SET_DMA_BEN(p_init->buffer_enable)     | /* buffer enable            */ 
+                SET_DMA_BEN(p_init->buffer_enable)     | /* buffer enable            */
                 SET_DMA_ETD(p_init->etd_output)        | /* end of transfer pin      */
                 SET_DMA_TCE(p_init->tce_enable)        | /* terminal count enable    */
                 SET_DMA_PL(p_init->pl)                 | /* peripheral location      */
@@ -128,7 +128,7 @@ int hw_init_dma_channel(unsigned int dmanr,  ppc_dma_ch_t *p_init)
         default:
             return DMA_STATUS_BAD_CHANNEL;
     }
-    
+
     /* save these values in our dma channel structure */
     memcpy(p_dma_ch, p_init, sizeof(ppc_dma_ch_t));
 
@@ -174,22 +174,22 @@ int get_channel_config(unsigned int dmanr, ppc_dma_ch_t *p_dma_ch)
 
     switch (dmanr) {
         case 0:
-            p_dma_ch->polarity = 
+            p_dma_ch->polarity =
                 polarity & (DMAReq0_ActiveLow | DMAAck0_ActiveLow | EOT0_ActiveLow);
             control = mfdcr(DCRN_DMACR0);
             break;
         case 1:
-            p_dma_ch->polarity = 
+            p_dma_ch->polarity =
                 polarity & (DMAReq1_ActiveLow | DMAAck1_ActiveLow | EOT1_ActiveLow);
             control = mfdcr(DCRN_DMACR1);
             break;
         case 2:
-            p_dma_ch->polarity = 
+            p_dma_ch->polarity =
                 polarity & (DMAReq2_ActiveLow | DMAAck2_ActiveLow | EOT2_ActiveLow);
             control = mfdcr(DCRN_DMACR2);
             break;
         case 3:
-            p_dma_ch->polarity = 
+            p_dma_ch->polarity =
                 polarity & (DMAReq3_ActiveLow | DMAAck3_ActiveLow | EOT3_ActiveLow);
             control = mfdcr(DCRN_DMACR3);
             break;
@@ -211,7 +211,7 @@ int get_channel_config(unsigned int dmanr, ppc_dma_ch_t *p_dma_ch)
 
 /*
  * Sets the priority for the DMA channel dmanr.
- * Since this is setup by the hardware init function, this function 
+ * Since this is setup by the hardware init function, this function
  * can be used to dynamically change the priority of a channel.
  *
  * Acceptable priorities:
@@ -269,7 +269,7 @@ int set_channel_priority(unsigned int dmanr, unsigned int priority)
 
 /*
  * Returns the width of the peripheral attached to this channel. This assumes
- * that someone who knows the hardware configuration, boot code or some other 
+ * that someone who knows the hardware configuration, boot code or some other
  * init code, already set the width.
  *
  * The return value is one of:
@@ -313,27 +313,27 @@ unsigned int get_peripheral_width(unsigned int dmanr)
  *   Create a scatter/gather list handle.  This is simply a structure which
  *   describes a scatter/gather list.
  *
- *   A handle is returned in "handle" which the driver should save in order to 
- *   be able to access this list later.  A chunk of memory will be allocated 
- *   to be used by the API for internal management purposes, including managing 
- *   the sg list and allocating memory for the sgl descriptors.  One page should 
- *   be more than enough for that purpose.  Perhaps it's a bit wasteful to use 
- *   a whole page for a single sg list, but most likely there will be only one 
+ *   A handle is returned in "handle" which the driver should save in order to
+ *   be able to access this list later.  A chunk of memory will be allocated
+ *   to be used by the API for internal management purposes, including managing
+ *   the sg list and allocating memory for the sgl descriptors.  One page should
+ *   be more than enough for that purpose.  Perhaps it's a bit wasteful to use
+ *   a whole page for a single sg list, but most likely there will be only one
  *   sg list per channel.
  *
  *   Interrupt notes:
  *   Each sgl descriptor has a copy of the DMA control word which the DMA engine
- *   loads in the control register.  The control word has a "global" interrupt 
+ *   loads in the control register.  The control word has a "global" interrupt
  *   enable bit for that channel. Interrupts are further qualified by a few bits
  *   in the sgl descriptor count register.  In order to setup an sgl, we have to
  *   know ahead of time whether or not interrupts will be enabled at the completion
  *   of the transfers.  Thus, enable_dma_interrupt()/disable_dma_interrupt() MUST
  *   be called before calling alloc_dma_handle().  If the interrupt mode will never
- *   change after powerup, then enable_dma_interrupt()/disable_dma_interrupt() 
+ *   change after powerup, then enable_dma_interrupt()/disable_dma_interrupt()
  *   do not have to be called -- interrupts will be enabled or disabled based
  *   on how the channel was configured after powerup by the hw_init_dma_channel()
  *   function.  Each sgl descriptor will be setup to interrupt if an error occurs;
- *   however, only the last descriptor will be setup to interrupt. Thus, an 
+ *   however, only the last descriptor will be setup to interrupt. Thus, an
  *   interrupt will occur (if interrupts are enabled) only after the complete
  *   sgl transfer is done.
  */

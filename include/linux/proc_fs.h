@@ -185,9 +185,10 @@ static inline void proc_net_remove(const char *name)
 #else
 
 #define proc_root_driver NULL
-#define proc_net_fops_create(name,mode,fops) do {} while(0)
-static inline struct proc_dir_entry *proc_net_create(const char *name, mode_t mode, 
-	get_info_t *get_info) {return NULL;}
+#define proc_net NULL
+
+#define proc_net_fops_create(name, mode, fops)  ({ (void)(mode), NULL; })
+#define proc_net_create(name, mode, info)	({ (void)(mode), NULL; })
 static inline void proc_net_remove(const char *name) {}
 
 static inline struct dentry *proc_pid_unhash(struct task_struct *p) { return NULL; }

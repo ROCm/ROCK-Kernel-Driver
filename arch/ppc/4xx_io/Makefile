@@ -1,5 +1,5 @@
 #
-# Makefile for the linux MPC4xx ppc-specific parts 
+# Makefile for the linux MPC4xx ppc-specific parts
 #
 
 

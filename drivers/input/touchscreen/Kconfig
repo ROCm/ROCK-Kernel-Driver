@@ -12,28 +12,26 @@ config INPUT_TOUCHSCREEN
 
 config TOUCHSCREEN_BITSY
 	tristate "Compaq iPAQ H3600 (Bitsy) touchscreen input driver"
-	depends on SA1100_BITSY && INPUT && INPUT_TOUCHSCREEN && SERIO
+	depends on SA1100_BITSY && INPUT && INPUT_TOUCHSCREEN
+	select SERIO
 	help
 	  Say Y here if you have the h3600 (Bitsy) touchscreen.
 
 	  If unsure, say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called gunze. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called h3600_ts_input.
 
 config TOUCHSCREEN_GUNZE
 	tristate "Gunze AHL-51S touchscreen"
-	depends on INPUT && INPUT_TOUCHSCREEN && SERIO
+	depends on INPUT && INPUT_TOUCHSCREEN
+	select SERIO
 	help
 	  Say Y here if you have the Gunze AHL-51 touchscreen connected to
 	  your system.
 
 	  If unsure, say N.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called gunze. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called gunze.
 

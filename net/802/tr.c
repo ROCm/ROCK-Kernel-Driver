@@ -464,8 +464,6 @@ static void rif_check_expire(unsigned long dummy)
  */
  
 #ifdef CONFIG_PROC_FS
-/* Magic token to indicate first entry (header line) */
-#define RIF_PROC_START	((void *)1)
 
 static struct rif_cache_s *rif_get_idx(loff_t pos)
 {
@@ -487,7 +485,7 @@ static void *rif_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	spin_lock_bh(&rif_lock);
 
-	return *pos ? rif_get_idx(*pos - 1) : RIF_PROC_START;
+	return *pos ? rif_get_idx(*pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *rif_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -497,7 +495,7 @@ static void *rif_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 
 	++*pos;
 
-	if (v == RIF_PROC_START) {
+	if (v == SEQ_START_TOKEN) {
 		i = -1;
 		goto scan;
 	}
@@ -524,7 +522,7 @@ static int rif_seq_show(struct seq_file *seq, void *v)
 	int j, rcf_len, segment, brdgnmb;
 	struct rif_cache_s *entry = v;
 
-	if (v == RIF_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq,
 		     "if     TR address       TTL   rcf   routing segments\n");
 	else {

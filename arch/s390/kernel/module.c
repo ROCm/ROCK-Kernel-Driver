@@ -133,9 +133,8 @@ module_frob_arch_sections(Elf_Ehdr *hdr, Elf_Shdr *sechdrs,
 
 	/* Allocate one syminfo structure per symbol. */
 	me->arch.nsyms = symtab->sh_size / sizeof(Elf_Sym);
-	me->arch.syminfo = kmalloc(me->arch.nsyms *
-				   sizeof(struct mod_arch_syminfo),
-				   GFP_KERNEL);
+	me->arch.syminfo = vmalloc(me->arch.nsyms *
+				   sizeof(struct mod_arch_syminfo));
 	if (!me->arch.syminfo)
 		return -ENOMEM;
 	symbols = (void *) hdr + symtab->sh_offset;
@@ -397,7 +396,7 @@ int module_finalize(const Elf_Ehdr *hdr,
 		    struct module *me)
 {
 	if (me->arch.syminfo)
-		kfree(me->arch.syminfo);
+		vfree(me->arch.syminfo);
 	return 0;
 }
 

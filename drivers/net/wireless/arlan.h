@@ -3,7 +3,6 @@
  *  Copyright (C) 1998 Elmer.Joandi@ut.ee, +37-255-13500	
  *  GNU General Public License applies
  */
-#include <linux/version.h>
 
 #include <linux/module.h>
 #include <linux/config.h>
@@ -40,14 +39,16 @@
 #define ARLAN_RCV_PROMISC 1
 #define ARLAN_RCV_CONTROL 2
 
-
 #ifdef CONFIG_PROC_FS
-extern int 	init_arlan_proc(void);
+extern int init_arlan_proc(void);
+extern void cleanup_arlan_proc(void);
+#else
+#define init_arlan_proc()	(0)
+#define cleanup_arlan_proc()	do { } while (0);
 #endif
 
 extern struct net_device *arlan_device[MAX_ARLANS];
 extern int	arlan_debug;
-extern char *	siteName;
 extern int	arlan_entry_debug;
 extern int	arlan_exit_debug;
 extern int	testMemory;
@@ -68,8 +69,6 @@ extern int     arlan_command(struct net_device * dev, int command);
 #define channelSetUNKNOWN 0
 #define systemIdUNKNOWN -1
 #define registrationModeUNKNOWN -1
-#define siteNameUNKNOWN "LinuxSite"
-
 
 
 #define IFDEBUG( L ) if ( (L) & arlan_debug ) 
@@ -294,7 +293,6 @@ struct arlan_conf_stru {
       int	lParameter;
       int	_15;
       int	headerSize;
-      int async;
       int retries;
       int tx_delay_ms;
       int waitReTransmitPacketMaxSize;
@@ -333,83 +331,56 @@ struct TxParam
       volatile	unsigned	char scrambled;
 };
 
-struct TxRingPoint  {
-	struct TxParam txParam;
-	
-	
-};
-
 #define TX_RING_SIZE 2
 /* Information that need to be kept for each board. */
 struct arlan_private {
       struct net_device_stats stats;
-      long open_time;			/* Useless example local info. */
       struct arlan_shmem * card;
       struct arlan_shmem * conf;
-      struct TxParam txParam;      
-      int multicastLength;
-      char  multicastList[ARLAN_MAX_MULTICAST_ADDRS][6];
-      int promiscModeEnabled;
+
       struct arlan_conf_stru * Conf;	     
       int	bad;
       int 	reset;
-      long long lastReset;
+      unsigned long lastReset;
       struct timer_list timer;
       struct timer_list tx_delay_timer;
       struct timer_list tx_retry_timer;
       struct timer_list rx_check_timer;
-      struct semaphore card_lock;
-      atomic_t 	card_users;
-      atomic_t	delay_on;
-      atomic_t  retr_on;
+
       int registrationLostCount;
       int reRegisterExp;
-      int nof_tx;
-      int nof_tx_ack;
-      int last_nof_tx;
-      int last_nof_tx_ack;
       int irq_test_done;
-      int last_command_was_rx;
+
       struct TxParam txRing[TX_RING_SIZE];
       char reTransmitBuff[0x800];
-      volatile int txLast;
-      volatile int txNew;
-      volatile int txOffset;
-      volatile char ReTransmitRequested;
-      volatile unsigned long tx_done_delayed;
-      volatile long long registrationLastSeen;
-      volatile char under_command;
-      volatile char under_toggle;
-      volatile long long tx_last_sent;
-      volatile long long tx_last_cleared;
-      volatile u_char under_tx;
-      volatile int 	retransmissions;
-      volatile int	tx_chain_active;
-      volatile int 	timer_chain_active;
-      volatile int 	interrupt_ack_requested;
-      volatile long	command_lock;
-      volatile int	rx_command_needed;
-      volatile int	tx_command_needed;
-      volatile int 	waiting_command_mask;
-      volatile int 	card_polling_interval;
-      volatile int 	last_command_buff_free_time;
-      volatile int	numResets;
-      volatile int 	under_reset;
-      volatile int 	under_config;
-      volatile int 	rx_command_given;
-      volatile long 	tx_command_given;
-      volatile long	interrupt_processing_active;
-      volatile long long 	last_tx_time;
-      volatile long long	last_rx_time;
-      volatile long long	last_rx_int_ack_time;
-      int	in_bytes;
-      int	out_bytes;
-      int	in_time;
-      int	out_time;
-      int	in_time10;
-      int	out_time10;
-      int	in_bytes10;
-      int	out_bytes10;
+      int txLast;
+      unsigned ReTransmitRequested;
+      unsigned long tx_done_delayed;
+      unsigned long registrationLastSeen;
+
+      unsigned long	tx_last_sent;
+      unsigned long	tx_last_cleared;
+      unsigned long	retransmissions;
+      unsigned long 	interrupt_ack_requested;
+      spinlock_t	lock;
+      unsigned long	waiting_command_mask;
+      unsigned long 	card_polling_interval;
+      unsigned long 	last_command_buff_free_time;
+
+      int 		under_reset;
+      int 		under_config;
+      int 		rx_command_given;
+      int	 	tx_command_given;
+      unsigned  long	interrupt_processing_active;
+      unsigned long	last_rx_int_ack_time;
+      unsigned long	in_bytes;
+      unsigned long 	out_bytes;
+      unsigned long	in_time;
+      unsigned long	out_time;
+      unsigned long	in_time10;
+      unsigned long	out_time10;
+      unsigned long	in_bytes10;
+      unsigned long 	out_bytes10;
       int	init_etherdev_alloc;
 };
 
@@ -498,13 +469,11 @@ struct arlan_private {
 #define arlan_interrupt_lancpu(dev) {\
    int cr;   \
    \
-   priv->under_toggle++;   \
    cr = readControlRegister(dev);\
    if (cr & ARLAN_CHANNEL_ATTENTION){ \
       writeControlRegister(dev, (cr & ~ARLAN_CHANNEL_ATTENTION));\
    }else  \
       writeControlRegister(dev, (cr | ARLAN_CHANNEL_ATTENTION));\
-   priv->under_toggle=0;     \
 }
 
 #define clearChannelAttention(dev){ \

@@ -1760,9 +1760,7 @@ static int sx_ioctl (struct tty_struct * tty, struct file * filp,
 		              (unsigned int *) arg);
 		break;
 	case TIOCSSOFTCAR:
-		if ((rc = verify_area(VERIFY_READ, (void *) arg,
-		                      sizeof(int))) == 0) {
-			get_user(ival, (unsigned int *) arg);
+		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
 			tty->termios->c_cflag =
 				(tty->termios->c_cflag & ~CLOCAL) |
 				(ival ? CLOCAL : 0);
@@ -1786,27 +1784,21 @@ static int sx_ioctl (struct tty_struct * tty, struct file * filp,
 		}
 		break;
 	case TIOCMBIS:
-		if ((rc = verify_area(VERIFY_READ, (void *) arg,
-		                      sizeof(unsigned int))) == 0) {
-			get_user(ival, (unsigned int *) arg);
+		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
 			sx_setsignals(port, ((ival & TIOCM_DTR) ? 1 : -1),
 			                     ((ival & TIOCM_RTS) ? 1 : -1));
 			sx_reconfigure_port(port);
 		}
 		break;
 	case TIOCMBIC:
-		if ((rc = verify_area(VERIFY_READ, (void *) arg,
-		                      sizeof(unsigned int))) == 0) {
-			get_user(ival, (unsigned int *) arg);
+		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
 			sx_setsignals(port, ((ival & TIOCM_DTR) ? 0 : -1),
 			                     ((ival & TIOCM_RTS) ? 0 : -1));
 			sx_reconfigure_port(port);
 		}
 		break;
 	case TIOCMSET:
-		if ((rc = verify_area(VERIFY_READ, (void *) arg,
-		                      sizeof(unsigned int))) == 0) {
-			get_user(ival, (unsigned int *) arg);
+		if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
 			sx_setsignals(port, ((ival & TIOCM_DTR) ? 1 : 0),
 			                     ((ival & TIOCM_RTS) ? 1 : 0));
 			sx_reconfigure_port(port);
@@ -2356,14 +2348,6 @@ static void __exit sx_release_drivers(void)
 	func_exit();
 }
 
-#ifdef TWO_ZERO
-#define PDEV unsigned char pci_bus, unsigned pci_fun
-#define pdev pci_bus, pci_fun
-#else
-#define PDEV   struct pci_dev *pdev
-#endif
-
-
 #ifdef CONFIG_PCI
  /******************************************************** 
  * Setting bit 17 in the CNTRL register of the PLX 9050  * 
@@ -2376,7 +2360,7 @@ static void __exit sx_release_drivers(void)
    EEprom.  As the bit is read/write for the CPU, we can fix it here,
    if we detect that it isn't set correctly. -- REW */
 
-static void fix_sx_pci (PDEV, struct sx_board *board)
+static void fix_sx_pci (struct pci_dev *pdev, struct sx_board *board)
 {
 	unsigned int hwbase;
 	unsigned long rebase;
@@ -2406,12 +2390,7 @@ static int __init sx_init(void)
 	struct sx_board *board;
 
 #ifdef CONFIG_PCI
-#ifndef TWO_ZERO
 	struct pci_dev *pdev = NULL;
-#else
-	unsigned char pci_bus, pci_fun;
-	/* in 2.2.x pdev is a pointer defining a PCI device. In 2.0 its the bus/fn */
-#endif
 	unsigned int tint;
 	unsigned short tshort;
 #endif
@@ -2431,19 +2410,12 @@ static int __init sx_init(void)
 	}
 
 #ifdef CONFIG_PCI
-#ifndef TWO_ZERO
 	while ((pdev = pci_find_device (PCI_VENDOR_ID_SPECIALIX, 
 					PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, 
 					      pdev))) {
 		if (pci_enable_device(pdev))
 			continue;
-#else
-	for (i=0;i< SX_NBOARDS;i++) {
-		if (pcibios_find_device (PCI_VENDOR_ID_SPECIALIX, 
-					 PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, i,
-					       &pci_bus, &pci_fun))
-			break;
-#endif
+
 		/* Specialix has a whole bunch of cards with
 		   0x2000 as the device ID. They say its because
 		   the standard requires it. Stupid standard. */

@@ -9,6 +9,7 @@
  *
  *  Page table sludge for ARM v3 and v4 processor architectures.
  */
+#include <linux/config.h>
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/bootmem.h>
@@ -392,10 +393,17 @@ static void __init create_mapping(struct map_desc *md)
 	long off;
 
 	if (md->virtual != vectors_base() && md->virtual < PAGE_OFFSET) {
-		printk(KERN_WARNING "MM: not creating mapping for "
+		printk(KERN_WARNING "BUG: not creating mapping for "
 		       "0x%08lx at 0x%08lx in user region\n",
 		       md->physical, md->virtual);
 		return;
+	}
+
+	if (md->type == MT_DEVICE &&
+	    md->virtual >= PAGE_OFFSET && md->virtual < VMALLOC_END) {
+		printk(KERN_WARNING "BUG: mapping for 0x%08lx at 0x%08lx "
+		       "overlaps vmalloc space\n",
+		       md->physical, md->virtual);
 	}
 
 	domain	  = mem_types[md->type].domain;
@@ -409,7 +417,7 @@ static void __init create_mapping(struct map_desc *md)
 
 	if (mem_types[md->type].prot_l1 == 0 &&
 	    (virt & 0xfffff || (virt + off) & 0xfffff || (virt + length) & 0xfffff)) {
-		printk(KERN_WARNING "MM: map for 0x%08lx at 0x%08lx can not "
+		printk(KERN_WARNING "BUG: map for 0x%08lx at 0x%08lx can not "
 		       "be mapped using pages, ignoring.\n",
 		       md->physical, md->virtual);
 		return;

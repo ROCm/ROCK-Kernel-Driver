@@ -37,13 +37,11 @@ EXPORT_SYMBOL(get_pci_node_path);
 #include <asm/irq.h>
 EXPORT_SYMBOL(enable_irq);
 EXPORT_SYMBOL(disable_irq);
+EXPORT_SYMBOL(probe_irq_mask);
 
 #include <asm/processor.h>
 EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(boot_cpu_data);
-#ifdef CONFIG_EISA
-EXPORT_SYMBOL(EISA_bus);
-#endif
 
 #include <linux/pm.h>
 EXPORT_SYMBOL(pm_power_off);
@@ -200,6 +198,9 @@ EXPORT_SYMBOL(__ashrdi3);
 EXPORT_SYMBOL(__ashldi3);
 EXPORT_SYMBOL(__lshrdi3);
 EXPORT_SYMBOL(__muldi3);
+
+asmlinkage void * __canonicalize_funcptr_for_compare(void *);
+EXPORT_SYMBOL(__canonicalize_funcptr_for_compare);
 
 #ifdef __LP64__
 extern void __divdi3(void);

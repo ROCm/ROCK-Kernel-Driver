@@ -5,6 +5,7 @@
 config ARM_AM79C961A
 	bool "ARM EBSA110 AM79C961A support"
 	depends on NET_ETHERNET && ARM && ARCH_EBSA110
+	select CRC32
 	help
 	  If you wish to compile a kernel for the EBSA-110, then you should
 	  always answer Y to this.
@@ -26,6 +27,7 @@ config ARM_ETHER3
 config ARM_ETHERH
 	tristate "I-cubed EtherH/ANT EtherM support"
 	depends on NET_ETHERNET && ARM && ARCH_ACORN
+	select CRC32
 	help
 	  If you have an Acorn system with one of these network cards, you
 	  should say Y to this option if you wish to use it with Linux.

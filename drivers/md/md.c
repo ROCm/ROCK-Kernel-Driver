@@ -1450,7 +1450,7 @@ abort:
 static struct kobject *md_probe(dev_t dev, int *part, void *data)
 {
 	static DECLARE_MUTEX(disks_sem);
-	int unit = MINOR(dev);
+	int unit = *part;
 	mddev_t *mddev = mddev_find(unit);
 	struct gendisk *disk;
 
@@ -1500,6 +1500,7 @@ static int do_md_run(mddev_t * mddev)
 	mdk_rdev_t *rdev;
 	struct gendisk *disk;
 	char b[BDEVNAME_SIZE];
+	int unit;
 
 	if (list_empty(&mddev->disks)) {
 		MD_BUG();
@@ -1591,8 +1592,9 @@ static int do_md_run(mddev_t * mddev)
 		invalidate_bdev(rdev->bdev, 0);
 	}
 
-	md_probe(mdidx(mddev), NULL, NULL);
-	disk = disks[mdidx(mddev)];
+	unit = mdidx(mddev);
+	md_probe(0, &unit, NULL);
+	disk = disks[unit];
 	if (!disk)
 		return -ENOMEM;
 
@@ -1606,9 +1608,6 @@ static int do_md_run(mddev_t * mddev)
 
 	mddev->pers = pers[pnum];
 	spin_unlock(&pers_lock);
-
-	blk_queue_make_request(mddev->queue, mddev->pers->make_request);
-	mddev->queue->queuedata = mddev;
 
 	err = mddev->pers->run(mddev);
 	if (err) {
@@ -1627,6 +1626,17 @@ static int do_md_run(mddev_t * mddev)
 	set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
 	md_wakeup_thread(mddev->thread);
 	set_capacity(disk, mddev->array_size<<1);
+
+	/* If we call blk_queue_make_request here, it will
+	 * re-initialise max_sectors etc which may have been
+	 * refined inside -> run.  So just set the bits we need to set.
+	 * Most initialisation happended when we called
+	 * blk_queue_make_request(..., md_fail_request)
+	 * earlier.
+	 */
+	mddev->queue->queuedata = mddev;
+	mddev->queue->make_request_fn = mddev->pers->make_request;
+
 	return 0;
 }
 
@@ -1698,12 +1708,8 @@ static int do_md_stop(mddev_t * mddev, int ro)
 		} else {
 			if (mddev->ro)
 				set_disk_ro(disk, 0);
-			if (mddev->pers->stop(mddev)) {
-				err = -EBUSY;
-				if (mddev->ro)
-					set_disk_ro(disk, 1);
-				goto out;
-			}
+			blk_queue_make_request(mddev->queue, md_fail_request);
+			mddev->pers->stop(mddev);
 			module_put(mddev->pers->owner);
 			mddev->pers = NULL;
 			if (mddev->ro)
@@ -1877,15 +1883,14 @@ static int autostart_array(dev_t startdev)
 	list_add(&start_rdev->same_set, &pending_raid_disks);
 
 	for (i = 0; i < MD_SB_DISKS; i++) {
-		mdp_disk_t *desc;
-		dev_t dev;
-
-		desc = sb->disks + i;
-		dev = MKDEV(desc->major, desc->minor);
+		mdp_disk_t *desc = sb->disks + i;
+		dev_t dev = MKDEV(desc->major, desc->minor);
 
 		if (!dev)
 			continue;
 		if (dev == startdev)
+			continue;
+		if (MAJOR(dev) != desc->major || MINOR(dev) != desc->minor)
 			continue;
 		rdev = md_import_device(dev, 0, 0);
 		if (IS_ERR(rdev)) {
@@ -2009,8 +2014,11 @@ static int add_new_disk(mddev_t * mddev, mdu_disk_info_t *info)
 {
 	char b[BDEVNAME_SIZE], b2[BDEVNAME_SIZE];
 	mdk_rdev_t *rdev;
-	dev_t dev;
-	dev = MKDEV(info->major,info->minor);
+	dev_t dev = MKDEV(info->major,info->minor);
+
+	if (info->major != MAJOR(dev) || info->minor != MINOR(dev))
+		return -EOVERFLOW;
+
 	if (!mddev->raid_disks) {
 		int err;
 		/* expecting a device which has a superblock */
@@ -2136,7 +2144,7 @@ static int hot_generate_error(mddev_t * mddev, dev_t dev)
 
 	rdev = find_rdev(mddev, dev);
 	if (!rdev) {
-		MD_BUG();
+		/* MD_BUG(); */ /* like hell - it's not a driver bug */
 		return -ENXIO;
 	}
 
@@ -2409,7 +2417,7 @@ static int md_ioctl(struct inode *inode, struct file *file,
 		/* START_ARRAY doesn't need to lock the array as autostart_array
 		 * does the locking, and it could even be a different array
 		 */
-		err = autostart_array(arg);
+		err = autostart_array(new_decode_dev(arg));
 		if (err) {
 			printk(KERN_WARNING "md: autostart %s failed!\n",
 				__bdevname(arg, b));
@@ -2546,18 +2554,18 @@ static int md_ioctl(struct inode *inode, struct file *file,
 			goto done_unlock;
 		}
 		case HOT_GENERATE_ERROR:
-			err = hot_generate_error(mddev, arg);
+			err = hot_generate_error(mddev, new_decode_dev(arg));
 			goto done_unlock;
 		case HOT_REMOVE_DISK:
-			err = hot_remove_disk(mddev, arg);
+			err = hot_remove_disk(mddev, new_decode_dev(arg));
 			goto done_unlock;
 
 		case HOT_ADD_DISK:
-			err = hot_add_disk(mddev, arg);
+			err = hot_add_disk(mddev, new_decode_dev(arg));
 			goto done_unlock;
 
 		case SET_DISK_FAULTY:
-			err = set_disk_faulty(mddev, arg);
+			err = set_disk_faulty(mddev, new_decode_dev(arg));
 			goto done_unlock;
 
 		case RUN_ARRAY:

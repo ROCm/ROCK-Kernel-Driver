@@ -384,6 +384,7 @@ static void udp_flush_pending_frames(struct sock *sk)
 	struct udp_opt *up = udp_sk(sk);
 
 	if (up->pending) {
+		up->len = 0;
 		up->pending = 0;
 		ip_flush_pending_frames(sk);
 	}
@@ -1460,11 +1461,10 @@ int udp_proc_register(struct udp_seq_afinfo *afinfo)
 	afinfo->seq_fops->llseek	= seq_lseek;
 	afinfo->seq_fops->release	= seq_release_private;
 
-	p = create_proc_entry(afinfo->name, S_IRUGO, proc_net);
-	if (p) {
+	p = proc_net_fops_create(afinfo->name, S_IRUGO, afinfo->seq_fops);
+	if (p)
 		p->data = afinfo;
-		p->proc_fops = afinfo->seq_fops;
-	} else
+	else
 		rc = -ENOMEM;
 	return rc;
 }
@@ -1473,7 +1473,7 @@ void udp_proc_unregister(struct udp_seq_afinfo *afinfo)
 {
 	if (!afinfo)
 		return;
-	remove_proc_entry(afinfo->name, proc_net);
+	proc_net_remove(afinfo->name);
 	memset(afinfo->seq_fops, 0, sizeof(*afinfo->seq_fops));
 }
 
@@ -1497,7 +1497,7 @@ static void udp4_format_sock(struct sock *sp, char *tmpbuf, int bucket)
 
 static int udp4_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq, "%-127s\n",
 			   "  sl  local_address rem_address   st tx_queue "
 			   "rx_queue tr tm->when retrnsmt   uid  timeout "

@@ -250,13 +250,13 @@ void switch_exec_pids(task_t *leader, task_t *thread)
 
 	attach_pid(thread, PIDTYPE_PID, thread->pid);
 	attach_pid(thread, PIDTYPE_TGID, thread->tgid);
-	attach_pid(thread, PIDTYPE_PGID, thread->pgrp);
+	attach_pid(thread, PIDTYPE_PGID, leader->__pgrp);
 	attach_pid(thread, PIDTYPE_SID, thread->session);
 	list_add_tail(&thread->tasks, &init_task.tasks);
 
 	attach_pid(leader, PIDTYPE_PID, leader->pid);
 	attach_pid(leader, PIDTYPE_TGID, leader->tgid);
-	attach_pid(leader, PIDTYPE_PGID, leader->pgrp);
+	attach_pid(leader, PIDTYPE_PGID, leader->__pgrp);
 	attach_pid(leader, PIDTYPE_SID, leader->session);
 }
 

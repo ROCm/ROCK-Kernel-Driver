@@ -26,7 +26,6 @@
  * TODO: 
  * - Allocate more than order 0 pages to avoid too much linear map splitting.
  */
-#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/init.h>
@@ -34,6 +33,7 @@
 #include <linux/miscdevice.h>
 #include <linux/pm.h>
 #include <linux/agp_backend.h>
+#include <linux/agpgart.h>
 #include <linux/vmalloc.h>
 #include <asm/io.h>
 #include "agp.h"
@@ -318,6 +318,7 @@ void __exit agp_exit(void)
 {
 }
 
+#ifndef MODULE
 static __init int agp_setup(char *s)
 {
 	if (!strcmp(s,"off"))
@@ -327,6 +328,7 @@ static __init int agp_setup(char *s)
 	return 1;	
 }
 __setup("agp=", agp_setup);
+#endif
 
 MODULE_AUTHOR("Dave Jones <davej@codemonkey.org.uk>");
 MODULE_DESCRIPTION("AGP GART driver");

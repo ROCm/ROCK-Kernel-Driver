@@ -15,10 +15,26 @@
 #include <linux/fs.h>
 #include "server.h"
 #include "kafstimod.h"
+#include "cache.h"
 
 #ifdef __KERNEL__
 
 struct afs_rxfs_fetch_descriptor;
+
+/*****************************************************************************/
+/*
+ * vnode catalogue entry
+ */
+struct afs_cache_vnode
+{
+	afs_vnodeid_t		vnode_id;	/* vnode ID */
+	unsigned		vnode_unique;	/* vnode ID uniquifier */
+	afs_dataversion_t	data_version;	/* data version */
+};
+
+#ifdef AFS_CACHING_SUPPORT
+extern struct cachefs_index_def afs_vnode_cache_index_def;
+#endif
 
 /*****************************************************************************/
 /*
@@ -28,10 +44,12 @@ struct afs_vnode
 {
 	struct inode		vfs_inode;	/* the VFS's inode record */
 
-	afs_volume_t		*volume;	/* volume on which vnode resides */
-	afs_fid_t		fid;		/* the file identifier for this inode */
-	afs_file_status_t	status;		/* AFS status info for this file */
-	unsigned		nix;		/* vnode index in cache */
+	struct afs_volume	*volume;	/* volume on which vnode resides */
+	struct afs_fid		fid;		/* the file identifier for this inode */
+	struct afs_file_status	status;		/* AFS status info for this file */
+#ifdef AFS_CACHING_SUPPORT
+	struct cachefs_cookie	*cache;		/* caching cookie */
+#endif
 
 	wait_queue_head_t	update_waitq;	/* status fetch waitqueue */
 	unsigned		update_cnt;	/* number of outstanding ops that will update the
@@ -43,10 +61,10 @@ struct afs_vnode
 #define AFS_VNODE_MOUNTPOINT	0x00000004	/* set if vnode is a mountpoint symlink */
 
 	/* outstanding callback notification on this file */
-	afs_server_t		*cb_server;	/* server that made the current promise */
+	struct afs_server	*cb_server;	/* server that made the current promise */
 	struct list_head	cb_link;	/* link in server's promises list */
 	struct list_head	cb_hash_link;	/* link in master callback hash */
-	afs_timer_t		cb_timeout;	/* timeout on promise */
+	struct afs_timer	cb_timeout;	/* timeout on promise */
 	unsigned		cb_version;	/* callback version */
 	unsigned		cb_expiry;	/* callback expiry time */
 	afs_callback_type_t	cb_type;	/* type of callback */

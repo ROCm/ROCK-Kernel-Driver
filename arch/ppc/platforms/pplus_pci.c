@@ -27,7 +27,6 @@
 #include <asm/ptrace.h>
 #include <asm/pci-bridge.h>
 #include <asm/residual.h>
-#include <asm/processor.h>
 #include <asm/irq.h>
 #include <asm/machdep.h>
 
@@ -36,7 +35,7 @@
 
 unsigned char *Motherboard_map_name;
 
-/* Tables for known hardware */   
+/* Tables for known hardware */
 
 /* Motorola Mesquite */
 static inline int
@@ -173,7 +172,7 @@ Genesis2_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	/* 2300
 	 * Raven 31
 	 * ISA   11
-	 * Univ  13 
+	 * Univ  13
 	 * eth   14 - IRQ2
 	 * PMC1  16 - 9,10,11,12 = A-D
 	 * PMC2  17 - 9,10,11,12 = B,C,D,A
@@ -369,7 +368,7 @@ pplus_pib_init(void)
 	 * Perform specific configuration for the Via Tech or
 	 * or Winbond PCI-ISA-Bridge part.
 	 */
-	if ((dev = pci_find_device(PCI_VENDOR_ID_VIA, 
+	if ((dev = pci_find_device(PCI_VENDOR_ID_VIA,
 					PCI_DEVICE_ID_VIA_82C586_1, dev))) {
 		/*
 		 * PPCBUG does not set the enable bits
@@ -523,10 +522,9 @@ pplus_setup_hose(void)
 
 	pplus_set_VIA_IDE_legacy();
 
-	hose->last_busno = pciauto_bus_scan(hose, hose->first_busno);           
+	hose->last_busno = pciauto_bus_scan(hose, hose->first_busno);
 
 	ppc_md.pcibios_fixup = pplus_pcibios_fixup;
 	ppc_md.pci_swizzle = common_swizzle;
 	pplus_set_board_type();
 }
-

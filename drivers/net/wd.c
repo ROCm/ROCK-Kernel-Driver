@@ -235,7 +235,7 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
 		int reg4 = inb(ioaddr+4);
 		if (ancient || reg1 == 0xff) {	/* Ack!! No way to read the IRQ! */
 			short nic_addr = ioaddr+WD_NIC_OFFSET;
-			unsigned long irq_mask, delay;
+			unsigned long irq_mask;
 
 			/* We have an old-style ethercard that doesn't report its IRQ
 			   line.  Do autoirq to find the IRQ line. Note that this IS NOT
@@ -248,8 +248,7 @@ static int __init wd_probe1(struct net_device *dev, int ioaddr)
 			outb_p(0x00, nic_addr + EN0_RCNTLO);
 			outb_p(0x00, nic_addr + EN0_RCNTHI);
 			outb(E8390_RREAD+E8390_START, nic_addr); /* Trigger it... */
-			delay = jiffies + HZ/50;
-			while (time_before(jiffies, delay)) ;
+			mdelay(20);
 			dev->irq = probe_irq_off(irq_mask);
 			
 			outb_p(0x00, nic_addr+EN0_IMR);	/* Mask all intrs. again. */
@@ -512,13 +511,3 @@ cleanup_module(void)
 	}
 }
 #endif /* MODULE */
-
-
-/*
- * Local variables:
- *  compile-command: "gcc -D__KERNEL__ -I/usr/src/linux/net/inet -Wall -Wstrict-prototypes -O6 -m486 -c wd.c"
- *  version-control: t
- *  tab-width: 4
- *  kept-new-versions: 5
- * End:
- */

@@ -722,15 +722,14 @@ typedef	struct s_GeInit {
 /*
  * Error numbers and messages for skxmac2.c and skgeinit.c
  */
-
 #define SKERR_HWI_E001		(SK_ERRBASE_HWINIT)
-#define SKERR_HWI_E001MSG	"SkXmClrExactAddr() has got invalid parameters"
+#define SKERR_HWI_E001MSG	"SkXmClrExactAddr() has got illegal parameters"
 #define SKERR_HWI_E002		(SKERR_HWI_E001+1)
 #define SKERR_HWI_E002MSG	"SkGeInit(): Level 1 call missing"
 #define SKERR_HWI_E003		(SKERR_HWI_E002+1)
-#define SKERR_HWI_E003MSG	"SkGeInit() called with invalid init Level"
+#define SKERR_HWI_E003MSG	"SkGeInit() called with illegal init Level"
 #define SKERR_HWI_E004		(SKERR_HWI_E003+1)
-#define SKERR_HWI_E004MSG	"SkGeInitPort(): Queue Size invalid configured"
+#define SKERR_HWI_E004MSG	"SkGeInitPort(): Queue Size illegal configured"
 #define SKERR_HWI_E005		(SKERR_HWI_E004+1)
 #define SKERR_HWI_E005MSG	"SkGeInitPort(): cannot init running ports"
 #define SKERR_HWI_E006		(SKERR_HWI_E005+1)
@@ -752,21 +751,21 @@ typedef	struct s_GeInit {
 #define SKERR_HWI_E014		(SKERR_HWI_E013+1)
 #define SKERR_HWI_E014MSG	"SkGeInitPort(): unknown GIPortUsage specified"
 #define SKERR_HWI_E015		(SKERR_HWI_E014+1)
-#define SKERR_HWI_E015MSG	"Invalid Link mode parameter"
+#define SKERR_HWI_E015MSG	"Illegal Link mode parameter"
 #define SKERR_HWI_E016		(SKERR_HWI_E015+1)
-#define SKERR_HWI_E016MSG	"Invalid Flow control mode parameter"
+#define SKERR_HWI_E016MSG	"Illegal Flow control mode parameter"
 #define SKERR_HWI_E017		(SKERR_HWI_E016+1)
-#define SKERR_HWI_E017MSG	"Invalid value specified for GIPollTimerVal"
+#define SKERR_HWI_E017MSG	"Illegal value specified for GIPollTimerVal"
 #define SKERR_HWI_E018		(SKERR_HWI_E017+1)
 #define SKERR_HWI_E018MSG	"FATAL: SkGeStopPort() does not terminate (Tx)"
 #define SKERR_HWI_E019		(SKERR_HWI_E018+1)
-#define SKERR_HWI_E019MSG	"Invalid Speed parameter"
+#define SKERR_HWI_E019MSG	"Illegal Speed parameter"
 #define SKERR_HWI_E020		(SKERR_HWI_E019+1)
-#define SKERR_HWI_E020MSG	"Invalid Master/Slave parameter"
+#define SKERR_HWI_E020MSG	"Illegal Master/Slave parameter"
 #define SKERR_HWI_E021		(SKERR_HWI_E020+1)
 #define	SKERR_HWI_E021MSG	"MacUpdateStats(): cannot update statistic counter"
 #define	SKERR_HWI_E022		(SKERR_HWI_E021+1)
-#define	SKERR_HWI_E022MSG	"MacStatistic(): invalid statistic base address"
+#define	SKERR_HWI_E022MSG	"MacStatistic(): illegal statistic base address"
 #define SKERR_HWI_E023		(SKERR_HWI_E022+1)
 #define SKERR_HWI_E023MSG	"SkGeInitPort(): Transmit Queue Size too small"
 #define SKERR_HWI_E024		(SKERR_HWI_E023+1)

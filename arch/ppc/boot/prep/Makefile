@@ -15,7 +15,7 @@
 
 TFTPIMAGE		:= /tftpboot/zImage.prep
 ifeq ($(CONFIG_SMP),y)
-TFTPIMAGE		:= $(TFTPBOOT).smp
+TFTPIMAGE		:= $(TFTPIMAGE).smp
 endif
 
 boot-y				:= head.o misc.o
@@ -32,12 +32,12 @@ OBJCOPYFLAGS	:= -O elf32-powerpc
 LIBS 		:= $(common)/lib.a $(bootlib)/lib.a
 
 targets		:= $(boot-y) dummy.o ../simple/legacy.o
-OBJS		:= $(addprefix $(obj)/,$(boot-y)) $(simple)/legacy.o 
+OBJS		:= $(addprefix $(obj)/,$(boot-y)) $(simple)/legacy.o
 
 # Extra include search dirs
 CFLAGS_kbd.o			+= -Idrivers/char
 
-zImage: initrd := 
+zImage: initrd :=
 zImage: $(images)/zImage.prep
 	@echo '  kernel: $@ is ready ($<)'
 
@@ -47,7 +47,7 @@ zImage.initrd: $(images)/zImage.initrd.prep
 
 $(images)/ramdisk.image.gz:
 	@echo '  MISSING $@'
-	@echo '          RAM disk image must be provided separatly'
+	@echo '          RAM disk image must be provided separately'
 	@/bin/false
 
 OBJCOPYFLAGS_image.o   := \

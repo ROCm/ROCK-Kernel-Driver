@@ -82,7 +82,7 @@ static void d_free(struct dentry *dentry)
 /*
  * Release the dentry's inode, using the filesystem
  * d_iput() operation if defined.
- * Called with dcache_lock held, drops it.
+ * Called with dcache_lock and per dentry lock held, drops both.
  */
 static inline void dentry_iput(struct dentry * dentry)
 {
@@ -90,13 +90,16 @@ static inline void dentry_iput(struct dentry * dentry)
 	if (inode) {
 		dentry->d_inode = NULL;
 		list_del_init(&dentry->d_alias);
+		spin_unlock(&dentry->d_lock);
 		spin_unlock(&dcache_lock);
 		if (dentry->d_op && dentry->d_op->d_iput)
 			dentry->d_op->d_iput(dentry, inode);
 		else
 			iput(inode);
-	} else
+	} else {
+		spin_unlock(&dentry->d_lock);
 		spin_unlock(&dcache_lock);
+	}
 }
 
 /* 
@@ -177,9 +180,8 @@ kill_it: {
   			dentry_stat.nr_unused--;
   		}
   		list_del(&dentry->d_child);
- 		spin_unlock(&dentry->d_lock);
 		dentry_stat.nr_dentry--;	/* For d_free, below */
-		/* drops the lock, at that point nobody can reach this dentry */
+		/*drops the locks, at that point nobody can reach this dentry */
 		dentry_iput(dentry);
 		parent = dentry->d_parent;
 		d_free(dentry);
@@ -341,7 +343,6 @@ static inline void prune_one_dentry(struct dentry * dentry)
 
 	__d_drop(dentry);
 	list_del(&dentry->d_child);
- 	spin_unlock(&dentry->d_lock);
 	dentry_stat.nr_dentry--;	/* For d_free, below */
 	dentry_iput(dentry);
 	parent = dentry->d_parent;
@@ -1116,7 +1117,6 @@ void d_delete(struct dentry * dentry)
 	spin_lock(&dcache_lock);
 	spin_lock(&dentry->d_lock);
 	if (atomic_read(&dentry->d_count) == 1) {
-		spin_unlock(&dentry->d_lock);
 		dentry_iput(dentry);
 		return;
 	}

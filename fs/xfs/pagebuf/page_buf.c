@@ -174,16 +174,13 @@ STATIC pb_hash_t	pbhash[NHASH];
 
 STATIC int
 _bhash(
-	dev_t		dev,
+	struct block_device *bdev,
 	loff_t		base)
 {
 	int		bit, hval;
 
 	base >>= 9;
-	/*
-	 * dev_t is 16 bits, loff_t is always 64 bits
-	 */
-	base ^= dev;
+	base ^= (unsigned long)bdev / L1_CACHE_BYTES;
 	for (bit = hval = 0; base && bit < sizeof(base) * 8; bit += NBITS) {
 		hval ^= (int)base & (NHASH-1);
 		base >>= NBITS;
@@ -619,7 +616,7 @@ _pagebuf_find(				/* find buffer for block	*/
 	/* Ensure we never do IOs that are not sector aligned */
 	BUG_ON(range_base & (loff_t)target->pbr_smask);
 
-	hval = _bhash(target->pbr_bdev->bd_dev, range_base);
+	hval = _bhash(target->pbr_bdev, range_base);
 	h = &pbhash[hval];
 
 	spin_lock(&h->pb_hash_lock);
@@ -1867,23 +1864,23 @@ STATIC struct ctl_table_header *pagebuf_table_header;
 
 STATIC ctl_table pagebuf_table[] = {
 	{PB_FLUSH_INT, "flush_int", &pb_params.flush_interval.val,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL,
 	&pb_params.flush_interval.min, &pb_params.flush_interval.max},
 
 	{PB_FLUSH_AGE, "flush_age", &pb_params.age_buffer.val,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_ms_jiffies_minmax,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL, 
 	&pb_params.age_buffer.min, &pb_params.age_buffer.max},
 
 	{PB_STATS_CLEAR, "stats_clear", &pb_params.stats_clear.val,
-	sizeof(ulong), 0644, NULL, &pb_stats_clear_handler,
+	sizeof(int), 0644, NULL, &pb_stats_clear_handler,
 	&sysctl_intvec, NULL, 
 	&pb_params.stats_clear.min, &pb_params.stats_clear.max},
 
 #ifdef PAGEBUF_TRACE
 	{PB_DEBUG, "debug", &pb_params.debug.val,
-	sizeof(ulong), 0644, NULL, &proc_doulongvec_minmax,
+	sizeof(int), 0644, NULL, &proc_dointvec_minmax,
 	&sysctl_intvec, NULL, 
 	&pb_params.debug.min, &pb_params.debug.max},
 #endif

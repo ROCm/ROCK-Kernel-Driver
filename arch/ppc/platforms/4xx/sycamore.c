@@ -2,7 +2,7 @@
  * arch/ppc/platforms/4xx/sycamore.c
  *
  * Architecture- / platform-specific boot-time initialization code for
- * IBM PowerPC 4xx based boards. 
+ * IBM PowerPC 4xx based boards.
  *
  * Author: Armin Kuster <akuster@mvista.com>
  *
@@ -24,7 +24,6 @@
 #include <asm/ppc4xx_pic.h>
 #include <asm/system.h>
 #include <asm/pci-bridge.h>
-#include <asm/processor.h>
 #include <asm/machdep.h>
 #include <asm/page.h>
 #include <asm/time.h>
@@ -44,7 +43,7 @@ void *kb_data;
 void *sycamore_rtc_base;
 
 /*
- * Define all of the IRQ senses and polarities.  
+ * Define all of the IRQ senses and polarities.
  */
 
 static u_char Sycamore_IRQ_initsenses[] __initdata = {

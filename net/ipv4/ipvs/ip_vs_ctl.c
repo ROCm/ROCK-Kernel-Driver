@@ -31,6 +31,8 @@
 #include <linux/proc_fs.h>
 #include <linux/timer.h>
 #include <linux/swap.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include <linux/netfilter.h>
 #include <linux/netfilter_ipv4.h>
@@ -46,7 +48,7 @@
 static DECLARE_MUTEX(__ip_vs_mutex);
 
 /* lock for service table */
-rwlock_t __ip_vs_svc_lock = RW_LOCK_UNLOCKED;
+static rwlock_t __ip_vs_svc_lock = RW_LOCK_UNLOCKED;
 
 /* lock for table with the real services */
 static rwlock_t __ip_vs_rs_lock = RW_LOCK_UNLOCKED;
@@ -361,14 +363,11 @@ __ip_vs_service_get(__u16 protocol, __u32 vaddr, __u16 vport)
 {
 	unsigned hash;
 	struct ip_vs_service *svc;
-	struct list_head *l,*e;
 
 	/* Check for "full" addressed entries */
 	hash = ip_vs_svc_hashkey(protocol, vaddr, vport);
 
-	l = &ip_vs_svc_table[hash];
-	for (e=l->next; e!=l; e=e->next) {
-		svc = list_entry(e, struct ip_vs_service, s_list);
+	list_for_each_entry(svc, &ip_vs_svc_table[hash], s_list){
 		if ((svc->addr == vaddr)
 		    && (svc->port == vport)
 		    && (svc->protocol == protocol)) {
@@ -389,14 +388,11 @@ static __inline__ struct ip_vs_service *__ip_vs_svc_fwm_get(__u32 fwmark)
 {
 	unsigned hash;
 	struct ip_vs_service *svc;
-	struct list_head *l,*e;
 
 	/* Check for fwmark addressed entries */
 	hash = ip_vs_svc_fwm_hashkey(fwmark);
 
-	l = &ip_vs_svc_fwm_table[hash];
-	for (e=l->next; e!=l; e=e->next) {
-		svc = list_entry(e, struct ip_vs_service, f_list);
+	list_for_each_entry(svc, &ip_vs_svc_fwm_table[hash], f_list) {
 		if (svc->fwmark == fwmark) {
 			/* HIT */
 			atomic_inc(&svc->usecnt);
@@ -533,7 +529,6 @@ ip_vs_lookup_real_service(__u16 protocol, __u32 daddr, __u16 dport)
 {
 	unsigned hash;
 	struct ip_vs_dest *dest;
-	struct list_head *l,*e;
 
 	/*
 	 *	Check for "full" addressed entries
@@ -541,11 +536,8 @@ ip_vs_lookup_real_service(__u16 protocol, __u32 daddr, __u16 dport)
 	 */
 	hash = ip_vs_rs_hashkey(daddr, dport);
 
-	l = &ip_vs_rtable[hash];
-
 	read_lock(&__ip_vs_rs_lock);
-	for (e=l->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, d_list);
+	list_for_each_entry(dest, &ip_vs_rtable[hash], d_list) {
 		if ((dest->addr == daddr)
 		    && (dest->port == dport)
 		    && ((dest->protocol == protocol) ||
@@ -567,14 +559,11 @@ static struct ip_vs_dest *
 ip_vs_lookup_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
 {
 	struct ip_vs_dest *dest;
-	struct list_head *l, *e;
 
 	/*
 	 * Find the destination for the given service
 	 */
-	l = &svc->destinations;
-	for (e=l->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry(dest, &svc->destinations, n_list) {
 		if ((dest->addr == daddr) && (dest->port == dport)) {
 			/* HIT */
 			return dest;
@@ -598,16 +587,12 @@ ip_vs_lookup_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
 static struct ip_vs_dest *
 ip_vs_trash_get_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
 {
-	struct ip_vs_dest *dest;
-	struct list_head *l, *e;
+	struct ip_vs_dest *dest, *nxt;
 
 	/*
 	 * Find the destination in trash
 	 */
-	l = &ip_vs_dest_trash;
-
-	for (e=l->next; e!=l; e=e->next) {
-		dest = list_entry(e, struct ip_vs_dest, n_list);
+	list_for_each_entry_safe(dest, nxt, &ip_vs_dest_trash, n_list) {
 		IP_VS_DBG(3, "Destination %u/%u.%u.%u.%u:%u still in trash, "
 			  "refcnt=%d\n",
 			  dest->vfwmark,
@@ -632,7 +617,6 @@ ip_vs_trash_get_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
 				  "from trash\n",
 				  dest->vfwmark,
 				  NIPQUAD(dest->addr), ntohs(dest->port));
-			e = e->prev;
 			list_del(&dest->n_list);
 			ip_vs_dst_reset(dest);
 			__ip_vs_unbind_svc(dest);
@@ -655,13 +639,9 @@ ip_vs_trash_get_dest(struct ip_vs_service *svc, __u32 daddr, __u16 dport)
  */
 static void ip_vs_trash_cleanup(void)
 {
-	struct ip_vs_dest *dest;
-	struct list_head *l;
+	struct ip_vs_dest *dest, *nxt;
 
-	l = &ip_vs_dest_trash;
-
-	while (l->next != l) {
-		dest = list_entry(l->next, struct ip_vs_dest, n_list);
+	list_for_each_entry_safe(dest, nxt, &ip_vs_dest_trash, n_list) {
 		list_del(&dest->n_list);
 		ip_vs_dst_reset(dest);
 		__ip_vs_unbind_svc(dest);
@@ -1196,8 +1176,7 @@ ip_vs_edit_service(struct ip_vs_service *svc, struct ip_vs_service_user *u)
  */
 static void __ip_vs_del_service(struct ip_vs_service *svc)
 {
-	struct list_head *l;
-	struct ip_vs_dest *dest;
+	struct ip_vs_dest *dest, *nxt;
 	struct ip_vs_scheduler *old_sched;
 
 	ip_vs_num_services--;
@@ -1218,9 +1197,7 @@ static void __ip_vs_del_service(struct ip_vs_service *svc)
 	/*
 	 *    Unlink the whole destination list
 	 */
-	l = &svc->destinations;
-	while (l->next != l) {
-		dest = list_entry(l->next, struct ip_vs_dest, n_list);
+	list_for_each_entry_safe(dest, nxt, &svc->destinations, n_list) {
 		__ip_vs_unlink_dest(svc, dest, 0);
 		__ip_vs_del_dest(dest);
 	}
@@ -1277,16 +1254,13 @@ static int ip_vs_del_service(struct ip_vs_service *svc)
 static int ip_vs_flush(void)
 {
 	int idx;
-	struct ip_vs_service *svc;
-	struct list_head *l;
+	struct ip_vs_service *svc, *nxt;
 
 	/*
 	 * Flush the service table hashed by <protocol,addr,port>
 	 */
 	for(idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		l = &ip_vs_svc_table[idx];
-		while (l->next != l) {
-			svc = list_entry(l->next,struct ip_vs_service,s_list);
+		list_for_each_entry_safe(svc, nxt, &ip_vs_svc_table[idx], s_list) {
 			write_lock_bh(&__ip_vs_svc_lock);
 			ip_vs_svc_unhash(svc);
 			/*
@@ -1302,9 +1276,8 @@ static int ip_vs_flush(void)
 	 * Flush the service table hashed by fwmark
 	 */
 	for(idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		l = &ip_vs_svc_fwm_table[idx];
-		while (l->next != l) {
-			svc = list_entry(l->next,struct ip_vs_service,f_list);
+		list_for_each_entry_safe(svc, nxt, 
+					 &ip_vs_svc_fwm_table[idx], f_list) {
 			write_lock_bh(&__ip_vs_svc_lock);
 			ip_vs_svc_unhash(svc);
 			/*
@@ -1334,12 +1307,10 @@ ip_vs_zero_stats(struct ip_vs_stats *stats)
 
 static int ip_vs_zero_service(struct ip_vs_service *svc)
 {
-	struct list_head *l;
 	struct ip_vs_dest *dest;
 
 	write_lock_bh(&__ip_vs_svc_lock);
-	list_for_each (l, &svc->destinations) {
-		dest = list_entry(l, struct ip_vs_dest, n_list);
+	list_for_each_entry(dest, &svc->destinations, n_list) {
 		ip_vs_zero_stats(&dest->stats);
 	}
 	ip_vs_zero_stats(&svc->stats);
@@ -1350,19 +1321,16 @@ static int ip_vs_zero_service(struct ip_vs_service *svc)
 static int ip_vs_zero_all(void)
 {
 	int idx;
-	struct list_head *l;
 	struct ip_vs_service *svc;
 
 	for(idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each (l, &ip_vs_svc_table[idx]) {
-			svc = list_entry(l, struct ip_vs_service, s_list);
+		list_for_each_entry(svc, &ip_vs_svc_table[idx], s_list) {
 			ip_vs_zero_service(svc);
 		}
 	}
 
 	for(idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each (l, &ip_vs_svc_fwm_table[idx]) {
-			svc = list_entry(l, struct ip_vs_service, f_list);
+		list_for_each_entry(svc, &ip_vs_svc_fwm_table[idx], f_list) {
 			ip_vs_zero_service(svc);
 		}
 	}
@@ -1507,207 +1475,254 @@ static struct ip_vs_sysctl_table ipv4_vs_table = {
 	 {0}}
 };
 
+#ifdef CONFIG_PROC_FS
+
+struct ip_vs_iter {
+	struct list_head *table;
+	int bucket;
+};
 
 /*
  *	Write the contents of the VS rule table to a PROCfs file.
  *	(It is kept just for backward compatibility)
  */
-static inline char *ip_vs_fwd_name(unsigned flags)
+static inline const char *ip_vs_fwd_name(unsigned flags)
 {
-	char *fwd;
-
 	switch (flags & IP_VS_CONN_F_FWD_MASK) {
 	case IP_VS_CONN_F_LOCALNODE:
-		fwd = "Local";
-		break;
+		return "Local";
 	case IP_VS_CONN_F_TUNNEL:
-		fwd = "Tunnel";
-		break;
+		return "Tunnel";
 	case IP_VS_CONN_F_DROUTE:
-		fwd = "Route";
-		break;
+		return "Route";
 	default:
-		fwd = "Masq";
+		return "Masq";
 	}
-	return fwd;
 }
 
-static inline int sprintf_dest(char *str, struct ip_vs_dest *dest)
-{
-	return sprintf(str, "  -> %08X:%04X      %-7s %-6d %-10d %-10d",
-		       ntohl(dest->addr), ntohs(dest->port),
-		       ip_vs_fwd_name(atomic_read(&dest->conn_flags)),
-		       atomic_read(&dest->weight),
-		       atomic_read(&dest->activeconns),
-		       atomic_read(&dest->inactconns));
-}
 
-static int ip_vs_get_info(char *buf, char **start, off_t offset, int length)
+/* Get the Nth entry in the two lists */
+static struct ip_vs_service *ip_vs_info_array(struct seq_file *seq, loff_t pos)
 {
-	int len=0;
-	off_t pos=0;
-	char temp[64], temp2[32];
+	struct ip_vs_iter *iter = seq->private;
 	int idx;
 	struct ip_vs_service *svc;
-	struct ip_vs_dest *dest;
-	struct list_head *l, *e, *p, *q;
 
-	/*
-	 * Note: since the length of the buffer is usually the multiple
-	 * of 512, it is good to use fixed record of the divisor of 512,
-	 * so that records won't be truncated at buffer boundary.
-	 */
-	pos = 192;
-	if (pos > offset) {
-		sprintf(temp,
-			"IP Virtual Server version %d.%d.%d (size=%d)",
-			NVERSION(IP_VS_VERSION_CODE), IP_VS_CONN_TAB_SIZE);
-		len += sprintf(buf+len, "%-63s\n", temp);
-		len += sprintf(buf+len, "%-63s\n",
-			       "Prot LocalAddress:Port Scheduler Flags");
-		len += sprintf(buf+len, "%-63s\n",
-			       "  -> RemoteAddress:Port Forward Weight ActiveConn InActConn");
-	}
-
-	read_lock_bh(&__ip_vs_svc_lock);
-
-	/* print the service table hashed by <protocol,addr,port> */
+	/* look in hash by protocol */
 	for (idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		l = &ip_vs_svc_table[idx];
-		for (e=l->next; e!=l; e=e->next) {
-			svc = list_entry(e, struct ip_vs_service, s_list);
-			pos += 64;
-			if (pos > offset) {
-				if (svc->flags & IP_VS_SVC_F_PERSISTENT)
-					sprintf(temp2, "persistent %d %08X",
-						svc->timeout,
-						ntohl(svc->netmask));
-				else
-					temp2[0] = '\0';
-
-				sprintf(temp, "%s  %08X:%04X %s %s",
-					ip_vs_proto_name(svc->protocol),
-					ntohl(svc->addr),
-					ntohs(svc->port),
-					svc->scheduler->name, temp2);
-				len += sprintf(buf+len, "%-63s\n", temp);
-				if (len >= length)
-					goto done;
-			}
-
-			p = &svc->destinations;
-			for (q=p->next; q!=p; q=q->next) {
-				dest = list_entry(q, struct ip_vs_dest, n_list);
-				pos += 64;
-				if (pos <= offset)
-					continue;
-				sprintf_dest(temp, dest);
-				len += sprintf(buf+len, "%-63s\n", temp);
-				if (len >= length)
-					goto done;
+		list_for_each_entry(svc, &ip_vs_svc_table[idx], s_list) {
+			if (pos-- == 0){
+				iter->table = ip_vs_svc_table;
+				iter->bucket = idx;
+				return svc;
 			}
 		}
 	}
 
-	/* print the service table hashed by fwmark */
+	/* keep looking in fwmark */
 	for (idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		l = &ip_vs_svc_fwm_table[idx];
-		for (e=l->next; e!=l; e=e->next) {
-			svc = list_entry(e, struct ip_vs_service, f_list);
-			pos += 64;
-			if (pos > offset) {
-				if (svc->flags & IP_VS_SVC_F_PERSISTENT)
-					sprintf(temp2, "persistent %d %08X",
-						svc->timeout,
-						ntohl(svc->netmask));
-				else
-					temp2[0] = '\0';
-
-				sprintf(temp, "FWM  %08X %s %s",
-					svc->fwmark,
-					svc->scheduler->name, temp2);
-				len += sprintf(buf+len, "%-63s\n", temp);
-				if (len >= length)
-					goto done;
-			}
-
-			p = &svc->destinations;
-			for (q=p->next; q!=p; q=q->next) {
-				dest = list_entry(q, struct ip_vs_dest, n_list);
-				pos += 64;
-				if (pos <= offset)
-					continue;
-				sprintf_dest(temp, dest);
-				len += sprintf(buf+len, "%-63s\n", temp);
-				if (len >= length)
-					goto done;
+		list_for_each_entry(svc, &ip_vs_svc_fwm_table[idx], f_list) {
+			if (pos-- == 0) {
+				iter->table = ip_vs_svc_fwm_table;
+				iter->bucket = idx;
+				return svc;
 			}
 		}
 	}
 
-  done:
-	read_unlock_bh(&__ip_vs_svc_lock);
-
-	*start = buf+len-(pos-offset);          /* Start of wanted data */
-	len = pos-offset;
-	if (len > length)
-		len = length;
-	if (len < 0)
-		len = 0;
-	return len;
+	return NULL;
 }
 
+static void *ip_vs_info_seq_start(struct seq_file *seq, loff_t *pos)
+{
+
+	read_lock_bh(&__ip_vs_svc_lock);
+	return *pos ? ip_vs_info_array(seq, *pos - 1) : SEQ_START_TOKEN;
+}
+
+
+static void *ip_vs_info_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct list_head *e;
+	struct ip_vs_iter *iter;
+	struct ip_vs_service *svc;
+
+	++*pos;
+	if (v == SEQ_START_TOKEN)
+		return ip_vs_info_array(seq,0);
+	
+	svc = v;
+	iter = seq->private;
+	
+	if (iter->table == ip_vs_svc_table) {
+		/* next service in table hashed by protocol */
+		if ((e = svc->s_list.next) != &ip_vs_svc_table[iter->bucket])
+			return list_entry(e, struct ip_vs_service, s_list);
+
+
+		while (++iter->bucket < IP_VS_SVC_TAB_SIZE) {
+			list_for_each_entry(svc,&ip_vs_svc_table[iter->bucket],
+					    s_list) {
+				return svc;
+			}
+		}
+
+		iter->table = ip_vs_svc_fwm_table;
+		iter->bucket = -1;
+		goto scan_fwmark;
+	}
+
+	/* next service in hashed by fwmark */
+	if ((e = svc->f_list.next) != &ip_vs_svc_fwm_table[iter->bucket])
+		return list_entry(e, struct ip_vs_service, f_list);
+
+ scan_fwmark:
+	while (++iter->bucket < IP_VS_SVC_TAB_SIZE) {
+		list_for_each_entry(svc, &ip_vs_svc_fwm_table[iter->bucket],
+				    f_list) 
+			return svc;
+	}
+
+	return NULL;
+}
+
+static void ip_vs_info_seq_stop(struct seq_file *seq, void *v)
+{
+	read_unlock_bh(&__ip_vs_svc_lock);
+}
+
+
+static int ip_vs_info_seq_show(struct seq_file *seq, void *v)
+{
+	if (v == SEQ_START_TOKEN) {
+		seq_printf(seq,
+			"IP Virtual Server version %d.%d.%d (size=%d)\n",
+			NVERSION(IP_VS_VERSION_CODE), IP_VS_CONN_TAB_SIZE);
+		seq_puts(seq,
+			 "Prot LocalAddress:Port Scheduler Flags\n");
+		seq_puts(seq,
+			 "  -> RemoteAddress:Port Forward Weight ActiveConn InActConn\n");
+	} else {
+		const struct ip_vs_service *svc = v;
+		const struct ip_vs_iter *iter = seq->private;
+		const struct ip_vs_dest *dest;
+
+		if (iter->table == ip_vs_svc_table) 
+			seq_printf(seq, "%s  %08X:%04X %s ",
+				   ip_vs_proto_name(svc->protocol),
+				   ntohl(svc->addr),
+				   ntohs(svc->port),
+				   svc->scheduler->name);
+		else
+			seq_printf(seq, "FWM  %08X %s ",
+				   svc->fwmark, svc->scheduler->name);
+
+		if (svc->flags & IP_VS_SVC_F_PERSISTENT)
+			seq_printf(seq, "persistent %d %08X\n",
+				svc->timeout,
+				ntohl(svc->netmask));
+		else
+			seq_putc(seq, '\n');
+
+		list_for_each_entry(dest, &svc->destinations, n_list) {
+			seq_printf(seq, 
+				   "  -> %08X:%04X      %-7s %-6d %-10d %-10d\n",
+				   ntohl(dest->addr), ntohs(dest->port),
+				   ip_vs_fwd_name(atomic_read(&dest->conn_flags)),
+				   atomic_read(&dest->weight),
+				   atomic_read(&dest->activeconns),
+				   atomic_read(&dest->inactconns));
+		}
+	}
+	return 0;
+}
+
+static struct seq_operations ip_vs_info_seq_ops = {
+	.start = ip_vs_info_seq_start,
+	.next  = ip_vs_info_seq_next,
+	.stop  = ip_vs_info_seq_stop,
+	.show  = ip_vs_info_seq_show,
+};
+
+static int ip_vs_info_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct ip_vs_iter *s = kmalloc(sizeof(*s), GFP_KERNEL);
+
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &ip_vs_info_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+static struct file_operations ip_vs_info_fops = {
+	.owner	 = THIS_MODULE,
+	.open    = ip_vs_info_open,
+	.read    = seq_read,
+	.llseek  = seq_lseek,
+	.release = seq_release_private,
+};
+
+#endif
 
 struct ip_vs_stats ip_vs_stats;
 
-static int
-ip_vs_stats_get_info(char *buf, char **start, off_t offset, int length)
+#ifdef CONFIG_PROC_FS
+static int ip_vs_stats_show(struct seq_file *seq, void *v)
 {
-	int len=0;
-	off_t pos=0;
-	char temp[64];
 
-	pos += 320;
-	if (pos > offset) {
-		len += sprintf(buf+len, "%-63s\n%-63s\n",
-/*                              01234567 01234567 01234567 0123456701234567 0123456701234567 */
-			       "   Total Incoming Outgoing         Incoming         Outgoing",
-			       "   Conns  Packets  Packets            Bytes            Bytes");
+/*               01234567 01234567 01234567 0123456701234567 0123456701234567 */
+	seq_puts(seq,
+		 "   Total Incoming Outgoing         Incoming         Outgoing\n");
+	seq_printf(seq, 	   
+		   "   Conns  Packets  Packets            Bytes            Bytes\n");
 
-		spin_lock_bh(&ip_vs_stats.lock);
-		sprintf(temp, "%8X %8X %8X %8X%08X %8X%08X",
-			ip_vs_stats.conns,
-			ip_vs_stats.inpkts,
-			ip_vs_stats.outpkts,
-			(__u32)(ip_vs_stats.inbytes>>32),
-			(__u32)ip_vs_stats.inbytes,
-			(__u32)(ip_vs_stats.outbytes>>32),
-			(__u32)ip_vs_stats.outbytes);
-		len += sprintf(buf+len, "%-62s\n\n", temp);
+	spin_lock_bh(&ip_vs_stats.lock);
+	seq_printf(seq, "%8X %8X %8X %16LX %16LX\n\n", ip_vs_stats.conns,
+		   ip_vs_stats.inpkts, ip_vs_stats.outpkts,
+		   (unsigned long long) ip_vs_stats.inbytes,
+		   (unsigned long long) ip_vs_stats.outbytes);
 
-		len += sprintf(buf+len, "%-63s\n",
-/*                              01234567 01234567 01234567 0123456701234567 0123456701234567 */
-			       " Conns/s   Pkts/s   Pkts/s          Bytes/s          Bytes/s");
-		sprintf(temp, "%8X %8X %8X %16X %16X",
+/*                 01234567 01234567 01234567 0123456701234567 0123456701234567 */
+	seq_puts(seq,
+		   " Conns/s   Pkts/s   Pkts/s          Bytes/s          Bytes/s\n");
+	seq_printf(seq,"%8X %8X %8X %16X %16X\n",
 			ip_vs_stats.cps,
 			ip_vs_stats.inpps,
 			ip_vs_stats.outpps,
 			ip_vs_stats.inbps,
 			ip_vs_stats.outbps);
-		len += sprintf(buf+len, "%-63s\n", temp);
+	spin_unlock_bh(&ip_vs_stats.lock);
 
-		spin_unlock_bh(&ip_vs_stats.lock);
-	}
-
-	*start = buf+len-(pos-offset);          /* Start of wanted data */
-	len = pos-offset;
-	if (len > length)
-		len = length;
-	if (len < 0)
-		len = 0;
-	return len;
+	return 0;
 }
 
+static int ip_vs_stats_seq_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, ip_vs_stats_show, NULL);
+}
+
+static struct file_operations ip_vs_stats_fops = {
+	.owner = THIS_MODULE,
+	.open = ip_vs_stats_seq_open,
+	.read = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
+
+#endif
 
 /*
  *	Set timeout values for tcp tcpfin udp in the timeout_table.
@@ -1912,19 +1927,17 @@ ip_vs_copy_service(struct ip_vs_service_entry *dst, struct ip_vs_service *src)
 
 static inline int
 __ip_vs_get_service_entries(const struct ip_vs_get_services *get,
-			    struct ip_vs_get_services *uptr)
+			    struct ip_vs_get_services __user *uptr)
 {
 	int idx, count=0;
 	struct ip_vs_service *svc;
-	struct list_head *l;
 	struct ip_vs_service_entry entry;
 	int ret = 0;
 
 	for (idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each (l, &ip_vs_svc_table[idx]) {
+		list_for_each_entry(svc, &ip_vs_svc_table[idx], s_list) {
 			if (count >= get->num_services)
 				goto out;
-			svc = list_entry(l, struct ip_vs_service, s_list);
 			ip_vs_copy_service(&entry, svc);
 			if (copy_to_user(&uptr->entrytable[count],
 					 &entry, sizeof(entry))) {
@@ -1936,10 +1949,9 @@ __ip_vs_get_service_entries(const struct ip_vs_get_services *get,
 	}
 
 	for (idx = 0; idx < IP_VS_SVC_TAB_SIZE; idx++) {
-		list_for_each (l, &ip_vs_svc_fwm_table[idx]) {
+		list_for_each_entry(svc, &ip_vs_svc_fwm_table[idx], f_list) {
 			if (count >= get->num_services)
 				goto out;
-			svc = list_entry(l, struct ip_vs_service, f_list);
 			ip_vs_copy_service(&entry, svc);
 			if (copy_to_user(&uptr->entrytable[count],
 					 &entry, sizeof(entry))) {
@@ -1955,7 +1967,7 @@ __ip_vs_get_service_entries(const struct ip_vs_get_services *get,
 
 static inline int
 __ip_vs_get_dest_entries(const struct ip_vs_get_dests *get,
-			 struct ip_vs_get_dests *uptr)
+			 struct ip_vs_get_dests __user *uptr)
 {
 	struct ip_vs_service *svc;
 	int ret = 0;
@@ -1968,14 +1980,12 @@ __ip_vs_get_dest_entries(const struct ip_vs_get_dests *get,
 	if (svc) {
 		int count = 0;
 		struct ip_vs_dest *dest;
-		struct list_head *l, *e;
 		struct ip_vs_dest_entry entry;
 
-		l = &svc->destinations;
-		for (e=l->next; e!=l; e=e->next) {
+		list_for_each_entry(dest, &svc->destinations, n_list) {
 			if (count >= get->num_dests)
 				break;
-			dest = list_entry(e, struct ip_vs_dest, n_list);
+
 			entry.addr = dest->addr;
 			entry.port = dest->port;
 			entry.conn_flags = atomic_read(&dest->conn_flags);
@@ -2034,7 +2044,7 @@ static unsigned char get_arglen[GET_CMDID(IP_VS_SO_GET_MAX)+1] = {
 };
 
 static int
-do_ip_vs_get_ctl(struct sock *sk, int cmd, void *user, int *len)
+do_ip_vs_get_ctl(struct sock *sk, int cmd, void __user *user, int *len)
 {
 	unsigned char arg[128];
 	int ret = 0;
@@ -2195,8 +2205,8 @@ int ip_vs_control_init(void)
 		return ret;
 	}
 
-	proc_net_create("ip_vs", 0, ip_vs_get_info);
-	proc_net_create("ip_vs_stats", 0, ip_vs_stats_get_info);
+	proc_net_fops_create("ip_vs", 0, &ip_vs_info_fops);
+	proc_net_fops_create("ip_vs_stats",0, &ip_vs_stats_fops);
 
 	ipv4_vs_table.sysctl_header =
 		register_sysctl_table(ipv4_vs_table.root_dir, 0);

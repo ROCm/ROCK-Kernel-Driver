@@ -1316,13 +1316,16 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
 	int err;
 
-	err = put_user(stat->dev, &statbuf->st_dev);
+	if (!old_valid_dev(stat->dev) || !old_valid_dev(stat->rdev))
+		return -EOVERFLOW;
+
+	err = put_user(old_encode_dev(stat->dev), &statbuf->st_dev);
 	err |= put_user(stat->ino, &statbuf->st_ino);
 	err |= put_user(stat->mode, &statbuf->st_mode);
 	err |= put_user(stat->nlink, &statbuf->st_nlink);
 	err |= put_user(high2lowuid(stat->uid), &statbuf->st_uid);
 	err |= put_user(high2lowgid(stat->gid), &statbuf->st_gid);
-	err |= put_user(stat->rdev, &statbuf->st_rdev);
+	err |= put_user(old_encode_dev(stat->rdev), &statbuf->st_rdev);
 	err |= put_user(stat->size, &statbuf->st_size);
 	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
 	err |= put_user(stat->atime.tv_nsec, &statbuf->st_atime_nsec);
@@ -1551,7 +1554,11 @@ struct sysinfo32 {
         u32 totalswap;
         u32 freeswap;
         unsigned short procs;
-        char _f[22];
+	unsigned short pads;
+	u32 totalhigh;
+	u32 freehigh;
+	unsigned int mem_unit;
+        char _f[8];
 };
 
 extern asmlinkage int sys_sysinfo(struct sysinfo *info);
@@ -1576,6 +1583,9 @@ asmlinkage int sys32_sysinfo(struct sysinfo32 *info)
 	err |= __put_user (s.totalswap, &info->totalswap);
 	err |= __put_user (s.freeswap, &info->freeswap);
 	err |= __put_user (s.procs, &info->procs);
+	err |= __put_user (s.totalhigh, &info->totalhigh);
+	err |= __put_user (s.freehigh, &info->freehigh);
+	err |= __put_user (s.mem_unit, &info->mem_unit);
 	if (err)
 		return -EFAULT;
 	return ret;
@@ -2543,8 +2553,7 @@ extern asmlinkage long sys32_sysctl(struct __sysctl_args32 *args)
 }
 
 struct stat64_emu31 {
-	unsigned char   __pad0[6];
-	unsigned short  st_dev;
+	unsigned long long  st_dev;
 	unsigned int    __pad1;
 #define STAT64_HAS_BROKEN_ST_INO        1
 	u32             __st_ino;
@@ -2552,8 +2561,7 @@ struct stat64_emu31 {
 	unsigned int    st_nlink;
 	u32             st_uid;
 	u32             st_gid;
-	unsigned char   __pad2[6];
-	unsigned short  st_rdev;
+	unsigned long long  st_rdev;
 	unsigned int    __pad3;
 	long            st_size;
 	u32             st_blksize;
@@ -2569,93 +2577,55 @@ struct stat64_emu31 {
 	unsigned long   st_ino;
 };	
 
-static inline int
-putstat64 (struct stat64_emu31 *ubuf, struct stat *kbuf)
+static int cp_stat64(struct stat64_emu31 *ubuf, struct kstat *stat)
 {
-    struct stat64_emu31 tmp;
-   
-    memset(&tmp, 0, sizeof(tmp));
+	struct stat64_emu31 tmp;
 
-    tmp.st_dev = (unsigned short)kbuf->st_dev;
-    tmp.st_ino = kbuf->st_ino;
-    tmp.__st_ino = (u32)kbuf->st_ino;
-    tmp.st_mode = kbuf->st_mode;
-    tmp.st_nlink = (unsigned int)kbuf->st_nlink;
-    tmp.st_uid = kbuf->st_uid;
-    tmp.st_gid = kbuf->st_gid;
-    tmp.st_rdev = (unsigned short)kbuf->st_rdev;
-    tmp.st_size = kbuf->st_size;
-    tmp.st_blksize = (u32)kbuf->st_blksize;
-    tmp.st_blocks = (u32)kbuf->st_blocks;
-    tmp.st_atime = (u32)kbuf->st_atime;
-    tmp.st_mtime = (u32)kbuf->st_mtime;
-    tmp.st_ctime = (u32)kbuf->st_ctime;
+	memset(&tmp, 0, sizeof(tmp));
 
-    return copy_to_user(ubuf,&tmp,sizeof(tmp)) ? -EFAULT : 0; 
+	tmp.st_dev = huge_encode_dev(stat->dev);
+	tmp.st_ino = stat->ino;
+	tmp.__st_ino = (u32)stat->ino;
+	tmp.st_mode = stat->mode;
+	tmp.st_nlink = (unsigned int)stat->nlink;
+	tmp.st_uid = stat->uid;
+	tmp.st_gid = stat->gid;
+	tmp.st_rdev = huge_encode_dev(stat->rdev);
+	tmp.st_size = stat->size;
+	tmp.st_blksize = (u32)stat->blksize;
+	tmp.st_blocks = (u32)stat->blocks;
+	tmp.st_atime = (u32)stat->atime.tv_sec;
+	tmp.st_mtime = (u32)stat->mtime.tv_sec;
+	tmp.st_ctime = (u32)stat->ctime.tv_sec;
+
+	return copy_to_user(ubuf,&tmp,sizeof(tmp)) ? -EFAULT : 0; 
 }
-
-extern asmlinkage long sys_newstat(char * filename, struct stat * statbuf);
 
 asmlinkage long sys32_stat64(char * filename, struct stat64_emu31 * statbuf, long flags)
 {
-    int ret;
-    struct stat s;
-    char * tmp;
-    int err;
-    mm_segment_t old_fs = get_fs();
-    
-    tmp = getname(filename);
-    err = PTR_ERR(tmp);
-    if (IS_ERR(tmp))   
-	    return err;
-
-    set_fs (KERNEL_DS);
-    ret = sys_newstat(tmp, &s);
-    set_fs (old_fs);
-    putname(tmp);
-    if (putstat64 (statbuf, &s)) 
-	    return -EFAULT;
-    return ret;
+	struct kstat stat;
+	int ret = vfs_stat(filename, &stat);
+	if (!ret)
+		ret = cp_stat64(statbuf, &stat);
+	return ret;
 }
-
-extern asmlinkage long sys_newlstat(char * filename, struct stat * statbuf);
 
 asmlinkage long sys32_lstat64(char * filename, struct stat64_emu31 * statbuf, long flags)
 {
-    int ret;
-    struct stat s;
-    char * tmp;
-    int err;
-    mm_segment_t old_fs = get_fs();
-    
-    tmp = getname(filename);
-    err = PTR_ERR(tmp);
-    if (IS_ERR(tmp))   
-	    return err;
-
-    set_fs (KERNEL_DS);
-    ret = sys_newlstat(tmp, &s);
-    set_fs (old_fs);
-    putname(tmp);
-    if (putstat64 (statbuf, &s)) 
-	    return -EFAULT;
-    return ret;
+	struct kstat stat;
+	int ret = vfs_lstat(filename, &stat);
+	if (!ret)
+		ret = cp_stat64(statbuf, &stat);
+	return ret;
 }
-
-extern asmlinkage long sys_newfstat(unsigned int fd, struct stat * statbuf);
 
 asmlinkage long sys32_fstat64(unsigned long fd, struct stat64_emu31 * statbuf, long flags)
 {
-    int ret;
-    struct stat s;
-    mm_segment_t old_fs = get_fs();
-    
-    set_fs (KERNEL_DS);
-    ret = sys_newfstat(fd, &s);
-    set_fs (old_fs);
-    if (putstat64 (statbuf, &s))
-	    return -EFAULT;
-    return ret;
+	struct kstat stat;
+	int ret = vfs_fstat(fd, &stat);
+	if (!ret)
+		ret = cp_stat64(statbuf, &stat);
+	return ret;
 }
 
 /*
@@ -2810,7 +2780,6 @@ asmlinkage int sys32_clone(struct pt_regs regs)
 {
         unsigned long clone_flags;
         unsigned long newsp;
-	struct task_struct *p;
 	int *parent_tidptr, *child_tidptr;
 
         clone_flags = regs.gprs[3] & 0xffffffffUL;
@@ -2819,7 +2788,8 @@ asmlinkage int sys32_clone(struct pt_regs regs)
 	child_tidptr = (int *) (regs.gprs[5] & 0x7fffffffUL);
         if (!newsp)
                 newsp = regs.gprs[15];
-        p = do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
-		    parent_tidptr, child_tidptr);
-	return IS_ERR(p) ? PTR_ERR(p) : p->pid;
+        return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0,
+		       parent_tidptr, child_tidptr);
 }
+
+

@@ -548,8 +548,10 @@ int mls_read_user(struct user_datum *usrdatum, void *fp)
 		memset(r, 0, sizeof(*r));
 
 		rc = mls_read_range_helper(&r->range, fp);
-		if (rc)
+		if (rc) {
+			kfree(r);
 			goto out;
+		}
 
 		if (l)
 			l->next = r;
@@ -581,10 +583,17 @@ int mls_read_trusted(struct policydb *p, void *fp)
 		goto out;
 	rc = ebitmap_read(&p->trustedwriters, fp);
 	if (rc)
-		goto out;
+		goto bad;
 	rc = ebitmap_read(&p->trustedobjects, fp);
+	if (rc)
+		goto bad2;
 out:
 	return rc;
+bad2:
+	ebitmap_destroy(&p->trustedwriters);
+bad:
+	ebitmap_destroy(&p->trustedreaders);
+	goto out;
 }
 
 int sens_index(void *key, void *datum, void *datap)

@@ -17,10 +17,22 @@
  *
  * The full GNU General Public License is included in this distribution in the
  * file called LICENSE.
+ *
+ *
+ * Changes:
+ *
+ * 2003/06/25 - Shmulik Hen <shmulik.hen at intel dot com>
+ *	- Fixed signed/unsigned calculation errors that caused load sharing
+ *	  to collapse to one slave under very heavy UDP Tx stress.
+ *
+ * 2003/08/06 - Amir Noam <amir.noam at intel dot com>
+ *	- Add support for setting bond's MAC address with special
+ *	  handling required for ALB/TLB.
  */
 
 #include <linux/skbuff.h>
 #include <linux/netdevice.h>
+#include <linux/etherdevice.h>
 #include <linux/pkt_sched.h>
 #include <linux/spinlock.h>
 #include <linux/slab.h>
@@ -246,7 +258,7 @@ tlb_get_least_loaded_slave(struct bonding *bond)
 {
 	struct slave *slave;
 	struct slave *least_loaded;
-	u32 curr_gap, max_gap;
+	s64 curr_gap, max_gap;
 
 	/* Find the first enabled slave */
 	slave = bond_get_first_slave(bond);
@@ -262,15 +274,15 @@ tlb_get_least_loaded_slave(struct bonding *bond)
 	}
 
 	least_loaded = slave;
-	max_gap = (slave->speed * 1000000) -
-		  (SLAVE_TLB_INFO(slave).load * 8);
+	max_gap = (s64)(slave->speed * 1000000) -
+			(s64)(SLAVE_TLB_INFO(slave).load * 8);
 
 	/* Find the slave with the largest gap */
 	slave = bond_get_next_slave(bond, slave);
 	while (slave) {
 		if (SLAVE_IS_OK(slave)) {
-			curr_gap = (slave->speed * 1000000) -
-				   (SLAVE_TLB_INFO(slave).load * 8);
+			curr_gap = (s64)(slave->speed * 1000000) -
+					(s64)(SLAVE_TLB_INFO(slave).load * 8);
 			if (max_gap < curr_gap) {
 				least_loaded = slave;
 				max_gap = curr_gap;
@@ -876,7 +888,7 @@ rlb_initialize(struct bonding *bond)
 	pk_type->type = __constant_htons(ETH_P_ARP);
 	pk_type->dev = bond->device;
 	pk_type->func = rlb_arp_recv;
-	pk_type->data = (void*)1;  /* understand shared skbs */
+	pk_type->data = PKT_CAN_SHARE_SKB;
 
 	dev_add_pack(pk_type);
 
@@ -936,10 +948,11 @@ alb_send_learning_packets(struct slave *slave, u8 mac_addr[])
 }
 
 /* hw is a boolean parameter that determines whether we should try and
- * set the hw address of the hw as well as the hw address of the net_device
+ * set the hw address of the device as well as the hw address of the
+ * net_device
  */
 static int
-alb_set_mac_addr(struct slave *slave, u8 addr[], int hw)
+alb_set_slave_mac_addr(struct slave *slave, u8 addr[], int hw)
 {
 	struct net_device *dev = NULL;
 	struct sockaddr s_addr;
@@ -947,16 +960,16 @@ alb_set_mac_addr(struct slave *slave, u8 addr[], int hw)
 	dev = slave->dev;
 
 	if (!hw) {
-		memcpy(dev->dev_addr, addr, ETH_ALEN);
+		memcpy(dev->dev_addr, addr, dev->addr_len);
 		return 0;
 	}
 
 	/* for rlb each slave must have a unique hw mac addresses so that */
 	/* each slave will receive packets destined to a different mac */
-	memcpy(s_addr.sa_data, addr, ETH_ALEN);
+	memcpy(s_addr.sa_data, addr, dev->addr_len);
 	s_addr.sa_family = dev->type;
 	if (dev->set_mac_address(dev, &s_addr)) {
-		printk(KERN_DEBUG "bonding: Error: alb_set_mac_addr:"
+		printk(KERN_DEBUG "bonding: Error: alb_set_slave_mac_addr:"
 				  " dev->set_mac_address of dev %s failed!"
 				  " ALB mode requires that the base driver"
 				  " support setting the hw address also when"
@@ -980,8 +993,8 @@ alb_swap_mac_addr(struct bonding *bond,
 	slaves_state_differ = (SLAVE_IS_OK(slave1) != SLAVE_IS_OK(slave2));
 
 	memcpy(tmp_mac_addr, slave1->dev->dev_addr, ETH_ALEN);
-	alb_set_mac_addr(slave1, slave2->dev->dev_addr, bond->alb_info.rlb_enabled);
-	alb_set_mac_addr(slave2, tmp_mac_addr, bond->alb_info.rlb_enabled);
+	alb_set_slave_mac_addr(slave1, slave2->dev->dev_addr, bond->alb_info.rlb_enabled);
+	alb_set_slave_mac_addr(slave2, tmp_mac_addr, bond->alb_info.rlb_enabled);
 
 	/* fasten the change in the switch */
 	if (SLAVE_IS_OK(slave1)) {
@@ -1146,8 +1159,8 @@ alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 	}
 
 	if (tmp_slave1) {
-		alb_set_mac_addr(slave, tmp_slave1->perm_hwaddr,
-				 bond->alb_info.rlb_enabled);
+		alb_set_slave_mac_addr(slave, tmp_slave1->perm_hwaddr,
+				       bond->alb_info.rlb_enabled);
 
 		printk(KERN_WARNING "bonding: Warning: the hw address "
 		       "of slave %s is in use by the bond; "
@@ -1163,6 +1176,67 @@ alb_handle_addr_collision_on_attach(struct bonding *bond, struct slave *slave)
 	}
 
 	return 0;
+}
+
+/**
+ * alb_set_mac_address
+ * @bond:
+ * @addr:
+ *
+ * In TLB mode all slaves are configured to the bond's hw address, but set
+ * their dev_addr field to different addresses (based on their permanent hw
+ * addresses).
+ *
+ * For each slave, this function sets the interface to the new address and then
+ * changes its dev_addr field to its previous value.
+ * 
+ * Unwinding assumes bond's mac address has not yet changed.
+ */
+static inline int
+alb_set_mac_address(struct bonding *bond, void *addr)
+{
+	struct sockaddr sa;
+	struct slave *slave;
+	char tmp_addr[ETH_ALEN];
+	int error;
+
+	if (bond->alb_info.rlb_enabled) {
+		return 0;
+	}
+
+	slave = bond_get_first_slave(bond);
+	for (; slave; slave = bond_get_next_slave(bond, slave)) {
+		if (slave->dev->set_mac_address == NULL) {
+			error = -EOPNOTSUPP;
+			goto unwind;
+		}
+
+		/* save net_device's current hw address */
+		memcpy(tmp_addr, slave->dev->dev_addr, ETH_ALEN);
+
+		error = slave->dev->set_mac_address(slave->dev, addr);
+
+		/* restore net_device's hw address */
+		memcpy(slave->dev->dev_addr, tmp_addr, ETH_ALEN);
+
+		if (error) {
+			goto unwind;
+		}
+	}
+
+	return 0;
+
+unwind:
+	memcpy(sa.sa_data, bond->device->dev_addr, bond->device->addr_len);
+	sa.sa_family = bond->device->type;
+	slave = bond_get_first_slave(bond);
+	for (; slave; slave = bond_get_next_slave(bond, slave)) {
+		memcpy(tmp_addr, slave->dev->dev_addr, ETH_ALEN);
+		slave->dev->set_mac_address(slave->dev, &sa);
+		memcpy(slave->dev->dev_addr, tmp_addr, ETH_ALEN);
+	}
+
+	return error;
 }
 
 /************************ exported alb funcions ************************/
@@ -1255,16 +1329,15 @@ bond_alb_xmit(struct sk_buff *skb, struct net_device *dev)
 		hash_size = 16;
 		break;
 
-#ifdef FIXME
 	case ETH_P_IPX:
-		if (skb->nh.ipxh->ipx_checksum !=
+		if (ipx_hdr(skb)->ipx_checksum !=
 		    __constant_htons(IPX_NO_CHECKSUM)) {
 			/* something is wrong with this packet */
 			do_tx_balance = 0;
 			break;
 		}
 
-		if (skb->nh.ipxh->ipx_type !=
+		if (ipx_hdr(skb)->ipx_type !=
 		    __constant_htons(IPX_TYPE_NCP)) {
 			/* The only protocol worth balancing in
 			 * this family since it has an "ARP" like
@@ -1277,7 +1350,6 @@ bond_alb_xmit(struct sk_buff *skb, struct net_device *dev)
 		hash_start = (char*)eth_data->h_dest;
 		hash_size = ETH_ALEN;
 		break;
-#endif
 
 	case ETH_P_ARP:
 		do_tx_balance = 0;
@@ -1437,8 +1509,8 @@ bond_alb_init_slave(struct bonding *bond, struct slave *slave)
 {
 	int err = 0;
 
-	err = alb_set_mac_addr(slave, slave->perm_hwaddr,
-				bond->alb_info.rlb_enabled);
+	err = alb_set_slave_mac_addr(slave, slave->perm_hwaddr,
+				     bond->alb_info.rlb_enabled);
 	if (err) {
 		return err;
 	}
@@ -1562,10 +1634,61 @@ bond_alb_assign_current_slave(struct bonding *bond, struct slave *new_slave)
 		alb_swap_mac_addr(bond, swap_slave, new_slave);
 	} else {
 		/* set the new_slave to the bond mac address */
-		alb_set_mac_addr(new_slave, bond->device->dev_addr,
-				 bond->alb_info.rlb_enabled);
+		alb_set_slave_mac_addr(new_slave, bond->device->dev_addr,
+				       bond->alb_info.rlb_enabled);
 		/* fasten bond mac on new current slave */
 		alb_send_learning_packets(new_slave, bond->device->dev_addr);
 	}
+}
+
+int
+bond_alb_set_mac_address(struct net_device *dev, void *addr)
+{
+	struct bonding *bond = dev->priv;
+	struct sockaddr *sa = addr;
+	struct slave *swap_slave = NULL;
+	int error = 0;
+
+	if (!is_valid_ether_addr(sa->sa_data)) {
+		return -EADDRNOTAVAIL;
+	}
+
+	error = alb_set_mac_address(bond, addr);
+	if (error) {
+		return error;
+	}
+
+	memcpy(dev->dev_addr, sa->sa_data, dev->addr_len);
+
+	/* If there is no current_slave there is nothing else to do.
+	 * Otherwise we'll need to pass the new address to it and handle
+	 * duplications.
+	 */
+	if (bond->current_slave == NULL) {
+		return 0;
+	}
+
+	swap_slave = bond_get_first_slave(bond);
+	while (swap_slave) {
+		if (!memcmp(swap_slave->dev->dev_addr, dev->dev_addr, ETH_ALEN)) {
+			break;
+		}
+		swap_slave = bond_get_next_slave(bond, swap_slave);
+	}
+
+	if (swap_slave) {
+		alb_swap_mac_addr(bond, swap_slave, bond->current_slave);
+	} else {
+		alb_set_slave_mac_addr(bond->current_slave, dev->dev_addr,
+				       bond->alb_info.rlb_enabled);
+
+		alb_send_learning_packets(bond->current_slave, dev->dev_addr);
+		if (bond->alb_info.rlb_enabled) {
+			/* inform clients mac address has changed */
+			rlb_req_update_slave_clients(bond, bond->current_slave);
+		}
+	}
+
+	return 0;
 }
 

@@ -50,9 +50,7 @@ int i2c_detect(struct i2c_adapter *adapter,
 		return -1;
 
 	for (addr = 0x00; addr <= (is_isa ? 0xffff : 0x7f); addr++) {
-		/* XXX: WTF is going on here??? */
-		if ((is_isa && check_region(addr, 1)) ||
-		    (!is_isa && i2c_check_addr(adapter, addr)))
+		if (!is_isa && i2c_check_addr(adapter, addr))
 			continue;
 
 		/* If it is in one of the force entries, we don't do any

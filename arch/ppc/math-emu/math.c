@@ -9,7 +9,7 @@
 #include <linux/sched.h>
 
 #include <asm/uaccess.h>
-#include <asm/processor.h>
+#include <asm/reg.h>
 
 #include "sfp-machine.h"
 #include "double.h"

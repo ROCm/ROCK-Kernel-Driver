@@ -34,7 +34,6 @@ ENTRY(v4_flush_user_tlb_range)
 	act_mm	r3				@ get current->active_mm
 	eors	r3, ip, r3				@ == mm ?
 	movne	pc, lr				@ no, we dont do anything
-	vma_vm_flags ip, r2
 .v4_flush_kern_tlb_range:
 	bic	r0, r0, #0x0ff
 	bic	r0, r0, #0xf00
@@ -56,7 +55,7 @@ ENTRY(v4_flush_user_tlb_range)
 .globl v4_flush_kern_tlb_range
 .equ v4_flush_kern_tlb_range, .v4_flush_kern_tlb_range
 
-	__INIT
+	__INITDATA
 
 	.type	v4_tlb_fns, #object
 ENTRY(v4_tlb_fns)

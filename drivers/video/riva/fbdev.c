@@ -1576,7 +1576,7 @@ static struct fb_ops riva_fb_ops = {
 	.fb_sync 	= rivafb_sync,
 };
 
-static int __init riva_set_fbinfo(struct fb_info *info)
+static int __devinit riva_set_fbinfo(struct fb_info *info)
 {
 	struct riva_par *par = (struct riva_par *) info->par;
 	unsigned int cmap_len;
@@ -1726,7 +1726,7 @@ static void riva_get_dfpinfo(struct fb_info *info)
  *
  * ------------------------------------------------------------------------- */
 
-static int __init rivafb_probe(struct pci_dev *pd,
+static int __devinit rivafb_probe(struct pci_dev *pd,
 			     	const struct pci_device_id *ent)
 {
 	struct riva_chip_info *rci = &riva_chip_info[ent->driver_data];

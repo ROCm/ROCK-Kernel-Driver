@@ -62,6 +62,7 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	pte_t *pte;
 	pgd_t *pgd;
 	pmd_t *pmd;
+	pte_t pte_val;
 	struct pte_chain *pte_chain;
 
 	pte_chain = pte_chain_alloc(GFP_KERNEL);
@@ -84,10 +85,11 @@ int install_page(struct mm_struct *mm, struct vm_area_struct *vma,
 	flush_icache_page(vma, page);
 	set_pte(pte, mk_pte(page, prot));
 	pte_chain = page_add_rmap(page, pte, pte_chain);
+	pte_val = *pte;
 	pte_unmap(pte);
 	if (flush)
 		flush_tlb_page(vma, addr);
-	update_mmu_cache(vma, addr, *pte);
+	update_mmu_cache(vma, addr, pte_val);
 	spin_unlock(&mm->page_table_lock);
 	pte_chain_free(pte_chain);
 	return 0;
@@ -99,6 +101,47 @@ err:
 	return err;
 }
 EXPORT_SYMBOL(install_page);
+
+
+/*
+ * Install a file pte to a given virtual memory address, release any
+ * previously existing mapping.
+ */
+int install_file_pte(struct mm_struct *mm, struct vm_area_struct *vma,
+		unsigned long addr, unsigned long pgoff, pgprot_t prot)
+{
+	int err = -ENOMEM, flush;
+	pte_t *pte;
+	pgd_t *pgd;
+	pmd_t *pmd;
+	pte_t pte_val;
+
+	pgd = pgd_offset(mm, addr);
+	spin_lock(&mm->page_table_lock);
+
+	pmd = pmd_alloc(mm, pgd, addr);
+	if (!pmd)
+		goto err_unlock;
+
+	pte = pte_alloc_map(mm, pmd, addr);
+	if (!pte)
+		goto err_unlock;
+
+	flush = zap_pte(mm, vma, addr, pte);
+
+	set_pte(pte, pgoff_to_pte(pgoff));
+	pte_val = *pte;
+	pte_unmap(pte);
+	if (flush)
+		flush_tlb_page(vma, addr);
+	update_mmu_cache(vma, addr, pte_val);
+	spin_unlock(&mm->page_table_lock);
+	return 0;
+
+err_unlock:
+	spin_unlock(&mm->page_table_lock);
+	return err;
+}
 
 
 /***

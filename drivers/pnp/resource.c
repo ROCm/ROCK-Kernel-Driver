@@ -21,8 +21,6 @@
 #include <linux/pnp.h>
 #include "base.h"
 
-int pnp_allow_dma0 = -1;		        /* allow dma 0 during auto activation:
-						 * -1=off (:default), 0=off (set by user), 1=on */
 int pnp_skip_pci_scan;				/* skip PCI resource scanning */
 int pnp_reserve_irq[16] = { [0 ... 15] = -1 };	/* reserve (don't use) some IRQ */
 int pnp_reserve_dma[8] = { [0 ... 7] = -1 };	/* reserve (don't use) some DMA */
@@ -426,7 +424,7 @@ int pnp_check_irq(struct pnp_dev * dev, int idx)
 
 int pnp_check_dma(struct pnp_dev * dev, int idx)
 {
-	int tmp, mindma = 1;
+	int tmp;
 	struct pnp_dev *tdev;
 	unsigned long * dma = &dev->res.dma_resource[idx].start;
 
@@ -435,9 +433,7 @@ int pnp_check_dma(struct pnp_dev * dev, int idx)
 		return 1;
 
 	/* check if the resource is valid */
-	if (pnp_allow_dma0 == 1)
-		mindma = 0;
-	if (*dma < mindma || *dma == 4 || *dma > 7)
+	if (*dma < 0 || *dma == 4 || *dma > 7)
 		return 0;
 
 	/* check if the resource is reserved */
@@ -487,16 +483,6 @@ EXPORT_SYMBOL(pnp_register_dma_resource);
 EXPORT_SYMBOL(pnp_register_port_resource);
 EXPORT_SYMBOL(pnp_register_mem_resource);
 
-
-/* format is: allowdma0 */
-
-static int __init pnp_allowdma0(char *str)
-{
-        pnp_allow_dma0 = 1;
-	return 1;
-}
-
-__setup("allowdma0", pnp_allowdma0);
 
 /* format is: pnp_reserve_irq=irq1[,irq2] .... */
 

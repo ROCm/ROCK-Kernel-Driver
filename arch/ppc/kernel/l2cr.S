@@ -1,17 +1,17 @@
 /*
 	L2CR functions
 	Copyright © 1997-1998 by PowerLogix R & D, Inc.
-	
+
 	This program is free software; you can redistribute it and/or modify
 	it under the terms of the GNU General Public License as published by
 	the Free Software Foundation; either version 2 of the License, or
 	(at your option) any later version.
-	
+
 	This program is distributed in the hope that it will be useful,
 	but WITHOUT ANY WARRANTY; without even the implied warranty of
 	MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 	GNU General Public License for more details.
-	
+
 	You should have received a copy of the GNU General Public License
 	along with this program; if not, write to the Free Software
 	Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
@@ -36,7 +36,7 @@
 		several months.  The L2CR is similar, but I'm going
 		to assume the user of this functions knows what they
 		are doing.
-	
+
 	Author:	Terry Greeniaus (tgree@phys.ualberta.ca)
 	Please e-mail updates to this file to me, thanks!
 */
@@ -47,7 +47,7 @@
 #include <asm/cache.h>
 
 /* Usage:
-	
+
 	When setting the L2CR register, you must do a few special
 	things.  If you are enabling the cache, you must perform a
 	global invalidate.  If you are disabling the cache, you must
@@ -104,7 +104,7 @@ BEGIN_FTR_SECTION
 END_FTR_SECTION_IFCLR(CPU_FTR_L2CR)
 
 	mflr	r9
-	
+
 	/* Stop DST streams */
 BEGIN_FTR_SECTION
 	DSSALL
@@ -134,10 +134,10 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	mr	r5,r3
 	bl	__flush_disable_L1
 	mr	r3,r5
-	
+
 	/* Get the current enable bit of the L2CR into r4 */
 	mfspr	r4,L2CR
-	
+
 	/* Tweak some bits */
 	rlwinm	r5,r3,0,0,0		/* r5 contains the new enable bit */
 	rlwinm	r3,r3,0,11,9		/* Turn off the invalidate bit */
@@ -152,7 +152,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	 * the size of the L2 cache plus the size of the L1 cache, but 4MB will
 	 * cover everything just to be safe).
 	 */
-		
+
 	 /**** Might be a good idea to set L2DO here - to prevent instructions
 	       from getting into the cache.  But since we invalidate
 	       the next time we enable the cache it doesn't really matter.
@@ -170,7 +170,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	addi	r4,r4,32		/* Go to start of next cache line */
 	bdnz	1b
 	isync
-	
+
 	/* Now, flush the first 4MB of memory */
 	lis	r4,0x0002
 	mtctr	r4
@@ -198,7 +198,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 21:	sync
 	isync
 	b	22b
-		
+
 23:
 	/* Perform a global invalidation */
 	oris	r3,r3,0x0020
@@ -220,12 +220,12 @@ END_FTR_SECTION_IFSET(CPU_FTR_SPEC7450)
 3:	mfspr	r3,L2CR
 	rlwinm.	r4,r3,0,31,31
 	bne	3b
-	
+
 11:	rlwinm	r3,r3,0,11,9		/* Turn off the L2I bit */
 	sync
 	mtspr	L2CR,r3
 	sync
-	
+
 	/* See if we need to enable the cache */
 	cmplwi	r5,0
 	beq	4f
@@ -264,7 +264,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_L2CR)
  * Here is a similar routine for dealing with the L3 cache
  * on the 745x family of chips
  */
- 
+
 _GLOBAL(_set_L3CR)
 	/* Make sure this is a 745x chip */
 BEGIN_FTR_SECTION
@@ -283,10 +283,10 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	/* Stop DST streams */
 	DSSALL
 	sync
-	
+
 	/* Get the current enable bit of the L3CR into r4 */
 	mfspr	r4,SPRN_L3CR
-	
+
 	/* Tweak some bits */
 	rlwinm	r5,r3,0,0,0		/* r5 contains the new enable bit */
 	rlwinm	r3,r3,0,22,20		/* Turn off the invalidate bit */
@@ -298,7 +298,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 
 	/* Flush the cache.
 	 */
-		
+
 	/* TODO: use HW flush assist */
 
 	lis	r4,0x0008
@@ -309,7 +309,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	dcbf	0,r4
 	addi	r4,r4,32		/* Go to start of next cache line */
 	bdnz	1b
-	
+
 2:
 	/* Set up the L3CR configuration bits (and switch L3 off) */
 	sync
@@ -327,7 +327,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	li	r0,256
 	mtctr	r0
 1:	bdnz	1b
-	
+
 	/* Perform a global invalidation */
 	ori	r3,r3,0x0400
 	sync
@@ -349,7 +349,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_L3CR)
 	li	r0,256
 	mtctr	r0
 1:	bdnz	1b
-	
+
 	/* See if we need to enable the cache */
 	cmplwi	r5,0
 	beq	4f
@@ -387,15 +387,13 @@ END_FTR_SECTION_IFSET(CPU_FTR_L3CR)
  * clobbers r0, r3, ctr, cr0
  *
  */
- 	.globl	__flush_disable_L1
- __flush_disable_L1:
- 
+_GLOBAL(__flush_disable_L1)
 	/* Stop pending alitvec streams and memory accesses */
 BEGIN_FTR_SECTION
 	DSSALL
 END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
  	sync
- 	
+
 	/* Load counter to 0x1000 cache lines (128k) and
 	 * load cache with datas
 	 */
@@ -426,7 +424,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 	rlwinm	r3,r3,0,18,15
 	mtspr	SPRN_HID0,r3
 	sync
-	isync	
+	isync
  	blr
 
 /* inval_enable_L1	- Invalidate and enable L1 cache
@@ -435,8 +433,7 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
  *
  * clobbers r3
  */
- 	.globl	__inval_enable_L1
- __inval_enable_L1:
+_GLOBAL(__inval_enable_L1)
 	/* Enable and then Flash inval the instruction & data cache */
 	mfspr	r3,SPRN_HID0
 	ori	r3,r3, HID0_ICE|HID0_ICFI|HID0_DCE|HID0_DCI
@@ -449,4 +446,4 @@ END_FTR_SECTION_IFSET(CPU_FTR_ALTIVEC)
 
  	blr
 
- 
+

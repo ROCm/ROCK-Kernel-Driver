@@ -101,7 +101,7 @@ static int amanda_data_fixup(struct ip_conntrack *ct,
 	struct ip_conntrack_expect *exp = expect;
 	struct ip_ct_amanda_expect *ct_amanda_info = &exp->help.exp_amanda_info;
 	struct ip_conntrack_tuple t = exp->tuple;
-	int port;
+	u_int16_t port;
 
 	MUST_BE_LOCKED(&ip_amanda_lock);
 
@@ -115,7 +115,7 @@ static int amanda_data_fixup(struct ip_conntrack *ct,
 	   writable */
 
 	t.dst.ip = newip;
-	for (port = ct_amanda_info->port + 10; port != 0; port++) {
+	for (port = ct_amanda_info->port; port != 0; port++) {
 		t.dst.u.tcp.port = htons(port);
 		if (ip_conntrack_change_expect(exp, &t) == 0)
 			break;

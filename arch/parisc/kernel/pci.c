@@ -10,6 +10,7 @@
  * Copyright (C) 1999-2001 Grant Grundler
  */
 #include <linux/config.h>
+#include <linux/eisa.h>
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
@@ -25,7 +26,7 @@
 #define DEBUG_CONFIG 0
 
 #if DEBUG_CONFIG
-# define DBGC(x...)     printk(KERN_DEBUG x)
+# define DBGC(x...)	printk(KERN_DEBUG x)
 #else
 # define DBGC(x...)
 #endif
@@ -38,13 +39,15 @@
 #endif
 
 /* To be used as: mdelay(pci_post_reset_delay);
-**
-** post_reset is the time the kernel should stall to prevent anyone from
-** accessing the PCI bus once #RESET is de-asserted. 
-** PCI spec somewhere says 1 second but with multi-PCI bus systems,
-** this makes the boot time much longer than necessary.
-** 20ms seems to work for all the HP PCI implementations to date.
-*/
+ *
+ * post_reset is the time the kernel should stall to prevent anyone from
+ * accessing the PCI bus once #RESET is de-asserted. 
+ * PCI spec somewhere says 1 second but with multi-PCI bus systems,
+ * this makes the boot time much longer than necessary.
+ * 20ms seems to work for all the HP PCI implementations to date.
+ *
+ * XXX: turn into a #defined constant in <asm/pci.h> ?
+ */
 int pci_post_reset_delay = 50;
 
 struct pci_port_ops *pci_port;
@@ -52,9 +55,7 @@ struct pci_bios_ops *pci_bios;
 
 int pci_hba_count = 0;
 
-/*
-** parisc_pci_hba used by pci_port->in/out() ops to lookup bus data.
-*/
+/* parisc_pci_hba used by pci_port->in/out() ops to lookup bus data.  */
 #define PCI_HBA_MAX 32
 struct pci_hba_data *parisc_pci_hba[PCI_HBA_MAX];
 
@@ -129,8 +130,6 @@ static int __init pcibios_init(void)
 /* Called from pci_do_scan_bus() *after* walking a bus but before walking PPBs. */
 void pcibios_fixup_bus(struct pci_bus *bus)
 {
-	ASSERT(pci_bios != NULL);
-
 	if (pci_bios->fixup_bus) {
 		pci_bios->fixup_bus(bus);
 	} else {
@@ -145,64 +144,26 @@ char *pcibios_setup(char *str)
 }
 
 
-/*
-** Used in drivers/pci/quirks.c
-*/
+/* Used in drivers/pci/quirks.c */
 struct pci_fixup pcibios_fixups[] = { {0} };
 
 
 /*
-** called by drivers/pci/setup.c:pdev_fixup_irq()
-*/
-void __devinit pcibios_update_irq(struct pci_dev *dev, int irq)
-{
-/*
-** updates IRQ_LINE cfg register to reflect PCI-PCI bridge skewing.
-**
-** Calling path for Alpha is:
-**  alpha/kernel/pci.c:common_init_pci(swizzle_func, pci_map_irq_func )
-**	drivers/pci/setup.c:pci_fixup_irqs()
-**	    drivers/pci/setup.c:pci_fixup_irq()	(for each PCI device)
-**		invoke swizzle and map functions
-**	        alpha/kernel/pci.c:pcibios_update_irq()
-**
-** Don't need this for PA legacy PDC systems.
-**
-** On PAT PDC systems, We only support one "swizzle" for any number
-** of PCI-PCI bridges deep. That's how bit3 PCI expansion chassis
-** are implemented. The IRQ lines are "skewed" for all devices but
-** *NOT* routed through the PCI-PCI bridge. Ie any device "0" will
-** share an IRQ line. Legacy PDC is expecting this IRQ line routing
-** as well.
-**
-** Unfortunately, PCI spec allows the IRQ lines to be routed
-** around the PCI bridge as long as the IRQ lines are skewed
-** based on the device number...<sigh>...
-**
-** Lastly, dino.c might be able to use pci_fixup_irq() to
-** support RS-232 and PS/2 children. Not sure how but it's
-** something to think about.
-*/
-}
-
-
-/*
-** Called by pci_set_master() - a driver interface.
-**
-** Legacy PDC guarantees to set:
-**      Map Memory BAR's into PA IO space.
-**      Map Expansion ROM BAR into one common PA IO space per bus.
-**      Map IO BAR's into PCI IO space.
-**      Command (see below)
-**      Cache Line Size
-**      Latency Timer
-**      Interrupt Line
-**	PPB: secondary latency timer, io/mmio base/limit,
-**		bus numbers, bridge control
-**
-*/
-void
-pcibios_set_master(struct pci_dev *dev)
+ * Called by pci_set_master() - a driver interface.
+ *
+ * Legacy PDC guarantees to set:
+ *	Map Memory BAR's into PA IO space.
+ *	Map Expansion ROM BAR into one common PA IO space per bus.
+ *	Map IO BAR's into PCI IO space.
+ *	Command (see below)
+ *	Cache Line Size
+ *	Latency Timer
+ *	Interrupt Line
+ *	PPB: secondary latency timer, io/mmio base/limit,
+ *		bus numbers, bridge control
+ *
+ */
+void pcibios_set_master(struct pci_dev *dev)
 {
 	u8 lat;
 
@@ -214,43 +175,36 @@ pcibios_set_master(struct pci_dev *dev)
 	** HP generally has fewer devices on the bus than other architectures.
 	** upper byte is PCI_LATENCY_TIMER.
 	*/
-        pci_write_config_word(dev, PCI_CACHE_LINE_SIZE,
+	pci_write_config_word(dev, PCI_CACHE_LINE_SIZE,
 				(0x80 << 8) | (L1_CACHE_BYTES / sizeof(u32)));
 }
 
 
-void __init
-pcibios_init_bus(struct pci_bus *bus)
+void __init pcibios_init_bus(struct pci_bus *bus)
 {
 	struct pci_dev *dev = bus->self;
+	unsigned short bridge_ctl;
 
 	/* We deal only with pci controllers and pci-pci bridges. */
-	if (dev && (dev->class >> 8) != PCI_CLASS_BRIDGE_PCI)
+	if (!dev || (dev->class >> 8) != PCI_CLASS_BRIDGE_PCI)
 		return;
-	
-	if (dev) {
-		unsigned short bridge_ctl;
 
-		/* PCI-PCI bridge - set the cache line and default latency
-		   (32) for primary and secondary buses. */
-		pci_write_config_byte(dev, PCI_SEC_LATENCY_TIMER, 32);
+	/* PCI-PCI bridge - set the cache line and default latency
+	   (32) for primary and secondary buses. */
+	pci_write_config_byte(dev, PCI_SEC_LATENCY_TIMER, 32);
 
-		/* Read bridge control */
-		pci_read_config_word(dev, PCI_BRIDGE_CONTROL, &bridge_ctl);
-		pci_write_config_word(dev, PCI_BRIDGE_CONTROL, bridge_ctl
-				| PCI_BRIDGE_CTL_PARITY | PCI_BRIDGE_CTL_SERR);
-
-	}
+	pci_read_config_word(dev, PCI_BRIDGE_CONTROL, &bridge_ctl);
+	bridge_ctl |= PCI_BRIDGE_CTL_PARITY | PCI_BRIDGE_CTL_SERR;
+	pci_write_config_word(dev, PCI_BRIDGE_CONTROL, bridge_ctl);
 }
 
 
-/*
-** KLUGE: Link the child and parent resources - generic PCI didn't
-*/
+/* KLUGE: Link the child and parent resources - generic PCI didn't */
 static void
 pcibios_link_hba_resources( struct resource *hba_res, struct resource *r)
 {
 	if (!r->parent) {
+		printk(KERN_EMERG "PCI: Tell willy he's wrong\n");
 		r->parent = hba_res;
 
 		/* reverse link is harder *sigh*  */
@@ -268,14 +222,9 @@ pcibios_link_hba_resources( struct resource *hba_res, struct resource *r)
 	}
 }
 
-/*
-** called by drivers/pci/setup-res.c:pci_setup_bridge().
-*/
-void __devinit pcibios_resource_to_bus(
- 	struct pci_dev *dev,
-	struct pci_bus_region *region,
-	struct resource *res
-	)
+/* called by drivers/pci/setup-bus.c:pci_setup_bridge().  */
+void __devinit pcibios_resource_to_bus(struct pci_dev *dev,
+		struct pci_bus_region *region, struct resource *res)
 {
 	struct pci_bus *bus = dev->bus;
 	struct pci_hba_data *hba = HBA_DATA(bus->dev->platform_data);
@@ -313,17 +262,16 @@ EXPORT_SYMBOL(pcibios_resource_to_bus);
 #endif
 
 /*
-** pcibios align resources() is called everytime generic PCI code
-** wants to generate a new address. The process of looking for
-** an available address, each candidate is first "aligned" and
-** then checked if the resource is available until a match is found.
-**
-** Since we are just checking candidates, don't use any fields other
-** than res->start.
-*/
-void __devinit
-pcibios_align_resource(void *data, struct resource *res,
-		       unsigned long size, unsigned long alignment)
+ * pcibios align resources() is called every time generic PCI code
+ * wants to generate a new address. The process of looking for
+ * an available address, each candidate is first "aligned" and
+ * then checked if the resource is available until a match is found.
+ *
+ * Since we are just checking candidates, don't use any fields other
+ * than res->start.
+ */
+void pcibios_align_resource(void *data, struct resource *res,
+				unsigned long size, unsigned long alignment)
 {
 	unsigned long mask, align;
 
@@ -331,10 +279,6 @@ pcibios_align_resource(void *data, struct resource *res,
 		pci_name(((struct pci_dev *) data)),
 		res->parent, res->start, res->end,
 		(int) res->flags, size, alignment);
-
-	/* has resource already been aligned/assigned? */
-	if (res->parent)
-		return;
 
 	/* If it's not IO, then it's gotta be MEM */
 	align = (res->flags & IORESOURCE_IO) ? PCIBIOS_MIN_IO : PCIBIOS_MIN_MEM;
@@ -344,32 +288,26 @@ pcibios_align_resource(void *data, struct resource *res,
 	res->start += mask;
 	res->start &= ~mask;
 
-	/*
-	** WARNING : caller is expected to update "end" field.
-	** We can't since it might really represent the *size*.
-	** The difference is "end = start + size" vs "end += start".
-	*/
+	/* The caller updates the end field, we don't.  */
 }
 
 
-int __devinit
-pcibios_enable_device(struct pci_dev *dev, int mask)
+/*
+ * A driver is enabling the device.  We make sure that all the appropriate
+ * bits are set to allow the device to operate as the driver is expecting.
+ * We enable the port IO and memory IO bits if the device has any BARs of
+ * that type, and we enable the PERR and SERR bits unconditionally.
+ * Drivers that do not need parity (eg graphics and possibly networking)
+ * can clear these bits if they want.
+ */
+int pcibios_enable_device(struct pci_dev *dev, int mask)
 {
 	u16 cmd;
 	int idx;
 
-	/*
-	** The various platform PDC's (aka "BIOS" for PCs) don't
-	** enable all the same bits. We just make sure they are here.
-	*/
 	pci_read_config_word(dev, PCI_COMMAND, &cmd);
 
-	/*
-	** See if any resources have been allocated
-	** While "regular" PCI devices only use 0-5, Bridges use a few
-	** beyond that for window registers.
-	*/
-        for (idx=0; idx<DEVICE_COUNT_RESOURCE; idx++) {
+	for (idx = 0; idx < DEVICE_COUNT_RESOURCE; idx++) {
 		struct resource *r = &dev->resource[idx];
 
 		/* only setup requested resources */
@@ -382,14 +320,6 @@ pcibios_enable_device(struct pci_dev *dev, int mask)
 			cmd |= PCI_COMMAND_MEMORY;
 	}
 
-	/*
-	** Enable System error and Parity Error reporting by default.
-	** Devices that do NOT want those behaviors should clear them
-	** (eg PCI graphics, possibly networking).
-	** Interfaces like SCSI certainly should not. We want the
-	** system to crash if a system or parity error is detected.
-	** At least until the device driver can recover from such an error.
-	*/
 	cmd |= (PCI_COMMAND_SERR | PCI_COMMAND_PARITY);
 
 #if 0
@@ -402,30 +332,15 @@ pcibios_enable_device(struct pci_dev *dev, int mask)
 	return 0;
 }
 
-void __init
-pcibios_setup_host_bridge(struct pci_bus *bus)
-{
-	ASSERT(pci_bios != NULL);
 
-#if 0
-	if (pci_bios)
-	{
-		if (pci_bios->setup_host_bridge) {
-			(*pci_bios->setup_host_bridge)(bus);
-		}
-	}
-#endif
-}
-
-
-/*
-** PARISC specific (unfortunately)
-*/
+/* PA-RISC specific */
 void pcibios_register_hba(struct pci_hba_data *hba)
 {
-	ASSERT(pci_hba_count < PCI_HBA_MAX);
+	if (pci_hba_count >= PCI_HBA_MAX) {
+		printk(KERN_ERR "PCI: Too many Host Bus Adapters\n");
+		return;
+	}
 
-	/* pci_port->in/out() uses parisc_pci_hba to lookup parameter. */
 	parisc_pci_hba[pci_hba_count] = hba;
 	hba->hba_num = pci_hba_count++;
 }

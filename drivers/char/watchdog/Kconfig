@@ -46,11 +46,8 @@ config SOFT_WATCHDOG
 	  from some situations that the hardware watchdog will recover
 	  from. Equally it's a lot cheaper to install.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called
-	  softdog.
+	  To compile this driver as a module, choose M here: the
+	  module will be called softdog.
 
 config WDT
 	tristate "WDT Watchdog timer"
@@ -63,10 +60,8 @@ config WDT
 	  documentation of your boot loader (lilo or loadlin) about how to
 	  pass options to the kernel at boot time).
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called wdt.
+	  To compile this driver as a module, choose M here: the
+	  module will be called wdt.
 
 config WDT_501
 	bool "WDT501 features"
@@ -97,10 +92,8 @@ config WDTPCI
 	  boot loader (lilo or loadlin) about how to pass options to the
 	  kernel at boot time).
 
-	  If you want to compile this as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
-	  will be called wdt_pci.
+	  To compile this driver as a module, choose M here: the
+	  module will be called wdt_pci.
 
 config WDT_501_PCI
 	bool "WDT501-PCI features"
@@ -124,10 +117,8 @@ config PCWATCHDOG
 	  hardware. Please read <file:Documentation/pcwd-watchdog.txt>. The PC
 	  watchdog cards can be ordered from <http://www.berkprod.com/>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called pcwd. If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called pcwd.
 
 	  Most people will say N.
 
@@ -139,13 +130,12 @@ config ACQUIRE_WDT
 	  Board Computer produced by Acquire Inc (and others).  This watchdog
 	  simply watches your kernel to make sure it doesn't freeze, and if
 	  it does, it reboots your computer after a certain amount of time.
-
 	  This driver is like the WDT501 driver but for different hardware.
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called acquirewdt.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.  Most
-	  people will say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called acquirewdt.
+
+	  Most people will say N.
 
 config ADVANTECH_WDT
 	tristate "Advantech SBC Watchdog Timer"
@@ -187,10 +177,8 @@ config SA1100_WATCHDOG
 	  system when timeout is reached.
 	  NOTE, that once enabled, this timer cannot be disabled.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called sa1100_wdt.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sa1100_wdt.
 
 config EUROTECH_WDT
 	tristate "Eurotech CPU-1220/1410 Watchdog Timer"
@@ -211,11 +199,10 @@ config IB700_WDT
 
 	  This driver is like the WDT501 driver but for slightly different hardware.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called ib700wdt. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>. Most people
-	  will say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called ib700wdt.
+
+	  Most people will say N.
 
 config I810_TCO
 	tristate "Intel i8xx TCO timer / Watchdog"
@@ -234,9 +221,8 @@ config I810_TCO
 	  machine. If this is the case you will get a kernel message like
 	  "i810tco init: failed to reset NO_REBOOT flag".
 
-	  If you want to compile this as a module, say M and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  i810-tco.
+	  To compile this driver as a module, choose M here: the
+	  module will be called i810-tco.
 
 config MIXCOMWD
 	tristate "Mixcom Watchdog"
@@ -247,11 +233,10 @@ config MIXCOMWD
 	  and if it does, it reboots your computer after a certain amount of
 	  time.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called mixcomwd.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.  Most
-	  people will say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called mixcomwd.
+
+	  Most people will say N.
 
 config SCx200_WDT
 	tristate "NatSemi SCx200 Watchdog"
@@ -286,11 +271,10 @@ config W83877F_WDT
 	  and if it does, it reboots your computer after a certain amount of
 	  time.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called w83877f_wdt.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.  Most
-	  people will say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called w83877f_wdt.
+
+	  Most people will say N.
 
 config MACHZ_WDT
 	tristate "ZF MachZ Watchdog"
@@ -302,10 +286,8 @@ config MACHZ_WDT
 	  your kernel to make sure it doesn't freeze, and if it does, it
 	  reboots your computer after a certain amount of time.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called machzwd.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called machzwd.
 
 config SC520_WDT
 	tristate "AMD Elan SC520 processor Watchdog"
@@ -340,11 +322,10 @@ config ALIM7101_WDT
 	  This is the driver for the hardware watchdog on the ALi M7101 PMU
 	  as used in the x86 Cobalt servers.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called alim7101_wdt.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.  Most
-	  people will say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called alim7101_wdt.
+
+	  Most people will say N.
 
 config ALIM1535_WDT
 	tristate "ALi M1535 PMU Watchdog Timer"
@@ -352,11 +333,10 @@ config ALIM1535_WDT
 	---help---
 	  This is the driver for the hardware watchdog on the ALi M1535 PMU.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called alim1535_wdt.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.  Most
-	  people will say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called alim1535_wdt.
+
+	  Most people will say N.
 
 config SC1200_WDT
 	tristate "National Semiconductor PC87307/PC97307 (ala SC1200) Watchdog"
@@ -367,11 +347,10 @@ config SC1200_WDT
 	  for power management purposes and can be used to power down the device
 	  during inactivity periods (includes interrupt activity monitoring).
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called sc1200wdt.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.  Most
-	  people will say N.
+	  To compile this driver as a module, choose M here: the
+	  module will be called sc1200wdt.
+
+	  Most people will say N.
 
 config WAFER_WDT
 	tristate "ICP Wafer 5823 Single Board Computer Watchdog"
@@ -380,20 +359,15 @@ config WAFER_WDT
 	  This is a driver for the hardware watchdog on the ICP Wafer 5823
 	  Single Board Computer (and probably other similar models).
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  If you want to compile it as a module, say M here and read
-	  <file:Documentation/modules.txt>. The module will be called
-	  wafer5823wdt.
+	  To compile this driver as a module, choose M here: the
+	  module will be called wafer5823wdt.
 
 config CPU5_WDT
 	tristate "SMA CPU5 Watchdog"
 	depends on WATCHDOG
 	---help---
 	  TBD.
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called cpu5wdt.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called cpu5wdt.
 
 endmenu

@@ -17,8 +17,6 @@
 #include <linux/pci.h>
 
 #include <asm/sn/sgi.h>
-#include <linux/devfs_fs.h>
-#include <linux/devfs_fs_kernel.h>
 #include <asm/io.h>
 #include <asm/sn/iograph.h>
 #include <asm/sn/invent.h>
@@ -354,7 +352,7 @@ struct file_operations ioconfig_bus_fops = {
 
 /*
  * init_ifconfig_bus() - Boot time initialization.  Ensure that it is called 
- *	after devfs has been initialized.
+ *	after hwgfs has been initialized.
  *
  */
 int init_ioconfig_bus(void)

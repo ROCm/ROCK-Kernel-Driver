@@ -1068,7 +1068,6 @@ int irlan_extract_param(__u8 *buf, char *name, char *value, __u16 *len)
 }
 
 #ifdef CONFIG_PROC_FS
-#define IRLAN_PROC_START_TOKEN	((void *)1)
 
 /*
  * Start of reading /proc entries.
@@ -1083,7 +1082,7 @@ static void *irlan_seq_start(struct seq_file *seq, loff_t *pos)
 
 	rcu_read_lock();
 	if (*pos == 0)
-		return IRLAN_PROC_START_TOKEN;
+		return SEQ_START_TOKEN;
 
 	list_for_each_entry(self, &irlans, dev_list) {
 		if (*pos == i) 
@@ -1099,7 +1098,7 @@ static void *irlan_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct list_head *nxt;
 
 	++*pos;
-	if (v == IRLAN_PROC_START_TOKEN) 
+	if (v == SEQ_START_TOKEN) 
 		nxt = irlans.next;
 	else
 		nxt = ((struct irlan_cb *)v)->dev_list.next;
@@ -1120,7 +1119,7 @@ static void irlan_seq_stop(struct seq_file *seq, void *v)
  */
 static int irlan_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == IRLAN_PROC_START_TOKEN)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, "IrLAN instances:\n");
 	else {
 		struct irlan_cb *self = v;

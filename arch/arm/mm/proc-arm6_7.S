@@ -14,6 +14,7 @@
 #include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
+#include <asm/pgtable.h>
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
 
@@ -214,19 +215,19 @@ ENTRY(cpu_arm6_set_pte)
 ENTRY(cpu_arm7_set_pte)
 		str	r1, [r0], #-2048		@ linux version
 
-		eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
+		eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
-		bic	r2, r1, #0xff0
-		bic	r2, r2, #3
-		orr	r2, r2, #HPTE_TYPE_SMALL
+		bic	r2, r1, #PTE_SMALL_AP_MASK
+		bic	r2, r2, #PTE_TYPE_MASK
+		orr	r2, r2, #PTE_TYPE_SMALL
 
-		tst	r1, #LPTE_USER | LPTE_EXEC	@ User or Exec?
-		orrne	r2, r2, #HPTE_AP_READ
+		tst	r1, #L_PTE_USER			@ User?
+		orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
 
-		tst	r1, #LPTE_WRITE | LPTE_DIRTY	@ Write and Dirty?
-		orreq	r2, r2, #HPTE_AP_WRITE
+		tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
+		orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
 
-		tst	r1, #LPTE_PRESENT | LPTE_YOUNG	@ Present and Young
+		tst	r1, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young
 		movne	r2, #0
 
 		str	r2, [r0]			@ hardware version
@@ -246,16 +247,9 @@ ENTRY(cpu_arm7_reset)
 		mcr	p15, 0, r1, c1, c0, 0		@ turn off MMU etc
 		mov	pc, r0
 
-cpu_arm6_name:	.asciz	"ARM6"
-cpu_arm610_name:
-		.asciz	"ARM610"
-cpu_arm7_name:	.asciz	"ARM7"
-cpu_arm710_name:
-		.asciz	"ARM710"
-		.align
-
 		__INIT
 
+		.type	__arm6_setup, #function
 __arm6_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c0		@ flush caches on v3
 		mcr	p15, 0, r0, c5, c0		@ flush TLBs on v3
@@ -265,7 +259,9 @@ __arm6_setup:	mov	r0, #0
 		mov	r0, #0x3d			@ . ..RS BLDP WCAM
 		orr	r0, r0, #0x100			@ . ..01 0011 1101
 		mov	pc, lr
+		.size	__arm6_setup, . - __arm6_setup
 
+		.type	__arm7_setup, #function
 __arm7_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c0		@ flush caches on v3
 		mcr	p15, 0, r0, c5, c0		@ flush TLBs on v3
@@ -275,6 +271,9 @@ __arm7_setup:	mov	r0, #0
 		mov	r0, #0x7d			@ . ..RS BLDP WCAM
 		orr	r0, r0, #0x100			@ . ..01 0111 1101
 		mov	pc, lr
+		.size	__arm7_setup, . - __arm7_setup
+
+		__INITDATA
 
 /*
  * Purpose : Function pointers used to access above functions - all calls
@@ -308,6 +307,8 @@ ENTRY(arm7_processor_functions)
 		.word	cpu_arm7_set_pte
 		.size	arm7_processor_functions, . - arm7_processor_functions
 
+		.section ".rodata"
+
 		.type	cpu_arch_name, #object
 cpu_arch_name:	.asciz	"armv3"
 		.size	cpu_arch_name, . - cpu_arch_name
@@ -315,6 +316,25 @@ cpu_arch_name:	.asciz	"armv3"
 		.type	cpu_elf_name, #object
 cpu_elf_name:	.asciz	"v3"
 		.size	cpu_elf_name, . - cpu_elf_name
+
+		.type	cpu_arm6_name, #object
+cpu_arm6_name:	.asciz	"ARM6"
+		.size	cpu_arm6_name, . - cpu_arm6_name
+
+		.type	cpu_arm610_name, #object
+cpu_arm610_name:
+		.asciz	"ARM610"
+		.size	cpu_arm610_name, . - cpu_arm610_name
+
+		.type	cpu_arm7_name, #object
+cpu_arm7_name:	.asciz	"ARM7"
+		.size	cpu_arm7_name, . - cpu_arm7_name
+
+		.type	cpu_arm710_name, #object
+cpu_arm710_name:
+		.asciz	"ARM710"
+		.size	cpu_arm710_name, . - cpu_arm710_name
+
 		.align
 
 		.section ".proc.info", #alloc, #execinstr

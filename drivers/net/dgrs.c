@@ -84,6 +84,7 @@
  */
 
 #include <linux/module.h>
+#include <linux/eisa.h>
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/delay.h>
@@ -120,7 +121,7 @@ typedef unsigned int bool;
 #include "dgrs_asstruct.h"
 #include "dgrs_bcomm.h"
 
-static struct pci_device_id dgrs_pci_tbl[] __initdata = {
+static struct pci_device_id dgrs_pci_tbl[] = {
 	{ SE6_PCI_VENDOR_ID, SE6_PCI_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, },
 	{ }			/* Terminating entry */
 };

@@ -1,10 +1,8 @@
 /*
- *  drivers/cpufreq/userspace.c
+ *  linux/drivers/cpufreq/cpufreq_userspace.c
  *
  *  Copyright (C)  2001 Russell King
  *            (C)  2002 - 2003 Dominik Brodowski <linux@brodo.de>
- *
- * $Id:$
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -12,6 +10,7 @@
  *
  */
 
+#include <linux/config.h>
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/smp.h>

@@ -5,6 +5,25 @@
 
 #ifdef __GNUC__
 
+static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
+{
+	__asm__("dep %0, 15, 8, %0\n\t"		/* deposit 00ab -> 0bab */
+		"shd %%r0, %0, 8, %0"		/* shift 000000ab -> 00ba */
+		: "=r" (x)
+		: "0" (x));
+	return x;
+}
+
+static __inline__ __const__ __u32 ___arch__swab24(__u32 x)
+{
+	__asm__("shd %0, %0, 8, %0\n\t"		/* shift xabcxabc -> cxab */
+		"dep %0, 15, 8, %0\n\t"		/* deposit cxab -> cbab */
+		"shd %%r0, %0, 8, %0"		/* shift 0000cbab -> 0cba */
+		: "=r" (x)
+		: "0" (x));
+	return x;
+}
+
 static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
 {
 	unsigned int temp;
@@ -39,34 +58,21 @@ static __inline__ __const__ __u64 ___arch__swab64(__u64 x) {
 	return x;
 }
 #define __arch__swab64(x) ___arch__swab64(x)
-#else
+#define __BYTEORDER_HAS_U64__
+#elif !defined(__STRICT_ANSI__)
 static __inline__ __const__ __u64 ___arch__swab64(__u64 x)
 {
-	__u32 t1 = (__u32) x;
-	__u32 t2 = (__u32) ((x) >> 32);
-	___arch__swab32(t1);
-	___arch__swab32(t2);
-	return (((__u64) t1 << 32) + ((__u64) t2));
+	__u32 t1 = ___arch__swab32((__u32) x);
+	__u32 t2 = ___arch__swab32((__u32) (x >> 32));
+	return (((__u64) t1 << 32) | t2);
 }
+#define __arch__swab64(x) ___arch__swab64(x)
+#define __BYTEORDER_HAS_U64__
 #endif
 
-
-static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
-{
-	__asm__("dep %0, 15, 8, %0\n\t"		/* deposit 00ab -> 0bab */
-		"shd %r0, %0, 8, %0"		/* shift 000000ab -> 00ba */
-		: "=r" (x)
-		: "0" (x));
-	return x;
-}
-
-#define __arch__swab32(x) ___arch__swab32(x)
 #define __arch__swab16(x) ___arch__swab16(x)
-
-#if !defined(__STRICT_ANSI__) || defined(__KERNEL__)
-#  define __BYTEORDER_HAS_U64__
-#  define __SWAB_64_THRU_32__
-#endif
+#define __arch__swab24(x) ___arch__swab24(x)
+#define __arch__swab32(x) ___arch__swab32(x)
 
 #endif /* __GNUC__ */
 

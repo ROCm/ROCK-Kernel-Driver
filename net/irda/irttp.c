@@ -27,6 +27,7 @@
 #include <linux/config.h>
 #include <linux/skbuff.h>
 #include <linux/init.h>
+#include <linux/seq_file.h>
 
 #include <asm/byteorder.h>
 #include <asm/unaligned.h>
@@ -1767,71 +1768,127 @@ void irttp_run_rx_queue(struct tsap_cb *self)
 }
 
 #ifdef CONFIG_PROC_FS
-/*
- * Function irttp_proc_read (buf, start, offset, len, unused)
- *
- *    Give some info to the /proc file system
- */
-int irttp_proc_read(char *buf, char **start, off_t offset, int len)
-{
-	struct tsap_cb *self;
+struct irttp_iter_state {
+	int id;
 	unsigned long flags;
-	int i = 0;
+};
 
-	ASSERT(irttp != NULL, return 0;);
-
-	len = 0;
+static void *irttp_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct irttp_iter_state *iter = seq->private;
+	struct tsap_cb *self;
 
 	/* Protect our access to the tsap list */
-	spin_lock_irqsave(&irttp->tsaps->hb_spinlock, flags);
+	spin_lock_irqsave(&irttp->tsaps->hb_spinlock, iter->flags);
+	iter->id = 0;
 
-	self = (struct tsap_cb *) hashbin_get_first(irttp->tsaps);
-	while (self != NULL) {
-		if (!self || self->magic != TTP_TSAP_MAGIC)
+	for (self = (struct tsap_cb *) hashbin_get_first(irttp->tsaps); 
+	     self != NULL;
+	     self = (struct tsap_cb *) hashbin_get_next(irttp->tsaps)) {
+		if (iter->id == *pos)
 			break;
-
-		len += sprintf(buf+len, "TSAP %d, ", i++);
-		len += sprintf(buf+len, "stsap_sel: %02x, ",
-			       self->stsap_sel);
-		len += sprintf(buf+len, "dtsap_sel: %02x\n",
-			       self->dtsap_sel);
-		len += sprintf(buf+len, "  connected: %s, ",
-			       self->connected? "TRUE":"FALSE");
-		len += sprintf(buf+len, "avail credit: %d, ",
-			       self->avail_credit);
-		len += sprintf(buf+len, "remote credit: %d, ",
-			       self->remote_credit);
-		len += sprintf(buf+len, "send credit: %d\n",
-			       self->send_credit);
-		len += sprintf(buf+len, "  tx packets: %ld, ",
-			       self->stats.tx_packets);
-		len += sprintf(buf+len, "rx packets: %ld, ",
-			       self->stats.rx_packets);
-		len += sprintf(buf+len, "tx_queue len: %d ",
-			       skb_queue_len(&self->tx_queue));
-		len += sprintf(buf+len, "rx_queue len: %d\n",
-			       skb_queue_len(&self->rx_queue));
-		len += sprintf(buf+len, "  tx_sdu_busy: %s, ",
-			       self->tx_sdu_busy? "TRUE":"FALSE");
-		len += sprintf(buf+len, "rx_sdu_busy: %s\n",
-			       self->rx_sdu_busy? "TRUE":"FALSE");
-		len += sprintf(buf+len, "  max_seg_size: %d, ",
-			       self->max_seg_size);
-		len += sprintf(buf+len, "tx_max_sdu_size: %d, ",
-			       self->tx_max_sdu_size);
-		len += sprintf(buf+len, "rx_max_sdu_size: %d\n",
-			       self->rx_max_sdu_size);
-
-		len += sprintf(buf+len, "  Used by (%s)\n",
-				self->notify.name);
-
-		len += sprintf(buf+len, "\n");
-
-		self = (struct tsap_cb *) hashbin_get_next(irttp->tsaps);
+		++iter->id;
 	}
-	spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, flags);
-
-	return len;
+		
+	return self;
 }
+
+static void *irttp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct irttp_iter_state *iter = seq->private;
+
+	++*pos;
+	++iter->id;
+	return (void *) hashbin_get_next(irttp->tsaps);
+}
+
+static void irttp_seq_stop(struct seq_file *seq, void *v)
+{
+	struct irttp_iter_state *iter = seq->private;
+	spin_unlock_irqrestore(&irttp->tsaps->hb_spinlock, iter->flags);
+}
+
+static int irttp_seq_show(struct seq_file *seq, void *v)
+{
+	const struct irttp_iter_state *iter = seq->private;
+	const struct tsap_cb *self = v;
+
+	seq_printf(seq, "TSAP %d, ", iter->id);
+	seq_printf(seq, "stsap_sel: %02x, ",
+		   self->stsap_sel);
+	seq_printf(seq, "dtsap_sel: %02x\n",
+		   self->dtsap_sel);
+	seq_printf(seq, "  connected: %s, ",
+		   self->connected? "TRUE":"FALSE");
+	seq_printf(seq, "avail credit: %d, ",
+		   self->avail_credit);
+	seq_printf(seq, "remote credit: %d, ",
+		   self->remote_credit);
+	seq_printf(seq, "send credit: %d\n",
+		   self->send_credit);
+	seq_printf(seq, "  tx packets: %ld, ",
+		   self->stats.tx_packets);
+	seq_printf(seq, "rx packets: %ld, ",
+		   self->stats.rx_packets);
+	seq_printf(seq, "tx_queue len: %d ",
+		   skb_queue_len(&self->tx_queue));
+	seq_printf(seq, "rx_queue len: %d\n",
+		   skb_queue_len(&self->rx_queue));
+	seq_printf(seq, "  tx_sdu_busy: %s, ",
+		   self->tx_sdu_busy? "TRUE":"FALSE");
+	seq_printf(seq, "rx_sdu_busy: %s\n",
+		   self->rx_sdu_busy? "TRUE":"FALSE");
+	seq_printf(seq, "  max_seg_size: %d, ",
+		   self->max_seg_size);
+	seq_printf(seq, "tx_max_sdu_size: %d, ",
+		   self->tx_max_sdu_size);
+	seq_printf(seq, "rx_max_sdu_size: %d\n",
+		   self->rx_max_sdu_size);
+
+	seq_printf(seq, "  Used by (%s)\n\n",
+		   self->notify.name);
+	return 0;
+}
+
+static struct seq_operations irttp_seq_ops = {
+	.start  = irttp_seq_start,
+	.next   = irttp_seq_next,
+	.stop   = irttp_seq_stop,
+	.show   = irttp_seq_show,
+};
+
+static int irttp_seq_open(struct inode *inode, struct file *file)
+{
+	struct seq_file *seq;
+	int rc = -ENOMEM;
+	struct irttp_iter_state *s;
+       
+	ASSERT(irttp != NULL, return -EINVAL;);
+
+	s = kmalloc(sizeof(*s), GFP_KERNEL);
+	if (!s)
+		goto out;
+
+	rc = seq_open(file, &irttp_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq	     = file->private_data;
+	seq->private = s;
+	memset(s, 0, sizeof(*s));
+out:
+	return rc;
+out_kfree:
+	kfree(s);
+	goto out;
+}
+
+struct file_operations irttp_seq_fops = {
+	.owner		= THIS_MODULE,
+	.open           = irttp_seq_open,
+	.read           = seq_read,
+	.llseek         = seq_lseek,
+	.release	= seq_release_private,
+};
 
 #endif /* PROC_FS */

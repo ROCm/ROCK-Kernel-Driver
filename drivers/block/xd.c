@@ -45,7 +45,6 @@
 #include <linux/ioport.h>
 #include <linux/init.h>
 #include <linux/wait.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/blkdev.h>
 #include <linux/blkpg.h>
 
@@ -182,7 +181,6 @@ static int __init xd_init(void)
 	if (!xd_queue)
 		goto out1a;
 
-	devfs_mk_dir("xd");
 	if (xd_detect(&controller,&address)) {
 
 		printk("Detected a%s controller (type %d) at address %06x\n",
@@ -213,6 +211,7 @@ static int __init xd_init(void)
 		disk->major = XT_DISK_MAJOR;
 		disk->first_minor = i<<6;
 		sprintf(disk->disk_name, "xd%c", i+'a');
+		sprintf(disk->devfs_name, "xd/target%d", i);
 		disk->fops = &xd_fops;
 		disk->private_data = p;
 		disk->queue = xd_queue;
@@ -249,7 +248,6 @@ out4:
 out3:
 	release_region(xd_iobase,4);
 out2:
-	devfs_remove("xd");
 	blk_cleanup_queue(xd_queue);
 out1a:
 	unregister_blkdev(XT_DISK_MAJOR, "xd");
@@ -1064,7 +1062,6 @@ void cleanup_module(void)
 	}
 	blk_cleanup_queue(xd_queue);
 	release_region(xd_iobase,4);
-	devfs_remove("xd");
 	if (xd_drives) {
 		free_irq(xd_irq, NULL);
 		free_dma(xd_dma);

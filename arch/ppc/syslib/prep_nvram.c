@@ -17,7 +17,6 @@
 #include <asm/sections.h>
 #include <asm/segment.h>
 #include <asm/io.h>
-#include <asm/processor.h>
 #include <asm/machdep.h>
 #include <asm/prep_nvram.h>
 
@@ -30,7 +29,7 @@ unsigned char __prep prep_nvram_read_val(int addr)
 	outb(addr>>8, PREP_NVRAM_AS1);
 	return inb(PREP_NVRAM_DATA);
 }
-  
+
 void __prep prep_nvram_write_val(int           addr,
 			  unsigned char val)
 {
@@ -38,7 +37,7 @@ void __prep prep_nvram_write_val(int           addr,
 	outb(addr>>8, PREP_NVRAM_AS1);
    	outb(val, PREP_NVRAM_DATA);
 }
-  
+
 void __init init_prep_nvram(void)
 {
 	unsigned char *nvp;
@@ -56,7 +55,7 @@ void __init init_prep_nvram(void)
 		*nvp = ppc_md.nvram_read_val(i);
 		nvp++;
 	}
-	
+
 	/*
 	 * The PReP NvRAM may be any size so read in the header to
 	 * determine how much we must read in order to get the complete
@@ -140,6 +139,3 @@ char __prep *prep_nvram_next_var(char *name)
 		return NULL;
 	}
 }
-
-
-

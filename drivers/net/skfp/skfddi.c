@@ -182,7 +182,7 @@ extern void mac_clear_multicast(struct s_smc *smc);
 extern void enable_tx_irq(struct s_smc *smc, u_short queue);
 extern void mac_drv_clear_txd(struct s_smc *smc);
 
-static struct pci_device_id skfddi_pci_tbl[] __initdata = {
+static struct pci_device_id skfddi_pci_tbl[] = {
 	{ PCI_VENDOR_ID_SK, PCI_DEVICE_ID_SK_FP, PCI_ANY_ID, PCI_ANY_ID, },
 	{ }			/* Terminating entry */
 };

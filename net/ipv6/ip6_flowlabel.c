@@ -603,14 +603,14 @@ static struct ip6_flowlabel *ip6fl_get_idx(struct seq_file *seq, loff_t pos)
 static void *ip6fl_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock_bh(&ip6_fl_lock);
-	return *pos ? ip6fl_get_idx(seq, *pos) : (void *)1;
+	return *pos ? ip6fl_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *ip6fl_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct ip6_flowlabel *fl;
 
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		fl = ip6fl_get_first(seq);
 	else
 		fl = ip6fl_get_next(seq, v);
@@ -644,7 +644,7 @@ static void ip6fl_fl_seq_show(struct seq_file *seq, struct ip6_flowlabel *fl)
 
 static int ip6fl_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq, "Label S Owner  Users  Linger Expires  "
 				"Dst                              Opt\n");
 	else
@@ -695,12 +695,7 @@ static struct file_operations ip6fl_seq_fops = {
 void ip6_flowlabel_init()
 {
 #ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *p;
-#endif
-#ifdef CONFIG_PROC_FS
-	p = create_proc_entry("ip6_flowlabel", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &ip6fl_seq_fops;
+	proc_net_fops_create("ip6_flowlabel", S_IRUGO, &ip6fl_seq_fops);
 #endif
 }
 

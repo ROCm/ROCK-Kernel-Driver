@@ -13,7 +13,7 @@
 #include <linux/mc146818rtc.h>
 #include <linux/threads.h>
 
-#include <asm/processor.h>
+#include <asm/reg.h>
 
 /* time.c */
 extern unsigned tb_ticks_per_jiffy;
@@ -97,6 +97,13 @@ extern __inline__ unsigned long get_rtcl(void) {
 	return rtcl;
 }
 
+extern __inline__ unsigned long get_rtcu(void)
+{
+	unsigned long rtcu;
+	asm volatile("mfrtcu %0" : "=r" (rtcu));
+	return rtcu;
+}
+
 extern __inline__ unsigned get_native_tbl(void) {
 	if (__USE_RTC())
 		return get_rtcl();
@@ -140,6 +147,7 @@ extern __inline__ unsigned binary_tbl(void) {
 #endif
 
 /* Use mulhwu to scale processor timebase to timeval */
+/* Specifically, this computes (x * y) / 2^32.  -- paulus */
 #define mulhwu(x,y) \
 ({unsigned z; asm ("mulhwu %0,%1,%2" : "=r" (z) : "r" (x), "r" (y)); z;})
 

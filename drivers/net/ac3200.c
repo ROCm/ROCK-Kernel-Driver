@@ -25,6 +25,7 @@ static const char version[] =
 	"ac3200.c:v1.01 7/1/94 Donald Becker (becker@cesdis.gsfc.nasa.gov)\n";
 
 #include <linux/module.h>
+#include <linux/eisa.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>
@@ -395,13 +396,3 @@ cleanup_module(void)
 	}
 }
 #endif /* MODULE */
-
-
-/*
- * Local variables:
- * compile-command: "gcc -D__KERNEL__ -I/usr/src/linux/net/inet -Wall -Wstrict-prototypes -O6 -m486 -c ac3200.c"
- *  version-control: t
- *  kept-new-versions: 5
- *  tab-width: 4
- * End:
- */

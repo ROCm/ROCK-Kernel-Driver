@@ -67,7 +67,8 @@ ccw_device_path_notoper(struct ccw_device *cdev)
 		      sch->schib.pmcw.pnom);
 
 	sch->lpm &= ~sch->schib.pmcw.pnom;
-	dev_fsm_event(cdev, DEV_EVENT_VERIFY);
+	if (cdev->private->options.pgroup)
+		cdev->private->flags.doverify = 1;
 }
 
 /*
@@ -93,6 +94,21 @@ ccw_device_accumulate_ecw(struct ccw_device *cdev, struct irb *irb)
 }
 
 /*
+ * Check if extended status word is valid.
+ */
+static inline int
+ccw_device_accumulate_esw_valid(struct irb *irb)
+{
+	if (irb->scsw.eswf && irb->scsw.stctl == SCSW_STCTL_STATUS_PEND)
+		return 0;
+	if (irb->scsw.stctl == 
+	    		(SCSW_STCTL_INTER_STATUS|SCSW_STCTL_STATUS_PEND) &&
+	    !(irb->scsw.actl & SCSW_ACTL_SUSPENDED))
+		return 0;
+	return 1;
+}
+
+/*
  * Copy valid bits from the extended status word to device irb.
  */
 static inline void
@@ -101,12 +117,7 @@ ccw_device_accumulate_esw(struct ccw_device *cdev, struct irb *irb)
 	struct irb *cdev_irb;
 	struct sublog *cdev_sublog, *sublog;
 
-	/* Check if extended status word is valid. */
-	if (irb->scsw.eswf && irb->scsw.stctl == SCSW_STCTL_STATUS_PEND)
-		return;
-	if (irb->scsw.stctl == 
-	    		(SCSW_STCTL_INTER_STATUS|SCSW_STCTL_STATUS_PEND) &&
-	    !(irb->scsw.actl & SCSW_ACTL_SUSPENDED))
+	if (!ccw_device_accumulate_esw_valid(irb))
 		return;
 
 	cdev_irb = &cdev->private->irb;
@@ -169,6 +180,8 @@ ccw_device_accumulate_esw(struct ccw_device *cdev, struct irb *irb)
 	cdev_irb->esw.esw0.erw.auth = irb->esw.esw0.erw.auth;
 	/* Copy path verification required flag. */
 	cdev_irb->esw.esw0.erw.pvrf = irb->esw.esw0.erw.pvrf;
+	if (irb->esw.esw0.erw.pvrf && cdev->private->options.pgroup)
+		cdev->private->flags.doverify = 1;
 	/* Copy concurrent sense bit. */
 	cdev_irb->esw.esw0.erw.cons = irb->esw.esw0.erw.cons;
 	if (irb->esw.esw0.erw.cons)
@@ -339,6 +352,10 @@ ccw_device_accumulate_basic_sense(struct ccw_device *cdev, struct irb *irb)
 		cdev->private->irb.esw.esw0.erw.cons = 1;
 		cdev->private->flags.dosense = 0;
 	}
+	/* Check if path verification is required. */
+	if (ccw_device_accumulate_esw_valid(irb) &&
+	    irb->esw.esw0.erw.pvrf && cdev->private->options.pgroup) 
+		cdev->private->flags.doverify = 1;
 }
 
 /*

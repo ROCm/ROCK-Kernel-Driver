@@ -21,8 +21,6 @@ LDFLAGS_vmlinux :=
 
 CFLAGS += -pipe
 
-check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi)
-
 # prevent gcc from keeping the stack 16 byte aligned
 CFLAGS += $(call check_gcc,-mpreferred-stack-boundary=2,)
 
@@ -102,6 +100,7 @@ drivers-$(CONFIG_MATH_EMULATION)	+= arch/i386/math-emu/
 drivers-$(CONFIG_PCI)			+= arch/i386/pci/
 # must be linked after kernel/
 drivers-$(CONFIG_OPROFILE)		+= arch/i386/oprofile/
+drivers-$(CONFIG_PM)			+= arch/i386/power/
 
 CFLAGS += $(mflags-y)
 AFLAGS += $(mflags-y)

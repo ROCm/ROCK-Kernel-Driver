@@ -14,6 +14,12 @@
 
 #define SELINUX_MAGIC 0xf97cff8c
 
+#ifdef CONFIG_SECURITY_SELINUX_BOOTPARAM
+extern int selinux_enabled;
+#else
+#define selinux_enabled 1
+#endif
+
 int security_load_policy(void * data, size_t len);
 
 struct av_decision {

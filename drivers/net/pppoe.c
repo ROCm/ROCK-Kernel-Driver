@@ -468,13 +468,13 @@ out:
 static struct packet_type pppoes_ptype = {
 	.type	= __constant_htons(ETH_P_PPP_SES),
 	.func	= pppoe_rcv,
-	.data   = (void *)1,
+	.data   = PKT_CAN_SHARE_SKB,
 };
 
 static struct packet_type pppoed_ptype = {
 	.type	= __constant_htons(ETH_P_PPP_DISC),
 	.func	= pppoe_disc_rcv,
-	.data   = (void *)1,
+	.data   = PKT_CAN_SHARE_SKB,
 };
 
 /***********************************************************************
@@ -986,7 +986,7 @@ static int pppoe_seq_show(struct seq_file *seq, void *v)
 	struct pppox_opt *po;
 	char *dev_name;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Id       Address              Device\n");
 		goto out;
 	}
@@ -1025,7 +1025,7 @@ static void *pppoe_seq_start(struct seq_file *seq, loff_t *pos)
 	loff_t l = *pos;
 
 	read_lock_bh(&pppoe_hash_lock);
-	return l ? pppoe_get_idx(--l) : (void *)1;
+	return l ? pppoe_get_idx(--l) : SEQ_START_TOKEN;
 }
 
 static void *pppoe_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -1033,7 +1033,7 @@ static void *pppoe_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct pppox_opt *po;
 
 	++*pos;
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		po = pppoe_get_idx(0);
 		goto out;
 	}

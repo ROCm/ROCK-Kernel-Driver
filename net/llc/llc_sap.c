@@ -11,46 +11,53 @@
  *
  * See the GNU General Public License for more details.
  */
-#include <linux/skbuff.h>
+
+#include <net/llc.h>
+#include <net/llc_if.h>
 #include <net/llc_conn.h>
+#include <net/llc_pdu.h>
 #include <net/llc_sap.h>
-#include <net/llc_s_ev.h>
 #include <net/llc_s_ac.h>
+#include <net/llc_s_ev.h>
 #include <net/llc_s_st.h>
 #include <net/sock.h>
 #include <linux/tcp.h>
-#include <net/llc_main.h>
-#include <net/llc_pdu.h>
-#include <linux/if_tr.h>
+#include <linux/llc.h>
 
 /**
- *	llc_sap_assign_sock - adds a connection to a SAP
- *	@sap: pointer to SAP.
- *	@conn: pointer to connection.
+ *	llc_alloc_frame - allocates sk_buff for frame
  *
- *	This function adds a connection to connection_list of a SAP.
+ *	Allocates an sk_buff for frame and initializes sk_buff fields.
+ *	Returns allocated skb or %NULL when out of memory.
  */
-void llc_sap_assign_sock(struct llc_sap *sap, struct sock *sk)
+struct sk_buff *llc_alloc_frame(void)
 {
-	write_lock_bh(&sap->sk_list.lock);
-	llc_sk(sk)->sap = sap;
-	sk_add_node(sk, &sap->sk_list.list);
-	write_unlock_bh(&sap->sk_list.lock);
+	struct sk_buff *skb = alloc_skb(128, GFP_ATOMIC);
+
+	if (skb) {
+		skb_reserve(skb, 50);
+		skb->nh.raw   = skb->h.raw = skb->data;
+		skb->protocol = htons(ETH_P_802_2);
+		skb->dev      = dev_base->next;
+		skb->mac.raw  = skb->head;
+	}
+	return skb;
 }
 
-/**
- *	llc_sap_unassign_sock - removes a connection from SAP
- *	@sap: SAP
- *	@sk: pointer to connection
- *
- *	This function removes a connection from sk_list.list of a SAP if
- *	the connection was in this list.
- */
-void llc_sap_unassign_sock(struct llc_sap *sap, struct sock *sk)
+void llc_save_primitive(struct sk_buff* skb, u8 prim)
 {
-	write_lock_bh(&sap->sk_list.lock);
-	sk_del_node_init(sk);
-	write_unlock_bh(&sap->sk_list.lock);
+	struct sockaddr_llc *addr = llc_ui_skb_cb(skb);
+
+       /* save primitive for use by the user. */
+	addr->sllc_family = skb->sk->sk_family;
+	addr->sllc_arphrd = skb->dev->type;
+	addr->sllc_test   = prim == LLC_TEST_PRIM;
+	addr->sllc_xid    = prim == LLC_XID_PRIM;
+	addr->sllc_ua     = prim == LLC_DATAUNIT_PRIM;
+	llc_pdu_decode_sa(skb, addr->sllc_smac);
+	llc_pdu_decode_da(skb, addr->sllc_dmac);
+	llc_pdu_decode_dsap(skb, &addr->sllc_dsap);
+	llc_pdu_decode_ssap(skb, &addr->sllc_ssap);
 }
 
 /**
@@ -192,4 +199,119 @@ void llc_sap_state_process(struct llc_sap *sap, struct sk_buff *skb)
 		}
 	} 
 	kfree_skb(skb);
+}
+
+/**
+ *	llc_build_and_send_test_pkt - TEST interface for upper layers.
+ *	@sap: sap to use
+ *	@skb: packet to send
+ *	@dmac: destination mac address
+ *	@dsap: destination sap
+ *
+ *	This function is called when upper layer wants to send a TEST pdu.
+ *	Returns 0 for success, 1 otherwise.
+ */
+void llc_build_and_send_test_pkt(struct llc_sap *sap, 
+				 struct sk_buff *skb, u8 *dmac, u8 dsap)
+{
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	ev->saddr.lsap = sap->laddr.lsap;
+	ev->daddr.lsap = dsap;
+	memcpy(ev->saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(ev->daddr.mac, dmac, IFHWADDRLEN);
+	
+	ev->type      = LLC_SAP_EV_TYPE_PRIM;
+	ev->prim      = LLC_TEST_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
+	llc_sap_state_process(sap, skb);
+}
+
+/**
+ *	llc_build_and_send_xid_pkt - XID interface for upper layers
+ *	@sap: sap to use
+ *	@skb: packet to send
+ *	@dmac: destination mac address
+ *	@dsap: destination sap
+ *
+ *	This function is called when upper layer wants to send a XID pdu.
+ *	Returns 0 for success, 1 otherwise.
+ */
+void llc_build_and_send_xid_pkt(struct llc_sap *sap, struct sk_buff *skb,
+				u8 *dmac, u8 dsap)
+{
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	ev->saddr.lsap = sap->laddr.lsap;
+	ev->daddr.lsap = dsap;
+	memcpy(ev->saddr.mac, skb->dev->dev_addr, IFHWADDRLEN);
+	memcpy(ev->daddr.mac, dmac, IFHWADDRLEN);
+
+	ev->type      = LLC_SAP_EV_TYPE_PRIM;
+	ev->prim      = LLC_XID_PRIM;
+	ev->prim_type = LLC_PRIM_TYPE_REQ;
+	llc_sap_state_process(sap, skb);
+}
+
+/**
+ *	llc_sap_rcv - sends received pdus to the sap state machine
+ *	@sap: current sap component structure.
+ *	@skb: received frame.
+ *
+ *	Sends received pdus to the sap state machine.
+ */
+static void llc_sap_rcv(struct llc_sap *sap, struct sk_buff *skb)
+{
+	struct llc_sap_state_ev *ev = llc_sap_ev(skb);
+
+	ev->type   = LLC_SAP_EV_TYPE_PDU;
+	ev->reason = 0;
+	llc_sap_state_process(sap, skb);
+}
+
+/**
+ *	llc_lookup_dgram - Finds dgram socket for the local sap/mac
+ *	@sap: SAP
+ *	@laddr: address of local LLC (MAC + SAP)
+ *
+ *	Search socket list of the SAP and finds connection using the local
+ *	mac, and local sap. Returns pointer for socket found, %NULL otherwise.
+ */
+struct sock *llc_lookup_dgram(struct llc_sap *sap, struct llc_addr *laddr)
+{
+	struct sock *rc;
+	struct hlist_node *node;
+
+	read_lock_bh(&sap->sk_list.lock);
+	sk_for_each(rc, node, &sap->sk_list.list) {
+		struct llc_opt *llc = llc_sk(rc);
+
+		if (rc->sk_type == SOCK_DGRAM &&
+		    llc->laddr.lsap == laddr->lsap &&
+		    llc_mac_match(llc->laddr.mac, laddr->mac)) {
+			sock_hold(rc);
+			goto found;
+		}
+	}
+	rc = NULL;
+found:
+	read_unlock_bh(&sap->sk_list.lock);
+	return rc;
+}
+
+void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb)
+{
+	struct llc_addr laddr;
+	struct sock *sk;
+
+	llc_pdu_decode_da(skb, laddr.mac);
+	llc_pdu_decode_dsap(skb, &laddr.lsap);
+
+	sk = llc_lookup_dgram(sap, &laddr);
+	if (sk) {
+		skb->sk = sk;
+		llc_sap_rcv(sap, skb);
+		sock_put(sk);
+	} else
+		kfree_skb(skb);
 }

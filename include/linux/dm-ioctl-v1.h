@@ -50,7 +50,7 @@ struct dm_ioctl {
 	uint32_t open_count;	/* out */
 	uint32_t flags;		/* in/out */
 
-	__kernel_dev_t dev;	/* in/out */
+	__kernel_old_dev_t dev;	/* in/out */
 
 	char name[DM_NAME_LEN];	/* device name */
 	char uuid[DM_UUID_LEN];	/* unique identifier for
@@ -87,7 +87,7 @@ struct dm_target_spec {
 struct dm_target_deps {
 	uint32_t count;
 
-	__kernel_dev_t dev[0];	/* out */
+	__kernel_old_dev_t dev[0];	/* out */
 };
 
 /*

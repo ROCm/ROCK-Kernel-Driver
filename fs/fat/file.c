@@ -11,8 +11,8 @@
 #include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
 
-static ssize_t fat_file_write(struct file *filp, const char *buf, size_t count,
-			      loff_t *ppos);
+static ssize_t fat_file_write(struct file *filp, const char __user *buf,
+			      size_t count, loff_t *ppos);
 
 struct file_operations fat_file_operations = {
 	.llseek		= generic_file_llseek,
@@ -66,8 +66,8 @@ int fat_get_block(struct inode *inode, sector_t iblock,
 	return 0;
 }
 
-static ssize_t fat_file_write(struct file *filp, const char *buf, size_t count,
-			      loff_t *ppos)
+static ssize_t fat_file_write(struct file *filp, const char __user *buf,
+			      size_t count, loff_t *ppos)
 {
 	struct inode *inode = filp->f_dentry->d_inode;
 	int retval;

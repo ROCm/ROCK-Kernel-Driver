@@ -946,13 +946,6 @@ static Scsi_Host_Template idescsi_template = {
 	.proc_name		= "ide-scsi",
 };
 
-static struct device     idescsi_primary = {
-	.bus_id		= "ide-scsi",
-};
-static struct bus_type   idescsi_emu_bus = {
-	.name		= "ide-scsi",
-};
-
 static int idescsi_attach(ide_drive_t *drive)
 {
 	idescsi_scsi_t *idescsi;
@@ -975,7 +968,7 @@ static int idescsi_attach(ide_drive_t *drive)
 	if (!err) {
 		idescsi_setup (drive, idescsi);
 		drive->disk->fops = &idescsi_ops;
-		err = scsi_add_host(host, &idescsi_primary);
+		err = scsi_add_host(host, &drive->gendev);
 		if (!err) {
 			scsi_scan_host(host);
 			return 0;
@@ -990,27 +983,11 @@ static int idescsi_attach(ide_drive_t *drive)
 
 static int __init init_idescsi_module(void)
 {
-	int err;
-
-	err = bus_register(&idescsi_emu_bus);
-	if (!err) {
-		err = device_register(&idescsi_primary);
-		if (!err) {
-			err = ide_register_driver(&idescsi_driver);
-			if (!err)
-				return 0;
-
-			device_unregister(&idescsi_primary);
-		}
-		bus_unregister(&idescsi_emu_bus);
-	}
-	return err;
+	return ide_register_driver(&idescsi_driver);
 }
 
 static void __exit exit_idescsi_module(void)
 {
-	device_unregister(&idescsi_primary);
-	bus_unregister   (&idescsi_emu_bus);
 	ide_unregister_driver(&idescsi_driver);
 }
 

@@ -498,7 +498,7 @@ static int __init parse_tag_core(const struct tag *tag)
 	if (tag->hdr.size > 2) {
 		if ((tag->u.core.flags & 1) == 0)
 			root_mountflags &= ~MS_RDONLY;
-		ROOT_DEV = tag->u.core.rootdev;
+		ROOT_DEV = old_decode_dev(tag->u.core.rootdev);
 	}
 	return 0;
 }
@@ -798,7 +798,7 @@ static int c_show(struct seq_file *m, void *v)
 			seq_printf(m, "Cache type\t: %s\n"
 				      "Cache clean\t: %s\n"
 				      "Cache lockdown\t: %s\n"
-				      "Cache unified\t: %s\n",
+				      "Cache format\t: %s\n",
 				   cache_types[CACHE_TYPE(cache_info)],
 				   cache_clean[CACHE_TYPE(cache_info)],
 				   cache_lockdown[CACHE_TYPE(cache_info)],

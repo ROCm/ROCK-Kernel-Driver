@@ -5,9 +5,6 @@
 
 #ifdef CONFIG_PROC_FS
 
-
-#include <linux/version.h>
-
 /* void enableReceive(struct net_device* dev);
 */
 
@@ -111,7 +108,7 @@ static const char *arlan_diagnostic_info_string(struct net_device *dev)
 		default:
 			return "ERROR unknown Diagnostic info reply code ";
 	  }
-};
+}
 
 static const char *arlan_hardware_type_string(struct net_device *dev)
 {
@@ -869,7 +866,6 @@ static int arlan_sysctl_reset(ctl_table * ctl, int write, struct file *filp,
 	CTBLN(32,cardNo,lParameter),\
 	CTBLN(33,cardNo,_15),\
 	CTBLN(34,cardNo,headerSize),\
-	CTBLN(35,cardNo,async),\
 	CTBLN(36,cardNo,tx_delay_ms),\
 	CTBLN(37,cardNo,retries),\
 	CTBLN(38,cardNo,ReTransmitPacketMaxSize),\
@@ -1236,7 +1232,7 @@ static ctl_table arlan_root_table[] =
 
 static struct ctl_table_header *arlan_device_sysctl_header;
 
-int init_arlan_proc(void)
+int __init init_arlan_proc(void)
 {
 
 	int i = 0;
@@ -1250,25 +1246,11 @@ int init_arlan_proc(void)
 
 	return 0;
 
-};
+}
 
-
-
-#ifdef MODULE
-
-int init_module(void)
-{
-
-	return init_arlan_proc();
-};
-
-void cleanup_module(void)
+void __exit cleanup_arlan_proc(void)
 {
 	unregister_sysctl_table(arlan_device_sysctl_header);
 	arlan_device_sysctl_header = NULL;
 
-	return;
-};
-
-#endif				// MODULE
-MODULE_LICENSE("GPL");
+}

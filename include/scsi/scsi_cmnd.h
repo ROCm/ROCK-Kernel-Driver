@@ -118,8 +118,6 @@ struct scsi_cmnd {
 						 * received on original command 
 						 * (auto-sense) */
 
-	unsigned flags;
-
 	/* Low-level done function - can be used by low-level driver to point
 	 *        to completion function.  Not used by mid/upper level code. */
 	void (*scsi_done) (struct scsi_cmnd *);

@@ -44,15 +44,6 @@ struct cpuinfo_mips cpu_data[NR_CPUS];
 struct screen_info screen_info;
 #endif
 
-/*
- * Set if box has EISA slots.
- */
-#ifdef CONFIG_EISA
-int EISA_bus;
-
-EXPORT_SYMBOL(EISA_bus);
-#endif
-
 #if defined(CONFIG_BLK_DEV_FD) || defined(CONFIG_BLK_DEV_FD_MODULE)
 extern struct fd_ops no_fd_ops;
 struct fd_ops *fd_ops;

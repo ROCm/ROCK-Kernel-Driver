@@ -23,7 +23,7 @@
 #include <asm/machdep.h>
 #include <asm/todc.h>
 
-void *cpci405_nvram; 
+void *cpci405_nvram;
 
 /*
  * Some IRQs unique to CPCI-405.

@@ -61,7 +61,6 @@
 
 /*****************************************************************************/
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <linux/ioport.h>
 #include <linux/string.h>
@@ -85,7 +84,7 @@ KERN_INFO "baycom_ser_hdx: version 0.10 compiled " __TIME__ " " __DATE__ "\n";
 
 #define NR_PORTS 4
 
-static struct net_device baycom_device[NR_PORTS];
+static struct net_device *baycom_device[NR_PORTS];
 
 /* --------------------------------------------------------------------- */
 
@@ -505,7 +504,6 @@ static int ser12_open(struct net_device *dev)
 	ser12_set_divisor(dev, bc->opt_dcd ? 6 : 4);
 	printk(KERN_INFO "%s: ser12 at iobase 0x%lx irq %u uart %s\n", 
 	       bc_drvname, dev->base_addr, dev->irq, uart_str[u]);
-	MOD_INC_USE_COUNT;
 	return 0;
 }
 
@@ -526,7 +524,6 @@ static int ser12_close(struct net_device *dev)
 	release_region(dev->base_addr, SER12_EXTENT);
 	printk(KERN_INFO "%s: close ser12 at iobase 0x%lx irq %u\n",
 	       bc_drvname, dev->base_addr, dev->irq);
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
@@ -543,11 +540,11 @@ static int baycom_ioctl(struct net_device *dev, struct ifreq *ifr,
 /* --------------------------------------------------------------------- */
 
 static struct hdlcdrv_ops ser12_ops = {
-	bc_drvname,
-	bc_drvinfo,
-	ser12_open,
-	ser12_close,
-	baycom_ioctl
+	.drvname = bc_drvname,
+	.drvinfo = bc_drvinfo,
+	.open    = ser12_open,
+	.close   = ser12_close,
+	.ioctl   = baycom_ioctl,
 };
 
 /* --------------------------------------------------------------------- */
@@ -659,35 +656,38 @@ MODULE_LICENSE("GPL");
 
 static int __init init_baycomserhdx(void)
 {
-	int i, j, found = 0;
+	int i, found = 0;
 	char set_hw = 1;
-	struct baycom_state *bc;
 
 	printk(bc_drvinfo);
 	/*
 	 * register net devices
 	 */
 	for (i = 0; i < NR_PORTS; i++) {
-		struct net_device *dev = baycom_device+i;
+		struct net_device *dev;
+		struct baycom_state *bc;
 		char ifname[IFNAMSIZ];
 
 		sprintf(ifname, "bcsh%d", i);
+
 		if (!mode[i])
 			set_hw = 0;
 		if (!set_hw)
 			iobase[i] = irq[i] = 0;
-		j = hdlcdrv_register_hdlcdrv(dev, &ser12_ops, sizeof(struct baycom_state),
-					     ifname, iobase[i], irq[i], 0);
-		if (!j) {
-			bc = (struct baycom_state *)dev->priv;
-			if (set_hw && baycom_setmode(bc, mode[i]))
-				set_hw = 0;
-			found++;
-		} else {
-			printk(KERN_WARNING "%s: cannot register net device\n",
-			       bc_drvname);
-		}
+
+		dev = hdlcdrv_register(&ser12_ops, 
+				       sizeof(struct baycom_state),
+				       ifname, iobase[i], irq[i], 0);
+		if (IS_ERR(dev)) 
+			break;
+
+		bc = (struct baycom_state *)dev->priv;
+		if (set_hw && baycom_setmode(bc, mode[i]))
+			set_hw = 0;
+		found++;
+		baycom_device[i] = dev;
 	}
+
 	if (!found)
 		return -ENXIO;
 	return 0;
@@ -698,16 +698,10 @@ static void __exit cleanup_baycomserhdx(void)
 	int i;
 
 	for(i = 0; i < NR_PORTS; i++) {
-		struct net_device *dev = baycom_device+i;
-		struct baycom_state *bc = (struct baycom_state *)dev->priv;
+		struct net_device *dev = baycom_device[i];
 
-		if (bc) {
-			if (bc->hdrv.magic != HDLCDRV_MAGIC)
-				printk(KERN_ERR "baycom: invalid magic in "
-				       "cleanup_module\n");
-			else
-				hdlcdrv_unregister_hdlcdrv(dev);
-		}
+		if (dev)
+			hdlcdrv_unregister(dev);
 	}
 }
 

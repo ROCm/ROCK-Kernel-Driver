@@ -17,7 +17,6 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-#include <linux/config.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
 #include <linux/init.h>
@@ -34,6 +33,8 @@
 #include <asm/hardware/amba.h>
 #include <asm/hardware/amba_kmi.h>
 
+#include <asm/arch/lm.h>
+
 #include <asm/mach/arch.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/map.h>
@@ -46,6 +47,7 @@
  * just for now).
  */
 #define VA_IC_BASE	IO_ADDRESS(INTEGRATOR_IC_BASE) 
+#define VA_SC_BASE	IO_ADDRESS(INTEGRATOR_SC_BASE)
 #define VA_CMIC_BASE	IO_ADDRESS(INTEGRATOR_HDR_BASE) + INTEGRATOR_HDR_IC_OFFSET
 
 /*
@@ -66,7 +68,7 @@
  * f1a00000	1a000000	Debug LEDs
  * f1b00000	1b000000	GPIO
  */
- 
+
 static struct map_desc integrator_io_desc[] __initdata = {
  { IO_ADDRESS(INTEGRATOR_HDR_BASE),   INTEGRATOR_HDR_BASE,   SZ_4K,  MT_DEVICE },
  { IO_ADDRESS(INTEGRATOR_SC_BASE),    INTEGRATOR_SC_BASE,    SZ_4K,  MT_DEVICE },
@@ -89,7 +91,7 @@ static void __init integrator_map_io(void)
 	iotable_init(integrator_io_desc, ARRAY_SIZE(integrator_io_desc));
 }
 
-#define ALLPCI ( (1 << IRQ_PCIINT0) | (1 << IRQ_PCIINT1) | (1 << IRQ_PCIINT2) | (1 << IRQ_PCIINT3) ) 
+#define ALLPCI ( (1 << IRQ_PCIINT0) | (1 << IRQ_PCIINT1) | (1 << IRQ_PCIINT2) | (1 << IRQ_PCIINT3) )
 
 static void sc_mask_irq(unsigned int irq)
 {
@@ -161,12 +163,35 @@ static struct amba_device *amba_devs[] __initdata = {
 
 static int __init register_devices(void)
 {
+	unsigned long sc_dec;
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
 		struct amba_device *d = amba_devs[i];
 
 		amba_device_register(d, &iomem_resource);
+	}
+
+	sc_dec = readl(VA_SC_BASE + INTEGRATOR_SC_DEC_OFFSET);
+	for (i = 0; i < 4; i++) {
+		struct lm_device *lmdev;
+
+		if ((sc_dec & (16 << i)) == 0)
+			continue;
+
+		lmdev = kmalloc(sizeof(struct lm_device), GFP_KERNEL);
+		if (!lmdev)
+			continue;
+
+		memset(lmdev, 0, sizeof(struct lm_device));
+
+		lmdev->resource.start = 0xc0000000 + 0x10000000 * i;
+		lmdev->resource.end = lmdev->resource.start + 0x0fffffff;
+		lmdev->resource.flags = IORESOURCE_MEM;
+		lmdev->irq = IRQ_EXPINT0 + i;
+		lmdev->id = i;
+
+		lm_device_register(lmdev);
 	}
 
 	return 0;

@@ -171,14 +171,6 @@ config MTRR
 
 	  See <file:Documentation/mtrr.txt> for more information.
 
-config HUGETLB_PAGE
-	bool "Huge TLB Page Support"
-	help
-	  This enables support for huge pages.  User space applications
-	  can make use of this support with the hugetlbfs file system
-	  To actually use it you need to pass an hugepages= argument
-	  to the kernel at boot time.
-
 config SMP
 	bool "Symmetric multi-processing support"
 	---help---
@@ -419,10 +411,6 @@ source "drivers/ieee1394/Kconfig"
 #source drivers/message/i2o/Config.in
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
-source "net/irda/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 # no support for non IDE/SCSI cdroms as they were all ISA only
@@ -444,8 +432,6 @@ source "drivers/video/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 source "arch/x86_64/oprofile/Kconfig"
 

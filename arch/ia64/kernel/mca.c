@@ -6,7 +6,7 @@
  * Copyright (C) 2003 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  *
- * Copyright (C) 2002 Dell Computer Corporation
+ * Copyright (C) 2002 Dell Inc.
  * Copyright (C) Matt Domsch (Matt_Domsch@dell.com)
  *
  * Copyright (C) 2002 Intel
@@ -1193,7 +1193,7 @@ static void
 ia64_mca_cmc_poll (unsigned long dummy)
 {
 	/* Trigger a CMC interrupt cascade  */
-	platform_send_ipi(__ffs(cpu_online_map), IA64_CMCP_VECTOR, IA64_IPI_DM_INT, 0);
+	platform_send_ipi(first_cpu(cpu_online_map), IA64_CMCP_VECTOR, IA64_IPI_DM_INT, 0);
 }
 
 /*
@@ -1260,7 +1260,7 @@ static void
 ia64_mca_cpe_poll (unsigned long dummy)
 {
 	/* Trigger a CPE interrupt cascade  */
-	platform_send_ipi(__ffs(cpu_online_map), IA64_CPEP_VECTOR, IA64_IPI_DM_INT, 0);
+	platform_send_ipi(first_cpu(cpu_online_map), IA64_CPEP_VECTOR, IA64_IPI_DM_INT, 0);
 }
 
 /*

@@ -2365,7 +2365,7 @@ static int cdrom_read_toc(ide_drive_t *drive, struct request_sense *sense)
 
 	/* Now try to get the total cdrom capacity. */
 	stat = cdrom_get_last_written(cdi, (long *) &toc->capacity);
-	if (stat)
+	if (stat || !toc->capacity)
 		stat = cdrom_read_capacity(drive, &toc->capacity, sense);
 	if (stat)
 		toc->capacity = 0x1fffff;
@@ -2498,7 +2498,7 @@ static int ide_cdrom_packet(struct cdrom_device_info *cdi,
 	req.sense = cgc->sense;
 	cgc->stat = cdrom_queue_packet_command(drive, &req);
 	if (!cgc->stat)
-		cgc->buflen = req.data_len;
+		cgc->buflen -= req.data_len;
 	return cgc->stat;
 }
 

@@ -77,9 +77,9 @@
 
 /* Some assembly to speed things up. */
 #define __FP_FRAC_ADD_3(r2,r1,r0,x2,x1,x0,y2,y1,y0)			\
-  __asm__ ("addcc %r7,%8,%2
-	    addxcc %r5,%6,%1
-	    addx %r3,%4,%0"						\
+  __asm__ ("addcc %r7,%8,%2\n\t"					\
+	   "addxcc %r5,%6,%1\n\t"					\
+	   "addx %r3,%4,%0\n"						\
 	   : "=r" ((USItype)(r2)),					\
 	     "=&r" ((USItype)(r1)),					\
 	     "=&r" ((USItype)(r0))					\
@@ -92,9 +92,9 @@
 	   : "cc")
 
 #define __FP_FRAC_SUB_3(r2,r1,r0,x2,x1,x0,y2,y1,y0)			\
-  __asm__ ("subcc %r7,%8,%2
-	    subxcc %r5,%6,%1
-	    subx %r3,%4,%0"						\
+  __asm__ ("subcc %r7,%8,%2\n\t"					\
+	    "subxcc %r5,%6,%1\n\t"					\
+	    "subx %r3,%4,%0\n"						\
 	   : "=r" ((USItype)(r2)),					\
 	     "=&r" ((USItype)(r1)),					\
 	     "=&r" ((USItype)(r0))					\
@@ -111,11 +111,11 @@
     /* We need to fool gcc,  as we need to pass more than 10		\
        input/outputs.  */						\
     register USItype _t1 __asm__ ("g1"), _t2 __asm__ ("g2");		\
-    __asm__ __volatile__ ("
-	    addcc %r8,%9,%1
-	    addxcc %r6,%7,%0
-	    addxcc %r4,%5,%%g2
-	    addx %r2,%3,%%g1"						\
+    __asm__ __volatile__ (						\
+	    "addcc %r8,%9,%1\n\t"					\
+	    "addxcc %r6,%7,%0\n\t"					\
+	    "addxcc %r4,%5,%%g2\n\t"					\
+	    "addx %r2,%3,%%g1\n\t"					\
 	   : "=&r" ((USItype)(r1)),					\
 	     "=&r" ((USItype)(r0))					\
 	   : "%rJ" ((USItype)(x3)),					\
@@ -136,11 +136,11 @@
     /* We need to fool gcc,  as we need to pass more than 10		\
        input/outputs.  */						\
     register USItype _t1 __asm__ ("g1"), _t2 __asm__ ("g2");		\
-    __asm__ __volatile__ ("
-	    subcc %r8,%9,%1
-	    subxcc %r6,%7,%0
-	    subxcc %r4,%5,%%g2
-	    subx %r2,%3,%%g1"						\
+    __asm__ __volatile__ (						\
+	    "subcc %r8,%9,%1\n\t"					\
+	    "subxcc %r6,%7,%0\n\t"					\
+	    "subxcc %r4,%5,%%g2\n\t"					\
+	    "subx %r2,%3,%%g1\n\t"					\
 	   : "=&r" ((USItype)(r1)),					\
 	     "=&r" ((USItype)(r0))					\
 	   : "%rJ" ((USItype)(x3)),					\
@@ -161,10 +161,10 @@
 #define __FP_FRAC_DEC_4(x3,x2,x1,x0,y3,y2,y1,y0) __FP_FRAC_SUB_4(x3,x2,x1,x0,x3,x2,x1,x0,y3,y2,y1,y0)
 
 #define __FP_FRAC_ADDI_4(x3,x2,x1,x0,i)					\
-  __asm__ ("addcc %3,%4,%3
-	    addxcc %2,%%g0,%2
-	    addxcc %1,%%g0,%1
-	    addx %0,%%g0,%0"						\
+  __asm__ ("addcc %3,%4,%3\n\t"						\
+	   "addxcc %2,%%g0,%2\n\t"					\
+	   "addxcc %1,%%g0,%1\n\t"					\
+	   "addx %0,%%g0,%0\n\t"					\
 	   : "=&r" ((USItype)(x3)),					\
 	     "=&r" ((USItype)(x2)),					\
 	     "=&r" ((USItype)(x1)),					\

@@ -28,18 +28,20 @@
 #ifndef _SIS_DRV_H_
 #define _SIS_DRV_H_
 
+#include "sis_ds.h"
+
 typedef struct drm_sis_private {
 	drm_map_t *buffers;
+
+	memHeap_t *AGPHeap;
+	memHeap_t *FBHeap;
 } drm_sis_private_t;
 
-/* Stereo ? - this was never committed */
-
-int sis_flip(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg);
-int sis_flip_init(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg);
-int sis_flip_final(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg);
-void flip_final(void);
+extern int sis_fb_alloc( DRM_IOCTL_ARGS );
+extern int sis_fb_free( DRM_IOCTL_ARGS );
+extern int sis_ioctl_agp_init( DRM_IOCTL_ARGS );
+extern int sis_ioctl_agp_alloc( DRM_IOCTL_ARGS );
+extern int sis_ioctl_agp_free( DRM_IOCTL_ARGS );
+extern int sis_fb_init( DRM_IOCTL_ARGS );
 
 #endif

@@ -203,8 +203,6 @@ source "drivers/md/Kconfig"
 
 source "net/Kconfig"
 
-source "net/irda/Kconfig"
-
 source "drivers/ide/Kconfig"
 
 source "drivers/scsi/Kconfig"
@@ -238,9 +236,6 @@ endif
 source "drivers/misc/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
-
 
 menu "Kernel hacking"
 

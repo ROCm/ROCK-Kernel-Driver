@@ -445,7 +445,7 @@ static int intel_i830_insert_entries(struct agp_memory *mem,off_t pg_start,
 	num_entries = A_SIZE_FIX(temp)->num_entries;
 
 	if (pg_start < intel_i830_private.gtt_entries) {
-		printk (KERN_DEBUG "pg_start == 0x%.8lx,intel_i830_private.gtt_entries == 0x%.8x\n",
+		printk (KERN_DEBUG PFX "pg_start == 0x%.8lx,intel_i830_private.gtt_entries == 0x%.8x\n",
 				pg_start,intel_i830_private.gtt_entries);
 
 		printk (KERN_INFO PFX "Trying to insert into local/stolen memory\n");

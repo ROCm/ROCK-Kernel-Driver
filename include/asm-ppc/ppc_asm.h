@@ -47,16 +47,16 @@
 #define REST_32FPRS(n, base)	REST_16FPRS(n, base); REST_16FPRS(n+16, base)
 
 #define SAVE_VR(n,b,base)	li b,THREAD_VR0+(16*(n));  stvx n,b,base
-#define SAVE_2VR(n,b,base)	SAVE_VR(n,b,base); SAVE_VR(n+1,b,base) 
-#define SAVE_4VR(n,b,base)	SAVE_2VR(n,b,base); SAVE_2VR(n+2,b,base) 
-#define SAVE_8VR(n,b,base)	SAVE_4VR(n,b,base); SAVE_4VR(n+4,b,base) 
+#define SAVE_2VR(n,b,base)	SAVE_VR(n,b,base); SAVE_VR(n+1,b,base)
+#define SAVE_4VR(n,b,base)	SAVE_2VR(n,b,base); SAVE_2VR(n+2,b,base)
+#define SAVE_8VR(n,b,base)	SAVE_4VR(n,b,base); SAVE_4VR(n+4,b,base)
 #define SAVE_16VR(n,b,base)	SAVE_8VR(n,b,base); SAVE_8VR(n+8,b,base)
 #define SAVE_32VR(n,b,base)	SAVE_16VR(n,b,base); SAVE_16VR(n+16,b,base)
 #define REST_VR(n,b,base)	li b,THREAD_VR0+(16*(n)); lvx n,b,base
-#define REST_2VR(n,b,base)	REST_VR(n,b,base); REST_VR(n+1,b,base) 
-#define REST_4VR(n,b,base)	REST_2VR(n,b,base); REST_2VR(n+2,b,base) 
-#define REST_8VR(n,b,base)	REST_4VR(n,b,base); REST_4VR(n+4,b,base) 
-#define REST_16VR(n,b,base)	REST_8VR(n,b,base); REST_8VR(n+8,b,base) 
+#define REST_2VR(n,b,base)	REST_VR(n,b,base); REST_VR(n+1,b,base)
+#define REST_4VR(n,b,base)	REST_2VR(n,b,base); REST_2VR(n+2,b,base)
+#define REST_8VR(n,b,base)	REST_4VR(n,b,base); REST_4VR(n+4,b,base)
+#define REST_16VR(n,b,base)	REST_8VR(n,b,base); REST_8VR(n+8,b,base)
 #define REST_32VR(n,b,base)	REST_16VR(n,b,base); REST_16VR(n+16,b,base)
 
 #ifdef CONFIG_PPC601_SYNC_FIX

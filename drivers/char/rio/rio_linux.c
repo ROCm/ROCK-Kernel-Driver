@@ -234,14 +234,12 @@ int rio_probe_addrs[]= {0xc0000, 0xd0000, 0xe0000};
    support up to 64 bits on 64bit architectures. -- REW 20/06/99 */
 long rio_irqmask = -1;
 
-#ifndef TWO_ZERO
 MODULE_AUTHOR("Rogier Wolff <R.E.Wolff@bitwizard.nl>, Patrick van de Lageweg <patrick@bitwizard.nl>");
 MODULE_DESCRIPTION("RIO driver");
 MODULE_LICENSE("GPL");
 MODULE_PARM(rio_poll, "i");
 MODULE_PARM(rio_debug, "i");
 MODULE_PARM(rio_irqmask, "i");
-#endif
 
 static struct real_driver rio_real_driver = {
   rio_disable_tx_interrupts,
@@ -691,9 +689,7 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
     break;
 #endif
   case TIOCSSOFTCAR:
-    if ((rc = verify_area(VERIFY_READ, (void *) arg,
-                          sizeof(int))) == 0) {
-      get_user(ival, (unsigned int *) arg);
+    if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
       tty->termios->c_cflag =
         (tty->termios->c_cflag & ~CLOCAL) |
         (ival ? CLOCAL : 0);
@@ -743,25 +739,19 @@ static int rio_ioctl (struct tty_struct * tty, struct file * filp,
     }
     break;
   case TIOCMBIS:
-    if ((rc = verify_area(VERIFY_READ, (void *) arg,
-                          sizeof(unsigned int))) == 0) {
-      get_user(ival, (unsigned int *) arg);
+    if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
       rio_setsignals(port, ((ival & TIOCM_DTR) ? 1 : -1),
                            ((ival & TIOCM_RTS) ? 1 : -1));
     }
     break;
   case TIOCMBIC:
-    if ((rc = verify_area(VERIFY_READ, (void *) arg,
-                          sizeof(unsigned int))) == 0) {
-      get_user(ival, (unsigned int *) arg);
+    if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
       rio_setsignals(port, ((ival & TIOCM_DTR) ? 0 : -1),
                            ((ival & TIOCM_RTS) ? 0 : -1));
     }
     break;
   case TIOCMSET:
-    if ((rc = verify_area(VERIFY_READ, (void *) arg,
-                          sizeof(unsigned int))) == 0) {
-      get_user(ival, (unsigned int *) arg);
+    if ((rc = get_user(ival, (unsigned int *) arg)) == 0) {
       rio_setsignals(port, ((ival & TIOCM_DTR) ? 1 : 0),
                            ((ival & TIOCM_RTS) ? 1 : 0));
     }
@@ -1012,9 +1002,9 @@ static int rio_init_datastructures (void)
 
  free6:for (i--;i>=0;i--)
         kfree (p->RIOPortp[i]);
-/*free5: */
+/*free5:
  free4:
- free3:kfree (p->RIOPortp);
+ free3:*/kfree (p->RIOPortp);
  free2:kfree (p->RIOHosts);
  free1:
   rio_dprintk (RIO_DEBUG_INIT, "Not enough memory! %p %p %p\n", 
@@ -1033,13 +1023,6 @@ static void  __exit rio_release_drivers(void)
   put_tty_driver(rio_driver);
   func_exit();
 }
-
-#ifdef TWO_ZERO
-#define PDEV unsigned char pci_bus, unsigned pci_fun
-#define pdev pci_bus, pci_fun
-#else
-#define PDEV   struct pci_dev *pdev
-#endif
 
 
 #ifdef CONFIG_PCI
@@ -1062,7 +1045,7 @@ static void  __exit rio_release_drivers(void)
    EEprom.  As the bit is read/write for the CPU, we can fix it here,
    if we detect that it isn't set correctly. -- REW */
 
-void fix_rio_pci (PDEV)
+void fix_rio_pci (struct pci_dev *pdev)
 {
   unsigned int hwbase;
   unsigned long rebase;
@@ -1095,12 +1078,7 @@ static int __init rio_init(void)
   int okboard;
 
 #ifdef CONFIG_PCI
-#ifndef TWO_ZERO
   struct pci_dev *pdev = NULL;
-#else
-  unsigned char pci_bus, pci_fun;
-  /* in 2.2.x pdev is a pointer defining a PCI device. In 2.0 its the bus/fn */
-#endif
   unsigned int tint;
   unsigned short tshort;
 #endif
@@ -1128,17 +1106,11 @@ static int __init rio_init(void)
 
 #ifdef CONFIG_PCI
     /* First look for the JET devices: */
-#ifndef TWO_ZERO
     while ((pdev = pci_find_device (PCI_VENDOR_ID_SPECIALIX, 
                                     PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, 
                                     pdev))) {
        if (pci_enable_device(pdev)) continue;
-#else
-    for (i=0;i< RIO_NBOARDS;i++) {
-      if (pcibios_find_device (PCI_VENDOR_ID_SPECIALIX, 
-			       PCI_DEVICE_ID_SPECIALIX_SX_XIO_IO8, i,
-			       &pci_bus, &pci_fun)) break;
-#endif
+
       /* Specialix has a whole bunch of cards with
          0x2000 as the device ID. They say its because
          the standard requires it. Stupid standard. */
@@ -1196,16 +1168,9 @@ static int __init rio_init(void)
       } else {
               iounmap((char*) (p->RIOHosts[p->RIONumHosts].Caddr));
       }
-      
-#ifdef TWO_ZERO
-    }  /* We have two variants with the opening brace, so to prevent */
-#else
-    }  /* Emacs from getting confused we have two closing braces too. */
-#endif
+    }
     
     /* Then look for the older PCI card.... : */
-#ifndef TWO_ZERO
-
 
   /* These older PCI cards have problems (only byte-mode access is
      supported), which makes them a bit awkward to support. 
@@ -1219,12 +1184,6 @@ static int __init rio_init(void)
                                     PCI_DEVICE_ID_SPECIALIX_RIO, 
                                     pdev))) {
        if (pci_enable_device(pdev)) continue;
-#else
-    for (i=0;i< RIO_NBOARDS;i++) {
-      if (pcibios_find_device (PCI_VENDOR_ID_SPECIALIX, 
-			       PCI_DEVICE_ID_SPECIALIX_RIO, i,
-			       &pci_bus, &pci_fun)) break;
-#endif
 
 #ifdef CONFIG_RIO_OLDPCI
       pci_read_config_dword(pdev, PCI_BASE_ADDRESS_0, &tint);
@@ -1272,11 +1231,7 @@ static int __init rio_init(void)
       printk (KERN_ERR "Found an older RIO PCI card, but the driver is not "
               "compiled to support it.\n");
 #endif
-#ifdef TWO_ZERO
-    }  /* We have two variants with the opening brace, so to prevent */
-#else
-    }  /* Emacs from getting confused we have two closing braces too. */
-#endif
+    }
 #endif /* PCI */
 
   /* Now probe for ISA cards... */

@@ -1,6 +1,6 @@
 /*
  * arch/ppc/syslib/harrier.c
- * 
+ *
  * Motorola MCG Harrier northbridge/memory controller support
  *
  * Author: Dale Farnsworth
@@ -198,7 +198,7 @@ harrier_get_mem_size(uint xcsr_base)
 				break;	/* Register not set correctly */
 			}
 			size = size_table[size];
-			
+		
 			val &= ~(size-1);
 			val += size;
 

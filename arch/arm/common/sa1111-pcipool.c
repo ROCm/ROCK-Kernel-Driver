@@ -51,7 +51,7 @@ struct pci_page {	/* cacheable header for 'allocation' bytes */
 
 static inline const char *slot_name(const struct pci_pool *pool)
 {
-	const struct pci_dev *pdev = pool->dev;
+	struct pci_dev *pdev = (struct pci_dev *)pool->dev;
 
 	if (pdev == 0)
 		return "[0]";

@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/mpc82xx.h
- * 
+ *
  * Board specific support for various 82xx platforms.
  *
  * Author: Allen Curtis <acurtis@onz.com>

@@ -21,32 +21,32 @@ static int init_dir(struct inode * inode)
 }
 
 
-static struct dentry * 
-create_dir(struct kobject * k, struct dentry * p, const char * n)
+static int create_dir(struct kobject * k, struct dentry * p,
+		      const char * n, struct dentry ** d)
 {
-	struct dentry * dentry;
+	int error;
 
 	down(&p->d_inode->i_sem);
-	dentry = sysfs_get_dentry(p,n);
-	if (!IS_ERR(dentry)) {
-		int error = sysfs_create(dentry,
+	*d = sysfs_get_dentry(p,n);
+	if (!IS_ERR(*d)) {
+		error = sysfs_create(*d,
 					 S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO,
 					 init_dir);
 		if (!error) {
-			dentry->d_fsdata = k;
+			(*d)->d_fsdata = k;
 			p->d_inode->i_nlink++;
-		} else
-			dentry = ERR_PTR(error);
-		dput(dentry);
-	}
+		}
+		dput(*d);
+	} else
+		error = PTR_ERR(*d);
 	up(&p->d_inode->i_sem);
-	return dentry;
+	return error;
 }
 
 
-struct dentry * sysfs_create_subdir(struct kobject * k, const char * n)
+int sysfs_create_subdir(struct kobject * k, const char * n, struct dentry ** d)
 {
-	return create_dir(k,k->dentry,n);
+	return create_dir(k,k->dentry,n,d);
 }
 
 /**
@@ -71,11 +71,9 @@ int sysfs_create_dir(struct kobject * kobj)
 	else
 		return -EFAULT;
 
-	dentry = create_dir(kobj,parent,kobject_name(kobj));
-	if (!IS_ERR(dentry))
+	error = create_dir(kobj,parent,kobject_name(kobj),&dentry);
+	if (!error)
 		kobj->dentry = dentry;
-	else
-		error = PTR_ERR(dentry);
 	return error;
 }
 

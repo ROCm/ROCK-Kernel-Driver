@@ -1,21 +1,8 @@
 #
-# Makefile for the kernel i2c bus driver.
+# Makefile for the i2c core.
 #
 
 obj-$(CONFIG_I2C)		+= i2c-core.o
 obj-$(CONFIG_I2C_CHARDEV)	+= i2c-dev.o
-obj-$(CONFIG_I2C_ALGOBIT)	+= i2c-algo-bit.o
-obj-$(CONFIG_I2C_PROSAVAGE)	+= i2c-prosavage.o
-obj-$(CONFIG_I2C_PHILIPSPAR)	+= i2c-philips-par.o
-obj-$(CONFIG_I2C_ELV)		+= i2c-elv.o
-obj-$(CONFIG_I2C_VELLEMAN)	+= i2c-velleman.o
-obj-$(CONFIG_I2C_ALGOPCF)	+= i2c-algo-pcf.o
-obj-$(CONFIG_I2C_ELEKTOR)	+= i2c-elektor.o
-obj-$(CONFIG_I2C_KEYWEST)	+= i2c-keywest.o
-obj-$(CONFIG_ITE_I2C_ALGO)	+= i2c-algo-ite.o
-obj-$(CONFIG_ITE_I2C_ADAP)	+= i2c-adap-ite.o
-obj-$(CONFIG_SCx200_I2C)	+= scx200_i2c.o
-obj-$(CONFIG_SCx200_ACB)	+= scx200_acb.o
 obj-$(CONFIG_I2C_SENSOR)	+= i2c-sensor.o
-obj-$(CONFIG_I2C_IOP3XX)	+= i2c-iop3xx.o
-obj-y				+= busses/ chips/
+obj-y				+= busses/ chips/ algos/

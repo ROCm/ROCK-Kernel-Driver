@@ -307,6 +307,15 @@ int timer_interrupt(struct pt_regs * regs)
 	return 1;
 }
 
+/*
+ * Scheduler clock - returns current time in nanosec units.
+ *
+ * This is wrong, but my CPUs run at 1GHz, so nyer nyer.
+ */
+unsigned long long sched_clock(void)
+{
+	return get_tb();
+}
 
 /*
  * This version of gettimeofday has microsecond resolution.

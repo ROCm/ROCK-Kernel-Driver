@@ -45,8 +45,9 @@ SP_R15       =  STACK_FRAME_OVERHEAD + PT_GPR15
 SP_AREGS     =  STACK_FRAME_OVERHEAD + PT_ACR0
 SP_ORIG_R2   =  STACK_FRAME_OVERHEAD + PT_ORIGGPR2
 /* Now the additional entries */
-SP_TRAP      =  (SP_ORIG_R2+GPR_SIZE)
-SP_SIZE      =  (SP_TRAP+4)
+SP_ILC       =  (SP_ORIG_R2+GPR_SIZE)
+SP_TRAP      =  (SP_ILC+2)
+SP_SIZE      =  (SP_TRAP+2)
 
 _TIF_WORK_SVC = (_TIF_SIGPENDING | _TIF_NEED_RESCHED | _TIF_RESTART_SVC)
 _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
@@ -86,7 +87,8 @@ _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
         stam    %a0,%a15,SP_AREGS(%r15)  # store access registers to kst.
         mvc     SP_AREGS+8(12,%r15),__LC_SAVE_AREA+16 # store ac. regs
         mvc     SP_PSW(16,%r15),\psworg  # move user PSW to stack
-	mvc	SP_TRAP(4,%r15),.L\psworg-.Lconst(%r14) # store trap ind.
+	mvc	SP_ILC(2,%r15),__LC_SVC_ILC # store instruction length
+	mvc	SP_TRAP(2,%r15),.L\psworg-.Lconst(%r14) # store trap ind.
         xc      0(8,%r15),0(%r15)        # clear back chain
         .endm
 
@@ -111,23 +113,24 @@ _TIF_WORK_INT = (_TIF_SIGPENDING | _TIF_NEED_RESCHED)
  * Returns:
  *  gpr2 = prev
  */
-        .globl  resume
-resume:
+        .globl  __switch_to
+__switch_to:
 	tm	__THREAD_per+4(%r3),0xe8 # is the new process using per ?
-	jz	resume_noper		# if not we're fine
+	jz	__switch_to_noper		# if not we're fine
         stctg   %c9,%c11,48(%r15)       # We are using per stuff
         clc     __THREAD_per(24,%r3),48(%r15)
-        je      resume_noper            # we got away without bashing TLB's
+        je      __switch_to_noper            # we got away without bashing TLB's
         lctlg   %c9,%c11,__THREAD_per(%r3)	# Nope we didn't
-resume_noper:
-        stmg    %r6,%r15,48(%r15)       # store resume registers of prev task
+__switch_to_noper:
+        stmg    %r6,%r15,48(%r15)       # store __switch_to registers of prev task
 	stg	%r15,__THREAD_ksp(%r2)	# store kernel stack to prev->tss.ksp
 	lg	%r15,__THREAD_ksp(%r3)	# load kernel stack from next->tss.ksp
         stam    %a2,%a2,__THREAD_ar2(%r2)	# store kernel access reg. 2
         stam    %a4,%a4,__THREAD_ar4(%r2)	# store kernel access reg. 4
         lam     %a2,%a2,__THREAD_ar2(%r3)	# load kernel access reg. 2
         lam     %a4,%a4,__THREAD_ar4(%r3)	# load kernel access reg. 4
-        lmg     %r6,%r15,48(%r15)       # load resume registers of next task
+        lmg     %r6,%r15,48(%r15)       # load __switch_to registers of next task
+	stg	%r3,__LC_CURRENT	# __LC_CURRENT = current task struct
 	lg	%r3,__THREAD_info(%r3)  # load thread_info from task struct
 	aghi	%r3,16384
 	stg	%r3,__LC_KERNEL_STACK	# __LC_KERNEL_STACK = new kernel stack
@@ -187,6 +190,8 @@ sysc_noemu:
 
 sysc_return:
 	stnsm   48(%r15),0xfc     # disable I/O and ext. interrupts
+        tm      SP_PSW+1(%r15),0x01    # returning to user ?
+        jno     sysc_leave
 	tm	__TI_flags+7(%r9),_TIF_WORK_SVC
 	jnz	sysc_work         # there is work to do (signals etc.)
 sysc_leave:
@@ -549,10 +554,8 @@ pgm_svc_nogo:
 io_int_handler:
         SAVE_ALL __LC_IO_OLD_PSW,0
         GET_THREAD_INFO                # load pointer to task_struct to R9
+	stck	__LC_INT_CLOCK
         la      %r2,SP_PTREGS(%r15)    # address of register-save area
-	llgh    %r3,__LC_SUBCHANNEL_NR # load subchannel number
-        llgf    %r4,__LC_IO_INT_PARM   # load interruption parm
-        llgf    %r5,__LC_IO_INT_WORD   # load interruption word
 	brasl   %r14,do_IRQ            # call standard irq handler
 
 io_return:
@@ -637,26 +640,10 @@ io_sigpending:
 ext_int_handler:
         SAVE_ALL __LC_EXT_OLD_PSW,0
         GET_THREAD_INFO                # load pointer to task_struct to R9
-	brasl   %r14,do_extint
-	llgh	%r6,__LC_EXT_INT_CODE  # get interruption code
-	lgr	%r1,%r6		       # calculate index = code & 0xff
-	nill	%r1,0xff
-	sll	%r1,3
-	larl	%r7,ext_int_hash
-	lg	%r7,0(%r1,%r7)	       # get first list entry for hash value
-	ltgr	%r7,%r7		       # == NULL ?
-	jz	io_return	       # yes, nothing to do, exit
-ext_int_loop:
-	ch	%r6,16(%r7)	       # compare external interrupt code
-	jne	ext_int_next
-	lg	%r1,8(%r7)	       # get handler address
+	stck	__LC_INT_CLOCK
 	la	%r2,SP_PTREGS(%r15)    # address of register-save area
-	lgr	%r3,%r6		       # interruption code
-	basr	%r14,%r1	       # call handler
-ext_int_next:
-	lg	%r7,0(%r7)	       # next list entry
-	ltgr	%r7,%r7
-	jnz	ext_int_loop
+	llgh	%r3,__LC_EXT_INT_CODE  # get interruption code
+	brasl   %r14,do_extint
 	j	io_return
 
 /*
@@ -705,9 +692,9 @@ restart_go:
 .Lconst:
 .Lc_ac:        .long  0,0,1
 .Lc_pactive:   .long  PREEMPT_ACTIVE
-.L0x0130:      .long  0x0130
-.L0x0140:      .long  0x0140
-.L0x0150:      .long  0x0150
-.L0x0160:      .long  0x0160
-.L0x0170:      .long  0x0170
+.L0x0130:      .word  0x0130
+.L0x0140:      .word  0x0140
+.L0x0150:      .word  0x0150
+.L0x0160:      .word  0x0160
+.L0x0170:      .word  0x0170
 .Lnr_syscalls: .long  NR_syscalls

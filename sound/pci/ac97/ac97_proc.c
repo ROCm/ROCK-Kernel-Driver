@@ -151,7 +151,7 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 		snd_iprintf(buffer, "SPDIF Control    :%s%s%s%s Category=0x%x Generation=%i%s%s%s\n",
 			val & AC97_SC_PRO ? " PRO" : " Consumer",
 			val & AC97_SC_NAUDIO ? " Non-audio" : " PCM",
-			val & AC97_SC_COPY ? " Copyright" : "",
+			val & AC97_SC_COPY ? "" : " Copyright",
 			val & AC97_SC_PRE ? " Preemph50/15" : "",
 			(val & AC97_SC_CC_MASK) >> AC97_SC_CC_SHIFT,
 			(val & AC97_SC_L) >> 11,
@@ -164,7 +164,31 @@ static void snd_ac97_proc_read_main(ac97_t *ac97, snd_info_buffer_t * buffer, in
 			(ac97->flags & AC97_CS_SPDIF) ?
 			    (val & AC97_SC_V ? " Enabled" : "") :
 			    (val & AC97_SC_V ? " Validity" : ""));
+		/* ALC650 specific*/
+		if ((ac97->id & 0xfffffff0) == 0x414c4720 &&
+		    (snd_ac97_read(ac97, AC97_ALC650_CLOCK) & 0x01)) {
+			val = snd_ac97_read(ac97, AC97_ALC650_SPDIF_INPUT_STATUS2);
+			if (val & AC97_ALC650_CLOCK_LOCK) {
+				val = snd_ac97_read(ac97, AC97_ALC650_SPDIF_INPUT_STATUS1);
+				snd_iprintf(buffer, "SPDIF In Status  :%s%s%s%s Category=0x%x Generation=%i",
+					    val & AC97_ALC650_PRO ? " PRO" : " Consumer",
+					    val & AC97_ALC650_NAUDIO ? " Non-audio" : " PCM",
+					    val & AC97_ALC650_COPY ? "" : " Copyright",
+					    val & AC97_ALC650_PRE ? " Preemph50/15" : "",
+					    (val & AC97_ALC650_CC_MASK) >> AC97_ALC650_CC_SHIFT,
+					    (val & AC97_ALC650_L) >> 15);
+				val = snd_ac97_read(ac97, AC97_ALC650_SPDIF_INPUT_STATUS2);
+				snd_iprintf(buffer, "%s Accuracy=%i%s%s\n",
+					    spdif_rates[(val & AC97_ALC650_SPSR_MASK) >> AC97_ALC650_SPSR_SHIFT],
+					    (val & AC97_ALC650_CLOCK_ACCURACY) >> AC97_ALC650_CLOCK_SHIFT,
+					    (val & AC97_ALC650_CLOCK_LOCK ? " Locked" : " Unlocked"),
+					    (val & AC97_ALC650_V ? " Validity?" : ""));
+			} else {
+				snd_iprintf(buffer, "SPDIF In Status  : Not Locked\n");
+			}
+		}
 	}
+
 
       __modem:
 	mext = snd_ac97_read(ac97, AC97_EXTENDED_MID);

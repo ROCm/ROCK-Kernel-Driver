@@ -90,7 +90,6 @@
    or override something. */
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/version.h>
 
 /*
  * Set this to zero to disable DMA code

@@ -200,13 +200,7 @@ static void cleanup_board_resources(void)
 	}
 }
 
-/*****************************************************************************/
-
-#ifdef MODULE
-
-/*****************************************************************************/
-
-static void pcxe_cleanup()
+static void __exit pcxe_cleanup(void)
 {
 
 	unsigned long	flags;
@@ -232,7 +226,6 @@ static void pcxe_cleanup()
  */
 module_init(pcxe_init);
 module_cleanup(pcxe_cleanup);
-#endif
 
 static inline struct channel *chan(register struct tty_struct *tty)
 {
@@ -1018,6 +1011,9 @@ void __init pcxx_setup(char *str, int *ints)
 }
 #endif
 
+module_init(pcxe_init)
+module_exit(pcxe_exit)
+
 static struct tty_operations pcxe_ops = {
 	.open = pcxe_open,
 	.close = pcxe_close,
@@ -1040,7 +1036,7 @@ static struct tty_operations pcxe_ops = {
  * function to initialize the driver with the given parameters, which are either
  * the default values from this file or the parameters given at boot.
  */
-int __init pcxe_init(void)
+static int __init pcxe_init(void)
 {
 	ulong memory_seg=0, memory_size=0;
 	int lowwater, enabled_cards=0, i, crd, shrinkmem=0, topwin = 0xff00L, botwin=0x100L;

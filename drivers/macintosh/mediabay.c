@@ -694,8 +694,7 @@ static int __devinit media_bay_attach(struct macio_dev *mdev, const struct of_ma
 
 	/* Startup kernel thread */
 	if (i == 0)
-		kernel_thread(media_bay_task, NULL,
-			      CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+		kernel_thread(media_bay_task, NULL, CLONE_KERNEL);
 
 	return 0;
 

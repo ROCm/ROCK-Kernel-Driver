@@ -184,9 +184,9 @@ static int DRM(name_info)(char *buf, char **start, off_t offset, int request,
 
 	if (dev->unique) {
 		DRM_PROC_PRINT("%s 0x%lx %s\n",
-			       dev->name, (long)dev->device, dev->unique);
+			       dev->name, (long)old_encode_dev(dev->device), dev->unique);
 	} else {
-		DRM_PROC_PRINT("%s 0x%lx\n", dev->name, (long)dev->device);
+		DRM_PROC_PRINT("%s 0x%lx\n", dev->name, (long)old_encode_dev(dev->device));
 	}
 
 	if (len > request + offset) return request;

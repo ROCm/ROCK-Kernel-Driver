@@ -169,8 +169,8 @@ W:	http://domsch.com/linux
 S:	Supported
 
 ACPI
-P:	Andy Grover
-M:	andrew.grover@intel.com
+P:	Len Brown
+M:	len.brown@intel.com
 L:	acpi-devel@lists.sourceforge.net
 W:	http://sf.net/projects/acpi/
 S:	Maintained
@@ -212,7 +212,7 @@ S:	Maintained
 
 ALCATEL SPEEDTOUCH USB DRIVER
 P:	Duncan Sands
-M:	duncan.sands@wanadoo.fr
+M:	duncan.sands@free.fr
 L:	linux-usb-users@lists.sourceforge.net
 L:	linux-usb-devel@lists.sourceforge.net
 W:	http://www.linux-usb.org/SpeedTouch/
@@ -328,16 +328,64 @@ M:	axboe@suse.de
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
-BLUETOOTH SUBSYSTEM (BlueZ)
+BLUETOOTH SUBSYSTEM
 P:	Maxim Krasnyansky
 M:	maxk@qualcomm.com
 W:	http://bluez.sf.net
 S:	Maintained
 
-BLUETOOTH SUBSYSTEM (PC Card Drivers)
+BLUETOOTH RFCOMM LAYER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH BNEP LAYER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH HCI USB DRIVER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH HCI UART DRIVER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
+S:	Maintained
+
+BLUETOOTH HCI DTL1 DRIVER
 P:	Marcel Holtmann
 M:	marcel@holtmann.org
 W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
+BLUETOOTH HCI BLUECARD DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
+BLUETOOTH HCI BT3C DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
+BLUETOOTH HCI BTUART DRIVER
+P:	Marcel Holtmann
+M:	marcel@holtmann.org
+W:	http://www.holtmann.org/linux/bluetooth/
+S:	Maintained
+
+BLUETOOTH HCI VHCI DRIVER
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
 S:	Maintained
 
 BONDING DRIVER
@@ -557,10 +605,7 @@ L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
 DEVICE FILESYSTEM
-P:	Richard Gooch
-M:	rgooch@atnf.csiro.au
-L:	linux-kernel@vger.kernel.org
-S:	Maintained
+S:	Obsolete
 
 DIGI INTL. EPCA DRIVER
 P:	Digi International, Inc
@@ -1157,6 +1202,13 @@ P:	Anton Blanchard (development kernel)
 M:	anton@au.ibm.com
 W:	http://linuxppc64.org
 L:	linuxppc64-dev@lists.linuxppc.org
+S:	Supported
+
+LINUX SECURITY MODULE (LSM) FRAMEWORK
+P:	Chris Wright
+M:	chrisw@osdl.org
+L:	linux-security-module@wirex.com
+W:	http://lsm.immunix.org
 S:	Supported
 
 LOGICAL DISK MANAGER SUPPORT (LDM, Windows 2000/XP Dynamic Disks)

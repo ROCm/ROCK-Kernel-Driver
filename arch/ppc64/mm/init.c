@@ -290,7 +290,7 @@ flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 
 	if (!pgd_none(*pgd)) {
 		pmd = pmd_offset(pgd, vmaddr);
-		if (!pmd_none(*pmd)) {
+		if (pmd_present(*pmd)) {
 			ptep = pte_offset_kernel(pmd, vmaddr);
 			/* Check if HPTE might exist and flush it if so */
 			pte = __pte(pte_update(ptep, _PAGE_HPTEFLAGS, 0));
@@ -298,6 +298,7 @@ flush_tlb_page(struct vm_area_struct *vma, unsigned long vmaddr)
 				flush_hash_page(context, vmaddr, pte, local);
 			}
 		}
+		WARN_ON(pmd_hugepage(*pmd));
 	}
 }
 
@@ -348,7 +349,7 @@ __flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
 				pmd_end = (start + PMD_SIZE) & PMD_MASK;
 				if (pmd_end > end)
 					pmd_end = end;
-				if (!pmd_none(*pmd)) {
+				if (pmd_present(*pmd)) {
 					ptep = pte_offset_kernel(pmd, start);
 					do {
 						if (pte_val(*ptep) & _PAGE_HASHPTE) {
@@ -367,6 +368,7 @@ __flush_tlb_range(struct mm_struct *mm, unsigned long start, unsigned long end)
 						++ptep;
 					} while (start < pmd_end);
 				} else {
+					WARN_ON(pmd_hugepage(*pmd));
 					start = pmd_end;
 				}
 				++pmd;
@@ -540,8 +542,6 @@ static int __init setup_kcore(void)
 }
 module_init(setup_kcore);
 
-void initialize_paca_hardware_interrupt_stack(void);
-
 void __init mem_init(void)
 {
 #ifndef CONFIG_DISCONTIGMEM
@@ -607,9 +607,6 @@ void __init mem_init(void)
 	       PAGE_OFFSET, (unsigned long)__va(lmb_end_of_DRAM()));
 #endif
 	mem_init_done = 1;
-
-	/* set the last page of each hardware interrupt stack to be protected */
-	initialize_paca_hardware_interrupt_stack();
 
 #ifdef CONFIG_PPC_ISERIES
 	create_virtual_bus_tce_table();

@@ -27,7 +27,6 @@ LD		+= -EB
 AFLAGS		+= -mbig-endian
 endif
 
-check_gcc = $(shell if $(CC) $(1) -S -o /dev/null -xc /dev/null > /dev/null 2>&1; then echo "$(1)"; else echo "$(2)"; fi)
 comma = ,
 
 # This selects which instruction set is used.
@@ -171,22 +170,6 @@ Img:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/Image
 bp:;	$(Q)$(MAKE) $(build)=$(boot) $(boot)/bootpImage
 i:;	$(Q)$(MAKE) $(build)=$(boot) install
 zi:;	$(Q)$(MAKE) $(build)=$(boot) zinstall
-
-#
-# Configuration targets.  Use these to select a
-# configuration for your architecture
-%_config:
-	@( \
-	CFG=$(@:_config=); \
-	if [ -f arch/arm/def-configs/$$CFG ]; then \
-	  [ -f .config ] && mv -f .config .config.old; \
-	  cp arch/arm/def-configs/$$CFG .config; \
-	  echo "*** Default configuration for $$CFG installed"; \
-	  echo "*** Next, you may run 'make oldconfig'"; \
-	else \
-	  echo "$$CFG does not exist"; \
-	fi; \
-	)
 
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/asm-arm/.arch \

@@ -1,4 +1,4 @@
-/* $Id: diva.c,v 1.1.2.5 2001/02/14 21:10:19 armin Exp $ */
+/* $Id: diva.c,v 1.17 2003/09/09 06:52:01 schindler Exp $ */
 
 #define CARDTYPE_H_WANT_DATA            1
 #define CARDTYPE_H_WANT_IDI_DATA        0
@@ -7,7 +7,6 @@
 
 #include "platform.h"
 #include "debuglib.h"
-#include "diva_pci.h"
 #include "cardtype.h"
 #include "dlist.h"
 #include "pc.h"
@@ -15,19 +14,17 @@
 #include "di.h"
 #include "io.h"
 #include "pc_maint.h"
-
 #include "xdi_msg.h"
 #include "xdi_adapter.h"
+#include "diva_pci.h"
 #include "diva.h"
 
 #ifdef CONFIG_ISDN_DIVAS_PRIPCI
 #include "os_pri.h"
 #endif
-#ifdef CONFIG_ISDN_DIVAS_4BRIPCI
-#include "os_4bri.h"
-#endif
 #ifdef CONFIG_ISDN_DIVAS_BRIPCI
 #include "os_bri.h"
+#include "os_4bri.h"
 #endif
 
 PISDN_ADAPTER IoAdapters[MAX_ADAPTER];
@@ -78,6 +75,11 @@ DivaIdiReqFunc(31)
 struct pt_regs;
 
 /*
+ * include queue functions
+ */
+#include "dlist.c"
+
+/*
 **  LOCALS
 */
 diva_entity_queue_t adapter_queue;
@@ -109,7 +111,7 @@ static diva_supported_cards_info_t divas_supported_cards[] = {
 	 */
 	{CARDTYPE_DIVASRV_VOICE_P_30M_V2_PCI, diva_pri_init_card},
 #endif
-#ifdef CONFIG_ISDN_DIVAS_4BRIPCI
+#ifdef CONFIG_ISDN_DIVAS_BRIPCI
 	/*
 	   4BRI Rev 1 Cards
 	 */
@@ -126,8 +128,6 @@ static diva_supported_cards_info_t divas_supported_cards[] = {
 	{CARDTYPE_DIVASRV_B_2M_V2_PCI, diva_4bri_init_card},
 	{CARDTYPE_DIVASRV_B_2F_PCI, diva_4bri_init_card},
 	{CARDTYPE_DIVASRV_VOICE_B_2M_V2_PCI, diva_4bri_init_card},
-#endif
-#ifdef CONFIG_ISDN_DIVAS_BRIPCI
 	/*
 	   BRI
 	 */
@@ -193,6 +193,7 @@ void *diva_driver_add_card(void *pdev, unsigned long CardOrdinal)
 					pdiva->controller = i + 1;
 					pdiva->xdi_adapter.ANum = pdiva->controller;
 					IoAdapters[i] = &pdiva->xdi_adapter;
+					diva_os_leave_spin_lock(&adapter_lock, &old_irql, "add card");
 					create_adapter_proc(pdiva);	/* add adapter to proc file system */
 
 					DBG_LOG(("add %s:%d",
@@ -200,6 +201,7 @@ void *diva_driver_add_card(void *pdev, unsigned long CardOrdinal)
 						 [CardOrdinal].Name,
 						 pdiva->controller))
 
+					diva_os_enter_spin_lock(&adapter_lock, &old_irql, "add card");
 					pa = pdiva;
 					for (j = 1; j < nr; j++) {	/* slave adapters, if any */
 						pa = (diva_os_xdi_adapter_t *) diva_q_get_next(&pa->link);
@@ -207,8 +209,11 @@ void *diva_driver_add_card(void *pdev, unsigned long CardOrdinal)
 							pa->controller = i + 1 + j;
 							pa->xdi_adapter.ANum = pa->controller;
 							IoAdapters[i + j] = &pa->xdi_adapter;
+							diva_os_leave_spin_lock(&adapter_lock, &old_irql, "add card");
 							DBG_LOG(("add slave adapter (%d)",
-								 pa->controller)) create_adapter_proc(pa);	/* add adapter to proc file system */
+								 pa->controller))
+							create_adapter_proc(pa);	/* add adapter to proc file system */
+							diva_os_enter_spin_lock(&adapter_lock, &old_irql, "add card");
 						} else {
 							DBG_ERR(("slave adapter problem"))
 							break;
@@ -463,7 +468,8 @@ diva_xdi_write(void *adapter, void *os_handle, const void *src,
 		}
 	} else {
 		DBG_ERR(("A: A(%d) write error (%d)", a->controller,
-			 length))}
+			 length))
+	}
 
 	diva_os_free(0, data);
 
@@ -564,7 +570,6 @@ static void diva_init_request_array(void)
 	Requests[31] = DivaIdiRequest31;
 }
 
-/* card:  1-based card number */
 void diva_xdi_display_adapter_features(int card)
 {
 	dword features;

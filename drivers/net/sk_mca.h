@@ -1,3 +1,5 @@
+#include <linux/version.h>
+
 #ifndef _SK_MCA_INCLUDE_
 #define _SK_MCA_INCLUDE_
 

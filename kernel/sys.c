@@ -290,7 +290,7 @@ asmlinkage long sys_setpriority(int which, int who, int niceval)
 			break;
 		case PRIO_PGRP:
 			if (!who)
-				who = current->pgrp;
+				who = process_group(current);
 			for_each_task_pid(who, PIDTYPE_PGID, p, l, pid)
 				error = set_one_prio(p, niceval, error);
 			break;
@@ -346,7 +346,7 @@ asmlinkage long sys_getpriority(int which, int who)
 			break;
 		case PRIO_PGRP:
 			if (!who)
-				who = current->pgrp;
+				who = process_group(current);
 			for_each_task_pid(who, PIDTYPE_PGID, p, l, pid) {
 				niceval = 20 - task_nice(p);
 				if (niceval > retval)
@@ -456,8 +456,11 @@ asmlinkage long sys_reboot(int magic1, int magic2, unsigned int cmd, void __user
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
 	case LINUX_REBOOT_CMD_SW_SUSPEND:
-		if (!pm_suspend(PM_SUSPEND_DISK))
-			break;
+		if (!software_suspend_enabled) {
+			unlock_kernel();
+			return -EAGAIN;
+		}
+		software_suspend();
 		do_exit(0);
 		break;
 #endif
@@ -979,11 +982,12 @@ ok_pgid:
 	if (err)
 		goto out;
 
-	if (p->pgrp != pgid) {
+	if (process_group(p) != pgid) {
 		detach_pid(p, PIDTYPE_PGID);
-		p->pgrp = pgid;
+		p->group_leader->__pgrp = pgid;
 		attach_pid(p, PIDTYPE_PGID, pgid);
 	}
+
 	err = 0;
 out:
 	/* All paths lead to here, thus we are safe. -DaveM */
@@ -994,7 +998,7 @@ out:
 asmlinkage long sys_getpgid(pid_t pid)
 {
 	if (!pid) {
-		return current->pgrp;
+		return process_group(current);
 	} else {
 		int retval;
 		struct task_struct *p;
@@ -1006,7 +1010,7 @@ asmlinkage long sys_getpgid(pid_t pid)
 		if (p) {
 			retval = security_task_getpgid(p);
 			if (!retval)
-				retval = p->pgrp;
+				retval = process_group(p);
 		}
 		read_unlock(&tasklist_lock);
 		return retval;
@@ -1016,7 +1020,7 @@ asmlinkage long sys_getpgid(pid_t pid)
 asmlinkage long sys_getpgrp(void)
 {
 	/* SMP - assuming writes are word atomic this is fine */
-	return current->pgrp;
+	return process_group(current);
 }
 
 asmlinkage long sys_getsid(pid_t pid)
@@ -1059,7 +1063,7 @@ asmlinkage long sys_setsid(void)
 	__set_special_pids(current->pid, current->pid);
 	current->tty = NULL;
 	current->tty_old_pgrp = 0;
-	err = current->pgrp;
+	err = process_group(current);
 out:
 	write_unlock_irq(&tasklist_lock);
 	return err;

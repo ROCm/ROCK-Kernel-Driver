@@ -92,40 +92,7 @@
 #include <linux/delay.h>
 #include <linux/version.h>
 #include <linux/pci.h>
-
-
-/* ************************************************************** */
-/* * This section can be removed when 2.0 becomes outdated....  * */
-/* ************************************************************** */
-
-#if LINUX_VERSION_CODE < 131328    /* Less than 2.1.0 */
-#define TWO_ZERO
-#else
-#if LINUX_VERSION_CODE < 131371   /* less than 2.1.43 */
-/* This has not been extensively tested yet. Sorry. */
-#warning "You're on your own between 2.1.0 and 2.1.43.... "
-#warning "Please use a recent kernel."
-#endif
-#endif
-
-
-#ifdef TWO_ZERO
-#define Get_user(a,b)         a = get_user(b)
-#define copy_from_user(a,b,c) memcpy_fromfs(a,b,c)
-#define copy_to_user(a,b,c)   memcpy_tofs(a,b,c)
-#define queue_task            queue_task_irq_off
-#else
-#define Get_user(a,b)         get_user(a,b)
-#endif
-
-/* ************************************************************** */
-/* *                End of compatibility section..              * */
-/* ************************************************************** */
-
-
-#ifndef TWO_ZERO
 #include <asm/uaccess.h>
-#endif
 
 #include "specialix_io8.h"
 #include "cd1865.h"
@@ -1395,7 +1362,6 @@ static int sx_open(struct tty_struct * tty, struct file * filp)
 	int error;
 	struct specialix_port * port;
 	struct specialix_board * bp;
-	unsigned long flags;
 	
 	board = SX_BOARD(tty->index);
 
@@ -1733,7 +1699,7 @@ static int sx_set_modem_info(struct specialix_port * port, unsigned int cmd,
 	if (error) 
 		return error;
 
-	Get_user(arg, (unsigned long *) value);
+	get_user(arg, (unsigned long *) value);
 	switch (cmd) {
 	case TIOCMBIS: 
 	   /*	if (arg & TIOCM_RTS) 
@@ -1925,7 +1891,7 @@ static int sx_ioctl(struct tty_struct * tty, struct file * filp,
 		         (unsigned long *) arg);
 		return 0;
 	 case TIOCSSOFTCAR:
-		Get_user(arg, (unsigned long *) arg);
+		get_user(arg, (unsigned long *) arg);
 		tty->termios->c_cflag =
 			((tty->termios->c_cflag & ~CLOCAL) |
 			(arg ? CLOCAL : 0));
@@ -2238,7 +2204,7 @@ void specialix_setup(char *str, int * ints)
 /* 
  * This routine must be called by kernel at boot time 
  */
-int specialix_init(void) 
+static int __init specialix_init(void)
 {
 	int i;
 	int found = 0;
@@ -2296,7 +2262,6 @@ int specialix_init(void)
 	return 0;
 }
 
-#ifdef MODULE
 int iobase[SX_NBOARD]  = {0,};
 
 int irq [SX_NBOARD] = {0,};
@@ -2313,7 +2278,7 @@ MODULE_PARM(irq,"1-" __MODULE_STRING(SX_NBOARD) "i");
  * only use 4 different interrupts. 
  *
  */
-int init_module(void) 
+static int __init specialix_init_module(void)
 {
 	int i;
 
@@ -2327,8 +2292,7 @@ int init_module(void)
 	return specialix_init();
 }
 	
-
-void cleanup_module(void)
+static void __exit specialix_exit_module(void)
 {
 	int i;
 	
@@ -2341,6 +2305,8 @@ void cleanup_module(void)
 #endif
 	
 }
-#endif /* MODULE */
+
+module_init(specialix_init_module);
+module_exit(specialix_exit_module);
 
 MODULE_LICENSE("GPL");

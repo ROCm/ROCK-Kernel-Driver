@@ -31,12 +31,9 @@ config PACKET
 	  protocol implemented in the kernel, e.g. tcpdump.  If you want them
 	  to work, choose Y.
 
-	  This driver is also available as a module called af_packet ( =
-	  code which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>; if you use modprobe
-	  or kmod, you may also want to add "alias net-pf-17 af_packet" to
-	  /etc/modules.conf.
+	  To compile this driver as a module, choose M here: the module will
+	  be called af_packet. If you use modprobe or kmod, you may also
+	  want to add "alias net-pf-17 af_packet" to /etc/modules.conf.
 
 	  If unsure, say Y.
 
@@ -69,10 +66,7 @@ config UNIX
 	  an embedded system or something similar, you therefore definitely
 	  want to say Y here.
 
-	  However, the socket support is also available as a module ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>. The module will be
+	  To compile this driver as a module, choose M here: the module will be
 	  called unix.  If you try building this as a module and you have
 	  said Y to "Kernel module loader support" above, be sure to add
 	  'alias net-pf-1 unix' to your /etc/modules.conf file. Note that
@@ -140,10 +134,8 @@ config IPV6
 	  given in <file:Documentation/Changes>. You will still be able to do
 	  regular IPv4 networking as well.
 
-	  This protocol support is also available as a module ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want). The module will be called ipv6. If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this protocol support as a module, choose M here: the
+	  module will be called ipv6.
 
 	  It is safe to say N here for now.
 
@@ -197,9 +189,7 @@ config BRIDGE
 	  Enabling arptables support when bridging will let arptables see
 	  bridged ARP traffic in the arptables FORWARD chain.
 
-	  If you want to compile this code as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
+	  To compile this code as a module, choose M here: the module
 	  will be called bridge.
 
 	  If unsure, say N.
@@ -370,24 +360,11 @@ config ATM_BR2684_IPFILTER
 config VLAN_8021Q
 	tristate "802.1Q VLAN Support"
 
-config LLC
-	tristate "ANSI/IEEE 802.2 - aka LLC (IPX, Appletalk, Token Ring)"
-	help
-	  This is a Logical Link Layer protocol used for Appletalk, IPX,
-	  Token Ring devices, the linux-sna.org project and in the future by
-	  NetBEUI. It originally came from Procom Inc. that released the code
-	  for 2.0.36 and was heavily modified to work with 2.{4,5}.
-	  Select this if you want to have support for those protocols or if
-	  you want to have the sockets interface for LLC.
-	  
-
-config LLC_UI
-	bool "LLC sockets interface"
-	depends on LLC
+source "net/llc/Kconfig"
 
 config IPX
 	tristate "The IPX protocol"
-	depends on LLC
+	select LLC
 	---help---
 	  This is support for the Novell networking protocol, IPX, commonly
 	  used for local networks of Windows machines.  You need it if you
@@ -413,18 +390,16 @@ config IPX
 	  General information about how to connect Linux, Windows machines and
 	  Macs is on the WWW at <http://www.eats.com/linux_mac_win.html>.
 
-	  The IPX driver would enlarge your kernel by about 16 KB. This driver
-	  is also available as a module ( = code which can be inserted in and
-	  removed from the running kernel whenever you want).  The module will
-	  be called ipx.  If you want to compile it as a module, say M here
-	  and read <file:Documentation/modules.txt>.  Unless you want to
-	  integrate your Linux box with a local Novell network, say N.
+	  The IPX driver would enlarge your kernel by about 16 KB. To compile
+	  this driver as a module, choose M here: the module will be called ipx.
+	  Unless you want to integrate your Linux box with a local Novell
+	  network, say N.
 
 source "net/ipx/Kconfig"
 
 config ATALK
 	tristate "Appletalk protocol support"
-	depends on LLC
+	select LLC
 	---help---
 	  AppleTalk is the protocol that Apple computers can use to communicate
 	  on a network.  If your Linux box is connected to such a network and you
@@ -443,14 +418,11 @@ config ATALK
 	  <http://www.tldp.org/docs.html#howto>, contains valuable
 	  information as well.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called appletalk.  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.  You
-	  almost certainly want to compile it as a module so you can restart
-	  your AppleTalk stack without rebooting your machine.  I hear that
-	  the GNU boycott of Apple is over, so even politically correct people
-	  are allowed to say Y here.
+	  To compile this driver as a module, choose M here: the module will be
+	  called appletalk. You almost certainly want to compile it as a
+	  module so you can restart your AppleTalk stack without rebooting
+	  your machine. I hear that the GNU boycott of Apple is over, so
+	  even politically correct people are allowed to say Y here.
 
 source "drivers/net/appletalk/Kconfig"
 
@@ -479,13 +451,10 @@ config X25
 	  using the X.21 protocol (not yet supported by Linux) or one can do
 	  X.25 over a standard telephone line using an ordinary modem (say Y
 	  to "X.25 async driver" below) or over Ethernet using an ordinary
-	  Ethernet card and either the 802.2 LLC protocol (say Y to "802.2
-	  LLC" below) or LAPB over Ethernet (say Y to "LAPB Data Link Driver"
-	  and "LAPB over Ethernet driver" below).
+	  Ethernet card and the LAPB over Ethernet (say Y to "LAPB Data Link
+	  Driver" and "LAPB over Ethernet driver" below).
 
-	  If you want to compile this driver as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want),
-	  say M here and read <file:Documentation/modules.txt>.  The module
+	  To compile this driver as a module, choose M here: the module
 	  will be called x25. If unsure, say N.
 
 config LAPB
@@ -504,9 +473,7 @@ config LAPB
 	  <file:Documentation/networking/lapb-module.txt> for technical
 	  details.
 
-	  If you want to compile this driver as a module though ( = code which
-	  can be inserted in and removed from the running kernel whenever you
-	  want), say M here and read <file:Documentation/modules.txt>.  The
+	  To compile this driver as a module, choose M here: the
 	  module will be called lapb.  If unsure, say N.
 
 config NET_DIVERT
@@ -550,10 +517,8 @@ config ECONET
 	  to send Econet/AUN traffic over a UDP Ethernet connection or over
 	  a native Econet network card.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called econet. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module
+	  will be called econet.
 
 config ECONET_AUNUDP
 	bool "AUN over UDP"
@@ -591,10 +556,8 @@ config WAN_ROUTER
 	  Read <file:Documentation/networking/wan-router.txt> for more
 	  information.
 
-	  The WAN routing support is also available as a module called
-	  wanrouter ( = code which can be inserted in and removed from the
-	  running kernel whenever you want).  If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile WAN routing support as a module, choose M here: the
+	  module will be called wanrouter.
 
 	  If unsure, say N.
 
@@ -692,15 +655,19 @@ config NET_PKTGEN
 	  Documentation on how to use the packet generaor can be found
 	  at <file:Documentation/networking/pktgen.txt>.
 
-	  This code is also available as a module called pktgen ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want).  If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this code as a module, choose M here: the
+	  module will be called pktgen.
 
 endmenu
 
 endmenu
 
 source "drivers/net/Kconfig"
+
+source "net/ax25/Kconfig"
+
+source "net/irda/Kconfig"
+
+source "net/bluetooth/Kconfig"
 
 endmenu

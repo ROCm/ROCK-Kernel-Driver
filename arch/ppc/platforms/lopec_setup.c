@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/lopec_setup.c
- * 
+ *
  * Setup routines for the Motorola LoPEC.
  *
  * Author: Dan Cox
@@ -232,7 +232,7 @@ lopec_request_io(void)
 	request_region(0x80, 0x10, "dma page reg");
 	request_region(0xa0, 0x20, "pic2");
 	request_region(0xc0, 0x20, "dma2");
-	
+
 	return 0;
 }
 
@@ -328,7 +328,7 @@ lopec_setup_arch(void)
 	conswitchp = &dummy_con;
 #endif
 #ifdef CONFIG_PPCBUG_NVRAM
-	/* Read in NVRAM data */ 
+	/* Read in NVRAM data */
 	init_prep_nvram();
 
 	/* if no bootargs, look in NVRAM */

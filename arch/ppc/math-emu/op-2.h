@@ -98,7 +98,7 @@
 #define _FP_MINFRAC_2		0, 1
 
 /*
- * Internals 
+ * Internals
  */
 
 #define __FP_FRAC_SET_2(X,I1,I0)	(X##_f0 = I0, X##_f1 = I1)
@@ -210,8 +210,8 @@
 /* This next macro appears to be totally broken. Fortunately nowhere
  * seems to use it :-> The problem is that we define _z[4] but
  * then use it in _FP_FRAC_SRS_4, which will attempt to access
- * _z_f[n] which will cause an error. The fix probably involves 
- * declaring it with _FP_FRAC_DECL_4, see previous macro. -- PMM 02/1998 
+ * _z_f[n] which will cause an error. The fix probably involves
+ * declaring it with _FP_FRAC_DECL_4, see previous macro. -- PMM 02/1998
  */
 #define _FP_MUL_MEAT_2_gmp(fs, R, X, Y)					\
   do {									\
@@ -232,7 +232,7 @@
 
 /*
  * Division algorithms:
- * This seems to be giving me difficulties -- PMM 
+ * This seems to be giving me difficulties -- PMM
  * Look, NetBSD seems to be able to comment algorithms. Can't you?
  * I've thrown printks at the problem.
  * This now appears to work, but I still don't really know why.
@@ -354,7 +354,7 @@
  * We have just one right now, maybe Newton approximation
  * should be added for those machines where division is fast.
  */
- 
+
 #define _FP_SQRT_MEAT_2(R, S, T, X, q)			\
   do {							\
     while (q)						\
@@ -391,7 +391,7 @@
 
 
 /*
- * Assembly/disassembly for converting to/from integral types.  
+ * Assembly/disassembly for converting to/from integral types.
  * No shifting or overflow handled here.
  */
 

@@ -1,6 +1,6 @@
 /*
  * arch/ppc/boot/simple/misc-ev64260.S
- * 
+ *
  * Host bridge init code for the Marvell/Galileo EV-64260-BP evaluation board
  * with a GT64260 onboard.
  *
@@ -13,7 +13,6 @@
  */
 
 #include <asm/ppc_asm.h>
-#include <asm/processor.h>
 #include <asm/cache.h>
 #include <asm/gt64260_defs.h>
 
@@ -26,7 +25,7 @@ ev64260_init:
 
 	/* Relocate galileo's regs */
         addis	r25,0,GT64260_INTERNAL_SPACE_DEFAULT_ADDR@h
-        ori	r25,r25,GT64260_INTERNAL_SPACE_DECODE             
+        ori	r25,r25,GT64260_INTERNAL_SPACE_DECODE
         lwbrx	r26,0,(r25)
 	lis	r24,0xffff
 	and	r26,r26,r24
@@ -45,7 +44,7 @@ ev64260_init:
 
         /* Change CS2 (UARTS on device module) window */
         addis	r25,0,EV64260_BRIDGE_REG_BASE@h
-        ori	r25,r25,GT64260_CPU_CS_DECODE_2_BOT             
+        ori	r25,r25,GT64260_CPU_CS_DECODE_2_BOT
 	addis	r26,0,EV64260_UART_BASE@h
 	srw	r26,r26,r23
         stwbrx  r26,0,(r25)

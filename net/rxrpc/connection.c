@@ -28,18 +28,20 @@ __RXACCT_DECL(atomic_t rxrpc_connection_count);
 
 LIST_HEAD(rxrpc_conns);
 DECLARE_RWSEM(rxrpc_conns_sem);
+unsigned long rxrpc_conn_timeout = 60 * 60;
 
 static void __rxrpc_conn_timeout(rxrpc_timer_t *timer)
 {
-	struct rxrpc_connection *conn = list_entry(timer,struct rxrpc_connection,timeout);
+	struct rxrpc_connection *conn =
+		list_entry(timer, struct rxrpc_connection, timeout);
 
-	_debug("Rx CONN TIMEOUT [%p{u=%d}]",conn,atomic_read(&conn->usage));
+	_debug("Rx CONN TIMEOUT [%p{u=%d}]", conn, atomic_read(&conn->usage));
 
 	rxrpc_conn_do_timeout(conn);
 }
 
 static const struct rxrpc_timer_ops rxrpc_conn_timer_ops = {
-	.timed_out	= __rxrpc_conn_timeout,
+	timed_out:	__rxrpc_conn_timeout,
 };
 
 /*****************************************************************************/
@@ -54,19 +56,20 @@ static inline int __rxrpc_create_connection(struct rxrpc_peer *peer,
 	_enter("%p",peer);
 
 	/* allocate and initialise a connection record */
-	conn = kmalloc(sizeof(struct rxrpc_connection),GFP_KERNEL);
+	conn = kmalloc(sizeof(struct rxrpc_connection), GFP_KERNEL);
 	if (!conn) {
 		_leave(" = -ENOMEM");
 		return -ENOMEM;
 	}
 
-	memset(conn,0,sizeof(struct rxrpc_connection));
-	atomic_set(&conn->usage,1);
+	memset(conn, 0, sizeof(struct rxrpc_connection));
+	atomic_set(&conn->usage, 1);
 
 	INIT_LIST_HEAD(&conn->link);
+	INIT_LIST_HEAD(&conn->id_link);
 	init_waitqueue_head(&conn->chanwait);
 	spin_lock_init(&conn->lock);
-	rxrpc_timer_init(&conn->timeout,&rxrpc_conn_timer_ops);
+	rxrpc_timer_init(&conn->timeout, &rxrpc_conn_timer_ops);
 
 	do_gettimeofday(&conn->atime);
 	conn->mtu_size = 1024;
@@ -75,7 +78,7 @@ static inline int __rxrpc_create_connection(struct rxrpc_peer *peer,
 
 	__RXACCT(atomic_inc(&rxrpc_connection_count));
 	*_conn = conn;
-	_leave(" = 0 (%p)",conn);
+	_leave(" = 0 (%p)", conn);
 
 	return 0;
 } /* end __rxrpc_create_connection() */
@@ -85,61 +88,123 @@ static inline int __rxrpc_create_connection(struct rxrpc_peer *peer,
  * create a new connection record for outgoing connections
  */
 int rxrpc_create_connection(struct rxrpc_transport *trans,
-			    u16 port,
-			    u32 addr,
-			    unsigned short service_id,
+			    uint16_t port,
+			    uint32_t addr,
+			    uint16_t service_id,
 			    void *security,
 			    struct rxrpc_connection **_conn)
 {
-	struct rxrpc_connection *conn;
+	struct rxrpc_connection *candidate, *conn;
 	struct rxrpc_peer *peer;
+	struct list_head *_p;
+	uint32_t connid;
 	int ret;
 
-	_enter("%p{%hu},%u,%hu",trans,trans->port,ntohs(port),service_id);
+	_enter("%p{%hu},%u,%hu", trans, trans->port, ntohs(port), service_id);
 
 	/* get a peer record */
-	ret = rxrpc_peer_lookup(trans,addr,&peer);
-	if (ret<0) {
-		_leave(" = %d",ret);
+	ret = rxrpc_peer_lookup(trans, addr, &peer);
+	if (ret < 0) {
+		_leave(" = %d", ret);
 		return ret;
 	}
 
 	/* allocate and initialise a connection record */
-	ret = __rxrpc_create_connection(peer,&conn);
-	if (ret<0) {
+	ret = __rxrpc_create_connection(peer, &candidate);
+	if (ret < 0) {
 		rxrpc_put_peer(peer);
-		_leave(" = %d",ret);
+		_leave(" = %d", ret);
 		return ret;
 	}
 
 	/* fill in the specific bits */
-	conn->addr.sin_family	= AF_INET;
-	conn->addr.sin_port	= port;
-	conn->addr.sin_addr.s_addr = addr;
+	candidate->addr.sin_family	= AF_INET;
+	candidate->addr.sin_port	= port;
+	candidate->addr.sin_addr.s_addr	= addr;
 
-	conn->in_epoch		= rxrpc_epoch;
-	conn->out_epoch		= rxrpc_epoch;
-	conn->in_clientflag	= 0;
-	conn->out_clientflag	= RXRPC_CLIENT_INITIATED;
-	conn->conn_id		= htonl((unsigned long) conn & RXRPC_CIDMASK);
-	conn->service_id	= htons(service_id);
+	candidate->in_epoch		= rxrpc_epoch;
+	candidate->out_epoch		= rxrpc_epoch;
+	candidate->in_clientflag	= 0;
+	candidate->out_clientflag	= RXRPC_CLIENT_INITIATED;
+	candidate->service_id		= htons(service_id);
+
+	/* invent a unique connection ID */
+	write_lock(&peer->conn_idlock);
+
+ try_next_id:
+	connid = htonl(peer->conn_idcounter & RXRPC_CIDMASK);
+	peer->conn_idcounter += RXRPC_MAXCALLS;
+
+	list_for_each(_p, &peer->conn_idlist) {
+		conn = list_entry(_p, struct rxrpc_connection, id_link);
+		if (connid == conn->conn_id)
+			goto try_next_id;
+		if (connid > conn->conn_id)
+			break;
+	}
+
+	_debug("selected candidate conn ID %x.%u",
+	       ntohl(peer->addr.s_addr), ntohl(connid));
+
+	candidate->conn_id = connid;
+	list_add_tail(&candidate->id_link, _p);
+
+	write_unlock(&peer->conn_idlock);
 
 	/* attach to peer */
-	conn->peer = peer;
+	candidate->peer = peer;
 
 	write_lock(&peer->conn_lock);
-	list_add_tail(&conn->link,&peer->conn_active);
+
+	/* search the peer's transport graveyard list */
+	spin_lock(&peer->conn_gylock);
+	list_for_each(_p, &peer->conn_graveyard) {
+		conn = list_entry(_p, struct rxrpc_connection, link);
+		if (conn->addr.sin_port	== candidate->addr.sin_port	&&
+		    conn->security_ix	== candidate->security_ix	&&
+		    conn->service_id	== candidate->service_id	&& 
+		    conn->in_clientflag	== 0)
+			goto found_in_graveyard;
+	}
+	spin_unlock(&peer->conn_gylock);
+
+	/* pick the new candidate */
+	_debug("created connection: {%08x} [out]", htonl(candidate->conn_id));
 	atomic_inc(&peer->conn_count);
+	conn = candidate;
+	candidate = NULL;
+
+ make_active:
+	list_add_tail(&conn->link, &peer->conn_active);
 	write_unlock(&peer->conn_lock);
 
-	down_write(&rxrpc_conns_sem);
-	list_add_tail(&conn->proc_link,&rxrpc_conns);
-	up_write(&rxrpc_conns_sem);
+	if (candidate) {
+		write_lock(&peer->conn_idlock);
+		list_del(&candidate->id_link);
+		write_unlock(&peer->conn_idlock);
+
+		__RXACCT(atomic_dec(&rxrpc_connection_count));
+		kfree(candidate);
+	}
+	else {
+		down_write(&rxrpc_conns_sem);
+		list_add_tail(&conn->proc_link, &rxrpc_conns);
+		up_write(&rxrpc_conns_sem);
+	}
 
 	*_conn = conn;
-	_leave(" = 0 (%p)",conn);
+	_leave(" = 0 (%p)", conn);
 
 	return 0;
+
+	/* handle resurrecting a connection from the graveyard */
+ found_in_graveyard:
+	_debug("resurrecting connection: {%08x} [out]", htonl(conn->conn_id));
+	rxrpc_get_connection(conn);
+	rxrpc_krxtimod_del_timer(&conn->timeout);
+	list_del_init(&conn->link);
+	spin_unlock(&peer->conn_gylock);
+	goto make_active;
 } /* end rxrpc_create_connection() */
 
 /*****************************************************************************/
@@ -159,7 +224,10 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 	u8 x_clflag;
 
 	_enter("%p{{%hu}},%u,%hu",
-	       peer,peer->trans->port,ntohs(msg->pkt->h.uh->source),ntohs(msg->hdr.serviceId));
+	       peer,
+	       peer->trans->port,
+	       ntohs(msg->pkt->h.uh->source),
+	       ntohs(msg->hdr.serviceId));
 
 	x_port		= msg->pkt->h.uh->source;
 	x_epoch		= msg->hdr.epoch;
@@ -170,8 +238,8 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 
 	/* [common case] search the transport's active list first */
 	read_lock(&peer->conn_lock);
-	list_for_each(_p,&peer->conn_active) {
-		conn = list_entry(_p,struct rxrpc_connection,link);
+	list_for_each(_p, &peer->conn_active) {
+		conn = list_entry(_p, struct rxrpc_connection, link);
 		if (conn->addr.sin_port		== x_port	&&
 		    conn->in_epoch		== x_epoch	&&
 		    conn->conn_id		== x_connid	&&
@@ -187,9 +255,9 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 	 * - only examine the graveyard for an outbound connection
 	 */
 	if (x_clflag) {
-		ret = __rxrpc_create_connection(peer,&candidate);
-		if (ret<0) {
-			_leave(" = %d",ret);
+		ret = __rxrpc_create_connection(peer, &candidate);
+		if (ret < 0) {
+			_leave(" = %d", ret);
 			return ret;
 		}
 
@@ -206,10 +274,11 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 		candidate->security_ix		= x_secix;
 	}
 
-	/* search the active list again, just in case it appeared whilst we were busy */
+	/* search the active list again, just in case it appeared whilst we
+	 * were busy */
 	write_lock(&peer->conn_lock);
-	list_for_each(_p,&peer->conn_active) {
-		conn = list_entry(_p,struct rxrpc_connection,link);
+	list_for_each(_p, &peer->conn_active) {
+		conn = list_entry(_p, struct rxrpc_connection, link);
 		if (conn->addr.sin_port		== x_port	&&
 		    conn->in_epoch		== x_epoch	&&
 		    conn->conn_id		== x_connid	&&
@@ -221,8 +290,8 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 
 	/* search the transport's graveyard list */
 	spin_lock(&peer->conn_gylock);
-	list_for_each(_p,&peer->conn_graveyard) {
-		conn = list_entry(_p,struct rxrpc_connection,link);
+	list_for_each(_p, &peer->conn_graveyard) {
+		conn = list_entry(_p, struct rxrpc_connection, link);
 		if (conn->addr.sin_port		== x_port	&&
 		    conn->in_epoch		== x_epoch	&&
 		    conn->conn_id		== x_connid	&&
@@ -241,6 +310,7 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 	}
 
 	/* we can now add the new candidate to the list */
+	_debug("created connection: {%08x} [in]", htonl(candidate->conn_id));
 	rxrpc_get_peer(peer);
 	conn = candidate;
 	candidate = NULL;
@@ -248,25 +318,29 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 	fresh = 1;
 
  make_active:
-	list_add_tail(&conn->link,&peer->conn_active);
+	list_add_tail(&conn->link, &peer->conn_active);
 
  success_uwfree:
 	write_unlock(&peer->conn_lock);
 
 	if (candidate) {
+		write_lock(&peer->conn_idlock);
+		list_del(&candidate->id_link);
+		write_unlock(&peer->conn_idlock);
+
 		__RXACCT(atomic_dec(&rxrpc_connection_count));
 		kfree(candidate);
 	}
 
 	if (fresh) {
 		down_write(&rxrpc_conns_sem);
-		list_add_tail(&conn->proc_link,&rxrpc_conns);
+		list_add_tail(&conn->proc_link, &rxrpc_conns);
 		up_write(&rxrpc_conns_sem);
 	}
 
  success:
 	*_conn = conn;
-	_leave(" = 0 (%p)",conn);
+	_leave(" = 0 (%p)", conn);
 	return 0;
 
 	/* handle the connection being found in the active list straight off */
@@ -277,6 +351,7 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 
 	/* handle resurrecting a connection from the graveyard */
  found_in_graveyard:
+	_debug("resurrecting connection: {%08x} [in]", htonl(conn->conn_id));
 	rxrpc_get_peer(peer);
 	rxrpc_get_connection(conn);
 	rxrpc_krxtimod_del_timer(&conn->timeout);
@@ -284,7 +359,8 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 	spin_unlock(&peer->conn_gylock);
 	goto make_active;
 
-	/* handle finding the connection on the second time through the active list */
+	/* handle finding the connection on the second time through the active
+	 * list */
  found_active_second_chance:
 	rxrpc_get_connection(conn);
 	goto success_uwfree;
@@ -294,19 +370,26 @@ int rxrpc_connection_lookup(struct rxrpc_peer *peer,
 /*****************************************************************************/
 /*
  * finish using a connection record
- * - it will be transferred to the peer's connection graveyard when refcount reaches 0
+ * - it will be transferred to the peer's connection graveyard when refcount
+ *   reaches 0
  */
 void rxrpc_put_connection(struct rxrpc_connection *conn)
 {
-	struct rxrpc_peer *peer = conn->peer;
+	struct rxrpc_peer *peer;
 
-	_enter("%p{u=%d p=%hu}",conn,atomic_read(&conn->usage),ntohs(conn->addr.sin_port));
+	if (!conn)
+		return;
+
+	_enter("%p{u=%d p=%hu}",
+	       conn, atomic_read(&conn->usage), ntohs(conn->addr.sin_port));
+
+	peer = conn->peer;
+	spin_lock(&peer->conn_gylock);
 
 	/* sanity check */
-	if (atomic_read(&conn->usage)<=0)
+	if (atomic_read(&conn->usage) <= 0)
 		BUG();
 
-	spin_lock(&peer->conn_gylock);
 	if (likely(!atomic_dec_and_test(&conn->usage))) {
 		spin_unlock(&peer->conn_gylock);
 		_leave("");
@@ -314,11 +397,11 @@ void rxrpc_put_connection(struct rxrpc_connection *conn)
 	}
 
 	/* move to graveyard queue */
+	_debug("burying connection: {%08x}", htonl(conn->conn_id));
 	list_del(&conn->link);
-	list_add_tail(&conn->link,&peer->conn_graveyard);
+	list_add_tail(&conn->link, &peer->conn_graveyard);
 
-	/* discard in 100 secs */
-	rxrpc_krxtimod_add_timer(&conn->timeout,20*HZ);
+	rxrpc_krxtimod_add_timer(&conn->timeout, rxrpc_conn_timeout * HZ);
 
 	spin_unlock(&peer->conn_gylock);
 
@@ -335,16 +418,17 @@ void rxrpc_conn_do_timeout(struct rxrpc_connection *conn)
 {
 	struct rxrpc_peer *peer;
 
-	_enter("%p{u=%d p=%hu}",conn,atomic_read(&conn->usage),ntohs(conn->addr.sin_port));
+	_enter("%p{u=%d p=%hu}",
+	       conn, atomic_read(&conn->usage), ntohs(conn->addr.sin_port));
 
 	peer = conn->peer;
 
-	if (atomic_read(&conn->usage)<0)
+	if (atomic_read(&conn->usage) < 0)
 		BUG();
 
 	/* remove from graveyard if still dead */
 	spin_lock(&peer->conn_gylock);
-	if (atomic_read(&conn->usage)==0) {
+	if (atomic_read(&conn->usage) == 0) {
 		list_del_init(&conn->link);
 	}
 	else {
@@ -357,11 +441,16 @@ void rxrpc_conn_do_timeout(struct rxrpc_connection *conn)
 		return; /* resurrected */
 	}
 
-	_debug("--- Destroying Connection %p ---",conn);
+	_debug("--- Destroying Connection %p{%08x} ---",
+	       conn, htonl(conn->conn_id));
 
 	down_write(&rxrpc_conns_sem);
 	list_del(&conn->proc_link);
 	up_write(&rxrpc_conns_sem);
+
+	write_lock(&peer->conn_idlock);
+	list_del(&conn->id_link);
+	write_unlock(&peer->conn_idlock);
 
 	__RXACCT(atomic_dec(&rxrpc_connection_count));
 	kfree(conn);
@@ -379,12 +468,12 @@ void rxrpc_conn_do_timeout(struct rxrpc_connection *conn)
  */
 void rxrpc_conn_clearall(struct rxrpc_peer *peer)
 {
-	DECLARE_WAITQUEUE(myself,current);
+	DECLARE_WAITQUEUE(myself, current);
 
 	struct rxrpc_connection *conn;
 	int err;
 
-	_enter("%p",peer);
+	_enter("%p", peer);
 
 	/* there shouldn't be any active conns remaining */
 	if (!list_empty(&peer->conn_active))
@@ -393,11 +482,12 @@ void rxrpc_conn_clearall(struct rxrpc_peer *peer)
 	/* manually timeout all conns in the graveyard */
 	spin_lock(&peer->conn_gylock);
 	while (!list_empty(&peer->conn_graveyard)) {
-		conn = list_entry(peer->conn_graveyard.next,struct rxrpc_connection,link);
+		conn = list_entry(peer->conn_graveyard.next,
+				  struct rxrpc_connection, link);
 		err = rxrpc_krxtimod_del_timer(&conn->timeout);
 		spin_unlock(&peer->conn_gylock);
 
-		if (err==0)
+		if (err == 0)
 			rxrpc_conn_do_timeout(conn);
 
 		spin_lock(&peer->conn_gylock);
@@ -406,27 +496,27 @@ void rxrpc_conn_clearall(struct rxrpc_peer *peer)
 
 	/* wait for the the conn graveyard to be completely cleared */
 	set_current_state(TASK_UNINTERRUPTIBLE);
-	add_wait_queue(&peer->conn_gy_waitq,&myself);
+	add_wait_queue(&peer->conn_gy_waitq, &myself);
 
-	while (atomic_read(&peer->conn_count)!=0) {
+	while (atomic_read(&peer->conn_count) != 0) {
 		schedule();
 		set_current_state(TASK_UNINTERRUPTIBLE);
 	}
 
-	remove_wait_queue(&peer->conn_gy_waitq,&myself);
+	remove_wait_queue(&peer->conn_gy_waitq, &myself);
 	set_current_state(TASK_RUNNING);
 
 	_leave("");
-
 } /* end rxrpc_conn_clearall() */
 
 /*****************************************************************************/
 /*
- * allocate and prepare a message for sending out through the transport endpoint
+ * allocate and prepare a message for sending out through the transport
+ * endpoint
  */
 int rxrpc_conn_newmsg(struct rxrpc_connection *conn,
 		      struct rxrpc_call *call,
-		      u8 type,
+		      uint8_t type,
 		      int dcount,
 		      struct iovec diov[],
 		      int alloc_flags,
@@ -435,21 +525,21 @@ int rxrpc_conn_newmsg(struct rxrpc_connection *conn,
 	struct rxrpc_message *msg;
 	int loop;
 
-	_enter("%p{%d},%p,%u",conn,ntohs(conn->addr.sin_port),call,type);
+	_enter("%p{%d},%p,%u", conn, ntohs(conn->addr.sin_port), call, type);
 
-	if (dcount>3) {
+	if (dcount > 3) {
 		_leave(" = -EINVAL");
 		return -EINVAL;
 	}
 
-	msg = kmalloc(sizeof(struct rxrpc_message),alloc_flags);
+	msg = kmalloc(sizeof(struct rxrpc_message), alloc_flags);
 	if (!msg) {
 		_leave(" = -ENOMEM");
 		return -ENOMEM;
 	}
 
-	memset(msg,0,sizeof(*msg));
-	atomic_set(&msg->usage,1);
+	memset(msg, 0, sizeof(*msg));
+	atomic_set(&msg->usage, 1);
 
 	INIT_LIST_HEAD(&msg->link);
 
@@ -471,7 +561,8 @@ int rxrpc_conn_newmsg(struct rxrpc_connection *conn,
 			msg->hdr.seq = htonl(msg->seq);
 			break;
 		case RXRPC_PACKET_TYPE_ACK:
-			/* ACK sequence numbers are complicated. The following may be wrong:
+			/* ACK sequence numbers are complicated. The following
+			 * may be wrong:
 			 * - jumbo packet ACKs should have a seq number
 			 * - normal ACKs should not
 			 */
@@ -485,7 +576,7 @@ int rxrpc_conn_newmsg(struct rxrpc_connection *conn,
 	msg->data[0].iov_len = sizeof(msg->hdr);
 	msg->data[0].iov_base = &msg->hdr;
 
-	for (loop=0; loop<dcount; loop++) {
+	for (loop=0; loop < dcount; loop++) {
 		msg->dsize += diov[loop].iov_len;
 		msg->data[loop+1].iov_len  = diov[loop].iov_len;
 		msg->data[loop+1].iov_base = diov[loop].iov_base;
@@ -493,7 +584,7 @@ int rxrpc_conn_newmsg(struct rxrpc_connection *conn,
 
 	__RXACCT(atomic_inc(&rxrpc_message_count));
 	*_msg = msg;
-	_leave(" = 0 (%p) #%d",msg,atomic_read(&rxrpc_message_count));
+	_leave(" = 0 (%p) #%d", msg, atomic_read(&rxrpc_message_count));
 	return 0;
 } /* end rxrpc_conn_newmsg() */
 
@@ -505,13 +596,14 @@ void __rxrpc_put_message(struct rxrpc_message *msg)
 {
 	int loop;
 
-	_enter("%p #%d",msg,atomic_read(&rxrpc_message_count));
+	_enter("%p #%d", msg, atomic_read(&rxrpc_message_count));
 
-	if (msg->pkt) kfree_skb(msg->pkt);
-	if (msg->conn) rxrpc_put_connection(msg->conn);
+	if (msg->pkt)
+		kfree_skb(msg->pkt);
+	rxrpc_put_connection(msg->conn);
 
-	for (loop=0; loop<8; loop++)
-		if (test_bit(loop,&msg->dfree))
+	for (loop = 0; loop < 8; loop++)
+		if (test_bit(loop, &msg->dfree))
 			kfree(msg->data[loop].iov_base);
 
 	__RXACCT(atomic_dec(&rxrpc_message_count));
@@ -524,13 +616,14 @@ void __rxrpc_put_message(struct rxrpc_message *msg)
 /*
  * send a message out through the transport endpoint
  */
-int rxrpc_conn_sendmsg(struct rxrpc_connection *conn, struct rxrpc_message *msg)
+int rxrpc_conn_sendmsg(struct rxrpc_connection *conn,
+		       struct rxrpc_message *msg)
 {
 	struct msghdr msghdr;
 	mm_segment_t oldfs;
 	int ret;
 
-	_enter("%p{%d}",conn,ntohs(conn->addr.sin_port));
+	_enter("%p{%d}", conn, ntohs(conn->addr.sin_port));
 
 	/* fill in some fields in the header */
 	spin_lock(&conn->lock);
@@ -545,7 +638,7 @@ int rxrpc_conn_sendmsg(struct rxrpc_connection *conn, struct rxrpc_message *msg)
 	msghdr.msg_iovlen	= msg->dcount;
 	msghdr.msg_control	= NULL;
 	msghdr.msg_controllen	= 0;
-	msghdr.msg_flags	= MSG_CONFIRM|MSG_DONTWAIT;
+	msghdr.msg_flags	= MSG_CONFIRM | MSG_DONTWAIT;
 
 	_net("Sending message type %d of %Zd bytes to %08x:%d",
 	     msg->hdr.type,
@@ -556,10 +649,10 @@ int rxrpc_conn_sendmsg(struct rxrpc_connection *conn, struct rxrpc_message *msg)
 	/* send the message */
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
-	ret = sock_sendmsg(conn->trans->socket,&msghdr,msg->dsize);
+	ret = sock_sendmsg(conn->trans->socket, &msghdr, msg->dsize);
 	set_fs(oldfs);
 
-	if (ret<0) {
+	if (ret < 0) {
 		msg->state = RXRPC_MSG_ERROR;
 	}
 	else {
@@ -572,7 +665,7 @@ int rxrpc_conn_sendmsg(struct rxrpc_connection *conn, struct rxrpc_message *msg)
 		spin_unlock(&conn->lock);
 	}
 
-	_leave(" = %d",ret);
+	_leave(" = %d", ret);
 
 	return ret;
 } /* end rxrpc_conn_sendmsg() */
@@ -590,7 +683,7 @@ int rxrpc_conn_receive_call_packet(struct rxrpc_connection *conn,
 	unsigned cix, seq;
 	int ret = 0;
 
-	_enter("%p,%p,%p",conn,call,msg);
+	_enter("%p,%p,%p", conn, call, msg);
 
 	if (!call) {
 		cix = ntohl(msg->hdr.cid) & RXRPC_CHANNELMASK;
@@ -600,7 +693,7 @@ int rxrpc_conn_receive_call_packet(struct rxrpc_connection *conn,
 
 		if (!call || call->call_id != msg->hdr.callNumber) {
 			spin_unlock(&conn->lock);
-			rxrpc_trans_immediate_abort(conn->trans,msg,-ENOENT);
+			rxrpc_trans_immediate_abort(conn->trans, msg, -ENOENT);
 			goto out;
 		}
 		else {
@@ -622,19 +715,21 @@ int rxrpc_conn_receive_call_packet(struct rxrpc_connection *conn,
 	call->pkt_rcv_count++;
 
 	if (msg->pkt->dst && msg->pkt->dst->dev)
-		conn->peer->if_mtu = msg->pkt->dst->dev->mtu - msg->pkt->dst->dev->hard_header_len;
+		conn->peer->if_mtu =
+			msg->pkt->dst->dev->mtu -
+			msg->pkt->dst->dev->hard_header_len;
 
 	/* queue on the call in seq order */
 	rxrpc_get_message(msg);
 	seq = msg->seq;
 
 	spin_lock(&call->lock);
-	list_for_each(_p,&call->rcv_receiveq) {
-		pmsg = list_entry(_p,struct rxrpc_message,link);
-		if (pmsg->seq>seq)
+	list_for_each(_p, &call->rcv_receiveq) {
+		pmsg = list_entry(_p, struct rxrpc_message, link);
+		if (pmsg->seq > seq)
 			break;
 	}
-	list_add_tail(&msg->link,_p);
+	list_add_tail(&msg->link, _p);
 
 	/* reset the activity timeout */
 	call->flags |= RXRPC_CALL_RCV_PKT;
@@ -646,8 +741,7 @@ int rxrpc_conn_receive_call_packet(struct rxrpc_connection *conn,
 
 	rxrpc_put_call(call);
  out:
-	_leave(" = %d",ret);
-
+	_leave(" = %d", ret);
 	return ret;
 } /* end rxrpc_conn_receive_call_packet() */
 
@@ -655,18 +749,19 @@ int rxrpc_conn_receive_call_packet(struct rxrpc_connection *conn,
 /*
  * handle an ICMP error being applied to a connection
  */
-void rxrpc_conn_handle_error(struct rxrpc_connection *conn, int local, int errno)
+void rxrpc_conn_handle_error(struct rxrpc_connection *conn,
+			     int local, int errno)
 {
 	struct rxrpc_call *calls[4];
 	int loop;
 
-	_enter("%p{%d},%d",conn,ntohs(conn->addr.sin_port),errno);
+	_enter("%p{%d},%d", conn, ntohs(conn->addr.sin_port), errno);
 
 	/* get a ref to all my calls in one go */
-	memset(calls,0,sizeof(calls));
+	memset(calls, 0, sizeof(calls));
 	spin_lock(&conn->lock);
 
-	for (loop=3; loop>=0; loop--) {
+	for (loop = 3; loop >= 0; loop--) {
 		if (conn->channels[loop]) {
 			calls[loop] = conn->channels[loop];
 			rxrpc_get_call(calls[loop]);
@@ -676,9 +771,9 @@ void rxrpc_conn_handle_error(struct rxrpc_connection *conn, int local, int errno
 	spin_unlock(&conn->lock);
 
 	/* now kick them all */
-	for (loop=3; loop>=0; loop--) {
+	for (loop = 3; loop >= 0; loop--) {
 		if (calls[loop]) {
-			rxrpc_call_handle_error(calls[loop],local,errno);
+			rxrpc_call_handle_error(calls[loop], local, errno);
 			rxrpc_put_call(calls[loop]);
 		}
 	}

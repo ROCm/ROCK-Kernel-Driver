@@ -613,7 +613,7 @@ static int reiserfs_mknod (struct inode * dir, struct dentry *dentry, int mode, 
     struct reiserfs_transaction_handle th ;
     int jbegin_count = JOURNAL_PER_BALANCE_CNT * 3; 
 
-    if (!old_valid_dev(rdev))
+    if (!new_valid_dev(rdev))
 	return -EINVAL;
 
     if (!(inode = new_inode(dir->i_sb))) {

@@ -159,7 +159,7 @@ void hpfs_read_inode(struct inode *i)
 				i->i_size = 0;
 				i->i_blocks = 1;
 				init_special_inode(i, mode,
-					old_decode_dev(rdev));
+					new_decode_dev(rdev));
 				return;
 			}
 		}
@@ -223,7 +223,7 @@ void hpfs_write_inode_ea(struct inode *i, struct fnode *fnode)
 				hpfs_inode->i_ea_mode = 1;
 			}
 		if (S_ISBLK(i->i_mode) || S_ISCHR(i->i_mode)) {
-			ea = cpu_to_le32(old_encode_dev(i->i_rdev));
+			ea = cpu_to_le32(new_encode_dev(i->i_rdev));
 			hpfs_set_ea(i, fnode, "DEV", (char *)&ea, 4);
 		}
 	}

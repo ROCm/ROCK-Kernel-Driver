@@ -95,22 +95,52 @@ update_stateid(stateid_t *stateid)
 	stateid->si_generation++;
 }
 
+/* A reasonable value for REPLAY_ISIZE was estimated as follows:  
+ * The OPEN response, typically the largest, requires 
+ *   4(status) + 8(stateid) + 20(changeinfo) + 4(rflags) +  8(verifier) + 
+ *   4(deleg. type) + 8(deleg. stateid) + 4(deleg. recall flag) + 
+ *   20(deleg. space limit) + ~32(deleg. ace) = 112 bytes 
+ */
+
+#define NFSD4_REPLAY_ISIZE       112 
+
 /*
-* nfs4_stateowner can either be an open_owner, or (eventually) a lock_owner
+ * Replay buffer, where the result of the last seqid-mutating operation 
+ * is cached. 
+ */
+struct nfs4_replay {
+	u32			rp_status;
+	unsigned int		rp_buflen;
+	char			*rp_buf;
+	unsigned		intrp_allocated;
+	char			rp_ibuf[NFSD4_REPLAY_ISIZE];
+};
+
+/*
+* nfs4_stateowner can either be an open_owner, or a lock_owner
 *
-*    o so_peropenstate list is used to ensure no dangling nfs4_stateid
-*              reverences when we release a stateowner.
+*    so_idhash:  stateid_hashtbl[] for open owner, lockstateid_hashtbl[]
+*         for lock_owner
+*    so_strhash: ownerstr_hashtbl[] for open_owner, lock_ownerstr_hashtbl[]
+*         for lock_owner
+*    so_perclient: nfs4_client->cl_perclient entry - used when nfs4_client
+*         struct is reaped.
+*    so_perfilestate: heads the list of nfs4_stateid (either open or lock) 
+*         and is used to ensure no dangling nfs4_stateid references when we 
+*         release a stateowner.
 */
 struct nfs4_stateowner {
 	struct list_head        so_idhash;   /* hash by so_id */
 	struct list_head        so_strhash;   /* hash by op_name */
 	struct list_head        so_perclient; /* nfs4_client->cl_perclient */
-	struct list_head        so_peropenstate; /* list: nfs4_stateid */
+	struct list_head        so_perfilestate; /* list: nfs4_stateid */
+	int			so_is_open_owner; /* 1=openowner,0=lockowner */
 	u32                     so_id;
 	struct nfs4_client *    so_client;
 	u32                     so_seqid;    
 	struct xdr_netobj       so_owner;     /* open owner name */
 	int                     so_confirmed; /* successful OPEN_CONFIRM? */
+	struct nfs4_replay	so_replay;
 };
 
 /*
@@ -123,19 +153,25 @@ struct nfs4_file {
 	struct list_head        fi_perfile; /* list: nfs4_stateid */
 	struct inode		*fi_inode;
 	u32                     fi_id;      /* used with stateowner->so_id 
-					     * for openstateid_hashtbl hash */
+					     * for stateid_hashtbl hash */
 };
 
 /*
 * nfs4_stateid can either be an open stateid or (eventually) a lock stateid
 *
 * (open)nfs4_stateid: one per (open)nfs4_stateowner, nfs4_file
+*
+* 	st_hash: stateid_hashtbl[] entry or lockstateid_hashtbl entry
+* 	st_perfile: file_hashtbl[] entry.
+* 	st_perfile_state: nfs4_stateowner->so_perfilestate
+* 	st_share_access: used only for open stateid
+* 	st_share_deny: used only for open stateid
 */
 
 struct nfs4_stateid {
-	struct list_head              st_hash; /* openstateid_hashtbl[]*/
-	struct list_head              st_perfile; /* file_hashtbl[]*/
-	struct list_head              st_peropenstate; /* nfs4_stateowner->so_peropenstate */
+	struct list_head              st_hash; 
+	struct list_head              st_perfile;
+	struct list_head              st_perfilestate; 
 	struct nfs4_stateowner      * st_stateowner;
 	struct nfs4_file            * st_file;
 	stateid_t                     st_stateid;
@@ -148,6 +184,9 @@ struct nfs4_stateid {
 /* flags for preprocess_seqid_op() */
 #define CHECK_FH                0x00000001
 #define CONFIRM                 0x00000002
+#define OPEN_STATE              0x00000004
+#define LOCK_STATE              0x00000008
+#define RDWR_STATE              0x00000010
 
 #define seqid_mutating_err(err)                       \
 	(((err) != nfserr_stale_clientid) &&    \
@@ -161,6 +200,6 @@ extern int nfs4_preprocess_stateid_op(struct svc_fh *current_fh,
 		stateid_t *stateid, int flags, struct nfs4_stateid **stpp);
 extern int nfs4_share_conflict(struct svc_fh *current_fh, 
 		unsigned int deny_type);
-extern void nfsd4_lock_state(void);
-extern void nfsd4_unlock_state(void);
+extern void nfs4_lock_state(void);
+extern void nfs4_unlock_state(void);
 #endif   /* NFSD4_STATE_H */

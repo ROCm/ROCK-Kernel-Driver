@@ -260,11 +260,6 @@ static inline void clear_in_cr4 (unsigned long mask)
  * Bus types (default is ISA, but people can check others with these..)
  * pc98 indicates PC98 systems (CBUS)
  */
-#ifdef CONFIG_EISA
-extern int EISA_bus;
-#else
-#define EISA_bus (0)
-#endif
 extern int MCA_bus;
 #ifdef CONFIG_X86_PC9800
 #define pc98 1
@@ -272,6 +267,22 @@ extern int MCA_bus;
 #define pc98 0
 #endif
 
+static inline void __monitor(const void *eax, unsigned long ecx,
+		unsigned long edx)
+{
+	/* "monitor %eax,%ecx,%edx;" */
+	asm volatile(
+		".byte 0x0f,0x01,0xc8;"
+		: :"a" (eax), "c" (ecx), "d"(edx));
+}
+
+static inline void __mwait(unsigned long eax, unsigned long ecx)
+{
+	/* "mwait %eax,%ecx;" */
+	asm volatile(
+		".byte 0x0f,0x01,0xc9;"
+		: :"a" (eax), "c" (ecx));
+}
 
 /* from system description table in BIOS.  Mostly for MCA use, but
 others may find it useful. */
@@ -600,5 +611,7 @@ extern inline void prefetchw(const void *x)
 			  "r" (x));
 }
 #define spin_lock_prefetch(x)	prefetchw(x)
+
+extern void select_idle_routine(const struct cpuinfo_x86 *c);
 
 #endif /* __ASM_I386_PROCESSOR_H */

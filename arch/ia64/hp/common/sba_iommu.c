@@ -54,6 +54,11 @@
 */
 #define ALLOW_IOV_BYPASS
 
+#ifdef CONFIG_PROC_FS
+  /* turn it off for now; without per-CPU counters, it's too much of a scalability bottleneck: */
+# define SBA_PROC_FS 0
+#endif
+
 /*
 ** If a device prefetches beyond the end of a valid pdir entry, it will cause
 ** a hard failure, ie. MCA.  Version 3.0 and later of the zx1 LBA should
@@ -193,7 +198,7 @@ struct ioc {
 	} saved[DELAYED_RESOURCE_CNT];
 #endif
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 #define SBA_SEARCH_SAMPLE	0x100
 	unsigned long avg_search[SBA_SEARCH_SAMPLE];
 	unsigned long avg_idx;	/* current index into avg_search */
@@ -517,7 +522,7 @@ static int
 sba_alloc_range(struct ioc *ioc, size_t size)
 {
 	unsigned int pages_needed = size >> IOVP_SHIFT;
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	unsigned long itc_start = ia64_get_itc();
 #endif
 	unsigned long pide;
@@ -551,7 +556,7 @@ sba_alloc_range(struct ioc *ioc, size_t size)
 		(uint) ((unsigned long) ioc->res_hint - (unsigned long) ioc->res_map),
 		ioc->res_bitshift );
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	{
 		unsigned long itc_end = ia64_get_itc();
 		unsigned long tmp = itc_end - itc_start;
@@ -593,7 +598,7 @@ sba_free_range(struct ioc *ioc, dma_addr_t iova, size_t size)
 		__FUNCTION__, (uint) iova, size,
 		bits_not_wanted, m, pide, res_ptr, *res_ptr);
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->used_pages -= bits_not_wanted;
 #endif
 
@@ -785,7 +790,7 @@ sba_map_single(struct device *dev, void *addr, size_t size, int dir)
  		** Device is bit capable of DMA'ing to the buffer...
 		** just return the PCI address of ptr
  		*/
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		spin_lock_irqsave(&ioc->res_lock, flags);
 		ioc->msingle_bypass++;
 		spin_unlock_irqrestore(&ioc->res_lock, flags);
@@ -811,7 +816,7 @@ sba_map_single(struct device *dev, void *addr, size_t size, int dir)
 		panic("Sanity check failed");
 #endif
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->msingle_calls++;
 	ioc->msingle_pages += size >> IOVP_SHIFT;
 #endif
@@ -870,7 +875,7 @@ void sba_unmap_single(struct device *dev, dma_addr_t iova, size_t size, int dir)
 		/*
 		** Address does not fall w/in IOVA, must be bypassing
 		*/
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		spin_lock_irqsave(&ioc->res_lock, flags);
 		ioc->usingle_bypass++;
 		spin_unlock_irqrestore(&ioc->res_lock, flags);
@@ -895,7 +900,7 @@ void sba_unmap_single(struct device *dev, dma_addr_t iova, size_t size, int dir)
 	size = ROUNDUP(size, IOVP_SIZE);
 
 	spin_lock_irqsave(&ioc->res_lock, flags);
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->usingle_calls++;
 	ioc->usingle_pages += size >> IOVP_SHIFT;
 #endif
@@ -957,20 +962,20 @@ void sba_unmap_single(struct device *dev, dma_addr_t iova, size_t size, int dir)
 
 
 /**
- * sba_alloc_consistent - allocate/map shared mem for DMA
- * @hwdev: instance of PCI owned by the driver that's asking.
+ * sba_alloc_coherent - allocate/map shared mem for DMA
+ * @dev: instance of PCI owned by the driver that's asking.
  * @size:  number of bytes mapped in driver buffer.
  * @dma_handle:  IOVA of new buffer.
  *
  * See Documentation/DMA-mapping.txt
  */
 void *
-sba_alloc_coherent (struct device *hwdev, size_t size, dma_addr_t *dma_handle, int flags)
+sba_alloc_coherent (struct device *dev, size_t size, dma_addr_t *dma_handle, int flags)
 {
 	struct ioc *ioc;
 	void *addr;
 
-        addr = (void *) __get_free_pages(flags, get_order(size));
+	addr = (void *) __get_free_pages(flags, get_order(size));
 	if (!addr)
 		return NULL;
 
@@ -978,7 +983,7 @@ sba_alloc_coherent (struct device *hwdev, size_t size, dma_addr_t *dma_handle, i
 	 * REVISIT: if sba_map_single starts needing more than dma_mask from the
 	 * device, this needs to be updated.
 	 */
-	ioc = GET_IOC(hwdev);
+	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 	*dma_handle = sba_map_single(&ioc->sac_only_dev->dev, addr, size, 0);
 
@@ -988,17 +993,17 @@ sba_alloc_coherent (struct device *hwdev, size_t size, dma_addr_t *dma_handle, i
 
 
 /**
- * sba_free_consistent - free/unmap shared mem for DMA
- * @hwdev: instance of PCI owned by the driver that's asking.
+ * sba_free_coherent - free/unmap shared mem for DMA
+ * @dev: instance of PCI owned by the driver that's asking.
  * @size:  number of bytes mapped in driver buffer.
  * @vaddr:  virtual address IOVA of "consistent" buffer.
  * @dma_handler:  IO virtual address of "consistent" buffer.
  *
  * See Documentation/DMA-mapping.txt
  */
-void sba_free_coherent (struct device *hwdev, size_t size, void *vaddr, dma_addr_t dma_handle)
+void sba_free_coherent (struct device *dev, size_t size, void *vaddr, dma_addr_t dma_handle)
 {
-	sba_unmap_single(hwdev, dma_handle, size, 0);
+	sba_unmap_single(dev, dma_handle, size, 0);
 	free_pages((unsigned long) vaddr, get_order(size));
 }
 
@@ -1078,7 +1083,7 @@ sba_fill_pdir(
 			cnt += dma_offset;
 			dma_offset=0;	/* only want offset on first chunk */
 			cnt = ROUNDUP(cnt, IOVP_SIZE);
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 			ioc->msg_pages += cnt >> IOVP_SHIFT;
 #endif
 			do {
@@ -1268,7 +1273,7 @@ int sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents, int di
 			sg->dma_length = sg->length;
 			sg->dma_address = virt_to_phys(sba_sg_address(sg));
 		}
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		spin_lock_irqsave(&ioc->res_lock, flags);
 		ioc->msg_bypass++;
 		spin_unlock_irqrestore(&ioc->res_lock, flags);
@@ -1281,7 +1286,7 @@ int sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents, int di
 		sglist->dma_length = sglist->length;
 		sglist->dma_address = sba_map_single(dev, sba_sg_address(sglist), sglist->length,
 						     dir);
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		/*
 		** Should probably do some stats counting, but trying to
 		** be precise quickly starts wasting CPU time.
@@ -1300,7 +1305,7 @@ int sba_map_sg(struct device *dev, struct scatterlist *sglist, int nents, int di
 	}
 #endif
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->msg_calls++;
 #endif
 
@@ -1363,7 +1368,7 @@ void sba_unmap_sg (struct device *dev, struct scatterlist *sglist, int nents, in
 	ioc = GET_IOC(dev);
 	ASSERT(ioc);
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc->usg_calls++;
 #endif
 
@@ -1376,7 +1381,7 @@ void sba_unmap_sg (struct device *dev, struct scatterlist *sglist, int nents, in
 	while (nents && sglist->dma_length) {
 
 		sba_unmap_single(dev, sglist->dma_address, sglist->dma_length, dir);
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 		/*
 		** This leaves inconsistent data in the stats, but we can't
 		** tell which sg lists were mapped by map_single and which
@@ -1704,7 +1709,7 @@ ioc_init(u64 hpa, void *handle)
 **
 **************************************************************************/
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 static void *
 ioc_start(struct seq_file *s, loff_t *pos)
 {
@@ -1758,7 +1763,7 @@ ioc_show(struct seq_file *s, void *v)
 		if (ioc->avg_search[i] > max) max = ioc->avg_search[i];
 		if (ioc->avg_search[i] < min) min = ioc->avg_search[i];
 	}
-  	avg /= SBA_SEARCH_SAMPLE;
+	avg /= SBA_SEARCH_SAMPLE;
 	seq_printf(s, "  Bitmap search : %ld/%ld/%ld (min/avg/max CPU Cycles)\n", min, avg, max);
 
 	seq_printf(s, "pci_map_single(): %12ld calls  %12ld pages (avg %d/1000)\n",
@@ -1844,22 +1849,23 @@ static struct file_operations ioc_map_fops = {
 static void __init
 ioc_proc_init(void)
 {
-	if (ioc_list) {
-		struct proc_dir_entry *dir, *entry;
+	struct proc_dir_entry *dir, *entry;
 
-		dir = proc_mkdir("bus/mckinley", 0);
-		entry = create_proc_entry(ioc_list->name, 0, dir);
-		if (entry)
-			entry->proc_fops = &ioc_fops;
+	dir = proc_mkdir("bus/mckinley", 0);
+	if (!dir)
+		return;
 
-		entry = create_proc_entry("bitmap", 0, dir);
-		if (entry)
-			entry->proc_fops = &ioc_map_fops;
-	}
+	entry = create_proc_entry(ioc_list->name, 0, dir);
+	if (entry)
+		entry->proc_fops = &ioc_fops;
+
+	entry = create_proc_entry("bitmap", 0, dir);
+	if (entry)
+		entry->proc_fops = &ioc_map_fops;
 }
 #endif
 
-void
+static void
 sba_connect_bus(struct pci_bus *bus)
 {
 	acpi_handle handle, parent;
@@ -1867,7 +1873,7 @@ sba_connect_bus(struct pci_bus *bus)
 	struct ioc *ioc;
 
 	if (!PCI_CONTROLLER(bus))
-		panic(PFX "no sysdata on bus %d!\n",bus->number);
+		panic(PFX "no sysdata on bus %d!\n", bus->number);
 
 	if (PCI_CONTROLLER(bus)->iommu)
 		return;
@@ -1941,6 +1947,8 @@ static int __init
 sba_init(void)
 {
 	acpi_bus_register_driver(&acpi_sba_ioc_driver);
+	if (!ioc_list)
+		return 0;
 
 #ifdef CONFIG_PCI
 	{
@@ -1950,7 +1958,7 @@ sba_init(void)
 	}
 #endif
 
-#ifdef CONFIG_PROC_FS
+#if SBA_PROC_FS
 	ioc_proc_init();
 #endif
 	return 0;

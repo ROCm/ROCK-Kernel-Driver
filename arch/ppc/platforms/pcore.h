@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/pcore.h
- * 
+ *
  * Definitions for Force PowerCore board support
  *
  * Author: Matt Porter <mporter@mvista.com>
@@ -21,7 +21,7 @@
 
 #define PCORE_NVRAM_AS0			0x73
 #define PCORE_NVRAM_AS1			0x75
-#define PCORE_NVRAM_DATA		0x77    
+#define PCORE_NVRAM_DATA		0x77
 
 #define PCORE_DCCR_REG			(MPC10X_MAPB_ISA_IO_BASE + 0x308)
 #define PCORE_DCCR_L2_MASK		0xc0

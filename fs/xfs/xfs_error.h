@@ -33,7 +33,7 @@
 #define	__XFS_ERROR_H__
 
 #define prdev(fmt,dev,args...) \
-	printk("XFS: device 0x%x- " fmt "\n", (unsigned)dev, ## args)
+	printk("XFS: device %u:%u- " fmt "\n", MAJOR(dev), MINOR(dev), ## args)
 
 #define XFS_ERECOVER	1	/* Failure to recover log */
 #define XFS_ELOGSTAT	2	/* Failure to stat log in user space */
@@ -177,18 +177,18 @@ int		xfs_errortag_clearall_umount(int64_t fsid, char *fsname,
  *			sysctl.  update xfs_max[XFS_PARAM] if
  *			more are added.
  */
-#define		XFS_NO_PTAG			0LL
-#define		XFS_PTAG_IFLUSH			0x0000000000000001LL
-#define		XFS_PTAG_LOGRES			0x0000000000000002LL
-#define		XFS_PTAG_AILDELETE		0x0000000000000004LL
-#define		XFS_PTAG_ERROR_REPORT		0x0000000000000008LL
-#define		XFS_PTAG_SHUTDOWN_CORRUPT	0x0000000000000010LL
-#define		XFS_PTAG_SHUTDOWN_IOERROR	0x0000000000000020LL
-#define		XFS_PTAG_SHUTDOWN_LOGERROR	0x0000000000000040LL
+#define		XFS_NO_PTAG			0
+#define		XFS_PTAG_IFLUSH			0x00000001
+#define		XFS_PTAG_LOGRES			0x00000002
+#define		XFS_PTAG_AILDELETE		0x00000004
+#define		XFS_PTAG_ERROR_REPORT		0x00000008
+#define		XFS_PTAG_SHUTDOWN_CORRUPT	0x00000010
+#define		XFS_PTAG_SHUTDOWN_IOERROR	0x00000020
+#define		XFS_PTAG_SHUTDOWN_LOGERROR	0x00000040
 
 struct xfs_mount;
 /* PRINTFLIKE4 */
-void		xfs_cmn_err(uint64_t panic_tag, int level, struct xfs_mount *mp,
+void		xfs_cmn_err(int panic_tag, int level, struct xfs_mount *mp,
 			    char *fmt, ...);
 /* PRINTFLIKE3 */
 void		xfs_fs_cmn_err(int level, struct xfs_mount *mp, char *fmt, ...);

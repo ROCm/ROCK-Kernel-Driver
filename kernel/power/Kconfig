@@ -1,0 +1,93 @@
+config PM
+	bool "Power Management support"
+	---help---
+	  "Power Management" means that parts of your computer are shut
+	  off or put into a power conserving "sleep" mode if they are not
+	  being used.  There are two competing standards for doing this: APM
+	  and ACPI.  If you want to use either one, say Y here and then also
+	  to the requisite support below.
+
+	  Power Management is most important for battery powered laptop
+	  computers; if you have a laptop, check out the Linux Laptop home
+	  page on the WWW at
+	  <http://www.cs.utexas.edu/users/kharker/linux-laptop/> and the
+	  Battery Powered Linux mini-HOWTO, available from
+	  <http://www.tldp.org/docs.html#howto>.
+
+	  Note that, even if you say N here, Linux on the x86 architecture
+	  will issue the hlt instruction if nothing is to be done, thereby
+	  sending the processor to sleep and saving power.
+
+config SOFTWARE_SUSPEND
+	bool "Software Suspend (EXPERIMENTAL)"
+	depends on EXPERIMENTAL && PM && SWAP
+	---help---
+	  Enable the possibilty of suspendig machine. It doesn't need APM.
+	  You may suspend your machine by 'swsusp' or 'shutdown -z <time>' 
+	  (patch for sysvinit needed). 
+
+	  It creates an image which is saved in your active swaps. By the next
+	  booting the, pass 'resume=/dev/swappartition' and kernel will 
+	  detect the saved image, restore the memory from
+	  it and then it continues to run as before you've suspended.
+	  If you don't want the previous state to continue use the 'noresume'
+	  kernel option. However note that your partitions will be fsck'd and
+	  you must re-mkswap your swap partitions. It does not work with swap
+	  files.
+
+	  Right now you may boot without resuming and then later resume but
+	  in meantime you cannot use those swap partitions/files which were
+	  involved in suspending. Also in this case there is a risk that buffers
+	  on disk won't match with saved ones.
+
+	  For more information take a look at Documentation/swsusp.txt.
+
+config PM_DISK
+	bool "Suspend-to-Disk Support"
+	depends on PM && SWAP
+	---help---
+	  Suspend-to-disk is a power management state in which the contents
+	  of memory are stored on disk and the entire system is shut down or
+	  put into a low-power state (e.g. ACPI S4). When the computer is 
+	  turned back on, the stored image is loaded from disk and execution
+	  resumes from where it left off before suspending. 
+
+	  This config option enables the core infrastructure necessary to 
+	  perform the suspend and resume transition. 
+
+	  Currently, this suspend-to-disk implementation is based on a forked
+	  version of the swsusp code base. As such, it's still experimental,
+	  and still relies on CONFIG_SWAP. 
+
+	  More information can be found in Documentation/power/.
+
+	  If unsure, Say N.
+
+config PM_DISK_PARTITION
+	string "Default resume partition"
+	depends on PM_DISK
+	default ""
+	---help---
+	  The default resume partition is the partition that the pmdisk suspend-
+	  to-disk implementation will look for a suspended disk image. 
+
+	  The partition specified here will be different for almost every user. 
+	  It should be a valid swap partition (at least for now) that is turned
+	  on before suspending. 
+
+	  The partition specified can be overridden by specifying:
+
+		pmdisk=/dev/<other device> 
+
+	  which will set the resume partition to the device specified. 
+
+	  One may also do: 
+
+		pmdisk=off
+
+	  to inform the kernel not to perform a resume transition. 
+
+	  Note there is currently not a way to specify which device to save the
+	  suspended image to. It will simply pick the first available swap 
+	  device.
+

@@ -5,6 +5,7 @@
  *
  * Copyright (c) 2001 Silicon Graphics, Inc.  All rights reserved.
  *
+ * 09/11/2003	jbarnes@sgi.com		updated for 2.6
  * 10/30/2001	jbarnes@sgi.com		copied much of Stephane's palinfo
  *					code to create this file
  */
@@ -59,7 +60,7 @@ salinfo_init(void)
 		*sdir = create_proc_read_entry (salinfo_entries[i].name, 0, salinfo_dir,
 						  salinfo_read, (void *)salinfo_entries[i].feature);
 		if (*sdir)
-			*sdir->owner = THIS_MODULE;
+			(*sdir)->owner = THIS_MODULE;
 		sdir++;
 	}
 	*sdir++ = salinfo_dir;

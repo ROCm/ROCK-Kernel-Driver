@@ -8,6 +8,7 @@
  * Copyright (C) 1996, 1997, 1998, 2000, 2003 by Ralf Baechle
  */
 #include <linux/config.h>
+#include <linux/eisa.h>
 #include <linux/hdreg.h>
 #include <linux/ioport.h>
 #include <linux/sched.h>

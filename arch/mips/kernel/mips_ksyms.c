@@ -25,7 +25,6 @@
 #include <asm/page.h>
 #include <asm/pgalloc.h>
 #include <asm/semaphore.h>
-#include <asm/softirq.h>
 #include <asm/uaccess.h>
 #ifdef CONFIG_BLK_DEV_FD
 #include <asm/floppy.h>
@@ -42,10 +41,6 @@ extern long __strnlen_user_nocheck_asm(const char *s);
 extern long __strnlen_user_asm(const char *s);
 
 EXPORT_SYMBOL(mips_machtype);
-
-#ifdef CONFIG_EISA
-EXPORT_SYMBOL(EISA_bus);
-#endif
 
 /*
  * String functions

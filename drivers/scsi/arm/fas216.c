@@ -2592,7 +2592,7 @@ int fas216_eh_bus_reset(Scsi_Cmnd *SCpnt)
 	 * all command structures.  Leave the running
 	 * command in place.
 	 */
-	list_for_each_entry(SDpnt, &info->host->my_devices, siblings) {
+	shost_for_each_device(SDpnt, info->host) {
 		int i;
 
 		if (SDpnt->soft_reset)
@@ -3007,7 +3007,7 @@ int fas216_print_devices(FAS216_Info *info, char *buffer)
 
 	p += sprintf(p, "Device/Lun TaggedQ       Parity   Sync\n");
 
-	list_for_each_entry(scd, &info->host->my_devices, siblings) {
+	shost_for_each_device(scd, info->host) {
 		dev = &info->device[scd->id];
 		p += sprintf(p, "     %d/%d   ", scd->id, scd->lun);
 		if (scd->tagged_supported)

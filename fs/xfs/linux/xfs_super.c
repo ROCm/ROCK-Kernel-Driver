@@ -174,7 +174,7 @@ xfs_revalidate_inode(
 		inode->i_rdev = 0;
 	} else {
 		xfs_dev_t dev = ip->i_df.if_u2.if_rdev;
-		inode->i_rdev = XFS_DEV_TO_KDEVT(dev);
+		inode->i_rdev = MKDEV(sysv_major(dev) & 0x1ff, sysv_minor(dev));
 	}
 	inode->i_blksize = PAGE_CACHE_SIZE;
 	inode->i_generation = ip->i_d.di_gen;
@@ -187,7 +187,22 @@ xfs_revalidate_inode(
 	inode->i_mtime.tv_nsec	= ip->i_d.di_mtime.t_nsec;
 	inode->i_ctime.tv_sec	= ip->i_d.di_ctime.t_sec;
 	inode->i_ctime.tv_nsec	= ip->i_d.di_ctime.t_nsec;
-
+	if (ip->i_d.di_flags & XFS_DIFLAG_IMMUTABLE)
+		inode->i_flags |= S_IMMUTABLE;
+	else
+		inode->i_flags &= ~S_IMMUTABLE;
+	if (ip->i_d.di_flags & XFS_DIFLAG_APPEND)
+		inode->i_flags |= S_APPEND;
+	else
+		inode->i_flags &= ~S_APPEND;
+	if (ip->i_d.di_flags & XFS_DIFLAG_SYNC)
+		inode->i_flags |= S_SYNC;
+	else
+		inode->i_flags &= ~S_SYNC;
+	if (ip->i_d.di_flags & XFS_DIFLAG_NOATIME)
+		inode->i_flags |= S_NOATIME;
+	else
+		inode->i_flags &= ~S_NOATIME;
 	vp->v_flag &= ~VMODIFIED;
 }
 
@@ -300,8 +315,8 @@ xfs_setsize_buftarg(
 
 	if (set_blocksize(btp->pbr_bdev, sectorsize)) {
 		printk(KERN_WARNING
-			"XFS: Cannot set_blocksize to %u on device 0x%lx\n",
-			sectorsize, (unsigned long)btp->pbr_dev);
+			"XFS: Cannot set_blocksize to %u on device %u:%u\n",
+			sectorsize, MAJOR(btp->pbr_dev), MINOR(btp->pbr_dev));
 	}
 }
 

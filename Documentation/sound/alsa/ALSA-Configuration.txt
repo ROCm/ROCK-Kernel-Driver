@@ -449,7 +449,8 @@ Module parameters
     pcm_substreams_c	- capture channels (1-8, default=0)
     clock		- clock (0 = auto-detection)
     use_pm		- support the power-management (0 = off, 1 = on,
-			  2 = auto)
+			  2 = auto (default))
+    enable_mpu		- enable MPU401 (0 = off, 1 = on, 2 = auto (default))
 
     Module supports up to 8 cards and autoprobe.
 
@@ -992,7 +993,7 @@ Module parameters
 		  [VIA686A/686B only]
     ac97_clock	- AC'97 codec clock base (default 48000Hz)
     dxs_support	- support DXS channels,
-		  0 = auto (default), 1 = enable, 2 = disable,
+		  0 = auto (defalut), 1 = enable, 2 = disable,
 		  3 = 48k only
 		  [VIA8233/C,8235 only]
 
@@ -1005,13 +1006,15 @@ Module parameters
           assigned under 15. You might also upgrade your BIOS.
     
     Note: VIA8233/5 (not VIA8233A) can support DXS (direct sound)
-	  channels as the first PCM.  With this device, up to 4
-	  streams can be played at the same time.  On some motherboards,
-	  these channels don't work properly due to the bug of BIOS.
-	  If you experience that the playback on this PCM is noisy,
-	  try to specify dxs_support option to 2 or 3.  In most cases
-	  dxs_support=3 would suffice, so you can keep the multi-play
-	  capability.
+	  channels as the first PCM.  On these channels, up to 4
+	  streams can be played at the same time.
+	  As default (dxs_support = 0), 48k fixed rate is chosen since
+	  the output is often noisy except for 48k on some mother
+	  boards due to the bug of BIOS.
+	  Please try once dxs_support=1 and if it works on other
+	  sample rates, please let us know the PCI subsystem
+	  vendor/device id's (output of "lspci -nv").
+	  If it doesn't work, use dxs_support=3 or dxs_support=2.
 
     Note: for the MPU401 on VIA823x, use snd-mpu401 driver
 	  additonally.  The mpu_port option is for VIA686 chips only.

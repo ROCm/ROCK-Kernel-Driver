@@ -109,10 +109,6 @@
 #include <linux/wireless.h>		/* Note : will define WIRELESS_EXT */
 #include <net/iw_handler.h>
 #endif	/* CONFIG_NET_RADIO */
-#ifdef CONFIG_PLIP
-extern int plip_init(void);
-#endif
-
 #include <asm/current.h>
 
 /* This define, if set, will randomly drop a packet when congestion
@@ -183,6 +179,7 @@ int netdev_fastroute_obstacles;
 
 extern int netdev_sysfs_init(void);
 extern int netdev_register_sysfs(struct net_device *);
+extern int netdev_unregister_sysfs(struct net_device *);
 
 
 /*******************************************************************************
@@ -233,7 +230,7 @@ void dev_add_pack(struct packet_type *pt)
 	spin_lock_bh(&ptype_lock);
 #ifdef CONFIG_NET_FASTROUTE
 	/* Hack to detect packet socket */
-	if (pt->data && (long)(pt->data) != 1) {
+	if (pt->data && pt->data != PKT_CAN_SHARE_SKB) {
 		netdev_fastroute_obstacles++;
 		dev_clear_fastroute(pt->dev);
 	}
@@ -281,7 +278,7 @@ void __dev_remove_pack(struct packet_type *pt)
 	list_for_each_entry(pt1, head, list) {
 		if (pt == pt1) {
 #ifdef CONFIG_NET_FASTROUTE
-			if (pt->data)
+			if (pt->data && pt->data != PKT_CAN_SHARE_SKB)
 				netdev_fastroute_obstacles--;
 #endif
 			list_del_rcu(&pt->list);
@@ -470,10 +467,10 @@ struct net_device *dev_get_by_name(const char *name)
  *	to be sure the name is not allocated or removed during the test the
  *	caller must hold the rtnl semaphore.
  *
- *	This function primarily exists for back compatibility with older
+ *	This function exists only for back compatibility with older
  *	drivers.
  */
-int dev_get(const char *name)
+int __dev_get(const char *name)
 {
 	struct net_device *dev;
 
@@ -698,7 +695,13 @@ void netdev_state_change(struct net_device *dev)
 
 void dev_load(const char *name)
 {
-	if (!dev_get(name) && capable(CAP_SYS_MODULE))
+	struct net_device *dev;  
+
+	read_lock(&dev_base_lock);
+	dev = __dev_get_by_name(name);
+	read_unlock(&dev_base_lock);
+
+	if (!dev && capable(CAP_SYS_MODULE))
 		request_module("%s", name);
 }
 
@@ -841,7 +844,11 @@ int dev_close(struct net_device *dev)
 	 * engine, but this requires more changes in devices. */
 
 	smp_mb__after_clear_bit(); /* Commit netif_running(). */
-	netif_poll_disable(dev);
+	while (test_bit(__LINK_STATE_RX_SCHED, &dev->state)) {
+		/* No hurry. */
+		current->state = TASK_INTERRUPTIBLE;
+		schedule_timeout(1);
+	}
 
 	/*
 	 *	Call the device specific close. This cannot fail.
@@ -1840,13 +1847,13 @@ static __inline__ struct net_device *dev_get_idx(loff_t pos)
 void *dev_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? dev_get_idx(*pos - 1) : (void *)1;
+	return *pos ? dev_get_idx(*pos - 1) : SEQ_START_TOKEN;
 }
 
 void *dev_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
-	return v == (void *)1 ? dev_base : ((struct net_device *)v)->next;
+	return v == SEQ_START_TOKEN ? dev_base : ((struct net_device *)v)->next;
 }
 
 void dev_seq_stop(struct seq_file *seq, void *v)
@@ -1886,7 +1893,7 @@ static void dev_seq_printf_stats(struct seq_file *seq, struct net_device *dev)
  */
 static int dev_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, "Inter-|   Receive                            "
 			      "                    |  Transmit\n"
 			      " face |bytes    packets errs drop fifo frame "
@@ -1990,26 +1997,21 @@ extern int wireless_proc_init(void);
 
 static int __init dev_proc_init(void)
 {
-	struct proc_dir_entry *p;
 	int rc = -ENOMEM;
 
-	p = create_proc_entry("dev", S_IRUGO, proc_net);
-	if (!p)
+	if (!proc_net_fops_create("dev", S_IRUGO, &dev_seq_fops))
 		goto out;
-	p->proc_fops = &dev_seq_fops;
-	p = create_proc_entry("softnet_stat", S_IRUGO, proc_net);
-	if (!p)
+	if (!proc_net_fops_create("softnet_stat", S_IRUGO, &softnet_seq_fops))
 		goto out_dev;
-	p->proc_fops = &softnet_seq_fops;
 	if (wireless_proc_init())
 		goto out_softnet;
 	rc = 0;
 out:
 	return rc;
 out_softnet:
-	remove_proc_entry("softnet_stat", proc_net);
+	proc_net_remove("softnet_stat");
 out_dev:
-	remove_proc_entry("dev", proc_net);
+	proc_net_remove("dev");
 	goto out;
 }
 #else
@@ -2755,7 +2757,6 @@ static void netdev_wait_allrefs(struct net_device *dev)
 
 		current->state = TASK_INTERRUPTIBLE;
 		schedule_timeout(HZ / 4);
-		current->state = TASK_RUNNING;
 
 		if (time_after(jiffies, warning_time + 10 * HZ)) {
 			printk(KERN_EMERG "unregister_netdevice: "
@@ -2819,7 +2820,7 @@ void netdev_run_todo(void)
 			break;
 
 		case NETREG_UNREGISTERING:
-			class_device_del(&dev->class_dev);
+			netdev_unregister_sysfs(dev);
 			dev->reg_state = NETREG_UNREGISTERED;
 
 			netdev_wait_allrefs(dev);

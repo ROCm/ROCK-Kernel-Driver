@@ -634,9 +634,11 @@ static int br2684_create(unsigned long arg)
  * This handles ioctls actually performed on our vcc - we must return
  * -ENOIOCTLCMD for any unrecognized ioctl
  */
-static int br2684_ioctl(struct atm_vcc *atmvcc, unsigned int cmd,
+static int br2684_ioctl(struct socket *sock, unsigned int cmd,
 	unsigned long arg)
 {
+	struct atm_vcc *atmvcc = ATM_SD(sock);
+
 	int err;
 	switch(cmd) {
 	case ATM_SETBACKEND:
@@ -666,6 +668,12 @@ static int br2684_ioctl(struct atm_vcc *atmvcc, unsigned int cmd,
 	}
 	return -ENOIOCTLCMD;
 }
+
+static struct atm_ioctl br2684_ioctl_ops = {
+	.owner	= THIS_MODULE,
+	.ioctl	= br2684_ioctl,
+};
+
 
 #ifdef CONFIG_PROC_FS
 static void *br2684_seq_start(struct seq_file *seq, loff_t *pos)
@@ -732,9 +740,10 @@ static int br2684_seq_show(struct seq_file *seq, void *v)
 #ifdef CONFIG_ATM_BR2684_IPFILTER
 #define b1(var, byte)	((u8 *) &brvcc->filter.var)[byte]
 #define bs(var)		b1(var, 0), b1(var, 1), b1(var, 2), b1(var, 3)
-			if (brvcc->filter.netmask != 0 && pos-- == 0)
-				return sprintf(buf, "    filter=%d.%d.%d.%d/"
-				    "%d.%d.%d.%d\n", bs(prefix), bs(netmask));
+			if (brvcc->filter.netmask != 0)
+				seq_printf(seq, "    filter=%d.%d.%d.%d/"
+						"%d.%d.%d.%d\n",
+						bs(prefix), bs(netmask));
 #undef bs
 #undef b1
 #endif /* CONFIG_ATM_BR2684_IPFILTER */
@@ -773,7 +782,7 @@ static int __init br2684_init(void)
 		return -ENOMEM;
 	p->proc_fops = &br2684_proc_ops;
 #endif
-	br2684_ioctl_set(br2684_ioctl);
+	register_atm_ioctl(&br2684_ioctl_ops);
 	return 0;
 }
 
@@ -782,7 +791,7 @@ static void __exit br2684_exit(void)
 	struct net_device *net_dev;
 	struct br2684_dev *brdev;
 	struct br2684_vcc *brvcc;
-	br2684_ioctl_set(NULL);
+	deregister_atm_ioctl(&br2684_ioctl_ops);
 
 #ifdef CONFIG_PROC_FS
 	remove_proc_entry("br2684", atm_proc_root);

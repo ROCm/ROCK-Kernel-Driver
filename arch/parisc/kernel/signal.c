@@ -13,7 +13,6 @@
  *  arch/parisc/hpux/signal.c when we figure out how to do them.
  */
 
-#include <linux/version.h>
 #include <linux/sched.h>
 #include <linux/mm.h>
 #include <linux/smp.h>
@@ -458,6 +457,8 @@ do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 		if (in_syscall) {
 			/* Check the return code */
 			switch (regs->gr[28]) {
+		        case -ERESTART_RESTARTBLOCK:
+				current_thread_info()->restart_block.fn = do_no_restart_syscall;
 			case -ERESTARTNOHAND:
 				DBG(("ERESTARTNOHAND: returning -EINTR\n"));
 				regs->gr[28] = -EINTR;
@@ -495,7 +496,8 @@ do_signal(sigset_t *oldset, struct pt_regs *regs, int in_syscall)
 	/* Did we come from a system call? */
 	if (in_syscall) {
 		/* Restart the system call - no handlers present */
-		if (regs->gr[28] == -ERESTARTNOHAND ||
+		if (regs->gr[28] == -ERESTART_RESTARTBLOCK ||
+		    regs->gr[28] == -ERESTARTNOHAND ||
 		    regs->gr[28] == -ERESTARTSYS ||
 		    regs->gr[28] == -ERESTARTNOINTR) {
 			/* Hooray for delayed branching.  We don't

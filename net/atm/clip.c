@@ -24,6 +24,10 @@
 #include <linux/if.h> /* for IFF_UP */
 #include <linux/inetdevice.h>
 #include <linux/bitops.h>
+#ifdef CONFIG_PROC_FS
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#endif
 #include <net/route.h> /* for struct rtable and routing */
 #include <net/icmp.h> /* icmp_send */
 #include <asm/param.h> /* for HZ */
@@ -93,6 +97,7 @@ static void unlink_clip_vcc(struct clip_vcc *clip_vcc)
 		printk(KERN_CRIT "!clip_vcc->entry (clip_vcc %p)\n",clip_vcc);
 		return;
 	}
+	spin_lock_bh(&entry->neigh->dev->xmit_lock);	/* block clip_start_xmit() */
 	entry->neigh->used = jiffies;
 	for (walk = &entry->vccs; *walk; walk = &(*walk)->next)
 		if (*walk == clip_vcc) {
@@ -102,17 +107,20 @@ static void unlink_clip_vcc(struct clip_vcc *clip_vcc)
 			clip_vcc->entry = NULL;
 			if (clip_vcc->xoff)
 				netif_wake_queue(entry->neigh->dev);
-			if (entry->vccs) return;
+			if (entry->vccs)
+				goto out;
 			entry->expires = jiffies-1;
 				/* force resolution or expiration */
 			error = neigh_update(entry->neigh,NULL,NUD_NONE,0,0);
 			if (error)
 				printk(KERN_CRIT "unlink_clip_vcc: "
 				    "neigh_update failed with %d\n",error);
-			return;
+			goto out;
 		}
 	printk(KERN_CRIT "ATMARP: unlink_clip_vcc failed (entry %p, vcc "
 	  "0x%p)\n",entry,clip_vcc);
+out:
+	spin_unlock_bh(&entry->neigh->dev->xmit_lock);
 }
 
 
@@ -189,6 +197,13 @@ static int clip_arp_rcv(struct sk_buff *skb)
 	return 0;
 }
 
+static const unsigned char llc_oui[] = {
+	0xaa,	/* DSAP: non-ISO */
+	0xaa,	/* SSAP: non-ISO */
+	0x03,	/* Ctrl: Unnumbered Information Command PDU */
+	0x00,	/* OUI: EtherType */
+	0x00,
+	0x00 };
 
 static void clip_push(struct atm_vcc *vcc,struct sk_buff *skb)
 {
@@ -477,6 +492,7 @@ static int clip_mkip(struct atm_vcc *vcc,int timeout)
 	DPRINTK("mkip clip_vcc %p vcc %p\n",clip_vcc,vcc);
 	clip_vcc->vcc = vcc;
 	vcc->user_back = clip_vcc;
+	set_bit(ATM_VF_IS_CLIP, &vcc->flags);
 	clip_vcc->entry = NULL;
 	clip_vcc->xoff = 0;
 	clip_vcc->encap = 1;
@@ -746,18 +762,267 @@ static int atm_init_atmarp(struct atm_vcc *vcc)
 	return 0;
 }
 
-static struct atm_clip_ops __atm_clip_ops = {
-	.clip_create =		clip_create,
-	.clip_mkip =		clip_mkip,
-	.clip_setentry =	clip_setentry,
-	.clip_encap =		clip_encap,
-	.clip_push =		clip_push,
-	.atm_init_atmarp =	atm_init_atmarp,
-	.owner =		THIS_MODULE
+static int clip_ioctl(struct socket *sock, unsigned int cmd, unsigned long arg)
+{
+	struct atm_vcc *vcc = ATM_SD(sock);
+	int err = 0;
+
+	switch (cmd) {
+		case SIOCMKCLIP:
+		case ATMARPD_CTRL:
+		case ATMARP_MKIP:
+		case ATMARP_SETENTRY:
+		case ATMARP_ENCAP:
+			if (!capable(CAP_NET_ADMIN))
+				return -EPERM;
+			break;
+		default:
+			return -ENOIOCTLCMD;
+	}
+
+	switch (cmd) {
+		case SIOCMKCLIP:
+			err = clip_create(arg);
+			break;
+		case ATMARPD_CTRL:
+			err = atm_init_atmarp(vcc);
+			if (!err) {
+				sock->state = SS_CONNECTED;
+				__module_get(THIS_MODULE);
+			}
+			break;
+		case ATMARP_MKIP:
+			err = clip_mkip(vcc ,arg);
+			break;
+		case ATMARP_SETENTRY:
+			err = clip_setentry(vcc, arg);
+			break;
+		case ATMARP_ENCAP:
+			err = clip_encap(vcc, arg);
+			break;
+	}
+	return err;
+}
+
+static struct atm_ioctl clip_ioctl_ops = {
+	.owner 	= THIS_MODULE,
+	.ioctl	= clip_ioctl,
 };
+
+#ifdef CONFIG_PROC_FS
+
+static void svc_addr(struct seq_file *seq, struct sockaddr_atmsvc *addr)
+{
+	static int code[] = { 1,2,10,6,1,0 };
+	static int e164[] = { 1,8,4,6,1,0 };
+
+	if (*addr->sas_addr.pub) {
+		seq_printf(seq, "%s", addr->sas_addr.pub);
+		if (*addr->sas_addr.prv)
+			seq_putc(seq, '+');
+	} else if (!*addr->sas_addr.prv) {
+		seq_printf(seq, "%s", "(none)");
+		return;
+	}
+	if (*addr->sas_addr.prv) {
+		unsigned char *prv = addr->sas_addr.prv;
+		int *fields;
+		int i, j;
+
+		fields = *prv == ATM_AFI_E164 ? e164 : code;
+		for (i = 0; fields[i]; i++) {
+			for (j = fields[i]; j; j--)
+				seq_printf(seq, "%02X", *prv++);
+			if (fields[i+1])
+				seq_putc(seq, '.');
+		}
+	}
+}
+
+static void atmarp_info(struct seq_file *seq, struct net_device *dev,
+			struct atmarp_entry *entry, struct clip_vcc *clip_vcc)
+{
+	char buf[17];
+	int svc, off;
+
+	svc = !clip_vcc || clip_vcc->vcc->sk->sk_family == AF_ATMSVC;
+	seq_printf(seq, "%-6s%-4s%-4s%5ld ", dev->name, svc ? "SVC" : "PVC",
+	    !clip_vcc || clip_vcc->encap ? "LLC" : "NULL",
+	    (jiffies-(clip_vcc ? clip_vcc->last_use : entry->neigh->used))/HZ);
+
+	off = snprintf(buf, sizeof(buf) - 1, "%d.%d.%d.%d", NIPQUAD(entry->ip));
+	while (off < 16)
+		buf[off++] = ' ';
+	buf[off] = '\0';
+	seq_printf(seq, "%s", buf);
+
+	if (!clip_vcc) {
+		if (time_before(jiffies, entry->expires))
+			seq_printf(seq, "(resolving)\n");
+		else
+			seq_printf(seq, "(expired, ref %d)\n",
+				   atomic_read(&entry->neigh->refcnt));
+	} else if (!svc) {
+		seq_printf(seq, "%d.%d.%d\n", clip_vcc->vcc->dev->number,
+			   clip_vcc->vcc->vpi, clip_vcc->vcc->vci);
+	} else {
+		svc_addr(seq, &clip_vcc->vcc->remote);
+		seq_putc(seq, '\n');
+	}
+}
+
+struct arp_state {
+	int bucket;
+  	struct neighbour *n;
+	struct clip_vcc *vcc;
+};
+  
+static void *arp_vcc_walk(struct arp_state *state,
+			  struct atmarp_entry *e, loff_t *l)
+{
+	struct clip_vcc *vcc = state->vcc;
+
+	if (!vcc)
+		vcc = e->vccs;
+	if (vcc == (void *)1) {
+		vcc = e->vccs;
+		--*l;
+  	}
+	for (; vcc; vcc = vcc->next) {
+		if (--*l < 0)
+			break;
+	}
+	state->vcc = vcc;
+	return (*l < 0) ? state : NULL;
+}
+  
+static void *arp_get_idx(struct arp_state *state, loff_t l)
+{
+	void *v = NULL;
+
+	for (; state->bucket <= NEIGH_HASHMASK; state->bucket++) {
+		for (; state->n; state->n = state->n->next) {
+			v = arp_vcc_walk(state, NEIGH2ENTRY(state->n), &l);
+			if (v)
+				goto done;
+  		}
+		state->n = clip_tbl_hook->hash_buckets[state->bucket + 1];
+	}
+done:
+	return v;
+}
+
+static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
+{
+	struct arp_state *state = seq->private;
+	void *ret = (void *)1;
+
+	if (!clip_tbl_hook) {
+		state->bucket = -1;
+		goto out;
+	}
+
+	read_lock_bh(&clip_tbl_hook->lock);
+	state->bucket = 0;
+	state->n = clip_tbl_hook->hash_buckets[0];
+	state->vcc = (void *)1;
+	if (*pos)
+		ret = arp_get_idx(state, *pos);
+out:
+	return ret;
+}
+
+static void arp_seq_stop(struct seq_file *seq, void *v)
+{
+	struct arp_state *state = seq->private;
+
+	if (state->bucket != -1)
+		read_unlock_bh(&clip_tbl_hook->lock);
+}
+
+static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
+{
+	struct arp_state *state = seq->private;
+
+	v = arp_get_idx(state, 1);
+	*pos += !!PTR_ERR(v);
+	return v;
+}
+
+static int arp_seq_show(struct seq_file *seq, void *v)
+{
+	static char atm_arp_banner[] = 
+		"IPitf TypeEncp Idle IP address      ATM address\n";
+
+	if (v == (void *)1)
+		seq_puts(seq, atm_arp_banner);
+	else {
+		struct arp_state *state = seq->private;
+		struct neighbour *n = state->n;	
+		struct clip_vcc *vcc = state->vcc;
+
+		atmarp_info(seq, n->dev, NEIGH2ENTRY(n), vcc);
+	}
+  	return 0;
+}
+
+static struct seq_operations arp_seq_ops = {
+	.start	= arp_seq_start,
+	.next	= arp_seq_next,
+	.stop	= arp_seq_stop,
+	.show	= arp_seq_show,
+};
+
+static int arp_seq_open(struct inode *inode, struct file *file)
+{
+	struct arp_state *state;
+	struct seq_file *seq;
+	int rc = -EAGAIN;
+
+	state = kmalloc(sizeof(*state), GFP_KERNEL);
+	if (!state) {
+		rc = -ENOMEM;
+		goto out_kfree;
+	}
+
+	rc = seq_open(file, &arp_seq_ops);
+	if (rc)
+		goto out_kfree;
+
+	seq = file->private_data;
+	seq->private = state;
+out:
+	return rc;
+
+out_kfree:
+	kfree(state);
+	goto out;
+}
+
+static int arp_seq_release(struct inode *inode, struct file *file)
+{
+	return seq_release_private(inode, file);
+}
+
+static struct file_operations arp_seq_fops = {
+	.open		= arp_seq_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= arp_seq_release,
+	.owner		= THIS_MODULE
+};
+#endif
 
 static int __init atm_clip_init(void)
 {
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry *p;
+
+	p = create_proc_entry("arp", S_IRUGO, atm_proc_root);
+	if (p)
+		p->proc_fops = &arp_seq_fops;
+#endif
+
 	/* we should use neigh_table_init() */
 	clip_tbl.lock = RW_LOCK_UNLOCKED;
 	clip_tbl.kmem_cachep = kmem_cache_create(clip_tbl.id,
@@ -770,7 +1035,7 @@ static int __init atm_clip_init(void)
 	skb_queue_head_init(&clip_tbl.proxy_queue);
 
 	clip_tbl_hook = &clip_tbl;
-	atm_clip_ops_set(&__atm_clip_ops);
+	register_atm_ioctl(&clip_ioctl_ops);
 
 	return 0;
 }
@@ -779,7 +1044,9 @@ static void __exit atm_clip_exit(void)
 {
 	struct net_device *dev, *next;
 
-	atm_clip_ops_set(NULL);
+	remove_proc_entry("arp", atm_proc_root);
+
+	deregister_atm_ioctl(&clip_ioctl_ops);
 
 	neigh_ifdown(&clip_tbl, NULL);
 	dev = clip_devs;

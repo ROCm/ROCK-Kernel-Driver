@@ -40,7 +40,7 @@ static void __init handle_initrd(void)
 	int error;
 	int i, pid;
 
-	real_root_dev = ROOT_DEV;
+	real_root_dev = new_encode_dev(ROOT_DEV);
 	create_dev("/dev/root.old", Root_RAM0, NULL);
 	/* mount initrd on rootfs' /root */
 	mount_block_root("/dev/root.old", root_mountflags & ~MS_RDONLY);
@@ -69,12 +69,12 @@ static void __init handle_initrd(void)
 	close(root_fd);
 	umount_devfs("/old/dev");
 
-	if (real_root_dev == Root_RAM0) {
+	if (new_decode_dev(real_root_dev) == Root_RAM0) {
 		sys_chdir("/old");
 		return;
 	}
 
-	ROOT_DEV = real_root_dev;
+	ROOT_DEV = new_decode_dev(real_root_dev);
 	mount_root();
 
 	printk(KERN_NOTICE "Trying to move old root to /initrd ... ");

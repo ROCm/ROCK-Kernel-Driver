@@ -243,6 +243,12 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 				((v >> 2) & 0x3fffff);
 			break;
 
+		case R_SPARC_WDISP19:
+			v -= (Elf64_Addr) location;
+			*loc32 = (*loc32 & ~0x7ffff) |
+				((v >> 2) & 0x7ffff);
+			break;
+
 		case R_SPARC_LO10:
 			*loc32 = (*loc32 & ~0x3ff) | (v & 0x3ff);
 			break;

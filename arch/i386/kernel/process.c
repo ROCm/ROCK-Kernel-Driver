@@ -151,11 +151,57 @@ void cpu_idle (void)
 	}
 }
 
+/*
+ * This uses new MONITOR/MWAIT instructions on P4 processors with PNI,
+ * which can obviate IPI to trigger checking of need_resched.
+ * We execute MONITOR against need_resched and enter optimized wait state
+ * through MWAIT. Whenever someone changes need_resched, we would be woken
+ * up from MWAIT (without an IPI).
+ */
+static void mwait_idle(void)
+{
+	local_irq_enable();
+
+	if (!need_resched()) {
+		set_thread_flag(TIF_POLLING_NRFLAG);
+		do {
+			__monitor((void *)&current_thread_info()->flags, 0, 0);
+			if (need_resched())
+				break;
+			__mwait(0, 0);
+		} while (!need_resched());
+		clear_thread_flag(TIF_POLLING_NRFLAG);
+	}
+}
+
+void __init select_idle_routine(const struct cpuinfo_x86 *c)
+{
+	if (cpu_has(c, X86_FEATURE_MWAIT)) {
+		printk("monitor/mwait feature present.\n");
+		/*
+		 * Skip, if setup has overridden idle.
+		 * Also, take care of system with asymmetric CPUs.
+		 * Use, mwait_idle only if all cpus support it.
+		 * If not, we fallback to default_idle()
+		 */
+		if (!pm_idle) {
+			printk("using mwait in idle threads.\n");
+			pm_idle = mwait_idle;
+		}
+		return;
+	}
+	pm_idle = default_idle;
+	return;
+}
+
 static int __init idle_setup (char *str)
 {
 	if (!strncmp(str, "poll", 4)) {
 		printk("using polling idle threads.\n");
 		pm_idle = poll_idle;
+	} else if (!strncmp(str, "halt", 4)) {
+		printk("using halt in idle threads.\n");
+		pm_idle = default_idle;
 	}
 
 	return 1;

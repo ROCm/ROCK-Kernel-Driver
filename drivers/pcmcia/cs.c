@@ -244,12 +244,9 @@ static const lookup_t service_table[] = {
 static int socket_resume(struct pcmcia_socket *skt);
 static int socket_suspend(struct pcmcia_socket *skt);
 
-int pcmcia_socket_dev_suspend(struct device *dev, u32 state, u32 level)
+int pcmcia_socket_dev_suspend(struct device *dev, u32 state)
 {
 	struct pcmcia_socket *socket;
-
-	if (level != SUSPEND_SAVE_STATE)
-		return 0;
 
 	down_read(&pcmcia_socket_list_rwsem);
 	list_for_each_entry(socket, &pcmcia_socket_list, socket_list) {
@@ -265,12 +262,9 @@ int pcmcia_socket_dev_suspend(struct device *dev, u32 state, u32 level)
 }
 EXPORT_SYMBOL(pcmcia_socket_dev_suspend);
 
-int pcmcia_socket_dev_resume(struct device *dev, u32 level)
+int pcmcia_socket_dev_resume(struct device *dev)
 {
 	struct pcmcia_socket *socket;
-
-	if (level != RESUME_RESTORE_STATE)
-		return 0;
 
 	down_read(&pcmcia_socket_list_rwsem);
 	list_for_each_entry(socket, &pcmcia_socket_list, socket_list) {
@@ -287,72 +281,29 @@ int pcmcia_socket_dev_resume(struct device *dev, u32 level)
 EXPORT_SYMBOL(pcmcia_socket_dev_resume);
 
 
-static int pccardd(void *__skt);
-#define to_class_data(dev) dev->class_data
-
-static int pcmcia_add_socket(struct class_device *class_dev)
-{
-	struct pcmcia_socket *socket = class_get_devdata(class_dev);
-	int ret = 0;
-
-	/* base address = 0, map = 0 */
-	socket->cis_mem.flags = 0;
-	socket->cis_mem.speed = cis_speed;
-	socket->erase_busy.next = socket->erase_busy.prev = &socket->erase_busy;
-	INIT_LIST_HEAD(&socket->cis_cache);
-	spin_lock_init(&socket->lock);
-
-	init_completion(&socket->thread_done);
-	init_waitqueue_head(&socket->thread_wait);
-	init_MUTEX(&socket->skt_sem);
-	spin_lock_init(&socket->thread_lock);
-
-	socket->socket = dead_socket;
-	socket->ops->init(socket);
-
-	ret = kernel_thread(pccardd, socket, CLONE_KERNEL);
-	if (ret < 0)
-		return ret;
-
-	wait_for_completion(&socket->thread_done);
-	BUG_ON(!socket->thread);
-	pcmcia_parse_events(socket, SS_DETECT);
-
-	return 0;
-}
-
-static void pcmcia_remove_socket(struct class_device *class_dev)
+static void pcmcia_release_socket(struct class_device *class_dev)
 {
 	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 	client_t *client;
 
-	if (socket->thread) {
-		init_completion(&socket->thread_done);
-		socket->thread = NULL;
-		wake_up(&socket->thread_wait);
-		wait_for_completion(&socket->thread_done);
-	}
-	release_cis_mem(socket);
 	while (socket->clients) {
 		client = socket->clients;
 		socket->clients = socket->clients->next;
 		kfree(client);
 	}
-	socket->ops = NULL;
-}
 
-static void pcmcia_release_socket(struct class_device *class_dev)
-{
-	struct pcmcia_socket *socket = class_get_devdata(class_dev);
 	complete(&socket->socket_released);
 }
 
+static int pccardd(void *__skt);
 
 /**
  * pcmcia_register_socket - add a new pcmcia socket device
  */
 int pcmcia_register_socket(struct pcmcia_socket *socket)
 {
+	int ret;
+
 	if (!socket || !socket->ops || !socket->dev.dev)
 		return -EINVAL;
 
@@ -387,15 +338,34 @@ int pcmcia_register_socket(struct pcmcia_socket *socket)
 	socket->dev.class = &pcmcia_socket_class;
 	snprintf(socket->dev.class_id, BUS_ID_SIZE, "pcmcia_socket%u", socket->sock);
 
-	/* register with the device core */
-	if (class_device_register(&socket->dev)) {
-		down_write(&pcmcia_socket_list_rwsem);
-		list_del(&socket->socket_list);
-		up_write(&pcmcia_socket_list_rwsem);
-		return -EINVAL;
-	}
+	/* base address = 0, map = 0 */
+	socket->cis_mem.flags = 0;
+	socket->cis_mem.speed = cis_speed;
+	socket->erase_busy.next = socket->erase_busy.prev = &socket->erase_busy;
+	INIT_LIST_HEAD(&socket->cis_cache);
+	spin_lock_init(&socket->lock);
+
+	init_completion(&socket->socket_released);
+	init_completion(&socket->thread_done);
+	init_waitqueue_head(&socket->thread_wait);
+	init_MUTEX(&socket->skt_sem);
+	spin_lock_init(&socket->thread_lock);
+
+	ret = kernel_thread(pccardd, socket, CLONE_KERNEL);
+	if (ret < 0)
+		goto err;
+
+	wait_for_completion(&socket->thread_done);
+	BUG_ON(!socket->thread);
+	pcmcia_parse_events(socket, SS_DETECT);
 
 	return 0;
+
+ err:
+	down_write(&pcmcia_socket_list_rwsem);
+	list_del(&socket->socket_list);
+	up_write(&pcmcia_socket_list_rwsem);
+	return ret;
 } /* pcmcia_register_socket */
 EXPORT_SYMBOL(pcmcia_register_socket);
 
@@ -410,10 +380,13 @@ void pcmcia_unregister_socket(struct pcmcia_socket *socket)
 
 	DEBUG(0, "cs: pcmcia_unregister_socket(0x%p)\n", socket->ops);
 
-	init_completion(&socket->socket_released);
-
-	/* remove from the device core */
-	class_device_unregister(&socket->dev);
+	if (socket->thread) {
+		init_completion(&socket->thread_done);
+		socket->thread = NULL;
+		wake_up(&socket->thread_wait);
+		wait_for_completion(&socket->thread_done);
+	}
+	release_cis_mem(socket);
 
 	/* remove from our own list */
 	down_write(&pcmcia_socket_list_rwsem);
@@ -657,7 +630,7 @@ static int socket_setup(struct pcmcia_socket *skt, int initial_delay)
 		pcmcia_error(skt, "unsupported voltage key.\n");
 		return CS_BAD_TYPE;
 	}
-	skt->socket.flags = SS_DEBOUNCED;
+	skt->socket.flags = 0;
 	skt->ops->set_socket(skt, &skt->socket);
 
 	/*
@@ -690,7 +663,6 @@ static int socket_insert(struct pcmcia_socket *skt)
 		}
 #endif
 		send_event(skt, CS_EVENT_CARD_INSERTION, CS_EVENT_PRI_LOW);
-		skt->socket.flags &= ~SS_DEBOUNCED;
 	} else {
 		socket_shutdown(skt);
 		cs_socket_put(skt);
@@ -739,7 +711,6 @@ static int socket_resume(struct pcmcia_socket *skt)
 		} else {
 			send_event(skt, CS_EVENT_PM_RESUME, CS_EVENT_PRI_LOW);
 		}
-		skt->socket.flags &= ~SS_DEBOUNCED;
 	} else {
 		socket_shutdown(skt);
 		cs_socket_put(skt);
@@ -791,10 +762,21 @@ static int pccardd(void *__skt)
 {
 	struct pcmcia_socket *skt = __skt;
 	DECLARE_WAITQUEUE(wait, current);
+	int ret;
 
 	daemonize("pccardd");
 	skt->thread = current;
 	complete(&skt->thread_done);
+
+	skt->socket = dead_socket;
+	skt->ops->init(skt);
+
+	/* register with the device core */
+	ret = class_device_register(&skt->dev);
+	if (ret) {
+		printk(KERN_WARNING "PCMCIA: unable to register socket 0x%p\n",
+			skt);
+	}
 
 	add_wait_queue(&skt->thread_wait, &wait);
 	for (;;) {
@@ -830,6 +812,9 @@ static int pccardd(void *__skt)
 			break;
 	}
 	remove_wait_queue(&skt->thread_wait, &wait);
+
+	/* remove from the device core */
+	class_device_unregister(&skt->dev);
 
 	complete_and_exit(&skt->thread_done, 0);
 }
@@ -2509,12 +2494,6 @@ struct class pcmcia_socket_class = {
 };
 EXPORT_SYMBOL(pcmcia_socket_class);
 
-static struct class_interface pcmcia_socket = {
-	.class = &pcmcia_socket_class,
-	.add = &pcmcia_add_socket,
-	.remove = &pcmcia_remove_socket,
-};
-
 
 static int __init init_pcmcia_cs(void)
 {
@@ -2522,7 +2501,6 @@ static int __init init_pcmcia_cs(void)
     printk(KERN_INFO "  %s\n", options);
     DEBUG(0, "%s\n", version);
     class_register(&pcmcia_socket_class);
-    class_interface_register(&pcmcia_socket);
 
     return 0;
 }
@@ -2531,7 +2509,6 @@ static void __exit exit_pcmcia_cs(void)
 {
     printk(KERN_INFO "unloading Kernel Card Services\n");
     release_resource_db();
-    class_interface_unregister(&pcmcia_socket);
     class_unregister(&pcmcia_socket_class);
 }
 

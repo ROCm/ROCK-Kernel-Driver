@@ -105,8 +105,8 @@ static void *malloc(int size)
 {
 	void *p;
 
-	if (size <0) error("Malloc error\n");
-	if (free_mem_ptr == 0) error("Memory error\n");
+	if (size <0) error("Malloc error");
+	if (free_mem_ptr == 0) error("Memory error");
 
 	free_mem_ptr = (free_mem_ptr + 3) & ~3;	/* Align */
 
@@ -114,7 +114,7 @@ static void *malloc(int size)
 	free_mem_ptr += size;
 
 	if (free_mem_ptr >= free_mem_end_ptr)
-		error("\nOut of memory\n");
+		error("Out of memory");
 
 	return p;
 }
@@ -180,7 +180,7 @@ void* memcpy(void* __dest, __const void* __src,
 static int fill_inbuf(void)
 {
 	if (insize != 0) {
-		error("ran out of input data\n");
+		error("ran out of input data");
 	}
 
 	inbuf = input_data;

@@ -307,24 +307,6 @@ static int smc_link_ok(struct net_device *dev);
 
 /*======================================================================
 
-    This bit of code is used to avoid unregistering network devices
-    at inappropriate times.  2.2 and later kernels are fairly picky
-    about when this can happen.
-
-======================================================================*/
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    smc91c92_detach(link);
-    }
-}
-
-/*======================================================================
-
   smc91c92_attach() creates an "instance" of the driver, allocating
   local data structures for one device.  The device is registered
   with Card Services.
@@ -340,7 +322,6 @@ static dev_link_t *smc91c92_attach(void)
     int i, ret;
 
     DEBUG(0, "smc91c92_attach()\n");
-    flush_stale_links();
 
     /* Create new ethernet device */
     dev = alloc_etherdev(sizeof(struct smc_private));
@@ -432,10 +413,8 @@ static void smc91c92_detach(dev_link_t *link)
 
     if (link->state & DEV_CONFIG) {
 	smc91c92_release(link);
-	if (link->state & DEV_STALE_CONFIG) {
-	    link->state |= DEV_STALE_LINK;
+	if (link->state & DEV_STALE_CONFIG)
 	    return;
-	}
     }
 
     if (link->handle)
@@ -1103,7 +1082,9 @@ static void smc91c92_release(dev_link_t *link)
 
     link->state &= ~DEV_CONFIG;
 
-} /* smc91c92_release */
+    if (link->state & DEV_STALE_CONFIG)
+	    smc91c92_detach(link);
+}
 
 /*======================================================================
 
@@ -2235,6 +2216,8 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
     struct smc_private *smc = dev->priv;
     struct mii_ioctl_data *mii;
     int rc = 0;
+    u_short saved_bank;
+    ioaddr_t ioaddr = dev->base_addr;
 
     mii = (struct mii_ioctl_data *) &rq->ifr_data;
     if (!netif_running(dev))
@@ -2242,12 +2225,18 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
 
     switch (cmd) {
     case SIOCETHTOOL:
+	saved_bank = inw(ioaddr + BANK_SELECT);
+	SMC_SELECT_BANK(3);
 	rc = smc_ethtool_ioctl(dev, (void *) rq->ifr_data);
+	SMC_SELECT_BANK(saved_bank);
 	break;
 
     default:
 	spin_lock_irq(&smc->lock);
+	saved_bank = inw(ioaddr + BANK_SELECT);
+	SMC_SELECT_BANK(3);
 	rc = generic_mii_ioctl(&smc->mii_if, mii, cmd, NULL);
+	SMC_SELECT_BANK(saved_bank);
 	spin_unlock_irq(&smc->lock);
 	break;
     }

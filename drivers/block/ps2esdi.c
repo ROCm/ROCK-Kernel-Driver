@@ -62,8 +62,6 @@
 
 static void reset_ctrl(void);
 
-int ps2esdi_init(void);
-
 static int ps2esdi_geninit(void);
 
 static void do_ps2esdi_request(request_queue_t * q);
@@ -141,7 +139,7 @@ static struct block_device_operations ps2esdi_fops =
 static struct gendisk *ps2esdi_gendisk[2];
 
 /* initialization routine called by ll_rw_blk.c   */
-int __init ps2esdi_init(void)
+static int __init ps2esdi_init(void)
 {
 
 	int error = 0;
@@ -169,9 +167,11 @@ int __init ps2esdi_init(void)
 	return 0;
 }				/* ps2esdi_init */
 
+#ifndef MODULE
+
 module_init(ps2esdi_init);
 
-#ifdef MODULE
+#else
 
 static int cyl[MAX_HD] = {-1,-1};
 static int head[MAX_HD] = {-1, -1};
@@ -187,7 +187,7 @@ int init_module(void) {
 	int drive;
 
 	for(drive = 0; drive < MAX_HD; drive++) {
-	        struct ps2_esdi_i_struct *info = &ps2esdi_info[drive];
+	        struct ps2esdi_i_struct *info = &ps2esdi_info[drive];
 
         	if (cyl[drive] != -1) {
 		  	info->cyl = info->lzone = cyl[drive];
@@ -204,6 +204,7 @@ int init_module(void) {
 
 void
 cleanup_module(void) {
+	int i;
 	if(ps2esdi_slot) {
 		mca_mark_as_unused(ps2esdi_slot);
 		mca_set_adapter_procfn(ps2esdi_slot, NULL, NULL);
@@ -421,6 +422,7 @@ static int __init ps2esdi_geninit(void)
 		disk->major = PS2ESDI_MAJOR;
 		disk->first_minor = i<<6;
 		sprintf(disk->disk_name, "ed%c", 'a'+i);
+		sprintf(disk->devfs_name, "ed/target%d", i);
 		disk->fops = &ps2esdi_fops;
 		ps2esdi_gendisk[i] = disk;
 	}

@@ -343,7 +343,7 @@ static struct file_operations proc_modules_operations = {
 #endif
 
 extern struct seq_operations slabinfo_op;
-extern ssize_t slabinfo_write(struct file *, const char *, size_t, loff_t *);
+extern ssize_t slabinfo_write(struct file *, const char __user *, size_t, loff_t *);
 static int slabinfo_open(struct inode *inode, struct file *file)
 {
 	return seq_open(file, &slabinfo_op);
@@ -548,8 +548,8 @@ static int execdomains_read_proc(char *page, char **start, off_t off,
  * buffer. Use of the program readprofile is recommended in order to
  * get meaningful info out of these data.
  */
-static ssize_t read_profile(struct file *file, char *buf,
-			    size_t count, loff_t *ppos)
+static ssize_t
+read_profile(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 {
 	unsigned long p = *ppos;
 	ssize_t read;
@@ -580,13 +580,13 @@ static ssize_t read_profile(struct file *file, char *buf,
  * Writing a 'profiling multiplier' value into it also re-sets the profiling
  * interrupt frequency, on architectures that support this.
  */
-static ssize_t write_profile(struct file * file, const char * buf,
+static ssize_t write_profile(struct file *file, const char __user *buf,
 			     size_t count, loff_t *ppos)
 {
 #ifdef CONFIG_SMP
 	extern int setup_profiling_timer (unsigned int multiplier);
 
-	if (count==sizeof(int)) {
+	if (count == sizeof(int)) {
 		unsigned int multiplier;
 
 		if (copy_from_user(&multiplier, buf, sizeof(int)))
@@ -610,8 +610,8 @@ static struct file_operations proc_profile_operations = {
 /*
  * writing 'C' to /proc/sysrq-trigger is like sysrq-C
  */
-static ssize_t write_sysrq_trigger(struct file *file, const char *buf,
-				     size_t count, loff_t *ppos)
+static ssize_t write_sysrq_trigger(struct file *file, const char __user *buf,
+				   size_t count, loff_t *ppos)
 {
 	if (count) {
 		char c;
@@ -685,12 +685,14 @@ void __init proc_misc_init(void)
 #ifdef CONFIG_MODULES
 	create_seq_entry("modules", 0, &proc_modules_operations);
 #endif
+#ifdef CONFIG_PROC_KCORE
 	proc_root_kcore = create_proc_entry("kcore", S_IRUSR, NULL);
 	if (proc_root_kcore) {
 		proc_root_kcore->proc_fops = &proc_kcore_operations;
 		proc_root_kcore->size =
 				(size_t)high_memory - PAGE_OFFSET + PAGE_SIZE;
 	}
+#endif
 	if (prof_on) {
 		entry = create_proc_entry("profile", S_IWUSR | S_IRUGO, NULL);
 		if (entry) {

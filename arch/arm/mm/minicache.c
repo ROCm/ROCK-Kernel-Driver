@@ -56,6 +56,8 @@ static int __init minicache_init(void)
 	pgd_t *pgd;
 	pmd_t *pmd;
 
+	spin_lock(&init_mm.page_table_lock);
+
 	pgd = pgd_offset_k(minicache_address);
 	pmd = pmd_alloc(&init_mm, pgd, minicache_address);
 	if (!pmd)
@@ -63,6 +65,8 @@ static int __init minicache_init(void)
 	minicache_pte = pte_alloc_kernel(&init_mm, pmd, minicache_address);
 	if (!minicache_pte)
 		BUG();
+
+	spin_unlock(&init_mm.page_table_lock);
 
 	return 0;
 }

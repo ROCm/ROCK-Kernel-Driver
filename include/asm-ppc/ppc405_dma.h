@@ -36,7 +36,7 @@ extern unsigned long ISA_DMA_THRESHOLD;
 #define dma_inb		inb
 
 
-/* 
+/*
  * Function return status codes
  * These values are used to indicate whether or not the function
  * call was successful, or a bad/invalid parameter was passed.
@@ -79,7 +79,7 @@ extern unsigned long ISA_DMA_THRESHOLD;
 #define DMA_MODE_MM_DEVATDST	(SET_DMA_TM(TM_D_MM))
 
 
-/* 
+/*
  * DMA Polarity Configuration Register
  */
 #define DMAReq0_ActiveLow (1<<31)
@@ -113,14 +113,14 @@ extern unsigned long ISA_DMA_THRESHOLD;
 #define DMA_CS3           (1<<28)
 
 #define DMA_TS0           (1<<27) /* End of Transfer has been requested */
-#define DMA_TS1           (1<<26) 
-#define DMA_TS2           (1<<25)  
-#define DMA_TS3           (1<<24)   
+#define DMA_TS1           (1<<26)
+#define DMA_TS2           (1<<25)
+#define DMA_TS3           (1<<24)
 
 #define DMA_CH0_ERR       (1<<23) /* DMA Chanel 0 Error */
-#define DMA_CH1_ERR       (1<<22) 
-#define DMA_CH2_ERR       (1<<21) 
-#define DMA_CH3_ERR       (1<<20) 
+#define DMA_CH1_ERR       (1<<22)
+#define DMA_CH2_ERR       (1<<21)
+#define DMA_CH3_ERR       (1<<20)
 
 #define DMA_IN_DMA_REQ0   (1<<19) /* Internal DMA Request is pending */
 #define DMA_IN_DMA_REQ1   (1<<18)
@@ -133,14 +133,14 @@ extern unsigned long ISA_DMA_THRESHOLD;
 #define DMA_EXT_DMA_REQ3  (1<<12)
 
 #define DMA_CH0_BUSY      (1<<11) /* DMA Channel 0 Busy */
-#define DMA_CH1_BUSY      (1<<10)  
-#define DMA_CH2_BUSY       (1<<9)  
-#define DMA_CH3_BUSY       (1<<8)  
+#define DMA_CH1_BUSY      (1<<10)
+#define DMA_CH2_BUSY       (1<<9)
+#define DMA_CH3_BUSY       (1<<8)
 
 #define DMA_SG0            (1<<7) /* DMA Channel 0 Scatter/Gather in progress */
-#define DMA_SG1            (1<<6) 
-#define DMA_SG2            (1<<5) 
-#define DMA_SG3            (1<<4) 
+#define DMA_SG1            (1<<6)
+#define DMA_SG2            (1<<5)
+#define DMA_SG3            (1<<4)
 
 
 
@@ -155,7 +155,7 @@ extern unsigned long ISA_DMA_THRESHOLD;
 #define SET_DMA_CIE_ENABLE(x) (((x)&0x1)<<30)
 #define GET_DMA_CIE_ENABLE(x) (((x)&DMA_CIE_ENABLE)>>30)
 
-#define DMA_TD                (1<<29)      
+#define DMA_TD                (1<<29)
 #define SET_DMA_TD(x)         (((x)&0x1)<<29)
 #define GET_DMA_TD(x)         (((x)&DMA_TD)>>29)
 
@@ -212,7 +212,7 @@ extern unsigned long ISA_DMA_THRESHOLD;
 
 #define SET_DMA_PRIORITY(x)   (((x)&0x3)<<6)   /* DMA Channel Priority */
 #define DMA_PRIORITY_MASK SET_DMA_PRIORITY(3)
-#define   PRIORITY_LOW         0 
+#define   PRIORITY_LOW         0
 #define   PRIORITY_MID_LOW     1
 #define   PRIORITY_MID_HIGH    2
 #define   PRIORITY_HIGH        3
@@ -241,13 +241,13 @@ extern unsigned long ISA_DMA_THRESHOLD;
 #define SSG2_ENABLE        (1<<29)
 #define SSG3_ENABLE        (1<<28)
 #define SSG0_MASK_ENABLE   (1<<15)        /* Enable writing to SSG0 bit */
-#define SSG1_MASK_ENABLE   (1<<14)   
-#define SSG2_MASK_ENABLE   (1<<13)  
-#define SSG3_MASK_ENABLE   (1<<12) 
+#define SSG1_MASK_ENABLE   (1<<14)
+#define SSG2_MASK_ENABLE   (1<<13)
+#define SSG3_MASK_ENABLE   (1<<12)
 
 
 /*
- * DMA Scatter/Gather Descriptor Bit fields 
+ * DMA Scatter/Gather Descriptor Bit fields
  */
 #define SG_LINK            (1<<31)        /* Link */
 #define SG_TCI_ENABLE      (1<<29)        /* Enable Terminal Count Interrupt */
@@ -262,7 +262,7 @@ typedef uint32_t sgl_handle_t;
 
 typedef struct {
 
-	/* 
+	/*
 	 * Valid polarity settings:
 	 *   DMAReq0_ActiveLow
 	 *   DMAAck0_ActiveLow
@@ -271,18 +271,18 @@ typedef struct {
 	 *   DMAReq1_ActiveLow
 	 *   DMAAck1_ActiveLow
 	 *   EOT1_ActiveLow
-	 * 
+	 *
 	 *   DMAReq2_ActiveLow
 	 *   DMAAck2_ActiveLow
 	 *   EOT2_ActiveLow
 	 *
-	 *   DMAReq3_ActiveLow 
+	 *   DMAReq3_ActiveLow
 	 *   DMAAck3_ActiveLow
 	 *   EOT3_ActiveLow
 	 */
 	unsigned int polarity;
 
-	char buffer_enable;      /* Boolean: buffer enable            */      
+	char buffer_enable;      /* Boolean: buffer enable            */
 	char tce_enable;         /* Boolean: terminal count enable    */
 	char etd_output;         /* Boolean: eot pin is a tc output   */
 	char pce;                /* Boolean: parity check enable      */
@@ -423,7 +423,7 @@ static __inline__ int enable_405gp_dma(unsigned int dmanr)
 	case 0:
 		if (p_dma_ch->mode == DMA_MODE_READ) {
 			/* peripheral to memory */
-			mtdcr(DCRN_DMASA0, NULL); 
+			mtdcr(DCRN_DMASA0, NULL);
 			mtdcr(DCRN_DMADA0, p_dma_ch->addr);
 			}
 		else if (p_dma_ch->mode == DMA_MODE_WRITE) {
@@ -438,8 +438,8 @@ static __inline__ int enable_405gp_dma(unsigned int dmanr)
 		mtdcr(DCRN_DMACR0, control);
 		break;
 	case 1:
-		if (p_dma_ch->mode == DMA_MODE_READ) {      
-			mtdcr(DCRN_DMASA1, NULL); 
+		if (p_dma_ch->mode == DMA_MODE_READ) {
+			mtdcr(DCRN_DMASA1, NULL);
 			mtdcr(DCRN_DMADA1, p_dma_ch->addr);
 		} else if (p_dma_ch->mode == DMA_MODE_WRITE) {
 			mtdcr(DCRN_DMASA1, p_dma_ch->addr);
@@ -451,10 +451,10 @@ static __inline__ int enable_405gp_dma(unsigned int dmanr)
 		mtdcr(DCRN_DMACR1, control);
 		break;
 	case 2:
-		if (p_dma_ch->mode == DMA_MODE_READ) {     
-			mtdcr(DCRN_DMASA2, NULL); 
+		if (p_dma_ch->mode == DMA_MODE_READ) {
+			mtdcr(DCRN_DMASA2, NULL);
 			mtdcr(DCRN_DMADA2, p_dma_ch->addr);
-		} else if (p_dma_ch->mode == DMA_MODE_WRITE) { 
+		} else if (p_dma_ch->mode == DMA_MODE_WRITE) {
 			mtdcr(DCRN_DMASA2, p_dma_ch->addr);
 			mtdcr(DCRN_DMADA2, NULL);
 		}
@@ -464,8 +464,8 @@ static __inline__ int enable_405gp_dma(unsigned int dmanr)
 		mtdcr(DCRN_DMACR2, control);
 		break;
 	case 3:
-		if (p_dma_ch->mode == DMA_MODE_READ) {    
-			mtdcr(DCRN_DMASA3, NULL); 
+		if (p_dma_ch->mode == DMA_MODE_READ) {
+			mtdcr(DCRN_DMASA3, NULL);
 			mtdcr(DCRN_DMADA3, p_dma_ch->addr);
 		} else if (p_dma_ch->mode == DMA_MODE_WRITE) {
 			mtdcr(DCRN_DMASA3, p_dma_ch->addr);
@@ -529,7 +529,7 @@ static __inline__ void disable_405gp_dma(unsigned int dmanr)
  *
  * Valid mode values are:
  *
- * DMA_MODE_READ          peripheral to memory 
+ * DMA_MODE_READ          peripheral to memory
  * DMA_MODE_WRITE         memory to peripheral
  * DMA_MODE_MM            memory to memory
  * DMA_MODE_MM_DEVATSRC   device-paced memory to memory, device at src
@@ -569,8 +569,8 @@ static __inline__ int set_405gp_dma_mode(unsigned int dmanr, unsigned int mode)
  * where each transfer is equal to the bus width.  Thus, count
  * MUST be a multiple of the bus width.
  */
-static __inline__ void 
-set_405gp_dma_count(unsigned int dmanr, unsigned int count)  
+static __inline__ void
+set_405gp_dma_count(unsigned int dmanr, unsigned int count)
 {
 	ppc_dma_ch_t *p_dma_ch = &dma_channels[dmanr];
 
@@ -697,21 +697,21 @@ static __inline__ void set_405gp_dma_addr(unsigned int dmanr, dma_addr_t addr)
 		printk("Warning: set_dma_addr addr 0x%x bus width %d\n",
 			addr, p_dma_ch->pwidth);
 	}
-#endif 
+#endif
 
 	/* save dma address and program it later after we know the xfer mode */
-	p_dma_ch->addr = addr;   
+	p_dma_ch->addr = addr;
 }
 
 
 
 
 /*
- * Sets both DMA addresses for a memory to memory transfer. 
+ * Sets both DMA addresses for a memory to memory transfer.
  * For memory to peripheral or peripheral to memory transfers
  * the function set_dma_addr() should be used instead.
  */
-static __inline__ void 
+static __inline__ void
 set_405gp_dma_addr2(unsigned int dmanr, dma_addr_t src_dma_addr,
 	dma_addr_t dst_dma_addr)
 {
@@ -746,7 +746,7 @@ set_405gp_dma_addr2(unsigned int dmanr, dma_addr_t src_dma_addr,
 		return;
 	}
 	if (error)
-		printk("Warning: set_dma_addr2 src 0x%x dst 0x%x bus width %d\n", 
+		printk("Warning: set_dma_addr2 src 0x%x dst 0x%x bus width %d\n",
 			src_dma_addr, dst_dma_addr, p_dma_ch->pwidth);
 	}
 #endif
@@ -780,12 +780,12 @@ set_405gp_dma_addr2(unsigned int dmanr, dma_addr_t src_dma_addr,
 /*
  * Enables the channel interrupt.
  *
- * If performing a scatter/gatter transfer, this function 
+ * If performing a scatter/gatter transfer, this function
  * MUST be called before calling alloc_dma_handle() and building
- * the sgl list.  Otherwise, interrupts will not be enabled, if 
+ * the sgl list.  Otherwise, interrupts will not be enabled, if
  * they were previously disabled.
  */
-static __inline__ int 
+static __inline__ int
 enable_405gp_dma_interrupt(unsigned int dmanr)
 {
 	unsigned int control;
@@ -827,12 +827,12 @@ enable_405gp_dma_interrupt(unsigned int dmanr)
 /*
  * Disables the channel interrupt.
  *
- * If performing a scatter/gatter transfer, this function 
+ * If performing a scatter/gatter transfer, this function
  * MUST be called before calling alloc_dma_handle() and building
- * the sgl list.  Otherwise, interrupts will not be disabled, if 
+ * the sgl list.  Otherwise, interrupts will not be disabled, if
  * they were previously enabled.
  */
-static __inline__ int 
+static __inline__ int
 disable_405gp_dma_interrupt(unsigned int dmanr)
 {
 	unsigned int control;
@@ -873,8 +873,8 @@ disable_405gp_dma_interrupt(unsigned int dmanr)
 #ifdef DCRNCAP_DMA_SG
 
 /*
- *   Add a new sgl descriptor to the end of a scatter/gather list 
- *   which was created by alloc_dma_handle(). 
+ *   Add a new sgl descriptor to the end of a scatter/gather list
+ *   which was created by alloc_dma_handle().
  *
  *   For a memory to memory transfer, both dma addresses must be
  *   valid. For a peripheral to memory transfer, one of the addresses
@@ -882,13 +882,13 @@ disable_405gp_dma_interrupt(unsigned int dmanr)
  *   memory to peripheral: set dst_addr to NULL,
  *   peripheral to memory: set src_addr to NULL.
  */
-static __inline__ int 
+static __inline__ int
 add_405gp_dma_sgl(sgl_handle_t handle, dma_addr_t src_addr, dma_addr_t dst_addr,
 	unsigned int count)
 {
 	sgl_list_info_t *psgl = (sgl_list_info_t *)handle;
 	ppc_dma_ch_t *p_dma_ch;
-	
+
 	if (!handle) {
 #ifdef DEBUG_405DMA
 		printk("add_dma_sgl: null handle\n");
@@ -930,7 +930,7 @@ add_405gp_dma_sgl(sgl_handle_t handle, dma_addr_t src_addr, dma_addr_t dst_addr,
 		return DMA_STATUS_GENERAL_ERROR;
 	}
 	if (error)
-		printk("Alignment warning: add_dma_sgl src 0x%x dst 0x%x count 0x%x bus width var %d\n", 
+		printk("Alignment warning: add_dma_sgl src 0x%x dst 0x%x count 0x%x bus width var %d\n",
 			src_addr, dst_addr, count, p_dma_ch->pwidth);
 
 	}
@@ -1023,7 +1023,7 @@ static __inline__ void enable_405gp_dma_sgl(sgl_handle_t handle)
 
 	pnext = psgl->phead;
 	while (pnext) {
-		printk("dma descriptor at 0x%x, dma addr 0x%x\n", 
+		printk("dma descriptor at 0x%x, dma addr 0x%x\n",
 			(unsigned)pnext, (unsigned)virt_to_bus(pnext));
 		printk("control 0x%x src 0x%x dst 0x%x c_count 0x%x, next 0x%x\n",
 			(unsigned)pnext->control, (unsigned)pnext->src_addr,
@@ -1099,7 +1099,7 @@ static __inline__ void disable_405gp_dma_sgl(sgl_handle_t handle)
  *
  *  An sgl transfer must NOT be active when this function is called.
  */
-static __inline__ int 
+static __inline__ int
 get_405gp_dma_sgl_residue(sgl_handle_t handle, dma_addr_t *src_addr,
 	dma_addr_t *dst_addr)
 {
@@ -1170,7 +1170,7 @@ get_405gp_dma_sgl_residue(sgl_handle_t handle, dma_addr_t *src_addr,
 		 */
 		pnext++;
 
-		while ((pnext != psgl->ptail) && 
+		while ((pnext != psgl->ptail) &&
 			((unsigned)pnext < ((unsigned)psgl + SGL_LIST_SIZE))
 		      ) {
 			count_left += pnext->control_count & SG_COUNT_MASK;
@@ -1188,7 +1188,7 @@ get_405gp_dma_sgl_residue(sgl_handle_t handle, dma_addr_t *src_addr,
 		/* success */
 		p_dma_ch = &dma_channels[psgl->dmanr];
 		return (count_left << p_dma_ch->shift);  /* count in bytes */
-	
+
 	} else {
 	/* this shouldn't happen */
 #ifdef DEBUG_405DMA
@@ -1215,7 +1215,7 @@ error:
  *
  * This function should only be called when the DMA is not active.
  */
-static __inline__ int 
+static __inline__ int
 delete_405gp_dma_sgl_element(sgl_handle_t handle, dma_addr_t *src_dma_addr,
 	dma_addr_t *dst_dma_addr)
 {

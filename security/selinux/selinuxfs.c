@@ -17,8 +17,6 @@
 #include "security.h"
 #include "objsec.h"
 
-extern int selinux_enabled;
-
 /* Check whether a task is allowed to use a security operation. */
 int task_has_security(struct task_struct *tsk,
 		      u32 perms)

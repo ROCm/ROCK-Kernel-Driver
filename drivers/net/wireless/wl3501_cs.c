@@ -82,7 +82,7 @@ static int pc_debug = PCMCIA_DEBUG;
 MODULE_PARM(pc_debug, "i");
 #define dprintk(n, format, args...) \
 	{ if (pc_debug > (n)) \
-		printk(KERN_INFO "%s: " format "\n", __FUNCTION__, ##args); }
+		printk(KERN_INFO "%s: " format "\n", __FUNCTION__ , ##args); }
 #else
 #define dprintk(n, format, args...)
 #endif
@@ -638,8 +638,10 @@ static int wl3501_mgmt_join(struct wl3501_card *this, u16 stas)
 		.sig_id		  = WL3501_SIG_JOIN_REQ,
 		.timeout	  = 10,
 		.ds_pset = {
-			.el.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
-			.el.len = 1,
+			.el = {
+				.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+				.len = 1,
+			},
 			.chan	= this->chan,
 		},
 	};
@@ -655,13 +657,17 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 		.beacon_period		= 400,
 		.dtim_period		= 1,
 		.ds_pset = {
-			.el.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
-			.el.len = 1,
+			.el = {
+				.id  = IW_MGMT_INFO_ELEMENT_DS_PARAMETER_SET,
+				.len = 1,
+			},
 			.chan	= this->chan,
 		},
 		.bss_basic_rset	= {
-			.el.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
-			.el.len = 2,
+			.el = {
+				.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
+				.len = 2,
+			},
 			.data_rate_labels = {
 				[0] = IW_MGMT_RATE_LABEL_MANDATORY |
 				      IW_MGMT_RATE_LABEL_1MBIT,
@@ -670,8 +676,10 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 			},
 		},
 		.operational_rset	= {
-			.el.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
-			.el.len = 2,
+			.el = {
+				.id	= IW_MGMT_INFO_ELEMENT_SUPPORTED_RATES,
+				.len = 2,
+			},
 			.data_rate_labels = {
 				[0] = IW_MGMT_RATE_LABEL_MANDATORY |
 				      IW_MGMT_RATE_LABEL_1MBIT,
@@ -680,8 +688,10 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 			},
 		},
 		.ibss_pset		= {
-			.el.id	     = IW_MGMT_INFO_ELEMENT_IBSS_PARAMETER_SET,
-			.el.len	     = 2,
+			.el = {
+				.id	 = IW_MGMT_INFO_ELEMENT_IBSS_PARAMETER_SET,
+				.len     = 2,
+			},
 			.atim_window = 10,
 		},
 		.bss_type		= wl3501_fw_bss_type(this),
@@ -1571,7 +1581,6 @@ static void wl3501_detach(dev_link_t *link)
 		printk(KERN_DEBUG "wl3501_cs: detach postponed, '%s' "
 		       "still locked\n", link->dev->dev_name);
 #endif
-		link->state |= DEV_STALE_LINK;
 		goto out;
 	}
 
@@ -1587,22 +1596,6 @@ static void wl3501_detach(dev_link_t *link)
 	kfree(link);
 out:
 	return;
-}
-
-/**
- * wl3501_flush_stale_links - Remove zombie instances
- *
- * Remove zombie instances (card removed, detach pending)
- */
-static void wl3501_flush_stale_links(void)
-{
-	dev_link_t *link, *next;
-
-	for (link = wl3501_dev_list; link; link = next) {
-		next = link->next;
-		if (link->state & DEV_STALE_LINK)
-			wl3501_detach(link);
-	}
 }
 
 static int wl3501_get_name(struct net_device *dev, struct iw_request_info *info,
@@ -2033,8 +2026,6 @@ static dev_link_t *wl3501_attach(void)
 	struct net_device *dev;
 	int ret, i;
 
-	wl3501_flush_stale_links();
-
 	/* Initialize the dev_link_t structure */
 	link = kmalloc(sizeof(*link), GFP_KERNEL);
 	if (!link)
@@ -2263,7 +2254,7 @@ static void wl3501_release(dev_link_t *link)
 	CardServices(ReleaseIRQ, link->handle, &link->irq);
 	link->state &= ~DEV_CONFIG;
 
-	if (link->state & DEV_STALE_LINK)
+	if (link->state & DEV_STALE_CONFIG)
 		wl3501_detach(link);
 out:
 	return;

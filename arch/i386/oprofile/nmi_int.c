@@ -372,12 +372,12 @@ int __init nmi_init(struct oprofile_operations ** ops)
 				model = &op_athlon_spec;
 				nmi_ops.cpu_type = "i386/athlon";
 				break;
-#if defined(CONFIG_X86_64)
 			case 0xf:
 				model = &op_athlon_spec;
+				/* Actually it could be i386/hammer too, but give
+				   user space an consistent name. */
 				nmi_ops.cpu_type = "x86-64/hammer";
 				break;
-#endif /* CONFIG_X86_64 */
 			}
 			break;
  

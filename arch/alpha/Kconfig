@@ -484,6 +484,9 @@ config EISA
 
 	  Otherwise, say N.
 
+config EISA_ALWAYS
+	def_bool EISA
+
 config SMP
 	bool "Symmetric multi-processing support"
 	depends on ALPHA_SABLE || ALPHA_LYNX || ALPHA_RAWHIDE || ALPHA_DP264 || ALPHA_WILDFIRE || ALPHA_TITAN || ALPHA_GENERIC || ALPHA_SHARK || ALPHA_MARVEL
@@ -651,8 +654,6 @@ source "drivers/ieee1394/Kconfig"
 
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 source "drivers/cdrom/Kconfig"
@@ -671,8 +672,6 @@ source "drivers/video/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 source "arch/alpha/oprofile/Kconfig"
 

@@ -138,7 +138,7 @@ static void ray_update_parm(struct net_device *dev, UCHAR objid, UCHAR *value, i
 static void verify_dl_startup(u_long);
 
 /* Prototypes for interrpt time functions **********************************/
-static void ray_interrupt (int reg, void *dev_id, struct pt_regs *regs);
+static irqreturn_t ray_interrupt (int reg, void *dev_id, struct pt_regs *regs);
 static void clear_interrupt(ray_dev_t *local);
 static void rx_deauthenticate(ray_dev_t *local, struct rcs *prcs, 
                        unsigned int pkt_addr, int rx_len);
@@ -319,24 +319,6 @@ static char hop_pattern_length[] = { 1,
 
 static char rcsid[] = "Raylink/WebGear wireless LAN - Corey <Thomas corey@world.std.com>";
 
-/*======================================================================
-
-    This bit of code is used to avoid unregistering network devices
-    at inappropriate times.  2.2 and later kernels are fairly picky
-    about when this can happen.
-    
-======================================================================*/
-
-static void flush_stale_links(void)
-{
-    dev_link_t *link, *next;
-    for (link = dev_list; link; link = next) {
-	next = link->next;
-	if (link->state & DEV_STALE_LINK)
-	    ray_detach(link);
-    }
-}
-
 /*=============================================================================
     ray_attach() creates an "instance" of the driver, allocating
     local data structures for one device.  The device is registered
@@ -354,7 +336,6 @@ static dev_link_t *ray_attach(void)
     struct net_device *dev;
     
     DEBUG(1, "ray_attach()\n");
-    flush_stale_links();
 
     /* Initialize the dev_link_t structure */
     link = kmalloc(sizeof(struct dev_link_t), GFP_KERNEL);
@@ -484,10 +465,8 @@ static void ray_detach(dev_link_t *link)
     */
     if (link->state & DEV_CONFIG) {
         ray_release(link);
-        if(link->state & DEV_STALE_CONFIG) {
-            link->state |= DEV_STALE_LINK;
+        if(link->state & DEV_STALE_CONFIG)
             return;
-        }
     }
 
     /* Break the link with Card Services */
@@ -932,7 +911,11 @@ static void ray_release(dev_link_t *link)
     if ( i != CS_SUCCESS ) DEBUG(0,"ReleaseIRQ ret = %x\n",i);
 
     DEBUG(2,"ray_release ending\n");
-} /* ray_release */
+
+    if (link->state & DEV_STALE_CONFIG)
+	    ray_detach(link);
+}
+
 /*=============================================================================
     The card status event handler.  Mostly, this schedules other
     stuff to run after an event is received.  A CARD_REMOVAL event
@@ -2050,7 +2033,7 @@ static void set_multicast_list(struct net_device *dev)
 /*=============================================================================
  * All routines below here are run at interrupt time.
 =============================================================================*/
-static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
+static irqreturn_t ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
     struct net_device *dev = (struct net_device *)dev_id;
     dev_link_t *link;
@@ -2063,7 +2046,7 @@ static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     UCHAR status;
 
     if (dev == NULL) /* Note that we want interrupts with dev->start == 0 */
-    return;
+	return IRQ_NONE;
 
     DEBUG(4,"ray_cs: interrupt for *dev=%p\n",dev);
 
@@ -2071,7 +2054,7 @@ static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     link = (dev_link_t *)local->finder;
     if ( ! (link->state & DEV_PRESENT) || link->state & DEV_SUSPEND ) {
         DEBUG(2,"ray_cs interrupt from device not present or suspended.\n");
-        return;
+        return IRQ_NONE;
     }
     rcsindex = readb(&((struct scb *)(local->sram))->rcs_index);
 
@@ -2079,7 +2062,7 @@ static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
     {
         DEBUG(1,"ray_cs interrupt bad rcsindex = 0x%x\n",rcsindex);
         clear_interrupt(local);
-        return;
+        return IRQ_HANDLED;
     }
     if (rcsindex < NUMBER_OF_CCS) /* If it's a returned CCS */
     {
@@ -2235,6 +2218,7 @@ static void ray_interrupt(int irq, void *dev_id, struct pt_regs * regs)
         writeb(CCS_BUFFER_FREE, &prcs->buffer_status);
     }
     clear_interrupt(local);
+    return IRQ_HANDLED;
 } /* ray_interrupt */
 /*===========================================================================*/
 static void ray_rx(struct net_device *dev, ray_dev_t *local, struct rcs *prcs)

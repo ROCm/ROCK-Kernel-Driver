@@ -10,6 +10,7 @@ menu "Serial drivers"
 # The new 8250/16550 serial drivers
 config SERIAL_8250
 	tristate "8250/16550 and compatible serial support"
+	select SERIAL_CORE
 	---help---
 	  This selects whether you want to include the driver for the standard
 	  serial ports.  The standard answer is Y.  People who might say N
@@ -20,9 +21,8 @@ config SERIAL_8250
 	  serial port drivers do not need this driver built in for them to
 	  work.)
 
-	  If you want to compile this driver as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  serial.
+	  To compile this driver as a module, choose M here: the
+	  module will be called serial.
 	  [WARNING: Do not compile this driver as a module if you are using
 	  non-standard serial ports, since the configuration information will
 	  be lost when the driver is unloaded.  This limitation may be lifted
@@ -41,6 +41,7 @@ config SERIAL_8250
 config SERIAL_8250_CONSOLE
 	bool "Console on 8250/16550 and compatible serial port"
 	depends on SERIAL_8250=y
+	select SERIAL_CORE_CONSOLE
 	---help---
 	  If you say Y here, it will be possible to use a serial port as the
 	  system console (the system console is the device which receives all
@@ -70,10 +71,9 @@ config SERIAL_8250_CS
 	  multi-function Ethernet/modem cards. (PCMCIA- or PC-cards are
 	  credit-card size devices often used with laptops.)
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called serial_cs.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called serial_cs.
+
 	  If unsure, say N.
 
 config SERIAL_8250_ACPI
@@ -167,12 +167,14 @@ config SERIAL_8250_ACORN
 config SERIAL_ANAKIN
 	bool "Anakin serial port support"
 	depends on ARM && ARCH_ANAKIN
+	select SERIAL_CORE
 	help
 	  ::: To be written :::
 
 config SERIAL_ANAKIN_CONSOLE
 	bool "Console on Anakin serial port"
 	depends on SERIAL_ANAKIN
+	select SERIAL_CORE_CONSOLE
 	help
 	  Even if you say Y here, the currently visible virtual console
 	  (/dev/tty0) will still be used as the system console by default, but
@@ -190,7 +192,8 @@ config ANAKIN_DEFAULT_BAUDRATE
 
 config SERIAL_AMBA
 	tristate "ARM AMBA serial port support"
-	depends on ARM && ARCH_INTEGRATOR
+	depends on ARM_AMBA
+	select SERIAL_CORE
 	help
 	  This selects the ARM(R) AMBA(R) PrimeCell UART.  If you have an
 	  Integrator platform, say Y or M here.
@@ -200,6 +203,7 @@ config SERIAL_AMBA
 config SERIAL_AMBA_CONSOLE
 	bool "Support for console on AMBA serial port"
 	depends on SERIAL_AMBA=y
+	select SERIAL_CORE_CONSOLE
 	---help---
 	  Say Y here if you wish to use an AMBA PrimeCell UART as the system
 	  console (the system console is the device which receives all kernel
@@ -214,18 +218,20 @@ config SERIAL_AMBA_CONSOLE
 
 config SERIAL_INTEGRATOR
 	bool
-	depends on SERIAL_AMBA=y
+	depends on SERIAL_AMBA && ARCH_INTEGRATOR
 	default y
 
 config SERIAL_CLPS711X
 	tristate "CLPS711X serial port support"
 	depends on ARM && ARCH_CLPS711X
+	select SERIAL_CORE
 	help
 	  ::: To be written :::
 
 config SERIAL_CLPS711X_CONSOLE
 	bool "Support for console on CLPS711X serial port"
 	depends on SERIAL_CLPS711X=y
+	select SERIAL_CORE_CONSOLE
 	help
 	  Even if you say Y here, the currently visible virtual console
 	  (/dev/tty0) will still be used as the system console by default, but
@@ -243,21 +249,16 @@ config SERIAL_CLPS711X_OLD_NAME
 config SERIAL_21285
 	tristate "DC21285 serial port support"
 	depends on ARM && FOOTBRIDGE
+	select SERIAL_CORE
 	help
 	  If you have a machine based on a 21285 (Footbridge) StrongARM(R)/
 	  PCI bridge you can enable its onboard serial port by enabling this
 	  option.
 
-config SERIAL_21285_OLD
-	bool "Use /dev/ttyS0 device (OBSOLETE)"
-	depends on SERIAL_21285=y && OBSOLETE
-	help
-	  Use the old /dev/ttyS name, major 4 minor 64.  This is obsolete
-	  and will be removed during later 2.5 development.
-
 config SERIAL_21285_CONSOLE
 	bool "Console on DC21285 serial port"
 	depends on SERIAL_21285=y
+	select SERIAL_CORE_CONSOLE
 	help
 	  If you have enabled the serial port on the 21285 footbridge you can
 	  make it the console by answering Y to this option.
@@ -272,6 +273,7 @@ config SERIAL_21285_CONSOLE
 config SERIAL_UART00
 	bool "Excalibur serial port (uart00) support"
 	depends on ARM && ARCH_CAMELOT
+	select SERIAL_CORE
 	help
 	  Say Y here if you want to use the hard logic uart on Excalibur. This
 	  driver also supports soft logic implentations of this uart core.
@@ -279,6 +281,7 @@ config SERIAL_UART00
 config SERIAL_UART00_CONSOLE
 	bool "Support for console on Excalibur serial port"
 	depends on SERIAL_UART00
+	select SERIAL_CORE_CONSOLE
 	help
 	  Say Y here if you want to support a serial console on an Excalibur
 	  hard logic uart or uart00 IP core.
@@ -293,6 +296,7 @@ config SERIAL_UART00_CONSOLE
 config SERIAL_SA1100
 	bool "SA1100 serial port support"
 	depends on ARM && ARCH_SA1100
+	select SERIAL_CORE
 	help
 	  If you have a machine based on a SA1100/SA1110 StrongARM(R) CPU you
 	  can enable its onboard serial port by enabling this option.
@@ -302,6 +306,7 @@ config SERIAL_SA1100
 config SERIAL_SA1100_CONSOLE
 	bool "Console on SA1100 serial port"
 	depends on SERIAL_SA1100
+	select SERIAL_CORE_CONSOLE
 	help
 	  If you have enabled the serial port on the SA1100/SA1110 StrongARM
 	  CPU you can make it the console by answering Y to this option.
@@ -316,6 +321,8 @@ config SERIAL_SA1100_CONSOLE
 config SERIAL_SUNCORE
 	bool
 	depends on SPARC32 || SPARC64
+	select SERIAL_CORE
+	select SERIAL_CORE_CONSOLE
 	default y
 
 config SERIAL_SUNZILOG
@@ -352,6 +359,7 @@ config SERIAL_SUNSU_CONSOLE
 config SERIAL_MUX
 	tristate "Serial MUX support"
 	depends on PARISC
+	select SERIAL_CORE
 	default y
 	---help---
 	  Saying Y here will enable the hardware MUX serial driver for
@@ -369,6 +377,7 @@ config SERIAL_MUX
 config SERIAL_MUX_CONSOLE
         bool "Support for console on serial MUX"
         depends on SERIAL_MUX
+	select SERIAL_CORE_CONSOLE
         default y
 
 config PDC_CONSOLE
@@ -406,6 +415,7 @@ config SERIAL_SUNSAB_CONSOLE
 config V850E_UART
 	bool "NEC V850E on-chip UART support"
 	depends on V850E_MA1 || V850E_ME2 || V850E_TEG || V850E2_ANNA || V850E_AS85EP1
+	select SERIAL_CORE
 	default y
 
 config V850E_UARTB
@@ -416,10 +426,12 @@ config V850E_UARTB
 config V850E_UART_CONSOLE
 	bool "Use NEC V850E on-chip UART for console"
 	depends on V850E_UART
+	select SERIAL_CORE_CONSOLE
 
 config SERIAL98
 	tristate "PC-9800 8251-based primary serial port support"
 	depends on X86_PC9800
+	select SERIAL_CORE
 	help
 	  If you want to use standard primary serial ports on PC-9800, 
 	  say Y.  Otherwise, say N.
@@ -427,16 +439,13 @@ config SERIAL98
 config SERIAL98_CONSOLE
         bool "Support for console on PC-9800 standard serial port"
         depends on SERIAL98=y
+	select SERIAL_CORE_CONSOLE
 
 config SERIAL_CORE
 	tristate
-	default m if SERIAL_AMBA!=y && SERIAL_CLPS711X!=y && SERIAL_21285!=y && !SERIAL_SA1100 && !SERIAL_ANAKIN && !SERIAL_UART00 && SERIAL_8250!=y && SERIAL_MUX!=y && !SERIAL_ROCKETPORT && !SERIAL_SUNCORE && !V850E_UART && SERIAL_PMACZILOG!=y && (SERIAL_AMBA=m || SERIAL_CLPS711X=m || SERIAL_21285=m || SERIAL_8250=m || SERIAL_MUX=m || SERIAL98=m || SERIAL_PMACZILOG=m)
-	default y if SERIAL_AMBA=y || SERIAL_CLPS711X=y || SERIAL_21285=y || SERIAL_SA1100 || SERIAL_ANAKIN || SERIAL_UART00 || SERIAL_8250=y || SERIAL_MUX=y || SERIAL_ROCKETPORT || SERIAL_SUNCORE || V850E_UART || SERIAL98=y || SERIAL_PMACZILOG=y
 
 config SERIAL_CORE_CONSOLE
 	bool
-	depends on SERIAL_AMBA_CONSOLE || SERIAL_CLPS711X_CONSOLE || SERIAL_21285_CONSOLE || SERIAL_SA1100_CONSOLE || SERIAL_ANAKIN_CONSOLE || SERIAL_UART00_CONSOLE || SERIAL_8250_CONSOLE || SERIAL_MUX_CONSOLE || SERIAL_SUNZILOG_CONSOLE || SERIAL_SUNSU_CONSOLE || SERIAL_SUNSAB_CONSOLE || V850E_UART_CONSOLE || SERIAL98_CONSOLE || SERIAL_PMACZILOG_CONSOLE
-	default y
 
 config SERIAL_68328
 	bool "68328 serial support"
@@ -476,6 +485,7 @@ config SERIAL_68360
 config SERIAL_PMACZILOG
 	tristate "PowerMac z85c30 ESCC support"
 	depends on PPC_OF
+	select SERIAL_CORE
 	help
 	  This driver supports the Zilog z85C30 serial ports found on
 	  PowerMac machines.
@@ -484,6 +494,7 @@ config SERIAL_PMACZILOG
 config SERIAL_PMACZILOG_CONSOLE
 	bool "Console on PowerMac z85c30 serial port"
 	depends on SERIAL_PMACZILOG=y
+	select SERIAL_CORE_CONSOLE
 	help
 	  If you would like to be able to use the z85c30 serial port
 	  on your PowerMac as the console, you can do so by answering

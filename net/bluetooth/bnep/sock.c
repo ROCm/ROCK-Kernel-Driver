@@ -175,6 +175,9 @@ static int bnep_sock_create(struct socket *sock, int protocol)
 
 	if (!(sk = bt_sock_alloc(sock, PF_BLUETOOTH, 0, GFP_KERNEL)))
 		return -ENOMEM;
+
+	sk_set_owner(sk, THIS_MODULE);
+
 	sock->ops = &bnep_sock_ops;
 
 	sock->state  = SS_UNCONNECTED;
@@ -186,6 +189,7 @@ static int bnep_sock_create(struct socket *sock, int protocol)
 
 static struct net_proto_family bnep_sock_family_ops = {
 	.family = PF_BLUETOOTH,
+	.owner	= THIS_MODULE,
 	.create = bnep_sock_create
 };
 

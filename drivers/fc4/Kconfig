@@ -33,10 +33,8 @@ config FC4_SOC
 	  that if you have older firmware in the card, you'll need the
 	  microcode from the Solaris driver to make it work.
 
-	  This support is also available as a module called soc ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this support as a module, choose M here: the module will
+	  be called soc.
 
 config FC4_SOCAL
 	tristate "Sun SOC+ (aka SOCAL)"
@@ -48,10 +46,8 @@ config FC4_SOCAL
 	  Interface Board). You'll probably need the microcode from the
 	  Solaris driver to make it work.
 
-	  This support is also available as a module called socal ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this support as a module, choose M here: the module will
+	  be called socal.
 
 comment "FC4 targets"
 	depends on FC4
@@ -62,10 +58,8 @@ config SCSI_PLUTO
 	help
 	  If you never bought a disk array made by Sun, go with N.
 
-	  This support is also available as a module called pluto ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>.
+	  To compile this support as a module, choose M here: the module will
+	  be called pluto.
 
 config SCSI_FCAL
 	tristate "Sun Enterprise Network Array (A5000 and EX500)" if SPARC32 || SPARC64
@@ -76,10 +70,8 @@ config SCSI_FCAL
 	  common is either A5000 array or internal disks in E[3-6]000
 	  machines.
 
-	  This support is also available as a module called fcal ( = code
-	  which can be inserted in and removed from the running kernel
-	  whenever you want). If you want to compile it as a module, say M
-	  here and read <file:Documentation/modules.txt>. If unsure, say N.
+	  To compile this support as a module, choose M here: the module will
+	  be called fcal.
 
 config SCSI_FCAL
 	prompt "Generic FC-AL disk driver"

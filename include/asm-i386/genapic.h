@@ -30,6 +30,7 @@ struct genapic {
 	unsigned long (*check_apicid_used)(physid_mask_t bitmap, int apicid);
 	unsigned long (*check_apicid_present)(int apicid); 
 	int no_balance_irq;
+	int no_ioapic_check;
 	void (*init_apic_ldr)(void);
 	physid_mask_t (*ioapic_phys_id_map)(physid_mask_t map);
 
@@ -77,6 +78,7 @@ struct genapic {
 	.int_dest_mode = INT_DEST_MODE, \
 	.apic_broadcast_id = APIC_BROADCAST_ID, \
 	.no_balance_irq = NO_BALANCE_IRQ, \
+	.no_ioapic_check = NO_IOAPIC_CHECK, \
 	APICFUNC(apic_id_registered), \
 	APICFUNC(target_cpus), \
 	APICFUNC(check_apicid_used), \

@@ -169,6 +169,7 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/ioport.h>
+#include <linux/eisa.h>
 #include <linux/pci.h>
 #include <linux/netdevice.h>
 #include <linux/etherdevice.h>
@@ -882,7 +883,9 @@ static int TLan_Init( struct net_device *dev )
 			err );
 	}
 	dev->addr_len = 6;
-	
+
+	netif_carrier_off(dev);
+
 	/* Device methods */
 	dev->open = &TLan_Open;
 	dev->hard_start_xmit = &TLan_StartTx;
@@ -2204,6 +2207,8 @@ TLan_ResetAdapter( struct net_device *dev )
 
 	priv->tlanFullDuplex = FALSE;
 	priv->phyOnline=0;
+	netif_carrier_off(dev);
+
 /*  1.	Assert reset bit. */
 
 	data = inl(dev->base_addr + TLAN_HOST_CMD);
@@ -2367,6 +2372,7 @@ TLan_FinishReset( struct net_device *dev )
 		}
 		outl( priv->rxListDMA, dev->base_addr + TLAN_CH_PARM );
 		outl( TLAN_HC_GO | TLAN_HC_RT, dev->base_addr + TLAN_HOST_CMD );
+		netif_carrier_on(dev);
 	} else {
 		printk( "TLAN: %s: Link inactive, will retry in 10 secs...\n", dev->name );
 		TLan_SetTimer( dev, (10*HZ), TLAN_TIMER_FINISH_RESET );

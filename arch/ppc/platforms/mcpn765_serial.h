@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/mcpn765_serial.h
- * 
+ *
  * Definitions for Motorola MCG MCPN765 cPCI board support
  *
  * Author: Mark A. Greer

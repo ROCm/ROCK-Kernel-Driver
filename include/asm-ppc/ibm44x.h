@@ -84,11 +84,11 @@ typedef struct board_info {
 
 /*
  * DCRN definitions
- */ 
+ */
 
 #ifdef CONFIG_440GX
 /* SDRs */
-#define DCRN_SDR_CONFIG_ADDR 	0xe 
+#define DCRN_SDR_CONFIG_ADDR 	0xe
 #define DCRN_SDR_CONFIG_DATA	0xf
 #define DCRN_SDR_PFC0		0x4100
 #define DCRN_SDR_PFC1		0x4101
@@ -107,7 +107,7 @@ typedef struct board_info {
 #define DCRN_SDR_MFR_E0RXFH	0x00001000
 #define DCRN_SDR_MFR_E1TXFL	0x00000800
 #define DCRN_SDR_MFR_E1TXFH	0x00000400
-#define DCRN_SDR_MFR_E1RXFL	0x00000200 
+#define DCRN_SDR_MFR_E1RXFL	0x00000200
 #define DCRN_SDR_MFR_E1RXFH	0x00000100
 #define DCRN_SDR_MFR_E2TXFL	0x00000080
 #define DCRN_SDR_MFR_E2TXFH	0x00000040
@@ -166,14 +166,14 @@ typedef struct board_info {
 #define DCRN_MALRXCARR(base)		(base + 0x11)	/* Rx Channel Active Reset */
 #define DCRN_MALRXEOBISR(base)		(base + 0x12)	/* Rx End of Buffer Interrupt Status */
 #define DCRN_MALRXDEIR(base)		(base + 0x13)	/* Rx Descriptor Error Interrupt */
-#define DCRN_MALTXCTP0R(base)		(base + 0x20)	/* Channel Tx 0 Channel Table Pointer */	
+#define DCRN_MALTXCTP0R(base)		(base + 0x20)	/* Channel Tx 0 Channel Table Pointer */
 #define DCRN_MALTXCTP1R(base)		(base + 0x21)	/* Channel Tx 1 Channel Table Pointer */
 #define DCRN_MALTXCTP2R(base)		(base + 0x22)	/* Channel Tx 2 Channel Table Pointer */
 #define DCRN_MALTXCTP3R(base)		(base + 0x23)	/* Channel Tx 3 Channel Table Pointer */
-#define DCRN_MALRXCTP0R(base)		(base + 0x40)	/* Channel Rx 0 Channel Table Pointer */	
-#define DCRN_MALRXCTP1R(base)		(base + 0x41)	/* Channel Rx 1 Channel Table Pointer */	
-#define DCRN_MALRCBS0(base)		(base + 0x60)	/* Channel Rx 0 Channel Buffer Size */	
-#define DCRN_MALRCBS1(base)		(base + 0x61)	/* Channel Rx 1 Channel Buffer Size */	
+#define DCRN_MALRXCTP0R(base)		(base + 0x40)	/* Channel Rx 0 Channel Table Pointer */
+#define DCRN_MALRXCTP1R(base)		(base + 0x41)	/* Channel Rx 1 Channel Table Pointer */
+#define DCRN_MALRCBS0(base)		(base + 0x60)	/* Channel Rx 0 Channel Buffer Size */
+#define DCRN_MALRCBS1(base)		(base + 0x61)	/* Channel Rx 1 Channel Buffer Size */
 
 /* Compatibility DCRN's */
 #define DCRN_MALRXCTP2R(base)	((base) + 0x42)	/* Channel Rx 2 Channel Table Pointer */

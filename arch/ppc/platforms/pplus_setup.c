@@ -46,7 +46,6 @@
 
 #include <asm/sections.h>
 #include <asm/mmu.h>
-#include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/residual.h>
 #include <asm/io.h>
@@ -101,10 +100,10 @@ pplus_setup_arch(void)
 
 	if ( ppc_md.progress )
 		ppc_md.progress("pplus_setup_arch: find_bridges\n", 0);
-	
+
 	/* Setup PCI host bridge */
 	pplus_setup_hose();
-	
+
 	/* Set up floppy in PS/2 mode */
 	outb(0x09, SIO_CONFIG_RA);
 	reg = inb(SIO_CONFIG_RD);
@@ -142,7 +141,7 @@ pplus_setup_arch(void)
 	conswitchp = &dummy_con;
 #endif
 #ifdef CONFIG_PPCBUG_NVRAM
-	/* Read in NVRAM data */ 
+	/* Read in NVRAM data */
 	init_prep_nvram();
 
 	/* if no bootargs, look in NVRAM */
@@ -227,14 +226,14 @@ pplus_init_IRQ(void)
 		openpic_init(1, NUM_8259_INTERRUPTS, 0, -1);
 	for ( i = 0 ; i < NUM_8259_INTERRUPTS ; i++ )
 		irq_desc[i].handler = &i8259_pic;
-	i8259_init(NULL);	
+	i8259_init(NULL);
 }
 
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 /*
  * IDE stuff.
  */
-static int 
+static int
 pplus_ide_default_irq(unsigned long base)
 {
 	switch (base) {
@@ -244,7 +243,7 @@ pplus_ide_default_irq(unsigned long base)
 	}
 }
 
-static unsigned long 
+static unsigned long
 pplus_ide_default_io_base(int index)
 {
 	switch (index) {

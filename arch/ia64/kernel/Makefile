@@ -14,6 +14,7 @@ obj-$(CONFIG_IA64_GENERIC)	+= acpi-ext.o
 obj-$(CONFIG_IA64_HP_ZX1)	+= acpi-ext.o
 obj-$(CONFIG_IA64_MCA)		+= mca.o mca_asm.o
 obj-$(CONFIG_IA64_PALINFO)	+= palinfo.o
+obj-$(CONFIG_IA64_SALINFO)	+= salinfo.o
 obj-$(CONFIG_IOSAPIC)		+= iosapic.o
 obj-$(CONFIG_MODULES)		+= module.o
 obj-$(CONFIG_SMP)		+= smp.o smpboot.o

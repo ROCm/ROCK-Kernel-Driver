@@ -31,7 +31,6 @@
 #include <linux/smp_lock.h>
 #include <linux/init.h>
 #include <linux/mm.h>
-#include <linux/slab.h>
 #include <linux/suspend.h>
 #include <linux/pagemap.h>
 #include <asm/uaccess.h>

@@ -330,9 +330,6 @@ static unsigned long __srmmu_get_nocache(int size, int align)
 	offset = bit_map_string_get(&srmmu_nocache_map,
 		       			size >> SRMMU_NOCACHE_BITMAP_SHIFT,
 					align >> SRMMU_NOCACHE_BITMAP_SHIFT);
-/* P3 */ /* printk("srmmu: get size %d align %d, got %d (0x%x)\n",
-   size >> SRMMU_NOCACHE_BITMAP_SHIFT, align >> SRMMU_NOCACHE_BITMAP_SHIFT,
-   offset, offset); */
 	if (offset == -1) {
 		printk("srmmu: out of nocache %d: %d/%d\n",
 		    size, (int) srmmu_nocache_size,
@@ -385,7 +382,6 @@ void srmmu_free_nocache(unsigned long vaddr, int size)
 	offset = (vaddr - SRMMU_NOCACHE_VADDR) >> SRMMU_NOCACHE_BITMAP_SHIFT;
 	size = size >> SRMMU_NOCACHE_BITMAP_SHIFT;
 
-/* P3 */ /* printk("srmmu: free off %d (0x%x) size %d\n", offset, offset, size); */
 	bit_map_clear(&srmmu_nocache_map, offset, size);
 }
 
@@ -446,9 +442,6 @@ void srmmu_nocache_init(void)
 
 	paddr = __pa((unsigned long)srmmu_nocache_pool);
 	vaddr = SRMMU_NOCACHE_VADDR;
-
-/* P3 */ printk("srmmu: pool 0x%x vaddr 0x%x bitmap 0x%x bits %d (0x%x)\n",
-  (int)srmmu_nocache_pool, vaddr, srmmu_nocache_bitmap, bitmap_bits, bitmap_bits);
 
 	while (vaddr < srmmu_nocache_end) {
 		pgd = pgd_offset_k(vaddr);

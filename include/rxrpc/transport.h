@@ -85,10 +85,11 @@ extern int rxrpc_create_transport(unsigned short port,
 
 static inline void rxrpc_get_transport(struct rxrpc_transport *trans)
 {
-	if (atomic_read(&trans->usage)<=0)
+	if (atomic_read(&trans->usage) <= 0)
 		BUG();
 	atomic_inc(&trans->usage);
-	//printk("rxrpc_get_transport(%p{u=%d})\n",trans,atomic_read(&trans->usage));
+	//printk("rxrpc_get_transport(%p{u=%d})\n",
+	//       trans, atomic_read(&trans->usage));
 }
 
 extern void rxrpc_put_transport(struct rxrpc_transport *trans);
@@ -98,11 +99,6 @@ extern int rxrpc_add_service(struct rxrpc_transport *trans,
 
 extern void rxrpc_del_service(struct rxrpc_transport *trans,
 			      struct rxrpc_service *srv);
-
-#if 0
-extern int rxrpc_trans_add_connection(struct rxrpc_transport *trans,
-				      struct rxrpc_connection *conn);
-#endif
 
 extern void rxrpc_trans_receive_packet(struct rxrpc_transport *trans);
 

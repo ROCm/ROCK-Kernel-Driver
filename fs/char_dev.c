@@ -11,7 +11,6 @@
 #include <linux/string.h>
 
 #include <linux/major.h>
-#include <linux/string.h>
 #include <linux/errno.h>
 #include <linux/module.h>
 #include <linux/smp_lock.h>
@@ -445,3 +444,18 @@ void __init chrdev_init(void)
 	kset_register(&kset_dynamic);
 	cdev_map = kobj_map_init(base_probe, &cdev_subsys);
 }
+
+
+/* Let modules do char dev stuff */
+EXPORT_SYMBOL(register_chrdev_region);
+EXPORT_SYMBOL(unregister_chrdev_region);
+EXPORT_SYMBOL(alloc_chrdev_region);
+EXPORT_SYMBOL(cdev_init);
+EXPORT_SYMBOL(cdev_alloc);
+EXPORT_SYMBOL(cdev_get);
+EXPORT_SYMBOL(cdev_put);
+EXPORT_SYMBOL(cdev_del);
+EXPORT_SYMBOL(cdev_add);
+EXPORT_SYMBOL(cdev_unmap);
+EXPORT_SYMBOL(register_chrdev);
+EXPORT_SYMBOL(unregister_chrdev);

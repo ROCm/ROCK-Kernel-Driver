@@ -720,28 +720,14 @@ typedef struct invplace_s {
 extern invplace_t invplace_none;
 #define INVPLACE_NONE invplace_none
 
-extern void	    add_to_inventory(int, int, int, int, int);
-extern void	    replace_in_inventory(inventory_t *, int, int, int, int, int);
-extern void         start_scan_inventory(invplace_t *);
-extern inventory_t  *get_next_inventory(invplace_t *);
-extern void         end_scan_inventory(invplace_t *);
-extern inventory_t  *find_inventory(inventory_t *, int, int, int, int, int);
-extern int	    scaninvent(int (*)(inventory_t *, void *), void *);
-extern int	    get_sizeof_inventory(int);
-
-extern void device_inventory_add(	vertex_hdl_t device, 
+static inline void device_inventory_add(vertex_hdl_t device, 
 					int class, 
 					int type, 
 					major_t ctlr, 
 					minor_t unit, 
-					int state);
+					int state)
+{
+}
 
-
-extern inventory_t *device_inventory_get_next(	vertex_hdl_t device,
-						invplace_t *);
-
-extern void device_controller_num_set(	vertex_hdl_t,
-					int);
-extern int device_controller_num_get(	vertex_hdl_t);
 #endif /* __KERNEL__ */
 #endif /* _ASM_IA64_SN_INVENT_H */

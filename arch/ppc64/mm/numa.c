@@ -24,18 +24,21 @@
 int numa_cpu_lookup_table[NR_CPUS] = { [ 0 ... (NR_CPUS - 1)] = -1};
 int numa_memory_lookup_table[MAX_MEMORY >> MEMORY_INCREMENT_SHIFT] =
 	{ [ 0 ... ((MAX_MEMORY >> MEMORY_INCREMENT_SHIFT) - 1)] = -1};
-unsigned long numa_cpumask_lookup_table[MAX_NUMNODES];
+cpumask_t numa_cpumask_lookup_table[MAX_NUMNODES];
 int nr_cpus_in_node[MAX_NUMNODES] = { [0 ... (MAX_NUMNODES -1)] = 0};
 
 struct pglist_data node_data[MAX_NUMNODES];
 bootmem_data_t plat_node_bdata[MAX_NUMNODES];
 
+EXPORT_SYMBOL(node_data);
+EXPORT_SYMBOL(numa_memory_lookup_table);
+
 static inline void map_cpu_to_node(int cpu, int node)
 {
 	dbg("cpu %d maps to domain %d\n", cpu, node);
 	numa_cpu_lookup_table[cpu] = node;
-	if (!(numa_cpumask_lookup_table[node] & 1UL << cpu)) {
-		numa_cpumask_lookup_table[node] |= 1UL << cpu;
+	if (!(cpu_isset(cpu, numa_cpumask_lookup_table[node]))) {
+		cpu_set(cpu, numa_cpumask_lookup_table[node]);
 		nr_cpus_in_node[node]++;
 	}
 }

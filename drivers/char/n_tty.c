@@ -977,11 +977,11 @@ do_it_again:
 	if (file->f_op->write != redirected_tty_write && current->tty == tty) {
 		if (tty->pgrp <= 0)
 			printk("read_chan: tty->pgrp <= 0!\n");
-		else if (current->pgrp != tty->pgrp) {
+		else if (process_group(current) != tty->pgrp) {
 			if (is_ignored(SIGTTIN) ||
-			    is_orphaned_pgrp(current->pgrp))
+			    is_orphaned_pgrp(process_group(current)))
 				return -EIO;
-			kill_pg(current->pgrp, SIGTTIN, 1);
+			kill_pg(process_group(current), SIGTTIN, 1);
 			return -ERESTARTSYS;
 		}
 	}

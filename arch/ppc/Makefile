@@ -32,6 +32,7 @@ head-$(CONFIG_4xx)		:= arch/ppc/kernel/head_4xx.o
 head-$(CONFIG_44x)		:= arch/ppc/kernel/head_44x.o
 
 head-$(CONFIG_6xx)		+= arch/ppc/kernel/idle_6xx.o
+head-$(CONFIG_POWER4)		+= arch/ppc/kernel/idle_power4.o
 
 core-y				+= arch/ppc/kernel/ arch/ppc/platforms/ \
 				   arch/ppc/mm/ arch/ppc/lib/ arch/ppc/syslib/
@@ -44,7 +45,7 @@ drivers-$(CONFIG_4xx)		+= arch/ppc/4xx_io/
 drivers-$(CONFIG_8260)		+= arch/ppc/8260_io/
 drivers-$(CONFIG_OCP)		+= arch/ppc/ocp/
 
-BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd pImage vmlinux.sm
+BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd vmlinux.sm
 
 .PHONY: $(BOOT_TARGETS)
 
@@ -55,12 +56,17 @@ AFLAGS_vmlinux.lds.o	:= -Upowerpc
 # All the instructions talk about "make bzImage".
 bzImage: zImage
 
-$(BOOT_TARGETS): vmlinux
-	$(Q)$(MAKE) $(build)=arch/ppc/boot $@
+boot := arch/$(ARCH)/boot
 
-%_config: arch/ppc/configs/%_defconfig
-	rm -f .config arch/ppc/defconfig
-	cp -f arch/ppc/configs/$(@:config=defconfig) .config
+$(BOOT_TARGETS): vmlinux
+	$(Q)$(MAKE) $(build)=$(boot) $@
+
+uImage: vmlinux
+	$(Q)$(MAKE) $(build)=$(boot)/images $(boot)/images/$@
+
+define archhelp
+  @echo '  uImage          - Create a bootable image for U-Boot / PPCBoot'
+endef
 
 archclean:
 	$(Q)$(MAKE) $(clean)=arch/ppc/boot
@@ -70,7 +76,7 @@ prepare: include/asm-$(ARCH)/offsets.h checkbin
 arch/$(ARCH)/kernel/asm-offsets.s: include/asm include/linux/version.h \
 				   include/config/MARKER
 
-include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s 
+include/asm-$(ARCH)/offsets.h: arch/$(ARCH)/kernel/asm-offsets.s
 	$(call filechk,gen-asm-offsets)
 
 ifdef CONFIG_6xx

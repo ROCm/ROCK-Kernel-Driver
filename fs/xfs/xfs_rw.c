@@ -59,7 +59,6 @@
 #include "xfs_bmap.h"
 #include "xfs_acl.h"
 #include "xfs_mac.h"
-#include "xfs_attr.h"
 #include "xfs_error.h"
 #include "xfs_buf_item.h"
 #include "xfs_rw.h"
@@ -261,10 +260,11 @@ xfs_ioerror_alert(
 	xfs_daddr_t		blkno)
 {
 	cmn_err(CE_ALERT,
- "I/O error in filesystem (\"%s\") meta-data dev 0x%x block 0x%llx"
+ "I/O error in filesystem (\"%s\") meta-data dev %u:%u block 0x%llx"
  "       (\"%s\") error %d buf count %u",
 		(!mp || !mp->m_fsname) ? "(fs name not set)" : mp->m_fsname,
-		XFS_BUF_TARGET_DEV(bp),
+		MAJOR(XFS_BUF_TARGET_DEV(bp)),
+		MINOR(XFS_BUF_TARGET_DEV(bp)),
 		(__uint64_t)blkno,
 		func,
 		XFS_BUF_GETERROR(bp),

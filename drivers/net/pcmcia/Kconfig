@@ -28,11 +28,8 @@ config PCMCIA_3C589
 	  Say Y here if you intend to attach a 3Com 3c589 or compatible PCMCIA
 	  (PC-card) Ethernet card to your computer.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called 3c589_cs.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>. If
-	  unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called 3c589_cs.  If unsure, say N.
 
 config PCMCIA_3C574
 	tristate "3Com 3c574 PCMCIA support"
@@ -41,37 +38,30 @@ config PCMCIA_3C574
 	  Say Y here if you intend to attach a 3Com 3c574 or compatible PCMCIA
 	  (PC-card) Fast Ethernet card to your computer.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called 3c574_cs.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.  If
-	  unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called 3c574_cs.  If unsure, say N.
 
 config PCMCIA_FMVJ18X
 	tristate "Fujitsu FMV-J18x PCMCIA support"
 	depends on NET_PCMCIA && PCMCIA
+	select CRC32
 	help
 	  Say Y here if you intend to attach a Fujitsu FMV-J18x or compatible
 	  PCMCIA (PC-card) Ethernet card to your computer.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called fmvj18x_cs.  If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
-	  If unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called fmvj18x_cs.  If unsure, say N.
 
 config PCMCIA_PCNET
 	tristate "NE2000 compatible PCMCIA support"
 	depends on NET_PCMCIA && PCMCIA
+	select CRC32
 	help
 	  Say Y here if you intend to attach an NE2000 compatible PCMCIA
 	  (PC-card) Ethernet or Fast Ethernet card to your computer.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called pcnet_cs.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>. If
-	  unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called pcnet_cs.  If unsure, say N.
 
 config PCMCIA_NMCLAN
 	tristate "New Media PCMCIA support"
@@ -80,24 +70,20 @@ config PCMCIA_NMCLAN
 	  Say Y here if you intend to attach a New Media Ethernet or LiveWire
 	  PCMCIA (PC-card) Ethernet card to your computer.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called nmclan_cs.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.  If
-	  unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called nmclan_cs.  If unsure, say N.
 
 config PCMCIA_SMC91C92
 	tristate "SMC 91Cxx PCMCIA support"
 	depends on NET_PCMCIA && PCMCIA
+	select CRC32
+	select MII
 	help
 	  Say Y here if you intend to attach an SMC 91Cxx compatible PCMCIA
 	  (PC-card) Ethernet or Fast Ethernet card to your computer.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called smc91c92_cs.  If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
-	  If unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called smc91c92_cs.  If unsure, say N.
 
 config PCMCIA_XIRC2PS
 	tristate "Xircom 16-bit PCMCIA support"
@@ -106,11 +92,8 @@ config PCMCIA_XIRC2PS
 	  Say Y here if you intend to attach a Xircom 16-bit PCMCIA (PC-card)
 	  Ethernet or Fast Ethernet card to your computer.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called xirc2ps_cs.  If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
-	  If unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called xirc2ps_cs.  If unsure, say N.
 
 config PCMCIA_AXNET
 	tristate "Asix AX88190 PCMCIA support"
@@ -121,11 +104,8 @@ config PCMCIA_AXNET
 	  nearly NE2000 compatible but need a separate driver due to a few
 	  misfeatures.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called axnet_cs.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.  If
-	  unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called axnet_cs.  If unsure, say N.
 
 config ARCNET_COM20020_CS
 	tristate "COM20020 ARCnet PCMCIA support"
@@ -134,11 +114,8 @@ config ARCNET_COM20020_CS
 	  Say Y here if you intend to attach this type of ARCnet PCMCIA card
 	  to your computer.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called com20020_cs.  If you want to compile it
-	  as a module, say M here and read <file:Documentation/modules.txt>.
-	  If unsure, say N.
+	  To compile this driver as a module, choose M here: the module will be
+	  called com20020_cs.  If unsure, say N.
 
 config PCMCIA_IBMTR
 	tristate "IBM PCMCIA tokenring adapter support"
@@ -148,10 +125,8 @@ config PCMCIA_IBMTR
 	  card to your computer. You then also need to say Y to "Token Ring
 	  driver support".
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called ibmtr_cs.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the module will be
+	  called ibmtr_cs.
 
 endmenu
 

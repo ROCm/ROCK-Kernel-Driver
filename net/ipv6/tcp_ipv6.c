@@ -2023,11 +2023,12 @@ static void get_timewait6_sock(struct seq_file *seq,
 		   atomic_read(&tw->tw_refcnt), tw);
 }
 
+#ifdef CONFIG_PROC_FS
 static int tcp6_seq_show(struct seq_file *seq, void *v)
 {
 	struct tcp_iter_state *st;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_printf(seq,
 			   "  sl  "
 			   "local_address                         "
@@ -2072,6 +2073,7 @@ void tcp6_proc_exit(void)
 {
 	tcp_proc_unregister(&tcp6_seq_afinfo);
 }
+#endif
 
 struct proto tcpv6_prot = {
 	.name		=	"TCPv6",

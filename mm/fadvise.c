@@ -20,7 +20,7 @@
  * POSIX_FADV_WILLNEED could set PG_Referenced, and POSIX_FADV_NOREUSE could
  * deactivate the pages and clear PG_Referenced.
  */
-long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
+asmlinkage long sys_fadvise64_64(int fd, loff_t offset, loff_t len, int advice)
 {
 	struct file *file = fget(fd);
 	struct inode *inode;
@@ -80,7 +80,7 @@ out:
 	return ret;
 }
 
-long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
+asmlinkage long sys_fadvise64(int fd, loff_t offset, size_t len, int advice)
 {
 	return sys_fadvise64_64(fd, offset, len, advice);
 }

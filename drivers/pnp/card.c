@@ -62,8 +62,14 @@ static int card_probe(struct pnp_card * card, struct pnp_card_driver * drv)
 		if (drv->probe) {
 			if (drv->probe(clink, id)>=0)
 				return 1;
-			else
+			else {
+				struct pnp_dev * dev;
+				card_for_each_dev(card, dev) {
+					if (dev->card_link == clink)
+						pnp_release_card_device(dev);
+				}
 				kfree(clink);
+			}
 		} else
 			return 1;
 	}

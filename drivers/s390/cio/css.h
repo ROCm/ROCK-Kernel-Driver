@@ -78,6 +78,7 @@ struct ccw_device_private {
 		unsigned int pgid_single:1; /* use single path for Set PGID */
 		unsigned int esid:1;        /* Ext. SenseID supported by HW */
 		unsigned int dosense:1;	    /* delayed SENSE required */
+		unsigned int doverify:1;    /* delayed path verification */
 	} __attribute__((packed)) flags;
 	unsigned long intparm;	/* user interruption parameter */
 	struct qdio_irq *qdio_data;

@@ -53,7 +53,7 @@
  *   r7 - End of kernel command line string
  *
  * This is all going to change RSN when we add bi_recs.......  -- Dan
- */ 
+ */
 	.text
 _GLOBAL(_stext)
 _GLOBAL(_start)
@@ -121,7 +121,7 @@ _GLOBAL(crit_srr1)
  * Note that we have to have decremented r1 before we write to any fields
  * of the exception frame, since a critical interrupt could occur at any
  * time, and it will write to the area immediately below the current r1.
- */ 
+ */
 #define NORMAL_EXCEPTION_PROLOG						     \
 	mtspr	SPRN_SPRG0,r10;		/* save two registers to work with */\
 	mtspr	SPRN_SPRG1,r11;						     \
@@ -666,7 +666,7 @@ label:
 	mr	r11, r12
 
 	b	finish_tlb_load
-	
+
 5:
 	/* The bailout.  Restore registers to pre-exception conditions
 	 * and call the heavyweights to help us out.
@@ -771,7 +771,7 @@ DataAccess:
  * have vectors from 0x2100 through 0x2F00 defined, but marked as reserved.
  * However, for the 4xx-series processors these are neither defined nor
  * reserved.
- */ 
+ */
 
 	/* Damn, I came up one instruction too many to fit into the
 	 * exception space :-).  Both the instruction and data TLB
@@ -838,7 +838,7 @@ _GLOBAL(giveup_fpu)
 	blr
 
 /* This is where the main kernel code starts.
- */ 
+ */
 start_here:
 
 	/* ptr to current */
@@ -916,7 +916,7 @@ start_here:
  */
 initial_mmu:
 	tlbia			/* Invalidate all TLB entries */
-	isync 
+	isync
 
 	/* We should still be executing code at physical address 0x0000xxxx
 	 * at this point. However, start_here is at virtual address
@@ -953,7 +953,7 @@ initial_mmu:
 	tlbwe	r3,r0,TLB_TAG		/* Load the tag portion of the entry */
 
 #if defined(CONFIG_SERIAL_TEXT_DEBUG) && defined(SERIAL_DEBUG_IO_BASE)
-	
+
 	/* Load a TLB entry for the UART, so that ppc4xx_progress() can use
 	 * the UARTs nice and early.  We use a 4k real==virtual mapping. */
 
@@ -983,7 +983,7 @@ initial_mmu:
 
 _GLOBAL(abort)
         mfspr   r13,SPRN_DBCR0
-        oris    r13,r13,DBCR_RST(DBCR_RST_SYSTEM)@h
+        oris    r13,r13,DBCR0_RST_SYSTEM@h
         mtspr   SPRN_DBCR0,r13
 
 _GLOBAL(set_context)
@@ -1012,7 +1012,7 @@ _GLOBAL(empty_zero_page)
 _GLOBAL(swapper_pg_dir)
 	.space	4096
 
-	
+
 /* Stack for handling critical exceptions from kernel mode */
 	.section .bss
 critical_stack_bottom:

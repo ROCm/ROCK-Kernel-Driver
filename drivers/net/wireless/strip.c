@@ -83,7 +83,6 @@ static const char StripVersion[] = "1.3A-STUART.CHESHIRE";
 
 #include <linux/config.h>
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/init.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
@@ -965,8 +964,6 @@ static char *time_delta(char buffer[], long time)
 	return (buffer);
 }
 
-#define STRIP_PROC_HEADER	((void *)1)
-
 /* get Nth element of the linked list */
 static struct strip *strip_get_idx(loff_t pos) 
 {
@@ -984,7 +981,7 @@ static struct strip *strip_get_idx(loff_t pos)
 static void *strip_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	rcu_read_lock();
-	return *pos ? strip_get_idx(*pos - 1) : STRIP_PROC_HEADER;
+	return *pos ? strip_get_idx(*pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *strip_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -993,7 +990,7 @@ static void *strip_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	struct strip *s;
 
 	++*pos;
-	if (v == STRIP_PROC_HEADER)
+	if (v == SEQ_START_TOKEN)
 		return strip_get_idx(1);
 
 	s = v;
@@ -1149,7 +1146,7 @@ static void strip_seq_status_info(struct seq_file *seq,
  */
 static int strip_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == STRIP_PROC_HEADER)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq, "strip_version: %s\n", StripVersion);
 	else
 		strip_seq_status_info(seq, (const struct strip *)v);

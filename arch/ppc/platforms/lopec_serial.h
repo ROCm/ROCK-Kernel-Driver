@@ -1,6 +1,6 @@
 /*
  * include/asm-ppc/lopec_serial.h
- * 
+ *
  * Definitions for Motorola LoPEC board.
  *
  * Author: Dan Cox

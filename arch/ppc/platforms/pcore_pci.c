@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/pcore_pci.c
- * 
+ *
  * PCI support for Force PCORE boards
  *
  * Author: Matt Porter <mporter@mvista.com>
@@ -31,7 +31,7 @@
 #define DBG(x...) printk(x)
 #else
 #define DBG(x...)
-#endif /* DEBUG */ 
+#endif /* DEBUG */
 
 static inline int __init
 pcore_6750_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
@@ -40,7 +40,7 @@ pcore_6750_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	/*
 	 *      PCI IDSEL/INTPIN->INTLINE
 	 *      A       B       C       D
-	 */ 
+	 */
 	{
 		{9,	10,	11,	12},	/* IDSEL 24 - DEC 21554 */
 		{10,	0,	0,	0},	/* IDSEL 25 - DEC 21143 */
@@ -61,7 +61,7 @@ pcore_680_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 	/*
 	 *      PCI IDSEL/INTPIN->INTLINE
 	 *      A       B       C       D
-	 */ 
+	 */
 	{
 		{9,	10,	11,	12},	/* IDSEL 24 - Sentinel */
 		{10,	0,	0,	0},	/* IDSEL 25 - i82559 #1 */
@@ -87,16 +87,16 @@ pcore_pcibios_fixup(void)
 		/* Reroute interrupts both IDE channels to 15 */
 		pci_write_config_byte(dev,
 				PCORE_WINBOND_IDE_INT,
-				0xff); 
+				0xff);
 
 		/* Route INTA-D to IRQ9-12, respectively */
 		pci_write_config_word(dev,
 				PCORE_WINBOND_PCI_INT,
-				0x9abc); 
+				0x9abc);
 
 		/*
 		 * Set up 8259 edge/level triggering
-		 */ 
+		 */
  		outb(0x00, PCORE_WINBOND_PRI_EDG_LVL);
 		outb(0x1e, PCORE_WINBOND_SEC_EDG_LVL);
 	}

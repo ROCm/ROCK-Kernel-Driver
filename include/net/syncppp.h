@@ -57,8 +57,11 @@ struct ppp_device
 	struct sppp sppp;	/* Synchronous PPP */
 };
 
-#define sppp_of(dev)	\
-	    (&((struct ppp_device *)(*(unsigned long *)((dev)->priv)))->sppp)
+static inline struct sppp *sppp_of(struct net_device *dev) 
+{
+	struct ppp_device *ppp = dev->priv;
+	return &ppp->sppp;
+}
 
 #define PP_KEEPALIVE    0x01    /* use keepalive protocol */
 #define PP_CISCO        0x02    /* use Cisco protocol instead of PPP */

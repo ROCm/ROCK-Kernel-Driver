@@ -757,7 +757,7 @@ static int loop_set_fd(struct loop_device *lo, struct file *lo_file,
 		blk_queue_merge_bvec(lo->lo_queue, q->merge_bvec_fn);
 	}
 
-	kernel_thread(loop_thread, lo, CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	kernel_thread(loop_thread, lo, CLONE_KERNEL);
 	down(&lo->lo_sem);
 
 	fput(file);
@@ -931,9 +931,9 @@ loop_get_status(struct loop_device *lo, struct loop_info64 *info)
 		return error;
 	memset(info, 0, sizeof(*info));
 	info->lo_number = lo->lo_number;
-	info->lo_device = stat.dev;
+	info->lo_device = huge_encode_dev(stat.dev);
 	info->lo_inode = stat.ino;
-	info->lo_rdevice = lo->lo_device ? stat.rdev : stat.dev;
+	info->lo_rdevice = huge_encode_dev(lo->lo_device ? stat.rdev : stat.dev);
 	info->lo_offset = lo->lo_offset;
 	info->lo_sizelimit = lo->lo_sizelimit;
 	info->lo_flags = lo->lo_flags;

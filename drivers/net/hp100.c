@@ -104,6 +104,7 @@
 #include <linux/ioport.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/eisa.h>
 #include <linux/pci.h>
 #include <linux/spinlock.h>
 #include <linux/netdevice.h>
@@ -284,7 +285,7 @@ static struct hp100_pci_id hp100_pci_ids[] = {
 
 #define HP100_PCI_IDS_SIZE	(sizeof(hp100_pci_ids)/sizeof(struct hp100_pci_id))
 
-static struct pci_device_id hp100_pci_tbl[] __initdata = {
+static struct pci_device_id hp100_pci_tbl[] = {
 	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_J2585A, PCI_ANY_ID, PCI_ANY_ID,},
 	{PCI_VENDOR_ID_HP, PCI_DEVICE_ID_HP_J2585B, PCI_ANY_ID, PCI_ANY_ID,},
 	{PCI_VENDOR_ID_COMPEX, PCI_DEVICE_ID_COMPEX_ENET100VG4, PCI_ANY_ID, PCI_ANY_ID,},

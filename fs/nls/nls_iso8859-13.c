@@ -282,21 +282,5 @@ static void __exit exit_nls_iso8859_13(void)
 
 module_init(init_nls_iso8859_13)
 module_exit(exit_nls_iso8859_13)
-MODULE_LICENSE("Dual BSD/GPL");
 
-/*
- * Overrides for Emacs so that we follow Linus's tabbing style.
- * Emacs will notice this stuff at the end of the file and automatically
- * adjust the settings for this buffer only.  This must remain at the end
- * of the file.
- * ---------------------------------------------------------------------------
- * Local variables:
- * c-indent-level: 8
- * c-brace-imaginary-offset: 0
- * c-brace-offset: -8
- * c-argdecl-indent: 8
- * c-label-offset: -8
- * c-continued-statement-offset: 8
- * c-continued-brace-offset: 0
- * End:
- */
+MODULE_LICENSE("Dual BSD/GPL");

@@ -1,17 +1,14 @@
 /*
- * Locks for smp ppc 
- * 
+ * Locks for smp ppc
+ *
  * Written by Cort Dougan (cort@cs.nmt.edu)
  */
 
-
-#include <linux/kernel.h>
+#include <linux/config.h>
 #include <linux/sched.h>
-#include <linux/delay.h>
 #include <linux/spinlock.h>
-#include <asm/processor.h>
-#include <asm/system.h>
-#include <asm/io.h>
+#include <asm/ppc_asm.h>
+#include <asm/smp.h>
 
 #ifdef CONFIG_DEBUG_SPINLOCK
 
@@ -70,7 +67,7 @@ int _raw_spin_trylock(spinlock_t *lock)
 {
 	if (__spin_trylock(&lock->lock))
 		return 0;
-	lock->owner_cpu = smp_processor_id(); 
+	lock->owner_cpu = smp_processor_id();
 	lock->owner_pc = (unsigned long)__builtin_return_address(0);
 	return 1;
 }
@@ -101,7 +98,7 @@ void _raw_read_lock(rwlock_t *rw)
 	unsigned long stuck = INIT_STUCK;
 	int cpu = smp_processor_id();
 
-again:	
+again:
 	/* get our read lock in there */
 	atomic_inc((atomic_t *) &(rw)->lock);
 	if ( (signed long)((rw)->lock) < 0) /* someone has a write lock */
@@ -153,7 +150,7 @@ again:
 		}
 		goto again;
 	}
-	
+
 	if ( (rw)->lock & ~(1<<31)) /* someone has a read lock */
 	{
 		/* clear our write lock and wait for reads to go away */

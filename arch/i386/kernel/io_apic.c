@@ -1143,6 +1143,7 @@ int irq_vector[NR_IRQS] = { FIRST_DEVICE_VECTOR , 0 };
 static int __init assign_irq_vector(int irq)
 {
 	static int current_vector = FIRST_DEVICE_VECTOR, offset = 0;
+	BUG_ON(irq >= NR_IRQS);
 	if (IO_APIC_VECTOR(irq) > 0)
 		return IO_APIC_VECTOR(irq);
 next:
@@ -1652,6 +1653,10 @@ static void __init setup_ioapic_ids_from_mpc(void)
 			mp_ioapics[apic].mpc_apicid = reg_00.bits.ID;
 		}
 
+		/* Don't check I/O APIC IDs for some xAPIC systems.  They have
+		 * no meaning without the serial APIC bus. */
+		if (NO_IOAPIC_CHECK)
+			continue;
 		/*
 		 * Sanity check, is the ID really free? Every APIC in a
 		 * system must have a unique ID or we get lots of nice
@@ -2345,7 +2350,7 @@ int io_apic_set_pci_routing (int ioapic, int pin, int irq, int edge_level, int a
 	unsigned long flags;
 
 	if (!IO_APIC_IRQ(irq)) {
-		printk(KERN_ERR "IOAPIC[%d]: Invalid reference to IRQ 0/n", 
+		printk(KERN_ERR "IOAPIC[%d]: Invalid reference to IRQ 0\n",
 			ioapic);
 		return -EINVAL;
 	}

@@ -115,10 +115,8 @@ static inline void free_one_pgd(struct mmu_gather *tlb, pgd_t * dir)
 	}
 	pmd = pmd_offset(dir, 0);
 	pgd_clear(dir);
-	for (j = 0; j < PTRS_PER_PMD ; j++) {
-		prefetchw(pmd + j + PREFETCH_STRIDE/sizeof(*pmd));
+	for (j = 0; j < PTRS_PER_PMD ; j++)
 		free_one_pmd(tlb, pmd+j);
-	}
 	pmd_free_tlb(tlb, pmd);
 }
 
@@ -1667,6 +1665,8 @@ int make_pages_present(unsigned long addr, unsigned long end)
 	len = (end+PAGE_SIZE-1)/PAGE_SIZE-addr/PAGE_SIZE;
 	ret = get_user_pages(current, current->mm, addr,
 			len, write, 0, NULL, NULL);
+	if (ret < 0)
+		return ret;
 	return ret == len ? 0 : -1;
 }
 

@@ -55,8 +55,8 @@ static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
  *	check for trapped MIPS 46xx CPU, dump exception frame
  */
 
+	base = DIVA_OS_MEM_ATTACH_CONTROL(IoAdapter);
 	offset = IoAdapter->ControllerNumber * (IoAdapter->MemorySize >> factor) ;
-	base   = IoAdapter->ram - offset - ((IoAdapter->MemorySize >> factor) - MQ_SHARED_RAM_SIZE) ;
 
 	TrapID = READ_DWORD(&base[0x80]) ;
 
@@ -75,8 +75,10 @@ static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 	if ( (regs[0] >= offset)
 	  && (regs[0] < offset + (IoAdapter->MemorySize >> factor) - 1) )
 	{
-		if ( !(Xlog = (word *)diva_os_malloc (0, MAX_XLOG_SIZE)) )
+		if ( !(Xlog = (word *)diva_os_malloc (0, MAX_XLOG_SIZE)) ) {
+			DIVA_OS_MEM_DETACH_CONTROL(IoAdapter, base);
 			return ;
+		}
 
 		size = offset + (IoAdapter->MemorySize >> factor) - regs[0] ;
 		if ( size > MAX_XLOG_SIZE )
@@ -89,7 +91,7 @@ static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 		diva_os_free (0, Xlog) ;
 		IoAdapter->trapped = 2 ;
 	}
-
+	DIVA_OS_MEM_DETACH_CONTROL(IoAdapter, base);
 }
 
 /* --------------------------------------------------------------------------
@@ -97,10 +99,10 @@ static void qBri_cpu_trapped (PISDN_ADAPTER IoAdapter) {
 	 -------------------------------------------------------------------------- */
 static void reset_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 	word volatile *qBriReset ;
-	dword  volatile *qBriCntrl ;
+	byte  volatile *qBriCntrl ;
+	byte  volatile *p ;
 
-	qBriReset = (word volatile *)IoAdapter->prom ;
-	qBriCntrl = (dword volatile *)(&IoAdapter->ctlReg[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_RISC) : (MQ_BREG_RISC)]);
+	qBriReset = (word volatile *)DIVA_OS_MEM_ATTACH_PROM(IoAdapter);
 	WRITE_WORD(qBriReset, READ_WORD(qBriReset) | PLX9054_SOFT_RESET) ;
 	diva_os_wait (1) ;
 	WRITE_WORD(qBriReset, READ_WORD(qBriReset) & ~PLX9054_SOFT_RESET) ;
@@ -109,34 +111,40 @@ static void reset_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 	diva_os_wait (1) ;
 	WRITE_WORD(qBriReset, READ_WORD(qBriReset) & ~PLX9054_RELOAD_EEPROM) ;
 	diva_os_wait (1);
+	DIVA_OS_MEM_DETACH_PROM(IoAdapter, qBriReset);
 
-	WRITE_DWORD(qBriCntrl, 0) ;
+	qBriCntrl = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	p = &qBriCntrl[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_RISC) : (MQ_BREG_RISC)];
+	WRITE_DWORD(p, 0) ;
+	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, qBriCntrl);
 
 	DBG_TRC(("resetted board @ reset addr 0x%08lx", qBriReset))
-	DBG_TRC(("resetted board @ cntrl addr 0x%08lx", qBriCntrl))
-
+	DBG_TRC(("resetted board @ cntrl addr 0x%08lx", p))
 }
 
 /* --------------------------------------------------------------------------
 		Start Card CPU
 	 -------------------------------------------------------------------------- */
 void start_qBri_hardware (PISDN_ADAPTER IoAdapter) {
-	dword volatile *qBriReset ;
+	byte volatile *qBriReset ;
+	byte volatile *p ;
 
-	qBriReset = (dword volatile *)(&IoAdapter->ctlReg[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_RISC) : (MQ_BREG_RISC)]);
+	p = (byte volatile *)DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	qBriReset = &p[(DIVA_4BRI_REVISION(IoAdapter)) ? (MQ2_BREG_RISC) : (MQ_BREG_RISC)];
 	WRITE_DWORD(qBriReset, MQ_RISC_COLD_RESET_MASK) ;
 	diva_os_wait (2) ;
 	WRITE_DWORD(qBriReset, MQ_RISC_WARM_RESET_MASK | MQ_RISC_COLD_RESET_MASK) ;
 	diva_os_wait (10) ;
+	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 
 	DBG_TRC(("started processor @ addr 0x%08lx", qBriReset))
-
 }
 
 /* --------------------------------------------------------------------------
 		Stop Card CPU
 	 -------------------------------------------------------------------------- */
 static void stop_qBri_hardware (PISDN_ADAPTER IoAdapter) {
+	byte volatile *p ;
 	dword volatile *qBriReset ;
 	dword volatile *qBriIrq ;
 	dword volatile *qBriIsacDspReset ;
@@ -147,16 +155,24 @@ static void stop_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 
 	if ( IoAdapter->ControllerNumber > 0 )
 		return ;
- qBriReset = (dword volatile *)(&IoAdapter->ctlReg[reset_offset]) ;
- qBriIrq   = (dword volatile *)(&IoAdapter->ctlReg[irq_offset]) ;
- qBriIsacDspReset = (dword volatile *)(&IoAdapter->ctlReg[hw_offset]);
+	p = (byte volatile *)DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	qBriReset = (dword volatile *)&p[reset_offset];
+	qBriIsacDspReset = (dword volatile *)&p[hw_offset];
 /*
  *	clear interrupt line (reset Local Interrupt Test Register)
  */
 	WRITE_DWORD(qBriReset, 0) ;
  	WRITE_DWORD(qBriIsacDspReset, 0) ;
-	IoAdapter->reset[PLX9054_INTCSR] = 0x00 ;	/* disable PCI interrupts */
+	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
+	
+	p = (byte volatile *)DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+	p[PLX9054_INTCSR] = 0x00 ;	/* disable PCI interrupts */
+	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
+	
+	p = (byte volatile *)DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	qBriIrq   = (dword volatile *)&p[irq_offset];
 	WRITE_DWORD(qBriIrq, MQ_IRQ_REQ_OFF) ;
+	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 
 	DBG_TRC(("stopped processor @ addr 0x%08lx", qBriReset))
 
@@ -260,7 +276,7 @@ int qBri_FPGA_download (PISDN_ADAPTER IoAdapter) {
 	int            bit ;
 	byte           *File ;
 	dword          code, FileLength ;
-	word volatile *addr = (word volatile *)IoAdapter->prom ;
+	word volatile *addr = (word volatile *)DIVA_OS_MEM_ATTACH_PROM(IoAdapter);
 	word           val, baseval = FPGA_CS | FPGA_PROG ;
 
 
@@ -291,8 +307,10 @@ int qBri_FPGA_download (PISDN_ADAPTER IoAdapter) {
 		File = qBri_check_FPGAsrc (IoAdapter, "ds4bri.bit",
 		                           &FileLength, &code) ;
 	}
-	if ( !File )
+	if ( !File ) {
+		DIVA_OS_MEM_DETACH_PROM(IoAdapter, addr);
 		return (0) ;
+	}
 /*
  *	prepare download, pulse PROGRAM pin down.
  */
@@ -306,6 +324,7 @@ int qBri_FPGA_download (PISDN_ADAPTER IoAdapter) {
 	{
 		DBG_FTL(("FPGA download: acknowledge for FPGA memory clear missing"))
 		xdiFreeFile (File) ;
+		DIVA_OS_MEM_DETACH_PROM(IoAdapter, addr);
 		return (0) ;
 	}
 /*
@@ -329,6 +348,8 @@ int qBri_FPGA_download (PISDN_ADAPTER IoAdapter) {
 	diva_os_wait (100) ;
 	val = READ_WORD(addr) ;
 
+	DIVA_OS_MEM_DETACH_PROM(IoAdapter, addr);
+
 	if ( !(val & FPGA_BUSY) )
 	{
 		DBG_FTL(("FPGA download: chip remains in busy state (0x%04x)", val))
@@ -343,12 +364,10 @@ int qBri_FPGA_download (PISDN_ADAPTER IoAdapter) {
 		Download protocol code to the adapter
 	 -------------------------------------------------------------------------- */
 
-#define	DOWNLOAD_ADDR(IoAdapter) (&IoAdapter->ram[IoAdapter->downloadAddr & (IoAdapter->MemorySize - 1)])
-
-
 static int qBri_protocol_load (PISDN_ADAPTER BaseIoAdapter, PISDN_ADAPTER IoAdapter) {
 	PISDN_ADAPTER HighIoAdapter;
 
+	byte *p;
 	dword  FileLength ;
 	dword *sharedRam, *File;
 	dword  Addr, ProtOffset, SharedRamOffset, i;
@@ -436,7 +455,8 @@ static int qBri_protocol_load (PISDN_ADAPTER BaseIoAdapter, PISDN_ADAPTER IoAdap
 		return (0) ;
 	}
 	IoAdapter->downloadAddr = 0 ;
-	sharedRam = (dword *)DOWNLOAD_ADDR(IoAdapter) ;
+	p = DIVA_OS_MEM_ATTACH_RAM(IoAdapter);
+	sharedRam = (dword *)&p[IoAdapter->downloadAddr & (IoAdapter->MemorySize - 1)];
 	memcpy (sharedRam, File, FileLength) ;
 
 	DBG_TRC(("Download addr 0x%08x len %ld - virtual 0x%08x",
@@ -449,10 +469,12 @@ static int qBri_protocol_load (PISDN_ADAPTER BaseIoAdapter, PISDN_ADAPTER IoAdap
 		DBG_FTL(("File=0x%x, sharedRam=0x%x", File, sharedRam))
 		DBG_BLK(( (char *)File, 256))
 		DBG_BLK(( (char *)sharedRam, 256))
+		DIVA_OS_MEM_DETACH_RAM(IoAdapter, p);
 
 		xdiFreeFile (File) ;
 		return (0) ;
 	}
+	DIVA_OS_MEM_DETACH_RAM(IoAdapter, p);
 	xdiFreeFile (File) ;
 
 	return (1) ;
@@ -466,6 +488,7 @@ static long qBri_download_buffer (OsFileHandle *fp, long length, void **addr) {
 	PISDN_ADAPTER IoAdapter;
 	word        i ;
 	dword       *sharedRam ;
+	byte *p;
 
 	i = 0 ;
 
@@ -485,12 +508,14 @@ static long qBri_download_buffer (OsFileHandle *fp, long length, void **addr) {
 		         IoAdapter->downloadAddr + length))
 		return (-1) ;
 	}
-	sharedRam = (dword*)(&BaseIoAdapter->ram[IoAdapter->downloadAddr &
-	                                         (IoAdapter->MemorySize - 1)]) ;
+	p = DIVA_OS_MEM_ATTACH_RAM(BaseIoAdapter);
+	sharedRam = (dword*)&p[IoAdapter->downloadAddr & (IoAdapter->MemorySize - 1)];
 
-
-	if ( fp->sysFileRead (fp, sharedRam, length) != length )
+	if ( fp->sysFileRead (fp, sharedRam, length) != length ) {
+		DIVA_OS_MEM_DETACH_RAM(BaseIoAdapter, p);
 		return (-1) ;
+	}
+	DIVA_OS_MEM_DETACH_RAM(BaseIoAdapter, p);
 
 	IoAdapter->downloadAddr += length ;
 	IoAdapter->downloadAddr  = (IoAdapter->downloadAddr + 3) & (~3) ;
@@ -509,6 +534,7 @@ static dword qBri_telindus_load (PISDN_ADAPTER BaseIoAdapter) {
 	word                 download_count, i ;
 	dword               *sharedRam ;
 	dword                FileLength ;
+	byte *p;
 
 	if ( !(fp = OsOpenFile (DSP_TELINDUS_FILE)) ) {
 		DBG_FTL(("qBri_telindus_load: %s not found!", DSP_TELINDUS_FILE))
@@ -553,8 +579,8 @@ static dword qBri_telindus_load (PISDN_ADAPTER BaseIoAdapter) {
 	 *	store # of download files extracted from the archive and download table
 	 */
 		HighIoAdapter->downloadAddr = HighIoAdapter->DspCodeBaseAddr ;
-		sharedRam = (dword *)(&BaseIoAdapter->ram[HighIoAdapter->downloadAddr &
-		                                          (IoAdapter->MemorySize - 1)]) ;
+		p = DIVA_OS_MEM_ATTACH_RAM(BaseIoAdapter);
+		sharedRam = (dword *)&p[HighIoAdapter->downloadAddr & (IoAdapter->MemorySize - 1)];
 		WRITE_DWORD(&(sharedRam[0]), (dword)download_count);
 		memcpy (&sharedRam[1], &download_table[0], sizeof(download_table)) ;
 
@@ -563,6 +589,7 @@ static dword qBri_telindus_load (PISDN_ADAPTER BaseIoAdapter) {
 	if ( memcmp (&sharedRam[1], &download_table, download_count) ) {
 		DBG_FTL(("%s: Dsp Memory test failed!", IoAdapter->Properties.Name))
 	}
+	DIVA_OS_MEM_DETACH_RAM(BaseIoAdapter, p);
 
 	return (FileLength) ;
 }
@@ -588,6 +615,7 @@ static byte* qBri_sdp_load (PISDN_ADAPTER BaseIoAdapter,
 	dword phys_start_addr;
 	dword end_addr;
 	byte* sharedRam = 0;
+	byte *p;
 
   if (task) {
 		if (!(fp = OsOpenFile (task))) {
@@ -657,18 +685,22 @@ static byte* qBri_sdp_load (PISDN_ADAPTER BaseIoAdapter,
 		}
 
 		fp->sysFileSeek (fp, 0, OS_SEEK_SET);
-		sharedRam = &BaseIoAdapter->ram[phys_start_addr];
+		p = DIVA_OS_MEM_ATTACH_RAM(BaseIoAdapter);
+		sharedRam = &p[phys_start_addr];
 		if ((dword)fp->sysFileRead (fp, sharedRam, FileLength) != FileLength) {
+			DIVA_OS_MEM_DETACH_RAM(BaseIoAdapter, p);
 			OsCloseFile (fp) ;
 			DBG_ERR(("Can't read image [%s]", task))
 			return (0);
 		}
+		DIVA_OS_MEM_DETACH_RAM(BaseIoAdapter, p);
 
 		OsCloseFile (fp) ;
   }
 
+	p = DIVA_OS_MEM_ATTACH_RAM(BaseIoAdapter);
 	if (!link_addr) {
-		link_addr = &BaseIoAdapter->ram[OFFS_DSP_CODE_BASE_ADDR];
+		link_addr = &p[OFFS_DSP_CODE_BASE_ADDR];
 	}
 
 	DBG_TRC(("Write task [%s] link %08lx at %08lx",
@@ -681,6 +713,8 @@ static byte* qBri_sdp_load (PISDN_ADAPTER BaseIoAdapter,
 	link_addr[2] = (byte)((start_addr >> 16) & 0xff);
 	link_addr[3] = (byte)((start_addr >> 24) & 0xff);
 
+	DIVA_OS_MEM_DETACH_RAM(BaseIoAdapter, p);
+
 	return (task ? &sharedRam[DIVA_MIPS_TASK_IMAGE_LINK_OFFS] : 0);
 }
 
@@ -691,6 +725,7 @@ static int load_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 	dword         i, offset, controller ;
 	word         *signature ;
 	int           factor = (IoAdapter->tasks == 1) ? 1 : 2;
+	byte *p;
 
 	PISDN_ADAPTER Slave ;
 
@@ -751,7 +786,8 @@ static int load_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 		Slave->reset   = IoAdapter->reset ;
 		Slave->ctlReg  = IoAdapter->ctlReg ;
 		Slave->prom    = IoAdapter->prom ;
-		Slave->reset   = IoAdapter->reset ;
+		Slave->Config  = IoAdapter->Config ;
+		Slave->Control = IoAdapter->Control ;
 
 		if ( !qBri_protocol_load (IoAdapter, Slave) )
 			return (0) ;
@@ -782,9 +818,11 @@ static int load_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 	{
 		Slave = IoAdapter->QuadroList->QuadroAdapter[i] ;
 		Slave->ram += (IoAdapter->MemorySize >> factor) - MQ_SHARED_RAM_SIZE ;
+		p = DIVA_OS_MEM_ATTACH_RAM(Slave);
 		DBG_TRC(("Configure instance %d shared memory @ 0x%08lx",
-		         Slave->ControllerNumber, Slave->ram))
-		memset (Slave->ram, '\0', 256) ;
+		         Slave->ControllerNumber, p))
+		memset (p, '\0', 256) ;
+		DIVA_OS_MEM_DETACH_RAM(Slave, p);
 		diva_configure_protocol (Slave);
 	}
 
@@ -792,7 +830,8 @@ static int load_qBri_hardware (PISDN_ADAPTER IoAdapter) {
  *	start adapter
  */
 	start_qBri_hardware (IoAdapter) ;
-	signature = (word *)(&IoAdapter->ram[0x1E]) ;
+	p = DIVA_OS_MEM_ATTACH_RAM(IoAdapter);
+	signature = (word *)(&p[0x1E]) ;
 /*
  *	wait for signature in shared memory (max. 3 seconds)
  */
@@ -802,12 +841,14 @@ static int load_qBri_hardware (PISDN_ADAPTER IoAdapter) {
 
 		if ( signature[0] == 0x4447 )
 		{
+			DIVA_OS_MEM_DETACH_RAM(IoAdapter, p);
 			DBG_TRC(("Protocol startup time %d.%02d seconds",
 			         (i / 100), (i % 100) ))
 
 			return (1) ;
 		}
 	}
+	DIVA_OS_MEM_DETACH_RAM(IoAdapter, p);
 	DBG_FTL(("%s: Adapter selftest failed (0x%04X)!",
 	         IoAdapter->Properties.Name, signature[0] >> 16))
 	qBri_cpu_trapped (IoAdapter) ;
@@ -829,16 +870,23 @@ static int qBri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
 
 	word              	i ;
 	int             	serviced = 0 ;
+	byte *p;
 
+	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
 
-	if ( !(IoAdapter->reset[PLX9054_INTCSR] & 0x80) )
+	if ( !(p[PLX9054_INTCSR] & 0x80) ) {
+		DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 		return (0) ;
+	}
+	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
 
 /*
  *	clear interrupt line (reset Local Interrupt Test Register)
  */
-	qBriIrq = (dword volatile *)(&IoAdapter->ctlReg[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_IRQ_TEST)  : (MQ_BREG_IRQ_TEST)]);
+	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	qBriIrq = (dword volatile *)(&p[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_IRQ_TEST)  : (MQ_BREG_IRQ_TEST)]);
 	WRITE_DWORD(qBriIrq, MQ_IRQ_REQ_OFF) ;
+	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 
 	for ( i = 0 ; i < IoAdapter->tasks; ++i )
 	{
@@ -861,15 +909,21 @@ static int qBri_ISR (struct _ISDN_ADAPTER* IoAdapter) {
 	 -------------------------------------------------------------------------- */
 static void disable_qBri_interrupt (PISDN_ADAPTER IoAdapter) {
 	dword volatile *qBriIrq ;
+	byte *p;
 
 	if ( IoAdapter->ControllerNumber > 0 )
 		return ;
-	qBriIrq = (dword volatile *)(&IoAdapter->ctlReg[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_IRQ_TEST)  : (MQ_BREG_IRQ_TEST)]);
 /*
  *	clear interrupt line (reset Local Interrupt Test Register)
  */
-	IoAdapter->reset[PLX9054_INTCSR] = 0x00 ;	/* disable PCI interrupts */
+	p = DIVA_OS_MEM_ATTACH_RESET(IoAdapter);
+	p[PLX9054_INTCSR] = 0x00 ;	/* disable PCI interrupts */
+	DIVA_OS_MEM_DETACH_RESET(IoAdapter, p);
+
+	p = DIVA_OS_MEM_ATTACH_CTLREG(IoAdapter);
+	qBriIrq = (dword volatile *)(&p[DIVA_4BRI_REVISION(IoAdapter) ? (MQ2_BREG_IRQ_TEST)  : (MQ_BREG_IRQ_TEST)]);
 	WRITE_DWORD(qBriIrq, MQ_IRQ_REQ_OFF) ;
+	DIVA_OS_MEM_DETACH_CTLREG(IoAdapter, p);
 }
 
 /* --------------------------------------------------------------------------

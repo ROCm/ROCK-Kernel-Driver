@@ -26,7 +26,6 @@
 #include <asm/uaccess.h>
 #include <asm/system.h>
 #include <asm/io.h>
-#include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/cache.h>
 #include <asm/cputable.h>
@@ -64,5 +63,5 @@ int cpu_idle(void)
 			ppc_md.idle();
 		else
 			default_idle();
-	return 0; 
+	return 0;
 }

@@ -9,10 +9,8 @@ config JOYSTICK_IFORCE
 
 	  You also must choose at least one of the two options below.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called iforce. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called iforce.
 
 config JOYSTICK_IFORCE_USB
 	bool "I-Force USB joysticks and wheels"

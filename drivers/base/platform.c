@@ -68,9 +68,39 @@ static int platform_match(struct device * dev, struct device_driver * drv)
 	return (strncmp(pdev->name, drv->name, BUS_ID_SIZE) == 0);
 }
 
+static int platform_suspend(struct device * dev, u32 state)
+{
+	int ret = 0;
+
+	if (dev->driver && dev->driver->suspend) {
+		ret = dev->driver->suspend(dev, state, SUSPEND_DISABLE);
+		if (ret == 0)
+			ret = dev->driver->suspend(dev, state, SUSPEND_SAVE_STATE);
+		if (ret == 0)
+			ret = dev->driver->suspend(dev, state, SUSPEND_POWER_DOWN);
+	}
+	return ret;
+}
+
+static int platform_resume(struct device * dev)
+{
+	int ret = 0;
+
+	if (dev->driver && dev->driver->resume) {
+		ret = dev->driver->resume(dev, RESUME_POWER_ON);
+		if (ret == 0)
+			ret = dev->driver->resume(dev, RESUME_RESTORE_STATE);
+		if (ret == 0)
+			ret = dev->driver->resume(dev, RESUME_ENABLE);
+	}
+	return ret;
+}
+
 struct bus_type platform_bus_type = {
 	.name		= "platform",
 	.match		= platform_match,
+	.suspend	= platform_suspend,
+	.resume		= platform_resume,
 };
 
 int __init platform_bus_init(void)

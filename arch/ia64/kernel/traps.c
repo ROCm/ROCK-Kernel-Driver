@@ -335,7 +335,8 @@ handle_fpu_swa (int fp_fault, struct pt_regs *regs, unsigned long isr)
 	if ((fpu_swa_count < 4) && !(current->thread.flags & IA64_THREAD_FPEMU_NOPRINT)) {
 		last_time = jiffies;
 		++fpu_swa_count;
-		printk(KERN_WARNING "%s(%d): floating-point assist fault at ip %016lx, isr %016lx\n",
+		printk(KERN_WARNING
+		       "%s(%d): floating-point assist fault at ip %016lx, isr %016lx\n",
 		       current->comm, current->pid, regs->cr_iip + ia64_psr(regs)->ri, isr);
 	}
 
@@ -568,10 +569,10 @@ ia64_fault (unsigned long vector, unsigned long isr, unsigned long ifa,
 		}
 		siginfo.si_signo = SIGTRAP;
 		siginfo.si_errno = 0;
-		siginfo.si_flags = 0;
-		siginfo.si_isr = 0;
-		siginfo.si_addr = (void *) ifa;
-		siginfo.si_imm = 0;
+		siginfo.si_addr  = (void *) ifa;
+		siginfo.si_imm   = 0;
+		siginfo.si_flags = __ISR_VALID;
+		siginfo.si_isr   = isr;
 		force_sig_info(SIGTRAP, &siginfo, current);
 		return;
 

@@ -53,6 +53,7 @@
 #include <linux/skbuff.h>
 #include <linux/timer.h>
 #include <linux/init.h>
+#include <linux/delay.h>
 
 #include <net/arp.h>
 
@@ -220,24 +221,26 @@ static void __init sbni_devsetup(struct net_device *dev)
 	SET_MODULE_OWNER( dev );
 }
 
-int __init sbni_probe(void)
+int __init sbni_probe(int unit)
 {
 	struct net_device *dev;
 	static unsigned  version_printed __initdata = 0;
+	int err;
 
-	if( version_printed++ == 0 )
-		printk( KERN_INFO "%s", version );
-
-	dev = alloc_netdev(sizeof(struct net_local), "sbni%d", sbni_devsetup);
+	dev = alloc_netdev(sizeof(struct net_local), "sbni", sbni_devsetup);
 	if (!dev)
 		return -ENOMEM;
 
+	sprintf(dev->name, "sbni%d", unit);
 	netdev_boot_setup_check(dev);
 
-	if (register_netdev(dev)) {
-		kfree(dev);
-		return -ENODEV;
+	err = register_netdev(dev);
+	if (err) {
+		free_netdev(dev);
+		return err;
 	}
+	if( version_printed++ == 0 )
+		printk( KERN_INFO "%s", version );
 	return 0;
 }
 
@@ -337,13 +340,12 @@ sbni_probe1( struct net_device  *dev,  unsigned long  ioaddr,  int  irq )
 	outb( 0, ioaddr + CSR0 );
 
 	if( irq < 2 ) {
-		unsigned long irq_mask, delay;
+		unsigned long irq_mask;
 
 		irq_mask = probe_irq_on();
 		outb( EN_INT | TR_REQ, ioaddr + CSR0 );
 		outb( PR_RES, ioaddr + CSR1 );
-		delay = jiffies + HZ/20;
-		while (time_before(jiffies, delay)) ;
+		mdelay(50);
 		irq = probe_irq_off(irq_mask);
 		outb( 0, ioaddr + CSR0 );
 
@@ -1562,13 +1564,13 @@ __setup( "sbni=", sbni_setup );
 static u32
 calc_crc32( u32  crc,  u8  *p,  u32  len )
 {
-	register u32  _crc __asm ( "ax" );
+	register u32  _crc;
 	_crc = crc;
 	
 	__asm __volatile (
 		"xorl	%%ebx, %%ebx\n"
-		"movl	%1, %%esi\n" 
-		"movl	%2, %%ecx\n" 
+		"movl	%2, %%esi\n" 
+		"movl	%3, %%ecx\n" 
 		"movl	$crc32tab, %%edi\n"
 		"shrl	$2, %%ecx\n"
 		"jz	1f\n"
@@ -1604,7 +1606,7 @@ calc_crc32( u32  crc,  u8  *p,  u32  len )
 		"jnz	0b\n"
 
 	"1:\n"
-		"movl	%2, %%ecx\n"
+		"movl	%3, %%ecx\n"
 		"andl	$3, %%ecx\n"
 		"jz	2f\n"
 
@@ -1629,9 +1631,9 @@ calc_crc32( u32  crc,  u8  *p,  u32  len )
 		"xorb	2(%%esi), %%bl\n"
 		"xorl	(%%edi,%%ebx,4), %%eax\n"
 	"2:\n"
-		:
-		: "a" (_crc), "g" (p), "g" (len)
-		: "ax", "bx", "cx", "dx", "si", "di"
+		: "=a" (_crc)
+		: "0" (_crc), "g" (p), "g" (len)
+		: "bx", "cx", "dx", "si", "di"
 	);
 
 	return  _crc;

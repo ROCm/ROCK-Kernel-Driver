@@ -23,10 +23,11 @@
 #include "super.h"
 #include "internal.h"
 
-static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *);
+static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry,
+				     struct nameidata *nd);
 static int afs_dir_open(struct inode *inode, struct file *file);
 static int afs_dir_readdir(struct file *file, void *dirent, filldir_t filldir);
-static int afs_d_revalidate(struct dentry *dentry, struct nameidata *);
+static int afs_d_revalidate(struct dentry *dentry, struct nameidata *nd);
 static int afs_d_delete(struct dentry *dentry);
 static int afs_dir_lookup_filldir(void *_cookie, const char *name, int nlen, loff_t fpos,
 				     ino_t ino, unsigned dtype);
@@ -70,7 +71,7 @@ typedef union afs_dirent {
 		u8	name[16];
 		u8	overflow[4];	/* if any char of the name (inc NUL) reaches here, consume
 					 * the next dirent too */
-	} parts;
+	} u;
 	u8	extended_name[32];
 } afs_dirent_t;
 
@@ -256,7 +257,7 @@ static int afs_dir_iterate_block(unsigned *fpos,
 
 		/* got a valid entry */
 		dire = &block->dirents[offset];
-		nlen = strnlen(dire->parts.name,sizeof(*block) - offset*sizeof(afs_dirent_t));
+		nlen = strnlen(dire->u.name,sizeof(*block) - offset*sizeof(afs_dirent_t));
 
 		_debug("ENT[%Zu.%u]: %s %Zu \"%s\"\n",
 		       blkoff/sizeof(afs_dir_block_t),offset,
@@ -288,11 +289,11 @@ static int afs_dir_iterate_block(unsigned *fpos,
 
 		/* found the next entry */
 		ret = filldir(cookie,
-			      dire->parts.name,
+			      dire->u.name,
 			      nlen,
 			      blkoff + offset * sizeof(afs_dirent_t),
-			      ntohl(dire->parts.vnode),
-			      filldir==afs_dir_lookup_filldir ? dire->parts.unique : DT_UNKNOWN);
+			      ntohl(dire->u.vnode),
+			      filldir==afs_dir_lookup_filldir ? dire->u.unique : DT_UNKNOWN);
 		if (ret<0) {
 			_leave(" = 0 [full]");
 			return 0;
@@ -414,7 +415,8 @@ static int afs_dir_lookup_filldir(void *_cookie, const char *name, int nlen, lof
 /*
  * look up an entry in a directory
  */
-static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry, struct nameidata *nd)
+static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry,
+				     struct nameidata *nd)
 {
 	struct afs_dir_lookup_cookie cookie;
 	struct afs_super_info *as;
@@ -423,11 +425,11 @@ static struct dentry *afs_dir_lookup(struct inode *dir, struct dentry *dentry, s
 	unsigned fpos;
 	int ret;
 
-	_enter("{%lu},{%s}",dir->i_ino,dentry->d_name.name);
+	_enter("{%lu},%p{%s}",dir->i_ino,dentry,dentry->d_name.name);
 
 	/* insanity checks first */
-	if (sizeof(afs_dir_block_t) != 2048) BUG();
-	if (sizeof(afs_dirent_t) != 32) BUG();
+	BUG_ON(sizeof(afs_dir_block_t) != 2048);
+	BUG_ON(sizeof(afs_dirent_t) != 32);
 
 	if (dentry->d_name.len > 255) {
 		_leave(" = -ENAMETOOLONG");
@@ -495,9 +497,11 @@ static int afs_d_revalidate(struct dentry *dentry, struct nameidata *nd)
 	unsigned fpos;
 	int ret;
 
-	_enter("%s,%p",dentry->d_name.name,nd);
+	_enter("{sb=%p n=%s},",dentry->d_sb,dentry->d_name.name);
 
-	parent = dget_parent(dentry);
+	/* lock down the parent dentry so we can peer at it */
+	parent = dget_parent(dentry->d_parent);
+
 	dir = parent->d_inode;
 	inode = dentry->d_inode;
 

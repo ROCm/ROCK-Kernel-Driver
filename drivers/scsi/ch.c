@@ -732,7 +732,7 @@ ch_is_busy(scsi_changer *ch, int type, int unit)
 		return 0;
 	if (!ch->dt[unit])
 		return 0;
-	return ch->dt[unit]->access_count;
+	return atomic_read(&ch->dt[unit]->access_count);
 }
 
 static int ch_ioctl(struct inode * inode, struct file * file,

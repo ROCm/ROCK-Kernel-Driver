@@ -1,9 +1,9 @@
-/* $Id: platform.h,v 1.1.2.6 2001/05/01 15:48:05 armin Exp $
+/* $Id: platform.h,v 1.31 2003/09/08 15:15:22 schindler Exp $
  *
  * platform.h
  * 
  *
- * Copyright 2000-2002  by Armin Schindler (mac@melware.de)
+ * Copyright 2000-2003  by Armin Schindler (mac@melware.de)
  * Copyright 2000  Eicon Networks 
  *
  * This software may be used and distributed according to the terms
@@ -23,20 +23,27 @@
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
+#include <linux/sched.h>
 #include <linux/skbuff.h>
+#include <linux/vmalloc.h>
 #include <linux/proc_fs.h>
 #include <linux/interrupt.h>
 #include <linux/smp_lock.h>
+#include <linux/delay.h>
 #include <asm/types.h>
 #include <asm/io.h>
 
 #include "cardtype.h"
 
+/* activate debuglib for modules only */
+#ifndef MODULE
+#define DIVA_NO_DEBUGLIB
+#endif
+
 #define DIVA_INIT_FUNCTION  __init
 #define DIVA_EXIT_FUNCTION  __exit
 
 #define DIVA_USER_MODE_CARD_CONFIG 1
-#define XDI_USE_XLOG 1
 #define	USE_EXTENDED_DEBUGS 1
 
 #define MAX_ADAPTER     32
@@ -45,11 +52,6 @@
 
 #define MEMORY_SPACE_TYPE  0
 #define PORT_SPACE_TYPE    1
-
-#include "debuglib.h"
-
-#define dtrc(p) DBG_PRV0(p)
-#define dbug(a,p) DBG_PRV1(p)
 
 
 #include <linux/string.h>
@@ -106,6 +108,36 @@
 #define _cdecl
 #endif
 
+#define MEM_TYPE_RAM		0
+#define MEM_TYPE_PORT		1
+#define MEM_TYPE_PROM		2
+#define MEM_TYPE_CTLREG		3
+#define MEM_TYPE_RESET		4
+#define MEM_TYPE_CFG		5
+#define MEM_TYPE_ADDRESS	6
+#define MEM_TYPE_CONFIG		7
+#define MEM_TYPE_CONTROL	8
+
+#define DIVA_OS_MEM_ATTACH_RAM(a)	((a)->ram)
+#define DIVA_OS_MEM_ATTACH_PORT(a)	((a)->port)
+#define DIVA_OS_MEM_ATTACH_PROM(a)	((a)->prom)
+#define DIVA_OS_MEM_ATTACH_CTLREG(a)	((a)->ctlReg)
+#define DIVA_OS_MEM_ATTACH_RESET(a)	((a)->reset)
+#define DIVA_OS_MEM_ATTACH_CFG(a)	((a)->cfg)
+#define DIVA_OS_MEM_ATTACH_ADDRESS(a)	((a)->Address)
+#define DIVA_OS_MEM_ATTACH_CONFIG(a)	((a)->Config)
+#define DIVA_OS_MEM_ATTACH_CONTROL(a)	((a)->Control)
+
+#define DIVA_OS_MEM_DETACH_RAM(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_PORT(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_PROM(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_CTLREG(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_RESET(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_CFG(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_ADDRESS(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_CONFIG(a, x)	do { } while(0)
+#define DIVA_OS_MEM_DETACH_CONTROL(a, x)	do { } while(0)
+
 #if !defined(DIM)
 #define DIM(array)  (sizeof (array)/sizeof ((array)[0]))
 #endif
@@ -124,7 +156,11 @@ typedef struct _ISDN_ADAPTER   ISDN_ADAPTER;
 typedef struct _ISDN_ADAPTER* PISDN_ADAPTER;
 
 typedef void (* DIVA_DI_PRINTF) (unsigned char *, ...);
-extern DIVA_DI_PRINTF dprintf;
+#include "debuglib.h"
+
+#define dtrc(p) DBG_PRV0(p)
+#define dbug(a,p) DBG_PRV1(p)
+
 
 typedef struct e_info_s E_INFO ;
 
@@ -146,8 +182,21 @@ void diva_xdi_didd_remove_adapter (int card);
 /*
 ** memory allocation
 */
-void* diva_os_malloc (unsigned long flags, unsigned long size);
-void  diva_os_free   (unsigned long flags, void* ptr);
+static __inline__ void* diva_os_malloc (unsigned long flags, unsigned long size)
+{
+	void *ret = NULL;
+
+	if (size) {
+		ret = (void *) vmalloc((unsigned int) size);
+	}
+	return (ret);
+}
+static __inline__ void  diva_os_free   (unsigned long flags, void* ptr)
+{
+	if (ptr) {
+		vfree(ptr);
+	}
+}
 
 /*
 ** use skbuffs for message buffer
@@ -161,8 +210,17 @@ void diva_os_free_message_buffer(diva_os_message_buffer_s *dmb);
 /*
 ** mSeconds waiting
 */
-void diva_os_sleep(dword mSec);
-void diva_os_wait(dword mSec);
+static __inline__ void diva_os_sleep(dword mSec)
+{
+	unsigned long timeout = HZ * mSec / 1000 + 1;
+
+	set_current_state(TASK_UNINTERRUPTIBLE);
+	schedule_timeout(timeout);
+}
+static __inline__ void diva_os_wait(dword mSec)
+{
+	mdelay(mSec);
+}
 
 /*
 **  PCI Configuration space access
@@ -173,8 +231,8 @@ void PCIread (byte bus, byte func, int offset, void* data, int length, void* pci
 /*
 **  I/O Port utilities
 */
-int diva_os_register_io_port (int register, unsigned long port, unsigned long length, const char* name);
-
+int diva_os_register_io_port (void *adapter, int register, unsigned long port,
+				unsigned long length, const char* name, int id);
 /*
 **  I/O port access abstraction
 */
@@ -197,14 +255,6 @@ int diva_os_register_irq (void* context, byte irq, const char* name);
 void diva_os_remove_irq (void* context, byte irq);
 
 #define diva_os_in_irq() in_irq()
-
-/*
-** module locking
-*/
-/* 
-#define DIVA_LOCK_MODULE MOD_INC_USE_COUNT
-#define DIVA_UNLOCK_MODULE MOD_DEC_USE_COUNT
-*/
 
 /*
 **  Spin Lock framework

@@ -281,7 +281,9 @@ struct signal_struct {
 #define MAX_RT_PRIO		MAX_USER_RT_PRIO
 
 #define MAX_PRIO		(MAX_RT_PRIO + 40)
- 
+
+#define rt_task(p)		((p)->prio < MAX_RT_PRIO)
+
 /*
  * Some day this will be a full-fledged user tracking system..
  */
@@ -340,7 +342,9 @@ struct task_struct {
 	prio_array_t *array;
 
 	unsigned long sleep_avg;
-	unsigned long last_run;
+	long interactive_credit;
+	unsigned long long timestamp;
+	int activated;
 
 	unsigned long policy;
 	cpumask_t cpus_allowed;
@@ -360,7 +364,7 @@ struct task_struct {
 	unsigned long personality;
 	int did_exec:1;
 	pid_t pid;
-	pid_t pgrp;
+	pid_t __pgrp;		/* Accessed via process_group() */
 	pid_t tty_old_pgrp;
 	pid_t session;
 	pid_t tgid;
@@ -375,7 +379,7 @@ struct task_struct {
 	struct task_struct *parent;	/* parent process */
 	struct list_head children;	/* list of my children */
 	struct list_head sibling;	/* linkage in my parent's children list */
-	struct task_struct *group_leader;
+	struct task_struct *group_leader;	/* threadgroup leader */
 
 	/* PID/PID hash table linkage. */
 	struct pid_link pids[PIDTYPE_MAX];
@@ -461,6 +465,11 @@ struct task_struct {
 	siginfo_t *last_siginfo; /* For ptrace use.  */
 };
 
+static inline pid_t process_group(struct task_struct *tsk)
+{
+	return tsk->group_leader->__pgrp;
+}
+
 extern void __put_task_struct(struct task_struct *tsk);
 #define get_task_struct(tsk) do { atomic_inc(&(tsk)->usage); } while(0)
 #define put_task_struct(tsk) \
@@ -498,6 +507,8 @@ static inline int set_cpus_allowed(task_t *p, cpumask_t new_mask)
 	return 0;
 }
 #endif
+
+extern unsigned long long sched_clock(void);
 
 #ifdef CONFIG_NUMA
 extern void sched_balance_exec(void);

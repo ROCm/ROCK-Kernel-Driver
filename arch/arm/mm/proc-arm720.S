@@ -34,6 +34,7 @@
 #include <linux/init.h>
 #include <asm/assembler.h>
 #include <asm/constants.h>
+#include <asm/pgtable.h>
 #include <asm/procinfo.h>
 #include <asm/ptrace.h>
 #include <asm/hardware.h>
@@ -90,19 +91,19 @@ ENTRY(cpu_arm720_switch_mm)
 ENTRY(cpu_arm720_set_pte)
 		str	r1, [r0], #-2048		@ linux version
 
-		eor	r1, r1, #LPTE_PRESENT | LPTE_YOUNG | LPTE_WRITE | LPTE_DIRTY
+		eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
-		bic	r2, r1, #0xff0
-		bic	r2, r2, #3
-		orr	r2, r2, #HPTE_TYPE_SMALL
+		bic	r2, r1, #PTE_SMALL_AP_MASK
+		bic	r2, r2, #PTE_TYPE_MASK
+		orr	r2, r2, #PTE_TYPE_SMALL
 
-		tst	r1, #LPTE_USER			@ User?
-		orrne	r2, r2, #HPTE_AP_READ
+		tst	r1, #L_PTE_USER			@ User?
+		orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
 
-		tst	r1, #LPTE_WRITE | LPTE_DIRTY	@ Write and Dirty?
-		orreq	r2, r2, #HPTE_AP_WRITE
+		tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
+		orreq	r2, r2, #PTE_SMALL_AP_UNO_SRW
 
-		tst	r1, #LPTE_PRESENT | LPTE_YOUNG	@ Present and Young
+		tst	r1, #L_PTE_PRESENT | L_PTE_YOUNG	@ Present and Young
 		movne	r2, #0
 
 		str	r2, [r0]			@ hardware version
@@ -123,13 +124,9 @@ ENTRY(cpu_arm720_reset)
 		mcr	p15, 0, ip, c1, c0, 0		@ ctrl register
 		mov	pc, r0
 
-	
-cpu_arm720_name:
-		.asciz	"ARM720T"
-		.align
-
 		__INIT
 
+		.type	__arm720_setup, #function
 __arm720_setup:	mov	r0, #0
 		mcr	p15, 0, r0, c7, c7, 0		@ invalidate caches
 		mcr	p15, 0, r0, c8, c7, 0		@ flush TLB (v4)
@@ -142,6 +139,9 @@ __arm720_setup:	mov	r0, #0
 		orr	r0, r0, #0x2100			@ .... .... .111 .... (old)
 		orr	r0, r0, #0x003d			@ ..1. ..01 ..11 1101 (new)
 		mov	pc, lr				@ __ret (head-armv.S)
+		.size	__arm720_setup, . - __arm720_setup
+
+		__INITDATA
 
 /*
  * Purpose : Function pointers used to access above functions - all calls
@@ -159,6 +159,8 @@ ENTRY(arm720_processor_functions)
 		.word	cpu_arm720_set_pte
 		.size	arm720_processor_functions, . - arm720_processor_functions
 
+		.section ".rodata"
+
 		.type	cpu_arch_name, #object
 cpu_arch_name:	.asciz	"armv4t"
 		.size	cpu_arch_name, . - cpu_arch_name
@@ -166,6 +168,12 @@ cpu_arch_name:	.asciz	"armv4t"
 		.type	cpu_elf_name, #object
 cpu_elf_name:	.asciz	"v4"
 		.size	cpu_elf_name, . - cpu_elf_name
+
+		.type	cpu_arm720_name, #object
+cpu_arm720_name:
+		.asciz	"ARM720T"
+		.size	cpu_arm720_name, . - cpu_arm720_name
+
 		.align
 
 /*

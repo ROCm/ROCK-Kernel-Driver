@@ -304,9 +304,6 @@ config FORCE_MAX_ZONEORDER
 	int
 	default "18"
 
-config HUGETLB_PAGE
-	bool "IA-64 Huge TLB Page Support"
-
 choice
 	prompt "IA-64 Huge TLB Page Size"
 	depends on HUGETLB_PAGE
@@ -413,6 +410,16 @@ config IA64_PALINFO
 	  To use this option, you have to ensure that the "/proc file system
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
+config IA64_SALINFO
+	tristate "/proc/sal support"
+	help
+	  The /proc/sal directory exports the SAL (system abstraction layer)
+	  feature bits, like whether the platform is subject to ITC drift.  It
+	  is intended to be used by user programs that care about such things.
+
+	  To use this option, you have to ensure that the "/proc file system
+	  support" (CONFIG_PROC_FS) is enabled, too.
+
 config EFI_VARS
 	tristate "/proc/efi/vars support"
 	help
@@ -424,9 +431,15 @@ config EFI_VARS
 	  support" (CONFIG_PROC_FS) is enabled, too.
 
 config NR_CPUS
-	int "Maximum number of CPUs (2-64)"
+	int "Maximum number of CPUs"
 	depends on SMP
 	default "64"
+	help
+	  You should set this to the number of CPUs in your system, but
+	  keep in mind that a kernel compiled for, e.g., 2 CPUs will boot but
+	  only use 2 CPUs on a >2 CPU system.  Setting this to a value larger
+	  than 64 will cause the use of a CPU mask array, causing a small
+	  performance hit.
 
 source "fs/Kconfig.binfmt"
 
@@ -511,8 +524,6 @@ source "net/Kconfig"
 
 if !IA64_HP_SIM
 
-source "net/ax25/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 source "drivers/cdrom/Kconfig"
@@ -559,9 +570,6 @@ source "drivers/video/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-
-source "net/bluetooth/Kconfig"
 
 endif
 
@@ -628,33 +636,6 @@ config MAGIC_SYSRQ
 	  send a BREAK and then within 5 seconds a command keypress. The
 	  keys are documented in <file:Documentation/sysrq.txt>. Don't say Y
 	  unless you really know what this hack does.
-
-config IA64_EARLY_PRINTK
-	bool "Early printk support"
-	depends on DEBUG_KERNEL && !IA64_GENERIC
-	help
-	  Selecting this option uses the VGA screen or serial console for
-	  printk() output before the consoles are initialised.  It is useful
-	  for debugging problems early in the boot process, but only if you
-	  have a suitable VGA/serial console attached.  If you're unsure,
-	  select N.
-
-config IA64_EARLY_PRINTK_UART
-	bool "Early printk on MMIO serial port"
-	depends on IA64_EARLY_PRINTK
-
-config IA64_EARLY_PRINTK_UART_BASE
-	hex "UART MMIO base address"
-	depends on IA64_EARLY_PRINTK_UART
-	default "ff5e0000"
-
-config IA64_EARLY_PRINTK_VGA
-	bool "Early printk on VGA"
-	depends on IA64_EARLY_PRINTK
-
-config IA64_EARLY_PRINTK_SGI_SN
-	bool "Early printk on SGI SN serial console"
-	depends on IA64_EARLY_PRINTK && (IA64_GENERIC || IA64_SGI_SN2)
 
 config DEBUG_SLAB
 	bool "Debug memory allocations"

@@ -393,7 +393,7 @@ running once the system is up.
 			See Documentation/ide.txt.
 
 	idle=		[HW]
-			Format: poll
+			Format: idle=poll or idle=halt
  
 	in2000=		[HW,SCSI]
 			See header of drivers/scsi/in2000.c.
@@ -787,6 +787,10 @@ running once the system is up.
 			See Documentation/ramdisk.txt.
 
 	psmouse_noext	[HW,MOUSE] Disable probing for PS2 mouse protocol extensions
+
+	psmouse_resetafter=
+			[HW,MOUSE] Try to reset Synaptics Touchpad after so many
+			bad packets (0 = never).
 
 	pss=		[HW,OSS] Personal Sound System (ECHO ESC614)
 			Format: <io>,<mss_io>,<mss_irq>,<mss_dma>,<mpu_io>,<mpu_irq>

@@ -10,7 +10,6 @@
 #ifndef _ASMARM_PGTABLE_H
 #define _ASMARM_PGTABLE_H
 
-#include <linux/config.h>
 #include <asm/memory.h>
 #include <asm/proc-fns.h>
 #include <asm/arch/vmalloc.h>
@@ -106,6 +105,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
 /*
  *   - extended small page/tiny page
  */
+#define PTE_EXT_AP_MASK		(3 << 4)
 #define PTE_EXT_AP_UNO_SRO	(0 << 4)
 #define PTE_EXT_AP_UNO_SRW	(1 << 4)
 #define PTE_EXT_AP_URO_SRW	(2 << 4)
@@ -115,12 +115,11 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
 /*
  *   - small page
  */
+#define PTE_SMALL_AP_MASK	(0xff << 4)
 #define PTE_SMALL_AP_UNO_SRO	(0x00 << 4)
 #define PTE_SMALL_AP_UNO_SRW	(0x55 << 4)
 #define PTE_SMALL_AP_URO_SRW	(0xaa << 4)
 #define PTE_SMALL_AP_URW_SRW	(0xff << 4)
-#define PTE_AP_READ		PTE_SMALL_AP_URO_SRW
-#define PTE_AP_WRITE		PTE_SMALL_AP_UNO_SRW
 
 /*
  * "Linux" PTE definitions.

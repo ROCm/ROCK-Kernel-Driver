@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/spruce_pci.c
- * 
+ *
  * PCI support for IBM Spruce
  *
  * Author: Johnnie Peters
@@ -31,7 +31,7 @@ spruce_map_irq(struct pci_dev *dev, unsigned char idsel, unsigned char pin)
 {
 	static char pci_irq_table[][4] =
 		/*
-		 * 	PCI IDSEL/INTPIN->INTLINE 
+		 * 	PCI IDSEL/INTPIN->INTLINE
 		 * 	A	B	C	D
 		 */
 	{
@@ -52,7 +52,7 @@ spruce_setup_hose(void)
 
 	/* Setup hose */
 	hose = pcibios_alloc_controller();
-	if (!hose) 
+	if (!hose)
 		return;
 
 	hose->first_busno = 0;

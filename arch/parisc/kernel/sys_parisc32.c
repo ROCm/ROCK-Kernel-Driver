@@ -46,6 +46,7 @@
 #include <linux/namei.h>
 #include <linux/vfs.h>
 #include <linux/ptrace.h>
+#include <linux/swap.h>
 
 #include <asm/types.h>
 #include <asm/uaccess.h>
@@ -373,18 +374,16 @@ put_compat_timeval(struct compat_timeval *u, struct timeval *t)
 	return copy_to_user(u, &t32, sizeof t32);
 }
 
-static int
-get_compat_timeval(struct compat_timeval *u, struct timeval *t)
+static inline long get_ts32(struct timespec *o, struct compat_timeval *i)
 {
-	int err;
-	struct compat_timeval t32;
+	long usec;
 
-	if ((err = copy_from_user(&t32, u, sizeof t32)) == 0)
-	{
-	    t->tv_sec = t32.tv_sec;
-	    t->tv_usec = t32.tv_usec;
-	}
-	return err;
+	if (__get_user(o->tv_sec, &i->tv_sec))
+		return -EFAULT;
+	if (__get_user(usec, &i->tv_usec))
+		return -EFAULT;
+	o->tv_nsec = usec * 1000;
+	return 0;
 }
 
 asmlinkage long sys32_time(compat_time_t *tloc)
@@ -418,39 +417,39 @@ sys32_gettimeofday(struct compat_timeval *tv, struct timezone *tz)
     return 0;
 }
 
-asmlinkage int
-sys32_settimeofday(struct compat_timespec *tv, struct timezone *tz)
+asmlinkage 
+int sys32_settimeofday(struct compat_timeval *tv, struct timezone *tz)
 {
-    struct timeval ktv;
-    struct timezone ktz;
-    extern int do_sys_settimeofday(struct timespec *tv, struct timezone *tz);
+	struct timespec kts;
+	struct timezone ktz;
 
-    if (tv) {
-	    if (get_compat_timeval(tv, &ktv))
-		    return -EFAULT;
-    }
-    if (tz) {
-	    if (copy_from_user(&ktz, tz, sizeof(ktz)))
-		    return -EFAULT;
-    }
+ 	if (tv) {
+		if (get_ts32(&kts, tv))
+			return -EFAULT;
+	}
+	if (tz) {
+		if (copy_from_user(&ktz, tz, sizeof(ktz)))
+			return -EFAULT;
+	}
 
-    return do_sys_settimeofday(tv ? &ktv : NULL, tz ? &ktz : NULL);
+	return do_sys_settimeofday(tv ? &kts : NULL, tz ? &ktz : NULL);
 }
 
 int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
 	int err;
 
-	if (stat->size > MAX_NON_LFS)
+	if (stat->size > MAX_NON_LFS || !new_valid_dev(stat->dev) ||
+	    !new_valid_dev(stat->rdev))
 		return -EOVERFLOW;
 
-	err  = put_user(stat->dev, &statbuf->st_dev);
+	err  = put_user(new_encode_dev(stat->dev), &statbuf->st_dev);
 	err |= put_user(stat->ino, &statbuf->st_ino);
 	err |= put_user(stat->mode, &statbuf->st_mode);
 	err |= put_user(stat->nlink, &statbuf->st_nlink);
 	err |= put_user(0, &statbuf->st_reserved1);
 	err |= put_user(0, &statbuf->st_reserved2);
-	err |= put_user(stat->rdev, &statbuf->st_rdev);
+	err |= put_user(new_encode_dev(stat->rdev), &statbuf->st_rdev);
 	err |= put_user(stat->size, &statbuf->st_size);
 	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
 	err |= put_user(stat->atime.tv_nsec, &statbuf->st_atime_nsec);
@@ -1087,6 +1086,27 @@ asmlinkage long sys32_msgrcv(int msqid,
 
 	kfree(mb);
 	return err;
+}
+
+
+extern asmlinkage ssize_t sys_sendfile(int out_fd, int in_fd, off_t *offset, size_t count);
+asmlinkage int sys32_sendfile(int out_fd, int in_fd, compat_off_t *offset, s32 count)
+{
+        mm_segment_t old_fs = get_fs();
+        int ret;
+        off_t of;
+
+        if (offset && get_user(of, offset))
+                return -EFAULT;
+
+        set_fs(KERNEL_DS);
+        ret = sys_sendfile(out_fd, in_fd, offset ? &of : NULL, count);
+        set_fs(old_fs);
+
+        if (offset && put_user(of, offset))
+                return -EFAULT;
+
+        return ret;
 }
 
 /* EXPORT/UNEXPORT */

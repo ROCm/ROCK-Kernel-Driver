@@ -2,27 +2,35 @@
 #define __LINUX_COMPILER_H
 
 #ifdef __CHECKER__
-  #define __user	__attribute__((noderef, address_space(1)))
-  #define __kernel	/* default address space */
+# define __user		__attribute__((noderef, address_space(1)))
+# define __kernel	/* default address space */
 #else
-  #define __user
-  #define __kernel
+# define __user
+# define __kernel
 #endif
 
-#if !defined(__ASSEMBLY__) && ((__GNUC__ > 3) || (__GNUC__ == 3 && __GNUC_MINOR__ >= 1))
-#define inline		__inline__ __attribute__((always_inline))
-#define __inline__	__inline__ __attribute__((always_inline))
-#define __inline	__inline__ __attribute__((always_inline))
+#if __GNUC__ > 3
+# include <linux/compiler-gcc+.h>	/* catch-all for GCC 4, 5, etc. */
+#elif __GNUC__ == 3
+# include <linux/compiler-gcc3.h>
+#elif __GNUC__ == 2
+# include <linux/compiler-gcc2.h>
+#else
+# error Sorry, your compiler is too old/not recognized.
 #endif
 
-/* Somewhere in the middle of the GCC 2.96 development cycle, we implemented
-   a mechanism by which the user can annotate likely branch directions and
-   expect the blocks to be reordered appropriately.  Define __builtin_expect
-   to nothing for earlier compilers.  */
-
-#if __GNUC__ == 2 && __GNUC_MINOR__ < 96
-#define __builtin_expect(x, expected_value) (x)
+/* Intel compiler defines __GNUC__. So we will overwrite implementations
+ * coming from above header files here
+ */
+#ifdef __INTEL_COMPILER
+# include <linux/compiler-intel.h>
 #endif
+
+/*
+ * Generic compiler-dependent macros required for kernel
+ * build go below this comment. Actual compiler/compiler version
+ * specific implementations come from the above header files
+ */
 
 #define likely(x)	__builtin_expect(!!(x), 1)
 #define unlikely(x)	__builtin_expect(!!(x), 0)
@@ -33,10 +41,8 @@
  * Usage is:
  * 		int __deprecated foo(void)
  */
-#if ( __GNUC__ == 3 && __GNUC_MINOR__ > 0 ) || __GNUC__ > 3
-#define __deprecated	__attribute__((deprecated))
-#else
-#define __deprecated
+#ifndef __deprecated
+# define __deprecated		/* unimplemented */
 #endif
 
 /*
@@ -50,10 +56,8 @@
  * In prior versions of gcc, such functions and data would be emitted, but
  * would be warned about except with attribute((unused)).
  */
-#if __GNUC__ == 3 && __GNUC_MINOR__ >= 3 || __GNUC__ > 3
-#define __attribute_used__	__attribute__((__used__))
-#else
-#define __attribute_used__	__attribute__((__unused__))
+#ifndef __attribute_used__
+# define __attribute_used__	/* unimplemented */
 #endif
 
 /*
@@ -65,19 +69,21 @@
  * elimination and loop optimization just as an arithmetic operator
  * would be.
  * [...]
- * The attribute `pure' is not implemented in GCC versions earlier
- * than 2.96.
  */
-#if (__GNUC__ == 2 && __GNUC_MINOR__ >= 96) || __GNUC__ > 2
-#define __attribute_pure__	__attribute__((pure))
-#else
-#define __attribute_pure__	/* unimplemented */
+#ifndef __attribute_pure__
+# define __attribute_pure__	/* unimplemented */
 #endif
 
-/* This macro obfuscates arithmetic on a variable address so that gcc
-   shouldn't recognize the original var, and make assumptions about it */
-#define RELOC_HIDE(ptr, off)					\
+/* Optimization barrier */
+#ifndef barrier
+# define barrier() __memory_barrier()
+#endif
+
+#ifndef RELOC_HIDE
+# define RELOC_HIDE(ptr, off)					\
   ({ unsigned long __ptr;					\
-    __asm__ ("" : "=g"(__ptr) : "0"(ptr));		\
+     __ptr = (unsigned long) (ptr);				\
     (typeof(ptr)) (__ptr + (off)); })
+#endif
+
 #endif /* __LINUX_COMPILER_H */

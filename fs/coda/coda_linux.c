@@ -25,10 +25,14 @@
 int coda_fake_statfs;
 
 /* print a fid */
-char * coda_f2s(ViceFid *f)
+char * coda_f2s(struct CodaFid *f)
 {
 	static char s[60];
-	sprintf(s, "(%-#lx.%-#lx.%-#lx)", f->Volume, f->Vnode, f->Unique);
+#ifdef CODA_FS_OLD_API
+ 	sprintf(s, "(%08x.%08x.%08x)", f->opaque[0], f->opaque[1], f->opaque[2]);
+#else
+ 	sprintf(s, "(%08x.%08x.%08x.%08x)", f->opaque[0], f->opaque[1], f->opaque[2], f->opaque[3]);
+#endif
 	return s;
 }
 
@@ -43,30 +47,6 @@ int coda_iscontrol(const char *name, size_t length)
 int coda_isroot(struct inode *i)
 {
     return ( i->i_sb->s_root->d_inode == i );
-}
-
-/* put the current process credentials in the cred */
-void coda_load_creds(struct coda_cred *cred)
-{
-        cred->cr_uid = (vuid_t) current->uid;
-        cred->cr_euid = (vuid_t) current->euid;
-        cred->cr_suid = (vuid_t) current->suid;
-        cred->cr_fsuid = (vuid_t) current->fsuid;
-
-        cred->cr_groupid = (vgid_t) current->gid;
-        cred->cr_egid = (vgid_t) current->egid;
-        cred->cr_sgid = (vgid_t) current->sgid;
-        cred->cr_fsgid = (vgid_t) current->fsgid;
-}
-
-int coda_cred_ok(struct coda_cred *cred)
-{
-	return(current->fsuid == cred->cr_fsuid);
-}
-
-int coda_cred_eq(struct coda_cred *cred1, struct coda_cred *cred2)
-{
-	return (cred1->cr_fsuid == cred2->cr_fsuid);
 }
 
 unsigned short coda_flags_to_cflags(unsigned short flags)
@@ -215,58 +195,3 @@ void coda_iattr_to_vattr(struct iattr *iattr, struct coda_vattr *vattr)
 	}
 }
 
-void print_vattr(struct coda_vattr *attr)
-{
-    char *typestr;
-
-    switch (attr->va_type) {
-    case C_VNON:
-	typestr = "C_VNON";
-	break;
-    case C_VREG:
-	typestr = "C_VREG";
-	break;
-    case C_VDIR:
-	typestr = "C_VDIR";
-	break;
-    case C_VBLK:
-	typestr = "C_VBLK";
-	break;
-    case C_VCHR:
-	typestr = "C_VCHR";
-	break;
-    case C_VLNK:
-	typestr = "C_VLNK";
-	break;
-    case C_VSOCK:
-	typestr = "C_VSCK";
-	break;
-    case C_VFIFO:
-	typestr = "C_VFFO";
-	break;
-    case C_VBAD:
-	typestr = "C_VBAD";
-	break;
-    default:
-	typestr = "????";
-	break;
-    }
-
-
-    printk("attr: type %s (%o)  mode %o uid %d gid %d rdev %d\n",
-	   typestr, (int)attr->va_type, (int)attr->va_mode, 
-	   (int)attr->va_uid, (int)attr->va_gid, (int)attr->va_rdev);
-    
-    printk("      fileid %d nlink %d size %d blocksize %d bytes %d\n",
-	      (int)attr->va_fileid, (int)attr->va_nlink, 
-	      (int)attr->va_size,
-	      (int)attr->va_blocksize,(int)attr->va_bytes);
-    printk("      gen %ld flags %ld\n",
-	      attr->va_gen, attr->va_flags);
-    printk("      atime sec %d nsec %d\n",
-	      (int)attr->va_atime.tv_sec, (int)attr->va_atime.tv_nsec);
-    printk("      mtime sec %d nsec %d\n",
-	      (int)attr->va_mtime.tv_sec, (int)attr->va_mtime.tv_nsec);
-    printk("      ctime sec %d nsec %d\n",
-	      (int)attr->va_ctime.tv_sec, (int)attr->va_ctime.tv_nsec);
-}

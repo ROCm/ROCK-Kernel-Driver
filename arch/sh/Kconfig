@@ -753,10 +753,6 @@ source "drivers/ieee1394/Kconfig"
 
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
-source "net/irda/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 source "drivers/telephony/Kconfig"
@@ -839,9 +835,8 @@ config SERIAL
 	  serial port drivers do not need this driver built in for them to
 	  work.)
 
-	  If you want to compile this driver as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  serial.
+	  To compile this driver as a module, choose M here: the
+	  module will be called serial.
 	  [WARNING: Do not compile this driver as a module if you are using
 	  non-standard serial ports, since the configuration information will
 	  be lost when the driver is unloaded.  This limitation may be lifted
@@ -973,10 +968,8 @@ config PRINTER
 
 	  It is possible to share one parallel port among several devices
 	  (e.g. printer and ZIP drive) and it is safe to compile the
-	  corresponding drivers into the kernel.  If you want to compile this
-	  driver as a module however ( = code which can be inserted in and
-	  removed from the running kernel whenever you want), say M here and
-	  read <file:Documentation/modules.txt> and
+	  corresponding drivers into the kernel.
+	  To compile this driver as a module, choose M here and read
 	  <file:Documentation/parport.txt>.  The module will be called lp.
 
 	  If you have several parallel ports, you can specify which ports to
@@ -1018,10 +1011,8 @@ config PPDEV
 	  It is safe to say N to this -- it is not needed for normal printing
 	  or parallel port CD-ROM/disk support.
 
-	  This support is also available as a module.  If you want to compile
-	  it as a module, say M here and read
-	  <file:Documentation/modules.txt>.  The module will be called
-	  ppdev.
+	  To compile this support as a module, choose M here: the
+	  module will be called ppdev.
 
 	  If unsure, say N.
 
@@ -1097,10 +1088,8 @@ config SH_WDT
 	  some performance issues. As such, the WDT should be avoided here
 	  unless it is absolutely necessary.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called shwdt. If you want to compile it as a module,
-	  say M here and read Documentation/modules.txt.
+	  To compile this driver as a module, choose M here: the
+	  module will be called shwdt.
 
 endmenu
 
@@ -1126,10 +1115,8 @@ config RTC
 	  sampling), then say Y here, and read <file:Documentation/rtc.txt>
 	  for details.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module is called rtc. If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rtc.
 
 source "drivers/char/pcmcia/Kconfig"
 
@@ -1148,8 +1135,6 @@ source "drivers/video/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 
 menu "Kernel hacking"

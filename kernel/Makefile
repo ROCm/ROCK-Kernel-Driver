@@ -18,6 +18,7 @@ obj-$(CONFIG_PM) += power/
 obj-$(CONFIG_BSD_PROCESS_ACCT) += acct.o
 obj-$(CONFIG_COMPAT) += compat.o
 obj-$(CONFIG_IKCONFIG) += configs.o
+obj-$(CONFIG_IKCONFIG_PROC) += configs.o
 
 ifneq ($(CONFIG_IA64),y)
 # According to Alan Modra <alan@linuxcare.com.au>, the -fno-omit-frame-pointer is
@@ -28,12 +29,32 @@ ifneq ($(CONFIG_IA64),y)
 CFLAGS_sched.o := $(PROFILING) -fno-omit-frame-pointer
 endif
 
+# configs.o uses generated files - dependecies must be listed explicitly
+$(obj)/configs.o: $(obj)/ikconfig.h
+
+ifdef CONFIG_IKCONFIG_PROC
+$(obj)/configs.o: $(obj)/config_data.h
+endif
+
+# ikconfig.h contains all the selected config entries - generated
+# from top-level Makefile and .config. Info from ikconfig.h can
+# be extracted from the kernel binary.
+
 quiet_cmd_ikconfig = IKCFG   $@
       cmd_ikconfig = $(CONFIG_SHELL) $< .config $(srctree)/Makefile > $@
 
 targets += ikconfig.h
-
 $(obj)/ikconfig.h: scripts/mkconfigs .config Makefile FORCE
 	$(call if_changed,ikconfig)
 
-$(obj)/configs.o: $(obj)/ikconfig.h
+# config_data.h contains the same information as ikconfig.h but gzipped.
+# Info from config_data can be extracted from /proc/config*
+targets += config_data.gz
+$(obj)/config_data.gz: .config FORCE
+	$(call if_changed,gzip)
+
+quiet_cmd_ikconfiggz = IKCFG   $@
+      cmd_ikconfiggz = cat $< | scripts/bin2c kernel_config_data > $@
+targets += config_data.h
+$(obj)/config_data.h: $(obj)/config_data.gz FORCE
+	$(call if_changed,ikconfiggz)

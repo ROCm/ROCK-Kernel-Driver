@@ -604,7 +604,7 @@ static void *dn_neigh_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *dn_neigh_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return *pos ? dn_neigh_get_idx(seq, *pos - 1) : (void*)1;
+	return *pos ? dn_neigh_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *dn_neigh_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -612,7 +612,7 @@ static void *dn_neigh_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	void *rc;
 
 
-	if (v == (void*)1) {
+	if (v == SEQ_START_TOKEN) {
 		rc = dn_neigh_get_idx(seq, 0);
 		goto out;
 	}
@@ -628,7 +628,7 @@ out:
 
 static void dn_neigh_seq_stop(struct seq_file *seq, void *v)
 {
-	if (v && v != (void*)1)
+	if (v && v != SEQ_START_TOKEN)
 		read_unlock_bh(&dn_neigh_table.lock);
 }
 
@@ -653,7 +653,7 @@ static inline void dn_neigh_format_entry(struct seq_file *seq,
 
 static int dn_neigh_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void*)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Addr    Flags State Use Blksize Dev\n");
 	} else {
 		dn_neigh_format_entry(seq, v);

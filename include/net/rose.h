@@ -140,9 +140,6 @@ typedef struct {
 
 #define rose_sk(__sk) ((rose_cb *)(__sk)->sk_protinfo)
 
-/* Magic value indicating first entry in /proc (ie header) */
-#define ROSE_PROC_START ((void *) 1)
-
 /* af_rose.c */
 extern ax25_address rose_callsign;
 extern int  sysctl_rose_restart_request_timeout;

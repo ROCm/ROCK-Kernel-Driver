@@ -397,17 +397,6 @@ config X86_OOSTORE
 	depends on MWINCHIP3D || MWINCHIP2 || MWINCHIPC6
 	default y
 
-config HUGETLB_PAGE
-	bool "Huge TLB Page Support"
-	help
-	  This enables support for huge pages.  User space applications
-	  can make use of this support with the sys_alloc_hugepages and
-	  sys_free_hugepages system calls.  If your applications are
-	  huge page aware and your processor (Pentium or later for x86)
-	  supports this, then say Y here.
-
-	  Otherwise, say N.
-
 config HPET_TIMER
 	bool "HPET Timer Support"
 	help
@@ -454,6 +443,7 @@ config SMP
 config NR_CPUS
 	int "Maximum number of CPUs (2-255)"
 	depends on SMP
+	default "32" if X86_NUMAQ || X86_SUMMIT || X86_BIGSMP || X86_ES7000
 	default "8"
 	help
 	  This allows you to specify the maximum number of CPUs which this
@@ -605,11 +595,9 @@ config MICROCODE
 	  ingredients for this driver, check:
 	  <http://www.urbanmyth.org/microcode/>.
 
-	  This driver is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called microcode.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.  If
-	  you use modprobe or kmod you may also want to add the line
+	  To compile this driver as a module, choose M here: the
+	  module will be called microcode.
+	  If you use modprobe or kmod you may also want to add the line
 	  'alias char-major-10-184 microcode' to your /etc/modules.conf file.
 
 config X86_MSR
@@ -814,49 +802,7 @@ endmenu
 menu "Power management options (ACPI, APM)"
 	depends on !X86_VOYAGER
 
-config PM
-	bool "Power Management support"
-	---help---
-	  "Power Management" means that parts of your computer are shut
-	  off or put into a power conserving "sleep" mode if they are not
-	  being used.  There are two competing standards for doing this: APM
-	  and ACPI.  If you want to use either one, say Y here and then also
-	  to the requisite support below.
-
-	  Power Management is most important for battery powered laptop
-	  computers; if you have a laptop, check out the Linux Laptop home
-	  page on the WWW at
-	  <http://www.cs.utexas.edu/users/kharker/linux-laptop/> and the
-	  Battery Powered Linux mini-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  Note that, even if you say N here, Linux on the x86 architecture
-	  will issue the hlt instruction if nothing is to be done, thereby
-	  sending the processor to sleep and saving power.
-
-config SOFTWARE_SUSPEND
-	bool "Software Suspend (EXPERIMENTAL)"
-	depends on EXPERIMENTAL && PM && SWAP
-	---help---
-	  Enable the possibilty of suspendig machine. It doesn't need APM.
-	  You may suspend your machine by 'swsusp' or 'shutdown -z <time>' 
-	  (patch for sysvinit needed). 
-
-	  It creates an image which is saved in your active swaps. By the next
-	  booting the, pass 'resume=/dev/swappartition' and kernel will 
-	  detect the saved image, restore the memory from
-	  it and then it continues to run as before you've suspended.
-	  If you don't want the previous state to continue use the 'noresume'
-	  kernel option. However note that your partitions will be fsck'd and
-	  you must re-mkswap your swap partitions. It does not work with swap
-	  files.
-
-	  Right now you may boot without resuming and then later resume but
-	  in meantime you cannot use those swap partitions/files which were
-	  involved in suspending. Also in this case there is a risk that buffers
-	  on disk won't match with saved ones.
-
-	  For more information take a look at Documentation/swsusp.txt.
+source kernel/power/Kconfig
 
 source "drivers/acpi/Kconfig"
 
@@ -919,10 +865,8 @@ config APM
 	  11) exchange RAM chips
 	  12) exchange the motherboard.
 
-	  To compile this driver as a module ( = code which can be inserted in
-	  and removed from the running kernel whenever you want), say M here
-	  and read <file:Documentation/modules.txt>. The module will be called
-	  apm.
+	  To compile this driver as a module, choose M here: the
+	  module will be called apm.
 
 config APM_IGNORE_USER_SUSPEND
 	bool "Ignore USER SUSPEND"
@@ -1200,10 +1144,6 @@ source "drivers/message/i2o/Kconfig"
 
 source "net/Kconfig"
 
-source "net/ax25/Kconfig"
-
-source "net/irda/Kconfig"
-
 source "drivers/isdn/Kconfig"
 
 source "drivers/telephony/Kconfig"
@@ -1225,8 +1165,6 @@ source "drivers/video/Kconfig"
 source "sound/Kconfig"
 
 source "drivers/usb/Kconfig"
-
-source "net/bluetooth/Kconfig"
 
 source "arch/i386/oprofile/Kconfig"
 

@@ -4,7 +4,7 @@
  * http://developer.intel.com/technology/efi/efi.htm
  *
  * By Matt Domsch <Matt_Domsch@dell.com>  Fri Sep 22 22:15:56 CDT 2000  
- *   Copyright 2000,2001 Dell Computer Corporation
+ *   Copyright 2000,2001 Dell Inc.
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

@@ -55,6 +55,13 @@ DECLARE_WAIT_QUEUE_HEAD(input_devices_poll_wait);
 static int input_devices_state;
 #endif
 
+static inline unsigned int ms_to_jiffies(unsigned int ms)
+{
+        unsigned int j;
+        j = (ms * HZ + 500) / 1000;
+        return (j > 0) ? j : 1;
+}
+
 
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
@@ -93,9 +100,9 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 
 			change_bit(code, dev->key);
 
-			if (test_bit(EV_REP, dev->evbit) && dev->rep[REP_PERIOD] && value) {
+			if (test_bit(EV_REP, dev->evbit) && dev->rep[REP_PERIOD] && dev->timer.data && value) {
 				dev->repeat_key = code;
-				mod_timer(&dev->timer, jiffies + dev->rep[REP_DELAY]);
+				mod_timer(&dev->timer, jiffies + ms_to_jiffies(dev->rep[REP_DELAY]));
 			}
 
 			break;
@@ -162,7 +169,7 @@ void input_event(struct input_dev *dev, unsigned int type, unsigned int code, in
 
 		case EV_REP:
 
-			if (code > REP_MAX || dev->rep[code] == value) return;
+			if (code > REP_MAX || value < 0 || dev->rep[code] == value) return;
 
 			dev->rep[code] = value;
 			if (dev->event) dev->event(dev, type, code, value);
@@ -195,7 +202,7 @@ static void input_repeat_key(unsigned long data)
 	input_event(dev, EV_KEY, dev->repeat_key, 2);
 	input_sync(dev);
 
-	mod_timer(&dev->timer, jiffies + dev->rep[REP_PERIOD]);
+	mod_timer(&dev->timer, jiffies + ms_to_jiffies(dev->rep[REP_PERIOD]));
 }
 
 int input_accept_process(struct input_handle *handle, struct file *file)
@@ -423,11 +430,18 @@ void input_register_device(struct input_dev *dev)
 
 	set_bit(EV_SYN, dev->evbit);
 
+	/*
+	 * If delay and period are pre-set by the driver, then autorepeating
+	 * is handled by the driver itself and we don't do it in input.c.
+	 */
+
 	init_timer(&dev->timer);
-	dev->timer.data = (long) dev;
-	dev->timer.function = input_repeat_key;
-	dev->rep[REP_DELAY] = HZ/4;
-	dev->rep[REP_PERIOD] = HZ/33;
+	if (!dev->rep[REP_DELAY] && !dev->rep[REP_PERIOD]) {
+		dev->timer.data = (long) dev;
+		dev->timer.function = input_repeat_key;
+		dev->rep[REP_DELAY] = 250;
+		dev->rep[REP_PERIOD] = 33;
+	}
 
 	INIT_LIST_HEAD(&dev->h_list);
 	list_add_tail(&dev->node, &input_dev_list);
@@ -676,20 +690,10 @@ static int input_handlers_read(char *buf, char **start, off_t pos, int count, in
 	return (count > cnt) ? cnt : count;
 }
 
-#endif
-
-struct class input_class = {
-	.name		= "input",
-};
-
-static int __init input_init(void)
+static int __init input_proc_init(void)
 {
 	struct proc_dir_entry *entry;
-	int retval = -ENOMEM;
 
-	class_register(&input_class);
-
-#ifdef CONFIG_PROC_FS
 	proc_bus_input_dir = proc_mkdir("input", proc_bus);
 	if (proc_bus_input_dir == NULL)
 		return -ENOMEM;
@@ -708,7 +712,22 @@ static int __init input_init(void)
 		return -ENOMEM;
 	}
 	entry->owner = THIS_MODULE;
+	return 0;
+}
+#else /* !CONFIG_PROC_FS */
+static inline int input_proc_init(void) { return 0; }
 #endif
+
+struct class input_class = {
+	.name		= "input",
+};
+
+static int __init input_init(void)
+{
+	int retval = -ENOMEM;
+
+	class_register(&input_class);
+	input_proc_init();
 	retval = register_chrdev(INPUT_MAJOR, "input", &input_fops);
 	if (retval) {
 		printk(KERN_ERR "input: unable to register char major %d", INPUT_MAJOR);
@@ -730,11 +749,10 @@ static int __init input_init(void)
 
 static void __exit input_exit(void)
 {
-#ifdef CONFIG_PROC_FS
 	remove_proc_entry("devices", proc_bus_input_dir);
 	remove_proc_entry("handlers", proc_bus_input_dir);
 	remove_proc_entry("input", proc_bus);
-#endif
+
 	devfs_remove("input");
 	unregister_chrdev(INPUT_MAJOR, "input");
 	class_unregister(&input_class);

@@ -180,6 +180,7 @@ struct hdlcdrv_ops {
 
 struct hdlcdrv_state {
 	int magic;
+	int opened;
 
 	const struct hdlcdrv_ops *ops;
 

@@ -164,7 +164,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 	}
 #endif
 
-
+	select_idle_routine(c);
 	if (c->cpuid_level > 1) {
 		/* supports eax=2  call */
 		int i, j, n;

@@ -5,7 +5,7 @@
 
 #ifdef CONFIG_X86_NUMAQ
 #include <asm/numaq.h>
-#elif CONFIG_NUMA
+#elif CONFIG_ACPI_SRAT
 #include <asm/srat.h>
 #else
 #define MAX_NUMNODES	1

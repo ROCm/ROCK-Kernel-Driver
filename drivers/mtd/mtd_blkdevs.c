@@ -397,8 +397,7 @@ int register_mtd_blktrans(struct mtd_blktrans_ops *tr)
 
 	tr->blkcore_priv->rq->queuedata = tr;
 
-	ret = kernel_thread(mtd_blktrans_thread, tr, 
-			    CLONE_FS|CLONE_FILES|CLONE_SIGHAND);
+	ret = kernel_thread(mtd_blktrans_thread, tr, CLONE_KERNEL);
 	if (ret < 0) {
 		blk_cleanup_queue(tr->blkcore_priv->rq);
 		unregister_blkdev(tr->major, tr->name);

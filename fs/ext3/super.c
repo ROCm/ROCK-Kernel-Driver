@@ -34,10 +34,6 @@
 #include "xattr.h"
 #include "acl.h"
 
-#ifdef CONFIG_JBD_DEBUG
-static int ext3_ro_after; /* Make fs read-only after this many jiffies */
-#endif
-
 static int ext3_load_journal(struct super_block *, struct ext3_super_block *);
 static int ext3_create_journal(struct super_block *, struct ext3_super_block *,
 			       int);
@@ -49,64 +45,6 @@ static void ext3_mark_recovery_complete(struct super_block * sb,
 static void ext3_clear_journal_err(struct super_block * sb,
 				   struct ext3_super_block * es);
 static int ext3_sync_fs(struct super_block *sb, int wait);
-
-#ifdef CONFIG_JBD_DEBUG
-int journal_no_write[2];
-
-/*
- * Debug code for turning filesystems "read-only" after a specified
- * amount of time.  This is for crash/recovery testing.
- */
-
-static void make_rdonly(struct block_device *bdev, int *no_write)
-{
-	char b[BDEVNAME_SIZE];
-
-	if (bdev) {
-		printk(KERN_WARNING "Turning device %s read-only\n", 
-		       bdevname(bdev, b));
-		*no_write = 0xdead0000 + bdev->bd_dev;
-	}
-}
-
-static void turn_fs_readonly(unsigned long arg)
-{
-	struct super_block *sb = (struct super_block *)arg;
-
-	make_rdonly(sb->s_bdev, &journal_no_write[0]);
-	make_rdonly(EXT3_SB(sb)->s_journal->j_dev, &journal_no_write[1]);
-	wake_up(&EXT3_SB(sb)->ro_wait_queue);
-}
-
-static void setup_ro_after(struct super_block *sb)
-{
-	struct ext3_sb_info *sbi = EXT3_SB(sb);
-	init_timer(&sbi->turn_ro_timer);
-	if (ext3_ro_after) {
-		printk(KERN_DEBUG "fs will go read-only in %d jiffies\n",
-		       ext3_ro_after);
-		init_waitqueue_head(&sbi->ro_wait_queue);
-		journal_no_write[0] = 0;
-		journal_no_write[1] = 0;
-		sbi->turn_ro_timer.function = turn_fs_readonly;
-		sbi->turn_ro_timer.data = (unsigned long)sb;
-		sbi->turn_ro_timer.expires = jiffies + ext3_ro_after;
-		ext3_ro_after = 0;
-		add_timer(&sbi->turn_ro_timer);
-	}
-}
-
-static void clear_ro_after(struct super_block *sb)
-{
-	del_timer_sync(&EXT3_SB(sb)->turn_ro_timer);
-	journal_no_write[0] = 0;
-	journal_no_write[1] = 0;
-	ext3_ro_after = 0;
-}
-#else
-#define setup_ro_after(sb)	do {} while (0)
-#define clear_ro_after(sb)	do {} while (0)
-#endif
 
 /* 
  * Wrappers for journal_start/end.
@@ -481,7 +419,6 @@ void ext3_put_super (struct super_block * sb)
 		invalidate_bdev(sbi->journal_bdev, 0);
 		ext3_blkdev_remove(sbi);
 	}
-	clear_ro_after(sb);
 	sb->s_fs_info = NULL;
 	kfree(sbi);
 	return;
@@ -741,14 +678,6 @@ static int parse_options (char * options, struct ext3_sb_info *sbi,
 			set_opt (sbi->s_mount_opt, OLDALLOC);
 		else if (!strcmp (this_char, "orlov"))
 			clear_opt (sbi->s_mount_opt, OLDALLOC);
-#ifdef CONFIG_JBD_DEBUG
-		else if (!strcmp (this_char, "ro-after")) {
-			unsigned long v;
-			if (want_numeric(value, "ro-after", &v))
-				return 0;
-			ext3_ro_after = v;
-		}
-#endif
 		/* Silently ignore the quota options */
 		else if (!strcmp (this_char, "grpquota")
 		         || !strcmp (this_char, "noquota")
@@ -892,7 +821,6 @@ static int ext3_setup_super(struct super_block *sb, struct ext3_super_block *es,
 		ext3_check_inodes_bitmap (sb);
 	}
 #endif
-	setup_ro_after(sb);
 	return res;
 }
 
@@ -1092,9 +1020,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	int i;
 	int needs_recovery;
 
-#ifdef CONFIG_JBD_DEBUG
-	ext3_ro_after = 0;
-#endif
 	sbi = kmalloc(sizeof(*sbi), GFP_KERNEL);
 	if (!sbi)
 		return -ENOMEM;
@@ -1103,7 +1028,6 @@ static int ext3_fill_super (struct super_block *sb, void *data, int silent)
 	sbi->s_mount_opt = 0;
 	sbi->s_resuid = EXT3_DEF_RESUID;
 	sbi->s_resgid = EXT3_DEF_RESGID;
-	setup_ro_after(sb);
 
 	blocksize = sb_min_blocksize(sb, EXT3_MIN_BLOCK_SIZE);
 	if (!blocksize) {
@@ -1603,7 +1527,7 @@ static int ext3_load_journal(struct super_block * sb,
 {
 	journal_t *journal;
 	int journal_inum = le32_to_cpu(es->s_journal_inum);
-	dev_t journal_dev = old_decode_dev(le32_to_cpu(es->s_journal_dev));
+	dev_t journal_dev = new_decode_dev(le32_to_cpu(es->s_journal_dev));
 	int err = 0;
 	int really_read_only;
 
@@ -1868,8 +1792,6 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 	struct ext3_sb_info *sbi = EXT3_SB(sb);
 	unsigned long tmp;
 
-	clear_ro_after(sb);
-
 	/*
 	 * Allow the "check" option to be passed as a remount option.
 	 */
@@ -1929,7 +1851,6 @@ int ext3_remount (struct super_block * sb, int * flags, char * data)
 				sb->s_flags &= ~MS_RDONLY;
 		}
 	}
-	setup_ro_after(sb);
 	return 0;
 }
 

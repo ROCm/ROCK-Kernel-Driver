@@ -508,10 +508,12 @@ enum
 #define IFLA_MASTER IFLA_MASTER
 	IFLA_WIRELESS,		/* Wireless Extension event - see wireless.h */
 #define IFLA_WIRELESS IFLA_WIRELESS
+	IFLA_PROTINFO,		/* Protocol specific information for a link */
+#define IFLA_PROTINFO IFLA_PROTINFO
 };
 
 
-#define IFLA_MAX IFLA_WIRELESS
+#define IFLA_MAX IFLA_PROTINFO
 
 #define IFLA_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct ifinfomsg))))
 #define IFLA_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct ifinfomsg))
@@ -544,6 +546,18 @@ enum
    or maybe 0, what means, that real media is unknown (usual
    for IPIP tunnels, when route to endpoint is allowed to change)
  */
+
+/* Subtype attributes for IFLA_PROTINFO */
+enum
+{
+	IFLA_INET6_UNSPEC,
+	IFLA_INET6_FLAGS,	/* link flags			*/
+	IFLA_INET6_CONF,	/* sysctl parameters		*/
+	IFLA_INET6_STATS,	/* statistics			*/
+	IFLA_INET6_MCAST,	/* MC things. What of them?	*/
+};
+
+#define IFLA_INET6_MAX	IFLA_INET6_MCAST
 
 /*****************************************************************
  *		Traffic control messages.
@@ -604,7 +618,7 @@ enum
 
 #include <linux/config.h>
 
-static __inline__ int rtattr_strcmp(struct rtattr *rta, char *str)
+static __inline__ int rtattr_strcmp(const struct rtattr *rta, const char *str)
 {
 	int len = strlen(str) + 1;
 	return len > rta->rta_len || memcmp(RTA_DATA(rta), str, len);
@@ -628,8 +642,9 @@ extern int rtnetlink_put_metrics(struct sk_buff *skb, u32 *metrics);
 extern void __rta_fill(struct sk_buff *skb, int attrtype, int attrlen, const void *data);
 
 #define RTA_PUT(skb, attrtype, attrlen, data) \
-({ if (skb_tailroom(skb) < (int)RTA_SPACE(attrlen)) goto rtattr_failure; \
-   __rta_fill(skb, attrtype, attrlen, data); })
+({	if (unlikely(skb_tailroom(skb) < (int)RTA_SPACE(attrlen))) \
+		 goto rtattr_failure; \
+   	__rta_fill(skb, attrtype, attrlen, data); }) 
 
 static inline struct rtattr *
 __rta_reserve(struct sk_buff *skb, int attrtype, int attrlen)
@@ -644,8 +659,9 @@ __rta_reserve(struct sk_buff *skb, int attrtype, int attrlen)
 }
 
 #define __RTA_PUT(skb, attrtype, attrlen) \
-({ if (skb_tailroom(skb) < (int)RTA_SPACE(attrlen)) goto rtattr_failure; \
-   __rta_reserve(skb, attrtype, attrlen); })
+({ 	if (unlikely(skb_tailroom(skb) < (int)RTA_SPACE(attrlen))) \
+		goto rtattr_failure; \
+   	__rta_reserve(skb, attrtype, attrlen); })
 
 extern void rtmsg_ifinfo(int type, struct net_device *dev, unsigned change);
 
@@ -667,11 +683,21 @@ extern void rtnl_lock(void);
 extern void rtnl_unlock(void);
 extern void rtnetlink_init(void);
 
-#define ASSERT_RTNL() do { if (down_trylock(&rtnl_sem) == 0)  { up(&rtnl_sem); \
-printk("RTNL: assertion failed at " __FILE__ "(%d)\n", __LINE__); } \
-		   } while(0)
-#define BUG_TRAP(x) if (!(x)) { printk("KERNEL: assertion (" #x ") failed at " __FILE__ "(%d)\n", __LINE__); }
+#define ASSERT_RTNL() do { \
+	if (unlikely(down_trylock(&rtnl_sem) == 0)) { \
+		up(&rtnl_sem); \
+		printk(KERN_ERR "RTNL: assertion failed at %s (%d)\n", \
+		       __FILE__,  __LINE__); \
+		dump_stack(); \
+	} \
+} while(0)
 
+#define BUG_TRAP(x) do { \
+	if (unlikely(!(x))) { \
+		printk(KERN_ERR "KERNEL: assertion (%s) failed at %s (%d)\n", \
+			#x,  __FILE__ , __LINE__); \
+	} \
+} while(0)
 
 #endif /* __KERNEL__ */
 

@@ -3590,7 +3590,7 @@ byte manufacturer_req(dword Id, word Number, DIVA_CAPI_ADAPTER   * a, PLCI   * p
         {
           if (plci->channels)
           {
-            for (ncci = 1; ncci < MAX_NCCI+1; i++)
+            for (ncci = 1; ncci < MAX_NCCI+1; ncci++)
             {
               if ((a->ncci_plci[ncci] == plci->Id) && (a->ncci_state[ncci] == CONNECTED))
               {
@@ -6612,7 +6612,7 @@ void nl_ind(PLCI   * plci)
           ||(*data == DSP_UDATA_INDICATION_CTS_ON)) )
       {
         word conn_opt, ncpi_opt = 0x00;
-//      HexDump ("MDM N_UDATA:", plci->NL.RBuffer->length, data);
+/*      HexDump ("MDM N_UDATA:", plci->NL.RBuffer->length, data); */
 
         if (*data == DSP_UDATA_INDICATION_DCD_ON)
           plci->ncpi_state |= NCPI_MDM_DCD_ON_RECEIVED;
@@ -7813,15 +7813,15 @@ word add_b1(PLCI   * plci, API_PARSE * bp, word b_channel_info, word b1_faciliti
 
     }
   }
-  if(READ_WORD(bp_parms[0].info)==2 ||                         // V.110 async
-     READ_WORD(bp_parms[0].info)==3 )                          // V.110 sync
+  if(READ_WORD(bp_parms[0].info)==2 ||                         /* V.110 async */
+     READ_WORD(bp_parms[0].info)==3 )                          /* V.110 sync */
   {
     if(bp_parms[3].length){
       dbug(1,dprintf("V.110,%d",READ_WORD(&bp_parms[3].info[1])));
-      switch(READ_WORD(&bp_parms[3].info[1])){                 // Rate
+      switch(READ_WORD(&bp_parms[3].info[1])){                 /* Rate */
         case 0:
         case 56000:
-          if(READ_WORD(bp_parms[0].info)==3){                  //V.110 sync 56k
+          if(READ_WORD(bp_parms[0].info)==3){                  /* V.110 sync 56k */
             dbug(1,dprintf("56k sync HSCX"));
             cai[1] = 8;
             cai[2] = 0;
@@ -7859,7 +7859,7 @@ word add_b1(PLCI   * plci, API_PARSE * bp, word b_channel_info, word b1_faciliti
           return _B1_PARM_NOT_SUPPORTED;
       }
       cai[3] = 0;
-      if (cai[1] == 13)                                        // v.110 async
+      if (cai[1] == 13)                                        /* v.110 async */
       {
         if (bp_parms[3].length >= 8)
         {
@@ -7906,7 +7906,7 @@ word add_b1(PLCI   * plci, API_PARSE * bp, word b_channel_info, word b1_faciliti
   }
   WRITE_WORD(&cai[5],plci->appl->MaxDataLength);
   dbug(1,dprintf("CAI[%d]=%x,%x,%x,%x,%x,%x", cai[0], cai[1], cai[2], cai[3], cai[4], cai[5], cai[6]));
-//HexDump ("CAI", sizeof(cai), &cai[0]);
+/* HexDump ("CAI", sizeof(cai), &cai[0]); */
 
   add_p(plci, CAI, cai);
   return 0;
@@ -8681,7 +8681,7 @@ static word add_modem_b23 (PLCI  * plci, API_PARSE* bp_parms)
                DLC_MODEMPROT_DISABLE_COMPRESSION;
   }
   dlc[0] = (byte)(i - 1);
-//HexDump ("DLC", sizeof(dlc), &dlc[0]);
+/* HexDump ("DLC", sizeof(dlc), &dlc[0]); */
   add_p(plci, DLC, dlc);
   return (0);
 }
@@ -8739,7 +8739,7 @@ void send_req(PLCI   * plci)
 {
   ENTITY   * e;
   word l;
-//  word i;
+/*  word i; */
 
   if(!plci) return;
   if(plci->adapter->adapter_disabled) return;
@@ -8856,7 +8856,7 @@ void send_data(PLCI   * plci)
         }
         else if (plci->send_disc == ncci)
         {
-          //dprintf("N_DISC");
+          /* dprintf("N_DISC"); */
           plci->NData[0].PLength = 0;
           plci->NL.ReqCh = a->ncci_ch[ncci];
           plci->NL.Req = plci->nl_req = N_DISC;
@@ -9059,15 +9059,15 @@ static byte AddInfo(byte   **add_i,
       for(k=0;k<=flen;k++,j++)
       {
         facility[j]=fty_i[i][k];
-//      dbug(1,dprintf("%x ",facility[j]));
+/*      dbug(1,dprintf("%x ",facility[j])); */
       }
     }
     facility[0] = len;
     add_i[3] = facility;
   }
-//  dbug(1,dprintf("FacArrLen=%d ",len));
+/*  dbug(1,dprintf("FacArrLen=%d ",len)); */
   len = add_i[0][0]+add_i[1][0]+add_i[2][0]+add_i[3][0];
-  len += 4;                          // calculate length of all
+  len += 4;                          /* calculate length of all */
   return(len);
 }
 
@@ -9083,8 +9083,8 @@ void SetVoiceChannel(PLCI   *plci, byte   *chi, DIVA_CAPI_ADAPTER   * a)
   channel = chi[chi[0]]&0x3;
   dbug(1,dprintf("ExtDevON(Ch=0x%x)",channel));
   voice_chi[2] = (channel) ? channel : 1;
-  add_p(plci,FTY,"\x02\x01\x07");             // B On, default on 1
-  add_p(plci,ESC,voice_chi);                  // Channel
+  add_p(plci,FTY,"\x02\x01\x07");             /* B On, default on 1 */
+  add_p(plci,ESC,voice_chi);                  /* Channel */
   sig_req(plci,TEL_CTRL,0);
   send_req(plci);
   if(a->AdvSignalPLCI)
@@ -9096,7 +9096,7 @@ void SetVoiceChannel(PLCI   *plci, byte   *chi, DIVA_CAPI_ADAPTER   * a)
 void VoiceChannelOff(PLCI   *plci)
 {
   dbug(1,dprintf("ExtDevOFF"));
-  add_p(plci,FTY,"\x02\x01\x08");             // B Off
+  add_p(plci,FTY,"\x02\x01\x08");             /* B Off */
   sig_req(plci,TEL_CTRL,0);
   send_req(plci);
   if(plci->adapter->AdvSignalPLCI)

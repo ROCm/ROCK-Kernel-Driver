@@ -18,13 +18,13 @@
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 
-static ssize_t proc_file_read(struct file * file, char * buf,
+static ssize_t proc_file_read(struct file *file, char __user *buf,
 			      size_t nbytes, loff_t *ppos);
-static ssize_t proc_file_write(struct file * file, const char * buffer,
+static ssize_t proc_file_write(struct file *file, const char __user *buffer,
 			       size_t count, loff_t *ppos);
 static loff_t proc_file_lseek(struct file *, loff_t, int);
 
-int proc_match(int len, const char *name,struct proc_dir_entry * de)
+int proc_match(int len, const char *name, struct proc_dir_entry *de)
 {
 	if (de->namelen != len)
 		return 0;
@@ -45,7 +45,8 @@ static struct file_operations proc_file_operations = {
 #define PROC_BLOCK_SIZE	(PAGE_SIZE - 1024)
 
 static ssize_t
-proc_file_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
+proc_file_read(struct file *file, char __user *buf, size_t nbytes,
+	       loff_t *ppos)
 {
 	struct inode * inode = file->f_dentry->d_inode;
 	char 	*page;
@@ -59,8 +60,7 @@ proc_file_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 	if (!(page = (char*) __get_free_page(GFP_KERNEL)))
 		return -ENOMEM;
 
-	while ((nbytes > 0) && !eof)
-	{
+	while ((nbytes > 0) && !eof) {
 		count = MIN(PROC_BLOCK_SIZE, nbytes);
 
 		start = NULL;
@@ -184,7 +184,7 @@ proc_file_read(struct file * file, char * buf, size_t nbytes, loff_t *ppos)
 }
 
 static ssize_t
-proc_file_write(struct file * file, const char * buffer,
+proc_file_write(struct file *file, const char __user *buffer,
 		size_t count, loff_t *ppos)
 {
 	struct inode *inode = file->f_dentry->d_inode;
@@ -201,7 +201,7 @@ proc_file_write(struct file * file, const char * buffer,
 
 
 static loff_t
-proc_file_lseek(struct file * file, loff_t offset, int orig)
+proc_file_lseek(struct file *file, loff_t offset, int orig)
 {
     lock_kernel();
 
@@ -299,15 +299,16 @@ out:
 	return i;
 }
 
-static int proc_readlink(struct dentry *dentry, char *buffer, int buflen)
+static int
+proc_readlink(struct dentry *dentry, char __user *buffer, int buflen)
 {
-	char *s=PDE(dentry->d_inode)->data;
+	char *s = PDE(dentry->d_inode)->data;
 	return vfs_readlink(dentry, buffer, buflen, s);
 }
 
 static int proc_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
-	char *s=PDE(dentry->d_inode)->data;
+	char *s = PDE(dentry->d_inode)->data;
 	return vfs_follow_link(nd, s);
 }
 

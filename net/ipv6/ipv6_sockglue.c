@@ -62,7 +62,7 @@ static struct packet_type ipv6_packet_type =
 	.type = __constant_htons(ETH_P_IPV6), 
 	.dev  = NULL,				/* All devices */
 	.func = ipv6_rcv,
-	.data = (void*)1,
+	.data = PKT_CAN_SHARE_SKB,
 };
 
 /*

@@ -11,4 +11,3 @@ EXTRA_CFLAGS := -DLITTLE_ENDIAN
 
 obj-y				+= probe.o setup.o bte.o irq.o mca.o idle.o sn2/
 obj-$(CONFIG_IA64_GENERIC)      += machvec.o
-obj-$(CONFIG_MODULES)           += sn_ksyms.o

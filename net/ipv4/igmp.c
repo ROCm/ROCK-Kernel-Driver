@@ -280,8 +280,10 @@ static struct sk_buff *igmpv3_newpack(struct net_device *dev, int size)
 				    .nl_u = { .ip4_u = {
 				    .daddr = IGMPV3_ALL_MCR } },
 				    .proto = IPPROTO_IGMP };
-		if (ip_route_output_key(&rt, &fl))
+		if (ip_route_output_key(&rt, &fl)) {
+			kfree_skb(skb);
 			return 0;
+		}
 	}
 	if (rt->rt_src == 0) {
 		ip_rt_put(rt);
@@ -2162,13 +2164,13 @@ static struct ip_mc_list *igmp_mc_get_idx(struct seq_file *seq, loff_t pos)
 static void *igmp_mc_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? igmp_mc_get_idx(seq, *pos) : (void *)1;
+	return *pos ? igmp_mc_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *igmp_mc_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct ip_mc_list *im;
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		im = igmp_mc_get_first(seq);
 	else
 		im = igmp_mc_get_next(seq, v);
@@ -2190,7 +2192,7 @@ static void igmp_mc_seq_stop(struct seq_file *seq, void *v)
 
 static int igmp_mc_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq, 
 			   "Idx\tDevice    : Count Querier\tGroup    Users Timer\tReporter\n");
 	else {
@@ -2337,13 +2339,13 @@ static struct ip_sf_list *igmp_mcf_get_idx(struct seq_file *seq, loff_t pos)
 static void *igmp_mcf_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&dev_base_lock);
-	return *pos ? igmp_mcf_get_idx(seq, *pos) : (void *)1;
+	return *pos ? igmp_mcf_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *igmp_mcf_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct ip_sf_list *psf;
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		psf = igmp_mcf_get_first(seq);
 	else
 		psf = igmp_mcf_get_next(seq, v);
@@ -2372,7 +2374,7 @@ static int igmp_mcf_seq_show(struct seq_file *seq, void *v)
 	struct ip_sf_list *psf = (struct ip_sf_list *)v;
 	struct igmp_mcf_iter_state *state = igmp_mcf_seq_private(seq);
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_printf(seq, 
 			   "%3s %6s "
 			   "%10s %10s %6s %6s\n", "Idx",
@@ -2430,15 +2432,8 @@ static struct file_operations igmp_mcf_seq_fops = {
 
 int __init igmp_mc_proc_init(void)
 {
-	struct proc_dir_entry *p;
-
-	p = create_proc_entry("igmp", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &igmp_mc_seq_fops;
-
-	p = create_proc_entry("mcfilter", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &igmp_mcf_seq_fops;
+	proc_net_fops_create("igmp", S_IRUGO, &igmp_mc_seq_fops);
+	proc_net_fops_create("mcfilter", S_IRUGO, &igmp_mcf_seq_fops);
 	return 0;
 }
 #endif

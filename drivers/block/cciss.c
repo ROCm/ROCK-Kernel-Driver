@@ -243,7 +243,7 @@ cciss_proc_write(struct file *file, const char *buffer,
  * Get us a file in /proc/cciss that says something about each controller.
  * Create /proc/cciss if it doesn't exist yet.
  */
-static void __init cciss_procinit(int i)
+static void __devinit cciss_procinit(int i)
 {
 	struct proc_dir_entry *pde;
 
@@ -754,16 +754,24 @@ static int cciss_ioctl(struct inode *inode, struct file *filep,
 			status = -ENOMEM;
 			goto cleanup1;
 		}
-		if (copy_from_user(ioc, (void *) arg, sizeof(*ioc)))
-			return -EFAULT;
+		if (copy_from_user(ioc, (void *) arg, sizeof(*ioc))) {
+			status = -EFAULT;
+			goto cleanup1;
+		}
 		if ((ioc->buf_size < 1) &&
-			(ioc->Request.Type.Direction != XFER_NONE))
-				return -EINVAL;
+			(ioc->Request.Type.Direction != XFER_NONE)) {
+				status = -EINVAL;
+				goto cleanup1;
+		}
 		/* Check kmalloc limits  using all SGs */
-		if (ioc->malloc_size > MAX_KMALLOC_SIZE)
-			return -EINVAL;
-		if (ioc->buf_size > ioc->malloc_size * MAXSGENTRIES)
-			return -EINVAL;
+		if (ioc->malloc_size > MAX_KMALLOC_SIZE) {
+			status = -EINVAL;
+			goto cleanup1;
+		}
+		if (ioc->buf_size > ioc->malloc_size * MAXSGENTRIES) {
+			status = -EINVAL;
+			goto cleanup1;
+		}
 		buff = (unsigned char **) kmalloc(MAXSGENTRIES * 
 				sizeof(char *), GFP_KERNEL);
 		if (!buff) {
@@ -2427,7 +2435,7 @@ static void free_hba(int i)
  *  stealing all these major device numbers.
  *  returns the number of block devices registered.
  */
-static int __init cciss_init_one(struct pci_dev *pdev,
+static int __devinit cciss_init_one(struct pci_dev *pdev,
 	const struct pci_device_id *ent)
 {
 	request_queue_t *q;
@@ -2531,6 +2539,7 @@ static int __init cciss_init_one(struct pci_dev *pdev,
 		struct gendisk *disk = hba[i]->gendisk[j];
 
 		sprintf(disk->disk_name, "cciss/c%dd%d", i, j);
+		sprintf(disk->devfs_name, "cciss/host%d/target%d", i, j);
 		disk->major = COMPAQ_CISS_MAJOR + i;
 		disk->first_minor = j << NWD_SHIFT;
 		disk->fops = &cciss_fops;

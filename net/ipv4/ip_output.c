@@ -1299,7 +1299,7 @@ static struct packet_type ip_packet_type =
 	.type = __constant_htons(ETH_P_IP),
 	.dev  = NULL,	/* All devices */
 	.func = ip_rcv,
-	.data = (void*)1,
+	.data = PKT_CAN_SHARE_SKB,
 };
 
 /*

@@ -1269,6 +1269,9 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 	if (!len)
 		return addr;
 
+	if ((addr + len) > TASK_SIZE || (addr + len) < addr)
+		return -EINVAL;
+
 	/*
 	 * mlock MCL_FUTURE?
 	 */

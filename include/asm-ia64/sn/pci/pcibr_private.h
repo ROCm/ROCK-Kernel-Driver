@@ -15,11 +15,9 @@
  * should ever peek into this file.
  */
 
-#include <linux/config.h>
 #include <linux/pci.h>
 #include <asm/sn/pci/pcibr.h>
 #include <asm/sn/pci/pciio_private.h>
-#include <asm/sn/ksys/l1.h>
 
 /*
  * convenience typedefs
@@ -141,6 +139,7 @@ struct pcibr_dmamap_s {
     bridge_ate_p            bd_ate_ptr;		/* where to write first ATE */
     bridge_ate_t            bd_ate_proto;	/* prototype ATE (for xioaddr=0) */
     bridge_ate_t            bd_ate_prime;	/* value of 1st ATE written */
+    dma_addr_t		    bd_dma_addr;	/* Linux dma handle */
 };
 
 #define	IBUFSIZE	5		/* size of circular buffer (holds 4) */

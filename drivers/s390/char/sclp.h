@@ -26,6 +26,7 @@
 #define EvTyp_CntlProgOpCmd	0x20
 #define EvTyp_CntlProgIdent	0x0B
 #define EvTyp_SigQuiesce	0x1D
+#define EvTyp_VT220Msg		0x1A
 
 #define EvTyp_OpCmd_Mask	0x80000000
 #define EvTyp_Msg_Mask		0x40000000
@@ -34,6 +35,7 @@
 #define EvTyp_CtlProgOpCmd_Mask	0x00000001
 #define EvTyp_CtlProgIdent_Mask	0x00200000
 #define EvTyp_SigQuiesce_Mask	0x00000008
+#define EvTyp_VT220Msg_Mask	0x00000040
 
 #define GnrlMsgFlgs_DOM		0x8000
 #define GnrlMsgFlgs_SndAlrm	0x4000

@@ -22,12 +22,12 @@
 #include <linux/string.h>
 
 #include <asm/page.h>
-#include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/bootinfo.h>
 #ifdef CONFIG_44x
 #include <asm/ibm4xx.h>
 #endif
+#include <asm/reg.h>
 
 #include "nonstdio.h"
 #include "zlib.h"
@@ -230,7 +230,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 		 	puts("\n");
 		}
 	}
- 
+
 	rec->tag = BI_FIRST;
 	rec->size = sizeof(struct bi_record);
 	rec = (struct bi_record *)((unsigned long)rec + rec->size);

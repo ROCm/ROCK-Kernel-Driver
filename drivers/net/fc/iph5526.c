@@ -110,7 +110,7 @@ static const char *version =
 #define ALIGNED_ADDR(addr, len) ((((unsigned long)(addr) + (len - 1)) & ~(len - 1)) - (unsigned long)(addr))
 
 
-static struct pci_device_id iph5526_pci_tbl[] __initdata = {
+static struct pci_device_id iph5526_pci_tbl[] = {
 	{ PCI_VENDOR_ID_INTERPHASE, PCI_DEVICE_ID_INTERPHASE_5526, PCI_ANY_ID, PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_INTERPHASE, PCI_DEVICE_ID_INTERPHASE_55x6, PCI_ANY_ID, PCI_ANY_ID, },
 	{ }			/* Terminating entry */

@@ -16,7 +16,6 @@
 #include <asm/sn/types.h>
 #include <asm/uaccess.h>		/* for copy_??_user */
 #include <linux/mm.h>
-#include <linux/devfs_fs_kernel.h>
 #include <linux/fs.h>
 #include <asm/sn/hwgfs.h>
 

@@ -99,8 +99,14 @@ static void __init initialize_physnode_map(void)
 	}
 }
 
-void __init get_memcfg_numaq(void)
+/*
+ * Unlike Summit, we don't really care to let the NUMA-Q
+ * fall back to flat mode.  Don't compile for NUMA-Q
+ * unless you really need it!
+ */
+int __init get_memcfg_numaq(void)
 {
 	smp_dump_qct();
 	initialize_physnode_map();
+	return 1;
 }

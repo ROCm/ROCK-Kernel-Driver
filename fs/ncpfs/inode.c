@@ -262,7 +262,7 @@ ncp_iget(struct super_block *sb, struct ncp_entry_info *info)
 #ifdef CONFIG_NCPFS_NFS_NS
 		} else if (S_ISCHR(inode->i_mode) || S_ISBLK(inode->i_mode) || S_ISFIFO(inode->i_mode) || S_ISSOCK(inode->i_mode)) {
 			init_special_inode(inode, inode->i_mode,
-				old_decode_dev(info->i.nfs.rdev));
+				new_decode_dev(info->i.nfs.rdev));
 #endif
 #if defined(CONFIG_NCPFS_EXTRAS) || defined(CONFIG_NCPFS_NFS_NS)
 		} else if (S_ISLNK(inode->i_mode)) {

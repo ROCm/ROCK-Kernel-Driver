@@ -27,8 +27,8 @@ struct serial8250_probe {
 int serial8250_register_probe(struct serial8250_probe *probe);
 void serial8250_unregister_probe(struct serial8250_probe *probe);
 void serial8250_get_irq_map(unsigned int *map);
-void serial8250_suspend_port(int line, u32 level);
-void serial8250_resume_port(int line, u32 level);
+void serial8250_suspend_port(int line);
+void serial8250_resume_port(int line);
 
 struct old_serial_port {
 	unsigned int uart;

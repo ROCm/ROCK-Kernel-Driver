@@ -49,27 +49,14 @@ extern spinlock_t __atomic_hash[ATOMIC_HASH_SIZE];
  * Cache-line alignment would conflict with, for example, linux/module.h
  */
 
-typedef struct {
-	volatile int counter;
-} atomic_t;
+typedef struct { volatile long counter; } atomic_t;
 
 
-/*
-** xchg/cmpxchg moved from asm/system.h - ggg
-*/
-
-#if 1
 /* This should get optimized out since it's never called.
 ** Or get a link error if xchg is used "wrong".
 */
 extern void __xchg_called_with_bad_pointer(void);
-#else
-static inline void __xchg_called_with_bad_pointer(void)
-{
-	extern void panic(const char * fmt, ...);
-	panic("xchg called with bad pointer");
-}
-#endif
+
 
 /* __xchg32/64 defined in arch/parisc/lib/bitops.c */
 extern unsigned long __xchg8(char, char *);

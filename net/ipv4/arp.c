@@ -1108,7 +1108,7 @@ void arp_ifdown(struct net_device *dev)
 static struct packet_type arp_packet_type = {
 	.type =	__constant_htons(ETH_P_ARP),
 	.func =	arp_rcv,
-	.data =	(void*) 1, /* understand shared skbs */
+	.data =	PKT_CAN_SHARE_SKB,
 };
 
 static int arp_proc_init(void);
@@ -1275,7 +1275,7 @@ static void *arp_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *arp_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return *pos ? arp_get_idx(seq, *pos - 1) : (void *)1;
+	return *pos ? arp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -1283,7 +1283,7 @@ static void *arp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	void *rc;
 	struct arp_iter_state* state;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		rc = arp_get_idx(seq, 0);
 		goto out;
 	}
@@ -1306,7 +1306,7 @@ static void arp_seq_stop(struct seq_file *seq, void *v)
 {
 	struct arp_iter_state* state = seq->private;
 
-	if (!state->is_pneigh && v != (void *)1)
+	if (!state->is_pneigh && v != SEQ_START_TOKEN)
 		read_unlock_bh(&arp_tbl.lock);
 }
 
@@ -1359,7 +1359,7 @@ static __inline__ void arp_format_pneigh_entry(struct seq_file *seq,
 
 static int arp_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, "IP address       HW type     Flags       "
 			      "HW address            Mask     Device\n");
 	else {
@@ -1416,14 +1416,9 @@ static struct file_operations arp_seq_fops = {
 
 static int __init arp_proc_init(void)
 {
-	int rc = 0;
-	struct proc_dir_entry *p = create_proc_entry("arp", S_IRUGO, proc_net);
-
-        if (p)
-		p->proc_fops = &arp_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	if (!proc_net_fops_create("arp", S_IRUGO, &arp_seq_fops))
+		return -ENOMEM;
+	return 0;
 }
 
 #else /* CONFIG_PROC_FS */

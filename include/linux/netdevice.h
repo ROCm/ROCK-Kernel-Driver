@@ -28,8 +28,6 @@
 #include <linux/if.h>
 #include <linux/if_ether.h>
 #include <linux/if_packet.h>
-#include <linux/device.h>
-#include <linux/percpu.h>
 
 #include <asm/atomic.h>
 #include <asm/cache.h>
@@ -37,6 +35,8 @@
 
 #ifdef __KERNEL__
 #include <linux/config.h>
+#include <linux/device.h>
+#include <linux/percpu.h>
 
 struct divert_blk;
 struct vlan_group;
@@ -477,6 +477,7 @@ struct net_device
  */
 #define SET_NETDEV_DEV(net, pdev)	((net)->class_dev.dev = (pdev))
 
+#define PKT_CAN_SHARE_SKB	((void*)1)
 
 struct packet_type 
 {
@@ -502,7 +503,11 @@ extern struct net_device    *dev_getbyhwaddr(unsigned short type, char *hwaddr);
 extern void		dev_add_pack(struct packet_type *pt);
 extern void		dev_remove_pack(struct packet_type *pt);
 extern void		__dev_remove_pack(struct packet_type *pt);
-extern int		dev_get(const char *name);
+extern int		__dev_get(const char *name);
+static inline int __deprecated dev_get(const char *name)
+{
+	return __dev_get(name);
+}
 extern struct net_device	*dev_get_by_flags(unsigned short flags,
 						  unsigned short mask);
 extern struct net_device	*__dev_get_by_flags(unsigned short flags,

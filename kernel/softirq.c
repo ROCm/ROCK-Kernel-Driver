@@ -9,8 +9,6 @@
 #include <linux/module.h>
 #include <linux/kernel_stat.h>
 #include <linux/interrupt.h>
-#include <linux/notifier.h>
-#include <linux/percpu.h>
 #include <linux/init.h>
 #include <linux/mm.h>
 #include <linux/notifier.h>
@@ -59,11 +57,22 @@ static inline void wakeup_softirqd(void)
 		wake_up_process(tsk);
 }
 
+/*
+ * We restart softirq processing MAX_SOFTIRQ_RESTART times,
+ * and we fall back to softirqd after that.
+ *
+ * This number has been established via experimentation.
+ * The two things to balance is latency against fairness -
+ * we want to handle softirqs as soon as possible, but they
+ * should not be able to lock up the box.
+ */
+#define MAX_SOFTIRQ_RESTART 10
+
 asmlinkage void do_softirq(void)
 {
+	int max_restart = MAX_SOFTIRQ_RESTART;
 	__u32 pending;
 	unsigned long flags;
-	__u32 mask;
 
 	if (in_interrupt())
 		return;
@@ -75,7 +84,6 @@ asmlinkage void do_softirq(void)
 	if (pending) {
 		struct softirq_action *h;
 
-		mask = ~pending;
 		local_bh_disable();
 restart:
 		/* Reset the pending bitmask before enabling irqs */
@@ -95,10 +103,8 @@ restart:
 		local_irq_disable();
 
 		pending = local_softirq_pending();
-		if (pending & mask) {
-			mask &= ~pending;
+		if (pending && --max_restart)
 			goto restart;
-		}
 		if (pending)
 			wakeup_softirqd();
 		__local_bh_enable();

@@ -91,7 +91,6 @@
 #if	defined(_LINUX_)	/****** Linux *******************************/
 
 #include <linux/config.h>
-#include <linux/version.h>
 #include <linux/kernel.h>	/* printk(), and other useful stuff */
 #include <linux/stddef.h>	/* offsetof(), etc. */
 #include <linux/errno.h>	/* return codes */
@@ -201,7 +200,7 @@ static int pci_probe(sdlahw_t *hw);
  * Note: All data must be explicitly initialized!!!
  */
 
-static struct pci_device_id sdladrv_pci_tbl[] __initdata = {
+static struct pci_device_id sdladrv_pci_tbl[] = {
 	{ V3_VENDOR_ID, V3_DEVICE_ID, PCI_ANY_ID, PCI_ANY_ID, },
 	{ }			/* Terminating entry */
 };
@@ -351,7 +350,7 @@ static void sdladrv_cleanup(void)
 }
 
 module_init(sdladrv_init);
-module_cleanup(sdladrv_cleanup);
+module_exit(sdladrv_cleanup);
 #endif
 
 /******* Kernel APIs ********************************************************/

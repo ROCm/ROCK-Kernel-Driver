@@ -1,7 +1,6 @@
 #ifndef __MEGARAID_H__
 #define __MEGARAID_H__
 
-#include <linux/version.h>
 #include <linux/spinlock.h>
 
 

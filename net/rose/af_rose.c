@@ -1344,7 +1344,7 @@ static void *rose_info_start(struct seq_file *seq, loff_t *pos)
 
 	spin_lock_bh(&rose_list_lock);
 	if (*pos == 0)
-		return ROSE_PROC_START;
+		return SEQ_START_TOKEN;
 	
 	i = 1;
 	sk_for_each(s, node, &rose_list) {
@@ -1359,7 +1359,7 @@ static void *rose_info_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
 
-	return (v == ROSE_PROC_START) ? sk_head(&rose_list) 
+	return (v == SEQ_START_TOKEN) ? sk_head(&rose_list) 
 		: sk_next((struct sock *)v);
 }
 	
@@ -1370,7 +1370,7 @@ static void rose_info_stop(struct seq_file *seq, void *v)
 
 static int rose_info_show(struct seq_file *seq, void *v)
 {
-	if (v == ROSE_PROC_START)
+	if (v == SEQ_START_TOKEN)
 		seq_puts(seq, 
 			 "dest_addr  dest_call src_addr   src_call  dev   lci neigh st vs vr va   t  t1  t2  t3  hb    idle Snd-Q Rcv-Q inode\n");
 

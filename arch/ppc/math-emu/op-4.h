@@ -7,14 +7,14 @@
  * _FP_MUL_MEAT_2_wide() uses _FP_FRAC_DECL_4, _FP_FRAC_WORD_4,
  * _FP_FRAC_ADD_4, _FP_FRAC_SRS_4
  * _FP_MUL_MEAT_2_gmp() uses _FP_FRAC_SRS_4 (and should use
- * _FP_FRAC_DECL_4: it appears to be broken and is not used 
+ * _FP_FRAC_DECL_4: it appears to be broken and is not used
  * anywhere anyway. )
  *
  * I've now fixed all the macros that were here from the sparc64 code.
  * [*none* of the shift macros were correct!] -- PMM 02/1998
- * 
- * The only quadword stuff that remains to be coded is: 
- * 1) the conversion to/from ints, which requires 
+ *
+ * The only quadword stuff that remains to be coded is:
+ * 1) the conversion to/from ints, which requires
  * that we check (in op-common.h) that the following do the right thing
  * for quadwords: _FP_TO_INT(Q,4,r,X,rsz,rsg), _FP_FROM_INT(Q,4,X,r,rs,rt)
  * 2) multiply, divide and sqrt, which require:
@@ -32,9 +32,9 @@
 /* The _FP_FRAC_SET_n(X,I) macro is intended for use with another
  * macro such as _FP_ZEROFRAC_n which returns n comma separated values.
  * The result is that we get an expansion of __FP_FRAC_SET_n(X,I0,I1,I2,I3)
- * which just assigns the In values to the array X##_f[]. 
+ * which just assigns the In values to the array X##_f[].
  * This is why the number of parameters doesn't appear to match
- * at first glance...      -- PMM 
+ * at first glance...      -- PMM
  */
 #define _FP_FRAC_SET_4(X,I)	__FP_FRAC_SET_4(X, I)
 #define _FP_FRAC_HIGH_4(X)	(X##_f[3])
@@ -70,7 +70,7 @@
   } while (0)
 
 
-/* Right shift with sticky-lsb. 
+/* Right shift with sticky-lsb.
  * What this actually means is that we do a standard right-shift,
  * but that if any of the bits that fall off the right hand side
  * were one then we always set the LSbit.
@@ -187,7 +187,7 @@
 
 
 /*
- * Internals 
+ * Internals
  */
 
 #define __FP_FRAC_SET_4(X,I3,I2,I1,I0)					\
@@ -218,9 +218,9 @@
 /* Convert FP values between word sizes. This appears to be more
  * complicated than I'd have expected it to be, so these might be
  * wrong... These macros are in any case somewhat bogus because they
- * use information about what various FRAC_n variables look like 
+ * use information about what various FRAC_n variables look like
  * internally [eg, that 2 word vars are X_f0 and x_f1]. But so do
- * the ones in op-2.h and op-1.h. 
+ * the ones in op-2.h and op-1.h.
  */
 #define _FP_FRAC_CONV_1_4(dfs, sfs, D, S)                               \
    do {                                                                 \
@@ -237,7 +237,7 @@
      D##_f1 = S##_f[1];                                                  \
   } while (0)
 
-/* Assembly/disassembly for converting to/from integral types.  
+/* Assembly/disassembly for converting to/from integral types.
  * No shifting or overflow handled here.
  */
 /* Put the FP value X into r, which is an integer of size rsize. */

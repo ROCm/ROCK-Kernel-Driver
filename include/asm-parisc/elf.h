@@ -283,6 +283,7 @@ struct pt_regs;	/* forward declaration... */
  */
 #define ELF_DATA	ELFDATA2MSB
 #define ELF_ARCH	EM_PARISC
+#define ELF_OSABI 	ELFOSABI_LINUX
 
 /* %r23 is set by ld.so to a pointer to a function which might be 
    registered using atexit.  This provides a mean for the dynamic

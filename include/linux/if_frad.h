@@ -191,9 +191,6 @@ struct frad_local
    int               buffer;		/* current buffer for S508 firmware */
 };
 
-int register_frad(const char *name);
-int unregister_frad(const char *name);
-
 extern void dlci_ioctl_set(int (*hook)(unsigned int, void *));
 
 #endif /* __KERNEL__ */

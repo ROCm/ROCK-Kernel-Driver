@@ -376,6 +376,11 @@ void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
 	q->hardsect_size = size;
 }
 
+/*
+ * Returns the minimum that is _not_ zero, unless both are zero.
+ */
+#define min_not_zero(l, r) (l == 0) ? r : ((r == 0) ? l : min(l, r))
+
 /**
  * blk_queue_stack_limits - inherit underlying queue limits for stacked drivers
  * @t:	the stacking driver (top)
@@ -383,7 +388,9 @@ void blk_queue_hardsect_size(request_queue_t *q, unsigned short size)
  **/
 void blk_queue_stack_limits(request_queue_t *t, request_queue_t *b)
 {
-	t->max_sectors = min(t->max_sectors,b->max_sectors);
+	/* zero is "infinity" */
+	t->max_sectors = min_not_zero(t->max_sectors,b->max_sectors);
+
 	t->max_phys_segments = min(t->max_phys_segments,b->max_phys_segments);
 	t->max_hw_segments = min(t->max_hw_segments,b->max_hw_segments);
 	t->max_segment_size = min(t->max_segment_size,b->max_segment_size);
@@ -458,16 +465,19 @@ void blk_queue_free_tags(request_queue_t *q)
 	if (!bqt)
 		return;
 
-	BUG_ON(bqt->busy);
-	BUG_ON(!list_empty(&bqt->busy_list));
+	if (atomic_dec_and_test(&bqt->refcnt)) {
+		BUG_ON(bqt->busy);
+		BUG_ON(!list_empty(&bqt->busy_list));
 
-	kfree(bqt->tag_index);
-	bqt->tag_index = NULL;
+		kfree(bqt->tag_index);
+		bqt->tag_index = NULL;
 
-	kfree(bqt->tag_map);
-	bqt->tag_map = NULL;
+		kfree(bqt->tag_map);
+		bqt->tag_map = NULL;
 
-	kfree(bqt);
+		kfree(bqt);
+	}
+
 	q->queue_tags = NULL;
 	q->queue_flags &= ~(1 << QUEUE_FLAG_QUEUED);
 }
@@ -503,6 +513,9 @@ init_tag_map(request_queue_t *q, struct blk_queue_tag *tags, int depth)
 	for (i = depth; i < bits * BLK_TAGS_PER_LONG; i++)
 		__set_bit(i, tags->tag_map);
 
+	INIT_LIST_HEAD(&tags->busy_list);
+	tags->busy = 0;
+	atomic_set(&tags->refcnt, 1);
 	return 0;
 fail:
 	kfree(tags->tag_index);
@@ -514,19 +527,18 @@ fail:
  * @q:  the request queue for the device
  * @depth:  the maximum queue depth supported
  **/
-int blk_queue_init_tags(request_queue_t *q, int depth)
+int blk_queue_init_tags(request_queue_t *q, int depth,
+			struct blk_queue_tag *tags)
 {
-	struct blk_queue_tag *tags;
+	if (!tags) {
+		tags = kmalloc(sizeof(struct blk_queue_tag), GFP_ATOMIC);
+		if (!tags)
+			goto fail;
 
-	tags = kmalloc(sizeof(struct blk_queue_tag),GFP_ATOMIC);
-	if (!tags)
-		goto fail;
-
-	if (init_tag_map(q, tags, depth))
-		goto fail;
-
-	INIT_LIST_HEAD(&tags->busy_list);
-	tags->busy = 0;
+		if (init_tag_map(q, tags, depth))
+			goto fail;
+	} else
+		atomic_inc(&tags->refcnt);
 
 	/*
 	 * assign it, all done
@@ -1016,7 +1028,13 @@ static int ll_merge_requests_fn(request_queue_t *q, struct request *req,
 void blk_plug_device(request_queue_t *q)
 {
 	WARN_ON(!irqs_disabled());
-	if (!blk_queue_plugged(q)) {
+
+	/*
+	 * don't plug a stopped queue, it must be paired with blk_start_queue()
+	 * which will restart the queueing
+	 */
+	if (!blk_queue_plugged(q)
+	    && !test_bit(QUEUE_FLAG_STOPPED, &q->queue_flags)) {
 		spin_lock(&blk_plug_lock);
 		list_add_tail(&q->plug_list, &blk_plug_list);
 		mod_timer(&q->unplug_timer, jiffies + q->unplug_delay);
@@ -2861,3 +2879,4 @@ EXPORT_SYMBOL(blk_run_queue);
 EXPORT_SYMBOL(blk_run_queues);
 
 EXPORT_SYMBOL(blk_rq_bio_prep);
+EXPORT_SYMBOL(blk_rq_prep_restart);

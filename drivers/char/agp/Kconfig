@@ -21,8 +21,7 @@ config AGP
 	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
 	  use GLX or DRI.  If unsure, say N.
 
-	  This driver is available as a module.  If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.  The
+	  To compile this driver as a module, choose M here: the
 	  module will be called agpgart.
 
 config AGP_ALI
@@ -80,8 +79,8 @@ config AGP_INTEL
 	tristate "Intel 440LX/BX/GX, I8xx and E7x05 chipset support"
 	depends on AGP && X86 && !X86_64
 	help
-	  This option gives you AGP support for the GLX component of
-	  XFree86 4.x on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850, 860
+	  This option gives you AGP support for the GLX component of XFree86 4.x
+	  on Intel 440LX/BX/GX, 815, 820, 830, 840, 845, 850, 860, 875,
 	  E7205 and E7505 chipsets and full support for the 810, 815, 830M, 845G,
 	  852GM, 855GM and 865G integrated graphics chipsets.
 

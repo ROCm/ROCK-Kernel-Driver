@@ -1,6 +1,6 @@
 /*
  * arch/ppc/platforms/adir.h
- * 
+ *
  * Definitions for SBS Adirondack board support
  *
  * By Michael Sokolov <msokolov@ivan.Harhan.ORG>

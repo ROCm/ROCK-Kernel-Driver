@@ -84,10 +84,10 @@
 #define MPTFWDOWNLOAD		_IOWR(MPT_MAGIC_NUMBER,15,struct mpt_fw_xfer)
 #define MPTCOMMAND		_IOWR(MPT_MAGIC_NUMBER,20,struct mpt_ioctl_command)
 
-#if defined(__KERNEL__) && defined(__sparc__) && defined(__sparc_v9__)		/*{*/
+#if defined(__KERNEL__) && defined(CONFIG_COMPAT)
 #define MPTFWDOWNLOAD32		_IOWR(MPT_MAGIC_NUMBER,15,struct mpt_fw_xfer32)
 #define MPTCOMMAND32		_IOWR(MPT_MAGIC_NUMBER,20,struct mpt_ioctl_command32)
-#endif	/*}*/
+#endif
 
 #define MPTIOCINFO		_IOWR(MPT_MAGIC_NUMBER,17,struct mpt_ioctl_iocinfo)
 #define MPTIOCINFO1		_IOWR(MPT_MAGIC_NUMBER,17,struct mpt_ioctl_iocinfo_rev0)
@@ -117,7 +117,7 @@ struct mpt_fw_xfer {
 	void		*bufp;		/* Pointer to firmware buffer */
 };
 
-#if defined(__KERNEL__) && defined(__sparc__) && defined(__sparc_v9__)		/*{*/
+#if defined(__KERNEL__) && defined(CONFIG_COMPAT)
 struct mpt_fw_xfer32 {
 	unsigned int iocnum;
 	unsigned int fwlen;
@@ -316,7 +316,7 @@ struct mpt_ioctl_command {
 /*
  * SPARC PLATFORM: See earlier remark.
  */
-#if defined(__KERNEL__) && defined(__sparc__) && defined(__sparc_v9__)		/*{*/
+#if defined(__KERNEL__) && defined(CONFIG_COMPAT)
 struct mpt_ioctl_command32 {
 	mpt_ioctl_header hdr;
 	int	timeout;

@@ -27,7 +27,7 @@
  *
  * $Id: af_bluetooth.c,v 1.3 2002/04/17 17:37:15 maxk Exp $
  */
-#define VERSION "2.2"
+#define VERSION "2.3"
 
 #include <linux/config.h>
 #include <linux/module.h>
@@ -130,7 +130,6 @@ struct sock *bt_sock_alloc(struct socket *sock, int proto, int pi_size, int prio
 	}
 
 	sock_init_data(sock, sk);
-	sk_set_owner(sk, THIS_MODULE);
 	INIT_LIST_HEAD(&bt_sk(sk)->accept_q);
 	
 	sk->sk_zapped   = 0;
@@ -273,19 +272,24 @@ unsigned int bt_sock_poll(struct file * file, struct socket *sock, poll_table *w
 	return mask;
 }
 
-int bt_sock_w4_connect(struct sock *sk, int flags)
+int bt_sock_wait_state(struct sock *sk, int state, unsigned long timeo)
 {
 	DECLARE_WAITQUEUE(wait, current);
-	long timeo = sock_sndtimeo(sk, flags & O_NONBLOCK);
 	int err = 0;
 
 	BT_DBG("sk %p", sk);
 
 	add_wait_queue(sk->sk_sleep, &wait);
-	while (sk->sk_state != BT_CONNECTED) {
+	while (sk->sk_state != state) {
 		set_current_state(TASK_INTERRUPTIBLE);
+
 		if (!timeo) {
 			err = -EAGAIN;
+			break;
+		}
+
+		if (signal_pending(current)) {
+			err = sock_intr_errno(timeo);
 			break;
 		}
 
@@ -293,17 +297,8 @@ int bt_sock_w4_connect(struct sock *sk, int flags)
 		timeo = schedule_timeout(timeo);
 		lock_sock(sk);
 
-		err = 0;
-		if (sk->sk_state == BT_CONNECTED)
-			break;
-
 		if (sk->sk_err) {
 			err = sock_error(sk);
-			break;
-		}
-
-		if (signal_pending(current)) {
-			err = sock_intr_errno(timeo);
 			break;
 		}
 	}

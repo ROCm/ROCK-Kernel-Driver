@@ -2,7 +2,6 @@
 #define _LINUX_INIT_H
 
 #include <linux/config.h>
-#include <linux/compiler.h>
 
 /* These macros are used to mark some functions or 
  * initialized data (doesn't apply to uninitialized data)
@@ -44,12 +43,12 @@
 #define __init		__attribute__ ((__section__ (".init.text")))
 #define __initdata	__attribute__ ((__section__ (".init.data")))
 #define __exitdata	__attribute__ ((__section__(".exit.data")))
-#define __exit_call	__attribute__ ((unused,__section__ (".exitcall.exit")))
+#define __exit_call	__attribute_used__ __attribute__ ((__section__ (".exitcall.exit")))
 
 #ifdef MODULE
 #define __exit		__attribute__ ((__section__(".exit.text")))
 #else
-#define __exit		__attribute__ ((unused,__section__(".exit.text")))
+#define __exit		__attribute_used__ __attribute__ ((__section__(".exit.text")))
 #endif
 
 /* For assembly routines */
@@ -72,16 +71,16 @@ extern initcall_t __security_initcall_start, __security_initcall_end;
 
 #ifndef __ASSEMBLY__
 
-/* initcalls are now grouped by functionality into separate
+/* initcalls are now grouped by functionality into separate 
  * subsections. Ordering inside the subsections is determined
- * by link order.
- * For backwards compatibility, initcall() puts the call in
+ * by link order. 
+ * For backwards compatibility, initcall() puts the call in 
  * the device init subsection.
  */
 
-#define __define_initcall(level,fn)								\
-	static initcall_t __initcall_##fn							\
-	  __attribute_used__ __attribute__ ((__section__ (".initcall" level ".init"))) = fn
+#define __define_initcall(level,fn) \
+	static initcall_t __initcall_##fn __attribute_used__ \
+	__attribute__((__section__(".initcall" level ".init"))) = fn
 
 #define core_initcall(fn)		__define_initcall("1",fn)
 #define postcore_initcall(fn)		__define_initcall("2",fn)
@@ -93,16 +92,16 @@ extern initcall_t __security_initcall_start, __security_initcall_end;
 
 #define __initcall(fn) device_initcall(fn)
 
-#define __exitcall(fn)							\
+#define __exitcall(fn) \
 	static exitcall_t __exitcall_##fn __exit_call = fn
 
 #define console_initcall(fn) \
 	static initcall_t __initcall_##fn \
-	  __attribute_used__ __attribute__ ((__section__ (".con_initcall.init"))) = fn
+	__attribute_used__ __attribute__((__section__(".con_initcall.init")))=fn
 
 #define security_initcall(fn) \
 	static initcall_t __initcall_##fn \
-	  __attribute_used__ __attribute__ ((__section__ (".security_initcall.init"))) = fn
+	__attribute_used__ __attribute__((__section__(".security_initcall.init"))) = fn
 
 struct obs_kernel_param {
 	const char *str;
@@ -110,10 +109,11 @@ struct obs_kernel_param {
 };
 
 /* OBSOLETE: see moduleparam.h for the right way. */
-#define __setup(str, fn)							\
-	static char __setup_str_##fn[] __initdata = str;			\
-	static struct obs_kernel_param __setup_##fn				\
-		__attribute_used__ __attribute__((__section__ (".init.setup")))	\
+#define __setup(str, fn)					\
+	static char __setup_str_##fn[] __initdata = str;	\
+	static struct obs_kernel_param __setup_##fn		\
+		 __attribute_used__				\
+		 __attribute__((__section__(".init.setup")))	\
 		= { __setup_str_##fn, fn }
 
 #endif /* __ASSEMBLY__ */

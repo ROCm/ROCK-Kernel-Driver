@@ -14,9 +14,11 @@
 #include <linux/ptrace.h>
 #include <linux/mm.h>
 #include <linux/bitops.h>
+#include <linux/vmalloc.h>
 #include <linux/init.h>
 
 #include <asm/cacheflush.h>
+#include <asm/io.h>
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/tlbflush.h>
@@ -127,6 +129,8 @@ do_PrefetchAbort(unsigned long addr, struct pt_regs *regs)
 	do_translation_fault(addr, 0, regs);
 }
 
+static unsigned long shared_pte_mask = L_PTE_CACHEABLE;
+
 /*
  * We take the easy way out of this problem - we make the
  * PTE uncacheable.  However, we leave the write buffer on.
@@ -157,9 +161,9 @@ static int adjust_pte(struct vm_area_struct *vma, unsigned long address)
 	 * If this page isn't present, or is already setup to
 	 * fault (ie, is old), we can safely ignore any issues.
 	 */
-	if (pte_present(entry) && pte_val(entry) & L_PTE_CACHEABLE) {
+	if (pte_present(entry) && pte_val(entry) & shared_pte_mask) {
 		flush_cache_page(vma, address);
-		pte_val(entry) &= ~L_PTE_CACHEABLE;
+		pte_val(entry) &= ~shared_pte_mask;
 		set_pte(pte, entry);
 		flush_tlb_page(vma, address);
 		ret = 1;
@@ -295,5 +299,67 @@ void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte)
 			__cpuc_flush_dcache_page(page_address(page));
 
 		make_coherent(vma, addr, page, dirty);
+	}
+}
+
+/*
+ * Check whether the write buffer has physical address aliasing
+ * issues.  If it has, we need to avoid them for the case where
+ * we have several shared mappings of the same object in user
+ * space.
+ */
+static int __init check_writebuffer(unsigned long *p1, unsigned long *p2)
+{
+	register unsigned long zero = 0, one = 1, val;
+
+	local_irq_disable();
+	mb();
+	*p1 = one;
+	mb();
+	*p2 = zero;
+	mb();
+	val = *p1;
+	mb();
+	local_irq_enable();
+	return val != zero;
+}
+
+void __init check_writebuffer_bugs(void)
+{
+	struct page *page;
+	const char *reason;
+	unsigned long v = 1;
+
+	printk(KERN_INFO "CPU: Testing write buffer coherency: ");
+
+	page = alloc_page(GFP_KERNEL);
+	if (page) {
+		unsigned long *p1, *p2;
+		pgprot_t prot = __pgprot(L_PTE_PRESENT|L_PTE_YOUNG|
+					 L_PTE_DIRTY|L_PTE_WRITE|
+					 L_PTE_BUFFERABLE);
+
+		p1 = vmap(&page, 1, VM_IOREMAP, prot);
+		p2 = vmap(&page, 1, VM_IOREMAP, prot);
+
+		if (p1 && p2) {
+			v = check_writebuffer(p1, p2);
+			reason = "enabling work-around";
+		} else {
+			reason = "unable to map memory\n";
+		}
+
+		vunmap(p1);
+		vunmap(p2);
+		put_page(page);
+	} else {
+		reason = "unable to grab page\n";
+	}
+
+	if (v) {
+		printk("failed, %s\n", reason);
+		shared_pte_mask |= L_PTE_BUFFERABLE;
+	} else {
+		printk("ok\n");
 	}
 }

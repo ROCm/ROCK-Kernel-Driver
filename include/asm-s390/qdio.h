@@ -76,7 +76,7 @@ typedef void qdio_handler_t(struct ccw_device *,unsigned int,unsigned int,
 #define QDIO_FLAG_CLEANUP_USING_CLEAR 0x01
 #define QDIO_FLAG_CLEANUP_USING_HALT 0x02
 
-struct qdio_initialize{
+struct qdio_initialize {
 	struct ccw_device *cdev;
 	unsigned char q_format;
 	unsigned char adapter_name[8];
@@ -99,9 +99,10 @@ struct qdio_initialize{
 	void **input_sbal_addr_array; /* addr of n*128 void ptrs */
 	void **output_sbal_addr_array; /* addr of n*128 void ptrs */
 };
+
 extern int qdio_initialize(struct qdio_initialize *init_data);
 extern int qdio_allocate(struct qdio_initialize *init_data);
-extern int qdio_establish(struct ccw_device *);
+extern int qdio_establish(struct qdio_initialize *init_data);
 
 extern int qdio_activate(struct ccw_device *,int flags);
 

@@ -1,10 +1,10 @@
-/* $Id: idifunc.c,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: idifunc.c,v 1.13 2003/08/25 14:49:53 schindler Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * User Mode IDI Interface 
  *
- * Copyright 2000-2002 by Armin Schindler (mac@melware.de)
- * Copyright 2000-2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de)
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -19,7 +19,7 @@
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)
 
-extern char *DRIVERRELEASE;
+extern char *DRIVERRELEASE_IDI;
 
 extern void DIVA_DIDD_Read(void *, int);
 extern int diva_user_mode_idi_create_adapter(const DESCRIPTOR *, int);
@@ -35,8 +35,6 @@ static void no_printf(unsigned char *x, ...)
 {
 	/* dummy debug function */
 }
-
-DIVA_DI_PRINTF dprintf = no_printf;
 
 #include "debuglib.c"
 
@@ -202,7 +200,7 @@ static void *didd_callback(void *context, DESCRIPTOR * adapter,
 		} else {
 			memcpy(&MAdapter, adapter, sizeof(MAdapter));
 			dprintf = (DIVA_DI_PRINTF) MAdapter.request;
-			DbgRegister("User IDI", DRIVERRELEASE, DBG_DEFAULT);
+			DbgRegister("User IDI", DRIVERRELEASE_IDI, DBG_DEFAULT);
 		}
 	} else if ((adapter->type > 0) && (adapter->type < 16)) {	/* IDI Adapter */
 		if (removal) {
@@ -233,7 +231,7 @@ static int DIVA_INIT_FUNCTION connect_didd(void)
 			req.didd_notify.e.Req = 0;
 			req.didd_notify.e.Rc =
 			    IDI_SYNC_REQ_DIDD_REGISTER_ADAPTER_NOTIFY;
-			req.didd_notify.info.callback = didd_callback;
+			req.didd_notify.info.callback = (void *)didd_callback;
 			req.didd_notify.info.context = 0;
 			DAdapter.request((ENTITY *) & req);
 			if (req.didd_notify.e.Rc != 0xff) {
@@ -244,7 +242,7 @@ static int DIVA_INIT_FUNCTION connect_didd(void)
 		} else if (DIDD_Table[x].type == IDI_DIMAINT) {	/* MAINT found */
 			memcpy(&MAdapter, &DIDD_Table[x], sizeof(DAdapter));
 			dprintf = (DIVA_DI_PRINTF) MAdapter.request;
-			DbgRegister("User IDI", DRIVERRELEASE, DBG_DEFAULT);
+			DbgRegister("User IDI", DRIVERRELEASE_IDI, DBG_DEFAULT);
 		} else if ((DIDD_Table[x].type > 0)
 			   && (DIDD_Table[x].type < 16)) {	/* IDI Adapter found */
 			um_new_card(&DIDD_Table[x]);

@@ -72,9 +72,9 @@ struct usb_request {
 	unsigned		length;
 	dma_addr_t		dma;
 
-	unsigned		no_interrupt : 1,
-				zero : 1,
-				short_not_ok : 1;
+	unsigned		no_interrupt:1;
+	unsigned		zero:1;
+	unsigned		short_not_ok:1;
 
 	void			(*complete)(struct usb_ep *ep,
 					struct usb_request *req);
@@ -122,9 +122,11 @@ struct usb_ep_ops {
 /**
  * struct usb_ep - device side representation of USB endpoint
  * @name:identifier for the endpoint, such as "ep-a" or "ep9in-bulk"
+ * @ops: Function pointers used to access hardware-specific operations.
  * @ep_list:the gadget's ep_list holds all of its endpoints
- * @maxpacket:the maximum packet size used on this endpoint, as
- * 	configured when the endpoint was enabled.
+ * @maxpacket:The maximum packet size used on this endpoint.  The initial
+ *	value can sometimes be reduced (hardware allowing), according to
+ *      the endpoint descriptor used to configure the endpoint.
  * @driver_data:for use by the gadget driver.  all other fields are
  * 	read-only to gadget drivers.
  *
@@ -138,7 +140,7 @@ struct usb_ep {
 	const char		*name;
 	const struct usb_ep_ops	*ops;
 	struct list_head	ep_list;
-	unsigned		maxpacket : 16;
+	unsigned		maxpacket:16;
 };
 
 /*-------------------------------------------------------------------------*/
@@ -443,18 +445,21 @@ struct usb_gadget_ops {
 
 /**
  * struct usb_gadget - represents a usb slave device
+ * @ops: Function pointers used to access hardware-specific operations.
  * @ep0: Endpoint zero, used when reading or writing responses to
  * 	driver setup() requests
  * @ep_list: List of other endpoints supported by the device.
  * @speed: Speed of current connection to USB host.
  * @name: Identifies the controller hardware type.  Used in diagnostics
  * 	and sometimes configuration.
+ * @dev: Driver model state for this abstract device.
  *
  * Gadgets have a mostly-portable "gadget driver" implementing device
- * functions, handling all usb configurations and interfaces.  They
- * also have a hardware-specific driver (accessed through ops vectors),
- * which insulates the gadget driver from hardware details and packages
- * the hardware endpoints through generic i/o queues.
+ * functions, handling all usb configurations and interfaces.  Gadget
+ * drivers talk to hardware-specific code indirectly, through ops vectors.
+ * That insulates the gadget driver from hardware details, and packages
+ * the hardware endpoints through generic i/o queues.  The "usb_gadget"
+ * and "usb_ep" interfaces provide that insulation from the hardware.
  *
  * Except for the driver data, all fields in this structure are
  * read-only to the gadget driver.  That driver data is part of the
@@ -469,10 +474,6 @@ struct usb_gadget {
 	struct list_head		ep_list;	/* of usb_ep */
 	enum usb_device_speed		speed;
 	const char			*name;
-
-	/* use this to allocate dma-coherent buffers or set up
-	 * dma mappings.  or print diagnostics, etc.
-	 */
 	struct device			dev;
 };
 
@@ -576,6 +577,7 @@ usb_gadget_clear_selfpowered (struct usb_gadget *gadget)
  * 	Called in a context that permits sleeping.
  * @suspend: Invoked on USB suspend.  May be called in_interrupt.
  * @resume: Invoked on USB resume.  May be called in_interrupt.
+ * @driver: Driver model state for this driver.
  *
  * Devices are disabled till a gadget driver successfully bind()s, which
  * means the driver will handle setup() requests needed to enumerate (and

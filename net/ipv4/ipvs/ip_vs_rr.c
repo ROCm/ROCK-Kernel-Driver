@@ -57,7 +57,7 @@ static int ip_vs_rr_update_svc(struct ip_vs_service *svc)
 static struct ip_vs_dest *
 ip_vs_rr_schedule(struct ip_vs_service *svc, struct iphdr *iph)
 {
-	register struct list_head *p, *q;
+	struct list_head *p, *q;
 	struct ip_vs_dest *dest;
 
 	IP_VS_DBG(6, "ip_vs_rr_schedule(): Scheduling...\n");

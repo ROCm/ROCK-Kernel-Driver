@@ -47,6 +47,7 @@ static const char *version = "smc-ultra32.c: 06/97 v1.00\n";
 
 
 #include <linux/module.h>
+#include <linux/eisa.h>
 #include <linux/kernel.h>
 #include <linux/errno.h>
 #include <linux/string.h>

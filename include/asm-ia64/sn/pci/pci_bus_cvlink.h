@@ -60,11 +60,6 @@ struct sn_device_sysdata {
 	volatile unsigned int *xbow_buf_sync;
 };
 
-struct sn_dma_maps_s{
-	struct pcibr_dmamap_s dma_map;
-        dma_addr_t      dma_addr;
-};
-
 struct ioports_to_tlbs_s {
 	unsigned long	p:1,
 			rv_1:1,

@@ -37,7 +37,6 @@
 
 #include <linux/delay.h>
 #include <linux/poll.h>
-#include <linux/kernel.h>
 
 #include <linux/sound.h>
 #include <linux/ac97_codec.h>

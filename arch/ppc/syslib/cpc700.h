@@ -1,6 +1,6 @@
 /*
  * arch/ppc/syslib/cpc700.h
- * 
+ *
  * Header file for IBM CPC700 Host Bridge, et. al.
  *
  * Author: Mark A. Greer
@@ -85,7 +85,7 @@
  */
 extern struct hw_interrupt_type cpc700_pic;
 extern unsigned int cpc700_irq_assigns[32][2];
- 
+
 extern void __init cpc700_init_IRQ(void);
 extern int cpc700_get_irq(struct pt_regs *);
 

@@ -83,7 +83,7 @@ void show_trace(struct task_struct *task, unsigned long * stack)
 	unsigned long backchain, low_addr, high_addr, ret_addr;
 
 	if (!stack)
-		stack = *stack_pointer;
+		stack = (task == NULL) ? *stack_pointer : &(task->thread.ksp);
 
 	printk("Call Trace:\n");
 	low_addr = ((unsigned long) stack) & PSW_ADDR_INSN;
@@ -120,8 +120,12 @@ void show_stack(struct task_struct *task, unsigned long *sp)
 	// debugging aid: "show_stack(NULL);" prints the
 	// back trace for this cpu.
 
-	if(sp == NULL)
-		sp = *stack_pointer;
+	if (!sp) {
+		if (task)
+			sp = (unsigned long *) task->thread.ksp;
+		else
+			sp = *stack_pointer;
+	}
 
 	stack = sp;
 	for (i = 0; i < kstack_depth_to_print; i++) {
@@ -140,7 +144,7 @@ void show_stack(struct task_struct *task, unsigned long *sp)
  */
 void dump_stack(void)
 {
-	show_stack(current, 0);
+	show_stack(0, 0);
 }
 
 void show_registers(struct pt_regs *regs)

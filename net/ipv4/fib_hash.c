@@ -979,14 +979,14 @@ static void *fib_seq_start(struct seq_file *seq, loff_t *pos)
 
 	read_lock(&fib_hash_lock);
 	if (ip_fib_main_table)
-		v = *pos ? fib_get_next(seq) : (void *)1;
+		v = *pos ? fib_get_next(seq) : SEQ_START_TOKEN;
 	return v;
 }
 
 static void *fib_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	++*pos;
-	return v == (void *)1 ? fib_get_first(seq) : fib_get_next(seq);
+	return v == SEQ_START_TOKEN ? fib_get_first(seq) : fib_get_next(seq);
 }
 
 static void fib_seq_stop(struct seq_file *seq, void *v)
@@ -1025,7 +1025,7 @@ static int fib_seq_show(struct seq_file *seq, void *v)
 	struct fib_node *f;
 	struct fib_info *fi;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_printf(seq, "%-127s\n", "Iface\tDestination\tGateway "
 			   "\tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU"
 			   "\tWindow\tIRTT");
@@ -1096,19 +1096,13 @@ static struct file_operations fib_seq_fops = {
 
 int __init fib_proc_init(void)
 {
-	struct proc_dir_entry *p;
-	int rc = 0;
-
-	p = create_proc_entry("route", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &fib_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	if (!proc_net_fops_create("route", S_IRUGO, &fib_seq_fops))
+		return -ENOMEM;
+	return 0;
 }
 
 void __init fib_proc_exit(void)
 {
-	remove_proc_entry("route", proc_net);
+	proc_net_remove("route");
 }
 #endif /* CONFIG_PROC_FS */

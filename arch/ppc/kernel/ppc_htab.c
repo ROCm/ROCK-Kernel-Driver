@@ -23,12 +23,12 @@
 #include <asm/uaccess.h>
 #include <asm/bitops.h>
 #include <asm/mmu.h>
-#include <asm/processor.h>
 #include <asm/residual.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
 #include <asm/cputable.h>
 #include <asm/system.h>
+#include <asm/reg.h>
 
 static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 			     size_t count, loff_t *ppos);
@@ -48,19 +48,6 @@ extern unsigned long pte_misses;
 extern unsigned long pte_errors;
 extern unsigned int primary_pteg_full;
 extern unsigned int htab_hash_searches;
-
-/* these will go into processor.h when I'm done debugging -- Cort */
-#define MMCR0 952
-#define MMCR0_PMC1_CYCLES (0x1<<7)
-#define MMCR0_PMC1_ICACHEMISS (0x5<<7)
-#define MMCR0_PMC1_DTLB (0x6<<7)
-#define MMCR0_PMC2_DCACHEMISS (0x6)
-#define MMCR0_PMC2_CYCLES (0x1)
-#define MMCR0_PMC2_ITLB (0x7)
-#define MMCR0_PMC2_LOADMISSTIME (0x5)
-
-#define PMC1 953
-#define PMC2 954
 
 struct file_operations ppc_htab_operations = {
         .llseek =       ppc_htab_lseek,
@@ -83,7 +70,7 @@ static char *pmc1_lookup(unsigned long mmcr0)
 	default:
 		return "unknown";
 	}
-}	
+}
 
 static char *pmc2_lookup(unsigned long mmcr0)
 {
@@ -102,7 +89,7 @@ static char *pmc2_lookup(unsigned long mmcr0)
 	default:
 		return "unknown";
 	}
-}	
+}
 
 /*
  * print some useful info about the hash table.  This function
@@ -124,10 +111,9 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		return -EINVAL;
 
 	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-		asm volatile ("mfspr %0,952 \n\t"
-		    "mfspr %1,953 \n\t"
-		    "mfspr %2,954 \n\t"
-		    : "=r" (mmcr0), "=r" (pmc1), "=r" (pmc2) );
+		mmcr0 = mfspr(SPRN_MMCR0);
+		pmc1 = mfspr(SPRN_PMC1);
+		pmc2 = mfspr(SPRN_PMC2);
 		n += sprintf( buffer + n,
 			      "604 Performance Monitoring\n"
 			      "MMCR0\t\t: %08lx %s%s ",
@@ -162,7 +148,7 @@ static ssize_t ppc_htab_read(struct file * file, char __user * buf,
 		else
 			uptes++;
 	}
-	
+
 	n += sprintf( buffer + n,
 		      "PTE Hash Table Information\n"
 		      "Size\t\t: %luKb\n"
@@ -228,25 +214,12 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 	if ( !strncmp( buffer, "size ", 5) )
 		return -EBUSY;
 
-	/* turn off performance monitoring */
-	if ( !strncmp( buffer, "off", 3) )
-	{
-		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-			asm volatile ("mtspr %0, %3 \n\t"
-			    "mtspr %1, %3 \n\t"
-			    "mtspr %2, %3 \n\t"			    
-			    :: "i" (MMCR0), "i" (PMC1), "i" (PMC2), "r" (0));
-		}
-	}
-
 	if ( !strncmp( buffer, "reset", 5) )
 	{
 		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
 			/* reset PMC1 and PMC2 */
-			asm volatile (
-				"mtspr 953, %0 \n\t"
-				"mtspr 954, %0 \n\t"
-				:: "r" (0));
+			mtspr(SPRN_PMC1, 0);
+			mtspr(SPRN_PMC2, 0);
 		}
 		htab_reloads = 0;
 		htab_evicts = 0;
@@ -254,118 +227,97 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 		pte_errors = 0;
 	}
 
+	/* Everything below here requires the performance monitor feature. */
+	if ( !cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON )
+		return count;
+
+	/* turn off performance monitoring */
+	if ( !strncmp( buffer, "off", 3) )
+	{
+		mtspr(SPRN_MMCR0, 0);
+		mtspr(SPRN_PMC1, 0);
+		mtspr(SPRN_PMC2, 0);
+	}
+
 	if ( !strncmp( buffer, "user", 4) )
 	{
-		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-			/* setup mmcr0 and clear the correct pmc */
-			asm("mfspr %0,%1\n\t"  : "=r" (tmp) : "i" (MMCR0));
-			tmp &= ~(0x60000000);
-			tmp |= 0x20000000;
-			asm volatile (
-				"mtspr %1,%0 \n\t"    /* set new mccr0 */
-				"mtspr %3,%4 \n\t"    /* reset the pmc */
-				"mtspr %5,%4 \n\t"    /* reset the pmc2 */
-				:: "r" (tmp), "i" (MMCR0), "i" (0),
-				"i" (PMC1),  "r" (0), "i"(PMC2) );
-		}
+		/* setup mmcr0 and clear the correct pmc */
+		tmp = (mfspr(SPRN_MMCR0) & ~(0x60000000)) | 0x20000000;
+		mtspr(SPRN_MMCR0, tmp);
+		mtspr(SPRN_PMC1, 0);
+		mtspr(SPRN_PMC2, 0);
 	}
 
 	if ( !strncmp( buffer, "kernel", 6) )
 	{
-		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-			/* setup mmcr0 and clear the correct pmc */
-			asm("mfspr %0,%1\n\t"  : "=r" (tmp) : "i" (MMCR0));
-			tmp &= ~(0x60000000);
-			tmp |= 0x40000000;
-			asm volatile (
-				"mtspr %1,%0 \n\t"    /* set new mccr0 */
-				"mtspr %3,%4 \n\t"    /* reset the pmc */
-				"mtspr %5,%4 \n\t"    /* reset the pmc2 */
-				:: "r" (tmp), "i" (MMCR0), "i" (0),
-				"i" (PMC1),  "r" (0), "i"(PMC2) );
-		}
+		/* setup mmcr0 and clear the correct pmc */
+		tmp = (mfspr(SPRN_MMCR0) & ~(0x60000000)) | 0x40000000;
+		mtspr(SPRN_MMCR0, tmp);
+		mtspr(SPRN_PMC1, 0);
+		mtspr(SPRN_PMC2, 0);
 	}
-	
+
 	/* PMC1 values */
 	if ( !strncmp( buffer, "dtlb", 4) )
 	{
-		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-			/* setup mmcr0 and clear the correct pmc */
-			asm("mfspr %0,%1\n\t"  : "=r" (tmp) : "i" (MMCR0));
-			tmp &= ~(0x7f<<7);
-			tmp |= MMCR0_PMC1_DTLB;
-			asm volatile (
-				"mtspr %1,%0 \n\t"    /* set new mccr0 */
-				"mtspr %3,%4 \n\t"    /* reset the pmc */
-				:: "r" (tmp), "i" (MMCR0), "i" (MMCR0_PMC1_DTLB),
-				"i" (PMC1),  "r" (0) );
-		}
-	}	
+		/* setup mmcr0 and clear the correct pmc */
+		tmp = (mfspr(SPRN_MMCR0) & ~(0x7F << 7)) | MMCR0_PMC1_DTLB;
+		mtspr(SPRN_MMCR0, tmp);
+		mtspr(SPRN_PMC1, 0);
+	}
 
 	if ( !strncmp( buffer, "ic miss", 7) )
 	{
-		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-			/* setup mmcr0 and clear the correct pmc */
-			asm("mfspr %0,%1\n\t"  : "=r" (tmp) : "i" (MMCR0));
-			tmp &= ~(0x7f<<7);
-			tmp |= MMCR0_PMC1_ICACHEMISS;
-			asm volatile (
-				"mtspr %1,%0 \n\t"    /* set new mccr0 */
-				"mtspr %3,%4 \n\t"    /* reset the pmc */
-				:: "r" (tmp), "i" (MMCR0),
-				"i" (MMCR0_PMC1_ICACHEMISS), "i" (PMC1),  "r" (0));
-		}
-	}	
+		/* setup mmcr0 and clear the correct pmc */
+		tmp = (mfspr(SPRN_MMCR0) & ~(0x7F<<7)) | MMCR0_PMC1_ICACHEMISS;
+		mtspr(SPRN_MMCR0, tmp);
+		mtspr(SPRN_PMC1, 0);
+	}
 
 	/* PMC2 values */
 	if ( !strncmp( buffer, "load miss time", 14) )
 	{
-		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-			/* setup mmcr0 and clear the correct pmc */
-		       asm volatile(
-			       "mfspr %0,%1\n\t"     /* get current mccr0 */
-			       "rlwinm %0,%0,0,0,31-6\n\t"  /* clear bits [26-31] */
-			       "ori   %0,%0,%2 \n\t" /* or in mmcr0 settings */
-			       "mtspr %1,%0 \n\t"    /* set new mccr0 */
-			       "mtspr %3,%4 \n\t"    /* reset the pmc */
-			       : "=r" (tmp)
-			       : "i" (MMCR0), "i" (MMCR0_PMC2_LOADMISSTIME),
-			       "i" (PMC2),  "r" (0) );
-		}
+		/* setup mmcr0 and clear the correct pmc */
+	       asm volatile(
+		       "mfspr %0,%1\n\t"     /* get current mccr0 */
+		       "rlwinm %0,%0,0,0,31-6\n\t"  /* clear bits [26-31] */
+		       "ori   %0,%0,%2 \n\t" /* or in mmcr0 settings */
+		       "mtspr %1,%0 \n\t"    /* set new mccr0 */
+		       "mtspr %3,%4 \n\t"    /* reset the pmc */
+		       : "=r" (tmp)
+		       : "i" (SPRN_MMCR0),
+		       "i" (MMCR0_PMC2_LOADMISSTIME),
+		       "i" (SPRN_PMC2),  "r" (0) );
 	}
-	
+
 	if ( !strncmp( buffer, "itlb", 4) )
 	{
-		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-			/* setup mmcr0 and clear the correct pmc */
-		       asm volatile(
-			       "mfspr %0,%1\n\t"     /* get current mccr0 */
-			       "rlwinm %0,%0,0,0,31-6\n\t"  /* clear bits [26-31] */
-			       "ori   %0,%0,%2 \n\t" /* or in mmcr0 settings */
-			       "mtspr %1,%0 \n\t"    /* set new mccr0 */
-			       "mtspr %3,%4 \n\t"    /* reset the pmc */
-			       : "=r" (tmp)
-			       : "i" (MMCR0), "i" (MMCR0_PMC2_ITLB),
-			       "i" (PMC2),  "r" (0) );
-		}
+		/* setup mmcr0 and clear the correct pmc */
+	       asm volatile(
+		       "mfspr %0,%1\n\t"     /* get current mccr0 */
+		       "rlwinm %0,%0,0,0,31-6\n\t"  /* clear bits [26-31] */
+		       "ori   %0,%0,%2 \n\t" /* or in mmcr0 settings */
+		       "mtspr %1,%0 \n\t"    /* set new mccr0 */
+		       "mtspr %3,%4 \n\t"    /* reset the pmc */
+		       : "=r" (tmp)
+		       : "i" (SPRN_MMCR0), "i" (MMCR0_PMC2_ITLB),
+		       "i" (SPRN_PMC2),  "r" (0) );
 	}
 
 	if ( !strncmp( buffer, "dc miss", 7) )
 	{
-		if (cur_cpu_spec[0]->cpu_features & CPU_FTR_604_PERF_MON) {
-			/* setup mmcr0 and clear the correct pmc */
-		       asm volatile(
-			       "mfspr %0,%1\n\t"     /* get current mccr0 */
-			       "rlwinm %0,%0,0,0,31-6\n\t"  /* clear bits [26-31] */
-			       "ori   %0,%0,%2 \n\t" /* or in mmcr0 settings */
-			       "mtspr %1,%0 \n\t"    /* set new mccr0 */
-			       "mtspr %3,%4 \n\t"    /* reset the pmc */
-			       : "=r" (tmp)
-			       : "i" (MMCR0), "i" (MMCR0_PMC2_DCACHEMISS),
-			       "i" (PMC2),  "r" (0) );
-		}
-	}	
-	
+		/* setup mmcr0 and clear the correct pmc */
+	       asm volatile(
+		       "mfspr %0,%1\n\t"     /* get current mccr0 */
+		       "rlwinm %0,%0,0,0,31-6\n\t"  /* clear bits [26-31] */
+		       "ori   %0,%0,%2 \n\t" /* or in mmcr0 settings */
+		       "mtspr %1,%0 \n\t"    /* set new mccr0 */
+		       "mtspr %3,%4 \n\t"    /* reset the pmc */
+		       : "=r" (tmp)
+		       : "i" (SPRN_MMCR0), "i" (MMCR0_PMC2_DCACHEMISS),
+		       "i" (SPRN_PMC2),  "r" (0) );
+	}
+
 	return count;
 #else /* CONFIG_PPC_STD_MMU */
 	return 0;
@@ -416,12 +368,12 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 
 	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR))
 		return -EFAULT;
-	
+
 	if ( /*!table->maxlen ||*/ (filp->f_pos && !write)) {
 		*lenp = 0;
 		return 0;
 	}
-	
+
 	vleft = table->maxlen / sizeof(int);
 	left = *lenp;
 
@@ -475,9 +427,9 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 			p += sprintf(p, "%s", (val>>15)&1 ? ", DLL slow" : "");
 			p += sprintf(p, "%s", (val>>14)&1 ? ", diff clock" :"");
 			p += sprintf(p, "%s", (val>>13)&1 ? ", DLL bypass" :"");
-			
+
 			p += sprintf(p,"\n");
-			
+
 			len = strlen(buf);
 			if (len > left)
 				len = left;

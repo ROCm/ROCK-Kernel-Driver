@@ -16,7 +16,7 @@
 # Modified for PA-RISC Linux by Paul Lahaie, Alex deVries, 
 # Mike Shaver, Helge Deller and Martin K. Petersen
 #
-
+NM		= sh arch/parisc/nm
 ifdef CONFIG_PARISC64
 CROSS_COMPILE	:= hppa64-linux-
 UTS_MACHINE	:= parisc64

@@ -23,10 +23,6 @@
  *
  * This version does not support shared irq's.
  *
- * This module exports the following rs232 io functions:
- *   int cy_init(void);
- *   int  cy_open(struct tty_struct *tty, struct file *filp);
- *
  * $Log: cyclades.c,v $
  * Revision 1.36.1.4  1995/03/29  06:14:14  bentson
  * disambiguate between Cyclom-16Y and Cyclom-32Ye;
@@ -2321,7 +2317,7 @@ static struct tty_operations cy_ops = {
     If there are more cards with more ports than have been statically
     allocated above, a warning is printed and the extra ports are ignored.
  */
-int
+static int __init
 serial167_init(void)
 {
   struct cyclades_port *info;
@@ -2496,6 +2492,8 @@ cleanup_serial_driver:
     put_tty_driver(cy_serial_driver);
     return ret;
 } /* serial167_init */
+
+module_init(serial167_init);
 
 
 #ifdef CYCLOM_SHOW_STATUS

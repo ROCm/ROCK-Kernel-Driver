@@ -748,16 +748,17 @@ int cp_compat_stat(struct kstat *stat, struct compat_stat *statbuf)
 {
 	int err;
 
-	if (stat->size > MAX_NON_LFS)
+	if (stat->size > MAX_NON_LFS || !new_valid_dev(stat->dev) ||
+	    !new_valid_dev(stat->rdev))
 		return -EOVERFLOW;
 
-	err  = put_user(stat->dev, &statbuf->st_dev);
+	err  = put_user(new_encode_dev(stat->dev), &statbuf->st_dev);
 	err |= put_user(stat->ino, &statbuf->st_ino);
 	err |= put_user(stat->mode, &statbuf->st_mode);
 	err |= put_user(stat->nlink, &statbuf->st_nlink);
 	err |= put_user(stat->uid, &statbuf->st_uid);
 	err |= put_user(stat->gid, &statbuf->st_gid);
-	err |= put_user(stat->rdev, &statbuf->st_rdev);
+	err |= put_user(new_encode_dev(stat->rdev), &statbuf->st_rdev);
 	err |= put_user(stat->size, &statbuf->st_size);
 	err |= put_user(stat->atime.tv_sec, &statbuf->st_atime);
 	err |= put_user(0, &statbuf->__unused1);
@@ -1243,16 +1244,19 @@ asmlinkage long sys32_settimeofday(struct compat_timeval *tv, struct timezone *t
 }
 
 
-struct msgbuf32 { s32 mtype; char mtext[1]; };
+struct msgbuf32 {
+	compat_long_t mtype; 
+	char mtext[1];
+};
 
 struct semid_ds32 {
 	struct ipc_perm sem_perm;
 	compat_time_t sem_otime;
 	compat_time_t sem_ctime;
-	u32 sem_base;
-	u32 sem_pending;
-	u32 sem_pending_last;
-	u32 undo;
+	compat_uptr_t sem_base;
+	compat_uptr_t sem_pending;
+	compat_uptr_t sem_pending_last;
+	compat_uptr_t undo;
 	unsigned short sem_nsems;
 };
 
@@ -1262,21 +1266,20 @@ struct semid64_ds32 {
 	compat_time_t sem_otime;
 	unsigned int __unused2;
 	compat_time_t sem_ctime;
-	u32 sem_nsems;
-	u32 __unused3;
-	u32 __unused4;
+	compat_ulong_t sem_nsems;
+	compat_ulong_t __unused3;
+	compat_ulong_t __unused4;
 };
 
-struct msqid_ds32
-{
+struct msqid_ds32 {
 	struct ipc_perm msg_perm;
-	u32 msg_first;
-	u32 msg_last;
+	compat_uptr_t msg_first;
+	compat_uptr_t msg_last;
 	compat_time_t msg_stime;
 	compat_time_t msg_rtime;
 	compat_time_t msg_ctime;
-	u32 msg_lcbytes;
-	u32 msg_lqbytes;
+	compat_ulong_t msg_lcbytes;
+	compat_ulong_t msg_lqbytes;
 	unsigned short msg_cbytes;
 	unsigned short msg_qnum;
 	unsigned short msg_qbytes;
@@ -1292,13 +1295,13 @@ struct msqid64_ds32 {
 	compat_time_t msg_rtime;
 	unsigned int __unused3;
 	compat_time_t msg_ctime;
-	unsigned int msg_cbytes;
-	unsigned int msg_qnum;
-	unsigned int msg_qbytes;
+	compat_ulong_t msg_cbytes;
+	compat_ulong_t msg_qnum;
+	compat_ulong_t msg_qbytes;
 	compat_pid_t msg_lspid;
 	compat_pid_t msg_lrpid;
-	unsigned int __unused4;
-	unsigned int __unused5;
+	compat_ulong_t __unused4;
+	compat_ulong_t __unused5;
 };
 
 struct shmid_ds32 {
@@ -1311,8 +1314,8 @@ struct shmid_ds32 {
 	compat_ipc_pid_t shm_lpid;
 	unsigned short shm_nattch;
 	unsigned short __unused;
-	unsigned int __unused2;
-	unsigned int __unused3;
+	compat_uptr_t __unused2;
+	compat_uptr_t __unused3;
 };
 
 struct shmid64_ds32 {
@@ -1327,9 +1330,9 @@ struct shmid64_ds32 {
 	compat_size_t shm_segsz;
 	compat_pid_t shm_cpid;
 	compat_pid_t shm_lpid;
-	unsigned int shm_nattch;
-	unsigned int __unused5;
-	unsigned int __unused6;
+	compat_ulong_t shm_nattch;
+	compat_ulong_t __unused5;
+	compat_ulong_t __unused6;
 };
 
 /*
@@ -1350,7 +1353,7 @@ static long do_sys32_semctl(int first, int second, int third, void *uptr)
 	err = -EFAULT;
 	if (get_user(pad, (u32 *)uptr))
 		return err;
-	if (third == SETVAL)
+	if ((third & ~IPC_64) == SETVAL)
 		fourth.val = (int)pad;
 	else
 		fourth.__pad = (void *)A(pad);

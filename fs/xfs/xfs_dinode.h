@@ -471,13 +471,21 @@ xfs_dinode_t *xfs_buf_to_dinode(struct xfs_buf *bp);
  * There should be a one-to-one correspondence between these flags and the
  * XFS_XFLAG_s.
  */
-#define XFS_DIFLAG_REALTIME_BIT	0	/* file's blocks come from rt area */
-#define XFS_DIFLAG_PREALLOC_BIT	1	/* file space has been preallocated */
-#define	XFS_DIFLAG_NEWRTBM_BIT	2	/* for rtbitmap inode, new format */
-#define XFS_DIFLAG_REALTIME     (1 << XFS_DIFLAG_REALTIME_BIT)
-#define XFS_DIFLAG_PREALLOC	(1 << XFS_DIFLAG_PREALLOC_BIT)
-#define	XFS_DIFLAG_NEWRTBM	(1 << XFS_DIFLAG_NEWRTBM_BIT)
-#define XFS_DIFLAG_ALL  \
-	(XFS_DIFLAG_REALTIME|XFS_DIFLAG_PREALLOC|XFS_DIFLAG_NEWRTBM)
+#define XFS_DIFLAG_REALTIME_BIT  0	/* file's blocks come from rt area */
+#define XFS_DIFLAG_PREALLOC_BIT  1	/* file space has been preallocated */
+#define XFS_DIFLAG_NEWRTBM_BIT   2	/* for rtbitmap inode, new format */
+#define XFS_DIFLAG_IMMUTABLE_BIT 3	/* inode is immutable */
+#define XFS_DIFLAG_APPEND_BIT    4	/* inode is append-only */
+#define XFS_DIFLAG_SYNC_BIT      5	/* inode is written synchronously */
+#define XFS_DIFLAG_NOATIME_BIT   6	/* do not update atime */
+#define XFS_DIFLAG_NODUMP_BIT    7	/* do not dump */
+#define XFS_DIFLAG_REALTIME      (1 << XFS_DIFLAG_REALTIME_BIT)
+#define XFS_DIFLAG_PREALLOC      (1 << XFS_DIFLAG_PREALLOC_BIT)
+#define XFS_DIFLAG_NEWRTBM       (1 << XFS_DIFLAG_NEWRTBM_BIT)
+#define XFS_DIFLAG_IMMUTABLE     (1 << XFS_DIFLAG_IMMUTABLE_BIT)
+#define XFS_DIFLAG_APPEND        (1 << XFS_DIFLAG_APPEND_BIT)
+#define XFS_DIFLAG_SYNC          (1 << XFS_DIFLAG_SYNC_BIT)
+#define XFS_DIFLAG_NOATIME       (1 << XFS_DIFLAG_NOATIME_BIT)
+#define XFS_DIFLAG_NODUMP        (1 << XFS_DIFLAG_NODUMP_BIT)
 
 #endif	/* __XFS_DINODE_H__ */

@@ -27,7 +27,7 @@ static int open_kcore(struct inode * inode, struct file * filp)
 	return capable(CAP_SYS_RAWIO) ? 0 : -EPERM;
 }
 
-static ssize_t read_kcore(struct file *, char *, size_t, loff_t *);
+static ssize_t read_kcore(struct file *, char __user *, size_t, loff_t *);
 
 struct file_operations proc_kcore_operations = {
 	.read		= read_kcore,
@@ -175,6 +175,7 @@ static void elf_kcore_store_hdr(char *bufp, int nphdr, int dataoff)
 	elf->e_ident[EI_CLASS]	= ELF_CLASS;
 	elf->e_ident[EI_DATA]	= ELF_DATA;
 	elf->e_ident[EI_VERSION]= EV_CURRENT;
+	elf->e_ident[EI_OSABI] = ELF_OSABI;
 	memset(elf->e_ident+EI_PAD, 0, EI_NIDENT-EI_PAD);
 	elf->e_type	= ET_CORE;
 	elf->e_machine	= ELF_ARCH;
@@ -267,7 +268,8 @@ static void elf_kcore_store_hdr(char *bufp, int nphdr, int dataoff)
 /*
  * read from the ELF header and then kernel memory
  */
-static ssize_t read_kcore(struct file *file, char *buffer, size_t buflen, loff_t *fpos)
+static ssize_t
+read_kcore(struct file *file, char __user *buffer, size_t buflen, loff_t *fpos)
 {
 	ssize_t acc = 0;
 	size_t size, tsz;

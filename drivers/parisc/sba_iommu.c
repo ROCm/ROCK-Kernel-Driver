@@ -1978,8 +1978,6 @@ sba_driver_callback(struct parisc_device *dev)
 
 	printk(KERN_INFO "%s found %s at 0x%lx\n",
 		MODULE_NAME, version, dev->hpa);
-	snprintf(dev->dev.name, sizeof(dev->dev.name), "%s version %s",
-		 MODULE_NAME, version);
 
 #ifdef DEBUG_SBA_INIT
 	sba_dump_tlb(dev->hpa);

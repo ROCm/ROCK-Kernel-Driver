@@ -74,7 +74,6 @@
  *          - Fix allocation of scsi host structs and private data
  **************************************************************************/
 
-#include <linux/version.h>
 #include <linux/module.h>
 #include <asm/irq.h>
 #include <linux/pci.h>

@@ -16,13 +16,12 @@
  */
 
 #include <linux/config.h>
-#include <asm/processor.h>
 #include <asm/cache.h>
 #include <asm/ppc_asm.h>
 
 #define GETSYM(reg, sym)	\
-	lis	reg, sym@h; ori	reg, reg, sym@l	
-	
+	lis	reg, sym@h; ori	reg, reg, sym@l
+
 	.text
 	/* We get called from the early initialization code.
 	 * Register 3 has the address where we were loaded,
@@ -54,7 +53,7 @@ relocate:
 	cmp	cr0,r3,r4
 	beq	start_ldr	/* If 0, we don't need to relocate */
 
-	/* Move this code somewhere safe.  This is max(load + size, end) 
+	/* Move this code somewhere safe.  This is max(load + size, end)
 	 * r8 == load address
 	 */
 	GETSYM(r4, start)
@@ -66,10 +65,10 @@ relocate:
 	cmpw	r5,r6
 	bgt	1f
 	b	2f
-1:	
-	mr	r6, r5	
-2: 
-	/* dest is in r6 */	
+1:
+	mr	r6, r5
+2:
+	/* dest is in r6 */
 	/* Ensure alignment --- this code is precautionary */
 	addi	r6,r6,4
 	li	r5,0x0003
@@ -81,20 +80,20 @@ relocate:
 	GETSYM(r3, start)
 
 	/* Size to copy */
-	sub	r4,r4,r5	
+	sub	r4,r4,r5
 	srwi	r4,r4,2
-	
+
 	/* Src addr to copy (= __relocate_start - start + where_loaded) */
 	sub	r3,r5,r3
-	add	r5,r8,r3	
+	add	r5,r8,r3
 
 	/* Save dest */
 	mr	r3, r6
 
-	/* Do the copy */	
-	mtctr	r4	
+	/* Do the copy */
+	mtctr	r4
 3:	lwz	r4,0(r5)
-	stw	r4,0(r3)	
+	stw	r4,0(r3)
 	addi	r3,r3,4
 	addi	r5,r5,4
 	bdnz	3b
@@ -110,23 +109,23 @@ relocate:
 	b	flush_instruction_cache
 
 	.section ".relocate_code","xa"
-			
-do_relocate:		
-	/* We have 2 cases --- start < load, or start > load  
+	
+do_relocate:
+	/* We have 2 cases --- start < load, or start > load
 	 * This determines whether we copy from the end, or the start.
 	 * Its easier to have 2 loops than to have paramaterised
 	 * loops.  Sigh.
 	 */
 	li	r6,0		/* Clear checksum */
 	mtctr	r7		/* Setup for a loop */
-			
+	
 	GETSYM(r4, start)
 	mr	r3,r8		/* Get the load addr */
 
 	cmp	cr0,r4,r3	/* If we need to copy from the end, do so */
 	bgt	do_relocate_from_end
-	
-do_relocate_from_start:		
+
+do_relocate_from_start:
 1:	lwz	r5,0(r3)	/* Load and decrement */
 	stw	r5,0(r4)	/* Store and decrement */
 	addi	r3,r3,4
@@ -135,7 +134,7 @@ do_relocate_from_start:
 	bdnz	1b		/* Are we done? */
 	b	do_relocate_out	/* Finished */
 
-do_relocate_from_end:	
+do_relocate_from_end:
 	GETSYM(r3, end)
 	slwi	r4,r7,2
 	add	r4,r8,r4	/* Get the physical end */
@@ -144,7 +143,7 @@ do_relocate_from_end:
 	xor	r6,r6,r5
 	bdnz	1b
 
-do_relocate_out:	
+do_relocate_out:
 	GETSYM(r3,start_ldr)
 	mtlr	r3		/* Easiest way to do an absolute jump */
 /* Some boards don't boot up with the I-cache enabled.  Do that
@@ -155,7 +154,7 @@ do_relocate_out:
 	b	flush_instruction_cache
 
 	.previous
-		
+
 start_ldr:
 /* Clear all of BSS and set up stack for C calls */
 	lis	r3,edata@h

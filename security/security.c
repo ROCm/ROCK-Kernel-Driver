@@ -79,9 +79,8 @@ int __init security_scaffolding_startup (void)
  * value passed to this function.  A call to unregister_security() should be
  * done to remove this security_options structure from the kernel.
  *
- * If the @ops structure does not contain function pointers for all hooks in
- * the structure, or there is already a security module registered with the
- * kernel, an error will be returned.  Otherwise 0 is returned on success.
+ * If there is already a security module registered with the kernel,
+ * an error will be returned.  Otherwise 0 is returned on success.
  */
 int register_security (struct security_operations *ops)
 {

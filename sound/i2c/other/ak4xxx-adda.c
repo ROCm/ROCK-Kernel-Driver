@@ -84,12 +84,14 @@ void snd_akm4xxx_reset(akm4xxx_t *ak, int state)
 		/* FIXME: needed for ak4529? */
 		break;
 	case SND_AK4355:
-		snd_akm4xxx_write(ak, 0, 0x01, state ? 0x02 : 0x01);
-		if (state)
+		if (state) {
+			snd_akm4xxx_write(ak, 0, 0x01, 0x02); /* reset and soft-mute */
 			return;
-		for (reg = 0x00; reg < 0x0a; reg++)
+		}
+		for (reg = 0x00; reg < 0x0b; reg++)
 			if (reg != 0x01)
 				snd_akm4xxx_write(ak, 0, reg, snd_akm4xxx_get(ak, 0, reg));
+		snd_akm4xxx_write(ak, 0, 0x01, 0x01); /* un-reset, unmute */
 		break;
 	case SND_AK4381:
 		for (chip = 0; chip < ak->num_dacs/2; chip++) {
@@ -151,8 +153,8 @@ void snd_akm4xxx_init(akm4xxx_t *ak)
 	static unsigned char inits_ak4355[] = {
 		0x01, 0x02, /* 1: reset and soft-mute */
 		0x00, 0x06, /* 0: mode3(i2s), disable auto-clock detect, disable DZF, sharp roll-off, RSTN#=0 */
-		// 0x02, 0x0e, /* 2: DA's power up, normal speed, RSTN#=0 */
-		0x02, 0x2e,
+		0x02, 0x0e, /* 2: DA's power up, normal speed, RSTN#=0 */
+		// 0x02, 0x2e, /* quad speed */
 		0x03, 0x01, /* 3: de-emphasis off */
 		0x04, 0x00, /* 4: LOUT1 volume muted */
 		0x05, 0x00, /* 5: ROUT1 volume muted */
@@ -166,8 +168,8 @@ void snd_akm4xxx_init(akm4xxx_t *ak)
 	};
 	static unsigned char inits_ak4381[] = {
 		0x00, 0x0c, /* 0: mode3(i2s), disable auto-clock detect */
-		// 0x01, 0x02, /* 1: de-emphasis off, normal speed, sharp roll-off, DZF off */
-		0x01, 0x12,
+		0x01, 0x02, /* 1: de-emphasis off, normal speed, sharp roll-off, DZF off */
+		// 0x01, 0x12, /* quad speed */
 		0x02, 0x00, /* 2: DZF disabled */
 		0x03, 0x00, /* 3: LATT 0 */
 		0x04, 0x00, /* 4: RATT 0 */
@@ -340,7 +342,7 @@ static int snd_akm4xxx_deemphasis_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_val
 
 int snd_akm4xxx_build_controls(akm4xxx_t *ak)
 {
-	unsigned int idx;
+	unsigned int idx, num_emphs;
 	int err;
 
 	for (idx = 0; idx < ak->num_dacs; ++idx) {
@@ -382,7 +384,7 @@ int snd_akm4xxx_build_controls(akm4xxx_t *ak)
 		snd_kcontrol_t ctl;
 		memset(&ctl, 0, sizeof(ctl));
 		strcpy(ctl.id.name, "ADC Volume");
-		ctl.id.index = idx;
+		ctl.id.index = idx + ak->idx_offset * 2;
 		ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
 		ctl.count = 1;
 		ctl.info = snd_akm4xxx_volume_info;
@@ -394,7 +396,7 @@ int snd_akm4xxx_build_controls(akm4xxx_t *ak)
 			return err;
 		memset(&ctl, 0, sizeof(ctl));
 		strcpy(ctl.id.name, "IPGA Analog Capture Volume");
-		ctl.id.index = idx;
+		ctl.id.index = idx + ak->idx_offset * 2;
 		ctl.id.iface = SNDRV_CTL_ELEM_IFACE_MIXER;
 		ctl.count = 1;
 		ctl.info = snd_akm4xxx_ipga_gain_info;
@@ -405,7 +407,11 @@ int snd_akm4xxx_build_controls(akm4xxx_t *ak)
 		if ((err = snd_ctl_add(ak->card, snd_ctl_new(&ctl, SNDRV_CTL_ELEM_ACCESS_READ|SNDRV_CTL_ELEM_ACCESS_WRITE))) < 0)
 			return err;
 	}
-	for (idx = 0; idx < ak->num_dacs/2; idx++) {
+	if (ak->type == SND_AK4355)
+		num_emphs = 1;
+	else
+		num_emphs = ak->num_dacs / 2;
+	for (idx = 0; idx < num_emphs; idx++) {
 		snd_kcontrol_t ctl;
 		memset(&ctl, 0, sizeof(ctl));
 		strcpy(ctl.id.name, "Deemphasis");

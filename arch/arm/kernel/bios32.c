@@ -20,11 +20,15 @@
 
 static int debug_pci;
 
-void pcibios_report_status(u_int status_mask, int warn)
+/*
+ * We can't use pci_find_device() here since we are
+ * called from interrupt context.
+ */
+static void pcibios_bus_report_status(struct pci_bus *bus, u_int status_mask, int warn)
 {
-	struct pci_dev *dev = NULL;
+	struct pci_dev *dev;
 
-	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
+	list_for_each_entry(dev, &bus->devices, bus_list) {
 		u16 status;
 
 		/*
@@ -35,18 +39,32 @@ void pcibios_report_status(u_int status_mask, int warn)
 			continue;
 
 		pci_read_config_word(dev, PCI_STATUS, &status);
+		if (status == 0xffff)
+			continue;
 
-		status &= status_mask;
-		if (status == 0)
+		if ((status & status_mask) == 0)
 			continue;
 
 		/* clear the status errors */
-		pci_write_config_word(dev, PCI_STATUS, status);
+		pci_write_config_word(dev, PCI_STATUS, status & status_mask);
 
 		if (warn)
-			printk("(%02x:%02x.%d: %04X) ", dev->bus->number,
-				PCI_SLOT(dev->devfn), PCI_FUNC(dev->devfn),
-				status);
+			printk("(%s: %04X) ", pci_name(dev), status);
+	}
+
+	list_for_each_entry(dev, &bus->devices, bus_list)
+		if (dev->subordinate)
+			pcibios_bus_report_status(dev->subordinate, status_mask, warn);
+}
+
+void pcibios_report_status(u_int status_mask, int warn)
+{
+	struct list_head *l;
+
+	list_for_each(l, &pci_root_buses) {
+		struct pci_bus *bus = pci_bus_b(l);
+
+		pcibios_bus_report_status(bus, status_mask, warn);
 	}
 }
 

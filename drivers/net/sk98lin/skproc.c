@@ -2,8 +2,8 @@
  *
  * Name:    skproc.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.8 $
- * Date:    $Date: 2003/06/27 14:41:42 $
+ * Version:	$Revision: 1.2 $
+ * Date:    $Date: 2003/08/12 16:45:29 $
  * Purpose:	Funktions to display statictic data
  *
  ******************************************************************************/
@@ -28,6 +28,13 @@
  * History:
  *
  *	$Log: skproc.c,v $
+ *	Revision 1.2  2003/08/12 16:45:29  mlindner
+ *	Add: Removed SkNumber and SkDoDiv
+ *	Add: Counter output as (unsigned long long)
+ *	
+ *	Revision 1.1  2003/07/18 13:39:57  rroesler
+ *	Fix: Re-enter after CVS crash
+ *	
  *	Revision 1.8  2003/06/27 14:41:42  rroesler
  *	Corrected compiler-warning kernel 2.2
  *	
@@ -83,452 +90,227 @@
  ******************************************************************************/
 
 #include <linux/proc_fs.h>
+#include <linux/seq_file.h>
 
 #include "h/skdrv1st.h"
 #include "h/skdrv2nd.h"
-#define ZEROPAD		1		/* pad with zero */
-#define SIGN		2		/* unsigned/signed long */
-#define PLUS		4		/* show plus */
-#define SPACE		8		/* space if plus */
-#define LEFT		16		/* left justified */
-#define SPECIALX	32		/* 0x */
-#define LARGE		64
 
-	extern struct net_device	*SkGeRootDev;
+#ifdef CONFIG_PROC_FS
 
-extern char * SkNumber(
-				char * str,
-				long long num,
-				int base,
-				int size,
-				int precision,
-				int type);
+extern struct net_device	*SkGeRootDev;
 
-int sk_proc_read(char *buffer,
-				char **buffer_location,
-				off_t offset,
-				int buffer_length,
-				int *eof,
-				void *data);
-
-
-
-/*****************************************************************************
- *
- * 	sk_proc_read - print "summaries" entry 
- *
- * Description:
- *  This function fills the proc entry with statistic data about 
- *  the ethernet device.
- *  
- *
- * Returns: buffer with statistic data
- *	
- */
-int sk_proc_read(char *buffer,
-char **buffer_location,
-off_t offset,
-int buffer_length,
-int *eof,
-void *data)
+static int sk_seq_show(struct seq_file *seq, void *v)
 {
-	int len = 0;
-	int t;
+	struct net_device *dev = seq->private;
+	DEV_NET		*pNet = dev->priv;
+	SK_AC		*pAC = pNet->pAC;
+	SK_PNMI_STRUCT_DATA *pPnmiStruct = &pAC->PnmiStruct;
+	SK_PNMI_STAT	*pPnmiStat = &pPnmiStruct->Stat[0];
+	int unit = !(pAC->dev[0] == dev);
 	int i;
-	DEV_NET					*pNet;
-	SK_AC					*pAC;
-	char 					test_buf[100];
-	char					sens_msg[50];
-	unsigned long			Flags;	
-	unsigned int			Size;
-	struct SK_NET_DEVICE 		*next;
-	struct SK_NET_DEVICE 		*SkgeProcDev = SkGeRootDev;
+	char sens_msg[50];
 
-	SK_PNMI_STRUCT_DATA 	*pPnmiStruct;
-	SK_PNMI_STAT		*pPnmiStat;
-	struct proc_dir_entry *file = (struct proc_dir_entry*) data;
-
-	while (SkgeProcDev) {
-		pNet = (DEV_NET*) SkgeProcDev->priv;
-		pAC = pNet->pAC;
-		next = pAC->Next;
-		pPnmiStruct = &pAC->PnmiStruct;
-		/* NetIndex in GetStruct is now required, zero is only dummy */
-
-		for (t=pAC->GIni.GIMacsFound; t > 0; t--) {
-			if ((pAC->GIni.GIMacsFound == 2) && pAC->RlmtNets == 1)
-				t--;
-
-			spin_lock_irqsave(&pAC->SlowPathLock, Flags);
-			Size = SK_PNMI_STRUCT_SIZE;
-			SkPnmiGetStruct(pAC, pAC->IoBase, 
-				pPnmiStruct, &Size, t-1);
-			spin_unlock_irqrestore(&pAC->SlowPathLock, Flags);
+	seq_printf(seq,
+		   "\nDetailed statistic for device %s\n",
+		   dev->name);
+	seq_printf(seq,
+		   "=======================================\n");
 	
-			if (strcmp(pAC->dev[t-1]->name, file->name) == 0) {
-				pPnmiStat = &pPnmiStruct->Stat[0];
-				len = sprintf(buffer, 
-					"\nDetailed statistic for device %s\n",
-					pAC->dev[t-1]->name);
-				len += sprintf(buffer + len,
-					"=======================================\n");
-	
-				/* Board statistics */
-				len += sprintf(buffer + len, 
-					"\nBoard statistics\n\n");
-				len += sprintf(buffer + len,
-					"Active Port                    %c\n",
-					'A' + pAC->Rlmt.Net[t-1].Port[pAC->Rlmt.
-					Net[t-1].PrefPort]->PortNumber);
-				len += sprintf(buffer + len,
-					"Preferred Port                 %c\n",
-					'A' + pAC->Rlmt.Net[t-1].Port[pAC->Rlmt.
-					Net[t-1].PrefPort]->PortNumber);
+	/* Board statistics */
+	seq_printf(seq, 
+		   "\nBoard statistics\n\n");
+	seq_printf(seq,
+		   "Active Port                    %c\n",
+		   'A' + pAC->Rlmt.Net[unit].Port[pAC->Rlmt.
+						 Net[unit].PrefPort]->PortNumber);
+	seq_printf(seq,
+		   "Preferred Port                 %c\n",
+		   'A' + pAC->Rlmt.Net[unit].Port[pAC->Rlmt.
+						 Net[unit].PrefPort]->PortNumber);
 
-				len += sprintf(buffer + len,
-					"Bus speed (MHz)                %d\n",
-					pPnmiStruct->BusSpeed);
+	seq_printf(seq,
+		   "Bus speed (MHz)                %d\n",
+		   pPnmiStruct->BusSpeed);
 
-				len += sprintf(buffer + len,
-					"Bus width (Bit)                %d\n",
-					pPnmiStruct->BusWidth);
-				len += sprintf(buffer + len,
-					"Hardware revision              v%d.%d\n",
-					(pAC->GIni.GIPciHwRev >> 4) & 0x0F,
-					pAC->GIni.GIPciHwRev & 0x0F);
+	seq_printf(seq,
+		   "Bus width (Bit)                %d\n",
+		   pPnmiStruct->BusWidth);
+	seq_printf(seq,
+		   "Hardware revision              v%d.%d\n",
+		   (pAC->GIni.GIPciHwRev >> 4) & 0x0F,
+		   pAC->GIni.GIPciHwRev & 0x0F);
 
-				/* Print sensor informations */
-				for (i=0; i < pAC->I2c.MaxSens; i ++) {
-					/* Check type */
-					switch (pAC->I2c.SenTable[i].SenType) {
-					case 1:
-						strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
-						strcat(sens_msg, " (C)");
-						len += sprintf(buffer + len,
-							"%-25s      %d.%02d\n",
-							sens_msg,
-							pAC->I2c.SenTable[i].SenValue / 10,
-							pAC->I2c.SenTable[i].SenValue % 10);
+	/* Print sensor informations */
+	for (i=0; i < pAC->I2c.MaxSens; i ++) {
+		/* Check type */
+		switch (pAC->I2c.SenTable[i].SenType) {
+		case 1:
+			strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
+			strcat(sens_msg, " (C)");
+			seq_printf(seq,
+				   "%-25s      %d.%02d\n",
+				   sens_msg,
+				   pAC->I2c.SenTable[i].SenValue / 10,
+				   pAC->I2c.SenTable[i].SenValue % 10);
 
-						strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
-						strcat(sens_msg, " (F)");
-						len += sprintf(buffer + len,
-							"%-25s      %d.%02d\n",
-							sens_msg,
-							((((pAC->I2c.SenTable[i].SenValue)
-							*10)*9)/5 + 3200)/100,
-							((((pAC->I2c.SenTable[i].SenValue)
-							*10)*9)/5 + 3200) % 10);
-						break;
-					case 2:
-						strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
-						strcat(sens_msg, " (V)");
-						len += sprintf(buffer + len,
-							"%-25s      %d.%03d\n",
-							sens_msg,
-							pAC->I2c.SenTable[i].SenValue / 1000,
-							pAC->I2c.SenTable[i].SenValue % 1000);
-						break;
-					case 3:
-						strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
-						strcat(sens_msg, " (rpm)");
-						len += sprintf(buffer + len,
-							"%-25s      %d\n",
-							sens_msg,
-							pAC->I2c.SenTable[i].SenValue);
-						break;
-					default:
-						break;
-					}
-				}
+			strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
+			strcat(sens_msg, " (F)");
+			seq_printf(seq,
+				   "%-25s      %d.%02d\n",
+				   sens_msg,
+				   ((((pAC->I2c.SenTable[i].SenValue)
+				      *10)*9)/5 + 3200)/100,
+				   ((((pAC->I2c.SenTable[i].SenValue)
+				      *10)*9)/5 + 3200) % 10);
+			break;
+		case 2:
+			strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
+			strcat(sens_msg, " (V)");
+			seq_printf(seq,
+				   "%-25s      %d.%03d\n",
+				   sens_msg,
+				   pAC->I2c.SenTable[i].SenValue / 1000,
+				   pAC->I2c.SenTable[i].SenValue % 1000);
+			break;
+		case 3:
+			strcpy(sens_msg, pAC->I2c.SenTable[i].SenDesc);
+			strcat(sens_msg, " (rpm)");
+			seq_printf(seq,
+				   "%-25s      %d\n",
+				   sens_msg,
+				   pAC->I2c.SenTable[i].SenValue);
+			break;
+		default:
+			break;
+		}
+	}
 				
-				/*Receive statistics */
-				len += sprintf(buffer + len, 
-				"\nReceive statistics\n\n");
+	/*Receive statistics */
+	seq_printf(seq, 
+		   "\nReceive statistics\n\n");
 
-				len += sprintf(buffer + len,
-					"Received bytes                 %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxOctetsOkCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Received packets               %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxOkCts,
-					10,0,-1,0));
+	seq_printf(seq,
+		   "Received bytes                 %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxOctetsOkCts);
+	seq_printf(seq,
+		   "Received packets               %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxOkCts);
 #if 0
-				if (pAC->GIni.GP[0].PhyType == SK_PHY_XMAC && 
-					pAC->HWRevision < 12) {
-					pPnmiStruct->InErrorsCts = pPnmiStruct->InErrorsCts - 
-						pPnmiStat->StatRxShortsCts;
-					pPnmiStat->StatRxShortsCts = 0;
-				}
+	if (pAC->GIni.GP[0].PhyType == SK_PHY_XMAC && 
+	    pAC->HWRevision < 12) {
+		pPnmiStruct->InErrorsCts = pPnmiStruct->InErrorsCts - 
+			pPnmiStat->StatRxShortsCts;
+		pPnmiStat->StatRxShortsCts = 0;
+	}
 #endif
-				if (pNet->Mtu > 1500) 
-					pPnmiStruct->InErrorsCts = pPnmiStruct->InErrorsCts -
-						pPnmiStat->StatRxTooLongCts;
+	if (pNet->Mtu > 1500) 
+		pPnmiStruct->InErrorsCts = pPnmiStruct->InErrorsCts -
+			pPnmiStat->StatRxTooLongCts;
 
-				len += sprintf(buffer + len,
-					"Receive errors                 %s\n",
-					SkNumber(test_buf, pPnmiStruct->InErrorsCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Receive dropped                %s\n",
-					SkNumber(test_buf, pPnmiStruct->RxNoBufCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Received multicast             %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxMulticastOkCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Receive error types\n");
-				len += sprintf(buffer + len,
-					"   length                      %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxRuntCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   buffer overflow             %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxFifoOverflowCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   bad crc                     %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxFcsCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   framing                     %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxFramingCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   missed frames               %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxMissedCts,
-					10, 0, -1, 0));
+	seq_printf(seq,
+		   "Receive errors                 %Ld\n",
+		   (unsigned long long) pPnmiStruct->InErrorsCts);
+	seq_printf(seq,
+		   "Receive dropped                %Ld\n",
+		   (unsigned long long) pPnmiStruct->RxNoBufCts);
+	seq_printf(seq,
+		   "Received multicast             %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxMulticastOkCts);
+	seq_printf(seq,
+		   "Receive error types\n");
+	seq_printf(seq,
+		   "   length                      %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxRuntCts);
+	seq_printf(seq,
+		   "   buffer overflow             %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxFifoOverflowCts);
+	seq_printf(seq,
+		   "   bad crc                     %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxFcsCts);
+	seq_printf(seq,
+		   "   framing                     %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxFramingCts);
+	seq_printf(seq,
+		   "   missed frames               %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxMissedCts);
 
-				if (pNet->Mtu > 1500)
-					pPnmiStat->StatRxTooLongCts = 0;
+	if (pNet->Mtu > 1500)
+		pPnmiStat->StatRxTooLongCts = 0;
 
-				len += sprintf(buffer + len,
-					"   too long                    %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxTooLongCts,
-					10, 0, -1, 0));					
-				len += sprintf(buffer + len,
-					"   carrier extension           %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxCextCts,
-					10, 0, -1, 0));				
-				len += sprintf(buffer + len,
-					"   too short                   %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxShortsCts,
-					10, 0, -1, 0));				
-				len += sprintf(buffer + len,
-					"   symbol                      %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxSymbolCts,
-					10, 0, -1, 0));				
-				len += sprintf(buffer + len,
-					"   LLC MAC size                %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxIRLengthCts,
-					10, 0, -1, 0));				
-				len += sprintf(buffer + len,
-					"   carrier event               %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxCarrierCts,
-					10, 0, -1, 0));				
-				len += sprintf(buffer + len,
-					"   jabber                      %s\n",
-					SkNumber(test_buf, pPnmiStat->StatRxJabberCts,
-					10, 0, -1, 0));				
+	seq_printf(seq,
+		   "   too long                    %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxTooLongCts);					
+	seq_printf(seq,
+		   "   carrier extension           %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxCextCts);				
+	seq_printf(seq,
+		   "   too short                   %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxShortsCts);				
+	seq_printf(seq,
+		   "   symbol                      %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxSymbolCts);				
+	seq_printf(seq,
+		   "   LLC MAC size                %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxIRLengthCts);				
+	seq_printf(seq,
+		   "   carrier event               %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxCarrierCts);				
+	seq_printf(seq,
+		   "   jabber                      %Ld\n",
+		   (unsigned long long) pPnmiStat->StatRxJabberCts);				
 
 
-				/*Transmit statistics */
-				len += sprintf(buffer + len, 
-				"\nTransmit statistics\n\n");
+	/*Transmit statistics */
+	seq_printf(seq, 
+		   "\nTransmit statistics\n\n");
 				
-				len += sprintf(buffer + len,
-					"Transmited bytes               %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxOctetsOkCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmited packets             %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxOkCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmit errors                %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxSingleCollisionCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmit dropped               %s\n",
-					SkNumber(test_buf, pPnmiStruct->TxNoBufCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmit collisions            %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxSingleCollisionCts,
-					10,0,-1,0));
-				len += sprintf(buffer + len,
-					"Transmit error types\n");
-				len += sprintf(buffer + len,
-					"   excessive collision         %ld\n",
-					pAC->stats.tx_aborted_errors);
-				len += sprintf(buffer + len,
-					"   carrier                     %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxCarrierCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   fifo underrun               %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxFifoUnderrunCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   heartbeat                   %s\n",
-					SkNumber(test_buf, pPnmiStat->StatTxCarrierCts,
-					10, 0, -1, 0));
-				len += sprintf(buffer + len,
-					"   window                      %ld\n",
-					pAC->stats.tx_window_errors);
+	seq_printf(seq,
+		   "Transmited bytes               %Ld\n",
+		   (unsigned long long) pPnmiStat->StatTxOctetsOkCts);
+	seq_printf(seq,
+		   "Transmited packets             %Ld\n",
+		   (unsigned long long) pPnmiStat->StatTxOkCts);
+	seq_printf(seq,
+		   "Transmit errors                %Ld\n",
+		   (unsigned long long) pPnmiStat->StatTxSingleCollisionCts);
+	seq_printf(seq,
+		   "Transmit dropped               %Ld\n",
+		   (unsigned long long) pPnmiStruct->TxNoBufCts);
+	seq_printf(seq,
+		   "Transmit collisions            %Ld\n",
+		   (unsigned long long) pPnmiStat->StatTxSingleCollisionCts);
+	seq_printf(seq,
+		   "Transmit error types\n");
+	seq_printf(seq,
+		   "   excessive collision         %ld\n",
+		   pAC->stats.tx_aborted_errors);
+	seq_printf(seq,
+		   "   carrier                     %Ld\n",
+		   (unsigned long long) pPnmiStat->StatTxCarrierCts);
+	seq_printf(seq,
+		   "   fifo underrun               %Ld\n",
+		   (unsigned long long) pPnmiStat->StatTxFifoUnderrunCts);
+	seq_printf(seq,
+		   "   heartbeat                   %Ld\n",
+		   (unsigned long long) pPnmiStat->StatTxCarrierCts);
+	seq_printf(seq,
+		   "   window                      %ld\n",
+		   pAC->stats.tx_window_errors);
 				
-			}
-		}
-		SkgeProcDev = next;
-	}
-	if (offset >= len) {
-		*eof = 1;
-		return 0;
-	}
-
-	*buffer_location = buffer + offset;
-	if (buffer_length >= len - offset) {
-		*eof = 1;
-	}
-	return (min_t(int, buffer_length, len - offset));
+	return 0;
 }
 
 
-
-
-
-/*****************************************************************************
- *
- * SkDoDiv - convert 64bit number
- *
- * Description:
- *	This function "converts" a long long number.
- *
- * Returns:
- *	remainder of division
- */
-static long SkDoDiv (long long Dividend, int Divisor, long long *pErg)
+static int sk_proc_open(struct inode *inode, struct file *file)
 {
- long   	Rest;
- long long 	Ergebnis;
- long   	Akku;
-
-
- Akku  = Dividend >> 32;
-
- Ergebnis = ((long long) (Akku / Divisor)) << 32;
- Rest = Akku % Divisor ;
-
- Akku = Rest << 16;
- Akku |= ((Dividend & 0xFFFF0000) >> 16);
-
-
- Ergebnis += ((long long) (Akku / Divisor)) << 16;
- Rest = Akku % Divisor ;
-
- Akku = Rest << 16;
- Akku |= (Dividend & 0xFFFF);
-
- Ergebnis += (Akku / Divisor);
- Rest = Akku % Divisor ;
-
- *pErg = Ergebnis;
- return (Rest);
+	return single_open(file, sk_seq_show, PDE(inode)->data);
 }
 
-
-#if 0
-#define do_div(n,base) ({ \
-long long __res; \
-__res = ((unsigned long long) n) % (unsigned) base; \
-n = ((unsigned long long) n) / (unsigned) base; \
-__res; })
-
+struct file_operations sk_proc_fops = {
+	.owner = THIS_MODULE,
+	.open  = sk_proc_open,
+	.read  = seq_read,
+	.llseek = seq_lseek,
+	.release = single_release,
+};
 #endif
-
-
-/*****************************************************************************
- *
- * SkNumber - Print results
- *
- * Description:
- *	This function converts a long long number into a string.
- *
- * Returns:
- *	number as string
- */
-char * SkNumber(char * str, long long num, int base, int size, int precision
-	,int type)
-{
-	char c,sign,tmp[66], *strorg = str;
-	const char *digits="0123456789abcdefghijklmnopqrstuvwxyz";
-	int i;
-
-	if (type & LARGE)
-		digits = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-	if (type & LEFT)
-		type &= ~ZEROPAD;
-	if (base < 2 || base > 36)
-		return 0;
-	c = (type & ZEROPAD) ? '0' : ' ';
-	sign = 0;
-	if (type & SIGN) {
-		if (num < 0) {
-			sign = '-';
-			num = -num;
-			size--;
-		} else if (type & PLUS) {
-			sign = '+';
-			size--;
-		} else if (type & SPACE) {
-			sign = ' ';
-			size--;
-		}
-	}
-	if (type & SPECIALX) {
-		if (base == 16)
-			size -= 2;
-		else if (base == 8)
-			size--;
-	}
-	i = 0;
-	if (num == 0)
-		tmp[i++]='0';
-	else while (num != 0)
-		tmp[i++] = digits[SkDoDiv(num,base, &num)];
-
-	if (i > precision)
-		precision = i;
-	size -= precision;
-	if (!(type&(ZEROPAD+LEFT)))
-		while(size-->0)
-			*str++ = ' ';
-	if (sign)
-		*str++ = sign;
-	if (type & SPECIALX) {
-		if (base==8)
-			*str++ = '0';
-		else if (base==16) {
-			*str++ = '0';
-			*str++ = digits[33];
-		}
-	}
-	if (!(type & LEFT))
-		while (size-- > 0)
-			*str++ = c;
-	while (i < precision--)
-		*str++ = '0';
-	while (i-- > 0)
-		*str++ = tmp[i];
-	while (size-- > 0)
-		*str++ = ' ';
-	
-	str[0] = '\0';
-	
-	return strorg;
-}
-
-
-

@@ -736,14 +736,14 @@ static struct sock *raw_get_idx(struct seq_file *seq, loff_t pos)
 static void *raw_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock(&raw_v4_lock);
-	return *pos ? raw_get_idx(seq, *pos) : (void *)1;
+	return *pos ? raw_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *raw_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct sock *sk;
 
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		sk = raw_get_first(seq);
 	else
 		sk = raw_get_next(seq, v);
@@ -778,7 +778,7 @@ static int raw_seq_show(struct seq_file *seq, void *v)
 {
 	char tmpbuf[129];
 
-	if (v == (void *)1)
+	if (v == SEQ_START_TOKEN)
 		seq_printf(seq, "%-127s\n",
 			       "  sl  local_address rem_address   st tx_queue "
 			       "rx_queue tr tm->when retrnsmt   uid  timeout "
@@ -831,19 +831,13 @@ static struct file_operations raw_seq_fops = {
 
 int __init raw_proc_init(void)
 {
-	struct proc_dir_entry *p;
-	int rc = 0;
-
-	p = create_proc_entry("raw", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &raw_seq_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	if (!proc_net_fops_create("raw", S_IRUGO, &raw_seq_fops))
+		return -ENOMEM;
+	return 0;
 }
 
 void __init raw_proc_exit(void)
 {
-	remove_proc_entry("raw", proc_net);
+	proc_net_remove("raw");
 }
 #endif /* CONFIG_PROC_FS */

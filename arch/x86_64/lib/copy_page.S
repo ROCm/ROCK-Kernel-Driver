@@ -10,14 +10,8 @@
 copy_page:
 	prefetch (%rsi) 
 	prefetch 1*64(%rsi)
-	prefetch 2*64(%rsi)
-	prefetch 3*64(%rsi)
-	prefetch 4*64(%rsi)
 	prefetchw (%rdi) 
 	prefetchw 1*64(%rdi) 
-	prefetchw 2*64(%rdi) 
-	prefetchw 3*64(%rdi)
-	prefetchw 4*64(%rdi)
 
 	subq	$3*8,%rsp
 	movq	%rbx,(%rsp)

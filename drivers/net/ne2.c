@@ -60,7 +60,6 @@
 static const char *version = "ne2.c:v0.91 Nov 16 1998 Wim Dumon <wimpie@kotnet.org>\n";
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/fcntl.h>
@@ -791,11 +790,3 @@ void cleanup_module(void)
 	}
 }
 #endif /* MODULE */
-
-/*
- * Local variables:
- *  compile-command: "gcc -DKERNEL -Wall -O6 -fomit-frame-pointer -I/usr/src/linux/net/tcp -c ne2.c"
- *  version-control: t
- *  kept-new-versions: 5
- * End:
- */

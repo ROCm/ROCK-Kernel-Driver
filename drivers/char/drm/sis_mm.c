@@ -28,232 +28,328 @@
  * 
  */
 
-#include <linux/config.h>
 #include "sis.h"
-#include "video/sisfb.h"
 #include "drmP.h"
 #include "sis_drm.h"
 #include "sis_drv.h"
 #include "sis_ds.h"
+#if defined(__linux__) && defined(CONFIG_FB_SIS)
+#include <video/sisfb.h>
+#endif
 
 #define MAX_CONTEXT 100
 #define VIDEO_TYPE 0 
 #define AGP_TYPE 1
 
 typedef struct {
-  int used;
-  int context;
-  set_t *sets[2]; /* 0 for video, 1 for AGP */
+	int used;
+	int context;
+	set_t *sets[2]; /* 0 for video, 1 for AGP */
 } sis_context_t;
 
 static sis_context_t global_ppriv[MAX_CONTEXT];
 
+
 static int add_alloc_set(int context, int type, unsigned int val)
 {
-  int i, retval = 0;
-  
-  for(i = 0; i < MAX_CONTEXT; i++)
-    if(global_ppriv[i].used && global_ppriv[i].context == context){
-      retval = setAdd(global_ppriv[i].sets[type], val);
-      break;
-    }
-  return retval;
+	int i, retval = 0;
+	
+	for (i = 0; i < MAX_CONTEXT; i++) {
+		if (global_ppriv[i].used && global_ppriv[i].context == context)
+		{
+			retval = setAdd(global_ppriv[i].sets[type], val);
+			break;
+		}
+	}
+	return retval;
 }
 
 static int del_alloc_set(int context, int type, unsigned int val)
 {  
-  int i, retval = 0;
-  for(i = 0; i < MAX_CONTEXT; i++)
-    if(global_ppriv[i].used && global_ppriv[i].context == context){
-      retval = setDel(global_ppriv[i].sets[type], val);
-      break;
-    }
-  return retval;
+	int i, retval = 0;
+
+	for (i = 0; i < MAX_CONTEXT; i++) {
+		if (global_ppriv[i].used && global_ppriv[i].context == context)
+		{
+			retval = setDel(global_ppriv[i].sets[type], val);
+			break;
+		}
+	}
+	return retval;
 }
 
 /* fb management via fb device */ 
-#if 1
-int sis_fb_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+#if defined(__linux__) && defined(CONFIG_FB_SIS)
+
+int sis_fb_init( DRM_IOCTL_ARGS )
 {
-  drm_sis_mem_t fb;
-  struct sis_memreq req;
-  int retval = 0;
-   
-  if (copy_from_user(&fb, (drm_sis_mem_t *)arg, sizeof(fb)))
-	  return -EFAULT;
-  
-  req.size = fb.size;
-  sis_malloc(&req);
-  if(req.offset){
-    /* TODO */
-    fb.offset = req.offset;
-    fb.free = req.offset;
-    if(!add_alloc_set(fb.context, VIDEO_TYPE, fb.free)){
-      DRM_DEBUG("adding to allocation set fails\n");
-      sis_free(req.offset);
-      retval = -1;
-    }
-  }
-  else{  
-    fb.offset = 0;
-    fb.size = 0;
-    fb.free = 0;
-  }
-   
-  if (copy_to_user((drm_sis_mem_t *)arg, &fb, sizeof(fb))) return -EFAULT;
-
-  DRM_DEBUG("alloc fb, size = %d, offset = %ld\n", fb.size, req.offset);
-
-  return retval;
+	return 0;
 }
 
-int sis_fb_free(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sis_fb_alloc( DRM_IOCTL_ARGS )
 {
-  drm_sis_mem_t fb;
-  int retval = 0;
-    
-  if (copy_from_user(&fb, (drm_sis_mem_t *)arg, sizeof(fb)))
-	  return -EFAULT;
-  
-  if(!fb.free){
-    return -1;
-  }
+	drm_sis_mem_t fb;
+	struct sis_memreq req;
+	int retval = 0;
 
-  sis_free(fb.free);
-  if(!del_alloc_set(fb.context, VIDEO_TYPE, fb.free))
-    retval = -1;
+	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
 
-  DRM_DEBUG("free fb, offset = %d\n", fb.free);
-  
-  return retval;
+	req.size = fb.size;
+	sis_malloc(&req);
+	if (req.offset) {
+		/* TODO */
+		fb.offset = req.offset;
+		fb.free = req.offset;
+		if (!add_alloc_set(fb.context, VIDEO_TYPE, fb.free)) {
+			DRM_DEBUG("adding to allocation set fails\n");
+			sis_free(req.offset);
+			retval = DRM_ERR(EINVAL);
+		}
+	} else {  
+		fb.offset = 0;
+		fb.size = 0;
+		fb.free = 0;
+	}
+
+	DRM_COPY_TO_USER_IOCTL((drm_sis_mem_t *)data, fb, sizeof(fb));
+
+	DRM_DEBUG("alloc fb, size = %d, offset = %ld\n", fb.size, req.offset);
+
+	return retval;
+}
+
+int sis_fb_free( DRM_IOCTL_ARGS )
+{
+	drm_sis_mem_t fb;
+	int retval = 0;
+
+	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
+
+	if (!fb.free)
+		return DRM_ERR(EINVAL);
+
+	if (!del_alloc_set(fb.context, VIDEO_TYPE, fb.free))
+		retval = DRM_ERR(EINVAL);
+	sis_free(fb.free);
+
+	DRM_DEBUG("free fb, offset = %lu\n", fb.free);
+
+	return retval;
 }
 
 #else
 
-int sis_fb_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+/* Called by the X Server to initialize the FB heap.  Allocations will fail
+ * unless this is called.  Offset is the beginning of the heap from the
+ * framebuffer offset (MaxXFBMem in XFree86).
+ *
+ * Memory layout according to Thomas Winischofer:
+ * |------------------|DDDDDDDDDDDDDDDDDDDDDDDDDDDDD|HHHH|CCCCCCCCCCC|
+ *
+ *    X driver/sisfb                                  HW-   Command-
+ *  framebuffer memory           DRI heap           Cursor   queue
+ */
+int sis_fb_init( DRM_IOCTL_ARGS )
 {
-  return -1;
+	DRM_DEVICE;
+	drm_sis_private_t *dev_priv = dev->dev_private;
+	drm_sis_fb_t fb;
+
+	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_fb_t *)data, sizeof(fb));
+
+	if (dev_priv == NULL) {
+		dev->dev_private = DRM(calloc)(1, sizeof(drm_sis_private_t),
+		    DRM_MEM_DRIVER);
+		dev_priv = dev->dev_private;
+		if (dev_priv == NULL)
+			return ENOMEM;
+	}
+
+	if (dev_priv->FBHeap != NULL)
+		return DRM_ERR(EINVAL);
+
+	dev_priv->FBHeap = mmInit(fb.offset, fb.size);
+
+	DRM_DEBUG("offset = %u, size = %u", fb.offset, fb.size);
+
+	return 0;
 }
 
-int sis_fb_free(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sis_fb_alloc( DRM_IOCTL_ARGS )
 {
-  return 0;
+	DRM_DEVICE;
+	drm_sis_private_t *dev_priv = dev->dev_private;
+	drm_sis_mem_t fb;
+	PMemBlock block;
+	int retval = 0;
+
+	if (dev_priv == NULL || dev_priv->FBHeap == NULL)
+		return DRM_ERR(EINVAL);
+  
+	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
+  
+	block = mmAllocMem(dev_priv->FBHeap, fb.size, 0, 0);
+	if (block) {
+		/* TODO */
+		fb.offset = block->ofs;
+		fb.free = (unsigned long)block;
+		if (!add_alloc_set(fb.context, VIDEO_TYPE, fb.free)) {
+			DRM_DEBUG("adding to allocation set fails\n");
+			mmFreeMem((PMemBlock)fb.free);
+			retval = DRM_ERR(EINVAL);
+		}
+	} else {
+		fb.offset = 0;
+		fb.size = 0;
+		fb.free = 0;
+	}
+
+	DRM_COPY_TO_USER_IOCTL((drm_sis_mem_t *)data, fb, sizeof(fb));
+
+	DRM_DEBUG("alloc fb, size = %d, offset = %d\n", fb.size, fb.offset);
+
+	return retval;
+}
+
+int sis_fb_free( DRM_IOCTL_ARGS )
+{
+	DRM_DEVICE;
+	drm_sis_private_t *dev_priv = dev->dev_private;
+	drm_sis_mem_t fb;
+
+	if (dev_priv == NULL || dev_priv->FBHeap == NULL)
+		return DRM_ERR(EINVAL);
+
+	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
+
+	if (!mmBlockInHeap(dev_priv->FBHeap, (PMemBlock)fb.free))
+		return DRM_ERR(EINVAL);
+
+	if (!del_alloc_set(fb.context, VIDEO_TYPE, fb.free))
+		return DRM_ERR(EINVAL);
+	mmFreeMem((PMemBlock)fb.free);
+
+	DRM_DEBUG("free fb, free = 0x%lx\n", fb.free);
+
+	return 0;
 }
 
 #endif
 
 /* agp memory management */ 
-#if 1
 
-static memHeap_t *AgpHeap = NULL;
-
-int sisp_agp_init(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sis_ioctl_agp_init( DRM_IOCTL_ARGS )
 {
-  drm_sis_agp_t agp;
-   
-  if (copy_from_user(&agp, (drm_sis_agp_t *)arg, sizeof(agp)))
-	  return -EFAULT;
+	DRM_DEVICE;
+	drm_sis_private_t *dev_priv = dev->dev_private;
+	drm_sis_agp_t agp;
 
-  AgpHeap = mmInit(agp.offset, agp.size);
+	if (dev_priv == NULL) {
+		dev->dev_private = DRM(calloc)(1, sizeof(drm_sis_private_t),
+		    DRM_MEM_DRIVER);
+		dev_priv = dev->dev_private;
+		if (dev_priv == NULL)
+			return ENOMEM;
+	}
 
-  DRM_DEBUG("offset = %u, size = %u", agp.offset, agp.size);
+	if (dev_priv->AGPHeap != NULL)
+		return DRM_ERR(EINVAL);
+
+	DRM_COPY_FROM_USER_IOCTL(agp, (drm_sis_agp_t *)data, sizeof(agp));
+
+	dev_priv->AGPHeap = mmInit(agp.offset, agp.size);
+
+	DRM_DEBUG("offset = %u, size = %u", agp.offset, agp.size);
   
-  return 0;
+	return 0;
 }
 
-int sisp_agp_alloc(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sis_ioctl_agp_alloc( DRM_IOCTL_ARGS )
 {
-  drm_sis_mem_t agp;
-  PMemBlock block;
-  int retval = 0;
+	DRM_DEVICE;
+	drm_sis_private_t *dev_priv = dev->dev_private;
+	drm_sis_mem_t agp;
+	PMemBlock block;
+	int retval = 0;
    
-  if(!AgpHeap)
-    return -1;
+	if (dev_priv == NULL || dev_priv->AGPHeap == NULL)
+		return DRM_ERR(EINVAL);
   
-  if (copy_from_user(&agp, (drm_sis_mem_t *)arg, sizeof(agp)))
-	  return -EFAULT;
+	DRM_COPY_FROM_USER_IOCTL(agp, (drm_sis_mem_t *)data, sizeof(agp));
   
-  block = mmAllocMem(AgpHeap, agp.size, 0, 0);
-  if(block){
-    /* TODO */
-    agp.offset = block->ofs;
-    agp.free = (unsigned long)block;
-    if(!add_alloc_set(agp.context, AGP_TYPE, agp.free)){
-      DRM_DEBUG("adding to allocation set fails\n");
-      mmFreeMem((PMemBlock)(unsigned long)agp.free);
-      retval = -1;
-    }
-  }
-  else{  
-    agp.offset = 0;
-    agp.size = 0;
-    agp.free = 0;
-  }
-   
-  if (copy_to_user((drm_sis_mem_t *)arg, &agp, sizeof(agp))) return -EFAULT;
+	block = mmAllocMem(dev_priv->AGPHeap, agp.size, 0, 0);
+	if (block) {
+		/* TODO */
+		agp.offset = block->ofs;
+		agp.free = (unsigned long)block;
+		if (!add_alloc_set(agp.context, AGP_TYPE, agp.free)) {
+			DRM_DEBUG("adding to allocation set fails\n");
+			mmFreeMem((PMemBlock)agp.free);
+			retval = -1;
+		}
+	} else {  
+		agp.offset = 0;
+		agp.size = 0;
+		agp.free = 0;
+	}
 
-  DRM_DEBUG("alloc agp, size = %d, offset = %d\n", agp.size, agp.offset);
+	DRM_COPY_TO_USER_IOCTL((drm_sis_mem_t *)data, agp, sizeof(agp));
 
-  return retval;
+	DRM_DEBUG("alloc agp, size = %d, offset = %d\n", agp.size, agp.offset);
+
+	return retval;
 }
 
-int sisp_agp_free(struct inode *inode, struct file *filp, unsigned int cmd,
-		  unsigned long arg)
+int sis_ioctl_agp_free( DRM_IOCTL_ARGS )
 {
-  drm_sis_mem_t agp;
-  int retval = 0;
+	DRM_DEVICE;
+	drm_sis_private_t *dev_priv = dev->dev_private;
+	drm_sis_mem_t agp;
 
-  if(!AgpHeap)
-    return -1;
-    
-  if (copy_from_user(&agp, (drm_sis_mem_t *)arg, sizeof(agp)))
-	  return -EFAULT;
-  
-  if(!agp.free){
-    return -1;
-  }
+	if (dev_priv == NULL || dev_priv->AGPHeap == NULL)
+		return DRM_ERR(EINVAL);
 
-  mmFreeMem((PMemBlock)(unsigned long)agp.free);
-  if(!del_alloc_set(agp.context, AGP_TYPE, agp.free))
-    retval = -1;
+	DRM_COPY_FROM_USER_IOCTL(agp, (drm_sis_mem_t *)data, sizeof(agp));
 
-  DRM_DEBUG("free agp, free = %d\n", agp.free);
-  
-  return retval;
+	if (!mmBlockInHeap(dev_priv->AGPHeap, (PMemBlock)agp.free))
+		return DRM_ERR(EINVAL);
+
+	mmFreeMem((PMemBlock)agp.free);
+	if (!del_alloc_set(agp.context, AGP_TYPE, agp.free))
+		return DRM_ERR(EINVAL);
+
+	DRM_DEBUG("free agp, free = 0x%lx\n", agp.free);
+
+	return 0;
 }
-
-#endif
 
 int sis_init_context(int context)
 {
 	int i;
-	
-	for(i = 0; i < MAX_CONTEXT ; i++)
-	  if(global_ppriv[i].used && (global_ppriv[i].context == context))
-	    break;
 
-	if(i >= MAX_CONTEXT){
-	  for(i = 0; i < MAX_CONTEXT ; i++){
-	    if(!global_ppriv[i].used){
-	      global_ppriv[i].context = context;
-	      global_ppriv[i].used = 1;
-	      global_ppriv[i].sets[0] = setInit();
-	      global_ppriv[i].sets[1] = setInit();
-	      DRM_DEBUG("init allocation set, socket=%d, context = %d\n", 
-	                 i, context);
-	      break;
-	    }	
-	  }
-	  if((i >= MAX_CONTEXT) || (global_ppriv[i].sets[0] == NULL) ||
-	     (global_ppriv[i].sets[1] == NULL)){
-	    return 0;
-	  }
+	for (i = 0; i < MAX_CONTEXT ; i++) {
+		if (global_ppriv[i].used &&
+		    (global_ppriv[i].context == context))
+			break;
+	}
+
+	if (i >= MAX_CONTEXT) {
+		for (i = 0; i < MAX_CONTEXT ; i++) {
+			if (!global_ppriv[i].used) {
+				global_ppriv[i].context = context;
+				global_ppriv[i].used = 1;
+				global_ppriv[i].sets[0] = setInit();
+				global_ppriv[i].sets[1] = setInit();
+				DRM_DEBUG("init allocation set, socket=%d, "
+				    "context = %d\n", i, context);
+				break;
+			}
+		}
+		if ((i >= MAX_CONTEXT) || (global_ppriv[i].sets[0] == NULL) ||
+		    (global_ppriv[i].sets[1] == NULL))
+		{
+			return 0;
+		}
 	}
 	
 	return 1;
@@ -263,45 +359,45 @@ int sis_final_context(int context)
 {
 	int i;
 
-	for(i=0; i<MAX_CONTEXT; i++)
-	  if(global_ppriv[i].used && (global_ppriv[i].context == context))
-	    break;
-          
-	if(i < MAX_CONTEXT){
-	  set_t *set;
-	  unsigned int item;
-	  int retval;
-	  
-  	  DRM_DEBUG("find socket %d, context = %d\n", i, context);
+	for (i=0; i<MAX_CONTEXT; i++) {
+		if (global_ppriv[i].used &&
+		    (global_ppriv[i].context == context))
+			break;
+	}
 
-	  /* Video Memory */
-	  set = global_ppriv[i].sets[0];
-	  retval = setFirst(set, &item);
-	  while(retval){
-   	    DRM_DEBUG("free video memory 0x%x\n", item);
-            sis_free(item);
-	    retval = setNext(set, &item);
-	  }
-	  setDestroy(set);
+	if (i < MAX_CONTEXT) {
+		set_t *set;
+		unsigned int item;
+		int retval;
 
-	  /* AGP Memory */
-	  set = global_ppriv[i].sets[1];
-	  retval = setFirst(set, &item);
-	  while(retval){
-   	    DRM_DEBUG("free agp memory 0x%x\n", item);
-	    mmFreeMem((PMemBlock)(unsigned long)item);
-	    retval = setNext(set, &item);
-	  }
-	  setDestroy(set);
-	  
-	  global_ppriv[i].used = 0;	  
-        }
+		DRM_DEBUG("find socket %d, context = %d\n", i, context);
 
-	/* turn-off auto-flip */
-	/* TODO */
-#if defined(SIS_STEREO)
-	flip_final();
+		/* Video Memory */
+		set = global_ppriv[i].sets[0];
+		retval = setFirst(set, &item);
+		while (retval) {
+			DRM_DEBUG("free video memory 0x%x\n", item);
+#if defined(__linux__) && defined(CONFIG_FB_SIS)
+			sis_free(item);
+#else
+			mmFreeMem((PMemBlock)item);
 #endif
+			retval = setNext(set, &item);
+		}
+		setDestroy(set);
+
+		/* AGP Memory */
+		set = global_ppriv[i].sets[1];
+		retval = setFirst(set, &item);
+		while (retval) {
+			DRM_DEBUG("free agp memory 0x%x\n", item);
+			mmFreeMem((PMemBlock)item);
+			retval = setNext(set, &item);
+		}
+		setDestroy(set);
+
+		global_ppriv[i].used = 0;	  
+        }
 	
 	return 1;
 }

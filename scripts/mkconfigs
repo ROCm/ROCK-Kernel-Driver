@@ -25,12 +25,6 @@
 #	- Retain lines that begin with "# CONFIG_"
 #	- lines that use double-quotes must \\-escape-quote them
 
-
-kernel_version()
-{
-	KERNVER="`grep VERSION $1 | head -n 1 | cut -f3 -d' '`.`grep PATCHLEVEL $1 | head -n 1 | cut -f3 -d' '`.`grep SUBLEVEL $1 | head -n 1 | cut -f3 -d' '``grep EXTRAVERSION $1 | head -n 1 | cut -f3 -d' '`"
-}
-
 if [ $# -lt 2 ]
 then
 	echo "Usage: `basename $0` <configuration_file> <Makefile>"
@@ -66,15 +60,7 @@ echo \
  *
  */"
 
-echo "static char *ikconfig_built_with ="
-echo "    \"`uname -s` `uname -r` `uname -v` `uname -m`\";"
-echo
-kernel_version $makefile
-echo "#ifdef CONFIG_IKCONFIG_PROC"
-echo "static char *ikconfig_config = "
-echo "#else"
-echo "static char *ikconfig_config __initdata __attribute__((unused)) = "
-echo "#endif"
+echo "static char const ikconfig_config[] __attribute__((unused)) = "
 echo "\"CONFIG_BEGIN=n\\n\\"
 echo "`cat $config | sed 's/\"/\\\\\"/g' | grep "^#\? \?CONFIG_" | awk '{ print $0 "\\\\n\\\\" }' `"
 echo "CONFIG_END=n\\n\";"

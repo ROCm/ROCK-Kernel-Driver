@@ -1,7 +1,7 @@
 #ifndef _CIO_QDIO_H
 #define _CIO_QDIO_H
 
-#define VERSION_CIO_QDIO_H "$Revision: 1.18 $"
+#define VERSION_CIO_QDIO_H "$Revision: 1.20 $"
 
 //#define QDIO_DBF_LIKE_HELL
 
@@ -56,7 +56,6 @@
 #define QDIO_STATS_CLASSES 2
 #define QDIO_STATS_COUNT_NEEDED 2*/
 
-#define QDIO_NO_USE_COUNT_TIME 10
 #define QDIO_NO_USE_COUNT_TIMEOUT 1000 /* wait for 1 sec on each q before
 					  exiting without having use_count
 					  of the queue to 0 */
@@ -577,9 +576,6 @@ struct qdio_q {
 	volatile struct qdio_q *list_next;
 	volatile struct qdio_q *list_prev;
 
-	struct slib *slib; /* a page is allocated under this pointer,
-			      sl points into this page, offset PAGE_SIZE/2
-			      (after slib) */
 	struct sl *sl;
 	volatile struct sbal *sbal[QDIO_MAX_BUFFERS_PER_Q];
 
@@ -605,6 +601,11 @@ struct qdio_q {
 		__u64 last_transfer_time;
 	} timing;
         unsigned int queue_type;
+
+	/* leave this member at the end. won't be cleared in qdio_fill_qs */
+	struct slib *slib; /* a page is allocated under this pointer,
+			      sl points into this page, offset PAGE_SIZE/2
+			      (after slib) */
 } __attribute__ ((aligned(256)));
 
 struct qdio_irq {
@@ -619,19 +620,13 @@ struct qdio_irq {
 	unsigned int sync_done_on_outb_pcis;
 
 	enum qdio_irq_states state;
-	struct semaphore setting_up_sema;
 
 	unsigned int no_input_qs;
 	unsigned int no_output_qs;
 
 	unsigned char qdioac;
 
-	struct qdio_q *input_qs[QDIO_MAX_QUEUES_PER_IRQ];
-	struct qdio_q *output_qs[QDIO_MAX_QUEUES_PER_IRQ];
-
 	struct ccw1 ccw;
-
-	struct qdr *qdr;
 
 	struct ciw equeue;
 	struct ciw aqueue;
@@ -641,5 +636,10 @@ struct qdio_irq {
  	void (*original_int_handler) (struct ccw_device *,
  				      unsigned long, struct irb *);
 
+	/* leave these four members together at the end. won't be cleared in qdio_fill_irq */
+	struct qdr *qdr;
+	struct qdio_q *input_qs[QDIO_MAX_QUEUES_PER_IRQ];
+	struct qdio_q *output_qs[QDIO_MAX_QUEUES_PER_IRQ];
+	struct semaphore setting_up_sema;
 };
 #endif

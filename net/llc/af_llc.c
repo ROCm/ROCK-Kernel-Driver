@@ -24,13 +24,13 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/tcp.h>
+#include <linux/rtnetlink.h>
+#include <linux/init.h>
+#include <net/llc.h>
 #include <net/llc_sap.h>
 #include <net/llc_pdu.h>
 #include <net/llc_conn.h>
-#include <net/llc_mac.h>
-#include <net/llc_main.h>
-#include <linux/rtnetlink.h>
-#include <linux/init.h>
+#include <net/llc_proc.h>
 
 /* remember: uninitialized global data is zeroed because its in .bss */
 static u16 llc_ui_sap_last_autoport = LLC_SAP_DYN_START;
@@ -182,10 +182,12 @@ static int llc_ui_release(struct socket *sock)
 	if (!llc_send_disc(sk))
 		llc_ui_wait_for_disc(sk, sk->sk_rcvtimeo);
 	if (!sk->sk_zapped)
-		llc_sap_unassign_sock(llc->sap, sk);
+		llc_sap_remove_socket(llc->sap, sk);
 	release_sock(sk);
-	if (llc->sap && hlist_empty(&llc->sap->sk_list.list))
+	if (llc->sap && hlist_empty(&llc->sap->sk_list.list)) {
+		llc_release_sockets(llc->sap);
 		llc_sap_close(llc->sap);
+	}
 	sock_put(sk);
 	llc_sk_free(sk);
 out:
@@ -303,7 +305,7 @@ static int llc_ui_autobind(struct socket *sock, struct sockaddr_llc *addr)
 	memcpy(llc->daddr.mac, addr->sllc_dmac, IFHWADDRLEN);
 	memcpy(&llc->addr, addr, sizeof(llc->addr));
 	/* assign new connection to its SAP */
-	llc_sap_assign_sock(sap, sk);
+	llc_sap_add_socket(sap, sk);
 	rc = sk->sk_zapped = 0;
 out:
 	return rc;
@@ -1042,14 +1044,38 @@ static struct proto_ops llc_ui_ops = {
 	.sendpage    = sock_no_sendpage,
 };
 
-int __init llc_ui_init(void)
+extern void llc_sap_handler(struct llc_sap *sap, struct sk_buff *skb);
+extern void llc_conn_handler(struct llc_sap *sap, struct sk_buff *skb);
+
+static int __init llc2_init(void)
 {
+	int rc;
+
+	llc_build_offset_table();
+	llc_station_init();
 	llc_ui_sap_last_autoport = LLC_SAP_DYN_START;
-	sock_register(&llc_ui_family_ops);
-	return 0;
+	rc = llc_proc_init();
+	if (!rc) {
+		sock_register(&llc_ui_family_ops);
+		llc_add_pack(LLC_DEST_SAP, llc_sap_handler);
+		llc_add_pack(LLC_DEST_CONN, llc_conn_handler);
+	}
+	return rc;
 }
 
-void __exit llc_ui_exit(void)
+static void __exit llc2_exit(void)
 {
+	llc_station_exit();
+	llc_remove_pack(LLC_DEST_SAP);
+	llc_remove_pack(LLC_DEST_CONN);
 	sock_unregister(PF_LLC);
+	llc_proc_exit();
 }
+
+module_init(llc2_init);
+module_exit(llc2_exit);
+
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Procom 1997, Jay Schullist 2001, Arnaldo C. Melo 2001-2003");
+MODULE_DESCRIPTION("IEEE 802.2 PF_LLC support");
+MODULE_ALIAS_NETPROTO(PF_LLC);

@@ -3789,17 +3789,11 @@ static int snd_hdsp_hwdep_dummy_op(snd_hwdep_t *hw, struct file *file)
 static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int cmd, unsigned long arg)
 {
 	hdsp_t *hdsp = (hdsp_t *)hw->private_data;	
-	hdsp_peak_rms_t *peak_rms;
-	hdsp_firmware_t *firmware;
-	hdsp_mixer_t	*mixer;
-	hdsp_config_info_t info;
-	hdsp_version_t hdsp_version;
-	int i;
-	int err;
-	unsigned long flags;
 	
 	switch (cmd) {
-	case SNDRV_HDSP_IOCTL_GET_PEAK_RMS:
+	case SNDRV_HDSP_IOCTL_GET_PEAK_RMS: {
+		hdsp_peak_rms_t *peak_rms;
+
 		if (hdsp->io_type == H9652) {
 		    snd_printk("hardware metering isn't supported yet for hdsp9652 cards\n");
 		    return -EINVAL;
@@ -3825,7 +3819,12 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 			return -EFAULT;
 		}
 		break;
-	case SNDRV_HDSP_IOCTL_GET_CONFIG_INFO:
+	}
+	case SNDRV_HDSP_IOCTL_GET_CONFIG_INFO: {
+		hdsp_config_info_t info;
+		unsigned long flags;
+		int i;
+
 		if (!(hdsp->state & HDSP_FirmwareLoaded)) {
 			snd_printk("Firmware needs to be uploaded to the card.\n");	
 			return -EINVAL;
@@ -3855,7 +3854,11 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 		if (copy_to_user((void *)arg, &info, sizeof(info)))
 			return -EFAULT;
 		break;
-	case SNDRV_HDSP_IOCTL_GET_VERSION:
+	}
+	case SNDRV_HDSP_IOCTL_GET_VERSION: {
+		hdsp_version_t hdsp_version;
+		int err;
+
 		if (hdsp->io_type == H9652) return -EINVAL;
 		if (hdsp->io_type == Undefined) {
 			if ((err = hdsp_get_iobox_version(hdsp)) < 0) {
@@ -3868,19 +3871,27 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 		    	return -EFAULT;
 		}
 		break;
-	case SNDRV_HDSP_IOCTL_UPLOAD_FIRMWARE:
+	}
+	case SNDRV_HDSP_IOCTL_UPLOAD_FIRMWARE: {
+		hdsp_firmware_t *firmware;
+		unsigned long *firmware_data;
+		int err;
+
 		if (hdsp->io_type == H9652) return -EINVAL;
 		/* SNDRV_HDSP_IOCTL_GET_VERSION must have been called */
 		if (hdsp->io_type == Undefined) return -EINVAL;
 
 		snd_printk("initializing firmware upload\n");
 		firmware = (hdsp_firmware_t *)arg;
+		if (get_user(firmware_data, &firmware->firmware_data)) {
+			return -EFAULT;
+		}
 
 		if (hdsp_check_for_iobox (hdsp)) {
 			return -EIO;
 		}
 
-		if (copy_from_user(hdsp->firmware_cache, firmware->firmware_data, sizeof(unsigned long)*24413) != 0) {
+		if (copy_from_user(hdsp->firmware_cache, firmware_data, sizeof(unsigned long)*24413) != 0) {
 			return -EFAULT;
 		}
 		
@@ -3902,11 +3913,15 @@ static int snd_hdsp_hwdep_ioctl(snd_hwdep_t *hw, struct file *file, unsigned int
 			}
 		}
 		break;
-	case SNDRV_HDSP_IOCTL_GET_MIXER:
+	}
+	case SNDRV_HDSP_IOCTL_GET_MIXER: {
+		hdsp_mixer_t	*mixer;
+
 		mixer = (hdsp_mixer_t *)arg;
 		if (copy_to_user(mixer->matrix, hdsp->mixer_matrix, sizeof(unsigned short)*HDSP_MATRIX_MIXER_SIZE))
 			return -EFAULT;
 		break;
+	}
 	default:
 		return -EINVAL;
 	}

@@ -2,10 +2,10 @@
 # Sensor device configuration
 #
 
-menu "I2C Hardware Sensors Mainboard support"
+menu "I2C Hardware Bus support"
 
 config I2C_ALI1535
-	tristate "  ALI 1535"
+	tristate "ALI 1535"
 	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the SMB
@@ -13,63 +13,61 @@ config I2C_ALI1535
 	  controller is part of the 7101 device, which is an ACPI-compliant
 	  Power Management Unit (PMU).
 
-	  This can also be built as a module.  If so, the module will be
-	  called i2c-ali1535.
-
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at
-	  http://www.lm-sensors.nu
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-ali1535.
 
 config I2C_ALI15X3
-	tristate "  ALI 15x3"
+	tristate "ALI 15x3"
 	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the
 	  Acer Labs Inc. (ALI) M1514 and M1543 motherboard I2C interfaces.
 
-	  This can also be built as a module.  If so, the module will be
-	  called i2c-ali15x3.
-
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at
-	  http://www.lm-sensors.nu
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-ali15x3.
 
 config I2C_AMD756
-	tristate "  AMD 756/766"
+	tristate "AMD 756/766"
 	depends on I2C && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the AMD
 	  756/766/768 mainboard I2C interfaces.
 
-	  This can also be built as a module which can be inserted and removed 
-	  while the kernel is running.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
-
-	  The module will be called i2c-amd756.
-
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at 
-	  http://www.lm-sensors.nu
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-amd756.
 
 config I2C_AMD8111
-	tristate "  AMD 8111"
+	tristate "AMD 8111"
 	depends on I2C && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the AMD
 	  8111 mainboard I2C interfaces.
 
-	  This can also be built as a module which can be inserted and removed 
-	  while the kernel is running.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-amd8111.
 
-	  The module will be called i2c-amd8111.
+config I2C_ELEKTOR
+	tristate "Elektor ISA card"
+	depends on I2C_ALGOPCF && BROKEN_ON_SMP
+	help
+	  This supports the PCF8584 ISA bus I2C adapter.  Say Y if you own
+	  such an adapter.
 
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at 
-	  http://www.lm-sensors.nu
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-elektor.
+
+config I2C_ELV
+	tristate "ELV adapter"
+	depends on I2C_ALGOBIT && ISA
+	help
+	  This supports parallel-port I2C adapters called ELV.  Say Y if you
+	  own such an adapter.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-elv.
 
 config I2C_I801
-	tristate "  Intel 801"
+	tristate "Intel 801"
 	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the Intel
@@ -81,53 +79,84 @@ config I2C_I801
 	    82801CA/CAM
 	    82801DB
 
-	  This can also be built as a module which can be inserted and removed 
-	  while the kernel is running.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-i801.
 
-	  The module will be called i2c-i801.
+config I2C_I810
+	tristate "Intel 810/815"
+	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the Intel
+	  810/815 family of mainboard I2C interfaces.  Specifically, the 
+	  following versions of the chipset is supported:
+	    i810AA
+	    i810AB
+	    i810E
+	    i815
 
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at 
-	  http://www.lm-sensors.nu
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-i810.
+
+config I2C_IBM_IIC
+	tristate "IBM IIC I2C"
+	depends on IBM_OCP && I2C
+
+config I2C_IOP3XX
+	tristate "Intel XScale IOP3xx on-chip I2C interface"
+	depends on ARCH_IOP3XX && I2C
 
 config I2C_ISA
-	tristate "  ISA Bus support"
+	tristate "ISA Bus support"
 	depends on I2C && ISA && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for i2c
 	  interfaces that are on the ISA bus.
 
-	  This can also be built as a module which can be inserted and removed 
-	  while the kernel is running.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-isa.
 
-	  The module will be called i2c-isa.
+config I2C_ITE
+	tristate "ITE I2C Adapter"
+	depends on I2C_ALGOITE
+	help
+	  This supports the ITE8172 I2C peripheral found on some MIPS
+	  systems. Say Y if you have one of these. You should also say Y for
+	  the ITE I2C driver algorithm support above.
 
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at 
-	  http://www.lm-sensors.nu
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-ite.
+
+config I2C_KEYWEST
+	tristate "Powermac Keywest I2C interface"
+	depends on I2C && PPC_PMAC
+	help
+	  This supports the use of the I2C interface in the combo-I/O
+	  chip on recent Apple machines.  Say Y if you have such a machine.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-keywest.
 
 config I2C_NFORCE2
-	tristate "  Nvidia Nforce2"
+	tristate "Nvidia Nforce2"
 	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the Nvidia
 	  Nforce2 family of mainboard I2C interfaces.
 
-	  This can also be built as a module which can be inserted and removed
-	  while the kernel is running.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-nforce2.
 
-	  The module will be called i2c-nforce2.
+config I2C_PHILIPSPAR
+	tristate "Philips style parallel port adapter"
+	depends on I2C_ALGOBIT && PARPORT
+	help
+	  This supports parallel-port I2C adapters made by Philips.
 
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at
-	  http://www.lm-sensors.nu
-
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-philips-par.
 
 config I2C_PIIX4
-	tristate "  Intel PIIX4"
+	tristate "Intel PIIX4"
 	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the Intel
@@ -139,19 +168,97 @@ config I2C_PIIX4
 	    Serverworks CSB5
 	    SMSC Victory66
 
-	  This can also be built as a module which can be inserted and removed 
-	  while the kernel is running.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-piix4.
 
-	  The module will be called i2c-piix4.
+config I2C_PROSAVAGE
+	tristate "S3/VIA (Pro)Savage"
+	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the
+	  I2C bus and DDC bus of the S3VIA embedded Savage4 and ProSavage8
+	  graphics processors.
+	  chipsets supported:
+	    S3/VIA KM266/VT8375 aka ProSavage8
+	    S3/VIA KM133/VT8365 aka Savage4
 
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at 
-	  http://www.lm-sensors.nu
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-prosavage.
 
+config I2C_RPXLITE
+	tristate "Embedded Planet RPX Lite/Classic suppoort"
+	depends on (RPXLITE || RPXCLASSIC) && I2C_ALGO8XX
+
+config I2C_SAVAGE4
+	tristate "S3 Savage 4"
+	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the 
+	  S3 Savage 4 I2C interface.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-savage4.
+
+config SCx200_I2C
+	tristate "NatSemi SCx200 I2C using GPIO pins"
+	depends on SCx200 && I2C_ALGOBIT
+	help
+	  Enable the use of two GPIO pins of a SCx200 processor as an I2C bus.
+
+	  If you don't know what to do here, say N.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called scx200_i2c.
+
+config SCx200_I2C_SCL
+	int "GPIO pin used for SCL"
+	depends on SCx200_I2C
+	default "12"
+	help
+	  Enter the GPIO pin number used for the SCL signal.  This value can
+	  also be specified with a module parameter.
+
+config SCx200_I2C_SDA
+	int "GPIO pin used for SDA"
+	depends on SCx200_I2C
+	default "13"
+	help
+	  Enter the GPIO pin number used for the SSA signal.  This value can
+	  also be specified with a module parameter.
+
+config SCx200_ACB
+	tristate "NatSemi SCx200 ACCESS.bus"
+	depends on I2C_ALGOBIT!=n && I2C
+	help
+	  Enable the use of the ACCESS.bus controllers of a SCx200 processor.
+
+	  If you don't know what to do here, say N.
+
+	  This support is also available as a module.  If so, the module 
+	  will be called scx200_acb.
+
+config I2C_SIS5595
+	tristate "SiS 5595"
+	depends on I2C && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the 
+	  SiS5595 SMBus (a subset of I2C) interface.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-sis5595.
+
+config I2C_SIS630
+	tristate "SiS 630"
+	depends on I2C && PCI && EXPERIMENTAL
+	help
+	  If you say yes to this option, support will be included for the 
+	  SiS630 SMBus (a subset of I2C) interface.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-sis630.
 
 config I2C_SIS96X
-	tristate "  SiS 96x"
+	tristate "SiS 96x"
 	depends on I2C && PCI && EXPERIMENTAL
 	help
 	  If you say yes to this option, support will be included for the SiS
@@ -164,19 +271,32 @@ config I2C_SIS96X
 	    650/961
 	    735
 
-	  This can also be built as a module which can be inserted and removed 
-	  while the kernel is running.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-sis96x.
 
-	  The module will be called i2c-sis96x.
+config I2C_VELLEMAN
+	tristate "Velleman K9000 adapter"
+	depends on I2C_ALGOBIT && ISA
+	help
+	  This supports the Velleman K9000 parallel-port I2C adapter.  Say Y
+	  if you own such an adapter.
 
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at 
-	  http://www.lm-sensors.nu
+	  This support is also available as a module.  If so, the module 
+	  will be called i2c-velleman.
 
+config I2C_VIA
+	tristate "VIA 82C58B"
+	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	help
+
+	  If you say yes to this option, support will be included for the VIA
+          82C586B I2C interface
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-via.
 
 config I2C_VIAPRO
-	tristate "  VIA 82C596/82C686/823x"
+	tristate "VIA 82C596/82C686/823x"
 	depends on I2C && PCI && EXPERIMENTAL
 	help
 
@@ -190,15 +310,18 @@ config I2C_VIAPRO
 	  8233A
 	  8235
 
-	  This can also be built as a module which can be inserted and removed
-	  while the kernel is running.  If you want to compile it as a module,
-	  say M here and read <file:Documentation/modules.txt>.
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-viapro.
 
-	  The module will be called i2c-viapro.
+config I2C_VOODOO3
+	tristate "Voodoo 3"
+	depends on I2C_ALGOBIT && PCI && EXPERIMENTAL
+	help
 
-	  You will also need the latest user-space utilties: you can find them
-	  in the lm_sensors package, which you can download at
-	  http://www.lm-sensors.nu
+	  If you say yes to this option, support will be included for the
+	  Voodoo 3 I2C interface.
+
+	  This driver can also be built as a module.  If so, the module
+	  will be called i2c-voodoo3.
 
 endmenu
-

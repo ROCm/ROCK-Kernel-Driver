@@ -2351,7 +2351,7 @@ static void *tcp_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *tcp_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return *pos ? tcp_get_idx(seq, *pos - 1) : (void *)1;
+	return *pos ? tcp_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
@@ -2359,7 +2359,7 @@ static void *tcp_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 	void *rc = NULL;
 	struct tcp_iter_state* st;
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		rc = tcp_get_idx(seq, 0);
 		goto out;
 	}
@@ -2397,7 +2397,7 @@ static void tcp_seq_stop(struct seq_file *seq, void *v)
 			read_unlock_bh(&tp->syn_wait_lock);
 		}
 	case TCP_SEQ_STATE_LISTENING:
-		if (v != (void *)1)
+		if (v != SEQ_START_TOKEN)
 			tcp_listen_unlock();
 		break;
 	case TCP_SEQ_STATE_TIME_WAIT:
@@ -2413,11 +2413,15 @@ static int tcp_seq_open(struct inode *inode, struct file *file)
 {
 	struct tcp_seq_afinfo *afinfo = PDE(inode)->data;
 	struct seq_file *seq;
-	int rc = -ENOMEM;
-	struct tcp_iter_state *s = kmalloc(sizeof(*s), GFP_KERNEL);
+	struct tcp_iter_state *s;
+	int rc;
 
+	if (unlikely(afinfo == NULL))
+		return -EINVAL;
+
+	s = kmalloc(sizeof(*s), GFP_KERNEL);
 	if (!s)
-		goto out;
+		return -ENOMEM;
 	memset(s, 0, sizeof(*s));
 	s->family		= afinfo->family;
 	s->seq_ops.start	= tcp_seq_start;
@@ -2450,11 +2454,10 @@ int tcp_proc_register(struct tcp_seq_afinfo *afinfo)
 	afinfo->seq_fops->llseek	= seq_lseek;
 	afinfo->seq_fops->release	= seq_release_private;
 	
-	p = create_proc_entry(afinfo->name, S_IRUGO, proc_net);
-	if (p) {
+	p = proc_net_fops_create(afinfo->name, S_IRUGO, afinfo->seq_fops);
+	if (p)
 		p->data = afinfo;
-		p->proc_fops = afinfo->seq_fops;
-	} else
+	else
 		rc = -ENOMEM;
 	return rc;
 }
@@ -2463,7 +2466,7 @@ void tcp_proc_unregister(struct tcp_seq_afinfo *afinfo)
 {
 	if (!afinfo)
 		return;
-	remove_proc_entry(afinfo->name, proc_net);
+	proc_net_remove(afinfo->name);
 	memset(afinfo->seq_fops, 0, sizeof(*afinfo->seq_fops)); 
 }
 
@@ -2559,7 +2562,7 @@ static int tcp4_seq_show(struct seq_file *seq, void *v)
 	struct tcp_iter_state* st;
 	char tmpbuf[TMPSZ + 1];
 
-	if (v == (void *)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_printf(seq, "%-*s\n", TMPSZ - 1,
 			   "  sl  local_address rem_address   st tx_queue "
 			   "rx_queue tr tm->when retrnsmt   uid  timeout "

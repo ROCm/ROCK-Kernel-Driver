@@ -210,14 +210,13 @@ static int __devinit olympic_probe(struct pci_dev *pdev, const struct pci_device
 	pci_set_master(pdev);
 
 	if ((i = pci_request_regions(pdev,"olympic"))) { 
-		return i ; 
-	} ; 
+		goto op_disable_dev;
+	}
  
 	dev = alloc_trdev(sizeof(struct olympic_private)) ; 
-
 	if (!dev) {
-		pci_release_regions(pdev) ; 
-		return -ENOMEM ; 
+		i = -ENOMEM; 
+		goto op_free_dev;
 	}
 
 	olympic_priv = dev->priv ;
@@ -231,10 +230,12 @@ static int __devinit olympic_probe(struct pci_dev *pdev, const struct pci_device
 	dev->base_addr=pci_resource_start(pdev, 0);
 	dev->init=NULL; /* Must be NULL otherwise we get called twice */
 	olympic_priv->olympic_card_name = pci_name(pdev);
+	olympic_priv->pdev = pdev; 
 	olympic_priv->olympic_mmio = ioremap(pci_resource_start(pdev,1),256);
 	olympic_priv->olympic_lap = ioremap(pci_resource_start(pdev,2),2048);
-#warning check ioremap return value
-	olympic_priv->pdev = pdev ; 
+	if (!olympic_priv->olympic_mmio || !olympic_priv->olympic_lap) {
+		goto op_free_iomap;
+	}
 				
 	if ((pkt_buf_sz[card_no] < 100) || (pkt_buf_sz[card_no] > 18000) )
 		olympic_priv->pkt_buf_sz = PKT_BUF_SZ ; 
@@ -246,12 +247,8 @@ static int __devinit olympic_probe(struct pci_dev *pdev, const struct pci_device
 	olympic_priv->olympic_message_level = message_level[card_no] ; 
 	olympic_priv->olympic_network_monitor = network_monitor[card_no];
 	
-	if((i = olympic_init(dev))) {
-		iounmap(olympic_priv->olympic_mmio) ; 
-		iounmap(olympic_priv->olympic_lap) ; 
-		kfree(dev) ; 
-		pci_release_regions(pdev) ; 
-		return i ; 
+	if ((i = olympic_init(dev))) {
+		goto op_free_iomap;
 	}				
 
 	dev->open=&olympic_open;
@@ -275,6 +272,20 @@ static int __devinit olympic_probe(struct pci_dev *pdev, const struct pci_device
 		printk("Olympic: Network Monitor information: /proc/%s\n",proc_name); 
 	}
 	return  0 ;
+
+op_free_iomap:
+	if (olympic_priv->olympic_mmio)
+		iounmap(olympic_priv->olympic_mmio); 
+	if (olympic_priv->olympic_lap)
+		iounmap(olympic_priv->olympic_lap);
+
+op_free_dev:
+	free_netdev(dev);
+	pci_release_regions(pdev); 
+
+op_disable_dev:
+	pci_disable_device(pdev);
+	return i;
 }
 
 static int __devinit olympic_init(struct net_device *dev)

@@ -14,7 +14,7 @@
  */
 
 #include <linux/config.h>
-#include <asm/processor.h>
+#include <asm/reg.h>
 #include <asm/cache.h>
 #include <asm/ppc_asm.h>
 
@@ -71,21 +71,8 @@ start_:
 #ifdef CONFIG_6xx
 	bl	disable_6xx_mmu
 	bl	disable_6xx_l1cache
-#if defined(CONFIG_FORCE) || defined(CONFIG_K2)		\
-		|| defined(CONFIG_EV64260) || defined(CONFIG_PAL4)
-	bl	_setup_L2CR
 
-	/* If 745x, turn off L3CR as well */
-	mfspr	r8,PVR
-	srwi	r8,r8,16
-
-	cmpli	cr0,r8,0x8000			/* 7450 */
-	cmpli	cr1,r8,0x8001			/* 7455 */
-	cmpli	cr2,r8,0x8002			/* 7457 */
-	cror	4*cr0+eq,4*cr0+eq,4*cr1+eq	/* Now test if any are true. */
-	cror	4*cr0+eq,4*cr0+eq,4*cr2+eq
-	beql	_setup_L3CR
-#endif
+	CLEAR_CACHES
 #endif
 
 #ifdef CONFIG_8xx

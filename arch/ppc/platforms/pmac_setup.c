@@ -1,7 +1,7 @@
 /*
  *  arch/ppc/platforms/setup.c
  *
- *  PowerPC version 
+ *  PowerPC version
  *    Copyright (C) 1995-1996 Gary Thomas (gdt@linuxppc.org)
  *
  *  Adapted for Power Macintosh by Paul Mackerras
@@ -52,7 +52,7 @@
 #include <linux/seq_file.h>
 #include <linux/root_dev.h>
 
-#include <asm/processor.h>
+#include <asm/reg.h>
 #include <asm/sections.h>
 #include <asm/prom.h>
 #include <asm/system.h>
@@ -107,7 +107,7 @@ extern char saved_command_line[];
 
 extern int pmac_newworld;
 
-#define DEFAULT_ROOT_DEVICE 0x0801	/* sda1 - slightly silly choice */
+#define DEFAULT_ROOT_DEVICE Root_SDA1	/* sda1 - slightly silly choice */
 
 extern void zs_kgdb_hook(int tty_num);
 static void ohare_init(void);
@@ -136,7 +136,7 @@ pmac_show_cpuinfo(struct seq_file *m)
 
 	if (pmac_call_feature(PMAC_FTR_GET_MB_INFO, NULL, PMAC_MB_INFO_NAME, (int)&mbname) != 0)
 		mbname = "Unknown";
-		
+	
 	/* find motherboard type */
 	seq_printf(m, "machine\t\t: ");
 	np = find_devices("device-tree");
@@ -163,7 +163,7 @@ pmac_show_cpuinfo(struct seq_file *m)
 	/* print parsed model */
 	seq_printf(m, "detected as\t: %d (%s)\n", mbmodel, mbname);
 	seq_printf(m, "pmac flags\t: %08x\n", mbflags);
-	
+
 	/* find l2 cache info */
 	np = find_devices("l2-cache");
 	if (np == 0)
@@ -196,7 +196,7 @@ pmac_show_cpuinfo(struct seq_file *m)
 		int n;
 		struct reg_property *reg = (struct reg_property *)
 			get_property(np, "reg", &n);
-		
+	
 		if (reg != 0) {
 			unsigned long total = 0;
 
@@ -207,9 +207,9 @@ pmac_show_cpuinfo(struct seq_file *m)
 	}
 
 	/* Checks "l2cr-value" property in the registry */
-	np = find_devices("cpus");		
+	np = find_devices("cpus");	
 	if (np == 0)
-		np = find_type_devices("cpu");		
+		np = find_type_devices("cpu");	
 	if (np != 0) {
 		unsigned int *l2cr = (unsigned int *)
 			get_property(np, "l2cr-value", NULL);
@@ -217,11 +217,11 @@ pmac_show_cpuinfo(struct seq_file *m)
 			seq_printf(m, "l2cr override\t: 0x%x\n", *l2cr);
 		}
 	}
-	
+
 	/* Indicate newworld/oldworld */
 	seq_printf(m, "pmac-generation\t: %s\n",
 		   pmac_newworld ? "NewWorld" : "OldWorld");
-	
+
 
 	return 0;
 }
@@ -248,7 +248,7 @@ pmac_setup_arch(void)
 	struct device_node *cpu;
 	int *fp;
 	unsigned long pvr;
-	
+
 	pvr = PVR_VER(mfspr(PVR));
 
 	/* Set loops_per_jiffy to a half-way reasonable value,
@@ -274,12 +274,12 @@ pmac_setup_arch(void)
 
 	/* Lookup PCI hosts */
 	pmac_find_bridges();
-	
+
 	/* Checks "l2cr-value" property in the registry */
 	if (cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR) {
-		struct device_node *np = find_devices("cpus");		
+		struct device_node *np = find_devices("cpus");	
 		if (np == 0)
-			np = find_type_devices("cpu");		
+			np = find_type_devices("cpu");	
 		if (np != 0) {
 			unsigned int *l2cr = (unsigned int *)
 				get_property(np, "l2cr-value", NULL);
@@ -296,7 +296,7 @@ pmac_setup_arch(void)
 		printk(KERN_INFO "L2CR overriden (0x%x), backside cache is %s\n",
 			ppc_override_l2cr_value, (ppc_override_l2cr_value & 0x80000000)
 				? "enabled" : "disabled");
-	
+
 #ifdef CONFIG_KGDB
 	zs_kgdb_hook(0);
 #endif
@@ -308,7 +308,7 @@ pmac_setup_arch(void)
 		printk("WARNING ! Your machine is Cuda based but your kernel\n");
 		printk("          wasn't compiled with CONFIG_ADB_CUDA option !\n");
 	}
-#endif	
+#endif
 #ifdef CONFIG_ADB_PMU
 	find_via_pmu();
 #else
@@ -316,7 +316,7 @@ pmac_setup_arch(void)
 		printk("WARNING ! Your machine is PMU based but your kernel\n");
 		printk("          wasn't compiled with CONFIG_ADB_PMU option !\n");
 	}
-#endif	
+#endif
 #ifdef CONFIG_NVRAM
 	pmac_nvram_init();
 #endif
@@ -472,7 +472,7 @@ pmac_restart(char *cmd)
 #ifdef CONFIG_NVRAM
 	pmac_nvram_update();
 #endif
-	
+
 	switch (sys_ctrler) {
 #ifdef CONFIG_ADB_CUDA
 	case SYS_CTRLER_CUDA:
@@ -482,11 +482,11 @@ pmac_restart(char *cmd)
 			cuda_poll();
 		break;
 #endif /* CONFIG_ADB_CUDA */
-#ifdef CONFIG_ADB_PMU		
+#ifdef CONFIG_ADB_PMU	
 	case SYS_CTRLER_PMU:
 		pmu_restart();
 		break;
-#endif /* CONFIG_ADB_PMU */		
+#endif /* CONFIG_ADB_PMU */	
 	default: ;
 	}
 }
@@ -501,7 +501,7 @@ pmac_power_off(void)
 #ifdef CONFIG_NVRAM
 	pmac_nvram_update();
 #endif
-	
+
 	switch (sys_ctrler) {
 #ifdef CONFIG_ADB_CUDA
 	case SYS_CTRLER_CUDA:
@@ -623,7 +623,7 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.irq_canonicalize = NULL;
 	ppc_md.init_IRQ       = pmac_pic_init;
 	ppc_md.get_irq        = pmac_get_irq; /* Changed later on ... */
-	
+
 	ppc_md.pcibios_fixup  = pmac_pcibios_fixup;
 	ppc_md.pcibios_enable_device_hook = pmac_pci_enable_device_hook;
 	ppc_md.pcibios_after_init = pmac_pcibios_after_init;
@@ -658,7 +658,7 @@ pmac_init(unsigned long r3, unsigned long r4, unsigned long r5,
 #endif /* CONFIG_BOOTX_TEXT */
 
 	if (ppc_md.progress) ppc_md.progress("pmac_init(): exit", 0);
-	
+
 }
 
 #ifdef CONFIG_BOOTX_TEXT

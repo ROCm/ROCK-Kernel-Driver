@@ -1088,6 +1088,7 @@ static int irix_core_dump(long signr, struct pt_regs * regs, struct file *file)
 	elf.e_ident[EI_CLASS] = ELFCLASS32;
 	elf.e_ident[EI_DATA] = ELFDATA2LSB;
 	elf.e_ident[EI_VERSION] = EV_CURRENT;
+	elf.e_ident[EI_OSABI] = ELF_OSABI;
 	memset(elf.e_ident+EI_PAD, 0, EI_NIDENT-EI_PAD);
 
 	elf.e_type = ET_CORE;
@@ -1129,7 +1130,7 @@ static int irix_core_dump(long signr, struct pt_regs * regs, struct file *file)
 	prstatus.pr_sighold = current->blocked.sig[0];
 	psinfo.pr_pid = prstatus.pr_pid = current->pid;
 	psinfo.pr_ppid = prstatus.pr_ppid = current->parent->pid;
-	psinfo.pr_pgrp = prstatus.pr_pgrp = current->pgrp;
+	psinfo.pr_pgrp = prstatus.pr_pgrp = process_group(current);
 	psinfo.pr_sid = prstatus.pr_sid = current->session;
 	prstatus.pr_utime.tv_sec = CT_TO_SECS(current->utime);
 	prstatus.pr_utime.tv_usec = CT_TO_USECS(current->utime);

@@ -1,6 +1,6 @@
 /*
  * arch/ppc/syslib/cpc700_pic.c
- * 
+ *
  * Interrupt controller support for IBM Spruce
  *
  * Authors: Mark Greer, Matt Porter, and Johnnie Peters
@@ -21,7 +21,6 @@
 #include <linux/irq.h>
 
 #include <asm/io.h>
-#include <asm/processor.h>
 #include <asm/system.h>
 #include <asm/irq.h>
 
@@ -47,7 +46,7 @@ cpc700_unmask_irq(unsigned int irq)
 
 		/* Know IRQ fits in entry 0 of ppc_cached_irq_mask[] */
 		ppc_cached_irq_mask[0] |= CPC700_UIC_IRQ_BIT(irq);
-		
+	
 		CPC700_OUT_32(CPC700_UIC_UICER, ppc_cached_irq_mask[0]);
 	}
 	return;
@@ -128,10 +127,10 @@ cpc700_pic_init_irq(unsigned int irq)
 	tmp = CPC700_IN_32(CPC700_UIC_UICCR);
 	tmp |= CPC700_UIC_IRQ_BIT(irq);
 	CPC700_OUT_32(CPC700_UIC_UICCR, tmp);
-			
+		
 	return;
 }
-	
+
 __init void
 cpc700_init_IRQ(void)
 {
@@ -179,7 +178,7 @@ cpc700_get_irq(struct pt_regs *regs)
 		irq++;
 		irq_test <<= 1;
 	} while (irq < NR_IRQS);
-		
+	
 
 	if (irq == NR_IRQS)
 	    irq = 33;

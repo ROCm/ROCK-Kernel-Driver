@@ -13,11 +13,70 @@
 
 #include "sleep.h"
 
+#define ACPI_SYSTEM_FILE_SLEEP		"sleep"
 #define ACPI_SYSTEM_FILE_ALARM		"alarm"
 
 #define _COMPONENT		ACPI_SYSTEM_COMPONENT
 ACPI_MODULE_NAME		("sleep")
 
+
+static int acpi_system_sleep_seq_show(struct seq_file *seq, void *offset)
+{
+	int			i;
+
+	ACPI_FUNCTION_TRACE("acpi_system_sleep_seq_show");
+
+	for (i = 0; i <= ACPI_STATE_S5; i++) {
+		if (sleep_states[i]) {
+			seq_printf(seq,"S%d ", i);
+			if (i == ACPI_STATE_S4 && acpi_gbl_FACS->S4bios_f)
+				seq_printf(seq, "S4bios ");
+		}
+	}
+
+	seq_puts(seq, "\n");
+
+	return 0;
+}
+
+static int acpi_system_sleep_open_fs(struct inode *inode, struct file *file)
+{
+	return single_open(file, acpi_system_sleep_seq_show, PDE(inode)->data);
+}
+
+static int
+acpi_system_write_sleep (
+	struct file		*file,
+	const char		*buffer,
+	size_t			count,
+	loff_t			*ppos)
+{
+	char	str[12];
+	u32	state = 0;
+	int	error = 0;
+
+	if (count > sizeof(str) - 1)
+		goto Done;
+	memset(str,0,sizeof(str));
+	if (copy_from_user(str, buffer, count))
+		return -EFAULT;
+
+	/* Check for S4 bios request */
+	if (!strcmp(str,"4b")) {
+		error = acpi_suspend(4);
+		goto Done;
+	}
+	state = simple_strtoul(str, NULL, 0);
+#ifdef CONFIG_SOFTWARE_SUSPEND
+	if (state == 4) {
+		software_suspend();
+		goto Done;
+	}
+#endif
+	error = acpi_suspend(state);
+ Done:
+	return error ? error : count;
+}
 
 static int acpi_system_alarm_seq_show(struct seq_file *seq, void *offset)
 {
@@ -294,6 +353,14 @@ end:
 }
 
 
+static struct file_operations acpi_system_sleep_fops = {
+	.open		= acpi_system_sleep_open_fs,
+	.read		= seq_read,
+	.write		= acpi_system_write_sleep,
+	.llseek		= seq_lseek,
+	.release	= single_release,
+};
+
 static struct file_operations acpi_system_alarm_fops = {
 	.open		= acpi_system_alarm_open_fs,
 	.read		= seq_read,
@@ -306,6 +373,12 @@ static struct file_operations acpi_system_alarm_fops = {
 static int acpi_sleep_proc_init(void)
 {
 	struct proc_dir_entry	*entry = NULL;
+
+	/* 'sleep' [R/W]*/
+	entry = create_proc_entry(ACPI_SYSTEM_FILE_SLEEP,
+				  S_IFREG|S_IRUGO|S_IWUSR, acpi_root_dir);
+	if (entry)
+		entry->proc_fops = &acpi_system_sleep_fops;
 
 	/* 'alarm' [R/W] */
 	entry = create_proc_entry(ACPI_SYSTEM_FILE_ALARM,

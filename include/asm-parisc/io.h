@@ -291,4 +291,11 @@ extern void outsl (unsigned long port, const void *src, unsigned long count);
 #define dma_cache_wback(_start,_size)		do { flush_kernel_dcache_range(_start,_size); } while (0)
 #define dma_cache_wback_inv(_start,_size)	do { flush_kernel_dcache_range(_start,_size); } while (0)
 
+/* PA machines have an MM I/O space from 0xf0000000-0xffffffff in 32
+ * bit mode and from 0xfffffffff0000000-0xfffffffffffffff in 64 bit
+ * mode (essentially just sign extending.  This macro takes in a 32
+ * bit I/O address (still with the leading f) and outputs the correct
+ * value for either 32 or 64 bit mode */
+#define F_EXTEND(x) ((unsigned long)((x) | (0xffffffff00000000ULL)))
+
 #endif

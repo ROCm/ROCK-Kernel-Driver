@@ -44,6 +44,7 @@
 #include <asm/arch_hooks.h>
 #include <asm/sections.h>
 #include <asm/io_apic.h>
+#include <asm/ist.h>
 #include "setup_arch_pre.h"
 #include "mach_resources.h"
 
@@ -102,6 +103,7 @@ struct sys_desc_table_struct {
 	unsigned char table[0];
 };
 struct edid_info edid_info;
+struct ist_info ist_info;
 struct e820map e820;
 
 unsigned char aux_device_present;
@@ -955,11 +957,12 @@ void __init setup_arch(char **cmdline_p)
 	pre_setup_arch_hook();
 	early_cpu_init();
 
- 	ROOT_DEV = ORIG_ROOT_DEV;
+ 	ROOT_DEV = old_decode_dev(ORIG_ROOT_DEV);
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
 	edid_info = EDID_INFO;
 	apm_info.bios = APM_BIOS_INFO;
+	ist_info = IST_INFO;
 	saved_videomode = VIDEO_MODE;
 	printk("Video mode to be used for restore is %lx\n", saved_videomode);
 	if( SYS_DESC_TABLE.length != 0 ) {

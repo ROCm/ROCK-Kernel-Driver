@@ -2081,7 +2081,7 @@ static struct packet_type dn_dix_packet_type = {
 	.type =		__constant_htons(ETH_P_DNA_RT),
 	.dev =		NULL,		/* All devices */
 	.func =		dn_route_rcv,
-	.data =		(void*)1,
+	.data =		PKT_CAN_SHARE_SKB,
 };
 
 #ifdef CONFIG_PROC_FS
@@ -2146,14 +2146,14 @@ static void *dn_socket_get_idx(struct seq_file *seq, loff_t pos)
 
 static void *dn_socket_seq_start(struct seq_file *seq, loff_t *pos)
 {
-	return *pos ? dn_socket_get_idx(seq, *pos - 1) : (void*)1;
+	return *pos ? dn_socket_get_idx(seq, *pos - 1) : SEQ_START_TOKEN;
 }
 
 static void *dn_socket_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	void *rc;
 
-	if (v == (void*)1) {
+	if (v == SEQ_START_TOKEN) {
 		rc = dn_socket_get_idx(seq, 0);
 		goto out;
 	}
@@ -2169,7 +2169,7 @@ out:
 
 static void dn_socket_seq_stop(struct seq_file *seq, void *v)
 {
-	if (v && v != (void*)1)
+	if (v && v != SEQ_START_TOKEN)
 		read_unlock_bh(&dn_hash_lock);
 }
 
@@ -2269,7 +2269,7 @@ static inline void dn_socket_format_entry(struct seq_file *seq, struct sock *sk)
 
 static int dn_socket_seq_show(struct seq_file *seq, void *v)
 {
-	if (v == (void*)1) {
+	if (v == SEQ_START_TOKEN) {
 		seq_puts(seq, "Local                                              Remote\n");
 	} else {
 		dn_socket_format_entry(seq, v);

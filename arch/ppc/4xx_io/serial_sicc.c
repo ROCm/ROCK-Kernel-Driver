@@ -63,7 +63,7 @@
 
 
 /* -----------------------------------------------------------------------------
- *  From STB03xxx SICC UART Specification 
+ *  From STB03xxx SICC UART Specification
  * -----------------------------------------------------------------------------
  *  UART Register Offsets.
  */
@@ -253,7 +253,7 @@ struct SICC_port {
     unsigned int        fifosize;
     unsigned int        tiocm_support;
     void (*set_mctrl)(struct SICC_port *, u_int mctrl);
-};  
+};
 
 /*
  * This is the state information which is persistent across opens
@@ -833,7 +833,7 @@ static void siccuart_change_speed(struct SICC_info *info, struct termios *old_te
     /* As a last resort, if the quotient is zero, default to 9600 bps */
     if (!quot)
         quot = (info->port->uartclk / (16 * 9600)) - 1;
-        
+
     info->timeout = info->port->fifosize * HZ * bits / baud;
     info->timeout += HZ/50;     /* Add .02 seconds of slop */
 
@@ -1239,7 +1239,7 @@ static int get_lsr_info(struct SICC_info *info, unsigned int *value)
                SICC_XMIT_SIZE) > 0) &&
          !info->tty->stopped && !info->tty->hw_stopped))
         result &= TIOCSER_TEMT;
-    
+
     return put_user(result, value);
 }
 

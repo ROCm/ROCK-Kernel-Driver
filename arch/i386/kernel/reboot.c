@@ -251,7 +251,7 @@ void machine_restart(char * __unused)
 	 * other OSs see a clean IRQ state.
 	 */
 	smp_send_stop();
-#elif CONFIG_X86_LOCAL_APIC
+#elif defined(CONFIG_X86_LOCAL_APIC)
 	if (cpu_has_apic) {
 		local_irq_disable();
 		disable_local_APIC();

@@ -31,6 +31,7 @@
 #include <asm/smp.h>
 #include <asm/tlbflush.h>
 #include <asm/proto.h>
+#include <asm/kdebug.h>
 
 void bust_spinlocks(int yes)
 {
@@ -51,6 +52,87 @@ void bust_spinlocks(int yes)
 		printk(" ");
 		console_loglevel = loglevel_save;
 	}
+}
+
+/* Sometimes the CPU reports invalid exceptions on prefetch.
+   Check that here and ignore.
+   Opcode checker based on code by Richard Brunner */
+static int is_prefetch(struct pt_regs *regs, unsigned long addr)
+{ 
+	unsigned char *instr = (unsigned char *)(regs->rip);
+	int scan_more = 1;
+	int prefetch = 0; 
+	unsigned char *max_instr = instr + 15;
+
+	/* Avoid recursive faults for this common case */
+	if (regs->rip == addr)
+		return 0; 
+	
+	/* Code segments in LDT could have a non zero base. Don't check
+	   when that's possible */
+	if (regs->cs & (1<<2))
+		return 0;
+
+	while (scan_more && instr < max_instr) { 
+		unsigned char opcode;
+		unsigned char instr_hi;
+		unsigned char instr_lo;
+
+		if (__get_user(opcode, instr))
+			break; 
+
+		instr_hi = opcode & 0xf0; 
+		instr_lo = opcode & 0x0f; 
+		instr++;
+
+		switch (instr_hi) { 
+		case 0x20:
+		case 0x30:
+			/* Values 0x26,0x2E,0x36,0x3E are valid x86
+			   prefixes.  In long mode, the CPU will signal
+			   invalid opcode if some of these prefixes are
+			   present so we will never get here anyway */
+			scan_more = ((instr_lo & 7) == 0x6);
+			break;
+			
+		case 0x40:
+			/* In AMD64 long mode, 0x40 to 0x4F are valid REX prefixes
+			   Need to figure out under what instruction mode the
+			   instruction was issued ... */
+			/* Could check the LDT for lm, but for now it's good
+			   enough to assume that long mode only uses well known
+			   segments or kernel. */
+			scan_more = ((regs->cs & 3) == 0) || (regs->cs == __USER_CS);
+			break;
+			
+		case 0x60:
+			/* 0x64 thru 0x67 are valid prefixes in all modes. */
+			scan_more = (instr_lo & 0xC) == 0x4;
+			break;		
+		case 0xF0:
+			/* 0xF0, 0xF2, and 0xF3 are valid prefixes in all modes. */
+			scan_more = !instr_lo || (instr_lo>>1) == 1;
+			break;			
+		case 0x00:
+			/* Prefetch instruction is 0x0F0D or 0x0F18 */
+			scan_more = 0;
+			if (__get_user(opcode, instr)) 
+				break;
+			prefetch = (instr_lo == 0xF) &&
+				(opcode == 0x0D || opcode == 0x18);
+			break;			
+		default:
+			scan_more = 0;
+			break;
+		} 
+	}
+
+#if 1
+	if (prefetch)
+		printk("%s: prefetch caused page fault at %lx/%lx\n", current->comm,
+		       regs->rip, addr);
+#endif
+	return prefetch;
 }
 
 static int bad_address(void *p) 
@@ -88,6 +170,12 @@ ret:
 	return;
 bad:
 	printk("BAD\n");
+}
+
+static inline int unhandled_signal(struct task_struct *tsk, int sig)
+{
+	return (tsk->sighand->action[sig-1].sa.sa_handler == SIG_IGN) ||
+		(tsk->sighand->action[sig-1].sa.sa_handler == SIG_DFL);
 }
 
 int page_fault_trace; 
@@ -151,7 +239,7 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	 * context, we must not take the fault..
 	 */
 	if (unlikely(in_atomic() || !mm))
-		goto no_context;
+		goto bad_area_nosemaphore;
 
  again:
 	down_read(&mm->mmap_sem);
@@ -234,13 +322,16 @@ bad_area_nosemaphore:
 
 	/* User mode accesses just cause a SIGSEGV */
 	if (error_code & 4) {
+		if (is_prefetch(regs, address))
+			return;
+
 		if (exception_trace && !(tsk->ptrace & PT_PTRACED) && 
-		    (tsk->sighand->action[SIGSEGV-1].sa.sa_handler == SIG_IGN ||
-		    (tsk->sighand->action[SIGSEGV-1].sa.sa_handler == SIG_DFL)))
+		    !unhandled_signal(tsk, SIGSEGV)) { 
 		printk(KERN_INFO 
 		       "%s[%d]: segfault at %016lx rip %016lx rsp %016lx error %lx\n",
 					tsk->comm, tsk->pid, address, regs->rip,
 					regs->rsp, error_code);
+		}
        
 		tsk->thread.cr2 = address;
 		tsk->thread.error_code = error_code;
@@ -262,6 +353,9 @@ no_context:
 		return;
 	}
 
+ 	if (is_prefetch(regs, address))
+ 		return;
+
 /*
  * Oops. The kernel tried to access some bad page. We'll have to
  * terminate things with extreme prejudice.
@@ -273,13 +367,13 @@ no_context:
 		printk(KERN_ALERT "Unable to handle kernel NULL pointer dereference");
 	else
 		printk(KERN_ALERT "Unable to handle kernel paging request");
-	printk(" at virtual address %016lx\n",address);
-	printk(" printing rip:\n");
-	printk("%016lx\n", regs->rip);
+	printk(" at %016lx RIP: \n",address);	
+	printk_address(regs->rip);
 	dump_pagetable(address);
 	__die("Oops", regs, error_code);
-
-	/* never reached */
+	/* Execute summary in case the body of the oops scrolled away */
+	printk(KERN_EMERG "CR2: %016lx\n", address);
+	oops_end(); 
 	do_exit(SIGKILL);
 
 /*
@@ -301,10 +395,10 @@ out_of_memory2:
 do_sigbus:
 	up_read(&mm->mmap_sem);
 
-	/*
-	 * Send a sigbus, regardless of whether we were in kernel
-	 * or user mode.
-	 */
+	/* Kernel mode? Handle exceptions or die */
+	if (!(error_code & 4))
+		goto no_context;
+
 	tsk->thread.cr2 = address;
 	tsk->thread.error_code = error_code;
 	tsk->thread.trap_no = 14;
@@ -313,12 +407,7 @@ do_sigbus:
 	info.si_code = BUS_ADRERR;
 	info.si_addr = (void *)address;
 	force_sig_info(SIGBUS, &info, tsk);
-
-	/* Kernel mode? Handle exceptions or die */
-	if (!(error_code & 4))
-		goto no_context;
 	return;
-
 
 vmalloc_fault:
 	{

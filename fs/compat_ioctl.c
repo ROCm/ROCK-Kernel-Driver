@@ -56,12 +56,10 @@
 #include <linux/elevator.h>
 #include <linux/rtc.h>
 #include <linux/pci.h>
-#include <linux/rtc.h>
 #include <linux/module.h>
 #include <linux/serial.h>
 #include <linux/reiserfs_fs.h>
 #include <linux/if_tun.h>
-#include <linux/dirent.h>
 #include <linux/ctype.h>
 #include <linux/ioctl32.h>
 #include <linux/ncp_fs.h>

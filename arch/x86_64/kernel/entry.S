@@ -41,10 +41,9 @@
 #include <asm/thread_info.h>
 #include <asm/hw_irq.h>
 #include <asm/errno.h>
+#include <asm/dwarf2.h>
 
 	.code64
-
-#define PDAREF(field) %gs:field	 		
 
 #ifdef CONFIG_PREEMPT
 #define preempt_stop cli
@@ -63,7 +62,7 @@
 		
 	/* %rsp:at FRAMEEND */ 
 	.macro FIXUP_TOP_OF_STACK tmp
-	movq	PDAREF(pda_oldrsp),\tmp
+	movq	%gs:pda_oldrsp,\tmp
 	movq  	\tmp,RSP(%rsp)
 	movq    $__USER_DS,SS(%rsp)
 	movq    $__USER_CS,CS(%rsp)
@@ -74,7 +73,7 @@
 
 	.macro RESTORE_TOP_OF_STACK tmp,offset=0
 	movq   RSP-\offset(%rsp),\tmp
-	movq   \tmp,PDAREF(pda_oldrsp)
+	movq   \tmp,%gs:pda_oldrsp
 	movq   EFLAGS-\offset(%rsp),\tmp
 	movq   \tmp,R11-\offset(%rsp)
 	.endm
@@ -146,8 +145,8 @@ rff_trace:
 
 ENTRY(system_call)
 	swapgs
-	movq	%rsp,PDAREF(pda_oldrsp) 
-	movq	PDAREF(pda_kernelstack),%rsp
+	movq	%rsp,%gs:pda_oldrsp 
+	movq	%gs:pda_kernelstack,%rsp
 	sti					
 	SAVE_ARGS 8,1
 	movq  %rax,ORIG_RAX-ARGOFFSET(%rsp) 
@@ -176,7 +175,7 @@ sysret_check:
 	jnz  sysret_careful 
 	movq RIP-ARGOFFSET(%rsp),%rcx
 	RESTORE_ARGS 0,-ARG_SKIP,1
-	movq	PDAREF(pda_oldrsp),%rsp
+	movq	%gs:pda_oldrsp,%rsp
 	swapgs
 	sysretq
 
@@ -369,8 +368,8 @@ ENTRY(stub_rt_sigreturn)
 	testl $3,CS(%rdi)
 	je 1f
 	swapgs	
-1:	addl $1,PDAREF(pda_irqcount)	# RED-PEN should check preempt count
-	movq PDAREF(pda_irqstackptr),%rax
+1:	addl $1,%gs:pda_irqcount	# RED-PEN should check preempt count
+	movq %gs:pda_irqstackptr,%rax
 	cmoveq %rax,%rsp							
 	pushq %rdi			# save old stack	
 	call \func
@@ -382,7 +381,7 @@ ENTRY(common_interrupt)
 ret_from_intr:		
 	popq  %rdi
 	cli	
-	subl $1,PDAREF(pda_irqcount)
+	subl $1,%gs:pda_irqcount
 	leaq ARGOFFSET(%rdi),%rsp
 exit_intr:	 	
 	GET_THREAD_INFO(%rcx)

@@ -15,7 +15,7 @@ ofstdio(ihandle *stdin, ihandle *stdout, ihandle *stderr)
 {
     ihandle in, out;
     phandle chosen;
-   
+
     if ((chosen = finddevice("/chosen")) == OF_INVALID_HANDLE)
 	goto err;
     if (getprop(chosen, "stdout", &out, sizeof(out)) != 4)

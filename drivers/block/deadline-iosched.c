@@ -287,8 +287,11 @@ deadline_find_first_drq(struct deadline_data *dd, int data_dir)
  * add drq to rbtree and fifo
  */
 static inline void
-deadline_add_request(struct deadline_data *dd, struct deadline_rq *drq)
+deadline_add_request(struct request_queue *q, struct request *rq)
 {
+	struct deadline_data *dd = q->elevator.elevator_data;
+	struct deadline_rq *drq = RQ_DATA(rq);
+
 	const int data_dir = rq_data_dir(drq->request);
 
 	deadline_add_drq_rb(dd, drq);
@@ -297,6 +300,13 @@ deadline_add_request(struct deadline_data *dd, struct deadline_rq *drq)
 	 */
 	drq->expires = jiffies + dd->fifo_expire[data_dir];
 	list_add_tail(&drq->fifo, &dd->fifo_list[data_dir]);
+
+	if (rq_mergeable(rq)) {
+		deadline_add_drq_hash(dd, drq);
+
+		if (!q->last_merge)
+			q->last_merge = rq;
+	}
 }
 
 /*
@@ -616,7 +626,11 @@ static void
 deadline_insert_request(request_queue_t *q, struct request *rq, int where)
 {
 	struct deadline_data *dd = q->elevator.elevator_data;
-	struct deadline_rq *drq = RQ_DATA(rq);
+
+	/* barriers must flush the reorder queue */
+	if (unlikely(rq->flags & (REQ_SOFTBARRIER | REQ_HARDBARRIER)
+			&& where == ELEVATOR_INSERT_SORT))
+		where = ELEVATOR_INSERT_BACK;
 
 	switch (where) {
 		case ELEVATOR_INSERT_BACK:
@@ -629,18 +643,11 @@ deadline_insert_request(request_queue_t *q, struct request *rq, int where)
 			break;
 		case ELEVATOR_INSERT_SORT:
 			BUG_ON(!blk_fs_request(rq));
-			deadline_add_request(dd, drq);
+			deadline_add_request(q, rq);
 			break;
 		default:
 			printk("%s: bad insert point %d\n", __FUNCTION__,where);
 			return;
-	}
-
-	if (rq_mergeable(rq)) {
-		deadline_add_drq_hash(dd, drq);
-
-		if (!q->last_merge)
-			q->last_merge = rq;
 	}
 }
 

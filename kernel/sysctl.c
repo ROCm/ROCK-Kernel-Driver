@@ -581,16 +581,6 @@ static ctl_table kern_table[] = {
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
 	},
-#ifdef CONFIG_SMP
-	{
-		.ctl_name	= KERN_CACHEDECAYTICKS,
-		.procname	= "cache_decay_ticks",
-		.data		= &cache_decay_ticks,
-		.maxlen		= sizeof(cache_decay_ticks),
-		.mode		= 0644,
-		.proc_handler	= &proc_doulongvec_minmax,
-	},
-#endif
 	{ .ctl_name = 0 }
 };
 
@@ -653,7 +643,7 @@ static ctl_table vm_table[] = {
 		.data		= &dirty_writeback_centisecs,
 		.maxlen		= sizeof(dirty_writeback_centisecs),
 		.mode		= 0644,
-		.proc_handler	= dirty_writeback_centisecs_handler,
+		.proc_handler	= &dirty_writeback_centisecs_handler,
 	},
 	{
 		.ctl_name	= VM_DIRTY_EXPIRE_CS,

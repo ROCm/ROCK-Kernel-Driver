@@ -149,7 +149,7 @@ static struct rng_operations rng_vendor_ops[] = {
  * register a pci_driver, because someone else might one day
  * want to register another driver on the same PCI id.
  */
-static struct pci_device_id rng_pci_tbl[] __initdata = {
+static struct pci_device_id rng_pci_tbl[] = {
 	{ 0x1022, 0x7443, PCI_ANY_ID, PCI_ANY_ID, 0, 0, rng_hw_amd },
 	{ 0x1022, 0x746b, PCI_ANY_ID, PCI_ANY_ID, 0, 0, rng_hw_amd },
 

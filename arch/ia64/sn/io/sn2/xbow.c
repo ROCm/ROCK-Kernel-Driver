@@ -257,7 +257,7 @@ xbow_attach(vertex_hdl_t conn)
      */
 
     /*
-     * Register a xbow driver with devfs.
+     * Register a xbow driver with hwgraph.
      * file ops.
      */
     vhdl = NULL;

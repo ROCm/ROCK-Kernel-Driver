@@ -13,18 +13,16 @@
 
 static inline void scr_writew(u16 val, u16 *addr)
 {
-	if ((long) addr < 0)
-		*addr = val;
-	else
-		writew(val, (unsigned long) addr);
+	BUG_ON((long) addr >= 0);
+
+	*addr = val;
 }
 
 static inline u16 scr_readw(const u16 *addr)
 {
-	if ((long) addr < 0)
-		return *addr;
-	else
-		return readw((unsigned long) addr);
+	BUG_ON((long) addr >= 0);
+
+	return *addr;
 }
 
 #define VGA_MAP_MEM(x) (x)

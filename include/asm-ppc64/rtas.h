@@ -166,6 +166,13 @@ extern void rtas_restart(char *cmd);
 extern void rtas_power_off(void);
 extern void rtas_halt(void);
 
+/* Given an RTAS status code of 9900..9905 compute the hinted delay */
+unsigned int rtas_extended_busy_delay_time(int status);
+static inline int rtas_is_extended_busy(int status)
+{
+	return status >= 9900 && status <= 9909;
+}
+
 /* Some RTAS ops require a data buffer and that buffer must be < 4G.
  * Rather than having a memory allocator, just use this buffer
  * (get the lock first), make the RTAS call.  Copy the data instead

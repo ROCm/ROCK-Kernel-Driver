@@ -17,13 +17,14 @@
  *
  * See the GNU General Public License for more details.
  */
+
 #include <linux/netdevice.h>
-#include <net/llc_if.h>
-#include <net/llc_sap.h>
-#include <net/llc_main.h>
-#include <net/llc_s_ev.h>
+#include <net/llc.h>
 #include <net/llc_pdu.h>
-#include <net/llc_mac.h>
+#include <net/llc_s_ac.h>
+#include <net/llc_s_ev.h>
+#include <net/llc_sap.h>
+#include "llc_output.h"
 
 /**
  *	llc_sap_action_unit_data_ind - forward UI PDU to network layer
@@ -56,7 +57,7 @@ int llc_sap_action_send_ui(struct llc_sap *sap, struct sk_buff *skb)
 	llc_pdu_header_init(skb, LLC_PDU_TYPE_U, ev->saddr.lsap,
 			    ev->daddr.lsap, LLC_PDU_CMD);
 	llc_pdu_init_as_ui_cmd(skb);
-	rc = lan_hdrs_init(skb, ev->saddr.mac, ev->daddr.mac);
+	rc = llc_mac_hdr_init(skb, ev->saddr.mac, ev->daddr.mac);
 	if (!rc)
 		rc = dev_queue_xmit(skb);
 	return rc;
@@ -79,7 +80,7 @@ int llc_sap_action_send_xid_c(struct llc_sap *sap, struct sk_buff *skb)
 	llc_pdu_header_init(skb, LLC_PDU_TYPE_U, ev->saddr.lsap,
 			    ev->daddr.lsap, LLC_PDU_CMD);
 	llc_pdu_init_as_xid_cmd(skb, LLC_XID_NULL_CLASS_2, 0);
-	rc = lan_hdrs_init(skb, ev->saddr.mac, ev->daddr.mac);
+	rc = llc_mac_hdr_init(skb, ev->saddr.mac, ev->daddr.mac);
 	if (!rc)
 		rc = dev_queue_xmit(skb);
 	return rc;
@@ -109,7 +110,7 @@ int llc_sap_action_send_xid_r(struct llc_sap *sap, struct sk_buff *skb)
 	llc_pdu_header_init(nskb, LLC_PDU_TYPE_U, sap->laddr.lsap, dsap,
 			    LLC_PDU_RSP);
 	llc_pdu_init_as_xid_rsp(nskb, LLC_XID_NULL_CLASS_2, 0);
-	rc = lan_hdrs_init(nskb, mac_sa, mac_da);
+	rc = llc_mac_hdr_init(nskb, mac_sa, mac_da);
 	if (!rc)
 		rc = dev_queue_xmit(nskb);
 out:
@@ -133,7 +134,7 @@ int llc_sap_action_send_test_c(struct llc_sap *sap, struct sk_buff *skb)
 	llc_pdu_header_init(skb, LLC_PDU_TYPE_U, ev->saddr.lsap,
 			    ev->daddr.lsap, LLC_PDU_CMD);
 	llc_pdu_init_as_test_cmd(skb);
-	rc = lan_hdrs_init(skb, ev->saddr.mac, ev->daddr.mac);
+	rc = llc_mac_hdr_init(skb, ev->saddr.mac, ev->daddr.mac);
 	if (!rc)
 		rc = dev_queue_xmit(skb);
 	return rc;
@@ -155,7 +156,7 @@ int llc_sap_action_send_test_r(struct llc_sap *sap, struct sk_buff *skb)
 	llc_pdu_header_init(nskb, LLC_PDU_TYPE_U, sap->laddr.lsap, dsap,
 			    LLC_PDU_RSP);
 	llc_pdu_init_as_test_rsp(nskb, skb);
-	rc = lan_hdrs_init(nskb, mac_sa, mac_da);
+	rc = llc_mac_hdr_init(nskb, mac_sa, mac_da);
 	if (!rc)
 		rc = dev_queue_xmit(nskb);
 out:

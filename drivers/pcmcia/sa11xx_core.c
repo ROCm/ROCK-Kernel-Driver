@@ -556,7 +556,6 @@ static struct bittbl conf_bits[] = {
 	{ SS_DMA_MODE,		"SS_DMA_MODE"	},
 	{ SS_SPKR_ENA,		"SS_SPKR_ENA"	},
 	{ SS_OUTPUT_ENA,	"SS_OUTPUT_ENA"	},
-	{ SS_DEBOUNCED,		"SS_DEBOUNCED"	},
 };
 
 static void

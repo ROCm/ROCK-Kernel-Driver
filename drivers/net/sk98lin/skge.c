@@ -1,10 +1,9 @@
-
 /******************************************************************************
  *
  * Name:    skge.c
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.63 $
- * Date:       	$Date: 2003/07/15 09:26:23 $
+ * Version:	$Revision: 1.11 $
+ * Date:       	$Date: 2003/08/26 16:05:19 $
  * Purpose:	The main driver source module
  *
  ******************************************************************************/
@@ -57,6 +56,52 @@
  * History:
  *
  *	$Log: skge.c,v $
+ *	Revision 1.16  2003/09/23 11:07:35  mlindner
+ *	Fix: IO-control return race condition
+ *	Fix: Interrupt moderation value check
+ *	
+ *	Revision 1.15  2003/09/22 08:40:05  mlindner
+ *	Add: Added DRIVER_FILE_NAME and DRIVER_REL_DATE
+ *	
+ *	Revision 1.14  2003/09/22 08:11:10  mlindner
+ *	Add: New function for PCI initialization (SkGeInitPCI)
+ *	Add: Yukon Plus changes (ChipID, PCI...)
+ *	Fix: TCP and UDP Checksum calculation
+ *	
+ *	Revision 1.11  2003/08/26 16:05:19  mlindner
+ *	Fix: Compiler warnings (void *)
+ *	
+ *	Revision 1.10  2003/08/25 09:24:08  mlindner
+ *	Add: Dynamic Interrupt Moderation (DIM) port up message
+ *	
+ *	Revision 1.9  2003/08/21 14:09:43  mlindner
+ *	Fix: Disable Half Duplex with Gigabit-Speed (Yukon). Enable Full Duplex.
+ *	
+ *	Revision 1.8  2003/08/19 15:09:18  mlindner
+ *	Fix: Ignore ConType parameter if empty value
+ *	
+ *	Revision 1.7  2003/08/13 12:00:35  mlindner
+ *	Fix: Removed useless defines
+ *	
+ *	Revision 1.6  2003/08/12 16:49:41  mlindner
+ *	Fix: UDP and TCP HW-CSum calculation (Kernel 2.5/2.6)
+ *	Fix: UDP and TCP Proto checks
+ *	Fix: Build without ProcFS
+ *	Fix: Kernel 2.6 editorial changes
+ *	
+ *	Revision 1.5  2003/08/07 12:25:07  mlindner
+ *	Fix: ConType parameter check and error detection
+ *	Fix: Insert various fixes applied to the kernel tree
+ *	
+ *	Revision 1.4  2003/08/07 10:50:21  mlindner
+ *	Add: Speed and HW-Csum support for Yukon Lite chipset
+ *	
+ *	Revision 1.3  2003/08/06 11:24:08  mlindner
+ *	Add: Kernel updates
+ *	
+ *	Revision 1.2  2003/07/21 08:28:47  rroesler
+ *	Fix: Handle padded bytes using skb_put()
+ *	
  *	Revision 1.63  2003/07/15 09:26:23  rroesler
  *	Fix: Removed memory leak when sending short padded frames
  *	
@@ -408,7 +453,10 @@
 
 #include	<linux/module.h>
 #include	<linux/init.h>
+
+#ifdef CONFIG_PROC_FS
 #include 	<linux/proc_fs.h>
+#endif
 
 #include	"h/skdrv1st.h"
 #include	"h/skdrv2nd.h"
@@ -515,6 +563,7 @@ static void	ClearTxRing(SK_AC*, TX_PORT*);
 static int	SkGeChangeMtu(struct SK_NET_DEVICE *dev, int new_mtu);
 static void	PortReInitBmu(SK_AC*, int);
 static int	SkGeIocMib(DEV_NET*, unsigned int, int);
+static int	SkGeInitPCI(SK_AC *pAC);
 static void	StartDrvCleanupTimer(SK_AC *pAC);
 static void	StopDrvCleanupTimer(SK_AC *pAC);
 static int	XmitFrameSG(SK_AC*, TX_PORT*, struct sk_buff*);
@@ -525,14 +574,11 @@ static int	XmitFrameSG(SK_AC*, TX_PORT*, struct sk_buff*);
  *
  ******************************************************************************/
 
+#ifdef CONFIG_PROC_FS
 static const char 	SK_Root_Dir_entry[] = "sk98lin";
 static struct		proc_dir_entry *pSkRootDir;
-extern int 		sk_proc_read(	char   *buffer,
-					char	**buffer_location,
-					off_t	offset,
-					int	buffer_length,
-					int	*eof,
-					void	*data);
+extern struct		file_operations sk_proc_fops;
+#endif
 
 extern void SkDimEnableModerationIfNeeded(SK_AC *pAC);	
 extern void SkDimDisplayModerationSettings(SK_AC *pAC);
@@ -555,9 +601,6 @@ static uintptr_t TxQueueAddr[SK_MAX_MACS][2] = {{0x680, 0x600},{0x780, 0x700}};
 static uintptr_t RxQueueAddr[SK_MAX_MACS] = {0x400, 0x480};
 
 
-static struct proc_dir_entry	*pSkRootDir;
-
-
 /*****************************************************************************
  *
  * 	skge_probe - find all SK-98xx adapters
@@ -573,17 +616,18 @@ static struct proc_dir_entry	*pSkRootDir;
  */
 static int __init skge_probe (void)
 {
-	int			proc_root_initialized = 0;
 	int			boards_found = 0;
 	int			vendor_flag = SK_FALSE;
 	SK_AC			*pAC;
 	DEV_NET			*pNet = NULL;
-	struct proc_dir_entry	*pProcFile;
 	struct pci_dev	*pdev = NULL;
-	unsigned long		base_address;
 	struct SK_NET_DEVICE *dev = NULL;
 	SK_BOOL DeviceFound = SK_FALSE;
 	SK_BOOL BootStringCount = SK_FALSE;
+	int			retval;
+#ifdef CONFIG_PROC_FS
+	struct proc_dir_entry	*pProcFile;
+#endif
 
 	if (probed)
 		return -ENODEV;
@@ -604,7 +648,7 @@ static int __init skge_probe (void)
 			continue;
 
 		/* Configure DMA attributes. */
-		if (pci_set_dma_mask(pdev, (u64) 0xffffffffffffffff) &&
+		if (pci_set_dma_mask(pdev, (u64) 0xffffffffffffffffULL) &&
 			pci_set_dma_mask(pdev, (u64) 0xffffffff))
 			continue;
 
@@ -624,6 +668,8 @@ static int __init skge_probe (void)
 		pNet = dev->priv;
 		pNet->pAC = kmalloc(sizeof(SK_AC), GFP_KERNEL);
 		if (pNet->pAC == NULL){
+			dev->get_stats = NULL;
+			unregister_netdev(dev);
 			kfree(dev->priv);
 			printk(KERN_ERR "Unable to allocate adapter "
 			       "structure!\n");
@@ -650,6 +696,14 @@ static int __init skge_probe (void)
 		pNet->Mtu = 1500;
 		pNet->Up = 0;
 		dev->irq = pdev->irq;
+		retval = SkGeInitPCI(pAC);
+		if (retval) {
+			printk("SKGE: PCI setup failed: %i\n", retval);
+			dev->get_stats = NULL;
+			unregister_netdev(dev);
+			kfree(dev);
+			continue;
+		}
 
 		SET_MODULE_OWNER(dev);
 		dev->open =		&SkGeOpen;
@@ -665,48 +719,13 @@ static int __init skge_probe (void)
 #ifdef SK_ZEROCOPY
 #ifdef USE_SK_TX_CHECKSUM
 
-		if (pAC->GIni.GIChipId == CHIP_ID_YUKON) {
+		if (pAC->ChipsetType) {
 			/* Use only if yukon hardware */
 			/* SK and ZEROCOPY - fly baby... */
 			dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
 		}
 #endif
 #endif
-
-		/*
-		 * Dummy value.
-		 */
-		dev->base_addr = 42;
-		pci_set_master(pdev);
-
-		pci_set_master(pdev);
-		base_address = pci_resource_start (pdev, 0);
-
-#ifdef SK_BIG_ENDIAN
-		/*
-		 * On big endian machines, we use the adapter's aibility of
-		 * reading the descriptors as big endian.
-		 */
-		{
-		SK_U32		our2;
-			SkPciReadCfgDWord(pAC, PCI_OUR_REG_2, &our2);
-			our2 |= PCI_REV_DESC;
-			SkPciWriteCfgDWord(pAC, PCI_OUR_REG_2, our2);
-		}
-#endif
-
-		/*
-		 * Remap the regs into kernel space.
-		 */
-		pAC->IoBase = (char*)ioremap(base_address, 0x4000);
-
-		if (!pAC->IoBase){
-			printk(KERN_ERR "%s:  Unable to map I/O register, "
-			       "SK 98xx No. %i will be disabled.\n",
-			       dev->name, boards_found);
-			kfree(dev);
-			break;
-		}
 
 		pAC->Index = boards_found;
 		if (SkGeBoardInit(dev, pAC)) {
@@ -719,42 +738,39 @@ static int __init skge_probe (void)
 			(caddr_t) &pAC->Addr.Net[0].CurrentMacAddress, 6);
 
 		/* First adapter... Create proc and print message */
+#ifdef CONFIG_PROC_FS
 		if (!DeviceFound) {
 			DeviceFound = SK_TRUE;
 			SK_MEMCPY(&SK_Root_Dir_entry, BootString,
 				sizeof(SK_Root_Dir_entry) - 1);
 
 			/*Create proc (directory)*/
-			if(!proc_root_initialized) {
-				pSkRootDir = create_proc_entry(SK_Root_Dir_entry,
-					S_IFDIR | S_IWUSR | S_IRUGO | S_IXUGO, proc_net);
-				pSkRootDir->owner = THIS_MODULE;
-				proc_root_initialized = 1;
+			if(!pSkRootDir) {
+				pSkRootDir = proc_mkdir(SK_Root_Dir_entry, proc_net);
+				if (!pSkRootDir) 
+					printk(KERN_WARNING "%s: Unable to create /proc/net/%s",
+					       dev->name, SK_Root_Dir_entry);
+				else
+					pSkRootDir->owner = THIS_MODULE;
 			}
-
 		}
-
-
-
-		/* Create proc file */
-		pProcFile = create_proc_entry(dev->name,
-			S_IFREG | S_IXUSR | S_IWGRP | S_IROTH,
-			pSkRootDir);
-
 		
-		pProcFile->read_proc = sk_proc_read;
-		pProcFile->write_proc = NULL;
-		pProcFile->nlink = 1;
-		pProcFile->size = sizeof(dev->name + 1);
-		pProcFile->data = (void *)pProcFile;
-		pProcFile->owner = THIS_MODULE;
+		/* Create proc file */
+		if (pSkRootDir 
+		    && (pProcFile = create_proc_entry(dev->name, S_IRUGO,
+						      pSkRootDir))) {
+			pProcFile->proc_fops = &sk_proc_fops;
+			pProcFile->data = dev;
+		}
+#endif
 
 		pNet->PortNr = 0;
 		pNet->NetNr = 0;
 
+
 #ifdef SK_ZEROCOPY
 #ifdef USE_SK_TX_CHECKSUM
-			if (pAC->GIni.GIChipId == CHIP_ID_YUKON) {
+			if (pAC->ChipsetType) {
 				/* SG and ZEROCOPY - fly baby... */
 				dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
 			}
@@ -791,24 +807,22 @@ static int __init skge_probe (void)
 
 #ifdef SK_ZEROCOPY
 #ifdef USE_SK_TX_CHECKSUM
-			if (pAC->GIni.GIChipId == CHIP_ID_YUKON) {
+			if (pAC->ChipsetType) {
 				/* SG and ZEROCOPY - fly baby... */
 				dev->features |= NETIF_F_SG | NETIF_F_IP_CSUM;
 			}
 #endif
 #endif
 
-			pProcFile = create_proc_entry(dev->name,
-				S_IFREG | S_IXUSR | S_IWGRP | S_IROTH,
-				pSkRootDir);
-
-		
-			pProcFile->read_proc = sk_proc_read;
-			pProcFile->write_proc = NULL;
-			pProcFile->nlink = 1;
-			pProcFile->size = sizeof(dev->name + 1);
-			pProcFile->data = (void *)pProcFile;
-			pProcFile->owner = THIS_MODULE;
+#ifdef CONFIG_PROC_FS
+			if (pSkRootDir 
+			    && (pProcFile = create_proc_entry(dev->name, 
+							      S_IRUGO,
+							      pSkRootDir))) {
+				pProcFile->proc_fops = &sk_proc_fops;
+				pProcFile->data = dev;
+			}
+#endif
 
 			memcpy((caddr_t) &dev->dev_addr,
 			(caddr_t) &pAC->Addr.Net[1].CurrentMacAddress, 6);
@@ -842,6 +856,68 @@ static int __init skge_probe (void)
 } /* skge_probe */
 
 
+
+/*****************************************************************************
+ *
+ * 	SkGeInitPCI - Init the PCI resources
+ *
+ * Description:
+ *	This function initialize the PCI resources and IO
+ *
+ * Returns: N/A
+ *	
+ */
+int SkGeInitPCI(SK_AC *pAC)
+{
+	struct SK_NET_DEVICE *dev = pAC->dev[0];
+	struct pci_dev *pdev = pAC->PciDev;
+	int retval;
+
+	if (pci_enable_device(pdev) != 0) {
+		return 1;
+	}
+
+	dev->mem_start = pci_resource_start (pdev, 0);
+	pci_set_master(pdev);
+
+	if (pci_request_regions(pdev, pAC->Name) != 0) {
+		retval = 2;
+		goto out_disable;
+	}
+
+#ifdef SK_BIG_ENDIAN
+	/*
+	 * On big endian machines, we use the adapter's aibility of
+	 * reading the descriptors as big endian.
+	 */
+	{
+		SK_U32		our2;
+		SkPciReadCfgDWord(pAC, PCI_OUR_REG_2, &our2);
+		our2 |= PCI_REV_DESC;
+		SkPciWriteCfgDWord(pAC, PCI_OUR_REG_2, our2);
+	}
+#endif
+
+	/*
+	 * Remap the regs into kernel space.
+	 */
+	pAC->IoBase = (char*)ioremap_nocache(dev->mem_start, 0x4000);
+
+	if (!pAC->IoBase){
+		retval = 3;
+		goto out_release;
+	}
+
+	return 0;
+
+ out_release:
+	pci_release_regions(pdev);
+ out_disable:
+	pci_disable_device(pdev);
+	return retval;
+}
+
+
 /*****************************************************************************
  *
  * 	FreeResources - release resources allocated for adapter
@@ -863,6 +939,9 @@ SK_AC		*pAC;
 		pNet = (DEV_NET*) dev->priv;
 		pAC = pNet->pAC;
 		AllocFlag = pAC->AllocFlag;
+		if (pAC->PciDev) {
+			pci_release_regions(pAC->PciDev);
+		}
 		if (AllocFlag & SK_ALLOC_IRQ) {
 			free_irq(dev->irq, dev);
 		}
@@ -1087,8 +1166,11 @@ SK_EVPARA EvPara;
 		SkGeRootDev = next;
 	}
 
+#ifdef CONFIG_PROC_FS
 	/* clear proc-dir */
-	remove_proc_entry(pSkRootDir->name, proc_net);
+	if (pSkRootDir) 
+		remove_proc_entry(pSkRootDir->name, proc_net);
+#endif
 
 } /* skge_cleanup_module */
 
@@ -1172,6 +1254,13 @@ SK_BOOL	DualNet;
 	SkRlmtInit( pAC, pAC->IoBase, SK_INIT_IO);
 	SkTimerInit(pAC, pAC->IoBase, SK_INIT_IO);
 
+	/* Set chipset type support */
+	pAC->ChipsetType = 0;
+	if ((pAC->GIni.GIChipId == CHIP_ID_YUKON) ||
+		(pAC->GIni.GIChipId == CHIP_ID_YUKON_LITE)) {
+		pAC->ChipsetType = 1;
+	}
+
 	GetConfiguration(pAC);
 	if (pAC->RlmtNets == 2) {
 		pAC->GIni.GIPortUsage = SK_MUL_LINK;
@@ -1186,11 +1275,11 @@ SK_BOOL	DualNet;
 		Ret = request_irq(dev->irq, SkGeIsrOnePort, SA_SHIRQ,
 			pAC->Name, dev);
 	} else {
-		printk(KERN_WARNING "%s: Invalid number of ports: %d\n",
+		printk(KERN_WARNING "%s: Illegal number of ports: %d\n",
 		       dev->name, pAC->GIni.GIMacsFound);
 		return -EAGAIN;
 	}
-	
+
 	if (Ret) {
 		printk(KERN_WARNING "%s: Requested IRQ %d is busy.\n",
 		       dev->name, dev->irq);
@@ -2118,7 +2207,7 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 	*/
 	if (BytesSend < C_LEN_ETHERNET_MINSIZE) {
 	    skb_put(pMessage, (C_LEN_ETHERNET_MINSIZE-BytesSend));
-	    memset( ((void *)(pMessage->data))+BytesSend,
+	    SK_MEMSET( ((char *)(pMessage->data))+BytesSend,
 	            0, C_LEN_ETHERNET_MINSIZE-BytesSend);
 	}
 
@@ -2142,7 +2231,7 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 	*/
 	PhysAddr = (SK_U64) pci_map_page(pAC->PciDev,
 					virt_to_page(pMessage->data),
-					offset_in_page(pMessage->data),
+					((unsigned long) pMessage->data & ~PAGE_MASK),
 					pMessage->len,
 					PCI_DMA_TODEVICE);
 	pTxd->VDataLow  = (SK_U32) (PhysAddr & 0xffffffff);
@@ -2150,18 +2239,22 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 	pTxd->pMBuf     = pMessage;
 
 	if (pMessage->ip_summed == CHECKSUM_HW) {
-		Protocol = ((SK_U8)pMessage->data[C_OFFSET_IPPROTO] & 0xf);
-		if ((Protocol == C_PROTO_ID_TCP) && (pAC->GIni.GIChipRev != 0)) {
-			pTxd->TBControl = BMU_UDP_CHECK;
+		Protocol = ((SK_U8)pMessage->data[C_OFFSET_IPPROTO] & 0xff);
+		if ((Protocol == C_PROTO_ID_UDP) && 
+			(pAC->GIni.GIChipRev == 0) &&
+			(pAC->GIni.GIChipId == CHIP_ID_YUKON)) {
+			pTxd->TBControl = BMU_TCP_CHECK;
 		} else {
-			pTxd->TBControl = BMU_TCP_CHECK ;
+			pTxd->TBControl = BMU_UDP_CHECK;
 		}
 
 		IpHeaderLength  = (SK_U8)pMessage->data[C_OFFSET_IPHEADER];
 		IpHeaderLength  = (IpHeaderLength & 0xf) * 4;
 		pTxd->TcpSumOfs = 0; /* PH-Checksum already calculated */
 		pTxd->TcpSumSt  = C_LEN_ETHERMAC_HEADER + IpHeaderLength + 
-					C_OFFSET_TCPHEADER_TCPCS;
+							(Protocol == C_PROTO_ID_UDP ?
+							C_OFFSET_UDPHEADER_UDPCS : 
+							C_OFFSET_TCPHEADER_TCPCS);
 		pTxd->TcpSumWr  = C_LEN_ETHERMAC_HEADER + IpHeaderLength;
 
 		pTxd->TBControl |= BMU_OWN | BMU_STF | 
@@ -2176,7 +2269,7 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 #ifdef USE_TX_COMPLETE
 				   BMU_IRQ_EOF |
 #endif
-				   pMessage->len;
+			pMessage->len;
 	}
 
 	/* 
@@ -2259,7 +2352,7 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 	*/
 	PhysAddr = (SK_U64) pci_map_page(pAC->PciDev,
 			virt_to_page(pMessage->data),
-			offset_in_page(pMessage->data),
+			((unsigned long) pMessage->data & ~PAGE_MASK),
 			skb_headlen(pMessage),
 			PCI_DMA_TODEVICE);
 
@@ -2276,17 +2369,21 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 		** opcode for udp is not working in the hardware yet 
 		** (Revision 2.0)
 		*/
-		Protocol = ((SK_U8)pMessage->data[C_OFFSET_IPPROTO] & 0xf);
-		if ((Protocol == C_PROTO_ID_TCP) && (pAC->GIni.GIChipRev != 0)) {
-			pTxd->TBControl |= BMU_UDP_CHECK;
+		Protocol = ((SK_U8)pMessage->data[C_OFFSET_IPPROTO] & 0xff);
+		if ((Protocol == C_PROTO_ID_UDP) && 
+			(pAC->GIni.GIChipRev == 0) &&
+			(pAC->GIni.GIChipId == CHIP_ID_YUKON)) {
+			pTxd->TBControl |= BMU_TCP_CHECK;
 		} else {
-			pTxd->TBControl |= BMU_TCP_CHECK ;
+			pTxd->TBControl |= BMU_UDP_CHECK;
 		}
 
 		IpHeaderLength  = ((SK_U8)pMessage->data[C_OFFSET_IPHEADER] & 0xf)*4;
 		pTxd->TcpSumOfs = 0; /* PH-Checksum already claculated */
 		pTxd->TcpSumSt  = C_LEN_ETHERMAC_HEADER + IpHeaderLength +
-					C_OFFSET_TCPHEADER_TCPCS;
+						(Protocol == C_PROTO_ID_UDP ?
+						C_OFFSET_UDPHEADER_UDPCS :
+						C_OFFSET_TCPHEADER_TCPCS);
 		pTxd->TcpSumWr  = C_LEN_ETHERMAC_HEADER + IpHeaderLength;
 	} else {
 		pTxd->TBControl = BMU_CHECK | BMU_SW | BMU_STF |
@@ -2325,11 +2422,12 @@ struct sk_buff	*pMessage)	/* pointer to send-message              */
 			** opcode for udp is not working in the hardware yet 
 			** (revision 2.0)
 			*/
-			if ( (Protocol == C_PROTO_ID_TCP) && 
-			     (pAC->GIni.GIChipRev != 0) ) {
-				pTxd->TBControl |= BMU_UDP_CHECK ;
+			if ((Protocol == C_PROTO_ID_UDP) && 
+				(pAC->GIni.GIChipRev == 0) &&
+				(pAC->GIni.GIChipId == CHIP_ID_YUKON)) {
+				pTxd->TBControl |= BMU_TCP_CHECK;
 			} else {
-				pTxd->TBControl |= BMU_TCP_CHECK ;
+				pTxd->TBControl |= BMU_UDP_CHECK;
 			}
 		} else {
 			pTxd->TBControl = BMU_CHECK | BMU_SW | BMU_OWN;
@@ -2518,7 +2616,8 @@ SK_U64		PhysAddr;	/* physical address of a rx buffer */
 	Length = pAC->RxBufSize;
 	PhysAddr = (SK_U64) pci_map_page(pAC->PciDev,
 		virt_to_page(pMsgBlock->data),
-		offset_in_page(pMsgBlock->data),
+		((unsigned long) pMsgBlock->data &
+		~PAGE_MASK),
 		pAC->RxBufSize - 2,
 		PCI_DMA_FROMDEVICE);
 
@@ -2790,7 +2889,7 @@ rx_start:
 				/* Frame not padded => TCP offload! */
 					if ((((Csum1 & 0xfffe) && (Csum2 & 0xfffe)) &&
 						(pAC->GIni.GIChipId == CHIP_ID_GENESIS)) ||
-						(pAC->GIni.GIChipId == CHIP_ID_YUKON)) {
+						(pAC->ChipsetType)) {
 						Result = SkCsGetReceiveInfo(pAC,
 							&pMsg->data[14],
 							Csum1, Csum2, pRxPort->PortIndex);
@@ -3557,21 +3656,26 @@ int		HeaderLength = sizeof(SK_U32) + sizeof(SK_U32);
 			Length = sizeof(pAC->PnmiStruct) + HeaderLength;
 		}
 		if (NULL == (pMemBuf = kmalloc(Length, GFP_KERNEL))) {
-			return -EFAULT;
+			return -ENOMEM;
 		}
 		if(copy_from_user(pMemBuf, Ioctl.pData, Length)) {
-			return -EFAULT;
+			Err = -EFAULT;
+			goto fault_gen;
 		}
 		if ((Ret = SkPnmiGenIoctl(pAC, pAC->IoBase, pMemBuf, &Length, 0)) < 0) {
-			return -EFAULT;
+			Err = -EFAULT;
+			goto fault_gen;
 		}
 		if(copy_to_user(Ioctl.pData, pMemBuf, Length) ) {
-			return -EFAULT;
+			Err = -EFAULT;
+			goto fault_gen;
 		}
 		Ioctl.Len = Length;
 		if(copy_to_user(rq->ifr_data, &Ioctl, sizeof(SK_GE_IOCTL))) {
-			return -EFAULT;
+			Err = -EFAULT;
+			goto fault_gen;
 		}
+fault_gen:
 		kfree(pMemBuf); /* cleanup everything */
 		break;
 	default:
@@ -3658,6 +3762,7 @@ int	AutoNeg            = 1;			/* autoneg off (0) or on (1) */
 int	DuplexCap          = 0;			/* 0=both,1=full,2=half */
 int	FlowCtrl           = SK_FLOW_MODE_SYM_OR_REM;	/* FlowControl  */
 int	MSMode             = SK_MS_MODE_AUTO;	/* master/slave mode    */
+
 SK_BOOL IsConTypeDefined   = SK_TRUE;
 SK_BOOL IsLinkSpeedDefined = SK_TRUE;
 SK_BOOL IsFlowCtrlDefined  = SK_TRUE;
@@ -3687,6 +3792,7 @@ int	Capabilities[3][3] =
 #define AN_ON	1
 #define AN_SENS	2
 #define M_CurrPort pAC->GIni.GP[Port]
+
 
 	/*
 	** Set the default values first for both ports!
@@ -3721,9 +3827,24 @@ int	Capabilities[3][3] =
         if ( (ConType != NULL)                && 
 	     (pAC->Index < SK_MAX_CARD_PARAM) &&
 	     (ConType[pAC->Index] != NULL) ) {
-                if (strcmp(ConType[pAC->Index],"")==0) {
+
+			/* Check chipset family */
+			if ((!pAC->ChipsetType) && 
+				(strcmp(ConType[pAC->Index],"Auto")!=0) &&
+				(strcmp(ConType[pAC->Index],"")!=0)) {
+				/* Set the speed parameter back */
+					printk("%s: Illegal value \"%s\" " 
+							"for ConType."
+							" Using Auto.\n", 
+							pAC->dev[0]->name, 
+							ConType[pAC->Index]);
+
+					sprintf(ConType[pAC->Index], "Auto");	
+			}
+
+				if (strcmp(ConType[pAC->Index],"")==0) {
 			IsConTypeDefined = SK_FALSE; /* No ConType defined */
-                } else if (strcmp(ConType[pAC->Index],"Auto")==0) {
+				} else if (strcmp(ConType[pAC->Index],"Auto")==0) {
 		    for (Port = 0; Port < SK_MAX_MACS; Port++) {
 			M_CurrPort.PLinkModeConf = Capabilities[AN_ON][DC_BOTH];
 			M_CurrPort.PFlowCtrlMode = SK_FLOW_MODE_SYM_OR_REM;
@@ -3796,8 +3917,7 @@ int	Capabilities[3][3] =
 	** Check speed parameter: 
 	**    Only copper type adapter and GE V2 cards 
 	*/
-	if (((pAC->GIni.GIChipId != CHIP_ID_YUKON) ||
-		(pAC->GIni.GICopperType != SK_TRUE)) &&
+	if (((!pAC->ChipsetType) || (pAC->GIni.GICopperType != SK_TRUE)) &&
 		((LinkSpeed != SK_LSPEED_AUTO) &&
 		(LinkSpeed != SK_LSPEED_1000MBPS))) {
 		printk("%s: Illegal value for Speed_A. "
@@ -3859,6 +3979,16 @@ int	Capabilities[3][3] =
 	/* 
 	** Check for illegal combinations 
 	*/
+	if ((LinkSpeed = SK_LSPEED_1000MBPS) &&
+		((DuplexCap == SK_LMODE_STAT_AUTOHALF) ||
+		(DuplexCap == SK_LMODE_STAT_HALF)) &&
+		(pAC->ChipsetType)) {
+		    printk("%s: Half Duplex not possible with Gigabit speed!\n"
+					"    Using Full Duplex.\n",
+				pAC->dev[0]->name);
+				DuplexCap = DC_FULL;
+	}
+
 	if ( AutoSet && AutoNeg==AN_SENS && DupSet) {
 		printk("%s, Port A: DuplexCapabilities"
 			" ignored using Sense mode\n", pAC->dev[0]->name);
@@ -3986,8 +4116,7 @@ int	Capabilities[3][3] =
 	** Check speed parameter:
 	**    Only copper type adapter and GE V2 cards 
 	*/
-	if (((pAC->GIni.GIChipId != CHIP_ID_YUKON) ||
-		(pAC->GIni.GICopperType != SK_TRUE)) &&
+	if (((!pAC->ChipsetType) || (pAC->GIni.GICopperType != SK_TRUE)) &&
 		((LinkSpeed != SK_LSPEED_AUTO) &&
 		(LinkSpeed != SK_LSPEED_1000MBPS))) {
 		printk("%s: Illegal value for Speed_B. "
@@ -4045,10 +4174,21 @@ int	Capabilities[3][3] =
 			pAC->dev[0]->name, DupCap_B[pAC->Index]);
 		}
 	}
+
 	
 	/* 
 	** Check for illegal combinations 
 	*/
+	if ((LinkSpeed = SK_LSPEED_1000MBPS) &&
+		((DuplexCap == SK_LMODE_STAT_AUTOHALF) ||
+		(DuplexCap == SK_LMODE_STAT_HALF)) &&
+		(pAC->ChipsetType)) {
+		    printk("%s: Half Duplex not possible with Gigabit speed!\n"
+					"    Using Full Duplex.\n",
+				pAC->dev[1]->name);
+				DuplexCap = DC_FULL;
+	}
+
 	if (AutoSet && AutoNeg==AN_SENS && DupSet) {
 		printk("%s, Port B: DuplexCapabilities"
 			" ignored using Sense mode\n", pAC->dev[1]->name);
@@ -4275,7 +4415,7 @@ int	Capabilities[3][3] =
         }
 
         if (IntsPerSec[pAC->Index] != 0) {
-           if ((IntsPerSec[pAC->Index]< 30)&&(IntsPerSec[pAC->Index]> 40000)) {
+           if ((IntsPerSec[pAC->Index]< 30) || (IntsPerSec[pAC->Index]> 40000)) {
               pAC->DynIrqModInfo.MaxModIntsPerSec = C_INTS_PER_SEC_DEFAULT;
            } else {
               pAC->DynIrqModInfo.MaxModIntsPerSec = IntsPerSec[pAC->Index];
@@ -4755,9 +4895,23 @@ SK_BOOL		DualNet;
 				printk("    role:            ???\n");
 			}
 		}
- 
+
+		/* 
+		   Display dim (dynamic interrupt moderation) 
+		   informations
+		 */
+		if (pAC->DynIrqModInfo.IntModTypeSelect == C_INT_MOD_STATIC)
+			printk("    irq moderation:  static (%d ints/sec)\n",
+					pAC->DynIrqModInfo.MaxModIntsPerSec);
+		else if (pAC->DynIrqModInfo.IntModTypeSelect == C_INT_MOD_DYNAMIC)
+			printk("    irq moderation:  dynamic (%d ints/sec)\n",
+					pAC->DynIrqModInfo.MaxModIntsPerSec);
+		else
+			printk("    irq moderation:  disabled\n");
+
+
 #ifdef SK_ZEROCOPY
-		if (pAC->GIni.GIChipId == CHIP_ID_YUKON)
+		if (pAC->ChipsetType)
 #ifdef USE_SK_TX_CHECKSUM
 			printk("    scatter-gather:  enabled\n");
 #else

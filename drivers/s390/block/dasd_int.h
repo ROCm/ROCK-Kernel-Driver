@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.42 $
+ * $Revision: 1.45 $
  */
 
 #ifndef DASD_INT_H
@@ -14,7 +14,8 @@
 
 #ifdef __KERNEL__
 
-#define DASD_PER_MAJOR ( 1U<<(MINORBITS-DASD_PARTN_BITS))
+/* we keep old device allocation scheme; IOW, minors are still in 0..255 */
+#define DASD_PER_MAJOR ( 1U<<(8-DASD_PARTN_BITS))
 #define DASD_PARTN_MASK ((1 << DASD_PARTN_BITS) - 1)
 
 /*
@@ -29,14 +30,13 @@
  * Things to do for startup state transitions:
  *   new -> known: find discipline for the device and create devfs entries.
  *   known -> basic: request irq line for the device.
- *   basic -> accept: do the initial analysis, e.g. format detection.
- *   accept-> ready: do block device setup and detect partitions.
+ *   basic -> ready: do the initial analysis, e.g. format detection,
+ *                   do block device setup and detect partitions.
  *   ready -> online: schedule the device tasklet.
  * Things to do for shutdown state transitions:
  *   online -> ready: just set the new device state.
- *   ready -> accept: flush requests from the block device layer and
- *                    clear partition information.
- *   accept -> basic: reset format information.
+ *   ready -> basic: flush requests from the block device layer, clear
+ *                   partition information and reset format information.
  *   basic -> known: terminate all requests and free irq.
  *   known -> new: remove devfs entries and forget discipline.
  */
@@ -44,12 +44,10 @@
 #define DASD_STATE_NEW	  0
 #define DASD_STATE_KNOWN  1
 #define DASD_STATE_BASIC  2
-#define DASD_STATE_ACCEPT 3
-#define DASD_STATE_READY  4
-#define DASD_STATE_ONLINE 5
+#define DASD_STATE_READY  3
+#define DASD_STATE_ONLINE 4
 
 #include <linux/module.h>
-#include <linux/version.h>
 #include <linux/wait.h>
 #include <linux/blkdev.h>
 #include <linux/devfs_fs_kernel.h>
@@ -137,8 +135,7 @@ do { \
 /* messages to be written via klogd and dbf */
 #define DEV_MESSAGE(d_loglevel,d_device,d_string,d_args...)\
 do { \
-	printk(d_loglevel PRINTK_HEADER " %s,%s: " \
-	       d_string "\n", d_device->gdp->disk_name, \
+	printk(d_loglevel PRINTK_HEADER " %s: " d_string "\n", \
 	       d_device->cdev->dev.bus_id, d_args); \
 	DBF_DEV_EVENT(DBF_ALERT, d_device, d_string, d_args); \
 } while(0)
@@ -265,6 +262,7 @@ struct dasd_device {
 	struct gendisk *gdp;
 	request_queue_t *request_queue;
 	spinlock_t request_queue_lock;
+        unsigned int devindex;
 	unsigned long blocks;		/* size of volume in blocks */
 	unsigned int bp_block;		/* bytes per block */
 	unsigned int s2b_shift;		/* log2 (bp_block/512) */
@@ -441,7 +439,7 @@ dasd_kmalloc_set_cda(struct ccw1 *ccw, void *cda, struct dasd_device *device)
 	return set_normalized_cda(ccw, cda);
 }
 
-struct dasd_device *dasd_alloc_device(unsigned int devindex);
+struct dasd_device *dasd_alloc_device(void);
 void dasd_free_device(struct dasd_device *);
 
 void dasd_enable_device(struct dasd_device *);
@@ -485,9 +483,9 @@ int dasd_devno_in_range(int);
 /* externals in dasd_gendisk.c */
 int  dasd_gendisk_init(void);
 void dasd_gendisk_exit(void);
-int  dasd_gendisk_index_major(int);
-struct gendisk *dasd_gendisk_alloc(int);
-void dasd_setup_partitions(struct dasd_device *);
+int dasd_gendisk_alloc(struct dasd_device *);
+void dasd_gendisk_free(struct dasd_device *);
+void dasd_scan_partitions(struct dasd_device *);
 void dasd_destroy_partitions(struct dasd_device *);
 
 /* externals in dasd_ioctl.c */

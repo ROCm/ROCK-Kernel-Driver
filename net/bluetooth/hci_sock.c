@@ -75,7 +75,7 @@ static struct hci_sec_filter hci_sec_filter = {
 		/* OGF_LINK_POLICY */
 		{ 0x1200, 0x0, 0x0, 0x0      },
 		/* OGF_HOST_CTL */
-		{ 0x80100000, 0x2a, 0x0, 0x0 },
+		{ 0x80100000, 0x202a, 0x0, 0x0 },
 		/* OGF_INFO_PARAM */
 		{ 0x22a, 0x0, 0x0, 0x0       },
 		/* OGF_STATUS_PARAM */
@@ -586,6 +586,8 @@ static int hci_sock_create(struct socket *sock, int protocol)
 	sk = bt_sock_alloc(sock, protocol, sizeof(struct hci_pinfo), GFP_KERNEL);
 	if (!sk)
 		return -ENOMEM;
+
+	sk_set_owner(sk, THIS_MODULE);
 
 	sock->state = SS_UNCONNECTED;
 	sk->sk_state   = BT_OPEN;

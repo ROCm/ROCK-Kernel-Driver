@@ -96,14 +96,14 @@ int main(int argc, char *argv[])
   }
 
   /* needs to handle args more elegantly -- but this is a small/simple program */
-  
+
   /* check for -pbp */
   if ( !strcmp( argv[argptr], "-pbp" ) )
   {
     prep = 1;
     argptr++;
   }
-  
+
   /* check for -asm */
   if ( !strcmp( argv[argptr], "-asm" ) )
   {
@@ -130,7 +130,7 @@ int main(int argc, char *argv[])
   /* skip elf header in input file */
   /*if ( !prep )*/
   lseek(in_fd, elfhdr_size, SEEK_SET);
-  
+
   /* write prep partition if necessary */
   if ( prep )
 	  write_prep_partition( in_fd, out_fd );
@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
 	  write_asm_data( in_fd, out_fd );
   else
 	  copy_image(in_fd, out_fd);
-  
+
   return 0;
 }
 
@@ -151,15 +151,15 @@ void write_prep_partition(int in, int out)
   dword_t *entry  = (dword_t *)&block[0];
   dword_t *length = (dword_t *)&block[sizeof(long)];
   struct stat info;
-  
+
   if (fstat(in, &info) < 0)
   {
     fprintf(stderr,"info failed\n");
     exit(-1);
   }
-  
+
   bzero( block, sizeof block );
- 
+
   /* set entry point and boot image size skipping over elf header */
 #ifdef __i386__
   *entry = 0x400/*+65536*/;
@@ -172,7 +172,7 @@ void write_prep_partition(int in, int out)
   /* sets magic number for msdos partition (used by linux) */
   block[510] = 0x55;
   block[511] = 0xAA;
-  
+
   /*
    * Build a "PReP" partition table entry in the boot record
    *  - "PReP" may only look at the system_indicator
@@ -203,13 +203,13 @@ void write_prep_partition(int in, int out)
 #if 0
   pe->beginning_sector  = cpu_to_le32(1);
 #else
-  /* This has to be 0 on the PowerStack? */   
+  /* This has to be 0 on the PowerStack? */
 #ifdef __i386__
   pe->beginning_sector  = 0;
 #else
   pe->beginning_sector  = cpu_to_le32(0);
 #endif /* __i386__ */
-#endif    
+#endif
 
 #ifdef __i386__
   pe->number_of_sectors = 2*18*80-1;
@@ -219,7 +219,7 @@ void write_prep_partition(int in, int out)
 
   write( out, block, sizeof(block) );
   write( out, entry, sizeof(*entry) );
-  write( out, length, sizeof(*length) );  
+  write( out, length, sizeof(*length) );
   /* set file position to 2nd sector where image will be written */
   lseek( out, 0x400, SEEK_SET );
 }
@@ -245,7 +245,7 @@ write_asm_data( int in, int out )
   unsigned char *lp;
   unsigned char buf[SIZE];
   unsigned char str[256];
-  
+
   write( out, "\t.data\n\t.globl input_data\ninput_data:\n",
 	 strlen( "\t.data\n\t.globl input_data\ninput_data:\n" ) );
   pos = 0;

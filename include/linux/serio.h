@@ -65,7 +65,9 @@ void serio_rescan(struct serio *serio);
 irqreturn_t serio_interrupt(struct serio *serio, unsigned char data, unsigned int flags, struct pt_regs *regs);
 
 void serio_register_port(struct serio *serio);
+void serio_register_slave_port(struct serio *serio);
 void serio_unregister_port(struct serio *serio);
+void serio_unregister_slave_port(struct serio *serio);
 void serio_register_device(struct serio_dev *dev);
 void serio_unregister_device(struct serio_dev *dev);
 
@@ -104,6 +106,8 @@ static __inline__ void serio_cleanup(struct serio *serio)
 #define SERIO_RS232	0x02000000UL
 #define SERIO_HIL_MLC	0x03000000UL
 #define SERIO_PC9800	0x04000000UL
+#define SERIO_PS_PSTHRU	0x05000000UL
+#define SERIO_8042_XL	0x06000000UL
 
 #define SERIO_PROTO	0xFFUL
 #define SERIO_MSC	0x01

@@ -1023,6 +1023,7 @@ static inline void fill_elf_header(struct elfhdr *elf, int segs)
 	elf->e_ident[EI_CLASS] = ELF_CLASS;
 	elf->e_ident[EI_DATA] = ELF_DATA;
 	elf->e_ident[EI_VERSION] = EV_CURRENT;
+	elf->e_ident[EI_OSABI] = ELF_OSABI;
 	memset(elf->e_ident+EI_PAD, 0, EI_NIDENT-EI_PAD);
 
 	elf->e_type = ET_CORE;
@@ -1076,7 +1077,7 @@ static void fill_prstatus(struct elf_prstatus *prstatus,
 	prstatus->pr_sighold = p->blocked.sig[0];
 	prstatus->pr_pid = p->pid;
 	prstatus->pr_ppid = p->parent->pid;
-	prstatus->pr_pgrp = p->pgrp;
+	prstatus->pr_pgrp = process_group(p);
 	prstatus->pr_sid = p->session;
 	jiffies_to_timeval(p->utime, &prstatus->pr_utime);
 	jiffies_to_timeval(p->stime, &prstatus->pr_stime);
@@ -1104,7 +1105,7 @@ static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
 
 	psinfo->pr_pid = p->pid;
 	psinfo->pr_ppid = p->parent->pid;
-	psinfo->pr_pgrp = p->pgrp;
+	psinfo->pr_pgrp = process_group(p);
 	psinfo->pr_sid = p->session;
 
 	i = p->state ? ffz(~p->state) + 1 : 0;

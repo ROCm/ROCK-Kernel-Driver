@@ -460,3 +460,4 @@ static void raid0_exit (void)
 module_init(raid0_init);
 module_exit(raid0_exit);
 MODULE_LICENSE("GPL");
+MODULE_ALIAS("md-personality-2"); /* RAID0 */

@@ -1,5 +1,5 @@
 /*
- *  linux/arch/arm/mm/proc-sa110.S
+ *  linux/arch/arm/mm/proc-sa1100.S
  *
  *  Copyright (C) 1997-2002 Russell King
  *
@@ -187,11 +187,11 @@ ENTRY(cpu_sa1100_set_pte)
 
 	eor	r1, r1, #L_PTE_PRESENT | L_PTE_YOUNG | L_PTE_WRITE | L_PTE_DIRTY
 
-	bic	r2, r1, #0xff0
-	bic	r2, r2, #3
+	bic	r2, r1, #PTE_SMALL_AP_MASK
+	bic	r2, r2, #PTE_TYPE_MASK
 	orr	r2, r2, #PTE_TYPE_SMALL
 
-	tst	r1, #L_PTE_USER			@ User or Exec?
+	tst	r1, #L_PTE_USER			@ User?
 	orrne	r2, r2, #PTE_SMALL_AP_URO_SRW
 
 	tst	r1, #L_PTE_WRITE | L_PTE_DIRTY	@ Write and Dirty?
@@ -206,15 +206,9 @@ ENTRY(cpu_sa1100_set_pte)
 	mcr	p15, 0, r0, c7, c10, 4		@ drain WB
 	mov	pc, lr
 
-
-cpu_sa1100_name:
-	.asciz	"StrongARM-1100"
-cpu_sa1110_name:
-	.asciz	"StrongARM-1110"
-	.align
-
 	__INIT
 
+	.type	__sa1100_setup, #function
 __sa1100_setup:
 	mov	r10, #0
 	mcr	p15, 0, r10, c7, c7		@ invalidate I,D caches on v4
@@ -229,8 +223,9 @@ __sa1100_setup:
 	orr	r0, r0, #0x003d
 	orr	r0, r0, #0x3100			@ ..11 ...1 ..11 11.1
 	mov	pc, lr
+	.size	__sa1100_setup, . - __sa1100_setup
 
-	.text
+	__INITDATA
 
 /*
  * Purpose : Function pointers used to access above functions - all calls
@@ -252,6 +247,8 @@ ENTRY(sa1100_processor_functions)
 	.word	cpu_sa1100_set_pte
 	.size	sa1100_processor_functions, . - sa1100_processor_functions
 
+	.section ".rodata"
+
 	.type	cpu_arch_name, #object
 cpu_arch_name:
 	.asciz	"armv4"
@@ -261,6 +258,17 @@ cpu_arch_name:
 cpu_elf_name:
 	.asciz	"v4"
 	.size	cpu_elf_name, . - cpu_elf_name
+
+	.type	cpu_sa1100_name, #object
+cpu_sa1100_name:
+	.asciz	"StrongARM-1100"
+	.size	cpu_sa1100_name, . - cpu_sa1100_name
+
+	.type	cpu_sa1110_name, #object
+cpu_sa1110_name:
+	.asciz	"StrongARM-1110"
+	.size	cpu_sa1110_name, . - cpu_sa1110_name
+
 	.align
 
 	.section ".proc.info", #alloc, #execinstr

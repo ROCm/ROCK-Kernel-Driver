@@ -27,7 +27,7 @@ static inline void scsi_activate_tcq(struct scsi_device *sdev, int depth)
 {
         if (sdev->tagged_supported) {
 		if (!blk_queue_tagged(sdev->request_queue))
-			blk_queue_init_tags(sdev->request_queue, depth);
+			blk_queue_init_tags(sdev->request_queue, depth, NULL);
 		scsi_adjust_queue_depth(sdev, MSG_ORDERED_TAG, depth);
         }
 }

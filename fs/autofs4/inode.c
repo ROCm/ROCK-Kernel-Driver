@@ -101,7 +101,7 @@ static int parse_options(char *options, int *pipefd, uid_t *uid, gid_t *gid,
 	
 	*uid = current->uid;
 	*gid = current->gid;
-	*pgrp = current->pgrp;
+	*pgrp = process_group(current);
 
 	*minproto = AUTOFS_MIN_PROTO_VERSION;
 	*maxproto = AUTOFS_MAX_PROTO_VERSION;
@@ -192,7 +192,7 @@ int autofs4_fill_super(struct super_block *s, void *data, int silent)
 	sbi->magic = AUTOFS_SBI_MAGIC;
 	sbi->catatonic = 0;
 	sbi->exp_timeout = 0;
-	sbi->oz_pgrp = current->pgrp;
+	sbi->oz_pgrp = process_group(current);
 	sbi->sb = s;
 	sbi->version = 0;
 	sbi->queues = NULL;

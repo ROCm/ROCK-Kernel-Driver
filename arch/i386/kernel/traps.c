@@ -28,6 +28,7 @@
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
+#include <linux/eisa.h>
 #endif
 
 #ifdef CONFIG_MCA
@@ -782,7 +783,7 @@ void __init trap_init_f00f_bug(void)
 	 * it uses the read-only mapped virtual address.
 	 */
 	idt_descr.address = fix_to_virt(FIX_F00F_IDT);
-	__asm__ __volatile__("lidt %0": "=m" (idt_descr));
+	__asm__ __volatile__("lidt %0" : : "m" (idt_descr));
 }
 #endif
 
@@ -831,10 +832,6 @@ static void __init set_task_gate(unsigned int n, unsigned int gdt_entry)
 	_set_gate(idt_table+n,5,0,0,(gdt_entry<<3));
 }
 
-
-#ifdef CONFIG_EISA
-int EISA_bus;
-#endif
 
 void __init trap_init(void)
 {

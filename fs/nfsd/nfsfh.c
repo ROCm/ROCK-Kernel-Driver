@@ -125,6 +125,9 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			case 1:
 				len = 1;
 				break;
+			case 2:
+				len = 3;
+				break;
 			default:
 				goto out;
 			}
@@ -137,7 +140,7 @@ fh_verify(struct svc_rqst *rqstp, struct svc_fh *fhp, int type, int access)
 			if (fh->fh_size != NFS_FHSIZE)
 				goto out;
 			/* assume old filehandle format */
-			xdev = u32_to_dev_t(fh->ofh_xdev);
+			xdev = old_decode_dev(fh->ofh_xdev);
 			xino = u32_to_ino_t(fh->ofh_xino);
 			mk_fsid_v0(tfh, xdev, xino);
 			exp = exp_find(rqstp->rq_client, 0, tfh, &rqstp->rq_chandle);
@@ -329,12 +332,21 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		parent->d_name.name, dentry->d_name.name,
 		(inode ? inode->i_ino : 0));
 
-	if (ref_fh) {
+	/* for large devnums rules are simple */
+	if (!old_valid_dev(ex_dev)) {
+		ref_fh_version = 1;
+		if (exp->ex_flags & NFSEXP_FSID)
+			ref_fh_fsid_type = 1;
+		else
+			ref_fh_fsid_type = 2;
+	} else if (ref_fh) {
 		ref_fh_version = ref_fh->fh_handle.fh_version;
 		ref_fh_fsid_type = ref_fh->fh_handle.fh_fsid_type;
-		if (ref_fh == fhp)
-			fh_put(ref_fh);
+		if (!(exp->ex_flags & NFSEXP_FSID) || ref_fh_fsid_type == 2)
+			ref_fh_fsid_type = 0;
 	}
+	if (ref_fh == fhp)
+		fh_put(ref_fh);
 
 	if (fhp->fh_locked || fhp->fh_dentry) {
 		printk(KERN_ERR "fh_compose: fh %s/%s not initialized!\n",
@@ -353,7 +365,7 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		memset(&fhp->fh_handle.fh_base, 0, NFS_FHSIZE);
 		fhp->fh_handle.fh_size = NFS_FHSIZE;
 		fhp->fh_handle.ofh_dcookie = 0xfeebbaca;
-		fhp->fh_handle.ofh_dev =  htonl((MAJOR(ex_dev)<<16)| MINOR(ex_dev));
+		fhp->fh_handle.ofh_dev =  old_encode_dev(ex_dev);
 		fhp->fh_handle.ofh_xdev = fhp->fh_handle.ofh_dev;
 		fhp->fh_handle.ofh_xino = ino_t_to_u32(exp->ex_dentry->d_inode->i_ino);
 		fhp->fh_handle.ofh_dirino = ino_t_to_u32(parent_ino(dentry));
@@ -363,19 +375,33 @@ fh_compose(struct svc_fh *fhp, struct svc_export *exp, struct dentry *dentry, st
 		fhp->fh_handle.fh_version = 1;
 		fhp->fh_handle.fh_auth_type = 0;
 		datap = fhp->fh_handle.fh_auth+0;
-		if ((exp->ex_flags & NFSEXP_FSID) &&
-		    (ref_fh_fsid_type == 1)) {
-			fhp->fh_handle.fh_fsid_type = 1;
-			/* fsid_type 1 == 4 bytes filesystem id */
-			mk_fsid_v1(datap, exp->ex_fsid);
-			datap += 1;
-			fhp->fh_handle.fh_size = 2*4;
-		} else {
-			fhp->fh_handle.fh_fsid_type = 0;
-			/* fsid_type 0 == 2byte major, 2byte minor, 4byte inode */
-			mk_fsid_v0(datap, ex_dev, exp->ex_dentry->d_inode->i_ino);
-			datap += 2;
-			fhp->fh_handle.fh_size = 3*4;
+		fhp->fh_handle.fh_fsid_type = ref_fh_fsid_type;
+		switch (ref_fh_fsid_type) {
+			case 1:
+				/* fsid_type 1 == 4 bytes filesystem id */
+				mk_fsid_v1(datap, exp->ex_fsid);
+				datap += 1;
+				fhp->fh_handle.fh_size = 2*4;
+				break;
+			case 2:
+				/*
+				 * fsid_type 2:
+				 * 4byte major, 4byte minor, 4byte inode
+				 */
+				mk_fsid_v2(datap, ex_dev,
+					exp->ex_dentry->d_inode->i_ino);
+				datap += 3;
+				fhp->fh_handle.fh_size = 4*4;
+				break;
+			default:
+				/*
+				 * fsid_type 0:
+				 * 2byte major, 2byte minor, 4byte inode
+				 */
+				mk_fsid_v0(datap, ex_dev,
+					exp->ex_dentry->d_inode->i_ino);
+				datap += 2;
+				fhp->fh_handle.fh_size = 3*4;
 		}
 		if (inode) {
 			int size = fhp->fh_maxsize/4 - 3;

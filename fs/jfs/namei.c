@@ -1312,7 +1312,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 	tid_t tid;
 	struct tblock *tblk;
 
-	if (!old_valid_dev(rdev))
+	if (!new_valid_dev(rdev))
 		return -EINVAL;
 
 	jfs_info("jfs_mknod: %s", dentry->d_name.name);
@@ -1344,7 +1344,7 @@ int jfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t rdev)
 		goto out3;
 
 	ip->i_op = &jfs_file_inode_operations;
-	jfs_ip->dev = old_encode_dev(rdev);
+	jfs_ip->dev = new_encode_dev(rdev);
 	init_special_inode(ip, ip->i_mode, rdev);
 
 	insert_inode_hash(ip);

@@ -14,10 +14,8 @@ config USB_EMI26
 	  After firmware load the device is handled with standard linux
 	  USB Audio driver.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called audio. If you want to compile it as a
-	  module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called audio.
 
 config USB_TIGL
 	tristate "Texas Instruments Graph Link USB (aka SilverLink) cable support"
@@ -30,10 +28,8 @@ config USB_TIGL
 	  If you enable this driver, you will be able to communicate with
 	  your calculator through a set of device nodes under /dev.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called tiglusb. If you want to compile it as a
-	  module, say M here and read Documentation/modules.txt.
+	  To compile this driver as a module, choose M here: the
+	  module will be called tiglusb.
 
 	  If you don't know what the SilverLink cable is or what a Texas
 	  Instruments graphing calculator is, then you probably don't need this
@@ -48,10 +44,8 @@ config USB_AUERSWALD
 	  Say Y here if you want to connect an Auerswald USB ISDN Device
 	  to your computer's USB port.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called auerswald. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called auerswald.
 
 config USB_RIO500
 	tristate "USB Diamond Rio500 support (EXPERIMENTAL)"
@@ -61,10 +55,8 @@ config USB_RIO500
 	  computer's USB port. Please read <file:Documentation/usb/rio.txt>
 	  for more information.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called rio500. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called rio500.
 
 config USB_BRLVGER
 	tristate "Tieman Voyager USB Braille display support (EXPERIMENTAL)"
@@ -74,10 +66,8 @@ config USB_BRLVGER
 	  Tieman. See <file:Documentation/usb/brlvger.txt> for more
 	  information.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called brlvger. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called brlvger.
 
 config USB_LCD
 	tristate "USB LCD driver support"
@@ -88,23 +78,20 @@ config USB_LCD
 	  alphanumeric LCD modules. See <http://www.usblcd.de> for more
 	  information.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called usblcd. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called usblcd.
 
 config USB_SPEEDTOUCH
 	tristate "Alcatel Speedtouch USB support"
 	depends on USB && ATM
+	select CRC32
 	help
 	  Say Y here if you have an Alcatel SpeedTouch USB or SpeedTouch 330
 	  modem.  In order to use your modem you will need to install some user
 	  space tools, see <http://www.linux-usb.org/SpeedTouch/> for details.
 
-	  This code is also available as a module ( = code which can be
-	  inserted in and removed from the running kernel whenever you want).
-	  The module will be called speedtch. If you want to compile it as
-	  a module, say M here and read <file:Documentation/modules.txt>.
+	  To compile this driver as a module, choose M here: the
+	  module will be called speedtch.
 
 config USB_TEST
 	tristate "USB testing driver (DEVELOPMENT)"

@@ -1,10 +1,10 @@
-/* $Id: capifunc.h,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: capifunc.h,v 1.10 2003/08/25 10:06:37 schindler Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
  * 
- * Copyright 2000-2002 by Armin Schindler (mac@melware.de) 
- * Copyright 2000-2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de) 
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -21,7 +21,7 @@
 
 #define M_COMPANY "Eicon Networks"
 
-extern char DRIVERRELEASE[];
+extern char DRIVERRELEASE_CAPI[];
 
 typedef struct _diva_card {
 	int Id;

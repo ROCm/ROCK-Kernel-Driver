@@ -1,10 +1,10 @@
-/* $Id: mntfunc.c,v 1.1.2.2 2002/10/02 14:38:37 armin Exp $
+/* $Id: mntfunc.c,v 1.15 2003/08/25 14:49:53 schindler Exp $
  *
  * Driver for Eicon DIVA Server ISDN cards.
  * Maint module
  *
- * Copyright 2000,2001 by Armin Schindler (mac@melware.de)
- * Copyright 2000,2001 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de)
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -17,7 +17,7 @@
 #include "di_defs.h"
 #include "debug_if.h"
 
-extern char *DRIVERRELEASE;
+extern char *DRIVERRELEASE_MNT;
 
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)
@@ -45,8 +45,6 @@ static void no_printf(unsigned char *x, ...)
 	/* dummy debug function */
 }
 
-DIVA_DI_PRINTF dprintf = no_printf;
-
 #include "debuglib.c"
 
 /*
@@ -73,7 +71,7 @@ static void *didd_callback(void *context, DESCRIPTOR * adapter,
 		} else {
 			memcpy(&MAdapter, adapter, sizeof(MAdapter));
 			dprintf = (DIVA_DI_PRINTF) MAdapter.request;
-			DbgRegister("MAINT", DRIVERRELEASE, DBG_DEFAULT);
+			DbgRegister("MAINT", DRIVERRELEASE_MNT, DBG_DEFAULT);
 		}
 	} else if ((adapter->type > 0) && (adapter->type < 16)) {
 		if (removal) {
@@ -104,7 +102,7 @@ static int DIVA_INIT_FUNCTION connect_didd(void)
 			req.didd_notify.e.Req = 0;
 			req.didd_notify.e.Rc =
 			    IDI_SYNC_REQ_DIDD_REGISTER_ADAPTER_NOTIFY;
-			req.didd_notify.info.callback = didd_callback;
+			req.didd_notify.info.callback = (void *)didd_callback;
 			req.didd_notify.info.context = 0;
 			DAdapter.request((ENTITY *) & req);
 			if (req.didd_notify.e.Rc != 0xff)

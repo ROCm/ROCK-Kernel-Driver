@@ -58,6 +58,7 @@ struct mousedev_list {
 	unsigned long buttons;
 	unsigned char ready, buffer, bufsiz;
 	unsigned char mode, imexseq, impsseq;
+	int finger;
 };
 
 #define MOUSEDEV_SEQ_LEN	6
@@ -73,12 +74,58 @@ static struct mousedev mousedev_mix;
 static int xres = CONFIG_INPUT_MOUSEDEV_SCREEN_X;
 static int yres = CONFIG_INPUT_MOUSEDEV_SCREEN_Y;
 
+static void mousedev_abs_event(struct input_handle *handle, struct mousedev_list *list, unsigned int code, int value)
+{
+	int size;
+
+	/* Ignore joysticks */
+	if (test_bit(BTN_TRIGGER, handle->dev->keybit))
+		return;
+
+	/* Handle touchpad data */
+	if (test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
+
+		if (list->finger && list->finger < 3)
+			list->finger++;
+
+		switch (code) {
+			case ABS_X:
+				if (list->finger == 3)
+					list->dx += (value - list->oldx) / 8;
+				list->oldx = value;
+				return;
+			case ABS_Y:
+				if (list->finger == 3)
+					list->dy -= (value - list->oldy) / 8;
+				list->oldy = value;
+				return;
+		}
+		return;
+	}
+
+	/* Handle tablet data */
+	switch (code) {
+		case ABS_X:
+			size = handle->dev->absmax[ABS_X] - handle->dev->absmin[ABS_X];
+			if (size == 0) size = xres;
+			list->dx += (value * xres - list->oldx) / size;
+			list->oldx += list->dx * size;
+			return;
+		case ABS_Y:
+			size = handle->dev->absmax[ABS_Y] - handle->dev->absmin[ABS_Y];
+			if (size == 0) size = yres;
+			list->dy -= (value * yres - list->oldy) / size;
+			list->oldy -= list->dy * size;
+			return;
+	}
+}
+
 static void mousedev_event(struct input_handle *handle, unsigned int type, unsigned int code, int value)
 {
 	struct mousedev *mousedevs[3] = { handle->private, &mousedev_mix, NULL };
 	struct mousedev **mousedev = mousedevs;
 	struct mousedev_list *list;
-	int index, size, wake;
+	int index, wake;
 
 	while (*mousedev) {
 
@@ -87,31 +134,7 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 		list_for_each_entry(list, &(*mousedev)->list, node)
 			switch (type) {
 				case EV_ABS:
-					if (test_bit(BTN_TRIGGER, handle->dev->keybit))
-						break;
-					switch (code) {
-						case ABS_X:	
-							size = handle->dev->absmax[ABS_X] - handle->dev->absmin[ABS_X];
-							if (size != 0) {
-								list->dx += (value * xres - list->oldx) / size;
-								list->oldx += list->dx * size;
-							} else {
-								list->dx += value - list->oldx;
-								list->oldx += list->dx;
-							}
-							break;
-
-						case ABS_Y:
-							size = handle->dev->absmax[ABS_Y] - handle->dev->absmin[ABS_Y];
-							if (size != 0) {
-								list->dy -= (value * yres - list->oldy) / size;
-								list->oldy -= list->dy * size;
-							} else {
-								list->dy -= value - list->oldy;
-								list->oldy -= list->dy;
-							}
-							break;
-					}
+					mousedev_abs_event(handle, list, code, value);
 					break;
 
 				case EV_REL:
@@ -124,8 +147,13 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 
 				case EV_KEY:
 					switch (code) {
+						case BTN_TOUCH: /* Handle touchpad data */
+							if (test_bit(BTN_TOOL_FINGER, handle->dev->keybit)) {
+								list->finger = value;
+								return;
+							}
 						case BTN_0:
-						case BTN_TOUCH:
+						case BTN_FORWARD:
 						case BTN_LEFT:   index = 0; break;
 						case BTN_4:
 						case BTN_EXTRA:  if (list->mode == 2) { index = 4; break; }
@@ -133,6 +161,7 @@ static void mousedev_event(struct input_handle *handle, unsigned int type, unsig
 						case BTN_1:
 						case BTN_RIGHT:  index = 1; break;
 						case BTN_3:
+						case BTN_BACK:
 						case BTN_SIDE:   if (list->mode == 2) { index = 3; break; }
 						case BTN_2:
 						case BTN_STYLUS2:
@@ -291,7 +320,7 @@ static ssize_t mousedev_write(struct file * file, const char * buffer, size_t co
 {
 	struct mousedev_list *list = file->private_data;
 	unsigned char c;
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < count; i++) {
 
@@ -472,6 +501,12 @@ static struct input_device_id mousedev_ids[] = {
 		.keybit = { [LONG(BTN_TOUCH)] = BIT(BTN_TOUCH) },
 		.absbit = { BIT(ABS_X) | BIT(ABS_Y) },
 	},	/* A tablet like device, at least touch detection, two absolute axes */
+	{
+		.flags = INPUT_DEVICE_ID_MATCH_EVBIT | INPUT_DEVICE_ID_MATCH_KEYBIT | INPUT_DEVICE_ID_MATCH_ABSBIT,
+		.evbit = { BIT(EV_KEY) | BIT(EV_ABS) },
+		.keybit = { [LONG(BTN_TOOL_FINGER)] = BIT(BTN_TOOL_FINGER) },
+		.absbit = { BIT(ABS_X) | BIT(ABS_Y) | BIT(ABS_PRESSURE) | BIT(ABS_TOOL_WIDTH) },
+	},	/* A touchpad */
 
 	{ }, 	/* Terminating entry */
 };

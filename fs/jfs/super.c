@@ -284,6 +284,9 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 
 	jfs_info("In jfs_read_super: s_flags=0x%lx", sb->s_flags);
 
+	if (!new_valid_dev(sb->s_bdev->bd_dev))
+		return -EOVERFLOW;
+
 	sbi = kmalloc(sizeof (struct jfs_sb_info), GFP_KERNEL);
 	if (!sbi)
 		return -ENOSPC;
@@ -501,24 +504,21 @@ static int __init init_jfs_fs(void)
 	/*
 	 * I/O completion thread (endio)
 	 */
-	jfsIOthread = kernel_thread(jfsIOWait, 0,
-				    CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	jfsIOthread = kernel_thread(jfsIOWait, 0, CLONE_KERNEL);
 	if (jfsIOthread < 0) {
 		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsIOthread);
 		goto end_txmngr;
 	}
 	wait_for_completion(&jfsIOwait);	/* Wait until thread starts */
 
-	jfsCommitThread = kernel_thread(jfs_lazycommit, 0,
-					CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	jfsCommitThread = kernel_thread(jfs_lazycommit, 0, CLONE_KERNEL);
 	if (jfsCommitThread < 0) {
 		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsCommitThread);
 		goto kill_iotask;
 	}
 	wait_for_completion(&jfsIOwait);	/* Wait until thread starts */
 
-	jfsSyncThread = kernel_thread(jfs_sync, 0,
-				      CLONE_FS | CLONE_FILES | CLONE_SIGHAND);
+	jfsSyncThread = kernel_thread(jfs_sync, 0, CLONE_KERNEL);
 	if (jfsSyncThread < 0) {
 		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsSyncThread);
 		goto kill_committask;

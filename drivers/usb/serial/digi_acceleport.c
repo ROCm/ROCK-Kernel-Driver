@@ -594,8 +594,6 @@ static inline long cond_wait_interruptible_timeout_irqrestore(
 
 	timeout = schedule_timeout(timeout);
 
-	set_current_state( TASK_RUNNING );
-
 	remove_wait_queue( q, &wait );
 
 	return( timeout );

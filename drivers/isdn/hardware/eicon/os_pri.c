@@ -1,4 +1,4 @@
-/* $Id: os_pri.c,v 1.1.2.3 2001/02/14 21:10:19 armin Exp $ */
+/* $Id: os_pri.c,v 1.29 2003/08/25 13:41:27 schindler Exp $ */
 
 #include "platform.h"
 #include "debuglib.h"
@@ -55,6 +55,34 @@ static int pri_is_rev_2_card(int card_ordinal)
 		return (1);
 	}
 	return (0);
+}
+
+static void diva_pri_set_addresses(diva_os_xdi_adapter_t * a)
+{
+	a->resources.pci.mem_type_id[MEM_TYPE_ADDRESS] = 0;
+	a->resources.pci.mem_type_id[MEM_TYPE_CONTROL] = 2;
+	a->resources.pci.mem_type_id[MEM_TYPE_CONFIG] = 4;
+	a->resources.pci.mem_type_id[MEM_TYPE_RAM] = 0;
+	a->resources.pci.mem_type_id[MEM_TYPE_RESET] = 2;
+	a->resources.pci.mem_type_id[MEM_TYPE_CFG] = 4;
+	a->resources.pci.mem_type_id[MEM_TYPE_PROM] = 3;
+	
+	a->xdi_adapter.Address = a->resources.pci.addr[0];
+	a->xdi_adapter.Control = a->resources.pci.addr[2];
+	a->xdi_adapter.Config = a->resources.pci.addr[4];
+
+	a->xdi_adapter.ram = a->resources.pci.addr[0];
+	a->xdi_adapter.ram += MP_SHARED_RAM_OFFSET;
+
+	a->xdi_adapter.reset = a->resources.pci.addr[2];
+	a->xdi_adapter.reset += MP_RESET;
+
+	a->xdi_adapter.cfg = a->resources.pci.addr[4];
+	a->xdi_adapter.cfg += MP_IRQ_RESET;
+
+	a->xdi_adapter.sdram_bar = a->resources.pci.bar[0];
+
+	a->xdi_adapter.prom = a->resources.pci.addr[3];
 }
 
 /*
@@ -117,7 +145,7 @@ int diva_pri_init_card(diva_os_xdi_adapter_t * a)
 	 */
 	for (bar = 0; bar < 5; bar++) {
 		a->resources.pci.addr[bar] =
-		    divasa_remap_pci_bar(a->resources.pci.bar[bar],
+		    divasa_remap_pci_bar(a, bar, a->resources.pci.bar[bar],
 					 bar_length[bar]);
 		if (!a->resources.pci.addr[bar]) {
 			DBG_ERR(("A: A(%d), can't map bar[%d]",
@@ -126,6 +154,11 @@ int diva_pri_init_card(diva_os_xdi_adapter_t * a)
 			return (-1);
 		}
 	}
+
+	/*
+	   Set all memory areas
+	 */
+	diva_pri_set_addresses(a);
 
 	/*
 	   Get Serial Number of this adapter
@@ -193,23 +226,6 @@ int diva_pri_init_card(diva_os_xdi_adapter_t * a)
 	} else {
 		prepare_pri_functions(&a->xdi_adapter);
 	}
-
-	/*
-	   Set all memory areas
-	 */
-	a->xdi_adapter.Address = a->resources.pci.addr[0];
-	a->xdi_adapter.sdram_bar = a->resources.pci.bar[0];
-	a->xdi_adapter.ram = a->resources.pci.addr[0];
-	a->xdi_adapter.ram += MP_SHARED_RAM_OFFSET;
-
-	a->xdi_adapter.reset = a->resources.pci.addr[2];
-	a->xdi_adapter.reset += MP_RESET;
-
-	a->xdi_adapter.prom =
-	    (byte *) (unsigned long) a->resources.pci.bar[3];
-
-	a->xdi_adapter.cfg = a->resources.pci.addr[4];
-	a->xdi_adapter.cfg += MP_IRQ_RESET;
 
 	a->dsp_mask = diva_pri_detect_dsps(a);
 
@@ -317,7 +333,7 @@ static int diva_pri_cleanup_adapter(diva_os_xdi_adapter_t * a)
 static int diva_pri_reset_adapter(PISDN_ADAPTER IoAdapter)
 {
 	dword i;
-	struct mp_load *boot = (struct mp_load *) IoAdapter->Address;
+	struct mp_load *boot;
 
 	if (!IoAdapter->Address || !IoAdapter->reset) {
 		return (-1);
@@ -328,12 +344,20 @@ static int diva_pri_reset_adapter(PISDN_ADAPTER IoAdapter)
 		return (-1);
 	}
 
+	boot = (struct mp_load *) DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
 	WRITE_DWORD(&boot->err, 0);
+	DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, boot);
+
 	IoAdapter->rstFnc(IoAdapter);
+
 	diva_os_wait(10);
+
+	boot = (struct mp_load *) DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
 	i = READ_DWORD(&boot->live);
+
 	diva_os_wait(10);
 	if (i == READ_DWORD(&boot->live)) {
+		DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, boot);
 		DBG_ERR(("A: A(%d) CPU on PRI %ld is not alive!",
 			 IoAdapter->ANum, IoAdapter->serialNo))
 		return (-1);
@@ -342,8 +366,10 @@ static int diva_pri_reset_adapter(PISDN_ADAPTER IoAdapter)
 		DBG_ERR(("A: A(%d) PRI %ld Board Selftest failed, error=%08lx",
 			 IoAdapter->ANum, IoAdapter->serialNo,
 			 READ_DWORD(&boot->err)))
+		DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, boot);
 		return (-1);
 	}
+	DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, boot);
 
 	/*
 	   Forget all outstanding entities
@@ -383,9 +409,11 @@ diva_pri_write_sdram_block(PISDN_ADAPTER IoAdapter,
 			   dword address,
 			   const byte * data, dword length, dword limit)
 {
-	byte *mem = IoAdapter->Address;
+	byte *p = DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
+	byte *mem = p;
 
 	if (((address + length) >= limit) || !mem) {
+		DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, p);
 		DBG_ERR(("A: A(%d) write PRI address=0x%08lx",
 			 IoAdapter->ANum, address + length))
 		return (-1);
@@ -396,6 +424,7 @@ diva_pri_write_sdram_block(PISDN_ADAPTER IoAdapter,
 		*mem++ = *data++;
 	}
 
+	DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, p);
 	return (0);
 }
 
@@ -405,15 +434,18 @@ diva_pri_start_adapter(PISDN_ADAPTER IoAdapter,
 {
 	dword i;
 	int started = 0;
-	struct mp_load *boot = (struct mp_load *) IoAdapter->Address;
+	byte *p;
+	struct mp_load *boot = (struct mp_load *) DIVA_OS_MEM_ATTACH_ADDRESS(IoAdapter);
 	ADAPTER *a = &IoAdapter->a;
 
 	if (IoAdapter->Initialized) {
+		DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, boot);
 		DBG_ERR(("A: A(%d) pri_start_adapter, adapter already running",
 			 IoAdapter->ANum))
 		return (-1);
 	}
 	if (!boot) {
+		DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, boot);
 		DBG_ERR(("A: PRI %ld can't start, adapter not mapped",
 			 IoAdapter->serialNo))
 		return (-1);
@@ -437,17 +469,22 @@ diva_pri_start_adapter(PISDN_ADAPTER IoAdapter,
 	}
 
 	if (!started) {
-		dword TrapId = READ_DWORD(&IoAdapter->Address[0x80]);
-		dword debug = READ_DWORD(&IoAdapter->Address[0x1c]);
+		byte *p = (byte *)boot;
+		dword TrapId;
+		dword debug;
+		TrapId = READ_DWORD(&p[0x80]);
+		debug = READ_DWORD(&p[0x1c]);
 		DBG_ERR(("A(%d) Adapter start failed 0x%08lx, TrapId=%08lx, debug=%08lx",
 			 IoAdapter->ANum, READ_DWORD(&boot->signature),
 			 TrapId, debug))
+		DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, boot);
 		if (IoAdapter->trapFnc) {
 			(*(IoAdapter->trapFnc)) (IoAdapter);
 		}
 		IoAdapter->stop(IoAdapter);
 		return (-1);
 	}
+	DIVA_OS_MEM_DETACH_ADDRESS(IoAdapter, boot);
 
 	IoAdapter->Initialized = TRUE;
 
@@ -455,8 +492,9 @@ diva_pri_start_adapter(PISDN_ADAPTER IoAdapter,
 	   Check Interrupt
 	 */
 	IoAdapter->IrqCount = 0;
-	WRITE_DWORD(((dword volatile *) IoAdapter->cfg),
-		    (dword) ~ 0x03E00000);
+	p = DIVA_OS_MEM_ATTACH_CFG(IoAdapter);
+	WRITE_DWORD(((dword volatile *) p), (dword) ~ 0x03E00000);
+	DIVA_OS_MEM_DETACH_CFG(IoAdapter, p);
 	a->ReadyInt = 1;
 	a->ram_out(a, &PR_RAM->ReadyInt, 1);
 
@@ -658,7 +696,8 @@ diva_pri_cmd_card_proc(struct _diva_os_xdi_adapter *a,
 		    diva_os_malloc(0, a->xdi_mbox.data_length);
 		if (a->xdi_mbox.data) {
 			dword *data = (dword *) a->xdi_mbox.data;
-			if (!a->xdi_adapter.ram || !a->xdi_adapter.reset ||
+			if (!a->xdi_adapter.ram ||
+				!a->xdi_adapter.reset ||
 			    !a->xdi_adapter.cfg) {
 				*data = 3;
 			} else if (a->xdi_adapter.trapped) {
@@ -691,23 +730,18 @@ diva_pri_cmd_card_proc(struct _diva_os_xdi_adapter *a,
 							   a->xdi_mbox.
 							   data_length);
 					if (a->xdi_mbox.data) {
-						byte *src =
-						    a->xdi_adapter.Address;
-						byte *dst =
-						    a->xdi_mbox.data;
-						dword len =
-						    a->xdi_mbox.
-						    data_length;
+						byte *p = DIVA_OS_MEM_ATTACH_ADDRESS(&a->xdi_adapter);
+						byte *src = p;
+						byte *dst = a->xdi_mbox.data;
+						dword len = a->xdi_mbox.data_length;
 
-						src +=
-						    cmd->command_data.
-						    read_sdram.offset;
+						src += cmd->command_data.read_sdram.offset;
 
 						while (len--) {
 							*dst++ = *src++;
 						}
-						a->xdi_mbox.status =
-						    DIVA_XDI_MBOX_BUSY;
+						a->xdi_mbox.status = DIVA_XDI_MBOX_BUSY;
+						DIVA_OS_MEM_DETACH_ADDRESS(&a->xdi_adapter, p);
 						ret = 0;
 					}
 				}
@@ -731,27 +765,33 @@ static int pri_get_serial_number(diva_os_xdi_adapter_t * a)
 	byte data[64];
 	int i;
 	dword len = sizeof(data);
-	volatile byte *config = (byte *) a->resources.pci.addr[4];
-	volatile byte *flash = (byte *) a->resources.pci.addr[3];
+	volatile byte *config;
+	volatile byte *flash;
 
 /*
  *  First set some GT6401x config registers before accessing the BOOT-ROM
  */
+ 	config = DIVA_OS_MEM_ATTACH_CONFIG(&a->xdi_adapter);
 	if (!(config[0xc3c] & 0x08)) {
 		config[0xc3c] |= 0x08;	/* Base Address enable register */
 	}
 	config[LOW_BOOTCS_DREG] = 0x00;
 	config[HI_BOOTCS_DREG] = 0xFF;
+ 	DIVA_OS_MEM_DETACH_CONFIG(&a->xdi_adapter, config);
 /*
  *  Read only the last 64 bytes of manufacturing data
  */
 	memset(data, '\0', len);
+ 	flash = DIVA_OS_MEM_ATTACH_PROM(&a->xdi_adapter);
 	for (i = 0; i < len; i++) {
 		data[i] = flash[0x8000 - len + i];
 	}
+ 	DIVA_OS_MEM_DETACH_PROM(&a->xdi_adapter, flash);
 
+ 	config = DIVA_OS_MEM_ATTACH_CONFIG(&a->xdi_adapter);
 	config[LOW_BOOTCS_DREG] = 0xFC;	/* Disable FLASH EPROM access */
 	config[HI_BOOTCS_DREG] = 0xFF;
+ 	DIVA_OS_MEM_DETACH_CONFIG(&a->xdi_adapter, config);
 
 	if (memcmp(&data[48], "DIVAserverPR", 12)) {
 #if !defined(DIVA_PRI_NO_PCI_BIOS_WORKAROUND)	/* { */
@@ -791,22 +831,26 @@ static int pri_get_serial_number(diva_os_xdi_adapter_t * a)
 		/*
 		   Try to read Flash again
 		 */
-		config = (byte *) a->resources.pci.addr[4];
-		flash = (byte *) a->resources.pci.addr[3];
 		len = sizeof(data);
 
+ 		config = DIVA_OS_MEM_ATTACH_CONFIG(&a->xdi_adapter);
 		if (!(config[0xc3c] & 0x08)) {
 			config[0xc3c] |= 0x08;	/* Base Address enable register */
 		}
 		config[LOW_BOOTCS_DREG] = 0x00;
 		config[HI_BOOTCS_DREG] = 0xFF;
+ 		DIVA_OS_MEM_DETACH_CONFIG(&a->xdi_adapter, config);
 
 		memset(data, '\0', len);
+ 		flash = DIVA_OS_MEM_ATTACH_PROM(&a->xdi_adapter);
 		for (i = 0; i < len; i++) {
 			data[i] = flash[0x8000 - len + i];
 		}
+ 		DIVA_OS_MEM_ATTACH_PROM(&a->xdi_adapter, flash);
+ 		config = DIVA_OS_MEM_ATTACH_CONFIG(&a->xdi_adapter);
 		config[LOW_BOOTCS_DREG] = 0xFC;
 		config[HI_BOOTCS_DREG] = 0xFF;
+ 		DIVA_OS_MEM_DETACH_CONFIG(&a->xdi_adapter, config);
 
 		if (memcmp(&data[48], "DIVAserverPR", 12)) {
 			DBG_ERR(("A: failed to read serial number"))
@@ -907,7 +951,8 @@ dsp_check_presence(volatile byte * addr, volatile byte * data, int dsp)
 */
 static dword diva_pri_detect_dsps(diva_os_xdi_adapter_t * a)
 {
-	byte *base = a->resources.pci.addr[2];
+	byte *base;
+	byte *p;
 	dword ret = 0;
 	dword row_offset[7] = {
 		0x00000000,
@@ -921,13 +966,16 @@ static dword diva_pri_detect_dsps(diva_os_xdi_adapter_t * a)
 	byte *dsp_addr_port, *dsp_data_port, row_state;
 	int dsp_row = 0, dsp_index, dsp_num;
 
-	if (!base || !a->xdi_adapter.reset) {
+	if (!a->xdi_adapter.Control || !a->xdi_adapter.reset) {
 		return (0);
 	}
 
-	*(volatile byte *) (a->xdi_adapter.reset) =
-	    _MP_RISC_RESET | _MP_DSP_RESET;
+	p = DIVA_OS_MEM_ATTACH_RESET(&a->xdi_adapter);
+	*(volatile byte *) p = _MP_RISC_RESET | _MP_DSP_RESET;
+	DIVA_OS_MEM_DETACH_RESET(&a->xdi_adapter, p);
 	diva_os_wait(5);
+
+	base = DIVA_OS_MEM_ATTACH_CONTROL(&a->xdi_adapter);
 
 	for (dsp_num = 0; dsp_num < 30; dsp_num++) {
 		dsp_row = dsp_num / 7 + 1;
@@ -947,9 +995,11 @@ static dword diva_pri_detect_dsps(diva_os_xdi_adapter_t * a)
 			ret |= (1 << dsp_num);
 		}
 	}
+	DIVA_OS_MEM_DETACH_CONTROL(&a->xdi_adapter, base);
 
-	*(volatile byte *) (a->xdi_adapter.reset) =
-	    _MP_RISC_RESET | _MP_LED1 | _MP_LED2;
+	p = DIVA_OS_MEM_ATTACH_RESET(&a->xdi_adapter);
+	*(volatile byte *) p = _MP_RISC_RESET | _MP_LED1 | _MP_LED2;
+	DIVA_OS_MEM_DETACH_RESET(&a->xdi_adapter, p);
 	diva_os_wait(5);
 
 	/*

@@ -427,6 +427,11 @@ module_param(disable_dev, intarray, 0444);
 
 postcore_initcall (eisa_init);
 
+#ifndef CONFIG_EISA_ALWAYS
+int EISA_bus;
+EXPORT_SYMBOL(EISA_bus);
+#endif
+
 EXPORT_SYMBOL (eisa_bus_type);
 EXPORT_SYMBOL (eisa_driver_register);
 EXPORT_SYMBOL (eisa_driver_unregister);

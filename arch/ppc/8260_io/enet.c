@@ -206,7 +206,7 @@ scc_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	cep->stats.tx_bytes += skb->len;
 	cep->skb_cur = (cep->skb_cur+1) & TX_RING_MOD_MASK;
-	
+
 	spin_lock_irq(&cep->lock);
 
 	/* Send it on its way.  Tell CPM its ready, interrupt when done,
@@ -429,7 +429,7 @@ scc_enet_rx(struct net_device *dev)
 for (;;) {
 	if (bdp->cbd_sc & BD_ENET_RX_EMPTY)
 		break;
-		
+
 #ifndef final_version
 	/* Since we have allocated space to hold a complete frame, both
 	 * the first and last indicators should be set.
@@ -549,7 +549,7 @@ static void set_multicast_list(struct net_device *dev)
 	ep = (scc_enet_t *)dev->base_addr;
 
 	if (dev->flags&IFF_PROMISC) {
-	  
+	
 		/* Log any net taps. */
 		printk("%s: Promiscuous mode enabled.\n", dev->name);
 		cep->sccp->scc_pmsr |= SCC_PSMR_PRO;
@@ -577,7 +577,7 @@ static void set_multicast_list(struct net_device *dev)
 			dmi = dev->mc_list;
 
 			for (i=0; i<dev->mc_count; i++) {
-				
+		
 				/* Only support group multicast for now.
 				*/
 				if (!(dmi->dmi_addr[0] & 1))
@@ -660,7 +660,7 @@ static int __init scc_enet_init(void)
 		(PC_ENET_RENA | PC_ENET_CLSN | PC_ENET_TXCLK | PC_ENET_RXCLK);
 	io->iop_pdirc &=
 		~(PC_ENET_RENA | PC_ENET_CLSN | PC_ENET_TXCLK | PC_ENET_RXCLK);
-	io->iop_psorc &= 
+	io->iop_psorc &=
 		~(PC_ENET_RENA | PC_ENET_TXCLK | PC_ENET_RXCLK);
 	io->iop_psorc |= PC_ENET_CLSN;
 

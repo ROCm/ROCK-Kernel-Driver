@@ -2483,7 +2483,7 @@ static void adpt_fail_posted_scbs(adpt_hba* pHba)
 	Scsi_Cmnd* 	cmd = NULL;
 	Scsi_Device* 	d = NULL;
 
-	list_for_each_entry(d, &pHba->host->my_devices, siblings) {
+	shost_for_each_device(d, pHba->host) {
 		unsigned long flags;
 		spin_lock_irqsave(&d->list_lock, flags);
 		list_for_each_entry(cmd, &d->cmd_list, list) {

@@ -34,7 +34,6 @@
 #include <linux/seq_file.h>
 
 #include <asm/mmu.h>
-#include <asm/processor.h>
 #include <asm/residual.h>
 #include <asm/io.h>
 #include <asm/pgtable.h>
@@ -260,4 +259,3 @@ m8260_init(unsigned long r3, unsigned long r4, unsigned long r5,
 	ppc_md.find_end_of_memory	= m8260_find_end_of_memory;
 	ppc_md.setup_io_mappings	= m8260_map_io;
 }
-

@@ -34,6 +34,10 @@ __SA1100_start:
 		@ REVISIT_PFS168: Temporary until firmware updated to use assigned machine number
 		mov	r7, #MACH_TYPE_PFS168
 #endif
+#ifdef CONFIG_SA1100_SIMPAD
+		@ UNTIL we've something like an open bootldr
+		mov	r7, #MACH_TYPE_SIMPAD @should be 87
+#endif
 
 #ifdef CONFIG_SA1100_VICTOR
 		teq	r7, #MACH_TYPE_VICTOR

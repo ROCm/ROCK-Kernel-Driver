@@ -60,14 +60,6 @@ struct lane2_ops {
                                     u8 *tlvs, u32 sizeoftlvs);
 };
 
-struct atm_lane_ops {
-        int (*lecd_attach)(struct atm_vcc *vcc, int arg);
-        int (*mcast_attach)(struct atm_vcc *vcc, int arg);
-        int (*vcc_attach)(struct atm_vcc *vcc, void *arg);
-        struct net_device * (*get_lec)(int itf);
-        struct module *owner;
-};
-
 /*
  * ATM LAN Emulation supports both LLC & Dix Ethernet EtherType
  * frames. 
@@ -156,10 +148,6 @@ int send_to_lecd(struct lec_priv *priv,
                  atmlec_msg_type type, unsigned char *mac_addr,
                  unsigned char *atm_addr, struct sk_buff *data);
 void lec_push(struct atm_vcc *vcc, struct sk_buff *skb);
-
-extern struct atm_lane_ops *atm_lane_ops;
-void atm_lane_ops_set(struct atm_lane_ops *hook);
-int try_atm_lane_ops(void);
 
 #endif /* _LEC_H_ */
 

@@ -54,9 +54,13 @@ static void *alloc_upcall(int opcode, int size)
 
         inp->ih.opcode = opcode;
 	inp->ih.pid = current->pid;
-	inp->ih.pgid = current->pgrp;
-	coda_load_creds(&(inp->ih.cred));
-
+	inp->ih.pgid = process_group(current);
+#ifdef CODA_FS_OLD_API
+	memset(&inp->ih.cred, 0, sizeof(struct coda_cred));
+	inp->ih.cred.cr_fsuid = current->fsuid;
+#else
+	inp->ih.uid = current->fsuid;
+#endif
 	return (void*)inp;
 }
 
@@ -74,7 +78,7 @@ do {\
 
 
 /* the upcalls */
-int venus_rootfid(struct super_block *sb, ViceFid *fidp)
+int venus_rootfid(struct super_block *sb, struct CodaFid *fidp)
 {
         union inputArgs *inp;
         union outputArgs *outp;
@@ -88,14 +92,14 @@ int venus_rootfid(struct super_block *sb, ViceFid *fidp)
 	if (error) {
 	        printk("coda_get_rootfid: error %d\n", error);
 	} else {
-		*fidp = (ViceFid) outp->coda_root.VFid;
+		*fidp = outp->coda_root.VFid;
 	}
 
 	CODA_FREE(inp, insize);
 	return error;
 }
 
-int venus_getattr(struct super_block *sb, struct ViceFid *fid, 
+int venus_getattr(struct super_block *sb, struct CodaFid *fid, 
 		     struct coda_vattr *attr) 
 {
         union inputArgs *inp;
@@ -114,7 +118,7 @@ int venus_getattr(struct super_block *sb, struct ViceFid *fid,
         return error;
 }
 
-int venus_setattr(struct super_block *sb, struct ViceFid *fid, 
+int venus_setattr(struct super_block *sb, struct CodaFid *fid, 
 		  struct coda_vattr *vattr)
 {
         union inputArgs *inp;
@@ -133,9 +137,9 @@ int venus_setattr(struct super_block *sb, struct ViceFid *fid,
         return error;
 }
 
-int venus_lookup(struct super_block *sb, struct ViceFid *fid, 
+int venus_lookup(struct super_block *sb, struct CodaFid *fid, 
 		    const char *name, int length, int * type, 
-		    struct ViceFid *resfid)
+		    struct CodaFid *resfid)
 {
         union inputArgs *inp;
         union outputArgs *outp;
@@ -162,17 +166,25 @@ int venus_lookup(struct super_block *sb, struct ViceFid *fid,
 	return error;
 }
 
-int venus_store(struct super_block *sb, struct ViceFid *fid, int flags,
-                struct coda_cred *cred)
+int venus_store(struct super_block *sb, struct CodaFid *fid, int flags,
+                vuid_t uid)
 {
         union inputArgs *inp;
         union outputArgs *outp;
         int insize, outsize, error;
+#ifdef CODA_FS_OLD_API
+	struct coda_cred cred = { 0, };
+	cred.cr_fsuid = uid;
+#endif
 	
 	insize = SIZE(store);
 	UPARG(CODA_STORE);
 	
-	memcpy(&(inp->ih.cred), cred, sizeof(*cred));
+#ifdef CODA_FS_OLD_API
+	memcpy(&(inp->ih.cred), &cred, sizeof(cred));
+#else
+	inp->ih.uid = uid;
+#endif
 	
         inp->coda_store.VFid = *fid;
         inp->coda_store.flags = flags;
@@ -183,7 +195,7 @@ int venus_store(struct super_block *sb, struct ViceFid *fid, int flags,
         return error;
 }
 
-int venus_release(struct super_block *sb, struct ViceFid *fid, int flags)
+int venus_release(struct super_block *sb, struct CodaFid *fid, int flags)
 {
         union inputArgs *inp;
         union outputArgs *outp;
@@ -201,17 +213,25 @@ int venus_release(struct super_block *sb, struct ViceFid *fid, int flags)
 	return error;
 }
 
-int venus_close(struct super_block *sb, struct ViceFid *fid, int flags,
-                struct coda_cred *cred)
+int venus_close(struct super_block *sb, struct CodaFid *fid, int flags,
+                vuid_t uid)
 {
 	union inputArgs *inp;
 	union outputArgs *outp;
 	int insize, outsize, error;
+#ifdef CODA_FS_OLD_API
+	struct coda_cred cred = { 0, };
+	cred.cr_fsuid = uid;
+#endif
 	
 	insize = SIZE(release);
 	UPARG(CODA_CLOSE);
 	
-	memcpy(&(inp->ih.cred), cred, sizeof(*cred));
+#ifdef CODA_FS_OLD_API
+	memcpy(&(inp->ih.cred), &cred, sizeof(cred));
+#else
+	inp->ih.uid = uid;
+#endif
 	
         inp->coda_close.VFid = *fid;
         inp->coda_close.flags = flags;
@@ -222,7 +242,7 @@ int venus_close(struct super_block *sb, struct ViceFid *fid, int flags,
         return error;
 }
 
-int venus_open(struct super_block *sb, struct ViceFid *fid,
+int venus_open(struct super_block *sb, struct CodaFid *fid,
 		  int flags, struct file **fh)
 {
         union inputArgs *inp;
@@ -243,9 +263,9 @@ int venus_open(struct super_block *sb, struct ViceFid *fid,
 	return error;
 }	
 
-int venus_mkdir(struct super_block *sb, struct ViceFid *dirfid, 
+int venus_mkdir(struct super_block *sb, struct CodaFid *dirfid, 
 		   const char *name, int length, 
-		   struct ViceFid *newfid, struct coda_vattr *attrs)
+		   struct CodaFid *newfid, struct coda_vattr *attrs)
 {
         union inputArgs *inp;
         union outputArgs *outp;
@@ -273,8 +293,8 @@ int venus_mkdir(struct super_block *sb, struct ViceFid *dirfid,
 }
 
 
-int venus_rename(struct super_block *sb, struct ViceFid *old_fid, 
-		 struct ViceFid *new_fid, size_t old_length, 
+int venus_rename(struct super_block *sb, struct CodaFid *old_fid, 
+		 struct CodaFid *new_fid, size_t old_length, 
 		 size_t new_length, const char *old_name, 
 		 const char *new_name)
 {
@@ -310,9 +330,9 @@ int venus_rename(struct super_block *sb, struct ViceFid *old_fid,
 	return error;
 }
 
-int venus_create(struct super_block *sb, struct ViceFid *dirfid, 
+int venus_create(struct super_block *sb, struct CodaFid *dirfid, 
 		 const char *name, int length, int excl, int mode, dev_t rdev,
-		 struct ViceFid *newfid, struct coda_vattr *attrs) 
+		 struct CodaFid *newfid, struct coda_vattr *attrs) 
 {
         union inputArgs *inp;
         union outputArgs *outp;
@@ -325,7 +345,7 @@ int venus_create(struct super_block *sb, struct ViceFid *dirfid,
 
         inp->coda_create.VFid = *dirfid;
         inp->coda_create.attr.va_mode = mode;
-        inp->coda_create.attr.va_rdev = rdev;
+        inp->coda_create.attr.va_rdev = huge_encode_dev(rdev);
 	inp->coda_create.excl = excl;
         inp->coda_create.mode = mode;
         inp->coda_create.name = offset;
@@ -343,7 +363,7 @@ int venus_create(struct super_block *sb, struct ViceFid *dirfid,
 	return error;        
 }
 
-int venus_rmdir(struct super_block *sb, struct ViceFid *dirfid, 
+int venus_rmdir(struct super_block *sb, struct CodaFid *dirfid, 
 		    const char *name, int length)
 {
         union inputArgs *inp;
@@ -366,7 +386,7 @@ int venus_rmdir(struct super_block *sb, struct ViceFid *dirfid,
 	return error;
 }
 
-int venus_remove(struct super_block *sb, struct ViceFid *dirfid, 
+int venus_remove(struct super_block *sb, struct CodaFid *dirfid, 
 		    const char *name, int length)
 {
         union inputArgs *inp;
@@ -388,7 +408,7 @@ int venus_remove(struct super_block *sb, struct ViceFid *dirfid,
 	return error;
 }
 
-int venus_readlink(struct super_block *sb, struct ViceFid *fid, 
+int venus_readlink(struct super_block *sb, struct CodaFid *fid, 
 		      char *buffer, int *length)
 { 
         union inputArgs *inp;
@@ -421,8 +441,8 @@ int venus_readlink(struct super_block *sb, struct ViceFid *fid,
 
 
 
-int venus_link(struct super_block *sb, struct ViceFid *fid, 
-		  struct ViceFid *dirfid, const char *name, int len )
+int venus_link(struct super_block *sb, struct CodaFid *fid, 
+		  struct CodaFid *dirfid, const char *name, int len )
 {
         union inputArgs *inp;
         union outputArgs *outp;
@@ -447,7 +467,7 @@ int venus_link(struct super_block *sb, struct ViceFid *fid,
         return error;
 }
 
-int venus_symlink(struct super_block *sb, struct ViceFid *fid,
+int venus_symlink(struct super_block *sb, struct CodaFid *fid,
 		     const char *name, int len,
 		     const char *symname, int symlen)
 {
@@ -482,7 +502,7 @@ int venus_symlink(struct super_block *sb, struct ViceFid *fid,
         return error;
 }
 
-int venus_fsync(struct super_block *sb, struct ViceFid *fid)
+int venus_fsync(struct super_block *sb, struct CodaFid *fid)
 {
         union inputArgs *inp;
         union outputArgs *outp; 
@@ -499,7 +519,7 @@ int venus_fsync(struct super_block *sb, struct ViceFid *fid)
 	return error;
 }
 
-int venus_access(struct super_block *sb, struct ViceFid *fid, int mask)
+int venus_access(struct super_block *sb, struct CodaFid *fid, int mask)
 {
         union inputArgs *inp;
         union outputArgs *outp; 
@@ -518,7 +538,7 @@ int venus_access(struct super_block *sb, struct ViceFid *fid, int mask)
 }
 
 
-int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
+int venus_pioctl(struct super_block *sb, struct CodaFid *fid,
 		 unsigned int cmd, struct PioctlData *data)
 {
         union inputArgs *inp;
@@ -568,14 +588,10 @@ int venus_pioctl(struct super_block *sb, struct ViceFid *fid,
         if (outp->coda_ioctl.len > data->vi.out_size) {
 		error = -EINVAL;
         } else {
-		error = verify_area(VERIFY_WRITE, data->vi.out, 
-                                    data->vi.out_size);
-		if ( error ) goto exit;
-
 		if (copy_to_user(data->vi.out, 
 				 (char *)outp + (long)outp->coda_ioctl.data, 
 				 data->vi.out_size)) {
-			error = -EINVAL;
+			error = -EFAULT;
 			goto exit;
 		}
         }
@@ -808,7 +824,7 @@ static int coda_upcall(struct coda_sb_info *sbi,
  * The last  allows Venus to replace local fids with global ones
  * during reintegration.
  *
- * CODA_REPLACE -- replace one ViceFid with another throughout the name cache */
+ * CODA_REPLACE -- replace one CodaFid with another throughout the name cache */
 
 int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 {
@@ -819,25 +835,20 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 	  switch (opcode) {
 
 	  case CODA_FLUSH : {
-		   coda_cache_clear_all(sb, NULL);
+		   coda_cache_clear_all(sb);
 		   shrink_dcache_sb(sb);
 		   coda_flag_inode(sb->s_root->d_inode, C_FLUSH);
 		   return(0);
 	  }
 
 	  case CODA_PURGEUSER : {
-	           struct coda_cred *cred = &out->coda_purgeuser.cred;
-		   if ( !cred ) {
-		           printk("PURGEUSER: null cred!\n");
-			   return 0;
-		   }
-		   coda_cache_clear_all(sb, cred);
+		   coda_cache_clear_all(sb);
 		   return(0);
 	  }
 
 	  case CODA_ZAPDIR : {
 	          struct inode *inode;
-		  ViceFid *fid = &out->coda_zapdir.CodaFid;
+		  struct CodaFid *fid = &out->coda_zapdir.CodaFid;
 
 		  inode = coda_fid_to_inode(fid, sb);
 		  if (inode) {
@@ -851,7 +862,7 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 
 	  case CODA_ZAPFILE : {
 	          struct inode *inode;
-		  struct ViceFid *fid = &out->coda_zapfile.CodaFid;
+		  struct CodaFid *fid = &out->coda_zapfile.CodaFid;
 		  inode = coda_fid_to_inode(fid, sb);
 		  if ( inode ) {
 	                  coda_flag_inode(inode, C_VATTR);
@@ -862,7 +873,7 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 
 	  case CODA_PURGEFID : {
 	          struct inode *inode;
-		  ViceFid *fid = &out->coda_purgefid.CodaFid;
+		  struct CodaFid *fid = &out->coda_purgefid.CodaFid;
 		  inode = coda_fid_to_inode(fid, sb);
 		  if ( inode ) { 
 			coda_flag_inode_children(inode, C_PURGE);
@@ -878,8 +889,8 @@ int coda_downcall(int opcode, union outputArgs * out, struct super_block *sb)
 
 	  case CODA_REPLACE : {
 	          struct inode *inode;
-		  ViceFid *oldfid = &out->coda_replace.OldFid;
-		  ViceFid *newfid = &out->coda_replace.NewFid;
+		  struct CodaFid *oldfid = &out->coda_replace.OldFid;
+		  struct CodaFid *newfid = &out->coda_replace.NewFid;
 		  inode = coda_fid_to_inode(oldfid, sb);
 		  if ( inode ) { 
 			  coda_replace_fid(inode, oldfid, newfid);

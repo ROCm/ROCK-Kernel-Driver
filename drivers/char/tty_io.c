@@ -138,12 +138,7 @@ static int tty_release(struct inode *, struct file *);
 int tty_ioctl(struct inode * inode, struct file * file,
 	      unsigned int cmd, unsigned long arg);
 static int tty_fasync(int fd, struct file * filp, int on);
-extern int vme_scc_init (void);
-extern int serial167_init(void);
-extern int rs_8xx_init(void);
-extern void tub3270_init(void);
 extern void rs_360_init(void);
-extern void tx3912_rs_init(void);
 
 static struct tty_struct *alloc_tty_struct(void)
 {
@@ -325,13 +320,13 @@ int tty_check_change(struct tty_struct * tty)
 		printk(KERN_WARNING "tty_check_change: tty->pgrp <= 0!\n");
 		return 0;
 	}
-	if (current->pgrp == tty->pgrp)
+	if (process_group(current) == tty->pgrp)
 		return 0;
 	if (is_ignored(SIGTTOU))
 		return 0;
-	if (is_orphaned_pgrp(current->pgrp))
+	if (is_orphaned_pgrp(process_group(current)))
 		return -EIO;
-	(void) kill_pg(current->pgrp,SIGTTOU,1);
+	(void) kill_pg(process_group(current), SIGTTOU, 1);
 	return -ERESTARTSYS;
 }
 
@@ -826,7 +821,6 @@ static int init_dev(struct tty_driver *driver, int idx,
 	if(!tty)
 		goto fail_no_mem;
 	initialize_tty_struct(tty);
-	tty->device = MKDEV(driver->major, driver->minor_start) + idx;
 	tty->driver = driver;
 	tty->index = idx;
 	tty_line_name(driver, idx, tty->name);
@@ -854,8 +848,6 @@ static int init_dev(struct tty_driver *driver, int idx,
 		if (!o_tty)
 			goto free_mem_out;
 		initialize_tty_struct(o_tty);
-		o_tty->device = MKDEV(driver->other->major,
-					driver->other->minor_start) + idx;
 		o_tty->driver = driver->other;
 		o_tty->index = idx;
 		tty_line_name(driver->other, idx, o_tty->name);
@@ -1406,7 +1398,7 @@ got_driver:
 		task_unlock(current);
 		current->tty_old_pgrp = 0;
 		tty->session = current->session;
-		tty->pgrp = current->pgrp;
+		tty->pgrp = process_group(current);
 	}
 	return 0;
 }
@@ -1580,7 +1572,7 @@ static int tiocsctty(struct tty_struct *tty, int arg)
 	task_unlock(current);
 	current->tty_old_pgrp = 0;
 	tty->session = current->session;
-	tty->pgrp = current->pgrp;
+	tty->pgrp = process_group(current);
 	return 0;
 }
 
@@ -2423,7 +2415,7 @@ static struct cdev vc0_cdev;
  * Ok, now we can initialize the rest of the tty devices and can count
  * on memory allocations, interrupts etc..
  */
-void __init tty_init(void)
+static int __init tty_init(void)
 {
 	strcpy(tty_cdev.kobj.name, "dev.tty");
 	cdev_init(&tty_cdev, &tty_fops);
@@ -2465,51 +2457,6 @@ void __init tty_init(void)
 
 	vty_init();
 #endif
-
-#ifdef CONFIG_ESPSERIAL  /* init ESP before rs, so rs doesn't see the port */
-	espserial_init();
-#endif
-#if defined(CONFIG_MVME162_SCC) || defined(CONFIG_BVME6000_SCC) || defined(CONFIG_MVME147_SCC)
-	vme_scc_init();
-#endif
-#ifdef CONFIG_SERIAL_TX3912
-	tx3912_rs_init();
-#endif
-#ifdef CONFIG_ROCKETPORT
-	rp_init();
-#endif
-#ifdef CONFIG_SERIAL167
-	serial167_init();
-#endif
-#ifdef CONFIG_CYCLADES
-	cy_init();
-#endif
-#ifdef CONFIG_STALLION
-	stl_init();
-#endif
-#ifdef CONFIG_ISTALLION
-	stli_init();
-#endif
-#ifdef CONFIG_DIGI
-	pcxe_init();
-#endif
-#ifdef CONFIG_DIGIEPCA
-	pc_init();
-#endif
-#ifdef CONFIG_SPECIALIX
-	specialix_init();
-#endif
-#if (defined(CONFIG_8xx) || defined(CONFIG_8260))
-	rs_8xx_init();
-#endif /* CONFIG_8xx */
-	pty_init();
-#ifdef CONFIG_MOXA_INTELLIO
-	moxa_init();
-#endif	
-#ifdef CONFIG_TN3270
-	tub3270_init();
-#endif
-#ifdef CONFIG_A2232
-	a2232board_init();
-#endif
+	return 0;
 }
+module_init(tty_init);

@@ -1,7 +1,7 @@
 /*
  *  drivers/s390/cio/chsc.c
  *   S/390 common I/O routines -- channel subsystem call
- *   $Revision: 1.74 $
+ *   $Revision: 1.77 $
  *
  *    Copyright (C) 1999-2002 IBM Deutschland Entwicklung GmbH,
  *			      IBM Corporation
@@ -865,9 +865,7 @@ new_channel_path(int chpid, int status)
 	chp->state = status;
 	chp->dev.parent = &css_bus_device;
 
-	snprintf(chp->dev.name, DEVICE_NAME_SIZE,
-		 "channel path %x", chpid);
-	snprintf(chp->dev.bus_id, DEVICE_ID_SIZE, "chp%x", chpid);
+	snprintf(chp->dev.bus_id, BUS_ID_SIZE, "chp0.%x", chpid);
 
 	/* make it known to the system */
 	ret = device_register(&chp->dev);

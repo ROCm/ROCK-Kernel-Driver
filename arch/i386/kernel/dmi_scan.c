@@ -205,7 +205,7 @@ struct dmi_blacklist
 
 /* 
  * Reboot options and system auto-detection code provided by
- * Dell Computer Corporation so their systems "just work". :-)
+ * Dell Inc. so their systems "just work". :-)
  */
 
 /* 

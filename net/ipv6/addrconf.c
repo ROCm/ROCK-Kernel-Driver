@@ -2149,59 +2149,65 @@ struct if6_iter_state {
 	int bucket;
 };
 
-static inline struct inet6_ifaddr *if6_get_bucket(struct seq_file *seq, loff_t *pos)
+static struct inet6_ifaddr *if6_get_first(struct seq_file *seq)
 {
-	int i;
 	struct inet6_ifaddr *ifa = NULL;
-	loff_t l = *pos;
 	struct if6_iter_state *state = seq->private;
 
-	for (; state->bucket < IN6_ADDR_HSIZE; ++state->bucket)
-		for (i = 0, ifa = inet6_addr_lst[state->bucket]; ifa; ++i, ifa=ifa->lst_next) {
-			if (l--)
-				continue;
-			*pos = i;
-			goto out;
-		}
-out:
+	for (state->bucket = 0; state->bucket < IN6_ADDR_HSIZE; ++state->bucket) {
+		ifa = inet6_addr_lst[state->bucket];
+		if (ifa)
+			break;
+	}
 	return ifa;
+}
+
+static struct inet6_ifaddr *if6_get_next(struct seq_file *seq, struct inet6_ifaddr *ifa)
+{
+	struct if6_iter_state *state = seq->private;
+
+	ifa = ifa->lst_next;
+try_again:
+	if (!ifa && ++state->bucket < IN6_ADDR_HSIZE) {
+		ifa = inet6_addr_lst[state->bucket];
+		goto try_again;
+	}
+	return ifa;
+}
+
+static struct inet6_ifaddr *if6_get_idx(struct seq_file *seq, loff_t pos)
+{
+	struct inet6_ifaddr *ifa = if6_get_first(seq);
+
+	if (ifa)
+		while(pos && (ifa = if6_get_next(seq, ifa)) != NULL)
+			--pos;
+	return pos ? NULL : ifa;
 }
 
 static void *if6_seq_start(struct seq_file *seq, loff_t *pos)
 {
 	read_lock_bh(&addrconf_hash_lock);
-	return *pos ? if6_get_bucket(seq, pos) : (void *)1;
+	return if6_get_idx(seq, *pos);
 }
 
 static void *if6_seq_next(struct seq_file *seq, void *v, loff_t *pos)
 {
 	struct inet6_ifaddr *ifa;
-	struct if6_iter_state *state;
 
-	if (v == (void *)1) {
-		ifa = if6_get_bucket(seq, pos);
-		goto out;
-	}
-
-	state = seq->private;
-
-	ifa = v;
-	ifa = ifa->lst_next;
-	if (ifa)
-		goto out;
-
-	if (++state->bucket >= IN6_ADDR_HSIZE)
-		goto out;
-
-	*pos = 0;
-	ifa = if6_get_bucket(seq, pos);
-out:
+	ifa = if6_get_next(seq, v);
 	++*pos;
 	return ifa;
 }
 
-static inline void if6_iface_seq_show(struct seq_file *seq, struct inet6_ifaddr *ifp)
+static void if6_seq_stop(struct seq_file *seq, void *v)
 {
+	read_unlock_bh(&addrconf_hash_lock);
+}
+
+static int if6_seq_show(struct seq_file *seq, void *v)
+{
+	struct inet6_ifaddr *ifp = (struct inet6_ifaddr *)v;
 	seq_printf(seq,
 		   "%04x%04x%04x%04x%04x%04x%04x%04x %02x %02x %02x %02x %8s\n",
 		   NIP6(ifp->addr),
@@ -2210,20 +2216,7 @@ static inline void if6_iface_seq_show(struct seq_file *seq, struct inet6_ifaddr 
 		   ifp->scope,
 		   ifp->flags,
 		   ifp->idev->dev->name);
-}
-
-static int if6_seq_show(struct seq_file *seq, void *v)
-{
-	if (v == (void *)1)
-		return 0;
-	else
-		if6_iface_seq_show(seq, v);
 	return 0;
-}
-
-static void if6_seq_stop(struct seq_file *seq, void *v)
-{
-	read_unlock_bh(&addrconf_hash_lock);
 }
 
 static struct seq_operations if6_seq_ops = {
@@ -2266,16 +2259,11 @@ static struct file_operations if6_fops = {
 
 int __init if6_proc_init(void)
 {
-	struct proc_dir_entry *p;
-	int rc = 0;
-
-	p = create_proc_entry("if_inet6", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &if6_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	if (!proc_net_fops_create("if_inet6", S_IRUGO, &if6_fops))
+		return -ENOMEM;
+	return 0;
 }
+
 void if6_proc_exit(void)
 {
 	proc_net_remove("if_inet6");
@@ -2529,7 +2517,109 @@ static void inet6_ifa_notify(int event, struct inet6_ifaddr *ifa)
 	netlink_broadcast(rtnl, skb, 0, RTMGRP_IPV6_IFADDR, GFP_ATOMIC);
 }
 
+static void inline ipv6_store_devconf(struct ipv6_devconf *cnf,
+				__s32 *array, int bytes)
+{
+	memset(array, 0, bytes);
+	array[DEVCONF_FORWARDING] = cnf->forwarding;
+	array[DEVCONF_HOPLIMIT] = cnf->hop_limit;
+	array[DEVCONF_MTU6] = cnf->mtu6;
+	array[DEVCONF_ACCEPT_RA] = cnf->accept_ra;
+	array[DEVCONF_ACCEPT_REDIRECTS] = cnf->accept_redirects;
+	array[DEVCONF_AUTOCONF] = cnf->autoconf;
+	array[DEVCONF_DAD_TRANSMITS] = cnf->dad_transmits;
+	array[DEVCONF_RTR_SOLICITS] = cnf->rtr_solicits;
+	array[DEVCONF_RTR_SOLICIT_INTERVAL] = cnf->rtr_solicit_interval;
+	array[DEVCONF_RTR_SOLICIT_DELAY] = cnf->rtr_solicit_delay;
+#ifdef CONFIG_IPV6_PRIVACY
+	array[DEVCONF_USE_TEMPADDR] = cnf->use_tempaddr;
+	array[DEVCONF_TEMP_VALID_LFT] = cnf->temp_valid_lft;
+	array[DEVCONF_TEMP_PREFERED_LFT] = cnf->temp_prefered_lft;
+	array[DEVCONF_REGEN_MAX_RETRY] = cnf->regen_max_retry;
+	array[DEVCONF_MAX_DESYNC_FACTOR] = cnf->max_desync_factor;
+#endif
+}
+
+static int inet6_fill_ifinfo(struct sk_buff *skb, struct net_device *dev,
+			    struct inet6_dev *idev,
+			    int type, u32 pid, u32 seq)
+{
+	__s32			*array = NULL;
+	struct ifinfomsg	*r;
+	struct nlmsghdr 	*nlh;
+	unsigned char		*b = skb->tail;
+	struct rtattr		*subattr;
+
+	nlh = NLMSG_PUT(skb, pid, seq, type, sizeof(*r));
+	if (pid) nlh->nlmsg_flags |= NLM_F_MULTI;
+	r = NLMSG_DATA(nlh);
+	r->ifi_family = AF_INET6;
+	r->ifi_type = dev->type;
+	r->ifi_index = dev->ifindex;
+	r->ifi_flags = dev->flags;
+	r->ifi_change = 0;
+	if (!netif_running(dev) || !netif_carrier_ok(dev))
+		r->ifi_flags &= ~IFF_RUNNING;
+	else
+		r->ifi_flags |= IFF_RUNNING;
+
+	RTA_PUT(skb, IFLA_IFNAME, strlen(dev->name)+1, dev->name);
+
+	subattr = (struct rtattr*)skb->tail;
+
+	RTA_PUT(skb, IFLA_PROTINFO, 0, NULL);
+
+	/* return the device flags */
+	RTA_PUT(skb, IFLA_INET6_FLAGS, sizeof(__u32), &idev->if_flags);
+
+	/* return the device sysctl params */
+	if ((array = kmalloc(DEVCONF_MAX * sizeof(*array), GFP_ATOMIC)) == NULL)
+		goto rtattr_failure;
+	ipv6_store_devconf(&idev->cnf, array, DEVCONF_MAX * sizeof(*array));
+	RTA_PUT(skb, IFLA_INET6_CONF, DEVCONF_MAX * sizeof(*array), array);
+
+	/* XXX - Statistics/MC not implemented */
+	subattr->rta_len = skb->tail - (u8*)subattr;
+
+	nlh->nlmsg_len = skb->tail - b;
+	kfree(array);
+	return skb->len;
+
+nlmsg_failure:
+rtattr_failure:
+	if (array)
+		kfree(array);
+	skb_trim(skb, b - skb->data);
+	return -1;
+}
+
+static int inet6_dump_ifinfo(struct sk_buff *skb, struct netlink_callback *cb)
+{
+	int idx, err;
+	int s_idx = cb->args[0];
+	struct net_device *dev;
+	struct inet6_dev *idev;
+
+	read_lock(&dev_base_lock);
+	for (dev=dev_base, idx=0; dev; dev = dev->next, idx++) {
+		if (idx < s_idx)
+			continue;
+		if ((idev = in6_dev_get(dev)) == NULL)
+			continue;
+		err = inet6_fill_ifinfo(skb, dev, idev, RTM_NEWLINK,
+				NETLINK_CB(cb->skb).pid, cb->nlh->nlmsg_seq);
+		in6_dev_put(idev);
+		if (err <= 0)
+			break;
+	}
+	read_unlock(&dev_base_lock);
+	cb->args[0] = idx;
+
+	return skb->len;
+}
+
 static struct rtnetlink_link inet6_rtnetlink_table[RTM_MAX - RTM_BASE + 1] = {
+	[RTM_GETLINK - RTM_BASE] = { .dumpit	= inet6_dump_ifinfo, },
 	[RTM_NEWADDR - RTM_BASE] = { .doit	= inet6_rtm_newaddr, },
 	[RTM_DELADDR - RTM_BASE] = { .doit	= inet6_rtm_deladdr, },
 	[RTM_GETADDR - RTM_BASE] = { .dumpit	= inet6_dump_ifaddr, },

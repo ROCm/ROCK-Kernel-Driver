@@ -51,9 +51,9 @@
 #include <linux/netfilter_ipv4/ip_nat.h>
 #include <linux/netfilter_ipv4/ip_nat_helper.h>
 #include <linux/ip.h>
+#include <net/checksum.h>
 #include <net/udp.h>
 #include <asm/uaccess.h>
-#include <asm/checksum.h>
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("James Morris <jmorris@intercode.com.au>");

@@ -78,9 +78,8 @@ static void * __init read_dir(char *path, int *len)
 /*
  * recursively scan <path>, looking for a device node of type <dev>
  */
-static int __init find_in_devfs(char *path, dev_t dev)
+static int __init find_in_devfs(char *path, unsigned dev)
 {
-	struct stat buf;
 	char *end = path + strlen(path);
 	int rest = path + 64 - end;
 	int size;
@@ -96,11 +95,7 @@ static int __init find_in_devfs(char *path, dev_t dev)
 		switch (d->d_type) {
 			case DT_BLK:
 				sprintf(end, "/%s", d->d_name);
-				if (sys_newstat(path, &buf) < 0)
-					break;
-				if (!S_ISBLK(buf.st_mode))
-					break;
-				if (buf.st_rdev != dev)
+				if (bstat(path) != dev)
 					break;
 				kfree(p);
 				return 0;
@@ -140,7 +135,7 @@ int __init create_dev(char *name, dev_t dev, char *devfs_name)
 	if (!dev)
 		return -1;
 	strcpy(path, "/dev");
-	if (find_in_devfs(path, dev) < 0)
+	if (find_in_devfs(path, new_encode_dev(dev)) < 0)
 		return -1;
 	return sys_symlink(path + 5, name);
 }

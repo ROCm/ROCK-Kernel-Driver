@@ -7,7 +7,6 @@
  * assume GCC is being used.
  */
 
-typedef unsigned int	__kernel_dev_t;
 typedef unsigned int	__kernel_ino_t;
 typedef unsigned int	__kernel_mode_t;
 typedef unsigned int	__kernel_nlink_t;

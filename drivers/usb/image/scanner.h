@@ -1,5 +1,5 @@
 /*
- * Driver for USB Scanners (linux-2.5)
+ * Driver for USB Scanners (linux-2.6)
  *
  * Copyright (C) 1999, 2000, 2001, 2002 David E. Nelson
  * Previously maintained by Brian Beattie
@@ -43,7 +43,7 @@
 
 // #define DEBUG
 
-#define DRIVER_VERSION "0.4.14"
+#define DRIVER_VERSION "0.4.15"
 #define DRIVER_DESC "USB Scanner Driver"
 
 #include <linux/usb.h>
@@ -122,7 +122,10 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04a9, 0x220d) }, /* CanoScan N670U/N676U/LIDE 20 */
 	{ USB_DEVICE(0x04a9, 0x220e) }, /* CanoScan N1240U/LIDE 30 */
 	{ USB_DEVICE(0x04a9, 0x220f) },	/* CanoScan 8000F */
+	{ USB_DEVICE(0x04a9, 0x2210) },	/* CanoScan 9900F */
+	{ USB_DEVICE(0x04a9, 0x2212) },	/* CanoScan 5000F */
 	{ USB_DEVICE(0x04a9, 0x2213) },	/* LIDE 50 */
+	{ USB_DEVICE(0x04a9, 0x2215) },	/* CanoScan 3000 */
 	{ USB_DEVICE(0x04a9, 0x3042) }, /* FS4000US */
 	/* Colorado -- See Primax/Colorado below */
 	/* Compaq */
@@ -158,7 +161,9 @@ static struct usb_device_id scanner_device_ids [] = {
 	//	{ USB_DEVICE(0x03f0, 0x0701) },	/* ScanJet 5300C - NOT SUPPORTED - use hpusbscsi driver */
 	{ USB_DEVICE(0x03f0, 0x0705) }, /* ScanJet 4400C */
 	//	{ USB_DEVICE(0x03f0, 0x0801) },	/* ScanJet 7400C - NOT SUPPORTED - use hpusbscsi driver */
+	{ USB_DEVICE(0x03f0, 0x0805) },	/* ScanJet 4470c */
 	{ USB_DEVICE(0x03f0, 0x0901) }, /* ScanJet 2300C */
+	{ USB_DEVICE(0x03f0, 0x0a01) },	/* ScanJet 2400c */
 	{ USB_DEVICE(0x03F0, 0x1005) },	/* ScanJet 5400C */
 	{ USB_DEVICE(0x03F0, 0x1105) },	/* ScanJet 5470C */
 	{ USB_DEVICE(0x03f0, 0x1205) }, /* ScanJet 5550C */
@@ -177,9 +182,11 @@ static struct usb_device_id scanner_device_ids [] = {
 	/* Memorex */
 	{ USB_DEVICE(0x0461, 0x0346) }, /* 6136u - repackaged Primax ? */
 	/* Microtek */
+	{ USB_DEVICE(0x05da, 0x20a7) },	/* ScanMaker 5600 */
 	{ USB_DEVICE(0x05da, 0x20c9) }, /* ScanMaker 6700 */
 	{ USB_DEVICE(0x05da, 0x30ce) },	/* ScanMaker 3800 */
 	{ USB_DEVICE(0x05da, 0x30cf) },	/* ScanMaker 4800 */
+	{ USB_DEVICE(0x05da, 0x30d4) },	/* ScanMaker 3830 + 3840 */
 	{ USB_DEVICE(0x04a7, 0x0224) },	/* Scanport 3000 (actually Visioneer?)*/
 	/* The following SCSI-over-USB Microtek devices are supported by the
 	   microtek driver: Enable SCSI and USB Microtek in kernel config */
@@ -214,6 +221,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x055f, 0x021e) }, /* BearPaw 1200 TA/CS */
 	{ USB_DEVICE(0x055f, 0x0400) }, /* BearPaw 2400 TA PRO */
 	{ USB_DEVICE(0x055f, 0x0401) },	/* P 3600 A3 Pro */
+	{ USB_DEVICE(0x055f, 0x0409) },	/* BearPaw 2448TA Pro */
 	{ USB_DEVICE(0x055f, 0x0873) }, /* ScanExpress 600 USB */
 	{ USB_DEVICE(0x055f, 0x1000) }, /* BearPaw 4800 TA PRO */
 	//	{ USB_DEVICE(0x05d8, 0x4002) }, /* BearPaw 1200 CU and ScanExpress 1200 UB Plus (see Artec) */
@@ -279,6 +287,9 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04b8, 0x011e) }, /* Perfection 1660 Photo */
 	{ USB_DEVICE(0x04b8, 0x0801) }, /* Stylus CX5200 */
 	{ USB_DEVICE(0x04b8, 0x0802) }, /* Stylus CX3200 */
+	/* Siemens */
+	{ USB_DEVICE(0x0681, 0x0005) },	/* ID Mouse Professional */
+	{ USB_DEVICE(0x0681, 0x0010) },	/* Cherry FingerTIP ID Board - Sensor */
 	/* SYSCAN */
 	{ USB_DEVICE(0x0a82, 0x4600) }, /* TravelScan 460/464 */
 	/* Trust */
@@ -289,6 +300,7 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x1606, 0x0010) },	/* Astra 1220U */
 	{ USB_DEVICE(0x1606, 0x0030) },	/* Astra 2000U */
 	{ USB_DEVICE(0x1606, 0x0060) }, /* Astra 3400U/3450U */
+	{ USB_DEVICE(0x1606, 0x0070) },	/* Astra 4400 */
 	{ USB_DEVICE(0x1606, 0x0130) }, /* Astra 2100U */
 	{ USB_DEVICE(0x1606, 0x0160) }, /* Astra 5400U */  
 	{ USB_DEVICE(0x1606, 0x0230) },	/* Astra 2200U */
@@ -296,7 +308,8 @@ static struct usb_device_id scanner_device_ids [] = {
 	{ USB_DEVICE(0x04a7, 0x0211) },	/* OneTouch 7600 USB */
 	{ USB_DEVICE(0x04a7, 0x0221) },	/* OneTouch 5300 USB */
 	{ USB_DEVICE(0x04a7, 0x0224) },	/* OneTouch 4800 USB */
-	{ USB_DEVICE(0x04a7, 0x0226) },	/* OneTouch 5300 USB */
+	{ USB_DEVICE(0x04a7, 0x0226) },	/* OneTouch 5800 USB */
+	{ USB_DEVICE(0x04a7, 0x022c) },	/* OneTouch 9020 USB */
 	{ USB_DEVICE(0x04a7, 0x0231) },	/* 6100 USB */
 	{ USB_DEVICE(0x04a7, 0x0311) },	/* 6200 EPP/USB */
 	{ USB_DEVICE(0x04a7, 0x0321) },	/* OneTouch 8100 EPP/USB */

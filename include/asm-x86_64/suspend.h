@@ -44,7 +44,6 @@ extern unsigned long saved_context_eflags;
                        :"r" ((thread)->debugreg##register))
 
 extern void fix_processor_context(void);
-extern int do_magic(int resume);
 
 #ifdef CONFIG_ACPI_SLEEP
 extern unsigned long saved_eip;

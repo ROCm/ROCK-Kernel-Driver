@@ -1,9 +1,9 @@
-/* $Id: divasmain.c,v 1.1.2.8 2001/05/01 15:48:05 armin Exp $
+/* $Id: divasmain.c,v 1.40 2003/09/10 08:02:33 schindler Exp $
  *
  * Low level driver for Eicon DIVA Server ISDN cards.
  *
- * Copyright 2000-2002 by Armin Schindler (mac@melware.de)
- * Copyright 2000-2002 Cytronics & Melware (info@melware.de)
+ * Copyright 2000-2003 by Armin Schindler (mac@melware.de)
+ * Copyright 2000-2003 Cytronics & Melware (info@melware.de)
  *
  * This software may be used and distributed according to the terms
  * of the GNU General Public License, incorporated herein by reference.
@@ -16,14 +16,12 @@
 #include <linux/kernel.h>
 #include <linux/sched.h>
 #include <linux/unistd.h>
-#include <linux/vmalloc.h>
 #include <linux/devfs_fs_kernel.h>
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <linux/ioport.h>
 #include <linux/workqueue.h>
 #include <linux/pci.h>
-#include <linux/delay.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
 #include <linux/poll.h>
@@ -37,36 +35,39 @@
 #include "di_defs.h"
 #include "divasync.h"
 #include "diva.h"
-#include "diva_pci.h"
 #include "di.h"
 #include "io.h"
 #include "xdi_msg.h"
 #include "xdi_adapter.h"
 #include "xdi_vers.h"
 #include "diva_dma.h"
+#include "diva_pci.h"
 
-static char *main_revision = "$Revision: 1.1.2.8 $";
+static char *main_revision = "$Revision: 1.40 $";
 
-int errno = 0;
-static int major = 240;
+static int major;
+
+static int dbgmask;
 
 MODULE_DESCRIPTION("Kernel driver for Eicon DIVA Server cards");
 MODULE_AUTHOR("Cytronics & Melware, Eicon Networks");
 MODULE_LICENSE("GPL");
-MODULE_PARM(major, "i");
-MODULE_PARM_DESC(major, "Major number for /dev/Divas");
+
+MODULE_PARM(dbgmask, "i");
+MODULE_PARM_DESC(dbgmask, "initial debug mask");
 
 static char *DRIVERNAME =
     "Eicon DIVA Server driver (http://www.melware.net)";
 static char *DRIVERLNAME = "divas";
-char *DRIVERRELEASE = "2.0";
+static char *DEVNAME = "Divas";
+char *DRIVERRELEASE_DIVAS = "2.0";
 
 extern irqreturn_t diva_os_irq_wrapper(int irq, void *context,
 				struct pt_regs *regs);
 extern int create_divas_proc(void);
 extern void remove_divas_proc(void);
 extern void diva_get_vserial_number(PISDN_ADAPTER IoAdapter, char *buf);
-extern int divasfunc_init(void);
+extern int divasfunc_init(int dbgmask);
 extern void divasfunc_exit(void);
 
 typedef struct _diva_os_thread_dpc {
@@ -185,19 +186,6 @@ static char *getrev(const char *revision)
 	return rev;
 }
 
-void diva_os_sleep(dword mSec)
-{
-	unsigned long timeout = HZ * mSec / 1000 + 1;
-
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout(timeout);
-}
-
-void diva_os_wait(dword mSec)
-{
-	mdelay(mSec);
-}
-
 void diva_log_info(unsigned char *format, ...)
 {
 	va_list args;
@@ -215,29 +203,8 @@ void divas_get_version(char *p)
 	char tmprev[32];
 
 	strcpy(tmprev, main_revision);
-	sprintf(p, "%s: %s(%s) %s(%s)\n", DRIVERLNAME, DRIVERRELEASE,
-		getrev(tmprev), diva_xdi_common_code_build, DIVA_BUILD);
-}
-
-/*********************************************************
- ** malloc / free
- *********************************************************/
-
-void *diva_os_malloc(unsigned long flags, unsigned long size)
-{
-	void *ret = NULL;
-
-	if (size) {
-		ret = (void *) vmalloc((unsigned int) size);
-	}
-	return (ret);
-}
-
-void diva_os_free(unsigned long unused, void *ptr)
-{
-	if (ptr) {
-		vfree(ptr);
-	}
+	sprintf(p, "%s: %s(%s) %s(%s) major=%d\n", DRIVERLNAME, DRIVERRELEASE_DIVAS,
+		getrev(tmprev), diva_xdi_common_code_build, DIVA_BUILD, major);
 }
 
 /* --------------------------------------------------------------------------
@@ -282,6 +249,7 @@ void diva_run_trap_script(PISDN_ADAPTER IoAdapter, dword ANum)
 	    (diva_os_thread_dpc_t *) psoft_isr->object;
 
 	if (context && !context->card_failed) {
+		printk(KERN_ERR "%s: adapter %d trapped !\n", DRIVERLNAME, ANum + 1);
 		context->card_failed = ANum + 1;
 		schedule_work(&context->trap_script_task);
 	}
@@ -505,8 +473,8 @@ void diva_free_dma_map(void *hdev, struct _diva_dma_map_entry *pmap)
  *********************************************************/
 
 int
-diva_os_register_io_port(int on, unsigned long port, unsigned long length,
-			 const char *name)
+diva_os_register_io_port(void *adapter, int on, unsigned long port,
+			 unsigned long length, const char *name, int id)
 {
 	if (on) {
 		if (!request_region(port, length, name)) {
@@ -519,7 +487,7 @@ diva_os_register_io_port(int on, unsigned long port, unsigned long length,
 	return (0);
 }
 
-void *divasa_remap_pci_bar(unsigned long bar, unsigned long area_length)
+void *divasa_remap_pci_bar(diva_os_xdi_adapter_t *a, int id, unsigned long bar, unsigned long area_length)
 {
 	void *ret;
 
@@ -772,20 +740,20 @@ static struct file_operations divas_fops = {
 
 static void divas_unregister_chrdev(void)
 {
-	devfs_remove("Divas");
-	unregister_chrdev(major, "Divas");
+	devfs_remove(DEVNAME);
+	unregister_chrdev(major, DEVNAME);
 }
 
 static int DIVA_INIT_FUNCTION divas_register_chrdev(void)
 {
-	if (register_chrdev(major, "Divas", &divas_fops))
+	if ((major = register_chrdev(0, DEVNAME, &divas_fops)) < 0)
 	{
 		printk(KERN_ERR "%s: failed to create /dev entry.\n",
 		       DRIVERLNAME);
 		return (0);
 	}
+	devfs_mk_cdev(MKDEV(major, 0), S_IFCHR|S_IRUSR|S_IWUSR, DEVNAME);
 
-	devfs_mk_cdev(MKDEV(major, 0), S_IFCHR|S_IRUSR|S_IWUSR, "Divas");
 	return (1);
 }
 
@@ -877,23 +845,20 @@ static int DIVA_INIT_FUNCTION divas_init(void)
 	int ret = 0;
 
 	printk(KERN_INFO "%s\n", DRIVERNAME);
-	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE);
+	printk(KERN_INFO "%s: Rel:%s  Rev:", DRIVERLNAME, DRIVERRELEASE_DIVAS);
 	strcpy(tmprev, main_revision);
-	printk("%s  Build: %s(%s) Major: %d\n", getrev(tmprev),
-	       diva_xdi_common_code_build, DIVA_BUILD, major);
+	printk("%s  Build: %s(%s)\n", getrev(tmprev),
+	       diva_xdi_common_code_build, DIVA_BUILD);
 	printk(KERN_INFO "%s: support for: ", DRIVERLNAME);
 #ifdef CONFIG_ISDN_DIVAS_BRIPCI
 	printk("BRI/PCI ");
 #endif
-#ifdef CONFIG_ISDN_DIVAS_4BRIPCI
-	printk("4BRI/PCI ");
-#endif
 #ifdef CONFIG_ISDN_DIVAS_PRIPCI
 	printk("PRI/PCI ");
 #endif
-	printk("\n");
+	printk("adapters\n");
 
-	if (!divasfunc_init()) {
+	if (!divasfunc_init(dbgmask)) {
 		printk(KERN_ERR "%s: failed to connect to DIDD.\n",
 		       DRIVERLNAME);
 		ret = -EIO;
@@ -901,15 +866,19 @@ static int DIVA_INIT_FUNCTION divas_init(void)
 	}
 
 	if (!divas_register_chrdev()) {
+#ifdef MODULE
 		divasfunc_exit();
+#endif
 		ret = -EIO;
 		goto out;
 	}
 
 	if (!create_divas_proc()) {
+#ifdef MODULE
 		remove_divas_proc();
 		divas_unregister_chrdev();
 		divasfunc_exit();
+#endif
 		printk(KERN_ERR "%s: failed to create proc entry.\n",
 		       DRIVERLNAME);
 		ret = -EIO;
@@ -917,13 +886,16 @@ static int DIVA_INIT_FUNCTION divas_init(void)
 	}
 
 	if ((ret = pci_module_init(&diva_pci_driver))) {
+#ifdef MODULE
 		remove_divas_proc();
 		divas_unregister_chrdev();
 		divasfunc_exit();
+#endif
 		printk(KERN_ERR "%s: failed to init pci driver.\n",
 		       DRIVERLNAME);
 		goto out;
 	}
+	printk(KERN_INFO "%s: started with major %d\n", DRIVERLNAME, major);
 
       out:
 	return (ret);

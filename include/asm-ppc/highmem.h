@@ -10,7 +10,7 @@
  *		      Gerhard.Wichert@pdb.siemens.de
  *
  *
- * Redesigned the x86 32-bit VM architecture to deal with 
+ * Redesigned the x86 32-bit VM architecture to deal with
  * up to 16 Terrabyte physical memory. With current x86 CPUs
  * we now support up to 64 Gigabytes physical RAM.
  *
@@ -26,6 +26,7 @@
 #include <linux/interrupt.h>
 #include <asm/kmap_types.h>
 #include <asm/tlbflush.h>
+#include <asm/page.h>
 
 /* undef for production */
 #define HIGHMEM_DEBUG 1
@@ -41,8 +42,8 @@ extern void kmap_init(void) __init;
  * easily, subsequent pte tables have to be allocated in one physical
  * chunk of RAM.
  */
-#define PKMAP_BASE CONFIG_HIGHMEM_START
-#define LAST_PKMAP 1024
+#define PKMAP_BASE 	CONFIG_HIGHMEM_START
+#define LAST_PKMAP 	(1 << PTE_SHIFT)
 #define LAST_PKMAP_MASK (LAST_PKMAP-1)
 #define PKMAP_NR(virt)  ((virt-PKMAP_BASE) >> PAGE_SHIFT)
 #define PKMAP_ADDR(nr)  (PKMAP_BASE + ((nr) << PAGE_SHIFT))

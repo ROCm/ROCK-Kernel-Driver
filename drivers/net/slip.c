@@ -869,12 +869,12 @@ slip_open(struct tty_struct *tty)
 
 	/* OK.  Find a free SLIP channel to use. */
 	err = -ENFILE;
-	if ((sl = sl_alloc(tty->device)) == NULL)
+	if ((sl = sl_alloc(tty_devnum(tty))) == NULL)
 		goto err_exit;
 
 	sl->tty = tty;
 	tty->disc_data = sl;
-	sl->line = tty->device;
+	sl->line = tty_devnum(tty);
 	sl->pid = current->pid;
 	if (tty->driver->flush_buffer)
 		tty->driver->flush_buffer(tty);
@@ -1389,9 +1389,8 @@ static void __exit slip_exit(void)
 	 */
 	do {
 		if (busy) {
-			current->state = TASK_INTERRUPTIBLE;
+			set_current_state(TASK_INTERRUPTIBLE);
 			schedule_timeout(HZ / 10);
-			current->state = TASK_RUNNING;
 		}
 
 		busy = 0;
