@@ -336,7 +336,7 @@ static int rt6_ins(struct rt6_info *rt, struct nlmsghdr *nlh, void *_rtattr)
 	return err;
 }
 
-/* No rt6_lock! If COW faild, the function returns dead route entry
+/* No rt6_lock! If COW failed, the function returns dead route entry
    with dst->error set to errno value.
  */
 

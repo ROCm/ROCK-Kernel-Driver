@@ -111,7 +111,7 @@ static inline void fib6_walker_unlink(struct fib6_walker_t *w)
 struct rt6_statistics {
 	__u32		fib_nodes;
 	__u32		fib_route_nodes;
-	__u32		fib_rt_alloc;		/* permanet routes	*/
+	__u32		fib_rt_alloc;		/* permanent routes	*/
 	__u32		fib_rt_entries;		/* rt entries in table	*/
 	__u32		fib_rt_cache;		/* cache routes		*/
 };
