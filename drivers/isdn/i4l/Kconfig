@@ -85,7 +85,7 @@ config ISDN_TTY_FAX
 
 config ISDN_X25
 	bool "X.25 PLP on top of ISDN"
-	depends on X25
+	depends on X25 && BROKEN
 	help
 	  This feature provides the X.25 protocol over ISDN connections.
 	  See <file:Documentation/isdn/README.x25> for more information
