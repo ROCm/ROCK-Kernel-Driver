@@ -1160,16 +1160,20 @@ module_init(inet_init);
 /* ------------------------------------------------------------------------ */
 
 #ifdef CONFIG_PROC_FS
-
-extern int ip_misc_proc_init(void);
-extern int raw_get_info(char *, char **, off_t, int);
-extern int tcp_get_info(char *, char **, off_t, int);
+extern int  fib_proc_init(void);
+extern void fib_proc_exit(void);
+extern int  ip_misc_proc_init(void);
+extern int  raw_proc_init(void);
+extern void raw_proc_exit(void);
+extern int  tcp_get_info(char *buffer, char **start, off_t offset, int length);
+extern int  udp_proc_init(void);
+extern void udp_proc_exit(void);
 
 int __init ipv4_proc_init(void)
 {
 	int rc = 0;
 
-	if (!proc_net_create("raw", 0, raw_get_info))
+	if (raw_proc_init())
 		goto out_raw;
 	if (!proc_net_create("tcp", 0, tcp_get_info))
 		goto out_tcp;
@@ -1188,7 +1192,7 @@ out_fib:
 out_udp:
 	proc_net_remove("tcp");
 out_tcp:
-	proc_net_remove("raw");
+	raw_proc_exit();
 out_raw:
 	rc = -ENOMEM;
 	goto out;

@@ -96,6 +96,7 @@ struct xfrm_state
 		u8		replay_window;
 		u8		aalgo, ealgo, calgo;
 		u16		reqid;
+		u16		family;
 		xfrm_address_t	saddr;
 		int		header_len;
 		int		trailer_len;
@@ -187,22 +188,6 @@ struct xfrm_tmpl
 
 #define XFRM_MAX_DEPTH		3
 
-enum
-{
-	XFRM_SHARE_ANY,		/* No limitations */
-	XFRM_SHARE_SESSION,	/* For this session only */
-	XFRM_SHARE_USER,	/* For this user only */
-	XFRM_SHARE_UNIQUE	/* Use once */
-};
-
-enum
-{
-	XFRM_POLICY_IN	= 0,
-	XFRM_POLICY_OUT	= 1,
-	XFRM_POLICY_FWD	= 2,
-	XFRM_POLICY_MAX	= 3
-};
-
 struct xfrm_policy
 {
 	struct xfrm_policy	*next;
@@ -217,11 +202,9 @@ struct xfrm_policy
 	struct xfrm_lifetime_cfg lft;
 	struct xfrm_lifetime_cur curlft;
 	struct dst_entry       *bundles;
+	__u16			family;
 	__u8			action;
-#define XFRM_POLICY_ALLOW	0
-#define XFRM_POLICY_BLOCK	1
 	__u8			flags;
-#define XFRM_POLICY_LOCALOK	1	/* Allow user to override global policy */
 	__u8			dead;
 	__u8			xfrm_nr;
 	struct xfrm_tmpl       	xfrm_vec[XFRM_MAX_DEPTH];
@@ -390,7 +373,7 @@ struct xfrm_policy *xfrm_policy_delete(int dir, struct xfrm_selector *sel);
 struct xfrm_policy *xfrm_policy_byid(int dir, u32 id, int delete);
 void xfrm_policy_flush(void);
 void xfrm_alloc_spi(struct xfrm_state *x, u32 minspi, u32 maxspi);
-struct xfrm_state * xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr);
+struct xfrm_state * xfrm_find_acq(u8 mode, u16 reqid, u8 proto, u32 daddr, u32 saddr, int create);
 extern void xfrm_policy_flush(void);
 extern void xfrm_policy_kill(struct xfrm_policy *);
 extern int xfrm_sk_policy_insert(struct sock *sk, int dir, struct xfrm_policy *pol);

@@ -91,7 +91,7 @@ int xfrm4_rcv(struct sk_buff *skb)
 		iph = skb->nh.iph;
 
 		if (x->props.mode) {
-			if (iph->protocol != IPPROTO_IP)
+			if (iph->protocol != IPPROTO_IPIP)
 				goto drop;
 			skb->nh.raw = skb->data;
 			iph = skb->nh.iph;
