@@ -328,11 +328,12 @@ qla2x00_start_scsi(srb_t *sp)
 	uint32_t	*clr_ptr;
 	uint32_t        index;
 	uint32_t	handle;
-	uint16_t	cnt;
 	cmd_entry_t	*cmd_pkt;
 	uint32_t        timeout;
 	struct scatterlist *sg;
-
+	uint16_t	cnt;
+	uint16_t	req_cnt;
+	uint16_t	tot_dsds;
 	device_reg_t	*reg;
 
 	/* Setup device pointers. */
@@ -350,41 +351,8 @@ qla2x00_start_scsi(srb_t *sp)
 		ha->marker_needed = 0;
 	}
 
-	/* Calculate number of segments and entries required. */
-	if (sp->req_cnt == 0) {
-		sp->tot_dsds = 0;
-		if (cmd->use_sg) {
-			sg = (struct scatterlist *) cmd->request_buffer;
-			sp->tot_dsds = pci_map_sg(ha->pdev, sg, cmd->use_sg,
-			    cmd->sc_data_direction);
-		} else if (cmd->request_bufflen) {
-		    sp->tot_dsds++;
-		}
-		sp->req_cnt = (ha->calc_request_entries)(sp->tot_dsds);
-	}
-
 	/* Acquire ring specific lock */
 	spin_lock_irqsave(&ha->hardware_lock, flags);
-
-	if (ha->req_q_cnt < (sp->req_cnt + 2)) {
-		/* Calculate number of free request entries */
-		cnt = RD_REG_WORD_RELAXED(ISP_REQ_Q_OUT(ha, reg));
-		if (ha->req_ring_index < cnt)
-			ha->req_q_cnt = cnt - ha->req_ring_index;
-		else
-			ha->req_q_cnt = ha->request_q_length -
-			    (ha->req_ring_index - cnt);
-	}
-
-	/* If no room for request in request ring */
-	if (ha->req_q_cnt < (sp->req_cnt + 2)) {
-		DEBUG5(printk("scsi(%ld): in-ptr=%x req_q_cnt=%x "
-		    "tot_dsds=%x.\n",
-		    ha->host_no, ha->req_ring_index, ha->req_q_cnt,
-		    sp->tot_dsds));
-
-		goto queuing_error;
-	}
 
 	/* Check for room in outstanding command list. */
 	handle = ha->current_outstanding_cmd;
@@ -392,30 +360,51 @@ qla2x00_start_scsi(srb_t *sp)
 		handle++;
 		if (handle == MAX_OUTSTANDING_COMMANDS)
 			handle = 1;
-		if (ha->outstanding_cmds[handle] == 0) {
-			ha->current_outstanding_cmd = handle;
+		if (ha->outstanding_cmds[handle] == 0)
 			break;
-		}
 	}
-	if (index == MAX_OUTSTANDING_COMMANDS) {
-		DEBUG5(printk("scsi(%ld): Unable to queue command -- NO ROOM "
-		    "IN OUTSTANDING ARRAY (req_q_cnt=%x).\n",
-		    ha->host_no, ha->req_q_cnt));
+	if (index == MAX_OUTSTANDING_COMMANDS)
 		goto queuing_error;
+
+	/* Calculate the number of request entries needed. */
+	req_cnt = (ha->calc_request_entries)(cmd->request->nr_hw_segments);
+	if (ha->req_q_cnt < (req_cnt + 2)) {
+		cnt = RD_REG_WORD_RELAXED(ISP_REQ_Q_OUT(ha, reg));
+		if (ha->req_ring_index < cnt)
+			ha->req_q_cnt = cnt - ha->req_ring_index;
+		else
+			ha->req_q_cnt = ha->request_q_length -
+			    (ha->req_ring_index - cnt);
 	}
+	if (ha->req_q_cnt < (req_cnt + 2))
+		goto queuing_error;
+
+	/* Finally, we have enough space, now perform mappings. */
+	tot_dsds = 0;
+	if (cmd->use_sg) {
+		sg = (struct scatterlist *) cmd->request_buffer;
+		tot_dsds = pci_map_sg(ha->pdev, sg, cmd->use_sg,
+		    cmd->sc_data_direction);
+		if (tot_dsds == 0)
+			goto queuing_error;
+	} else if (cmd->request_bufflen) {
+	    tot_dsds++;
+	}
+	req_cnt = (ha->calc_request_entries)(tot_dsds);
 
 	/* Build command packet */
+	ha->current_outstanding_cmd = handle;
 	ha->outstanding_cmds[handle] = sp;
 	sp->ha = ha;
 	sp->cmd->host_scribble = (unsigned char *)(unsigned long)handle;
-	ha->req_q_cnt -= sp->req_cnt;
+	ha->req_q_cnt -= req_cnt;
 
 	cmd_pkt = (cmd_entry_t *)ha->request_ring_ptr;
 	cmd_pkt->handle = handle;
 	/* Zero out remaining portion of packet. */
 	clr_ptr = (uint32_t *)cmd_pkt + 2;
 	memset(clr_ptr, 0, REQUEST_ENTRY_SIZE - 8);
-	cmd_pkt->dseg_count = cpu_to_le16(sp->tot_dsds);
+	cmd_pkt->dseg_count = cpu_to_le16(tot_dsds);
 
 	/* Set target ID */
 	SET_TARGET_ID(ha, cmd_pkt->target, fclun->fcport->loop_id);
@@ -455,10 +444,10 @@ qla2x00_start_scsi(srb_t *sp)
 	cmd_pkt->byte_count = cpu_to_le32((uint32_t)cmd->request_bufflen);
 
 	/* Build IOCB segments */
-	(ha->build_scsi_iocbs)(sp, cmd_pkt, sp->tot_dsds);
+	(ha->build_scsi_iocbs)(sp, cmd_pkt, tot_dsds);
 
 	/* Set total data segment count. */
-	cmd_pkt->entry_count = (uint8_t)sp->req_cnt;
+	cmd_pkt->entry_count = (uint8_t)req_cnt;
 	wmb();
 
 	/* Adjust ring index. */

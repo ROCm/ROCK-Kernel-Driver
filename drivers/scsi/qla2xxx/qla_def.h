@@ -264,10 +264,6 @@ typedef struct srb {
 #define SRB_ERR_DEVICE	3		/* Request failed -- "device error" */
 #define SRB_ERR_OTHER	4
 
-	/* Segment/entries counts */
-	uint16_t	req_cnt;	/* !0 indicates counts determined */
-	uint16_t	tot_dsds;
-
 	/* SRB magic number */
 	uint16_t magic;
 #define SRB_MAGIC       0x10CB
