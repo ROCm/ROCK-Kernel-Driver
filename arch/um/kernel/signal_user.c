@@ -19,8 +19,6 @@
 #include "sysdep/sigcontext.h"
 #include "sigcontext.h"
 
-extern int kern_timer_on;
-
 void set_sigstack(void *sig_stack, int size)
 {
 	stack_t stack;
@@ -65,12 +63,8 @@ static void change_signals(int type)
 	sigset_t mask;
 
 	sigemptyset(&mask);
-	if(type == SIG_BLOCK) kern_timer_on = 0;
-	else {
-		kern_timer_on = 1;
-		sigaddset(&mask, SIGVTALRM);
-		sigaddset(&mask, SIGALRM);
-	}
+	sigaddset(&mask, SIGVTALRM);
+	sigaddset(&mask, SIGALRM);
 	sigaddset(&mask, SIGIO);
 	sigaddset(&mask, SIGPROF);
 	if(sigprocmask(type, &mask, NULL) < 0)
@@ -97,7 +91,6 @@ static int disable_mask(sigset_t *mask)
 	sigs = sigismember(mask, SIGIO) ? 1 << SIGIO_BIT : 0;
 	sigs |= sigismember(mask, SIGVTALRM) ? 1 << SIGVTALRM_BIT : 0;
 	sigs |= sigismember(mask, SIGALRM) ? 1 << SIGVTALRM_BIT : 0;
-	if(!kern_timer_on) sigs |= 1 << SIGVTALRM_BIT;
 	return(sigs);
 }
 
@@ -116,21 +109,27 @@ int set_signals(int disable)
 	int ret;
 
 	sigemptyset(&mask);
-	if(!(disable & (1 << SIGIO_BIT))) sigaddset(&mask, SIGIO);
+	if(!(disable & (1 << SIGIO_BIT)))
+		sigaddset(&mask, SIGIO);
 	if(!(disable & (1 << SIGVTALRM_BIT))){
-		kern_timer_on = 1;
 		sigaddset(&mask, SIGVTALRM);
 		sigaddset(&mask, SIGALRM);
 	}
 	if(sigprocmask(SIG_UNBLOCK, &mask, &mask) < 0)
 		panic("Failed to enable signals");
+
 	ret = disable_mask(&mask);
+
 	sigemptyset(&mask);
-	if(disable & (1 << SIGIO_BIT)) sigaddset(&mask, SIGIO);
-	if(disable & (1 << SIGVTALRM_BIT))
-		kern_timer_on = 0;
+	if(disable & (1 << SIGIO_BIT))
+		sigaddset(&mask, SIGIO);
+	if(disable & (1 << SIGVTALRM_BIT)){
+		sigaddset(&mask, SIGVTALRM);
+		sigaddset(&mask, SIGALRM);
+	}
 	if(sigprocmask(SIG_BLOCK, &mask, NULL) < 0)
 		panic("Failed to block signals");
+
 	return(ret);
 }
 

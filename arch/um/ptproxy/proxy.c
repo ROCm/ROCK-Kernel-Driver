@@ -122,6 +122,7 @@ int debugger_syscall(debugger_state *debugger, pid_t child)
 	return(0);
 }
 
+/* Used by the tracing thread */
 static debugger_state parent;
 static int parent_syscall(debugger_state *debugger, int pid);
 
@@ -174,10 +175,7 @@ void debugger_cancelled_return(debugger_state *debugger, int result)
 	syscall_continue(debugger->pid);
 }
 
-#ifdef CONFIG_SMP
-#error need to make these arrays
-#endif
-
+/* Used by the tracing thread */
 static debugger_state debugger;
 static debugee_state debugee;
 

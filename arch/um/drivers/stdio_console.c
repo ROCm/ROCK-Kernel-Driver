@@ -32,7 +32,13 @@
 
 #define MAX_TTYS (8)
 
+/* Referenced only by tty_driver below - presumably it's locked correctly
+ * by the tty driver.
+ */
+
 static struct tty_driver console_driver;
+
+static int console_refcount = 0;
 
 static struct chan_ops init_console_ops = {
 	init : 		NULL,
@@ -88,6 +94,9 @@ static struct line_driver driver = {
 
 static struct lines console_lines = LINES_INIT(MAX_TTYS);
 
+/* The array is initialized by line_init, which is an initcall.  The 
+ * individual elements are protected by individual semaphores.
+ */
 struct line vts[MAX_TTYS] = { LINE_INIT(CONFIG_CON_ZERO_CHAN, &driver),
 			      [ 1 ... MAX_TTYS - 1 ] = 
 			      LINE_INIT(CONFIG_CON_CHAN, &driver) };

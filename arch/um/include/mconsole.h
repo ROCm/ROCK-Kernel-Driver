@@ -77,6 +77,8 @@ extern int mconsole_get_request(int fd, struct mc_request *req);
 extern int mconsole_notify(char *sock_name, int type, const void *data, 
 			   int len);
 extern char *mconsole_notify_socket(void);
+extern void lock_notify(void);
+extern void unlock_notify(void);
 
 #endif
 

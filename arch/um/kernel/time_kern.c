@@ -27,21 +27,21 @@ int hz(void)
 	return(HZ);
 }
 
+/* Changed at early boot */
 int timer_irq_inited = 0;
 
-/* kern_timer_on and missed_ticks are modified after kernel memory has been 
+/* missed_ticks will be modified after kernel memory has been 
  * write-protected, so this puts it in a section which will be left 
  * write-enabled.
  */
-int __attribute__ ((__section__ (".unprotected"))) kern_timer_on = 0;
-int __attribute__ ((__section__ (".unprotected"))) missed_ticks = 0;
+int __attribute__ ((__section__ (".unprotected"))) missed_ticks[NR_CPUS];
 
 void timer_irq(struct uml_pt_regs *regs)
 {
-	int ticks = missed_ticks;
+	int cpu = current->thread_info->cpu, ticks = missed_ticks[cpu];
 
         if(!timer_irq_inited) return;
-	missed_ticks = 0;
+	missed_ticks[cpu] = 0;
 	while(ticks--) do_IRQ(TIMER_IRQ, regs);
 }
 
@@ -114,6 +114,27 @@ void __const_udelay(um_udelay_t usecs)
 
 	n = (loops_per_jiffy * HZ * usecs) / 1000000;
 	for(i=0;i<n;i++) ;
+}
+
+void timer_handler(int sig, struct uml_pt_regs *regs)
+{
+#ifdef CONFIG_SMP
+	update_process_times(user_context(UPT_SP(regs)));
+#endif
+	if(current->thread_info->cpu == 0)
+		timer_irq(regs);
+}
+
+static spinlock_t timer_spinlock = SPIN_LOCK_UNLOCKED;
+
+void time_lock(void)
+{
+	spin_lock(&timer_spinlock);
+}
+
+void time_unlock(void)
+{
+	spin_unlock(&timer_spinlock);
 }
 
 int __init timer_init(void)

@@ -64,10 +64,14 @@ static inline struct thread_info *current_thread_info(void)
 #define TIF_SYSCALL_TRACE	0	/* syscall trace active */
 #define TIF_SIGPENDING		1	/* signal pending */
 #define TIF_NEED_RESCHED	2	/* rescheduling necessary */
+#define TIF_POLLING_NRFLAG      3       /* true if poll_idle() is polling 
+					 * TIF_NEED_RESCHED 
+					 */
 
 #define _TIF_SYSCALL_TRACE	(1 << TIF_SYSCALL_TRACE)
 #define _TIF_SIGPENDING		(1 << TIF_SIGPENDING)
 #define _TIF_NEED_RESCHED	(1 << TIF_NEED_RESCHED)
+#define _TIF_POLLING_NRFLAG     (1 << TIF_POLLING_NRFLAG)
 
 #endif
 

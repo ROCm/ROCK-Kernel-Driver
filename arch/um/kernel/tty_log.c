@@ -17,8 +17,8 @@
 
 #define TTY_LOG_DIR "./"
 
-char *tty_log_dir = TTY_LOG_DIR;
-
+/* Set early in boot and then unchanged */
+static char *tty_log_dir = TTY_LOG_DIR;
 static int tty_log_fd = -1;
 
 #define TTY_LOG_OPEN 1

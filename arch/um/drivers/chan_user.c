@@ -155,6 +155,8 @@ static void tracer_winch_handler(int sig)
 		       errno);
 }
 
+/* Called only by the tracing thread during initialization */
+
 void setup_tracer_winch(void)
 {
 	int err;

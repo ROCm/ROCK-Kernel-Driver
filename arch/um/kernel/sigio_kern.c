@@ -11,6 +11,7 @@
 #include "sigio.h"
 #include "irq_user.h"
 
+/* Protected by sigio_lock() called from write_sigio_workaround */
 static int sigio_irq_fd = -1;
 
 void sigio_interrupt(int irq, void *data, struct pt_regs *unused)
@@ -29,6 +30,18 @@ int write_sigio_irq(int fd)
 	}
 	sigio_irq_fd = fd;
 	return(0);
+}
+
+static spinlock_t sigio_spinlock = SPIN_LOCK_UNLOCKED;
+
+void sigio_lock(void)
+{
+	spin_lock(&sigio_spinlock);
+}
+
+void sigio_unlock(void)
+{
+	spin_unlock(&sigio_spinlock);
 }
 
 /*
