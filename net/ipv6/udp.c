@@ -358,7 +358,7 @@ out:
 
 static void udpv6_close(struct sock *sk, long timeout)
 {
-	inet_sock_release(sk);
+	sk_common_release(sk);
 }
 
 /*

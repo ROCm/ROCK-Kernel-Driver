@@ -771,6 +771,19 @@ extern ssize_t			sock_no_sendpage(struct socket *sock,
 						int flags);
 
 /*
+ * Functions to fill in entries in struct proto_ops when a protocol
+ * uses the inet style.
+ */
+extern int sock_common_getsockopt(struct socket *sock, int level, int optname,
+				  char __user *optval, int __user *optlen);
+extern int sock_common_recvmsg(struct kiocb *iocb, struct socket *sock,
+			       struct msghdr *msg, size_t size, int flags);
+extern int sock_common_setsockopt(struct socket *sock, int level, int optname,
+				  char __user *optval, int optlen);
+
+extern void sk_common_release(struct sock *sk);
+
+/*
  *	Default socket callbacks and setup code
  */
  

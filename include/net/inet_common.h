@@ -20,27 +20,14 @@ extern int			inet_dgram_connect(struct socket *sock,
 						   int addr_len, int flags);
 extern int			inet_accept(struct socket *sock, 
 					    struct socket *newsock, int flags);
-extern int			inet_recvmsg(struct kiocb *iocb,
-					     struct socket *sock, 
-					     struct msghdr *ubuf, 
-					     size_t size, int flags);
 extern int			inet_sendmsg(struct kiocb *iocb,
 					     struct socket *sock, 
 					     struct msghdr *msg, 
 					     size_t size);
 extern int			inet_shutdown(struct socket *sock, int how);
 extern unsigned int		inet_poll(struct file * file, struct socket *sock, struct poll_table_struct *wait);
-extern int			inet_setsockopt(struct socket *sock, int level,
-						int optname,
-						char __user *optval, 
-						int optlen);
-extern int			inet_getsockopt(struct socket *sock, int level,
-						int optname,
-						char __user *optval, 
-						int __user *optlen);
 extern int			inet_listen(struct socket *sock, int backlog);
 
-extern void			inet_sock_release(struct sock *sk);
 extern void			inet_sock_destruct(struct sock *sk);
 extern atomic_t			inet_sock_nr;
 
