@@ -1980,12 +1980,11 @@ struct tg3 {
 	 * lock: Held during all operations except TX packet
 	 *       processing.
 	 *
-	 * tx_lock: Held during tg3_start_xmit{,_4gbug} and tg3_tx
+	 * dev->xmit_lock: Held during tg3_start_xmit and tg3_tx
 	 *
 	 * If you want to shut up all asynchronous processing you must
-	 * acquire both locks, 'lock' taken before 'tx_lock'.  IRQs must
-	 * be disabled to take 'lock' but only softirq disabling is
-	 * necessary for acquisition of 'tx_lock'.
+	 * acquire both locks, 'lock' taken before 'xmit_lock'.  IRQs must
+	 * be disabled to take either lock.
 	 */
 	spinlock_t			lock;
 	spinlock_t			indirect_lock;
@@ -2003,8 +2002,6 @@ struct tg3 {
 	u32				tx_prod;
 	u32				tx_cons;
 	u32				tx_pending;
-
-	spinlock_t			tx_lock;
 
 	struct tg3_tx_buffer_desc	*tx_ring;
 	struct tx_ring_info		*tx_buffers;

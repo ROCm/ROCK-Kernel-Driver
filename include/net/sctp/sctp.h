@@ -423,7 +423,7 @@ static inline __s32 sctp_jitter(__u32 rto)
 }
 
 /* Break down data chunks at this point.  */
-static inline int sctp_frag_point(const struct sctp_opt *sp, int pmtu)
+static inline int sctp_frag_point(const struct sctp_sock *sp, int pmtu)
 {
 	int frag = pmtu;
 
@@ -575,23 +575,6 @@ static inline int sctp_vtag_hashfn(__u16 lport, __u16 rport, __u32 vtag)
 	h ^= vtag;
 	return (h & (sctp_assoc_hashsize-1));
 }
-
-/* WARNING: Do not change the layout of the members in sctp_sock! */
-struct sctp_sock {
-	struct inet_sock  inet;
-	struct sctp_opt	  sctp;
-};
-
-#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
-struct sctp6_sock {
-	struct inet_sock  inet;
-	struct sctp_opt	  sctp;
-	struct ipv6_pinfo inet6;
-};
-#endif /* CONFIG_IPV6 */
-
-#define sctp_sk(__sk) (&((struct sctp_sock *)__sk)->sctp)
-#define sctp_opt2sk(__sp) &container_of(__sp, struct sctp_sock, sctp)->inet.sk
 
 /* Is a socket of this style? */
 #define sctp_style(sk, style) __sctp_style((sk), (SCTP_SOCKET_##style))

@@ -98,8 +98,9 @@ static inline unsigned long rif_hash(const unsigned char *addr)
  *	makes this a little more exciting than on ethernet.
  */
  
-int tr_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
-              void *daddr, void *saddr, unsigned len) 
+static int tr_header(struct sk_buff *skb, struct net_device *dev,
+		     unsigned short type,
+		     void *daddr, void *saddr, unsigned len) 
 {
 	struct trh_hdr *trh;
 	int hdr_len;
@@ -153,7 +154,7 @@ int tr_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
  *	can now send the packet.
  */
  
-int tr_rebuild_header(struct sk_buff *skb) 
+static int tr_rebuild_header(struct sk_buff *skb) 
 {
 	struct trh_hdr *trh=(struct trh_hdr *)skb->data;
 	struct trllc *trllc=(struct trllc *)(skb->data+sizeof(struct trh_hdr));

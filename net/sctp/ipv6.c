@@ -502,7 +502,7 @@ static int sctp_v6_is_any(const union sctp_addr *addr)
 }
 
 /* Should this be available for binding?   */
-static int sctp_v6_available(union sctp_addr *addr, struct sctp_opt *sp)
+static int sctp_v6_available(union sctp_addr *addr, struct sctp_sock *sp)
 {
 	int type;
 	struct in6_addr *in6 = (struct in6_addr *)&addr->v6.sin6_addr;
@@ -531,14 +531,14 @@ static int sctp_v6_available(union sctp_addr *addr, struct sctp_opt *sp)
  * Return 0 - If the address is a non-unicast or an illegal address.
  * Return 1 - If the address is a unicast.
  */
-static int sctp_v6_addr_valid(union sctp_addr *addr, struct sctp_opt *sp)
+static int sctp_v6_addr_valid(union sctp_addr *addr, struct sctp_sock *sp)
 {
 	int ret = ipv6_addr_type(&addr->v6.sin6_addr);
 
 	/* Support v4-mapped-v6 address. */
 	if (ret == IPV6_ADDR_MAPPED) {
 		/* Note: This routine is used in input, so v4-mapped-v6
-		 * are disallowed here when there is no sctp_opt.
+		 * are disallowed here when there is no sctp_sock.
 		 */
 		if (!sp || !sp->v4mapped)
 			return 0;
@@ -616,7 +616,7 @@ static struct sock *sctp_v6_create_accept_sk(struct sock *sk,
 	newsk->sk_shutdown = sk->sk_shutdown;
 
 	newsctp6sk = (struct sctp6_sock *)newsk;
-	newsctp6sk->inet.pinet6 = &newsctp6sk->inet6;
+	inet_sk(newsk)->pinet6 = &newsctp6sk->inet6;
 
 	newinet = inet_sk(newsk);
 	newnp = inet6_sk(newsk);
@@ -661,7 +661,7 @@ out:
 }
 
 /* Map v4 address to mapped v6 address */
-static void sctp_v6_addr_v4map(struct sctp_opt *sp, union sctp_addr *addr)
+static void sctp_v6_addr_v4map(struct sctp_sock *sp, union sctp_addr *addr)
 {
 	if (sp->v4mapped && AF_INET == addr->sa.sa_family)
 		sctp_v4_map_v6(addr);
@@ -766,7 +766,7 @@ static void sctp_inet6_skb_msgname(struct sk_buff *skb, char *msgname,
 }
 
 /* Do we support this AF? */
-static int sctp_inet6_af_supported(sa_family_t family, struct sctp_opt *sp)
+static int sctp_inet6_af_supported(sa_family_t family, struct sctp_sock *sp)
 {
 	switch (family) {
 	case AF_INET6:
@@ -786,7 +786,7 @@ static int sctp_inet6_af_supported(sa_family_t family, struct sctp_opt *sp)
  */
 static int sctp_inet6_cmp_addr(const union sctp_addr *addr1,
 			       const union sctp_addr *addr2,
-			       struct sctp_opt *opt)
+			       struct sctp_sock *opt)
 {
 	struct sctp_af *af1, *af2;
 
@@ -808,7 +808,7 @@ static int sctp_inet6_cmp_addr(const union sctp_addr *addr1,
 /* Verify that the provided sockaddr looks bindable.   Common verification,
  * has already been taken care of.
  */
-static int sctp_inet6_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
+static int sctp_inet6_bind_verify(struct sctp_sock *opt, union sctp_addr *addr)
 {
 	struct sctp_af *af;
 
@@ -838,7 +838,7 @@ static int sctp_inet6_bind_verify(struct sctp_opt *opt, union sctp_addr *addr)
 /* Verify that the provided sockaddr looks bindable.   Common verification,
  * has already been taken care of.
  */
-static int sctp_inet6_send_verify(struct sctp_opt *opt, union sctp_addr *addr)
+static int sctp_inet6_send_verify(struct sctp_sock *opt, union sctp_addr *addr)
 {
 	struct sctp_af *af = NULL;
 
@@ -872,7 +872,7 @@ static int sctp_inet6_send_verify(struct sctp_opt *opt, union sctp_addr *addr)
  * addresses.
  * Returns number of addresses supported.
  */
-static int sctp_inet6_supported_addrs(const struct sctp_opt *opt,
+static int sctp_inet6_supported_addrs(const struct sctp_sock *opt,
 				      __u16 *types)
 {
 	types[0] = SCTP_PARAM_IPV4_ADDRESS;

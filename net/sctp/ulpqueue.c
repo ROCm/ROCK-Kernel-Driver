@@ -138,8 +138,7 @@ int sctp_ulpq_tail_data(struct sctp_ulpq *ulpq, struct sctp_chunk *chunk,
  */
 int sctp_clear_pd(struct sock *sk)
 {
-	struct sctp_opt *sp;
-	sp = sctp_sk(sk);
+	struct sctp_sock *sp = sctp_sk(sk);
 
 	sp->pd_mode = 0;
 	if (!skb_queue_empty(&sp->pd_lobby)) {

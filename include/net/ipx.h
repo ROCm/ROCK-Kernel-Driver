@@ -90,7 +90,11 @@ struct ipx_cb {
 	} last_hop;
 };
 
-struct ipx_opt {
+#include <net/sock.h>
+
+struct ipx_sock {
+	/* struct sock has to be the first member of ipx_sock */
+	struct sock		sk;
 	struct ipx_address	dest_addr;
 	struct ipx_interface	*intrfc;
 	unsigned short		port;
@@ -105,9 +109,14 @@ struct ipx_opt {
 	unsigned short		ipx_ncp_conn;
 };
 
-#define ipx_sk(__sk) ((struct ipx_opt *)(__sk)->sk_protinfo)
+static inline struct ipx_sock *ipx_sk(struct sock *sk)
+{
+	return (struct ipx_sock *)sk;
+}
+
 #define IPX_SKB_CB(__skb) ((struct ipx_cb *)&((__skb)->cb[0]))
 #endif
+
 #define IPX_MIN_EPHEMERAL_SOCKET	0x4000
 #define IPX_MAX_EPHEMERAL_SOCKET	0x7fff
 

@@ -129,8 +129,7 @@ static inline void tcp_event_data_sent(struct tcp_sock *tp,
 {
 	u32 now = tcp_time_stamp;
 
-	if (!tcp_get_pcount(&tp->packets_out) &&
-	    (s32)(now - tp->lsndtime) > tp->rto)
+	if (!tp->packets_out && (s32)(now - tp->lsndtime) > tp->rto)
 		tcp_cwnd_restart(tp, __sk_dst_get(sk));
 
 	tp->lsndtime = now;
@@ -509,8 +508,8 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	TCP_SKB_CB(buff)->when = TCP_SKB_CB(skb)->when;
 
 	if (TCP_SKB_CB(skb)->sacked & TCPCB_LOST) {
-		tcp_dec_pcount(&tp->lost_out, skb);
-		tcp_dec_pcount(&tp->left_out, skb);
+		tp->lost_out -= tcp_skb_pcount(skb);
+		tp->left_out -= tcp_skb_pcount(skb);
 	}
 
 	/* Fix up tso_factor for both original and new SKB.  */
@@ -518,13 +517,13 @@ static int tcp_fragment(struct sock *sk, struct sk_buff *skb, u32 len)
 	tcp_set_skb_tso_segs(buff, tp->mss_cache_std);
 
 	if (TCP_SKB_CB(skb)->sacked & TCPCB_LOST) {
-		tcp_inc_pcount(&tp->lost_out, skb);
-		tcp_inc_pcount(&tp->left_out, skb);
+		tp->lost_out += tcp_skb_pcount(skb);
+		tp->left_out += tcp_skb_pcount(skb);
 	}
 
 	if (TCP_SKB_CB(buff)->sacked&TCPCB_LOST) {
-		tcp_inc_pcount(&tp->lost_out, buff);
-		tcp_inc_pcount(&tp->left_out, buff);
+		tp->lost_out += tcp_skb_pcount(buff);
+		tp->left_out += tcp_skb_pcount(buff);
 	}
 
 	/* Link BUFF into the send queue. */
@@ -773,7 +772,7 @@ int tcp_write_xmit(struct sock *sk, int nonagle)
 			return 0;
 		}
 
-		return !tcp_get_pcount(&tp->packets_out) && sk->sk_send_head;
+		return !tp->packets_out && sk->sk_send_head;
 	}
 	return 0;
 }
@@ -945,15 +944,15 @@ static void tcp_retrans_try_collapse(struct sock *sk, struct sk_buff *skb, int m
 		 */
 		TCP_SKB_CB(skb)->sacked |= TCP_SKB_CB(next_skb)->sacked&(TCPCB_EVER_RETRANS|TCPCB_AT_TAIL);
 		if (TCP_SKB_CB(next_skb)->sacked&TCPCB_SACKED_RETRANS)
-			tcp_dec_pcount(&tp->retrans_out, next_skb);
+			tp->retrans_out -= tcp_skb_pcount(next_skb);
 		if (TCP_SKB_CB(next_skb)->sacked&TCPCB_LOST) {
-			tcp_dec_pcount(&tp->lost_out, next_skb);
-			tcp_dec_pcount(&tp->left_out, next_skb);
+			tp->lost_out -= tcp_skb_pcount(next_skb);
+			tp->left_out -= tcp_skb_pcount(next_skb);
 		}
 		/* Reno case is special. Sigh... */
-		if (!tp->sack_ok && tcp_get_pcount(&tp->sacked_out)) {
+		if (!tp->sack_ok && tp->sacked_out) {
 			tcp_dec_pcount_approx(&tp->sacked_out, next_skb);
-			tcp_dec_pcount(&tp->left_out, next_skb);
+			tp->left_out -= tcp_skb_pcount(next_skb);
 		}
 
 		/* Not quite right: it can be > snd.fack, but
@@ -981,11 +980,11 @@ void tcp_simple_retransmit(struct sock *sk)
 		    !(TCP_SKB_CB(skb)->sacked&TCPCB_SACKED_ACKED)) {
 			if (TCP_SKB_CB(skb)->sacked&TCPCB_SACKED_RETRANS) {
 				TCP_SKB_CB(skb)->sacked &= ~TCPCB_SACKED_RETRANS;
-				tcp_dec_pcount(&tp->retrans_out, skb);
+				tp->retrans_out -= tcp_skb_pcount(skb);
 			}
 			if (!(TCP_SKB_CB(skb)->sacked&TCPCB_LOST)) {
 				TCP_SKB_CB(skb)->sacked |= TCPCB_LOST;
-				tcp_inc_pcount(&tp->lost_out, skb);
+				tp->lost_out += tcp_skb_pcount(skb);
 				lost = 1;
 			}
 		}
@@ -1060,9 +1059,8 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 
 		/* New SKB created, account for it. */
 		new_factor = tcp_skb_pcount(skb);
-		tcp_dec_pcount_explicit(&tp->packets_out,
-					old_factor - new_factor);
-		tcp_inc_pcount(&tp->packets_out, skb->next);
+		tp->packets_out -= old_factor - new_factor;
+		tp->packets_out += tcp_skb_pcount(skb->next);
 	}
 
 	/* Collapse two adjacent packets if worthwhile and we can. */
@@ -1071,6 +1069,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 	   (skb->next != sk->sk_send_head) &&
 	   (skb->next != (struct sk_buff *)&sk->sk_write_queue) &&
 	   (skb_shinfo(skb)->nr_frags == 0 && skb_shinfo(skb->next)->nr_frags == 0) &&
+	   (tcp_skb_pcount(skb) == 1 && tcp_skb_pcount(skb->next) == 1) &&
 	   (sysctl_tcp_retrans_collapse != 0))
 		tcp_retrans_try_collapse(sk, skb, cur_mss);
 
@@ -1115,7 +1114,7 @@ int tcp_retransmit_skb(struct sock *sk, struct sk_buff *skb)
 		}
 #endif
 		TCP_SKB_CB(skb)->sacked |= TCPCB_RETRANS;
-		tcp_inc_pcount(&tp->retrans_out, skb);
+		tp->retrans_out += tcp_skb_pcount(skb);
 
 		/* Save stamp of the first retransmit. */
 		if (!tp->retrans_stamp)
@@ -1143,7 +1142,7 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *skb;
-	int packet_cnt = tcp_get_pcount(&tp->lost_out);
+	int packet_cnt = tp->lost_out;
 
 	/* First pass: retransmit lost packets. */
 	if (packet_cnt) {
@@ -1210,7 +1209,7 @@ void tcp_xmit_retransmit_queue(struct sock *sk)
 		 * real MSS sized packet because tcp_retransmit_skb()
 		 * will fragment it if necessary.
 		 */
-		if (++packet_cnt > tcp_get_pcount(&tp->fackets_out))
+		if (++packet_cnt > tp->fackets_out)
 			break;
 
 		if (tcp_packets_in_flight(tp) >= tp->snd_cwnd)
@@ -1496,7 +1495,7 @@ int tcp_connect(struct sock *sk)
 	tp->retrans_stamp = TCP_SKB_CB(buff)->when;
 	__skb_queue_tail(&sk->sk_write_queue, buff);
 	sk_charge_skb(sk, buff);
-	tcp_inc_pcount(&tp->packets_out, buff);
+	tp->packets_out += tcp_skb_pcount(buff);
 	tcp_transmit_skb(sk, skb_clone(buff, GFP_KERNEL));
 	TCP_INC_STATS(TCP_MIB_ACTIVEOPENS);
 
@@ -1694,7 +1693,7 @@ void tcp_send_probe0(struct sock *sk)
 
 	err = tcp_write_wakeup(sk);
 
-	if (tcp_get_pcount(&tp->packets_out) || !sk->sk_send_head) {
+	if (tp->packets_out || !sk->sk_send_head) {
 		/* Cancel probe timer, if it is not required. */
 		tp->probes_out = 0;
 		tp->backoff = 0;

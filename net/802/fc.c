@@ -35,8 +35,9 @@
  *	Put the headers on a Fibre Channel packet. 
  */
  
-int fc_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
-              void *daddr, void *saddr, unsigned len) 
+static int fc_header(struct sk_buff *skb, struct net_device *dev,
+		     unsigned short type,
+		     void *daddr, void *saddr, unsigned len) 
 {
 	struct fch_hdr *fch;
 	int hdr_len;
@@ -81,7 +82,7 @@ int fc_header(struct sk_buff *skb, struct net_device *dev, unsigned short type,
  *	can now send the packet.
  */
  
-int fc_rebuild_header(struct sk_buff *skb) 
+static int fc_rebuild_header(struct sk_buff *skb) 
 {
 	struct fch_hdr *fch=(struct fch_hdr *)skb->data;
 	struct fcllc *fcllc=(struct fcllc *)(skb->data+sizeof(struct fch_hdr));

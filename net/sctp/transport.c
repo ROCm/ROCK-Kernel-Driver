@@ -237,7 +237,7 @@ void sctp_transport_pmtu(struct sctp_transport *transport)
  * address.
  */
 void sctp_transport_route(struct sctp_transport *transport,
-			  union sctp_addr *saddr, struct sctp_opt *opt)
+			  union sctp_addr *saddr, struct sctp_sock *opt)
 {
 	struct sctp_association *asoc = transport->asoc;
 	struct sctp_af *af = transport->af_specific;
