@@ -83,8 +83,6 @@ extern struct sti_struct *sti_init_roms(void);
    there's no other way for stifb to find it. */
 extern struct sti_struct *default_sti;
 
-extern struct display_switch fbcon_sti; /* fbcon-sti.c */
-
 int  sti_init_graph(struct sti_struct *sti);
 void sti_inq_conf(struct sti_struct *sti);
 void sti_putc(struct sti_struct *sti, int c, int y, int x);
