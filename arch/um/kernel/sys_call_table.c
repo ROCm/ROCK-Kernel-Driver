@@ -125,10 +125,8 @@ extern syscall_handler_t sys_ni_syscall;
 extern syscall_handler_t sys_adjtimex;
 extern syscall_handler_t sys_mprotect;
 extern syscall_handler_t sys_sigprocmask;
-extern syscall_handler_t sys_create_module;
 extern syscall_handler_t sys_init_module;
 extern syscall_handler_t sys_delete_module;
-extern syscall_handler_t sys_get_kernel_syms;
 extern syscall_handler_t sys_quotactl;
 extern syscall_handler_t sys_getpgid;
 extern syscall_handler_t sys_fchdir;
@@ -162,7 +160,6 @@ extern syscall_handler_t sys_mremap;
 extern syscall_handler_t sys_setresuid16;
 extern syscall_handler_t sys_getresuid16;
 extern syscall_handler_t sys_ni_syscall;
-extern syscall_handler_t sys_query_module;
 extern syscall_handler_t sys_poll;
 extern syscall_handler_t sys_nfsservctl;
 extern syscall_handler_t sys_setresgid16;
@@ -235,9 +232,10 @@ extern syscall_handler_t sys_epoll_create;
 extern syscall_handler_t sys_epoll_ctl;
 extern syscall_handler_t sys_epoll_wait;
 extern syscall_handler_t sys_remap_file_pages;
+extern syscall_handler_t sys_set_tid_address;
 
 #if CONFIG_NFSD
-#define NFSSERVCTL sys_nfsserctl
+#define NFSSERVCTL sys_nfsservctl
 #else
 #define NFSSERVCTL sys_ni_syscall
 #endif
@@ -246,7 +244,7 @@ extern syscall_handler_t um_mount;
 extern syscall_handler_t um_time;
 extern syscall_handler_t um_stime;
 
-#define LAST_GENERIC_SYSCALL __NR_remap_file_pages
+#define LAST_GENERIC_SYSCALL __NR_set_tid_address
 
 #if LAST_GENERIC_SYSCALL > LAST_ARCH_SYSCALL
 #define LAST_SYSCALL LAST_GENERIC_SYSCALL
@@ -384,10 +382,10 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_adjtimex ] = sys_adjtimex,
 	[ __NR_mprotect ] = sys_mprotect,
 	[ __NR_sigprocmask ] = sys_sigprocmask,
-	[ __NR_create_module ] = sys_create_module,
+	[ __NR_create_module ] = sys_ni_syscall,
 	[ __NR_init_module ] = sys_init_module,
 	[ __NR_delete_module ] = sys_delete_module,
-	[ __NR_get_kernel_syms ] = sys_get_kernel_syms,
+	[ __NR_get_kernel_syms ] = sys_ni_syscall,
 	[ __NR_quotactl ] = sys_quotactl,
 	[ __NR_getpgid ] = sys_getpgid,
 	[ __NR_fchdir ] = sys_fchdir,
@@ -424,7 +422,7 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_setresuid ] = sys_setresuid16,
 	[ __NR_getresuid ] = sys_getresuid16,
 	[ __NR_vm86 ] = sys_ni_syscall,
-	[ __NR_query_module ] = sys_query_module,
+	[ __NR_query_module ] = sys_ni_syscall,
 	[ __NR_poll ] = sys_poll,
 	[ __NR_nfsservctl ] = NFSSERVCTL,
 	[ __NR_setresgid ] = sys_setresgid16,
@@ -489,6 +487,7 @@ syscall_handler_t *sys_call_table[] = {
 	[ __NR_sys_epoll_ctl ] = sys_epoll_ctl,
 	[ __NR_sys_epoll_wait ] = sys_epoll_wait,
         [ __NR_remap_file_pages ] = sys_remap_file_pages,
+        [ __NR_set_tid_address ] = sys_set_tid_address,
 
 	ARCH_SYSCALLS
 	[ LAST_SYSCALL + 1 ... NR_syscalls ] = 

@@ -17,6 +17,7 @@
 #include "kern_util.h"
 #include "user_util.h"
 #include "time_user.h"
+#include "mode.h"
 
 u64 jiffies_64;
 
@@ -142,7 +143,7 @@ int __init timer_init(void)
 {
 	int err;
 
-	user_time_init();
+	CHOOSE_MODE(user_time_init_tt(), user_time_init_skas());
 	if((err = request_irq(TIMER_IRQ, um_timer, SA_INTERRUPT, "timer", 
 			      NULL)) != 0)
 		printk(KERN_ERR "timer_init : request_irq failed - "

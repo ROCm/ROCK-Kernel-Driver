@@ -7,6 +7,8 @@
 #include <stdio.h>
 #include <errno.h>
 #include <signal.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
 #include "os.h"
 #include "user.h"
 
@@ -75,9 +77,12 @@ void os_stop_process(int pid)
 	kill(pid, SIGSTOP);
 }
 
-void os_kill_process(int pid)
+void os_kill_process(int pid, int reap_child)
 {
 	kill(pid, SIGKILL);
+	if(reap_child)
+		waitpid(pid, NULL, 0);
+		
 }
 
 void os_usr1_process(int pid)
@@ -88,6 +93,41 @@ void os_usr1_process(int pid)
 int os_getpid(void)
 {
 	return(getpid());
+}
+
+int os_map_memory(void *virt, int fd, unsigned long off, unsigned long len, 
+		  int r, int w, int x)
+{
+	void *loc;
+	int prot;
+
+	prot = (r ? PROT_READ : 0) | (w ? PROT_WRITE : 0) | 
+		(x ? PROT_EXEC : 0);
+
+	loc = mmap((void *) virt, len, prot, MAP_SHARED | MAP_FIXED, 
+		   fd, off);
+	if(loc < 0)
+		return(-errno);
+	return(0);
+}
+
+int os_protect_memory(void *addr, unsigned long len, int r, int w, int x)
+{
+        int prot = ((r ? PROT_READ : 0) | (w ? PROT_WRITE : 0) | 
+		    (x ? PROT_EXEC : 0));
+
+        if(mprotect(addr, len, prot) < 0)
+		return(-errno);
+        return(0);
+}
+
+int os_unmap_memory(void *addr, int len)
+{
+        int err;
+
+        err = munmap(addr, len);
+        if(err < 0) return(-errno);
+        return(0);
 }
 
 /*
