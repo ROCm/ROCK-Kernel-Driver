@@ -54,63 +54,7 @@ typedef struct { volatile int counter; } atomic_t;
 #define atomic_set(v,i)	(((v)->counter) = (i))
 
 /**
- * atomic_add - add integer to atomic variable
- * @i: integer value to add
- * @v: pointer of type atomic_t
- *
- * Atomically adds @i to @v.
- */
-static inline void atomic_add(int i, atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	__asm__ __volatile__ (
-		"# atomic_add			\n\t"
-		DCACHE_CLEAR("r4", "r5", "%0")
-		LOAD"	r4, @%0;		\n\t"
-		"add	r4, %1;			\n\t"
-		STORE"	r4, @%0;		\n\t"
-		: /* no outputs */
-		: "r" (&v->counter), "r" (i)
-		: "memory", "r4"
-#ifdef CONFIG_CHIP_M32700_TS1
-		, "r5"
-#endif	/* CONFIG_CHIP_M32700_TS1 */
-	);
-	local_irq_restore(flags);
-}
-
-/**
- * atomic_sub - subtract the atomic variable
- * @i: integer value to subtract
- * @v: pointer of type atomic_t
- *
- * Atomically subtracts @i from @v.
- */
-static inline void atomic_sub(int i, atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	__asm__ __volatile__ (
-		"# atomic_sub			\n\t"
-		DCACHE_CLEAR("r4", "r5", "%0")
-		LOAD"	r4, @%0;		\n\t"
-		"sub	r4, %1;			\n\t"
-		STORE"	r4, @%0;		\n\t"
-		: /* no outputs */
-		: "r" (&v->counter), "r" (i)
-		: "memory", "r4"
-#ifdef CONFIG_CHIP_M32700_TS1
-		, "r5"
-#endif	/* CONFIG_CHIP_M32700_TS1 */
-	);
-	local_irq_restore(flags);
-}
-
-/**
- * atomic_add_return - add integer to atomic variable and return
+ * atomic_add_return - add integer to atomic variable and return it
  * @i: integer value to add
  * @v: pointer of type atomic_t
  *
@@ -123,7 +67,7 @@ static inline int atomic_add_return(int i, atomic_t *v)
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		"# atomic_add			\n\t"
+		"# atomic_add_return		\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
 		LOAD"	%0, @%1;		\n\t"
 		"add	%0, %2;			\n\t"
@@ -141,7 +85,7 @@ static inline int atomic_add_return(int i, atomic_t *v)
 }
 
 /**
- * atomic_sub_return - subtract the atomic variable and return
+ * atomic_sub_return - subtract integer from atomic variable and return it
  * @i: integer value to subtract
  * @v: pointer of type atomic_t
  *
@@ -154,7 +98,7 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		"# atomic_sub			\n\t"
+		"# atomic_sub_return		\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
 		LOAD"	%0, @%1;		\n\t"
 		"sub	%0, %2;			\n\t"
@@ -172,6 +116,24 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 }
 
 /**
+ * atomic_add - add integer to atomic variable
+ * @i: integer value to add
+ * @v: pointer of type atomic_t
+ *
+ * Atomically adds @i to @v.
+ */
+#define atomic_add(i,v) ((void) atomic_add_return((i), (v)))
+
+/**
+ * atomic_sub - subtract the atomic variable
+ * @i: integer value to subtract
+ * @v: pointer of type atomic_t
+ *
+ * Atomically subtracts @i from @v.
+ */
+#define atomic_sub(i,v) ((void) atomic_sub_return((i), (v)))
+
+/**
  * atomic_sub_and_test - subtract value from variable and test result
  * @i: integer value to subtract
  * @v: pointer of type atomic_t
@@ -183,61 +145,7 @@ static inline int atomic_sub_return(int i, atomic_t *v)
 #define atomic_sub_and_test(i,v) (atomic_sub_return((i), (v)) == 0)
 
 /**
- * atomic_inc - increment atomic variable
- * @v: pointer of type atomic_t
- *
- * Atomically increments @v by 1.
- */
-static inline void atomic_inc(atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	__asm__ __volatile__ (
-		"# atomic_inc			\n\t"
-		DCACHE_CLEAR("r4", "r5", "%0")
-		LOAD"	r4, @%0; 		\n\t"
-		"addi	r4, #1;			\n\t"
-		STORE"	r4, @%0;		\n\t"
-		: /* no outputs */
-		: "r" (&v->counter)
-		: "memory", "r4"
-#ifdef CONFIG_CHIP_M32700_TS1
-		, "r5"
-#endif	/* CONFIG_CHIP_M32700_TS1 */
-	);
-	local_irq_restore(flags);
-}
-
-/**
- * atomic_dec - decrement atomic variable
- * @v: pointer of type atomic_t
- *
- * Atomically decrements @v by 1.
- */
-static inline void atomic_dec(atomic_t *v)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-	__asm__ __volatile__ (
-		"# atomic_dec			\n\t"
-		DCACHE_CLEAR("r4", "r5", "%0")
-		LOAD"	r4, @%0;		\n\t"
-		"addi	r4, #-1;		\n\t"
-		STORE"	r4, @%0;		\n\t"
-		: /* no outputs */
-		: "r" (&v->counter)
-		: "memory", "r4"
-#ifdef CONFIG_CHIP_M32700_TS1
-		, "r5"
-#endif	/* CONFIG_CHIP_M32700_TS1 */
-	);
-	local_irq_restore(flags);
-}
-
-/**
- * atomic_inc_return - increment atomic variable and return
+ * atomic_inc_return - increment atomic variable and return it
  * @v: pointer of type atomic_t
  *
  * Atomically increments @v by 1 and returns the result.
@@ -249,7 +157,7 @@ static inline int atomic_inc_return(atomic_t *v)
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		"# atomic_dec_and_test		\n\t"
+		"# atomic_inc_return		\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
 		LOAD"	%0, @%1;		\n\t"
 		"addi	%0, #1;			\n\t"
@@ -267,7 +175,7 @@ static inline int atomic_inc_return(atomic_t *v)
 }
 
 /**
- * atomic_dec_return - decrement atomic variable and return
+ * atomic_dec_return - decrement atomic variable and return it
  * @v: pointer of type atomic_t
  *
  * Atomically decrements @v by 1 and returns the result.
@@ -279,7 +187,7 @@ static inline int atomic_dec_return(atomic_t *v)
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		"# atomic_dec_and_test		\n\t"
+		"# atomic_dec_return		\n\t"
 		DCACHE_CLEAR("%0", "r4", "%1")
 		LOAD"	%0, @%1;		\n\t"
 		"addi	%0, #-1;		\n\t"
@@ -295,6 +203,22 @@ static inline int atomic_dec_return(atomic_t *v)
 
 	return result;
 }
+
+/**
+ * atomic_inc - increment atomic variable
+ * @v: pointer of type atomic_t
+ *
+ * Atomically increments @v by 1.
+ */
+#define atomic_inc(v) ((void)atomic_inc_return(v))
+
+/**
+ * atomic_dec - decrement atomic variable
+ * @v: pointer of type atomic_t
+ *
+ * Atomically decrements @v by 1.
+ */
+#define atomic_dec(v) ((void)atomic_dec_return(v))
 
 /**
  * atomic_inc_and_test - increment and test
@@ -330,17 +254,18 @@ static inline int atomic_dec_return(atomic_t *v)
 static inline void atomic_clear_mask(unsigned long  mask, atomic_t *addr)
 {
 	unsigned long flags;
+	unsigned long tmp;
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
-		"# atomic_set_mask		\n\t"
-		DCACHE_CLEAR("r4", "r5", "%0")
-		LOAD"	r4, @%0;		\n\t"
-		"and	r4, %1;			\n\t"
-		STORE"	r4, @%0;		\n\t"
-		: /* no outputs */
+		"# atomic_clear_mask		\n\t"
+		DCACHE_CLEAR("%0", "r5", "%1")
+		LOAD"	%0, @%1;		\n\t"
+		"and	%0, %2;			\n\t"
+		STORE"	%0, @%1;		\n\t"
+		: "=&r" (tmp)
 		: "r" (addr), "r" (~mask)
-		: "memory", "r4"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r5"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
@@ -351,17 +276,18 @@ static inline void atomic_clear_mask(unsigned long  mask, atomic_t *addr)
 static inline void atomic_set_mask(unsigned long  mask, atomic_t *addr)
 {
 	unsigned long flags;
+	unsigned long tmp;
 
 	local_irq_save(flags);
 	__asm__ __volatile__ (
 		"# atomic_set_mask		\n\t"
-		DCACHE_CLEAR("r4", "r5", "%0")
-		LOAD"	r4, @%0;		\n\t"
-		"or	r4, %1;			\n\t"
-		STORE"	r4, @%0;		\n\t"
-		: /* no outputs */
+		DCACHE_CLEAR("%0", "r5", "%1")
+		LOAD"	%0, @%1;		\n\t"
+		"or	%0, %2;			\n\t"
+		STORE"	%0, @%1;		\n\t"
+		: "=&r" (tmp)
 		: "r" (addr), "r" (mask)
-		: "memory", "r4"
+		: "memory"
 #ifdef CONFIG_CHIP_M32700_TS1
 		, "r5"
 #endif	/* CONFIG_CHIP_M32700_TS1 */
