@@ -5009,7 +5009,7 @@ pfm_handle_work(void)
 	unsigned long flags;
 	unsigned long ovfl_regs;
 	unsigned int reason;
-	int ret, must_free = 0;
+	int ret;
 
 	ctx = PFM_GET_CTX(current);
 	if (ctx == NULL) {
@@ -5087,7 +5087,6 @@ pfm_handle_work(void)
 do_zombie:
 		DPRINT(("context is zombie, bailing out\n"));
 		pfm_context_force_terminate(ctx, regs);
-		must_free = 1;
 		goto nothing_to_do;
 	}
 	/*
@@ -5102,8 +5101,6 @@ skip_blocking:
 nothing_to_do:
 
 	UNPROTECT_CTX(ctx, flags);
-
-	if (must_free) pfm_context_free(ctx);
 }
 
 static int
