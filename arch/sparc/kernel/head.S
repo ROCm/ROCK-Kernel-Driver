@@ -746,9 +746,6 @@ go_to_highmem:
 		jmpl	%g1, %g0
 		 nop
 
-	/* This is to align init_thread_union properly, be careful. -DaveM */
-	.align	8192
-
 /* The code above should be at beginning and we have to take care about
  * short jumps, as branching to .text.init section from .text is usually
  * impossible */
