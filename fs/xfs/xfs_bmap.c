@@ -4077,64 +4077,6 @@ xfs_bmap_cancel(
 }
 
 /*
- * Returns EINVAL if the specified file is not swappable.
- */
-int						/* error */
-xfs_bmap_check_swappable(
-	xfs_inode_t	*ip)			/* incore inode */
-{
-	xfs_bmbt_rec_t	*base;			/* base of extent array */
-	xfs_bmbt_rec_t	*ep;			/* pointer to an extent entry */
-	xfs_fileoff_t	end_fsb;		/* last block of file within size */
-	xfs_bmbt_irec_t	ext;			/* extent list entry, decoded */
-	xfs_ifork_t	*ifp;			/* inode fork pointer */
-	xfs_fileoff_t	lastaddr;		/* last block number seen */
-	xfs_extnum_t	nextents;		/* number of extent entries */
-	int		retval = 0;		/* return value */
-
-	xfs_ilock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-
-	/*
-	 * Check for a zero length file.
-	 */
-	if (ip->i_d.di_size == 0)
-		goto check_done;
-
-	ASSERT(XFS_IFORK_FORMAT(ip, XFS_DATA_FORK) == XFS_DINODE_FMT_BTREE ||
-	       XFS_IFORK_FORMAT(ip, XFS_DATA_FORK) == XFS_DINODE_FMT_EXTENTS);
-
-	ifp = &ip->i_df;
-	if (!(ifp->if_flags & XFS_IFEXTENTS) &&
-	    (retval = xfs_iread_extents(NULL, ip, XFS_DATA_FORK)))
-		goto check_done;
-	/*
-	 * Scan extents until the file size is reached. Look for
-	 * holes or unwritten extents, since I/O to these would cause
-	 * a transaction.
-	 */
-	end_fsb = XFS_B_TO_FSB(ip->i_mount, ip->i_d.di_size);
-	nextents = ifp->if_bytes / (uint)sizeof(xfs_bmbt_rec_t);
-	base = &ifp->if_u1.if_extents[0];
-	for (lastaddr = 0, ep = base; ep < &base[nextents]; ep++) {
-		xfs_bmbt_get_all(ep, &ext);
-		if (lastaddr < ext.br_startoff ||
-		    ext.br_state != XFS_EXT_NORM) {
-			goto error_done;
-		}
-		if (end_fsb <= (lastaddr = ext.br_startoff +
-						ext.br_blockcount))
-			goto check_done;
-	}
-error_done:
-	retval = XFS_ERROR(EINVAL);
-
-
-check_done:
-	xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_ILOCK_EXCL);
-	return retval;
-}
-
-/*
  * Returns the file-relative block number of the first unused block(s)
  * in the file with at least "len" logically contiguous blocks free.
  * This is the lowest-address hole if the file has holes, else the first block

@@ -3753,32 +3753,6 @@ xfs_iaccess(
 }
 
 /*
- * Return whether or not it is OK to swap to the given file in the
- * given range.  Return 0 for OK and otherwise return the error.
- *
- * It is only OK to swap to a file if it has no holes, and all
- * extents have been initialized.
- *
- * We use the vnode behavior chain prevent and allow primitives
- * to ensure that the vnode chain stays coherent while we do this.
- * This allows us to walk the chain down to the bottom where XFS
- * lives without worrying about it changing out from under us.
- */
-int
-xfs_swappable(
-	bhv_desc_t	*bdp)
-{
-	xfs_inode_t	*ip;
-
-	ip = XFS_BHVTOI(bdp);
-	/*
-	 * Verify that the file does not have any
-	 * holes or unwritten exents.
-	 */
-	return xfs_bmap_check_swappable(ip);
-}
-
-/*
  * xfs_iroundup: round up argument to next power of two
  */
 uint
