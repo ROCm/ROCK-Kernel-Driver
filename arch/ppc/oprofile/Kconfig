@@ -1,6 +1,6 @@
 
 menu "Profiling support"
-	depends on EXPERIMENTAL
+	depends on EXPERIMENTAL && BROKEN
 
 config PROFILING
 	bool "Profiling support (EXPERIMENTAL)"
