@@ -104,7 +104,6 @@ struct sn_sal_ops {
 static struct sn_sal_ops *sn_func;
 
 /* Prototypes */
-int __init sn_sal_serial_console_init(void);
 static int snt_hw_puts(const char *, int);
 static int snt_poll_getc(void);
 static int snt_poll_input_pending(void);
@@ -1011,7 +1010,7 @@ static struct console sal_console = {
 	.index = -1
 };
 
-int __init
+static int __init
 sn_sal_serial_console_init(void)
 {
 	if (ia64_platform_is("sn2")) {
