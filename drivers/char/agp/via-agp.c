@@ -398,7 +398,6 @@ found:
 	if (!bridge)
 		return -ENOMEM;
 
-	get_agp_version(bridge);
 	bridge->dev = pdev;
 	bridge->capndx = cap_ptr;
 	bridge->driver = &via_driver;
@@ -415,6 +414,7 @@ found:
 	}
 
 	/* If this is an AGP3 bridge, check which mode its in and adjust. */
+	get_agp_version(bridge);
 	if (bridge->major_version >= 3)
 		check_via_agp3(bridge);
 
