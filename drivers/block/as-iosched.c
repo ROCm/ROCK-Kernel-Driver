@@ -173,13 +173,10 @@ static kmem_cache_t *arq_pool;
 /*
  * IO Context helper functions
  */
-/* Debug */
-static atomic_t nr_as_io_requests = ATOMIC_INIT(0);
 
 /* Called to deallocate the as_io_context */
 static void free_as_io_context(struct as_io_context *aic)
 {
-	atomic_dec(&nr_as_io_requests);
 	kfree(aic);
 }
 
@@ -195,7 +192,6 @@ static struct as_io_context *alloc_as_io_context(void)
 
 	ret = kmalloc(sizeof(*ret), GFP_ATOMIC);
 	if (ret) {
-		atomic_inc(&nr_as_io_requests);
 		ret->dtor = free_as_io_context;
 		ret->exit = exit_as_io_context;
 		ret->state = 1 << AS_TASK_RUNNING;
