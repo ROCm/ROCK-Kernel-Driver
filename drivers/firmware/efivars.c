@@ -1,7 +1,7 @@
 /*
  * EFI Variables - efivars.c
  *
- * Copyright (C) 2001,2003 Dell <Matt_Domsch@dell.com>
+ * Copyright (C) 2001,2003,2004 Dell <Matt_Domsch@dell.com>
  * Copyright (C) 2004 Intel Corporation <matthew.e.tolentino@intel.com>
  *
  * This code takes all variables accessible from EFI runtime and
@@ -22,6 +22,9 @@
  *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  *
  * Changelog:
+ *
+ *  26 Apr 2004 - Matt Domsch <Matt_Domsch@dell.com>
+ *   minor bug fixes
  *
  *  21 Apr 2004 - Matt Tolentino <matthew.e.tolentino@intel.com)
  *   converted driver to export variable information via sysfs
@@ -78,7 +81,7 @@ MODULE_AUTHOR("Matt Domsch <Matt_Domsch@Dell.com>");
 MODULE_DESCRIPTION("sysfs interface to EFI Variables");
 MODULE_LICENSE("GPL");
 
-#define EFIVARS_VERSION "0.07 2003-Aug-29"
+#define EFIVARS_VERSION "0.07 2004-Apr-26"
 
 /*
  * efivars_lock protects two things:
@@ -408,7 +411,7 @@ static struct kobj_type ktype_efivar = {
 static ssize_t
 dummy(struct subsystem *sub, char *buf)
 {
-	return 0;
+	return -ENODEV;
 }
 
 static inline void
@@ -472,7 +475,10 @@ efivar_create(struct subsystem *sub, const char *buf, size_t count)
 	/* Create the entry in sysfs.  Locking is not required here */
 	status = efivar_create_sysfs_entry(utf8_strsize(new_var->VariableName,
 			1024), new_var->VariableName, &new_var->VendorGuid);
-	return status;
+	if (status) {
+		printk(KERN_WARNING "efivars: variable created, but sysfs entry wasn't.\n");
+	}
+	return count;
 }
 
 static ssize_t
@@ -532,7 +538,7 @@ efivar_delete(struct subsystem *sub, const char *buf, size_t count)
 	efivar_unregister(search_efivar);
 
 	/* It's dead Jim.... */
-	return status;
+	return count;
 }
 
 static VAR_SUBSYS_ATTR(new_var, 0200, dummy, efivar_create);
