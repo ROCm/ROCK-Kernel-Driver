@@ -570,7 +570,7 @@ static int change_speed(struct stir_cb *stir, unsigned speed)
  */
 static int stir_hard_xmit(struct sk_buff *skb, struct net_device *netdev)
 {
-	struct stir_cb *stir = netdev->priv;
+	struct stir_cb *stir = netdev_priv(netdev);
 
 	netif_stop_queue(netdev);
 
@@ -871,7 +871,7 @@ static void stir_rcv_irq(struct urb *urb, struct pt_regs *regs)
  */
 static int stir_net_open(struct net_device *netdev)
 {
-	struct stir_cb *stir = netdev->priv;
+	struct stir_cb *stir = netdev_priv(netdev);
 	int err;
 	char hwname[16];
 
@@ -924,7 +924,7 @@ static int stir_net_open(struct net_device *netdev)
 	sprintf(hwname, "usb#%d", stir->usbdev->devnum);
 	stir->irlap = irlap_open(netdev, &stir->qos, hwname);
 	if (!stir->irlap) {
-		err("irlap_open failed");
+		err("stir4200: irlap_open failed");
 		goto err_out5;
 	}
 
@@ -933,7 +933,7 @@ static int stir_net_open(struct net_device *netdev)
 				      CLONE_FS|CLONE_FILES);
 	if (stir->thr_pid < 0) {
 		err = stir->thr_pid;
-		err("unable to start kernel thread");
+		err("stir4200: unable to start kernel thread");
 		goto err_out6;
 	}
 
@@ -963,7 +963,7 @@ static int stir_net_open(struct net_device *netdev)
  */
 static int stir_net_close(struct net_device *netdev)
 {
-	struct stir_cb *stir = netdev->priv;
+	struct stir_cb *stir = netdev_priv(netdev);
 
 	/* Stop transmit processing */
 	netif_stop_queue(netdev);
@@ -992,10 +992,10 @@ static int stir_net_close(struct net_device *netdev)
 /*
  * IOCTLs : Extra out-of-band network commands...
  */
-static int stir_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int stir_net_ioctl(struct net_device *netdev, struct ifreq *rq, int cmd)
 {
 	struct if_irda_req *irq = (struct if_irda_req *) rq;
-	struct stir_cb *stir = dev->priv;
+	struct stir_cb *stir = netdev_priv(netdev);
 	int ret = 0;
 
 	switch (cmd) {
@@ -1032,9 +1032,9 @@ static int stir_net_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 /*
  * Get device stats (for /proc/net/dev and ifconfig)
  */
-static struct net_device_stats *stir_net_get_stats(struct net_device *dev)
+static struct net_device_stats *stir_net_get_stats(struct net_device *netdev)
 {
-	struct stir_cb *stir = dev->priv;
+	struct stir_cb *stir = netdev_priv(netdev);
 	return &stir->stats;
 }
 
@@ -1060,13 +1060,13 @@ static int stir_probe(struct usb_interface *intf,
 
 	SET_MODULE_OWNER(net);
 	SET_NETDEV_DEV(net, &intf->dev);
-	stir = net->priv;
+	stir = netdev_priv(net);
 	stir->netdev = net;
 	stir->usbdev = dev;
 
 	ret = usb_reset_configuration(dev);
 	if (ret != 0) {
-		err("usb reset configuration failed");
+		err("stir4200: usb reset configuration failed");
 		goto err_out2;
 	}
 
@@ -1099,7 +1099,7 @@ static int stir_probe(struct usb_interface *intf,
 	if (ret != 0)
 		goto err_out2;
 
-	MESSAGE("IrDA: Registered SigmaTel device %s\n", net->name);
+	info("IrDA: Registered SigmaTel device %s", net->name);
 
 	usb_set_intfdata(intf, stir);
 
@@ -1169,11 +1169,7 @@ static struct usb_driver irda_driver = {
  */
 static int __init stir_init(void)
 {
-	if (usb_register(&irda_driver) < 0)
-		return -1;
-
-	MESSAGE("SigmaTel support registered\n");
-	return 0;
+	return usb_register(&irda_driver);
 }
 module_init(stir_init);
 
