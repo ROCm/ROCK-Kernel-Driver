@@ -270,13 +270,15 @@ EXPORT_SYMBOL_GPL(agp_num_entries);
 int agp_copy_info(agp_kern_info * info)
 {
 	memset(info, 0, sizeof(agp_kern_info));
-	info->chipset = agp_bridge->type;
-
-	if (agp_bridge->type == NOT_SUPPORTED)
+	if (!agp_bridge || agp_bridge->type == NOT_SUPPORTED ||
+	    !agp_bridge->version) {
+		info->chipset = NOT_SUPPORTED;
 		return -EIO;
+	}
 
 	info->version.major = agp_bridge->version->major;
 	info->version.minor = agp_bridge->version->minor;
+	info->chipset = agp_bridge->type;
 	info->device = agp_bridge->dev;
 	info->mode = agp_bridge->mode;
 	info->aper_base = agp_bridge->gart_bus_addr;
