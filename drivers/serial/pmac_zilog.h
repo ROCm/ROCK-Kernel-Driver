@@ -11,7 +11,7 @@
 /* 
  * We wrap our port structure around the generic uart_port.
  */
-#define NUM_ZSREGS    16
+#define NUM_ZSREGS    17
 
 struct uart_pmac_port {
 	struct uart_port		port;
@@ -43,6 +43,10 @@ struct uart_pmac_port {
 #define PMACZILOG_FLAG_IS_INTMODEM	0x00000200
 #define PMACZILOG_FLAG_HAS_DMA		0x00000400
 #define PMACZILOG_FLAG_RSRC_REQUESTED	0x00000800
+#define PMACZILOG_FLAG_IS_ASLEEP	0x00001000
+#define PMACZILOG_FLAG_IS_OPEN		0x00002000
+#define PMACZILOG_FLAG_IS_IRQ_ON	0x00004000
+#define PMACZILOG_FLAG_IS_EXTCLK	0x00008000
 
 	unsigned char			parity_mask;
 	unsigned char			prev_status;
@@ -54,9 +58,18 @@ struct uart_pmac_port {
 	unsigned int			rx_dma_irq;
 	volatile struct dbdma_regs	*tx_dma_regs;
 	volatile struct dbdma_regs	*rx_dma_regs;
+
+	struct termios			termios_cache;
 };
 
 #define to_pmz(p) ((struct uart_pmac_port *)(p))
+
+static inline struct uart_pmac_port *pmz_get_port_A(struct uart_pmac_port *uap)
+{
+	if (uap->flags & PMACZILOG_FLAG_IS_CHANNEL_A)
+		return uap;
+	return uap->mate;
+}
 
 /*
  * Register acessors. Note that we don't need to enforce a recovery
@@ -122,6 +135,7 @@ static inline void zssync(struct uart_pmac_port *port)
 #define	R13	13
 #define	R14	14
 #define	R15	15
+#define	R7P	16
 
 #define	NULLCODE	0	/* Null Code */
 #define	POINT_HIGH	0x8	/* Select upper half of registers */
@@ -359,5 +373,9 @@ static inline void zssync(struct uart_pmac_port *port)
 #define ZS_IS_IRDA(UP)			((UP)->flags & PMACZILOG_FLAG_IS_IRDA)
 #define ZS_IS_INTMODEM(UP)	       	((UP)->flags & PMACZILOG_FLAG_IS_INTMODEM)
 #define ZS_HAS_DMA(UP)			((UP)->flags & PMACZILOG_FLAG_HAS_DMA)
+#define ZS_IS_ASLEEP(UP)       		((UP)->flags & PMACZILOG_FLAG_IS_ASLEEP)
+#define ZS_IS_OPEN(UP)       		((UP)->flags & PMACZILOG_FLAG_IS_OPEN)
+#define ZS_IS_IRQ_ON(UP)       		((UP)->flags & PMACZILOG_FLAG_IS_IRQ_ON)
+#define ZS_IS_EXTCLK(UP)       		((UP)->flags & PMACZILOG_FLAG_IS_EXTCLK)
 
 #endif /* __PMAC_ZILOG_H__ */
