@@ -299,9 +299,9 @@ typedef enum {	ide_unknown,	ide_generic,	ide_pci,
 
 typedef struct ide_io_ops_s {
 	/* insert io operations here! */
-	void (*OUTB)(u8 addr, ide_ioreg_t port);
-	void (*OUTW)(u16 addr, ide_ioreg_t port);
-	void (*OUTL)(u32 addr, ide_ioreg_t port);
+	void (*OUTB)(u8 value, ide_ioreg_t port);
+	void (*OUTW)(u16 value, ide_ioreg_t port);
+	void (*OUTL)(u32 value, ide_ioreg_t port);
 	void (*OUTSW)(ide_ioreg_t port, void *addr, u32 count);
 	void (*OUTSL)(ide_ioreg_t port, void *addr, u32 count);
 
@@ -740,6 +740,7 @@ typedef struct ide_drive_s {
 	u8	nice1;			/* give potential excess bandwidth */
 
 	unsigned present	: 1;	/* drive is physically present */
+	unsigned dead		: 1;	/* device ejected hint */
 	unsigned noprobe 	: 1;	/* from:  hdx=noprobe */
 	unsigned removable	: 1;	/* 1 if need to do check_media_change */
 	unsigned is_flash	: 1;	/* 1 if probed as flash */
@@ -756,6 +757,7 @@ typedef struct ide_drive_s {
 	unsigned remap_0_to_1	: 2;	/* 0=remap if ezdrive, 1=remap, 2=noremap */
 	unsigned ata_flash	: 1;	/* 1=present, 0=default */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
+	unsigned vdma		: 1;	/* 1=doing PIO over DMA 0=doing normal DMA */
 	unsigned queue_setup	: 1;
 	unsigned addressing;		/*      : 3;
 					 *  0=28-bit
@@ -1189,9 +1191,7 @@ typedef struct ide_driver_s {
 	unsigned supports_dma		: 1;
 	unsigned supports_dsc_overlap	: 1;
 	int		(*cleanup)(ide_drive_t *);
-	int		(*standby)(ide_drive_t *);
-	int		(*suspend)(ide_drive_t *);
-	int		(*resume)(ide_drive_t *);
+	int		(*shutdown)(ide_drive_t *);
 	int		(*flushcache)(ide_drive_t *);
 	ide_startstop_t	(*do_request)(ide_drive_t *, struct request *, sector_t);
 	int		(*end_request)(ide_drive_t *, int, int);
@@ -1599,6 +1599,8 @@ extern int ideprobe_init(void);
 extern void ide_scan_pcibus(int scan_direction) __init;
 extern int ide_pci_register_driver(struct pci_driver *driver);
 extern void ide_pci_unregister_driver(struct pci_driver *driver);
+extern void ide_pci_setup_ports(struct pci_dev *dev, struct ide_pci_device_s *d, int autodma, int pciirq, ata_index_t *index);
+extern void ide_setup_pci_noise (struct pci_dev *dev, struct ide_pci_device_s *d);
 
 extern void default_hwif_iops(ide_hwif_t *);
 extern void default_hwif_mmiops(ide_hwif_t *);
@@ -1647,6 +1649,7 @@ typedef struct ide_pci_device_s {
 	u16			device;
 	char			*name;
 	void			(*init_setup)(struct pci_dev *, struct ide_pci_device_s *);
+	void			(*init_setup_dma)(struct pci_dev *, struct ide_pci_device_s *, ide_hwif_t *);
 	unsigned int		(*init_chipset)(struct pci_dev *, const char *);
 	void			(*init_iops)(ide_hwif_t *);
 	void                    (*init_hwif)(ide_hwif_t *);
@@ -1657,6 +1660,7 @@ typedef struct ide_pci_device_s {
 	u8			bootable;
 	unsigned int		extra;
 	struct ide_pci_device_s	*next;
+	u8			isa_ports; 	/* Uses ISA control ports not PCI ones */
 } ide_pci_device_t;
 
 extern void ide_setup_pci_device(struct pci_dev *, ide_pci_device_t *);
@@ -1664,6 +1668,8 @@ extern void ide_setup_pci_devices(struct pci_dev *, struct pci_dev *, ide_pci_de
 
 #define BAD_DMA_DRIVE		0
 #define GOOD_DMA_DRIVE		1
+
+#ifdef CONFIG_BLK_DEV_IDEDMA_PCI
 extern int ide_build_dmatable(ide_drive_t *, struct request *);
 extern void ide_destroy_dmatable(ide_drive_t *);
 extern ide_startstop_t ide_dma_intr(ide_drive_t *);
@@ -1708,6 +1714,10 @@ static inline int __ide_dma_queued_off(ide_drive_t *drive)
 }
 #endif
 
+#else
+static inline void ide_release_dma(ide_hwif_t *) {;}
+#endif
+
 extern void hwif_unregister(ide_hwif_t *);
 
 extern void export_ide_init_queue(ide_drive_t *);
@@ -1730,6 +1740,7 @@ extern u8 ide_rate_filter(u8 mode, u8 speed);
 extern int ide_dma_enable(ide_drive_t *drive);
 extern char *ide_xfer_verbose(u8 xfer_rate);
 extern void ide_toggle_bounce(ide_drive_t *drive, int on);
+extern int ide_set_xfer_rate(ide_drive_t *drive, u8 rate);
 
 extern spinlock_t ide_lock;
 
