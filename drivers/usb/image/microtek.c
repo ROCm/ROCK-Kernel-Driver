@@ -914,7 +914,7 @@ static int mts_usb_probe (struct usb_interface *intf,
 		return -ENODEV;
 	}
 
-	result = usb_set_interface(dev, altsetting->bInterfaceNumber, 0);
+	result = usb_set_interface(dev, altsetting->desc.bInterfaceNumber, 0);
 
 	MTS_DEBUG("usb_set_interface returned %d.\n",result);
 	switch( result )

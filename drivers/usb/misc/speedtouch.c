@@ -917,7 +917,7 @@ static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *
 static int udsl_usb_probe (struct usb_interface *intf, const struct usb_device_id *id)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
-	int ifnum = intf->altsetting->bInterfaceNumber;
+	int ifnum = intf->altsetting->desc.bInterfaceNumber;
 	int i;
 	unsigned char mac[6];
 	unsigned char mac_str[13];
