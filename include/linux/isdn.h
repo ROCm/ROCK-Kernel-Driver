@@ -242,12 +242,10 @@ typedef struct {
 #define ISDN_TIMER_RINGING     5 /* tty RINGs = ISDN_TIMER_1SEC * this factor       */
 #define ISDN_TIMER_KEEPINT    10 /* Cisco-Keepalive = ISDN_TIMER_1SEC * this factor */
 #define ISDN_TIMER_MODEMREAD   1
-#define ISDN_TIMER_MODEMPLUS   2
 #define ISDN_TIMER_MODEMRING   4
 #define ISDN_TIMER_MODEMXMIT   8
 #define ISDN_TIMER_CARRIER   256 /* Wait for Carrier */
-#define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD | ISDN_TIMER_MODEMPLUS | \
-                              ISDN_TIMER_MODEMXMIT)
+#define ISDN_TIMER_FAST      (ISDN_TIMER_MODEMREAD | ISDN_TIMER_MODEMXMIT)
 #define ISDN_TIMER_SLOW      (ISDN_TIMER_MODEMRING | ISDN_TIMER_CARRIER)
 
 /* GLOBAL_FLAGS */
@@ -363,6 +361,7 @@ typedef struct modem_info {
 #endif
   struct tty_struct 	*tty;            /* Pointer to corresponding tty   */
   atemu                 emu;             /* AT-emulator data               */
+  struct timer_list     escape_timer;    /* to recognize +++ escape        */
   struct termios	normal_termios;  /* For saving termios structs     */
   struct termios	callout_termios;
   wait_queue_head_t	open_wait, close_wait;

@@ -26,7 +26,9 @@
 /* Prototypes */
 
 static int isdn_tty_edit_at(const char *, int, modem_info *, int);
-static void isdn_tty_check_esc(const u_char *, u_char, int, int *, int *, int);
+static void isdn_tty_escape_timer(unsigned long data);
+static void isdn_tty_check_esc(struct modem_info *info, 
+			       const unsigned char *p, int count);
 static void isdn_tty_modem_reset_regs(modem_info *, int);
 static void isdn_tty_cmd_ATA(modem_info *);
 static void isdn_tty_flush_buffer(struct tty_struct *);
@@ -1228,13 +1230,6 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 		    || (info->vonline & 3)
 #endif
 			) {
-#ifdef CONFIG_ISDN_AUDIO
-			if (!info->vonline)
-#endif
-				isdn_tty_check_esc(buf, m->mdmreg[REG_ESC], c,
-						   &(m->pluscount),
-						   &(m->lastplus),
-						   from_user);
 			if (from_user) {
 				if (copy_from_user(&(info->xmit_buf[info->xmit_count]), buf, c)) {
 					total = -EFAULT;
@@ -1242,6 +1237,10 @@ isdn_tty_write(struct tty_struct *tty, int from_user, const u_char * buf, int co
 				}
 			} else
 				memcpy(&(info->xmit_buf[info->xmit_count]), buf, c);
+#ifdef CONFIG_ISDN_AUDIO
+			if (!info->vonline)
+#endif
+				isdn_tty_check_esc(info, &info->xmit_buf[info->xmit_count], c);
 #ifdef CONFIG_ISDN_AUDIO
 			if (info->vonline) {
 				int cc = isdn_tty_handleDLEdown(info, m, c);
@@ -2131,6 +2130,9 @@ isdn_tty_init(void)
 		init_waitqueue_head(&info->open_wait);
 		init_waitqueue_head(&info->close_wait);
 		info->isdn_slot = NULL;
+		init_timer(&info->escape_timer);
+		info->escape_timer.data = (unsigned long) info;
+		info->escape_timer.function = isdn_tty_escape_timer;
 		skb_queue_head_init(&info->rpqueue);
 		info->xmit_size = ISDN_SERIAL_XMIT_SIZE;
 		skb_queue_head_init(&info->xmit_queue);
@@ -2595,55 +2597,56 @@ isdn_tty_off_hook(void)
 #define PLUSWAIT1 (HZ/2)        /* 0.5 sec. */
 #define PLUSWAIT2 (HZ*3/2)      /* 1.5 sec */
 
+static void
+isdn_tty_escape_timer(unsigned long data)
+{
+	struct modem_info *info = (struct modem_info *) data;
+
+	if (!info->online)
+		return;
+	
+	info->emu.pluscount = 0;
+	info->online = 0;
+	isdn_tty_modem_result(RESULT_OK, info);
+}
+
 /*
  * Check Buffer for Modem-escape-sequence, activate timer-callback to
  * isdn_tty_modem_escape() if sequence found.
- *
- * Parameters:
- *   p          pointer to databuffer
- *   plus       escape-character
- *   count      length of buffer
- *   pluscount  count of valid escape-characters so far
- *   lastplus   timestamp of last character
  */
-static void
-isdn_tty_check_esc(const u_char * p, u_char plus, int count, int *pluscount,
-		   int *lastplus, int from_user)
+static void isdn_tty_check_esc(struct modem_info *info, 
+			       const unsigned char *p, int count)
 {
-	char cbuf[3];
+	unsigned char plus = info->emu.mdmreg[REG_ESC];
 
 	if (plus > 127)
 		return;
+
 	if (count > 3) {
 		p += count - 3;
 		count = 3;
-		*pluscount = 0;
+		info->emu.pluscount = 0;
+		info->emu.lastplus = jiffies;
 	}
-	if (from_user) {
-		if (copy_from_user(cbuf, p, count))
-			return;
-		p = cbuf;
+	for (; count > 0; info->emu.lastplus = jiffies, count--) {
+		if (*(p++) != plus) {
+			info->emu.pluscount = 0;
+			continue;
+		}
+		if (info->emu.pluscount == 0) {
+			if (time_after(jiffies, info->emu.lastplus + PLUSWAIT2))
+				info->emu.pluscount = 1;
+		} else {
+			if (time_after(jiffies, info->emu.lastplus + PLUSWAIT1))
+				info->emu.pluscount = 1;
+			else
+				info->emu.pluscount++;
+		}
 	}
-	while (count > 0) {
-		if (*(p++) == plus) {
-			if ((*pluscount)++) {
-				/* Time since last '+' > 0.5 sec. ? */
-				if (time_after(jiffies, *lastplus + PLUSWAIT1))
-					*pluscount = 1;
-			} else {
-				/* Time since last non-'+' < 1.5 sec. ? */
-				if (time_before(jiffies, *lastplus + PLUSWAIT2))
-					*pluscount = 0;
-			}
-			if ((*pluscount == 3) && (count == 1))
-				isdn_timer_ctrl(ISDN_TIMER_MODEMPLUS, 1);
-			if (*pluscount > 3)
-				*pluscount = 1;
-		} else
-			*pluscount = 0;
-		*lastplus = jiffies;
-		count--;
-	}
+	if (info->emu.pluscount == 3)
+		mod_timer(&info->escape_timer, jiffies + PLUSWAIT2);
+	else
+		del_timer(&info->escape_timer);
 }
 
 /*
@@ -3975,36 +3978,6 @@ isdn_tty_edit_at(const char *p, int count, modem_info * info, int user)
 		}
 	}
 	return total;
-}
-
-/*
- * Switch all modem-channels who are online and got a valid
- * escape-sequence 1.5 seconds ago, to command-mode.
- * This function is called every second via timer-interrupt from within
- * timer-dispatcher isdn_timer_function()
- */
-void
-isdn_tty_modem_escape(void)
-{
-	int ton = 0;
-	int i;
-	int midx;
-
-	for (i = 0; i < ISDN_MAX_CHANNELS; i++)
-		if (USG_MODEM(isdn_slot_usage(i)))
-			if ((midx = isdn_slot_m_idx(i)) >= 0) {
-				modem_info *info = &isdn_mdm.info[midx];
-				if (info->online) {
-					ton = 1;
-					if ((info->emu.pluscount == 3) &&
-					    time_after(jiffies , info->emu.lastplus + PLUSWAIT2)) {
-						info->emu.pluscount = 0;
-						info->online = 0;
-						isdn_tty_modem_result(RESULT_OK, info);
-					}
-				}
-			}
-	isdn_timer_ctrl(ISDN_TIMER_MODEMPLUS, ton);
 }
 
 /*

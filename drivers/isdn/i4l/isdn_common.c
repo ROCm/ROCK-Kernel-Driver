@@ -1163,8 +1163,6 @@ isdn_timer_funct(ulong dummy)
 	if (tf & ISDN_TIMER_FAST) {
 		if (tf & ISDN_TIMER_MODEMREAD)
 			isdn_tty_readmodem();
-		if (tf & ISDN_TIMER_MODEMPLUS)
-			isdn_tty_modem_escape();
 		if (tf & ISDN_TIMER_MODEMXMIT)
 			isdn_tty_modem_xmit();
 	}
@@ -1983,7 +1981,7 @@ isdn_get_free_slot(int usage, int l2_proto, int l3_proto,
 	for (i = 0; i < ISDN_MAX_CHANNELS; i++) {
 		slot = &slots[i];
 
-		if (drivers[slot->di]->fi.state != ST_DRV_RUNNING)
+		if (!slot->drv || slot->drv->fi.state != ST_DRV_RUNNING)
 			continue;
 		
 		if (!USG_NONE(slots[i].usage))
