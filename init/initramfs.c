@@ -413,7 +413,7 @@ static void __init flush_window(void)
 	outcnt = 0;
 }
 
-char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
+static char * __init unpack_to_rootfs(char *buf, unsigned len, int check_only)
 {
 	int written;
 	dry_run = check_only;
