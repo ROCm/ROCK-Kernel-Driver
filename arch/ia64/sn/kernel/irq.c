@@ -129,10 +129,15 @@ static void sn_end_irq(unsigned int irq)
 static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 {
 	struct sn_irq_info *sn_irq_info = sn_irq[irq];
+	struct sn_irq_info *tmp_sn_irq_info;
 	int cpuid, cpuphys;
 	nasid_t t_nasid;	/* nasid to target */
 	int t_slice;		/* slice to target */
-	int status;
+
+	/* allocate a temp sn_irq_info struct to get new target info */
+	tmp_sn_irq_info = kmalloc(sizeof(*tmp_sn_irq_info), GFP_KERNEL);
+	if (!tmp_sn_irq_info)
+		return;
 
 	cpuid = first_cpu(mask);
 	cpuphys = cpu_physical_id(cpuid);
@@ -140,17 +145,13 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 	t_slice = cpu_physical_id_to_slice(cpuphys);
 
 	while (sn_irq_info) {
+		int status;
 		int local_widget;
-		struct sn_irq_info *new_sn_irq_info;
 		uint64_t bridge = (uint64_t) sn_irq_info->irq_bridge;
 		nasid_t local_nasid = NASID_GET(bridge);
 
 		if (!bridge)
-			break;	/* irq is not a bridge interrupt */
-
-		new_sn_irq_info = kmalloc(sizeof(*new_sn_irq_info), GFP_KERNEL);
-		if (!new_sn_irq_info)
-			break;
+			break;	/* irq is not a device interrupt */
 
 		if (local_nasid & 1)
 			local_widget = TIO_SWIN_WIDGETNUM(bridge);
@@ -162,7 +163,7 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 
 		/* allocate a new PROM sn_irq_info struct */
 		status = sn_intr_alloc(local_nasid, local_widget,
-				       __pa(new_sn_irq_info), irq, t_nasid,
+				       __pa(tmp_sn_irq_info), irq, t_nasid,
 				       t_slice);
 
 		if (status == 0) {
@@ -172,8 +173,8 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 			sn_irq_info->irq_nasid = t_nasid;
 			sn_irq_info->irq_slice = t_slice;
 			sn_irq_info->irq_xtalkaddr =
-			    new_sn_irq_info->irq_xtalkaddr;
-			sn_irq_info->irq_cookie = new_sn_irq_info->irq_cookie;
+			    tmp_sn_irq_info->irq_xtalkaddr;
+			sn_irq_info->irq_cookie = tmp_sn_irq_info->irq_cookie;
 			register_intr_pda(sn_irq_info);
 
 			if (IS_PCI_BRIDGE_ASIC(sn_irq_info->irq_bridge_type)) {
@@ -184,11 +185,10 @@ static void sn_set_affinity_irq(unsigned int irq, cpumask_t mask)
 
 			set_irq_affinity_info((irq & 0xff), cpuphys, 0);
 		} else {
-			break;	/* snp_affiity failed the intr_alloc */
+			break;	/* snp_affinity failed the intr_alloc */
 		}
-
-		kfree(new_sn_irq_info);
 	}
+	kfree(tmp_sn_irq_info);
 }
 
 struct hw_interrupt_type irq_type_sn = {
