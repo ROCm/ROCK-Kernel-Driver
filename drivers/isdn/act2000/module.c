@@ -463,18 +463,15 @@ act2000_sendbuf(act2000_card *card, int channel, int ack, struct sk_buff *skb)
 
 /* Read the Status-replies from the Interface */
 static int
-act2000_readstatus(u_char * buf, int len, int user, act2000_card * card)
+act2000_readstatus(u_char __user * buf, int len, act2000_card * card)
 {
         int count;
-        u_char *p;
+        u_char __user *p;
 
         for (p = buf, count = 0; count < len; p++, count++) {
                 if (card->status_buf_read == card->status_buf_write)
                         return count;
-                if (user)
-                        put_user(*card->status_buf_read++, p);
-                else
-                        *p = *card->status_buf_read++;
+		put_user(*card->status_buf_read++, p);
                 if (card->status_buf_read > card->status_buf_end)
                         card->status_buf_read = card->status_buf;
         }
@@ -514,7 +511,7 @@ if_command(isdn_ctrl * c)
 }
 
 static int
-if_writecmd(const u_char * buf, int len, int user, int id, int channel)
+if_writecmd(const u_char __user *buf, int len, int id, int channel)
 {
         act2000_card *card = act2000_findcard(id);
 
@@ -529,14 +526,14 @@ if_writecmd(const u_char * buf, int len, int user, int id, int channel)
 }
 
 static int
-if_readstatus(u_char * buf, int len, int user, int id, int channel)
+if_readstatus(u_char __user * buf, int len, int id, int channel)
 {
         act2000_card *card = act2000_findcard(id);
 	
         if (card) {
                 if (!card->flags & ACT2000_FLAGS_RUNNING)
                         return -ENODEV;
-                return (act2000_readstatus(buf, len, user, card));
+                return (act2000_readstatus(buf, len, card));
         }
         printk(KERN_ERR
                "act2000: if_readstatus called with invalid driverId!\n");

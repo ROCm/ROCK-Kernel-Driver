@@ -1892,11 +1892,11 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 	}
 }
 
-static int if_readstat(u8 *buf, int len, int user, int id, int channel)
+static int if_readstat(u8 __user *buf, int len, int id, int channel)
 {
 	capidrv_contr *card = findcontrbydriverid(id);
 	int count;
-	u8 *p;
+	u8 __user *p;
 
 	if (!card) {
 		printk(KERN_ERR "capidrv: if_readstat called with invalid driverId %d!\n",
@@ -1905,10 +1905,7 @@ static int if_readstat(u8 *buf, int len, int user, int id, int channel)
 	}
 
 	for (p=buf, count=0; count < len; p++, count++) {
-	        if (user)
-	                put_user(*card->q931_read++, p);
-	        else
-	                *p = *card->q931_read++;
+		put_user(*card->q931_read++, p);
 	        if (card->q931_read > card->q931_end)
 	                card->q931_read = card->q931_buf;
 	}

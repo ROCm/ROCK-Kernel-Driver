@@ -1018,7 +1018,7 @@ isdn_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 			if (count > dev->drv[drvidx]->stavail)
 				count = dev->drv[drvidx]->stavail;
 			len = dev->drv[drvidx]->interface->
-				readstat(buf, count, 1, drvidx,
+				readstat(buf, count, drvidx,
 					 isdn_minor2chan(minor));
 		} else {
 			len = 0;
@@ -1091,7 +1091,7 @@ isdn_write(struct file *file, const char __user *buf, size_t count, loff_t * off
 		 */
 		if (dev->drv[drvidx]->interface->writecmd)
 			retval = dev->drv[drvidx]->interface->
-				writecmd(buf, count, 1, drvidx, isdn_minor2chan(minor));
+				writecmd(buf, count, drvidx, isdn_minor2chan(minor));
 		else
 			retval = count;
 		goto out;
