@@ -150,7 +150,7 @@ static __inline__ void timer_check_rtc(void)
          */
         if ( (time_status & STA_UNSYNC) == 0 &&
              xtime.tv_sec - last_rtc_update >= 659 &&
-             abs(xtime.tv_usec - (1000000-1000000/HZ)) < 500000/HZ &&
+             abs((xtime.tv_nsec/1000) - (1000000-1000000/HZ)) < 500000/HZ &&
              jiffies - wall_jiffies == 1) {
 	    struct rtc_time tm;
 	    to_tm(xtime.tv_sec+1, &tm);
@@ -175,7 +175,7 @@ static __inline__ void timer_sync_xtime( unsigned long cur_tb )
 		do_gettimeofday( &my_tv );
 		if ( xtime.tv_sec <= my_tv.tv_sec ) {
 			xtime.tv_sec = my_tv.tv_sec;
-			xtime.tv_usec = my_tv.tv_usec;
+			xtime.tv_nsec = my_tv.tv_usec * 1000;
 		}
 	}
 }
@@ -356,7 +356,7 @@ void do_settimeofday(struct timeval *tv)
 		new_sec--; 
 		new_usec += USEC_PER_SEC;
 	}
-	xtime.tv_usec = new_usec;
+	xtime.tv_nsec = new_usec * 1000;
 	xtime.tv_sec = new_sec;
 
 	/* In case of a large backwards jump in time with NTP, we want the 
@@ -465,7 +465,7 @@ void __init time_init(void)
 
 	time_freq = 0;
 
-	xtime.tv_usec = 0;
+	xtime.tv_nsec = 0;
 	last_rtc_update = xtime.tv_sec;
 	write_unlock_irqrestore(&xtime_lock, flags);
 

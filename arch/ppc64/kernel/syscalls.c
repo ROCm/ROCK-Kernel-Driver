@@ -254,7 +254,7 @@ asmlinkage time_t sys64_time(time_t* tloc)
 	tb_delta += (jiffies - wall_jiffies) * tb_ticks_per_jiffy;
 
 	secs  = xtime.tv_sec;  
-	usecs = xtime.tv_usec + tb_delta / tb_ticks_per_usec;
+	usecs = (xtime.tv_nsec/1000) + tb_delta / tb_ticks_per_usec;
 	while (usecs >= USEC_PER_SEC) {
 		++secs;
 		usecs -= USEC_PER_SEC;
