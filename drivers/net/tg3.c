@@ -643,7 +643,14 @@ static int tg3_phy_reset_5703_4_5(struct tg3 *tp)
 	tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x8200);
 	tg3_writephy(tp, 0x16, 0x0000);
 
-	tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0400);
+	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703 ||
+	    GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+		/* Set Extended packet length bit for jumbo frames */
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x4400);
+	}
+	else {
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0400);
+	}
 
 	tg3_writephy(tp, MII_TG3_CTRL, phy9_orig);
 
@@ -698,6 +705,15 @@ out:
 	if (tp->tg3_flags2 & TG3_FLG2_PHY_5704_A0_BUG) {
 		tg3_writephy(tp, 0x1c, 0x8d68);
 		tg3_writephy(tp, 0x1c, 0x8d68);
+	}
+	/* Set Extended packet length bit (bit 14) on all chips that */
+	/* support jumbo frames */
+	if ((tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5401 ||
+	    (tp->phy_id & PHY_ID_MASK) == PHY_ID_BCM5411) {
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x4c20);
+	}
+	else if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x4400);
 	}
 	tg3_phy_set_wirespeed(tp);
 	return 0;
@@ -1190,7 +1206,8 @@ static int tg3_init_5401phy_dsp(struct tg3 *tp)
 	int err;
 
 	/* Turn off tap power management. */
-	err  = tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0c20);
+	/* Set Extended packet length bit */
+	err  = tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x4c20);
 
 	err |= tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x0012);
 	err |= tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x1804);
@@ -4644,6 +4661,8 @@ static int tg3_reset_hw(struct tg3 *tp)
 		return -ENODEV;
 	}
 
+#if 0	/* Remove FTQ reset because it is redundant and can cause */
+	/* race condition with ASF */
 	tw32(FTQ_RESET, 0xffffffff);
 	tw32(FTQ_RESET, 0x00000000);
 	for (i = 0; i < 2000; i++) {
@@ -4656,6 +4675,7 @@ static int tg3_reset_hw(struct tg3 *tp)
 		       tp->dev->name);
 		return -ENODEV;
 	}
+#endif
 
 	/* Clear statistics/status block in chip, and status block in ram. */
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5705) {
@@ -6518,7 +6538,7 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 	}
 
 	if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5703) {
-		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x0c00);
+		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x4c00);
 		tg3_writephy(tp, MII_TG3_DSP_ADDRESS, 0x201f);
 		tg3_writephy(tp, MII_TG3_DSP_RW_PORT, 0x2aaa);
 	}
