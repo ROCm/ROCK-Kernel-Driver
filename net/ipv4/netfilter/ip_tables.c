@@ -68,13 +68,12 @@ static DECLARE_MUTEX(ipt_mutex);
 #define inline
 #endif
 
-/* Locking is simple: we assume at worst case there will be one packet
-   in user context and one from bottom halves (or soft irq if Alexey's
-   softnet patch was applied).
-
+/*
    We keep a set of rules for each CPU, so we can avoid write-locking
-   them; doing a readlock_bh() stops packets coming through if we're
-   in user context.
+   them in the softirq when updating the counters and therefore
+   only need to read-lock in the softirq; doing a write_lock_bh() in user
+   context stops packets coming through and allows user context to read
+   the counters or update the rules.
 
    To be cache friendly on SMP, we arrange them like so:
    [ n-entries ]

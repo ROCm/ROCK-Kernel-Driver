@@ -1085,18 +1085,17 @@ EXPORT_NO_SYMBOLS;
    <title>Initializing structure members</title>
 
    <para>
-    The preferred method of initializing structures is to use the
-    gcc Labeled Elements extension, eg:
+    The preferred method of initializing structures is to use
+    designated initialisers, as defined by ISO C99, eg:
    </para>
    <programlisting>
 static struct block_device_operations opt_fops = {
-        open:                   opt_open,
-        release:                opt_release,
-        ioctl:                  opt_ioctl,
-        check_media_change:     opt_media_change,
+        .open               = opt_open,
+        .release            = opt_release,
+        .ioctl              = opt_ioctl,
+        .check_media_change = opt_media_change,
 };
    </programlisting>
-
    <para>
     This makes it easy to grep for, and makes it clear which
     structure fields are set.  You should do this because it looks

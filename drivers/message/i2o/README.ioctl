@@ -318,7 +318,7 @@ X. Validating Configuration
    DESCRIPTION
 
    This function posts an ExecConfigValidate message to the controller
-   identified by iop. This message indicates that the the current
+   identified by iop. This message indicates that the current
    configuration is accepted. The iop changes the status of suspect drivers 
    to valid and may delete old drivers from its store.
 

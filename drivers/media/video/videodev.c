@@ -44,7 +44,7 @@ static struct video_device *video_device[VIDEO_NUM_DEVICES];
 static DECLARE_MUTEX(videodev_lock);
 
 
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+#ifdef CONFIG_VIDEO_PROC_FS
 
 #include <linux/proc_fs.h>
 
@@ -60,7 +60,7 @@ struct proc_dir_entry *video_proc_entry = NULL;
 EXPORT_SYMBOL(video_proc_entry);
 LIST_HEAD(videodev_proc_list);
 
-#endif /* CONFIG_PROC_FS && CONFIG_VIDEO_PROC_FS */
+#endif /* CONFIG_VIDEO_PROC_FS */
 
 struct video_device* video_devdata(struct file *file)
 {
@@ -198,7 +198,7 @@ extern int video_exclusive_release(struct inode *inode, struct file *file)
  *	/proc support
  */
 
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+#ifdef CONFIG_VIDEO_PROC_FS
 
 /* Hmm... i'd like to see video_capability information here, but
  * how can I access it (without changing the other drivers? -claudio
@@ -289,7 +289,7 @@ static void videodev_proc_create(void)
 }
 
 #ifdef MODULE
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+#ifdef CONFIG_VIDEO_PROC_FS
 static void videodev_proc_destroy(void)
 {
 	if (video_dev_proc_entry != NULL)
@@ -439,7 +439,7 @@ int video_register_device(struct video_device *vfd, int type, int nr)
 				NULL);
 	init_MUTEX(&vfd->lock);
 	
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+#ifdef CONFIG_VIDEO_PROC_FS
 	sprintf (name, "%s%d", name_base, i - base);
 	videodev_proc_create_dev (vfd, name);
 #endif
@@ -460,7 +460,7 @@ void video_unregister_device(struct video_device *vfd)
 	if(video_device[vfd->minor]!=vfd)
 		panic("videodev: bad unregister");
 
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+#ifdef CONFIG_VIDEO_PROC_FS
 	videodev_proc_destroy_dev (vfd);
 #endif
 
@@ -489,7 +489,7 @@ static int __init videodev_init(void)
 		return -EIO;
 	}
 
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+#ifdef CONFIG_VIDEO_PROC_FS
 	videodev_proc_create ();
 #endif
 	
@@ -498,7 +498,7 @@ static int __init videodev_init(void)
 
 static void __exit videodev_exit(void)
 {
-#if defined(CONFIG_PROC_FS) && defined(CONFIG_VIDEO_PROC_FS)
+#ifdef CONFIG_VIDEO_PROC_FS
 	videodev_proc_destroy ();
 #endif
 	unregister_chrdev(VIDEO_MAJOR, "video_capture");

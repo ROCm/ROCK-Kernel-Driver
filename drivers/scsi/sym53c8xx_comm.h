@@ -2509,7 +2509,7 @@ sym53c8xx_pci_init(Scsi_Host_Template *tpnt, pcidev_t pdev, ncr_device *device)
 **    differ and attach them using the order in the NVRAM.
 **
 **    If no NVRAM is found or data appears invalid attach boards in 
-**    the the order they are detected.
+**    the order they are detected.
 **
 **===================================================================
 */
