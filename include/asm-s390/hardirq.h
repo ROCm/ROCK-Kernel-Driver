@@ -61,10 +61,9 @@ softirq_pending(unsigned int cpu)
 #define SOFTIRQ_SHIFT	(PREEMPT_SHIFT + PREEMPT_BITS)
 #define HARDIRQ_SHIFT	(SOFTIRQ_SHIFT + SOFTIRQ_BITS)
 
-extern void do_call_softirq(void);
 extern void account_ticks(struct pt_regs *);
 
-#define invoke_softirq() do_call_softirq()
+#define __ARCH_HAS_DO_SOFTIRQ
 
 #define irq_enter()							\
 do {									\
@@ -75,7 +74,7 @@ do {									\
 	preempt_count() -= IRQ_EXIT_OFFSET;				\
 	if (!in_interrupt() && local_softirq_pending())			\
 		/* Use the async. stack for softirq */			\
-		do_call_softirq();					\
+		do_softirq();						\
 	preempt_enable_no_resched();					\
 } while (0)
 
