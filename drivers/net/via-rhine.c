@@ -562,7 +562,7 @@ static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 
 		/* VT86C100A may need long delay after reset (dlink) */
 		/* Seen on Rhine-II as well (rl) */
-		while ((readw(ioaddr + ChipCmd) & CmdReset) && --boguscnt);
+		while ((readw(ioaddr + ChipCmd) & CmdReset) && --boguscnt)
 			udelay(5);
 
 	}
