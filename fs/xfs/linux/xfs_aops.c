@@ -108,7 +108,7 @@ linvfs_unwritten_done(
 	struct buffer_head	*bh,
 	int			uptodate)
 {
-	page_buf_t		*pb = (page_buf_t *)bh->b_private;
+	xfs_buf_t		*pb = (xfs_buf_t *)bh->b_private;
 
 	ASSERT(buffer_unwritten(bh));
 	bh->b_end_io = NULL;
@@ -267,7 +267,7 @@ xfs_probe_unwritten_page(
 	struct address_space	*mapping,
 	unsigned long		index,
 	xfs_iomap_t		*iomapp,
-	page_buf_t		*pb,
+	xfs_buf_t		*pb,
 	unsigned long		max_offset,
 	unsigned long		*fsbs,
 	unsigned int            bbits)
@@ -445,7 +445,7 @@ xfs_map_unwritten(
 {
 	struct buffer_head	*bh = curr;
 	xfs_iomap_t		*tmp;
-	page_buf_t		*pb;
+	xfs_buf_t		*pb;
 	loff_t			offset, size;
 	unsigned long		nblocks = 0;
 

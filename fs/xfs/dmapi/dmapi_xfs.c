@@ -170,6 +170,7 @@ xfs_dm_send_data_event(
 	bhv_desc_t	*bdp;
 	xfs_inode_t	*ip;
 	uint16_t	dmstate;
+	struct inode	*inode = LINVFS_GET_IP(vp);
 
 	XFS_BHV_LOOKUP(vp, bdp);
 	ip = XFS_BHVTOI(bdp);
@@ -177,8 +178,32 @@ xfs_dm_send_data_event(
 		dmstate = ip->i_iocore.io_dmstate;
 		if (locktype)
 			xfs_rwunlock(bdp, *locktype);
+
+		if (flags & DM_FLAGS_ISEM)
+			up(&inode->i_sem);
+#ifdef DM_FLAGS_IALLOCSEM_WR
+		if (flags & DM_FLAGS_IALLOCSEM_WR)
+			up_write(&inode->i_alloc_sem);
+#endif
+#ifdef DM_FLAGS_IALLOCSEM_RD
+		if (flags & DM_FLAGS_IALLOCSEM_RD)
+			up_read(&inode->i_alloc_sem);
+#endif
+
 		error = dm_send_data_event(event, vp, DM_RIGHT_NULL,
 				offset, length, flags);
+
+		if (flags & DM_FLAGS_ISEM)
+			down(&inode->i_sem);
+#ifdef DM_FLAGS_IALLOCSEM_WR
+		if (flags & DM_FLAGS_IALLOCSEM_WR)
+			down_write(&inode->i_alloc_sem);
+#endif
+#ifdef DM_FLAGS_IALLOCSEM_RD
+		if (flags & DM_FLAGS_IALLOCSEM_RD)
+			down_read(&inode->i_alloc_sem);
+#endif
+
 		if (locktype)
 			xfs_rwlock(bdp, *locktype);
 	} while (!error && (ip->i_iocore.io_dmstate != dmstate));

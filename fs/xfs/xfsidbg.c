@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2000-2003 Silicon Graphics, Inc.  All Rights Reserved.
+ * Copyright (c) 2000-2004 Silicon Graphics, Inc.  All Rights Reserved.
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of version 2 of the GNU General Public License as
@@ -2421,11 +2421,12 @@ static int	kdbm_vn(
 
 static char	*pb_flag_vals[] = {
 /*  0 */ "READ", "WRITE", "MAPPED", "PARTIAL", "ASYNC",
-/*  5 */ "NONE", "DELWRI", "FREED", "SYNC", "MAPPABLE",
+/*  5 */ "NONE", "DELWRI", "INVALID0x07", "INVALID0x08", "INVALID0x09",
 /* 10 */ "STALE", "FS_MANAGED", "FS_DATAIOD", "LOCK", "TRYLOCK",
-/* 15 */ "DONT_BLOCK", "LOCKABLE", "PRIVATE_BH", "ALL_PAGES_MAPPED", 
+/* 15 */ "DONT_BLOCK", "PAGECACHE", "PRIVATE_BH", "ALL_PAGES_MAPPED", 
 	 "ADDR_ALLOCATED",
-/* 20 */ "MEM_ALLOCATED", "FORCEIO", "FLUSH", "READ_AHEAD",
+/* 20 */ "MEM_ALLOCATED", "MEM_SLAB", "FORCEIO", "FLUSH", "READ_AHEAD",
+/* 25 */ "RUN_QUEUES", "DIRECTIO",
 	 NULL };
 
 static char	*iomap_flag_vals[] = {
@@ -2484,19 +2485,19 @@ kdbm_pb_flags(int argc, const char **argv, const char **envp, struct pt_regs *re
 
 static void
 print_pagebuf(
-	page_buf_t	*pb,
+	xfs_buf_t	*pb,
 	unsigned long addr)
 {
-	kdb_printf("page_buf_t at 0x%lx\n", addr);
+	kdb_printf("xfs_buf_t at 0x%lx\n", addr);
 	kdb_printf("  pb_flags %s\n", pb_flags(pb->pb_flags));
 	kdb_printf("  pb_target 0x%p pb_hold %d pb_next 0x%p pb_prev 0x%p\n",
 		   pb->pb_target, pb->pb_hold.counter,
-		   list_entry(pb->pb_list.next, page_buf_t, pb_list),
-		   list_entry(pb->pb_list.prev, page_buf_t, pb_list));
+		   list_entry(pb->pb_list.next, xfs_buf_t, pb_list),
+		   list_entry(pb->pb_list.prev, xfs_buf_t, pb_list));
 	kdb_printf("  pb_hash_index %d pb_hash_next 0x%p pb_hash_prev 0x%p\n",
 		   pb->pb_hash_index,
-		   list_entry(pb->pb_hash_list.next, page_buf_t, pb_hash_list),
-		   list_entry(pb->pb_hash_list.prev, page_buf_t, pb_hash_list));
+		   list_entry(pb->pb_hash_list.next, xfs_buf_t, pb_hash_list),
+		   list_entry(pb->pb_hash_list.prev, xfs_buf_t, pb_hash_list));
 	kdb_printf("  pb_file_offset 0x%llx pb_buffer_length 0x%llx pb_addr 0x%p\n",
 		   (unsigned long long) pb->pb_file_offset,
 		   (unsigned long long) pb->pb_buffer_length,
@@ -2510,11 +2511,11 @@ print_pagebuf(
 	kdb_printf("  pb_page_count %u pb_offset 0x%x pb_pages 0x%p\n",
 		pb->pb_page_count, pb->pb_offset,
 		pb->pb_pages);
-/*	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
+	kdb_printf("  pb_iodonesema (%d,%d) pb_sema (%d,%d) pincount (%d)\n",
 		   pb->pb_iodonesema.count.counter,
 		   pb->pb_iodonesema.sleepers,
 		   pb->pb_sema.count.counter, pb->pb_sema.sleepers,
-		   pb->pb_pin_count.counter);*/
+		   pb->pb_pin_count.counter);
 #ifdef PAGEBUF_LOCK_TRACKING
 	kdb_printf("  last holder %d\n", pb->pb_last_holder);
 #endif
@@ -2527,7 +2528,7 @@ print_pagebuf(
 static int
 kdbm_pb(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 {
-	page_buf_t bp;
+	xfs_buf_t bp;
 	unsigned long addr;
 	long	offset=0;
 	int nextarg;
@@ -2554,7 +2555,7 @@ kdbm_pbdelay(int argc, const char **argv, const char **envp,
 	unsigned long	verbose = 0;
 	int	count = 0;
 	struct list_head	*curr, *next;
-	page_buf_t	bp;
+	xfs_buf_t	bp;
 	unsigned long addr;
 	int diag;
 	extern struct list_head pbd_delwrite_queue;
@@ -2573,7 +2574,7 @@ kdbm_pbdelay(int argc, const char **argv, const char **envp,
 	}
 
 	list_for_each_safe(curr, next, &pbd_delwrite_queue) {
-		addr = (unsigned long)list_entry(curr, page_buf_t, pb_list);
+		addr = (unsigned long)list_entry(curr, xfs_buf_t, pb_list);
 		if ((diag = kdb_getarea(bp, addr)))
 			return diag;
 
@@ -2936,13 +2937,13 @@ static struct xif xfsidbg_funcs[] = {
 };
 
 static struct xif pb_funcs[] = {
-  {  "pb",	kdbm_pb,	"<vaddr>",	"Display page_buf_t" },
+  {  "pb",	kdbm_pb,	"<vaddr>",	"Display xfs_buf_t" },
   {  "pbflags",	kdbm_pb_flags,	"<flags>",	"Display page_buf flags" },
   {  "iomapap",	kdbm_iomap,	"<iomap_t *>",	"Display IOmap" },
   {  "pbdelay",	kdbm_pbdelay,	"0|1",		"Display delwri pagebufs" },
 #ifdef PAGEBUF_TRACE
-  {  "pbtrace",	kdbm_pbtrace,	"<vaddr>|<count>",	"page_buf_t trace" },
-  {  "pboffset",kdbm_pbtrace_offset, "<daddr> [<mask>]","page_buf_t trace" },
+  {  "pbtrace",	kdbm_pbtrace,	"<vaddr>|<count>",	"xfs_buf_t trace" },
+  {  "pboffset",kdbm_pbtrace_offset, "<daddr> [<mask>]","xfs_buf_t trace" },
 #endif
   {  0,		0,	0 }
 };
@@ -6438,8 +6439,8 @@ xfsidbg_xlog(xlog_t *log)
 	kdb_printf("iclog_bak: 0x%p  iclog_size: 0x%x (%d)  num iclogs: %d\n",
 		log->l_iclog_bak, log->l_iclog_size, log->l_iclog_size,
 		log->l_iclog_bufs);
-/*	kdb_printf("l_stripemask %d l_iclog_hsize %d l_iclog_heads %d\n",
-		log->l_stripemask, log->l_iclog_hsize, log->l_iclog_heads);*/
+	kdb_printf("l_iclog_hsize %d l_iclog_heads %d\n",
+		log->l_iclog_hsize, log->l_iclog_heads);
 	kdb_printf("l_sectbb_log %u l_sectbb_mask %u\n",
 		log->l_sectbb_log, log->l_sectbb_mask);
 	kdb_printf("&grant_lock: 0x%p  resHeadQ: 0x%p  wrHeadQ: 0x%p\n",

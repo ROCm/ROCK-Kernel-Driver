@@ -347,4 +347,10 @@ bhv_insert_all_vfsops(
 
 	mp = xfs_mount_init();
 	vfs_insertbhv(vfsp, &mp->m_bhv, &xfs_vfsops, mp);
+	bhv_get_vfsops(vfsp, XFS_DMOPS,
+		xfs_probe_dmapi ? XFS_DM_MODULE : NULL);
+	bhv_get_vfsops(vfsp, XFS_QMOPS,
+		xfs_probe_quota ? XFS_QM_MODULE : NULL);
+	bhv_get_vfsops(vfsp, XFS_IOOPS,
+		xfs_probe_ioops ? XFS_IO_MODULE : NULL);
 }

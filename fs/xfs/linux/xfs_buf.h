@@ -51,10 +51,7 @@
  *	Base types
  */
 
-/* daddr must be signed since -1 is used for bmaps that are not yet allocated */
-typedef loff_t page_buf_daddr_t;
-
-#define PAGE_BUF_DADDR_NULL ((page_buf_daddr_t) (-1LL))
+#define XFS_BUF_DADDR_NULL ((xfs_daddr_t) (-1LL))
 
 #define page_buf_ctob(pp)	((pp) * PAGE_CACHE_SIZE)
 #define page_buf_btoc(dd)	(((dd) + PAGE_CACHE_SIZE - 1) >> PAGE_CACHE_SHIFT)
@@ -103,17 +100,17 @@ typedef enum page_buf_flags_e {		/* pb_flags values */
 #define PBF_NOT_DONE(pb) (((pb)->pb_flags & (PBF_PARTIAL|PBF_NONE)) != 0)
 #define PBF_DONE(pb) (((pb)->pb_flags & (PBF_PARTIAL|PBF_NONE)) == 0)
 
-typedef struct pb_target {
+typedef struct xfs_buftarg {
 	dev_t			pbr_dev;
 	struct block_device	*pbr_bdev;
 	struct address_space	*pbr_mapping;
 	unsigned int		pbr_bsize;
 	unsigned int		pbr_sshift;
 	size_t			pbr_smask;
-} pb_target_t;
+} xfs_buftarg_t;
 
 /*
- *	page_buf_t:  Buffer structure for page cache-based buffers
+ *	xfs_buf_t:  Buffer structure for page cache-based buffers
  *
  * This buffer structure is used by the page cache buffer management routines
  * to refer to an assembly of pages forming a logical buffer.  The actual
@@ -128,16 +125,16 @@ typedef struct pb_target {
  * to indicate which disk blocks in the page are not valid.
  */
 
-struct page_buf_s;
-typedef void (*page_buf_iodone_t)(struct page_buf_s *);
+struct xfs_buf;
+typedef void (*page_buf_iodone_t)(struct xfs_buf *);
 			/* call-back function on I/O completion */
-typedef void (*page_buf_relse_t)(struct page_buf_s *);
+typedef void (*page_buf_relse_t)(struct xfs_buf *);
 			/* call-back function on I/O completion */
-typedef int (*page_buf_bdstrat_t)(struct page_buf_s *);
+typedef int (*page_buf_bdstrat_t)(struct xfs_buf *);
 
 #define PB_PAGES	4
 
-typedef struct page_buf_s {
+typedef struct xfs_buf {
 	struct semaphore	pb_sema;	/* semaphore for lockables  */
 	unsigned long		pb_flushtime;	/* time to flush pagebuf    */
 	atomic_t		pb_pin_count;	/* pin count		    */
@@ -145,9 +142,9 @@ typedef struct page_buf_s {
 	struct list_head	pb_list;
 	page_buf_flags_t	pb_flags;	/* status flags */
 	struct list_head	pb_hash_list;
-	struct pb_target	*pb_target;	/* logical object */
+	xfs_buftarg_t		*pb_target;	/* logical object */
 	atomic_t		pb_hold;	/* reference count */
-	page_buf_daddr_t	pb_bn;		/* block number for I/O */
+	xfs_daddr_t		pb_bn;		/* block number for I/O */
 	loff_t			pb_file_offset;	/* offset in file */
 	size_t			pb_buffer_length; /* size of buffer in bytes */
 	size_t			pb_count_desired; /* desired transfer size */
@@ -171,52 +168,52 @@ typedef struct page_buf_s {
 #ifdef PAGEBUF_LOCK_TRACKING
 	int			pb_last_holder;
 #endif
-} page_buf_t;
+} xfs_buf_t;
 
 
 /* Finding and Reading Buffers */
 
-extern page_buf_t *pagebuf_find(	/* find buffer for block if	*/
+extern xfs_buf_t *pagebuf_find(	/* find buffer for block if	*/
 					/* the block is in memory	*/
-		struct pb_target *,	/* inode for block		*/
+		xfs_buftarg_t *,	/* inode for block		*/
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
 		page_buf_flags_t);	/* PBF_LOCK			*/
 
-extern page_buf_t *pagebuf_get(		/* allocate a buffer		*/
-		struct pb_target *,	/* inode for buffer		*/
+extern xfs_buf_t *pagebuf_get(		/* allocate a buffer		*/
+		xfs_buftarg_t *,	/* inode for buffer		*/
 		loff_t,			/* starting offset of range     */
 		size_t,			/* length of range              */
 		page_buf_flags_t);	/* PBF_LOCK, PBF_READ,		*/
 					/* PBF_ASYNC			*/
 
-extern page_buf_t *pagebuf_lookup(
-		struct pb_target *,
+extern xfs_buf_t *pagebuf_lookup(
+		xfs_buftarg_t *,
 		loff_t,			/* starting offset of range	*/
 		size_t,			/* length of range		*/
 		page_buf_flags_t);	/* PBF_READ, PBF_WRITE,		*/
 					/* PBF_FORCEIO, 		*/
 
-extern page_buf_t *pagebuf_get_empty(	/* allocate pagebuf struct with	*/
+extern xfs_buf_t *pagebuf_get_empty(	/* allocate pagebuf struct with	*/
 					/*  no memory or disk address	*/
 		size_t len,
-		struct pb_target *);	/* mount point "fake" inode	*/
+		xfs_buftarg_t *);	/* mount point "fake" inode	*/
 
-extern page_buf_t *pagebuf_get_no_daddr(/* allocate pagebuf struct	*/
+extern xfs_buf_t *pagebuf_get_no_daddr(/* allocate pagebuf struct	*/
 					/* without disk address		*/
 		size_t len,
-		struct pb_target *);	/* mount point "fake" inode	*/
+		xfs_buftarg_t *);	/* mount point "fake" inode	*/
 
 extern int pagebuf_associate_memory(
-		page_buf_t *,
+		xfs_buf_t *,
 		void *,
 		size_t);
 
 extern void pagebuf_hold(		/* increment reference count	*/
-		page_buf_t *);		/* buffer to hold		*/
+		xfs_buf_t *);		/* buffer to hold		*/
 
 extern void pagebuf_readahead(		/* read ahead into cache	*/
-		struct pb_target  *,	/* target for buffer (or NULL)	*/
+		xfs_buftarg_t  *,	/* target for buffer (or NULL)	*/
 		loff_t,			/* starting offset of range     */
 		size_t,			/* length of range              */
 		page_buf_flags_t);	/* additional read flags	*/
@@ -224,63 +221,63 @@ extern void pagebuf_readahead(		/* read ahead into cache	*/
 /* Releasing Buffers */
 
 extern void pagebuf_free(		/* deallocate a buffer		*/
-		page_buf_t *);		/* buffer to deallocate		*/
+		xfs_buf_t *);		/* buffer to deallocate		*/
 
 extern void pagebuf_rele(		/* release hold on a buffer	*/
-		page_buf_t *);		/* buffer to release		*/
+		xfs_buf_t *);		/* buffer to release		*/
 
 /* Locking and Unlocking Buffers */
 
 extern int pagebuf_cond_lock(		/* lock buffer, if not locked	*/
 					/* (returns -EBUSY if locked)	*/
-		page_buf_t *);		/* buffer to lock		*/
+		xfs_buf_t *);		/* buffer to lock		*/
 
 extern int pagebuf_lock_value(		/* return count on lock		*/
-		page_buf_t *);          /* buffer to check              */
+		xfs_buf_t *);          /* buffer to check              */
 
 extern int pagebuf_lock(		/* lock buffer                  */
-		page_buf_t *);          /* buffer to lock               */
+		xfs_buf_t *);          /* buffer to lock               */
 
 extern void pagebuf_unlock(		/* unlock buffer		*/
-		page_buf_t *);		/* buffer to unlock		*/
+		xfs_buf_t *);		/* buffer to unlock		*/
 
 /* Buffer Read and Write Routines */
 
 extern void pagebuf_iodone(		/* mark buffer I/O complete	*/
-		page_buf_t *,		/* buffer to mark		*/
+		xfs_buf_t *,		/* buffer to mark		*/
 		int,			/* use data/log helper thread.	*/
 		int);			/* run completion locally, or in
 					 * a helper thread.		*/
 
 extern void pagebuf_ioerror(		/* mark buffer in error	(or not) */
-		page_buf_t *,		/* buffer to mark		*/
+		xfs_buf_t *,		/* buffer to mark		*/
 		unsigned int);		/* error to store (0 if none)	*/
 
 extern int pagebuf_iostart(		/* start I/O on a buffer	*/
-		page_buf_t *,		/* buffer to start		*/
+		xfs_buf_t *,		/* buffer to start		*/
 		page_buf_flags_t);	/* PBF_LOCK, PBF_ASYNC,		*/
 					/* PBF_READ, PBF_WRITE,		*/
 					/* PBF_DELWRI			*/
 
 extern int pagebuf_iorequest(		/* start real I/O		*/
-		page_buf_t *);		/* buffer to convey to device	*/
+		xfs_buf_t *);		/* buffer to convey to device	*/
 
 extern int pagebuf_iowait(		/* wait for buffer I/O done	*/
-		page_buf_t *);		/* buffer to wait on		*/
+		xfs_buf_t *);		/* buffer to wait on		*/
 
 extern void pagebuf_iomove(		/* move data in/out of pagebuf	*/
-		page_buf_t *,		/* buffer to manipulate		*/
+		xfs_buf_t *,		/* buffer to manipulate		*/
 		size_t,			/* starting buffer offset	*/
 		size_t,			/* length in buffer		*/
 		caddr_t,		/* data pointer			*/
 		page_buf_rw_t);		/* direction			*/
 
-static inline int pagebuf_iostrategy(page_buf_t *pb)
+static inline int pagebuf_iostrategy(xfs_buf_t *pb)
 {
 	return pb->pb_strat ? pb->pb_strat(pb) : pagebuf_iorequest(pb);
 }
 
-static inline int pagebuf_geterror(page_buf_t *pb)
+static inline int pagebuf_geterror(xfs_buf_t *pb)
 {
 	return pb ? pb->pb_error : ENOMEM;
 }
@@ -288,30 +285,30 @@ static inline int pagebuf_geterror(page_buf_t *pb)
 /* Buffer Utility Routines */
 
 extern caddr_t pagebuf_offset(		/* pointer at offset in buffer	*/
-		page_buf_t *,		/* buffer to offset into	*/
+		xfs_buf_t *,		/* buffer to offset into	*/
 		size_t);		/* offset			*/
 
 /* Pinning Buffer Storage in Memory */
 
 extern void pagebuf_pin(		/* pin buffer in memory		*/
-		page_buf_t *);		/* buffer to pin		*/
+		xfs_buf_t *);		/* buffer to pin		*/
 
 extern void pagebuf_unpin(		/* unpin buffered data		*/
-		page_buf_t *);		/* buffer to unpin		*/
+		xfs_buf_t *);		/* buffer to unpin		*/
 
 extern int pagebuf_ispin(		/* check if buffer is pinned	*/
-		page_buf_t *);		/* buffer to check		*/
+		xfs_buf_t *);		/* buffer to check		*/
 
 /* Delayed Write Buffer Routines */
 
 #define PBDF_WAIT    0x01
 extern void pagebuf_delwri_flush(
-		pb_target_t *,
+		xfs_buftarg_t *,
 		unsigned long,
 		int *);
 
 extern void pagebuf_delwri_dequeue(
-		page_buf_t *);
+		xfs_buf_t *);
 
 /* Buffer Daemon Setup Routines */
 
@@ -322,7 +319,7 @@ extern void pagebuf_terminate(void);
 #ifdef PAGEBUF_TRACE
 extern ktrace_t *pagebuf_trace_buf;
 extern void pagebuf_trace(
-		page_buf_t *,		/* buffer being traced		*/
+		xfs_buf_t *,		/* buffer being traced		*/
 		char *,			/* description of operation	*/
 		void *,			/* arbitrary diagnostic value	*/
 		void *);		/* return address		*/
@@ -369,7 +366,7 @@ extern void pagebuf_trace(
 #define XFS_BUF_MANAGE		PBF_FS_MANAGED
 #define XFS_BUF_UNMANAGE(x)	((x)->pb_flags &= ~PBF_FS_MANAGED)
 
-static inline void xfs_buf_undelay(page_buf_t *pb)
+static inline void xfs_buf_undelay(xfs_buf_t *pb)
 {
 	if (pb->pb_flags & PBF_DELWRI) {
 		if (pb->pb_list.next != &pb->pb_list) {
@@ -423,12 +420,6 @@ static inline void xfs_buf_undelay(page_buf_t *pb)
 
 #define XFS_BUF_BP_ISMAPPED(bp)	 1
 
-typedef struct page_buf_s xfs_buf_t;
-#define xfs_buf page_buf_s
-
-typedef struct pb_target xfs_buftarg_t;
-#define xfs_buftarg pb_target
-
 #define XFS_BUF_DATAIO(x)	((x)->pb_flags |= PBF_FS_DATAIOD)
 #define XFS_BUF_UNDATAIO(x)	((x)->pb_flags &= ~PBF_FS_DATAIOD)
 
@@ -461,7 +452,7 @@ typedef struct pb_target xfs_buftarg_t;
 
 #define XFS_BUF_PTR(bp)		(xfs_caddr_t)((bp)->pb_addr)
 
-extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
+extern inline xfs_caddr_t xfs_buf_offset(xfs_buf_t *bp, size_t offset)
 {
 	if (bp->pb_flags & PBF_MAPPED)
 		return XFS_BUF_PTR(bp) + offset;
@@ -472,7 +463,7 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 				pagebuf_associate_memory(bp, val, count)
 #define XFS_BUF_ADDR(bp)	((bp)->pb_bn)
 #define XFS_BUF_SET_ADDR(bp, blk)		\
-			((bp)->pb_bn = (page_buf_daddr_t)(blk))
+			((bp)->pb_bn = (blk))
 #define XFS_BUF_OFFSET(bp)	((bp)->pb_file_offset)
 #define XFS_BUF_SET_OFFSET(bp, off)		\
 			((bp)->pb_file_offset = (off))
@@ -517,7 +508,7 @@ extern inline xfs_caddr_t xfs_buf_offset(page_buf_t *bp, size_t offset)
 #define xfs_buf_get_flags(target, blkno, len, flags) \
 		pagebuf_get((target), (blkno), (len), (flags))
 
-static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
+static inline int	xfs_bawrite(void *mp, xfs_buf_t *bp)
 {
 	bp->pb_fspriv3 = mp;
 	bp->pb_strat = xfs_bdstrat_cb;
@@ -525,7 +516,7 @@ static inline int	xfs_bawrite(void *mp, page_buf_t *bp)
 	return pagebuf_iostart(bp, PBF_WRITE | PBF_ASYNC | PBF_RUN_QUEUES);
 }
 
-static inline void	xfs_buf_relse(page_buf_t *bp)
+static inline void	xfs_buf_relse(xfs_buf_t *bp)
 {
 	if (!bp->pb_relse)
 		pagebuf_unlock(bp);
@@ -553,7 +544,7 @@ static inline void	xfs_buf_relse(page_buf_t *bp)
 	    pagebuf_iomove((pb), (off), (len), NULL, PBRW_ZERO)
 
 
-static inline int	XFS_bwrite(page_buf_t *pb)
+static inline int	XFS_bwrite(xfs_buf_t *pb)
 {
 	int	iowait = (pb->pb_flags & PBF_ASYNC) == 0;
 	int	error = 0;
@@ -573,7 +564,7 @@ static inline int	XFS_bwrite(page_buf_t *pb)
 #define XFS_bdwrite(pb)		     \
 	    pagebuf_iostart(pb, PBF_DELWRI | PBF_ASYNC)
 
-static inline int xfs_bdwrite(void *mp, page_buf_t *bp)
+static inline int xfs_bdwrite(void *mp, xfs_buf_t *bp)
 {
 	bp->pb_strat = xfs_bdstrat_cb;
 	bp->pb_fspriv3 = mp;
