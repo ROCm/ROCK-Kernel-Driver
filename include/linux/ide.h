@@ -1354,11 +1354,6 @@ extern void atapi_output_bytes(ide_drive_t *, void *, u32);
 extern void taskfile_input_data(ide_drive_t *, void *, u32);
 extern void taskfile_output_data(ide_drive_t *, void *, u32);
 
-void ide_pio_sector(ide_drive_t *, unsigned int);
-void ide_pio_multi(ide_drive_t *, unsigned int);
-
-ide_startstop_t task_error(ide_drive_t *, struct request *, const char *, u8);
-
 extern int drive_is_ready(ide_drive_t *);
 extern int wait_for_ready(ide_drive_t *, int /* timeout */);
 

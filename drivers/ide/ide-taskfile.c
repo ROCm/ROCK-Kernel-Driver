@@ -273,7 +273,7 @@ static u8 wait_drive_not_busy(ide_drive_t *drive)
 	return stat;
 }
 
-void ide_pio_sector(ide_drive_t *drive, unsigned int write)
+static void ide_pio_sector(ide_drive_t *drive, unsigned int write)
 {
 	ide_hwif_t *hwif = drive->hwif;
 	struct scatterlist *sg = hwif->sg_table;
@@ -310,9 +310,7 @@ void ide_pio_sector(ide_drive_t *drive, unsigned int write)
 #endif
 }
 
-EXPORT_SYMBOL_GPL(ide_pio_sector);
-
-void ide_pio_multi(ide_drive_t *drive, unsigned int write)
+static void ide_pio_multi(ide_drive_t *drive, unsigned int write)
 {
 	unsigned int nsect;
 
@@ -320,8 +318,6 @@ void ide_pio_multi(ide_drive_t *drive, unsigned int write)
 	while (nsect--)
 		ide_pio_sector(drive, write);
 }
-
-EXPORT_SYMBOL_GPL(ide_pio_multi);
 
 static inline void ide_pio_datablock(ide_drive_t *drive, struct request *rq,
 				     unsigned int write)
@@ -340,8 +336,8 @@ static inline void ide_pio_datablock(ide_drive_t *drive, struct request *rq,
 	}
 }
 
-ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
-			   const char *s, u8 stat)
+static ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
+				  const char *s, u8 stat)
 {
 	if (rq->bio) {
 		ide_hwif_t *hwif = drive->hwif;
@@ -371,8 +367,6 @@ ide_startstop_t task_error(ide_drive_t *drive, struct request *rq,
 	return drive->driver->error(drive, s, stat);
 }
 
-EXPORT_SYMBOL_GPL(task_error);
-
 static void task_end_request(ide_drive_t *drive, struct request *rq, u8 stat)
 {
 	if (rq->flags & REQ_DRIVE_TASKFILE) {
@@ -396,6 +390,7 @@ ide_startstop_t task_in_intr (ide_drive_t *drive)
 	struct request *rq = HWGROUP(drive)->rq;
 	u8 stat = hwif->INB(IDE_STATUS_REG);
 
+	/* new way for dealing with premature shared PCI interrupts */
 	if (!OK_STAT(stat, DATA_READY, BAD_R_STAT)) {
 		if (stat & (ERR_STAT | DRQ_STAT))
 			return task_error(drive, rq, __FUNCTION__, stat);
