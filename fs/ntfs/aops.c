@@ -458,7 +458,7 @@ err_out:
  *
  * Based on ntfs_read_block() and __block_write_full_page().
  */
-static int ntfs_write_block(struct page *page)
+static int ntfs_write_block(struct writeback_control *wbc, struct page *page)
 {
 	VCN vcn;
 	LCN lcn;
@@ -499,10 +499,7 @@ static int ntfs_write_block(struct page *page)
 		 * Put the page back on mapping->dirty_pages, but leave its
 		 * buffer's dirty state as-is.
 		 */
-		// FIXME: Once Andrew's -EAGAIN patch goes in, remove the
-		// __set_page_dirty_nobuffers(page) and return -EAGAIN instead
-		// of zero.
-		__set_page_dirty_nobuffers(page);
+		redirty_page_for_writepage(wbc, page);
 		unlock_page(page);
 		return 0;
 	}
@@ -733,10 +730,7 @@ lock_retry_remap:
 			 * Put the page back on mapping->dirty_pages, but
 			 * leave its buffer's dirty state as-is.
 			 */
-			// FIXME: Once Andrew's -EAGAIN patch goes in, remove
-			// the __set_page_dirty_nobuffers(page) and set err to
-			// -EAGAIN instead of zero.
-			__set_page_dirty_nobuffers(page);
+			redirty_page_for_writepage(wbc, page);
 			err = 0;
 		} else
 			SetPageError(page);
@@ -869,7 +863,7 @@ static int ntfs_writepage(struct page *page, struct writeback_control *wbc)
 		}
 
 		/* Normal data stream. */
-		return ntfs_write_block(page);
+		return ntfs_write_block(wbc, page);
 	}
 
 	/*
@@ -986,10 +980,7 @@ err_out:
 		 * Put the page back on mapping->dirty_pages, but leave its
 		 * buffer's dirty state as-is.
 		 */
-		// FIXME: Once Andrew's -EAGAIN patch goes in, remove the
-		// __set_page_dirty_nobuffers(page) and set err to -EAGAIN
-		// instead of zero.
-		__set_page_dirty_nobuffers(page);
+		redirty_page_for_writepage(wbc, page);
 		err = 0;
 	} else {
 		ntfs_error(vi->i_sb, "Resident attribute write failed with "

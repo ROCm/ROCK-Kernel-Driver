@@ -251,6 +251,12 @@
 #define __NR_reserved1			1259	/* reserved for NUMA interface */
 #define __NR_reserved2			1260	/* reserved for NUMA interface */
 #define __NR_reserved3			1261	/* reserved for NUMA interface */
+#define __NR_mq_open			1262
+#define __NR_mq_unlink			1263
+#define __NR_mq_timedsend		1264
+#define __NR_mq_timedreceive		1265
+#define __NR_mq_notify			1266
+#define __NR_mq_getsetattr		1267
 
 #ifdef __KERNEL__
 

@@ -851,12 +851,12 @@ fsyscall_table:
 	data8 0
 	data8 0							// 1260
 	data8 0
-	data8 0
-	data8 0
-	data8 0
-	data8 0							// 1265
-	data8 0
-	data8 0
+	data8 0				// mq_open
+	data8 0				// mq_unlink
+	data8 0				// mq_timedsend
+	data8 0				// mq_timedreceive	// 1265
+	data8 0				// mq_notify
+	data8 0				// mq_getsetattr
 	data8 0
 	data8 0
 	data8 0							// 1270
