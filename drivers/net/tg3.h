@@ -1415,6 +1415,7 @@ struct tg3_tx_buffer_desc {
 
 	u32				vlan_tag;
 #define TXD_VLAN_TAG_SHIFT		0
+#define TXD_MSS_SHIFT			16
 };
 
 #define TXD_ADDR			0x00UL /* 64-bit */
