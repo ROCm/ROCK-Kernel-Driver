@@ -1098,6 +1098,7 @@ extern inline const char *bdevname(struct block_device *bdev)
 {
 	return __bdevname(bdev->bd_dev);
 }
+extern struct block_device *lookup_bdev(const char *);
 extern struct block_device *open_bdev_excl(const char *, int, int, void *);
 extern void close_bdev_excl(struct block_device *, int);
 
