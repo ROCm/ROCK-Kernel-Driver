@@ -23,7 +23,7 @@ config SCSI
 
 config SCSI_PROC_FS
 	bool "legacy /proc/scsi/ support"
-	depends on SCSI
+	depends on SCSI && PROC_FS
 	default y
 	---help---
 	  This option enables support for the various files in
