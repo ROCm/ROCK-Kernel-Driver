@@ -1442,7 +1442,7 @@ int radeonfb_set_par(struct fb_info *info)
 			nopllcalc = 1;
 			newmode.ppll_div_3 = rinfo->panel_info.fbk_divider |
 				(rinfo->panel_info.post_divider << 16);
-			newmode.ppll_ref_div = rinfo->pll.ref_div;
+			newmode.ppll_ref_div = rinfo->panel_info.ref_divider;
 		}
 	}
 	dotClock = 1000000000 / pixClock;
