@@ -94,6 +94,7 @@ static int lcrash_init_dump_header(const char *panic_str)
 {
 	struct timeval dh_time;
 	unsigned long temp_dha_stack[DUMP_MAX_NUM_CPUS];
+	u64 temp_memsz = dump_header.dh_memory_size;
 
 	/* make sure the dump header isn't TOO big */
 	if ((sizeof(struct __dump_header) +
@@ -109,6 +110,7 @@ static int lcrash_init_dump_header(const char *panic_str)
 		DUMP_MAX_NUM_CPUS * sizeof(unsigned long));
 	memset(&dump_header, 0, sizeof(dump_header));
 	memset(&dump_header_asm, 0, sizeof(dump_header_asm));
+	dump_header.dh_memory_size = temp_memsz;
 	memcpy(&(dump_header_asm.dha_stack[0]), &(temp_dha_stack[0]),
 		DUMP_MAX_NUM_CPUS * sizeof(unsigned long));
 
