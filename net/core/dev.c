@@ -1742,6 +1742,7 @@ int netif_receive_skb(struct sk_buff *skb)
 #endif
 
 	skb->h.raw = skb->nh.raw = skb->data;
+	skb->mac_len = skb->nh.raw - skb->mac.raw;
 
 	pt_prev = NULL;
 	rcu_read_lock();
