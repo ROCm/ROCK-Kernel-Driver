@@ -160,7 +160,7 @@ struct reiserfs_transaction_handle {
   int t_blocks_allocated ;      /* number of blocks this writer allocated */
   unsigned long t_trans_id ;    /* sanity check, equals the current trans id */
   struct super_block *t_super ; /* super for this FS when journal_begin was 
-                                   called. saves calls to reiserfs_get_super */
+                                   called. */
 } ;
 
 /*
