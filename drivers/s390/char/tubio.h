@@ -336,7 +336,7 @@ extern int fs3270_major;
 extern int tty3270_major;
 extern int tty3270_proc_misc;
 extern enum tubwhat tty3270_proc_what;
-extern struct tty_driver tty3270_driver;
+extern struct tty_driver *tty3270_driver;
 
 #ifndef spin_trylock_irqsave
 #define spin_trylock_irqsave(lock, flags) \
@@ -380,7 +380,7 @@ extern inline tub_t *INODE2TUB(struct inode *ip)
 	unsigned int minor = minor(ip->i_rdev);
 	tub_t *tubp = NULL;
 	if (minor == 0 && current->tty) {
-		if (current->tty->driver == &tty3270_driver)
+		if (current->tty->driver == tty3270_driver)
 			minor = current->tty->index;
 	}
 	if (minor <= tubnummins && minor > 0)

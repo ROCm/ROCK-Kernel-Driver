@@ -48,16 +48,30 @@ static void tty3270_do_showi(tub_t *, char *, int);
 static int tty3270_show_tube(int, char *, int);
 
 static int tty3270_major = -1;
-struct tty_driver tty3270_driver;
-#ifdef CONFIG_TN3270_CONSOLE
-static int con3270_major = -1;
-static struct tty_driver con3270_driver;
-#endif /* CONFIG_TN3270_CONSOLE */
+struct tty_driver *tty3270_driver;
 
 static int tty3270_proc_index;
 static int tty3270_proc_data;
 static int tty3270_proc_misc;
 static enum tubwhat tty3270_proc_what;
+
+static struct tty_operations tty3270_ops = {
+	.open = tty3270_open,
+	.close = tty3270_close,
+	.write = tty3270_write,
+	.put_char = tty3270_put_char,
+	.flush_chars = tty3270_flush_chars,
+	.write_room = tty3270_write_room,
+	.chars_in_buffer = tty3270_chars_in_buffer,
+#if 0
+	.ioctl = tty3270_ioctl,
+#endif
+	.set_termios = tty3270_set_termios,
+	.hangup = tty3270_hangup,
+	.flush_buffer = tty3270_flush_buffer,
+	.read_proc = tty3270_read_proc,
+	.write_proc = tty3270_write_proc,
+};
 
 /*
  * tty3270_init() -- Register the tty3270 driver
@@ -65,78 +79,33 @@ static enum tubwhat tty3270_proc_what;
 int
 tty3270_init(void)
 {
-	struct tty_driver *td = &tty3270_driver;
+	struct tty_driver *td = alloc_tty_driver(TUBMAXMINS);
 	int rc;
 
+	if (!td)
+		return -ENOMEM;
+
 	/* Initialize for tty driver */
-	td->magic = TTY_DRIVER_MAGIC;
 	td->owner = THIS_MODULE;
 	td->driver_name = "tty3270";
 	td->name = "tty3270";
 	td->major = IBM_TTY3270_MAJOR;
 	td->minor_start = 0;
-	td->num = TUBMAXMINS;
 	td->type = TTY_DRIVER_TYPE_SYSTEM;
 	td->subtype = SYSTEM_TYPE_TTY;
 	td->init_termios = tty_std_termios;
-	td->flags = TTY_DRIVER_RESET_TERMIOS;
-	td->flags |= TTY_DRIVER_NO_DEVFS;
-
-	td->open = tty3270_open;
-	td->close = tty3270_close;
-	td->write = tty3270_write;
-	td->put_char = tty3270_put_char;
-	td->flush_chars = tty3270_flush_chars;
-	td->write_room = tty3270_write_room;
-	td->chars_in_buffer = tty3270_chars_in_buffer;
-	td->ioctl = tty3270_ioctl;
-	td->ioctl = NULL;
-	td->set_termios = tty3270_set_termios;
-	td->throttle = NULL;
-	td->unthrottle = NULL;
-	td->stop = NULL;
-	td->start = NULL;
-	td->hangup = tty3270_hangup;
-	td->break_ctl = NULL;
-	td->flush_buffer = tty3270_flush_buffer;
-	td->set_ldisc = NULL;
-	td->wait_until_sent = NULL;
-	td->send_xchar = NULL;
-	td->read_proc = tty3270_read_proc;
-	td->write_proc = tty3270_write_proc;
-
+	td->flags = TTY_DRIVER_RESET_TERMIOS | TTY_DRIVER_NO_DEVFS;
+	tty_set_operations(td, &tty3270_ops);
 	rc = tty_register_driver(td);
 	if (rc) {
+		put_tty_driver(td);
 		printk(KERN_ERR "tty3270 registration failed with %d\n", rc);
 	} else {
 		tty3270_major = IBM_TTY3270_MAJOR;
 		if (td->proc_entry != NULL)
 			td->proc_entry->mode = S_IRUGO | S_IWUGO;
+		tty3270_driver = td;
 	}
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,3,0))
-#ifdef CONFIG_TN3270_CONSOLE
-	if (CONSOLE_IS_3270) {
-		tty3270_con_driver = *td;
-		td = &tty3270_con_driver;
-		td->driver_name = "con3270";
-		td->name = "con3270";
-		td->major = MAJOR(S390_CONSOLE_DEV);
-		td->minor_start = MINOR(S390_CONSOLE_DEV);
-		td->num = 1;
-
-		rc = tty_register_driver(td);
-		if (rc) {
-			printk(KERN_ERR
-			       "con3270 registration failed with %d\n", rc);
-		} else {
-			con3270_major = MAJOR(S390_CONSOLE_DEV);
-			if (td->proc_entry != NULL)
-				td->proc_entry->mode = S_IRUGO | S_IWUGO;
-		}
-	}
-#endif /* ifdef CONFIG_TN3270_CONSOLE */
-#endif /* if LINUX_VERSION_CODE */
-
 	return rc;
 }
 
@@ -147,15 +116,11 @@ void
 tty3270_fini(void)
 {
 	if (tty3270_major != -1) {
-		tty_unregister_driver(&tty3270_driver);
+		tty_unregister_driver(tty3270_driver);
+		put_tty_driver(tty3270_driver);
+		tty3270_driver = NULL;
 		tty3270_major = -1;
 	}
-#ifdef CONFIG_TN3270_CONSOLE
-	if (CONSOLE_IS_3270 && con3270_major != -1) {
-		tty_unregister_driver(&con3270_driver);
-		con3270_major = -1;
-	}
-#endif
 }
 
 static int 
@@ -519,7 +484,7 @@ tty3270_write_proc(struct file *file, const char *buffer,
 	 */
 	tubp = NULL;
 	tty = current->tty;
-	if (tty && tty->driver == &tty3270_driver)
+	if (tty && tty->driver == tty3270_driver)
 		tubp = (*tubminors)[tty->index];
 	if (tubp) {
 		if ((rc = tty3270_aid_set(tubp, mybuf, mycount + 1)))
