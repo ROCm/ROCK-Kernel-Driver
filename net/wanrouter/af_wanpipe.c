@@ -388,7 +388,7 @@ static int wanpipe_listen_rcv (struct sk_buff *skb,  struct sock *sk)
 
 	/* Register the lcn on which incoming call came
          * from. Thus, if we have to clear it, we know
-         * whic lcn to clear 
+         * which lcn to clear
 	 */ 
 
 	newwp->lcn = mbox_ptr->cmd.lcn;

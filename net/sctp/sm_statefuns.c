@@ -3734,7 +3734,7 @@ sctp_disposition_t sctp_sf_shutdown_ack_sent_prm_abort(
  * o association id - local handle to the SCTP association
  *
  * o destination transport address - the transport address of the
- *   asociation on which a heartbeat should be issued.
+ *   association on which a heartbeat should be issued.
  */
 sctp_disposition_t sctp_sf_do_prm_requestheartbeat(
 					const sctp_endpoint_t *ep,

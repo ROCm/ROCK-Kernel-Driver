@@ -1332,7 +1332,7 @@ static int rme96xx_ioctl(struct inode *in, struct file *file, unsigned int cmd, 
                 file->f_flags |= O_NONBLOCK;
                 return 0;
 
-        case SNDCTL_DSP_GETODELAY: /* What shold this exactly do ? , 
+        case SNDCTL_DSP_GETODELAY: /* What should this exactly do ? ,
 				      ATM it is just abinfo.bytes */
 		if (!(file->f_mode & FMODE_WRITE))
 			return -EINVAL;

@@ -1629,7 +1629,7 @@ struct buffer_head * reiserfs_breada (struct block_device *dev, int block, int b
 /*
 ** read and replay the log
 ** on a clean unmount, the journal header's next unflushed pointer will be to an invalid
-** transaction.  This tests that before finding all the transactions in the log, whic makes normal mount times fast.
+** transaction.  This tests that before finding all the transactions in the log, which makes normal mount times fast.
 **
 ** After a crash, this starts with the next unflushed transaction, and replays until it finds one too old, or invalid.
 **

@@ -195,7 +195,7 @@ typedef struct {
 
 /* The SIR unwrapper async_unwrap_char() will use a Rx-copy-break mechanism
  * when using the optional ZeroCopy Rx, where only small frames are memcpy
- * to a smaller skb to save memory. This is the thresold under which copy
+ * to a smaller skb to save memory. This is the threshold under which copy
  * will happen (and over which it won't happen).
  * Some FIR drivers may use this #define as well...
  * This is the same value as various Ethernet drivers. - Jean II */

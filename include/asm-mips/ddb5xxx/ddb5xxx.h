@@ -34,7 +34,7 @@
  * that are true for all DDB 5xxx boards.  The modification is based on
  *
  *	uPD31577(VRC5477) VR5432-SDRAM/PCI Bridge (Luke)
- *	Preliminary Specification Decoment, Rev 1.1, 27 Dec, 2000
+ *	Preliminary Specification Document, Rev 1.1, 27 Dec, 2000
  *  
  */
 

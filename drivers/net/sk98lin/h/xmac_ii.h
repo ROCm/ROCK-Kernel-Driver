@@ -279,7 +279,7 @@ extern "C" {
  * XMAC Bit Definitions
  *
  * If the bit access behaviour differs from the register access behaviour
- * (r/w, ro) this is docomented after the bit number. The following bit
+ * (r/w, ro) this is documented after the bit number. The following bit
  * access behaviours are used:
  *	(sc)	self clearing
  *	(ro)	read only

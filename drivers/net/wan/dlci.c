@@ -14,7 +14,7 @@
  *		0.15	Mike Mclagan	Packet freeing, bug in kmalloc call
  *					DLCI_RET handling
  *		0.20	Mike McLagan	More conservative on which packets
- *					are returned for retry and whic are
+ *					are returned for retry and which are
  *					are dropped.  If DLCI_RET_DROP is
  *					returned from the FRAD, the packet is
  *				 	sent back to Linux for re-transmission
