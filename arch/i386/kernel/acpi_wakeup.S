@@ -41,20 +41,19 @@ wakeup_code:
 	cmpl	$0x12345678, %eax
 	jne	bogus_real_magic
 
-#if 1
+	testl	$1, video_flags - wakeup_code
+	jz	1f
 	lcall   $0xc000,$3
-#endif
-#if 0
+1:
+
+	testl	$2, video_flags - wakeup_code
+	jz	1f
 	mov	video_mode - wakeup_code, %ax
 	call	mode_set
-#endif
+1:
 
 	# set up page table
-#if 1
 	movl	$swapper_pg_dir-__PAGE_OFFSET, %eax
-#else
-	movl    (real_save_cr3 - wakeup_data), %eax
-#endif
 	movl	%eax, %cr3
 
 	# make sure %cr4 is set correctly (features, etc)
@@ -86,6 +85,7 @@ real_save_cr3:	.long 0
 real_save_cr4:	.long 0
 real_magic:	.long 0
 video_mode:	.long 0
+video_flags:	.long 0
 
 bogus_real_magic:
 	movw	$0x0e00 + 'B', %fs:(0x12)
@@ -254,6 +254,8 @@ ENTRY(acpi_copy_wakeup_routine)
 
 	movl	saved_videomode, %edx
 	movl	%edx, video_mode - wakeup_start (%eax)
+	movl	acpi_video_flags, %edx
+	movl	%edx, video_flags - wakeup_start (%eax)
 	movl	$0x12345678, real_magic - wakeup_start (%eax)
 	movl	$0x12345678, saved_magic
 	ret
