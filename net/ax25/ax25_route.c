@@ -118,134 +118,176 @@ void ax25_rt_device_down(struct net_device *dev)
 	write_unlock(&ax25_route_lock);
 }
 
-int ax25_rt_ioctl(unsigned int cmd, void *arg)
+static int ax25_rt_add(struct ax25_routes_struct *route)
 {
-	ax25_route *s, *t, *ax25_rt;
-	struct ax25_routes_struct route;
-	struct ax25_route_opt_struct rt_option;
+	ax25_route *ax25_rt;
 	ax25_dev *ax25_dev;
 	int i;
+
+	if ((ax25_dev = ax25_addr_ax25dev(&route->port_addr)) == NULL)
+		return -EINVAL;
+	if (route->digi_count > AX25_MAX_DIGIS)
+		return -EINVAL;
+
+	write_lock(ax25_route_lock);
+
+	ax25_rt = ax25_route_list;
+	while (ax25_rt != NULL) {
+		if (ax25cmp(&ax25_rt->callsign, &route->dest_addr) == 0 &&
+		            ax25_rt->dev == ax25_dev->dev) {
+			if (ax25_rt->digipeat != NULL) {
+				kfree(ax25_rt->digipeat);
+				ax25_rt->digipeat = NULL;
+			}
+			if (route->digi_count != 0) {
+				if ((ax25_rt->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
+					write_unlock(ax25_route_lock);
+					return -ENOMEM;
+				}
+				ax25_rt->digipeat->lastrepeat = -1;
+				ax25_rt->digipeat->ndigi      = route->digi_count;
+				for (i = 0; i < route->digi_count; i++) {
+					ax25_rt->digipeat->repeated[i] = 0;
+					ax25_rt->digipeat->calls[i]    = route->digi_addr[i];
+				}
+			}
+			return 0;
+		}
+		ax25_rt = ax25_rt->next;
+	}
+
+	if ((ax25_rt = kmalloc(sizeof(ax25_route), GFP_ATOMIC)) == NULL) {
+		write_unlock(ax25_route_lock);
+		return -ENOMEM;
+	}
+
+	ax25_rt->callsign     = route->dest_addr;
+	ax25_rt->dev          = ax25_dev->dev;
+	ax25_rt->digipeat     = NULL;
+	ax25_rt->ip_mode      = ' ';
+	if (route->digi_count != 0) {
+		if ((ax25_rt->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
+			write_unlock(ax25_route_lock);
+			kfree(ax25_rt);
+			return -ENOMEM;
+		}
+		ax25_rt->digipeat->lastrepeat = -1;
+		ax25_rt->digipeat->ndigi      = route->digi_count;
+		for (i = 0; i < route->digi_count; i++) {
+			ax25_rt->digipeat->repeated[i] = 0;
+			ax25_rt->digipeat->calls[i]    = route->digi_addr[i];
+		}
+	}
+	ax25_rt->next   = ax25_route_list;
+	ax25_route_list = ax25_rt;
+	write_unlock(ax25_route_lock);
+
+	return 0;
+}
+
+static int ax25_rt_del(struct ax25_routes_struct *route)
+{
+	ax25_route *s, *t, *ax25_rt;
+	ax25_dev *ax25_dev;
+
+	if ((ax25_dev = ax25_addr_ax25dev(&route->port_addr)) == NULL)
+		return -EINVAL;
+
+	write_lock(ax25_route_lock);
+
+	ax25_rt = ax25_route_list;
+	while (ax25_rt != NULL) {
+		s       = ax25_rt;
+		ax25_rt = ax25_rt->next;
+		if (s->dev == ax25_dev->dev && ax25cmp(&route->dest_addr, &s->callsign) == 0) {
+			if (ax25_route_list == s) {
+				ax25_route_list = s->next;
+				if (s->digipeat != NULL)
+					kfree(s->digipeat);
+				kfree(s);
+			} else {
+				for (t = ax25_route_list; t != NULL; t = t->next) {
+					if (t->next == s) {
+						t->next = s->next;
+						if (s->digipeat != NULL)
+							kfree(s->digipeat);
+						kfree(s);
+						break;
+					}
+				}				
+			}
+		}
+	}
+	write_unlock(ax25_route_lock);
+
+	return 0;
+}
+
+static int ax25_rt_opt(struct ax25_route_opt_struct *rt_option)
+{
+	ax25_route *ax25_rt;
+	ax25_dev *ax25_dev;
+	int err = 0;
+
+	if ((ax25_dev = ax25_addr_ax25dev(&rt_option->port_addr)) == NULL)
+		return -EINVAL;
+
+	write_lock(ax25_route_lock);
+
+	ax25_rt = ax25_route_list;
+	while (ax25_rt != NULL) {
+		if (ax25_rt->dev == ax25_dev->dev &&
+		    ax25cmp(&rt_option->dest_addr, &ax25_rt->callsign) == 0) {
+			switch (rt_option->cmd) {
+			case AX25_SET_RT_IPMODE:
+				switch (rt_option->arg) {
+				case ' ':
+				case 'D':
+				case 'V':
+					ax25_rt->ip_mode = rt_option->arg;
+					break;
+				default:
+					err = -EINVAL;
+					goto out;
+				}
+				break;
+			default:
+				err = -EINVAL;
+				goto out;
+			}
+		}
+		ax25_rt = ax25_rt->next;
+	}
+
+out:
+	write_unlock(ax25_route_lock);
+	return err;
+}
+
+int ax25_rt_ioctl(unsigned int cmd, void *arg)
+{
+	struct ax25_route_opt_struct rt_option;
+	struct ax25_routes_struct route;
 
 	switch (cmd) {
 	case SIOCADDRT:
 		if (copy_from_user(&route, arg, sizeof(route)))
 			return -EFAULT;
-		if ((ax25_dev = ax25_addr_ax25dev(&route.port_addr)) == NULL)
-			return -EINVAL;
-		if (route.digi_count > AX25_MAX_DIGIS)
-			return -EINVAL;
-		write_lock(ax25_route_lock);
-		for (ax25_rt = ax25_route_list; ax25_rt != NULL; ax25_rt = ax25_rt->next) {
-			if (ax25cmp(&ax25_rt->callsign, &route.dest_addr) == 0 && ax25_rt->dev == ax25_dev->dev) {
-				if (ax25_rt->digipeat != NULL) {
-					kfree(ax25_rt->digipeat);
-					ax25_rt->digipeat = NULL;
-				}
-				if (route.digi_count != 0) {
-					if ((ax25_rt->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
-						write_unlock(ax25_route_lock);
-						return -ENOMEM;
-					}
-					ax25_rt->digipeat->lastrepeat = -1;
-					ax25_rt->digipeat->ndigi      = route.digi_count;
-					for (i = 0; i < route.digi_count; i++) {
-						ax25_rt->digipeat->repeated[i] = 0;
-						ax25_rt->digipeat->calls[i]    = route.digi_addr[i];
-					}
-				}
-				return 0;
-			}
-		}
-		if ((ax25_rt = kmalloc(sizeof(ax25_route), GFP_ATOMIC)) == NULL) {
-			write_unlock(ax25_route_lock);
-			return -ENOMEM;
-		}
-		ax25_rt->callsign     = route.dest_addr;
-		ax25_rt->dev          = ax25_dev->dev;
-		ax25_rt->digipeat     = NULL;
-		ax25_rt->ip_mode      = ' ';
-		if (route.digi_count != 0) {
-			if ((ax25_rt->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
-				write_unlock(ax25_route_lock);
-				kfree(ax25_rt);
-				return -ENOMEM;
-			}
-			ax25_rt->digipeat->lastrepeat = -1;
-			ax25_rt->digipeat->ndigi      = route.digi_count;
-			for (i = 0; i < route.digi_count; i++) {
-				ax25_rt->digipeat->repeated[i] = 0;
-				ax25_rt->digipeat->calls[i]    = route.digi_addr[i];
-			}
-		}
-		ax25_rt->next   = ax25_route_list;
-		ax25_route_list = ax25_rt;
-		write_unlock(ax25_route_lock);
-
-		break;
+		return ax25_rt_add(&route);
 
 	case SIOCDELRT:
 		if (copy_from_user(&route, arg, sizeof(route)))
 			return -EFAULT;
-		if ((ax25_dev = ax25_addr_ax25dev(&route.port_addr)) == NULL)
-			return -EINVAL;
-		ax25_rt = ax25_route_list;
-		while (ax25_rt != NULL) {
-			s       = ax25_rt;
-			ax25_rt = ax25_rt->next;
-			if (s->dev == ax25_dev->dev && ax25cmp(&route.dest_addr, &s->callsign) == 0) {
-				if (ax25_route_list == s) {
-					ax25_route_list = s->next;
-					if (s->digipeat != NULL)
-						kfree(s->digipeat);
-					kfree(s);
-				} else {
-					for (t = ax25_route_list; t != NULL; t = t->next) {
-						if (t->next == s) {
-							t->next = s->next;
-							if (s->digipeat != NULL)
-								kfree(s->digipeat);
-							kfree(s);
-							break;
-						}
-					}				
-				}
-			}
-		}
-		break;
+		return ax25_rt_del(&route);
 
 	case SIOCAX25OPTRT:
 		if (copy_from_user(&rt_option, arg, sizeof(rt_option)))
 			return -EFAULT;
-		if ((ax25_dev = ax25_addr_ax25dev(&rt_option.port_addr)) == NULL)
-			return -EINVAL;
-		write_lock(ax25_route_lock);
-		for (ax25_rt = ax25_route_list; ax25_rt != NULL; ax25_rt = ax25_rt->next) {
-			if (ax25_rt->dev == ax25_dev->dev && ax25cmp(&rt_option.dest_addr, &ax25_rt->callsign) == 0) {
-				switch (rt_option.cmd) {
-					case AX25_SET_RT_IPMODE:
-						switch (rt_option.arg) {
-							case ' ':
-							case 'D':
-							case 'V':
-								ax25_rt->ip_mode = rt_option.arg;
-								break;
-							default:
-								return -EINVAL;
-						}
-						break;
-					default:
-						return -EINVAL;
-				}
-			}
-		}
-		write_unlock(ax25_route_lock);
-		break;
+		return ax25_rt_opt(&rt_option);
 
 	default:
 		return -EINVAL;
 	}
-
-	return 0;
 }
 
 int ax25_rt_get_info(char *buffer, char **start, off_t offset, int length)
