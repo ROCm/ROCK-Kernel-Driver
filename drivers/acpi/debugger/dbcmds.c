@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbcmds - debug commands and output routines
- *              $Revision: 85 $
+ *              $Revision: 87 $
  *
  ******************************************************************************/
 
@@ -33,9 +33,9 @@
 #include "acresrc.h"
 #include "acdisasm.h"
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
-#define _COMPONENT          ACPI_DEBUGGER
+#define _COMPONENT          ACPI_CA_DEBUGGER
 	 ACPI_MODULE_NAME    ("dbcmds")
 
 
@@ -1111,4 +1111,4 @@ acpi_db_check_integrity (void)
 
 }
 
-#endif /* ENABLE_DEBUGGER */
+#endif /* ACPI_DEBUGGER */

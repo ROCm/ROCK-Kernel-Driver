@@ -2,7 +2,7 @@
  *
  * Module Name: dbfileio - Debugger file I/O commands.  These can't usually
  *              be used when running the debugger in Ring 0 (Kernel mode)
- *              $Revision: 67 $
+ *              $Revision: 68 $
  *
  ******************************************************************************/
 
@@ -30,9 +30,9 @@
 #include "acnamesp.h"
 #include "actables.h"
 
-#if (defined ENABLE_DEBUGGER || defined ACPI_DISASSEMBLER)
+#if (defined ACPI_DEBUGGER || defined ACPI_DISASSEMBLER)
 
-#define _COMPONENT          ACPI_DEBUGGER
+#define _COMPONENT          ACPI_CA_DEBUGGER
 	 ACPI_MODULE_NAME    ("dbfileio")
 
 
@@ -86,7 +86,7 @@ acpi_db_match_argument (
 }
 
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_db_close_debug_file
@@ -395,5 +395,5 @@ acpi_db_load_acpi_table (
 }
 
 
-#endif  /* ENABLE_DEBUGGER */
+#endif  /* ACPI_DEBUGGER */
 

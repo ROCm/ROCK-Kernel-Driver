@@ -139,8 +139,8 @@ typedef struct
 	u16                     plvl3_lat;          /* Worst case HW latency to enter/exit C3 state */
 	u16                     flush_size;         /* Number of flush strides that need to be read */
 	u16                     flush_stride;       /* Processor's memory cache line width, in bytes */
-	u8                      duty_offset;        /* Processor_’s duty cycle index in processor's P_CNT reg*/
-	u8                      duty_width;         /* Processor_’s duty cycle value bit width in P_CNT register.*/
+	u8                      duty_offset;        /* Processor’s duty cycle index in processor's P_CNT reg*/
+	u8                      duty_width;         /* Processor’s duty cycle value bit width in P_CNT register.*/
 	u8                      day_alrm;           /* Index to day-of-month alarm in RTC CMOS RAM */
 	u8                      mon_alrm;           /* Index to month-of-year alarm in RTC CMOS RAM */
 	u8                      century;            /* Index to century in RTC CMOS RAM */

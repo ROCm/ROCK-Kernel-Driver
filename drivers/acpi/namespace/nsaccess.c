@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsaccess - Top-level functions for accessing ACPI namespace
- *              $Revision: 156 $
+ *              $Revision: 161 $
  *
  ******************************************************************************/
 
@@ -117,6 +117,19 @@ acpi_ns_root_initialize (void)
 			 * used for initial values are implemented here.
 			 */
 			switch (init_val->type) {
+			case ACPI_TYPE_METHOD:
+				obj_desc->method.param_count =
+						(u8) ACPI_STRTOUL (init_val->val, NULL, 10);
+				obj_desc->common.flags |= AOPOBJ_DATA_VALID;
+
+#if defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
+
+				/* Compiler cheats by putting parameter count in the Owner_iD */
+
+				new_node->owner_id = obj_desc->method.param_count;
+#endif
+				break;
+
 			case ACPI_TYPE_INTEGER:
 
 				obj_desc->integer.value =
@@ -228,6 +241,7 @@ acpi_ns_lookup (
 	acpi_namespace_node     **return_node)
 {
 	acpi_status             status;
+	NATIVE_CHAR             *path = pathname;
 	acpi_namespace_node     *prefix_node;
 	acpi_namespace_node     *current_node = NULL;
 	acpi_namespace_node     *this_node = NULL;
@@ -235,7 +249,9 @@ acpi_ns_lookup (
 	acpi_name               simple_name;
 	acpi_object_type        type_to_check_for;
 	acpi_object_type        this_search_type;
-	u32                     local_flags = flags & ~ACPI_NS_ERROR_IF_FOUND;
+	u32                     search_parent_flag = ACPI_NS_SEARCH_PARENT;
+	u32                     local_flags = flags & ~(ACPI_NS_ERROR_IF_FOUND |
+			   ACPI_NS_SEARCH_PARENT);
 
 
 	ACPI_FUNCTION_TRACE ("Ns_lookup");
@@ -266,6 +282,21 @@ acpi_ns_lookup (
 	}
 	else {
 		prefix_node = scope_info->scope.node;
+		if (ACPI_GET_DESCRIPTOR_TYPE (prefix_node) != ACPI_DESC_TYPE_NAMED) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "[%p] Not a namespace node\n",
+				prefix_node));
+			return_ACPI_STATUS (AE_AML_INTERNAL);
+		}
+
+		/*
+		 * This node might not be a actual "scope" node (such as a
+		 * Device/Method, etc.)  It could be a Package or other object node.
+		 * Backup up the tree to find the containing scope node.
+		 */
+		while (!acpi_ns_opens_scope (prefix_node->type) &&
+				prefix_node->type != ACPI_TYPE_ANY) {
+			prefix_node = acpi_ns_get_parent_node (prefix_node);
+		}
 	}
 
 	/*
@@ -297,7 +328,7 @@ acpi_ns_lookup (
 
 		num_segments = 0;
 		this_node    = acpi_gbl_root_node;
-		pathname     = "";
+		path     = "";
 
 		ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 			"Null Pathname (Zero segments), Flags=%X\n", flags));
@@ -316,23 +347,24 @@ acpi_ns_lookup (
 		 * Parent Prefixes (in which case the name's scope is relative
 		 * to the current scope).
 		 */
-		if (*pathname == (u8) AML_ROOT_PREFIX) {
+		if (*path == (u8) AML_ROOT_PREFIX) {
 			/* Pathname is fully qualified, start from the root */
 
 			this_node = acpi_gbl_root_node;
+			search_parent_flag = ACPI_NS_NO_UPSEARCH;
 
 			/* Point to name segment part */
 
-			pathname++;
+			path++;
 
-			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES, "Searching from root [%p]\n",
-				this_node));
+			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+				"Path is absolute from root [%p]\n", this_node));
 		}
 		else {
 			/* Pathname is relative to current scope, start there */
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
-				"Searching relative to pfx scope [%p]\n",
+				"Searching relative to prefix scope [%p]\n",
 				prefix_node));
 
 			/*
@@ -340,12 +372,15 @@ acpi_ns_lookup (
 			 * the parent node for each prefix instance.
 			 */
 			this_node = prefix_node;
-			while (*pathname == (u8) AML_PARENT_PREFIX) {
+			while (*path == (u8) AML_PARENT_PREFIX) {
+				/* Name is fully qualified, no search rules apply */
+
+				search_parent_flag = ACPI_NS_NO_UPSEARCH;
 				/*
 				 * Point past this prefix to the name segment
 				 * part or the next Parent Prefix
 				 */
-				pathname++;
+				path++;
 
 				/* Backup to the parent node */
 
@@ -357,6 +392,11 @@ acpi_ns_lookup (
 						("ACPI path has too many parent prefixes (^) - reached beyond root node\n"));
 					return_ACPI_STATUS (AE_NOT_FOUND);
 				}
+			}
+
+			if (search_parent_flag == ACPI_NS_NO_UPSEARCH) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
+					"Path is absolute with one or more carats\n"));
 			}
 		}
 
@@ -373,7 +413,7 @@ acpi_ns_lookup (
 		 * Examine the name prefix opcode, if any, to determine the number of
 		 * segments.
 		 */
-		switch (*pathname) {
+		switch (*path) {
 		case 0:
 			/*
 			 * Null name after a root or parent prefixes. We already
@@ -387,10 +427,14 @@ acpi_ns_lookup (
 
 		case AML_DUAL_NAME_PREFIX:
 
+			/* More than one Name_seg, search rules do not apply */
+
+			search_parent_flag = ACPI_NS_NO_UPSEARCH;
+
 			/* Two segments, point to first name segment */
 
 			num_segments = 2;
-			pathname++;
+			path++;
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 				"Dual Pathname (2 segments, Flags=%X)\n", flags));
@@ -398,11 +442,15 @@ acpi_ns_lookup (
 
 		case AML_MULTI_NAME_PREFIX_OP:
 
+			/* More than one Name_seg, search rules do not apply */
+
+			search_parent_flag = ACPI_NS_NO_UPSEARCH;
+
 			/* Extract segment count, point to first name segment */
 
-			pathname++;
-			num_segments = (u32) (u8) *pathname;
-			pathname++;
+			path++;
+			num_segments = (u32) (u8) *path;
+			path++;
 
 			ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 				"Multi Pathname (%d Segments, Flags=%X) \n",
@@ -421,33 +469,49 @@ acpi_ns_lookup (
 			break;
 		}
 
-		ACPI_DEBUG_EXEC (acpi_ns_print_pathname (num_segments, pathname));
+		ACPI_DEBUG_EXEC (acpi_ns_print_pathname (num_segments, path));
 	}
+
 
 	/*
 	 * Search namespace for each segment of the name.  Loop through and
-	 * verify/add each name segment.
+	 * verify (or add to the namespace) each name segment.
+	 *
+	 * The object type is significant only at the last name
+	 * segment.  (We don't care about the types along the path, only
+	 * the type of the final target object.)
 	 */
+	this_search_type = ACPI_TYPE_ANY;
 	current_node = this_node;
 	while (num_segments && current_node) {
-		/*
-		 * Search for the current name segment under the current
-		 * named object.  The Type is significant only at the last name
-		 * segment.  (We don't care about the types along the path, only
-		 * the type of the final target object.)
-		 */
-		this_search_type = ACPI_TYPE_ANY;
 		num_segments--;
 		if (!num_segments) {
+			/*
+			 * This is the last segment, enable typechecking
+			 */
 			this_search_type = type;
-			local_flags = flags;
+
+			/*
+			 * Only allow automatic parent search (search rules) if the caller
+			 * requested it AND we have a single, non-fully-qualified Name_seg
+			 */
+			if ((search_parent_flag != ACPI_NS_NO_UPSEARCH) &&
+				(flags & ACPI_NS_SEARCH_PARENT)) {
+				local_flags |= ACPI_NS_SEARCH_PARENT;
+			}
+
+			/* Set error flag according to caller */
+
+			if (flags & ACPI_NS_ERROR_IF_FOUND) {
+				local_flags |= ACPI_NS_ERROR_IF_FOUND;
+			}
 		}
 
 		/* Extract one ACPI name from the front of the pathname */
 
-		ACPI_MOVE_UNALIGNED32_TO_32 (&simple_name, pathname);
+		ACPI_MOVE_UNALIGNED32_TO_32 (&simple_name, path);
 
-		/* Try to find the ACPI name */
+		/* Try to find the single (4 character) ACPI name */
 
 		status = acpi_ns_search_and_enter (simple_name, walk_state, current_node,
 				  interpreter_mode, this_search_type, local_flags, &this_node);
@@ -457,7 +521,8 @@ acpi_ns_lookup (
 
 				ACPI_DEBUG_PRINT ((ACPI_DB_NAMES,
 					"Name [%4.4s] not found in scope [%4.4s] %p\n",
-					(char *) &simple_name, (char *) &current_node->name, current_node));
+					(char *) &simple_name, (char *) &current_node->name,
+					current_node));
 			}
 
 			return_ACPI_STATUS (status);
@@ -504,7 +569,7 @@ acpi_ns_lookup (
 
 		/* Point to next name segment and make this node current */
 
-		pathname += ACPI_NAME_SIZE;
+		path += ACPI_NAME_SIZE;
 		current_node = this_node;
 	}
 

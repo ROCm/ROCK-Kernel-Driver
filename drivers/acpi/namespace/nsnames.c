@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nsnames - Name manipulation and search
- *              $Revision: 78 $
+ *              $Revision: 79 $
  *
  ******************************************************************************/
 
@@ -103,7 +103,7 @@ acpi_ns_build_external_path (
 }
 
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_ns_get_external_pathname

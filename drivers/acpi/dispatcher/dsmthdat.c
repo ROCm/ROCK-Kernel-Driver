@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dsmthdat - control method arguments and local variables
- *              $Revision: 62 $
+ *              $Revision: 63 $
  *
  ******************************************************************************/
 
@@ -587,23 +587,40 @@ acpi_ds_store_object_to_local (
 		 *
 		 * Weird, but true.
 		 */
-		if ((opcode == AML_ARG_OP) &&
-			(ACPI_GET_DESCRIPTOR_TYPE (current_obj_desc) == ACPI_DESC_TYPE_NAMED)) {
-			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
-				"Arg (%p) is an Obj_ref(Node), storing in node %p\n",
-				obj_desc, current_obj_desc));
-
-			/* Detach an existing object from the Node */
-
-			acpi_ns_detach_object ((acpi_namespace_node *) current_obj_desc);
+		if (opcode == AML_ARG_OP) {
+			/*
+			 * Make sure that the object is the correct type.  This may be overkill, but
+			 * it is here because references were NS nodes in the past.  Now they are
+			 * operand objects of type Reference.
+			 */
+			if (ACPI_GET_DESCRIPTOR_TYPE (current_obj_desc) != ACPI_DESC_TYPE_OPERAND) {
+				ACPI_REPORT_ERROR (("Invalid descriptor type while storing to method arg: %X\n",
+					current_obj_desc->common.type));
+				return_ACPI_STATUS (AE_AML_INTERNAL);
+			}
 
 			/*
-			 * Store this object into the Node
-			 * (perform the indirect store)
+			 * If we have a valid reference object that came from Ref_of(), do the
+			 * indirect store
 			 */
-			status = acpi_ns_attach_object ((acpi_namespace_node *) current_obj_desc,
-					  obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc));
-			return_ACPI_STATUS (status);
+			if ((current_obj_desc->common.type == INTERNAL_TYPE_REFERENCE) &&
+				(current_obj_desc->reference.opcode == AML_REF_OF_OP)) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_EXEC,
+					"Arg (%p) is an Obj_ref(Node), storing in node %p\n",
+					obj_desc, current_obj_desc));
+
+				/* Detach an existing object from the referenced Node */
+
+				acpi_ns_detach_object (current_obj_desc->reference.object);
+
+				/*
+				 * Store this object into the Node
+				 * (perform the indirect store)
+				 */
+				status = acpi_ns_attach_object (current_obj_desc->reference.object,
+						  obj_desc, ACPI_GET_OBJECT_TYPE (obj_desc));
+				return_ACPI_STATUS (status);
+			}
 		}
 
 		/*

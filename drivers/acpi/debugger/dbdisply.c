@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbdisply - debug display commands
- *              $Revision: 76 $
+ *              $Revision: 78 $
  *
  ******************************************************************************/
 
@@ -33,10 +33,10 @@
 #include "acdebug.h"
 
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
 
-#define _COMPONENT          ACPI_DEBUGGER
+#define _COMPONENT          ACPI_CA_DEBUGGER
 	 ACPI_MODULE_NAME    ("dbdisply")
 
 
@@ -855,5 +855,5 @@ acpi_db_display_argument_object (
 	acpi_db_display_internal_object (obj_desc, walk_state);
 }
 
-#endif /* ENABLE_DEBUGGER */
+#endif /* ACPI_DEBUGGER */
 

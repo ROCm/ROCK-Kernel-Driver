@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: evmisc - Miscellaneous event manager support functions
- *              $Revision: 53 $
+ *              $Revision: 56 $
  *
  *****************************************************************************/
 
@@ -442,11 +442,13 @@ acpi_ev_acquire_global_lock (
 	ACPI_FUNCTION_TRACE ("Ev_acquire_global_lock");
 
 
+#ifndef ACPI_APPLICATION
 	/* Make sure that we actually have a global lock */
 
 	if (!acpi_gbl_global_lock_present) {
 		return_ACPI_STATUS (AE_NO_GLOBAL_LOCK);
 	}
+#endif
 
 	/* One more thread wants the global lock */
 
@@ -552,9 +554,56 @@ acpi_ev_release_global_lock (void)
 void
 acpi_ev_terminate (void)
 {
+	NATIVE_UINT_MAX32       i;
+	acpi_status             status;
+
 
 	ACPI_FUNCTION_TRACE ("Ev_terminate");
 
+	/*
+	 * Disable all event-related functionality.
+	 * In all cases, on error, print a message but obviously we don't abort.
+	 */
+
+	/*
+	 * Disable all fixed events
+	 */
+	for (i = 0; i < ACPI_NUM_FIXED_EVENTS; i++) {
+		status = acpi_disable_event(i, ACPI_EVENT_FIXED, 0);
+		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Failed to disable fixed event %d.\n", i));
+		}
+	}
+
+	/*
+	 * Disable all GPEs
+	 */
+	for (i = 0; i < acpi_gbl_gpe_number_max; i++) {
+		if (acpi_ev_get_gpe_number_index(i) != ACPI_GPE_INVALID) {
+			status = acpi_hw_disable_gpe(i);
+			if (ACPI_FAILURE (status)) {
+				ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Failed to disable GPE %d.\n", i));
+			}
+		}
+	}
+
+	/*
+	 * Remove SCI handler
+	 */
+	status = acpi_ev_remove_sci_handler();
+	if (ACPI_FAILURE(status)) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unable to remove SCI handler.\n"));
+	}
+
+	/*
+	 * Return to original mode if necessary
+	 */
+	if (acpi_gbl_original_mode == ACPI_SYS_MODE_LEGACY) {
+		status = acpi_disable ();
+		if (ACPI_FAILURE (status)) {
+			ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Acpi_disable failed.\n"));
+		}
+	}
 
 	/*
 	 * Free global tables, etc.

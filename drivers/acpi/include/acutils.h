@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: acutils.h -- prototypes for the common (subsystem-wide) procedures
- *       $Revision: 142 $
+ *       $Revision: 143 $
  *
  *****************************************************************************/
 
@@ -94,7 +94,7 @@ acpi_ut_validate_fadt (
  * Ut_global - Global data structures and procedures
  */
 
-#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
 
 NATIVE_CHAR *
 acpi_ut_get_mutex_name (
@@ -686,7 +686,7 @@ void
 acpi_ut_set_integer_width (
 	u8                      revision);
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 void
 acpi_ut_display_init_pathname (
 	acpi_handle             obj_handle,

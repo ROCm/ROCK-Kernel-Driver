@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: hwacpi - ACPI Hardware Initialization/Mode Interface
- *              $Revision: 58 $
+ *              $Revision: 60 $
  *
  *****************************************************************************/
 
@@ -95,6 +95,27 @@ acpi_hw_set_mode (
 
 
 	ACPI_FUNCTION_TRACE ("Hw_set_mode");
+
+	/*
+	 * ACPI 2.0 clarified that if SMI_CMD in FADT is zero,
+	 * system does not support mode transition.
+	 */
+	if (!acpi_gbl_FADT->smi_cmd) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "No SMI_CMD in FADT, mode transition failed.\n"));
+		return_ACPI_STATUS (AE_NO_HARDWARE_RESPONSE);
+	}
+
+	/*
+	 * ACPI 2.0 clarified the meaning of ACPI_ENABLE and ACPI_DISABLE
+	 * in FADT: If it is zero, enabling or disabling is not supported.
+	 * As old systems may have used zero for mode transition,
+	 * we make sure both the numbers are zero to determine these
+	 * transitions are not supported.
+	 */
+	if (!acpi_gbl_FADT->acpi_enable && !acpi_gbl_FADT->acpi_disable) {
+		ACPI_DEBUG_PRINT ((ACPI_DB_INFO, "No mode transition supported in this system.\n"));
+		return_ACPI_STATUS (AE_OK);
+	}
 
 	switch (mode) {
 	case ACPI_SYS_MODE_ACPI:

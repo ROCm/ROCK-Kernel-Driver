@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: dbxface - AML Debugger external interfaces
- *              $Revision: 61 $
+ *              $Revision: 64 $
  *
  ******************************************************************************/
 
@@ -30,9 +30,9 @@
 #include "acdisasm.h"
 
 
-#ifdef ENABLE_DEBUGGER
+#ifdef ACPI_DEBUGGER
 
-#define _COMPONENT          ACPI_DEBUGGER
+#define _COMPONENT          ACPI_CA_DEBUGGER
 	 ACPI_MODULE_NAME    ("dbxface")
 
 
@@ -184,7 +184,7 @@ acpi_db_single_step (
 		/* Restore everything */
 
 		op->common.next = next;
-		acpi_os_printf ("\n");
+		acpi_os_printf ("\n\n");
 		acpi_dbg_level = original_debug_level;
 	}
 
@@ -385,4 +385,4 @@ acpi_db_terminate (void)
 }
 
 
-#endif /* ENABLE_DEBUGGER */
+#endif /* ACPI_DEBUGGER */

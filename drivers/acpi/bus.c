@@ -2052,7 +2052,7 @@ acpi_bus_init (void)
 
 	/* Mimic structured exception handling */
 error4:
-	remove_proc_entry("ACPI", NULL);
+	remove_proc_entry(ACPI_BUS_FILE_ROOT, NULL);
 error3:
 	acpi_bus_remove(acpi_root, ACPI_BUS_REMOVAL_NORMAL);
 error2:

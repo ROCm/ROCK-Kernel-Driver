@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: nssearch - Namespace search
- *              $Revision: 86 $
+ *              $Revision: 89 $
  *
  ******************************************************************************/
 
@@ -71,7 +71,7 @@ acpi_ns_search_node (
 	ACPI_FUNCTION_TRACE ("Ns_search_node");
 
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 	if (ACPI_LV_NAMES & acpi_dbg_level) {
 		NATIVE_CHAR         *scope_name;
 
@@ -290,10 +290,10 @@ acpi_ns_search_and_enter (
 	/* Parameter validation */
 
 	if (!node || !target_name || !return_node) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null param-  Table %p Name %X Return %p\n",
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Null param: Node %p Name %X Return_node %p\n",
 			node, target_name, return_node));
 
-		ACPI_REPORT_ERROR (("Ns_search_and_enter: bad (null) parameter\n"));
+		ACPI_REPORT_ERROR (("Ns_search_and_enter: Null parameter\n"));
 		return_ACPI_STATUS (AE_BAD_PARAMETER);
 	}
 

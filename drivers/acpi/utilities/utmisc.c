@@ -1,7 +1,7 @@
 /*******************************************************************************
  *
  * Module Name: utmisc - common utility procedures
- *              $Revision: 78 $
+ *              $Revision: 80 $
  *
  ******************************************************************************/
 
@@ -104,7 +104,7 @@ acpi_ut_set_integer_width (
 }
 
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 /*******************************************************************************
  *
  * FUNCTION:    Acpi_ut_display_init_pathname

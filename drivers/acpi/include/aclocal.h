@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Name: aclocal.h - Internal data types used across the ACPI subsystem
- *       $Revision: 173 $
+ *       $Revision: 175 $
  *
  *****************************************************************************/
 
@@ -73,7 +73,7 @@ typedef u32                             ACPI_MUTEX_HANDLE;
 #define NUM_MTX                         MAX_MTX+1
 
 
-#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
 #ifdef DEFINE_ACPI_GLOBALS
 
 /* Names for the mutexes used in the subsystem */
@@ -567,7 +567,7 @@ acpi_status (*ACPI_EXECUTE_OP) (
  */
 typedef struct acpi_opcode_info
 {
-#if defined(ACPI_DISASSEMBLER) || defined(ACPI_DEBUG)
+#if defined(ACPI_DISASSEMBLER) || defined(ACPI_DEBUG_OUTPUT)
 	NATIVE_CHAR             *name;          /* Opcode name (disassembler/debug only) */
 #endif
 	u32                     parse_args;     /* Grammar/Parse time arguments */

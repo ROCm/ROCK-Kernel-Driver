@@ -32,7 +32,6 @@
 #include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/bootmem.h>
-#include <linux/slab.h>
 #include <linux/irq.h>
 #include <linux/acpi.h>
 #include <asm/mpspec.h>
@@ -53,11 +52,9 @@
                               Boot-time Configuration
    -------------------------------------------------------------------------- */
 
-#ifdef CONFIG_ACPI_BOOT
-
 enum acpi_irq_model_id		acpi_irq_model;
 
-
+#ifdef CONFIG_ACPI_BOOT
 /*
  * Use reserved fixmap pages for physical-to-virtual mappings of ACPI tables.
  * Note that the same range is used for each table, so tables that need to

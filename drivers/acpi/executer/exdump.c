@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 157 $
+ *              $Revision: 159 $
  *
  *****************************************************************************/
 
@@ -38,7 +38,7 @@
  * The following routines are used for debug output only
  */
 
-#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
 
 /*****************************************************************************
  *

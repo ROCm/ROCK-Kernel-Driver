@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psargs - Parse AML opcode arguments
- *              $Revision: 62 $
+ *              $Revision: 64 $
  *
  *****************************************************************************/
 
@@ -162,7 +162,7 @@ acpi_ps_get_next_namestring (
 	/* Handle multiple prefix characters */
 
 	while (acpi_ps_is_prefix_char (ACPI_GET8 (end))) {
-		/* include prefix '\\' or '^' */
+		/* Include prefix '\\' or '^' */
 
 		end++;
 	}
@@ -218,20 +218,17 @@ acpi_ps_get_next_namestring (
  *              Method_call         - Whether the namepath can be the start
  *                                    of a method call
  *
- * RETURN:      None
+ * RETURN:      Status
  *
- * DESCRIPTION: Get next name (if method call, push appropriate # args).  Names
- *              are looked up in either the parsed or internal namespace to
- *              determine if the name represents a control method.  If a method
+ * DESCRIPTION: Get next name (if method call, return # of required args).
+ *              Names are looked up in the internal namespace to determine
+ *              if the name represents a control method.  If a method
  *              is found, the number of arguments to the method is returned.
  *              This information is critical for parsing to continue correctly.
  *
  ******************************************************************************/
 
-
-#ifdef PARSER_ONLY
-
-void
+acpi_status
 acpi_ps_get_next_namepath (
 	acpi_parse_state        *parser_state,
 	acpi_parse_object       *arg,
@@ -240,62 +237,71 @@ acpi_ps_get_next_namepath (
 {
 	NATIVE_CHAR             *path;
 	acpi_parse_object       *name_op;
-	acpi_parse_object       *op;
-	acpi_parse_object       *count;
+	acpi_status             status = AE_OK;
+	acpi_operand_object     *method_desc;
+	acpi_namespace_node     *node;
+	acpi_generic_state      scope_info;
 
 
 	ACPI_FUNCTION_TRACE ("Ps_get_next_namepath");
 
 
 	path = acpi_ps_get_next_namestring (parser_state);
-	if (!path || !method_call) {
-		/* Null name case, create a null namepath object */
 
-		acpi_ps_init_op (arg, AML_INT_NAMEPATH_OP);
-		arg->common.value.name = path;
-		return_VOID;
-	}
+	/* Null path case is allowed */
 
-
-	if (acpi_gbl_parsed_namespace_root) {
+	if (path) {
 		/*
-		 * Lookup the name in the parsed namespace
+		 * Lookup the name in the internal namespace
 		 */
-		op = NULL;
-		if (method_call) {
-			op = acpi_ps_find (acpi_ps_get_parent_scope (parser_state),
-					   path, AML_METHOD_OP, 0);
+		scope_info.scope.node = NULL;
+		node = parser_state->start_node;
+		if (node) {
+			scope_info.scope.node = node;
 		}
 
-		if (op) {
-			if (op->common.aml_opcode == AML_METHOD_OP) {
-				/*
-				 * The name refers to a control method, so this namepath is a
-				 * method invocation.  We need to 1) Get the number of arguments
-				 * associated with this method, and 2) Change the NAMEPATH
-				 * object into a METHODCALL object.
-				 */
-				count = acpi_ps_get_arg (op, 0);
-				if (count && count->common.aml_opcode == AML_BYTE_OP) {
-					name_op = acpi_ps_alloc_op (AML_INT_NAMEPATH_OP);
-					if (name_op) {
-						/* Change arg into a METHOD CALL and attach the name */
+		/*
+		 * Lookup object.  We don't want to add anything new to the namespace
+		 * here, however.  So we use MODE_EXECUTE.  Allow searching of the
+		 * parent tree, but don't open a new scope -- we just want to lookup the
+		 * object  (MUST BE mode EXECUTE to perform upsearch)
+		 */
+		status = acpi_ns_lookup (&scope_info, path, ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
+				 ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE, NULL,
+				 &node);
+		if (ACPI_SUCCESS (status) && method_call) {
+			if (node->type == ACPI_TYPE_METHOD) {
+				method_desc = acpi_ns_get_attached_object (node);
+				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p Desc %p Path=%p\n",
+					node, method_desc, path));
 
-						acpi_ps_init_op (arg, AML_INT_METHODCALL_OP);
-
-						name_op->common.value.name = path;
-
-						/* Point METHODCALL/NAME to the METHOD Node */
-
-						name_op->common.node = (acpi_namespace_node *) op;
-						acpi_ps_append_arg (arg, name_op);
-
-						*arg_count = (u32) count->common.value.integer &
-								 METHOD_FLAGS_ARG_COUNT;
-					}
+				name_op = acpi_ps_alloc_op (AML_INT_NAMEPATH_OP);
+				if (!name_op) {
+					return_ACPI_STATUS (AE_NO_MEMORY);
 				}
 
-				return_VOID;
+				/* Change arg into a METHOD CALL and attach name to it */
+
+				acpi_ps_init_op (arg, AML_INT_METHODCALL_OP);
+
+				name_op->common.value.name = path;
+
+				/* Point METHODCALL/NAME to the METHOD Node */
+
+				name_op->common.node = node;
+				acpi_ps_append_arg (arg, name_op);
+
+				if (!method_desc) {
+					ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p has no attached object\n",
+						node));
+					return_ACPI_STATUS (AE_AML_INTERNAL);
+				}
+
+				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p Args %X\n",
+					node, method_desc->method.param_count));
+
+				*arg_count = method_desc->method.param_count;
+				return_ACPI_STATUS (AE_OK);
 			}
 
 			/*
@@ -307,121 +313,15 @@ acpi_ps_get_next_namepath (
 	}
 
 	/*
-	 * Either we didn't find the object in the namespace, or the object is
-	 * something other than a control method.  Just initialize the Op with the
-	 * pathname
+	 * Regardless of success/failure above,
+	 * Just initialize the Op with the pathname.
 	 */
 	acpi_ps_init_op (arg, AML_INT_NAMEPATH_OP);
 	arg->common.value.name = path;
 
-
-	return_VOID;
+	return_ACPI_STATUS (status);
 }
 
-
-#else
-
-
-void
-acpi_ps_get_next_namepath (
-	acpi_parse_state        *parser_state,
-	acpi_parse_object       *arg,
-	u32                     *arg_count,
-	u8                      method_call)
-{
-	NATIVE_CHAR             *path;
-	acpi_parse_object       *name_op;
-	acpi_status             status;
-	acpi_operand_object     *method_desc;
-	acpi_namespace_node     *node;
-	acpi_generic_state      scope_info;
-
-
-	ACPI_FUNCTION_TRACE ("Ps_get_next_namepath");
-
-
-	path = acpi_ps_get_next_namestring (parser_state);
-	if (!path || !method_call) {
-		/* Null name case, create a null namepath object */
-
-		acpi_ps_init_op (arg, AML_INT_NAMEPATH_OP);
-		arg->common.value.name = path;
-		return_VOID;
-	}
-
-	/*
-	 * Lookup the name in the internal namespace
-	 */
-	scope_info.scope.node = NULL;
-	node = parser_state->start_node;
-	if (node) {
-		scope_info.scope.node = node;
-	}
-
-	/*
-	 * Lookup object.  We don't want to add anything new to the namespace
-	 * here, however.  So we use MODE_EXECUTE.  Allow searching of the
-	 * parent tree, but don't open a new scope -- we just want to lookup the
-	 * object  (MUST BE mode EXECUTE to perform upsearch)
-	 */
-	status = acpi_ns_lookup (&scope_info, path, ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
-			 ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE, NULL,
-			 &node);
-	if (ACPI_SUCCESS (status)) {
-		if (node->type == ACPI_TYPE_METHOD) {
-			method_desc = acpi_ns_get_attached_object (node);
-			ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p Desc %p Path=%p\n",
-				node, method_desc, path));
-
-			name_op = acpi_ps_alloc_op (AML_INT_NAMEPATH_OP);
-			if (!name_op) {
-				return_VOID;
-			}
-
-			/* Change arg into a METHOD CALL and attach name to it */
-
-			acpi_ps_init_op (arg, AML_INT_METHODCALL_OP);
-
-			name_op->common.value.name = path;
-
-			/* Point METHODCALL/NAME to the METHOD Node */
-
-			name_op->common.node = node;
-			acpi_ps_append_arg (arg, name_op);
-
-			if (!method_desc) {
-				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p has no attached object\n",
-					node));
-				return_VOID;
-			}
-
-			ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p Args %X\n",
-				node, method_desc->method.param_count));
-
-			*arg_count = method_desc->method.param_count;
-			return_VOID;
-		}
-
-		/*
-		 * Else this is normal named object reference.
-		 * Just init the NAMEPATH object with the pathname.
-		 * (See code below)
-		 */
-	}
-
-	/*
-	 * Either we didn't find the object in the namespace, or the object is
-	 * something other than a control method.  Just initialize the Op with the
-	 * pathname.
-	 */
-	acpi_ps_init_op (arg, AML_INT_NAMEPATH_OP);
-	arg->common.value.name = path;
-
-
-	return_VOID;
-}
-
-#endif
 
 /*******************************************************************************
  *
@@ -630,23 +530,25 @@ acpi_ps_get_next_field (
  *              Arg_count           - If the argument points to a control method
  *                                    the method's argument is returned here.
  *
- * RETURN:      An op object containing the next argument.
+ * RETURN:      Status, and an op object containing the next argument.
  *
  * DESCRIPTION: Get next argument (including complex list arguments that require
  *              pushing the parser stack)
  *
  ******************************************************************************/
 
-acpi_parse_object *
+acpi_status
 acpi_ps_get_next_arg (
 	acpi_parse_state        *parser_state,
 	u32                     arg_type,
-	u32                     *arg_count)
+	u32                     *arg_count,
+	acpi_parse_object       **return_arg)
 {
 	acpi_parse_object       *arg = NULL;
 	acpi_parse_object       *prev = NULL;
 	acpi_parse_object       *field;
 	u32                     subop;
+	acpi_status             status = AE_OK;
 
 
 	ACPI_FUNCTION_TRACE_PTR ("Ps_get_next_arg", parser_state);
@@ -663,15 +565,16 @@ acpi_ps_get_next_arg (
 		/* constants, strings, and namestrings are all the same size */
 
 		arg = acpi_ps_alloc_op (AML_BYTE_OP);
-		if (arg) {
-			acpi_ps_get_next_simple_arg (parser_state, arg_type, arg);
+		if (!arg) {
+			return_ACPI_STATUS (AE_NO_MEMORY);
 		}
+		acpi_ps_get_next_simple_arg (parser_state, arg_type, arg);
 		break;
 
 
 	case ARGP_PKGLENGTH:
 
-		/* package length, nothing returned */
+		/* Package length, nothing returned */
 
 		parser_state->pkg_end = acpi_ps_get_next_package_end (parser_state);
 		break;
@@ -680,18 +583,17 @@ acpi_ps_get_next_arg (
 	case ARGP_FIELDLIST:
 
 		if (parser_state->aml < parser_state->pkg_end) {
-			/* non-empty list */
+			/* Non-empty list */
 
 			while (parser_state->aml < parser_state->pkg_end) {
 				field = acpi_ps_get_next_field (parser_state);
 				if (!field) {
-					break;
+					return_ACPI_STATUS (AE_NO_MEMORY);
 				}
 
 				if (prev) {
 					prev->common.next = field;
 				}
-
 				else {
 					arg = field;
 				}
@@ -699,7 +601,7 @@ acpi_ps_get_next_arg (
 				prev = field;
 			}
 
-			/* skip to End of byte data */
+			/* Skip to End of byte data */
 
 			parser_state->aml = parser_state->pkg_end;
 		}
@@ -709,17 +611,19 @@ acpi_ps_get_next_arg (
 	case ARGP_BYTELIST:
 
 		if (parser_state->aml < parser_state->pkg_end) {
-			/* non-empty list */
+			/* Non-empty list */
 
 			arg = acpi_ps_alloc_op (AML_INT_BYTELIST_OP);
-			if (arg) {
-				/* fill in bytelist data */
-
-				arg->common.value.size = ACPI_PTR_DIFF (parser_state->pkg_end, parser_state->aml);
-				arg->named.data = parser_state->aml;
+			if (!arg) {
+				return_ACPI_STATUS (AE_NO_MEMORY);
 			}
 
-			/* skip to End of byte data */
+			/* Fill in bytelist data */
+
+			arg->common.value.size = ACPI_PTR_DIFF (parser_state->pkg_end, parser_state->aml);
+			arg->named.data = parser_state->aml;
+
+			/* Skip to End of byte data */
 
 			parser_state->aml = parser_state->pkg_end;
 		}
@@ -728,24 +632,25 @@ acpi_ps_get_next_arg (
 
 	case ARGP_TARGET:
 	case ARGP_SUPERNAME:
-	case ARGP_SIMPLENAME: {
-			subop = acpi_ps_peek_opcode (parser_state);
-			if (subop == 0              ||
-				acpi_ps_is_leading_char (subop) ||
-				acpi_ps_is_prefix_char (subop)) {
-				/* Null_name or Name_string */
+	case ARGP_SIMPLENAME:
 
-				arg = acpi_ps_alloc_op (AML_INT_NAMEPATH_OP);
-				if (arg) {
-					acpi_ps_get_next_namepath (parser_state, arg, arg_count, 0);
-				}
+		subop = acpi_ps_peek_opcode (parser_state);
+		if (subop == 0                  ||
+			acpi_ps_is_leading_char (subop) ||
+			acpi_ps_is_prefix_char (subop)) {
+			/* Null_name or Name_string */
+
+			arg = acpi_ps_alloc_op (AML_INT_NAMEPATH_OP);
+			if (!arg) {
+				return_ACPI_STATUS (AE_NO_MEMORY);
 			}
 
-			else {
-				/* single complex argument, nothing returned */
+			status = acpi_ps_get_next_namepath (parser_state, arg, arg_count, 0);
+		}
+		else {
+			/* single complex argument, nothing returned */
 
-				*arg_count = 1;
-			}
+			*arg_count = 1;
 		}
 		break;
 
@@ -770,10 +675,14 @@ acpi_ps_get_next_arg (
 		}
 		break;
 
+
 	default:
+
 		ACPI_REPORT_ERROR (("Invalid Arg_type: %X\n", arg_type));
+		status = AE_AML_OPERAND_TYPE;
 		break;
 	}
 
-	return_PTR (arg);
+	*return_arg = arg;
+	return_ACPI_STATUS (status);
 }

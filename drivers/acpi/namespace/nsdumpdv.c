@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 1 $
+ *              $Revision: 3 $
  *
  *****************************************************************************/
 
@@ -33,7 +33,7 @@
 	 ACPI_MODULE_NAME    ("nsdumpdv")
 
 
-#if defined(ACPI_DEBUG) || defined(ENABLE_DEBUGGER)
+#if defined(ACPI_DEBUG_OUTPUT) || defined(ACPI_DEBUGGER)
 
 /*******************************************************************************
  *

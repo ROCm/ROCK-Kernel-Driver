@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utdebug - Debug print routines
- *              $Revision: 103 $
+ *              $Revision: 104 $
  *
  *****************************************************************************/
 
@@ -30,7 +30,7 @@
 	 ACPI_MODULE_NAME    ("utdebug")
 
 
-#ifdef ACPI_DEBUG
+#ifdef ACPI_DEBUG_OUTPUT
 
 static u32   acpi_gbl_prev_thread_id = 0xFFFFFFFF;
 static char     *acpi_gbl_fn_entry_str = "----Entry";
