@@ -371,7 +371,7 @@ static struct seq_operations proc_bus_pci_devices_op = {
 	show:	show_device
 };
 
-static struct proc_dir_entry *proc_bus_pci_dir;
+struct proc_dir_entry *proc_bus_pci_dir;
 
 /* driverfs files */
 static ssize_t pci_show_irq(struct device * dev, char * buf, size_t count, loff_t off)
@@ -621,5 +621,6 @@ EXPORT_SYMBOL(pci_proc_attach_device);
 EXPORT_SYMBOL(pci_proc_detach_device);
 EXPORT_SYMBOL(pci_proc_attach_bus);
 EXPORT_SYMBOL(pci_proc_detach_bus);
+EXPORT_SYMBOL(proc_bus_pci_dir);
 #endif
 
