@@ -440,7 +440,7 @@ static void cpia_usb_free_resources(struct usb_cpia *ucpia, int try)
 
 	/* Unschedule all of the iso td's */
 	if (ucpia->sbuf[1].urb) {
-		usb_unlink_urb(ucpia->sbuf[1].urb);
+		usb_kill_urb(ucpia->sbuf[1].urb);
 		usb_free_urb(ucpia->sbuf[1].urb);
 		ucpia->sbuf[1].urb = NULL;
 	}
@@ -451,7 +451,7 @@ static void cpia_usb_free_resources(struct usb_cpia *ucpia, int try)
 	}
  
 	if (ucpia->sbuf[0].urb) {
-		usb_unlink_urb(ucpia->sbuf[0].urb);
+		usb_kill_urb(ucpia->sbuf[0].urb);
 		usb_free_urb(ucpia->sbuf[0].urb);
 		ucpia->sbuf[0].urb = NULL;
 	}
