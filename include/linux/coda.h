@@ -163,11 +163,11 @@ typedef unsigned int	   u_int32_t;
 #ifndef _VENUS_DIRENT_T_
 #define _VENUS_DIRENT_T_ 1
 struct venus_dirent {
-        unsigned long	d_fileno;		/* file number of entry */
-        unsigned short	d_reclen;		/* length of this record */
-        unsigned char 	d_type;			/* file type, see below */
-        unsigned char	d_namlen;		/* length of string in d_name */
-        char		d_name[CODA_MAXNAMLEN + 1];/* name must be no longer than this */
+        u_int32_t d_fileno;		/* file number of entry */
+        u_int16_t d_reclen;		/* length of this record */
+        u_int8_t  d_type;			/* file type, see below */
+        u_int8_t  d_namlen;		/* length of string in d_name */
+        char	  d_name[CODA_MAXNAMLEN + 1];/* name must be no longer than this */
 };
 #undef DIRSIZ
 #define DIRSIZ(dp)      ((sizeof (struct venus_dirent) - (CODA_MAXNAMLEN+1)) + \
@@ -196,10 +196,10 @@ struct venus_dirent {
 
 #ifndef	_FID_T_
 #define _FID_T_	1
-typedef u_long VolumeId;
-typedef u_long VnodeId;
-typedef u_long Unique_t;
-typedef u_long FileVersion;
+typedef u_int32_t VolumeId;
+typedef u_int32_t VnodeId;
+typedef u_int32_t Unique_t;
+typedef u_int32_t FileVersion;
 #endif 
 
 #ifndef	_VICEFID_T_
@@ -336,19 +336,19 @@ struct coda_statfs {
  *        Venus <-> Coda  RPC arguments
  */
 struct coda_in_hdr {
-    unsigned long opcode;
-    unsigned long unique;	    /* Keep multiple outstanding msgs distinct */
-    u_short pid;		    /* Common to all */
-    u_short pgid;		    /* Common to all */
-    u_short sid;                    /* Common to all */
-    struct coda_cred cred;	    /* Common to all */
+    u_int32_t opcode;
+    u_int32_t unique;	    /* Keep multiple outstanding msgs distinct */
+    u_int16_t pid;	    /* Common to all */
+    u_int16_t pgid;	    /* Common to all */
+    u_int16_t sid;          /* Common to all */
+    struct coda_cred cred;  /* Common to all */
 };
 
 /* Really important that opcode and unique are 1st two fields! */
 struct coda_out_hdr {
-    unsigned long opcode;
-    unsigned long unique;	
-    unsigned long result;
+    u_int32_t opcode;
+    u_int32_t unique;	
+    u_int32_t result;
 };
 
 /* coda_root: NO_IN */
@@ -633,14 +633,6 @@ struct coda_zapdir_out {
     ViceFid CodaFid;
 };
 
-/* coda_zapnode: */
-/* CODA_ZAPVNODE is a venus->kernel call */	
-struct coda_zapvnode_out { 
-    struct coda_out_hdr oh;
-    struct coda_cred cred;
-    ViceFid VFid;
-};
-
 /* coda_purgefid: */
 /* CODA_PURGEFID is a venus->kernel call */	
 struct coda_purgefid_out { 
@@ -741,7 +733,6 @@ union outputArgs {
     struct coda_purgeuser_out coda_purgeuser;
     struct coda_zapfile_out coda_zapfile;
     struct coda_zapdir_out coda_zapdir;
-    struct coda_zapvnode_out coda_zapvnode;
     struct coda_purgefid_out coda_purgefid;
     struct coda_replace_out coda_replace;
     struct coda_open_by_fd_out coda_open_by_fd;
@@ -755,7 +746,6 @@ union coda_downcalls {
     struct coda_purgeuser_out purgeuser;
     struct coda_zapfile_out zapfile;
     struct coda_zapdir_out zapdir;
-    struct coda_zapvnode_out zapvnode;
     struct coda_purgefid_out purgefid;
     struct coda_replace_out replace;
 };
@@ -778,18 +768,9 @@ struct PioctlData {
         struct ViceIoctl vi;
 };
 
-#define	CODA_CONTROL		".CONTROL"
-#define CODA_CONTROLLEN           8
-#define	CTL_VOL			-1
-#define	CTL_VNO			-1
-#define	CTL_UNI			-1
-#define CTL_INO                 -1
-#define	CTL_FILE		"/coda/.CONTROL"
-
-
-#define	IS_CTL_FID(fidp)	((fidp)->Volume == CTL_VOL &&\
-				 (fidp)->Vnode == CTL_VNO &&\
-				 (fidp)->Unique == CTL_UNI)
+#define CODA_CONTROL		".CONTROL"
+#define CODA_CONTROLLEN		8
+#define CTL_INO			-1
 
 /* Data passed to mount */
 

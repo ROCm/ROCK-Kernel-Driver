@@ -13,16 +13,7 @@
 
 inline int coda_fideq(ViceFid *fid1, ViceFid *fid2)
 {
-	if (fid1->Vnode != fid2->Vnode)   return 0;
-	if (fid1->Volume != fid2->Volume) return 0;
-	if (fid1->Unique != fid2->Unique) return 0;
-	return 1;
-}
-
-inline int coda_isnullfid(ViceFid *fid)
-{
-	if (fid->Vnode || fid->Volume || fid->Unique) return 0;
-	return 1;
+	return memcmp(fid1, fid2, sizeof(*fid1)) == 0;
 }
 
 static struct inode_operations coda_symlink_inode_operations = {

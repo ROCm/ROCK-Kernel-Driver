@@ -169,7 +169,6 @@ static int coda_fill_super(struct super_block *sb, void *data, int silent)
 
 	vc->vc_sb = sb;
 
-	sbi->sbi_sb = sb;
 	sbi->sbi_vcomm = vc;
 	INIT_LIST_HEAD(&sbi->sbi_cihead);
 

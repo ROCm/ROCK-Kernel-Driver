@@ -6,12 +6,11 @@
 
 #define CODA_SUPER_MAGIC	0x73757245
 
-struct statfs;
+struct kstatfs;
 
 struct coda_sb_info
 {
-	struct venus_comm * sbi_vcomm;
-	struct super_block *sbi_sb;
+	struct venus_comm *sbi_vcomm;
 	struct list_head    sbi_cihead;
 };
 

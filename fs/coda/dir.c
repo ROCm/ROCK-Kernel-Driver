@@ -588,8 +588,7 @@ static int coda_venus_readdir(struct file *filp, filldir_t filldir,
 			break;
 		}
 		/* validate whether the directory file actually makes sense */
-		if (vdir->d_reclen < vdir_size + vdir->d_namlen ||
-		    vdir->d_namlen > CODA_MAXNAMLEN) {
+		if (vdir->d_reclen < vdir_size + vdir->d_namlen) {
 			printk("coda_venus_readdir: Invalid dir: %ld\n",
 			       filp->f_dentry->d_inode->i_ino);
 			ret = -EBADF;

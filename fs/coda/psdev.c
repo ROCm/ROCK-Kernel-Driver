@@ -61,7 +61,6 @@ unsigned long coda_timeout = 30; /* .. secs, then signals will dequeue */
 
 
 struct venus_comm coda_comms[MAX_CODADEVS];
-kmem_cache_t *cii_cache, *cred_cache, *upc_cache;
 
 /*
  * Device operations
@@ -126,13 +125,13 @@ static ssize_t coda_psdev_write(struct file *file, const char *buf,
 		}
 
 		if  ( nbytes < sizeof(struct coda_out_hdr) ) {
-		        printk("coda_downcall opc %ld uniq %ld, not enough!\n",
+		        printk("coda_downcall opc %d uniq %d, not enough!\n",
 			       hdr.opcode, hdr.unique);
 			count = nbytes;
 			goto out;
 		}
 		if ( nbytes > size ) {
-		        printk("Coda: downcall opc %ld, uniq %ld, too much!",
+		        printk("Coda: downcall opc %d, uniq %d, too much!",
 			       hdr.opcode, hdr.unique);
 		        nbytes = size;
 		}
@@ -171,7 +170,7 @@ static ssize_t coda_psdev_write(struct file *file, const char *buf,
 	unlock_kernel();
 
 	if (!req) {
-		printk("psdev_write: msg (%ld, %ld) not found\n", 
+		printk("psdev_write: msg (%d, %d) not found\n", 
 			hdr.opcode, hdr.unique);
 		retval = -ESRCH;
 		goto out;
@@ -179,7 +178,7 @@ static ssize_t coda_psdev_write(struct file *file, const char *buf,
 
         /* move data into response buffer. */
 	if (req->uc_outSize < nbytes) {
-                printk("psdev_write: too much cnt: %d, cnt: %ld, opc: %ld, uniq: %ld.\n",
+                printk("psdev_write: too much cnt: %d, cnt: %ld, opc: %d, uniq: %d.\n",
 		       req->uc_outSize, (long)nbytes, hdr.opcode, hdr.unique);
 		nbytes = req->uc_outSize; /* don't have more space! */
 	}
@@ -325,10 +324,7 @@ static int coda_psdev_release(struct inode * inode, struct file * file)
 	}
         
         /* Wakeup clients so they can return. */
-	lh = vcp->vc_pending.next;
-	next = lh;
-	while ( (lh = next) != &vcp->vc_pending) {
-		next = lh->next;
+	list_for_each_safe(lh, next, &vcp->vc_pending) {
 		req = list_entry(lh, struct upc_req, uc_chain);
 		/* Async requests need to be freed here */
 		if (req->uc_flags & REQ_ASYNC) {
@@ -340,9 +336,7 @@ static int coda_psdev_release(struct inode * inode, struct file * file)
 		wake_up(&req->uc_sleep);
         }
         
-	lh = &vcp->vc_processing;
-	while ( (lh = lh->next) != &vcp->vc_processing) {
-		req = list_entry(lh, struct upc_req, uc_chain);
+	list_for_each_entry(req, &vcp->vc_processing, uc_chain) {
 		req->uc_flags |= REQ_ABORT;
 	        wake_up(&req->uc_sleep);
         }
