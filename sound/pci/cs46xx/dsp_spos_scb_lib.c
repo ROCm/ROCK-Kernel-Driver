@@ -603,8 +603,8 @@ cs46xx_dsp_create_src_task_scb(cs46xx_t * chip,char * scb_name,
 		src_buffer_addr << 0x10,
 		0x04000000,
 		{ 
-			0x8000,0x8000,
-			0xffff,0xffff
+			0xffff - ins->dac_volume_right,0xffff - ins->dac_volume_left,
+			0xffff - ins->dac_volume_right,0xffff - ins->dac_volume_left
 		}
 	};
 
@@ -658,7 +658,7 @@ cs46xx_dsp_create_mix_only_scb(cs46xx_t * chip,char * scb_name,
 		/* D */ 0,
 		{
 			/* E */ 0x8000,0x8000,
-			/* F */ 0xffff,0xffff
+			/* F */ 0x8000,0x8000
 		}
 	};
 
@@ -830,7 +830,7 @@ cs46xx_dsp_create_asynch_fg_tx_scb(cs46xx_t * chip,char * scb_name,u32 dest,
 		0,0x2aab,           /* Const 1/3 */
     
 		{
-			0,                /* Define the unused elements */
+			0,         /* Define the unused elements */
 			0,
 			0
 		},
@@ -846,7 +846,7 @@ cs46xx_dsp_create_asynch_fg_tx_scb(cs46xx_t * chip,char * scb_name,u32 dest,
 		   rate etc  */
 		0x18000000,                     /* Phi increment for approx 32k operation */
 		0x8000,0x8000,                  /* Volume controls are unused at this time */
-		0xffff,0xffff
+		0x8000,0x8000
 	};
   
 	scb = cs46xx_dsp_create_generic_scb(chip,scb_name,(u32 *)&asynch_fg_tx_scb,
@@ -864,7 +864,7 @@ cs46xx_dsp_create_asynch_fg_rx_scb(cs46xx_t * chip,char * scb_name,u32 dest,
                                    dsp_scb_descriptor_t * parent_scb,
                                    int scb_child_type)
 {
-
+	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 	dsp_scb_descriptor_t * scb;
 
 	asynch_fg_rx_scb_t asynch_fg_rx_scb = {
@@ -893,9 +893,9 @@ cs46xx_dsp_create_asynch_fg_rx_scb(cs46xx_t * chip,char * scb_name,u32 dest,
 		   rate etc  */
 		0x18000000,         
 
-		/* Mute stream */
-		0x8000,0x8000,       
-		0xffff,0xffff
+		/* Set IEC958 input volume */
+		0xffff - ins->spdif_input_volume_right,0xffff - ins->spdif_input_volume_left,
+		0xffff - ins->spdif_input_volume_right,0xffff - ins->spdif_input_volume_left,
 	};
 
 	scb = cs46xx_dsp_create_generic_scb(chip,scb_name,(u32 *)&asynch_fg_rx_scb,
@@ -1116,11 +1116,13 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 	case DSP_IEC958_CHANNEL:
 		snd_assert (ins->asynch_tx_scb != NULL, return NULL);
 		mixer_scb = ins->asynch_tx_scb;
+#if 0
 		if (ins->spdif_status_out & DSP_SPDIF_STATUS_AC3_MODE) {
 			snd_printdd ("IEC958 opened in AC3 mode\n");
 			/*src_scb = ins->asynch_tx_scb;
 			  ins->asynch_tx_scb->ref_count ++;*/
 		}
+#endif
 		break;
 	default:
 		snd_assert (0);
@@ -1198,9 +1200,7 @@ pcm_channel_descriptor_t * cs46xx_dsp_create_pcm_channel (cs46xx_t * chip,
 			return NULL;
 		}
 
-		if (pcm_channel_id != DSP_IEC958_CHANNEL ||
-		    !(ins->spdif_status_out & DSP_SPDIF_STATUS_AC3_MODE))
-			cs46xx_dsp_set_src_sample_rate(chip,src_scb,sample_rate);
+		cs46xx_dsp_set_src_sample_rate(chip,src_scb,sample_rate);
 
 		ins->nsrc_scb ++;
 	} 
@@ -1461,17 +1461,11 @@ void cs46xx_dsp_set_src_sample_rate(cs46xx_t *chip,dsp_scb_descriptor_t * src, u
 	 */
 	spin_lock_irqsave(&chip->reg_lock, flags);
 
-	/* mute SCB */
-	/* cs46xx_dsp_scb_set_volume (chip,src,0,0); */
-
 	snd_cs46xx_poke(chip, (src->address + SRCCorPerGof) << 2,
 	  ((correctionPerSec << 16) & 0xFFFF0000) | (correctionPerGOF & 0xFFFF));
 
 	snd_cs46xx_poke(chip, (src->address + SRCPhiIncr6Int26Frac) << 2, phiIncr);
 
-	/* raise volume */
-	/* cs46xx_dsp_scb_set_volume (chip,src,0x7fff,0x7fff); */
-	
 	spin_unlock_irqrestore(&chip->reg_lock, flags);
 }
 
@@ -1641,9 +1635,8 @@ int cs46xx_iec958_pre_open (cs46xx_t *chip)
 								SCB_ON_PARENT_NEXT_SCB);
 
 
-	if (ins->spdif_status_out & DSP_SPDIF_STATUS_AC3_MODE) 
-		/* set left (13), right validity bit (12) , and non-audio(1) and profsional bit (0) */
-		cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, 0x00000000 | (1 << 13) | (1 << 12) | (1 << 1) | 1);
+	/* set spdif channel status value for streaming */
+	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, ins->spdif_csuv_stream);
 
 	ins->spdif_status_out  |= DSP_SPDIF_STATUS_PLAYBACK_OPEN;
 
@@ -1659,7 +1652,7 @@ int cs46xx_iec958_post_close (cs46xx_t *chip)
 	ins->spdif_status_out  &= ~DSP_SPDIF_STATUS_PLAYBACK_OPEN;
 
 	/* restore settings */
-	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, 0x00000000 | (1 << 13) | (1 << 12));
+	cs46xx_poke_via_dsp (chip,SP_SPDOUT_CSUV, ins->spdif_csuv_default);
 	
 	/* deallocate stuff */
 	cs46xx_dsp_remove_scb (chip,ins->asynch_tx_scb);

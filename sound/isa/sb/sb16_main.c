@@ -10,6 +10,12 @@
  *  Note: 16-bit wide is assigned to first direction which made request.
  *        With full duplex - playback is preferred with abstract layer.
  *
+ *  Note: Some chip revisions have hardware bug. Changing capture
+ *        channel from full-duplex 8bit DMA to 16bit DMA will block
+ *        16bit DMA transfers from DSP chip (capture) until 8bit transfer
+ *        to DSP chip (playback) starts. This bug can be avoided with
+ *        "16bit DMA Allocation" setting set to Playback or Capture.
+ *
  *
  *   This program is free software; you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by

@@ -63,7 +63,6 @@
 #define DSP_SPDIF_STATUS_OUTPUT_ENABLED 1
 #define DSP_SPDIF_STATUS_PLAYBACK_OPEN  2
 #define DSP_SPDIF_STATUS_HW_ENABLED     4
-#define DSP_SPDIF_STATUS_AC3_MODE       8
 
 struct _dsp_module_desc_t;
 
@@ -196,6 +195,10 @@ typedef struct _dsp_spos_instance_t {
 	int spdif_status_in;
 	u16 spdif_input_volume_right;
 	u16 spdif_input_volume_left;
+	/* spdif channel status,
+	   left right and user validity bits */
+	int spdif_csuv_default;
+	int spdif_csuv_stream;
 
 	/* SPDIF input sample rate converter */
 	dsp_scb_descriptor_t * spdif_in_src;

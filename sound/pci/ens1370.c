@@ -1355,6 +1355,7 @@ static snd_kcontrol_new_t snd_ens1373_spdif_default __devinitdata =
 
 static snd_kcontrol_new_t snd_ens1373_spdif_mask __devinitdata =
 {
+	.access =	SNDRV_CTL_ELEM_ACCESS_READ,
 	.iface =	SNDRV_CTL_ELEM_IFACE_PCM,
 	.name =		SNDRV_CTL_NAME_IEC958("",PLAYBACK,MASK),
 	.info =		snd_ens1373_spdif_info,
@@ -2181,10 +2182,10 @@ static int __devinit snd_audiopci_probe(struct pci_dev *pci,
 		return err;
 	}
 #ifdef CHIP1370
-	strcpy(card->driver, "ES1370");
+	strcpy(card->driver, "ENS1370");
 #endif
 #ifdef CHIP1371
-	strcpy(card->driver, "ES1371");
+	strcpy(card->driver, "ENS1371");
 #endif
 	strcpy(card->shortname, "Ensoniq AudioPCI");
 	sprintf(card->longname, "%s %s at 0x%lx, irq %i",
