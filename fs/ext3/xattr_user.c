@@ -92,8 +92,8 @@ ext3_xattr_user_set(struct inode *inode, const char *name,
 }
 
 struct ext3_xattr_handler ext3_xattr_user_handler = {
-	prefix:	XATTR_USER_PREFIX,
-	list:	ext3_xattr_user_list,
-	get:	ext3_xattr_user_get,
-	set:	ext3_xattr_user_set,
+	.prefix	= XATTR_USER_PREFIX,
+	.list	= ext3_xattr_user_list,
+	.get	= ext3_xattr_user_get,
+	.set	= ext3_xattr_user_set,
 };
