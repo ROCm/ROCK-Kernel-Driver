@@ -2,7 +2,7 @@ This file contains brief information about the SCSI tape driver.
 The driver is currently maintained by Kai Mäkisara (email
 Kai.Makisara@kolumbus.fi)
 
-Last modified: Thu Feb 19 21:57:30 2004 by makisara
+Last modified: Wed Feb 25 14:09:08 2004 by makisara
 
 
 BASICS
@@ -36,8 +36,9 @@ The user can override the parameters defined by the system
 manager. The changes persist until the defaults again come into
 effect.
 
-3. Up to four modes can be defined and selected using the minor number
-(bits 5 and 6). Mode 0 corresponds to the defaults discussed
+3. By default, up to four modes can be defined and selected using the minor
+number (bits 5 and 6). The number of modes can be changed by changing
+ST_NBR_MODE_BITS in st.h. Mode 0 corresponds to the defaults discussed
 above. Additional modes are dormant until they are defined by the
 system manager (root). When specification of a new mode is started,
 the configuration of mode 0 is used to provide a starting point for
@@ -107,7 +108,7 @@ The minor numbers consist of the following bit fields:
 dev_upper non-rew mode dev-lower
   20 -  8     7    6 5  4      0
 The non-rewind bit is always bit 7 (the uppermost bit in the lowermost
-byte). The bits defining the mode are next to the non-rewind bits. The
+byte). The bits defining the mode are below the non-rewind bit. The
 remaining bits define the tape device number. This numbering is
 backward compatible with the numbering used when the minor number was
 only 8 bits wide.
@@ -117,10 +118,10 @@ SYSFS SUPPORT
 
 The driver creates the directory /sys/class/scsi_tape and populates it with
 directories corresponding to the existing tape devices. There are autorewind
-and non-rewind entries for each mode. The names are stxmy and stxmyn, where x
-is the tape number and y is the mode. For example, the directories for the
-first tape device are (assuming four modes): st0m0  st0m0n  st0m1  st0m1n
-st0m2  st0m2n  st0m3  st0m3n.
+and non-rewind entries for each mode. The names are stxy and nstxy, where x
+is the tape number and y a character corresponding to the mode (none, l, m,
+a). For example, the directories for the first tape device are (assuming four
+modes): st0  nst0  st0l  nst0l  st0m  nst0m  st0a  nst0a.
 
 Each directory contains the entries: default_blksize  default_compression
 default_density  defined  dev  device  driver. The file 'defined' contains 1
@@ -130,7 +131,7 @@ file 'dev' contains the device numbers corresponding to this device. The links
 'device' and 'driver' point to the SCSI device and driver entries.
 
 A link named 'tape' is made from the SCSI device directory to the class
-directory corresponding to the mode 0 auto-rewind device (e.g., st0m0). 
+directory corresponding to the mode 0 auto-rewind device (e.g., st0). 
 
 
 BSD AND SYS V SEMANTICS

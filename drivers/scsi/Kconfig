@@ -196,6 +196,25 @@ config SCSI_LOGGING
 	  there should be no noticeable performance impact as long as you have
 	  logging turned off.
 
+menu "SCSI Transport Attributes"
+	depends on SCSI
+
+config SCSI_SPI_ATTRS
+	tristate "Parallel SCSI (SPI) Transport Attributes"
+	depends on SCSI
+	help
+	  If you wish to export transport-specific information about
+	  each attached SCSI device to sysfs, say Y.  Otherwise, say N.
+
+config SCSI_FC_ATTRS
+	tristate "FiberChannel Transport Attributes"
+	depends on SCSI
+	help
+	  If you wish to export transport-specific information about
+	  each attached FiberChannel device to sysfs, say Y.
+	  Otherwise, say N.
+
+endmenu
 
 menu "SCSI low-level drivers"
 	depends on SCSI!=n
@@ -845,6 +864,7 @@ config SCSI_NCR53C406A
 config SCSI_NCR_D700
 	tristate "NCR Dual 700 MCA SCSI support"
 	depends on MCA && SCSI
+	select SCSI_SPI_ATTRS
 	help
 	  This is a driver for the MicroChannel Dual 700 card produced by
 	  NCR and commonly used in 345x/35xx/4100 class machines.  It always
@@ -861,6 +881,7 @@ config 53C700_IO_MAPPED
 config SCSI_LASI700
 	tristate "HP Lasi SCSI support for 53c700/710"
 	depends on GSC && SCSI
+	select SCSI_SPI_ATTRS
 	help
 	  This is a driver for the SCSI controller in the Lasi chip found in
 	  many PA-RISC workstations & servers.  If you do not know whether you
@@ -1212,6 +1233,7 @@ config SCSI_SEAGATE
 config SCSI_SIM710
 	tristate "Simple 53c710 SCSI support (Compaq, NCR machines)"
 	depends on (EISA || MCA) && SCSI
+	select SCSI_SPI_ATTRS
 	---help---
 	  This driver for NCR53c710 based SCSI host adapters.
 

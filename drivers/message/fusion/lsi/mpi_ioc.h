@@ -1,12 +1,12 @@
 /*
- *  Copyright (c) 2000-2002 LSI Logic Corporation.
+ *  Copyright (c) 2000-2003 LSI Logic Corporation.
  *
  *
- *           Name:  MPI_IOC.H
+ *           Name:  mpi_ioc.h
  *          Title:  MPI IOC, Port, Event, FW Download, and FW Upload messages
  *  Creation Date:  August 11, 2000
  *
- *    MPI_IOC.H Version:  01.02.06
+ *    mpi_ioc.h Version:  01.05.xx
  *
  *  Version History
  *  ---------------
@@ -55,6 +55,8 @@
  *  05-31-02  01.02.06  Added define for
  *                      MPI_IOCFACTS_EXCEPT_RAID_CONFIG_INVALID.
  *                      Added AliasIndex to EVENT_DATA_LOGOUT structure.
+ *  04-01-03  01.02.07  Added defines for MPI_FW_HEADER_SIGNATURE_.
+ *  06-26-03  01.02.08  Added new values to the product family defines.
  *  --------------------------------------------------------------------------
  */
 
@@ -87,19 +89,21 @@ typedef struct _MSG_IOC_INIT
     U8                      Reserved1[2];               /* 0Eh */
     U32                     HostMfaHighAddr;            /* 10h */
     U32                     SenseBufferHighAddr;        /* 14h */
+    U32                     ReplyFifoHostSignalingAddr; /* 18h */
 } MSG_IOC_INIT, MPI_POINTER PTR_MSG_IOC_INIT,
   IOCInit_t, MPI_POINTER pIOCInit_t;
 
 /* WhoInit values */
-#define MPI_WHOINIT_NO_ONE                      (0x00)
-#define MPI_WHOINIT_SYSTEM_BIOS                 (0x01)
-#define MPI_WHOINIT_ROM_BIOS                    (0x02)
-#define MPI_WHOINIT_PCI_PEER                    (0x03)
-#define MPI_WHOINIT_HOST_DRIVER                 (0x04)
-#define MPI_WHOINIT_MANUFACTURER                (0x05)
+#define MPI_WHOINIT_NO_ONE                          (0x00)
+#define MPI_WHOINIT_SYSTEM_BIOS                     (0x01)
+#define MPI_WHOINIT_ROM_BIOS                        (0x02)
+#define MPI_WHOINIT_PCI_PEER                        (0x03)
+#define MPI_WHOINIT_HOST_DRIVER                     (0x04)
+#define MPI_WHOINIT_MANUFACTURER                    (0x05)
 
 /* Flags values */
-#define MPI_IOCINIT_FLAGS_DISCARD_FW_IMAGE      (0x01)
+#define MPI_IOCINIT_FLAGS_DISCARD_FW_IMAGE          (0x01)
+#define MPI_IOCINIT_FLAGS_REPLY_FIFO_HOST_SIGNAL    (0x02)
 
 typedef struct _MSG_IOC_INIT_REPLY
 {
@@ -179,8 +183,10 @@ typedef struct _MSG_IOC_FACTS_REPLY
     U8                      MaxDevices;                 /* 2Eh */
     U8                      MaxBuses;                   /* 2Fh */
     U32                     FWImageSize;                /* 30h */
-    U32                     Reserved4;                  /* 34h */
+    U32                     IOCCapabilities;            /* 34h */
     MPI_FW_VERSION          FWVersion;                  /* 38h */
+    U16                     HighPriorityQueueDepth;     /* 3Ch */
+    U16                     Reserved2;                  /* 3Eh */
 } MSG_IOC_FACTS_REPLY, MPI_POINTER PTR_MSG_IOC_FACTS_REPLY,
   IOCFactsReply_t, MPI_POINTER pIOCFactsReply_t;
 
@@ -192,11 +198,21 @@ typedef struct _MSG_IOC_FACTS_REPLY
 
 #define MPI_IOCFACTS_EXCEPT_CONFIG_CHECKSUM_FAIL    (0x0001)
 #define MPI_IOCFACTS_EXCEPT_RAID_CONFIG_INVALID     (0x0002)
+#define MPI_IOCFACTS_EXCEPT_FW_CHECKSUM_FAIL        (0x0004)
+#define MPI_IOCFACTS_EXCEPT_PERSISTENT_TABLE_FULL   (0x0008)
 
 #define MPI_IOCFACTS_FLAGS_FW_DOWNLOAD_BOOT         (0x01)
 
 #define MPI_IOCFACTS_EVENTSTATE_DISABLED            (0x00)
 #define MPI_IOCFACTS_EVENTSTATE_ENABLED             (0x01)
+
+#define MPI_IOCFACTS_CAPABILITY_HIGH_PRI_Q          (0x00000001)
+#define MPI_IOCFACTS_CAPABILITY_REPLY_HOST_SIGNAL   (0x00000002)
+#define MPI_IOCFACTS_CAPABILITY_QUEUE_FULL_HANDLING (0x00000004)
+#define MPI_IOCFACTS_CAPABILITY_DIAG_TRACE_BUFFER   (0x00000008)
+#define MPI_IOCFACTS_CAPABILITY_SNAPSHOT_BUFFER     (0x00000010)
+#define MPI_IOCFACTS_CAPABILITY_EXTENDED_BUFFER     (0x00000020)
+#define MPI_IOCFACTS_CAPABILITY_EEDP                (0x00000040)
 
 
 
@@ -253,6 +269,8 @@ typedef struct _MSG_PORT_FACTS_REPLY
 #define MPI_PORTFACTS_PORTTYPE_INACTIVE         (0x00)
 #define MPI_PORTFACTS_PORTTYPE_SCSI             (0x01)
 #define MPI_PORTFACTS_PORTTYPE_FC               (0x10)
+#define MPI_PORTFACTS_PORTTYPE_ISCSI            (0x20)
+#define MPI_PORTFACTS_PORTTYPE_SAS              (0x30)
 
 /* ProtocolFlags values */
 
@@ -386,6 +404,10 @@ typedef struct _MSG_EVENT_ACK_REPLY
 #define MPI_EVENT_INTEGRATED_RAID           (0x0000000B)
 #define MPI_EVENT_SCSI_DEVICE_STATUS_CHANGE (0x0000000C)
 #define MPI_EVENT_ON_BUS_TIMER_EXPIRED      (0x0000000D)
+#define MPI_EVENT_QUEUE_FULL                (0x0000000E)
+#define MPI_EVENT_SAS_DEVICE_STATUS_CHANGE  (0x0000000F)
+#define MPI_EVENT_SAS_SES                   (0x00000010)
+#define MPI_EVENT_PERSISTENT_TABLE_FULL     (0x00000011)
 
 /* AckRequired field values */
 
@@ -432,6 +454,39 @@ typedef struct _EVENT_DATA_SCSI_DEVICE_STATUS_CHANGE
 #define MPI_EVENT_SCSI_DEV_STAT_RC_ADDED                (0x03)
 #define MPI_EVENT_SCSI_DEV_STAT_RC_NOT_RESPONDING       (0x04)
 #define MPI_EVENT_SCSI_DEV_STAT_RC_SMART_DATA           (0x05)
+
+/* SAS Device Status Change Event data */
+
+typedef struct _EVENT_DATA_SAS_DEVICE_STATUS_CHANGE
+{
+    U8                      TargetID;                   /* 00h */
+    U8                      Bus;                        /* 01h */
+    U8                      ReasonCode;                 /* 02h */
+    U8                      Reserved;                   /* 03h */
+    U8                      ASC;                        /* 04h */
+    U8                      ASCQ;                       /* 05h */
+    U16                     DevHandle;                  /* 06h */
+    U32                     DeviceInfo;                 /* 08h */
+} EVENT_DATA_SAS_DEVICE_STATUS_CHANGE,
+  MPI_POINTER PTR_EVENT_DATA_SAS_DEVICE_STATUS_CHANGE,
+  MpiEventDataSasDeviceStatusChange_t,
+  MPI_POINTER pMpiEventDataSasDeviceStatusChange_t;
+
+/* MPI SAS Device Status Change Event data ReasonCode values */
+#define MPI_EVENT_SAS_DEV_STAT_RC_ADDED                 (0x03)
+#define MPI_EVENT_SAS_DEV_STAT_RC_NOT_RESPONDING        (0x04)
+#define MPI_EVENT_SAS_DEV_STAT_RC_SMART_DATA            (0x05)
+#define MPI_EVENT_SAS_DEV_STAT_RC_NO_PERSIST_ADDED      (0x06)
+
+/* SCSI Event data for Queue Full event */
+
+typedef struct _EVENT_DATA_QUEUE_FULL
+{
+    U8                      TargetID;                   /* 00h */
+    U8                      Bus;                        /* 01h */
+    U16                     CurrentDepth;               /* 02h */
+} EVENT_DATA_QUEUE_FULL, MPI_POINTER PTR_EVENT_DATA_QUEUE_FULL,
+  EventDataQueueFull_t, MPI_POINTER pEventDataQueueFull_t;
 
 /* MPI Link Status Change Event data */
 
@@ -538,6 +593,7 @@ typedef struct _MSG_FW_DOWNLOAD
 #define MPI_FW_DOWNLOAD_ITYPE_FW            (0x01)
 #define MPI_FW_DOWNLOAD_ITYPE_BIOS          (0x02)
 #define MPI_FW_DOWNLOAD_ITYPE_NVDATA        (0x03)
+#define MPI_FW_DOWNLOAD_ITYPE_BOOTLOADER    (0x04)
 
 
 typedef struct _FWDownloadTCSGE
@@ -590,6 +646,7 @@ typedef struct _MSG_FW_UPLOAD
 #define MPI_FW_UPLOAD_ITYPE_FW_FLASH        (0x01)
 #define MPI_FW_UPLOAD_ITYPE_BIOS_FLASH      (0x02)
 #define MPI_FW_UPLOAD_ITYPE_NVDATA          (0x03)
+#define MPI_FW_UPLOAD_ITYPE_BOOTLOADER      (0x04)
 
 typedef struct _FWUploadTCSGE
 {
@@ -653,6 +710,11 @@ typedef struct _MPI_FW_HEADER
 #define MPI_FW_HEADER_PID_TYPE_MASK             (0xF000)
 #define MPI_FW_HEADER_PID_TYPE_SCSI             (0x0000)
 #define MPI_FW_HEADER_PID_TYPE_FC               (0x1000)
+#define MPI_FW_HEADER_PID_TYPE_SAS              (0x2000)
+
+#define MPI_FW_HEADER_SIGNATURE_0               (0x5AEAA55A)
+#define MPI_FW_HEADER_SIGNATURE_1               (0xA55AEAA5)
+#define MPI_FW_HEADER_SIGNATURE_2               (0x5AA55AEA)
 
 #define MPI_FW_HEADER_PID_PROD_MASK                     (0x0F00)
 #define MPI_FW_HEADER_PID_PROD_INITIATOR_SCSI           (0x0100)
@@ -663,6 +725,7 @@ typedef struct _MPI_FW_HEADER
 #define MPI_FW_HEADER_PID_PROD_CTX_SCSI                 (0x0600)
 
 #define MPI_FW_HEADER_PID_FAMILY_MASK           (0x00FF)
+/* SCSI */
 #define MPI_FW_HEADER_PID_FAMILY_1030A0_SCSI    (0x0001)
 #define MPI_FW_HEADER_PID_FAMILY_1030B0_SCSI    (0x0002)
 #define MPI_FW_HEADER_PID_FAMILY_1030B1_SCSI    (0x0003)
@@ -673,9 +736,17 @@ typedef struct _MPI_FW_HEADER
 #define MPI_FW_HEADER_PID_FAMILY_1020C0_SCSI    (0x0008)
 #define MPI_FW_HEADER_PID_FAMILY_1035A0_SCSI    (0x0009)
 #define MPI_FW_HEADER_PID_FAMILY_1035B0_SCSI    (0x000A)
+#define MPI_FW_HEADER_PID_FAMILY_1030TA0_SCSI   (0x000B)
+#define MPI_FW_HEADER_PID_FAMILY_1020TA0_SCSI   (0x000C)
+/* Fibre Channel */
 #define MPI_FW_HEADER_PID_FAMILY_909_FC         (0x0000)
 #define MPI_FW_HEADER_PID_FAMILY_919_FC         (0x0001)
 #define MPI_FW_HEADER_PID_FAMILY_919X_FC        (0x0002)
+#define MPI_FW_HEADER_PID_FAMILY_919XL_FC       (0x0003)
+#define MPI_FW_HEADER_PID_FAMILY_949_FC         (0x0004)
+#define MPI_FW_HEADER_PID_FAMILY_959_FC         (0x0005)
+/* SAS */
+#define MPI_FW_HEADER_PID_FAMILY_1064_SAS       (0x0001)
 
 typedef struct _MPI_EXT_IMAGE_HEADER
 {
@@ -694,5 +765,6 @@ typedef struct _MPI_EXT_IMAGE_HEADER
 #define MPI_EXT_IMAGE_TYPE_UNSPECIFIED          (0x00)
 #define MPI_EXT_IMAGE_TYPE_FW                   (0x01)
 #define MPI_EXT_IMAGE_TYPE_NVDATA               (0x03)
+#define MPI_EXT_IMAGE_TYPE_BOOTLOADER           (0x04)
 
 #endif
