@@ -631,6 +631,11 @@ int ip_setsockopt(struct sock *sk, int level, int optname, char *optval, int opt
 				kfree(msf);
 				break;
 			}
+			if (IP_MSFILTER_SIZE(msf->imsf_numsrc) > optlen) {
+				kfree(msf);
+				err = -EINVAL;
+				break;
+			}
 			err = ip_mc_msfilter(sk, msf, 0);
 			kfree(msf);
 			break;
