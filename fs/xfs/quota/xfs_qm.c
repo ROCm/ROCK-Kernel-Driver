@@ -229,11 +229,8 @@ xfs_qm_hold_quotafs_ref(
 	 */
 	XFS_QM_LOCK(xfs_Gqm);
 
-	if (xfs_Gqm == NULL) {
-		if ((xfs_Gqm = xfs_Gqm_init()) == NULL) {
-			return (XFS_ERROR(EINVAL));
-		}
-	}
+	if (xfs_Gqm == NULL)
+		xfs_Gqm = xfs_Gqm_init();
 	/*
 	 * We can keep a list of all filesystems with quotas mounted for
 	 * debugging and statistical purposes, but ...
