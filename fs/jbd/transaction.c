@@ -742,7 +742,7 @@ int journal_get_write_access(handle_t *handle,
 	/* We do not want to get caught playing with fields which the
 	 * log thread also manipulates.  Make sure that the buffer
 	 * completes any outstanding IO before proceeding. */
-	rc = do_get_write_access(handle, jh, 0, NULL);
+	rc = do_get_write_access(handle, jh, 0, credits);
 	journal_put_journal_head(jh);
 	return rc;
 }

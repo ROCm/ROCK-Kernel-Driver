@@ -1050,12 +1050,10 @@ ext3_xattr_cache_find(handle_t *handle, struct inode *inode,
 			ext3_error(inode->i_sb, "ext3_xattr_cache_find",
 				"inode %ld: block %ld read error",
 				inode->i_ino, (unsigned long) ce->e_block);
-		} else {
+		} else if (ext3_journal_get_write_access_credits(
+				handle, bh, credits) == 0) {
 			/* ext3_journal_get_write_access() requires an unlocked
 			 * bh, which complicates things here. */
-			if (ext3_journal_get_write_access_credits(handle, bh,
-								  credits) != 0)
-				return NULL;
 			lock_buffer(bh);
 			if (le32_to_cpu(HDR(bh)->h_refcount) >
 				   EXT3_XATTR_REFCOUNT_MAX) {
@@ -1070,6 +1068,7 @@ ext3_xattr_cache_find(handle_t *handle, struct inode *inode,
 			}
 			unlock_buffer(bh);
 			journal_release_buffer(handle, bh, *credits);
+			*credits = 0;
 			brelse(bh);
 		}
 		ce = mb_cache_entry_find_next(ce, 0, inode->i_sb->s_bdev, hash);
