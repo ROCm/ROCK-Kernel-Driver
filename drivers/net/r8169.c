@@ -334,8 +334,7 @@ static void rtl8169_tx_timeout(struct net_device *dev);
 static struct net_device_stats *rtl8169_get_stats(struct net_device *netdev);
 
 static const u16 rtl8169_intr_mask =
-    SYSErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver | TxErr | TxOK |
-    RxErr | RxOK;
+    RxUnderrun | RxOverflow | RxFIFOOver | TxErr | TxOK | RxErr | RxOK;
 static const unsigned int rtl8169_rx_config =
     (RX_FIFO_THRESH << RxCfgFIFOShift) | (RX_DMA_BURST << RxCfgDMAShift);
 
@@ -1441,9 +1440,7 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 		RTL_W16(IntrStatus,
 			(status & RxFIFOOver) ? (status | RxOverflow) : status);
 
-		if ((status &
-		     (SYSErr | PCSTimeout | RxUnderrun | RxOverflow | RxFIFOOver
-		      | TxErr | TxOK | RxErr | RxOK)) == 0)
+		if (!(status & rtl8169_intr_mask))
 			break;
 
 		// Rx interrupt 
