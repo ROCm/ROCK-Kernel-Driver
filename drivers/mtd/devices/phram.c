@@ -1,6 +1,6 @@
 /**
  *
- * $Id: phram.c,v 1.3 2004/11/16 18:29:01 dwmw2 Exp $
+ * $Id: phram.c,v 1.6 2004/11/25 16:51:09 joern Exp $
  *
  * Copyright (c) Jochen Schaeuble <psionic@psionic.de>
  * 07/2003	rewritten by Joern Engel <joern@wh.fh-wedel.de>
@@ -15,8 +15,11 @@
  *   phram=<name>,<start>,<len>
  * <name> may be up to 63 characters.
  * <start> and <len> can be octal, decimal or hexadecimal.  If followed
- * by "k", "M" or "G", the numbers will be interpreted as kilo, mega or
+ * by "ki", "Mi" or "Gi", the numbers will be interpreted as kilo, mega or
  * gigabytes.
+ *
+ * Example:
+ *	phram=swap,896Mi,110Mi phram=test,1006Mi,1Mi
  *
  */
 
@@ -184,7 +187,9 @@ static int ustrtoul(const char *cp, char **endp, unsigned int base)
 		result *= 1024;
 	case 'k':
 		result *= 1024;
-		endp++;
+	/* By dwmw2 editorial decree, "ki", "Mi" or "Gi" are to be used. */
+		if ((*endp)[1] == 'i')
+			(*endp) += 2;
 	}
 	return result;
 }
@@ -235,7 +240,7 @@ static int phram_setup(const char *val, struct kernel_param *kp)
 	uint32_t len;
 	int i, ret;
 
-	if (strnlen(val, sizeof(str)) >= sizeof(str))
+	if (strnlen(val, sizeof(buf)) >= sizeof(buf))
 		parse_err("parameter too long\n");
 
 	strcpy(str, val);
@@ -283,7 +288,7 @@ static int __init slram_setup(const char *val, struct kernel_param *kp)
 	if (!val || !val[0])
 		parse_err("no arguments to \"slram=\"\n");
 
-	if (strnlen(val, sizeof(str)) >= sizeof(str))
+	if (strnlen(val, sizeof(buf)) >= sizeof(buf))
 		parse_err("parameter too long\n");
 
 	strcpy(str, val);
@@ -342,7 +347,6 @@ MODULE_PARM_DESC(slram, "List of memory regions to map. \"map=<name>,<start><len
 
 static int __init init_phram(void)
 {
-	printk(KERN_ERR "phram loaded\n");
 	return 0;
 }
 

@@ -3,7 +3,7 @@
  *
  * Author: Jonas Holmberg <jonas.holmberg@axis.com>
  *
- * $Id: amd_flash.c,v 1.25 2004/08/09 13:19:43 dwmw2 Exp $
+ * $Id: amd_flash.c,v 1.26 2004/11/20 12:49:04 dwmw2 Exp $
  *
  * Copyright (c) 2001 Axis Communications AB
  *
@@ -1122,7 +1122,7 @@ retry:
 	timeo = jiffies + (HZ * 20);
 
 	spin_unlock_bh(chip->mutex);
-	schedule_timeout(HZ);
+	msleep(1000);
 	spin_lock_bh(chip->mutex);
 	
 	while (flash_is_busy(map, adr, private->interleave)) {

@@ -14,7 +14,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA
  *
- * $Id: dilnetpc.c,v 1.16 2004/11/04 13:24:14 gleixner Exp $
+ * $Id: dilnetpc.c,v 1.17 2004/11/28 09:40:39 dwmw2 Exp $
  *
  * The DIL/Net PC is a tiny embedded PC board made by SSV Embedded Systems
  * featuring the AMD Elan SC410 processor. There are two variants of this
