@@ -68,10 +68,10 @@ void __lockfunc _write_unlock_irqrestore(rwlock_t *lock, unsigned long flags);
 void __lockfunc _write_unlock_irq(rwlock_t *lock);
 void __lockfunc _write_unlock_bh(rwlock_t *lock);
 int __lockfunc _spin_trylock_bh(spinlock_t *lock);
-
-extern unsigned long __lock_text_start;
-extern unsigned long __lock_text_end;
+int in_lock_functions(unsigned long addr);
 #else
+
+#define in_lock_functions(ADDR) 0
 
 #if !defined(CONFIG_PREEMPT) && !defined(CONFIG_DEBUG_SPINLOCK)
 # define atomic_dec_and_lock(atomic,lock) atomic_dec_and_test(atomic)
@@ -404,11 +404,6 @@ do { \
 #define write_trylock(lock)	_write_trylock(lock)
 
 /* Where's read_trylock? */
-
-#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-void __preempt_spin_lock(spinlock_t *lock);
-void __preempt_write_lock(rwlock_t *lock);
-#endif
 
 #define spin_lock(lock)		_spin_lock(lock)
 #define write_lock(lock)	_write_lock(lock)

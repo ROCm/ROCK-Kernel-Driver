@@ -4654,8 +4654,9 @@ int in_sched_functions(unsigned long addr)
 {
 	/* Linker adds these: start and end of __sched functions */
 	extern char __sched_text_start[], __sched_text_end[];
-	return addr >= (unsigned long)__sched_text_start
-		&& addr < (unsigned long)__sched_text_end;
+	return in_lock_functions(addr) ||
+		(addr >= (unsigned long)__sched_text_start
+		&& addr < (unsigned long)__sched_text_end);
 }
 
 void __init sched_init(void)
@@ -4747,49 +4748,3 @@ void __might_sleep(char *file, int line)
 }
 EXPORT_SYMBOL(__might_sleep);
 #endif
-
-
-#if defined(CONFIG_SMP) && defined(CONFIG_PREEMPT)
-/*
- * This could be a long-held lock.  If another CPU holds it for a long time,
- * and that CPU is not asked to reschedule then *this* CPU will spin on the
- * lock for a long time, even if *this* CPU is asked to reschedule.
- *
- * So what we do here, in the slow (contended) path is to spin on the lock by
- * hand while permitting preemption.
- *
- * Called inside preempt_disable().
- */
-void __sched __preempt_spin_lock(spinlock_t *lock)
-{
-	if (preempt_count() > 1) {
-		_raw_spin_lock(lock);
-		return;
-	}
-	do {
-		preempt_enable();
-		while (spin_is_locked(lock))
-			cpu_relax();
-		preempt_disable();
-	} while (!_raw_spin_trylock(lock));
-}
-
-EXPORT_SYMBOL(__preempt_spin_lock);
-
-void __sched __preempt_write_lock(rwlock_t *lock)
-{
-	if (preempt_count() > 1) {
-		_raw_write_lock(lock);
-		return;
-	}
-
-	do {
-		preempt_enable();
-		while (rwlock_is_locked(lock))
-			cpu_relax();
-		preempt_disable();
-	} while (!_raw_write_trylock(lock));
-}
-
-EXPORT_SYMBOL(__preempt_write_lock);
-#endif /* defined(CONFIG_SMP) && defined(CONFIG_PREEMPT) */
