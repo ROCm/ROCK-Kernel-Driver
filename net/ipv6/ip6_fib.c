@@ -593,7 +593,7 @@ out:
 
 #ifdef CONFIG_IPV6_SUBTREES
 	/* Subtree creation failed, probably main tree node
-	   is orphan. If it is, shot it.
+	   is orphan. If it is, shoot it.
 	 */
 st_failure:
 	if (fn && !(fn->fn_flags&RTN_RTINFO|RTN_ROOT))
@@ -979,7 +979,7 @@ int fib6_del(struct rt6_info *rt, struct nlmsghdr *nlh)
 }
 
 /*
- *	Tree transversal function.
+ *	Tree traversal function.
  *
  *	Certainly, it is not interrupt safe.
  *	However, it is internally reenterable wrt itself and fib6_add/fib6_del.
