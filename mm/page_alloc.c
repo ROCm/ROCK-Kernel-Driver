@@ -1589,7 +1589,7 @@ void __init page_alloc_init(void)
  *	that the pages_{min,low,high} values for each zone are set correctly 
  *	with respect to min_free_kbytes.
  */
-void setup_per_zone_pages_min(void)
+static void setup_per_zone_pages_min(void)
 {
 	unsigned long pages_min = min_free_kbytes >> (PAGE_SHIFT - 10);
 	unsigned long lowmem_pages = 0;
@@ -1631,6 +1631,45 @@ void setup_per_zone_pages_min(void)
 		spin_unlock_irqrestore(&zone->lru_lock, flags);
 	}
 }
+
+/*
+ * Initialise min_free_kbytes.
+ *
+ * For small machines we want it small (128k min).  For large machines
+ * we want it large (16MB max).  But it is not linear, because network
+ * bandwidth does not increase linearly with machine size.  We use
+ *
+ *	min_free_kbytes = sqrt(lowmem_kbytes)
+ *
+ * which yields
+ *
+ * 16MB:	128k
+ * 32MB:	181k
+ * 64MB:	256k
+ * 128MB:	362k
+ * 256MB:	512k
+ * 512MB:	724k
+ * 1024MB:	1024k
+ * 2048MB:	1448k
+ * 4096MB:	2048k
+ * 8192MB:	2896k
+ * 16384MB:	4096k
+ */
+static int __init init_per_zone_pages_min(void)
+{
+	unsigned long lowmem_kbytes;
+
+	lowmem_kbytes = nr_free_buffer_pages() * (PAGE_SIZE >> 10);
+
+	min_free_kbytes = int_sqrt(lowmem_kbytes);
+	if (min_free_kbytes < 128)
+		min_free_kbytes = 128;
+	if (min_free_kbytes > 16384)
+		min_free_kbytes = 16384;
+	setup_per_zone_pages_min();
+	return 0;
+}
+module_init(init_per_zone_pages_min)
 
 /*
  * min_free_kbytes_sysctl_handler - just a wrapper around proc_dointvec() so 

@@ -396,7 +396,6 @@ asmlinkage void __init start_kernel(void)
 	lock_kernel();
 	printk(linux_banner);
 	setup_arch(&command_line);
-	setup_per_zone_pages_min();
 	setup_per_cpu_areas();
 
 	/*
