@@ -1537,8 +1537,8 @@ rtl8169_interrupt(int irq, void *dev_instance, struct pt_regs *regs)
 	do {
 		status = RTL_R16(IntrStatus);
 
-		/* h/w no longer present (hotplug?) or major error, bail */
-		if (status == 0xFFFF)
+		/* hotplug/major error/no more work/shared irq */
+		if ((status == 0xFFFF) || !status)
 			break;
 
 		handled = 1;
