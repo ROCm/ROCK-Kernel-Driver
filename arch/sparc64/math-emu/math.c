@@ -341,7 +341,7 @@ int do_mathemu(struct pt_regs *regs, struct fpustate *f)
 		freg = ((insn >> 14) & 0x1f);
 		switch (type & 0x3) {
 		case 3: if (freg & 2) {
-				current_thread_info->xfsr[0] |= (6 << 14) /* invalid_fp_register */;
+				current_thread_info()->xfsr[0] |= (6 << 14) /* invalid_fp_register */;
 				goto err;
 			}
 		case 2: freg = ((freg & 1) << 5) | (freg & 0x1e);
