@@ -653,6 +653,7 @@ static inline void __pxafb_lcd_power(struct pxafb_info *fbi, int on)
 
 static void pxafb_setup_gpio(struct pxafb_info *fbi)
 {
+	int gpio, ldd_bits;
         unsigned int lccr0 = fbi->lccr0;
 
 	/*
@@ -663,49 +664,31 @@ static void pxafb_setup_gpio(struct pxafb_info *fbi)
 	if ((lccr0 & LCCR0_CMS) == LCCR0_Mono &&
 	    (lccr0 & LCCR0_SDS) == LCCR0_Sngl &&
 	    (lccr0 & LCCR0_DPD) == LCCR0_4PixMono)
-	{
-		// bits 58-61
-		GPDR1 |= (0xf << 26);
-		GAFR1_U = (GAFR1_U & ~(0xff << 20)) | (0xaa << 20);
-
-		// bits 74-77
-		GPDR2 |= (0xf << 10);
-		GAFR2_L = (GAFR2_L & ~(0xff << 20)) | (0xaa << 20);
-	}
+		ldd_bits = 4;
 
 	/* 8 bit interface */
         else if (((lccr0 & LCCR0_CMS) == LCCR0_Mono &&
 		  ((lccr0 & LCCR0_SDS) == LCCR0_Dual || (lccr0 & LCCR0_DPD) == LCCR0_8PixMono)) ||
                  ((lccr0 & LCCR0_CMS) == LCCR0_Color &&
 		  (lccr0 & LCCR0_PAS) == LCCR0_Pas && (lccr0 & LCCR0_SDS) == LCCR0_Sngl))
-	{
-		// bits 58-65
-		GPDR1 |= (0x3f << 26);
-		GPDR2 |= (0x3);
-
-		GAFR1_U = (GAFR1_U & ~(0xfff << 20)) | (0xaaa << 20);
-		GAFR2_L = (GAFR2_L & ~0xf) | (0xa);
-
-		// bits 74-77
-		GPDR2 |= (0xf << 10);
-		GAFR2_L = (GAFR2_L & ~(0xff << 20)) | (0xaa << 20);
-	}
+		ldd_bits = 8;
 
 	/* 16 bit interface */
 	else if ((lccr0 & LCCR0_CMS) == LCCR0_Color &&
 		 ((lccr0 & LCCR0_SDS) == LCCR0_Dual || (lccr0 & LCCR0_PAS) == LCCR0_Act))
-	{
-		// bits 58-77
-		GPDR1 |= (0x3f << 26);
-		GPDR2 |= 0x00003fff;
-
-		GAFR1_U = (GAFR1_U & ~(0xfff << 20)) | (0xaaa << 20);
-		GAFR2_L = (GAFR2_L & 0xf0000000) | 0x0aaaaaaa;
-	}
+		ldd_bits = 16;
 
 	else {
 	        printk(KERN_ERR "pxafb_setup_gpio: unable to determine bits per pixel\n");
+		return;
         }
+
+	for (gpio = 58; ldd_bits; gpio++, ldd_bits--)
+		pxa_gpio_mode(gpio | GPIO_ALT_FN_2_OUT);
+	pxa_gpio_mode(GPIO74_LCD_FCLK_MD);
+	pxa_gpio_mode(GPIO75_LCD_LCLK_MD);
+	pxa_gpio_mode(GPIO76_LCD_PCLK_MD);
+	pxa_gpio_mode(GPIO77_LCD_ACBIAS_MD);
 }
 
 static void pxafb_enable_controller(struct pxafb_info *fbi)
