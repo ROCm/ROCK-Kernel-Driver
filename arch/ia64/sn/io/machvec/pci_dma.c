@@ -29,7 +29,6 @@
 #include <asm/sn/types.h>
 #include <asm/sn/alenlist.h>
 #include <asm/sn/pci/pci_bus_cvlink.h>
-#include <asm/sn/nag.h>
 
 /*
  * For ATE allocations
