@@ -1648,9 +1648,9 @@ static int rtl8169_change_mtu(struct net_device *dev, int new_mtu)
 	if (ret < 0)
 		goto out;
 
-	rtl8169_hw_start(dev);
-
 	netif_poll_enable(dev);
+
+	rtl8169_hw_start(dev);
 
 	rtl8169_request_timer(dev);
 
@@ -2352,6 +2352,7 @@ static void rtl8169_down(struct net_device *dev)
 {
 	struct rtl8169_private *tp = netdev_priv(dev);
 	void __iomem *ioaddr = tp->mmio_addr;
+	unsigned int poll_locked = 0;
 
 	rtl8169_delete_timer(dev);
 
@@ -2359,6 +2360,7 @@ static void rtl8169_down(struct net_device *dev)
 
 	flush_scheduled_work();
 
+core_down:
 	spin_lock_irq(&tp->lock);
 
 	/* Stop the chip's Tx and Rx DMA processes. */
@@ -2375,10 +2377,27 @@ static void rtl8169_down(struct net_device *dev)
 
 	synchronize_irq(dev->irq);
 
-	netif_poll_disable(dev);
+	if (!poll_locked) {
+		netif_poll_disable(dev);
+		poll_locked++;
+	}
 
 	/* Give a racing hard_start_xmit a few cycles to complete. */
 	synchronize_kernel();
+
+	/*
+	 * And now for the 50k$ question: are IRQ disabled or not ?
+	 *
+	 * Two paths lead here:
+	 * 1) dev->close
+	 *    -> netif_running() is available to sync the current code and the
+	 *       IRQ handler. See rtl8169_interrupt for details.
+	 * 2) dev->change_mtu
+	 *    -> rtl8169_poll can not be issued again and re-enable the
+	 *       interruptions. Let's simply issue the IRQ down sequence again.
+	 */
+	if (RTL_R16(IntrMask))
+		goto core_down;
 
 	rtl8169_tx_clear(tp);
 
