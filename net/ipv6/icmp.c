@@ -158,6 +158,7 @@ static inline int icmpv6_xrlim_allow(struct sock *sk, int type,
 {
 	struct dst_entry *dst;
 	int res = 0;
+	struct inet6_dev *idev = NULL;
 
 	/* Informational messages are not limited. */
 	if (type & ICMPV6_INFOMSG_MASK)
@@ -173,8 +174,12 @@ static inline int icmpv6_xrlim_allow(struct sock *sk, int type,
 	 * this lookup should be more aggressive (not longer than timeout).
 	 */
 	dst = ip6_route_output(sk, fl);
+	/* idev reference for IP MIBs */
+	if (likely(dst->dev))
+		idev = in6_dev_get(dst->dev);
 	if (dst->error) {
 		IP6_INC_STATS(Ip6OutNoRoutes);
+		IPV6_INC_STATS(idev, ipStatsOutNoRoutes);
 	} else if (dst->dev && (dst->dev->flags&IFF_LOOPBACK)) {
 		res = 1;
 	} else {
@@ -187,6 +192,9 @@ static inline int icmpv6_xrlim_allow(struct sock *sk, int type,
 
 		res = xrlim_allow(dst, tmo);
 	}
+	/* release the idev reference for IP MIBs */
+	if (likely(idev))
+		in6_dev_put(idev);
 	dst_release(dst);
 	return res;
 }

@@ -506,11 +506,15 @@ static int rawv6_send_hdrinc(struct sock *sk, void *from, int length,
 	struct ipv6hdr *iph;
 	struct sk_buff *skb;
 	unsigned int hh_len;
-	int err;
+	int err = 0;
+	struct inet6_dev *idev = NULL;
+
+	/* hold reference for IP MIBs */
 
 	if (length > rt->u.dst.dev->mtu) {
 		ipv6_local_error(sk, EMSGSIZE, fl, rt->u.dst.dev->mtu);
-		return -EMSGSIZE;
+		err = -EMSGSIZE;
+		goto out;
 	}
 	if (flags&MSG_PROBE)
 		goto out;
@@ -526,6 +530,9 @@ static int rawv6_send_hdrinc(struct sock *sk, void *from, int length,
 	skb->priority = sk->sk_priority;
 	skb->dst = dst_clone(&rt->u.dst);
 
+	if (skb->dst)
+		idev = in6_dev_get(skb->dst->dev);
+
 	skb->nh.ipv6h = iph = (struct ipv6hdr *)skb_put(skb, length);
 
 	skb->ip_summed = CHECKSUM_NONE;
@@ -535,21 +542,27 @@ static int rawv6_send_hdrinc(struct sock *sk, void *from, int length,
 	if (err)
 		goto error_fault;
 
-	IP6_INC_STATS(Ip6OutRequests);		
+	IP6_INC_STATS(Ip6OutRequests);
+	IPV6_INC_STATS(idev, ipStatsOutRequests);
+	IPV6_ADD_STATS(idev, ipStatsOutOctets, skb->len);
+
 	err = NF_HOOK(PF_INET6, NF_IP6_LOCAL_OUT, skb, NULL, rt->u.dst.dev,
 		      dst_output);
 	if (err > 0)
 		err = inet->recverr ? net_xmit_errno(err) : 0;
 	if (err)
 		goto error;
-out:
-	return 0;
-
+	else
+		goto out;
 error_fault:
 	err = -EFAULT;
 	kfree_skb(skb);
 error:
 	IP6_INC_STATS(Ip6OutDiscards);
+	IPV6_INC_STATS(idev, ipStatsOutDiscards);
+out:
+	if (idev)
+		in6_dev_put(idev);
 	return err; 
 }
 static int rawv6_sendmsg(struct kiocb *iocb, struct sock *sk,

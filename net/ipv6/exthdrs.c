@@ -156,10 +156,15 @@ static int ipv6_destopt_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 {
 	struct sk_buff *skb = *skbp;
 	struct inet6_skb_parm *opt = (struct inet6_skb_parm *)skb->cb;
+	struct inet6_dev *idev = NULL;
+
+	if (likely(skb->dev))
+		idev = __in6_dev_get(skb->dev);
 
 	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+8) ||
 	    !pskb_may_pull(skb, (skb->h.raw-skb->data)+((skb->h.raw[1]+1)<<3))) {
 		IP6_INC_STATS_BH(Ip6InHdrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 		kfree_skb(skb);
 		return -1;
 	}
@@ -173,6 +178,7 @@ static int ipv6_destopt_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 	}
 
 	IP6_INC_STATS_BH(Ip6InHdrErrors);
+	IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 	return -1;
 }
 
@@ -224,10 +230,15 @@ static int ipv6_rthdr_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 
 	struct ipv6_rt_hdr *hdr;
 	struct rt0_hdr *rthdr;
+	struct inet6_dev *idev = NULL;
+
+	if (likely(skb->dev))
+		idev = __in6_dev_get(skb->dev);
 
 	if (!pskb_may_pull(skb, (skb->h.raw-skb->data)+8) ||
 	    !pskb_may_pull(skb, (skb->h.raw-skb->data)+((skb->h.raw[1]+1)<<3))) {
 		IP6_INC_STATS_BH(Ip6InHdrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 		kfree_skb(skb);
 		return -1;
 	}
@@ -237,6 +248,7 @@ static int ipv6_rthdr_rcv(struct sk_buff **skbp, unsigned int *nhoffp)
 	if (ipv6_addr_is_multicast(&skb->nh.ipv6h->daddr) ||
 	    skb->pkt_type != PACKET_HOST) {
 		IP6_INC_STATS_BH(Ip6InAddrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInAddrErrors);
 		kfree_skb(skb);
 		return -1;
 	}
@@ -253,12 +265,14 @@ looped_back:
 
 	if (hdr->type != IPV6_SRCRT_TYPE_0) {
 		IP6_INC_STATS_BH(Ip6InHdrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, (&hdr->type) - skb->nh.raw);
 		return -1;
 	}
 	
 	if (hdr->hdrlen & 0x01) {
 		IP6_INC_STATS_BH(Ip6InHdrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, (&hdr->hdrlen) - skb->nh.raw);
 		return -1;
 	}
@@ -272,6 +286,7 @@ looped_back:
 
 	if (hdr->segments_left > n) {
 		IP6_INC_STATS_BH(Ip6InHdrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, (&hdr->segments_left) - skb->nh.raw);
 		return -1;
 	}
@@ -284,7 +299,8 @@ looped_back:
 		kfree_skb(skb);
 		/* the copy is a forwarded packet */
 		if (skb2 == NULL) {
-			IP6_INC_STATS_BH(Ip6OutDiscards);	
+			IP6_INC_STATS_BH(Ip6OutDiscards);
+			IPV6_INC_STATS_BH(idev, ipStatsOutDiscards);
 			return -1;
 		}
 		*skbp = skb = skb2;
@@ -303,6 +319,7 @@ looped_back:
 
 	if (ipv6_addr_is_multicast(addr)) {
 		IP6_INC_STATS_BH(Ip6InAddrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInAddrErrors);
 		kfree_skb(skb);
 		return -1;
 	}
@@ -320,6 +337,7 @@ looped_back:
 	if (skb->dst->dev->flags&IFF_LOOPBACK) {
 		if (skb->nh.ipv6h->hop_limit <= 1) {
 			IP6_INC_STATS_BH(Ip6InHdrErrors);
+			IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 			icmpv6_send(skb, ICMPV6_TIME_EXCEED, ICMPV6_EXC_HOPLIMIT,
 				    0, skb->dev);
 			kfree_skb(skb);
@@ -432,28 +450,36 @@ static int ipv6_hop_ra(struct sk_buff *skb, int optoff)
 static int ipv6_hop_jumbo(struct sk_buff *skb, int optoff)
 {
 	u32 pkt_len;
+	struct inet6_dev *idev = NULL;
+
+	if (likely(skb->dev))
+		idev = __in6_dev_get(skb->dev);
 
 	if (skb->nh.raw[optoff+1] != 4 || (optoff&3) != 2) {
 		LIMIT_NETDEBUG(
 			 printk(KERN_DEBUG "ipv6_hop_jumbo: wrong jumbo opt length/alignment %d\n", skb->nh.raw[optoff+1]));
 		IP6_INC_STATS_BH(Ip6InHdrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 		goto drop;
 	}
 
 	pkt_len = ntohl(*(u32*)(skb->nh.raw+optoff+2));
 	if (pkt_len <= IPV6_MAXPLEN) {
 		IP6_INC_STATS_BH(Ip6InHdrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, optoff+2);
 		return 0;
 	}
 	if (skb->nh.ipv6h->payload_len) {
 		IP6_INC_STATS_BH(Ip6InHdrErrors);
+		IPV6_INC_STATS_BH(idev, ipStatsInHdrErrors);
 		icmpv6_param_prob(skb, ICMPV6_HDR_FIELD, optoff);
 		return 0;
 	}
 
 	if (pkt_len > skb->len - sizeof(struct ipv6hdr)) {
 		IP6_INC_STATS_BH(Ip6InTruncatedPkts);
+		IPV6_INC_STATS_BH(idev, ipStatsInTruncatedPkts);
 		goto drop;
 	}
 	if (pkt_len + sizeof(struct ipv6hdr) < skb->len) {

@@ -149,6 +149,7 @@ struct ifacaddr6
 struct ipv6_devstat {
 	struct proc_dir_entry	*proc_dir_entry;
 	DEFINE_SNMP_STAT(struct icmpv6_mib, icmpv6);
+	DEFINE_SNMP_STAT(struct ip_stats, ipv6);
 };
 
 struct inet6_dev 

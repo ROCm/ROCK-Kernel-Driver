@@ -44,6 +44,9 @@
 #define	RTM_DELTFILTER	(RTM_BASE+29)
 #define	RTM_GETTFILTER	(RTM_BASE+30)
 
+#define RTM_NEWIPSTATS (RTM_BASE+32)
+#define RTM_GETIPSTATS (RTM_BASE+34)
+
 #define RTM_NEWPREFIX	(RTM_BASE+36)
 #define RTM_GETPREFIX	(RTM_BASE+38)
 
@@ -636,6 +639,23 @@ enum
 
 #define TCA_RTA(r)  ((struct rtattr*)(((char*)(r)) + NLMSG_ALIGN(sizeof(struct tcmsg))))
 #define TCA_PAYLOAD(n) NLMSG_PAYLOAD(n,sizeof(struct tcmsg))
+
+/********************************************************************
+ *		IP mibs information
+ ****/
+struct ipstatsmsg
+{
+	int	ipstats_family;
+	int	ipstats_ifindex;
+};
+
+enum
+{
+	IPSTATS_IFNAME,
+	IPSTATS_COUNTERS,
+};
+
+#define IPSTATS_MAX IPSTATS_COUNTERS
 
 
 /* SUMMARY: maximal rtattr understood by kernel */

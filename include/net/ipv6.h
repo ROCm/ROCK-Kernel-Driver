@@ -116,6 +116,44 @@ DECLARE_SNMP_STAT(struct ipv6_mib, ipv6_statistics);
 #define IP6_INC_STATS_BH(field)		SNMP_INC_STATS_BH(ipv6_statistics, field)
 #define IP6_INC_STATS_USER(field) 	SNMP_INC_STATS_USER(ipv6_statistics, field)
 DECLARE_SNMP_STAT(struct icmpv6_mib, icmpv6_statistics);
+/* new IPv6 MIB */
+DECLARE_SNMP_STAT(struct ip_stats, ipv6_stats);
+#define IPV6_INC_STATS(idev, field)		({			\
+	struct inet6_dev *_idev = (idev);				\
+	if (likely(_idev != NULL))					\
+		SNMP_INC_STATS(_idev->stats.ipv6, field);		\
+	SNMP_INC_STATS(ipv6_stats, field);				\
+})
+#define IPV6_INC_STATS_BH(idev, field)		({			\
+	struct inet6_dev *_idev = (idev);				\
+	if (likely(_idev != NULL))					\
+		SNMP_INC_STATS(_idev->stats.ipv6, field);		\
+	SNMP_INC_STATS_BH(ipv6_stats, field);			\
+})
+#define IPV6_INC_STATS_USER(idev, field) 	({			\
+	struct inet6_dev *_idev = (idev);				\
+	if (likely(_idev != NULL))					\
+		SNMP_INC_STATS(_idev->stats.ipv6, field);		\
+	SNMP_INC_STATS_USER(ipv6_stats, field);			\
+})
+#define IPV6_ADD_STATS_BH(idev, field, addend)	({			\
+	struct inet6_dev *_idev = (idev);				\
+	if (likely(_idev != NULL))					\
+		SNMP_ADD_STATS_BH(_idev->stats.ipv6, field, addend);	\
+	SNMP_ADD_STATS_BH(ipv6_stats, field, addend);		\
+})
+#define IPV6_ADD_STATS_USER(idev, field, addend) ({			\
+	struct inet6_dev *_idev = (idev);				\
+	if (likely(_idev != NULL))					\
+		SNMP_ADD_STATS_USER(_idev->stats.ipv6, field, addend);	\
+	SNMP_ADD_STATS_USER(ipv6_stats, field, addend);		\
+})
+#define IPV6_ADD_STATS(idev, field, addend)	({			\
+	struct inet6_dev *_idev = (idev);				\
+	if (likely(_idev != NULL))					\
+		SNMP_ADD_STATS(_idev->stats.ipv6, field, addend);	\
+	SNMP_ADD_STATS(ipv6_stats, field, addend);			\
+})	
 #define ICMP6_INC_STATS(idev, field)		({			\
 	struct inet6_dev *_idev = (idev);				\
 	if (likely(_idev != NULL))					\
