@@ -38,7 +38,6 @@
 
 #include <linux/i2c.h>
 #include <linux/i2c-algo-pcf.h>
-#include <linux/i2c-elektor.h>
 
 #include <asm/io.h>
 #include <asm/irq.h>

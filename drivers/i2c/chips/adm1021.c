@@ -23,9 +23,20 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
-#include <linux/sensors.h>
+#include <linux/i2c-proc.h>
 #include <linux/init.h>
 
+/* Registers */
+#define ADM1021_SYSCTL_TEMP		1200
+#define ADM1021_SYSCTL_REMOTE_TEMP	1201
+#define ADM1021_SYSCTL_DIE_CODE		1202
+#define ADM1021_SYSCTL_ALARMS		1203
+
+#define ADM1021_ALARM_TEMP_HIGH		0x40
+#define ADM1021_ALARM_TEMP_LOW		0x20
+#define ADM1021_ALARM_RTEMP_HIGH	0x10
+#define ADM1021_ALARM_RTEMP_LOW		0x08
+#define ADM1021_ALARM_RTEMP_NA		0x04
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = { SENSORS_I2C_END };

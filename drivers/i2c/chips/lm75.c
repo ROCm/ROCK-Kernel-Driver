@@ -22,9 +22,11 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
-#include <linux/sensors.h>
+#include <linux/i2c-proc.h>
 #include <linux/init.h>
 
+
+#define LM75_SYSCTL_TEMP 1200	/* Degrees Celcius * 10 */
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = { SENSORS_I2C_END };
