@@ -312,6 +312,19 @@ struct rb_node *rb_first(struct rb_root *root)
 }
 EXPORT_SYMBOL(rb_first);
 
+struct rb_node *rb_last(struct rb_root *root)
+{
+	struct rb_node	*n;
+
+	n = root->rb_node;
+	if (!n)
+		return NULL;
+	while (n->rb_right)
+		n = n->rb_right;
+	return n;
+}
+EXPORT_SYMBOL(rb_last);
+
 struct rb_node *rb_next(struct rb_node *node)
 {
 	/* If we have a right-hand child, go down and then left as far
