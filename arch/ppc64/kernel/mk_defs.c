@@ -157,6 +157,7 @@ main(void)
 	DEFINE(_SRR1, STACK_FRAME_OVERHEAD+sizeof(struct pt_regs)+8);
 
 	DEFINE(CLONE_VM, CLONE_VM);
+	DEFINE(CLONE_UNTRACED, CLONE_UNTRACED);
 
 	return 0;
 }

@@ -116,6 +116,7 @@ main(void)
 	DEFINE(RESULT, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, result));
 	DEFINE(TRAP, STACK_FRAME_OVERHEAD+offsetof(struct pt_regs, trap));
 	DEFINE(CLONE_VM, CLONE_VM);
+	DEFINE(CLONE_UNTRACED, CLONE_UNTRACED);
 	DEFINE(MM_PGD, offsetof(struct mm_struct, pgd));
 
 	/* About the CPU features table */
