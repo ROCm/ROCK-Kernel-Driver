@@ -403,7 +403,7 @@ static int sctp_packet(struct ip_conntrack *conntrack,
 		WRITE_UNLOCK(&sctp_lock);
 	}
 
-	ip_ct_refresh(conntrack, *sctp_timeouts[newconntrack]);
+	ip_ct_refresh_acct(conntrack, ctinfo, skb, *sctp_timeouts[newconntrack]);
 
 	if (oldsctpstate == SCTP_CONNTRACK_COOKIE_ECHOED
 		&& CTINFO2DIR(ctinfo) == IP_CT_DIR_REPLY
