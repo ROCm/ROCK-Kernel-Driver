@@ -823,13 +823,7 @@ static int __init do_boot_cpu(int apicid)
 
 	store_NMI_vector(&nmi_high, &nmi_low);
 
-	CMOS_WRITE(0xa, 0xf);
-	local_flush_tlb();
-	Dprintk("1.\n");
-	*((volatile unsigned short *) TRAMPOLINE_HIGH) = start_eip >> 4;
-	Dprintk("2.\n");
-	*((volatile unsigned short *) TRAMPOLINE_LOW) = start_eip & 0xf;
-	Dprintk("3.\n");
+	smpboot_setup_warm_reset_vector(start_eip);
 
 	/*
 	 * Starting actual IPI sequence...
