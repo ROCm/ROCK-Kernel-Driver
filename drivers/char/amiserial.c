@@ -646,7 +646,7 @@ static int startup(struct async_struct * info)
 	/*
 	 * and set the speed of the serial port
 	 */
-	change_speed(info, 0);
+	change_speed(info, NULL);
 
 	info->flags |= ASYNC_INITIALIZED;
 	local_irq_restore(flags);
@@ -692,7 +692,7 @@ static void shutdown(struct async_struct * info)
 
 	if (info->xmit.buf) {
 		free_page((unsigned long) info->xmit.buf);
-		info->xmit.buf = 0;
+		info->xmit.buf = NULL;
 	}
 
 	info->IER = 0;
@@ -1206,7 +1206,7 @@ check_and_exit:
 				info->tty->alt_speed = 230400;
 			if ((state->flags & ASYNC_SPD_MASK) == ASYNC_SPD_WARP)
 				info->tty->alt_speed = 460800;
-			change_speed(info, 0);
+			change_speed(info, NULL);
 		}
 	} else
 		retval = startup(info);
@@ -1561,7 +1561,7 @@ static void rs_close(struct tty_struct *tty, struct file * filp)
 	tty_ldisc_flush(tty);
 	tty->closing = 0;
 	info->event = 0;
-	info->tty = 0;
+	info->tty = NULL;
 	if (info->blocked_open) {
 		if (info->close_delay) {
 			msleep_interruptible(jiffies_to_msecs(info->close_delay));
@@ -1652,7 +1652,7 @@ static void rs_hangup(struct tty_struct *tty)
 	info->event = 0;
 	state->count = 0;
 	info->flags &= ~ASYNC_NORMAL_ACTIVE;
-	info->tty = 0;
+	info->tty = NULL;
 	wake_up_interruptible(&info->open_wait);
 }
 
@@ -1908,7 +1908,7 @@ static inline int line_info(char *buf, struct serial_state *state)
 		info->magic = SERIAL_MAGIC;
 		info->flags = state->flags;
 		info->quot = 0;
-		info->tty = 0;
+		info->tty = NULL;
 	}
 	local_irq_save(flags);
 	status = ciab.pra;

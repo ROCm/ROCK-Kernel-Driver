@@ -77,7 +77,7 @@ pmd_t *get_pointer_table (void)
 		ptable_desc *new;
 
 		if (!(page = (void *)get_zeroed_page(GFP_KERNEL)))
-			return 0;
+			return NULL;
 
 		flush_tlb_kernel_page(page);
 		nocache_page(page);
