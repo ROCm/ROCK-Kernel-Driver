@@ -1140,7 +1140,7 @@ nfsd4_process_open2(struct svc_rqst *rqstp, struct svc_fh *current_fh, struct nf
 						GFP_KERNEL)) == NULL)
 			goto out;
 
-		if (open->op_share_access && NFS4_SHARE_ACCESS_WRITE)
+		if (open->op_share_access & NFS4_SHARE_ACCESS_WRITE)
 			flags = MAY_WRITE;
 		else
 			flags = MAY_READ;
