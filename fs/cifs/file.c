@@ -999,8 +999,8 @@ cifs_readpages(struct file *file, struct address_space *mapping,
 
 		/* count adjacent pages that we will read into */
 		contig_pages = 0;
-		expected_index = list_entry(page_list->prev,struct page,list)->index;
-		list_for_each_entry_reverse(tmp_page,page_list,list) {
+		expected_index = list_entry(page_list->prev,struct page,lru)->index;
+		list_for_each_entry_reverse(tmp_page,page_list,lru) {
 			if(tmp_page->index == expected_index) {
 				contig_pages++;
 				expected_index++;
