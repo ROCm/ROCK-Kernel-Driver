@@ -1,19 +1,11 @@
 /*
- *	ROSE release 003
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	ROSE 001	Jonathan(G4KLX)	Cloned from rose_timer.c
- *	ROSE 003	Jonathan(G4KLX)	New timer architecture.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/errno.h>
 #include <linux/types.h>
 #include <linux/socket.h>
@@ -142,25 +134,25 @@ void rose_link_rx_restart(struct sk_buff *skb, struct rose_neigh *neigh, unsigne
 	struct sk_buff *skbn;
 
 	switch (frametype) {
-		case ROSE_RESTART_REQUEST:
-			rose_stop_t0timer(neigh);
-			neigh->restarted = 1;
-			neigh->dce_mode  = (skb->data[3] == ROSE_DTE_ORIGINATED);
-			rose_transmit_restart_confirmation(neigh);
-			break;
+	case ROSE_RESTART_REQUEST:
+		rose_stop_t0timer(neigh);
+		neigh->restarted = 1;
+		neigh->dce_mode  = (skb->data[3] == ROSE_DTE_ORIGINATED);
+		rose_transmit_restart_confirmation(neigh);
+		break;
 
-		case ROSE_RESTART_CONFIRMATION:
-			rose_stop_t0timer(neigh);
-			neigh->restarted = 1;
-			break;
+	case ROSE_RESTART_CONFIRMATION:
+		rose_stop_t0timer(neigh);
+		neigh->restarted = 1;
+		break;
 
-		case ROSE_DIAGNOSTIC:
-			printk(KERN_WARNING "ROSE: received diagnostic #%d - %02X %02X %02X\n", skb->data[3], skb->data[4], skb->data[5], skb->data[6]);
-			break;
+	case ROSE_DIAGNOSTIC:
+		printk(KERN_WARNING "ROSE: received diagnostic #%d - %02X %02X %02X\n", skb->data[3], skb->data[4], skb->data[5], skb->data[6]);
+		break;
 
-		default:
-			printk(KERN_WARNING "ROSE: received unknown %02X with LCI 000\n", frametype);
-			break;
+	default:
+		printk(KERN_WARNING "ROSE: received unknown %02X with LCI 000\n", frametype);
+		break;
 	}
 
 	if (neigh->restarted) {

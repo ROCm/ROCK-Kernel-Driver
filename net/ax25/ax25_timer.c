@@ -1,30 +1,17 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	History
- *	AX.25 028a	Jonathan(G4KLX)	New state machine based on SDL diagrams.
- *	AX.25 028b	Jonathan(G4KLX)	Extracted AX25 control block from the
- *					sock structure.
- *	AX.25 029	Alan(GW4PTS)	Switched to KA9Q constant names.
- *	AX.25 031	Joerg(DL1BKE)	Added DAMA support
- *	AX.25 032	Joerg(DL1BKE)	Fixed DAMA timeout bug
- *	AX.25 033	Jonathan(G4KLX)	Modularisation functions.
- *	AX.25 035	Frederic(F1OAT)	Support for pseudo-digipeating.
- *	AX.25 036	Jonathan(G4KLX)	Split Standard and DAMA code into separate files.
- *			Joerg(DL1BKE)	Fixed DAMA Slave. We are *required* to start with
- *					standard AX.25 mode.
- *	AX.25 037	Jonathan(G4KLX)	New timer architecture.
- *                      Tomi(OH2BNS)    Fixed heartbeat expiry (check ax25_dev).
+ * Copyright (C) Alan Cox GW4PTS (alan@lxorguk.ukuu.org.uk)
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
+ * Copyright (C) Tomi Manninen OH2BNS (oh2bns@sral.fi)
+ * Copyright (C) Darryl Miles G7LED (dlm@g7led.demon.co.uk)
+ * Copyright (C) Joerg Reuter DL1BKE (jreuter@yaina.de)
+ * Copyright (C) Frederic Rible F1OAT (frible@teaser.fr)
+ * Copyright (C) 2002 Ralf Baechle DO1GRB (ralf@gnu.org)
  */
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -152,105 +139,121 @@ unsigned long ax25_display_timer(struct timer_list *timer)
 
 static void ax25_heartbeat_expiry(unsigned long param)
 {
-	ax25_cb *ax25 = (ax25_cb *)param;
 	int proto = AX25_PROTO_STD_SIMPLEX;
+	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
 	if (ax25->ax25_dev)
 		proto = ax25->ax25_dev->values[AX25_VALUES_PROTOCOL];
 
+	bh_lock_sock(sk);
+
 	switch (proto) {
-		case AX25_PROTO_STD_SIMPLEX:
-		case AX25_PROTO_STD_DUPLEX:
-			ax25_std_heartbeat_expiry(ax25);
-			break;
+	case AX25_PROTO_STD_SIMPLEX:
+	case AX25_PROTO_STD_DUPLEX:
+		ax25_std_heartbeat_expiry(ax25);
+		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-		case AX25_PROTO_DAMA_SLAVE:
-			if (ax25->ax25_dev->dama.slave)
-				ax25_ds_heartbeat_expiry(ax25);
-			else
-				ax25_std_heartbeat_expiry(ax25);
-			break;
+	case AX25_PROTO_DAMA_SLAVE:
+		if (ax25->ax25_dev->dama.slave)
+			ax25_ds_heartbeat_expiry(ax25);
+		else
+			ax25_std_heartbeat_expiry(ax25);
+		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }
 
 static void ax25_t1timer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
+	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-		case AX25_PROTO_STD_SIMPLEX:
-		case AX25_PROTO_STD_DUPLEX:
-			ax25_std_t1timer_expiry(ax25);
-			break;
+	case AX25_PROTO_STD_SIMPLEX:
+	case AX25_PROTO_STD_DUPLEX:
+		ax25_std_t1timer_expiry(ax25);
+		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-		case AX25_PROTO_DAMA_SLAVE:
-			if (!ax25->ax25_dev->dama.slave)
-				ax25_std_t1timer_expiry(ax25);
-			break;
+	case AX25_PROTO_DAMA_SLAVE:
+		if (!ax25->ax25_dev->dama.slave)
+			ax25_std_t1timer_expiry(ax25);
+		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }
 
 static void ax25_t2timer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
+	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-		case AX25_PROTO_STD_SIMPLEX:
-		case AX25_PROTO_STD_DUPLEX:
-			ax25_std_t2timer_expiry(ax25);
-			break;
+	case AX25_PROTO_STD_SIMPLEX:
+	case AX25_PROTO_STD_DUPLEX:
+		ax25_std_t2timer_expiry(ax25);
+		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-		case AX25_PROTO_DAMA_SLAVE:
-			if (!ax25->ax25_dev->dama.slave)
-				ax25_std_t2timer_expiry(ax25);
-			break;
+	case AX25_PROTO_DAMA_SLAVE:
+		if (!ax25->ax25_dev->dama.slave)
+			ax25_std_t2timer_expiry(ax25);
+		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }
 
 static void ax25_t3timer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
+	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-		case AX25_PROTO_STD_SIMPLEX:
-		case AX25_PROTO_STD_DUPLEX:
-			ax25_std_t3timer_expiry(ax25);
-			break;
+	case AX25_PROTO_STD_SIMPLEX:
+	case AX25_PROTO_STD_DUPLEX:
+		ax25_std_t3timer_expiry(ax25);
+		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-		case AX25_PROTO_DAMA_SLAVE:
-			if (ax25->ax25_dev->dama.slave)
-				ax25_ds_t3timer_expiry(ax25);
-			else
-				ax25_std_t3timer_expiry(ax25);
-			break;
+	case AX25_PROTO_DAMA_SLAVE:
+		if (ax25->ax25_dev->dama.slave)
+			ax25_ds_t3timer_expiry(ax25);
+		else
+			ax25_std_t3timer_expiry(ax25);
+		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }
 
 static void ax25_idletimer_expiry(unsigned long param)
 {
 	ax25_cb *ax25 = (ax25_cb *)param;
+	struct sock *sk = ax25->sk;
 
+	bh_lock_sock(sk);
 	switch (ax25->ax25_dev->values[AX25_VALUES_PROTOCOL]) {
-		case AX25_PROTO_STD_SIMPLEX:
-		case AX25_PROTO_STD_DUPLEX:
-			ax25_std_idletimer_expiry(ax25);
-			break;
+	case AX25_PROTO_STD_SIMPLEX:
+	case AX25_PROTO_STD_DUPLEX:
+		ax25_std_idletimer_expiry(ax25);
+		break;
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
-		case AX25_PROTO_DAMA_SLAVE:
-			if (ax25->ax25_dev->dama.slave)
-				ax25_ds_idletimer_expiry(ax25);
-			else
-				ax25_std_idletimer_expiry(ax25);
-			break;
+	case AX25_PROTO_DAMA_SLAVE:
+		if (ax25->ax25_dev->dama.slave)
+			ax25_ds_idletimer_expiry(ax25);
+		else
+			ax25_std_idletimer_expiry(ax25);
+		break;
 #endif
 	}
+	bh_unlock_sock(sk);
 }

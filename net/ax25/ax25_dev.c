@@ -1,21 +1,11 @@
 /*
- *	AX.25 release 037
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
  *
- *	This code REQUIRES 2.1.15 or higher/ NET3.038
- *
- *	This module:
- *		This module is free software; you can redistribute it and/or
- *		modify it under the terms of the GNU General Public License
- *		as published by the Free Software Foundation; either version
- *		2 of the License, or (at your option) any later version.
- *
- *	Other kernels modules in this kit are generally BSD derived. See the copyright headers.
- *
- *
- *	History
- *	AX.25 036	Jonathan(G4KLX)	Split from ax25_route.c.
+ * Copyright (C) Jonathan Naylor G4KLX (g4klx@g4klx.demon.co.uk)
  */
-
 #include <linux/config.h>
 #include <linux/errno.h>
 #include <linux/types.h>
@@ -27,6 +17,7 @@
 #include <linux/string.h>
 #include <linux/sockios.h>
 #include <linux/net.h>
+#include <linux/spinlock.h>
 #include <net/ax25.h>
 #include <linux/inet.h>
 #include <linux/netdevice.h>
@@ -41,27 +32,35 @@
 #include <linux/init.h>
 
 ax25_dev *ax25_dev_list;
+spinlock_t ax25_dev_lock = SPIN_LOCK_UNLOCKED;
 
 ax25_dev *ax25_dev_ax25dev(struct net_device *dev)
 {
-	ax25_dev *ax25_dev;
+	ax25_dev *ax25_dev, *res = NULL;
 
+	spin_lock_bh(&ax25_dev_lock);
 	for (ax25_dev = ax25_dev_list; ax25_dev != NULL; ax25_dev = ax25_dev->next)
-		if (ax25_dev->dev == dev)
-			return ax25_dev;
+		if (ax25_dev->dev == dev) {
+			res = ax25_dev;
+			break;
+		}
+	spin_unlock_bh(&ax25_dev_lock);
 
-	return NULL;
+	return res;
 }
 
 ax25_dev *ax25_addr_ax25dev(ax25_address *addr)
 {
-	ax25_dev *ax25_dev;
+	ax25_dev *ax25_dev, *res = NULL;
 
+	spin_lock_bh(&ax25_dev_lock);
 	for (ax25_dev = ax25_dev_list; ax25_dev != NULL; ax25_dev = ax25_dev->next)
-		if (ax25cmp(addr, (ax25_address *)ax25_dev->dev->dev_addr) == 0)
-			return ax25_dev;
+		if (ax25cmp(addr, (ax25_address *)ax25_dev->dev->dev_addr) == 0) {
+			res = ax25_dev;
+		}
+	spin_unlock_bh(&ax25_dev_lock);
 
-	return NULL;
+	return res;
 }
 
 /*
@@ -71,7 +70,6 @@ ax25_dev *ax25_addr_ax25dev(ax25_address *addr)
 void ax25_dev_device_up(struct net_device *dev)
 {
 	ax25_dev *ax25_dev;
-	unsigned long flags;
 
 	if ((ax25_dev = kmalloc(sizeof(*ax25_dev), GFP_ATOMIC)) == NULL) {
 		printk(KERN_ERR "AX.25: ax25_dev_device_up - out of memory\n");
@@ -100,10 +98,10 @@ void ax25_dev_device_up(struct net_device *dev)
 	ax25_dev->values[AX25_VALUES_PROTOCOL]  = AX25_DEF_PROTOCOL;
 	ax25_dev->values[AX25_VALUES_DS_TIMEOUT]= AX25_DEF_DS_TIMEOUT;
 
-	save_flags(flags); cli();
+	spin_lock_bh(&ax25_dev_lock);
 	ax25_dev->next = ax25_dev_list;
 	ax25_dev_list  = ax25_dev;
-	restore_flags(flags);
+	spin_unlock_bh(&ax25_dev_lock);
 
 	ax25_register_sysctl();
 }
@@ -111,14 +109,13 @@ void ax25_dev_device_up(struct net_device *dev)
 void ax25_dev_device_down(struct net_device *dev)
 {
 	ax25_dev *s, *ax25_dev;
-	unsigned long flags;
 
 	if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL)
 		return;
 
 	ax25_unregister_sysctl();
 
-	save_flags(flags); cli();
+	spin_lock_bh(&ax25_dev_lock);
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
 	ax25_ds_del_timer(ax25_dev);
@@ -133,7 +130,7 @@ void ax25_dev_device_down(struct net_device *dev)
 
 	if ((s = ax25_dev_list) == ax25_dev) {
 		ax25_dev_list = s->next;
-		restore_flags(flags);
+		spin_unlock_bh(&ax25_dev_lock);
 		kfree(ax25_dev);
 		ax25_register_sysctl();
 		return;
@@ -142,7 +139,7 @@ void ax25_dev_device_down(struct net_device *dev)
 	while (s != NULL && s->next != NULL) {
 		if (s->next == ax25_dev) {
 			s->next = ax25_dev->next;
-			restore_flags(flags);
+			spin_unlock_bh(&ax25_dev_lock);
 			kfree(ax25_dev);
 			ax25_register_sysctl();
 			return;
@@ -150,8 +147,8 @@ void ax25_dev_device_down(struct net_device *dev)
 
 		s = s->next;
 	}
+	spin_unlock_bh(&ax25_dev_lock);
 
-	restore_flags(flags);
 	ax25_register_sysctl();
 }
 
@@ -163,22 +160,22 @@ int ax25_fwd_ioctl(unsigned int cmd, struct ax25_fwd_struct *fwd)
 		return -EINVAL;
 
 	switch (cmd) {
-		case SIOCAX25ADDFWD:
-			if ((fwd_dev = ax25_addr_ax25dev(&fwd->port_to)) == NULL)
-				return -EINVAL;
-			if (ax25_dev->forward != NULL)
-				return -EINVAL;
-			ax25_dev->forward = fwd_dev->dev;
-			break;
-
-		case SIOCAX25DELFWD:
-			if (ax25_dev->forward == NULL)
-				return -EINVAL;
-			ax25_dev->forward = NULL;
-			break;
-
-		default:
+	case SIOCAX25ADDFWD:
+		if ((fwd_dev = ax25_addr_ax25dev(&fwd->port_to)) == NULL)
 			return -EINVAL;
+		if (ax25_dev->forward != NULL)
+			return -EINVAL;
+		ax25_dev->forward = fwd_dev->dev;
+		break;
+
+	case SIOCAX25DELFWD:
+		if (ax25_dev->forward == NULL)
+			return -EINVAL;
+		ax25_dev->forward = NULL;
+		break;
+
+	default:
+		return -EINVAL;
 	}
 
 	return 0;
@@ -202,12 +199,16 @@ struct net_device *ax25_fwd_dev(struct net_device *dev)
  */
 void __exit ax25_dev_free(void)
 {
-	ax25_dev *s, *ax25_dev = ax25_dev_list;
+	ax25_dev *s, *ax25_dev;
 
+	spin_lock_bh(&ax25_dev_lock);
+	ax25_dev = ax25_dev_list;
 	while (ax25_dev != NULL) {
 		s        = ax25_dev;
 		ax25_dev = ax25_dev->next;
 
 		kfree(s);
 	}
+	ax25_dev_list = NULL;
+	spin_unlock_bh(&ax25_dev_lock);
 }
