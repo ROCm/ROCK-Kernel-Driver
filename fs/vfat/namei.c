@@ -82,10 +82,10 @@ static int vfat_revalidate(struct dentry *dentry, struct nameidata *nd)
 		 */
 		ret = 0;
 	else {
-		spin_lock(&dcache_lock);
+		spin_lock(&dentry->d_lock);
 		if (dentry->d_time != dentry->d_parent->d_inode->i_version)
 			ret = 0;
-		spin_unlock(&dcache_lock);
+		spin_unlock(&dentry->d_lock);
 	}
 	return ret;
 }
