@@ -666,8 +666,8 @@ repeat_lock_task:
 			if (unlikely(sync && !task_running(rq, p) &&
 				(task_cpu(p) != smp_processor_id()) &&
 					cpu_isset(smp_processor_id(),
-							p->cpus_allowed))) {
-
+							p->cpus_allowed) &&
+					!cpu_is_offline(smp_processor_id()))) {
 				set_task_cpu(p, smp_processor_id());
 				task_rq_unlock(rq, &flags);
 				goto repeat_lock_task;
@@ -1298,6 +1298,9 @@ static void load_balance(runqueue_t *this_rq, int idle, cpumask_t cpumask)
 	prio_array_t *array;
 	struct list_head *head, *curr;
 	task_t *tmp;
+
+	if (cpu_is_offline(this_cpu))
+		goto out;
 
 	busiest = find_busiest_queue(this_rq, this_cpu, idle,
 				     &imbalance, cpumask);
