@@ -54,7 +54,6 @@ static struct timer_list flow_hash_rnd_timer;
 #define FLOW_HASH_RND_PERIOD	(10 * 60 * HZ)
 
 struct flow_flush_info {
-	void *object;
 	atomic_t cpuleft;
 	struct completion completion;
 };
@@ -224,18 +223,20 @@ void *flow_cache_lookup(struct flowi *key, u16 family, u8 dir,
 static void flow_cache_flush_tasklet(unsigned long data)
 {
 	struct flow_flush_info *info = (void *)data;
-	void *object = info->object;
 	int i;
 	int cpu;
 
 	cpu = smp_processor_id();
 	for (i = 0; i < flow_hash_size; i++) {
-		struct flow_cache_entry *fle, **flp;
+		struct flow_cache_entry *fle;
 
-		flp = &flow_table[(cpu << flow_hash_shift) + i];
-		for (; (fle = *flp) != NULL; flp = &fle->next) {
-			if (fle->object != object)
+		fle = flow_table[(cpu << flow_hash_shift) + i];
+		for (; fle; fle = fle->next) {
+			unsigned genid = atomic_read(&flow_cache_genid);
+
+			if (!fle->object || fle->genid == genid)
 				continue;
+
 			fle->object = NULL;
 			atomic_dec(fle->object_ref);
 		}
@@ -257,11 +258,10 @@ static void flow_cache_flush_per_cpu(void *data)
 	tasklet_schedule(tasklet);
 }
 
-void flow_cache_flush(void *object)
+void flow_cache_flush(void)
 {
 	struct flow_flush_info info;
 
-	info.object = object;
 	atomic_set(&info.cpuleft, num_online_cpus());
 	init_completion(&info.completion);
 
