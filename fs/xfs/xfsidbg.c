@@ -4207,8 +4207,9 @@ xfsidbg_xlog(xlog_t *log)
 	};
 
 	kdb_printf("xlog at 0x%p\n", log);
-	kdb_printf("&flushsm: 0x%p  tic_cnt: %d	 tic_tcnt: %d  \n",
-		&log->l_flushsema, log->l_ticket_cnt, log->l_ticket_tcnt);
+	kdb_printf("&flushsm: 0x%p  flushcnt: %d tic_cnt: %d	 tic_tcnt: %d  \n",
+		&log->l_flushsema, log->l_flushcnt,
+		log->l_ticket_cnt, log->l_ticket_tcnt);
 	kdb_printf("freelist: 0x%p  tail: 0x%p	ICLOG: 0x%p  \n",
 		log->l_freelist, log->l_tail, log->l_iclog);
 	kdb_printf("&icloglock: 0x%p  tail_lsn: %s  last_sync_lsn: %s \n",
