@@ -60,8 +60,6 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk, unsigned cpu)
 {
 }
 
-extern void flush_stab(void);
-
 /*
  * The context number queue has underflowed.
  * Meaning: we tried to push a context number that was freed
@@ -133,6 +131,7 @@ destroy_context(struct mm_struct *mm)
 	spin_unlock( &mmu_context_queue.lock );
 }
 
+extern void flush_stab(struct task_struct *tsk, struct mm_struct *mm);
 
 /*
  * switch_mm is the entry point called from the architecture independent
@@ -142,22 +141,16 @@ static inline void
 switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	  struct task_struct *tsk, int cpu)
 {
-	tsk->thread.pgdir = next->pgd;	/* cache the pgdir in the thread 
-					   maybe not needed any more */
-	flush_stab();
+	flush_stab(tsk, next);
+	set_bit(cpu, &next->cpu_vm_mask);
 }
 
 /*
  * After we have set current->mm to a new value, this activates
  * the context for the new mm so we see the new mappings.
  */
-static inline void
-activate_mm(struct mm_struct *active_mm, struct mm_struct *mm)
-{
-	current->thread.pgdir = mm->pgd;
-	flush_stab();
-}
-
+#define activate_mm(active_mm, mm) \
+	switch_mm(active_mm, mm, current, smp_processor_id());
 
 #define VSID_RANDOMIZER 42470972311
 #define VSID_MASK	0xfffffffff
