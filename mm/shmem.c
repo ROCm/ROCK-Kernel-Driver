@@ -10,6 +10,10 @@
  * Copyright (C) 2002-2004 VERITAS Software Corporation.
  * Copyright (C) 2004 Andi Kleen, SuSE Labs
  *
+ * Extended attribute support for tmpfs:
+ * Copyright (c) 2004, Luke Kenneth Casson Leighton <lkcl@lkcl.net>
+ * Copyright (c) 2004 Red Hat, Inc., James Morris <jmorris@redhat.com>
+ *
  * This file is released under the GPL.
  */
 
@@ -41,6 +45,7 @@
 #include <linux/swapops.h>
 #include <linux/mempolicy.h>
 #include <linux/namei.h>
+#include <linux/xattr.h>
 #include <asm/uaccess.h>
 #include <asm/div64.h>
 #include <asm/pgtable.h>
@@ -171,6 +176,7 @@ static struct address_space_operations shmem_aops;
 static struct file_operations shmem_file_operations;
 static struct inode_operations shmem_inode_operations;
 static struct inode_operations shmem_dir_inode_operations;
+static struct inode_operations shmem_special_inode_operations;
 static struct vm_operations_struct shmem_vm_ops;
 
 static struct backing_dev_info shmem_backing_dev_info = {
@@ -1235,6 +1241,7 @@ shmem_get_inode(struct super_block *sb, int mode, dev_t dev)
 
 		switch (mode & S_IFMT) {
 		default:
+			inode->i_op = &shmem_special_inode_operations;
 			init_special_inode(inode, mode, dev);
 			break;
 		case S_IFREG:
@@ -1756,6 +1763,12 @@ static void shmem_put_link(struct dentry *dentry, struct nameidata *nd)
 static struct inode_operations shmem_symlink_inline_operations = {
 	.readlink	= generic_readlink,
 	.follow_link	= shmem_follow_link_inline,
+#ifdef CONFIG_TMPFS_XATTR
+	.setxattr       = generic_setxattr,
+	.getxattr       = generic_getxattr,
+	.listxattr      = generic_listxattr,
+	.removexattr    = generic_removexattr,
+#endif
 };
 
 static struct inode_operations shmem_symlink_inode_operations = {
@@ -1763,6 +1776,12 @@ static struct inode_operations shmem_symlink_inode_operations = {
 	.readlink	= generic_readlink,
 	.follow_link	= shmem_follow_link,
 	.put_link	= shmem_put_link,
+#ifdef CONFIG_TMPFS_XATTR
+	.setxattr       = generic_setxattr,
+	.getxattr       = generic_getxattr,
+	.listxattr      = generic_listxattr,
+	.removexattr    = generic_removexattr,
+#endif
 };
 
 static int shmem_parse_options(char *options, int *mode, uid_t *uid, gid_t *gid, unsigned long *blocks, unsigned long *inodes)
@@ -1862,6 +1881,12 @@ static void shmem_put_super(struct super_block *sb)
 	sb->s_fs_info = NULL;
 }
 
+#ifdef CONFIG_TMPFS_XATTR
+static struct xattr_handler *shmem_xattr_handlers[];
+#else
+#define shmem_xattr_handlers NULL
+#endif
+
 static int shmem_fill_super(struct super_block *sb,
 			    void *data, int silent)
 {
@@ -1904,6 +1929,7 @@ static int shmem_fill_super(struct super_block *sb,
 		sbinfo->max_inodes = inodes;
 		sbinfo->free_inodes = inodes;
 	}
+	sb->s_xattr = shmem_xattr_handlers;
 #endif
 
 	sb->s_maxbytes = SHMEM_MAX_BYTES;
@@ -1995,6 +2021,12 @@ static struct file_operations shmem_file_operations = {
 static struct inode_operations shmem_inode_operations = {
 	.truncate	= shmem_truncate,
 	.setattr	= shmem_notify_change,
+#ifdef CONFIG_TMPFS_XATTR
+	.setxattr       = generic_setxattr,
+	.getxattr       = generic_getxattr,
+	.listxattr      = generic_listxattr,
+	.removexattr    = generic_removexattr,
+#endif
 };
 
 static struct inode_operations shmem_dir_inode_operations = {
@@ -2008,6 +2040,21 @@ static struct inode_operations shmem_dir_inode_operations = {
 	.rmdir		= shmem_rmdir,
 	.mknod		= shmem_mknod,
 	.rename		= shmem_rename,
+#ifdef CONFIG_TMPFS_XATTR
+	.setxattr       = generic_setxattr,
+	.getxattr       = generic_getxattr,
+	.listxattr      = generic_listxattr,
+	.removexattr    = generic_removexattr,
+#endif
+#endif
+};
+
+static struct inode_operations shmem_special_inode_operations = {
+#ifdef CONFIG_TMPFS_XATTR
+	.setxattr	= generic_setxattr,
+	.getxattr	= generic_getxattr,
+	.listxattr	= generic_listxattr,
+	.removexattr	= generic_removexattr,
 #endif
 };
 
@@ -2031,6 +2078,49 @@ static struct vm_operations_struct shmem_vm_ops = {
 	.get_policy     = shmem_get_policy,
 #endif
 };
+
+
+#ifdef CONFIG_TMPFS_SECURITY
+
+static size_t shmem_xattr_security_list(struct inode *inode, char *list, size_t list_len,
+					const char *name, size_t name_len)
+{
+	return security_inode_listsecurity(inode, list, list_len);
+}
+
+static int shmem_xattr_security_get(struct inode *inode, const char *name, void *buffer, size_t size)
+{
+	if (strcmp(name, "") == 0)
+		return -EINVAL;
+	return security_inode_getsecurity(inode, name, buffer, size);
+}
+
+static int shmem_xattr_security_set(struct inode *inode, const char *name, const void *value, size_t size, int flags)
+{
+	if (strcmp(name, "") == 0)
+		return -EINVAL;
+	return security_inode_setsecurity(inode, name, value, size, flags);
+}
+
+struct xattr_handler shmem_xattr_security_handler = {
+	.prefix	= XATTR_SECURITY_PREFIX,
+	.list	= shmem_xattr_security_list,
+	.get	= shmem_xattr_security_get,
+	.set	= shmem_xattr_security_set,
+};
+
+#endif	/* CONFIG_TMPFS_SECURITY */
+
+#ifdef CONFIG_TMPFS_XATTR
+
+static struct xattr_handler *shmem_xattr_handlers[] = {
+#ifdef CONFIG_TMPFS_SECURITY
+	&shmem_xattr_security_handler,
+#endif
+	NULL
+};
+
+#endif	/* CONFIG_TMPFS_XATTR */
 
 static struct super_block *shmem_get_sb(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
