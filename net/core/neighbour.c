@@ -690,6 +690,7 @@ static void neigh_timer_handler(unsigned long arg)
 		} else {
 			neigh->nud_state = NUD_STALE;
 			neigh_suspect(neigh);
+			goto out;
 		}
 	} else if (state & NUD_DELAY) {
 		if (now - neigh->confirmed <= neigh->parms->delay_probe_time) {
