@@ -72,18 +72,21 @@ static struct dentry_operations vfat_dentry_ops[4] = {
 static int vfat_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
 	int ret = 1;
-	PRINTK1(("vfat_revalidate: %s\n", dentry->d_name.name));
-	spin_lock(&dcache_lock);
-	if (nd && !(nd->flags & LOOKUP_CONTINUE) && (nd->flags & LOOKUP_CREATE))
+
+	if (!dentry->d_inode &&
+	    nd && !(nd->flags & LOOKUP_CONTINUE) && (nd->flags & LOOKUP_CREATE))
 		/*
 		 * negative dentry is dropped, in order to make sure
 		 * to use the name which a user desires if this is
 		 * create path.
 		 */
 		ret = 0;
-	else if (dentry->d_time != dentry->d_parent->d_inode->i_version)
-		ret = 0;
-	spin_unlock(&dcache_lock);
+	else {
+		spin_lock(&dcache_lock);
+		if (dentry->d_time != dentry->d_parent->d_inode->i_version)
+			ret = 0;
+		spin_unlock(&dcache_lock);
+	}
 	return ret;
 }
 
