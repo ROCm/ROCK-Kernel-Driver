@@ -63,15 +63,13 @@ extern void cap_task_reparent_to_init (struct task_struct *p);
 /* setfsuid or setfsgid, id0 == fsuid or fsgid */
 #define LSM_SETID_FS	8
 
-
-#ifdef CONFIG_SECURITY
-
 /* forward declares to avoid warnings */
 struct sk_buff;
-struct net_device;
 struct nfsctl_arg;
 struct sched_param;
 struct swap_info_struct;
+
+#ifdef CONFIG_SECURITY
 
 /**
  * struct security_operations - main security structure
@@ -952,6 +950,9 @@ struct security_operations {
 	                          struct security_operations *ops);
 	int (*unregister_security) (const char *name,
 	                            struct security_operations *ops);
+
+#ifdef CONFIG_SECURITY_NETWORK
+#endif	/* CONFIG_SECURITY_NETWORK */
 };
 
 /* global variables */
@@ -2105,6 +2106,10 @@ static inline int security_sem_semop (struct sem_array * sma,
 }
 
 #endif	/* CONFIG_SECURITY */
+
+#ifdef CONFIG_SECURITY_NETWORK
+#else	/* CONFIG_SECURITY_NETWORK */
+#endif	/* CONFIG_SECURITY_NETWORK */
 
 #endif /* ! __LINUX_SECURITY_H */
 

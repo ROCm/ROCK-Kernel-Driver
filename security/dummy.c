@@ -597,6 +597,9 @@ static int dummy_sem_semop (struct sem_array *sma,
 	return 0;
 }
 
+#ifdef CONFIG_SECURITY_NETWORK
+#endif	/* CONFIG_SECURITY_NETWORK */
+
 static int dummy_register_security (const char *name, struct security_operations *ops)
 {
 	return -EINVAL;
@@ -725,5 +728,7 @@ void security_fixup_ops (struct security_operations *ops)
 	set_to_dummy_if_null(ops, sem_semop);
 	set_to_dummy_if_null(ops, register_security);
 	set_to_dummy_if_null(ops, unregister_security);
+#ifdef CONFIG_SECURITY_NETWORK
+#endif	/* CONFIG_SECURITY_NETWORK */
 }
 
