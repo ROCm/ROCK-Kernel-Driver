@@ -50,6 +50,8 @@
 #define ASL_RESNAME_ADDRESS                     "_ADR"
 #define ASL_RESNAME_ALIGNMENT                   "_ALN"
 #define ASL_RESNAME_ADDRESSSPACE                "_ASI"
+#define ASL_RESNAME_ACCESSSIZE                  "_ASZ"
+#define ASL_RESNAME_TYPESPECIFICATTRIBUTES      "_ATT"
 #define ASL_RESNAME_BASEADDRESS                 "_BAS"
 #define ASL_RESNAME_BUSMASTER                   "_BM_"  /* Master(1), Slave(0) */
 #define ASL_RESNAME_DECODE                      "_DEC"
@@ -223,6 +225,27 @@ struct asl_fixed_memory_32_desc
 };
 
 
+struct asl_extended_address_desc
+{
+	u8                                  descriptor_type;
+	u16                                 length;
+	u8                                  resource_type;
+	u8                                  flags;
+	u8                                  specific_flags;
+	u8                                  revision_iD;
+	u8                                  reserved;
+	u64                                 granularity;
+	u64                                 address_min;
+	u64                                 address_max;
+	u64                                 translation_offset;
+	u64                                 address_length;
+	u64                                 type_specific_attributes;
+	u8                                  optional_fields[2]; /* Used for length calculation only */
+};
+
+#define ASL_EXTENDED_ADDRESS_DESC_REVISION          1       /* ACPI 3.0 */
+
+
 struct asl_qword_address_desc
 {
 	u8                                  descriptor_type;
@@ -289,7 +312,7 @@ struct asl_general_register_desc
 	u8                                  address_space_id;
 	u8                                  bit_width;
 	u8                                  bit_offset;
-	u8                                  reserved;
+	u8                                  access_size; /* ACPI 3.0, was Reserved */
 	u64                                 address;
 };
 
@@ -317,6 +340,7 @@ union asl_resource_desc
 	struct asl_qword_address_desc       qas;
 	struct asl_dword_address_desc       das;
 	struct asl_word_address_desc        was;
+	struct asl_extended_address_desc    eas;
 	struct asl_extended_xrupt_desc      exx;
 	struct asl_general_register_desc    grg;
 	u32                                 u32_item;
