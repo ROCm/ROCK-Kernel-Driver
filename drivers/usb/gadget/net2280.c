@@ -307,7 +307,6 @@ static void ep_reset (struct net2280_regs *regs, struct net2280_ep *ep)
 		| (1 << SET_NAK_OUT_PACKETS)
 		| (1 << CLEAR_EP_HIDE_STATUS_PHASE)
 		| (1 << CLEAR_INTERRUPT_MODE)
-		| (1 << CLEAR_CONTROL_STATUS_PHASE_HANDSHAKE)
 		| (1 << CLEAR_ENDPOINT_TOGGLE)
 		| (1 << CLEAR_ENDPOINT_HALT)
 		, &ep->regs->ep_rsp);
@@ -2511,15 +2510,23 @@ next_endpoints:
 static void handle_stat1_irqs (struct net2280 *dev, u32 stat)
 {
 	struct net2280_ep	*ep;
-	u32			tmp, num, scratch;
+	u32			tmp, num, mask, scratch;
 
 	/* after disconnect there's nothing else to do! */
 	tmp = (1 << VBUS_INTERRUPT) | (1 << ROOT_PORT_RESET_INTERRUPT);
+	mask = (1 << HIGH_SPEED) | (1 << FULL_SPEED);
+
+	/* VBUS disconnect is indicated by VBUS_PIN and VBUS_INTERRUPT set.
+	 * Root Port Reset is indicated by ROOT_PORT_RESET_INTERRRUPT set and
+	 * both HIGH_SPEED and FULL_SPEED clear (as ROOT_PORT_RESET_INTERRUPT 
+	 * only indicates a change in the reset state).
+	 */
 	if (stat & tmp) {
 		writel (tmp, &dev->regs->irqstat1);
-		if (((stat & (1 << ROOT_PORT_RESET_INTERRUPT)) != 0
-			|| (readl (&dev->usb->usbctl) & (1 << VBUS_PIN)) == 0
-			) && dev->gadget.speed != USB_SPEED_UNKNOWN) {
+		if ((((stat & (1 << ROOT_PORT_RESET_INTERRUPT)) && 
+				((readl (&dev->usb->usbstat) & mask) == 0))
+				|| ((readl (&dev->usb->usbctl) & (1 << VBUS_PIN)) == 0) 
+			    ) && ( dev->gadget.speed != USB_SPEED_UNKNOWN)) {
 			DEBUG (dev, "disconnect %s\n",
 					dev->driver->driver.name);
 			stop_activity (dev, dev->driver);
