@@ -1478,7 +1478,7 @@ static inline void cache_free_one(kmem_cache_t *cachep, void *objp)
 		} else if (unlikely(inuse == cachep->num)) {
 			/* Was full. */
 			list_del(&slabp->list);
-			list_add(&slabp->list, &cachep->slabs_partial);
+			list_add_tail(&slabp->list, &cachep->slabs_partial);
 		}
 	}
 }
