@@ -151,7 +151,6 @@ xfs_getattr(
 	}
 	vap->va_nblocks =
 		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
-	vap->va_fsid = mp->m_dev;
 	vap->va_nodeid = ip->i_ino;
 #if XFS_BIG_INUMS
 	vap->va_nodeid += mp->m_inoadd;
