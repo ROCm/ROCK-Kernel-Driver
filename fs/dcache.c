@@ -32,8 +32,9 @@
 #include <linux/swap.h>
 #include <linux/bootmem.h>
 
-#define DCACHE_PARANOIA 1
 /* #define DCACHE_DEBUG 1 */
+
+int sysctl_vfs_cache_pressure = 100;
 
 spinlock_t dcache_lock __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 seqlock_t rename_lock __cacheline_aligned_in_smp = SEQLOCK_UNLOCKED;
@@ -664,7 +665,7 @@ static int shrink_dcache_memory(int nr, unsigned int gfp_mask)
 			return -1;
 		prune_dcache(nr);
 	}
-	return dentry_stat.nr_unused;
+	return (dentry_stat.nr_unused / 100) * sysctl_vfs_cache_pressure;
 }
 
 /**
