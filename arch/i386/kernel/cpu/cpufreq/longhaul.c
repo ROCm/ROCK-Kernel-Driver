@@ -222,7 +222,7 @@ static int guess_fsb(int maxmult)
 static int __init longhaul_get_ranges (void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
-	unsigned long invalue,invalue2;
+	unsigned long invalue;
 	unsigned int minmult=0, maxmult=0;
 	unsigned int multipliers[32]= {
 		50,30,40,100,55,35,45,95,90,70,80,60,120,75,85,65,
@@ -277,19 +277,10 @@ static int __init longhaul_get_ranges (void)
 
 		//TODO: Nehemiah may have borken MaxMHzBR.
 		// need to extrapolate from FSB.
-
-		invalue2 = longhaul.bits.MinMHzBR;
-		invalue = longhaul.bits.MaxMHzBR;
-		if (longhaul.bits.MaxMHzBR4)
-			invalue += 16;
-		maxmult=multipliers[invalue];
-
+		minmult=50;
 		maxmult=longhaul_get_cpu_mult();
 
-		dprintk(KERN_INFO PFX " invalue: %ld  maxmult: %d \n", invalue, maxmult);
-		dprintk(KERN_INFO PFX " invalue2: %ld \n", invalue2);
-
-		minmult=50;
+		dprintk(KERN_INFO PFX " maxmult: %d \n", maxmult);
 
 		switch (longhaul.bits.MaxMHzFSB) {
 		case 0x0:	fsb=133;
