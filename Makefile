@@ -501,11 +501,8 @@ all: modules
 
 #	Build modules
 
-include/linux/compile.h: FORCE
-	$(Q)$(MAKE) $(build)=init include/linux/compile.h
-
 .PHONY: modules
-modules: $(SUBDIRS) $(if $(KBUILD_BUILTIN),vmlinux) include/linux/compile.h
+modules: $(SUBDIRS) $(if $(KBUILD_BUILTIN),vmlinux)
 	@echo '  Building modules, stage 2.';
 	$(Q)$(MAKE) -rR -f scripts/Makefile.modpost
 
