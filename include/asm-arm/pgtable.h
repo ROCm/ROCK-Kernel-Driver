@@ -117,7 +117,6 @@ extern struct page *empty_zero_page;
 
 /* to find an entry in a page-table-directory */
 #define pgd_index(addr)		((addr) >> PGDIR_SHIFT)
-#define __pgd_offset(addr)	pgd_index(addr)
 
 #define pgd_offset(mm, addr)	((mm)->pgd+pgd_index(addr))
 

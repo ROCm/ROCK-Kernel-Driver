@@ -342,20 +342,20 @@ int do_translation_fault(unsigned long addr, unsigned int fsr,
 			 struct pt_regs *regs)
 {
 	struct task_struct *tsk;
-	unsigned int offset;
+	unsigned int index;
 	pgd_t *pgd, *pgd_k;
 	pmd_t *pmd, *pmd_k;
 
 	if (addr < TASK_SIZE)
 		return do_page_fault(addr, fsr, regs);
 
-	offset = __pgd_offset(addr);
+	index = pgd_index(addr);
 
 	/*
 	 * FIXME: CP15 C1 is write only on ARMv3 architectures.
 	 */
-	pgd = cpu_get_pgd() + offset;
-	pgd_k = init_mm.pgd + offset;
+	pgd = cpu_get_pgd() + index;
+	pgd_k = init_mm.pgd + index;
 
 	if (pgd_none(*pgd_k))
 		goto bad_area;
