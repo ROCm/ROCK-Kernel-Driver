@@ -51,7 +51,6 @@
  */
 
 #include "transport.h"
-#include "raw_bulk.h"
 #include "protocol.h"
 #include "usb.h"
 #include "debug.h"
@@ -91,16 +90,14 @@ static int datafab_read_data(struct us_data *us,
 			     struct datafab_info *info,
 			     u32 sector,
 			     u32 sectors, 
-			     unsigned char *dest, 
+			     unsigned char *buffer, 
 			     int use_sg)
 {
 	unsigned char *command = us->iobuf;
-	unsigned char *buffer = NULL;
-	unsigned char *ptr;
 	unsigned char  thistime;
-	int totallen, len, result;
-	int sg_idx = 0, sg_offset = 0;
-	int rc;
+	unsigned int totallen, alloclen;
+	int len, result;
+	unsigned int sg_idx = 0, sg_offset = 0;
 
 	// we're working in LBA mode.  according to the ATA spec, 
 	// we can support up to 28-bit addressing.  I don't know if Datafab
@@ -111,23 +108,28 @@ static int datafab_read_data(struct us_data *us,
 		return USB_STOR_TRANSPORT_ERROR;
 
 	if (info->lun == -1) {
-		rc = datafab_determine_lun(us, info);
-		if (rc != USB_STOR_TRANSPORT_GOOD)
-			return rc;
+		result = datafab_determine_lun(us, info);
+		if (result != USB_STOR_TRANSPORT_GOOD)
+			return result;
 	}
 
 	totallen = sectors * info->ssize;
+
+	// Since we don't read more than 64 KB at a time, we have to create
+	// a bounce buffer if the transfer uses scatter-gather.
+
+	alloclen = min(totallen, 65536u);
+	if (use_sg) {
+		buffer = kmalloc(alloclen, GFP_NOIO);
+		if (buffer == NULL)
+			return USB_STOR_TRANSPORT_ERROR;
+	}
 
 	do {
 		// loop, never allocate or transfer more than 64k at once
 		// (min(128k, 255*info->ssize) is the real limit)
 
-		len = min_t(int, totallen, 65536);
-
-		ptr = buffer = (use_sg ? kmalloc(len, GFP_NOIO) : dest);
-		if (buffer == NULL)
-			return USB_STOR_TRANSPORT_ERROR;
-
+		len = min(totallen, alloclen);
 		thistime = (len / info->ssize) & 0xff;
 
 		command[0] = 0;
@@ -135,7 +137,7 @@ static int datafab_read_data(struct us_data *us,
 		command[2] = sector & 0xFF;
 		command[3] = (sector >> 8) & 0xFF;
 		command[4] = (sector >> 16) & 0xFF;
-	
+
 		command[5] = 0xE0 + (info->lun << 4);
 		command[5] |= (sector >> 24) & 0x0F;
 		command[6] = 0x20;
@@ -147,24 +149,22 @@ static int datafab_read_data(struct us_data *us,
 			goto leave;
 
 		// read the result
-		result = datafab_bulk_read(us, ptr, len);
+		result = datafab_bulk_read(us, buffer, len);
 		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
-		sectors -= thistime;
-		sector  += thistime;
+		if (use_sg)
+			usb_stor_access_xfer_buf(buffer, len, us->srb,
+					 &sg_idx, &sg_offset, TO_XFER_BUF);
+		else
+			buffer += len;
 
-		if (use_sg) {
-			us_copy_to_sgbuf(buffer, len, dest,
-					 &sg_idx, &sg_offset, use_sg);
-			kfree(buffer);
-		} else {
-			dest += len;
-		}
-
+		sector += thistime;
 		totallen -= len;
 	} while (totallen > 0);
 
+	if (use_sg)
+		kfree(buffer);
 	return USB_STOR_TRANSPORT_GOOD;
 
  leave:
@@ -178,16 +178,15 @@ static int datafab_write_data(struct us_data *us,
 			      struct datafab_info *info,
 			      u32 sector,
 			      u32 sectors, 
-			      unsigned char *src, 
+			      unsigned char *buffer, 
 			      int use_sg)
 {
 	unsigned char *command = us->iobuf;
 	unsigned char *reply = us->iobuf;
-	unsigned char *buffer = NULL;
-	unsigned char *ptr;
 	unsigned char thistime;
-	int totallen, len, result, rc;
-	int sg_idx = 0, sg_offset = 0;
+	unsigned int totallen, alloclen;
+	int len, result;
+	unsigned int sg_idx = 0, sg_offset = 0;
 
 	// we're working in LBA mode.  according to the ATA spec, 
 	// we can support up to 28-bit addressing.  I don't know if Datafab
@@ -198,37 +197,33 @@ static int datafab_write_data(struct us_data *us,
 		return USB_STOR_TRANSPORT_ERROR;
 
 	if (info->lun == -1) {
-		rc = datafab_determine_lun(us, info);
-		if (rc != USB_STOR_TRANSPORT_GOOD)
-			return rc;
+		result = datafab_determine_lun(us, info);
+		if (result != USB_STOR_TRANSPORT_GOOD)
+			return result;
 	}
 
-	// If we're using scatter-gather, we have to create a new
-	// buffer to read all of the data in first, since a
-	// scatter-gather buffer could in theory start in the middle
-	// of a page, which would be bad. A developer who wants a
-	// challenge might want to write a limited-buffer
-	// version of this code.
-
 	totallen = sectors * info->ssize;
+
+	// Since we don't write more than 64 KB at a time, we have to create
+	// a bounce buffer if the transfer uses scatter-gather.
+
+	alloclen = min(totallen, 65536u);
+	if (use_sg) {
+		buffer = kmalloc(alloclen, GFP_NOIO);
+		if (buffer == NULL)
+			return USB_STOR_TRANSPORT_ERROR;
+	}
 
 	do {
 		// loop, never allocate or transfer more than 64k at once
 		// (min(128k, 255*info->ssize) is the real limit)
 
-		len = min_t(int, totallen, 65536);
-
-		// if we are using scatter-gather,
-		// first copy all to one big buffer
-
-		buffer = us_copy_from_sgbuf(src, len, &sg_idx,
-					    &sg_offset, use_sg);
-		if (buffer == NULL)
-			return USB_STOR_TRANSPORT_ERROR;
-
-		ptr = buffer;
-
+		len = min(totallen, alloclen);
 		thistime = (len / info->ssize) & 0xff;
+
+		if (use_sg)
+			usb_stor_access_xfer_buf(buffer, len, us->srb,
+					&sg_idx, &sg_offset, FROM_XFER_BUF);
 
 		command[0] = 0;
 		command[1] = thistime;
@@ -247,7 +242,7 @@ static int datafab_write_data(struct us_data *us,
 			goto leave;
 
 		// send the data
-		result = datafab_bulk_write(us, ptr, len);
+		result = datafab_bulk_write(us, buffer, len);
 		if (result != USB_STOR_XFER_GOOD)
 			goto leave;
 
@@ -264,17 +259,15 @@ static int datafab_write_data(struct us_data *us,
 			goto leave;
 		}
 
-		sectors -= thistime;
-		sector  += thistime;
+		if (!use_sg)
+			buffer += len;
 
-		if (use_sg)
-			kfree(buffer);
-		else
-			src += len;
-
+		sector += thistime;
 		totallen -= len;
 	} while (totallen > 0);
 
+	if (use_sg)
+		kfree(buffer);
 	return USB_STOR_TRANSPORT_GOOD;
 
  leave:
@@ -435,7 +428,7 @@ static int datafab_handle_mode_sense(struct us_data *us,
 	// datafab reader doesn't present a SCSI interface so we
 	// fudge the SCSI commands...
 	//
-	
+
 	if (sense_6)
 		param_len = srb->cmnd[4];
 	else
