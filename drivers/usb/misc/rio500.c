@@ -94,8 +94,6 @@ static int open_rio(struct inode *inode, struct file *file)
 
 	init_waitqueue_head(&rio->wait_q);
 
-	MOD_INC_USE_COUNT;
-
 	unlock_kernel();
 
 	info("Rio opened.");
@@ -108,8 +106,6 @@ static int close_rio(struct inode *inode, struct file *file)
 	struct rio_usb_data *rio = &rio_instance;
 
 	rio->isopen = 0;
-
-	MOD_DEC_USE_COUNT;
 
 	info("Rio closed.");
 	return 0;
@@ -443,6 +439,7 @@ read_rio(struct file *file, char *buffer, size_t count, loff_t * ppos)
 
 static struct
 file_operations usb_rio_fops = {
+	.owner =	THIS_MODULE,
 	.read =		read_rio,
 	.write =	write_rio,
 	.ioctl =	ioctl_rio,

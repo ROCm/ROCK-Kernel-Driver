@@ -703,7 +703,7 @@ static void kaweth_usb_transmit_complete(struct urb *urb, struct pt_regs *regs)
 		kaweth_dbg("%s: TX status %d.", kaweth->net->name, urb->status);
 
 	netif_wake_queue(kaweth->net);
-	dev_kfree_skb(skb);
+	dev_kfree_skb_irq(skb);
 }
 
 /****************************************************************
@@ -721,7 +721,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 	if (kaweth->removed) {
 	/* our device is undergoing disconnection - we bail out */
 		spin_unlock(&kaweth->device_lock);
-		dev_kfree_skb(skb);
+		dev_kfree_skb_irq(skb);
 		return 0;
 	}
 
@@ -733,7 +733,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 		/* no such luck - we make our own */
 		struct sk_buff *copied_skb;
 		copied_skb = skb_copy_expand(skb, 2, 0, GFP_ATOMIC);
-		dev_kfree_skb_any(skb);
+		dev_kfree_skb_irq(skb);
 		skb = copied_skb;
 		if (!copied_skb) {
 			kaweth->stats.tx_errors++;
@@ -763,7 +763,7 @@ static int kaweth_start_xmit(struct sk_buff *skb, struct net_device *net)
 		kaweth->stats.tx_errors++;
 
 		netif_start_queue(net);
-		dev_kfree_skb(skb);
+		dev_kfree_skb_irq(skb);
 	}
 	else
 	{

@@ -347,7 +347,7 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 			/* FALLTHROUGH */
 	case DeviceOutRequest | USB_REQ_CLEAR_FEATURE:
 	case DeviceOutRequest | USB_REQ_SET_FEATURE:
-		dev_dbg (*hcd->controller, "no device features yet yet\n");
+		dev_dbg (hcd->controller, "no device features yet yet\n");
 		break;
 	case DeviceRequest | USB_REQ_GET_CONFIGURATION:
 		ubuf [0] = 1;
@@ -390,7 +390,7 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 		break;
 	case DeviceOutRequest | USB_REQ_SET_ADDRESS:
 		// wValue == urb->dev->devaddr
-		dev_dbg (*hcd->controller, "root hub device address %d\n",
+		dev_dbg (hcd->controller, "root hub device address %d\n",
 			wValue);
 		break;
 
@@ -405,7 +405,7 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 			/* FALLTHROUGH */
 	case EndpointOutRequest | USB_REQ_CLEAR_FEATURE:
 	case EndpointOutRequest | USB_REQ_SET_FEATURE:
-		dev_dbg (*hcd->controller, "no endpoint features yet\n");
+		dev_dbg (hcd->controller, "no endpoint features yet\n");
 		break;
 
 	/* CLASS REQUESTS (and errors) */
@@ -419,12 +419,12 @@ static int rh_call_control (struct usb_hcd *hcd, struct urb *urb)
 error:
 		/* "protocol stall" on error */
 		urb->status = -EPIPE;
-		dev_dbg (*hcd->controller, "unsupported hub control message (maxchild %d)\n",
+		dev_dbg (hcd->controller, "unsupported hub control message (maxchild %d)\n",
 				urb->dev->maxchild);
 	}
 	if (urb->status) {
 		urb->actual_length = 0;
-		dev_dbg (*hcd->controller, "CTRL: TypeReq=0x%x val=0x%x idx=0x%x len=%d ==> %d\n",
+		dev_dbg (hcd->controller, "CTRL: TypeReq=0x%x val=0x%x idx=0x%x len=%d ==> %d\n",
 			typeReq, wValue, wIndex, wLength, urb->status);
 	}
 	if (bufp) {
@@ -457,7 +457,7 @@ static int rh_status_urb (struct usb_hcd *hcd, struct urb *urb)
 	if (timer_pending (&hcd->rh_timer)
 			|| urb->status != -EINPROGRESS
 			|| urb->transfer_buffer_length < len) {
-		dev_dbg (*hcd->controller, "not queuing status urb, stat %d\n", urb->status);
+		dev_dbg (hcd->controller, "not queuing status urb, stat %d\n", urb->status);
 		return -EINVAL;
 	}
 
@@ -668,7 +668,7 @@ void usb_register_bus(struct usb_bus *bus)
 
 	usbfs_add_bus (bus);
 
-	dev_info (*bus->controller, "new USB bus registered, assigned bus number %d\n", bus->busnum);
+	dev_info (bus->controller, "new USB bus registered, assigned bus number %d\n", bus->busnum);
 }
 EXPORT_SYMBOL (usb_register_bus);
 
@@ -682,7 +682,7 @@ EXPORT_SYMBOL (usb_register_bus);
  */
 void usb_deregister_bus (struct usb_bus *bus)
 {
-	dev_info (*bus->controller, "USB bus %d deregistered\n", bus->busnum);
+	dev_info (bus->controller, "USB bus %d deregistered\n", bus->busnum);
 
 	/*
 	 * NOTE: make sure that all the devices are removed by the
@@ -718,7 +718,7 @@ int usb_register_root_hub (struct usb_device *usb_dev, struct device *parent_dev
 	sprintf (&usb_dev->dev.bus_id[0], "usb%d", usb_dev->bus->busnum);
 	retval = usb_new_device (usb_dev, parent_dev);
 	if (retval)
-		dev_err (*parent_dev, "can't register root hub for %s, %d\n",
+		dev_err (parent_dev, "can't register root hub for %s, %d\n",
 				usb_dev->dev.bus_id, retval);
 	return retval;
 }
@@ -825,7 +825,7 @@ int usb_check_bandwidth (struct usb_device *dev, struct urb *urb)
 #else
 			"would have ";
 #endif
-		dev_dbg (dev->dev, "usb_check_bandwidth %sFAILED: %d + %ld = %d usec\n",
+		dev_dbg (&dev->dev, "usb_check_bandwidth %sFAILED: %d + %ld = %d usec\n",
 			mode, old_alloc, bustime, new_alloc);
 #endif
 #ifdef CONFIG_USB_BANDWIDTH
@@ -864,7 +864,7 @@ void usb_claim_bandwidth (struct usb_device *dev, struct urb *urb, int bustime, 
 	urb->bandwidth = bustime;
 
 #ifdef USB_BANDWIDTH_MESSAGES
-	dev_dbg (dev->dev, "bandwidth alloc increased by %d (%s) to %d for %d requesters\n",
+	dev_dbg (&dev->dev, "bandwidth alloc increased by %d (%s) to %d for %d requesters\n",
 		bustime,
 		isoc ? "ISOC" : "INTR",
 		dev->bus->bandwidth_allocated,
@@ -893,7 +893,7 @@ void usb_release_bandwidth (struct usb_device *dev, struct urb *urb, int isoc)
 		dev->bus->bandwidth_int_reqs--;
 
 #ifdef USB_BANDWIDTH_MESSAGES
-	dev_dbg (dev->dev, "bandwidth alloc reduced by %d (%s) to %d for %d requesters\n",
+	dev_dbg (&dev->dev, "bandwidth alloc reduced by %d (%s) to %d for %d requesters\n",
 		urb->bandwidth,
 		isoc ? "ISOC" : "INTR",
 		dev->bus->bandwidth_allocated,
@@ -1154,7 +1154,7 @@ static int hcd_unlink_urb (struct urb *urb)
 	 */
 	if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
 		if (in_interrupt ()) {
-			dev_dbg (*hcd->controller, "non-async unlink in_interrupt");
+			dev_dbg (hcd->controller, "non-async unlink in_interrupt");
 			retval = -EWOULDBLOCK;
 			goto done;
 		}
@@ -1180,7 +1180,7 @@ static int hcd_unlink_urb (struct urb *urb)
 
 		/* hcds shouldn't really fail these calls, but... */
 		if (retval) {
-			dev_dbg (*sys, "dequeue %p --> %d\n", urb, retval);
+			dev_dbg (sys, "dequeue %p --> %d\n", urb, retval);
 			if (!(urb->transfer_flags & URB_ASYNC_UNLINK)) {
 				spin_lock_irqsave (&urb->lock, flags);
 				urb->complete = splice.complete;
@@ -1203,7 +1203,7 @@ done:
 	spin_unlock_irqrestore (&urb->lock, flags);
 bye:
 	if (retval && sys)
-		dev_dbg (*sys, "hcd_unlink_urb %p fail %d\n", urb, retval);
+		dev_dbg (sys, "hcd_unlink_urb %p fail %d\n", urb, retval);
 	return retval;
 }
 
@@ -1234,7 +1234,7 @@ static int hcd_free_dev (struct usb_device *udev)
 
 	/* device driver problem with refcounts? */
 	if (!list_empty (&dev->urb_list)) {
-		dev_dbg (*hcd->controller, "free busy dev, %s devnum %d (bug!)\n",
+		dev_dbg (hcd->controller, "free busy dev, %s devnum %d (bug!)\n",
 			hcd->self.bus_name, udev->devnum);
 		return -EINVAL;
 	}
@@ -1367,7 +1367,7 @@ void usb_hc_died (struct usb_hcd *hcd)
 		dev = list_entry (devlist, struct hcd_dev, dev_list);
 		list_for_each (urblist, &dev->urb_list) {
 			urb = list_entry (urblist, struct urb, urb_list);
-			dev_dbg (*hcd->controller, "shutdown %s urb %p pipe %x, current status %d\n",
+			dev_dbg (hcd->controller, "shutdown %s urb %p pipe %x, current status %d\n",
 				hcd->self.bus_name, urb, urb->pipe, urb->status);
 			if (urb->status == -EINPROGRESS)
 				urb->status = -ESHUTDOWN;

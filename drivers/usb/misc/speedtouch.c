@@ -1,31 +1,49 @@
+/******************************************************************************
+ *  speedtouch.c  --  Alcatel SpeedTouch USB xDSL modem driver.
+ *
+ *  Copyright (C) 2001, Alcatel
+ *
+ *  This program is free software; you can redistribute it and/or modify it
+ *  under the terms of the GNU General Public License as published by the Free
+ *  Software Foundation; either version 2 of the License, or (at your option)
+ *  any later version.
+ *
+ *  This program is distributed in the hope that it will be useful, but WITHOUT
+ *  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ *  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ *  more details.
+ *
+ *  You should have received a copy of the GNU General Public License along with
+ *  this program; if not, write to the Free Software Foundation, Inc., 59
+ *  Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
+ ******************************************************************************/
+
 /*
- *  Driver Module for Alcatel SpeedTouch USB xDSL modem
- *  Copyright 2001, Alcatel
  *  Written by Johan Verrept (Johan.Verrept@advalvas.be)
  *
-
-1.5A:   - Version for inclusion in 2.5 series kernel
-        - Modifcations by Richard Purdie (rpurdie@rpsys.net)
-        - made compatible with kernel 2.5.6 onwards by changing
-	  udsl_usb_send_data_context->urb changed to a pointer 
-	  and adding code to alloc and free it
-        - remove_wait_queue() added to udsl_atm_processqueue_thread() 
-
-1.5:	- fixed memory leak when atmsar_decode_aal5 returned NULL.
-	 (reported by stephen.robinson@zen.co.uk)
-
-1.4:	- changed the spin_lock() under interrupt to spin_lock_irqsave()
-	- unlink all active send urbs of a vcc that is being closed.
-
-1.3.1:	- added the version number
-
-1.3:	- Added multiple send urb support
-	- fixed memory leak and vcc->tx_inuse starvation bug
-	  when not enough memory left in vcc.
-
-1.2:	- Fixed race condition in udsl_usb_send_data()
-1.1:	- Turned off packet debugging
- 
+ *  1.5A:	- Version for inclusion in 2.5 series kernel
+ *		- Modifications by Richard Purdie (rpurdie@rpsys.net)
+ *		- made compatible with kernel 2.5.6 onwards by changing
+ *		udsl_usb_send_data_context->urb to a pointer and adding code
+ *		to alloc and free it
+ *		- remove_wait_queue() added to udsl_atm_processqueue_thread()
+ *
+ *  1.5:	- fixed memory leak when atmsar_decode_aal5 returned NULL.
+ *		(reported by stephen.robinson@zen.co.uk)
+ *
+ *  1.4:	- changed the spin_lock() under interrupt to spin_lock_irqsave()
+ *		- unlink all active send urbs of a vcc that is being closed.
+ *
+ *  1.3.1:	- added the version number
+ *
+ *  1.3:	- Added multiple send urb support
+ *		- fixed memory leak and vcc->tx_inuse starvation bug
+ *		  when not enough memory left in vcc.
+ *
+ *  1.2:	- Fixed race condition in udsl_usb_send_data()
+ *  1.1:	- Turned off packet debugging
+ *
  */
 
 #include <linux/module.h>
@@ -43,8 +61,6 @@
 #include <linux/atm.h>
 #include <linux/atmdev.h>
 #include "atmsar.h"
-
-const char *udsl_version = "1.5A";
 
 /*
 #define DEBUG 1
@@ -736,7 +752,7 @@ void udsl_usb_data_receive (struct urb *urb, struct pt_regs *regs)
 	case -ENOENT:		/* buffer was unlinked */
 	case -EILSEQ:		/* unplug or timeout */
 	case -ETIMEDOUT:	/* unplug or timeout */
-		/* 
+		/*
 		 * we don't do anything here and we don't resubmit
 		 */
 		return;
@@ -1007,11 +1023,11 @@ static void udsl_usb_disconnect (struct usb_interface *intf)
 *
 ****************************************************************************/
 
-static int udsl_usb_init (void)
+static int __init udsl_usb_init (void)
 {
 	int i;
 
-	PDEBUG ("Initializing SpeedTouch Driver Version %s\n", udsl_version);
+	PDEBUG ("Initializing SpeedTouch Driver Version " DRIVER_VERSION "\n");
 
 	for (i = 0; i < MAX_UDSL; i++)
 		minor_data[i] = NULL;
@@ -1022,7 +1038,7 @@ static int udsl_usb_init (void)
 	return usb_register (&udsl_usb_driver);
 }
 
-static void udsl_usb_cleanup (void)
+static void __exit udsl_usb_cleanup (void)
 {
 	/* killing threads */
 	udsl_atm_sar_stop ();
@@ -1035,7 +1051,7 @@ module_exit(udsl_usb_cleanup);
 #ifdef DEBUG_PACKET
 /*******************************************************************************
 *
-* Debug 
+* Debug
 *
 *******************************************************************************/
 

@@ -1,81 +1,77 @@
+/******************************************************************************
+ *  atmsar.c  --  General SAR library for ATM devices.
+ *
+ *  Copyright (C) 2000, Johan Verrept
+ *
+ *  This program is free software; you can redistribute it and/or modify it
+ *  under the terms of the GNU General Public License as published by the Free
+ *  Software Foundation; either version 2 of the License, or (at your option)
+ *  any later version.
+ *
+ *  This program is distributed in the hope that it will be useful, but WITHOUT
+ *  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ *  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+ *  more details.
+ *
+ *  You should have received a copy of the GNU General Public License along with
+ *  this program; if not, write to the Free Software Foundation, Inc., 59
+ *  Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
+ ******************************************************************************/
+
 /*
- *  General SAR library for ATM devices. 
- * 
- *  Written By Johan Verrept ( Johan.Verrept@advalvas.be )
+ *  Written by Johan Verrept (Johan.Verrept@advalvas.be)
  *
- *  Copyright (c) 2000, Johan Verrept
+ *  0.2.4A:	- Version for inclusion in 2.5 series kernel
+ *		- Modifications by Richard Purdie (rpurdie@rpsys.net)
+ *		- replaced "sarlib" with "atmsar"
+ *		- adaptations for inclusion in kernel tree
  *
- *  This code falls under the GNU General Public License, see COPYING for details
+ *  0.2.4:	- Fixed wrong buffer overrun check in atmsar_decode_rawcell()
+ *		reported by Stephen Robinson <stephen.robinson@zen.co.uk>
+ *		- Fixed bug when input skb did not contain a multple of 52/53
+ *		bytes (would happen when the speedtouch device resynced)
+ *		also reported by Stephen Robinson <stephen.robinson@zen.co.uk>
  *
- *  This package is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *  
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA. 
-
-Version 0.2.4A:
-       - Version for inclusion in 2.5 series kernel
-       - Modifcations by Richard Purdie (rpurdie@rpsys.net)
- 	- replaced "sarlib" with "atmsar"
-       - adaptations for inclusion in kernel tree
-
-Version 0.2.4:
-	- Fixed wrong buffer overrun check in atmsar_decode_rawcell()
-	  reported by Stephen Robinson <stephen.robinson@zen.co.uk>
-	- Fixed bug when input skb did not contain a multple of 52/53 bytes.
-	  (would happen when the speedtouch device resynced)
-	  also reported by Stephen Robinson <stephen.robinson@zen.co.uk>
-
-Version 0.2.3:
-	- Fixed wrong allocation size. caused memory corruption in some
-	  cases. Reported by Vladimir Dergachev <volodya@mindspring.com>
-	- Added some comments
-
-Version 0.2.2:
-	- Fixed CRCASM (patch from Linus Flannagan <linusf@netservices.eng.net>)
-	- Fixed problem when user did NOT use the ATMSAR_USE_53BYTE_CELL flag.
-          (reported by  Piers Scannell <email@lot105.com> )
-	- No more in-buffer rewriting for cloned buffers.
-	- Removed the PII specific CFLAGS in the Makefile.
-
-Version 0.2.1:
-	- removed dependancy on alloc_tx. tis presented problems when using
-		this with the  br2684 code.
-
-Version 0.2:
-        - added AAL0 reassembly
-        - added alloc_tx support                  
-        - replaced alloc_skb in decode functions to dev_alloc_skb to allow
-                 calling from interrupt
-        - fixed embarassing AAL5 bug. I was setting the pti bit in the wrong
-                byte...
-        - fixed another emabrassing bug.. picked up the wrong crc type and
-                forgot to invert the crc result...
-        - fixed AAL5 length calculations.
-        - removed automatic skb freeing from encode functions.
-                This caused problems because i did kfree_skb it, while it
-                needed to be popped. I cannot determine though whether it
-                needs to be popped or not. Figu'e it out ye'self ;-)
-        - added mru field. This is the buffersize. atmsar_decode_aal0 will
-                use when it allocates a receive buffer. A stop gap for real
-		buffer management.
-
-Version 0.1:
-	- library created.
-	- only contains AAL5, AAL0 can be easily added. ( actually, only
-		AAL0 reassembly is missing)
-*/
+ *  0.2.3:	- Fixed wrong allocation size. caused memory corruption in some
+ *		cases. Reported by Vladimir Dergachev <volodya@mindspring.com>
+ *		- Added some comments
+ *
+ *  0.2.2:	- Fixed CRCASM
+ *		patch from Linus Flannagan <linusf@netservices.eng.net>
+ *		- Fixed problem when user did NOT use the
+ *		ATMSAR_USE_53BYTE_CELL flag.
+ *		reported by  Piers Scannell <email@lot105.com>
+ *		- No more in-buffer rewriting for cloned buffers.
+ *		- Removed the PII specific CFLAGS in the Makefile.
+ *
+ *  0.2.1:	- removed dependancy on alloc_tx. tis presented problems when
+ *		using this with the br2684 code.
+ *
+ *  0.2:	- added AAL0 reassembly
+ *		- added alloc_tx support
+ *		- replaced alloc_skb in decode functions to dev_alloc_skb to
+ *		allow calling from interrupt
+ *		- fixed embarassing AAL5 bug. I was setting the pti bit in the
+ *		wrong byte...
+ *		- fixed another emabrassing bug.. picked up the wrong crc type
+ *		and forgot to invert the crc result...
+ *		- fixed AAL5 length calculations.
+ *		- removed automatic skb freeing from encode functions.
+ *		This caused problems because i did kfree_skb it, while it
+ *		needed to be popped. I cannot determine though whether it
+ *		needs to be popped or not. Figu'e it out ye'self ;-)
+ *		- added mru field. This is the buffersize. atmsar_decode_aal0
+ *		will use when it allocates a receive buffer. A stop gap for
+ *		real buffer management.
+ *
+ *  0.1:	- library created.
+ *		- only contains AAL5, AAL0 can be easily added. (actually, only
+ *		AAL0 reassembly is missing)
+ *
+ */
 
 #include "atmsar.h"
-#include <linux/module.h>
-#include <linux/init.h>
-
-#define DRIVER_AUTHOR "Johan Verrept, Johan.Verrept@advalvas.be"
-#define DRIVER_DESC "General SAR library for ATM devices"
-#define DRIVER_VERSION "0.2.4A"
 
 /***********************
  **
@@ -220,7 +216,7 @@ unsigned long calc_crc (char *mem, int len, unsigned initial)
 
 #define crc32( crc, mem, len) calc_crc(mem, len, crc);
 
-/* initialiation routines. not used at the moment 
+/* initialization routines. not used at the moment
  * I will avoid these as long as possible !!
  */
 
@@ -302,7 +298,7 @@ struct atmsar_vcc_data *atmsar_open (struct atmsar_vcc_data **list, struct atm_v
 /*
  * This gives problems with the ATM layer alloc_tx().
  * It is not usable from interrupt context and for
- * some reason this is used in interurpt context 
+ * some reason this is used in interrupt context
  * with br2684.c
  *
   if (vcc->alloc_tx)
@@ -587,7 +583,7 @@ struct sk_buff *atmsar_decode_rawcell (struct atmsar_vcc_data *list, struct sk_b
 					vcc->reasBuffer = dev_alloc_skb (vcc->mtu);
 
 				/* if alloc fails, we just drop the cell. it is possible that we can still
-				 * receive cells on other vcc's 
+				 * receive cells on other vcc's
 				 */
 				if (vcc->reasBuffer) {
 					/* if (buffer overrun) discard received cells until now */
@@ -693,28 +689,3 @@ struct sk_buff *atmsar_decode_aal5 (struct atmsar_vcc_data *ctx, struct sk_buff 
 	PDEBUG ("atmsar_decode_aal5 returns pdu 0x%p with length %d\n", skb, skb->len);
 	return skb;
 };
-
-
-static int start (void)
-{
-	return 0;
-}
-
-static void cleanup (void)
-{
-}
-
-module_init (start);
-module_exit (cleanup);
-
-EXPORT_SYMBOL (atmsar_open);
-EXPORT_SYMBOL (atmsar_close);
-EXPORT_SYMBOL (atmsar_encode_rawcell);
-EXPORT_SYMBOL (atmsar_encode_aal5);
-EXPORT_SYMBOL (atmsar_decode_rawcell);
-EXPORT_SYMBOL (atmsar_decode_aal5);
-EXPORT_SYMBOL (atmsar_alloc_tx);
-
-MODULE_AUTHOR (DRIVER_AUTHOR);
-MODULE_DESCRIPTION (DRIVER_DESC);
-MODULE_LICENSE ("GPL");

@@ -24,8 +24,8 @@ config USB_SCANNER
 	depends on USB
 	help
 	  Say Y here if you want to connect a USB scanner to your computer's
-	  USB port. Please read <file:Documentation/usb/scanner.txt> and
-	  <file:Documentation/usb/scanner-hp-sane.txt> for more information.
+	  USB port. Please read <file:Documentation/usb/scanner.txt> for more
+	  information.
 
 	  This code is also available as a module ( = code which can be
 	  inserted in and removed from the running kernel whenever you want).
