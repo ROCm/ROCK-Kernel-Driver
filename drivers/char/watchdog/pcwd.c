@@ -278,8 +278,10 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 			{
 				rv |= WDIOF_OVERHEAT;
 
-				if (temp_panic)
-					panic("pcwd: Temperature overheat trip!\n");
+				if (temp_panic) {
+					printk (KERN_INFO "pcwd: Temperature overheat trip!\n");
+					machine_power_off();
+				}
 			}
 		}
 		else 
@@ -291,8 +293,10 @@ static int pcwd_ioctl(struct inode *inode, struct file *file,
 			{
 				rv |= WDIOF_OVERHEAT;
 
-				if (temp_panic)
-					panic("pcwd: Temperature overheat trip!\n");
+				if (temp_panic) {
+					printk (KERN_INFO "pcwd: Temperature overheat trip!\n");
+					machine_power_off();
+				}
 			}
 		}
 
