@@ -532,4 +532,7 @@ static inline int acpi_get_pxm(acpi_handle handle)
 	return 0;
 }
 #endif
+
+extern int pnpacpi_disabled;
+
 #endif /*_LINUX_ACPI_H*/
