@@ -849,6 +849,8 @@ struct dentry * d_lookup(struct dentry * parent, struct qstr * name)
 	struct dentry * dentry;
 	spin_lock(&dcache_lock);
 	dentry = __d_lookup(parent,name);
+	if (dentry)
+		__dget_locked(dentry);
 	spin_unlock(&dcache_lock);
 	return dentry;
 }
@@ -881,7 +883,6 @@ struct dentry * __d_lookup(struct dentry * parent, struct qstr * name)
 			if (memcmp(dentry->d_name.name, str, len))
 				continue;
 		}
-		__dget_locked(dentry);
 		dentry->d_vfs_flags |= DCACHE_REFERENCED;
 		return dentry;
 	}

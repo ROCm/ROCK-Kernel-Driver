@@ -654,6 +654,8 @@ struct nameidata {
 	struct qstr last;
 	unsigned int flags;
 	int last_type;
+	struct dentry *old_dentry;
+	struct vfsmount *old_mnt;
 };
 
 #define DQUOT_USR_ENABLED	0x01		/* User diskquotas enabled */
@@ -1395,7 +1397,6 @@ extern ino_t find_inode_number(struct dentry *, struct qstr *);
 #define LOOKUP_CONTINUE		(4)
 #define LOOKUP_PARENT		(16)
 #define LOOKUP_NOALT		(32)
-#define LOOKUP_LOCKED		(64)
 
 /*
  * Type of the last component on LOOKUP_PARENT
