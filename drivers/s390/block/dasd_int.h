@@ -6,7 +6,7 @@
  * Bugreports.to..: <Linux390@de.ibm.com>
  * (C) IBM Corporation, IBM Deutschland Entwicklung GmbH, 1999,2000
  *
- * $Revision: 1.40 $
+ * $Revision: 1.42 $
  */
 
 #ifndef DASD_INT_H
@@ -188,7 +188,6 @@ struct dasd_ccw_req {
 #define DASD_CQR_DONE     0x03	/* request is completed successfully */
 #define DASD_CQR_ERROR    0x04	/* request is completed with error */
 #define DASD_CQR_FAILED   0x05	/* request is finally failed */
-#define DASD_CQR_PENDING  0x06  /* request is waiting for interrupt - ERP only */ 
 
 /* Signature for error recovery functions. */
 typedef struct dasd_ccw_req *(*dasd_erp_fn_t) (struct dasd_ccw_req *);
@@ -279,6 +278,7 @@ struct dasd_device {
 
 	/* Device state and target state. */
 	int state, target;
+	int stopped;		/* device (ccw_device_start) was stopped */
 
 	/* Open and reference count. */
         atomic_t ref_count;
@@ -305,6 +305,12 @@ struct dasd_device {
 	struct dasd_profile_info_t profile;
 #endif
 };
+
+/* reasons why device (ccw_device_start) was stopped */
+#define DASD_STOPPED_NOT_ACC 1         /* not accessible */
+#define DASD_STOPPED_QUIESCE 2         /* Quiesced */
+#define DASD_STOPPED_PENDING 4         /* long busy */
+
 
 void dasd_put_device_wake(struct dasd_device *);
 

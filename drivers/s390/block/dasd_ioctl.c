@@ -169,6 +169,58 @@ dasd_ioctl_disable(struct block_device *bdev, int no, long args)
 }
 
 /*
+ * Quiesce device.
+ */
+static int
+dasd_ioctl_quiesce(struct block_device *bdev, int no, long args)
+{
+	struct dasd_device *device;
+	unsigned long flags;
+	
+	if (!capable (CAP_SYS_ADMIN))
+		return -EACCES;
+	
+	device = bdev->bd_disk->private_data;
+	if (device == NULL)
+		return -ENODEV;
+	
+	DEV_MESSAGE (KERN_DEBUG, device, "%s",
+		     "Quiesce IO on device");
+	spin_lock_irqsave(get_ccwdev_lock(device->cdev), flags);
+	device->stopped |= DASD_STOPPED_QUIESCE;
+	spin_unlock_irqrestore(get_ccwdev_lock(device->cdev), flags);
+	return 0;
+}
+
+
+/*
+ * Quiesce device.
+ */
+static int
+dasd_ioctl_resume(struct block_device *bdev, int no, long args)
+{
+	struct dasd_device *device;
+	unsigned long flags;
+	
+	if (!capable (CAP_SYS_ADMIN)) 
+		return -EACCES;
+
+	device = bdev->bd_disk->private_data;
+	if (device == NULL)
+		return -ENODEV;
+
+	DEV_MESSAGE (KERN_DEBUG, device, "%s",
+		     "resume IO on device");
+	
+	spin_lock_irqsave(get_ccwdev_lock(device->cdev), flags);
+	device->stopped &= ~DASD_STOPPED_QUIESCE;
+	spin_unlock_irqrestore(get_ccwdev_lock(device->cdev), flags);
+
+	dasd_schedule_bh (device);
+	return 0;
+}
+
+/*
  * performs formatting of _device_ according to _fdata_
  * Note: The discipline's format_function is assumed to deliver formatting
  * commands to format a single unit of the device. In terms of the ECKD
@@ -438,6 +490,8 @@ static struct { int no; dasd_ioctl_fn_t fn; } dasd_ioctls[] =
 {
 	{ BIODASDDISABLE, dasd_ioctl_disable },
 	{ BIODASDENABLE, dasd_ioctl_enable },
+	{ BIODASDQUIESCE, dasd_ioctl_quiesce },
+	{ BIODASDRESUME, dasd_ioctl_resume },
 	{ BIODASDFMT, dasd_ioctl_format },
 	{ BIODASDINFO, dasd_ioctl_information },
 	{ BIODASDINFO2, dasd_ioctl_information },
