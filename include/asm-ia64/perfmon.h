@@ -199,6 +199,8 @@ extern int pfm_remove_alternate_syswide_subsystem(pfm_intr_handler_desc_t *h);
 #define PFM_CPUINFO_DCR_PP	0x2	/* if set the system wide session has started */
 #define PFM_CPUINFO_EXCL_IDLE	0x4	/* the system wide session excludes the idle task */
 
+#define PFM_CPUINFO_CLEAR(v)	__get_cpu_var(pfm_syst_info) &= ~(v)
+#define PFM_CPUINFO_SET(v)	__get_cpu_var(pfm_syst_info) |= (v)
 
 #endif /* __KERNEL__ */
 

@@ -7,6 +7,7 @@ config HP_SIMETH
 
 config HP_SIMSERIAL
 	bool "Simulated serial driver support"
+	default y if IA64_GENERIC
 
 config HP_SIMSCSI
 	bool "Simulated SCSI disk"

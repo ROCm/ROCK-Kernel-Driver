@@ -131,9 +131,6 @@
 
 #define PFM_REG_RETFLAG_SET(flags, val)	do { flags &= ~PFM_REG_RETFL_MASK; flags |= (val); } while(0)
 
-#define PFM_CPUINFO_CLEAR(v)	__get_cpu_var(pfm_syst_info) &= ~(v)
-#define PFM_CPUINFO_SET(v)	__get_cpu_var(pfm_syst_info) |= (v)
-
 /*
  * debugging
  */
