@@ -170,6 +170,17 @@ config X86_P4_CLOCKMOD
 
 	  If in doubt, say N.
 
+config X86_CPUFREQ_NFORCE2
+	tristate "nVidia nForce2 FSB changing"
+	depends on CPU_FREQ && EXPERIMENTAL
+	help
+	  This adds the CPUFreq driver for FSB changing on nVidia nForce2
+	  plattforms.
+
+	  For details, take a look at <file:Documentation/cpu-freq/>.
+
+	  If in doubt, say N.
+
 config X86_LONGRUN
 	tristate "Transmeta LongRun"
 	depends on CPU_FREQ
