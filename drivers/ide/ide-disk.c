@@ -1607,6 +1607,8 @@ static void idedisk_setup (ide_drive_t *drive)
 	if ((id->csfo & 1) || (id->cfs_enable_1 & (1 << 5)))
 		drive->wcache = 1;
 
+	write_cache(drive, 1);
+
 	/*
 	 * We must avoid issuing commands a drive does not understand
 	 * or we may crash it. We check flush cache is supported. We also
@@ -1622,14 +1624,6 @@ static void idedisk_setup (ide_drive_t *drive)
 		if (capacity > (1ULL << 28) && !ide_id_has_flush_cache_ext(id))
 			barrier = 0;
 	}
-	/* Now we have barrier awareness we can be properly conservative
-	   by default with other drives. We turn off write caching when
-	   barrier is not available. Users can adjust this at runtime if
-	   they need unsafe but fast filesystems. This will reduce the
-	   performance of non cache flush supporting disks but it means
-	   you get the data order guarantees the journalling fs's require */
-
-	write_cache(drive, barrier);
 
 	printk(KERN_DEBUG "%s: cache flushes %ssupported\n",
 		drive->name, barrier ? "" : "not ");
