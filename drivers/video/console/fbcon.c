@@ -744,7 +744,6 @@ static void fbcon_init(struct vc_data *vc, int init)
 	fbcon_set_display(unit, init, !init);
 }
 
-
 static void fbcon_deinit(struct vc_data *vc)
 {
 	int unit = vc->vc_num;
@@ -764,7 +763,6 @@ static int fbcon_changevar(int con)
 		struct vc_data *vc = p->conp;
 		int nr_rows, nr_cols;
 		int old_rows, old_cols;
-		unsigned short *save = NULL, *q;
 		int i, charcnt = 256;
 		struct font_desc *font;
 
@@ -844,15 +842,6 @@ static int fbcon_changevar(int con)
 		 	vt_cons[vc->vc_num]->vc_mode == KD_TEXT) {
 			accel_clear_margins(vc, p, 0);
 			update_screen(con);
-		}
-		if (save) {
-			q = (unsigned short *) (vc->vc_origin +
-						vc->vc_size_row *
-						old_rows);
-			scr_memcpyw(q, save, logo_lines * nr_cols * 2);
-			vc->vc_y += logo_lines;
-			vc->vc_pos += logo_lines * vc->vc_size_row;
-			kfree(save);
 		}
 
 		if (con == fg_console && softback_buf) {
