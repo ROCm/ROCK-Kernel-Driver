@@ -38,7 +38,6 @@
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/machdep.h>
-#include <asm/macio_asic.h>
 #include <asm/pmac_feature.h>
 #include <asm/dbdma.h>
 #include <asm/pci-bridge.h>
@@ -2187,6 +2186,8 @@ probe_macios(void)
 		macio_chips[0] = macio_chips[1];
 		macio_chips[1] = temp;
 	}
+	macio_chips[0].lbus.index = 0;
+	macio_chips[1].lbus.index = 1;
 
 	return (macio_chips[0].of_node == NULL) ? -ENODEV : 0;
 }

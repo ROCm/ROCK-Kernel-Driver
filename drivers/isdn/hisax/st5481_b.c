@@ -254,7 +254,7 @@ static int st5481_setup_b_out(struct st5481_bcs *bcs)
 
 	DBG(4,"");
 
-	altsetting = &(dev->config->interface[0].altsetting[3]);
+	altsetting = &(dev->config->interface[0]->altsetting[3]);
 
 	// Allocate URBs and buffers for the B channel out
 	endpoint = &altsetting->endpoint[EP_B1_OUT - 1 + bcs->channel * 2];
