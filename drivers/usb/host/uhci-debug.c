@@ -402,7 +402,7 @@ static int uhci_show_lists(struct uhci_hcd *uhci, char *buf, int len)
 		head = &uhci->complete_list;
 		tmp = head->next;
 		while (tmp != head) {
-			struct urb_priv *urbp = list_entry(tmp, struct urb_priv, complete_list);
+			struct urb_priv *urbp = list_entry(tmp, struct urb_priv, urb_list);
 
 			out += sprintf(out, "  %d: ", ++count);
 			out += uhci_show_urbp(uhci, urbp, out, len - (out - buf));

@@ -387,7 +387,6 @@ struct urb_priv {
 	unsigned long fsbrtime;		/* In jiffies */
 
 	struct list_head queue_list;	/* P: uhci->frame_list_lock */
-	struct list_head complete_list;	/* P: uhci->complete_list_lock */
 };
 
 /*

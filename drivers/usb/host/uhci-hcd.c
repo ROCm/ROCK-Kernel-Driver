@@ -122,21 +122,17 @@ static inline void uhci_set_next_interrupt(struct uhci_hcd *uhci)
 
 static inline void uhci_clear_next_interrupt(struct uhci_hcd *uhci)
 {
-	unsigned long flags;
-
-	spin_lock_irqsave(&uhci->frame_list_lock, flags);
+	spin_lock(&uhci->frame_list_lock);
 	uhci->term_td->status &= ~cpu_to_le32(TD_CTRL_IOC);
-	spin_unlock_irqrestore(&uhci->frame_list_lock, flags);
+	spin_unlock(&uhci->frame_list_lock);
 }
 
-static inline void uhci_add_complete(struct uhci_hcd *uhci, struct urb *urb)
+static inline void uhci_moveto_complete(struct uhci_hcd *uhci, 
+					struct urb_priv *urbp)
 {
-	struct urb_priv *urbp = (struct urb_priv *)urb->hcpriv;
-	unsigned long flags;
-
-	spin_lock_irqsave(&uhci->complete_list_lock, flags);
-	list_add_tail(&urbp->complete_list, &uhci->complete_list);
-	spin_unlock_irqrestore(&uhci->complete_list_lock, flags);
+	spin_lock(&uhci->complete_list_lock);
+	list_move_tail(&urbp->urb_list, &uhci->complete_list);
+	spin_unlock(&uhci->complete_list_lock);
 }
 
 static struct uhci_td *uhci_alloc_td(struct uhci_hcd *uhci, struct usb_device *dev)
@@ -672,7 +668,6 @@ static struct urb_priv *uhci_alloc_urb_priv(struct uhci_hcd *uhci, struct urb *u
 	
 	INIT_LIST_HEAD(&urbp->td_list);
 	INIT_LIST_HEAD(&urbp->queue_list);
-	INIT_LIST_HEAD(&urbp->complete_list);
 	INIT_LIST_HEAD(&urbp->urb_list);
 
 	list_add_tail(&urbp->urb_list, &uhci->urb_list);
@@ -722,9 +717,6 @@ static void uhci_destroy_urb_priv(struct uhci_hcd *uhci, struct urb *urb)
 
 	if (!list_empty(&urbp->urb_list))
 		warn("uhci_destroy_urb_priv: urb %p still on uhci->urb_list or uhci->remove_list", urb);
-
-	if (!list_empty(&urbp->complete_list))
-		warn("uhci_destroy_urb_priv: urb %p still on uhci->complete_list", urb);
 
 	spin_lock_irqsave(&uhci->td_remove_list_lock, flags);
 
@@ -1533,10 +1525,9 @@ out:
 static void uhci_transfer_result(struct uhci_hcd *uhci, struct urb *urb)
 {
 	int ret = -EINPROGRESS;
-	unsigned long flags;
 	struct urb_priv *urbp;
 
-	spin_lock_irqsave(&urb->lock, flags);
+	spin_lock(&urb->lock);
 
 	urbp = (struct urb_priv *)urb->hcpriv;
 
@@ -1591,13 +1582,11 @@ static void uhci_transfer_result(struct uhci_hcd *uhci, struct urb *urb)
 			usb_pipetype(urb->pipe), urb);
 	}
 
-	/* Remove it from uhci->urb_list */
-	list_del_init(&urbp->urb_list);
-
-	uhci_add_complete(uhci, urb);
+	/* Move it from uhci->urb_list to uhci->complete_list */
+	uhci_moveto_complete(uhci, urbp);
 
 out:
-	spin_unlock_irqrestore(&urb->lock, flags);
+	spin_unlock(&urb->lock);
 }
 
 /*
@@ -1796,9 +1785,8 @@ static int init_stall_timer(struct usb_hcd *hcd)
 static void uhci_free_pending_qhs(struct uhci_hcd *uhci)
 {
 	struct list_head *tmp, *head;
-	unsigned long flags;
 
-	spin_lock_irqsave(&uhci->qh_remove_list_lock, flags);
+	spin_lock(&uhci->qh_remove_list_lock);
 	head = &uhci->qh_remove_list;
 	tmp = head->next;
 	while (tmp != head) {
@@ -1810,15 +1798,14 @@ static void uhci_free_pending_qhs(struct uhci_hcd *uhci)
 
 		uhci_free_qh(uhci, qh);
 	}
-	spin_unlock_irqrestore(&uhci->qh_remove_list_lock, flags);
+	spin_unlock(&uhci->qh_remove_list_lock);
 }
 
 static void uhci_free_pending_tds(struct uhci_hcd *uhci)
 {
 	struct list_head *tmp, *head;
-	unsigned long flags;
 
-	spin_lock_irqsave(&uhci->td_remove_list_lock, flags);
+	spin_lock(&uhci->td_remove_list_lock);
 	head = &uhci->td_remove_list;
 	tmp = head->next;
 	while (tmp != head) {
@@ -1830,17 +1817,16 @@ static void uhci_free_pending_tds(struct uhci_hcd *uhci)
 
 		uhci_free_td(uhci, td);
 	}
-	spin_unlock_irqrestore(&uhci->td_remove_list_lock, flags);
+	spin_unlock(&uhci->td_remove_list_lock);
 }
 
 static void uhci_finish_urb(struct usb_hcd *hcd, struct urb *urb, struct pt_regs *regs)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
-	unsigned long flags;
 
-	spin_lock_irqsave(&urb->lock, flags);
+	spin_lock(&urb->lock);
 	uhci_destroy_urb_priv(uhci, urb);
-	spin_unlock_irqrestore(&urb->lock, flags);
+	spin_unlock(&urb->lock);
 
 	usb_hcd_giveback_urb(hcd, urb, regs);
 }
@@ -1849,44 +1835,40 @@ static void uhci_finish_completion(struct usb_hcd *hcd, struct pt_regs *regs)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
 	struct list_head *tmp, *head;
-	unsigned long flags;
 
-	spin_lock_irqsave(&uhci->complete_list_lock, flags);
+	spin_lock(&uhci->complete_list_lock);
 	head = &uhci->complete_list;
-	tmp = head->next;
-	while (tmp != head) {
-		struct urb_priv *urbp = list_entry(tmp, struct urb_priv, complete_list);
-		struct urb *urb = urbp->urb;
-
-		list_del_init(&urbp->complete_list);
-		spin_unlock_irqrestore(&uhci->complete_list_lock, flags);
-
-		uhci_finish_urb(hcd, urb, regs);
-
-		spin_lock_irqsave(&uhci->complete_list_lock, flags);
-		head = &uhci->complete_list;
-		tmp = head->next;
-	}
-	spin_unlock_irqrestore(&uhci->complete_list_lock, flags);
-}
-
-static void uhci_remove_pending_urbps(struct uhci_hcd *uhci)
-{
-	struct list_head *tmp, *head;
-	unsigned long flags;
-
-	spin_lock_irqsave(&uhci->urb_remove_list_lock, flags);
-	head = &uhci->urb_remove_list;
 	tmp = head->next;
 	while (tmp != head) {
 		struct urb_priv *urbp = list_entry(tmp, struct urb_priv, urb_list);
 		struct urb *urb = urbp->urb;
 
-		tmp = tmp->next;
 		list_del_init(&urbp->urb_list);
-		uhci_add_complete(uhci, urb);
+		spin_unlock(&uhci->complete_list_lock);
+
+		uhci_finish_urb(hcd, urb, regs);
+
+		spin_lock(&uhci->complete_list_lock);
+		head = &uhci->complete_list;
+		tmp = head->next;
 	}
-	spin_unlock_irqrestore(&uhci->urb_remove_list_lock, flags);
+	spin_unlock(&uhci->complete_list_lock);
+}
+
+static void uhci_remove_pending_urbps(struct uhci_hcd *uhci)
+{
+	struct list_head *tmp, *head;
+
+	spin_lock(&uhci->urb_remove_list_lock);
+	head = &uhci->urb_remove_list;
+	tmp = head->next;
+	while (tmp != head) {
+		struct urb_priv *urbp = list_entry(tmp, struct urb_priv, urb_list);
+
+		tmp = tmp->next;
+		uhci_moveto_complete(uhci, urbp);
+	}
+	spin_unlock(&uhci->urb_remove_list_lock);
 }
 
 static irqreturn_t uhci_irq(struct usb_hcd *hcd, struct pt_regs *regs)
@@ -2434,6 +2416,7 @@ err_create_proc_entry:
 static void uhci_stop(struct usb_hcd *hcd)
 {
 	struct uhci_hcd *uhci = hcd_to_uhci(hcd);
+	unsigned long flags;
 
 	del_timer_sync(&uhci->stall_timer);
 
@@ -2441,6 +2424,7 @@ static void uhci_stop(struct usb_hcd *hcd)
 	 * At this point, we're guaranteed that no new connects can be made
 	 * to this bus since there are no more parents
 	 */
+	local_irq_save(flags);
 	uhci_free_pending_qhs(uhci);
 	uhci_free_pending_tds(uhci);
 	uhci_remove_pending_urbps(uhci);
@@ -2449,7 +2433,8 @@ static void uhci_stop(struct usb_hcd *hcd)
 
 	uhci_free_pending_qhs(uhci);
 	uhci_free_pending_tds(uhci);
-
+	local_irq_restore(flags);
+	
 	release_uhci(uhci);
 }
 
