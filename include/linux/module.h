@@ -183,7 +183,7 @@ struct module
 
 	/* Exported symbols */
 	const struct kernel_symbol *syms;
-	unsigned int num_ksyms;
+	unsigned int num_syms;
 	const unsigned long *crcs;
 
 	/* GPL-only exported symbols. */
@@ -233,7 +233,7 @@ struct module
 #ifdef CONFIG_KALLSYMS
 	/* We keep the symbol and string tables for kallsyms. */
 	Elf_Sym *symtab;
-	unsigned long num_syms;
+	unsigned long num_kallsyms;
 	char *strtab;
 #endif
 
