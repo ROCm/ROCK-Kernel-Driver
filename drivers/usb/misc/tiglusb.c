@@ -397,7 +397,11 @@ tiglusb_probe (struct usb_interface *intf,
 static void
 tiglusb_disconnect (struct usb_interface *intf)
 {
+	wait_queue_t __wait;
 	ptiglusb_t s = usb_get_intfdata (intf);
+	
+	init_waitqueue_entry(&__wait, current);
+	
 
 	usb_set_intfdata (intf, NULL);
 	if (!s || !s->dev) {
@@ -407,8 +411,12 @@ tiglusb_disconnect (struct usb_interface *intf)
 
 	s->remove_pending = 1;
 	wake_up (&s->wait);
+	add_wait_queue(&s->wait, &__wait);
+	set_current_state(TASK_UNINTERRUPTIBLE);
 	if (s->state == _started)
-		sleep_on (&s->remove_ok);
+		schedule();
+	current->state = TASK_RUNNING;
+	remove_wait_queue(&s->wait, &__wait);
 	down (&s->mutex);
 	s->dev = NULL;
 	s->opened = 0;
