@@ -275,9 +275,9 @@ static int convert_fxsr_from_user( struct i387_fxsave_struct *fxsave,
 		unsigned long *t = (unsigned long *)to;
 		unsigned long *f = (unsigned long *)from;
 
-		if (__get_user(*f, t) ||
-				__get_user(*(f + 1), t + 1) ||
-				__get_user(from->exponent, &to->exponent))
+		if (__get_user(*t, f) ||
+				__get_user(*(t + 1), f + 1) ||
+				__get_user(to->exponent, &from->exponent))
 			return 1;
 	}
 	return 0;
