@@ -182,7 +182,7 @@ static int part_write_user_prot_reg (struct mtd_info *mtd, loff_t from, size_t l
 					len, retlen, buf);
 }
 
-static int part_writev (struct mtd_info *mtd,  const struct iovec *vecs,
+static int part_writev (struct mtd_info *mtd,  const struct kvec *vecs,
 			 unsigned long count, loff_t to, size_t *retlen)
 {
 	struct mtd_part *part = PART(mtd);
@@ -197,7 +197,7 @@ static int part_writev (struct mtd_info *mtd,  const struct iovec *vecs,
 					NULL, &mtd->oobinfo);
 }
 
-static int part_readv (struct mtd_info *mtd,  struct iovec *vecs,
+static int part_readv (struct mtd_info *mtd,  struct kvec *vecs,
 			 unsigned long count, loff_t from, size_t *retlen)
 {
 	struct mtd_part *part = PART(mtd);
@@ -210,7 +210,7 @@ static int part_readv (struct mtd_info *mtd,  struct iovec *vecs,
 					NULL, &mtd->oobinfo);
 }
 
-static int part_writev_ecc (struct mtd_info *mtd,  const struct iovec *vecs,
+static int part_writev_ecc (struct mtd_info *mtd,  const struct kvec *vecs,
 			 unsigned long count, loff_t to, size_t *retlen,
 			 u_char *eccbuf,  struct nand_oobinfo *oobsel)
 {
@@ -224,7 +224,7 @@ static int part_writev_ecc (struct mtd_info *mtd,  const struct iovec *vecs,
 					eccbuf, oobsel);
 }
 
-static int part_readv_ecc (struct mtd_info *mtd,  struct iovec *vecs,
+static int part_readv_ecc (struct mtd_info *mtd,  struct kvec *vecs,
 			 unsigned long count, loff_t from, size_t *retlen,
 			 u_char *eccbuf,  struct nand_oobinfo *oobsel)
 {

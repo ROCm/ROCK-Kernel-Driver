@@ -279,6 +279,16 @@ void path_release(struct nameidata *nd)
 }
 
 /*
+ * umount() mustn't call path_release()/mntput() as that would clear
+ * mnt_expiry_mark
+ */
+void path_release_on_umount(struct nameidata *nd)
+{
+	dput(nd->dentry);
+	_mntput(nd->mnt);
+}
+
+/*
  * Internal lookup() using the new generic dcache.
  * SMP-safe
  */

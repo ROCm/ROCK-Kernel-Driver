@@ -2061,7 +2061,7 @@ static int diAllocBit(struct inomap * imap, struct iag * iagp, int ino)
 {
 	int extno, bitno, agno, sword, rc;
 	struct metapage *amp = NULL, *bmp = NULL;
-	struct iag *aiagp = 0, *biagp = 0;
+	struct iag *aiagp = NULL, *biagp = NULL;
 	u32 mask;
 
 	/* check if this is the last free inode within the iag.
@@ -2207,7 +2207,7 @@ static int diAllocBit(struct inomap * imap, struct iag * iagp, int ino)
 static int diNewExt(struct inomap * imap, struct iag * iagp, int extno)
 {
 	int agno, iagno, fwd, back, freei = 0, sword, rc;
-	struct iag *aiagp = 0, *biagp = 0, *ciagp = 0;
+	struct iag *aiagp = NULL, *biagp = NULL, *ciagp = NULL;
 	struct metapage *amp, *bmp, *cmp, *dmp;
 	struct inode *ipimap;
 	s64 blkno, hint;
@@ -2910,7 +2910,7 @@ int diExtendFS(struct inode *ipimap, struct inode *ipbmap)
 {
 	int rc, rcx = 0;
 	struct inomap *imap = JFS_IP(ipimap)->i_imap;
-	struct iag *iagp = 0, *hiagp = 0;
+	struct iag *iagp = NULL, *hiagp = NULL;
 	struct bmap *mp = JFS_SBI(ipbmap->i_sb)->bmap;
 	struct metapage *bp, *hbp;
 	int i, n, head;

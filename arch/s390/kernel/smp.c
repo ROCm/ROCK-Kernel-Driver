@@ -582,38 +582,45 @@ static void __init smp_create_idle(unsigned int cpu)
 
 /* Reserving and releasing of CPUs */
 
-static atomic_t smp_cpu_reserved[NR_CPUS];
+static spinlock_t smp_reserve_lock = SPIN_LOCK_UNLOCKED;
+static int smp_cpu_reserved[NR_CPUS];
 
 int
 smp_get_cpu(cpumask_t cpu_mask)
 {
-	int val, cpu;
+	unsigned long flags;
+	int cpu;
 
+	spin_lock_irqsave(&smp_reserve_lock, flags);
 	/* Try to find an already reserved cpu. */
 	for_each_cpu_mask(cpu, cpu_mask) {
-		while ((val = atomic_read(&smp_cpu_reserved[cpu])) != 0) {
-			if (!atomic_compare_and_swap(val, val + 1,
-						     &smp_cpu_reserved[cpu]))
-				/* Found one. */
-				goto out;
+		if (smp_cpu_reserved[cpu] != 0) {
+			smp_cpu_reserved[cpu]++;
+			/* Found one. */
+			goto out;
 		}
 	}
 	/* Reserve a new cpu from cpu_mask. */
 	for_each_cpu_mask(cpu, cpu_mask) {
-		atomic_inc(&smp_cpu_reserved[cpu]);
-		if (cpu_online(cpu))
+		if (cpu_online(cpu)) {
+			smp_cpu_reserved[cpu]++;
 			goto out;
-		atomic_dec(&smp_cpu_reserved[cpu]);
+		}
 	}
 	cpu = -ENODEV;
 out:
+	spin_unlock_irqrestore(&smp_reserve_lock, flags);
 	return cpu;
 }
 
 void
 smp_put_cpu(int cpu)
 {
-	atomic_dec(&smp_cpu_reserved[cpu]);
+	unsigned long flags;
+
+	spin_lock_irqsave(&smp_reserve_lock, flags);
+	smp_cpu_reserved[cpu]--;
+	spin_unlock_irqrestore(&smp_reserve_lock, flags);
 }
 
 static inline int
@@ -682,10 +689,9 @@ __cpu_disable(void)
 	unsigned long flags;
 	ec_creg_mask_parms cr_parms;
 
-	local_irq_save(flags);
-
-	if (atomic_read(&smp_cpu_reserved[smp_processor_id()])) {
-		local_irq_restore(flags);
+	spin_lock_irqsave(&smp_reserve_lock, flags);
+	if (smp_cpu_reserved[smp_processor_id()] != 0) {
+		spin_unlock_irqrestore(&smp_reserve_lock, flags);
 		return -EBUSY;
 	}
 
@@ -715,7 +721,7 @@ __cpu_disable(void)
 	cr_parms.andvals[14] = ~(1<<28 | 1<<27 | 1<<26 | 1<<25 | 1<<24);
 	smp_ctl_bit_callback(&cr_parms);
 
-	local_irq_restore(flags);
+	spin_unlock_irqrestore(&smp_reserve_lock, flags);
 	return 0;
 }
 

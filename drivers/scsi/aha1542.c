@@ -1069,7 +1069,7 @@ static int __init aha1542_detect(Scsi_Host_Template * tpnt)
 	/*
 	 *	Find MicroChannel cards (AHA1640)
 	 */
-#ifdef CONFIG_MCA
+#ifdef CONFIG_MCA_LEGACY
 	if(MCA_bus) {
 		int slot = 0;
 		int pos = 0;

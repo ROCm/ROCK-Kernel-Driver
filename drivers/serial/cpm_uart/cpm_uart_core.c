@@ -184,14 +184,15 @@ static void cpm_uart_enable_ms(struct uart_port *port)
 static void cpm_uart_break_ctl(struct uart_port *port, int break_state)
 {
 	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
+	int line = pinfo - cpm_uart_ports;
 
 	pr_debug("CPM uart[%d]:break ctrl, break_state: %d\n", port->line,
 		break_state);
 
 	if (break_state)
-		cpm_line_cr_cmd(pinfo->port.line, CPM_CR_STOP_TX);
+		cpm_line_cr_cmd(line, CPM_CR_STOP_TX);
 	else
-		cpm_line_cr_cmd(pinfo->port.line, CPM_CR_RESTART_TX);
+		cpm_line_cr_cmd(line, CPM_CR_RESTART_TX);
 }
 
 /*
@@ -378,6 +379,7 @@ static int cpm_uart_startup(struct uart_port *port)
 static void cpm_uart_shutdown(struct uart_port *port)
 {
 	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
+	int line = pinfo - cpm_uart_ports;
 
 	pr_debug("CPM uart[%d]:shutdown\n", port->line);
 
@@ -398,7 +400,7 @@ static void cpm_uart_shutdown(struct uart_port *port)
 		}
 
 		/* Shut them really down and reinit buffer descriptors */
-		cpm_line_cr_cmd(pinfo->port.line, CPM_CR_INIT_TRX);
+		cpm_line_cr_cmd(line, CPM_CR_INIT_TRX);
 	}
 }
 
@@ -410,6 +412,7 @@ static void cpm_uart_set_termios(struct uart_port *port,
 	u16 cval, scval;
 	int bits, sbits;
 	struct uart_cpm_port *pinfo = (struct uart_cpm_port *)port;
+	int line = pinfo - cpm_uart_ports;
 	volatile cbd_t *bdp;
 
 	pr_debug("CPM uart[%d]:set_termios\n", port->line);
@@ -429,7 +432,7 @@ static void cpm_uart_set_termios(struct uart_port *port,
 		/* point to the last txed bd */
 		bdp = pinfo->tx_cur;
 		if (bdp == pinfo->tx_bd_base)
-			bdp = pinfo->tx_bd_base + pinfo->tx_nrfifos;
+			bdp = pinfo->tx_bd_base + (pinfo->tx_nrfifos - 1);
 		else
 			bdp--;
 
@@ -444,7 +447,7 @@ static void cpm_uart_set_termios(struct uart_port *port,
 	spin_lock_irqsave(&port->lock, flags);
 
 	/* Send the CPM an initialize command. */
-	cpm_line_cr_cmd(pinfo->port.line, CPM_CR_STOP_TX);
+	cpm_line_cr_cmd(line, CPM_CR_STOP_TX);
 
 	/* Stop uart */
 	if (IS_SMC(pinfo))
@@ -453,7 +456,7 @@ static void cpm_uart_set_termios(struct uart_port *port,
 		pinfo->sccp->scc_gsmrl &= ~(SCC_GSMRL_ENR | SCC_GSMRL_ENT);
 
 	/* Send the CPM an initialize command. */
-	cpm_line_cr_cmd(pinfo->port.line, CPM_CR_INIT_TRX);
+	cpm_line_cr_cmd(line, CPM_CR_INIT_TRX);
 
 	spin_unlock_irqrestore(&port->lock, flags);
 
@@ -660,6 +663,7 @@ static int cpm_uart_tx_pump(struct uart_port *port)
 
 static void cpm_uart_init_scc(struct uart_cpm_port *pinfo, int bits, u16 scval)
 {
+	int line = pinfo - cpm_uart_ports;
 	volatile scc_t *scp;
 	volatile scc_uart_t *sup;
 	u8 *mem_addr;
@@ -728,7 +732,7 @@ static void cpm_uart_init_scc(struct uart_cpm_port *pinfo, int bits, u16 scval)
 
 	/* Send the CPM an initialize command.
 	 */
-	cpm_line_cr_cmd(pinfo->port.line, CPM_CR_INIT_TRX);
+	cpm_line_cr_cmd(line, CPM_CR_INIT_TRX);
 
 	/* Set UART mode, 8 bit, no parity, one stop.
 	 * Enable receive and transmit.
@@ -748,6 +752,7 @@ static void cpm_uart_init_scc(struct uart_cpm_port *pinfo, int bits, u16 scval)
 
 static void cpm_uart_init_smc(struct uart_cpm_port *pinfo, int bits, u16 cval)
 {
+	int line = pinfo - cpm_uart_ports;
 	volatile smc_t *sp;
 	volatile smc_uart_t *up;
 	volatile u8 *mem_addr;
@@ -797,7 +802,7 @@ static void cpm_uart_init_smc(struct uart_cpm_port *pinfo, int bits, u16 cval)
 	up->smc_maxidl = pinfo->rx_fifosize;
 	up->smc_brkcr = 1;
 
-	cpm_line_cr_cmd(pinfo->port.line, CPM_CR_INIT_TRX);
+	cpm_line_cr_cmd(line, CPM_CR_INIT_TRX);
 
 	/* Set UART mode, according to the parameters */
 	sp->smc_smcmr = smcr_mk_clen(bits) | cval | SMCMR_SM_UART;
@@ -883,7 +888,6 @@ struct uart_cpm_port cpm_uart_ports[UART_NR] = {
 			.irq		= SMC1_IRQ,
 			.ops		= &cpm_uart_pops,
 			.iotype		= SERIAL_IO_MEM,
-			.line		= UART_SMC1,
 		},
 		.flags = FLAG_SMC,
 		.tx_nrfifos = TX_NUM_FIFO,
@@ -910,7 +914,6 @@ struct uart_cpm_port cpm_uart_ports[UART_NR] = {
 			.irq		= SCC1_IRQ,
 			.ops		= &cpm_uart_pops,
 			.iotype		= SERIAL_IO_MEM,
-			.line		= UART_SCC1,
 		},
 		.tx_nrfifos = TX_NUM_FIFO,
 		.tx_fifosize = TX_BUF_SIZE,
@@ -947,7 +950,6 @@ struct uart_cpm_port cpm_uart_ports[UART_NR] = {
 			.irq		= SCC4_IRQ,
 			.ops		= &cpm_uart_pops,
 			.iotype		= SERIAL_IO_MEM,
-			.line		= UART_SCC4,
 		},
 		.tx_nrfifos = TX_NUM_FIFO,
 		.tx_fifosize = TX_BUF_SIZE,

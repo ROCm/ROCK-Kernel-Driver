@@ -10,23 +10,35 @@ VFAT MOUNT OPTIONS
 ----------------------------------------------------------------------
 umask=###     -- The permission mask (for files and directories, see umask(1)).
                  The default is the umask of current process.
+
 dmask=###     -- The permission mask for the directory.
                  The default is the umask of current process.
+
 fmask=###     -- The permission mask for files.
                  The default is the umask of current process.
-codepage=###  -- Sets the codepage for converting to shortname characters
-		 on FAT and VFAT filesystems.  By default, codepage 437
-		 is used.  This is the default for the U.S. and some
-		 European countries.
-iocharset=name -- Character set to use for converting between 8 bit characters
-		 and 16 bit Unicode characters. Long filenames are stored on
-		 disk in Unicode format, but Unix for the most part doesn't
-		 know how to deal with Unicode. There is also an option of
-		 doing UTF8 translations with the utf8 option.
+
+codepage=###  -- Sets the codepage number for converting to shortname
+		 characters on FAT filesystem.
+		 By default, FAT_DEFAULT_CODEPAGE setting is used.
+
+iocharset=name -- Character set to use for converting between the
+		 encoding is used for user visible filename and 16 bit
+		 Unicode characters. Long filenames are stored on disk
+		 in Unicode format, but Unix for the most part doesn't
+		 know how to deal with Unicode.
+		 By default, FAT_DEFAULT_IOCHARSET setting is used.
+
+		 There is also an option of doing UTF8 translations
+		 with the utf8 option.
+
+		 NOTE: "iocharset=utf8" is not recommended. If unsure,
+		 you should consider the following option instead.
+
 utf8=<bool>   -- UTF8 is the filesystem safe version of Unicode that
 		 is used by the console.  It can be be enabled for the
 		 filesystem with this option. If 'uni_xlate' gets set,
 		 UTF8 gets disabled.
+
 uni_xlate=<bool> -- Translate unhandled Unicode characters to special
 		 escaped sequences.  This would let you backup and
 		 restore filenames that are created with any Unicode
@@ -37,6 +49,7 @@ uni_xlate=<bool> -- Translate unhandled Unicode characters to special
 		 illegal on the vfat filesystem.  The escape sequence
 		 that gets used is ':' and the four digits of hexadecimal
 		 unicode.
+
 nonumtail=<bool> -- When creating 8.3 aliases, normally the alias will
                  end in '~1' or tilde followed by some number.  If this
                  option is set, then if the filename is 
@@ -45,6 +58,7 @@ nonumtail=<bool> -- When creating 8.3 aliases, normally the alias will
                  be the short alias instead of 'longfi~1.txt'. 
                   
 quiet         -- Stops printing certain warning messages.
+
 check=s|r|n   -- Case sensitivity checking setting.
                  s: strict, case sensitive
                  r: relaxed, case insensitive

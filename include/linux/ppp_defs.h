@@ -42,7 +42,7 @@
 #ifndef _PPP_DEFS_H_
 #define _PPP_DEFS_H_
 
-#include <linux/crc16.h>
+#include <linux/crc-ccitt.h>
 
 /*
  * The basic PPP frame.
@@ -97,7 +97,7 @@
 
 #define PPP_INITFCS	0xffff	/* Initial FCS value */
 #define PPP_GOODFCS	0xf0b8	/* Good final FCS value */
-#define PPP_FCS(fcs, c) crc16_byte(fcs, c)
+#define PPP_FCS(fcs, c) crc_ccitt_byte(fcs, c)
 
 /*
  * Extended asyncmap - allows any character to be escaped.

@@ -18,7 +18,7 @@
 /* This ought to be in core MTD code. All registered MTD devices
    without writev should have this put in place. Bug the MTD
    maintainer */
-static inline int mtd_fake_writev(struct mtd_info *mtd, const struct iovec *vecs,
+static inline int mtd_fake_writev(struct mtd_info *mtd, const struct kvec *vecs,
 				  unsigned long count, loff_t to, size_t *retlen)
 {
 	unsigned long i;
@@ -39,7 +39,7 @@ static inline int mtd_fake_writev(struct mtd_info *mtd, const struct iovec *vecs
 	return ret;
 }
 
-int jffs2_flash_direct_writev(struct jffs2_sb_info *c, const struct iovec *vecs,
+int jffs2_flash_direct_writev(struct jffs2_sb_info *c, const struct kvec *vecs,
 			      unsigned long count, loff_t to, size_t *retlen)
 {
 	if (c->mtd->writev)

@@ -702,7 +702,7 @@ int freeZeroLink(struct inode *ip)
 		pxdlock->flag = mlckFREEPXD;
 		PXDaddress(&pxdlock->pxd, xaddr);
 		PXDlength(&pxdlock->pxd, xlen);
-		txFreeMap(ip, pxdlock, 0, COMMIT_WMAP);
+		txFreeMap(ip, pxdlock, NULL, COMMIT_WMAP);
 	}
 
 	/*
@@ -722,7 +722,7 @@ int freeZeroLink(struct inode *ip)
 		pxdlock->flag = mlckFREEPXD;
 		PXDaddress(&pxdlock->pxd, xaddr);
 		PXDlength(&pxdlock->pxd, xlen);
-		txFreeMap(ip, pxdlock, 0, COMMIT_WMAP);
+		txFreeMap(ip, pxdlock, NULL, COMMIT_WMAP);
 	}
 
 	/*

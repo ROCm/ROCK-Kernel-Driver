@@ -422,7 +422,7 @@ static int jfs_fill_super(struct super_block *sb, void *data, int silent)
 		goto out_kfree;
 	}
 	if (sb->s_flags & MS_RDONLY)
-		sbi->log = 0;
+		sbi->log = NULL;
 	else {
 		rc = jfs_mount_rw(sb, 0);
 		if (rc) {
@@ -600,7 +600,7 @@ static int __init init_jfs_fs(void)
 	/*
 	 * I/O completion thread (endio)
 	 */
-	jfsIOthread = kernel_thread(jfsIOWait, 0, CLONE_KERNEL);
+	jfsIOthread = kernel_thread(jfsIOWait, NULL, CLONE_KERNEL);
 	if (jfsIOthread < 0) {
 		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsIOthread);
 		goto end_txmngr;
@@ -613,7 +613,7 @@ static int __init init_jfs_fs(void)
 		commit_threads = MAX_COMMIT_THREADS;
 
 	for (i = 0; i < commit_threads; i++) {
-		jfsCommitThread[i] = kernel_thread(jfs_lazycommit, 0,
+		jfsCommitThread[i] = kernel_thread(jfs_lazycommit, NULL,
 						   CLONE_KERNEL);
 		if (jfsCommitThread[i] < 0) {
 			jfs_err("init_jfs_fs: fork failed w/rc = %d",
@@ -625,7 +625,7 @@ static int __init init_jfs_fs(void)
 		wait_for_completion(&jfsIOwait);
 	}
 
-	jfsSyncThread = kernel_thread(jfs_sync, 0, CLONE_KERNEL);
+	jfsSyncThread = kernel_thread(jfs_sync, NULL, CLONE_KERNEL);
 	if (jfsSyncThread < 0) {
 		jfs_err("init_jfs_fs: fork failed w/rc = %d", jfsSyncThread);
 		goto kill_committask;
