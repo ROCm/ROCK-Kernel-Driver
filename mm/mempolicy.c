@@ -75,6 +75,7 @@
 #include <linux/init.h>
 #include <linux/compat.h>
 #include <linux/mempolicy.h>
+#include <asm/tlbflush.h>
 #include <asm/uaccess.h>
 
 static kmem_cache_t *policy_cache;
