@@ -46,8 +46,6 @@
 #include <asm/hardware.h>
 #include <asm/mach-types.h>
 #include <asm/setup.h>
-#include <asm/page.h>
-#include <asm/pgtable.h>
 #include <asm/irq.h>
 
 #include <asm/mach/arch.h>
