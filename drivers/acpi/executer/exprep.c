@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exprep - ACPI AML (p-code) execution - field prep utilities
- *              $Revision: 117 $
+ *              $Revision: 118 $
  *
  *****************************************************************************/
 
@@ -140,7 +140,7 @@ acpi_ex_decode_field_access (
 		return (0);
 	}
 
-	if (obj_desc->common.type == ACPI_TYPE_BUFFER_FIELD) {
+	if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_BUFFER_FIELD) {
 		/*
 		 * Buffer_field access can be on any byte boundary, so the
 		 * Byte_alignment is always 1 byte -- regardless of any Byte_alignment

@@ -2,7 +2,7 @@
  *  include/asm-s390/semaphore.h
  *
  *  S390 version
- *    Copyright (C) 1999,2000 IBM Deutschland Entwicklung GmbH, IBM Corporation
+ *    Copyright (C) 1999 IBM Deutschland Entwicklung GmbH, IBM Corporation
  *
  *  Derived from "include/asm-i386/semaphore.h"
  *    (C) Copyright 1996 Linus Torvalds
@@ -17,16 +17,17 @@
 #include <linux/rwsem.h>
 
 struct semaphore {
+	/*
+	 * Note that any negative value of count is equivalent to 0,
+	 * but additionally indicates that some process(es) might be
+	 * sleeping on `wait'.
+	 */
 	atomic_t count;
-	int sleepers;
 	wait_queue_head_t wait;
 };
 
-#define __SEM_DEBUG_INIT(name)
-
 #define __SEMAPHORE_INITIALIZER(name,count) \
-{ ATOMIC_INIT(count), 0, __WAIT_QUEUE_HEAD_INITIALIZER((name).wait) \
-	__SEM_DEBUG_INIT(name) }
+	{ ATOMIC_INIT(count), __WAIT_QUEUE_HEAD_INITIALIZER((name).wait) }
 
 #define __MUTEX_INITIALIZER(name) \
 	__SEMAPHORE_INITIALIZER(name,1)
@@ -39,7 +40,7 @@ struct semaphore {
 
 static inline void sema_init (struct semaphore *sem, int val)
 {
-	*sem = (struct semaphore)__SEMAPHORE_INITIALIZER((*sem),val);
+	*sem = (struct semaphore) __SEMAPHORE_INITIALIZER((*sem),val);
 }
 
 static inline void init_MUTEX (struct semaphore *sem)
@@ -51,11 +52,6 @@ static inline void init_MUTEX_LOCKED (struct semaphore *sem)
 {
 	sema_init(sem, 0);
 }
-
-asmlinkage void __down_failed(void /* special register calling convention */);
-asmlinkage int  __down_failed_interruptible(void  /* params in registers */);
-asmlinkage int  __down_failed_trylock(void  /* params in registers */);
-asmlinkage void __up_wakeup(void /* special register calling convention */);
 
 asmlinkage void __down(struct semaphore * sem);
 asmlinkage int  __down_interruptible(struct semaphore * sem);
@@ -79,11 +75,28 @@ static inline int down_interruptible(struct semaphore * sem)
 
 static inline int down_trylock(struct semaphore * sem)
 {
-	int ret = 0;
+	int old_val, new_val;
 
-	if (atomic_dec_return(&sem->count) < 0)
-		ret = __down_trylock(sem);
-	return ret;
+	/*
+	 * This inline assembly atomically implements the equivalent
+	 * to the following C code:
+	 *   old_val = sem->count.counter;
+	 *   if ((new_val = old_val) > 0)
+	 *       sem->count.counter = --new_val;
+	 * In the ppc code this is called atomic_dec_if_positive.
+	 */
+	__asm__ __volatile__ (
+		"   l    %0,0(%3)\n"
+		"0: ltr  %1,%0\n"
+		"   jle  1f\n"
+		"   ahi  %1,-1\n"
+		"   cs   %0,%1,0(%3)\n"
+		"   jl   0b\n"
+		"1:"
+		: "=&d" (old_val), "=&d" (new_val),
+		  "+m" (sem->count.counter)
+		: "a" (&sem->count.counter) : "cc" );
+	return old_val <= 0;
 }
 
 static inline void up(struct semaphore * sem)

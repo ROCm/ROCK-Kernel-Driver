@@ -70,6 +70,7 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR GOLDSTAR_CDROM_MAJOR
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #define gscd_port gscd		/* for compatible parameter passing with "insmod" */
 #include "gscd.h"
@@ -279,10 +280,8 @@ static void __do_gscd_request(unsigned long dummy)
 	unsigned int nsect;
 
       repeat:
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
 	dev = minor(CURRENT->rq_dev);
 	block = CURRENT->sector;
@@ -293,13 +292,13 @@ static void __do_gscd_request(unsigned long dummy)
 
 	if (CURRENT->cmd != READ) {
 		printk("GSCD: bad cmd %p\n", CURRENT->cmd);
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 
 	if (dev != 0) {
 		printk("GSCD: this version supports only one device\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 		goto repeat;
 	}
 
@@ -308,7 +307,7 @@ static void __do_gscd_request(unsigned long dummy)
 	/* if we satisfied the request from the buffer, we're done. */
 
 	if (CURRENT->nr_sectors == 0) {
-		end_request(1);
+		end_request(CURRENT, 1);
 		goto repeat;
 	}
 #ifdef GSCD_DEBUG
@@ -338,11 +337,11 @@ static void gscd_read_cmd(void)
 	cmd_status();
 	if (disk_state & (ST_NO_DISK | ST_DOOR_OPEN)) {
 		printk("GSCD: no disk or door open\n");
-		end_request(0);
+		end_request(CURRENT, 0);
 	} else {
 		if (disk_state & ST_INVALID) {
 			printk("GSCD: disk invalid\n");
-			end_request(0);
+			end_request(CURRENT, 0);
 		} else {
 			gscd_bn = -1;	/* purge our buffer */
 			block = CURRENT->sector / 4;
@@ -361,7 +360,7 @@ static void gscd_read_cmd(void)
 
 			gscd_bn = CURRENT->sector / 4;
 			gscd_transfer();
-			end_request(1);
+			end_request(CURRENT, 1);
 		}
 	}
 	SET_TIMER(__do_gscd_request, 1);

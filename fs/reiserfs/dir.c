@@ -24,9 +24,10 @@ struct file_operations reiserfs_dir_operations = {
 };
 
 int reiserfs_dir_fsync(struct file *filp, struct dentry *dentry, int datasync) {
-  lock_kernel();
-  reiserfs_commit_for_inode(dentry->d_inode) ;
-  unlock_kernel() ;
+  struct inode *inode = dentry->d_inode;
+  reiserfs_write_lock(inode->i_sb);
+  reiserfs_commit_for_inode(inode) ;
+  reiserfs_write_unlock(inode->i_sb) ;
   return 0 ;
 }
 
@@ -50,7 +51,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
     struct reiserfs_dir_entry de;
     int ret = 0;
 
-    lock_kernel();
+    reiserfs_write_lock(inode->i_sb);
 
     reiserfs_check_lock_depth("readdir") ;
 
@@ -109,7 +110,7 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 		if (!d_name[d_reclen - 1])
 		    d_reclen = strlen (d_name);
 	
-		if (d_reclen > REISERFS_MAX_NAME_LEN(inode->i_sb->s_blocksize)){
+		if (d_reclen > REISERFS_MAX_NAME(inode->i_sb->s_blocksize)){
 		    /* too big to send back to VFS */
 		    continue ;
 		}
@@ -181,13 +182,12 @@ static int reiserfs_readdir (struct file * filp, void * dirent, filldir_t filldi
 
 
  end:
-    // FIXME: ext2_readdir does not reset f_pos
     filp->f_pos = next_pos;
     pathrelse (&path_to_entry);
     reiserfs_check_path(&path_to_entry) ;
     UPDATE_ATIME(inode) ;
  out:
-    unlock_kernel();
+    reiserfs_write_unlock(inode->i_sb);
     return ret;
 }
 

@@ -31,6 +31,7 @@
 #include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/list.h>
+#include <linux/init.h>
 #include "ibmphp.h"
 
 static int flags = 0;		/* for testing */
@@ -45,7 +46,7 @@ static inline struct bus_node *find_bus_wprev (u8, struct bus_node **, u8);
 
 static LIST_HEAD(gbuses);
 
-static struct bus_node * alloc_error_bus (struct ebda_pci_rsrc * curr)
+static struct bus_node * __init alloc_error_bus (struct ebda_pci_rsrc * curr)
 {
 	struct bus_node * newbus;
 
@@ -61,7 +62,7 @@ static struct bus_node * alloc_error_bus (struct ebda_pci_rsrc * curr)
 	return newbus;
 }
 
-static struct resource_node * alloc_resources (struct ebda_pci_rsrc * curr)
+static struct resource_node * __init alloc_resources (struct ebda_pci_rsrc * curr)
 {
 	struct resource_node *rs = kmalloc (sizeof (struct resource_node), GFP_KERNEL);
 	if (!rs) {
@@ -77,7 +78,7 @@ static struct resource_node * alloc_resources (struct ebda_pci_rsrc * curr)
 	return rs;
 }
 
-static int alloc_bus_range (struct bus_node **new_bus, struct range_node **new_range, struct ebda_pci_rsrc *curr, int flag, u8 first_bus)
+static int __init alloc_bus_range (struct bus_node **new_bus, struct range_node **new_range, struct ebda_pci_rsrc *curr, int flag, u8 first_bus)
 {
 	struct bus_node * newbus;
 	struct range_node *newrange;
@@ -184,7 +185,7 @@ static int alloc_bus_range (struct bus_node **new_bus, struct range_node **new_r
  * Input: ptr to the head of the resource list from EBDA
  * Output: 0, -1 or error codes
  ***************************************************************************/
-int ibmphp_rsrc_init (void)
+int __init ibmphp_rsrc_init (void)
 {
 	struct ebda_pci_rsrc *curr;
 	struct range_node *newrange = NULL;
@@ -1650,7 +1651,7 @@ void ibmphp_free_resources (void)
  * a new Mem node
  * This routine is called right after initialization
  *******************************************************************************/
-static int once_over (void)
+static int __init once_over (void)
 {
 	struct resource_node *pfmem_cur;
 	struct resource_node *pfmem_prev;
@@ -1871,7 +1872,7 @@ void ibmphp_print_test (void)
  *	 behind them All these are TO DO.
  *	 Also need to add more error checkings... (from fnc returns etc)
  */
-static int update_bridge_ranges (struct bus_node **bus)
+static int __init update_bridge_ranges (struct bus_node **bus)
 {
 	u8 sec_busno, device, function, busno, hdr_type, start_io_address, end_io_address;
 	u16 vendor_id, upper_io_start, upper_io_end, start_mem_address, end_mem_address;
@@ -1885,7 +1886,7 @@ static int update_bridge_ranges (struct bus_node **bus)
 	bus_cur = *bus;
 	busno = bus_cur->busno;
 
-	debug ("inside update_bridge_ranges \n");
+	debug ("inside %s \n", __FUNCTION__);
 	debug ("bus_cur->busno = %x\n", bus_cur->busno);
 
 	for (device = 0; device < 32; device++) {

@@ -1,78 +1,74 @@
 #ifndef DASD_ECKD_H
 #define DASD_ECKD_H
 
-#include "dasd_3990_erp.h"
-#include "dasd_9343_erp.h"
-
-#define DASD_ECKD_CCW_WRITE 0x05
-#define DASD_ECKD_CCW_READ 0x06
+/*******************************************************************************
+ * SECTION: CCW Definitions
+ ******************************************************************************/
+#define DASD_ECKD_CCW_WRITE		 0x05
+#define DASD_ECKD_CCW_READ		 0x06
 #define DASD_ECKD_CCW_WRITE_HOME_ADDRESS 0x09
-#define DASD_ECKD_CCW_READ_HOME_ADDRESS 0x0a
-#define DASD_ECKD_CCW_WRITE_KD 0x0d
-#define DASD_ECKD_CCW_READ_KD 0x0e
-#define DASD_ECKD_CCW_ERASE 0x11
-#define DASD_ECKD_CCW_READ_COUNT 0x12
-#define DASD_ECKD_CCW_WRITE_RECORD_ZERO 0x15
-#define DASD_ECKD_CCW_READ_RECORD_ZERO 0x16
-#define DASD_ECKD_CCW_WRITE_CKD 0x1d
-#define DASD_ECKD_CCW_READ_CKD 0x1e
-#define DASD_ECKD_CCW_LOCATE_RECORD 0x47
-#define DASD_ECKD_CCW_DEFINE_EXTENT 0x63
-#define DASD_ECKD_CCW_WRITE_MT 0x85
-#define DASD_ECKD_CCW_READ_MT 0x86
-#define DASD_ECKD_CCW_WRITE_KD_MT 0x8d
-#define DASD_ECKD_CCW_READ_KD_MT 0x8e
-#define DASD_ECKD_CCW_RELEASE 0x94
-#define DASD_ECKD_CCW_READ_CKD_MT 0x9e
-#define DASD_ECKD_CCW_WRITE_CKD_MT 0x9d
-#define DASD_ECKD_CCW_RESERVE 0xB4
-#define DASD_ECKD_CCW_SLCK 0x14	/* steal lock - unconditional reserve */
+#define DASD_ECKD_CCW_READ_HOME_ADDRESS	 0x0a
+#define DASD_ECKD_CCW_WRITE_KD		 0x0d
+#define DASD_ECKD_CCW_READ_KD		 0x0e
+#define DASD_ECKD_CCW_ERASE		 0x11
+#define DASD_ECKD_CCW_READ_COUNT	 0x12
+#define DASD_ECKD_CCW_SLCK		 0x14
+#define DASD_ECKD_CCW_WRITE_RECORD_ZERO	 0x15
+#define DASD_ECKD_CCW_READ_RECORD_ZERO	 0x16
+#define DASD_ECKD_CCW_WRITE_CKD		 0x1d
+#define DASD_ECKD_CCW_READ_CKD		 0x1e
+#define DASD_ECKD_CCW_PSF		 0x27
+#define DASD_ECKD_CCW_RSSD		 0x3e
+#define DASD_ECKD_CCW_LOCATE_RECORD	 0x47
+#define DASD_ECKD_CCW_DEFINE_EXTENT	 0x63
+#define DASD_ECKD_CCW_WRITE_MT		 0x85
+#define DASD_ECKD_CCW_READ_MT		 0x86
+#define DASD_ECKD_CCW_WRITE_KD_MT	 0x8d
+#define DASD_ECKD_CCW_READ_KD_MT	 0x8e
+#define DASD_ECKD_CCW_RELEASE		 0x94
+#define DASD_ECKD_CCW_READ_CKD_MT	 0x9e
+#define DASD_ECKD_CCW_WRITE_CKD_MT	 0x9d
+#define DASD_ECKD_CCW_RESERVE		 0xB4
 
-typedef
-    struct eckd_count_t {
+/*
+ *Perform Subsystem Function / Sub-Orders
+ */
+#define PSF_ORDER_PRSSD			 0x18
+
+/*******************************************************************************
+ * SECTION: Type Definitions
+ ******************************************************************************/
+
+typedef struct eckd_count_t {
 	__u16 cyl;
 	__u16 head;
 	__u8 record;
 	__u8 kl;
 	__u16 dl;
-} __attribute__ ((packed))
+} __attribute__ ((packed)) eckd_count_t;
 
-    eckd_count_t;
-
-typedef
-    struct ch_t {
+typedef struct ch_t {
 	__u16 cyl;
 	__u16 head;
-} __attribute__ ((packed))
+} __attribute__ ((packed)) ch_t;
 
-    ch_t;
-
-typedef
-    struct chs_t {
+typedef struct chs_t {
 	__u16 cyl;
 	__u16 head;
 	__u32 sector;
-} __attribute__ ((packed))
+} __attribute__ ((packed)) chs_t;
 
-    chs_t;
-
-typedef
-    struct chr_t {
+typedef struct chr_t {
 	__u16 cyl;
 	__u16 head;
 	__u8 record;
-} __attribute__ ((packed))
+} __attribute__ ((packed)) chr_t;
 
-    chr_t;
-
-typedef
-    struct geom_t {
+typedef struct geom_t {
 	__u16 cyl;
 	__u16 head;
 	__u32 sector;
-} __attribute__ ((packed))
-
-    geom_t;
+} __attribute__ ((packed)) geom_t;
 
 typedef struct eckd_home_t {
 	__u8 skip_control[14];
@@ -83,12 +79,9 @@ typedef struct eckd_home_t {
 	__u8 reserved;
 	__u8 key_length;
 	__u8 reserved2[2];
-} __attribute__ ((packed))
+} __attribute__ ((packed)) eckd_home_t;
 
-    eckd_home_t;
-
-typedef
-    struct DE_eckd_data_t {
+typedef struct DE_eckd_data_t {
 	struct {
 		unsigned char perm:2;	/* Permissions on this extent */
 		unsigned char reserved:1;
@@ -105,16 +98,13 @@ typedef
 	} __attribute__ ((packed)) attributes;
 	__u16 short blk_size;	/* Blocksize */
 	__u16 fast_write_id;
-	__u8 unused;
-	__u8 reserved;
+	__u8 ga_additional;	/* Global Attributes Additional */
+	__u8 ga_extended;	/* Global Attributes Extended	*/
 	ch_t beg_ext;
 	ch_t end_ext;
-} __attribute__ ((packed))
+} __attribute__ ((packed)) DE_eckd_data_t;
 
-    DE_eckd_data_t;
-
-typedef
-    struct LO_eckd_data_t {
+typedef struct LO_eckd_data_t {
 	struct {
 		unsigned char orientation:2;
 		unsigned char operation:6;
@@ -130,12 +120,9 @@ typedef
 	chr_t search_arg;
 	__u8 sector;
 	__u16 length;
-} __attribute__ ((packed))
+} __attribute__ ((packed)) LO_eckd_data_t;
 
-    LO_eckd_data_t;
-
-typedef
-    struct dasd_eckd_characteristics_t {
+typedef struct dasd_eckd_characteristics_t {
 	__u16 cu_type;
 	struct {
 		unsigned char support:2;
@@ -205,9 +192,7 @@ typedef
 	__u8 factor8;
 	__u8 reserved2[3];
 	__u8 reserved3[10];
-} __attribute__ ((packed))
-
-    dasd_eckd_characteristics_t;
+} __attribute__ ((packed)) dasd_eckd_characteristics_t;
 
 typedef struct dasd_eckd_confdata_t {
 	struct {
@@ -324,10 +309,19 @@ typedef struct dasd_eckd_confdata_t {
 		__u8 log_dev_address;
 		unsigned char reserved2[12];
 	} __attribute__ ((packed)) neq;
-} __attribute__ ((packed))
+} __attribute__ ((packed)) dasd_eckd_confdata_t;
 
-    dasd_eckd_confdata_t;
+/*
+ * Perform Subsystem Function - Prepare for Read Subsystem Data	 
+ */
+typedef struct dasd_psf_prssd_data_t {
+	unsigned char order;
+	unsigned char flags;
+	unsigned char reserved[4];
+	unsigned char suborder;
+	unsigned char varies[9];
+} __attribute__ ((packed)) dasd_psf_prssd_data_t;
 
-int dasd_eckd_init (void);
-void dasd_eckd_cleanup (void);
+int dasd_eckd_init(void);
+void dasd_eckd_cleanup(void);
 #endif				/* DASD_ECKD_H */

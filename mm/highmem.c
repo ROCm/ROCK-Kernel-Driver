@@ -20,6 +20,7 @@
 #include <linux/pagemap.h>
 #include <linux/mempool.h>
 #include <linux/blkdev.h>
+#include <linux/init.h>
 #include <asm/pgalloc.h>
 
 static mempool_t *page_pool, *isa_page_pool;

@@ -47,6 +47,7 @@
 #include <linux/bootmem.h>
 #include <linux/mmzone.h>
 #include <linux/interrupt.h>
+#include <linux/root_dev.h>
 
 #include <asm/io.h>
 #include <asm/sal.h>
@@ -259,7 +260,7 @@ sn1_setup(char **cmdline_p)
 	 * we set the default root device to /dev/hda
 	 * to make simulation easy
 	 */
-	ROOT_DEV = to_kdev_t(0x0301);
+	ROOT_DEV = Root_HDA1;
 
 	/*
 	 * Create the PDAs and NODEPDAs for all the cpus.

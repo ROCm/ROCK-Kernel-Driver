@@ -52,7 +52,7 @@ static int		exp_verify_string(char *cp, int max);
 #define CLIENT_HASH(a) \
 		((((a)>>24) ^ ((a)>>16) ^ ((a)>>8) ^(a)) & CLIENT_HASHMASK)
 /* XXX: is this adequate for 32bit kdev_t ? */
-#define EXPORT_HASH(dev)	(minor(dev) & (NFSCLNT_EXPMAX - 1))
+#define EXPORT_HASH(dev)	(MINOR(dev) & (NFSCLNT_EXPMAX - 1))
 #define EXPORT_FSID_HASH(fsid)	((fsid) & (NFSCLNT_EXPMAX - 1))
 
 struct svc_clnthash {
@@ -75,7 +75,7 @@ exp_get(svc_client *clp, kdev_t dev, ino_t ino)
 	if (!clp)
 		return NULL;
 
-	head = &clp->cl_export[EXPORT_HASH(dev)];
+	head = &clp->cl_export[EXPORT_HASH(kdev_t_to_nr(dev))];
 	list_for_each(p, head) {
 		svc_export *exp = list_entry(p, svc_export, ex_hash);
 		if (exp->ex_ino == ino && kdev_same(exp->ex_dev, dev))
@@ -364,7 +364,7 @@ exp_export(struct nfsctl_export *nxp)
 	if (parent)
 		exp_change_parents(clp, parent, exp);
 
-	list_add(&exp->ex_hash, clp->cl_export + EXPORT_HASH(dev));
+	list_add(&exp->ex_hash, clp->cl_export + EXPORT_HASH(kdev_t_to_nr(dev)));
 	list_add_tail(&exp->ex_list, &clp->cl_list);
 
 	exp_fsid_hash(clp, exp);

@@ -19,6 +19,7 @@
 #include <linux/console.h>
 #include <linux/timex.h>
 #include <linux/sched.h>
+#include <linux/root_dev.h>
 
 #include <asm/io.h>
 #include <asm/machvec.h>
@@ -44,7 +45,7 @@ dig_setup (char **cmdline_p)
 	 * is physical disk 1 partition 1 and the Linux root disk is
 	 * physical disk 1 partition 2.
 	 */
-	ROOT_DEV = to_kdev_t(0x0802);		/* default to second partition on first drive */
+	ROOT_DEV = Root_SDA2;		/* default to second partition on first drive */
 
 #ifdef CONFIG_SMP
 	init_smp_config();

@@ -42,11 +42,15 @@ fi
 if [ "$CONFIG_PCI" = "y" ]; then
    dep_tristate '3ware Hardware ATA-RAID support' CONFIG_BLK_DEV_3W_XXXX_RAID $CONFIG_SCSI
 fi
-dep_tristate '7000FASST SCSI support' CONFIG_SCSI_7000FASST $CONFIG_SCSI
+dep_tristate '7000FASST SCSI support' CONFIG_SCSI_7000FASST $CONFIG_SCSI $CONFIG_ISA
 dep_tristate 'ACARD SCSI support' CONFIG_SCSI_ACARD $CONFIG_SCSI
-dep_tristate 'Adaptec AHA152X/2825 support' CONFIG_SCSI_AHA152X $CONFIG_SCSI
-dep_tristate 'Adaptec AHA1542 support' CONFIG_SCSI_AHA1542 $CONFIG_SCSI
-dep_tristate 'Adaptec AHA1740 support' CONFIG_SCSI_AHA1740 $CONFIG_SCSI
+if [ "$CONFIG_ISA" = "y" ]; then
+   dep_tristate 'Adaptec AHA152X/2825 support' CONFIG_SCSI_AHA152X $CONFIG_SCSI
+   dep_tristate 'Adaptec AHA1542 support' CONFIG_SCSI_AHA1542 $CONFIG_SCSI
+fi
+if [ "$CONFIG_EISA" = "y" ]; then
+  dep_tristate 'Adaptec AHA1740 support' CONFIG_SCSI_AHA1740 $CONFIG_SCSI
+fi
 source drivers/scsi/aic7xxx/Config.in
 if [ "$CONFIG_SCSI_AIC7XXX" != "y" ]; then
    dep_tristate 'Old Adaptec AIC7xxx support' CONFIG_SCSI_AIC7XXX_OLD $CONFIG_SCSI
@@ -56,10 +60,16 @@ if [ "$CONFIG_SCSI_AIC7XXX" != "y" ]; then
       bool '  Collect statistics to report in /proc' CONFIG_AIC7XXX_OLD_PROC_STATS
    fi
 fi
-dep_tristate 'Adaptec I2O RAID support ' CONFIG_SCSI_DPT_I2O $CONFIG_SCSI
+# All the I2O code and drivers do not seem to be 64bit safe.
+if [ "$CONFIG_X86_64" != "y" ]; then
+  dep_tristate 'Adaptec I2O RAID support ' CONFIG_SCSI_DPT_I2O $CONFIG_SCSI
+fi
 dep_tristate 'AdvanSys SCSI support' CONFIG_SCSI_ADVANSYS $CONFIG_SCSI
 dep_tristate 'Always IN2000 SCSI support' CONFIG_SCSI_IN2000 $CONFIG_SCSI
-dep_tristate 'AM53/79C974 PCI SCSI support' CONFIG_SCSI_AM53C974 $CONFIG_SCSI $CONFIG_PCI
+# does not use pci dma and seems to be isa/onboard only for old machines
+if [ "$CONFIG_X86_64" != "y" ]; then
+  dep_tristate 'AM53/79C974 PCI SCSI support' CONFIG_SCSI_AM53C974 $CONFIG_SCSI $CONFIG_PCI
+fi
 dep_tristate 'AMI MegaRAID support' CONFIG_SCSI_MEGARAID $CONFIG_SCSI
 
 dep_tristate 'BusLogic SCSI support' CONFIG_SCSI_BUSLOGIC $CONFIG_SCSI
@@ -70,7 +80,7 @@ if [ "$CONFIG_PCI" = "y" ]; then
    dep_tristate 'Compaq Fibre Channel 64-bit/66Mhz HBA support' CONFIG_SCSI_CPQFCTS $CONFIG_SCSI
 fi
 dep_tristate 'DMX3191D SCSI support' CONFIG_SCSI_DMX3191D $CONFIG_SCSI $CONFIG_PCI
-dep_tristate 'DTC3180/3280 SCSI support' CONFIG_SCSI_DTC3280 $CONFIG_SCSI
+dep_tristate 'DTC3180/3280 SCSI support' CONFIG_SCSI_DTC3280 $CONFIG_SCSI $CONFIG_ISA
 dep_tristate 'EATA ISA/EISA/PCI (DPT and generic EATA/DMA-compliant boards) support' CONFIG_SCSI_EATA $CONFIG_SCSI
 if [ "$CONFIG_SCSI_EATA" != "n" ]; then
    bool '  enable tagged command queueing' CONFIG_SCSI_EATA_TAGGED_QUEUE
@@ -111,7 +121,7 @@ if [ "$CONFIG_PARPORT" != "n" ]; then
       bool  '  ppa/imm option - Assume slow parport control register' CONFIG_SCSI_IZIP_SLOW_CTR
    fi
 fi
-dep_tristate 'NCR53c406a SCSI support' CONFIG_SCSI_NCR53C406A $CONFIG_SCSI
+dep_tristate 'NCR53c406a SCSI support' CONFIG_SCSI_NCR53C406A $CONFIG_SCSI $CONFIG_ISA
 if [ "$CONFIG_MCA" = "y" ]; then
    dep_tristate 'NCR Dual 700 MCA SCSI support' CONFIG_SCSI_NCR_D700 $CONFIG_SCSI
    if [ "$CONFIG_SCSI_NCR_D700" != "n" ]; then
@@ -164,11 +174,11 @@ fi
 if [ "$CONFIG_MCA" = "y" ]; then
    dep_tristate 'NCR MCA 53C9x SCSI support' CONFIG_SCSI_MCA_53C9X $CONFIG_SCSI
 fi
-dep_tristate 'PAS16 SCSI support' CONFIG_SCSI_PAS16 $CONFIG_SCSI
+dep_tristate 'PAS16 SCSI support' CONFIG_SCSI_PAS16 $CONFIG_SCSI $CONFIG_ISA
 dep_tristate 'PCI2000 support' CONFIG_SCSI_PCI2000 $CONFIG_SCSI
 dep_tristate 'PCI2220i support' CONFIG_SCSI_PCI2220I $CONFIG_SCSI
-dep_tristate 'PSI240i support' CONFIG_SCSI_PSI240I $CONFIG_SCSI
-dep_tristate 'Qlogic FAS SCSI support' CONFIG_SCSI_QLOGIC_FAS $CONFIG_SCSI
+dep_tristate 'PSI240i support' CONFIG_SCSI_PSI240I $CONFIG_SCSI $CONFIG_ISA
+dep_tristate 'Qlogic FAS SCSI support' CONFIG_SCSI_QLOGIC_FAS $CONFIG_SCSI $CONFIG_ISA
 if [ "$CONFIG_PCI" = "y" ]; then
    dep_tristate 'Qlogic ISP SCSI support' CONFIG_SCSI_QLOGIC_ISP $CONFIG_SCSI
    dep_tristate 'Qlogic ISP FC SCSI support' CONFIG_SCSI_QLOGIC_FC $CONFIG_SCSI
@@ -177,24 +187,27 @@ if [ "$CONFIG_PCI" = "y" ]; then
    fi
    dep_tristate 'Qlogic QLA 1280 SCSI support' CONFIG_SCSI_QLOGIC_1280 $CONFIG_SCSI
 fi
-if [ "$CONFIG_X86" = "y" ]; then
+if [ "$CONFIG_X86" = "y" -a "$CONFIG_ISA" = "y" ]; then
    dep_tristate 'Seagate ST-02 and Future Domain TMC-8xx SCSI support' CONFIG_SCSI_SEAGATE $CONFIG_SCSI
 fi
-dep_tristate 'Simple 53c710 SCSI support (Compaq, NCR machines)' CONFIG_SCSI_SIM710 $CONFIG_SCSI
-dep_tristate 'Symbios 53c416 SCSI support' CONFIG_SCSI_SYM53C416 $CONFIG_SCSI
+# definitely looks note 64bit safe:
+if [ "$CONFIG_ISA" = "y" -o "$CONFIG_MCA" = "y" -a "$CONFIG_X86_64" != "y" ]; then
+  dep_tristate 'Simple 53c710 SCSI support (Compaq, NCR machines)' CONFIG_SCSI_SIM710 $CONFIG_SCSI
+fi
+dep_tristate 'Symbios 53c416 SCSI support' CONFIG_SCSI_SYM53C416 $CONFIG_SCSI $CONFIG_ISA
 if [ "$CONFIG_PCI" = "y" ]; then
    dep_tristate 'Tekram DC390(T) and Am53/79C974 SCSI support' CONFIG_SCSI_DC390T $CONFIG_SCSI
    if [ "$CONFIG_SCSI_DC390T" != "n" ]; then
       bool '  _omit_ support for non-DC390 adapters' CONFIG_SCSI_DC390T_NOGENSUPP
    fi
 fi
-dep_tristate 'Trantor T128/T128F/T228 SCSI support' CONFIG_SCSI_T128 $CONFIG_SCSI
+dep_tristate 'Trantor T128/T128F/T228 SCSI support' CONFIG_SCSI_T128 $CONFIG_SCSI $CONFIG_ISA
 dep_tristate 'UltraStor 14F/34F support' CONFIG_SCSI_U14_34F $CONFIG_SCSI
-   if [ "$CONFIG_SCSI_U14_34F" != "n" ]; then
+if [ "$CONFIG_SCSI_U14_34F" != "n" ]; then
       bool '  enable elevator sorting' CONFIG_SCSI_U14_34F_LINKED_COMMANDS
       int  '  maximum number of queued commands' CONFIG_SCSI_U14_34F_MAX_TAGS 8
-   fi
-if [ "$CONFIG_X86" = "y" ]; then
+fi
+if [ "$CONFIG_X86" = "y" -a "$CONFIG_ISA" = "y" ]; then
    dep_tristate 'UltraStor SCSI support' CONFIG_SCSI_ULTRASTOR $CONFIG_SCSI
 fi
 #

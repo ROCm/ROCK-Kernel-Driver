@@ -7,20 +7,20 @@
 	(dentry)->d_parent->d_name.name,(dentry)->d_name.name
 
 /*
- * safety checks that should never happen ??? 
+ * safety checks that should never happen ???
  * these are normally enabled.
  */
 #ifdef SMBFS_PARANOIA
-#define PARANOIA(x...) printk(KERN_NOTICE __FUNCTION__ ": " x)
+# define PARANOIA(f, a...) printk(KERN_NOTICE "%s: " f, __FUNCTION__, ## a)
 #else
-#define PARANOIA(x...) do { ; } while(0)
+# define PARANOIA(f, a...) do { ; } while(0)
 #endif
 
 /* lots of debug messages */
 #ifdef SMBFS_DEBUG_VERBOSE
-#define VERBOSE(x...) printk(KERN_DEBUG __FUNCTION__ ": " x)
+# define VERBOSE(f, a...) printk(KERN_DEBUG "%s: " f, __FUNCTION__, ## a)
 #else
-#define VERBOSE(x...) do { ; } while(0)
+# define VERBOSE(f, a...) do { ; } while(0)
 #endif
 
 /*

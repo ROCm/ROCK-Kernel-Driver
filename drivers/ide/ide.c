@@ -106,18 +106,19 @@ int drive_is_flashcard(struct ata_device *drive)
 	return 0;
 }
 
-int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate, unsigned int nr_secs)
+/*
+ * Not locking variabt of the end_request method.
+ *
+ * Channel lock should be held.
+ */
+int __ata_end_request(struct ata_device *drive, struct request *rq, int uptodate, unsigned int nr_secs)
 {
-	unsigned long flags;
 	int ret = 1;
-
-	spin_lock_irqsave(drive->channel->lock, flags);
 
 	BUG_ON(!(rq->flags & REQ_STARTED));
 
-	/*
-	 * small hack to eliminate locking from ide_end_request to grab
-	 * the first segment number of sectors
+	/* FIXME: Make this "small" hack to eliminate locking from
+	 * ata_end_request to grab the first segment number of sectors go away.
 	 */
 	if (!nr_secs)
 		nr_secs = rq->hard_cur_sectors;
@@ -126,7 +127,6 @@ int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate
 	 * Decide whether to reenable DMA -- 3 is a random magic for now,
 	 * if we DMA timeout more than 3 times, just stay in PIO.
 	 */
-
 	if (drive->state == DMA_PIO_RETRY && drive->retry_pio <= 3) {
 		drive->state = 0;
 		udma_enable(drive, 1, 1);
@@ -143,15 +143,24 @@ int __ide_end_request(struct ata_device *drive, struct request *rq, int uptodate
 		ret = 0;
 	}
 
-	spin_unlock_irqrestore(drive->channel->lock, flags);
 
 	return ret;
 }
 
-/* This is the default end request function as well */
-int ide_end_request(struct ata_device *drive, struct request *rq, int uptodate)
+/*
+ * This is the default end request function as well
+ */
+int ata_end_request(struct ata_device *drive, struct request *rq, int uptodate)
 {
-	return __ide_end_request(drive, rq, uptodate, 0);
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
+	int ret;
+
+	spin_lock_irqsave(ch->lock, flags);
+	ret = __ata_end_request(drive, rq, uptodate, 0);
+	spin_unlock_irqrestore(drive->channel->lock, flags);
+
+	return ret;
 }
 
 /*
@@ -160,25 +169,25 @@ int ide_end_request(struct ata_device *drive, struct request *rq, int uptodate)
  * at the appropriate code to handle the next interrupt, and a
  * timer is started to prevent us from waiting forever in case
  * something goes wrong (see the ide_timer_expiry() handler later on).
+ *
+ * Channel lock should be held.
  */
-void ide_set_handler(struct ata_device *drive, ata_handler_t handler,
+void ata_set_handler(struct ata_device *drive, ata_handler_t handler,
 		      unsigned long timeout, ata_expiry_t expiry)
 {
-	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
 
-	spin_lock_irqsave(ch->lock, flags);
+	if (ch->handler)
+		printk("%s: %s: handler not null; old=%p, new=%p, from %p\n",
+			drive->name, __FUNCTION__, ch->handler, handler, __builtin_return_address(0));
 
-	if (ch->handler != NULL) {
-		printk("%s: ide_set_handler: handler not null; old=%p, new=%p, from %p\n",
-			drive->name, ch->handler, handler, __builtin_return_address(0));
-	}
 	ch->handler = handler;
+
 	ch->expiry = expiry;
 	ch->timer.expires = jiffies + timeout;
+
 	add_timer(&ch->timer);
 
-	spin_unlock_irqrestore(ch->lock, flags);
 }
 
 static void check_crc_errors(struct ata_device *drive)
@@ -256,26 +265,31 @@ static ide_startstop_t do_reset1(struct ata_device *, int); /* needed below */
  */
 static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
+	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
+	int ret = ide_stopped;
 
+	spin_lock_irqsave(ch->lock, flags);
 	ata_select(drive, 10);
-
-	if (ata_status(drive, 0, BUSY_STAT))
-		printk("%s: ATAPI reset complete\n", drive->name);
-	else {
+	if (!ata_status(drive, 0, BUSY_STAT)) {
 		if (time_before(jiffies, ch->poll_timeout)) {
-			ide_set_handler (drive, atapi_reset_pollfunc, HZ/20, NULL);
+			ata_set_handler(drive, atapi_reset_pollfunc, HZ/20, NULL);
+			ret = ide_started;	/* continue polling */
+		} else {
+			ch->poll_timeout = 0;	/* end of polling */
+			printk("%s: ATAPI reset timed out, status=0x%02x\n", drive->name, drive->status);
 
-			return ide_started;	/* continue polling */
+			ret = do_reset1(drive, 0);	/* do it the old fashioned way */
 		}
-		ch->poll_timeout = 0;	/* end of polling */
-		printk("%s: ATAPI reset timed out, status=0x%02x\n", drive->name, drive->status);
+	} else {
+		printk("%s: ATAPI reset complete\n", drive->name);
+		ch->poll_timeout = 0;	/* done polling */
 
-		return do_reset1(drive, 1);	/* do it the old fashioned way */
+		ret = ide_stopped;
 	}
-	ch->poll_timeout = 0;	/* done polling */
+	spin_unlock_irqrestore(ch->lock, flags);
 
-	return ide_stopped;
+	return ret;
 }
 
 /*
@@ -285,16 +299,20 @@ static ide_startstop_t atapi_reset_pollfunc(struct ata_device *drive, struct req
  */
 static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *__rq)
 {
+	unsigned long flags;
 	struct ata_channel *ch = drive->channel;
+	int ret;
 
+	spin_lock_irqsave(ch->lock, flags);
 	if (!ata_status(drive, 0, BUSY_STAT)) {
 		if (time_before(jiffies, ch->poll_timeout)) {
-			ide_set_handler(drive, reset_pollfunc, HZ/20, NULL);
-
-			return ide_started;	/* continue polling */
+			ata_set_handler(drive, reset_pollfunc, HZ/20, NULL);
+			ret = ide_started;	/* continue polling */
+		} else {
+			printk("%s: reset timed out, status=0x%02x\n", ch->name, drive->status);
+			++drive->failures;
+			ret = ide_stopped;
 		}
-		printk("%s: reset timed out, status=0x%02x\n", ch->name, drive->status);
-		drive->failures++;
 	} else  {
 		u8 stat;
 
@@ -303,11 +321,11 @@ static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *
 			printk("success\n");
 			drive->failures = 0;
 		} else {
-			char *msg;
+			const char *msg = "";
 
 #if FANCY_STATUS_DUMPS
 			u8 val;
-			static char *messages[5] = {
+			static const char *messages[5] = {
 				" passed",
 				" formatter device",
 				" sector buffer",
@@ -319,16 +337,17 @@ static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *
 			val = stat & 0x7f;
 			if (val >= 1 && val <= 5)
 				msg = messages[val -1];
-			else
-				msg = "";
 			if (stat & 0x80)
 				printk("; slave:");
 #endif
-			printk("%s error [%02x]\n", msg, stat);
-			drive->failures++;
+			printk(KERN_ERR "%s error [%02x]\n", msg, stat);
+			++drive->failures;
 		}
+
+		ret = ide_stopped;
 	}
 	ch->poll_timeout = 0;	/* done polling */
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	return ide_stopped;
 }
@@ -347,9 +366,11 @@ static ide_startstop_t reset_pollfunc(struct ata_device *drive, struct request *
  * Equally poor, though, is the fact that this may a very long time to
  * complete, (up to 30 seconds worst case).  So, instead of busy-waiting here
  * for it, we set a timer to poll at 50ms intervals.
+ *
+ * Channel lock should be held.
  */
 
-static ide_startstop_t do_reset1(struct ata_device *drive, int do_not_try_atapi)
+static ide_startstop_t do_reset1(struct ata_device *drive, int try_atapi)
 {
 	unsigned int unit;
 	unsigned long flags;
@@ -359,15 +380,17 @@ static ide_startstop_t do_reset1(struct ata_device *drive, int do_not_try_atapi)
 	__cli();		/* local CPU only */
 
 	/* For an ATAPI device, first try an ATAPI SRST. */
-	if (drive->type != ATA_DISK && !do_not_try_atapi) {
-		check_crc_errors(drive);
-		ata_select(drive, 20);
-		OUT_BYTE(WIN_SRST, IDE_COMMAND_REG);
-		ch->poll_timeout = jiffies + WAIT_WORSTCASE;
-		ide_set_handler(drive, atapi_reset_pollfunc, HZ/20, NULL);
-		__restore_flags(flags);	/* local CPU only */
+	if (try_atapi) {
+		if (drive->type != ATA_DISK) {
+			check_crc_errors(drive);
+			ata_select(drive, 20);
+			OUT_BYTE(WIN_SRST, IDE_COMMAND_REG);
+			ch->poll_timeout = jiffies + WAIT_WORSTCASE;
+			ata_set_handler(drive, atapi_reset_pollfunc, HZ/20, NULL);
+			__restore_flags(flags);	/* local CPU only */
 
-		return ide_started;
+			return ide_started;
+		}
 	}
 
 	/*
@@ -377,7 +400,7 @@ static ide_startstop_t do_reset1(struct ata_device *drive, int do_not_try_atapi)
 	for (unit = 0; unit < MAX_DRIVES; ++unit)
 		check_crc_errors(&ch->drives[unit]);
 
-	__restore_flags (flags);	/* local CPU only */
+	__restore_flags(flags);	/* local CPU only */
 
 	return ide_started;
 }
@@ -546,6 +569,8 @@ static int do_recalibrate(struct ata_device *drive)
 
 /*
  * Take action based on the error returned by the drive.
+ *
+ * FIXME: Channel lock should be held.
  */
 ide_startstop_t ata_error(struct ata_device *drive, struct request *rq,	const char *msg)
 {
@@ -562,6 +587,7 @@ ide_startstop_t ata_error(struct ata_device *drive, struct request *rq,	const ch
 
 		return ide_stopped;
 	}
+
 	/* other bits are useless when BUSY */
 	if (stat & BUSY_STAT || ((stat & WRERR_STAT) && !drive->nowerr))
 		rq->errors |= ERROR_RESET; /* FIXME: What's that?! */
@@ -588,71 +614,20 @@ ide_startstop_t ata_error(struct ata_device *drive, struct request *rq,	const ch
 
 	if (rq->errors >= ERROR_MAX) {
 		printk(KERN_ERR "%s: max number of retries exceeded!\n", drive->name);
+		/* FIXME: make sure all end_request implementations are lock free */
 		if (ata_ops(drive) && ata_ops(drive)->end_request)
 			ata_ops(drive)->end_request(drive, rq, 0);
 		else
-			ide_end_request(drive, rq, 0);
+			__ata_end_request(drive, rq, 0, 0);
 	} else {
 		++rq->errors;
 		if ((rq->errors & ERROR_RESET) == ERROR_RESET)
-			return do_reset1(drive, 0);
+			return do_reset1(drive, 1);
 		if ((rq->errors & ERROR_RECAL) == ERROR_RECAL)
 			return do_recalibrate(drive);
 	}
 
 	return ide_stopped;
-}
-
-/*
- * Busy-wait for the drive status to be not "busy".  Check then the status for
- * all of the "good" bits and none of the "bad" bits, and if all is okay it
- * returns 0.  All other cases return 1 after invoking error handler -- caller
- * should just return.
- *
- * This routine should get fixed to not hog the cpu during extra long waits..
- * That could be done by busy-waiting for the first jiffy or two, and then
- * setting a timer to wake up at half second intervals thereafter, until
- * timeout is achieved, before timing out.
- */
-int ide_wait_stat(ide_startstop_t *startstop,
-		struct ata_device *drive, struct request *rq,
-		byte good, byte bad, unsigned long timeout)
-{
-	int i;
-
-	/* bail early if we've exceeded max_failures */
-	if (drive->max_failures && (drive->failures > drive->max_failures)) {
-		*startstop = ide_stopped;
-
-		return 1;
-	}
-
-	/* spec allows drive 400ns to assert "BUSY" */
-	udelay(1);
-	if (!ata_status(drive, 0, BUSY_STAT)) {
-		timeout += jiffies;
-		while (!ata_status(drive, 0, BUSY_STAT)) {
-			if (time_after(jiffies, timeout)) {
-				*startstop = ata_error(drive, rq, "status timeout");
-				return 1;
-			}
-		}
-	}
-
-	/*
-	 * Allow status to settle, then read it again.  A few rare drives
-	 * vastly violate the 400ns spec here, so we'll wait up to 10usec for a
-	 * "good" status rather than expensively fail things immediately.  This
-	 * fix courtesy of Matthew Faupel & Niccolo Rigacci.
-	 */
-	for (i = 0; i < 10; i++) {
-		udelay(1);
-		if (ata_status(drive, good, bad))
-			return 0;
-	}
-	*startstop = ata_error(drive, rq, "status error");
-
-	return 1;
 }
 
 /*
@@ -698,8 +673,8 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		ide_startstop_t res;
 
 		ata_select(drive, 0);
-		if (ide_wait_stat(&res, drive, rq, drive->ready_stat,
-					BUSY_STAT|DRQ_STAT, WAIT_READY)) {
+		if (ata_status_poll(drive, drive->ready_stat, BUSY_STAT | DRQ_STAT,
+					WAIT_READY, rq, &res)) {
 			printk(KERN_WARNING "%s: drive not ready for command\n", drive->name);
 
 			return res;
@@ -709,7 +684,8 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 	/* This issues a special drive command.
 	 */
 	if (rq->flags & REQ_SPECIAL)
-		return ata_taskfile(drive, rq->special, NULL);
+		if (drive->type == ATA_DISK)
+			return ata_taskfile(drive, rq->special, NULL);
 
 	/* The normal way of execution is to pass and execute the request
 	 * handler down to the device type driver.
@@ -718,7 +694,7 @@ static ide_startstop_t start_request(struct ata_device *drive, struct request *r
 		if (ata_ops(drive)->do_request)
 			return ata_ops(drive)->do_request(drive, rq, block);
 		else {
-			ide_end_request(drive, rq, 0);
+			ata_end_request(drive, rq, 0);
 
 			return ide_stopped;
 		}
@@ -735,7 +711,7 @@ kill_rq:
 	if (ata_ops(drive) && ata_ops(drive)->end_request)
 		ata_ops(drive)->end_request(drive, rq, 0);
 	else
-		ide_end_request(drive, rq, 0);
+		ata_end_request(drive, rq, 0);
 
 	return ide_stopped;
 }
@@ -744,6 +720,7 @@ ide_startstop_t restart_request(struct ata_device *drive)
 {
 	struct ata_channel *ch = drive->channel;
 	unsigned long flags;
+	int ret;
 
 	spin_lock_irqsave(ch->lock, flags);
 
@@ -752,7 +729,12 @@ ide_startstop_t restart_request(struct ata_device *drive)
 
 	spin_unlock_irqrestore(ch->lock, flags);
 
-	return start_request(drive, drive->rq);
+	/* FIXME make start_request do the unlock itself and
+	 * push this locking further down. */
+
+	ret = start_request(drive, drive->rq);
+
+	return ret;
 }
 
 /*
@@ -844,14 +826,16 @@ static struct ata_device *choose_urgent_device(struct ata_channel *channel)
 			sleep = jiffies + WAIT_MIN_SLEEP;
 #if 1
 		if (timer_pending(&channel->timer))
-			printk(KERN_ERR "ide_set_handler: timer already active\n");
+			printk(KERN_ERR "%s: timer already active\n", __FUNCTION__);
 #endif
 		set_bit(IDE_SLEEP, channel->active);
 		mod_timer(&channel->timer, sleep);
 		/* we purposely leave hwgroup busy while sleeping */
 	} else {
+		/* FIXME: use queue plugging instead of active to
+		 * block upper layers from stomping on us */
 		/* Ugly, but how can we sleep for the lock otherwise? */
-		ide_release_lock(&irq_lock);/* for atari only */
+		ide_release_lock(&ide_irq_lock);/* for atari only */
 		clear_bit(IDE_BUSY, channel->active);
 	}
 
@@ -918,11 +902,10 @@ static void queue_commands(struct ata_device *drive)
 
 		drive->rq = rq;
 
+		/* FIXME: push this locaing further down */
 		spin_unlock(drive->channel->lock);
-
 		ide__sti();	/* allow other IRQs while we start this request */
 		startstop = start_request(drive, rq);
-
 		spin_lock_irq(drive->channel->lock);
 
 		/* command started, we are busy */
@@ -948,7 +931,7 @@ static void queue_commands(struct ata_device *drive)
  */
 static void do_request(struct ata_channel *channel)
 {
-	ide_get_lock(&irq_lock, ata_irq_request, hwgroup);/* for atari only: POSSIBLY BROKEN HERE(?) */
+	ide_get_lock(&ide_irq_lock, ata_irq_request, channel);/* for atari only: POSSIBLY BROKEN HERE(?) */
 //	__cli();	/* necessary paranoia: ensure IRQs are masked on local CPU */
 
 	while (!test_and_set_bit(IDE_BUSY, channel->active)) {
@@ -988,64 +971,24 @@ void do_ide_request(request_queue_t *q)
 }
 
 /*
- * Un-busy the hwgroup etc, and clear any pending DMA status. we want to
- * retry the current request in PIO mode instead of risking tossing it
- * all away
- */
-static void dma_timeout_retry(struct ata_device *drive, struct request *rq)
-{
-	/*
-	 * end current dma transaction
-	 */
-	udma_stop(drive);
-	udma_timeout(drive);
-
-	/*
-	 * Disable dma for now, but remember that we did so because of
-	 * a timeout -- we'll reenable after we finish this next request
-	 * (or rather the first chunk of it) in pio.
-	 */
-	drive->retry_pio++;
-	drive->state = DMA_PIO_RETRY;
-	udma_enable(drive, 0, 0);
-
-	/*
-	 * un-busy drive etc (hwgroup->busy is cleared on return) and
-	 * make sure request is sane
-	 */
-	drive->rq = NULL;
-
-	rq->errors = 0;
-	if (rq->bio) {
-		rq->sector = rq->bio->bi_sector;
-		rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
-		rq->buffer = NULL;
-	}
-}
-
-/*
  * This is our timeout function for all drive operations.  But note that it can
  * also be invoked as a result of a "sleep" operation triggered by the
  * mod_timer() call in do_request.
+ *
+ * FIXME: this should take a drive context instead of a channel.
  */
 void ide_timer_expiry(unsigned long data)
 {
-	struct ata_channel *ch = (struct ata_channel *) data;
-	ata_handler_t *handler;
-	ata_expiry_t *expiry;
 	unsigned long flags;
-	unsigned long wait;
-
-	/*
-	 * A global lock protects timers etc -- shouldn't get contention
-	 * worth mentioning.
-	 */
+	struct ata_channel *ch = (struct ata_channel *) data;
 
 	spin_lock_irqsave(ch->lock, flags);
 	del_timer(&ch->timer);
 
-	handler = ch->handler;
-	if (!handler) {
+	if (!ch->drive) {
+		printk(KERN_ERR "%s: IRQ handler was NULL\n", __FUNCTION__);
+		ch->handler = NULL;
+	} else if (!ch->handler) {
 
 		/*
 		 * Either a marginal timeout occurred (got the interrupt just
@@ -1058,69 +1001,103 @@ void ide_timer_expiry(unsigned long data)
 			clear_bit(IDE_BUSY, ch->active);
 	} else {
 		struct ata_device *drive = ch->drive;
-		if (!drive) {
-			printk(KERN_ERR "ide_timer_expiry: IRQ handler was NULL\n");
-			ch->handler = NULL;
-		} else {
-			ide_startstop_t startstop;
+		ide_startstop_t ret;
+		ata_handler_t *handler;
 
-			/* paranoia */
-			if (!test_and_set_bit(IDE_BUSY, ch->active))
-				printk(KERN_ERR "%s: ide_timer_expiry: IRQ handler was not busy??\n", drive->name);
-			if ((expiry = ch->expiry) != NULL) {
-				/* continue */
-				if ((wait = expiry(drive, drive->rq)) != 0) {
-					/* reengage timer */
-					ch->timer.expires  = jiffies + wait;
-					add_timer(&ch->timer);
+		/* paranoia */
+		if (!test_and_set_bit(IDE_BUSY, ch->active))
+			printk(KERN_ERR "%s: %s: IRQ handler was not busy?!\n",
+					drive->name, __FUNCTION__);
 
-					spin_unlock_irqrestore(ch->lock, flags);
+		if (ch->expiry) {
+			unsigned long wait;
 
-					return;
-				}
+			/* continue */
+			if ((wait = ch->expiry(drive, drive->rq)) != 0) {
+				/* reengage timer */
+				ch->timer.expires  = jiffies + wait;
+				add_timer(&ch->timer);
+
+				spin_unlock_irqrestore(ch->lock, flags);
+
+				return;
 			}
-			ch->handler = NULL;
+		}
+
+		/*
+		 * We need to simulate a real interrupt when invoking the
+		 * handler() function, which means we need to globally mask the
+		 * specific IRQ:
+		 */
+
+		handler = ch->handler;
+		ch->handler = NULL;
+		spin_unlock(ch->lock);
+
+		ch = drive->channel;
+#if DISABLE_IRQ_NOSYNC
+		disable_irq_nosync(ch->irq);
+#else
+		disable_irq(ch->irq);	/* disable_irq_nosync ?? */
+#endif
+		__cli();	/* local CPU only, as if we were handling an interrupt */
+		if (ch->poll_timeout) {
+			ret = handler(drive, drive->rq);
+		} else if (drive_is_ready(drive)) {
+			if (drive->waiting_for_dma)
+				udma_irq_lost(drive);
+			(void) ide_ack_intr(ch);
+			printk("%s: lost interrupt\n", drive->name);
+			ret = handler(drive, drive->rq);
+		} else if (drive->waiting_for_dma) {
+			struct request *rq = drive->rq;
+
 			/*
-			 * We need to simulate a real interrupt when invoking
-			 * the handler() function, which means we need to globally
-			 * mask the specific IRQ:
+			 * Un-busy the hwgroup etc, and clear any pending DMA
+			 * status. we want to retry the current request in PIO
+			 * mode instead of risking tossing it all away.
 			 */
 
-			spin_unlock(ch->lock);
+			udma_stop(drive);
+			udma_timeout(drive);
 
-			ch = drive->channel;
-#if DISABLE_IRQ_NOSYNC
-			disable_irq_nosync(ch->irq);
-#else
-			disable_irq(ch->irq);	/* disable_irq_nosync ?? */
-#endif
-			__cli();	/* local CPU only, as if we were handling an interrupt */
-			if (ch->poll_timeout != 0) {
-				startstop = handler(drive, drive->rq);
-			} else if (drive_is_ready(drive)) {
-				if (drive->waiting_for_dma)
-					udma_irq_lost(drive);
-				(void) ide_ack_intr(ch);
-				printk("%s: lost interrupt\n", drive->name);
-				startstop = handler(drive, drive->rq);
-			} else {
-				if (drive->waiting_for_dma) {
-					startstop = ide_stopped;
-					dma_timeout_retry(drive, drive->rq);
-				} else
-					startstop = ata_error(drive, drive->rq, "irq timeout");
+			/* Disable dma for now, but remember that we did so
+			 * because of a timeout -- we'll reenable after we
+			 * finish this next request (or rather the first chunk
+			 * of it) in pio.
+			 */
+
+			drive->retry_pio++;
+			drive->state = DMA_PIO_RETRY;
+			udma_enable(drive, 0, 0);
+
+			/* Un-busy drive etc (hwgroup->busy is cleared on
+			 * return) and make sure request is sane.
+			 */
+
+			drive->rq = NULL;
+
+			rq->errors = 0;
+			if (rq->bio) {
+				rq->sector = rq->bio->bi_sector;
+				rq->current_nr_sectors = bio_iovec(rq->bio)->bv_len >> 9;
+				rq->buffer = NULL;
 			}
-			enable_irq(ch->irq);
+			ret = ide_stopped;
+		} else
+			ret = ata_error(drive, drive->rq, "irq timeout");
 
-			spin_lock_irq(ch->lock);
+		enable_irq(ch->irq);
 
-			if (startstop == ide_stopped)
-				clear_bit(IDE_BUSY, ch->active);
-		}
+		spin_lock_irq(ch->lock);
+
+		if (ret == ide_stopped)
+			clear_bit(IDE_BUSY, ch->active);
+
+
+		/* Reenter the request handling engine */
+		do_request(ch);
 	}
-
-	do_request(ch->drive->channel);
-
 	spin_unlock_irqrestore(ch->lock, flags);
 }
 
@@ -1142,7 +1119,7 @@ void ide_timer_expiry(unsigned long data)
  *
  * In reality, this is a non-issue.  The new command is not sent unless the
  * drive is ready to accept one, in which case we know the drive is not
- * trying to interrupt us.  And ide_set_handler() is always invoked before
+ * trying to interrupt us.  And ata_set_handler() is always invoked before
  * completing the issuance of any new drive command, so we will not be
  * accidentally invoked as a result of any valid command completion interrupt.
  *
@@ -1416,15 +1393,14 @@ EXPORT_SYMBOL(drive_is_flashcard);
 EXPORT_SYMBOL(ide_timer_expiry);
 EXPORT_SYMBOL(do_ide_request);
 
-EXPORT_SYMBOL(ide_set_handler);
+EXPORT_SYMBOL(ata_set_handler);
 EXPORT_SYMBOL(ata_dump);
 EXPORT_SYMBOL(ata_error);
 
-EXPORT_SYMBOL(ide_wait_stat);
 /* FIXME: this is a trully bad name */
 EXPORT_SYMBOL(restart_request);
-EXPORT_SYMBOL(__ide_end_request);
-EXPORT_SYMBOL(ide_end_request);
+EXPORT_SYMBOL(ata_end_request);
+EXPORT_SYMBOL(__ata_end_request);
 EXPORT_SYMBOL(ide_stall_queue);
 
 EXPORT_SYMBOL(ide_setup_ports);

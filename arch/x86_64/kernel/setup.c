@@ -28,7 +28,6 @@
 #include <linux/delay.h>
 #include <linux/config.h>
 #include <linux/init.h>
-#include <linux/apm_bios.h>
 #ifdef CONFIG_BLK_DEV_RAM
 #include <linux/blk.h>
 #endif
@@ -37,6 +36,7 @@
 #include <asm/processor.h>
 #include <linux/console.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 #include <asm/mtrr.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
@@ -64,6 +64,8 @@ unsigned long mmu_cr4_features;
 
 /* For PCI or other memory-mapped resources */
 unsigned long pci_mem_start = 0x10000000;
+
+unsigned long saved_video_mode;
 
 /*
  * Setup options
@@ -545,15 +547,18 @@ static inline void parse_mem_cmdline (char ** cmdline_p)
 
 unsigned long start_pfn, end_pfn; 
 
+extern void exception_table_check(void);
+
 void __init setup_arch(char **cmdline_p)
 {
 	unsigned long bootmap_size, low_mem_size;
 	int i;
 
- 	ROOT_DEV = to_kdev_t(ORIG_ROOT_DEV);
+ 	ROOT_DEV = ORIG_ROOT_DEV;
  	drive_info = DRIVE_INFO;
  	screen_info = SCREEN_INFO;
 	aux_device_present = AUX_DEVICE_INFO;
+	saved_video_mode = SAVED_VIDEO_MODE;
 
 #ifdef CONFIG_BLK_DEV_RAM
 	rd_image_start = RAMDISK_FLAGS & RAMDISK_IMAGE_START_MASK;
@@ -782,6 +787,8 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+
+	exception_table_check(); 
 }
 
 #ifndef CONFIG_X86_TSC
@@ -1092,7 +1099,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	else
 		seq_printf(m, "stepping\t: unknown\n");
 	
-	if ( test_bit(X86_FEATURE_TSC, &c->x86_capability) ) {
+	if (cpu_has(c,X86_FEATURE_TSC)) {
 		seq_printf(m, "cpu MHz\t\t: %u.%03u\n",
 			     cpu_khz / 1000, (cpu_khz % 1000));
 	}

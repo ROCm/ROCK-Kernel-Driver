@@ -30,6 +30,7 @@
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/mmu_context.h>
+#include <asm/tlbflush.h>
 #include <asm/dma.h>
 #include <asm/starfire.h>
 #include <asm/tlb.h>
@@ -89,17 +90,15 @@ void check_pgt_cache(void)
         if (pgd_cache_size > PGT_CACHE_HIGH / 4) {
 		struct page *page, *page2;
                 for (page2 = NULL, page = (struct page *)pgd_quicklist; page;) {
-                        if ((unsigned long)page->pprev_hash == 3) {
+                        if ((unsigned long)page->lru.prev == 3) {
                                 if (page2)
-                                        page2->next_hash = page->next_hash;
+                                        page2->lru.next = page->lru.next;
                                 else
-                                        (struct page *)pgd_quicklist = page->next_hash;
-                                page->next_hash = NULL;
-                                page->pprev_hash = NULL;
+                                        (struct page *)pgd_quicklist = page->lru.next;
                                 pgd_cache_size -= 2;
                                 __free_page(page);
                                 if (page2)
-                                        page = page2->next_hash;
+                                        page = (struct page *)page2->lru.next;
                                 else
                                         page = (struct page *)pgd_quicklist;
                                 if (pgd_cache_size <= PGT_CACHE_LOW / 4)
@@ -107,7 +106,7 @@ void check_pgt_cache(void)
                                 continue;
                         }
                         page2 = page;
-                        page = page->next_hash;
+                        page = (struct page *)page->lru.next;
                 }
         }
 #endif

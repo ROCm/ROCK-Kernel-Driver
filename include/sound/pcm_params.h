@@ -38,7 +38,7 @@ extern int _snd_pcm_hw_param_set(snd_pcm_hw_params_t *params,
 /* To share the same code we have  alsa-lib */
 #define snd_mask_bits(mask) (*(mask))
 #define INLINE static inline
-#define assert(a)
+#define assert(a) (void)(a)
 
 INLINE unsigned int ld2(u_int32_t v)
 {

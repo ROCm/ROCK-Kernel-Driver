@@ -18,7 +18,6 @@
 #include <asm/dasd.h>
 #endif
 
-#define DASD_API_VERSION 0
 
 #define LINE_LENGTH 80
 #define VTOC_START_CC 0x0

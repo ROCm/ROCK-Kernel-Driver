@@ -34,6 +34,7 @@
 #include <linux/ioport.h>
 #include <linux/bootmem.h>
 #include <linux/seq_file.h>
+#include <linux/root_dev.h>
 
 #include <asm/mmu.h>
 #include <asm/processor.h>
@@ -76,12 +77,12 @@ m8xx_setup_arch(void)
 #endif
 
 #ifdef notdef
-	ROOT_DEV = to_kdev_t(0x0301); /* hda1 */
+	ROOT_DEV = Root_HDA1; /* hda1 */
 #endif
 
 #ifdef CONFIG_BLK_DEV_INITRD
 #if 0
-	ROOT_DEV = to_kdev_t(0x0200); /* floppy */
+	ROOT_DEV = Root_FD0; /* floppy */
 	rd_prompt = 1;
 	rd_doload = 1;
 	rd_image_start = 0;

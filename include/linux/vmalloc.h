@@ -1,7 +1,6 @@
 #ifndef __LINUX_VMALLOC_H
 #define __LINUX_VMALLOC_H
 
-#include <linux/mm.h>
 #include <linux/spinlock.h>
 
 #include <asm/pgtable.h>
@@ -24,33 +23,12 @@ extern long vread(char *buf, char *addr, unsigned long count);
 extern void vmfree_area_pages(unsigned long address, unsigned long size);
 extern int vmalloc_area_pages(unsigned long address, unsigned long size,
                               int gfp_mask, pgprot_t prot);
-
 /*
- *	Allocate any pages
- */
- 
-static inline void * vmalloc (unsigned long size)
-{
-	return __vmalloc(size, GFP_KERNEL | __GFP_HIGHMEM, PAGE_KERNEL);
-}
-
-/*
- *	Allocate ISA addressable pages for broke crap
+ * Various ways to allocate pages.
  */
 
-static inline void * vmalloc_dma (unsigned long size)
-{
-	return __vmalloc(size, GFP_KERNEL|GFP_DMA, PAGE_KERNEL);
-}
-
-/*
- *	vmalloc 32bit PA addressable pages - eg for PCI 32bit devices
- */
- 
-static inline void * vmalloc_32(unsigned long size)
-{
-	return __vmalloc(size, GFP_KERNEL, PAGE_KERNEL);
-}
+extern void * vmalloc(unsigned long size);
+extern void * vmalloc_32(unsigned long size);
 
 /*
  * vmlist_lock is a read-write spinlock that protects vmlist

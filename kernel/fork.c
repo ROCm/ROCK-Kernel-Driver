@@ -24,6 +24,7 @@
 #include <linux/file.h>
 #include <linux/binfmts.h>
 #include <linux/fs.h>
+#include <linux/mm.h>
 
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>

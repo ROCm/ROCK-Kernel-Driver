@@ -475,6 +475,9 @@ static __inline__ int ffs(int x)
 #define minix_find_first_zero_bit(addr,size) \
 	find_first_zero_bit((void*)addr,size)
 
+/* find last set bit */
+#define fls(x) generic_fls(x)
+
 #endif /* __KERNEL__ */
 
 #endif /* _X86_64_BITOPS_H */

@@ -69,13 +69,6 @@
 #define         READ_SUBSYS_DATA        0x3E    /* 3490 CMD */
 #define         SET_INTERFACE_ID        0x73    /* 3490 CMD */
 
-#ifndef MIN
-#define MIN(a,b)                ( (a) < (b) ? (a) : (b) )
-#endif
-
-
-#define BLOCKSIZE               4096            /* size of the tape rcds */
-
 #define COMMAND_CHAIN    CCW_FLAG_CC      /* redefine from irq.h */
 #define CHANNEL_END      DEV_STAT_CHN_END /* redefine from irq.h */
 #define DEVICE_END       DEV_STAT_DEV_END /* redefine from irq.h */
@@ -112,72 +105,29 @@
 typedef struct _tape34xx_disc_data_t {
     __u8 modeset_byte;
 } tape34xx_disc_data_t  __attribute__ ((packed, aligned(8)));
+#define MOD_BYTE ((tape34xx_disc_data_t *)td->discdata)->modeset_byte
 
 /* discipline functions */
-int tape34xx_ioctl_overload (struct inode *inode, struct file *filp, unsigned int cmd, unsigned long arg);
-ccw_req_t * tape34xx_write_block (const char *data, size_t count, tape_info_t * ti);
-void tape34xx_free_write_block (ccw_req_t * cqr, tape_info_t * ti);
-ccw_req_t * tape34xx_read_block (const char *data, size_t count, tape_info_t * ti);
-void  tape34xx_free_read_block (ccw_req_t * cqr, tape_info_t * ti);
-void  tape34xx_clear_read_block (ccw_req_t * cqr, tape_info_t * ti);
-ccw_req_t * tape34xx_mtfsf (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtbsf (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtfsr (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtbsr (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtweof (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtrew (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtoffl (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtnop (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtbsfm (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtfsfm (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mteom (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mterase (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtsetdensity (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtseek (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mttell (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtsetdrvbuffer (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtlock (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtunlock (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtload (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtunload (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtcompression (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtsetpart (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtmkpart (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtiocget (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_mtiocpos (tape_info_t * ti, int count);
-ccw_req_t * tape34xx_bread (struct request *req, tape_info_t* ti,int tapeblock_major);
-ccw_req_t * tape34xx_bwrite (struct request *req, tape_info_t* ti,int tapeblock_major);
-void tape34xx_free_bread (ccw_req_t*,struct _tape_info_t*);
-void tape34xx_free_bwrite (ccw_req_t*,struct _tape_info_t*);
+int tape34xx_ioctl_overload (tape_dev_t* td, unsigned int cmd, unsigned long arg);
+tape_ccw_req_t * tape34xx_write_block (const char *data, size_t count, tape_dev_t* td);
+tape_ccw_req_t * tape34xx_read_block (const char *data, size_t count, tape_dev_t* td);
+tape_ccw_req_t * tape34xx_ioctl(tape_dev_t* td, int op,int count, int* rc);
+tape_ccw_req_t * tape34xx_bread (struct request *req, tape_dev_t* td,int tapeblock_major);
+void tape34xx_free_bread (tape_ccw_req_t* treq);
+void tape34xx_bread_enable_locate (tape_ccw_req_t * treq);
+tape_ccw_req_t * tape34xx_bwrite (struct request *req, tape_dev_t* td,int tapeblock_major);
 
 /* Event handlers */
-void tape34xx_default_handler (tape_info_t * ti);
-void tape34xx_unexpect_uchk_handler (tape_info_t * ti);
-void tape34xx_unused_done(tape_info_t* ti);
-void tape34xx_idle_done(tape_info_t* ti);
-void tape34xx_block_done(tape_info_t* ti);
-void tape34xx_bsf_init_done(tape_info_t* ti);
-void tape34xx_dse_init_done(tape_info_t* ti);
-void tape34xx_fsf_init_done(tape_info_t* ti);
-void tape34xx_bsb_init_done(tape_info_t* ti);
-void tape34xx_fsb_init_done(tape_info_t* ti);
-void tape34xx_lbl_init_done(tape_info_t* ti);
-void tape34xx_nop_init_done(tape_info_t* ti);
-void tape34xx_rfo_init_done(tape_info_t* ti);
-void tape34xx_rbi_init_done(tape_info_t* ti);
-void tape34xx_rew_init_done(tape_info_t* ti);
-void tape34xx_rew_release_init_done(tape_info_t* ti);
-void tape34xx_run_init_done(tape_info_t* ti);
-void tape34xx_wri_init_done(tape_info_t* ti);
-void tape34xx_wtm_init_done(tape_info_t* ti);
-
-extern void schedule_tapeblock_exec_IO (tape_info_t *ti);
+void tape34xx_default_handler (tape_dev_t * td);
+void tape34xx_unexpect_uchk_handler (tape_dev_t * td);
+void tape34xx_irq (tape_dev_t* td);
+void tape34xx_process_eov(tape_dev_t* td);
 
 // the error recovery stuff:
-void tape34xx_error_recovery (tape_info_t* ti);
-void tape34xx_error_recovery_has_failed (tape_info_t* ti,int error_id);
-void tape34xx_error_recovery_succeded(tape_info_t* ti);
-void tape34xx_error_recovery_do_retry(tape_info_t* ti);
-void tape34xx_error_recovery_read_opposite (tape_info_t* ti);
-void  tape34xx_error_recovery_HWBUG (tape_info_t* ti,int condno);
+void tape34xx_error_recovery (tape_dev_t* td);
+void tape34xx_error_recovery_has_failed (tape_dev_t* td,int error_id);
+void tape34xx_error_recovery_succeded(tape_dev_t* td);
+void tape34xx_error_recovery_do_retry(tape_dev_t* td);
+void tape34xx_error_recovery_read_opposite (tape_dev_t* td);
+void  tape34xx_error_recovery_HWBUG (tape_dev_t* td,int condno);
 #endif // _TAPE34XX_H

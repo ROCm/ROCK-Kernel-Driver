@@ -20,6 +20,7 @@
 #include <asm/unaligned.h>
 #include <linux/bitops.h>
 #include <linux/proc_fs.h>
+#include <linux/smp_lock.h>
 #include <linux/buffer_head.h>
 #include <linux/reiserfs_fs_i.h>
 #include <linux/reiserfs_fs_sb.h>
@@ -1062,9 +1063,7 @@ static inline int entry_length (const struct buffer_head * bh,
 #define B_I_E_NAME(bh,ih,entry_num) ((char *)(bh->b_data + ih_location(ih) + deh_location(B_I_DEH(bh,ih)+(entry_num))))
 
 // two entries per block (at least)
-//#define REISERFS_MAX_NAME_LEN(block_size) 
-//((block_size - BLKH_SIZE - IH_SIZE - DEH_SIZE * 2) / 2)
-#define REISERFS_MAX_NAME_LEN(block_size) 255
+#define REISERFS_MAX_NAME(block_size) 255
 
 
 /* this structure is used for operations on directory entries. It is
@@ -1641,18 +1640,20 @@ extern wait_queue_head_t reiserfs_commit_thread_wait ;
 #define JBH_HASH_SHIFT 13 /* these are based on journal hash size of 8192 */
 #define JBH_HASH_MASK 8191
 
-/* After several hours of tedious analysis, the following hash
- * function won.  Do not mess with it... -DaveM
- */
-#define _jhashfn(dev,block)	\
-	((((dev)<<(JBH_HASH_SHIFT - 6)) ^ ((dev)<<(JBH_HASH_SHIFT - 9))) ^ \
+#define _jhashfn(sb,block)	\
+	(((unsigned long)sb>>L1_CACHE_SHIFT) ^ \
 	 (((block)<<(JBH_HASH_SHIFT - 6)) ^ ((block) >> 13) ^ ((block) << (JBH_HASH_SHIFT - 12))))
-#define journal_hash(t,sb,block) ((t)[_jhashfn((kdev_t_to_nr(sb->s_dev)),(block)) & JBH_HASH_MASK])
+#define journal_hash(t,sb,block) ((t)[_jhashfn((sb),(block)) & JBH_HASH_MASK])
 
 /* finds n'th buffer with 0 being the start of this commit.  Needs to go away, j_ap_blocks has changed
 ** since I created this.  One chunk of code in journal.c needs changing before deleting it
 */
 #define JOURNAL_BUFFER(j,n) ((j)->j_ap_blocks[((j)->j_start + (n)) % JOURNAL_BLOCK_COUNT])
+
+// We need these to make journal.c code more readable
+#define journal_get_hash_table(s, block) __get_hash_table(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
+#define journal_getblk(s, block) __getblk(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
+#define journal_bread(s, block) __bread(SB_JOURNAL(s)->j_dev_bd, block, s->s_blocksize)
 
 void reiserfs_commit_for_inode(struct inode *) ;
 void reiserfs_update_inode_transaction(struct inode *) ;
@@ -2073,6 +2074,12 @@ int reiserfs_unpack (struct inode * inode, struct file * filp);
  
 /* ioctl's command */
 #define REISERFS_IOC_UNPACK		_IOW(0xCD,1,long)
+
+/* Locking primitives */
+/* Right now we are still falling back to (un)lock_kernel, but eventually that
+   would evolve into real per-fs locks */
+#define reiserfs_write_lock( sb ) lock_kernel()
+#define reiserfs_write_unlock( sb ) unlock_kernel()
  			         
 #endif /* _LINUX_REISER_FS_H */
 

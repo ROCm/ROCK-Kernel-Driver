@@ -141,13 +141,6 @@ static rwlock_t capiminor_list_lock = RW_LOCK_UNLOCKED;
 static LIST_HEAD(capiminor_list);
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
-static kmem_cache_t *capidev_cachep;
-static kmem_cache_t *capincci_cachep;
-#ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
-static kmem_cache_t *capiminor_cachep;
-static kmem_cache_t *capidh_cachep;
-#endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
-
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 /* -------- datahandles --------------------------------------------- */
 
@@ -155,8 +148,7 @@ static int capincci_add_ack(struct capiminor *mp, u16 datahandle)
 {
 	struct datahandle_queue *n, **pp;
 
-	n = (struct datahandle_queue *)
-	kmem_cache_alloc(capidh_cachep, GFP_ATOMIC);
+	n = kmalloc(sizeof(*n), GFP_ATOMIC);
 	if (!n) {
 	   printk(KERN_ERR "capi: alloc datahandle failed\n");
 	   return -1;
@@ -177,7 +169,7 @@ static int capiminor_del_ack(struct capiminor *mp, u16 datahandle)
  		if ((*pp)->datahandle == datahandle) {
 			p = *pp;
 			*pp = (*pp)->next;
-			kmem_cache_free(capidh_cachep, p);
+			kfree(p);
 			mp->nack--;
 			return 0;
 		}
@@ -193,7 +185,7 @@ static void capiminor_del_all_ack(struct capiminor *mp)
 	while (*pp) {
 		p = *pp;
 		*pp = (*pp)->next;
-		kmem_cache_free(capidh_cachep, p);
+		kfree(p);
 		mp->nack--;
 	}
 }
@@ -209,7 +201,7 @@ static struct capiminor *capiminor_alloc(struct capi20_appl *ap, u32 ncci)
 	unsigned long flags;
   
   	MOD_INC_USE_COUNT;
-	mp = kmem_cache_alloc(capiminor_cachep, GFP_ATOMIC);
+	mp = kmalloc(sizeof(*mp), GFP_ATOMIC);
   	if (!mp) {
   		MOD_DEC_USE_COUNT;
   		printk(KERN_ERR "capi: can't alloc capiminor\n");
@@ -258,7 +250,7 @@ static void capiminor_free(struct capiminor *mp)
 	skb_queue_purge(&mp->inqueue);
 	skb_queue_purge(&mp->outqueue);
 	capiminor_del_all_ack(mp);
-	kmem_cache_free(capiminor_cachep, mp);
+	kfree(mp);
 	MOD_DEC_USE_COUNT;
 #ifdef _DEBUG_REFCOUNT
 	printk(KERN_DEBUG "capiminor_free %d\n", GET_USE_COUNT(THIS_MODULE));
@@ -294,7 +286,7 @@ static struct capincci *capincci_alloc(struct capidev *cdev, u32 ncci)
 	kdev_t kdev;
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
-	np = (struct capincci *)kmem_cache_alloc(capincci_cachep, GFP_ATOMIC);
+	np = kmalloc(sizeof(*np), GFP_ATOMIC);
 	if (!np)
 		return 0;
 	memset(np, 0, sizeof(struct capincci));
@@ -350,7 +342,7 @@ static void capincci_free(struct capidev *cdev, u32 ncci)
 				}
 			}
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
-			kmem_cache_free(capincci_cachep, np);
+			kfree(np);
 			if (*pp == 0) return;
 		} else {
 			pp = &(*pp)->next;
@@ -376,7 +368,7 @@ static struct capidev *capidev_alloc(void)
 	struct capidev *cdev;
 	unsigned long flags;
 
-	cdev = kmem_cache_alloc(capidev_cachep, GFP_KERNEL);
+	cdev = kmalloc(sizeof(*cdev), GFP_KERNEL);
 	if (!cdev)
 		return 0;
 	memset(cdev, 0, sizeof(struct capidev));
@@ -402,7 +394,7 @@ static void capidev_free(struct capidev *cdev)
 	write_lock_irqsave(&capidev_list_lock, flags);
 	list_del(&cdev->list);
 	write_unlock_irqrestore(&capidev_list_lock, flags);
-	kmem_cache_free(capidev_cachep, cdev);
+	kfree(cdev);
 }
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
@@ -1476,72 +1468,6 @@ static void __exit proc_exit(void)
 /* -------- init function and module interface ---------------------- */
 
 
-static void alloc_exit(void)
-{
-	if (capidev_cachep) {
-		(void)kmem_cache_destroy(capidev_cachep);
-		capidev_cachep = 0;
-	}
-	if (capincci_cachep) {
-		(void)kmem_cache_destroy(capincci_cachep);
-		capincci_cachep = 0;
-	}
-#ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
-	if (capidh_cachep) {
-		(void)kmem_cache_destroy(capidh_cachep);
-		capidh_cachep = 0;
-	}
-	if (capiminor_cachep) {
-		(void)kmem_cache_destroy(capiminor_cachep);
-		capiminor_cachep = 0;
-	}
-#endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
-}
-
-static int __init alloc_init(void)
-{
-	capidev_cachep = kmem_cache_create("capi20_dev",
-					 sizeof(struct capidev),
-					 0,
-					 SLAB_HWCACHE_ALIGN,
-					 NULL, NULL);
-	if (!capidev_cachep) {
-		alloc_exit();
-		return -ENOMEM;
-	}
-
-	capincci_cachep = kmem_cache_create("capi20_ncci",
-					 sizeof(struct capincci),
-					 0,
-					 SLAB_HWCACHE_ALIGN,
-					 NULL, NULL);
-	if (!capincci_cachep) {
-		alloc_exit();
-		return -ENOMEM;
-	}
-#ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
-	capidh_cachep = kmem_cache_create("capi20_dh",
-					 sizeof(struct datahandle_queue),
-					 0,
-					 SLAB_HWCACHE_ALIGN,
-					 NULL, NULL);
-	if (!capidh_cachep) {
-		alloc_exit();
-		return -ENOMEM;
-	}
-	capiminor_cachep = kmem_cache_create("capi20_minor",
-					 sizeof(struct capiminor),
-					 0,
-					 SLAB_HWCACHE_ALIGN,
-					 NULL, NULL);
-	if (!capiminor_cachep) {
-		alloc_exit();
-		return -ENOMEM;
-	}
-#endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
-	return 0;
-}
-
 static char rev[32];
 
 static int __init capi_init(void)
@@ -1578,19 +1504,7 @@ static int __init capi_init(void)
 	}
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
-	if (alloc_init() < 0) {
-#ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
-		capinc_tty_exit();
-#endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
-		devfs_unregister_chrdev(capi_major, "capi20");
-		devfs_unregister(devfs_find_handle(NULL, "capi20",
-						   capi_major, 0,
-						   DEVFS_SPECIAL_CHR, 0));
-		MOD_DEC_USE_COUNT;
-		return -ENOMEM;
-	}
-
-	(void)proc_init();
+	proc_init();
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 #if defined(CONFIG_ISDN_CAPI_CAPIFS) || defined(CONFIG_ISDN_CAPI_CAPIFS_MODULE)
@@ -1610,8 +1524,7 @@ static int __init capi_init(void)
 
 static void __exit capi_exit(void)
 {
-	alloc_exit();
-	(void)proc_exit();
+	proc_exit();
 
 	devfs_unregister_chrdev(capi_major, "capi20");
 	devfs_unregister(devfs_find_handle(NULL, "isdn/capi20", capi_major, 0, DEVFS_SPECIAL_CHR, 0));

@@ -38,7 +38,11 @@ startup_32:
 
 	movl %ebx,%ebp	/* Save trampoline flag */
 	
-	/* First check if extended functions are implemented */
+	/* If the CPU doesn't support CPUID this will double fault.
+	 * Unfortunately it is hard to check for CPUID without a stack. 
+	 */
+	
+	/* Check if extended functions are implemented */		
 	movl	$0x80000000, %eax
 	cpuid
 	cmpl	$0x80000000, %eax
@@ -157,6 +161,17 @@ reach_long64:
 	 */
 	lgdt	pGDT64
 
+	/* 
+	 * Setup up a dummy PDA. this is just for some early bootup code
+	 * that does in_interrupt() 
+	 */ 
+	movl	$MSR_GS_BASE,%ecx
+	movq	$empty_zero_page,%rax
+	movq    %rax,%rdx
+	shrq	$32,%rdx
+	wrmsr	
+
+	/* set up data segments. actually 0 would do too */
 	movl $__KERNEL_DS,%eax
 	movl %eax,%ds	
 	movl %eax,%ss

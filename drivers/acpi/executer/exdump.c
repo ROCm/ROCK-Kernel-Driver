@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: exdump - Interpreter debug output routines
- *              $Revision: 153 $
+ *              $Revision: 155 $
  *
  *****************************************************************************/
 
@@ -96,34 +96,10 @@ acpi_ex_dump_operand (
 
 	ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "%p ", obj_desc));
 
-	switch (obj_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc)) {
 	case INTERNAL_TYPE_REFERENCE:
 
 		switch (obj_desc->reference.opcode) {
-		case AML_ZERO_OP:
-
-			acpi_os_printf ("Reference: Zero\n");
-			break;
-
-
-		case AML_ONE_OP:
-
-			acpi_os_printf ("Reference: One\n");
-			break;
-
-
-		case AML_ONES_OP:
-
-			acpi_os_printf ("Reference: Ones\n");
-			break;
-
-
-		case AML_REVISION_OP:
-
-			acpi_os_printf ("Reference: Revision\n");
-			break;
-
-
 		case AML_DEBUG_OP:
 
 			acpi_os_printf ("Reference: Debug\n");
@@ -150,7 +126,7 @@ acpi_ex_dump_operand (
 			acpi_os_printf ("Reference: Arg%d",
 					 obj_desc->reference.offset);
 
-			if (ACPI_TYPE_INTEGER == obj_desc->common.type) {
+			if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
 				/* Value is a Number */
 
 				acpi_os_printf (" value is [%8.8X%8.8x]",
@@ -167,7 +143,7 @@ acpi_ex_dump_operand (
 			acpi_os_printf ("Reference: Local%d",
 					 obj_desc->reference.offset);
 
-			if (ACPI_TYPE_INTEGER == obj_desc->common.type) {
+			if (ACPI_GET_OBJECT_TYPE (obj_desc) == ACPI_TYPE_INTEGER) {
 
 				/* Value is a Number */
 
@@ -189,7 +165,7 @@ acpi_ex_dump_operand (
 
 			/*  unknown opcode  */
 
-			acpi_os_printf ("Unknown opcode=%X\n",
+			acpi_os_printf ("Unknown Reference opcode=%X\n",
 				obj_desc->reference.opcode);
 			break;
 
@@ -340,8 +316,7 @@ acpi_ex_dump_operand (
 		{
 			ACPI_DEBUG_PRINT ((ACPI_DB_EXEC, "*NULL* \n"));
 		}
-		else if (ACPI_TYPE_BUFFER !=
-				  obj_desc->buffer_field.buffer_obj->common.type)
+		else if (ACPI_GET_OBJECT_TYPE (obj_desc->buffer_field.buffer_obj) != ACPI_TYPE_BUFFER)
 		{
 			acpi_os_printf ("*not a Buffer* \n");
 		}
@@ -399,9 +374,9 @@ acpi_ex_dump_operand (
 
 
 	default:
-		/* Unknown Obj_desc->Common.Type value */
+		/* Unknown Type */
 
-		acpi_os_printf ("Unknown Type %X\n", obj_desc->common.type);
+		acpi_os_printf ("Unknown Type %X\n", ACPI_GET_OBJECT_TYPE (obj_desc));
 		break;
 	}
 
@@ -603,13 +578,13 @@ acpi_ex_dump_object_descriptor (
 
 	/* Common Fields */
 
-	acpi_ex_out_string ("Type",          acpi_ut_get_type_name (obj_desc->common.type));
+	acpi_ex_out_string ("Type",          acpi_ut_get_object_type_name (obj_desc));
 	acpi_ex_out_integer ("Reference Count", obj_desc->common.reference_count);
 	acpi_ex_out_integer ("Flags",        obj_desc->common.flags);
 
 	/* Object-specific Fields */
 
-	switch (obj_desc->common.type)
+	switch (ACPI_GET_OBJECT_TYPE (obj_desc))
 	{
 	case ACPI_TYPE_INTEGER:
 
@@ -649,7 +624,7 @@ acpi_ex_dump_object_descriptor (
 				acpi_os_printf ("[%.3d] %p", i, obj_desc->package.elements[i]);
 				if (obj_desc->package.elements[i])
 				{
-					acpi_os_printf (" %s", acpi_ut_get_type_name ((obj_desc->package.elements[i])->common.type));
+					acpi_os_printf (" %s", acpi_ut_get_object_type_name (obj_desc->package.elements[i]));
 				}
 				acpi_os_printf ("\n");
 			}
@@ -745,7 +720,7 @@ acpi_ex_dump_object_descriptor (
 		acpi_ex_out_integer ("End_buf_valid_bits", obj_desc->common_field.end_buffer_valid_bits);
 		acpi_ex_out_pointer ("Parent_node",  obj_desc->common_field.node);
 
-		switch (obj_desc->common.type)
+		switch (ACPI_GET_OBJECT_TYPE (obj_desc))
 		{
 		case ACPI_TYPE_BUFFER_FIELD:
 			acpi_ex_out_pointer ("Buffer_obj",   obj_desc->buffer_field.buffer_obj);
@@ -813,15 +788,10 @@ acpi_ex_dump_object_descriptor (
 	case INTERNAL_TYPE_DEF_ANY:
 	case INTERNAL_TYPE_EXTRA:
 	case INTERNAL_TYPE_DATA:
-
-		acpi_os_printf ("Ex_dump_object_descriptor: Display not implemented for object type %X\n",
-			obj_desc->common.type);
-		break;
-
-
 	default:
 
-		acpi_os_printf ("Ex_dump_object_descriptor: Unknown object type %X\n", obj_desc->common.type);
+		acpi_os_printf ("Ex_dump_object_descriptor: Display not implemented for object type %s\n",
+			acpi_ut_get_object_type_name (obj_desc));
 		break;
 	}
 

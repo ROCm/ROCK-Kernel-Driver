@@ -3,7 +3,7 @@
  *
  * Module Name: exstoren - AML Interpreter object store support,
  *                        Store to Node (namespace object)
- *              $Revision: 48 $
+ *              $Revision: 50 $
  *
  *****************************************************************************/
 
@@ -84,7 +84,7 @@ acpi_ex_resolve_object (
 		 * are all essentially the same.  This case handles the
 		 * "interchangeable" types Integer, String, and Buffer.
 		 */
-		if (source_desc->common.type == INTERNAL_TYPE_REFERENCE) {
+		if (ACPI_GET_OBJECT_TYPE (source_desc) == INTERNAL_TYPE_REFERENCE) {
 			/* Resolve a reference object first */
 
 			status = acpi_ex_resolve_to_value (source_desc_ptr, walk_state);
@@ -96,15 +96,15 @@ acpi_ex_resolve_object (
 		/*
 		 * Must have a Integer, Buffer, or String
 		 */
-		if ((source_desc->common.type != ACPI_TYPE_INTEGER)    &&
-			(source_desc->common.type != ACPI_TYPE_BUFFER)     &&
-			(source_desc->common.type != ACPI_TYPE_STRING)) {
+		if ((ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_INTEGER)    &&
+			(ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_BUFFER)     &&
+			(ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_STRING)) {
 			/*
 			 * Conversion successful but still not a valid type
 			 */
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR,
 				"Cannot assign type %s to %s (must be type Int/Str/Buf)\n",
-				acpi_ut_get_type_name (source_desc->common.type),
+				acpi_ut_get_object_type_name (source_desc),
 				acpi_ut_get_type_name (target_type)));
 			status = AE_AML_OPERAND_TYPE;
 		}
@@ -195,7 +195,7 @@ acpi_ex_store_object_to_object (
 		return_ACPI_STATUS (status);
 	}
 
-	if (source_desc->common.type != dest_desc->common.type) {
+	if (ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_GET_OBJECT_TYPE (dest_desc)) {
 		/*
 		 * The source type does not match the type of the destination.
 		 * Perform the "implicit conversion" of the source to the current type
@@ -205,7 +205,7 @@ acpi_ex_store_object_to_object (
 		 * Otherwise, Actual_src_desc is a temporary object to hold the
 		 * converted object.
 		 */
-		status = acpi_ex_convert_to_target_type (dest_desc->common.type, source_desc,
+		status = acpi_ex_convert_to_target_type (ACPI_GET_OBJECT_TYPE (dest_desc), source_desc,
 				  &actual_src_desc, walk_state);
 		if (ACPI_FAILURE (status)) {
 			return_ACPI_STATUS (status);
@@ -216,14 +216,14 @@ acpi_ex_store_object_to_object (
 	 * We now have two objects of identical types, and we can perform a
 	 * copy of the *value* of the source object.
 	 */
-	switch (dest_desc->common.type) {
+	switch (ACPI_GET_OBJECT_TYPE (dest_desc)) {
 	case ACPI_TYPE_INTEGER:
 
 		dest_desc->integer.value = actual_src_desc->integer.value;
 
 		/* Truncate value if we are executing from a 32-bit ACPI table */
 
-		acpi_ex_truncate_for32bit_table (dest_desc, walk_state);
+		acpi_ex_truncate_for32bit_table (dest_desc);
 		break;
 
 	case ACPI_TYPE_STRING:
@@ -246,7 +246,7 @@ acpi_ex_store_object_to_object (
 		 * All other types come here.
 		 */
 		ACPI_DEBUG_PRINT ((ACPI_DB_WARN, "Store into type %s not implemented\n",
-			acpi_ut_get_type_name (dest_desc->common.type)));
+			acpi_ut_get_object_type_name (dest_desc)));
 
 		status = AE_NOT_IMPLEMENTED;
 		break;

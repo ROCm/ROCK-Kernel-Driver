@@ -11,6 +11,7 @@
 #include <linux/errno.h>
 #include <linux/slab.h>
 #include <linux/version.h>
+#include <linux/sched.h>
 #include <asm/semaphore.h>
 #include <asm/ebcdic.h>
 #include "hwc_rw.h"

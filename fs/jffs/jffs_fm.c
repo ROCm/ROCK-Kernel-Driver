@@ -31,7 +31,7 @@ extern kmem_cache_t     *node_cache;
 
 /* This function creates a new shiny flash memory control structure.  */
 struct jffs_fmcontrol *
-jffs_build_begin(struct jffs_control *c, kdev_t dev)
+jffs_build_begin(struct jffs_control *c, int unit)
 {
 	struct jffs_fmcontrol *fmc;
 	struct mtd_info *mtd;
@@ -46,7 +46,7 @@ jffs_build_begin(struct jffs_control *c, kdev_t dev)
 	}
 	DJM(no_jffs_fmcontrol++);
 
-	mtd = get_mtd_device(NULL, minor(dev));
+	mtd = get_mtd_device(NULL, unit);
 
 	if (!mtd) {
 		kfree(fmc);

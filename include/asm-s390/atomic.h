@@ -26,29 +26,17 @@ typedef struct { volatile int counter; } __attribute__ ((aligned (4))) atomic_t;
 #define atomic_eieio()          __asm__ __volatile__ ("BCR 15,0")
 
 #define __CS_LOOP(old_val, new_val, ptr, op_val, op_string)		\
-        __asm__ __volatile__("   l     %0,0(%2)\n"			\
+        __asm__ __volatile__("   l     %0,0(%3)\n"			\
                              "0: lr    %1,%0\n"				\
-                             op_string "  %1,%3\n"			\
-                             "   cs    %0,%1,0(%2)\n"			\
+                             op_string "  %1,%4\n"			\
+                             "   cs    %0,%1,0(%3)\n"			\
                              "   jl    0b"				\
-                             : "=&d" (old_val), "=&d" (new_val)		\
+                             : "=&d" (old_val), "=&d" (new_val),	\
+			       "+m" (((atomic_t *)(ptr))->counter)	\
 			     : "a" (ptr), "d" (op_val) : "cc" );
 
-static __inline__ int atomic_read(atomic_t *v)
-{
-        int retval;
-        __asm__ __volatile__("bcr      15,0\n\t"
-                             "l        %0,%1"
-                             : "=d" (retval) : "m" (*v) );
-        return retval;
-}
-
-static __inline__ void atomic_set(atomic_t *v, int i)
-{
-        __asm__ __volatile__("st  %1,%0\n\t"
-                             "bcr 15,0"
-                             : "=m" (*v) : "d" (i) );
-}
+#define atomic_read(v)          ((v)->counter)
+#define atomic_set(v,i)         (((v)->counter) = (i))
 
 static __inline__ void atomic_add(int i, atomic_t *v)
 {
@@ -138,14 +126,14 @@ atomic_compare_and_swap(int expected_oldval,int new_val,atomic_t *v)
         int retval;
 
         __asm__ __volatile__(
-                "  lr   0,%2\n"
-                "  cs   0,%3,0(%1)\n"
+                "  lr   %0,%3\n"
+                "  cs   %0,%4,0(%2)\n"
                 "  ipm  %0\n"
                 "  srl  %0,28\n"
                 "0:"
-                : "=&d" (retval)
+                : "=&d" (retval), "+m" (v->counter)
                 : "a" (v), "d" (expected_oldval) , "d" (new_val)
-                : "0", "cc");
+                : "cc" );
         return retval;
 }
 
@@ -155,12 +143,14 @@ atomic_compare_and_swap(int expected_oldval,int new_val,atomic_t *v)
 static __inline__ void
 atomic_compare_and_swap_spin(int expected_oldval,int new_val,atomic_t *v)
 {
+	unsigned long tmp;
         __asm__ __volatile__(
-                "0: lr  0,%1\n"
-                "   cs  0,%2,0(%0)\n"
+                "0: lr  %1,%3\n"
+                "   cs  %1,%4,0(%2)\n"
                 "   jl  0b\n"
-                : : "a" (v), "d" (expected_oldval) , "d" (new_val)
-                : "cc", "0" );
+                : "+m" (v->counter), "=&d" (tmp)
+		: "a" (v), "d" (expected_oldval) , "d" (new_val)
+                : "cc" );
 }
 
 #define atomic_compare_and_swap_debug(where,from,to) \

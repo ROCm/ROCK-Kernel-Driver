@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/buffer_head.h>
 #include <linux/mtd/mtd.h>
 #include <linux/mtd/compatmac.h>
 
@@ -396,10 +397,8 @@ static void handle_mtdblock_request(void)
 	unsigned int res;
 
 	for (;;) {
-		if (blk_queue_empty(QUEUE)) {
-			CLEAR_INTR;
+		if (blk_queue_empty(QUEUE))
 			return;
-		}
 
 		req = CURRENT;
 		spin_unlock_irq(QUEUE->queue_lock);

@@ -122,7 +122,7 @@ struct jffs_fmcontrol
 
 
 
-struct jffs_fmcontrol *jffs_build_begin(struct jffs_control *c, kdev_t dev);
+struct jffs_fmcontrol *jffs_build_begin(struct jffs_control *c, int unit);
 void jffs_build_end(struct jffs_fmcontrol *fmc);
 void jffs_cleanup_fmcontrol(struct jffs_fmcontrol *fmc);
 

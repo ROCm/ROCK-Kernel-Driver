@@ -6,7 +6,7 @@ EXTRA_CFLAGS      += -DHISAX_MAX_CARDS=$(CONFIG_HISAX_MAX_CARDS)
 
 # Objects that export symbols.
 
-export-objs	  := config.o fsm.o hisax_isac.o hisax_hscx.o
+export-objs	  := config.o hisax_isac.o hisax_hscx.o
 
 # Each configuration option enables a list of files.
 
@@ -39,7 +39,7 @@ hisax-objs-$(CONFIG_HISAX_AVM_A1_PCMCIA) += avm_a1p.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_FRITZPCI) += avm_pci.o isac.o arcofi.o
 hisax-objs-$(CONFIG_HISAX_ELSA) += elsa.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_IX1MICROR2) += ix1_micro.o isac.o arcofi.o hscx.o
-hisax-objs-$(CONFIG_HISAX_DIEHLDIVA) += diva.o isac.o arcofi.o hscx.o
+hisax-objs-$(CONFIG_HISAX_DIEHLDIVA) += diva.o isac.o arcofi.o hscx.o ipacx.o
 hisax-objs-$(CONFIG_HISAX_ASUSCOM) += asuscom.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_TELEINT) += teleint.o isac.o arcofi.o hfc_2bs0.o
 hisax-objs-$(CONFIG_HISAX_SEDLBAUER) += sedlbauer.o isac.o arcofi.o hscx.o isar.o
@@ -57,6 +57,7 @@ hisax-objs-$(CONFIG_HISAX_BKM_A4T) += bkm_a4t.o isac.o arcofi.o jade.o
 hisax-objs-$(CONFIG_HISAX_SCT_QUADRO) += bkm_a8.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_GAZEL) += gazel.o isac.o arcofi.o hscx.o
 hisax-objs-$(CONFIG_HISAX_W6692) += w6692.o
+hisax-objs-$(CONFIG_HISAX_ENTERNOW_PCI) += enternow_pci.o amd7930_fn.o
 #hisax-objs-$(CONFIG_HISAX_TESTEMU) += testemu.o
 
 hisax-objs += $(hisax-objs-y)

@@ -15,6 +15,7 @@
  * User space memory access functions
  */
 #include <linux/sched.h>
+#include <linux/errno.h>
 
 #define VERIFY_READ     0
 #define VERIFY_WRITE    1
@@ -28,21 +29,22 @@
  * For historical reasons, these macros are grossly misnamed.
  */
 
-#define MAKE_MM_SEG(s,a)  ((mm_segment_t) { (s),(a) })
+#define MAKE_MM_SEG(a)  ((mm_segment_t) { (a) })
 
 
-#define KERNEL_DS       MAKE_MM_SEG(0x7FFFFFFF,0)
-#define USER_DS         MAKE_MM_SEG(PAGE_OFFSET,1)
+#define KERNEL_DS       MAKE_MM_SEG(0)
+#define USER_DS         MAKE_MM_SEG(1)
 
 #define get_ds()        (KERNEL_DS)
-#define get_fs()        (current->thread.fs)
-#define set_fs(x)       ({asm volatile("sar   4,%0"::"a" (x.acc4)); \
-                         current->thread.fs = (x);})
+#define get_fs()        ({ mm_segment_t __x; \
+			   asm volatile("ear   %0,4":"=a" (__x)); \
+			   __x;})
+#define set_fs(x)       ({asm volatile("sar   4,%0"::"a" ((x).ar4));})
 
-#define segment_eq(a,b) ((a).acc4 == (b).acc4)
+#define segment_eq(a,b) ((a).ar4 == (b).ar4)
 
 
-#define __access_ok(addr,size) ((((long) addr + size)&0x7FFFFFFFL) < current->addr_limit.seg)
+#define __access_ok(addr,size) (1)
 
 #define access_ok(type,addr,size) __access_ok(addr,size)
 
@@ -78,20 +80,20 @@ extern unsigned long search_exception_table(unsigned long);
  * use the right size if we just have the right pointer type.
  */
 
-extern inline int __put_user_asm_8(__u64 x, void *ptr)
+extern inline int __put_user_asm_8(void *x, void *ptr)
 {
         int err;
 
-        __asm__ __volatile__ (  "   sr    %1,%1\n"
-				"   la    2,%2\n"
-				"   la    4,%0\n"
+        __asm__ __volatile__ (  "   sr    %0,01\n"
+				"   lr    2,%1\n"
+				"   lr    4,%2\n"
                                 "   sacf  512\n"
                                 "0: mvc   0(8,4),0(2)\n"
                                 "   sacf  0\n"
 				"1:\n"
 				".section .fixup,\"ax\"\n"
 				"2: sacf  0\n"
-				"   lhi   %1,%h3\n"
+				"   lhi   %0,%h3\n"
 				"   bras  4,3f\n"
 				"   .long 1b\n"
 				"3: l     4,0(4)\n"
@@ -101,8 +103,8 @@ extern inline int __put_user_asm_8(__u64 x, void *ptr)
 				"   .align 4\n"
 				"   .long  0b,2b\n"
 				".previous"
-                                : "=m" (*((__u32*) ptr)), "=&d" (err)
-                                : "m" (x), "K" (-EFAULT)
+                                : "=&d" (err)
+                                : "d" (x), "d" (ptr), "K" (-EFAULT)
                                 : "cc", "2", "4" );
         return err;
 }
@@ -111,15 +113,15 @@ extern inline int __put_user_asm_4(__u32 x, void *ptr)
 {
         int err;
 
-        __asm__ __volatile__ (  "   sr    %1,%1\n"
-				"   la    4,%0\n"
+        __asm__ __volatile__ (  "   sr    %0,%0\n"
+				"   lr    4,%2\n"
                                 "   sacf  512\n"
-                                "0: st    %2,0(4)\n"
+                                "0: st    %1,0(4)\n"
                                 "   sacf  0\n"
 				"1:\n"
 				".section .fixup,\"ax\"\n"
 				"2: sacf  0\n"
-				"   lhi   %1,%h3\n"
+				"   lhi   %0,%h3\n"
 				"   bras  4,3f\n"
 				"   .long 1b\n"
 				"3: l     4,0(4)\n"
@@ -129,8 +131,8 @@ extern inline int __put_user_asm_4(__u32 x, void *ptr)
 				"   .align 4\n"
 				"   .long  0b,2b\n"
 				".previous"
-                                : "=m" (*((__u32*) ptr)) , "=&d" (err)
-                                : "d" (x), "K" (-EFAULT)
+                                : "=&d" (err)
+                                : "d" (x), "d" (ptr), "K" (-EFAULT)
                                 : "cc", "4" );
         return err;
 }
@@ -139,15 +141,15 @@ extern inline int __put_user_asm_2(__u16 x, void *ptr)
 {
         int err;
 
-        __asm__ __volatile__ (  "   sr    %1,%1\n"
-				"   la    4,%0\n"
+        __asm__ __volatile__ (  "   sr    %0,%0\n"
+				"   lr    4,%2\n"
                                 "   sacf  512\n"
-                                "0: sth   %2,0(4)\n"
+                                "0: sth   %1,0(4)\n"
                                 "   sacf  0\n"
 				"1:\n"
 				".section .fixup,\"ax\"\n"
 				"2: sacf  0\n"
-				"   lhi   %1,%h3\n"
+				"   lhi   %0,%h3\n"
 				"   bras  4,3f\n"
 				"   .long 1b\n"
 				"3: l     4,0(4)\n"
@@ -157,8 +159,8 @@ extern inline int __put_user_asm_2(__u16 x, void *ptr)
 				"   .align 4\n"
 				"   .long  0b,2b\n"
 				".previous"
-                                : "=m" (*((__u16*) ptr)) , "=&d" (err)
-                                : "d" (x), "K" (-EFAULT)
+                                : "=&d" (err)
+                                : "d" (x), "d" (ptr), "K" (-EFAULT)
                                 : "cc", "4" );
         return err;
 }
@@ -167,15 +169,15 @@ extern inline int __put_user_asm_1(__u8 x, void *ptr)
 {
         int err;
 
-        __asm__ __volatile__ (  "   sr    %1,%1\n"
-				"   la    4,%0\n"
+        __asm__ __volatile__ (  "   sr    %0,%0\n"
+				"   lr    4,%2\n"
                                 "   sacf  512\n"
-                                "0: stc   %2,0(4)\n"
+                                "0: stc   %1,0(4)\n"
                                 "   sacf  0\n"
 				"1:\n"
 				".section .fixup,\"ax\"\n"
 				"2: sacf  0\n"
-				"   lhi   %1,%h3\n"
+				"   lhi   %0,%h3\n"
 				"   bras  4,3f\n"
 				"   .long 1b\n"
 				"3: l     4,0(4)\n"
@@ -185,8 +187,8 @@ extern inline int __put_user_asm_1(__u8 x, void *ptr)
 				"   .align 4\n"
 				"   .long  0b,2b\n"
 				".previous"
-                                : "=m" (*((__u8*) ptr)) , "=&d" (err)
-                                : "d" (x), "K" (-EFAULT)
+                                : "=&d" (err)
+                                : "d" (x), "d" (ptr), "K" (-EFAULT)
                                 : "cc", "4" );
         return err;
 }
@@ -197,38 +199,33 @@ extern inline int __put_user_asm_1(__u8 x, void *ptr)
  */
 #define __put_user(x, ptr)                                      \
 ({                                                              \
+        __typeof__(*(ptr)) *__pu_addr = (ptr);                  \
+        __typeof__(*(ptr)) __x = (x);                           \
         int __pu_err;                                           \
         switch (sizeof (*(ptr))) {                              \
-                case 1:                                         \
-                        __pu_err = __put_user_asm_1((__u8)(__u32)x,(ptr));\
-                        break;                                  \
-                case 2:                                         \
-                        __pu_err = __put_user_asm_2((__u16)(__u32)x,(ptr));\
-                        break;                                  \
-                case 4:                                         \
-                        __pu_err = __put_user_asm_4((__u32) x,(ptr));\
-                        break;                                  \
-		case 8:						\
-			__pu_err = __put_user_asm_8((__u64) x,(ptr));\
-			break;					\
-                default:                                        \
+        case 1:                                                 \
+                __pu_err = __put_user_asm_1((__u8)(__u32) __x,  \
+                                            __pu_addr);         \
+                break;                                          \
+        case 2:                                                 \
+                __pu_err = __put_user_asm_2((__u16)(__u32) __x, \
+                                            __pu_addr);         \
+                break;                                          \
+        case 4:                                                 \
+                __pu_err = __put_user_asm_4((__u32) __x,        \
+                                            __pu_addr);         \
+                break;                                          \
+        case 8:                                                 \
+                __pu_err = __put_user_asm_8(&__x, __pu_addr);   \
+                break;                                          \
+        default:                                                \
                 __pu_err = __put_user_bad();                    \
                 break;                                          \
          }                                                      \
         __pu_err;                                               \
 })
 
-#define put_user(x, ptr)                                        \
-({                                                              \
-        long __pu_err = -EFAULT;                                \
-        __typeof__(*(ptr)) *__pu_addr = (ptr);                  \
-        __typeof__(*(ptr)) __x = (x);                           \
-        if (__access_ok((long)__pu_addr,sizeof(*(ptr)))) {      \
-                __pu_err = 0;                                   \
-                __put_user((__x), (__pu_addr));                 \
-        }                                                       \
-        __pu_err;                                               \
-})
+#define put_user(x, ptr) __put_user(x, ptr)
 
 extern int __put_user_bad(void);
 
@@ -336,42 +333,32 @@ extern int __put_user_bad(void);
 
 #define __get_user(x, ptr)                                      \
 ({                                                              \
+        __typeof__(ptr) __gu_addr = (ptr);                      \
+        __typeof__(*(ptr)) __x;                                 \
         int __gu_err;                                           \
-        switch (sizeof(*(ptr))) {                               \
-                case 1:                                         \
-                        __get_user_asm_1(x,ptr,__gu_err);       \
-                        break;                                  \
-                case 2:                                         \
-                        __get_user_asm_2(x,ptr,__gu_err);       \
-                        break;                                  \
-                case 4:                                         \
-                        __get_user_asm_4(x,ptr,__gu_err);       \
-                        break;                                  \
-                case 8:                                         \
-                        __get_user_asm_8(x,ptr,__gu_err);       \
-                        break;                                  \
-                default:                                        \
-                        (x) = 0;                                \
-                        __gu_err = __get_user_bad();            \
+        switch (sizeof(*(__gu_addr))) {                         \
+        case 1:                                                 \
+                __get_user_asm_1(__x, __gu_addr, __gu_err);     \
+                break;                                          \
+        case 2:                                                 \
+                __get_user_asm_2(__x, __gu_addr, __gu_err);     \
+                break;                                          \
+        case 4:                                                 \
+                __get_user_asm_4(__x, __gu_addr, __gu_err);     \
+                break;                                          \
+        case 8:                                                 \
+                __get_user_asm_8(__x, __gu_addr, __gu_err);     \
+                break;                                          \
+        default:                                                \
+                __x = 0;                                        \
+                __gu_err = __get_user_bad();                    \
                 break;                                          \
         }                                                       \
+        (x) = __x;                                              \
         __gu_err;                                               \
 })
 
-#define get_user(x, ptr)                                        \
-({                                                              \
-        long __gu_err = -EFAULT;                                \
-        __typeof__(ptr) __gu_addr = (ptr);                      \
-        __typeof__(*(ptr)) __x;                                 \
-        if (__access_ok((long)__gu_addr,sizeof(*(ptr)))) {      \
-                __gu_err = 0;                                   \
-                __get_user((__x), (__gu_addr));                 \
-                (x) = __x;                                      \
-        }                                                       \
-        else                                                    \
-                (x) = 0;                                        \
-        __gu_err;                                               \
-})
+#define get_user(x, ptr) __get_user(x, ptr)
 
 extern int __get_user_bad(void);
 
@@ -379,34 +366,11 @@ extern int __get_user_bad(void);
  * access register are set up, that 4 points to secondary (user) , 2 to primary (kernel)
  */
 
-asmlinkage void __copy_from_user_fixup(void /* special calling convention */);
-asmlinkage void __copy_to_user_fixup(void /* special calling convention */);
-
-extern inline unsigned long
-__copy_to_user_asm(void* to, const void* from,  long n)
-{
-
-        __asm__ __volatile__ (  "   lr    2,%2\n"
-                                "   lr    4,%1\n"
-                                "   lr    3,%0\n"
-                                "   lr    5,3\n"
-                                "   sacf  512\n"
-                                "0: mvcle 4,2,0\n"
-                                "   jo    0b\n"
-                                "   sacf  0\n"
-                                "   lr    %0,3\n"
-				".section __ex_table,\"a\"\n"
-				"   .align 4\n"
-				"   .long  0b,__copy_to_user_fixup\n"
-				".previous"
-                                : "+&d" (n) : "d" (to), "d" (from)
-                                : "cc", "2", "3", "4", "5" );
-        return n;
-}
+extern long __copy_to_user_asm(const void *from, long n, const void *to);
 
 #define __copy_to_user(to, from, n)                             \
 ({                                                              \
-        __copy_to_user_asm(to,from,n);                          \
+        __copy_to_user_asm(from, n, to);                        \
 })
 
 #define copy_to_user(to, from, n)                               \
@@ -414,38 +378,18 @@ __copy_to_user_asm(void* to, const void* from,  long n)
         long err = 0;                                           \
         __typeof__(n) __n = (n);                                \
         if (__access_ok(to,__n)) {                              \
-                err = __copy_to_user_asm(to,from,__n);          \
+                err = __copy_to_user_asm(from, __n, to);        \
         }                                                       \
         else                                                    \
                 err = __n;                                      \
         err;                                                    \
 })
 
-extern inline unsigned long
-__copy_from_user_asm(void* to, const void* from,  long n)
-{
-        __asm__ __volatile__ (  "   lr    2,%1\n"
-                                "   lr    4,%2\n"
-                                "   lr    3,%0\n"
-                                "   lr    5,3\n"
-                                "   sacf  512\n"
-                                "0: mvcle 2,4,0\n"
-                                "   jo    0b\n"
-                                "   sacf  0\n"
-                                "   lr    %0,5\n"
-				".section __ex_table,\"a\"\n"
-				"   .align 4\n"
-				"   .long  0b,__copy_from_user_fixup\n"
-				".previous"
-                                : "+&d" (n) : "d" (to), "d" (from)
-                                : "cc", "2", "3", "4", "5" );
-        return n;
-}
-
+extern long __copy_from_user_asm(void *to, long n, const void *from);
 
 #define __copy_from_user(to, from, n)                           \
 ({                                                              \
-        __copy_from_user_asm(to,from,n);                        \
+        __copy_from_user_asm(to, n, from);                      \
 })
 
 #define copy_from_user(to, from, n)                             \
@@ -453,7 +397,7 @@ __copy_from_user_asm(void* to, const void* from,  long n)
         long err = 0;                                           \
         __typeof__(n) __n = (n);                                \
         if (__access_ok(from,__n)) {                            \
-                err = __copy_from_user_asm(to,from,__n);        \
+                err = __copy_from_user_asm(to, __n, from);      \
         }                                                       \
         else                                                    \
                 err = __n;                                      \
@@ -550,38 +494,12 @@ strnlen_user(const char * src, unsigned long n)
  * Zero Userspace
  */
 
-static inline unsigned long
-__clear_user(void *to, unsigned long n)
-{
-        __asm__ __volatile__ (  "   sacf  512\n"
-                                "   lr    4,%1\n"
-                                "   lr    5,%0\n"
-                                "   sr    2,2\n"
-                                "   sr    3,3\n"
-                                "0: mvcle 4,2,0\n"
-                                "   jo    0b\n"
-                                "   sacf  0\n"
-                                "1: lr    %0,3\n"
-                                ".section .fixup,\"ax\"\n"
-                                "2: lhi   5,-4096\n"
-                                "   n     5,0x90\n"
-                                "   sr    5,4\n"
-                                "   mvcle 4,2,0\n"
-                                "   sacf  0\n"
-                                "   basr  4,0\n"
-                                "   l     4,3f-.(4)\n"
-                                "   br    4\n"
-                                "3: .long 1b\n"
-                                ".previous\n"
-				".section __ex_table,\"a\"\n"
-				"   .align 4\n"
-				"   .long  0b,2b\n"
-				".previous"
-                                : "+&a" (n)
-                                : "a"   (to)
-                                : "cc", "2", "3", "4", "5" );
-        return n;
-}
+extern long __clear_user_asm(void *to, long n);
+
+#define __clear_user(to, n)                                     \
+({                                                              \
+        __clear_user_asm(to, n);                                \
+})
 
 static inline unsigned long
 clear_user(void *to, unsigned long n)

@@ -326,7 +326,7 @@ iplstart:
         bnz   .Lrdcont
         st    %r2,INITRD_START+4-PARMAREA(%r12)# no ramdisk found, null it
 .Lrdcont:
-	l     %r2,INITRD_START-PARMAREA(%r12)
+	l     %r2,INITRD_START+4-PARMAREA(%r12)
 	clc   0(3,%r2),.L_hdr		       # skip HDRx and EOFx 
 	bz    .Lagain2
 	clc   0(3,%r2),.L_eof
@@ -613,7 +613,7 @@ _stext:	basr  %r13,0                    # get base
 #
 # Setup stack
 #
-	larl  %r15,init_task_union
+	larl  %r15,init_thread_union
         aghi  %r15,16384                # init_task_union + 16384
         stg   %r15,__LC_KERNEL_STACK    # set end of kernel stack
         aghi  %r15,-160

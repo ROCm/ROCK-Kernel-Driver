@@ -24,8 +24,6 @@
 #include <asm/ptrace.h>
 #include <asm/uaccess.h>
 
-static struct i387_fxsave_struct init_fpu_env; 
-
 /*
  * Called at bootup to set up the initial FPU state that is later cloned
  * into all processes.
@@ -76,6 +74,9 @@ int save_i387(struct _fpstate *buf)
 		if (sizeof(struct user_i387_struct) != sizeof(tsk->thread.i387.fxsave))
 			bad_user_i387_struct();
 	} 
+
+	if ((unsigned long)buf % 16) 
+		printk("save_i387: bad fpstate %p\n",buf); 
 
 	if (!tsk->used_math) 
 		return 0;

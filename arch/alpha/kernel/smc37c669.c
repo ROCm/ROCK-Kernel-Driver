@@ -7,6 +7,7 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/delay.h>
+#include <linux/spinlock.h>
 
 #include <asm/hwrpb.h>
 #include <asm/io.h>
@@ -1103,66 +1104,7 @@ static int SMC37c669_xlate_drq(
     unsigned int drq 
 );
 
-#if 0
-/*
-** External Data Declarations
-*/
-
-extern struct LOCK spl_atomic;
-
-/*
-** External Function Prototype Declarations
-*/
-
-/* From kernel_alpha.mar */
-extern spinlock( 
-    struct LOCK *spl 
-);
-
-extern spinunlock( 
-    struct LOCK *spl 
-);
-
-/* From filesys.c */
-int allocinode(
-    char *name, 
-    int can_create, 
-    struct INODE **ipp
-);
-
-extern int null_procedure( void );
-
-int smcc669_init( void );
-int smcc669_open( struct FILE *fp, char *info, char *next, char *mode );
-int smcc669_read( struct FILE *fp, int size, int number, unsigned char *buf );
-int smcc669_write( struct FILE *fp, int size, int number, unsigned char *buf );
-int smcc669_close( struct FILE *fp );
-
-struct DDB smc_ddb = {
-	"smc",			/* how this routine wants to be called	*/
-	smcc669_read,		/* read routine				*/
-	smcc669_write,		/* write routine			*/
-	smcc669_open,		/* open routine				*/
-	smcc669_close,		/* close routine			*/
-	null_procedure,		/* name expansion routine		*/
-	null_procedure,		/* delete routine			*/
-	null_procedure,		/* create routine			*/
-	null_procedure,		/* setmode				*/
-	null_procedure,		/* validation routine			*/
-	0,			/* class specific use			*/
-	1,			/* allows information			*/
-	0,			/* must be stacked			*/
-	0,			/* is a flash update driver		*/
-	0,			/* is a block device			*/
-	0,			/* not seekable				*/
-	0,			/* is an Ethernet device		*/
-	0,			/* is a filesystem driver		*/
-};
-#endif
-
-#define spinlock(x)
-#define spinunlock(x)
-
+static spinlock_t smc_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 
 /*
 **++
@@ -2042,10 +1984,10 @@ static void __init SMC37c669_config_mode(
 ** mode.  Therefore, a spinlock is placed around the two writes to 
 ** guarantee that they complete uninterrupted.
 */
-	spinlock( &spl_atomic );
+	spin_lock(&smc_lock);
     	wb( &SMC37c669->index_port, SMC37c669_CONFIG_ON_KEY );
     	wb( &SMC37c669->index_port, SMC37c669_CONFIG_ON_KEY );
-	spinunlock( &spl_atomic );
+	spin_unlock(&smc_lock);
     }
     else {
     	wb( &SMC37c669->index_port, SMC37c669_CONFIG_OFF_KEY );

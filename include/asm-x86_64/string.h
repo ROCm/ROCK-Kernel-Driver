@@ -2,36 +2,76 @@
 #define _X86_64_STRING_H_
 
 #ifdef __KERNEL__
-#include <linux/config.h>
 
 #define struct_cpy(x,y) (*(x)=*(y))
 
-#define __HAVE_ARCH_MEMCMP
-#define __HAVE_ARCH_STRLEN
+/* Written 2002 by Andi Kleen */ 
 
-#define memset __builtin_memset
-#define memcpy __builtin_memcpy
-#define memcmp __builtin_memcmp
-
-/* Work around "undefined reference to strlen" linker errors.  */
-/* #define strlen __builtin_strlen */
-
-#define __HAVE_ARCH_STRLEN
-static inline size_t strlen(const char * s)
+/* Only used for special circumstances. Stolen from i386/string.h */ 
+static inline void * __inline_memcpy(void * to, const void * from, size_t n)
 {
-int d0;
-register int __res;
+unsigned long d0, d1, d2;
 __asm__ __volatile__(
-	"repne\n\t"
-	"scasb\n\t"
-	"notl %0\n\t"
-	"decl %0"
-	:"=c" (__res), "=&D" (d0) :"1" (s),"a" (0), "0" (0xffffffff));
-return __res;
+	"rep ; movsl\n\t"
+	"testb $2,%b4\n\t"
+	"je 1f\n\t"
+	"movsw\n"
+	"1:\ttestb $1,%b4\n\t"
+	"je 2f\n\t"
+	"movsb\n"
+	"2:"
+	: "=&c" (d0), "=&D" (d1), "=&S" (d2)
+	:"0" (n/4), "q" (n),"1" ((long) to),"2" ((long) from)
+	: "memory");
+return (to);
 }
 
+/* Even with __builtin_ the compiler may decide to use the out of line
+   function. */
 
-extern char *strstr(const char *cs, const char *ct);
+#define __HAVE_ARCH_MEMCPY 1
+extern void *__memcpy(void *to, const void *from, size_t len); 
+#define memcpy(dst,src,len) \
+	({ size_t __len = (len);				\
+	   void *__ret;						\
+	   if (__builtin_constant_p(len) && __len >= 64)	\
+		 __ret = __memcpy((dst),(src),__len);		\
+	   else							\
+		 __ret = __builtin_memcpy((dst),(src),__len);	\
+	   __ret; }) 
+
+#if 0
+#define __HAVE_ARCH_MEMSET
+extern void *__memset(void *mem, int val, size_t len); 
+#define memset(dst,val,len)					\
+	({ size_t __len = (len);				\
+	   void *__ret;						\
+	   if (__builtin_constant_p(len) && __len >= 64)	\
+		   __ret = __memset((dst),(val),__len);		\
+	   else							\
+		   __ret = __builtin_memset((dst),(val),__len);	\
+	   __ret; }) 
+#endif	   
+
+#define __HAVE_ARCH_MEMMOVE
+void * memmove(void * dest,const void *src,size_t count);
+
+/* Use C out of line version for memcmp */ 
+#define memcmp __builtin_memcmp
+int memcmp(const void * cs,const void * ct,size_t count);
+
+/* out of line string functions use always C versions */ 
+#define strlen __builtin_strlen
+size_t strlen(const char * s);
+
+#define strcpy __builtin_strcpy
+char * strcpy(char * dest,const char *src);
+
+#define strcat __builtin_strcat
+char * strcat(char * dest, const char * src);
+
+#define strcmp __builtin_strcmp
+int strcmp(const char * cs,const char * ct);
 
 #endif /* __KERNEL__ */
 

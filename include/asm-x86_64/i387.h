@@ -140,6 +140,7 @@ static inline void empty_fpu(struct task_struct *child)
 {
 	if (!child->used_math) {
 		/* Simulate an empty FPU. */
+		memset(&child->thread.i387.fxsave,0,sizeof(struct i387_fxsave_struct));
 		child->thread.i387.fxsave.cwd = 0x037f; 
 		child->thread.i387.fxsave.swd = 0;
 		child->thread.i387.fxsave.twd = 0; 

@@ -48,6 +48,7 @@
 #include "isar.h"
 #include "isdnl1.h"
 #include <linux/pci.h>
+#include <linux/isapnp.h>
 
 extern const char *CardType[];
 
@@ -530,6 +531,21 @@ Sedl_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 
 static struct pci_dev *dev_sedl __devinitdata = NULL;
 
+#ifdef __ISAPNP__
+static struct isapnp_device_id sedl_ids[] __initdata = {
+	{ ISAPNP_VENDOR('S', 'A', 'G'), ISAPNP_FUNCTION(0x01),
+	  ISAPNP_VENDOR('S', 'A', 'G'), ISAPNP_FUNCTION(0x01), 
+	  (unsigned long) "Speed win" },
+	{ ISAPNP_VENDOR('S', 'A', 'G'), ISAPNP_FUNCTION(0x02),
+	  ISAPNP_VENDOR('S', 'A', 'G'), ISAPNP_FUNCTION(0x02), 
+	  (unsigned long) "Speed Fax+" },
+	{ 0, }
+};
+
+static struct isapnp_device_id *pdev = &sedl_ids[0];
+static struct pci_bus *pnp_c __devinitdata = NULL;
+#endif
+
 int __devinit
 setup_sedlbauer(struct IsdnCard *card)
 {
@@ -565,6 +581,57 @@ setup_sedlbauer(struct IsdnCard *card)
 			bytecnt = 16;
 		}
 	} else {
+#ifdef __ISAPNP__
+		if (isapnp_present()) {
+			struct pci_bus *pb;
+			struct pci_dev *pd;
+
+			while(pdev->card_vendor) {
+				if ((pb = isapnp_find_card(pdev->card_vendor,
+					pdev->card_device, pnp_c))) {
+					pnp_c = pb;
+					pd = NULL;
+					if ((pd = isapnp_find_dev(pnp_c,
+						pdev->vendor, pdev->function, pd))) {
+						printk(KERN_INFO "HiSax: %s detected\n",
+							(char *)pdev->driver_data);
+						pd->prepare(pd);
+						pd->deactivate(pd);
+						pd->activate(pd);
+						card->para[1] =
+							pd->resource[0].start;
+						card->para[0] =
+							pd->irq_resource[0].start;
+						if (!card->para[0] || !card->para[1]) {
+							printk(KERN_ERR "Sedlbauer PnP:some resources are missing %ld/%lx\n",
+								card->para[0], card->para[1]);
+							pd->deactivate(pd);
+							return(0);
+						}
+						cs->hw.sedl.cfg_reg = card->para[1];
+						cs->irq = card->para[0];
+						if (pdev->function == ISAPNP_FUNCTION(0x2)) {
+							cs->subtyp = SEDL_SPEED_FAX;
+							cs->hw.sedl.chip = SEDL_CHIP_ISAC_ISAR;
+							bytecnt = 16;
+						} else {
+							cs->subtyp = SEDL_SPEED_CARD_WIN;
+							cs->hw.sedl.chip = SEDL_CHIP_TEST;
+						}
+						goto ready;
+					} else {
+						printk(KERN_ERR "Sedlbauer PnP: PnP error card found, no device\n");
+						return(0);
+					}
+				}
+				pdev++;
+				pnp_c=NULL;
+			} 
+			if (!pdev->card_vendor) {
+				printk(KERN_INFO "Sedlbauer PnP: no ISAPnP card found\n");
+			}
+		}
+#endif
 /* Probe for Sedlbauer speed pci */
 #if CONFIG_PCI
 		if (!pci_present()) {
@@ -630,7 +697,7 @@ setup_sedlbauer(struct IsdnCard *card)
 		return (0);
 #endif /* CONFIG_PCI */
 	}	
-	
+ready:	
 	/* In case of the sedlbauer pcmcia card, this region is in use,
 	 * reserved for us by the card manager. So we do not check it
 	 * here, it would fail.

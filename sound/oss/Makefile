@@ -95,6 +95,7 @@ sb_lib-objs	:= sb_common.o sb_audio.o sb_midi.o sb_mixer.o sb_ess.o
 vidc_mod-objs	:= vidc.o vidc_fill.o
 wavefront-objs  := wavfront.o wf_midi.o yss225.o
 
+host-progs	:= bin2hex hex2hex
 
 include $(TOPDIR)/Rules.make
 
@@ -104,16 +105,6 @@ include $(TOPDIR)/Rules.make
 # of what name was used to build them.  If the name changes, they
 # will be forced to be remade.
 #
-# First make the utilities.
-
-bin2hex: bin2hex.c
-	$(HOSTCC) $(HOSTCFLAGS) -o bin2hex bin2hex.c
-
-hex2hex: hex2hex.c
-	$(HOSTCC) $(HOSTCFLAGS) -o hex2hex hex2hex.c
-
-
-
 
 # Turtle Beach Maui / Tropez
 

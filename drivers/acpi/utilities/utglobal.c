@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: utglobal - Global variables for the ACPI subsystem
- *              $Revision: 161 $
+ *              $Revision: 162 $
  *
  *****************************************************************************/
 
@@ -538,6 +538,20 @@ acpi_ut_get_type_name (
 	}
 
 	return ((NATIVE_CHAR *) acpi_gbl_ns_type_names[type]);
+}
+
+
+NATIVE_CHAR *
+acpi_ut_get_object_type_name (
+	acpi_operand_object     *obj_desc)
+{
+
+	if (!obj_desc)
+	{
+		return ("[NULL Object Descriptor]");
+	}
+
+	return (acpi_ut_get_type_name (ACPI_GET_OBJECT_TYPE (obj_desc)));
 }
 
 

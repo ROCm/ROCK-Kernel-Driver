@@ -61,7 +61,7 @@
 /*
  * Version Information
  */
-#define DRIVER_VERSION "v1.60 for Linux 2.5"
+#define DRIVER_VERSION "v1.60a for Linux 2.5"
 #define EMAIL "mmcclell@bigfoot.com"
 #define DRIVER_AUTHOR "Mark McClelland <mmcclell@bigfoot.com> & Bret Wallach \
 	& Orion Sky Lawlor <olawlor@acm.org> & Kevin Moore & Charl P. Botha \
@@ -3882,7 +3882,10 @@ ov51x_isoc_irq(struct urb *urb)
 		}
 	}
 
+	/* Resubmit this URB */
 	urb->dev = ov->dev;
+	if ((i = usb_submit_urb(urb, GFP_ATOMIC)) != 0)
+		err("usb_submit_urb() ret %d", i);
 
 	return;
 }
@@ -3967,6 +3970,7 @@ ov51x_init_isoc(struct usb_ov511 *ov)
 		urb->complete = ov51x_isoc_irq;
 		urb->number_of_packets = FRAMES_PER_DESC;
 		urb->transfer_buffer_length = ov->packet_size * FRAMES_PER_DESC;
+		urb->interval = 1;
 		for (fx = 0; fx < FRAMES_PER_DESC; fx++) {
 			urb->iso_frame_desc[fx].offset = ov->packet_size * fx;
 			urb->iso_frame_desc[fx].length = ov->packet_size;
@@ -3974,10 +3978,6 @@ ov51x_init_isoc(struct usb_ov511 *ov)
 	}
 
 	ov->streaming = 1;
-
-	ov->sbuf[OV511_NUMSBUF - 1].urb->next = ov->sbuf[0].urb;
-	for (n = 0; n < OV511_NUMSBUF - 1; n++)
-		ov->sbuf[n].urb->next = ov->sbuf[n+1].urb;
 
 	for (n = 0; n < OV511_NUMSBUF; n++) {
 		ov->sbuf[n].urb->dev = ov->dev;

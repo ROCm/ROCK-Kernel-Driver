@@ -149,6 +149,8 @@ typedef struct {
 
 mto_t;
 
+/* FIXME: don't define static variables in a header!!! */
+#warning
 static write_hwcb_t write_hwcb_template =
 {
 	sizeof (write_hwcb_t),
@@ -180,6 +182,7 @@ static write_hwcb_t write_hwcb_template =
 	}
 };
 
+#warning
 static mto_t mto_template =
 {
 	sizeof (mto_t),
@@ -202,6 +205,7 @@ typedef struct {
 
 init_hwcb_t;
 
+#warning
 static init_hwcb_t init_hwcb_template =
 {
 	sizeof (init_hwcb_t),
@@ -258,6 +262,7 @@ typedef struct {
 
 read_hwcb_t;
 
+#warning
 static read_hwcb_t read_hwcb_template =
 {
 	PAGE_SIZE,

@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exoparg6 - AML execution - opcodes with 6 arguments
- *              $Revision: 10 $
+ *              $Revision: 11 $
  *
  *****************************************************************************/
 
@@ -212,7 +212,7 @@ acpi_ex_opcode_6A_0T_1R (
 			 * Treat any NULL or non-numeric elements as non-matching.
 			 */
 			if (!this_element ||
-				this_element->common.type != ACPI_TYPE_INTEGER) {
+				ACPI_GET_OBJECT_TYPE (this_element) != ACPI_TYPE_INTEGER) {
 				continue;
 			}
 

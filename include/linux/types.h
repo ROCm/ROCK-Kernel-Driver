@@ -3,6 +3,9 @@
 
 #ifdef	__KERNEL__
 #include <linux/config.h>
+
+#define bitmap_member(name,bits) \
+	unsigned long name[((bits)+BITS_PER_LONG-1)/BITS_PER_LONG]
 #endif
 
 #include <linux/posix_types.h>

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: nsdump - table dumping routines for debug
- *              $Revision: 135 $
+ *              $Revision: 136 $
  *
  *****************************************************************************/
 
@@ -500,7 +500,7 @@ acpi_ns_dump_one_object (
 
 		case ACPI_DESC_TYPE_OPERAND:
 
-			obj_type = obj_desc->common.type;
+			obj_type = ACPI_GET_OBJECT_TYPE (obj_desc);
 
 			if (obj_type > INTERNAL_TYPE_MAX) {
 				acpi_os_printf ("(Ptr to ACPI Object type %X [UNKNOWN])\n", obj_type);

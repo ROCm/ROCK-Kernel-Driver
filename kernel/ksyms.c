@@ -49,6 +49,7 @@
 #include <linux/binfmts.h>
 #include <linux/namei.h>
 #include <linux/buffer_head.h>
+#include <linux/root_dev.h>
 #include <asm/checksum.h>
 
 #if defined(CONFIG_PROC_FS)
@@ -108,6 +109,8 @@ EXPORT_SYMBOL(kmalloc);
 EXPORT_SYMBOL(kfree);
 EXPORT_SYMBOL(vfree);
 EXPORT_SYMBOL(__vmalloc);
+EXPORT_SYMBOL(vmalloc);
+EXPORT_SYMBOL(vmalloc_32);
 EXPORT_SYMBOL(vmalloc_to_page);
 EXPORT_SYMBOL(mem_map);
 EXPORT_SYMBOL(remap_page_range);
@@ -130,6 +133,7 @@ EXPORT_SYMBOL(kmap_pte);
 EXPORT_SYMBOL(def_blk_fops);
 EXPORT_SYMBOL(update_atime);
 EXPORT_SYMBOL(get_fs_type);
+EXPORT_SYMBOL(user_get_super);
 EXPORT_SYMBOL(get_super);
 EXPORT_SYMBOL(drop_super);
 EXPORT_SYMBOL(getname);
@@ -256,6 +260,7 @@ EXPORT_SYMBOL(vfs_statfs);
 EXPORT_SYMBOL(vfs_fstat);
 EXPORT_SYMBOL(vfs_stat);
 EXPORT_SYMBOL(vfs_lstat);
+EXPORT_SYMBOL(vfs_getattr);
 EXPORT_SYMBOL(lock_rename);
 EXPORT_SYMBOL(unlock_rename);
 EXPORT_SYMBOL(generic_read_dir);
@@ -326,6 +331,7 @@ EXPORT_SYMBOL(tty_std_termios);
 EXPORT_SYMBOL(blk_size);
 EXPORT_SYMBOL(blk_dev);
 EXPORT_SYMBOL(is_read_only);
+EXPORT_SYMBOL(bdev_read_only);
 EXPORT_SYMBOL(set_device_ro);
 EXPORT_SYMBOL(bmap);
 EXPORT_SYMBOL(devfs_register_partitions);
@@ -457,6 +463,9 @@ EXPORT_SYMBOL(iomem_resource);
 /* process management */
 EXPORT_SYMBOL(complete_and_exit);
 EXPORT_SYMBOL(__wake_up);
+#if CONFIG_SMP
+EXPORT_SYMBOL_GPL(__wake_up_sync); /* internal use only */
+#endif
 EXPORT_SYMBOL(wake_up_process);
 EXPORT_SYMBOL(sleep_on);
 EXPORT_SYMBOL(sleep_on_timeout);

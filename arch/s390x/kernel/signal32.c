@@ -23,14 +23,16 @@
 #include <linux/ptrace.h>
 #include <linux/unistd.h>
 #include <linux/stddef.h>
+#include <linux/tty.h>
 #include <linux/personality.h>
+#include <linux/binfmts.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include "linux32.h"
 
 #define _BLOCKABLE (~(sigmask(SIGKILL) | sigmask(SIGSTOP)))
 
-#define _USER_PSW_MASK32 0x0701C00080000000
+#define _USER_PSW_MASK32 0x0705C00080000000
 
 typedef struct 
 {
@@ -85,7 +87,8 @@ int copy_siginfo_to_user32(siginfo_t32 *to, siginfo_t *from)
 			err |= __put_user(from->si_status, &to->si_status);
 			break;
 		case __SI_FAULT >> 16:
-			err |= __put_user(from->si_addr, &to->si_addr);
+			err |= __put_user((unsigned long) from->si_addr,
+					  &to->si_addr);
 			break;
 		case __SI_POLL >> 16:
 		case __SI_TIMER >> 16:
@@ -262,7 +265,7 @@ sys32_sigaltstack(const stack_t32 *uss, stack_t32 *uoss, struct pt_regs *regs)
 	if (uss) {
 		if (!access_ok(VERIFY_READ, uss, sizeof(*uss)))
 			return -EFAULT;
-		err |= __get_user(kss.ss_sp, &uss->ss_sp);
+		err |= __get_user((unsigned long) kss.ss_sp, &uss->ss_sp);
 		err |= __get_user(kss.ss_size, &uss->ss_size);
 		err |= __get_user(kss.ss_flags, &uss->ss_flags);
 		if (err)
@@ -276,7 +279,7 @@ sys32_sigaltstack(const stack_t32 *uss, stack_t32 *uoss, struct pt_regs *regs)
 	if (!ret && uoss) {
 		if (!access_ok(VERIFY_WRITE, uoss, sizeof(*uoss)))
 			return -EFAULT;
-		err |= __put_user(koss.ss_sp, &uoss->ss_sp);
+		err |= __put_user((unsigned long) koss.ss_sp, &uoss->ss_sp);
 		err |= __put_user(koss.ss_size, &uoss->ss_size);
 		err |= __put_user(koss.ss_flags, &uoss->ss_flags);
 		if (err)
@@ -369,6 +372,7 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 	rt_sigframe32 *frame = (rt_sigframe32 *)regs->gprs[15];
 	sigset_t set;
 	stack_t st;
+	__u32 ss_sp;
 	int err;
 	mm_segment_t old_fs = get_fs();
 
@@ -386,8 +390,8 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 	if (restore_sigregs32(regs, &frame->uc.uc_mcontext))
 		goto badframe;
 
-	err = __get_user(st.ss_sp, &frame->uc.uc_stack.ss_sp);
-	st.ss_sp = (void *) A((unsigned long)st.ss_sp);
+	err = __get_user(ss_sp, &frame->uc.uc_stack.ss_sp);
+	st.ss_sp = (void *) A((unsigned long)ss_sp);
 	err |= __get_user(st.ss_size, &frame->uc.uc_stack.ss_size);
 	err |= __get_user(st.ss_flags, &frame->uc.uc_stack.ss_flags);
 	if (err)
@@ -440,10 +444,10 @@ get_sigframe(struct k_sigaction *ka, struct pt_regs * regs, size_t frame_size)
 
 static inline int map_signal(int sig)
 {
-	if (current->exec_domain
-	    && current->exec_domain->signal_invmap
+	if (current_thread_info()->exec_domain
+	    && current_thread_info()->exec_domain->signal_invmap
 	    && sig < 32)
-		return current->exec_domain->signal_invmap[sig];
+		return current_thread_info()->exec_domain->signal_invmap[sig];
         else
 		return sig;
 }
@@ -460,7 +464,7 @@ static void setup_frame32(int sig, struct k_sigaction *ka,
 
 	if (save_sigregs32(regs, &frame->sregs))
 		goto give_sigsegv;
-	if (__put_user(&frame->sregs, &frame->sc.sregs))
+	if (__put_user((unsigned long) &frame->sregs, &frame->sc.sregs))
 		goto give_sigsegv;
 
 	/* Set up to return from userspace.  If provided, use a stub
@@ -473,6 +477,10 @@ static void setup_frame32(int sig, struct k_sigaction *ka,
 		               (u16 *)(frame->retcode)))
 			goto give_sigsegv;
         }
+
+	/* Set up backchain. */
+	if (__put_user(regs->gprs[15], (unsigned int *) frame))
+		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
 	regs->gprs[15] = (addr_t)frame;
@@ -526,6 +534,10 @@ static void setup_rt_frame32(int sig, struct k_sigaction *ka, siginfo_t *info,
 		err |= __put_user(S390_SYSCALL_OPCODE | __NR_rt_sigreturn,
 		                  (u16 *)(frame->retcode));
 	}
+
+	/* Set up backchain. */
+	if (__put_user(regs->gprs[15], (unsigned int *) frame))
+		goto give_sigsegv;
 
 	/* Set up registers for signal handler */
 	regs->gprs[15] = (addr_t)frame;

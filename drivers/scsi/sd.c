@@ -50,6 +50,7 @@
 
 #define MAJOR_NR SCSI_DISK0_MAJOR
 #define LOCAL_END_REQUEST
+#define DEVICE_NR(device) (((major(device) & SD_MAJOR_MASK) << (8 - 4)) + (minor(device) >> 4))
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 #include "scsi.h"

@@ -83,7 +83,7 @@ struct atm_dev *atm_find_dev(int number)
 
 
 struct atm_dev *atm_dev_register(const char *type, const struct atmdev_ops *ops,
-				 int number, atm_dev_flags_t *flags)
+				 int number, unsigned long *flags)
 {
 	struct atm_dev *dev;
 

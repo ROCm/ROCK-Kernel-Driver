@@ -7,13 +7,13 @@ mod-subdirs	:= matrox
 # All of the (potential) objects that export symbols.
 # This list comes from 'grep -l EXPORT_SYMBOL *.[hc]'.
 
-export-objs    := fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o \
-		  fbcon-afb.o fbcon-ilbm.o fbcon-accel.o \
-		  fbcon-vga.o fbcon-iplan2p2.o fbcon-iplan2p4.o \
-		  fbcon-iplan2p8.o fbcon-vga-planes.o fbcon-cfb16.o \
-		  fbcon-cfb2.o fbcon-cfb24.o fbcon-cfb32.o fbcon-cfb4.o \
-		  fbcon-cfb8.o fbcon-mac.o fbcon-mfb.o \
-		  cyber2000fb.o sa1100fb.o fbcon-hga.o fbgen.o
+export-objs    	:= fbmem.o fbcmap.o fbcon.o fbmon.o modedb.o \
+		   fbcon-afb.o fbcon-ilbm.o fbcon-accel.o \
+		   fbcon-vga.o fbcon-iplan2p2.o fbcon-iplan2p4.o \
+		   fbcon-iplan2p8.o fbcon-vga-planes.o fbcon-cfb16.o \
+		   fbcon-cfb2.o fbcon-cfb24.o fbcon-cfb32.o fbcon-cfb4.o \
+		   fbcon-cfb8.o fbcon-mac.o fbcon-mfb.o \
+		   cyber2000fb.o sa1100fb.o fbcon-hga.o fbgen.o
 
 # Each configuration option enables a list of files.
 
@@ -83,10 +83,10 @@ obj-$(CONFIG_FB_CGFOURTEEN)       += cgfourteenfb.o sbusfb.o
 obj-$(CONFIG_FB_P9100)            += p9100fb.o sbusfb.o
 obj-$(CONFIG_FB_LEO)              += leofb.o sbusfb.o
 obj-$(CONFIG_FB_STI)	          += stifb.o sticore.o
-obj-$(CONFIG_FB_PMAG_BA)          += pmag-ba-fb.o
-obj-$(CONFIG_FB_PMAGB_B)          += pmagb-b-fb.o
-obj-$(CONFIG_FB_MAXINE)           += maxinefb.o
-obj-$(CONFIG_FB_TX3912)           += tx3912fb.o
+obj-$(CONFIG_FB_PMAG_BA)          += pmag-ba-fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
+obj-$(CONFIG_FB_PMAGB_B)          += pmagb-b-fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
+obj-$(CONFIG_FB_MAXINE)           += maxinefb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
+obj-$(CONFIG_FB_TX3912)           += tx3912fb.o cfbfillrect.o cfbcopyarea.o cfbimgblt.o
 
 obj-$(CONFIG_FB_MATROX)		  += matrox/
 obj-$(CONFIG_FB_RIVA)		  += riva/
@@ -124,13 +124,12 @@ obj-$(CONFIG_FBCON_HGA)           += fbcon-hga.o
 obj-$(CONFIG_FBCON_STI)           += fbcon-sti.o
 obj-$(CONFIG_FBCON_ACCEL)	  += fbcon-accel.o
 
+host-progs := ../conmakehash
+
 include $(TOPDIR)/Rules.make
 
 clean:
 	rm -f core *.o *.a *.s
-
-../conmakehash: ../conmakehash.c
-	$(HOSTCC) $(HOSTCFLAGS) -o ../conmakehash ../conmakehash.c
 
 promcon_tbl.c: prom.uni ../char/conmakehash
 	../char/conmakehash prom.uni | \

@@ -13,75 +13,48 @@
 
 #ifdef __GNUC__
 
-static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
-{
-  __u32 temp;
-
-  __asm__ __volatile__ (
-          "        st    %0,0(%1)\n"
-          "        icm   %0,8,3(%1)\n"
-          "        icm   %0,4,2(%1)\n"
-          "        icm   %0,2,1(%1)\n"
-          "        ic    %0,0(%1)"
-          : "+&d" (x) : "a" (&temp) : "cc" );
-  return x;
-}
-
 static __inline__ __const__ __u32 ___arch__swab32p(__u32 *x)
 {
-  __u32 result;
+	__u32 result;
+	
+	__asm__ __volatile__ (
+		"        icm   %0,8,3(%1)\n"
+		"        icm   %0,4,2(%1)\n"
+		"        icm   %0,2,1(%1)\n"
+		"        ic    %0,0(%1)"
+		: "=&d" (result) : "a" (x) : "cc" );
+	return result;
+}
 
-  __asm__ __volatile__ (
-          "        icm   %0,8,3(%1)\n"
-          "        icm   %0,4,2(%1)\n"
-          "        icm   %0,2,1(%1)\n"
-          "        ic    %0,0(%1)"
-          : "=&d" (result) : "a" (x) : "cc" );
-  return result;
+static __inline__ __const__ __u32 ___arch__swab32(__u32 x)
+{
+	return ___arch__swab32p(&x);
 }
 
 static __inline__ void ___arch__swab32s(__u32 *x)
 {
-  __asm__ __volatile__ (
-          "        icm   0,8,3(%0)\n"
-          "        icm   0,4,2(%0)\n"
-          "        icm   0,2,1(%0)\n"
-          "        ic    0,0(%0)\n"
-          "        st    0,0(%0)"
-          : : "a" (x) : "0", "memory", "cc");
-}
-
-static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
-{
-  __u16 temp;
-
-  __asm__ __volatile__ (
-          "        sth   %0,0(%1)\n"
-          "        icm   %0,2,1(%1)\n"
-          "        ic    %0,0(%1)\n"
-          : "+&d" (x) : "a" (&temp) : "memory", "cc" );
-  return x;
+	*x = ___arch__swab32p(x);
 }
 
 static __inline__ __const__ __u16 ___arch__swab16p(__u16 *x)
 {
-  __u16 result;
+	__u16 result;
+	
+	__asm__ __volatile__ (
+		"        icm   %0,2,1(%1)\n"
+		"        ic    %0,0(%1)\n"
+		: "=&d" (result) : "a" (x) : "cc" );
+	return result;
+}
 
-  __asm__ __volatile__ (
-          "        sr    %0,%0\n"
-          "        icm   %0,2,1(%1)\n"
-          "        ic    %0,0(%1)\n"
-          : "=&d" (result) : "a" (x) : "cc" );
-  return result;
+static __inline__ __const__ __u16 ___arch__swab16(__u16 x)
+{
+	return ___arch__swab16p(&x);
 }
 
 static __inline__ void ___arch__swab16s(__u16 *x)
 {
-  __asm__ __volatile__(
-          "        icm   0,2,1(%0)\n"
-          "        ic    0,0(%0)\n"
-          "        sth   0,0(%0)"
-          : : "a" (x) : "0", "memory", "cc" );
+	*x = ___arch__swab16p(x);
 }
 
 #define __arch__swab32(x) ___arch__swab32(x)

@@ -114,12 +114,12 @@ spinlock_t ide_lock __cacheline_aligned = SPIN_LOCK_UNLOCKED;
 static int ide_scan_direction;	/* THIS was formerly 2.2.x pci=reverse */
 #endif
 
-#if defined(__mc68000__) || defined(CONFIG_APUS)
+#ifdef ATA_ARCH_LOCK
 /*
  * This is used by the Atari code to obtain access to the IDE interrupt,
  * which is shared between several drivers.
  */
-static int irq_lock;
+int ide_irq_lock;
 #endif
 
 int noautodma = 0;
@@ -430,7 +430,7 @@ void ide_unregister(struct ata_channel *ch)
 		struct ata_device *drive = &ch->drives[i];
 
 		if (drive->de) {
-			devfs_unregister (drive->de);
+			devfs_unregister(drive->de);
 			drive->de = NULL;
 		}
 		if (!drive->present)
@@ -679,8 +679,8 @@ static int __init stridx (const char *s, char c)
  */
 static int __init match_parm (char *s, const char *keywords[], int vals[], int max_vals)
 {
-	static const char *decimal = "0123456789";
-	static const char *hex = "0123456789abcdef";
+	static const char decimal[] = "0123456789";
+	static const char hex[] = "0123456789abcdef";
 	int i, n;
 
 	if (*s++ == '=') {
@@ -1246,7 +1246,7 @@ static int ata_sys_notify(struct notifier_block *this, unsigned long event, void
 			return NOTIFY_DONE;
 	}
 
-	printk("flushing ide devices: ");
+	printk(KERN_INFO "flushing ATA/ATAPI devices: ");
 
 	for (i = 0; i < MAX_HWIFS; i++) {
 		int unit;
@@ -1264,9 +1264,10 @@ static int ata_sys_notify(struct notifier_block *this, unsigned long event, void
 			/* set the drive to standby */
 			printk("%s ", drive->name);
 			if (ata_ops(drive)) {
-				if (event != SYS_RESTART)
+				if (event != SYS_RESTART) {
 					if (ata_ops(drive)->standby && ata_ops(drive)->standby(drive))
 						continue;
+				}
 
 				if (ata_ops(drive)->cleanup)
 					ata_ops(drive)->cleanup(drive);
@@ -1290,8 +1291,7 @@ static int __init ata_module_init(void)
 {
 	printk(KERN_INFO "ATA/ATAPI device driver v" VERSION "\n");
 
-	ide_devfs_handle = devfs_mk_dir(NULL, "ata", NULL);
-	devfs_mk_symlink(NULL, "ide", DEVFS_FL_DEFAULT, "ata", NULL, NULL);
+	ide_devfs_handle = devfs_mk_dir(NULL, "ide", NULL);
 
 	/*
 	 * Because most of the ATA adapters represent the timings in unit of
@@ -1449,7 +1449,7 @@ static int __init ata_module_init(void)
 #if defined(CONFIG_BLK_DEV_IDE) || defined(CONFIG_BLK_DEV_IDE_MODULE)
 # if defined(__mc68000__) || defined(CONFIG_APUS)
 	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET]) {
-		// ide_get_lock(&irq_lock, NULL, NULL);/* for atari only */
+		ide_get_lock(&ide_irq_lock, NULL, NULL);/* for atari only */
 		disable_irq(ide_hwifs[0].irq);	/* disable_irq_nosync ?? */
 //		disable_irq_nosync(ide_hwifs[0].irq);
 	}
@@ -1460,7 +1460,7 @@ static int __init ata_module_init(void)
 # if defined(__mc68000__) || defined(CONFIG_APUS)
 	if (ide_hwifs[0].io_ports[IDE_DATA_OFFSET]) {
 		enable_irq(ide_hwifs[0].irq);
-		ide_release_lock(&irq_lock);/* for atari only */
+		ide_release_lock(&ide_irq_lock);/* for atari only */
 	}
 # endif
 #endif

@@ -3,7 +3,7 @@
  *
  * Module Name: hwregs - Read/write access functions for the various ACPI
  *                       control and status registers.
- *              $Revision: 130 $
+ *              $Revision: 133 $
  *
  ******************************************************************************/
 
@@ -129,7 +129,7 @@ acpi_get_sleep_type_data (
 
 
 	/*
-	 *  Validate parameters
+	 * Validate parameters
 	 */
 	if ((sleep_state > ACPI_S_STATES_MAX) ||
 		!sleep_type_a || !sleep_type_b) {
@@ -137,7 +137,7 @@ acpi_get_sleep_type_data (
 	}
 
 	/*
-	 *  Acpi_evaluate the namespace object containing the values for this state
+	 * Evaluate the namespace object containing the values for this state
 	 */
 	status = acpi_ns_evaluate_by_name ((NATIVE_CHAR *) acpi_gbl_db_sleep_states[sleep_state],
 			  NULL, &obj_desc);
@@ -145,46 +145,47 @@ acpi_get_sleep_type_data (
 		return_ACPI_STATUS (status);
 	}
 
+	/* Must have a return object */
+
 	if (!obj_desc) {
 		ACPI_REPORT_ERROR (("Missing Sleep State object\n"));
-		return_ACPI_STATUS (AE_NOT_EXIST);
+		status = AE_NOT_EXIST;
 	}
 
-	/*
-	 *  We got something, now ensure it is correct.  The object must
-	 *  be a package and must have at least 2 numeric values as the
-	 *  two elements
-	 */
+	/* It must be of type Package */
 
-	/* Even though Acpi_evaluate_object resolves package references,
-	 * Ns_evaluate doesn't. So, we do it here.
-	 */
-	status = acpi_ut_resolve_package_references(obj_desc);
+	else if (ACPI_GET_OBJECT_TYPE (obj_desc) != ACPI_TYPE_PACKAGE) {
+		ACPI_REPORT_ERROR (("Sleep State object not a Package\n"));
+		status = AE_AML_OPERAND_TYPE;
+	}
 
-	if (obj_desc->package.count < 2) {
-		/* Must have at least two elements */
+	/* The package must have at least two elements */
 
+	else if (obj_desc->package.count < 2) {
 		ACPI_REPORT_ERROR (("Sleep State package does not have at least two elements\n"));
 		status = AE_AML_NO_OPERAND;
 	}
-	else if (((obj_desc->package.elements[0])->common.type != ACPI_TYPE_INTEGER) ||
-			 ((obj_desc->package.elements[1])->common.type != ACPI_TYPE_INTEGER)) {
-		/* Must have two  */
 
-		ACPI_REPORT_ERROR (("Sleep State package elements are not both of type Number\n"));
+	/* The first two elements must both be of type Integer */
+
+	else if ((ACPI_GET_OBJECT_TYPE (obj_desc->package.elements[0]) != ACPI_TYPE_INTEGER) ||
+			 (ACPI_GET_OBJECT_TYPE (obj_desc->package.elements[1]) != ACPI_TYPE_INTEGER)) {
+		ACPI_REPORT_ERROR (("Sleep State package elements are not both Integers (%s, %s)\n",
+			acpi_ut_get_object_type_name (obj_desc->package.elements[0]),
+			acpi_ut_get_object_type_name (obj_desc->package.elements[1])));
 		status = AE_AML_OPERAND_TYPE;
 	}
 	else {
 		/*
-		 *  Valid _Sx_ package size, type, and value
+		 * Valid _Sx_ package size, type, and value
 		 */
 		*sleep_type_a = (u8) (obj_desc->package.elements[0])->integer.value;
 		*sleep_type_b = (u8) (obj_desc->package.elements[1])->integer.value;
 	}
 
 	if (ACPI_FAILURE (status)) {
-		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Bad Sleep object %p type %X\n",
-			obj_desc, obj_desc->common.type));
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Bad Sleep object %p type %s\n",
+			obj_desc, acpi_ut_get_object_type_name (obj_desc)));
 	}
 
 	acpi_ut_remove_reference (obj_desc);
@@ -196,7 +197,7 @@ acpi_get_sleep_type_data (
  *
  * FUNCTION:    Acpi_hw_get_register_bit_mask
  *
- * PARAMETERS:  Register_id     - index of ACPI Register to access
+ * PARAMETERS:  Register_id         - Index of ACPI Register to access
  *
  * RETURN:      The bit mask to be used when accessing the register
  *
@@ -224,8 +225,8 @@ acpi_hw_get_bit_register_info (
  *
  * FUNCTION:    Acpi_get_register
  *
- * PARAMETERS:  Register_id     - index of ACPI Register to access
- *              Use_lock        - Lock the hardware
+ * PARAMETERS:  Register_id         - Index of ACPI Register to access
+ *              Use_lock            - Lock the hardware
  *
  * RETURN:      Value is read from specified Register.  Value returned is
  *              normalized to bit0 (is shifted all the way right)

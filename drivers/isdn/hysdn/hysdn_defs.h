@@ -276,7 +276,6 @@ extern void hysdn_rx_netpkt(hysdn_card *, uchar *, word);	/* rxed packet from ne
 
 #ifdef CONFIG_HYSDN_CAPI
 extern unsigned int hycapi_enable; 
-extern struct capi_driver_interface *hy_di;
 extern int hycapi_capi_create(hysdn_card *);	/* create a new capi device */
 extern int hycapi_capi_release(hysdn_card *);	/* delete the device */
 extern int hycapi_capi_stop(hysdn_card *card);   /* suspend */

@@ -95,42 +95,6 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 	return sum & 0xFF;
 }
 
-/*
- * Processor encoding in an MP configuration block
- */
-
-static char __init *mpc_family(int family,int model)
-{
-	static char n[32];
-	static char *model_defs[]=
-	{
-		"80486DX","80486DX",
-		"80486SX","80486DX/2 or 80487",
-		"80486SL","80486SX/2",
-		"Unknown","80486DX/2-WB",
-		"80486DX/4","80486DX/4-WB"
-	};
-
-	switch (family) {
-		case 0x04:
-			if (model < 10)
-				return model_defs[model];
-			break;
-
-		case 0x05:
-			return("Pentium(tm)");
-
-		case 0x06:
-			return("Pentium(tm) Pro");
-
-		case 0x0F:
-			if (model == 0x0F)
-				return("Special controller");
-	}
-	sprintf(n,"Unknown CPU [%d:%d]",family, model);
-	return n;
-}
-
 static void __init MP_processor_info (struct mpc_config_processor *m)
 {
 	int ver;
@@ -138,10 +102,10 @@ static void __init MP_processor_info (struct mpc_config_processor *m)
 	if (!(m->mpc_cpuflag & CPU_ENABLED))
 		return;
 
-	printk("Processor #%d %s APIC version %d\n",
+	printk("Processor #%d %d:%d APIC version %d\n",
 		m->mpc_apicid,
-		mpc_family(	(m->mpc_cpufeature & CPU_FAMILY_MASK)>>8 ,
-				(m->mpc_cpufeature & CPU_MODEL_MASK)>>4),
+	       (m->mpc_cpufeature & CPU_FAMILY_MASK)>>8,
+	       (m->mpc_cpufeature & CPU_MODEL_MASK)>>4,
 		m->mpc_apicver);
 
 	if (m->mpc_featureflag&(1<<0))

@@ -80,8 +80,7 @@ static int dabusb_add_buf_tail (pdabusb_t s, struct list_head *dst, struct list_
 		goto err;
 	}
 	tmp = src->next;
-	list_del (tmp);
-	list_add_tail (tmp, dst);
+	list_move_tail (tmp, dst);
 
   err:	spin_unlock_irqrestore (&s->lock, flags);
 	return ret;
@@ -609,6 +608,7 @@ static int dabusb_open (struct inode *inode, struct file *file)
 		down (&s->mutex);
 	}
 	if (usb_set_interface (s->usbdev, _DABUSB_IF, 1) < 0) {
+		up(&s->mutex);
 		err("set_interface failed");
 		return -EINVAL;
 	}

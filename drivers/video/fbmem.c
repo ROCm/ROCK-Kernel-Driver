@@ -132,6 +132,7 @@ extern int pmagbafb_init(void);
 extern int pmagbbfb_init(void);
 extern void maxinefb_init(void);
 extern int tx3912fb_init(void);
+extern int tx3912fb_setup(char*);
 extern int radeonfb_init(void);
 extern int radeonfb_setup(char*);
 extern int e1355fb_init(void);
@@ -300,7 +301,7 @@ static struct {
 	{ "hitfb", hitfb_init, NULL },
 #endif
 #ifdef CONFIG_FB_TX3912
-	{ "tx3912", tx3912fb_init, NULL },
+	{ "tx3912", tx3912fb_init, tx3912fb_setup },
 #endif
 #ifdef CONFIG_FB_E1355
 	{ "e1355fb", e1355fb_init, e1355fb_setup },

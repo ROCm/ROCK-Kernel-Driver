@@ -4,6 +4,7 @@
 #include <linux/config.h>
 
 #ifdef __KERNEL__
+#include <linux/mm.h>		/* for struct page */
 
 /* Can be used to override the logic in pci_scan_bus for skipping
    already-configured bus numbers - to be used for buggy BIOSes
@@ -108,7 +109,7 @@ static inline dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
 	if (direction == PCI_DMA_NONE)
 		BUG();
 
-	return (page - mem_map) * PAGE_SIZE + offset;
+	return (dma_addr_t)(page - mem_map) * PAGE_SIZE + offset;
 }
 
 static inline void pci_unmap_page(struct pci_dev *hwdev, dma_addr_t dma_address,

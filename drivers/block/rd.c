@@ -57,6 +57,7 @@
  * include/linux/major.h for now
  */
 #define MAJOR_NR RAMDISK_MAJOR
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 #include <linux/blkpg.h>
 
@@ -357,7 +358,7 @@ static struct file_operations initrd_fops = {
 
 static int rd_open(struct inode * inode, struct file * filp)
 {
-	int unit = DEVICE_NR(inode->i_rdev);
+	int unit = minor(inode->i_rdev);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (unit == INITRD_MINOR) {

@@ -1,7 +1,7 @@
 /* Driver for Philips webcam
    Functions that send various control messages to the webcam, including
    video modes.
-   (C) 1999-2001 Nemosoft Unv. (webcam@smcc.demon.nl)
+   (C) 1999-2002 Nemosoft Unv. (webcam@smcc.demon.nl)
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -78,10 +78,12 @@
 #define READ_SHUTTER_FORMATTER			0x0600
 #define READ_RED_GAIN_FORMATTER			0x0700
 #define READ_BLUE_GAIN_FORMATTER		0x0800
+#define SENSOR_TYPE_FORMATTER1			0x0C00
 #define READ_RAW_Y_MEAN_FORMATTER		0x3100
 #define SET_POWER_SAVE_MODE_FORMATTER		0x3200
 #define MIRROR_IMAGE_FORMATTER			0x3300
 #define LED_FORMATTER				0x3400
+#define SENSOR_TYPE_FORMATTER2			0x3700
 
 /* Formatters for the Video Endpoint controls [GS]ET_EP_STREAM_CTL */
 #define VIDEO_OUTPUT_CONTROL_FORMATTER		0x0100
@@ -162,6 +164,21 @@ static struct Kiara_table_entry Kiara_table[PSZ_MAX][6][4] =
 /****************************************************************************/
 
 
+#define SendControlMsg(request, value, buflen) \
+	usb_control_msg(pdev->udev, usb_sndctrlpipe(pdev->udev, 0), \
+		request, \
+		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE, \
+		value, \
+		pdev->vcinterface, \
+		&buf, buflen, HZ / 2)
+
+#define RecvControlMsg(request, value, buflen) \
+	usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0), \
+		request, \
+		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE, \
+		value, \
+		pdev->vcinterface, \
+		&buf, buflen, HZ / 2)
 
 
 #if PWC_DEBUG
@@ -241,7 +258,7 @@ static inline int set_video_mode_Nala(struct pwc_device *pdev, int size, int fra
 	ret = send_video_command(pdev->udev, pdev->vendpoint, buf, 3);
 	if (ret < 0)
 		return ret;
-	if (pEntry->compressed)
+	if (pEntry->compressed && pdev->decompressor != NULL)
 		pdev->decompressor->init(pdev->release, buf, pdev->decompress_data);
 		
 	/* Set various parameters */
@@ -911,7 +928,7 @@ static inline int pwc_get_red_gain(struct pwc_device *pdev)
 	int ret;
 	
 	ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
- 	        GET_STATUS_CTL, 
+ 	        GET_CHROM_CTL, 
 		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 	        PRESET_MANUAL_RED_GAIN_FORMATTER,
 		pdev->vcinterface,
@@ -950,7 +967,7 @@ static inline int pwc_get_blue_gain(struct pwc_device *pdev)
 	int ret;
 	
 	ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
-   	        GET_STATUS_CTL,
+   	        GET_CHROM_CTL,
 		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
 		PRESET_MANUAL_BLUE_GAIN_FORMATTER,
 		pdev->vcinterface,
@@ -961,6 +978,7 @@ static inline int pwc_get_blue_gain(struct pwc_device *pdev)
 	
 	return (buf << 8);
 }
+
 
 /* The following two functions are different, since they only read the
    internal red/blue gains, which may be different from the manual 
@@ -979,7 +997,7 @@ static inline int pwc_read_red_gain(struct pwc_device *pdev)
 		&buf, 1, HZ / 2);
 
 	if (ret < 0)
-	    return ret;
+		return ret;
 	
 	return (buf << 8);
 }
@@ -997,10 +1015,73 @@ static inline int pwc_read_blue_gain(struct pwc_device *pdev)
 		&buf, 1, HZ / 2);
 
 	if (ret < 0)
-	    return ret;
+		return ret;
 	
 	return (buf << 8);
 }
+
+
+static inline int pwc_set_wb_speed(struct pwc_device *pdev, int speed)
+{
+	unsigned char buf;
+	
+	/* useful range is 0x01..0x20 */
+	buf = speed / 0x7f0;
+	return usb_control_msg(pdev->udev, usb_sndctrlpipe(pdev->udev, 0),
+		SET_CHROM_CTL,
+		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		AWB_CONTROL_SPEED_FORMATTER,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+}
+
+static inline int pwc_get_wb_speed(struct pwc_device *pdev)
+{
+	unsigned char buf;
+	int ret;
+	
+	ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
+		GET_CHROM_CTL,
+		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		AWB_CONTROL_SPEED_FORMATTER,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+	if (ret < 0)
+		return ret;
+	return (buf * 0x7f0);
+}
+
+
+static inline int pwc_set_wb_delay(struct pwc_device *pdev, int delay)
+{
+	unsigned char buf;
+	
+	/* useful range is 0x01..0x3F */
+	buf = (delay >> 10);
+	return usb_control_msg(pdev->udev, usb_sndctrlpipe(pdev->udev, 0),
+		SET_CHROM_CTL,
+		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		AWB_CONTROL_DELAY_FORMATTER,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+}
+
+static inline int pwc_get_wb_delay(struct pwc_device *pdev)
+{
+	unsigned char buf;
+	int ret;
+	
+	ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
+		GET_CHROM_CTL,
+		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		AWB_CONTROL_DELAY_FORMATTER,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+	if (ret < 0)
+		return ret;
+	return (buf << 10);
+}
+
 
 int pwc_set_leds(struct pwc_device *pdev, int on_value, int off_value)
 {
@@ -1055,61 +1136,248 @@ int pwc_get_leds(struct pwc_device *pdev, int *on_value, int *off_value)
 	return 0;
 }
 
+static inline int pwc_set_contour(struct pwc_device *pdev, int contour)
+{
+	unsigned char buf;
+	int ret;
+	
+	if (contour < 0)
+		buf = 0xff; /* auto contour on */
+	else
+		buf = 0x0; /* auto contour off */
+	ret = usb_control_msg(pdev->udev, usb_sndctrlpipe(pdev->udev, 0),
+		SET_LUM_CTL,
+		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		AUTO_CONTOUR_FORMATTER,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+	if (ret < 0)
+		return ret;
+	
+	if (contour < 0)
+		return 0;
+	if (contour > 0xffff)
+		contour = 0xffff;
+	
+	buf = (contour >> 10); /* contour preset is [0..3f] */
+	ret = usb_control_msg(pdev->udev, usb_sndctrlpipe(pdev->udev, 0),
+		SET_LUM_CTL,
+		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		PRESET_CONTOUR_FORMATTER,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+	if (ret < 0)	
+		return ret;	
+	return 0;
+}
+
+static inline int pwc_get_contour(struct pwc_device *pdev, int *contour)
+{
+	unsigned char buf;
+	int ret;
+	
+	ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
+		GET_LUM_CTL,
+		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		AUTO_CONTOUR_FORMATTER,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+	if (ret < 0)
+		return ret;
+
+	if (buf == 0) {
+		/* auto mode off, query current preset value */
+		ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
+			GET_LUM_CTL,
+			USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+			PRESET_CONTOUR_FORMATTER,
+			pdev->vcinterface,
+			&buf, 1, HZ / 2);
+		if (ret < 0)	
+			return ret;
+		*contour =  (buf << 10);
+	}
+	else
+		*contour = -1;
+	return 0;
+}
+
+
+static inline int pwc_set_backlight(struct pwc_device *pdev, int backlight)
+{
+	unsigned char buf;
+	
+	if (backlight)
+		buf = 0xff;
+	else
+		buf = 0x0;
+	return usb_control_msg(pdev->udev, usb_sndctrlpipe(pdev->udev, 0),
+		SET_LUM_CTL,
+		USB_DIR_OUT | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		BACK_LIGHT_COMPENSATION_FORMATTER,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+}
+
+static inline int pwc_get_backlight(struct pwc_device *pdev)
+{
+	int ret;
+	unsigned char buf;
+	
+	ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
+		GET_LUM_CTL,
+		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		BACK_LIGHT_COMPENSATION_FORMATTER,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+	if (ret < 0)
+		return ret;
+	return buf;
+}
+
+
+static inline int pwc_set_flicker(struct pwc_device *pdev, int flicker)
+{
+	unsigned char buf;
+	
+	if (flicker)
+		buf = 0xff;
+	else
+		buf = 0x0;
+	return SendControlMsg(SET_LUM_CTL, FLICKERLESS_MODE_FORMATTER, 1);
+}
+
+static inline int pwc_get_flicker(struct pwc_device *pdev)
+{
+	int ret;
+	unsigned char buf;
+	
+	ret = RecvControlMsg(GET_LUM_CTL, FLICKERLESS_MODE_FORMATTER, 1);
+	if (ret < 0)
+		return ret;
+	return buf;
+}
+
+
+static inline int pwc_set_dynamic_noise(struct pwc_device *pdev, int noise)
+{
+	unsigned char buf;
+
+	if (noise < 0)
+		noise = 0;
+	if (noise > 3)
+		noise = 3;
+	buf = noise;
+	return SendControlMsg(SET_LUM_CTL, DYNAMIC_NOISE_CONTROL_FORMATTER, 1);
+}
+
+static inline int pwc_get_dynamic_noise(struct pwc_device *pdev)
+{
+	int ret;
+	unsigned char buf;
+	
+	ret = RecvControlMsg(GET_LUM_CTL, DYNAMIC_NOISE_CONTROL_FORMATTER, 1);
+	if (ret < 0)
+		return ret;
+//Debug("pwc_get_dynamic_noise = %d\n", buf);
+	return buf;
+}
+
+
+int pwc_get_cmos_sensor(struct pwc_device *pdev)
+{
+	unsigned char buf;
+	int ret = -1, request;
+	
+	if (pdev->type < 675)
+		request = SENSOR_TYPE_FORMATTER1;
+	else if (pdev->type < 730)
+		return -1; /* The Vesta series doesn't have this call */
+	else
+		request = SENSOR_TYPE_FORMATTER2;
+	
+	ret = usb_control_msg(pdev->udev, usb_rcvctrlpipe(pdev->udev, 0),
+		GET_STATUS_CTL,
+		USB_DIR_IN | USB_TYPE_VENDOR | USB_RECIP_DEVICE,
+		request,
+		pdev->vcinterface,
+		&buf, 1, HZ / 2);
+	if (ret < 0)
+		return ret;
+	if (pdev->type < 675)
+		return buf | 0x100;
+	else
+		return buf;
+}
+
+
  /* End of Add-Ons                                    */
  /* ************************************************* */
 
 int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 {
+	int ret = 0;
+
 	switch(cmd) {
 	case VIDIOCPWCRUSER:
 	{
 		if (pwc_restore_user(pdev))
-			return -EINVAL;
+			ret = -EINVAL;
 		break;
 	}
 	
 	case VIDIOCPWCSUSER:
 	{
 		if (pwc_save_user(pdev))
-			return -EINVAL;
+			ret = -EINVAL;
 		break;
 	}
 		
 	case VIDIOCPWCFACTORY:
 	{
 		if (pwc_restore_factory(pdev))
-			return -EINVAL;
+			ret = -EINVAL;
 		break;
 	}
 	
 	case VIDIOCPWCSCQUAL:
 	{	
 		int *qual = arg;
-		int ret;
 
 		if (*qual < 0 || *qual > 3)
-			return -EINVAL;
-		ret = pwc_try_video_mode(pdev, pdev->view.x, pdev->view.y, pdev->vframes, *qual, pdev->vsnapshot);
-		if (ret < 0)
-			return ret;
-		pdev->vcompression = *qual;
+			ret = -EINVAL;
+		else
+			ret = pwc_try_video_mode(pdev, pdev->view.x, pdev->view.y, pdev->vframes, *qual, pdev->vsnapshot);
+		if (ret >= 0)
+			pdev->vcompression = *qual;
 		break;
 	}
 	
 	case VIDIOCPWCGCQUAL:
 	{
 		int *qual = arg;
-
+		
 		*qual = pdev->vcompression;
+		break;
+	}
+
+	case VIDIOCPWCPROBE:
+	{
+		struct pwc_probe probe;
+		
+		strcpy(probe.name, pdev->vdev->name);
+		probe.type = pdev->type;
+		if (copy_to_user(arg, &probe, sizeof(probe)))
+			ret = -EFAULT;
 		break;
 	}
 
 	case VIDIOCPWCSAGC:
 	{
 		int *agc = arg;
-		
+
 		if (pwc_set_agc(pdev, *agc < 0 ? 1 : 0, *agc))
-			return -EINVAL;
+			ret = -EINVAL;
 		break;
 	}
 	
@@ -1118,29 +1386,21 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 		int *agc = arg;
 		
 		if (pwc_get_agc(pdev, agc))
-			return -EINVAL;
+			ret = -EINVAL;
 		break;
 	}
 	
 	case VIDIOCPWCSSHUTTER:
 	{
 		int *shutter_speed = arg;
-		int ret;
 
 		ret = pwc_set_shutter_speed(pdev, *shutter_speed < 0 ? 1 : 0, *shutter_speed);
-		if (ret < 0)
-			return ret;
 		break;
 	}
 	
-
- /* ************************************************* */
- /* Begin of Add-Ons for color compensation           */
-
         case VIDIOCPWCSAWB:
 	{
 		struct pwc_whitebalance *wb = arg;
-		int ret;
 		
 		ret = pwc_set_awb(pdev, wb->mode);
 		if (ret >= 0 && wb->mode == PWC_WB_MANUAL) {
@@ -1153,52 +1413,149 @@ int pwc_ioctl(struct pwc_device *pdev, unsigned int cmd, void *arg)
 	case VIDIOCPWCGAWB:
 	{
 		struct pwc_whitebalance *wb = arg;
-		
+
 		memset(wb, 0, sizeof(*wb));
 		wb->mode = pwc_get_awb(pdev);
 		if (wb->mode < 0)
-			return -EINVAL;
-		wb->manual_red = pwc_get_red_gain(pdev);
-		wb->manual_blue = pwc_get_blue_gain(pdev);
-		if (wb->mode == PWC_WB_AUTO) {
-			wb->read_red = pwc_read_red_gain(pdev);
-			wb->read_blue = pwc_read_blue_gain(pdev);
+			ret = -EINVAL;
+		else {
+			if (wb->mode == PWC_WB_MANUAL) {
+				wb->manual_red = pwc_get_red_gain(pdev);
+				wb->manual_blue = pwc_get_blue_gain(pdev);
+			}
+			if (wb->mode == PWC_WB_AUTO) {
+				wb->read_red = pwc_read_red_gain(pdev);
+				wb->read_blue = pwc_read_blue_gain(pdev);
+			}
 		}
+		break;
+	}
+	
+	case VIDIOCPWCSAWBSPEED:
+	{
+		struct pwc_wb_speed *wbs = arg;
+		
+		if (wbs->control_speed > 0) {
+			ret = pwc_set_wb_speed(pdev, wbs->control_speed);
+		}
+		if (wbs->control_delay > 0) {
+			ret = pwc_set_wb_delay(pdev, wbs->control_delay);
+		}
+		break;
+	}
+	
+	case VIDIOCPWCGAWBSPEED:
+	{
+		struct pwc_wb_speed *wbs = arg;
+		
+		ret = pwc_get_wb_speed(pdev);
+		if (ret < 0)
+			break;
+		wbs->control_speed = ret;
+		ret = pwc_get_wb_delay(pdev);
+		if (ret < 0)
+			break;
+		wbs->control_delay = ret;
 		break;
 	}
 
         case VIDIOCPWCSLED:
 	{
-		int ret;
 		struct pwc_leds *leds = arg;
 
 		ret = pwc_set_leds(pdev, leds->led_on, leds->led_off);
-		if (ret<0)
-		    return ret;
-	    break;
+	    	break;
 	}
-
 
 
 	case VIDIOCPWCGLED:
 	{
-		int led;
 		struct pwc_leds *leds = arg;
 		
-		led = pwc_get_leds(pdev, &leds->led_on, &leds->led_off); 
-		if (led < 0)
-			return -EINVAL;
+		ret = pwc_get_leds(pdev, &leds->led_on, &leds->led_off); 
 		break;
 	}
 
- /* End of Add-Ons                                    */
- /* ************************************************* */
+	case VIDIOCPWCSCONTOUR:
+	{
+		int *contour = arg;
+
+		ret = pwc_set_contour(pdev, *contour);
+		break;
+	}
+			
+	case VIDIOCPWCGCONTOUR:
+	{
+		int *contour = arg;
+		
+		ret = pwc_get_contour(pdev, contour);
+		break;
+	}
+	
+	case VIDIOCPWCSBACKLIGHT:
+	{
+		int *backlight = arg;
+		
+		ret = pwc_set_backlight(pdev, *backlight);
+		break;
+	}
+
+	case VIDIOCPWCGBACKLIGHT:
+	{
+		int *backlight = arg;
+		
+		ret = pwc_get_backlight(pdev);
+		if (ret >= 0)
+			*backlight = ret;
+		break;
+	}
+	
+	case VIDIOCPWCSFLICKER:
+	{
+		int *flicker = arg;
+		
+		ret = pwc_set_flicker(pdev, *flicker);
+		break;
+	}
+
+	case VIDIOCPWCGFLICKER:
+	{
+		int *flicker = arg;
+		
+		ret = pwc_get_flicker(pdev);
+		if (ret >= 0)
+			*flicker = ret;
+		break;
+	}
+	
+	case VIDIOCPWCSDYNNOISE:
+	{
+		int *dynnoise = arg;
+		
+		ret = pwc_set_dynamic_noise(pdev, *dynnoise);
+		break;
+	}
+	
+	case VIDIOCPWCGDYNNOISE:
+	{
+		int *dynnoise = arg;
+
+		ret = pwc_get_dynamic_noise(pdev);
+		if (ret < 0)
+			break;
+		*dynnoise = ret;
+		break;
+	}
+	
 
 	default:
-		return -ENOIOCTLCMD;
+		ret = -ENOIOCTLCMD;
 		break;
 	}
-	return 0;
+	
+	if (ret > 0)
+		return 0;
+	return ret;
 }
 
 

@@ -41,15 +41,9 @@ static __inline__ void apic_wait_icr_idle(void)
 	while ( apic_read( APIC_ICR ) & APIC_ICR_BUSY );
 }
 
-#ifdef CONFIG_X86_GOOD_APIC
-# define FORCE_READ_AROUND_WRITE 0
-# define apic_read_around(x)
-# define apic_write_around(x,y) apic_write((x),(y))
-#else
-# define FORCE_READ_AROUND_WRITE 1
-# define apic_read_around(x) apic_read(x)
-# define apic_write_around(x,y) apic_write_atomic((x),(y))
-#endif
+#define FORCE_READ_AROUND_WRITE 0
+#define apic_read_around(x)
+#define apic_write_around(x,y) apic_write((x),(y))
 
 static inline void ack_APIC_irq(void)
 {

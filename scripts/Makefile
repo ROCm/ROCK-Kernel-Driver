@@ -5,15 +5,9 @@
 # The following temporary rule will make sure that people's
 # trees get updated to the right permissions, since patch(1)
 # can't do it
-CHMOD_FILES := docgen gen-all-syms kernel-doc mkcompile_h mkversion_h makelst
+CHMOD_FILES := docgen gen-all-syms kernel-doc mkcompile_h makelst
 
 all: fixdep split-include $(CHMOD_FILES)
-
-fixdep: fixdep.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
-
-split-include: split-include.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
 
 $(CHMOD_FILES): FORCE
 	@chmod a+x $@
@@ -28,7 +22,7 @@ TAIL=tail.tk
 # Config.in files to depend on anyways.  So I'll force it to remake.
 
 kconfig.tk: $(TOPDIR)/arch/$(ARCH)/config.in tkparse $(HEADER) $(TAIL) FORCE
-	@echo Generating $@
+	@echo '  Generating $@'
 	@(                                                      \
 	  if [ -f /usr/local/bin/wish ];	then            \
 		echo '#!'"/usr/local/bin/wish -f";              \
@@ -43,23 +37,27 @@ kconfig.tk: $(TOPDIR)/arch/$(ARCH)/config.in tkparse $(HEADER) $(TAIL) FORCE
 	) > $@
 	chmod 755 $@
 
-tkparse: tkparse.o tkcond.o tkgen.o
-	$(HOSTCC) -o $@ $^
-
-tkparse.o tkcond.o tkgen.o: %.o: %.c
-	$(HOSTCC) $(HOSTCFLAGS) -c -o $@ $<
-
 # DocBook stuff
 # ---------------------------------------------------------------------------
 
 doc-progs: docproc
 
-docproc: docproc.c
-	$(HOSTCC) $(HOSTCFLAGS) -o $@ $<
+# ---------------------------------------------------------------------------
+
+.PHONY: lxdialog
+
+lxdialog:
+	$(MAKE) -C lxdialog all
+
+# ---------------------------------------------------------------------------
+
+host-progs := fixdep split-include docproc tkparse
+
+tkparse-objs := tkparse.o tkcond.o tkgen.o
+
+# fixdep is needed to compile other host programs
+
+split-include docproc $(tkparse-objs) lxdialog: fixdep
+
 
 include $(TOPDIR)/Rules.make
-
-# we don't have automatic deps for host programs
-
-tkparse.o tkcond.o tkgen.o: tkparse.h
-

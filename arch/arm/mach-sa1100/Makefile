@@ -40,6 +40,7 @@ obj-$(CONFIG_ASSABET_NEPONSET)		+= neponset.o
 
 obj-$(CONFIG_SA1100_BADGE4)		+= badge4.o
 export-objs				+= badge4.o
+led-$(CONFIG_SA1100_BADGE4)		+= leds-badge4.o
 
 obj-$(CONFIG_SA1100_BRUTUS)		+= brutus.o
 led-$(CONFIG_SA1100_BRUTUS)		+= leds-brutus.o

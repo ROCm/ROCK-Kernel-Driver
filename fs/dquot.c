@@ -179,7 +179,7 @@ static inline void put_dquot_dup_ref(struct dquot *dquot)
 
 static inline int const hashfn(struct super_block *sb, unsigned int id, int type)
 {
-	return((HASHDEV(sb->s_dev) ^ id) * (MAXQUOTAS - type)) % NR_DQHASH;
+	return((((unsigned long)sb>>L1_CACHE_SHIFT) ^ id) * (MAXQUOTAS - type)) % NR_DQHASH;
 }
 
 static inline void insert_dquot_hash(struct dquot *dquot)

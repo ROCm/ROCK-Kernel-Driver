@@ -1,5 +1,6 @@
 /*
  *   Copyright (c) International Business Machines Corp., 2000-2002
+ *   Portions Copyright (c) Christoph Hellwig, 2001-2002
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -1324,7 +1325,7 @@ static int txLog(log_t * log, tblock_t * tblk, commit_t * cd)
 
 		/* initialize lrd common */
 		ip = tlck->ip;
-		lrd->aggregate = cpu_to_le32(kdev_t_to_nr(ip->i_dev));
+		lrd->aggregate = cpu_to_le32(ip->i_sb->s_bdev->bd_dev);
 		lrd->log.redopage.fileset = cpu_to_le32(JFS_IP(ip)->fileset);
 		lrd->log.redopage.inode = cpu_to_le32(ip->i_ino);
 

@@ -199,13 +199,21 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 			IDE_SELECT_REG);
 
 	if (ar->handler) {
+		unsigned long flags;
+		struct ata_channel *ch = drive->channel;
 
 		/* This is apparently supposed to reset the wait timeout for
 		 * the interrupt to accur.
 		 */
 
-		ide_set_handler(drive, ar->handler, WAIT_CMD, NULL);
+		/* FIXME: this locking should encompass the above register
+		 * file access too.
+		 */
+
+		spin_lock_irqsave(ch->lock, flags);
+		ata_set_handler(drive, ar->handler, WAIT_CMD, NULL);
 		OUT_BYTE(ar->cmd, IDE_COMMAND_REG);
+		spin_unlock_irqrestore(ch->lock, flags);
 
 		/* FIXME: Warning check for race between handler and prehandler
 		 * for writing first block of data.  however since we are well
@@ -225,7 +233,8 @@ ide_startstop_t ata_taskfile(struct ata_device *drive,
 		    ar->cmd == WIN_MULTWRITE_EXT) {
 			ide_startstop_t startstop;
 
-			if (ide_wait_stat(&startstop, drive, rq, DATA_READY, drive->bad_wstat, WAIT_DRQ)) {
+			if (ata_status_poll(drive, DATA_READY, drive->bad_wstat,
+						WAIT_DRQ, rq, &startstop)) {
 				printk(KERN_ERR "%s: no DRQ after issuing %s\n",
 						drive->name, drive->mult_count ? "MULTWRITE" : "WRITE");
 				return startstop;
@@ -373,8 +382,12 @@ ide_startstop_t ata_special_intr(struct ata_device *drive, struct
 
 	struct ata_taskfile *ar = rq->special;
 	ide_startstop_t ret = ide_stopped;
+	unsigned long flags;
 
 	ide__sti();	/* local CPU only */
+
+	spin_lock_irqsave(drive->channel->lock, flags);
+
 	if (rq->buffer && ar->taskfile.sector_number) {
 		if (!ata_status(drive, 0, DRQ_STAT) && ar->taskfile.sector_number) {
 			int retries = 10;
@@ -408,6 +421,8 @@ ide_startstop_t ata_special_intr(struct ata_device *drive, struct
 	blkdev_dequeue_request(rq);
 	drive->rq = NULL;
 	end_that_request_last(rq);
+
+	spin_unlock_irqrestore(drive->channel->lock, flags);
 
 	return ret;
 }

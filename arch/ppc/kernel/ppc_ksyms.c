@@ -217,7 +217,7 @@ EXPORT_SYMBOL(__global_cli);
 EXPORT_SYMBOL(__global_sti);
 EXPORT_SYMBOL(__global_save_flags);
 EXPORT_SYMBOL(__global_restore_flags);
-#ifdef SPINLOCK_DEBUG
+#ifdef CONFIG_DEBUG_SPINLOCK
 EXPORT_SYMBOL(_raw_spin_lock);
 EXPORT_SYMBOL(_raw_spin_unlock);
 EXPORT_SYMBOL(_raw_spin_trylock);

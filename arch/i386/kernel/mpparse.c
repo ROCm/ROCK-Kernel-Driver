@@ -89,46 +89,6 @@ static int __init mpf_checksum(unsigned char *mp, int len)
 }
 
 /*
- * Processor encoding in an MP configuration block
- */
-
-static char __init *mpc_family(int family,int model)
-{
-	static char n[32];
-	static char *model_defs[]=
-	{
-		"80486DX","80486DX",
-		"80486SX","80486DX/2 or 80487",
-		"80486SL","80486SX/2",
-		"Unknown","80486DX/2-WB",
-		"80486DX/4","80486DX/4-WB"
-	};
-
-	switch (family) {
-		case 0x04:
-			if (model < 10)
-				return model_defs[model];
-			break;
-
-		case 0x05:
-			return("Pentium(tm)");
-
-		case 0x06:
-			return("Pentium(tm) Pro");
-
-		case 0x0F:
-			if (model == 0x00)
-				return("Pentium 4(tm)");
-			if (model == 0x02)
-				return("XEON(tm)");
-			if (model == 0x0F)
-				return("Special controller");
-	}
-	sprintf(n,"Unknown CPU [%d:%d]",family, model);
-	return n;
-}
-
-/* 
  * Have to match translation table entries to main table entries by counter
  * hence the mpc_record variable .... can't see a less disgusting way of
  * doing this ....
@@ -149,16 +109,16 @@ void __init MP_processor_info (struct mpc_config_processor *m)
 		quad = translation_table[mpc_record]->trans_quad;
 		logical_apicid = (quad << 4) + 
 			(m->mpc_apicid ? m->mpc_apicid << 1 : 1);
-		printk("Processor #%d %s APIC version %d (quad %d, apic %d)\n",
+		printk("Processor #%d %ld:%ld APIC version %d (quad %d, apic %d)\n",
 			m->mpc_apicid,
-			mpc_family((m->mpc_cpufeature & CPU_FAMILY_MASK)>>8 ,
-				   (m->mpc_cpufeature & CPU_MODEL_MASK)>>4),
+		        (m->mpc_cpufeature & CPU_FAMILY_MASK)>>8,
+			(m->mpc_cpufeature & CPU_MODEL_MASK)>>4,
 			m->mpc_apicver, quad, logical_apicid);
 	} else {
-		printk("Processor #%d %s APIC version %d\n",
+		printk("Processor #%d %ld:%ld APIC version %d\n",
 			m->mpc_apicid,
-			mpc_family((m->mpc_cpufeature & CPU_FAMILY_MASK)>>8 ,
-				   (m->mpc_cpufeature & CPU_MODEL_MASK)>>4),
+			(m->mpc_cpufeature & CPU_FAMILY_MASK)>>8,
+			(m->mpc_cpufeature & CPU_MODEL_MASK)>>4,
 			m->mpc_apicver);
 	}
 

@@ -1127,8 +1127,6 @@ S:	Maintained
 NETWORKING [IPv4/IPv6]
 P:	David S. Miller
 M:	davem@redhat.com
-P:	Andi Kleen
-M:	ak@muc.de
 P:	Alexey Kuznetsov
 M:	kuznet@ms2.inr.ac.ru
 P:	Pekka Savola (ipv6)

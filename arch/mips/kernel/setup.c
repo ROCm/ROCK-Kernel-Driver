@@ -29,6 +29,7 @@
 #include <linux/blk.h>
 #include <linux/ide.h>
 #include <linux/timex.h>
+#include <linux/root_dev.h>
 
 #include <asm/asm.h>
 #include <asm/bootinfo.h>
@@ -724,7 +725,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	/* Board specific code should have set up initrd_start and initrd_end */
-	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
+	ROOT_DEV = Root_RAM0;
 	if( __rd_start != __rd_end ) {
 		initrd_start = (unsigned long)&__rd_start;
 		initrd_end = (unsigned long)&__rd_end;

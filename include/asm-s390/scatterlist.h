@@ -1,5 +1,5 @@
-#ifndef _ASMS390X_SCATTERLIST_H
-#define _ASMS390X_SCATTERLIST_H
+#ifndef _ASMS390_SCATTERLIST_H
+#define _ASMS390_SCATTERLIST_H
 
 struct scatterlist {
     struct page *page;

@@ -102,6 +102,7 @@
 #include <asm/uaccess.h>
 
 #define MAJOR_NR MITSUMI_CDROM_MAJOR
+#define DEVICE_NR(device) (minor(device))
 #include <linux/blk.h>
 
 #define mcd_port mcd		/* for compatible parameter passing with "insmod" */
@@ -621,14 +622,14 @@ static void do_mcd_request(request_queue_t * q)
 	while (current_valid()) {
 		mcd_transfer();
 		if (CURRENT->nr_sectors == 0) {
-			end_request(1);
+			end_request(CURRENT, 1);
 		} else {
 			mcd_buf_out = -1;	/* Want to read a block not in buffer */
 			if (mcd_state == MCD_S_IDLE) {
 				if (!tocUpToDate) {
 					if (updateToc() < 0) {
 						while (current_valid())
-							end_request(0);
+							end_request(CURRENT, 0);
 						break;
 					}
 				}
@@ -693,7 +694,7 @@ static void mcd_poll(unsigned long dummy)
 					goto ret;
 				}
 				if (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				McdTries = MCD_RETRY_ATTEMPTS;
 			}
 		}
@@ -750,7 +751,7 @@ set_mode_immediately:
 				       "mcd: disk removed\n");
 				mcd_state = MCD_S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				goto out;
 			}
 			outb(MCMD_SET_MODE, MCDPORT(0));
@@ -784,7 +785,7 @@ read_immediately:
 				       "mcd: disk removed\n");
 				mcd_state = MCD_S_IDLE;
 				while (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				goto out;
 			}
 
@@ -825,7 +826,7 @@ data_immediately:
 					break;
 				}
 				if (current_valid())
-					end_request(0);
+					end_request(CURRENT, 0);
 				McdTries = 5;
 			}
 			mcd_state = MCD_S_START;
@@ -852,7 +853,7 @@ data_immediately:
 				while (current_valid()) {
 					mcd_transfer();
 					if (CURRENT->nr_sectors == 0)
-						end_request(1);
+						end_request(CURRENT, 1);
 					else
 						break;
 				}

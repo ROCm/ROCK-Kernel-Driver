@@ -247,7 +247,7 @@ int nfs_fill_super(struct super_block *sb, struct nfs_mount_data *data, int sile
 	int			tcp, version, maxlen;
 
 	/* We probably want something more informative here */
-	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", major(sb->s_dev), minor(sb->s_dev));
+	snprintf(sb->s_id, sizeof(sb->s_id), "%x:%x", MAJOR(sb->s_dev), MINOR(sb->s_dev));
 
 	sb->s_magic      = NFS_SUPER_MAGIC;
 	sb->s_op         = &nfs_sops;
@@ -693,6 +693,7 @@ __nfs_fhget(struct super_block *sb, struct nfs_fh *fh, struct nfs_fattr *fattr)
 		inode->i_atime = new_atime;
 		NFS_CACHE_MTIME(inode) = new_mtime;
 		inode->i_mtime = nfs_time_to_secs(new_mtime);
+		NFS_MTIME_UPDATE(inode) = jiffies;
 		NFS_CACHE_ISIZE(inode) = new_size;
 		inode->i_size = new_isize;
 		inode->i_mode = fattr->mode;
@@ -1058,7 +1059,8 @@ __nfs_refresh_inode(struct inode *inode, struct nfs_fattr *fattr)
 	inode->i_atime = new_atime;
 
 	if (NFS_CACHE_MTIME(inode) != new_mtime) {
-		NFS_MTIME_UPDATE(inode) = jiffies;
+		if (invalid)
+			NFS_MTIME_UPDATE(inode) = jiffies;
 		NFS_CACHE_MTIME(inode) = new_mtime;
 		inode->i_mtime = nfs_time_to_secs(new_mtime);
 	}

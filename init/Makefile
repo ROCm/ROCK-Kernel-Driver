@@ -22,4 +22,5 @@ $(TOPDIR)/include/linux/compile.h: ../include/linux/compile.h ;
 # actual file if its content has changed.
 
 ../include/linux/compile.h: FORCE
+	@echo -n '  Generating $@'
 	@../scripts/mkcompile_h $@ "$(ARCH)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"

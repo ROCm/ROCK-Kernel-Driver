@@ -18,6 +18,7 @@ extern char x86_boot_params[2048];
 #define SYS_DESC_TABLE (*(struct sys_desc_table_struct*)(PARAM+0xa0))
 #define MOUNT_ROOT_RDONLY (*(unsigned short *) (PARAM+0x1F2))
 #define RAMDISK_FLAGS (*(unsigned short *) (PARAM+0x1F8))
+#define SAVED_VIDEO_MODE (*(unsigned short *) (PARAM+0x1FA))
 #define ORIG_ROOT_DEV (*(unsigned short *) (PARAM+0x1FC))
 #define AUX_DEVICE_INFO (*(unsigned char *) (PARAM+0x1FF))
 #define LOADER_TYPE (*(unsigned char *) (PARAM+0x210))

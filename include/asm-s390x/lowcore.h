@@ -45,6 +45,8 @@
 #define __LC_CPUADDR                    0xD98
 #define __LC_IPLDEV                     0xDB8
 
+#define __LC_JIFFY_TIMER		0xDC0
+
 #define __LC_PANIC_MAGIC                0xE00
 
 #define __LC_AREGS_SAVE_AREA            0x1340
@@ -60,7 +62,7 @@
 #define _SVC_PSW_MASK        0x0400000180000000
 #define _MCCK_PSW_MASK       0x0400000180000000
 #define _IO_PSW_MASK         0x0400000180000000
-#define _USER_PSW_MASK       0x0701C00180000000
+#define _USER_PSW_MASK       0x0705C00180000000
 #define _WAIT_PSW_MASK       0x0706000180000000
 #define _DW_PSW_MASK         0x0002000180000000
 
@@ -158,7 +160,7 @@ struct _lowcore
 	/* entry.S sensitive area end */
 
         /* SMP info area: defined by DJB */
-        __u64        jiffy_timer_cc;           /* 0xdc0 */
+        __u64        jiffy_timer;              /* 0xdc0 */
 	__u64        ext_call_fast;            /* 0xdc8 */
         __u8         pad12[0xe00-0xdd0];       /* 0xdd0 */
 
@@ -198,12 +200,12 @@ extern __inline__ void set_prefix(__u32 address)
 extern struct _lowcore *lowcore_ptr[];
 
 #ifndef CONFIG_SMP
-#define get_cpu_lowcore(cpu)    S390_lowcore
-#define safe_get_cpu_lowcore(cpu) S390_lowcore
+#define get_cpu_lowcore(cpu)      (&S390_lowcore)
+#define safe_get_cpu_lowcore(cpu) (&S390_lowcore)
 #else
-#define get_cpu_lowcore(cpu)    (*lowcore_ptr[cpu])
+#define get_cpu_lowcore(cpu)      (lowcore_ptr[(cpu)])
 #define safe_get_cpu_lowcore(cpu) \
-        ((cpu)==smp_processor_id() ? S390_lowcore:(*lowcore_ptr[(cpu)]))
+        ((cpu) == smp_processor_id() ? &S390_lowcore : lowcore_ptr[(cpu)])
 #endif
 #endif /* __ASSEMBLY__ */
 

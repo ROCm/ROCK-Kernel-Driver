@@ -32,6 +32,7 @@
 #include <linux/slab.h>
 #include <linux/seq_file.h>
 #include <linux/ide.h>
+#include <linux/root_dev.h>
 
 #include <asm/byteorder.h>
 #include <asm/system.h>
@@ -81,13 +82,13 @@ powerpmc250_setup_arch(void)
 	
 #ifdef CONFIG_BLK_DEV_INITRD
 	if (initrd_start)
-		ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0); /* /dev/ram */
+		ROOT_DEV = Root_RAM0;
 	else
 #endif
 #ifdef CONFIG_ROOT_NFS
-		ROOT_DEV = to_kdev_t(0x00ff); /* /dev/nfs pseudo device */
+		ROOT_DEV = Root_NFS;
 #else
-		ROOT_DEV = to_kdev_t(0x0802); /* /dev/sda2 */
+		ROOT_DEV = Root_SDA2;
 #endif
 
 	printk("Force PowerPMC250 port (C) 2001 MontaVista Software, Inc. (source@mvista.com)\n");

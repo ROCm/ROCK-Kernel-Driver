@@ -194,7 +194,6 @@ struct reiserfs_journal {
   struct reiserfs_journal_cnode *j_last ; /* newest journal block */
   struct reiserfs_journal_cnode *j_first ; /*  oldest journal block.  start here for traverse */
 
-  kdev_t               j_dev;
   struct file         *j_dev_file;
   struct block_device *j_dev_bd;  
   int j_1st_reserved_block;     /* first block on s_dev of reserved area journal */        
@@ -408,6 +407,8 @@ struct reiserfs_sb_info
 #define REISERFS_HASHED_RELOCATION 13
 #define REISERFS_TEST4 14 
 
+#define REISERFS_ATTRS 15
+
 #define REISERFS_TEST1 11
 #define REISERFS_TEST2 12
 #define REISERFS_TEST3 13
@@ -430,7 +431,7 @@ struct reiserfs_sb_info
 
 
 void reiserfs_file_buffer (struct buffer_head * bh, int list);
-int reiserfs_is_super(struct super_block *s)  ;
+int is_reiserfs_super(struct super_block *s)  ;
 int journal_mark_dirty(struct reiserfs_transaction_handle *, struct super_block *, struct buffer_head *bh) ;
 int flush_old_commits(struct super_block *s, int) ;
 int show_reiserfs_locks(void) ;
@@ -454,6 +455,13 @@ int reiserfs_resize(struct super_block *, unsigned long) ;
 #define SB_JOURNAL_MAX_BATCH(s)      (SB_JOURNAL(s)->s_journal_max_batch)
 #define SB_JOURNAL_MAX_COMMIT_AGE(s) (SB_JOURNAL(s)->s_journal_max_commit_age)
 #define SB_JOURNAL_MAX_TRANS_AGE(s)  (SB_JOURNAL(s)->s_journal_max_trans_age)
-#define SB_JOURNAL_DEV(s)            (SB_JOURNAL(s)->j_dev)
+
+/* A safe version of the "bdevname", which returns the "s_id" field of
+ * a superblock or else "Null superblock" if the super block is NULL.
+ */
+static inline char *reiserfs_bdevname(struct super_block *s)
+{
+        return (s == NULL) ? "Null superblock" : s -> s_id;
+}
 
 #endif	/* _LINUX_REISER_FS_SB */

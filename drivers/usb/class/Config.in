@@ -4,5 +4,6 @@
 comment 'USB Device Class drivers'
 dep_tristate '  USB Audio support' CONFIG_USB_AUDIO $CONFIG_USB $CONFIG_SOUND
 dep_tristate '  USB Bluetooth TTY support' CONFIG_USB_BLUETOOTH_TTY $CONFIG_USB
+dep_tristate '  USB MIDI support' CONFIG_USB_MIDI $CONFIG_USB
 dep_tristate '  USB Modem (CDC ACM) support' CONFIG_USB_ACM $CONFIG_USB
 dep_tristate '  USB Printer support' CONFIG_USB_PRINTER $CONFIG_USB

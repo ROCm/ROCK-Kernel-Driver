@@ -1502,10 +1502,6 @@ static int uhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, int mem_flags)
 		break;
 	case PIPE_ISOCHRONOUS:
 		if (urb->bandwidth == 0) {	/* not yet checked/allocated */
-			if (urb->number_of_packets <= 0) {
-				ret = -EINVAL;
-				break;
-			}
 			bustime = usb_check_bandwidth(urb->dev, urb);
 			if (bustime < 0) {
 				ret = bustime;
@@ -1777,10 +1773,8 @@ static void stall_callback(unsigned long ptr)
 			uhci_fsbr_timeout(uhci, u);
 
 		/* Check if the URB timed out */
-		if (u->timeout && time_after_eq(jiffies, up->inserttime + u->timeout)) {
-			list_del(&up->urb_list);
-			list_add_tail(&up->urb_list, &list);
-		}
+		if (u->timeout && time_after_eq(jiffies, up->inserttime + u->timeout))
+			list_move_tail(&up->urb_list, &list);
 
 		spin_unlock(&u->lock);
 	}

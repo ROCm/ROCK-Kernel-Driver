@@ -64,7 +64,7 @@
 #define DRIVER_DESC "USB Printer Device Class driver"
 
 #define USBLP_BUF_SIZE		8192
-#define DEVICE_ID_SIZE		1024
+#define USBLP_DEVICE_ID_SIZE	1024
 
 /* ioctls: */
 #define LPGETSTATUS		0x060b		/* same as in drivers/char/lp.c */
@@ -722,7 +722,8 @@ static ssize_t usblp_read(struct file *file, char *buffer, size_t count, loff_t 
 			usblp->minor, usblp->readurb->status);
 		usblp->readurb->dev = usblp->dev;
  		usblp->readcount = 0;
-		usb_submit_urb(usblp->readurb, GFP_KERNEL);
+		if (usb_submit_urb(usblp->readurb, GFP_KERNEL) < 0)
+			dbg("error submitting urb"); 
 		count = -EIO;
 		goto done;
 	}
@@ -839,7 +840,7 @@ static void *usblp_probe(struct usb_device *dev, unsigned int ifnum,
 	/* Malloc device ID string buffer to the largest expected length,
 	 * since we can re-query it on an ioctl and a dynamic string
 	 * could change in length. */
-	if (!(usblp->device_id_string = kmalloc(DEVICE_ID_SIZE, GFP_KERNEL))) {
+	if (!(usblp->device_id_string = kmalloc(USBLP_DEVICE_ID_SIZE, GFP_KERNEL))) {
 		err("out of memory for device_id_string");
 		goto abort_minor;
 	}
@@ -1045,7 +1046,7 @@ static int usblp_cache_device_id_string(struct usblp *usblp)
 {
 	int err, length;
 
-	err = usblp_get_id(usblp, 0, usblp->device_id_string, DEVICE_ID_SIZE - 1);
+	err = usblp_get_id(usblp, 0, usblp->device_id_string, USBLP_DEVICE_ID_SIZE - 1);
 	if (err < 0) {
 		dbg("usblp%d: error = %d reading IEEE-1284 Device ID string",
 			usblp->minor, err);
@@ -1059,8 +1060,8 @@ static int usblp_cache_device_id_string(struct usblp *usblp)
 	length = (usblp->device_id_string[0] << 8) + usblp->device_id_string[1];
 	if (length < 2)
 		length = 2;
-	else if (length >= DEVICE_ID_SIZE)
-		length = DEVICE_ID_SIZE - 1;
+	else if (length >= USBLP_DEVICE_ID_SIZE)
+		length = USBLP_DEVICE_ID_SIZE - 1;
 	usblp->device_id_string[length] = '\0';
 
 	dbg("usblp%d Device ID string [len=%d]=\"%s\"",

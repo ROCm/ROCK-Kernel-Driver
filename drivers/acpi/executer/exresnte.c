@@ -2,7 +2,7 @@
 /******************************************************************************
  *
  * Module Name: exresnte - AML Interpreter object resolution
- *              $Revision: 53 $
+ *              $Revision: 56 $
  *
  *****************************************************************************/
 
@@ -73,7 +73,6 @@ acpi_ex_resolve_node_to_value (
 	acpi_operand_object     *obj_desc = NULL;
 	acpi_namespace_node     *node;
 	acpi_object_type        entry_type;
-	acpi_integer            temp_val;
 
 
 	ACPI_FUNCTION_TRACE ("Ex_resolve_node_to_value");
@@ -113,9 +112,9 @@ acpi_ex_resolve_node_to_value (
 	switch (entry_type) {
 	case ACPI_TYPE_PACKAGE:
 
-		if (ACPI_TYPE_PACKAGE != source_desc->common.type) {
+		if (ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_PACKAGE) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Object not a Package, type %s\n",
-				acpi_ut_get_type_name (source_desc->common.type)));
+				acpi_ut_get_object_type_name (source_desc)));
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
@@ -131,9 +130,9 @@ acpi_ex_resolve_node_to_value (
 
 	case ACPI_TYPE_BUFFER:
 
-		if (ACPI_TYPE_BUFFER != source_desc->common.type) {
+		if (ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_BUFFER) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Object not a Buffer, type %s\n",
-				acpi_ut_get_type_name (source_desc->common.type)));
+				acpi_ut_get_object_type_name (source_desc)));
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
@@ -149,9 +148,9 @@ acpi_ex_resolve_node_to_value (
 
 	case ACPI_TYPE_STRING:
 
-		if (ACPI_TYPE_STRING != source_desc->common.type) {
+		if (ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_STRING) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Object not a String, type %s\n",
-				acpi_ut_get_type_name (source_desc->common.type)));
+				acpi_ut_get_object_type_name (source_desc)));
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
@@ -164,9 +163,9 @@ acpi_ex_resolve_node_to_value (
 
 	case ACPI_TYPE_INTEGER:
 
-		if (ACPI_TYPE_INTEGER != source_desc->common.type) {
+		if (ACPI_GET_OBJECT_TYPE (source_desc) != ACPI_TYPE_INTEGER) {
 			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Object not a Integer, type %s\n",
-				acpi_ut_get_type_name (source_desc->common.type)));
+				acpi_ut_get_object_type_name (source_desc)));
 			return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 		}
 
@@ -216,61 +215,14 @@ acpi_ex_resolve_node_to_value (
 		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);  /* Cannot be AE_TYPE */
 
 
-	/*
-	 * The only named references allowed are named constants
-	 *   e.g. -- Name (\OSFL, Ones)
-	 */
 	case INTERNAL_TYPE_REFERENCE:
 
-		switch (source_desc->reference.opcode) {
+		/* No named references are allowed here */
 
-		case AML_ZERO_OP:
+		ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unsupported reference opcode %X\n",
+			source_desc->reference.opcode));
 
-			temp_val = 0;
-			break;
-
-		case AML_ONE_OP:
-
-			temp_val = 1;
-			break;
-
-		case AML_ONES_OP:
-
-			temp_val = ACPI_INTEGER_MAX;
-			break;
-
-		case AML_REVISION_OP:
-
-			temp_val = ACPI_CA_SUPPORT_LEVEL;
-			break;
-
-		default:
-
-			ACPI_DEBUG_PRINT ((ACPI_DB_ERROR, "Unsupported reference opcode %X\n",
-				source_desc->reference.opcode));
-
-			return_ACPI_STATUS (AE_AML_BAD_OPCODE);
-		}
-
-		/* Create object for result */
-
-		obj_desc = acpi_ut_create_internal_object (ACPI_TYPE_INTEGER);
-		if (!obj_desc) {
-			return_ACPI_STATUS (AE_NO_MEMORY);
-		}
-
-		obj_desc->integer.value = temp_val;
-
-		/*
-		 * Truncate value if we are executing from a 32-bit ACPI table
-		 * AND actually executing AML code.  If we are resolving
-		 * an object in the namespace via an external call to the
-		 * subsystem, we will have a null Walk_state
-		 */
-		if (walk_state) {
-			acpi_ex_truncate_for32bit_table (obj_desc, walk_state);
-		}
-		break;
+		return_ACPI_STATUS (AE_AML_OPERAND_TYPE);
 
 
 	/* Default case is for unknown types */

@@ -163,7 +163,7 @@ int show_interrupts(struct seq_file *p, void *v)
 	}
 	seq_printf(p, "NMI: ");
 	for (j = 0; j < smp_num_cpus; j++)
-		seq_printf(p, "%10u ", nmi_count(cpu_logical_map(j)));
+		seq_printf(p, "%10u ", cpu_pda[cpu_logical_map(j)].__nmi_count);
 	seq_putc(p, '\n');
 #if CONFIG_X86_LOCAL_APIC
 	seq_printf(p, "LOC: ");

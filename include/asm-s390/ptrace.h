@@ -105,12 +105,16 @@
 
 #define STACK_FRAME_OVERHEAD	96	/* size of minimum stack frame */
 
+#define PTRACE_SETOPTIONS         21
+
+/* options set using PTRACE_SETOPTIONS */
+#define PTRACE_O_TRACESYSGOOD     0x00000001
+
 #ifndef __ASSEMBLY__
 #include <linux/config.h>
 #include <linux/stddef.h>
 #include <linux/types.h>
 
-#include <asm/current.h>
 #include <asm/setup.h>
 
 /* this typedef defines how a Program Status Word looks like */
@@ -118,7 +122,7 @@ typedef struct
 {
         __u32   mask;
         __u32   addr;
-} psw_t __attribute__ ((aligned(8)));
+} __attribute__ ((aligned(8))) psw_t;
 
 #ifdef __KERNEL__
 #define FIX_PSW(addr) ((unsigned long)(addr)|0x80000000UL)
@@ -150,8 +154,8 @@ typedef struct
 #define FPC_VALID_MASK          0xF8F8FF03
 
 /*
- * The first entries in pt_regs, gdb_pt_regs and user_regs_struct
- * are common for all three structures. The s390_regs structure
+ * The first entries in pt_regs and user_regs_struct
+ * are common for the two structures. The s390_regs structure
  * covers the common parts. It simplifies copying the common part
  * between the three structures.
  */
@@ -174,26 +178,7 @@ struct pt_regs
 	__u32 acrs[NUM_ACRS];
 	__u32 orig_gpr2;
 	__u32 trap;
-        __u32 old_ilc;
 };
-
-/*
- * The gdb_pt_regs struct is used instead of the pt_regs structure
- * if kernel remote debugging is used.
- */
-#if CONFIG_REMOTE_DEBUG
-struct gdb_pt_regs
-{
-	psw_t psw;
-	__u32 gprs[NUM_GPRS];
-	__u32 acrs[NUM_ACRS];
-	__u32 orig_gpr2;
-	__u32 trap;
-	__u32 crs[16];
-	s390_fp_regs fp_regs;
-	__u32 old_ilc;
-};
-#endif
 
 /*
  * Now for the program event recording (trace) definitions.
@@ -201,7 +186,7 @@ struct gdb_pt_regs
 typedef struct
 {
 	__u32 cr[3];
-} per_cr_words  __attribute__((packed));
+} per_cr_words;
 
 #define PER_EM_MASK 0xE8000000
 
@@ -223,14 +208,14 @@ typedef	struct
 	unsigned                       : 21;
 	addr_t   starting_addr;
 	addr_t   ending_addr;
-} per_cr_bits  __attribute__((packed));
+} per_cr_bits;
 
 typedef struct
 {
 	__u16          perc_atmid;          /* 0x096 */
 	__u32          address;             /* 0x098 */
 	__u8           access_id;           /* 0x0a1 */
-} per_lowcore_words  __attribute__((packed));
+} per_lowcore_words;
 
 typedef struct
 {
@@ -249,14 +234,14 @@ typedef struct
 	addr_t   address;                     /* 0x098 */
 	unsigned                         : 4; /* 0x0a1 */
 	unsigned access_id               : 4;
-} per_lowcore_bits __attribute__((packed));
+} per_lowcore_bits;
 
 typedef struct
 {
 	union {
 		per_cr_words   words;
 		per_cr_bits    bits;
-	} control_regs  __attribute__((packed));
+	} control_regs;
 	/*
 	 * Use these flags instead of setting em_instruction_fetch
 	 * directly they are used so that single stepping can be
@@ -275,7 +260,7 @@ typedef struct
 		per_lowcore_words words;
 		per_lowcore_bits  bits;
 	} lowcore; 
-} per_struct __attribute__((packed));
+} per_struct;
 
 typedef struct
 {
@@ -294,6 +279,7 @@ typedef struct
 #define PTRACE_PEEKDATA_AREA	      0x5003
 #define PTRACE_POKETEXT_AREA	      0x5004
 #define PTRACE_POKEDATA_AREA 	      0x5005
+
 /*
  * PT_PROT definition is loosely based on hppa bsd definition in
  * gdb/hppab-nat.c
@@ -345,7 +331,6 @@ struct user_regs_struct
 #define user_mode(regs) (((regs)->psw.mask & PSW_PROBLEM_STATE) != 0)
 #define instruction_pointer(regs) ((regs)->psw.addr)
 extern void show_regs(struct pt_regs * regs);
-extern char *task_show_regs(struct task_struct *task, char *buffer);
 #endif
 
 #endif /* __ASSEMBLY__ */

@@ -848,7 +848,7 @@ static void unmap_region(struct mm_struct *mm,
 {
 	mmu_gather_t *tlb;
 
-	tlb = tlb_gather_mmu(mm);
+	tlb = tlb_gather_mmu(mm, 0);
 
 	do {
 		unsigned long from, to;
@@ -1105,7 +1105,7 @@ void exit_mmap(struct mm_struct * mm)
 	release_segments(mm);
 	spin_lock(&mm->page_table_lock);
 
-	tlb = tlb_gather_mmu(mm);
+	tlb = tlb_gather_mmu(mm, 1);
 
 	flush_cache_mm(mm);
 	mpnt = mm->mmap;

@@ -791,7 +791,7 @@ static int e100_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct 
 
 		if(!atapi) {
 			/* set the irq handler which will finish the request when DMA is done */
-			ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
+			ata_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
 
 			/* issue cmd to drive */
 			OUT_BYTE(WIN_READDMA, IDE_COMMAND_REG);
@@ -802,10 +802,10 @@ static int e100_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct 
 		*R_DMA_CH3_CMD   = IO_STATE(R_DMA_CH3_CMD, cmd, start);
 
 		/* initiate a multi word dma read using DMA handshaking */
-		
+
 		*R_ATA_TRANSFER_CNT =
 			IO_FIELD(R_ATA_TRANSFER_CNT, count, ata_tot_size >> 1);
-		
+
 		*R_ATA_CTRL_DATA =
 			IO_FIELD(R_ATA_CTRL_DATA, data, IDE_DATA_REG) |
 			IO_STATE(R_ATA_CTRL_DATA, rw,       read) |
@@ -831,7 +831,7 @@ static int e100_dmaproc(ide_dma_action_t func, struct ata_device *drive, struct 
 
 		if(!atapi) {
 			/* set the irq handler which will finish the request when DMA is done */
-			ide_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
+			ata_set_handler(drive, &etrax_dma_intr, WAIT_CMD, NULL);
 
 			/* issue cmd to drive */
 			OUT_BYTE(WIN_WRITEDMA, IDE_COMMAND_REG);

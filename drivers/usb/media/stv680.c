@@ -86,7 +86,7 @@ static unsigned int debug = 0;
 #define PDEBUG(level, fmt, args...) \
 	do { \
 	if (debug >= level)	\
-		info("[" __PRETTY_FUNCTION__ ":%d] " fmt, __LINE__ , ## args);	\
+		info("[%s:%d] " fmt, __FUNCTION__, __LINE__ , ## args);	\
 	} while (0)
 
 

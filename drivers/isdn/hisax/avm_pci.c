@@ -19,6 +19,7 @@
 #include "isac.h"
 #include "isdnl1.h"
 #include <linux/pci.h>
+#include <linux/isapnp.h>
 #include <linux/interrupt.h>
 
 extern const char *CardType[];
@@ -763,6 +764,10 @@ AVM_card_msg(struct IsdnCardState *cs, int mt, void *arg)
 }
 
 static struct pci_dev *dev_avm __initdata = NULL;
+#ifdef __ISAPNP__
+static struct pci_bus *bus_avm __initdata = NULL;
+static struct pci_dev *pnp_avm __initdata = NULL;
+#endif
 
 int __init
 setup_avm_pcipnp(struct IsdnCard *card)
@@ -776,10 +781,47 @@ setup_avm_pcipnp(struct IsdnCard *card)
 	if (cs->typ != ISDN_CTYPE_FRITZPCI)
 		return (0);
 	if (card->para[1]) {
+		/* old manual method */
 		cs->hw.avm.cfg_reg = card->para[1];
 		cs->irq = card->para[0];
 		cs->subtyp = AVM_FRITZ_PNP;
 	} else {
+#ifdef __ISAPNP__
+		if (isapnp_present()) {
+			struct pci_bus *ba;
+			if ((ba = isapnp_find_card(
+				ISAPNP_VENDOR('A', 'V', 'M'),
+				ISAPNP_FUNCTION(0x0900), bus_avm))) {
+				bus_avm = ba;
+				pnp_avm = NULL;
+				if ((pnp_avm = isapnp_find_dev(bus_avm,
+					ISAPNP_VENDOR('A', 'V', 'M'),
+					ISAPNP_FUNCTION(0x0900), pnp_avm))) {
+					pnp_avm->prepare(pnp_avm);
+					pnp_avm->deactivate(pnp_avm);
+					pnp_avm->activate(pnp_avm);
+					cs->hw.avm.cfg_reg =
+						pnp_avm->resource[0].start;
+					cs->irq = 
+						pnp_avm->irq_resource[0].start;
+					if (!cs->irq) {
+						printk(KERN_ERR "FritzPnP:No IRQ\n");
+						pnp_avm->deactivate(pnp_avm);
+						return(0);
+					}
+					if (!cs->hw.avm.cfg_reg) {
+						printk(KERN_ERR "FritzPnP:No IO address\n");
+						pnp_avm->deactivate(pnp_avm);
+						return(0);
+					}
+					cs->subtyp = AVM_FRITZ_PNP;
+					goto ready;
+				}
+			}
+		} else {
+			printk(KERN_INFO "FritzPnP: no ISA PnP present\n");
+		}
+#endif
 #if CONFIG_PCI
 		if (!pci_present()) {
 			printk(KERN_ERR "FritzPCI: no PCI bus present\n");
@@ -810,6 +852,7 @@ setup_avm_pcipnp(struct IsdnCard *card)
 		return (0);
 #endif /* CONFIG_PCI */
 	}
+ready:
 	cs->hw.avm.isac = cs->hw.avm.cfg_reg + 0x10;
 	if (check_region((cs->hw.avm.cfg_reg), 32)) {
 		printk(KERN_WARNING

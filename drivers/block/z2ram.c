@@ -26,6 +26,8 @@
 */
 
 #define MAJOR_NR    Z2RAM_MAJOR
+#define DEVICE_NAME "Z2RAM"
+#define DEVICE_NR(device) (minor(device))
 
 #include <linux/major.h>
 #include <linux/slab.h>
@@ -76,10 +78,8 @@ do_z2_request( request_queue_t * q )
 
     while ( TRUE )
     {
-	if (blk_queue_empty(QUEUE)) {
-		CLEAR_INTR;
+	if (blk_queue_empty(QUEUE))
 		return;
-	}
 
 	start = CURRENT->sector << 9;
 	len  = CURRENT->current_nr_sectors << 9;
@@ -89,14 +89,14 @@ do_z2_request( request_queue_t * q )
 	    printk( KERN_ERR DEVICE_NAME ": bad access: block=%lu, count=%u\n",
 		CURRENT->sector,
 		CURRENT->current_nr_sectors);
-	    end_request( FALSE );
+	    end_request(CURRENT, FALSE);
 	    continue;
 	}
 
 	if ( ( rq_data_dir(CURRENT) != READ ) && ( rq_data_dir(CURRENT) != WRITE ) )
 	{
 	    printk( KERN_ERR DEVICE_NAME ": bad command: %ld\n", rq_data_dir(CURRENT) );
-	    end_request( FALSE );
+	    end_request(CURRENT, FALSE);
 	    continue;
 	}
 
@@ -118,7 +118,7 @@ do_z2_request( request_queue_t * q )
 	    len -= size;
 	}
 
-	end_request( TRUE );
+	end_request(CURRENT, TRUE);
     }
 }
 

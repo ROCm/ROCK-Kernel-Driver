@@ -58,11 +58,18 @@ static ide_startstop_t service(struct ata_device *drive, struct request *rq);
 static ide_startstop_t tcq_nop_handler(struct ata_device *drive, struct request *rq)
 {
 	struct ata_taskfile *args = rq->special;
+	unsigned long flags;
 
 	ide__sti();
+
+	spin_lock_irqsave(drive->channel->lock, flags);
+
 	blkdev_dequeue_request(rq);
 	drive->rq = NULL;
 	end_that_request_last(rq);
+
+	spin_unlock_irqrestore(drive->channel->lock, flags);
+
 	kfree(args);
 
 	return ide_stopped;
@@ -218,6 +225,8 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
  * and it must have reported a need for service (status has SERVICE_STAT set)
  *
  * Also, nIEN must be set as not to need protection against ide_dmaq_intr
+ *
+ * Channel lock should be held.
  */
 static ide_startstop_t service(struct ata_device *drive, struct request *rq)
 {
@@ -318,6 +327,8 @@ static ide_startstop_t check_service(struct ata_device *drive, struct request *r
 
 static ide_startstop_t dmaq_complete(struct ata_device *drive, struct request *rq)
 {
+	unsigned long flags;
+	struct ata_channel *ch = drive->channel;
 	u8 dma_stat;
 
 	/*
@@ -339,7 +350,14 @@ static ide_startstop_t dmaq_complete(struct ata_device *drive, struct request *r
 		printk("%s: bad DMA status (dma_stat=%x)\n", drive->name, dma_stat);
 
 	TCQ_PRINTK("%s: ending %p, tag %d\n", __FUNCTION__, rq, rq->tag);
-	__ide_end_request(drive, rq, !dma_stat, rq->nr_sectors);
+
+	/* FIXME: this locking should encompass the above register
+	 * file access too.
+	 */
+
+	spin_lock_irqsave(ch->lock, flags);
+	__ata_end_request(drive, rq, !dma_stat, rq->nr_sectors);
+	spin_unlock_irqrestore(ch->lock, flags);
 
 	/*
 	 * we completed this command, check if we can service a new command
@@ -503,6 +521,8 @@ static int tcq_wait_dataphase(struct ata_device *drive)
 /*
  * Invoked from a SERVICE interrupt, command etc already known.  Just need to
  * start the dma engine for this tag.
+ *
+ * Channel lock should be held.
  */
 static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *rq)
 {
@@ -527,6 +547,8 @@ static ide_startstop_t udma_tcq_start(struct ata_device *drive, struct request *
 
 /*
  * Start a queued command from scratch.
+ *
+ * Channel lock should be held.
  */
 ide_startstop_t udma_tcq_taskfile(struct ata_device *drive, struct request *rq)
 {

@@ -12,6 +12,7 @@
 #include <linux/types.h>
 #include <linux/kdev_t.h>
 #include <linux/console.h>
+#include <linux/root_dev.h>
 
 #include <asm/delay.h>
 #include <asm/irq.h>
@@ -52,7 +53,7 @@ ia64_ctl_trace (long on)
 void __init
 hpsim_setup (char **cmdline_p)
 {
-	ROOT_DEV = to_kdev_t(0x0801);		/* default to first SCSI drive */
+	ROOT_DEV = Root_SDA1;		/* default to first SCSI drive */
 
 	register_console (&hpsim_cons);
 }

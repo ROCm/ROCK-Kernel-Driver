@@ -49,6 +49,9 @@
 #define __LDT(n) (((n)<<2) + __FIRST_LDT_ENTRY)
 
 #ifndef __ASSEMBLY__
+
+#include <asm/mmu.h>
+
 struct desc_struct {
 	unsigned long a,b;
 };

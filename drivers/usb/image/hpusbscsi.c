@@ -273,8 +273,6 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 	usb_urb_callback usb_callback;
 	int res;
 
-	hpusbscsi->use_count++;
-
 	/* we don't answer for anything but our single device on any faked host controller */
 	if ( srb->device->lun || srb->device->id || srb->device->channel ) {
 		if (callback) {
@@ -341,7 +339,6 @@ static int hpusbscsi_scsi_queuecommand (Scsi_Cmnd *srb, scsi_callback callback)
 	}
 
 out:
-	hpusbscsi->use_count--;
 	return 0;
 }
 

@@ -24,6 +24,17 @@ extern int have_isa_bridge;
 #define have_isa_bridge		(0)
 #endif
 
+struct pt_regs;
+
+void die(const char *msg, struct pt_regs *regs, int err)
+		__attribute__((noreturn));
+
+void die_if_kernel(const char *str, struct pt_regs *regs, int err);
+
+void hook_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+				       struct pt_regs *),
+		     int sig, const char *name);
+
 #include <asm/proc-fns.h>
 
 #define xchg(ptr,x) \

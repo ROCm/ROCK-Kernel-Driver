@@ -29,6 +29,7 @@ struct ed {
 	/* rest are purely for the driver's use */
 	dma_addr_t		dma;		/* addr of ED */
 	struct ed		*ed_prev;	/* for non-interrupt EDs */
+	struct td		*dummy;
 
 	u8			type; 		/* PIPE_{BULK,...} */
 	u8			interval;	/* interrupt, isochronous */
@@ -37,9 +38,9 @@ struct ed {
 			u8	int_period;
 			u8	int_branch;
 			u8	int_load; 
-		};
+		} intr_info;
 		u16		last_iso;	/* isochronous */
-	};
+	} intriso;
 
 	u8			state;		/* ED_{NEW,UNLINK,OPER} */
 #define ED_NEW 		0x00		/* unused, no dummy td */
@@ -63,24 +64,33 @@ struct ed {
 struct td {
 	/* first fields are hardware-specified, le32 */
 	__u32		hwINFO;		/* transfer info bitmask */
+
+	/* hwINFO bits for both general and iso tds: */
 #define TD_CC       0xf0000000			/* condition code */
 #define TD_CC_GET(td_p) ((td_p >>28) & 0x0f)
 //#define TD_CC_SET(td_p, cc) (td_p) = ((td_p) & 0x0fffffff) | (((cc) & 0x0f) << 28)
+#define TD_DI       0x00E00000			/* frames before interrupt */
+#define TD_DI_SET(X) (((X) & 0x07)<< 21)
+	/* these two bits are available for definition/use by HCDs in both
+	 * general and iso tds ... others are available for only one type
+	 */
+//#define TD____	    0x00020000
+#define TD_ISO	    0x00010000			/* copy of ED_ISO */
+
+	/* hwINFO bits for general tds: */
 #define TD_EC       0x0C000000			/* error count */
 #define TD_T        0x03000000			/* data toggle state */
 #define TD_T_DATA0  0x02000000				/* DATA0 */
 #define TD_T_DATA1  0x03000000				/* DATA1 */
 #define TD_T_TOGGLE 0x00000000				/* uses ED_C */
-#define TD_DI       0x00E00000			/* frames before interrupt */
-//#define TD_DI_SET(X) (((X) & 0x07)<< 21)
 #define TD_DP       0x00180000			/* direction/pid */
 #define TD_DP_SETUP 0x00000000			/* SETUP pid */
 #define TD_DP_IN    0x00100000				/* IN pid */
 #define TD_DP_OUT   0x00080000				/* OUT pid */
 							/* 0x00180000 rsvd */
 #define TD_R        0x00040000			/* round: short packets OK? */
-					/* bits 0x1ffff are defined by HCD */
-#define TD_ISO	    0x00010000			/* copy of ED_ISO */
+
+	/* (no hwINFO #defines yet for iso tds) */
 
   	__u32		hwCBP;		/* Current Buffer Pointer (or 0) */
   	__u32		hwNextTD;	/* Next TD Pointer */
@@ -331,6 +341,11 @@ struct hash_list_t {
 struct ohci_hcd {
 	spinlock_t		lock;
 
+        /*
+	 * parent device
+	 */
+        struct device		*parent_dev;
+
 	/*
 	 * I/O memory used to communicate with the HC (uncached);
 	 */
@@ -348,12 +363,10 @@ struct ohci_hcd {
 	struct ed		*ed_controltail;	/* last in ctrl list */
  	struct ed		*ed_isotail;		/* last in iso list */
 
-#ifdef CONFIG_PCI
 	struct pci_pool		*td_cache;
 	struct pci_pool		*ed_cache;
 	struct hash_list_t	td_hash [TD_HASH_SIZE];
 	struct hash_list_t	ed_hash [ED_HASH_SIZE];
-#endif
 
 	/*
 	 * driver state

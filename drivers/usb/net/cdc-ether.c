@@ -129,13 +129,13 @@ goon:
 			usb_rcvbulkpipe(ether_dev->usb, ether_dev->data_ep_in),
 			ether_dev->rx_buff, ether_dev->wMaxSegmentSize, 
 			read_bulk_callback, ether_dev );
-			
-	// Give this to the USB subsystem so it can tell us 
+
+	// Give this to the USB subsystem so it can tell us
 	// when more data arrives.
 	if ( (res = usb_submit_urb(ether_dev->rx_urb, GFP_KERNEL)) ) {
-		warn( __FUNCTION__ " failed submint rx_urb %d", res);
+		warn("%s failed submint rx_urb %d", __FUNCTION__, res);
 	}
-	
+
 	// We are no longer busy, show us the frames!!!
 	ether_dev->flags &= ~CDC_ETHER_RX_BUSY;
 }
@@ -339,7 +339,7 @@ static int CDCEther_open(struct net_device *net)
 
 	// Turn on the USB and let the packets flow!!!
 	if ( (res = enable_net_traffic( ether_dev )) ) {
-		err( __FUNCTION__ "can't enable_net_traffic() - %d", res );
+		err("%s can't enable_net_traffic() - %d", __FUNCTION__, res );
 		return -EIO;
 	}
 
@@ -353,7 +353,7 @@ static int CDCEther_open(struct net_device *net)
 	if ( (res = usb_submit_urb(ether_dev->rx_urb, GFP_KERNEL)) )
 	{
 		// Hmm...  Okay...
-		warn( __FUNCTION__ " failed rx_urb %d", res );
+		warn("%s failed rx_urb %d", __FUNCTION__, res );
 	}
 
 	// Tell the kernel we are ready to start receiving from it
@@ -411,6 +411,7 @@ static int CDCEther_ioctl( struct net_device *net, struct ifreq *rq, int cmd )
 	}
 }
 
+#if 0
 static void CDC_SetEthernetPacketFilter (ether_dev_t *ether_dev)
 {
 	usb_control_msg(ether_dev->usb,
@@ -422,7 +423,8 @@ static void CDC_SetEthernetPacketFilter (ether_dev_t *ether_dev)
 			NULL,
 			0, /* size */
 			HZ); /* timeout */
-}	
+}
+#endif
 
 
 static void CDCEther_set_multicast( struct net_device *net )
@@ -430,7 +432,7 @@ static void CDCEther_set_multicast( struct net_device *net )
 	ether_dev_t *ether_dev = net->priv;
 	int i;
 	__u8 *buff;
-	
+
 
 	// Tell the kernel to stop sending us frames while we get this
 	// all set up.
