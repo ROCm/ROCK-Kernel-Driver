@@ -323,7 +323,7 @@ static inline int dup_mmap(struct mm_struct * mm, struct mm_struct * oldmm)
       
 			/* insert tmp into the share list, just after mpnt */
 			down(&file->f_mapping->i_shared_sem);
-			list_add_tail(&tmp->shared, &mpnt->shared);
+			list_add(&tmp->shared, &mpnt->shared);
 			up(&file->f_mapping->i_shared_sem);
 		}
 
