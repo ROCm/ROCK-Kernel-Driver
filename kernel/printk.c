@@ -366,7 +366,7 @@ out:
 void kdb_syslog_data(char *syslog_data[4])
 {
     syslog_data[0] = log_buf;
-    syslog_data[1] = log_buf + sizeof(log_buf);
+    syslog_data[1] = log_buf + __LOG_BUF_LEN;
     syslog_data[2] = log_buf + log_end - (logged_chars < __LOG_BUF_LEN ? logged_chars : __LOG_BUF_LEN);
     syslog_data[3] = log_buf + log_end;
 }
