@@ -387,6 +387,12 @@ static void pcmcia_remove_socket(struct class_device *class_dev)
 	socket->ss_entry = NULL;
 }
 
+static void pcmcia_release_socket(struct class_device *class_dev)
+{
+	struct pcmcia_socket *socket = class_get_devdata(class_dev);
+	complete(&socket->socket_released);
+}
+
 
 /**
  * pcmcia_register_socket - add a new pcmcia socket device
@@ -450,6 +456,8 @@ void pcmcia_unregister_socket(struct pcmcia_socket *socket)
 
 	DEBUG(0, "cs: pcmcia_unregister_socket(0x%p)\n", socket->ss_entry);
 
+	init_completion(&socket->socket_released);
+
 	/* remove from the device core */
 	class_device_unregister(&socket->dev);
 
@@ -457,6 +465,9 @@ void pcmcia_unregister_socket(struct pcmcia_socket *socket)
 	down_write(&pcmcia_socket_list_rwsem);
 	list_del(&socket->socket_list);
 	up_write(&pcmcia_socket_list_rwsem);
+
+	/* wait for sysfs to drop all references */
+	wait_for_completion(&socket->socket_released);
 } /* pcmcia_unregister_socket */
 EXPORT_SYMBOL(pcmcia_unregister_socket);
 
@@ -2496,6 +2507,7 @@ EXPORT_SYMBOL(MTDHelperEntry);
 
 struct class pcmcia_socket_class = {
 	.name = "pcmcia_socket",
+	.release = pcmcia_release_socket,
 };
 EXPORT_SYMBOL(pcmcia_socket_class);
 

@@ -193,6 +193,7 @@ struct pcmcia_socket {
 	char				*fake_cis;
 
 	struct list_head		socket_list;
+	struct completion		socket_released;
 
  	/* deprecated */
 	unsigned int			sock;		/* socket number */
