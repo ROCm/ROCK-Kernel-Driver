@@ -327,7 +327,7 @@ find_miiphy (struct net_device *dev)
 	return 0;
 }
 
-int
+static int __devinit
 parse_eeprom (struct net_device *dev)
 {
 	int i, j;
@@ -1275,7 +1275,7 @@ rio_ioctl_ext (struct net_device *dev, struct ioctl_data *iodata)
 #define EEP_READ 0x0200
 #define EEP_BUSY 0x8000
 /* Read the EEPROM word */
-int
+static int __devinit
 read_eeprom (long ioaddr, int eep_addr)
 {
 	int i = 1000;
