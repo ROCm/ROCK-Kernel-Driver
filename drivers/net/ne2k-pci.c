@@ -69,8 +69,6 @@ KERN_INFO "  http://www.scyld.com/network/ne2k-pci.html\n";
 #if defined(__powerpc__)
 #define inl_le(addr)  le32_to_cpu(inl(addr))
 #define inw_le(addr)  le16_to_cpu(inw(addr))
-#define insl insl_ns
-#define outsl outsl_ns
 #endif
 
 #define PFX DRV_NAME ": "
