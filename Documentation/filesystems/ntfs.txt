@@ -247,6 +247,12 @@ ChangeLog
 
 Note, a technical ChangeLog aimed at kernel hackers is in fs/ntfs/ChangeLog.
 
+2.0.20:
+	- Support non-resident directory index bitmaps. This means we now cope
+	  with huge directories without problems.
+	- Fix a page leak that manifested itself in some cases when reading
+	  directory contents.
+	- Internal cleanups.
 2.0.19:
 	- Fix race condition and improvements in block i/o interface.
 	- Optimization when reading compressed files.

@@ -329,12 +329,9 @@ static void __ntfs_init_inode(struct super_block *sb, ntfs_inode *ni)
 	ni->attr_list_size = 0;
 	ni->attr_list = NULL;
 	init_run_list(&ni->attr_list_rl);
+	ni->_IDM(bmp_ino) = NULL;
 	ni->_IDM(index_block_size) = 0;
 	ni->_IDM(index_vcn_size) = 0;
-	ni->_IDM(bmp_size) = 0;
-	ni->_IDM(bmp_initialized_size) = 0;
-	ni->_IDM(bmp_allocated_size) = 0;
-	init_run_list(&ni->_IDM(bmp_rl));
 	ni->_IDM(index_block_size_bits) = 0;
 	ni->_IDM(index_vcn_size_bits) = 0;
 	init_MUTEX(&ni->extent_lock);
@@ -680,6 +677,8 @@ skip_attr_list_load:
 	 * in ntfs_ino->attr_list and it is ntfs_ino->attr_list_size bytes.
 	 */
 	if (S_ISDIR(vi->i_mode)) {
+		struct inode *bvi;
+		ntfs_inode *bni;
 		INDEX_ROOT *ir;
 		char *ir_end, *index_end;
 
@@ -787,7 +786,8 @@ skip_attr_list_load:
 
 		if (!(ir->index.flags & LARGE_INDEX)) {
 			/* No index allocation. */
-			vi->i_size = ni->initialized_size = 0;
+			vi->i_size = ni->initialized_size =
+					ni->allocated_size = 0;
 			goto skip_large_dir_stuff;
 		} /* LARGE_INDEX: Index allocation present. Setup state. */
 		NInoSetIndexAllocPresent(ni);
@@ -832,63 +832,31 @@ skip_attr_list_load:
 				ctx->attr->_ANR(initialized_size));
 		ni->allocated_size = sle64_to_cpu(
 				ctx->attr->_ANR(allocated_size));
-		/* Find bitmap attribute. */
-		reinit_attr_search_ctx(ctx);
-		if (!lookup_attr(AT_BITMAP, I30, 4, CASE_SENSITIVE, 0, NULL, 0,
-				ctx)) {
-			ntfs_error(vi->i_sb, "$BITMAP attribute is not "
-					"present but it must be.");
+
+		/* Get the index bitmap attribute inode. */
+		bvi = ntfs_attr_iget(vi, AT_BITMAP, I30, 4);
+		if (unlikely(IS_ERR(bvi))) {
+			ntfs_error(vi->i_sb, "Failed to get bitmap attribute.");
+			err = PTR_ERR(bvi);
 			goto unm_err_out;
 		}
-		if (ctx->attr->flags & (ATTR_COMPRESSION_MASK |
-				ATTR_IS_ENCRYPTED | ATTR_IS_SPARSE)) {
+		ni->_IDM(bmp_ino) = bvi;
+		bni = NTFS_I(bvi);
+		if (NInoCompressed(bni) || NInoEncrypted(bni) ||
+				NInoSparse(bni)) {
 			ntfs_error(vi->i_sb, "$BITMAP attribute is compressed "
 					"and/or encrypted and/or sparse.");
 			goto unm_err_out;
 		}
-		if (ctx->attr->non_resident) {
-			NInoSetBmpNonResident(ni);
-			if (ctx->attr->_ANR(lowest_vcn)) {
-				ntfs_error(vi->i_sb, "First extent of $BITMAP "
-						"attribute has non zero "
-						"lowest_vcn. Inode is corrupt. "
-						"You should run chkdsk.");
-				goto unm_err_out;
-			}
-			ni->_IDM(bmp_size) = sle64_to_cpu(
-					ctx->attr->_ANR(data_size));
-			ni->_IDM(bmp_initialized_size) = sle64_to_cpu(
-					ctx->attr->_ANR(initialized_size));
-			ni->_IDM(bmp_allocated_size) = sle64_to_cpu(
-					ctx->attr->_ANR(allocated_size));
-			/*
-			 * Setup the run list. No need for locking as we have
-			 * exclusive access to the inode at this time.
-			 */
-			ni->_IDM(bmp_rl).rl = decompress_mapping_pairs(vol,
-					ctx->attr, NULL);
-			if (IS_ERR(ni->_IDM(bmp_rl).rl)) {
-				err = PTR_ERR(ni->_IDM(bmp_rl).rl);
-				ni->_IDM(bmp_rl).rl = NULL;
-				ntfs_error(vi->i_sb, "Mapping pairs "
-						"decompression failed with "
-						"error code %i.", -err);
-				goto unm_err_out;
-			}
-		} else
-			ni->_IDM(bmp_size) = ni->_IDM(bmp_initialized_size) =
-					ni->_IDM(bmp_allocated_size) =
-					le32_to_cpu(
-					ctx->attr->_ARA(value_length));
 		/* Consistency check bitmap size vs. index allocation size. */
-		if (ni->_IDM(bmp_size) << 3 < vi->i_size >>
-				ni->_IDM(index_block_size_bits)) {
-			ntfs_error(vi->i_sb, "$I30 bitmap too small (0x%Lx) "
+		if ((bvi->i_size << 3) < (vi->i_size >>
+				ni->_IDM(index_block_size_bits))) {
+			ntfs_error(vi->i_sb, "Index bitmap too small (0x%Lx) "
 					"for index allocation (0x%Lx).",
-					(long long)ni->_IDM(bmp_size) << 3,
-					vi->i_size);
+					bvi->i_size << 3, vi->i_size);
 			goto unm_err_out;
 		}
+
 skip_large_dir_stuff:
 		/* Everyone gets read and scan permissions. */
 		vi->i_mode |= S_IRUGO | S_IXUGO;
@@ -1271,7 +1239,7 @@ static int ntfs_read_locked_attr_inode(struct inode *base_vi, struct inode *vi)
 						"will probably cause problems "
 						"when trying to access the "
 						"file. Please notify "
-						"linux-ntfs-dev@ lists.sf.net "
+						"linux-ntfs-dev@lists.sf.net "
 						"that you saw this message.");
 		}
 	}
@@ -1785,6 +1753,32 @@ int ntfs_commit_inode(ntfs_inode *ni)
 	return 0;
 }
 
+/**
+ * ntfs_put_inode - handler for when the inode reference count is decremented
+ * @vi:		vfs inode
+ *
+ * The VFS calls ntfs_put_inode() every time the inode reference count (i_count)
+ * is about to be decremented (but before the decrement itself.
+ *
+ * If the inode @vi is a directory with a single reference, we need to put the
+ * attribute inode for the directory index bitmap, if it is present, otherwise
+ * the directory inode would remain pinned for ever (or rather until umount()
+ * time.
+ */
+void ntfs_put_inode(struct inode *vi)
+{
+	if (S_ISDIR(vi->i_mode) && (atomic_read(&vi->i_count) == 2)) {
+		ntfs_inode *ni;
+
+		ni = NTFS_I(vi);
+		if (NInoIndexAllocPresent(ni) && ni->_IDM(bmp_ino)) {
+			iput(ni->_IDM(bmp_ino));
+			ni->_IDM(bmp_ino) = NULL;
+		}
+	}
+	return;
+}
+
 void __ntfs_clear_inode(ntfs_inode *ni)
 {
 	int err;
@@ -1866,12 +1860,7 @@ void ntfs_clear_big_inode(struct inode *vi)
 
 	__ntfs_clear_inode(ni);
 
-	if (S_ISDIR(vi->i_mode)) {
-		down_write(&ni->_IDM(bmp_rl).lock);
-		if (ni->_IDM(bmp_rl).rl)
-			ntfs_free(ni->_IDM(bmp_rl).rl);
-		up_write(&ni->_IDM(bmp_rl).lock);
-	} else if (NInoAttr(ni)) {
+	if (NInoAttr(ni)) {
 		/* Release the base inode if we are holding it. */
 		if (ni->nr_extents == -1) {
 			iput(VFS_I(ni->_INE(base_ntfs_ino)));
