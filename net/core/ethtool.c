@@ -454,6 +454,33 @@ static int ethtool_set_sg(struct net_device *dev, char *useraddr)
 	return dev->ethtool_ops->set_sg(dev, edata.data);
 }
 
+static int ethtool_get_tso(struct net_device *dev, char *useraddr)
+{
+	struct ethtool_value edata = { ETHTOOL_GTSO };
+
+	if (!dev->ethtool_ops->get_tso)
+		return -EOPNOTSUPP;
+
+	edata.data = dev->ethtool_ops->get_tso(dev);
+
+	if (copy_to_user(useraddr, &edata, sizeof(edata)))
+		return -EFAULT;
+	return 0;
+}
+
+static int ethtool_set_tso(struct net_device *dev, char *useraddr)
+{
+	struct ethtool_value edata;
+
+	if (!dev->ethtool_ops->set_tso)
+		return -EOPNOTSUPP;
+
+	if (copy_from_user(&edata, useraddr, sizeof(edata)))
+		return -EFAULT;
+
+	return dev->ethtool_ops->set_tso(dev, edata.data);
+}
+
 static int ethtool_self_test(struct net_device *dev, char *useraddr)
 {
 	struct ethtool_test test;
@@ -653,6 +680,10 @@ int dev_ethtool(struct ifreq *ifr)
 		return ethtool_get_sg(dev, useraddr);
 	case ETHTOOL_SSG:
 		return ethtool_set_sg(dev, useraddr);
+	case ETHTOOL_GTSO:
+		return ethtool_get_tso(dev, useraddr);
+	case ETHTOOL_STSO:
+		return ethtool_set_tso(dev, useraddr);
 	case ETHTOOL_TEST:
 		return ethtool_self_test(dev, useraddr);
 	case ETHTOOL_GSTRINGS:

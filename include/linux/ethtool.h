@@ -284,6 +284,8 @@ int ethtool_op_set_sg(struct net_device *dev, u32 data);
  * set_tx_csum: Turn transmit checksums on or off
  * get_sg: Report whether scatter-gather is enabled
  * set_sg: Turn scatter-gather on or off
+ * get_tso: Report whether TCP segmentation offload is enabled
+ * set_tso: Turn TCP segmentation offload on or off
  * self_test: Run specified self-tests
  * get_strings: Return a set of strings that describe the requested objects 
  * phys_id: Identify the device
@@ -337,6 +339,8 @@ struct ethtool_ops {
 	int	(*set_tx_csum)(struct net_device *, u32);
 	u32	(*get_sg)(struct net_device *);
 	int	(*set_sg)(struct net_device *, u32);
+	u32	(*get_tso)(struct net_device *);
+	int	(*set_tso)(struct net_device *, u32);
 	int	(*self_test_count)(struct net_device *);
 	void	(*self_test)(struct net_device *, struct ethtool_test *, u64 *);
 	void	(*get_strings)(struct net_device *, u32 stringset, u8 *);
