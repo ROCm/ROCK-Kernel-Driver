@@ -1438,8 +1438,9 @@ static void setup_req_params( int drive )
 
 static void redo_fd_request(void)
 {
-	int device, drive, type;
-  
+	int drive, type;
+	struct atari_floppy_struct *floppy;
+
 	DPRINT(("redo_fd_request: CURRENT=%p dev=%s CURRENT->sector=%ld\n",
 		CURRENT, !blk_queue_empty(QUEUE) ? CURRENT->rq_disk->disk_name : "",
 		!blk_queue_empty(QUEUE) ? CURRENT->sector : 0 ));
@@ -1451,9 +1452,9 @@ repeat:
 	if (blk_queue_empty(QUEUE))
 		goto the_end;
 
-	device = minor(CURRENT->rq_dev);
-	drive = device & 3;
-	type = device >> 2;
+	floppy = CURRENT->rq_disk->private_data;
+	drive = floppy - unit;
+	type = fd_device[drive];
 	
 	if (!UD.connected) {
 		/* drive not connected */
@@ -1857,7 +1858,7 @@ static int floppy_open( struct inode *inode, struct file *filp )
 	int old_dev = fd_device[drive];
 
 	DPRINT(("fd_open: type=%d\n",type));
-	if (fd_ref[drive] && old_dev != minor(inode->i_rdev))
+	if (fd_ref[drive] && old_dev != type)
 		return -EBUSY;
 
 	if (fd_ref[drive] == -1 || (fd_ref[drive] && filp->f_flags & O_EXCL))
@@ -1868,10 +1869,10 @@ static int floppy_open( struct inode *inode, struct file *filp )
 	else
 		fd_ref[drive]++;
 
-	fd_device[drive] = minor(inode->i_rdev);
+	fd_device[drive] = type;
 
-	if (old_dev && old_dev != minor(inode->i_rdev))
-		invalidate_buffers(mk_kdev(FLOPPY_MAJOR, old_dev));
+	if (old_dev && old_dev != type)
+		invalidate_buffers(mk_kdev(FLOPPY_MAJOR, drive + (type<<2)));
 
 	if (filp->f_flags & O_NDELAY)
 		return 0;

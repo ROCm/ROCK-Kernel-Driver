@@ -2019,14 +2019,9 @@ static void DAC960_ComputeGenericDiskInfo(DAC960_Controller_T *Controller)
 
 static int DAC960_revalidate(struct gendisk *disk)
 {
-	DAC960_Controller_T *p = disk->private_data;
-	int unit;
-	for (unit = 0; unit < DAC960_MaxLogicalDrives; unit++) {
-		if (p->disks[unit] == disk) {
-			set_capacity(disk, disk_size(p, unit));
-			return 0;
-		}
-	}
+	DAC960_Controller_T *p = disk->queue->queuedata;
+	int unit = (int)disk->private_data;
+	set_capacity(disk, disk_size(p, unit));
 	return 0;
 }
 
@@ -2205,7 +2200,7 @@ static void DAC960_DetectControllers(DAC960_HardwareType_T HardwareType)
 		Controller->disks[i] = alloc_disk(1<<DAC960_MaxPartitionsBits);
 		if (!Controller->disks[i])
 			goto Enomem;
-		Controller->disks[i]->private_data = Controller;
+		Controller->disks[i]->private_data = (void*)i;
 		Controller->disks[i]->queue = &Controller->RequestQueue;
       }
       Controller->ControllerNumber = DAC960_ControllerCount;
@@ -2855,7 +2850,7 @@ static boolean DAC960_ProcessRequest(DAC960_Controller_T *Controller,
     Command->CommandType = DAC960_ReadCommand;
   else Command->CommandType = DAC960_WriteCommand;
   Command->Completion = Request->waiting;
-  Command->LogicalDriveNumber = DAC960_LogicalDriveNumber(Request->rq_dev);
+  Command->LogicalDriveNumber = (int)Request->rq_disk->private_data;
   Command->BlockNumber = Request->sector;
   Command->BlockCount = Request->nr_sectors;
   Command->SegmentCount = Request->nr_phys_segments;
