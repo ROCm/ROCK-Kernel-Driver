@@ -21,6 +21,7 @@
 #include <linux/rcupdate.h>
 #include <net/tcp.h>
 #include <net/udp.h>
+#include <asm/unaligned.h>
 
 /*
  * We maintain a small pool of fully-sized skbs, to make sure the
@@ -207,17 +208,17 @@ void netpoll_send_udp(struct netpoll *np, const char *msg, int len)
 
 	iph = (struct iphdr *)skb_push(skb, sizeof(*iph));
 
-	iph->version  = 4;
-	iph->ihl      = 5;
+	/* iph->version = 4; iph->ihl = 5; */
+	put_unaligned(0x54, (unsigned char *)iph);
 	iph->tos      = 0;
-	iph->tot_len  = htons(ip_len);
+	put_unaligned(htonl(ip_len), &(iph->tot_len));
 	iph->id       = 0;
 	iph->frag_off = 0;
 	iph->ttl      = 64;
 	iph->protocol = IPPROTO_UDP;
 	iph->check    = 0;
-	iph->saddr    = htonl(np->local_ip);
-	iph->daddr    = htonl(np->remote_ip);
+	put_unaligned(htonl(np->local_ip), &(iph->saddr));
+	put_unaligned(htonl(np->remote_ip), &(iph->daddr));
 	iph->check    = ip_fast_csum((unsigned char *)iph, iph->ihl);
 
 	eth = (struct ethhdr *) skb_push(skb, ETH_HLEN);
