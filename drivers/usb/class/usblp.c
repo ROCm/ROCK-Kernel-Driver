@@ -296,13 +296,13 @@ static int usblp_check_status(struct usblp *usblp, int err)
 	}
 
 	status = *usblp->statusbuf;
-	if (~status & LP_PERRORP) {
+
+	if (~status & LP_PERRORP)
 		newerr = 3;
-		if (status & LP_POUTPA)
-			newerr = 1;
-		if (~status & LP_PSELECD)
-			newerr = 2;
-	}
+	if (status & LP_POUTPA)
+		newerr = 1;
+	if (~status & LP_PSELECD)
+		newerr = 2;
 
 	if (newerr != err)
 		info("usblp%d: %s", usblp->minor, usblp_messages[newerr]);
@@ -426,7 +426,7 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 {
 	struct usblp *usblp = file->private_data;
 	int length, err, i;
-	unsigned char lpstatus, newChannel;
+	unsigned char newChannel;
 	int status;
 	int twoints[2];
 	int retval = 0;
@@ -578,12 +578,12 @@ static int usblp_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 		switch (cmd) {
 
 			case LPGETSTATUS:
-				if (usblp_read_status(usblp, &lpstatus)) {
+				if (usblp_read_status(usblp, usblp->statusbuf)) {
 					err("usblp%d: failed reading printer status", usblp->minor);
 					retval = -EIO;
 					goto done;
 				}
-				status = lpstatus;
+				status = *usblp->statusbuf;
 				if (copy_to_user ((int *)arg, &status, sizeof(int)))
 					retval = -EFAULT;
 				break;
@@ -858,8 +858,8 @@ static int usblp_probe(struct usb_interface *intf,
 	}
 
 	usblp->writebuf = usblp->readbuf = NULL;
-	usblp->writeurb->transfer_flags = URB_NO_DMA_MAP;
-	usblp->readurb->transfer_flags = URB_NO_DMA_MAP;
+	usblp->writeurb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
+	usblp->readurb->transfer_flags = URB_NO_TRANSFER_DMA_MAP;
 	/* Malloc write & read buffers.  We somewhat wastefully
 	 * malloc both regardless of bidirectionality, because the
 	 * alternate setting can be changed later via an ioctl. */

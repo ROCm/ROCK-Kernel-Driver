@@ -39,13 +39,10 @@
 #include <linux/interrupt.h>
 #include <linux/reboot.h>
 #include <linux/usb.h>
+#include <linux/moduleparam.h>
 
 #include <linux/version.h>
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,5,32)
-#include "../hcd.h"
-#else
 #include "../core/hcd.h"
-#endif
 
 #include <asm/byteorder.h>
 #include <asm/io.h>
@@ -94,11 +91,11 @@
  * 2001-June	Works with usb-storage and NEC EHCI on 2.4
  */
 
-#define DRIVER_VERSION "2003-Jan-22"
+#define DRIVER_VERSION "2003-Jun-13"
 #define DRIVER_AUTHOR "David Brownell"
 #define DRIVER_DESC "USB 2.0 'Enhanced' Host Controller (EHCI) Driver"
 
-static const char	hcd_name [] = "ehci-hcd";
+static const char	hcd_name [] = "ehci_hcd";
 
 
 // #define EHCI_VERBOSE_DEBUG
@@ -123,7 +120,7 @@ static const char	hcd_name [] = "ehci-hcd";
 
 /* Initial IRQ latency:  lower than default */
 static int log2_irq_thresh = 0;		// 0 to 6
-MODULE_PARM (log2_irq_thresh, "i");
+module_param (log2_irq_thresh, int, S_IRUGO);
 MODULE_PARM_DESC (log2_irq_thresh, "log2 IRQ latency, 1-64 microframes");
 
 #define	INTR_MASK (STS_IAA | STS_FATAL | STS_ERR | STS_INT)
@@ -1020,7 +1017,8 @@ static int __init init (void)
 	if (usb_disabled())
 		return -ENODEV;
 
-	dbg ("block sizes: qh %Zd qtd %Zd itd %Zd sitd %Zd",
+	pr_debug ("%s: block sizes: qh %Zd qtd %Zd itd %Zd sitd %Zd\n",
+		hcd_name,
 		sizeof (struct ehci_qh), sizeof (struct ehci_qtd),
 		sizeof (struct ehci_itd), sizeof (struct ehci_sitd));
 
