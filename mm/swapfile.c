@@ -961,13 +961,20 @@ asmlinkage long sys_swapoff(const char * specialfile)
 	unsigned short *swap_map;
 	struct file *swap_file, *victim;
 	struct address_space *mapping;
+	char * pathname;
 	int i, type, prev;
 	int err;
 	
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	victim = filp_open(specialfile, O_RDWR, 0);
+	pathname = getname(specialfile);
+	err = PTR_ERR(pathname);
+	if (IS_ERR(pathname))
+		goto out;
+
+	victim = filp_open(pathname, O_RDWR, 0);
+	putname(pathname);
 	err = PTR_ERR(victim);
 	if (IS_ERR(victim))
 		goto out;
