@@ -1,5 +1,5 @@
 /*
- *   Copyright (C) International Business Machines Corp., 2000-2003
+ *   Copyright (C) International Business Machines Corp., 2000-2004
  *
  *   This program is free software;  you can redistribute it and/or modify
  *   it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@
  */
 
 #include <linux/fs.h>
+#include <linux/quotaops.h>
 #include "jfs_incore.h"
 #include "jfs_filsys.h"
 #include "jfs_metapage.h"
@@ -829,8 +830,12 @@ int xtInsert(tid_t tid,		/* transaction id */
 			hint = addressXAD(xad) + lengthXAD(xad) - 1;
 		} else
 			hint = 0;
-		if ((rc = dbAlloc(ip, hint, (s64) xlen, &xaddr)))
+		if ((rc = DQUOT_ALLOC_BLOCK(ip, xlen)))
 			goto out;
+		if ((rc = dbAlloc(ip, hint, (s64) xlen, &xaddr))) {
+			DQUOT_FREE_BLOCK(ip, xlen);
+			goto out;
+		}
 	}
 
 	/*
@@ -855,8 +860,10 @@ int xtInsert(tid_t tid,		/* transaction id */
 		split.pxdlist = NULL;
 		if ((rc = xtSplitUp(tid, ip, &split, &btstack))) {
 			/* undo data extent allocation */
-			if (*xaddrp == 0)
+			if (*xaddrp == 0) {
 				dbFree(ip, xaddr, (s64) xlen);
+				DQUOT_FREE_BLOCK(ip, xlen);
+			}
 			return rc;
 		}
 
@@ -1214,22 +1221,34 @@ xtSplitPage(tid_t tid, struct inode *ip,
 	pxd_t *pxd;
 	struct tlock *tlck;
 	struct xtlock *sxtlck = NULL, *rxtlck = NULL;
+	int quota_allocation = 0;
 
 	smp = split->mp;
 	sp = XT_PAGE(ip, smp);
 
 	INCREMENT(xtStat.split);
 
-	/*
-	 * allocate the new right page for the split
-	 */
 	pxdlist = split->pxdlist;
 	pxd = &pxdlist->pxd[pxdlist->npxd];
 	pxdlist->npxd++;
 	rbn = addressPXD(pxd);
+
+	/* Allocate blocks to quota. */
+       if (DQUOT_ALLOC_BLOCK(ip, lengthPXD(pxd))) {
+	       rc = -EDQUOT;
+	       goto clean_up;
+	}
+
+	quota_allocation += lengthPXD(pxd);
+
+	/*
+	 * allocate the new right page for the split
+	 */
 	rmp = get_metapage(ip, rbn, PSIZE, 1);
-	if (rmp == NULL)
-		return -EIO;
+	if (rmp == NULL) {
+		rc = -EIO;
+		goto clean_up;
+	}
 
 	jfs_info("xtSplitPage: ip:0x%p smp:0x%p rmp:0x%p", ip, smp, rmp);
 
@@ -1304,8 +1323,6 @@ xtSplitPage(tid_t tid, struct inode *ip,
 		*rmpp = rmp;
 		*rbnp = rbn;
 
-		ip->i_blocks += LBLK2PBLK(ip->i_sb, lengthPXD(pxd));
-
 		jfs_info("xtSplitPage: sp:0x%p rp:0x%p", sp, rp);
 		return 0;
 	}
@@ -1321,7 +1338,7 @@ xtSplitPage(tid_t tid, struct inode *ip,
 		XT_GETPAGE(ip, nextbn, mp, PSIZE, p, rc);
 		if (rc) {
 			XT_PUTPAGE(rmp);
-			return rc;
+			goto clean_up;
 		}
 
 		BT_MARK_DIRTY(mp, ip);
@@ -1420,10 +1437,16 @@ xtSplitPage(tid_t tid, struct inode *ip,
 	*rmpp = rmp;
 	*rbnp = rbn;
 
-	ip->i_blocks += LBLK2PBLK(ip->i_sb, lengthPXD(pxd));
-
 	jfs_info("xtSplitPage: sp:0x%p rp:0x%p", sp, rp);
 	return rc;
+
+      clean_up:
+
+	/* Rollback quota allocation. */
+	if (quota_allocation)
+		DQUOT_FREE_BLOCK(ip, quota_allocation);
+
+	return (rc);
 }
 
 
@@ -1477,6 +1500,12 @@ xtSplitRoot(tid_t tid,
 	rmp = get_metapage(ip, rbn, PSIZE, 1);
 	if (rmp == NULL)
 		return -EIO;
+
+	/* Allocate blocks to quota. */
+	if (DQUOT_ALLOC_BLOCK(ip, lengthPXD(pxd))) {
+		release_metapage(rmp);
+		return -EDQUOT;
+	}
 
 	jfs_info("xtSplitRoot: ip:0x%p rmp:0x%p", ip, rmp);
 
@@ -1560,8 +1589,6 @@ xtSplitRoot(tid_t tid,
 	}
 
 	*rmpp = rmp;
-
-	ip->i_blocks += LBLK2PBLK(ip->i_sb, lengthPXD(pxd));
 
 	jfs_info("xtSplitRoot: sp:0x%p rp:0x%p", sp, rp);
 	return 0;
@@ -3909,8 +3936,8 @@ s64 xtTruncate(tid_t tid, struct inode *ip, s64 newsize, int flag)
 	else
 		ip->i_size = newsize;
 
-	/* update nblocks to reflect freed blocks */
-	ip->i_blocks -= LBLK2PBLK(ip->i_sb, nfreed);
+	/* update quota allocation to reflect freed blocks */
+	DQUOT_FREE_BLOCK(ip, nfreed);
 
 	/*
 	 * free tlock of invalidated pages

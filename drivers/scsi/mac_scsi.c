@@ -326,6 +326,7 @@ int macscsi_release (struct Scsi_Host *shpnt)
 {
 	if (shpnt->irq != SCSI_IRQ_NONE)
 		free_irq (shpnt->irq, NCR5380_intr);
+	NCR5380_exit(shpnt);
 
 	return 0;
 }

@@ -6,9 +6,12 @@ menu "ALSA PowerMac devices"
 comment "ALSA PowerMac requires I2C"
 	depends on SND && I2C=n
 
+comment "ALSA PowerMac requires INPUT"
+	depends on SND && INPUT=n
+
 config SND_POWERMAC
 	tristate "PowerMac (AWACS, DACA, Burgundy, Tumbler, Keywest)"
-	depends on SND && I2C
+	depends on SND && I2C && INPUT
 	select SND_PCM
 
 endmenu

@@ -8,6 +8,8 @@
  * 18-Feb-03 louisk	Implement fsys_gettimeofday().
  * 28-Feb-03 davidm	Fixed several bugs in fsys_gettimeofday().  Tuned it some more,
  *			probably broke it along the way... ;-)
+ * 13-Jul-04 clameter   Implement fsys_clock_gettime and revise fsys_gettimeofday to make
+ *                      it capable of using memory based clocks without falling back to C code.
  */
 
 #include <asm/asmmacro.h>
@@ -144,194 +146,205 @@ ENTRY(fsys_set_tid_address)
 END(fsys_set_tid_address)
 
 /*
- * Note 1: This routine uses floating-point registers, but only with registers that
- *	   operate on integers.  Because of that, we don't need to set ar.fpsr to the
- *	   kernel default value.
- *
- * Note 2: For now, we will assume that all CPUs run at the same clock-frequency.
- *	   If that wasn't the case, we would have to disable preemption (e.g.,
- *	   by disabling interrupts) between reading the ITC and reading
- *	   local_cpu_data->nsec_per_cyc.
- *
- * Note 3: On platforms where the ITC-drift bit is set in the SAL feature vector,
- *	   we ought to either skip the ITC-based interpolation or run an ntp-like
- *	   daemon to keep the ITCs from drifting too far apart.
+ * Ensure that the time interpolator structure is compatible with the asm code
  */
+#if IA64_TIME_INTERPOLATOR_SOURCE_OFFSET !=0 || IA64_TIME_INTERPOLATOR_SHIFT_OFFSET != 2 \
+	|| IA64_TIME_INTERPOLATOR_JITTER_OFFSET != 3 || IA64_TIME_INTERPOLATOR_NSEC_OFFSET != 4
+#error fsys_gettimeofday incompatible with changes to struct time_interpolator
+#endif
+#define CLOCK_REALTIME 0
+#define CLOCK_MONOTONIC 1
+#define CLOCK_DIVIDE_BY_1000 0x4000
+#define CLOCK_ADD_MONOTONIC 0x8000
 
 ENTRY(fsys_gettimeofday)
 	.prologue
 	.altrp b6
 	.body
-	add r9=TI_FLAGS+IA64_TASK_SIZE,r16
-	addl r3=THIS_CPU(cpu_info),r0
-
-#ifdef CONFIG_SMP
-	movl r10=__per_cpu_offset
-	movl r2=sal_platform_features
+	mov r31 = r32
+	tnat.nz p6,p0 = r33		// guard against NaT argument
+(p6)    br.cond.spnt.few .fail_einval
+	mov r30 = CLOCK_DIVIDE_BY_1000
 	;;
-
-	ld8 r2=[r2]
-	movl r19=xtime			// xtime is a timespec struct
-
-	ld8 r10=[r10]			// r10 <- __per_cpu_offset[0]
-	addl r21=THIS_CPU(cpu_info),r0
+.gettime:
+	// Register map
+	// Incoming r31 = pointer to address where to place result
+	//          r30 = flags determining how time is processed
+	// r2,r3 = temp r4-r7 preserved
+	// r8 = result nanoseconds
+	// r9 = result seconds
+	// r10 = temporary storage for clock difference
+	// r11 = preserved: saved ar.pfs
+	// r12 = preserved: memory stack
+	// r13 = preserved: thread pointer
+	// r14 = debug pointer / usable
+	// r15 = preserved: system call number
+	// r16 = preserved: current task pointer
+	// r17 = wall to monotonic use
+	// r18 = time_interpolator->offset
+	// r19 = address of wall_to_monotonic
+	// r20 = pointer to struct time_interpolator / pointer to time_interpolator->address
+	// r21 = shift factor
+	// r22 = address of time interpolator->last_counter
+	// r23 = address of time_interpolator->last_cycle
+	// r24 = adress of time_interpolator->offset
+	// r25 = last_cycle value
+	// r26 = last_counter value
+	// r27 = pointer to xtime
+	// r28 = sequence number at the beginning of critcal section
+	// r29 = address of seqlock
+	// r30 = time processing flags / memory address
+	// r31 = pointer to result
+	// Predicates
+	// p6,p7 short term use
+	// p8 = timesource ar.itc
+	// p9 = timesource mmio64
+	// p10 = timesource mmio32
+	// p11 = timesource not to be handled by asm code
+	// p12 = memory time source ( = p9 | p10)
+	// p13 = do cmpxchg with time_interpolator_last_cycle
+	// p14 = Divide by 1000
+	// p15 = Add monotonic
+	//
+	// Note that instructions are optimized for McKinley. McKinley can process two
+	// bundles simultaneously and therefore we continuously try to feed the CPU
+	// two bundles and then a stop.
+	tnat.nz p6,p0 = r31	// branch deferred since it does not fit into bundle structure
+	mov pr = r30,0xc000	// Set predicates according to function
+	add r2 = TI_FLAGS+IA64_TASK_SIZE,r16
+	movl r20 = time_interpolator
 	;;
-	add r10=r21, r10		// r10 <- &cpu_data(time_keeper_id)
-	tbit.nz p8,p0 = r2, IA64_SAL_PLATFORM_FEATURE_ITC_DRIFT_BIT
-(p8)	br.spnt.many fsys_fallback_syscall
-#else
+	ld8 r20 = [r20]		// get pointer to time_interpolator structure
+	movl r29 = xtime_lock
+	ld4 r2 = [r2]		// process work pending flags
+	movl r27 = xtime
+	;;	// only one bundle here
+	ld8 r21 = [r20]		// first quad with control information
+	and r2 = TIF_ALLWORK_MASK,r2
+(p6)    br.cond.spnt.few .fail_einval	// deferred branch
 	;;
-	mov r10=r3
-	movl r19=xtime			// xtime is a timespec struct
-#endif
-	ld4 r9=[r9]
-	movl r17=xtime_lock
+	add r10 = IA64_TIME_INTERPOLATOR_ADDRESS_OFFSET,r20
+	extr r3 = r21,32,32	// time_interpolator->nsec_per_cyc
+	extr r8 = r21,0,16	// time_interpolator->source
+	nop.i 123
+	cmp.ne p6, p0 = 0, r2	// Fallback if work is scheduled
+(p6)    br.cond.spnt.many fsys_fallback_syscall
 	;;
-
-	// r32, r33 should contain the 2 args of gettimeofday
-	adds r21=IA64_CPUINFO_ITM_NEXT_OFFSET, r10
-	mov r2=-1
-	tnat.nz p6,p7=r32		// guard against NaT args
+	cmp.eq p8,p12 = 0,r8	// Check for cpu timer
+	cmp.eq p9,p0 = 1,r8	// MMIO64 ?
+	extr r2 = r21,24,8	// time_interpolator->jitter
+	cmp.eq p10,p0 = 2,r8	// MMIO32 ?
+	cmp.lt p11,p0 = 2,r8	// function?
+(p11)	br.cond.spnt.many fsys_fallback_syscall
 	;;
-
-	adds r10=IA64_CPUINFO_ITM_DELTA_OFFSET, r10
-(p7)	tnat.nz p6,p0=r33
-(p6)	br.cond.spnt.few .fail_einval
-
-	adds r8=IA64_CPUINFO_NSEC_PER_CYC_OFFSET, r3
-	movl r24=2361183241434822607	// for division hack (only for / 1000)
+	setf.sig f7 = r3	// Setup for scaling of counter
+(p15)	movl r19 = wall_to_monotonic
+(p12)	ld8 r30 = [r10]
+	cmp.ne p13,p0 = r2,r0	// need jitter compensation?
+	extr r21 = r21,16,8	// shift factor
 	;;
-
-	ldf8 f7=[r10]			// f7 now contains itm_delta
-	setf.sig f11=r2
-	adds r10=8, r32
-
-	adds r20=IA64_TIMESPEC_TV_NSEC_OFFSET, r19	// r20 = &xtime->tv_nsec
-	movl r26=jiffies
-
-	setf.sig f9=r24			// f9 is used for division hack
-	movl r27=wall_jiffies
-
-	and r9=TIF_ALLWORK_MASK,r9
-	movl r25=last_nsec_offset
+.time_redo:
+	.pred.rel.mutex p8,p9,p10
+	ld4.acq r28 = [r29]	// xtime_lock.sequence. Must come first for locking purposes
+(p8)	mov r2 = ar.itc		// CPU_TIMER. 36 clocks latency!!!
+	add r22 = IA64_TIME_INTERPOLATOR_LAST_COUNTER_OFFSET,r20
+(p9)	ld8 r2 = [r30]		// readq(ti->address). Could also have latency issues..
+(p10)	ld4 r2 = [r30]		// readw(ti->address)
+(p13)	add r23 = IA64_TIME_INTERPOLATOR_LAST_CYCLE_OFFSET,r20
+	;;			// could be removed by moving the last add upward
+	ld8 r26 = [r22]		// time_interpolator->last_counter
+(p13)	ld8 r25 = [r23]		// time interpolator->last_cycle
+	add r24 = IA64_TIME_INTERPOLATOR_OFFSET_OFFSET,r20
+(p15)	ld8 r17 = [r19],IA64_TIMESPEC_TV_NSEC_OFFSET
+ 	ld8 r9 = [r27],IA64_TIMESPEC_TV_NSEC_OFFSET
+	nop.i 123
 	;;
-
-	/*
-	 * Verify that we have permission to write to struct timeval.  Note:
-	 * Another thread might unmap the mapping before we actually get
-	 * to store the result.  That's OK as long as the stores are also
-	 * protect by EX().
-	 */
-EX(.fail_efault, probe.w.fault r32, 3)		// this must come _after_ NaT-check
-EX(.fail_efault, probe.w.fault r10, 3)		// this must come _after_ NaT-check
-	nop 0
-
-	ldf8 f10=[r8]			// f10 <- local_cpu_data->nsec_per_cyc value
-	cmp.ne p8, p0=0, r9
-(p8)	br.spnt.many fsys_fallback_syscall
+	ld8 r18 = [r24]		// time_interpolator->offset
+	ld8 r8 = [r27],-IA64_TIMESPEC_TV_NSEC_OFFSET	// xtime.tv_nsec
+(p13)	sub r3 = r25,r2	// Diff needed before comparison (thanks davidm)
 	;;
-.retry:	// *** seq = read_seqbegin(&xtime_lock); ***
-	ld4.acq r23=[r17]		// since &xtime_lock == &xtime_lock->sequence
-	ld8 r14=[r25]			// r14 (old) = last_nsec_offset
-
-	ld8 r28=[r26]			// r28 = jiffies
-	ld8 r29=[r27]			// r29 = wall_jiffies
+(p13)	cmp.gt.unc p6,p7 = r3,r0	// check if it is less than last. p6,p7 cleared
+	sub r10 = r2,r26	// current_counter - last_counter
 	;;
-
-	ldf8 f8=[r21]			// f8 now contains itm_next
-	mov.m r31=ar.itc		// put time stamp into r31 (ITC) == now
-	sub r28=r29, r28, 1		// r28 now contains "-(lost + 1)"
+(p6)	sub r10 = r25,r26	// time we got was less than last_cycle
+(p7)	mov ar.ccv = r25	// more than last_cycle. Prep for cmpxchg
 	;;
-
-	ld8 r2=[r19]			// r2 = sec = xtime.tv_sec
-	ld8 r29=[r20]			// r29 = nsec = xtime.tv_nsec
-	tbit.nz p9, p10=r23, 0		// p9 <- is_odd(r23), p10 <- is_even(r23)
-
-	setf.sig f6=r28			// f6 <- -(lost + 1)				(6 cyc)
+	setf.sig f8 = r10
+	nop.i 123
 	;;
-
+(p7)	cmpxchg8.rel r3 = [r23],r2,ar.ccv
+EX(.fail_efault, probe.w.fault r31, 3)	// This takes 5 cycles and we have spare time
+	xmpy.l f8 = f8,f7	// nsec_per_cyc*(counter-last_counter)
+(p15)	add r9 = r9,r17		// Add wall to monotonic.secs to result secs
+	;;
+(p15)	ld8 r17 = [r19],-IA64_TIMESPEC_TV_NSEC_OFFSET
+(p7)	cmp.ne p7,p0 = r25,r3	// if cmpxchg not successful redo
+	// simulate tbit.nz.or p7,p0 = r28,0
+	and r28 = ~1,r28	// Make sequence even to force retry if odd
+	getf.sig r2 = f8
 	mf
-	xma.l f8=f6, f7, f8	// f8 (last_tick) <- -(lost + 1)*itm_delta + itm_next	(5 cyc)
-	nop 0
-
-	setf.sig f12=r31		// f12 <- ITC					(6 cyc)
-	// *** if (unlikely(read_seqretry(&xtime_lock, seq))) continue; ***
-	ld4 r24=[r17]			// r24 = xtime_lock->sequence (re-read)
-	nop 0
+	add r8 = r8,r18		// Add time interpolator offset
 	;;
-
-	xma.l f8=f11, f8, f12	// f8 (elapsed_cycles) <- (-1*last_tick + now) = (now - last_tick)
-	nop 0
+	ld4 r10 = [r29]		// xtime_lock.sequence
+(p15)	add r8 = r8, r17	// Add monotonic.nsecs to nsecs
+	shr.u r2 = r2,r21
+	;;		// overloaded 3 bundles!
+	// End critical section.
+	add r8 = r8,r2		// Add xtime.nsecs
+	cmp4.ne.or p7,p0 = r28,r10
+(p7)	br.cond.dpnt.few .time_redo	// sequence number changed ?
+	// Now r8=tv->tv_nsec and r9=tv->tv_sec
+	mov r10 = r0
+	movl r2 = 1000000000
+	add r23 = IA64_TIMESPEC_TV_NSEC_OFFSET, r31
+(p14)	movl r3 = 2361183241434822607	// Prep for / 1000 hack
 	;;
-
-	getf.sig r18=f8			// r18 <- (now - last_tick)
-	xmpy.l f8=f8, f10		// f8 <- elapsed_cycles*nsec_per_cyc (5 cyc)
-	add r3=r29, r14			// r3 = (nsec + old)
+.time_normalize:
+	mov r21 = r8
+	cmp.ge p6,p0 = r8,r2
+(p14)	shr.u r20 = r8, 3		// We can repeat this if necessary just wasting some time
 	;;
-
-	cmp.lt p7, p8=r18, r0		// if now < last_tick, set p7 = 1, p8 = 0
-	getf.sig r18=f8			// r18 = elapsed_cycles*nsec_per_cyc		(6 cyc)
-	nop 0
+(p14)	setf.sig f8 = r20
+(p6)	sub r8 = r8,r2
+(p6)	add r9 = 1,r9			// two nops before the branch.
+(p14)	setf.sig f7 = r3		// Chances for repeats are 1 in 10000 for gettod
+(p6)	br.cond.dpnt.few .time_normalize
 	;;
-
-(p10)	cmp.ne p9, p0=r23, r24		// if xtime_lock->sequence != seq, set p9
-	shr.u r18=r18, IA64_NSEC_PER_CYC_SHIFT	// r18 <- offset
-(p9)	br.spnt.many .retry
+	// Divided by 8 though shift. Now divide by 125
+	// The compiler was able to do that with a multiply
+	// and a shift and we do the same
+EX(.fail_efault, probe.w.fault r23, 3)		// This also costs 5 cycles
+(p14)	xmpy.hu f8 = f8, f7			// xmpy has 5 cycles latency so use it...
 	;;
-
-	mov ar.ccv=r14			// ar.ccv = old					(1 cyc)
-	cmp.leu p7, p8=r18, r14		// if (offset <= old), set p7 = 1, p8 = 0
+	mov r8 = r0
+(p14)	getf.sig r2 = f8
 	;;
-
-(p8)	cmpxchg8.rel r24=[r25], r18, ar.ccv	// compare-and-exchange (atomic!)
-(p8)	add r3=r29, r18			// r3 = (nsec + offset)
+(p14)	shr.u r21 = r2, 4
 	;;
-	shr.u r3=r3, 3			// initiate dividing r3 by 1000
-	;;
-	setf.sig f8=r3			//						(6 cyc)
-	mov r10=1000000			// r10 = 1000000
-	;;
-(p8)	cmp.ne.unc p9, p0=r24, r14
-	xmpy.hu f6=f8, f9		//						(5 cyc)
-(p9)	br.spnt.many .retry
-	;;
-
-	getf.sig r3=f6			//						(6 cyc)
-	;;
-	shr.u r3=r3, 4			// end of division, r3 is divided by 1000 (=usec)
-	;;
-
-1:	cmp.geu p7, p0=r3, r10		// while (usec >= 1000000)
-	;;
-(p7)	sub r3=r3, r10			// usec -= 1000000
-(p7)	adds r2=1, r2			// ++sec
-(p7)	br.spnt.many 1b
-
-	// finally: r2 = sec, r3 = usec
-EX(.fail_efault, st8 [r32]=r2)
-	adds r9=8, r32
-	mov r8=r0			// success
-	;;
-EX(.fail_efault, st8 [r9]=r3)		// store them in the timeval struct
-	mov r10=0
+EX(.fail_efault, st8 [r31] = r9)
+EX(.fail_efault, st8 [r23] = r21)
 	FSYS_RETURN
-	/*
-	 * Note: We are NOT clearing the scratch registers here.  Since the only things
-	 *	 in those registers are time-related variables and some addresses (which
-	 *	 can be obtained from System.map), none of this should be security-sensitive
-	 *	 and we should be fine.
-	 */
-
 .fail_einval:
-	mov r8=EINVAL			// r8 = EINVAL
-	mov r10=-1			// r10 = -1
+	mov r8 = EINVAL
+	mov r10 = -1
 	FSYS_RETURN
-
 .fail_efault:
-	mov r8=EFAULT			// r8 = EFAULT
-	mov r10=-1			// r10 = -1
+	mov r8 = EFAULT
+	mov r10 = -1
 	FSYS_RETURN
 END(fsys_gettimeofday)
+
+ENTRY(fsys_clock_gettime)
+	.prologue
+	.altrp b6
+	.body
+	cmp4.lt p6, p0 = CLOCK_MONOTONIC, r32
+	// Fallback if this is not CLOCK_REALTIME or CLOCK_MONOTONIC
+(p6)	br.spnt.few fsys_fallback_syscall
+	mov r31 = r33
+	shl r30 = r32,15
+	br.many .gettime
+END(fsys_clock_gettime)
 
 /*
  * long fsys_rt_sigprocmask (int how, sigset_t *set, sigset_t *oset, size_t sigsetsize).
@@ -838,7 +851,7 @@ fsyscall_table:
 	data8 0				// timer_getoverrun
 	data8 0				// timer_delete
 	data8 0				// clock_settime
-	data8 0				// clock_gettime
+	data8 fsys_clock_gettime	// clock_gettime
 	data8 0				// clock_getres		// 1255
 	data8 0				// clock_nanosleep
 	data8 0				// fstatfs64

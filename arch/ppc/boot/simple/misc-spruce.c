@@ -26,7 +26,6 @@ extern unsigned long decompress_kernel(unsigned long load_addr, int num_words,
 /* Define some important locations of the Spruce. */
 #define SPRUCE_PCI_CONFIG_ADDR	0xfec00000
 #define SPRUCE_PCI_CONFIG_DATA	0xfec00004
-#define SPRUCE_ISA_IO_BASE	0xf8000000
 
 /* PCI configuration space access routines. */
 unsigned int *pci_config_address = (unsigned int *)SPRUCE_PCI_CONFIG_ADDR;
@@ -85,8 +84,6 @@ void cpc700_pcibios_write_config_dword(unsigned char bus, unsigned char dev_fn,
 
 	out_le32((unsigned *)pci_config_data, val);
 }
-
-unsigned long isa_io_base = SPRUCE_ISA_IO_BASE;
 
 #define PCNET32_WIO_RDP		0x10
 #define PCNET32_WIO_RAP		0x12

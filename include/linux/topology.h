@@ -55,7 +55,7 @@ static inline int __next_node_with_cpus(int node)
 	for (node = 0; node < numnodes; node = __next_node_with_cpus(node))
 
 #ifndef node_distance
-#define node_distance(from,to)	(from != to)
+#define node_distance(from,to)	((from) != (to))
 #endif
 #ifndef PENALTY_FOR_NODE_WITH_CPUS
 #define PENALTY_FOR_NODE_WITH_CPUS	(1)

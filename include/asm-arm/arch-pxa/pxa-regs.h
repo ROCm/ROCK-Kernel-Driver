@@ -1134,15 +1134,15 @@ typedef void            (*ExcpHndlr) (void) ;
 #define _GEDR(x)	__REG2(0x40E00048, ((x) & 0x60) >> 3)
 #define _GAFR(x)	__REG2(0x40E00054, ((x) & 0x70) >> 2)
 
-#define GPLR(x) 	((((x) & 0x7f) < 96) ? _GPLR(x) : GPLR3)
-#define GPDR(x)		((((x) & 0x7f) < 96) ? _GPDR(x) : GPDR3)
-#define GPSR(x)		((((x) & 0x7f) < 96) ? _GPSR(x) : GPSR3)
-#define GPCR(x)		((((x) & 0x7f) < 96) ? _GPCR(x) : GPCR3)
-#define GRER(x)		((((x) & 0x7f) < 96) ? _GRER(x) : GRER3)
-#define GFER(x)		((((x) & 0x7f) < 96) ? _GFER(x) : GFER3)
-#define GEDR(x)		((((x) & 0x7f) < 96) ? _GEDR(x) : GEDR3)
-#define GAFR(x)		((((x) & 0x7f) < 96) ? _GAFR(x) : \
-			 ((((x) & 0x7f) < 112) ? GAFR3_L : GAFR3_U))
+#define GPLR(x) 	(*((((x) & 0x7f) < 96) ? &_GPLR(x) : &GPLR3))
+#define GPDR(x)		(*((((x) & 0x7f) < 96) ? &_GPDR(x) : &GPDR3))
+#define GPSR(x)		(*((((x) & 0x7f) < 96) ? &_GPSR(x) : &GPSR3))
+#define GPCR(x)		(*((((x) & 0x7f) < 96) ? &_GPCR(x) : &GPCR3))
+#define GRER(x)		(*((((x) & 0x7f) < 96) ? &_GRER(x) : &GRER3))
+#define GFER(x)		(*((((x) & 0x7f) < 96) ? &_GFER(x) : &GFER3))
+#define GEDR(x)		(*((((x) & 0x7f) < 96) ? &_GEDR(x) : &GEDR3))
+#define GAFR(x)		(*((((x) & 0x7f) < 96) ? &_GAFR(x) : \
+			 ((((x) & 0x7f) < 112) ? &GAFR3_L : &GAFR3_U)))
 #else
 
 #define GPLR(x)		__REG2(0x40E00000, ((x) & 0x60) >> 3)

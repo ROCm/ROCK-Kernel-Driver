@@ -86,10 +86,15 @@ extern struct proc_dir_entry *proc_root_kcore;
 extern void proc_root_init(void);
 extern void proc_misc_init(void);
 
+struct mm_struct;
+
 struct dentry *proc_pid_lookup(struct inode *dir, struct dentry * dentry, struct nameidata *);
 struct dentry *proc_pid_unhash(struct task_struct *p);
 void proc_pid_flush(struct dentry *proc_dentry);
 int proc_pid_readdir(struct file * filp, void * dirent, filldir_t filldir);
+unsigned long task_vsize(struct mm_struct *);
+int task_statm(struct mm_struct *, int *, int *, int *, int *);
+char *task_mem(struct mm_struct *, char *);
 
 extern struct proc_dir_entry *create_proc_entry(const char *name, mode_t mode,
 						struct proc_dir_entry *parent);
@@ -201,14 +206,13 @@ static inline struct proc_dir_entry *create_proc_entry(const char *name,
 #define remove_proc_entry(name, parent) do {} while (0)
 
 static inline struct proc_dir_entry *proc_symlink(const char *name,
-		struct proc_dir_entry *parent,char *dest) {return NULL;}
+		struct proc_dir_entry *parent,const char *dest) {return NULL;}
 static inline struct proc_dir_entry *proc_mkdir(const char *name,
 	struct proc_dir_entry *parent) {return NULL;}
 
 static inline struct proc_dir_entry *create_proc_read_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *base, 
-	int (*read_proc)(char *, char **, off_t, int, int *, void *),
-	void * data) { return NULL; }
+	read_proc_t *read_proc, void * data) { return NULL; }
 static inline struct proc_dir_entry *create_proc_info_entry(const char *name,
 	mode_t mode, struct proc_dir_entry *base, get_info_t *get_info)
 	{ return NULL; }

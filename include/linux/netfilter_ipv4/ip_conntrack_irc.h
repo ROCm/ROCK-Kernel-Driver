@@ -33,12 +33,7 @@ struct ip_ct_irc_master {
 
 #ifdef __KERNEL__
 
-#include <linux/netfilter_ipv4/lockhelp.h>
-
 #define IRC_PORT	6667
-
-/* Protects irc part of conntracks */
-DECLARE_LOCK_EXTERN(ip_irc_lock);
 
 #endif /* __KERNEL__ */
 

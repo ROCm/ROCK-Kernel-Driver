@@ -21,7 +21,6 @@
 #include <asm/uaccess.h>
 #include <asm/checksum.h>
 #include <asm/io.h>
-#include <asm/hardirq.h>
 #include <asm/delay.h>
 #include <asm/irq.h>
 #include <asm/mmx.h>
@@ -63,10 +62,10 @@ EXPORT_SYMBOL(pm_idle);
 EXPORT_SYMBOL(pm_power_off);
 EXPORT_SYMBOL(get_cmos_time);
 
-EXPORT_SYMBOL_NOVERS(__down_failed);
-EXPORT_SYMBOL_NOVERS(__down_failed_interruptible);
-EXPORT_SYMBOL_NOVERS(__down_failed_trylock);
-EXPORT_SYMBOL_NOVERS(__up_wakeup);
+EXPORT_SYMBOL(__down_failed);
+EXPORT_SYMBOL(__down_failed_interruptible);
+EXPORT_SYMBOL(__down_failed_trylock);
+EXPORT_SYMBOL(__up_wakeup);
 /* Networking helper routines. */
 EXPORT_SYMBOL(csum_partial_copy_nocheck);
 EXPORT_SYMBOL(ip_compute_csum);
@@ -76,14 +75,14 @@ EXPORT_SYMBOL(__ndelay);
 EXPORT_SYMBOL(__delay);
 EXPORT_SYMBOL(__const_udelay);
 
-EXPORT_SYMBOL_NOVERS(__get_user_1);
-EXPORT_SYMBOL_NOVERS(__get_user_2);
-EXPORT_SYMBOL_NOVERS(__get_user_4);
-EXPORT_SYMBOL_NOVERS(__get_user_8);
-EXPORT_SYMBOL_NOVERS(__put_user_1);
-EXPORT_SYMBOL_NOVERS(__put_user_2);
-EXPORT_SYMBOL_NOVERS(__put_user_4);
-EXPORT_SYMBOL_NOVERS(__put_user_8);
+EXPORT_SYMBOL(__get_user_1);
+EXPORT_SYMBOL(__get_user_2);
+EXPORT_SYMBOL(__get_user_4);
+EXPORT_SYMBOL(__get_user_8);
+EXPORT_SYMBOL(__put_user_1);
+EXPORT_SYMBOL(__put_user_2);
+EXPORT_SYMBOL(__put_user_4);
+EXPORT_SYMBOL(__put_user_8);
 
 EXPORT_SYMBOL(strpbrk);
 EXPORT_SYMBOL(strstr);
@@ -108,18 +107,15 @@ EXPORT_SYMBOL(pcibios_penalize_isa_irq);
 EXPORT_SYMBOL(pci_mem_start);
 #endif
 
-#ifdef CONFIG_X86_USE_3DNOW
-EXPORT_SYMBOL(_mmx_memcpy);
-EXPORT_SYMBOL(mmx_clear_page);
-EXPORT_SYMBOL(mmx_copy_page);
-#endif
+EXPORT_SYMBOL(copy_page);
+EXPORT_SYMBOL(clear_page);
 
 EXPORT_SYMBOL(cpu_pda);
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(cpu_data);
 EXPORT_SYMBOL(cpu_online_map);
-EXPORT_SYMBOL_NOVERS(__write_lock_failed);
-EXPORT_SYMBOL_NOVERS(__read_lock_failed);
+EXPORT_SYMBOL(__write_lock_failed);
+EXPORT_SYMBOL(__read_lock_failed);
 
 EXPORT_SYMBOL(synchronize_irq);
 EXPORT_SYMBOL(smp_call_function);
@@ -164,28 +160,35 @@ extern void * __memcpy(void *,const void *,__kernel_size_t);
 extern char * strcat(char *, const char *);
 extern int memcmp(const void * cs,const void * ct,size_t count);
 
-EXPORT_SYMBOL_NOVERS(memset);
-EXPORT_SYMBOL_NOVERS(strlen);
-EXPORT_SYMBOL_NOVERS(memmove);
-EXPORT_SYMBOL_NOVERS(strcpy);
-EXPORT_SYMBOL_NOVERS(strncmp);
-EXPORT_SYMBOL_NOVERS(strncpy);
-EXPORT_SYMBOL_NOVERS(strchr);
-EXPORT_SYMBOL_NOVERS(strcmp); 
-EXPORT_SYMBOL_NOVERS(strcat);
-EXPORT_SYMBOL_NOVERS(strncat);
-EXPORT_SYMBOL_NOVERS(memchr);
-EXPORT_SYMBOL_NOVERS(strrchr);
-EXPORT_SYMBOL_NOVERS(strnlen);
-EXPORT_SYMBOL_NOVERS(memscan);
-EXPORT_SYMBOL_NOVERS(memcpy);
-EXPORT_SYMBOL_NOVERS(__memcpy);
-EXPORT_SYMBOL_NOVERS(memcmp);
+EXPORT_SYMBOL(memset);
+EXPORT_SYMBOL(strlen);
+EXPORT_SYMBOL(memmove);
+EXPORT_SYMBOL(strcpy);
+EXPORT_SYMBOL(strncmp);
+EXPORT_SYMBOL(strncpy);
+EXPORT_SYMBOL(strchr);
+EXPORT_SYMBOL(strcmp);
+EXPORT_SYMBOL(strcat);
+EXPORT_SYMBOL(strncat);
+EXPORT_SYMBOL(memchr);
+EXPORT_SYMBOL(strrchr);
+EXPORT_SYMBOL(strnlen);
+EXPORT_SYMBOL(memscan);
+EXPORT_SYMBOL(memcpy);
+EXPORT_SYMBOL(__memcpy);
+EXPORT_SYMBOL(memcmp);
 
-/* syscall export needed for misdesigned sound drivers. */
-EXPORT_SYMBOL(sys_read);
-EXPORT_SYMBOL(sys_lseek);
-EXPORT_SYMBOL(sys_open);
+#ifdef CONFIG_RWSEM_XCHGADD_ALGORITHM
+/* prototypes are wrong, these are assembly with custom calling functions */
+extern void rwsem_down_read_failed_thunk(void);
+extern void rwsem_wake_thunk(void);
+extern void rwsem_downgrade_thunk(void);
+extern void rwsem_down_write_failed_thunk(void);
+EXPORT_SYMBOL(rwsem_down_read_failed_thunk);
+EXPORT_SYMBOL(rwsem_wake_thunk);
+EXPORT_SYMBOL(rwsem_downgrade_thunk);
+EXPORT_SYMBOL(rwsem_down_write_failed_thunk);
+#endif
 
 EXPORT_SYMBOL(empty_zero_page);
 
@@ -201,7 +204,7 @@ EXPORT_SYMBOL(smp_num_siblings);
 #endif
 
 extern void do_softirq_thunk(void);
-EXPORT_SYMBOL_NOVERS(do_softirq_thunk);
+EXPORT_SYMBOL(do_softirq_thunk);
 
 void out_of_line_bug(void);
 EXPORT_SYMBOL(out_of_line_bug);
@@ -211,10 +214,9 @@ EXPORT_SYMBOL(init_level4_pgt);
 extern unsigned long __supported_pte_mask;
 EXPORT_SYMBOL(__supported_pte_mask);
 
-EXPORT_SYMBOL(clear_page);
-
 #ifdef CONFIG_SMP
 EXPORT_SYMBOL(flush_tlb_page);
 EXPORT_SYMBOL_GPL(flush_tlb_all);
 #endif
 
+EXPORT_SYMBOL(cpu_khz);

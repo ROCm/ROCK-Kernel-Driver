@@ -225,7 +225,7 @@ void __init paging_init(void)
 		pfn_t end_pfn = node_getmaxclick(node) + 1;
 
 		zones_size[ZONE_DMA] = end_pfn - start_pfn;
-		free_area_init_node(node, NODE_DATA(node), NULL,
+		free_area_init_node(node, NODE_DATA(node),
 				zones_size, start_pfn, NULL);
 
 		if (end_pfn > max_low_pfn)

@@ -62,6 +62,7 @@ struct sparc_stackf {
 #ifdef __KERNEL__
 #define user_mode(regs) (!((regs)->psr & PSR_PS))
 #define instruction_pointer(regs) ((regs)->pc)
+unsigned long profile_pc(struct pt_regs *);
 extern void show_regs(struct pt_regs *);
 #endif
 

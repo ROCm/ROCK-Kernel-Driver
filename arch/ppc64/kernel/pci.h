@@ -17,9 +17,7 @@ extern unsigned long isa_io_base;
 extern struct pci_controller* pci_alloc_pci_controller(enum phb_types controller_type);
 extern struct pci_controller* pci_find_hose_for_OF_device(struct device_node* node);
 
-extern struct pci_controller* hose_head;
-extern struct pci_controller** hose_tail;
-
+extern struct list_head hose_list;
 extern int global_phb_number;
 
 /*******************************************************************

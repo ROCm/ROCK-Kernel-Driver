@@ -208,7 +208,7 @@ static struct tunertype tuners[] = {
 	{ "Temic PAL* auto + FM (4009 FN5)", TEMIC, PAL,
 	  16*141.00, 16*464.00, 0xa0,0x90,0x30,0x8e,623},
 	{ "SHARP NTSC_JP (2U5JF5540)", SHARP, NTSC, /* 940=16*58.75 NTSC@Japan */
-	  16*137.25,16*317.25,0x01,0x02,0x08,0x8e,732 }, // Corrected to NTSC=732 (was:940)
+	  16*137.25,16*317.25,0x01,0x02,0x08,0x8e,940 },
 
 	{ "Samsung PAL TCPM9091PD27", Samsung, PAL,  /* from sourceforge v3tv */
           16*169,16*464,0xA0,0x90,0x30,0x8e,623},
@@ -229,7 +229,7 @@ static struct tunertype tuners[] = {
           16*170.00, 16*450.00, 0x01,0x02,0x08,0x8e,732},
 
 	{ "HITACHI V7-J180AT", HITACHI, NTSC,
-	  16*170.00, 16*450.00, 0x01,0x02,0x00,0x8e,940 },
+	  16*170.00, 16*450.00, 0x01,0x02,0x08,0x8e,940 },
 	{ "Philips PAL_MK (FI1216 MK)", Philips, PAL,
 	  16*140.25,16*463.25,0x01,0xc2,0xcf,0x8e,623},
 	{ "Philips 1236D ATSC/NTSC daul in",Philips,ATSC,
@@ -241,6 +241,13 @@ static struct tunertype tuners[] = {
           16*160.00,16*442.00,0x01,0x02,0x04,0x8e,732},
 	{ "Microtune 4049 FM5",Microtune,PAL,
 	  16*141.00,16*464.00,0xa0,0x90,0x30,0x8e,623},
+	{ "Panasonic VP27s/ENGE4324D", Panasonic, NTSC,
+	  16*160.00,16*454.00,0x01,0x02,0x08,0xce,940},
+        { "LG NTSC (TAPE series)", LGINNOTEK, NTSC,
+          16*170.00, 16*450.00, 0x01,0x02,0x04,0x8e,732 },
+
+        { "Tenna TNF 8831 BGFF)", Philips, PAL,
+          16*161.25,16*463.25,0xa0,0x90,0x30,0x8e,623},
 
 };
 #define TUNERS ARRAY_SIZE(tuners)
@@ -934,6 +941,9 @@ static void default_set_radio_freq(struct i2c_client *c, unsigned int freq)
 	case TUNER_PHILIPS_FM1236_MK3:
 		buffer[3] = 0x19;
 		break;
+	case TUNER_LG_PAL_FM:
+		buffer[3] = 0xa5;
+		break;
 	default:
 		buffer[3] = 0xa4;
 		break;
@@ -1300,13 +1310,12 @@ static struct i2c_client client_template =
         .driver     = &driver,
 };
 
-static int tuner_init_module(void)
+static int __init tuner_init_module(void)
 {
-	i2c_add_driver(&driver);
-	return 0;
+	return i2c_add_driver(&driver);
 }
 
-static void tuner_cleanup_module(void)
+static void __exit tuner_cleanup_module(void)
 {
 	i2c_del_driver(&driver);
 }

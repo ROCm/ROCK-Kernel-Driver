@@ -1,9 +1,9 @@
 
 		       LINUX ALLOCATED DEVICES
 
-	     Maintained by John Cagle <device@lanana.org>
+	     Maintained by Torben Mathiasen <device@lanana.org>
 
-		      Last revised: 15 March 2004
+		      Last revised: 04 August 2004
 
 This list is the Linux Device List, the official registry of allocated
 device numbers and /dev directory nodes for the Linux operating
@@ -410,6 +410,7 @@ Your cooperation is appreciated.
 		199 = /dev/scanners/cuecat :CueCat barcode scanner
 		200 = /dev/net/tun	TAP/TUN network device
 		201 = /dev/button/gulpb	Transmeta GULP-B buttons
+		202 = /dev/emd/ctl	Enhanced Metadisk RAID (EMD) control
 		204 = /dev/video/em8300		EM8300 DVD decoder control
 		205 = /dev/video/em8300_mv	EM8300 DVD decoder video
 		206 = /dev/video/em8300_ma	EM8300 DVD decoder audio
@@ -1796,14 +1797,15 @@ Your cooperation is appreciated.
 		partitions is 15.
 
 103 char	Arla network file system
-		  0 = /dev/xfs0		Arla XFS
+		  0 = /dev/nnpfs0	First NNPFS device
+		  1 = /dev/nnpfs1	Second NNPFS device
 
 		Arla is a free clone of the Andrew File System, AFS.
-		Any resemblance with the Swedish milk producer is
-		coincidental.  For more information about the project,
-		write to <arla-drinkers@stacken.kth.se> or subscribe
-		to the arla announce mailing list by sending a mail to
-		<arla-announce-request@stacken.kth.se>.
+		The NNPFS device gives user mode filesystem
+		implementations a kernel presence for caching and easy
+		mounting.  For more information about the project,
+		write to <arla-drinkers@stacken.kth.se> or see
+		http://www.stacken.kth.se/project/arla/
 
 103 block	Audit device
 		  0 = /dev/audit	Audit device
@@ -2060,12 +2062,10 @@ Your cooperation is appreciated.
                 device names.  For example, /dev/hda5 would become
                 /dev/evms/hda5.
 
-118 char	Solidum ???
-		  0 = /dev/solnp0
-		  1 = /dev/solnp1
-		    ...
-		128 = /dev/solnpctl0
-		129 = /dev/solnpctl1
+118 char	IBM Cryptographic Accelerator
+		  0 = /dev/ica	Virtual interface to all IBM Crypto Accelerators
+		  1 = /dev/ica0	IBMCA Device 0
+		  2 = /dev/ica1	IBMCA Device 1
 		    ...
 
 119 char	VMware virtual network control
@@ -2310,6 +2310,11 @@ Your cooperation is appreciated.
 		  1 = /dev/aureal1	Second Aureal Vortex
 		    ...
 
+147 block	Distributed Replicated Block Device (DRBD)
+		  0 = /dev/drbd0	First DRBD device
+		  1 = /dev/drbd1	Second DRBD device
+		    ...
+
 148 char	Technology Concepts serial card
 		  0 = /dev/ttyT0	First TCL port
 		  1 = /dev/ttyT1	Second TCL port
@@ -2346,6 +2351,22 @@ Your cooperation is appreciated.
 		    ...
 		 15 = /dev/spi15	Sixteenth SPI device on the bus
 
+153 block	Enhanced Metadisk RAID (EMD) storage units
+		  0 = /dev/emd/0	First unit
+		  1 = /dev/emd/0p1	Partition 1 on First unit
+		  2 = /dev/emd/0p2	Partition 2 on First unit
+		    ...
+		 15 = /dev/emd/0p15	Partition 15 on First unit
+
+		 16 = /dev/emd/1	Second unit
+		 32 = /dev/emd/2	Third unit
+		    ...
+		240 = /dev/emd/15	Sixteenth unit
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
+
 154 char	Specialix RIO serial card
 		  0 = /dev/ttySR0	First RIO port
 		    ...
@@ -2371,23 +2392,24 @@ Your cooperation is appreciated.
 		  1 = /dev/gfax1	GammaLink channel 1
 		    ...
 
-159		RESERVED
+159 char	RESERVED
+159 block	RESERVED
 
 160 char	General Purpose Instrument Bus (GPIB)
 		  0 = /dev/gpib0	First GPIB bus
 		  1 = /dev/gpib1	Second GPIB bus
 		    ...
 
-160 block       Promise SX8 8-port SATA Disks on First Controller
-		  0 = /dev/sx8/0     SATA disk 0 whole disk
-		  1 = /dev/sx8/0p1   SATA disk 0 partition 1
+160 block       Carmel 8-port SATA Disks on First Controller
+		  0 = /dev/carmel/0     SATA disk 0 whole disk
+		  1 = /dev/carmel/0p1   SATA disk 0 partition 1
 		    ...
-		 31 = /dev/sx8/0p31  SATA disk 0 partition 31
+		 31 = /dev/carmel/0p31  SATA disk 0 partition 31
 
-		 32 = /dev/sx8/1     SATA disk 1 whole disk
-		 64 = /dev/sx8/2     SATA disk 2 whole disk
+		 32 = /dev/carmel/1     SATA disk 1 whole disk
+		 64 = /dev/carmel/2     SATA disk 2 whole disk
 		    ...
-		224 = /dev/sx8/7     SATA disk 7 whole disk
+		224 = /dev/carmel/7     SATA disk 7 whole disk
 
 		Partitions are handled in the same way as for IDE
 		disks (see major number 3) except that the limit on
@@ -2401,16 +2423,16 @@ Your cooperation is appreciated.
 		 17 = /dev/irlpt1	Second IrLPT device
 		    ...
 
-161 block       Promise SX8 8-port SATA Disks on Second Controller
-		  0 = /dev/sx8/8     SATA disk 8 whole disk
-		  1 = /dev/sx8/8p1   SATA disk 8 partition 1
+161 block       Carmel 8-port SATA Disks on Second Controller
+		  0 = /dev/carmel/8     SATA disk 8 whole disk
+		  1 = /dev/carmel/8p1   SATA disk 8 partition 1
 		    ...
-		 31 = /dev/sx8/8p31  SATA disk 8 partition 31
+		 31 = /dev/carmel/8p31  SATA disk 8 partition 31
 
-		 32 = /dev/sx8/9     SATA disk 9 whole disk
-		 64 = /dev/sx8/10    SATA disk 10 whole disk
+		 32 = /dev/carmel/9     SATA disk 9 whole disk
+		 64 = /dev/carmel/10    SATA disk 10 whole disk
 		    ...
-		224 = /dev/sx8/15    SATA disk 15 whole disk
+		224 = /dev/carmel/15    SATA disk 15 whole disk
 
 		Partitions are handled in the same way as for IDE
 		disks (see major number 3) except that the limit on
@@ -2720,6 +2742,9 @@ Your cooperation is appreciated.
 		    ...
 		 39 = /dev/ttyDB7		DataBooster serial port 7
 		 40 = /dev/ttySG0		SGI Altix console port
+		 41 = /dev/ttySMX0		Motorola i.MX - port 0
+		 42 = /dev/ttySMX1		Motorola i.MX - port 1
+		 43 = /dev/ttySMX2		Motorola i.MX - port 2
 
 205 char	Low-density serial ports (alternate device)
 		  0 = /dev/culu0		Callout device for ttyLU0
@@ -2745,6 +2770,9 @@ Your cooperation is appreciated.
 		    ...
 		 39 = /dev/cudb7		Callout device for ttyDB7
 		 40 = /dev/cusg0		Callout device for ttySG0
+		 41 = /dev/ttySMX0		Callout device for ttySMX0
+		 42 = /dev/ttySMX1		Callout device for ttySMX1
+		 43 = /dev/ttySMX2		Callout device for ttySMX2
 
 206 char	OnStream SC-x0 tape devices
 		  0 = /dev/osst0		First OnStream SCSI tape, mode 0

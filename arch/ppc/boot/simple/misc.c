@@ -29,7 +29,6 @@
 #include <asm/reg.h>
 
 #include "nonstdio.h"
-#include "zlib.h"
 
 /* Default cmdline */
 #ifdef CONFIG_CMDLINE
@@ -97,7 +96,6 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	struct bi_record *rec;
 	unsigned long initrd_loc, TotalMemory = 0;
 
-	serial_fixups();
 #ifdef CONFIG_SERIAL_8250_CONSOLE
 	com_port = serial_init(0, NULL);
 #endif
@@ -221,7 +219,7 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	puts("\n");
 
 	puts("Uncompressing Linux...");
-	gunzip(NULL, 0x400000, zimage_start, &zimage_size);
+	gunzip(0x0, 0x400000, zimage_start, &zimage_size);
 	puts("done.\n");
 
 	/* get the bi_rec address */
@@ -268,10 +266,16 @@ decompress_kernel(unsigned long load_addr, int num_words, unsigned long cksum)
 	return rec;
 }
 
+void __attribute__ ((weak))
+board_isa_init(void)
+{
+}
+
 /* Allow decompress_kernel to be hooked into.  This is the default. */
 void * __attribute__ ((weak))
 load_kernel(unsigned long load_addr, int num_words, unsigned long cksum,
 		void *ign1, void *ign2)
 {
+		board_isa_init();
 		return decompress_kernel(load_addr, num_words, cksum);
 }

@@ -31,6 +31,7 @@
 #include <linux/string.h>
 #include <linux/smp_lock.h>
 #include <linux/backing-dev.h>
+#include <linux/ramfs.h>
 
 #include <asm/uaccess.h>
 
@@ -39,7 +40,6 @@
 
 static struct super_operations ramfs_ops;
 static struct address_space_operations ramfs_aops;
-static struct file_operations ramfs_file_operations;
 static struct inode_operations ramfs_file_inode_operations;
 static struct inode_operations ramfs_dir_inode_operations;
 
@@ -48,7 +48,7 @@ static struct backing_dev_info ramfs_backing_dev_info = {
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
-static struct inode *ramfs_get_inode(struct super_block *sb, int mode, dev_t dev)
+struct inode *ramfs_get_inode(struct super_block *sb, int mode, dev_t dev)
 {
 	struct inode * inode = new_inode(sb);
 
@@ -146,7 +146,7 @@ static struct address_space_operations ramfs_aops = {
 	.commit_write	= simple_commit_write
 };
 
-static struct file_operations ramfs_file_operations = {
+struct file_operations ramfs_file_operations = {
 	.read		= generic_file_read,
 	.write		= generic_file_write,
 	.mmap		= generic_file_mmap,
@@ -199,7 +199,7 @@ static int ramfs_fill_super(struct super_block * sb, void * data, int silent)
 	return 0;
 }
 
-static struct super_block *ramfs_get_sb(struct file_system_type *fs_type,
+struct super_block *ramfs_get_sb(struct file_system_type *fs_type,
 	int flags, const char *dev_name, void *data)
 {
 	return get_sb_nodev(fs_type, flags, data, ramfs_fill_super);

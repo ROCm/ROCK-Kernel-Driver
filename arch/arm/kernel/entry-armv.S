@@ -584,6 +584,39 @@ ENTRY(soft_irq_mask)
 		.macro  irq_prio_table
 		.endm
 
+#elif defined(CONFIG_ARCH_IOP331)
+		.macro  disable_fiq
+		.endm
+
+		/*
+		 * Note: only deal with normal interrupts, not FIQ
+		 */
+		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+		mov     \irqnr, #0
+		mrc     p6, 0, \irqstat, c4, c0, 0      @ Read IINTSRC0
+		cmp     \irqstat, #0
+		bne     1002f
+		mrc     p6, 0, \irqstat, c5, c0, 0      @ Read IINTSRC1
+		cmp	\irqstat, #0
+		beq	1001f
+		clz	\irqnr, \irqstat
+/*
+ *		mov	\base, #31
+ *		subs	\irqnr,\base,\irqnr
+ */
+        rsbs    \irqnr,\irqnr,#31   @ recommend by RMK
+		add	\irqnr,\irqnr,#IRQ_IOP331_XINT8
+		b	1001f
+1002:		clz     \irqnr, \irqstat
+		mov     \base, #31
+		subs    \irqnr,\base,\irqnr
+		add     \irqnr,\irqnr,#IRQ_IOP331_DMA0_EOT
+1001:
+		.endm
+
+		.macro  irq_prio_table
+		.endm
+
 #elif defined(CONFIG_ARCH_PXA)
 
 		.macro	disable_fiq

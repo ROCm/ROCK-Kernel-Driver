@@ -83,9 +83,9 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
  * code.
  */
 
-asmlinkage long sys_iopl(unsigned int level, struct pt_regs regs)
+asmlinkage long sys_iopl(unsigned int level, struct pt_regs *regs)
 {
-	unsigned int old = (regs.eflags >> 12) & 3;
+	unsigned int old = (regs->eflags >> 12) & 3;
 
 	if (level > 3)
 		return -EINVAL;
@@ -94,6 +94,6 @@ asmlinkage long sys_iopl(unsigned int level, struct pt_regs regs)
 		if (!capable(CAP_SYS_RAWIO))
 			return -EPERM;
 	}
-	regs.eflags = (regs.eflags &~ 0x3000UL) | (level << 12);
+	regs->eflags = (regs->eflags &~ 0x3000UL) | (level << 12);
 	return 0;
 }

@@ -394,4 +394,6 @@ EXPORT_SYMBOL(ip_nat_cheat_check);
 EXPORT_SYMBOL(ip_nat_mangle_tcp_packet);
 EXPORT_SYMBOL(ip_nat_mangle_udp_packet);
 EXPORT_SYMBOL(ip_nat_used_tuple);
+EXPORT_SYMBOL(ip_nat_find_helper);
+EXPORT_SYMBOL(__ip_nat_find_helper);
 MODULE_LICENSE("GPL");

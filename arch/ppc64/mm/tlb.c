@@ -26,10 +26,10 @@
 #include <linux/mm.h>
 #include <linux/init.h>
 #include <linux/percpu.h>
+#include <linux/hardirq.h>
 #include <asm/pgalloc.h>
 #include <asm/tlbflush.h>
 #include <asm/tlb.h>
-#include <asm/hardirq.h>
 #include <linux/highmem.h>
 
 DEFINE_PER_CPU(struct ppc64_tlb_batch, ppc64_tlb_batch);

@@ -24,6 +24,7 @@
 #include <linux/string.h>
 #include <linux/crypto.h>
 #include <linux/highmem.h>
+#include <linux/moduleparam.h>
 #include "tcrypt.h"
 
 /*
@@ -61,7 +62,8 @@ static char *tvmem;
 static char *check[] = {
 	"des", "md5", "des3_ede", "rot13", "sha1", "sha256", "blowfish",
 	"twofish", "serpent", "sha384", "sha512", "md4", "aes", "cast6", 
-	"arc4", "michael_mic", "deflate", "crc32c", "tea", "xtea", NULL
+	"arc4", "michael_mic", "deflate", "crc32c", "tea", "xtea", 
+	"whirlpool", NULL
 };
 
 static void
@@ -680,6 +682,7 @@ do_test(void)
 
 		test_hash("sha384", sha384_tv_template, SHA384_TEST_VECTORS);
 		test_hash("sha512", sha512_tv_template, SHA512_TEST_VECTORS);
+		test_hash("whirlpool", whirlpool_tv_template, WHIRLPOOL_TEST_VECTORS);
 		test_deflate();
 		test_crc32c();
 #ifdef CONFIG_CRYPTO_HMAC
@@ -791,6 +794,11 @@ do_test(void)
 		test_cipher ("khazad", MODE_ECB, DECRYPT, khazad_dec_tv_template, KHAZAD_DEC_TEST_VECTORS);
 		break;
 
+	case 22:
+		test_hash("whirlpool", whirlpool_tv_template, WHIRLPOOL_TEST_VECTORS);
+		break;
+
+
 #ifdef CONFIG_CRYPTO_HMAC
 	case 100:
 		test_hmac("md5", hmac_md5_tv_template, HMAC_MD5_TEST_VECTORS);
@@ -846,7 +854,7 @@ static void __exit fini(void) { }
 module_init(init);
 module_exit(fini);
 
-MODULE_PARM(mode, "i");
+module_param(mode, int, 0);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Quick & dirty crypto testing module");

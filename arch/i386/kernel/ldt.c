@@ -142,12 +142,17 @@ static int read_ldt(void __user * ptr, unsigned long bytecount)
 		err = -EFAULT;
 	up(&mm->context.sem);
 	if (err < 0)
-		return err;
+		goto error_return;
 	if (size != bytecount) {
 		/* zero-fill the rest */
-		clear_user(ptr+size, bytecount-size);
+		if (clear_user(ptr+size, bytecount-size) != 0) {
+			err = -EFAULT;
+			goto error_return;
+		}
 	}
 	return bytecount;
+error_return:
+	return err;
 }
 
 static int read_default_ldt(void __user * ptr, unsigned long bytecount)

@@ -31,8 +31,6 @@
 #include "sis_ds.h"
 
 typedef struct drm_sis_private {
-	drm_map_t *buffers;
-
 	memHeap_t *AGPHeap;
 	memHeap_t *FBHeap;
 } drm_sis_private_t;

@@ -21,7 +21,7 @@
 
 static int nibblemap[] = { 0,1,1,2,1,2,2,3,1,2,2,3,2,3,3,4 };
 
-u32
+static u32
 affs_count_free_bits(u32 blocksize, const void *data)
 {
 	const u32 *map;

@@ -17,10 +17,14 @@
 #define DRM_UDELAY(d)			udelay(d)
 /** Read a byte from a MMIO region */
 #define DRM_READ8(map, offset)		readb(((unsigned long)(map)->handle) + (offset))
+/** Read a word from a MMIO region */
+#define DRM_READ16(map, offset)         readw(((unsigned long)(map)->handle) + (offset))
 /** Read a dword from a MMIO region */
 #define DRM_READ32(map, offset)		readl(((unsigned long)(map)->handle) + (offset))
 /** Write a byte into a MMIO region */
 #define DRM_WRITE8(map, offset, val)	writeb(val, ((unsigned long)(map)->handle) + (offset))
+/** Write a word into a MMIO region */
+#define DRM_WRITE16(map, offset, val)   writew(val, ((unsigned long)(map)->handle) + (offset))
 /** Write a dword into a MMIO region */
 #define DRM_WRITE32(map, offset, val)	writel(val, ((unsigned long)(map)->handle) + (offset))
 /** Read memory barrier */
@@ -37,8 +41,34 @@
 #define DRM_IRQ_ARGS		int irq, void *arg, struct pt_regs *regs
 
 /** AGP types */
+#if __OS_HAS_AGP
 #define DRM_AGP_MEM		struct agp_memory
 #define DRM_AGP_KERN		struct agp_kern_info
+#else
+/* define some dummy types for non AGP supporting kernels */
+struct no_agp_kern {
+  unsigned long aper_base;
+  unsigned long aper_size;
+};
+#define DRM_AGP_MEM             int
+#define DRM_AGP_KERN            struct no_agp_kern
+#endif
+
+#if !(__OS_HAS_MTRR)
+static __inline__ int mtrr_add (unsigned long base, unsigned long size,
+                                unsigned int type, char increment)
+{
+	return -ENODEV;
+}
+
+static __inline__ int mtrr_del (int reg, unsigned long base,
+                                unsigned long size)
+{
+	return -ENODEV;
+}
+#define MTRR_TYPE_WRCOMB     1
+
+#endif
 
 /** Task queue handler arguments */
 #define DRM_TASKQUEUE_ARGS	void *arg

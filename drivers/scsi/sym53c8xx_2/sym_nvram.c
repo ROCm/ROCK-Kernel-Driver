@@ -53,11 +53,6 @@
 #include "sym_glue.h"
 #include "sym_nvram.h"
 
-/*
- *  Some poor and bogus sync table that refers to Tekram NVRAM layout.
- */
-static u_char Tekram_sync[16] =
-	{25,31,37,43, 50,62,75,125, 12,15,18,21, 6,7,9,10};
 #ifdef	SYM_CONF_DEBUG_NVRAM
 static u_char Tekram_boot_delay[7] = {3, 5, 10, 20, 30, 60, 120};
 #endif
@@ -100,8 +95,6 @@ sym_Symbios_setup_target(struct sym_hcb *np, int target, Symbios_nvram *nvram)
 	struct sym_tcb *tp = &np->target[target];
 	Symbios_target *tn = &nvram->target[target];
 
-	tp->tinfo.user.period = tn->sync_period ? (tn->sync_period + 3) / 4 : 0;
-	tp->tinfo.user.width  = tn->bus_width == 0x10 ? BUS_16_BIT : BUS_8_BIT;
 	tp->usrtags =
 		(tn->flags & SYMBIOS_QUEUE_TAGS_ENABLED)? SYM_SETUP_MAX_TAG : 0;
 
@@ -121,15 +114,6 @@ sym_Tekram_setup_target(struct sym_hcb *np, int target, Tekram_nvram *nvram)
 {
 	struct sym_tcb *tp = &np->target[target];
 	struct Tekram_target *tn = &nvram->target[target];
-	int i;
-
-	if (tn->flags & TEKRAM_SYNC_NEGO) {
-		i = tn->sync_index & 0xf;
-		tp->tinfo.user.period = Tekram_sync[i];
-	}
-
-	tp->tinfo.user.width = (tn->flags & TEKRAM_WIDE_NEGO) ?
-		BUS_16_BIT : BUS_8_BIT;
 
 	if (tn->flags & TEKRAM_TAGGED_COMMANDS) {
 		tp->usrtags = 2 << nvram->max_tags_index;

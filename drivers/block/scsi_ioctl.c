@@ -178,6 +178,7 @@ static int verify_command(struct file *file, unsigned char *cmd)
 		safe_for_write(GPCMD_SEND_EVENT),
 		safe_for_write(GPCMD_SEND_KEY),
 		safe_for_write(GPCMD_SEND_OPC),
+		safe_for_write(GPCMD_SEND_CUE_SHEET),
 		safe_for_write(GPCMD_SET_SPEED),
 		safe_for_write(GPCMD_PREVENT_ALLOW_MEDIUM_REMOVAL),
 		safe_for_write(GPCMD_LOAD_UNLOAD),
@@ -537,6 +538,7 @@ int scsi_cmd_ioctl(struct file *file, struct gendisk *bd_disk, unsigned int cmd,
 		 * old junk scsi send command ioctl
 		 */
 		case SCSI_IOCTL_SEND_COMMAND:
+			printk(KERN_WARNING "program %s is using a deprecated SCSI ioctl, please convert it to SG_IO\n", current->comm);
 			err = -EINVAL;
 			if (!arg)
 				break;

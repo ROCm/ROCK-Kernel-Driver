@@ -95,7 +95,7 @@ int snd_seq_dump_var_event(const snd_seq_event_t *event, snd_seq_dump_func_t fun
 			int size = sizeof(buf);
 			if (len < size)
 				size = len;
-			if (copy_from_user(buf, curptr, size) < 0)
+			if (copy_from_user(buf, curptr, size))
 				return -EFAULT;
 			err = func(private_data, buf, size);
 			if (err < 0)
@@ -158,7 +158,7 @@ int snd_seq_expand_var_event(const snd_seq_event_t *event, int count, char *buf,
 	if (event->data.ext.len & SNDRV_SEQ_EXT_USRPTR) {
 		if (! in_kernel)
 			return -EINVAL;
-		if (copy_from_user(buf, event->data.ext.ptr, len) < 0)
+		if (copy_from_user(buf, event->data.ext.ptr, len))
 			return -EFAULT;
 		return newlen;
 	}
@@ -453,7 +453,7 @@ pool_t *snd_seq_pool_new(int poolsize)
 	pool_t *pool;
 
 	/* create pool block */
-	pool = snd_kcalloc(sizeof(pool_t), GFP_KERNEL);
+	pool = kcalloc(1, sizeof(*pool), GFP_KERNEL);
 	if (pool == NULL) {
 		snd_printd("seq: malloc failed for pool\n");
 		return NULL;

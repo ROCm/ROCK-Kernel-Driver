@@ -1,5 +1,5 @@
 /* 
- * Copyright (C) 2002 Jeff Dike (jdike@karaya.com)
+ * Copyright (C) 2002 - 2003 Jeff Dike (jdike@addtoit.com)
  * Licensed under the GPL
  */
 
@@ -35,14 +35,10 @@ void sig_handler_common_skas(int sig, void *sc_ptr)
 	errno = save_errno;
 }
 
-extern int missed_ticks[];
-
 void user_signal(int sig, union uml_pt_regs *regs)
 {
 	struct signal_info *info;
 
-	if(sig == SIGVTALRM)
-		missed_ticks[cpu()]++;
 	regs->skas.is_user = 1;
 	regs->skas.fault_addr = 0;
 	regs->skas.fault_type = 0;

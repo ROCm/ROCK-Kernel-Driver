@@ -47,14 +47,18 @@
  *      kernel PLL updated to 1994-12-13 specs (rfc-1589)
  * 1997-08-30    Ulrich Windl
  *      Added new constant NTP_PHASE_LIMIT
+ * 2004-08-12    Christoph Lameter
+ *      Reworked time interpolation logic
  */
 #ifndef _LINUX_TIMEX_H
 #define _LINUX_TIMEX_H
 
 #include <linux/config.h>
 #include <linux/compiler.h>
+#include <linux/jiffies.h>
 
 #include <asm/param.h>
+#include <asm/io.h>
 
 /*
  * The following defines establish the engineering parameters of the PLL
@@ -320,99 +324,58 @@ extern long pps_stbcnt;		/* stability limit exceeded */
 
 #ifdef CONFIG_TIME_INTERPOLATION
 
-struct time_interpolator {
-	/* cache-hot stuff first: */
-	unsigned long (*get_offset) (void);
-	void (*update) (long);
-	void (*reset) (void);
+#define TIME_SOURCE_CPU 0
+#define TIME_SOURCE_MMIO64 1
+#define TIME_SOURCE_MMIO32 2
+#define TIME_SOURCE_FUNCTION 3
 
-	/* cache-cold stuff follows here: */
-	struct time_interpolator *next;
+/* For proper operations time_interpolator clocks must run slightly slower
+ * than the standard clock since the interpolator may only correct by having
+ * time jump forward during a tick. A slower clock is usually a side effect
+ * of the integer divide of the nanoseconds in a second by the frequency.
+ * The accuracy of the division can be increased by specifying a shift.
+ * However, this may cause the clock not to be slow enough.
+ * The interpolator will self-tune the clock by slowing down if no
+ * resets occur or speeding up if the time jumps per analysis cycle
+ * become too high.
+ *
+ * Setting jitter compensates for a fluctuating timesource by comparing
+ * to the last value read from the timesource to insure that an earlier value
+ * is not returned by a later call. The price to pay
+ * for the compensation is that the timer routines are not as scalable anymore.
+ */
+
+#define INTERPOLATOR_ADJUST 65536
+#define INTERPOLATOR_MAX_SKIP 10*INTERPOLATOR_ADJUST
+
+struct time_interpolator {
+	unsigned short source;		/* time source flags */
+	unsigned char shift;		/* increases accuracy of multiply by shifting. */
+			/* Note that bits may be lost if shift is set too high */
+	unsigned char jitter;		/* if set compensate for fluctuations */
+	unsigned nsec_per_cyc;		/* set by register_time_interpolator() */
+	void *addr;			/* address of counter or function */
+	unsigned long offset;		/* nsec offset at last update of interpolator */
+	unsigned long last_counter;	/* counter value in units of the counter at last update */
+	unsigned long last_cycle;	/* Last timer value if TIME_SOURCE_JITTER is set */
 	unsigned long frequency;	/* frequency in counts/second */
 	long drift;			/* drift in parts-per-million (or -1) */
+	unsigned long skips;		/* skips forward */
+	unsigned long ns_skipped;	/* nanoseconds skipped */
+	struct time_interpolator *next;
 };
-
-extern volatile unsigned long last_nsec_offset;
-#ifndef __HAVE_ARCH_CMPXCHG
-extern spin_lock_t last_nsec_offset_lock;
-#endif
-extern struct time_interpolator *time_interpolator;
 
 extern void register_time_interpolator(struct time_interpolator *);
 extern void unregister_time_interpolator(struct time_interpolator *);
-
-/* Called with xtime WRITE-lock acquired.  */
-static inline void
-time_interpolator_update(long delta_nsec)
-{
-	struct time_interpolator *ti = time_interpolator;
-
-	if (last_nsec_offset > 0) {
-#ifdef __HAVE_ARCH_CMPXCHG
-		unsigned long new, old;
-
-		do {
-			old = last_nsec_offset;
-			if (old > delta_nsec)
-				new = old - delta_nsec;
-			else
-				new = 0;
-		} while (cmpxchg(&last_nsec_offset, old, new) != old);
-#else
-		/*
-		 * This really hurts, because it serializes gettimeofday(), but without an
-		 * atomic single-word compare-and-exchange, there isn't all that much else
-		 * we can do.
-		 */
-		spin_lock(&last_nsec_offset_lock);
-		{
-			last_nsec_offset -= min(last_nsec_offset, delta_nsec);
-		}
-		spin_unlock(&last_nsec_offset_lock);
-#endif
-	}
-
-	if (ti)
-		(*ti->update)(delta_nsec);
-}
-
-/* Called with xtime WRITE-lock acquired.  */
-static inline void
-time_interpolator_reset(void)
-{
-	struct time_interpolator *ti = time_interpolator;
-
-	last_nsec_offset = 0;
-	if (ti)
-		(*ti->reset)();
-}
-
-/* Called with xtime READ-lock acquired.  */
-static inline unsigned long
-time_interpolator_get_offset(void)
-{
-	struct time_interpolator *ti = time_interpolator;
-	if (ti)
-		return (*ti->get_offset)();
-	return last_nsec_offset;
-}
+extern void time_interpolator_reset(void);
+extern unsigned long time_interpolator_resolution(void);
+extern unsigned long time_interpolator_get_offset(void);
 
 #else /* !CONFIG_TIME_INTERPOLATION */
 
 static inline void
-time_interpolator_update(long delta_nsec)
-{
-}
-
-static inline void
 time_interpolator_reset(void)
 {
-}
-
-static inline unsigned long
-time_interpolator_get_offset(void)
-{
-	return 0;
 }
 
 #endif /* !CONFIG_TIME_INTERPOLATION */

@@ -459,17 +459,13 @@ static void handle_signal(unsigned long sig, struct k_sigaction *ka,
 	/* Set up Signal Frame */
 	setup_rt_frame(sig, ka, info, oldset, regs);
 
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
-
 	if (!(ka->sa.sa_flags & SA_NODEFER)) {
 		spin_lock_irq(&current->sighand->siglock);
-		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
+		sigorsets(&current->blocked, &current->blocked, &ka->sa.sa_mask);
 		sigaddset(&current->blocked,sig);
 		recalc_sigpending();
 		spin_unlock_irq(&current->sighand->siglock);
 	}
-	return;
 }
 
 static inline void syscall_restart(struct pt_regs *regs, struct k_sigaction *ka)
@@ -512,6 +508,7 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 {
 	siginfo_t info;
 	int signr;
+	struct k_sigaction ka;
 
 	/*
 	 * If the current thread is 32 bit - invoke the
@@ -523,14 +520,12 @@ int do_signal(sigset_t *oldset, struct pt_regs *regs)
 	if (!oldset)
 		oldset = &current->blocked;
 
-	signr = get_signal_to_deliver(&info, regs, NULL);
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	if (signr > 0) {
-		struct k_sigaction *ka = &current->sighand->action[signr-1];
-
 		/* Whee!  Actually deliver the signal.  */
 		if (TRAP(regs) == 0x0C00)
-			syscall_restart(regs, ka);
-		handle_signal(signr, ka, &info, oldset, regs);
+			syscall_restart(regs, &ka);
+		handle_signal(signr, &ka, &info, oldset, regs);
 		return 1;
 	}
 

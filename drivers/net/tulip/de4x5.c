@@ -1141,7 +1141,7 @@ de4x5_hw_init(struct net_device *dev, u_long iobase, struct device *gendev)
 	lp->asBitValid = TRUE;
 	lp->timeout = -1;
 	lp->gendev = gendev;
-	lp->lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
+	lp->lock = SPIN_LOCK_UNLOCKED;
 	init_timer(&lp->timer);
 	de4x5_parse_params(dev);
 
@@ -1316,7 +1316,7 @@ de4x5_open(struct net_device *dev)
     ** Re-initialize the DE4X5... 
     */
     status = de4x5_init(dev);
-    lp->lock = (spinlock_t) SPIN_LOCK_UNLOCKED;
+    lp->lock = SPIN_LOCK_UNLOCKED;
     lp->state = OPEN;
     de4x5_dbg_open(dev);
     
@@ -2242,8 +2242,13 @@ static int __devinit de4x5_pci_probe (struct pci_dev *pdev,
 		return -ENODEV;
 
 	/* Ok, the device seems to be for us. */
-	if (!(dev = alloc_etherdev (sizeof (struct de4x5_private))))
-		return -ENOMEM;
+	if (pci_enable_device (pdev))
+		return -ENODEV;
+
+	if (!(dev = alloc_etherdev (sizeof (struct de4x5_private)))) {
+		error = -ENOMEM;
+		goto disable_dev;
+	}
 
 	lp = netdev_priv(dev);
 	lp->bus = PCI;
@@ -2327,6 +2332,8 @@ static int __devinit de4x5_pci_probe (struct pci_dev *pdev,
 	release_region (iobase, DE4X5_PCI_TOTAL_SIZE);
  free_dev:
 	free_netdev (dev);
+ disable_dev:
+	pci_disable_device (pdev);
 	return error;
 }
 
@@ -2341,6 +2348,7 @@ static void __devexit de4x5_pci_remove (struct pci_dev *pdev)
 	unregister_netdev (dev);
 	free_netdev (dev);
 	release_region (iobase, DE4X5_PCI_TOTAL_SIZE);
+	pci_disable_device (pdev);
 }
 
 static struct pci_device_id de4x5_pci_tbl[] = {

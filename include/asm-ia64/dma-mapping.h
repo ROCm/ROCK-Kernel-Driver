@@ -5,7 +5,8 @@
  * Copyright (C) 2003-2004 Hewlett-Packard Co
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
-
+#include <linux/config.h>
+#include <linux/device.h>
 #include <asm/machvec.h>
 
 #define dma_alloc_coherent	platform_dma_alloc_coherent

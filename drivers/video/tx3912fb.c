@@ -208,6 +208,8 @@ static int tx3912fb_setcolreg(u_int regno, u_int red, u_int green,
 	return 0;
 }
 
+int __init tx3912fb_setup(char *options);
+
 /*
  * Initialization of the framebuffer
  */
@@ -215,6 +217,8 @@ int __init tx3912fb_init(void)
 {
 	u_long tx3912fb_paddr = 0;
 	int size = (info->var.bits_per_pixel == 8) ? 256 : 16;
+
+	tx3912fb_setup(fb_get_options("tx3912fb"));
 
 	/* Disable the video logic */
 	outl(inl(TX3912_VIDEO_CTRL1) &
@@ -329,4 +333,5 @@ int __init tx3912fb_setup(char *options)
 	return 0;
 }
 
+module_init(tx3912fb_init);
 MODULE_LICENSE("GPL");

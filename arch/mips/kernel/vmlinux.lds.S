@@ -29,6 +29,7 @@ SECTIONS
   .text : {
     *(.text)
     SCHED_TEXT
+    LOCK_TEXT
     *(.fixup)
     *(.gnu.warning)
   } =0
@@ -96,9 +97,6 @@ SECTIONS
   __setup_start = .;
   .init.setup : { *(.init.setup) }
   __setup_end = .;
-  __start___param = .;
-  __param : { *(__param) }
-  __stop___param = .;
 
   .early_initcall.init : {
   __earlyinitcall_start = .;

@@ -261,7 +261,7 @@ static int
 __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 {
 	unsigned int status;
-	int retval = 0;
+	int ret, retval = 0;
 
 	spin_unlock(&irq_controller_lock);
 
@@ -270,8 +270,10 @@ __do_irq(unsigned int irq, struct irqaction *action, struct pt_regs *regs)
 
 	status = 0;
 	do {
-		status |= action->flags;
-		retval |= action->handler(irq, action->dev_id, regs);
+		ret = action->handler(irq, action->dev_id, regs);
+		if (ret == IRQ_HANDLED)
+			status |= action->flags;
+		retval |= ret;
 		action = action->next;
 	} while (action);
 

@@ -626,11 +626,8 @@ pagebuf_get(				/* allocate a buffer		*/
 	pb = _pagebuf_find(target, ioff, isize, flags, new_pb);
 	if (pb == new_pb) {
 		error = _pagebuf_lookup_pages(pb, flags);
-		if (unlikely(error)) {
-			printk(KERN_WARNING
-			       "pagebuf_get: failed to lookup pages\n");
+		if (error)
 			goto no_buffer;
-		}
 	} else {
 		pagebuf_deallocate(new_pb);
 		if (unlikely(pb == NULL))

@@ -40,24 +40,6 @@ unsigned long long sched_clock(void)
 	return (unsigned long long)jiffies * (1000000000 / HZ);
 }
 
-static inline void do_profile (unsigned long pc)
-{
-	if (prof_buffer && current->pid) {
-		extern int _stext;
-		pc -= (unsigned long) &_stext;
-		pc >>= prof_shift;
-		if (pc < prof_len)
-			++prof_buffer[pc];
-		else
-		/*
-		 * Don't ignore out-of-bounds PC values silently,
-		 * put them into the last histogram slot, so if
-		 * present, they will show up as a sharp peak.
-		 */
-			++prof_buffer[prof_len-1];
-	}
-}
-
 /*
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
@@ -74,10 +56,7 @@ static irqreturn_t timer_interrupt (int irq, void *dummy, struct pt_regs *regs)
 	  mach_tick ();
 
 	do_timer (regs);
-
-	if (! user_mode (regs))
-		do_profile (regs->pc);
-
+	profile_tick(CPU_PROFILING, regs);
 #if 0
 	/*
 	 * If we have an externally synchronized Linux clock, then update

@@ -55,8 +55,6 @@ int mal_register_commac(struct ibm_ocp_mal *mal, struct mal_commac *commac)
 
 	write_unlock_irqrestore(&mal_list_lock, flags);
 
-	MOD_INC_USE_COUNT;
-
 	return 0;
 }
 
@@ -72,8 +70,6 @@ int mal_unregister_commac(struct ibm_ocp_mal *mal, struct mal_commac *commac)
 	list_del_init(&commac->list);
 
 	write_unlock_irqrestore(&mal_list_lock, flags);
-
-	MOD_DEC_USE_COUNT;
 
 	return 0;
 }

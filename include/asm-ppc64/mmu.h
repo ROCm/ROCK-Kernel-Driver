@@ -27,43 +27,17 @@ typedef struct {
 #endif
 } mm_context_t;
 
-#ifdef CONFIG_HUGETLB_PAGE
-#define KERNEL_LOW_HPAGES	.htlb_segs = 0,
-#else
-#define KERNEL_LOW_HPAGES
-#endif
+#define STE_ESID_V	0x80
+#define STE_ESID_KS	0x20
+#define STE_ESID_KP	0x10
+#define STE_ESID_N	0x08
 
-#define KERNEL_CONTEXT(ea) ({ \
-		mm_context_t ctx = { .id = REGION_ID(ea), KERNEL_LOW_HPAGES}; \
-		ctx; })
+#define STE_VSID_SHIFT	12
 
-typedef struct {
-	unsigned long esid: 36; /* Effective segment ID */
-	unsigned long resv0:20; /* Reserved */
-	unsigned long v:     1; /* Entry valid (v=1) or invalid */
-	unsigned long resv1: 1; /* Reserved */
-	unsigned long ks:    1; /* Supervisor (privileged) state storage key */
-	unsigned long kp:    1; /* Problem state storage key */
-	unsigned long n:     1; /* No-execute if n=1 */
-	unsigned long resv2: 3; /* padding to a 64b boundary */
-} ste_dword0;
-
-typedef struct {
-	unsigned long vsid: 52; /* Virtual segment ID */
-	unsigned long resv0:12; /* Padding to a 64b boundary */
-} ste_dword1;
-
-typedef struct _STE {
-	union {
-		unsigned long dword0;
-		ste_dword0    dw0;
-	} dw0;
-
-	union {
-		unsigned long dword1;
-		ste_dword1    dw1;
-	} dw1;
-} STE;
+struct stab_entry {
+	unsigned long esid_data;
+	unsigned long vsid_data;
+};
 
 /* Hardware Page Table Entry */
 
@@ -224,7 +198,7 @@ extern void htab_finish_init(void);
 #define STAB0_PHYS_ADDR	(STAB0_PAGE<<PAGE_SHIFT)
 #define STAB0_VIRT_ADDR	(KERNELBASE+STAB0_PHYS_ADDR)
 
-#define SLB_NUM_BOLTED		2
+#define SLB_NUM_BOLTED		3
 #define SLB_CACHE_ENTRIES	8
 
 /* Bits in the SLB ESID word */

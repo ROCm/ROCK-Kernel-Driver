@@ -875,7 +875,6 @@ extern void ufs_put_cylinder (struct super_block *, unsigned);
 
 /* dir.c */
 extern struct inode_operations ufs_dir_inode_operations;
-extern int ufs_check_dir_entry (const char *, struct inode *, struct ufs_dir_entry *, struct buffer_head *, unsigned long);
 extern int ufs_add_link (struct dentry *, struct inode *);
 extern ino_t ufs_inode_by_name(struct inode *, struct dentry *);
 extern int ufs_make_empty(struct inode *, struct inode *);
@@ -912,7 +911,6 @@ extern struct file_operations ufs_dir_operations;
 extern void ufs_warning (struct super_block *, const char *, const char *, ...) __attribute__ ((format (printf, 3, 4)));
 extern void ufs_error (struct super_block *, const char *, const char *, ...) __attribute__ ((format (printf, 3, 4)));
 extern void ufs_panic (struct super_block *, const char *, const char *, ...) __attribute__ ((format (printf, 3, 4)));
-extern void ufs_write_super (struct super_block *);
 
 /* symlink.c */
 extern struct inode_operations ufs_fast_symlink_inode_operations;

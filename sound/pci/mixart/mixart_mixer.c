@@ -31,8 +31,6 @@
 #include <sound/control.h>
 #include "mixart_mixer.h"
 
-#define chip_t mixart_t
-
 static u32 mixart_analog_level[256] = {
 	0xc2c00000,		/* [000] -96.0 dB */
 	0xc2bf0000,		/* [001] -95.5 dB */

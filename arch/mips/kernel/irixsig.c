@@ -121,9 +121,7 @@ static void setup_irix_frame(struct k_sigaction *ka, struct pt_regs *regs,
 	return;
 
 segv_and_exit:
-	if (signr == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(signr, current);
 }
 
 static void inline

@@ -3,7 +3,7 @@
 #
 # Reuse the i386 PCI subsystem
 #
-CFLAGS += -I arch/i386/pci
+CFLAGS += -Iarch/i386/pci
 
 obj-y		:= i386.o
 obj-$(CONFIG_PCI_DIRECT)+= direct.o
@@ -12,6 +12,8 @@ obj-$(CONFIG_ACPI_PCI)	+= acpi.o
 obj-y			+= legacy.o irq.o common.o
 # mmconfig has a 64bit special
 obj-$(CONFIG_PCI_MMCONFIG) += mmconfig.o
+
+obj-$(CONFIG_NUMA)	+= k8-bus.o
 
 direct-y += ../../i386/pci/direct.o
 acpi-y   += ../../i386/pci/acpi.o

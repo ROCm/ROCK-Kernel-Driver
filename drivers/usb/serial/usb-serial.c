@@ -421,6 +421,63 @@ static void return_serial (struct usb_serial *serial)
 	return;
 }
 
+static void destroy_serial(struct kref *kref)
+{
+	struct usb_serial *serial;
+	struct usb_serial_port *port;
+	int i;
+
+	serial = to_usb_serial(kref);
+
+	dbg ("%s - %s", __FUNCTION__, serial->type->name);
+
+	serial->type->shutdown(serial);
+
+	/* return the minor range that this device had */
+	return_serial(serial);
+
+	for (i = 0; i < serial->num_ports; ++i)
+		serial->port[i]->open_count = 0;
+
+	/* the ports are cleaned up and released in port_release() */
+	for (i = 0; i < serial->num_ports; ++i)
+		if (serial->port[i]->dev.parent != NULL) {
+			device_unregister(&serial->port[i]->dev);
+			serial->port[i] = NULL;
+		}
+
+	/* If this is a "fake" port, we have to clean it up here, as it will
+	 * not get cleaned up in port_release() as it was never registered with
+	 * the driver core */
+	if (serial->num_ports < serial->num_port_pointers) {
+		for (i = serial->num_ports; i < serial->num_port_pointers; ++i) {
+			port = serial->port[i];
+			if (!port)
+				continue;
+			if (port->read_urb) {
+				usb_unlink_urb(port->read_urb);
+				usb_free_urb(port->read_urb);
+			}
+			if (port->write_urb) {
+				usb_unlink_urb(port->write_urb);
+				usb_free_urb(port->write_urb);
+			}
+			if (port->interrupt_in_urb) {
+				usb_unlink_urb(port->interrupt_in_urb);
+				usb_free_urb(port->interrupt_in_urb);
+			}
+			kfree(port->bulk_in_buffer);
+			kfree(port->bulk_out_buffer);
+			kfree(port->interrupt_in_buffer);
+		}
+	}
+
+	usb_put_dev(serial->dev);
+
+	/* free up any memory that we allocated */
+	kfree (serial);
+}
+
 /*****************************************************************************
  * Driver tty interface functions
  *****************************************************************************/
@@ -465,7 +522,7 @@ static int serial_open (struct tty_struct *tty, struct file * filp)
 		if (retval) {
 			port->open_count = 0;
 			module_put(serial->type->owner);
-			kref_put(&serial->kref);
+			kref_put(&serial->kref, destroy_serial);
 		}
 	}
 bailout:
@@ -496,7 +553,7 @@ static void serial_close(struct tty_struct *tty, struct file * filp)
 	}
 
 	module_put(port->serial->type->owner);
-	kref_put(&port->serial->kref);
+	kref_put(&port->serial->kref, destroy_serial);
 }
 
 static int serial_write (struct tty_struct * tty, int from_user, const unsigned char *buf, int count)
@@ -654,13 +711,6 @@ exit:
 	;
 }
 
-static void serial_shutdown (struct usb_serial *serial)
-{
-	dbg ("%s", __FUNCTION__);
-
-	serial->type->shutdown(serial);
-}
-
 static int serial_read_proc (char *page, char **start, off_t off, int count, int *eof, void *data)
 {
 	struct usb_serial *serial;
@@ -694,7 +744,7 @@ static int serial_read_proc (char *page, char **start, off_t off, int count, int
 			begin += length;
 			length = 0;
 		}
-		kref_put(&serial->kref);
+		kref_put(&serial->kref, destroy_serial);
 	}
 	*eof = 1;
 done:
@@ -763,62 +813,6 @@ void usb_serial_port_softint(void *private)
 	wake_up_interruptible(&tty->write_wait);
 }
 
-static void destroy_serial(struct kref *kref)
-{
-	struct usb_serial *serial;
-	struct usb_serial_port *port;
-	int i;
-
-	serial = to_usb_serial(kref);
-
-	dbg ("%s - %s", __FUNCTION__, serial->type->name);
-	serial_shutdown (serial);
-
-	/* return the minor range that this device had */
-	return_serial(serial);
-
-	for (i = 0; i < serial->num_ports; ++i)
-		serial->port[i]->open_count = 0;
-
-	/* the ports are cleaned up and released in port_release() */
-	for (i = 0; i < serial->num_ports; ++i)
-		if (serial->port[i]->dev.parent != NULL) {
-			device_unregister(&serial->port[i]->dev);
-			serial->port[i] = NULL;
-		}
-
-	/* If this is a "fake" port, we have to clean it up here, as it will
-	 * not get cleaned up in port_release() as it was never registered with
-	 * the driver core */
-	if (serial->num_ports < serial->num_port_pointers) {
-		for (i = serial->num_ports; i < serial->num_port_pointers; ++i) {
-			port = serial->port[i];
-			if (!port)
-				continue;
-			if (port->read_urb) {
-				usb_unlink_urb(port->read_urb);
-				usb_free_urb(port->read_urb);
-			}
-			if (port->write_urb) {
-				usb_unlink_urb(port->write_urb);
-				usb_free_urb(port->write_urb);
-			}
-			if (port->interrupt_in_urb) {
-				usb_unlink_urb(port->interrupt_in_urb);
-				usb_free_urb(port->interrupt_in_urb);
-			}
-			kfree(port->bulk_in_buffer);
-			kfree(port->bulk_out_buffer);
-			kfree(port->interrupt_in_buffer);
-		}
-	}
-
-	usb_put_dev(serial->dev);
-
-	/* free up any memory that we allocated */
-	kfree (serial);
-}
-
 static void port_release(struct device *dev)
 {
 	struct usb_serial_port *port = to_usb_serial_port(dev);
@@ -859,7 +853,7 @@ static struct usb_serial * create_serial (struct usb_device *dev,
 	serial->interface = interface;
 	serial->vendor = dev->descriptor.idVendor;
 	serial->product = dev->descriptor.idProduct;
-	kref_init(&serial->kref, destroy_serial);
+	kref_init(&serial->kref);
 
 	return serial;
 }
@@ -1209,7 +1203,7 @@ void usb_serial_disconnect(struct usb_interface *interface)
 	if (serial) {
 		/* let the last holder of this object 
 		 * cause it to be cleaned up */
-		kref_put(&serial->kref);
+		kref_put(&serial->kref, destroy_serial);
 	}
 	dev_info(dev, "device disconnected\n");
 }

@@ -566,7 +566,6 @@ static int
 au1000_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
 {
 	unsigned int speed;
-	unsigned long start;
 	u_long flags;
 
 	if(map->map>=MAX_WIN){
@@ -588,25 +587,19 @@ au1000_pcmcia_set_mem_map(unsigned int sock, struct pccard_mem_map *map)
 	}
 
 	spin_lock_irqsave(&pcmcia_lock, flags);
-	start=map->sys_start;
-
-	if(map->sys_stop==0)
-		map->sys_stop=MAP_SIZE-1;
-
 	if (map->flags & MAP_ATTRIB) {
-		map->sys_start = pcmcia_socket[sock].phys_attr + 
+		map->static_start = pcmcia_socket[sock].phys_attr + 
 			map->card_start;
 	}
 	else {
-		map->sys_start = pcmcia_socket[sock].phys_mem + 
+		map->static_start = pcmcia_socket[sock].phys_mem + 
 			map->card_start;
 	}
 
-	map->sys_stop=map->sys_start+(map->sys_stop-start);
 	pcmcia_socket[sock].mem_map[map->map]=*map;
 	spin_unlock_irqrestore(&pcmcia_lock, flags);
-	debug(3, "set_mem_map %d start %x stop %x card_start %x\n", 
-			map->map, map->sys_start, map->sys_stop, 
+	debug(3, "set_mem_map %d start %x card_start %x\n", 
+			map->map, map->static_start,
 			map->card_start);
 	return 0;
 

@@ -64,7 +64,7 @@ void lmcEventLog (u_int32_t EventNum, u_int32_t arg2, u_int32_t arg3)
 #endif
 }
 
-inline void lmc_trace(struct net_device *dev, char *msg){
+void lmc_trace(struct net_device *dev, char *msg){
 #ifdef LMC_TRACE
     unsigned long j = jiffies + 3; /* Wait for 50 ms */
 

@@ -1,5 +1,5 @@
 /*
- *   Copyright (C) International Business Machines  Corp., 2000-2003
+ *   Copyright (C) International Business Machines  Corp., 2000-2004
  *   Copyright (C) Christoph Hellwig, 2002
  *
  *   This program is free software;  you can redistribute it and/or modify
@@ -19,6 +19,7 @@
 
 #include <linux/fs.h>
 #include <linux/xattr.h>
+#include <linux/quotaops.h>
 #include "jfs_incore.h"
 #include "jfs_superblock.h"
 #include "jfs_dmap.h"
@@ -251,9 +252,17 @@ static int ea_write(struct inode *ip, struct jfs_ea_list *ealist, int size,
 	/* figure out how many blocks we need */
 	nblocks = (size + (sb->s_blocksize - 1)) >> sb->s_blocksize_bits;
 
+	/* Allocate new blocks to quota. */
+	if (DQUOT_ALLOC_BLOCK(ip, nblocks)) {
+		return -EDQUOT;
+	}
+
 	rc = dbAlloc(ip, INOHINT(ip), nblocks, &blkno);
-	if (rc)
+	if (rc) {
+		/*Rollback quota allocation. */
+		DQUOT_FREE_BLOCK(ip, nblocks);
 		return rc;
+	}
 
 	/*
 	 * Now have nblocks worth of storage to stuff into the FEALIST.
@@ -315,6 +324,9 @@ static int ea_write(struct inode *ip, struct jfs_ea_list *ealist, int size,
 	return 0;
 
       failed:
+	/* Rollback quota allocation. */
+	DQUOT_FREE_BLOCK(ip, nblocks);
+
 	dbFree(ip, blkno, nblocks);
 	return rc;
 }
@@ -448,6 +460,7 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 	int blocks_needed, current_blocks;
 	s64 blkno;
 	int rc;
+	int quota_allocation = 0;
 
 	/* When fsck.jfs clears a bad ea, it doesn't clear the size */
 	if (ji->ea.flag == 0)
@@ -517,10 +530,16 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 	    sb->s_blocksize_bits;
 
 	if (blocks_needed > current_blocks) {
+		/* Allocate new blocks to quota. */
+		if (DQUOT_ALLOC_BLOCK(inode, blocks_needed))
+			return -EDQUOT;
+
+		quota_allocation = blocks_needed;
+
 		rc = dbAlloc(inode, INOHINT(inode), (s64) blocks_needed,
 			     &blkno);
 		if (rc)
-			return rc;
+			goto clean_up;
 
 		DXDlength(&ea_buf->new_ea, blocks_needed);
 		DXDaddress(&ea_buf->new_ea, blkno);
@@ -534,7 +553,8 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 					  1);
 		if (ea_buf->mp == NULL) {
 			dbFree(inode, blkno, (s64) blocks_needed);
-			return -EIO;
+			rc = -EIO;
+			goto clean_up;
 		}
 		ea_buf->xattr = ea_buf->mp->data;
 		ea_buf->max_size = (min_size + sb->s_blocksize - 1) &
@@ -544,7 +564,7 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		if ((rc = ea_read(inode, ea_buf->xattr))) {
 			discard_metapage(ea_buf->mp);
 			dbFree(inode, blkno, (s64) blocks_needed);
-			return rc;
+			goto clean_up;
 		}
 		goto size_check;
 	}
@@ -552,8 +572,10 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 	ea_buf->mp = read_metapage(inode, addressDXD(&ji->ea),
 				   lengthDXD(&ji->ea) << sb->s_blocksize_bits,
 				   1);
-	if (ea_buf->mp == NULL)
-		return -EIO;
+	if (ea_buf->mp == NULL) {
+		rc = -EIO;
+		goto clean_up;
+	}
 	ea_buf->xattr = ea_buf->mp->data;
 	ea_buf->max_size = (ea_size + sb->s_blocksize - 1) &
 	    ~(sb->s_blocksize - 1);
@@ -563,10 +585,18 @@ static int ea_get(struct inode *inode, struct ea_buffer *ea_buf, int min_size)
 		printk(KERN_ERR "ea_get: invalid extended attribute\n");
 		dump_mem("xattr", ea_buf->xattr, ea_size);
 		ea_release(inode, ea_buf);
-		return -EIO;
+		rc = -EIO;
+		goto clean_up;
 	}
 
 	return ea_size;
+
+      clean_up:
+	/* Rollback quota allocation */
+	if (quota_allocation)
+		DQUOT_FREE_BLOCK(inode, quota_allocation);
+
+	return (rc);
 }
 
 static void ea_release(struct inode *inode, struct ea_buffer *ea_buf)
@@ -640,7 +670,10 @@ static int ea_put(struct inode *inode, struct ea_buffer *ea_buf, int new_size)
 		ji->ea.size = 0;
 	}
 
-	inode->i_blocks += LBLK2PBLK(inode->i_sb, new_blocks - old_blocks);
+	/* If old blocks exist, they must be removed from quota allocation. */
+	if (old_blocks)
+		DQUOT_FREE_BLOCK(inode, old_blocks);
+
 	inode->i_ctime = CURRENT_TIME;
 	rc = txCommit(tid, 1, &inode, 0);
 	txEnd(tid);

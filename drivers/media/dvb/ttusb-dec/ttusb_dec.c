@@ -1181,7 +1181,7 @@ static int ttusb_dec_boot_dsp(struct ttusb_dec *dec)
 	firmware_size = fw_entry->size;
 
 	if (firmware_size < 60) {
-		printk("%s: firmware size too small for DSP code (%u < 60).\n",
+		printk("%s: firmware size too small for DSP code (%zu < 60).\n",
 			__FUNCTION__, firmware_size);
 		return -1;
 	}

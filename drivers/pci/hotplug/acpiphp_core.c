@@ -61,7 +61,7 @@ MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_LICENSE("GPL");
 MODULE_PARM_DESC(debug, "Debugging mode enabled or not");
-module_param(debug, bool, 644);
+module_param(debug, bool, 0644);
 
 /* export the attention callback registration methods */
 EXPORT_SYMBOL_GPL(acpiphp_register_attention);

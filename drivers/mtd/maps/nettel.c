@@ -180,7 +180,7 @@ int nettel_eraseconfig(void)
 	if (mtd) {
 		nettel_erase.mtd = mtd;
 		nettel_erase.callback = nettel_erasecallback;
-		nettel_erase.callback = 0;
+		nettel_erase.callback = NULL;
 		nettel_erase.addr = 0;
 		nettel_erase.len = mtd->size;
 		nettel_erase.priv = (u_long) &wait_q;

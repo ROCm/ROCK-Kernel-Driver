@@ -54,6 +54,7 @@
 #include <net/rawv6.h>
 #include <net/icmp.h>
 #include <net/xfrm.h>
+#include <net/checksum.h>
 
 static int ip6_fragment(struct sk_buff **pskb, int (*output)(struct sk_buff**));
 
@@ -796,10 +797,6 @@ int ip6_dst_lookup(struct sock *sk, struct dst_entry **dst, struct flowi *fl)
 			goto out_err_release;
 		}
 	}
-	if ((err = xfrm_lookup(dst, fl, sk, 0)) < 0) {
-		err = -ENETUNREACH;
-		goto out_err_release;
-        }
 
 	return 0;
 
@@ -821,7 +818,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 	int exthdrlen;
 	int hh_len;
 	int mtu;
-	int copy = 0;
+	int copy;
 	int err;
 	int offset = 0;
 	int csummode = CHECKSUM_NONE;
@@ -879,29 +876,79 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to, int offse
 		}
 	}
 
+	/*
+	 * Let's try using as much space as possible.
+	 * Use MTU if total length of the message fits into the MTU.
+	 * Otherwise, we need to reserve fragment header and
+	 * fragment alignment (= 8-15 octects, in total).
+	 *
+	 * Note that we may need to "move" the data from the tail of
+	 * of the buffer to the new fragment when we split 
+	 * the message.
+	 *
+	 * FIXME: It may be fragmented into multiple chunks 
+	 *        at once if non-fragmentable extension headers
+	 *        are too large.
+	 * --yoshfuji 
+	 */
+
 	inet->cork.length += length;
 
 	if ((skb = skb_peek_tail(&sk->sk_write_queue)) == NULL)
 		goto alloc_new_skb;
 
 	while (length > 0) {
-		if ((copy = maxfraglen - skb->len) <= 0) {
+		/* Check if the remaining data fits into current packet. */
+		copy = mtu - skb->len;
+		if (copy < length)
+			copy = maxfraglen - skb->len;
+
+		if (copy <= 0) {
 			char *data;
 			unsigned int datalen;
 			unsigned int fraglen;
+			unsigned int fraggap;
 			unsigned int alloclen;
-			BUG_TRAP(copy == 0);
+			struct sk_buff *skb_prev;
 alloc_new_skb:
-			datalen = maxfraglen - fragheaderlen;
-			if (datalen > length)
-				datalen = length;
+			skb_prev = skb;
+
+			/* There's no room in the current skb */
+			if (skb_prev)
+				fraggap = skb_prev->len - maxfraglen;
+			else
+				fraggap = 0;
+
+			/*
+			 * If remaining data exceeds the mtu,
+			 * we know we need more fragment(s).
+			 */
+			datalen = length + fraggap;
+			if (datalen > mtu - fragheaderlen)
+				datalen = maxfraglen - fragheaderlen;
+
 			fraglen = datalen + fragheaderlen;
 			if ((flags & MSG_MORE) &&
 			    !(rt->u.dst.dev->features&NETIF_F_SG))
-				alloclen = maxfraglen;
+				alloclen = mtu;
 			else
-				alloclen = fraglen;
+				alloclen = datalen + fragheaderlen;
+
+			/*
+			 * The last fragment gets additional space at tail.
+			 * Note: we overallocate on fragments with MSG_MODE
+			 * because we have no idea if we're the last one.
+			 */
+			if (datalen == length + fraggap)
+				alloclen += rt->u.dst.trailer_len;
+
+			/*
+			 * We just reserve space for fragment header.
+			 * Note: this may be overallocation if the message 
+			 * (without MSG_MORE) fits into the MTU.
+			 */
 			alloclen += sizeof(struct frag_hdr);
+
 			if (transhdrlen) {
 				skb = sock_alloc_send_skb(sk,
 						alloclen + hh_len,
@@ -923,7 +970,7 @@ alloc_new_skb:
 			 */
 			skb->ip_summed = csummode;
 			skb->csum = 0;
-			/* reserve 8 byte for fragmentation */
+			/* reserve for fragmentation */
 			skb_reserve(skb, hh_len+sizeof(struct frag_hdr));
 
 			/*
@@ -933,15 +980,29 @@ alloc_new_skb:
 			skb->nh.raw = data + exthdrlen;
 			data += fragheaderlen;
 			skb->h.raw = data + exthdrlen;
-			copy = datalen - transhdrlen;
-			if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, 0, skb) < 0) {
+
+			if (fraggap) {
+				skb->csum = skb_copy_and_csum_bits(
+					skb_prev, maxfraglen,
+					data + transhdrlen, fraggap, 0);
+				skb_prev->csum = csum_sub(skb_prev->csum,
+							  skb->csum);
+				data += fraggap;
+				skb_trim(skb_prev, maxfraglen);
+			}
+			copy = datalen - transhdrlen - fraggap;
+			if (copy < 0) {
+				err = -EINVAL;
+				kfree_skb(skb);
+				goto error;
+			} else if (copy > 0 && getfrag(from, data + transhdrlen, offset, copy, fraggap, skb) < 0) {
 				err = -EFAULT;
 				kfree_skb(skb);
 				goto error;
 			}
 
 			offset += copy;
-			length -= datalen;
+			length -= datalen - fraggap;
 			transhdrlen = 0;
 			exthdrlen = 0;
 			csummode = CHECKSUM_NONE;

@@ -10,7 +10,7 @@ NOTE:Eight space tabs are the optimum editor setting for reading this file.
 
 	       Author(s) :  Ryan S. Arnold <rsa@us.ibm.com>
 		       Date Created: March, 02, 2004
-		       Last Changed: July, 07, 2004
+		       Last Changed: August, 24, 2004
 
 ---------------------------------------------------------------------------
 Table of contents:
@@ -243,6 +243,25 @@ node.  If this is not done, the next user to connect to the console will
 continue using the previous user's logged in session which includes
 using the $TERM variable that the previous user supplied.
 
+Hotplug add and remove of vty-server adapters affects which /dev/hvcs* node
+is used to connect to each vty-server adapter.  In order to determine which
+vty-server adapter is associated with which /dev/hvcs* node a special sysfs
+attribute has been added to each vty-server sysfs entry.  This entry is
+called "index" and showing it reveals an integer that refers to the
+/dev/hvcs* entry to use to connect to that device.  For instance cating the
+index attribute of vty-server adapter 30000004 shows the following.
+
+	Pow5:/sys/bus/vio/drivers/hvcs/30000004 # cat index
+	2
+
+This index of '2' means that in order to connect to vty-server adapter
+30000004 the user should interact with /dev/hvcs2.
+
+It should be noted that due to the system hotplug I/O capabilities of a
+system the /dev/hvcs* entry that interacts with a particular vty-server
+adapter is not guarenteed to remain the same across system reboots.  Look
+in the Q & A section for more on this issue.
+
 ---------------------------------------------------------------------------
 6. Disconnection
 
@@ -328,8 +347,8 @@ address that is created by firmware.  An example vty-server sysfs entry
 looks like the following:
 
 	Pow5:/sys/bus/vio/drivers/hvcs/30000004 # ls
-	.   current_vty   devspec  partner_clcs  vterm_state
-	..  detach_state  name     partner_vtys
+	.   current_vty   devspec  name          partner_vtys
+	..  detach_state  index    partner_clcs  vterm_state
 
 Each entry is provided, by default with a "name" attribute.  Reading the
 "name" attribute will reveal the device type as shown in the following
@@ -498,6 +517,20 @@ Q: Does the hvcs driver support dynamic (hotplug) addition of devices?
 A: Yes, if you have dlpar and hotplug enabled for your system and it has
 been built into the kernel the hvcs drivers is configured to dynamically
 handle additions of new devices and removals of unused devices.
+
+---------------------------------------------------------------------------
+Q: For some reason /dev/hvcs* doesn't map to the same vty-server adapter
+after a reboot.  What happened?
+
+A: Assignment of vty-server adapters to /dev/hvcs* entries is always done
+in the order that the adapters are exposed.  Due to hotplug capabilities of
+this driver assignment of hotplug added vty-servers may be in a different
+order than how they would be exposed on module load.  Rebooting or
+reloading the module after dynamic addition may result in the /dev/hvcs*
+and vty-server coupling changing if a vty-server adapter was added in a
+slot inbetween two other vty-server adapters.  Refer to the section above
+on how to determine which vty-server goes with which /dev/hvcs* node.
+Hint; look at the sysfs "index" attribute for the vty-server.
 
 ---------------------------------------------------------------------------
 Q: Can I use /dev/hvcs* as a conduit to another partition and use a tty

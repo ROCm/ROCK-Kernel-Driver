@@ -9,8 +9,8 @@
  * published by the Free Software Foundation.
  *
  */
-
-#include <linux/config.h>
+#ifndef _IOP321_IRQS_H_
+#define _IOP321_IRQS_H_
 
 /*
  * IOP80321 chipset interrupts
@@ -62,7 +62,6 @@
 /*
  * Interrupts available on the IQ80321 board
  */
-#ifdef CONFIG_ARCH_IQ80321
 
 /*
  * On board devices
@@ -78,7 +77,24 @@
 #define	IRQ_IQ80321_INTC	IRQ_IOP321_XINT2
 #define	IRQ_IQ80321_INTD	IRQ_IOP321_XINT3
 
-#endif // CONFIG_ARCH_IQ80321
+/*
+ * Interrupts on the IQ31244 board
+ */
 
-#define XSCALE_PMU_IRQ	IRQ_IOP321_CORE_PMU
+/*
+ * On board devices
+ */
+#define IRQ_IQ31244_UART	IRQ_IOP321_XINT1
+#define	IRQ_IQ31244_I82546	IRQ_IOP321_XINT0
+#define IRQ_IQ31244_SATA	IRQ_IOP321_XINT2
+#define	IRQ_IQ31244_PCIX_SLOT	IRQ_IOP321_XINT3
 
+/*
+ * PCI interrupts
+ */
+#define	IRQ_IQ31244_INTA	IRQ_IOP321_XINT0
+#define	IRQ_IQ31244_INTB	IRQ_IOP321_XINT1
+#define	IRQ_IQ31244_INTC	IRQ_IOP321_XINT2
+#define	IRQ_IQ31244_INTD	IRQ_IOP321_XINT3
+
+#endif // _IOP321_IRQ_H_

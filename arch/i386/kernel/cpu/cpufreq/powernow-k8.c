@@ -948,13 +948,13 @@ static int __init powernowk8_cpu_init(struct cpufreq_policy *pol)
 		 * an UP version, and is deprecated by AMD.
 		 */
 
-		if (pol->cpu != 0) {
-			printk(KERN_ERR PFX "init not cpu 0\n");
+		if ((num_online_cpus() != 1) || (num_possible_cpus() != 1)) {
+			printk(KERN_INFO PFX "MP systems not supported by PSB BIOS structure\n");
 			kfree(data);
 			return -ENODEV;
 		}
-		if ((num_online_cpus() != 1) || (num_possible_cpus() != 1)) {
-			printk(KERN_INFO PFX "MP systems not supported by PSB BIOS structure\n");
+		if (pol->cpu != 0) {
+			printk(KERN_ERR PFX "init not cpu 0\n");
 			kfree(data);
 			return -ENODEV;
 		}

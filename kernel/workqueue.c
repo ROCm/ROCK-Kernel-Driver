@@ -525,5 +525,5 @@ EXPORT_SYMBOL_GPL(destroy_workqueue);
 
 EXPORT_SYMBOL(schedule_work);
 EXPORT_SYMBOL(schedule_delayed_work);
+EXPORT_SYMBOL(schedule_delayed_work_on);
 EXPORT_SYMBOL(flush_scheduled_work);
-

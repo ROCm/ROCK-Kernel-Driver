@@ -674,8 +674,8 @@ out:
 out_misc:
 #ifdef CONFIG_WDT_501_PCI
 	misc_deregister(&temp_miscdev);
-#endif /* CONFIG_WDT_501_PCI */
 out_rbt:
+#endif /* CONFIG_WDT_501_PCI */
 	unregister_reboot_notifier(&wdtpci_notifier);
 out_irq:
 	free_irq(irq, &wdtpci_miscdev);

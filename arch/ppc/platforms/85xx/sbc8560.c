@@ -144,9 +144,6 @@ sbc8560_setup_arch(void)
 	/* setup PCI host bridges */
 	mpc85xx_setup_hose();
 #endif
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
 #ifdef CONFIG_SERIAL_8250
 	sbc8560_early_serial_map();
 #endif

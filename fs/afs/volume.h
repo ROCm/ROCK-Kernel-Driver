@@ -99,7 +99,6 @@ extern int afs_vlocation_lookup(struct afs_cell *cell,
 
 #define afs_get_vlocation(V) do { atomic_inc(&(V)->usage); } while(0)
 
-extern void __afs_put_vlocation(struct afs_vlocation *vlocation);
 extern void afs_put_vlocation(struct afs_vlocation *vlocation);
 extern void afs_vlocation_do_timeout(struct afs_vlocation *vlocation);
 

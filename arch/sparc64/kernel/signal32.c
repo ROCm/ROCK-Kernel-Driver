@@ -59,6 +59,16 @@ struct signal_sframe32 {
 	unsigned int extramask[_COMPAT_NSIG_WORDS - 1];
 };
 
+/* This magic should be in g_upper[0] for all upper parts
+ * to be valid.
+ */
+#define SIGINFO_EXTRA_V8PLUS_MAGIC	0x130e269
+typedef struct {
+	unsigned int g_upper[8];
+	unsigned int o_upper[8];
+	unsigned int asi;
+} siginfo_extra_v8plus_t;
+
 /* 
  * And the new one, intended to be used for Linux applications only
  * (we have enough in there to work with clone).
@@ -76,9 +86,62 @@ struct new_signal_frame32 {
 	__siginfo_fpu_t		fpu_state;
 };
 
+struct siginfo32 {
+	int si_signo;
+	int si_errno;
+	int si_code;
+
+	union {
+		int _pad[SI_PAD_SIZE32];
+
+		/* kill() */
+		struct {
+			compat_pid_t _pid;		/* sender's pid */
+			unsigned int _uid;		/* sender's uid */
+		} _kill;
+
+		/* POSIX.1b timers */
+		struct {
+			timer_t _tid;			/* timer id */
+			int _overrun;			/* overrun count */
+			sigval_t32 _sigval;		/* same as below */
+			int _sys_private;		/* not to be passed to user */
+		} _timer;
+
+		/* POSIX.1b signals */
+		struct {
+			compat_pid_t _pid;		/* sender's pid */
+			unsigned int _uid;		/* sender's uid */
+			sigval_t32 _sigval;
+		} _rt;
+
+		/* SIGCHLD */
+		struct {
+			compat_pid_t _pid;		/* which child */
+			unsigned int _uid;		/* sender's uid */
+			int _status;			/* exit code */
+			compat_clock_t _utime;
+			compat_clock_t _stime;
+			struct compat_rusage _rusage;
+		} _sigchld;
+
+		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS, SIGEMT */
+		struct {
+			u32 _addr; /* faulting insn/memory ref. */
+			int _trapno;
+		} _sigfault;
+
+		/* SIGPOLL */
+		struct {
+			int _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
+			int _fd;
+		} _sigpoll;
+	} _sifields;
+};
+
 struct rt_signal_frame32 {
 	struct sparc_stackf32	ss;
-	siginfo_t32		info;
+	struct siginfo32	info;
 	struct pt_regs32	regs;
 	compat_sigset_t		mask;
 	/* __siginfo_fpu32_t * */ u32 fpu_save;
@@ -95,11 +158,11 @@ struct rt_signal_frame32 {
 #define NF_ALIGNEDSZ  (((sizeof(struct new_signal_frame32) + 7) & (~7)))
 #define RT_ALIGNEDSZ  (((sizeof(struct rt_signal_frame32) + 7) & (~7)))
 
-int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from)
+int copy_siginfo_to_user32(struct siginfo32 __user *to, siginfo_t *from)
 {
 	int err;
 
-	if (!access_ok(VERIFY_WRITE, to, sizeof(siginfo_t32)))
+	if (!access_ok(VERIFY_WRITE, to, sizeof(struct siginfo32)))
 		return -EFAULT;
 
 	/* If you change siginfo_t structure, please be sure
@@ -125,6 +188,8 @@ int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from)
 			err |= __put_user(from->si_utime, &to->si_utime);
 			err |= __put_user(from->si_stime, &to->si_stime);
 			err |= __put_user(from->si_status, &to->si_status);
+			err |= put_compat_rusage(&from->si_rusage,
+						 &to->si_rusage);
 		default:
 			err |= __put_user(from->si_pid, &to->si_pid);
 			err |= __put_user(from->si_uid, &to->si_uid);
@@ -143,6 +208,22 @@ int copy_siginfo_to_user32(siginfo_t32 __user *to, siginfo_t *from)
 		}
 	}
 	return err;
+}
+
+/* CAUTION: This is just a very minimalist implementation for the
+ *          sake of compat_sys_rt_sigqueueinfo()
+ */
+int copy_siginfo_to_kernel32(siginfo_t *to, struct siginfo32 __user *from)
+{
+	if (!access_ok(VERIFY_WRITE, from, sizeof(struct siginfo32)))
+		return -EFAULT;
+
+	if (copy_from_user(to, from, 3*sizeof(int)) ||
+	    copy_from_user(to->_sifields._pad, from->_sifields._pad,
+			   SI_PAD_SIZE))
+		return -EFAULT;
+
+	return 0;
 }
 
 /*
@@ -299,8 +380,13 @@ void do_new_sigreturn32(struct pt_regs *regs)
 	if ((psr & (PSR_VERS|PSR_IMPL)) == PSR_V8PLUS) {
 		err |= __get_user(i, &sf->v8plus.g_upper[0]);
 		if (i == SIGINFO_EXTRA_V8PLUS_MAGIC) {
+			unsigned long asi;
+
 			for (i = UREG_G1; i <= UREG_I7; i++)
 				err |= __get_user(((u32 *)regs->u_regs)[2*i], &sf->v8plus.g_upper[i]);
+			err |= __get_user(asi, &sf->v8plus.asi);
+			regs->tstate &= ~TSTATE_ASI;
+			regs->tstate |= ((asi & 0xffUL) << 24UL);
 		}
 	}
 
@@ -330,7 +416,7 @@ void do_new_sigreturn32(struct pt_regs *regs)
 	return;
 
 segv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void do_sigreturn32(struct pt_regs *regs)
@@ -400,7 +486,7 @@ asmlinkage void do_sigreturn32(struct pt_regs *regs)
 	return;
 
 segv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
@@ -447,8 +533,13 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	if ((psr & (PSR_VERS|PSR_IMPL)) == PSR_V8PLUS) {
 		err |= __get_user(i, &sf->v8plus.g_upper[0]);
 		if (i == SIGINFO_EXTRA_V8PLUS_MAGIC) {
+			unsigned long asi;
+
 			for (i = UREG_G1; i <= UREG_I7; i++)
 				err |= __get_user(((u32 *)regs->u_regs)[2*i], &sf->v8plus.g_upper[i]);
+			err |= __get_user(asi, &sf->v8plus.asi);
+			regs->tstate &= ~TSTATE_ASI;
+			regs->tstate |= ((asi & 0xffUL) << 24UL);
 		}
 	}
 
@@ -487,7 +578,7 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	spin_unlock_irq(&current->sighand->siglock);
 	return;
 segv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 /* Checks if the fp is valid */
@@ -648,7 +739,7 @@ setup_frame32(struct sigaction *sa, struct pt_regs *regs, int signr, sigset_t *o
 	return;
 
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 
@@ -715,7 +806,10 @@ static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	err |= __put_user(sizeof(siginfo_extra_v8plus_t), &sf->extra_size);
 	err |= __put_user(SIGINFO_EXTRA_V8PLUS_MAGIC, &sf->v8plus.g_upper[0]);
 	for (i = 1; i < 16; i++)
-		err |= __put_user(((u32 *)regs->u_regs)[2*i], &sf->v8plus.g_upper[i]);
+		err |= __put_user(((u32 *)regs->u_regs)[2*i],
+				  &sf->v8plus.g_upper[i]);
+	err |= __put_user((regs->tstate & TSTATE_ASI) >> 24UL,
+			  &sf->v8plus.asi);
 
 	if (psr & PSR_EF) {
 		err |= save_fpu_state32(regs, &sf->fpu_state);
@@ -796,7 +890,7 @@ static void new_setup_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 sigill:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signo, current);
 }
 
 /* Setup a Solaris stack frame */
@@ -920,7 +1014,7 @@ setup_svr4_frame32(struct sigaction *sa, unsigned long pc, unsigned long npc,
 	return;
 
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 asmlinkage int
@@ -1071,7 +1165,7 @@ asmlinkage int svr4_setcontext(svr4_ucontext_t __user *c, struct pt_regs *regs)
 
 	return -EINTR;
 sigsegv:
-	do_exit(SIGSEGV);
+	return -EFAULT;
 }
 
 static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
@@ -1120,6 +1214,8 @@ static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 	for (i = 1; i < 16; i++)
 		err |= __put_user(((u32 *)regs->u_regs)[2*i],
 				  &sf->v8plus.g_upper[i]);
+	err |= __put_user((regs->tstate & TSTATE_ASI) >> 24UL,
+			  &sf->v8plus.asi);
 
 	if (psr & PSR_EF) {
 		err |= save_fpu_state32(regs, &sf->fpu_state);
@@ -1208,7 +1304,7 @@ static void setup_rt_frame32(struct k_sigaction *ka, struct pt_regs *regs,
 sigill:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signr, current);
 }
 
 static inline void handle_signal32(unsigned long signr, struct k_sigaction *ka,
@@ -1227,8 +1323,6 @@ static inline void handle_signal32(unsigned long signr, struct k_sigaction *ka,
 		else
 			setup_frame32(&ka->sa, regs, signr, oldset, info);
 	}
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
 	if (!(ka->sa.sa_flags & SA_NOMASK)) {
 		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
@@ -1268,21 +1362,19 @@ int do_signal32(sigset_t *oldset, struct pt_regs * regs,
 {
 	siginfo_t info;
 	struct signal_deliver_cookie cookie;
+	struct k_sigaction ka;
 	int signr;
 	int svr4_signal = current->personality == PER_SVR4;
 	
 	cookie.restart_syscall = restart_syscall;
 	cookie.orig_i0 = orig_i0;
 
-	signr = get_signal_to_deliver(&info, regs, &cookie);
+	signr = get_signal_to_deliver(&info, &ka, regs, &cookie);
 	if (signr > 0) {
-		struct k_sigaction *ka;
-
-		ka = &current->sighand->action[signr-1];
-
 		if (cookie.restart_syscall)
-			syscall_restart32(orig_i0, regs, &ka->sa);
-		handle_signal32(signr, ka, &info, oldset, regs, svr4_signal);
+			syscall_restart32(orig_i0, regs, &ka.sa);
+		handle_signal32(signr, &ka, &info, oldset,
+				regs, svr4_signal);
 		return 1;
 	}
 	if (cookie.restart_syscall &&

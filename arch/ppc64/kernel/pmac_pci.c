@@ -672,9 +672,9 @@ void __init pmac_pcibios_fixup(void)
 
 static void __init pmac_fixup_phb_resources(void)
 {
-	struct pci_controller *hose;
+	struct pci_controller *hose, *tmp;
 	
-	for (hose = hose_head; hose; hose = hose->next) {
+	list_for_each_entry_safe(hose, tmp, &hose_list, list_node) {
 		unsigned long offset = (unsigned long)hose->io_base_virt - pci_io_base;
 		hose->io_resource.start += offset;
 		hose->io_resource.end += offset;

@@ -276,8 +276,6 @@ kmem_cache_t *tcp_timewait_cachep;
 
 atomic_t tcp_orphan_count = ATOMIC_INIT(0);
 
-int sysctl_tcp_default_win_scale = 7;
-
 int sysctl_tcp_mem[3];
 int sysctl_tcp_wmem[3] = { 4 * 1024, 16 * 1024, 128 * 1024 };
 int sysctl_tcp_rmem[3] = { 4 * 1024, 87380, 87380 * 2 };
@@ -1820,7 +1818,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	tp->backoff = 0;
 	tp->snd_cwnd = 2;
 	tp->probes_out = 0;
-	tp->packets_out = 0;
+	tcp_set_pcount(&tp->packets_out, 0);
 	tp->snd_ssthresh = 0x7fffffff;
 	tp->snd_cwnd_cnt = 0;
 	tcp_set_ca_state(tp, TCP_CA_Open);

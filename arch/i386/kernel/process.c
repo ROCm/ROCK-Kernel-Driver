@@ -183,18 +183,13 @@ void __init select_idle_routine(const struct cpuinfo_x86 *c)
 		printk("monitor/mwait feature present.\n");
 		/*
 		 * Skip, if setup has overridden idle.
-		 * Also, take care of system with asymmetric CPUs.
-		 * Use, mwait_idle only if all cpus support it.
-		 * If not, we fallback to default_idle()
+		 * One CPU supports mwait => All CPUs supports mwait
 		 */
 		if (!pm_idle) {
 			printk("using mwait in idle threads.\n");
 			pm_idle = mwait_idle;
 		}
-		return;
 	}
-	pm_idle = default_idle;
-	return;
 }
 
 static int __init idle_setup (char *str)
@@ -595,7 +590,7 @@ asmlinkage int sys_clone(struct pt_regs regs)
 	child_tidptr = (int __user *)regs.edi;
 	if (!newsp)
 		newsp = regs.esp;
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, parent_tidptr, child_tidptr);
+	return do_fork(clone_flags, newsp, &regs, 0, parent_tidptr, child_tidptr);
 }
 
 /*

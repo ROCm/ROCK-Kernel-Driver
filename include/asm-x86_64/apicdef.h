@@ -108,7 +108,7 @@
 
 #define APIC_BASE (fix_to_virt(FIX_APIC_BASE))
 
-#define MAX_IO_APICS 16
+#define MAX_IO_APICS 32
 
 /*
  * the local APIC register structure, memory mapped. Not terribly well

@@ -18,6 +18,7 @@
 #include <linux/tty.h>
 #include <linux/mm.h>
 #include <linux/delay.h>
+#include <linux/dma-mapping.h>
 
 #include <asm/io.h>
 #include <asm/console.h>
@@ -136,7 +137,9 @@ EXPORT_SYMBOL(pci_dac_dma_supported);
 EXPORT_SYMBOL(pci_dac_page_to_dma);
 EXPORT_SYMBOL(pci_dac_dma_to_page);
 EXPORT_SYMBOL(pci_dac_dma_to_offset);
+EXPORT_SYMBOL(alpha_gendev_to_pci);
 #endif
+EXPORT_SYMBOL(dma_set_mask);
 
 EXPORT_SYMBOL(dump_thread);
 EXPORT_SYMBOL(dump_elf_thread);
@@ -183,8 +186,8 @@ EXPORT_SYMBOL(__min_ipl);
 /*
  * The following are specially called from the uaccess assembly stubs.
  */
-EXPORT_SYMBOL_NOVERS(__copy_user);
-EXPORT_SYMBOL_NOVERS(__do_clear_user);
+EXPORT_SYMBOL(__copy_user);
+EXPORT_SYMBOL(__do_clear_user);
 EXPORT_SYMBOL(__strncpy_from_user);
 EXPORT_SYMBOL(__strnlen_user);
 
@@ -243,17 +246,17 @@ EXPORT_SYMBOL(rtc_lock);
  */
 # undef memcpy
 # undef memset
-EXPORT_SYMBOL_NOVERS(__divl);
-EXPORT_SYMBOL_NOVERS(__divlu);
-EXPORT_SYMBOL_NOVERS(__divq);
-EXPORT_SYMBOL_NOVERS(__divqu);
-EXPORT_SYMBOL_NOVERS(__reml);
-EXPORT_SYMBOL_NOVERS(__remlu);
-EXPORT_SYMBOL_NOVERS(__remq);
-EXPORT_SYMBOL_NOVERS(__remqu);
-EXPORT_SYMBOL_NOVERS(memcpy);
-EXPORT_SYMBOL_NOVERS(memset);
-EXPORT_SYMBOL_NOVERS(memchr);
+EXPORT_SYMBOL(__divl);
+EXPORT_SYMBOL(__divlu);
+EXPORT_SYMBOL(__divq);
+EXPORT_SYMBOL(__divqu);
+EXPORT_SYMBOL(__reml);
+EXPORT_SYMBOL(__remlu);
+EXPORT_SYMBOL(__remq);
+EXPORT_SYMBOL(__remqu);
+EXPORT_SYMBOL(memcpy);
+EXPORT_SYMBOL(memset);
+EXPORT_SYMBOL(memchr);
 
 EXPORT_SYMBOL(get_wchan);
 

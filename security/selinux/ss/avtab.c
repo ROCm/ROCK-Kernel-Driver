@@ -28,12 +28,14 @@
  (keyp->source_type << 9)) & \
  AVTAB_HASH_MASK)
 
+static kmem_cache_t *avtab_node_cachep;
+
 static struct avtab_node*
 avtab_insert_node(struct avtab *h, int hvalue, struct avtab_node * prev, struct avtab_node * cur,
 		  struct avtab_key *key, struct avtab_datum *datum)
 {
 	struct avtab_node * newnode;
-	newnode = (struct avtab_node *) kmalloc(sizeof(struct avtab_node),GFP_KERNEL);
+	newnode = kmem_cache_alloc(avtab_node_cachep, SLAB_KERNEL);
 	if (newnode == NULL)
 		return NULL;
 	memset(newnode, 0, sizeof(struct avtab_node));
@@ -226,7 +228,7 @@ void avtab_destroy(struct avtab *h)
 		while (cur != NULL) {
 			temp = cur;
 			cur = cur->next;
-			kfree(temp);
+			kmem_cache_free(avtab_node_cachep, temp);
 		}
 		h->htable[i] = NULL;
 	}
@@ -399,3 +401,9 @@ bad:
 	goto out;
 }
 
+void avtab_cache_init(void)
+{
+	avtab_node_cachep = kmem_cache_create("avtab_node",
+					      sizeof(struct avtab_node),
+					      0, SLAB_PANIC, NULL, NULL);
+}

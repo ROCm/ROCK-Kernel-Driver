@@ -183,7 +183,7 @@ typedef struct xwidget_hwid_s {
 
 
 /* Generic crosstalk widget initialization interface */
-#if __KERNEL__
+#ifdef __KERNEL__
 
 extern int              xwidget_driver_register(xwidget_part_num_t part_num,
 						xwidget_mfg_num_t mfg_num,

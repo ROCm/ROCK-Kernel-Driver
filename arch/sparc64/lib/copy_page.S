@@ -45,6 +45,7 @@
 
 	.align		32
 	.globl		copy_user_page
+	.type		copy_user_page,#function
 copy_user_page:		/* %o0=dest, %o1=src, %o2=vaddr */
 	lduw		[%g6 + TI_PRE_COUNT], %o4
 	sethi		%uhi(PAGE_OFFSET), %g2
@@ -237,3 +238,5 @@ copy_user_page:		/* %o0=dest, %o1=src, %o2=vaddr */
 
 	retl
 	 stw		%o4, [%g6 + TI_PRE_COUNT]
+
+	.size		copy_user_page, .-copy_user_page

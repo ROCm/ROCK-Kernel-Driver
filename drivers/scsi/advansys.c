@@ -15,16 +15,6 @@
  * As of March 8, 2000 Advanced System Products, Inc. (AdvanSys)
  * changed its name to ConnectCom Solutions, Inc.
  *
- * There is an AdvanSys Linux WWW page at:
- *  http://www.connectcom.net/downloads/software/os/linux.html
- *  http://www.advansys.com/linux.html
- *
- * The latest released version of the AdvanSys driver is available at:
- *  ftp://ftp.advansys.com/pub/linux/linux.tgz
- *  ftp://ftp.connectcom.net/pub/linux/linux.tgz
- *
- * Please send questions, comments, bug reports to:
- *  support@connectcom.net
  */
 
 /*
@@ -41,7 +31,6 @@
   H. Release History
   I. Known Problems/Fix List
   J. Credits (Chronological Order)
-  K. ConnectCom (AdvanSys) Contact Information
 
   A. Linux Kernels Supported by this Driver
 
@@ -2032,9 +2021,6 @@ STATIC ASC_DCNT  AscGetMaxDmaCount(ushort);
 #define ADV_LIB_VERSION_MAJOR  5
 #define ADV_LIB_VERSION_MINOR  14
 
-/* d_os_dep.h */
-#define ADV_OS_LINUX
-
 /*
  * Define Adv Library required special types.
  */
@@ -3370,9 +3356,9 @@ do { \
 /*
  * Default EEPROM Configuration structure defined in a_init.c.
  */
-extern ADVEEP_3550_CONFIG Default_3550_EEPROM_Config;
-extern ADVEEP_38C0800_CONFIG Default_38C0800_EEPROM_Config;
-extern ADVEEP_38C1600_CONFIG Default_38C1600_EEPROM_Config;
+static ADVEEP_3550_CONFIG Default_3550_EEPROM_Config;
+static ADVEEP_38C0800_CONFIG Default_38C0800_EEPROM_Config;
+static ADVEEP_38C1600_CONFIG Default_38C1600_EEPROM_Config;
 
 /*
  * DvcGetPhyAddr() flag arguments

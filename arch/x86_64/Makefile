@@ -37,7 +37,7 @@ LDFLAGS		:= -m elf_x86_64
 OBJCOPYFLAGS	:= -O binary -R .note -R .comment -S
 LDFLAGS_vmlinux := -e stext
 
-CHECKFLAGS      += -D__x86_64__=1
+CHECKFLAGS      += -D__x86_64__=1 -m64
 
 cflags-$(CONFIG_MK8) += $(call cc-option,-march=k8)
 cflags-$(CONFIG_MPSC) += $(call cc-option,-march=nocona)
@@ -77,6 +77,7 @@ boot := arch/x86_64/boot
 all: bzImage
 
 BOOTIMAGE                     := arch/x86_64/boot/bzImage
+KBUILD_IMAGE                  := $(BOOTIMAGE)
 
 bzImage: vmlinux
 	$(Q)$(MAKE) $(build)=$(boot) $(BOOTIMAGE)

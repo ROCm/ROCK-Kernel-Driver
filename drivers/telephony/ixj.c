@@ -7718,6 +7718,23 @@ static void __exit ixj_exit(void)
         cleanup();
 }
 
+static IXJ *new_ixj(unsigned long port)
+{
+	IXJ *res;
+	if (!request_region(port, 16, "ixj DSP")) {
+		printk(KERN_INFO "ixj: can't get I/O address 0x%lx\n", port);
+		return NULL;
+	}
+	res = ixj_alloc();
+	if (!res) {
+		release_region(port, 16);
+		printk(KERN_INFO "ixj: out of memory\n");
+		return NULL;
+	}
+	res->DSPbase = port;
+	return res;
+}
+
 int __init ixj_probe_isapnp(int *cnt)
 {               
 	int probe = 0;
@@ -7750,15 +7767,9 @@ int __init ixj_probe_isapnp(int *cnt)
 				return -ENODEV;
 			}
 
-			result = check_region(pnp_port_start(dev, 0), 16);
-			if (result) {
-				printk(KERN_INFO "ixj: can't get I/O address 0x%lx\n", pnp_port_start(dev, 0));
+			j = new_ixj(pnp_port_start(dev, 0));
+			if (!j)
 				break;
-			}
-
-			j = ixj_alloc();
-			j->DSPbase = pnp_port_start(dev,0);
-			request_region(j->DSPbase, 16, "ixj DSP");
 
 			if (func != 0x110)
 				j->XILINXbase = pnp_port_start(dev, 1);	/* get real port */
@@ -7806,22 +7817,15 @@ int __init ixj_probe_isapnp(int *cnt)
                         
 int __init ixj_probe_isa(int *cnt)
 {
-	int i, result, probe;
+	int i, probe;
 
 	/* Use passed parameters for older kernels without PnP */
 	for (i = 0; i < IXJMAX; i++) {
 		if (dspio[i]) {
-			IXJ *j;
+			IXJ *j = new_ixj(dspio[i]);
 
-			if ((result = check_region(ixj[*cnt].DSPbase, 16)) < 0) {
-				printk(KERN_INFO "ixj: can't get I/O address 0x%x\n", ixj[*cnt].DSPbase);
+			if (!j)
 				break;
-			}
-
-			j = ixj_alloc();
-
-			j->DSPbase = dspio[i];
-			request_region(j->DSPbase, 16, "ixj DSP");
 
 			j->XILINXbase = xio[i];
 			j->cardtype = 0;
@@ -7840,7 +7844,6 @@ int __init ixj_probe_pci(int *cnt)
 	struct pci_dev *pci = NULL;   
 	int i, probe = 0;
 	IXJ *j = NULL;
-	int result;
 
 	for (i = 0; i < IXJMAX - *cnt; i++) {
 		pci = pci_find_device(0x15E2, 0x0500, pci);
@@ -7849,20 +7852,12 @@ int __init ixj_probe_pci(int *cnt)
 
 		if (pci_enable_device(pci))
 			break;
-		if ((result = check_region(pci_resource_start(pci, 0), 16)) < 0) {
-			printk(KERN_INFO "ixj: can't get I/O address\n");
+		j = new_ixj(pci_resource_start(pci, 0));
+		if (!j)
 			break;
-		}
 
-		/* Grab a device slot */	
-		j = ixj_alloc();
-		if(j == NULL)
-			break;
-	
-		j->DSPbase = pci_resource_start(pci, 0);
 		j->serial = (PCIEE_GetSerialNumber)pci_resource_start(pci, 2);
 		j->XILINXbase = j->DSPbase + 0x10;
-		request_region(j->DSPbase, 16, "ixj DSP");
 		j->cardtype = QTI_PHONEJACK_PCI;
 		j->board = *cnt;
 		probe = ixj_selfprobe(j);

@@ -11,7 +11,6 @@
  *  Copyright (c) 2002  Vojtech Pavlik
  *  Copyright (c) 2003  Andi Kleen
  *  RTC support code taken from arch/i386/kernel/timers/time_hpet.c
- *
  */
 
 #include <linux/kernel.h>
@@ -41,6 +40,10 @@
 u64 jiffies_64 = INITIAL_JIFFIES;
 
 EXPORT_SYMBOL(jiffies_64);
+
+#ifdef CONFIG_CPU_FREQ
+static void cpufreq_delayed_get(void);
+#endif
 
 extern int using_apic_timer;
 
@@ -82,7 +85,7 @@ static inline void rdtscll_sync(unsigned long *tsc)
  * timer interrupt has happened already, but vxtime.trigger wasn't updated yet.
  * This is not a problem, because jiffies hasn't updated either. They are bound
  * together by xtime_lock.
-         */
+ */
 
 static inline unsigned int do_gettimeoffset_tsc(void)
 {
@@ -119,7 +122,7 @@ void do_gettimeofday(struct timeval *tv)
 		usec = xtime.tv_nsec / 1000;
 
 		/* i386 does some correction here to keep the clock 
-		   monotonus even when ntpd is fixing drift.
+		   monotonous even when ntpd is fixing drift.
 		   But they didn't work for me, there is a non monotonic
 		   clock anyways with ntp.
 		   I dropped all corrections now until a real solution can
@@ -176,6 +179,19 @@ int do_settimeofday(struct timespec *tv)
 
 EXPORT_SYMBOL(do_settimeofday);
 
+#if defined(CONFIG_SMP) && defined(CONFIG_FRAME_POINTER)
+unsigned long profile_pc(struct pt_regs *regs)
+{
+	unsigned long pc = instruction_pointer(regs);
+
+	if (pc >= (unsigned long)&__lock_text_start &&
+	    pc <= (unsigned long)&__lock_text_end)
+		return *(unsigned long *)regs->rbp;
+	return pc;
+}
+EXPORT_SYMBOL(profile_pc);
+#endif
+
 /*
  * In order to set the CMOS clock precisely, set_rtc_mmss has to be called 500
  * ms after the second nowtime has started, because when nowtime is written
@@ -214,7 +230,7 @@ static void set_rtc_mmss(unsigned long nowtime)
  * overflow. This avoids messing with unknown time zones but requires your RTC
  * not to be off by more than 15 minutes. Since we're calling it only when
  * our clock is externally synchronized using NTP, this shouldn't be a problem.
-	 */
+ */
 
 	real_seconds = nowtime % 60;
 	real_minutes = nowtime / 60;
@@ -293,19 +309,56 @@ unsigned long long monotonic_clock(void)
 }
 EXPORT_SYMBOL(monotonic_clock);
 
+static noinline void handle_lost_ticks(int lost, struct pt_regs *regs)
+{
+    static long lost_count;
+    static int warned;
+
+    if (report_lost_ticks) {
+	    printk(KERN_WARNING "time.c: Lost %d timer "
+		   "tick(s)! ", lost);
+	    print_symbol("rip %s)\n", regs->rip);
+    }
+
+    if (lost_count == 100 && !warned) {
+	    printk(KERN_WARNING
+		   "warning: many lost ticks.\n"
+		   KERN_WARNING "Your time source seems to be instable or "
+		   		"some driver is hogging interupts\n");
+	    print_symbol("rip %s\n", regs->rip);
+	    if (vxtime.mode == VXTIME_TSC && vxtime.hpet_address) {
+		    printk(KERN_WARNING "Falling back to HPET\n");
+		    vxtime.last = hpet_readl(HPET_T0_CMP) - hpet_tick;
+		    vxtime.mode = VXTIME_HPET;
+		    do_gettimeoffset = do_gettimeoffset_hpet;
+	    }
+	    /* else should fall back to PIT, but code missing. */
+	    warned = 1;
+    } else
+	    lost_count++;
+
+#ifdef CONFIG_CPU_FREQ
+    /* In some cases the CPU can change frequency without us noticing
+       (like going into thermal throttle)
+       Give cpufreq a change to catch up. */
+    if ((lost_count+1) % 25 == 0) {
+	    cpufreq_delayed_get();
+    }
+#endif
+}
 
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
 	static unsigned long rtc_update = 0;
-	unsigned long tsc, lost = 0;
-	int delay, offset = 0;
+	unsigned long tsc;
+	int delay, offset = 0, lost = 0;
 
 /*
  * Here we are in the timer irq handler. We have irqs locally disabled (so we
  * don't need spin_lock_irqsave()) but we don't know if the timer_bh is running
  * on the other CPU, so we need a lock. We also need to lock the vsyscall
  * variables, because both do_timer() and us change them -arca+vojtech
-	 */
+ */
 
 	write_seqlock(&xtime_lock);
 
@@ -354,12 +407,8 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 				(((long) offset << 32) / vxtime.tsc_quot) - 1;
 	}
 
-	if (lost) {
-		if (report_lost_ticks) {
-			printk(KERN_WARNING "time.c: Lost %ld timer "
-			       "tick(s)! ", lost);
-			print_symbol("rip %s)\n", regs->rip);
-		}
+	if (lost > 0) {
+		handle_lost_ticks(lost, regs);
 		jiffies += lost;
 	}
 
@@ -376,7 +425,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs *regs)
  */
 
 #ifndef CONFIG_X86_LOCAL_APIC
-	x86_do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 #else
 	if (!using_apic_timer)
 		smp_local_timer_interrupt(regs);
@@ -509,6 +558,38 @@ unsigned long get_cmos_time(void)
    Should fix up last_tsc too. Currently gettimeofday in the
    first tick after the change will be slightly wrong. */
 
+#include <linux/workqueue.h>
+
+static unsigned int cpufreq_delayed_issched = 0;
+static unsigned int cpufreq_init = 0;
+static struct work_struct cpufreq_delayed_get_work;
+
+static void handle_cpufreq_delayed_get(void *v)
+{
+	unsigned int cpu;
+	for_each_online_cpu(cpu) {
+		cpufreq_get(cpu);
+	}
+	cpufreq_delayed_issched = 0;
+}
+
+/* if we notice lost ticks, schedule a call to cpufreq_get() as it tries
+ * to verify the CPU frequency the timing core thinks the CPU is running
+ * at is still correct.
+ */
+static void cpufreq_delayed_get(void)
+{
+	static int warned;
+	if (cpufreq_init && !cpufreq_delayed_issched) {
+		cpufreq_delayed_issched = 1;
+		if (!warned) {
+			warned = 1;
+			printk(KERN_DEBUG "Losing some ticks... checking if CPU frequency changed.\n");
+		}
+		schedule_work(&cpufreq_delayed_get_work);
+	}
+}
+
 static unsigned int  ref_freq = 0;
 static unsigned long loops_per_jiffy_ref = 0;
 
@@ -518,13 +599,17 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 				 void *data)
 {
         struct cpufreq_freqs *freq = data;
-	unsigned long *lpj;
+	unsigned long *lpj, dummy;
 
+	lpj = &dummy;
+	if (!(freq->flags & CPUFREQ_CONST_LOOPS))
 #ifdef CONFIG_SMP
 	lpj = &cpu_data[freq->cpu].loops_per_jiffy;
 #else
 	lpj = &boot_cpu_data.loops_per_jiffy;
 #endif
+
+
 
 	if (!ref_freq) {
 		ref_freq = freq->old;
@@ -538,7 +623,8 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 		cpufreq_scale(loops_per_jiffy_ref, ref_freq, freq->new);
 
 		cpu_khz = cpufreq_scale(cpu_khz_ref, ref_freq, freq->new);
-		vxtime.tsc_quot = (1000L << 32) / cpu_khz;
+		if (!(freq->flags & CPUFREQ_CONST_LOOPS))
+			vxtime.tsc_quot = (1000L << 32) / cpu_khz;
 	}
 	
 	set_cyc2ns_scale(cpu_khz_ref / 1000);
@@ -549,6 +635,18 @@ static int time_cpufreq_notifier(struct notifier_block *nb, unsigned long val,
 static struct notifier_block time_cpufreq_notifier_block = {
          .notifier_call  = time_cpufreq_notifier
 };
+
+static int __init cpufreq_tsc(void)
+{
+	INIT_WORK(&cpufreq_delayed_get_work, handle_cpufreq_delayed_get, NULL);
+	if (!cpufreq_register_notifier(&time_cpufreq_notifier_block,
+				       CPUFREQ_TRANSITION_NOTIFIER))
+		cpufreq_init = 1;
+	return 0;
+}
+
+core_initcall(cpufreq_tsc);
+
 #endif
 
 /*
@@ -725,8 +823,8 @@ void __init time_init(void)
 		cpu_khz = hpet_calibrate_tsc();
 		timename = "HPET";
 	} else {
-	pit_init();
-	cpu_khz = pit_calibrate_tsc();
+		pit_init();
+		cpu_khz = pit_calibrate_tsc();
 		timename = "PIT";
 	}
 
@@ -742,11 +840,6 @@ void __init time_init(void)
 	setup_irq(0, &irq0);
 
 	set_cyc2ns_scale(cpu_khz / 1000);
-
-#ifdef CONFIG_CPU_FREQ
-	cpufreq_register_notifier(&time_cpufreq_notifier_block, 
-				  CPUFREQ_TRANSITION_NOTIFIER);
-#endif
 }
 
 void __init time_init_smp(void)
@@ -1037,6 +1130,8 @@ irqreturn_t hpet_rtc_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	return IRQ_HANDLED;
 }
 #endif
+
+
 
 static int __init nohpet_setup(char *s) 
 { 

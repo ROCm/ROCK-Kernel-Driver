@@ -35,7 +35,7 @@ static inline int
 idal_is_needed(void *vaddr, unsigned int length)
 {
 #ifdef __s390x__
-	return ((__pa(vaddr) + length) >> 31) != 0;
+	return ((__pa(vaddr) + length - 1) >> 31) != 0;
 #else
 	return 0;
 #endif

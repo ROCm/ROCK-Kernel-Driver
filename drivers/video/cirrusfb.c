@@ -2606,6 +2606,10 @@ int __init cirrusfb_init(void)
 {
 	int error = 0;
 
+#ifndef MODULE
+	cirrusfb_setup(fb_get_options("cirrusfb"));
+#endif
+
 #ifdef CONFIG_ZORRO
 	error |= zorro_module_init(&cirrusfb_zorro_driver);
 #endif
@@ -2663,8 +2667,9 @@ void __exit cirrusfb_exit (void)
 #endif
 }
 
-#ifdef MODULE
 module_init(cirrusfb_init);
+
+#ifdef MODULE
 module_exit(cirrusfb_exit);
 #endif
 

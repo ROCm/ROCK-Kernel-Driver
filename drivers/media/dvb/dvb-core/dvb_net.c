@@ -563,7 +563,7 @@ static int dvb_net_ts_callback(const u8 *buffer1, size_t buffer1_len,
 	if (buffer2 != 0)
 		printk(KERN_WARNING "buffer2 not 0: %p.\n", buffer2);
 	if (buffer1_len > 32768)
-		printk(KERN_WARNING "length > 32k: %u.\n", buffer1_len);
+		printk(KERN_WARNING "length > 32k: %zu.\n", buffer1_len);
 	/* printk("TS callback: %u bytes, %u TS cells @ %p.\n",
 	          buffer1_len, buffer1_len / TS_SZ, buffer1); */
 	dvb_net_ule(dev, buffer1, buffer1_len);

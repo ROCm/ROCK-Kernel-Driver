@@ -222,11 +222,13 @@ befs_dump_super_block(const struct super_block *sb, befs_super_block * sup)
 #endif				//CONFIG_BEFS_DEBUG
 }
 
+/* unused */
 void
 befs_dump_small_data(const struct super_block *sb, befs_small_data * sd)
 {
 }
 
+/* unused */
 void
 befs_dump_run(const struct super_block *sb, befs_block_run run)
 {

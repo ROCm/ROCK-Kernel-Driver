@@ -131,19 +131,34 @@ void riva_create_i2c_busses(struct riva_par *par)
 	par->chan[1].par	= par;
 	par->chan[2].par        = par;
 
-	switch (par->riva.Architecture) {
-#if 0		/* no support yet for other nVidia chipsets */
+	par->bus = 0;
+
+	switch ((par->pdev->device >> 4) & 0xff) {
+	case 0x17:
+	case 0x18:
+	case 0x25:
+	case 0x28:
+	case 0x30:
+	case 0x31:
+	case 0x32:
+	case 0x33:
+	case 0x34:
 		par->chan[2].ddc_base   = 0x50;
-		riva_setup_i2c_bus(&par->chan[2], "BUS2");
-#endif
-	case NV_ARCH_10:
-	case NV_ARCH_20:
-	case NV_ARCH_04:
+		par->bus++;
+		riva_setup_i2c_bus(&par->chan[2], "BUS3");
+	case 0x04:
+	case 0x05:
+	case 0x10:
+	case 0x11:
+	case 0x15:
+	case 0x20:
 		par->chan[1].ddc_base	= 0x36;
-		riva_setup_i2c_bus(&par->chan[1], "BUS1");
-	case NV_ARCH_03:
+		par->bus++;
+		riva_setup_i2c_bus(&par->chan[1], "BUS2");
+	case 0x03:
 		par->chan[0].ddc_base	= 0x3e;
-		riva_setup_i2c_bus(&par->chan[0], "BUS0");
+		par->bus++;
+		riva_setup_i2c_bus(&par->chan[0], "BUS1");
 	}
 }
 

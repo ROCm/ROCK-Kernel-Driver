@@ -5,12 +5,13 @@ MUST be NULL terminated, and domain structures should be per-CPU as they
 are locklessly updated.
 
 Each scheduling domain spans a number of CPUs (stored in the ->span field).
-A domain's span MUST be a superset of it child's span, and a base domain
-for CPU i MUST span at least i. The top domain for each CPU will generally
-span all CPUs in the system although strictly it doesn't have to, but this
-could lead to a case where some CPUs will never be given tasks to run unless
-the CPUs allowed mask is explicitly set. A sched domain's span means "balance
-process load among these CPUs".
+A domain's span MUST be a superset of it child's span (this restriction could
+be relaxed if the need arises), and a base domain for CPU i MUST span at least
+i. The top domain for each CPU will generally span all CPUs in the system
+although strictly it doesn't have to, but this could lead to a case where some
+CPUs will never be given tasks to run unless the CPUs allowed mask is
+explicitly set. A sched domain's span means "balance process load among these
+CPUs".
 
 Each scheduling domain must have one or more CPU groups (struct sched_group)
 which are organised as a circular one way linked list from the ->groups
@@ -45,6 +46,20 @@ might have just one domain covering its one NUMA level.
 The implementor should read comments in include/linux/sched.h:
 struct sched_domain fields, SD_FLAG_*, SD_*_INIT to get an idea of
 the specifics and what to tune.
+
+For SMT, the architecture must define CONFIG_SCHED_SMT and provide a
+cpumask_t cpu_sibling_map[NR_CPUS], where cpu_sibling_map[i] is the mask of
+all "i"'s siblings as well as "i" itself.
+
+Architectures may retain the regular override the default SD_*_INIT flags
+while using the generic domain builder in kernel/sched.c if they wish to
+retain the traditional SMT->SMP->NUMA topology (or some subset of that). This
+can be done by #define'ing ARCH_HASH_SCHED_TUNE.
+
+Alternatively, the architecture may completely override the generic domain
+builder by #define'ing ARCH_HASH_SCHED_DOMAIN, and exporting your
+arch_init_sched_domains function. This function will attach domains to all
+CPUs using cpu_attach_domain.
 
 Implementors should change the line
 #undef SCHED_DOMAIN_DEBUG

@@ -43,7 +43,6 @@
 #include <asm/idprom.h>
 #include <asm/head.h>
 #include <asm/starfire.h>
-#include <asm/hardirq.h>
 #include <asm/mmu_context.h>
 #include <asm/timer.h>
 #include <asm/sections.h>

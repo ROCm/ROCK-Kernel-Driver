@@ -682,6 +682,7 @@ config SERIAL_SGI_L1_CONSOLE
 	bool "SGI Altix L1 serial console support"
 	depends on IA64_GENERIC || IA64_SGI_SN2
 	select SERIAL_CORE
+	select SERIAL_CORE_CONSOLE
 	help
 		If you have an SGI Altix and you would like to use the system
 		controller serial port as your console (you want this!),

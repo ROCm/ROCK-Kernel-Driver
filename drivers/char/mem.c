@@ -31,9 +31,6 @@
 # include <linux/efi.h>
 #endif
 
-#ifdef CONFIG_FB
-extern void fbmem_init(void);
-#endif
 #if defined(CONFIG_S390_TAPE) && defined(CONFIG_S390_TAPE_CHAR)
 extern void tapechar_init(void);
 #endif
@@ -86,7 +83,7 @@ static inline int uncached_access(struct file *file, unsigned long addr)
 	 * above the IO hole... Ah, and of course, XFree86 doesn't pass
 	 * O_SYNC when mapping us to tap IO space. Surprised ?
 	 */
-	return !page_is_ram(addr);
+	return !page_is_ram(addr >> PAGE_SHIFT);
 #else
 	/*
 	 * Accessing memory above the top the kernel knows about or through a file pointer
@@ -416,7 +413,7 @@ static inline size_t read_zero_pagealigned(char __user * buf, size_t size)
 
 		if (vma->vm_start > addr || (vma->vm_flags & VM_WRITE) == 0)
 			goto out_up;
-		if (vma->vm_flags & VM_SHARED)
+		if (vma->vm_flags & (VM_SHARED | VM_HUGETLB))
 			break;
 		count = vma->vm_end - addr;
 		if (count > size)
@@ -730,9 +727,6 @@ static int __init chr_dev_init(void)
 				S_IFCHR | devlist[i].mode, devlist[i].name);
 	}
 	
-#if defined (CONFIG_FB)
-	fbmem_init();
-#endif
 	return 0;
 }
 

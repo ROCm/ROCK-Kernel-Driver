@@ -4,7 +4,7 @@
  * (markhe@nextd.demon.co.uk)
  */
 
-#if	!defined(_LINUX_SLAB_H)
+#ifndef _LINUX_SLAB_H
 #define	_LINUX_SLAB_H
 
 #if	defined(__KERNEL__)
@@ -45,6 +45,7 @@ typedef struct kmem_cache_s kmem_cache_t;
 #define SLAB_RECLAIM_ACCOUNT	0x00020000UL	/* track pages allocated to indicate
 						   what is reclaimable later*/
 #define SLAB_PANIC		0x00040000UL	/* panic if kmem_cache_create() fails */
+#define SLAB_DESTROY_BY_RCU	0x00080000UL	/* defer freeing pages to RCU */
 
 /* flags passed to a constructor func */
 #define	SLAB_CTOR_CONSTRUCTOR	0x001UL		/* if not set, then deconstructor */
@@ -97,6 +98,7 @@ found:
 	return __kmalloc(size, flags);
 }
 
+extern void *kcalloc(size_t, size_t, int);
 extern void kfree(const void *);
 extern unsigned int ksize(const void *);
 
@@ -114,8 +116,6 @@ extern kmem_cache_t	*fs_cachep;
 extern kmem_cache_t	*signal_cachep;
 extern kmem_cache_t	*sighand_cachep;
 extern kmem_cache_t	*bio_cachep;
-
-void ptrinfo(unsigned long addr);
 
 extern atomic_t slab_reclaim_pages;
 

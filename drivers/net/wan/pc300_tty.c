@@ -760,7 +760,7 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 	int rx_len, rx_aux; 
 	volatile unsigned char status; 
 	unsigned short first_bd = pc300chan->rx_first_bd;
-	st_cpc_rx_buf	*new;
+	st_cpc_rx_buf	*new=NULL;
 	unsigned char dsr_rx;
 
 	if (pc300dev->cpc_tty == NULL) { 
@@ -788,6 +788,10 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 				/* update EDA */ 
 				cpc_writel(card->hw.scabase + DRX_REG(EDAL, ch), 
 						RX_BD_ADDR(ch, pc300chan->rx_last_bd)); 
+			}
+			if (new) {
+				kfree(new);
+				new = NULL;
 			}
 			return; 
 		}
@@ -834,7 +838,8 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 						cpc_tty->name);
 				cpc_tty_rx_disc_frame(pc300chan);
 				rx_len = 0;
-				kfree((unsigned char *)new);
+				kfree(new);
+				new = NULL;
 				break; /* read next frame - while(1) */
 			}
 
@@ -843,7 +848,8 @@ void cpc_tty_receive(pc300dev_t *pc300dev)
 				cpc_tty_rx_disc_frame(pc300chan);
 				stats->rx_dropped++; 
 				rx_len = 0; 
-				kfree((unsigned char *)new);
+				kfree(new);
+				new = NULL;
 				break; /* read next frame - while(1) */
 			}
 

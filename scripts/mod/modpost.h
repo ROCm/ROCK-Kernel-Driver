@@ -74,6 +74,8 @@ struct module {
 	struct symbol *unres;
 	int seen;
 	int skip;
+	int has_init;
+	int has_cleanup;
 	struct buffer dev_table_buf;
 };
 

@@ -64,22 +64,22 @@ static const struct super_operations befs_sops = {
 /* slab cache for befs_inode_info objects */
 static kmem_cache_t *befs_inode_cachep;
 
-struct file_operations befs_dir_operations = {
+static struct file_operations befs_dir_operations = {
 	.read		= generic_read_dir,
 	.readdir	= befs_readdir,
 };
 
-struct inode_operations befs_dir_inode_operations = {
+static struct inode_operations befs_dir_inode_operations = {
 	.lookup		= befs_lookup,
 };
 
-struct file_operations befs_file_operations = {
+static struct file_operations befs_file_operations = {
 	.llseek		= default_llseek,
 	.read		= generic_file_read,
 	.mmap		= generic_file_readonly_mmap,
 };
 
-struct address_space_operations befs_aops = {
+static struct address_space_operations befs_aops = {
 	.readpage	= befs_readpage,
 	.sync_page	= block_sync_page,
 	.bmap		= befs_bmap,
@@ -433,7 +433,7 @@ befs_init_inodecache(void)
 {
 	befs_inode_cachep = kmem_cache_create("befs_inode_cache",
 					      sizeof (struct befs_inode_info),
-					      0, SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT,
+					      0, SLAB_RECLAIM_ACCOUNT,
 					      init_once, NULL);
 	if (befs_inode_cachep == NULL) {
 		printk(KERN_ERR "befs_init_inodecache: "
@@ -857,10 +857,14 @@ befs_fill_super(struct super_block *sb, void *data, int silent)
 		befs_sb->nls = load_nls(befs_sb->mount_opts.iocharset);
 		if (!befs_sb->nls) {
 			befs_warning(sb, "Cannot load nls %s"
-				     "loding default nls",
-				     befs_sb->mount_opts.iocharset);
+					" loading default nls",
+					befs_sb->mount_opts.iocharset);
 			befs_sb->nls = load_nls_default();
 		}
+	/* load default nls if none is specified  in mount options */
+	} else {
+		befs_debug(sb, "Loading default nls");
+		befs_sb->nls = load_nls_default();
 	}
 
 	return 0;

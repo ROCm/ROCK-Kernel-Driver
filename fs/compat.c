@@ -41,6 +41,7 @@
 #include <linux/nfsd/nfsd.h>
 #include <linux/nfsd/syscall.h>
 #include <linux/personality.h>
+#include <linux/rwsem.h>
 
 #include <net/sock.h>		/* siocdevprivate_ioctl */
 
@@ -247,7 +248,8 @@ out:
 /* ioctl32 stuff, used by sparc64, parisc, s390x, ppc64, x86_64, MIPS */
 
 #define IOCTL_HASHSIZE 256
-struct ioctl_trans *ioctl32_hash_table[IOCTL_HASHSIZE];
+static struct ioctl_trans *ioctl32_hash_table[IOCTL_HASHSIZE];
+static DECLARE_RWSEM(ioctl32_sem);
 
 extern struct ioctl_trans ioctl_start[];
 extern int ioctl_table_size;
@@ -291,8 +293,8 @@ static int __init init_sys32_ioctl(void)
 
 __initcall(init_sys32_ioctl);
 
-int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int,
-				unsigned int, unsigned long, struct file *))
+int register_ioctl32_conversion(unsigned int cmd,
+				ioctl_trans_handler_t handler)
 {
 	struct ioctl_trans *t;
 	struct ioctl_trans *new_t;
@@ -302,12 +304,12 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int,
 	if (!new_t)
 		return -ENOMEM;
 
-	lock_kernel(); 
+	down_write(&ioctl32_sem);
 	for (t = ioctl32_hash_table[hash]; t; t = t->next) {
 		if (t->cmd == cmd) {
 			printk(KERN_ERR "Trying to register duplicated ioctl32 "
 					"handler %x\n", cmd);
-			unlock_kernel();
+			up_write(&ioctl32_sem);
 			kfree(new_t);
 			return -EINVAL; 
 		}
@@ -317,7 +319,7 @@ int register_ioctl32_conversion(unsigned int cmd, int (*handler)(unsigned int,
 	new_t->handler = handler;
 	ioctl32_insert_translation(new_t);
 
-	unlock_kernel();
+	up_write(&ioctl32_sem);
 	return 0;
 }
 EXPORT_SYMBOL(register_ioctl32_conversion);
@@ -337,11 +339,11 @@ int unregister_ioctl32_conversion(unsigned int cmd)
 	unsigned long hash = ioctl32_hash(cmd);
 	struct ioctl_trans *t, *t1;
 
-	lock_kernel(); 
+	down_write(&ioctl32_sem);
 
 	t = ioctl32_hash_table[hash];
 	if (!t) { 
-		unlock_kernel();
+		up_write(&ioctl32_sem);
 		return -EINVAL;
 	} 
 
@@ -351,7 +353,7 @@ int unregister_ioctl32_conversion(unsigned int cmd)
 			       __builtin_return_address(0), cmd);
 		} else { 
 			ioctl32_hash_table[hash] = t->next;
-			unlock_kernel();
+			up_write(&ioctl32_sem);
 			kfree(t);
 			return 0;
 		}
@@ -366,7 +368,7 @@ int unregister_ioctl32_conversion(unsigned int cmd)
 				goto out;
 			} else { 
 				t->next = t1->next;
-				unlock_kernel();
+				up_write(&ioctl32_sem);
 				kfree(t1);
 				return 0;
 			}
@@ -376,7 +378,7 @@ int unregister_ioctl32_conversion(unsigned int cmd)
 	printk(KERN_ERR "Trying to free unknown 32bit ioctl handler %x\n",
 				cmd);
 out:
-	unlock_kernel();
+	up_write(&ioctl32_sem);
 	return -EINVAL;
 }
 EXPORT_SYMBOL(unregister_ioctl32_conversion); 
@@ -397,7 +399,7 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 		goto out;
 	}
 
-	lock_kernel();
+	down_read(&ioctl32_sem);
 
 	t = ioctl32_hash_table[ioctl32_hash (cmd)];
 
@@ -405,14 +407,16 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 		t = t->next;
 	if (t) {
 		if (t->handler) { 
+			lock_kernel();
 			error = t->handler(fd, cmd, arg, filp);
 			unlock_kernel();
+			up_read(&ioctl32_sem);
 		} else {
-			unlock_kernel();
+			up_read(&ioctl32_sem);
 			error = sys_ioctl(fd, cmd, arg);
 		}
 	} else {
-		unlock_kernel();
+		up_read(&ioctl32_sem);
 		if (cmd >= SIOCDEVPRIVATE && cmd <= (SIOCDEVPRIVATE + 15)) {
 			error = siocdevprivate_ioctl(fd, cmd, arg);
 		} else {
@@ -429,6 +433,8 @@ asmlinkage long compat_sys_ioctl(unsigned int fd, unsigned int cmd,
 			       		fn = d_path(filp->f_dentry,
 						filp->f_vfsmnt, path,
 						PAGE_SIZE);
+					if (IS_ERR(fn))
+						fn = "?";
 				}
 
 				sprintf(buf,"'%c'", (cmd>>24) & 0x3f);
@@ -979,19 +985,14 @@ static int compat_filldir64(void * __buf, const char * name, int namlen, loff_t 
 	dirent = buf->previous;
 
 	if (dirent) {
-		if (__put_user(offset, (u32 __user *)&dirent->d_off))
-			goto efault;
-		if (__put_user(offset >> 32,
-				((u32 __user *)&dirent->d_off) + 1))
+		if (__put_user_unaligned(offset, &dirent->d_off))
 			goto efault;
 	}
 	dirent = buf->current_dir;
-	if ((__put_user(ino, (u32 __user *)&dirent->d_ino))
-	 || (__put_user(ino >> 32, ((u32 __user *)&dirent->d_ino) + 1)))
+	if (__put_user_unaligned(ino, &dirent->d_ino))
 		goto efault;
 	off = 0;
-	if ((__put_user(off, (u32 __user *)&dirent->d_off))
-	 || (__put_user(off >> 32, ((u32 __user *)&dirent->d_off) + 1)))
+	if (__put_user_unaligned(off, &dirent->d_off))
 		goto efault;
 	if (__put_user(reclen, &dirent->d_reclen))
 		goto efault;
@@ -1040,8 +1041,7 @@ asmlinkage long compat_sys_getdents64(unsigned int fd,
 	lastdirent = buf.previous;
 	if (lastdirent) {
 		typeof(lastdirent->d_off) d_off = file->f_pos;
-		__put_user(d_off, (u32 __user *)&lastdirent->d_off);
-		__put_user(d_off >> 32, ((u32 __user *)&lastdirent->d_off) + 1);
+		__put_user_unaligned(d_off, &lastdirent->d_off);
 		error = count - buf.count;
 	}
 
@@ -1373,13 +1373,13 @@ int compat_do_execve(char * filename,
 	int retval;
 	int i;
 
-	sched_balance_exec();
-
 	file = open_exec(filename);
 
 	retval = PTR_ERR(file);
 	if (IS_ERR(file))
 		return retval;
+
+	sched_exec();
 
 	bprm.p = PAGE_SIZE*MAX_ARG_PAGES-sizeof(void *);
 	memset(bprm.page, 0, MAX_ARG_PAGES*sizeof(bprm.page[0]));
@@ -1390,6 +1390,8 @@ int compat_do_execve(char * filename,
 	bprm.sh_bang = 0;
 	bprm.loader = 0;
 	bprm.exec = 0;
+	bprm.interp_flags = 0;
+	bprm.interp_data = 0;
 	bprm.security = NULL;
 	bprm.mm = mm_alloc();
 	retval = -ENOMEM;

@@ -2265,8 +2265,8 @@ zoran_do_ioctl (struct inode *inode,
 
 		dprintk(3,
 			KERN_DEBUG
-			"%s: VIDIOCSFBUF - base=0x%x, w=%d, h=%d, depth=%d, bpl=%d\n",
-			ZR_DEVNAME(zr), (u32) vbuf->base, vbuf->width,
+			"%s: VIDIOCSFBUF - base=%p, w=%d, h=%d, depth=%d, bpl=%d\n",
+			ZR_DEVNAME(zr), vbuf->base, vbuf->width,
 			vbuf->height, vbuf->depth, vbuf->bytesperline);
 
 		for (i = 0; i < zoran_num_formats; i++)

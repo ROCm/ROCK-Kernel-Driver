@@ -315,11 +315,20 @@ typedef struct _RESIDUAL {
   } RESIDUAL;
 
 
+/*
+ * Forward declaration - we can't include <linux/pci.h> because it
+ * breaks the boot loader
+ */
+struct pci_dev;
+
 extern RESIDUAL *res;
 extern void print_residual_device_info(void);
 extern PPC_DEVICE *residual_find_device(unsigned long BusMask,
 					unsigned char * DevID, int BaseType,
 					int SubType, int Interface, int n);
+extern int residual_pcidev_irq(struct pci_dev *dev);
+extern void residual_irq_mask(char *irq_edge_mask_lo, char *irq_edge_mask_hi);
+extern unsigned int residual_isapic_addr(void);
 extern PnP_TAG_PACKET *PnP_find_packet(unsigned char *p, unsigned packet_tag,
 				       int n);
 extern PnP_TAG_PACKET *PnP_find_small_vendor_packet(unsigned char *p,
@@ -328,6 +337,13 @@ extern PnP_TAG_PACKET *PnP_find_small_vendor_packet(unsigned char *p,
 extern PnP_TAG_PACKET *PnP_find_large_vendor_packet(unsigned char *p,
 						    unsigned packet_type,
 						    int n);
+
+#ifdef CONFIG_PREP_RESIDUAL
+#define have_residual_data	(res && res->ResidualLength)
+#else
+#define have_residual_data	0
+#endif
+
 #endif /* __ASSEMBLY__ */
 #endif  /* ndef _RESIDUAL_ */
 

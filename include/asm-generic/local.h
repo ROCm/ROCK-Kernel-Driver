@@ -3,8 +3,8 @@
 
 #include <linux/config.h>
 #include <linux/percpu.h>
+#include <linux/hardirq.h>
 #include <asm/types.h>
-#include <asm/hardirq.h>
 
 /* An unsigned long type for operations which are atomic for a single
  * CPU.  Usually used in combination with per-cpu variables. */

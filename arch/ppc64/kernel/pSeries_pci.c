@@ -68,7 +68,9 @@ static int rtas_read_config(struct device_node *dn, int where, int size, u32 *va
 	int ret;
 
 	if (!dn)
-		return -2;
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	if (where & (size - 1))
+		return PCIBIOS_BAD_REGISTER_NUMBER;
 
 	addr = (dn->busno << 16) | (dn->devfn << 8) | where;
 	buid = dn->phb->buid;
@@ -79,7 +81,15 @@ static int rtas_read_config(struct device_node *dn, int where, int size, u32 *va
 		ret = rtas_call(read_pci_config, 2, 2, &returnval, addr, size);
 	}
 	*val = returnval;
-	return ret;
+
+	if (ret)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	if (returnval == EEH_IO_ERROR_VALUE(size)
+	    && eeh_dn_check_failure (dn, NULL))
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	return PCIBIOS_SUCCESSFUL;
 }
 
 static int rtas_pci_read_config(struct pci_bus *bus,
@@ -106,7 +116,9 @@ static int rtas_write_config(struct device_node *dn, int where, int size, u32 va
 	int ret;
 
 	if (!dn)
-		return -2;
+		return PCIBIOS_DEVICE_NOT_FOUND;
+	if (where & (size - 1))
+		return PCIBIOS_BAD_REGISTER_NUMBER;
 
 	addr = (dn->busno << 16) | (dn->devfn << 8) | where;
 	buid = dn->phb->buid;
@@ -115,7 +127,11 @@ static int rtas_write_config(struct device_node *dn, int where, int size, u32 va
 	} else {
 		ret = rtas_call(write_pci_config, 3, 1, NULL, addr, size, (ulong)val);
 	}
-	return ret;
+
+	if (ret)
+		return PCIBIOS_DEVICE_NOT_FOUND;
+
+	return PCIBIOS_SUCCESSFUL;
 }
 
 static int rtas_pci_write_config(struct pci_bus *bus,
@@ -729,9 +745,9 @@ EXPORT_SYMBOL(remap_bus_range);
 
 static void phbs_fixup_io(void)
 {
-	struct pci_controller *hose;
+	struct pci_controller *hose, *tmp;
 
-	for (hose=hose_head;hose;hose=hose->next) 
+	list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
 		remap_bus_range(hose->bus);
 }
 
@@ -764,8 +780,8 @@ struct pci_controller*
 pci_find_hose_for_OF_device(struct device_node *node)
 {
 	while (node) {
-		struct pci_controller *hose;
-		for (hose=hose_head;hose;hose=hose->next)
+		struct pci_controller *hose, *tmp;
+		list_for_each_entry_safe(hose, tmp, &hose_list, list_node)
 			if (hose->arch_data == node)
 				return hose;
 		node=node->parent;

@@ -29,6 +29,7 @@
 #include <linux/jiffies.h>
 #include <linux/cpufreq.h>
 #include <linux/percpu.h>
+#include <linux/profile.h>
 
 #include <asm/oplib.h>
 #include <asm/mostek.h>
@@ -66,6 +67,19 @@ static int set_rtc_mmss(unsigned long);
 struct sparc64_tick_ops *tick_ops;
 
 #define TICK_PRIV_BIT	(1UL << 63)
+
+#ifdef CONFIG_SMP
+unsigned long profile_pc(struct pt_regs *regs)
+{
+	unsigned long pc = instruction_pointer(regs);
+
+	if (pc >= (unsigned long)&__lock_text_start &&
+	    pc <= (unsigned long)&__lock_text_end)
+		return regs->u_regs[UREG_RETPC];
+	return pc;
+}
+EXPORT_SYMBOL(profile_pc);
+#endif
 
 static void tick_disable_protection(void)
 {
@@ -441,28 +455,6 @@ static inline void timer_check_rtc(void)
 	}
 }
 
-void sparc64_do_profile(struct pt_regs *regs)
-{
-	unsigned long pc;
-
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-
-	if (!prof_buffer)
-		return;
-
-	pc = regs->tpc;
-
-	pc -= (unsigned long) _stext;
-	pc >>= prof_shift;
-
-	if(pc >= prof_len)
-		pc = prof_len - 1;
-	atomic_inc((atomic_t *)&prof_buffer[pc]);
-}
-
 static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 {
 	unsigned long ticks, pstate;
@@ -471,7 +463,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id, struct pt_regs * regs)
 
 	do {
 #ifndef CONFIG_SMP
-		sparc64_do_profile(regs);
+		profile_tick(CPU_PROFILING, regs);
 #endif
 		do_timer(regs);
 

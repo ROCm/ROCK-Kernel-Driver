@@ -879,7 +879,7 @@ static int netdev_open(struct net_device *dev)
 	if (dev->if_port == 0)
 		dev->if_port = np->default_port;
 
-	np->mcastlock = (spinlock_t) SPIN_LOCK_UNLOCKED;
+	np->mcastlock = SPIN_LOCK_UNLOCKED;
 
 	set_rx_mode(dev);
 	writew(0, ioaddr + IntrEnable);

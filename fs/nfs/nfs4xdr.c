@@ -1027,7 +1027,6 @@ static int encode_readdir(struct xdr_stream *xdr, const struct nfs4_readdir_arg 
 static int encode_readlink(struct xdr_stream *xdr, const struct nfs4_readlink *readlink, struct rpc_rqst *req)
 {
 	struct rpc_auth *auth = req->rq_task->tk_auth;
-	unsigned int count = readlink->count - 5;
 	unsigned int replen;
 	uint32_t *p;
 
@@ -1036,10 +1035,11 @@ static int encode_readlink(struct xdr_stream *xdr, const struct nfs4_readlink *r
 
 	/* set up reply kvec
 	 *    toplevel_status + taglen + rescount + OP_PUTFH + status
-	 *      + OP_READLINK + status  = 7
+	 *      + OP_READLINK + status + string length = 8
 	 */
-	replen = (RPC_REPHDRSIZE + auth->au_rslack + 7) << 2;
-	xdr_inline_pages(&req->rq_rcv_buf, replen, readlink->pages, 0, count);
+	replen = (RPC_REPHDRSIZE + auth->au_rslack + 8) << 2;
+	xdr_inline_pages(&req->rq_rcv_buf, replen, readlink->pages,
+			readlink->pgbase, readlink->pglen);
 	
 	return 0;
 }
@@ -3053,21 +3053,30 @@ static int decode_readlink(struct xdr_stream *xdr, struct rpc_rqst *req)
 {
 	struct xdr_buf *rcvbuf = &req->rq_rcv_buf;
 	struct kvec *iov = rcvbuf->head;
-	uint32_t *strlen;
-	unsigned int hdrlen, len;
-	char *string;
+	int hdrlen, len, recvd;
+	uint32_t *p;
+	char *kaddr;
 	int status;
 
 	status = decode_op_hdr(xdr, OP_READLINK);
 	if (status)
 		return status;
 
-	hdrlen = (char *) xdr->p - (char *) iov->iov_base;
-	if (iov->iov_len > hdrlen) {
-		dprintk("NFS: READLINK header is short. iovec will be shifted.\n");
-		xdr_shift_buf(rcvbuf, iov->iov_len - hdrlen);
-
+	/* Convert length of symlink */
+	READ_BUF(4);
+	READ32(len);
+	if (len >= rcvbuf->page_len || len <= 0) {
+		dprintk(KERN_WARNING "nfs: server returned giant symlink!\n");
+		return -ENAMETOOLONG;
 	}
+	hdrlen = (char *) xdr->p - (char *) iov->iov_base;
+	recvd = req->rq_rcv_buf.len - hdrlen;
+	if (recvd < len) {
+		printk(KERN_WARNING "NFS: server cheating in readlink reply: "
+				"count %u > recvd %u\n", len, recvd);
+		return -EIO;
+	}
+	xdr_read_pages(xdr, len);
 	/*
 	 * The XDR encode routine has set things up so that
 	 * the link text will be copied directly into the
@@ -3075,18 +3084,9 @@ static int decode_readlink(struct xdr_stream *xdr, struct rpc_rqst *req)
 	 * and and null-terminate the text (the VFS expects
 	 * null-termination).
 	 */
-	strlen = (uint32_t *) kmap_atomic(rcvbuf->pages[0], KM_USER0);
-	len = ntohl(*strlen);
-	if (len > rcvbuf->page_len) {
-		dprintk(KERN_WARNING "nfs: server returned giant symlink!\n");
-		kunmap_atomic(strlen, KM_USER0);
-		return -ENAMETOOLONG;
-	}
-	*strlen = len;
-
-	string = (char *)(strlen + 1);
-	string[len] = '\0';
-	kunmap_atomic(strlen, KM_USER0);
+	kaddr = (char *)kmap_atomic(rcvbuf->pages[0], KM_USER0);
+	kaddr[len+rcvbuf->page_base] = '\0';
+	kunmap_atomic(kaddr, KM_USER0);
 	return 0;
 }
 

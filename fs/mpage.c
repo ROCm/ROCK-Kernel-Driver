@@ -290,7 +290,8 @@ do_mpage_readpage(struct bio *bio, struct page *page, unsigned nr_pages,
 alloc_new:
 	if (bio == NULL) {
 		bio = mpage_alloc(bdev, blocks[0] << (blkbits - 9),
-					nr_pages, GFP_KERNEL);
+			  	min_t(int, nr_pages, bio_get_nr_vecs(bdev)),
+				GFP_KERNEL);
 		if (bio == NULL)
 			goto confused;
 	}

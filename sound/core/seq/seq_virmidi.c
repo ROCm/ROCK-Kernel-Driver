@@ -115,7 +115,7 @@ int snd_virmidi_receive(snd_rawmidi_t *rmidi, snd_seq_event_t *ev)
 {
 	snd_virmidi_dev_t *rdev;
 
-	rdev = snd_magic_cast(snd_virmidi_dev_t, rmidi->private_data, return -EINVAL);
+	rdev = rmidi->private_data;
 	return snd_virmidi_dev_receive_event(rdev, ev);
 }
 
@@ -127,7 +127,7 @@ static int snd_virmidi_event_input(snd_seq_event_t *ev, int direct,
 {
 	snd_virmidi_dev_t *rdev;
 
-	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
+	rdev = private_data;
 	if (!(rdev->flags & SNDRV_VIRMIDI_USE))
 		return 0; /* ignored */
 	return snd_virmidi_dev_receive_event(rdev, ev);
@@ -138,7 +138,7 @@ static int snd_virmidi_event_input(snd_seq_event_t *ev, int direct,
  */
 static void snd_virmidi_input_trigger(snd_rawmidi_substream_t * substream, int up)
 {
-	snd_virmidi_t *vmidi = snd_magic_cast(snd_virmidi_t, substream->runtime->private_data, return);
+	snd_virmidi_t *vmidi = substream->runtime->private_data;
 
 	if (up) {
 		vmidi->trigger = 1;
@@ -152,7 +152,7 @@ static void snd_virmidi_input_trigger(snd_rawmidi_substream_t * substream, int u
  */
 static void snd_virmidi_output_trigger(snd_rawmidi_substream_t * substream, int up)
 {
-	snd_virmidi_t *vmidi = snd_magic_cast(snd_virmidi_t, substream->runtime->private_data, return);
+	snd_virmidi_t *vmidi = substream->runtime->private_data;
 	int count, res;
 	unsigned char buf[32], *pbuf;
 
@@ -199,17 +199,17 @@ static void snd_virmidi_output_trigger(snd_rawmidi_substream_t * substream, int 
  */
 static int snd_virmidi_input_open(snd_rawmidi_substream_t * substream)
 {
-	snd_virmidi_dev_t *rdev = snd_magic_cast(snd_virmidi_dev_t, substream->rmidi->private_data, return -EINVAL);
+	snd_virmidi_dev_t *rdev = substream->rmidi->private_data;
 	snd_rawmidi_runtime_t *runtime = substream->runtime;
 	snd_virmidi_t *vmidi;
 	unsigned long flags;
 
-	vmidi = snd_magic_kcalloc(snd_virmidi_t, 0, GFP_KERNEL);
+	vmidi = kcalloc(1, sizeof(*vmidi), GFP_KERNEL);
 	if (vmidi == NULL)
 		return -ENOMEM;
 	vmidi->substream = substream;
 	if (snd_midi_event_new(0, &vmidi->parser) < 0) {
-		snd_magic_kfree(vmidi);
+		kfree(vmidi);
 		return -ENOMEM;
 	}
 	vmidi->seq_mode = rdev->seq_mode;
@@ -228,16 +228,16 @@ static int snd_virmidi_input_open(snd_rawmidi_substream_t * substream)
  */
 static int snd_virmidi_output_open(snd_rawmidi_substream_t * substream)
 {
-	snd_virmidi_dev_t *rdev = snd_magic_cast(snd_virmidi_dev_t, substream->rmidi->private_data, return -EINVAL);
+	snd_virmidi_dev_t *rdev = substream->rmidi->private_data;
 	snd_rawmidi_runtime_t *runtime = substream->runtime;
 	snd_virmidi_t *vmidi;
 
-	vmidi = snd_magic_kcalloc(snd_virmidi_t, 0, GFP_KERNEL);
+	vmidi = kcalloc(1, sizeof(*vmidi), GFP_KERNEL);
 	if (vmidi == NULL)
 		return -ENOMEM;
 	vmidi->substream = substream;
 	if (snd_midi_event_new(MAX_MIDI_EVENT_BUF, &vmidi->parser) < 0) {
-		snd_magic_kfree(vmidi);
+		kfree(vmidi);
 		return -ENOMEM;
 	}
 	vmidi->seq_mode = rdev->seq_mode;
@@ -254,11 +254,11 @@ static int snd_virmidi_output_open(snd_rawmidi_substream_t * substream)
  */
 static int snd_virmidi_input_close(snd_rawmidi_substream_t * substream)
 {
-	snd_virmidi_t *vmidi = snd_magic_cast(snd_virmidi_t, substream->runtime->private_data, return -EINVAL);
+	snd_virmidi_t *vmidi = substream->runtime->private_data;
 	snd_midi_event_free(vmidi->parser);
 	list_del(&vmidi->list);
 	substream->runtime->private_data = NULL;
-	snd_magic_kfree(vmidi);
+	kfree(vmidi);
 	return 0;
 }
 
@@ -267,10 +267,10 @@ static int snd_virmidi_input_close(snd_rawmidi_substream_t * substream)
  */
 static int snd_virmidi_output_close(snd_rawmidi_substream_t * substream)
 {
-	snd_virmidi_t *vmidi = snd_magic_cast(snd_virmidi_t, substream->runtime->private_data, return -EINVAL);
+	snd_virmidi_t *vmidi = substream->runtime->private_data;
 	snd_midi_event_free(vmidi->parser);
 	substream->runtime->private_data = NULL;
-	snd_magic_kfree(vmidi);
+	kfree(vmidi);
 	return 0;
 }
 
@@ -281,7 +281,7 @@ static int snd_virmidi_subscribe(void *private_data, snd_seq_port_subscribe_t *i
 {
 	snd_virmidi_dev_t *rdev;
 
-	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
+	rdev = private_data;
 	if (!try_module_get(rdev->card->module))
 		return -EFAULT;
 	rdev->flags |= SNDRV_VIRMIDI_SUBSCRIBE;
@@ -295,7 +295,7 @@ static int snd_virmidi_unsubscribe(void *private_data, snd_seq_port_subscribe_t 
 {
 	snd_virmidi_dev_t *rdev;
 
-	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
+	rdev = private_data;
 	rdev->flags &= ~SNDRV_VIRMIDI_SUBSCRIBE;
 	module_put(rdev->card->module);
 	return 0;
@@ -309,7 +309,7 @@ static int snd_virmidi_use(void *private_data, snd_seq_port_subscribe_t *info)
 {
 	snd_virmidi_dev_t *rdev;
 
-	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
+	rdev = private_data;
 	if (!try_module_get(rdev->card->module))
 		return -EFAULT;
 	rdev->flags |= SNDRV_VIRMIDI_USE;
@@ -323,7 +323,7 @@ static int snd_virmidi_unuse(void *private_data, snd_seq_port_subscribe_t *info)
 {
 	snd_virmidi_dev_t *rdev;
 
-	rdev = snd_magic_cast(snd_virmidi_dev_t, private_data, return -EINVAL);
+	rdev = private_data;
 	rdev->flags &= ~SNDRV_VIRMIDI_USE;
 	module_put(rdev->card->module);
 	return 0;
@@ -424,7 +424,7 @@ static void snd_virmidi_dev_detach_seq(snd_virmidi_dev_t *rdev)
  */
 static int snd_virmidi_dev_register(snd_rawmidi_t *rmidi)
 {
-	snd_virmidi_dev_t *rdev = snd_magic_cast(snd_virmidi_dev_t, rmidi->private_data, return -ENXIO);
+	snd_virmidi_dev_t *rdev = rmidi->private_data;
 	int err;
 
 	switch (rdev->seq_mode) {
@@ -451,7 +451,7 @@ static int snd_virmidi_dev_register(snd_rawmidi_t *rmidi)
  */
 static int snd_virmidi_dev_unregister(snd_rawmidi_t *rmidi)
 {
-	snd_virmidi_dev_t *rdev = snd_magic_cast(snd_virmidi_dev_t, rmidi->private_data, return -ENXIO);
+	snd_virmidi_dev_t *rdev = rmidi->private_data;
 
 	if (rdev->seq_mode == SNDRV_VIRMIDI_SEQ_DISPATCH)
 		snd_virmidi_dev_detach_seq(rdev);
@@ -471,8 +471,8 @@ static snd_rawmidi_global_ops_t snd_virmidi_global_ops = {
  */
 static void snd_virmidi_free(snd_rawmidi_t *rmidi)
 {
-	snd_virmidi_dev_t *rdev = snd_magic_cast(snd_virmidi_dev_t, rmidi->private_data, return);
-	snd_magic_kfree(rdev);
+	snd_virmidi_dev_t *rdev = rmidi->private_data;
+	kfree(rdev);
 }
 
 /*
@@ -493,7 +493,7 @@ int snd_virmidi_new(snd_card_t *card, int device, snd_rawmidi_t **rrmidi)
 				   &rmidi)) < 0)
 		return err;
 	strcpy(rmidi->name, rmidi->id);
-	rdev = snd_magic_kcalloc(snd_virmidi_dev_t, 0, GFP_KERNEL);
+	rdev = kcalloc(1, sizeof(*rdev), GFP_KERNEL);
 	if (rdev == NULL) {
 		snd_device_free(card, rmidi);
 		return -ENOMEM;

@@ -21,7 +21,7 @@
 #include <asm/s390_ext.h>
 #include <asm/timer.h>
 
-#define VTIMER_MAGIC (0x4b87ad6e + 1)
+#define VTIMER_MAGIC (TIMER_MAGIC + 1)
 static ext_int_info_t ext_int_info_timer;
 DEFINE_PER_CPU(struct vtimer_queue, virt_cpu_timer);
 

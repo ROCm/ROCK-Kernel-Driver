@@ -77,6 +77,7 @@ static byte extended_xdi_features[DIVA_XDI_EXTENDED_FEATURES_MAX_SZ+1] = {
 #if defined(DIVA_IDI_RX_DMA)
   DIVA_XDI_EXTENDED_FEATURE_CMA          |
   DIVA_XDI_EXTENDED_FEATURE_RX_DMA       |
+  DIVA_XDI_EXTENDED_FEATURE_MANAGEMENT_DMA |
 #endif
   DIVA_XDI_EXTENDED_FEATURE_NO_CANCEL_RC),
  0
@@ -226,8 +227,10 @@ void request(PISDN_ADAPTER IoAdapter, ENTITY * e)
         if (pI->descriptor_number >= 0) {
           dword dma_magic;
           void* local_addr;
+#if 0
           DBG_TRC(("A(%d) dma_alloc(%d)",
                    IoAdapter->ANum, pI->descriptor_number))
+#endif
           diva_get_dma_map_entry (\
                                (struct _diva_dma_map_entry*)IoAdapter->dma_map,
                                pI->descriptor_number,
@@ -240,7 +243,9 @@ void request(PISDN_ADAPTER IoAdapter, ENTITY * e)
         }
       } else if ((pI->operation == IDI_SYNC_REQ_DMA_DESCRIPTOR_FREE) &&
                  (pI->descriptor_number >= 0)) {
+#if 0
         DBG_TRC(("A(%d) dma_free(%d)", IoAdapter->ANum, pI->descriptor_number))
+#endif
         diva_free_dma_map_entry((struct _diva_dma_map_entry*)IoAdapter->dma_map,
                                 pI->descriptor_number);
         pI->descriptor_number = -1;
@@ -257,6 +262,7 @@ void request(PISDN_ADAPTER IoAdapter, ENTITY * e)
                                      &syncReq->xdi_logical_adapter_number.info;
       pI->logical_adapter_number = IoAdapter->ANum;
       pI->controller = IoAdapter->ControllerNumber;
+      pI->total_controllers = IoAdapter->Properties.Adapters;
     } return;
     case IDI_SYNC_REQ_XDI_GET_CAPI_PARAMS: {
        diva_xdi_get_capi_parameters_t prms, *pI = &syncReq->xdi_capi_prms.info;
@@ -318,7 +324,25 @@ void request(PISDN_ADAPTER IoAdapter, ENTITY * e)
    }
    syncReq->GetSerial.serial = 0 ;
    break ;
+  case IDI_SYNC_REQ_GET_CARDTYPE:
+   if ( IoAdapter )
+   {
+    syncReq->GetCardType.cardtype = IoAdapter->cardType ;
+    DBG_TRC(("xdi: Adapter %d / CardType %ld",
+             IoAdapter->ANum, IoAdapter->cardType))
+    return ;
+   }
+   syncReq->GetCardType.cardtype = 0 ;
+   break ;
   case IDI_SYNC_REQ_GET_XLOG:
+   if ( IoAdapter )
+   {
+    pcm_req (IoAdapter, e) ;
+    return ;
+   }
+   e->Ind = 0 ;
+   break ;
+  case IDI_SYNC_REQ_GET_DBG_XLOG:
    if ( IoAdapter )
    {
     pcm_req (IoAdapter, e) ;
@@ -345,7 +369,9 @@ void request(PISDN_ADAPTER IoAdapter, ENTITY * e)
   }
   if ( IoAdapter )
   {
+#if 0
    DBG_FTL(("xdi: unknown Req 0 / Rc %d !", e->Rc))
+#endif
    return ;
   }
  }
@@ -496,7 +522,7 @@ pcm_req (PISDN_ADAPTER IoAdapter, ENTITY *e)
   diva_os_enter_spin_lock (&IoAdapter->data_spin_lock,
                &OldIrql,
                "data_pcm_1");
-  IoAdapter->pcm_data = (unsigned long)pcm;
+  IoAdapter->pcm_data = (void *)pcm;
   IoAdapter->pcm_pending = 1;
   diva_os_schedule_soft_isr (&IoAdapter->req_soft_isr);
   diva_os_leave_spin_lock (&IoAdapter->data_spin_lock,
@@ -510,7 +536,7 @@ pcm_req (PISDN_ADAPTER IoAdapter, ENTITY *e)
                  &OldIrql,
                  "data_pcm_3");
     IoAdapter->pcm_pending = 0;
-    IoAdapter->pcm_data   = 0;
+    IoAdapter->pcm_data    = NULL ;
     diva_os_leave_spin_lock (&IoAdapter->data_spin_lock,
                  &OldIrql,
                  "data_pcm_3");
@@ -528,7 +554,7 @@ pcm_req (PISDN_ADAPTER IoAdapter, ENTITY *e)
                &OldIrql,
                "data_pcm_4");
   IoAdapter->pcm_pending = 0;
-  IoAdapter->pcm_data   = 0;
+  IoAdapter->pcm_data    = NULL ;
   diva_os_leave_spin_lock (&IoAdapter->data_spin_lock,
                &OldIrql,
                "data_pcm_4");
@@ -668,7 +694,7 @@ word io_inw(ADAPTER * a, void * adr)
 void io_in_buffer(ADAPTER * a, void * adr, void * buffer, word len)
 {
   byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
- byte* P = (byte*)buffer;
+  byte* P = (byte*)buffer;
   if ((long)adr & 1) {
     outppw(Port+4, (word)(unsigned long)adr);
     *P = inpp(Port);
@@ -678,7 +704,7 @@ void io_in_buffer(ADAPTER * a, void * adr, void * buffer, word len)
     if (!len) {
 	DIVA_OS_MEM_DETACH_PORT((PISDN_ADAPTER)a->io, Port);
 	return;
-  }
+    }
   }
   outppw(Port+4, (word)(unsigned long)adr);
   inppw_buffer (Port, P, len+1);
@@ -710,7 +736,7 @@ void io_outw(ADAPTER * a, void * adr, word data)
 void io_out_buffer(ADAPTER * a, void * adr, void * buffer, word len)
 {
   byte *Port = (byte*)DIVA_OS_MEM_ATTACH_PORT((PISDN_ADAPTER)a->io);
- byte* P = (byte*)buffer;
+  byte* P = (byte*)buffer;
   if ((long)adr & 1) {
     outppw(Port+4, (word)(unsigned long)adr);
     outpp(Port, *P);
@@ -839,21 +865,21 @@ void CALLBACK(ADAPTER * a, ENTITY * e)
 /* --------------------------------------------------------------------------
   routines for aligned reading and writing on RISC
   -------------------------------------------------------------------------- */
-void outp_words_from_buffer (word* adr, byte* P, word len)
+void outp_words_from_buffer (word* adr, byte* P, dword len)
 {
-  word i = 0;
+  dword i = 0;
   word w;
-  while (i < (len & 0xfffe)) {
+  while (i < (len & 0xfffffffe)) {
     w = P[i++];
     w += (P[i++])<<8;
     outppw (adr, w);
   }
 }
-void inp_words_to_buffer (word* adr, byte* P, word len)
+void inp_words_to_buffer (word* adr, byte* P, dword len)
 {
-  word i = 0;
+  dword i = 0;
   word w;
-  while (i < (len & 0xfffe)) {
+  while (i < (len & 0xfffffffe)) {
     w = inppw (adr);
     P[i++] = (byte)(w);
     P[i++] = (byte)(w>>8);

@@ -30,3 +30,5 @@ extern void puthex(unsigned long val);
 extern void puts(const char *);
 extern void udelay(long delay);
 extern unsigned char inb(int port);
+extern void board_isa_init(void);
+extern void ISA_init(unsigned long base);

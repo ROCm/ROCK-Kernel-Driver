@@ -3,10 +3,19 @@
 
 #define WNOHANG		0x00000001
 #define WUNTRACED	0x00000002
+#define WSTOPPED	WUNTRACED
+#define WEXITED		0x00000004
+#define WCONTINUED	0x00000008
+#define WNOWAIT		0x01000000	/* Don't reap, just poll status.  */
 
 #define __WNOTHREAD	0x20000000	/* Don't wait on children of other threads in this group */
 #define __WALL		0x40000000	/* Wait on all children, regardless of type */
 #define __WCLONE	0x80000000	/* Wait only on non-SIGCHLD children */
+
+/* First argument to waitid: */
+#define P_ALL		0
+#define P_PID		1
+#define P_PGID		2
 
 #ifdef __KERNEL__
 
@@ -79,6 +88,15 @@ static inline int waitqueue_active(wait_queue_head_t *q)
 {
 	return !list_empty(&q->task_list);
 }
+
+/*
+ * Used to distinguish between sync and async io wait context:
+ * sync i/o typically specifies a NULL wait queue entry or a wait
+ * queue entry bound to a task (current task) to wake up.
+ * aio specifies a wait queue entry with an async notification
+ * callback routine, not associated with any task.
+ */
+#define is_sync_wait(wait)	(!(wait) || ((wait)->task))
 
 extern void FASTCALL(add_wait_queue(wait_queue_head_t *q, wait_queue_t * wait));
 extern void FASTCALL(add_wait_queue_exclusive(wait_queue_head_t *q, wait_queue_t * wait));

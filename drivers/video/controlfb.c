@@ -557,6 +557,8 @@ int __init control_init(void)
 {
 	struct device_node *dp;
 
+	control_setup(fb_get_options("controlfb"));
+
 	dp = find_devices("control");
 	if (dp != 0 && !control_of_init(dp))
 		return 0;
@@ -564,6 +566,7 @@ int __init control_init(void)
 	return -ENXIO;
 }
 
+module_init(control_init);
 
 /* Work out which banks of VRAM we have installed. */
 /* danj: I guess the card just ignores writes to nonexistant VRAM... */

@@ -859,8 +859,7 @@ static int __init pcwd_checkcard(int base_addr)
 		/* Not an 'ff' from a floating bus, so must be a card! */
 		for (i = 0; i < 4; ++i) {
 
-			set_current_state(TASK_INTERRUPTIBLE);
-			schedule_timeout(HZ / 2);
+			msleep(500);
 
 			last_port0 = port0;
 			last_port1 = port1;

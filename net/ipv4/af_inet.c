@@ -837,7 +837,7 @@ struct proto_ops inet_dgram_ops = {
 	.sendpage =	inet_sendpage,
 };
 
-struct net_proto_family inet_family_ops = {
+static struct net_proto_family inet_family_ops = {
 	.family = PF_INET,
 	.create = inet_create,
 	.owner	= THIS_MODULE,
@@ -1157,7 +1157,6 @@ EXPORT_SYMBOL(inet_accept);
 EXPORT_SYMBOL(inet_bind);
 EXPORT_SYMBOL(inet_dgram_connect);
 EXPORT_SYMBOL(inet_dgram_ops);
-EXPORT_SYMBOL(inet_family_ops);
 EXPORT_SYMBOL(inet_getname);
 EXPORT_SYMBOL(inet_ioctl);
 EXPORT_SYMBOL(inet_listen);

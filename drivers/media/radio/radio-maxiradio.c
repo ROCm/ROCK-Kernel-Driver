@@ -104,13 +104,6 @@ static struct radio_device
 } radio_unit = {0, 0, 0, 0, };
 
 
-static void sleep_125ms(void)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(HZ >> 3);
-}
-
-
 static void outbit(unsigned long bit, __u16 io)
 {
 	if(bit != 0)
@@ -228,7 +221,7 @@ inline static int radio_function(struct inode *inode, struct file *file,
 				return -EINVAL;
 			card->freq = *freq;
 			set_freq(card->io, FREQ2BITS(card->freq));
-			sleep_125ms();
+			msleep(125);
 			return 0;
 		}
 		case VIDIOCGAUDIO: {	

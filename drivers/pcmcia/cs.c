@@ -1886,11 +1886,6 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
 				       (*handle)->dev_info, s);
 	if (!win->ctl.res)
 	    return CS_IN_USE;
-	win->ctl.sys_start = win->ctl.res->start;
-	win->ctl.sys_stop = win->ctl.res->end;
-    } else {
-	win->ctl.sys_start = req->Base;
-	win->ctl.sys_stop = req->Base + req->Size - 1;
     }
     (*handle)->state |= CLIENT_WIN_REQ(w);
 
@@ -1912,7 +1907,11 @@ int pcmcia_request_window(client_handle_t *handle, win_req_t *req, window_handle
     s->state |= SOCKET_WIN_REQ(w);
 
     /* Return window handle */
-    req->Base = win->ctl.sys_start;
+    if (s->features & SS_CAP_STATIC_MAP) {
+	req->Base = win->ctl.static_start;
+    } else {
+	req->Base = win->ctl.res->start;
+    }
     *wh = win;
     
     return CS_SUCCESS;

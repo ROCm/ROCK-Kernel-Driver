@@ -45,8 +45,7 @@
 
 #if defined(CONFIG_IA64) || defined(CONFIG_X86_64)
 #define BROKEN_X86_ALIGNMENT
-#endif
-
+#else
 
 typedef struct xfs_fsop_bulkreq32 {
 	compat_uptr_t	lastip;		/* last inode # pointer		*/
@@ -77,6 +76,7 @@ xfs_ioctl32_bulkstat(
 
 	return sys_ioctl(fd, cmd, (unsigned long)p);
 }
+#endif
 
 struct ioctl_trans xfs_ioctl32_trans[] = {
 	{ XFS_IOC_DIOINFO, },

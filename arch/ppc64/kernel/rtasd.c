@@ -343,15 +343,18 @@ static int enable_surveillance(int timeout)
 {
 	int error;
 
-	error = rtas_call(rtas_token("set-indicator"), 3, 1, NULL,
-			  SURVEILLANCE_TOKEN, 0, timeout);
+	error = rtas_set_indicator(SURVEILLANCE_TOKEN, 0, timeout);
 
-	if (error) {
-		printk(KERN_ERR "rtasd: could not enable surveillance\n");
-		return -1;
+	if (error == 0)
+		return 0;
+
+	if (error == RTAS_NO_SUCH_INDICATOR) {
+		printk(KERN_INFO "rtasd: surveillance not supported\n");
+		return 0;
 	}
 
-	return 0;
+	printk(KERN_ERR "rtasd: could not update surveillance\n");
+	return -1;
 }
 
 static int get_eventscan_parms(void)
@@ -370,21 +373,8 @@ static int get_eventscan_parms(void)
 	rtas_event_scan_rate = *ip;
 	DEBUG("rtas-event-scan-rate %d\n", rtas_event_scan_rate);
 
-	ip = (int *)get_property(node, "rtas-error-log-max", NULL);
-	if (ip == NULL) {
-		printk(KERN_ERR "rtasd: no rtas-error-log-max\n");
-		of_node_put(node);
-		return -1;
-	}
-	rtas_error_log_max = *ip;
-	DEBUG("rtas-error-log-max %d\n", rtas_error_log_max);
-
-	if (rtas_error_log_max > RTAS_ERROR_LOG_MAX) {
-		printk(KERN_ERR "rtasd: truncated error log from %d to %d bytes\n", rtas_error_log_max, RTAS_ERROR_LOG_MAX);
-		rtas_error_log_max = RTAS_ERROR_LOG_MAX;
-	}
-
 	/* Make room for the sequence number */
+	rtas_error_log_max = rtas_get_error_log_max();
 	rtas_error_log_buffer_max = rtas_error_log_max + sizeof(int);
 
 	of_node_put(node);

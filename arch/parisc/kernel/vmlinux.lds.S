@@ -52,6 +52,7 @@ SECTIONS
   .text ALIGN(16) : {
 	*(.text)
 	SCHED_TEXT
+	LOCK_TEXT
 	*(.text.do_softirq)
 	*(.text.sys_exit)
 	*(.text.do_sigaltstack)
@@ -130,9 +131,6 @@ SECTIONS
   __setup_start = .;
   .init.setup : { *(.init.setup) }
   __setup_end = .;
-  __start___param = .;
-  __param : { *(__param) }
-  __stop___param = .;
   __initcall_start = .;
   .initcall.init : {
 	*(.initcall1.init) 

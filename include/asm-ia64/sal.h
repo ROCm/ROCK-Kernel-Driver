@@ -364,7 +364,7 @@ typedef struct sal_processor_static_info {
 	u64 cr[128];
 	u64 ar[128];
 	u64 rr[8];
-	struct ia64_fpreg fr[128];
+	struct ia64_fpreg __attribute__ ((packed)) fr[128];
 } sal_processor_static_info_t;
 
 struct sal_cpuid_info {
@@ -818,6 +818,16 @@ extern int (*salinfo_platform_oemdata)(const u8 *, u8 **, u64 *);
 struct sal_ret_values {
 	long r8; long r9; long r10; long r11;
 };
+
+#define IA64_SAL_OEMFUNC_MIN		0x02000000
+#define IA64_SAL_OEMFUNC_MAX		0x03ffffff
+
+extern int ia64_sal_oemcall(struct ia64_sal_retval *, u64, u64, u64, u64, u64,
+			    u64, u64, u64);
+extern int ia64_sal_oemcall_nolock(struct ia64_sal_retval *, u64, u64, u64,
+				   u64, u64, u64, u64, u64);
+extern int ia64_sal_oemcall_reentrant(struct ia64_sal_retval *, u64, u64, u64,
+				      u64, u64, u64, u64, u64);
 
 #endif /* __ASSEMBLY__ */
 

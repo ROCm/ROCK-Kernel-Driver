@@ -186,7 +186,7 @@ static void nibble_to_byte(u8 *s, u8 *d, u8 len, u8 nibble),
 	    reset_timer(struct net_device *dev);
 
 static u8 bps_to_speed_code(u32 bps);
-static u8 log2(u32 n);
+static u8 cycx_log2(u32 n);
 
 static unsigned dec_to_uint(u8 *str, int len);
 
@@ -263,7 +263,7 @@ int cycx_x25_wan_init(struct cycx_device *card, wandev_conf_t *conf)
 	else
 		card->wandev.mtu = 64;
 
-	cfg.pktlen = log2(card->wandev.mtu);
+	cfg.pktlen = cycx_log2(card->wandev.mtu);
 
 	if (conf->station == WANOPT_DTE) {
 		cfg.locaddr = 3; /* DTE */
@@ -1513,7 +1513,7 @@ static u8 bps_to_speed_code(u32 bps)
 }
 
 /* log base 2 */
-static u8 log2(u32 n)
+static u8 cycx_log2(u32 n)
 {
 	u8 log = 0;
 

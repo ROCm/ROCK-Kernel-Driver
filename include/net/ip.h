@@ -255,6 +255,7 @@ extern int	ip_call_ra_chain(struct sk_buff *skb);
  */
  
 struct sk_buff *ip_defrag(struct sk_buff *skb);
+extern void ipfrag_flush(void);
 extern int ip_frag_nqueues;
 extern atomic_t ip_frag_mem;
 

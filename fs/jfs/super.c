@@ -58,7 +58,7 @@ DECLARE_COMPLETION(jfsIOwait);
 
 #ifdef CONFIG_JFS_DEBUG
 int jfsloglevel = JFS_LOGLEVEL_WARN;
-module_param(jfsloglevel, int, 644);
+module_param(jfsloglevel, int, 0644);
 MODULE_PARM_DESC(jfsloglevel, "Specify JFS loglevel (0, 1 or 2)");
 #endif
 

@@ -89,11 +89,12 @@ static void afs_rxvl_aemap(struct rxrpc_call *call)
 	}
 } /* end afs_rxvl_aemap() */
 
+#if 0
 /*****************************************************************************/
 /*
- * probe a volume location server to see if it is still alive
+ * probe a volume location server to see if it is still alive -- unused
  */
-int afs_rxvl_probe(struct afs_server *server, int alloc_flags)
+static int afs_rxvl_probe(struct afs_server *server, int alloc_flags)
 {
 	struct rxrpc_connection *conn;
 	struct rxrpc_call *call;
@@ -173,6 +174,7 @@ int afs_rxvl_probe(struct afs_server *server, int alloc_flags)
 	return ret;
 
 } /* end afs_rxvl_probe() */
+#endif
 
 /*****************************************************************************/
 /*

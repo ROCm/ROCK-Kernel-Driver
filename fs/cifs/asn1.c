@@ -375,7 +375,7 @@ asn1_subid_decode(struct asn1_ctx *ctx, unsigned long *subid)
 	return 1;
 }
 
-static unsigned char
+static int 
 asn1_oid_decode(struct asn1_ctx *ctx,
 		unsigned char *eoc, unsigned long **oid, unsigned int *len)
 {
@@ -454,11 +454,11 @@ decode_negTokenInit(unsigned char *security_blob, int length,
 	struct asn1_ctx ctx;
 	unsigned char *end;
 	unsigned char *sequence_end;
-	unsigned long *oid;
+	unsigned long *oid = NULL;
 	unsigned int cls, con, tag, oidlen, rc;
 	int use_ntlmssp = FALSE;
 
-    *secType = NTLM; /* BB eventually make Kerberos or NLTMSSP the default */
+	*secType = NTLM; /* BB eventually make Kerberos or NLTMSSP the default */
 
 	/* cifs_dump_mem(" Received SecBlob ", security_blob, length); */
 
@@ -543,16 +543,19 @@ decode_negTokenInit(unsigned char *security_blob, int length,
 				return 0;
 			}
 			if ((tag == ASN1_OJI) && (con == ASN1_PRI)) {
-				asn1_oid_decode(&ctx, end, &oid, &oidlen);
-				cFYI(1,
-				     ("OID len = %d oid = 0x%lx 0x%lx 0x%lx 0x%lx",
-				      oidlen, *oid, *(oid + 1), *(oid + 2),
-				      *(oid + 3)));
-				rc = compare_oid(oid, oidlen, NTLMSSP_OID,
+				rc = asn1_oid_decode(&ctx, end, &oid, &oidlen);
+				if(rc) {		
+					cFYI(1,
+					  ("OID len = %d oid = 0x%lx 0x%lx 0x%lx 0x%lx",
+					   oidlen, *oid, *(oid + 1), *(oid + 2),
+					   *(oid + 3)));
+					rc = compare_oid(oid, oidlen, NTLMSSP_OID,
 						 NTLMSSP_OID_LEN);
-				kfree(oid);
-				if (rc)
-					use_ntlmssp = TRUE;
+					if(oid)
+						kfree(oid);
+					if (rc)
+						use_ntlmssp = TRUE;
+				}
 			} else {
 				cFYI(1,("This should be an oid what is going on? "));
 			}

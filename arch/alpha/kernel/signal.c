@@ -469,9 +469,7 @@ setup_frame(int sig, struct k_sigaction *ka, sigset_t *set,
 	return;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(sig, current);
 }
 
 static void
@@ -533,9 +531,7 @@ setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	return;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(sig, current);
 }
 
 
@@ -608,21 +604,20 @@ do_signal(sigset_t *oldset, struct pt_regs * regs, struct switch_stack * sw,
 	siginfo_t info;
 	int signr;
 	unsigned long single_stepping = ptrace_cancel_bpt(current);
+	struct k_sigaction ka;
 
 	if (!oldset)
 		oldset = &current->blocked;
 
 	/* This lets the debugger run, ... */
-	signr = get_signal_to_deliver(&info, regs, NULL);
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 	/* ... so re-check the single stepping. */
 	single_stepping |= ptrace_cancel_bpt(current);
 
 	if (signr > 0) {
 		/* Whee!  Actually deliver the signal.  */
-		struct k_sigaction *ka = &current->sighand->action[signr-1];
-
-		if (r0) syscall_restart(r0, r19, regs, ka);
-		handle_signal(signr, ka, &info, oldset, regs, sw);
+		if (r0) syscall_restart(r0, r19, regs, &ka);
+		handle_signal(signr, &ka, &info, oldset, regs, sw);
 		if (single_stepping) 
 			ptrace_set_bpt(current); /* re-set bpt */
 		return 1;

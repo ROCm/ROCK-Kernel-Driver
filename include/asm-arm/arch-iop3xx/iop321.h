@@ -20,23 +20,29 @@
  * IOP3xx variants but behave slightly differently on each.
  */
 #ifndef __ASSEMBLY__
-#define iop_is_321() ((processor_id & 0xfffff7e0) == 0x69052420)
+#ifdef	CONFIG_ARCH_IOP321
+#define iop_is_321() (((processor_id & 0xfffff5e0) == 0x69052420))
+#else
+#define	iop_is_321()	0
 #endif
-
+#endif
 
 /*
  * IOP321 I/O and Mem space regions for PCI autoconfiguration
  */
+#define IOP321_PCI_LOWER_IO             0x90000000
+#define IOP321_PCI_UPPER_IO             0x9000ffff
+#define IOP321_PCI_LOWER_MEM            0x80000000
+#define IOP321_PCI_UPPER_MEM            0x83ffffff
 
-#define	IOP321_PCI_IO_BASE		0x90000000
-#define	IOP321_PCI_IO_SIZE		0x00010000
-#define IOP321_PCI_MEM_BASE		0x80000000
-#define IOP321_PCI_MEM_SIZE		0x40000000
+#define IOP321_PCI_WINDOW_SIZE          64 * 0x100000
+
 
 /*
  * IOP321 chipset registers
  */
-#define IOP321_VIRT_MEM_BASE 0xfff00000  /* chip virtual mem address*/
+#define IOP321_VIRT_MEM_BASE 0xfeffe000  /* chip virtual mem address*/
+//#define IOP321_VIRT_MEM_BASE 0xfff00000  /* chip virtual mem address*/
 
 #define IOP321_PHY_MEM_BASE  0xffffe000  /* chip physical memory address */
 #define IOP321_REG_ADDR(reg) (IOP321_VIRT_MEM_BASE | (reg))
@@ -134,6 +140,16 @@
 #define IOP321_OPHPR      (volatile u32 *)IOP321_REG_ADDR(0x00000378)
 #define IOP321_OPTPR      (volatile u32 *)IOP321_REG_ADDR(0x0000037C)
 #define IOP321_IAR        (volatile u32 *)IOP321_REG_ADDR(0x00000380)
+
+#define IOP321_IIxR_MASK	0x7f /* masks all */
+#define IOP321_IIxR_IRI		0x40 /* RC Index Register Interrupt */
+#define IOP321_IIxR_OFQF	0x20 /* RC Output Free Q Full (ERROR) */
+#define IOP321_IIxR_ipq		0x10 /* RC Inbound Post Q (post) */
+#define IOP321_IIxR_ERRDI	0x08 /* RO Error Doorbell Interrupt */
+#define IOP321_IIxR_IDI		0x04 /* RO Inbound Doorbell Interrupt */
+#define IOP321_IIxR_IM1		0x02 /* RC Inbound Message 1 Interrupt */
+#define IOP321_IIxR_IM0		0x01 /* RC Inbound Message 0 Interrupt */
+
 /* Reserved 0x00000384 through 0x000003FF */
 
 /* DMA Controller 0x00000400 through 0x000004FF */
@@ -186,10 +202,21 @@
 
 #define IOP321_PBISR_BOOR_ERR 0x1
 
-
-
 /* Peripheral performance monitoring unit 0x00000700 through 0x00077F */
+#define IOP321_GTMR	(volatile u32 *)IOP321_REG_ADDR(0x00000700)
+#define IOP321_ESR	(volatile u32 *)IOP321_REG_ADDR(0x00000704)
+#define IOP321_EMISR	(volatile u32 *)IOP321_REG_ADDR(0x00000708)
+/* reserved 0x00000070c */
+#define IOP321_GTSR	(volatile u32 *)IOP321_REG_ADDR(0x00000710)
+/* PERC0 DOESN'T EXIST - index from 1! */
+#define IOP321_PERCR0	(volatile u32 *)IOP321_REG_ADDR(0x00000710)
+
+#define IOP321_GTMR_NGCE	0x04 /* (Not) Global Counter Enable */
+
 /* Internal arbitration unit 0x00000780 through 0x0007BF */
+#define IOP321_IACR	(volatile u32 *)IOP321_REG_ADDR(0x00000780)
+#define IOP321_MTTR1	(volatile u32 *)IOP321_REG_ADDR(0x00000784)
+#define IOP321_MTTR2	(volatile u32 *)IOP321_REG_ADDR(0x00000788)
 
 /* General Purpose I/O Registers */
 #define IOP321_GPOE       (volatile u32 *)IOP321_REG_ADDR(0x000007C4)
@@ -206,6 +233,17 @@
 
 #define IOP321_TU_TMR0		(volatile u32 *)IOP321_REG_ADDR(0x000007E0)
 #define IOP321_TU_TMR1		(volatile u32 *)IOP321_REG_ADDR(0x000007E4)
+
+#ifdef CONFIG_ARCH_IQ80321
+#define	IOP321_TICK_RATE	200000000	/* 200 MHz clock */
+#elif defined(CONFIG_ARCH_IQ31244)
+#define IOP321_TICK_RATE	198000000	/* 33.000 MHz crystal */
+#endif
+
+#ifdef CONFIG_ARCH_EP80219
+#undef IOP321_TICK_RATE
+#define IOP321_TICK_RATE 200000000 /* 33.333333 Mhz crystal */
+#endif
 
 #define IOP321_TMR_TC		0x01
 #define	IOP321_TMR_EN		0x02
@@ -224,15 +262,43 @@
 #define IOP321_TU_TISR    (volatile u32 *)IOP321_REG_ADDR(0x000007F8)
 #define IOP321_TU_WDTCR   (volatile u32 *)IOP321_REG_ADDR(0x000007FC)
 
-
-
 /* Application accelerator unit 0x00000800 - 0x000008FF */
 #define IOP321_AAU_ACR     (volatile u32 *)IOP321_REG_ADDR(0x00000800)
 #define IOP321_AAU_ASR     (volatile u32 *)IOP321_REG_ADDR(0x00000804)
 #define IOP321_AAU_ADAR    (volatile u32 *)IOP321_REG_ADDR(0x00000808)
 #define IOP321_AAU_ANDAR   (volatile u32 *)IOP321_REG_ADDR(0x0000080C)
 #define IOP321_AAU_SAR1    (volatile u32 *)IOP321_REG_ADDR(0x00000810)
-/* SAR2...SAR32 0x00000814 - 0x000008A4 */
+#define IOP321_AAU_SAR2    (volatile u32 *)IOP321_REG_ADDR(0x00000814)
+#define IOP321_AAU_SAR3    (volatile u32 *)IOP321_REG_ADDR(0x00000818)
+#define IOP321_AAU_SAR4    (volatile u32 *)IOP321_REG_ADDR(0x0000081C)
+#define IOP321_AAU_SAR5    (volatile u32 *)IOP321_REG_ADDR(0x0000082C)
+#define IOP321_AAU_SAR6    (volatile u32 *)IOP321_REG_ADDR(0x00000830)
+#define IOP321_AAU_SAR7    (volatile u32 *)IOP321_REG_ADDR(0x00000834)
+#define IOP321_AAU_SAR8    (volatile u32 *)IOP321_REG_ADDR(0x00000838)
+#define IOP321_AAU_SAR9    (volatile u32 *)IOP321_REG_ADDR(0x00000840)
+#define IOP321_AAU_SAR10   (volatile u32 *)IOP321_REG_ADDR(0x00000844)
+#define IOP321_AAU_SAR11   (volatile u32 *)IOP321_REG_ADDR(0x00000848)
+#define IOP321_AAU_SAR12   (volatile u32 *)IOP321_REG_ADDR(0x0000084C)
+#define IOP321_AAU_SAR13   (volatile u32 *)IOP321_REG_ADDR(0x00000850)
+#define IOP321_AAU_SAR14   (volatile u32 *)IOP321_REG_ADDR(0x00000854)
+#define IOP321_AAU_SAR15   (volatile u32 *)IOP321_REG_ADDR(0x00000858)
+#define IOP321_AAU_SAR16   (volatile u32 *)IOP321_REG_ADDR(0x0000085C)
+#define IOP321_AAU_SAR17   (volatile u32 *)IOP321_REG_ADDR(0x00000864)
+#define IOP321_AAU_SAR18   (volatile u32 *)IOP321_REG_ADDR(0x00000868)
+#define IOP321_AAU_SAR19   (volatile u32 *)IOP321_REG_ADDR(0x0000086C)
+#define IOP321_AAU_SAR20   (volatile u32 *)IOP321_REG_ADDR(0x00000870)
+#define IOP321_AAU_SAR21   (volatile u32 *)IOP321_REG_ADDR(0x00000874)
+#define IOP321_AAU_SAR22   (volatile u32 *)IOP321_REG_ADDR(0x00000878)
+#define IOP321_AAU_SAR23   (volatile u32 *)IOP321_REG_ADDR(0x0000087C)
+#define IOP321_AAU_SAR24   (volatile u32 *)IOP321_REG_ADDR(0x00000880)
+#define IOP321_AAU_SAR25   (volatile u32 *)IOP321_REG_ADDR(0x00000888)
+#define IOP321_AAU_SAR26   (volatile u32 *)IOP321_REG_ADDR(0x0000088C)
+#define IOP321_AAU_SAR27   (volatile u32 *)IOP321_REG_ADDR(0x00000890)
+#define IOP321_AAU_SAR28   (volatile u32 *)IOP321_REG_ADDR(0x00000894)
+#define IOP321_AAU_SAR29   (volatile u32 *)IOP321_REG_ADDR(0x00000898)
+#define IOP321_AAU_SAR30   (volatile u32 *)IOP321_REG_ADDR(0x0000089C)
+#define IOP321_AAU_SAR31   (volatile u32 *)IOP321_REG_ADDR(0x000008A0)
+#define IOP321_AAU_SAR32   (volatile u32 *)IOP321_REG_ADDR(0x000008A4)
 #define IOP321_AAU_DAR     (volatile u32 *)IOP321_REG_ADDR(0x00000820)
 #define IOP321_AAU_ABCR    (volatile u32 *)IOP321_REG_ADDR(0x00000824)
 #define IOP321_AAU_ADCR    (volatile u32 *)IOP321_REG_ADDR(0x00000828)
@@ -259,5 +325,12 @@
 /* Reserved 0x000016B8 through 0x000016FC */
 
 /* for I2C bit defs see drivers/i2c/i2c-iop3xx.h */
+
+
+#ifndef __ASSEMBLY__
+extern void iop321_map_io(void);
+extern void iop321_init_irq(void);
+extern void iop321_time_init(void);
+#endif
 
 #endif // _IOP321_HW_H_

@@ -814,19 +814,23 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 }
 
 static struct cifsSesInfo *
-cifs_find_tcp_session(__u32 new_target_ip_addr,
+cifs_find_tcp_session(struct in_addr * target_ip_addr, 
+		struct in6_addr *target_ip6_addr,
 		 char *userName, struct TCP_Server_Info **psrvTcp)
 {
 	struct list_head *tmp;
 	struct cifsSesInfo *ses;
-
 	*psrvTcp = NULL;
 	read_lock(&GlobalSMBSeslock);
+
 	list_for_each(tmp, &GlobalSMBSessionList) {
 		ses = list_entry(tmp, struct cifsSesInfo, cifsSessionList);
 		if (ses->server) {
-			if (ses->server->addr.sockAddr.sin_addr.s_addr ==
-			    new_target_ip_addr) {
+			if((target_ip_addr && 
+				(ses->server->addr.sockAddr.sin_addr.s_addr
+				  == target_ip_addr->s_addr)) || (target_ip6_addr
+				&& memcmp(&ses->server->addr.sockAddr6.sin6_addr,
+					target_ip6_addr,sizeof(*target_ip6_addr)))){
 				/* BB lock server and tcp session and increment use count here?? */
 				*psrvTcp = ses->server;	/* found a match on the TCP session */
 				/* BB check if reconnection needed */
@@ -1029,7 +1033,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 
 	/* send RFC1001 sessinit */
 
-	if(psin_server->sin_port == htons(139)) {
+	if(psin_server->sin_port == htons(RFC1001_PORT)) {
 		/* some servers require RFC1001 sessinit before sending
 		negprot - BB check reconnection in case where second 
 		sessinit is sent but no second negprot */
@@ -1072,6 +1076,7 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 {
 	int rc = 0;
 	int connected = 0;
+	unsigned short int orig_port = 0;
 
 	if(*csocket == NULL) {
 		rc = sock_create_kern(PF_INET6, SOCK_STREAM, IPPROTO_TCP, csocket);
@@ -1097,6 +1102,10 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 	} 
 
 	if(!connected) {
+		/* save original port so we can retry user specified port  
+			later if fall back ports fail this time  */
+
+		orig_port = psin_server->sin6_port;
 		/* do not retry on the same port we just failed on */
 		if(psin_server->sin6_port != htons(CIFS_PORT)) {
 			psin_server->sin6_port = htons(CIFS_PORT);
@@ -1119,6 +1128,8 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 	/* give up here - unless we want to retry on different
 		protocol families some day */
 	if (!connected) {
+		if(orig_port)
+			psin_server->sin6_port = orig_port;
 		cFYI(1,("Error %d connecting to server via ipv6",rc));
 		sock_release(*csocket);
 		*csocket = NULL;
@@ -1138,6 +1149,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 {
 	int rc = 0;
 	int xid;
+	int address_type = AF_INET;
 	struct socket *csocket = NULL;
 	struct sockaddr_in sin_server;
 	struct sockaddr_in6 sin_server6;
@@ -1179,12 +1191,16 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	if (volume_info.UNCip && volume_info.UNC) {
 		rc = cifs_inet_pton(AF_INET, volume_info.UNCip,&sin_server.sin_addr.s_addr);
 
-		if(rc == 0) {
+		if(rc <= 0) {
 			/* not ipv4 address, try ipv6 */
 			rc = cifs_inet_pton(AF_INET6,volume_info.UNCip,&sin_server6.sin6_addr.in6_u); 
-		} 
+			if(rc > 0)
+				address_type = AF_INET6;
+		} else {
+			address_type = AF_INET;
+		}
        
-		if(rc != 1) {
+		if(rc <= 0) {
 			/* we failed translating address */
 			if(volume_info.UNC)
 				kfree(volume_info.UNC);
@@ -1234,9 +1250,24 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		}
 	}
 
-	existingCifsSes =
-	    cifs_find_tcp_session(sin_server.sin_addr.s_addr,
-			     volume_info.username, &srvTcp);
+	if(address_type == AF_INET)
+		existingCifsSes = cifs_find_tcp_session(&sin_server.sin_addr,
+			NULL /* no ipv6 addr */,
+			volume_info.username, &srvTcp);
+	else if(address_type == AF_INET6)
+		existingCifsSes = cifs_find_tcp_session(NULL /* no ipv4 addr */,
+			&sin_server6.sin6_addr,
+			volume_info.username, &srvTcp);
+	else {
+		if(volume_info.UNC)
+			kfree(volume_info.UNC);
+		if(volume_info.password)
+			kfree(volume_info.password);
+		FreeXid(xid);
+		return -EINVAL;
+	}
+
+
 	if (srvTcp) {
 		cFYI(1, ("Existing tcp session with server found "));                
 	} else {	/* create socket */
@@ -1283,8 +1314,19 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			so no need to spinlock this init of tcpStatus */
 			srvTcp->tcpStatus = CifsNew;
 			init_MUTEX(&srvTcp->tcpSem);
-			kernel_thread((void *)(void *)cifs_demultiplex_thread, srvTcp,
+			rc = (int)kernel_thread((void *)(void *)cifs_demultiplex_thread, srvTcp,
 				      CLONE_FS | CLONE_FILES | CLONE_VM);
+			if(rc < 0) {
+				rc = -ENOMEM;
+				sock_release(csocket);
+				if(volume_info.UNC)
+					kfree(volume_info.UNC);
+				if(volume_info.password)
+					kfree(volume_info.password);
+				FreeXid(xid);
+				return rc;
+			} else
+				rc = 0;
 			memcpy(srvTcp->workstation_RFC1001_name, volume_info.source_rfc1001_name,16);
 		}
 	}
@@ -1464,15 +1506,18 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	SESSION_SETUP_ANDX *pSMB;
 	SESSION_SETUP_ANDX *pSMBr;
 	char *bcc_ptr;
-	char *user = ses->userName;
-	char *domain = ses->domainName;
+	char *user;
+	char *domain;
 	int rc = 0;
 	int remaining_words = 0;
 	int bytes_returned = 0;
 	int len;
 
 	cFYI(1, ("In sesssetup "));
-
+	if(ses == NULL)
+		return -EINVAL;
+	user = ses->userName;
+	domain = ses->domainName;
 	smb_buffer = cifs_buf_get();
 	if (smb_buffer == 0) {
 		return -ENOMEM;
@@ -1591,111 +1636,104 @@ CIFSSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 		pSMBr->resp.Action = le16_to_cpu(pSMBr->resp.Action);
 		if (pSMBr->resp.Action & GUEST_LOGIN)
 			cFYI(1, (" Guest login"));	/* do we want to mark SesInfo struct ? */
-		if (ses) {
-			ses->Suid = smb_buffer_response->Uid;	/* UID left in wire format (le) */
-			cFYI(1, ("UID = %d ", ses->Suid));
+		ses->Suid = smb_buffer_response->Uid;	/* UID left in wire format (le) */
+		cFYI(1, ("UID = %d ", ses->Suid));
          /* response can have either 3 or 4 word count - Samba sends 3 */
-			bcc_ptr = pByteArea(smb_buffer_response);	
-			if ((pSMBr->resp.hdr.WordCount == 3)
-			    || ((pSMBr->resp.hdr.WordCount == 4)
-				&& (pSMBr->resp.SecurityBlobLength <
-				    pSMBr->resp.ByteCount))) {
-				if (pSMBr->resp.hdr.WordCount == 4)
-					bcc_ptr +=
-					    pSMBr->resp.SecurityBlobLength;
+		bcc_ptr = pByteArea(smb_buffer_response);	
+		if ((pSMBr->resp.hdr.WordCount == 3)
+		    || ((pSMBr->resp.hdr.WordCount == 4)
+			&& (pSMBr->resp.SecurityBlobLength <
+			    pSMBr->resp.ByteCount))) {
+			if (pSMBr->resp.hdr.WordCount == 4)
+				bcc_ptr +=
+				    pSMBr->resp.SecurityBlobLength;
 
-				if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
-					if ((long) (bcc_ptr) % 2) {
-						remaining_words =
-						    (BCC(smb_buffer_response)
-						     - 1) / 2;
-						bcc_ptr++;	/* Unicode strings must be word aligned */
-					} else {
-						remaining_words =
-						    BCC
-						    (smb_buffer_response) / 2;
-					}
-					len =
-					    UniStrnlen((wchar_t *) bcc_ptr,
-						       remaining_words - 1);
+			if (smb_buffer->Flags2 & SMBFLG2_UNICODE) {
+				if ((long) (bcc_ptr) % 2) {
+					remaining_words =
+					    (BCC(smb_buffer_response) - 1) /2;
+					bcc_ptr++;	/* Unicode strings must be word aligned */
+				} else {
+					remaining_words =
+						BCC(smb_buffer_response) / 2;
+				}
+				len =
+				    UniStrnlen((wchar_t *) bcc_ptr,
+					       remaining_words - 1);
 /* We look for obvious messed up bcc or strings in response so we do not go off
    the end since (at least) WIN2K and Windows XP have a major bug in not null
    terminating last Unicode string in response  */
-					ses->serverOS = cifs_kcalloc(2 * (len + 1), GFP_KERNEL);
-					cifs_strfromUCS_le(ses->serverOS,
-							   (wchar_t *)bcc_ptr, len,nls_codepage);
+				ses->serverOS = cifs_kcalloc(2 * (len + 1), GFP_KERNEL);
+				cifs_strfromUCS_le(ses->serverOS,
+					   (wchar_t *)bcc_ptr, len,nls_codepage);
+				bcc_ptr += 2 * (len + 1);
+				remaining_words -= len + 1;
+				ses->serverOS[2 * len] = 0;
+				ses->serverOS[1 + (2 * len)] = 0;
+				if (remaining_words > 0) {
+					len = UniStrnlen((wchar_t *)bcc_ptr,
+							 remaining_words-1);
+					ses->serverNOS =cifs_kcalloc(2 * (len + 1),GFP_KERNEL);
+					cifs_strfromUCS_le(ses->serverNOS,
+							   (wchar_t *)bcc_ptr,len,nls_codepage);
 					bcc_ptr += 2 * (len + 1);
+					ses->serverNOS[2 * len] = 0;
+					ses->serverNOS[1 + (2 * len)] = 0;
 					remaining_words -= len + 1;
-					ses->serverOS[2 * len] = 0;
-					ses->serverOS[1 + (2 * len)] = 0;
 					if (remaining_words > 0) {
-						len = UniStrnlen((wchar_t *)bcc_ptr,
-								 remaining_words
-								 - 1);
-						ses->serverNOS =cifs_kcalloc(2 * (len + 1),GFP_KERNEL);
-						cifs_strfromUCS_le(ses->serverNOS,
-								   (wchar_t *)bcc_ptr,len,nls_codepage);
-						bcc_ptr += 2 * (len + 1);
-						ses->serverNOS[2 * len] = 0;
-						ses->serverNOS[1 + (2 * len)] = 0;
-						remaining_words -= len + 1;
-						if (remaining_words > 0) {
-							len = UniStrnlen((wchar_t *) bcc_ptr, remaining_words);	
+						len = UniStrnlen((wchar_t *) bcc_ptr, remaining_words);	
           /* last string is not always null terminated (for e.g. for Windows XP & 2000) */
-							ses->serverDomain =
-							    cifs_kcalloc(2*(len+1),GFP_KERNEL);
-							cifs_strfromUCS_le(ses->serverDomain,
-							     (wchar_t *)bcc_ptr,len,nls_codepage);
-							bcc_ptr += 2 * (len + 1);
-							ses->serverDomain[2*len] = 0;
-							ses->serverDomain[1+(2*len)] = 0;
-						} /* else no more room so create dummy domain string */
-						else
-							ses->serverDomain =
-							    cifs_kcalloc(2,
-								    GFP_KERNEL);
-					} else {	/* no room so create dummy domain and NOS string */
 						ses->serverDomain =
-						    cifs_kcalloc(2, GFP_KERNEL);
-						ses->serverNOS =
-						    cifs_kcalloc(2, GFP_KERNEL);
-					}
-				} else {	/* ASCII */
-					len = strnlen(bcc_ptr, 1024);
-					if (((long) bcc_ptr + len) - (long)
-					    pByteArea(smb_buffer_response)
-					    <= BCC(smb_buffer_response)) {
-						ses->serverOS = cifs_kcalloc(len + 1,GFP_KERNEL);
-						strncpy(ses->serverOS,bcc_ptr, len);
-
-						bcc_ptr += len;
-						bcc_ptr[0] = 0;	/* null terminate the string */
-						bcc_ptr++;
-
-						len = strnlen(bcc_ptr, 1024);
-						ses->serverNOS = cifs_kcalloc(len + 1,GFP_KERNEL);
-						strncpy(ses->serverNOS, bcc_ptr, len);
-						bcc_ptr += len;
-						bcc_ptr[0] = 0;
-						bcc_ptr++;
-
-						len = strnlen(bcc_ptr, 1024);
-						ses->serverDomain = cifs_kcalloc(len + 1,GFP_KERNEL);
-						strncpy(ses->serverDomain, bcc_ptr, len);
-						bcc_ptr += len;
-						bcc_ptr[0] = 0;
-						bcc_ptr++;
-					} else
-						cFYI(1,
-						     ("Variable field of length %d extends beyond end of smb ",
-						      len));
+						    cifs_kcalloc(2*(len+1),GFP_KERNEL);
+						cifs_strfromUCS_le(ses->serverDomain,
+						     (wchar_t *)bcc_ptr,len,nls_codepage);
+						bcc_ptr += 2 * (len + 1);
+						ses->serverDomain[2*len] = 0;
+						ses->serverDomain[1+(2*len)] = 0;
+					} /* else no more room so create dummy domain string */
+					else
+						ses->serverDomain =
+						    cifs_kcalloc(2,
+							    GFP_KERNEL);
+				} else {	/* no room so create dummy domain and NOS string */
+					ses->serverDomain =
+					    cifs_kcalloc(2, GFP_KERNEL);
+					ses->serverNOS =
+					    cifs_kcalloc(2, GFP_KERNEL);
 				}
-			} else {
-				cERROR(1,
-				       (" Security Blob Length extends beyond end of SMB"));
+			} else {	/* ASCII */
+				len = strnlen(bcc_ptr, 1024);
+				if (((long) bcc_ptr + len) - (long)
+				    pByteArea(smb_buffer_response)
+					    <= BCC(smb_buffer_response)) {
+					ses->serverOS = cifs_kcalloc(len + 1,GFP_KERNEL);
+					strncpy(ses->serverOS,bcc_ptr, len);
+
+					bcc_ptr += len;
+					bcc_ptr[0] = 0;	/* null terminate the string */
+					bcc_ptr++;
+
+					len = strnlen(bcc_ptr, 1024);
+					ses->serverNOS = cifs_kcalloc(len + 1,GFP_KERNEL);
+					strncpy(ses->serverNOS, bcc_ptr, len);
+					bcc_ptr += len;
+					bcc_ptr[0] = 0;
+					bcc_ptr++;
+
+					len = strnlen(bcc_ptr, 1024);
+					ses->serverDomain = cifs_kcalloc(len + 1,GFP_KERNEL);
+					strncpy(ses->serverDomain, bcc_ptr, len);
+					bcc_ptr += len;
+					bcc_ptr[0] = 0;
+					bcc_ptr++;
+				} else
+					cFYI(1,
+					     ("Variable field of length %d extends beyond end of smb ",
+					      len));
 			}
 		} else {
-			cERROR(1, ("No session structure passed in."));
+			cERROR(1,
+			       (" Security Blob Length extends beyond end of SMB"));
 		}
 	} else {
 		cERROR(1,
@@ -1720,14 +1758,18 @@ CIFSSpnegoSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	SESSION_SETUP_ANDX *pSMB;
 	SESSION_SETUP_ANDX *pSMBr;
 	char *bcc_ptr;
-	char *user = ses->userName;
-	char *domain = ses->domainName;
+	char *user;
+	char *domain;
 	int rc = 0;
 	int remaining_words = 0;
 	int bytes_returned = 0;
 	int len;
 
 	cFYI(1, ("In spnego sesssetup "));
+	if(ses == NULL)
+		return -EINVAL;
+	user = ses->userName;
+	domain = ses->domainName;
 
 	smb_buffer = cifs_buf_get();
 	if (smb_buffer == 0) {
@@ -1979,7 +2021,7 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	SESSION_SETUP_ANDX *pSMB;
 	SESSION_SETUP_ANDX *pSMBr;
 	char *bcc_ptr;
-	char *domain = ses->domainName;
+	char *domain;
 	int rc = 0;
 	int remaining_words = 0;
 	int bytes_returned = 0;
@@ -1989,6 +2031,9 @@ CIFSNTLMSSPNegotiateSessSetup(unsigned int xid,
 	PCHALLENGE_MESSAGE SecurityBlob2;
 
 	cFYI(1, ("In NTLMSSP sesssetup (negotiate) "));
+	if(ses == NULL)
+		return -EINVAL;
+	domain = ses->domainName;
 	*pNTLMv2_flag = FALSE;
 	smb_buffer = cifs_buf_get();
 	if (smb_buffer == 0) {
@@ -2319,8 +2364,8 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	SESSION_SETUP_ANDX *pSMB;
 	SESSION_SETUP_ANDX *pSMBr;
 	char *bcc_ptr;
-	char *user = ses->userName;
-	char *domain = ses->domainName;
+	char *user;
+	char *domain;
 	int rc = 0;
 	int remaining_words = 0;
 	int bytes_returned = 0;
@@ -2329,7 +2374,10 @@ CIFSNTLMSSPAuthSessSetup(unsigned int xid, struct cifsSesInfo *ses,
 	PAUTHENTICATE_MESSAGE SecurityBlob;
 
 	cFYI(1, ("In NTLMSSPSessSetup (Authenticate)"));
-
+	if(ses == NULL)
+		return -EINVAL;
+	user = ses->userName;
+	domain = ses->domainName;
 	smb_buffer = cifs_buf_get();
 	if (smb_buffer == 0) {
 		return -ENOMEM;

@@ -1552,13 +1552,12 @@ static int msp_command(struct i2c_client *client, unsigned int cmd, void *arg)
 
 /* ----------------------------------------------------------------------- */
 
-static int msp3400_init_module(void)
+static int __init msp3400_init_module(void)
 {
-	i2c_add_driver(&driver);
-	return 0;
+	return i2c_add_driver(&driver);
 }
 
-static void msp3400_cleanup_module(void)
+static void __exit msp3400_cleanup_module(void)
 {
 	i2c_del_driver(&driver);
 }

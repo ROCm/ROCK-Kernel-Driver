@@ -20,6 +20,10 @@
  *  If you do not delete the provisions above, a recipient may use your
  *  version of this file under either the OSL or the GPL.
  *
+ *  0.03
+ *     - Fixed a bug where the hotplug handlers for non-CK804/MCP04 were using
+ *       mmio_base, which is only set for the CK804/MCP04 case.
+ *
  *  0.02
  *     - Added support for CK804 SATA controller.
  *
@@ -40,7 +44,7 @@
 #include <linux/libata.h>
 
 #define DRV_NAME			"sata_nv"
-#define DRV_VERSION			"0.02"
+#define DRV_VERSION			"0.03"
 
 #define NV_PORTS			2
 #define NV_PIO_MASK			0x1f
@@ -422,33 +426,33 @@ static void nv_enable_hotplug(struct ata_probe_ent *probe_ent)
 	u8 intr_mask;
 
 	outb(NV_INT_STATUS_HOTPLUG,
-		(unsigned long)probe_ent->mmio_base + NV_INT_STATUS);
+		probe_ent->port[0].scr_addr + NV_INT_STATUS);
 
-	intr_mask = inb((unsigned long)probe_ent->mmio_base + NV_INT_ENABLE);
+	intr_mask = inb(probe_ent->port[0].scr_addr + NV_INT_ENABLE);
 	intr_mask |= NV_INT_ENABLE_HOTPLUG;
 
-	outb(intr_mask, (unsigned long)probe_ent->mmio_base + NV_INT_ENABLE);
+	outb(intr_mask, probe_ent->port[0].scr_addr + NV_INT_ENABLE);
 }
 
 static void nv_disable_hotplug(struct ata_host_set *host_set)
 {
 	u8 intr_mask;
 
-	intr_mask = inb((unsigned long)host_set->mmio_base + NV_INT_ENABLE);
+	intr_mask = inb(host_set->ports[0]->ioaddr.scr_addr + NV_INT_ENABLE);
 
 	intr_mask &= ~(NV_INT_ENABLE_HOTPLUG);
 
-	outb(intr_mask, (unsigned long)host_set->mmio_base + NV_INT_ENABLE);
+	outb(intr_mask, host_set->ports[0]->ioaddr.scr_addr + NV_INT_ENABLE);
 }
 
 static void nv_check_hotplug(struct ata_host_set *host_set)
 {
 	u8 intr_status;
 
-	intr_status = inb((unsigned long)host_set->mmio_base + NV_INT_STATUS);
+	intr_status = inb(host_set->ports[0]->ioaddr.scr_addr + NV_INT_STATUS);
 
 	// Clear interrupt status.
-	outb(0xff, (unsigned long)host_set->mmio_base + NV_INT_STATUS);
+	outb(0xff, host_set->ports[0]->ioaddr.scr_addr + NV_INT_STATUS);
 
 	if (intr_status & NV_INT_STATUS_HOTPLUG) {
 		if (intr_status & NV_INT_STATUS_PDEV_ADDED)

@@ -128,27 +128,33 @@ static void enable_xctrl(int baseio)
         outb(((unsigned char) (ENABLE_PINS | regd)), baseio + INDEX_DATA );
 }
 
-int __init probe_cs4232(struct address_info *hw_config, int isapnp_configured)
+static int __init probe_cs4232(struct address_info *hw_config, int isapnp_configured)
 {
 	int i, n;
 	int base = hw_config->io_base, irq = hw_config->irq;
 	int dma1 = hw_config->dma, dma2 = hw_config->dma2;
+	struct resource *ports;
+
+	if (base == -1 || irq == -1 || dma1 == -1) {
+		printk(KERN_ERR "cs4232: dma, irq and io must be set.\n");
+		return 0;
+	}
 
 	/*
 	 * Verify that the I/O port range is free.
 	 */
 
-	if (check_region(base, 4))
-	{
+	ports = request_region(base, 4, "ad1848");
+	if (!ports) {
 		printk(KERN_ERR "cs4232.c: I/O port 0x%03x not free\n", base);
 		return 0;
 	}
-	if (ad1848_detect(hw_config->io_base, NULL, hw_config->osp)) {
-		return 1;	/* The card is already active */
+	if (ad1848_detect(ports, NULL, hw_config->osp)) {
+		goto got_it;	/* The card is already active */
 	}
 	if (isapnp_configured) {
 		printk(KERN_ERR "cs4232.c: ISA PnP configured, but not detected?\n");
-		return 0;
+		goto fail;
 	}
 
 	/*
@@ -241,30 +247,20 @@ int __init probe_cs4232(struct address_info *hw_config, int isapnp_configured)
 		 * Then try to detect the codec part of the chip
 		 */
 
-		if (ad1848_detect(hw_config->io_base, NULL, hw_config->osp))
-			return 1;
+		if (ad1848_detect(ports, NULL, hw_config->osp))
+			goto got_it;
 		
 		sleep(HZ);
 	}
+fail:
+	release_region(base, 4);
 	return 0;
-}
 
-void __init attach_cs4232(struct address_info *hw_config)
-{
-	int base = hw_config->io_base,
-		irq = hw_config->irq,
-		dma1 = hw_config->dma,
-		dma2 = hw_config->dma2;
-
-	if (base == -1 || irq == -1 || dma1 == -1) {
-		printk(KERN_ERR "cs4232: dma, irq and io must be set.\n");
-		return;
-	}
-
+got_it:
 	if (dma2 == -1)
 		dma2 = dma1;
 
-	hw_config->slots[0] = ad1848_init("Crystal audio controller", base,
+	hw_config->slots[0] = ad1848_init("Crystal audio controller", ports,
 					  irq,
 					  dma1,		/* Playback DMA */
 					  dma2,		/* Capture DMA */
@@ -308,9 +304,9 @@ void __init attach_cs4232(struct address_info *hw_config)
 	}
 	
 	if (bss)
-	{
         	enable_xctrl(base);
-	}
+
+	return 1;
 }
 
 static void __devexit unload_cs4232(struct address_info *hw_config)
@@ -423,7 +419,6 @@ static int cs4232_pnp_probe(struct pnp_dev *dev, const struct pnp_device_id *dev
 		kfree(isapnpcfg);
 		return -ENODEV;
 	}
-	attach_cs4232(isapnpcfg);
 	pnp_set_drvdata(dev,isapnpcfg);
 	return 0;
 }
@@ -486,7 +481,6 @@ static int __init init_cs4232(void)
 
 	if (probe_cs4232(&cfg,FALSE) == 0)
 		return -ENODEV;
-	attach_cs4232(&cfg);
 
 	return 0;
 }

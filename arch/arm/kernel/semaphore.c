@@ -214,7 +214,7 @@ __up_wakeup:					\n\
 	ldmfd	sp!, {r0 - r3, pc}		\n\
 	");
 
-EXPORT_SYMBOL_NOVERS(__down_failed);
-EXPORT_SYMBOL_NOVERS(__down_interruptible_failed);
-EXPORT_SYMBOL_NOVERS(__down_trylock_failed);
-EXPORT_SYMBOL_NOVERS(__up_wakeup);
+EXPORT_SYMBOL(__down_failed);
+EXPORT_SYMBOL(__down_interruptible_failed);
+EXPORT_SYMBOL(__down_trylock_failed);
+EXPORT_SYMBOL(__up_wakeup);

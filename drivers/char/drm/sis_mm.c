@@ -90,9 +90,10 @@ int sis_fb_alloc( DRM_IOCTL_ARGS )
 {
 	drm_sis_mem_t fb;
 	struct sis_memreq req;
+	drm_sis_mem_t __user *argp = (void __user *)data;
 	int retval = 0;
 
-	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
+	DRM_COPY_FROM_USER_IOCTL(fb, argp, sizeof(fb));
 
 	req.size = fb.size;
 	sis_malloc(&req);
@@ -111,7 +112,7 @@ int sis_fb_alloc( DRM_IOCTL_ARGS )
 		fb.free = 0;
 	}
 
-	DRM_COPY_TO_USER_IOCTL((drm_sis_mem_t *)data, fb, sizeof(fb));
+	DRM_COPY_TO_USER_IOCTL(argp, fb, sizeof(fb));
 
 	DRM_DEBUG("alloc fb, size = %d, offset = %d\n", fb.size, req.offset);
 
@@ -123,7 +124,7 @@ int sis_fb_free( DRM_IOCTL_ARGS )
 	drm_sis_mem_t fb;
 	int retval = 0;
 
-	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t *)data, sizeof(fb));
+	DRM_COPY_FROM_USER_IOCTL(fb, (drm_sis_mem_t __user *)data, sizeof(fb));
 
 	if (!fb.free)
 		return DRM_ERR(EINVAL);
@@ -325,7 +326,7 @@ int sis_ioctl_agp_free( DRM_IOCTL_ARGS )
 	return 0;
 }
 
-int sis_init_context(int context)
+int sis_init_context(struct drm_device *dev, int context)
 {
 	int i;
 
@@ -357,7 +358,7 @@ int sis_init_context(int context)
 	return 1;
 }
 
-int sis_final_context(int context)
+int sis_final_context(struct drm_device *dev, int context)
 {
 	int i;
 
@@ -402,4 +403,11 @@ int sis_final_context(int context)
         }
 	
 	return 1;
+}
+
+void DRM(driver_register_fns)(drm_device_t *dev)
+{
+	dev->driver_features = DRIVER_USE_AGP | DRIVER_USE_MTRR;
+	dev->fn_tbl.context_ctor = sis_init_context;
+	dev->fn_tbl.context_dtor = sis_final_context;
 }

@@ -6,7 +6,7 @@
  * Copyright (c) 2002 Thibaut Varene <varenet@esiee.fr>
  *
  * Pieces of code based on linux-2.4's hp_mouse.c & hp_keyb.c
- * 	Copyright (c) 1999 Alex deVries <adevries@thepuffingroup.com>
+ * 	Copyright (c) 1999 Alex deVries <alex@onefishtwo.ca>
  *	Copyright (c) 1999-2000 Philipp Rumpf <prumpf@tux.org>
  *	Copyright (c) 2000 Xavier Debacker <debackex@esiee.fr>
  *	Copyright (c) 2000-2001 Thomas Marteau <marteaut@esiee.fr>

@@ -22,9 +22,11 @@ int init_new_context_skas(struct task_struct *task, struct mm_struct *mm)
 	else from = -1;
 
 	mm->context.skas.mm_fd = new_mm(from);
-	if(mm->context.skas.mm_fd < 0)
-		panic("init_new_context_skas - new_mm failed, errno = %d\n",
-		      mm->context.skas.mm_fd);
+	if(mm->context.skas.mm_fd < 0){
+		printk("init_new_context_skas - new_mm failed, errno = %d\n",
+		       mm->context.skas.mm_fd);
+		return(mm->context.skas.mm_fd);
+	}
 
 	return(0);
 }

@@ -184,6 +184,19 @@ ENTRY(arm922_flush_user_cache_range)
  *	- end	- virtual end address
  */
 ENTRY(arm922_coherent_kern_range)
+	/* FALLTHROUGH */
+
+/*
+ *	coherent_user_range(start, end)
+ *
+ *	Ensure coherency between the Icache and the Dcache in the
+ *	region described by start, end.  If you have non-snooping
+ *	Harvard caches, you need to implement this function.
+ *
+ *	- start	- virtual start address
+ *	- end	- virtual end address
+ */
+ENTRY(arm922_coherent_user_range)
 	bic	r0, r0, #CACHE_DLINESIZE - 1
 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean D entry
 	mcr	p15, 0, r0, c7, c5, 1		@ invalidate I entry
@@ -279,6 +292,7 @@ ENTRY(arm922_cache_fns)
 	.long	arm922_flush_user_cache_all
 	.long	arm922_flush_user_cache_range
 	.long	arm922_coherent_kern_range
+	.long	arm922_coherent_user_range
 	.long	arm922_flush_kern_dcache_page
 	.long	arm922_dma_inv_range
 	.long	arm922_dma_clean_range

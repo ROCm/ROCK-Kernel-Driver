@@ -44,81 +44,25 @@ int pcibios_set_irq_routing(struct pci_dev *dev, int pin, int irq);
 #include <asm/io.h>
 #include <asm/page.h>
 
-struct pci_dev;
-
 extern int iommu_setup(char *opt);
 
-extern dma_addr_t bad_dma_address;
-#define pci_dma_mapping_error(x) ((x) == bad_dma_address)
-
-/* Allocate and map kernel buffer using consistent mode DMA for a device.
- * hwdev should be valid struct pci_dev pointer for PCI devices,
- * NULL for PCI-like buses (ISA, EISA).
- * Returns non-NULL cpu-view pointer to the buffer if successful and
- * sets *dma_addrp to the pci side dma address as well, else *dma_addrp
- * is undefined.
- */
-extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size,
-				  dma_addr_t *dma_handle);
-
-/* Free and unmap a consistent DMA buffer.
- * cpu_addr is what was returned from pci_alloc_consistent,
- * size must be the same as what as passed into pci_alloc_consistent,
- * and likewise dma_addr must be the same as what *dma_addrp was set to.
- *
- * References to the memory and mappings associated with cpu_addr/dma_addr
- * past this call are illegal.
- */
-extern void pci_free_consistent(struct pci_dev *hwdev, size_t size,
-				void *vaddr, dma_addr_t dma_handle);
-
-#ifdef CONFIG_SWIOTLB
-extern int swiotlb; 
-extern dma_addr_t swiotlb_map_single (struct device *hwdev, void *ptr, size_t size, 
-				      int dir);
-extern void swiotlb_unmap_single (struct device *hwdev, dma_addr_t dev_addr,
-				  size_t size, int dir);
-extern void swiotlb_sync_single_for_cpu (struct device *hwdev,
-					 dma_addr_t dev_addr,
-					 size_t size, int dir);
-extern void swiotlb_sync_single_for_device (struct device *hwdev,
-					    dma_addr_t dev_addr,
-					    size_t size, int dir);
-extern void swiotlb_sync_sg_for_cpu (struct device *hwdev,
-				     struct scatterlist *sg, int nelems,
-				     int dir);
-extern void swiotlb_sync_sg_for_device (struct device *hwdev,
-					struct scatterlist *sg, int nelems,
-					int dir);
-extern int swiotlb_map_sg(struct device *hwdev, struct scatterlist *sg,
-		      int nents, int direction);
-extern void swiotlb_unmap_sg(struct device *hwdev, struct scatterlist *sg,
-			 int nents, int direction);
-
-#endif
-
 #ifdef CONFIG_GART_IOMMU
-
-/* Map a single buffer of the indicated size for DMA in streaming mode.
- * The 32-bit bus address to use is returned.
+/* The PCI address space does equal the physical memory
+ * address space.  The networking and block device layers use
+ * this boolean for bounce buffer decisions
  *
- * Once the device is given the dma address, the device owns this memory
- * until either pci_unmap_single or pci_dma_sync_single_for_cpu is performed.
+ * On AMD64 it mostly equals, but we set it to zero to tell some subsystems
+ * that an IOMMU is available.
  */
-extern dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr, size_t size, 
-				 int direction);
-
-
-void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t addr,
-				   size_t size, int direction);
+#define PCI_DMA_BUS_IS_PHYS	(no_iommu ? 1 : 0)
 
 /*
- * pci_{map,unmap}_single_page maps a kernel page to a dma_addr_t. identical
- * to pci_map_single, but takes a struct page instead of a virtual address
+ * x86-64 always supports DAC, but sometimes it is useful to force
+ * devices through the IOMMU to get automatic sg list merging.
+ * Optional right now.
  */
-
-#define pci_map_page(dev,page,offset,size,dir) \
-	pci_map_single((dev), page_address(page)+(offset), (size), (dir)) 
+extern int iommu_sac_force;
+#define pci_dac_dma_supported(pci_dev, mask)	(!iommu_sac_force)
 
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)	\
 	dma_addr_t ADDR_NAME;
@@ -133,113 +77,12 @@ void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t addr,
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)		\
 	(((PTR)->LEN_NAME) = (VAL))
 
-static inline void pci_dma_sync_single_for_cpu(struct pci_dev *hwdev,
-					       dma_addr_t dma_handle,
-					       size_t size, int direction)
-{
-	BUG_ON(direction == PCI_DMA_NONE); 
-
-#ifdef CONFIG_SWIOTLB
-	if (swiotlb)
-		return swiotlb_sync_single_for_cpu(&hwdev->dev,dma_handle,size,direction);
-#endif
-
-	flush_write_buffers();
-} 
-
-static inline void pci_dma_sync_single_for_device(struct pci_dev *hwdev,
-						  dma_addr_t dma_handle,
-						  size_t size, int direction)
-{
-	BUG_ON(direction == PCI_DMA_NONE);
-
-#ifdef CONFIG_SWIOTLB
-	if (swiotlb)
-		return swiotlb_sync_single_for_device(&hwdev->dev,dma_handle,size,direction);
-#endif
-
-	flush_write_buffers();
-}
-
-static inline void pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev,
-					   struct scatterlist *sg,
-					   int nelems, int direction)
-{
-	BUG_ON(direction == PCI_DMA_NONE);
-
-#ifdef CONFIG_SWIOTLB
-	if (swiotlb)
-		return swiotlb_sync_sg_for_cpu(&hwdev->dev,sg,nelems,direction);
-#endif
-	flush_write_buffers();
-}
-
-static inline void pci_dma_sync_sg_for_device(struct pci_dev *hwdev,
-					      struct scatterlist *sg,
-					      int nelems, int direction)
-{ 
-	BUG_ON(direction == PCI_DMA_NONE); 
-
-#ifdef CONFIG_SWIOTLB
-	if (swiotlb)
-		return swiotlb_sync_sg_for_device(&hwdev->dev,sg,nelems,direction);
-#endif
-	flush_write_buffers();
-} 
-
-/* The PCI address space does equal the physical memory
- * address space.  The networking and block device layers use
- * this boolean for bounce buffer decisions
- *
- * On AMD64 it mostly equals, but we set it to zero to tell some subsystems
- * that an IOMMU is available.
- */
-#define PCI_DMA_BUS_IS_PHYS	(no_iommu ? 1 : 0) 
-
-/* We lie slightly when the IOMMU is forced to get the device to 
-   use SAC instead of DAC. */
-#define pci_dac_dma_supported(pci_dev, mask)	(force_iommu ? 0 : 1)
-
 #else
-static inline dma_addr_t pci_map_single(struct pci_dev *hwdev, void *ptr,
-					size_t size, int direction)
-{
-	dma_addr_t addr; 
+/* No IOMMU */
 
-	if (direction == PCI_DMA_NONE)
-		out_of_line_bug();	
-	addr = virt_to_bus(ptr); 
+#define PCI_DMA_BUS_IS_PHYS	1
+#define pci_dac_dma_supported(pci_dev, mask)    1
 
-	/* 
-	 * This is gross, but what should I do.
-	 * Unfortunately drivers do not test the return value of this.
- */
-	if ((addr+size) & ~hwdev->dma_mask) 
-		out_of_line_bug(); 
-	return addr;
-}
-
-static inline void pci_unmap_single(struct pci_dev *hwdev, dma_addr_t dma_addr,
-				    size_t size, int direction)
-{
-	if (direction == PCI_DMA_NONE)
-		out_of_line_bug();
-	/* Nothing to do */
-}
-
-static inline dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
-				      unsigned long offset, size_t size, int direction)
-{
-	dma_addr_t addr;
-	if (direction == PCI_DMA_NONE)
-		out_of_line_bug();	
- 	addr = page_to_pfn(page) * PAGE_SIZE + offset;
-	if ((addr+size) & ~hwdev->dma_mask) 
-		out_of_line_bug();
-	return addr;
-}
-
-/* pci_unmap_{page,single} is a nop so... */
 #define DECLARE_PCI_UNMAP_ADDR(ADDR_NAME)
 #define DECLARE_PCI_UNMAP_LEN(LEN_NAME)
 #define pci_unmap_addr(PTR, ADDR_NAME)		(0)
@@ -247,74 +90,9 @@ static inline dma_addr_t pci_map_page(struct pci_dev *hwdev, struct page *page,
 #define pci_unmap_len(PTR, LEN_NAME)		(0)
 #define pci_unmap_len_set(PTR, LEN_NAME, VAL)	do { } while (0)
 
-/* Make physical memory consistent for a single
- * streaming mode DMA translation after a transfer.
- *
- * If you perform a pci_map_single() but wish to interrogate the
- * buffer using the cpu, yet do not wish to teardown the PCI dma
- * mapping, you must call this function before doing so.  At the
- * next point you give the PCI dma address back to the card, you
- * must first perform a pci_dma_sync_for_device, and then the
- * device again owns the buffer.
- */
-static inline void pci_dma_sync_single_for_cpu(struct pci_dev *hwdev,
-					       dma_addr_t dma_handle,
-					       size_t size, int direction)
-{
-	if (direction == PCI_DMA_NONE)
-		out_of_line_bug();
-}
-
-static inline void pci_dma_sync_single_for_device(struct pci_dev *hwdev,
-						  dma_addr_t dma_handle,
-						  size_t size, int direction)
-{
-	if (direction == PCI_DMA_NONE)
-		out_of_line_bug();
-	flush_write_buffers();
-}
-
-/* Make physical memory consistent for a set of streaming
- * mode DMA translations after a transfer.
- *
- * The same as pci_dma_sync_single_* but for a scatter-gather list,
- * same rules and usage.
- */
-static inline void pci_dma_sync_sg_for_cpu(struct pci_dev *hwdev,
-					   struct scatterlist *sg,
-					   int nelems, int direction)
-{
-	if (direction == PCI_DMA_NONE)
-		out_of_line_bug();
-}
-
-static inline void pci_dma_sync_sg_for_device(struct pci_dev *hwdev,
-					      struct scatterlist *sg,
-					      int nelems, int direction)
-{
-	if (direction == PCI_DMA_NONE)
-		out_of_line_bug();
-	flush_write_buffers();
-}
-
-#define PCI_DMA_BUS_IS_PHYS	1
-
-#define pci_dac_dma_supported(pci_dev, mask)	1
 #endif
 
-extern int pci_map_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-		      int nents, int direction);
-extern void pci_unmap_sg(struct pci_dev *hwdev, struct scatterlist *sg,
-			 int nents, int direction);
-
-#define pci_unmap_page pci_unmap_single
-
-/* Return whether the given PCI device DMA address mask can
- * be supported properly.  For example, if your device can
- * only drive the low 24-bits during PCI bus mastering, then
- * you would pass 0x00ffffff as the mask to this function.
- */
-extern int pci_dma_supported(struct pci_dev *hwdev, u64 mask);
+#include <asm-generic/pci-dma-compat.h>
 
 static inline dma64_addr_t
 pci_dac_page_to_dma(struct pci_dev *pdev, struct page *page, unsigned long offset, int direction)
@@ -359,7 +137,6 @@ static inline void pcibios_add_platform_entries(struct pci_dev *dev)
 /* generic pci stuff */
 #ifdef CONFIG_PCI
 #include <asm-generic/pci.h>
-#include <linux/dma-mapping.h>
 #endif
 
 #endif /* __x8664_PCI_H */

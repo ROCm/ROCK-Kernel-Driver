@@ -379,7 +379,7 @@ void snd_mixart_msg_tasklet( unsigned long arg)
 					snd_printk(KERN_ERR "tasklet : error MSG_STREAM_ST***_***PUT_STAGE_PACKET status=%x\n", mixart_msg_data[0]);
 				break;
 			default:
-				snd_printdd("tasklet received mf(%x) : msg_id(%x) uid(%x, %x) size(%d)\n",
+				snd_printdd("tasklet received mf(%x) : msg_id(%x) uid(%x, %x) size(%zd)\n",
 					   msg, resp.message_id, resp.uid.object_id, resp.uid.desc, resp.size);
 				break;
 			}
@@ -403,7 +403,7 @@ void snd_mixart_msg_tasklet( unsigned long arg)
 
 irqreturn_t snd_mixart_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 {
-	mixart_mgr_t *mgr = snd_magic_cast(mixart_mgr_t, dev_id, return IRQ_NONE);
+	mixart_mgr_t *mgr = dev_id;
 	int err;
 	mixart_msg_t resp;
 

@@ -90,7 +90,6 @@
 #define SYM_OPT_HANDLE_DIR_UNKNOWN
 #define SYM_OPT_HANDLE_DEVICE_QUEUEING
 #define SYM_OPT_NVRAM_PRE_READ
-#define SYM_OPT_SNIFF_INQUIRY
 #define SYM_OPT_LIMIT_COMMAND_REORDERING
 #define	SYM_OPT_ANNOUNCE_TRANSFER_RATE
 
@@ -437,6 +436,13 @@ struct sym_device {
 	struct sym_nvram *nvram;
 	u_short device_id;
 	u_char host_id;
+};
+
+/*
+ *  Driver host data structure.
+ */
+struct host_data {
+	struct sym_hcb *ncb;
 };
 
 /*

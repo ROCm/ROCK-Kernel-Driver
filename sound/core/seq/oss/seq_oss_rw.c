@@ -44,35 +44,47 @@ int
 snd_seq_oss_read(seq_oss_devinfo_t *dp, char __user *buf, int count)
 {
 	seq_oss_readq_t *readq = dp->readq;
-	int cnt, pos;
-	evrec_t *q;
+	int result = 0, err = 0;
+	int ev_len;
+	evrec_t rec;
 	unsigned long flags;
 
 	if (readq == NULL || ! is_read_mode(dp->file_mode))
-		return -EIO;
+		return -ENXIO;
 
-	/* copy queued events to read buffer */
-	cnt = count;
-	pos = 0;
-	q = snd_seq_oss_readq_pick(readq, !is_nonblock_mode(dp->file_mode), &flags);
-	if (q == NULL)
-		return 0;
-	do {
-		int ev_len;
-		/* tansfer the data */
-		ev_len = ev_length(q);
-		if (copy_to_user(buf + pos, q, ev_len)) {
+	while (count >= SHORT_EVENT_SIZE) {
+		snd_seq_oss_readq_lock(readq, flags);
+		err = snd_seq_oss_readq_pick(readq, &rec);
+		if (err == -EAGAIN &&
+		    !is_nonblock_mode(dp->file_mode) && result == 0) {
+			snd_seq_oss_readq_unlock(readq, flags);
+			snd_seq_oss_readq_wait(readq);
+			snd_seq_oss_readq_lock(readq, flags);
+			if (signal_pending(current))
+				err = -ERESTARTSYS;
+			else
+				err = snd_seq_oss_readq_pick(readq, &rec);
+		}
+		if (err < 0) {
 			snd_seq_oss_readq_unlock(readq, flags);
 			break;
 		}
-		snd_seq_oss_readq_free(readq, flags);
-		pos += ev_len;
-		cnt -= ev_len;
-		if (cnt < ev_len)
+		ev_len = ev_length(&rec);
+		if (ev_len < count) {
+			snd_seq_oss_readq_unlock(readq, flags);
 			break;
-	} while ((q = snd_seq_oss_readq_pick(readq, 0, &flags)) != NULL);
-
-	return count - cnt;
+		}
+		snd_seq_oss_readq_free(readq);
+		snd_seq_oss_readq_unlock(readq, flags);
+		if (copy_to_user(buf, &rec, ev_len)) {
+			err = -EFAULT;
+			break;
+		}
+		result += ev_len;
+		buf += ev_len;
+		count -= ev_len;
+	}
+	return result > 0 ? result : err;
 }
 
 
@@ -83,56 +95,64 @@ snd_seq_oss_read(seq_oss_devinfo_t *dp, char __user *buf, int count)
 int
 snd_seq_oss_write(seq_oss_devinfo_t *dp, const char __user *buf, int count, struct file *opt)
 {
-	int rc, c, p, ev_size;
+	int result = 0, err = 0;
+	int ev_size, fmt;
 	evrec_t rec;
 
 	if (! is_write_mode(dp->file_mode) || dp->writeq == NULL)
-		return -EIO;
+		return -ENXIO;
 
-	c = count;
-	p = 0;
-	while (c >= SHORT_EVENT_SIZE) {
-		if (copy_from_user(rec.c, buf + p, SHORT_EVENT_SIZE))
+	while (count >= SHORT_EVENT_SIZE) {
+		if (copy_from_user(&rec, buf, SHORT_EVENT_SIZE)) {
+			err = -EFAULT;
 			break;
-		p += SHORT_EVENT_SIZE;
-
+		}
 		if (rec.s.code == SEQ_FULLSIZE) {
 			/* load patch */
-			int fmt = (*(unsigned short *)rec.c) & 0xffff;
-			return snd_seq_oss_synth_load_patch(dp, rec.s.dev, fmt, buf, p, c);
-
+			if (result > 0) {
+				err = -EINVAL;
+				break;
+			}
+			fmt = (*(unsigned short *)rec.c) & 0xffff;
+			/* FIXME the return value isn't correct */
+			return snd_seq_oss_synth_load_patch(dp, rec.s.dev,
+							    fmt, buf, 0, count);
 		}
 		if (ev_is_long(&rec)) {
 			/* extended code */
 			if (rec.s.code == SEQ_EXTENDED &&
-			    dp->seq_mode == SNDRV_SEQ_OSS_MODE_MUSIC)
-				return -EINVAL;
+			    dp->seq_mode == SNDRV_SEQ_OSS_MODE_MUSIC) {
+				err = -EINVAL;
+				break;
+			}
 			ev_size = LONG_EVENT_SIZE;
-			if (c < ev_size)
+			if (count < ev_size)
 				break;
 			/* copy the reset 4 bytes */
-			if (copy_from_user(rec.c + SHORT_EVENT_SIZE, buf + p,
-					   LONG_EVENT_SIZE - SHORT_EVENT_SIZE))
+			if (copy_from_user(rec.c + SHORT_EVENT_SIZE,
+					   buf + SHORT_EVENT_SIZE,
+					   LONG_EVENT_SIZE - SHORT_EVENT_SIZE)) {
+				err = -EFAULT;
 				break;
-			p += LONG_EVENT_SIZE - SHORT_EVENT_SIZE;
-
+			}
 		} else {
 			/* old-type code */
-			if (dp->seq_mode == SNDRV_SEQ_OSS_MODE_MUSIC)
-				return -EINVAL;
+			if (dp->seq_mode == SNDRV_SEQ_OSS_MODE_MUSIC) {
+				err = -EINVAL;
+				break;
+			}
 			ev_size = SHORT_EVENT_SIZE;
 		}
 
 		/* insert queue */
-		if ((rc = insert_queue(dp, &rec, opt)) < 0)
+		if ((err = insert_queue(dp, &rec, opt)) < 0)
 			break;
 
-		c -= ev_size;
+		result += ev_size;
+		buf += ev_size;
+		count -= ev_size;
 	}
-
-	if (count == c && is_nonblock_mode(dp->file_mode))
-		return -EAGAIN;
-	return count - c;
+	return result > 0 ? result : err;
 }
 
 

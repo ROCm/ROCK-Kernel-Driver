@@ -116,7 +116,6 @@ int CpqTsCreateTachLiteQues( void* pHBA, int opcode)
   cpqfcHBAdata->fcLQ = pci_alloc_consistent(cpqfcHBAdata->PciDev,
 				 sizeof( FC_LINK_QUE), &cpqfcHBAdata->fcLQ_dma_handle);
   /* printk("@ %p (%u elements)\n", cpqfcHBAdata->fcLQ, FC_LINKQ_DEPTH); */
-  memset( cpqfcHBAdata->fcLQ, 0, sizeof( FC_LINK_QUE));
 
   if( cpqfcHBAdata->fcLQ == NULL ) // fatal error!!
   {

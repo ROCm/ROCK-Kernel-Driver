@@ -146,8 +146,8 @@ static int ehci_hub_resume (struct usb_hcd *hcd)
 
 #else
 
-#define ehci_hub_suspend	0
-#define ehci_hub_resume		0
+#define ehci_hub_suspend	NULL
+#define ehci_hub_resume		NULL
 
 #endif	/* CONFIG_PM */
 

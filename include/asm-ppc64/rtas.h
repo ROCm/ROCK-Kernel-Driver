@@ -22,12 +22,13 @@
 /* Buffer size for ppc_rtas system call. */
 #define RTAS_RMOBUF_MAX (64 * 1024)
 
-/* RTAS return codes */
-#define RTAS_BUSY		-2	/* RTAS Return Status - Busy */
-#define RTAS_EXTENDED_DELAY_MIN 9900
-#define RTAS_EXTENDED_DELAY_MAX 9905
+/* RTAS return status codes */
+#define RTAS_BUSY		-2    /* RTAS Busy */
+#define RTAS_NO_SUCH_INDICATOR	-3    /* No such indicator implemented */
+#define RTAS_EXTENDED_DELAY_MIN	9900
+#define RTAS_EXTENDED_DELAY_MAX	9905
 
-#define RTAS_UNKNOWN_OP		-1099	/* Return Status - Unknown RTAS Token */
+#define RTAS_UNKNOWN_OP		-1099 /* Unknown RTAS Token */
 
 /*
  * In general to call RTAS use rtas_token("string") to lookup
@@ -210,8 +211,14 @@ extern void pSeries_log_error(char *buf, unsigned int err_type, int fatal);
 #define RTAS_DEBUG KERN_DEBUG "RTAS: "
  
 #define RTAS_ERROR_LOG_MAX 2048
- 
- 
+
+/*
+ * Return the firmware-specified size of the error log buffer
+ *  for all rtas calls that require an error buffer argument.
+ *  This includes 'check-exception' and 'rtas-last-error'.
+ */
+extern int rtas_get_error_log_max(void);
+
 /* Event Scan Parameters */
 #define EVENT_SCAN_ALL_EVENTS	0xf0000000
 #define SURVEILLANCE_TOKEN	9000

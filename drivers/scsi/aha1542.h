@@ -91,10 +91,12 @@ struct chain {
 };
 
 /* These belong in scsi.h also */
-#define any2scsi(up, p)				\
-(up)[0] = (((unsigned long)(p)) >> 16)  ;	\
-(up)[1] = (((unsigned long)(p)) >> 8);		\
-(up)[2] = ((unsigned long)(p));
+static inline void any2scsi(u8 *p, u32 v)
+{
+	p[0] = v >> 16;
+	p[1] = v >> 8;
+	p[2] = v;
+}
 
 #define scsi2int(up) ( (((long)*(up)) << 16) + (((long)(up)[1]) << 8) + ((long)(up)[2]) )
 

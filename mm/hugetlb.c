@@ -21,7 +21,7 @@ static spinlock_t hugetlb_lock = SPIN_LOCK_UNLOCKED;
 
 static void enqueue_huge_page(struct page *page)
 {
-	int nid = page_zone(page)->zone_pgdat->node_id;
+	int nid = page_to_nid(page);
 	list_add(&page->lru, &hugepage_freelists[nid]);
 	free_huge_pages++;
 	free_huge_pages_node[nid]++;
@@ -52,7 +52,7 @@ static struct page *alloc_fresh_huge_page(void)
 {
 	static int nid = 0;
 	struct page *page;
-	page = alloc_pages_node(nid, GFP_HIGHUSER|__GFP_COMP,
+	page = alloc_pages_node(nid, GFP_HIGHUSER|__GFP_COMP|__GFP_NOWARN,
 					HUGETLB_PAGE_ORDER);
 	nid = (nid + 1) % numnodes;
 	if (page) {
@@ -123,6 +123,7 @@ static int __init hugetlb_setup(char *s)
 }
 __setup("hugepages=", hugetlb_setup);
 
+#ifdef CONFIG_SYSCTL
 static void update_and_free_page(struct page *page)
 {
 	int i;
@@ -188,7 +189,6 @@ static unsigned long set_max_huge_pages(unsigned long count)
 	return nr_huge_pages;
 }
 
-#ifdef CONFIG_SYSCTL
 int hugetlb_sysctl_handler(struct ctl_table *table, int write,
 			   struct file *file, void __user *buffer,
 			   size_t *length, loff_t *ppos)

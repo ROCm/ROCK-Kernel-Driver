@@ -56,7 +56,7 @@
 #include "ioasm.h"
 #include "chsc.h"
 
-#define VERSION_QDIO_C "$Revision: 1.84 $"
+#define VERSION_QDIO_C "$Revision: 1.86 $"
 
 /****************** MODULE PARAMETER VARIABLES ********************/
 MODULE_AUTHOR("Utz Bacher <utz.bacher@de.ibm.com>");
@@ -365,7 +365,7 @@ qdio_stop_polling(struct qdio_q *q)
 	 * small window we can miss between resetting it and
 	 * checking for PRIMED state 
 	 */
-	if (q->is_iqdio_q)
+	if (q->is_thinint_q)
 		tiqdio_set_summary_bit((__u32*)q->dev_st_chg_ind);
 	return 0;
 

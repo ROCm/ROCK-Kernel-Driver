@@ -75,6 +75,7 @@ void sync_inodes(int wait);
 /* writeback.h requires fs.h; it, too, is not included from here. */
 static inline void wait_on_inode(struct inode *inode)
 {
+	might_sleep();
 	if (inode->i_state & I_LOCK)
 		__wait_on_inode(inode);
 }

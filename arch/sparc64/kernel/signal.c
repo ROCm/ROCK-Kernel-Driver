@@ -84,8 +84,8 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 	regs->tnpc = npc;
 	err |= __get_user(regs->y, &((*grp)[MC_Y]));
 	err |= __get_user(tstate, &((*grp)[MC_TSTATE]));
-	regs->tstate &= ~(TSTATE_ICC | TSTATE_XCC);
-	regs->tstate |= (tstate & (TSTATE_ICC | TSTATE_XCC));
+	regs->tstate &= ~(TSTATE_ASI | TSTATE_ICC | TSTATE_XCC);
+	regs->tstate |= (tstate & (TSTATE_ASI | TSTATE_ICC | TSTATE_XCC));
 	err |= __get_user(regs->u_regs[UREG_G1], (&(*grp)[MC_G1]));
 	err |= __get_user(regs->u_regs[UREG_G2], (&(*grp)[MC_G2]));
 	err |= __get_user(regs->u_regs[UREG_G3], (&(*grp)[MC_G3]));
@@ -135,7 +135,7 @@ asmlinkage void sparc64_set_context(struct pt_regs *regs)
 
 	return;
 do_sigsegv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 asmlinkage void sparc64_get_context(struct pt_regs *regs)
@@ -226,7 +226,7 @@ asmlinkage void sparc64_get_context(struct pt_regs *regs)
 
 	return;
 do_sigsegv:
-	do_exit(SIGSEGV);
+	force_sig(SIGSEGV, current);
 }
 
 struct rt_signal_frame {
@@ -408,9 +408,9 @@ void do_rt_sigreturn(struct pt_regs *regs)
 	err |= __get_user(tstate, &sf->regs.tstate);
 	err |= copy_from_user(regs->u_regs, sf->regs.u_regs, sizeof(regs->u_regs));
 
-	/* User can only change condition codes in %tstate. */
-	regs->tstate &= ~(TSTATE_ICC | TSTATE_XCC);
-	regs->tstate |= (tstate & (TSTATE_ICC | TSTATE_XCC));
+	/* User can only change condition codes and %asi in %tstate. */
+	regs->tstate &= ~(TSTATE_ASI | TSTATE_ICC | TSTATE_XCC);
+	regs->tstate |= (tstate & (TSTATE_ASI | TSTATE_ICC | TSTATE_XCC));
 
 	err |= __get_user(fpu_save, &sf->fpu_save);
 	if (fpu_save)
@@ -439,7 +439,7 @@ void do_rt_sigreturn(struct pt_regs *regs)
 	spin_unlock_irq(&current->sighand->siglock);
 	return;
 segv:
-	send_sig(SIGSEGV, current, 1);
+	force_sig(SIGSEGV, current);
 }
 
 /* Checks if the fp is valid */
@@ -565,7 +565,7 @@ setup_rt_frame(struct k_sigaction *ka, struct pt_regs *regs,
 sigill:
 	do_exit(SIGILL);
 sigsegv:
-	do_exit(SIGSEGV);
+	force_sigsegv(signo, current);
 }
 
 static inline void handle_signal(unsigned long signr, struct k_sigaction *ka,
@@ -574,8 +574,6 @@ static inline void handle_signal(unsigned long signr, struct k_sigaction *ka,
 {
 	setup_rt_frame(ka, regs, signr, oldset,
 		       (ka->sa.sa_flags & SA_SIGINFO) ? info : NULL);
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
 	if (!(ka->sa.sa_flags & SA_NOMASK)) {
 		spin_lock_irq(&current->sighand->siglock);
 		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
@@ -615,6 +613,7 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 {
 	siginfo_t info;
 	struct signal_deliver_cookie cookie;
+	struct k_sigaction ka;
 	int signr;
 	
 	cookie.restart_syscall = restart_syscall;
@@ -632,15 +631,11 @@ static int do_signal(sigset_t *oldset, struct pt_regs * regs,
 	}
 #endif	
 
-	signr = get_signal_to_deliver(&info, regs, &cookie);
+	signr = get_signal_to_deliver(&info, &ka, regs, &cookie);
 	if (signr > 0) {
-		struct k_sigaction *ka;
-
-		ka = &current->sighand->action[signr-1];
-
 		if (cookie.restart_syscall)
-			syscall_restart(orig_i0, regs, &ka->sa);
-		handle_signal(signr, ka, &info, oldset, regs);
+			syscall_restart(orig_i0, regs, &ka.sa);
+		handle_signal(signr, &ka, &info, oldset, regs);
 		return 1;
 	}
 	if (cookie.restart_syscall &&

@@ -60,7 +60,6 @@
  *      ->swap_list_lock
  *        ->swap_device_lock	(exclusive_swap_page, others)
  *          ->mapping->tree_lock
- *    ->page_map_lock()		(try_to_unmap_file)
  *
  *  ->i_sem
  *    ->i_mmap_lock		(truncate->unmap_mapping_range)
@@ -83,16 +82,20 @@
  *    ->sb_lock			(fs/fs-writeback.c)
  *    ->mapping->tree_lock	(__sync_single_inode)
  *
+ *  ->i_mmap_lock
+ *    ->anon_vma.lock		(vma_adjust)
+ *
+ *  ->anon_vma.lock
+ *    ->page_table_lock		(anon_vma_prepare and various)
+ *
  *  ->page_table_lock
  *    ->swap_device_lock	(try_to_unmap_one)
  *    ->private_lock		(try_to_unmap_one)
  *    ->tree_lock		(try_to_unmap_one)
  *    ->zone.lru_lock		(follow_page->mark_page_accessed)
- *    ->page_map_lock()		(page_add_anon_rmap)
- *      ->tree_lock		(page_remove_rmap->set_page_dirty)
- *      ->private_lock		(page_remove_rmap->set_page_dirty)
- *      ->inode_lock		(page_remove_rmap->set_page_dirty)
- *    ->anon_vma.lock		(anon_vma_prepare)
+ *    ->private_lock		(page_remove_rmap->set_page_dirty)
+ *    ->tree_lock		(page_remove_rmap->set_page_dirty)
+ *    ->inode_lock		(page_remove_rmap->set_page_dirty)
  *    ->inode_lock		(zap_pte_range->set_page_dirty)
  *    ->private_lock		(zap_pte_range->__set_page_dirty_buffers)
  *
@@ -274,6 +277,7 @@ int sync_page_range(struct inode *inode, struct address_space *mapping,
 		ret = wait_on_page_writeback_range(mapping, start, end);
 	return ret;
 }
+EXPORT_SYMBOL(sync_page_range);
 
 /**
  * filemap_fdatawait - walk the list of under-writeback pages of the given
@@ -283,7 +287,13 @@ int sync_page_range(struct inode *inode, struct address_space *mapping,
  */
 int filemap_fdatawait(struct address_space *mapping)
 {
-	return wait_on_page_writeback_range(mapping, 0, -1);
+	loff_t i_size = i_size_read(mapping->host);
+
+	if (i_size == 0)
+		return 0;
+
+	return wait_on_page_writeback_range(mapping, 0,
+				(i_size - 1) >> PAGE_CACHE_SHIFT);
 }
 EXPORT_SYMBOL(filemap_fdatawait);
 
@@ -695,13 +705,15 @@ EXPORT_SYMBOL(grab_cache_page_nowait);
  *
  * This is really ugly. But the goto's actually try to clarify some
  * of the logic when it comes to error handling etc.
- * - note the struct file * is only passed for the use of readpage
+ *
+ * Note the struct file* is only passed for the use of readpage.  It may be
+ * NULL.
  */
 void do_generic_mapping_read(struct address_space *mapping,
 			     struct file_ra_state *_ra,
-			     struct file * filp,
+			     struct file *filp,
 			     loff_t *ppos,
-			     read_descriptor_t * desc,
+			     read_descriptor_t *desc,
 			     read_actor_t actor)
 {
 	struct inode *inode = mapping->host;
@@ -716,13 +728,26 @@ void do_generic_mapping_read(struct address_space *mapping,
 	offset = *ppos & ~PAGE_CACHE_MASK;
 
 	isize = i_size_read(inode);
-	end_index = isize >> PAGE_CACHE_SHIFT;
+	if (!isize)
+		goto out;
+
+	end_index = (isize - 1) >> PAGE_CACHE_SHIFT;
 	if (index > end_index)
 		goto out;
 
 	for (;;) {
 		struct page *page;
 		unsigned long nr, ret;
+
+		/* nr is the maximum number of bytes to copy from this page */
+		nr = PAGE_CACHE_SIZE;
+		if (index == end_index) {
+			nr = ((isize - 1) & ~PAGE_CACHE_MASK) + 1;
+			if (nr <= offset) {
+				goto out;
+			}
+		}
+		nr = nr - offset;
 
 		cond_resched();
 		page_cache_readahead(mapping, &ra, filp, index);
@@ -736,16 +761,6 @@ find_page:
 		if (!PageUptodate(page))
 			goto page_not_up_to_date;
 page_ok:
-		/* nr is the maximum number of bytes to copy from this page */
-		nr = PAGE_CACHE_SIZE;
-		if (index == end_index) {
-			nr = isize & ~PAGE_CACHE_MASK;
-			if (nr <= offset) {
-				page_cache_release(page);
-				goto out;
-			}
-		}
-		nr = nr - offset;
 
 		/* If users can be writing to this page using arbitrary
 		 * virtual addresses, take care about potential aliasing
@@ -821,11 +836,22 @@ readpage:
 		 * another truncate extends the file - this is desired though).
 		 */
 		isize = i_size_read(inode);
-		end_index = isize >> PAGE_CACHE_SHIFT;
-		if (index > end_index) {
+		end_index = (isize - 1) >> PAGE_CACHE_SHIFT;
+		if (unlikely(!isize || index > end_index)) {
 			page_cache_release(page);
 			goto out;
 		}
+
+		/* nr is the maximum number of bytes to copy from this page */
+		nr = PAGE_CACHE_SIZE;
+		if (index == end_index) {
+			nr = ((isize - 1) & ~PAGE_CACHE_MASK) + 1;
+			if (nr <= offset) {
+				page_cache_release(page);
+				goto out;
+			}
+		}
+		nr = nr - offset;
 		goto page_ok;
 
 readpage_error:
@@ -865,7 +891,8 @@ out:
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
 	if (cached_page)
 		page_cache_release(cached_page);
-	file_accessed(filp);
+	if (filp)
+		file_accessed(filp);
 }
 
 EXPORT_SYMBOL(do_generic_mapping_read);
@@ -885,7 +912,8 @@ int file_read_actor(read_descriptor_t *desc, struct page *page,
 	 */
 	if (!fault_in_pages_writeable(desc->arg.buf, size)) {
 		kaddr = kmap_atomic(page, KM_USER0);
-		left = __copy_to_user(desc->arg.buf, kaddr + offset, size);
+		left = __copy_to_user_inatomic(desc->arg.buf,
+						kaddr + offset, size);
 		kunmap_atomic(kaddr, KM_USER0);
 		if (left == 0)
 			goto success;
@@ -1483,7 +1511,7 @@ repeat:
 	return 0;
 }
 
-static struct vm_operations_struct generic_file_vm_ops = {
+struct vm_operations_struct generic_file_vm_ops = {
 	.nopage		= filemap_nopage,
 	.populate	= filemap_populate,
 };
@@ -1682,7 +1710,7 @@ filemap_copy_from_user(struct page *page, unsigned long offset,
 	int left;
 
 	kaddr = kmap_atomic(page, KM_USER0);
-	left = __copy_from_user(kaddr + offset, buf, bytes);
+	left = __copy_from_user_inatomic(kaddr + offset, buf, bytes);
 	kunmap_atomic(kaddr, KM_USER0);
 
 	if (left != 0) {
@@ -1705,7 +1733,7 @@ __filemap_copy_from_user_iovec(char *vaddr,
 		int copy = min(bytes, iov->iov_len - base);
 
 		base = 0;
-		left = __copy_from_user(vaddr, buf, copy);
+		left = __copy_from_user_inatomic(vaddr, buf, copy);
 		copied += copy;
 		bytes -= copy;
 		vaddr += copy;

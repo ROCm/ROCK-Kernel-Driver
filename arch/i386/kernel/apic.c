@@ -343,7 +343,7 @@ void __init init_bsp_APIC(void)
 
 void __init setup_local_APIC (void)
 {
-	unsigned long value, ver, maxlvt;
+	unsigned long oldvalue, value, ver, maxlvt;
 
 	/* Pound the ESR really hard over the head with a big hammer - mbligh */
 	if (esr_disable) {
@@ -459,9 +459,7 @@ void __init setup_local_APIC (void)
 		maxlvt = get_maxlvt();
 		if (maxlvt > 3)		/* Due to the Pentium erratum 3AP. */
 			apic_write(APIC_ESR, 0);
-		value = apic_read(APIC_ESR);
-		apic_printk(APIC_VERBOSE, "ESR value before enabling vector:"
-				" %08lx\n", value);
+		oldvalue = apic_read(APIC_ESR);
 
 		value = ERROR_APIC_VECTOR;      // enables sending errors
 		apic_write_around(APIC_LVTERR, value);
@@ -471,8 +469,10 @@ void __init setup_local_APIC (void)
 		if (maxlvt > 3)
 			apic_write(APIC_ESR, 0);
 		value = apic_read(APIC_ESR);
-		apic_printk(APIC_VERBOSE, "ESR value after enabling vector:"
-				" %08lx\n", value);
+		if (value != oldvalue)
+			apic_printk(APIC_VERBOSE, "ESR value before enabling "
+				"vector: 0x%08lx  after: 0x%08lx\n",
+				oldvalue, value);
 	} else {
 		if (esr_disable)	
 			/* 
@@ -1071,8 +1071,7 @@ inline void smp_local_timer_interrupt(struct pt_regs * regs)
 {
 	int cpu = smp_processor_id();
 
-	x86_do_profile(regs);
-
+	profile_tick(CPU_PROFILING, regs);
 	if (--per_cpu(prof_counter, cpu) <= 0) {
 		/*
 		 * The multiplier may have changed since the last time we got
@@ -1191,7 +1190,7 @@ asmlinkage void smp_error_interrupt(void)
 	   6: Received illegal vector
 	   7: Illegal register address
 	*/
-	printk (KERN_INFO "APIC error on CPU%d: %02lx(%02lx)\n",
+	printk (KERN_DEBUG "APIC error on CPU%d: %02lx(%02lx)\n",
 	        smp_processor_id(), v , v1);
 	irq_exit();
 }

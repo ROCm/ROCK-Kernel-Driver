@@ -43,10 +43,9 @@ static void
 mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 {
 	writel(0, host->base + MMCICOMMAND);
+
 	host->mrq = NULL;
 	host->cmd = NULL;
-	host->data = NULL;
-	host->buffer = NULL;
 
 	if (mrq->data)
 		mrq->data->bytes_xfered = host->data_xfered;
@@ -60,6 +59,13 @@ mmci_request_end(struct mmci_host *host, struct mmc_request *mrq)
 	spin_lock(&host->lock);
 }
 
+static void mmci_stop_data(struct mmci_host *host)
+{
+	writel(0, host->base + MMCIDATACTRL);
+	writel(0, host->base + MMCIMASK1);
+	host->data = NULL;
+}
+
 static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 {
 	unsigned int datactrl, timeout, irqmask;
@@ -69,7 +75,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	    1 << data->blksz_bits, data->blocks, data->flags);
 
 	host->data = data;
-	host->buffer = data->req->buffer;
+	host->offset = 0;
 	host->size = data->blocks << data->blksz_bits;
 	host->data_xfered = 0;
 
@@ -94,6 +100,7 @@ static void mmci_start_data(struct mmci_host *host, struct mmc_data *data)
 	}
 
 	writel(datactrl, base + MMCIDATACTRL);
+	writel(readl(base + MMCIMASK0) & ~MCI_DATAENDMASK, base + MMCIMASK0);
 	writel(irqmask, base + MMCIMASK1);
 }
 
@@ -147,7 +154,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
 		status |= MCI_DATAEND;
 	}
 	if (status & MCI_DATAEND) {
-		host->data = NULL;
+		mmci_stop_data(host);
+
 		if (!data->stop) {
 			mmci_request_end(host, data->mrq);
 		} else {
@@ -182,72 +190,171 @@ mmci_cmd_irq(struct mmci_host *host, struct mmc_command *cmd,
 	}
 }
 
-/*
- * PIO data transfer IRQ handler.
- */
-static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
+static int mmci_pio_read(struct mmci_host *host, struct request *req, u32 status)
 {
-	struct mmci_host *host = dev_id;
 	void *base = host->base;
-	u32 status;
 	int ret = 0;
 
 	do {
-		status = readl(base + MMCISTATUS);
+		unsigned long flags;
+		unsigned int bio_remain;
+		char *buffer;
 
-		if (!(status & (MCI_RXDATAAVLBL|MCI_RXFIFOHALFFULL|
-				MCI_TXFIFOHALFEMPTY)))
+		/*
+		 * Check for data available.
+		 */
+		if (!(status & MCI_RXDATAAVLBL))
 			break;
 
-		DBG(host, "irq1 %08x\n", status);
+		/*
+		 * Map the BIO buffer.
+		 */
+		buffer = bio_kmap_irq(req->cbio, &flags);
+		bio_remain = (req->current_nr_sectors << 9) - host->offset;
 
-		if (status & (MCI_RXDATAAVLBL|MCI_RXFIFOHALFFULL)) {
-			unsigned int count = host->size - (readl(base + MMCIFIFOCNT) << 2);
-			if (count < 0)
-				count = 0;
-			if (count && host->buffer) {
-				readsl(base + MMCIFIFO, host->buffer, count >> 2);
-				host->buffer += count;
+		do {
+			int count = host->size - (readl(base + MMCIFIFOCNT) << 2);
+
+			if (count > bio_remain)
+				count = bio_remain;
+
+			if (count > 0) {
+				ret = 1;
+				readsl(base + MMCIFIFO, buffer + host->offset, count >> 2);
+				host->offset += count;
 				host->size -= count;
-				if (host->size == 0)
-					host->buffer = NULL;
-			} else {
-				static int first = 1;
-				if (first) {
-					first = 0;
-					printk(KERN_ERR "MMCI: sinking excessive data\n");
-				}
-				readl(base + MMCIFIFO);
+				bio_remain -= count;
+				if (bio_remain == 0)
+					goto next_bio;
 			}
-		}
+
+			status = readl(base + MMCISTATUS);
+		} while (status & MCI_RXDATAAVLBL);
+
+		bio_kunmap_irq(buffer, &flags);
+		break;
+
+	 next_bio:
+		bio_kunmap_irq(buffer, &flags);
+
+		/*
+		 * Ok, we've completed that BIO, move on to next
+		 * BIO in the chain.  Note: this doesn't actually
+		 * complete the BIO!
+		 */
+		if (!process_that_request_first(req, req->current_nr_sectors))
+			break;
+
+		host->offset = 0;
+		status = readl(base + MMCISTATUS);
+	} while (1);
+
+	/*
+	 * If we're nearing the end of the read, switch to
+	 * "any data available" mode.
+	 */
+	if (host->size < MCI_FIFOSIZE)
+		writel(MCI_RXDATAAVLBLMASK, base + MMCIMASK1);
+
+	return ret;
+}
+
+static int mmci_pio_write(struct mmci_host *host, struct request *req, u32 status)
+{
+	void *base = host->base;
+	int ret = 0;
+
+	do {
+		unsigned long flags;
+		unsigned int bio_remain;
+		char *buffer;
 
 		/*
 		 * We only need to test the half-empty flag here - if
 		 * the FIFO is completely empty, then by definition
 		 * it is more than half empty.
 		 */
-		if (status & MCI_TXFIFOHALFEMPTY) {
-			unsigned int maxcnt = status & MCI_TXFIFOEMPTY ?
-					      MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
-			unsigned int count = min(host->size, maxcnt);
+		if (!(status & MCI_TXFIFOHALFEMPTY))
+			break;
 
-			writesl(base + MMCIFIFO, host->buffer, count >> 2);
+		/*
+		 * Map the BIO buffer.
+		 */
+		buffer = bio_kmap_irq(req->cbio, &flags);
+		bio_remain = (req->current_nr_sectors << 9) - host->offset;
 
-			host->buffer += count;
+		do {
+			unsigned int count, maxcnt;
+
+			maxcnt = status & MCI_TXFIFOEMPTY ?
+				 MCI_FIFOSIZE : MCI_FIFOHALFSIZE;
+			count = min(bio_remain, maxcnt);
+
+			writesl(base + MMCIFIFO, buffer + host->offset, count >> 2);
+			host->offset += count;
 			host->size -= count;
+			bio_remain -= count;
 
-			/*
-			 * If we run out of data, disable the data IRQs;
-			 * this prevents a race where the FIFO becomes
-			 * empty before the chip itself has disabled the
-			 * data path.
-			 */
-			if (host->size == 0)
-				writel(0, base + MMCIMASK1);
-		}
+			ret = 1;
 
-		ret = 1;
-	} while (status);
+			if (bio_remain == 0)
+				goto next_bio;
+
+			status = readl(base + MMCISTATUS);
+		} while (status & MCI_TXFIFOHALFEMPTY);
+
+		bio_kunmap_irq(buffer, &flags);
+		break;
+
+	 next_bio:
+		bio_kunmap_irq(buffer, &flags);
+
+		/*
+		 * Ok, we've completed that BIO, move on to next
+		 * BIO in the chain.  Note: this doesn't actually
+		 * complete the BIO!
+		 */
+		if (!process_that_request_first(req, req->current_nr_sectors))
+			break;
+
+		host->offset = 0;
+		status = readl(base + MMCISTATUS);
+	} while (1);
+
+	return ret;
+}
+
+/*
+ * PIO data transfer IRQ handler.
+ */
+static irqreturn_t mmci_pio_irq(int irq, void *dev_id, struct pt_regs *regs)
+{
+	struct mmci_host *host = dev_id;
+	struct request *req;
+	void *base = host->base;
+	u32 status;
+	int ret = 0;
+
+	status = readl(base + MMCISTATUS);
+
+	DBG(host, "irq1 %08x\n", status);
+
+	req = host->data->req;
+	if (status & MCI_RXACTIVE)
+		ret = mmci_pio_read(host, req, status);
+	else if (status & MCI_TXACTIVE)
+		ret = mmci_pio_write(host, req, status);
+
+	/*
+	 * If we run out of data, disable the data IRQs; this
+	 * prevents a race where the FIFO becomes empty before
+	 * the chip itself has disabled the data path, and
+	 * stops us racing with our data end IRQ.
+	 */
+	if (host->size == 0) {
+		writel(0, base + MMCIMASK1);
+		writel(readl(base + MMCIMASK0) | MCI_DATAENDMASK, base + MMCIMASK0);
+	}
 
 	return IRQ_RETVAL(ret);
 }
@@ -268,10 +375,8 @@ static irqreturn_t mmci_irq(int irq, void *dev_id, struct pt_regs *regs)
 		struct mmc_data *data;
 
 		status = readl(host->base + MMCISTATUS);
+		status &= readl(host->base + MMCIMASK0);
 		writel(status, host->base + MMCICLEAR);
-
-		if (!(status & MCI_IRQMASK))
-			break;
 
 		DBG(host, "irq0 %08x\n", status);
 
@@ -426,6 +531,25 @@ static int mmci_probe(struct amba_device *dev, void *id)
 	mmc->f_min = (host->mclk + 511) / 512;
 	mmc->f_max = min(host->mclk, fmax);
 	mmc->ocr_avail = plat->ocr_mask;
+
+	/*
+	 * We can do SGIO
+	 */
+	mmc->max_hw_segs = 16;
+	mmc->max_phys_segs = 16;
+
+	/*
+	 * Since we only have a 16-bit data length register, we must
+	 * ensure that we don't exceed 2^16-1 bytes in a single request.
+	 * Choose 64 (512-byte) sectors as the limit.
+	 */
+	mmc->max_sectors = 64;
+
+	/*
+	 * Set the maximum segment size.  Since we aren't doing DMA
+	 * (yet) we are only limited by the data length register.
+	 */
+	mmc->max_seg_size = mmc->max_sectors << 9;
 
 	spin_lock_init(&host->lock);
 

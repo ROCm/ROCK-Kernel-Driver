@@ -108,41 +108,19 @@ static inline int tb_delta(unsigned *jiffy_stamp) {
 	return delta;
 }
 
-extern char _stext;
-
-static inline void ppc_do_profile (struct pt_regs *regs)
+#ifdef CONFIG_SMP
+unsigned long profile_pc(struct pt_regs *regs)
 {
-	unsigned long nip;
-	extern unsigned long prof_cpu_mask;
+	unsigned long pc = instruction_pointer(regs);
 
-	profile_hook(regs);
+	if (pc >= (unsigned long)&__lock_text_start &&
+	    pc <= (unsigned long)&__lock_text_end)
+		return regs->link;
 
-	if (user_mode(regs))
-		return;
-
-	if (!prof_buffer)
-		return;
-
-	nip = instruction_pointer(regs);
-
-	/*
-	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
-	 * (default is all CPUs.)
-	 */
-	if (!((1<<smp_processor_id()) & prof_cpu_mask))
-		return;
-
-	nip -= (unsigned long) &_stext;
-	nip >>= prof_shift;
-	/*
-	 * Don't ignore out-of-bounds EIP values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (nip > prof_len-1)
-		nip = prof_len-1;
-	atomic_inc((atomic_t *)&prof_buffer[nip]);
+	return pc;
 }
+EXPORT_SYMBOL(profile_pc);
+#endif
 
 /*
  * timer_interrupt - gets called when the decrementer overflows,
@@ -164,7 +142,7 @@ void timer_interrupt(struct pt_regs * regs)
 	while ((next_dec = tb_ticks_per_jiffy - tb_delta(&jiffy_stamp)) <= 0) {
 		jiffy_stamp += tb_ticks_per_jiffy;
 		
-		ppc_do_profile(regs);
+		profile_tick(CPU_PROFILING, regs);
 
 	  	if (smp_processor_id())
 			continue;

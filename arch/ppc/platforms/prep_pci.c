@@ -836,52 +836,59 @@ struct mot_info {
 void __init
 ibm_prep_init(void)
 {
-#ifdef CONFIG_PREP_RESIDUAL
-	u32 addr, real_addr, len;
-	PPC_DEVICE *mpic;
-	PnP_TAG_PACKET *pkt;
+	if (have_residual_data) {
+		u32 addr, real_addr, len, offset;
+		PPC_DEVICE *mpic;
+		PnP_TAG_PACKET *pkt;
 
-	/* Use the PReP residual data to determine if an OpenPIC is
-	 * present.  If so, get the large vendor packet which will
-	 * tell us the base address and length in memory.
-	 * If we are successful, ioremap the memory area and set
-	 * OpenPIC_Addr (this indicates that the OpenPIC was found).
-	 */
-	mpic = residual_find_device(-1, NULL, SystemPeripheral,
-			    ProgrammableInterruptController, MPIC, 0);
-	if (!mpic)
-		return;
+		/* Use the PReP residual data to determine if an OpenPIC is
+		 * present.  If so, get the large vendor packet which will
+		 * tell us the base address and length in memory.
+		 * If we are successful, ioremap the memory area and set
+		 * OpenPIC_Addr (this indicates that the OpenPIC was found).
+		 */
+		mpic = residual_find_device(-1, NULL, SystemPeripheral,
+				    ProgrammableInterruptController, MPIC, 0);
+		if (!mpic)
+			return;
 
-	pkt = PnP_find_large_vendor_packet(res->DevicePnPHeap +
-			mpic->AllocatedOffset, 9, 0);
+		pkt = PnP_find_large_vendor_packet(res->DevicePnPHeap +
+				mpic->AllocatedOffset, 9, 0);
 
-	if (!pkt)
-		return;
+		if (!pkt)
+			return;
 
 #define p pkt->L4_Pack.L4_Data.L4_PPCPack
-	if (!((p.PPCData[0] == 2) && (p.PPCData[1] == 32)))
-		return; /* not a 32-bit memory address */
+	 	if (p.PPCData[1] == 32) {
+			switch (p.PPCData[0]) {
+				case 1:  offset = PREP_ISA_IO_BASE;  break;
+				case 2:  offset = PREP_ISA_MEM_BASE; break;
+				default: return; /* Not I/O or memory?? */
+			}
+		}
+		else
+			return; /* Not a 32-bit address */
 
-	real_addr = ld_le32((unsigned int *) (p.PPCData + 4));
-	if (real_addr == 0xffffffff)
-		return;
+		real_addr = ld_le32((unsigned int *) (p.PPCData + 4));
+		if (real_addr == 0xffffffff)
+			return;
 
-	/* Adjust address to be as seen by CPU */
-	addr = real_addr + PREP_ISA_MEM_BASE;
+		/* Adjust address to be as seen by CPU */
+		addr = real_addr + offset;
 
-	len = ld_le32((unsigned int *) (p.PPCData + 12));
-	if (!len)
-		return;
+		len = ld_le32((unsigned int *) (p.PPCData + 12));
+		if (!len)
+			return;
 #undef p
-	OpenPIC_Addr = ioremap(addr, len);
-	ppc_md.get_irq = openpic_get_irq;
+		OpenPIC_Addr = ioremap(addr, len);
+		ppc_md.get_irq = openpic_get_irq;
 
-	OpenPIC_InitSenses = prep_openpic_initsenses;
-	OpenPIC_NumInitSenses = sizeof(prep_openpic_initsenses);
+		OpenPIC_InitSenses = prep_openpic_initsenses;
+		OpenPIC_NumInitSenses = sizeof(prep_openpic_initsenses);
 
-	printk(KERN_INFO "MPIC at 0x%08x (0x%08x), length 0x%08x "
-	       "mapped to 0x%p\n", addr, real_addr, len, OpenPIC_Addr);
-#endif
+		printk(KERN_INFO "MPIC at 0x%08x (0x%08x), length 0x%08x "
+		       "mapped to 0x%p\n", addr, real_addr, len, OpenPIC_Addr);
+	}
 }
 
 static void __init
@@ -898,6 +905,17 @@ ibm43p_pci_map_non0(struct pci_dev *dev)
 	intpin = (PCI_SLOT(dev->devfn) + intpin - 1) & 3;
 	dev->irq = openpic_to_irq(bridge_intrs[intpin]);
 	pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
+}
+
+void __init
+prep_residual_setup_pci(char *irq_edge_mask_lo, char *irq_edge_mask_hi)
+{
+	if (have_residual_data) {
+		Motherboard_map_name = res->VitalProductData.PrintableModel;
+		Motherboard_map = NULL;
+		Motherboard_routes = NULL;
+		residual_irq_mask(irq_edge_mask_lo, irq_edge_mask_hi);
+	}
 }
 
 void __init
@@ -1011,21 +1029,31 @@ prep_route_pci_interrupts(void)
 		}
 	} else if ( _prep_type == _PREP_IBM ) {
 		unsigned char irq_edge_mask_lo, irq_edge_mask_hi;
+		unsigned short irq_edge_mask;
+		int i;
 
 		setup_ibm_pci(&irq_edge_mask_lo, &irq_edge_mask_hi);
 
 		outb(inb(0x04d0)|irq_edge_mask_lo, 0x4d0); /* primary 8259 */
 		outb(inb(0x04d1)|irq_edge_mask_hi, 0x4d1); /* cascaded 8259 */
+
+		irq_edge_mask = (irq_edge_mask_hi << 8) | irq_edge_mask_lo;
+		for (i = 0; i < 16; ++i, irq_edge_mask >>= 1)
+			if (irq_edge_mask & 1)
+				irq_desc[i].status |= IRQ_LEVEL;
 	} else {
 		printk("No known machine pci routing!\n");
 		return;
 	}
 
 	/* Set up mapping from slots */
-	for (i = 1;  i <= 4;  i++)
-		ibc_pirq[i-1] = Motherboard_routes[i];
-	/* Enable PCI interrupts */
-	*ibc_pcicon |= 0x20;
+	if (Motherboard_routes) {
+		for (i = 1;  i <= 4;  i++)
+			ibc_pirq[i-1] = Motherboard_routes[i];
+
+		/* Enable PCI interrupts */
+		*ibc_pcicon |= 0x20;
+	}
 }
 
 void __init
@@ -1171,38 +1199,52 @@ void __init
 prep_pcibios_fixup(void)
 {
         struct pci_dev *dev = NULL;
+	int irq;
+	int have_openpic = (OpenPIC_Addr != NULL);
 
 	prep_route_pci_interrupts();
 
 	printk("Setting PCI interrupts for a \"%s\"\n", Motherboard_map_name);
-	if (OpenPIC_Addr) {
-		/* PCI interrupts are controlled by the OpenPIC */
-		while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
-			if (dev->bus->number == 0) {
-                       		dev->irq = openpic_to_irq(Motherboard_map[PCI_SLOT(dev->devfn)]);
-				pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
-			} else {
-				if (Motherboard_non0 != NULL)
-					Motherboard_non0(dev);
-			}
-		}
 
-		/* Setup the Winbond or Via PIB */
-		prep_pib_init();
-
-		return;
-	}
-
-	dev = NULL;
+	/* Iterate through all the PCI devices, setting the IRQ */
 	while ((dev = pci_find_device(PCI_ANY_ID, PCI_ANY_ID, dev)) != NULL) {
 		/*
-		 * Use our old hard-coded kludge to figure out what
-		 * irq this device uses.  This is necessary on things
-		 * without residual data. -- Cort
+		 * If we have residual data, then this is easy: query the
+		 * residual data for the IRQ line allocated to the device.
+		 * This works the same whether we have an OpenPic or not.
 		 */
-		unsigned char d = PCI_SLOT(dev->devfn);
-		dev->irq = Motherboard_routes[Motherboard_map[d]];
+		if (have_residual_data) {
+			irq = residual_pcidev_irq(dev);
+			dev->irq = have_openpic ? openpic_to_irq(irq) : irq;
+		}
+		/*
+		 * If we don't have residual data, then we need to use
+		 * tables to determine the IRQ.  The table organisation
+		 * is different depending on whether there is an OpenPIC
+		 * or not.  The tables are only used for bus 0, so check
+		 * this first.
+		 */
+		else if (dev->bus->number == 0) {
+			irq = Motherboard_map[PCI_SLOT(dev->devfn)];
+			dev->irq = have_openpic ? openpic_to_irq(irq)
+						: Motherboard_routes[irq];
+		}
+		/*
+		 * Finally, if we don't have residual data and the bus is
+		 * non-zero, use the callback (if provided)
+		 */
+		else {
+			if (Motherboard_non0 != NULL)
+				Motherboard_non0(dev);
+
+			continue;
+		}
+
+		pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
 	}
+
+	/* Setup the Winbond or Via PIB */
+	prep_pib_init();
 }
 
 static void __init
@@ -1262,14 +1304,15 @@ prep_find_bridges(void)
 			   PREP_ISA_IO_BASE + 0xcfc);
 
 	printk("PReP architecture\n");
-#ifdef CONFIG_PREP_RESIDUAL
-	{
+
+	if (have_residual_data) {
 		PPC_DEVICE *hostbridge;
 
 		hostbridge = residual_find_device(PROCESSORDEVICE, NULL,
 			BridgeController, PCIBridge, -1, 0);
 		if (hostbridge &&
-			hostbridge->DeviceId.Interface == PCIBridgeIndirect) {
+			((hostbridge->DeviceId.Interface == PCIBridgeIndirect) ||
+			 (hostbridge->DeviceId.Interface == PCIBridgeRS6K))) {
 			PnP_TAG_PACKET * pkt;
 			pkt = PnP_find_large_vendor_packet(
 				res->DevicePnPHeap+hostbridge->AllocatedOffset,
@@ -1284,7 +1327,6 @@ prep_find_bridges(void)
 				setup_indirect_pci(hose, 0x80000cf8, 0x80000cfc);
 		}
 	}
-#endif /* CONFIG_PREP_RESIDUAL */
 
 	ppc_md.pcibios_fixup = prep_pcibios_fixup;
 	ppc_md.pcibios_after_init = prep_pcibios_after_init;

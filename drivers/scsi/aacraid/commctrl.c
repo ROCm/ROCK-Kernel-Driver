@@ -480,7 +480,7 @@ int aac_send_raw_srb(struct aac_dev* dev, void __user * arg)
 	default:
 		data_dir = DMA_NONE;
 	}
-	if (dev->pae_support == 1) {
+	if (dev->dac_support == 1) {
 		struct sgmap64* psg = (struct sgmap64*)&srbcmd->sg;
 		byte_count = 0;
 

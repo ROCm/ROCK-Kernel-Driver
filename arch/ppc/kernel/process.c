@@ -36,6 +36,7 @@
 #include <linux/module.h>
 #include <linux/kallsyms.h>
 #include <linux/mqueue.h>
+#include <linux/hardirq.h>
 
 #include <asm/pgtable.h>
 #include <asm/uaccess.h>
@@ -44,7 +45,6 @@
 #include <asm/processor.h>
 #include <asm/mmu.h>
 #include <asm/prom.h>
-#include <asm/hardirq.h>
 
 extern unsigned long _get_SP(void);
 
@@ -555,8 +555,7 @@ int sys_clone(unsigned long clone_flags, unsigned long usp,
 	CHECK_FULL_REGS(regs);
 	if (usp == 0)
 		usp = regs->gpr[1];	/* stack pointer for child */
- 	return do_fork(clone_flags & ~CLONE_IDLETASK, usp, regs, 0,
-			parent_tidp, child_tidp);
+ 	return do_fork(clone_flags, usp, regs, 0, parent_tidp, child_tidp);
 }
 
 int sys_fork(int p1, int p2, int p3, int p4, int p5, int p6,
@@ -662,7 +661,7 @@ void show_stack(struct task_struct *tsk, unsigned long *stack)
 		++count;
 		sp = *(unsigned long *)sp;
 	}
-#if !CONFIG_KALLSYMS
+#ifndef CONFIG_KALLSYMS
 	if (count > 0)
 		printk("\n");
 #endif

@@ -12,34 +12,22 @@ enum pid_type
 
 struct pid
 {
+	/* Try to keep pid_chain in the same cacheline as nr for find_pid */
 	int nr;
-	atomic_t count;
-	struct task_struct *task;
-	struct list_head task_list;
-	struct list_head hash_chain;
-};
-
-struct pid_link
-{
-	struct list_head pid_chain;
-	struct pid *pidptr;
-	struct pid pid;
+	struct hlist_node pid_chain;
+	/* list of pids with the same nr, only one of them is in the hash */
+	struct list_head pid_list;
 };
 
 #define pid_task(elem, type) \
-	list_entry(elem, struct task_struct, pids[type].pid_chain)
+	list_entry(elem, struct task_struct, pids[type].pid_list)
 
 /*
- * attach_pid() and link_pid() must be called with the tasklist_lock
+ * attach_pid() and detach_pid() must be called with the tasklist_lock
  * write-held.
  */
 extern int FASTCALL(attach_pid(struct task_struct *task, enum pid_type type, int nr));
 
-extern void FASTCALL(link_pid(struct task_struct *task, struct pid_link *link, struct pid *pid));
-
-/*
- * detach_pid() must be called with the tasklist_lock write-held.
- */
 extern void FASTCALL(detach_pid(struct task_struct *task, enum pid_type));
 
 /*
@@ -52,13 +40,16 @@ extern int alloc_pidmap(void);
 extern void FASTCALL(free_pidmap(int));
 extern void switch_exec_pids(struct task_struct *leader, struct task_struct *thread);
 
-#define for_each_task_pid(who, type, task, elem, pid)		\
-	if ((pid = find_pid(type, who)))			\
-	        for (elem = pid->task_list.next,			\
-			prefetch(elem->next),				\
-			task = pid_task(elem, type);			\
-			elem != &pid->task_list;			\
-			elem = elem->next, prefetch(elem->next), 	\
-			task = pid_task(elem, type))
+#define do_each_task_pid(who, type, task)				\
+	if ((task = find_task_by_pid_type(type, who))) {		\
+		prefetch((task)->pids[type].pid_list.next);		\
+		do {
+
+#define while_each_task_pid(who, type, task)				\
+		} while (task = pid_task((task)->pids[type].pid_list.next,\
+						type),			\
+			prefetch((task)->pids[type].pid_list.next),	\
+			hlist_unhashed(&(task)->pids[type].pid_chain));	\
+	}								\
 
 #endif /* _LINUX_PID_H */

@@ -28,16 +28,15 @@ struct backing_dev_info default_backing_dev_info = {
 EXPORT_SYMBOL_GPL(default_backing_dev_info);
 
 /*
- * Initialise a struct file's readahead state
+ * Initialise a struct file's readahead state.  Assumes that the caller has
+ * memset *ra to zero.
  */
 void
 file_ra_state_init(struct file_ra_state *ra, struct address_space *mapping)
 {
-	memset(ra, 0, sizeof(*ra));
 	ra->ra_pages = mapping->backing_dev_info->ra_pages;
 	ra->average = ra->ra_pages / 2;
 }
-EXPORT_SYMBOL(file_ra_state_init);
 
 /*
  * Return max readahead size for this inode in number-of-pages.
@@ -572,6 +571,6 @@ unsigned long max_sane_readahead(unsigned long nr)
 	unsigned long inactive;
 	unsigned long free;
 
-	get_zone_counts(&active, &inactive, &free);
+	__get_zone_counts(&active, &inactive, &free, NODE_DATA(numa_node_id()));
 	return min(nr, (inactive + free) / 2);
 }

@@ -60,15 +60,6 @@ static DECLARE_MUTEX(nwflash_sem);
 
 extern spinlock_t gpio_lock;
 
-/*
- * the delay routine - it is often required to let the flash "breeze"...
- */
-void flash_wait(int timeout)
-{
-	current->state = TASK_INTERRUPTIBLE;
-	schedule_timeout(timeout);
-}
-
 static int get_flash_id(void)
 {
 	volatile unsigned int c1, c2;
@@ -401,7 +392,7 @@ static int erase_block(int nBlock)
 	/*
 	 * wait 10 ms
 	 */
-	flash_wait(HZ / 100);
+	msleep(10);
 
 	/*
 	 * wait while erasing in process (up to 10 sec)
@@ -409,7 +400,7 @@ static int erase_block(int nBlock)
 	timeout = jiffies + 10 * HZ;
 	c1 = 0;
 	while (!(c1 & 0x80) && time_before(jiffies, timeout)) {
-		flash_wait(HZ / 100);
+		msleep(10);
 		/*
 		 * read any address
 		 */
@@ -440,7 +431,7 @@ static int erase_block(int nBlock)
 	/*
 	 * just to make sure - verify if erased OK...
 	 */
-	flash_wait(HZ / 100);
+	msleep(10);
 
 	pWritePtr = (unsigned char *) ((unsigned int) (FLASH_BASE + (nBlock << 16)));
 
@@ -587,7 +578,7 @@ static int write_block(unsigned long p, const char __user *buf, int count)
 				/*
 				 * wait couple ms
 				 */
-				flash_wait(HZ / 100);
+				msleep(10);
 				/*
 				 * red LED == write
 				 */
@@ -612,7 +603,7 @@ static int write_block(unsigned long p, const char __user *buf, int count)
 	leds_event(led_amber_off);
 	leds_event(led_green_on);
 
-	flash_wait(HZ / 100);
+	msleep(10);
 
 	pWritePtr = (unsigned char *) ((unsigned int) (FLASH_BASE + p));
 

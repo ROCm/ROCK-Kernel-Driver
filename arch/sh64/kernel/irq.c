@@ -148,6 +148,7 @@ asmlinkage void do_NMI(unsigned long vector_num, struct pt_regs * regs)
 int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction * action)
 {
 	int status;
+	int ret;
 
 	status = 1;	/* Force the "do bottom halves" bit */
 
@@ -155,8 +156,9 @@ int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction *
                 local_irq_enable();
 
 	do {
-		status |= action->flags;
-		action->handler(irq, action->dev_id, regs);
+		ret = action->handler(irq, action->dev_id, regs);
+		if (ret == IRQ_HANDLED)
+			status |= action->flags;
 		action = action->next;
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)

@@ -23,15 +23,16 @@
 /*
  * memory management
  */
-EXPORT_SYMBOL_NOVERS(_oi_bitmap);
-EXPORT_SYMBOL_NOVERS(_ni_bitmap);
-EXPORT_SYMBOL_NOVERS(_zb_findmap);
-EXPORT_SYMBOL_NOVERS(_sb_findmap);
-EXPORT_SYMBOL_NOVERS(__copy_from_user_asm);
-EXPORT_SYMBOL_NOVERS(__copy_to_user_asm);
-EXPORT_SYMBOL_NOVERS(__clear_user_asm);
-EXPORT_SYMBOL_NOVERS(__strncpy_from_user_asm);
-EXPORT_SYMBOL_NOVERS(__strnlen_user_asm);
+EXPORT_SYMBOL(_oi_bitmap);
+EXPORT_SYMBOL(_ni_bitmap);
+EXPORT_SYMBOL(_zb_findmap);
+EXPORT_SYMBOL(_sb_findmap);
+EXPORT_SYMBOL(__copy_from_user_asm);
+EXPORT_SYMBOL(__copy_to_user_asm);
+EXPORT_SYMBOL(__copy_in_user_asm);
+EXPORT_SYMBOL(__clear_user_asm);
+EXPORT_SYMBOL(__strncpy_from_user_asm);
+EXPORT_SYMBOL(__strnlen_user_asm);
 EXPORT_SYMBOL(diag10);
 
 /*
@@ -60,6 +61,6 @@ EXPORT_SYMBOL(csum_fold);
 EXPORT_SYMBOL(console_mode);
 EXPORT_SYMBOL(console_devno);
 EXPORT_SYMBOL(console_irq);
-EXPORT_SYMBOL_NOVERS(do_call_softirq);
+EXPORT_SYMBOL(do_call_softirq);
 EXPORT_SYMBOL(sys_wait4);
 EXPORT_SYMBOL(cpcmd);

@@ -30,6 +30,7 @@
 #define PMN_RESET	0x002	/* Reset event counters */
 #define	CCNT_RESET	0x004	/* Reset clock counter */
 #define	PMU_RESET	(CCNT_RESET | PMN_RESET)
+#define PMU_CNT64	0x008	/* Make CCNT count every 64th cycle */
 
 /* TODO do runtime detection */
 #ifdef CONFIG_ARCH_IOP310
@@ -125,12 +126,15 @@ static struct pmu_type *pmu;
 
 static void write_pmnc(u32 val)
 {
-	/* upper 4bits and 7, 11 are write-as-0 */
-	val &= 0xffff77f;
-	if (pmu->id == PMU_XSC1)
+	if (pmu->id == PMU_XSC1) {
+		/* upper 4bits and 7, 11 are write-as-0 */
+		val &= 0xffff77f;
 		__asm__ __volatile__ ("mcr p14, 0, %0, c0, c0, 0" : : "r" (val));
-	else
+	} else {
+		/* bits 4-23 are write-as-0, 24-31 are write ignored */
+		val &= 0xf;
 		__asm__ __volatile__ ("mcr p14, 0, %0, c0, c1, 0" : : "r" (val));
+	}
 }
 
 static u32 read_pmnc(void)
@@ -139,8 +143,11 @@ static u32 read_pmnc(void)
 
 	if (pmu->id == PMU_XSC1)
 		__asm__ __volatile__ ("mrc p14, 0, %0, c0, c0, 0" : "=r" (val));
-	else
+	else {
 		__asm__ __volatile__ ("mrc p14, 0, %0, c0, c1, 0" : "=r" (val));
+		/* bits 1-2 and 4-23 are read-unpredictable */
+		val &= 0xff000009;
+	}
 
 	return val;
 }
@@ -336,7 +343,7 @@ static void inline __xsc2_check_ctrs(void)
 
 static irqreturn_t xscale_pmu_interrupt(int irq, void *arg, struct pt_regs *regs)
 {
-	unsigned long eip = instruction_pointer(regs);
+	unsigned long pc = profile_pc(regs);
 	int i, is_kernel = !user_mode(regs);
 	u32 pmnc;
 
@@ -350,7 +357,7 @@ static irqreturn_t xscale_pmu_interrupt(int irq, void *arg, struct pt_regs *regs
 			continue;
 
 		write_counter(i, -(u32)results[i].reset_counter);
-		oprofile_add_sample(eip, is_kernel, i, smp_processor_id());
+		oprofile_add_sample(pc, is_kernel, i, smp_processor_id());
 		results[i].ovf--;
 	}
 
@@ -386,8 +393,10 @@ static int xscale_pmu_start(void)
 
 	if (pmu->id == PMU_XSC1)
 		pmnc |= pmu->int_enable;
-	else
+	else {
 		__asm__ __volatile__ ("mcr p14, 0, %0, c4, c1, 0" : : "r" (pmu->int_enable));
+		pmnc &= ~PMU_CNT64;
+	}
 
 	pmnc |= PMU_ENABLE;
 	write_pmnc(pmnc);

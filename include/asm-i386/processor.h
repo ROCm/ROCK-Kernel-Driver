@@ -297,6 +297,8 @@ extern unsigned int mca_pentium_flag;
  */
 #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
 
+#define HAVE_ARCH_PICK_MMAP_LAYOUT
+
 /*
  * Size of io_bitmap.
  */
@@ -646,10 +648,5 @@ extern inline void prefetchw(const void *x)
 extern void select_idle_routine(const struct cpuinfo_x86 *c);
 
 #define cache_line_size() (boot_cpu_data.x86_cache_alignment)
-
-#ifdef CONFIG_SCHED_SMT
-#define ARCH_HAS_SCHED_DOMAIN
-#define ARCH_HAS_SCHED_WAKE_IDLE
-#endif
 
 #endif /* __ASM_I386_PROCESSOR_H */

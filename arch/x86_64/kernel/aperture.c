@@ -31,6 +31,8 @@ int iommu_aperture_allowed __initdata = 0;
 int fallback_aper_order __initdata = 1; /* 64MB */
 int fallback_aper_force __initdata = 0; 
 
+int fix_aperture __initdata = 1;
+
 /* This code runs before the PCI subsystem is initialized, so just 
    access the northbridge directly. */
 
@@ -202,7 +204,7 @@ void __init iommu_hole_init(void)
 	u64 aper_base; 
 	int valid_agp = 0;
 
-	if (iommu_aperture_disabled)
+	if (iommu_aperture_disabled || !fix_aperture)
 		return;
 
 	printk("Checking aperture...\n"); 
@@ -241,20 +243,15 @@ void __init iommu_hole_init(void)
 		/* Got the aperture from the AGP bridge */
 	} else if ((!no_iommu && end_pfn >= 0xffffffff>>PAGE_SHIFT) ||
 		   force_iommu ||
-		   valid_agp || 
+		   valid_agp ||
 		   fallback_aper_force) { 
-		/* When there is a AGP bridge in the system assume the
-		   user wants to use the AGP driver too and needs an
-		   aperture.  However this case (AGP but no good
-		   aperture) should only happen with a more broken than
-		   usual BIOS, because it would even break Windows. */
+		printk("Your BIOS doesn't leave a aperture memory hole\n");
+		printk("Please enable the IOMMU option in the BIOS setup\n");
+		printk("This costs you %d MB of RAM\n",
+		       32 << fallback_aper_order);
 
-	printk("Your BIOS doesn't leave a aperture memory hole\n");
-	printk("Please enable the IOMMU option in the BIOS setup\n"); 
-		printk("This costs you %d MB of RAM\n", 32 << fallback_aper_order); 
- 
 		aper_order = fallback_aper_order;
-	aper_alloc = allocate_aperture(); 
+		aper_alloc = allocate_aperture();
 		if (!aper_alloc) { 
 			/* Could disable AGP and IOMMU here, but it's probably
 			   not worth it. But the later users cannot deal with

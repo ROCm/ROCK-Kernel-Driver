@@ -699,9 +699,7 @@ badframe:
 	printk("badframe in handle_rt_signal, regs=%p frame=%p newsp=%lx\n",
 	       regs, frame, newsp);
 #endif
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(sig, current);
 }
 
 static long do_setcontext32(struct ucontext32 __user *ucp, struct pt_regs *regs, int sig)
@@ -864,9 +862,7 @@ badframe:
 	printk("badframe in handle_signal, regs=%p frame=%x newsp=%x\n",
 	       regs, frame, *newspp);
 #endif
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, current);
+	force_sigsegv(sig, current);
 }
 
 /*
@@ -928,18 +924,16 @@ badframe:
 int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 {
 	siginfo_t info;
-	struct k_sigaction *ka;
 	unsigned int frame, newsp;
 	int signr, ret;
+	struct k_sigaction ka;
 
 	if (!oldset)
 		oldset = &current->blocked;
 
 	newsp = frame = 0;
 
-	signr = get_signal_to_deliver(&info, regs, NULL);
-
-	ka = (signr == 0)? NULL: &current->sighand->action[signr-1];
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 
 	if (TRAP(regs) == 0x0C00		/* System Call! */
 	    && regs->ccr & 0x10000000		/* error signalled */
@@ -950,7 +944,7 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 		if (signr > 0
 		    && (ret == ERESTARTNOHAND || ret == ERESTART_RESTARTBLOCK
 			|| (ret == ERESTARTSYS
-			    && !(ka->sa.sa_flags & SA_RESTART)))) {
+			    && !(ka.sa.sa_flags & SA_RESTART)))) {
 			/* make the system call return an EINTR error */
 			regs->result = -EINTR;
 			regs->gpr[3] = EINTR;
@@ -969,7 +963,7 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 	if (signr == 0)
 		return 0;		/* no signals delivered */
 
-	if ((ka->sa.sa_flags & SA_ONSTACK) && current->sas_ss_size
+	if ((ka.sa.sa_flags & SA_ONSTACK) && current->sas_ss_size
 	    && (!on_sig_stack(regs->gpr[1])))
 		newsp = (current->sas_ss_sp + current->sas_ss_size);
 	else
@@ -977,17 +971,15 @@ int do_signal32(sigset_t *oldset, struct pt_regs *regs)
 	newsp &= ~0xfUL;
 
 	/* Whee!  Actually deliver the signal.  */
-	if (ka->sa.sa_flags & SA_SIGINFO)
-		handle_rt_signal32(signr, ka, &info, oldset, regs, newsp);
+	if (ka.sa.sa_flags & SA_SIGINFO)
+		handle_rt_signal32(signr, &ka, &info, oldset, regs, newsp);
 	else
-		handle_signal32(signr, ka, &info, oldset, regs, newsp);
+		handle_signal32(signr, &ka, &info, oldset, regs, newsp);
 
-	if (ka->sa.sa_flags & SA_ONESHOT)
-		ka->sa.sa_handler = SIG_DFL;
-
-	if (!(ka->sa.sa_flags & SA_NODEFER)) {
+	if (!(ka.sa.sa_flags & SA_NODEFER)) {
 		spin_lock_irq(&current->sighand->siglock);
-		sigorsets(&current->blocked,&current->blocked,&ka->sa.sa_mask);
+		sigorsets(&current->blocked, &current->blocked,
+			  &ka.sa.sa_mask);
 		sigaddset(&current->blocked, signr);
 		recalc_sigpending();
 		spin_unlock_irq(&current->sighand->siglock);

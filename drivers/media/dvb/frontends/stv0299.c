@@ -1271,7 +1271,7 @@ static long probe_tuner (struct dvb_i2c_bus *i2c)
 
 	printk ("%s: try to attach to %s\n", __FUNCTION__, adapter->name);
 
-	if ( strcmp(adapter->name, "Technisat SkyStar2 driver") == 0 )
+	if ( strcmp(adapter->name, "SkyStar2") == 0 )
 	{
 	    printk ("%s: setup for tuner Samsung TBMU24112IMB\n", __FILE__);
 

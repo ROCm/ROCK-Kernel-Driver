@@ -49,6 +49,9 @@ typedef struct
 	short irq[IP2_MAX_BOARDS]; 
 	unsigned short addr[IP2_MAX_BOARDS];
 	int type[IP2_MAX_BOARDS];
+#ifdef CONFIG_PCI
+	struct pci_dev *pci_dev[IP2_MAX_BOARDS];
+#endif
 } ip2config_t;
 
 #endif

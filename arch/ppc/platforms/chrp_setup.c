@@ -250,13 +250,6 @@ chrp_setup_arch(void)
 	 */
 	sio_init();
 
-	/*
-	 *  Setup the console operations
-	 */
-#ifdef CONFIG_DUMMY_CONSOLE
-	conswitchp = &dummy_con;
-#endif
-
 	/* Get the event scan rate for the rtas so we know how
 	 * often it expects a heartbeat. -- Cort
 	 */

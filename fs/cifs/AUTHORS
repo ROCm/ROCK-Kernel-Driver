@@ -24,6 +24,7 @@ Shobhit Dayal
 Sergey Vlasov
 Richard Hughes
 Yury Umanets
+Mark Hamzy
 
 Test case and Bug Report contributors
 -------------------------------------
@@ -31,7 +32,9 @@ Thanks to those in the community who have submitted detailed bug reports
 and debug of problems they have found:  Jochen Dolze, David Blaine,
 Rene Scharfe, Martin Josefsson, Alexander Wild, Anthony Liguori,
 Lars Muller, Urban Widmark, Massimiliano Ferrero, Howard Owen,
-Olaf Kirch, Kieron Briggs, Nick Millington and others. 
+Olaf Kirch, Kieron Briggs, Nick Millington and others. Also special
+mention to the Stanford Checker (SWAT) which pointed out many minor
+bugs in error paths.
 
 And thanks to the IBM LTC and Power test teams and SuSE testers for
 finding multiple bugs during excellent stress test runs.

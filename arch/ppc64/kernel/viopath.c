@@ -38,8 +38,8 @@
 #include <linux/wait.h>
 #include <linux/seq_file.h>
 #include <linux/smp_lock.h>
+#include <linux/interrupt.h>
 
-#include <asm/hardirq.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/iSeries/LparData.h>

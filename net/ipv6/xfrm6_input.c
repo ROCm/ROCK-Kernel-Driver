@@ -21,8 +21,7 @@ static inline void ipip6_ecn_decapsulate(struct sk_buff *skb)
 	struct ipv6hdr *outer_iph = skb->nh.ipv6h;
 	struct ipv6hdr *inner_iph = skb->h.ipv6h;
 
-	if (INET_ECN_is_ce(ip6_get_dsfield(outer_iph)) &&
-	    INET_ECN_is_not_ce(ip6_get_dsfield(inner_iph)))
+	if (INET_ECN_is_ce(ip6_get_dsfield(outer_iph)))
 		IP6_ECN_set_ce(inner_iph);
 }
 

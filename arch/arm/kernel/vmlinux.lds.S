@@ -38,9 +38,6 @@ SECTIONS
 		__early_begin = .;
 			*(__early_param)
 		__early_end = .;
-		__start___param = .;
-			*(__param)
-		__stop___param = .;
 		__initcall_start = .;
 			*(.initcall1.init)
 			*(.initcall2.init)
@@ -74,6 +71,7 @@ SECTIONS
 		_text = .;		/* Text and read-only data	*/
 			*(.text)
 			SCHED_TEXT
+			LOCK_TEXT
 			*(.fixup)
 			*(.gnu.warning)
 			*(.rodata)

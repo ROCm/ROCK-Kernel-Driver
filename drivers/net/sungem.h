@@ -60,6 +60,9 @@
 				 GREG_STAT_PCS | GREG_STAT_TXMAC | GREG_STAT_RXMAC | \
 				 GREG_STAT_MAC | GREG_STAT_MIF | GREG_STAT_PCIERR)
 
+#define GREG_STAT_NAPI		(GREG_STAT_TXALL  | GREG_STAT_TXINTME | \
+				 GREG_STAT_RXDONE | GREG_STAT_ABNORMAL)
+
 /* The layout of GREG_IMASK and GREG_IACK is identical to GREG_STAT.
  * Bits set in GREG_IMASK will prevent that interrupt type from being
  * signalled to the cpu.  GREG_IACK can be used to clear specific top-level
@@ -969,6 +972,7 @@ struct gem {
 	struct sk_buff *tx_skbs[RX_RING_SIZE];
 
 	u32			msg_enable;
+	u32			status;
 
 	struct net_device_stats net_stats;
 

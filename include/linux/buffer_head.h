@@ -49,12 +49,12 @@ typedef void (bh_end_io_t)(struct buffer_head *bh, int uptodate);
 struct buffer_head {
 	/* First cache line: */
 	unsigned long b_state;		/* buffer state bitmap (see above) */
-	atomic_t b_count;		/* users using this block */
 	struct buffer_head *b_this_page;/* circular list of page's buffers */
 	struct page *b_page;		/* the page this bh is mapped to */
+	atomic_t b_count;		/* users using this block */
+	u32 b_size;			/* block size */
 
 	sector_t b_blocknr;		/* block number */
-	u32 b_size;			/* block size */
 	char *b_data;			/* pointer to data block */
 
 	struct block_device *b_bdev;
@@ -143,17 +143,13 @@ void end_buffer_write_sync(struct buffer_head *bh, int uptodate);
 void end_buffer_async_write(struct buffer_head *bh, int uptodate);
 
 /* Things to do with buffers at mapping->private_list */
-void buffer_insert_list(spinlock_t *lock,
-			struct buffer_head *, struct list_head *);
 void mark_buffer_dirty_inode(struct buffer_head *bh, struct inode *inode);
 int inode_has_buffers(struct inode *);
 void invalidate_inode_buffers(struct inode *);
 int remove_inode_buffers(struct inode *inode);
-int fsync_buffers_list(spinlock_t *lock, struct list_head *);
 int sync_mapping_buffers(struct address_space *mapping);
 void unmap_underlying_metadata(struct block_device *bdev, sector_t block);
 
-void mark_buffer_async_read(struct buffer_head *bh);
 void mark_buffer_async_write(struct buffer_head *bh);
 void invalidate_bdev(struct block_device *, int);
 int sync_blockdev(struct block_device *bdev);
@@ -272,12 +268,14 @@ map_bh(struct buffer_head *bh, struct super_block *sb, sector_t block)
  */
 static inline void wait_on_buffer(struct buffer_head *bh)
 {
+	might_sleep();
 	if (buffer_locked(bh) || atomic_read(&bh->b_count) == 0)
 		__wait_on_buffer(bh);
 }
 
 static inline void lock_buffer(struct buffer_head *bh)
 {
+	might_sleep();
 	if (test_set_buffer_locked(bh))
 		__lock_buffer(bh);
 }

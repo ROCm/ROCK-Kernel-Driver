@@ -8,6 +8,7 @@
 #include <linux/slab.h>
 
 #include <media/audiochip.h>
+#include <media/tuner.h>
 #include <media/id.h>
 
 /* Chips:
@@ -47,6 +48,7 @@ struct tda9887 {
 	struct i2c_client  client;
 	v4l2_std_id        std;
 	unsigned int       radio;
+	unsigned int       config;
 	unsigned int       pinnacle_id;
 	unsigned int       using_v4l2;
 };
@@ -397,6 +399,36 @@ static int tda9887_set_insmod(struct tda9887 *t, char *buf)
 	return 0;
 }
 
+static int tda9887_set_config(struct tda9887 *t, char *buf)
+{
+	if (t->config & TDA9887_PORT1)
+		buf[1] |= cOutputPort1Inactive;
+	if (t->config & TDA9887_PORT2)
+		buf[1] |= cOutputPort2Inactive;
+	if (t->config & TDA9887_QSS)
+		buf[1] |= cQSS;
+	if (t->config & TDA9887_INTERCARRIER)
+		buf[1] &= ~cQSS;
+
+	if (t->config & TDA9887_AUTOMUTE)
+		buf[1] |= cAutoMuteFmActive;
+	if (t->config & TDA9887_DEEMPHASIS_MASK) {
+		buf[2] &= ~0x60;
+		switch (t->config & TDA9887_DEEMPHASIS_MASK) {
+		case TDA9887_DEEMPHASIS_NONE:
+			buf[2] |= cDeemphasisOFF;
+			break;
+		case TDA9887_DEEMPHASIS_50:
+			buf[2] |= cDeemphasisON | cDeemphasis50;
+			break;
+		case TDA9887_DEEMPHASIS_75:
+			buf[2] |= cDeemphasisON | cDeemphasis75;
+			break;
+		}
+	}
+	return 0;
+}
+
 /* ---------------------------------------------------------------------- */
 
 static int tda9887_set_pinnacle(struct tda9887 *t, char *buf)
@@ -499,6 +531,7 @@ static int tda9887_configure(struct tda9887 *t)
 	if (UNSET != t->pinnacle_id) {
 		tda9887_set_pinnacle(t,buf);
 	}
+	tda9887_set_config(t,buf);
 	tda9887_set_insmod(t,buf);
 
 	dprintk(PREFIX "writing: b=0x%02x c=0x%02x e=0x%02x\n",
@@ -594,6 +627,14 @@ tda9887_command(struct i2c_client *client, unsigned int cmd, void *arg)
 		tda9887_configure(t);
 		break;
 	}
+	case TDA9887_SET_CONFIG:
+	{
+		int *i = arg;
+
+		t->config = *i;
+		tda9887_configure(t);
+		break;
+	}
 	/* --- v4l ioctls --- */
 	/* take care: bttv does userspace copying, we'll get a
 	   kernel pointer here... */
@@ -644,6 +685,25 @@ tda9887_command(struct i2c_client *client, unsigned int cmd, void *arg)
 			t->radio = 1;
 		}
 		tda9887_configure(t);
+		break;
+	}
+	case VIDIOC_G_TUNER:
+	{
+		static int AFC_BITS_2_kHz[] = {
+			-12500,  -37500,  -62500,  -97500,
+			-112500, -137500, -162500, -187500,
+			187500,  162500,  137500,  112500,
+			97500 ,  62500,   37500 ,  12500
+		};
+		struct v4l2_tuner* tuner = arg;
+
+		if (t->radio) {
+			__u8 reg = 0;
+			tuner->afc=0;
+			if (1 == i2c_master_recv(&t->client,&reg,1))
+				tuner->afc = AFC_BITS_2_kHz[(reg>>1)&0x0f];
+		}
+		break;
 	}
 	default:
 		/* nothing */
@@ -670,13 +730,12 @@ static struct i2c_client client_template =
         .driver    = &driver,
 };
 
-static int tda9887_init_module(void)
+static int __init tda9887_init_module(void)
 {
-	i2c_add_driver(&driver);
-	return 0;
+	return i2c_add_driver(&driver);
 }
 
-static void tda9887_cleanup_module(void)
+static void __exit tda9887_cleanup_module(void)
 {
 	i2c_del_driver(&driver);
 }

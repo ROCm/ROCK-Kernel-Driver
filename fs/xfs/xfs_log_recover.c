@@ -2047,12 +2047,11 @@ xfs_qm_dqcheck(
 		errs++;
 	}
 
-	if (! errs) {
+	if (! errs && !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
 		if (INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT) &&
 		    INT_GET(ddq->d_bcount, ARCH_CONVERT) >=
 				INT_GET(ddq->d_blk_softlimit, ARCH_CONVERT)) {
-			if (INT_ISZERO(ddq->d_btimer, ARCH_CONVERT) &&
-			    !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
+			if (INT_ISZERO(ddq->d_btimer, ARCH_CONVERT)) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
 					"%s : Dquot ID 0x%x (0x%p) "
@@ -2065,12 +2064,24 @@ xfs_qm_dqcheck(
 		if (INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT) &&
 		    INT_GET(ddq->d_icount, ARCH_CONVERT) >=
 				INT_GET(ddq->d_ino_softlimit, ARCH_CONVERT)) {
-			if (INT_ISZERO(ddq->d_itimer, ARCH_CONVERT) &&
-			    !INT_ISZERO(ddq->d_id, ARCH_CONVERT)) {
+			if (INT_ISZERO(ddq->d_itimer, ARCH_CONVERT)) {
 				if (flags & XFS_QMOPT_DOWARN)
 					cmn_err(CE_ALERT,
 					"%s : Dquot ID 0x%x (0x%p) "
 					"INODE TIMER NOT STARTED",
+					str, (int)
+					INT_GET(ddq->d_id, ARCH_CONVERT), ddq);
+				errs++;
+			}
+		}
+		if (INT_GET(ddq->d_rtb_softlimit, ARCH_CONVERT) &&
+		    INT_GET(ddq->d_rtbcount, ARCH_CONVERT) >=
+				INT_GET(ddq->d_rtb_softlimit, ARCH_CONVERT)) {
+			if (INT_ISZERO(ddq->d_rtbtimer, ARCH_CONVERT)) {
+				if (flags & XFS_QMOPT_DOWARN)
+					cmn_err(CE_ALERT,
+					"%s : Dquot ID 0x%x (0x%p) "
+					"RTBLK TIMER NOT STARTED",
 					str, (int)
 					INT_GET(ddq->d_id, ARCH_CONVERT), ddq);
 				errs++;

@@ -104,7 +104,7 @@ in[0-8]_input	Voltage input value.
 			in7_*	varies
 			in8_*	varies
 
-in0_ref		CPU core reference voltage.
+cpu[0-1]_vid	CPU core reference voltage.
 		Unit: millivolt
 		Read only.
 		Not always correct.

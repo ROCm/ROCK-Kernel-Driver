@@ -68,6 +68,7 @@
 #define __LC_ASYNC_STACK                0xC48
 #define __LC_KERNEL_ASCE		0xC4C
 #define __LC_USER_ASCE			0xC50
+#define __LC_PANIC_STACK                0xC54
 #define __LC_CPUID                      0xC60
 #define __LC_CPUADDR                    0xC68
 #define __LC_IPLDEV                     0xC7C
@@ -80,6 +81,7 @@
 #define __LC_ASYNC_STACK                0xD50
 #define __LC_KERNEL_ASCE		0xD58
 #define __LC_USER_ASCE			0xD60
+#define __LC_PANIC_STACK                0xD68
 #define __LC_CPUID                      0xD90
 #define __LC_CPUADDR                    0xD98
 #define __LC_IPLDEV                     0xDB8
@@ -176,7 +178,8 @@ struct _lowcore
 	__u32        async_stack;              /* 0xc48 */
 	__u32        kernel_asce;              /* 0xc4c */
 	__u32        user_asce;                /* 0xc50 */
-	__u8         pad10[0xc60-0xc54];       /* 0xc54 */
+	__u32        panic_stack;              /* 0xc54 */
+	__u8         pad10[0xc60-0xc58];       /* 0xc58 */
 	/* entry.S sensitive area start */
 	struct       cpuinfo_S390 cpu_data;    /* 0xc60 */
 	__u32        ipl_device;               /* 0xc7c */
@@ -257,7 +260,8 @@ struct _lowcore
 	__u64        async_stack;              /* 0xd50 */
 	__u64        kernel_asce;              /* 0xd58 */
 	__u64        user_asce;                /* 0xd60 */
-	__u8         pad10[0xd80-0xd68];       /* 0xd68 */
+	__u64        panic_stack;              /* 0xd68 */
+	__u8         pad10[0xd80-0xd70];       /* 0xd70 */
 	/* entry.S sensitive area start */
 	struct       cpuinfo_S390 cpu_data;    /* 0xd80 */
 	__u32        ipl_device;               /* 0xdb8 */

@@ -360,8 +360,7 @@ out:
 
 static inline void ipip6_ecn_decapsulate(struct iphdr *iph, struct sk_buff *skb)
 {
-	if (INET_ECN_is_ce(iph->tos) &&
-	    INET_ECN_is_not_ce(ip6_get_dsfield(skb->nh.ipv6h)))
+	if (INET_ECN_is_ce(iph->tos))
 		IP6_ECN_set_ce(skb->nh.ipv6h);
 }
 

@@ -1,4 +1,4 @@
-/* $Id: diva_didd.c,v 1.13 2003/08/27 10:11:21 schindler Exp $
+/* $Id: diva_didd.c,v 1.13.6.1 2004/08/28 20:03:53 armin Exp $
  *
  * DIDD Interface module for Eicon active cards.
  * 
@@ -23,7 +23,7 @@
 #include "divasync.h"
 #include "did_vers.h"
 
-static char *main_revision = "$Revision: 1.13 $";
+static char *main_revision = "$Revision: 1.13.6.1 $";
 
 static char *DRIVERNAME =
     "Eicon DIVA - DIDD table (http://www.melware.net)";
@@ -37,8 +37,6 @@ MODULE_AUTHOR("Cytronics & Melware, Eicon Networks");
 MODULE_SUPPORTED_DEVICE("Eicon diva drivers");
 MODULE_LICENSE("GPL");
 
-#define MAX_DESCRIPTORS  32
-
 #define DBG_MINIMUM  (DL_LOG + DL_FTL + DL_ERR)
 #define DBG_DEFAULT  (DBG_MINIMUM + DL_XLOG + DL_REG)
 
@@ -50,8 +48,8 @@ extern void DIVA_DIDD_Read(void *, int);
 static struct proc_dir_entry *proc_didd;
 struct proc_dir_entry *proc_net_eicon = NULL;
 
-EXPORT_SYMBOL_NOVERS(DIVA_DIDD_Read);
-EXPORT_SYMBOL_NOVERS(proc_net_eicon);
+EXPORT_SYMBOL(DIVA_DIDD_Read);
+EXPORT_SYMBOL(proc_net_eicon);
 
 static char *getrev(const char *revision)
 {

@@ -2072,6 +2072,7 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		neigh_sysctl_unregister(idev->nd_parms);
 #endif
 		neigh_parms_release(&nd_tbl, idev->nd_parms);
+		neigh_ifdown(&nd_tbl, dev);
 		in6_dev_put(idev);
 	}
 	return 0;

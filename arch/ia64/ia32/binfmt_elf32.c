@@ -187,7 +187,7 @@ ia32_setup_arg_pages (struct linux_binprm *bprm, int executable_stack)
 		mpnt->vm_page_prot = (mpnt->vm_flags & VM_EXEC)?
 					PAGE_COPY_EXEC: PAGE_COPY;
 		insert_vm_struct(current->mm, mpnt);
-		current->mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
+		current->mm->stack_vm = current->mm->total_vm = vma_pages(mpnt);
 	}
 
 	for (i = 0 ; i < MAX_ARG_PAGES ; i++) {

@@ -74,6 +74,8 @@ int ia32_copy_siginfo_to_user(siginfo_t32 __user *to, siginfo_t *from)
 			err |= __put_user(from->si_utime, &to->si_utime);
 			err |= __put_user(from->si_stime, &to->si_stime);
 			err |= __put_user(from->si_status, &to->si_status);
+			err |= put_compat_rusage(&from->si_rusage,
+						 &to->si_rusage);
 		default:
 		case __SI_KILL >> 16:
 			err |= __put_user(from->si_uid, &to->si_uid);
@@ -115,7 +117,8 @@ int ia32_copy_siginfo_from_user(siginfo_t *to, siginfo_t32 __user *from)
 }
 
 asmlinkage long
-sys32_sigsuspend(int history0, int history1, old_sigset_t mask, struct pt_regs regs)
+sys32_sigsuspend(int history0, int history1, old_sigset_t mask,
+		 struct pt_regs *regs)
 {
 	sigset_t saveset;
 
@@ -126,11 +129,11 @@ sys32_sigsuspend(int history0, int history1, old_sigset_t mask, struct pt_regs r
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 
-	regs.rax = -EINTR;
+	regs->rax = -EINTR;
 	while (1) {
 		current->state = TASK_INTERRUPTIBLE;
 		schedule();
-		if (do_signal(&regs, &saveset))
+		if (do_signal(regs, &saveset))
 			return -EINTR;
 	}
 }
@@ -138,7 +141,7 @@ sys32_sigsuspend(int history0, int history1, old_sigset_t mask, struct pt_regs r
 asmlinkage long
 sys32_sigaltstack(const stack_ia32_t __user *uss_ptr,
 		  stack_ia32_t __user *uoss_ptr, 
-		  struct pt_regs regs)
+		  struct pt_regs *regs)
 {
 	stack_t uss,uoss; 
 	int ret;
@@ -155,7 +158,7 @@ sys32_sigaltstack(const stack_ia32_t __user *uss_ptr,
 	}
 	seg = get_fs(); 
 	set_fs(KERNEL_DS); 
-	ret = do_sigaltstack(uss_ptr ? &uss : NULL, &uoss, regs.rsp);
+	ret = do_sigaltstack(uss_ptr ? &uss : NULL, &uoss, regs->rsp);
 	set_fs(seg); 
 	if (ret >= 0 && uoss_ptr)  {
 		if (!access_ok(VERIFY_WRITE,uoss_ptr,sizeof(stack_ia32_t)) ||
@@ -274,9 +277,9 @@ badframe:
 	return 1;
 }
 
-asmlinkage long sys32_sigreturn(struct pt_regs regs)
+asmlinkage long sys32_sigreturn(struct pt_regs *regs)
 {
-	struct sigframe __user *frame = (struct sigframe __user *)(regs.rsp-8);
+	struct sigframe __user *frame = (struct sigframe __user *)(regs->rsp-8);
 	sigset_t set;
 	unsigned int eax;
 
@@ -294,20 +297,23 @@ asmlinkage long sys32_sigreturn(struct pt_regs regs)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 	
-	if (ia32_restore_sigcontext(&regs, &frame->sc, &eax))
+	if (ia32_restore_sigcontext(regs, &frame->sc, &eax))
 		goto badframe;
 	return eax;
 
 badframe:
-	signal_fault(&regs, frame, "32bit sigreturn"); 
+	signal_fault(regs, frame, "32bit sigreturn");
 	return 0;
 }	
 
-asmlinkage long sys32_rt_sigreturn(struct pt_regs regs)
+asmlinkage long sys32_rt_sigreturn(struct pt_regs *regs)
 {
-	struct rt_sigframe __user *frame = (struct rt_sigframe __user *)(regs.rsp - 4);
+	struct rt_sigframe __user *frame;
 	sigset_t set;
 	unsigned int eax;
+	struct pt_regs tregs;
+
+	frame = (struct rt_sigframe __user *)(regs->rsp - 4);
 
 	if (verify_area(VERIFY_READ, frame, sizeof(*frame)))
 		goto badframe;
@@ -320,16 +326,17 @@ asmlinkage long sys32_rt_sigreturn(struct pt_regs regs)
 	recalc_sigpending();
 	spin_unlock_irq(&current->sighand->siglock);
 	
-	if (ia32_restore_sigcontext(&regs, &frame->uc.uc_mcontext, &eax))
+	if (ia32_restore_sigcontext(regs, &frame->uc.uc_mcontext, &eax))
 		goto badframe;
 
-	if (sys32_sigaltstack(&frame->uc.uc_stack, NULL, regs) == -EFAULT)
+	tregs = *regs;
+	if (sys32_sigaltstack(&frame->uc.uc_stack, NULL, &tregs) == -EFAULT)
 		goto badframe;
 
 	return eax;
 
 badframe:
-	signal_fault(&regs,frame,"32bit rt sigreturn");
+	signal_fault(regs,frame,"32bit rt sigreturn");
 	return 0;
 }	
 
@@ -484,7 +491,13 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 	regs->ss = __USER32_DS; 
 
 	set_fs(USER_DS);
-	regs->eflags &= ~TF_MASK;
+	if (regs->eflags & TF_MASK) {
+		if (current->ptrace & PT_PTRACED) {
+			ptrace_notify(SIGTRAP);
+		} else {
+			regs->eflags &= ~TF_MASK;
+		}
+	}
 
 #if DEBUG_SIG
 	printk("SIG deliver (%s:%d): sp=%p pc=%p ra=%p\n",
@@ -494,9 +507,7 @@ void ia32_setup_frame(int sig, struct k_sigaction *ka,
 	return;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	signal_fault(regs,frame,"32bit signal deliver");
+	force_sigsegv(sig, current);
 }
 
 void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
@@ -580,7 +591,13 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	regs->ss = __USER32_DS; 
 
 	set_fs(USER_DS);
-	regs->eflags &= ~TF_MASK;
+	if (regs->eflags & TF_MASK) {
+		if (current->ptrace & PT_PTRACED) {
+			ptrace_notify(SIGTRAP);
+		} else {
+			regs->eflags &= ~TF_MASK;
+		}
+	}
 
 #if DEBUG_SIG
 	printk("SIG deliver (%s:%d): sp=%p pc=%p ra=%p\n",
@@ -590,8 +607,6 @@ void ia32_setup_rt_frame(int sig, struct k_sigaction *ka, siginfo_t *info,
 	return;
 
 give_sigsegv:
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	signal_fault(regs, frame, "32bit rt signal setup"); 
+	force_sigsegv(sig, current);
 }
 

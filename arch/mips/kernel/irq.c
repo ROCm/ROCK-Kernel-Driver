@@ -144,14 +144,16 @@ inline void synchronize_irq(unsigned int irq)
 int handle_IRQ_event(unsigned int irq, struct pt_regs * regs, struct irqaction * action)
 {
 	int status = 1;	/* Force the "do bottom halves" bit */
-	int retval = 0;
+	int ret, retval = 0;
 
 	if (!(action->flags & SA_INTERRUPT))
 		local_irq_enable();
 
 	do {
-		status |= action->flags;
-		retval |= action->handler(irq, action->dev_id, regs);
+		ret = action->handler(irq, action->dev_id, regs);
+		if (ret == IRQ_HANDLED)
+			status |= action->flags;
+		retval |= ret;
 		action = action->next;
 	} while (action);
 	if (status & SA_SAMPLE_RANDOM)
@@ -872,30 +874,6 @@ static int irq_affinity_write_proc (struct file *file, const char *buffer,
 
 #endif
 
-static int prof_cpu_mask_read_proc (char *page, char **start, off_t off,
-			int count, int *eof, void *data)
-{
-	int len = cpumask_scnprintf(page, count, *(cpumask_t *)data);
-	if (count - len < 2)
-		return -EINVAL;
-	len += sprintf(page + len, "\n");
-	return len;
-}
-
-static int prof_cpu_mask_write_proc (struct file *file, const char *buffer,
-					unsigned long count, void *data)
-{
-	cpumask_t *mask = (cpumask_t *)data, new_value;
-	unsigned long full_count = count, err;
-
-	err = cpumask_parse(buffer, count, new_value);
-	if (err)
-		return err;
-
-	*mask = new_value;
-	return full_count;
-}
-
 #define MAX_NAMELEN 10
 
 static void register_irq_proc (unsigned int irq)
@@ -931,26 +909,15 @@ static void register_irq_proc (unsigned int irq)
 #endif
 }
 
-unsigned long prof_cpu_mask = -1;
-
 void init_irq_proc (void)
 {
-	struct proc_dir_entry *entry;
 	int i;
 
 	/* create /proc/irq */
 	root_irq_dir = proc_mkdir("irq", 0);
 
 	/* create /proc/irq/prof_cpu_mask */
-	entry = create_proc_entry("prof_cpu_mask", 0600, root_irq_dir);
-
-	if (!entry)
-	    return;
-
-	entry->nlink = 1;
-	entry->data = (void *)&prof_cpu_mask;
-	entry->read_proc = prof_cpu_mask_read_proc;
-	entry->write_proc = prof_cpu_mask_write_proc;
+	create_prof_cpu_mask(root_irq_dir);
 
 	/*
 	 * Create entries for all existing IRQs.

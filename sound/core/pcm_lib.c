@@ -128,12 +128,29 @@ void snd_pcm_playback_silence(snd_pcm_substream_t *substream, snd_pcm_uframes_t 
 	}
 }
 
+static void xrun(snd_pcm_substream_t *substream)
+{
+	snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+#ifdef CONFIG_SND_DEBUG
+	if (substream->pstr->xrun_debug) {
+		snd_printd(KERN_DEBUG "XRUN: pcmC%dD%d%c\n",
+			   substream->pcm->card->number,
+			   substream->pcm->device,
+			   substream->stream ? 'c' : 'p');
+		if (substream->pstr->xrun_debug > 1)
+			dump_stack();
+	}
+#endif
+}
+
 static inline snd_pcm_uframes_t snd_pcm_update_hw_ptr_pos(snd_pcm_substream_t *substream,
 							  snd_pcm_runtime_t *runtime)
 {
 	snd_pcm_uframes_t pos;
 
 	pos = substream->ops->pointer(substream);
+	if (pos == SNDRV_PCM_POS_XRUN)
+		return pos; /* XRUN */
 	if (runtime->tstamp_mode & SNDRV_PCM_TSTAMP_MMAP)
 		snd_timestamp_now((snd_timestamp_t*)&runtime->status->tstamp, runtime->tstamp_timespec);
 #ifdef CONFIG_SND_DEBUG
@@ -158,19 +175,10 @@ static inline int snd_pcm_update_hw_ptr_post(snd_pcm_substream_t *substream,
 	if (avail > runtime->avail_max)
 		runtime->avail_max = avail;
 	if (avail >= runtime->stop_threshold) {
-		snd_pcm_stop(substream,
-			     runtime->status->state == SNDRV_PCM_STATE_DRAINING ?
-			     SNDRV_PCM_STATE_SETUP : SNDRV_PCM_STATE_XRUN);
-#ifdef CONFIG_SND_DEBUG
-		if (substream->pstr->xrun_debug) {
-			snd_printd(KERN_DEBUG "XRUN: pcmC%dD%d%c\n",
-				   substream->pcm->card->number,
-				   substream->pcm->device,
-				   substream->stream ? 'c' : 'p');
-			if (substream->pstr->xrun_debug > 1)
-				dump_stack();
-		}
-#endif
+		if (substream->runtime->status->state == SNDRV_PCM_STATE_DRAINING)
+			snd_pcm_stop(substream, SNDRV_PCM_STATE_SETUP);
+		else
+			xrun(substream);
 		return -EPIPE;
 	}
 	if (avail >= runtime->control->avail_min)
@@ -186,6 +194,10 @@ static inline int snd_pcm_update_hw_ptr_interrupt(snd_pcm_substream_t *substream
 	snd_pcm_sframes_t delta;
 
 	pos = snd_pcm_update_hw_ptr_pos(substream, runtime);
+	if (pos == SNDRV_PCM_POS_XRUN) {
+		xrun(substream);
+		return -EPIPE;
+	}
 	if (runtime->period_size == runtime->buffer_size)
 		goto __next_buf;
 	new_hw_ptr = runtime->hw_ptr_base + pos;
@@ -230,6 +242,10 @@ int snd_pcm_update_hw_ptr(snd_pcm_substream_t *substream)
 
 	old_hw_ptr = runtime->status->hw_ptr;
 	pos = snd_pcm_update_hw_ptr_pos(substream, runtime);
+	if (pos == SNDRV_PCM_POS_XRUN) {
+		xrun(substream);
+		return -EPIPE;
+	}
 	new_hw_ptr = runtime->hw_ptr_base + pos;
 
 	delta = old_hw_ptr - new_hw_ptr;
@@ -887,22 +903,18 @@ int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime, unsigned int cond,
 	va_list args;
 	va_start(args, dep);
 	if (constrs->rules_num >= constrs->rules_all) {
-		snd_pcm_hw_rule_t *old = constrs->rules;
-		if (constrs->rules_all == 0)
-			constrs->rules_all = 32;
-		else {
-			old = constrs->rules;
-			constrs->rules_all += 10;
-		}
-		constrs->rules = snd_kcalloc(constrs->rules_all * sizeof(*c),
-					     GFP_KERNEL);
-		if (!constrs->rules)
+		snd_pcm_hw_rule_t *new;
+		unsigned int new_rules = constrs->rules_all + 16;
+		new = kcalloc(new_rules, sizeof(*c), GFP_KERNEL);
+		if (!new)
 			return -ENOMEM;
-		if (old) {
-			memcpy(constrs->rules, old,
+		if (constrs->rules) {
+			memcpy(new, constrs->rules,
 			       constrs->rules_num * sizeof(*c));
-			kfree(old);
+			kfree(constrs->rules);
 		}
+		constrs->rules = new;
+		constrs->rules_all = new_rules;
 	}
 	c = &constrs->rules[constrs->rules_num];
 	c->cond = cond;
@@ -911,7 +923,7 @@ int snd_pcm_hw_rule_add(snd_pcm_runtime_t *runtime, unsigned int cond,
 	c->private = private;
 	k = 0;
 	while (1) {
-		snd_assert(k < sizeof(c->deps) / sizeof(c->deps[0]), return -EINVAL);
+		snd_assert(k < ARRAY_SIZE(c->deps), return -EINVAL);
 		c->deps[k++] = dep;
 		if (dep < 0)
 			break;
@@ -1109,7 +1121,7 @@ static int snd_pcm_hw_rule_pow2(snd_pcm_hw_params_t *params, snd_pcm_hw_rule_t *
 		1<<24, 1<<25, 1<<26, 1<<27, 1<<28, 1<<29, 1<<30
 	};
 	return snd_interval_list(hw_param_interval(params, rule->var),
-				 sizeof(pow2_sizes)/sizeof(int), pow2_sizes, 0);
+				 ARRAY_SIZE(pow2_sizes), pow2_sizes, 0);
 }		
 
 /**
@@ -1769,12 +1781,14 @@ static int snd_pcm_lib_ioctl_reset(snd_pcm_substream_t *substream,
 				   void *arg)
 {
 	snd_pcm_runtime_t *runtime = substream->runtime;
+	unsigned long flags;
+	snd_pcm_stream_lock_irqsave(substream, flags);
 	if (snd_pcm_running(substream) &&
-	    snd_pcm_update_hw_ptr(substream) >= 0) {
+	    snd_pcm_update_hw_ptr(substream) >= 0)
 		runtime->status->hw_ptr %= runtime->buffer_size;
-		return 0;
-	}
-	runtime->status->hw_ptr = 0;
+	else
+		runtime->status->hw_ptr = 0;
+	snd_pcm_stream_unlock_irqrestore(substream, flags);
 	return 0;
 }
 

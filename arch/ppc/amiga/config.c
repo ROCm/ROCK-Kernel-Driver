@@ -423,9 +423,6 @@ void __init config_amiga(void)
   mach_floppy_setup    = amiga_floppy_setup;
 #endif
   mach_reset           = amiga_reset;
-#ifdef CONFIG_DUMMY_CONSOLE
-  conswitchp           = &dummy_con;
-#endif
 #ifdef CONFIG_HEARTBEAT
   mach_heartbeat = amiga_heartbeat;
 #endif

@@ -12,7 +12,6 @@
 
 #include "nonstdio.h"
 #include "of1275.h"
-#include "zlib.h"
 
 /* Passed from the linker */
 extern char __image_begin, __image_end;

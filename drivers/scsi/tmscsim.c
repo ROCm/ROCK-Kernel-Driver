@@ -240,17 +240,15 @@
 #include <linux/spinlock.h>
 #include <asm/io.h>
 
-#if 0
 #include <scsi/scsi.h>
 #include <scsi/scsi_cmnd.h>
 #include <scsi/scsi_device.h>
-#else
-#include "scsi.h"
-#endif
 #include <scsi/scsi_host.h>
 #include <scsi/scsicam.h>
 
-#include "dc390.h"
+
+#define DC390_BANNER "Tekram DC390/AM53C974"
+#define DC390_VERSION "2.1d 2004-05-27"
 
 #define PCI_DEVICE_ID_AMD53C974 	PCI_DEVICE_ID_AMD_SCSI
 
@@ -291,20 +289,14 @@ static void dc390_SRBdone( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struc
 static void dc390_DoingSRB_Done( struct dc390_acb* pACB, struct scsi_cmnd * cmd);
 static void dc390_ScsiRstDetect( struct dc390_acb* pACB );
 static void dc390_ResetSCSIBus( struct dc390_acb* pACB );
-static void __inline__ dc390_RequestSense( struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB );
-static void __inline__ dc390_InvalidCmd( struct dc390_acb* pACB );
-static void __inline__ dc390_EnableMsgOut_Abort (struct dc390_acb*, struct dc390_srb*);
+static void dc390_EnableMsgOut_Abort(struct dc390_acb*, struct dc390_srb*);
 static irqreturn_t do_DC390_Interrupt( int, void *, struct pt_regs *);
 
 static int    dc390_initAdapter(struct Scsi_Host *psh, unsigned long io_port, u8 Irq, u8 index );
 static void   dc390_updateDCB (struct dc390_acb* pACB, struct dc390_dcb* pDCB);
 
-static int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
-			    off_t offset, int length, int inout);
-
 static struct dc390_acb*	dc390_pACB_start= NULL;
 static struct dc390_acb*	dc390_pACB_current = NULL;
-static unsigned long	dc390_lastabortedpid = 0;
 static u32	dc390_laststatus = 0;
 static u8	dc390_adapterCnt = 0;
 
@@ -617,11 +609,7 @@ static struct dc390_dcb __inline__ *dc390_findDCB ( struct dc390_acb* pACB, u8 i
      {
 	pDCB = pDCB->pNextDCB;
 	if (pDCB == pACB->pLinkDCB)
-	  {
-	     DCBDEBUG(printk (KERN_WARNING "DC390: DCB not found (DCB=%p, DCBmap[%2x]=%2x)\n",
-			      pDCB, id, pACB->DCBmap[id]));
 	     return 0;
-	  }
      }
    DCBDEBUG1( printk (KERN_DEBUG "DCB %p (%02x,%02x) found.\n",	\
 		      pDCB, pDCB->TargetID, pDCB->TargetLUN));
@@ -942,8 +930,6 @@ static void dc390_BuildSRB (struct scsi_cmnd *pcmd, struct dc390_dcb* pDCB, stru
 {
     pSRB->pSRBDCB = pDCB;
     pSRB->pcmd = pcmd;
-    //pSRB->ScsiCmdLen = pcmd->cmd_len;
-    //memcpy (pSRB->CmdBlock, pcmd->cmnd, pcmd->cmd_len);
     
     pSRB->SGIndex = 0;
     pSRB->AdaptStatus = 0;
@@ -991,28 +977,6 @@ static int DC390_queue_command(struct scsi_cmnd *cmd,
     struct dc390_srb*   pSRB;
     struct dc390_acb*   pACB = (struct dc390_acb*) cmd->device->host->hostdata;
 
-    DEBUG0(/*  if(pACB->scan_devices) */	\
-	printk(KERN_INFO "DC390: Queue Cmd=%02x,Tgt=%d,LUN=%d (pid=%li), buffer=%p\n",\
-	       cmd->cmnd[0],cmd->device->id,cmd->device->lun,cmd->pid, cmd->buffer));
-
-    /* TODO: Change the policy: Always accept TEST_UNIT_READY or INQUIRY 
-     * commands and alloc a DCB for the device if not yet there. DCB will
-     * be removed in dc390_SRBdone if SEL_TIMEOUT */
-    if (!(pACB->scan_devices) && !(pACB->DCBmap[cmd->device->id] & (1 << cmd->device->lun))) {
-	printk(KERN_INFO "DC390: Ignore target %02x lun %02x\n",
-		cmd->device->id, cmd->device->lun); 
-	goto fail;
-    }
-
-    /* Should it be: BUG_ON(!pDCB); ? */
-
-    if (!pDCB)
-    {  /* should never happen */
-	printk (KERN_ERR "DC390: no DCB found, target %02x lun %02x\n", 
-		cmd->device->id, cmd->device->lun);
-	goto fail;
-    }
-
     pACB->Cmds++;
     cmd->scsi_done = done;
     cmd->result = 0;
@@ -1033,145 +997,7 @@ static int DC390_queue_command(struct scsi_cmnd *cmd,
 
  requeue:
     return 1;
- fail:
-    cmd->result = DID_BAD_TARGET << 16;
-    done(cmd);
-    return 0;
 }
-
-/* We ignore mapping problems, as we expect everybody to respect 
- * valid partition tables. Waiting for complaints ;-) */
-
-#ifdef CONFIG_SCSI_DC390T_TRADMAP
-/* 
- * The next function, partsize(), is copied from scsicam.c.
- *
- * This is ugly code duplication, but I didn't find another way to solve it:
- * We want to respect the partition table and if it fails, we apply the 
- * DC390 BIOS heuristic. Too bad, just calling scsicam_bios_param() doesn't do
- * the job, because we don't know, whether the values returned are from
- * the part. table or determined by setsize(). Unfortunately the setsize() 
- * values differ from the ones chosen by the DC390 BIOS.
- *
- * Looking forward to seeing suggestions for a better solution! KG, 98/10/14
- */
-#include <asm/unaligned.h>
-
-/*
- * Function : static int partsize(unsigned char *buf, unsigned long 
- *     capacity,unsigned int *cyls, unsigned int *hds, unsigned int *secs);
- *
- * Purpose : to determine the BIOS mapping used to create the partition
- *	table, storing the results in *cyls, *hds, and *secs 
- *
- * Returns : -1 on failure, 0 on success.
- *
- */
-
-static int partsize(unsigned char *buf, unsigned long capacity,
-    unsigned int  *cyls, unsigned int *hds, unsigned int *secs) {
-    struct partition *p, *largest = NULL;
-    int i, largest_cyl;
-    int cyl, ext_cyl, end_head, end_cyl, end_sector;
-    unsigned int logical_end, physical_end, ext_physical_end;
-    
-
-    if (*(unsigned short *) (buf+64) == 0xAA55) {
-	for (largest_cyl = -1, p = (struct partition *) buf, 
-    	    i = 0; i < 4; ++i, ++p) {
-    	    if (!p->sys_ind)
-    	    	continue;
-    	    cyl = p->cyl + ((p->sector & 0xc0) << 2);
-    	    if (cyl > largest_cyl) {
-    	    	largest_cyl = cyl;
-    	    	largest = p;
-    	    }
-    	}
-    }
-
-    if (largest) {
-    	end_cyl = largest->end_cyl + ((largest->end_sector & 0xc0) << 2);
-    	end_head = largest->end_head;
-    	end_sector = largest->end_sector & 0x3f;
-
-    	physical_end =  end_cyl * (end_head + 1) * end_sector +
-    	    end_head * end_sector + end_sector;
-
-	/* This is the actual _sector_ number at the end */
-	logical_end = get_unaligned(&largest->start_sect)
-			+ get_unaligned(&largest->nr_sects);
-
-	/* This is for >1023 cylinders */
-        ext_cyl= (logical_end-(end_head * end_sector + end_sector))
-                                        /(end_head + 1) / end_sector;
-	ext_physical_end = ext_cyl * (end_head + 1) * end_sector +
-            end_head * end_sector + end_sector;
-
-    	if ((logical_end == physical_end) ||
-	    (end_cyl==1023 && ext_physical_end==logical_end)) {
-    	    *secs = end_sector;
-    	    *hds = end_head + 1;
-    	    *cyls = capacity / ((end_head + 1) * end_sector);
-    	    return 0;
-    	}
-    }
-    return -1;
-}
-
-/***********************************************************************
- * Function:
- *   DC390_bios_param
- *
- * Description:
- *   Return the disk geometry for the given SCSI device.
- *   Respect the partition table, otherwise try own heuristic
- *
- * Note:
- *   In contrary to other externally callable funcs (DC390_), we don't lock
- ***********************************************************************/
-static int DC390_bios_param (struct scsi_device *sdev, struct block_device *bdev,
-			     sector_t capacity, int geom[])
-{
-    int heads, sectors, cylinders;
-    struct dc390_acb* pACB = (struct dc390_acb*) sdev->host->hostdata;
-    int ret_code = -1;
-    int size = capacity;
-    unsigned char *buf;
-
-    if ((buf = scsi_bios_ptable(bdev)))
-    {
-	/* try to infer mapping from partition table */
-	ret_code = partsize (buf, (unsigned long) size, (unsigned int *) geom + 2,
-			     (unsigned int *) geom + 0, (unsigned int *) geom + 1);
-	kfree (buf);
-    }
-    if (ret_code == -1)
-    {
-	heads = 64;
-	sectors = 32;
-	cylinders = size / (heads * sectors);
-
-	if ( (pACB->Gmode2 & GREATER_1G) && (cylinders > 1024) )
-	{
-		heads = 255;
-		sectors = 63;
-		cylinders = size / (heads * sectors);
-	}
-
-	geom[0] = heads;
-	geom[1] = sectors;
-	geom[2] = cylinders;
-    }
-
-    return (0);
-}
-#else
-static int DC390_bios_param (struct scsi_device *sdev, struct block_device *bdev,
-			     sector_t capacity, int geom[])
-{
-    return scsicam_bios_param (bdev, capacity, geom);
-}
-#endif
 
 static void dc390_dumpinfo (struct dc390_acb* pACB, struct dc390_dcb* pDCB, struct dc390_srb* pSRB)
 {
@@ -1219,146 +1045,54 @@ static void dc390_dumpinfo (struct dc390_acb* pACB, struct dc390_dcb* pDCB, stru
 }
 
 
-/***********************************************************************
- * Function : int DC390_abort (struct scsi_cmnd *cmd)
- *
- * Purpose : Abort an errant SCSI command
- *
- * Inputs : cmd - command to abort
- *
- * Returns : 0 on success, -1 on failure.
- *
- * Status: Buggy !
- ***********************************************************************/
-
-static int DC390_abort (struct scsi_cmnd *cmd)
+static int DC390_abort(struct scsi_cmnd *cmd)
 {
-    struct dc390_dcb *pDCB = (struct dc390_dcb*) cmd->device->hostdata;
-    struct dc390_srb *pSRB, *psrb;
-    u32  count, i;
-    int   status;
-    //unsigned long sbac;
-    struct dc390_acb *pACB = (struct dc390_acb*) cmd->device->host->hostdata;
+	struct dc390_acb *pACB = (struct dc390_acb*) cmd->device->host->hostdata;
+	struct dc390_dcb *pDCB = (struct dc390_dcb*) cmd->device->hostdata;
+	struct dc390_srb *pSRB, *psrb;
 
-    printk ("DC390: Abort command (pid %li, Device %02i-%02i)\n",
-	    cmd->pid, cmd->device->id, cmd->device->lun);
+	printk("DC390: Abort command (pid %li, Device %02i-%02i)\n",
+	       cmd->pid, cmd->device->id, cmd->device->lun);
 
-    if( !pDCB ) goto  NOT_RUN;
+	pSRB = pDCB->pWaitingSRB;
+	if (!pSRB)
+		goto on_going;
 
-    /* Added 98/07/02 KG */
-    /*
-    pSRB = pDCB->pActiveSRB;
-    if (pSRB && pSRB->pcmd == cmd )
-	goto ON_GOING;
-     */
-    
-    pSRB = pDCB->pWaitingSRB;
-    if( !pSRB )
-	goto  ON_GOING;
+	/* Now scan Waiting queue */
+	if (pSRB->pcmd != cmd) {
+		psrb = pSRB;
+		if (!(psrb->pNextSRB))
+			goto on_going;
 
-    /* Now scan Waiting queue */
-    if( pSRB->pcmd == cmd )
-    {
-	pDCB->pWaitingSRB = pSRB->pNextSRB;
-	goto  IN_WAIT;
-    }
-    else
-    {
-	psrb = pSRB;
-	if( !(psrb->pNextSRB) )
-	    goto ON_GOING;
-	while( psrb->pNextSRB->pcmd != cmd )
-	{
-	    psrb = psrb->pNextSRB;
-	    if( !(psrb->pNextSRB) || psrb == pSRB)
-		goto ON_GOING;
-	}
-	pSRB = psrb->pNextSRB;
-	psrb->pNextSRB = pSRB->pNextSRB;
-	if( pSRB == pDCB->pWaitLast )
-	    pDCB->pWaitLast = psrb;
-IN_WAIT:
-	dc390_Free_insert (pACB, pSRB);
+		while (psrb->pNextSRB->pcmd != cmd) {
+			psrb = psrb->pNextSRB;
+			if (!(psrb->pNextSRB) || psrb == pSRB)
+				goto on_going;
+		}
+
+		pSRB = psrb->pNextSRB;
+		psrb->pNextSRB = pSRB->pNextSRB;
+		if (pSRB == pDCB->pWaitLast)
+			pDCB->pWaitLast = psrb;
+	} else
+		pDCB->pWaitingSRB = pSRB->pNextSRB;
+
+	dc390_Free_insert(pACB, pSRB);
 	pDCB->WaitSRBCnt--;
 	INIT_LIST_HEAD((struct list_head*)&cmd->SCp);
-	status = SCSI_ABORT_SUCCESS;
-	goto  ABO_X;
-    }
 
-    /* SRB has already been sent ! */
-ON_GOING:
-    /* abort() is too stupid for already sent commands at the moment. 
-     * If it's called we are in trouble anyway, so let's dump some info 
-     * into the syslog at least. (KG, 98/08/20,99/06/20) */
-    dc390_dumpinfo (pACB, pDCB, pSRB);
-    pSRB = pDCB->pGoingSRB;
-    pDCB->DCBFlag |= ABORT_DEV_;
-    /* Now for the hard part: The command is currently processed */
-    for( count = pDCB->GoingSRBCnt, i=0; i<count; i++)
-    {
-	if( pSRB->pcmd != cmd )
-	    pSRB = pSRB->pNextSRB;
-	else
-	{
-	    if( (pACB->pActiveDCB == pDCB) && (pDCB->pActiveSRB == pSRB) )
-	    {
-		status = SCSI_ABORT_BUSY;
-		printk ("DC390: Abort current command (pid %li, SRB %p)\n",
-			cmd->pid, pSRB);
-		goto  ABO_X;
-	    }
-	    else
-	    {
-		status = SCSI_ABORT_SNOOZE;
-		goto  ABO_X;
-	    }
-	}
-    }
+	return SUCCESS;
 
-NOT_RUN:
-    status = SCSI_ABORT_NOT_RUNNING;
+on_going:
+	/* abort() is too stupid for already sent commands at the moment. 
+	 * If it's called we are in trouble anyway, so let's dump some info 
+	 * into the syslog at least. (KG, 98/08/20,99/06/20) */
+	dc390_dumpinfo(pACB, pDCB, pSRB);
 
-ABO_X:
-    cmd->result = DID_ABORT << 16;
-    printk(KERN_INFO "DC390: Aborted pid %li with status %i\n", cmd->pid, status);
-#if 0
-    if (cmd->pid == dc390_lastabortedpid) /* repeated failure ? */
-	{
-		/* Let's do something to help the bus getting clean again */
-		DC390_write8 (DMA_Cmd, DMA_IDLE_CMD);
-		DC390_write8 (ScsiCmd, DMA_COMMAND);
-		//DC390_write8 (ScsiCmd, CLEAR_FIFO_CMD);
-		//DC390_write8 (ScsiCmd, RESET_ATN_CMD);
-		DC390_write8 (ScsiCmd, NOP_CMD);
-		//udelay (10000);
-		//DC390_read8 (INT_Status);
-		//DC390_write8 (ScsiCmd, EN_SEL_RESEL);
-	}
-    sbac = DC390_read32 (DMA_ScsiBusCtrl);
-    if (sbac & SCSI_BUSY)
-    {	/* clear BSY, SEL and ATN */
-	printk (KERN_WARNING "DC390: Reset SCSI device: ");
-	//DC390_write32 (DMA_ScsiBusCtrl, (sbac | SCAM) & ~SCSI_LINES);
-	//udelay (250);
-	//sbac = DC390_read32 (DMA_ScsiBusCtrl);
-	//printk ("%08lx ", sbac);
-	//DC390_write32 (DMA_ScsiBusCtrl, sbac & ~(SCSI_LINES | SCAM));
-	//udelay (100);
-	//sbac = DC390_read32 (DMA_ScsiBusCtrl);
-	//printk ("%08lx ", sbac);
-	DC390_write8 (ScsiCmd, RST_DEVICE_CMD);
-	udelay (250);
-	DC390_write8 (ScsiCmd, NOP_CMD);
-	sbac = DC390_read32 (DMA_ScsiBusCtrl);
-	printk ("%08lx\n", sbac);
-    }
-#endif
-    dc390_lastabortedpid = cmd->pid;
-    //do_DC390_Interrupt (pACB->IRQLevel, 0, 0);
-#ifndef USE_NEW_EH	
-    if (status == SCSI_ABORT_SUCCESS) cmd->scsi_done(cmd);
-#endif	
-    return( status );
+	pDCB->DCBFlag |= ABORT_DEV_;
+	printk(KERN_INFO "DC390: Aborted pid %li\n", cmd->pid);
+
+	return FAILED;
 }
 
 
@@ -1385,93 +1119,38 @@ static void dc390_ResetDevParam( struct dc390_acb* pACB )
 
 }
 
-#if 0
-/* Moves all SRBs from Going to Waiting for all DCBs */
-static void dc390_RecoverSRB( struct dc390_acb* pACB )
+static int DC390_bus_reset (struct scsi_cmnd *cmd)
 {
-    struct dc390_dcb *pDCB, *pdcb;
-    struct dc390_srb *psrb, *psrb2;
-    u32   cnt, i;
+	struct dc390_acb*    pACB = (struct dc390_acb*) cmd->device->host->hostdata;
+	u8   bval;
 
-    pDCB = pACB->pLinkDCB;
-    if( !pDCB ) return;
-    pdcb = pDCB;
-    do
-    {
-	cnt = pdcb->GoingSRBCnt;
-	psrb = pdcb->pGoingSRB;
-	for (i=0; i<cnt; i++)
-	{
-	    psrb2 = psrb;
-	    psrb = psrb->pNextSRB;
-/*	    dc390_RewaitSRB( pDCB, psrb ); */
-	    if( pdcb->pWaitingSRB )
-	    {
-		psrb2->pNextSRB = pdcb->pWaitingSRB;
-		pdcb->pWaitingSRB = psrb2;
-	    }
-	    else
-	    {
-		pdcb->pWaitingSRB = psrb2;
-		pdcb->pWaitLast = psrb2;
-		psrb2->pNextSRB = NULL;
-	    }
-	}
-	pdcb->GoingSRBCnt = 0;
-	pdcb->pGoingSRB = NULL;
-	pdcb->TagMask = 0;
-	pdcb = pdcb->pNextDCB;
-    } while( pdcb != pDCB );
-}
-#endif
+	del_timer (&pACB->Waiting_Timer);
 
-/***********************************************************************
- * Function : int DC390_reset (struct scsi_cmnd *cmd, ...)
- *
- * Purpose : perform a hard reset on the SCSI bus
- *
- * Inputs : cmd - command which caused the SCSI RESET
- *	    resetFlags - how hard to try
- *
- * Returns : 0 on success.
- ***********************************************************************/
+	bval = DC390_read8(CtrlReg1) | DIS_INT_ON_SCSI_RST;
+	DC390_write8(CtrlReg1, bval);	/* disable IRQ on bus reset */
 
-static int DC390_reset (struct scsi_cmnd *cmd)
-{
-    u8   bval;
-    struct dc390_acb*    pACB = (struct dc390_acb*) cmd->device->host->hostdata;
+	pACB->ACBFlag |= RESET_DEV;
+	dc390_ResetSCSIBus(pACB);
 
-    printk(KERN_INFO "DC390: RESET ... ");
-
-    if (timer_pending (&pACB->Waiting_Timer)) del_timer (&pACB->Waiting_Timer);
-    bval = DC390_read8 (CtrlReg1);
-    bval |= DIS_INT_ON_SCSI_RST;
-    DC390_write8 (CtrlReg1, bval);	/* disable IRQ on bus reset */
-
-    pACB->ACBFlag |= RESET_DEV;
-    dc390_ResetSCSIBus( pACB );
-
-    dc390_ResetDevParam( pACB );
-    udelay (1000);
-    pACB->pScsiHost->last_reset = jiffies + 3*HZ/2 
+	dc390_ResetDevParam(pACB);
+	udelay(1000);
+	pACB->pScsiHost->last_reset = jiffies + 3*HZ/2 
 		+ HZ * dc390_eepromBuf[pACB->AdapterIndex][EE_DELAY];
     
-    DC390_write8 (ScsiCmd, CLEAR_FIFO_CMD);
-    DC390_read8 (INT_Status);		/* Reset Pending INT */
+	DC390_write8(ScsiCmd, CLEAR_FIFO_CMD);
+	DC390_read8(INT_Status);		/* Reset Pending INT */
 
-    dc390_DoingSRB_Done( pACB, cmd );
-    /* dc390_RecoverSRB (pACB); */
-    pACB->pActiveDCB = NULL;
+	dc390_DoingSRB_Done(pACB, cmd);
 
-    pACB->ACBFlag = 0;
-    bval = DC390_read8 (CtrlReg1);
-    bval &= ~DIS_INT_ON_SCSI_RST;
-    DC390_write8 (CtrlReg1, bval);	/* re-enable interrupt */
+	pACB->pActiveDCB = NULL;
+	pACB->ACBFlag = 0;
 
-    dc390_Waiting_process( pACB );
+	bval = DC390_read8(CtrlReg1) & ~DIS_INT_ON_SCSI_RST;
+	DC390_write8(CtrlReg1, bval);	/* re-enable interrupt */
 
-    printk("done\n");
-    return( SCSI_RESET_SUCCESS );
+	dc390_Waiting_process(pACB);
+
+	return SUCCESS;
 }
 
 #include "scsiiom.c"
@@ -1548,7 +1227,6 @@ static void dc390_linkSRB( struct dc390_acb* pACB )
 static void __devinit dc390_initACB (struct Scsi_Host *psh, unsigned long io_port, u8 Irq, u8 index)
 {
     struct dc390_acb*    pACB;
-    u8   i;
 
     psh->can_queue = MAX_CMD_QUEUE;
     psh->cmd_per_lun = MAX_CMD_PER_LUN;
@@ -1595,8 +1273,6 @@ static void __devinit dc390_initACB (struct Scsi_Host *psh, unsigned long io_por
     dc390_linkSRB( pACB );
     pACB->pTmpSRB = &pACB->TmpSRB;
     dc390_initSRB( pACB->pTmpSRB );
-    for(i=0; i<MAX_SCSI_ID; i++)
-	pACB->DCBmap[i] = 0;
     pACB->sel_timeout = SEL_TIMEOUT;
     pACB->glitch_cfg = EATER_25NS;
     pACB->Cmds = pACB->CmdInQ = pACB->CmdOutOfSRB = 0;
@@ -1757,7 +1433,6 @@ static int dc390_slave_alloc(struct scsi_device *scsi_device)
 			pDCB->CtrlR4 |= NEGATE_REQACKDATA | NEGATE_REQACK;
 	}
 
-	pACB->DCBmap[id] |= (1 << lun);
 	dc390_updateDCB(pACB, pDCB);
 
 	pACB->scan_devices = 1;
@@ -1781,8 +1456,6 @@ static void dc390_slave_destroy(struct scsi_device *scsi_device)
 
 	BUG_ON(pDCB->GoingSRBCnt > 1);
 	
-	pACB->DCBmap[pDCB->TargetID] &= ~(1 << pDCB->TargetLUN);
-   
 	if (pDCB == pACB->pLinkDCB) {
 		if (pACB->pLastDCB == pDCB) {
 			pDCB->pNextDCB = NULL;
@@ -1818,15 +1491,13 @@ static int dc390_slave_configure(struct scsi_device *scsi_device)
 static struct scsi_host_template driver_template = {
 	.module			= THIS_MODULE,
 	.proc_name		= "tmscsim", 
-	.proc_info		= DC390_proc_info,
 	.name			= DC390_BANNER " V" DC390_VERSION,
 	.slave_alloc		= dc390_slave_alloc,
 	.slave_configure	= dc390_slave_configure,
 	.slave_destroy		= dc390_slave_destroy,
 	.queuecommand		= DC390_queue_command,
 	.eh_abort_handler	= DC390_abort,
-	.eh_bus_reset_handler	= DC390_reset,
-	.bios_param		= DC390_bios_param,
+	.eh_bus_reset_handler	= DC390_bus_reset,
 	.can_queue		= 42,
 	.this_id		= 7,
 	.sg_tablesize		= SG_ALL,
@@ -1938,152 +1609,6 @@ static void __devexit dc390_remove_one(struct pci_dev *dev)
 	scsi_host_put(scsi_host);
 	pci_set_drvdata(dev, NULL);
 }
-
-/********************************************************************
- * Function: DC390_proc_info(char* buffer, char **start,
- *			     off_t offset, int length, int hostno, int inout)
- *
- * Purpose: return SCSI Adapter/Device Info
- *
- * Input: buffer: Pointer to a buffer where to write info
- *	  start :
- *	  offset:
- *	  hostno: Host adapter index
- *	  inout : Read (=0) or set(!=0) info
- *
- * Output: buffer: contains info
- *	   length; length of info in buffer
- *
- * return value: length
- *
- ********************************************************************/
-
-#undef SPRINTF
-#define SPRINTF(args...) pos += sprintf(pos, ## args)
-
-#define YESNO(YN)		\
- if (YN) SPRINTF(" Yes ");	\
- else SPRINTF(" No  ")
-
-
-static int DC390_proc_info (struct Scsi_Host *shpnt, char *buffer, char **start,
-			    off_t offset, int length, int inout)
-{
-  int dev, spd, spd1;
-  char *pos = buffer;
-  struct dc390_acb* pACB;
-  struct dc390_dcb* pDCB;
-
-  pACB = dc390_pACB_start;
-
-  while(pACB != (struct dc390_acb*)-1)
-     {
-	if (shpnt == pACB->pScsiHost)
-		break;
-	pACB = pACB->pNextACB;
-     }
-
-  if (pACB == (struct dc390_acb*)-1) return(-ESRCH);
-
-  if(inout) /* Has data been written to the file ? */
-      return -ENOSYS;
-   
-  SPRINTF("Tekram DC390/AM53C974 PCI SCSI Host Adapter, ");
-  SPRINTF("Driver Version %s\n", DC390_VERSION);
-
-  SPRINTF("SCSI Host Nr %i, ", shpnt->host_no);
-  SPRINTF("%s Adapter Nr %i\n", dc390_adapname, pACB->AdapterIndex);
-  SPRINTF("IOPortBase 0x%04x, ", pACB->IOPortBase);
-  SPRINTF("IRQ %02i\n", pACB->IRQLevel);
-
-  SPRINTF("MaxID %i, MaxLUN %i, ", shpnt->max_id, shpnt->max_lun);
-  SPRINTF("AdapterID %i, SelTimeout %i ms, DelayReset %i s\n", 
-	  shpnt->this_id, (pACB->sel_timeout*164)/100,
-	  dc390_eepromBuf[pACB->AdapterIndex][EE_DELAY]);
-
-  SPRINTF("TagMaxNum %i, Status 0x%02x, ACBFlag 0x%02x, GlitchEater %i ns\n",
-	  pACB->TagMaxNum, pACB->status, pACB->ACBFlag, GLITCH_TO_NS(pACB->glitch_cfg)*12);
-
-  SPRINTF("Statistics: Cmnds %li, Cmnds not sent directly %i, Out of SRB conds %i\n",
-	  pACB->Cmds, pACB->CmdInQ, pACB->CmdOutOfSRB);
-  SPRINTF("            Lost arbitrations %i, Sel. connected %i, Connected: %s\n", 
-	  pACB->SelLost, pACB->SelConn, pACB->Connected? "Yes": "No");
-   
-  SPRINTF("Nr of DCBs: %i\n", pACB->DCBCnt);
-  SPRINTF("Map of attached LUNs: %02x %02x %02x %02x %02x %02x %02x %02x\n",
-	  pACB->DCBmap[0], pACB->DCBmap[1], pACB->DCBmap[2], pACB->DCBmap[3], 
-	  pACB->DCBmap[4], pACB->DCBmap[5], pACB->DCBmap[6], pACB->DCBmap[7]);
-
-  SPRINTF("Idx ID LUN Prty Sync DsCn SndS TagQ NegoPeriod SyncSpeed SyncOffs MaxCmd\n");
-
-  pDCB = pACB->pLinkDCB;
-  for (dev = 0; dev < pACB->DCBCnt; dev++)
-     {
-      SPRINTF("%02i  %02i  %02i ", dev, pDCB->TargetID, pDCB->TargetLUN);
-      YESNO(pDCB->DevMode & PARITY_CHK_);
-      YESNO(pDCB->SyncMode & SYNC_NEGO_DONE);
-      YESNO(pDCB->DevMode & EN_DISCONNECT_);
-      YESNO(pDCB->DevMode & SEND_START_);
-      YESNO(pDCB->SyncMode & EN_TAG_QUEUEING);
-      if (pDCB->SyncOffset & 0x0f)
-      {
-	 int sp = pDCB->SyncPeriod; if (! (pDCB->CtrlR3 & FAST_SCSI)) sp++;
-	 SPRINTF("  %03i ns ", (pDCB->NegoPeriod) << 2);
-	 spd = 40/(sp); spd1 = 40%(sp);
-	 spd1 = (spd1 * 10 + sp/2) / (sp);
-	 SPRINTF("   %2i.%1i M      %02i", spd, spd1, (pDCB->SyncOffset & 0x0f));
-      }
-      else SPRINTF(" (%03i ns)                 ", (pDCB->NegoPeriod) << 2);
-      /* Add more info ...*/
-      SPRINTF ("      %02i\n", pDCB->MaxCommand);
-      pDCB = pDCB->pNextDCB;
-     }
-    if (timer_pending(&pACB->Waiting_Timer)) SPRINTF ("Waiting queue timer running\n");
-    else SPRINTF ("\n");
-    pDCB = pACB->pLinkDCB;
-	
-    for (dev = 0; dev < pACB->DCBCnt; dev++)
-    {
-	struct dc390_srb* pSRB;
-	if (pDCB->WaitSRBCnt) 
-		    SPRINTF ("DCB (%02i-%i): Waiting: %i:", pDCB->TargetID, pDCB->TargetLUN,
-			     pDCB->WaitSRBCnt);
-	for (pSRB = pDCB->pWaitingSRB; pSRB; pSRB = pSRB->pNextSRB)
-		SPRINTF(" %li", pSRB->pcmd->pid);
-	if (pDCB->GoingSRBCnt) 
-		    SPRINTF ("\nDCB (%02i-%i): Going  : %i:", pDCB->TargetID, pDCB->TargetLUN,
-			     pDCB->GoingSRBCnt);
-	for (pSRB = pDCB->pGoingSRB; pSRB; pSRB = pSRB->pNextSRB)
-#if 0 //def DC390_DEBUGTRACE
-		SPRINTF(" %s\n  ", pSRB->debugtrace);
-#else
-		SPRINTF(" %li", pSRB->pcmd->pid);
-#endif
-	if (pDCB->WaitSRBCnt || pDCB->GoingSRBCnt) SPRINTF ("\n");
-	pDCB = pDCB->pNextDCB;
-    }
-	
-#ifdef DC390_DEBUGDCB
-    SPRINTF ("DCB list for ACB %p:\n", pACB);
-    pDCB = pACB->pLinkDCB;
-    SPRINTF ("%p", pDCB);
-    for (dev = 0; dev < pACB->DCBCnt; dev++, pDCB=pDCB->pNextDCB)
-	SPRINTF ("->%p", pDCB->pNextDCB);
-    SPRINTF("\n");
-#endif
-  
-  *start = buffer + offset;
-
-  if (pos - buffer < offset)
-    return 0;
-  else if (pos - buffer - offset < length)
-    return pos - buffer - offset;
-  else
-    return length;
-}
-
-#undef YESNO
-#undef SPRINTF
 
 static struct pci_driver dc390_driver = {
 	.name           = "tmscsim",

@@ -107,6 +107,8 @@ struct ub_dev;
  * A second ought to be enough for a 32K transfer (UB_MAX_SECTORS)
  * even if a webcam hogs the bus (famous last words).
  * Some CDs need a second to spin up though.
+ * ZIP drive rejects commands when it's not spinning,
+ * so it does not need long timeouts either.
  */
 #define UB_URB_TIMEOUT	(HZ*2)
 #define UB_CTRL_TIMEOUT	(HZ/2) /* 500ms ought to be enough to clear a stall */
@@ -287,6 +289,7 @@ struct ub_dev {
 
 	struct ub_completion work_done;
 	struct urb work_urb;
+	struct timer_list work_timer;
 	int last_pipe;			/* What might need clearing */
 	struct bulk_cb_wrap work_bcb;
 	struct bulk_cs_wrap work_bcs;
@@ -776,16 +779,20 @@ static int ub_scsi_cmd_start(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	sc->last_pipe = sc->send_bulk_pipe;
 	usb_fill_bulk_urb(&sc->work_urb, sc->dev, sc->send_bulk_pipe,
 	    bcb, US_BULK_CB_WRAP_LEN, ub_urb_complete, sc);
-	sc->work_urb.timeout = UB_URB_TIMEOUT;
+	sc->work_urb.transfer_flags = URB_ASYNC_UNLINK;
 
 	/* Fill what we shouldn't be filling, because usb-storage did so. */
 	sc->work_urb.actual_length = 0;
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
+	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+	add_timer(&sc->work_timer);
+
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
 		/* XXX Clear stalls */
 		printk("ub: cmd #%d start failed (%d)\n", cmd->tag, rc); /* P3 */
+		del_timer(&sc->work_timer);
 		ub_complete(&sc->work_done);
 		return rc;
 	}
@@ -793,6 +800,19 @@ static int ub_scsi_cmd_start(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	cmd->state = UB_CMDST_CMD;
 	ub_cmdtr_state(sc, cmd);
 	return 0;
+}
+
+/*
+ * Timeout handler.
+ */
+static void ub_urb_timeout(unsigned long arg)
+{
+	struct ub_dev *sc = (struct ub_dev *) arg;
+	unsigned long flags;
+
+	spin_lock_irqsave(&sc->lock, flags);
+	usb_unlink_urb(&sc->work_urb);
+	spin_unlock_irqrestore(&sc->lock, flags);
 }
 
 /*
@@ -943,14 +963,18 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 		sc->last_pipe = pipe;
 		usb_fill_bulk_urb(&sc->work_urb, sc->dev, pipe,
 		    cmd->data, cmd->len, ub_urb_complete, sc);
-		sc->work_urb.timeout = UB_URB_TIMEOUT;
+		sc->work_urb.transfer_flags = URB_ASYNC_UNLINK;
 		sc->work_urb.actual_length = 0;
 		sc->work_urb.error_count = 0;
 		sc->work_urb.status = 0;
 
+		sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+		add_timer(&sc->work_timer);
+
 		if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
 			/* XXX Clear stalls */
 			printk("ub: data #%d submit failed (%d)\n", cmd->tag, rc); /* P3 */
+			del_timer(&sc->work_timer);
 			ub_complete(&sc->work_done);
 			ub_state_done(sc, cmd, rc);
 			return;
@@ -1034,16 +1058,20 @@ static void ub_scsi_urb_compl(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 			usb_fill_bulk_urb(&sc->work_urb, sc->dev,
 			    sc->recv_bulk_pipe, &sc->work_bcs,
 			    US_BULK_CS_WRAP_LEN, ub_urb_complete, sc);
-			sc->work_urb.timeout = UB_URB_TIMEOUT;
+			sc->work_urb.transfer_flags = URB_ASYNC_UNLINK;
 			sc->work_urb.actual_length = 0;
 			sc->work_urb.error_count = 0;
 			sc->work_urb.status = 0;
+
+			sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+			add_timer(&sc->work_timer);
 
 			rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC);
 			if (rc != 0) {
 				/* XXX Clear stalls */
 				printk("%s: CSW #%d submit failed (%d)\n",
 				   sc->name, cmd->tag, rc); /* P3 */
+				del_timer(&sc->work_timer);
 				ub_complete(&sc->work_done);
 				ub_state_done(sc, cmd, rc);
 				return;
@@ -1153,14 +1181,18 @@ static void ub_state_stat(struct ub_dev *sc, struct ub_scsi_cmd *cmd)
 	sc->last_pipe = sc->recv_bulk_pipe;
 	usb_fill_bulk_urb(&sc->work_urb, sc->dev, sc->recv_bulk_pipe,
 	    &sc->work_bcs, US_BULK_CS_WRAP_LEN, ub_urb_complete, sc);
-	sc->work_urb.timeout = UB_URB_TIMEOUT;
+	sc->work_urb.transfer_flags = URB_ASYNC_UNLINK;
 	sc->work_urb.actual_length = 0;
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
+	sc->work_timer.expires = jiffies + UB_URB_TIMEOUT;
+	add_timer(&sc->work_timer);
+
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
 		/* XXX Clear stalls */
 		printk("ub: CSW #%d submit failed (%d)\n", cmd->tag, rc); /* P3 */
+		del_timer(&sc->work_timer);
 		ub_complete(&sc->work_done);
 		ub_state_done(sc, cmd, rc);
 		return;
@@ -1233,14 +1265,17 @@ static int ub_submit_clear_stall(struct ub_dev *sc, struct ub_scsi_cmd *cmd,
 	UB_INIT_COMPLETION(sc->work_done);
 
 	usb_fill_control_urb(&sc->work_urb, sc->dev, sc->send_ctrl_pipe,
-	    (unsigned char*) cr, NULL, 0,
-	    ub_urb_complete, sc);
-	sc->work_urb.timeout = UB_CTRL_TIMEOUT;
+	    (unsigned char*) cr, NULL, 0, ub_urb_complete, sc);
+	sc->work_urb.transfer_flags = URB_ASYNC_UNLINK;
 	sc->work_urb.actual_length = 0;
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
+	sc->work_timer.expires = jiffies + UB_CTRL_TIMEOUT;
+	add_timer(&sc->work_timer);
+
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_ATOMIC)) != 0) {
+		del_timer(&sc->work_timer);
 		ub_complete(&sc->work_done);
 		return rc;
 	}
@@ -1653,6 +1688,12 @@ static void ub_probe_urb_complete(struct urb *urb, struct pt_regs *pt)
 	complete(cop);
 }
 
+static void ub_probe_timeout(unsigned long arg)
+{
+	struct completion *cop = (struct completion *) arg;
+	complete(cop);
+}
+
 /*
  * Clear initial stalls.
  */
@@ -1661,6 +1702,7 @@ static int ub_probe_clear_stall(struct ub_dev *sc, int stalled_pipe)
 	int endp;
 	struct usb_ctrlrequest *cr;
 	struct completion compl;
+	struct timer_list timer;
 	int rc;
 
 	init_completion(&compl);
@@ -1677,20 +1719,34 @@ static int ub_probe_clear_stall(struct ub_dev *sc, int stalled_pipe)
 	cr->wLength = cpu_to_le16(0);
 
 	usb_fill_control_urb(&sc->work_urb, sc->dev, sc->send_ctrl_pipe,
-	    (unsigned char*) cr, NULL, 0,
-	    ub_probe_urb_complete, &compl);
-	sc->work_urb.timeout = UB_CTRL_TIMEOUT;
+	    (unsigned char*) cr, NULL, 0, ub_probe_urb_complete, &compl);
+	sc->work_urb.transfer_flags = 0;
 	sc->work_urb.actual_length = 0;
 	sc->work_urb.error_count = 0;
 	sc->work_urb.status = 0;
 
+	init_timer(&timer);
+	timer.function = ub_probe_timeout;
+	timer.data = (unsigned long) &compl;
+	timer.expires = jiffies + UB_CTRL_TIMEOUT;
+	add_timer(&timer);
+
 	if ((rc = usb_submit_urb(&sc->work_urb, GFP_KERNEL)) != 0) {
 		printk(KERN_WARNING
 		     "%s: Unable to submit a probe clear (%d)\n", sc->name, rc);
+		del_timer_sync(&timer);
 		return rc;
 	}
 
 	wait_for_completion(&compl);
+
+	del_timer_sync(&timer);
+	/*
+	 * Most of the time, URB was done and dev set to NULL, and so
+	 * the unlink bounces out with ENODEV. We do not call usb_kill_urb
+	 * because we still think about a backport to 2.4.
+	 */
+	usb_unlink_urb(&sc->work_urb);
 
 	/* reset the endpoint toggle */
 	usb_settoggle(sc->dev, endp, usb_pipeout(sc->last_pipe), 0);
@@ -1766,6 +1822,10 @@ static int ub_probe(struct usb_interface *intf,
 	usb_init_urb(&sc->work_urb);
 	tasklet_init(&sc->tasklet, ub_scsi_action, (unsigned long)sc);
 	atomic_set(&sc->poison, 0);
+
+	init_timer(&sc->work_timer);
+	sc->work_timer.data = (unsigned long) sc;
+	sc->work_timer.function = ub_urb_timeout;
 
 	ub_init_completion(&sc->work_done);
 	sc->work_done.done = 1;		/* A little yuk, but oh well... */

@@ -168,9 +168,7 @@ void __init select_idle_routine(const struct cpuinfo_x86 *c)
 	if (cpu_has(c, X86_FEATURE_MWAIT)) {
 		/*
 		 * Skip, if setup has overridden idle.
-		 * Also, take care of system with asymmetric CPUs.
-		 * Use, mwait_idle only if all cpus support it.
-		 * If not, we fallback to default_idle()
+		 * One CPU supports mwait => All CPUs supports mwait
 		 */
 		if (!pm_idle) {
 			if (!printed) {
@@ -179,10 +177,7 @@ void __init select_idle_routine(const struct cpuinfo_x86 *c)
 			}
 			pm_idle = mwait_idle;
 		}
-		return;
 	}
-	pm_idle = default_idle;
-	return;
 }
 
 static int __init idle_setup (char *str)
@@ -546,17 +541,16 @@ void set_personality_64bit(void)
 	clear_thread_flag(TIF_IA32); 
 }
 
-asmlinkage long sys_fork(struct pt_regs regs)
+asmlinkage long sys_fork(struct pt_regs *regs)
 {
-	return do_fork(SIGCHLD, regs.rsp, &regs, 0, NULL, NULL);
+	return do_fork(SIGCHLD, regs->rsp, regs, 0, NULL, NULL);
 }
 
-asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void __user *parent_tid, void __user *child_tid, struct pt_regs regs)
+asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void __user *parent_tid, void __user *child_tid, struct pt_regs *regs)
 {
 	if (!newsp)
-		newsp = regs.rsp;
-	return do_fork(clone_flags & ~CLONE_IDLETASK, newsp, &regs, 0, 
-		    parent_tid, child_tid);
+		newsp = regs->rsp;
+	return do_fork(clone_flags, newsp, regs, 0, parent_tid, child_tid);
 }
 
 /*
@@ -569,9 +563,9 @@ asmlinkage long sys_clone(unsigned long clone_flags, unsigned long newsp, void _
  * do not have enough call-clobbered registers to hold all
  * the information you need.
  */
-asmlinkage long sys_vfork(struct pt_regs regs)
+asmlinkage long sys_vfork(struct pt_regs *regs)
 {
-	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs.rsp, &regs, 0, 
+	return do_fork(CLONE_VFORK | CLONE_VM | SIGCHLD, regs->rsp, regs, 0,
 		    NULL, NULL);
 }
 

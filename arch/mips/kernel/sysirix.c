@@ -810,8 +810,8 @@ asmlinkage int irix_times(struct tms * tbuf)
 			return err;
 		err |= __put_user(current->utime, &tbuf->tms_utime);
 		err |= __put_user(current->stime, &tbuf->tms_stime);
-		err |= __put_user(current->cutime, &tbuf->tms_cutime);
-		err |= __put_user(current->cstime, &tbuf->tms_cstime);
+		err |= __put_user(current->signal->cutime, &tbuf->tms_cutime);
+		err |= __put_user(current->signal->cstime, &tbuf->tms_cstime);
 	}
 
 	return err;

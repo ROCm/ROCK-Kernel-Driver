@@ -966,6 +966,11 @@ static int __init ic_bootp_recv(struct sk_buff *skb, struct net_device *dev, str
 				break;
 
 			case DHCPACK:
+				for (i = 0; (dev->dev_addr[i] == b->hw_addr[i])
+						&& (i < dev->addr_len); i++);
+				if (i < dev->addr_len)
+					goto drop_unlock;
+
 				/* Yeah! */
 				break;
 

@@ -349,13 +349,18 @@ void class_device_initialize(struct class_device *class_dev)
 
 int class_device_add(struct class_device *class_dev)
 {
-	struct class * parent;
+	struct class * parent = NULL;
 	struct class_interface * class_intf;
 	int error;
 
 	class_dev = class_device_get(class_dev);
-	if (!class_dev || !strlen(class_dev->class_id))
+	if (!class_dev)
 		return -EINVAL;
+
+	if (!strlen(class_dev->class_id)) {
+		error = -EINVAL;
+		goto register_done;
+	}
 
 	parent = class_get(class_dev->class);
 

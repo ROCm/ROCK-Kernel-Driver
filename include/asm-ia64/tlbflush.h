@@ -48,22 +48,19 @@ local_finish_flush_tlb_mm (struct mm_struct *mm)
 static inline void
 flush_tlb_mm (struct mm_struct *mm)
 {
-	MMU_TRACE('F', smp_processor_id(), mm, mm->context);
 	if (!mm)
-		goto out;
+		return;
 
 	mm->context = 0;
 
 	if (atomic_read(&mm->mm_users) == 0)
-		goto out;		/* happens as a result of exit_mmap() */
+		return;		/* happens as a result of exit_mmap() */
 
 #ifdef CONFIG_SMP
 	smp_flush_tlb_mm(mm);
 #else
 	local_finish_flush_tlb_mm(mm);
 #endif
-  out:
-	MMU_TRACE('f', smp_processor_id(), mm, mm->context);
 }
 
 extern void flush_tlb_range (struct vm_area_struct *vma, unsigned long start, unsigned long end);

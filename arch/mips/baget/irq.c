@@ -180,7 +180,7 @@ skip:
 static void do_IRQ(int irq, struct pt_regs * regs)
 {
 	struct irqaction *action;
-	int do_random, cpu;
+	int ret, do_random, cpu;
 
 	cpu = smp_processor_id();
 	irq_enter();
@@ -194,8 +194,9 @@ static void do_IRQ(int irq, struct pt_regs * regs)
 		action = *(irq + irq_action);
 		do_random = 0;
         	do {
-			do_random |= action->flags;
-			action->handler(irq, action->dev_id, regs);
+			ret = action->handler(irq, action->dev_id, regs);
+			if (ret == IRQ_HANDLED)
+				do_random |= action->flags;
 			action = action->next;
         	} while (action);
 		if (do_random & SA_SAMPLE_RANDOM)

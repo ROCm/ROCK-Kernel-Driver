@@ -1026,12 +1026,6 @@ int attach_mpu401(struct address_info *hw_config, struct module *owner)
 			spin_unlock_irqrestore(&devc->lock,flags);
 	}
 
-	if (!request_region(hw_config->io_base, 2, "mpu401"))
-	{
-		ret = -ENOMEM;
-		goto out_irq;
-	}	
-
 	if (devc->version != 0)
 		if (mpu_cmd(m, 0xC5, 0) >= 0)	/* Set timebase OK */
 			if (mpu_cmd(m, 0xE0, 120) >= 0)		/* Set tempo OK */
@@ -1044,7 +1038,7 @@ int attach_mpu401(struct address_info *hw_config, struct module *owner)
 	{
 		printk(KERN_ERR "mpu401: Can't allocate memory\n");
 		ret = -ENOMEM;
-		goto out_resource;
+		goto out_irq;
 	}
 	if (!(devc->capabilities & MPU_CAP_INTLG))	/* No intelligent mode */
 	{
@@ -1126,13 +1120,12 @@ int attach_mpu401(struct address_info *hw_config, struct module *owner)
 	
 	return 0;
 
-out_resource:
-	release_region(hw_config->io_base, 2);
 out_irq:
 	free_irq(devc->irq, (void *)m);
 out_mididev:
 	sound_unload_mididev(m);
 out_err:
+	release_region(hw_config->io_base, 2);
 	return ret;
 }
 
@@ -1207,16 +1200,11 @@ static void set_uart_mode(int dev, struct mpu_config *devc, int arg)
 
 }
 
-int probe_mpu401(struct address_info *hw_config)
+int probe_mpu401(struct address_info *hw_config, struct resource *ports)
 {
 	int ok = 0;
 	struct mpu_config tmp_devc;
 
-	if (check_region(hw_config->io_base, 2))
-	{
-		printk(KERN_ERR "mpu401: I/O port %x already in use\n\n", hw_config->io_base);
-		return 0;
-	}
 	tmp_devc.base = hw_config->io_base;
 	tmp_devc.irq = hw_config->irq;
 	tmp_devc.initialized = 0;
@@ -1791,10 +1779,16 @@ static int __init init_mpu401(void)
 	/* Can be loaded either for module use or to provide functions
 	   to others */
 	if (io != -1 && irq != -1) {
+		struct resource *ports;
 	        cfg.irq = irq;
 		cfg.io_base = io;
-		if (probe_mpu401(&cfg) == 0)
+		ports = request_region(io, 2, "mpu401");
+		if (!ports)
+			return -EBUSY;
+		if (probe_mpu401(&cfg, ports) == 0) {
+			release_region(io, 2);
 			return -ENODEV;
+		}
 		if ((ret = attach_mpu401(&cfg, THIS_MODULE)))
 			return ret;
 	}

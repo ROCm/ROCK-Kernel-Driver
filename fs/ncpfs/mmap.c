@@ -110,23 +110,19 @@ int ncp_mmap(struct file *file, struct vm_area_struct *vma)
 	
 	DPRINTK("ncp_mmap: called\n");
 
-	if (!ncp_conn_valid(NCP_SERVER(inode))) {
+	if (!ncp_conn_valid(NCP_SERVER(inode)))
 		return -EIO;
-	}
+
 	/* only PAGE_COW or read-only supported now */
 	if (vma->vm_flags & VM_SHARED)
 		return -EINVAL;
-	if (!inode->i_sb || !S_ISREG(inode->i_mode))
-		return -EACCES;
 	/* we do not support files bigger than 4GB... We eventually 
 	   supports just 4GB... */
 	if (((vma->vm_end - vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff 
 	   > (1U << (32 - PAGE_SHIFT)))
 		return -EFBIG;
-	if (!IS_RDONLY(inode)) {
-		inode->i_atime = CURRENT_TIME;
-	}
 
 	vma->vm_ops = &ncp_file_mmap;
+	file_accessed(file);
 	return 0;
 }

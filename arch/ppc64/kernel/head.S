@@ -199,6 +199,7 @@ exception_marker:
 #define EX_R12		24
 #define EX_R13		32
 #define EX_SRR0		40
+#define EX_R3		40	/* SLB miss saves R3, but not SRR0 */
 #define EX_DAR		48
 #define EX_LR		48	/* SLB miss saves LR, but not DAR */
 #define EX_DSISR	56
@@ -322,36 +323,11 @@ label##_Iseries:							\
 	HMT_MEDIUM;							\
 	mtspr	SPRG1,r13;		/* save r13 */			\
 	EXCEPTION_PROLOG_ISERIES_1(PACA_EXGEN);				\
-	lbz	r10,PACAPROFENABLED(r13);				\
-	cmpwi	r10,0;							\
-	bne-	label##_Iseries_profile;				\
-label##_Iseries_prof_ret:						\
 	lbz	r10,PACAPROCENABLED(r13);				\
 	cmpwi	0,r10,0;						\
 	beq-	label##_Iseries_masked;					\
 	EXCEPTION_PROLOG_ISERIES_2;					\
 	b	label##_common;						\
-label##_Iseries_profile:						\
-	ld	r12,PACALPPACA+LPPACASRR1(r13);				\
-	andi.	r12,r12,MSR_PR;		/* Test if in kernel */		\
-	bne	label##_Iseries_prof_ret;				\
-	ld	r11,PACALPPACA+LPPACASRR0(r13);				\
-	ld	r12,PACAPROFSTEXT(r13);	/* _stext */			\
-	subf	r11,r12,r11;		/* offset into kernel */	\
-	lwz	r12,PACAPROFSHIFT(r13);					\
-	srd	r11,r11,r12;						\
-	lwz	r12,PACAPROFLEN(r13);	/* profile table length - 1 */	\
-	cmpd	r11,r12;		/* off end? */			\
-	ble	1f;							\
-	mr	r11,r12;		/* force into last entry */	\
-1:	sldi	r11,r11,2;		/* convert to offset */		\
-	ld	r12,PACAPROFBUFFER(r13);/* profile buffer */		\
-	add	r12,r12,r11;						\
-2:	lwarx	r11,0,r12;		/* atomically increment */	\
-	addi	r11,r11,1;						\
-	stwcx.	r11,0,r12;						\
-	bne-	2b;							\
-	b	label##_Iseries_prof_ret
 
 #ifdef DO_SOFT_DISABLE
 #define DISABLE_INTS				\
@@ -446,21 +422,13 @@ DataAccessSLB_Pseries:
 	std	r10,PACA_EXSLB+EX_R10(r13)
 	std	r11,PACA_EXSLB+EX_R11(r13)
 	std	r12,PACA_EXSLB+EX_R12(r13)
-	std	r3,PACASLBR3(r13)
+	std	r3,PACA_EXSLB+EX_R3(r13)
 	mfspr	r9,SPRG1
 	std	r9,PACA_EXSLB+EX_R13(r13)
 	mfcr	r9
-	clrrdi	r12,r13,32		/* get high part of &label */
-	mfmsr	r10
-	mfspr	r11,SRR0		/* save SRR0 */
-	ori	r12,r12,(.do_slb_miss)@l
-	ori	r10,r10,MSR_IR|MSR_DR	/* DON'T set RI for SLB miss */
-	mtspr	SRR0,r12
 	mfspr	r12,SRR1		/* and SRR1 */
-	mtspr	SRR1,r10
 	mfspr	r3,DAR
-	rfid
-	b	.	/* prevent speculative execution */
+	b	.do_slb_miss		/* Rel. branch works in real mode */
 
 	STD_EXCEPTION_PSERIES(0x400, InstructionAccess)
 
@@ -474,21 +442,13 @@ InstructionAccessSLB_Pseries:
 	std	r10,PACA_EXSLB+EX_R10(r13)
 	std	r11,PACA_EXSLB+EX_R11(r13)
 	std	r12,PACA_EXSLB+EX_R12(r13)
-	std	r3,PACASLBR3(r13)
+	std	r3,PACA_EXSLB+EX_R3(r13)
 	mfspr	r9,SPRG1
 	std	r9,PACA_EXSLB+EX_R13(r13)
 	mfcr	r9
-	clrrdi	r12,r13,32		/* get high part of &label */
-	mfmsr	r10
-	mfspr	r11,SRR0		/* save SRR0 */
-	ori	r12,r12,(.do_slb_miss)@l
-	ori	r10,r10,MSR_IR|MSR_DR	/* DON'T set RI for SLB miss */
-	mtspr	SRR0,r12
 	mfspr	r12,SRR1		/* and SRR1 */
-	mtspr	SRR1,r10
-	mr	r3,r11			/* SRR0 is faulting address */
-	rfid
-	b	.	/* prevent speculative execution */
+	mfspr	r3,SRR0			/* SRR0 is faulting address */
+	b	.do_slb_miss		/* Rel. branch works in real mode */
 
 	STD_EXCEPTION_PSERIES(0x500, HardwareInterrupt)
 	STD_EXCEPTION_PSERIES(0x600, Alignment)
@@ -634,8 +594,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 DataAccessSLB_Iseries:
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_ISERIES_1(PACA_EXSLB)
-	std	r3,PACASLBR3(r13)
-	ld	r11,PACALPPACA+LPPACASRR0(r13)
+	std	r3,PACA_EXSLB+EX_R3(r13)
 	ld	r12,PACALPPACA+LPPACASRR1(r13)
 	mfspr	r3,DAR
 	b	.do_slb_miss
@@ -646,10 +605,9 @@ DataAccessSLB_Iseries:
 InstructionAccessSLB_Iseries:
 	mtspr	SPRG1,r13		/* save r13 */
 	EXCEPTION_PROLOG_ISERIES_1(PACA_EXSLB)
-	std	r3,PACASLBR3(r13)
-	ld	r11,PACALPPACA+LPPACASRR0(r13)
+	std	r3,PACA_EXSLB+EX_R3(r13)
 	ld	r12,PACALPPACA+LPPACASRR1(r13)
-	mr	r3,r11
+	ld	r3,PACALPPACA+LPPACASRR0(r13)
 	b	.do_slb_miss
 
 	MASKABLE_EXCEPTION_ISERIES(0x500, HardwareInterrupt)
@@ -1037,6 +995,9 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	 * interrupts if necessary.
 	 */
 	beq	.ret_from_except_lite
+	/* For a hash failure, we don't bother re-enabling interrupts */
+	ble-	12f
+
 	/*
 	 * hash_page couldn't handle it, set soft interrupt enable back
 	 * to what it was before the trap.  Note that .local_irq_restore
@@ -1047,6 +1008,8 @@ END_FTR_SECTION_IFCLR(CPU_FTR_SLB)
 	b	11f
 #else
 	beq	fast_exception_return   /* Return from exception on success */
+	ble-	12f			/* Failure return from hash_page */
+
 	/* fall through */
 #endif
 
@@ -1064,6 +1027,15 @@ _GLOBAL(handle_page_fault)
 	addi	r3,r1,STACK_FRAME_OVERHEAD
 	lwz	r4,_DAR(r1)
 	bl	.bad_page_fault
+	b	.ret_from_except
+
+/* We have a page fault that hash_page could handle but HV refused
+ * the PTE insertion
+ */
+12:	bl	.save_nvgprs
+	addi	r3,r1,STACK_FRAME_OVERHEAD
+	lwz	r4,_DAR(r1)
+	bl	.low_hash_fault
 	b	.ret_from_except
 
 	/* here we have a segment miss */
@@ -1180,7 +1152,6 @@ _GLOBAL(do_slb_miss)
 	mflr	r10
 
 	stw	r9,PACA_EXSLB+EX_CCR(r13)	/* save CR in exc. frame */
-	std	r11,PACA_EXSLB+EX_SRR0(r13)	/* save SRR0 in exc. frame */
 	std	r10,PACA_EXSLB+EX_LR(r13)	/* save LR */
 
 	bl	.slb_allocate			/* handle it */
@@ -1188,9 +1159,11 @@ _GLOBAL(do_slb_miss)
 	/* All done -- return from exception. */
 
 	ld	r10,PACA_EXSLB+EX_LR(r13)
-	ld	r3,PACASLBR3(r13)
+	ld	r3,PACA_EXSLB+EX_R3(r13)
 	lwz	r9,PACA_EXSLB+EX_CCR(r13)	/* get saved CR */
-	ld	r11,PACA_EXSLB+EX_SRR0(r13)	/* get saved SRR0 */
+#ifdef CONFIG_PPC_ISERIES
+	ld	r11,PACALPPACA+LPPACASRR0(r13)	/* get SRR0 value */
+#endif /* CONFIG_PPC_ISERIES */
 
 	mtlr	r10
 
@@ -1203,8 +1176,10 @@ _GLOBAL(do_slb_miss)
 	mtcrf	0x01,r9		/* slb_allocate uses cr0 and cr7 */
 .machine	pop
 
+#ifdef CONFIG_PPC_ISERIES
 	mtspr	SRR0,r11
 	mtspr	SRR1,r12
+#endif /* CONFIG_PPC_ISERIES */
 	ld	r9,PACA_EXSLB+EX_R9(r13)
 	ld	r10,PACA_EXSLB+EX_R10(r13)
 	ld	r11,PACA_EXSLB+EX_R11(r13)

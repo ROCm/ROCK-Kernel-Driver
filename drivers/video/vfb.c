@@ -496,6 +496,10 @@ int __init vfb_init(void)
 {
 	int ret = 0;
 
+#ifndef MODULE
+	vfb_setup(fb_get_options("vfb"));
+#endif
+
 	if (!vfb_enable)
 		return -ENXIO;
 
@@ -509,6 +513,8 @@ int __init vfb_init(void)
 	return ret;
 }
 
+module_init(vfb_init);
+
 #ifdef MODULE
 static void __exit vfb_exit(void)
 {
@@ -516,7 +522,6 @@ static void __exit vfb_exit(void)
 	driver_unregister(&vfb_driver);
 }
 
-module_init(vfb_init);
 module_exit(vfb_exit);
 
 MODULE_LICENSE("GPL");

@@ -59,6 +59,19 @@ ENTRY(v4_flush_user_cache_range)
  *	- end	 - virtual end address
  */
 ENTRY(v4_coherent_kern_range)
+	/* FALLTHROUGH */
+
+/*
+ *	coherent_user_range(start, end)
+ *
+ *	Ensure coherency between the Icache and the Dcache in the
+ *	region described by start.  If you have non-snooping
+ *	Harvard caches, you need to implement this function.
+ *
+ *	- start  - virtual start address
+ *	- end	 - virtual end address
+ */
+ENTRY(v4_coherent_user_range)
 	mov	pc, lr
 
 /*
@@ -118,6 +131,7 @@ ENTRY(v4_cache_fns)
 	.long	v4_flush_user_cache_all
 	.long	v4_flush_user_cache_range
 	.long	v4_coherent_kern_range
+	.long	v4_coherent_user_range
 	.long	v4_flush_kern_dcache_page
 	.long	v4_dma_inv_range
 	.long	v4_dma_clean_range

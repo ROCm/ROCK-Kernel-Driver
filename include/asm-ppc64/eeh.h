@@ -44,6 +44,7 @@ struct device_node;
 
 extern void __init eeh_init(void);
 unsigned long eeh_check_failure(void *token, unsigned long val);
+int eeh_dn_check_failure (struct device_node *dn, struct pci_dev *dev);
 void *eeh_ioremap(unsigned long addr, void *vaddr);
 void __init pci_addr_cache_build(void);
 
@@ -89,7 +90,15 @@ int eeh_set_option(struct pci_dev *dev, int options);
  */
 #define EEH_POSSIBLE_IO_ERROR(val, type)	((val) == (type)~0)
 
-/* The vaddr will equal the addr if EEH checking is disabled for
+/*
+ * Reads from a device which has been isolated by EEH will return
+ * all 1s.  This macro gives an all-1s value of the given size (in
+ * bytes: 1, 2, or 4) for comparing with the result of a read.
+ */
+#define EEH_IO_ERROR_VALUE(size)	(~0U >> ((4 - (size)) * 8))
+
+/*
+ * The vaddr will equal the addr if EEH checking is disabled for
  * this device.  This is because eeh_ioremap() will not have
  * remapped to 0xA0, and thus both vaddr and addr will be 0xE0...
  */

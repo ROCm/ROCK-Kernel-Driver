@@ -322,7 +322,7 @@ static void r128_cce_init_ring_buffer( drm_device_t *dev,
 	/* The manual (p. 2) says this address is in "VM space".  This
 	 * means it's an offset from the start of AGP space.
 	 */
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 	if ( !dev_priv->is_pci )
 		ring_start = dev_priv->cce_ring->offset - dev->agp->base;
 	else
@@ -467,29 +467,29 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		return DRM_ERR(EINVAL);
 	}
 
-	DRM_FIND_MAP( dev_priv->mmio, init->mmio_offset );
+	dev_priv->mmio = drm_core_findmap(dev, init->mmio_offset);
 	if(!dev_priv->mmio) {
 		DRM_ERROR("could not find mmio region!\n");
 		dev->dev_private = (void *)dev_priv;
 		r128_do_cleanup_cce( dev );
 		return DRM_ERR(EINVAL);
 	}
-	DRM_FIND_MAP( dev_priv->cce_ring, init->ring_offset );
+	dev_priv->cce_ring = drm_core_findmap(dev, init->ring_offset);
 	if(!dev_priv->cce_ring) {
 		DRM_ERROR("could not find cce ring region!\n");
 		dev->dev_private = (void *)dev_priv;
 		r128_do_cleanup_cce( dev );
 		return DRM_ERR(EINVAL);
 	}
-	DRM_FIND_MAP( dev_priv->ring_rptr, init->ring_rptr_offset );
+	dev_priv->ring_rptr = drm_core_findmap(dev, init->ring_rptr_offset);
 	if(!dev_priv->ring_rptr) {
 		DRM_ERROR("could not find ring read pointer!\n");
 		dev->dev_private = (void *)dev_priv;
 		r128_do_cleanup_cce( dev );
 		return DRM_ERR(EINVAL);
 	}
-	DRM_FIND_MAP( dev_priv->buffers, init->buffers_offset );
-	if(!dev_priv->buffers) {
+	dev->agp_buffer_map = drm_core_findmap(dev, init->buffers_offset);
+	if(!dev->agp_buffer_map) {
 		DRM_ERROR("could not find dma buffer region!\n");
 		dev->dev_private = (void *)dev_priv;
 		r128_do_cleanup_cce( dev );
@@ -497,8 +497,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	}
 
 	if ( !dev_priv->is_pci ) {
-		DRM_FIND_MAP( dev_priv->agp_textures,
-			      init->agp_textures_offset );
+		dev_priv->agp_textures = drm_core_findmap(dev, init->agp_textures_offset);
 		if(!dev_priv->agp_textures) {
 			DRM_ERROR("could not find agp texture region!\n");
 			dev->dev_private = (void *)dev_priv;
@@ -511,14 +510,14 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 		(drm_r128_sarea_t *)((u8 *)dev_priv->sarea->handle +
 				     init->sarea_priv_offset);
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 	if ( !dev_priv->is_pci ) {
-		DRM_IOREMAP( dev_priv->cce_ring, dev );
-		DRM_IOREMAP( dev_priv->ring_rptr, dev );
-		DRM_IOREMAP( dev_priv->buffers, dev );
+		drm_core_ioremap( dev_priv->cce_ring, dev );
+		drm_core_ioremap( dev_priv->ring_rptr, dev );
+		drm_core_ioremap( dev->agp_buffer_map, dev );
 		if(!dev_priv->cce_ring->handle ||
 		   !dev_priv->ring_rptr->handle ||
-		   !dev_priv->buffers->handle) {
+		   !dev->agp_buffer_map->handle) {
 			DRM_ERROR("Could not ioremap agp regions!\n");
 			dev->dev_private = (void *)dev_priv;
 			r128_do_cleanup_cce( dev );
@@ -531,10 +530,10 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 			(void *)dev_priv->cce_ring->offset;
 		dev_priv->ring_rptr->handle =
 			(void *)dev_priv->ring_rptr->offset;
-		dev_priv->buffers->handle = (void *)dev_priv->buffers->offset;
+		dev->agp_buffer_map->handle = (void *)dev->agp_buffer_map->offset;
 	}
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 	if ( !dev_priv->is_pci )
 		dev_priv->cce_buffers_offset = dev->agp->base;
 	else
@@ -559,7 +558,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 	R128_WRITE( R128_LAST_DISPATCH_REG,
 		    dev_priv->sarea_priv->last_dispatch );
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 	if ( dev_priv->is_pci ) {
 #endif
 		if (!DRM(ati_pcigart_init)( dev, &dev_priv->phys_pci_gart,
@@ -570,7 +569,7 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 			return DRM_ERR(ENOMEM);
 		}
 		R128_WRITE( R128_PCI_GART_PAGE, dev_priv->bus_pci_gart );
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 	}
 #endif
 
@@ -587,25 +586,23 @@ static int r128_do_init_cce( drm_device_t *dev, drm_r128_init_t *init )
 int r128_do_cleanup_cce( drm_device_t *dev )
 {
 
-#if __HAVE_IRQ
 	/* Make sure interrupts are disabled here because the uninstall ioctl
 	 * may not have been called from userspace and after dev_private
 	 * is freed, it's too late.
 	 */
 	if ( dev->irq_enabled ) DRM(irq_uninstall)(dev);
-#endif
 
 	if ( dev->dev_private ) {
 		drm_r128_private_t *dev_priv = dev->dev_private;
 
-#if __REALLY_HAVE_AGP
+#if __OS_HAS_AGP
 		if ( !dev_priv->is_pci ) {
 			if ( dev_priv->cce_ring != NULL )
-				DRM_IOREMAPFREE( dev_priv->cce_ring, dev );
+				drm_core_ioremapfree( dev_priv->cce_ring, dev );
 			if ( dev_priv->ring_rptr != NULL )
-				DRM_IOREMAPFREE( dev_priv->ring_rptr, dev );
-			if ( dev_priv->buffers != NULL )
-				DRM_IOREMAPFREE( dev_priv->buffers, dev );
+				drm_core_ioremapfree( dev_priv->ring_rptr, dev );
+			if ( dev->agp_buffer_map != NULL )
+				drm_core_ioremapfree( dev->agp_buffer_map, dev );
 		} else
 #endif
 		{

@@ -71,9 +71,6 @@ struct afs_vldbentry {
 
 };
 
-/* probe a volume location server to see if it is still alive */
-extern int afs_rxvl_probe(struct afs_server *server, int alloc_flags);
-
 /* look up a volume location database entry by name */
 extern int afs_rxvl_get_entry_by_name(struct afs_server *server,
 				      const char *volname,

@@ -100,7 +100,6 @@ typedef struct drm_r128_private {
 	drm_local_map_t *mmio;
 	drm_local_map_t *cce_ring;
 	drm_local_map_t *ring_rptr;
-	drm_local_map_t *buffers;
 	drm_local_map_t *agp_textures;
 } drm_r128_private_t;
 
@@ -143,6 +142,12 @@ extern int r128_cce_depth( DRM_IOCTL_ARGS );
 extern int r128_cce_stipple( DRM_IOCTL_ARGS );
 extern int r128_cce_indirect( DRM_IOCTL_ARGS );
 
+extern int r128_driver_vblank_wait(drm_device_t *dev, unsigned int *sequence);
+
+extern irqreturn_t r128_driver_irq_handler( DRM_IRQ_ARGS );
+extern void r128_driver_irq_preinstall( drm_device_t *dev );
+extern void r128_driver_irq_postinstall( drm_device_t *dev );
+extern void r128_driver_irq_uninstall( drm_device_t *dev );
 
 /* Register definitions, register access macros and drmAddMap constants
  * for Rage 128 kernel driver.

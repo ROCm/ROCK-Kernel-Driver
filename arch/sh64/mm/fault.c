@@ -30,7 +30,6 @@
 #include <asm/tlb.h>
 #include <asm/uaccess.h>
 #include <asm/pgalloc.h>
-#include <asm/hardirq.h>
 #include <asm/mmu_context.h>
 #include <asm/registers.h>		/* required by inline asm statements */
 

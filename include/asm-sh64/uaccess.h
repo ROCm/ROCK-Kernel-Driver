@@ -261,6 +261,9 @@ if (__copy_from_user(to,from,n)) \
 	return retval; \
 })
 
+#define __copy_to_user_inatomic __copy_to_user
+#define __copy_from_user_inatomic __copy_from_user
+
 /* XXX: Not sure it works well..
    should be such that: 4byte clear and the rest. */
 extern __kernel_size_t __clear_user(void *addr, __kernel_size_t size);

@@ -31,7 +31,6 @@
 
 #include <asm/mipsregs.h>
 #include <asm/ptrace.h>
-#include <asm/hardirq.h>
 #include <asm/div64.h>
 #include <asm/cpu.h>
 #include <asm/time.h>

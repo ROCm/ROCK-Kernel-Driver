@@ -1298,7 +1298,7 @@ static int set_nowerr(ide_drive_t *drive, int arg)
 	return 0;
 }
 
-static int write_cache (ide_drive_t *drive, int arg)
+static int write_cache(ide_drive_t *drive, int arg)
 {
 	ide_task_t args;
 	int err;
@@ -1508,7 +1508,7 @@ static void idedisk_setup (ide_drive_t *drive)
 		blk_queue_max_sectors(drive->queue, max_s);
 	}
 
-	printk("%s: max request size: %dKiB\n", drive->name, drive->queue->max_sectors / 2);
+	printk(KERN_INFO "%s: max request size: %dKiB\n", drive->name, drive->queue->max_sectors / 2);
 
 	/* Extract geometry if we did not already have one for the drive */
 	if (!drive->cyl || !drive->head || !drive->sect) {
@@ -1537,7 +1537,7 @@ static void idedisk_setup (ide_drive_t *drive)
 
 	/* limit drive capacity to 137GB if LBA48 cannot be used */
 	if (drive->addressing == 0 && drive->capacity64 > 1ULL << 28) {
-		printk("%s: cannot use LBA48 - full capacity "
+		printk(KERN_WARNING "%s: cannot use LBA48 - full capacity "
 		       "%llu sectors (%llu MB)\n",
 		       drive->name, (unsigned long long)drive->capacity64,
 		       sectors_to_MB(drive->capacity64));
@@ -1607,23 +1607,31 @@ static void idedisk_setup (ide_drive_t *drive)
 	if ((id->csfo & 1) || (id->cfs_enable_1 & (1 << 5)))
 		drive->wcache = 1;
 
-	write_cache(drive, 1);
-
 	/*
-	 * decide if we can sanely support flushes and barriers on
-	 * this drive. unfortunately not all drives advertise FLUSH_CACHE
-	 * support even if they support it. So assume FLUSH_CACHE is there
-	 * always. LBA48 drives are newer, so expect it to flag support
-	 * properly. We can safely support FLUSH_CACHE on lba48, if capacity
-	 * doesn't exceed lba28
+	 * We must avoid issuing commands a drive does not understand
+	 * or we may crash it. We check flush cache is supported. We also
+	 * check we have the LBA48 flush cache if the drive capacity is
+	 * too large. By this time we have trimmed the drive capacity if
+	 * LBA48 is not available so we don't need to recheck that.
 	 */
-	barrier = 1;
+	barrier = 0;
+	if (ide_id_has_flush_cache(id))
+		barrier = 1;
 	if (drive->addressing == 1) {
+		/* Can't issue the correct flush ? */
 		if (capacity > (1ULL << 28) && !ide_id_has_flush_cache_ext(id))
 			barrier = 0;
 	}
+	/* Now we have barrier awareness we can be properly conservative
+	   by default with other drives. We turn off write caching when
+	   barrier is not available. Users can adjust this at runtime if
+	   they need unsafe but fast filesystems. This will reduce the
+	   performance of non cache flush supporting disks but it means
+	   you get the data order guarantees the journalling fs's require */
 
-	printk("%s: cache flushes %ssupported\n",
+	write_cache(drive, barrier);
+
+	printk(KERN_DEBUG "%s: cache flushes %ssupported\n",
 		drive->name, barrier ? "" : "not ");
 	if (barrier) {
 		blk_queue_ordered(drive->queue, 1);
@@ -1809,11 +1817,9 @@ static int idedisk_attach(ide_drive_t *drive)
 	if ((!drive->head || drive->head > 16) && !drive->select.b.lba) {
 		printk(KERN_ERR "%s: INVALID GEOMETRY: %d PHYSICAL HEADS?\n",
 			drive->name, drive->head);
-		ide_cacheflush_p(drive);
-		ide_unregister_subdriver(drive);
-		DRIVER(drive)->busy--;
-		goto failed;
-	}
+		drive->attach = 0;
+	} else
+		drive->attach = 1;
 	DRIVER(drive)->busy--;
 	g->minors = 1 << PARTN_BITS;
 	strcpy(g->devfs_name, drive->devfs_name);
@@ -1821,7 +1827,6 @@ static int idedisk_attach(ide_drive_t *drive)
 	g->flags = drive->removable ? GENHD_FL_REMOVABLE : 0;
 	set_capacity(g, current_capacity(drive));
 	g->fops = &idedisk_ops;
-	drive->attach = 1;
 	add_disk(g);
 	return 0;
 failed:

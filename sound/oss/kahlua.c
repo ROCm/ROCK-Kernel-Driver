@@ -156,10 +156,14 @@ static int __devinit probe_one(struct pci_dev *pdev, const struct pci_device_id 
 	hw_config->dma2 = dma16;
 	hw_config->name = "Cyrix XpressAudio";
 	hw_config->driver_use_1 = SB_NO_MIDI | SB_PCI_IRQ;
+
+	if (!request_region(io, 16, "soundblaster"))
+		goto err_out_free;
 	
 	if(sb_dsp_detect(hw_config, 0, 0, NULL)==0)
 	{
 		printk(KERN_ERR "kahlua: audio not responding.\n");
+		release_region(io, 16);
 		goto err_out_free;
 	}
 

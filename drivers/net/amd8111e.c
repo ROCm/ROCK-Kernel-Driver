@@ -719,7 +719,7 @@ static int amd8111e_tx(struct net_device *dev)
 	return 0;
 }
 
-#if CONFIG_AMD8111E_NAPI 
+#ifdef CONFIG_AMD8111E_NAPI
 /* This function handles the driver receive operation in polling mode */
 static int amd8111e_rx_poll(struct net_device *dev, int * budget)
 {

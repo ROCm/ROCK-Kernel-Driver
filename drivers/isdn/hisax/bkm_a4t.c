@@ -265,7 +265,7 @@ setup_bkm_a4t(struct IsdnCard *card)
 	char tmp[64];
 	u_int pci_memaddr = 0, found = 0;
 	I20_REGISTER_FILE *pI20_Regs;
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 #endif
 
 	strcpy(tmp, bkm_a4t_revision);
@@ -275,7 +275,7 @@ setup_bkm_a4t(struct IsdnCard *card)
 	} else
 		return (0);
 
-#if CONFIG_PCI
+#ifdef CONFIG_PCI
 	while ((dev_a4t = pci_find_device(PCI_VENDOR_ID_ZORAN,
 		PCI_DEVICE_ID_ZORAN_36120, dev_a4t))) {
 		u16 sub_sys;

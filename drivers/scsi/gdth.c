@@ -618,9 +618,6 @@ static unchar gdth_direction_tab[0x100] = {
 };
 
 /* __initfunc, __initdata macros */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,0)
-#define __devinitdata
-#endif
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 #define GDTH_INITFUNC(type, func)       type __init func 
 #include <linux/init.h>

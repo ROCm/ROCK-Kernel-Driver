@@ -11,6 +11,7 @@
 #include <sys/ptrace.h>
 #include "user.h"
 #include "kern_util.h"
+#include "user_util.h"
 #include "os.h"
 #include "time_user.h"
 
@@ -26,7 +27,7 @@ static int user_thread_tramp(void *arg)
 
 int user_thread(unsigned long stack, int flags)
 {
-	int pid, status;
+	int pid, status, err;
 
 	pid = clone(user_thread_tramp, (void *) stack_sp(stack), 
 		    flags | CLONE_FILES | SIGCHLD, NULL);
@@ -35,7 +36,8 @@ int user_thread(unsigned long stack, int flags)
 		return(pid);
 	}
 
-	if(waitpid(pid, &status, WUNTRACED) < 0){
+	CATCH_EINTR(err = waitpid(pid, &status, WUNTRACED));
+	if(err < 0){
 		printk("user_thread - waitpid failed, errno = %d\n", errno);
 		return(-errno);
 	}

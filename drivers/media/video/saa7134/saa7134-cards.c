@@ -154,6 +154,26 @@ struct saa7134_board saa7134_boards[] = {
 			.gpio = 0x8000,
 		},
 	},
+	[SAA7134_BOARD_FLYTVPLATINUM] = {
+		/* "Arnaud Quette" <aquette@free.fr> */
+		.name           = "LifeView FlyTV Platinum",
+		.audio_clock    = 0x00200000,
+		.tuner_type     = TUNER_PHILIPS_SECAM,
+		.inputs         = {{
+			.name = name_tv,
+			.vmux = 1,
+			.amux = LINE2,
+			.tv   = 1,
+		},{
+			.name = name_comp1,
+			.vmux = 0,
+			.amux = LINE2,
+		},{
+			.name = name_svideo,
+			.vmux = 8,
+			.amux = LINE2,
+		}},
+	},
 	[SAA7134_BOARD_EMPRESS] = {
 		/* "Gert Vervoort" <gert.vervoort@philips.com> */
 		.name		= "EMPRESS",
@@ -177,7 +197,6 @@ struct saa7134_board saa7134_boards[] = {
 			.name = name_radio,
 			.amux = LINE2,
 		},
-		.i2s_rate  = 48000,
 		.has_ts    = 1,
 		.video_out = CCIR656,
 	},
@@ -243,7 +262,7 @@ struct saa7134_board saa7134_boards[] = {
 		.name		= "KNC One TV-Station RDS / Typhoon TV Tuner RDS",
 		.audio_clock	= 0x00200000,
 		.tuner_type	= TUNER_PHILIPS_FM1216ME_MK3,
-		.need_tda9887   = 1,
+		.tda9887_conf   = TDA9887_PRESENT,
 		.inputs         = {{
 			.name = name_tv,
 			.vmux = 1,
@@ -278,7 +297,7 @@ struct saa7134_board saa7134_boards[] = {
 		.name		= "KNC One TV-Station DVR",
 		.audio_clock	= 0x00200000,
 		.tuner_type	= TUNER_PHILIPS_FM1216ME_MK3,
-		.need_tda9887	= 1,
+		.tda9887_conf	= TDA9887_PRESENT,
 		.gpiomask	= 0x820000,
 		.inputs		= {{
 			.name = name_tv,
@@ -302,7 +321,6 @@ struct saa7134_board saa7134_boards[] = {
 			.amux = LINE2,
 			.gpio = 0x20000,
 		},
-		.i2s_rate	= 48000,
 		.has_ts		= 1,
 		.video_out	= CCIR656,
 	},
@@ -333,7 +351,7 @@ struct saa7134_board saa7134_boards[] = {
 		.name           = "Medion 5044",
 		.audio_clock    = 0x00187de7, // was: 0x00200000,
 		.tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
-		.need_tda9887   = 1,
+		.tda9887_conf   = TDA9887_PRESENT,
 		.inputs         = {{
 			.name = name_tv,
 			.vmux = 1,
@@ -414,7 +432,7 @@ struct saa7134_board saa7134_boards[] = {
 		//.audio_clock    = 0x00200000,
 		.audio_clock    = 0x00187de7,
 		.tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
-		.need_tda9887   = 1,
+		.tda9887_conf   = TDA9887_PRESENT,
 		.inputs = {{
 			.name   = name_tv,
 			.vmux   = 1,
@@ -440,7 +458,7 @@ struct saa7134_board saa7134_boards[] = {
 		.name           = "Typhoon TV+Radio 90031",
 		.audio_clock    = 0x00200000,
 		.tuner_type     = TUNER_PHILIPS_PAL,
-		.need_tda9887   = 1,
+		.tda9887_conf   = TDA9887_PRESENT,
 		.inputs         = {{
 			.name   = name_tv,
 			.vmux   = 1,
@@ -503,7 +521,7 @@ struct saa7134_board saa7134_boards[] = {
                 .name           = "ASUS TV-FM 7134",
                 .audio_clock    = 0x00187de7,
                 .tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
-                .need_tda9887   = 1,
+                .tda9887_conf   = TDA9887_PRESENT,
                 .inputs         = {{
                         .name = name_tv,
                         .vmux = 1,
@@ -607,7 +625,6 @@ struct saa7134_board saa7134_boards[] = {
 			.vmux = 8,
 			.amux = LINE1,
 		}},
-		.i2s_rate  = 48000,
 		.has_ts    = 1,
 		.video_out = CCIR656,
 	},
@@ -666,7 +683,7 @@ struct saa7134_board saa7134_boards[] = {
 		.name           = "AverMedia M156 / Medion 2819",
 		.audio_clock    = 0x00187de7,
 		.tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
-		.need_tda9887   = 1,
+		.tda9887_conf   = TDA9887_PRESENT,
 		.inputs         = {{
 			.name = name_tv,
 			.vmux = 1,
@@ -709,7 +726,6 @@ struct saa7134_board saa7134_boards[] = {
 			.amux = LINE2,
 			.tv   = 1,
 		}},
-		.i2s_rate  = 48000,
 		.has_ts    = 1,
 		.video_out = CCIR656,
         },
@@ -719,7 +735,7 @@ struct saa7134_board saa7134_boards[] = {
 		// probably wrong, the 7133 one is the NTSC version ...
 		// .tuner_type     = TUNER_PHILIPS_FM1236_MK3
                 .tuner_type     = TUNER_LG_NTSC_NEW_TAPC,
-                .need_tda9887   = 1,
+                .tda9887_conf   = TDA9887_PRESENT,
                 .inputs         = {{
                         .name = name_tv,
                         .vmux = 1,
@@ -743,7 +759,7 @@ struct saa7134_board saa7134_boards[] = {
                 .name           = "Pinnacle PCTV Stereo (saa7134)",
                 .audio_clock    = 0x00187de7,
                 .tuner_type     = TUNER_MT2032,
-                .need_tda9887   = 1,
+                .tda9887_conf   = TDA9887_PRESENT,
                 .inputs         = {{
                         .name = name_tv,
                         .vmux = 3,
@@ -957,7 +973,7 @@ struct saa7134_board saa7134_boards[] = {
 		.name           = "AverMedia 305",
 		.audio_clock    = 0x00187de7,
 		.tuner_type     = TUNER_PHILIPS_FM1216ME_MK3,
-		.need_tda9887   = 1,
+		.tda9887_conf   = TDA9887_PRESENT,
 		.inputs         = {{
 			.name = name_tv,
 			.vmux = 1,
@@ -989,7 +1005,7 @@ struct saa7134_board saa7134_boards[] = {
   		.name           = "UPMOST PURPLE TV",
   		.audio_clock    = 0x00187de7,
   		.tuner_type     = TUNER_PHILIPS_FM1236_MK3,
-  		.need_tda9887   = 1,
+  		.tda9887_conf   = TDA9887_PRESENT,
   		.inputs         = {{
   			.name = name_tv,
   			.vmux = 7,
@@ -1000,7 +1016,7 @@ struct saa7134_board saa7134_boards[] = {
   			.vmux = 7,
   			.amux = LINE1,
   		}},
-          },
+	},
 	[SAA7134_BOARD_ITEMS_MTV005] = {
 		/* Norman Jonas <normanjonas@arcor.de> */
 		.name           = "Items MuchTV Plus / IT-005",
@@ -1025,6 +1041,56 @@ struct saa7134_board saa7134_boards[] = {
 			.amux = LINE2,
 		},
 	},
+	[SAA7134_BOARD_CINERGY200] = {
+		.name           = "Terratec Cinergy 200 TV",
+		.audio_clock    = 0x00200000,
+		.tuner_type     = TUNER_PHILIPS_PAL,
+		.inputs         = {{
+       			.name = name_tv,
+			.vmux = 1,
+			.amux = LINE2,
+			.gpio = 0x0000,
+			.tv   = 1,
+		}},
+		.mute = {
+			 .name = name_mute,
+			 .amux = LINE2,
+		},
+	},
+	[SAA7134_BOARD_VIDEOMATE_TV_PVR] = {
+		/* Alain St-Denis <alain@topaze.homeip.net> */
+		.name           = "Compro VideoMate TV PVR/FM",
+		.audio_clock    = 0x00187de7,
+		.tuner_type     = TUNER_PHILIPS_NTSC_M,
+		.gpiomask	= 0x808c0080,
+                .inputs         = {{
+                        .name = name_svideo,
+                        .vmux = 8,
+                        .amux = LINE1,
+			.gpio = 0x00080
+                },{
+                        .name = name_comp1,
+                        .vmux = 3,
+                        .amux = LINE1,
+			.gpio = 0x00080
+                },{
+                        .name = name_tv,
+                        .vmux = 1,
+                        .amux = LINE2,
+                        .tv   = 1,
+			.gpio = 0x00080
+                }},
+		.radio = {
+			 .name = name_radio,
+			 .amux = LINE2,
+			.gpio = 0x80000
+		 },
+		.mute = {
+			.name = name_mute,
+                        .amux = LINE2,
+			.gpio = 0x40000,
+		},
+        },
 };
 const unsigned int saa7134_bcount = ARRAY_SIZE(saa7134_boards);
 
@@ -1086,6 +1152,12 @@ struct pci_device_id saa7134_pci_tbl[] = {
 		.subvendor    = 0x5168,
 		.subdevice    = 0x0138,
 		.driver_data  = SAA7134_BOARD_FLYVIDEO2000,
+        },{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7135,
+		.subvendor    = 0x5168,
+		.subdevice    = 0x0212,
+		.driver_data  = SAA7134_BOARD_FLYTVPLATINUM,
         },{
 		.vendor       = PCI_VENDOR_ID_PHILIPS,
 		.device       = PCI_DEVICE_ID_PHILIPS_SAA7134,
@@ -1219,6 +1291,19 @@ struct pci_device_id saa7134_pci_tbl[] = {
                 .subvendor    = 0x12ab,
                 .subdevice    = 0x0800,
  		.driver_data  = SAA7133_BOARD_UPMOST_PURPLE_TV,
+	},{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7130,
+		.subvendor    = 0x153B,
+		.subdevice    = 0x1152,
+		.driver_data  = SAA7134_BOARD_CINERGY200,
+
+ 	},{
+		.vendor       = PCI_VENDOR_ID_PHILIPS,
+		.device       = PCI_DEVICE_ID_PHILIPS_SAA7130,
+                .subvendor    = 0x185b,
+                .subdevice    = 0xc100,
+		.driver_data  = SAA7134_BOARD_VIDEOMATE_TV_PVR,
 		
  	},{
 		/* --- boards without eeprom + subsystem ID --- */
@@ -1297,6 +1382,7 @@ static struct {
 static void board_flyvideo(struct saa7134_dev *dev)
 {
 #if 0
+	/* non-working attempt to detect the correct tuner type ... */
 	u32 value;
 	int index;
 
@@ -1307,6 +1393,10 @@ static void board_flyvideo(struct saa7134_dev *dev)
 	       fly_list[index].tuner_type);
 	dev->tuner_type = fly_list[index].tuner_type;
 #endif
+	printk("%s: there are different flyvideo cards with different tuners\n"
+	       "%s: out there, you might have to use the tuner=<nr> insmod\n"
+	       "%s: option to override the default value.\n",
+	       dev->name, dev->name, dev->name);
 }
 
 /* ----------------------------------------------------------- */
@@ -1321,8 +1411,10 @@ int saa7134_board_init(struct saa7134_dev *dev)
 	switch (dev->board) {
 	case SAA7134_BOARD_FLYVIDEO2000:
 	case SAA7134_BOARD_FLYVIDEO3000:
-		board_flyvideo(dev);
 		dev->has_remote = 1;
+		/* fall throuth */
+	case SAA7134_BOARD_FLYTVPLATINUM:
+		board_flyvideo(dev);
 		break;
 	case SAA7134_BOARD_CINERGY400:
 	case SAA7134_BOARD_CINERGY600:
@@ -1332,6 +1424,12 @@ int saa7134_board_init(struct saa7134_dev *dev)
 		break;
 	case SAA7134_BOARD_AVACSSMARTTV:
 		dev->has_remote = 1;
+		break;
+	case SAA7134_BOARD_MD5044:
+		printk("%s: seems there are two different versions of the MD5044\n"
+		       "%s: (with the same ID) out there.  If sound doesn't work for\n"
+		       "%s: you try the audio_clock_override=0x200000 insmod option.\n",
+		       dev->name,dev->name,dev->name);
 		break;
 	}
 	return 0;

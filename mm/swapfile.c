@@ -520,14 +520,24 @@ static unsigned long unuse_pgd(struct vm_area_struct * vma, pgd_t *dir,
 }
 
 /* vma->vm_mm->page_table_lock is held */
-static unsigned long unuse_vma(struct vm_area_struct * vma, pgd_t *pgdir,
+static unsigned long unuse_vma(struct vm_area_struct * vma,
 	swp_entry_t entry, struct page *page)
 {
-	unsigned long start = vma->vm_start, end = vma->vm_end;
+	pgd_t *pgdir;
+	unsigned long start, end;
 	unsigned long foundaddr;
 
-	if (start >= end)
-		BUG();
+	if (page->mapping) {
+		start = page_address_in_vma(page, vma);
+		if (start == -EFAULT)
+			return 0;
+		else
+			end = start + PAGE_SIZE;
+	} else {
+		start = vma->vm_start;
+		end = vma->vm_end;
+	}
+	pgdir = pgd_offset(vma->vm_mm, start);
 	do {
 		foundaddr = unuse_pgd(vma, pgdir, start, end - start,
 						entry, page);
@@ -559,9 +569,8 @@ static int unuse_process(struct mm_struct * mm,
 	}
 	spin_lock(&mm->page_table_lock);
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		if (!is_vm_hugetlb_page(vma)) {
-			pgd_t * pgd = pgd_offset(mm, vma->vm_start);
-			foundaddr = unuse_vma(vma, pgd, entry, page);
+		if (vma->anon_vma) {
+			foundaddr = unuse_vma(vma, entry, page);
 			if (foundaddr)
 				break;
 		}

@@ -1,5 +1,5 @@
 config AGP
-	tristate "/dev/agpgart (AGP Support)" if !GART_IOMMU && !M68K
+	tristate "/dev/agpgart (AGP Support)" if !GART_IOMMU && !M68K && !ARM
 	default y if GART_IOMMU
 	---help---
 	  AGP (Accelerated Graphics Port) is a bus system mainly used to

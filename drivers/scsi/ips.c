@@ -474,21 +474,17 @@ static uint32_t ips_statupd_copperhead(ips_ha_t *);
 static uint32_t ips_statupd_copperhead_memio(ips_ha_t *);
 static uint32_t ips_statupd_morpheus(ips_ha_t *);
 static ips_scb_t *ips_getscb(ips_ha_t *);
-static inline void ips_putq_scb_head(ips_scb_queue_t *, ips_scb_t *);
-static inline void ips_putq_scb_tail(ips_scb_queue_t *, ips_scb_t *);
-static inline void ips_putq_wait_head(ips_wait_queue_t *, Scsi_Cmnd *);
-static inline void ips_putq_wait_tail(ips_wait_queue_t *, Scsi_Cmnd *);
-static inline void ips_putq_copp_head(ips_copp_queue_t *,
+static void ips_putq_scb_head(ips_scb_queue_t *, ips_scb_t *);
+static void ips_putq_wait_tail(ips_wait_queue_t *, Scsi_Cmnd *);
+static void ips_putq_copp_tail(ips_copp_queue_t *,
 				      ips_copp_wait_item_t *);
-static inline void ips_putq_copp_tail(ips_copp_queue_t *,
-				      ips_copp_wait_item_t *);
-static inline ips_scb_t *ips_removeq_scb_head(ips_scb_queue_t *);
-static inline ips_scb_t *ips_removeq_scb(ips_scb_queue_t *, ips_scb_t *);
-static inline Scsi_Cmnd *ips_removeq_wait_head(ips_wait_queue_t *);
-static inline Scsi_Cmnd *ips_removeq_wait(ips_wait_queue_t *, Scsi_Cmnd *);
-static inline ips_copp_wait_item_t *ips_removeq_copp(ips_copp_queue_t *,
+static ips_scb_t *ips_removeq_scb_head(ips_scb_queue_t *);
+static ips_scb_t *ips_removeq_scb(ips_scb_queue_t *, ips_scb_t *);
+static Scsi_Cmnd *ips_removeq_wait_head(ips_wait_queue_t *);
+static Scsi_Cmnd *ips_removeq_wait(ips_wait_queue_t *, Scsi_Cmnd *);
+static ips_copp_wait_item_t *ips_removeq_copp(ips_copp_queue_t *,
 						     ips_copp_wait_item_t *);
-static inline ips_copp_wait_item_t *ips_removeq_copp_head(ips_copp_queue_t *);
+static ips_copp_wait_item_t *ips_removeq_copp_head(ips_copp_queue_t *);
 
 static int ips_is_passthru(Scsi_Cmnd *);
 static int ips_make_passthru(ips_ha_t *, Scsi_Cmnd *, ips_scb_t *, int);
@@ -1885,7 +1881,7 @@ ips_flash_bios(ips_ha_t * ha, ips_passthru_t * pt, ips_scb_t * scb)
 /*   Fill in a single scb sg_list element from an address                   */
 /*   return a -1 if a breakup occurred                                      */
 /****************************************************************************/
-static inline int
+static int
 ips_fill_scb_sg_single(ips_ha_t * ha, dma_addr_t busaddr,
 		       ips_scb_t * scb, int indx, unsigned int e_len)
 {
@@ -2950,7 +2946,7 @@ ips_next(ips_ha_t * ha, int intr)
 /* ASSUMED to be called from within the HA lock                             */
 /*                                                                          */
 /****************************************************************************/
-static inline void
+static void
 ips_putq_scb_head(ips_scb_queue_t * queue, ips_scb_t * item)
 {
 	METHOD_TRACE("ips_putq_scb_head", 1);
@@ -2969,38 +2965,6 @@ ips_putq_scb_head(ips_scb_queue_t * queue, ips_scb_t * item)
 
 /****************************************************************************/
 /*                                                                          */
-/* Routine Name: ips_putq_scb_tail                                          */
-/*                                                                          */
-/* Routine Description:                                                     */
-/*                                                                          */
-/*   Add an item to the tail of the queue                                   */
-/*                                                                          */
-/* ASSUMED to be called from within the HA lock                             */
-/*                                                                          */
-/****************************************************************************/
-static inline void
-ips_putq_scb_tail(ips_scb_queue_t * queue, ips_scb_t * item)
-{
-	METHOD_TRACE("ips_putq_scb_tail", 1);
-
-	if (!item)
-		return;
-
-	item->q_next = NULL;
-
-	if (queue->tail)
-		queue->tail->q_next = item;
-
-	queue->tail = item;
-
-	if (!queue->head)
-		queue->head = item;
-
-	queue->count++;
-}
-
-/****************************************************************************/
-/*                                                                          */
 /* Routine Name: ips_removeq_scb_head                                       */
 /*                                                                          */
 /* Routine Description:                                                     */
@@ -3010,7 +2974,7 @@ ips_putq_scb_tail(ips_scb_queue_t * queue, ips_scb_t * item)
 /* ASSUMED to be called from within the HA lock                             */
 /*                                                                          */
 /****************************************************************************/
-static inline ips_scb_t *
+static ips_scb_t *
 ips_removeq_scb_head(ips_scb_queue_t * queue)
 {
 	ips_scb_t *item;
@@ -3045,7 +3009,7 @@ ips_removeq_scb_head(ips_scb_queue_t * queue)
 /* ASSUMED to be called from within the HA lock                             */
 /*                                                                          */
 /****************************************************************************/
-static inline ips_scb_t *
+static ips_scb_t *
 ips_removeq_scb(ips_scb_queue_t * queue, ips_scb_t * item)
 {
 	ips_scb_t *p;
@@ -3082,34 +3046,6 @@ ips_removeq_scb(ips_scb_queue_t * queue, ips_scb_t * item)
 
 /****************************************************************************/
 /*                                                                          */
-/* Routine Name: ips_putq_wait_head                                         */
-/*                                                                          */
-/* Routine Description:                                                     */
-/*                                                                          */
-/*   Add an item to the head of the queue                                   */
-/*                                                                          */
-/* ASSUMED to be called from within the HA lock                             */
-/*                                                                          */
-/****************************************************************************/
-static inline void
-ips_putq_wait_head(ips_wait_queue_t * queue, Scsi_Cmnd * item)
-{
-	METHOD_TRACE("ips_putq_wait_head", 1);
-
-	if (!item)
-		return;
-
-	item->host_scribble = (char *) queue->head;
-	queue->head = item;
-
-	if (!queue->tail)
-		queue->tail = item;
-
-	queue->count++;
-}
-
-/****************************************************************************/
-/*                                                                          */
 /* Routine Name: ips_putq_wait_tail                                         */
 /*                                                                          */
 /* Routine Description:                                                     */
@@ -3119,7 +3055,7 @@ ips_putq_wait_head(ips_wait_queue_t * queue, Scsi_Cmnd * item)
 /* ASSUMED to be called from within the HA lock                             */
 /*                                                                          */
 /****************************************************************************/
-static inline void
+static void
 ips_putq_wait_tail(ips_wait_queue_t * queue, Scsi_Cmnd * item)
 {
 	METHOD_TRACE("ips_putq_wait_tail", 1);
@@ -3151,7 +3087,7 @@ ips_putq_wait_tail(ips_wait_queue_t * queue, Scsi_Cmnd * item)
 /* ASSUMED to be called from within the HA lock                             */
 /*                                                                          */
 /****************************************************************************/
-static inline Scsi_Cmnd *
+static Scsi_Cmnd *
 ips_removeq_wait_head(ips_wait_queue_t * queue)
 {
 	Scsi_Cmnd *item;
@@ -3186,7 +3122,7 @@ ips_removeq_wait_head(ips_wait_queue_t * queue)
 /* ASSUMED to be called from within the HA lock                             */
 /*                                                                          */
 /****************************************************************************/
-static inline Scsi_Cmnd *
+static Scsi_Cmnd *
 ips_removeq_wait(ips_wait_queue_t * queue, Scsi_Cmnd * item)
 {
 	Scsi_Cmnd *p;
@@ -3223,34 +3159,6 @@ ips_removeq_wait(ips_wait_queue_t * queue, Scsi_Cmnd * item)
 
 /****************************************************************************/
 /*                                                                          */
-/* Routine Name: ips_putq_copp_head                                         */
-/*                                                                          */
-/* Routine Description:                                                     */
-/*                                                                          */
-/*   Add an item to the head of the queue                                   */
-/*                                                                          */
-/* ASSUMED to be called from within the HA lock                             */
-/*                                                                          */
-/****************************************************************************/
-static inline void
-ips_putq_copp_head(ips_copp_queue_t * queue, ips_copp_wait_item_t * item)
-{
-	METHOD_TRACE("ips_putq_copp_head", 1);
-
-	if (!item)
-		return;
-
-	item->next = queue->head;
-	queue->head = item;
-
-	if (!queue->tail)
-		queue->tail = item;
-
-	queue->count++;
-}
-
-/****************************************************************************/
-/*                                                                          */
 /* Routine Name: ips_putq_copp_tail                                         */
 /*                                                                          */
 /* Routine Description:                                                     */
@@ -3260,7 +3168,7 @@ ips_putq_copp_head(ips_copp_queue_t * queue, ips_copp_wait_item_t * item)
 /* ASSUMED to be called from within the HA lock                             */
 /*                                                                          */
 /****************************************************************************/
-static inline void
+static void
 ips_putq_copp_tail(ips_copp_queue_t * queue, ips_copp_wait_item_t * item)
 {
 	METHOD_TRACE("ips_putq_copp_tail", 1);
@@ -3292,7 +3200,7 @@ ips_putq_copp_tail(ips_copp_queue_t * queue, ips_copp_wait_item_t * item)
 /* ASSUMED to be called from within the HA lock                             */
 /*                                                                          */
 /****************************************************************************/
-static inline ips_copp_wait_item_t *
+static ips_copp_wait_item_t *
 ips_removeq_copp_head(ips_copp_queue_t * queue)
 {
 	ips_copp_wait_item_t *item;
@@ -3327,7 +3235,7 @@ ips_removeq_copp_head(ips_copp_queue_t * queue)
 /* ASSUMED to be called from within the HA lock                             */
 /*                                                                          */
 /****************************************************************************/
-static inline ips_copp_wait_item_t *
+static ips_copp_wait_item_t *
 ips_removeq_copp(ips_copp_queue_t * queue, ips_copp_wait_item_t * item)
 {
 	ips_copp_wait_item_t *p;

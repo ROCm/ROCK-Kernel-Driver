@@ -179,8 +179,12 @@ struct tty_struct *devpts_get_tty(int number)
 	struct dentry *dentry = get_node(number);
 	struct tty_struct *tty;
 
-	tty = (IS_ERR(dentry) || !dentry->d_inode) ? NULL :
-			dentry->d_inode->u.generic_ip;
+	tty = NULL;
+	if (!IS_ERR(dentry)) {
+		if (dentry->d_inode)
+			tty = dentry->d_inode->u.generic_ip;
+		dput(dentry);
+	}
 
 	up(&devpts_root->d_inode->i_sem);
 

@@ -635,7 +635,7 @@ ip_nat_setup_info(struct ip_conntrack *conntrack,
 
 	/* If there's a helper, assign it; based on new tuple. */
 	if (!conntrack->master)
-		info->helper = ip_nat_find_helper(&reply);
+		info->helper = __ip_nat_find_helper(&reply);
 
 	/* It's done. */
 	info->initialized |= (1 << HOOK2MANIP(hooknum));

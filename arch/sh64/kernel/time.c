@@ -298,37 +298,6 @@ static int set_rtc_time(unsigned long nowtime)
 /* last time the RTC clock got updated */
 static long last_rtc_update = 0;
 
-static inline void sh64_do_profile(struct pt_regs *regs)
-{
-	extern int _stext;
-	unsigned long pc;
-
-	profile_hook(regs);
-
-	if (user_mode(regs))
-		return;
-
-	/* Don't profile cpu_idle..  */
-	if (!prof_buffer || !current->pid)
-		return;
-
-	pc = instruction_pointer(regs);
-	pc -= (unsigned long) &_stext;
-	pc >>= prof_shift;
-
-	/*
-	 * Don't ignore out-of-bounds PC values silently, put them into the
-	 * last histogram slot, so if present, they will show up as a sharp
-	 * peak.
-	 */
-	if (pc > prof_len - 1)
-		pc = prof_len - 1;
-
-	/* We could just be sloppy and not lock against a re-entry on this
-	   increment, but the profiling code won't always be linked in anyway. */
-	atomic_inc((atomic_t *)&prof_buffer[pc]);
-}
-
 /*
  * timer_interrupt() needs to keep up the real-time clock,
  * as well as call the "do_timer()" routine every clocktick
@@ -340,8 +309,7 @@ static inline void do_timer_interrupt(int irq, void *dev_id, struct pt_regs *reg
 	ctc_last_interrupt = (unsigned long) current_ctc;
 
 	do_timer(regs);
-
-	sh64_do_profile(regs);
+	profile_tick(CPU_PROFILING, regs);
 
 #ifdef CONFIG_HEARTBEAT
 	{

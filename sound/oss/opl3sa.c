@@ -36,10 +36,7 @@
 static int sb_initialized;
 #endif
 
-static int kilroy_was_here;	/* Don't detect twice */
-static int mpu_initialized;
 static spinlock_t lock=SPIN_LOCK_UNLOCKED;
-static int *opl3sa_osp;
 
 static unsigned char opl3sa_read(int addr)
 {
@@ -106,25 +103,15 @@ static int __init opl3sa_detect(void)
  *     OPL3-SA
  */
 
-static int __init probe_opl3sa_wss(struct address_info *hw_config)
+static int __init probe_opl3sa_wss(struct address_info *hw_config, struct resource *ports)
 {
-	int ret;
 	unsigned char tmp = 0x24;	/* WSS enable */
 
-	if (check_region(0xf86, 2))	/* Control port is busy */
-		return 0;
 	/*
 	 * Check if the IO port returns valid signature. The original MS Sound
 	 * system returns 0x04 while some cards (OPL3-SA for example)
 	 * return 0x00.
 	 */
-
-	if (check_region(hw_config->io_base, 8))
-	{
-		printk(KERN_ERR "OPL3-SA: MSS I/O port conflict (%x)\n", hw_config->io_base);
-		return 0;
-	}
-	opl3sa_osp = hw_config->osp;
 
 	if (!opl3sa_detect())
 	{
@@ -152,21 +139,16 @@ static int __init probe_opl3sa_wss(struct address_info *hw_config)
 	}
 
 	opl3sa_write(0x01, tmp);	/* WSS setup register */
-	kilroy_was_here = 1;
 
-	ret = probe_ms_sound(hw_config);
-	if (ret)
-		request_region(0xf86, 2, "OPL3-SA");
-
-	return ret;
+	return probe_ms_sound(hw_config, ports);
 }
 
-static void __init attach_opl3sa_wss(struct address_info *hw_config)
+static void __init attach_opl3sa_wss(struct address_info *hw_config, struct resource *ports)
 {
 	int nm = num_mixers;
 
 	/* FIXME */
-	attach_ms_sound(hw_config, THIS_MODULE);
+	attach_ms_sound(hw_config, ports, THIS_MODULE);
 	if (num_mixers > nm)	/* A mixer was installed */
 	{
 		AD1848_REROUTE(SOUND_MIXER_LINE1, SOUND_MIXER_CD);
@@ -183,14 +165,6 @@ static int __init probe_opl3sa_mpu(struct address_info *hw_config)
 		-1, -1, -1, -1, -1, 1, -1, 2, -1, 3, 4
 	};
 
-	if (!kilroy_was_here)
-		return 0;	/* OPL3-SA has not been detected earlier */
-
-	if (mpu_initialized)
-	{
-		DDB(printk("OPL3-SA: MPU mode already initialized\n"));
-		return 0;
-	}
 	if (hw_config->irq > 10)
 	{
 		printk(KERN_ERR "OPL3-SA: Bad MPU IRQ %d\n", hw_config->irq);
@@ -224,7 +198,6 @@ static int __init probe_opl3sa_mpu(struct address_info *hw_config)
 
 	opl3sa_write(0x03, conf);
 
-	mpu_initialized = 1;
 	hw_config->name = "OPL3-SA (MPU401)";
 
 	return probe_uart401(hw_config, THIS_MODULE);
@@ -281,6 +254,7 @@ MODULE_PARM(mpu_irq,"i");
 
 static int __init init_opl3sa(void)
 {
+	struct resource *ports;
 	if (io == -1 || irq == -1 || dma == -1) {
 		printk(KERN_ERR "opl3sa: dma, irq and io must be set.\n");
 		return -EINVAL;
@@ -294,12 +268,31 @@ static int __init init_opl3sa(void)
 	cfg_mpu.io_base = mpu_io;
 	cfg_mpu.irq = mpu_irq;
 
-	if (probe_opl3sa_wss(&cfg) == 0)
+	ports = request_region(io + 4, 4, "ad1848");
+	if (!ports)
+		return -EBUSY;
+
+	if (!request_region(0xf86, 2, "OPL3-SA"))/* Control port is busy */ {
+		release_region(io + 4, 4);
+		return 0;
+	}
+
+	if (!request_region(io, 4, "WSS config")) {
+		release_region(0x86, 2);
+		release_region(io + 4, 4);
+		return 0;
+	}
+
+	if (probe_opl3sa_wss(&cfg, ports) == 0) {
+		release_region(0xf86, 2);
+		release_region(io, 4);
+		release_region(io + 4, 4);
 		return -ENODEV;
+	}
 
 	found_mpu=probe_opl3sa_mpu(&cfg_mpu);
 
-	attach_opl3sa_wss(&cfg);
+	attach_opl3sa_wss(&cfg, ports);
 	return 0;
 }
 

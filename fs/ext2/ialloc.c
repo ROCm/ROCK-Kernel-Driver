@@ -57,8 +57,8 @@ read_inode_bitmap(struct super_block * sb, unsigned long block_group)
 	if (!bh)
 		ext2_error(sb, "read_inode_bitmap",
 			    "Cannot read inode bitmap - "
-			    "block_group = %lu, inode_bitmap = %lu",
-			    block_group, (unsigned long) desc->bg_inode_bitmap);
+			    "block_group = %lu, inode_bitmap = %u",
+			    block_group, le32_to_cpu(desc->bg_inode_bitmap));
 error_out:
 	return bh;
 }

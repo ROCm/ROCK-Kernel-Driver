@@ -611,7 +611,7 @@ int __init pmac_feature_late_init(void)
 
 device_initcall(pmac_feature_late_init);
 
-
+#if 0
 static void dump_HT_speeds(char *name, u32 cfg, u32 frq)
 {
 	int	freqs[16] = { 200,300,400,500,600,800,1000,0,0,0,0,0,0,0,0,0 };
@@ -625,6 +625,7 @@ static void dump_HT_speeds(char *name, u32 cfg, u32 frq)
 		       name, freqs[freq],
 		       bits[(cfg >> 28) & 0x7], bits[(cfg >> 24) & 0x7]);
 }
+#endif
 
 void __init pmac_check_ht_link(void)
 {

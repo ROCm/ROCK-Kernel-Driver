@@ -465,9 +465,7 @@ handle_signal(unsigned long sig, siginfo_t *info, sigset_t *oldset,
 		return;
 	}
 
-	if (sig == SIGSEGV)
-		ka->sa.sa_handler = SIG_DFL;
-	force_sig(SIGSEGV, tsk);
+	force_sigsegv(sig, tsk);
 }
 
 /*

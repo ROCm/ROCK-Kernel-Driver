@@ -1,5 +1,5 @@
 # 
-# Copyright (C) 2000, 2002 Jeff Dike (jdike@karaya.com)
+# Copyright (C) 2000, 2002, 2003 Jeff Dike (jdike@karaya.com)
 # Licensed under the GPL
 #
 
@@ -15,7 +15,7 @@ mcast-objs := mcast_kern.o mcast_user.o
 #pcap-objs := pcap_kern.o pcap_user.o $(PCAP)
 net-objs := net_kern.o net_user.o
 mconsole-objs := mconsole_kern.o mconsole_user.o
-hostaudio-objs := hostaudio_kern.o hostaudio_user.o
+hostaudio-objs := hostaudio_kern.o
 ubd-objs := ubd_kern.o ubd_user.o
 port-objs := port_kern.o port_user.o
 harddog-objs := harddog_kern.o harddog_user.o
@@ -39,6 +39,7 @@ obj-$(CONFIG_PTY_CHAN) += pty.o
 obj-$(CONFIG_TTY_CHAN) += tty.o 
 obj-$(CONFIG_XTERM_CHAN) += xterm.o xterm_kern.o
 obj-$(CONFIG_UML_WATCHDOG) += harddog.o
+obj-$(CONFIG_BLK_DEV_COW_COMMON) += cow_user.o
 
 obj-y += stdio_console.o $(CHAN_OBJS)
 
@@ -46,18 +47,7 @@ USER_SINGLE_OBJS = $(foreach f,$(patsubst %.o,%,$(obj-y) $(obj-m)),$($(f)-objs))
 
 USER_OBJS := $(filter %_user.o,$(obj-y) $(obj-m) $(USER_SINGLE_OBJS)) fd.o \
 	null.o pty.o tty.o xterm.o
-USER_OBJS := $(foreach file,$(USER_OBJS),arch/um/drivers/$(file))
+USER_OBJS := $(foreach file,$(USER_OBJS),$(obj)/$(file))
 
 $(USER_OBJS) : %.o: %.c
 	$(CC) $(CFLAGS_$(notdir $@)) $(USER_CFLAGS) -c -o $@ $<
-
-clean:
-
-modules:
-
-fastdep:
-
-dep:
-
-archmrproper: clean
-

@@ -40,32 +40,3 @@ extern struct hw_interrupt_type i8259a_irq_type;
 extern void init_i8259a_irqs(void);
 
 extern void handle_irq(int irq, struct pt_regs * regs);
-
-extern unsigned long prof_cpu_mask;
-
-static inline void
-alpha_do_profile(unsigned long pc)
-{
-	extern char _stext;
-
-	if (!prof_buffer)
-		return;
-
-	/*
-	 * Only measure the CPUs specified by /proc/irq/prof_cpu_mask.
-	 * (default is all CPUs.)
-	 */
-	if (!((1<<smp_processor_id()) & prof_cpu_mask))
-		return;
-
-	pc -= (unsigned long) &_stext;
-	pc >>= prof_shift;
-	/*
-	 * Don't ignore out-of-bounds PC values silently,
-	 * put them into the last histogram slot, so if
-	 * present, they will show up as a sharp peak.
-	 */
-	if (pc > prof_len - 1)
-		pc = prof_len - 1;
-	atomic_inc((atomic_t *)&prof_buffer[pc]);
-}

@@ -25,11 +25,11 @@
 #include <linux/init.h>
 #include <linux/console.h>
 #include <linux/module.h>
+#include <linux/hardirq.h>
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
 #include <asm/pgtable.h>
-#include <asm/hardirq.h>
 
 #ifndef CONFIG_ARCH_S390X
 #define __FAIL_ADDR_MASK 0x7ffff000
@@ -126,8 +126,8 @@ static inline int check_user_space(struct pt_regs *regs, int error_code)
  * Send SIGSEGV to task.  This is an external routine
  * to keep the stack usage of do_page_fault small.
  */
-static void force_sigsegv(struct pt_regs *regs, unsigned long error_code,
-			  int si_code, unsigned long address)
+static void do_sigsegv(struct pt_regs *regs, unsigned long error_code,
+		       int si_code, unsigned long address)
 {
 	struct siginfo si;
 
@@ -282,7 +282,7 @@ bad_area:
         if (regs->psw.mask & PSW_MASK_PSTATE) {
                 tsk->thread.prot_addr = address;
                 tsk->thread.trap_no = error_code;
-		force_sigsegv(regs, error_code, si_code, address);
+		do_sigsegv(regs, error_code, si_code, address);
                 return;
 	}
 

@@ -8,6 +8,7 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 #include <linux/tty.h>
+#include <linux/string.h>
 #include <linux/tty_flip.h>
 #include <asm/irq.h>
 #include "chan_kern.h"
@@ -16,6 +17,7 @@
 #include "irq_user.h"
 #include "sigio.h"
 #include "line.h"
+#include "os.h"
 
 static void *not_configged_init(char *str, int device, struct chan_opts *opts)
 {
@@ -85,6 +87,52 @@ static struct chan_ops not_configged_ops = {
 	.free		= not_configged_free,
 	.winch		= 0,
 };
+
+void generic_close(int fd, void *unused)
+{
+	os_close_file(fd);
+}
+
+int generic_read(int fd, char *c_out, void *unused)
+{
+	int n;
+
+	n = os_read_file(fd, c_out, sizeof(*c_out));
+
+	if(n == -EAGAIN)
+		return(0);
+	else if(n == 0)
+		return(-EIO);
+	return(n);
+}
+
+int generic_write(int fd, const char *buf, int n, void *unused)
+{
+	return(os_write_file(fd, buf, n));
+}
+
+int generic_window_size(int fd, void *unused, unsigned short *rows_out,
+			unsigned short *cols_out)
+{
+	int rows, cols;
+	int ret;
+
+	ret = os_window_size(fd, &rows, &cols);
+	if(ret < 0)
+		return(ret);
+
+	ret = ((*rows_out != rows) || (*cols_out != cols));
+
+	*rows_out = rows;
+	*cols_out = cols;
+
+	return(ret);
+}
+
+void generic_free(void *data)
+{
+	kfree(data);
+}
 
 static void tty_receive_char(struct tty_struct *tty, char ch)
 {
@@ -265,6 +313,11 @@ static int one_chan_config_string(struct chan *chan, char *str, int size,
 {
 	int n = 0;
 
+	if(chan == NULL){
+		CONFIG_CHUNK(str, size, n, "none", 1);
+		return(n);
+	}
+
 	CONFIG_CHUNK(str, size, n, chan->ops->type, 0);
 
 	if(chan->dev == NULL){
@@ -420,7 +473,8 @@ int parse_chan_pair(char *str, struct list_head *chans, int pri, int device,
 		INIT_LIST_HEAD(chans);
 	}
 
-	if((out = strchr(str, ',')) != NULL){
+	out = strchr(str, ',');
+	if(out != NULL){
 		in = str;
 		*out = '\0';
 		out++;
@@ -475,12 +529,15 @@ void chan_interrupt(struct list_head *chans, struct work_struct *task,
 				goto out;
 			}
 			err = chan->ops->read(chan->fd, &c, chan->data);
-			if(err > 0) tty_receive_char(tty, c);
+			if(err > 0)
+				tty_receive_char(tty, c);
 		} while(err > 0);
+
 		if(err == 0) reactivate_fd(chan->fd, irq);
 		if(err == -EIO){
 			if(chan->primary){
-				if(tty != NULL) tty_hangup(tty);
+				if(tty != NULL)
+					tty_hangup(tty);
 				line_disable(dev, irq);
 				close_chan(chans);
 				free_chan(chans);

@@ -45,9 +45,6 @@ MODULE_LICENSE("GPL");
 module_param_array(ports, int, ports_c, 0400);
 MODULE_PARM_DESC(ports, "port numbers of IRC servers");
 
-/* protects irc part of conntracks */
-DECLARE_LOCK_EXTERN(ip_irc_lock);
-
 /* FIXME: Time out? --RR */
 
 static unsigned int
@@ -88,7 +85,7 @@ irc_nat_expected(struct sk_buff **pskb,
 	return ip_nat_setup_info(ct, &mr, hooknum);
 }
 
-static int irc_data_fixup(const struct ip_ct_irc_expect *ct_irc_info,
+static int irc_data_fixup(const struct ip_ct_irc_expect *exp_irc_info,
 			  struct ip_conntrack *ct,
 			  struct sk_buff **pskb,
 			  enum ip_conntrack_info ctinfo,
@@ -103,23 +100,16 @@ static int irc_data_fixup(const struct ip_ct_irc_expect *ct_irc_info,
 	/* "4294967296 65635 " */
 	char buffer[18];
 
-	MUST_BE_LOCKED(&ip_irc_lock);
-
 	DEBUGP("IRC_NAT: info (seq %u + %u) in %u\n",
-	       expect->seq, ct_irc_info->len,
+	       expect->seq, exp_irc_info->len,
 	       ntohl(tcph->seq));
 
 	newip = ct->tuplehash[IP_CT_DIR_REPLY].tuple.dst.ip;
 
 	/* Alter conntrack's expectations. */
-
-	/* We can read expect here without conntrack lock, since it's
-	   only set in ip_conntrack_irc, with ip_irc_lock held
-	   writable */
-
 	t = expect->tuple;
 	t.dst.ip = newip;
-	for (port = ct_irc_info->port; port != 0; port++) {
+	for (port = exp_irc_info->port; port != 0; port++) {
 		t.dst.u.tcp.port = htons(port);
 		if (ip_conntrack_change_expect(expect, &t) == 0) {
 			DEBUGP("using port %d", port);
@@ -149,7 +139,7 @@ static int irc_data_fixup(const struct ip_ct_irc_expect *ct_irc_info,
 
 	return ip_nat_mangle_tcp_packet(pskb, ct, ctinfo, 
 					expect->seq - ntohl(tcph->seq),
-					ct_irc_info->len, buffer, 
+					exp_irc_info->len, buffer, 
 					strlen(buffer));
 }
 
@@ -164,12 +154,12 @@ static unsigned int help(struct ip_conntrack *ct,
 	struct tcphdr *tcph = (void *) iph + iph->ihl * 4;
 	unsigned int datalen;
 	int dir;
-	struct ip_ct_irc_expect *ct_irc_info;
+	struct ip_ct_irc_expect *exp_irc_info;
 
 	if (!exp)
 		DEBUGP("ip_nat_irc: no exp!!");
 		
-	ct_irc_info = &exp->help.exp_irc_info;
+	exp_irc_info = &exp->help.exp_irc_info;
 
 	/* Only mangle things once: original direction in POST_ROUTING
 	   and reply direction on PRE_ROUTING. */
@@ -186,30 +176,24 @@ static unsigned int help(struct ip_conntrack *ct,
 	DEBUGP("got beyond not touching\n");
 
 	datalen = (*pskb)->len - iph->ihl * 4 - tcph->doff * 4;
-	LOCK_BH(&ip_irc_lock);
 	/* Check whether the whole IP/address pattern is carried in the payload */
-	if (between(exp->seq + ct_irc_info->len,
+	if (between(exp->seq + exp_irc_info->len,
 		    ntohl(tcph->seq),
 		    ntohl(tcph->seq) + datalen)) {
-		if (!irc_data_fixup(ct_irc_info, ct, pskb, ctinfo, exp)) {
-			UNLOCK_BH(&ip_irc_lock);
+		if (!irc_data_fixup(exp_irc_info, ct, pskb, ctinfo, exp))
 			return NF_DROP;
-		}
 	} else { 
 		/* Half a match?  This means a partial retransmisison.
 		   It's a cracker being funky. */
 		if (net_ratelimit()) {
 			printk
 			    ("IRC_NAT: partial packet %u/%u in %u/%u\n",
-			     exp->seq, ct_irc_info->len,
+			     exp->seq, exp_irc_info->len,
 			     ntohl(tcph->seq),
 			     ntohl(tcph->seq) + datalen);
 		}
-		UNLOCK_BH(&ip_irc_lock);
 		return NF_DROP;
 	}
-	UNLOCK_BH(&ip_irc_lock);
-
 	return NF_ACCEPT;
 }
 

@@ -160,22 +160,29 @@ irqreturn_t gusintr(int irq, void *dev_id, struct pt_regs *dummy)
 
 #ifdef CONFIG_SOUND_GUS16
 
-static int __init probe_gus_db16(struct address_info *hw_config)
+static int __init init_gus_db16(struct address_info *hw_config)
 {
-	return ad1848_detect(hw_config->io_base, NULL, hw_config->osp);
-}
+	struct resource *ports;
 
-static void __init attach_gus_db16(struct address_info *hw_config)
-{
+	ports = request_region(hw_config->io_base, 4, "ad1848");
+	if (!ports)
+		return 0;
+
+	if (!ad1848_detect(ports, NULL, hw_config->osp)) {
+		release_region(hw_config->io_base, 4);
+		return 0;
+	}
+
 	gus_pcm_volume = 100;
 	gus_wave_volume = 90;
 
-	hw_config->slots[3] = ad1848_init("GUS 16 bit sampling", hw_config->io_base,
+	hw_config->slots[3] = ad1848_init("GUS 16 bit sampling", ports,
 					  hw_config->irq,
 					  hw_config->dma,
 					  hw_config->dma, 0,
 					  hw_config->osp,
 					  THIS_MODULE);
+	return 1;
 }
 
 static void __exit unload_gus_db16(struct address_info *hw_config)
@@ -244,11 +251,8 @@ static int __init init_gus(void)
 	}
 
 #ifdef CONFIG_SOUND_GUS16
-	if (probe_gus_db16(&cfg) && gus16) {
-		/* FIXME: This can't work, can it ? -- Christoph */
-		attach_gus_db16(&cfg);
+	if (gus16 && init_gus_db16(&cfg))
 		db16 = 1;
-	}	
 #endif
 	if (!probe_gus(&cfg))
 		return -ENODEV;

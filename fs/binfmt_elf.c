@@ -40,6 +40,7 @@
 
 #include <asm/uaccess.h>
 #include <asm/param.h>
+#include <asm/page.h>
 
 #include <linux/elf.h>
 
@@ -703,10 +704,12 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	if (elf_read_implies_exec(elf_ex, have_pt_gnu_stack))
 		current->personality |= READ_IMPLIES_EXEC;
 
+	arch_pick_mmap_layout(current->mm);
+
 	/* Do this so that we can load the interpreter, if need be.  We will
 	   change some of these later */
 	current->mm->rss = 0;
-	current->mm->free_area_cache = TASK_UNMAPPED_BASE;
+	current->mm->free_area_cache = current->mm->mmap_base;
 	retval = setup_arg_pages(bprm, executable_stack);
 	if (retval < 0) {
 		send_sig(SIGKILL, current, 0);
@@ -1176,10 +1179,27 @@ static void fill_prstatus(struct elf_prstatus *prstatus,
 	prstatus->pr_ppid = p->parent->pid;
 	prstatus->pr_pgrp = process_group(p);
 	prstatus->pr_sid = p->signal->session;
-	jiffies_to_timeval(p->utime, &prstatus->pr_utime);
-	jiffies_to_timeval(p->stime, &prstatus->pr_stime);
-	jiffies_to_timeval(p->cutime, &prstatus->pr_cutime);
-	jiffies_to_timeval(p->cstime, &prstatus->pr_cstime);
+	if (p->pid == p->tgid) {
+		/*
+		 * This is the record for the group leader.  Add in the
+		 * cumulative times of previous dead threads.  This total
+		 * won't include the time of each live thread whose state
+		 * is included in the core dump.  The final total reported
+		 * to our parent process when it calls wait4 will include
+		 * those sums as well as the little bit more time it takes
+		 * this and each other thread to finish dying after the
+		 * core dump synchronization phase.
+		 */
+		jiffies_to_timeval(p->utime + p->signal->utime,
+				   &prstatus->pr_utime);
+		jiffies_to_timeval(p->stime + p->signal->stime,
+				   &prstatus->pr_stime);
+	} else {
+		jiffies_to_timeval(p->utime, &prstatus->pr_utime);
+		jiffies_to_timeval(p->stime, &prstatus->pr_stime);
+	}
+	jiffies_to_timeval(p->signal->cutime, &prstatus->pr_cutime);
+	jiffies_to_timeval(p->signal->cstime, &prstatus->pr_cstime);
 }
 
 static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,

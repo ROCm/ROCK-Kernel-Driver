@@ -612,6 +612,8 @@ int __init asiliantfb_init(void)
 	return pci_module_init(&asiliantfb_driver);
 }
 
+module_init(asiliantfb_init);
+
 static void __exit asiliantfb_exit(void)
 {
 	pci_unregister_driver(&asiliantfb_driver);

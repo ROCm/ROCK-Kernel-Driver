@@ -360,13 +360,11 @@ up the disc, etc. % and device-use count
 
 \subsection{$Void\ release(struct\ cdrom_device_info * cdi)$}
 
-In case of module support, a single call $MOD_DEC_USE_COUNT$ should be
-coded here.  Possibly other device-specific actions should be taken
-such as spinning down the device. However, strategic actions such as
-ejection of the tray, or unlocking the door, should be left over to
-the general routine $cdrom_release()$. Also, the invalidation of the
-allocated buffers in the VFS is taken care of by the routine in
-\cdromc.  This is the only function returning type $void$. 
+
+Device-specific actions should be taken such as spinning down the device.
+However, strategic actions such as ejection of the tray, or unlocking
+the door, should be left over to the general routine $cdrom_release()$.
+This is the only function returning type $void$.
 
 \subsection{$Int\ drive_status(struct\ cdrom_device_info * cdi, int\ slot_nr)$}
 \label{drive status}

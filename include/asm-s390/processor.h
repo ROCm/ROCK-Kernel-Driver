@@ -76,6 +76,8 @@ extern struct task_struct *last_task_used_math;
 
 #define MM_VM_SIZE(mm)		DEFAULT_TASK_SIZE
 
+#define HAVE_ARCH_PICK_MMAP_LAYOUT
+
 typedef struct {
         __u32 ar4;
 } mm_segment_t;
@@ -100,6 +102,25 @@ struct thread_struct {
 };
 
 typedef struct thread_struct thread_struct;
+
+/*
+ * Stack layout of a C stack frame.
+ */
+#ifndef __PACK_STACK
+struct stack_frame {
+	unsigned long back_chain;
+	unsigned long empty1[5];
+	unsigned long gprs[10];
+	unsigned int  empty2[8];
+};
+#else
+struct stack_frame {
+	unsigned long empty1[5];
+	unsigned int  empty2[8];
+	unsigned long gprs[10];
+	unsigned long back_chain;
+};
+#endif
 
 #define ARCH_MIN_TASKALIGN	8
 

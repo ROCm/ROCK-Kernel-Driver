@@ -119,7 +119,7 @@ int udf_write_fi(struct inode *inode, struct fileIdentDesc *cfi,
 		crc = udf_crc(fibh->ebh->b_data, fibh->eoffset, crc);
 	}
 
-	cfi->descTag.descCRC = cpu_to_le32(crc);
+	cfi->descTag.descCRC = cpu_to_le16(crc);
 	cfi->descTag.descCRCLength = cpu_to_le16(crclen);
 
 	for (i=0; i<16; i++)

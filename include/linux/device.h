@@ -59,7 +59,6 @@ struct bus_type {
 	struct driver_attribute	* drv_attrs;
 
 	int		(*match)(struct device * dev, struct device_driver * drv);
-	struct device * (*add)	(struct device * parent, char * bus_id);
 	int		(*hotplug) (struct device *dev, char **envp, 
 				    int num_envp, char *buffer, int buffer_size);
 	int		(*suspend)(struct device * dev, u32 state);
@@ -284,6 +283,9 @@ struct device {
 					     allocations such descriptors. */
 
 	struct list_head	dma_pools;	/* dma pools (if dma'ble) */
+
+	struct dma_coherent_mem	*dma_mem; /* internal for coherent mem
+					     override */
 
 	void	(*release)(struct device * dev);
 };

@@ -83,18 +83,6 @@ struct sigcontext {
 	unsigned long		sigc_mask;
 };
 
-#ifdef __KERNEL__
-
-/* This magic should be in g_upper[0] for all upper parts
-   to be valid.  */
-#define SIGINFO_EXTRA_V8PLUS_MAGIC	0x130e269
-typedef struct {
-	unsigned   int g_upper[8];
-	unsigned   int o_upper[8];
-} siginfo_extra_v8plus_t;
-
-#endif
-
 #endif /* !(__ASSEMBLY__) */
 
 #endif /* !(__SPARC64_SIGCONTEXT_H) */

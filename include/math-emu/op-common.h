@@ -769,9 +769,9 @@ do {									\
 	X##_c = FP_CLS_NORMAL;						\
 									\
 	if ((X##_s = (r < 0)))						\
-	  r = -r;							\
-									\
-	ur_ = (unsigned rtype) r;					\
+	  ur_ = (unsigned rtype) -r;					\
+	else								\
+	  ur_ = (unsigned rtype) r;					\
 	if (rsize <= _FP_W_TYPE_SIZE)					\
 	  __FP_CLZ(X##_e, ur_);						\
 	else								\

@@ -551,7 +551,7 @@ extern int	xfs_readsb(xfs_mount_t *mp);
 extern void	xfs_freesb(xfs_mount_t *);
 extern void	xfs_do_force_shutdown(bhv_desc_t *, int, char *, int);
 extern int	xfs_syncsub(xfs_mount_t *, int, int, int *);
-extern void	xfs_initialize_perag(xfs_mount_t *, int);
+extern xfs_agnumber_t	xfs_initialize_perag(xfs_mount_t *, xfs_agnumber_t);
 extern void	xfs_xlatesb(void *, struct xfs_sb *, int, xfs_arch_t,
 			__int64_t);
 

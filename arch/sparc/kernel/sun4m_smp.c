@@ -16,6 +16,7 @@
 #include <linux/spinlock.h>
 #include <linux/mm.h>
 #include <linux/swap.h>
+#include <linux/profile.h>
 #include <asm/cacheflush.h>
 #include <asm/tlbflush.h>
 
@@ -28,7 +29,6 @@
 #include <asm/pgalloc.h>
 #include <asm/pgtable.h>
 #include <asm/oplib.h>
-#include <asm/hardirq.h>
 #include <asm/cpudata.h>
 
 #define IRQ_RESCHEDULE		13
@@ -173,18 +173,9 @@ void __init smp4m_boot_cpus(void)
 			int timeout;
 
 			/* Cook up an idler for this guy. */
-			kernel_thread(start_secondary, NULL, CLONE_IDLETASK);
-
+			p = fork_idle(i);
 			cpucount++;
-
-			p = prev_task(&init_task);
-
-			init_idle(p, i);
-
 			current_set[i] = p->thread_info;
-
-			unhash_process(p);
-
 			/* See trampoline.S for details... */
 			entry += ((i-1) * 3);
 
@@ -400,16 +391,13 @@ void smp4m_cross_call_irq(void)
 	ccall_info.processors_out[i] = 1;
 }
 
-extern void sparc_do_profile(unsigned long pc, unsigned long o7);
-
 void smp4m_percpu_timer_interrupt(struct pt_regs *regs)
 {
 	int cpu = smp_processor_id();
 
 	clear_profile_irq(cpu);
 
-	if(!user_mode(regs))
-		sparc_do_profile(regs->pc, regs->u_regs[UREG_RETPC]);
+	profile_tick(CPU_PROFILING, regs);
 
 	if(!--prof_counter(cpu)) {
 		int user = user_mode(regs);

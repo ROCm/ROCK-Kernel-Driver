@@ -611,7 +611,6 @@ extern int sysctl_tcp_nometrics_save;
 extern int sysctl_tcp_bic;
 extern int sysctl_tcp_bic_fast_convergence;
 extern int sysctl_tcp_bic_low_window;
-extern int sysctl_tcp_default_win_scale;
 extern int sysctl_tcp_moderate_rcvbuf;
 
 extern atomic_t tcp_memory_allocated;
@@ -1048,13 +1047,16 @@ static inline void tcp_reset_xmit_timer(struct sock *sk, int what, unsigned long
  * is not a big flaw.
  */
 
-static __inline__ unsigned int tcp_current_mss(struct sock *sk, int large)
+static inline unsigned int tcp_current_mss(struct sock *sk, int large)
 {
 	struct tcp_opt *tp = tcp_sk(sk);
 	struct dst_entry *dst = __sk_dst_get(sk);
-	int mss_now = large && (sk->sk_route_caps & NETIF_F_TSO) &&
-		      !tp->urg_mode ?
-		tp->mss_cache : tp->mss_cache_std;
+	int do_large, mss_now;
+
+	do_large = (large &&
+		    (sk->sk_route_caps & NETIF_F_TSO) &&
+		    !tp->urg_mode);
+	mss_now = do_large ? tp->mss_cache : tp->mss_cache_std;
 
 	if (dst) {
 		u32 mtu = dst_pmtu(dst);
@@ -1182,11 +1184,75 @@ struct tcp_skb_cb {
 
 	__u16		urg_ptr;	/* Valid w/URG flags is set.	*/
 	__u32		ack_seq;	/* Sequence number ACK'd	*/
+	__u32		tso_factor;
 };
 
 #define TCP_SKB_CB(__skb)	((struct tcp_skb_cb *)&((__skb)->cb[0]))
 
 #include <net/tcp_ecn.h>
+
+/* Due to TSO, an SKB can be composed of multiple actual
+ * packets.  To keep these tracked properly, we use this.
+ */
+static inline int tcp_skb_pcount(struct sk_buff *skb)
+{
+	return TCP_SKB_CB(skb)->tso_factor;
+}
+
+static inline void tcp_inc_pcount(tcp_pcount_t *count, struct sk_buff *skb)
+{
+	count->val += tcp_skb_pcount(skb);
+}
+
+static inline void tcp_inc_pcount_explicit(tcp_pcount_t *count, int amt)
+{
+	count->val += amt;
+}
+
+static inline void tcp_dec_pcount_explicit(tcp_pcount_t *count, int amt)
+{
+	count->val -= amt;
+}
+
+static inline void tcp_dec_pcount(tcp_pcount_t *count, struct sk_buff *skb)
+{
+	count->val -= tcp_skb_pcount(skb);
+}
+
+static inline void tcp_dec_pcount_approx(tcp_pcount_t *count,
+					 struct sk_buff *skb)
+{
+	if (count->val) {
+		count->val -= tcp_skb_pcount(skb);
+		if ((int)count->val < 0)
+			count->val = 0;
+	}
+}
+
+static inline __u32 tcp_get_pcount(tcp_pcount_t *count)
+{
+	return count->val;
+}
+
+static inline void tcp_set_pcount(tcp_pcount_t *count, __u32 val)
+{
+	count->val = val;
+}
+
+static inline void tcp_packets_out_inc(struct sock *sk, struct tcp_opt *tp,
+				       struct sk_buff *skb)
+{
+	int orig = tcp_get_pcount(&tp->packets_out);
+
+	tcp_inc_pcount(&tp->packets_out, skb);
+	if (!orig)
+		tcp_reset_xmit_timer(sk, TCP_TIME_RETRANS, tp->rto);
+}
+
+static inline void tcp_packets_out_dec(struct tcp_opt *tp, struct sk_buff *skb)
+{
+	tcp_dec_pcount(&tp->packets_out, skb);
+}
 
 /* This determines how many packets are "in the network" to the best
  * of our knowledge.  In many cases it is conservative, but where
@@ -1204,7 +1270,9 @@ struct tcp_skb_cb {
  */
 static __inline__ unsigned int tcp_packets_in_flight(struct tcp_opt *tp)
 {
-	return tp->packets_out - tp->left_out + tp->retrans_out;
+	return (tcp_get_pcount(&tp->packets_out) -
+		tcp_get_pcount(&tp->left_out) +
+		tcp_get_pcount(&tp->retrans_out));
 }
 
 /* Recalculate snd_ssthresh, we want to set it to:
@@ -1305,9 +1373,15 @@ static inline __u32 tcp_current_ssthresh(struct tcp_opt *tp)
 
 static inline void tcp_sync_left_out(struct tcp_opt *tp)
 {
-	if (tp->sack_ok && tp->sacked_out >= tp->packets_out - tp->lost_out)
-		tp->sacked_out = tp->packets_out - tp->lost_out;
-	tp->left_out = tp->sacked_out + tp->lost_out;
+	if (tp->sack_ok &&
+	    (tcp_get_pcount(&tp->sacked_out) >=
+	     tcp_get_pcount(&tp->packets_out) - tcp_get_pcount(&tp->lost_out)))
+		tcp_set_pcount(&tp->sacked_out,
+			       (tcp_get_pcount(&tp->packets_out) -
+				tcp_get_pcount(&tp->lost_out)));
+	tcp_set_pcount(&tp->left_out,
+		       (tcp_get_pcount(&tp->sacked_out) +
+			tcp_get_pcount(&tp->lost_out)));
 }
 
 extern void tcp_cwnd_application_limited(struct sock *sk);
@@ -1316,14 +1390,16 @@ extern void tcp_cwnd_application_limited(struct sock *sk);
 
 static inline void tcp_cwnd_validate(struct sock *sk, struct tcp_opt *tp)
 {
-	if (tp->packets_out >= tp->snd_cwnd) {
+	__u32 packets_out = tcp_get_pcount(&tp->packets_out);
+
+	if (packets_out >= tp->snd_cwnd) {
 		/* Network is feed fully. */
 		tp->snd_cwnd_used = 0;
 		tp->snd_cwnd_stamp = tcp_time_stamp;
 	} else {
 		/* Network starves. */
-		if (tp->packets_out > tp->snd_cwnd_used)
-			tp->snd_cwnd_used = tp->packets_out;
+		if (tcp_get_pcount(&tp->packets_out) > tp->snd_cwnd_used)
+			tp->snd_cwnd_used = tcp_get_pcount(&tp->packets_out);
 
 		if ((s32)(tcp_time_stamp - tp->snd_cwnd_stamp) >= tp->rto)
 			tcp_cwnd_application_limited(sk);
@@ -1389,9 +1465,11 @@ tcp_nagle_check(struct tcp_opt *tp, struct sk_buff *skb, unsigned mss_now, int n
 		!(TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN) &&
 		((nonagle&TCP_NAGLE_CORK) ||
 		 (!nonagle &&
-		  tp->packets_out &&
+		  tcp_get_pcount(&tp->packets_out) &&
 		  tcp_minshall_check(tp))));
 }
+
+extern void tcp_set_skb_tso_factor(struct sk_buff *, unsigned int, unsigned int);
 
 /* This checks if the data bearing packet SKB (usually sk->sk_send_head)
  * should be put on the wire right now.
@@ -1399,6 +1477,13 @@ tcp_nagle_check(struct tcp_opt *tp, struct sk_buff *skb, unsigned mss_now, int n
 static __inline__ int tcp_snd_test(struct tcp_opt *tp, struct sk_buff *skb,
 				   unsigned cur_mss, int nonagle)
 {
+	int pkts = TCP_SKB_CB(skb)->tso_factor;
+
+	if (!pkts) {
+		tcp_set_skb_tso_factor(skb, cur_mss, tp->mss_cache_std);
+		pkts = TCP_SKB_CB(skb)->tso_factor;
+	}
+
 	/*	RFC 1122 - section 4.2.3.4
 	 *
 	 *	We must queue if
@@ -1425,14 +1510,14 @@ static __inline__ int tcp_snd_test(struct tcp_opt *tp, struct sk_buff *skb,
 	 */
 	return (((nonagle&TCP_NAGLE_PUSH) || tp->urg_mode
 		 || !tcp_nagle_check(tp, skb, cur_mss, nonagle)) &&
-		((tcp_packets_in_flight(tp) < tp->snd_cwnd) ||
+		(((tcp_packets_in_flight(tp) + (pkts-1)) < tp->snd_cwnd) ||
 		 (TCP_SKB_CB(skb)->flags & TCPCB_FLAG_FIN)) &&
 		!after(TCP_SKB_CB(skb)->end_seq, tp->snd_una + tp->snd_wnd));
 }
 
 static __inline__ void tcp_check_probe_timer(struct sock *sk, struct tcp_opt *tp)
 {
-	if (!tp->packets_out && !tp->pending)
+	if (!tcp_get_pcount(&tp->packets_out) && !tp->pending)
 		tcp_reset_xmit_timer(sk, TCP_TIME_PROBE0, tp->rto);
 }
 
@@ -1690,68 +1775,10 @@ static inline void tcp_syn_build_options(__u32 *ptr, int mss, int ts, int sack,
 		*ptr++ = htonl((TCPOPT_NOP << 24) | (TCPOPT_WINDOW << 16) | (TCPOLEN_WINDOW << 8) | (wscale));
 }
 
-/* Determine a window scaling and initial window to offer.
- * Based on the assumption that the given amount of space
- * will be offered. Store the results in the tp structure.
- * NOTE: for smooth operation initial space offering should
- * be a multiple of mss if possible. We assume here that mss >= 1.
- * This MUST be enforced by all callers.
- */
-static inline void tcp_select_initial_window(int __space, __u32 mss,
-	__u32 *rcv_wnd,
-	__u32 *window_clamp,
-	int wscale_ok,
-	__u8 *rcv_wscale)
-{
-	unsigned int space = (__space < 0 ? 0 : __space);
-
-	/* If no clamp set the clamp to the max possible scaled window */
-	if (*window_clamp == 0)
-		(*window_clamp) = (65535 << 14);
-	space = min(*window_clamp, space);
-
-	/* Quantize space offering to a multiple of mss if possible. */
-	if (space > mss)
-		space = (space / mss) * mss;
-
-	/* NOTE: offering an initial window larger than 32767
-	 * will break some buggy TCP stacks. We try to be nice.
-	 * If we are not window scaling, then this truncates
-	 * our initial window offering to 32k. There should also
-	 * be a sysctl option to stop being nice.
-	 */
-	(*rcv_wnd) = min(space, MAX_TCP_WINDOW);
-	(*rcv_wscale) = 0;
-	if (wscale_ok) {
-		/* See RFC1323 for an explanation of the limit to 14 */
-		while (space > 65535 && (*rcv_wscale) < 14) {
-			space >>= 1;
-			(*rcv_wscale)++;
-		}
-		if (*rcv_wscale && sysctl_tcp_app_win && space>=mss &&
-		    space - max((space>>sysctl_tcp_app_win), mss>>*rcv_wscale) < 65536/2)
-			(*rcv_wscale)--;
-
-		*rcv_wscale = max((__u8)sysctl_tcp_default_win_scale,
-				  *rcv_wscale);
-	}
-
-	/* Set initial window to value enough for senders,
-	 * following RFC1414. Senders, not following this RFC,
-	 * will be satisfied with 2.
-	 */
-	if (mss > (1<<*rcv_wscale)) {
-		int init_cwnd = 4;
-		if (mss > 1460*3)
-			init_cwnd = 2;
-		else if (mss > 1460)
-			init_cwnd = 3;
-		if (*rcv_wnd > init_cwnd*mss)
-			*rcv_wnd = init_cwnd*mss;
-	}
-	/* Set the clamp no higher than max representable value */
-	(*window_clamp) = min(65535U << (*rcv_wscale), *window_clamp);
-}
+/* Determine a window scaling and initial window to offer. */
+extern void tcp_select_initial_window(int __space, __u32 mss,
+				      __u32 *rcv_wnd, __u32 *window_clamp,
+				      int wscale_ok, __u8 *rcv_wscale);
 
 static inline int tcp_win_from_space(int space)
 {
@@ -1761,13 +1788,13 @@ static inline int tcp_win_from_space(int space)
 }
 
 /* Note: caller must be prepared to deal with negative returns */ 
-static inline int tcp_space(struct sock *sk)
+static inline int tcp_space(const struct sock *sk)
 {
 	return tcp_win_from_space(sk->sk_rcvbuf -
 				  atomic_read(&sk->sk_rmem_alloc));
 } 
 
-static inline int tcp_full_space( struct sock *sk)
+static inline int tcp_full_space(const struct sock *sk)
 {
 	return tcp_win_from_space(sk->sk_rcvbuf); 
 }
@@ -2023,7 +2050,7 @@ static inline void tcp_westwood_slow_bw(struct sock *sk, struct sk_buff *skb)
 static inline __u32 __tcp_westwood_bw_rttmin(const struct tcp_opt *tp)
 {
         return max((tp->westwood.bw_est) * (tp->westwood.rtt_min) /
-		   (__u32) (tp->mss_cache),
+		   (__u32) (tp->mss_cache_std),
 		   2U);
 }
 

@@ -14,6 +14,7 @@ SECTIONS
   .text : {
 	*(.text .text.*)
 	SCHED_TEXT
+	LOCK_TEXT
 	*(.fixup)
 	. = ALIGN(4096);
 	_etext = .;
@@ -59,12 +60,6 @@ SECTIONS
 	__setup_start = .;
 	*(.init.setup)
 	__setup_end = .;
-	}
-
-  __param : {
-	__start___param = .;
-	*(__param)
-	__stop___param = .;
 	}
 
   .initcall.init : {

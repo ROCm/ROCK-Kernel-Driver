@@ -234,7 +234,8 @@ CIFSSMBNegotiate(unsigned int xid, struct cifsSesInfo *ses)
 
 		/* BB might be helpful to save off the domain of server here */
 
-		if (pSMBr->hdr.Flags2 & SMBFLG2_EXT_SEC) {
+		if ((pSMBr->hdr.Flags2 & SMBFLG2_EXT_SEC) && 
+			(server->capabilities & CAP_EXTENDED_SECURITY)) {
 			if (pSMBr->ByteCount < 16)
 				rc = -EIO;
 			else if (pSMBr->ByteCount == 16) {
@@ -365,9 +366,12 @@ CIFSSMBLogoff(const int xid, struct cifsSesInfo *ses)
 
 	rc = smb_init(SMB_COM_LOGOFF_ANDX, 2, NULL /* no tcon anymore */,
 		 (void **) &pSMB, (void **) &smb_buffer_response);
-
-	if(ses->server->secMode & (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
-		pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	
+	if(ses->server) {
+		if(ses->server->secMode & 
+		   (SECMODE_SIGN_REQUIRED | SECMODE_SIGN_ENABLED))
+			pSMB->hdr.Flags2 |= SMBFLG2_SECURITY_SIGNATURE;
+	}
 
 	if (rc) {
 		up(&ses->sesSem);
@@ -818,7 +822,7 @@ CIFSSMBLock(const int xid, struct cifsTconInfo *tcon,
 	pSMB->AndXCommand = 0xFF;	/* none */
 	pSMB->Fid = smb_file_id; /* netfid stays le */
 
-	if(numLock != 0) {
+	if((numLock != 0) || (numUnlock != 0)) {
 		pSMB->Locks[0].Pid = cpu_to_le16(current->tgid);
 		/* BB where to store pid high? */
 		temp = cpu_to_le64(len);
@@ -2173,6 +2177,10 @@ getDFSRetry:
 			/* BB add check for name_len bigger than bcc */
 			*targetUNCs = 
 				kmalloc(name_len+1+ (*number_of_UNC_in_array),GFP_KERNEL);
+			if(*targetUNCs == NULL) {
+				rc = -ENOMEM;
+				goto GetDFSRefExit;
+			}
 			/* copy the ref strings */
 			referrals =  
 			    (struct dfs_referral_level_3 *) 
@@ -2196,6 +2204,7 @@ getDFSRetry:
 		}
 
 	}
+GetDFSRefExit:
 	if (pSMB)
 		cifs_buf_release(pSMB);
 
@@ -3105,7 +3114,7 @@ QAllEAsRetry:
 					rc += temp_fea->name_len;
 				/* account for prefix user. and trailing null */
 					rc = rc + 5 + 1; 
-					if(rc<buf_size) {
+					if(rc<(int)buf_size) {
 						memcpy(EAData,"user.",5);
 						EAData+=5;
 						memcpy(EAData,temp_ptr,temp_fea->name_len);
@@ -3141,7 +3150,7 @@ QAllEAsRetry:
 	if (rc == -EAGAIN)
 		goto QAllEAsRetry;
 
-	return rc;
+	return (ssize_t)rc;
 }
 
 ssize_t CIFSSMBQueryEA(const int xid,struct cifsTconInfo * tcon,
@@ -3255,7 +3264,7 @@ QEARetry:
 						/* found a match */
 						rc = temp_fea->value_len;
 				/* account for prefix user. and trailing null */
-						if(rc<=buf_size) {
+						if(rc<=(int)buf_size) {
 							memcpy(ea_value,
 								temp_fea->name+temp_fea->name_len+1,
 								rc);
@@ -3288,7 +3297,7 @@ QEARetry:
 	if (rc == -EAGAIN)
 		goto QEARetry;
 
-	return rc;
+	return (ssize_t)rc;
 }
 
 int

@@ -28,6 +28,7 @@
 #include <linux/backing-dev.h>
 #include <linux/buffer_head.h>
 #include <linux/vfs.h>
+#include <linux/moduleparam.h>
 
 #include "ntfs.h"
 #include "sysctl.h"
@@ -2638,7 +2639,7 @@ static int __init init_ntfs_fs(void)
 
 	ntfs_inode_cache = kmem_cache_create(ntfs_inode_cache_name,
 			sizeof(ntfs_inode), 0,
-			SLAB_HWCACHE_ALIGN|SLAB_RECLAIM_ACCOUNT, NULL, NULL);
+			SLAB_RECLAIM_ACCOUNT, NULL, NULL);
 	if (!ntfs_inode_cache) {
 		printk(KERN_CRIT "NTFS: Failed to create %s!\n",
 				ntfs_inode_cache_name);
@@ -2724,7 +2725,7 @@ MODULE_AUTHOR("Anton Altaparmakov <aia21@cantab.net>");
 MODULE_DESCRIPTION("NTFS 1.2/3.x driver - Copyright (c) 2001-2004 Anton Altaparmakov");
 MODULE_LICENSE("GPL");
 #ifdef DEBUG
-MODULE_PARM(debug_msgs, "i");
+module_param(debug_msgs, bool, 0);
 MODULE_PARM_DESC(debug_msgs, "Enable debug messages.");
 #endif
 

@@ -64,7 +64,7 @@ static void xfrm6_encap(struct sk_buff *skb)
 	top_iph->flow_lbl[1] = iph->flow_lbl[1];
 	top_iph->flow_lbl[2] = iph->flow_lbl[2];
 	top_iph->nexthdr = IPPROTO_IPV6; 
-	top_iph->hop_limit = iph->hop_limit;
+	top_iph->hop_limit = dst_path_metric(dst, RTAX_HOPLIMIT);
 	ipv6_addr_copy(&top_iph->saddr, (struct in6_addr *)&x->props.saddr);
 	ipv6_addr_copy(&top_iph->daddr, (struct in6_addr *)&x->id.daddr);
 }

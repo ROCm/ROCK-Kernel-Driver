@@ -10,8 +10,8 @@
  * published by the Free Software Foundation.
  *
  * Modifications:
- *     18-Aug-2004 BJD  Created initial version
- *
+ *      18-Aug-2004 BJD  Created initial version
+ *	27-Aug-2004 BJD  Added timers 0 through 3
 */
 
 extern struct platform_device s3c_device_usb;
@@ -27,5 +27,10 @@ extern struct platform_device s3c_device_spi0;
 extern struct platform_device s3c_device_spi1;
 
 extern struct platform_device s3c_device_nand;
+
+extern struct platform_device s3c_device_timer0;
+extern struct platform_device s3c_device_timer1;
+extern struct platform_device s3c_device_timer2;
+extern struct platform_device s3c_device_timer3;
 
 extern struct platform_device s3c_device_usbgadget;

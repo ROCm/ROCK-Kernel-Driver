@@ -54,7 +54,10 @@ MODULE_LICENSE("GPL");
 static mode_t udf_convert_permissions(struct fileEntry *);
 static int udf_update_inode(struct inode *, int);
 static void udf_fill_inode(struct inode *, struct buffer_head *);
-static struct buffer_head *inode_getblk(struct inode *, long, int *, long *, int *);
+static struct buffer_head *inode_getblk(struct inode *, long, int *,
+	long *, int *);
+static int8_t udf_insert_aext(struct inode *, lb_addr, int,
+	lb_addr, uint32_t, struct buffer_head *);
 static void udf_split_extents(struct inode *, int *, int, int,
 	long_ad [EXTENT_MERGE_SIZE], int *);
 static void udf_prealloc_extents(struct inode *, int, int,
@@ -268,12 +271,12 @@ struct buffer_head * udf_expand_dir_adinicb(struct inode *inode, int *block, int
 			return NULL;
 		}
 		UDF_I_ALLOCTYPE(inode) = alloctype;
-		sfi->descTag.tagLocation = *block;
+		sfi->descTag.tagLocation = cpu_to_le32(*block);
 		dfibh.soffset = dfibh.eoffset;
 		dfibh.eoffset += (sfibh.eoffset - sfibh.soffset);
 		dfi = (struct fileIdentDesc *)(dbh->b_data + dfibh.soffset);
 		if (udf_write_fi(inode, sfi, dfi, &dfibh, sfi->impUse,
-			sfi->fileIdent + sfi->lengthOfImpUse))
+			sfi->fileIdent + le16_to_cpu(sfi->lengthOfImpUse)))
 		{
 			UDF_I_ALLOCTYPE(inode) = ICBTAG_FLAG_AD_IN_ICB;
 			udf_release_data(dbh);
@@ -349,8 +352,8 @@ abort_negative:
 	goto abort;
 }
 
-struct buffer_head * udf_getblk(struct inode * inode, long block,
-	int create, int * err)
+static struct buffer_head *
+udf_getblk(struct inode *inode, long block, int create, int *err)
 {
 	struct buffer_head dummy;
 
@@ -941,7 +944,7 @@ udf_read_inode(struct inode *inode)
 	memset(&UDF_I_LOCATION(inode), 0xFF, sizeof(lb_addr));
 }
 
-void
+static void
 __udf_read_inode(struct inode *inode)
 {
 	struct buffer_head *bh = NULL;
@@ -1411,11 +1414,11 @@ udf_update_inode(struct inode *inode, int do_sync)
 				udf_add_extendedattr(inode,
 					sizeof(struct deviceSpec) +
 					sizeof(regid), 12, 0x3);
-			dsea->attrType = 12;
+			dsea->attrType = cpu_to_le32(12);
 			dsea->attrSubtype = 1;
-			dsea->attrLength = sizeof(struct deviceSpec) +
-				sizeof(regid);
-			dsea->impUseLength = sizeof(regid);
+			dsea->attrLength = cpu_to_le32(sizeof(struct deviceSpec) +
+				sizeof(regid));
+			dsea->impUseLength = cpu_to_le32(sizeof(regid));
 		}
 		eid = (regid *)dsea->impUse;
 		memset(eid, 0, sizeof(regid));
@@ -1901,8 +1904,9 @@ int8_t udf_current_aext(struct inode *inode, lb_addr *bloc, int *extoffset,
 	return etype;
 }
 
-int8_t udf_insert_aext(struct inode *inode, lb_addr bloc, int extoffset,
-	lb_addr neloc, uint32_t nelen, struct buffer_head *bh)
+static int8_t
+udf_insert_aext(struct inode *inode, lb_addr bloc, int extoffset,
+		lb_addr neloc, uint32_t nelen, struct buffer_head *bh)
 {
 	lb_addr oeloc;
 	uint32_t oelen;

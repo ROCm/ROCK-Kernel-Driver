@@ -75,6 +75,22 @@ ENTRY(v6_flush_user_cache_range)
  *	- the Icache does not read data from the write buffer
  */
 ENTRY(v6_coherent_kern_range)
+	/* FALLTHROUGH */
+
+/*
+ *	v6_coherent_user_range(start,end)
+ *
+ *	Ensure that the I and D caches are coherent within specified
+ *	region.  This is typically used when code has been written to
+ *	a memory region, and will be executed.
+ *
+ *	- start   - virtual start address of region
+ *	- end     - virtual end address of region
+ *
+ *	It is assumed that:
+ *	- the Icache does not read data from the write buffer
+ */
+ENTRY(v6_coherent_user_range)
 	bic	r0, r0, #CACHE_LINE_SIZE - 1
 1:
 #ifdef HARVARD_CACHE
@@ -203,6 +219,7 @@ ENTRY(v6_cache_fns)
 	.long	v6_flush_user_cache_all
 	.long	v6_flush_user_cache_range
 	.long	v6_coherent_kern_range
+	.long	v6_coherent_user_range
 	.long	v6_flush_kern_dcache_page
 	.long	v6_dma_inv_range
 	.long	v6_dma_clean_range

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <asm/ptrace.h>
 #include <asm/user.h>
 

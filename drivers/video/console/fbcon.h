@@ -48,10 +48,6 @@ struct display {
     struct fb_videomode *mode;
 };
 
-/* drivers/video/console/fbcon.c */
-extern signed char con2fb_map[MAX_NR_CONSOLES];
-extern int set_con2fb_map(int unit, int newidx);
-
     /*
      *  Attribute Decoding
      */

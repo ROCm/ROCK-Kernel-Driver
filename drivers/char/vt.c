@@ -136,9 +136,6 @@ extern void prom_con_init(void);
 #ifdef CONFIG_MDA_CONSOLE
 extern int mda_console_init(void);
 #endif
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-extern int fb_console_init(void);
-#endif
 
 struct vc vc_cons [MAX_NR_CONSOLES];
 
@@ -1981,12 +1978,16 @@ again:
 		hide_cursor(currcons);
 
 	while (!tty->stopped && count) {
-		c = *buf;
+		int orig = *buf;
+		c = orig;
 		buf++;
 		n++;
 		count--;
 
-		if (utf) {
+		/* Do no translation at all in control states */
+		if (vc_state != ESnormal) {
+			tc = c;
+		} else if (utf) {
 		    /* Combine UTF-8 into Unicode */
 		    /* Incomplete characters silently ignored */
 		    if(c > 0x7f) {
@@ -2086,7 +2087,7 @@ again:
 			continue;
 		}
 		FLUSH
-		do_con_trol(tty, currcons, c);
+		do_con_trol(tty, currcons, orig);
 	}
 	FLUSH
 	console_conditional_schedule();
@@ -2668,9 +2669,6 @@ int __init vty_init(void)
 #ifdef CONFIG_MDA_CONSOLE
 	mda_console_init();
 #endif
-#ifdef CONFIG_FRAMEBUFFER_CONSOLE
-	fb_console_init();
-#endif	
 	return 0;
 }
 

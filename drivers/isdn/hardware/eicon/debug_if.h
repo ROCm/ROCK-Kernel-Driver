@@ -57,12 +57,18 @@ void diva_mnt_remove_xdi_adapter (const DESCRIPTOR* d);
 void diva_mnt_add_xdi_adapter    (const DESCRIPTOR* d);
 int diva_mnt_shutdown_xdi_adapters (void);
 
+#define DIVA_MAX_SELECTIVE_FILTER_LENGTH 127
+int diva_set_trace_filter (int filter_length, const char* filter);
+int diva_get_trace_filter (int max_length,    char*       filter);
+
 
 #define DITRACE_CMD_GET_DRIVER_INFO   1
 #define DITRACE_READ_DRIVER_DBG_MASK  2
 #define DITRACE_WRITE_DRIVER_DBG_MASK 3
 #define DITRACE_READ_TRACE_ENTRY      4
 #define DITRACE_READ_TRACE_ENTRYS     5
+#define DITRACE_WRITE_SELECTIVE_TRACE_FILTER 6
+#define DITRACE_READ_SELECTIVE_TRACE_FILTER  7
 
 /*
   Trace lavels for debug via management interface

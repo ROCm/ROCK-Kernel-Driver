@@ -433,30 +433,32 @@ asmlinkage long sys_ptrace(long request, long pid, unsigned long addr, long data
 		break;
 
 	case PTRACE_GETREGS: { /* Get all gp regs from the child. */
-	  	if (!access_ok(VERIFY_WRITE, (unsigned __user *)data, FRAME_SIZE)) {
+	  	if (!access_ok(VERIFY_WRITE, (unsigned __user *)data,
+			       sizeof(struct user_regs_struct))) {
 			ret = -EIO;
 			break;
 		}
+		ret = 0;
 		for (ui = 0; ui < sizeof(struct user_regs_struct); ui += sizeof(long)) {
-			__put_user(getreg(child, ui),(unsigned long __user *) data);
+			ret |= __put_user(getreg(child, ui),(unsigned long __user *) data);
 			data += sizeof(long);
 		}
-		ret = 0;
 		break;
 	}
 
 	case PTRACE_SETREGS: { /* Set all gp regs in the child. */
 		unsigned long tmp;
-	  	if (!access_ok(VERIFY_READ, (unsigned __user *)data, FRAME_SIZE)) {
+	  	if (!access_ok(VERIFY_READ, (unsigned __user *)data,
+			       sizeof(struct user_regs_struct))) {
 			ret = -EIO;
 			break;
 		}
+		ret = 0;
 		for (ui = 0; ui < sizeof(struct user_regs_struct); ui += sizeof(long)) {
-			__get_user(tmp, (unsigned long __user *) data);
+			ret |= __get_user(tmp, (unsigned long __user *) data);
 			putreg(child, ui, tmp);
 			data += sizeof(long);
 		}
-		ret = 0;
 		break;
 	}
 

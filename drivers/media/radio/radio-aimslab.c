@@ -63,12 +63,7 @@ static void sleep_delay(long n)
 	if(!d)
 		udelay(n);
 	else
-	{
-		/* Yield CPU time */
-		unsigned long x=jiffies;
-		while((jiffies-x)<=d)
-			schedule();
-	}
+		msleep(jiffies_to_msecs(d));
 }
 
 static void rt_decvol(void)

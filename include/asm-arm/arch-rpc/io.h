@@ -22,40 +22,40 @@
  */
 #define __arch_base_getb(b,o)			\
  ({						\
-	unsigned int v, r = (b);		\
+	unsigned int __v, __r = (b);		\
 	__asm__ __volatile__(			\
 		"ldrb	%0, [%1, %2]"		\
-		: "=r" (v)			\
-		: "r" (r), "Ir" (o));		\
-	v;					\
+		: "=r" (__v)			\
+		: "r" (__r), "Ir" (o));		\
+	__v;					\
  })
 
 #define __arch_base_getl(b,o)			\
  ({						\
-	unsigned int v, r = (b);		\
+	unsigned int __v, __r = (b);		\
 	__asm__ __volatile__(			\
 		"ldr	%0, [%1, %2]"		\
-		: "=r" (v)			\
-		: "r" (r), "Ir" (o));		\
-	v;					\
+		: "=r" (__v)			\
+		: "r" (__r), "Ir" (o));		\
+	__v;					\
  })
 
 #define __arch_base_putb(v,b,o)			\
  ({						\
-	unsigned int r = (b);			\
+	unsigned int __r = (b);			\
 	__asm__ __volatile__(			\
 		"strb	%0, [%1, %2]"		\
 		:				\
-		: "r" (v), "r" (r), "Ir" (o));	\
+		: "r" (v), "r" (__r), "Ir" (o));\
  })
 
 #define __arch_base_putl(v,b,o)			\
  ({						\
-	unsigned int r = (b);			\
+	unsigned int __r = (b);			\
 	__asm__ __volatile__(			\
 		"str	%0, [%1, %2]"		\
 		:				\
-		: "r" (v), "r" (r), "Ir" (o));	\
+		: "r" (v), "r" (__r), "Ir" (o));\
  })
 
 /*
@@ -176,15 +176,15 @@ DECLARE_IO(int,l,"")
 
 #define __outwc(value,port)							\
 ({										\
-	unsigned long v = value;						\
+	unsigned long __v = value;						\
 	if (__PORT_PCIO((port)))						\
 		__asm__ __volatile__(						\
 		"str	%0, [%1, %2]	@ outwc"				\
-		: : "r" (v|v<<16), "r" (PCIO_BASE), "Jr" ((port) << 2));	\
+		: : "r" (__v|__v<<16), "r" (PCIO_BASE), "Jr" ((port) << 2));	\
 	else									\
 		__asm__ __volatile__(						\
 		"str	%0, [%1, %2]	@ outwc"				\
-		: : "r" (v|v<<16), "r" (IO_BASE), "r" ((port) << 2));		\
+		: : "r" (__v|__v<<16), "r" (IO_BASE), "r" ((port) << 2));		\
 })
 
 #define __inwc(port)								\
@@ -203,15 +203,15 @@ DECLARE_IO(int,l,"")
 
 #define __outlc(value,port)							\
 ({										\
-	unsigned long v = value;						\
+	unsigned long __v = value;						\
 	if (__PORT_PCIO((port)))						\
 		__asm__ __volatile__(						\
 		"str	%0, [%1, %2]	@ outlc"				\
-		: : "r" (v), "r" (PCIO_BASE), "Jr" ((port) << 2));		\
+		: : "r" (__v), "r" (PCIO_BASE), "Jr" ((port) << 2));		\
 	else									\
 		__asm__ __volatile__(						\
 		"str	%0, [%1, %2]	@ outlc"				\
-		: : "r" (v), "r" (IO_BASE), "r" ((port) << 2));			\
+		: : "r" (__v), "r" (IO_BASE), "r" ((port) << 2));			\
 })
 
 #define __inlc(port)								\
@@ -250,6 +250,6 @@ DECLARE_IO(int,l,"")
 /*
  * 1:1 mapping for ioremapped regions.
  */
-#define __mem_pci(x)	(x)
+#define __mem_pci(x)	((unsigned long)(x))
 
 #endif

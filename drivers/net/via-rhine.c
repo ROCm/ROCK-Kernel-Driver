@@ -346,7 +346,7 @@ enum rhine_revs {
 	VT6105L		= 0x8A,
 	VT6107		= 0x8C,
 	VTunknown2	= 0x8E,
-	VT6105M		= 0x90,
+	VT6105M		= 0x90,	/* Management adapter */
 };
 
 enum rhine_quirks {
@@ -485,6 +485,7 @@ struct rhine_private {
 	dma_addr_t tx_bufs_dma;
 
 	struct pci_dev *pdev;
+	long pioaddr;
 	struct net_device_stats stats;
 	spinlock_t lock;
 
@@ -593,7 +594,7 @@ static void rhine_power_init(struct net_device *dev)
 			default:
 				reason = "Unknown";
 			}
-			printk("%s: Woke system up. Reason: %s.\n",
+			printk(KERN_INFO "%s: Woke system up. Reason: %s.\n",
 			       DRV_NAME, reason);
 		}
 	}
@@ -703,7 +704,7 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	long memaddr;
 	long ioaddr;
 	int io_size, phy_id;
-	const char *name, *mname;
+	const char *name;
 
 /* when built into the kernel, we only print version if device is found */
 #ifndef MODULE
@@ -718,41 +719,24 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	phy_id = 0;
 	quirks = 0;
 	name = "Rhine";
-	mname = "unknown";
 	if (pci_rev < VTunknown0) {
 		quirks = rqRhineI;
 		io_size = 128;
-		mname = "VT86C100A";
 	}
 	else if (pci_rev >= VT6102) {
 		quirks = rqWOL | rqForceReset;
 		if (pci_rev < VT6105) {
 			name = "Rhine II";
 			quirks |= rqStatusWBRace;	/* Rhine-II exclusive */
-			if (pci_rev < VT8231)
-				mname = "VT6102";
-			else if (pci_rev < VT8233)
-				mname = "VT8231";
-			else if (pci_rev < VT8235)
-				mname = "VT8233";
-			else if (pci_rev < VT8237)
-				mname = "VT8235";
-			else if (pci_rev < VTunknown1)
-				mname = "VT8237";
 		}
 		else {
-			name = "Rhine III";
 			phy_id = 1;	/* Integrated PHY, phy_id fixed to 1 */
 			if (pci_rev >= VT6105_B0)
 				quirks |= rq6patterns;
-			if (pci_rev < VT6105L)
-				mname = "VT6105";
-			else if (pci_rev < VT6107)
-				mname = "VT6105L";
-			else if (pci_rev < VT6105M)
-				mname = "VT6107";
-			else if (pci_rev >= VT6105M)
-				mname = "Management Adapter VT6105M";
+			if (pci_rev < VT6105M)
+				name = "Rhine III";
+			else
+				name = "Rhine III (Management Adapter)";
 		}
 	}
 
@@ -790,6 +774,11 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	SET_MODULE_OWNER(dev);
 	SET_NETDEV_DEV(dev, &pdev->dev);
 
+	rp = netdev_priv(dev);
+	rp->quirks = quirks;
+	rp->pioaddr = pioaddr;
+	rp->pdev = pdev;
+
 	rc = pci_request_regions(pdev, DRV_NAME);
 	if (rc)
 		goto err_out_free_netdev;
@@ -823,8 +812,6 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 #endif /* USE_MMIO */
 
 	dev->base_addr = ioaddr;
-	rp = netdev_priv(dev);
-	rp->quirks = quirks;
 
 	/* Get chip registers into a sane state */
 	rhine_power_init(dev);
@@ -846,7 +833,6 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	dev->irq = pdev->irq;
 
 	spin_lock_init(&rp->lock);
-	rp->pdev = pdev;
 	rp->mii_if.dev = dev;
 	rp->mii_if.mdio_read = mdio_read;
 	rp->mii_if.mdio_write = mdio_write;
@@ -874,8 +860,8 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	if (rc)
 		goto err_out_unmap;
 
-	printk(KERN_INFO "%s: VIA %s (%s) at 0x%lx, ",
-	       dev->name, name, mname,
+	printk(KERN_INFO "%s: VIA %s at 0x%lx, ",
+	       dev->name, name,
 #ifdef USE_MMIO
 		memaddr
 #else
@@ -890,7 +876,10 @@ static int __devinit rhine_init_one(struct pci_dev *pdev,
 	pci_set_drvdata(pdev, dev);
 
 	{
+		u16 mii_cmd;
 		int mii_status = mdio_read(dev, phy_id, 1);
+		mii_cmd = mdio_read(dev, phy_id, MII_BMCR) & ~BMCR_ISOLATE;
+		mdio_write(dev, phy_id, MII_BMCR, mii_cmd);
 		if (mii_status != 0xffff && mii_status != 0x0000) {
 			rp->mii_if.advertising = mdio_read(dev, phy_id, 4);
 			printk(KERN_INFO "%s: MII PHY found at address "
@@ -1172,7 +1161,7 @@ static int mdio_read(struct net_device *dev, int phy_id, int regnum)
 
 	rhine_disable_linkmon(ioaddr, rp->quirks);
 
-	writeb(0, ioaddr + MIICmd);
+	/* rhine_disable_linkmon already cleared MIICmd */
 	writeb(phy_id, ioaddr + MIIPhyAddr);
 	writeb(regnum, ioaddr + MIIRegAddr);
 	writeb(0x40, ioaddr + MIICmd);		/* Trigger read */
@@ -1190,7 +1179,7 @@ static void mdio_write(struct net_device *dev, int phy_id, int regnum, int value
 
 	rhine_disable_linkmon(ioaddr, rp->quirks);
 
-	writeb(0, ioaddr + MIICmd);
+	/* rhine_disable_linkmon already cleared MIICmd */
 	writeb(phy_id, ioaddr + MIIPhyAddr);
 	writeb(regnum, ioaddr + MIIRegAddr);
 	writew(value, ioaddr + MIIData);
@@ -1951,11 +1940,70 @@ static void rhine_shutdown (struct device *gendev)
 
 }
 
+#ifdef CONFIG_PM
+static int rhine_suspend(struct pci_dev *pdev, u32 state)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct rhine_private *rp = netdev_priv(dev);
+	unsigned long flags;
+
+	if (!netif_running(dev))
+		return 0;
+
+	netif_device_detach(dev);
+	pci_save_state(pdev, pdev->saved_config_space);
+
+	spin_lock_irqsave(&rp->lock, flags);
+	rhine_shutdown(&pdev->dev);
+	spin_unlock_irqrestore(&rp->lock, flags);
+
+	return 0;
+}
+
+static int rhine_resume(struct pci_dev *pdev)
+{
+	struct net_device *dev = pci_get_drvdata(pdev);
+	struct rhine_private *rp = netdev_priv(dev);
+	unsigned long flags;
+	int ret;
+
+	if (!netif_running(dev))
+		return 0;
+
+	ret = pci_set_power_state(pdev, 0);
+	if (debug > 1)
+		printk(KERN_INFO "%s: Entering power state D0 %s (%d).\n",
+			dev->name, ret ? "failed" : "succeeded", ret);
+
+	pci_restore_state(pdev, pdev->saved_config_space);
+
+	spin_lock_irqsave(&rp->lock, flags);
+#ifdef USE_MMIO
+	enable_mmio(rp->pioaddr, rp->quirks);
+#endif
+	rhine_power_init(dev);
+	free_tbufs(dev);
+	free_rbufs(dev);
+	alloc_tbufs(dev);
+	alloc_rbufs(dev);
+	init_registers(dev);
+	spin_unlock_irqrestore(&rp->lock, flags);
+
+	netif_device_attach(dev);
+
+	return 0;
+}
+#endif /* CONFIG_PM */
+
 static struct pci_driver rhine_driver = {
 	.name		= DRV_NAME,
 	.id_table	= rhine_pci_tbl,
 	.probe		= rhine_init_one,
 	.remove		= __devexit_p(rhine_remove_one),
+#ifdef CONFIG_PM
+	.suspend	= rhine_suspend,
+	.resume		= rhine_resume,
+#endif /* CONFIG_PM */
 	.driver = {
 		.shutdown = rhine_shutdown,
 	}

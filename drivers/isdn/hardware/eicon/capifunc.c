@@ -1,4 +1,4 @@
-/* $Id: capifunc.c,v 1.61.4.2 2004/05/05 16:09:25 armin Exp $
+/* $Id: capifunc.c,v 1.61.4.5 2004/08/27 20:10:12 armin Exp $
  *
  * ISDN interface module for Eicon active cards DIVA.
  * CAPI Interface common functions
@@ -998,7 +998,8 @@ static u16 diva_send_message(struct capi_ctr *ctrl,
 
       write_end:
 	diva_os_leave_spin_lock(&api_lock, &old_irql, "send message");
-	diva_os_free_message_buffer(dmb);
+	if (retval == CAPI_NOERROR)
+		diva_os_free_message_buffer(dmb);
 	return retval;
 }
 

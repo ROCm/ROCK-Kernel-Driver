@@ -24,8 +24,8 @@
 
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/hardirq.h>
 #include <asm/desc.h>
+#include <asm/kdebug.h>
 
 extern void die(const char *,struct pt_regs *,long);
 
@@ -226,6 +226,9 @@ asmlinkage void do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	/* get the address */
 	__asm__("movl %%cr2,%0":"=r" (address));
 
+	if (notify_die(DIE_PAGE_FAULT, "page fault", regs, error_code, 14,
+					SIGSEGV) == NOTIFY_OK)
+		return;
 	/* It's safe to allow irq's after cr2 has been saved */
 	if (regs->eflags & (X86_EFLAGS_IF|VM_MASK))
 		local_irq_enable();
@@ -513,12 +516,13 @@ vmalloc_fault:
 		 * an interrupt in the middle of a task switch..
 		 */
 		int index = pgd_index(address);
+		unsigned long pgd_paddr;
 		pgd_t *pgd, *pgd_k;
 		pmd_t *pmd, *pmd_k;
 		pte_t *pte_k;
 
-		asm("movl %%cr3,%0":"=r" (pgd));
-		pgd = index + (pgd_t *)__va(pgd);
+		asm("movl %%cr3,%0":"=r" (pgd_paddr));
+		pgd = index + (pgd_t *)__va(pgd_paddr);
 		pgd_k = init_mm.pgd + index;
 
 		if (!pgd_present(*pgd_k))

@@ -539,36 +539,18 @@ static struct mixer_operations opl3sa3_mixer_operations =
  * Component probe, attach, unload functions
  */
 
-static inline int __init probe_opl3sa2_mpu(struct address_info* hw_config)
-{
-	return probe_mpu401(hw_config);
-}
-
-
-static inline int __init attach_opl3sa2_mpu(struct address_info* hw_config)
-{
-	return attach_mpu401(hw_config, THIS_MODULE);
-}
-
-
 static inline void __exit unload_opl3sa2_mpu(struct address_info *hw_config)
 {
 	unload_mpu401(hw_config);
 }
 
 
-static inline int __init probe_opl3sa2_mss(struct address_info* hw_config)
-{
-	return probe_ms_sound(hw_config);
-}
-
-
-static void __init attach_opl3sa2_mss(struct address_info* hw_config)
+static void __init attach_opl3sa2_mss(struct address_info* hw_config, struct resource *ports)
 {
 	int initial_mixers;
 
 	initial_mixers = num_mixers;
-	attach_ms_sound(hw_config, THIS_MODULE);	/* Slot 0 */
+	attach_ms_sound(hw_config, ports, THIS_MODULE);	/* Slot 0 */
 	if (hw_config->slots[0] != -1) {
 		/* Did the MSS driver install? */
 		if(num_mixers == (initial_mixers + 1)) {
@@ -957,6 +939,8 @@ static int __init init_opl3sa2(void)
 
 	for (card = 0; card < max; card++) {
 		/* If a user wants an I/O then assume they meant it */
+		struct resource *ports;
+		int base;
 		
 		if (!isapnp) {
 			if (io == -1 || irq == -1 || dma == -1 ||
@@ -995,17 +979,30 @@ static int __init init_opl3sa2(void)
 			opl3sa2_clear_slots(&opl3sa2_state[card].cfg_mpu);
 		}
 
+		/* FIXME: leak */
 		if (probe_opl3sa2(&opl3sa2_state[card].cfg, card))
 			return -ENODEV;
 
+		base = opl3sa2_state[card].cfg_mss.io_base;
 
-		if (!probe_opl3sa2_mss(&opl3sa2_state[card].cfg_mss)) {
+		if (!request_region(base, 4, "WSS config"))
+			goto failed;
+
+		ports = request_region(base + 4, 4, "ad1848");
+		if (!ports)
+			goto failed2;
+
+		if (!probe_ms_sound(&opl3sa2_state[card].cfg_mss, ports)) {
 			/*
 			 * If one or more cards are already registered, don't
 			 * return an error but print a warning.  Note, this
 			 * should never really happen unless the hardware or
 			 * ISA PnP screwed up.
 			 */
+			release_region(base + 4, 4);
+		failed2:
+			release_region(base, 4);
+		failed:
 			release_region(opl3sa2_state[card].cfg.io_base, 2);
 
 			if (opl3sa2_cards_num) {
@@ -1021,7 +1018,7 @@ static int __init init_opl3sa2(void)
 		attach_opl3sa2(&opl3sa2_state[card].cfg, card);
 		conf_printf(opl3sa2_state[card].chipset_name, &opl3sa2_state[card].cfg);
 		attach_opl3sa2_mixer(&opl3sa2_state[card].cfg, card);
-		attach_opl3sa2_mss(&opl3sa2_state[card].cfg_mss);
+		attach_opl3sa2_mss(&opl3sa2_state[card].cfg_mss, ports);
 
 		/* ewww =) */
 		opl3sa2_state[card].card = card;
@@ -1054,15 +1051,23 @@ static int __init init_opl3sa2(void)
 		
 		/* Attach MPU if we've been asked to do so, failure isn't fatal */
 		if (opl3sa2_state[card].cfg_mpu.io_base != -1) {
-			if (probe_opl3sa2_mpu(&opl3sa2_state[card].cfg_mpu)) {
-				if (attach_opl3sa2_mpu(&opl3sa2_state[card].cfg_mpu)) {
-					printk(KERN_ERR PFX "failed to attach MPU401\n");
-					opl3sa2_state[card].cfg_mpu.slots[1] = -1;
-				}
+			int base = opl3sa2_state[card].cfg_mpu.io_base;
+			struct resource *ports;
+			ports = request_region(base, 2, "mpu401");
+			if (!ports)
+				goto out;
+			if (!probe_mpu401(&opl3sa2_state[card].cfg_mpu, ports)) {
+				release_region(base, 2);
+				goto out;
+			}
+			if (attach_mpu401(&opl3sa2_state[card].cfg_mpu, THIS_MODULE)) {
+				printk(KERN_ERR PFX "failed to attach MPU401\n");
+				opl3sa2_state[card].cfg_mpu.slots[1] = -1;
 			}
 		}
 	}
 
+out:
 	if (isapnp) {
 		printk(KERN_NOTICE PFX "%d PnP card(s) found.\n", opl3sa2_cards_num);
 	}

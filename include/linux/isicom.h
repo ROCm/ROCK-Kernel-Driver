@@ -102,7 +102,6 @@ typedef	struct	{
 #define ClearInterrupt(base) (inw((base)+0x0a))	
 
 #define	BOARD(line)  (((line) >> 4) & 0x3)
-#define MIN(a, b) ( (a) < (b) ? (a) : (b) )
 
 	/*	isi kill queue bitmap	*/
 	

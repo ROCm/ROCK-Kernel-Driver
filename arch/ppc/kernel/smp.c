@@ -26,7 +26,6 @@
 #include <asm/irq.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
-#include <asm/hardirq.h>
 #include <asm/io.h>
 #include <asm/prom.h>
 #include <asm/smp.h>
@@ -364,22 +363,15 @@ int __devinit start_secondary(void *unused)
 
 int __cpu_up(unsigned int cpu)
 {
-	struct pt_regs regs;
 	struct task_struct *p;
 	char buf[32];
 	int c;
 
 	/* create a process for the processor */
 	/* only regs.msr is actually used, and 0 is OK for it */
-	memset(&regs, 0, sizeof(struct pt_regs));
-	p = copy_process(CLONE_VM|CLONE_IDLETASK, 0, &regs, 0, NULL, NULL);
+	p = fork_idle(cpu);
 	if (IS_ERR(p))
 		panic("failed fork for CPU %u: %li", cpu, PTR_ERR(p));
-	wake_up_forked_process(p);
-
-	init_idle(p, cpu);
-	unhash_process(p);
-
 	secondary_ti = p->thread_info;
 	p->thread_info->cpu = cpu;
 

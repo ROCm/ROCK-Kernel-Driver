@@ -42,6 +42,7 @@
 #include <linux/dcache.h>
 
 #include <asm/uaccess.h>
+#include <asm/processor.h>
 
 #ifdef CONFIG_ROOT_NFS
 #include <linux/nfs_fs.h>
@@ -116,12 +117,6 @@ extern int sysctl_userprocess_debug;
 
 extern int sysctl_hz_timer;
 
-#if defined(CONFIG_PPC32) && defined(CONFIG_6xx)
-extern unsigned long powersave_nap;
-int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
-		  void __user *buffer, size_t *lenp, loff_t *ppos);
-#endif
-
 #ifdef CONFIG_BSD_PROCESS_ACCT
 extern int acct_parm[];
 #endif
@@ -147,6 +142,10 @@ static ctl_table dev_table[];
 extern ctl_table random_table[];
 #ifdef CONFIG_UNIX98_PTYS
 extern ctl_table pty_table[];
+#endif
+
+#ifdef HAVE_ARCH_PICK_MMAP_LAYOUT
+int sysctl_legacy_va_layout;
 #endif
 
 /* /proc declarations: */
@@ -295,7 +294,7 @@ static ctl_table kern_table[] = {
 		.procname	= "tainted",
 		.data		= &tainted,
 		.maxlen		= sizeof(int),
-		.mode		= 0644,
+		.mode		= 0444,
 		.proc_handler	= &proc_dointvec,
 	},
 	{
@@ -359,22 +358,6 @@ static ctl_table kern_table[] = {
 		.maxlen		= sizeof (int),
 		.mode		= 0644,
 		.proc_handler	= &proc_dointvec,
-	},
-#endif
-#if defined(CONFIG_PPC32) && defined(CONFIG_6xx)
-	{
-		.ctl_name	= KERN_PPC_POWERSAVE_NAP,
-		.procname	= "powersave-nap",
-		.data		= &powersave_nap,
-		.maxlen		= sizeof(int),
-		.mode		= 0644,
-		.proc_handler	= &proc_dointvec,
-	},
-	{
-		.ctl_name	= KERN_PPC_L2CR,
-		.procname	= "l2cr",
-		.mode		= 0644,
-		.proc_handler	= &proc_dol2crvec,
 	},
 #endif
 	{
@@ -805,6 +788,18 @@ static ctl_table vm_table[] = {
 		.strategy	= &sysctl_intvec,
 		.extra1		= &zero,
 	},
+#ifdef HAVE_ARCH_PICK_MMAP_LAYOUT
+	{
+		.ctl_name	= VM_LEGACY_VA_LAYOUT,
+		.procname	= "legacy_va_layout",
+		.data		= &sysctl_legacy_va_layout,
+		.maxlen		= sizeof(sysctl_legacy_va_layout),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+		.strategy	= &sysctl_intvec,
+		.extra1		= &zero,
+	},
+#endif
 	{ .ctl_name = 0 }
 };
 

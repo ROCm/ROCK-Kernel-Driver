@@ -761,9 +761,6 @@ static void __sa1111_remove(struct sa1111 *sachip)
  */
 int dma_needs_bounce(struct device *dev, dma_addr_t addr, size_t size)
 {
-	unsigned int physaddr = SA1111_DMA_ADDR((unsigned int)addr);
-	u32 dma_mask = *dev->dma_mask;
-
 	/*
 	 * Section 4.6 of the "Intel StrongARM SA-1111 Development Module
 	 * User's Guide" mentions that jumpers R51 and R52 control the
@@ -771,14 +768,8 @@ int dma_needs_bounce(struct device *dev, dma_addr_t addr, size_t size)
 	 * SDRAM bank 1 on Neponset). The default configuration selects
 	 * Assabet, so any address in bank 1 is necessarily invalid.
 	 */
-	if ((machine_is_assabet() || machine_is_pfs168()) &&
-		(addr >= 0xc8000000 || (addr + size) >= 0xc8000000))
-	  	return 1;
-
-	/*
-	 * Check to see if either the start or end are illegal.
-	 */
-	return ((addr & ~dma_mask)) || ((addr + size - 1) & ~dma_mask);
+	return ((machine_is_assabet() || machine_is_pfs168()) &&
+		(addr >= 0xc8000000 || (addr + size) >= 0xc8000000));
 }
 
 struct sa1111_save_data {

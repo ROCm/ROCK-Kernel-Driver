@@ -18,14 +18,6 @@
 #if !defined(_USBVEND_H)
 #define	_USBVEND_H
 
-#ifndef __KERNEL__
-#include "ionprag.h"	/* Extra I/O Networks pragmas */
-
-#include <usbdi.h>
-
-#include "iondef.h"	/* Standard I/O Networks definitions */
-#endif
-
 /************************************************************************
  *
  *		D e f i n e s   /   T y p e d e f s
@@ -37,6 +29,7 @@
 // 
 
 #define	USB_VENDOR_ID_ION	0x1608		// Our VID
+#define	USB_VENDOR_ID_TI	0x0451		// TI VID
 
 //
 // Definitions of USB product IDs (PID)
@@ -48,36 +41,41 @@
 
 // ION-device OEM IDs
 #define	ION_OEM_ID_ION		0		// 00h Inside Out Networks
-#define	ION_OEM_ID_NLYNX	1		// 01h NLynx Systems	  
+#define	ION_OEM_ID_NLYNX	1		// 01h NLynx Systems
 #define	ION_OEM_ID_GENERIC	2		// 02h Generic OEM
 #define	ION_OEM_ID_MAC		3		// 03h Mac Version
 #define	ION_OEM_ID_MEGAWOLF	4		// 04h Lupusb OEM Mac version (MegaWolf)
 #define	ION_OEM_ID_MULTITECH	5		// 05h Multitech Rapidports
+#define	ION_OEM_ID_AGILENT	6		// 06h AGILENT board
 
-	
+
 // ION-device Device IDs
-// Product IDs - assigned to match middle digit of serial number
+// Product IDs - assigned to match middle digit of serial number (No longer true)
 
+#define ION_DEVICE_ID_80251_NETCHIP	0x020	// This bit is set in the PID if this edgeport hardware$
+						// is based on the 80251+Netchip.  
 
-// The ION_DEVICE_ID_GENERATION_2 bit (0x20) will be ORed into the existing edgeport
-// PIDs to identify 80251+Netchip hardware.  This will guarantee that if a second
-// generation edgeport device is plugged into a PC with an older (pre 2.0) driver,
-// it will not enumerate.
+#define ION_DEVICE_ID_GENERATION_1	0x00	// Value for 930 based edgeports
+#define ION_DEVICE_ID_GENERATION_2	0x01	// Value for 80251+Netchip.
+#define ION_DEVICE_ID_GENERATION_3	0x02	// Value for Texas Instruments TUSB5052 chip
+#define ION_DEVICE_ID_GENERATION_4	0x03	// Watchport Family of products
+#define ION_GENERATION_MASK		0x03
 
-#define ION_DEVICE_ID_GENERATION_2	0x020	// This bit is set in the PID if this edgeport hardware
-															// is based on the 80251+Netchip.  
+#define ION_DEVICE_ID_HUB_MASK		0x0080	// This bit in the PID designates a HUB device
+						// for example 8C would be a 421 4 port hub
+						// and 8D would be a 2 port embedded hub
 
-#define EDGEPORT_DEVICE_ID_MASK			0x3df	// Not including GEN_2 bit
+#define EDGEPORT_DEVICE_ID_MASK			0x0ff	// Not including OEM or GENERATION fields
 
 #define	ION_DEVICE_ID_UNCONFIGURED_EDGE_DEVICE	0x000	// In manufacturing only
 #define ION_DEVICE_ID_EDGEPORT_4		0x001	// Edgeport/4 RS232
-//	ION_DEVICE_ID_HUBPORT_7			0x002	// Hubport/7 (Placeholder, not used by software)
+#define	ION_DEVICE_ID_EDGEPORT_8R		0x002	// Edgeport with RJ45 no Ring
 #define ION_DEVICE_ID_RAPIDPORT_4		0x003	// Rapidport/4
 #define ION_DEVICE_ID_EDGEPORT_4T		0x004	// Edgeport/4 RS232 for Telxon (aka "Fleetport")
 #define ION_DEVICE_ID_EDGEPORT_2		0x005	// Edgeport/2 RS232
 #define ION_DEVICE_ID_EDGEPORT_4I		0x006	// Edgeport/4 RS422
 #define ION_DEVICE_ID_EDGEPORT_2I		0x007	// Edgeport/2 RS422/RS485
-//	ION_DEVICE_ID_HUBPORT_4			0x008	// Hubport/4 (Placeholder, not used by software)
+#define	ION_DEVICE_ID_EDGEPORT_8RR		0x008	// Edgeport with RJ45 with Data and RTS/CTS only
 //	ION_DEVICE_ID_EDGEPORT_8_HANDBUILT	0x009	// Hand-built Edgeport/8 (Placeholder, used in middle digit of serial number only!)
 //	ION_DEVICE_ID_MULTIMODEM_4X56		0x00A	// MultiTech version of RP/4 (Placeholder, used in middle digit of serial number only!)
 #define	ION_DEVICE_ID_EDGEPORT_PARALLEL_PORT	0x00B	// Edgeport/(4)21 Parallel port (USS720)
@@ -90,41 +88,134 @@
 #define ION_DEVICE_ID_EDGEPORT_16_DUAL_CPU	0x012	// Half of an Edgeport/16 (the kind with 2 EP/8s)
 #define ION_DEVICE_ID_EDGEPORT_COMPATIBLE	0x013	// Edgeport Compatible, for NCR, Axiohm etc. testing
 #define ION_DEVICE_ID_EDGEPORT_8I		0x014	// Edgeport/8 RS422 (single-CPU)
+#define ION_DEVICE_ID_EDGEPORT_1		0x015	// Edgeport/1 RS232
+#define ION_DEVICE_ID_EPOS44			0x016	// Half of an EPOS/44 (TIUMP BASED)
+#define ION_DEVICE_ID_EDGEPORT_42		0x017	// Edgeport/42
+#define ION_DEVICE_ID_EDGEPORT_412_8		0x018	// Edgeport/412 8 port part
+#define ION_DEVICE_ID_EDGEPORT_412_4		0x019	// Edgeport/412	4 port part
+#define ION_DEVICE_ID_EDGEPORT_22I		0x01A	// Edgeport/22I is an Edgeport/4 with ports 1&2 RS422 and ports 3&4 RS232
+
+// Compact Form factor TI based devices  2c, 21c, 22c, 221c
+#define ION_DEVICE_ID_EDGEPORT_2C		0x01B	// Edgeport/2c is a TI based Edgeport/2 - Small I2c
+#define ION_DEVICE_ID_EDGEPORT_221C		0x01C	// Edgeport/221c is a TI based Edgeport/2 with lucent chip and
+							// 2 external hub ports - Large I2C
+#define ION_DEVICE_ID_EDGEPORT_22C		0x01D	// Edgeport/22c is a TI based Edgeport/2 with
+							// 2 external hub ports - Large I2C
+#define ION_DEVICE_ID_EDGEPORT_21C		0x01E	// Edgeport/21c is a TI based Edgeport/2 with lucent chip
+							// Small I2C
+
+
+/*
+ *  DANGER DANGER The 0x20 bit was used to indicate a 8251/netchip GEN 2 device.
+ *  Since the MAC, Linux, and Optimal drivers still used the old code
+ *  I suggest that you skip the 0x20 bit when creating new PIDs
+ */
+
+
+// Generation 3 devices -- 3410 based edgport/1 (256 byte I2C)
+#define ION_DEVICE_ID_TI3410_EDGEPORT_1		0x040	// Edgeport/1 RS232
+#define ION_DEVICE_ID_TI3410_EDGEPORT_1I	0x041	// Edgeport/1i- RS422 model
+
+// Ti based software switchable RS232/RS422/RS485 devices
+#define ION_DEVICE_ID_EDGEPORT_4S		0x042	// Edgeport/4s - software switchable model
+#define ION_DEVICE_ID_EDGEPORT_8S		0x043	// Edgeport/8s - software switchable model
+
+// Usb to Ethernet dongle
+#define ION_DEVICE_ID_EDGEPORT_E		0x0E0	// Edgeport/E Usb to Ethernet
+
+// Edgeport TI based devices
+#define ION_DEVICE_ID_TI_EDGEPORT_4		0x0201	// Edgeport/4 RS232
+#define ION_DEVICE_ID_TI_EDGEPORT_2		0x0205	// Edgeport/2 RS232
+#define ION_DEVICE_ID_TI_EDGEPORT_4I		0x0206	// Edgeport/4i RS422
+#define ION_DEVICE_ID_TI_EDGEPORT_2I		0x0207	// Edgeport/2i RS422/RS485
+#define ION_DEVICE_ID_TI_EDGEPORT_421		0x020C	// Edgeport/421 4 hub 2 RS232 + Parallel (lucent on a different hub port)
+#define ION_DEVICE_ID_TI_EDGEPORT_21		0x020D	// Edgeport/21 2 RS232 + Parallel (lucent on a different hub port)
+#define ION_DEVICE_ID_TI_EDGEPORT_8		0x020F	// Edgeport/8 (single-CPU)
+#define ION_DEVICE_ID_TI_EDGEPORT_1		0x0215	// Edgeport/1 RS232
+#define ION_DEVICE_ID_TI_EDGEPORT_42		0x0217	// Edgeport/42 4 hub 2 RS232
+#define ION_DEVICE_ID_TI_EDGEPORT_22I  		0x021A	// Edgeport/22I is an Edgeport/4 with ports 1&2 RS422 and ports 3&4 RS232
+#define ION_DEVICE_ID_TI_EDGEPORT_2C		0x021B	// Edgeport/2c RS232
+#define ION_DEVICE_ID_TI_EDGEPORT_221C		0x021C	// Edgeport/221c is a TI based Edgeport/2 with lucent chip and
+							// 2 external hub ports - Large I2C
+#define ION_DEVICE_ID_TI_EDGEPORT_22C		0x021D	// Edgeport/22c is a TI based Edgeport/2 with
+							// 2 external hub ports - Large I2C
+#define ION_DEVICE_ID_TI_EDGEPORT_21C		0x021E	// Edgeport/21c is a TI based Edgeport/2 with lucent chip
+
+// Generation 3 devices -- 3410 based edgport/1 (256 byte I2C) 
+#define ION_DEVICE_ID_TI_TI3410_EDGEPORT_1	0x240	// Edgeport/1 RS232
+#define ION_DEVICE_ID_TI_TI3410_EDGEPORT_1I	0x241	// Edgeport/1i- RS422 model
+
+// Ti based software switchable RS232/RS422/RS485 devices
+#define ION_DEVICE_ID_TI_EDGEPORT_4S		0x242	// Edgeport/4s - software switchable model
+#define ION_DEVICE_ID_IT_EDGEPORT_8S		0x243	// Edgeport/8s - software switchable model
+
+
+/************************************************************************
+ *
+ *                        Generation 4 devices
+ *
+ ************************************************************************/
+
+// Watchport based on 3410 both 1-wire and binary products (16K I2C)
+#define ION_DEVICE_ID_WP_UNSERIALIZED		0x300	// Watchport based on 3410 both 1-wire and binary products
+#define ION_DEVICE_ID_WP_PROXIMITY		0x301	// Watchport/P Discontinued
+#define ION_DEVICE_ID_WP_MOTION			0x302	// Watchport/M
+#define ION_DEVICE_ID_WP_MOISTURE		0x303	// Watchport/W
+#define ION_DEVICE_ID_WP_TEMPERATURE		0x304	// Watchport/T
+#define ION_DEVICE_ID_WP_HUMIDITY		0x305	// Watchport/H
+
+#define ION_DEVICE_ID_WP_POWER			0x306	// Watchport
+#define ION_DEVICE_ID_WP_LIGHT			0x307	// Watchport
+#define ION_DEVICE_ID_WP_RADIATION		0x308	// Watchport
+#define ION_DEVICE_ID_WP_ACCELERATION		0x309	// Watchport/A
+#define ION_DEVICE_ID_WP_DISTANCE		0x30A	// Watchport/D Discontinued
+#define ION_DEVICE_ID_WP_PROX_DIST		0x30B	// Watchport/D uses distance sensor
+							// Default to /P function
+
+#define ION_DEVICE_ID_PLUS_PWR_HP4CD		0x30C	// 5052 Plus Power HubPort/4CD+ (for Dell)
+#define ION_DEVICE_ID_PLUS_PWR_HP4C		0x30D	// 5052 Plus Power HubPort/4C+ 
+#define ION_DEVICE_ID_PLUS_PWR_PCI		0x30E	// 3410 Plus Power PCI Host Controller 4 port
+
+
+//
+// Definitions for AXIOHM USB product IDs
+//
+#define	USB_VENDOR_ID_AXIOHM			0x05D9	// Axiohm VID
+
+#define AXIOHM_DEVICE_ID_MASK			0xffff
+#define AXIOHM_DEVICE_ID_EPIC_A758		0xA758
+#define AXIOHM_DEVICE_ID_EPIC_A794		0xA794
+#define AXIOHM_DEVICE_ID_EPIC_A225		0xA225
+
+
+//
+// Definitions for NCR USB product IDs
+//
+#define	USB_VENDOR_ID_NCR			0x0404	// NCR VID
+
+#define NCR_DEVICE_ID_MASK			0xffff
+#define NCR_DEVICE_ID_EPIC_0202			0x0202
+#define NCR_DEVICE_ID_EPIC_0203			0x0203
+#define NCR_DEVICE_ID_EPIC_0310			0x0310
+#define NCR_DEVICE_ID_EPIC_0311			0x0311
+#define NCR_DEVICE_ID_EPIC_0312			0x0312
+
+
+//
+// Definitions for SYMBOL USB product IDs
+//
+#define USB_VENDOR_ID_SYMBOL			0x05E0	// Symbol VID
+#define SYMBOL_DEVICE_ID_MASK			0xffff
+#define SYMBOL_DEVICE_ID_KEYFOB			0x0700
+
+
+//
+// Definitions for other product IDs
 #define ION_DEVICE_ID_MT4X56USB			0x1403	// OEM device
 
-// BlackBox OEM devices
-#define ION_DEVICE_ID_BB_EDGEPORT_4		0x001	// Edgeport/4 RS232
-#define ION_DEVICE_ID_BB_EDGEPORT_4T		0x004	// Edgeport/4 RS232 for Telxon (aka "Fleetport")
-#define ION_DEVICE_ID_BB_EDGEPORT_2		0x005	// Edgeport/2 RS232
-#define ION_DEVICE_ID_BB_EDGEPORT_4I		0x006	// Edgeport/4 RS422
-#define ION_DEVICE_ID_BB_EDGEPORT_2I		0x007	// Edgeport/2 RS422/RS485
-#define	ION_DEVICE_ID_BB_EDGEPORT_421		0x00C	// Edgeport/421 Hub+RS232+Parallel
-#define	ION_DEVICE_ID_BB_EDGEPORT_21		0x00D	// Edgeport/21  RS232+Parallel
-#define ION_DEVICE_ID_BB_EDGEPORT_8_DUAL_CPU	0x00E	// Half of an Edgeport/8 (the kind with 2 EP/4s on 1 PCB)
-#define ION_DEVICE_ID_BB_EDGEPORT_8		0x00F	// Edgeport/8 (single-CPU)
-#define ION_DEVICE_ID_BB_EDGEPORT_2_DIN		0x010	// Edgeport/2 RS232 with Apple DIN connector
-#define ION_DEVICE_ID_BB_EDGEPORT_4_DIN		0x011	// Edgeport/4 RS232 with Apple DIN connector
-#define ION_DEVICE_ID_BB_EDGEPORT_16_DUAL_CPU	0x012	// Half of an Edgeport/16 (the kind with 2 EP/8s)
-#define ION_DEVICE_ID_BB_EDGEPORT_8I		0x014	// Edgeport/8 RS422 (single-CPU)
 
-
-/* Edgeport TI based devices */
-#define ION_DEVICE_ID_TI_EDGEPORT_4		0x0201	/* Edgeport/4 RS232 */
-#define ION_DEVICE_ID_TI_EDGEPORT_2		0x0205	/* Edgeport/2 RS232 */
-#define ION_DEVICE_ID_TI_EDGEPORT_4I		0x0206	/* Edgeport/4i RS422 */
-#define ION_DEVICE_ID_TI_EDGEPORT_2I		0x0207	/* Edgeport/2i RS422/RS485 */
-#define ION_DEVICE_ID_TI_EDGEPORT_421		0x020C	/* Edgeport/421 4 hub 2 RS232 + Parallel (lucent on a different hub port) */
-#define ION_DEVICE_ID_TI_EDGEPORT_21		0x020D	/* Edgeport/21 2 RS232 + Parallel (lucent on a different hub port) */
-#define ION_DEVICE_ID_TI_EDGEPORT_1		0x0215	/* Edgeport/1 RS232 */
-#define ION_DEVICE_ID_TI_EDGEPORT_42		0x0217	/* Edgeport/42 4 hub 2 RS232 */
-#define ION_DEVICE_ID_TI_EDGEPORT_22		0x021A	/* Edgeport/22  Edgeport/22I is an Edgeport/4 with ports 1&2 RS422 and ports 3&4 RS232 */
-#define ION_DEVICE_ID_TI_EDGEPORT_2C		0x021B	/* Edgeport/2c RS232 */
-
-#define ION_DEVICE_ID_TI_EDGEPORT_421_BOOT	0x0240	/* Edgeport/421 in boot mode */
-#define ION_DEVICE_ID_TI_EDGEPORT_421_DOWN	0x0241	/* Edgeport/421 in download mode first interface is 2 RS232 (Note that the second interface of this multi interface device should be a standard USB class 7 printer port) */
-#define ION_DEVICE_ID_TI_EDGEPORT_21_BOOT	0x0242	/* Edgeport/21 in boot mode */
-#define ION_DEVICE_ID_TI_EDGEPORT_21_DOWN	0x0243	/*Edgeport/42 in download mode: first interface is 2 RS232 (Note that the second interface of this multi interface device should be a standard USB class 7 printer port) */
-
+#define	GENERATION_ID_FROM_USB_PRODUCT_ID( ProductId )				\
+			( (__u16) ((ProductId >> 8) & (ION_GENERATION_MASK)) )
 
 #define	MAKE_USB_PRODUCT_ID( OemId, DeviceId )					\
 			( (__u16) (((OemId) << 10) || (DeviceId)) )
@@ -143,7 +234,7 @@
 
 // TxCredits value below which driver won't bother sending (to prevent too many small writes).
 // Send only if above 25%
-#define EDGE_FW_GET_TX_CREDITS_SEND_THRESHOLD(InitialCredit)	(max(((InitialCredit) / 4), EDGE_FW_BULK_MAX_PACKET_SIZE))
+#define EDGE_FW_GET_TX_CREDITS_SEND_THRESHOLD(InitialCredit, MaxPacketSize) (max( ((InitialCredit) / 4), (MaxPacketSize) ))
 
 #define	EDGE_FW_BULK_MAX_PACKET_SIZE		64	// Max Packet Size for Bulk In Endpoint (EP1)
 #define EDGE_FW_BULK_READ_BUFFER_SIZE		1024	// Size to use for Bulk reads
@@ -158,8 +249,8 @@
 // Definitions of I/O Networks vendor-specific requests
 // for default endpoint
 //
-//	bmRequestType = 00100000	Set vendor-specific, to device
-//	bmRequestType = 10100000	Get vendor-specific, to device
+//	bmRequestType = 01000000	Set vendor-specific, to device
+//	bmRequestType = 11000000	Get vendor-specific, to device
 //
 // These are the definitions for the bRequest field for the
 // above bmRequestTypes.
@@ -184,11 +275,87 @@
 #define USB_REQUEST_ION_ENABLE_SUSPEND	9	// Enable/Disable suspend feature
 						// (wValue != 0: Enable; wValue = 0: Disable)
 
+#define USB_REQUEST_ION_SEND_IOSP	10	// Send an IOSP command to the edgeport over the control pipe	
+#define USB_REQUEST_ION_RECV_IOSP	11	// Receive an IOSP command from the edgeport over the control pipe
+
+
+#define USB_REQUEST_ION_DIS_INT_TIMER	0x80	// Sent to Axiohm to enable/ disable
+						// interrupt token timer
+						// wValue = 1, enable (default)
+						// wValue = 0, disable
 
 //
 // Define parameter values for our vendor-specific commands
 //
 
+//
+// Edgeport Compatiblity Descriptor
+//
+// This descriptor is only returned by Edgeport-compatible devices
+// supporting the EPiC spec. True ION devices do not return this
+// descriptor, but instead return STALL on receipt of the
+// GET_EPIC_DESC command. The driver interprets a STALL to mean that
+// this is a "real" Edgeport.
+//
+
+struct edge_compatibility_bits
+{
+	// This __u32 defines which Vendor-specific commands/functionality
+	// the device supports on the default EP0 pipe.
+
+	__u32	VendEnableSuspend	:  1;	// 0001 Set if device supports ION_ENABLE_SUSPEND
+	__u32	VendUnused		: 31;	// Available for future expansion, must be 0
+
+	// This __u32 defines which IOSP commands are supported over the
+	// bulk pipe EP1.
+
+											// xxxx Set if device supports:
+	__u32	IOSPOpen		:  1;	// 0001	OPEN / OPEN_RSP (Currently must be 1)
+	__u32	IOSPClose		:  1;	// 0002	CLOSE
+	__u32	IOSPChase		:  1;	// 0004	CHASE / CHASE_RSP
+	__u32	IOSPSetRxFlow		:  1;	// 0008	SET_RX_FLOW
+	__u32	IOSPSetTxFlow		:  1;	// 0010	SET_TX_FLOW
+	__u32	IOSPSetXChar		:  1;	// 0020	SET_XON_CHAR/SET_XOFF_CHAR
+	__u32	IOSPRxCheck		:  1;	// 0040	RX_CHECK_REQ/RX_CHECK_RSP
+	__u32	IOSPSetClrBreak		:  1;	// 0080	SET_BREAK/CLEAR_BREAK
+	__u32	IOSPWriteMCR		:  1;	// 0100	MCR register writes (set/clr DTR/RTS)
+	__u32	IOSPWriteLCR		:  1;	// 0200	LCR register writes (wordlen/stop/parity)
+	__u32	IOSPSetBaudRate		:  1;	// 0400	setting Baud rate (writes to LCR.80h and DLL/DLM register)
+	__u32	IOSPDisableIntPipe	:  1;	// 0800 Do not use the interrupt pipe for TxCredits or RxButesAvailable
+	__u32	IOSPRxDataAvail		:  1;   // 1000 Return status of RX Fifo (Data available in Fifo)
+	__u32	IOSPTxPurge		:  1;	// 2000 Purge TXBuffer and/or Fifo in Edgeport hardware
+	__u32	IOSPUnused		: 18;	// Available for future expansion, must be 0
+
+	// This __u32 defines which 'general' features are supported
+
+	__u32	TrueEdgeport		:  1;	// 0001	Set if device is a 'real' Edgeport
+											// (Used only by driver, NEVER set by an EPiC device)
+	__u32	GenUnused		: 31;	// Available for future expansion, must be 0
+
+};
+
+struct edge_compatibility_descriptor
+{
+	__u8	Length;				// Descriptor Length (per USB spec)
+	__u8	DescType;			// Descriptor Type (per USB spec, =DEVICE type)
+	__u8	EpicVer;			// Version of EPiC spec supported
+											// (Currently must be 1)
+	__u8	NumPorts;			// Number of serial ports supported
+	__u8	iDownloadFile;			// Index of string containing download code filename
+											// 0=no download, FF=download compiled into driver.
+	__u8	Unused[ 3 ];			// Available for future expansion, must be 0
+											// (Currently must be 0).
+	__u8	MajorVersion;			// Firmware version: xx.
+	__u8	MinorVersion;			//  yy.
+	__u16	BuildNumber;			//  zzzz (LE format)
+
+	// The following structure contains __u32s, with each bit
+	// specifying whether the EPiC device supports the given
+	// command or functionality.
+
+	struct edge_compatibility_bits	Supports;
+
+};
 
 // Values for iDownloadFile
 #define	EDGE_DOWNLOAD_FILE_NONE		0	// No download requested
@@ -272,7 +439,7 @@ struct edge_manuf_descriptor {
 
 	__u8	NumPorts;				// F08 Number of ports
 	__u8	DescDate[3];				// F09 MM/DD/YY when descriptor template was compiler,
-							//	   so host can track changes to USB-only descriptors.
+							//     so host can track changes to USB-only descriptors.
 
 	__u8	SerNumLength;				// F0C USB string descriptor len
 	__u8	SerNumDescType;				// F0D USB descriptor type (=STRING type)
@@ -294,8 +461,8 @@ struct edge_manuf_descriptor {
 
 	__u8	UartType;				// FBD Uart Type
 	__u8	IonPid;					// FBE Product ID, == LSB of USB DevDesc.PID
-							//     (Note: Edgeport/4s before 11/98 will have
-							//		00 here instead of 01)
+							//      (Note: Edgeport/4s before 11/98 will have
+							//       00 here instead of 01)
 	__u8	IonConfig;				// FBF Config byte for ION manufacturing use
 							// FBF end of structure, total len = 3C0h
 
@@ -312,7 +479,7 @@ struct edge_manuf_descriptor {
 // both 00 and 01 values mean '654.
 #define MANUF_UART_EXAR_654_EARLY	0	// Exar 16C654 in Edgeport/4s before 11/98
 #define MANUF_UART_EXAR_654		1	// Exar 16C654
-#define MANUF_UART_EXAR_2852		2	// Exar 16C2852 
+#define MANUF_UART_EXAR_2852		2	// Exar 16C2852
 
 //
 // Note: The CpuRev and BoardRev values do not conform to manufacturing
@@ -334,25 +501,22 @@ struct edge_manuf_descriptor {
 #define MANUF_BOARD_REV_GENERATION_2	0x20	// Second generaiton edgeport
 
 
-
-
 // Values of bottom 5 bits of CpuRev & BoardRev for
 // Implementation 1 (ie, 251+Netchip-based)
 #define	MANUF_CPU_REV_1			1	// C251TB Rev 1 (Need actual Intel rev here)
 
 #define MANUF_BOARD_REV_A		1	// First rev of 251+Netchip design
 
-
-
 #define	MANUF_SERNUM_LENGTH		sizeof(((struct edge_manuf_descriptor *)0)->SerialNumber)
 #define	MANUF_ASSYNUM_LENGTH		sizeof(((struct edge_manuf_descriptor *)0)->AssemblyNumber)
 #define	MANUF_OEMASSYNUM_LENGTH		sizeof(((struct edge_manuf_descriptor *)0)->OemAssyNumber)
 #define	MANUF_MANUFDATE_LENGTH		sizeof(((struct edge_manuf_descriptor *)0)->ManufDate)
 
-#define	MANUF_ION_CONFIG_MASTER		0x80	// 1=Master mode, 0=Normal
-#define	MANUF_ION_CONFIG_DIAG		0x40	// 1=Run h/w diags, 0=norm
-#define	MANUF_ION_CONFIG_DIAG_NO_LOOP	0x20	// As above but no ext loopback test
-
+#define	MANUF_ION_CONFIG_DIAG_NO_LOOP	0x20	// As below but no ext loopback test
+#define	MANUF_ION_CONFIG_DIAG		0x40	// 930 based device: 1=Run h/w diags, 0=norm
+						// TIUMP Device    : 1=IONSERIAL needs to run Final Test
+#define	MANUF_ION_CONFIG_MASTER		0x80	// 930 based device:  1=Master mode, 0=Normal
+						// TIUMP Device    :  1=First device on a multi TIUMP Device
 
 //
 // This structure describes parameters for the boot code, and
@@ -398,23 +562,29 @@ struct edge_boot_descriptor {
 #define	BOOT_CAP_RESET_CMD	0x0001	// If set, boot correctly supports ION_RESET_DEVICE
 
 
-
 /************************************************************************
                  T I   U M P   D E F I N I T I O N S
  ***********************************************************************/
 
+// Chip definitions in I2C
+#define UMP5152			0x52
+#define UMP3410			0x10
+
+
 //************************************************************************
 //	TI I2C Format Definitions
 //************************************************************************
-#define I2C_DESC_TYPE_INFO_BASIC	1
-#define I2C_DESC_TYPE_FIRMWARE_BASIC	2
-#define I2C_DESC_TYPE_DEVICE		3
-#define I2C_DESC_TYPE_CONFIG		4
-#define I2C_DESC_TYPE_STRING		5
-#define I2C_DESC_TYPE_FIRMWARE_BLANK 	0xf2
+#define I2C_DESC_TYPE_INFO_BASIC	0x01
+#define I2C_DESC_TYPE_FIRMWARE_BASIC	0x02
+#define I2C_DESC_TYPE_DEVICE		0x03
+#define I2C_DESC_TYPE_CONFIG		0x04
+#define I2C_DESC_TYPE_STRING		0x05
+#define I2C_DESC_TYPE_FIRMWARE_AUTO	0x07	// for 3410 download
+#define I2C_DESC_TYPE_CONFIG_KLUDGE	0x14	// for 3410
+#define I2C_DESC_TYPE_WATCHPORT_VERSION	0x15	// firmware version number for watchport
+#define I2C_DESC_TYPE_WATCHPORT_CALIBRATION_DATA 0x16	// Watchport Calibration Data
 
-#define I2C_DESC_TYPE_MAX		5
-// 3410 may define types 6, 7 for other firmware downloads
+#define I2C_DESC_TYPE_FIRMWARE_BLANK	0xf2
 
 // Special section defined by ION
 #define I2C_DESC_TYPE_ION		0	// Not defined by TI
@@ -428,11 +598,21 @@ struct ti_i2c_desc
 	__u8	Data[0];		// Data starts here
 }__attribute__((packed));
 
-struct ti_i2c_firmware_rec 
+// for 5152 devices only (type 2 record)
+// for 3410 the version is stored in the WATCHPORT_FIRMWARE_VERSION descriptor
+struct ti_i2c_firmware_rec
 {
 	__u8	Ver_Major;		// Firmware Major version number
 	__u8	Ver_Minor;		// Firmware Minor version number
 	__u8	Data[0];		// Download starts here
+}__attribute__((packed));
+
+
+struct watchport_firmware_version
+{
+// Added 2 bytes for version number
+	__u8	Version_Major;		//  Download Version (for Watchport)
+	__u8	Version_Minor;
 }__attribute__((packed));
 
 
@@ -461,6 +641,15 @@ struct ti_basic_descriptor
 } __attribute__((packed));
 
 
+// CPU / Board Rev Definitions
+#define TI_CPU_REV_5052			2	// 5052 based edgeports
+#define TI_CPU_REV_3410			3	// 3410 based edgeports
+
+#define TI_BOARD_REV_TI_EP		0	// Basic ti based edgeport
+#define TI_BOARD_REV_COMPACT		1	// Compact board
+#define TI_BOARD_REV_WATCHPORT		2	// Watchport
+
+
 #define TI_GET_CPU_REVISION(x)		(__u8)((((x)>>4)&0x0f))
 #define TI_GET_BOARD_REVISION(x)	(__u8)(((x)&0x0f))
 
@@ -469,20 +658,30 @@ struct ti_basic_descriptor
 
 #define TI_MAX_I2C_SIZE			( 16 * 1024 )
 
-/* TI USB 5052 definitions */
+#define TI_MANUF_VERSION_0		0	
+
+// IonConig2 flags
+#define TI_CONFIG2_RS232		0x01
+#define TI_CONFIG2_RS422		0x02
+#define TI_CONFIG2_RS485		0x04
+#define TI_CONFIG2_SWITCHABLE		0x08
+
+#define TI_CONFIG2_WATCHPORT		0x10
+
+
 struct edge_ti_manuf_descriptor
 {
 	__u8 IonConfig;		//  Config byte for ION manufacturing use
 	__u8 IonConfig2;	//  Expansion
-	__u8 Version;		//  Verqsion
+	__u8 Version;		//  Version
 	__u8 CpuRev_BoardRev;	//  CPU revision level (0xF0) and Board Rev Level (0x0F)
 	__u8 NumPorts;		//  Number of ports	for this UMP
 	__u8 NumVirtualPorts;	//  Number of Virtual ports
 	__u8 HubConfig1;	//  Used to configure the Hub
 	__u8 HubConfig2;	//  Used to configure the Hub
 	__u8 TotalPorts;	//  Total Number of Com Ports for the entire device (All UMPs)
-	__u8 Reserved;
+	__u8 Reserved;		//  Reserved
 }__attribute__((packed));
 
 
-#endif		// if !defined()
+#endif		// if !defined(_USBVEND_H)
