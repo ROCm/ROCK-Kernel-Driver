@@ -647,8 +647,10 @@ struct dst_entry *ndisc_dst_alloc(struct net_device *dev,
 		return NULL;
 
 	rt = ip6_dst_alloc();
-	if (unlikely(rt == NULL))
+	if (unlikely(rt == NULL)) {
+		in6_dev_put(idev);
 		goto out;
+	}
 
 	dev_hold(dev);
 	if (neigh)
