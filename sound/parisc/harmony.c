@@ -96,15 +96,13 @@ MODULE_DEVICES("{{ALSA,Harmony soundcard}}");
 #define MAX_PCM_SUBSTREAMS	4
 #define MAX_MIDI_DEVICES	0
 
-#define BUFFER_SIZE			4096
-#define MAX_BUFS			10
+#define HARMONY_BUF_SIZE	4096
+#define MAX_BUFS		10
+#define MAX_BUFFER_SIZE		(MAX_BUFS * HARMONY_BUF_SIZE)
 
 /* number of silence & graveyard buffers */
 #define GRAVEYARD_BUFS		3
 #define SILENCE_BUFS		3
-
-#define MAX_BUFFER_SIZE		(MAX_BUFS * BUFFER_SIZE)
-#define HARMONY_BUF_SIZE	BUFFER_SIZE
 
 #define HARMONY_CNTL_C		0x80000000
 
@@ -200,18 +198,16 @@ typedef struct snd_card_harmony {
 
 	struct parisc_device *pa_dev;
 
+	struct snd_dma_device dma_dev;
+
 	/* the graveyard buffer is used as recording buffer when playback, 
 	 * because harmony always want a buffer to put recorded data */
-
-	unsigned char *graveyard_addr;
-	dma_addr_t graveyard_dma;
+	struct snd_dma_buffer graveyard_dma;
 	int graveyard_count;
 	
 	/* same thing for silence buffer */
-	unsigned char *silence_addr;
-	dma_addr_t silence_dma;
+	struct snd_dma_buffer silence_dma;
 	int silence_count;
-	struct snd_dma_device dma_dev;
 
 	/* alsa stuff */
 	snd_card_t *card;
@@ -270,6 +266,15 @@ static snd_pcm_hw_constraint_list_t hw_constraint_rates = {
 #define HARMONY_SR_33KHZ	0x16
 #define HARMONY_SR_6KHZ		0x17
 
+/* bits corresponding to the entries of snd_card_harmony_rates */
+static unsigned int rate_bits[14] = {
+	HARMONY_SR_5KHZ, HARMONY_SR_6KHZ, HARMONY_SR_8KHZ,
+	HARMONY_SR_9KHZ, HARMONY_SR_11KHZ, HARMONY_SR_16KHZ,
+	HARMONY_SR_18KHZ, HARMONY_SR_22KHZ, HARMONY_SR_27KHZ,
+	HARMONY_SR_32KHZ, HARMONY_SR_33KHZ, HARMONY_SR_37KHZ,
+	HARMONY_SR_44KHZ, HARMONY_SR_48KHZ
+};
+
 /* snd_card_harmony_rate_bits
  * @rate:	index of current data rate in list
  * returns: harmony hex code for registers
@@ -279,26 +284,9 @@ static unsigned int snd_card_harmony_rate_bits(int rate)
 	unsigned int idx;
 	
 	for (idx = 0; idx <= RATES; idx++)
-		if (snd_card_harmony_rates[idx] == rate) break;
-	
-	switch (idx) {
-		case 0: return HARMONY_SR_5KHZ;
-		case 1: return HARMONY_SR_6KHZ;
-		case 2: return HARMONY_SR_8KHZ;
-		case 3: return HARMONY_SR_9KHZ;
-		case 4: return HARMONY_SR_11KHZ;
-		case 5: return HARMONY_SR_16KHZ;
-		case 6: return HARMONY_SR_18KHZ;
-		case 7: return HARMONY_SR_22KHZ;
-		case 8: return HARMONY_SR_27KHZ;
-		case 9: return HARMONY_SR_32KHZ;
-		case 10: return HARMONY_SR_33KHZ;
-		case 11: return HARMONY_SR_37KHZ;
-		case 12: return HARMONY_SR_44KHZ;
-		case 13: return HARMONY_SR_48KHZ;
-		default:  /* fallback */
-				return HARMONY_SR_44KHZ;
-	}
+		if (snd_card_harmony_rates[idx] == rate)
+			return rate_bits[idx];
+	return HARMONY_SR_44KHZ; /* fallback */
 }
 
 /*
@@ -320,27 +308,6 @@ void snd_harmony_update_control(snd_card_harmony_t *harmony)
 	
 	gsc_writel(default_cntl, harmony->hpa+REG_CNTL);
 	
-}
-
-/*
- * silence a buffer
- * XXX: alsa could probably do this by itself
- * XXX: memset hpmc, commented.
- */
-
-void snd_harmony_silence(snd_card_harmony_t *harmony,
-		void *addr, int length)
-{
-	u8 silence_char;
-	
-	switch(harmony->data_format) {
-			case HARMONY_DF_8BIT_ULAW: silence_char = 0x55; break;
-			case HARMONY_DF_8BIT_ALAW: silence_char = 0xff; break;
-			case HARMONY_DF_16BIT_LINEAR:
-			default:
-									   silence_char = 0;
-	}
-	//memset(addr, silence_char, length);
 }
 
 /*
@@ -391,9 +358,9 @@ static int snd_card_harmony_interrupt(int irq, void *dev, struct pt_regs *regs)
 			snd_pcm_period_elapsed(harmony->playback_substream);
 			harmony->ply_total++;
 		} else {
-			gsc_writel(harmony->silence_dma + 
-					(HARMONY_BUF_SIZE*harmony->silence_count),
-					hpa+REG_PNXTADD);
+			gsc_writel(harmony->silence_dma.addr + 
+				   (HARMONY_BUF_SIZE*harmony->silence_count),
+				   hpa+REG_PNXTADD);
 			harmony->silence_count++;
 			harmony->silence_count %= SILENCE_BUFS;
 		}
@@ -412,9 +379,9 @@ static int snd_card_harmony_interrupt(int irq, void *dev, struct pt_regs *regs)
 			harmony->cap_total++;
 		} else {
 			/* graveyard buffer */
-			gsc_writel(harmony->graveyard_dma +
-						(HARMONY_BUF_SIZE*harmony->graveyard_count),
-						hpa+REG_RNXTADD);
+			gsc_writel(harmony->graveyard_dma.addr +
+				   (HARMONY_BUF_SIZE*harmony->graveyard_count),
+				   hpa+REG_RNXTADD);
 			harmony->graveyard_count++;
 			harmony->graveyard_count %= GRAVEYARD_BUFS;
 		}
@@ -471,26 +438,8 @@ static void __devinit snd_harmony_proc_init(snd_card_harmony_t *harmony)
 {
 	snd_info_entry_t *entry;
 	
-	if ((entry = snd_info_create_card_entry(harmony->card, "harmony", harmony->card->proc_root)) != NULL) {
-		entry->content = SNDRV_INFO_CONTENT_TEXT;
-		entry->private_data = harmony;
-		entry->mode = S_IFREG | S_IRUGO | S_IWUSR;
-		entry->c.text.read_size = 2048;	 /* should be enough */
-		entry->c.text.read = snd_harmony_proc_read;
-		if (snd_info_register(entry) < 0) {
-			snd_info_free_entry(entry);
-			entry = NULL;
-		}
-	}
-	harmony->proc_entry = entry;
-}
-
-static void snd_harmony_proc_done(snd_card_harmony_t *harmony)
-{
-	if (harmony->proc_entry) {
-		snd_info_unregister(harmony->proc_entry);
-		harmony->proc_entry = NULL;
-	}
+	if (! snd_card_proc_new(harmony->card, "harmony", &entry))
+		snd_info_set_text_ops(entry, harmony, 2048, snd_harmony_proc_read);
 }
 
 /* 
@@ -569,6 +518,30 @@ static int snd_card_harmony_capture_trigger(snd_pcm_substream_t * substream,
 	return 0;
 }
 
+/* set data format */
+static int snd_harmony_set_data_format(snd_card_harmony_t *harmony, int pcm_format)
+{
+	int old_format = harmony->data_format;
+	int new_format = old_format;
+	switch (pcm_format) {
+	case SNDRV_PCM_FORMAT_S16_BE:
+		new_format = HARMONY_DF_16BIT_LINEAR;
+		break;
+	case SNDRV_PCM_FORMAT_A_LAW:
+		new_format = HARMONY_DF_8BIT_ALAW;
+		break;
+	case SNDRV_PCM_FORMAT_MU_LAW:
+		new_format = HARMONY_DF_8BIT_ULAW;
+		break;
+	}
+	/* re-initialize silence buffer if needed */
+	if (old_format != new_format)
+		snd_pcm_format_set_silence(pcm_format, harmony->silence_dma.area,
+					   (HARMONY_BUF_SIZE * SILENCE_BUFS * 8) / snd_pcm_format_width(pcm_format));
+
+	return new_format;
+}
+
 static int snd_card_harmony_playback_prepare(snd_pcm_substream_t * substream)
 {
 	snd_card_harmony_t *harmony = snd_pcm_substream_chip(substream);
@@ -583,12 +556,13 @@ static int snd_card_harmony_playback_prepare(snd_pcm_substream_t * substream)
 	harmony->sample_rate = snd_card_harmony_rate_bits(runtime->rate);
 
 	/* data format */
-	if (snd_pcm_format_width(runtime->format) == 16) harmony->data_format = HARMONY_DF_16BIT_LINEAR;
-	else harmony->data_format = HARMONY_DF_8BIT_ULAW;
-	
+	harmony->data_format = snd_harmony_set_data_format(haromny, runtime->format);
+
 	/* number of channels */
-	if (runtime->channels == 2) harmony->stereo_select = HARMONY_SS_STEREO;
-	else harmony->stereo_select = HARMONY_SS_MONO;
+	if (runtime->channels == 2)
+		harmony->stereo_select = HARMONY_SS_STEREO;
+	else
+		harmony->stereo_select = HARMONY_SS_MONO;
 	
 	DPRINTK(KERN_INFO PFX "Playback_prepare, sr=%d(%x), df=%x, ss=%x hpa=%lx\n", runtime->rate,
 				harmony->sample_rate, harmony->data_format, harmony->stereo_select, harmony->hpa);
@@ -613,12 +587,13 @@ static int snd_card_harmony_capture_prepare(snd_pcm_substream_t * substream)
 	harmony->sample_rate = snd_card_harmony_rate_bits(runtime->rate);
 	
 	/* data format */
-	if (snd_pcm_format_width(runtime->format) == 16) harmony->data_format = HARMONY_DF_16BIT_LINEAR;
-	else harmony->data_format = HARMONY_DF_8BIT_ULAW;
+	harmony->data_format = snd_harmony_set_data_format(haromny, runtime->format);
 	
 	/* number of channels */
-	if (runtime->channels == 1) harmony->stereo_select = HARMONY_SS_MONO;
-	else if (runtime->channels == 2) harmony->stereo_select = HARMONY_SS_STEREO;
+	if (runtime->channels == 1)
+		harmony->stereo_select = HARMONY_SS_MONO;
+	else if (runtime->channels == 2)
+		harmony->stereo_select = HARMONY_SS_STEREO;
 		
 	snd_harmony_update_control(harmony);
 	harmony->format_initialized = 1;
@@ -743,7 +718,6 @@ static int snd_card_harmony_capture_open(snd_pcm_substream_t * substream)
 static int snd_card_harmony_playback_close(snd_pcm_substream_t * substream)
 {
 	snd_card_harmony_t *harmony = snd_pcm_substream_chip(substream);
-	snd_pcm_lib_free_pages(substream);
 	
 	harmony->playback_substream = NULL;
 	harmony->ply_size 			= 0;
@@ -759,8 +733,6 @@ static int snd_card_harmony_playback_close(snd_pcm_substream_t * substream)
 static int snd_card_harmony_capture_close(snd_pcm_substream_t * substream)
 {
 	snd_card_harmony_t *harmony = snd_pcm_substream_chip(substream);
-	
-	snd_pcm_lib_free_pages(substream);
 	
 	harmony->capture_substream = NULL;
 	harmony->cap_size 			= 0;
@@ -839,13 +811,17 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	/* initialize graveyard buffer */
 	harmony->dma_dev.type = SNDRV_DMA_TYPE_DEV;
 	harmony->dma_dev.dev = &harmony->pa_dev->dev;
-	harmony->graveyard_addr = snd_dma_alloc_pages(&chip->dma_dev,
-			HARMONY_BUF_SIZE*GRAVEYARD_BUFS, &harmony->graveyard_dma);
+	err = snd_dma_alloc_pages(&harmony->dma_dev, HARMONY_BUF_SIZE*GRAVEYARD_BUFS,
+				  &harmony->graveyard_dma);
+	if (err < 0)
+		return err;
 	harmony->graveyard_count = 0;
 	
 	/* initialize silence buffers */
-	harmony->silence_addr = snd_dma_alloc_pages(&chip->dma_dev,
-			HARMONY_BUF_SIZE*SILENCE_BUFS, &harmony->silence_dma);
+	err = snd_dma_alloc_pages(&harmony->dma_dev, HARMONY_BUF_SIZE*SILENCE_BUFS,
+				  &harmony->silence_dma);
+	if (err < 0)
+		return err;
 	harmony->silence_count = 0;
 
 	harmony->ply_stopped = harmony->cap_stopped = 1;
@@ -856,7 +832,7 @@ static int snd_card_harmony_pcm_init(snd_card_harmony_t *harmony, int device)
 	
 	snd_pcm_lib_preallocate_pages_for_all(pcm, SNDRV_DMA_TYPE_DEV,
 					      &harmony->pa_dev->dev,
-					      64 * 1024, 128 * 1024);
+					      MAX_BUFFER_SIZE, MAX_BUFFER_SIZE);
 
 	return 0;
 }
@@ -953,7 +929,7 @@ HARMONY_VOLUME("Master Volume", 20, 20, 0x0f, 1),
 HARMONY_VOLUME("PCM Playback Volume", 6, 0, 0x3f, 1),
 };
 
-static void snd_harmony_reset_codec(snd_card_harmony_t *harmony)
+static void __init snd_harmony_reset_codec(snd_card_harmony_t *harmony)
 {
  	snd_harmony_wait_cntl(harmony);
 	gsc_writel(1, harmony->hpa+REG_RESET);
@@ -975,7 +951,7 @@ static void __init snd_harmony_mixer_reset(snd_card_harmony_t *harmony)
 }
 
 
-int __init snd_card_harmony_mixer_init(snd_card_harmony_t *harmony)
+static int __init snd_card_harmony_mixer_init(snd_card_harmony_t *harmony)
 {
 	snd_card_t *card = harmony->card;
 	int idx, err;
@@ -1039,7 +1015,7 @@ static int __init snd_card_harmony_probe(struct parisc_device *pa_dev)
 	snd_card_t *card;
 	int err;
 	
-    if (dev >= SNDRV_CARDS)
+	if (dev >= SNDRV_CARDS)
 		return -ENODEV;
 	if (!enable[dev]) {
 		dev++;
@@ -1053,6 +1029,8 @@ static int __init snd_card_harmony_probe(struct parisc_device *pa_dev)
 	if (card == NULL)
 		return -ENOMEM;
 	chip = (struct snd_card_harmony *)card->private_data;
+	spin_lock_init(&chip->control_lock);
+	spin_lock_init(&chip->mixer_lock);
 	
 	if ((err = snd_card_harmony_create(card, pa_dev, chip)) < 0) {
 		printk(KERN_ERR PFX "Creation failed\n");
@@ -1133,7 +1111,6 @@ static void __exit alsa_card_harmony_exit(void)
 		{	
 			DPRINTK(KERN_INFO PFX "Freeing card %d\n", idx);
 			harmony = snd_harmony_cards[idx]->private_data;
-			snd_harmony_proc_done(harmony);
 			free_irq(harmony->irq, snd_card_harmony_interrupt);
 			printk(KERN_INFO PFX "Card unloaded %d, irq=%d\n", idx, harmony->irq);
 			snd_card_free(snd_harmony_cards[idx]);
