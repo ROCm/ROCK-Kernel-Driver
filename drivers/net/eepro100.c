@@ -850,7 +850,30 @@ static int __devinit speedo_found1(struct pci_dev *pdev,
 
 	return 0;
 }
-
+
+static void do_slow_command(struct net_device *dev, int cmd)
+{
+	long cmd_ioaddr = dev->base_addr + SCBCmd;
+	int wait = 0;
+	do
+		if (inb(cmd_ioaddr) == 0) break;
+	while(++wait <= 200);
+	if (wait > 100)
+		printk(KERN_ERR "Command %4.4x never accepted (%d polls)!\n",
+		       inb(cmd_ioaddr), wait);
+
+	outb(cmd, cmd_ioaddr);
+
+	for (wait = 0; wait <= 100; wait++)
+		if (inb(cmd_ioaddr) == 0) return;
+	for (; wait <= 20000; wait++)
+		if (inb(cmd_ioaddr) == 0) return;
+		else udelay(1);
+	printk(KERN_ERR "Command %4.4x was not accepted after %d polls!"
+	       "  Current status %8.8x.\n",
+	       cmd, wait, inl(dev->base_addr + SCBStatus));
+}
+
 /* Serial EEPROM section.
    A "bit" grungy, but we work our way through bit-by-bit :->. */
 /*  EEPROM_Ctrl bits. */
@@ -1015,7 +1038,7 @@ speedo_open(struct net_device *dev)
 /* Start the chip hardware after a full reset. */
 static void speedo_resume(struct net_device *dev)
 {
-	struct speedo_private *sp = (struct speedo_private *)dev->priv;
+	struct speedo_private *sp = dev->priv;
 	long ioaddr = dev->base_addr;
 
 	/* Start with a Tx threshold of 256 (0x..20.... 8 byte units). */
@@ -1023,34 +1046,40 @@ static void speedo_resume(struct net_device *dev)
 
 	/* Set the segment registers to '0'. */
 	wait_for_cmd_done(ioaddr + SCBCmd);
-	outl(0, ioaddr + SCBPointer);
-	/* impose a delay to avoid a bug */
-	inl(ioaddr + SCBPointer);
-	udelay(10);
-	outb(RxAddrLoad, ioaddr + SCBCmd);
-	wait_for_cmd_done(ioaddr + SCBCmd);
-	outb(CUCmdBase, ioaddr + SCBCmd);
+	if (inb(ioaddr + SCBCmd)) {
+		outl(PortPartialReset, ioaddr + SCBPort);
+		udelay(10);
+	}
+
+        outl(0, ioaddr + SCBPointer);
+        inl(ioaddr + SCBPointer);			/* Flush to PCI. */
+        udelay(10);			/* Bogus, but it avoids the bug. */
+
+        /* Note: these next two operations can take a while. */
+        do_slow_command(dev, RxAddrLoad);
+        do_slow_command(dev, CUCmdBase);
 
 	/* Load the statistics block and rx ring addresses. */
-	wait_for_cmd_done(ioaddr + SCBCmd);
 	outl(sp->lstats_dma, ioaddr + SCBPointer);
+	inl(ioaddr + SCBPointer);			/* Flush to PCI */
+
 	outb(CUStatsAddr, ioaddr + SCBCmd);
 	sp->lstats->done_marker = 0;
+	wait_for_cmd_done(ioaddr + SCBCmd);
 
 	if (sp->rx_ringp[sp->cur_rx % RX_RING_SIZE] == NULL) {
 		if (speedo_debug > 2)
 			printk(KERN_DEBUG "%s: NULL cur_rx in speedo_resume().\n",
 					dev->name);
 	} else {
-		wait_for_cmd_done(ioaddr + SCBCmd);
 		outl(sp->rx_ring_dma[sp->cur_rx % RX_RING_SIZE],
 			 ioaddr + SCBPointer);
-		outb(RxStart, ioaddr + SCBCmd);
+		inl(ioaddr + SCBPointer);		/* Flush to PCI */
 	}
 
-	wait_for_cmd_done(ioaddr + SCBCmd);
-	outb(CUDumpStats, ioaddr + SCBCmd);
-	udelay(30);
+	/* Note: RxStart should complete instantly. */
+	do_slow_command(dev, RxStart);
+	do_slow_command(dev, CUDumpStats);
 
 	/* Fill the first command with our physical address. */
 	{
@@ -1063,11 +1092,12 @@ static void speedo_resume(struct net_device *dev)
 		ias_cmd->link =
 			cpu_to_le32(TX_RING_ELEM_DMA(sp, sp->cur_tx % TX_RING_SIZE));
 		memcpy(ias_cmd->params, dev->dev_addr, 6);
+		if (sp->last_cmd)
+			clear_suspend(sp->last_cmd);
 		sp->last_cmd = ias_cmd;
 	}
 
 	/* Start the chip's Tx process and unmask interrupts. */
-	wait_for_cmd_done(ioaddr + SCBCmd);
 	outl(TX_RING_ELEM_DMA(sp, sp->dirty_tx % TX_RING_SIZE),
 		 ioaddr + SCBPointer);
 	/* We are not ACK-ing FCP and ER in the interrupt handler yet so they should
