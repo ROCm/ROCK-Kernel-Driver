@@ -325,7 +325,6 @@ static void __init iSeries_parse_cmdline(void)
 	{
 	    /* ROOT_DEV = MKDEV(VIODASD_MAJOR, 1); */
 	}
-	ROOT_DEV = MKDEV(VIODASD_MAJOR, 3);
 
 	iSeries_recal_tb = get_tb();
 	iSeries_recal_titan = HvCallXm_loadTod();

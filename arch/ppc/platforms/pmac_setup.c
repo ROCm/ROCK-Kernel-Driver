@@ -324,7 +324,6 @@ pmac_setup_arch(void)
 	else
 #endif
 		ROOT_DEV = DEFAULT_ROOT_DEVICE;
-	ROOT_DEV = Root_SDA3;
 
 #ifdef CONFIG_SMP
 	/* Check for Core99 */

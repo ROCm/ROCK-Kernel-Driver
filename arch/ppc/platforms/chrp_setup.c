@@ -260,7 +260,6 @@ void __init chrp_setup_arch(void)
 	else
 #endif
 		ROOT_DEV = Root_SDA2; /* sda2 (sda1 is for the kernel) */
-	ROOT_DEV = Root_SDA3; /* sda3 (sda1 is for the kernel) */
 
 	/* On pegasos, enable the L2 cache if not already done by OF */
 	pegasos_set_l2cr();
