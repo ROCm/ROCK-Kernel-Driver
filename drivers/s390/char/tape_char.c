@@ -48,38 +48,29 @@ static struct file_operations tape_fops =
 
 static int tapechar_major = TAPECHAR_MAJOR;
 
-struct cdev *
-tapechar_register_tape_dev(struct tape_device *device, char *name, int i)
-{
-	struct cdev *	cdev;
-	char		devname[11];
-
-	sprintf(devname, "%s%i", name, i / 2);
-	cdev = register_tape_dev(
-		&device->cdev->dev,
-		MKDEV(tapechar_major, i),
-		&tape_fops,
-		devname
-	);
-
-	return ((IS_ERR(cdev)) ? NULL : cdev);
-}
-
 /*
  * This function is called for every new tapedevice
  */
 int
 tapechar_setup_device(struct tape_device * device)
 {
-	device->nt = tapechar_register_tape_dev(
-			device,
-			"ntibm",
-			device->first_minor
+	char	device_name[20];
+
+	sprintf(device_name, "ntibm%i", device->first_minor / 2);
+	device->nt = register_tape_dev(
+		&device->cdev->dev,
+		MKDEV(tapechar_major, device->first_minor),
+		&tape_fops,
+		device_name,
+		"non-rewinding"
 	);
-	device->rt = tapechar_register_tape_dev(
-			device,
-			"rtibm",
-			device->first_minor + 1
+	device_name[0] = 'r';
+	device->rt = register_tape_dev(
+		&device->cdev->dev,
+		MKDEV(tapechar_major, device->first_minor + 1),
+		&tape_fops,
+		device_name,
+		"rewinding"
 	);
 
 	return 0;
@@ -500,9 +491,6 @@ tapechar_init (void)
 	tapechar_major = MAJOR(dev);
 	PRINT_INFO("tape gets major %d for character devices\n", MAJOR(dev));
 
-#ifdef TAPE390_INTERNAL_CLASS
-	tape_setup_class();
-#endif
 	return 0;
 }
 
@@ -512,9 +500,6 @@ tapechar_init (void)
 void
 tapechar_exit(void)
 {
-#ifdef TAPE390_INTERNAL_CLASS
-	tape_cleanup_class();
-#endif
 	PRINT_INFO("tape releases major %d for character devices\n",
 		tapechar_major);
 	unregister_chrdev_region(MKDEV(tapechar_major, 0), 256);

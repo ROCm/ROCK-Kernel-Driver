@@ -18,6 +18,6 @@ obj-$(CONFIG_SCLP_CPI) += sclp_cpi.o
 
 tape-$(CONFIG_S390_TAPE_BLOCK) += tape_block.o
 tape-$(CONFIG_PROC_FS) += tape_proc.o
-tape-objs := tape_core.o tape_std.o tape_char.o tape_class.o $(tape-y)
-obj-$(CONFIG_S390_TAPE) += tape.o
+tape-objs := tape_core.o tape_std.o tape_char.o $(tape-y)
+obj-$(CONFIG_S390_TAPE) += tape.o tape_class.o
 obj-$(CONFIG_S390_TAPE_34XX) += tape_34xx.o
