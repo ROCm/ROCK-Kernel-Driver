@@ -2098,6 +2098,7 @@ generic_file_write(struct file *file, const char *buf,
 	ssize_t		written;
 	int		err;
 	unsigned	bytes;
+	time_t		time_now;
 
 	if (unlikely((ssize_t) count < 0))
 		return -EINVAL;
@@ -2195,9 +2196,12 @@ generic_file_write(struct file *file, const char *buf,
 		goto out;
 
 	remove_suid(file->f_dentry);
-	inode->i_ctime = CURRENT_TIME;
-	inode->i_mtime = CURRENT_TIME;
-	mark_inode_dirty_sync(inode);
+	time_now = CURRENT_TIME;
+	if (inode->i_ctime != time_now || inode->i_mtime != time_now) {
+		inode->i_ctime = time_now;
+		inode->i_mtime = time_now;
+		mark_inode_dirty_sync(inode);
+	}
 
 	if (unlikely(file->f_flags & O_DIRECT)) {
 		written = generic_file_direct_IO(WRITE, file,
