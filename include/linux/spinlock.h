@@ -584,4 +584,10 @@ static inline int bit_spin_is_locked(int bitnum, unsigned long *addr)
 #define DEFINE_SPINLOCK(x) spinlock_t x = SPIN_LOCK_UNLOCKED
 #define DEFINE_RWLOCK(x) rwlock_t x = RW_LOCK_UNLOCKED
 
+/**
+ * spin_can_lock - would spin_trylock() succeed?
+ * @lock: the spinlock in question.
+ */
+#define spin_can_lock(lock)		(!spin_is_locked(lock))
+
 #endif /* __LINUX_SPINLOCK_H */
