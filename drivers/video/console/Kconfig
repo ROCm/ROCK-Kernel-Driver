@@ -138,15 +138,6 @@ config FBCON_ADVANCED
 
 # Guess what we need
 
-config FONTWIDTH8_ONLY
-	bool "Support only 8 pixels wide fonts"
-	depends on FRAMEBUFFER_CONSOLE
-	help
-	  Answer Y here will make the kernel provide only the 8x8 fonts (these
-	  are the less readable).
-
-	  If unsure, say N.
-
 config FONT_SUN8x16
 	bool "Sparc console 8x16 font"
 	depends on FRAMEBUFFER_CONSOLE && (!SPARC32 && !SPARC64 && FONTS || SPARC32 || SPARC64)
@@ -155,7 +146,7 @@ config FONT_SUN8x16
 
 config FONT_SUN12x22
 	bool "Sparc console 12x22 font (not supported by all drivers)"
-	depends on FRAMEBUFFER_CONSOLE && !FONTWIDTH8_ONLY && (!SPARC32 && !SPARC64 && FONTS || SPARC32 || SPARC64)
+	depends on FRAMEBUFFER_CONSOLE && (!SPARC32 && !SPARC64 && FONTS || SPARC32 || SPARC64)
 	help
 	  This is the high resolution console font for Sun machines with very
 	  big letters (like the letters used in the SPARC PROM). If the
@@ -204,7 +195,7 @@ config FONT_8x16
 
 config FONT_6x11
 	bool "Mac console 6x11 font (not supported by all drivers)" if FONTS
-	depends on FRAMEBUFFER_CONSOLE && !FONTWIDTH8_ONLY
+	depends on FRAMEBUFFER_CONSOLE
 	default y if !SPARC32 && !SPARC64 && !FONTS && MAC
 	help
 	  Small console font with Macintosh-style high-half glyphs.  Some Mac

@@ -1222,11 +1222,13 @@ static int __devinit tdfxfb_probe(struct pci_dev *pdev,
 	info->pseudo_palette	= (void *)(default_par + 1); 
 	info->flags		= FBINFO_FLAG_DEFAULT;
 
+#ifndef MODULE
 	if (!mode_option)
 		mode_option = "640x480@60";
 	 
 	err = fb_find_mode(&info->var, info, mode_option, NULL, 0, NULL, 8); 
 	if (!err || err == 4)
+#endif
 		info->var = tdfx_var;
 
 	size = (info->var.bits_per_pixel == 8) ? 256 : 16;

@@ -799,14 +799,6 @@ static int fbcon_changevar(int con)
 			p->fontdata = font->data;
 		}
 
-#ifdef FONTWIDTH8_ONLY		
-		if (!fontwidthvalid(p, vc->vc_font.width)) {
-			/* ++Geert: changed from panic() to `correct and continue' */
-			printk(KERN_ERR
-		       		"fbcon_set_display: No support for fontwidth %d\n",
-		       		vc->vc_font.width);
-		}
-#endif		
 		updatescrollmode(p, vc);
 
 		old_cols = vc->vc_cols;
@@ -949,14 +941,6 @@ static void fbcon_set_display(int con, int init, int logo)
 		p->fontdata = font->data;
 	}
 
-#ifdef FONTWIDTH8_ONLY		
-	if (!fontwidthvalid(p, vc->vc_font.width)) {
-		/* ++Geert: changed from panic() to `correct and continue' */
-		printk(KERN_ERR
-		       "fbcon_set_display: No support for fontwidth %d\n",
-		       vc->vc_font.width);
-	}
-#endif	
 	updatescrollmode(p, vc);
 
 	old_cols = vc->vc_cols;
@@ -2010,10 +1994,6 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 	u8 *fontdata = p->fontdata;
 	int i, j;
 
-#ifdef CONFIG_FONTWIDTH8_ONLY
-	if (fontwidth(p) != 8)
-		return -EINVAL;
-#endif
 	op->width = vc->vc_font.width;
 	op->height = vc->vc_font.height;
 	op->charcount = (p->charmask == 0x1ff) ? 512 : 256;
@@ -2028,9 +2008,7 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 			data += 32;
 			fontdata += j;
 		}
-	}
-#ifndef CONFIG_FONTWIDTH8_ONLY
-	else if (op->width <= 16) {
+	} else if (op->width <= 16) {
 		j = vc->vc_font.height * 2;
 		for (i = 0; i < op->charcount; i++) {
 			memcpy(data, fontdata, j);
@@ -2058,7 +2036,6 @@ static inline int fbcon_get_font(struct vc_data *vc, struct console_font_op *op)
 			fontdata += j;
 		}
 	}
-#endif
 	return 0;
 }
 
@@ -2211,10 +2188,6 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 	int i, k;
 	u8 *new_data, *data = op->data, *p;
 
-#ifdef CONFIG_FONTWIDTH8_ONLY
-	if (w != 8)
-		return -EINVAL;
-#endif
 	if ((w <= 0) || (w > 32)
 	    || (op->charcount != 256 && op->charcount != 512))
 		return -EINVAL;
@@ -2242,9 +2215,7 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 			data += 32;
 			p += h;
 		}
-	}
-#ifndef CONFIG_FONTWIDTH8_ONLY
-	else if (w <= 16) {
+	} else if (w <= 16) {
 		h *= 2;
 		for (i = 0; i < op->charcount; i++) {
 			memcpy(p, data, h);
@@ -2270,7 +2241,6 @@ static inline int fbcon_set_font(struct vc_data *vc, struct console_font_op *op)
 			p += h;
 		}
 	}
-#endif
 	/* we can do it in u32 chunks because of charcount is 256 or 512, so
 	   font length must be multiple of 256, at least. And 256 is multiple
 	   of 4 */
