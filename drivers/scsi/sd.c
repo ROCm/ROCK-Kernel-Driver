@@ -1492,15 +1492,12 @@ static void sd_detach(Scsi_Device * sdp)
 static int __init init_sd(void)
 {
 	int rc;
+
 	SCSI_LOG_HLQUEUE(3, printk("init_sd: sd driver entry point\n"));
-	sd_template.module = THIS_MODULE;
+
 	rc = scsi_register_device(&sd_template);
-	if (!rc) {
-		sd_template.scsi_driverfs_driver.name = (char *)sd_template.tag;
-		sd_template.scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
-		driver_register(&sd_template.scsi_driverfs_driver);
+	if (!rc)
 		register_reboot_notifier(&sd_notifier_block);
-	}
 	return rc;
 }
 
@@ -1525,7 +1522,6 @@ static void __exit exit_sd(void)
 		vfree(sd_dsk_arr);
 	}
 	sd_template.dev_max = 0;
-	driver_unregister(&sd_template.scsi_driverfs_driver);
 
 	unregister_reboot_notifier(&sd_notifier_block);
 }

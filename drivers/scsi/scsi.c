@@ -1991,6 +1991,11 @@ int scsi_register_device(struct Scsi_Device_Template *tpnt)
 	tpnt->next = scsi_devicelist;
 	scsi_devicelist = tpnt;
 
+	tpnt->scsi_driverfs_driver.name = (char *)tpnt->tag;
+	tpnt->scsi_driverfs_driver.bus = &scsi_driverfs_bus_type;
+
+	driver_register(&tpnt->scsi_driverfs_driver);
+
 	/*
 	 * First scan the devices that we know about, and see if we notice them.
 	 */
@@ -2061,6 +2066,8 @@ int scsi_unregister_device(struct Scsi_Device_Template *tpnt)
 	 */
 	if (GET_USE_COUNT(tpnt->module) != 0)
 		goto error_out;
+
+	driver_unregister(&tpnt->scsi_driverfs_driver);
 
 	/*
 	 * Next, detach the devices from the driver.
