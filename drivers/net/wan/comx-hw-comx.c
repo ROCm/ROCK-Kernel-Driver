@@ -466,16 +466,16 @@ static int COMX_open(struct net_device *dev)
 	}
 
 	if (!twin_open) {
-		if (check_region(dev->base_addr, hw->io_extent)) {
+		if (!request_region(dev->base_addr, hw->io_extent, dev->name)) {
 			return -EAGAIN;
 		}
 		if (request_irq(dev->irq, COMX_interrupt, 0, dev->name, 
 		   (void *)dev)) {
 			printk(KERN_ERR "comx-hw-comx: unable to obtain irq %d\n", dev->irq);
+			release_region(dev->base_addr, hw->io_extent);
 			return -EAGAIN;
 		}
 		ch->init_status |= IRQ_ALLOCATED;
-		request_region(dev->base_addr, hw->io_extent, dev->name);
 		if (!ch->HW_load_board || ch->HW_load_board(dev)) {
 			ch->init_status &= ~IRQ_ALLOCATED;
 			retval=-ENODEV;
