@@ -968,7 +968,7 @@ EXPORT_SYMBOL(usbvideo_Deregister);
  */
 static void usbvideo_Disconnect(struct usb_interface *intf)
 {
-	struct uvd *uvd = dev_get_drvdata (&intf->dev);
+	struct uvd *uvd = usb_get_intfdata (intf);
 	int i;
 
 	if (uvd == NULL) {
@@ -976,7 +976,7 @@ static void usbvideo_Disconnect(struct usb_interface *intf)
 		return;
 	}
 
-	dev_set_drvdata (&intf->dev, NULL);
+	usb_set_intfdata (intf, NULL);
 
 	usbvideo_ClientIncModCount(uvd);
 	if (uvd->debug > 0)

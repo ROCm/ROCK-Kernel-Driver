@@ -1840,7 +1840,7 @@ static int usb_pwc_probe(struct usb_interface *intf, const struct usb_device_id 
 		device_hint[hint].pdev = pdev;
 
 	Trace(TRACE_PROBE, "probe() function returning struct at 0x%p.\n", pdev);
-	dev_set_drvdata (&intf->dev, pdev);
+	usb_set_intfdata (intf, pdev);
 	return 0;
 }
 
@@ -1854,8 +1854,8 @@ static void usb_pwc_disconnect(struct usb_interface *intf)
 	lock_kernel();
 	free_mem_leak();
 
-	pdev = dev_get_drvdata (&intf->dev);
-	dev_set_drvdata (&intf->dev, NULL);
+	pdev = usb_get_intfdata (intf);
+	usb_set_intfdata (intf, NULL);
 	if (pdev == NULL) {
 		Err("pwc_disconnect() Called without private pointer.\n");
 		goto disconnect_out;
