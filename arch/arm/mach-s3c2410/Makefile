@@ -4,7 +4,7 @@
 
 # Object file lists.
 
-obj-y			:= s3c2410.o irq.o time.o gpio.o clock.o
+obj-y			:= s3c2410.o irq.o time.o gpio.o clock.o devs.o
 obj-m			:=
 obj-n			:=
 obj-			:=
