@@ -347,7 +347,7 @@ static int slc90e66_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-unsigned int __init pci_init_slc90e66 (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_slc90e66(struct pci_dev *dev)
 {
 #if defined(DISPLAY_SLC90E66_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!slc90e66_proc) {

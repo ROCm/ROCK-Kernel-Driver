@@ -547,7 +547,7 @@ static int svwks_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-unsigned int __init pci_init_svwks (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_svwks(struct pci_dev *dev)
 {
 	unsigned int reg;
 	byte btr;

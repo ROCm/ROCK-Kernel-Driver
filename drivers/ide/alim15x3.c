@@ -504,7 +504,7 @@ static int ali15x3_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-unsigned int __init pci_init_ali15x3 (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_ali15x3(struct pci_dev *dev)
 {
 	unsigned long fixdma_base = pci_resource_start(dev, 4);
 
@@ -523,7 +523,7 @@ unsigned int __init pci_init_ali15x3 (struct pci_dev *dev, const char *name)
 		outb(inb(fixdma_base+2) & 0x60, fixdma_base+2);
 
 		if (inb(fixdma_base+2) & 0x80)
-			printk("%s: simplex device: DMA will fail!!\n", name);
+			printk("%s: simplex device: DMA will fail!!\n", dev->name);
 	}
 
 #if defined(DISPLAY_ALI_TIMINGS) && defined(CONFIG_PROC_FS)

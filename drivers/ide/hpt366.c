@@ -1097,7 +1097,7 @@ init_hpt370_done:
 	udelay(100);
 }
 
-unsigned int __init pci_init_hpt366 (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_hpt366(struct pci_dev *dev)
 {
 	byte test = 0;
 

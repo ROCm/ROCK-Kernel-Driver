@@ -357,7 +357,7 @@ int hpt34x_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
  */
 #define	HPT34X_PCI_INIT_REG		0x80
 
-unsigned int __init pci_init_hpt34x (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_hpt34x(struct pci_dev *dev)
 {
 	int i = 0;
 	unsigned long hpt34xIoBase = pci_resource_start(dev, 4);

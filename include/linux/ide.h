@@ -521,16 +521,6 @@ typedef void (ide_rw_proc_t) (ide_drive_t *, ide_dma_action_t);
  */
 typedef int (ide_busproc_t) (ide_drive_t *, int);
 
-#ifdef CONFIG_BLK_DEV_IDEPCI
-typedef struct ide_pci_devid_s {
-	unsigned short	vid;
-	unsigned short	did;
-} ide_pci_devid_t;
-
-#define IDE_PCI_DEVID_NULL	((ide_pci_devid_t){0,0})
-#define IDE_PCI_DEVID_EQ(a,b)	(a.vid == b.vid && a.did == b.did)
-#endif /* CONFIG_BLK_DEV_IDEPCI */
-
 typedef struct hwif_s {
 	struct hwif_s	*next;		/* for linked-list in ide_hwgroup_t */
 	struct hwgroup_s *hwgroup;	/* actually (ide_hwgroup_t *) */
@@ -575,8 +565,7 @@ typedef struct hwif_s {
 	byte		channel;	/* for dual-port chips: 0=primary, 1=secondary */
 #ifdef CONFIG_BLK_DEV_IDEPCI
 	struct pci_dev	*pci_dev;	/* for pci chipsets */
-	ide_pci_devid_t	pci_devid;	/* for pci chipsets: {VID,DID} */
-#endif /* CONFIG_BLK_DEV_IDEPCI */
+#endif
 #if (DISK_RECOVERY_TIME > 0)
 	unsigned long	last_time;	/* time when previous rq was done */
 #endif
@@ -850,34 +839,6 @@ typedef enum {
 #define task_rq_offset(rq) \
 	(((rq)->nr_sectors - (rq)->current_nr_sectors) * SECTOR_SIZE)
 
-extern inline void *ide_map_buffer(struct request *rq, unsigned long *flags)
-{
-	return bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
-}
-
-extern inline void ide_unmap_buffer(char *buffer, unsigned long *flags)
-{
-	bio_kunmap_irq(buffer, flags);
-}
-
-/*
- * for now, taskfile requests are special :/
- */
-extern inline char *ide_map_rq(struct request *rq, unsigned long *flags)
-{
-	if (rq->bio)
-		return ide_map_buffer(rq, flags);
-	else
-		return rq->buffer + task_rq_offset(rq);
-}
-
-extern inline void ide_unmap_rq(struct request *rq, char *buf,
-				unsigned long *flags)
-{
-	if (rq->bio)
-		ide_unmap_buffer(buf, flags);
-}
-
 /*
  * This function issues a special IDE device request
  * onto the request queue.
@@ -1027,8 +988,6 @@ void ide_init_subdrivers (void);
 extern struct block_device_operations ide_fops[];
 extern ide_proc_entry_t generic_subdriver_entries[];
 
-extern int ide_reinit_drive (ide_drive_t *drive);
-
 #ifdef CONFIG_BLK_DEV_IDE
 /* Probe for devices attached to the systems host controllers.
  */
@@ -1069,7 +1028,7 @@ extern int ide_replace_subdriver(ide_drive_t *drive, const char *driver);
 #  define OFF_BOARD		NEVER_BOARD
 #endif /* CONFIG_BLK_DEV_OFFBOARD */
 
-void ide_scan_pcibus (int scan_direction) __init;
+void __init ide_scan_pcibus(int scan_direction);
 #endif
 #ifdef CONFIG_BLK_DEV_IDEDMA
 #define BAD_DMA_DRIVE		0

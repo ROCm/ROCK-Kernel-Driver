@@ -71,7 +71,7 @@ int pdcadma_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 
-unsigned int __init pci_init_pdcadma (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_pdcadma(struct pci_dev *dev)
 {
 #if defined(DISPLAY_PDCADMA_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!pdcadma_proc) {

@@ -383,7 +383,7 @@ static void cy82c693_tune_drive (ide_drive_t *drive, byte pio)
  * the device prior to INIT.
  */
 
-unsigned int __init pci_init_cy82c693(struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_cy82c693(struct pci_dev *dev)
 {
 #ifdef CY82C693_SETDMA_CLOCK
         byte data;
@@ -399,7 +399,7 @@ unsigned int __init pci_init_cy82c693(struct pci_dev *dev, const char *name)
         data = IN_BYTE(CY82_DATA_PORT);
 
 #if CY82C693_DEBUG_INFO
-	printk (KERN_INFO "%s: Peripheral Configuration Register: 0x%X\n", name, data);
+	printk (KERN_INFO "%s: Peripheral Configuration Register: 0x%X\n", dev->name, data);
 #endif /* CY82C693_DEBUG_INFO */
 
         /*
@@ -420,7 +420,7 @@ unsigned int __init pci_init_cy82c693(struct pci_dev *dev, const char *name)
         OUT_BYTE(data, CY82_DATA_PORT);
 
 #if CY82C693_DEBUG_INFO
-	printk (KERN_INFO "%s: New Peripheral Configuration Register: 0x%X\n", name, data);
+	printk (KERN_INFO "%s: New Peripheral Configuration Register: 0x%X\n", dev->name, data);
 #endif /* CY82C693_DEBUG_INFO */
 
 #endif /* CY82C693_SETDMA_CLOCK */
@@ -433,7 +433,7 @@ unsigned int __init pci_init_cy82c693(struct pci_dev *dev, const char *name)
 void __init ide_init_cy82c693(ide_hwif_t *hwif)
 {
 	hwif->chipset = ide_cy82c693;
-	hwif->tuneproc = &cy82c693_tune_drive;
+	hwif->tuneproc = cy82c693_tune_drive;
 	hwif->drives[0].autotune = 1;
 	hwif->drives[1].autotune = 1;
 	hwif->autodma = 0;
@@ -441,7 +441,7 @@ void __init ide_init_cy82c693(ide_hwif_t *hwif)
 #ifdef CONFIG_BLK_DEV_IDEDMA
 	if (hwif->dma_base) {
 		hwif->highmem = 1;
-		hwif->dmaproc = &cy82c693_dmaproc;
+		hwif->dmaproc = cy82c693_dmaproc;
 		if (!noautodma)
 			hwif->autodma = 1;
 	}

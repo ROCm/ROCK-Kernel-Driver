@@ -518,11 +518,11 @@ int aec62xx_dmaproc (ide_dma_action_t func, ide_drive_t *drive)
 #endif /* CONFIG_BLK_DEV_IDEDMA */
 #endif /* CONFIG_AEC62XX_TUNING */
 
-unsigned int __init pci_init_aec62xx (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_aec62xx (struct pci_dev *dev)
 {
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_dword(dev, PCI_ROM_ADDRESS, dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk("%s: ROM enabled at 0x%08lx\n", name, dev->resource[PCI_ROM_RESOURCE].start);
+		printk("%s: ROM enabled at 0x%08lx\n", dev->name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 
 #if defined(DISPLAY_AEC62XX_TIMINGS) && defined(CONFIG_PROC_FS)

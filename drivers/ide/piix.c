@@ -451,7 +451,7 @@ static int piix_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 }
 #endif /* defined(CONFIG_BLK_DEV_IDEDMA) && (CONFIG_PIIX_TUNING) */
 
-unsigned int __init pci_init_piix (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_piix(struct pci_dev *dev)
 {
 #if defined(DISPLAY_PIIX_TIMINGS) && defined(CONFIG_PROC_FS)
 	if (!piix_proc) {

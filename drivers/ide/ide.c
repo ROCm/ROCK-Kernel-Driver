@@ -1781,8 +1781,8 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 		 * so in that case we just ignore it and hope it goes away.
 		 */
 #ifdef CONFIG_BLK_DEV_IDEPCI
-		if (IDE_PCI_DEVID_EQ(hwif->pci_devid, IDE_PCI_DEVID_NULL))
-#endif	/* CONFIG_BLK_DEV_IDEPCI */
+		if (hwif->pci_dev && !hwif->pci_dev->vendor)
+#endif
 		{
 			/*
 			 * Probably not a shared PCI interrupt,
@@ -1794,7 +1794,7 @@ void ide_intr (int irq, void *dev_id, struct pt_regs *regs)
 			/*
 			 * Whack the status register, just in case we have a leftover pending IRQ.
 			 */
-			(void) IN_BYTE(hwif->io_ports[IDE_STATUS_OFFSET]);
+			IN_BYTE(hwif->io_ports[IDE_STATUS_OFFSET]);
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 		}
 		goto out_lock;
@@ -2304,7 +2304,6 @@ void ide_unregister (unsigned int index)
 	hwif->udma_four		= old_hwif.udma_four;
 #ifdef CONFIG_BLK_DEV_IDEPCI
 	hwif->pci_dev		= old_hwif.pci_dev;
-	hwif->pci_devid		= old_hwif.pci_devid;
 #endif /* CONFIG_BLK_DEV_IDEPCI */
 	hwif->straight8		= old_hwif.straight8;
 	hwif->hwif_data		= old_hwif.hwif_data;
@@ -2648,61 +2647,6 @@ void ide_delay_50ms (void)
 	__set_current_state(TASK_UNINTERRUPTIBLE);
 	schedule_timeout(HZ/20);
 #endif /* CONFIG_BLK_DEV_IDECS */
-}
-
-int ide_reinit_drive (ide_drive_t *drive)
-{
-	switch (drive->media) {
-#ifdef CONFIG_BLK_DEV_IDECD
-		case ide_cdrom:
-		{
-			extern int ide_cdrom_reinit(ide_drive_t *drive);
-			if (ide_cdrom_reinit(drive))
-				return 1;
-			break;
-		}
-#endif /* CONFIG_BLK_DEV_IDECD */
-#ifdef CONFIG_BLK_DEV_IDEDISK
-		case ide_disk:
-		{
-			extern int idedisk_reinit(ide_drive_t *drive);
-			if (idedisk_reinit(drive))
-				return 1;
-			break;
-		}
-#endif /* CONFIG_BLK_DEV_IDEDISK */
-#ifdef CONFIG_BLK_DEV_IDEFLOPPY
-		case ide_floppy:
-		{
-			extern int idefloppy_reinit(ide_drive_t *drive);
-			if (idefloppy_reinit(drive))
-				return 1;
-			break;
-		}
-#endif /* CONFIG_BLK_DEV_IDEFLOPPY */
-#ifdef CONFIG_BLK_DEV_IDETAPE
-		case ide_tape:
-		{
-			extern int idetape_reinit(ide_drive_t *drive);
-			if (idetape_reinit(drive))
-				return 1;
-			break;
-		}
-#endif /* CONFIG_BLK_DEV_IDETAPE */
-#ifdef CONFIG_BLK_DEV_IDESCSI
-/*
- *              {
- *                      extern int idescsi_reinit(ide_drive_t *drive);
- *                      if (idescsi_reinit(drive))
- *                              return 1;
- *                      break;
- * }
- */
-#endif /* CONFIG_BLK_DEV_IDESCSI */
-		default:
-			return 1;
-	}
-	return 0;
 }
 
 static int ide_ioctl (struct inode *inode, struct file *file,
@@ -3559,20 +3503,20 @@ void __init ide_init_builtin_drivers (void)
 	 * Attempt to match drivers for the available drives
 	 */
 #ifdef CONFIG_BLK_DEV_IDEDISK
-	(void) idedisk_init();
+	idedisk_init();
 #endif /* CONFIG_BLK_DEV_IDEDISK */
 #ifdef CONFIG_BLK_DEV_IDECD
-	(void) ide_cdrom_init();
+	ide_cdrom_init();
 #endif /* CONFIG_BLK_DEV_IDECD */
 #ifdef CONFIG_BLK_DEV_IDETAPE
-	(void) idetape_init();
+	idetape_init();
 #endif /* CONFIG_BLK_DEV_IDETAPE */
 #ifdef CONFIG_BLK_DEV_IDEFLOPPY
-	(void) idefloppy_init();
+	idefloppy_init();
 #endif /* CONFIG_BLK_DEV_IDEFLOPPY */
 #ifdef CONFIG_BLK_DEV_IDESCSI
  #ifdef CONFIG_SCSI
-	(void) idescsi_init();
+	idescsi_init();
  #else
     #warning ide scsi-emulation selected but no SCSI-subsystem in kernel
  #endif
@@ -3672,6 +3616,9 @@ ide_drive_t *ide_scan_devices (byte media, const char *name, ide_driver_t *drive
 	return NULL;
 }
 
+/*
+ * This is in fact registering a drive not a driver.
+ */
 int ide_register_subdriver (ide_drive_t *drive, ide_driver_t *driver)
 {
 	unsigned long flags;
@@ -3832,7 +3779,6 @@ EXPORT_SYMBOL(ide_unregister);
 EXPORT_SYMBOL(ide_setup_ports);
 EXPORT_SYMBOL(get_info_ptr);
 EXPORT_SYMBOL(current_capacity);
-EXPORT_SYMBOL(ide_reinit_drive);
 
 static int ide_notify_reboot (struct notifier_block *this, unsigned long event, void *x)
 {

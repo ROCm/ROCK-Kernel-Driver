@@ -42,6 +42,24 @@
 #define DTF(x...)
 #endif
 
+/*
+ * for now, taskfile requests are special :/
+ */
+static inline char *ide_map_rq(struct request *rq, unsigned long *flags)
+{
+	if (rq->bio)
+		return  bio_kmap_irq(rq->bio, flags) + ide_rq_offset(rq);
+	else
+		return rq->buffer + task_rq_offset(rq);
+}
+
+static inline void ide_unmap_rq(struct request *rq, char *to,
+				unsigned long *flags)
+{
+	if (rq->bio)
+	    bio_kunmap_irq(to, flags);
+}
+
 inline u32 task_read_24 (ide_drive_t *drive)
 {
 	return	(IN_BYTE(IDE_HCYL_REG)<<16) |
@@ -1137,7 +1155,7 @@ ide_startstop_t bio_mulout_intr (ide_drive_t *drive)
 			nsect = mcount;
 		mcount -= nsect;
 
-		buffer = ide_map_buffer(rq, &flags);
+		buffer = bio_kmap_irq(rq->bio, &flags) + ide_rq_offset(rq);
 		rq->sector += nsect;
 		rq->nr_sectors -= nsect;
 		rq->current_nr_sectors -= nsect;
@@ -1161,7 +1179,7 @@ ide_startstop_t bio_mulout_intr (ide_drive_t *drive)
 		 * re-entering us on the last transfer.
 		 */
 		taskfile_output_data(drive, buffer, nsect * SECTOR_WORDS);
-		ide_unmap_buffer(buffer, &flags);
+		bio_kunmap_irq(buffer, &flags);
 	} while (mcount);
 
 	drive->io_32bit = io_32bit;

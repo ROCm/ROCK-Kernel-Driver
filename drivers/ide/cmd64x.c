@@ -954,7 +954,7 @@ static int cmd680_busproc (ide_drive_t * drive, int state)
 	return 0;
 }
 
-void cmd680_reset (ide_drive_t *drive)
+static void cmd680_reset (ide_drive_t *drive)
 {
 #if 0
 	ide_hwif_t *hwif	= HWIF(drive);
@@ -966,9 +966,9 @@ void cmd680_reset (ide_drive_t *drive)
 #endif
 }
 
-unsigned int cmd680_pci_init (struct pci_dev *dev, const char *name)
+static unsigned int cmd680_pci_init(struct pci_dev *dev)
 {
-	u8 tmpbyte	= 0;	
+	u8 tmpbyte	= 0;
 	pci_write_config_byte(dev, 0x80, 0x00);
 	pci_write_config_byte(dev, 0x84, 0x00);
 	pci_read_config_byte(dev, 0x8A, &tmpbyte);
@@ -992,7 +992,7 @@ unsigned int cmd680_pci_init (struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int cmd64x_pci_init (struct pci_dev *dev, const char *name)
+static unsigned int cmd64x_pci_init(struct pci_dev *dev)
 {
 	unsigned char mrdmode;
 	unsigned int class_rev;
@@ -1003,7 +1003,7 @@ unsigned int cmd64x_pci_init (struct pci_dev *dev, const char *name)
 #ifdef __i386__
 	if (dev->resource[PCI_ROM_RESOURCE].start) {
 		pci_write_config_byte(dev, PCI_ROM_ADDRESS, dev->resource[PCI_ROM_RESOURCE].start | PCI_ROM_ADDRESS_ENABLE);
-		printk("%s: ROM enabled at 0x%08lx\n", name, dev->resource[PCI_ROM_RESOURCE].start);
+		printk("%s: ROM enabled at 0x%08lx\n", dev->name, dev->resource[PCI_ROM_RESOURCE].start);
 	}
 #endif
 
@@ -1011,7 +1011,7 @@ unsigned int cmd64x_pci_init (struct pci_dev *dev, const char *name)
 		case PCI_DEVICE_ID_CMD_643:
 			break;
 		case PCI_DEVICE_ID_CMD_646:
-			printk("%s: chipset revision 0x%02X, ", name, class_rev);
+			printk("%s: chipset revision 0x%02X, ", dev->name, class_rev);
 			switch(class_rev) {
 				case 0x07:
 				case 0x05:
@@ -1081,11 +1081,11 @@ unsigned int cmd64x_pci_init (struct pci_dev *dev, const char *name)
 	return 0;
 }
 
-unsigned int __init pci_init_cmd64x (struct pci_dev *dev, const char *name)
+unsigned int __init pci_init_cmd64x(struct pci_dev *dev)
 {
 	if (dev->device == PCI_DEVICE_ID_CMD_680)
-		return cmd680_pci_init (dev, name);
-	return cmd64x_pci_init (dev, name);
+		return cmd680_pci_init (dev);
+	return cmd64x_pci_init (dev);
 }
 
 unsigned int cmd680_ata66 (ide_hwif_t *hwif)
