@@ -12,7 +12,7 @@
 #include <linux/namei.h>
 #include <linux/backing-dev.h>
 
-extern struct file_operations sysfs_file_operations;
+extern struct super_block * sysfs_sb;
 
 static struct address_space_operations sysfs_aops = {
 	.readpage	= simple_readpage,
@@ -20,17 +20,14 @@ static struct address_space_operations sysfs_aops = {
 	.commit_write	= simple_commit_write
 };
 
-
-
 static struct backing_dev_info sysfs_backing_dev_info = {
 	.ra_pages	= 0,	/* No readahead */
 	.memory_backed	= 1,	/* Does not contribute to dirty memory */
 };
 
-struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
+struct inode * sysfs_new_inode(mode_t mode)
 {
-	struct inode *inode = new_inode(sb);
-
+	struct inode * inode = new_inode(sysfs_sb);
 	if (inode) {
 		inode->i_mode = mode;
 		inode->i_uid = current->fsuid;
@@ -41,44 +38,42 @@ struct inode *sysfs_get_inode(struct super_block *sb, int mode, int dev)
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
 		inode->i_mapping->a_ops = &sysfs_aops;
 		inode->i_mapping->backing_dev_info = &sysfs_backing_dev_info;
-		switch (mode & S_IFMT) {
-		default:
-			init_special_inode(inode, mode, dev);
-			break;
-		case S_IFREG:
-			inode->i_size = PAGE_SIZE;
-			inode->i_fop = &sysfs_file_operations;
-			break;
-		case S_IFDIR:
-			inode->i_op = &simple_dir_inode_operations;
-			inode->i_fop = &simple_dir_operations;
-
-			/* directory inodes start off with i_nlink == 2 (for "." entry) */
-			inode->i_nlink++;
-			break;
-		case S_IFLNK:
-			inode->i_op = &page_symlink_inode_operations;
-			break;
-		}
 	}
 	return inode;
 }
 
+int sysfs_create(struct dentry * dentry, int mode, int (*init)(struct inode *))
+{
+	int error = 0;
+	struct inode * inode = NULL;
+
+	if (dentry) {
+		if (!dentry->d_inode) {
+			if ((inode = sysfs_new_inode(mode)))
+				goto Proceed;
+			else 
+				error = -ENOMEM;
+		} else
+			error = -EEXIST;
+	} else 
+		error = -ENOENT;
+	goto Done;
+
+ Proceed:
+	if (init)
+		error = init(inode);
+	if (!error) {
+		d_instantiate(dentry, inode);
+		dget(dentry);
+	} else
+		iput(inode);
+ Done:
+	return error;
+}
+
 int sysfs_mknod(struct inode *dir, struct dentry *dentry, int mode, dev_t dev)
 {
-	struct inode *inode;
-	int error = 0;
-
-	if (!dentry->d_inode) {
-		inode = sysfs_get_inode(dir->i_sb, mode, dev);
-		if (inode) {
-			d_instantiate(dentry, inode);
-			dget(dentry);
-		} else
-			error = -ENOSPC;
-	} else
-		error = -EEXIST;
-	return error;
+	return sysfs_create(dentry, mode, NULL);
 }
 
 struct dentry * sysfs_get_dentry(struct dentry * parent, const char * name)

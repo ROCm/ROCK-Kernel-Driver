@@ -2,6 +2,8 @@
  * mount.c - operations for initializing and mounting sysfs.
  */
 
+#define DEBUG 
+
 #include <linux/fs.h>
 #include <linux/mount.h>
 #include <linux/pagemap.h>
@@ -12,6 +14,7 @@
 #define SYSFS_MAGIC 0x62656572
 
 struct vfsmount *sysfs_mount;
+struct super_block * sysfs_sb = NULL;
 
 static struct super_operations sysfs_ops = {
 	.statfs		= simple_statfs,
@@ -27,10 +30,16 @@ static int sysfs_fill_super(struct super_block *sb, void *data, int silent)
 	sb->s_blocksize_bits = PAGE_CACHE_SHIFT;
 	sb->s_magic = SYSFS_MAGIC;
 	sb->s_op = &sysfs_ops;
-	inode = sysfs_get_inode(sb, S_IFDIR | 0755, 0);
+	sysfs_sb = sb;
 
-	if (!inode) {
-		pr_debug("%s: could not get inode!\n",__FUNCTION__);
+	inode = sysfs_new_inode(S_IFDIR | S_IRUGO | S_IWUSR);
+	if (inode) {
+		inode->i_op = &simple_dir_inode_operations;
+		inode->i_fop = &simple_dir_operations;
+		/* directory inodes start off with i_nlink == 2 (for "." entry) */
+		inode->i_nlink++;	
+	} else {
+		pr_debug("sysfs: could not get root inode\n");
 		return -ENOMEM;
 	}
 

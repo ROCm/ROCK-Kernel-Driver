@@ -8,12 +8,13 @@
 
 #include "sysfs.h"
 
-static int sysfs_create(struct inode *dir, struct dentry *dentry, int mode)
+static struct file_operations sysfs_file_operations;
+
+static int init_file(struct inode * inode)
 {
-	int res;
-	mode = (mode & S_IALLUGO) | S_IFREG;
- 	res = sysfs_mknod(dir, dentry, mode, 0);
-	return res;
+	inode->i_size = PAGE_SIZE;
+	inode->i_fop = &sysfs_file_operations;
+	return 0;
 }
 
 #define to_subsys(k) container_of(k,struct subsystem,kset.kobj)
@@ -325,7 +326,7 @@ static int sysfs_release(struct inode * inode, struct file * filp)
 	return 0;
 }
 
-struct file_operations sysfs_file_operations = {
+static struct file_operations sysfs_file_operations = {
 	.read		= sysfs_read_file,
 	.write		= sysfs_write_file,
 	.llseek		= generic_file_llseek,
@@ -354,7 +355,7 @@ int sysfs_create_file(struct kobject * kobj, struct attribute * attr)
 	dentry = sysfs_get_dentry(parent,attr->name);
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *)attr;
-		error = sysfs_create(parent->d_inode,dentry,attr->mode);
+		error = sysfs_create(dentry,(attr->mode & S_IALLUGO) | S_IFREG,init_file);
 	} else
 		error = PTR_ERR(dentry);
 	up(&parent->d_inode->i_sem);

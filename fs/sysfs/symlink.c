@@ -9,23 +9,22 @@
 #include "sysfs.h"
 
 
+static int init_symlink(struct inode * inode)
+{
+	inode->i_op = &page_symlink_inode_operations;
+	return 0;
+}
+
 static int sysfs_symlink(struct inode * dir, struct dentry *dentry, const char * symname)
 {
-	struct inode *inode;
-	int error = -ENOSPC;
+	int error;
 
-	if (dentry->d_inode)
-		return -EEXIST;
-
-	inode = sysfs_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
-	if (inode) {
+	error = sysfs_create(dentry, S_IFLNK|S_IRWXUGO, init_symlink);
+	if (!error) {
 		int l = strlen(symname)+1;
-		error = page_symlink(inode, symname, l);
-		if (!error) {
-			d_instantiate(dentry, inode);
-			dget(dentry);
-		} else
-			iput(inode);
+		error = page_symlink(dentry->d_inode, symname, l);
+		if (error)
+			iput(dentry->d_inode);
 	}
 	return error;
 }

@@ -10,16 +10,15 @@
 #include <linux/kobject.h>
 #include "sysfs.h"
 
-static int sysfs_mkdir(struct inode *dir, struct dentry *dentry, int mode)
+static int init_dir(struct inode * inode)
 {
-	int res;
-	mode = (mode & (S_IRWXUGO|S_ISVTX)) | S_IFDIR;
- 	res = sysfs_mknod(dir, dentry, mode, 0);
- 	if (!res)
- 		dir->i_nlink++;
-	return res;
-}
+	inode->i_op = &simple_dir_inode_operations;
+	inode->i_fop = &simple_dir_operations;
 
+	/* directory inodes start off with i_nlink == 2 (for "." entry) */
+	inode->i_nlink++;
+	return 0;
+}
 
 /**
  *	sysfs_create_dir - create a directory for an object.
@@ -48,8 +47,10 @@ int sysfs_create_dir(struct kobject * kobj)
 	if (!IS_ERR(dentry)) {
 		dentry->d_fsdata = (void *)kobj;
 		kobj->dentry = dentry;
-		error = sysfs_mkdir(parent->d_inode,dentry,
-				    (S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO));
+		error = sysfs_create(dentry,(S_IFDIR| S_IRWXU | S_IRUGO | S_IXUGO),
+				     init_dir);
+		if (!error)
+			parent->d_inode->i_nlink++;
 	} else
 		error = PTR_ERR(dentry);
 	up(&parent->d_inode->i_sem);
