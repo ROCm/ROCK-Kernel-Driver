@@ -156,6 +156,8 @@ extern int cg14_init(void);
 extern int cg14_setup(char*);
 extern int p9100_init(void);
 extern int p9100_setup(char*);
+extern int tcx_init(void);
+extern int tcx_setup(char*);
 
 static struct {
 	const char *name;
@@ -264,6 +266,9 @@ static struct {
 #endif
 #ifdef CONFIG_FB_P9100
 	{ "p9100", p9100_init, p9100_setup },
+#endif
+#ifdef CONFIG_FB_TCX
+	{ "tcx", tcx_init, tcx_setup },
 #endif
 
 	/*
