@@ -44,7 +44,7 @@ struct xfrm_selector
 	uid_t	user;
 };
 
-#define XFRM_INF (~(u64)0)
+#define XFRM_INF (~(__u64)0)
 
 struct xfrm_lifetime_cfg
 {
