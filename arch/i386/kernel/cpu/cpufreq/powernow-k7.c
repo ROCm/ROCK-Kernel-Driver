@@ -354,15 +354,12 @@ static int powernow_acpi_init(void)
 		unsigned int speed;
 
 		pc.val = (unsigned long) acpi_processor_perf->states[i].control;
-		dprintk (KERN_INFO PFX "acpi:  P%d: %d MHz, %d mW, %d uS, control %08x, status %08x, vid: %02x fid: %02x SGTC: %d\n",
+		dprintk (KERN_INFO PFX "acpi:  P%d: %d MHz %d mW %d uS control %08x SGTC %d\n",
 			 i,
 			 (u32) acpi_processor_perf->states[i].core_frequency,
 			 (u32) acpi_processor_perf->states[i].power,
 			 (u32) acpi_processor_perf->states[i].transition_latency,
 			 (u32) acpi_processor_perf->states[i].control,
-			 (u32) acpi_processor_perf->states[i].status,
-			 pc.bits.vid,
-			 pc.bits.fid,
 			 pc.bits.sgtc);
 
 		vid = pc.bits.vid;
