@@ -95,41 +95,109 @@ do {	spin_lock_init(&((__sk)->lock.slock)); \
 	init_waitqueue_head(&((__sk)->lock.wq)); \
 } while(0)
 
+/**
+  *	struct sock - network layer representation of sockets
+  *	@state - Connection state
+  *	@zapped	- ax25 & ipx means !linked
+  *	@reuse - %SO_REUSEADDR setting
+  *	@shutdown - mask of %SEND_SHUTDOWN and/or %RCV_SHUTDOWN
+  *	@bound_dev_if - bound device index if != 0
+  *	@next - main hash linkage for various protocol lookup tables
+  *	@pprev - main hash linkage for various protocol lookup tables
+  *	@bind_next - main hash linkage for various protocol lookup tables
+  *	@bind_pprev - main hash linkage for various protocol lookup tables
+  *	@refcnt - reference count
+  *	@family - network address family
+  *	@use_write_queue - wheter to call sk->write_space(sk) in sock_wfree
+  *	@userlocks - %SO_SNDBUF and %SO_RCVBUF settings
+  *	@lock -	synchronizer
+  *	@rcvbuf - size of receive buffer in bytes
+  *	@sleep - sock wait queue
+  *	@dst_cache - destination cache
+  *	@dst_lock - destination cache lock
+  *	@policy - flow policy
+  *	@rmem_alloc - receive queue bytes committed
+  *	@receive_queue - incoming packets
+  *	@wmem_alloc - transmit queue bytes committed
+  *	@write_queue - Packet sending queue
+  *	@omem_alloc - "o" is "option" or "other"
+  *	@wmem_queued - persistent queue size
+  *	@forward_alloc - space allocated forward
+  *	@allocation - allocation mode
+  *	@sndbuf - size of send buffer in bytes
+  *	@prev - pointer to previous sock in the list this sock is in
+  *	@flags - %SO_LINGER (l_onoff), %SO_BROADCAST, %SO_KEEPALIVE, %SO_OOBINLINE settings
+  *	@no_check - %SO_NO_CHECK setting, wether or not checkup packets
+  *	@debug - %SO_DEBUG setting
+  *	@rcvtstamp - %SO_TIMESTAMP setting
+  *	@no_largesend - whether to sent large segments or not
+  *	@route_caps - route capabilities (e.g. %NETIF_F_TSO)
+  *	@lingertime - %SO_LINGER l_linger setting
+  *	@hashent - hash entry in several tables (e.g. tcp_ehash)
+  *	@pair - socket pair (e.g. AF_UNIX/unix_peer)
+  *	@backlog - always used with the per-socket spinlock held
+  *	@callback_lock - used with the callbacks in the end of this struct
+  *	@error_queue - rarely used
+  *	@prot - protocol handlers inside a network family
+  *	@err - last error
+  *	@err_soft - errors that don't cause failure but are the cause of a persistent failure not just 'timed out'
+  *	@ack_backlog - current listen backlog
+  *	@max_ack_backlog - listen backlog set in listen()
+  *	@priority - %SO_PRIORITY setting
+  *	@type - socket type (%SOCK_STREAM, etc)
+  *	@localroute - route locally only, %SO_DONTROUTE setting
+  *	@protocol - which protocol this socket belongs in this network family
+  *	@peercred - %SO_PEERCRED setting
+  *	@rcvlowat - %SO_RCVLOWAT setting
+  *	@rcvtimeo - %SO_RCVTIMEO setting
+  *	@sndtimeo - %SO_SNDTIMEO setting
+  *	@filter - socket filtering instructions
+  *	@protinfo - private area, net family specific, when not using slab
+  *	@slab - the slabcache this instance was allocated from
+  *	@timer - sock cleanup timer
+  *	@stamp - time stamp of last packet received
+  *	@socket - Identd and reporting IO signals
+  *	@user_data - RPC layer private data
+  *	@owner - module that owns this socket
+  *	@state_change - callback to indicate change in the state of the sock
+  *	@data_ready - callback to indicate there is data to be processed
+  *	@write_space - callback to indicate there is bf sending space available
+  *	@error_report - callback to indicate errors (e.g. %MSG_ERRQUEUE)
+  *	@backlog_rcv - callback to process the backlog
+  *	@destruct - called at sock freeing time, i.e. when all refcnt == 0
+ */
 struct sock {
 	/* Begin of struct sock/struct tcp_tw_bucket shared layout */
-	volatile unsigned char	state,		/* Connection state */
-				zapped;		/* ax25 & ipx means !linked */
-	unsigned char		reuse;		/* SO_REUSEADDR setting */
+	volatile unsigned char	state,
+				zapped;
+	unsigned char		reuse;
 	unsigned char		shutdown;
-	int			bound_dev_if;	/* Bound device index if != 0 */
-	/* Main hash linkage for various protocol lookup tables. */
+	int			bound_dev_if;
 	struct sock		*next;
 	struct sock		**pprev;
 	struct sock		*bind_next;
 	struct sock		**bind_pprev;
-	atomic_t		refcnt;		/* Reference count			*/
-	unsigned short		family;		/* Address family */
+	atomic_t		refcnt;
+	unsigned short		family;
 	/* End of struct sock/struct tcp_tw_bucket shared layout */
 	unsigned char		use_write_queue;
 	unsigned char		userlocks;
-	socket_lock_t		lock;		/* Synchronizer...			*/
-	int			rcvbuf;		/* Size of receive buffer in bytes	*/
-
-	wait_queue_head_t	*sleep;		/* Sock wait queue			*/
-	struct dst_entry	*dst_cache;	/* Destination cache			*/
+	socket_lock_t		lock;
+	int			rcvbuf;
+	wait_queue_head_t	*sleep;
+	struct dst_entry	*dst_cache;
 	rwlock_t		dst_lock;
 	struct xfrm_policy	*policy[2];
-	atomic_t		rmem_alloc;	/* Receive queue bytes committed	*/
-	struct sk_buff_head	receive_queue;	/* Incoming packets			*/
-	atomic_t		wmem_alloc;	/* Transmit queue bytes committed	*/
-	struct sk_buff_head	write_queue;	/* Packet sending queue			*/
-	atomic_t		omem_alloc;	/* "o" is "option" or "other" */
-	int			wmem_queued;	/* Persistent queue size */
-	int			forward_alloc;	/* Space allocated forward. */
-	unsigned int		allocation;	/* Allocation mode			*/
-	int			sndbuf;		/* Size of send buffer in bytes		*/
+	atomic_t		rmem_alloc;
+	struct sk_buff_head	receive_queue;
+	atomic_t		wmem_alloc;
+	struct sk_buff_head	write_queue;
+	atomic_t		omem_alloc;
+	int			wmem_queued;
+	int			forward_alloc;
+	unsigned int		allocation;
+	int			sndbuf;
 	struct sock		*prev;
-
 	unsigned long 		flags;
 	char		 	no_check;
 	unsigned char		debug;
@@ -137,72 +205,44 @@ struct sock {
 	unsigned char		no_largesend;
 	int			route_caps;
 	unsigned long	        lingertime;
-
 	int			hashent;
 	struct sock		*pair;
-
-	/* The backlog queue is special, it is always used with
+	/*
+	 * The backlog queue is special, it is always used with
 	 * the per-socket spinlock held and requires low latency
-	 * access.  Therefore we special case it's implementation.
+	 * access. Therefore we special case it's implementation.
 	 */
 	struct {
 		struct sk_buff *head;
 		struct sk_buff *tail;
 	} backlog;
-
 	rwlock_t		callback_lock;
-
-	/* Error queue, rarely used. */
 	struct sk_buff_head	error_queue;
-
 	struct proto		*prot;
-
-	int			err, err_soft;	/* Soft holds errors that don't
-						   cause failure but are the cause
-						   of a persistent failure not just
-						   'timed out' */
+	int			err,
+				err_soft;
 	unsigned short		ack_backlog;
 	unsigned short		max_ack_backlog;
 	__u32			priority;
 	unsigned short		type;
-	unsigned char		localroute;	/* Route locally only */
+	unsigned char		localroute;
 	unsigned char		protocol;
 	struct ucred		peercred;
 	int			rcvlowat;
 	long			rcvtimeo;
 	long			sndtimeo;
-
-	/* Socket Filtering Instructions */
 	struct sk_filter      	*filter;
-
-	/* This is where all the private (optional) areas that don't
-	 * overlap will eventually live. 
-	 */
-	void *protinfo;
-
-	/* The slabcache this instance was allocated from, it is sk_cachep for most
-	 * protocols, but a private slab for protocols such as IPv4, IPv6, SPX
-	 * and Unix.
-	 */
-	kmem_cache_t *slab;
-
-	/* This part is used for the timeout functions. */
-	struct timer_list	timer;		/* This is the sock cleanup timer. */
+	void			*protinfo;
+	kmem_cache_t		*slab;
+	struct timer_list	timer;
 	struct timeval		stamp;
-
-	/* Identd and reporting IO signals */
 	struct socket		*socket;
-
-	/* RPC layer private data */
 	void			*user_data;
-  
-	/* Callbacks */
 	struct module		*owner;
 	void			(*state_change)(struct sock *sk);
-	void			(*data_ready)(struct sock *sk,int bytes);
+	void			(*data_ready)(struct sock *sk, int bytes);
 	void			(*write_space)(struct sock *sk);
 	void			(*error_report)(struct sock *sk);
-
   	int			(*backlog_rcv) (struct sock *sk,
 						struct sk_buff *skb);  
 	void                    (*destruct)(struct sock *sk);
