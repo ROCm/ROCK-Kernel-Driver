@@ -69,8 +69,6 @@ ohci_pci_start (struct usb_hcd *hcd)
 				&& pdev->device == 0xc861) {
 			ohci_info (ohci,
 				"WARNING: OPTi workarounds unavailable\n");
-			/* OPTi sometimes acts wierd during init */
-			ohci->flags = OHCI_QUIRK_INITRESET;
 		}
 
 		/* Check for NSC87560. We have to look at the bridge (fn1) to
@@ -88,13 +86,6 @@ ohci_pci_start (struct usb_hcd *hcd)
 				ohci_info (ohci, "Using NSC SuperIO setup\n");
 			}
 		}
-
-		/* SiS sometimes acts wierd during init */
-		else if (pdev->vendor == PCI_VENDOR_ID_SI) {
-			ohci->flags = OHCI_QUIRK_INITRESET;
-			ohci_info(ohci, "SiS init quirk\n");
-		}
-	
 	}
 
 	/* NOTE: there may have already been a first reset, to

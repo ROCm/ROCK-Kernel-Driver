@@ -545,6 +545,7 @@ static int ohci_run (struct ohci_hcd *ohci)
 	/* 2msec timelimit here means no irqs/preempt */
 	spin_lock_irq (&ohci->lock);
 
+retry:
 	/* HC Reset requires max 10 us delay */
 	writel (OHCI_HCR,  &ohci->regs->cmdstatus);
 	temp = 30;	/* ... allow extra time */
@@ -563,6 +564,8 @@ static int ohci_run (struct ohci_hcd *ohci)
 	 * ... but some hardware won't init fmInterval "by the book"
 	 * (SiS, OPTi ...), so reset again instead.  SiS doesn't need
 	 * this if we write fmInterval after we're OPERATIONAL.
+	 * Unclear about ALi, ServerWorks, and others ... this could
+	 * easily be a longstanding bug in chip init on Linux.
 	 */
 	if (ohci->flags & OHCI_QUIRK_INITRESET) {
 		writel (ohci->hc_control, &ohci->regs->control);
@@ -586,6 +589,11 @@ static int ohci_run (struct ohci_hcd *ohci)
 	 */
 	if ((ohci_readl (&ohci->regs->fminterval) & 0x3fff0000) == 0
 			|| !ohci_readl (&ohci->regs->periodicstart)) {
+		if (!(ohci->flags & OHCI_QUIRK_INITRESET)) {
+			ohci->flags |= OHCI_QUIRK_INITRESET;
+			ohci_dbg (ohci, "enabling initreset quirk\n");
+			goto retry;
+		}
 		spin_unlock_irq (&ohci->lock);
 		ohci_err (ohci, "init err (%08x %04x)\n",
 			ohci_readl (&ohci->regs->fminterval),
