@@ -893,7 +893,7 @@ int snd_gf1_pcm_new(snd_gus_card_t * gus, int pcm_dev, int control_index, snd_pc
 		kctl = snd_ctl_new1(&snd_gf1_pcm_volume_control1, gus);
 	else
 		kctl = snd_ctl_new1(&snd_gf1_pcm_volume_control, gus);
-	if ((err = snd_ctl_add(card, kctl = snd_ctl_new1(&snd_gf1_pcm_volume_control, gus))) < 0)
+	if ((err = snd_ctl_add(card, kctl)) < 0)
 		return err;
 	kctl->id.index = control_index;
 
