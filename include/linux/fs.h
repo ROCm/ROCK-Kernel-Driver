@@ -345,6 +345,7 @@ struct block_device {
 	struct inode *		bd_inode;	/* will die */
 	int			bd_openers;
 	struct semaphore	bd_sem;	/* open/close mutex */
+	struct semaphore	bd_mount_sem;	/* mount mutex */
 	struct list_head	bd_inodes;
 	void *			bd_holder;
 	int			bd_holders;
@@ -749,6 +750,9 @@ struct super_block {
 	struct list_head	s_instances;
 	struct quota_info	s_dquot;	/* Diskquota specific options */
 
+	int			s_frozen;
+	wait_queue_head_t	s_wait_unfrozen;
+
 	char s_id[32];				/* Informational name */
 
 	void 			*s_fs_info;	/* Filesystem private info */
@@ -759,6 +763,18 @@ struct super_block {
 	 */
 	struct semaphore s_vfs_rename_sem;	/* Kludge */
 };
+
+/*
+ * Snapshotting support.
+ */
+enum {
+	SB_UNFROZEN = 0,
+	SB_FREEZE_WRITE	= 1,
+	SB_FREEZE_TRANS = 2,
+};
+
+#define vfs_check_frozen(sb, level) \
+	wait_event((sb)->s_wait_unfrozen, ((sb)->s_frozen < (level)))
 
 /*
  * Superblock locking.
