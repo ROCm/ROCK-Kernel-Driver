@@ -35,7 +35,7 @@ static int ppc_htab_show(struct seq_file *m, void *v);
 static ssize_t ppc_htab_write(struct file * file, const char __user * buffer,
 			      size_t count, loff_t *ppos);
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
-		  void __user *buffer, size_t *lenp);
+		  void __user *buffer, size_t *lenp, loff_t *ppos);
 
 extern PTE *Hash, *Hash_end;
 extern unsigned long Hash_size, Hash_mask;
@@ -320,7 +320,7 @@ static ssize_t ppc_htab_write(struct file * file, const char __user * ubuffer,
 }
 
 int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
-		  void __user *buffer_arg, size_t *lenp)
+		  void __user *buffer_arg, size_t *lenp, loff_t *ppos)
 {
 	int vleft, first=1, len, left, val;
 	char __user *buffer = (char __user *) buffer_arg;
@@ -344,7 +344,7 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 	if (!(cur_cpu_spec[0]->cpu_features & CPU_FTR_L2CR))
 		return -EFAULT;
 
-	if ( /*!table->maxlen ||*/ (filp->f_pos && !write)) {
+	if ( /*!table->maxlen ||*/ (*ppos && !write)) {
 		*lenp = 0;
 		return 0;
 	}
@@ -435,6 +435,6 @@ int proc_dol2crvec(ctl_table *table, int write, struct file *filp,
 	if (write && first)
 		return -EINVAL;
 	*lenp -= left;
-	filp->f_pos += *lenp;
+	*ppos += *lenp;
 	return 0;
 }

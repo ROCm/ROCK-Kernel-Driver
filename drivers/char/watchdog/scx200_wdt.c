@@ -101,7 +101,7 @@ static int scx200_wdt_open(struct inode *inode, struct file *file)
 		return -EBUSY;
 	scx200_wdt_enable();
 
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int scx200_wdt_release(struct inode *inode, struct file *file)
@@ -135,9 +135,6 @@ static struct notifier_block scx200_wdt_notifier =
 static ssize_t scx200_wdt_write(struct file *file, const char __user *data,
 				     size_t len, loff_t *ppos)
 {
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	/* check for a magic close character */
 	if (len)
 	{

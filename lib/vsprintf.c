@@ -668,8 +668,16 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 		qualifier = -1;
 		if (*fmt == 'h' || *fmt == 'l' || *fmt == 'L' ||
 		    *fmt == 'Z' || *fmt == 'z') {
-			qualifier = *fmt;
-			fmt++;
+			qualifier = *fmt++;
+			if (unlikely(qualifier == *fmt)) {
+				if (qualifier == 'h') {
+					qualifier = 'H';
+					fmt++;
+				} else if (qualifier == 'l') {
+					qualifier = 'L';
+					fmt++;
+				}
+			}
 		}
 		base = 10;
 		is_sign = 0;
@@ -754,6 +762,15 @@ int vsscanf(const char * buf, const char * fmt, va_list args)
 				break;
 
 		switch(qualifier) {
+		case 'H':	/* that's 'hh' in format */
+			if (is_sign) {
+				signed char *s = (signed char *) va_arg(args,signed char *);
+				*s = (signed char) simple_strtol(str,&next,base);
+			} else {
+				unsigned char *s = (unsigned char *) va_arg(args, unsigned char *);
+				*s = (unsigned char) simple_strtoul(str, &next, base);
+			}
+			break;
 		case 'h':
 			if (is_sign) {
 				short *s = (short *) va_arg(args,short *);

@@ -302,7 +302,7 @@ static int hci_vhci_chr_open(struct inode *inode, struct file * file)
 	}
 
 	file->private_data = hci_vhci;
-	return 0;   
+	return nonseekable_open(inode, file);   
 }
 
 static int hci_vhci_chr_close(struct inode *inode, struct file *file)

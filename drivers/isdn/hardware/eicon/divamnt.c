@@ -151,9 +151,6 @@ maint_read(struct file *file, char __user *buf, size_t count, loff_t * off)
 	int str_length;
 	int *str_msg;
 
-	if (off != &file->f_pos)
-		return -ESPIPE;
-
 	if (!file->private_data) {
 		for (;;) {
 			while (
@@ -306,7 +303,7 @@ static int maint_open(struct inode *ino, struct file *filep)
 
 	filep->private_data = NULL;
 
-	return (0);
+	return nonseekable_open(ino, filep);
 }
 
 static int maint_close(struct inode *ino, struct file *filep)

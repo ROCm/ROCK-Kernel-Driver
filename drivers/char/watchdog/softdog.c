@@ -141,7 +141,7 @@ static int softdog_open(struct inode *inode, struct file *file)
 	 *	Activate timer
 	 */
 	softdog_keepalive();
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int softdog_release(struct inode *inode, struct file *file)
@@ -163,10 +163,6 @@ static int softdog_release(struct inode *inode, struct file *file)
 
 static ssize_t softdog_write(struct file *file, const char __user *data, size_t len, loff_t *ppos)
 {
-	/*  Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	/*
 	 *	Refresh the timer.
 	 */

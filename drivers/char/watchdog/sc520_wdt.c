@@ -227,10 +227,6 @@ static int wdt_set_heartbeat(int t)
 
 static ssize_t fop_write(struct file * file, const char __user * buf, size_t count, loff_t * ppos)
 {
-	/* We can't seek */
-	if(ppos != &file->f_pos)
-		return -ESPIPE;
-
 	/* See if we got the magic character 'V' and reload the timer */
 	if(count) {
 		if (!nowayout) {
@@ -258,6 +254,8 @@ static ssize_t fop_write(struct file * file, const char __user * buf, size_t cou
 
 static int fop_open(struct inode * inode, struct file * file)
 {
+	nonseekable_open(inode, file);
+
 	/* Just in case we're already talking to someone... */
 	if(test_and_set_bit(0, &wdt_is_open))
 		return -EBUSY;

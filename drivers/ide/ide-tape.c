@@ -3755,10 +3755,6 @@ static ssize_t idetape_chrdev_read (struct file *file, char __user *buf,
 	idetape_tape_t *tape = drive->driver_data;
 	ssize_t bytes_read,temp, actually_read = 0, rc;
 
-	if (ppos != &file->f_pos) {
-		/* "A request was outside the capabilities of the device." */
-		return -ENXIO;
-	}
 #if IDETAPE_DEBUG_LOG
 	if (tape->debug_level >= 3)
 		printk(KERN_INFO "ide-tape: Reached idetape_chrdev_read, count %Zd\n", count);
@@ -3817,11 +3813,6 @@ static ssize_t idetape_chrdev_write (struct file *file, const char __user *buf,
 	ide_drive_t *drive = file->private_data;
 	idetape_tape_t *tape = drive->driver_data;
 	ssize_t retval, actually_written = 0;
-
-	if (ppos != &file->f_pos) {
-		/* "A request was outside the capabilities of the device." */
-		return -ENXIO;
-	}
 
 	/* The drive is write protected. */
 	if (tape->write_prot)
@@ -4187,6 +4178,7 @@ static int idetape_chrdev_open (struct inode *inode, struct file *filp)
 	idetape_pc_t pc;
 	int retval;
 
+	nonseekable_open(inode, filp);
 #if IDETAPE_DEBUG_LOG
 	printk(KERN_INFO "ide-tape: Reached idetape_chrdev_open\n");
 #endif /* IDETAPE_DEBUG_LOG */

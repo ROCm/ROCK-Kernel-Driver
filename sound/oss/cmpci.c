@@ -1852,7 +1852,7 @@ static int cm_open_mixdev(struct inode *inode, struct file *file)
 	}
        	VALIDATE_STATE(s);
 	file->private_data = s;
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int cm_release_mixdev(struct inode *inode, struct file *file)
@@ -1926,8 +1926,6 @@ static ssize_t cm_read(struct file *file, char __user *buffer, size_t count, lof
 	int cnt;
 
 	VALIDATE_STATE(s);
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (s->dma_adc.mapped)
 		return -ENXIO;
 	if (!s->dma_adc.ready && (ret = prog_dmabuf(s, 1)))
@@ -2028,8 +2026,6 @@ static ssize_t cm_write(struct file *file, const char __user *buffer, size_t cou
 	int cnt;
 
 	VALIDATE_STATE(s);
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
 	if (s->dma_dac.mapped)
 		return -ENXIO;
 	if (!s->dma_dac.ready && (ret = prog_dmabuf(s, 0)))
@@ -2878,7 +2874,7 @@ static int cm_open(struct inode *inode, struct file *file)
 	set_fmt(s, fmtm, fmts);
 	s->open_mode |= file->f_mode & (FMODE_READ | FMODE_WRITE);
 	up(&s->open_sem);
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 static int cm_release(struct inode *inode, struct file *file)

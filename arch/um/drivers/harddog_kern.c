@@ -82,7 +82,7 @@ static int harddog_open(struct inode *inode, struct file *file)
 
 	timer_alive = 1;
 	unlock_kernel();
-	return 0;
+	return nonseekable_open(inode, file);
 }
 
 extern void stop_watchdog(int in_fd, int out_fd);
@@ -108,10 +108,6 @@ extern int ping_watchdog(int fd);
 static ssize_t harddog_write(struct file *file, const char *data, size_t len,
 			     loff_t *ppos)
 {
-	/*  Can't seek (pwrite) on this device  */
-	if (ppos != &file->f_pos)
-		return -ESPIPE;
-
 	/*
 	 *	Refresh the timer.
 	 */

@@ -1924,10 +1924,10 @@ static int flush_delay;
 
 static
 int ipv6_sysctl_rtcache_flush(ctl_table *ctl, int write, struct file * filp,
-			      void __user *buffer, size_t *lenp)
+			      void __user *buffer, size_t *lenp, loff_t *ppos)
 {
 	if (write) {
-		proc_dointvec(ctl, write, filp, buffer, lenp);
+		proc_dointvec(ctl, write, filp, buffer, lenp, ppos);
 		if (flush_delay < 0)
 			flush_delay = 0;
 		fib6_run_gc((unsigned long)flush_delay);
