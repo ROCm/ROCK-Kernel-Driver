@@ -370,25 +370,24 @@ static int sd_open(struct inode *inode, struct file *filp)
 	if (!scsi_block_when_processing_errors(sdev))
 		goto error_out;
 
-	if (sdev->removable) {
+	if (sdev->removable || sdkp->write_prot)
 		check_disk_change(inode->i_bdev);
 
-		/*
-		 * If the drive is empty, just let the open fail.
-		 */
-		retval = -ENOMEDIUM;
-		if ((!sdkp->media_present) && !(filp->f_flags & O_NDELAY))
-			goto error_out;
+	/*
+	 * If the drive is empty, just let the open fail.
+	 */
+	retval = -ENOMEDIUM;
+	if (sdev->removable && !sdkp->media_present &&
+	    !(filp->f_flags & O_NDELAY))
+		goto error_out;
 
-		/*
-		 * Similarly, if the device has the write protect tab set,
-		 * have the open fail if the user expects to be able to write
-		 * to the thing.
-		 */
-		retval = -EROFS;
-		if ((sdkp->write_prot) && (filp->f_mode & FMODE_WRITE))
-			goto error_out;
-	}
+	/*
+	 * If the device has the write protect tab set, have the open fail
+	 * if the user expects to be able to write to the thing.
+	 */
+	retval = -EROFS;
+	if (sdkp->write_prot && (filp->f_mode & FMODE_WRITE))
+		goto error_out;
 
 	/*
 	 * It is possible that the disk changing stuff resulted in
