@@ -43,7 +43,7 @@ typedef struct user_fxsr_struct elf_fpxregset_t;
    We might as well make sure everything else is cleared too (except for %esp),
    just to make things more deterministic.
  */
-#define ELF_PLAT_INIT(_r)	do { \
+#define ELF_PLAT_INIT(_r, load_addr)	do { \
 	_r->ebx = 0; _r->ecx = 0; _r->edx = 0; \
 	_r->esi = 0; _r->edi = 0; _r->ebp = 0; \
 	_r->eax = 0; \

@@ -82,9 +82,16 @@ static struct notifier_block exit_mmap_nb = {
  
 int sync_start(void)
 {
-	int err = profile_event_register(EXIT_TASK, &exit_task_nb);
+	int err;
+
+	init_timer(&sync_timer);
+	sync_timer.function = timer_ping;
+	sync_timer.expires = jiffies + DEFAULT_EXPIRE;
+	add_timer(&sync_timer);
+
+	err = profile_event_register(EXIT_TASK, &exit_task_nb);
 	if (err)
-		goto out;
+		goto out1;
 	err = profile_event_register(EXIT_MMAP, &exit_mmap_nb);
 	if (err)
 		goto out2;
@@ -92,16 +99,14 @@ int sync_start(void)
 	if (err)
 		goto out3;
 
-	init_timer(&sync_timer);
-	sync_timer.function = timer_ping;
-	sync_timer.expires = jiffies + DEFAULT_EXPIRE;
-	add_timer(&sync_timer);
 out:
 	return err;
 out3:
 	profile_event_unregister(EXIT_MMAP, &exit_mmap_nb);
 out2:
 	profile_event_unregister(EXIT_TASK, &exit_task_nb);
+out1:
+	del_timer_sync(&sync_timer);
 	goto out;
 }
 

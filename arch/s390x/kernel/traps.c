@@ -228,10 +228,11 @@ spinlock_t die_lock = SPIN_LOCK_UNLOCKED;
 
 void die(const char * str, struct pt_regs * regs, long err)
 {
+	static int die_counter;
         console_verbose();
         spin_lock_irq(&die_lock);
 	bust_spinlocks(1);
-        printk("%s: %04lx\n", str, err & 0xffff);
+	printk("%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
         show_regs(regs);
 	bust_spinlocks(0);
         spin_unlock_irq(&die_lock);

@@ -12,6 +12,26 @@
 
 #define ELF_CLASS	ELFCLASS32
 
+#define ELF_CORE_COPY_REGS(dst, pt)	\
+	memset(dst, 0, sizeof(dst));	/* don't leak any "random" bits */ \
+	{	int i; \
+		for (i = 0; i < 32; i++) dst[i] = (elf_greg_t) pt->gr[i]; \
+		for (i = 0; i < 8; i++) dst[32 + i] = (elf_greg_t) pt->sr[i]; \
+	} \
+	dst[40] = (elf_greg_t) pt->iaoq[0]; dst[41] = (elf_greg_t) pt->iaoq[1]; \
+	dst[42] = (elf_greg_t) pt->iasq[0]; dst[43] = (elf_greg_t) pt->iasq[1]; \
+	dst[44] = (elf_greg_t) pt->sar;   dst[45] = (elf_greg_t) pt->iir; \
+	dst[46] = (elf_greg_t) pt->isr;   dst[47] = (elf_greg_t) pt->ior; \
+	dst[48] = (elf_greg_t) mfctl(22); dst[49] = (elf_greg_t) mfctl(0); \
+	dst[50] = (elf_greg_t) mfctl(24); dst[51] = (elf_greg_t) mfctl(25); \
+	dst[52] = (elf_greg_t) mfctl(26); dst[53] = (elf_greg_t) mfctl(27); \
+	dst[54] = (elf_greg_t) mfctl(28); dst[55] = (elf_greg_t) mfctl(29); \
+	dst[56] = (elf_greg_t) mfctl(30); dst[57] = (elf_greg_t) mfctl(31); \
+	dst[58] = (elf_greg_t) mfctl( 8); dst[59] = (elf_greg_t) mfctl( 9); \
+	dst[60] = (elf_greg_t) mfctl(12); dst[61] = (elf_greg_t) mfctl(13); \
+	dst[62] = (elf_greg_t) mfctl(10); dst[63] = (elf_greg_t) mfctl(15);
+
+
 typedef unsigned int elf_greg_t;
 
 #include <linux/spinlock.h>
@@ -60,25 +80,6 @@ struct elf_prpsinfo32
 #define init_elf_binfmt init_elf32_binfmt
 
 #define ELF_PLATFORM  ("PARISC32\0")
-
-#define ELF_CORE_COPY_REGS(dst, pt)	\
-	memset(dst, 0, sizeof(dst));	/* don't leak any "random" bits */ \
-	{	int i; \
-		for (i = 0; i < 32; i++) dst[i] = (elf_greg_t) pt->gr[i]; \
-		for (i = 0; i < 8; i++) dst[32 + i] = (elf_greg_t) pt->sr[i]; \
-	} \
-	dst[40] = (elf_greg_t) pt->iaoq[0]; dst[41] = (elf_greg_t) pt->iaoq[1]; \
-	dst[42] = (elf_greg_t) pt->iasq[0]; dst[43] = (elf_greg_t) pt->iasq[1]; \
-	dst[44] = (elf_greg_t) pt->sar;   dst[45] = (elf_greg_t) pt->iir; \
-	dst[46] = (elf_greg_t) pt->isr;   dst[47] = (elf_greg_t) pt->ior; \
-	dst[48] = (elf_greg_t) mfctl(22); dst[49] = (elf_greg_t) mfctl(0); \
-	dst[50] = (elf_greg_t) mfctl(24); dst[51] = (elf_greg_t) mfctl(25); \
-	dst[52] = (elf_greg_t) mfctl(26); dst[53] = (elf_greg_t) mfctl(27); \
-	dst[54] = (elf_greg_t) mfctl(28); dst[55] = (elf_greg_t) mfctl(29); \
-	dst[56] = (elf_greg_t) mfctl(30); dst[57] = (elf_greg_t) mfctl(31); \
-	dst[58] = (elf_greg_t) mfctl( 8); dst[59] = (elf_greg_t) mfctl( 9); \
-	dst[60] = (elf_greg_t) mfctl(12); dst[61] = (elf_greg_t) mfctl(13); \
-	dst[62] = (elf_greg_t) mfctl(10); dst[63] = (elf_greg_t) mfctl(15);
 
 /*
  * We should probably use this macro to set a flag somewhere to indicate

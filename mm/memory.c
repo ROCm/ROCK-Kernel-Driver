@@ -1453,7 +1453,7 @@ int handle_mm_fault(struct mm_struct *mm, struct vm_area_struct * vma,
 	pgd_t *pgd;
 	pmd_t *pmd;
 
-	current->state = TASK_RUNNING;
+	__set_current_state(TASK_RUNNING);
 	pgd = pgd_offset(mm, address);
 
 	inc_page_state(pgfault);

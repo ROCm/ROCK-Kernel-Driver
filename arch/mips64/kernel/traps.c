@@ -161,12 +161,13 @@ spinlock_t die_lock;
 
 void die(const char * str, struct pt_regs * regs, unsigned long err)
 {
+	static int die_counter;
 	if (user_mode(regs))	/* Just return if in user mode.  */
 		return;
 
 	console_verbose();
 	spin_lock_irq(&die_lock);
-	printk("%s: %04lx\n", str, err & 0xffff);
+	printk("%s: %04lx [#%d]\n", str, err & 0xffff, ++die_counter);
 	show_regs(regs);
 	printk("Process %s (pid: %d, stackpage=%08lx)\n",
 		current->comm, current->pid, (unsigned long) current);

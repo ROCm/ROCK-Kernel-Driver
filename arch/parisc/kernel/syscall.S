@@ -567,10 +567,10 @@ sys_call_table:
 	ENTRY_SAME(rt_sigsuspend_wrapper) /* not really SAME -- see the code */
 	ENTRY_SAME(chown)		/* 180 */
 	/* setsockopt() used by iptables: SO_SET_REPLACE/SO_SET_ADD_COUNTERS */
-	ENTRY_DIFF(setsockopt)
+	ENTRY_COMP(setsockopt)
 	ENTRY_SAME(getsockopt)
-	ENTRY_DIFF(sendmsg)
-	ENTRY_DIFF(recvmsg)
+	ENTRY_COMP(sendmsg)
+	ENTRY_COMP(recvmsg)
 	ENTRY_SAME(semop)		/* 185 */
 	ENTRY_SAME(semget)
 	ENTRY_DIFF(semctl_broken)
@@ -600,8 +600,8 @@ sys_call_table:
 	ENTRY_COMP(futex)		/* 210 */
 	ENTRY_SAME(sched_setaffinity)
 	ENTRY_SAME(sched_getaffinity)
-	ENTRY_SAME(set_thread_area)
-	ENTRY_SAME(get_thread_area)
+	ENTRY_SAME(ni_syscall)
+	ENTRY_SAME(ni_syscall)
 	ENTRY_SAME(io_setup)		/* 215 */
 	ENTRY_SAME(io_destroy)
 	ENTRY_SAME(io_getevents)

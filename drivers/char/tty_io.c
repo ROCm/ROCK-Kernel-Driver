@@ -1034,7 +1034,9 @@ static void release_mem(struct tty_struct *tty, int idx)
 		}
 		o_tty->magic = 0;
 		(*o_tty->driver.refcount)--;
+		file_list_lock();
 		list_del(&o_tty->tty_files);
+		file_list_unlock();
 		free_tty_struct(o_tty);
 	}
 
@@ -1046,7 +1048,9 @@ static void release_mem(struct tty_struct *tty, int idx)
 	}
 	tty->magic = 0;
 	(*tty->driver.refcount)--;
+	file_list_lock();
 	list_del(&tty->tty_files);
+	file_list_unlock();
 	module_put(tty->driver.owner);
 	free_tty_struct(tty);
 }

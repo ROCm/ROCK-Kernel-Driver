@@ -452,6 +452,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	unsigned int size;
 	unsigned long elf_entry, interp_load_addr = 0;
 	unsigned long start_code, end_code, start_data, end_data;
+	unsigned long reloc_func_desc = 0;
 	struct elfhdr elf_ex;
 	struct elfhdr interp_elf_ex;
   	struct exec interp_ex;
@@ -695,6 +696,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 				load_bias += error -
 				             ELF_PAGESTART(load_bias + vaddr);
 				load_addr += load_bias;
+				reloc_func_desc = load_addr;
 			}
 		}
 		k = elf_ppnt->p_vaddr;
@@ -742,6 +744,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 			retval = -ENOEXEC; /* Nobody gets to see this, but.. */
 			goto out;
 		}
+		reloc_func_desc = interp_load_addr;
 	} else {
 		elf_entry = elf_ex.e_entry;
 	}
@@ -789,10 +792,14 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 	/*
 	 * The ABI may specify that certain registers be set up in special
 	 * ways (on i386 %edx is the address of a DT_FINI function, for
-	 * example.  This macro performs whatever initialization to
-	 * the regs structure is required.
+	 * example.  In addition, it may also specify (eg, PowerPC64 ELF)
+	 * that the e_entry field is the address of the function descriptor
+	 * for the startup routine, rather than the address of the startup
+	 * routine itself.  This macro performs whatever initialization to
+	 * the regs structure is required as well as any relocations to the
+	 * function descriptor entries when executing dynamically links apps.
 	 */
-	ELF_PLAT_INIT(regs);
+	ELF_PLAT_INIT(regs, reloc_func_desc);
 #endif
 
 	start_thread(regs, elf_entry, bprm->p);

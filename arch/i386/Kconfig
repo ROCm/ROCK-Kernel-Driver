@@ -476,21 +476,6 @@ config NR_CPUS
 	  This is purely to save memory - each supported CPU adds
 	  approximately eight kilobytes to the kernel image.
 
-# Common NUMA Features
-config NUMA
-	bool "Numa Memory Allocation Support"
-	depends on (HIGHMEM64G && (X86_NUMAQ || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY))) || X86_PC
-
-config DISCONTIGMEM
-	bool
-	depends on NUMA
-	default y
-
-config HAVE_ARCH_BOOTMEM_NODE
-	bool
-	depends on NUMA
-	default y
-
 config X86_TSC
 	bool
 	depends on (MWINCHIP3D || MWINCHIP2 || MCRUSOE || MCYRIXIII || MK7 || MK6 || MPENTIUM4 || MPENTIUMIII || MPENTIUMII || M686 || M586MMX || M586TSC || MK8 || MVIAC3_2) && !X86_NUMAQ
@@ -678,6 +663,30 @@ config HIGHMEM
 config X86_PAE
 	bool
 	depends on HIGHMEM64G
+	default y
+
+# Common NUMA Features
+config NUMA
+	bool "Numa Memory Allocation Support"
+	depends on SMP && HIGHMEM64G && (X86_PC || X86_NUMAQ || (X86_SUMMIT && ACPI && !ACPI_HT_ONLY))
+	default n if X86_PC
+	default y if (X86_NUMAQ || X86_SUMMIT)
+
+# Need comments to help the hapless user trying to turn on NUMA support
+comment "NUMA (NUMA-Q) requires SMP, 64GB highmem support"
+	depends on X86_NUMAQ && (!HIGHMEM64G || !SMP)
+
+comment "NUMA (Summit) requires SMP, 64GB highmem support, full ACPI"
+	depends on X86_SUMMIT && (!HIGHMEM64G || !ACPI || ACPI_HT_ONLY)
+
+config DISCONTIGMEM
+	bool
+	depends on NUMA
+	default y
+
+config HAVE_ARCH_BOOTMEM_NODE
+	bool
+	depends on NUMA
 	default y
 
 config HIGHPTE

@@ -84,9 +84,10 @@ ppc64_elf_core_copy_regs(elf_gregset_t dstRegs, struct pt_regs* srcRegs)
 
 #define ELF_PLATFORM	(NULL)
 
-#define ELF_PLAT_INIT(_r)	do { \
+#define ELF_PLAT_INIT(_r, load_addr)	do { \
 	memset(_r->gpr, 0, sizeof(_r->gpr)); \
 	_r->ctr = _r->link = _r->xer = _r->ccr = 0; \
+	_r->gpr[2] = load_addr; \
 } while (0)
 
 #ifdef __KERNEL__
