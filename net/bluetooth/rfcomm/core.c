@@ -859,6 +859,50 @@ static int rfcomm_send_msc(struct rfcomm_session *s, int cr, u8 dlci, u8 v24_sig
 	return rfcomm_send_frame(s, buf, ptr - buf);
 }
 
+static int rfcomm_send_fcoff(struct rfcomm_session *s, int cr)
+{
+	struct rfcomm_hdr *hdr;
+	struct rfcomm_mcc *mcc;
+	u8 buf[16], *ptr = buf;
+
+	BT_DBG("%p cr %d", s, cr);
+
+	hdr = (void *) ptr; ptr += sizeof(*hdr);
+	hdr->addr = __addr(s->initiator, 0);
+	hdr->ctrl = __ctrl(RFCOMM_UIH, 0);
+	hdr->len  = __len8(sizeof(*mcc));
+
+	mcc = (void *) ptr; ptr += sizeof(*mcc);
+	mcc->type = __mcc_type(cr, RFCOMM_FCOFF);
+	mcc->len  = __len8(0);
+
+	*ptr = __fcs(buf); ptr++;
+
+	return rfcomm_send_frame(s, buf, ptr - buf);
+}
+
+static int rfcomm_send_fcon(struct rfcomm_session *s, int cr)
+{
+	struct rfcomm_hdr *hdr;
+	struct rfcomm_mcc *mcc;
+	u8 buf[16], *ptr = buf;
+
+	BT_DBG("%p cr %d", s, cr);
+
+	hdr = (void *) ptr; ptr += sizeof(*hdr);
+	hdr->addr = __addr(s->initiator, 0);
+	hdr->ctrl = __ctrl(RFCOMM_UIH, 0);
+	hdr->len  = __len8(sizeof(*mcc));
+
+	mcc = (void *) ptr; ptr += sizeof(*mcc);
+	mcc->type = __mcc_type(cr, RFCOMM_FCON);
+	mcc->len  = __len8(0);
+
+	*ptr = __fcs(buf); ptr++;
+
+	return rfcomm_send_frame(s, buf, ptr - buf);
+}
+
 static int rfcomm_send_test(struct rfcomm_session *s, int cr, u8 *pattern, int len)
 {
 	struct socket *sock = s->sock;
@@ -1358,6 +1402,20 @@ static int rfcomm_recv_mcc(struct rfcomm_session *s, struct sk_buff *skb)
 		rfcomm_recv_msc(s, cr, skb);
 		break;
 
+	case RFCOMM_FCOFF:
+		if (cr) {
+			set_bit(RFCOMM_TX_THROTTLED, &s->flags);
+			rfcomm_send_fcoff(s, 0);
+		}
+		break;
+
+	case RFCOMM_FCON:
+		if (cr) {
+			clear_bit(RFCOMM_TX_THROTTLED, &s->flags);
+			rfcomm_send_fcon(s, 0);
+		}
+		break;
+
 	case RFCOMM_TEST:
 		if (cr)
 			rfcomm_send_test(s, 0, skb->data, skb->len);
@@ -1547,6 +1605,9 @@ static inline void rfcomm_process_dlcs(struct rfcomm_session *s)
 			__rfcomm_dlc_close(d, ETIMEDOUT);
 			continue;
 		}
+
+		if (test_bit(RFCOMM_TX_THROTTLED, &s->flags))
+			continue;
 
 		if ((d->state == BT_CONNECTED || d->state == BT_DISCONN) &&
 				d->mscex == RFCOMM_MSCEX_OK)
