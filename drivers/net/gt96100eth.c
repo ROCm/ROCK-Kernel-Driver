@@ -3,8 +3,6 @@
  * Author: MontaVista Software, Inc.
  *         	stevel@mvista.com or source@mvista.com
  *
- * ########################################################################
- *
  *  This program is free software; you can distribute it and/or modify it
  *  under the terms of the GNU General Public License (Version 2) as
  *  published by the Free Software Foundation.
@@ -18,8 +16,6 @@
  *  with this program; if not, write to the Free Software Foundation, Inc.,
  *  59 Temple Place - Suite 330, Boston MA 02111-1307, USA.
  *
- * ########################################################################
- *
  * Ethernet driver for the MIPS GT96100 Advanced Communication Controller.
  * 
  *  Revision history
@@ -32,18 +28,7 @@
  *                gt96100_cleanup_module(), and other general code cleanups
  *                <stevel@mvista.com>.
  */
-
-#ifndef __OPTIMIZE__
-#error You must compile this file with the correct options!
-#error See the last lines of the source file.
-#error You must compile this driver with "-O".
-#endif
-
-#ifndef __mips__
-#error This driver only works with MIPS architectures!
-#endif
-
-
+#include <linux/config.h>
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/string.h>

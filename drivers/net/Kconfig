@@ -501,7 +501,7 @@ config MIPS_AU1X00_ENET
 
 config NET_SB1250_MAC
 	tristate "SB1250 Ethernet support"
-	depends on NET_ETHERNET && SIBYTE_SB1250
+	depends on NET_ETHERNET && SIBYTE_SB1xxx_SOC
 
 config SGI_IOC3_ETH
 	bool "SGI IOC3 Ethernet"
@@ -1394,6 +1394,10 @@ config CS89x0
 	  say M here and read <file:Documentation/modules.txt> as well as
 	  <file:Documentation/networking/net-modules.txt>.  The module will be
 	  called cs89x.
+
+config TC35815
+	tristate "TOSHIBA TC35815 Ethernet support"
+	depends on NET_PCI && PCI
 
 config DGRS
 	tristate "Digi Intl. RightSwitch SE-X support"
