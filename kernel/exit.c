@@ -586,7 +586,7 @@ static void exit_notify(void)
 	 * is about to become orphaned.
 	 */
 	 
-	t = current->parent;
+	t = current->real_parent;
 	
 	if ((t->pgrp != current->pgrp) &&
 	    (t->session == current->session) &&
@@ -619,8 +619,16 @@ static void exit_notify(void)
 		current->exit_signal = SIGCHLD;
 
 
-	if (current->exit_signal != -1)
-		do_notify_parent(current, current->exit_signal);
+	/* If something other than our normal parent is ptracing us, then
+	 * send it a SIGCHLD instead of honoring exit_signal.  exit_signal
+	 * only has special meaning to our real parent.
+	 */
+	if (current->exit_signal != -1) {
+		if (current->parent == current->real_parent)
+			do_notify_parent(current, current->exit_signal);
+		else
+			do_notify_parent(current, SIGCHLD);
+	}
 
 	current->state = TASK_ZOMBIE;
 	/*
@@ -877,7 +885,7 @@ repeat:
 				if (p->real_parent != p->parent) {
 					write_lock_irq(&tasklist_lock);
 					__ptrace_unlink(p);
-					do_notify_parent(p, SIGCHLD);
+					do_notify_parent(p, p->exit_signal);
 					p->state = TASK_ZOMBIE;
 					write_unlock_irq(&tasklist_lock);
 				} else
