@@ -3,8 +3,9 @@
  *
  * ADB HID driver for Power Macintosh computers.
  *
- * Adapted from drivers/macintosh/mac_keyb.c by Franz Sirl
- * (see that file for its authors and contributors).
+ * Adapted from drivers/macintosh/mac_keyb.c by Franz Sirl.
+ * drivers/macintosh/mac_keyb.c was Copyright (C) 1996 Paul Mackerras
+ * with considerable contributions from Ben Herrenschmidt and others.
  *
  * Copyright (C) 2000 Franz Sirl.
  *
@@ -433,22 +434,17 @@ static void leds_done(struct adb_request *req)
 static int
 adb_message_handler(struct notifier_block *this, unsigned long code, void *x)
 {
-	unsigned long flags;
-
 	switch (code) {
 	case ADB_MSG_PRE_RESET:
 	case ADB_MSG_POWERDOWN:
 	    	/* Stop the repeat timer. Autopoll is already off at this point */
-		save_flags(flags);
-		cli();
 		{
 			int i;
 			for (i = 1; i < 16; i++) {
 				if (adbhid[i])
-					del_timer(&adbhid[i]->input.timer);
+					del_timer_sync(&adbhid[i]->input.timer);
 			}
 		}
-		restore_flags(flags);
 
 		/* Stop pending led requests */
 		while(!led_request.complete)
@@ -479,7 +475,7 @@ adbhid_input_register(int id, int default_id, int original_handler_id,
 	memset(adbhid[id], 0, sizeof(struct adbhid));
 	sprintf(adbhid[id]->phys, "adb%d:%d.%02x/input", id, default_id, original_handler_id);
 
-	init_input_dev(&adbhid[id]);
+	init_input_dev(&adbhid[id]->input);
 
 	adbhid[id]->id = default_id;
 	adbhid[id]->original_handler_id = original_handler_id;
@@ -508,21 +504,21 @@ adbhid_input_register(int id, int default_id, int original_handler_id,
 		switch (original_handler_id) {
 		default:
 			printk("<unknown>.\n");
-			adbhid[id]->input.idversion = ADB_KEYBOARD_UNKNOWN;
+			adbhid[id]->input.id.version = ADB_KEYBOARD_UNKNOWN;
 			break;
 
 		case 0x01: case 0x02: case 0x03: case 0x06: case 0x08:
 		case 0x0C: case 0x10: case 0x18: case 0x1B: case 0x1C:
 		case 0xC0: case 0xC3: case 0xC6:
 			printk("ANSI.\n");
-			adbhid[id]->input.idversion = ADB_KEYBOARD_ANSI;
+			adbhid[id]->input.id.version = ADB_KEYBOARD_ANSI;
 			break;
 
 		case 0x04: case 0x05: case 0x07: case 0x09: case 0x0D:
 		case 0x11: case 0x14: case 0x19: case 0x1D: case 0xC1:
 		case 0xC4: case 0xC7:
 			printk("ISO, swapping keys.\n");
-			adbhid[id]->input.idversion = ADB_KEYBOARD_ISO;
+			adbhid[id]->input.id.version = ADB_KEYBOARD_ISO;
 			i = adbhid[id]->keycode[10];
 			adbhid[id]->keycode[10] = adbhid[id]->keycode[50];
 			adbhid[id]->keycode[50] = i;
@@ -531,7 +527,7 @@ adbhid_input_register(int id, int default_id, int original_handler_id,
 		case 0x12: case 0x15: case 0x16: case 0x17: case 0x1A:
 		case 0x1E: case 0xC2: case 0xC5: case 0xC8: case 0xC9:
 			printk("JIS.\n");
-			adbhid[id]->input.idversion = ADB_KEYBOARD_JIS;
+			adbhid[id]->input.id.version = ADB_KEYBOARD_JIS;
 			break;
 		}
 

@@ -603,8 +603,7 @@ static int make_rate (const hrz_dev * dev, u32 c, rounding r,
   
   // note: rounding the rate down means rounding 'p' up
   
-  const unsigned long br = test_bit (ultra, (hrz_flags *) &dev->flags) ?
-    BR_ULT : BR_HRZ;
+  const unsigned long br = test_bit(ultra, &dev->flags) ? BR_ULT : BR_HRZ;
   
   u32 div = CR_MIND;
   u32 pre;
@@ -1106,9 +1105,9 @@ static inline void rx_bus_master_complete_handler (hrz_dev * dev) {
 
 static inline int tx_hold (hrz_dev * dev) {
   while (test_and_set_bit (tx_busy, &dev->flags)) {
-    PRINTD (DBG_TX, "sleeping at tx lock %p %u", dev, dev->flags);
+    PRINTD (DBG_TX, "sleeping at tx lock %p %lu", dev, dev->flags);
     interruptible_sleep_on (&dev->tx_queue);
-    PRINTD (DBG_TX, "woken at tx lock %p %u", dev, dev->flags);
+    PRINTD (DBG_TX, "woken at tx lock %p %lu", dev, dev->flags);
     if (signal_pending (current))
       return -1;
   }
