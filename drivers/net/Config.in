@@ -166,7 +166,8 @@ if [ "$CONFIG_NET_ETHERNET" = "y" ]; then
          tristate '    Digi Intl. RightSwitch SE-X support' CONFIG_DGRS
       fi
       dep_tristate '    Davicom DM910x/DM980x support' CONFIG_DM9102 $CONFIG_PCI
-      dep_tristate '    EtherExpressPro/100 support' CONFIG_EEPRO100 $CONFIG_PCI
+      dep_tristate '    EtherExpressPro/100 support (eepro100, original Becker driver)' CONFIG_EEPRO100 $CONFIG_PCI
+      dep_tristate '    EtherExpressPro/100 support (e100, Alternate Intel driver)' CONFIG_E100 $CONFIG_PCI
       dep_tristate '    Mylex EISA LNE390A/B support (EXPERIMENTAL)' CONFIG_LNE390 $CONFIG_EISA $CONFIG_EXPERIMENTAL
       dep_tristate '    Myson MTD-8xx PCI Ethernet support' CONFIG_FEALNX $CONFIG_PCI
       dep_tristate '    National Semiconductor DP8381x series PCI Ethernet support' CONFIG_NATSEMI $CONFIG_PCI

@@ -25,6 +25,9 @@ ifeq ($(CONFIG_TULIP),y)
   obj-y += tulip/tulip.o
 endif
 
+ifeq ($(CONFIG_E100),y)
+  obj-y += e1000/e100.o
+endif
 ifeq ($(CONFIG_E1000),y)
   obj-y += e1000/e1000.o
 endif
@@ -36,6 +39,7 @@ endif
 subdir-$(CONFIG_NET_PCMCIA) += pcmcia
 subdir-$(CONFIG_NET_WIRELESS) += wireless
 subdir-$(CONFIG_TULIP) += tulip
+subdir-$(CONFIG_E100) += e100
 subdir-$(CONFIG_E1000) += e1000
 subdir-$(CONFIG_IRDA) += irda
 subdir-$(CONFIG_TR) += tokenring
