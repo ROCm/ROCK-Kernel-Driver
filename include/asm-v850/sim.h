@@ -22,7 +22,7 @@
 #define PLATFORM_LONG		"GDB V850E simulator"
 
 
-/* We use a wierd value for RAM, not just 0, for testing purposes.
+/* We use a weird value for RAM, not just 0, for testing purposes.
    These must match the values used in the linker script.  */
 #define RAM_ADDR		0x8F000000
 #define RAM_SIZE		0x01000000

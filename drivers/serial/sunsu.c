@@ -713,7 +713,7 @@ static int sunsu_startup(struct uart_port *port)
 
 	/*
 	 * Finally, enable interrupts.  Note: Modem status interrupts
-	 * are set via set_termios(), which will be occuring imminently
+	 * are set via set_termios(), which will be occurring imminently
 	 * anyway, so we don't enable them here.
 	 */
 	up->ier = UART_IER_RLSI | UART_IER_RDI;
@@ -852,7 +852,7 @@ sunsu_change_speed(struct uart_port *port, unsigned int cflag,
 	/*
 	 * Update the per-port timeout.
 	 */
-	uart_update_timeout(port, cflag, quot);
+	uart_update_timeout(port, cflag, (port->uartclk / (16 * quot)));
 
 	up->port.read_status_mask = UART_LSR_OE | UART_LSR_THRE | UART_LSR_DR;
 	if (iflag & INPCK)
@@ -919,12 +919,13 @@ static void
 sunsu_set_termios(struct uart_port *port, struct termios *termios,
 		  struct termios *old)
 {
-	unsigned int quot;
+	unsigned int baud, quot;
 
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	quot = uart_get_divisor(port, termios, old);
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	quot = uart_get_divisor(port, baud);
 
 	sunsu_change_speed(port, termios->c_cflag, termios->c_iflag, quot);
 }

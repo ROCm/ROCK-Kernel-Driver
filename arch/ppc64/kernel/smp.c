@@ -51,7 +51,7 @@
 int smp_threads_ready = 0;
 unsigned long cache_decay_ticks;
 
-/* initialised so it doesnt end up in bss */
+/* initialised so it doesn't end up in bss */
 unsigned long cpu_online_map = 0;
 
 static struct smp_ops_t *smp_ops;

@@ -192,7 +192,7 @@ sclp_write(struct sclp_buffer *buffer,
 	 * under VM (Why does VM interpret \n but the native machine doesn't ?)
 	 *
 	 * Depending on i/o-control setting the message is always written
-	 * immediatly or we wait for a final new line maybe coming with the
+	 * immediately or we wait for a final new line maybe coming with the
 	 * next message. Besides we avoid a buffer overrun by writing its
 	 * content.
 	 *

@@ -9,7 +9,7 @@
  *
  * Please note that the code in this file should never be included
  * from user space.  Many of these are not implemented in assembler
- * since they would be too costly.  Also, they require priviledged
+ * since they would be too costly.  Also, they require privileged
  * instructions (which are not available from user mode) to ensure
  * that they are atomic.
  */

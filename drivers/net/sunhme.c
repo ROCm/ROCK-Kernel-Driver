@@ -1198,7 +1198,7 @@ static void happy_meal_transceiver_check(struct happy_meal *hp, unsigned long tr
  * (ETH_FRAME_LEN + 64 + 2) = (1514 + 64 + 2) = 1580 bytes.
  *
  * First our alloc_skb() routine aligns the data base to a 64 byte
- * boundry.  We now have 0xf001b040 as our skb data address.  We
+ * boundary.  We now have 0xf001b040 as our skb data address.  We
  * plug this into the receive descriptor address.
  *
  * Next, we skb_reserve() 2 bytes to account for the Happy Meal offset.
@@ -1651,7 +1651,7 @@ static int happy_meal_init(struct happy_meal *hp)
 		    hme_read32(hp, etxregs + ETX_CFG) | ETX_CFG_DMAENABLE);
 
 	/* This chip really rots, for the receiver sometimes when you
-	 * write to it's control registers not all the bits get there
+	 * write to its control registers not all the bits get there
 	 * properly.  I cannot think of a sane way to provide complete
 	 * coverage for this hardware bug yet.
 	 */

@@ -17,7 +17,7 @@ void __init wbflush_setup(void)
 }
 
 /*
- * Baget/MIPS doesnt need to write back the WB.
+ * Baget/MIPS doesn't need to write back the WB.
  */
 static void wbflush_baget(void)
 {

@@ -405,7 +405,7 @@ kill_motor:
 	ret
 
 sectors:	.word 0
-disksizes:	.byte 36, 18, 15, 9
+disksizes:	.byte 36, 21, 18, 15, 9
 msg1:		.byte 13, 10
 		.ascii "Loading"
 

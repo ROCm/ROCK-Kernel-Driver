@@ -242,7 +242,7 @@ lan_reply (MPT_ADAPTER *ioc, MPT_FRAME_HDR *mf, MPT_FRAME_HDR *reply)
 			//  would Oops because mf has already been set
 			//  to NULL.  So after return from this func,
 			//  mpt_interrupt() will attempt to put (NULL) mf ptr
-			//  item back onto it's adapter FreeQ - Oops!:-(
+			//  item back onto its adapter FreeQ - Oops!:-(
 			//  It's Ok, since mpt_lan_send_turbo() *currently*
 			//  always returns 0, but..., just in case:
 

@@ -357,7 +357,7 @@ EvalSysrTokData(hysdn_card * card, uchar * cp, int len)
 		hysdn_addlog(card, "SysReady Token Data invalid CRC");
 		return (1);
 	}
-	len--;			/* dont check CRC byte */
+	len--;			/* don't check CRC byte */
 	while (len > 0) {
 
 		if (*cp == SYSR_TOK_END)

@@ -158,9 +158,7 @@ pte_t * pte_alloc_map(struct mm_struct *mm, pmd_t *pmd, unsigned long address)
 		pmd_populate(mm, pmd, new);
 	}
 out:
-	if (pmd_present(*pmd))
-		return pte_offset_map(pmd, address);
-	return NULL;
+	return pte_offset_map(pmd, address);
 }
 
 pte_t * pte_alloc_kernel(struct mm_struct *mm, pmd_t *pmd, unsigned long address)

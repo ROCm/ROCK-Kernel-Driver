@@ -72,7 +72,7 @@
 #define TP_CFG_DisableLBusTimeout 0	/* Enable LBus timeout */
 #define TP_CFG_N_Divisor       32	/* Clock = 39.1608 Mhz */
 #define TP_CFG_M_Multiplier    37	/* " */
-#define TP_CFG_PllBypass        0	/* dont bypass */
+#define TP_CFG_PllBypass        0	/* don't bypass */
 #define TP_CFG_ChipletEnable 0xFFFF	/* Enable all chiplets */
 
 typedef struct {

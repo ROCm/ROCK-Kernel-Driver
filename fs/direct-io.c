@@ -42,7 +42,7 @@
 /*
  * This code generally works in units of "dio_blocks".  A dio_block is
  * somewhere between the hard sector size and the filesystem block size.  it
- * is determined on a per-invokation basis.   When talking to the filesystem
+ * is determined on a per-invocation basis.   When talking to the filesystem
  * we need to convert dio_blocks to fs_blocks by scaling the dio_block quantity
  * down by dio->blkfactor.  Similarly, fs-blocksize quantities are converted
  * to bio_block quantities by shifting left by blkfactor.

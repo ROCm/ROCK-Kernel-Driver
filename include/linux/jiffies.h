@@ -28,7 +28,7 @@ static inline u64 get_jiffies_64(void)
  *	These inlines deal with timer wrapping correctly. You are 
  *	strongly encouraged to use them
  *	1. Because people otherwise forget
- *	2. Because if the timer wrap changes in future you wont have to
+ *	2. Because if the timer wrap changes in future you won't have to
  *	   alter your driver code.
  *
  * time_after(a,b) returns true if the time a is after time b.

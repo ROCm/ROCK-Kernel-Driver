@@ -58,15 +58,20 @@ static spinlock_t elan_104nc_spin = SPIN_LOCK_UNLOCKED;
 /* partition_info gives details on the logical partitions that the split the 
  * single flash device into. If the size if zero we use up to the end of the
  * device. */
-static struct mtd_partition partition_info[]={
-    { name: "ELAN-104NC flash boot partition", 
-      offset: 0, 
-      size: 640*1024 },
-    { name: "ELAN-104NC flash partition 1", 
-      offset: 640*1024, 
-      size: 896*1024 },
-    { name: "ELAN-104NC flash partition 2", 
-      offset: (640+896)*1024 }
+static struct mtd_partition partition_info[] = {
+	{
+		.name	= "ELAN-104NC flash boot partition", 
+		.size	= 640*1024
+	},
+	{
+		.name	= "ELAN-104NC flash partition 1", 
+		.offset	= 640*1024, 
+		.size	= 896*1024
+	},
+	{
+		.name	= "ELAN-104NC flash partition 2", 
+		.offset = (640+896)*1024,
+	}
 };
 #define NUM_PARTITIONS (sizeof(partition_info)/sizeof(partition_info[0]))
 
@@ -195,19 +200,20 @@ static void elan_104nc_copy_to(struct map_info *map, unsigned long to, const voi
 }
 
 static struct map_info elan_104nc_map = {
-	name: "ELAN-104NC flash",
-	size: 8*1024*1024, /* this must be set to a maximum possible amount
-			of flash so the cfi probe routines find all
-			the chips */
-	buswidth: 2,
-	read8: elan_104nc_read8,
-	read16: elan_104nc_read16,
-	read32: elan_104nc_read32,
-	copy_from: elan_104nc_copy_from,
-	write8: elan_104nc_write8,
-	write16: elan_104nc_write16,
-	write32: elan_104nc_write32,
-	copy_to: elan_104nc_copy_to
+	.name		= "ELAN-104NC flash",
+	.size		= 8*1024*1024, /* this must be set to a maximum
+					  possible amount of flash so the
+					  cfi probe routines find all
+					  the chips */
+	.buswidth	= 2,
+	.read8		= elan_104nc_read8,
+	.read16		= elan_104nc_read16,
+	.read32		= elan_104nc_read32,
+	.copy_from	= elan_104nc_copy_from,
+	.write8		= elan_104nc_write8,
+	.write16	= elan_104nc_write16,
+	.write32	= elan_104nc_write32,
+	.copy_to	= elan_104nc_copy_to
 };
 
 /* MTD device for all of the flash. */

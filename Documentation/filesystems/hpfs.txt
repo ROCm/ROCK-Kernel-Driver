@@ -109,7 +109,7 @@ support is quite buggy. I have Czech OS/2 working in codepage 852 on my disk.
 Once I booted English OS/2 working in cp 850 and I created a file on my 852
 partition. It marked file name codepage as 850 - good. But when I again booted
 Czech OS/2, the file was completely inaccessible under any name. It seems that
-OS/2 uppercases the search pattern with it's system code page (852) and file
+OS/2 uppercases the search pattern with its system code page (852) and file
 name it's comparing to with its code page (850). These could never match. Is it
 really what IBM developers wanted? But problems continued. When I created in
 Czech OS/2 another file in that directory, that file was inaccessible too. OS/2

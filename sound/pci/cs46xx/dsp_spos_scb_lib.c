@@ -181,7 +181,7 @@ void cs46xx_dsp_remove_scb (cs46xx_t *chip, dsp_scb_descriptor_t * scb)
 		      (ins->scbs + scb->index) == scb), return );
 
 #if 0
-	/* cant remove a SCB with childs before 
+	/* can't remove a SCB with childs before 
 	   removing childs first  */
 	snd_assert ( (scb->sub_list_ptr == ins->the_null_scb &&
 		      scb->next_scb_ptr == ins->the_null_scb),
@@ -1540,7 +1540,7 @@ int cs46xx_dsp_enable_spdif_out (cs46xx_t *chip)
 		cs46xx_dsp_enable_spdif_hw (chip);
 	}
 
-	/* dont touch anything if SPDIF is open */
+	/* don't touch anything if SPDIF is open */
 	if ( ins->spdif_status_out & DSP_SPDIF_STATUS_PLAYBACK_OPEN) {
 		/* when cs46xx_iec958_post_close(...) is called it
 		   will call this function if necessary depending on
@@ -1584,7 +1584,7 @@ int  cs46xx_dsp_disable_spdif_out (cs46xx_t *chip)
 {
 	dsp_spos_instance_t * ins = chip->dsp_spos_instance;
 
-	/* dont touch anything if SPDIF is open */
+	/* don't touch anything if SPDIF is open */
 	if ( ins->spdif_status_out & DSP_SPDIF_STATUS_PLAYBACK_OPEN) {
 		ins->spdif_status_out &= ~DSP_SPDIF_STATUS_OUTPUT_ENABLED;
 		return -EBUSY;

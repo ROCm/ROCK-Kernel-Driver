@@ -1780,7 +1780,7 @@ static int __devinit it8172_probe(struct pci_dev *pcidev,
 	goto err_dev2;
 
 #ifdef IT8172_DEBUG
-    /* intialize the debug proc device */
+    /* initialize the debug proc device */
     s->ps = create_proc_read_entry(IT8172_MODULE_NAME, 0, NULL,
 				   proc_it8172_dump, NULL);
 #endif /* IT8172_DEBUG */

@@ -327,7 +327,7 @@ static void sa1100_int(int irq, void *dev_id, struct pt_regs *regs)
 			sa1100_rx_chars(sport, regs);
 		}
 
-		/* Clear the relevent break bits */
+		/* Clear the relevant break bits */
 		if (status & (UTSR0_RBB | UTSR0_REB))
 			UART_PUT_UTSR0(sport, status & (UTSR0_RBB | UTSR0_REB));
 
@@ -441,7 +441,7 @@ sa1100_set_termios(struct uart_port *port, struct termios *termios,
 {
 	struct sa1100_port *sport = (struct sa1100_port *)port;
 	unsigned long flags;
-	unsigned int utcr0, old_utcr3, quot;
+	unsigned int utcr0, old_utcr3, baud, quot;
 	unsigned int old_csize = old ? old->c_cflag & CSIZE : CS8;
 
 	/*
@@ -470,7 +470,8 @@ sa1100_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	quot = uart_get_divisor(port, termios, old);
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	quot = uart_get_divisor(port, baud);
 
 	spin_lock_irqsave(&sport->port.lock, flags);
 
@@ -507,7 +508,7 @@ sa1100_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Update the per-port timeout.
 	 */
-	uart_update_timeout(port, termios->c_cflag, quot);
+	uart_update_timeout(port, termios->c_cflag, baud);
 
 	/*
 	 * disable interrupts and drain transmitter

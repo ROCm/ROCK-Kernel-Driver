@@ -93,7 +93,7 @@
 	/* Check is PTE is present, if not then jump to LABEL.
 	 * PTR points to the page table where this PTE is located,
 	 * when the macro is done executing PTE will be restored
-	 * with it's original value.
+	 * with its original value.
 	 */
 #define PTE_PRESENT(pte, ptr, label) \
 	andi	pte, pte, (_PAGE_PRESENT | _PAGE_READ); \

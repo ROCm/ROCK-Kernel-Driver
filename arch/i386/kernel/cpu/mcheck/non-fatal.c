@@ -33,7 +33,7 @@ static void mce_checkregs (void *info)
 		rdmsr (MSR_IA32_MC0_STATUS+i*4, low, high);
 
 		if (high & (1<<31)) {
-			printk (KERN_EMERG "MCE: The hardware reports a non fatal, correctable incident occured on CPU %d.\n",
+			printk (KERN_EMERG "MCE: The hardware reports a non fatal, correctable incident occurred on CPU %d.\n",
 				smp_processor_id());
 			printk (KERN_EMERG "Bank %d: %08x%08x\n", i, high, low);
 

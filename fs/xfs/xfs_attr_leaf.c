@@ -1374,7 +1374,7 @@ xfs_attr_leaf_toosmall(xfs_da_state_t *state, int *action)
 		count * sizeof(xfs_attr_leaf_entry_t) +
 		INT_GET(leaf->hdr.usedbytes, ARCH_CONVERT);
 	if (bytes > (state->blocksize >> 1)) {
-		*action = 0;	/* blk over 50%, dont try to join */
+		*action = 0;	/* blk over 50%, don't try to join */
 		return(0);
 	}
 

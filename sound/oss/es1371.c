@@ -73,7 +73,7 @@
  *                       detect the ES1373 and later parts.
  *                       added AC97 #defines for readability
  *                       added a /proc file system for dumping hardware state
- *                       updated SRC and CODEC w/r functions to accomodate bugs
+ *                       updated SRC and CODEC w/r functions to accommodate bugs
  *                       in some versions of the ES137x chips.
  *    31.08.1999   0.17  add spin_lock_init
  *                       replaced current->state = x with set_current_state(x)
@@ -2863,7 +2863,7 @@ static int __devinit es1371_probe(struct pci_dev *pcidev, const struct pci_devic
 	if ((res=(s->dev_midi = register_sound_midi(&es1371_midi_fops, -1))<0 ))
 		goto err_dev4;
 #ifdef ES1371_DEBUG
-	/* intialize the debug proc device */
+	/* initialize the debug proc device */
 	s->ps = create_proc_read_entry("es1371",0,NULL,proc_es1371_dump,NULL);
 #endif /* ES1371_DEBUG */
 	

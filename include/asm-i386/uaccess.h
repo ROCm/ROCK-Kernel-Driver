@@ -101,7 +101,7 @@ extern int fixup_exception(struct pt_regs *regs);
  * This gets kind of ugly. We want to return _two_ values in "get_user()"
  * and yet we don't want to do any pointers, because that is too much
  * of a performance impact. Thus we have a few rather ugly macros here,
- * and hide all the uglyness from the user.
+ * and hide all the ugliness from the user.
  *
  * The "__xxx" versions of the user access functions are versions that
  * do not verify the address space, that must have been done previously
@@ -258,7 +258,7 @@ unsigned long __copy_to_user_ll(void *to, const void *from, unsigned long n);
 unsigned long __copy_from_user_ll(void *to, const void *from, unsigned long n);
 
 /*
- * Here we special-case 1, 2 and 4-byte copy_*_user invokations.  On a fault
+ * Here we special-case 1, 2 and 4-byte copy_*_user invocations.  On a fault
  * we return the initial request size (1, 2 or 4), as copy_*_user should do.
  * If a store crosses a page boundary and gets a fault, the x86 will not write
  * anything, so this is accurate.

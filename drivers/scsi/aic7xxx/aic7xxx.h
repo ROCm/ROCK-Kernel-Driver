@@ -372,7 +372,7 @@ typedef enum {
 
 /*
  * The driver keeps up to MAX_SCB scb structures per card in memory.  The SCB
- * consists of a "hardware SCB" mirroring the fields availible on the card
+ * consists of a "hardware SCB" mirroring the fields available on the card
  * and additional information the kernel stores for each transaction.
  *
  * To minimize space utilization, a portion of the hardware scb stores

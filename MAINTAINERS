@@ -1791,10 +1791,10 @@ W:	http://www.buzzard.org.uk/toshiba/
 S:	Maintained
 
 TRIDENT 4DWAVE/SIS 7018 PCI AUDIO CORE
-P:	Ollie Lho  
-M:	ollie@sis.com.tw
+P:	Muli Ben-Yehuda
+M:	mulix@mulix.org
 L:	linux-kernel@vger.kernel.org
-S:	Supported
+S:	Maintained
 
 TMS380 TOKEN-RING NETWORK DRIVER
 P:	Adam Fritzler

@@ -284,6 +284,7 @@ void __init zone_sizes_init(void)
 
 	for (nid = 0; nid < numnodes; nid++) {
 		unsigned long zones_size[MAX_NR_ZONES] = {0, 0, 0};
+		unsigned long *zholes_size;
 		unsigned int max_dma;
 
 		unsigned long low = max_low_pfn;
@@ -307,6 +308,7 @@ void __init zone_sizes_init(void)
 #endif
 			}
 		}
+		zholes_size = get_zholes_size(nid);
 		/*
 		 * We let the lmem_map for node 0 be allocated from the
 		 * normal bootmem allocator, but other nodes come from the
@@ -315,10 +317,10 @@ void __init zone_sizes_init(void)
 		if (nid)
 			free_area_init_node(nid, NODE_DATA(nid), 
 				node_remap_start_vaddr[nid], zones_size, 
-				start, 0);
+				start, zholes_size);
 		else
 			free_area_init_node(nid, NODE_DATA(nid), 0, 
-				zones_size, start, 0);
+				zones_size, start, zholes_size);
 	}
 	return;
 }

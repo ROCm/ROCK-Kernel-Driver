@@ -1884,7 +1884,7 @@ static int __devinit vrc5477_ac97_probe(struct pci_dev *pcidev,
 		goto err_dev2;
 
 #ifdef VRC5477_AC97_DEBUG
-	/* intialize the debug proc device */
+	/* initialize the debug proc device */
 	s->ps = create_proc_read_entry(VRC5477_AC97_MODULE_NAME, 0, NULL,
 				       proc_vrc5477_ac97_dump, NULL);
 #endif /* VRC5477_AC97_DEBUG */

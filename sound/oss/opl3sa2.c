@@ -918,7 +918,7 @@ static int opl3sa2_suspend(struct pm_dev *pdev, unsigned char pm_mode)
 		break;
 	}
 
-	/* its supposed to automute before suspending, so we wont bother */
+	/* its supposed to automute before suspending, so we won't bother */
 	opl3sa2_read(p->cfg_port, OPL3SA2_PM, &p->reg);
 	opl3sa2_write(p->cfg_port, OPL3SA2_PM, p->reg | pm_mode);
 

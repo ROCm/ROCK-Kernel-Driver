@@ -914,8 +914,8 @@ static struct block_device_operations nftl_fops =
  ****************************************************************************/
 
 static struct mtd_notifier nftl_notifier = {
-	add:	NFTL_notify_add,
-	remove:	NFTL_notify_remove
+	.add	= NFTL_notify_add,
+	.remove	= NFTL_notify_remove
 };
 
 extern char nftlmountrev[];

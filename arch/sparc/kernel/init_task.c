@@ -12,7 +12,7 @@ static struct sighand_struct init_sighand = INIT_SIGHAND(init_sighand);
 struct mm_struct init_mm = INIT_MM(init_mm);
 struct task_struct init_task = INIT_TASK(init_task);
 
-/* .text section in head.S is aligned at 8k boundry and this gets linked
+/* .text section in head.S is aligned at 8k boundary and this gets linked
  * right after that so that the init_thread_union is aligned properly as well.
  * If this is not aligned on a 8k boundry, then you should change code
  * in etrap.S which assumes it.

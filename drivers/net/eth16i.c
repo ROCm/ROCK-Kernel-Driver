@@ -1231,7 +1231,7 @@ static void eth16i_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 	/* Turn off all interrupts from adapter */
 	outw(ETH16I_INTR_OFF, ioaddr + TX_INTR_REG);
 
-	/* eth16i_tx wont be called */
+	/* eth16i_tx won't be called */
 	spin_lock(&lp->lock);
 
 	status = inw(ioaddr + TX_STATUS_REG);      /* Get the status */

@@ -49,7 +49,7 @@
  *
  * Credits:
  * Programming the driver for Formula-n enter:now ISDN PCI and
- * neccessary the driver for the used Amd 7930 D-channel-controller
+ * necessary the driver for the used Amd 7930 D-channel-controller
  * was spnsored by Formula-n Europe AG.
  * Thanks to Karsten Keil and Petr Novak, who gave me support in
  * Hisax-specific questions.

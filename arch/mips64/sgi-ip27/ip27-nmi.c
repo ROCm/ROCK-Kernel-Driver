@@ -127,7 +127,7 @@ cont_nmi_dump(void)
 	 * This is for 2 reasons:
 	 *	- sometimes a MMSC fail to NMI all cpus.
 	 *	- on 512p SN0 system, the MMSC will only send NMIs to
-	 *	  half the cpus. Unfortunately, we dont know which cpus may be
+	 *	  half the cpus. Unfortunately, we don't know which cpus may be
 	 *	  NMIed - it depends on how the site chooses to configure.
 	 * 
 	 * Note: it has been measure that it takes the MMSC up to 2.3 secs to

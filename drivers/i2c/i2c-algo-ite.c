@@ -860,7 +860,7 @@ MODULE_PARM_DESC(i2c_debug,
  * is loaded via insmod) when this file is compiled with MODULES defined.
  * Otherwise (i.e. if you want this driver statically linked to the kernel),
  * a pointer to this function is stored in a table and called
- * during the intialization of the kernel (in do_basic_setup in /init/main.c) 
+ * during the initialization of the kernel (in do_basic_setup in /init/main.c) 
  *
  * All this functionality is complements of the macros defined in linux/init.h
  */

@@ -132,7 +132,7 @@ static int backoff;
    Both 'options[]' and 'full_duplex[]' should exist for driver
    interoperability.
    The media type is usually passed in 'options[]'.
-   The default is autonegotation for speed and duplex.
+   The default is autonegotiation for speed and duplex.
      This should rarely be overridden.
    Use option values 0x10/0x20 for 10Mbps, 0x100,0x200 for 100Mbps.
    Use option values 0x10 and 0x100 for forcing half duplex fixed speed.
@@ -368,6 +368,8 @@ enum chip_capability_flags {
 #else
 #define RHINE_IOTYPE (PCI_USES_IO  | PCI_USES_MASTER | PCI_ADDR0)
 #endif
+/* Beware of PCI posted writes */
+#define IOSYNC	do { readb(dev->base_addr + StationAddr); } while (0)
 
 /* directly indexed by enum via_rhine_chips, above */
 static struct via_rhine_chip_info via_rhine_chip_info[] __devinitdata =
@@ -403,7 +405,8 @@ enum register_offsets {
 	MIICmd=0x70, MIIRegAddr=0x71, MIIData=0x72, MACRegEEcsr=0x74,
 	ConfigA=0x78, ConfigB=0x79, ConfigC=0x7A, ConfigD=0x7B,
 	RxMissed=0x7C, RxCRCErrs=0x7E, MiscCmd=0x81,
-	StickyHW=0x83, WOLcrClr=0xA4, WOLcgClr=0xA7, PwrcsrClr=0xAC,
+	StickyHW=0x83, IntrStatus2=0x84, WOLcrClr=0xA4, WOLcgClr=0xA7,
+	PwrcsrClr=0xAC,
 };
 
 /* Bits in ConfigD */
@@ -430,6 +433,8 @@ enum intr_status_bits {
 	IntrTxAborted=0x2000, IntrLinkChange=0x4000,
 	IntrRxWakeUp=0x8000,
 	IntrNormalSummary=0x0003, IntrAbnormalSummary=0xC260,
+	IntrTxDescRace=0x080000,	/* mapped from IntrStatus2 */
+	IntrTxErrSummary=0x082210,
 };
 
 /* The Rx and Tx buffer descriptors. */
@@ -527,14 +532,28 @@ static struct net_device_stats *via_rhine_get_stats(struct net_device *dev);
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
 static int  via_rhine_close(struct net_device *dev);
 
+static inline u32 get_intr_status(struct net_device *dev)
+{
+	long ioaddr = dev->base_addr;
+	struct netdev_private *np = dev->priv;
+	u32 intr_status;
+
+	intr_status = readw(ioaddr + IntrStatus);
+	/* On Rhine-II, Bit 3 indicates Tx descriptor write-back race. */
+	if (np->chip_id == VT6102)
+		intr_status |= readb(ioaddr + IntrStatus2) << 16;
+	return intr_status;
+}
+
 static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 {
 	long ioaddr = dev->base_addr;
+	int boguscnt = 20;
 
-	udelay(5);
+	IOSYNC;
 
 	if (readw(ioaddr + ChipCmd) & CmdReset) {
-		printk(KERN_INFO "%s: Reset did not complete in 5 us. "
+		printk(KERN_INFO "%s: Reset not complete yet. "
 			"Trying harder.\n", name);
 
 		/* Rhine-II needs to be forced sometimes */
@@ -543,12 +562,14 @@ static void wait_for_reset(struct net_device *dev, int chip_id, char *name)
 
 		/* VT86C100A may need long delay after reset (dlink) */
 		/* Seen on Rhine-II as well (rl) */
-		udelay(100);
+		while ((readw(ioaddr + ChipCmd) & CmdReset) && --boguscnt);
+			udelay(5);
+
 	}
 
 	if (debug > 1)
 		printk(KERN_INFO "%s: Reset %s.\n", name,
-			(readw(ioaddr + ChipCmd) & CmdReset) ? "failed" : "succeeded");
+			boguscnt ? "succeeded" : "failed");
 }
 
 #ifdef USE_MEM
@@ -1226,6 +1247,7 @@ static int via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
 {
 	struct netdev_private *np = dev->priv;
 	unsigned entry;
+	u32 intr_status;
 
 	/* Caution: the write order is important here, set the field
 	   with the "ownership" bits last. */
@@ -1275,8 +1297,15 @@ static int via_rhine_start_tx(struct sk_buff *skb, struct net_device *dev)
 
 	/* Non-x86 Todo: explicitly flush cache lines here. */
 
-	/* Wake the potentially-idle transmit channel. */
-	writew(CmdTxDemand | np->chip_cmd, dev->base_addr + ChipCmd);
+	/*
+	 * Wake the potentially-idle transmit channel unless errors are
+	 * pending (the ISR must sort them out first).
+	 */
+	intr_status = get_intr_status(dev);
+	if ((intr_status & IntrTxErrSummary) == 0) {
+		writew(CmdTxDemand | np->chip_cmd, dev->base_addr + ChipCmd);
+	}
+	IOSYNC;
 
 	if (np->cur_tx == np->dirty_tx + TX_QUEUE_LEN)
 		netif_stop_queue(dev);
@@ -1303,38 +1332,51 @@ static void via_rhine_interrupt(int irq, void *dev_instance, struct pt_regs *rgs
 
 	ioaddr = dev->base_addr;
 	
-	while ((intr_status = readw(ioaddr + IntrStatus))) {
+	while ((intr_status = get_intr_status(dev))) {
 		/* Acknowledge all of the current interrupt sources ASAP. */
+		if (intr_status & IntrTxDescRace)
+			writeb(0x08, ioaddr + IntrStatus2);
 		writew(intr_status & 0xffff, ioaddr + IntrStatus);
+		IOSYNC;
 
 		if (debug > 4)
-			printk(KERN_DEBUG "%s: Interrupt, status %4.4x.\n",
+			printk(KERN_DEBUG "%s: Interrupt, status %8.8x.\n",
 				   dev->name, intr_status);
 
 		if (intr_status & (IntrRxDone | IntrRxErr | IntrRxDropped |
 						   IntrRxWakeUp | IntrRxEmpty | IntrRxNoBuf))
 			via_rhine_rx(dev);
 
-		if (intr_status & (IntrTxDone | IntrTxError | IntrTxUnderrun |
-						   IntrTxAborted))
+		if (intr_status & (IntrTxErrSummary | IntrTxDone)) {
+			if (intr_status & IntrTxErrSummary) {
+				int cnt = 20;
+				/* Avoid scavenging before Tx engine turned off */
+				while ((readw(ioaddr+ChipCmd) & CmdTxOn) && --cnt)
+					udelay(5);
+				if (debug > 2 && !cnt)
+					printk(KERN_WARNING "%s: via_rhine_interrupt() "
+						   "Tx engine still on.\n",
+						   dev->name);
+			}
 			via_rhine_tx(dev);
+		}
 
 		/* Abnormal error summary/uncommon events handlers. */
 		if (intr_status & (IntrPCIErr | IntrLinkChange |
 				   IntrStatsMax | IntrTxError | IntrTxAborted |
-				   IntrTxUnderrun))
+				   IntrTxUnderrun | IntrTxDescRace))
 			via_rhine_error(dev, intr_status);
 
 		if (--boguscnt < 0) {
 			printk(KERN_WARNING "%s: Too much work at interrupt, "
-				   "status=0x%4.4x.\n",
+				   "status=%#8.8x.\n",
 				   dev->name, intr_status);
 			break;
 		}
 	}
 
 	if (debug > 3)
-		printk(KERN_DEBUG "%s: exiting interrupt, status=%4.4x.\n",
+		printk(KERN_DEBUG "%s: exiting interrupt, status=%8.8x.\n",
 			   dev->name, readw(ioaddr + IntrStatus));
 }
 
@@ -1512,7 +1554,8 @@ static void via_rhine_rx(struct net_device *dev)
 	}
 
 	/* Pre-emptively restart Rx engine. */
-	writew(CmdRxDemand | np->chip_cmd, dev->base_addr + ChipCmd);
+	writew(readw(dev->base_addr + ChipCmd) | CmdRxOn | CmdRxDemand,
+		   dev->base_addr + ChipCmd);
 }
 
 /* Clears the "tally counters" for CRC errors and missed frames(?).
@@ -1526,15 +1569,35 @@ static inline void clear_tally_counters(const long ioaddr)
 	readw(ioaddr + RxMissed);
 }
 
-static inline void via_rhine_restart_tx(struct net_device *dev) {
+static void via_rhine_restart_tx(struct net_device *dev) {
 	struct netdev_private *np = dev->priv;
+	long ioaddr = dev->base_addr;
 	int entry = np->dirty_tx % TX_RING_SIZE;
+	u32 intr_status;
 
-	/* We know better than the chip where it should continue */
-	writel(np->tx_ring_dma + entry * sizeof(struct tx_desc),
-		   dev->base_addr + TxRingPtr);
+	/*
+	 * If new errors occured, we need to sort them out before doing Tx.
+	 * In that case the ISR will be back here RSN anyway.
+	 */
+	intr_status = get_intr_status(dev);
 
-	writew(CmdTxDemand | np->chip_cmd, dev->base_addr + ChipCmd);
+	if ((intr_status & IntrTxErrSummary) == 0) {
+
+		/* We know better than the chip where it should continue. */
+		writel(np->tx_ring_dma + entry * sizeof(struct tx_desc),
+			   ioaddr + TxRingPtr);
+
+		writew(CmdTxDemand | np->chip_cmd, ioaddr + ChipCmd);
+		IOSYNC;
+	}
+	else {
+		/* This should never happen */
+		if (debug > 1)
+			printk(KERN_WARNING "%s: via_rhine_restart_tx() "
+				   "Another error occured %8.8x.\n",
+				   dev->name, intr_status);
+	}
+
 }
 
 static void via_rhine_error(struct net_device *dev, int intr_status)
@@ -1564,9 +1627,8 @@ static void via_rhine_error(struct net_device *dev, int intr_status)
 	}
 	if (intr_status & IntrTxAborted) {
 		if (debug > 1)
-			printk(KERN_INFO "%s: Abort %4.4x, frame dropped.\n",
+			printk(KERN_INFO "%s: Abort %8.8x, frame dropped.\n",
 				   dev->name, intr_status);
-		via_rhine_restart_tx(dev);
 	}
 	if (intr_status & IntrTxUnderrun) {
 		if (np->tx_thresh < 0xE0)
@@ -1575,15 +1637,21 @@ static void via_rhine_error(struct net_device *dev, int intr_status)
 			printk(KERN_INFO "%s: Transmitter underrun, Tx "
 				   "threshold now %2.2x.\n",
 				   dev->name, np->tx_thresh);
-		via_rhine_restart_tx(dev);
 	}
+	if (intr_status & IntrTxDescRace) {
+		if (debug > 2)
+			printk(KERN_INFO "%s: Tx descriptor write-back race.\n",
+				   dev->name);
+	}
+	if (intr_status & ( IntrTxAborted | IntrTxUnderrun | IntrTxDescRace ))
+		via_rhine_restart_tx(dev);
+
 	if (intr_status & ~( IntrLinkChange | IntrStatsMax | IntrTxUnderrun |
- 						 IntrTxError | IntrTxAborted | IntrNormalSummary)) {
+ 						 IntrTxError | IntrTxAborted | IntrNormalSummary |
+						 IntrTxDescRace )) {
 		if (debug > 1)
-			printk(KERN_ERR "%s: Something Wicked happened! %4.4x.\n",
-			   dev->name, intr_status);
-		/* Recovery for other fault sources not known. */
-		writew(CmdTxDemand | np->chip_cmd, dev->base_addr + ChipCmd);
+			printk(KERN_ERR "%s: Something Wicked happened! %8.8x.\n",
+				   dev->name, intr_status);
 	}
 
 	spin_unlock (&np->lock);

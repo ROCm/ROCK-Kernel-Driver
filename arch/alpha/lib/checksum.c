@@ -63,7 +63,7 @@ unsigned int csum_tcpudp_nofold(unsigned long saddr,
 		  ((unsigned long) ntohs(len) << 16) +
 		  ((unsigned long) proto << 8));
 
-	/* Fold down to 32-bits so we don't loose in the typedef-less 
+	/* Fold down to 32-bits so we don't lose in the typedef-less 
 	   network stack.  */
 	/* 64 to 33 */
 	result = (result & 0xffffffff) + (result >> 32);

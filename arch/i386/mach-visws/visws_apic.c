@@ -190,7 +190,7 @@ static struct hw_interrupt_type piix4_virtual_irq_type = {
  * the 'master' interrupt source: CO_IRQ_8259.
  *
  * When the 8259 interrupts its handler figures out which of these
- * devices is interrupting and dispatches to it's handler.
+ * devices is interrupting and dispatches to its handler.
  *
  * CAREFUL: devices see the 'virtual' interrupt only. Thus disable/
  * enable_irq gets the right irq. This 'master' irq is never directly

@@ -99,39 +99,39 @@ void flagadm_copy_to(struct map_info *map, unsigned long to, const void *from, s
 }
 
 struct map_info flagadm_map = {
-		name: "FlagaDM flash device",
-		size: FLASH_SIZE,
-		buswidth: 2,
-		read8: flagadm_read8,
-		read16: flagadm_read16,
-		read32: flagadm_read32,
-		copy_from: flagadm_copy_from,
-		write8: flagadm_write8,
-		write16: flagadm_write16,
-		write32: flagadm_write32,
-		copy_to: flagadm_copy_to
+	.name		= "FlagaDM flash device",
+	.size		= FLASH_SIZE,
+	.buswidth	= 2,
+	.read8		= flagadm_read8,
+	.read16		= flagadm_read16,
+	.read32		= flagadm_read32,
+	.copy_from	= flagadm_copy_from,
+	.write8		= flagadm_write8,
+	.write16	= flagadm_write16,
+	.write32	= flagadm_write32,
+	.copy_to	= flagadm_copy_to
 };
 
 struct mtd_partition flagadm_parts[] = {
 	{
-		name	: "Bootloader",
-		offset	: FLASH_PARTITION0_ADDR,
-		size	: FLASH_PARTITION0_SIZE
+		.name	= "Bootloader",
+		.offset	= FLASH_PARTITION0_ADDR,
+		.size	= FLASH_PARTITION0_SIZE
 	},
 	{
-		name	: "Kernel image",
-		offset	: FLASH_PARTITION1_ADDR,
-		size	: FLASH_PARTITION1_SIZE
+		.name	= "Kernel image",
+		.offset	= FLASH_PARTITION1_ADDR,
+		.size	= FLASH_PARTITION1_SIZE
 	},
 	{
-		name	: "Initial ramdisk image",
-		offset	: FLASH_PARTITION2_ADDR,
-		size	: FLASH_PARTITION2_SIZE
+		.name	= "Initial ramdisk image",
+		.offset	= FLASH_PARTITION2_ADDR,
+		.size	= FLASH_PARTITION2_SIZE
 	},
 	{	
-		name	: "Persistant storage",
-		offset	: FLASH_PARTITION3_ADDR,
-		size	: FLASH_PARTITION3_SIZE
+		.name	= "Persistant storage",
+		.offset	= FLASH_PARTITION3_ADDR,
+		.size	= FLASH_PARTITION3_SIZE
 	}
 };
 

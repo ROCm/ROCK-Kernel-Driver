@@ -259,7 +259,7 @@ adfs_obj2dir(struct adfs_direntry *de, struct object_info *obj)
 
 /*
  * get a directory entry.  Note that the caller is responsible
- * for holding the relevent locks.
+ * for holding the relevant locks.
  */
 int
 __adfs_dir_get(struct adfs_dir *dir, int pos, struct object_info *obj)

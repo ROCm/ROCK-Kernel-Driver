@@ -1563,7 +1563,7 @@ void isp2x00_intr_handler(int irq, void *dev_id, struct pt_regs *regs)
 				/* 
 				 * if any of the following are true we do not
 				 * call scsi_done.  if the status is CS_ABORTED
-				 * we dont have to call done because the upper
+				 * we don't have to call done because the upper
 				 * level should already know its aborted.
 				 */
 				if (hostdata->handle_serials[le_hand] != Cmnd->serial_number 

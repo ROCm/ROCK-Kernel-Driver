@@ -142,7 +142,7 @@ int diva_istream_write (void* context,
   return 0  if zero packet was received
   return -1 if stream is empty
     return -2 if read buffer does not profide sufficient space
-              to accomodate entire segment
+              to accommodate entire segment
   max_length should be at least 68 bytes
   ------------------------------------------------------------------- */
 int diva_istream_read (void* context,

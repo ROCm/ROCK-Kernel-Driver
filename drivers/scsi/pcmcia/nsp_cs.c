@@ -128,7 +128,7 @@ MODULE_PARM(free_ports, "i");
 MODULE_PARM_DESC(free_ports, "Release IO ports after configuration? (default: 0 (=no))");
 
 /* /usr/src/linux/drivers/scsi/hosts.h */
-static Scsi_Host_Template driver_template = {
+static Scsi_Host_Template nsp_driver_template = {
 #if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0))
 	.proc_name	         = "nsp_cs",      /* kernel 2.4 */
 #else
@@ -136,8 +136,10 @@ static Scsi_Host_Template driver_template = {
 #endif
 	.proc_info		 = nsp_proc_info,
 	.name			 = "WorkBit NinjaSCSI-3/32Bi(16bit)",
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
 	.detect			 = nsp_detect,
 	.release		 = nsp_release,
+#endif
 	.info			 = nsp_info,
 	.queuecommand		 = nsp_queuecommand,
 /*	.eh_strategy_handler	 = nsp_eh_strategy,*/
@@ -1215,7 +1217,7 @@ timer_out:
 /*----------------------------------------------------------------*/
 /* look for ninja3 card and init if found			  */
 /*----------------------------------------------------------------*/
-static int nsp_detect(Scsi_Host_Template *sht)
+static struct Scsi_Host *__nsp_detect(Scsi_Host_Template *sht)
 {
 	struct Scsi_Host *host;	/* registered host structure */
 	nsp_hw_data *data = &nsp_data;
@@ -1225,7 +1227,7 @@ static int nsp_detect(Scsi_Host_Template *sht)
 	request_region(data->BaseAddress, data->NumAddress, "nsp_cs");
 	host		  = scsi_register(sht, 0);
 	if(host == NULL)
-		return 0;
+		return NULL;
 
 	host->unique_id	  = data->BaseAddress;
 	host->io_port	  = data->BaseAddress;
@@ -1252,7 +1254,13 @@ static int nsp_detect(Scsi_Host_Template *sht)
 
 	//MOD_INC_USE_COUNT;
 
-	return 1; /* detect done. */
+	return host;
+}
+
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,5,0))
+static int nsp_detect(Scsi_Host_Template *sht)
+{
+	return (__nsp_detect(sht) != NULL);
 }
 
 static int nsp_release(struct Scsi_Host *shpnt)
@@ -1271,6 +1279,7 @@ static int nsp_release(struct Scsi_Host *shpnt)
 
 	return 0;
 }
+#endif
 
 /*----------------------------------------------------------------*/
 /* return info string						  */
@@ -1763,55 +1772,53 @@ static void nsp_cs_config(dev_link_t *link)
 	}
 
 #if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2))
-	scsi_register_host(&driver_template);
+	host = __nsp_detect(&nsp_driver_template);
 #else
-	scsi_register_module(MODULE_SCSI_HA, &driver_template);
+	scsi_register_module(MODULE_SCSI_HA, &nsp_driver_template);
+	for (host = scsi_hostlist; host != NULL; host = host->next) {
+		if (host->hostt == &nsp_driver_template)
+			break;
 #endif
+
+	if (!host)
+		goto cs_failed;
 
 	DEBUG(0, "GET_SCSI_INFO\n");
 	tail = &link->dev;
 	info->ndev = 0;
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,45))
-	for (host = scsi_host_get_next(NULL); host;
-	     host = scsi_host_get_next(host)) {
-#else
-	for (host = scsi_hostlist; host != NULL; host = host->next) {
-#endif
-		if (host->hostt == &driver_template) {
-	    		list_for_each_entry (dev, &host->my_devices, siblings) {
-				u_long arg[2], id;
-				kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
-				id = (arg[0]&0x0f) + ((arg[0]>>4)&0xf0) +
-					((arg[0]>>8)&0xf00) + ((arg[0]>>12)&0xf000);
-				node = &info->node[info->ndev];
-				node->minor = 0;
-				switch (dev->type) {
-				case TYPE_TAPE:
-					node->major = SCSI_TAPE_MAJOR;
-					sprintf(node->dev_name, "st#%04lx", id);
-					break;
-				case TYPE_DISK:
-				case TYPE_MOD:
-					node->major = SCSI_DISK0_MAJOR;
-					sprintf(node->dev_name, "sd#%04lx", id);
-					break;
-				case TYPE_ROM:
-				case TYPE_WORM:
-					node->major = SCSI_CDROM_MAJOR;
-					sprintf(node->dev_name, "sr#%04lx", id);
-					break;
-				default:
-					node->major = SCSI_GENERIC_MAJOR;
-					sprintf(node->dev_name, "sg#%04lx", id);
-					break;
-				}
-				*tail = node; tail = &node->next;
-				info->ndev++;
-				info->host = dev->host;
-			}
+	list_for_each_entry (dev, &host->my_devices, siblings) {
+		u_long arg[2], id;
+		kernel_scsi_ioctl(dev, SCSI_IOCTL_GET_IDLUN, arg);
+		id = (arg[0]&0x0f) + ((arg[0]>>4)&0xf0) +
+			((arg[0]>>8)&0xf00) + ((arg[0]>>12)&0xf000);
+		node = &info->node[info->ndev];
+		node->minor = 0;
+		switch (dev->type) {
+		case TYPE_TAPE:
+			node->major = SCSI_TAPE_MAJOR;
+			sprintf(node->dev_name, "st#%04lx", id);
+			break;
+		case TYPE_DISK:
+		case TYPE_MOD:
+			node->major = SCSI_DISK0_MAJOR;
+			sprintf(node->dev_name, "sd#%04lx", id);
+			break;
+		case TYPE_ROM:
+		case TYPE_WORM:
+			node->major = SCSI_CDROM_MAJOR;
+			sprintf(node->dev_name, "sr#%04lx", id);
+			break;
+		default:
+			node->major = SCSI_GENERIC_MAJOR;
+			sprintf(node->dev_name, "sg#%04lx", id);
+			break;
 		}
+		*tail = node; tail = &node->next;
+		info->ndev++;
+		info->host = dev->host;
 	}
+
 	*tail = NULL;
 	if (info->ndev == 0) {
 		printk(KERN_INFO "nsp_cs: no SCSI devices found\n");
@@ -1839,6 +1846,10 @@ static void nsp_cs_config(dev_link_t *link)
 		       req.Base+req.Size-1);
 	printk("\n");
 
+#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,0))
+	scsi_add_host(host, NULL);
+#endif
+
 	link->state &= ~DEV_CONFIG_PENDING;
 	return;
 
@@ -1859,6 +1870,7 @@ cs_failed:
 static void nsp_cs_release(u_long arg)
 {
 	dev_link_t *link = (dev_link_t *)arg;
+	scsi_info_t *info = link->priv;
 
 	DEBUG(0, "%s(0x%p)\n", __FUNCTION__, link);
 
@@ -1874,10 +1886,11 @@ static void nsp_cs_release(u_long arg)
 	}
 
 	/* Unlink the device chain */
-#if (LINUX_VERSION_CODE > KERNEL_VERSION(2,5,2))
-	scsi_unregister_host(&driver_template);
+#if (LINUX_VERSION_CODE <= KERNEL_VERSION(2,5,2))
+	scsi_unregister_module(MODULE_SCSI_HA, &nsp_driver_template);
 #else
-	scsi_unregister_module(MODULE_SCSI_HA, &driver_template);
+	scsi_remove_host(info->host);
+	scsi_unregister(info->host);
 #endif
 	link->dev = NULL;
 

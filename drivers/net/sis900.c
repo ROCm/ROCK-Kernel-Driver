@@ -1971,7 +1971,7 @@ static int sis900_set_config(struct net_device *dev, struct ifmap *map)
 			status = mdio_read(dev, mii_phy->phy_addr, MII_CONTROL);
                 
 			/* enable auto negotiation and reset the negotioation
-			   (I dont really know what the auto negatiotiation reset
+			   (I don't really know what the auto negatiotiation reset
 			   really means, but it sounds for me right to do one here)*/
 			mdio_write(dev, mii_phy->phy_addr,
 				   MII_CONTROL, status | MII_CNTL_AUTO | MII_CNTL_RST_AUTO);

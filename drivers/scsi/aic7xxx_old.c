@@ -111,7 +111,7 @@
  * but are not limited to:
  *
  *  1: Import of the latest FreeBSD sequencer code for this driver
- *  2: Modification of kernel code to accomodate different sequencer semantics
+ *  2: Modification of kernel code to accommodate different sequencer semantics
  *  3: Extensive changes throughout kernel portion of driver to improve
  *     abort/reset processing and error hanndling
  *  4: Other work contributed by various people on the Internet
@@ -4609,8 +4609,8 @@ aic7xxx_handle_seqint(struct aic7xxx_host *p, unsigned char intstat)
          * handler do the rest.  We don't want to unpause the sequencer yet
          * though so we'll return early.  We also have to make sure that
          * we clear the SEQINT *BEFORE* we set the REQINIT handler active
-         * or else it's possible on VLB cards to loose the first REQINIT
-         * interrupt.  Edge triggered EISA cards could also loose this
+         * or else it's possible on VLB cards to lose the first REQINIT
+         * interrupt.  Edge triggered EISA cards could also lose this
          * interrupt, although PCI and level triggered cards should not
          * have this problem since they continually interrupt the kernel
          * until we take care of the situation.
@@ -4945,9 +4945,9 @@ aic7xxx_parse_msg(struct aic7xxx_host *p, struct aic7xxx_scb *scb)
   target_mask = (0x01 << tindex);
 
   /*
-   * Parse as much of the message as is availible,
+   * Parse as much of the message as is available,
    * rejecting it if we don't support it.  When
-   * the entire message is availible and has been
+   * the entire message is available and has been
    * handled, return TRUE indicating that we have
    * parsed an entire message.
    */
@@ -10392,7 +10392,7 @@ aic7xxx_bus_device_reset(Scsi_Cmnd *cmd)
   aic7xxx_done_cmds_complete(p);
   /* If the command was already complete or just completed, then we didn't
    * do a reset, return FAILED */
-  if(!scb->flags & SCB_ACTIVE)
+  if(!(scb->flags & SCB_ACTIVE))
     return FAILED;
 
   pause_sequencer(p);
@@ -10615,7 +10615,7 @@ aic7xxx_abort(Scsi_Cmnd *cmd)
   aic7xxx_done_cmds_complete(p);
   /* If the command was already complete or just completed, then we didn't
    * do a reset, return FAILED */
-  if(!scb->flags & SCB_ACTIVE)
+  if(!(scb->flags & SCB_ACTIVE))
     return FAILED;
 
   pause_sequencer(p);

@@ -2120,7 +2120,7 @@ static void __init get_srmmu_type(void)
 	srmmu_is_bad();
 }
 
-/* dont laugh, static pagetables */
+/* don't laugh, static pagetables */
 static void srmmu_check_pgt_cache(int low, int high)
 {
 }

@@ -133,7 +133,7 @@ static int longrun_verify_policy(struct cpufreq_policy *policy)
  * longrun_determine_freqs - determines the lowest and highest possible core frequency
  *
  * Determines the lowest and highest possible core frequencies on this CPU.
- * This is neccessary to calculate the performance percentage according to
+ * This is necessary to calculate the performance percentage according to
  * TMTA rules:
  * performance_pctg = (target_freq - low_freq)/(high_freq - low_freq)
  */

@@ -65,7 +65,7 @@
 
 void smp_local_timer_interrupt(struct pt_regs *);
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 /* keep track of when we need to update the rtc */
 time_t last_rtc_update;

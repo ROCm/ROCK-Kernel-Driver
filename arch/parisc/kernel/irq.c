@@ -349,7 +349,7 @@ txn_alloc_addr(int virt_irq)
 
 
 /*
-** The alloc process needs to accept a parameter to accomodate limitations
+** The alloc process needs to accept a parameter to accommodate limitations
 ** of the HW/SW which use these bits:
 ** Legacy PA I/O (GSC/NIO): 5 bits (architected EIM register)
 ** V-class (EPIC):          6 bits

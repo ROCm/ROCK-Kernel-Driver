@@ -379,7 +379,7 @@ EXPORT_SYMBOL(ide_cmd);
  *	@drive: drive the completion interrupt occurred on
  *
  *	drive_cmd_intr() is invoked on completion of a special DRIVE_CMD.
- *	We do any neccessary daya reading and then wait for the drive to
+ *	We do any necessary daya reading and then wait for the drive to
  *	go non busy. At that point we may read the error data and complete
  *	the request
  */
@@ -652,7 +652,7 @@ EXPORT_SYMBOL(ide_stall_queue);
  *	@hwgroup: hardware group to select on
  *
  *	choose_drive() selects the next drive which will be serviced.
- *	This is neccessary because the IDE layer can't issue commands
+ *	This is necessary because the IDE layer can't issue commands
  *	to both drives on the same cable, unlike SCSI.
  */
  

@@ -79,7 +79,7 @@ static unsigned int int_log(unsigned long n, unsigned long base)
 }
 
 #define __HIGH(l, r) if (*(l) < (r)) *(l) = (r)
-#define __LOW(l, r) if (*(l) < (r)) *(l) = (r)
+#define __LOW(l, r) if (*(l) == 0 || *(l) > (r)) *(l) = (r)
 
 /*
  * Combine two io_restrictions, always taking the lower value.
@@ -499,7 +499,7 @@ int dm_get_device(struct dm_target *ti, const char *path, sector_t start,
 }
 
 /*
- * Decrement a devices use count and remove it if neccessary.
+ * Decrement a devices use count and remove it if necessary.
  */
 void dm_put_device(struct dm_target *ti, struct dm_dev *dd)
 {
@@ -591,7 +591,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	tgt->type = dm_get_target_type(type);
 	if (!tgt->type) {
 		tgt->error = "unknown target type";
-		goto bad;
+		return -EINVAL;
 	}
 
 	tgt->table = t;
@@ -604,6 +604,7 @@ int dm_table_add_target(struct dm_table *t, const char *type,
 	 */
 	if (!adjoin(t, tgt)) {
 		tgt->error = "Gap in table";
+		r = -EINVAL;
 		goto bad;
 	}
 

@@ -248,7 +248,7 @@ struct globals {
 	volatile u_char n_port_try;
 	volatile u_char nport_timer_set;
 	volatile u_char lport_timer_set;
-	/* Hmmm... We dont want to Initialize while closing */
+	/* Hmmm... We don't want to Initialize while closing */
 	u_char dont_init; 
 	u_int my_node_name_high;
 	u_int my_node_name_low;

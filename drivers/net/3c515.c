@@ -469,7 +469,7 @@ static int corkscrew_scan(struct net_device *dev)
 
 			if (pnp_device_attach(idev) < 0)
 				continue;
-			if (pnp_activate_dev(idev, NULL) < 0) {
+			if (pnp_activate_dev(idev) < 0) {
 				printk("pnp activate failed (out of resources?)\n");
 				pnp_device_detach(idev);
 				return -ENOMEM;

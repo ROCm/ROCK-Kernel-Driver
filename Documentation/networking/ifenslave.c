@@ -299,7 +299,7 @@ main(int argc, char **argv)
 		else {  /* attach a slave interface to the master */
 			/* two possibilities :
 			   - if hwaddr_notset, do nothing.  The bond will assign the
-			     hwaddr from it's first slave.
+			     hwaddr from its first slave.
 			   - if !hwaddr_notset, assign the master's hwaddr to each slave
 			*/
 

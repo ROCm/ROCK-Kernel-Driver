@@ -1806,7 +1806,7 @@ pcibr_pioerror(
 	 *
 	 * CAUTION: Resetting bit BRIDGE_IRR_PCI_GRP_CLR, acknowledges
 	 *      a group of interrupts. If while handling this error,
-	 *      some other error has occured, that would be
+	 *      some other error has occurred, that would be
 	 *      implicitly cleared by this write.
 	 *      Need a way to ensure we don't inadvertently clear some
 	 *      other errors.

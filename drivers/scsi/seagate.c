@@ -493,7 +493,7 @@ int __init seagate_st0x_detect (Scsi_Host_Template * tpnt)
 
 	/*
 	 *	At all times, we will use IRQ 5.  Should also check for IRQ3
-	 *	if we loose our first interrupt.
+	 *	if we lose our first interrupt.
 	 */
 	instance = scsi_register (tpnt, 0);
 	if (instance == NULL)

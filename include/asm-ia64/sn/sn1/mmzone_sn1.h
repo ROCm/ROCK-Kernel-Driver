@@ -130,7 +130,7 @@ typedef signed short cnodeid_t;
 
 /*
  * Calculate a "goal" value to be passed to __alloc_bootmem_node for allocating structures on
- * nodes so that they dont alias to the same line in the cache as the previous allocated structure.
+ * nodes so that they don't alias to the same line in the cache as the previous allocated structure.
  * This macro takes an address of the end of previous allocation, rounds it to a page boundary & 
  * changes the node number.
  */

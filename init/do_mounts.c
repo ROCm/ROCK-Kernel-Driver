@@ -297,13 +297,12 @@ retry:
 		 * Allow the user to distinguish between failed open
 		 * and bad superblock on root device.
 		 */
-		printk ("VFS: Cannot open root device \"%s\" or %s\n",
-			root_device_name, kdevname (to_kdev_t(ROOT_DEV)));
-		printk ("Please append a correct \"root=\" boot option\n");
-		panic("VFS: Unable to mount root fs on %s",
-			kdevname(to_kdev_t(ROOT_DEV)));
+		printk("VFS: Cannot open root device \"%s\" or %s\n",
+			root_device_name, __bdevname(ROOT_DEV));
+		printk("Please append a correct \"root=\" boot option\n");
+		panic("VFS: Unable to mount root fs on %s", __bdevname(ROOT_DEV));
 	}
-	panic("VFS: Unable to mount root fs on %s", kdevname(to_kdev_t(ROOT_DEV)));
+	panic("VFS: Unable to mount root fs on %s", __bdevname(ROOT_DEV));
 out:
 	putname(fs_names);
 	sys_chdir("/root");

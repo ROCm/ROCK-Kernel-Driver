@@ -494,7 +494,7 @@ handle_signal(int canrestart, unsigned long sig,
 			case -ERESTARTNOHAND:
 				/* ERESTARTNOHAND means that the syscall should only be
 				   restarted if there was no handler for the signal, and since
-				   we only get here if there is a handler, we dont restart */
+				   we only get here if there is a handler, we don't restart */
 				regs->r10 = -EINTR;
 				break;
 

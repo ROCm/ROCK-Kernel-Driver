@@ -1016,7 +1016,7 @@ static inline unsigned cs_get_dma_addr(struct cs_state *state)
 	}
 		
 	/*
-	 * ganularity is byte boundry, good part.
+	 * ganularity is byte boundary, good part.
 	 */
 	if(dmabuf->enable & DAC_RUNNING)
 	{

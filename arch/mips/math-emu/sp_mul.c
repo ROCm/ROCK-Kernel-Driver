@@ -72,7 +72,7 @@ ieee754sp ieee754sp_mul(ieee754sp x, ieee754sp y)
 		return x;
 
 
-		/* Infinity handeling */
+		/* Infinity handling */
 
 	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_ZERO):
 	case CLPAIR(IEEE754_CLASS_ZERO, IEEE754_CLASS_INF):

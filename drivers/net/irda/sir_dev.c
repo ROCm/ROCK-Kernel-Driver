@@ -569,7 +569,7 @@ struct sir_dev * sirdev_get_instance(const struct sir_driver *drv, const char *n
 
 	/* instead of adding tests to protect against drv->do_write==NULL
 	 * at several places we refuse to create a sir_dev instance for
-	 * drivers which dont implement do_write.
+	 * drivers which don't implement do_write.
 	 */
 	if (!drv ||  !drv->do_write)
 		return NULL;

@@ -265,7 +265,7 @@ switch to RIO).
 	  -- Done (Ugly: not the way I want it. Copied from serial.c).
 
         - write buffer isn't flushed at close.
-	  -- Done. I still seem to loose a few chars at close. 
+	  -- Done. I still seem to lose a few chars at close. 
 	     Sorry. I think that this is a firmware issue. (-> Specialix)
 
 	- drain hardware before  changing termios

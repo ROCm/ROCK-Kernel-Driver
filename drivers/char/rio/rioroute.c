@@ -521,7 +521,7 @@ int RIORouteRup( struct rio_info *p, uint Rup, struct Host *HostP, PKT *PacketP 
       /*
       ** If either of the modules on this unit is read-only or write-only
       ** or none-xprint, then we need to transfer that info over to the
-      ** relevent ports.
+      ** relevant ports.
       */
       if ( HostP->Mapping[ThisUnit].SysPort != NO_PORT )
       {
@@ -976,7 +976,7 @@ RIORemoveFromSavedTable(struct rio_info *p, struct Map *pMap)
     /*
     ** We loop for all entries even after finding an entry and
     ** zeroing it because we may have two entries to delete if
-    ** its a 16 port RTA.
+    ** it's a 16 port RTA.
     */
     for (entry = 0; entry < TOTAL_MAP_ENTRIES; entry++)
     {

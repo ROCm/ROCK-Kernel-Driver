@@ -46,7 +46,7 @@
 #define IRQ_GPIO_CF_IRQ         IRQ_GPIO1
 #define IRQ_GPIO_CF_CD          IRQ_GPIO24      
 
-// CS3 Latch is write only, a shadow is neccessary 
+// CS3 Latch is write only, a shadow is necessary 
 
 #define CS3BUSTYPE unsigned volatile long           
 #define CS3_BASE        0xf1000000

@@ -47,10 +47,10 @@ struct mtd_info *cfi_cmdset_0001(struct map_info *, int);
 static struct mtd_info *cfi_intelext_setup (struct map_info *);
 
 static struct mtd_chip_driver cfi_intelext_chipdrv = {
-	probe: NULL, /* Not usable directly */
-	destroy: cfi_intelext_destroy,
-	name: "cfi_cmdset_0001",
-	module: THIS_MODULE
+	.probe		= NULL, /* Not usable directly */
+	.destroy	= cfi_intelext_destroy,
+	.name		= "cfi_cmdset_0001",
+	.module		= THIS_MODULE
 };
 
 /* #define DEBUG_LOCK_BITS */

@@ -606,7 +606,7 @@ int ip_route_me_harder(struct sk_buff **pskb)
 	struct net_device *dev_src = NULL;
 	int err;
 
-	/* accomodate ip_route_output_slow(), which expects the key src to be
+	/* accommodate ip_route_output_slow(), which expects the key src to be
 	   0 or a local address; however some non-standard hacks like
 	   ipt_REJECT.c:send_reset() can cause packets with foreign
            saddr to be appear on the NF_IP_LOCAL_OUT hook -MB */

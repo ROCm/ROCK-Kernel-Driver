@@ -237,7 +237,7 @@ serial21285_set_termios(struct uart_port *port, struct termios *termios,
 			struct termios *old)
 {
 	unsigned long flags;
-	unsigned int quot, h_lcr;
+	unsigned int baud, quot, h_lcr;
 
 	/*
 	 * We don't support modem control lines.
@@ -253,7 +253,8 @@ serial21285_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Ask the core to calculate the divisor for us.
 	 */
-	quot = uart_get_divisor(port, termios, old);
+	baud = uart_get_baud_rate(port, termios, old, 0, port->uartclk/16); 
+	quot = uart_get_divisor(port, baud);
 
 	switch (termios->c_cflag & CSIZE) {
 	case CS5:
@@ -286,7 +287,7 @@ serial21285_set_termios(struct uart_port *port, struct termios *termios,
 	/*
 	 * Update the per-port timeout.
 	 */
-	uart_update_timeout(port, termios->c_cflag, quot);
+	uart_update_timeout(port, termios->c_cflag, baud);
 
 	/*
 	 * Which character status flags are we interested in?

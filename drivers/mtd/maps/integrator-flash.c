@@ -195,16 +195,16 @@ static void armflash_copy_to(struct map_info *map, unsigned long to, const void 
 
 static struct map_info armflash_map =
 {
-	name:		"AFS",
-	read8:		armflash_read8,
-	read16:		armflash_read16,
-	read32:		armflash_read32,
-	copy_from:	armflash_copy_from,
-	write8:		armflash_write8,
-	write16:	armflash_write16,
-	write32:	armflash_write32,
-	copy_to:	armflash_copy_to,
-	set_vpp:	armflash_set_vpp,
+	.name		= "AFS",
+	.read8		= armflash_read8,
+	.read16		= armflash_read16,
+	.read32		= armflash_read32,
+	.copy_from	= armflash_copy_from,
+	.write8		= armflash_write8,
+	.write16	= armflash_write16,
+	.write32	= armflash_write32,
+	.copy_to	= armflash_copy_to,
+	.set_vpp	= armflash_set_vpp,
 };
 
 static struct mtd_info *mtd;

@@ -2440,7 +2440,7 @@ static int raw1394_release(struct inode *inode, struct file *file)
         spin_unlock_irq(&host_info_lock);
         if (fail > 0) {
                 printk(KERN_ERR "raw1394: during addr_list-release "
-                        "error(s) occured \n");
+                        "error(s) occurred \n");
         }
 
         while (!done) {

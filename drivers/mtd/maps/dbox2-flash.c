@@ -16,22 +16,28 @@
 /* partition_info gives details on the logical partitions that the split the
  * single flash device into. If the size if zero we use up to the end of the
  * device. */
-static struct mtd_partition partition_info[]= {{name: "BR bootloader",		// raw
-						      size: 128 * 1024, 
-						      offset: 0,                  
-						      mask_flags: MTD_WRITEABLE},
-                                                     {name: "PPC bootloader",		// flfs
-						      size: 128 * 1024, 
-						      offset: MTDPART_OFS_APPEND, 
-						      mask_flags: 0},
-                                                     {name: "Kernel",			// idxfs
-						      size: 768 * 1024, 
-						      offset: MTDPART_OFS_APPEND, 
-						      mask_flags: 0},
-                                                     {name: "System",			// jffs
-						      size: MTDPART_SIZ_FULL, 
-						      offset: MTDPART_OFS_APPEND, 
-						      mask_flags: 0}};
+static struct mtd_partition partition_info[]= {
+	{
+		.name		= "BR bootloader",	/* raw */
+		.size		= 128 * 1024, 
+		.mask_flags	= MTD_WRITEABLE
+	},
+	{
+		.name		= "PPC bootloader",	/* flfs */
+		.size		= 128 * 1024, 
+		.offset		= MTDPART_OFS_APPEND, 
+	},
+	{
+		.name		= "Kernel",		/* idxfs */
+		.size		= 768 * 1024, 
+		.offset		= MTDPART_OFS_APPEND, 
+	},
+	{
+		.name		= "System",		/* jffs */
+		.size		= MTDPART_SIZ_FULL, 
+		.offset		= MTDPART_OFS_APPEND, 
+	}
+};
 
 #define NUM_PARTITIONS (sizeof(partition_info) / sizeof(partition_info[0]))
 
@@ -84,17 +90,17 @@ void dbox2_flash_copy_to(struct map_info *map, unsigned long to, const void *fro
 }
 
 struct map_info dbox2_flash_map = {
-	name: "D-Box 2 flash memory",
-	size: WINDOW_SIZE,
-	buswidth: 4,
-	read8: dbox2_flash_read8,
-	read16: dbox2_flash_read16,
-	read32: dbox2_flash_read32,
-	copy_from: dbox2_flash_copy_from,
-	write8: dbox2_flash_write8,
-	write16: dbox2_flash_write16,
-	write32: dbox2_flash_write32,
-	copy_to: dbox2_flash_copy_to
+	.name		= "D-Box 2 flash memory",
+	.size		= WINDOW_SIZE,
+	.buswidth	= 4,
+	.read8		= dbox2_flash_read8,
+	.read16		= dbox2_flash_read16,
+	.read32		= dbox2_flash_read32,
+	.copy_from	= dbox2_flash_copy_from,
+	.write8		= dbox2_flash_write8,
+	.write16	= dbox2_flash_write16,
+	.write32	= dbox2_flash_write32,
+	.copy_to	= dbox2_flash_copy_to
 };
 
 int __init init_dbox2_flash(void)

@@ -154,7 +154,7 @@ int main(int argc, char **argv)
   
 	/* Process the Sysmap file to determine where _end is */
 	sysmapPages = sysmapLen / 4096;
-	/* read the whole file line by line, expect that it doesnt fail */
+	/* read the whole file line by line, expect that it doesn't fail */
 	while ( fgets(inbuf, 4096, sysmap) )  ;
 	/* search for _end in the last page of the system map */
 	ptr_end = strstr(inbuf, " _end");

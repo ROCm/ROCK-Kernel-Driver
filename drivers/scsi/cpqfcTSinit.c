@@ -1514,7 +1514,7 @@ int cpqfcTS_eh_abort(Scsi_Cmnd *Cmnd)
       Exchanges->fcExchange[i].timeOut = 10; // seconds default (changed later)
 
       // Since we need to immediately return the aborted Cmnd to Scsi 
-      // upper layers, we can't make future reference to any of it's 
+      // upper layers, we can't make future reference to any of its 
       // fields (e.g the Nexus).
 
       cpqfcTSPutLinkQue( cpqfcHBAdata, BLS_ABTS, &i);

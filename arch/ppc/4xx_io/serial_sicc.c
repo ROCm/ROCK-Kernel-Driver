@@ -139,7 +139,7 @@
 #define _LSR_RX_ERR    (_LSR_LB_BREAK | _LSR_FE_MASK | _LSR_OE_MASK | \
 			 _LSR_PE_MASK )
 
-/* serial port reciever command register */
+/* serial port receiver command register */
 
 #define _RCR_ER_MASK   0x80           /* enable receiver mask */
 #define _RCR_DME_MASK  0x60           /* dma mode */

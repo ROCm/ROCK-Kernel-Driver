@@ -199,7 +199,7 @@ DECLARE_PRIMITIVE(SEND);
  * o association id - local handle to the SCTP association
  *
  * o destination transport address - the transport address of the
- *   asociation on which a heartbeat should be issued.
+ *   association on which a heartbeat should be issued.
  */
 
 DECLARE_PRIMITIVE(REQUESTHEARTBEAT);

@@ -242,7 +242,7 @@ long sys_ptrace(long request, pid_t pid, long addr, long data)
 			 *
 			 * Allow writing to Nullify, Divide-step-correction,
 			 * and carry/borrow bits.
-			 * BEWARE, if you set N, and then single step, it wont
+			 * BEWARE, if you set N, and then single step, it won't
 			 * stop on the nullified instruction.
 			 */
 			DBG(("sys_ptrace(POKEUSR, %d, %lx, %lx)\n",

@@ -459,7 +459,7 @@ int bus_add_driver(struct device_driver * drv)
  *	@drv:	driver.
  *
  *	Detach the driver from the devices it controls, and remove
- *	it from it's bus's list of drivers. Finally, we drop the reference
+ *	it from its bus's list of drivers. Finally, we drop the reference
  *	to the bus we took in bus_add_driver().
  */
 

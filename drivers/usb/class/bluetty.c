@@ -267,7 +267,7 @@ static inline struct usb_bluetooth* get_usb_bluetooth (struct usb_bluetooth *blu
 {
 	if (!bluetooth || 
 	    bluetooth_paranoia_check (bluetooth, function)) { 
-		/* then say that we dont have a valid usb_bluetooth thing, which will
+		/* then say that we don't have a valid usb_bluetooth thing, which will
 		 * end up generating -ENODEV return values */
 		return NULL;
 	}

@@ -45,7 +45,7 @@
 
 #include <asm/svinto.h>
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 static int have_rtc;  /* used to remember if we have an RTC or not */
 

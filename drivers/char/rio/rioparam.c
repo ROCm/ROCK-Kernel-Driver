@@ -714,7 +714,7 @@ PKT *PktP;
 /*
 ** can_remove_receive(PktP,P) returns non-zero if PKT_IN_USE is set
 ** for the next packet on the queue. It will also set PktP to point to the
-** relevent packet, [having cleared the PKT_IN_USE bit]. If PKT_IN_USE is clear,
+** relevant packet, [having cleared the PKT_IN_USE bit]. If PKT_IN_USE is clear,
 ** then can_remove_receive() returns 0.
 */
 int

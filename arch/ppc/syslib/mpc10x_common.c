@@ -109,7 +109,7 @@ mpc10x_bridge_init(struct pci_controller *hose,
 			return -1;
 	}
 
-	/* Make sure its a supported bridge */
+	/* Make sure it's a supported bridge */
 	early_read_config_dword(hose,
 			        0,
 			        PCI_DEVFN(0,0),

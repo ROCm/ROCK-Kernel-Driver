@@ -72,7 +72,7 @@ ieee754dp ieee754dp_sub(ieee754dp x, ieee754dp y)
 		return x;
 
 
-		/* Inifity handeling 
+		/* Inifity handling
 		 */
 
 	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_INF):
@@ -91,7 +91,7 @@ ieee754dp ieee754dp_sub(ieee754dp x, ieee754dp y)
 	case CLPAIR(IEEE754_CLASS_INF, IEEE754_CLASS_DNORM):
 		return x;
 
-		/* Zero handeling 
+		/* Zero handling
 		 */
 
 	case CLPAIR(IEEE754_CLASS_ZERO, IEEE754_CLASS_ZERO):

@@ -40,7 +40,7 @@ extern void verify_sglist(struct scatterlist *sg, int nents, iopte_t *iopte, int
 
 /* Two addresses are "virtually contiguous" if and only if:
  * 1) They are equal, or...
- * 2) They are both on a page boundry
+ * 2) They are both on a page boundary
  */
 #define VCONTIG(__X, __Y)	(((__X) == (__Y)) || \
 				 (((__X) | (__Y)) << (64UL - PAGE_SHIFT)) == 0UL)

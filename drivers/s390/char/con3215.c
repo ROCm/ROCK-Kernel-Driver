@@ -312,10 +312,10 @@ raw3215_timeout(unsigned long __data)
 }
 
 /*
- * Function to conditionally start an IO. A read is started immediatly,
- * a write is only started immediatly if the flush flag is on or the
+ * Function to conditionally start an IO. A read is started immediately,
+ * a write is only started immediately if the flush flag is on or the
  * amount of data is bigger than RAW3215_MIN_WRITE. If a write is not
- * done immediatly a timer is started with a delay of RAW3215_TIMEOUT.
+ * done immediately a timer is started with a delay of RAW3215_TIMEOUT.
  */
 static inline void
 raw3215_try_io(struct raw3215_info *raw)

@@ -32,7 +32,7 @@ typedef __signed__ long long __s64;
 typedef unsigned long long __u64;
 #endif
 /* A address type so that arithmetic can be done on it & it can be upgraded to
-   64 bit when neccessary 
+   64 bit when necessary 
 */
 typedef __u32  addr_t; 
 typedef __s32  saddr_t;

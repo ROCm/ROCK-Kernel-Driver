@@ -67,7 +67,7 @@ static inline int do_timer_overflow(int count)
 #ifdef BUGGY_NEPTUN_TIMER
 		/*
 		 * for the Neptun bug we know that the 'latch'
-		 * command doesnt latch the high and low value
+		 * command doesn't latch the high and low value
 		 * of the counter atomically. Thus we have to 
 		 * substract 256 from the counter 
 		 * ... funny, isnt it? :)

@@ -38,7 +38,7 @@ int vlan_ioctl_handler(unsigned long arg);
 extern struct vlan_group *vlan_group_hash[VLAN_GRP_HASH_SIZE];
 extern spinlock_t vlan_group_lock;
 
-/*  Find a VLAN device by the MAC address of it's Ethernet device, and
+/*  Find a VLAN device by the MAC address of its Ethernet device, and
  *  it's VLAN ID.  The default configuration is to have VLAN's scope
  *  to be box-wide, so the MAC will be ignored.  The mac will only be
  *  looked at if we are configured to have a separate set of VLANs per

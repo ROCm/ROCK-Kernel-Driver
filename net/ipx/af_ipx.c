@@ -684,7 +684,7 @@ static int ipxitf_send(struct ipx_interface *intrfc, struct sk_buff *skb,
 	if (ipx->ipx_source.net != intrfc->if_netnum) {
 		/*
 		 * Unshare the buffer before modifying the count in
-		 * case its a flood or tcpdump
+		 * case it's a flood or tcpdump
 		 */
 		skb = skb_unshare(skb, GFP_ATOMIC);
 		if (!skb)

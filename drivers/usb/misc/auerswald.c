@@ -1946,7 +1946,7 @@ static int auerswald_probe (struct usb_interface *intf,
         if (intf->altsetting->desc.bInterfaceNumber != 0)
 		return -ENODEV;
 
-	/* allocate memory for our device and intialize it */
+	/* allocate memory for our device and initialize it */
 	cp = kmalloc (sizeof(auerswald_t), GFP_KERNEL);
 	if (cp == NULL) {
 		err ("out of memory");

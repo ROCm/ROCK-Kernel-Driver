@@ -740,7 +740,7 @@ int ibmphp_add_resource (struct resource_node *res)
 				res->nextRange = NULL;
 			}
 		} else {
-			/* this is the case where it is 1st occurence of the range */
+			/* this is the case where it is 1st occurrence of the range */
 			if (!res_prev) {
 				/* at the beginning of the resource list */
 				res->next = NULL;

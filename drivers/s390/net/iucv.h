@@ -214,7 +214,7 @@ typedef struct {
  *        pgm_data- application data passed to interrupt handlers 
  * Output: NA                                                     
  * Return: address of handler                                     
- *         (0) - Error occured, registration not completed.
+ *         (0) - Error occurred, registration not completed.
  * NOTE: Exact cause of failure will be recorded in syslog.                        
 */
 iucv_handle_t iucv_register_program (uchar pgmname[16],

@@ -4260,7 +4260,7 @@ int load_next_tx_holding_buffer(struct mgsl_struct *info)
 
 	if ( info->tx_holding_count ) {
 		/* determine if we have enough tx dma buffers
-		 * to accomodate the next tx frame
+		 * to accommodate the next tx frame
 		 */
 		struct tx_holding_buffer *ptx =
 			&info->tx_holding_buffers[info->get_tx_holding_index];
@@ -7621,7 +7621,7 @@ BOOLEAN mgsl_dma_test( struct mgsl_struct *info )
 		status = info->rx_buffer_list[0].status;
 
 		if ( status & (BIT8 + BIT3 + BIT1) ) {
-			/* receive error has occured */
+			/* receive error has occurred */
 			rc = FALSE;
 		} else {
 			if ( memcmp( info->tx_buffer_list[0].virt_addr ,
@@ -8103,7 +8103,7 @@ void mgsl_sppp_rx_done(struct mgsl_struct *info, char *buf, int size)
 	if (debug_level >= DEBUG_LEVEL_INFO)
 		printk("mgsl_sppp_rx_done(%s)\n",info->netname);	
 	if (skb == NULL) {
-		printk(KERN_NOTICE "%s: cant alloc skb, dropping packet\n",
+		printk(KERN_NOTICE "%s: can't alloc skb, dropping packet\n",
 			info->netname);
 		info->netstats.rx_dropped++;
 		return;

@@ -1427,7 +1427,7 @@ dasd_eckd_dump_sense(struct dasd_device_t *device, dasd_ccw_req_t * req,
  * addition we have one define extent ccw + 16 bytes of data and one
  * locate record ccw + 16 bytes of data. That makes:
  * (8192 - 24 - 136 - 8 - 16 - 8 - 16) / 16 = 499 blocks at maximum.
- * We want to fit two into the available memory so that we can immediatly
+ * We want to fit two into the available memory so that we can immediately
  * start the next request if one finishes off. That makes 249.5 blocks
  * for one request. Give a little safety and the result is 240.
  */

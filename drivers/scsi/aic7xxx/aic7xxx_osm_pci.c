@@ -179,14 +179,21 @@ ahc_linux_pci_dev_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	}
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	pci_set_drvdata(pdev, ahc);
-	if (aic7xxx_detect_complete)
+	if (aic7xxx_detect_complete) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,5,0)
 		ahc_linux_register_host(ahc, &aic7xxx_driver_template);
+#else
+		printf("aic7xxx: ignoring PCI device found after "
+		       "initialization\n");
+		return (-ENODEV);
+#endif
+	}
 #endif
 	return (0);
 }
 
 int
-ahc_linux_pci_probe(Scsi_Host_Template *template)
+ahc_linux_pci_init(void)
 {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,4,0)
 	return (pci_module_init(&aic7xxx_pci_driver));
@@ -213,6 +220,12 @@ ahc_linux_pci_probe(Scsi_Host_Template *template)
 	}
 	return (found);
 #endif
+}
+
+void
+ahc_linux_pci_exit(void)
+{
+	pci_unregister_driver(&aic7xxx_pci_driver);
 }
 
 static int

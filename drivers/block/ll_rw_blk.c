@@ -1461,6 +1461,7 @@ void blk_insert_request(request_queue_t *q, struct request *rq,
 	if (blk_rq_tagged(rq))
 		blk_queue_end_tag(q, rq);
 
+	drive_stat_acct(rq, rq->nr_sectors, 1);
 	__elv_add_request(q, rq, !at_head, 0);
 	q->request_fn(q);
 	spin_unlock_irqrestore(q->queue_lock, flags);
@@ -1892,7 +1893,7 @@ static inline void blk_partition_remap(struct bio *bio)
 }
 
 /**
- * generic_make_request: hand a buffer to it's device driver for I/O
+ * generic_make_request: hand a buffer to its device driver for I/O
  * @bio:  The bio describing the location in memory and on the device.
  *
  * generic_make_request() is used to make I/O requests of block

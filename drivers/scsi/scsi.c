@@ -1308,7 +1308,8 @@ void scsi_device_put(struct scsi_device *sdev)
 void scsi_set_device_offline(struct scsi_device *sdev)
 {
 	struct scsi_cmnd *scmd;
-	int	cmds_active = 0;
+	LIST_HEAD(active_list);
+	struct list_head *lh, *lh_sf;
 	unsigned long flags;
 
 	sdev->online = FALSE;
@@ -1324,15 +1325,17 @@ void scsi_set_device_offline(struct scsi_device *sdev)
 			if (!scsi_delete_timer(scmd)) {
 				continue;
 			}
-
-			++cmds_active;
-
-			scsi_eh_scmd_add(scmd, SCSI_EH_CANCEL_CMD);
+			list_add_tail(&scmd->eh_entry, &active_list);
 		}
 	}
 	spin_unlock_irqrestore(&sdev->list_lock, flags);
 
-	if (!cmds_active) {
+	if (!list_empty(&active_list)) {
+		list_for_each_safe(lh, lh_sf, &active_list) {
+			scmd = list_entry(lh, struct scsi_cmnd, eh_entry);
+			scsi_eh_scmd_add(scmd, SCSI_EH_CANCEL_CMD);
+		}
+	} else {
 		/* FIXME: Send online state change hotplug event */
 	}
 }

@@ -32,7 +32,7 @@
 #define USECS_PER_JIFFY (1000000/HZ)
 #define USECS_PER_JIFFY_FRAC ((1000000ULL << 32) / HZ & 0xffffffff)
 
-u64 jiffies_64;
+u64 jiffies_64 = INITIAL_JIFFIES;
 
 /*
  * forward reference

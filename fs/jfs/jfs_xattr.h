@@ -57,8 +57,8 @@ extern int __jfs_setxattr(struct inode *, const char *, const void *, size_t,
 extern int jfs_setxattr(struct dentry *, const char *, const void *, size_t,
 			int);
 extern ssize_t __jfs_getxattr(struct inode *, const char *, void *, size_t);
-extern ssize_t jfs_getxattr(struct dentry *, const char *, void *, size_t, int);
-extern ssize_t jfs_listxattr(struct dentry *, char *, size_t, int);
-extern int jfs_removexattr(struct dentry *, const char *, int);
+extern ssize_t jfs_getxattr(struct dentry *, const char *, void *, size_t);
+extern ssize_t jfs_listxattr(struct dentry *, char *, size_t);
+extern int jfs_removexattr(struct dentry *, const char *);
 
 #endif	/* H_JFS_XATTR */

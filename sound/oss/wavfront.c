@@ -95,7 +95,7 @@
 
    I consider /dev/sequencer to be an anachronism, but given its
    widespread usage by various Linux MIDI software, it seems worth
-   offering support to it if its not too painful. Instead of using
+   offering support to it if it's not too painful. Instead of using
    /dev/sequencer, I recommend:
 
      for synth programming and patch loading: /dev/synthNN
@@ -1041,7 +1041,7 @@ wavefront_send_sample (wavefront_patch_info *header,
 
 	if (header->size) {
 
-		/* XXX its a debatable point whether or not RDONLY semantics
+		/* XXX it's a debatable point whether or not RDONLY semantics
 		   on the ROM samples should cover just the sample data or
 		   the sample header. For now, it only covers the sample data,
 		   so anyone is free at all times to rewrite sample headers.

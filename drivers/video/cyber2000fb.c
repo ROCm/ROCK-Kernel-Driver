@@ -1697,7 +1697,7 @@ static int cyberpro_pci_enable_mmio(struct cfb_info *cfb)
 	unsigned char val;
 
 #if defined(__sparc_v9__)
-#error "You loose, consult DaveM."
+#error "You lose, consult DaveM."
 #elif defined(__sparc__)
 	/*
 	 * SPARC does not have an "outb" instruction, so we generate

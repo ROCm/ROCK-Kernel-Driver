@@ -170,7 +170,7 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 
 	if (miss) {
 		/* see if the pte exists at all
-		 * refer through current_pgd, dont use mm->pgd
+		 * refer through current_pgd, don't use mm->pgd
 		 */
 
 		pmd = (pmd_t *)(current_pgd + pgd_index(address));

@@ -542,7 +542,7 @@ static int streamer_reset(struct net_device *dev)
 
 	writew(readw(streamer_mmio + LAPWWO) + 6, streamer_mmio + LAPA);
 	if (readw(streamer_mmio + LAPD)) {
-		printk(KERN_INFO "tokenring card intialization failed. errorcode : %x\n",
+		printk(KERN_INFO "tokenring card initialization failed. errorcode : %x\n",
 		       ntohs(readw(streamer_mmio + LAPD)));
 		release_region(dev->base_addr, STREAMER_IO_SPACE);
 		return -1;

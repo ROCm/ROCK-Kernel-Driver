@@ -543,7 +543,7 @@ static int sun3scsi_dma_finish(int write_flag)
 #if 1
 	// check to empty the fifo on a read
 	if(!write_flag) {
-		int tmo = 200000; /* 2 sec */
+		int tmo = 20000; /* .2 sec */
 		
 		while(1) {
 			if(dregs->csr & CSR_FIFO_EMPTY)

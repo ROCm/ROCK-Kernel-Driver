@@ -28,6 +28,12 @@ struct timezone {
 #include <linux/seqlock.h>
 
 /*
+ * Have the 32 bit jiffies value wrap 5 minutes after boot
+ * so jiffies wrap bugs show up earlier.
+ */
+#define INITIAL_JIFFIES ((unsigned int) (-300*HZ))
+
+/*
  * Change timeval to jiffies, trying to avoid the
  * most obvious overflows..
  *

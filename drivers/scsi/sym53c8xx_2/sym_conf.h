@@ -244,7 +244,7 @@
  *  But for HVD/SE only capable chips (825a, 875, 885), 
  *  the driver uses some heuristic to probe against HVD. 
  *  Normally, the chip senses the DIFFSENS signal and 
- *  should switch its BUS tranceivers to high impedance 
+ *  should switch its BUS transceivers to high impedance 
  *  in situation of the driver having been wrong about 
  *  the actual BUS mode. May-be, the BUS mode probing of 
  *  the driver is safe, but, given that it may be partially 

@@ -785,7 +785,7 @@ static void sctp_rcvmsg_rfree(struct sk_buff *skb)
 	sctp_association_put(asoc);
 }
 
-/* Charge receive window for bytes recieved.  */
+/* Charge receive window for bytes received.  */
 static void sctp_ulpevent_set_owner_r(struct sk_buff *skb, sctp_association_t *asoc)
 {
 	sctp_ulpevent_t *event;

@@ -151,7 +151,7 @@ static void __init init_intel(struct cpuinfo_x86 *c)
 #ifdef CONFIG_X86_F00F_BUG
 	/*
 	 * All current models of Pentium and Pentium with MMX technology CPUs
-	 * have the F0 0F bug, which lets nonpriviledged users lock up the system.
+	 * have the F0 0F bug, which lets nonprivileged users lock up the system.
 	 * Note that the workaround only should be initialized once...
 	 */
 	c->f00f_bug = 0;

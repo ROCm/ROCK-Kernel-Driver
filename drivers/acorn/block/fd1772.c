@@ -1081,7 +1081,7 @@ static void finish_fdc(void)
 		MotorOn = 1;
 		START_TIMEOUT();
 		/* we must wait for the IRQ here, because the ST-DMA is
-		 * released immediatly afterwards and the interrupt may be
+		 * released immediately afterwards and the interrupt may be
 		 * delivered to the wrong driver.
 		 */
 	}

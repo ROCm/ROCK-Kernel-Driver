@@ -815,7 +815,7 @@ static int read_from_eeprom(char * buf, int count)
       i2c_outbyte( eeprom.select_cmd | 1 );
     }
 
-    if(i2c_getack());
+    if(i2c_getack())
     {
       break;
     }

@@ -498,7 +498,7 @@ static int skel_probe(struct usb_interface *interface, const struct usb_device_i
 		goto exit;
 	}
 
-	/* allocate memory for our device state and intialize it */
+	/* allocate memory for our device state and initialize it */
 	dev = kmalloc (sizeof(struct usb_skel), GFP_KERNEL);
 	if (dev == NULL) {
 		err ("Out of memory");

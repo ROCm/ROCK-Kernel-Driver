@@ -161,7 +161,7 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define   ES_1370_CSTAT		(1<<10)		/* CODEC is busy or register write in progress */
 #define   ES_1370_CBUSY         (1<<9)		/* CODEC is busy */
 #define   ES_1370_CWRIP		(1<<8)		/* CODEC register write in progress */
-#define   ES_1371_SYNC_ERR	(1<<8)		/* CODEC synchronization error occured */
+#define   ES_1371_SYNC_ERR	(1<<8)		/* CODEC synchronization error occurred */
 #define   ES_1371_VC(i)         (((i)>>6)&0x03)	/* voice code from CCB module */
 #define   ES_1370_VC(i)		(((i)>>5)&0x03)	/* voice code from CCB module */
 #define   ES_1371_MPWR          (1<<5)		/* power level interrupt pending */
@@ -172,8 +172,8 @@ MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 #define   ES_ADC		(1<<0)		/* ADC channel interrupt pending */
 #define ES_REG_UART_DATA 0x08	/* R/W: UART data register */
 #define ES_REG_UART_STATUS 0x09	/* R/O: UART status register */
-#define   ES_RXINT		(1<<7)		/* RX interrupt occured */
-#define   ES_TXINT		(1<<2)		/* TX interrupt occured */
+#define   ES_RXINT		(1<<7)		/* RX interrupt occurred */
+#define   ES_TXINT		(1<<2)		/* TX interrupt occurred */
 #define   ES_TXRDY		(1<<1)		/* transmitter ready */
 #define   ES_RXRDY		(1<<0)		/* receiver ready */
 #define ES_REG_UART_CONTROL 0x09	/* W/O: UART control register */

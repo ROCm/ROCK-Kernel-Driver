@@ -309,7 +309,7 @@ struct rio_info *	p;
 	}
 
 	/*
-	** wow! if we get here then its a goody!
+	** wow! if we get here then it's a goody!
 	*/
 
 	/*

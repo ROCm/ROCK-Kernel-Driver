@@ -424,7 +424,7 @@ struct dma_desc {
 };
 
 /* There are only 12 bits in the DMA engine for descriptor offsetting
- * so the table must be aligned on a boundry of this.
+ * so the table must be aligned on a boundary of this.
  */
 #define DMA_TABLE_BYTES		4096
 

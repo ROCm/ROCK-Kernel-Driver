@@ -142,34 +142,33 @@ static void vmax301_copy_to(struct map_info *map, unsigned long to, const void *
 
 static struct map_info vmax_map[2] = {
 	{
-		name: "VMAX301 Internal Flash",
-		size: 3*2*1024*1024,
-		buswidth: 1,
-		read8: vmax301_read8,
-		read16: vmax301_read16,
-		read32: vmax301_read32,
-		copy_from: vmax301_copy_from,
-		write8: vmax301_write8,
-		write16: vmax301_write16,
-		write32: vmax301_write32,
-		copy_to: vmax301_copy_to,
-		map_priv_1: WINDOW_START + WINDOW_LENGTH,
-		map_priv_2: 0xFFFFFFFF
+		.name		= "VMAX301 Internal Flash",
+		.size		= 3*2*1024*1024,
+		.buswidth	= 1,
+		.read8		= vmax301_read8,
+		.read16		= vmax301_read16,
+		.read32		= vmax301_read32,
+		.copy_from	= vmax301_copy_from,
+		.write8		= vmax301_write8,
+		.write16	= vmax301_write16,
+		.write32	= vmax301_write32,
+		.copy_to	= vmax301_copy_to,
+		.map_priv_1	= WINDOW_START + WINDOW_LENGTH,
+		.map_priv_2	= 0xFFFFFFFF
 	},
 	{
-		name: "VMAX301 Socket",
-		size: 0,
-		buswidth: 1,
-		read8: vmax301_read8,
-		read16: vmax301_read16,
-		read32: vmax301_read32,
-		copy_from: vmax301_copy_from,
-		write8: vmax301_write8,
-		write16: vmax301_write16,
-		write32: vmax301_write32,
-		copy_to: vmax301_copy_to,
-		map_priv_1: WINDOW_START + (3*WINDOW_LENGTH),
-		map_priv_2: 0xFFFFFFFF
+		.name		= "VMAX301 Socket",
+		.buswidth	= 1,
+		.read8		= vmax301_read8,
+		.read16		= vmax301_read16,
+		.read32		= vmax301_read32,
+		.copy_from	= vmax301_copy_from,
+		.write8		= vmax301_write8,
+		.write16	= vmax301_write16,
+		.write32	= vmax301_write32,
+		.copy_to	= vmax301_copy_to,
+		.map_priv_1	= WINDOW_START + (3*WINDOW_LENGTH),
+		.map_priv_2	= 0xFFFFFFFF
 	}
 };
 

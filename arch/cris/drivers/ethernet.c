@@ -236,7 +236,7 @@ static unsigned int network_rec_config_shadow = 0;
 /* Network speed indication. */
 static struct timer_list speed_timer = TIMER_INITIALIZER(NULL, 0, 0);
 static struct timer_list clear_led_timer = TIMER_INITIALIZER(NULL, 0, 0);
-static int current_speed; /* Speed read from tranceiver */
+static int current_speed; /* Speed read from transceiver */
 static int current_speed_selection; /* Speed selected by user */
 static int led_next_time;
 static int led_active;
@@ -276,7 +276,7 @@ static unsigned short e100_get_mdio_reg(unsigned char reg_num);
 static void e100_send_mdio_cmd(unsigned short cmd, int write_cmd);
 static void e100_send_mdio_bit(unsigned char bit);
 static unsigned char e100_receive_mdio_bit(void);
-static void e100_reset_tranceiver(void);
+static void e100_reset_transceiver(void);
 
 static void e100_clear_network_leds(unsigned long dummy);
 static void e100_set_network_leds(int active);
@@ -786,7 +786,7 @@ e100_receive_mdio_bit()
 }
 
 static void 
-e100_reset_tranceiver(void)
+e100_reset_transceiver(void)
 {
 	unsigned short cmd;
 	unsigned short data;
@@ -826,9 +826,9 @@ e100_tx_timeout(struct net_device *dev)
 	RESET_DMA(NETWORK_TX_DMA_NBR);
 	WAIT_DMA(NETWORK_TX_DMA_NBR);
 	
-	/* Reset the tranceiver. */
+	/* Reset the transceiver. */
 	
-	e100_reset_tranceiver();
+	e100_reset_transceiver();
 	
 	/* and get rid of the packet that never got an interrupt */
 	

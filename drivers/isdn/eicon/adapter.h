@@ -185,7 +185,7 @@ extern
 IDI_CALL	DivasIdiRequest[];
 
 /*
- * intialisation entry point
+ * initialisation entry point
  */
 
 int		DivasInit(void);

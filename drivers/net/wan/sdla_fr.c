@@ -107,7 +107,7 @@
 *                                  the if clause for it(0,dev->tbusy) 
 *				   forever.
 *				   The code got into this stage due to an 
-*				   interrupt occuring within the if clause for 
+*				   interrupt occurring within the if clause for 
 *				   set_bit(0,dev->tbusy).  Since an interrupt 
 *				   disables furhter transmit interrupt and 
 * 				   makes dev->tbusy = 0, this effect was undone 
@@ -1726,7 +1726,7 @@ if_send_start_and_exit:
 
 
 /*============================================================================
- * Setup so that a frame can be transmitted on the occurence of a transmit
+ * Setup so that a frame can be transmitted on the occurrence of a transmit
  * interrupt.
  */
 static int setup_for_delayed_transmit (netdevice_t* dev, struct sk_buff *skb)
@@ -2071,7 +2071,7 @@ static void fr_isr (sdla_t* card)
 			++card->statistics.isr_intr_test;
 	    		break;	
 
-                case FR_INTR_DLC: /* Event interrupt occured */
+                case FR_INTR_DLC: /* Event interrupt occurred */
 			mbox->cmd.command = FR_READ_STATUS;
 			mbox->cmd.length = 0;
 			err = sdla_exec(mbox) ? mbox->cmd.result : CMD_TIMEOUT;
@@ -2747,7 +2747,7 @@ static int handle_IPXWAN(unsigned char *sendpacket,
 		return 1;
 	}
 
-	/* If we get here, its an IPX-data packet so it'll get passed up the 
+	/* If we get here, it's an IPX-data packet so it'll get passed up the 
 	 * stack.
 	 * switch the network numbers 
 	 */

@@ -153,7 +153,7 @@ sn_map_nr (unsigned long addr)
 /**
  * early_sn_setup - early setup routine for SN platforms
  *
- * Sets up an intial console to aid debugging.  Intended primarily
+ * Sets up an initial console to aid debugging.  Intended primarily
  * for bringup, it's only called if %BRINGUP and %CONFIG_IA64_EARLY_PRINTK
  * are turned on.  See start_kernel() in init/main.c.
  */
@@ -172,7 +172,7 @@ early_sn_setup(void)
 
 	/*
 	 * Parse enough of the SAL tables to locate the SAL entry point. Since, console
-	 * IO on SN2 is done via SAL calls, early_printk wont work without this.
+	 * IO on SN2 is done via SAL calls, early_printk won't work without this.
 	 *
 	 * This code duplicates some of the ACPI table parsing that is in efi.c & sal.c.
 	 * Any changes to those file may have to be made hereas well.

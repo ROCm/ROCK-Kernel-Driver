@@ -204,7 +204,7 @@ void __init e820_reserve_resources(void)
 		request_resource(&iomem_resource, res);
 		if (e820.map[i].type == E820_RAM) {
 			/*
-			 *  We dont't know which RAM region contains kernel data,
+			 *  We don't know which RAM region contains kernel data,
 			 *  so we try it repeatedly and let the resource manager
 			 *  test it.
 			 */

@@ -111,7 +111,7 @@
 #define UNI_N_ARB_CTRL_QACK_DELAY105	0x00
 
 /* This one _might_ return the CPU number of the CPU reading it;
- * the bootROM decides wether to boot or to sleep/spinloop depending
+ * the bootROM decides whether to boot or to sleep/spinloop depending
  * on this register beeing 0 or not
  */
 #define UNI_N_CPU_NUMBER		0x0050

@@ -912,7 +912,8 @@ int			 aic7770_map_int(struct ahc_softc *ahc, u_int irq);
 #include <linux/bios32.h>
 #endif
 
-int			 ahc_linux_pci_probe(Scsi_Host_Template *);
+int			 ahc_linux_pci_init(void);
+void			 ahc_linux_pci_exit(void);
 int			 ahc_pci_map_registers(struct ahc_softc *ahc);
 int			 ahc_pci_map_int(struct ahc_softc *ahc);
 

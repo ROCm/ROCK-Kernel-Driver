@@ -1300,7 +1300,7 @@ static inline int vcc_tx_space(const struct lanai_vcc *lvcc, int endptr)
 #define DESCRIPTOR_AAL5_STREAM	(0x00004000)
 #define DESCRIPTOR_CLP		(0x00002000)
 
-/* Add 32-bit descriptor with it's padding */
+/* Add 32-bit descriptor with its padding */
 static inline void vcc_tx_add_aal5_descriptor(struct lanai_vcc *lvcc,
 	u32 flags, int len)
 {

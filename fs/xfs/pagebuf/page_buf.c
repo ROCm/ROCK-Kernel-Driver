@@ -57,6 +57,7 @@
 #include <linux/sysctl.h>
 #include <linux/proc_fs.h>
 #include <linux/workqueue.h>
+#include <linux/suspend.h>
 
 #include <support/debug.h>
 #include <support/kmem.h>
@@ -155,37 +156,35 @@ struct pbstats pbstats;
  * Pagebuf hashing
  */
 
-/* This structure must be a power of 2 long for the hash to work */
+#define NBITS	8
+#define NHASH	(1<<NBITS)
+
 typedef struct {
 	struct list_head	pb_hash;
 	int			pb_count;
 	spinlock_t		pb_hash_lock;
 } pb_hash_t;
 
-static pb_hash_t	*pbhash;
-static unsigned int	pb_hash_mask;
-static unsigned int	pb_hash_shift;
-static unsigned int	pb_order;
+STATIC pb_hash_t	pbhash[NHASH];
 #define pb_hash(pb)	&pbhash[pb->pb_hash_index]
 
-/*
- * This hash is the same one as used on the Linux buffer cache,
- * see fs/buffer.c
- */
-
-#define _hashfn(dev,block)      \
-        ((((dev)<<(pb_hash_shift - 6)) ^ ((dev)<<(pb_hash_shift - 9))) ^ \
-         (((block)<<(pb_hash_shift - 6)) ^ ((block) >> 13) ^ \
-          ((block) << (pb_hash_shift - 12))))
-
-static inline int
+STATIC int
 _bhash(
 	dev_t		dev,
 	loff_t		base)
 {
+	int		bit, hval;
+
 	base >>= 9;
-	
-	return (_hashfn(dev, base) & pb_hash_mask);
+	/*
+	 * dev_t is 16 bits, loff_t is always 64 bits
+	 */
+	base ^= dev;
+	for (bit = hval = 0; base != 0 && bit < sizeof(base) * 8; bit += NBITS) {
+		hval ^= (int)base & (NHASH-1);
+		base >>= NBITS;
+	}
+	return hval;
 }
 
 /*
@@ -703,8 +702,7 @@ found:
  *	are in memory.	The buffer may have unallocated holes, if
  *	some, but not all, of the blocks are in memory.	 Even where
  *	pages are present in the buffer, not all of every page may be
- *	valid.	The file system may use pagebuf_segment to visit the
- *	various segments of the buffer.
+ *	valid.
  */
 page_buf_t *
 pagebuf_find(				/* find buffer for block	*/
@@ -721,11 +719,10 @@ pagebuf_find(				/* find buffer for block	*/
  *	pagebuf_get
  *
  *	pagebuf_get assembles a buffer covering the specified range.
- *	Some or all of the blocks in the range may be valid.  The file
- *	system may use pagebuf_segment to visit the various segments
- *	of the buffer.	Storage in memory for all portions of the
- *	buffer will be allocated, although backing storage may not be.
- *	If PBF_READ is set in flags, pagebuf_read
+ *	Some or all of the blocks in the range may be valid.  Storage
+ *	in memory for all portions of the buffer will be allocated,
+ *	although backing storage may not be.  If PBF_READ is set in
+ *	flags, pagebuf_iostart is called also.
  */
 page_buf_t *
 pagebuf_get(				/* allocate a buffer		*/
@@ -1200,8 +1197,10 @@ pagebuf_iostart(			/* start I/O on a buffer	  */
 		return status;
 	}
 
-	pb->pb_flags &= ~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
-	pb->pb_flags |= flags & (PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
+	pb->pb_flags &=
+		~(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_DELWRI|PBF_READ_AHEAD);
+	pb->pb_flags |= flags &
+		(PBF_READ|PBF_WRITE|PBF_ASYNC|PBF_SYNC|PBF_READ_AHEAD);
 
 	BUG_ON(pb->pb_bn == PAGE_BUF_DADDR_NULL);
 
@@ -1298,7 +1297,6 @@ int
 pagebuf_iorequest(			/* start real I/O		*/
 	page_buf_t		*pb)	/* buffer to convey to device	*/
 {
-	int			status = 0;
 	int			i, map_i, total_nr_pages, nr_pages;
 	struct bio		*bio;
 	int			offset = pb->pb_offset;
@@ -1313,7 +1311,7 @@ pagebuf_iorequest(			/* start real I/O		*/
 
 	if (pb->pb_flags & PBF_DELWRI) {
 		pagebuf_delwri_queue(pb, 1);
-		return status;
+		return 0;
 	}
 
 	/* Set the count to 1 initially, this will stop an I/O
@@ -1413,10 +1411,11 @@ next_chunk:
 io_submitted:
 
 	if (atomic_dec_and_test(&pb->pb_io_remaining) == 1) {
+		pb->pb_locked = 0;
 		pagebuf_iodone(pb, 0);
 	}
 
-	return status < 0 ? status : 0;
+	return 0;
 }
 
 /*
@@ -1459,7 +1458,7 @@ pagebuf_mapout_locked(
 caddr_t
 pagebuf_offset(
 	page_buf_t		*pb,
-	off_t			offset)
+	size_t			offset)
 {
 	struct page		*page;
 
@@ -1586,6 +1585,10 @@ pagebuf_daemon(
 
 	INIT_LIST_HEAD(&tmp);
 	do {
+		/* swsusp */
+		if (current->flags & PF_FREEZE)
+			refrigerator(PF_IOTHREAD);
+
 		if (pbd_active == 1) {
 			del_timer(&pb_daemon_timer);
 			pb_daemon_timer.expires = jiffies +
@@ -1864,39 +1867,7 @@ pagebuf_shaker(void)
 int __init
 pagebuf_init(void)
 {
-	int		order, mempages, i;
-	unsigned int	nr_hash;
-	extern int	xfs_physmem;
-
-	mempages = xfs_physmem >>= 16;
-	mempages *= sizeof(pb_hash_t);
-	for (order = 0; (1 << order) < mempages; order++)
-		;
-
-	if (order > 3) order = 3;	/* cap us at 2K buckets */
-
-	do {
-		unsigned long tmp;
-
-		nr_hash = (PAGE_SIZE << order) / sizeof(pb_hash_t);	
-		nr_hash = 1 << (ffs(nr_hash) - 1);
-		pb_hash_mask =  (nr_hash - 1);
-		tmp = nr_hash;
-		pb_hash_shift = 0;
-		while((tmp >>= 1UL) != 0UL)
-			pb_hash_shift++;
-
-		pbhash = (pb_hash_t *)
-			__get_free_pages(GFP_KERNEL, order);
-		pb_order = order;
-	} while (pbhash == NULL && --order > 0);
-	printk("pagebuf cache hash table entries: %d (order: %d, %ld bytes)\n",
-		nr_hash, order, (PAGE_SIZE << order));
-
-	for(i = 0; i < nr_hash; i++) {
-		spin_lock_init(&pbhash[i].pb_hash_lock);
-		INIT_LIST_HEAD(&pbhash[i].pb_hash);
-	} 
+	int			i;
 
 	pagebuf_table_header = register_sysctl_table(pagebuf_root_table, 1);
 
@@ -1912,6 +1883,11 @@ pagebuf_init(void)
 		printk("pagebuf: couldn't init pagebuf cache\n");
 		pagebuf_terminate();
 		return -ENOMEM;
+	}
+
+	for (i = 0; i < NHASH; i++) {
+		spin_lock_init(&pbhash[i].pb_hash_lock);
+		INIT_LIST_HEAD(&pbhash[i].pb_hash);
 	}
 
 #ifdef PAGEBUF_TRACE
@@ -1940,7 +1916,6 @@ pagebuf_terminate(void)
 
 	kmem_cache_destroy(pagebuf_cache);
 	kmem_shake_deregister(pagebuf_shaker);
-	free_pages((unsigned long)pbhash, pb_order);
 
 	unregister_sysctl_table(pagebuf_table_header);
 #ifdef	CONFIG_PROC_FS

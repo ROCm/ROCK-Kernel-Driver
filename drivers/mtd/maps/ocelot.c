@@ -70,22 +70,22 @@ void ocelot_copy_to(struct map_info *map, unsigned long to, const void *from, ss
 static struct mtd_partition *parsed_parts;
 
 struct map_info ocelot_flash_map = {
-	name: "Ocelot boot flash",
-	size: FLASH_WINDOW_SIZE,
-	buswidth: FLASH_BUSWIDTH,
-	read8: ocelot_read8,
-	copy_from: ocelot_copy_from_cache,
-	write8: ocelot_write8,
+	.name		= "Ocelot boot flash",
+	.size		= FLASH_WINDOW_SIZE,
+	.buswidth	= FLASH_BUSWIDTH,
+	.read8		= ocelot_read8,
+	.copy_from	= ocelot_copy_from_cache,
+	.write8		= ocelot_write8,
 };
 
 struct map_info ocelot_nvram_map = {
-	name: "Ocelot NVRAM",
-	size: NVRAM_WINDOW_SIZE,
-	buswidth: NVRAM_BUSWIDTH,
-	read8: ocelot_read8,
-	copy_from: ocelot_copy_from,
-	write8: ocelot_write8,
-	copy_to: ocelot_copy_to
+	.name		= "Ocelot NVRAM",
+	.size		= NVRAM_WINDOW_SIZE,
+	.buswidth	= NVRAM_BUSWIDTH,
+	.read8		= ocelot_read8,
+	.copy_from	= ocelot_copy_from,
+	.write8		= ocelot_write8,
+	.copy_to	= ocelot_copy_to
 };
 
 static int __init init_ocelot_maps(void)

@@ -827,7 +827,7 @@ static int ohci_transmit(struct hpsb_host *host, struct hpsb_packet *packet)
 		return 0;
 	}
 
-	/* Decide wether we have an iso, a request, or a response packet */
+	/* Decide whether we have an iso, a request, or a response packet */
 	if (packet->type == hpsb_raw)
 		d = &ohci->at_req_context;
 	else if (packet->tcode == TCODE_ISO_DATA) {
@@ -2266,7 +2266,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 	if (event & OHCI1394_cycleInconsistent) {
 		/* We subscribe to the cycleInconsistent event only to
 		 * clear the corresponding event bit... otherwise,
-		 * isochronous cycleMatch DMA wont work. */
+		 * isochronous cycleMatch DMA won't work. */
 		DBGMSG(ohci->id, "OHCI1394_cycleInconsistent");
 		event &= ~OHCI1394_cycleInconsistent;
 	}
@@ -2366,7 +2366,7 @@ static void ohci_irq_handler(int irq, void *dev_id,
 			if (!(node_id & 0x80000000)) {
 				PRINT(KERN_ERR, ohci->id,
 				      "SelfID received, but NodeID invalid "
-				      "(probably new bus reset occured): %08X",
+				      "(probably new bus reset occurred): %08X",
 				      node_id);
 				goto selfid_not_valid;
 			}
@@ -3530,7 +3530,7 @@ void ohci1394_init_iso_tasklet(struct ohci1394_iso_tasklet *tasklet, int type,
 	tasklet_init(&tasklet->tasklet, func, data);
 	tasklet->type = type;
 	/* We init the tasklet->link field, so we can list_del() it
-	 * without worrying wether it was added to the list or not. */
+	 * without worrying whether it was added to the list or not. */
 	INIT_LIST_HEAD(&tasklet->link);
 }
 

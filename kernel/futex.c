@@ -39,7 +39,7 @@
 
 /*
  * We use this hashed waitqueue instead of a normal wait_queue_t, so
- * we can wake only the relevent ones (hashed queues may be shared):
+ * we can wake only the relevant ones (hashed queues may be shared):
  */
 struct futex_q {
 	struct list_head list;
@@ -297,7 +297,7 @@ static int futex_wait(unsigned long uaddr,
 		time = schedule_timeout(time);
 	set_current_state(TASK_RUNNING);
 	/*
-	 * NOTE: we dont remove ourselves from the waitqueue because
+	 * NOTE: we don't remove ourselves from the waitqueue because
 	 * we are the only user of it.
 	 */
 	if (time == 0) {

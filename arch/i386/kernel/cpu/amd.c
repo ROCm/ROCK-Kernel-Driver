@@ -151,11 +151,10 @@ static void __init init_amd(struct cpuinfo_x86 *c)
 		case 6: /* An Athlon/Duron */
  
 			/* Bit 15 of Athlon specific MSR 15, needs to be 0
- 			 * to enable SSE on Palomino/Morgan CPU's.
-			 * If the BIOS didn't enable it already, enable it
-			 * here.
+ 			 * to enable SSE on Palomino/Morgan/Barton CPU's.
+			 * If the BIOS didn't enable it already, enable it here.
 			 */
-			if (c->x86_model == 6 || c->x86_model == 7) {
+			if (c->x86_model >= 6 && c->x86_model <= 10) {
 				if (!cpu_has(c, X86_FEATURE_XMM)) {
 					printk(KERN_INFO "Enabling disabled K7/SSE Support.\n");
 					rdmsr(MSR_K7_HWCR, l, h);
