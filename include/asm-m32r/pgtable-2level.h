@@ -69,8 +69,7 @@ static __inline__ pmd_t *pmd_offset(pgd_t * dir, unsigned long address)
 #define pfn_pmd(pfn, prot)	__pmd(((pfn) << PAGE_SHIFT) | pgprot_val(prot))
 
 #define PTE_FILE_MAX_BITS	29
-#define pte_to_pgoff(pte)	(((pte_val(pte) >> 2) & 0xff) | (((pte_val(pte) >> 11)) << 8))
-#define pgoff_to_pte(off)	((pte_t) { (((off) & 0xff) << 2) | (((off) >> 8) << 11) | _PAGE_FILE })
+#define pte_to_pgoff(pte)	(((pte_val(pte) >> 2) & 0xef) | (((pte_val(pte) >> 10)) << 7))
+#define pgoff_to_pte(off)	((pte_t) { (((off) & 0xef) << 2) | (((off) >> 7) << 10) | _PAGE_FILE })
 
 #endif /* _ASM_M32R_PGTABLE_2LEVEL_H */
-

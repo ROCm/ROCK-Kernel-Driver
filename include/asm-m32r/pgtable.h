@@ -87,10 +87,8 @@ extern unsigned long empty_zero_page[1024];
 #define _PAGE_BIT_WRITE		5	/* Write */
 #define _PAGE_BIT_READ		6	/* Read */
 #define _PAGE_BIT_NONCACHABLE	7	/* Non cachable */
-#define _PAGE_BIT_USER		8	/* software: user space access
-					   allowed */
-#define _PAGE_BIT_ACCESSED	9	/* software: page referenced */
-#define _PAGE_BIT_PROTNONE	10	/* software: if not present */
+#define _PAGE_BIT_ACCESSED	8	/* software: page referenced */
+#define _PAGE_BIT_PROTNONE	9	/* software: if not present */
 
 #define _PAGE_DIRTY		(1UL << _PAGE_BIT_DIRTY)
 #define _PAGE_FILE		(1UL << _PAGE_BIT_FILE)
@@ -101,13 +99,12 @@ extern unsigned long empty_zero_page[1024];
 #define _PAGE_WRITE		(1UL << _PAGE_BIT_WRITE)
 #define _PAGE_READ		(1UL << _PAGE_BIT_READ)
 #define _PAGE_NONCACHABLE	(1UL << _PAGE_BIT_NONCACHABLE)
-#define _PAGE_USER		(1UL << _PAGE_BIT_USER)
 #define _PAGE_ACCESSED		(1UL << _PAGE_BIT_ACCESSED)
 #define _PAGE_PROTNONE		(1UL << _PAGE_BIT_PROTNONE)
 
 #define _PAGE_TABLE	\
-	( _PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_USER \
-	| _PAGE_ACCESSED | _PAGE_DIRTY )
+	( _PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_ACCESSED \
+	| _PAGE_DIRTY )
 #define _KERNPG_TABLE	\
 	( _PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_ACCESSED \
 	| _PAGE_DIRTY )
@@ -118,21 +115,18 @@ extern unsigned long empty_zero_page[1024];
 #define PAGE_NONE	\
 	__pgprot(_PAGE_PROTNONE | _PAGE_ACCESSED)
 #define PAGE_SHARED	\
-	__pgprot(_PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_USER \
-		| _PAGE_ACCESSED)
+	__pgprot(_PAGE_PRESENT | _PAGE_WRITE | _PAGE_READ | _PAGE_ACCESSED)
 #define PAGE_SHARED_EXEC \
 	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_WRITE | _PAGE_READ \
-		| _PAGE_USER | _PAGE_ACCESSED)
+		| _PAGE_ACCESSED)
 #define PAGE_COPY	\
-	__pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_USER | _PAGE_ACCESSED)
+	__pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_ACCESSED)
 #define PAGE_COPY_EXEC	\
-	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_USER \
-		| _PAGE_ACCESSED)
+	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_ACCESSED)
 #define PAGE_READONLY	\
-	__pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_USER | _PAGE_ACCESSED)
+	__pgprot(_PAGE_PRESENT | _PAGE_READ | _PAGE_ACCESSED)
 #define PAGE_READONLY_EXEC \
-	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_USER \
-		| _PAGE_ACCESSED)
+	__pgprot(_PAGE_PRESENT | _PAGE_EXEC | _PAGE_READ | _PAGE_ACCESSED)
 
 #define __PAGE_KERNEL	\
 	( _PAGE_PRESENT | _PAGE_EXEC | _PAGE_WRITE | _PAGE_READ | _PAGE_DIRTY \
@@ -187,8 +181,7 @@ extern unsigned long empty_zero_page[1024];
 #define pmd_none(x)	(!pmd_val(x))
 #define pmd_present(x)	(pmd_val(x) & _PAGE_PRESENT)
 #define pmd_clear(xp)	do { set_pmd(xp, __pmd(0)); } while (0)
-#define	pmd_bad(x)	((pmd_val(x) & (~PAGE_MASK & ~_PAGE_USER)) \
-	!= _KERNPG_TABLE)
+#define	pmd_bad(x)	((pmd_val(x) & ~PAGE_MASK) != _KERNPG_TABLE)
 
 #define pages_to_mb(x)	((x) >> (20 - PAGE_SHIFT))
 
@@ -196,11 +189,6 @@ extern unsigned long empty_zero_page[1024];
  * The following only work if pte_present() is true.
  * Undefined behaviour if not..
  */
-static inline int pte_user(pte_t pte)
-{
-	return pte_val(pte) & _PAGE_USER;
-}
-
 static inline int pte_read(pte_t pte)
 {
 	return pte_val(pte) & _PAGE_READ;
@@ -384,9 +372,9 @@ static inline void pmd_set(pmd_t * pmdp, pte_t * ptep)
 
 /* Encode and de-code a swap entry */
 #define __swp_type(x)			(((x).val >> 2) & 0x3f)
-#define __swp_offset(x)			((x).val >> 11)
+#define __swp_offset(x)			((x).val >> 10)
 #define __swp_entry(type, offset)	\
-	((swp_entry_t) { ((type) << 2) | ((offset) << 11) })
+	((swp_entry_t) { ((type) << 2) | ((offset) << 10) })
 #define __pte_to_swp_entry(pte)		((swp_entry_t) { pte_val(pte) })
 #define __swp_entry_to_pte(x)		((pte_t) { (x).val })
 
