@@ -1104,8 +1104,9 @@ void init_irqwork_curcpu(void)
 {
 	register struct irq_work_struct *workp asm("o2");
 	unsigned long tmp;
+	int cpu = hard_smp_processor_id();
 
-	memset(__irq_work + smp_processor_id(), 0, sizeof(*workp));
+	memset(__irq_work + cpu, 0, sizeof(*workp));
 
 	/* Make sure we are called with PSTATE_IE disabled.  */
 	__asm__ __volatile__("rdpr	%%pstate, %0\n\t"
@@ -1120,7 +1121,7 @@ void init_irqwork_curcpu(void)
 	}
 
 	/* Set interrupt globals.  */
-	workp = &__irq_work[smp_processor_id()];
+	workp = &__irq_work[cpu];
 	__asm__ __volatile__(
 	"rdpr	%%pstate, %0\n\t"
 	"wrpr	%0, %1, %%pstate\n\t"
