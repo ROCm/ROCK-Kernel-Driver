@@ -29,8 +29,11 @@ config AGP_GART
 	bool "/dev/agpgart (AGP Support)"
 	depends on GART_IOMMU
 
+config AGP3
+	bool "AGP 3.0 compliance (EXPERIMENTAL)"
+
 config AGP_INTEL
-	bool "Intel 440LX/BX/GX and I815/I820/I830M/I830MP/I840/I845/I850/I860 support"
+	tristate "Intel 440LX/BX/GX and I815/I820/I830M/I830MP/I840/I845/I850/I860 support"
 	depends on AGP
 	help
 	  This option gives you AGP support for the GLX component of the
@@ -40,7 +43,7 @@ config AGP_INTEL
 	  use GLX or DRI.  If unsure, say N.
 
 #config AGP_I810
-#	bool "Intel I810/I815/I830M (on-board) support"
+#	tristate "Intel I810/I815/I830M (on-board) support"
 #	depends on AGP
 #	help
 #	  This option gives you AGP support for the Xserver on the Intel 810
@@ -48,7 +51,7 @@ config AGP_INTEL
 #	  is required to do any useful video modes with these boards.
 
 config AGP_VIA
-	bool "VIA chipset support"
+	tristate "VIA chipset support"
 	depends on AGP
 	help
 	  This option gives you AGP support for the GLX component of the
@@ -58,7 +61,7 @@ config AGP_VIA
 	  use GLX or DRI.  If unsure, say N.
 
 config AGP_AMD
-	bool "AMD Irongate, 761, and 762 support"
+	tristate "AMD Irongate, 761, and 762 support"
 	depends on AGP
 	help
 	  This option gives you AGP support for the GLX component of the
@@ -68,7 +71,7 @@ config AGP_AMD
 	  use GLX or DRI.  If unsure, say N.
 
 config AGP_SIS
-	bool "Generic SiS support"
+	tristate "Generic SiS support"
 	depends on AGP
 	help
 	  This option gives you AGP support for the GLX component of the "soon
@@ -81,7 +84,7 @@ config AGP_SIS
 	  use GLX or DRI.  If unsure, say N.
 
 config AGP_ALI
-	bool "ALI chipset support"
+	tristate "ALI chipset support"
 	depends on AGP
 	---help---
 	  This option gives you AGP support for the GLX component of the
@@ -99,14 +102,14 @@ config AGP_ALI
 	  use GLX or DRI.  If unsure, say N.
 
 config AGP_SWORKS
-	bool "Serverworks LE/HE support"
+	tristate "Serverworks LE/HE support"
 	depends on AGP
 	help
 	  Say Y here to support the Serverworks AGP card.  See 
 	  <http://www.serverworks.com/> for product descriptions and images.
 
 config AGP_AMD_8151
-	bool "AMD 8151 support"
+	tristate "AMD 8151 support"
 	depends on AGP
 	default GART_IOMMU
 	help
@@ -114,16 +117,28 @@ config AGP_AMD_8151
 	  GART on the AMD Athlon64/Opteron ("Hammer") CPUs.
 
 config AGP_I460
-	bool "Intel 460GX support"
+	tristate "Intel 460GX support"
 	depends on AGP && IA64
 	help
 	  This option gives you AGP GART support for the Intel 460GX chipset
 	  for IA64 processors.
 
 config AGP_HP_ZX1
-	bool "HP ZX1 AGP support"
+	tristate "HP ZX1 AGP support"
 	depends on AGP && IA64
 	help
 	  This option gives you AGP GART support for the HP ZX1 chipset
 	  for IA64 processors.
+
+# Put AGP 3.0 entries below here.
+
+config AGP_I7505
+	tristate "Intel 7205/7505 support (AGP 3.0)"
+	depends on AGP3
+	help
+	  This option gives you AGP support for the GLX component of the
+	  XFree86 4.x on Intel I7505 chipsets.
+
+	  You should say Y here if you use XFree86 3.3.6 or 4.x and want to
+	  use GLX or DRI.  If unsure, say N
 
