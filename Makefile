@@ -56,7 +56,7 @@ ifeq (.config,$(wildcard .config))
 include .config
 ifeq (.depend,$(wildcard .depend))
 include .depend
-do-it-all:	Version vmlinux
+do-it-all:	vmlinux
 else
 CONFIGURATION = depend
 do-it-all:	depend
@@ -161,9 +161,6 @@ export	NETWORKS DRIVERS LIBS HEAD LDFLAGS LINKFLAGS MAKEBOOT ASFLAGS
 # Build vmlinux / boot target
 # ---------------------------------------------------------------------------
 
-Version: dummy
-	@rm -f include/linux/compile.h
-
 boot: vmlinux
 	@$(MAKE) CFLAGS="$(CFLAGS) $(CFLAGS_KERNEL)" -C arch/$(ARCH)/boot
 
@@ -216,17 +213,15 @@ symlinks:
 include/config/MARKER: scripts/split-include include/linux/autoconf.h
 	scripts/split-include include/linux/autoconf.h include/config
 	@ touch include/config/MARKER
+	. scripts/mkversion > .tmpversion
+	@mv -f .tmpversion .version
 
 # Generate some files
 
 $(TOPDIR)/include/linux/version.h: include/linux/version.h
 $(TOPDIR)/include/linux/compile.h: include/linux/compile.h
 
-newversion:
-	. scripts/mkversion > .tmpversion
-	@mv -f .tmpversion .version
-
-include/linux/compile.h: $(CONFIGURATION) include/linux/version.h newversion
+include/linux/compile.h: $(CONFIGURATION) include/linux/version.h
 	@echo Generating $@
 	@. scripts/mkcompile_h $@ "$(ARCH)" "$(CONFIG_SMP)" "$(CC) $(CFLAGS)"
 
