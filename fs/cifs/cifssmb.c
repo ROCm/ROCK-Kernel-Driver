@@ -62,6 +62,7 @@ smb_init(int smb_command, int wct, struct cifsTconInfo *tcon,
 				if(!rc)
 					reopen_files(tcon,nls_codepage);
 			}
+			unload_nls(nls_codepage);
 		}
 	}
 	if(rc)
@@ -821,7 +822,6 @@ int CIFSSMBRenameOpenFile(const int xid,struct cifsTconInfo *pTcon,
 	} else {
 		len_of_str = cifs_strtoUCS((wchar_t *) rename_info->target_name, target_name, 530, nls_codepage);
 	}
-	cFYI(1,("len of str: %d", len_of_str)); /* BB removeme BB */
 	rename_info->target_name_len = cpu_to_le32(2 * len_of_str);
 	pSMB->DataCount = 12 /* sizeof(struct set_file_rename) */ + (2 * len_of_str) + 2;
 	pSMB->ByteCount += pSMB->DataCount;
