@@ -59,13 +59,13 @@ struct acpi_os_dpc
 #ifdef ENABLE_DEBUGGER
 #include <linux/kdb.h>
 /* stuff for debugger support */
-int acpi_in_debugger = 0;
+int acpi_in_debugger;
 extern char line_buf[80];
 #endif /*ENABLE_DEBUGGER*/
 
-static int acpi_irq_irq = 0;
-static OSD_HANDLER acpi_irq_handler = NULL;
-static void *acpi_irq_context = NULL;
+static int acpi_irq_irq;
+static OSD_HANDLER acpi_irq_handler;
+static void *acpi_irq_context;
 
 acpi_status
 acpi_os_initialize(void)
@@ -257,13 +257,13 @@ acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 		return AE_OK;
 	}
 #endif
-	acpi_irq_irq = irq;
 	acpi_irq_handler = handler;
 	acpi_irq_context = context;
 	if (request_irq(irq, acpi_irq, SA_SHIRQ, "acpi", acpi_irq)) {
 		printk(KERN_ERR PREFIX "SCI (IRQ%d) allocation failed\n", irq);
 		return AE_NOT_ACQUIRED;
 	}
+	acpi_irq_irq = irq;
 
 	return AE_OK;
 }
@@ -271,12 +271,13 @@ acpi_os_install_interrupt_handler(u32 irq, OSD_HANDLER handler, void *context)
 acpi_status
 acpi_os_remove_interrupt_handler(u32 irq, OSD_HANDLER handler)
 {
-	if (acpi_irq_handler) {
+	if (irq) {
 #ifdef CONFIG_IA64
 		irq = acpi_irq_to_vector(irq);
 #endif
 		free_irq(irq, acpi_irq);
 		acpi_irq_handler = NULL;
+		acpi_irq_irq = 0;
 	}
 
 	return AE_OK;

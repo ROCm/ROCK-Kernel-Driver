@@ -71,7 +71,7 @@ struct acpi_fan {
                               FS Interface (/proc)
    -------------------------------------------------------------------------- */
 
-struct proc_dir_entry		*acpi_fan_dir = NULL;
+struct proc_dir_entry		*acpi_fan_dir;
 
 
 static int
