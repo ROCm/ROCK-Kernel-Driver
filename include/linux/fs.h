@@ -321,8 +321,8 @@ struct address_space {
 	unsigned long		nrpages;	/* number of total pages */
 	struct address_space_operations *a_ops;	/* methods */
 	struct list_head	i_mmap;		/* list of private mappings */
-	struct list_head	i_mmap_shared;	/* list of private mappings */
-	struct semaphore	i_shared_sem;	/* and sem protecting it */
+	struct list_head	i_mmap_shared;	/* list of shared mappings */
+	struct semaphore	i_shared_sem;	/* protect both above lists */
 	unsigned long		dirtied_when;	/* jiffies of first page dirtying */
 	int			gfp_mask;	/* how to allocate the pages */
 	struct backing_dev_info *backing_dev_info; /* device readahead, etc */
