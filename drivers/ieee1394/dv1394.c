@@ -834,8 +834,7 @@ static void start_dma_receive(struct video_card *video)
 				printk("RUNNING!\n");
 		}
 #endif
-	} 
-	else if ( reg_read(video->ohci, video->ohci_IsoRcvContextControlSet) &  (1 << 11) ) {
+	} else if ( reg_read(video->ohci, video->ohci_IsoRcvContextControlSet) &  (1 << 11) ) {
 		debug_printk("DEAD, event = %x\n", 
 			     reg_read(video->ohci, video->ohci_IsoRcvContextControlSet) & 0x1F);
 
@@ -1986,8 +1985,6 @@ static void it_tasklet_func(unsigned long data)
 				video->dropped_frames++;
 			}
 
-
-		
 		} /* for (each frame) */
 	}
 
@@ -2013,8 +2010,7 @@ static void ir_tasklet_func(unsigned long data)
 		goto out;
 	
 	if ( (video->ohci_ir_ctx != -1) &&
-	    (reg_read(video->ohci, video->ohci_IsoRcvContextControlSet) & (1 << 10)) )
-	{ 
+	    (reg_read(video->ohci, video->ohci_IsoRcvContextControlSet) & (1 << 10)) ) {
 
 		int sof=0; /* start-of-frame flag */
 		struct frame *f;
@@ -2616,6 +2612,7 @@ static int __init dv1394_init_module(void)
 
 	cdev_init(&dv1394_cdev, &dv1394_fops);
 	dv1394_cdev.owner = THIS_MODULE;
+	kobject_set_name(&dv1394_cdev.kobj, "dv1394");
 	ret = cdev_add(&dv1394_cdev, IEEE1394_DV1394_DEV, 16);
 	if (ret) {
 		printk(KERN_ERR "dv1394: unable to register character device\n");

@@ -356,7 +356,6 @@ static int nodemgr_rescan_bus_thread(void *__unused)
 {
 	/* No userlevel access needed */
 	daemonize("kfwrescan");
-	allow_signal(SIGTERM);
 
 	bus_rescan_devices(&ieee1394_bus_type);
 
@@ -1056,13 +1055,14 @@ static int nodemgr_hotplug(struct class_device *cdev, char **envp, int num_envp,
 
 #define PUT_ENVP(fmt,val) 					\
 do {								\
+    	int printed;						\
 	envp[i++] = buffer;					\
-	length += snprintf(buffer, buffer_size - length,	\
+	printed = snprintf(buffer, buffer_size - length,	\
 			   fmt, val);				\
-	if ((buffer_size - length <= 0) || (i >= num_envp))	\
+	if ((buffer_size - (length+printed) <= 0) || (i >= num_envp))	\
 		return -ENOMEM;					\
-	++length;						\
-	buffer += length;					\
+	length += printed+1;					\
+	buffer += printed+1;					\
 } while (0)
 
 	PUT_ENVP("VENDOR_ID=%06x", ud->vendor_id);
@@ -1382,7 +1382,8 @@ static int nodemgr_do_irm_duties(struct hpsb_host *host, int cycles)
 {
 	quadlet_t bc;
         
-	if (!host->is_irm)
+	/* if irm_id == -1 then there is no IRM on this bus */
+	if (!host->is_irm || host->irm_id == (nodeid_t)-1)
 		return 1;
 
 	host->csr.broadcast_channel |= 0x40000000;  /* set validity bit */
@@ -1467,7 +1468,6 @@ static int nodemgr_host_thread(void *__hi)
 
 	/* No userlevel access needed */
 	daemonize(hi->daemon_name);
-	allow_signal(SIGTERM);
 
 	/* Setup our device-model entries */
 	nodemgr_create_host_dev_files(host);

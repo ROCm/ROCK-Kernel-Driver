@@ -511,7 +511,6 @@ struct video_card {
 
 	       The interrupt handler will NEVER advance active_frame to a
 	       frame that is not READY.
-	       
 	*/
 	int active_frame;
 	int first_run;

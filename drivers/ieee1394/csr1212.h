@@ -37,6 +37,7 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/interrupt.h>
+#include <linux/sched.h>
 
 #define CSR1212_MALLOC(size)		kmalloc((size), in_interrupt() ? GFP_ATOMIC : GFP_KERNEL)
 #define CSR1212_FREE(ptr)		kfree(ptr)

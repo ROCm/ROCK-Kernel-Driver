@@ -78,7 +78,7 @@
 #include "sbp2.h"
 
 static char version[] __devinitdata =
-	"$Rev: 1193 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1205 $ Ben Collins <bcollins@debian.org>";
 
 /*
  * Module load parameter definitions
@@ -1314,6 +1314,7 @@ static int sbp2_logout_device(struct scsi_id_instance_data *scsi_id)
 {
 	struct sbp2scsi_host_info *hi = scsi_id->hi;
 	quadlet_t data[2];
+	int error;
 
 	SBP2_DEBUG("sbp2_logout_device");
 
@@ -1354,10 +1355,15 @@ static int sbp2_logout_device(struct scsi_id_instance_data *scsi_id)
 
 	atomic_set(&scsi_id->sbp2_login_complete, 0);
 
-	hpsb_node_write(scsi_id->ne, scsi_id->sbp2_management_agent_addr, data, 8);
+	error = hpsb_node_write(scsi_id->ne,
+	                            scsi_id->sbp2_management_agent_addr,
+	                            data, 8);
+	if (error)
+		return error;
 
 	/* Wait for device to logout...1 second. */
-	sbp2util_down_timeout(&scsi_id->sbp2_login_complete, HZ);
+	if (sbp2util_down_timeout(&scsi_id->sbp2_login_complete, HZ))
+		return -EIO;
 
 	SBP2_INFO("Logged out of SBP-2 device");
 
@@ -1373,6 +1379,7 @@ static int sbp2_reconnect_device(struct scsi_id_instance_data *scsi_id)
 {
 	struct sbp2scsi_host_info *hi = scsi_id->hi;
 	quadlet_t data[2];
+	int error;
 
 	SBP2_DEBUG("sbp2_reconnect_device");
 
@@ -1419,7 +1426,11 @@ static int sbp2_reconnect_device(struct scsi_id_instance_data *scsi_id)
 
 	atomic_set(&scsi_id->sbp2_login_complete, 0);
 
-	hpsb_node_write(scsi_id->ne, scsi_id->sbp2_management_agent_addr, data, 8);
+	error = hpsb_node_write(scsi_id->ne,
+	                            scsi_id->sbp2_management_agent_addr,
+	                            data, 8);
+	if (error)
+		return error;
 
 	/*
 	 * Wait for reconnect status (up to 1 second)...
@@ -1639,9 +1650,9 @@ static int sbp2_max_speed_and_size(struct scsi_id_instance_data *scsi_id)
 					(u8)(hi->host->csr.max_rec - 1));
 
 	HPSB_DEBUG("Node " NODE_BUS_FMT ": Max speed [%s] - Max payload [%u]",
-		   NODE_BUS_ARGS(hi->host, scsi_id->ne->nodeid),
-		   hpsb_speedto_str[scsi_id->speed_code],
-		   1 << ((u32)scsi_id->max_payload_size + 2));
+		 NODE_BUS_ARGS(hi->host, scsi_id->ne->nodeid),
+		 hpsb_speedto_str[scsi_id->speed_code],
+		 1 << ((u32)scsi_id->max_payload_size + 2));
 
 	return(0);
 }
@@ -2278,7 +2289,6 @@ static void sbp2_check_sbp2_response(struct scsi_id_instance_data *scsi_id,
 				scsi_buf[2] = scsi_buf[3];	/* Device specific parameter */
 				scsi_buf[3] = scsi_buf[7];	/* Block descriptor length */
 				memcpy(scsi_buf + 4, scsi_buf + 8, scsi_buf[0]);
-	
 			}
 
 			break;

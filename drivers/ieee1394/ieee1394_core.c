@@ -123,11 +123,10 @@ struct hpsb_packet *hpsb_alloc_packet(size_t data_size)
 {
 	struct hpsb_packet *packet = NULL;
 	struct sk_buff *skb;
-	int gfp_flags = (in_atomic() || irqs_disabled()) ? GFP_ATOMIC : GFP_KERNEL;
 
 	data_size = ((data_size + 3) & ~3);
 
-	skb = alloc_skb(data_size + sizeof(*packet), gfp_flags);
+	skb = alloc_skb(data_size + sizeof(*packet), GFP_ATOMIC);
 	if (skb == NULL)
 		return NULL;
 
@@ -511,8 +510,9 @@ int hpsb_send_packet(struct hpsb_packet *packet)
 		skb_queue_tail(&host->pending_packet_queue, packet->skb);
 	}
 
-        if (packet->node_id == host->node_id)
-        { /* it is a local request, so handle it locally */
+        if (packet->node_id == host->node_id) {
+		/* it is a local request, so handle it locally */
+
                 quadlet_t *data;
                 size_t size = packet->data_size + packet->header_size;
 
@@ -698,7 +698,7 @@ static struct hpsb_packet *create_reply_packet(struct hpsb_host *host,
 	p->generation = get_hpsb_generation(host);
 
 	if (dsize % 4)
-		p->data[dsize / 4] = 0;
+                p->data[dsize / 4] = 0;
 
         return p;
 }
@@ -938,28 +938,28 @@ void abort_requests(struct hpsb_host *host)
 	struct hpsb_packet *packet;
 	struct sk_buff *skb;
 
-	host->driver->devctl(host, CANCEL_REQUESTS, 0);
+        host->driver->devctl(host, CANCEL_REQUESTS, 0);
 
 	while ((skb = skb_dequeue(&host->pending_packet_queue)) != NULL) {
 		packet = (struct hpsb_packet *)skb->data;
 
-		packet->state = hpsb_complete;
-		packet->ack_code = ACKX_ABORTED;
+                packet->state = hpsb_complete;
+                packet->ack_code = ACKX_ABORTED;
 		queue_packet_complete(packet);
-	}
+        }
 }
 
 void abort_timedouts(unsigned long __opaque)
 {
 	struct hpsb_host *host = (struct hpsb_host *)__opaque;
-	unsigned long flags;
+        unsigned long flags;
 	struct hpsb_packet *packet;
 	struct sk_buff *skb;
-	unsigned long expire;
+        unsigned long expire;
 
-	spin_lock_irqsave(&host->csr.lock, flags);
+        spin_lock_irqsave(&host->csr.lock, flags);
 	expire = host->csr.expire;
-	spin_unlock_irqrestore(&host->csr.lock, flags);
+        spin_unlock_irqrestore(&host->csr.lock, flags);
 
 	/* Hold the lock around this, since we aren't dequeuing all
 	 * packets, just ones we need. */
@@ -972,16 +972,16 @@ void abort_timedouts(unsigned long __opaque)
 
 		if (time_before(packet->sendtime + expire, jiffies)) {
 			__skb_unlink(skb, skb->list);
-			packet->state = hpsb_complete;
-			packet->ack_code = ACKX_TIMEOUT;
-			queue_packet_complete(packet);
+                packet->state = hpsb_complete;
+                packet->ack_code = ACKX_TIMEOUT;
+		queue_packet_complete(packet);
 		} else {
 			/* Since packets are added to the tail, the oldest
 			 * ones are first, always. When we get to one that
 			 * isn't timed out, the rest aren't either. */
 			break;
 		}
-	}
+        }
 
 	if (!skb_queue_empty(&host->pending_packet_queue))
 		mod_timer(&host->timeout, jiffies + host->timeout_interval);
@@ -1019,7 +1019,6 @@ static int hpsbpkt_thread(void *__hi)
 	void *complete_data;
 
 	daemonize("khpsbpkt");
-	allow_signal(SIGTERM);
 
 	while (!down_interruptible(&khpsbpkt_sig)) {
 		while ((skb = skb_dequeue(&hpsbpkt_queue)) != NULL) {

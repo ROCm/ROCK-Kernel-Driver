@@ -256,8 +256,7 @@ struct csr1212_keyval *csr1212_new_leaf(u_int8_t key, const void *data, size_t d
 	
 	if (data_len > 0) {
 		kv->value.leaf.data = CSR1212_MALLOC(data_len);
-		if (!kv->value.leaf.data)
-		{
+		if (!kv->value.leaf.data) {
 			CSR1212_FREE(kv);
 			return NULL;
 		}
@@ -788,8 +787,7 @@ static int csr1212_append_new_cache(struct csr1212_csr *csr, size_t romsize)
 		return CSR1212_ENOMEM;
 	}
 
-	if (csr1212_attach_keyval_to_directory(csr->root_kv, cache->ext_rom) != CSR1212_SUCCESS)
-	{
+	if (csr1212_attach_keyval_to_directory(csr->root_kv, cache->ext_rom) != CSR1212_SUCCESS) {
 		csr1212_release_keyval(cache->ext_rom);
 		csr->ops->release_addr(csr_addr, csr->private);
 		CSR1212_FREE(cache);

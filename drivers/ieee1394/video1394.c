@@ -1438,7 +1438,7 @@ static void __exit video1394_exit_module (void)
 	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_TALK_WAIT_BUFFER);
 	ret |= unregister_ioctl32_conversion(VIDEO1394_IOC32_LISTEN_POLL_BUFFER);
 	if (ret)
-		PRINT_G(KERN_INFO, "Error unregistering ioctl32 translations");
+		PRINT_G(KERN_CRIT, "Error unregistering ioctl32 translations");
 #endif
 
 	hpsb_unregister_protocol(&video1394_driver);
@@ -1457,6 +1457,7 @@ static int __init video1394_init_module (void)
 
 	cdev_init(&video1394_cdev, &video1394_fops);
 	video1394_cdev.owner = THIS_MODULE;
+	kobject_set_name(&video1394_cdev.kobj, VIDEO1394_DRIVER_NAME);
 	ret = cdev_add(&video1394_cdev, IEEE1394_VIDEO1394_DEV, 16);
 	if (ret) {
 		PRINT_G(KERN_ERR, "video1394: unable to get minor device block");

@@ -89,7 +89,7 @@
 #define TRACE() printk(KERN_ERR "%s:%s[%d] ---- TRACE\n", driver_name, __FUNCTION__, __LINE__)
 
 static char version[] __devinitdata =
-	"$Rev: 1188 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1198 $ Ben Collins <bcollins@debian.org>";
 
 struct fragment_info {
 	struct list_head list;
@@ -216,7 +216,7 @@ static struct hpsb_highlevel eth1394_highlevel = {
 /* This is called after an "ifup" */
 static int ether1394_open (struct net_device *dev)
 {
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 	int ret = 0;
 
 	/* Something bad happened, don't even try */
@@ -278,7 +278,7 @@ static void ether1394_tx_timeout (struct net_device *dev)
 
 static int ether1394_change_mtu(struct net_device *dev, int new_mtu)
 {
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 
 	if ((new_mtu < 68) ||
 	    (new_mtu > min(ETH1394_DATA_LEN,
@@ -479,7 +479,7 @@ static void ether1394_reset_priv (struct net_device *dev, int set_mtu)
 {
 	unsigned long flags;
 	int i;
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 	struct hpsb_host *host = priv->host;
 	u64 guid = *((u64*)&(host->csr.rom->bus_info_data[3]));
 	u16 maxpayload = 1 << (host->csr.max_rec + 1);
@@ -731,14 +731,12 @@ static int ether1394_header(struct sk_buff *skb, struct net_device *dev,
 
 	eth->h_proto = htons(type);
 
-	if (dev->flags & (IFF_LOOPBACK|IFF_NOARP)) 
-	{
+	if (dev->flags & (IFF_LOOPBACK|IFF_NOARP)) {
 		memset(eth->h_dest, 0, dev->addr_len);
 		return(dev->hard_header_len);
 	}
 
-	if (daddr)
-	{
+	if (daddr) {
 		memcpy(eth->h_dest,daddr,dev->addr_len);
 		return dev->hard_header_len;
 	}
@@ -760,8 +758,8 @@ static int ether1394_rebuild_header(struct sk_buff *skb)
 	struct eth1394hdr *eth = (struct eth1394hdr *)skb->data;
 	struct net_device *dev = skb->dev;
 
-	switch (eth->h_proto)
-	{
+	switch (eth->h_proto) {
+
 #ifdef CONFIG_INET
 	case __constant_htons(ETH_P_IP):
  		return arp_find((unsigned char*)&eth->h_dest, skb);
@@ -867,7 +865,7 @@ static inline u16 ether1394_parse_encap(struct sk_buff *skb,
 					nodeid_t srcid, nodeid_t destid,
 					u16 ether_type)
 {
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 	u64 dest_hw;
 	unsigned short ret = 0;
 
@@ -1582,7 +1580,7 @@ static inline void ether1394_dg_complete(struct packet_task *ptask, int fail)
 {
 	struct sk_buff *skb = ptask->skb;
 	struct net_device *dev = skb->dev;
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
         unsigned long flags;
 		
 	/* Statistics */
@@ -1615,8 +1613,7 @@ static void ether1394_complete_cb(void *__ptask)
 	ether1394_free_packet(packet);
 
 	ptask->outstanding_pkts--;
-	if (ptask->outstanding_pkts > 0 && !fail)
-	{
+	if (ptask->outstanding_pkts > 0 && !fail) {
 		int tx_len;
 
 		/* Add the encapsulation header to the fragment */
@@ -1636,7 +1633,7 @@ static int ether1394_tx (struct sk_buff *skb, struct net_device *dev)
 {
 	int kmflags = in_interrupt() ? GFP_ATOMIC : GFP_KERNEL;
 	struct eth1394hdr *eth;
-	struct eth1394_priv *priv = (struct eth1394_priv *)dev->priv;
+	struct eth1394_priv *priv = dev->priv;
 	int proto;
 	unsigned long flags;
 	nodeid_t dest_node;
@@ -1796,7 +1793,7 @@ static int ether1394_ethtool_ioctl(struct net_device *dev, void *useraddr)
 		case ETHTOOL_GDRVINFO: {
 			struct ethtool_drvinfo info = { ETHTOOL_GDRVINFO };
 			strcpy (info.driver, driver_name);
-			strcpy (info.version, "$Rev: 1188 $");
+			strcpy (info.version, "$Rev: 1198 $");
 			/* FIXME XXX provide sane businfo */
 			strcpy (info.bus_info, "ieee1394");
 			if (copy_to_user (useraddr, &info, sizeof (info)))

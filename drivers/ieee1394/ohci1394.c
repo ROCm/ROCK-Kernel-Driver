@@ -162,7 +162,7 @@ printk(level "%s: " fmt "\n" , OHCI1394_DRIVER_NAME , ## args)
 printk(level "%s: fw-host%d: " fmt "\n" , OHCI1394_DRIVER_NAME, ohci->host->id , ## args)
 
 static char version[] __devinitdata =
-	"$Rev: 1193 $ Ben Collins <bcollins@debian.org>";
+	"$Rev: 1203 $ Ben Collins <bcollins@debian.org>";
 
 /* Module Parameters */
 static int phys_dma = 1;
@@ -615,7 +615,7 @@ static void ohci_initialize(struct ti_ohci *ohci)
 		      (reg_read(ohci, OHCI1394_Version) >> 24) & 0x1);
 		reg_write(ohci, OHCI1394_GUID_ROM, 0x80000000);
 
-		for (i = 0; 
+		for (i = 0;
 		     ((i < 1000) &&
 		      (reg_read(ohci, OHCI1394_GUID_ROM) & 0x80000000)); i++)
 			udelay(10);
@@ -805,7 +805,7 @@ static void insert_packet(struct ti_ohci *ohci,
 
 	/* queue the packet in the appropriate context queue */
 	list_add_tail(&packet->driver_list, &d->fifo_list);
-	d->prg_ind = (d->prg_ind + 1) % d->num_desc;
+	d->prg_ind = (d->prg_ind+1)%d->num_desc;
 }
 
 /*
@@ -844,7 +844,7 @@ static void dma_trm_flush(struct ti_ohci *ohci, struct dma_trm_ctx *d)
 		u32 nodeId = reg_read(ohci, OHCI1394_NodeID);
 
 		DBGMSG("Starting transmit DMA ctx=%d",d->ctx);
-		reg_write(ohci, d->cmdPtr, d->prg_bus[idx] | z);
+		reg_write(ohci, d->cmdPtr, d->prg_bus[idx]|z);
 
 		/* Check that the node id is valid, and not 63 */
 		if (!(nodeId & 0x80000000) || (nodeId & 0x3f) == 63)
@@ -2410,7 +2410,8 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 			ohci1394_stop_context(ohci, d->ctrlClear,
 					      "reqTxComplete");
 		else
-			tasklet_schedule(&d->task);
+			dma_trm_tasklet((unsigned long)d);
+			//tasklet_schedule(&d->task);
 		event &= ~OHCI1394_reqTxComplete;
 	}
 	if (event & OHCI1394_respTxComplete) {
