@@ -15,14 +15,15 @@ extern unsigned long __per_cpu_offset[NR_CPUS];
 #define per_cpu(var, cpu) (*RELOC_HIDE(&per_cpu__##var, __per_cpu_offset[cpu]))
 #define __get_cpu_var(var) per_cpu(var, smp_processor_id())
 
-static inline void percpu_modcopy(void *pcpudst, const void *src,
-				  unsigned long size)
-{
-	unsigned int i;
-	for (i = 0; i < NR_CPUS; i++)
-		if (cpu_possible(i))
-			memcpy(pcpudst + __per_cpu_offset[i], src, size);
-}
+/* A macro to avoid #include hell... */
+#define percpu_modcopy(pcpudst, src, size)			\
+do {								\
+	unsigned int __i;					\
+	for (__i = 0; __i < NR_CPUS; __i++)			\
+		if (cpu_possible(__i))				\
+			memcpy((pcpudst)+__per_cpu_offset[__i],	\
+			       (src), (size));			\
+} while (0)
 #else /* ! SMP */
 
 #define DEFINE_PER_CPU(type, name) \
