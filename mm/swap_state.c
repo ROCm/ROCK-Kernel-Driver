@@ -68,18 +68,17 @@ static int __add_to_swap_cache(struct page *page,
 	BUG_ON(PagePrivate(page));
 	error = radix_tree_preload(gfp_mask);
 	if (!error) {
-		page_cache_get(page);
 		spin_lock_irq(&swapper_space.tree_lock);
 		error = radix_tree_insert(&swapper_space.page_tree,
 						entry.val, page);
 		if (!error) {
+			page_cache_get(page);
 			SetPageLocked(page);
 			SetPageSwapCache(page);
 			page->private = entry.val;
 			total_swapcache_pages++;
 			pagecache_acct(1);
-		} else
-			page_cache_release(page);
+		}
 		spin_unlock_irq(&swapper_space.tree_lock);
 		radix_tree_preload_end();
 	}
