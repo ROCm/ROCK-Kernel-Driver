@@ -4573,9 +4573,11 @@ static int tg3_reset_hw(struct tg3 *tp)
 
 	tw32(MAC_LED_CTRL, 0);
 	tw32(MAC_MI_STAT, MAC_MI_STAT_LNKSTAT_ATTN_ENAB);
-	tw32(MAC_RX_MODE, RX_MODE_RESET);
-	tr32(MAC_RX_MODE);
-	udelay(10);
+	if (tp->phy_id == PHY_ID_SERDES) {
+		tw32(MAC_RX_MODE, RX_MODE_RESET);
+		tr32(MAC_RX_MODE);
+		udelay(10);
+	}
 	tw32(MAC_RX_MODE, tp->rx_mode);
 	tr32(MAC_RX_MODE);
 	udelay(10);
