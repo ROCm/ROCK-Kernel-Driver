@@ -153,6 +153,7 @@ void do_hw_interrupt(unsigned long type, unsigned long psr, unsigned long pc)
 void do_illegal_instruction(struct pt_regs *regs, unsigned long pc, unsigned long npc,
 			    unsigned long psr)
 {
+	extern int do_user_muldiv (struct pt_regs *, unsigned long);
 	siginfo_t info;
 
 	if(psr & PSR_PS)
@@ -161,11 +162,9 @@ void do_illegal_instruction(struct pt_regs *regs, unsigned long pc, unsigned lon
 	printk("Ill instr. at pc=%08lx instruction is %08lx\n",
 	       regs->pc, *(unsigned long *)regs->pc);
 #endif
-	if (sparc_cpu_model == sun4c || sparc_cpu_model == sun4) {
-		extern int do_user_muldiv (struct pt_regs *, unsigned long);
-		if (!do_user_muldiv (regs, pc))
-			return;
-	}
+	if (!do_user_muldiv (regs, pc))
+		return;
+
 	info.si_signo = SIGILL;
 	info.si_errno = 0;
 	info.si_code = ILL_ILLOPC;

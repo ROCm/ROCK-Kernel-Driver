@@ -132,8 +132,7 @@ out:
 	return err;
 }
 
-static void ipcomp_tunnel_encap(struct xfrm_state *x,
-                                struct sk_buff *skb, int compress)
+static void ipcomp_tunnel_encap(struct xfrm_state *x, struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb->dst;
 	struct iphdr *iph, *top_iph;
@@ -147,7 +146,6 @@ static void ipcomp_tunnel_encap(struct xfrm_state *x,
 	if (!(iph->frag_off&htons(IP_DF)))
 		__ip_select_ident(top_iph, dst, 0);
 	top_iph->ttl = iph->ttl;
-	top_iph->protocol = compress ? IPPROTO_COMP : IPPROTO_IPIP;
 	top_iph->check = 0;
 	top_iph->saddr = x->props.saddr.a4;
 	top_iph->daddr = x->id.daddr.a4;
@@ -184,15 +182,16 @@ static int ipcomp_output(struct sk_buff *skb)
 	/* Don't bother compressing */
 	if (skb->len < ipcd->threshold) {
 		if (x->props.mode) {
-			ipcomp_tunnel_encap(x, skb, 0);
+			ipcomp_tunnel_encap(x, skb);
 			iph = skb->nh.iph;
+			iph->protocol = IPPROTO_IPIP;
 			ip_send_check(iph);
 		}
 		goto out_ok;
 	}
 
 	if (x->props.mode) 
-		ipcomp_tunnel_encap(x, skb, 1);
+		ipcomp_tunnel_encap(x, skb);
 
 	if ((skb_is_nonlinear(skb) || skb_cloned(skb)) &&
 	    skb_linearize(skb, GFP_ATOMIC) != 0) {
@@ -202,8 +201,14 @@ static int ipcomp_output(struct sk_buff *skb)
 	
 	err = ipcomp_compress(x, skb);
 	if (err) {
-		if (err == -EMSGSIZE)
+		if (err == -EMSGSIZE) {
+			if (x->props.mode) {
+				iph = skb->nh.iph;
+				iph->protocol = IPPROTO_IPIP;
+				ip_send_check(iph);
+			}
 			goto out_ok;
+		}
 		goto error;
 	}
 

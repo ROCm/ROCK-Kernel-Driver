@@ -447,8 +447,6 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 
 	host = SCpnt->device->host;
 
-	ASSERT_LOCK(host->host_lock, 0);
-
 	/* Assign a unique nonzero serial_number. */
 	if (++serial_number == 0)
 		serial_number = 1;
@@ -573,8 +571,6 @@ int scsi_dispatch_cmd(Scsi_Cmnd * SCpnt)
 void scsi_init_cmd_from_req(Scsi_Cmnd * SCpnt, Scsi_Request * SRpnt)
 {
 	struct Scsi_Host *host = SCpnt->device->host;
-
-	ASSERT_LOCK(host->host_lock, 0);
 
 	SCpnt->owner = SCSI_OWNER_MIDLEVEL;
 	SRpnt->sr_command = SCpnt;
@@ -819,11 +815,10 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
 	struct Scsi_Host *host;
 	Scsi_Device *device;
 	Scsi_Request * SRpnt;
+	unsigned int flags;
 
 	host = SCpnt->device->host;
 	device = SCpnt->device;
-
-	ASSERT_LOCK(host->host_lock, 0);
 
         /*
          * We need to protect the decrement, as otherwise a race condition
@@ -833,6 +828,9 @@ void scsi_finish_command(Scsi_Cmnd * SCpnt)
          * shared.
          */
 	scsi_host_busy_dec_and_test(host, device);
+	spin_lock_irqsave(SCpnt->device->request_queue->queue_lock, flags);
+	SCpnt->device->device_busy--;
+	spin_unlock_irqrestore(SCpnt->device->request_queue->queue_lock, flags);
 
         /*
          * Clear the flags which say that the device/host is no longer

@@ -60,6 +60,8 @@ EXPORT_SYMBOL(scsi_allocate_request);
 EXPORT_SYMBOL(scsi_release_request);
 EXPORT_SYMBOL(scsi_wait_req);
 EXPORT_SYMBOL(scsi_do_req);
+EXPORT_SYMBOL(scsi_get_command);
+EXPORT_SYMBOL(scsi_put_command);
 
 EXPORT_SYMBOL(scsi_report_bus_reset);
 EXPORT_SYMBOL(scsi_block_requests);

@@ -163,7 +163,7 @@ out:
 	return 0;
 }
 
-void ipip_err(struct sk_buff *skb, u32 info)
+static void ipip_err(struct sk_buff *skb, u32 info)
 {
 	struct xfrm_tunnel *handler = ipip_handler;
 	u32 arg = info;

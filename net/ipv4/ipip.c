@@ -208,7 +208,7 @@ static void ipip_tunnel_link(struct ip_tunnel *t)
 	write_unlock_bh(&ipip_lock);
 }
 
-struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
+static struct ip_tunnel * ipip_tunnel_locate(struct ip_tunnel_parm *parms, int create)
 {
 	u32 remote = parms->iph.daddr;
 	u32 local = parms->iph.saddr;
@@ -286,7 +286,7 @@ static void ipip_tunnel_uninit(struct net_device *dev)
 	dev_put(dev);
 }
 
-void ipip_err(struct sk_buff *skb, void *__unused)
+static void ipip_err(struct sk_buff *skb, void *__unused)
 {
 #ifndef I_WISH_WORLD_WERE_PERFECT
 
@@ -478,7 +478,7 @@ static inline void ipip_ecn_decapsulate(struct iphdr *outer_iph, struct sk_buff 
 		IP_ECN_set_ce(inner_iph);
 }
 
-int ipip_rcv(struct sk_buff *skb)
+static int ipip_rcv(struct sk_buff *skb)
 {
 	struct iphdr *iph;
 	struct ip_tunnel *tunnel;
@@ -852,7 +852,7 @@ static int ipip_tunnel_init(struct net_device *dev)
 	return 0;
 }
 
-int __init ipip_fb_tunnel_init(struct net_device *dev)
+static int __init ipip_fb_tunnel_init(struct net_device *dev)
 {
 	struct iphdr *iph;
 

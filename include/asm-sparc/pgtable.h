@@ -263,6 +263,8 @@ extern __inline__ int pte_file(pte_t pte)
 	return pte_val(pte) & BTFIXUP_HALF(pte_filei);
 }
 
+/*
+ */
 BTFIXUPDEF_HALF(pte_wrprotecti)
 BTFIXUPDEF_HALF(pte_mkcleani)
 BTFIXUPDEF_HALF(pte_mkoldi)
@@ -387,11 +389,15 @@ extern int invalid_segment;
 /* file-offset-in-pte helpers */
 BTFIXUPDEF_CALL(unsigned long, pte_to_pgoff, pte_t pte);
 BTFIXUPDEF_CALL(pte_t, pgoff_to_pte, unsigned long pgoff);
-BTFIXUPDEF_SIMM13(pte_file_max_bits);
 
 #define pte_to_pgoff(pte) BTFIXUP_CALL(pte_to_pgoff)(pte)
 #define pgoff_to_pte(off) BTFIXUP_CALL(pgoff_to_pte)(off)
-#define PTE_FILE_MAX_BITS BTFIXUP_SIMM13(pte_file_max_bits)
+
+/*
+ * This is made a constant because mm/fremap.c required a constant.
+ * Note that layout of these bits is different between sun4c.c and srmmu.c.
+ */
+#define PTE_FILE_MAX_BITS 24
 
 /*
  */
