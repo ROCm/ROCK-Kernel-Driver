@@ -320,13 +320,19 @@ static void __init init_ide_data (void)
 #endif
 }
 
-/*
- * ide_system_bus_speed() returns what we think is the system VESA/PCI
- * bus speed (in MHz).  This is used for calculating interface PIO timings.
- * The default is 40 for known PCI systems, 50 otherwise.
- * The "idebus=xx" parameter can be used to override this value.
- * The actual value to be used is computed/displayed the first time through.
+/**
+ *	ide_system_bus_speed	-	guess bus speed
+ *
+ *	ide_system_bus_speed() returns what we think is the system VESA/PCI
+ *	bus speed (in MHz). This is used for calculating interface PIO timings.
+ *	The default is 40 for known PCI systems, 50 otherwise.
+ *	The "idebus=xx" parameter can be used to override this value.
+ *	The actual value to be used is computed/displayed the first time
+ *	through. Drivers should only use this as a last resort.
+ *
+ *	Returns a guessed speed in MHz.
  */
+
 int ide_system_bus_speed (void)
 {
 	if (!system_bus_speed) {
@@ -347,10 +353,15 @@ int ide_system_bus_speed (void)
 	return system_bus_speed;
 }
 
-/*
- * current_capacity() returns the capacity (in sectors) of a drive
- * according to its current geometry/LBA settings.
+/**
+ *	current_capacity	-	drive capacity
+ *	@drive: drive to query
+ *
+ *	Return the current capacity (in sectors) of a drive according to
+ *	its current geometry/LBA settings. Empty removables are reported
+ *	as size zero.
  */
+
 sector_t current_capacity (ide_drive_t *drive)
 {
 	if (!drive->present)
@@ -360,9 +371,17 @@ sector_t current_capacity (ide_drive_t *drive)
 
 EXPORT_SYMBOL(current_capacity);
 
-/*
- * Error reporting, in human readable form (luxurious, but a memory hog).
+/**
+ *	ide_dump_status		-	translate ATA error
+ *	@drive: drive the error occured on
+ *	@msg: information string
+ *	@stat: status byte
+ *
+ *	Error reporting, in human readable form (luxurious, but a memory hog).
+ *	Combines the drive name, message and status byte to provide a
+ *	user understandable explanation of the device error.
  */
+
 u8 ide_dump_status (ide_drive_t *drive, const char *msg, u8 stat)
 {
 	ide_hwif_t *hwif = HWIF(drive);
@@ -474,11 +493,17 @@ static int ide_open (struct inode * inode, struct file * filp)
 	return -ENXIO;
 }
 
+/*
+ *	drives_lock protects the list of drives, drivers_lock the
+ *	list of drivers.  Currently nobody takes both at once.
+ */
+
 static spinlock_t drives_lock = SPIN_LOCK_UNLOCKED;
 static spinlock_t drivers_lock = SPIN_LOCK_UNLOCKED;
 static LIST_HEAD(drivers);
 
-/* Iterator */
+/* Iterator for the driver list. */
+
 static void *m_start(struct seq_file *m, loff_t *pos)
 {
 	struct list_head *p;
@@ -489,22 +514,26 @@ static void *m_start(struct seq_file *m, loff_t *pos)
 			return list_entry(p, ide_driver_t, drivers);
 	return NULL;
 }
+
 static void *m_next(struct seq_file *m, void *v, loff_t *pos)
 {
 	struct list_head *p = ((ide_driver_t *)v)->drivers.next;
 	(*pos)++;
 	return p==&drivers ? NULL : list_entry(p, ide_driver_t, drivers);
 }
+
 static void m_stop(struct seq_file *m, void *v)
 {
 	spin_unlock(&drivers_lock);
 }
+
 static int show_driver(struct seq_file *m, void *v)
 {
 	ide_driver_t *driver = v;
 	seq_printf(m, "%s version %s\n", driver->name, driver->version);
 	return 0;
 }
+
 struct seq_operations ide_drivers_op = {
 	.start	= m_start,
 	.next	= m_next,
@@ -541,6 +570,7 @@ static struct resource* hwif_request_region(ide_hwif_t *hwif,
  *	MMIO leaves it to the controller driver,
  *	PIO will migrate this way over time.
  */
+
 int ide_hwif_request_regions(ide_hwif_t *hwif)
 {
 	unsigned long addr;
@@ -590,6 +620,7 @@ control_region_busy:
  *	importantly our caller should be doing this so we need to 
  *	restructure this as a helper function for drivers.
  */
+
 void ide_hwif_release_regions(ide_hwif_t *hwif)
 {
 	u32 i = 0;
@@ -607,7 +638,15 @@ void ide_hwif_release_regions(ide_hwif_t *hwif)
 			release_region(hwif->io_ports[i], 1);
 }
 
-/* restore hwif to a sane state */
+/**
+ *	ide_hwif_restore	-	restore hwif to template
+ *	@hwif: hwif to update
+ *	@tmp_hwif: template
+ *
+ *	Restore hwif to a previous state by copying most settngs
+ *	from the template.
+ */
+
 static void ide_hwif_restore(ide_hwif_t *hwif, ide_hwif_t *tmp_hwif)
 {
 	hwif->hwgroup			= tmp_hwif->hwgroup;
@@ -957,10 +996,17 @@ void ide_setup_ports (	hw_regs_t *hw,
  */
 }
 
-/*
- * Register an IDE interface, specifying exactly the registers etc
- * Set init=1 iff calling before probes have taken place.
+/**
+ *	ide_register_hw		-	register IDE interface
+ *	@hw: hardware registers
+ *	@hwifp: pointer to returned hwif
+ *
+ *	Register an IDE interface, specifying exactly the registers etc.
+ *	Set init=1 iff calling before probes have taken place.
+ *
+ *	Returns -1 on error.
  */
+
 int ide_register_hw (hw_regs_t *hw, ide_hwif_t **hwifp)
 {
 	int index, retry = 1;
@@ -1214,6 +1260,15 @@ int ide_read_setting (ide_drive_t *drive, ide_settings_t *setting)
 	return val;
 }
 
+/**
+ *	ide_spin_wait_hwgroup	-	wait for group
+ *	@drive: drive in the group
+ *
+ *	Wait for an IDE device group to go non busy and then return
+ *	holding the ide_lock which guards the hwgroup->busy status
+ *	and right to use it.
+ */
+
 int ide_spin_wait_hwgroup (ide_drive_t *drive)
 {
 	ide_hwgroup_t *hwgroup = HWGROUP(drive);
@@ -1255,6 +1310,7 @@ EXPORT_SYMBOL(ide_spin_wait_hwgroup);
  *	to the driver to change settings, and then wait on a sema for completion.
  *	The current scheme of polling is kludgy, though safe enough.
  */
+
 int ide_write_setting (ide_drive_t *drive, ide_settings_t *setting, int val)
 {
 	int i;
@@ -1348,6 +1404,15 @@ static int set_xfer_rate (ide_drive_t *drive, int arg)
 	return err;
 }
 
+/**
+ *	ide_add_generic_settings	-	generic ide settings
+ *	@drive: drive being configured
+ *
+ *	Add the generic parts of the system settings to the /proc files and
+ *	ioctls for this IDE device. The caller must not be holding the
+ *	ide_setting_sem.
+ */
+
 void ide_add_generic_settings (ide_drive_t *drive)
 {
 /*
@@ -1363,6 +1428,13 @@ void ide_add_generic_settings (ide_drive_t *drive)
 	ide_add_setting(drive,	"current_speed",	SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	70,				1,		1,		&drive->current_speed,		set_xfer_rate);
 	ide_add_setting(drive,	"number",		SETTING_RW,					-1,			-1,			TYPE_BYTE,	0,	3,				1,		1,		&drive->dn,			NULL);
 }
+
+/**
+ *	system_bus_clock	-	clock guess
+ *
+ *	External version of the bus clock guess used by very old IDE drivers
+ *	for things like VLB timings. Should not be used.
+ */
 
 int system_bus_clock (void)
 {
@@ -1397,6 +1469,22 @@ int ide_replace_subdriver (ide_drive_t *drive, const char *driver)
 abort:
 	return 1;
 }
+
+/**
+ *	ata_attach		-	attach an ATA/ATAPI device
+ *	@drive: drive to attach
+ *
+ *	Takes a drive that is as yet not assigned to any midlayer IDE
+ *	driver (or is assigned to the default driver) and figures out
+ *	which driver would like to own it. If nobody claims the drive
+ *	then it is automatically attached to the default driver used for
+ *	unclaimed objects.
+ *
+ *	A return of zero indicates attachment to a driver, of one
+ *	attachment to the default driver.
+ *
+ *	Takes drivers_lock.
+ */
 
 int ata_attach(ide_drive_t *drive)
 {
@@ -2206,6 +2294,20 @@ int ide_register_subdriver(ide_drive_t *drive, ide_driver_t *driver)
 
 EXPORT_SYMBOL(ide_register_subdriver);
 
+/**
+ *	ide_unregister_subdriver	-	disconnect drive from driver
+ *	@drive: drive to unplug
+ *
+ *	Disconnect a drive from the driver it was attached to and then
+ *	clean up the various proc files and other objects attached to it.
+ *
+ *	Takes ide_setting_sem, ide_lock and drives_lock.
+ *	Caller must hold none of the locks.
+ *
+ *	No locking versus subdriver unload because we are moving to the
+ *	default driver anyway. Wants double checking.
+ */
+
 int ide_unregister_subdriver (ide_drive_t *drive)
 {
 	unsigned long flags;
@@ -2241,6 +2343,17 @@ static int ide_drive_remove(struct device * dev)
 	return 0;
 }
 
+/**
+ *	ide_register_driver	-	register IDE device driver
+ *	@driver: the IDE device driver
+ *
+ *	Register a new device driver and then scan the devices
+ *	on the IDE bus in case any should be attached to the
+ *	driver we have just registered.  If so attach them.
+ *
+ *	Takes drivers_lock and drives_lock.
+ */
+
 int ide_register_driver(ide_driver_t *driver)
 {
 	struct list_head list;
@@ -2271,6 +2384,17 @@ int ide_register_driver(ide_driver_t *driver)
 }
 
 EXPORT_SYMBOL(ide_register_driver);
+
+/**
+ *	ide_unregister_driver	-	unregister IDE device driver
+ *	@driver: the IDE device driver
+ *
+ *	Called when a driver module is being unloaded. We reattach any
+ *	devices to whatever driver claims them next (typically the default
+ *	driver).
+ *
+ *	Takes drivers_lock and called functions will take ide_setting_sem.
+ */
 
 void ide_unregister_driver(ide_driver_t *driver)
 {
