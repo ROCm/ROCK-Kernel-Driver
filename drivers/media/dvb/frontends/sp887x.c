@@ -24,7 +24,7 @@
 #include <linux/fcntl.h>
 #include <linux/errno.h>
 #include <linux/i2c.h>
-
+#include <linux/syscalls.h>
 
 #include "dvb_frontend.h"
 #include "dvb_functions.h"
