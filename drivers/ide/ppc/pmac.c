@@ -1241,6 +1241,8 @@ pmac_ide_setup_device(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 		hwif->noprobe = 0;
 #endif /* CONFIG_PMAC_PBOOK */
 
+	hwif->sg_max_nents = MAX_DCMDS;
+
 #ifdef CONFIG_BLK_DEV_IDEDMA_PMAC
 	/* has a DBDMA controller channel */
 	if (pmif->dma_regs)
@@ -2064,14 +2066,6 @@ pmac_ide_setup_dma(pmac_ide_hwif_t *pmif, ide_hwif_t *hwif)
 		return;
 	}
 
-	hwif->sg_table = kmalloc(sizeof(struct scatterlist) * MAX_DCMDS,
-				 GFP_KERNEL);
-	if (hwif->sg_table == NULL) {
-		pci_free_consistent(	hwif->pci_dev,
-					(MAX_DCMDS + 2) * sizeof(struct dbdma_cmd),
-					pmif->dma_table_cpu, hwif->dmatable_dma);
-		return;
-	}
 	hwif->ide_dma_off_quietly = &__ide_dma_off_quietly;
 	hwif->ide_dma_on = &__ide_dma_on;
 	hwif->ide_dma_check = &pmac_ide_dma_check;
