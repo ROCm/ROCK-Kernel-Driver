@@ -22,6 +22,7 @@
  * the usable vector space is 0x20-0xff (224 vectors)
  */
 #define NR_IRQS 224
+#define NR_IRQ_VECTORS NR_IRQS
 
 static __inline__ int irq_canonicalize(int irq)
 {

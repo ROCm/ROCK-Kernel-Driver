@@ -153,7 +153,7 @@ EXPORT_SYMBOL_GPL(unset_nmi_callback);
 
 extern void * memset(void *,int,__kernel_size_t);
 extern size_t strlen(const char *);
-extern char * bcopy(const char * src, char * dest, int count);
+extern void bcopy(const char * src, char * dest, int count);
 extern void * memmove(void * dest,const void *src,size_t count);
 extern char * strcpy(char * dest,const char *src);
 extern int strcmp(const char * cs,const char * ct);
