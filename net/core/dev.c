@@ -2520,6 +2520,11 @@ int register_netdevice(struct net_device *dev)
 		if (d == dev || !strcmp(d->name, dev->name))
 			goto out_err;
 	}
+	snprintf(dev->kobj.name,KOBJ_NAME_LEN,dev->name);
+	kobj_set_kset_s(dev,net_subsys);
+	if ((ret = kobject_register(&dev->kobj)))
+		goto out_err;
+	
 	/*
 	 *	nil rebuild_header routine,
 	 *	that should be never called and used as just bug trap.
@@ -2547,10 +2552,7 @@ int register_netdevice(struct net_device *dev)
 	notifier_call_chain(&netdev_chain, NETDEV_REGISTER, dev);
 
 	net_run_sbin_hotplug(dev, "register");
-
-	snprintf(dev->kobj.name,KOBJ_NAME_LEN,dev->name);
-	kobj_set_kset_s(dev,net_subsys);
-	ret = kobject_register(&dev->kobj);
+	ret = 0;
 
 out:
 	return ret;
