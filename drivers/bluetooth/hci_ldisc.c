@@ -344,7 +344,8 @@ static void hci_uart_tty_wakeup(struct tty_struct *tty)
 	if (tty != hu->tty)
 		return;
 
-	hci_uart_tx_wakeup(hu);
+	if (test_bit(HCI_UART_PROTO_SET, &hu->flags))
+		hci_uart_tx_wakeup(hu);
 }
 
 /* hci_uart_tty_room()
