@@ -308,6 +308,24 @@ struct nfs3_readdirres {
 	int			plus;
 };
 
+struct nfs_read_data {
+	struct rpc_task		task;
+	struct inode		*inode;
+	struct rpc_cred		*cred;
+	struct nfs_fattr	fattr;	/* fattr storage */
+	struct list_head	pages;	/* Coalesced read requests */
+	struct page		*pagevec[NFS_READ_MAXIOV];
+	union {
+		struct {
+			struct nfs_readargs args;
+			struct nfs_readres  res;
+		} v3;   /* also v2 */
+#ifdef CONFIG_NFS_V4
+		/* NFSv4 data will come here... */
+#endif
+	} u;
+};
+
 /*
  * RPC procedure vector for NFSv2/NFSv3 demuxing
  */
@@ -355,6 +373,7 @@ struct nfs_rpc_ops {
 	int	(*statfs)  (struct nfs_server *, struct nfs_fh *,
 			    struct nfs_fsinfo *);
 	u32 *	(*decode_dirent)(u32 *, struct nfs_entry *, int plus);
+	void	(*read_setup)   (struct nfs_read_data *, unsigned int count);
 };
 
 /*

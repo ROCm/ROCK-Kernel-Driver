@@ -379,6 +379,11 @@ nfs_wb_file(struct inode *inode, struct file *file)
 	return (error < 0) ? error : 0;
 }
 
+/* Hack for future NFS swap support */
+#ifndef IS_SWAPFILE
+# define IS_SWAPFILE(inode)	(0)
+#endif
+
 /*
  * linux/fs/nfs/read.c
  */
@@ -387,6 +392,8 @@ extern int  nfs_pagein_inode(struct inode *, unsigned long, unsigned int);
 extern int  nfs_pagein_list(struct list_head *, int);
 extern int  nfs_scan_lru_read(struct nfs_server *, struct list_head *);
 extern int  nfs_scan_lru_read_timeout(struct nfs_server *, struct list_head *);
+extern void nfs_readpage_result(struct rpc_task *, unsigned int count, int eof);
+extern void nfs_readdata_release(struct rpc_task *);
 
 /*
  * linux/fs/mount_clnt.c

@@ -41,6 +41,7 @@
 #include <linux/nfs.h>
 #include <linux/nfs2.h>
 #include <linux/nfs_fs.h>
+#include <linux/nfs_page.h>
 #include <linux/smp_lock.h>
 
 #define NFSDBG_FACILITY		NFSDBG_PROC
@@ -469,6 +470,48 @@ nfs_proc_statfs(struct nfs_server *server, struct nfs_fh *fhandle,
 
 extern u32 * nfs_decode_dirent(u32 *, struct nfs_entry *, int);
 
+static void
+nfs_read_done(struct rpc_task *task)
+{
+	struct nfs_read_data *data = (struct nfs_read_data *) task->tk_calldata;
+	nfs_readpage_result(task, data->u.v3.res.count, data->u.v3.res.eof);
+}
+
+static void
+nfs_proc_read_setup(struct nfs_read_data *data, unsigned int count)
+{
+	struct rpc_task		*task = &data->task;
+	struct inode		*inode = data->inode;
+	struct nfs_page		*req;
+	int			flags;
+	struct rpc_message	msg;
+	
+	req = nfs_list_entry(data->pages.next);
+	data->u.v3.args.fh     = NFS_FH(inode);
+	data->u.v3.args.offset = req_offset(req) + req->wb_offset;
+	data->u.v3.args.pgbase = req->wb_offset;
+	data->u.v3.args.pages  = data->pagevec;
+	data->u.v3.args.count  = count;
+	data->u.v3.res.fattr   = &data->fattr;
+	data->u.v3.res.count   = count;
+	data->u.v3.res.eof     = 0;
+	
+	/* N.B. Do we need to test? Never called for swapfile inode */
+	flags = RPC_TASK_ASYNC | (IS_SWAPFILE(inode)? NFS_RPC_SWAPFLAGS : 0);
+
+	/* Finalize the task. */
+	rpc_init_task(task, NFS_CLIENT(inode), nfs_read_done, flags);
+	task->tk_calldata = data;
+	/* Release requests */
+	task->tk_release = nfs_readdata_release;
+
+	msg.rpc_proc = NFSPROC_READ;
+	msg.rpc_argp = &data->u.v3.args;
+	msg.rpc_resp = &data->u.v3.res;
+	msg.rpc_cred = data->cred;
+	rpc_call_setup(&data->task, &msg, 0);
+}
+
 struct nfs_rpc_ops	nfs_v2_clientops = {
 	.version	= 2,		       /* protocol version */
 	.getroot	= nfs_proc_get_root,
@@ -493,4 +536,5 @@ struct nfs_rpc_ops	nfs_v2_clientops = {
 	.mknod		= nfs_proc_mknod,
 	.statfs		= nfs_proc_statfs,
 	.decode_dirent	= nfs_decode_dirent,
+	.read_setup	= nfs_proc_read_setup,
 };
