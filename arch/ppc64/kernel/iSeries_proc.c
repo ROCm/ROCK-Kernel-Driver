@@ -19,6 +19,7 @@
 #include <linux/proc_fs.h>
 #include <linux/spinlock.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <asm/iSeries/iSeries_proc.h>
 
 static struct proc_dir_entry *iSeries_proc_root;
@@ -129,3 +130,4 @@ void iSeries_proc_callback(iSeriesProcFunction initFunction)
 	}
 	spin_unlock_irqrestore(&iSeries_proc_lock, flags);
 }
+EXPORT_SYMBOL(iSeries_proc_callback);

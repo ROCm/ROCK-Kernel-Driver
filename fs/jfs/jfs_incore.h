@@ -114,7 +114,6 @@ struct jfs_inode_info {
  * cflag
  */
 enum cflags {
-	COMMIT_New,		/* never committed inode   */
 	COMMIT_Nolink,		/* inode committed with zero link count */
 	COMMIT_Inlineea,	/* commit inode inline EA */
 	COMMIT_Freewmap,	/* free WMAP at iClose() */

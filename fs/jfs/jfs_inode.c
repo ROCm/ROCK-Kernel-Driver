@@ -72,7 +72,6 @@ struct inode *ialloc(struct inode *parent, umode_t mode)
 	inode->i_generation = JFS_SBI(sb)->gengen++;
 
 	jfs_inode->cflag = 0;
-	set_cflag(COMMIT_New, inode);
 
 	/* Zero remaining fields */
 	memset(&jfs_inode->acl, 0, sizeof(dxd_t));

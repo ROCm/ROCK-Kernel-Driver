@@ -23,7 +23,7 @@
  * locking when running on an RPA platform.  As we do more performance
  * tuning, I would expect this selection mechanism to change.  Dave E. 
  */
-#define SPLPAR_LOCKS
+#undef SPLPAR_LOCKS
 #define HVSC			".long 0x44000022\n"
 
 typedef struct {

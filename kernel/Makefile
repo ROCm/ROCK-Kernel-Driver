@@ -20,6 +20,7 @@ obj-$(CONFIG_BSD_PROCESS_ACCT) += acct.o
 obj-$(CONFIG_COMPAT) += compat.o
 obj-$(CONFIG_IKCONFIG) += configs.o
 obj-$(CONFIG_IKCONFIG_PROC) += configs.o
+obj-$(CONFIG_STOP_MACHINE) += stop_machine.o
 obj-$(CONFIG_EVLOG) += evlbuf.o evlapi.o evlposix.o
 
 ifneq ($(CONFIG_IA64),y)

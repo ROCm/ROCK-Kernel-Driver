@@ -33,6 +33,7 @@
 #include <linux/suspend.h>
 #include <linux/blkdev.h>
 #include <linux/delay.h>
+#include <linux/smp.h>
 #include <linux/timer.h>
 #include <linux/rcupdate.h>
 #include <linux/cpu.h>
@@ -2350,7 +2351,7 @@ asmlinkage long sys_sched_getaffinity(pid_t pid, unsigned int len,
 		goto out_unlock;
 
 	retval = 0;
-	cpus_and(mask, p->cpus_allowed, cpu_online_map);
+	cpus_and(mask, p->cpus_allowed, cpu_possible_map);
 
 out_unlock:
 	read_unlock(&tasklist_lock);

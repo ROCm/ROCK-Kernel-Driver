@@ -209,7 +209,7 @@ get_vsid( unsigned long context, unsigned long ea )
 {
 	unsigned long ordinal, vsid;
 
-	ordinal = (((ea >> 28) & 0x1fffff) * LAST_USER_CONTEXT) | context;
+	ordinal = (((ea >> 28) & 0x1fff) * LAST_USER_CONTEXT) | context;
 	vsid = (ordinal * VSID_RANDOMIZER) & VSID_MASK;
 
 	ifppcdebug(PPCDBG_HTABSTRESS) {

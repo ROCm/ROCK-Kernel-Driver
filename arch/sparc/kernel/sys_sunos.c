@@ -682,8 +682,8 @@ static int get_default (int value, int def_value)
 
 static int sunos_nfs_mount(char *dir_name, int linux_flags, void *data)
 {
-	int  server_fd;
-	char *the_name;
+	int  server_fd, err;
+	char *the_name, *mount_page;
 	struct nfs_mount_data linux_nfs_mount;
 	struct sunos_nfs_mount_args sunos_mount;
 
@@ -736,7 +736,16 @@ static int sunos_nfs_mount(char *dir_name, int linux_flags, void *data)
 		sizeof(linux_nfs_mount.hostname));
 	putname (the_name);
 	
-	return do_mount ("", dir_name, "nfs", linux_flags, &linux_nfs_mount);
+	mount_page = (char *) get_zeroed_page(GFP_KERNEL);
+	if (!mount_page)
+		return -ENOMEM;
+
+	memcpy(mount_page, &linux_nfs_mount, sizeof(linux_nfs_mount));
+
+	err = do_mount("", dir_name, "nfs", linux_flags, mount_page);
+
+	free_page((unsigned long) mount_page);
+	return err;
 }
 
 asmlinkage int

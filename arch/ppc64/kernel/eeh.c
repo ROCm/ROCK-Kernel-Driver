@@ -644,6 +644,7 @@ void eeh_add_device(struct pci_dev *dev)
 	early_enable_eeh(dn, &info);
 	pci_addr_cache_insert_device (dev);
 }
+EXPORT_SYMBOL(eeh_add_device);
 
 /**
  * eeh_remove_device - undo EEH setup for the indicated pci device
@@ -664,6 +665,7 @@ void eeh_remove_device(struct pci_dev *dev)
 #endif
 	pci_addr_cache_remove_device(dev);
 }
+EXPORT_SYMBOL(eeh_remove_device);
 
 /*
  * If EEH is implemented, find the PCI device using given phys addr

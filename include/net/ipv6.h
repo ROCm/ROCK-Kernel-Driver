@@ -123,6 +123,7 @@ struct frag_hdr {
 
 /* sysctls */
 extern int sysctl_ipv6_bindv6only;
+extern int sysctl_mld_max_msf;
 
 /* MIBs */
 DECLARE_SNMP_STAT(struct ipv6_mib, ipv6_statistics);

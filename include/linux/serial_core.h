@@ -84,6 +84,7 @@
 #include <linux/interrupt.h>
 #include <linux/circ_buf.h>
 #include <linux/spinlock.h>
+#include <linux/sched.h>
 
 struct uart_port;
 struct uart_info;
@@ -340,7 +341,6 @@ int uart_resume_port(struct uart_driver *reg, struct uart_port *port);
 
 #define uart_tx_stopped(port)		\
 	((port)->info->tty->stopped || (port)->info->tty->hw_stopped)
-
 
 /*
  * The following are helper functions for the low level drivers.

@@ -27,6 +27,7 @@
 /************************************************************************/
 #include <linux/config.h>
 #include <linux/init.h>
+#include <linux/module.h>
 #include <linux/pci.h>
 #include <asm/types.h>
 #include <asm/resource.h>
@@ -105,6 +106,7 @@ LocationData* iSeries_GetLocationData(struct pci_dev *PciDev)
 	strcpy(&LocationPtr->CardLocation[0], &DevNode->CardLocation[0]);
 	return LocationPtr;
 }
+EXPORT_SYMBOL(iSeries_GetLocationData);
 
 /*
  * Formats the device information.

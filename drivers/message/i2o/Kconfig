@@ -39,7 +39,10 @@ config I2O_BLOCK
 	depends on I2O
 	help
 	  Include support for the I2O Block OSM. The Block OSM presents disk
-	  and other structured block devices to the operating system.
+	  and other structured block devices to the operating system. If you
+	  are using an RAID controller, you could access the array only by
+	  the Block OSM driver. But it is possible to access the single disks
+	  by the SCSI OSM driver, for example to monitor the disks.
 
 	  To compile this support as a module, choose M here: the
 	  module will be called i2o_block.
@@ -50,7 +53,8 @@ config I2O_SCSI
 	help
 	  Allows direct SCSI access to SCSI devices on a SCSI or FibreChannel
 	  I2O controller. You can use both the SCSI and Block OSM together if
-	  you wish.
+	  you wish. To access a RAID array, you must use the Block OSM driver.
+	  But you could use the SCSI OSM driver to monitor the single disks.
 
 	  To compile this support as a module, choose M here: the
 	  module will be called i2o_scsi.
