@@ -237,6 +237,23 @@ static void tg3_enable_ints(struct tg3 *tp)
 	tr32(MAILBOX_INTERRUPT_0 + TG3_64BIT_REG_LOW);
 }
 
+static void tg3_switch_clocks(struct tg3 *tp)
+{
+	if (tr32(TG3PCI_CLOCK_CTRL) & CLOCK_CTRL_44MHZ_CORE) {
+		tw32(TG3PCI_CLOCK_CTRL,
+		     (CLOCK_CTRL_44MHZ_CORE | CLOCK_CTRL_ALTCLK));
+		tr32(TG3PCI_CLOCK_CTRL);
+		udelay(40);
+		tw32(TG3PCI_CLOCK_CTRL,
+		     (CLOCK_CTRL_ALTCLK));
+		tr32(TG3PCI_CLOCK_CTRL);
+		udelay(40);
+	}
+	tw32(TG3PCI_CLOCK_CTRL, 0);
+	tr32(TG3PCI_CLOCK_CTRL);
+	udelay(40);
+}
+
 #define PHY_BUSY_LOOPS	5000
 
 static int tg3_readphy(struct tg3 *tp, int reg, u32 *val)
@@ -443,10 +460,12 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 		tp->link_config.orig_autoneg = tp->link_config.autoneg;
 	}
 
-	tp->link_config.speed = SPEED_10;
-	tp->link_config.duplex = DUPLEX_HALF;
-	tp->link_config.autoneg = AUTONEG_ENABLE;
-	tg3_setup_phy(tp);
+	if (tp->phy_id != PHY_ID_SERDES) {
+		tp->link_config.speed = SPEED_10;
+		tp->link_config.duplex = DUPLEX_HALF;
+		tp->link_config.autoneg = AUTONEG_ENABLE;
+		tg3_setup_phy(tp);
+	}
 
 	tg3_halt(tp);
 
@@ -455,14 +474,19 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 	if (tp->tg3_flags & TG3_FLAG_WOL_ENABLE) {
 		u32 mac_mode;
 
-		tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x5a);
-		udelay(40);
+		if (tp->phy_id != PHY_ID_SERDES) {
+			tg3_writephy(tp, MII_TG3_AUX_CTRL, 0x5a);
+			udelay(40);
 
-		mac_mode = MAC_MODE_PORT_MODE_MII;
+			mac_mode = MAC_MODE_PORT_MODE_MII;
 
-		if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 ||
-		    !(tp->tg3_flags & TG3_FLAG_WOL_SPEED_100MB))
-			mac_mode |= MAC_MODE_LINK_POLARITY;
+			if (GET_ASIC_REV(tp->pci_chip_rev_id) != ASIC_REV_5700 ||
+			    !(tp->tg3_flags & TG3_FLAG_WOL_SPEED_100MB))
+				mac_mode |= MAC_MODE_LINK_POLARITY;
+		} else {
+			mac_mode = MAC_MODE_PORT_MODE_TBI;
+		}
+
 
 		if (((power_caps & PCI_PM_CAP_PME_D3cold) &&
 		     (tp->tg3_flags & TG3_FLAG_WOL_ENABLE)))
@@ -470,7 +494,7 @@ static int tg3_set_power_state(struct tg3 *tp, int state)
 
 		tw32(MAC_MODE, mac_mode);
 		tr32(MAC_MODE);
-		udelay(40);
+		udelay(100);
 
 		tw32(MAC_RX_MODE, RX_MODE_ENABLE);
 		tr32(MAC_RX_MODE);
@@ -4385,6 +4409,8 @@ static int tg3_init_hw(struct tg3 *tp)
 	if (err)
 		goto out;
 
+	tg3_switch_clocks(tp);
+
 	tw32(TG3PCI_MEM_WIN_BASE_ADDR, 0);
 
 	err = tg3_reset_hw(tp);
@@ -5259,6 +5285,11 @@ static int tg3_ethtool_ioctl (struct net_device *dev, void *useraddr)
 			return -EFAULT;
 		if (wol.wolopts & ~WAKE_MAGIC)
 			return -EINVAL;
+		if ((wol.wolopts & WAKE_MAGIC) &&
+		    tp->phy_id == PHY_ID_SERDES &&
+		    !(tp->tg3_flags & TG3_FLAG_SERDES_WOL_CAP))
+			return -EINVAL;
+
 		spin_lock_irq(&tp->lock);
 		if (wol.wolopts & WAKE_MAGIC)
 			tp->tg3_flags |= TG3_FLAG_WOL_ENABLE;
@@ -5793,6 +5824,8 @@ static int __devinit tg3_phy_probe(struct tg3 *tp)
 
 		if (nic_cfg & NIC_SRAM_DATA_CFG_ASF_ENABLE)
 			tp->tg3_flags |= TG3_FLAG_ENABLE_ASF;
+		if (nic_cfg & NIC_SRAM_DATA_CFG_FIBER_WOL)
+			tp->tg3_flags |= TG3_FLAG_SERDES_WOL_CAP;
 	}
 
 	/* Now read the physical PHY_ID from the chip and verify
@@ -6131,8 +6164,9 @@ static int __devinit tg3_get_invariants(struct tg3 *tp)
 	/* Initialize data/descriptor byte/word swapping. */
 	tw32(GRC_MODE, tp->grc_mode);
 
-	/* Clear these out for sanity. */
-	tw32(TG3PCI_CLOCK_CTRL, 0);
+	tg3_switch_clocks(tp);
+
+	/* Clear this out for sanity. */
 	tw32(TG3PCI_MEM_WIN_BASE_ADDR, 0);
 
 	pci_read_config_dword(tp->pdev, TG3PCI_PCISTATE,
