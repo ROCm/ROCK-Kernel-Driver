@@ -137,12 +137,12 @@ static __inline__ struct fib_node * fz_chain(fn_key_t key, struct fn_zone *fz)
 	return fz->fz_hash[fn_hash(key, fz).datum];
 }
 
-extern __inline__ int fn_key_eq(fn_key_t a, fn_key_t b)
+static __inline__ int fn_key_eq(fn_key_t a, fn_key_t b)
 {
 	return a.datum == b.datum;
 }
 
-extern __inline__ int fn_key_leq(fn_key_t a, fn_key_t b)
+static __inline__ int fn_key_leq(fn_key_t a, fn_key_t b)
 {
 	return a.datum <= b.datum;
 }
@@ -703,7 +703,7 @@ FTprint("tb(%d)_delete: %d %08x/%d %d\n", tb->tb_id, r->rtm_type, rta->rta_dst ?
 	return -ESRCH;
 }
 
-extern __inline__ int
+static __inline__ int
 fn_flush_list(struct fib_node ** fp, int z, struct fn_hash *table)
 {
 	int found = 0;
