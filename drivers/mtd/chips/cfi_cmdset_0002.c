@@ -13,7 +13,7 @@
  *
  * This code is GPL
  *
- * $Id: cfi_cmdset_0002.c,v 1.111 2004/11/16 18:29:00 dwmw2 Exp $
+ * $Id: cfi_cmdset_0002.c,v 1.112 2004/11/20 12:49:04 dwmw2 Exp $
  *
  */
 
@@ -1173,8 +1173,7 @@ static inline int do_erase_chip(struct map_info *map, struct flchip *chip)
 	chip->in_progress_block_addr = adr;
 
 	cfi_spin_unlock(chip->mutex);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout((chip->erase_time*HZ)/(2*1000));
+	msleep(chip->erase_time/2);
 	cfi_spin_lock(chip->mutex);
 
 	timeo = jiffies + (HZ*20);
@@ -1259,8 +1258,7 @@ static inline int do_erase_oneblock(struct map_info *map, struct flchip *chip, u
 	chip->in_progress_block_addr = adr;
 	
 	cfi_spin_unlock(chip->mutex);
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	schedule_timeout((chip->erase_time*HZ)/(2*1000));
+	msleep(chip->erase_time/2);
 	cfi_spin_lock(chip->mutex);
 
 	timeo = jiffies + (HZ*20);
