@@ -474,6 +474,8 @@ int scsi_register_host(Scsi_Host_Template *shost_tp)
 	struct list_head *lh;
 	struct Scsi_Host *shost;
 
+	INIT_LIST_HEAD(&shost_tp->shtp_list);
+
 	/*
 	 * Check no detect routine.
 	 */
