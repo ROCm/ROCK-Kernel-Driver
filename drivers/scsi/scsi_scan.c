@@ -1482,6 +1482,13 @@ static int scsi_add_lun(Scsi_Device *sdevscan, Scsi_Device **sdevnew,
 			printk(KERN_INFO "%s: scsi_add_lun: failed low level driver attach, setting device offline", devname);
 			sdev->online = FALSE;
 		}
+		/*
+		 * For untagged devices, did the lldd set the untagged queue
+		 * depth?
+		 */
+		if(sdev->tagged_supported == 0 &&
+			sdev->new_queue_depth != sdev->host->cmd_per_lun)
+			scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
 	} else if(sdev->host->cmd_per_lun) {
 		scsi_adjust_queue_depth(sdev, 0, sdev->host->cmd_per_lun);
 	}
