@@ -291,10 +291,11 @@ extern unsigned int mca_pentium_flag;
 #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 3))
 
 /*
- * Size of io_bitmap in longwords: 32 is ports 0-0x3ff.
+ * Size of io_bitmap, covering ports 0 to 0x3ff.
  */
-#define IO_BITMAP_SIZE	32
-#define IO_BITMAP_BYTES	(IO_BITMAP_SIZE * 4)
+#define IO_BITMAP_BITS  1024
+#define IO_BITMAP_BYTES (IO_BITMAP_BITS/8)
+#define IO_BITMAP_LONGS (IO_BITMAP_BYTES/sizeof(long))
 #define IO_BITMAP_OFFSET offsetof(struct tss_struct,io_bitmap)
 #define INVALID_IO_BITMAP_OFFSET 0x8000
 
@@ -373,8 +374,14 @@ struct tss_struct {
 	unsigned short	fs, __fsh;
 	unsigned short	gs, __gsh;
 	unsigned short	ldt, __ldth;
-	unsigned short	trace, bitmap;
-	unsigned long	io_bitmap[IO_BITMAP_SIZE+1];
+	unsigned short	trace, io_bitmap_base;
+	/*
+	 * The extra 1 is there because the CPU will access an
+	 * additional byte beyond the end of the IO permission
+	 * bitmap. The extra byte must be all 1 bits, and must
+	 * be within the limit.
+	 */
+	unsigned long	io_bitmap[IO_BITMAP_LONGS + 1];
 	/*
 	 * pads the TSS to be cacheline-aligned (size is 0x100)
 	 */
@@ -383,7 +390,7 @@ struct tss_struct {
 	 * .. and then another 0x100 bytes for emergency kernel stack
 	 */
 	unsigned long stack[64];
-};
+} __attribute__((packed));
 
 struct thread_struct {
 /* cached TLS descriptors. */
@@ -405,22 +412,28 @@ struct thread_struct {
 	unsigned long		v86flags, v86mask, saved_esp0;
 	unsigned int		saved_fs, saved_gs;
 /* IO permissions */
-	unsigned long	*ts_io_bitmap;
+	unsigned long	*io_bitmap_ptr;
 };
 
 #define INIT_THREAD  {							\
 	.vm86_info = NULL,						\
-	.ts_io_bitmap = NULL,						\
+	.io_bitmap_ptr = NULL,						\
 }
 
+/*
+ * Note that the .io_bitmap member must be extra-big. This is because
+ * the CPU will access an additional byte beyond the end of the IO
+ * permission bitmap. The extra byte must be all 1 bits, and must
+ * be within the limit.
+ */
 #define INIT_TSS  {							\
 	.esp0		= sizeof(init_stack) + (long)&init_stack,	\
 	.ss0		= __KERNEL_DS,					\
 	.esp1		= sizeof(init_tss[0]) + (long)&init_tss[0],	\
 	.ss1		= __KERNEL_CS,					\
 	.ldt		= GDT_ENTRY_LDT,				\
-	.bitmap		= INVALID_IO_BITMAP_OFFSET,			\
-	.io_bitmap	= { [ 0 ... IO_BITMAP_SIZE ] = ~0 },		\
+	.io_bitmap_base	= INVALID_IO_BITMAP_OFFSET,			\
+	.io_bitmap	= { [ 0 ... IO_BITMAP_LONGS] = ~0 },		\
 }
 
 static inline void load_esp0(struct tss_struct *tss, unsigned long esp0)

@@ -123,3 +123,24 @@ int device_pm_power_down(u32 state)
 	dpm_power_up();
 	goto Done;
 }
+
+
+/**
+ * device_suspend - suspend all devices on the device ree
+ * @state:	state we're entering
+ * @level:	Stage of suspend sequence we're in.
+ *
+ *
+ *	This function is deprecated. Calls should be replaced with
+ *	appropriate calls to device_pm_suspend() and device_pm_power_down().
+ */
+
+int device_suspend(u32 state, u32 level)
+{
+
+	printk("%s Called from:\n",__FUNCTION__);
+	dump_stack();
+	return -EFAULT;
+}
+
+EXPORT_SYMBOL(device_suspend);

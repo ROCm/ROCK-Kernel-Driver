@@ -43,6 +43,7 @@
 #include <asm/setup.h>
 #include <asm/arch_hooks.h>
 #include <asm/sections.h>
+#include <asm/io_apic.h>
 #include "setup_arch_pre.h"
 #include "mach_resources.h"
 
@@ -543,10 +544,12 @@ static void __init parse_cmdline_early (char ** cmdline_p)
 			if (!acpi_force) acpi_disabled = 1;
 		}
 
+#ifdef CONFIG_X86_LOCAL_APIC
 		/* disable IO-APIC */
 		else if (!memcmp(from, "noapic", 6))
 			disable_ioapic_setup();
-#endif
+#endif /* CONFIG_X86_LOCAL_APIC */
+#endif /* CONFIG_ACPI_BOOT */
 
 		/*
 		 * highmem=size forces highmem to be exactly 'size' bytes.

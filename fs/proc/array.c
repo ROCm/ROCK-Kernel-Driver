@@ -300,7 +300,7 @@ int proc_pid_stat(struct task_struct *task, char * buffer)
 	task_lock(task);
 	mm = task->mm;
 	if(mm)
-		atomic_inc(&mm->mm_users);
+		mm = mmgrab(mm);
 	if (task->tty) {
 		tty_pgrp = task->tty->pgrp;
 		tty_nr = task->tty->device;

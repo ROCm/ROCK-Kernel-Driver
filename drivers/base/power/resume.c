@@ -82,3 +82,20 @@ void device_pm_power_up(void)
 	sysdev_resume();
 	dpm_power_up();
 }
+
+/**
+ * device_resume - resume all the devices in the system
+ * @level:	stage of resume process we're at 
+ * 
+ *	This function is deprecated, and should be replaced with appropriate
+ *	calls to device_pm_power_up() and device_pm_resume() above.
+ */
+
+void device_resume(u32 level)
+{
+
+	printk("%s is deprecated. Called from:\n",__FUNCTION__);
+	dump_stack();
+}
+
+EXPORT_SYMBOL(device_resume);
