@@ -47,7 +47,7 @@ void init_new_thread_stack(void *sig_stack, void (*usr1_handler)(int))
 	int flags = 0, pages;
 
 	if(sig_stack != NULL){
-		pages = (1 << CONFIG_KERNEL_STACK_ORDER) - 2;
+		pages = (1 << UML_CONFIG_KERNEL_STACK_ORDER) - 2;
 		set_sigstack(sig_stack, pages * page_size());
 		flags = SA_ONSTACK;
 	}
