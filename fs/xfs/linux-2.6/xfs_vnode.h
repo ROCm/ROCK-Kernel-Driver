@@ -532,6 +532,7 @@ typedef struct vnode_map {
 extern void	vn_purge(struct vnode *, vmap_t *);
 extern vnode_t	*vn_get(struct vnode *, vmap_t *);
 extern int	vn_revalidate(struct vnode *);
+extern void	vn_revalidate_core(struct vnode *, vattr_t *);
 extern void	vn_remove(struct vnode *);
 
 static inline int vn_count(struct vnode *vp)
