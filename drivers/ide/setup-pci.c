@@ -693,7 +693,7 @@ static ata_index_t do_ide_setup_pci_device (struct pci_dev *dev, ide_pci_device_
 	int autodma = 0;
 	int pciirq = 0;
 	int tried_config = 0;
-	ata_index_t index;
+	ata_index_t index = { .b = { .low = 0xff, .high = 0xff } };
 
 	if((autodma = ide_setup_pci_controller(dev, d, noisy, &tried_config)) < 0)
 		return index;

@@ -7,21 +7,21 @@
 # watchdog dies or is 'borrowed' for some reason the software watchdog
 # still gives you some cover.
 
-watchdog-$(CONFIG_PCWATCHDOG) += pcwd.o
-watchdog-$(CONFIG_ACQUIRE_WDT) += acquirewdt.o
-watchdog-$(CONFIG_ADVANTECH_WDT) += advantechwdt.o
-watchdog-$(CONFIG_IB700_WDT) += ib700wdt.o
-watchdog-$(CONFIG_MIXCOMWD) += mixcomwd.o
-watchdog-$(CONFIG_SCx200_WDT) += scx200_wdt.o
-watchdog-$(CONFIG_60XX_WDT) += sbc60xxwdt.o
-watchdog-$(CONFIG_WDT) += wdt.o
-watchdog-$(CONFIG_WDTPCI) += wdt_pci.o
-watchdog-$(CONFIG_21285_WATCHDOG) += wdt285.o
-watchdog-$(CONFIG_977_WATCHDOG) += wdt977.o
-watchdog-$(CONFIG_I810_TCO) += i810-tco.o
-watchdog-$(CONFIG_MACHZ_WDT) += machzwd.o
-watchdog-$(CONFIG_SH_WDT) += shwdt.o
-watchdog-$(CONFIG_EUROTECH_WDT) += eurotechwdt.o
-watchdog-$(CONFIG_SOFT_WATCHDOG) += softdog.o
+obj-$(CONFIG_PCWATCHDOG) += pcwd.o
+obj-$(CONFIG_ACQUIRE_WDT) += acquirewdt.o
+obj-$(CONFIG_ADVANTECH_WDT) += advantechwdt.o
+obj-$(CONFIG_IB700_WDT) += ib700wdt.o
+obj-$(CONFIG_MIXCOMWD) += mixcomwd.o
+obj-$(CONFIG_SCx200_WDT) += scx200_wdt.o
+obj-$(CONFIG_60XX_WDT) += sbc60xxwdt.o
+obj-$(CONFIG_WDT) += wdt.o
+obj-$(CONFIG_WDTPCI) += wdt_pci.o
+obj-$(CONFIG_21285_WATCHDOG) += wdt285.o
+obj-$(CONFIG_977_WATCHDOG) += wdt977.o
+obj-$(CONFIG_I810_TCO) += i810-tco.o
+obj-$(CONFIG_MACHZ_WDT) += machzwd.o
+obj-$(CONFIG_SH_WDT) += shwdt.o
+obj-$(CONFIG_EUROTECH_WDT) += eurotechwdt.o
+obj-$(CONFIG_SOFT_WATCHDOG) += softdog.o
 
 include $(TOPDIR)/Rules.make
