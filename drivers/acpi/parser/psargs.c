@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: psargs - Parse AML opcode arguments
- *              $Revision: 64 $
+ *              $Revision: 65 $
  *
  *****************************************************************************/
 
@@ -95,6 +95,7 @@ acpi_ps_get_next_package_length (
 		break;
 
 	default:
+
 		/* Can't get here, only 2 bits / 4 cases */
 		break;
 	}
@@ -126,6 +127,8 @@ acpi_ps_get_next_package_end (
 
 	ACPI_FUNCTION_TRACE ("Ps_get_next_package_end");
 
+
+	/* Function below changes Parser_state->Aml */
 
 	length = (NATIVE_UINT) acpi_ps_get_next_package_length (parser_state);
 
@@ -184,21 +187,21 @@ acpi_ps_get_next_namestring (
 
 		/* Two name segments */
 
-		end += 9;
+		end += 1 + (2 * ACPI_NAME_SIZE);
 		break;
 
 	case AML_MULTI_NAME_PREFIX_OP:
 
 		/* Multiple name segments, 4 chars each */
 
-		end += 2 + ((ACPI_SIZE) ACPI_GET8 (end + 1) * 4);
+		end += 2 + ((ACPI_SIZE) ACPI_GET8 (end + 1) * ACPI_NAME_SIZE);
 		break;
 
 	default:
 
 		/* Single name segment */
 
-		end += 4;
+		end += ACPI_NAME_SIZE;
 		break;
 	}
 
@@ -215,8 +218,8 @@ acpi_ps_get_next_namestring (
  *              Arg                 - Where the namepath will be stored
  *              Arg_count           - If the namepath points to a control method
  *                                    the method's argument is returned here.
- *              Method_call         - Whether the namepath can be the start
- *                                    of a method call
+ *              Method_call         - Whether the namepath can possibly be the
+ *                                    start of a method call
  *
  * RETURN:      Status
  *
@@ -230,9 +233,9 @@ acpi_ps_get_next_namestring (
 
 acpi_status
 acpi_ps_get_next_namepath (
+	acpi_walk_state         *walk_state,
 	acpi_parse_state        *parser_state,
 	acpi_parse_object       *arg,
-	u32                     *arg_count,
 	u8                      method_call)
 {
 	NATIVE_CHAR             *path;
@@ -267,12 +270,15 @@ acpi_ps_get_next_namepath (
 		 * object  (MUST BE mode EXECUTE to perform upsearch)
 		 */
 		status = acpi_ns_lookup (&scope_info, path, ACPI_TYPE_ANY, ACPI_IMODE_EXECUTE,
-				 ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE, NULL,
-				 &node);
+				 ACPI_NS_SEARCH_PARENT | ACPI_NS_DONT_OPEN_SCOPE, NULL, &node);
 		if (ACPI_SUCCESS (status) && method_call) {
 			if (node->type == ACPI_TYPE_METHOD) {
+				/*
+				 * This name is actually a control method invocation
+				 */
 				method_desc = acpi_ns_get_attached_object (node);
-				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p Desc %p Path=%p\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
+					"Control Method - %p Desc %p Path=%p\n",
 					node, method_desc, path));
 
 				name_op = acpi_ps_alloc_op (AML_INT_NAMEPATH_OP);
@@ -283,7 +289,6 @@ acpi_ps_get_next_namepath (
 				/* Change arg into a METHOD CALL and attach name to it */
 
 				acpi_ps_init_op (arg, AML_INT_METHODCALL_OP);
-
 				name_op->common.value.name = path;
 
 				/* Point METHODCALL/NAME to the METHOD Node */
@@ -292,15 +297,19 @@ acpi_ps_get_next_namepath (
 				acpi_ps_append_arg (arg, name_op);
 
 				if (!method_desc) {
-					ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p has no attached object\n",
+					ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
+						"Control Method - %p has no attached object\n",
 						node));
 					return_ACPI_STATUS (AE_AML_INTERNAL);
 				}
 
-				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE, "Control Method - %p Args %X\n",
+				ACPI_DEBUG_PRINT ((ACPI_DB_PARSE,
+					"Control Method - %p Args %X\n",
 					node, method_desc->method.param_count));
 
-				*arg_count = method_desc->method.param_count;
+				/* Get the number of arguments to expect */
+
+				walk_state->arg_count = method_desc->method.param_count;
 				return_ACPI_STATUS (AE_OK);
 			}
 
@@ -309,6 +318,29 @@ acpi_ps_get_next_namepath (
 			 * Just init the NAMEPATH object with the pathname.
 			 * (See code below)
 			 */
+		}
+
+		if (ACPI_FAILURE (status)) {
+			/*
+			 * 1) Any error other than NOT_FOUND is always severe
+			 * 2) NOT_FOUND is only important if we are executing a method.
+			 * 3) If executing a Cond_ref_of opcode, NOT_FOUND is ok.
+			 */
+			if ((((walk_state->parse_flags & ACPI_PARSE_MODE_MASK) == ACPI_PARSE_EXECUTE) &&
+				(status == AE_NOT_FOUND)                                                &&
+				(walk_state->op->common.aml_opcode != AML_COND_REF_OF_OP)) ||
+
+				(status != AE_NOT_FOUND)) {
+				ACPI_REPORT_NSERROR (path, status);
+			}
+			else {
+				/*
+				 * We got a NOT_FOUND during table load or we encountered
+				 * a Cond_ref_of(x) where the target does not exist.
+				 * -- either case is ok
+				 */
+				status = AE_OK;
+			}
 		}
 	}
 
@@ -410,6 +442,7 @@ acpi_ps_get_next_simple_arg (
 
 
 	default:
+
 		ACPI_REPORT_ERROR (("Invalid Arg_type %X\n", arg_type));
 		break;
 	}
@@ -435,7 +468,7 @@ acpi_ps_get_next_field (
 	acpi_parse_state        *parser_state)
 {
 	u32                     aml_offset = ACPI_PTR_DIFF (parser_state->aml,
-			  parser_state->aml_start);
+			 parser_state->aml_start);
 	acpi_parse_object       *field;
 	u16                     opcode;
 	u32                     name;
@@ -484,7 +517,7 @@ acpi_ps_get_next_field (
 
 		ACPI_MOVE_UNALIGNED32_TO_32 (&name, parser_state->aml);
 		acpi_ps_set_name (field, name);
-		parser_state->aml += 4;
+		parser_state->aml += ACPI_NAME_SIZE;
 
 		/* Get the length which is encoded as a package length */
 
@@ -513,6 +546,7 @@ acpi_ps_get_next_field (
 		break;
 
 	default:
+
 		/* Opcode was set in previous switch */
 		break;
 	}
@@ -539,9 +573,9 @@ acpi_ps_get_next_field (
 
 acpi_status
 acpi_ps_get_next_arg (
+	acpi_walk_state         *walk_state,
 	acpi_parse_state        *parser_state,
 	u32                     arg_type,
-	u32                     *arg_count,
 	acpi_parse_object       **return_arg)
 {
 	acpi_parse_object       *arg = NULL;
@@ -620,7 +654,8 @@ acpi_ps_get_next_arg (
 
 			/* Fill in bytelist data */
 
-			arg->common.value.size = ACPI_PTR_DIFF (parser_state->pkg_end, parser_state->aml);
+			arg->common.value.size = ACPI_PTR_DIFF (parser_state->pkg_end,
+					  parser_state->aml);
 			arg->named.data = parser_state->aml;
 
 			/* Skip to End of byte data */
@@ -645,12 +680,12 @@ acpi_ps_get_next_arg (
 				return_ACPI_STATUS (AE_NO_MEMORY);
 			}
 
-			status = acpi_ps_get_next_namepath (parser_state, arg, arg_count, 0);
+			status = acpi_ps_get_next_namepath (walk_state, parser_state, arg, 0);
 		}
 		else {
 			/* single complex argument, nothing returned */
 
-			*arg_count = 1;
+			walk_state->arg_count = 1;
 		}
 		break;
 
@@ -660,7 +695,7 @@ acpi_ps_get_next_arg (
 
 		/* single complex argument, nothing returned */
 
-		*arg_count = 1;
+		walk_state->arg_count = 1;
 		break;
 
 
@@ -671,7 +706,7 @@ acpi_ps_get_next_arg (
 		if (parser_state->aml < parser_state->pkg_end) {
 			/* non-empty list of variable arguments, nothing returned */
 
-			*arg_count = ACPI_VAR_ARGS;
+			walk_state->arg_count = ACPI_VAR_ARGS;
 		}
 		break;
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  * Module Name: tbutils - Table manipulation utilities
- *              $Revision: 56 $
+ *              $Revision: 57 $
  *
  *****************************************************************************/
 
@@ -175,8 +175,8 @@ acpi_tb_verify_table_checksum (
 	/* Return the appropriate exception */
 
 	if (checksum) {
-		ACPI_REPORT_WARNING (("Invalid checksum (%X) in table %4.4s\n",
-			(u32) checksum, table_header->signature));
+		ACPI_REPORT_WARNING (("Invalid checksum in table [%4.4s] (%02X, sum %02X is not zero)\n",
+			table_header->signature, (u32) table_header->checksum, (u32) checksum));
 
 		status = AE_BAD_CHECKSUM;
 	}
