@@ -1726,14 +1726,14 @@ cfq_insert_request(request_queue_t *q, struct request *rq, int where)
 
 static inline int cfq_pending_requests(struct cfq_data *cfqd)
 {
-	return list_empty(&cfqd->queue->queue_head) && !cfqd->busy_queues;
+	return !list_empty(&cfqd->queue->queue_head) || cfqd->busy_queues;
 }
 
 static int cfq_queue_empty(request_queue_t *q)
 {
 	struct cfq_data *cfqd = q->elevator->elevator_data;
 
-	return cfq_pending_requests(cfqd);
+	return !cfq_pending_requests(cfqd);
 }
 
 static void cfq_completed_request(request_queue_t *q, struct request *rq)
