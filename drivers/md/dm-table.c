@@ -250,12 +250,12 @@ void table_destroy(struct dm_table *t)
 
 	/* free the targets */
 	for (i = 0; i < t->num_targets; i++) {
-		struct dm_target *tgt = &t->targets[i];
-
-		dm_put_target_type(t->targets[i].type);
+		struct dm_target *tgt = t->targets + i;
 
 		if (tgt->type->dtr)
 			tgt->type->dtr(tgt);
+
+		dm_put_target_type(tgt->type);
 	}
 
 	vfree(t->highs);
