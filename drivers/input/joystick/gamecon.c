@@ -15,14 +15,14 @@
 /*
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; either version 2 of the License, or 
+ * the Free Software Foundation; either version 2 of the License, or
  * (at your option) any later version.
- * 
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
@@ -70,13 +70,13 @@ __obsolete_setup("gc_3=");
 #define GC_NES4		3
 #define GC_MULTI	4
 #define GC_MULTI2	5
-#define GC_N64		6	
+#define GC_N64		6
 #define GC_PSX		7
 
 #define GC_MAX		7
 
 #define GC_REFRESH_TIME	HZ/100
- 
+
 struct gc {
 	struct pardevice *pd;
 	struct input_dev dev[5];
@@ -104,7 +104,7 @@ static short gc_n64_btn[] = { BTN_A, BTN_B, BTN_C, BTN_X, BTN_Y, BTN_Z, BTN_TL, 
 #define GC_N64_DELAY		133		/* delay between transmit request, and response ready (us) */
 #define GC_N64_REQUEST		0x1dd1111111ULL /* the request data command (encoded for 000000011) */
 #define GC_N64_DWS		3		/* delay between write segments (required for sound playback because of ISA DMA) */
-						/* GC_N64_DWS > 24 is known to fail */ 
+						/* GC_N64_DWS > 24 is known to fail */
 #define GC_N64_POWER_W		0xe2		/* power during write (transmit request) */
 #define GC_N64_POWER_R		0xfd		/* power during read */
 #define GC_N64_OUT		0x1d		/* output bits to the 4 pads */
@@ -113,8 +113,8 @@ static short gc_n64_btn[] = { BTN_A, BTN_B, BTN_C, BTN_X, BTN_Y, BTN_Z, BTN_TL, 
 						/* than 123 us */
 #define GC_N64_CLOCK		0x02		/* clock bits for read */
 
-/* 
- * gc_n64_read_packet() reads an N64 packet. 
+/*
+ * gc_n64_read_packet() reads an N64 packet.
  * Each pad uses one bit per byte. So all pads connected to this port are read in parallel.
  */
 
@@ -224,7 +224,7 @@ static void gc_multi_read_packet(struct gc *gc, int length, unsigned char *data)
  *	http://www.dim.com/~mackys/psxmemcard/ps-eng2.txt
  *	http://www.gamesx.com/controldata/psxcont/psxcont.htm
  *	ftp://milano.usal.es/pablo/
- *	
+ *
  */
 
 #define GC_PSX_DELAY	25		/* 25 usec */
@@ -331,13 +331,13 @@ static void gc_timer(unsigned long private)
 			s = gc_status_bit[i];
 
 			if (s & gc->pads[GC_N64] & ~(data[8] | data[9])) {
-	
+
 				signed char axes[2];
 				axes[0] = axes[1] = 0;
 
 				for (j = 0; j < 8; j++) {
-					if (data[23 - j] & s) axes[0] |= 1 << j; 
-					if (data[31 - j] & s) axes[1] |= 1 << j; 
+					if (data[23 - j] & s) axes[0] |= 1 << j;
+					if (data[31 - j] & s) axes[1] |= 1 << j;
 				}
 
 				input_report_abs(dev + i, ABS_X,  axes[0]);
@@ -588,7 +588,7 @@ static struct gc __init *gc_probe(int *config, int nargs)
 				break;
 
 			case GC_PSX:
-				
+
 				psx = gc_psx_read_packet(gc, data);
 
 				switch(psx) {
@@ -629,7 +629,7 @@ static struct gc __init *gc_probe(int *config, int nargs)
 		}
 
 		sprintf(gc->phys[i], "%s/input%d", gc->pd->port->name, i);
-		
+
                 gc->dev[i].name = gc_names[config[i + 1]];
 		gc->dev[i].phys = gc->phys[i];
                 gc->dev[i].id.bustype = BUS_PARPORT;
@@ -646,7 +646,7 @@ static struct gc __init *gc_probe(int *config, int nargs)
 		return NULL;
 	}
 
-	for (i = 0; i < 5; i++) 
+	for (i = 0; i < 5; i++)
 		if (gc->pads[0] & gc_status_bit[i]) {
 			input_register_device(gc->dev + i);
 			printk(KERN_INFO "input: %s on %s\n", gc->dev[i].name, gc->pd->port->name);
@@ -675,7 +675,7 @@ void __exit gc_exit(void)
 		if (gc_base[i]) {
 			for (j = 0; j < 5; j++)
 				if (gc_base[i]->pads[0] & gc_status_bit[j])
-					input_unregister_device(gc_base[i]->dev + j); 
+					input_unregister_device(gc_base[i]->dev + j);
 			parport_unregister_device(gc_base[i]->pd);
 		}
 }

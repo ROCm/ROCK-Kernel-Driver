@@ -2075,9 +2075,8 @@ static struct ethtool_ops e100_ethtool_ops = {
 static int e100_do_ioctl(struct net_device *netdev, struct ifreq *ifr, int cmd)
 {
 	struct nic *nic = netdev_priv(netdev);
-	struct mii_ioctl_data *mii = (struct mii_ioctl_data *)&ifr->ifr_data;
 
-	return generic_mii_ioctl(&nic->mii, mii, cmd, NULL);
+	return generic_mii_ioctl(&nic->mii, if_mii(ifr), cmd, NULL);
 }
 
 static int e100_alloc(struct nic *nic)

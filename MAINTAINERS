@@ -944,15 +944,15 @@ S:	Maintained
 IA64 (Itanium) PLATFORM
 P:	David Mosberger-Tang
 M:	davidm@hpl.hp.com
-L:	linux-ia64@linuxia64.org
-W:	http://www.linuxia64.org/
+L:	linux-ia64@vger.kernel.org
+W:	http://www.ia64-linux.org/
 S:	Maintained
 
 SN-IA64 (Itanium) SUB-PLATFORM
 P:	Jesse Barnes
 M:	jbarnes@sgi.com
 L:	linux-altix@sgi.com
-L:	linux-ia64@linuxia64.org
+L:	linux-ia64@vger.kernel.org
 W:	http://www.sgi.com/altix
 S:	Maintained
 

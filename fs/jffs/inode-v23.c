@@ -1582,7 +1582,7 @@ jffs_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			struct jffs_fmcontrol *fmc = c->fmc;
 			printk("Flash status -- ");
 			if (!access_ok(VERIFY_WRITE,
-				       (struct jffs_flash_status *)arg,
+				       (struct jffs_flash_status __user *)arg,
 				       sizeof(struct jffs_flash_status))) {
 				D(printk("jffs_ioctl(): Bad arg in "
 					 "JFFS_GET_STATUS ioctl!\n"));
@@ -1598,7 +1598,7 @@ jffs_ioctl(struct inode *inode, struct file *filp, unsigned int cmd,
 			       "begin: %d, end: %d\n",
 			       fst.size, fst.used, fst.dirty,
 			       fst.begin, fst.end);
-			if (copy_to_user((struct jffs_flash_status *)arg,
+			if (copy_to_user((struct jffs_flash_status __user *)arg,
 					 &fst,
 					 sizeof(struct jffs_flash_status))) {
 				ret = -EFAULT;

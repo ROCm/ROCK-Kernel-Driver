@@ -202,7 +202,6 @@ ia64_sync_itc (unsigned int master)
 {
 	long i, delta, adj, adjust_latency = 0, done = 0;
 	unsigned long flags, rt, master_time_stamp, bound;
-	extern void ia64_cpu_local_tick (void);
 #if DEBUG_ITC_SYNC
 	struct {
 		long rt;	/* roundtrip time */
@@ -525,7 +524,7 @@ build_cpu_to_node_map (void)
 #else
 #		error Fixme: Dunno how to build CPU-to-node map.
 #endif
-		cpu_to_node_map[cpu] = node;
+		cpu_to_node_map[cpu] = (node >= 0) ? node : 0;
 		if (node >= 0)
 			cpu_set(cpu, node_to_cpu_mask[node]);
 	}

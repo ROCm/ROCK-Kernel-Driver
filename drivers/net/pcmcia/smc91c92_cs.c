@@ -2221,7 +2221,7 @@ static int smc_ioctl (struct net_device *dev, struct ifreq *rq, int cmd)
     u_short saved_bank;
     ioaddr_t ioaddr = dev->base_addr;
 
-    mii = (struct mii_ioctl_data *) &rq->ifr_data;
+    mii = if_mii(rq);
     if (!netif_running(dev))
     	return -EINVAL;
 

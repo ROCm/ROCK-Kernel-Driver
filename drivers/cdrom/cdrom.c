@@ -651,7 +651,6 @@ int cdrom_get_random_writable(struct cdrom_device_info *cdi,
 {
 	struct packet_command cgc;
 	char buffer[24];
-	struct feature_header *fh;
 	int ret;
 
 	init_cdrom_command(&cgc, buffer, sizeof(buffer), CGC_DATA_READ);
@@ -664,14 +663,7 @@ int cdrom_get_random_writable(struct cdrom_device_info *cdi,
 	if ((ret = cdi->ops->generic_packet(cdi, &cgc)))
 		return ret;
 
-	fh = (struct feature_header *)&buffer[0];
-	if (be32_to_cpu(fh->data_len) >= (sizeof(struct feature_header)+
-					  sizeof(struct rwrt_feature_desc)))
-		memcpy(rfd, &buffer[sizeof(struct feature_header)],
-		       sizeof (*rfd));
-	else
-		memset(rfd, 0, sizeof(*rfd));
-
+	memcpy(rfd, &buffer[sizeof(struct feature_header)], sizeof (*rfd));
 	return 0;
 }
 

@@ -147,7 +147,7 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
 
 	memset(stinger, 0, sizeof(struct stinger));
 
-	stinger->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);	
+	stinger->dev.evbit[0] = BIT(EV_KEY) | BIT(EV_ABS);
 	stinger->dev.keybit[LONG(BTN_A)] = BIT(BTN_A) | BIT(BTN_B) | BIT(BTN_C) | BIT(BTN_X) | \
 					   BIT(BTN_Y) | BIT(BTN_Z) | BIT(BTN_TL) | BIT(BTN_TR) | \
 					   BIT(BTN_START) | BIT(BTN_SELECT);
@@ -164,8 +164,8 @@ static void stinger_connect(struct serio *serio, struct serio_dev *dev)
 	stinger->dev.id.version = 0x0100;
 
 	for (i = 0; i < 2; i++) {
-		stinger->dev.absmax[ABS_X+i] =  64;	
-		stinger->dev.absmin[ABS_X+i] = -64;	
+		stinger->dev.absmax[ABS_X+i] =  64;
+		stinger->dev.absmin[ABS_X+i] = -64;
 		stinger->dev.absflat[ABS_X+i] = 4;
 	}
 

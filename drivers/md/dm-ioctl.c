@@ -417,9 +417,9 @@ static int list_devices(struct dm_ioctl *param, size_t param_size)
 	return 0;
 }
 
-static void list_version_get_needed(struct target_type *tt, void *param)
+static void list_version_get_needed(struct target_type *tt, void *needed_param)
 {
-    int *needed = param;
+    size_t *needed = needed_param;
 
     *needed += strlen(tt->name);
     *needed += sizeof(tt->version);

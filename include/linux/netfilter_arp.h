@@ -17,4 +17,5 @@
 #define NF_ARP_FORWARD	2
 #define NF_ARP_NUMHOOKS	3
 
+static DECLARE_MUTEX(arpt_mutex);
 #endif /* __LINUX_ARP_NETFILTER_H */

@@ -258,6 +258,7 @@
 #define __NR_mq_notify			1266
 #define __NR_mq_getsetattr		1267
 #define __NR_kexec_load			1268
+#define __NR_vserver			1269
 
 #ifdef __KERNEL__
 

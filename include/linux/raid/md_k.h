@@ -255,6 +255,14 @@ struct mddev_s
 	struct list_head		all_mddevs;
 };
 
+
+static inline void rdev_dec_pending(mdk_rdev_t *rdev, mddev_t *mddev)
+{
+	int faulty = rdev->faulty;
+	if (atomic_dec_and_test(&rdev->nr_pending) && faulty)
+		set_bit(MD_RECOVERY_NEEDED, &mddev->recovery);
+}
+
 struct mdk_personality_s
 {
 	char *name;
@@ -271,6 +279,8 @@ struct mdk_personality_s
 	int (*hot_remove_disk) (mddev_t *mddev, int number);
 	int (*spare_active) (mddev_t *mddev);
 	int (*sync_request)(mddev_t *mddev, sector_t sector_nr, int go_faster);
+	int (*resize) (mddev_t *mddev, sector_t sectors);
+	int (*reshape) (mddev_t *mddev, int raid_disks);
 };
 
 

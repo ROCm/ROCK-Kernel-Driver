@@ -690,7 +690,6 @@ typedef union {
 typedef enum {
 	ide_stopped,	/* no drive operation was started */
 	ide_started,	/* a drive operation was started, handler was set */
-	ide_released,	/* as ide_started, but bus also released */
 } ide_startstop_t;
 
 struct ide_driver_s;
@@ -724,7 +723,6 @@ typedef struct ide_drive_s {
 	u8	keep_settings;		/* restore settings after drive reset */
 	u8	autodma;		/* device can safely use dma on host */
 	u8	using_dma;		/* disk is using dma for read/write */
-	u8	using_tcq;		/* disk is using queueing */
 	u8	retry_pio;		/* retrying dma capable host in pio */
 	u8	state;			/* retry state */
 	u8	waiting_for_dma;	/* dma currently in progress */
@@ -751,6 +749,7 @@ typedef struct ide_drive_s {
 	unsigned remap_0_to_1	: 1;	/* 0=noremap, 1=remap 0->1 (for EZDrive) */
 	unsigned blocked        : 1;	/* 1=powermanagment told us not to do anything, so sleep nicely */
 	unsigned vdma		: 1;	/* 1=doing PIO over DMA 0=doing normal DMA */
+	unsigned stroke		: 1;	/* from:  hdx=stroke */
 	unsigned addressing;		/*      : 3;
 					 *  0=28-bit
 					 *  1=48-bit
@@ -781,7 +780,6 @@ typedef struct ide_drive_s {
 	u8	sect;		/* "real" sectors per track */
 	u8	bios_head;	/* BIOS/fdisk/LILO number of heads */
 	u8	bios_sect;	/* BIOS/fdisk/LILO sectors per track */
-	u8	queue_depth;	/* max queue depth */
 
 	unsigned int	bios_cyl;	/* BIOS/fdisk/LILO number of cyls */
 	unsigned int	cyl;		/* "real" number of cyls */
@@ -1095,7 +1093,6 @@ typedef struct ide_settings_s {
 
 extern struct semaphore ide_setting_sem;
 extern int ide_add_setting(ide_drive_t *drive, const char *name, int rw, int read_ioctl, int write_ioctl, int data_type, int min, int max, int mul_factor, int div_factor, void *data, ide_procset_t *set);
-extern void ide_remove_setting(ide_drive_t *drive, char *name);
 extern ide_settings_t *ide_find_setting_by_name(ide_drive_t *drive, char *name);
 extern int ide_read_setting(ide_drive_t *t, ide_settings_t *setting);
 extern int ide_write_setting(ide_drive_t *drive, ide_settings_t *setting, int val);
@@ -1116,7 +1113,6 @@ extern struct proc_dir_entry *proc_ide_root;
 
 extern void proc_ide_create(void);
 extern void proc_ide_destroy(void);
-extern void destroy_proc_ide_device(ide_hwif_t *, ide_drive_t *);
 extern void destroy_proc_ide_drives(ide_hwif_t *);
 extern void create_proc_ide_interfaces(void);
 extern void ide_add_proc_entries(struct proc_dir_entry *, ide_proc_entry_t *, void *);
@@ -1358,6 +1354,8 @@ extern int ide_do_drive_cmd(ide_drive_t *, struct request *, ide_action_t);
  * (ide_drive_t *drive, u8 stat, u8 err)
  */
 extern void ide_end_drive_cmd(ide_drive_t *, u8, u8);
+
+extern void try_to_flush_leftover_data(ide_drive_t *);
 
 /*
  * Issue ATA command and wait for completion.
@@ -1622,14 +1620,6 @@ extern int __ide_dma_lostirq(ide_drive_t *);
 extern int __ide_dma_timeout(ide_drive_t *);
 #endif /* CONFIG_BLK_DEV_IDEDMA_PCI */
 
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-extern int __ide_dma_queued_on(ide_drive_t *drive);
-extern int __ide_dma_queued_off(ide_drive_t *drive);
-extern ide_startstop_t __ide_dma_queued_read(ide_drive_t *drive);
-extern ide_startstop_t __ide_dma_queued_write(ide_drive_t *drive);
-extern ide_startstop_t __ide_dma_queued_start(ide_drive_t *drive);
-#endif
-
 #else
 static inline int __ide_dma_off(ide_drive_t *drive) { return 0; }
 #endif /* CONFIG_BLK_DEV_IDEDMA */
@@ -1697,28 +1687,6 @@ extern struct semaphore ide_cfg_sem;
  */
 
 #define local_irq_set(flags)	do { local_save_flags((flags)); local_irq_enable(); } while (0)
-
-#define IDE_MAX_TAG	32
-#ifdef CONFIG_BLK_DEV_IDE_TCQ
-static inline int ata_pending_commands(ide_drive_t *drive)
-{
-	if (drive->using_tcq)
-		return blk_queue_tag_depth(drive->queue);
-
-	return 0;
-}
-
-static inline int ata_can_queue(ide_drive_t *drive)
-{
-	if (drive->using_tcq)
-		return blk_queue_tag_queue(drive->queue);
-
-	return 1;
-}
-#else
-#define ata_pending_commands(drive)	(0)
-#define ata_can_queue(drive)		(1)
-#endif
 
 extern struct bus_type ide_bus_type;
 

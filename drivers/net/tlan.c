@@ -984,7 +984,7 @@ static int TLan_Open( struct net_device *dev )
 static int TLan_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	TLanPrivateInfo *priv = dev->priv;
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
+	struct mii_ioctl_data *data = if_mii(rq);
 	u32 phy   = priv->phy[priv->phyNum];
 	
 	if (!priv->phyOnline)

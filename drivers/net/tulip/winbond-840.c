@@ -1526,8 +1526,8 @@ static struct ethtool_ops netdev_ethtool_ops = {
 
 static int netdev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
-	struct mii_ioctl_data *data = (struct mii_ioctl_data *)&rq->ifr_data;
-	struct netdev_private *np = dev->priv;
+	struct mii_ioctl_data *data = if_mii(rq);
+	struct netdev_private *np = netdev_priv(dev);
 
 	switch(cmd) {
 	case SIOCGMIIPHY:		/* Get address of MII PHY in use. */

@@ -41,6 +41,58 @@ static struct sock *tcpnl;
    rta->rta_len = rtalen;                   \
    RTA_DATA(rta); })
 
+/* Return information about state of tcp endpoint in API format. */
+void tcp_get_info(struct sock *sk, struct tcp_info *info)
+{
+	struct tcp_opt *tp = tcp_sk(sk);
+	u32 now = tcp_time_stamp;
+
+	memset(info, 0, sizeof(*info));
+
+	info->tcpi_state = sk->sk_state;
+	info->tcpi_ca_state = tp->ca_state;
+	info->tcpi_retransmits = tp->retransmits;
+	info->tcpi_probes = tp->probes_out;
+	info->tcpi_backoff = tp->backoff;
+
+	if (tp->tstamp_ok)
+		info->tcpi_options |= TCPI_OPT_TIMESTAMPS;
+	if (tp->sack_ok)
+		info->tcpi_options |= TCPI_OPT_SACK;
+	if (tp->wscale_ok) {
+		info->tcpi_options |= TCPI_OPT_WSCALE;
+		info->tcpi_snd_wscale = tp->snd_wscale;
+		info->tcpi_rcv_wscale = tp->rcv_wscale;
+	} 
+
+	if (tp->ecn_flags&TCP_ECN_OK)
+		info->tcpi_options |= TCPI_OPT_ECN;
+
+	info->tcpi_rto = (1000000*tp->rto)/HZ;
+	info->tcpi_ato = (1000000*tp->ack.ato)/HZ;
+	info->tcpi_snd_mss = tp->mss_cache;
+	info->tcpi_rcv_mss = tp->ack.rcv_mss;
+
+	info->tcpi_unacked = tp->packets_out;
+	info->tcpi_sacked = tp->sacked_out;
+	info->tcpi_lost = tp->lost_out;
+	info->tcpi_retrans = tp->retrans_out;
+	info->tcpi_fackets = tp->fackets_out;
+
+	info->tcpi_last_data_sent = ((now - tp->lsndtime)*1000)/HZ;
+	info->tcpi_last_data_recv = ((now - tp->ack.lrcvtime)*1000)/HZ;
+	info->tcpi_last_ack_recv = ((now - tp->rcv_tstamp)*1000)/HZ;
+
+	info->tcpi_pmtu = tp->pmtu_cookie;
+	info->tcpi_rcv_ssthresh = tp->rcv_ssthresh;
+	info->tcpi_rtt = ((1000000*tp->srtt)/HZ)>>3;
+	info->tcpi_rttvar = ((1000000*tp->mdev)/HZ)>>2;
+	info->tcpi_snd_ssthresh = tp->snd_ssthresh;
+	info->tcpi_snd_cwnd = tp->snd_cwnd;
+	info->tcpi_advmss = tp->advmss;
+	info->tcpi_reordering = tp->reordering;
+}
+
 static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 			int ext, u32 pid, u32 seq)
 {
@@ -150,55 +202,8 @@ static int tcpdiag_fill(struct sk_buff *skb, struct sock *sk,
 		minfo->tcpdiag_tmem = atomic_read(&sk->sk_wmem_alloc);
 	}
 
-	if (info) {
-		u32 now = tcp_time_stamp;
-
-		info->tcpi_state = sk->sk_state;
-		info->tcpi_ca_state = tp->ca_state;
-		info->tcpi_retransmits = tp->retransmits;
-		info->tcpi_probes = tp->probes_out;
-		info->tcpi_backoff = tp->backoff;
-		info->tcpi_options = 0;
-		if (tp->tstamp_ok)
-			info->tcpi_options |= TCPI_OPT_TIMESTAMPS;
-		if (tp->sack_ok)
-			info->tcpi_options |= TCPI_OPT_SACK;
-		if (tp->wscale_ok) {
-			info->tcpi_options |= TCPI_OPT_WSCALE;
-			info->tcpi_snd_wscale = tp->snd_wscale;
-			info->tcpi_rcv_wscale = tp->rcv_wscale;
-		} else {
-			info->tcpi_snd_wscale = 0;
-			info->tcpi_rcv_wscale = 0;
-		}
-		if (tp->ecn_flags&TCP_ECN_OK)
-			info->tcpi_options |= TCPI_OPT_ECN;
-
-		info->tcpi_rto = (1000000*tp->rto)/HZ;
-		info->tcpi_ato = (1000000*tp->ack.ato)/HZ;
-		info->tcpi_snd_mss = tp->mss_cache;
-		info->tcpi_rcv_mss = tp->ack.rcv_mss;
-
-		info->tcpi_unacked = tp->packets_out;
-		info->tcpi_sacked = tp->sacked_out;
-		info->tcpi_lost = tp->lost_out;
-		info->tcpi_retrans = tp->retrans_out;
-		info->tcpi_fackets = tp->fackets_out;
-
-		info->tcpi_last_data_sent = ((now - tp->lsndtime)*1000)/HZ;
-		info->tcpi_last_ack_sent = 0;
-		info->tcpi_last_data_recv = ((now - tp->ack.lrcvtime)*1000)/HZ;
-		info->tcpi_last_ack_recv = ((now - tp->rcv_tstamp)*1000)/HZ;
-
-		info->tcpi_pmtu = tp->pmtu_cookie;
-		info->tcpi_rcv_ssthresh = tp->rcv_ssthresh;
-		info->tcpi_rtt = ((1000000*tp->srtt)/HZ)>>3;
-		info->tcpi_rttvar = ((1000000*tp->mdev)/HZ)>>2;
-		info->tcpi_snd_ssthresh = tp->snd_ssthresh;
-		info->tcpi_snd_cwnd = tp->snd_cwnd;
-		info->tcpi_advmss = tp->advmss;
-		info->tcpi_reordering = tp->reordering;
-	}
+	if (info) 
+		tcp_get_info(sk, info);
 
 	if (vinfo) {
 		vinfo->tcpv_enabled = tp->vegas.doing_vegas_now;

@@ -800,8 +800,8 @@ asmlinkage int sunos_setpgrp(pid_t pid, pid_t pgid)
 }
 
 /* So stupid... */
-extern long compat_sys_wait4(compat_pid_t, compat_uint_t *, int,
-			     struct compat_rusage *);
+extern long compat_sys_wait4(compat_pid_t, compat_uint_t __user *, int,
+			     struct compat_rusage __user *);
 
 asmlinkage int sunos_wait4(compat_pid_t pid, compat_uint_t __user *stat_addr, int options, struct compat_rusage __user *ru)
 {

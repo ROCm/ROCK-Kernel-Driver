@@ -248,6 +248,13 @@ Summary of ide driver parameters for kernel command line
  			  allowing ide-floppy, ide-tape, and ide-cdrom|writers
  			  to use ide-scsi emulation on a device specific option.
 
+ "hdx=stroke"		: Should you have a system w/ an AWARD Bios and your
+			  drives are larger than 32GB and it will not boot,
+			  one is required to perform a few OEM operations first.
+			  The option is called "stroke" because it allows one
+			  to "soft clip" the drive to work around a barrier
+			  limit.
+
  "idebus=xx"		: inform IDE driver of VESA/PCI bus speed in MHz,
 			  where "xx" is between 20 and 66 inclusive,
 			  used when tuning chipset PIO modes.
