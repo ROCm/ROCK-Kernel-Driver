@@ -532,6 +532,13 @@ UNUSUAL_DEV( 0x066f, 0x8000, 0x0001, 0x0001,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_FIX_CAPACITY ),
 
+/* Reported by Alex Butcher <alex.butcher@assursys.co.uk> */
+UNUSUAL_DEV( 0x067b, 0x3507, 0x0001, 0x0001,
+		"Prolific Technology Inc.",
+		"ATAPI-6 Bridge Controller",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY ),
+
 /* Submitted by Benny Sjostrand <benny@hostmobility.com> */
 UNUSUAL_DEV( 0x0686, 0x4011, 0x0001, 0x0001,
 		"Minolta",
