@@ -490,8 +490,6 @@ MODULE_PARM(suppress_linkstatus, "i");
 
 #define DUMMY_FID		0xFFFF
 
-#define RUP_EVEN(a) (((a) + 1) & (~1))
-
 /*#define MAX_MULTICAST(priv)	(priv->firmware_type == FIRMWARE_TYPE_AGERE ? \
   HERMES_MAX_MULTICAST : 0)*/
 #define MAX_MULTICAST(priv)	(HERMES_MAX_MULTICAST)
@@ -847,7 +845,7 @@ orinoco_xmit(struct sk_buff *skb, struct net_device *dev)
 	}
 
 	/* Round up for odd length packets */
-	err = hermes_bap_pwrite(hw, USER_BAP, p, RUP_EVEN(data_len), txfid, data_off);
+	err = hermes_bap_pwrite(hw, USER_BAP, p, ALIGN(data_len, 2), txfid, data_off);
 	if (err) {
 		printk(KERN_ERR "%s: Error %d writing packet to BAP\n",
 		       dev->name, err);
@@ -1132,7 +1130,7 @@ static void __orinoco_ev_rx(struct net_device *dev, hermes_t *hw)
 	}
 
 	p = skb_put(skb, data_len);
-	err = hermes_bap_pread(hw, IRQ_BAP, p, RUP_EVEN(data_len),
+	err = hermes_bap_pread(hw, IRQ_BAP, p, ALIGN(data_len, 2),
 			       rxfid, data_off);
 	if (err) {
 		printk(KERN_ERR "%s: error %d reading frame. "
