@@ -144,7 +144,7 @@ struct udsl_instance_data {
 	struct usb_device *usb_dev;
 	struct sk_buff_head sndqueue;
 	struct udsl_usb_send_data_context send_ctx [UDSL_NUMBER_SND_URBS];
-	int data_started;
+	int firmware_loaded;
 
 	/* atm device part */
 	struct atm_dev *atm_dev;
@@ -556,7 +556,7 @@ static int udsl_atm_open (struct atm_vcc *vcc, short vpi, int vci)
 
 	dev_data->atmsar_vcc->mtu = UDSL_MAX_AAL5_MRU;
 
-	if (instance->data_started)
+	if (instance->firmware_loaded)
 		udsl_fire_receivers (instance);
 
 	PDEBUG ("udsl_atm_open successfull\n");
@@ -677,7 +677,7 @@ static int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_v
 
 	PDEBUG ("udsl_usb_send_data entered, sending packet %p with length %d\n", skb, skb->len);
 
-	if (!instance->data_started)
+	if (!instance->firmware_loaded)
 		return -EAGAIN;
 
 	PACKETDEBUG (skb->data, skb->len);
@@ -731,12 +731,12 @@ static int udsl_usb_send_data (struct udsl_instance_data *instance, struct atm_v
 	return err;
 }
 
-static int udsl_usb_data_init (struct udsl_instance_data *instance)
+static void udsl_usb_data_init (struct udsl_instance_data *instance)
 {
 	int i, succes;
 
-	if (instance->data_started)
-		return 1;
+	if (instance->firmware_loaded)
+		return;
 
 	/* set alternate setting 1 on interface 1 */
 	usb_set_interface (instance->usb_dev, 1, 2);
@@ -759,21 +759,11 @@ static int udsl_usb_data_init (struct udsl_instance_data *instance)
 
 	PDEBUG ("udsl_usb_data_init %d urb%s queued for send\n", succes, (succes != 1) ? "s" : "");
 
-	instance->data_started = 1;
-	instance->atm_dev->signal = ATM_PHY_SIG_FOUND;
+	wmb ();
 
-	return 0;
-}
+	instance->firmware_loaded = 1;
 
-static int udsl_usb_data_exit (struct udsl_instance_data *instance)
-{
-	if (!instance->data_started)
-		return 0;
-
-	instance->data_started = 0;
-	instance->atm_dev->signal = ATM_PHY_SIG_LOST;
-
-	return 0;
+	return;
 }
 
 
@@ -791,10 +781,13 @@ static int udsl_usb_ioctl (struct usb_interface *intf, unsigned int code, void *
 	down(&udsl_usb_ioctl_lock);
 	switch (code) {
 	case UDSL_IOCTL_START:
-		retval = udsl_usb_data_init (instance);
+		instance->atm_dev->signal = ATM_PHY_SIG_FOUND;
+		udsl_usb_data_init (instance);
+		retval = 0;
 		break;
 	case UDSL_IOCTL_STOP:
-		retval = udsl_usb_data_exit (instance);
+		instance->atm_dev->signal = ATM_PHY_SIG_LOST;
+		retval = 0;
 		break;
 	default:
 		retval = -ENOTTY;
