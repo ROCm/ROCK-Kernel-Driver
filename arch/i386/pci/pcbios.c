@@ -385,8 +385,8 @@ void __devinit pcibios_sort(void)
 			}
 		}
 		if (!found) {
-			printk(KERN_WARNING "PCI: Device %02x:%02x not found by BIOS\n",
-				dev->bus->number, dev->devfn);
+			printk(KERN_WARNING "PCI: Device %s not found by BIOS\n",
+				pci_name(dev));
 			list_del(&dev->global_list);
 			list_add_tail(&dev->global_list, &sorted_devices);
 		}

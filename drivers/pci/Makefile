@@ -56,4 +56,6 @@ $(obj)/devlist.h: $(src)/pci.ids $(obj)/gen-devlist
 # Files generated that shall be removed upon make clean
 clean-files := devlist.h classlist.h
 
+# Build PCI Express stuff if needed
+obj-$(CONFIG_PCIEPORTBUS) += pcie/
 
