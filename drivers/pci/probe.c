@@ -15,6 +15,9 @@
 #define DBG(x...)
 #endif
 
+#define CARDBUS_LATENCY_TIMER	176	/* secondary latency timer */
+#define CARDBUS_RESERVE_BUSNR	3
+
 LIST_HEAD(pci_root_buses);
 LIST_HEAD(pci_devices);
 
@@ -336,8 +339,10 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 		 * yenta.c forces a secondary latency timer of 176.
 		 * Copy that behaviour here.
 		 */
-		if (is_cardbus)
-			buses = (buses & 0x00ffffff) | (176 << 24);
+		if (is_cardbus) {
+			buses &= ~0xff000000;
+			buses |= CARDBUS_LATENCY_TIMER << 24;
+		}
 			
 		/*
 		 * We need to blast all three values with a single write.
@@ -353,7 +358,7 @@ int __devinit pci_scan_bridge(struct pci_bus *bus, struct pci_dev * dev, int max
 			 * as cards with a PCI-to-PCI bridge can be
 			 * inserted later.
 			 */
-			max += 3;
+			max += CARDBUS_RESERVE_BUSNR;
 		}
 		/*
 		 * Set the subordinate bus number to its real value.
