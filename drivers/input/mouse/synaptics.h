@@ -9,7 +9,7 @@
 #ifndef _SYNAPTICS_H
 #define _SYNAPTICS_H
 
-extern int synaptics_detect(struct psmouse *psmouse);
+extern int synaptics_detect(struct psmouse *psmouse, int set_properties);
 extern int synaptics_init(struct psmouse *psmouse);
 extern void synaptics_reset(struct psmouse *psmouse);
 
@@ -104,6 +104,7 @@ struct synaptics_data {
 	/* Data for normal processing */
 	int old_w;				/* Previous w value */
 	unsigned char pkt_type;			/* packet type - old, new, etc */
+	unsigned char mode;			/* current mode byte */
 };
 
 #endif /* _SYNAPTICS_H */

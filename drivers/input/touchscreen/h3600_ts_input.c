@@ -100,6 +100,7 @@ static char *h3600_name = "H3600 TouchScreen";
  */
 struct h3600_dev {
 	struct input_dev dev;
+	struct pm_dev *pm_dev;
 	struct serio *serio;
 	unsigned char event;	/* event ID from packet */
 	unsigned char chksum;
@@ -452,8 +453,8 @@ static void h3600ts_connect(struct serio *serio, struct serio_driver *drv)
 
 	//h3600_flite_control(1, 25);     /* default brightness */
 #ifdef CONFIG_PM
-	ts->dev.pm_dev = pm_register(PM_ILLUMINATION_DEV, PM_SYS_LIGHT,
-					h3600ts_pm_callback);
+	ts->pm_dev = pm_register(PM_ILLUMINATION_DEV, PM_SYS_LIGHT,
+				h3600ts_pm_callback);
 	printk("registered pm callback\n");
 #endif
 	input_register_device(&ts->dev);

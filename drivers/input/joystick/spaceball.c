@@ -253,6 +253,7 @@ static void spaceball_connect(struct serio *serio, struct serio_driver *drv)
 	spaceball->dev.id.vendor = SERIO_SPACEBALL;
 	spaceball->dev.id.product = id;
 	spaceball->dev.id.version = 0x0100;
+	spaceball->dev.dev = &serio->dev;
 
 	serio->private = spaceball;
 

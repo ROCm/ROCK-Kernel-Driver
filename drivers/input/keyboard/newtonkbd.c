@@ -126,6 +126,7 @@ void nkbd_connect(struct serio *serio, struct serio_driver *drv)
 	nkbd->dev.id.vendor = SERIO_NEWTON;
 	nkbd->dev.id.product = 0x0001;
 	nkbd->dev.id.version = 0x0100;
+	nkbd->dev.dev = &serio->dev;
 
 	input_register_device(&nkbd->dev);
 

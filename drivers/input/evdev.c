@@ -169,6 +169,9 @@ static ssize_t evdev_read(struct file * file, char __user * buffer, size_t count
 	struct evdev_list *list = file->private_data;
 	int retval;
 
+	if (count < sizeof(struct input_event))
+		return -EINVAL;
+
 	if (list->head == list->tail && list->evdev->exist && (file->f_flags & O_NONBLOCK))
 		return -EAGAIN;
 

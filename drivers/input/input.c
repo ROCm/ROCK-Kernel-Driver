@@ -17,7 +17,6 @@
 #include <linux/module.h>
 #include <linux/random.h>
 #include <linux/major.h>
-#include <linux/pm.h>
 #include <linux/proc_fs.h>
 #include <linux/kobject_uevent.h>
 #include <linux/interrupt.h>
@@ -66,9 +65,6 @@ static inline unsigned int ms_to_jiffies(unsigned int ms)
 void input_event(struct input_dev *dev, unsigned int type, unsigned int code, int value)
 {
 	struct input_handle *handle;
-
-	if (dev->pm_dev)
-		pm_access(dev->pm_dev);
 
 	if (type > EV_MAX || !test_bit(type, dev->evbit))
 		return;
@@ -230,8 +226,6 @@ void input_release_device(struct input_handle *handle)
 
 int input_open_device(struct input_handle *handle)
 {
-	if (handle->dev->pm_dev)
-		pm_access(handle->dev->pm_dev);
 	handle->open++;
 	if (handle->dev->open)
 		return handle->dev->open(handle->dev);
@@ -249,8 +243,6 @@ int input_flush_device(struct input_handle* handle, struct file* file)
 void input_close_device(struct input_handle *handle)
 {
 	input_release_device(handle);
-	if (handle->dev->pm_dev)
-		pm_dev_idle(handle->dev->pm_dev);
 	if (handle->dev->close)
 		handle->dev->close(handle->dev);
 	handle->open--;
@@ -467,9 +459,6 @@ void input_unregister_device(struct input_dev *dev)
 	struct list_head * node, * next;
 
 	if (!dev) return;
-
-	if (dev->pm_dev)
-		pm_unregister(dev->pm_dev);
 
 	del_timer_sync(&dev->timer);
 

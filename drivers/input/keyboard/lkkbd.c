@@ -14,13 +14,13 @@
  * DISCLAIMER: This works for _me_. If you break anything by using the
  * information given below, I will _not_ be liable!
  *
- * RJ11 pinout:		To DB9:		Or DB25:
+ * RJ11 pinout:		To DE9:		Or DB25:
  * 	1 - RxD <---->	Pin 3 (TxD) <->	Pin 2 (TxD)
  * 	2 - GND <---->	Pin 5 (GND) <->	Pin 7 (GND)
  * 	4 - TxD <---->	Pin 2 (RxD) <->	Pin 3 (RxD)
- * 	3 - +12V (from HDD drive connector), DON'T connect to DB9 or DB25!!!
+ * 	3 - +12V (from HDD drive connector), DON'T connect to DE9 or DB25!!!
  *
- * Pin numbers for DB9 and DB25 are noted on the plug (quite small:). For
+ * Pin numbers for DE9 and DB25 are noted on the plug (quite small:). For
  * RJ11, it's like this:
  *
  *      __=__	Hold the plug in front of you, cable downwards,
@@ -685,6 +685,7 @@ lkkbd_connect (struct serio *serio, struct serio_driver *drv)
 	lk->dev.id.vendor = SERIO_LKKBD;
 	lk->dev.id.product = 0;
 	lk->dev.id.version = 0x0100;
+	lk->dev.dev = &serio->dev;
 
 	input_register_device (&lk->dev);
 

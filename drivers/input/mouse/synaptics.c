@@ -26,6 +26,7 @@
 #include <linux/module.h>
 #include <linux/input.h>
 #include <linux/serio.h>
+#include <linux/libps2.h>
 #include "psmouse.h"
 #include "synaptics.h"
 
@@ -50,7 +51,7 @@ static int synaptics_send_cmd(struct psmouse *psmouse, unsigned char c, unsigned
 {
 	if (psmouse_sliced_command(psmouse, c))
 		return -1;
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO))
+	if (ps2_command(&psmouse->ps2dev, param, PSMOUSE_CMD_GETINFO))
 		return -1;
 	return 0;
 }
@@ -65,7 +66,7 @@ static int synaptics_mode_cmd(struct psmouse *psmouse, unsigned char mode)
 	if (psmouse_sliced_command(psmouse, mode))
 		return -1;
 	param[0] = SYN_PS_SET_MODE2;
-	if (psmouse_command(psmouse, param, PSMOUSE_CMD_SETRATE))
+	if (ps2_command(&psmouse->ps2dev, param, PSMOUSE_CMD_SETRATE))
 		return -1;
 	return 0;
 }
@@ -192,21 +193,35 @@ static int synaptics_query_hardware(struct psmouse *psmouse)
 	return 0;
 }
 
-static int synaptics_set_mode(struct psmouse *psmouse, int mode)
+static int synaptics_set_absolute_mode(struct psmouse *psmouse)
 {
 	struct synaptics_data *priv = psmouse->private;
 
-	mode |= SYN_BIT_ABSOLUTE_MODE;
-	if (psmouse_rate >= 80)
-		mode |= SYN_BIT_HIGH_RATE;
+	priv->mode = SYN_BIT_ABSOLUTE_MODE;
 	if (SYN_ID_MAJOR(priv->identity) >= 4)
-		mode |= SYN_BIT_DISABLE_GESTURE;
+		priv->mode |= SYN_BIT_DISABLE_GESTURE;
 	if (SYN_CAP_EXTENDED(priv->capabilities))
-		mode |= SYN_BIT_W_MODE;
-	if (synaptics_mode_cmd(psmouse, mode))
+		priv->mode |= SYN_BIT_W_MODE;
+
+	if (synaptics_mode_cmd(psmouse, priv->mode))
 		return -1;
 
 	return 0;
+}
+
+static void synaptics_set_rate(struct psmouse *psmouse, unsigned int rate)
+{
+	struct synaptics_data *priv = psmouse->private;
+
+	if (rate >= 80) {
+		priv->mode |= SYN_BIT_HIGH_RATE;
+		psmouse->rate = 80;
+	} else {
+		priv->mode &= ~SYN_BIT_HIGH_RATE;
+		psmouse->rate = 40;
+	}
+
+	synaptics_mode_cmd(psmouse, priv->mode);
 }
 
 /*****************************************************************************
@@ -219,7 +234,7 @@ static int synaptics_pt_write(struct serio *serio, unsigned char c)
 
 	if (psmouse_sliced_command(parent, c))
 		return -1;
-	if (psmouse_command(parent, &rate_param, PSMOUSE_CMD_SETRATE))
+	if (ps2_command(&parent->ps2dev, &rate_param, PSMOUSE_CMD_SETRATE))
 		return -1;
 	return 0;
 }
@@ -245,12 +260,18 @@ static void synaptics_pass_pt_packet(struct serio *ptport, unsigned char *packet
 
 static void synaptics_pt_activate(struct psmouse *psmouse)
 {
-	struct psmouse *child = psmouse->serio->child->private;
+	struct psmouse *child = psmouse->ps2dev.serio->child->private;
+	struct synaptics_data *priv = psmouse->private;
 
 	/* adjust the touchpad to child's choice of protocol */
-	if (child && child->type >= PSMOUSE_GENPS) {
-		if (synaptics_set_mode(psmouse, SYN_BIT_FOUR_BYTE_CLIENT))
-			printk(KERN_INFO "synaptics: failed to enable 4-byte guest protocol\n");
+	if (child) {
+		if (child->type >= PSMOUSE_GENPS)
+			priv->mode |= SYN_BIT_FOUR_BYTE_CLIENT;
+		else
+			priv->mode &= ~SYN_BIT_FOUR_BYTE_CLIENT;
+
+		if (synaptics_mode_cmd(psmouse, priv->mode))
+			printk(KERN_INFO "synaptics: failed to switch guest protocol\n");
 	}
 }
 
@@ -270,11 +291,11 @@ static void synaptics_pt_create(struct psmouse *psmouse)
 	strlcpy(serio->name, "Synaptics pass-through", sizeof(serio->name));
 	strlcpy(serio->phys, "synaptics-pt/serio0", sizeof(serio->name));
 	serio->write = synaptics_pt_write;
-	serio->parent = psmouse->serio;
+	serio->parent = psmouse->ps2dev.serio;
 
 	psmouse->pt_activate = synaptics_pt_activate;
 
-	psmouse->serio->child = serio;
+	psmouse->ps2dev.serio->child = serio;
 }
 
 /*****************************************************************************
@@ -470,8 +491,8 @@ static psmouse_ret_t synaptics_process_byte(struct psmouse *psmouse, struct pt_r
 			priv->pkt_type = synaptics_detect_pkt_type(psmouse);
 
 		if (SYN_CAP_PASS_THROUGH(priv->capabilities) && synaptics_is_pt_packet(psmouse->packet)) {
-			if (psmouse->serio->child)
-				synaptics_pass_pt_packet(psmouse->serio->child, psmouse->packet);
+			if (psmouse->ps2dev.serio->child)
+				synaptics_pass_pt_packet(psmouse->ps2dev.serio->child, psmouse->packet);
 		} else
 			synaptics_process_packet(psmouse);
 
@@ -537,7 +558,7 @@ static int synaptics_reconnect(struct psmouse *psmouse)
 	struct synaptics_data *priv = psmouse->private;
 	struct synaptics_data old_priv = *priv;
 
-	if (!synaptics_detect(psmouse))
+	if (synaptics_detect(psmouse, 0))
 		return -1;
 
 	if (synaptics_query_hardware(psmouse)) {
@@ -551,7 +572,7 @@ static int synaptics_reconnect(struct psmouse *psmouse)
 	    old_priv.ext_cap != priv->ext_cap)
 		return -1;
 
-	if (synaptics_set_mode(psmouse, 0)) {
+	if (synaptics_set_absolute_mode(psmouse)) {
 		printk(KERN_ERR "Unable to initialize Synaptics hardware.\n");
 		return -1;
 	}
@@ -559,20 +580,43 @@ static int synaptics_reconnect(struct psmouse *psmouse)
 	return 0;
 }
 
-int synaptics_detect(struct psmouse *psmouse)
+int synaptics_detect(struct psmouse *psmouse, int set_properties)
 {
+	struct ps2dev *ps2dev = &psmouse->ps2dev;
 	unsigned char param[4];
 
 	param[0] = 0;
 
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_SETRES);
-	psmouse_command(psmouse, param, PSMOUSE_CMD_GETINFO);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_SETRES);
+	ps2_command(ps2dev, param, PSMOUSE_CMD_GETINFO);
 
-	return param[1] == 0x47;
+	if (param[1] != 0x47)
+		return -1;
+
+	if (set_properties) {
+		psmouse->vendor = "Synaptics";
+		psmouse->name = "TouchPad";
+	}
+
+	return 0;
 }
+
+#if defined(__i386__)
+#include <linux/dmi.h>
+static struct dmi_system_id toshiba_dmi_table[] = {
+	{
+		.ident = "Toshiba Satellite",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "TOSHIBA"),
+			DMI_MATCH(DMI_PRODUCT_NAME , "Satellite"),
+		},
+	},
+	{ }
+};
+#endif
 
 int synaptics_init(struct psmouse *psmouse)
 {
@@ -588,7 +632,7 @@ int synaptics_init(struct psmouse *psmouse)
 		goto init_fail;
 	}
 
-	if (synaptics_set_mode(psmouse, 0)) {
+	if (synaptics_set_absolute_mode(psmouse)) {
 		printk(KERN_ERR "Unable to initialize Synaptics hardware.\n");
 		goto init_fail;
 	}
@@ -602,8 +646,22 @@ int synaptics_init(struct psmouse *psmouse)
 	set_input_params(&psmouse->dev, priv);
 
 	psmouse->protocol_handler = synaptics_process_byte;
+	psmouse->set_rate = synaptics_set_rate;
 	psmouse->disconnect = synaptics_disconnect;
 	psmouse->reconnect = synaptics_reconnect;
+	psmouse->pktsize = 6;
+
+#if defined(__i386__)
+	/*
+	 * Toshiba's KBC seems to have trouble handling data from
+	 * Synaptics as full rate, switch to lower rate which is roughly
+	 * thye same as rate of standard PS/2 mouse.
+	 */
+	if (psmouse->rate >= 80 && dmi_check_system(toshiba_dmi_table)) {
+		printk(KERN_INFO "synaptics: Toshiba Satellite detected, limiting rate to 40pps.\n");
+		psmouse->rate = 40;
+	}
+#endif
 
 	return 0;
 

@@ -37,14 +37,16 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("Parallel port to Keyboard port adapter driver");
 MODULE_LICENSE("GPL");
 
-MODULE_PARM(parkbd, "1i");
-MODULE_PARM(parkbd_mode, "1i");
+static unsigned int parkbd_pp_no;
+module_param_named(port, parkbd_pp_no, int, 0);
+MODULE_PARM_DESC(port, "Parallel port the adapter is connected to (default is 0)");
+
+static unsigned int parkbd_mode = SERIO_8042;
+module_param_named(mode, parkbd_mode, uint, 0);
+MODULE_PARM_DESC(mode, "Mode of operation: XT = 0/AT = 1 (default)");
 
 #define PARKBD_CLOCK	0x01	/* Strobe & Ack */
 #define PARKBD_DATA	0x02	/* AutoFd & Busy */
-
-static int parkbd;
-static int parkbd_mode = SERIO_8042;
 
 static int parkbd_buffer;
 static int parkbd_counter;
@@ -126,12 +128,7 @@ static int parkbd_getport(void)
 {
 	struct parport *pp;
 
-	if (parkbd < 0) {
-		printk(KERN_ERR "parkbd: no port specified\n");
-		return -ENODEV;
-	}
-
-	pp = parport_find_number(parkbd);
+	pp = parport_find_number(parkbd_pp_no);
 
 	if (pp == NULL) {
 		printk(KERN_ERR "parkbd: no such parport\n");

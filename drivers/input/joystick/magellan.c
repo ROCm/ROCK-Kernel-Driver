@@ -183,6 +183,7 @@ static void magellan_connect(struct serio *serio, struct serio_driver *drv)
 	magellan->dev.id.vendor = SERIO_MAGELLAN;
 	magellan->dev.id.product = 0x0001;
 	magellan->dev.id.version = 0x0100;
+	magellan->dev.dev = &serio->dev;
 
 	serio->private = magellan;
 

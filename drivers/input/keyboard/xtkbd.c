@@ -131,6 +131,7 @@ void xtkbd_connect(struct serio *serio, struct serio_driver *drv)
 	xtkbd->dev.id.vendor = 0x0001;
 	xtkbd->dev.id.product = 0x0001;
 	xtkbd->dev.id.version = 0x0100;
+	xtkbd->dev.dev = &serio->dev;
 
 	input_register_device(&xtkbd->dev);
 

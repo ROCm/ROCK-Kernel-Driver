@@ -16,6 +16,7 @@ config KEYBOARD_ATKBD
 	default y
 	depends on INPUT && INPUT_KEYBOARD
 	select SERIO
+	select SERIO_LIBPS2
 	select SERIO_I8042 if PC
 	select SERIO_GSCPS2 if GSC
 	help

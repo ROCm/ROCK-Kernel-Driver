@@ -2,9 +2,11 @@
 #define _PSMOUSE_H
 
 #define PSMOUSE_CMD_SETSCALE11	0x00e6
+#define PSMOUSE_CMD_SETSCALE21	0x00e7
 #define PSMOUSE_CMD_SETRES	0x10e8
 #define PSMOUSE_CMD_GETINFO	0x03e9
 #define PSMOUSE_CMD_SETSTREAM	0x00ea
+#define PSMOUSE_CMD_SETPOLL	0x00f0
 #define PSMOUSE_CMD_POLL	0x03eb
 #define PSMOUSE_CMD_GETID	0x02f2
 #define PSMOUSE_CMD_SETRATE	0x10f3
@@ -17,11 +19,6 @@
 #define PSMOUSE_RET_ID		0x00
 #define PSMOUSE_RET_ACK		0xfa
 #define PSMOUSE_RET_NAK		0xfe
-
-#define PSMOUSE_FLAG_ACK	0	/* Waiting for ACK/NAK */
-#define PSMOUSE_FLAG_CMD	1	/* Waiting for command to finish */
-#define PSMOUSE_FLAG_CMD1	2	/* Waiting for the first byte of command response */
-#define PSMOUSE_FLAG_WAITID	3	/* Command execiting is GET ID */
 
 enum psmouse_state {
 	PSMOUSE_IGNORE,
@@ -40,28 +37,29 @@ typedef enum {
 struct psmouse {
 	void *private;
 	struct input_dev dev;
-	struct serio *serio;
+	struct ps2dev ps2dev;
 	char *vendor;
 	char *name;
-	unsigned char cmdbuf[8];
 	unsigned char packet[8];
-	unsigned char cmdcnt;
 	unsigned char pktcnt;
+	unsigned char pktsize;
 	unsigned char type;
 	unsigned char model;
 	unsigned long last;
 	unsigned long out_of_sync;
 	enum psmouse_state state;
-	unsigned char nak;
-	char error;
 	char devname[64];
 	char phys[32];
-	unsigned long flags;
 
-	/* Used to signal completion from interrupt handler */
-	wait_queue_head_t wait;
+	unsigned int rate;
+	unsigned int resolution;
+	unsigned int resetafter;
+	unsigned int smartscroll;	/* Logitech only */
 
 	psmouse_ret_t (*protocol_handler)(struct psmouse *psmouse, struct pt_regs *regs);
+	void (*set_rate)(struct psmouse *psmouse, unsigned int rate);
+	void (*set_resolution)(struct psmouse *psmouse, unsigned int resolution);
+
 	int (*reconnect)(struct psmouse *psmouse);
 	void (*disconnect)(struct psmouse *psmouse);
 
@@ -73,19 +71,36 @@ enum psmouse_type {
 	PSMOUSE_NONE,
 	PSMOUSE_PS2,
 	PSMOUSE_PS2PP,
-	PSMOUSE_PS2TPP,
 	PSMOUSE_THINKPS,
 	PSMOUSE_GENPS,
 	PSMOUSE_IMPS,
 	PSMOUSE_IMEX,
 	PSMOUSE_SYNAPTICS,
+	PSMOUSE_ALPS,
 };
 
-int psmouse_command(struct psmouse *psmouse, unsigned char *param, int command);
 int psmouse_sliced_command(struct psmouse *psmouse, unsigned char command);
 int psmouse_reset(struct psmouse *psmouse);
+void psmouse_set_resolution(struct psmouse *psmouse, unsigned int resolution);
 
-extern int psmouse_smartscroll;
-extern unsigned int psmouse_rate;
+ssize_t psmouse_attr_show_helper(struct device *dev, char *buf,
+			ssize_t (*handler)(struct psmouse *, char *));
+ssize_t psmouse_attr_set_helper(struct device *dev, const char *buf, size_t count,
+			ssize_t (*handler)(struct psmouse *, const char *, size_t));
+
+#define PSMOUSE_DEFINE_ATTR(_name)						\
+static ssize_t psmouse_attr_show_##_name(struct psmouse *, char *);		\
+static ssize_t psmouse_attr_set_##_name(struct psmouse *, const char *, size_t);\
+static ssize_t psmouse_do_show_##_name(struct device *d, char *b)		\
+{										\
+	return psmouse_attr_show_helper(d, b, psmouse_attr_show_##_name);	\
+}										\
+static ssize_t psmouse_do_set_##_name(struct device *d, const char *b, size_t s)\
+{										\
+	return psmouse_attr_set_helper(d, b, s, psmouse_attr_set_##_name);	\
+}										\
+static struct device_attribute psmouse_attr_##_name = 				\
+	__ATTR(_name, S_IWUSR | S_IRUGO,					\
+		psmouse_do_show_##_name, psmouse_do_set_##_name);
 
 #endif /* _PSMOUSE_H */

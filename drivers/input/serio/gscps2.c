@@ -322,19 +322,6 @@ static void gscps2_close(struct serio *port)
 	gscps2_enable(ps2port, DISABLE);
 }
 
-static struct serio gscps2_serio_port =
-{
-	.name =		"GSC PS/2",
-	.idbus =	BUS_GSC,
-	.idvendor =	PCI_VENDOR_ID_HP,
-	.idproduct =	0x0001,
-	.idversion =	0x0010,
-	.type =		SERIO_8042,
-	.write =	gscps2_write,
-	.open =		gscps2_open,
-	.close =	gscps2_close,
-};
-
 /**
  * gscps2_probe() - Probes PS2 devices
  * @return: success/error report

@@ -23,6 +23,8 @@
 #include "i8042-ppcio.h"
 #elif defined(CONFIG_SPARC32) || defined(CONFIG_SPARC64)
 #include "i8042-sparcio.h"
+#elif defined(CONFIG_X86) || defined(CONFIG_IA64)
+#include "i8042-x86ia64io.h"
 #else
 #include "i8042-io.h"
 #endif
@@ -115,10 +117,14 @@
  */
 
 #ifdef DEBUG
-static unsigned long i8042_start;
-#define dbg_init() do { i8042_start = jiffies; } while (0)
-#define dbg(format, arg...) printk(KERN_DEBUG __FILE__ ": " format " [%d]\n" ,\
-	 ## arg, (int) (jiffies - i8042_start))
+static unsigned long i8042_start_time;
+#define dbg_init() do { i8042_start_time = jiffies; } while (0)
+#define dbg(format, arg...) 							\
+	do { 									\
+		if (i8042_debug)						\
+			printk(KERN_DEBUG __FILE__ ": " format " [%d]\n" ,	\
+	 			## arg, (int) (jiffies - i8042_start_time));	\
+	} while (0)
 #else
 #define dbg_init() do { } while (0)
 #define dbg(format, arg...) do {} while (0)

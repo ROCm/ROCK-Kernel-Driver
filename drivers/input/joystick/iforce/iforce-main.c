@@ -352,7 +352,21 @@ int iforce_init_device(struct iforce *iforce)
  * Input device fields.
  */
 
-	iforce->dev.id.bustype = BUS_USB;
+	switch (iforce->bus) {
+#ifdef CONFIG_JOYSTICK_IFORCE_USB
+	case IFORCE_USB:
+		iforce->dev.id.bustype = BUS_USB;
+		iforce->dev.dev = &iforce->usbdev->dev;
+		break;
+#endif
+#ifdef CONFIG_JOYSTICK_IFORCE_232
+	case IFORCE_232:
+		iforce->dev.id.bustype = BUS_RS232;
+		iforce->dev.dev = &iforce->serio->dev;
+		break;
+#endif
+	}
+
 	iforce->dev.private = iforce;
 	iforce->dev.name = "Unknown I-Force device";
 	iforce->dev.open = iforce_open;
