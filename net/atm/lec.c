@@ -553,8 +553,8 @@ lec_atm_close(struct atm_vcc *vcc)
 }
 
 static struct atmdev_ops lecdev_ops = {
-        close:	lec_atm_close,
-        send:	lec_atm_send
+        .close	= lec_atm_close,
+        .send	= lec_atm_send
 };
 
 static struct atm_dev lecatm_dev = {
