@@ -5,10 +5,6 @@
 #include <linux/pci.h>
 #include <linux/ide.h>
 
-#ifndef SPLIT_BYTE
-#define SPLIT_BYTE(B,H,L)	((H)=(B>>4), (L)=(B-((B>>4)<<4)))
-#endif
-
 #define PDC202XX_DEBUG_DRIVE_INFO		0
 
 static const char *pdc_quirk_drives[] = {

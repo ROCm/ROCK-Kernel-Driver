@@ -69,7 +69,8 @@
 		((sc1c & 0x02) == 0x02) ? "8" :
 		((sc1c & 0x01) == 0x01) ? "6" :
 		((sc1c & 0x00) == 0x00) ? "4" : "??");
-	SPLIT_BYTE(sc1e, hi, lo);
+	hi = sc1e >> 4;
+	lo = sc1e & 0xf;
 	p += sprintf(p, "Status Polling Period                : %d\n", hi);
 	p += sprintf(p, "Interrupt Check Status Polling Delay : %d\n", lo);
 #endif
