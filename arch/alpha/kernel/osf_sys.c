@@ -103,7 +103,7 @@ struct osf_dirent {
 struct osf_dirent_callback {
 	struct osf_dirent *dirent;
 	long *basep;
-	int count;
+	unsigned int count;
 	int error;
 };
 
@@ -113,7 +113,7 @@ osf_filldir(void *__buf, const char *name, int namlen, loff_t offset,
 {
 	struct osf_dirent *dirent;
 	struct osf_dirent_callback *buf = (struct osf_dirent_callback *) __buf;
-	int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1);
+	unsigned int reclen = ROUND_UP(NAME_OFFSET(dirent) + namlen + 1);
 
 	buf->error = -EINVAL;	/* only used if we fail */
 	if (reclen > buf->count)
@@ -1343,14 +1343,14 @@ arch_get_unmapped_area(struct file *filp, unsigned long addr,
 
 	if (addr) {
 		addr = arch_get_unmapped_area_1 (PAGE_ALIGN(addr), len, limit);
-		if (addr != -ENOMEM)
+		if (addr != (unsigned long) -ENOMEM)
 			return addr;
 	}
 
 	/* Next, try allocating at TASK_UNMAPPED_BASE.  */
 	addr = arch_get_unmapped_area_1 (PAGE_ALIGN(TASK_UNMAPPED_BASE),
 					 len, limit);
-	if (addr != -ENOMEM)
+	if (addr != (unsigned long) -ENOMEM)
 		return addr;
 
 	/* Finally, try allocating in low memory.  */

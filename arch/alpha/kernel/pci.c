@@ -474,5 +474,5 @@ int
 pci_controller_num(struct pci_dev *pdev)
 {
         struct pci_controller *hose = pdev->sysdata;
-	return (hose ? hose->index : -ENXIO);
+	return (hose ? (int) hose->index : -ENXIO);
 }
