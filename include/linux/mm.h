@@ -531,6 +531,13 @@ extern void truncate_inode_pages(struct address_space *, loff_t);
 extern int filemap_sync(struct vm_area_struct *, unsigned long,	size_t, unsigned int);
 extern struct page *filemap_nopage(struct vm_area_struct *, unsigned long, int);
 
+/* readahead.c */
+void do_page_cache_readahead(struct file *file,
+			unsigned long offset, unsigned long nr_to_read);
+void page_cache_readahead(struct file *file, unsigned long offset);
+void page_cache_readaround(struct file *file, unsigned long offset);
+void handle_ra_thrashing(struct file *file);
+
 /* vma is the first one with  address < vma->vm_end,
  * and even  address < vma->vm_start. Have to extend vma. */
 static inline int expand_stack(struct vm_area_struct * vma, unsigned long address)

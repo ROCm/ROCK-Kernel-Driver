@@ -237,6 +237,18 @@ int blk_ioctl(struct block_device *bdev, unsigned int cmd, unsigned long arg)
 			intval = (is_read_only(dev) != 0);
 			return put_user(intval, (int *)(arg));
 
+		case BLKRASET:
+		case BLKFRASET:
+			if(!capable(CAP_SYS_ADMIN))
+				return -EACCES;
+			return blk_set_readahead(dev, arg);
+
+		case BLKRAGET:
+		case BLKFRAGET:
+			if (!arg)
+				return -EINVAL;
+			return put_user(blk_get_readahead(dev), (long *)arg);
+
 		case BLKSECTGET:
 			if ((q = blk_get_queue(dev)) == NULL)
 				return -EINVAL;

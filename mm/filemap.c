@@ -26,6 +26,7 @@
 #include <linux/compiler.h>
 #include <linux/fs.h>
 #include <linux/hash.h>
+#include <linux/blkdev.h>
 
 #include <asm/pgalloc.h>
 #include <asm/uaccess.h>
@@ -262,7 +263,6 @@ static int truncate_list_pages(struct address_space *mapping,
 	}
 	return unlocked;
 }
-
 
 /**
  * truncate_inode_pages - truncate *all* the pages from an offset
@@ -661,28 +661,6 @@ static int page_cache_read(struct file * file, unsigned long offset)
 }
 
 /*
- * Read in an entire cluster at once.  A cluster is usually a 64k-
- * aligned block that includes the page requested in "offset."
- */
-static int FASTCALL(read_cluster_nonblocking(struct file * file, unsigned long offset,
-					     unsigned long filesize));
-static int read_cluster_nonblocking(struct file * file, unsigned long offset,
-	unsigned long filesize)
-{
-	unsigned long pages = CLUSTER_PAGES;
-
-	offset = CLUSTER_OFFSET(offset);
-	while ((pages-- > 0) && (offset < filesize)) {
-		int error = page_cache_read(file, offset);
-		if (error < 0)
-			return error;
-		offset ++;
-	}
-
-	return 0;
-}
-
-/*
  * In order to wait for pages to become available there must be
  * waitqueues associated with pages. By using a hash table of
  * waitqueues where the bucket discipline is to maintain all
@@ -954,232 +932,6 @@ struct page *grab_cache_page_nowait(struct address_space *mapping, unsigned long
 	return page;
 }
 
-#if 0
-#define PROFILE_READAHEAD
-#define DEBUG_READAHEAD
-#endif
-
-/*
- * Read-ahead profiling information
- * --------------------------------
- * Every PROFILE_MAXREADCOUNT, the following information is written 
- * to the syslog:
- *   Percentage of asynchronous read-ahead.
- *   Average of read-ahead fields context value.
- * If DEBUG_READAHEAD is defined, a snapshot of these fields is written 
- * to the syslog.
- */
-
-#ifdef PROFILE_READAHEAD
-
-#define PROFILE_MAXREADCOUNT 1000
-
-static unsigned long total_reada;
-static unsigned long total_async;
-static unsigned long total_ramax;
-static unsigned long total_ralen;
-static unsigned long total_rawin;
-
-static void profile_readahead(int async, struct file *filp)
-{
-	unsigned long flags;
-
-	++total_reada;
-	if (async)
-		++total_async;
-
-	total_ramax	+= filp->f_ramax;
-	total_ralen	+= filp->f_ralen;
-	total_rawin	+= filp->f_rawin;
-
-	if (total_reada > PROFILE_MAXREADCOUNT) {
-		save_flags(flags);
-		cli();
-		if (!(total_reada > PROFILE_MAXREADCOUNT)) {
-			restore_flags(flags);
-			return;
-		}
-
-		printk("Readahead average:  max=%ld, len=%ld, win=%ld, async=%ld%%\n",
-			total_ramax/total_reada,
-			total_ralen/total_reada,
-			total_rawin/total_reada,
-			(total_async*100)/total_reada);
-#ifdef DEBUG_READAHEAD
-		printk("Readahead snapshot: max=%ld, len=%ld, win=%ld, raend=%Ld\n",
-			filp->f_ramax, filp->f_ralen, filp->f_rawin, filp->f_raend);
-#endif
-
-		total_reada	= 0;
-		total_async	= 0;
-		total_ramax	= 0;
-		total_ralen	= 0;
-		total_rawin	= 0;
-
-		restore_flags(flags);
-	}
-}
-#endif  /* defined PROFILE_READAHEAD */
-
-/*
- * Read-ahead context:
- * -------------------
- * The read ahead context fields of the "struct file" are the following:
- * - f_raend : position of the first byte after the last page we tried to
- *	       read ahead.
- * - f_ramax : current read-ahead maximum size.
- * - f_ralen : length of the current IO read block we tried to read-ahead.
- * - f_rawin : length of the current read-ahead window.
- *		if last read-ahead was synchronous then
- *			f_rawin = f_ralen
- *		otherwise (was asynchronous)
- *			f_rawin = previous value of f_ralen + f_ralen
- *
- * Read-ahead limits:
- * ------------------
- * MIN_READAHEAD   : minimum read-ahead size when read-ahead.
- * MAX_READAHEAD   : maximum read-ahead size when read-ahead.
- *
- * Synchronous read-ahead benefits:
- * --------------------------------
- * Using reasonable IO xfer length from peripheral devices increase system 
- * performances.
- * Reasonable means, in this context, not too large but not too small.
- * The actual maximum value is:
- *	MAX_READAHEAD + PAGE_CACHE_SIZE = 76k is CONFIG_READA_SMALL is undefined
- *      and 32K if defined (4K page size assumed).
- *
- * Asynchronous read-ahead benefits:
- * ---------------------------------
- * Overlapping next read request and user process execution increase system 
- * performance.
- *
- * Read-ahead risks:
- * -----------------
- * We have to guess which further data are needed by the user process.
- * If these data are often not really needed, it's bad for system 
- * performances.
- * However, we know that files are often accessed sequentially by 
- * application programs and it seems that it is possible to have some good 
- * strategy in that guessing.
- * We only try to read-ahead files that seems to be read sequentially.
- *
- * Asynchronous read-ahead risks:
- * ------------------------------
- * In order to maximize overlapping, we must start some asynchronous read
- * request from the device, as soon as possible.
- * We must be very careful about:
- * - The number of effective pending IO read requests.
- *   ONE seems to be the only reasonable value.
- * - The total memory pool usage for the file access stream.
- *   This maximum memory usage is implicitly 2 IO read chunks:
- *   2*(MAX_READAHEAD + PAGE_CACHE_SIZE) = 156K if CONFIG_READA_SMALL is undefined,
- *   64k if defined (4K page size assumed).
- */
-
-static void generic_file_readahead(int reada_ok,
-	struct file * filp, struct inode * inode,
-	struct page * page)
-{
-	unsigned long end_index;
-	unsigned long index = page->index;
-	unsigned long max_ahead, ahead;
-	unsigned long raend;
-
-	end_index = inode->i_size >> PAGE_CACHE_SHIFT;
-
-	raend = filp->f_raend;
-	max_ahead = 0;
-
-/*
- * The current page is locked.
- * If the current position is inside the previous read IO request, do not
- * try to reread previously read ahead pages.
- * Otherwise decide or not to read ahead some pages synchronously.
- * If we are not going to read ahead, set the read ahead context for this 
- * page only.
- */
-	if (PageLocked(page)) {
-		if (!filp->f_ralen || index >= raend || index + filp->f_rawin < raend) {
-			raend = index;
-			if (raend < end_index)
-				max_ahead = filp->f_ramax;
-			filp->f_rawin = 0;
-			filp->f_ralen = 1;
-			if (!max_ahead) {
-				filp->f_raend  = index + filp->f_ralen;
-				filp->f_rawin += filp->f_ralen;
-			}
-		}
-	}
-/*
- * The current page is not locked.
- * If we were reading ahead and,
- * if the current max read ahead size is not zero and,
- * if the current position is inside the last read-ahead IO request,
- *   it is the moment to try to read ahead asynchronously.
- * We will later force unplug device in order to force asynchronous read IO.
- */
-	else if (reada_ok && filp->f_ramax && raend >= 1 &&
-		 index <= raend && index + filp->f_ralen >= raend) {
-/*
- * Add ONE page to max_ahead in order to try to have about the same IO max size
- * as synchronous read-ahead (MAX_READAHEAD + 1)*PAGE_CACHE_SIZE.
- * Compute the position of the last page we have tried to read in order to 
- * begin to read ahead just at the next page.
- */
-		raend -= 1;
-		if (raend < end_index)
-			max_ahead = filp->f_ramax + 1;
-
-		if (max_ahead) {
-			filp->f_rawin = filp->f_ralen;
-			filp->f_ralen = 0;
-			reada_ok      = 2;
-		}
-	}
-/*
- * Try to read ahead pages.
- * We hope that ll_rw_blk() plug/unplug, coalescence, requests sort and the
- * scheduler, will work enough for us to avoid too bad actuals IO requests.
- */
-	ahead = 0;
-	while (ahead < max_ahead) {
-		ahead ++;
-		if ((raend + ahead) >= end_index)
-			break;
-		if (page_cache_read(filp, raend + ahead) < 0)
-			break;
-	}
-/*
- * If we tried to read ahead some pages,
- * If we tried to read ahead asynchronously,
- *   Try to force unplug of the device in order to start an asynchronous
- *   read IO request.
- * Update the read-ahead context.
- * Store the length of the current read-ahead window.
- * Double the current max read ahead size.
- *   That heuristic avoid to do some large IO for files that are not really
- *   accessed sequentially.
- */
-	if (ahead) {
-		filp->f_ralen += ahead;
-		filp->f_rawin += filp->f_ralen;
-		filp->f_raend = raend + ahead + 1;
-
-		filp->f_ramax += filp->f_ramax;
-
-		if (filp->f_ramax > MAX_READAHEAD)
-			filp->f_ramax = MAX_READAHEAD;
-
-#ifdef PROFILE_READAHEAD
-		profile_readahead((reada_ok == 2), filp);
-#endif
-	}
-
-	return;
-}
-
 /*
  * Mark a page as having seen activity.
  *
@@ -1214,51 +966,11 @@ void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * 
 	struct inode *inode = mapping->host;
 	unsigned long index, offset;
 	struct page *cached_page;
-	int reada_ok;
 	int error;
 
 	cached_page = NULL;
 	index = *ppos >> PAGE_CACHE_SHIFT;
 	offset = *ppos & ~PAGE_CACHE_MASK;
-
-/*
- * If the current position is outside the previous read-ahead window, 
- * we reset the current read-ahead context and set read ahead max to zero
- * (will be set to just needed value later),
- * otherwise, we assume that the file accesses are sequential enough to
- * continue read-ahead.
- */
-	if (index > filp->f_raend || index + filp->f_rawin < filp->f_raend) {
-		reada_ok = 0;
-		filp->f_raend = 0;
-		filp->f_ralen = 0;
-		filp->f_ramax = 0;
-		filp->f_rawin = 0;
-	} else {
-		reada_ok = 1;
-	}
-/*
- * Adjust the current value of read-ahead max.
- * If the read operation stay in the first half page, force no readahead.
- * Otherwise try to increase read ahead max just enough to do the read request.
- * Then, at least MIN_READAHEAD if read ahead is ok,
- * and at most MAX_READAHEAD in all cases.
- */
-	if (!index && offset + desc->count <= (PAGE_CACHE_SIZE >> 1)) {
-		filp->f_ramax = 0;
-	} else {
-		unsigned long needed;
-
-		needed = ((offset + desc->count) >> PAGE_CACHE_SHIFT) + 1;
-
-		if (filp->f_ramax < needed)
-			filp->f_ramax = needed;
-
-		if (reada_ok && filp->f_ramax < MIN_READAHEAD)
-			filp->f_ramax = MIN_READAHEAD;
-		if (filp->f_ramax > MAX_READAHEAD)
-			filp->f_ramax = MAX_READAHEAD;
-	}
 
 	for (;;) {
 		struct page *page;
@@ -1275,6 +987,8 @@ void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * 
 				break;
 		}
 
+		page_cache_readahead(filp, index);
+
 		nr = nr - offset;
 
 		/*
@@ -1283,15 +997,18 @@ void do_generic_file_read(struct file * filp, loff_t *ppos, read_descriptor_t * 
 
 		write_lock(&mapping->page_lock);
 		page = radix_tree_lookup(&mapping->page_tree, index);
-		if (!page)
+		if (!page) {
+			write_unlock(&mapping->page_lock);
+			handle_ra_thrashing(filp);
+			write_lock(&mapping->page_lock);
 			goto no_cached_page;
+		}
 found_page:
 		page_cache_get(page);
 		write_unlock(&mapping->page_lock);
 
 		if (!Page_Uptodate(page))
 			goto page_not_up_to_date;
-		generic_file_readahead(reada_ok, filp, inode, page);
 page_ok:
 		/* If users can be writing to this page using arbitrary
 		 * virtual addresses, take care about potential aliasing
@@ -1301,10 +1018,9 @@ page_ok:
 			flush_dcache_page(page);
 
 		/*
-		 * Mark the page accessed if we read the
-		 * beginning or we just did an lseek.
+		 * Mark the page accessed if we read the beginning.
 		 */
-		if (!offset || !filp->f_reada)
+		if (!offset)
 			mark_page_accessed(page);
 
 		/*
@@ -1327,12 +1043,7 @@ page_ok:
 			continue;
 		break;
 
-/*
- * Ok, the page was not immediately readable, so let's try to read ahead while we're at it..
- */
 page_not_up_to_date:
-		generic_file_readahead(reada_ok, filp, inode, page);
-
 		if (Page_Uptodate(page))
 			goto page_ok;
 
@@ -1359,9 +1070,6 @@ readpage:
 		if (!error) {
 			if (Page_Uptodate(page))
 				goto page_ok;
-
-			/* Again, try some read-ahead while waiting for the page to finish.. */
-			generic_file_readahead(reada_ok, filp, inode, page);
 			wait_on_page(page);
 			if (Page_Uptodate(page))
 				goto page_ok;
@@ -1415,7 +1123,6 @@ no_cached_page:
 	}
 
 	*ppos = ((loff_t) index << PAGE_CACHE_SHIFT) + offset;
-	filp->f_reada = 1;
 	if (cached_page)
 		page_cache_release(cached_page);
 	UPDATE_ATIME(inode);
@@ -1740,24 +1447,12 @@ static ssize_t do_readahead(struct file *file, unsigned long index, unsigned lon
 	if (!mapping || !mapping->a_ops || !mapping->a_ops->readpage)
 		return -EINVAL;
 
-	/* Limit it to the size of the file.. */
-	max = (mapping->host->i_size + ~PAGE_CACHE_MASK) >> PAGE_CACHE_SHIFT;
-	if (index > max)
-		return 0;
-	max -= index;
-	if (nr > max)
-		nr = max;
-
-	/* And limit it to a sane percentage of the inactive list.. */
+	/* Limit it to a sane percentage of the inactive list.. */
 	max = nr_inactive_pages / 2;
 	if (nr > max)
 		nr = max;
 
-	while (nr) {
-		page_cache_read(file, index);
-		index++;
-		nr--;
-	}
+	do_page_cache_readahead(file, index, nr);
 	return 0;
 }
 
@@ -1771,66 +1466,13 @@ asmlinkage ssize_t sys_readahead(int fd, loff_t offset, size_t count)
 	if (file) {
 		if (file->f_mode & FMODE_READ) {
 			unsigned long start = offset >> PAGE_CACHE_SHIFT;
-			unsigned long len = (count + ((long)offset & ~PAGE_CACHE_MASK)) >> PAGE_CACHE_SHIFT;
+			unsigned long end = (offset + count - 1) >> PAGE_CACHE_SHIFT;
+			unsigned long len = end - start + 1;
 			ret = do_readahead(file, start, len);
 		}
 		fput(file);
 	}
 	return ret;
-}
-
-/*
- * Read-ahead and flush behind for MADV_SEQUENTIAL areas.  Since we are
- * sure this is sequential access, we don't need a flexible read-ahead
- * window size -- we can always use a large fixed size window.
- */
-static void nopage_sequential_readahead(struct vm_area_struct * vma,
-	unsigned long pgoff, unsigned long filesize)
-{
-	unsigned long ra_window;
-
-	ra_window = CLUSTER_OFFSET(MAX_READAHEAD + CLUSTER_PAGES - 1);
-
-	/* vm_raend is zero if we haven't read ahead in this area yet.  */
-	if (vma->vm_raend == 0)
-		vma->vm_raend = vma->vm_pgoff + ra_window;
-
-	/*
-	 * If we've just faulted the page half-way through our window,
-	 * then schedule reads for the next window, and release the
-	 * pages in the previous window.
-	 */
-	if ((pgoff + (ra_window >> 1)) == vma->vm_raend) {
-		unsigned long start = vma->vm_pgoff + vma->vm_raend;
-		unsigned long end = start + ra_window;
-
-		if (end > ((vma->vm_end >> PAGE_SHIFT) + vma->vm_pgoff))
-			end = (vma->vm_end >> PAGE_SHIFT) + vma->vm_pgoff;
-		if (start > end)
-			return;
-
-		while ((start < end) && (start < filesize)) {
-			if (read_cluster_nonblocking(vma->vm_file,
-							start, filesize) < 0)
-				break;
-			start += CLUSTER_PAGES;
-		}
-		run_task_queue(&tq_disk);
-
-		/* if we're far enough past the beginning of this area,
-		   recycle pages that are in the previous window. */
-		if (vma->vm_raend > (vma->vm_pgoff + ra_window + ra_window)) {
-			unsigned long window = ra_window << PAGE_SHIFT;
-
-			end = vma->vm_start + (vma->vm_raend << PAGE_SHIFT);
-			end -= window + window;
-			filemap_sync(vma, end - window, window, MS_INVALIDATE);
-		}
-
-		vma->vm_raend += ra_window;
-	}
-
-	return;
 }
 
 /*
@@ -1841,6 +1483,7 @@ static void nopage_sequential_readahead(struct vm_area_struct * vma,
  * it in the page cache, and handles the special cases reasonably without
  * having a lot of duplicated code.
  */
+
 struct page * filemap_nopage(struct vm_area_struct * area, unsigned long address, int unused)
 {
 	int error;
@@ -1867,6 +1510,20 @@ retry_all:
 		size = endoff;
 
 	/*
+	 * The readahead code wants to be told about each and every page
+	 * so it can build and shrink its windows appropriately
+	 */
+	if (VM_SequentialReadHint(area))
+		page_cache_readahead(area->vm_file, pgoff);
+
+	/*
+	 * If the offset is outside the mapping size we're off the end
+	 * of a privately mapped file, so we need to map a zero page.
+	 */
+	if ((pgoff < size) && !VM_RandomReadHint(area))
+		page_cache_readaround(file, pgoff);
+
+	/*
 	 * Do we have something in the page cache already?
 	 */
 retry_find:
@@ -1882,12 +1539,6 @@ retry_find:
 		goto page_not_uptodate;
 
 success:
- 	/*
-	 * Try read-ahead for sequential areas.
-	 */
-	if (VM_SequentialReadHint(area))
-		nopage_sequential_readahead(area, pgoff, size);
-
 	/*
 	 * Found the page and have a reference on it, need to check sharing
 	 * and possibly copy it over to another page..
@@ -1898,16 +1549,10 @@ success:
 
 no_cached_page:
 	/*
-	 * If the requested offset is within our file, try to read a whole 
-	 * cluster of pages at once.
-	 *
-	 * Otherwise, we're off the end of a privately mapped file,
-	 * so we need to map a zero page.
+	 * We're only likely to ever get here if MADV_RANDOM is in
+	 * effect.
 	 */
-	if ((pgoff < size) && !VM_RandomReadHint(area))
-		error = read_cluster_nonblocking(file, pgoff, size);
-	else
-		error = page_cache_read(file, pgoff);
+	error = page_cache_read(file, pgoff);
 
 	/*
 	 * The page we want has now been added to the page cache.
@@ -2152,7 +1797,7 @@ static long madvise_behavior(struct vm_area_struct * vma,
  * to make sure they are started.  Do not wait for completion.
  */
 static long madvise_willneed(struct vm_area_struct * vma,
-	unsigned long start, unsigned long end)
+				unsigned long start, unsigned long end)
 {
 	long error = -EBADF;
 	struct file * file;
@@ -2177,30 +1822,8 @@ static long madvise_willneed(struct vm_area_struct * vma,
 	if ((vma->vm_mm->rss + (end - start)) > rlim_rss)
 		return error;
 
-	/* round to cluster boundaries if this isn't a "random" area. */
-	if (!VM_RandomReadHint(vma)) {
-		start = CLUSTER_OFFSET(start);
-		end = CLUSTER_OFFSET(end + CLUSTER_PAGES - 1);
-
-		while ((start < end) && (start < size)) {
-			error = read_cluster_nonblocking(file, start, size);
-			start += CLUSTER_PAGES;
-			if (error < 0)
-				break;
-		}
-	} else {
-		while ((start < end) && (start < size)) {
-			error = page_cache_read(file, start);
-			start++;
-			if (error < 0)
-				break;
-		}
-	}
-
-	/* Don't wait for someone else to push these requests. */
-	run_task_queue(&tq_disk);
-
-	return error;
+	do_page_cache_readahead(file, start, end - start);
+	return 0;
 }
 
 /*

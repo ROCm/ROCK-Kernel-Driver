@@ -173,12 +173,10 @@ extern int leases_enable, dir_notify_enable, lease_break_time;
 #define BLKRRPART  _IO(0x12,95)	/* re-read partition table */
 #define BLKGETSIZE _IO(0x12,96)	/* return device size /512 (long *arg) */
 #define BLKFLSBUF  _IO(0x12,97)	/* flush buffer cache */
-#if 0				/* Obsolete, these don't do anything. */
 #define BLKRASET   _IO(0x12,98)	/* set read ahead for block device */
 #define BLKRAGET   _IO(0x12,99)	/* get current read ahead setting */
 #define BLKFRASET  _IO(0x12,100)/* set filesystem (mm/filemap.c) read-ahead */
 #define BLKFRAGET  _IO(0x12,101)/* get filesystem (mm/filemap.c) read-ahead */
-#endif
 #define BLKSECTSET _IO(0x12,102)/* set max sectors per request (ll_rw_blk.c) */
 #define BLKSECTGET _IO(0x12,103)/* get max sectors per request (ll_rw_blk.c) */
 #define BLKSSZGET  _IO(0x12,104)/* get block device sector size */
@@ -487,6 +485,18 @@ struct fown_struct {
 	int signum;		/* posix.1b rt signal to be delivered on IO */
 };
 
+/*
+ * Track a single file's readahead state
+ */
+struct file_ra_state {
+	unsigned long start;		/* Current window */
+	unsigned long size;
+	unsigned long next_size;	/* Next window size */
+	unsigned long prev_page;	/* Cache last read() position */
+	unsigned long ahead_start;	/* Ahead window */
+	unsigned long ahead_size;
+};
+
 struct file {
 	struct list_head	f_list;
 	struct dentry		*f_dentry;
@@ -496,10 +506,10 @@ struct file {
 	unsigned int 		f_flags;
 	mode_t			f_mode;
 	loff_t			f_pos;
-	unsigned long 		f_reada, f_ramax, f_raend, f_ralen, f_rawin;
 	struct fown_struct	f_owner;
 	unsigned int		f_uid, f_gid;
 	int			f_error;
+	struct file_ra_state	f_ra;
 
 	unsigned long		f_version;
 
