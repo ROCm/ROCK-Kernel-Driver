@@ -403,7 +403,7 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 	}
 	init_waitqueue_entry(&wait, current);
 	add_wait_queue(&rmidi->open_wait, &wait);
-	down(&rmidi->open_lock);
+	down(&rmidi->open_mutex);
 	while (1) {
 		subdevice = -1;
 		down_read(&card->controls_rwsem);
@@ -426,9 +426,9 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 		} else
 			break;
 		set_current_state(TASK_INTERRUPTIBLE);
-		up(&rmidi->open_lock);
+		up(&rmidi->open_mutex);
 		schedule();
-		down(&rmidi->open_lock);
+		down(&rmidi->open_mutex);
 		if (signal_pending(current)) {
 			err = -ERESTARTSYS;
 			break;
@@ -447,7 +447,7 @@ static int snd_rawmidi_open(struct inode *inode, struct file *file)
 		snd_card_file_remove(card, file);
 		snd_magic_kfree(rawmidi_file);
 	}
-	up(&rmidi->open_lock);
+	up(&rmidi->open_mutex);
 	return err;
 }
 
