@@ -175,7 +175,7 @@ typedef struct siginfo32 {
 #undef SI_MESGQ
 #define SI_ASYNCIO	-2	/* sent by AIO completion */
 #define SI_TIMER __SI_CODE(__SI_TIMER,-3) /* sent by timer expiration */
-#define SI_MESGQ	-4	/* sent by real time mesq state change */
+#define SI_MESGQ __SI_CODE(__SI_MESGQ,-4) /* sent by real time mesq state change */
 
 #ifdef __KERNEL__
 

@@ -1,6 +1,25 @@
 #
 # PCI configuration
 #
+config PCI_USE_VECTOR
+	bool "Vector-based interrupt indexing (MSI)"
+	depends on (X86_LOCAL_APIC && X86_IO_APIC && !X86_64) || IA64
+	default n
+	help
+	   This replaces the current existing IRQ-based index interrupt scheme
+	   with the vector-base index scheme. The advantages of vector base
+	   over IRQ base are listed below:
+	   1) Support MSI implementation.
+	   2) Support future IOxAPIC hotplug
+
+	   Note that this allows the device drivers to enable MSI, Message
+	   Signaled Interrupt, on all MSI capable device functions detected.
+	   Message Signal Interrupt enables an MSI-capable hardware device to
+	   send an inbound Memory Write on its PCI bus instead of asserting
+	   IRQ signal on device IRQ pin.
+
+	   If you don't know what to do here, say N.
+
 config PCI_LEGACY_PROC
 	bool "Legacy /proc/pci interface"
 	depends on PCI

@@ -208,6 +208,7 @@ struct reiserfs_journal {
   unsigned int s_journal_trans_max ;           /* max number of blocks in a transaction.  */
   unsigned int s_journal_max_batch ;           /* max number of blocks to batch into a trans */
   unsigned int s_journal_max_commit_age ;      /* in seconds, how old can an async commit be */
+  unsigned int s_journal_default_max_commit_age ; /* the default for the max commit age */
   unsigned int s_journal_max_trans_age ;       /* in seconds, how old can a transaction be */  
 
   struct reiserfs_journal_cnode *j_cnode_free_list ;
@@ -481,6 +482,7 @@ int reiserfs_resize(struct super_block *, unsigned long) ;
 #define SB_JOURNAL_TRANS_MAX(s)      (SB_JOURNAL(s)->s_journal_trans_max)
 #define SB_JOURNAL_MAX_BATCH(s)      (SB_JOURNAL(s)->s_journal_max_batch)
 #define SB_JOURNAL_MAX_COMMIT_AGE(s) (SB_JOURNAL(s)->s_journal_max_commit_age)
+#define SB_JOURNAL_DEFAULT_MAX_COMMIT_AGE(s) (SB_JOURNAL(s)->s_journal_default_max_commit_age)
 #define SB_JOURNAL_MAX_TRANS_AGE(s)  (SB_JOURNAL(s)->s_journal_max_trans_age)
 
 /* A safe version of the "bdevname", which returns the "s_id" field of

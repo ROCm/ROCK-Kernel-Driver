@@ -361,16 +361,6 @@ config PCI
 	  information about which PCI hardware does work under Linux and which
 	  doesn't.
 
-config PCI_USE_VECTOR
-	bool
-	default y if IA64
-	help
-	   This enables MSI, Message Signaled Interrupt, on specific
-	   MSI capable device functions detected upon requests from the
-	   device drivers. Message Signal Interrupt enables an MSI-capable
-	   hardware device to send an inbound Memory Write on its PCI bus
-	   instead of asserting IRQ signal on device IRQ pin.
-
 config PCI_DOMAINS
 	bool
 	default PCI

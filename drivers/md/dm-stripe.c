@@ -187,9 +187,12 @@ static int stripe_status(struct dm_target *ti,
 			 status_type_t type, char *result, unsigned int maxlen)
 {
 	struct stripe_c *sc = (struct stripe_c *) ti->private;
-	int offset;
+	unsigned int sz = 0;
 	unsigned int i;
 	char buffer[32];
+
+#define EMIT(x...) sz += ((sz >= maxlen) ? \
+			  0 : scnprintf(result + sz, maxlen - sz, x))
 
 	switch (type) {
 	case STATUSTYPE_INFO:
@@ -197,14 +200,11 @@ static int stripe_status(struct dm_target *ti,
 		break;
 
 	case STATUSTYPE_TABLE:
-		offset = scnprintf(result, maxlen, "%d " SECTOR_FORMAT,
-				  sc->stripes, sc->chunk_mask + 1);
+		EMIT("%d " SECTOR_FORMAT, sc->stripes, sc->chunk_mask + 1);
 		for (i = 0; i < sc->stripes; i++) {
 			format_dev_t(buffer, sc->stripe[i].dev->bdev->bd_dev);
-			offset +=
-			    scnprintf(result + offset, maxlen - offset,
-				     " %s " SECTOR_FORMAT, buffer,
-				     sc->stripe[i].physical_start);
+			EMIT(" %s " SECTOR_FORMAT, buffer,
+			     sc->stripe[i].physical_start);
 		}
 		break;
 	}
