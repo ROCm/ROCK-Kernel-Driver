@@ -75,11 +75,8 @@
 #include "e1000.h"
 
 char e1000_driver_name[] = "e1000";
-
 char e1000_driver_string[] = "Intel(R) PRO/1000 Network Driver";
-
-char e1000_driver_version[] = "4.2.4-k2";
-
+char e1000_driver_version[] = "4.2.8";
 char e1000_copyright[] = "Copyright (c) 1999-2002 Intel Corporation.";
 
 /* e1000_pci_tbl - PCI Device ID Table
@@ -199,6 +196,7 @@ static struct pci_driver e1000_driver = {
 MODULE_AUTHOR("Intel Corporation, <linux.nics@intel.com>");
 MODULE_DESCRIPTION("Intel(R) PRO/1000 Network Driver");
 MODULE_LICENSE("Dual BSD/GPL");
+EXPORT_NO_SYMBOLS;
 
 /**
  * e1000_init_module - Driver Registration Routine
@@ -271,6 +269,8 @@ e1000_down(struct e1000_adapter *adapter)
 	free_irq(netdev->irq, netdev);
 	del_timer_sync(&adapter->watchdog_timer);
 	del_timer_sync(&adapter->phy_info_timer);
+	adapter->link_speed = 0;
+	adapter->link_duplex = 0;
 	netif_carrier_off(netdev);
 	netif_stop_queue(netdev);
 
@@ -1271,6 +1271,7 @@ e1000_watchdog(unsigned long data)
 			       netdev->name);
 			netif_carrier_off(netdev);
 			netif_stop_queue(netdev);
+			mod_timer(&adapter->phy_info_timer, jiffies + 2 * HZ);
 		}
 	}
 
@@ -1837,7 +1838,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 			E1000_DBG("Receive packet consumed multiple buffers\n");
 
 			dev_kfree_skb_irq(skb);
-			memset(rx_desc, 0, 16);
+			memset(rx_desc, 0, sizeof(struct e1000_rx_desc));
 			mb();
 			rx_ring->buffer_info[i].skb = NULL;
 
@@ -1866,7 +1867,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 			} else {
 
 				dev_kfree_skb_irq(skb);
-				memset(rx_desc, 0, 16);
+				memset(rx_desc, 0, sizeof(struct e1000_rx_desc));
 				mb();
 				rx_ring->buffer_info[i].skb = NULL;
 
@@ -1878,7 +1879,7 @@ e1000_clean_rx_irq(struct e1000_adapter *adapter)
 		}
 
 		/* Good Receive */
-		skb_put(skb, length - CRC_LENGTH);
+		skb_put(skb, length - ETHERNET_FCS_SIZE);
 
 		/* Receive Checksum Offload */
 		e1000_rx_checksum(adapter, rx_desc, skb);
