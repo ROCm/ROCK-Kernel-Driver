@@ -52,6 +52,7 @@ obj-$(CONFIG_JBD)		+= jbd/
 obj-$(CONFIG_EXT2_FS)		+= ext2/
 obj-$(CONFIG_CRAMFS)		+= cramfs/
 obj-$(CONFIG_RAMFS)		+= ramfs/
+obj-$(CONFIG_HUGETLBFS)		+= hugetlbfs/
 obj-$(CONFIG_CODA_FS)		+= coda/
 obj-$(CONFIG_INTERMEZZO_FS)	+= intermezzo/
 obj-$(CONFIG_MINIX_FS)		+= minix/

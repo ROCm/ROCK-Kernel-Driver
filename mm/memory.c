@@ -38,6 +38,7 @@
 
 #include <linux/kernel_stat.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/mman.h>
 #include <linux/swap.h>
 #include <linux/highmem.h>
@@ -397,6 +398,11 @@ void unmap_page_range(mmu_gather_t *tlb, struct vm_area_struct *vma, unsigned lo
 {
 	pgd_t * dir;
 
+	if (is_vm_hugetlb_page(vma)) {
+		unmap_hugepage_range(vma, address, end);
+		return;
+	}
+
 	BUG_ON(address >= end);
 
 	dir = pgd_offset(vma->vm_mm, address);
@@ -435,6 +441,11 @@ void zap_page_range(struct vm_area_struct *vma, unsigned long address, unsigned 
 	struct mm_struct *mm = vma->vm_mm;
 	mmu_gather_t *tlb;
 	unsigned long end, block;
+
+	if (is_vm_hugetlb_page(vma)) {
+		zap_hugepage_range(vma, address, size);
+		return;
+	}
 
 	spin_lock(&mm->page_table_lock);
 

@@ -8,6 +8,7 @@
  */
 
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/slab.h>
 #include <linux/shm.h>
 #include <linux/mman.h>

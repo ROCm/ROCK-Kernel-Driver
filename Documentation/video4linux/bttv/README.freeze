@@ -61,6 +61,9 @@ greatest workarounds for hardware bugs might fix these problems.
 other
 -----
 
+If you use some binary-only yunk (like nvidia module) try to reproduce
+the problem without.
+
 IRQ sharing is known to cause problems in some cases.  It works just
 fine in theory and many configurations.  Neverless it might be worth a
 try to shuffle around the PCI cards to give bttv another IRQ or make

@@ -13,6 +13,7 @@
 #include <linux/fs.h>
 #include <linux/file.h>
 #include <linux/mm.h>
+#include <linux/hugetlb.h>
 #include <linux/sem.h>
 #include <linux/msg.h>
 #include <linux/shm.h>

@@ -95,7 +95,7 @@ out:
 	return error;
 }
 
-static int setattr_mask(unsigned int ia_valid)
+int setattr_mask(unsigned int ia_valid)
 {
 	unsigned long dn_mask = 0;
 

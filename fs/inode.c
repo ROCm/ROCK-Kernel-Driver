@@ -142,7 +142,7 @@ static struct inode *alloc_inode(struct super_block *sb)
 	return inode;
 }
 
-static void destroy_inode(struct inode *inode) 
+void destroy_inode(struct inode *inode) 
 {
 	if (inode_has_buffers(inode))
 		BUG();

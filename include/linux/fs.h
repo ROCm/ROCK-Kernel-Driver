@@ -1149,6 +1149,7 @@ extern int filemap_fdatawrite(struct address_space *);
 extern int filemap_fdatawait(struct address_space *);
 extern void sync_supers(void);
 extern sector_t bmap(struct inode *, sector_t);
+extern int setattr_mask(unsigned int);
 extern int notify_change(struct dentry *, struct iattr *);
 extern int permission(struct inode *, int);
 extern int vfs_permission(struct inode *, int);
@@ -1227,6 +1228,7 @@ static inline struct inode *iget(struct super_block *sb, unsigned long ino)
 
 extern void __iget(struct inode * inode);
 extern void clear_inode(struct inode *);
+extern void destroy_inode(struct inode *);
 extern struct inode *new_inode(struct super_block *);
 extern void remove_suid(struct dentry *);
 

@@ -603,6 +603,10 @@ config RAMFS
 	  say M here and read <file:Documentation/modules.txt>.  The module
 	  will be called ramfs.o.
 
+config HUGETLBFS
+	bool "HugeTLB file system support"
+	depends on HUGETLB_PAGE
+
 config ISO9660_FS
 	tristate "ISO 9660 CDROM file system support"
 	---help---
