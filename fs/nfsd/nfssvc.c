@@ -324,35 +324,33 @@ nfsd_dispatch(struct svc_rqst *rqstp, u32 *statp)
 }
 
 static struct svc_version	nfsd_version2 = {
-		vs_vers:	2,
-		vs_nproc:	18,
-		vs_proc:	nfsd_procedures2,
-		vs_dispatch:	nfsd_dispatch
+		.vs_vers	= 2,
+		.vs_nproc	= 18,
+		.vs_proc	= nfsd_procedures2,
+		.vs_dispatch	= nfsd_dispatch
 };
 #ifdef CONFIG_NFSD_V3
 static struct svc_version	nfsd_version3 = {
-		vs_vers:	3,
-		vs_nproc:	22,
-		vs_proc:	nfsd_procedures3,
-		vs_dispatch:	nfsd_dispatch
+		.vs_vers	= 3,
+		.vs_nproc	= 22,
+		.vs_proc	= nfsd_procedures3,
+		.vs_dispatch	= nfsd_dispatch
 };
 #endif
 static struct svc_version *	nfsd_version[] = {
-	NULL,
-	NULL,
-	&nfsd_version2,
+	[2] = &nfsd_version2,
 #ifdef CONFIG_NFSD_V3
-	&nfsd_version3,
+	[3] = &nfsd_version3,
 #endif
 };
 
 #define NFSD_NRVERS		(sizeof(nfsd_version)/sizeof(nfsd_version[0]))
 struct svc_program		nfsd_program = {
-	pg_prog:		NFS_PROGRAM,		/* program number */
-	pg_lovers:		2,			// version
-	pg_hivers:		NFSD_NRVERS-1,		// range
-	pg_nvers:		NFSD_NRVERS,		/* nr of entries in nfsd_version */
-	pg_vers:		nfsd_version,		/* version table */
-	pg_name:		"nfsd",			/* program name */
-	pg_stats:		&nfsd_svcstats,		/* version table */
+	.pg_prog		= NFS_PROGRAM,		/* program number */
+	.pg_lovers		= 2,			// version
+	.pg_hivers		= NFSD_NRVERS-1,	// range
+	.pg_nvers		= NFSD_NRVERS,		/* nr of entries in nfsd_version */
+	.pg_vers		= nfsd_version,		/* version table */
+	.pg_name		= "nfsd",		/* program name */
+	.pg_stats		= &nfsd_svcstats,	/* version table */
 };

@@ -37,7 +37,7 @@
 
 struct nfsd_stats	nfsdstats;
 struct svc_stat		nfsd_svcstats = {
-	program:	&nfsd_program,
+	.program	= &nfsd_program,
 };
 
 static int

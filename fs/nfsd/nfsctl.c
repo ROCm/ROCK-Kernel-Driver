@@ -114,14 +114,14 @@ static int TA_release(struct inode *inode, struct file *file)
 }
 
 static struct file_operations writer_ops = {
-	write:	fs_write,
+	.write	= fs_write,
 };
 
 static struct file_operations reader_ops = {
-	write:	fs_write,
-	read:	TA_read,
-	open:	TA_open,
-	release:TA_release,
+	.write		= fs_write,
+	.read		= TA_read,
+	.open		= TA_open,
+	.release	= TA_release,
 };
 
 extern struct seq_operations nfs_exports_op;
@@ -130,10 +130,10 @@ static int exports_open(struct inode *inode, struct file *file)
 	return seq_open(file, &nfs_exports_op);
 }
 static struct file_operations exports_operations = {
-	open:		exports_open,
-	read:		seq_read,
-	llseek:		seq_lseek,
-	release:	seq_release,
+	.open		= exports_open,
+	.read		= seq_read,
+	.llseek		= seq_lseek,
+	.release	= seq_release,
 };
 
 /*
@@ -305,7 +305,7 @@ static ssize_t write_getfd(struct file *file, const char *buf, size_t size)
  */
 
 static struct super_operations s_ops = {
-	statfs:		simple_statfs,
+	.statfs		= simple_statfs,
 };
 
 static int nfsd_fill_super(struct super_block * sb, void * data, int silent)
@@ -371,10 +371,10 @@ static struct super_block *nfsd_get_sb(struct file_system_type *fs_type,
 }
 
 static struct file_system_type nfsd_fs_type = {
-	owner:		THIS_MODULE,
-	name:		"nfsd",
-	get_sb:		nfsd_get_sb,
-	kill_sb:	kill_litter_super,
+	.owner		= THIS_MODULE,
+	.name		= "nfsd",
+	.get_sb		= nfsd_get_sb,
+	.kill_sb	= kill_litter_super,
 };
 
 static int __init init_nfsd(void)
