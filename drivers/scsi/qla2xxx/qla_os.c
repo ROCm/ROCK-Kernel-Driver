@@ -1784,7 +1784,7 @@ qla2xxx_slave_configure(struct scsi_device *sdev)
 
 		ql2xmaxqdepth = queue_depth;
 
-		scsi_adjust_queue_depth(sdev, MSG_ORDERED_TAG, queue_depth);
+		scsi_activate_tcq(sdev, queue_depth);
 
 		qla_printk(KERN_INFO, ha,
 		    "scsi(%d:%d:%d:%d): Enabled tagged queuing, queue "
