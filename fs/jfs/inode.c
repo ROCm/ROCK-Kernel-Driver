@@ -59,7 +59,7 @@ struct inode *jfs_iget(struct super_block *sb, ino_t ino)
 		inode->i_mapping->a_ops = &jfs_aops;
 		inode->i_mapping->gfp_mask = GFP_NOFS;
 	} else if (S_ISLNK(inode->i_mode)) {
-		if (inode->i_size > IDATASIZE) {
+		if (inode->i_size >= IDATASIZE) {
 			inode->i_op = &page_symlink_inode_operations;
 			inode->i_mapping->a_ops = &jfs_aops;
 		} else
