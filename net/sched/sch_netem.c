@@ -825,7 +825,7 @@ static int netem_dump(struct Qdisc *sch, struct sk_buff *skb)
 
 	qopt.latency = q->latency;
 	qopt.jitter = q->jitter;
-	qopt.limit = sch->dev->tx_queue_len;
+	qopt.limit = q->limit;
 	qopt.loss = q->loss;
 	qopt.gap = q->gap;
 
