@@ -162,7 +162,6 @@ struct Scsi_Device_Template osst_template =
        name:		"OnStream tape",
        tag:		"osst",
        scsi_type:	TYPE_TAPE,
-       major:		OSST_MAJOR,
        detect:		osst_detect,
        init:		osst_init,
        attach:		osst_attach,

@@ -760,9 +760,13 @@ static inline struct bio *idescsi_dma_bio(ide_drive_t *drive, idescsi_pc_t *pc)
 static inline int should_transform(ide_drive_t *drive, Scsi_Cmnd *cmd)
 {
 	idescsi_scsi_t *scsi = drive->driver_data;
+	struct gendisk *disk = cmd->request->rq_disk;
 
-	if (major(cmd->request->rq_dev) == SCSI_GENERIC_MAJOR)
-		return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
+	if (disk) {
+		struct Scsi_Device_Template **p = disk->private_data;
+		if (strcmp((*p)->tag, "sg") == 0)
+			return test_bit(IDESCSI_SG_TRANSFORM, &scsi->transform);
+	}
 	return test_bit(IDESCSI_TRANSFORM, &scsi->transform);
 }
 

@@ -175,7 +175,6 @@ static struct Scsi_Device_Template st_template = {
 	.name =		"tape", 
 	.tag =		"st", 
 	.scsi_type =	TYPE_TAPE,
-	.major =	SCSI_TAPE_MAJOR, 
 	.detect =	st_detect, 
 	.attach =	st_attach, 
 	.detach =	st_detach

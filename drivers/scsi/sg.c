@@ -125,7 +125,6 @@ static struct Scsi_Device_Template sg_template = {
 	.name = "generic",
 	.tag = "sg",
 	.scsi_type = 0xff,
-	.major = SCSI_GENERIC_MAJOR,
 	.detect = sg_detect,
 	.init = sg_init,
 	.attach = sg_attach,

@@ -77,7 +77,6 @@ static struct Scsi_Device_Template sr_template = {
 	.name		= "cdrom",
 	.tag		= "sr",
 	.scsi_type	= TYPE_ROM,
-	.major		= SCSI_CDROM_MAJOR,
 	.blk		= 1,
 	.detect		= sr_detect,
 	.init		= sr_init,
