@@ -446,24 +446,23 @@ int i2c_detach_client(struct i2c_client *client)
 	return 0;
 }
 
-void i2c_inc_use_client(struct i2c_client *client)
+static int i2c_inc_use_client(struct i2c_client *client)
 {
 
-	if (client->driver->inc_use != NULL)
-		client->driver->inc_use(client);
+	if (!try_module_get(client->driver->owner))
+		return -ENODEV;
+	if (!try_module_get(client->adapter->owner)) {
+		module_put(client->driver->owner);
+		return -ENODEV;
+	}
 
-	if (client->adapter->inc_use != NULL)
-		client->adapter->inc_use(client->adapter);
+	return 0;
 }
 
-void i2c_dec_use_client(struct i2c_client *client)
+static void i2c_dec_use_client(struct i2c_client *client)
 {
-	
-	if (client->driver->dec_use != NULL)
-		client->driver->dec_use(client);
-
-	if (client->adapter->dec_use != NULL)
-		client->adapter->dec_use(client->adapter);
+	module_put(client->driver->owner);
+	module_put(client->adapter->owner);
 }
 
 struct i2c_client *i2c_get_client(int driver_id, int adapter_id, 
@@ -535,20 +534,22 @@ struct i2c_client *i2c_get_client(int driver_id, int adapter_id,
 
 int i2c_use_client(struct i2c_client *client)
 {
-	if(client->flags & I2C_CLIENT_ALLOW_USE) {
-		if (client->flags & I2C_CLIENT_ALLOW_MULTIPLE_USE) 
+	if (!i2c_inc_use_client(client))
+		return -ENODEV;
+
+	if (client->flags & I2C_CLIENT_ALLOW_USE) {
+		if (client->flags & I2C_CLIENT_ALLOW_MULTIPLE_USE)
 			client->usage_count++;
-		else {
-			if(client->usage_count > 0) 
-				return -EBUSY;
-			 else 
-				client->usage_count++;
-		}
+		else if (client->usage_count > 0) 
+			goto busy;
+		else 
+			client->usage_count++;
 	}
 
-	i2c_inc_use_client(client);
-
 	return 0;
+ busy:
+	i2c_dec_use_client(client);
+	return -EBUSY;
 }
 
 int i2c_release_client(struct i2c_client *client)
@@ -1420,8 +1421,6 @@ EXPORT_SYMBOL(i2c_add_driver);
 EXPORT_SYMBOL(i2c_del_driver);
 EXPORT_SYMBOL(i2c_attach_client);
 EXPORT_SYMBOL(i2c_detach_client);
-EXPORT_SYMBOL(i2c_inc_use_client);
-EXPORT_SYMBOL(i2c_dec_use_client);
 EXPORT_SYMBOL(i2c_get_client);
 EXPORT_SYMBOL(i2c_use_client);
 EXPORT_SYMBOL(i2c_release_client);

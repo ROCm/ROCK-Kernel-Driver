@@ -995,11 +995,6 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 	printk("CPU%d: ", 0);
 	print_cpu_info(&cpu_data[0]);
 
-	/*
-	 * We have the boot CPU online for sure.
-	 */
-	set_bit(0, &cpu_online_map);
-	set_bit(0, &cpu_callout_map);
 	boot_cpu_logical_apicid = logical_smp_processor_id();
 	map_cpu_to_boot_apicid(0, boot_cpu_apicid);
 
@@ -1170,6 +1165,12 @@ static void __init smp_boot_cpus(unsigned int max_cpus)
 void __init smp_prepare_cpus(unsigned int max_cpus)
 {
 	smp_boot_cpus(max_cpus);
+}
+
+void __devinit smp_prepare_boot_cpu(void)
+{
+	set_bit(smp_processor_id(), &cpu_online_map);
+	set_bit(smp_processor_id(), &cpu_callout_map);
 }
 
 int __devinit __cpu_up(unsigned int cpu)

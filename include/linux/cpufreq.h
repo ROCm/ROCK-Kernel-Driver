@@ -104,27 +104,14 @@ static inline unsigned long cpufreq_scale(unsigned long old, u_int div, u_int mu
 
 
 /*********************************************************************
- *                      DYNAMIC CPUFREQ INTERFACE                    *
- *********************************************************************/
-#ifdef CONFIG_CPU_FREQ_DYNAMIC
-/* TBD */
-#endif /* CONFIG_CPU_FREQ_DYNAMIC */
-
-
-/*********************************************************************
  *                      CPUFREQ DRIVER INTERFACE                     *
  *********************************************************************/
 
-typedef int (*cpufreq_policy_t)          (struct cpufreq_policy *policy);
-
 struct cpufreq_driver {
 	/* needed by all drivers */
-	cpufreq_policy_t        verify;
-	cpufreq_policy_t        setpolicy;
+	int     (*verify)       (struct cpufreq_policy *policy);
+	int     (*setpolicy)    (struct cpufreq_policy *policy);
 	struct cpufreq_policy   *policy;
-#ifdef CONFIG_CPU_FREQ_DYNAMIC
-	/* TBD */
-#endif
 	/* 2.4. compatible API */
 #ifdef CONFIG_CPU_FREQ_24_API
 	unsigned int            cpu_cur_freq[NR_CPUS];

@@ -263,7 +263,8 @@ static void usb_hub_power_on(struct usb_hub *hub)
 	int i;
 
 	/* Enable power to the ports */
-	dbg("enabling power on all ports");
+	dev_dbg(*hubdev(interface_to_usbdev(hub->intf)),
+		"enabling power on all ports\n");
 	dev = interface_to_usbdev(hub->intf);
 	for (i = 0; i < hub->descriptor->bNbrPorts; i++)
 		usb_set_port_feature(dev, i + 1, USB_PORT_FEAT_POWER);
@@ -276,6 +277,7 @@ static int usb_hub_configure(struct usb_hub *hub,
 	struct usb_endpoint_descriptor *endpoint)
 {
 	struct usb_device *dev = interface_to_usbdev (hub->intf);
+	struct device *hub_dev;
 	struct usb_hub_status hubstatus;
 	unsigned int pipe;
 	int maxp, ret;
@@ -303,8 +305,9 @@ static int usb_hub_configure(struct usb_hub *hub,
 		goto fail;
 	}
 
+	hub_dev = hubdev(dev);
 	dev->maxchild = hub->descriptor->bNbrPorts;
-	dev_info (*hubdev (dev), "%d port%s detected\n", dev->maxchild,
+	dev_info (*hub_dev, "%d port%s detected\n", dev->maxchild,
 		(dev->maxchild == 1) ? "" : "s");
 
 	le16_to_cpus(&hub->descriptor->wHubCharacteristics);
@@ -318,33 +321,33 @@ static int usb_hub_configure(struct usb_hub *hub,
 				    [((i + 1) / 8)] & (1 << ((i + 1) % 8))
 				? 'F' : 'R';
 		portstr[dev->maxchild] = 0;
-		dbg("compound device; port removable status: %s", portstr);
+		dev_dbg(*hub_dev, "compound device; port removable status: %s\n", portstr);
 	} else
-		dbg("standalone hub");
+		dev_dbg(*hub_dev, "standalone hub\n");
 
 	switch (hub->descriptor->wHubCharacteristics & HUB_CHAR_LPSM) {
 		case 0x00:
-			dbg("ganged power switching");
+			dev_dbg(*hub_dev, "ganged power switching\n");
 			break;
 		case 0x01:
-			dbg("individual port power switching");
+			dev_dbg(*hub_dev, "individual port power switching\n");
 			break;
 		case 0x02:
 		case 0x03:
-			dbg("unknown reserved power switching mode");
+			dev_dbg(*hub_dev, "unknown reserved power switching mode\n");
 			break;
 	}
 
 	switch (hub->descriptor->wHubCharacteristics & HUB_CHAR_OCPM) {
 		case 0x00:
-			dbg("global over-current protection");
+			dev_dbg(*hub_dev, "global over-current protection\n");
 			break;
 		case 0x08:
-			dbg("individual port over-current protection");
+			dev_dbg(*hub_dev, "individual port over-current protection\n");
 			break;
 		case 0x10:
 		case 0x18:
-			dbg("no over-current protection");
+			dev_dbg(*hub_dev, "no over-current protection\n");
                         break;
 	}
 
@@ -355,16 +358,16 @@ static int usb_hub_configure(struct usb_hub *hub,
 		case 0:
 			break;
 		case 1:
-			dbg("Single TT");
+			dev_dbg(*hub_dev, "Single TT\n");
 			hub->tt.hub = dev;
 			break;
 		case 2:
-			dbg("TT per port");
+			dev_dbg(*hub_dev, "TT per port\n");
 			hub->tt.hub = dev;
 			hub->tt.multi = 1;
 			break;
 		default:
-			dbg("Unrecognized hub protocol %d",
+			dev_dbg(*hub_dev, "Unrecognized hub protocol %d\n",
 				dev->descriptor.bDeviceProtocol);
 			break;
 	}
@@ -372,26 +375,26 @@ static int usb_hub_configure(struct usb_hub *hub,
 	switch (hub->descriptor->wHubCharacteristics & HUB_CHAR_TTTT) {
 		case 0x00:
 			if (dev->descriptor.bDeviceProtocol != 0)
-				dbg("TT requires at most 8 FS bit times");
+				dev_dbg(*hub_dev, "TT requires at most 8 FS bit times\n");
 			break;
 		case 0x20:
-			dbg("TT requires at most 16 FS bit times");
+			dev_dbg(*hub_dev, "TT requires at most 16 FS bit times\n");
 			break;
 		case 0x40:
-			dbg("TT requires at most 24 FS bit times");
+			dev_dbg(*hub_dev, "TT requires at most 24 FS bit times\n");
 			break;
 		case 0x60:
-			dbg("TT requires at most 32 FS bit times");
+			dev_dbg(*hub_dev, "TT requires at most 32 FS bit times\n");
 			break;
 	}
 
-	dbg("Port indicators are %s supported", 
+	dev_dbg(*hub_dev, "Port indicators are %s supported\n", 
 	    (hub->descriptor->wHubCharacteristics & HUB_CHAR_PORTIND)
 	    	? "" : "not");
 
-	dbg("power on to power good time: %dms",
+	dev_dbg(*hub_dev, "power on to power good time: %dms\n",
 		hub->descriptor->bPwrOn2PwrGood * 2);
-	dbg("hub controller current requirement: %dmA",
+	dev_dbg(*hub_dev, "hub controller current requirement: %dmA\n",
 		hub->descriptor->bHubContrCurrent);
 
 	ret = usb_get_hub_status(dev, &hubstatus);
@@ -402,11 +405,11 @@ static int usb_hub_configure(struct usb_hub *hub,
 
 	le16_to_cpus(&hubstatus.wHubStatus);
 
-	dbg("local power source is %s",
+	dev_dbg(*hub_dev, "local power source is %s\n",
 		(hubstatus.wHubStatus & HUB_STATUS_LOCAL_POWER)
 		? "lost (inactive)" : "good");
 
-	dbg("%sover-current condition exists",
+	dev_dbg(*hub_dev, "%sover-current condition exists\n",
 		(hubstatus.wHubStatus & HUB_STATUS_OVERCURRENT) ? "" : "no ");
 
 	/* Start the interrupt endpoint */

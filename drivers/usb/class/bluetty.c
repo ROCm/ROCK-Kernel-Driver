@@ -1201,7 +1201,7 @@ static int usb_bluetooth_probe (struct usb_interface *intf,
 		     bluetooth, endpoint->bInterval);
 
 	/* initialize the devfs nodes for this device and let the user know what bluetooths we are bound to */
-	tty_register_devfs (&bluetooth_tty_driver, 0, minor);
+	tty_register_device (&bluetooth_tty_driver, minor);
 	info("Bluetooth converter now attached to ttyUB%d (or usb/ttub/%d for devfs)", minor, minor);
 
 	bluetooth_table[minor] = bluetooth;
@@ -1267,7 +1267,7 @@ static void usb_bluetooth_disconnect(struct usb_interface *intf)
 		if (bluetooth->interrupt_in_buffer)
 			kfree (bluetooth->interrupt_in_buffer);
 
-		tty_unregister_devfs (&bluetooth_tty_driver, bluetooth->minor);
+		tty_unregister_device (&bluetooth_tty_driver, bluetooth->minor);
 
 		for (i = 0; i < NUM_BULK_URBS; ++i) {
 			if (bluetooth->write_urb_pool[i]) {

@@ -89,41 +89,13 @@ static int bit_velle_getsda(void *data)
 
 static int bit_velle_init(void)
 {
-	if (check_region(base,(base == 0x3bc)? 3 : 8) < 0 ) {
-		DEBE(printk(KERN_DEBUG "i2c-velleman.o: Port %#x already in use.\n",
-		     base));
+	if (!request_region(base, (base == 0x3bc) ? 3 : 8, 
+			"i2c (Vellemann adapter)"))
 		return -ENODEV;
-	} else {
-		request_region(base, (base == 0x3bc)? 3 : 8, 
-			"i2c (Vellemann adapter)");
-		bit_velle_setsda((void*)base,1);
-		bit_velle_setscl((void*)base,1);
-	}
+
+	bit_velle_setsda((void*)base,1);
+	bit_velle_setscl((void*)base,1);
 	return 0;
-}
-
-static int bit_velle_reg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static int bit_velle_unreg(struct i2c_client *client)
-{
-	return 0;
-}
-
-static void bit_velle_inc_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_INC_USE_COUNT;
-#endif
-}
-
-static void bit_velle_dec_use(struct i2c_adapter *adap)
-{
-#ifdef MODULE
-	MOD_DEC_USE_COUNT;
-#endif
 }
 
 /* ------------------------------------------------------------------------
@@ -141,14 +113,10 @@ static struct i2c_algo_bit_data bit_velle_data = {
 };
 
 static struct i2c_adapter bit_velle_ops = {
-	"Velleman K8000",
-	I2C_HW_B_VELLE,
-	NULL,
-	&bit_velle_data,
-	bit_velle_inc_use,
-	bit_velle_dec_use,
-	bit_velle_reg,
-	bit_velle_unreg,
+	.owner		= THIS_MODULE,
+	.name		= "Velleman K8000",
+	.id		= I2C_HW_B_VELLE,
+	.algo_data	= &bit_velle_data,
 };
 
 static int __init i2c_bitvelle_init(void)

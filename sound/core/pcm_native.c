@@ -1791,7 +1791,7 @@ int snd_pcm_open(struct inode *inode, struct file *file)
 	err = snd_card_file_add(pcm->card, file);
 	if (err < 0)
 		goto __error1;
-	if (!try_inc_mod_count(pcm->card->module)) {
+	if (!try_module_get(pcm->card->module)) {
 		err = -EFAULT;
 		goto __error2;
 	}

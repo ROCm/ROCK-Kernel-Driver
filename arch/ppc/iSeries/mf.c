@@ -40,6 +40,7 @@
 #include <asm/iSeries/iSeries_proc.h>
 #include <asm/uaccess.h>
 #include <linux/pci.h>
+#include <linux/bcd.h>
 
 
 /*

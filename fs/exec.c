@@ -142,7 +142,7 @@ asmlinkage long sys_uselib(const char * library)
 		for (fmt = formats ; fmt ; fmt = fmt->next) {
 			if (!fmt->load_shlib)
 				continue;
-			if (!try_inc_mod_count(fmt->module))
+			if (!try_module_get(fmt->module))
 				continue;
 			read_unlock(&binfmt_lock);
 			error = fmt->load_shlib(file);
@@ -971,7 +971,7 @@ int search_binary_handler(struct linux_binprm *bprm,struct pt_regs *regs)
 			int (*fn)(struct linux_binprm *, struct pt_regs *) = fmt->load_binary;
 			if (!fn)
 				continue;
-			if (!try_inc_mod_count(fmt->module))
+			if (!try_module_get(fmt->module))
 				continue;
 			read_unlock(&binfmt_lock);
 			retval = fn(bprm, regs);

@@ -22,9 +22,11 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <linux/i2c.h>
-#include <linux/sensors.h>
+#include <linux/i2c-proc.h>
 #include <linux/init.h>
 
+
+#define LM75_SYSCTL_TEMP 1200	/* Degrees Celcius * 10 */
 
 /* Addresses to scan */
 static unsigned short normal_i2c[] = { SENSORS_I2C_END };
@@ -72,8 +74,6 @@ static void lm75_init_client(struct i2c_client *client);
 static int lm75_detach_client(struct i2c_client *client);
 static int lm75_command(struct i2c_client *client, unsigned int cmd,
 			void *arg);
-static void lm75_inc_use(struct i2c_client *client);
-static void lm75_dec_use(struct i2c_client *client);
 static u16 swap_bytes(u16 val);
 static int lm75_read_value(struct i2c_client *client, u8 reg);
 static int lm75_write_value(struct i2c_client *client, u8 reg, u16 value);
@@ -84,14 +84,12 @@ static void lm75_update_client(struct i2c_client *client);
 
 /* This is the driver that will be inserted */
 static struct i2c_driver lm75_driver = {
-	/* name */ "LM75 sensor chip driver",
-	/* id */ I2C_DRIVERID_LM75,
-	/* flags */ I2C_DF_NOTIFY,
-	/* attach_adapter */ &lm75_attach_adapter,
-	/* detach_client */ &lm75_detach_client,
-	/* command */ &lm75_command,
-	/* inc_use */ &lm75_inc_use,
-	/* dec_use */ &lm75_dec_use
+	.name		= "LM75 sensor chip driver",
+	.id		= I2C_DRIVERID_LM75,
+	.flags		= I2C_DF_NOTIFY,
+	.attach_adapter	= lm75_attach_adapter,
+	.detach_client	= lm75_detach_client,
+	.command	= lm75_command,
 };
 
 /* These files are created for each detected LM75. This is just a template;
@@ -221,40 +219,17 @@ int lm75_detect(struct i2c_adapter *adapter, int address,
 
 int lm75_detach_client(struct i2c_client *client)
 {
-	int err;
+	struct lm75_data *data = client->data;
 
-#ifdef MODULE
-	if (MOD_IN_USE)
-		return -EBUSY;
-#endif
-
-	i2c_deregister_entry(((struct lm75_data *) (client->data))->
-				 sysctl_id);
-
-	if ((err = i2c_detach_client(client))) {
-		printk
-		    ("lm75.o: Client deregistration failed, client not detached.\n");
-		return err;
-	}
-
+	i2c_deregister_entry(data->sysctl_id);
+	i2c_detach_client(client);
 	kfree(client);
-
 	return 0;
 }
 
 int lm75_command(struct i2c_client *client, unsigned int cmd, void *arg)
 {
 	return 0;
-}
-
-void lm75_inc_use(struct i2c_client *client)
-{
-	MOD_INC_USE_COUNT;
-}
-
-void lm75_dec_use(struct i2c_client *client)
-{
-	MOD_DEC_USE_COUNT;
 }
 
 u16 swap_bytes(u16 val)

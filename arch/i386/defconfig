@@ -32,8 +32,10 @@ CONFIG_KMOD=y
 #
 # Processor type and features
 #
-CONFIG_PC=y
-# CONFIG_VOYAGER is not set
+CONFIG_X86_PC=y
+# CONFIG_X86_VOYAGER is not set
+# CONFIG_X86_NUMAQ is not set
+# CONFIG_X86_SUMMIT is not set
 # CONFIG_M386 is not set
 # CONFIG_M486 is not set
 # CONFIG_M586 is not set
@@ -70,7 +72,6 @@ CONFIG_SMP=y
 CONFIG_X86_LOCAL_APIC=y
 CONFIG_X86_IO_APIC=y
 CONFIG_NR_CPUS=32
-# CONFIG_X86_NUMA is not set
 CONFIG_X86_MCE=y
 # CONFIG_X86_MCE_NONFATAL is not set
 CONFIG_X86_MCE_P4THERMAL=y

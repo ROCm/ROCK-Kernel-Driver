@@ -87,19 +87,10 @@ static int matroxfb_gpio_getscl(void* data) {
 	return (matroxfb_read_gpio(b->minfo) & b->mask.clock) ? 1 : 0;
 }
 
-static void matroxfb_dh_inc_use(struct i2c_adapter* dummy) {
-	MOD_INC_USE_COUNT;
-}
-
-static void matroxfb_dh_dec_use(struct i2c_adapter* dummy) {
-	MOD_DEC_USE_COUNT;
-}
-
 static struct i2c_adapter matrox_i2c_adapter_template =
 {
+	.owner =	THIS_MODULE,
 	.id =		I2C_HW_B_G400,
-	.inc_use =	matroxfb_dh_inc_use,
-	.dec_use =	matroxfb_dh_dec_use,
 };
 
 static struct i2c_algo_bit_data matrox_i2c_algo_template =

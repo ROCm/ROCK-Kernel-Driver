@@ -660,14 +660,16 @@ void batch_entropy_store(u32 a, u32 b, int num)
 	batch_entropy_credit[batch_head] = num;
 
 	new = (batch_head+1) & (batch_max-1);
-	if (new != batch_tail) {
+	if ((unsigned)(new - batch_tail) >= (unsigned)(batch_max / 2)) {
 		/*
 		 * Schedule it for the next timer tick:
 		 */
 		schedule_delayed_work(&batch_work, 1);
 		batch_head = new;
-	} else {
+	} else if (new == batch_tail) {
 		DEBUG_ENT("batch entropy buffer full\n");
+	} else {
+		batch_head = new;
 	}
 }
 

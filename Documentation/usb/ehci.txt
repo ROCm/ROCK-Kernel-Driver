@@ -1,4 +1,4 @@
-23-Aug-2002
+27-Dec-2002
 
 The EHCI driver is used to talk to high speed USB 2.0 devices using
 USB 2.0-capable host controller hardware.  The USB 2.0 standard is
@@ -47,9 +47,11 @@ used on PPC hardware so big/little endianness issues should be gone.
 It's believed to do all the right PCI magic so that I/O works even on
 systems with interesting DMA mapping issues.
 
+Transfer Types
+
 At this writing the driver should comfortably handle all control, bulk,
 and interrupt transfers, including requests to USB 1.1 devices through
-transaction translators (TTs) in USB 2.0 hubs.
+transaction translators (TTs) in USB 2.0 hubs.  But you may find bugs.
 
 High Speed Isochronous (ISO) transfer support is also functional, but
 at this writing no Linux drivers have been using that support.
@@ -59,6 +61,8 @@ is not yet available.  Note that split transaction support for ISO
 transfers can't share much code with the code for high speed ISO transfers,
 since EHCI represents these with a different data structure.  So for now,
 most USB audio and video devices can't be connected to high speed buses.
+
+Driver Behavior
 
 Transfers of all types can be queued.  This means that control transfers
 from a driver on one interface (or through usbfs) won't interfere with
@@ -104,9 +108,20 @@ Module parameters (pass to "modprobe") include:
 	is 6, indicating 2^6 = 64 microframes.  This controls how often
 	the EHCI controller can issue interrupts.
 
-The EHCI interrupt handler just acknowledges interrupts and schedules
-a tasklet to handle whatever needs handling.  That keeps latencies low,
-no matter how often interrupts are issued.
+If you're using this driver on a 2.5 kernel, and you've enabled USB
+debugging support, you'll see three files in the "sysfs" directory for
+any EHCI controller:
+
+	"async" dumps the asynchronous schedule, used for control
+		and bulk transfers.  Shows each active qh and the qtds
+		pending, usually one qtd per urb.  (Look at it with
+		usb-storage doing disk I/O; watch the request queues!)
+	"periodic" dumps the periodic schedule, used for interrupt
+		and isochronous transfers.  Doesn't show qtds.
+	"registers" show controller register state, and
+
+The contents of those files can help identify driver problems.
+
 
 Device drivers shouldn't care whether they're running over EHCI or not,
 but they may want to check for "usb_device->speed == USB_SPEED_HIGH".
@@ -114,6 +129,11 @@ High speed devices can do things that full speed (or low speed) ones
 can't, such as "high bandwidth" periodic (interrupt or ISO) transfers.
 Also, some values in device descriptors (such as polling intervals for
 periodic transfers) use different encodings when operating at high speed.
+
+However, do make a point of testing device drivers through USB 2.0 hubs.
+Those hubs report some failures, such as disconnections, differently when
+transaction translators are in use; some drivers have been seen to behave
+badly when they see different faults than OHCI or UHCI report.
 
 
 PERFORMANCE
@@ -176,9 +196,15 @@ than the I/O.  If that same loop used 16 KB chunks, it'd be better; a
 sequence of 128 KB chunks would waste a lot less.
 
 But rather than depending on such large I/O buffers to make synchronous
-I/O be efficient, it's better to just queue all several (bulk) requests
+I/O be efficient, it's better to just queue up several (bulk) requests
 to the HC, and wait for them all to complete (or be canceled on error).
 Such URB queuing should work with all the USB 1.1 HC drivers too.
+
+In the Linux 2.5 kernels, new usb_sg_*() api calls have been defined; they
+queue all the buffers from a scatterlist.  They also use scatterlist DMA
+mapping (which might apply an IOMMU) and IRQ reduction, all of which will
+help make high speed transfers run as fast as they can.
+
 
 TBD:  Interrupt and ISO transfer performance issues.  Those periodic
 transfers are fully scheduled, so the main issue is likely to be how

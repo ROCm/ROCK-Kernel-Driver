@@ -234,9 +234,6 @@ extern void ia64_load_extra (struct task_struct *task);
 
 #ifdef CONFIG_SMP
 
-/* Return true if this CPU can call the console drivers in printk() */
-#define arch_consoles_callable() (cpu_online_map & (1UL << smp_processor_id()))
-
 /*
  * In the SMP case, we save the fph state when context-switching
  * away from a thread that modified fph.  This way, when the thread

@@ -15,6 +15,7 @@
 #include <linux/interrupt.h>
 #include <linux/init.h>
 #include <linux/rtc.h>
+#include <linux/bcd.h>
 
 #include <asm/rtc.h>
 

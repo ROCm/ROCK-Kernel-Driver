@@ -234,7 +234,7 @@ snd_seq_oss_synth_setup(seq_oss_devinfo_t *dp)
 		else
 			info->arg.event_passing = SNDRV_SEQ_OSS_PASS_EVENTS;
 		info->opened = 0;
-		if (!try_inc_mod_count(rec->oper.owner)) {
+		if (!try_module_get(rec->oper.owner)) {
 			snd_use_lock_free(&rec->use_lock);
 			continue;
 		}

@@ -377,6 +377,13 @@ asmlinkage void __init start_kernel(void)
 	printk(linux_banner);
 	setup_arch(&command_line);
 	setup_per_cpu_areas();
+
+	/*
+	 * Mark the boot cpu "online" so that it can call console drivers in
+	 * printk() and can access its per-cpu storage.
+	 */
+	smp_prepare_boot_cpu();
+
 	build_all_zonelists();
 	page_alloc_init();
 	printk("Kernel command line: %s\n", saved_command_line);

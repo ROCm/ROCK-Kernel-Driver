@@ -49,24 +49,22 @@ cflags-$(CONFIG_MCYRIXIII)	+= $(call check_gcc,-falign-functions=0 -falign-jumps
 
 CFLAGS += $(cflags-y)
 
-#default subarch .c files
+# Default subarch .c files
 mcore-y  := mach-default
 
-#Voyager subarch support
-mflags-$(CONFIG_VOYAGER)	:= -Iinclude/asm-i386/mach-voyager
-mcore-$(CONFIG_VOYAGER)		:= mach-voyager
+# Voyager subarch support
+mflags-$(CONFIG_X86_VOYAGER)	:= -Iinclude/asm-i386/mach-voyager
+mcore-$(CONFIG_X86_VOYAGER)	:= mach-voyager
 
-#VISWS subarch support
-mflags-$(CONFIG_VISWS) := -Iinclude/asm-i386/mach-visws
-mcore-$(CONFIG_VISWS)  := mach-visws
+# VISWS subarch support
+mflags-$(CONFIG_X86_VISWS)	:= -Iinclude/asm-i386/mach-visws
+mcore-$(CONFIG_X86_VISWS)	:= mach-visws
 
-#NUMAQ subarch support
-mflags-$(CONFIG_X86_NUMAQ) := -Iinclude/asm-i386/mach-numaq
-mcore-$(CONFIG_X86_NUMAQ)  := mach-default
+# NUMAQ subarch support
+mflags-$(CONFIG_X86_NUMAQ)	:= -Iinclude/asm-i386/mach-numaq
+mcore-$(CONFIG_X86_NUMAQ)	:= mach-default
 
-#add other subarch support here
-
-#default subarch .h files
+# default subarch .h files
 mflags-y += -Iinclude/asm-i386/mach-default
 
 HEAD := arch/i386/kernel/head.o arch/i386/kernel/init_task.o

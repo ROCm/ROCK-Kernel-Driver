@@ -78,6 +78,13 @@ extern int register_cpu_notifier(struct notifier_block *nb);
 extern void unregister_cpu_notifier(struct notifier_block *nb);
 
 int cpu_up(unsigned int cpu);
+
+/*
+ * Mark the boot cpu "online" so that it can call console drivers in
+ * printk() and can access its per-cpu storage.
+ */
+void smp_prepare_boot_cpu(void);
+
 #else /* !SMP */
 
 /*
@@ -94,7 +101,8 @@ static inline void smp_send_reschedule_all(void) { }
 #define cpu_online(cpu)				({ BUG_ON((cpu) != 0); 1; })
 #define num_online_cpus()			1
 #define num_booting_cpus()			1
-#define cpu_possible(cpu)				({ BUG_ON((cpu) != 0); 1; })
+#define cpu_possible(cpu)			({ BUG_ON((cpu) != 0); 1; })
+#define smp_prepare_boot_cpu()			do {} while (0)
 
 struct notifier_block;
 

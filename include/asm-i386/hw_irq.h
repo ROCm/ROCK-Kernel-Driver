@@ -131,7 +131,7 @@ static inline int unregister_profile_notifier(struct notifier_block * nb)
 
 #endif /* CONFIG_PROFILING */
  
-#if defined(CONFIG_SMP) && !defined(CONFIG_VOYAGER) /*more of this file should probably be ifdefed SMP */
+#ifdef CONFIG_X86_IO_APIC /*more of this file should probably be ifdefed SMP */
 static inline void hw_resend_irq(struct hw_interrupt_type *h, unsigned int i) {
 	if (IO_APIC_IRQ(i))
 		send_IPI_self(IO_APIC_VECTOR(i));
