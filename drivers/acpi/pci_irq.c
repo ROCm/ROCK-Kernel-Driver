@@ -33,7 +33,9 @@
 #include <linux/pm.h>
 #include <linux/pci.h>
 #include <linux/acpi.h>
+#ifdef CONFIG_X86_IO_APIC
 #include <asm/mpspec.h>
+#endif
 #include "acpi_bus.h"
 #include "acpi_drivers.h"
 
@@ -387,6 +389,10 @@ acpi_pci_irq_init (void)
 	/* Program IOAPICs using data from PRT entries. */
 	if (acpi_irq_model == ACPI_IRQ_MODEL_IOAPIC)
 		mp_parse_prt();
+#endif
+#ifdef CONFIG_IOSAPIC
+	if (acpi_irq_model == ACPI_IRQ_MODEL_IOSAPIC)
+		iosapic_parse_prt();
 #endif
 
 	pci_for_each_dev(dev)

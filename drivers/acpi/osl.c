@@ -38,13 +38,8 @@
 #include "acpi.h"
 
 #ifdef CONFIG_ACPI_EFI
-#include <asm/efi.h>
+#include <linux/efi.h>
 u64 efi_mem_attributes (u64 phys_addr);
-#endif
-
-#ifdef CONFIG_IA64
-#include <asm/hw_irq.h>
-#include <asm/delay.h>
 #endif
 
 
@@ -167,10 +162,10 @@ acpi_status
 acpi_os_map_memory(ACPI_PHYSICAL_ADDRESS phys, ACPI_SIZE size, void **virt)
 {
 #ifdef CONFIG_ACPI_EFI
-	if (!(EFI_MEMORY_WB & efi_mem_attributes(phys))) {
-		*virt = ioremap(phys, size);
-	} else {
+	if (EFI_MEMORY_WB & efi_mem_attributes(phys)) {
 		*virt = phys_to_virt(phys);
+	} else {
+		*virt = ioremap(phys, size);
 	}
 #else
 	if (phys > ULONG_MAX) {
@@ -342,8 +337,7 @@ acpi_os_read_memory(
 
 	if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
 		virt_addr = phys_to_virt(phys_addr);
-	}
-	else {
+	} else {
 		iomem = 1;
 		virt_addr = ioremap(phys_addr, width);
 	}
@@ -388,8 +382,7 @@ acpi_os_write_memory(
 
 	if (EFI_MEMORY_WB & efi_mem_attributes(phys_addr)) {
 		virt_addr = phys_to_virt(phys_addr);
-	}
-	else {
+	} else {
 		iomem = 1;
 		virt_addr = ioremap(phys_addr, width);
 	}
