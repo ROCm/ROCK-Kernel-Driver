@@ -2092,6 +2092,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 {
 	struct net_device *netdev = data;
 	struct e1000_adapter *adapter = netdev->priv;
+	struct e1000_hw *hw = &adapter->hw;
 	uint32_t icr = E1000_READ_REG(&adapter->hw, ICR);
 #ifndef CONFIG_E1000_NAPI
 	unsigned int i;
@@ -2101,7 +2102,7 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		return IRQ_NONE;  /* Not our interrupt */
 
 	if(icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
-		adapter->hw.get_link_status = 1;
+		hw->get_link_status = 1;
 		mod_timer(&adapter->watchdog_timer, jiffies);
 	}
 
@@ -2113,14 +2114,30 @@ e1000_intr(int irq, void *data, struct pt_regs *regs)
 		*/
 
 		atomic_inc(&adapter->irq_sem);
-		E1000_WRITE_REG(&adapter->hw, IMC, ~0);
+		E1000_WRITE_REG(hw, IMC, ~0);
 		__netif_rx_schedule(netdev);
 	}
 #else
+        /* Writing IMC and IMS is needed for 82547.
+	   Due to Hub Link bus being occupied, an interrupt 
+	   de-assertion message is not able to be sent. 
+	   When an interrupt assertion message is generated later,
+	   two messages are re-ordered and sent out.
+	   That causes APIC to think 82547 is in de-assertion
+	   state, while 82547 is in assertion state, resulting 
+	   in dead lock. Writing IMC forces 82547 into 
+	   de-assertion state.
+        */
+	if(hw->mac_type == e1000_82547 || hw->mac_type == e1000_82547_rev_2)
+		e1000_irq_disable(adapter);
+
 	for(i = 0; i < E1000_MAX_INTR; i++)
 		if(!e1000_clean_rx_irq(adapter) &
 		   !e1000_clean_tx_irq(adapter))
 			break;
+
+	if(hw->mac_type == e1000_82547 || hw->mac_type == e1000_82547_rev_2)
+		e1000_irq_enable(adapter);
 #endif
 
 	return IRQ_HANDLED;
