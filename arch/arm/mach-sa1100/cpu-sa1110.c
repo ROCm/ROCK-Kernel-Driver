@@ -212,7 +212,7 @@ sdram_update_refresh(u_int cpu_khz, struct sdram_params *sdram)
  * above, we can match for an exact frequency.  If we don't find
  * an exact match, we will to set the lowest frequency to be safe.
  */
-static void sa1110_setspeed(struct cpufreq_policy *policy)
+static int sa1110_setspeed(struct cpufreq_policy *policy)
 {
 	struct sdram_params *sdram = &sdram_params;
 	struct cpufreq_freqs freqs;
@@ -291,6 +291,8 @@ static void sa1110_setspeed(struct cpufreq_policy *policy)
 	sdram_update_refresh(policy->max, sdram);
 
 	cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+
+	return 0;
 }
 
 static struct cpufreq_policy sa1110_policy = {
@@ -300,10 +302,10 @@ static struct cpufreq_policy sa1110_policy = {
 };
 
 static struct cpufreq_driver sa1110_driver = {
-	.verify		= sa11x0_verify_speed,
-	.setpolicy	= sa1110_setspeed,
-	.policy		= &sa1110_policy,
-	.cpu_min_freq	= 59000,
+	.verify		 = sa11x0_verify_speed,
+	.setpolicy	 = sa1110_setspeed,
+	.policy		 = &sa1110_policy,
+	.cpu_min_freq[0] = 59000,
 };
 
 static int __init sa1110_clk_init(void)

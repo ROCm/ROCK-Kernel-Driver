@@ -5,7 +5,7 @@
  *            (C) 2002 Dominik Brodowski <linux@brodo.de>
  *            
  *
- * $Id: cpufreq.h,v 1.27 2002/10/08 14:54:23 db Exp $
+ * $Id: cpufreq.h,v 1.29 2002/11/11 15:35:47 db Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -104,7 +104,7 @@ static inline unsigned long cpufreq_scale(unsigned long old, u_int div, u_int mu
  *                      CPUFREQ DRIVER INTERFACE                     *
  *********************************************************************/
 
-typedef void (*cpufreq_policy_t)          (struct cpufreq_policy *policy);
+typedef int (*cpufreq_policy_t)          (struct cpufreq_policy *policy);
 
 struct cpufreq_driver {
 	/* needed by all drivers */
@@ -116,7 +116,7 @@ struct cpufreq_driver {
 #endif
 	/* 2.4. compatible API */
 #ifdef CONFIG_CPU_FREQ_24_API
-	unsigned int            cpu_min_freq;
+	unsigned int            cpu_min_freq[NR_CPUS];
 	unsigned int            cpu_cur_freq[NR_CPUS];
 #endif
 };
@@ -205,19 +205,19 @@ enum {
 	CPU_NR_FREQ = 3,
 };
 
-#define CTL_CPU_VARS_SPEED_MAX { \
+#define CTL_CPU_VARS_SPEED_MAX(cpunr) { \
                 .ctl_name	= CPU_NR_FREQ_MAX, \
-                .data		= &cpu_max_freq, \
+                .data		= &cpu_max_freq[cpunr], \
                 .procname	= "speed-max", \
-                .maxlen		= sizeof(cpu_max_freq),\
+                .maxlen		= sizeof(cpu_max_freq[cpunr]),\
                 .mode		= 0444, \
                 .proc_handler	= proc_dointvec, }
 
-#define CTL_CPU_VARS_SPEED_MIN { \
+#define CTL_CPU_VARS_SPEED_MIN(cpunr) { \
                 .ctl_name	= CPU_NR_FREQ_MIN, \
-                .data		= &cpu_min_freq, \
+                .data		= &cpu_min_freq[cpunr], \
                 .procname	= "speed-min", \
-                .maxlen		= sizeof(cpu_min_freq),\
+                .maxlen		= sizeof(cpu_min_freq[cpunr]),\
                 .mode		= 0444, \
                 .proc_handler	= proc_dointvec, }
 
@@ -230,8 +230,8 @@ enum {
                 .extra1		= (void*) (cpunr), }
 
 #define CTL_TABLE_CPU_VARS(cpunr) static ctl_table ctl_cpu_vars_##cpunr[] = {\
-                CTL_CPU_VARS_SPEED_MAX, \
-                CTL_CPU_VARS_SPEED_MIN, \
+                CTL_CPU_VARS_SPEED_MAX(cpunr), \
+                CTL_CPU_VARS_SPEED_MIN(cpunr), \
                 CTL_CPU_VARS_SPEED(cpunr),  \
                 { .ctl_name = 0, }, }
 

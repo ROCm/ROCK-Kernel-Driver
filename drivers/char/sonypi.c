@@ -1,7 +1,9 @@
 /*
  * Sony Programmable I/O Control Device driver for VAIO
  *
- * Copyright (C) 2001 Stelian Pop <stelian.pop@fr.alcove.com>, Alcôve
+ * Copyright (C) 2001-2002 Stelian Pop <stelian@popies.net>
+ *
+ * Copyright (C) 2001-2002 Alcôve <www.alcove.com>
  *
  * Copyright (C) 2001 Michael Ashley <m.ashley@unsw.edu.au>
  *
@@ -39,6 +41,7 @@
 #include <linux/poll.h>
 #include <linux/delay.h>
 #include <linux/wait.h>
+#include <linux/acpi.h>
 
 #include <asm/uaccess.h>
 #include <asm/io.h>
@@ -53,7 +56,7 @@ static int verbose; /* = 0 */
 static int fnkeyinit; /* = 0 */
 static int camera; /* = 0 */
 static int compat; /* = 0 */
-static int nojogdial; /* = 0 */
+static unsigned long mask = 0xffffffff;
 
 /* Inits the queue */
 static inline void sonypi_initq(void) {
@@ -113,29 +116,14 @@ static inline int sonypi_emptyq(void) {
         return result;
 }
 
-static void sonypi_ecrset(u8 addr, u8 value) {
-
-	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3);
-	outb_p(0x81, SONYPI_CST_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2);
-	outb_p(addr, SONYPI_DATA_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2);
-	outb_p(value, SONYPI_DATA_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2);
-}
-
-static u8 sonypi_ecrget(u8 addr) {
-
-	wait_on_command(1, inb_p(SONYPI_CST_IOPORT) & 3);
-	outb_p(0x80, SONYPI_CST_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2);
-	outb_p(addr, SONYPI_DATA_IOPORT);
-	wait_on_command(0, inb_p(SONYPI_CST_IOPORT) & 2);
-	return inb_p(SONYPI_DATA_IOPORT);
-}
-
-static u16 sonypi_ecrget16(u8 addr) {
-	return sonypi_ecrget(addr) | (sonypi_ecrget(addr + 1) << 8);
+static int ec_read16(u8 addr, u16 *value) {
+	u8 val_lb, val_hb;
+	if (ec_read(addr, &val_lb))
+		return -1;
+	if (ec_read(addr + 1, &val_hb))
+		return -1;
+	*value = val_lb | (val_hb << 8);
+	return 0;
 }
 
 /* Initializes the device - this comes from the AML code in the ACPI bios */
@@ -162,9 +150,12 @@ static void __devinit sonypi_type1_srs(void) {
 }
 
 static void __devinit sonypi_type2_srs(void) {
-	sonypi_ecrset(SONYPI_SHIB, (sonypi_device.ioport1 & 0xFF00) >> 8);
-	sonypi_ecrset(SONYPI_SLOB,  sonypi_device.ioport1 & 0x00FF);
-	sonypi_ecrset(SONYPI_SIRQ,  sonypi_device.bits);
+	if (ec_write(SONYPI_SHIB, (sonypi_device.ioport1 & 0xFF00) >> 8))
+		printk(KERN_WARNING "ec_write failed\n");
+	if (ec_write(SONYPI_SLOB,  sonypi_device.ioport1 & 0x00FF))
+		printk(KERN_WARNING "ec_write failed\n");
+	if (ec_write(SONYPI_SIRQ,  sonypi_device.bits))
+		printk(KERN_WARNING "ec_write failed\n");
 	udelay(10);
 }
 
@@ -182,15 +173,18 @@ static void __devexit sonypi_type1_dis(void) {
 }
 
 static void __devexit sonypi_type2_dis(void) {
-	sonypi_ecrset(SONYPI_SHIB, 0);
-	sonypi_ecrset(SONYPI_SLOB, 0);
-	sonypi_ecrset(SONYPI_SIRQ, 0);
+	if (ec_write(SONYPI_SHIB, 0))
+		printk(KERN_WARNING "ec_write failed\n");
+	if (ec_write(SONYPI_SLOB, 0))
+		printk(KERN_WARNING "ec_write failed\n");
+	if (ec_write(SONYPI_SIRQ, 0))
+		printk(KERN_WARNING "ec_write failed\n");
 }
 
 static u8 sonypi_call1(u8 dev) {
 	u8 v1, v2;
 
-	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2);
+	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2, ITERATIONS_LONG);
 	outb(dev, sonypi_device.ioport2);
 	v1 = inb_p(sonypi_device.ioport2);
 	v2 = inb_p(sonypi_device.ioport1);
@@ -200,9 +194,9 @@ static u8 sonypi_call1(u8 dev) {
 static u8 sonypi_call2(u8 dev, u8 fn) {
 	u8 v1;
 
-	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2);
+	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2, ITERATIONS_LONG);
 	outb(dev, sonypi_device.ioport2);
-	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2);
+	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2, ITERATIONS_LONG);
 	outb(fn, sonypi_device.ioport1);
 	v1 = inb_p(sonypi_device.ioport1);
 	return v1;
@@ -211,11 +205,11 @@ static u8 sonypi_call2(u8 dev, u8 fn) {
 static u8 sonypi_call3(u8 dev, u8 fn, u8 v) {
 	u8 v1;
 
-	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2);
+	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2, ITERATIONS_LONG);
 	outb(dev, sonypi_device.ioport2);
-	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2);
+	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2, ITERATIONS_LONG);
 	outb(fn, sonypi_device.ioport1);
-	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2);
+	wait_on_command(0, inb_p(sonypi_device.ioport2) & 2, ITERATIONS_LONG);
 	outb(v, sonypi_device.ioport1);
 	v1 = inb_p(sonypi_device.ioport1);
 	return v1;
@@ -237,7 +231,7 @@ static u8 sonypi_read(u8 fn) {
 /* Set brightness, hue etc */
 static void sonypi_set(u8 fn, u8 v) {
 	
-	wait_on_command(0, sonypi_call3(0x90, fn, v));
+	wait_on_command(0, sonypi_call3(0x90, fn, v), ITERATIONS_SHORT);
 }
 
 /* Tests if the camera is ready */
@@ -311,79 +305,30 @@ static void sonypi_setbluetoothpower(u8 state) {
 /* Interrupt handler: some event is available */
 void sonypi_irq(int irq, void *dev_id, struct pt_regs *regs) {
 	u8 v1, v2, event = 0;
-	int i;
-	u8 sonypi_jogger_ev, sonypi_fnkey_ev;
-	u8 sonypi_capture_ev, sonypi_bluetooth_ev;
-	u8 sonypi_pkey_ev;
-
-	if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2) {
-		sonypi_jogger_ev = SONYPI_TYPE2_JOGGER_EV;
-		sonypi_fnkey_ev = SONYPI_TYPE2_FNKEY_EV;
-		sonypi_capture_ev = SONYPI_TYPE2_CAPTURE_EV;
-		sonypi_bluetooth_ev = SONYPI_TYPE2_BLUETOOTH_EV;
-		sonypi_pkey_ev = nojogdial ? SONYPI_TYPE2_PKEY_EV 
-					   : SONYPI_TYPE1_PKEY_EV;
-	}
-	else {
-		sonypi_jogger_ev = SONYPI_TYPE1_JOGGER_EV;
-		sonypi_fnkey_ev = SONYPI_TYPE1_FNKEY_EV;
-		sonypi_capture_ev = SONYPI_TYPE1_CAPTURE_EV;
-		sonypi_bluetooth_ev = SONYPI_TYPE1_BLUETOOTH_EV;
-		sonypi_pkey_ev = SONYPI_TYPE1_PKEY_EV;
-	}
+	int i, j;
 
 	v1 = inb_p(sonypi_device.ioport1);
 	v2 = inb_p(sonypi_device.ioport2);
 
-	if ((v2 & sonypi_pkey_ev) == sonypi_pkey_ev) {
-		for (i = 0; sonypi_pkeyev[i].event; i++)
-			if (sonypi_pkeyev[i].data == v1) {
-				event = sonypi_pkeyev[i].event;
+	if (verbose > 1)
+		printk(KERN_INFO 
+		       "sonypi: event port1=0x%02x,port2=0x%02x\n", v1, v2);
+
+	for (i = 0; sonypi_eventtypes[i].model; i++) {
+		if (sonypi_device.model != sonypi_eventtypes[i].model)
+			continue;
+		if ((v2 & sonypi_eventtypes[i].data) != sonypi_eventtypes[i].data)
+			continue;
+		if (! (mask & sonypi_eventtypes[i].mask))
+			continue;
+		for (j = 0; sonypi_eventtypes[i].events[j].event; j++) {
+			if (v1 == sonypi_eventtypes[i].events[j].data) {
+				event = sonypi_eventtypes[i].events[j].event;
 				goto found;
 			}
+		}
 	}
-	if ((v2 & sonypi_jogger_ev) == sonypi_jogger_ev) {
-		for (i = 0; sonypi_joggerev[i].event; i++)
-			if (sonypi_joggerev[i].data == v1) {
-				event = sonypi_joggerev[i].event;
-				goto found;
-			}
-	}
-	if ((v2 & sonypi_capture_ev) == sonypi_capture_ev) {
-		for (i = 0; sonypi_captureev[i].event; i++)
-			if (sonypi_captureev[i].data == v1) {
-				event = sonypi_captureev[i].event;
-				goto found;
-			}
-	}
-	if ((v2 & sonypi_fnkey_ev) == sonypi_fnkey_ev) {
-		for (i = 0; sonypi_fnkeyev[i].event; i++)
-			if (sonypi_fnkeyev[i].data == v1) {
-				event = sonypi_fnkeyev[i].event;
-				goto found;
-			}
-	}
-	if ((v2 & sonypi_bluetooth_ev) == sonypi_bluetooth_ev) {
-		for (i = 0; sonypi_blueev[i].event; i++)
-			if (sonypi_blueev[i].data == v1) {
-				event = sonypi_blueev[i].event;
-				goto found;
-			}
-	}
-	if ((v2 & SONYPI_BACK_EV) == SONYPI_BACK_EV) {
-		for (i = 0; sonypi_backev[i].event; i++)
-			if (sonypi_backev[i].data == v1) {
-				event = sonypi_backev[i].event;
-				goto found;
-			}
-	}
-	if ((v2 & SONYPI_LID_EV) == SONYPI_LID_EV) {
-		for (i = 0; sonypi_lidev[i].event; i++)
-			if (sonypi_lidev[i].data == v1) {
-				event = sonypi_lidev[i].event;
-				goto found;
-			}
-	}
+
 	if (verbose)
 		printk(KERN_WARNING 
 		       "sonypi: unknown event port1=0x%02x,port2=0x%02x\n",v1,v2);
@@ -545,72 +490,77 @@ static int sonypi_misc_ioctl(struct inode *ip, struct file *fp,
 	down(&sonypi_device.lock);
 	switch (cmd) {
 	case SONYPI_IOCGBRT:
-		val8 = sonypi_ecrget(SONYPI_LCD_LIGHT);
-		if (copy_to_user((u8 *)arg, &val8, sizeof(val8))) {
-			ret = -EFAULT;
-			goto out;
+		if (ec_read(SONYPI_LCD_LIGHT, &val8)) {
+			ret = -EIO;
+			break;
 		}
+		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
+			ret = -EFAULT;
 		break;
 	case SONYPI_IOCSBRT:
 		if (copy_from_user(&val8, (u8 *)arg, sizeof(val8))) {
 			ret = -EFAULT;
-			goto out;
+			break;
 		}
-		sonypi_ecrset(SONYPI_LCD_LIGHT, val8);
+		if (ec_write(SONYPI_LCD_LIGHT, val8))
+			ret = -EIO;
 		break;
 	case SONYPI_IOCGBAT1CAP:
-		val16 = sonypi_ecrget16(SONYPI_BAT1_FULL);
-		if (copy_to_user((u16 *)arg, &val16, sizeof(val16))) {
-			ret = -EFAULT;
-			goto out;
+		if (ec_read16(SONYPI_BAT1_FULL, &val16)) {
+			ret = -EIO;
+			break;
 		}
+		if (copy_to_user((u16 *)arg, &val16, sizeof(val16)))
+			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBAT1REM:
-		val16 = sonypi_ecrget16(SONYPI_BAT1_LEFT);
-		if (copy_to_user((u16 *)arg, &val16, sizeof(val16))) {
-			ret = -EFAULT;
-			goto out;
+		if (ec_read16(SONYPI_BAT1_FULL, &val16)) {
+			ret = -EIO;
+			break;
 		}
+		if (copy_to_user((u16 *)arg, &val16, sizeof(val16)))
+			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBAT2CAP:
-		val16 = sonypi_ecrget16(SONYPI_BAT2_FULL);
-		if (copy_to_user((u16 *)arg, &val16, sizeof(val16))) {
-			ret = -EFAULT;
-			goto out;
+		if (ec_read16(SONYPI_BAT1_FULL, &val16)) {
+			ret = -EIO;
+			break;
 		}
+		if (copy_to_user((u16 *)arg, &val16, sizeof(val16)))
+			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBAT2REM:
-		val16 = sonypi_ecrget16(SONYPI_BAT2_LEFT);
-		if (copy_to_user((u16 *)arg, &val16, sizeof(val16))) {
-			ret = -EFAULT;
-			goto out;
+		if (ec_read16(SONYPI_BAT1_FULL, &val16)) {
+			ret = -EIO;
+			break;
 		}
+		if (copy_to_user((u16 *)arg, &val16, sizeof(val16)))
+			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBATFLAGS:
-		val8 = sonypi_ecrget(SONYPI_BAT_FLAGS) & 0x07;
-		if (copy_to_user((u8 *)arg, &val8, sizeof(val8))) {
-			ret = -EFAULT;
-			goto out;
+		if (ec_read(SONYPI_BAT_FLAGS, &val8)) {
+			ret = -EIO;
+			break;
 		}
+		val8 &= 0x07;
+		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
+			ret = -EFAULT;
 		break;
 	case SONYPI_IOCGBLUE:
 		val8 = sonypi_device.bluetooth_power;
-		if (copy_to_user((u8 *)arg, &val8, sizeof(val8))) {
+		if (copy_to_user((u8 *)arg, &val8, sizeof(val8)))
 			ret = -EFAULT;
-			goto out;
-		}
 		break;
 	case SONYPI_IOCSBLUE:
 		if (copy_from_user(&val8, (u8 *)arg, sizeof(val8))) {
 			ret = -EFAULT;
-			goto out;
+			break;
 		}
 		sonypi_setbluetoothpower(val8);
 		break;
 	default:
 		ret = -EINVAL;
 	}
-out:
 	up(&sonypi_device.lock);
 	return ret;
 }
@@ -621,13 +571,58 @@ static struct file_operations sonypi_misc_fops = {
 	.poll		= sonypi_misc_poll,
 	.open		= sonypi_misc_open,
 	.release	= sonypi_misc_release,
-	.fasync 	= sonypi_misc_fasync,
+	.fasync		= sonypi_misc_fasync,
 	.ioctl		= sonypi_misc_ioctl,
 };
 
 struct miscdevice sonypi_misc_device = {
 	-1, "sonypi", &sonypi_misc_fops
 };
+
+#if CONFIG_PM
+static int sonypi_pm_callback(struct pm_dev *dev, pm_request_t rqst, void *data) {
+	static int old_camera_power;
+
+	switch (rqst) {
+	case PM_SUSPEND:
+		sonypi_call2(0x81, 0); /* make sure we don't get any more events */
+		if (camera) {
+			old_camera_power = sonypi_device.camera_power;
+			sonypi_camera_off();
+		}
+		if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
+			sonypi_type2_dis();
+		else
+			sonypi_type1_dis();
+#if !defined(CONFIG_ACPI)
+		/* disable ACPI mode */
+		if (fnkeyinit)
+			outb(0xf1, 0xb2);
+#endif
+		break;
+	case PM_RESUME:
+#if !defined(CONFIG_ACPI)
+		/* Enable ACPI mode to get Fn key events */
+		if (fnkeyinit)
+			outb(0xf0, 0xb2);
+#endif
+		if (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE2)
+			sonypi_type2_srs();
+		else
+			sonypi_type1_srs();
+		sonypi_call1(0x82);
+		sonypi_call2(0x81, 0xff);
+		if (compat)
+			sonypi_call1(0x92); 
+		else
+			sonypi_call1(0x82);
+		if (camera && old_camera_power)
+			sonypi_camera_on();
+		break;
+	}
+	return 0;
+}
+#endif
 
 static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	int i, ret;
@@ -720,20 +715,24 @@ static int __devinit sonypi_probe(struct pci_dev *pcidev) {
 	       SONYPI_DRIVER_MINORVERSION);
 	printk(KERN_INFO "sonypi: detected %s model, "
 	       "verbose = %s, fnkeyinit = %s, camera = %s, "
-	       "compat = %s, nojogdial = %s\n",
+	       "compat = %s, mask = 0x%08lx\n",
 	       (sonypi_device.model == SONYPI_DEVICE_MODEL_TYPE1) ?
 			"type1" : "type2",
 	       verbose ? "on" : "off",
 	       fnkeyinit ? "on" : "off",
 	       camera ? "on" : "off",
 	       compat ? "on" : "off",
-	       nojogdial ? "on" : "off");
+	       mask);
 	printk(KERN_INFO "sonypi: enabled at irq=%d, port1=0x%x, port2=0x%x\n",
 	       sonypi_device.irq, 
 	       sonypi_device.ioport1, sonypi_device.ioport2);
 	if (minor == -1)
 		printk(KERN_INFO "sonypi: device allocated minor is %d\n",
 		       sonypi_misc_device.minor);
+
+#if CONFIG_PM
+	sonypi_device.pm = pm_register(PM_PCI_DEV, 0, sonypi_pm_callback);
+#endif
 
 	return 0;
 
@@ -746,6 +745,11 @@ out1:
 }
 
 static void __devexit sonypi_remove(void) {
+
+#if CONFIG_PM
+	pm_unregister(sonypi_device.pm);
+#endif
+
 	sonypi_call2(0x81, 0); /* make sure we don't get any more events */
 	if (camera)
 		sonypi_camera_off();
@@ -803,7 +807,7 @@ static int __init sonypi_setup(char *str)  {
 	compat = ints[5];
 	if (ints[0] == 5)
 		goto out;
-	nojogdial = ints[6];
+	mask = ints[6];
 out:
 	return 1;
 }
@@ -815,7 +819,7 @@ __setup("sonypi=", sonypi_setup);
 module_init(sonypi_init_module);
 module_exit(sonypi_cleanup_module);
 
-MODULE_AUTHOR("Stelian Pop <stelian.pop@fr.alcove.com>");
+MODULE_AUTHOR("Stelian Pop <stelian@popies.net>");
 MODULE_DESCRIPTION("Sony Programmable I/O Control Device driver");
 MODULE_LICENSE("GPL");
 
@@ -830,7 +834,7 @@ MODULE_PARM(camera,"i");
 MODULE_PARM_DESC(camera, "set this if you have a MotionEye camera (PictureBook series)");
 MODULE_PARM(compat,"i");
 MODULE_PARM_DESC(compat, "set this if you want to enable backward compatibility mode");
-MODULE_PARM(nojogdial, "i");
-MODULE_PARM_DESC(nojogdial, "set this if you have a Vaio without a jogdial (like the fx series)");
+MODULE_PARM(mask, "i");
+MODULE_PARM_DESC(mask, "set this to the mask of event you want to enable (see doc)");
 
 EXPORT_SYMBOL(sonypi_camera_command);

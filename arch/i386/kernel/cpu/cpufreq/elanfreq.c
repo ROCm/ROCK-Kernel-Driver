@@ -172,13 +172,13 @@ static void elanfreq_set_cpu_state (unsigned int state) {
  *      for the hardware supported by the driver. 
  */
 
-static void elanfreq_verify (struct cpufreq_policy *policy)
+static int elanfreq_verify (struct cpufreq_policy *policy)
 {
 	unsigned int    number_states = 0;
 	unsigned int    i;
 
 	if (!policy || !max_freq)
-		return;
+		return -EINVAL;
 
 	policy->cpu = 0;
 
@@ -190,7 +190,7 @@ static void elanfreq_verify (struct cpufreq_policy *policy)
 			number_states++;
 
 	if (number_states)
-		return;
+		return 0;
 
 	for (i=(sizeof(elan_multiplier)/sizeof(struct s_elan_multiplier) - 1); i>=0; i--)
 		if (elan_multiplier[i].clock < policy->max)
@@ -198,16 +198,16 @@ static void elanfreq_verify (struct cpufreq_policy *policy)
 
 	policy->max = elan_multiplier[i+1].clock;
 
-	return;
+	return 0;
 }
 
-static void elanfreq_setpolicy (struct cpufreq_policy *policy)
+static int elanfreq_setpolicy (struct cpufreq_policy *policy)
 {
 	unsigned int    number_states = 0;
 	unsigned int    i, j=4;
 
 	if (!elanfreq_driver)
-		return;
+		return -EINVAL;
 
 	for (i=(sizeof(elan_multiplier)/sizeof(struct s_elan_multiplier) - 1); i>=0; i--)
 		if ((elan_multiplier[i].clock >= policy->min) &&
@@ -219,7 +219,7 @@ static void elanfreq_setpolicy (struct cpufreq_policy *policy)
 
 	if (number_states == 1) {
 		elanfreq_set_cpu_state(j);
-		return;
+		return 0;
 	}
 
 	switch (policy->policy) {
@@ -236,14 +236,14 @@ static void elanfreq_setpolicy (struct cpufreq_policy *policy)
 				j = i;
 		break;
 	default:
-		return;
+		return -EINVAL;
 	}
 
 	if (elan_multiplier[j].clock > max_freq)
-		BUG();
+		return -EINVAL;
 
 	elanfreq_set_cpu_state(j);
-	return;
+	return 0;
 }
 
 
@@ -296,7 +296,7 @@ static int __init elanfreq_init(void)
 		max_freq = elanfreq_get_cpu_frequency();
 
 #ifdef CONFIG_CPU_FREQ_24_API
-	driver->cpu_min_freq    = 1000;
+	driver->cpu_min_freq[0] = 1000;
 	driver->cpu_cur_freq[0] = elanfreq_get_cpu_frequency();
 #endif
 
@@ -309,15 +309,15 @@ static int __init elanfreq_init(void)
 	driver->policy[0].policy = CPUFREQ_POLICY_PERFORMANCE;
 	driver->policy[0].max_cpu_freq  = max_freq;
 
-	ret = cpufreq_register(driver);
-	if (ret) {
-		kfree(driver);
-		return ret;
-	}
-
 	elanfreq_driver = driver;
 
-	return 0;
+	ret = cpufreq_register(driver);
+	if (ret) {
+		elanfreq_driver = NULL;
+		kfree(driver);
+	}
+
+	return ret;
 }
 
 

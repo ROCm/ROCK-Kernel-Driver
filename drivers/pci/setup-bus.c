@@ -333,13 +333,13 @@ pbus_size_mem(struct pci_bus *bus, unsigned long mask, unsigned long type)
 }
 
 void __devinit
-pbus_size_bridges(struct pci_bus *bus)
+pci_bus_size_bridges(struct pci_bus *bus)
 {
 	struct list_head *ln;
 	unsigned long mask, type;
 
 	for (ln=bus->children.next; ln != &bus->children; ln=ln->next)
-		pbus_size_bridges(pci_bus_b(ln));
+		pci_bus_size_bridges(pci_bus_b(ln));
 
 	/* The root bus? */
 	if (!bus->self)
@@ -358,10 +358,10 @@ pbus_size_bridges(struct pci_bus *bus)
 	}
 	pbus_size_mem(bus, mask, type);
 }
-EXPORT_SYMBOL(pbus_size_bridges);
+EXPORT_SYMBOL(pci_bus_size_bridges);
 
 void __devinit
-pbus_assign_resources(struct pci_bus *bus)
+pci_bus_assign_resources(struct pci_bus *bus)
 {
 	struct list_head *ln;
 	int found_vga = pbus_assign_resources_sorted(bus);
@@ -377,11 +377,11 @@ pbus_assign_resources(struct pci_bus *bus)
 	for (ln=bus->children.next; ln != &bus->children; ln=ln->next) {
 		struct pci_bus *b = pci_bus_b(ln);
 
-		pbus_assign_resources(b);
+		pci_bus_assign_resources(b);
 		pci_setup_bridge(b);
 	}
 }
-EXPORT_SYMBOL(pbus_assign_resources);
+EXPORT_SYMBOL(pci_bus_assign_resources);
 
 void __init
 pci_assign_unassigned_resources(void)
@@ -392,10 +392,10 @@ pci_assign_unassigned_resources(void)
 	/* Depth first, calculate sizes and alignments of all
 	   subordinate buses. */
 	for(ln=pci_root_buses.next; ln != &pci_root_buses; ln=ln->next)
-		pbus_size_bridges(pci_bus_b(ln));
+		pci_bus_size_bridges(pci_bus_b(ln));
 	/* Depth last, allocate resources and update the hardware. */
 	for(ln=pci_root_buses.next; ln != &pci_root_buses; ln=ln->next)
-		pbus_assign_resources(pci_bus_b(ln));
+		pci_bus_assign_resources(pci_bus_b(ln));
 
 	pci_for_each_dev(dev) {
 		pdev_enable_device(dev);
