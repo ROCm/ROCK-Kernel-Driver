@@ -61,10 +61,6 @@ static struct smp_ops_t *smp_ops;
 /* all cpu mappings are 1-1 -- Cort */
 volatile unsigned long cpu_callin_map[NR_CPUS];
 
-#define TB_SYNC_PASSES 4
-volatile unsigned long __initdata tb_sync_flag = 0;
-volatile unsigned long __initdata tb_offset = 0;
-
 int start_secondary(void *);
 extern int cpu_idle(void *unused);
 void smp_call_function_interrupt(void);
@@ -289,41 +285,6 @@ void smp_call_function_interrupt(void)
 	(*func)(info);
 	if (wait)
 		atomic_inc(&call_data->finished);
-}
-
-/* FIXME: Do this properly for all archs --RR */
-static spinlock_t timebase_lock = SPIN_LOCK_UNLOCKED;
-static unsigned int timebase_upper = 0, timebase_lower = 0;
-
-void __devinit
-smp_generic_give_timebase(void)
-{
-	spin_lock(&timebase_lock);
-	do {
-		timebase_upper = get_tbu();
-		timebase_lower = get_tbl();
-	} while (timebase_upper != get_tbu());
-	spin_unlock(&timebase_lock);
-
-	while (timebase_upper || timebase_lower)
-		rmb();
-}
-
-void __devinit
-smp_generic_take_timebase(void)
-{
-	int done = 0;
-
-	while (!done) {
-		spin_lock(&timebase_lock);
-		if (timebase_upper || timebase_lower) {
-			set_tb(timebase_upper, timebase_lower);
-			timebase_upper = 0;
-			timebase_lower = 0;
-			done = 1;
-		}
-		spin_unlock(&timebase_lock);
-	}
 }
 
 static void __devinit smp_store_cpu_info(int id)
