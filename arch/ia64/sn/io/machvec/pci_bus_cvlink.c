@@ -28,7 +28,9 @@ vertex_hdl_t devfn_to_vertex(unsigned char busnum, unsigned int devfn);
 
 extern void register_pcibr_intr(int irq, pcibr_intr_t intr);
 
-static void sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int slot);
+static void sn_dma_flush_init(unsigned long start,
+				unsigned long end,
+				int idx, int pin, int slot);
 extern int cbrick_type_get_nasid(nasid_t);
 extern void ioconfig_bus_new_entries(void);
 extern void ioconfig_get_busnum(char *, int *);
@@ -272,31 +274,34 @@ sn_dma_flush_init(unsigned long start, unsigned long end, int idx, int pin, int 
 	if (isIO9(nasid) && ( (IS_ALTIX(nasid) && wid_num == 0xc)
 				|| (IS_OPUS(nasid) && wid_num == 0xf) )
 				&& bus == 0) {
-		if (slot == 2) {
+		if (pin == 1) {
 			p->force_int_addr = (unsigned long)pcireg_bridge_force_always_addr_get(b, 6);
 			pcireg_bridge_intr_device_bit_set(b, (1<<18));
 			dnasid = NASID_GET(virt_to_phys(&p->flush_addr));
 			pcireg_bridge_intr_addr_set(b, 6, ((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
 						    (dnasid << 36) | (0xfUL << 48)));
-		} else  if (slot == 3) { /* 12160 SCSI device in IO9 */
+		} else if (pin == 2) { /* 12160 SCSI device in IO9 */
 			p->force_int_addr = (unsigned long)pcireg_bridge_force_always_addr_get(b, 4);
 			pcireg_bridge_intr_device_bit_set(b, (2<<12));
 			dnasid = NASID_GET(virt_to_phys(&p->flush_addr));
-			pcireg_bridge_intr_addr_set(b, 4, ((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
-						    (dnasid << 36) | (0xfUL << 48)));
+			pcireg_bridge_intr_addr_set(b, 4,
+					((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
+					    (dnasid << 36) | (0xfUL << 48)));
 		} else { /* slot == 6 */
 			p->force_int_addr = (unsigned long)pcireg_bridge_force_always_addr_get(b, 7);
 			pcireg_bridge_intr_device_bit_set(b, (5<<21));
 			dnasid = NASID_GET(virt_to_phys(&p->flush_addr));
-			pcireg_bridge_intr_addr_set(b, 7, ((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
-						    (dnasid << 36) | (0xfUL << 48)));
+			pcireg_bridge_intr_addr_set(b, 7,
+					((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
+					    (dnasid << 36) | (0xfUL << 48)));
 		}
 	} else {
 		p->force_int_addr = (unsigned long)pcireg_bridge_force_always_addr_get(b, (pin +2));
-		pcireg_bridge_intr_device_bit_set(b, ((slot - 1) << ( pin * 3)));
+		pcireg_bridge_intr_device_bit_set(b, (pin << (pin * 3)));
 		dnasid = NASID_GET(virt_to_phys(&p->flush_addr));
-		pcireg_bridge_intr_addr_set(b, (pin + 2), ((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
-						    (dnasid << 36) | (0xfUL << 48)));
+		pcireg_bridge_intr_addr_set(b, (pin + 2),
+				((virt_to_phys(&p->flush_addr) & 0xfffffffff) |
+				    (dnasid << 36) | (0xfUL << 48)));
 	}
 }
 
@@ -318,7 +323,7 @@ sn_pci_fixup(int arg)
 	pcibr_intr_t intr_handle;
 	pciio_provider_t *pci_provider;
 	vertex_hdl_t device_vertex;
-	pciio_intr_line_t lines;
+	pciio_intr_line_t lines = 0;
 	extern int numnodes;
 	int cnode;
 
@@ -487,14 +492,22 @@ sn_pci_fixup(int arg)
 		device_vertex = device_sysdata->vhdl;
 		pci_provider = device_sysdata->pci_provider;
  
+		if (!lines) {
+			continue;
+		}
+
 		irqpdaindr->curr = device_dev;
 		intr_handle = (pci_provider->intr_alloc)(device_vertex, NULL, lines, device_vertex);
 
+		if (intr_handle == NULL) {
+			printk("sn_pci_fixup:  pcibr_intr_alloc() failed\n");
+			continue;
+		}
 		irq = intr_handle->bi_irq;
 		irqpdaindr->device_dev[irq] = device_dev;
 		(pci_provider->intr_connect)(intr_handle, (intr_func_t)0, (intr_arg_t)0);
 		device_dev->irq = irq;
-		register_pcibr_intr(irq, intr_handle);
+		register_pcibr_intr(irq, (pcibr_intr_t)intr_handle);
 
 		for (idx = 0; idx < PCI_ROM_RESOURCE; idx++) {
 			int ibits = intr_handle->bi_ibits;
@@ -508,10 +521,10 @@ sn_pci_fixup(int arg)
 			for (i=0; i<8; i++) {
 				if (ibits & (1 << i) ) {
 					sn_dma_flush_init(device_dev->resource[idx].start, 
-							device_dev->resource[idx].end,
-							idx,
-							i,
-							PCI_SLOT(device_dev->devfn));
+						device_dev->resource[idx].end,
+						idx,
+						i,
+						PCIBR_INFO_SLOT_GET_EXT(pcibr_info_get(device_sysdata->vhdl)));
 				}
 			}
 		}
