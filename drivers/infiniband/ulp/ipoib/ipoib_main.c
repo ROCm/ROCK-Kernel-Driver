@@ -606,7 +606,7 @@ out:
 	return NETDEV_TX_OK;
 }
 
-struct net_device_stats *ipoib_get_stats(struct net_device *dev)
+static struct net_device_stats *ipoib_get_stats(struct net_device *dev)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 

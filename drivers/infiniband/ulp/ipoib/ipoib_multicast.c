@@ -44,7 +44,7 @@
 #include "ipoib.h"
 
 #ifdef CONFIG_INFINIBAND_IPOIB_DEBUG
-int mcast_debug_level;
+static int mcast_debug_level;
 
 module_param(mcast_debug_level, int, 0644);
 MODULE_PARM_DESC(mcast_debug_level,
@@ -623,7 +623,7 @@ int ipoib_mcast_stop_thread(struct net_device *dev)
 	return 0;
 }
 
-int ipoib_mcast_leave(struct net_device *dev, struct ipoib_mcast *mcast)
+static int ipoib_mcast_leave(struct net_device *dev, struct ipoib_mcast *mcast)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	struct ib_sa_mcmember_rec rec = {

@@ -252,7 +252,7 @@ static void ib_cache_event(struct ib_event_handler *handler,
 	}
 }
 
-void ib_cache_setup_one(struct ib_device *device)
+static void ib_cache_setup_one(struct ib_device *device)
 {
 	int p;
 
@@ -295,7 +295,7 @@ err:
 	kfree(device->cache.gid_cache);
 }
 
-void ib_cache_cleanup_one(struct ib_device *device)
+static void ib_cache_cleanup_one(struct ib_device *device)
 {
 	int p;
 
@@ -311,7 +311,7 @@ void ib_cache_cleanup_one(struct ib_device *device)
 	kfree(device->cache.gid_cache);
 }
 
-struct ib_client cache_client = {
+static struct ib_client cache_client = {
 	.name   = "cache",
 	.add    = ib_cache_setup_one,
 	.remove = ib_cache_cleanup_one
