@@ -100,4 +100,12 @@ name:
 # define TEXT_ALIGN(n)
 #endif
 
+#ifdef HAVE_SERIALIZE_DIRECTIVE
+# define dv_serialize_data		.serialize.data
+# define dv_serialize_instruction	.serialize.instruction
+#else
+# define dv_serialize_data
+# define dv_serialize_instruction
+#endif
+
 #endif /* _ASM_IA64_ASMMACRO_H */

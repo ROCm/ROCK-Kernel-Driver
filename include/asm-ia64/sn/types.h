@@ -15,11 +15,9 @@ typedef signed char	partid_t;	/* partition ID type */
 typedef unsigned int    moduleid_t;     /* user-visible module number type */
 typedef unsigned int    cmoduleid_t;    /* kernel compact module id type */
 typedef signed char     slabid_t;
-typedef unsigned char	clusterid_t;	/* Clusterid of the cell */
 
 typedef unsigned long iopaddr_t;
 typedef unsigned long paddr_t;
-typedef unsigned long pfn_t;
 typedef short cnodeid_t;
 
 #endif /* _ASM_IA64_SN_TYPES_H */

@@ -157,7 +157,7 @@ hubii_eint_init(cnodeid_t cnode)
     hubio_eint.ii_iidsr_regval = 0;
     hubio_eint.ii_iidsr_fld_s.i_enable = 1;
     hubio_eint.ii_iidsr_fld_s.i_level = bit;/* Take the least significant bits*/
-    hubio_eint.ii_iidsr_fld_s.i_node = COMPACT_TO_NASID_NODEID(cnode);
+    hubio_eint.ii_iidsr_fld_s.i_node = cnodeid_to_nasid(cnode);
     hubio_eint.ii_iidsr_fld_s.i_pi_id = cpuid_to_subnode(intr_cpu);
     REMOTE_HUB_S(hinfo->h_nasid, IIO_IIDSR, hubio_eint.ii_iidsr_regval);
 
@@ -450,7 +450,7 @@ hubiio_crb_error_handler(vertex_hdl_t hub_v, hubinfo_t hinfo)
 	int		rc;
 
 	nasid = hinfo->h_nasid;
-	cnode = NASID_TO_COMPACT_NODEID(nasid);
+	cnode = nasid_to_cnodeid(nasid);
 
 	/*
 	 * XXX - Add locking for any recovery actions
