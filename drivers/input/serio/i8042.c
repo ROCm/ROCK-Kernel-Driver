@@ -1,7 +1,7 @@
 /*
  *  i8042 keyboard and mouse controller driver for Linux
  *
- *  Copyright (c) 1999-2002 Vojtech Pavlik
+ *  Copyright (c) 1999-2004 Vojtech Pavlik
  */
 
 /*
@@ -51,6 +51,8 @@ MODULE_PARM_DESC(direct, "Put keyboard port into non-translated mode.");
 static unsigned int i8042_dumbkbd;
 module_param_named(dumbkbd, i8042_dumbkbd, bool, 0);
 MODULE_PARM_DESC(dumbkbd, "Pretend that controller can only read data from keyboard");
+
+static unsigned int i8042_noloop;
 
 __obsolete_setup("i8042_noaux");
 __obsolete_setup("i8042_nomux");
@@ -153,6 +155,9 @@ static int i8042_command(unsigned char *param, int command)
 { 
 	unsigned long flags;
 	int retval = 0, i = 0;
+
+	if (i8042_noloop && command == I8042_CMD_AUX_LOOP)
+		return -1;
 
 	spin_lock_irqsave(&i8042_lock, flags);
 
@@ -954,6 +959,13 @@ int __init i8042_init(void)
 
 	if (i8042_dumbkbd)
 		i8042_kbd_port.write = NULL;
+
+#ifdef __i386__
+	if (i8042_dmi_noloop) {
+		printk(KERN_INFO "i8042.c: AUX LoopBack command disabled by DMI.\n");
+		i8042_noloop = 1;
+	}
+#endif
 
 	if (!i8042_noaux && !i8042_check_aux(&i8042_aux_values)) {
 		if (!i8042_nomux && !i8042_check_mux(&i8042_aux_values))
