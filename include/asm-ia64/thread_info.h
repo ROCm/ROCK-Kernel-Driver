@@ -15,6 +15,8 @@
 #define TI_ADDR_LIMIT	0x10
 #define TI_PRE_COUNT	0x18
 
+#define PREEMPT_ACTIVE	0x4000000
+
 #ifndef __ASSEMBLY__
 
 /*

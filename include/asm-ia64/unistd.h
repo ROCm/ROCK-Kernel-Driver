@@ -220,6 +220,8 @@
 #define __NR_fremovexattr		1228
 #define __NR_tkill			1229
 #define __NR_futex			1230
+#define __NR_sched_setaffinity		1231
+#define __NR_sched_getaffinity		1232
 
 #if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
 

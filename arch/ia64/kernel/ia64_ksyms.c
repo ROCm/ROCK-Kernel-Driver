@@ -67,7 +67,7 @@ EXPORT_SYMBOL(kernel_thread);
 EXPORT_SYMBOL(last_cli_ip);
 #endif
 
-#include <asm/pgalloc.h>
+#include <asm/tlbflush.h>
 
 EXPORT_SYMBOL(flush_tlb_range);
 

@@ -16,10 +16,11 @@
 #include <linux/smp.h>
 #include <linux/mm.h>
 
+#include <asm/delay.h>
 #include <asm/mmu_context.h>
 #include <asm/pgalloc.h>
 #include <asm/pal.h>
-#include <asm/delay.h>
+#include <asm/tlbflush.h>
 
 #define SUPPORTED_PGBITS (			\
 		1 << _PAGE_SIZE_256M |		\

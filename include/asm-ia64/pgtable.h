@@ -14,7 +14,6 @@
 
 #include <linux/config.h>
 
-#include <asm/cacheflush.h>
 #include <asm/mman.h>
 #include <asm/page.h>
 #include <asm/processor.h>
@@ -122,6 +121,7 @@
 # ifndef __ASSEMBLY__
 
 #include <asm/bitops.h>
+#include <asm/cacheflush.h>
 #include <asm/mmu_context.h>
 #include <asm/processor.h>
 
@@ -405,31 +405,6 @@ pte_same (pte_t a, pte_t b)
 
 extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
 extern void paging_init (void);
-
-/*
- * IA-64 doesn't have any external MMU info: the page tables contain all the necessary
- * information.  However, we use this macro to take care of any (delayed) i-cache flushing
- * that may be necessary.
- */
-static inline void
-update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
-{
-	unsigned long addr;
-	struct page *page;
-
-	if (!pte_exec(pte))
-		return;				/* not an executable page... */
-
-	page = pte_page(pte);
-	/* don't use VADDR: it may not be mapped on this CPU (or may have just been flushed): */
-	addr = (unsigned long) page_address(page);
-
-	if (test_bit(PG_arch_1, &page->flags))
-		return;				/* i-cache is already coherent with d-cache */
-
-	flush_icache_range(addr, addr + PAGE_SIZE);
-	set_bit(PG_arch_1, &page->flags);	/* mark page as clean */
-}
 
 #define SWP_TYPE(entry)			(((entry).val >> 1) & 0xff)
 #define SWP_OFFSET(entry)		(((entry).val << 1) >> 10)

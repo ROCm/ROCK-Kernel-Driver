@@ -6,8 +6,6 @@
  *	David Mosberger-Tang <davidm@hpl.hp.com>
  */
 
-#include <linux/mm.h>
-
 #include <asm/bitops.h>
 #include <asm/page.h>
 
@@ -30,10 +28,10 @@ do {						\
 
 extern void flush_icache_range (unsigned long start, unsigned long end);
 
-#define flush_icache_user_range(vma, page, user_addr, len)			\
-do {										\
-	unsigned long _addr = page_address(page) + ((user_addr) & ~PAGE_MASK);	\
-	flush_icache_range(_addr, _addr + (len));				\
+#define flush_icache_user_range(vma, page, user_addr, len)					\
+do {												\
+	unsigned long _addr = (unsigned long) page_address(page) + ((user_addr) & ~PAGE_MASK);	\
+	flush_icache_range(_addr, _addr + (len));						\
 } while (0)
 
 #endif /* _ASM_IA64_CACHEFLUSH_H */

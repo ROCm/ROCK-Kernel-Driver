@@ -36,6 +36,7 @@
 #include <asm/kregs.h>
 #include <asm/offsets.h>
 #include <asm/pgtable.h>
+#include <asm/percpu.h>
 #include <asm/processor.h>
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
@@ -1208,8 +1209,8 @@ sys_call_table:
 	data8 sys_fremovexattr
 	data8 sys_tkill
 	data8 sys_futex				// 1230
-	data8 ia64_ni_syscall
-	data8 ia64_ni_syscall
+	data8 sys_sched_setaffinity
+	data8 sys_sched_getaffinity
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall
 	data8 ia64_ni_syscall			// 1235

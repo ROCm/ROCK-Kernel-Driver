@@ -150,6 +150,31 @@ pte_free_kernel (pte_t *pte)
 	free_page((unsigned long) pte);
 }
 
-extern int do_check_pgt_cache (int, int);
+extern void check_pgt_cache (void);
+
+/*
+ * IA-64 doesn't have any external MMU info: the page tables contain all the necessary
+ * information.  However, we use this macro to take care of any (delayed) i-cache flushing
+ * that may be necessary.
+ */
+static inline void
+update_mmu_cache (struct vm_area_struct *vma, unsigned long vaddr, pte_t pte)
+{
+	unsigned long addr;
+	struct page *page;
+
+	if (!pte_exec(pte))
+		return;				/* not an executable page... */
+
+	page = pte_page(pte);
+	/* don't use VADDR: it may not be mapped on this CPU (or may have just been flushed): */
+	addr = (unsigned long) page_address(page);
+
+	if (test_bit(PG_arch_1, &page->flags))
+		return;				/* i-cache is already coherent with d-cache */
+
+	flush_icache_range(addr, addr + PAGE_SIZE);
+	set_bit(PG_arch_1, &page->flags);	/* mark page as clean */
+}
 
 #endif /* _ASM_IA64_PGALLOC_H */

@@ -54,7 +54,10 @@
 
 extern char _end;
 
+#ifdef CONFIG_SMP
 unsigned long __per_cpu_offset[NR_CPUS];
+#endif
+
 struct cpuinfo_ia64 cpu_info __per_cpu_data;
 
 unsigned long ia64_phys_stacked_size_p8;
@@ -527,20 +530,25 @@ setup_per_cpu_areas (void)
 void
 cpu_init (void)
 {
-	extern char __per_cpu_start[], __phys_per_cpu_start[], __per_cpu_end[];
+	extern char __per_cpu_start[], __phys_per_cpu_start[];
 	extern void __init ia64_mmu_init (void *);
 	unsigned long num_phys_stacked;
 	pal_vm_info_2_u_t vmi;
 	unsigned int max_ctx;
 	struct cpuinfo_ia64 *my_cpu_info;
 	void *my_cpu_data;
+
+#ifdef CONFIG_SMP
+	extern char __per_cpu_end[];
 	int cpu = smp_processor_id();
 
 	my_cpu_data = alloc_bootmem_pages(__per_cpu_end - __per_cpu_start);
 	memcpy(my_cpu_data, __phys_per_cpu_start, __per_cpu_end - __per_cpu_start);
-
 	__per_cpu_offset[cpu] = (char *) my_cpu_data - __per_cpu_start;
-
+	my_cpu_info = my_cpu_data + ((char *) &cpu_info - __per_cpu_start);
+#else
+	my_cpu_data = __phys_per_cpu_start;
+#endif
 	my_cpu_info = my_cpu_data + ((char *) &cpu_info - __per_cpu_start);
 
 	/*

@@ -273,9 +273,7 @@ pcibios_enable_device (struct pci_dev *dev)
 
 	/* Not needed, since we enable all devices at startup.  */
 
-	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", dev->irq, 
-		dev->slot_name);
-
+	printk(KERN_INFO "PCI: Found IRQ %d for device %s\n", dev->irq, dev->slot_name);
 	return 0;
 }
 

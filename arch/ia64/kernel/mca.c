@@ -353,7 +353,9 @@ static int
 verify_guid (efi_guid_t *test, efi_guid_t *target)
 {
 	int     rc;
+#ifdef IA64_MCA_DEBUG_INFO
 	char out[40];
+#endif
 
 	if ((rc = efi_guidcmp(*test, *target))) {
 		IA64_MCA_DEBUG(KERN_DEBUG
