@@ -84,6 +84,7 @@ static struct av_perm_to_string av_perm_to_string[] = {
    { SECCLASS_SECURITY, SECURITY__COMPUTE_RELABEL, "compute_relabel" },
    { SECCLASS_SECURITY, SECURITY__COMPUTE_USER, "compute_user" },
    { SECCLASS_SECURITY, SECURITY__SETENFORCE, "setenforce" },
+   { SECCLASS_SECURITY, SECURITY__SETBOOL, "setbool" },
    { SECCLASS_SYSTEM, SYSTEM__IPC_INFO, "ipc_info" },
    { SECCLASS_SYSTEM, SYSTEM__SYSLOG_READ, "syslog_read" },
    { SECCLASS_SYSTEM, SYSTEM__SYSLOG_MOD, "syslog_mod" },

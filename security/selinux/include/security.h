@@ -2,7 +2,9 @@
  * Security server interface.
  *
  * Author : Stephen Smalley, <sds@epoch.ncsc.mil>
+ *
  */
+
 #ifndef _SELINUX_SECURITY_H_
 #define _SELINUX_SECURITY_H_
 
@@ -13,12 +15,19 @@
 #define SECCLASS_NULL			0x0000 /* no class */
 
 #define SELINUX_MAGIC 0xf97cff8c
-#define POLICYDB_VERSION 15
+#define POLICYDB_VERSION 16
+#define POLICYDB_VERSION_COMPAT 15
 
 #ifdef CONFIG_SECURITY_SELINUX_BOOTPARAM
 extern int selinux_enabled;
 #else
 #define selinux_enabled 1
+#endif
+
+#ifdef CONFIG_SECURITY_SELINUX_MLS
+#define selinux_mls_enabled 1
+#else
+#define selinux_mls_enabled 0
 #endif
 
 int security_load_policy(void * data, size_t len);

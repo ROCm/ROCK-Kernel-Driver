@@ -48,12 +48,12 @@ usercon.range = __ranges->range;
 
 #define mls_end_user_ranges } }
 
-#define mls_symtab_names , "levels", "categories"
-#define mls_symtab_sizes , 16, 16
-#define mls_index_f ,sens_index, cat_index
-#define mls_destroy_f ,sens_destroy, cat_destroy
-#define mls_read_f ,sens_read, cat_read
-#define mls_write_f ,sens_write, cat_write
+#define mls_symtab_names  "levels", "categories",
+#define mls_symtab_sizes  16, 16,
+#define mls_index_f sens_index, cat_index,
+#define mls_destroy_f sens_destroy, cat_destroy,
+#define mls_read_f sens_read, cat_read,
+#define mls_write_f sens_write, cat_write,
 #define mls_policydb_index_others(p) printk(", %d levels", p->nlevels);
 
 #define mls_set_config(config) config |= POLICYDB_CONFIG_MLS
