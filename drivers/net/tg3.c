@@ -4997,8 +4997,17 @@ static int tg3_reset_hw(struct tg3 *tp)
 	tw32_f(MAC_RX_MODE, tp->rx_mode);
 	udelay(10);
 
-	if (tp->pci_chip_rev_id == CHIPREV_ID_5703_A1)
-		tw32(MAC_SERDES_CFG, 0x616000);
+	if (tp->phy_id == PHY_ID_SERDES) {
+		if (GET_ASIC_REV(tp->pci_chip_rev_id) == ASIC_REV_5704) {
+			/* Set drive transmission level to 1.2V  */
+			val = tr32(MAC_SERDES_CFG);
+			val &= 0xfffff000;
+			val |= 0x880;
+			tw32(MAC_SERDES_CFG, val);
+		}
+		if (tp->pci_chip_rev_id == CHIPREV_ID_5703_A1)
+			tw32(MAC_SERDES_CFG, 0x616000);
+	}
 
 	/* Prevent chip from dropping frames when flow control
 	 * is enabled.
