@@ -340,8 +340,23 @@ static struct platform_device ixdp2x01_flash = {
 	.resource	= &ixdp2x01_flash_resource,
 };
 
+static struct ixp2000_i2c_pins ixdp2x01_i2c_gpio_pins = {
+	.sda_pin	= IXDP2X01_GPIO_SDA,
+	.scl_pin	= IXDP2X01_GPIO_SCL,
+};
+
+static struct platform_device ixdp2x01_i2c_controller = {
+	.name		= "IXP2000-I2C",
+	.id		= 0,
+	.dev		= {
+		.platform_data = &ixdp2x01_i2c_gpio_pins,
+	},
+	.num_resources	= 0
+};
+
 static struct platform_device *ixdp2x01_devices[] __initdata = {
-	&ixdp2x01_flash
+	&ixdp2x01_flash,
+	&ixdp2x01_i2c_controller
 };
 
 static void __init ixdp2x01_init_machine(void)
