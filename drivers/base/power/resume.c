@@ -21,7 +21,7 @@ extern int sysdev_restore(void);
  *
  */
 
-static int resume_device(struct device * dev)
+int resume_device(struct device * dev)
 {
 	struct device_driver * drv = dev->driver;
 
@@ -70,7 +70,7 @@ void device_pm_resume(void)
  *	@dev:	Device.
  */
 
-static void power_up_device(struct device * dev)
+void power_up_device(struct device * dev)
 {
 	struct device_driver * drv = dev->driver;
 	if (drv && drv->resume)

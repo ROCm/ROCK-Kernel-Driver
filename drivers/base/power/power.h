@@ -25,10 +25,32 @@ static inline struct device * to_device(struct list_head * entry)
 
 
 /*
+ * sysfs.c
+ */
+
+extern int dpm_sysfs_add(struct device *);
+extern void dpm_sysfs_remove(struct device *);
+
+/*
  * resume.c 
  */
 extern int dpm_resume(void);
 extern void dpm_power_up(void);
 extern void dpm_power_up_irq(void);
+extern void power_up_device(struct device *);
+extern int resume_device(struct device *);
 
+/*
+ * suspend.c
+ */
+extern int suspend_device(struct device *, u32);
+extern int power_down_device(struct device *, u32);
+
+
+/*
+ * runtime.c
+ */
+
+extern int dpm_runtime_suspend(struct device *, u32);
+extern void dpm_runtime_resume(struct device *);
 

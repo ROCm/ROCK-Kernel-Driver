@@ -36,13 +36,19 @@ extern int sysdev_suspend(u32 state);
  *	@state:	Power state device is entering.
  */
 
-static int suspend_device(struct device * dev, u32 state)
+int suspend_device(struct device * dev, u32 state)
 {
 	struct device_driver * drv = dev->driver;
+	int error = 0;
 
-	if (drv && drv->suspend)
-		return drv->suspend(dev,state,SUSPEND_SAVE_STATE);
-	return 0;
+	if (drv && drv->suspend) 
+		error = drv->suspend(dev,state,SUSPEND_SAVE_STATE);
+
+	if (!error) {
+		list_del(&dev->power.entry);
+		list_add(&dev->power.entry,&dpm_suspended);
+	}
+	return error;
 }
 
 
@@ -74,15 +80,8 @@ int device_pm_suspend(u32 state)
 	while(!list_empty(&dpm_active)) {
 		struct list_head * entry = dpm_active.prev;
 		struct device * dev = to_device(entry);
-		list_del_init(entry);
-		error = suspend_device(dev,state);
-
-		if (!error)
-			list_add(entry,&dpm_suspended);
-		else {
-			list_add_tail(entry,&dpm_active);
+		if ((error = suspend_device(dev,state)))
 			goto Error;
-		}
 	}
 
 	if ((error = sysdev_save(state)))
@@ -102,12 +101,18 @@ int device_pm_suspend(u32 state)
  *	@state:	Power state to enter.
  */
 
-static int power_down_device(struct device * dev, u32 state)
+int power_down_device(struct device * dev, u32 state)
 {
 	struct device_driver * drv = dev->driver;
+	int error = 0;
+
 	if (drv && drv->suspend)
-		return drv->suspend(dev,state,SUSPEND_POWER_DOWN);
-	return 0;
+		error = drv->suspend(dev,state,SUSPEND_POWER_DOWN);
+	if (!error) {
+		list_del(&dev->power.entry);
+		list_add(&dev->power.entry,&dpm_off);
+	}
+	return error;
 }
 
 
@@ -128,15 +133,13 @@ static int dpm_power_down(u32 state)
 	while(!list_empty(&dpm_suspended)) {
 		struct list_head * entry = dpm_suspended.prev;
 		int error;
-
-		list_del_init(entry);
 		error = power_down_device(to_device(entry),state);
-		if (!error)
-			list_add(entry,&dpm_off);
-		else if (error == -EAGAIN)
-			list_add(entry,&dpm_off_irq);
-		else {
-			list_add_tail(entry,&dpm_suspended);
+		if (error) {
+			if (error == -EAGAIN) {
+				list_del(entry);
+				list_add(entry,&dpm_off_irq);
+				continue;
+			}
 			return error;
 		}
 	}
