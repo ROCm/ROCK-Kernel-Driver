@@ -111,6 +111,9 @@ config BINFMT_MISC
 	  feature, and <file:Documentation/java.txt> for information about how
 	  to include Java support.
 
+          To use binfmt_misc, you will need to mount it:
+		mount binfmt_misc -t binfmt_misc /proc/sys/fs/binfmt_misc
+
 	  You may say M here for module support and later load the module when
 	  you have use for it; the module is called binfmt_misc. If you
 	  don't know what to answer at this point, say Y.
