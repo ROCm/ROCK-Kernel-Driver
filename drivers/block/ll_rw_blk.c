@@ -1523,6 +1523,9 @@ request_queue_t *blk_init_queue(request_fn_proc *rfn, spinlock_t *lock)
 	blk_queue_max_hw_segments(q, MAX_HW_SEGMENTS);
 	blk_queue_max_phys_segments(q, MAX_PHYS_SEGMENTS);
 
+	/*
+	 * all done
+	 */
 	if (!elevator_init(q, chosen_elevator))
 		return q;
 

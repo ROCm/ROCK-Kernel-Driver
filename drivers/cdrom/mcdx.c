@@ -233,7 +233,7 @@ static int mcdx_block_ioctl(struct inode *inode, struct file *file,
 				unsigned cmd, unsigned long arg)
 {
 	struct s_drive_stuff *p = inode->i_bdev->bd_disk->private_data;
-	return cdrom_ioctl(&p->info, inode, cmd, arg);
+	return cdrom_ioctl(file, &p->info, inode, cmd, arg);
 }
 
 static int mcdx_block_media_changed(struct gendisk *disk)

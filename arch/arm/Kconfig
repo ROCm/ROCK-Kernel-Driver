@@ -253,7 +253,7 @@ menu "General setup"
 # Select various configuration options depending on the machine type
 config DISCONTIGMEM
 	bool
-	depends on ARCH_EDB7211 || ARCH_SA1100 || (ARCH_LH7A40X && !LH7A40X_SROMLL)
+	depends on ARCH_EDB7211 || ARCH_SA1100 || (ARCH_LH7A40X && !LH7A40X_CONTIGMEM)
 	default y
 	help
 	  Say Y to support efficient handling of discontiguous physical memory,
