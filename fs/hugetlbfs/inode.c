@@ -79,6 +79,7 @@ static int hugetlbfs_file_mmap(struct file *file, struct vm_area_struct *vma)
  */
 static int hugetlbfs_readpage(struct file *file, struct page * page)
 {
+	unlock_page(page);
 	return -EINVAL;
 }
 

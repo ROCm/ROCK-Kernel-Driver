@@ -29,15 +29,6 @@ typedef __kernel_fsid_t	__kernel_fsid_t32;
 #define IA32_PAGE_ALIGN(addr)	(((addr) + IA32_PAGE_SIZE - 1) & IA32_PAGE_MASK)
 #define IA32_CLOCKS_PER_SEC	100	/* Cast in stone for IA32 Linux */
 
-/* fcntl.h */
-struct flock32 {
-       short l_type;
-       short l_whence;
-       compat_off_t l_start;
-       compat_off_t l_len;
-       compat_pid_t l_pid;
-};
-
 #define F_GETLK64	12
 #define F_SETLK64	13
 #define F_SETLKW64	14

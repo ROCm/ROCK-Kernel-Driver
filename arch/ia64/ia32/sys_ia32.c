@@ -3017,38 +3017,6 @@ sys32_ptrace (int request, pid_t pid, unsigned int addr, unsigned int data,
 	return ret;
 }
 
-static inline int
-get_flock32(struct flock *kfl, struct flock32 *ufl)
-{
-	int err;
-
-	if (!access_ok(VERIFY_READ, ufl, sizeof(*ufl)))
-		return -EFAULT;
-
-	err = __get_user(kfl->l_type, &ufl->l_type);
-	err |= __get_user(kfl->l_whence, &ufl->l_whence);
-	err |= __get_user(kfl->l_start, &ufl->l_start);
-	err |= __get_user(kfl->l_len, &ufl->l_len);
-	err |= __get_user(kfl->l_pid, &ufl->l_pid);
-	return err;
-}
-
-static inline int
-put_flock32(struct flock *kfl, struct flock32 *ufl)
-{
-	int err;
-
-	if (!access_ok(VERIFY_WRITE, ufl, sizeof(*ufl)))
-		return -EFAULT;
-
-	err = __put_user(kfl->l_type, &ufl->l_type);
-	err |= __put_user(kfl->l_whence, &ufl->l_whence);
-	err |= __put_user(kfl->l_start, &ufl->l_start);
-	err |= __put_user(kfl->l_len, &ufl->l_len);
-	err |= __put_user(kfl->l_pid, &ufl->l_pid);
-	return err;
-}
-
 extern asmlinkage long sys_fcntl (unsigned int fd, unsigned int cmd, unsigned long arg);
 
 asmlinkage long
@@ -3062,13 +3030,13 @@ sys32_fcntl (unsigned int fd, unsigned int cmd, unsigned int arg)
 	      case F_GETLK:
 	      case F_SETLK:
 	      case F_SETLKW:
-		if (get_flock32(&f, (struct flock32 *) A(arg)))
+		if (get_compat_flock(&f, (struct compat_flock *) A(arg)))
 			return -EFAULT;
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
 		ret = sys_fcntl(fd, cmd, (unsigned long) &f);
 		set_fs(old_fs);
-		if (cmd == F_GETLK && put_flock32(&f, (struct flock32 *) A(arg)))
+		if (cmd == F_GETLK && put_compat_flock(&f, (struct compat_flock *) A(arg)))
 			return -EFAULT;
 		return ret;
 
