@@ -1,4 +1,4 @@
-/*  $Header: /var/lib/cvs/prism54-ng/ksrc/isl_38xx.c,v 1.22 2004/02/28 03:06:07 mcgrof Exp $
+/*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc.
  *  Copyright (C) 2003-2004 Luis R. Rodriguez <mcgrof@ruslug.rutgers.edu>_

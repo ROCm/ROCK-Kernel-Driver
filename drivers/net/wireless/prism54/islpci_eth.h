@@ -1,4 +1,4 @@
-/*  $Header: /var/lib/cvs/prism54-ng/ksrc/islpci_eth.h,v 1.5 2004/01/12 22:16:32 jmaurer Exp $
+/*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc.
  *

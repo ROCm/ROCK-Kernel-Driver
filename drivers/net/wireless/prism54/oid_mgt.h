@@ -1,4 +1,4 @@
-/*   
+/*
  *  Copyright (C) 2003 Aurelien Alleaume <slts@free.fr>
  *
  *  This program is free software; you can redistribute it and/or modify

@@ -1,8 +1,9 @@
 /*
- *  $Id: isl_oid.h,v 1.3 2004/03/09 09:05:27 mcgrof Exp $
+ *
  *  
  *  Copyright (C) 2003 Herbert Valerio Riedel <hvr@gnu.org>
  *  Copyright (C) 2004 Luis R. Rodriguez <mcgrof@ruslug.rutgers.edu>
+ *  Copyright (C) 2004 Aurelien Alleaume <slts@free.fr>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by

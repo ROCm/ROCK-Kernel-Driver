@@ -1,8 +1,9 @@
-/*  $Header: /var/lib/cvs/prism54-ng/ksrc/islpci_dev.h,v 1.53 2004/02/28 03:06:07 mcgrof Exp $
+/*
  *  
  *  Copyright (C) 2002 Intersil Americas Inc. 
  *  Copyright (C) 2003 Herbert Valerio Riedel <hvr@gnu.org>
  *  Copyright (C) 2003 Luis R. Rodriguez <mcgrof@ruslug.rutgers.edu>
+ *  Copyright (C) 2003 Aurelien Alleaume <slts@free.fr>
  *
  *  This program is free software; you can redistribute it and/or modify
  *  it under the terms of the GNU General Public License as published by
