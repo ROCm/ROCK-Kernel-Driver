@@ -111,7 +111,7 @@ static struct sk_buff *dly_dequeue(struct Qdisc *sch)
 	if (skb) {
 		struct dly_skb_cb *cb = (struct dly_skb_cb *)skb->cb;
 		psched_time_t now;
-		long diff;
+		long diff, delay;
 
 		PSCHED_GET_TIME(now);
 		diff = q->latency - PSCHED_TDIFF(now, cb->queuetime);
@@ -128,12 +128,10 @@ static struct sk_buff *dly_dequeue(struct Qdisc *sch)
 			goto retry;
 		}
 
-		if (!netif_queue_stopped(sch->dev)) {
-			long delay = PSCHED_US2JIFFIE(diff);
-			if (delay <= 0)
-				delay = 1;
-			mod_timer(&q->timer, jiffies+delay);
-		}
+		delay = PSCHED_US2JIFFIE(diff);
+		if (delay <= 0)
+		  delay = 1;
+		mod_timer(&q->timer, jiffies+delay);
 
 		sch->flags |= TCQ_F_THROTTLED;
 	}

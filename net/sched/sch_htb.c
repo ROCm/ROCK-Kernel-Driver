@@ -1008,7 +1008,6 @@ next:
 static void htb_delay_by(struct Qdisc *sch,long delay)
 {
 	struct htb_sched *q = (struct htb_sched *)sch->data;
-	if (netif_queue_stopped(sch->dev)) return;
 	if (delay <= 0) delay = 1;
 	if (unlikely(delay > 5*HZ)) {
 		if (net_ratelimit())
