@@ -412,6 +412,14 @@ struct fb_info {
    struct vc_data *display_fg;		/* Console visible on this display */
    int currcon;				/* Current VC. */	
    void *pseudo_palette;                /* Fake palette of 16 colors */ 
+#ifdef CONFIG_BOOTSPLASH
+   struct splash_data *splash_data;
+   unsigned char *splash_pic;
+   int splash_pic_size;
+   int splash_bytes;
+   char *silent_screen_base;		/* real screen base */
+   char fb_cursordata[64];
+#endif
    /* From here on everything is device dependent */
    void *par;	
 };
