@@ -224,7 +224,7 @@ scripts:
 # ---------------------------------------------------------------------------
 
 init-y		:= init/
-drivers-y	:= drivers/ sound/
+drivers-y	:= drivers/ sound/ suse/
 net-y		:= net/
 libs-y		:= lib/
 core-y		:= usr/
