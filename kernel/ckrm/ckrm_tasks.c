@@ -298,23 +298,30 @@ recalc_and_propagate(ckrm_numtasks_t *res, ckrm_numtasks_t *parres)
 		//
 		if (parres->cnt_guarantee == CKRM_SHARE_DONTCARE) {
 			res->cnt_guarantee = CKRM_SHARE_DONTCARE;
-		} else {
+		} else if (par->total_guarantee) {
 			res->cnt_guarantee = (self->my_guarantee * parres->cnt_guarantee) 
 					/ par->total_guarantee;
+		} else {
+			res->cnt_guarantee = 0;
 		}
+
 		if (parres->cnt_limit == CKRM_SHARE_DONTCARE) {
 			res->cnt_limit = CKRM_SHARE_DONTCARE;
-		} else {
+		} else if (par->max_limit) {
 			res->cnt_limit = (self->my_limit * parres->cnt_limit)
 					/ par->max_limit;
+		} else {
+			res->cnt_limit = 0;
 		}
 
 		// Calculate unused units
 		if (res->cnt_guarantee == CKRM_SHARE_DONTCARE) {
 			res->cnt_unused = CKRM_SHARE_DONTCARE;
-		} else {
+		} else if (self->total_guarantee) {
 			res->cnt_unused = (self->unused_guarantee *
 					res->cnt_guarantee) / self->total_guarantee;
+		} else {
+			res->cnt_unused = 0;
 		}
 	}
 
@@ -358,11 +365,12 @@ numtasks_set_share_values(void *my_res, struct ckrm_shares *new)
 		// Calculate parent's unused units
 		if (parres->cnt_guarantee == CKRM_SHARE_DONTCARE) {
 			parres->cnt_unused = CKRM_SHARE_DONTCARE;
-		} else {
+		} else if (par->total_guarantee) {
 			parres->cnt_unused = (par->unused_guarantee *
 					parres->cnt_guarantee) / par->total_guarantee;
+		} else {
+			parres->cnt_unused = 0;
 		}
-
 		recalc_and_propagate(res, parres);
 	}
 	spin_unlock(&res->cnt_lock);
