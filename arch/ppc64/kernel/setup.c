@@ -312,6 +312,11 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	else
 		seq_printf(m, "unknown (%08x)", pvr);
 
+#ifdef CONFIG_ALTIVEC
+	if (cur_cpu_spec->cpu_features & CPU_FTR_ALTIVEC)
+		seq_printf(m, ", altivec supported");
+#endif /* CONFIG_ALTIVEC */
+
 	seq_printf(m, "\n");
 
 #ifdef CONFIG_PPC_PSERIES

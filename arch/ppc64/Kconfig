@@ -72,6 +72,13 @@ config PPC64
 	bool
 	default y
 
+# VMX is pSeries only for now until somebody writes the iSeries
+# exception vectors for it
+config ALTIVEC
+	bool "Support for VMX (Altivec) vector unit"
+	depends on PPC_PSERIES
+	default y
+
 config POWER4_ONLY
 	bool "Optimize for POWER4"
 	default n

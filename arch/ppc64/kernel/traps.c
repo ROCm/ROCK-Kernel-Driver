@@ -420,6 +420,14 @@ KernelFPUnavailableException(struct pt_regs *regs)
 }
 
 void
+KernelAltivecUnavailableException(struct pt_regs *regs)
+{
+	printk("Illegal VMX/Altivec used in kernel (task=0x%p, "
+		"pc=0x%016lx, trap=0x%lx)\n", current, regs->nip, regs->trap);
+	panic("Unrecoverable VMX/Altivec Unavailable Exception in Kernel");
+}
+
+void
 SingleStepException(struct pt_regs *regs)
 {
 	siginfo_t info;
@@ -487,6 +495,17 @@ AlignmentException(struct pt_regs *regs)
 	info.si_addr = (void *)regs->nip;
 	_exception(SIGBUS, &info, regs);	
 }
+
+#ifdef CONFIG_ALTIVEC
+void
+AltivecAssistException(struct pt_regs *regs)
+{
+	if (regs->msr & MSR_VEC)
+		giveup_altivec(current);
+	/* XXX quick hack for now: set the non-Java bit in the VSCR */
+	current->thread.vscr.u[3] |= 0x10000;
+}
+#endif /* CONFIG_ALTIVEC */
 
 void __init trap_init(void)
 {

@@ -418,7 +418,7 @@ _GLOBAL(cvt_df)
 	blr
 
 /*
- * identify_cpu,
+ * identify_cpu and calls setup_cpu
  * In:	r3 = base of the cpu_specs array
  *	r4 = address of cur_cpu_spec
  *	r5 = relocation offset
@@ -434,9 +434,17 @@ _GLOBAL(identify_cpu)
 	addi	r3,r3,CPU_SPEC_ENTRY_SIZE
 	b	1b
 1:
-	add	r3,r3,r5
-	std	r3,0(r4)
-	blr
+	add	r0,r3,r5
+	std	r0,0(r4)
+	ld	r4,CPU_SPEC_SETUP(r3)
+	sub	r4,r4,r5
+	ld	r4,0(r4)
+	sub	r4,r4,r5
+	mtctr	r4
+	/* Calling convention for cpu setup is r3=offset, r4=cur_cpu_spec */
+	mr	r4,r3
+	mr	r3,r5
+	bctr
 
 /*
  * do_cpu_ftr_fixups - goes through the list of CPU feature fixups
@@ -485,25 +493,6 @@ _GLOBAL(do_cpu_ftr_fixups)
 	sync			/* additional sync needed on g4 */
 	isync
 	b	1b
-
-/*
- * call_setup_cpu - call the setup_cpu function for this cpu
- * r3 = data offset
- *
- * Setup function is called with:
- *   r3 = data offset
- *   r4 = ptr to CPU spec (relocated)
- */
-_GLOBAL(call_setup_cpu)
-	LOADADDR(r4, cur_cpu_spec)
-	sub	r4,r4,r3
-	lwz	r4,0(r4)		# load pointer to cpu_spec
-	sub	r4,r4,r3		# relocate
-	lwz	r6,CPU_SPEC_SETUP(r4)	# load function pointer
-	sub	r6,r6,r3
-	mtctr	r6
-	bctr
-
 
 
 /*
@@ -823,7 +812,7 @@ _GLOBAL(sys_call_table32)
 	.llong .compat_clock_gettime
 	.llong .compat_clock_getres
 	.llong .compat_clock_nanosleep
-	.llong .sys_ni_syscall
+	.llong .ppc32_swapcontext
 	.llong .sys32_tgkill		/* 250 */
 	.llong .sys32_utimes
 	.llong .compat_statfs64
@@ -1082,7 +1071,7 @@ _GLOBAL(sys_call_table)
 	.llong .sys_clock_gettime
 	.llong .sys_clock_getres
 	.llong .sys_clock_nanosleep
-	.llong .sys_ni_syscall
+	.llong .ppc64_swapcontext
 	.llong .sys_tgkill		/* 250 */
 	.llong .sys_utimes
 	.llong .sys_statfs64
