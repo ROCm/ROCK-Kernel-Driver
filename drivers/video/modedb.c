@@ -300,6 +300,7 @@ int __fb_try_mode(struct fb_var_screeninfo *var, struct fb_info *info,
     var->vmode = mode->vmode;
     err = info->fbops->fb_set_var(var, PROC_CONSOLE(info), info);
     var->activate &= ~FB_ACTIVATE_TEST;
+    gen_set_disp(PROC_CONSOLE(info), info);	
     return !err;
 }
 

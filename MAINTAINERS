@@ -591,6 +591,13 @@ M:	kevin.curtis@farsite.co.uk
 W:	http://www.farsite.co.uk/
 S:	Supported
 
+FRAMEBUFFER LAYER
+P:	James Simmons, Geert Uytterhoeven	
+M:	jsimmons@users.sf.net, geert@linux-m68k.org	
+L:	linux-fbdev-devel@lists.sourceforge.net	
+W:	http://www.linux-fbdev.org
+S:	Supported
+
 FILE LOCKING (flock() and fcntl()/lockf())
 P:	Matthew Wilcox
 M:	matthew@wil.cx
