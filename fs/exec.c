@@ -404,6 +404,8 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		return -ENOMEM;
 	}
 
+	memset(mpnt, 0, sizeof(*mpnt));
+
 	down_write(&mm->mmap_sem);
 	{
 		mpnt->vm_mm = mm;
@@ -425,11 +427,6 @@ int setup_arg_pages(struct linux_binprm *bprm, int executable_stack)
 		else
 			mpnt->vm_flags = VM_STACK_FLAGS;
 		mpnt->vm_page_prot = protection_map[mpnt->vm_flags & 0x7];
-		mpnt->vm_ops = NULL;
-		mpnt->vm_pgoff = 0;
-		mpnt->vm_file = NULL;
-		mpol_set_vma_default(mpnt);
-		mpnt->vm_private_data = (void *) 0;
 		insert_vm_struct(mm, mpnt);
 		mm->total_vm = (mpnt->vm_end - mpnt->vm_start) >> PAGE_SHIFT;
 	}

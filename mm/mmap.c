@@ -689,21 +689,18 @@ munmap_back:
 	 * not unmapped, but the maps are removed from the list.
 	 */
 	vma = kmem_cache_alloc(vm_area_cachep, SLAB_KERNEL);
-	error = -ENOMEM;
-	if (!vma)
+	if (!vma) {
+		error = -ENOMEM;
 		goto unacct_error;
+	}
+	memset(vma, 0, sizeof(*vma));
 
 	vma->vm_mm = mm;
 	vma->vm_start = addr;
 	vma->vm_end = addr + len;
 	vma->vm_flags = vm_flags;
 	vma->vm_page_prot = protection_map[vm_flags & 0x0f];
-	vma->vm_ops = NULL;
 	vma->vm_pgoff = pgoff;
-	vma->vm_file = NULL;
-	vma->vm_private_data = NULL;
-	vma->vm_next = NULL;
-	mpol_set_vma_default(vma);
 
 	if (file) {
 		error = -EINVAL;
@@ -1447,17 +1444,13 @@ unsigned long do_brk(unsigned long addr, unsigned long len)
 		vm_unacct_memory(len >> PAGE_SHIFT);
 		return -ENOMEM;
 	}
+	memset(vma, 0, sizeof(*vma));
 
 	vma->vm_mm = mm;
 	vma->vm_start = addr;
 	vma->vm_end = addr + len;
 	vma->vm_flags = flags;
 	vma->vm_page_prot = protection_map[flags & 0x0f];
-	vma->vm_ops = NULL;
-	vma->vm_pgoff = 0;
-	vma->vm_file = NULL;
-	vma->vm_private_data = NULL;
-	mpol_set_vma_default(vma);
 	vma_link(mm, vma, prev, rb_link, rb_parent);
 out:
 	mm->total_vm += len >> PAGE_SHIFT;
