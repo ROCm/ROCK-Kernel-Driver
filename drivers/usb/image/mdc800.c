@@ -319,7 +319,9 @@ static int mdc800_usb_waitForIRQ (int mode, int msec)
 	set_current_state(TASK_INTERRUPTIBLE);
 	if (!mdc800->irq_woken)
 	{
-		schedule_timeout (msec*HZ/1000);
+		long timeout = msec*HZ/1000;
+		while(timeout)
+			timeout = schedule_timeout (timeout);
 	}
         remove_wait_queue(&mdc800->irq_wait, &wait);
 	set_current_state(TASK_RUNNING);
@@ -718,7 +720,9 @@ static ssize_t mdc800_device_read (struct file *file, char *buf, size_t len, lof
 				set_current_state(TASK_INTERRUPTIBLE);
 				if (!mdc800->downloaded)
 				{
-					schedule_timeout (TO_DOWNLOAD_GET_READY*HZ/1000);
+					long timeout = TO_DOWNLOAD_GET_READY*HZ/1000;
+					while(timeout)
+						timeout = schedule_timeout (timeout);
 				}
 				set_current_state(TASK_RUNNING);
 				remove_wait_queue(&mdc800->download_wait, &wait);
@@ -842,7 +846,9 @@ static ssize_t mdc800_device_write (struct file *file, const char *buf, size_t l
 			set_current_state(TASK_INTERRUPTIBLE);
 			if (!mdc800->written)
 			{
-				schedule_timeout (TO_WRITE_GET_READY*HZ/1000);
+				long timeout = TO_WRITE_GET_READY*HZ/1000;
+				while(timeout)
+					timeout = schedule_timeout (timeout);
 			}
                         set_current_state(TASK_RUNNING);
 			remove_wait_queue(&mdc800->write_wait, &wait);
