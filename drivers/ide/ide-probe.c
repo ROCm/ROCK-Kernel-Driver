@@ -1322,8 +1322,7 @@ int ideprobe_init (void)
 {
 	unsigned int index;
 	int probe[MAX_HWIFS];
-	
-	MOD_INC_USE_COUNT;
+
 	memset(probe, 0, MAX_HWIFS * sizeof(int));
 	for (index = 0; index < MAX_HWIFS; ++index)
 		probe[index] = !ide_hwifs[index].present;
@@ -1343,32 +1342,14 @@ int ideprobe_init (void)
 			int unit;
 			if (!hwif->present)
 				continue;
+			if (hwif->chipset == ide_unknown || hwif->chipset == ide_forced)
+				hwif->chipset = ide_generic;
 			for (unit = 0; unit < MAX_DRIVES; ++unit)
 				if (hwif->drives[unit].present)
 					ata_attach(&hwif->drives[unit]);
 		}
 	}
-	if (!ide_probe)
-		ide_probe = &ideprobe_init;
-	MOD_DEC_USE_COUNT;
 	return 0;
 }
 
-#ifdef MODULE
-int init_module (void)
-{
-	unsigned int index;
-	
-	for (index = 0; index < MAX_HWIFS; ++index)
-		ide_unregister(index);
-	ideprobe_init();
-	create_proc_ide_interfaces();
-	return 0;
-}
-
-void cleanup_module (void)
-{
-	ide_probe = NULL;
-}
-MODULE_LICENSE("GPL");
-#endif /* MODULE */
+EXPORT_SYMBOL_GPL(ideprobe_init);
