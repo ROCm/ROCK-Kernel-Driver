@@ -14,6 +14,24 @@
 
 /*
  * This is our kernel timer structure.
+ *
+ * - init
+ *   Initialise the kernels jiffy timer source, claim interrupt
+ *   using setup_irq.  This is called early on during initialisation
+ *   while interrupts are still disabled on the local CPU.
+ * - suspend
+ *   Suspend the kernel jiffy timer source, if necessary.  This
+ *   is called with interrupts disabled, after all normal devices
+ *   have been suspended.  If no action is required, set this to
+ *   NULL.
+ * - resume
+ *   Resume the kernel jiffy timer source, if necessary.  This
+ *   is called with interrupts disabled before any normal devices
+ *   are resumed.  If no action is required, set this to NULL.
+ * - offset
+ *   Return the timer offset in microseconds since the last timer
+ *   interrupt.  Note: this must take account of any unprocessed
+ *   timer interrupt which may be pending.
  */
 struct sys_timer {
 	struct sys_device	dev;
@@ -24,11 +42,12 @@ struct sys_timer {
 };
 
 extern struct sys_timer *system_timer;
-
-extern int (*set_rtc)(void);
-
 extern void timer_tick(struct pt_regs *);
 
+/*
+ * Kernel time keeping support.
+ */
+extern int (*set_rtc)(void);
 extern void save_time_delta(struct timespec *delta, struct timespec *rtc);
 extern void restore_time_delta(struct timespec *delta, struct timespec *rtc);
 
