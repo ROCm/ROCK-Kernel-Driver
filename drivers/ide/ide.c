@@ -505,26 +505,12 @@ ide_startstop_t ata_error(struct ata_device *drive, struct request *rq,	const ch
  */
 void do_ide_request(request_queue_t *q)
 {
-	/* FIXME: queuedata should contain the device instead.
-	 */
-	struct ata_channel *channel = q->queuedata;
+	struct ata_device *drive = q->queuedata;
+	struct ata_channel *ch = drive->channel;
 
-	while (!test_and_set_bit(IDE_BUSY, channel->active)) {
-		struct ata_device *drive = NULL;
+	while (!test_and_set_bit(IDE_BUSY, ch->active)) {
 		unsigned int unit;
 		ide_startstop_t ret;
-
-		/*
-		 * Select the device corresponding to the queue.
-		 */
-		for (unit = 0; unit < MAX_DRIVES; ++unit) {
-			struct ata_device *tmp = &channel->drives[unit];
-
-			if (&tmp->queue == q) {
-				drive = tmp;
-				break;
-			}
-		}
 
 		if (drive) {
 			/* No request pending?! */
@@ -542,7 +528,7 @@ void do_ide_request(request_queue_t *q)
 			 */
 			// printk(KERN_INFO "no device found!\n");
 			for (unit = 0; unit < MAX_DRIVES; ++unit) {
-				struct ata_device *tmp = &channel->drives[unit];
+				struct ata_device *tmp = &ch->drives[unit];
 
 				if (!tmp->present)
 					continue;
@@ -567,7 +553,7 @@ void do_ide_request(request_queue_t *q)
 			 */
 
 			ide_release_lock(&ide_irq_lock);/* for atari only */
-			clear_bit(IDE_BUSY, channel->active);
+			clear_bit(IDE_BUSY, ch->active);
 
 			/* All requests are done.
 			 *
@@ -576,15 +562,15 @@ void do_ide_request(request_queue_t *q)
 			 * are not prepared to take them.
 			 */
 
-			if (channel->drive && !channel->drive->using_tcq)
-				ata_irq_enable(channel->drive, 0);
+			if (ch->drive && !ch->drive->using_tcq)
+				ata_irq_enable(ch->drive, 0);
 
 			return;
 		}
 
 		/* Remember the last drive we where acting on.
 		 */
-		channel->drive = drive;
+		ch->drive = drive;
 
 		/* Feed commands to a drive until it barfs.
 		 */
@@ -598,14 +584,14 @@ void do_ide_request(request_queue_t *q)
 
 			if (!ata_can_queue(drive)) {
 				if (!ata_pending_commands(drive)) {
-					clear_bit(IDE_BUSY, channel->active);
+					clear_bit(IDE_BUSY, ch->active);
 					if (drive->using_tcq)
 						ata_irq_enable(drive, 0);
 				}
 				break;
 			}
 
-			if (test_bit(IDE_DMA, channel->active)) {
+			if (test_bit(IDE_DMA, ch->active)) {
 				printk(KERN_ERR "%s: error: DMA in progress...\n", drive->name);
 				break;
 			}
@@ -624,7 +610,7 @@ void do_ide_request(request_queue_t *q)
 
 			if (!(rq = elv_next_request(&drive->queue))) {
 				if (!ata_pending_commands(drive)) {
-					clear_bit(IDE_BUSY, channel->active);
+					clear_bit(IDE_BUSY, ch->active);
 					if (drive->using_tcq)
 						ata_irq_enable(drive, 0);
 				}
@@ -642,7 +628,7 @@ void do_ide_request(request_queue_t *q)
 
 			drive->rq = rq;
 
-			spin_unlock(channel->lock);
+			spin_unlock(ch->lock);
 			/* allow other IRQs while we start this request */
 			local_irq_enable();
 
@@ -687,7 +673,7 @@ kill_rq:
 				ret = ATA_OP_FINISHED;
 
 			}
-			spin_lock_irq(channel->lock);
+			spin_lock_irq(ch->lock);
 			/* continue if command started, so we are busy */
 		} while (ret != ATA_OP_CONTINUES);
 	}

@@ -977,23 +977,24 @@ static int init_irq(struct ata_channel *ch)
 			ch->drive = drive;
 
 		/*
-		 * Init the per device request queue
+		 * Init the per device request queue.
 		 */
 
 		q = &drive->queue;
-		q->queuedata = drive->channel;
+		q->queuedata = drive;
 		blk_init_queue(q, do_ide_request, drive->channel->lock);
 		blk_queue_segment_boundary(q, ch->seg_boundary_mask);
 		blk_queue_max_segment_size(q, ch->max_segment_size);
 
-		/* ATA can do up to 128K per request, pdc4030 needs smaller limit */
+		/* ATA can do up to 128K per request, pdc4030 needs smaller
+		 * limit. */
 #ifdef CONFIG_BLK_DEV_PDC4030
 		if (drive->channel->chipset == ide_pdc4030)
 			max_sectors = 127;
 #endif
 		blk_queue_max_sectors(q, max_sectors);
 
-		/* IDE DMA can do PRD_ENTRIES number of segments. */
+		/* ATA DMA can do PRD_ENTRIES number of segments. */
 		blk_queue_max_hw_segments(q, PRD_ENTRIES);
 
 		/* FIXME: This is a driver limit and could be eliminated. */
