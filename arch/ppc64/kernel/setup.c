@@ -38,6 +38,7 @@
 #include <asm/paca.h>
 #include <asm/ppcdebug.h>
 #include <asm/time.h>
+#include <asm/cputable.h>
 #include <asm/sections.h>
 
 extern unsigned long klimit;
@@ -430,8 +431,58 @@ void parse_cmd_line(unsigned long r3, unsigned long r4, unsigned long r5,
 	}
 }
 
-
 #ifdef CONFIG_PPC_PSERIES
+static int __init set_preferred_console(void)
+{
+	struct device_node *prom_stdout;
+	char *name;
+
+	/* The user has requested a console so this is already set up. */
+	if (strstr(cmd_line, "console="))
+		return -EBUSY;
+
+	prom_stdout = find_path_device(of_stdout_device);
+	if (!prom_stdout)
+		return -ENODEV;
+
+	name = (char *)get_property(prom_stdout, "name", NULL);
+	if (!name)
+		return -ENODEV;
+
+	if (strcmp(name, "serial") == 0) {
+		int i;
+		u32 *reg = (u32 *)get_property(prom_stdout, "reg", &i);
+		if (i > 8) {
+			int offset;
+			switch (reg[1]) {
+				case 0x3f8:
+					offset = 0;
+					break;
+				case 0x2f8:
+					offset = 1;
+					break;
+				case 0x898:
+					offset = 2;
+					break;
+				case 0x890:
+					offset = 3;
+					break;
+				default:
+					/* We dont recognise the serial port */
+					return -ENODEV;
+			}
+
+			return add_preferred_console("ttyS", offset, NULL);
+		}
+	} else if (strcmp(name, "vty") == 0) {
+		/* pSeries LPAR virtual console */
+		return add_preferred_console("hvc", 0, NULL);
+	}
+
+	return -ENODEV;
+}
+console_initcall(set_preferred_console);
+
 int parse_bootinfo(void)
 {
 	struct bi_record *rec;

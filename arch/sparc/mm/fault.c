@@ -392,7 +392,7 @@ vmalloc_fault:
 
 		if (pmd_present(*pmd) || !pmd_present(*pmd_k))
 			goto bad_area_nosemaphore;
-		pmd_val(*pmd) = pmd_val(*pmd_k);
+		*pmd = *pmd_k;
 		return;
 	}
 }

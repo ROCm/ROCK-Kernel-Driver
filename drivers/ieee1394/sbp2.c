@@ -745,6 +745,7 @@ static struct sbp2scsi_host_info *sbp2_add_host(struct hpsb_host *host)
 		SBP2_ERR("failed to add scsi host");
 		scsi_host_put(hi->scsi_host);
 		hpsb_destroy_hostinfo(&sbp2_highlevel, host);
+		return NULL;
 	}
 
 	return hi;
@@ -990,6 +991,9 @@ alloc_fail:
 		return PTR_ERR(sdev);
 	}
 
+	sdev->hostdata = scsi_id;
+	scsi_id->sdev = sdev;
+
 	return 0;
 }
 
@@ -999,7 +1003,6 @@ alloc_fail:
 static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 {
 	struct sbp2scsi_host_info *hi = scsi_id->hi;
-	struct scsi_device *sdev;
 
 	SBP2_DEBUG("sbp2_remove_device");
 
@@ -1007,12 +1010,9 @@ static void sbp2_remove_device(struct scsi_id_instance_data *scsi_id)
 	sbp2scsi_complete_all_commands(scsi_id, DID_NO_CONNECT);
 
 	/* Remove it from the scsi layer now */
-	/* XXX(hch): why can't we simply cache the scsi_device
-	   	     in struct scsi_id_instance_data? */
-	sdev = scsi_device_lookup(hi->scsi_host, 0, scsi_id->id, 0);
-	if (sdev) {
-		scsi_remove_device(sdev);
-		scsi_device_put(sdev);
+	if (scsi_id->sdev) {
+		scsi_remove_device(scsi_id->sdev);
+		scsi_device_put(scsi_id->sdev);
 	}
 
 	sbp2util_remove_command_orb_pool(scsi_id);
@@ -2849,6 +2849,27 @@ static const char *sbp2scsi_info (struct Scsi_Host *host)
         return "SCSI emulation for IEEE-1394 SBP-2 Devices";
 }
 
+static ssize_t sbp2_sysfs_ieee1394_guid_show(struct device *dev, char *buf)
+{
+	struct scsi_device *sdev;
+	struct scsi_id_instance_data *scsi_id;
+
+	if (!(sdev = to_scsi_device(dev)))
+		return 0;
+
+	if (!(scsi_id = sdev->hostdata))
+		return 0;
+
+	return sprintf(buf, "%016Lx\n", (unsigned long long)scsi_id->ne->guid);
+}
+
+static DEVICE_ATTR(ieee1394_guid, S_IRUGO, sbp2_sysfs_ieee1394_guid_show, NULL);
+
+static struct device_attribute *sbp2_sysfs_sdev_attrs[] = {
+	&dev_attr_ieee1394_guid,
+	NULL
+};
+
 MODULE_AUTHOR("Ben Collins <bcollins@debian.org>");
 MODULE_DESCRIPTION("IEEE-1394 SBP-2 protocol driver");
 MODULE_SUPPORTED_DEVICE(SBP2_DEVICE_NAME);
@@ -2871,6 +2892,7 @@ static Scsi_Host_Template scsi_driver_template = {
 	.cmd_per_lun =			SBP2_MAX_CMDS_PER_LUN,
 	.can_queue = 			SBP2_MAX_SCSI_QUEUE,
 	.emulated =			1,
+	.sdev_attrs =			sbp2_sysfs_sdev_attrs,
 };
 
 static int sbp2_module_init(void)

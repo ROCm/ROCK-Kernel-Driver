@@ -274,7 +274,7 @@ sclp_write(struct sclp_buffer *buffer, const unsigned char *msg, int count)
 			if (buffer->current_line != NULL)
 				sclp_finalize_mto(buffer);
 			/* skip the rest of the message including the 0 byte */
-			i_msg = count;
+			i_msg = count - 1;
 			break;
 		default:	/* no escape character	*/
 			/* do not output unprintable characters */

@@ -13,22 +13,38 @@ EXTRA_CFLAGS				+= -Idrivers/ide
 
 obj-$(CONFIG_BLK_DEV_IDE)		+= pci/
 
-# Core IDE code - must come before legacy
+ide-core-y += ide.o ide-default.o ide-io.o ide-iops.o ide-lib.o ide-probe.o \
+	ide-taskfile.o
 
-obj-$(CONFIG_BLK_DEV_IDE)		+= ide-io.o ide-probe.o ide-iops.o ide-taskfile.o ide.o ide-lib.o ide-default.o
+ide-core-$(CONFIG_BLK_DEV_CMD640)	+= pci/cmd640.o
+
+# Core IDE code - must come before legacy
+ide-core-$(CONFIG_BLK_DEV_IDEPCI)	+= setup-pci.o
+ide-core-$(CONFIG_BLK_DEV_IDEDMA_PCI)	+= ide-dma.o
+ide-core-$(CONFIG_BLK_DEV_IDE_TCQ)	+= ide-tcq.o
+ide-core-$(CONFIG_PROC_FS)		+= ide-proc.o
+ide-core-$(CONFIG_BLK_DEV_IDEPNP)	+= ide-pnp.o
+
+# built-in only drivers from legacy/
+ide-core-$(CONFIG_BLK_DEV_IDE_PC9800)	+= legacy/pc9800.o
+ide-core-$(CONFIG_BLK_DEV_BUDDHA)	+= legacy/buddha.o
+ide-core-$(CONFIG_BLK_DEV_FALCON_IDE)	+= legacy/falconide.o
+ide-core-$(CONFIG_BLK_DEV_GAYLE)	+= legacy/gayle.o
+ide-core-$(CONFIG_BLK_DEV_MAC_IDE)	+= legacy/macide.o
+ide-core-$(CONFIG_BLK_DEV_Q40IDE)	+= legacy/q40ide.o
+
+# built-in only drivers from ppc/
+ide-core-$(CONFIG_BLK_DEV_MPC8xx_IDE)	+= ppc/mpc8xx.o
+ide-core-$(CONFIG_BLK_DEV_IDE_PMAC)	+= ppc/pmac.o
+ide-core-$(CONFIG_BLK_DEV_IDE_SWARM)	+= ppc/swarm.o
+
+obj-$(CONFIG_BLK_DEV_IDE)		+= ide-core.o
+obj-$(CONFIG_IDE_GENERIC)		+= ide-generic.o
+
 obj-$(CONFIG_BLK_DEV_IDEDISK)		+= ide-disk.o
 obj-$(CONFIG_BLK_DEV_IDECD)		+= ide-cd.o
 obj-$(CONFIG_BLK_DEV_IDETAPE)		+= ide-tape.o
 obj-$(CONFIG_BLK_DEV_IDEFLOPPY)		+= ide-floppy.o
 
-obj-$(CONFIG_BLK_DEV_IDEPCI)		+= setup-pci.o
-obj-$(CONFIG_BLK_DEV_IDEDMA_PCI)	+= ide-dma.o
-obj-$(CONFIG_BLK_DEV_IDE_TCQ)		+= ide-tcq.o
-obj-$(CONFIG_BLK_DEV_IDEPNP)		+= ide-pnp.o
-
-ifeq ($(CONFIG_BLK_DEV_IDE),y)
-obj-$(CONFIG_PROC_FS)			+= ide-proc.o
-endif
-
-obj-$(CONFIG_BLK_DEV_IDE)		+= legacy/ ppc/ arm/
+obj-$(CONFIG_BLK_DEV_IDE)		+= legacy/ arm/
 obj-$(CONFIG_BLK_DEV_HD)		+= legacy/

@@ -2,8 +2,6 @@
  *
  * Name:	skdrv2nd.h
  * Project:	GEnesis, PCI Gigabit Ethernet Adapter
- * Version:	$Revision: 1.10 $
- * Date:	$Date: 2003/12/11 16:04:45 $
  * Purpose:	Second header file for driver and all other modules
  *
  ******************************************************************************/
@@ -19,122 +17,6 @@
  *	(at your option) any later version.
  *
  *	The information in this file is provided "AS IS" without warranty.
- *
- ******************************************************************************/
-
-/******************************************************************************
- *
- * History:
- *
- *	$Log: skdrv2nd.h,v $
- *	Revision 1.10  2003/12/11 16:04:45  mlindner
- *	Add: New pnmi data backup structure
- *	
- *	Revision 1.9  2003/11/10 09:31:37  rroesler
- *	Add: pnmiBackup structure for DIAG backup restore
- *	
- *	Revision 1.8  2003/10/22 14:18:32  rroesler
- *	Fix: DIAG handling for DualNet cards
- *	
- *	Revision 1.7  2003/10/07 09:34:59  mlindner
- *	Add: New defines for lower and upper range values (interrupt moderation)
- *	
- *	Revision 1.6  2003/10/07 08:16:51  mlindner
- *	Fix: Copyright changes
- *	
- *	Revision 1.5  2003/09/01 13:10:39  rroesler
- *	Add: Prototypes for DIAG Attach/Detach functions
- *	
- *	Revision 1.4  2003/09/01 12:33:38  rroesler
- *	Add: Defines for optimized DIAG interaction
- *	
- *	Revision 1.3  2003/08/12 16:51:18  mlindner
- *	Fix: UDP and TCP Proto checks
- *	Fix: UDP header offset
- *	
- *	Revision 1.2  2003/08/07 10:50:54  mlindner
- *	Add: Speed and HW-Csum support for Yukon Lite chipset
- *	
- *	Revision 1.1  2003/07/21 07:25:29  rroesler
- *	Fix: Re-Enter after CVS crash
- *	
- *	Revision 1.19  2003/07/07 09:53:10  rroesler
- *	Fix: Removed proprietary RxTx defines and used the ones from skgehw.h instead
- *	
- *	Revision 1.18  2003/06/12 07:54:14  mlindner
- *	Fix: Changed Descriptor Alignment to 64 Byte
- *	
- *	Revision 1.17  2003/05/26 12:56:39  mlindner
- *	Add: Support for Kernel 2.5/2.6
- *	Add: New SkOsGetTimeCurrent function
- *	Add: SK_PNMI_HUNDREDS_SEC definition
- *	Fix: SK_TICKS_PER_SEC on Intel Itanium2
- *	
- *	Revision 1.16  2003/03/21 14:56:18  rroesler
- *	Added code regarding interrupt moderation
- *	
- *	Revision 1.15  2003/02/25 14:16:40  mlindner
- *	Fix: Copyright statement
- *	
- *	Revision 1.14  2003/02/25 13:26:26  mlindner
- *	Add: Support for various vendors
- *	
- *	Revision 1.13  2002/10/02 12:46:02  mlindner
- *	Add: Support for Yukon
- *	
- *	Revision 1.12.2.2  2001/09/05 12:14:50  mlindner
- *	add: New hardware revision int
- *	
- *	Revision 1.12.2.1  2001/03/12 16:50:59  mlindner
- *	chg: kernel 2.4 adaption
- *	
- *	Revision 1.12  2001/03/01 12:52:15  mlindner
- *	Fixed ring size
- *
- *	Revision 1.11  2001/02/19 13:28:02  mlindner
- *	Changed PNMI parameter values
- *
- *	Revision 1.10  2001/01/22 14:16:04  mlindner
- *	added ProcFs functionality
- *	Dual Net functionality integrated
- *	Rlmt networks added
- *
- *	Revision 1.1  2000/10/05 19:46:50  phargrov
- *	Add directory src/vipk_devs_nonlbl/vipk_sk98lin/
- *	This is the SysKonnect SK-98xx Gigabit Ethernet driver,
- *	contributed by SysKonnect.
- *
- *	Revision 1.9  2000/02/21 10:39:55  cgoos
- *	Added flag for jumbo support usage.
- *
- *	Revision 1.8  1999/11/22 13:50:44  cgoos
- *	Changed license header to GPL.
- *	Fixed two comments.
- *
- *	Revision 1.7  1999/09/28 12:38:21  cgoos
- *	Added CheckQueue to SK_AC.
- *	
- *	Revision 1.6  1999/07/27 08:04:05  cgoos
- *	Added checksumming variables to SK_AC.
- *	
- *	Revision 1.5  1999/03/29 12:33:26  cgoos
- *	Rreversed to fine lock granularity.
- *	
- *	Revision 1.4  1999/03/15 12:14:02  cgoos
- *	Added DriverLock to SK_AC.
- *	Removed other locks.
- *	
- *	Revision 1.3  1999/03/01 08:52:27  cgoos
- *	Changed pAC->PciDev declaration.
- *	
- *	Revision 1.2  1999/02/18 10:57:14  cgoos
- *	Removed SkDrvTimeStamp prototype.
- *	Fixed SkGeOsGetTime prototype.
- *	
- *	Revision 1.1  1999/02/16 07:41:01  cgoos
- *	First version.
- *	
- *	
  *
  ******************************************************************************/
 

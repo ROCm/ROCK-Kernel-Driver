@@ -315,8 +315,9 @@ sclp_interrupt_handler(struct pt_regs *regs, __u16 code)
 	/* Head queue a read sccb if an event buffer is pending */
 	if (evbuf_pending)
 		__sclp_unconditional_read();
-	/* Now clear the running bit */
-	clear_bit(SCLP_RUNNING, &sclp_status);
+	/* Now clear the running bit if SCLP indicated a finished SCCB */
+	if (finished_sccb != 0U)
+		clear_bit(SCLP_RUNNING, &sclp_status);
 	spin_unlock(&sclp_lock);
 	/* and start next request on the queue */
 	sclp_start_request();
