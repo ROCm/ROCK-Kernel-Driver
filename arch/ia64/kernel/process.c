@@ -751,7 +751,7 @@ dup_task_struct(struct task_struct *orig)
 }
 
 void
-__put_task_struct (struct task_struct *tsk)
+free_task_struct (struct task_struct *tsk)
 {
 	free_pages((unsigned long) tsk, KERNEL_STACK_SIZE_ORDER);
 }
