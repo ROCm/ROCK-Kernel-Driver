@@ -95,6 +95,12 @@ static inline unsigned long _get_base(char * addr)
 		: :"m" (*(unsigned int *)&(value)))
 
 /*
+ * Save a segment register away
+ */
+#define savesegment(seg, value) \
+	asm volatile("movl %%" #seg ",%0":"=m" (*(int *)&(value)))
+
+/*
  * Clear and set 'TS' bit respectively
  */
 #define clts() __asm__ __volatile__ ("clts")
