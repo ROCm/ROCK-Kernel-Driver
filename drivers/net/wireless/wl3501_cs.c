@@ -757,19 +757,6 @@ static int wl3501_mgmt_start(struct wl3501_card *this)
 	return rc;
 }
 
-#undef WL3501_STUPID_LOOP
-#ifdef WL3501_STUPID_LOOP
-#define wl3501_loop(__cmd) \
-({	int i; \
-	for (i = 0; i < 3000; i++) \
-		if (!__cmd) \
-			break; \
-	i == 3000; \
-})
-#else
-#define wl3501_loop(__cmd) ({ __cmd; 0; })
-#endif
-
 static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 {
 	u16 i, j;
@@ -829,19 +816,18 @@ static void wl3501_mgmt_scan_confirm(struct wl3501_card *this, u16 addr)
 		   this->driver_state != WL3501_SIG_SCAN_REQ) {
 		this->join_sta_bss = 0;
 		for (j = this->join_sta_bss; j < this->bss_cnt; j++)
-			if (!wl3501_loop(wl3501_mgmt_join(this, j)))
+			if (!wl3501_mgmt_join(this, j))
 				break;
 		this->join_sta_bss = j;
 		if (this->join_sta_bss == this->bss_cnt) {
-			if (this->net_type == WL3501_NET_TYPE_INFRASTRUCTURE) {
-				wl3501_loop(wl3501_mgmt_scan(this, 100));
-			} else {
+			if (this->net_type == WL3501_NET_TYPE_INFRASTRUCTURE)
+				wl3501_mgmt_scan(this, 100);
+			else {
 				this->adhoc_times++;
 				if (this->adhoc_times > WL3501_MAX_ADHOC_TRIES)
-					wl3501_loop(wl3501_mgmt_start(this));
+					wl3501_mgmt_start(this);
 				else
-					wl3501_loop(wl3501_mgmt_scan(this,
-								     100));
+					wl3501_mgmt_scan(this, 100);
 			}
 
 		}
@@ -1011,7 +997,7 @@ static int wl3501_esbq_confirm(struct wl3501_card *this)
 static void wl3501_online(struct wl3501_card *this)
 {
 	this->card_start = 1;
-	printk(KERN_INFO "Wireless LAN On-Line. BSSID: "
+	printk(KERN_INFO "Wireless LAN online. BSSID: "
 	       "%02X %02X %02X %02X %02X %02X\n",
 	       this->bssid.b0, this->bssid.b1, this->bssid.b2,
 	       this->bssid.b3, this->bssid.b4, this->bssid.b5);
@@ -1087,7 +1073,7 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev,
 				this->chan = this->bss_set[i].phy_pset[2];
 				memcpy((char *)this->keep_essid,
 				       (char *)this->bss_set[i].ssid, 34);
-				wl3501_loop(wl3501_mgmt_auth(this));
+				wl3501_mgmt_auth(this);
 			}
 		} else {
 			i = this->join_sta_bss;
@@ -1101,19 +1087,18 @@ static void wl3501_mgmt_join_confirm(struct net_device *dev,
 	} else {
 		this->join_sta_bss++;
 		for (j = this->join_sta_bss; j < this->bss_cnt; j++)
-			if (!wl3501_loop(wl3501_mgmt_join(this, j)))
+			if (!wl3501_mgmt_join(this, j))
 				break;
 		this->join_sta_bss = j;
 		if (this->join_sta_bss == this->bss_cnt) {
 			if (this->net_type == WL3501_NET_TYPE_INFRASTRUCTURE)
-				wl3501_loop(wl3501_mgmt_scan(this, 100));
+				wl3501_mgmt_scan(this, 100);
 			else {
 				this->adhoc_times++;
 				if (this->adhoc_times > WL3501_MAX_ADHOC_TRIES)
-					wl3501_loop(wl3501_mgmt_start(this));
+					wl3501_mgmt_start(this);
 				else
-					wl3501_loop(wl3501_mgmt_scan(this,
-								     100));
+					wl3501_mgmt_scan(this, 100);
 			}
 		}
 	}
@@ -1128,9 +1113,9 @@ static inline void wl3501_alarm_interrupt(struct net_device *dev,
 					  struct wl3501_card *this)
 {
 	if (this->net_type == WL3501_NET_TYPE_INFRASTRUCTURE) {
-		printk(KERN_INFO "Wireless LAN Off-Line\n");
+		printk(KERN_INFO "Wireless LAN offline\n");
 		netif_stop_queue(dev);
-		wl3501_loop(wl3501_mgmt_resync(this));
+		wl3501_mgmt_resync(this);
 	}
 }
 
@@ -1254,12 +1239,12 @@ static inline void wl3501_auth_confirm_interrupt(struct wl3501_card *this,
 	wl3501_get_from_wla(this, addr, &sig, sizeof(sig));
 
 	if (sig.status == WL3501_STATUS_SUCCESS)
-		wl3501_loop(wl3501_mgmt_association(this));
+		wl3501_mgmt_association(this);
 	else
-		wl3501_loop(wl3501_mgmt_resync(this));
+		wl3501_mgmt_resync(this);
 }
 
-static void wl3501_rx_interrupt(struct net_device *dev)
+static inline void wl3501_rx_interrupt(struct net_device *dev)
 {
 	int morepkts;
 	u16 addr;
@@ -1315,7 +1300,7 @@ free:
 		goto loop;
 }
 
-static __inline__ void wl3501_ack_interrupt(struct wl3501_card *this)
+static inline void wl3501_ack_interrupt(struct wl3501_card *this)
 {
 	wl3501_outb(WL3501_GCR_ECINT, this->base_addr + WL3501_NIC_GCR);
 }
@@ -1511,7 +1496,7 @@ static int wl3501_reset(struct net_device *dev)
 
 	/* Enable interrupt from card */
 	wl3501_unblock_interrupt(this);
-	wl3501_loop(wl3501_mgmt_scan(this, 100));
+	wl3501_mgmt_scan(this, 100);
 	printk(KERN_INFO "%s: device reset\n", dev->name);
 	rc = 0;
 out:
@@ -1623,7 +1608,7 @@ static int wl3501_open(struct net_device *dev)
 
 	/* Enable interrupt from card after all */
 	wl3501_unblock_interrupt(this);
-	wl3501_loop(wl3501_mgmt_scan(this, 100));
+	wl3501_mgmt_scan(this, 100);
 	rc = 0;
 	printk(KERN_INFO "%s: WL3501 opened\n", dev->name);
 out:
