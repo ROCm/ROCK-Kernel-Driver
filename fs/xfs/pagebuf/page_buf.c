@@ -571,7 +571,8 @@ _pagebuf_lookup_pages(
 
 	if (!pb->pb_locked) {
 		for (pi = 0; pi < page_count; pi++) {
-			unlock_page(pb->pb_pages[pi]);
+			if (pb->pb_pages[pi])
+				unlock_page(pb->pb_pages[pi]);
 		}
 	}
 
