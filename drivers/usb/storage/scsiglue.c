@@ -231,36 +231,24 @@ static int usb_storage_bus_reset( Scsi_Cmnd *srb )
 	scsi_unlock(srb->device->host);
 	us = (struct us_data *)srb->device->host->hostdata[0];
 
-	/* attempt to reset the port */
-	result = usb_reset_device(us->pusb_dev);
-	US_DEBUGP("usb_reset_device returns %d\n", result);
-	if (result < 0) {
-		scsi_lock(srb->device->host);
-		return FAILED;
+	/* The USB subsystem doesn't handle synchronisation between
+	   a device's several drivers. Therefore we reset only devices
+	   with one interface which we of course own.
+	*/
+	
+	//FIXME: needs locking against config changes
+	
+	if ( us->pusb_dev->actconfig->desc.bNumInterfaces == 1) {
+		/* attempt to reset the port */
+		result = usb_reset_device(us->pusb_dev);
+		US_DEBUGP("usb_reset_device returns %d\n", result);
+	} else {
+		result = -EBUSY;
 	}
 
-	/* FIXME: This needs to lock out driver probing while it's working
-	 * or we can have race conditions */
-	/* This functionality really should be provided by the khubd thread */
-	for (i = 0; i < us->pusb_dev->actconfig->desc.bNumInterfaces; i++) {
- 		struct usb_interface *intf =
-			&us->pusb_dev->actconfig->interface[i];
-
-		/* if this is an unclaimed interface, skip it */
-		if (!intf->driver) {
-			continue;
-		}
-
-		US_DEBUGP("Examining driver %s...", intf->driver->name);
-
-		/* simulate a disconnect and reconnect for all interfaces */
-		US_DEBUGPX("simulating disconnect/reconnect.\n");
-		usb_device_remove (&intf->dev);
-		usb_device_probe (&intf->dev);
-	}
 	US_DEBUGP("bus_reset() complete\n");
 	scsi_lock(srb->device->host);
-	return SUCCESS;
+	return result < 0 ? FAILED : SUCCESS;
 }
 
 /***********************************************************************
