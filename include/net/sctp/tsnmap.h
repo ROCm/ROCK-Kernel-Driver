@@ -6,13 +6,13 @@
  * These are the definitions needed for the tsnmap type.  The tsnmap is used
  * to track out of order TSNs received.
  *
- * The SCTP reference implementation  is free software;
+ * The SCTP reference implementation is free software;
  * you can redistribute it and/or modify it under the terms of
  * the GNU General Public License as published by
  * the Free Software Foundation; either version 2, or (at your option)
  * any later version.
  *
- * the SCTP reference implementation  is distributed in the hope that it
+ * The SCTP reference implementation is distributed in the hope that it
  * will be useful, but WITHOUT ANY WARRANTY; without even the implied
  *                 ************************
  * warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
@@ -23,12 +23,17 @@
  * the Free Software Foundation, 59 Temple Place - Suite 330,
  * Boston, MA 02111-1307, USA.
  *
- * Please send any bug reports or fixes you make to one of the
- * following email addresses:
+ * Please send any bug reports or fixes you make to the
+ * email address(es):
+ *    lksctp developers <lksctp-developers@lists.sourceforge.net>
  *
- * Jon Grimm <jgrimm@us.ibm.com>
- * La Monte H.P. Yarroll <piggy@acm.org>
- * Karl Knutson <karl@athena.chicago.il.us>
+ * Or submit a bug report through the following website:
+ *    http://www.sf.net/projects/lksctp
+ *
+ * Written or modified by:
+ *   Jon Grimm             <jgrimm@us.ibm.com>
+ *   La Monte H.P. Yarroll <piggy@acm.org>
+ *   Karl Knutson          <karl@athena.chicago.il.us>
  *
  * Any bugs reported given to us we will try to fix... any fixes shared will
  * be incorporated into the next SCTP release.
@@ -153,14 +158,17 @@ static inline __u32 *sctp_tsnmap_get_dups(struct sctp_tsnmap *map)
 	return map->dup_tsns;
 }
 
-/* Mark a duplicate TSN.  Note:  we limit how many we are willing to
- * store and consequently report.
+/* Mark a duplicate TSN.  Note:  limit the storage of duplicate TSN
+ * information.
  */
 static inline void sctp_tsnmap_mark_dup(struct sctp_tsnmap *map, __u32 tsn)
 {
 	if (map->num_dup_tsns < SCTP_MAX_DUP_TSNS)
-		map->dup_tsns[map->num_dup_tsns++] = tsn;
+		map->dup_tsns[map->num_dup_tsns++] = htonl(tsn);
 }
+
+/* Renege a TSN that was seen.  */
+void sctp_tsnmap_renege(struct sctp_tsnmap *, __u32 tsn);
 
 /* Is there a gap in the TSN map? */
 int sctp_tsnmap_has_gap(const struct sctp_tsnmap *);
@@ -176,6 +184,3 @@ int sctp_tsnmap_next_gap_ack(const struct sctp_tsnmap *,
 	struct sctp_tsnmap_iter *,__u16 *start, __u16 *end);
 
 #endif /* __sctp_tsnmap_h__ */
-
-
-

@@ -655,31 +655,118 @@ static inline struct sctp_ulpevent *sctp_ulpq_order(struct sctp_ulpq *ulpq,
 	return event;
 }
 
+/* Renege 'needed' bytes from the ordering queue. */
+static __u16 sctp_ulpq_renege_order(struct sctp_ulpq *ulpq, __u16 needed)
+{
+	__u16 freed = 0;
+	__u32 tsn;
+	struct sk_buff *skb;
+	struct sctp_ulpevent *event;
+	struct sctp_tsnmap *tsnmap;
+
+	tsnmap = &ulpq->asoc->peer.tsn_map;
+
+	while ((skb = __skb_dequeue_tail(&ulpq->lobby))) {
+		freed += skb_headlen(skb);
+		event = sctp_skb2event(skb);
+		tsn = event->sndrcvinfo.sinfo_tsn;
+
+		sctp_ulpevent_free(event);
+		sctp_tsnmap_renege(tsnmap, tsn);
+		if (freed >= needed)
+			return freed;
+	}
+
+	return freed;
+}
+
+/* Renege 'needed' bytes from the reassembly queue. */
+static __u16 sctp_ulpq_renege_frags(struct sctp_ulpq *ulpq, __u16 needed)
+{
+	__u16 freed = 0;
+	__u32 tsn;
+	struct sk_buff *skb;
+	struct sctp_ulpevent *event;
+	struct sctp_tsnmap *tsnmap;
+
+	tsnmap = &ulpq->asoc->peer.tsn_map;
+
+	/* Walk backwards through the list, reneges the newest tsns. */
+	while ((skb = __skb_dequeue_tail(&ulpq->reasm))) {
+		freed += skb_headlen(skb);
+		event = sctp_skb2event(skb);
+		tsn = event->sndrcvinfo.sinfo_tsn;
+
+		sctp_ulpevent_free(event);
+		sctp_tsnmap_renege(tsnmap, tsn);
+		if (freed >= needed)
+			return freed;
+	}
+
+	return freed;
+}
+
 /* Partial deliver the first message as there is pressure on rwnd. */
 void sctp_ulpq_partial_delivery(struct sctp_ulpq *ulpq,
 				struct sctp_chunk *chunk, int priority)
 {
 	struct sctp_ulpevent *event;
+	struct sctp_association *asoc;
+
+	asoc = ulpq->asoc;
 
 	/* Are we already in partial delivery mode?  */
-	if (!sctp_sk(ulpq->asoc->base.sk)->pd_mode) {
+	if (!sctp_sk(asoc->base.sk)->pd_mode) {
 
 		/* Is partial delivery possible?  */
 		event = sctp_ulpq_retrieve_first(ulpq);
 		/* Send event to the ULP.   */
 		if (event) {
 			sctp_ulpq_tail_event(ulpq, event);
-			sctp_sk(ulpq->asoc->base.sk)->pd_mode = 1;
+			sctp_sk(asoc->base.sk)->pd_mode = 1;
 			ulpq->pd_mode = 1;
 			return;
 		}
 	}
-
-	/* Assert:  Either already in partial delivery mode or partial
-	 * delivery wasn't possible, so now the only recourse is
-	 * to renege.  FIXME: Add renege support starts here.
-	 */
 }
+
+/* Renege some packets to make room for an incoming chunk.  */
+void sctp_ulpq_renege(struct sctp_ulpq *ulpq, struct sctp_chunk *chunk,
+		      int priority)
+{
+	struct sctp_association *asoc;
+	__u16 needed, freed;
+
+	asoc = ulpq->asoc;
+
+	if (chunk) {
+		needed = ntohs(chunk->chunk_hdr->length);
+		needed -= sizeof(sctp_data_chunk_t);
+	} else 
+		needed = SCTP_DEFAULT_MAXWINDOW;
+
+	freed = 0;
+
+	if (skb_queue_empty(&asoc->base.sk->receive_queue)) {
+		freed = sctp_ulpq_renege_order(ulpq, needed);
+		if (freed < needed) {
+			freed += sctp_ulpq_renege_frags(ulpq, needed - freed);
+		}
+	}
+	/* If able to free enough room, accept this chunk. */
+	if (chunk && (freed >= needed)) {
+		__u32 tsn;
+		tsn = ntohl(chunk->subh.data_hdr->tsn);
+		sctp_tsnmap_mark(&asoc->peer.tsn_map, tsn);
+		sctp_ulpq_tail_data(ulpq, chunk, priority);
+		
+		sctp_ulpq_partial_delivery(ulpq, chunk, priority);
+	}
+
+	return;
+}
+
+
 
 /* Notify the application if an association is aborted and in
  * partial delivery mode.  Send up any pending received messages.

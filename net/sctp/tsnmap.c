@@ -385,3 +385,23 @@ static void sctp_tsnmap_find_gap_ack(__u8 *map, __u16 off,
 		}
 	}
 }
+
+/* Renege that we have seen a TSN.  */
+void sctp_tsnmap_renege(struct sctp_tsnmap *map, __u32 tsn)
+{
+	__s32 gap;
+
+	if (TSN_lt(tsn, map->base_tsn))
+		return;
+	if (!TSN_lt(tsn, map->base_tsn + map->len + map->len))
+		return;
+	
+	/* Assert: TSN is in range.  */
+	gap = tsn - map->base_tsn;
+
+	/* Pretend we never saw the TSN.  */
+	if (gap < map->len)
+		map->tsn_map[gap] = 0;
+	else
+		map->overflow_map[gap - map->len] = 0;
+}
