@@ -140,12 +140,11 @@ static struct omap_irq_bank omap1510_irq_banks[] = {
 };
 #endif
 
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912) \
-				  || defined(CONFIG_ARCH_OMAP1710)
+#if defined(CONFIG_ARCH_OMAP16XX)
 
 static struct omap_irq_bank omap1610_irq_banks[] = {
 	{ .base_reg = OMAP_IH1_BASE, 		.trigger_map = 0xb3fefe8f },
-	{ .base_reg = OMAP_IH2_BASE, 		.trigger_map = 0xfffff7ff },
+	{ .base_reg = OMAP_IH2_BASE, 		.trigger_map = 0xfdb7c1fd },
 	{ .base_reg = OMAP_IH2_BASE + 0x100,	.trigger_map = 0xfffff7ff },
 	{ .base_reg = OMAP_IH2_BASE + 0x200,	.trigger_map = 0xffffffff },
 };
@@ -173,9 +172,8 @@ void __init omap_init_irq(void)
 		irq_bank_count = ARRAY_SIZE(omap1510_irq_banks);
 	}
 #endif
-#if defined(CONFIG_ARCH_OMAP1610) || defined(CONFIG_ARCH_OMAP5912) \
-				  || defined(CONFIG_ARCH_OMAP1710)
-	if (cpu_is_omap1610() || cpu_is_omap5912() || cpu_is_omap1710()) {
+#if defined(CONFIG_ARCH_OMAP16XX)
+	if (cpu_is_omap16xx()) {
 		irq_banks = omap1610_irq_banks;
 		irq_bank_count = ARRAY_SIZE(omap1610_irq_banks);
 	}

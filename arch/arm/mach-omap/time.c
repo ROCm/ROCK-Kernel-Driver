@@ -41,7 +41,6 @@
 #include <asm/irq.h>
 #include <asm/mach/irq.h>
 #include <asm/mach/time.h>
-#include <asm/arch/clocks.h>
 
 #ifndef __instrument
 #define __instrument
