@@ -8,8 +8,6 @@
  *
  */
 
-#define DEBUG
-
 #include <linux/suspend.h>
 #include <linux/kobject.h>
 #include <linux/string.h>
@@ -167,6 +165,15 @@ static int enter_state(u32 state)
  Unlock:
 	up(&pm_sem);
 	return error;
+}
+
+/*
+ * This is main interface to the outside world. It needs to be
+ * called from process context.
+ */
+int software_suspend(void)
+{
+	return enter_state(PM_SUSPEND_DISK);
 }
 
 

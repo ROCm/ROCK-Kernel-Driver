@@ -1,22 +1,18 @@
-/* originally gcc generated, but now changed. don't overwrite. */
+/* Originally gcc generated, modified by hand
+ *
+ * This may not use any stack, nor any variable that is not "NoSave":
+ *
+ * Its rewriting one kernel image with another. What is stack in "old"
+ * image could very well be data page in "new" image, and overwriting
+ * your own stack under you is bad idea.
+ */
 	
 	.text
 #include <linux/linkage.h>
 #include <asm/segment.h>
 #include <asm/page.h>
 
-/* Input:
- * rdi	resume flag 
- */	
-			
-ENTRY(do_magic)
-.LFB5:
-	subq	$8, %rsp
-.LCFI2:
-	testl	%edi, %edi
-	jne	.L90
-	call	do_magic_suspend_1
-	call	save_processor_state
+ENTRY(swsusp_arch_suspend)
 
 	movq %rsp, saved_context_esp(%rip)
 	movq %rax, saved_context_eax(%rip)
@@ -36,9 +32,10 @@ ENTRY(do_magic)
 	movq %r15, saved_context_r15(%rip)
 	pushfq ; popq saved_context_eflags(%rip)
 
-	addq	$8, %rsp
-	jmp	do_magic_suspend_2
-.L90:
+	call swsusp_save
+	ret
+
+ENTRY(swsusp_arch_resume)
 	/* set up cr3 */	
 	leaq	init_level4_pgt(%rip),%rax
 	subq	$__START_KERNEL_map,%rax
@@ -53,7 +50,6 @@ ENTRY(do_magic)
 	movq %rcx, %cr3;                     
 	movq %rax, %cr4;  # turn PGE back on 
 
-	call	do_magic_resume_1
 	movl	nr_copy_pages(%rip), %eax
 	xorl	%ecx, %ecx
 	movq	$0, loop(%rip)
@@ -113,9 +109,8 @@ ENTRY(do_magic)
 	movq saved_context_r14(%rip), %r14
 	movq saved_context_r15(%rip), %r15
 	pushq saved_context_eflags(%rip) ; popfq
-	call	restore_processor_state
-	addq	$8, %rsp
-	jmp	do_magic_resume_2
+	call	swsusp_restore
+	ret
 
 	.section .data.nosave
 loop:
