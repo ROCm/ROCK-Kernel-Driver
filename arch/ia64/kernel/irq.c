@@ -303,7 +303,7 @@ static void report_bad_irq(int irq, irq_desc_t *desc, irqreturn_t action_ret)
 	}
 }
 
-static int noirqdebug;
+static int noirqdebug = 1;
 
 static int __init noirqdebug_setup(char *str)
 {
@@ -313,6 +313,15 @@ static int __init noirqdebug_setup(char *str)
 }
 
 __setup("noirqdebug", noirqdebug_setup);
+
+static int __init irqdebug_setup(char *str)
+{
+	noirqdebug = 0;
+	printk("IRQ lockup detection enabled\n");
+	return 1;
+}
+
+__setup("irqdebug", irqdebug_setup);
 
 /*
  * If 99,900 of the previous 100,000 interrupts have not been handled then

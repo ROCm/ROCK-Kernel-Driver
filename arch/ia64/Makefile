@@ -13,7 +13,9 @@ READELF := $(CROSS_COMPILE)readelf
 
 export AWK
 
-OBJCOPYFLAGS	:= --strip-all
+ifndef CONFIG_DEBUG_INFO
+OBJCOPYFLAGS	:= --strip-debug
+endif
 LDFLAGS_vmlinux	:= -static
 LDFLAGS_MODULE	+= -T $(srctree)/arch/ia64/module.lds
 AFLAGS_KERNEL	:= -mconstant-gp
