@@ -28,7 +28,9 @@ struct tcf_police
 	struct qdisc_rate_table *R_tab;
 	struct qdisc_rate_table *P_tab;
 
-	struct tc_stats	stats;
+	struct gnet_stats_basic bstats;
+	struct gnet_stats_queue qstats;
+	struct gnet_stats_rate_est rate_est;
 	spinlock_t	*stats_lock;
 };
 
@@ -101,6 +103,7 @@ extern int qdisc_copy_stats(struct sk_buff *skb, struct tc_stats *st, spinlock_t
 extern void tcf_police_destroy(struct tcf_police *p);
 extern struct tcf_police * tcf_police_locate(struct rtattr *rta, struct rtattr *est);
 extern int tcf_police_dump(struct sk_buff *skb, struct tcf_police *p);
+extern int tcf_police_dump_stats(struct sk_buff *skb, struct tcf_police *p);
 
 static inline int
 tcf_police_release(struct tcf_police *p, int bind)
