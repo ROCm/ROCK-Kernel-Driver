@@ -5156,9 +5156,9 @@ procmpt_summary_read(char *buf, char **start, off_t offset, int request, int *eo
 	int len;
 
 	if (data) {
-		ioc = data;
-		int	more = 0;
+		int more = 0;
 
+		ioc = data;
 		mpt_print_ioc_summary(ioc, out, &more, 0, 1);
 
 		out += more;
