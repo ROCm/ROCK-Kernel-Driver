@@ -129,6 +129,10 @@
 #define ARCH_KMALLOC_MINALIGN 0
 #endif
 
+#ifndef ARCH_KMALLOC_FLAGS
+#define ARCH_KMALLOC_FLAGS SLAB_HWCACHE_ALIGN
+#endif
+
 /* Legal flag mask for kmem_cache_create(). */
 #if DEBUG
 # define CREATE_MASK	(SLAB_DEBUG_INITIAL | SLAB_RED_ZONE | \
@@ -758,7 +762,7 @@ void __init kmem_cache_init(void)
 		 * allow tighter packing of the smaller caches. */
 		sizes->cs_cachep = kmem_cache_create(names->name,
 			sizes->cs_size, ARCH_KMALLOC_MINALIGN,
-			SLAB_PANIC, NULL, NULL);
+			(ARCH_KMALLOC_FLAGS | SLAB_PANIC), NULL, NULL);
 
 		/* Inc off-slab bufctl limit until the ceiling is hit. */
 		if (!(OFF_SLAB(sizes->cs_cachep))) {
@@ -768,7 +772,8 @@ void __init kmem_cache_init(void)
 
 		sizes->cs_dmacachep = kmem_cache_create(names->name_dma,
 			sizes->cs_size, ARCH_KMALLOC_MINALIGN,
-			(SLAB_CACHE_DMA | SLAB_PANIC), NULL, NULL);
+			(ARCH_KMALLOC_FLAGS | SLAB_CACHE_DMA | SLAB_PANIC),
+			NULL, NULL);
 
 		sizes++;
 		names++;
@@ -1116,8 +1121,9 @@ static void slab_destroy (kmem_cache_t *cachep, struct slab *slabp)
  * %SLAB_NO_REAP - Don't automatically reap this cache when we're under
  * memory pressure.
  *
- * %SLAB_HWCACHE_ALIGN - This flag has no effect and will be removed soon.
- *
+ * %SLAB_HWCACHE_ALIGN - Align the objects in this cache to a hardware
+ * cacheline.  This can be beneficial if you're counting cycles as closely
+ * as davem.
  */
 kmem_cache_t *
 kmem_cache_create (const char *name, size_t size, size_t align,
