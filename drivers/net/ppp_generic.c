@@ -803,7 +803,7 @@ int __init ppp_init(void)
 				S_IFCHR|S_IRUSR|S_IWUSR, "ppp");
 	}
 
-	if (!err)
+	if (err)
 		printk(KERN_ERR "failed to register PPP device (%d)\n", err);
 	return err;
 }
