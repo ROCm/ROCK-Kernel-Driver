@@ -32,10 +32,7 @@
 #include <linux/in_route.h>
 #include <net/route.h>
 #include <net/arp.h>
-
-#ifndef _SNMP_H
 #include <net/snmp.h>
-#endif
 
 struct sock;
 
