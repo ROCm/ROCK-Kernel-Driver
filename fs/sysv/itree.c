@@ -6,7 +6,6 @@
  */
 
 #include <linux/locks.h>
-#include <linux/smp_lock.h>
 #include "sysv.h"
 
 enum {DIRECT = 10, DEPTH = 4};	/* Have triple indirect */
@@ -62,6 +61,8 @@ typedef struct {
 	struct buffer_head *bh;
 } Indirect;
 
+static rwlock_t pointers_lock = RW_LOCK_UNLOCKED;
+
 static inline void add_chain(Indirect *p, struct buffer_head *bh, u32 *v)
 {
 	p->key = *(p->p = v);
@@ -91,7 +92,7 @@ static Indirect *get_branch(struct inode *inode,
 	struct buffer_head *bh;
 
 	*err = 0;
-	add_chain (chain, NULL, SYSV_I(inode)->i_data + *offsets);
+	add_chain(chain, NULL, SYSV_I(inode)->i_data + *offsets);
 	if (!p->key)
 		goto no_block;
 	while (--depth) {
@@ -99,15 +100,18 @@ static Indirect *get_branch(struct inode *inode,
 		bh = sb_bread(sb, block);
 		if (!bh)
 			goto failure;
+		read_lock(&pointers_lock);
 		if (!verify_chain(chain, p))
 			goto changed;
 		add_chain(++p, bh, (u32*)bh->b_data + *++offsets);
+		read_unlock(&pointers_lock);
 		if (!p->key)
-		goto no_block;
+			goto no_block;
 	}
 	return NULL;
 
 changed:
+	read_unlock(&pointers_lock);
 	*err = -EAGAIN;
 	goto no_block;
 failure:
@@ -165,12 +169,14 @@ static inline int splice_branch(struct inode *inode,
 				int num)
 {
 	int i;
-	/* Verify that place we are splicing to is still there and vacant */
 
+	/* Verify that place we are splicing to is still there and vacant */
+	write_lock(&pointers_lock);
 	if (!verify_chain(chain, where-1) || *where->p)
 		goto changed;
-
 	*where->p = where->key;
+	write_unlock(&pointers_lock);
+
 	inode->i_ctime = CURRENT_TIME;
 
 	/* had we spliced it onto indirect block? */
@@ -184,6 +190,7 @@ static inline int splice_branch(struct inode *inode,
 	return 0;
 
 changed:
+	write_unlock(&pointers_lock);
 	for (i = 1; i < num; i++)
 		bforget(where[i].bh);
 	for (i = 0; i < num; i++)
@@ -204,7 +211,6 @@ static int get_block(struct inode *inode, sector_t iblock, struct buffer_head *b
 	if (depth == 0)
 		goto out;
 
-	lock_kernel();
 reread:
 	partial = get_branch(inode, depth, offsets, chain, &err);
 
@@ -225,7 +231,6 @@ cleanup:
 			brelse(partial->bh);
 			partial--;
 		}
-		unlock_kernel();
 out:
 		return err;
 	}
@@ -277,6 +282,8 @@ static Indirect *find_shared(struct inode *inode,
 	*top = 0;
 	for (k = depth; k > 1 && !offsets[k-1]; k--)
 		;
+
+	write_lock(&pointers_lock);
 	partial = get_branch(inode, k, offsets, chain, &err);
 	if (!partial)
 		partial = chain + k-1;
@@ -284,8 +291,10 @@ static Indirect *find_shared(struct inode *inode,
 	 * If the branch acquired continuation since we've looked at it -
 	 * fine, it should all survive and (new) top doesn't belong to us.
 	 */
-	if (!partial->key && *partial->p)
+	if (!partial->key && *partial->p) {
+		write_unlock(&pointers_lock);
 		goto no_top;
+	}
 	for (p=partial; p>chain && all_zeroes((u32*)p->bh->b_data,p->p); p--)
 		;
 	/*
@@ -300,8 +309,9 @@ static Indirect *find_shared(struct inode *inode,
 		*top = *p->p;
 		*p->p = 0;
 	}
+	write_unlock(&pointers_lock);
 
-	while(partial > p) {
+	while (partial > p) {
 		brelse(partial->bh);
 		partial--;
 	}
@@ -372,8 +382,6 @@ void sysv_truncate (struct inode * inode)
 	if (n == 0)
 		return;
 
-	lock_kernel();
-
 	if (n == 1) {
 		free_data(inode, i_data+offsets[0], i_data + DIRECT);
 		goto do_indirects;
@@ -412,7 +420,6 @@ do_indirects:
 		sysv_sync_inode (inode);
 	else
 		mark_inode_dirty(inode);
-	unlock_kernel();
 }
 
 static int sysv_writepage(struct page *page)
