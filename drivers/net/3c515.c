@@ -1676,7 +1676,7 @@ void cleanup_module(void)
 		outw(TotalReset, root_corkscrew_dev->base_addr + EL3_CMD);
 		release_region(root_corkscrew_dev->base_addr,
 			       CORKSCREW_TOTAL_SIZE);
-		kfree(root_corkscrew_dev);
+		free_netdev(root_corkscrew_dev);
 		root_corkscrew_dev = next_dev;
 	}
 }

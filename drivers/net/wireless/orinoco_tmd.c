@@ -182,7 +182,7 @@ static void __devexit orinoco_tmd_remove_one(struct pci_dev *pdev)
 		
 	pci_set_drvdata(pdev, NULL);
 
-	kfree(dev);
+	free_netdev(dev);
 
 	release_region(pci_resource_start(pdev, 2), pci_resource_len(pdev, 2));
 

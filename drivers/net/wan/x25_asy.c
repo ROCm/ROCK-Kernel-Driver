@@ -840,7 +840,7 @@ static void __exit exit_x25_asy(void)
 			 * unregistered while close proc.
 			 */
 			unregister_netdev(dev);
-			kfree(dev);
+			free_netdev(dev);
 		}
 	}
 

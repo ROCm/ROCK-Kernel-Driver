@@ -5837,7 +5837,7 @@ unlink_modules(struct net_device *p)
 	kfree(lp->cache.priv);              /* Free the private area     */
     }
     unregister_netdev(p);
-    kfree(p);                               /* Free the device structure */
+    free_netdev(p);                         /* Free the device structure */
     
     return next;
 }

@@ -1310,7 +1310,7 @@ static void pegasus_disconnect(struct usb_interface *intf)
 	free_skb_pool(pegasus);
 	if (pegasus->rx_skb)
 		dev_kfree_skb(pegasus->rx_skb);
-	kfree(pegasus->net);
+	free_netdev(pegasus->net);
 	kfree(pegasus);
 }
 

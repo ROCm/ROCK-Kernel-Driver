@@ -324,7 +324,7 @@ static void lapbeth_setup(struct net_device *dev)
 	dev->hard_start_xmit = lapbeth_xmit;
 	dev->open	     = lapbeth_open;
 	dev->stop	     = lapbeth_close;
-	dev->destructor	     = (void (*)(struct net_device *))kfree;
+	dev->destructor	     = free_netdev;
 	dev->set_mac_address = lapbeth_set_mac_address;
 	dev->get_stats	     = lapbeth_get_stats;
 	dev->type            = ARPHRD_X25;

@@ -628,70 +628,21 @@ spitfire_vpte_base:
 #undef KERN_HIGHBITS
 #undef KERN_LOWBITS
 
-	/* Setup Interrupt globals */
-	wrpr	%o1, (PSTATE_IG|PSTATE_IE), %pstate
-#ifndef CONFIG_SMP
-	sethi	%hi(__up_workvec), %g5
-	or	%g5, %lo(__up_workvec), %g6
-#else
-	/* By definition of where we are, this is boot_cpu. */
-	brz,pt	%i0, not_starfire
-	 sethi	%hi(0x1fff4000), %g1
-	or	%g1, %lo(0x1fff4000), %g1
-	sllx	%g1, 12, %g1
-	or	%g1, 0xd0, %g1
-	lduwa	[%g1] ASI_PHYS_BYPASS_EC_E, %g1
-	b,pt	%xcc, set_worklist
-	 nop
-
-not_starfire:
-	BRANCH_IF_JALAPENO(g1,g5,is_jalapeno)
-	BRANCH_IF_ANY_CHEETAH(g1,g5,is_cheetah)
-
-	ba,pt	%xcc, not_cheetah
-	 nop
-
-is_jalapeno:
-	ldxa		[%g0] ASI_JBUS_CONFIG, %g1
-	srlx		%g1, 17, %g1
-	ba,pt		%xcc, set_worklist
-	 and		%g1, 0x1f, %g1		! 5bit JBUS ID
-
-is_cheetah:
-	ldxa		[%g0] ASI_SAFARI_CONFIG, %g1
-	srlx		%g1, 17, %g1
-	ba,pt		%xcc, set_worklist
-	 and		%g1, 0x3ff, %g1		! 10bit Safari Agent ID
-
-not_cheetah:
-	ldxa	[%g0] ASI_UPA_CONFIG, %g1
-	srlx	%g1, 17, %g1
-	and	%g1, 0x1f, %g1
-
-	/* In theory this is: &(cpu_data[boot_cpu_id].irq_worklists[0]) */
-set_worklist:
-	sethi	%hi(cpu_data), %g5
-	or	%g5, %lo(cpu_data), %g5
-	sllx	%g1, 7, %g1
-	add	%g5, %g1, %g5
-	add	%g5, 64, %g6
-#endif
-
 	/* Kill PROM timer */
-	sethi	%hi(0x80000000), %g1
-	sllx	%g1, 32, %g1
-	wr	%g1, 0, %tick_cmpr
+	sethi	%hi(0x80000000), %o2
+	sllx	%o2, 32, %o2
+	wr	%o2, 0, %tick_cmpr
 
-	BRANCH_IF_ANY_CHEETAH(g1,g5,1f)
+	BRANCH_IF_ANY_CHEETAH(o2,o3,1f)
 
 	ba,pt	%xcc, 2f
 	 nop
 
 	/* Disable STICK_INT interrupts. */
 1:
-	sethi	%hi(0x80000000), %g1
-	sllx	%g1, 32, %g1
-	wr	%g1, %asr25
+	sethi	%hi(0x80000000), %o2
+	sllx	%o2, 32, %o2
+	wr	%o2, %asr25
 
 	/* Ok, we're done setting up all the state our trap mechanims needs,
 	 * now get back into normal globals and let the PROM know what is up.
@@ -699,6 +650,9 @@ set_worklist:
 2:
 	wrpr	%g0, %g0, %wstate
 	wrpr	%o1, PSTATE_IE, %pstate
+
+	call	init_irqwork_curcpu
+	 nop
 
 	sethi	%hi(sparc64_ttable_tl0), %g5
 	call	prom_set_trap_table

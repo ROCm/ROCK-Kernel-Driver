@@ -246,20 +246,12 @@ startup_continue:
 	wrpr		%o1, 0x0, %pstate
 	ldx		[%g6 + TI_TASK], %g4
 
-	/* Setup interrupt globals, we are always SMP. */
-	wrpr		%o1, PSTATE_IG, %pstate
-
-	/* Get our UPA MID. */
-	ldub		[%o2 + TI_CPU], %g1
-	sethi		%hi(cpu_data), %g5
-	or		%g5, %lo(cpu_data), %g5
-
-	/* In theory this is: &(cpu_data[this_upamid].irq_worklists[0]) */
-	sllx		%g1, 7, %g1
-	add		%g5, %g1, %g1
-	add		%g1, 64, %g6
-
 	wrpr		%g0, 0, %wstate
+
+	call		init_irqwork_curcpu
+	 nop
+
+	rdpr		%pstate, %o1
 	or		%o1, PSTATE_IE, %o1
 	wrpr		%o1, 0, %pstate
 

@@ -143,7 +143,7 @@ static int __init usb_console_setup(struct console *co, char *options)
 		return -ENODEV;
 	}
 
-	port = &serial->port[0];
+	port = serial->port[0];
 	port->tty = NULL;
 
 	info->port = port;

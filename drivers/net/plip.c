@@ -1346,7 +1346,7 @@ static void __exit plip_cleanup_module (void)
 			if (nl->port_owner)
 				parport_release(nl->pardev);
 			parport_unregister_device(nl->pardev);
-			kfree(dev);
+			free_netdev(dev);
 			dev_plip[i] = NULL;
 		}
 	}

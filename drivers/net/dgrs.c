@@ -1337,7 +1337,7 @@ fail:	aux = priv->next_dev;
 		
 		dgrs_root_dev = ((DGRS_PRIV *)d->priv)->next_dev;
 		unregister_netdev(d);
-		kfree(d);
+		free_netdev(d);
 	}
 	return ret;
 }
@@ -1529,7 +1529,7 @@ static void __exit dgrs_cleanup_module (void)
 		if (dgrs_root_dev->irq)
 			free_irq(dgrs_root_dev->irq, dgrs_root_dev);
 
-                kfree(dgrs_root_dev);
+                free_netdev(dgrs_root_dev);
                 dgrs_root_dev = next_dev;
         }
 }

@@ -706,7 +706,7 @@ static void hardware_send_packet(struct net_device * dev, char *buf, int length)
 inline void wait_for_buffer(struct net_device * dev)
 {
 	int ioaddr = dev->base_addr;
-	int tmp;
+	unsigned long tmp;
 	int status;
 	
 	tmp = jiffies + HZ;

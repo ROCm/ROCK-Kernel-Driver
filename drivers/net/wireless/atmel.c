@@ -1468,7 +1468,7 @@ void stop_atmel_card(struct net_device *dev, int freeres)
 		/* PCMCIA frees this stuff, so only for PCI */
 	        release_region(dev->base_addr, 64);
         }
-	kfree(dev);
+	free_netdev(dev);
 }
 
 EXPORT_SYMBOL(stop_atmel_card);

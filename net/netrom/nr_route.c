@@ -735,7 +735,7 @@ void nr_link_failed(ax25_cb *ax25, int reason)
 	if (nr_neigh == NULL) return;
 
 	nr_neigh->ax25 = NULL;
-	// ax25_cb_put(ax25);
+	ax25_cb_put(ax25);
 
 	if (++nr_neigh->failed < sysctl_netrom_link_fails_count) {
 		nr_neigh_put(nr_neigh);
@@ -829,7 +829,7 @@ int nr_route_frame(struct sk_buff *skb, ax25_cb *ax25)
 	ax25s = ax25_send_frame(skb, 256, (ax25_address *)dev->dev_addr, &nr_neigh->callsign, nr_neigh->digipeat, nr_neigh->dev);
 	if (nr_neigh->ax25 && ax25s) {
 		/* We were already holding this ax25_cb */
-		// ax25_cb_put(ax25s);
+		ax25_cb_put(ax25s);
 	}
 	nr_neigh->ax25 = ax25s;
 

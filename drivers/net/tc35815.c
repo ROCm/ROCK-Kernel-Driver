@@ -1769,7 +1769,7 @@ static void __exit tc35815_cleanup_module(void)
 		next_dev = ((struct tc35815_local *)dev->priv)->next_module;
 		iounmap((void *)(dev->base_addr));
 		unregister_netdev(dev);
-		kfree(dev);
+		free_netdev(dev);
 		root_tc35815_dev = next_dev;
 	}
 }

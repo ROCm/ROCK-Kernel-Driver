@@ -640,7 +640,7 @@ static void sl_setup(struct net_device *dev)
 	dev->init		= sl_init;
 	dev->uninit	  	= sl_uninit;
 	dev->open		= sl_open;
-	dev->destructor		= (void (*)(struct net_device *))kfree;
+	dev->destructor		= free_netdev;
 	dev->stop		= sl_close;
 	dev->get_stats	        = sl_get_stats;
 	dev->change_mtu		= sl_change_mtu;

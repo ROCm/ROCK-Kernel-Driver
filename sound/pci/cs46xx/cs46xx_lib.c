@@ -3887,8 +3887,8 @@ int __devinit snd_cs46xx_create(snd_card_t * card,
 	chip->ba1_addr = pci_resource_start(pci, 1);
 	if (chip->ba0_addr == 0 || chip->ba0_addr == (unsigned long)~0 ||
 	    chip->ba1_addr == 0 || chip->ba1_addr == (unsigned long)~0) {
-	    	snd_cs46xx_free(chip);
 	    	snd_printk("wrong address(es) - ba0 = 0x%lx, ba1 = 0x%lx\n", chip->ba0_addr, chip->ba1_addr);
+	    	snd_cs46xx_free(chip);
 	    	return -ENOMEM;
 	}
 

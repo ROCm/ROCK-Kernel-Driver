@@ -2879,7 +2879,7 @@ static void __devexit gem_remove_one(struct pci_dev *pdev)
 				    gp->gblock_dvma);
 		iounmap((void *) gp->regs);
 		pci_release_regions(pdev);
-		kfree(dev);
+		free_netdev(dev);
 
 		pci_set_drvdata(pdev, NULL);
 	}

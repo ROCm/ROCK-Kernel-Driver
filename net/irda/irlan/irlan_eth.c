@@ -47,14 +47,12 @@
  *    The network device initialization function.
  *
  */
-int irlan_eth_init(struct net_device *dev)
+void irlan_eth_setup(struct net_device *dev)
 {
 	struct irlan_cb *self;
 
 	IRDA_DEBUG(2, "%s()\n", __FUNCTION__ );
 
-	ASSERT(dev != NULL, return -1;);
-       
 	self = (struct irlan_cb *) dev->priv;
 
 	dev->open               = irlan_eth_open;
@@ -62,6 +60,8 @@ int irlan_eth_init(struct net_device *dev)
 	dev->hard_start_xmit    = irlan_eth_xmit; 
 	dev->get_stats	        = irlan_eth_get_stats;
 	dev->set_multicast_list = irlan_eth_set_multicast_list;
+	dev->destructor		= (void (*)(struct net_device *)) kfree;
+
 	SET_MODULE_OWNER(dev);
 
 	ether_setup(dev);
@@ -85,8 +85,6 @@ int irlan_eth_init(struct net_device *dev)
 		get_random_bytes(dev->dev_addr+4, 1);
 		get_random_bytes(dev->dev_addr+5, 1);
 	}
-
-	return 0;
 }
 
 /*
@@ -237,7 +235,7 @@ int irlan_eth_receive(void *instance, void *sap, struct sk_buff *skb)
 	 * might have been previously set by the low level IrDA network
 	 * device driver 
 	 */
-	skb->dev = &self->dev;
+	skb->dev = self->dev;
 	skb->protocol=eth_type_trans(skb, skb->dev); /* Remove eth header */
 	
 	self->stats.rx_packets++;
@@ -264,7 +262,7 @@ void irlan_eth_flow_indication(void *instance, void *sap, LOCAL_FLOW flow)
 	ASSERT(self != NULL, return;);
 	ASSERT(self->magic == IRLAN_MAGIC, return;);
 	
-	dev = &self->dev;
+	dev = self->dev;
 
 	ASSERT(dev != NULL, return;);
 	

@@ -67,6 +67,9 @@
  *  ->mmap_sem
  *    ->lock_page		(access_process_vm)
  *
+ *  ->mmap_sem
+ *    ->i_sem			(msync)
+ *
  *  ->inode_lock
  *    ->sb_lock			(fs/fs-writeback.c)
  *    ->mapping->page_lock	(__sync_single_inode)

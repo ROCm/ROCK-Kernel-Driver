@@ -659,10 +659,10 @@ static void igmp6_group_dropped(struct ifmcaddr6 *mc)
 		if (ndisc_mc_map(&mc->mca_addr, buf, dev, 0) == 0)
 			dev_mc_delete(dev, buf, dev->addr_len, 0);
 	}
-	spin_unlock_bh(&mc->mca_lock);
 
 	if (mc->mca_flags & MAF_NOREPORT)
 		goto done;
+	spin_unlock_bh(&mc->mca_lock);
 
 	if (dev->flags&IFF_UP)
 		igmp6_leave_group(mc);
@@ -670,10 +670,9 @@ static void igmp6_group_dropped(struct ifmcaddr6 *mc)
 	spin_lock_bh(&mc->mca_lock);
 	if (del_timer(&mc->mca_timer))
 		atomic_dec(&mc->mca_refcnt);
-	spin_unlock_bh(&mc->mca_lock);
-
 done:
 	ip6_mc_clear_src(mc);
+	spin_unlock_bh(&mc->mca_lock);
 }
 
 /*
@@ -1307,7 +1306,7 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ifmcaddr6 *pmc,
 	struct net_device *dev = pmc->idev->dev;
 	struct mld2_report *pmr;
 	struct mld2_grec *pgr = 0;
-	struct ip6_sf_list *psf, *psf_next, *psf_prev, *psf_list;
+	struct ip6_sf_list *psf, *psf_next, *psf_prev, **psf_list;
 	int scount, first, isquery, truncate;
 
 	if (pmc->mca_flags & MAF_NOREPORT)
@@ -1318,9 +1317,9 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ifmcaddr6 *pmc,
 	truncate = type == MLD2_MODE_IS_EXCLUDE ||
 		    type == MLD2_CHANGE_TO_EXCLUDE;
 
-	psf_list = sdeleted ? pmc->mca_tomb : pmc->mca_sources;
+	psf_list = sdeleted ? &pmc->mca_tomb : &pmc->mca_sources;
 
-	if (!psf_list) {
+	if (!*psf_list) {
 		if (type == MLD2_ALLOW_NEW_SOURCES ||
 		    type == MLD2_BLOCK_OLD_SOURCES)
 			return skb;
@@ -1351,7 +1350,7 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ifmcaddr6 *pmc,
 	first = 1;
 	scount = 0;
 	psf_prev = 0;
-	for (psf=psf_list; psf; psf=psf_next) {
+	for (psf=*psf_list; psf; psf=psf_next) {
 		struct in6_addr *psrc;
 
 		psf_next = psf->sf_next;
@@ -1391,7 +1390,7 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ifmcaddr6 *pmc,
 				if (psf_prev)
 					psf_prev->sf_next = psf->sf_next;
 				else
-					pmc->mca_tomb = psf->sf_next;
+					*psf_list = psf->sf_next;
 				kfree(psf);
 				continue;
 			}
@@ -1667,11 +1666,11 @@ int ip6_mc_del_src(struct inet6_dev *idev, struct in6_addr *pmca, int sfmode,
 		return -ESRCH;
 	}
 	spin_lock_bh(&pmc->mca_lock);
-	read_unlock_bh(&idev->lock);
 	sf_markstate(pmc);
 	if (!delta) {
 		if (!pmc->mca_sfcount[sfmode]) {
 			spin_unlock_bh(&pmc->mca_lock);
+			read_unlock_bh(&idev->lock);
 			return -EINVAL;
 		}
 		pmc->mca_sfcount[sfmode]--;
@@ -1699,6 +1698,7 @@ int ip6_mc_del_src(struct inet6_dev *idev, struct in6_addr *pmca, int sfmode,
 	} else if (sf_setstate(pmc) || changerec)
 		mld_ifc_event(pmc->idev);
 	spin_unlock_bh(&pmc->mca_lock);
+	read_unlock_bh(&idev->lock);
 	return err;
 }
 
@@ -1790,7 +1790,6 @@ int ip6_mc_add_src(struct inet6_dev *idev, struct in6_addr *pmca, int sfmode,
 		return -ESRCH;
 	}
 	spin_lock_bh(&pmc->mca_lock);
-	read_unlock_bh(&idev->lock);
 
 	sf_markstate(pmc);
 	isexclude = pmc->mca_sfmode == MCAST_EXCLUDE;
@@ -1827,6 +1826,7 @@ int ip6_mc_add_src(struct inet6_dev *idev, struct in6_addr *pmca, int sfmode,
 	} else if (sf_setstate(pmc))
 		mld_ifc_event(idev);
 	spin_unlock_bh(&pmc->mca_lock);
+	read_unlock_bh(&idev->lock);
 	return err;
 }
 

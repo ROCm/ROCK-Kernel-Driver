@@ -3112,14 +3112,6 @@ static int ia_send(struct atm_vcc *vcc, struct sk_buff *skb)
 
 }
 
-static int ia_sg_send(struct atm_vcc *vcc, unsigned long start,   
-	unsigned long size)  
-{  
-	IF_EVENT(printk(">ia_sg_send\n");)  
-	return 0;  
-}  
-  
-  
 static int ia_proc_read(struct atm_dev *dev,loff_t *pos,char *page)
 { 
   int   left = *pos, n;   
@@ -3179,7 +3171,6 @@ static const struct atmdev_ops ops = {
 	.getsockopt	= ia_getsockopt,  
 	.setsockopt	= ia_setsockopt,  
 	.send		= ia_send,  
-	.sg_send	= ia_sg_send,  
 	.phy_put	= ia_phy_put,  
 	.phy_get	= ia_phy_get,  
 	.change_qos	= ia_change_qos,  

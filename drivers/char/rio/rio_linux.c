@@ -465,7 +465,8 @@ static irqreturn_t rio_interrupt (int irq, void *ptr, struct pt_regs *regs)
     rio_reset_interrupt (HostP);
   }
 
-  if ((HostP->Flags & RUN_STATE) != RC_RUNNING) return;
+  if ((HostP->Flags & RUN_STATE) != RC_RUNNING)
+  	return IRQ_HANDLED;
 
   if (test_and_set_bit (RIO_BOARD_INTR_LOCK, &HostP->locks)) {
     printk (KERN_ERR "Recursive interrupt! (host %d/irq%d)\n", 

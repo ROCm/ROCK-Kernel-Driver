@@ -485,7 +485,7 @@ static void ndisc_send_na(struct net_device *dev, struct neighbour *neigh,
         msg->icmph.icmp6_override  = !!override;
 
         /* Set the target address. */
-	ipv6_addr_copy(&msg->target, src_addr);
+	ipv6_addr_copy(&msg->target, solicited_addr);
 
 	if (inc_opt)
 		ndisc_fill_option(msg->opt, ND_OPT_TARGET_LL_ADDR, dev->dev_addr, dev->addr_len);
@@ -861,7 +861,8 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 		struct inet6_dev *in6_dev = in6_dev_get(dev);
 
 		if (in6_dev && in6_dev->cnf.forwarding &&
-		    (addr_type & IPV6_ADDR_UNICAST) &&
+		    (addr_type & IPV6_ADDR_UNICAST ||
+		     addr_type == IPV6_ADDR_ANY) &&
 		    pneigh_lookup(&nd_tbl, &msg->target, dev, 0)) {
 			int inc = ipv6_addr_type(daddr)&IPV6_ADDR_MULTICAST;
 
@@ -874,12 +875,20 @@ static void ndisc_recv_ns(struct sk_buff *skb)
 				else
 					nd_tbl.stats.rcv_probes_ucast++;
 					
-				neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, dev);
+				if (addr_type & IPV6_ADDR_UNICAST) {
+					neigh = neigh_event_ns(&nd_tbl, lladdr, saddr, dev);
 
-				if (neigh) {
-					ndisc_send_na(dev, neigh, saddr, &msg->target,
-						      0, 1, 0, 1);
-					neigh_release(neigh);
+					if (neigh) {
+						ndisc_send_na(dev, neigh, saddr, &msg->target,
+							      0, 1, 0, 1);
+						neigh_release(neigh);
+					}
+				} else {
+					/* proxy should also protect against DAD */
+					struct in6_addr maddr;
+					ipv6_addr_all_nodes(&maddr);
+					ndisc_send_na(dev, NULL, &maddr, &msg->target, 
+						      0, 0, 0, 1);
 				}
 			} else {
 				struct sk_buff *n = skb_clone(skb, GFP_ATOMIC);
@@ -1447,6 +1456,26 @@ int ndisc_rcv(struct sk_buff *skb)
 	return 0;
 }
 
+static int ndisc_netdev_event(struct notifier_block *this, unsigned long event, void *ptr)
+{
+	struct net_device *dev = ptr;
+
+	switch (event) {
+	case NETDEV_CHANGEADDR:
+		neigh_changeaddr(&nd_tbl, dev);
+		fib6_run_gc(0);
+		break;
+	default:
+		break;
+	}
+
+	return NOTIFY_DONE;
+}
+
+struct notifier_block ndisc_netdev_notifier = {
+	.notifier_call = ndisc_netdev_event,
+};
+
 int __init ndisc_init(struct net_proto_family *ops)
 {
 	struct ipv6_pinfo *np;
@@ -1480,6 +1509,7 @@ int __init ndisc_init(struct net_proto_family *ops)
 	neigh_sysctl_register(NULL, &nd_tbl.parms, NET_IPV6, NET_IPV6_NEIGH, "ipv6");
 #endif
 
+	register_netdevice_notifier(&ndisc_netdev_notifier);
 	return 0;
 }
 

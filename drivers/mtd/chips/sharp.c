@@ -435,7 +435,7 @@ static int sharp_do_wait_for_ready(struct map_info *map, struct flchip *chip,
 	unsigned long adr)
 {
 	int ret;
-	int timeo;
+	unsigned long timeo;
 	int status;
 	DECLARE_WAITQUEUE(wait, current);
 

@@ -199,6 +199,7 @@ EXPORT_SYMBOL(neigh_parms_alloc);
 EXPORT_SYMBOL(neigh_parms_release);
 EXPORT_SYMBOL(neigh_rand_reach_time);
 EXPORT_SYMBOL(neigh_compat_output); 
+EXPORT_SYMBOL(neigh_changeaddr); 
 
 /*	dst_entry	*/
 EXPORT_SYMBOL(dst_alloc);
@@ -480,6 +481,7 @@ EXPORT_SYMBOL(call_netdevice_notifiers);
 EXPORT_SYMBOL(loopback_dev);
 EXPORT_SYMBOL(register_netdevice);
 EXPORT_SYMBOL(unregister_netdevice);
+EXPORT_SYMBOL(free_netdev);
 EXPORT_SYMBOL(synchronize_net);
 EXPORT_SYMBOL(netdev_state_change);
 EXPORT_SYMBOL(netdev_boot_setup_check);

@@ -33,20 +33,20 @@ static struct protocol_struct {
 	struct protocol_struct *next;
 	unsigned int pid;
 	int (*func)(struct sk_buff *, ax25_cb *);
-} *protocol_list;
+} *protocol_list = NULL;
 static rwlock_t protocol_list_lock = RW_LOCK_UNLOCKED;
 
 static struct linkfail_struct {
 	struct linkfail_struct *next;
 	void (*func)(ax25_cb *, int);
-} *linkfail_list;
+} *linkfail_list = NULL;
 static spinlock_t linkfail_lock = SPIN_LOCK_UNLOCKED;
 
 static struct listen_struct {
 	struct listen_struct *next;
 	ax25_address  callsign;
 	struct net_device *dev;
-} *listen_list;
+} *listen_list = NULL;
 static spinlock_t listen_lock = SPIN_LOCK_UNLOCKED;
 
 int ax25_protocol_register(unsigned int pid,
@@ -129,8 +129,10 @@ void ax25_linkfail_release(void (*func)(ax25_cb *, int))
 
 	spin_lock_bh(&linkfail_lock);
 	linkfail = linkfail_list;
-	if (linkfail == NULL)
+	if (linkfail == NULL) {
+		spin_unlock_bh(&linkfail_lock);
 		return;
+	}
 
 	if (linkfail->func == func) {
 		linkfail_list = linkfail->next;
@@ -180,8 +182,10 @@ void ax25_listen_release(ax25_address *callsign, struct net_device *dev)
 
 	spin_lock_bh(&listen_lock);
 	listen = listen_list;
-	if (listen == NULL)
+	if (listen == NULL) {
+		spin_unlock_bh(&listen_lock);
 		return;
+	}
 
 	if (ax25cmp(&listen->callsign, callsign) == 0 && listen->dev == dev) {
 		listen_list = listen->next;
@@ -226,8 +230,10 @@ int ax25_listen_mine(ax25_address *callsign, struct net_device *dev)
 
 	spin_lock_bh(&listen_lock);
 	for (listen = listen_list; listen != NULL; listen = listen->next)
-		if (ax25cmp(&listen->callsign, callsign) == 0 && (listen->dev == dev || listen->dev == NULL))
+		if (ax25cmp(&listen->callsign, callsign) == 0 && (listen->dev == dev || listen->dev == NULL)) {
+			spin_unlock_bh(&listen_lock);
 			return 1;
+	}
 	spin_unlock_bh(&listen_lock);
 
 	return 0;
