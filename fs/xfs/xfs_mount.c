@@ -31,13 +31,6 @@
  */
 
 #include <xfs.h>
-#include <linux/major.h>
-#include <linux/namei.h>
-#include <linux/pagemap.h>
-
-#ifndef EVMS_MAJOR
-#define EVMS_MAJOR	117
-#endif
 
 STATIC void	xfs_mount_reset_sbqflags(xfs_mount_t *);
 STATIC void	xfs_mount_log_sbunit(xfs_mount_t *, __int64_t);
@@ -1730,69 +1723,4 @@ xfs_check_frozen(
 
 	if (level == XFS_FREEZE_TRANS)
 		atomic_inc(&mp->m_active_trans);
-}
-
-int
-xfs_blkdev_get(
-	const char		*name,
-	struct block_device	**bdevp)
-{
-	struct nameidata	nd;
-	int			error = 0;
-
-	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
-	if (error) {
-		printk("XFS: Invalid device [%s], error=%d\n",
-				name, error);
-		return error;
-	}
-
-	/* I think we actually want bd_acquire here..  --hch */
-	*bdevp = bdget(kdev_t_to_nr(nd.dentry->d_inode->i_rdev));
-	if (*bdevp) {
-		error = blkdev_get(*bdevp, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
-	} else {
-		error = -ENOMEM;
-	}
-
-	path_release(&nd);
-	return -error;
-}
-
-void
-xfs_blkdev_put(
-	struct block_device	*bdev)
-{
-	blkdev_put(bdev, BDEV_FS);
-}
-
-void
-xfs_free_buftarg(
-	xfs_buftarg_t		*btp)
-{
-	pagebuf_delwri_flush(btp, PBDF_WAIT, NULL);
-	kfree(btp);
-}
-
-xfs_buftarg_t *
-xfs_alloc_buftarg(
-	struct block_device	*bdev)
-{
-	xfs_buftarg_t		*btp;
-
-	btp = kmem_zalloc(sizeof(*btp), KM_SLEEP);
-
-	btp->pbr_dev =  bdev->bd_dev;
-	btp->pbr_bdev = bdev;
-	btp->pbr_mapping = bdev->bd_inode->i_mapping;
-	btp->pbr_blocksize = PAGE_CACHE_SIZE;
-
-	switch (MAJOR(btp->pbr_dev)) {
-	case MD_MAJOR:
-	case EVMS_MAJOR:
-		btp->pbr_flags = PBR_ALIGNED_ONLY;
-		break;
-	}
-
-	return btp;
 }

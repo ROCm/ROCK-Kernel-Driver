@@ -1567,40 +1567,6 @@ xfs_syncsub(
 	return XFS_ERROR(last_error);
 }
 
-STATIC void
-xfs_initialize_vnode(
-	bhv_desc_t	*bdp,
-	vnode_t		*vp,
-	bhv_desc_t	*inode_bhv,
-	int		unlock)
-{
-	xfs_inode_t	*ip = XFS_BHVTOI(inode_bhv);
-	struct inode	*inode = LINVFS_GET_IP(vp);
-
-	if (vp->v_fbhv == NULL) {
-		vp->v_vfsp = bhvtovfs(bdp);
-		bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
-		bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
-	}
-
-	vp->v_type = IFTOVT(ip->i_d.di_mode);
-	/* Have we been called during the new inode create process,
-	 * in which case we are too early to fill in the linux inode.
-	 */
-	if (vp->v_type == VNON)
-		return;
-
-	xfs_revalidate_inode(XFS_BHVTOM(bdp), vp, ip);
-
-	/* For new inodes we need to set the ops vectors,
-	 * and unlock the inode.
-	 */
-	if (unlock && (inode->i_state & I_NEW)) {
-		xfs_set_inodeops(inode);
-		unlock_new_inode(inode);
-	}
-}
-
 /*
  * xfs_vget - called by DMAPI to get vnode from file handle
  */

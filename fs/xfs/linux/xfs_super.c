@@ -34,6 +34,8 @@
 #include <linux/bitops.h>
 #include <linux/blkdev.h>
 #include <linux/namei.h>
+#include <linux/pagemap.h>
+#include <linux/major.h>
 #include <linux/init.h>
 #include <linux/ctype.h>
 #include <linux/seq_file.h>
@@ -42,6 +44,10 @@
 /* xfs_vfs[ops].c */
 extern int  xfs_init(void);
 extern void xfs_cleanup(void);
+
+#ifndef EVMS_MAJOR
+# define EVMS_MAJOR		117
+#endif
 
 /* For kernels which have the s_maxbytes field - set it */
 #ifdef MAX_NON_LFS
@@ -371,7 +377,7 @@ xfs_showargs(
 	return 0;
 }
 
-void
+STATIC __inline__ void
 xfs_set_inodeops(
 	struct inode		*inode)
 {
@@ -397,6 +403,134 @@ xfs_set_inodeops(
 	}
 }
 
+STATIC __inline__ void
+xfs_revalidate_inode(
+	xfs_mount_t	*mp,
+	vnode_t		*vp,
+	xfs_inode_t	*ip)
+{
+	struct inode	*inode = LINVFS_GET_IP(vp);
+
+	inode->i_mode	= (ip->i_d.di_mode & MODEMASK) | VTTOIF(vp->v_type);
+	inode->i_nlink	= ip->i_d.di_nlink;
+	inode->i_uid	= ip->i_d.di_uid;
+	inode->i_gid 	= ip->i_d.di_gid;
+	if (((1 << vp->v_type) & ((1<<VBLK) | (1<<VCHR))) == 0) {
+		inode->i_rdev	= NODEV;
+	} else {
+		xfs_dev_t dev = ip->i_df.if_u2.if_rdev;
+		inode->i_rdev	= XFS_DEV_TO_KDEVT(dev);
+	}
+	inode->i_blksize = PAGE_CACHE_SIZE;
+	inode->i_generation = ip->i_d.di_gen;
+	inode->i_size	= ip->i_d.di_size;
+	inode->i_blocks =
+		XFS_FSB_TO_BB(mp, ip->i_d.di_nblocks + ip->i_delayed_blks);
+	inode->i_atime	= ip->i_d.di_atime.t_sec;
+	inode->i_mtime	= ip->i_d.di_mtime.t_sec;
+	inode->i_ctime	= ip->i_d.di_ctime.t_sec;
+
+	vp->v_flag &= ~VMODIFIED;
+}
+
+void
+xfs_initialize_vnode(
+	bhv_desc_t	*bdp,
+	vnode_t		*vp,
+	bhv_desc_t	*inode_bhv,
+	int		unlock)
+{
+	xfs_inode_t	*ip = XFS_BHVTOI(inode_bhv);
+	struct inode	*inode = LINVFS_GET_IP(vp);
+
+	if (vp->v_fbhv == NULL) {
+		vp->v_vfsp = bhvtovfs(bdp);
+		bhv_desc_init(&(ip->i_bhv_desc), ip, vp, &xfs_vnodeops);
+		bhv_insert_initial(VN_BHV_HEAD(vp), &(ip->i_bhv_desc));
+	}
+
+	vp->v_type = IFTOVT(ip->i_d.di_mode);
+	/* Have we been called during the new inode create process,
+	 * in which case we are too early to fill in the linux inode.
+	 */
+	if (vp->v_type == VNON)
+		return;
+
+	xfs_revalidate_inode(XFS_BHVTOM(bdp), vp, ip);
+
+	/* For new inodes we need to set the ops vectors,
+	 * and unlock the inode.
+	 */
+	if (unlock && (inode->i_state & I_NEW)) {
+		xfs_set_inodeops(inode);
+		unlock_new_inode(inode);
+	}
+}
+
+int
+xfs_blkdev_get(
+	const char		*name,
+	struct block_device	**bdevp)
+{
+	struct nameidata	nd;
+	int			error;
+
+	error = path_lookup(name, LOOKUP_FOLLOW, &nd);
+	if (error) {
+		printk("XFS: Invalid device [%s], error=%d\n",
+				name, error);
+		return error;
+	}
+
+	/* I think we actually want bd_acquire here..  --hch */
+	*bdevp = bdget(kdev_t_to_nr(nd.dentry->d_inode->i_rdev));
+	if (*bdevp) {
+		error = blkdev_get(*bdevp, FMODE_READ|FMODE_WRITE, 0, BDEV_FS);
+	} else {
+		error = -ENOMEM;
+	}
+
+	path_release(&nd);
+	return -error;
+}
+
+void
+xfs_blkdev_put(
+	struct block_device	*bdev)
+{
+	blkdev_put(bdev, BDEV_FS);
+}
+
+void
+xfs_free_buftarg(
+	xfs_buftarg_t		*btp)
+{
+	pagebuf_delwri_flush(btp, PBDF_WAIT, NULL);
+	kfree(btp);
+}
+
+xfs_buftarg_t *
+xfs_alloc_buftarg(
+	struct block_device	*bdev)
+{
+	xfs_buftarg_t		*btp;
+
+	btp = kmem_zalloc(sizeof(*btp), KM_SLEEP);
+
+	btp->pbr_dev =  bdev->bd_dev;
+	btp->pbr_bdev = bdev;
+	btp->pbr_mapping = bdev->bd_inode->i_mapping;
+	btp->pbr_blocksize = PAGE_CACHE_SIZE;
+
+	switch (MAJOR(btp->pbr_dev)) {
+	case MD_MAJOR:
+	case EVMS_MAJOR:
+		btp->pbr_flags = PBR_ALIGNED_ONLY;
+		break;
+	}
+
+	return btp;
+}
 
 STATIC kmem_cache_t * linvfs_inode_cachep;
 
@@ -517,6 +651,7 @@ linvfs_fill_super(
 	sb->s_dirt = 1;
 	sb->s_blocksize = statvfs.f_bsize;
 	sb->s_blocksize_bits = ffs(statvfs.f_bsize) - 1;
+	set_posix_acl(sb);
 
 	VFS_ROOT(vfsp, &rootvp, error);
 	if (error)
@@ -544,9 +679,8 @@ linvfs_fill_super(
 			goto fail_vnrele;
 		}
 	}
-	set_posix_acl(sb);
 
-	vn_trace_exit(rootvp, "linvfs_read_super", (inst_t *)__return_address);
+	vn_trace_exit(rootvp, __FUNCTION__, (inst_t *)__return_address);
 
 	kfree(args);
 	return 0;
@@ -575,7 +709,7 @@ out_null:
  * super block dirty so that sync_supers calls us and
  * forces the flush.
  */
-void
+STATIC void
 linvfs_write_inode(
 	struct inode		*inode,
 	int			sync)
@@ -584,9 +718,7 @@ linvfs_write_inode(
 	int			error, flags = FLUSH_INODE;
 
 	if (vp) {
-		vn_trace_entry(vp, "linvfs_write_inode",
-					(inst_t *)__return_address);
-
+		vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 		if (sync)
 			flags |= FLUSH_SYNC;
 		VOP_IFLUSH(vp, flags, error);
@@ -595,7 +727,7 @@ linvfs_write_inode(
 	}
 }
 
-void
+STATIC void
 linvfs_clear_inode(
 	struct inode		*inode)
 {
@@ -603,8 +735,7 @@ linvfs_clear_inode(
 
 	if (vp) {
 		vn_rele(vp);
-		vn_trace_entry(vp, "linvfs_clear_inode",
-					(inst_t *)__return_address);
+		vn_trace_entry(vp, __FUNCTION__, (inst_t *)__return_address);
 		/*
 		 * Do all our cleanup, and remove this vnode.
 		 */
@@ -613,7 +744,7 @@ linvfs_clear_inode(
 	}
 }
 
-void
+STATIC void
 linvfs_put_inode(
 	struct inode		*ip)
 {
@@ -624,7 +755,7 @@ linvfs_put_inode(
 		VOP_RELEASE(vp, error);
 }
 
-void
+STATIC void
 linvfs_put_super(
 	struct super_block	*sb)
 {
@@ -634,14 +765,14 @@ linvfs_put_super(
 	VFS_DOUNMOUNT(vfsp, 0, NULL, NULL, error);
 	if (error) {
 		printk("XFS unmount got error %d\n", error);
-		printk("linvfs_put_super: vfsp/0x%p left dangling!\n", vfsp);
+		printk("%s: vfsp/0x%p left dangling!\n", __FUNCTION__, vfsp);
 		return;
 	}
 
 	vfs_deallocate(vfsp);
 }
 
-void
+STATIC void
 linvfs_write_super(
 	struct super_block	*sb)
 {
@@ -655,7 +786,7 @@ linvfs_write_super(
 		NULL, error);
 }
 
-int
+STATIC int
 linvfs_statfs(
 	struct super_block	*sb,
 	struct statfs		*statp)
@@ -664,11 +795,10 @@ linvfs_statfs(
 	int			error;
 
 	VFS_STATVFS(vfsp, statp, NULL, error);
-
 	return error;
 }
 
-int
+STATIC int
 linvfs_remount(
 	struct super_block	*sb,
 	int			*flags,
@@ -716,7 +846,7 @@ out:
 	return error;
 }
 
-void
+STATIC void
 linvfs_freeze_fs(
 	struct super_block	*sb)
 {
@@ -732,7 +862,7 @@ linvfs_freeze_fs(
 	VN_RELE(vp);
 }
 
-void
+STATIC void
 linvfs_unfreeze_fs(
 	struct super_block	*sb)
 {
@@ -745,7 +875,6 @@ linvfs_unfreeze_fs(
 	VOP_IOCTL(vp, LINVFS_GET_IP(vp), NULL, XFS_IOC_THAW, 0, error);
 	VN_RELE(vp);
 }
-
 
 STATIC struct dentry *
 linvfs_get_parent(
