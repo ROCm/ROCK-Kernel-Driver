@@ -34,6 +34,8 @@
 #include <linux/vermagic.h>
 #include <linux/notifier.h>
 #include <linux/stop_machine.h>
+#include <linux/trigevent_hooks.h>
+
 #include <asm/uaccess.h>
 #include <asm/semaphore.h>
 #include <asm/pgalloc.h>
@@ -945,6 +947,8 @@ static unsigned long resolve_symbol(Elf_Shdr *sechdrs,
 /* Free a module, remove from lists, etc (must hold module mutex). */
 static void free_module(struct module *mod)
 {
+	TRIG_EVENT(free_module_hook, mod);
+
 	/* Delete from various lists */
 	spin_lock_irq(&modlist_lock);
 	list_del(&mod->list);
@@ -1625,6 +1629,8 @@ sys_init_module(void __user *umod,
 	notifier_call_chain(&module_notify_list, MODULE_STATE_COMING, mod);
 	up(&notify_mutex);
 
+	TRIG_EVENT(module_init_hook, mod);
+
 	/* Start the module */
 	ret = mod->init();
 	if (ret < 0) {
@@ -1641,6 +1647,7 @@ sys_init_module(void __user *umod,
 			free_module(mod);
 			up(&module_mutex);
 		}
+		TRIG_EVENT(module_init_failed_hook, mod);
 		return ret;
 	}
 

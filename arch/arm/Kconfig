@@ -762,6 +762,45 @@ config DEBUG_CLPS711X_UART2
 	  output to the second serial port on these devices.  Saying N will
 	  cause the debug messages to appear on the first serial port.
 
+config HOOK
+	tristate "Kernel Hook support"
+	depends on DEBUG_KERNEL 
+	help
+	 The Kernel Hooks Interface is a generalised facility for placing hooks in
+	 arbitrary kernel locations. A hook is a location in the kernel that
+	 calls out of the kernel to a kernel module routine - a hook exit routine.
+	 Read Documentation/hook/HOWTO for more details.
+
+config HOOK_PROCFS
+	bool "/proc interface for hooks" 
+	depends on DEBUG_KERNEL && HOOK
+
+config TRIGEVENT_HOOKS
+	bool "RAS Instrumentation Hooks"
+	depends on HOOK=y 
+	help 
+	RAS Instrumentation Hooks are kernel hooks to trace system calls and
+	 events used by Linux Trace Toolkit. These hooks may be used by other tools 
+	 also.
+
+	 RAS hooks trace Interprocess communication routines (sys_ipc, sys_msgget, 
+	 sys_semget, sys_shmget etc), IRQ's entry and exit points, Kernel timer 
+	 routines, Kernel threads create routine, Process Management routines (such as 
+	 fork, exec, exit, wait etc), Process Scheduling switch and dispatch routines, 
+	 Signals, Memory Management routines(such as __get_free_pages, __free_pages_ok, 
+	 do_swap_page, swap_writepage etc), Network packets transmit and receive 
+	 routines, Sockets  create, send, receive routines, tasklets, Trap 
+	 entry and exit routines etc.
+
+	 To enable RAS Instrumentation Hooks, say Y. If in doubt, Say N.	
+
+config TRIGEVENT_SYSCALL_HOOK
+	bool " Enable syscall entry/exit hooks"
+	depends on TRIGEVENT_HOOKS
+	help 
+	RAS hooks to enable tracing of system call entry and exit points.
+	 To enable RAS Syscall Hooks, say Y. If in doubt, Say N.	
+
 endmenu
 
 source "security/Kconfig"

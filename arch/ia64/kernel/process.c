@@ -148,7 +148,6 @@ do_notify_resume_user (sigset_t *oldset, struct sigscratch *scr, long in_syscall
 			ia64_psr(&scr->pt)->lp = 1;
 		return;
 	}
-
 #ifdef CONFIG_PERFMON
 	if (current->thread.pfm_needs_checking)
 		pfm_handle_work();
@@ -590,6 +589,7 @@ kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 {
 	extern void start_kernel_thread (void);
 	unsigned long *helper_fptr = (unsigned long *) &start_kernel_thread;
+	pid_t ret;
 	struct {
 		struct switch_stack sw;
 		struct pt_regs pt;
@@ -606,7 +606,14 @@ kernel_thread (int (*fn)(void *), void *arg, unsigned long flags)
 	regs.sw.ar_fpsr = regs.pt.ar_fpsr = ia64_getreg(_IA64_REG_AR_FPSR);
 	regs.sw.ar_bspstore = (unsigned long) current + IA64_RBS_OFFSET;
 
-	return do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs.pt, 0, NULL, NULL);
+	ret = do_fork(flags | CLONE_VM | CLONE_UNTRACED, 0, &regs.pt, 0, NULL, NULL);
+#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
+
+	if (ret > 0)
+		TRIG_EVENT(kthread_hook, ret, (unsigned long) fn);
+#endif
+	return ret;
+
 }
 EXPORT_SYMBOL(kernel_thread);
 

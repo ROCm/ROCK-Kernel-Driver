@@ -302,9 +302,29 @@ ENTRY(system_call)
 	testb $_TIF_SYSCALL_TRACE,TI_FLAGS(%ebp)
 	jnz syscall_trace_entry
 syscall_call:
+#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
+	movl pre_syscall_enabled, %eax
+	testl %eax, %eax
+	jz pre_syscall_done
+	movl %esp, %eax                 # copy the stack pointer
+	pushl %eax                      # pass the stack pointer copy
+	call pre_syscall
+	addl $4,%esp                    # return stack to state before pass
+pre_syscall_done:
+	movl ORIG_EAX(%esp),%eax	# restore eax to it's original content
+#endif
 	call *sys_call_table(,%eax,4)
 	movl %eax,EAX(%esp)		# store the return value
 syscall_exit:
+#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
+	pushl %ebx
+	movl post_syscall_enabled, %eax
+	testl %eax, %eax                   # are we tracing system call exits
+	jz post_syscall_done
+	call post_syscall
+post_syscall_done:
+	popl %ebx	
+#endif
 	cli				# make sure we don't miss an interrupt
 					# setting need_resched or sigpending
 					# between sampling and the iret

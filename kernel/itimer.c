@@ -11,6 +11,8 @@
 #include <linux/interrupt.h>
 #include <linux/time.h>
 
+#include <linux/trigevent_hooks.h>
+
 #include <asm/uaccess.h>
 
 int do_getitimer(int which, struct itimerval *value)
@@ -68,6 +70,8 @@ void it_real_fn(unsigned long __data)
 	struct task_struct * p = (struct task_struct *) __data;
 	unsigned long interval;
 
+	TRIG_EVENT(timer_expired_hook, p);
+
 	send_group_sig_info(SIGALRM, SEND_SIG_PRIV, p);
 	interval = p->it_real_incr;
 	if (interval) {
@@ -87,6 +91,7 @@ int do_setitimer(int which, struct itimerval *value, struct itimerval *ovalue)
 	j = timeval_to_jiffies(&value->it_value);
 	if (ovalue && (k = do_getitimer(which, ovalue)) < 0)
 		return k;
+	TRIG_EVENT(setitimer_hook, which, i, j);
 	switch (which) {
 		case ITIMER_REAL:
 			del_timer_sync(&current->real_timer);

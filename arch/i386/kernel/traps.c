@@ -27,6 +27,7 @@
 #include <linux/ptrace.h>
 #include <linux/version.h>
 #include <linux/dump.h>
+#include <linux/trigevent_hooks.h>
 
 #ifdef CONFIG_EISA
 #include <linux/ioport.h>
@@ -327,6 +328,8 @@ static inline unsigned long get_cr2(void)
 static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 			   struct pt_regs * regs, long error_code, siginfo_t *info)
 {
+	TRIG_EVENT(trap_entry_hook, trapnr, regs->eip);
+
 	if (regs->eflags & VM_MASK) {
 		if (vm86)
 			goto vm86_trap;
@@ -344,20 +347,24 @@ static inline void do_trap(int trapnr, int signr, char *str, int vm86,
 			force_sig_info(signr, info, tsk);
 		else
 			force_sig(signr, tsk);
+		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
 	kernel_trap: {
 		if (!fixup_exception(regs))
 			die(str, regs, error_code);
+		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
 
 	vm86_trap: {
 		int ret = handle_vm86_trap((struct kernel_vm86_regs *) regs, error_code, trapnr);
 		if (ret) goto trap_signal;
+		TRIG_EVENT(trap_exit_hook);
 		return;
 	}
+	TRIG_EVENT(trap_exit_hook);
 }
 
 #define DO_ERROR(trapnr, signr, str, name) \
@@ -420,12 +427,16 @@ asmlinkage void do_general_protection(struct pt_regs * regs, long error_code)
 
 	current->thread.error_code = error_code;
 	current->thread.trap_no = 13;
+	TRIG_EVENT(trap_entry_hook, 13, regs->eip);
 	force_sig(SIGSEGV, current);
+	TRIG_EVENT(trap_exit_hook);
 	return;
 
 gp_in_vm86:
 	local_irq_enable();
+	TRIG_EVENT(trap_entry_hook, 13, regs->eip);
 	handle_vm86_fault((struct kernel_vm86_regs *) regs, error_code);
+	TRIG_EVENT(trap_exit_hook);
 	return;
 
 gp_in_kernel:
@@ -535,6 +546,10 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 {
 	int cpu;
 
+#ifndef CONFIG_X86_LOCAL_APIC /* On an machine with APIC enabled NMIs are used to implement a
+				watchdog and will hang the machine if traced. */
+	TRIG_EVENT(trap_entry_hook, 2, regs->eip);
+#endif
 	nmi_enter();
 
 	cpu = smp_processor_id();
@@ -544,6 +559,7 @@ asmlinkage void do_nmi(struct pt_regs * regs, long error_code)
 		default_do_nmi(regs);
 
 	nmi_exit();
+	TRIG_EVENT(trap_exit_hook);
 }
 
 void set_nmi_callback(nmi_callback_t callback)
@@ -636,7 +652,9 @@ asmlinkage void do_debug(struct pt_regs * regs, long error_code)
 	 */
 	info.si_addr = ((regs->xcs & 3) == 0) ? (void *)tsk->thread.eip : 
 	                                        (void *)regs->eip;
+        TRIG_EVENT(trap_entry_hook, 1, regs->eip);
 	force_sig_info(SIGTRAP, &info, tsk);
+        TRIG_EVENT(trap_exit_hook);
 
 	/* Disable additional traps. They'll be re-enabled when
 	 * the signal is delivered.
@@ -648,7 +666,9 @@ clear_dr7:
 	return;
 
 debug_vm86:
+        TRIG_EVENT(trap_entry_hook, 1, regs->eip);
 	handle_vm86_trap((struct kernel_vm86_regs *) regs, error_code, 1);
+        TRIG_EVENT(trap_exit_hook);
 	return;
 
 clear_TF_reenable:
@@ -810,10 +830,12 @@ asmlinkage void do_simd_coprocessor_error(struct pt_regs * regs,
 asmlinkage void do_spurious_interrupt_bug(struct pt_regs * regs,
 					  long error_code)
 {
+        TRIG_EVENT(trap_entry_hook, 16, regs->eip);
 #if 0
 	/* No need to warn about this any longer. */
 	printk("Ignoring P6 Local APIC Spurious Interrupt Bug...\n");
 #endif
+        TRIG_EVENT(trap_exit_hook);	
 }
 
 /*
@@ -844,8 +866,10 @@ asmlinkage void math_emulate(long arg)
 {
 	printk("math-emulation not enabled and no coprocessor found.\n");
 	printk("killing %s.\n",current->comm);
+        TRIG_EVENT(trap_entry_hook, 7, 0);
 	force_sig(SIGFPE,current);
 	schedule();
+        TRIG_EVENT(trap_exit_hook);
 }
 
 #endif /* CONFIG_MATH_EMULATION */

@@ -23,6 +23,7 @@
 #include <linux/a.out.h>
 #include <linux/init.h>
 #include <linux/completion.h>
+#include <linux/trigevent_hooks.h>
 
 #include <asm/bootinfo.h>
 #include <asm/cpu.h>
@@ -187,6 +188,10 @@ long kernel_thread(int (*fn)(void *), void *arg, unsigned long flags)
 		: "$2", "$3", "$4", "$5", "$6", "$7", "$8",
 		  "$9","$10","$11","$12","$13","$14","$15","$24","$25","$31");
 
+#ifdef CONFIG_TRIGEVENT_SYSCALL_HOOK
+	if (retval > 0)
+		TRIG_EVENT(kthread_hook, retval, (int) fn);
+#endif
 	return retval;
 }
 
