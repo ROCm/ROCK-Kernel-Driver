@@ -285,6 +285,18 @@ ppp_sync_close(struct tty_struct *tty)
 }
 
 /*
+ * Called on tty hangup in process context.
+ *
+ * Wait for I/O to driver to complete and unregister PPP channel.
+ * This is already done by the close routine, so just call that.
+ */
+static int ppp_sync_hangup(struct tty_struct *tty)
+{
+	ppp_sync_close(tty);
+	return 0;
+}
+
+/*
  * Read does nothing - no data is ever available this way.
  * Pppd reads and writes packets via /dev/ppp instead.
  */
@@ -422,6 +434,7 @@ static struct tty_ldisc ppp_sync_ldisc = {
 	.name	= "pppsync",
 	.open	= ppp_sync_open,
 	.close	= ppp_sync_close,
+	.hangup	= ppp_sync_hangup,
 	.read	= ppp_sync_read,
 	.write	= ppp_sync_write,
 	.ioctl	= ppp_synctty_ioctl,
