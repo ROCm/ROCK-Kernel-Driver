@@ -20,6 +20,7 @@
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
 #include <linux/interrupt.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/segment.h>
@@ -161,7 +162,7 @@ asmlinkage int lookup_fault(unsigned long pc, unsigned long ret_pc,
 	unsigned int insn;
 	int i;
 	
-	i = search_exception_table(ret_pc, &g2);
+	i = search_extables_range(ret_pc, &g2);
 	switch (i) {
 	case 3:
 		/* load & store will be handled by fixup */
@@ -316,7 +317,7 @@ bad_area_nosemaphore:
 	/* Is this in ex_table? */
 no_context:
 	g2 = regs->u_regs[UREG_G2];
-	if (!from_user && (fixup = search_exception_table (regs->pc, &g2))) {
+	if (!from_user && (fixup = search_extables_range(regs->pc, &g2))) {
 		if (fixup > 10) { /* Values below are reserved for other things */
 			extern const unsigned __memset_start[];
 			extern const unsigned __memset_end[];
