@@ -14,12 +14,6 @@
 #include <linux/wait.h>
 
 /*
- * Define this if you want to test the fast scheduler for async calls.
- * This is still experimental and may not work.
- */
-#undef  CONFIG_RPC_FASTSCHED
-
-/*
  * This is the actual RPC procedure call info.
  */
 struct rpc_message {
@@ -48,6 +42,7 @@ struct rpc_task {
 	 */
 	struct rpc_message	tk_msg;		/* RPC call info */
 	__u32 *			tk_buffer;	/* XDR buffer */
+	size_t			tk_bufsize;
 	__u8			tk_garb_retry,
 				tk_cred_retry,
 				tk_suid_retry;
@@ -184,20 +179,16 @@ void		rpc_wake_up(struct rpc_wait_queue *);
 struct rpc_task *rpc_wake_up_next(struct rpc_wait_queue *);
 void		rpc_wake_up_status(struct rpc_wait_queue *, int);
 void		rpc_delay(struct rpc_task *, unsigned long);
-void *		rpc_allocate(unsigned int flags, unsigned int);
-void		rpc_free(void *);
+void *		rpc_malloc(struct rpc_task *, size_t);
+void		rpc_free(struct rpc_task *);
 int		rpciod_up(void);
 void		rpciod_down(void);
 void		rpciod_wake_up(void);
 #ifdef RPC_DEBUG
 void		rpc_show_tasks(void);
 #endif
-
-static __inline__ void *
-rpc_malloc(struct rpc_task *task, unsigned int size)
-{
-	return rpc_allocate(task->tk_flags, size);
-}
+int		rpc_init_mempool(void);
+void		rpc_destroy_mempool(void);
 
 static __inline__ void
 rpc_exit(struct rpc_task *task, int status)

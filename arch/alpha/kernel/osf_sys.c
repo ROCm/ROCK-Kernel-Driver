@@ -45,7 +45,6 @@
 
 extern int do_pipe(int *);
 extern asmlinkage unsigned long sys_brk(unsigned long);
-extern int sys_getpriority(int, int);
 extern asmlinkage unsigned long sys_create_module(char *, unsigned long);
 
 /*
@@ -172,68 +171,9 @@ osf_getdirentries(unsigned int fd, struct osf_dirent *dirent,
 #undef ROUND_UP
 #undef NAME_OFFSET
 
-/*
- * Alpha syscall convention has no problem returning negative
- * values:
- */
-asmlinkage int
-osf_getpriority(int which, int who,
-		int a2, int a3, int a4, int a5, struct pt_regs regs)
-{
-	extern int sys_getpriority(int, int);
-	int prio;
-
-	/*
-	 * We don't need to acquire the kernel lock here, because
-	 * all of these operations are local. sys_getpriority
-	 * will get the lock as required..
-	 */
-	prio = sys_getpriority(which, who);
-	if (prio >= 0) {
-		regs.r0 = 0;		/* special return: no errors */
-		prio = 20 - prio;
-	}
-	return prio;
-}
-
-/*
- * No need to acquire the kernel lock, we're local..
- */
-asmlinkage unsigned long
-sys_getxuid(int a0, int a1, int a2, int a3, int a4, int a5, struct pt_regs regs)
-{
-	struct task_struct * tsk = current;
-	(&regs)->r20 = tsk->euid;
-	return tsk->uid;
-}
-
-asmlinkage unsigned long
-sys_getxgid(int a0, int a1, int a2, int a3, int a4, int a5, struct pt_regs regs)
-{
-	struct task_struct * tsk = current;
-	(&regs)->r20 = tsk->egid;
-	return tsk->gid;
-}
-
-asmlinkage unsigned long
-sys_getxpid(int a0, int a1, int a2, int a3, int a4, int a5, struct pt_regs regs)
-{
-	struct task_struct *tsk = current;
-
-	/* 
-	 * This isn't strictly "local" any more and we should actually
-	 * acquire the kernel lock. The "p_opptr" pointer might change
-	 * if the parent goes away (or due to ptrace). But any race
-	 * isn't actually going to matter, as if the parent happens
-	 * to change we can happily return either of the pids.
-	 */
-	(&regs)->r20 = tsk->real_parent->tgid;
-	return tsk->tgid;
-}
-
 asmlinkage unsigned long
 osf_mmap(unsigned long addr, unsigned long len, unsigned long prot,
-         unsigned long flags, unsigned long fd, unsigned long off)
+	 unsigned long flags, unsigned long fd, unsigned long off)
 {
 	struct file *file = NULL;
 	unsigned long ret = -EBADF;
@@ -502,19 +442,6 @@ sys_getdtablesize(void)
 	return NR_OPEN;
 }
 
-asmlinkage int
-sys_pipe(int a0, int a1, int a2, int a3, int a4, int a5, struct pt_regs regs)
-{
-	int fd[2], error;
-
-	error = do_pipe(fd);
-	if (!error) {
-		regs.r20 = fd[1];
-		error = fd[0];
-	}
-	return error;
-}
-
 /*
  * For compatibility with OSF/1 only.  Use utsname(2) instead.
  */
@@ -723,8 +650,8 @@ osf_sigstack(struct sigstack *uss, struct sigstack *uoss)
  */
 
 asmlinkage unsigned long
-alpha_create_module(char *module_name, unsigned long size,
-		    int a3, int a4, int a5, int a6, struct pt_regs regs)
+do_alpha_create_module(char *module_name, unsigned long size,
+		       struct pt_regs *regs)
 {
 	long retval;
 
@@ -735,7 +662,7 @@ alpha_create_module(char *module_name, unsigned long size,
 	   the error number is a small negative number, while the address
 	   is always negative but much larger.  */
 	if (retval + 1000 < 0)
-		regs.r0 = 0;
+		regs->r0 = 0;
 
         unlock_kernel();
 	return retval;

@@ -15,6 +15,7 @@
 #include <linux/sched.h>
 #include <linux/interrupt.h>
 #include <linux/slab.h>
+#include <linux/mempool.h>
 #include <linux/unistd.h>
 #include <linux/smp.h>
 #include <linux/smp_lock.h>
@@ -29,9 +30,15 @@ static int			rpc_task_id;
 #endif
 
 /*
- * We give RPC the same get_free_pages priority as NFS
+ * RPC slabs and memory pools
  */
-#define GFP_RPC			GFP_NOFS
+#define RPC_BUFFER_MAXSIZE	(2048)
+#define RPC_BUFFER_POOLSIZE	(8)
+#define RPC_TASK_POOLSIZE	(8)
+static kmem_cache_t	*rpc_task_slabp;
+static kmem_cache_t	*rpc_buffer_slabp;
+static mempool_t	*rpc_task_mempool;
+static mempool_t	*rpc_buffer_mempool;
 
 static void			__rpc_default_timer(struct rpc_task *task);
 static void			rpciod_killall(void);
@@ -78,24 +85,6 @@ static spinlock_t rpc_queue_lock = SPIN_LOCK_UNLOCKED;
  * Spinlock for other critical sections of code.
  */
 static spinlock_t rpc_sched_lock = SPIN_LOCK_UNLOCKED;
-
-/*
- * This is the last-ditch buffer for NFS swap requests
- */
-static u32			swap_buffer[PAGE_SIZE >> 2];
-static long			swap_buffer_used;
-
-/*
- * Make allocation of the swap_buffer SMP-safe
- */
-static __inline__ int rpc_lock_swapbuf(void)
-{
-	return !test_and_set_bit(1, &swap_buffer_used);
-}
-static __inline__ void rpc_unlock_swapbuf(void)
-{
-	clear_bit(1, &swap_buffer_used);
-}
 
 /*
  * Disable the timer for a given RPC task. Should be called with
@@ -592,10 +581,7 @@ __rpc_execute(struct rpc_task *task)
 				/* Release RPC slot and buffer memory */
 				if (task->tk_rqstp)
 					xprt_release(task);
-				if (task->tk_buffer) {
-					rpc_free(task->tk_buffer);
-					task->tk_buffer = NULL;
-				}
+				rpc_free(task);
 				goto restarted;
 			}
 			printk(KERN_ERR "RPC: dead task tries to walk away.\n");
@@ -676,63 +662,46 @@ __rpc_schedule(void)
 }
 
 /*
- * Allocate memory for RPC purpose.
+ * Allocate memory for RPC purposes.
  *
- * This is yet another tricky issue: For sync requests issued by
- * a user process, we want to make kmalloc sleep if there isn't
- * enough memory. Async requests should not sleep too excessively
- * because that will block rpciod (but that's not dramatic when
- * it's starved of memory anyway). Finally, swapout requests should
- * never sleep at all, and should not trigger another swap_out
- * request through kmalloc which would just increase memory contention.
- *
- * I hope the following gets it right, which gives async requests
- * a slight advantage over sync requests (good for writeback, debatable
- * for readahead):
- *
- *   sync user requests:	GFP_KERNEL
- *   async requests:		GFP_RPC		(== GFP_NOFS)
- *   swap requests:		GFP_ATOMIC	(or new GFP_SWAPPER)
+ * We try to ensure that some NFS reads and writes can always proceed
+ * by using a mempool when allocating 'small' buffers.
+ * In order to avoid memory starvation triggering more writebacks of
+ * NFS requests, we use GFP_NOFS rather than GFP_KERNEL.
  */
 void *
-rpc_allocate(unsigned int flags, unsigned int size)
+rpc_malloc(struct rpc_task *task, size_t size)
 {
-	u32	*buffer;
 	int	gfp;
 
-	if (flags & RPC_TASK_SWAPPER)
+	if (task->tk_flags & RPC_TASK_SWAPPER)
 		gfp = GFP_ATOMIC;
-	else if (flags & RPC_TASK_ASYNC)
-		gfp = GFP_RPC;
 	else
-		gfp = GFP_KERNEL;
+		gfp = GFP_NOFS;
 
-	do {
-		if ((buffer = (u32 *) kmalloc(size, gfp)) != NULL) {
-			dprintk("RPC:      allocated buffer %p\n", buffer);
-			return buffer;
-		}
-		if ((flags & RPC_TASK_SWAPPER) && size <= sizeof(swap_buffer)
-		    && rpc_lock_swapbuf()) {
-			dprintk("RPC:      used last-ditch swap buffer\n");
-			return swap_buffer;
-		}
-		if (flags & RPC_TASK_ASYNC)
-			return NULL;
-		yield();
-	} while (!signalled());
-
-	return NULL;
+	if (size > RPC_BUFFER_MAXSIZE) {
+		task->tk_buffer =  kmalloc(size, gfp);
+		if (task->tk_buffer)
+			task->tk_bufsize = size;
+	} else {
+		task->tk_buffer =  mempool_alloc(rpc_buffer_mempool, gfp);
+		if (task->tk_buffer)
+			task->tk_bufsize = RPC_BUFFER_MAXSIZE;
+	}
+	return task->tk_buffer;
 }
 
 void
-rpc_free(void *buffer)
+rpc_free(struct rpc_task *task)
 {
-	if (buffer != swap_buffer) {
-		kfree(buffer);
-		return;
+	if (task->tk_buffer) {
+		if (task->tk_bufsize == RPC_BUFFER_MAXSIZE)
+			mempool_free(task->tk_buffer, rpc_buffer_mempool);
+		else
+			kfree(task->tk_buffer);
+		task->tk_buffer = NULL;
+		task->tk_bufsize = 0;
 	}
-	rpc_unlock_swapbuf();
 }
 
 /*
@@ -774,11 +743,17 @@ rpc_init_task(struct rpc_task *task, struct rpc_clnt *clnt,
 				current->pid);
 }
 
+static struct rpc_task *
+rpc_alloc_task(void)
+{
+	return (struct rpc_task *)mempool_alloc(rpc_task_mempool, GFP_NOFS);
+}
+
 static void
 rpc_default_free_task(struct rpc_task *task)
 {
 	dprintk("RPC: %4d freeing task\n", task->tk_pid);
-	rpc_free(task);
+	mempool_free(task, rpc_task_mempool);
 }
 
 /*
@@ -791,7 +766,7 @@ rpc_new_task(struct rpc_clnt *clnt, rpc_action callback, int flags)
 {
 	struct rpc_task	*task;
 
-	task = (struct rpc_task *) rpc_allocate(flags, sizeof(*task));
+	task = rpc_alloc_task();
 	if (!task)
 		goto cleanup;
 
@@ -856,10 +831,7 @@ rpc_release_task(struct rpc_task *task)
 		xprt_release(task);
 	if (task->tk_msg.rpc_cred)
 		rpcauth_unbindcred(task);
-	if (task->tk_buffer) {
-		rpc_free(task->tk_buffer);
-		task->tk_buffer = NULL;
-	}
+	rpc_free(task);
 	if (task->tk_client) {
 		rpc_release_client(task->tk_client);
 		task->tk_client = NULL;
@@ -1159,3 +1131,49 @@ void rpc_show_tasks(void)
 	spin_unlock(&rpc_sched_lock);
 }
 #endif
+
+void
+rpc_destroy_mempool(void)
+{
+	if (rpc_buffer_mempool)
+		mempool_destroy(rpc_buffer_mempool);
+	if (rpc_task_mempool)
+		mempool_destroy(rpc_task_mempool);
+	if (rpc_task_slabp && kmem_cache_destroy(rpc_task_slabp))
+		printk(KERN_INFO "rpc_task: not all structures were freed\n");
+	if (rpc_buffer_slabp && kmem_cache_destroy(rpc_buffer_slabp))
+		printk(KERN_INFO "rpc_buffers: not all structures were freed\n");
+}
+
+int
+rpc_init_mempool(void)
+{
+	rpc_task_slabp = kmem_cache_create("rpc_tasks",
+					     sizeof(struct rpc_task),
+					     0, SLAB_HWCACHE_ALIGN,
+					     NULL, NULL);
+	if (!rpc_task_slabp)
+		goto err_nomem;
+	rpc_buffer_slabp = kmem_cache_create("rpc_buffers",
+					     RPC_BUFFER_MAXSIZE,
+					     0, SLAB_HWCACHE_ALIGN,
+					     NULL, NULL);
+	if (!rpc_buffer_slabp)
+		goto err_nomem;
+	rpc_task_mempool = mempool_create(RPC_TASK_POOLSIZE,
+					    mempool_alloc_slab,
+					    mempool_free_slab,
+					    rpc_task_slabp);
+	if (!rpc_task_mempool)
+		goto err_nomem;
+	rpc_buffer_mempool = mempool_create(RPC_BUFFER_POOLSIZE,
+					    mempool_alloc_slab,
+					    mempool_free_slab,
+					    rpc_buffer_slabp);
+	if (!rpc_buffer_mempool)
+		goto err_nomem;
+	return 0;
+err_nomem:
+	rpc_destroy_mempool();
+	return -ENOMEM;
+}

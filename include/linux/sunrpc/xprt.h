@@ -71,7 +71,7 @@ struct rpc_timeout {
 				to_initval,		/* initial timeout */
 				to_maxval,		/* max timeout */
 				to_increment;		/* if !exponential */
-	short			to_retries;		/* max # of retries */
+	unsigned int		to_retries;		/* max # of retries */
 	unsigned char		to_exponential;
 };
 
@@ -109,7 +109,7 @@ struct rpc_rqst {
 	
 	u32			rq_bytes_sent;	/* Bytes we have sent */
 
-	long			rq_xtime;	/* when transmitted */
+	unsigned long		rq_xtime;	/* when transmitted */
 	int			rq_ntimeo;
 	int			rq_nresend;
 };

@@ -42,7 +42,12 @@ rpc_getport(struct rpc_task *task, struct rpc_clnt *clnt)
 {
 	struct rpc_portmap *map = &clnt->cl_pmap;
 	struct sockaddr_in *sap = &clnt->cl_xprt->addr;
-	struct rpc_message msg = { PMAP_GETPORT, map, &clnt->cl_port, NULL };
+	struct rpc_message msg = {
+		.rpc_proc	= PMAP_GETPORT,
+		.rpc_argp	= map,
+		.rpc_resp	= &clnt->cl_port,
+		.rpc_cred	= NULL
+	};
 	struct rpc_clnt	*pmap_clnt;
 	struct rpc_task	*child;
 
@@ -90,7 +95,12 @@ bailout:
 int
 rpc_getport_external(struct sockaddr_in *sin, __u32 prog, __u32 vers, int prot)
 {
-	struct rpc_portmap map = { prog, vers, prot, 0 };
+	struct rpc_portmap map = {
+		.pm_prog	= prog,
+		.pm_vers	= vers,
+		.pm_prot	= prot,
+		.pm_port	= 0
+	};
 	struct rpc_clnt	*pmap_clnt;
 	char		hostname[32];
 	int		status;

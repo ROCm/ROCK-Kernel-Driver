@@ -85,7 +85,7 @@ rpc_create_client(struct rpc_xprt *xprt, char *servname,
 	if (vers >= program->nrvers || !(version = program->version[vers]))
 		goto out;
 
-	clnt = (struct rpc_clnt *) rpc_allocate(0, sizeof(*clnt));
+	clnt = (struct rpc_clnt *) kmalloc(sizeof(*clnt), GFP_KERNEL);
 	if (!clnt)
 		goto out_no_clnt;
 	memset(clnt, 0, sizeof(*clnt));
@@ -125,7 +125,7 @@ out_no_clnt:
 out_no_auth:
 	printk(KERN_INFO "RPC: Couldn't create auth handle (flavor %u)\n",
 		flavor);
-	rpc_free(clnt);
+	kfree(clnt);
 	clnt = NULL;
 	goto out;
 }
@@ -180,7 +180,7 @@ rpc_destroy_client(struct rpc_clnt *clnt)
 		xprt_destroy(clnt->cl_xprt);
 		clnt->cl_xprt = NULL;
 	}
-	rpc_free(clnt);
+	kfree(clnt);
 	return 0;
 }
 
@@ -487,7 +487,7 @@ call_allocate(struct rpc_task *task)
 	 * auth->au_wslack */
 	bufsiz = rpcproc_bufsiz(clnt, task->tk_msg.rpc_proc) + RPC_SLACK_SPACE;
 
-	if ((task->tk_buffer = rpc_malloc(task, bufsiz << 1)) != NULL)
+	if (rpc_malloc(task, bufsiz << 1) != NULL)
 		return;
 	printk(KERN_INFO "RPC: buffer allocation failed for task %p\n", task); 
 
@@ -522,7 +522,7 @@ call_encode(struct rpc_task *task)
 	task->tk_action = call_bind;
 
 	/* Default buffer setup */
-	bufsiz = rpcproc_bufsiz(clnt, task->tk_msg.rpc_proc)+RPC_SLACK_SPACE;
+	bufsiz = task->tk_bufsize >> 1;
 	sndbuf->head[0].iov_base = (void *)task->tk_buffer;
 	sndbuf->head[0].iov_len  = bufsiz;
 	sndbuf->tail[0].iov_len  = 0;

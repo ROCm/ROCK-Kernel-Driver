@@ -68,7 +68,7 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 
-/* FIXME: soem day we shouldnt need to look in here! */
+/* FIXME: some day we shouldnt need to look in here! */
 
 #include "legacy/pdc4030.h"
 

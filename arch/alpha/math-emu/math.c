@@ -223,12 +223,12 @@ alpha_fp_emul (unsigned long pc)
 				FP_CONV(S,D,1,1,SR,DB);
 				goto pack_s;
 			} else {
-				/* CVTST need do nothing else but copy the
-				   bits and repack.  */
+				vb = alpha_read_fp_reg_s(fb);
+				FP_UNPACK_SP(SB, &vb);
 				DR_c = DB_c;
 				DR_s = DB_s;
 				DR_e = DB_e;
-				DR_f = DB_f;
+				DR_f = SB_f << (52 - 23);
 				goto pack_d;
 			}
 

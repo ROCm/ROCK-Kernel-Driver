@@ -17,6 +17,7 @@
 #include <linux/sched.h>
 #include <linux/adb.h>
 #include <linux/cuda.h>
+#include <linux/spinlock.h>
 #ifdef CONFIG_PPC
 #include <asm/prom.h>
 #include <asm/machdep.h>
@@ -31,6 +32,7 @@
 #include <linux/init.h>
 
 static volatile unsigned char *via;
+static spinlock_t cuda_lock = SPIN_LOCK_UNLOCKED;
 
 #ifdef CONFIG_MAC
 #define CUDA_IRQ IRQ_MAC_ADB
@@ -386,8 +388,8 @@ cuda_write(struct adb_request *req)
     req->sent = 0;
     req->complete = 0;
     req->reply_len = 0;
-    save_flags(flags); cli();
 
+    spin_lock_irqsave(&cuda_lock, flags);
     if (current_req != 0) {
 	last_req->next = req;
 	last_req = req;
@@ -397,15 +399,14 @@ cuda_write(struct adb_request *req)
 	if (cuda_state == idle)
 	    cuda_start();
     }
+    spin_unlock_irqrestore(&cuda_lock, flags);
 
-    restore_flags(flags);
     return 0;
 }
 
 static void
 cuda_start()
 {
-    unsigned long flags;
     struct adb_request *req;
 
     /* assert cuda_state == idle */
@@ -413,41 +414,46 @@ cuda_start()
     req = current_req;
     if (req == 0)
 	return;
-    save_flags(flags); cli();
-    if ((via[B] & TREQ) == 0) {
-	restore_flags(flags);
+    if ((via[B] & TREQ) == 0)
 	return;			/* a byte is coming in from the CUDA */
-    }
 
     /* set the shift register to shift out and send a byte */
     via[ACR] |= SR_OUT; eieio();
     via[SR] = req->data[0]; eieio();
     via[B] &= ~TIP;
     cuda_state = sent_first_byte;
-    restore_flags(flags);
 }
 
 void
 cuda_poll()
 {
-    unsigned long flags;
+    if (via[IFR] & SR_INT) {
+	unsigned long flags;
 
-    save_flags(flags);
-    cli();
-    if (via[IFR] & SR_INT)
+	/* cuda_interrupt only takes a normal lock, we disable
+	 * interrupts here to avoid re-entering and thus deadlocking.
+	 * An option would be to disable only the IRQ source with
+	 * disable_irq(), would that work on m68k ? --BenH
+	 */
+	local_irq_save(flags);
 	cuda_interrupt(0, 0, 0);
-    restore_flags(flags);
+	local_irq_restore(flags);
+    }
 }
 
 static void
 cuda_interrupt(int irq, void *arg, struct pt_regs *regs)
 {
     int x, status;
-    struct adb_request *req;
-
+    struct adb_request *req = NULL;
+    unsigned char ibuf[16];
+    int ibuf_len = 0;
+    int complete = 0;
+    
     if ((via[IFR] & SR_INT) == 0)
 	return;
 
+    spin_lock(&cuda_lock);
     status = (~via[B] & (TIP|TREQ)) | (via[ACR] & SR_OUT); eieio();
     /* printk("cuda_interrupt: state=%d status=%x\n", cuda_state, status); */
     switch (cuda_state) {
@@ -502,8 +508,7 @@ cuda_interrupt(int irq, void *arg, struct pt_regs *regs)
 		cuda_state = awaiting_reply;
 	    } else {
 		current_req = req->next;
-		if (req->done)
-		    (*req->done)(req);
+		complete = 1;
 		/* not sure about this */
 		cuda_state = idle;
 		cuda_start();
@@ -544,12 +549,18 @@ cuda_interrupt(int irq, void *arg, struct pt_regs *regs)
 		    memmove(req->reply, req->reply + 2, req->reply_len);
 		}
 	    }
-	    req->complete = 1;
 	    current_req = req->next;
-	    if (req->done)
-		(*req->done)(req);
+	    complete = 1;
 	} else {
-	    cuda_input(cuda_rbuf, reply_ptr - cuda_rbuf, regs);
+	    /* This is tricky. We must break the spinlock to call
+	     * cuda_input. However, doing so means we might get
+	     * re-entered from another CPU getting an interrupt
+	     * or calling cuda_poll(). I ended up using the stack
+	     * (it's only for 16 bytes) and moving the actual
+	     * call to cuda_input to outside of the lock.
+	     */
+	    ibuf_len = reply_ptr - cuda_rbuf;
+	    memcpy(ibuf, cuda_rbuf, ibuf_len);
 	}
 	if (status == TREQ) {
 	    via[B] &= ~TIP; eieio();
@@ -565,6 +576,19 @@ cuda_interrupt(int irq, void *arg, struct pt_regs *regs)
     default:
 	printk("cuda_interrupt: unknown cuda_state %d?\n", cuda_state);
     }
+    spin_unlock(&cuda_lock);
+    if (complete && req) {
+    	void (*done)(struct adb_request *) = req->done;
+    	mb();
+    	req->complete = 1;
+    	/* Here, we assume that if the request has a done member, the
+    	 * struct request will survive to setting req->complete to 1
+    	 */
+    	if (done)
+		(*done)(req);
+    }
+    if (ibuf_len)
+	cuda_input(ibuf, ibuf_len, regs);
 }
 
 static void

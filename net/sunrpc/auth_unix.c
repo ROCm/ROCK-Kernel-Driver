@@ -41,7 +41,7 @@ unx_create(struct rpc_clnt *clnt)
 	struct rpc_auth	*auth;
 
 	dprintk("RPC: creating UNIX authenticator for client %p\n", clnt);
-	if (!(auth = (struct rpc_auth *) rpc_allocate(0, sizeof(*auth))))
+	if (!(auth = (struct rpc_auth *) kmalloc(sizeof(*auth), GFP_KERNEL)))
 		return NULL;
 	auth->au_cslack = UNX_WRITESLACK;
 	auth->au_rslack = 2;	/* assume AUTH_NULL verf */
@@ -58,7 +58,7 @@ unx_destroy(struct rpc_auth *auth)
 {
 	dprintk("RPC: destroying UNIX authenticator %p\n", auth);
 	rpcauth_free_credcache(auth);
-	rpc_free(auth);
+	kfree(auth);
 }
 
 static struct rpc_cred *
@@ -70,7 +70,7 @@ unx_create_cred(int flags)
 	dprintk("RPC:      allocating UNIX cred for uid %d gid %d\n",
 				current->uid, current->gid);
 
-	if (!(cred = (struct unx_cred *) rpc_allocate(flags, sizeof(*cred))))
+	if (!(cred = (struct unx_cred *) kmalloc(sizeof(*cred), GFP_KERNEL)))
 		return NULL;
 
 	atomic_set(&cred->uc_count, 0);
@@ -98,32 +98,10 @@ unx_create_cred(int flags)
 	return (struct rpc_cred *) cred;
 }
 
-struct rpc_cred *
-authunix_fake_cred(struct rpc_task *task, uid_t uid, gid_t gid)
-{
-	struct unx_cred	*cred;
-
-	dprintk("RPC:      allocating fake UNIX cred for uid %d gid %d\n",
-				uid, gid);
-
-	if (!(cred = (struct unx_cred *) rpc_malloc(task, sizeof(*cred))))
-		return NULL;
-
-	atomic_set(&cred->uc_count, 1);
-	cred->uc_flags = RPCAUTH_CRED_DEAD|RPCAUTH_CRED_UPTODATE;
-	cred->uc_uid   = uid;
-	cred->uc_gid   = gid;
-	cred->uc_fsuid = uid;
-	cred->uc_fsgid = gid;
-	cred->uc_gids[0] = (gid_t) NOGROUP;
-
-	return task->tk_msg.rpc_cred = (struct rpc_cred *) cred;
-}
-
 static void
 unx_destroy_cred(struct rpc_cred *cred)
 {
-	rpc_free(cred);
+	kfree(cred);
 }
 
 /*

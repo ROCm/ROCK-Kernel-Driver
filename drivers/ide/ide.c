@@ -153,6 +153,7 @@
 #include <linux/cdrom.h>
 #include <linux/seq_file.h>
 #include <linux/device.h>
+#include <linux/kmod.h>
 
 #include <asm/byteorder.h>
 #include <asm/irq.h>
@@ -162,7 +163,6 @@
 
 #include "ide_modes.h"
 
-#include <linux/kmod.h>
 
 /* default maximum number of failures */
 #define IDE_DEFAULT_MAX_FAILURES 	1

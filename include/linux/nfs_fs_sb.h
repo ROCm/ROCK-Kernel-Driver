@@ -25,11 +25,6 @@ struct nfs_server {
 	unsigned int		acdirmax;
 	unsigned int		namelen;
 	char *			hostname;	/* remote hostname */
-	struct nfs_reqlist *	rw_requests;	/* async read/write requests */
-	struct list_head	lru_read,
-				lru_dirty,
-				lru_commit,
-				lru_busy;
 	struct nfs_fh		fh;
 	struct sockaddr_in	addr;
 #if CONFIG_NFS_V4

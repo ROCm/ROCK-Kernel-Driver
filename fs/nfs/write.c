@@ -58,7 +58,6 @@
 #include <linux/sunrpc/clnt.h>
 #include <linux/nfs_fs.h>
 #include <linux/nfs_mount.h>
-#include <linux/nfs_flushd.h>
 #include <linux/nfs_page.h>
 #include <asm/uaccess.h>
 #include <linux/smp_lock.h>
@@ -280,33 +279,6 @@ out:
 	return err; 
 }
 
-/*
- * Check whether the file range we want to write to is locked by
- * us.
- */
-static int
-region_locked(struct inode *inode, struct nfs_page *req)
-{
-	struct file_lock	*fl;
-	loff_t			rqstart, rqend;
-
-	/* Don't optimize writes if we don't use NLM */
-	if (NFS_SERVER(inode)->flags & NFS_MOUNT_NONLM)
-		return 0;
-
-	rqstart = req_offset(req) + req->wb_offset;
-	rqend = rqstart + req->wb_bytes;
-	for (fl = inode->i_flock; fl; fl = fl->fl_next) {
-		if (fl->fl_owner == current->files && (fl->fl_flags & FL_POSIX)
-		    && fl->fl_type == F_WRLCK
-		    && fl->fl_start <= rqstart && rqend <= fl->fl_end) {
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
 int
 nfs_writepages(struct address_space *mapping, struct writeback_control *wbc)
 {
@@ -408,8 +380,6 @@ nfs_mark_request_dirty(struct nfs_page *req)
 	spin_lock(&nfs_wreq_lock);
 	nfs_list_add_request(req, &nfsi->dirty);
 	nfsi->ndirty++;
-	__nfs_del_lru(req);
-	__nfs_add_lru(&NFS_SERVER(inode)->lru_dirty, req);
 	spin_unlock(&nfs_wreq_lock);
 	mark_inode_dirty(inode);
 }
@@ -437,8 +407,6 @@ nfs_mark_request_commit(struct nfs_page *req)
 	spin_lock(&nfs_wreq_lock);
 	nfs_list_add_request(req, &nfsi->commit);
 	nfsi->ncommit++;
-	__nfs_del_lru(req);
-	__nfs_add_lru(&NFS_SERVER(inode)->lru_commit, req);
 	spin_unlock(&nfs_wreq_lock);
 	mark_inode_dirty(inode);
 }
@@ -489,52 +457,6 @@ nfs_wait_on_requests(struct inode *inode, struct file *file, unsigned long idx_s
 	return res;
 }
 
-/**
- * nfs_scan_lru_dirty_timeout - Scan LRU list for timed out dirty requests
- * @server: NFS superblock data
- * @dst: destination list
- *
- * Moves a maximum of 'wpages' requests from the NFS dirty page LRU list.
- * The elements are checked to ensure that they form a contiguous set
- * of pages, and that they originated from the same file.
- */
-int
-nfs_scan_lru_dirty_timeout(struct nfs_server *server, struct list_head *dst)
-{
-	struct nfs_inode *nfsi;
-	int npages;
-
-	npages = nfs_scan_lru_timeout(&server->lru_dirty, dst, server->wpages);
-	if (npages) {
-		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
-		nfsi->ndirty -= npages;
-	}
-	return npages;
-}
-
-/**
- * nfs_scan_lru_dirty - Scan LRU list for dirty requests
- * @server: NFS superblock data
- * @dst: destination list
- *
- * Moves a maximum of 'wpages' requests from the NFS dirty page LRU list.
- * The elements are checked to ensure that they form a contiguous set
- * of pages, and that they originated from the same file.
- */
-int
-nfs_scan_lru_dirty(struct nfs_server *server, struct list_head *dst)
-{
-	struct nfs_inode *nfsi;
-	int npages;
-
-	npages = nfs_scan_lru(&server->lru_dirty, dst, server->wpages);
-	if (npages) {
-		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
-		nfsi->ndirty -= npages;
-	}
-	return npages;
-}
-
 /*
  * nfs_scan_dirty - Scan an inode for dirty requests
  * @inode: NFS inode to scan
@@ -559,59 +481,6 @@ nfs_scan_dirty(struct inode *inode, struct list_head *dst, struct file *file, un
 }
 
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-/**
- * nfs_scan_lru_commit_timeout - Scan LRU list for timed out commit requests
- * @server: NFS superblock data
- * @dst: destination list
- *
- * Finds the first a timed out request in the NFS commit LRU list and moves it
- * to the list dst. If such an element is found, we move all other commit
- * requests that apply to the same inode.
- * The assumption is that doing everything in a single commit-to-disk is
- * the cheaper alternative.
- */
-int
-nfs_scan_lru_commit_timeout(struct nfs_server *server, struct list_head *dst)
-{
-	struct nfs_inode *nfsi;
-	int npages;
-
-	npages = nfs_scan_lru_timeout(&server->lru_commit, dst, 1);
-	if (npages) {
-		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
-		npages += nfs_scan_list(&nfsi->commit, dst, NULL, 0, 0);
-		nfsi->ncommit -= npages;
-	}
-	return npages;
-}
-
-
-/**
- * nfs_scan_lru_commit_timeout - Scan LRU list for timed out commit requests
- * @server: NFS superblock data
- * @dst: destination list
- *
- * Finds the first request in the NFS commit LRU list and moves it
- * to the list dst. If such an element is found, we move all other commit
- * requests that apply to the same inode.
- * The assumption is that doing everything in a single commit-to-disk is
- * the cheaper alternative.
- */
-int
-nfs_scan_lru_commit(struct nfs_server *server, struct list_head *dst)
-{
-	struct nfs_inode *nfsi;
-	int npages;
-
-	npages = nfs_scan_lru(&server->lru_commit, dst, 1);
-	if (npages) {
-		nfsi = NFS_I(nfs_list_entry(dst->next)->wb_inode);
-		npages += nfs_scan_list(&nfsi->commit, dst, NULL, 0, 0);
-		nfsi->ncommit -= npages;
-	}
-	return npages;
-}
-
 /*
  * nfs_scan_commit - Scan an inode for commit requests
  * @inode: NFS inode to scan
@@ -697,11 +566,6 @@ nfs_update_request(struct file* file, struct inode *inode, struct page *page,
 			new->wb_file = file;
 			get_file(file);
 		}
-		/* If the region is locked, adjust the timeout */
-		if (region_locked(inode, new))
-			new->wb_timeout = jiffies + NFS_WRITEBACK_LOCKDELAY;
-		else
-			new->wb_timeout = jiffies + NFS_WRITEBACK_DELAY;
 	}
 
 	/* We have a request for our page.
@@ -1059,7 +923,6 @@ nfs_writeback_done(struct rpc_task *task, int stable,
 			goto next;
 		}
 		memcpy(&req->wb_verf, &data->verf, sizeof(req->wb_verf));
-		req->wb_timeout = jiffies + NFS_COMMIT_DELAY;
 		nfs_mark_request_commit(req);
 		dprintk(" marked for commit\n");
 #else
