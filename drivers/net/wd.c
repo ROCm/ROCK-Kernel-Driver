@@ -370,9 +370,11 @@ wd_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_page
 	if (ei_status.word16)
 		outb(ISA16 | ei_status.reg5, wd_cmdreg+WD_CMDREG5);
 
-#ifdef notdef
+#ifdef __BIG_ENDIAN
 	/* Officially this is what we are doing, but the readl() is faster */
+	/* unfortunately it isn't endian aware of the struct               */
 	isa_memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
+	hdr->count = le16_to_cpu(hdr->count);
 #else
 	((unsigned int*)hdr)[0] = isa_readl(hdr_start);
 #endif

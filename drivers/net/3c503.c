@@ -512,6 +512,7 @@ el2_get_8390_hdr(struct net_device *dev, struct e8390_pkt_hdr *hdr, int ring_pag
 
     if (dev->mem_start) {       /* Use the shared memory. */
 	isa_memcpy_fromio(hdr, hdr_start, sizeof(struct e8390_pkt_hdr));
+	hdr->count = le16_to_cpu(hdr->count);
 	return;
     }
 
