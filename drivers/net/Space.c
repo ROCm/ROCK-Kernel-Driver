@@ -114,7 +114,7 @@ extern int de620_probe(struct net_device *);
 extern int iph5526_probe(struct net_device *dev);
 
 /* SBNI adapters */
-extern int sbni_probe(struct net_device *);
+extern int sbni_probe(void);
 
 struct devprobe
 {
@@ -443,6 +443,11 @@ void __init probe_old_netdevs(void)
 {
 	int num;
 
+#ifdef CONFIG_SBNI
+	for (num = 0; num < 8; ++num)
+		if (sbni_probe())
+			break;
+#endif
 #ifdef CONFIG_TR
 	for (num = 0; num < 8; ++num)
 		if (trif_probe())
@@ -472,53 +477,6 @@ static struct net_device dev_ltpc = {
 #undef NEXT_DEV
 #define NEXT_DEV	(&dev_ltpc)
 #endif  /* LTPC */
-
-
-#ifdef CONFIG_SBNI
-static struct net_device sbni7_dev = {
-	.name		= "sbni7",
-	.next		= NEXT_DEV,
-	.init		= sbni_probe,
-};
-static struct net_device sbni6_dev = {
-	.name		= "sbni6",
-	.next		= &sbni7_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni5_dev = {
-	.name		= "sbni5",
-	.next		= &sbni6_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni4_dev = {
-	.name		= "sbni4",
-	.next		= &sbni5_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni3_dev = {
-	.name		= "sbni3",
-	.next		= &sbni4_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni2_dev = {
-	.name		= "sbni2",
-	.next		= &sbni3_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni1_dev = {
-	.name		= "sbni1",
-	.next		= &sbni2_dev,
-	.init		= sbni_probe,
-};
-static struct net_device sbni0_dev = {
-	.name		= "sbni0",
-	.next		= &sbni1_dev,
-	.init		= sbni_probe,
-};
-
-#undef	NEXT_DEV
-#define	NEXT_DEV	(&sbni0_dev)
-#endif 
 	
 /*
  *	The loopback device is global so it can be directly referenced
