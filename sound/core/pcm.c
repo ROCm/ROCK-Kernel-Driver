@@ -819,7 +819,8 @@ void snd_pcm_release_substream(snd_pcm_substream_t *substream)
 		runtime->private_free(runtime);
 	snd_free_pages((void*)runtime->status, PAGE_ALIGN(sizeof(snd_pcm_mmap_status_t)));
 	snd_free_pages((void*)runtime->control, PAGE_ALIGN(sizeof(snd_pcm_mmap_control_t)));
-	kfree(runtime->hw_constraints.rules);
+	if (runtime->hw_constraints.rules)
+		kfree(runtime->hw_constraints.rules);
 	kfree(runtime);
 	substream->runtime = NULL;
 	substream->pstr->substream_opened--;
