@@ -628,16 +628,6 @@ static void tcp_listen_stop (struct sock *sk)
 	BUG_TRAP(!sk->sk_ack_backlog);
 }
 
-static inline void fill_page_desc(struct sk_buff *skb, int i,
-				  struct page *page, int off, int size)
-{
-	skb_frag_t *frag = &skb_shinfo(skb)->frags[i];
-	frag->page = page;
-	frag->page_offset = off;
-	frag->size = size;
-	skb_shinfo(skb)->nr_frags = i + 1;
-}
-
 static inline void tcp_mark_push(struct tcp_opt *tp, struct sk_buff *skb)
 {
 	TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_PSH;
@@ -740,7 +730,7 @@ new_segment:
 			skb_shinfo(skb)->frags[i - 1].size += copy;
 		} else if (i < MAX_SKB_FRAGS) {
 			get_page(page);
-			fill_page_desc(skb, i, page, offset, copy);
+			skb_fill_page_desc(skb, i, page, offset, copy);
 		} else {
 			tcp_mark_push(tp, skb);
 			goto new_segment;
@@ -980,7 +970,7 @@ new_segment:
 					skb_shinfo(skb)->frags[i - 1].size +=
 									copy;
 				} else {
-					fill_page_desc(skb, i, page, off, copy);
+					skb_fill_page_desc(skb, i, page, off, copy);
 					if (TCP_PAGE(sk)) {
 						get_page(page);
 					} else if (off + copy < PAGE_SIZE) {
