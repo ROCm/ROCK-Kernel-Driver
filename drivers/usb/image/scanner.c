@@ -397,7 +397,6 @@
  */
 
 
-#include <linux/devfs_fs_kernel.h>
 #include <asm/byteorder.h>
 
 /* 
@@ -843,9 +842,6 @@ static void destroy_scanner (struct kobject *kobj)
 	kfree(scn->ibuf);
 	kfree(scn->obuf);
 
-	dbg("%s: De-allocating minor:%d", __FUNCTION__, scn->scn_minor);
-	devfs_remove("usb/scanner%d", scn->scn_minor - SCN_BASE_MNR);
-	usb_deregister_dev(1, scn->scn_minor);
 	usb_free_urb(scn->scn_irq);
 	usb_put_dev(scn->scn_dev);
 	up (&(scn->sem));
@@ -867,6 +863,13 @@ file_operations usb_scanner_fops = {
 	.release =	close_scanner,
 };
 
+static struct usb_class_driver scanner_class = {
+	.name =		"usb/scanner%d",
+	.fops =		&usb_scanner_fops,
+	.mode =		S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH,
+	.minor_base =	SCN_BASE_MNR,
+};
+
 static int
 probe_scanner(struct usb_interface *intf,
 	      const struct usb_device_id *id)
@@ -878,7 +881,6 @@ probe_scanner(struct usb_interface *intf,
 
 	int ep_cnt;
 	int ix;
-	int scn_minor;
 	int retval;
 
 	char valid_device = 0;
@@ -1011,14 +1013,14 @@ probe_scanner(struct usb_interface *intf,
 	
 	down(&scn_mutex);
 
-	retval = usb_register_dev(&usb_scanner_fops, SCN_BASE_MNR, 1, &scn_minor);
+	retval = usb_register_dev(intf, &scanner_class);
 	if (retval) {
 		err ("Not able to get a minor for this device.");
 		up(&scn_mutex);
 		return -ENOMEM;
 	}
 
-	dbg("probe_scanner: Allocated minor:%d", scn_minor);
+	dbg("probe_scanner: Allocated minor:%d", intf->minor);
 
 	if (!(scn = kmalloc (sizeof (struct scn_usb_data), GFP_KERNEL))) {
 		err("probe_scanner: Out of memory.");
@@ -1038,11 +1040,11 @@ probe_scanner(struct usb_interface *intf,
 
 	init_MUTEX(&(scn->sem)); /* Initializes to unlocked */
 
-	dbg ("probe_scanner(%d): Address of scn:%p", scn_minor, scn);
+	dbg ("probe_scanner(%d): Address of scn:%p", intf->minor, scn);
 
 /* Ok, if we detected an interrupt EP, setup a handler for it */
 	if (have_intr) {
-		dbg("probe_scanner(%d): Configuring IRQ handler for intr EP:%d", scn_minor, have_intr);
+		dbg("probe_scanner(%d): Configuring IRQ handler for intr EP:%d", intf->minor, have_intr);
 		usb_fill_int_urb(scn->scn_irq, dev,
 			     usb_rcvintpipe(dev, have_intr),
 			     &scn->button, 1, irq_scanner, scn,
@@ -1050,7 +1052,7 @@ probe_scanner(struct usb_interface *intf,
 			     250);
 
 	        if (usb_submit_urb(scn->scn_irq, GFP_KERNEL)) {
-			err("probe_scanner(%d): Unable to allocate INT URB.", scn_minor);
+			err("probe_scanner(%d): Unable to allocate INT URB.", intf->minor);
                 	kfree(scn);
 			up(&scn_mutex);
                 	return -ENOMEM;
@@ -1060,21 +1062,21 @@ probe_scanner(struct usb_interface *intf,
 
 /* Ok, now initialize all the relevant values */
 	if (!(scn->obuf = (char *)kmalloc(OBUF_SIZE, GFP_KERNEL))) {
-		err("probe_scanner(%d): Not enough memory for the output buffer.", scn_minor);
+		err("probe_scanner(%d): Not enough memory for the output buffer.", intf->minor);
 		kfree(scn);
 		up(&scn_mutex);
 		return -ENOMEM;
 	}
-	dbg("probe_scanner(%d): obuf address:%p", scn_minor, scn->obuf);
+	dbg("probe_scanner(%d): obuf address:%p", intf->minor, scn->obuf);
 
 	if (!(scn->ibuf = (char *)kmalloc(IBUF_SIZE, GFP_KERNEL))) {
-		err("probe_scanner(%d): Not enough memory for the input buffer.", scn_minor);
+		err("probe_scanner(%d): Not enough memory for the input buffer.", intf->minor);
 		kfree(scn->obuf);
 		kfree(scn);
 		up(&scn_mutex);
 		return -ENOMEM;
 	}
-	dbg("probe_scanner(%d): ibuf address:%p", scn_minor, scn->ibuf);
+	dbg("probe_scanner(%d): ibuf address:%p", intf->minor, scn->ibuf);
 	
 
 	switch (dev->descriptor.idVendor) { /* Scanner specific read timeout parameters */
@@ -1101,16 +1103,8 @@ probe_scanner(struct usb_interface *intf,
 	scn->intr_ep = have_intr;
 	scn->present = 1;
 	scn->scn_dev = dev;
-	scn->scn_minor = scn_minor;
+	scn->scn_minor = intf->minor;
 	scn->isopen = 0;
-
-	sprintf(name, "usb/scanner%d", scn->scn_minor - SCN_BASE_MNR);
-	
-	devfs_register(NULL, name,
-				    DEVFS_FL_DEFAULT, USB_MAJOR,
-				    scn->scn_minor,
-				    S_IFCHR | S_IRUSR | S_IWUSR | S_IRGRP |
-				    S_IWGRP | S_IROTH | S_IWOTH, &usb_scanner_fops, NULL);
 
 	info ("USB scanner device (0x%04x/0x%04x) now attached to %s",
 	      dev->descriptor.idVendor, dev->descriptor.idProduct, name);
@@ -1118,7 +1112,6 @@ probe_scanner(struct usb_interface *intf,
 	up(&scn_mutex);
 
 	usb_set_intfdata(intf, scn);
-	intf->minor = scn_minor;
 
 	return 0;
 }
@@ -1129,7 +1122,8 @@ disconnect_scanner(struct usb_interface *intf)
 	struct scn_usb_data *scn = usb_get_intfdata(intf);
 
 	/* disable open() */
-	intf->minor = -1;
+	dbg("%s: De-allocating minor:%d", __FUNCTION__, scn->scn_minor);
+	usb_deregister_dev(intf, &scanner_class);
 
 	usb_set_intfdata(intf, NULL);
 	if(scn->intr_ep) {
