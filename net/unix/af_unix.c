@@ -633,7 +633,7 @@ static unix_socket *unix_find_other(struct sockaddr_un *sunname, int len,
 		u=unix_find_socket_byname(sunname, len, type, hash);
 		if (u) {
 			struct dentry *dentry;
-			dentry = u->protinfo.af_unix.dentry;
+			dentry = unix_sk(u)->dentry;
 			if (dentry)
 				UPDATE_ATIME(dentry->d_inode);
 		} else
