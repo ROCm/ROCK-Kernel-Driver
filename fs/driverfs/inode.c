@@ -53,10 +53,48 @@ static struct file_operations driverfs_file_operations;
 static struct inode_operations driverfs_dir_inode_operations;
 static struct dentry_operations driverfs_dentry_dir_ops;
 static struct dentry_operations driverfs_dentry_file_ops;
+static struct address_space_operations driverfs_aops;
 
 static struct vfsmount *driverfs_mount;
 static spinlock_t mount_lock = SPIN_LOCK_UNLOCKED;
 static int mount_count = 0;
+
+
+static int driverfs_readpage(struct file *file, struct page * page)
+{
+	if (!PageUptodate(page)) {
+		memset(kmap(page), 0, PAGE_CACHE_SIZE);
+		kunmap(page);
+		flush_dcache_page(page);
+		SetPageUptodate(page);
+	}
+	unlock_page(page);
+	return 0;
+}
+
+static int driverfs_prepare_write(struct file *file, struct page *page, unsigned offset, unsigned to)
+{
+	void *addr = kmap(page);
+	if (!PageUptodate(page)) {
+		memset(addr, 0, PAGE_CACHE_SIZE);
+		flush_dcache_page(page);
+		SetPageUptodate(page);
+	}
+	SetPageDirty(page);
+	return 0;
+}
+
+static int driverfs_commit_write(struct file *file, struct page *page, unsigned offset, unsigned to)
+{
+	struct inode *inode = page->mapping->host;
+	loff_t pos = ((loff_t)page->index << PAGE_CACHE_SHIFT) + to;
+
+	kunmap(page);
+	if (pos > inode->i_size)
+		inode->i_size = pos;
+	return 0;
+}
+
 
 struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 {
@@ -70,6 +108,7 @@ struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 		inode->i_blocks = 0;
 		inode->i_rdev = NODEV;
 		inode->i_atime = inode->i_mtime = inode->i_ctime = CURRENT_TIME;
+		inode->i_mapping->a_ops = &driverfs_aops;
 		switch (mode & S_IFMT) {
 		default:
 			init_special_inode(inode, mode, dev);
@@ -80,6 +119,9 @@ struct inode *driverfs_get_inode(struct super_block *sb, int mode, int dev)
 		case S_IFDIR:
 			inode->i_op = &driverfs_dir_inode_operations;
 			inode->i_fop = &simple_dir_operations;
+			break;
+		case S_IFLNK:
+			inode->i_op = &page_symlink_inode_operations;
 			break;
 		}
 	}
@@ -119,6 +161,24 @@ static int driverfs_create(struct inode *dir, struct dentry *dentry, int mode)
  	res = driverfs_mknod(dir, dentry, mode | S_IFREG, 0);
 	unlock_kernel();
 	return res;
+}
+
+static int driverfs_symlink(struct inode * dir, struct dentry *dentry, const char * symname)
+{
+	struct inode *inode;
+	int error = -ENOSPC;
+
+	inode = driverfs_get_inode(dir->i_sb, S_IFLNK|S_IRWXUGO, 0);
+	if (inode) {
+		int l = strlen(symname)+1;
+		error = block_symlink(inode, symname, l);
+		if (!error) {
+			d_instantiate(dentry, inode);
+			dget(dentry);
+		} else
+			iput(inode);
+	}
+	return error;
 }
 
 static inline int driverfs_positive(struct dentry *dentry)
@@ -364,8 +424,16 @@ static struct inode_operations driverfs_dir_inode_operations = {
 	create:		driverfs_create,
 	lookup:		simple_lookup,
 	unlink:		driverfs_unlink,
+	symlink:	driverfs_symlink,
 	mkdir:		driverfs_mkdir,
 	rmdir:		driverfs_rmdir,
+};
+
+static struct address_space_operations driverfs_aops = {
+	readpage:	driverfs_readpage,
+	writepage:	fail_writepage,
+	prepare_write:	driverfs_prepare_write,
+	commit_write:	driverfs_commit_write
 };
 
 static struct dentry_operations driverfs_dentry_file_ops = {
@@ -569,6 +637,52 @@ driverfs_create_file(struct driver_file_entry * entry,
 }
 
 /**
+ * driverfs_create_symlink - make a symlink
+ * @parent:	directory we're creating in 
+ * @entry:	entry describing link
+ * @target:	place we're symlinking to
+ * 
+ */
+int driverfs_create_symlink(struct driver_dir_entry * parent, 
+			    struct driver_file_entry * entry,
+			    char * target)
+{
+	struct dentry * dentry;
+	struct qstr qstr;
+	int error = 0;
+
+	if (!entry || !parent)
+		return -EINVAL;
+
+	get_mount();
+
+	if (!parent->dentry) {
+		put_mount();
+		return -EINVAL;
+	}
+	down(&parent->dentry->d_inode->i_sem);
+	qstr.name = entry->name;
+	qstr.len = strlen(entry->name);
+	qstr.hash = full_name_hash(entry->name,qstr.len);
+	dentry = lookup_hash(&qstr,parent->dentry);
+	if (!IS_ERR(dentry)) {
+		dentry->d_fsdata = (void *)entry;
+		error = vfs_symlink(parent->dentry->d_inode,dentry,target);
+		if (!error) {
+			dentry->d_inode->u.generic_ip = (void *)entry;
+			entry->dentry = dentry;
+			entry->parent = parent;
+			list_add_tail(&entry->node,&parent->files);
+		}
+	} else
+		error = PTR_ERR(dentry);
+	up(&parent->dentry->d_inode->i_sem);
+	if (error)
+		put_mount();
+	return error;
+}
+
+/**
  * driverfs_remove_file - exported file removal
  * @dir:	directory the file supposedly resides in
  * @name:	name of the file
@@ -641,6 +755,7 @@ void driverfs_remove_dir(struct driver_dir_entry * dir)
 }
 
 EXPORT_SYMBOL(driverfs_create_file);
+EXPORT_SYMBOL(driverfs_create_symlink);
 EXPORT_SYMBOL(driverfs_create_dir);
 EXPORT_SYMBOL(driverfs_remove_file);
 EXPORT_SYMBOL(driverfs_remove_dir);
