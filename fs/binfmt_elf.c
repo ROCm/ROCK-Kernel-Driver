@@ -110,18 +110,18 @@ static void padzero(unsigned long elf_bss)
 	nbyte = ELF_PAGEOFFSET(elf_bss);
 	if (nbyte) {
 		nbyte = ELF_MIN_ALIGN - nbyte;
-		clear_user((void *) elf_bss, nbyte);
+		clear_user((void __user *) elf_bss, nbyte);
 	}
 }
 
 /* Let's use some macros to make this stack manipulation a litle clearer */
 #ifdef CONFIG_STACK_GROWSUP
-#define STACK_ADD(sp, items) ((elf_addr_t *)(sp) + (items))
+#define STACK_ADD(sp, items) ((elf_addr_t __user *)(sp) + (items))
 #define STACK_ROUND(sp, items) \
 	((15 + (unsigned long) ((sp) + (items))) &~ 15UL)
-#define STACK_ALLOC(sp, len) ({ elf_addr_t *old_sp = (elf_addr_t *)sp; sp += len; old_sp; })
+#define STACK_ALLOC(sp, len) ({ elf_addr_t __user *old_sp = (elf_addr_t __user *)sp; sp += len; old_sp; })
 #else
-#define STACK_ADD(sp, items) ((elf_addr_t *)(sp) - (items))
+#define STACK_ADD(sp, items) ((elf_addr_t __user *)(sp) - (items))
 #define STACK_ROUND(sp, items) \
 	(((unsigned long) (sp - items)) &~ 15UL)
 #define STACK_ALLOC(sp, len) ({ sp -= len ; sp; })
@@ -135,8 +135,10 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	unsigned long p = bprm->p;
 	int argc = bprm->argc;
 	int envc = bprm->envc;
-	elf_addr_t *argv, *envp;
-	elf_addr_t *sp, *u_platform;
+	elf_addr_t __user *argv;
+	elf_addr_t __user *envp;
+	elf_addr_t __user *sp;
+	elf_addr_t __user *u_platform;
 	const char *k_platform = ELF_PLATFORM;
 	int items;
 	elf_addr_t *elf_info;
@@ -169,7 +171,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 		if (smp_num_siblings > 1)
 			STACK_ALLOC(p, ((current->pid % 64) << 7));
 #endif
-		u_platform = (elf_addr_t *)STACK_ALLOC(p, len);
+		u_platform = (elf_addr_t __user *)STACK_ALLOC(p, len);
 		__copy_to_user(u_platform, k_platform, len);
 	}
 
@@ -222,10 +224,10 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 
 	/* Point sp at the lowest address on the stack */
 #ifdef CONFIG_STACK_GROWSUP
-	sp = (elf_addr_t *)bprm->p - items - ei_index;
+	sp = (elf_addr_t __user *)bprm->p - items - ei_index;
 	bprm->exec = (unsigned long) sp; /* XXX: PARISC HACK */
 #else
-	sp = (elf_addr_t *)bprm->p;
+	sp = (elf_addr_t __user *)bprm->p;
 #endif
 
 	/* Now, let's put argc (and argv, envp if appropriate) on the stack */
@@ -245,7 +247,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	while (argc-- > 0) {
 		size_t len;
 		__put_user((elf_addr_t)p, argv++);
-		len = strnlen_user((void *)p, PAGE_SIZE*MAX_ARG_PAGES);
+		len = strnlen_user((void __user *)p, PAGE_SIZE*MAX_ARG_PAGES);
 		if (!len || len > PAGE_SIZE*MAX_ARG_PAGES)
 			return;
 		p += len;
@@ -255,7 +257,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	while (envc-- > 0) {
 		size_t len;
 		__put_user((elf_addr_t)p, envp++);
-		len = strnlen_user((void *)p, PAGE_SIZE*MAX_ARG_PAGES);
+		len = strnlen_user((void __user *)p, PAGE_SIZE*MAX_ARG_PAGES);
 		if (!len || len > PAGE_SIZE*MAX_ARG_PAGES)
 			return;
 		p += len;
@@ -264,7 +266,7 @@ create_elf_tables(struct linux_binprm *bprm, struct elfhdr * exec,
 	current->mm->env_end = p;
 
 	/* Put the elf_info on the stack in the right place.  */
-	sp = (elf_addr_t *)envp + 1;
+	sp = (elf_addr_t __user *)envp + 1;
 	copy_to_user(sp, elf_info, ei_index * sizeof(elf_addr_t));
 }
 
@@ -418,7 +420,7 @@ static unsigned long load_aout_interp(struct exec * interp_ex,
 			     struct file * interpreter)
 {
 	unsigned long text_data, elf_entry = ~0UL;
-	char * addr;
+	char __user * addr;
 	loff_t offset;
 
 	current->mm->end_code = interp_ex->a_text;
@@ -429,12 +431,12 @@ static unsigned long load_aout_interp(struct exec * interp_ex,
 	switch (N_MAGIC(*interp_ex)) {
 	case OMAGIC:
 		offset = 32;
-		addr = (char *) 0;
+		addr = (char __user *)0;
 		break;
 	case ZMAGIC:
 	case QMAGIC:
 		offset = N_TXTOFF(*interp_ex);
-		addr = (char *) N_TXTADDR(*interp_ex);
+		addr = (char __user *) N_TXTADDR(*interp_ex);
 		break;
 	default:
 		goto out;
@@ -734,7 +736,7 @@ static int load_elf_binary(struct linux_binprm * bprm, struct pt_regs * regs)
 				nbyte = ELF_MIN_ALIGN - nbyte;
 				if (nbyte > elf_brk - elf_bss)
 					nbyte = elf_brk - elf_bss;
-				clear_user((void *) elf_bss + load_bias, nbyte);
+				clear_user((void __user *) elf_bss + load_bias, nbyte);
 			}
 		}
 
@@ -1184,7 +1186,7 @@ static void fill_psinfo(struct elf_prpsinfo *psinfo, struct task_struct *p,
 	if (len >= ELF_PRARGSZ)
 		len = ELF_PRARGSZ-1;
 	copy_from_user(&psinfo->pr_psargs,
-		       (const char *)mm->arg_start, len);
+		       (const char __user *)mm->arg_start, len);
 	for(i = 0; i < len; i++)
 		if (psinfo->pr_psargs[i] == 0)
 			psinfo->pr_psargs[i] = ' ';
