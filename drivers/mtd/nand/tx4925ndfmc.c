@@ -11,7 +11,7 @@
  * Derived from drivers/mtd/autcpu12.c
  *       Copyright (c) 2001 Thomas Gleixner (gleixner@autronix.de)
  *
- * $Id: tx4925ndfmc.c,v 1.2 2004/03/27 19:55:53 gleixner Exp $
+ * $Id: tx4925ndfmc.c,v 1.3 2004/07/20 02:44:26 dwmw2 Exp $
  *
  * Copyright (C) 2001 Toshiba Corporation 
  * 
@@ -38,14 +38,6 @@ extern struct nand_oobinfo jffs2_oobinfo;
  * MTD structure for RBTX4925 board
  */
 static struct mtd_info *tx4925ndfmc_mtd = NULL;
-
-/*
- * Module stuff
- */
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define tx4925ndfmc_init init_module
-#define tx4925ndfmc_cleanup cleanup_module
-#endif
 
 /*
  * Define partitions for flash devices

@@ -4,7 +4,7 @@
  *
  * (C) 2000 Red Hat. GPL'd
  *
- * $Id: cfi_cmdset_0020.c,v 1.13 2004/07/12 21:52:50 dwmw2 Exp $
+ * $Id: cfi_cmdset_0020.c,v 1.14 2004/07/20 02:44:25 dwmw2 Exp $
  * 
  * 10/10/2000	Nicolas Pitre <nico@cam.org>
  * 	- completely revamped method functions so they are aware and
@@ -1399,11 +1399,6 @@ static void cfi_staa_destroy(struct mtd_info *mtd)
 	kfree(cfi->cmdset_priv);
 	kfree(cfi);
 }
-
-#if LINUX_VERSION_CODE < 0x20212 && defined(MODULE)
-#define cfi_staa_init init_module
-#define cfi_staa_exit cleanup_module
-#endif
 
 static char im_name[]="cfi_cmdset_0020";
 
