@@ -411,7 +411,7 @@ static void usX2Y_urb_release(struct urb** urb, int free_tb)
 		if (free_tb)
 			kfree((*urb)->transfer_buffer);
 		usb_free_urb(*urb);
-		*urb = 0;
+		*urb = NULL;
 	}
 }
 /*
@@ -427,7 +427,7 @@ static void usX2Y_urbs_release(snd_usX2Y_substream_t *subs)
 
 	if (subs->tmpbuf) {
 		kfree(subs->tmpbuf);
-		subs->tmpbuf = 0;
+		subs->tmpbuf = NULL;
 	}
 }
 
@@ -794,7 +794,7 @@ static int snd_usX2Y_pcm_prepare(snd_pcm_substream_t *substream)
 				return err;
 		snd_printdd("starting capture pipe for playpipe\n");
 		usX2Y_urbs_allocate(capsubs);
-		capsubs->completed_urb = 0;
+		capsubs->completed_urb = NULL;
 		{
 			DECLARE_WAITQUEUE(wait, current);
 			add_wait_queue(&capsubs->wait_queue, &wait);
@@ -838,7 +838,7 @@ static int snd_usX2Y_pcm_prepare(snd_pcm_substream_t *substream)
 				}
 			}
 		}
-		subs->completed_urb = 0;
+		subs->completed_urb = NULL;
 		subs->next_urb_complete = -1;
 		subs->stalled = 0;
 	}
