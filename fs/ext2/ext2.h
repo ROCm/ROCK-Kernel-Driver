@@ -34,7 +34,7 @@ struct ext2_inode_info {
 
 static inline struct ext2_inode_info *EXT2_I(struct inode *inode)
 {
-	return list_entry(inode, struct ext2_inode_info, vfs_inode);
+	return container_of(inode, struct ext2_inode_info, vfs_inode);
 }
 
 /* balloc.c */

@@ -140,7 +140,7 @@ static inline struct qnx4_sb_info *qnx4_sb(struct super_block *sb)
 
 static inline struct qnx4_inode_info *qnx4_i(struct inode *inode)
 {
-	return list_entry(inode, struct qnx4_inode_info, vfs_inode);
+	return container_of(inode, struct qnx4_inode_info, vfs_inode);
 }
 
 static inline struct qnx4_inode_entry *qnx4_raw_inode(struct inode *inode)

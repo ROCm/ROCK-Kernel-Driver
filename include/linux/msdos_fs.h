@@ -198,7 +198,7 @@ static inline struct msdos_sb_info *MSDOS_SB(struct super_block *sb)
 
 static inline struct msdos_inode_info *MSDOS_I(struct inode *inode)
 {
-	return list_entry(inode, struct msdos_inode_info, vfs_inode);
+	return container_of(inode, struct msdos_inode_info, vfs_inode);
 }
 
 struct fat_cache {

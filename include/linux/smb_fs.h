@@ -38,7 +38,7 @@ static inline struct smb_sb_info *SMB_SB(struct super_block *sb)
 
 static inline struct smb_inode_info *SMB_I(struct inode *inode)
 {
-	return list_entry(inode, struct smb_inode_info, vfs_inode);
+	return container_of(inode, struct smb_inode_info, vfs_inode);
 }
 
 /* macro names are short for word, double-word, long value (?) */

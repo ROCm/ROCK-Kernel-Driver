@@ -392,6 +392,7 @@ struct pci_dev {
 
 #define pci_dev_g(n) list_entry(n, struct pci_dev, global_list)
 #define pci_dev_b(n) list_entry(n, struct pci_dev, bus_list)
+#define	to_pci_dev(n) container_of(n, struct pci_dev, dev)
 
 /*
  *  For PCI devices, the region numbers are assigned this way:
@@ -490,6 +491,8 @@ struct pci_driver {
 
 	struct device_driver	driver;
 };
+
+#define	to_pci_driver(drv) container_of(drv,struct pci_driver, driver)
 
 
 /* these external functions are only available when PCI support is enabled */

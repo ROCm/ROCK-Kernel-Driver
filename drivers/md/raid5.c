@@ -1820,18 +1820,18 @@ static int raid5_add_disk(mddev_t *mddev, mdk_rdev_t *rdev)
 
 static mdk_personality_t raid5_personality=
 {
-	name:		"raid5",
-	make_request:	make_request,
-	run:		run,
-	stop:		stop,
-	status:		status,
-	error_handler:	error,
-	hot_add_disk:	raid5_add_disk,
-	hot_remove_disk:raid5_remove_disk,
-	spare_write:	raid5_spare_write,
-	spare_inactive:	raid5_spare_inactive,
-	spare_active:	raid5_spare_active,
-	sync_request:	sync_request
+	.name		= "raid5",
+	.make_request	= make_request,
+	.run		= run,
+	.stop		= stop,
+	.status		= status,
+	.error_handler	= error,
+	.hot_add_disk	= raid5_add_disk,
+	.hot_remove_disk= raid5_remove_disk,
+	.spare_write	= raid5_spare_write,
+	.spare_inactive	= raid5_spare_inactive,
+	.spare_active	= raid5_spare_active,
+	.sync_request	= sync_request,
 };
 
 static int __init raid5_init (void)

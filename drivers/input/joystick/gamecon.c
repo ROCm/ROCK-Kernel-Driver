@@ -113,8 +113,7 @@ static void gc_n64_read_packet(struct gc *gc, unsigned char *data)
  * Request the pad to transmit data
  */
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 	for (i = 0; i < GC_N64_REQUEST_LENGTH; i++) {
 		parport_write_data(gc->pd->port, GC_N64_POWER_W | ((GC_N64_REQUEST >> i) & 1 ? GC_N64_OUT : 0));
 		udelay(GC_N64_DWS);
@@ -270,8 +269,7 @@ static int gc_psx_read_packet(struct gc *gc, unsigned char *data)
 	parport_write_data(gc->pd->port, GC_PSX_CLOCK | GC_PSX_POWER);			/* Deselect, begin command */
 	udelay(GC_PSX_DELAY * 2);
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 
 	gc_psx_command(gc, 0x01);							/* Access pad */
 	id = gc_psx_command(gc, 0x42);							/* Get device id */

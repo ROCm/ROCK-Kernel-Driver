@@ -1863,7 +1863,7 @@ queue:
 
 	goto queue;
 startio:
-	blk_stop_queue(q);
+	__blk_stop_queue(q);
 	start_io(h);
 }
 

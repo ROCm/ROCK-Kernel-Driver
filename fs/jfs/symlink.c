@@ -19,17 +19,6 @@
 #include <linux/fs.h>
 #include "jfs_incore.h"
 
-static int jfs_readlink(struct dentry *, char *buffer, int buflen);
-static int jfs_follow_link(struct dentry *dentry, struct nameidata *nd);
-
-/*
- * symlinks can't do much...
- */
-struct inode_operations jfs_symlink_inode_operations = {
-	readlink:	jfs_readlink,
-	follow_link:	jfs_follow_link,
-};
-
 static int jfs_follow_link(struct dentry *dentry, struct nameidata *nd)
 {
 	char *s = JFS_IP(dentry->d_inode)->i_inline;
@@ -41,3 +30,9 @@ static int jfs_readlink(struct dentry *dentry, char *buffer, int buflen)
 	char *s = JFS_IP(dentry->d_inode)->i_inline;
 	return vfs_readlink(dentry, buffer, buflen, s);
 }
+
+struct inode_operations jfs_symlink_inode_operations = {
+	.readlink	= jfs_readlink,
+	.follow_link	= jfs_follow_link,
+};
+

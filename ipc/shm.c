@@ -105,12 +105,14 @@ static void shm_open (struct vm_area_struct *shmd)
  *
  * @shp: struct to free
  *
- * It has to be called with shp and shm_ids.sem locked
+ * It has to be called with shp and shm_ids.sem locked,
+ * but returns with shp unlocked and freed.
  */
 static void shm_destroy (struct shmid_kernel *shp)
 {
 	shm_tot -= (shp->shm_segsz + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	shm_rmid (shp->id);
+	shm_unlock(shp->id);
 	shmem_lock(shp->shm_file, 0);
 	fput (shp->shm_file);
 	kfree (shp);
@@ -138,8 +140,8 @@ static void shm_close (struct vm_area_struct *shmd)
 	if(shp->shm_nattch == 0 &&
 	   shp->shm_flags & SHM_DEST)
 		shm_destroy (shp);
-
-	shm_unlock(id);
+	else
+		shm_unlock(id);
 	up (&shm_ids.sem);
 }
 
@@ -502,11 +504,9 @@ asmlinkage long sys_shmctl (int shmid, int cmd, struct shmid_ds *buf)
 			shp->shm_flags |= SHM_DEST;
 			/* Do not find it any more */
 			shp->shm_perm.key = IPC_PRIVATE;
+			shm_unlock(shmid);
 		} else
 			shm_destroy (shp);
-
-		/* Unlock */
-		shm_unlock(shmid);
 		up(&shm_ids.sem);
 		return err;
 	}
@@ -644,7 +644,8 @@ invalid:
 	if(shp->shm_nattch == 0 &&
 	   shp->shm_flags & SHM_DEST)
 		shm_destroy (shp);
-	shm_unlock(shmid);
+	else
+		shm_unlock(shmid);
 	up (&shm_ids.sem);
 
 	*raddr = (unsigned long) user_addr;

@@ -45,15 +45,6 @@ int jfs_fsync(struct file *file, struct dentry *dentry, int datasync)
 	return rc ? -EIO : 0;
 }
 
-struct file_operations jfs_file_operations = {
-	open:		generic_file_open,
-	llseek:		generic_file_llseek,
-	write:		generic_file_write,
-	read:		generic_file_read,
-	mmap:		generic_file_mmap,
-	fsync:		jfs_fsync,
-};
-
 /*
  * Guts of jfs_truncate.  Called with locks already held.  Can be called
  * with directory for truncating directory index table.
@@ -98,5 +89,14 @@ static void jfs_truncate(struct inode *ip)
 }
 
 struct inode_operations jfs_file_inode_operations = {
-	truncate:	jfs_truncate,
+	.truncate	= jfs_truncate,
+};
+
+struct file_operations jfs_file_operations = {
+	.open		= generic_file_open,
+	.llseek		= generic_file_llseek,
+	.write		= generic_file_write,
+	.read		= generic_file_read,
+	.mmap		= generic_file_mmap,
+	.fsync		= jfs_fsync,
 };

@@ -306,7 +306,7 @@ static struct pci_ops * __devinit pci_check_direct(void)
 	unsigned int tmp;
 	unsigned long flags;
 
-	local_save_flags(flags); local_irq_disable();
+	local_irq_save(flags);
 
 	/*
 	 * Check if configuration type 1 works.

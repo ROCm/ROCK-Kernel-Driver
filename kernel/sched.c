@@ -728,7 +728,7 @@ void scheduler_tick(int user_tick, int system)
 
 	if (p == rq->idle) {
 		/* note: this timer irq context must be accounted for as well */
-		if (preempt_count() >= 2*IRQ_OFFSET)
+		if (irq_count() >= 2*HARDIRQ_OFFSET)
 			kstat.per_cpu_system[cpu] += system;
 #if CONFIG_SMP
 		idle_tick();
@@ -902,6 +902,12 @@ asmlinkage void preempt_schedule(void)
 
 	if (unlikely(ti->preempt_count))
 		return;
+	if (unlikely(irqs_disabled())) {
+		preempt_disable();
+		printk("bad: schedule() with irqs disabled!\n");
+		show_stack(NULL);
+		preempt_enable_no_resched();
+	}
 
 need_resched:
 	ti->preempt_count = PREEMPT_ACTIVE;
@@ -1020,7 +1026,7 @@ void wait_for_completion(struct completion *x)
 	wait_queue_t wait;			\
 	init_waitqueue_entry(&wait, current);
 
-#define	SLEEP_ON_HEAD					\
+#define SLEEP_ON_HEAD					\
 	spin_lock_irqsave(&q->lock,flags);		\
 	__add_wait_queue(q, &wait);			\
 	spin_unlock(&q->lock);
@@ -1467,7 +1473,12 @@ asmlinkage long sys_sched_yield(void)
 		list_add_tail(&current->run_list, array->queue + current->prio);
 		__set_bit(current->prio, array->bitmap);
 	}
-	spin_unlock_no_resched(&rq->lock);
+	/*
+	 * Since we are going to call schedule() anyway, there's
+	 * no need to preempt:
+	 */
+	_raw_spin_unlock(&rq->lock);
+	preempt_enable_no_resched();
 
 	schedule();
 
@@ -1680,8 +1691,7 @@ void __init init_idle(task_t *idle, int cpu)
 	runqueue_t *idle_rq = cpu_rq(cpu), *rq = cpu_rq(task_cpu(idle));
 	unsigned long flags;
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 	double_rq_lock(idle_rq, rq);
 
 	idle_rq->curr = idle_rq->idle = idle;
@@ -1697,6 +1707,8 @@ void __init init_idle(task_t *idle, int cpu)
 	/* Set the preempt count _outside_ the spinlocks! */
 #if CONFIG_PREEMPT
 	idle->thread_info->preempt_count = (idle->lock_depth >= 0);
+#else
+	idle->thread_info->preempt_count = 0;
 #endif
 }
 

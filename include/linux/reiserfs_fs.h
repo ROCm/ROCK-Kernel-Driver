@@ -288,7 +288,7 @@ struct unfm_nodeinfo {
 
 static inline struct reiserfs_inode_info *REISERFS_I(struct inode *inode)
 {
-	return list_entry(inode, struct reiserfs_inode_info, vfs_inode);
+	return container_of(inode, struct reiserfs_inode_info, vfs_inode);
 }
 
 static inline struct reiserfs_sb_info *REISERFS_SB(const struct super_block *sb)

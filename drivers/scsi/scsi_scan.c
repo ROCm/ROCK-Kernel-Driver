@@ -293,8 +293,7 @@ static int scsilun_to_int(ScsiLun *scsilun_pnt)
 static ssize_t scsi_device_type_read(struct device *driverfs_dev, char *page, 
 	size_t count, loff_t off)
 {
-	struct scsi_device *SDpnt = list_entry(driverfs_dev,
-		struct scsi_device, sdev_driverfs_dev);
+	struct scsi_device *SDpnt = to_scsi_device(driverfs_dev);
 
 	if ((SDpnt->type <= MAX_SCSI_DEVICE_CODE) && 
 		(scsi_device_types[(int)SDpnt->type] != NULL))

@@ -460,7 +460,7 @@ void do_tty_hangup(void *data)
 	{
 		unsigned long flags;
 
-		local_save_flags(flags); local_irq_disable(); // FIXME: is this safe?
+		local_irq_save(flags); // FIXME: is this safe?
 		if (tty->ldisc.flush_buffer)
 			tty->ldisc.flush_buffer(tty);
 		if (tty->driver.flush_buffer)
@@ -1900,7 +1900,7 @@ static void flush_to_ldisc(void *private_)
 		fp = tty->flip.flag_buf + TTY_FLIPBUF_SIZE;
 		tty->flip.buf_num = 0;
 
-		local_save_flags(flags); local_irq_disable(); // FIXME: is this safe?
+		local_irq_save(flags); // FIXME: is this safe?
 		tty->flip.char_buf_ptr = tty->flip.char_buf;
 		tty->flip.flag_buf_ptr = tty->flip.flag_buf;
 	} else {
@@ -1908,7 +1908,7 @@ static void flush_to_ldisc(void *private_)
 		fp = tty->flip.flag_buf;
 		tty->flip.buf_num = 1;
 
-		local_save_flags(flags); local_irq_disable(); // FIXME: is this safe?
+		local_irq_save(flags); // FIXME: is this safe?
 		tty->flip.char_buf_ptr = tty->flip.char_buf + TTY_FLIPBUF_SIZE;
 		tty->flip.flag_buf_ptr = tty->flip.flag_buf + TTY_FLIPBUF_SIZE;
 	}

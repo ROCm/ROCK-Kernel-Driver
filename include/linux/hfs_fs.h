@@ -322,7 +322,7 @@ extern void hfs_tolower(unsigned char *, int);
 
 static inline struct hfs_inode_info *HFS_I(struct inode *inode)
 {
-	return list_entry(inode, struct hfs_inode_info, vfs_inode);
+	return container_of(inode, struct hfs_inode_info, vfs_inode);
 }
 
 static inline struct hfs_sb_info *HFS_SB(struct super_block *sb)

@@ -1346,18 +1346,18 @@ static int stop(mddev_t *mddev)
 
 static mdk_personality_t raid1_personality =
 {
-	name:		"raid1",
-	make_request:	make_request,
-	run:		run,
-	stop:		stop,
-	status:		status,
-	error_handler:	error,
-	hot_add_disk:	raid1_add_disk,
-	hot_remove_disk:raid1_remove_disk,
-	spare_write:	raid1_spare_write,
-	spare_inactive:	raid1_spare_inactive,
-	spare_active:	raid1_spare_active,
-	sync_request:	sync_request
+	.name		= "raid1",
+	.make_request	= make_request,
+	.run		= run,
+	.stop		= stop,
+	.status		= status,
+	.error_handler	= error,
+	.hot_add_disk	= raid1_add_disk,
+	.hot_remove_disk= raid1_remove_disk,
+	.spare_write	= raid1_spare_write,
+	.spare_inactive	= raid1_spare_inactive,
+	.spare_active	= raid1_spare_active,
+	.sync_request	= sync_request,
 };
 
 static int __init raid_init(void)

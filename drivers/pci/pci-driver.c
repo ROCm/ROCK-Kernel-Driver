@@ -41,8 +41,8 @@ static int pci_device_probe(struct device * dev)
 	struct pci_driver *drv;
 	struct pci_dev *pci_dev;
 
-	drv = list_entry(dev->driver, struct pci_driver, driver);
-	pci_dev = list_entry(dev, struct pci_dev, dev);
+	drv = to_pci_driver(dev->driver);
+	pci_dev = to_pci_dev(dev);
 
 	if (drv->probe) {
 		const struct pci_device_id *id;
@@ -60,7 +60,7 @@ static int pci_device_probe(struct device * dev)
 
 static int pci_device_remove(struct device * dev)
 {
-	struct pci_dev * pci_dev = list_entry(dev,struct pci_dev,dev);
+	struct pci_dev * pci_dev = to_pci_dev(dev);
 	struct pci_driver * drv = pci_dev->driver;
 
 	if (drv) {
@@ -73,7 +73,7 @@ static int pci_device_remove(struct device * dev)
 
 static int pci_device_suspend(struct device * dev, u32 state, u32 level)
 {
-	struct pci_dev * pci_dev = (struct pci_dev *)list_entry(dev,struct pci_dev,dev);
+	struct pci_dev * pci_dev = to_pci_dev(dev);
 	int error = 0;
 
 	if (pci_dev->driver) {
@@ -87,7 +87,7 @@ static int pci_device_suspend(struct device * dev, u32 state, u32 level)
 
 static int pci_device_resume(struct device * dev, u32 level)
 {
-	struct pci_dev * pci_dev = (struct pci_dev *)list_entry(dev,struct pci_dev,dev);
+	struct pci_dev * pci_dev = to_pci_dev(dev);
 
 	if (pci_dev->driver) {
 		if (level == RESUME_POWER_ON && pci_dev->driver->resume)
@@ -175,8 +175,8 @@ pci_dev_driver(const struct pci_dev *dev)
  */
 static int pci_bus_match(struct device * dev, struct device_driver * drv) 
 {
-	struct pci_dev * pci_dev = list_entry(dev, struct pci_dev, dev);
-	struct pci_driver * pci_drv = list_entry(drv,struct pci_driver,driver);
+	struct pci_dev * pci_dev = to_pci_dev(dev);
+	struct pci_driver * pci_drv = to_pci_driver(drv);
 	const struct pci_device_id * ids = pci_drv->id_table;
 
 	if (!ids) 

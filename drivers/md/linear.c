@@ -193,11 +193,11 @@ static int linear_status (char *page, mddev_t *mddev)
 
 static mdk_personality_t linear_personality=
 {
-	name:		"linear",
-	make_request:	linear_make_request,
-	run:		linear_run,
-	stop:		linear_stop,
-	status:		linear_status,
+	.name		= "linear",
+	.make_request	= linear_make_request,
+	.run		= linear_run,
+	.stop		= linear_stop,
+	.status		= linear_status,
 };
 
 static int __init linear_init (void)

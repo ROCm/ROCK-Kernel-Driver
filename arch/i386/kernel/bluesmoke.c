@@ -10,6 +10,7 @@
 #include <linux/config.h>
 #include <linux/irq.h>
 #include <linux/tqueue.h>
+#include <linux/interrupt.h>
 
 #include <asm/processor.h> 
 #include <asm/system.h>

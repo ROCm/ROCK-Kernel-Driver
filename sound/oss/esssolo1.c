@@ -235,10 +235,9 @@ static inline void write_seq(struct solo1_state *s, unsigned char data)
         int i;
 	unsigned long flags;
 
-	/* the local_irq_disable stunt is to send the data within the command window */
+	/* the local_irq_save stunt is to send the data within the command window */
         for (i = 0; i < 0xffff; i++) {
-		local_save_flags(flags);
-		local_irq_disable();
+		local_irq_save(flags);
                 if (!(inb(s->sbbase+0xc) & 0x80)) {
                         outb(data, s->sbbase+0xc);
 			local_irq_restore(flags);

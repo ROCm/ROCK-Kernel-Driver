@@ -740,10 +740,10 @@ struct task_struct *do_fork(unsigned long clone_flags,
 	 * total amount of pending timeslices in the system doesnt change,
 	 * resulting in more scheduling fairness.
 	 */
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 	p->time_slice = (current->time_slice + 1) >> 1;
 	current->time_slice >>= 1;
+	p->sleep_timestamp = jiffies;
 	if (!current->time_slice) {
 		/*
 	 	 * This case is rare, it happens when the parent has only
@@ -751,10 +751,12 @@ struct task_struct *do_fork(unsigned long clone_flags,
 		 * runqueue lock is not a problem.
 		 */
 		current->time_slice = 1;
+		preempt_disable();
 		scheduler_tick(0, 0);
-	}
-	p->sleep_timestamp = jiffies;
-	local_irq_restore(flags);
+		local_irq_restore(flags);
+		preempt_enable();
+	} else
+		local_irq_restore(flags);
 
 	/*
 	 * Ok, add it to the run-queues and make it

@@ -318,7 +318,7 @@ void __kfree_skb(struct sk_buff *skb)
 
 	dst_release(skb->dst);
 	if(skb->destructor) {
-		if (0 && in_irq())
+		if (in_irq())
 			printk(KERN_WARNING "Warning: kfree_skb on "
 					    "hard IRQ %p\n", NET_CALLER(skb));
 		skb->destructor(skb);

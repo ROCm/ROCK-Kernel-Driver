@@ -125,8 +125,7 @@ static int tmdc_read_packet(struct gameport *gameport, unsigned char data[2][TMD
 		i[k] = j[k] = 0;
 	}
 
-	local_save_flags(flags);
-	local_irq_disable();
+	local_irq_save(flags);
 	gameport_trigger(gameport);
 	
 	w = gameport_read(gameport) >> 4;

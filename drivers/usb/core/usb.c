@@ -832,7 +832,7 @@ show_config (struct device *dev, char *buf, size_t count, loff_t off)
 
 	if (off)
 		return 0;
-	udev = list_entry (dev, struct usb_device, dev);
+	udev = to_usb_device (dev);
 	return sprintf (buf, "%u\n", udev->actconfig->bConfigurationValue);
 }
 static struct driver_file_entry usb_config_entry = {
@@ -851,7 +851,7 @@ show_altsetting (struct device *dev, char *buf, size_t count, loff_t off)
 
 	if (off)
 		return 0;
-	interface = list_entry (dev, struct usb_interface, dev);
+	interface = to_usb_interface (dev);
 	return sprintf (buf, "%u\n", interface->altsetting->bAlternateSetting);
 }
 static struct driver_file_entry usb_altsetting_entry = {
@@ -868,7 +868,7 @@ static ssize_t show_product (struct device *dev, char *buf, size_t count, loff_t
 
 	if (off)
 		return 0;
-	udev = list_entry (dev, struct usb_device, dev);
+	udev = to_usb_device (dev);
 
 	len = usb_string(udev, udev->descriptor.iProduct, buf, PAGE_SIZE); 
 	buf[len] = '\n';
@@ -890,7 +890,7 @@ show_manufacturer (struct device *dev, char *buf, size_t count, loff_t off)
 
 	if (off)
 		return 0;
-	udev = list_entry (dev, struct usb_device, dev);
+	udev = to_usb_device (dev);
 
 	len = usb_string(udev, udev->descriptor.iManufacturer, buf, PAGE_SIZE); 
 	buf[len] = '\n';
@@ -912,7 +912,7 @@ show_serial (struct device *dev, char *buf, size_t count, loff_t off)
 
 	if (off)
 		return 0;
-	udev = list_entry (dev, struct usb_device, dev);
+	udev = to_usb_device (dev);
 
 	len = usb_string(udev, udev->descriptor.iSerialNumber, buf, PAGE_SIZE); 
 	buf[len] = '\n';

@@ -68,7 +68,7 @@ static inline struct adfs_sb_info *ADFS_SB(struct super_block *sb)
 
 static inline struct adfs_inode_info *ADFS_I(struct inode *inode)
 {
-	return list_entry(inode, struct adfs_inode_info, vfs_inode);
+	return container_of(inode, struct adfs_inode_info, vfs_inode);
 }
 
 #endif

@@ -257,6 +257,7 @@ struct usb_interface {
 	struct device dev;		/* interface specific device info */
 	void *private_data;
 };
+#define	to_usb_interface(d) container_of(d, struct usb_interface, dev)
 
 /* USB_DT_CONFIG: Configuration descriptor information.
  *
@@ -422,6 +423,7 @@ struct usb_device {
 	int maxchild;			/* Number of ports if hub */
 	struct usb_device *children[USB_MAXCHILDREN];
 };
+#define	to_usb_device(d) container_of(d, struct usb_device, dev)
 
 extern struct usb_device *usb_alloc_dev(struct usb_device *parent, struct usb_bus *);
 extern struct usb_device *usb_get_dev(struct usb_device *dev);

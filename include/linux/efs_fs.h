@@ -41,7 +41,7 @@ static const char cprt[] = "EFS: "EFS_VERSION" - (c) 1999 Al Smith <Al.Smith@aes
 
 static inline struct efs_inode_info *INODE_INFO(struct inode *inode)
 {
-	return list_entry(inode, struct efs_inode_info, vfs_inode);
+	return container_of(inode, struct efs_inode_info, vfs_inode);
 }
 
 static inline struct efs_sb_info *SUPER_INFO(struct super_block *sb)

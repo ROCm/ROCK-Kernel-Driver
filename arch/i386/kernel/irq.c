@@ -187,6 +187,10 @@ int show_interrupts(struct seq_file *p, void *v)
 #if CONFIG_SMP
 inline void synchronize_irq(unsigned int irq)
 {
+	/* is there anything to synchronize with? */
+	if (!irq_desc[irq].action)
+		return;
+
 	while (irq_desc[irq].status & IRQ_INPROGRESS)
 		cpu_relax();
 }
@@ -392,8 +396,6 @@ out:
 
 	irq_exit();
 
-	if (softirq_pending(cpu))
-		do_softirq();
 	return 1;
 }
 

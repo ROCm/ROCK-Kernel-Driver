@@ -249,7 +249,6 @@ static inline kdev_t mddev_to_kdev(mddev_t * mddev)
 }
 
 extern mdk_rdev_t * find_rdev_nr(mddev_t *mddev, int nr);
-extern mdk_rdev_t *get_spare(mddev_t *mddev);
 
 /*
  * iterates through some rdev ringlist. It's safe to remove the

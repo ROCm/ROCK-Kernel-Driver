@@ -701,10 +701,10 @@ static int e_show(struct seq_file *m, void *p)
 }
 
 struct seq_operations nfs_exports_op = {
-	start:	e_start,
-	next:	e_next,
-	stop:	e_stop,
-	show:	e_show,
+	.start	= e_start,
+	.next	= e_next,
+	.stop	= e_stop,
+	.show	= e_show,
 };
 
 /*

@@ -627,6 +627,8 @@ struct scsi_device {
 	int allow_revalidate;
 	struct device sdev_driverfs_dev;
 };
+#define	to_scsi_device(d)	\
+	container_of(d, struct scsi_device, sdev_driverfs_dev)
 
 
 /*

@@ -267,7 +267,7 @@ driverfs_read_file(struct file *file, char *buf, size_t count, loff_t *ppos)
 	if (count > PAGE_SIZE)
 		count = PAGE_SIZE;
 
-	dev = list_entry(entry->parent,struct device, dir);
+	dev = to_device(entry->parent);
 
 	page = (unsigned char*)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -328,7 +328,7 @@ driverfs_write_file(struct file *file, const char *buf, size_t count, loff_t *pp
 	if (!entry->store)
 		return 0;
 
-	dev = list_entry(entry->parent,struct device, dir);
+	dev = to_device(entry->parent);
 
 	page = (char *)__get_free_page(GFP_KERNEL);
 	if (!page)
@@ -394,7 +394,7 @@ static int driverfs_open_file(struct inode * inode, struct file * filp)
 	entry = (struct driver_file_entry *)inode->u.generic_ip;
 	if (!entry)
 		return -EFAULT;
-	dev = (struct device *)list_entry(entry->parent,struct device,dir);
+	dev = to_device(entry->parent);
 	get_device(dev);
 	filp->private_data = entry;
 	return 0;
@@ -408,7 +408,7 @@ static int driverfs_release(struct inode * inode, struct file * filp)
 	entry = (struct driver_file_entry *)filp->private_data;
 	if (!entry)
 		return -EFAULT;
-	dev = (struct device *)list_entry(entry->parent,struct device,dir);
+	dev = to_device(entry->parent);
 	put_device(dev);
 	return 0;
 }

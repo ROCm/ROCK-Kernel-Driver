@@ -288,7 +288,7 @@ static struct inode *sock_alloc_inode(struct super_block *sb)
 static void sock_destroy_inode(struct inode *inode)
 {
 	kmem_cache_free(sock_inode_cachep,
-			list_entry(inode, struct socket_alloc, vfs_inode));
+			container_of(inode, struct socket_alloc, vfs_inode));
 }
 
 static void init_once(void * foo, kmem_cache_t * cachep, unsigned long flags)

@@ -219,7 +219,7 @@ struct proc_inode {
 
 static inline struct proc_inode *PROC_I(const struct inode *inode)
 {
-	return list_entry(inode, struct proc_inode, vfs_inode);
+	return container_of(inode, struct proc_inode, vfs_inode);
 }
 
 static inline struct proc_dir_entry *PDE(const struct inode *inode)
