@@ -171,7 +171,7 @@ RTN *FNAME ARGS										\
 					if (!new) break;				\
 											\
 					new->MEMBER.next = tmp->MEMBER.next;		\
-					*head = &new->MEMBER;				\
+					*hp = &new->MEMBER;				\
 					tmp->MEMBER.next = NULL;			\
 					set_bit(CACHE_HASHED, &new->MEMBER.flags);	\
 					clear_bit(CACHE_HASHED, &tmp->MEMBER.flags);	\
