@@ -2454,7 +2454,7 @@ void __init ip_rt_init(void)
 
 #ifdef CONFIG_NET_CLS_ROUTE
 	for (order = 0;
-	     (PAGE_SIZE << order) < 256 * sizeof(ip_rt_acct) * NR_CPUS; order++)
+	     (PAGE_SIZE << order) < 256 * sizeof(struct ip_rt_acct) * NR_CPUS; order++)
 		/* NOTHING */;
 	ip_rt_acct = (struct ip_rt_acct *)__get_free_pages(GFP_KERNEL, order);
 	if (!ip_rt_acct)
