@@ -19,7 +19,7 @@
 #define NCR_A0VPP	(1<<16)
 #define NCR_A1VPP	(1<<17)
 
-static int xp860_pcmcia_init(struct pcmcia_init *init)
+static int xp860_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 {
   /* Set GPIO_A<3:0> to be outputs for PCMCIA/CF power controller: */
   PA_DDR &= ~(GPIO_GPIO0 | GPIO_GPIO1 | GPIO_GPIO2 | GPIO_GPIO3);
@@ -38,11 +38,11 @@ static int xp860_pcmcia_init(struct pcmcia_init *init)
   GPDR |= (NCR_A0VPP | NCR_A1VPP);
   GPCR &= ~(NCR_A0VPP | NCR_A1VPP);
 
-  return sa1111_pcmcia_init(init);
+  return sa1111_pcmcia_hw_init(skt);
 }
 
 static int
-xp860_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
+xp860_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
 {
   unsigned int gpio_mask, pa_dwr_mask;
   unsigned int gpio_set, pa_dwr_set;
@@ -72,28 +72,28 @@ xp860_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
    * the corresponding truth table.
    */
 
-  switch (sock) {
+  switch (skt->nr) {
   case 0:
     pa_dwr_mask = GPIO_GPIO0 | GPIO_GPIO1;
     gpio_mask = NCR_A0VPP | NCR_A1VPP;
 
-    switch (conf->vcc) {
+    switch (state->Vcc) {
     default:
     case 0:	pa_dwr_set = 0;			break;
     case 33:	pa_dwr_set = GPIO_GPIO1;	break;
     case 50:	pa_dwr_set = GPIO_GPIO0;	break;
     }
 
-    switch (conf->vpp) {
+    switch (state->Vpp) {
     case 0:	gpio_set = 0;			break;
     case 120:	gpio_set = NCR_A1VPP;		break;
 
     default:
-      if (conf->vpp == conf->vcc)
+      if (state->Vpp == state->Vcc)
 	gpio_set = NCR_A0VPP;
       else {
 	printk(KERN_ERR "%s(): unrecognized Vpp %u\n",
-	       __FUNCTION__, conf->vpp);
+	       __FUNCTION__, state->Vpp);
 	return -1;
       }
     }
@@ -104,22 +104,22 @@ xp860_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
     gpio_mask = 0;
     gpio_set = 0;
 
-    switch (conf->vcc) {
+    switch (state->Vcc) {
     default:
     case 0:	pa_dwr_set = 0;			break;
     case 33:	pa_dwr_set = GPIO_GPIO2;	break;
     case 50:	pa_dwr_set = GPIO_GPIO3;	break;
     }
 
-    if (conf->vpp != conf->vcc && conf->vpp != 0) {
+    if (state->Vpp != state->Vcc && state->Vpp != 0) {
       printk(KERN_ERR "%s(): CF slot cannot support Vpp %u\n",
-	     __FUNCTION__, conf->vpp);
+	     __FUNCTION__, state->Vpp);
       return -1;
     }
     break;
   }
 
-  ret = sa1111_pcmcia_configure_socket(sock, conf);
+  ret = sa1111_pcmcia_configure_socket(skt, state);
   if (ret == 0) {
     unsigned long flags;
 
@@ -134,14 +134,13 @@ xp860_pcmcia_configure_socket(int sock, const struct pcmcia_configure *conf)
 }
 
 static struct pcmcia_low_level xp860_pcmcia_ops = { 
-  .owner		= THIS_MODULE,
-  .init			= xp860_pcmcia_init,
-  .shutdown		= sa1111_pcmcia_shutdown,
-  .socket_state		= sa1111_pcmcia_socket_state,
-  .configure_socket	= xp860_pcmcia_configure_socket,
-
-  .socket_init		= sa1111_pcmcia_socket_init,
-  .socket_suspend	= sa1111_pcmcia_socket_suspend,
+	.owner			= THIS_MODULE,
+	.hw_init		= xp860_pcmcia_hw_init,
+	.hw_shutdown		= sa1111_pcmcia_hw_shutdown,
+	.socket_state		= sa1111_pcmcia_socket_state,
+	.configure_socket	= xp860_pcmcia_configure_socket,
+	.socket_init		= sa1111_pcmcia_socket_init,
+	.socket_suspend		= sa1111_pcmcia_socket_suspend,
 };
 
 int __init pcmcia_xp860_init(struct device *dev)
@@ -149,13 +148,7 @@ int __init pcmcia_xp860_init(struct device *dev)
 	int ret = -ENODEV;
 
 	if (machine_is_xp860())
-		ret = sa1100_register_pcmcia(&xp860_pcmcia_ops, dev);
+		ret = sa11xx_drv_pcmcia_probe(dev, &xp860_pcmcia_ops, 0, 2);
 
 	return ret;
 }
-
-void __exit pcmcia_xp860_exit(struct device *dev)
-{
-	sa1100_unregister_pcmcia(&xp860_pcmcia_ops, dev);
-}
-

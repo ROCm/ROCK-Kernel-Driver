@@ -106,7 +106,7 @@ static void bad_page(const char *function, struct page *page)
  * This is only for debug at present.  This usage means that zero-order pages
  * may not be compound.
  */
-static void prep_compound_page(struct page *page, int order)
+static void prep_compound_page(struct page *page, unsigned long order)
 {
 	int i;
 	int nr_pages = 1 << order;
@@ -121,7 +121,7 @@ static void prep_compound_page(struct page *page, int order)
 	}
 }
 
-static void destroy_compound_page(struct page *page, int order)
+static void destroy_compound_page(struct page *page, unsigned long order)
 {
 	int i;
 	int nr_pages = 1 << order;

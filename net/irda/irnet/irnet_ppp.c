@@ -213,10 +213,12 @@ irnet_read_discovery_log(irnet_socket *	ap,
   if(ap->disco_index < ap->disco_number)
     {
       /* Write an event */
-      sprintf(event, "Found %08x (%s) behind %08x\n",
+      sprintf(event, "Found %08x (%s) behind %08x {hints %02X-%02X}\n",
 	      ap->discoveries[ap->disco_index].daddr,
 	      ap->discoveries[ap->disco_index].info,
-	      ap->discoveries[ap->disco_index].saddr);
+	      ap->discoveries[ap->disco_index].saddr,
+	      ap->discoveries[ap->disco_index].hints[0],
+	      ap->discoveries[ap->disco_index].hints[1]);
       DEBUG(CTRL_INFO, "Writing discovery %d : %s\n",
 	    ap->disco_index, ap->discoveries[ap->disco_index].info);
 
@@ -313,16 +315,20 @@ irnet_ctrl_read(irnet_socket *	ap,
   switch(irnet_events.log[ap->event_index].event)
     {
     case IRNET_DISCOVER:
-      sprintf(event, "Discovered %08x (%s) behind %08x\n",
+      sprintf(event, "Discovered %08x (%s) behind %08x {hints %02X-%02X}\n",
 	      irnet_events.log[ap->event_index].daddr,
 	      irnet_events.log[ap->event_index].name,
-	      irnet_events.log[ap->event_index].saddr);
+	      irnet_events.log[ap->event_index].saddr,
+	      irnet_events.log[ap->event_index].hints.byte[0],
+	      irnet_events.log[ap->event_index].hints.byte[1]);
       break;
     case IRNET_EXPIRE:
-      sprintf(event, "Expired %08x (%s) behind %08x\n",
+      sprintf(event, "Expired %08x (%s) behind %08x {hints %02X-%02X}\n",
 	      irnet_events.log[ap->event_index].daddr,
 	      irnet_events.log[ap->event_index].name,
-	      irnet_events.log[ap->event_index].saddr);
+	      irnet_events.log[ap->event_index].saddr,
+	      irnet_events.log[ap->event_index].hints.byte[0],
+	      irnet_events.log[ap->event_index].hints.byte[1]);
       break;
     case IRNET_CONNECT_TO:
       sprintf(event, "Connected to %08x (%s) on ppp%d\n",
@@ -445,8 +451,6 @@ dev_irnet_open(struct inode *	inode,
   ap = kmalloc(sizeof(*ap), GFP_KERNEL);
   DABORT(ap == NULL, -ENOMEM, FS_ERROR, "Can't allocate struct irnet...\n");
 
-  MOD_INC_USE_COUNT;
-
   /* initialize the irnet structure */
   memset(ap, 0, sizeof(*ap));
   ap->file = file;
@@ -469,7 +473,6 @@ dev_irnet_open(struct inode *	inode,
     {
       DERROR(FS_ERROR, "Can't setup IrDA link...\n");
       kfree(ap);
-      MOD_DEC_USE_COUNT;
       return err;
     }
 
@@ -514,7 +517,6 @@ dev_irnet_close(struct inode *	inode,
     }
 
   kfree(ap);
-  MOD_DEC_USE_COUNT;
 
   DEXIT(FS_TRACE, "\n");
   return 0;

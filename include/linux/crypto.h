@@ -31,7 +31,6 @@
 #define CRYPTO_ALG_TYPE_DIGEST		0x00000002
 #define CRYPTO_ALG_TYPE_COMPRESS	0x00000004
 
-
 /*
  * Transform masks and values (for crt_flags).
  */
@@ -45,13 +44,11 @@
 #define CRYPTO_TFM_MODE_CTR		0x00000008
 
 #define CRYPTO_TFM_REQ_WEAK_KEY		0x00000100
-
 #define CRYPTO_TFM_RES_WEAK_KEY		0x00100000
 #define CRYPTO_TFM_RES_BAD_KEY_LEN   	0x00200000
 #define CRYPTO_TFM_RES_BAD_KEY_SCHED 	0x00400000
 #define CRYPTO_TFM_RES_BAD_BLOCK_LEN 	0x00800000
 #define CRYPTO_TFM_RES_BAD_FLAGS 	0x01000000
-
 
 /*
  * Miscellaneous stuff.
@@ -83,8 +80,12 @@ struct digest_alg {
 };
 
 struct compress_alg {
-	void (*coa_compress)(void);
-	void (*coa_decompress)(void);
+	int (*coa_init)(void *ctx);
+	void (*coa_exit)(void *ctx);
+	int (*coa_compress)(void *ctx, const u8 *src, unsigned int slen,
+	                    u8 *dst, unsigned int *dlen);
+	int (*coa_decompress)(void *ctx, const u8 *src, unsigned int slen,
+	                      u8 *dst, unsigned int *dlen);
 };
 
 #define cra_cipher	cra_u.cipher
@@ -162,8 +163,12 @@ struct digest_tfm {
 };
 
 struct compress_tfm {
-	void (*cot_compress)(struct crypto_tfm *tfm);
-	void (*cot_decompress)(struct crypto_tfm *tfm);
+	int (*cot_compress)(struct crypto_tfm *tfm,
+	                    const u8 *src, unsigned int slen,
+	                    u8 *dst, unsigned int *dlen);
+	int (*cot_decompress)(struct crypto_tfm *tfm,
+	                      const u8 *src, unsigned int slen,
+	                      u8 *dst, unsigned int *dlen);
 };
 
 #define crt_cipher	crt_u.cipher
@@ -336,16 +341,20 @@ static inline void crypto_cipher_get_iv(struct crypto_tfm *tfm,
 	memcpy(dst, tfm->crt_cipher.cit_iv, len);
 }
 
-static inline void crypto_comp_compress(struct crypto_tfm *tfm)
+static inline int crypto_comp_compress(struct crypto_tfm *tfm,
+                                       const u8 *src, unsigned int slen,
+                                       u8 *dst, unsigned int *dlen)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_COMPRESS);
-	tfm->crt_compress.cot_compress(tfm);
+	return tfm->crt_compress.cot_compress(tfm, src, slen, dst, dlen);
 }
 
-static inline void crypto_comp_decompress(struct crypto_tfm *tfm) 
+static inline int crypto_comp_decompress(struct crypto_tfm *tfm,
+                                         const u8 *src, unsigned int slen,
+                                         u8 *dst, unsigned int *dlen)
 {
 	BUG_ON(crypto_tfm_alg_type(tfm) != CRYPTO_ALG_TYPE_COMPRESS);
-	tfm->crt_compress.cot_decompress(tfm);
+	return tfm->crt_compress.cot_decompress(tfm, src, slen, dst, dlen);
 }
 
 /*

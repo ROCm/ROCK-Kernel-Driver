@@ -13,40 +13,44 @@
 
 #define RESERVED_ID_BITS 8
 
-#if     BITS_PER_LONG == 32
-#define IDR_BITS 5
-#define IDR_FULL 0xffffffff
+#if BITS_PER_LONG == 32
+# define IDR_BITS 5
+# define IDR_FULL 0xffffffff
 #elif BITS_PER_LONG == 64
-#define IDR_BITS 6
-#define IDR_FULL 0xffffffffffffffff
+# define IDR_BITS 6
+# define IDR_FULL 0xffffffffffffffff
 #else
-#error "BITS_PER_LONG is not 32 or 64"
+# error "BITS_PER_LONG is not 32 or 64"
 #endif
 
 #define IDR_MASK ((1 << IDR_BITS)-1)
 
-/* Leave the possibility of an incomplete final layer */
-#define MAX_LEVEL (BITS_PER_LONG - RESERVED_ID_BITS + IDR_BITS - 1) / IDR_BITS
-#define MAX_ID_SHIFT (BITS_PER_LONG - RESERVED_ID_BITS)
-#define MAX_ID_BIT (1L << MAX_ID_SHIFT)
+/* Define the size of the id's */
+#define BITS_PER_INT (sizeof(int)*8)
+
+#define MAX_ID_SHIFT (BITS_PER_INT - RESERVED_ID_BITS)
+#define MAX_ID_BIT (1 << MAX_ID_SHIFT)
 #define MAX_ID_MASK (MAX_ID_BIT - 1)
+
+/* Leave the possibility of an incomplete final layer */
+#define MAX_LEVEL (MAX_ID_SHIFT + IDR_BITS - 1) / IDR_BITS
 
 /* Number of id_layer structs to leave in free list */
 #define IDR_FREE_MAX MAX_LEVEL + MAX_LEVEL
 
 struct idr_layer {
-	unsigned long	        bitmap;     // A zero bit means "space here"
-	int                     count;      // When zero, we can release it
-	struct idr_layer       *ary[1<<IDR_BITS];
+	unsigned long		 bitmap;	/* A zero bit means "space here" */
+	struct idr_layer	*ary[1<<IDR_BITS];
+	int			 count;		/* When zero, we can release it */
 };
 
 struct idr {
 	struct idr_layer *top;
-	int		  layers;
-	long		  count;
 	struct idr_layer *id_free;
-	int               id_free_cnt;
-	spinlock_t        lock;
+	long		  count;
+	int		  layers;
+	int		  id_free_cnt;
+	spinlock_t	  lock;
 };
 
 /*

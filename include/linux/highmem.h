@@ -18,7 +18,11 @@ unsigned int nr_free_highpages(void);
 
 static inline unsigned int nr_free_highpages(void) { return 0; }
 
-static inline void *kmap(struct page *page) { return page_address(page); }
+static inline void *kmap(struct page *page)
+{
+	might_sleep();
+	return page_address(page);
+}
 
 #define kunmap(page) do { (void) (page); } while (0)
 

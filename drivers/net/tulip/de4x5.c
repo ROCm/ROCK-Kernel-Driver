@@ -452,7 +452,6 @@
 #include <linux/pci.h>
 #include <linux/delay.h>
 #include <linux/init.h>
-#include <linux/version.h>
 #include <linux/spinlock.h>
 #include <linux/crc32.h>
 #include <linux/netdevice.h>

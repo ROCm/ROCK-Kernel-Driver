@@ -208,7 +208,9 @@ static int el3_resume(struct pm_dev *pdev);
 static int el3_pm_callback(struct pm_dev *pdev, pm_request_t rqst, void *data);
 #endif
 /* generic device remove for all device types */
+#if defined(CONFIG_EISA) || defined(CONFIG_MCA)
 static int el3_device_remove (struct device *device);
+#endif
 
 #ifdef CONFIG_EISA
 struct eisa_device_id el3_eisa_ids[] = {

@@ -157,7 +157,6 @@ typedef struct socket_info_t {
 #ifdef CONFIG_PROC_FS
     struct proc_dir_entry	*proc;
 #endif
-    int				use_bus_pm;
 } socket_info_t;
 
 /* Flags in config state */

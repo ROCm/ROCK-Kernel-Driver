@@ -72,8 +72,8 @@ int DRM(waitlist_put)(drm_waitlist_t *bl, drm_buf_t *buf)
 
 	left = DRM_LEFTCOUNT(bl);
 	if (!left) {
-		DRM_ERROR("Overflow while adding buffer %d from pid %d\n",
-			  buf->idx, buf->pid);
+		DRM_ERROR("Overflow while adding buffer %d from filp %p\n",
+			  buf->idx, buf->filp);
 		return -EINVAL;
 	}
 #if __HAVE_DMA_HISTOGRAM

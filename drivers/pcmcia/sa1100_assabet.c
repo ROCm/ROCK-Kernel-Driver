@@ -20,85 +20,47 @@
 
 #include "sa1100_generic.h"
 
-static struct irqs {
-	int irq;
-	const char *str;
-} irqs[] = {
-	{ ASSABET_IRQ_GPIO_CF_CD,   "CF_CD"   },
-	{ ASSABET_IRQ_GPIO_CF_BVD2, "CF_BVD2" },
-	{ ASSABET_IRQ_GPIO_CF_BVD1, "CF_BVD1" },
+static struct pcmcia_irqs irqs[] = {
+	{ 1, ASSABET_IRQ_GPIO_CF_CD,   "CF CD"   },
+	{ 1, ASSABET_IRQ_GPIO_CF_BVD2, "CF BVD2" },
+	{ 1, ASSABET_IRQ_GPIO_CF_BVD1, "CF BVD1" },
 };
 
-static int assabet_pcmcia_init(struct pcmcia_init *init)
+static int assabet_pcmcia_hw_init(struct sa1100_pcmcia_socket *skt)
 {
-	int i, res;
+	skt->irq = ASSABET_IRQ_GPIO_CF_IRQ;
 
-	/* Register interrupts */
-	for (i = 0; i < ARRAY_SIZE(irqs); i++) {
-		res = request_irq(irqs[i].irq, sa1100_pcmcia_interrupt,
-				  SA_INTERRUPT, irqs[i].str, NULL);
-		if (res)
-			goto irq_err;
-		set_irq_type(irqs[i].irq, IRQT_NOEDGE);
-	}
-
-	init->socket_irq[0] = NO_IRQ;
-	init->socket_irq[1] = ASSABET_IRQ_GPIO_CF_IRQ;
-
-	/* There's only one slot, but it's "Slot 1": */
-	return 2;
-
- irq_err:
-	printk(KERN_ERR "%s: request for IRQ%d failed (%d)\n",
-		__FUNCTION__, irqs[i].irq, res);
-
-	while (i--)
-		free_irq(irqs[i].irq, NULL);
-
-	return res;
+	return sa11xx_request_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 /*
  * Release all resources.
  */
-static int assabet_pcmcia_shutdown(void)
+static void assabet_pcmcia_hw_shutdown(struct sa1100_pcmcia_socket *skt)
 {
-	int i;
-
-	for (i = 0; i < ARRAY_SIZE(irqs); i++)
-		free_irq(irqs[i].irq, NULL);
-  
-	return 0;
+	sa11xx_free_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 static void
-assabet_pcmcia_socket_state(int sock, struct pcmcia_state *state)
+assabet_pcmcia_socket_state(struct sa1100_pcmcia_socket *skt, struct pcmcia_state *state)
 {
 	unsigned long levels = GPLR;
 
-	if (sock == 1) {
-		state->detect = (levels & ASSABET_GPIO_CF_CD) ? 0 : 1;
-		state->ready  = (levels & ASSABET_GPIO_CF_IRQ) ? 1 : 0;
-		state->bvd1   = (levels & ASSABET_GPIO_CF_BVD1) ? 1 : 0;
-		state->bvd2   = (levels & ASSABET_GPIO_CF_BVD2) ? 1 : 0;
-		state->wrprot = 0; /* Not available on Assabet. */
-		state->vs_3v  = 1; /* Can only apply 3.3V on Assabet. */
-		state->vs_Xv  = 0;
-	}
+	state->detect = (levels & ASSABET_GPIO_CF_CD) ? 0 : 1;
+	state->ready  = (levels & ASSABET_GPIO_CF_IRQ) ? 1 : 0;
+	state->bvd1   = (levels & ASSABET_GPIO_CF_BVD1) ? 1 : 0;
+	state->bvd2   = (levels & ASSABET_GPIO_CF_BVD2) ? 1 : 0;
+	state->wrprot = 0; /* Not available on Assabet. */
+	state->vs_3v  = 1; /* Can only apply 3.3V on Assabet. */
+	state->vs_Xv  = 0;
 }
 
 static int
-assabet_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configure)
+assabet_pcmcia_configure_socket(struct sa1100_pcmcia_socket *skt, const socket_state_t *state)
 {
 	unsigned int mask;
 
-	if (sock > 1)
-		return -1;
-
-	if (sock == 0)
-		return 0;
-
-	switch (configure->vcc) {
+	switch (state->Vcc) {
 	case 0:
 		mask = 0;
 		break;
@@ -113,13 +75,13 @@ assabet_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configu
 
 	default:
 		printk(KERN_ERR "%s(): unrecognized Vcc %u\n", __FUNCTION__,
-			configure->vcc);
+			state->Vcc);
 		return -1;
 	}
 
 	/* Silently ignore Vpp, output enable, speaker enable. */
 
-	if (configure->reset)
+	if (state->flags & SS_RESET)
 		mask |= ASSABET_BCR_CF_RST;
 
 	ASSABET_BCR_frob(ASSABET_BCR_CF_RST | ASSABET_BCR_CF_PWR, mask);
@@ -132,48 +94,36 @@ assabet_pcmcia_configure_socket(int sock, const struct pcmcia_configure *configu
  * be called at initialisation, power management event, or
  * pcmcia event.
  */
-static int assabet_pcmcia_socket_init(int sock)
+static void assabet_pcmcia_socket_init(struct sa1100_pcmcia_socket *skt)
 {
-	int i;
+	/*
+	 * Enable CF bus
+	 */
+	ASSABET_BCR_clear(ASSABET_BCR_CF_BUS_OFF);
 
-	if (sock == 1) {
-		/*
-		 * Enable CF bus
-		 */
-		ASSABET_BCR_clear(ASSABET_BCR_CF_BUS_OFF);
-
-		for (i = 0; i < ARRAY_SIZE(irqs); i++)
-			set_irq_type(irqs[i].irq, IRQT_BOTHEDGE);
-	}
-
-	return 0;
+	sa11xx_enable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 }
 
 /*
  * Disable card status IRQs on suspend.
  */
-static int assabet_pcmcia_socket_suspend(int sock)
+static void assabet_pcmcia_socket_suspend(struct sa1100_pcmcia_socket *skt)
 {
-	int i;
+	sa11xx_disable_irqs(skt, irqs, ARRAY_SIZE(irqs));
 
-	if (sock == 1) {
-		for (i = 0; i < ARRAY_SIZE(irqs); i++)
-			set_irq_type(irqs[i].irq, IRQT_NOEDGE);
-
-		/*
-		 * Tristate the CF bus signals.  Also assert CF
-		 * reset as per user guide page 4-11.
-		 */
-		ASSABET_BCR_set(ASSABET_BCR_CF_BUS_OFF | ASSABET_BCR_CF_RST);
-	}
-
-	return 0;
+	/*
+	 * Tristate the CF bus signals.  Also assert CF
+	 * reset as per user guide page 4-11.
+	 */
+	ASSABET_BCR_set(ASSABET_BCR_CF_BUS_OFF | ASSABET_BCR_CF_RST);
 }
 
 static struct pcmcia_low_level assabet_pcmcia_ops = { 
 	.owner			= THIS_MODULE,
-	.init			= assabet_pcmcia_init,
-	.shutdown		= assabet_pcmcia_shutdown,
+
+	.hw_init		= assabet_pcmcia_hw_init,
+	.hw_shutdown		= assabet_pcmcia_hw_shutdown,
+
 	.socket_state		= assabet_pcmcia_socket_state,
 	.configure_socket	= assabet_pcmcia_configure_socket,
 
@@ -185,20 +135,8 @@ int __init pcmcia_assabet_init(struct device *dev)
 {
 	int ret = -ENODEV;
 
-	if (machine_is_assabet()) {
-		if (!machine_has_neponset())
-			ret = sa1100_register_pcmcia(&assabet_pcmcia_ops, dev);
-#ifndef CONFIG_ASSABET_NEPONSET
-		else
-			printk(KERN_ERR "Card Services disabled: missing "
-				"Neponset support\n");
-#endif
-	}
+	if (machine_is_assabet() && !machine_has_neponset())
+		ret = sa11xx_drv_pcmcia_probe(dev, &assabet_pcmcia_ops, 1, 1);
+
 	return ret;
 }
-
-void __exit pcmcia_assabet_exit(struct device *dev)
-{
-	sa1100_unregister_pcmcia(&assabet_pcmcia_ops, dev);
-}
-

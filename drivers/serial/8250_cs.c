@@ -690,26 +690,25 @@ serial_event(event_t event, int priority, event_callback_args_t * args)
 	return 0;
 }
 
-/*====================================================================*/
+static struct pcmcia_driver serial_cs_driver = {
+	.owner		= THIS_MODULE,
+	.drv		= {
+		.name	= "serial_cs",
+	},
+	.attach		= serial_attach,
+	.detach		= serial_detach,
+};
 
 static int __init init_serial_cs(void)
 {
-	servinfo_t serv;
-	DEBUG(0, "%s\n", version);
-	CardServices(GetCardServicesInfo, &serv);
-	if (serv.Revision != CS_RELEASE_CODE) {
-		printk(KERN_NOTICE "serial_cs: Card Services release "
-		       "does not match!\n");
-		return -1;
-	}
-	register_pccard_driver(&dev_info, &serial_attach, &serial_detach);
-	return 0;
+	return pcmcia_register_driver(&serial_cs_driver);
 }
 
 static void __exit exit_serial_cs(void)
 {
-	DEBUG(0, "serial_cs: unloading\n");
-	unregister_pccard_driver(&dev_info);
+	pcmcia_unregister_driver(&serial_cs_driver);
+
+	/* XXX: this really needs to move into generic code.. */
 	while (dev_list != NULL)
 		serial_detach(dev_list);
 }

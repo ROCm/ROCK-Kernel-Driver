@@ -289,9 +289,10 @@ static void do_sys_vm86(struct kernel_vm86_struct *info, struct task_struct *tsk
 	asm volatile("movl %%fs,%0":"=m" (tsk->thread.saved_fs));
 	asm volatile("movl %%gs,%0":"=m" (tsk->thread.saved_gs));
 
-	tss = init_tss + smp_processor_id();
+	tss = init_tss + get_cpu();
 	tss->esp0 = tsk->thread.esp0 = (unsigned long) &info->VM86_TSS_ESP0;
 	disable_sysenter(tss);
+	put_cpu();
 
 	tsk->thread.screen_bitmap = info->screen_bitmap;
 	if (info->flags & VM86_SCREEN_BITMAP)

@@ -49,6 +49,7 @@
 #include <linux/poll.h>
 #include <linux/pci.h>
 #include <linux/list.h>
+#include <linux/workqueue.h>
 
 #include <pcmcia/version.h>
 #include <pcmcia/cs_types.h>
@@ -103,7 +104,7 @@ struct pcmcia_bus_socket {
 	user_info_t		*user;
 	int			req_pending, req_result;
 	wait_queue_head_t	queue, request;
-	struct timer_list	removal;
+	struct work_struct	removal;
 	socket_bind_t		*bind;
 	struct device		*socket_dev;
 	struct list_head	socket_list;
@@ -299,9 +300,9 @@ static int handle_request(struct pcmcia_bus_socket *s, event_t event)
     return CS_SUCCESS;
 }
 
-static void handle_removal(u_long sn)
+static void handle_removal(void *data)
 {
-    struct pcmcia_bus_socket *s = get_socket_info_by_nr(sn);
+    struct pcmcia_bus_socket *s = data;
     handle_event(s, CS_EVENT_CARD_REMOVAL);
     s->state &= ~SOCKET_REMOVAL_PENDING;
 }
@@ -326,10 +327,8 @@ static int ds_event(event_t event, int priority,
     case CS_EVENT_CARD_REMOVAL:
 	s->state &= ~SOCKET_PRESENT;
 	if (!(s->state & SOCKET_REMOVAL_PENDING)) {
-	    s->state |= SOCKET_REMOVAL_PENDING;
-	    init_timer(&s->removal);
-	    s->removal.expires = jiffies + HZ/10;
-	    add_timer(&s->removal);
+		s->state |= SOCKET_REMOVAL_PENDING;
+		schedule_delayed_work(&s->removal,  HZ/10);
 	}
 	break;
 	
@@ -922,9 +921,7 @@ static int __devinit pcmcia_bus_add_socket(struct device *dev, unsigned int sock
 
 	/* initialize data */
 	s->socket_dev = dev;
-	s->removal.data = s->socket_no;
-	s->removal.function = &handle_removal;
-	init_timer(&s->removal);
+	INIT_WORK(&s->removal, handle_removal, s);
     
 	/* Set up hotline to Card Services */
 	client_reg.dev_info = bind.dev_info = &dev_info;
@@ -985,6 +982,8 @@ static int __devexit pcmcia_bus_remove_socket_dev(struct device *dev)
 
 	if (!cls_d)
 		return -ENODEV;
+
+	flush_scheduled_work();
 
 	down_write(&bus_socket_list_rwsem);
 	list_for_each_safe(list_loop, tmp_storage, &bus_socket_list) {
