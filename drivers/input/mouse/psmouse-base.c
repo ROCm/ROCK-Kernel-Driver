@@ -176,7 +176,7 @@ static irqreturn_t psmouse_interrupt(struct serio *serio,
 		       psmouse->name, psmouse->phys, psmouse->pktcnt);
 		psmouse->pktcnt = 0;
 
-		if (++psmouse->out_of_sync == psmouse->resetafter) {
+		if (psmouse->resetafter) {
 			psmouse->state = PSMOUSE_IGNORE;
 			printk(KERN_NOTICE "psmouse.c: issuing reconnect request\n");
 			serio_reconnect(psmouse->ps2dev.serio);
