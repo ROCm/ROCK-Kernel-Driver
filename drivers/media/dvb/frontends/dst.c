@@ -963,7 +963,6 @@ struct lkup {
 	{FE_GET_FRONTEND,            "FE_GET_FRONTEND:" },
 	{FE_SLEEP,                   "FE_SLEEP:" },
 	{FE_INIT,                    "FE_INIT:" },
-	{FE_RESET,                   "FE_RESET:" },
 	{FE_SET_TONE,                "FE_SET_TONE:" },
 	{FE_SET_VOLTAGE,             "FE_SET_VOLTAGE:" },
 	};
@@ -1091,9 +1090,6 @@ static int dst_ioctl (struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		dst_init(dst);
 		break;
 
-	case FE_RESET:
-		break;
-
 	case FE_DISEQC_SEND_MASTER_CMD:
 	{
 		struct dvb_diseqc_master_cmd *cmd = (struct dvb_diseqc_master_cmd *)arg;
@@ -1149,8 +1145,8 @@ static int dst_attach (struct dvb_i2c_bus *i2c, void **data)
 	}
 
 	dst_init (dst);
-	dprintk("%s: register dst %p bt %p i2c %p\n", __FUNCTION__, 
-		dst, dst->bt, dst->i2c);
+	dprintk("%s: register dst %8.8x bt %8.8x i2c %8.8x\n", __FUNCTION__, 
+			(u32)dst, (u32)(dst->bt), (u32)(dst->i2c));
 
 	info = &dst_info_sat;
 	if (dst->dst_type == DST_TYPE_IS_TERR)
@@ -1166,7 +1162,7 @@ static int dst_attach (struct dvb_i2c_bus *i2c, void **data)
 static void dst_detach (struct dvb_i2c_bus *i2c, void *data)
 {
 	dvb_unregister_frontend (dst_ioctl, i2c);
-	dprintk("%s: unregister dst %p\n", __FUNCTION__, data);
+	dprintk("%s: unregister dst %8.8x\n", __FUNCTION__, (u32)(data));
 	if (data)
 		kfree(data);
 }

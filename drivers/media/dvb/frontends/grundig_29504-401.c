@@ -35,6 +35,9 @@ static int debug = 0;
 
 #define dprintk	if (debug) printk
 
+struct grundig_state {
+	int first:1;
+};
 
 struct dvb_frontend_info grundig_29504_401_info = {
 	.name = "Grundig 29504-401",
@@ -48,7 +51,7 @@ struct dvb_frontend_info grundig_29504_401_info = {
 	.caps = FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 	      FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
 	      FE_CAN_QPSK | FE_CAN_QAM_16 | FE_CAN_QAM_64 |
-	      FE_CAN_MUTE_TS /*| FE_CAN_CLEAN_SETUP*/
+              FE_CAN_MUTE_TS
 };
 
 
@@ -102,6 +105,7 @@ static int tsa5060_write (struct dvb_i2c_bus *i2c, u8 data [4])
  */
 static int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 {
+#if 1
 	u32 div;
 	u8 buf [4];
 	u8 cfg, cpump, band_select;
@@ -118,6 +122,20 @@ static int tsa5060_set_tv_freq (struct dvb_i2c_bus *i2c, u32 freq)
 	buf [1] = div & 0xff;
 	buf [2] = ((div >> 10) & 0x60) | cfg;
 	buf [3] = (cpump << 6) | band_select;
+#else
+	/* old code which seems to work better for at least one person */
+        u32 div;
+        u8 buf [4];
+        u8 cfg;
+
+        div = (36000000 + freq) / 166666;
+        cfg = 0x88;
+
+        buf [0] = (div >> 8) & 0x7f;
+        buf [1] = div & 0xff;
+        buf [2] = ((div >> 10) & 0x60) | cfg;
+        buf [3] = 0xc0;
+#endif
 
 	return tsa5060_write (i2c, buf);
 }
@@ -276,6 +294,123 @@ static int reset_and_configure (struct dvb_i2c_bus *i2c)
 }
 
 
+static int get_frontend(struct dvb_i2c_bus* i2c, struct dvb_frontend_parameters* param)
+{
+	int tmp;
+
+
+	tmp = l64781_readreg(i2c, 0x04);
+	switch(tmp & 3) {
+	case 0: 
+		param->u.ofdm.guard_interval = GUARD_INTERVAL_1_32; 
+		break;
+	case 1:
+		param->u.ofdm.guard_interval = GUARD_INTERVAL_1_16;
+		break;
+	case 2:
+		param->u.ofdm.guard_interval = GUARD_INTERVAL_1_8; 
+		break;
+	case 3:
+		param->u.ofdm.guard_interval = GUARD_INTERVAL_1_4; 
+		break;
+	}
+	switch((tmp >> 2) & 3) {
+	case 0: 
+		param->u.ofdm.transmission_mode = TRANSMISSION_MODE_2K;
+		break;
+	case 1:
+		param->u.ofdm.transmission_mode = TRANSMISSION_MODE_8K;
+		break;
+	default:
+		printk("Unexpected value for transmission_mode\n");
+	}
+	
+	
+	
+	tmp = l64781_readreg(i2c, 0x05);
+	switch(tmp & 7) {
+	case 0: 
+		param->u.ofdm.code_rate_HP = FEC_1_2;
+		break;
+	case 1:
+		param->u.ofdm.code_rate_HP = FEC_2_3;
+		break;
+	case 2:
+		param->u.ofdm.code_rate_HP = FEC_3_4;
+		break;
+	case 3:
+		param->u.ofdm.code_rate_HP = FEC_5_6;
+		break;
+	case 4:
+		param->u.ofdm.code_rate_HP = FEC_7_8;
+		break;
+	default:
+		printk("Unexpected value for code_rate_HP\n");
+	}
+	switch((tmp >> 3) & 7) {
+	case 0: 
+		param->u.ofdm.code_rate_LP = FEC_1_2;
+		break;
+	case 1:
+		param->u.ofdm.code_rate_LP = FEC_2_3;
+		break;
+	case 2:
+		param->u.ofdm.code_rate_LP = FEC_3_4;
+		break;
+	case 3:
+		param->u.ofdm.code_rate_LP = FEC_5_6;
+		break;
+	case 4:
+		param->u.ofdm.code_rate_LP = FEC_7_8;
+		break;
+	default:
+		printk("Unexpected value for code_rate_LP\n");
+	}
+	
+	
+	tmp = l64781_readreg(i2c, 0x06);
+	switch(tmp & 3) {
+	case 0: 
+		param->u.ofdm.constellation = QPSK;
+		break;
+	case 1:
+		param->u.ofdm.constellation = QAM_16;
+		break;
+	case 2:
+		param->u.ofdm.constellation = QAM_64;
+		break;
+	default:
+		printk("Unexpected value for constellation\n");
+	}
+	switch((tmp >> 2) & 7) {
+	case 0: 
+		param->u.ofdm.hierarchy_information = HIERARCHY_NONE;
+		break;
+	case 1:
+		param->u.ofdm.hierarchy_information = HIERARCHY_1;
+		break;
+	case 2:
+		param->u.ofdm.hierarchy_information = HIERARCHY_2;
+		break;
+	case 3:
+		param->u.ofdm.hierarchy_information = HIERARCHY_4;
+		break;
+	default:
+		printk("Unexpected value for hierarchy\n");
+	}
+
+
+	tmp = l64781_readreg (i2c, 0x1d);
+	param->inversion = (tmp & 0x80) ? INVERSION_ON : INVERSION_OFF;
+
+	tmp = (int) (l64781_readreg (i2c, 0x08) | 
+		     (l64781_readreg (i2c, 0x09) << 8) |
+		     (l64781_readreg (i2c, 0x0a) << 16));
+	param->frequency += tmp;
+
+	return 0;
+}
+
 
 static int init (struct dvb_i2c_bus *i2c)
 {
@@ -318,6 +453,9 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 			     unsigned int cmd, void *arg)
 {
 	struct dvb_i2c_bus *i2c = fe->i2c;
+	int res;
+	struct grundig_state* state = (struct grundig_state*) fe->data;
+
         switch (cmd) {
         case FE_GET_INFO:
 		memcpy (arg, &grundig_29504_401_info,
@@ -393,18 +531,33 @@ int grundig_29504_401_ioctl (struct dvb_frontend *fe,
 		tsa5060_set_tv_freq (i2c, p->frequency);
 		return apply_frontend_param (i2c, p);
 	}
+
         case FE_GET_FRONTEND:
-		/*  we could correct the frequency here, but...
-		 *  (...do you want to implement this?;)
-		 */
-		return 0;
+	{
+		struct dvb_frontend_parameters *p = arg;
+		return get_frontend(i2c, p);
+	}
 
 	case FE_SLEEP:
 		/* Power down */
 		return l64781_writereg (i2c, 0x3e, 0x5a);
 
 	case FE_INIT:
-		return init (i2c);
+		res = init (i2c);
+		if ((res == 0) && (state->first)) {
+			state->first = 0;
+			dvb_delay(200);
+		}
+		return res;
+
+	case FE_GET_TUNE_SETTINGS:
+	{
+	        struct dvb_frontend_tune_settings* fesettings = (struct dvb_frontend_tune_settings*) arg;
+	        fesettings->min_delay_ms = 200;
+	        fesettings->step_size = 166667;
+	        fesettings->max_drift = 166667*2;
+	        return 0;
+	}
 
         default:
 		dprintk ("%s: unknown command !!!\n", __FUNCTION__);
@@ -422,6 +575,7 @@ static int l64781_attach (struct dvb_i2c_bus *i2c, void **data)
 	u8 b1 [] = { 0x00 };
 	struct i2c_msg msg [] = { { .addr = 0x55, .flags = 0, .buf = b0, .len = 1 },
 			   { .addr = 0x55, .flags = I2C_M_RD, .buf = b1, .len = 1 } };
+	struct grundig_state* state;
 
 	/**
 	 *  the L64781 won't show up before we send the reset_and_configure()
@@ -465,7 +619,12 @@ static int l64781_attach (struct dvb_i2c_bus *i2c, void **data)
 	        goto bailout;
 	}
 
-	return dvb_register_frontend (grundig_29504_401_ioctl, i2c, NULL,
+	state = kmalloc(sizeof(struct grundig_state), GFP_KERNEL);
+	if (state == NULL) goto bailout;
+	*data = state;
+	state->first = 1;
+
+	return dvb_register_frontend (grundig_29504_401_ioctl, i2c, state,
 			       &grundig_29504_401_info);
 
  bailout:
@@ -477,6 +636,7 @@ static int l64781_attach (struct dvb_i2c_bus *i2c, void **data)
 
 static void l64781_detach (struct dvb_i2c_bus *i2c, void *data)
 {
+	kfree(data);
 	dvb_unregister_frontend (grundig_29504_401_ioctl, i2c);
 }
 

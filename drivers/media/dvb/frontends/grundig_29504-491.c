@@ -52,8 +52,7 @@ static struct dvb_frontend_info grundig_29504_491_info = {
 		FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 | FE_CAN_FEC_3_4 |
 		FE_CAN_FEC_4_5 | FE_CAN_FEC_5_6 | FE_CAN_FEC_6_7 |
 		FE_CAN_FEC_7_8 | FE_CAN_FEC_8_9 | FE_CAN_FEC_AUTO |
-		FE_CAN_QPSK |
-		FE_CAN_MUTE_TS | FE_CAN_CLEAN_SETUP
+		FE_CAN_QPSK | FE_CAN_MUTE_TS
 };
 
 
@@ -394,11 +393,6 @@ static int grundig_29504_491_ioctl (struct dvb_frontend *fe, unsigned int cmd,
 
 	case FE_INIT:
 		tda8083_init (i2c);
-		tda8083_writereg (i2c, 0x00, 0x3c);
-		tda8083_writereg (i2c, 0x00, 0x04);
-		break;
-
-	case FE_RESET:
 		tda8083_writereg (i2c, 0x00, 0x3c);
 		tda8083_writereg (i2c, 0x00, 0x04);
 		break;

@@ -111,8 +111,7 @@ static struct dvb_frontend_info ves1820_info = {
 #endif
 	.caps = FE_CAN_QAM_16 | FE_CAN_QAM_32 | FE_CAN_QAM_64 |
 		FE_CAN_QAM_128 | FE_CAN_QAM_256 | 
-		FE_CAN_FEC_AUTO | FE_CAN_INVERSION_AUTO |
-		FE_CAN_CLEAN_SETUP | FE_CAN_RECOVER
+		FE_CAN_FEC_AUTO | FE_CAN_INVERSION_AUTO,
 };
 
 

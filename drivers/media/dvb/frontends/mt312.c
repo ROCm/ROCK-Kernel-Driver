@@ -66,8 +66,8 @@ static struct dvb_frontend_info mt312_info = {
 	.caps =
 	    FE_CAN_INVERSION_AUTO | FE_CAN_FEC_1_2 | FE_CAN_FEC_2_3 |
 	    FE_CAN_FEC_3_4 | FE_CAN_FEC_5_6 | FE_CAN_FEC_7_8 |
-	    FE_CAN_FEC_AUTO | FE_CAN_QPSK | FE_CAN_RECOVER |
-	    FE_CAN_CLEAN_SETUP | FE_CAN_MUTE_TS
+	    FE_CAN_FEC_AUTO | FE_CAN_QPSK | FE_CAN_MUTE_TS | 
+            FE_CAN_RECOVER
 };
 
 static int mt312_read(struct dvb_i2c_bus *i2c,
@@ -570,6 +570,8 @@ static int mt312_set_frontend(struct dvb_i2c_bus *i2c,
 	if ((ret = mt312_write(i2c, SYM_RATE_H, buf, sizeof(buf))) < 0)
 		return ret;
 
+        mt312_reset(i2c, 0);
+
 	return 0;
 }
 
@@ -756,8 +758,14 @@ static int mt312_ioctl(struct dvb_frontend *fe, unsigned int cmd, void *arg)
 		else
 			return mt312_init(i2c, (long) fe->data, (u8) 60);
 
-	case FE_RESET:
-		return mt312_reset(i2c, 0);
+	case FE_GET_TUNE_SETTINGS:
+	{
+	        struct dvb_frontend_tune_settings* fesettings = (struct dvb_frontend_tune_settings*) arg;
+	        fesettings->min_delay_ms = 50;
+	        fesettings->step_size = 0;
+	        fesettings->max_drift = 0;
+	        return 0;
+	}	    
 
 	default:
 		return -ENOIOCTLCMD;
