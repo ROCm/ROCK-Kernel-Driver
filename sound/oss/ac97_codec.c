@@ -65,6 +65,7 @@ static int tritech_maestro_init(struct ac97_codec * codec);
 static int sigmatel_9708_init(struct ac97_codec *codec);
 static int sigmatel_9721_init(struct ac97_codec *codec);
 static int sigmatel_9744_init(struct ac97_codec *codec);
+static int ad1886_init(struct ac97_codec *codec);
 static int eapd_control(struct ac97_codec *codec, int);
 static int crystal_digital_control(struct ac97_codec *codec, int mode);
 
@@ -94,6 +95,7 @@ static struct ac97_ops sigmatel_9708_ops = { sigmatel_9708_init, NULL, NULL };
 static struct ac97_ops sigmatel_9721_ops = { sigmatel_9721_init, NULL, NULL };
 static struct ac97_ops sigmatel_9744_ops = { sigmatel_9744_init, NULL, NULL };
 static struct ac97_ops crystal_digital_ops = { NULL, eapd_control, crystal_digital_control };
+static struct ac97_ops ad1886_ops = { ad1886_init, eapd_control, NULL };
 
 /* sorted by vendor/device id */
 static const struct {
@@ -107,7 +109,7 @@ static const struct {
 	{0x41445360, "Analog Devices AD1885",	&default_ops},
 	{0x41445361, "Analog Devices AD1886",	&default_ops},
 	{0x41445460, "Analog Devices AD1885",	&default_ops},
-	{0x41445461, "Analog Devices AD1886",	&default_ops},
+	{0x41445461, "Analog Devices AD1886",	&ad1886_ops},
 	{0x414B4D00, "Asahi Kasei AK4540",	&null_ops},
 	{0x414B4D01, "Asahi Kasei AK4542",	&null_ops},
 	{0x414B4D02, "Asahi Kasei AK4543",	&null_ops},
@@ -871,6 +873,26 @@ static int tritech_maestro_init(struct ac97_codec * codec)
 	codec->codec_write(codec, 0x2C, 0XFFFF);
 	return 0;
 }
+
+
+
+/* 
+ *	Presario700 workaround 
+ * 	for Jack Sense/SPDIF Register misetting causing
+ *	no audible output
+ *	by Santiago Nullo 04/05/2002
+ */
+
+#define AC97_AD1886_JACK_SENSE 0x72
+
+static int ad1886_init(struct ac97_codec * codec)
+{
+	/* from AD1886 Specs */
+	codec->codec_write(codec, AC97_AD1886_JACK_SENSE, 0x0010);
+	return 0;
+}
+
+
 
 
 /*

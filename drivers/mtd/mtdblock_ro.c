@@ -258,7 +258,7 @@ int __init init_mtdblock(void)
 	if (register_blkdev(MAJOR_NR,DEVICE_NAME,&mtd_fops)) {
 		printk(KERN_NOTICE "Can't allocate major number %d for Memory Technology Devices.\n",
 		       MTD_BLOCK_MAJOR);
-		return EAGAIN;
+		return -EAGAIN;
 	}
 	
 	/* We fill it in at open() time. */

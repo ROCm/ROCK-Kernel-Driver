@@ -371,14 +371,14 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
 	return FALSE;
 
 #ifdef PORT_OVERRIDE
-    if(check_region(PORT_OVERRIDE, 0xc)) {
+    if(!request_region(PORT_OVERRIDE, 0xc, "ultrastor")) {
       printk("Ultrastor I/O space already in use\n");
       return FALSE;
     };
     config.port_address = PORT_OVERRIDE;
 #else
     for (i = 0; i < ARRAY_SIZE(ultrastor_ports_14f); i++) {
-      if(check_region(ultrastor_ports_14f[i], 0x0c)) continue;
+      if(!request_region(ultrastor_ports_14f[i], 0x0c, "ultrastor")) continue;
       config.port_address = ultrastor_ports_14f[i];
 #endif
 
@@ -396,8 +396,9 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
 # endif
 #endif
 #ifdef PORT_OVERRIDE
-	    return FALSE;
+	    goto out_release_port;
 #else
+	    release_region(config.port_address, 0x0c);
 	    continue;
 #endif
 	}
@@ -412,8 +413,9 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
 # endif
 #endif
 #ifdef PORT_OVERRIDE
-	    return FALSE;
+	    goto out_release_port;
 #else
+	    release_region(config.port_address, 0x0c);
 	    continue;
 #endif
 	}
@@ -425,6 +427,7 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
 # if (ULTRASTOR_DEBUG & UD_DETECT)
 	printk("US14F: detect: no port address found!\n");
 # endif
+	/* all ports probed already released - we can just go straight out */
 	return FALSE;
     }
 #endif
@@ -441,7 +444,6 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
     /* All above tests passed, must be the right thing.  Get some useful
        info. */
 
-    request_region(config.port_address, 0x0c,"ultrastor"); 
     /* Register the I/O space that we use */
 
     *(char *)&config_1 = inb(CONFIG(config.port_address + 0));
@@ -465,7 +467,7 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
 #if (ULTRASTOR_DEBUG & UD_DETECT)
 	printk("US14F: detect: not detected.\n");
 #endif
-	return FALSE;
+	goto out_release_port;
     }
 
     /* Final consistency check, verify previous info. */
@@ -474,7 +476,7 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
 #if (ULTRASTOR_DEBUG & UD_DETECT)
 	    printk("US14F: detect: consistency check failed\n");
 #endif
-	    return FALSE;
+           goto out_release_port;
 	}
 
     /* If we were TRULY paranoid, we could issue a host adapter inquiry
@@ -507,19 +509,22 @@ static int ultrastor_14f_detect(Scsi_Host_Template * tpnt)
     if (request_irq(config.interrupt, do_ultrastor_interrupt, 0, "Ultrastor", &config.mscp[0].SCint->host)) {
 	printk("Unable to allocate IRQ%u for UltraStor controller.\n",
 	       config.interrupt);
-	return FALSE;
+	goto out_release_port;
     }
     if (config.dma_channel && request_dma(config.dma_channel,"Ultrastor")) {
 	printk("Unable to allocate DMA channel %u for UltraStor controller.\n",
 	       config.dma_channel);
 	free_irq(config.interrupt, NULL);
-	return FALSE;
+	goto out_release_port;
     }
     tpnt->sg_tablesize = ULTRASTOR_14F_MAX_SG;
     printk("UltraStor driver version" VERSION ".  Using %d SG lists.\n",
 	   ULTRASTOR_14F_MAX_SG);
 
     return TRUE;
+out_release_port:
+    release_region(config.port_address, 0x0c);
+    return FALSE;
 }
 
 static int ultrastor_24f_detect(Scsi_Host_Template * tpnt)
