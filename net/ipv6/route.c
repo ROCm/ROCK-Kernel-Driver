@@ -1220,10 +1220,12 @@ int ip6_rt_addr_add(struct in6_addr *addr, struct net_device *dev)
 	if (rt == NULL)
 		return -ENOMEM;
 
+	dev_hold(&loopback_dev);
+
 	rt->u.dst.flags = DST_HOST;
 	rt->u.dst.input = ip6_input;
 	rt->u.dst.output = ip6_output;
-	rt->rt6i_dev = dev_get_by_name("lo");
+	rt->rt6i_dev = &loopback_dev;
 	rt->u.dst.metrics[RTAX_MTU-1] = ipv6_get_mtu(rt->rt6i_dev);
 	rt->u.dst.metrics[RTAX_ADVMSS-1] = max_t(unsigned int, dst_pmtu(&rt->u.dst) - 60, ip6_rt_min_advmss);
 	if (rt->u.dst.metrics[RTAX_ADVMSS-1] > 65535-20)
