@@ -251,17 +251,17 @@ static struct xfrm_algo_desc calg_list[] = {
 
 static inline int aalg_entries(void)
 {
-	return sizeof(aalg_list) / sizeof(aalg_list[0]);
+	return ARRAY_SIZE(aalg_list);
 }
 
 static inline int ealg_entries(void)
 {
-	return sizeof(ealg_list) / sizeof(ealg_list[0]);
+	return ARRAY_SIZE(ealg_list);
 }
 
 static inline int calg_entries(void)
 {
-	return sizeof(calg_list) / sizeof(calg_list[0]);
+	return ARRAY_SIZE(calg_list);
 }
 
 /* Todo: generic iterators */

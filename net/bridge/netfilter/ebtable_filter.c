@@ -98,7 +98,7 @@ static int __init init(void)
 	ret = ebt_register_table(&frame_filter);
 	if (ret < 0)
 		return ret;
-	for (i = 0; i < sizeof(ebt_ops_filter) / sizeof(ebt_ops_filter[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(ebt_ops_filter); i++)
 		if ((ret = nf_register_hook(&ebt_ops_filter[i])) < 0)
 			goto cleanup;
 	return ret;
@@ -113,7 +113,7 @@ static void __exit fini(void)
 {
 	int i;
 
-	for (i = 0; i < sizeof(ebt_ops_filter) / sizeof(ebt_ops_filter[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(ebt_ops_filter); i++)
 		nf_unregister_hook(&ebt_ops_filter[i]);
 	ebt_unregister_table(&frame_filter);
 }

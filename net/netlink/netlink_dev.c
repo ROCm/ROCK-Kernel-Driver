@@ -232,7 +232,7 @@ int __init init_netlink(void)
 	devfs_mk_dir("netlink");
 
 	/*  Someone tell me the official names for the uppercase ones  */
-	for (i = 0; i < sizeof(entries)/sizeof(entries[0]); i++) {
+	for (i = 0; i < ARRAY_SIZE(entries); i++) {
 		devfs_mk_cdev(MKDEV(NETLINK_MAJOR, entries[i].minor),
 			S_IFCHR|S_IRUSR|S_IWUSR, "netlink/%s", entries[i].name);
 	}
@@ -259,7 +259,7 @@ void cleanup_module(void)
 {
 	int i;
 
-	for (i = 0; i < sizeof(entries)/sizeof(entries[0]); i++)
+	for (i = 0; i < ARRAY_SIZE(entries); i++)
 		devfs_remove("netlink/%s", entries[i].name);
 	for (i = 0; i < 16; i++)
 		devfs_remove("netlink/tap%d", i);

@@ -620,13 +620,11 @@ static struct nf_hook_ops br_nf_ops[] = {
 	  .priority = NF_IP_PRI_FIRST, },
 };
 
-#define NUMHOOKS (sizeof(br_nf_ops)/sizeof(br_nf_ops[0]))
-
 int br_netfilter_init(void)
 {
 	int i;
 
-	for (i = 0; i < NUMHOOKS; i++) {
+	for (i = 0; i < ARRAY_SIZE(br_nf_ops); i++) {
 		int ret;
 
 		if ((ret = nf_register_hook(&br_nf_ops[i])) >= 0)
@@ -647,6 +645,6 @@ void br_netfilter_fini(void)
 {
 	int i;
 
-	for (i = NUMHOOKS - 1; i >= 0; i--)
+	for (i = ARRAY_SIZE(br_nf_ops) - 1; i >= 0; i--)
 		nf_unregister_hook(&br_nf_ops[i]);
 }
