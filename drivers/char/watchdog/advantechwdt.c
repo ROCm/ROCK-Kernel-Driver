@@ -33,7 +33,6 @@
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/spinlock.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>

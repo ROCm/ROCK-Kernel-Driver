@@ -3,27 +3,41 @@
  *
  *	(c) Copyright 2001 Ascensit <support@ascensit.com>
  *	(c) Copyright 2001 Rodolfo Giometti <giometti@ascensit.com>
+ *	(c) Copyright 2002 Rob Radez <rob@osinvestor.com>
  *
  *	Based on wdt.c.
  *	Original copyright messages:
  *
- *	(c) Copyright 1996-1997 Alan Cox <alan@redhat.com>, All Rights Reserved.
- *	http://www.redhat.com
+ *      (c) Copyright 1996-1997 Alan Cox <alan@redhat.com>, All Rights Reserved.
+ *                              http://www.redhat.com
  *
- *	This program is free software; you can redistribute it and/or
- *	modify it under the terms of the GNU General Public License
- *	as published by the Free Software Foundation; either version
- *	2 of the License, or (at your option) any later version.
+ *      This program is free software; you can redistribute it and/or
+ *      modify it under the terms of the GNU General Public License
+ *      as published by the Free Software Foundation; either version
+ *      2 of the License, or (at your option) any later version.
  *
- *	Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
- *	warranty for any of this software. This material is provided
- *	"AS-IS" and at no charge.
+ *      Neither Alan Cox nor CymruNet Ltd. admit liability nor provide
+ *      warranty for any of this software. This material is provided
+ *      "AS-IS" and at no charge.
  *
- *	(c) Copyright 1995 Alan Cox <alan@lxorguk.ukuu.org.uk>
+ *      (c) Copyright 1995    Alan Cox <alan@lxorguk.ukuu.org.uk>*
+ */
+
+/* Changelog:
  *
- *	14-Dec-2001 Matt Domsch <Matt_Domsch@dell.com>
- *	  Added nowayout module option to override CONFIG_WATCHDOG_NOWAYOUT
- *	  Added timeout module option to override default
+ * 2002/04/25 - Rob Radez
+ *	clean up #includes
+ *	clean up locking
+ *	make __setup param unique
+ *	proper options in watchdog_info
+ *	add WDIOC_GETSTATUS and WDIOC_SETOPTIONS ioctls
+ *	add expect_close support
+ *
+ * 2001 - Rodolfo Giometti
+ *	Initial release
+ *
+ * 2002.05.30 - Joel Becker <joel.becker@oracle.com>
+ * 	Added Matt Domsch's nowayout module option.
  */
 
 #include <linux/config.h>
@@ -36,39 +50,34 @@
 #include <linux/notifier.h>
 #include <linux/reboot.h>
 #include <linux/init.h>
-#include <linux/spinlock.h>
 
 #include <asm/io.h>
 #include <asm/uaccess.h>
 #include <asm/system.h>
 
-static int eurwdt_is_open;
-static spinlock_t eurwdt_lock;
+static unsigned long eurwdt_is_open;
+static int eurwdt_timeout;
 static char eur_expect_close;
- 
+
 /*
  * You must set these - there is no sane way to probe for this board.
- * You can use wdt=x,y to set these now.
+ * You can use eurwdt=x,y to set these now.
  */
  
 static int io = 0x3f0;
 static int irq = 10;
 static char *ev = "int";
  
-#define WDT_TIMEOUT		60	/* 1 minute */
-static int timeout = WDT_TIMEOUT;
-
-MODULE_PARM(timeout,"i");
-MODULE_PARM_DESC(timeout, "Eurotech WDT timeout in seconds (default=60)"); 
+#define WDT_TIMEOUT		60                /* 1 minute */
 
 #ifdef CONFIG_WATCHDOG_NOWAYOUT
 static int nowayout = 1;
 #else
 static int nowayout = 0;
 #endif
+
 MODULE_PARM(nowayout,"i");
 MODULE_PARM_DESC(nowayout, "Watchdog cannot be stopped once started (default=CONFIG_WATCHDOG_NOWAYOUT)");
-
 
 /*
  * Some symbolic names 
@@ -110,7 +119,7 @@ str = get_options (str, ARRAY_SIZE(ints), ints);
 	return 1;
 }
  
-__setup("wdt=", eurwdt_setup);
+__setup("eurwdt=", eurwdt_setup);
 
 #endif /* !MODULE */
  
@@ -119,21 +128,12 @@ MODULE_PARM_DESC(io, "Eurotech WDT io port (default=0x3f0)");
 MODULE_PARM(irq, "i");
 MODULE_PARM_DESC(irq, "Eurotech WDT irq (default=10)");
 MODULE_PARM(ev, "s");
-MODULE_PARM_DESC(ev, "Eurotech WDT event type (default is `reboot')");
+MODULE_PARM_DESC(ev, "Eurotech WDT event type (default is `int')");
 
 
 /*
  * Programming support
  */
-
-static void __init eurwdt_validate_timeout(void)
-{
-	if (timeout < 0 || timeout > 255) {
-		timeout = WDT_TIMEOUT;
-		printk(KERN_INFO "eurwdt: timeout must be 0 < x < 255, using %d\n",
-			timeout);
-	}
-}
 
 static inline void eurwdt_write_reg(u8 index, u8 data)
 {
@@ -209,7 +209,7 @@ void eurwdt_interrupt(int irq, void *dev_id, struct pt_regs *regs)
 static void eurwdt_ping(void)
 {
 	/* Write the watchdog default value */
-	eurwdt_set_timeout(timeout);
+	eurwdt_set_timeout(eurwdt_timeout);
 }
  
 /**
@@ -245,10 +245,9 @@ loff_t *ppos)
 			}
 		}
 		eurwdt_ping();	/* the default timeout */
-		return 1;
 	}
 
-	return 0;
+	return count;
 }
 
 /**
@@ -266,12 +265,13 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
 	unsigned int cmd, unsigned long arg)
 {
 	static struct watchdog_info ident = {
-		.options	  = WDIOF_CARDRESET,
+		.options	  = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
 		.firmware_version = 1,
 		.identity	  = "WDT Eurotech CPU-1220/1410",
 	};
 
 	int time;
+	int options, retval = -EINVAL;
  
 	switch(cmd) {
 	default:
@@ -281,6 +281,7 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
 		return copy_to_user((struct watchdog_info *)arg, &ident,
 			sizeof(ident)) ? -EFAULT : 0;
  
+	case WDIOC_GETSTATUS:
 	case WDIOC_GETBOOTSTATUS:
 		return put_user(0, (int *) arg);
 
@@ -296,9 +297,26 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
 		if (time < 0 || time > 255)
 			return -EINVAL;
 
-		timeout = time; 
+		eurwdt_timeout = time; 
 		eurwdt_set_timeout(time); 
-		return 0;
+		/* Fall */
+
+	case WDIOC_GETTIMEOUT:
+		return put_user(eurwdt_timeout, (int *)arg);
+
+	case WDIOC_SETOPTIONS:
+		if (get_user(options, (int *)arg))
+			return -EFAULT;
+		if (options & WDIOS_DISABLECARD) {
+			eurwdt_disable_timer();
+			retval = 0;
+		}
+		if (options & WDIOS_ENABLECARD) {
+			eurwdt_activate_timer();
+			eurwdt_ping();
+			retval = 0;
+		}
+		return retval;
 	}
 }
 
@@ -313,32 +331,12 @@ static int eurwdt_ioctl(struct inode *inode, struct file *file,
  
 static int eurwdt_open(struct inode *inode, struct file *file)
 {
-	switch (minor(inode->i_rdev)) {
-	case WATCHDOG_MINOR:
-		spin_lock(&eurwdt_lock);
-		if (eurwdt_is_open) {
-			spin_unlock(&eurwdt_lock);
-			return -EBUSY;
-		}
-		 if (nowayout)
-			 MOD_INC_USE_COUNT;
-
-		eurwdt_is_open = 1;
-
-		/* Activate the WDT */
-		eurwdt_activate_timer(); 
-
-		spin_unlock(&eurwdt_lock);
-
-		MOD_INC_USE_COUNT;
-		return 0;
-
-	case TEMP_MINOR:
-		return 0;
-
-	default:
-		return -ENODEV;
-	}
+	if (test_and_set_bit(0, &eurwdt_is_open))
+		return -EBUSY;
+	eurwdt_timeout = WDT_TIMEOUT;	/* initial timeout */
+	/* Activate the WDT */
+	eurwdt_activate_timer();
+	return 0;
 }
  
 /**
@@ -355,14 +353,14 @@ static int eurwdt_open(struct inode *inode, struct file *file)
  
 static int eurwdt_release(struct inode *inode, struct file *file)
 {
-	if (minor(inode->i_rdev) == WATCHDOG_MINOR) {
-		if (!nowayout)
-			eurwdt_disable_timer();
-
-		eurwdt_is_open = 0;
-		MOD_DEC_USE_COUNT;
-	}
-
+	if (eur_expect_close == 42) {
+		eurwdt_disable_timer();
+	} else {
+		printk(KERN_CRIT "eurwdt: Unexpected close, not stopping watchdog!\n");
+		eurwdt_ping();
+    }
+	clear_bit(0, &eurwdt_is_open);
+	eur_expect_close = 0;
 	return 0;
 }
  
@@ -451,7 +449,6 @@ static int __init eurwdt_init(void)
 {
 	int ret;
 
-	eurwdt_validate_timeout();
 	ret = misc_register(&eurwdt_miscdev);
 	if (ret) {
 		printk(KERN_ERR "eurwdt: can't misc_register on minor=%d\n",
@@ -483,8 +480,6 @@ static int __init eurwdt_init(void)
 	printk(KERN_INFO "Eurotech WDT driver 0.01 at %X (Interrupt %d)"
 		" - timeout event: %s\n", 
 		io, irq, (!strcmp("int", ev) ? "int" : "reboot"));
-
-	spin_lock_init(&eurwdt_lock);
 
 out:
 	return ret;
