@@ -174,8 +174,8 @@ extern int br_handle_frame_finish(struct sk_buff *skb);
 extern int br_handle_frame(struct sk_buff *skb);
 
 /* br_ioctl.c */
-extern int br_ioctl_deviceless_stub(unsigned long arg);
 extern int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd);
+extern int br_ioctl_deviceless_stub(unsigned int cmd, unsigned long arg);
 
 /* br_netfilter.c */
 extern int br_netfilter_init(void);

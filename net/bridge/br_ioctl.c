@@ -78,13 +78,36 @@ static int get_fdb_entries(struct net_bridge *br, void __user *userbuf,
 	return num;
 }
 
-int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+static int add_del_if(struct net_bridge *br, int ifindex, int isadd)
+{
+	struct net_device *dev;
+	int ret;
+
+	if (!capable(CAP_NET_ADMIN))
+		return -EPERM;
+
+	dev = dev_get_by_index(ifindex);
+	if (dev == NULL)
+		return -EINVAL;
+	
+	if (isadd)
+		ret = br_add_if(br, dev);
+	else
+		ret = br_del_if(br, dev);
+
+	dev_put(dev);
+	return ret;
+}
+
+/*
+ * Legacy ioctl's through SIOCDEVPRIVATE
+ * This interface is deprecated because it was too difficult to
+ * to do the translation for 32/64bit ioctl compatability.
+ */
+static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	struct net_bridge *br = netdev_priv(dev);
 	unsigned long args[4];
-
-	if (cmd != SIOCDEVPRIVATE)
-		return -EOPNOTSUPP;
 	
 	if (copy_from_user(args, rq->ifr_data, sizeof(args)))
 		return -EFAULT;
@@ -92,25 +115,7 @@ int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	switch (args[0]) {
 	case BRCTL_ADD_IF:
 	case BRCTL_DEL_IF:
-	{
-		struct net_device *dev;
-		int ret;
-
-		if (!capable(CAP_NET_ADMIN))
-			return -EPERM;
-
-		dev = dev_get_by_index(args[1]);
-		if (dev == NULL)
-			return -EINVAL;
-
-		if (args[0] == BRCTL_ADD_IF)
-			ret = br_add_if(br, dev);
-		else
-			ret = br_del_if(br, dev);
-
-		dev_put(dev);
-		return ret;
-	}
+		return add_del_if(br, args[1], args[0] == BRCTL_ADD_IF);
 
 	case BRCTL_GET_BRIDGE_INFO:
 	{
@@ -303,8 +308,7 @@ int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	return -EOPNOTSUPP;
 }
 
-
-int br_ioctl_deviceless_stub(unsigned long uarg)
+static int old_deviceless(unsigned long uarg)
 {
 	unsigned long args[3];
 
@@ -354,5 +358,51 @@ int br_ioctl_deviceless_stub(unsigned long uarg)
 	}
 	}
 
+	return -EOPNOTSUPP;
+}
+
+int br_ioctl_deviceless_stub(unsigned int cmd, unsigned long uarg)
+{
+	switch (cmd) {
+	case SIOCGIFBR:
+	case SIOCSIFBR:
+		return old_deviceless(uarg);
+		
+	case SIOCBRADDBR:
+	case SIOCBRDELBR:
+	{
+		char buf[IFNAMSIZ];
+
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+
+		if (copy_from_user(buf, (void __user *) uarg, IFNAMSIZ))
+			return -EFAULT;
+
+		buf[IFNAMSIZ-1] = 0;
+		if (cmd == SIOCBRADDBR)
+			return br_add_bridge(buf);
+
+		return br_del_bridge(buf);
+	}
+	}
+	return -EOPNOTSUPP;
+}
+
+int br_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
+{
+	struct net_bridge *br = netdev_priv(dev);
+
+	switch(cmd) {
+	case SIOCDEVPRIVATE:
+		return old_dev_ioctl(dev, rq, cmd);
+
+	case SIOCBRADDIF:
+	case SIOCBRDELIF:
+		return add_del_if(br, rq->ifr_ifindex, cmd == SIOCBRADDIF);
+
+	}
+
+	printk(KERN_DEBUG "Bridge does not support ioctl 0x%x\n", cmd);
 	return -EOPNOTSUPP;
 }

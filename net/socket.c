@@ -729,9 +729,9 @@ static ssize_t sock_writev(struct file *file, const struct iovec *vector,
  */
 
 static DECLARE_MUTEX(br_ioctl_mutex);
-static int (*br_ioctl_hook)(unsigned long arg) = NULL;
+static int (*br_ioctl_hook)(unsigned int cmd, unsigned long arg) = NULL;
 
-void brioctl_set(int (*hook)(unsigned long))
+void brioctl_set(int (*hook)(unsigned int, unsigned long))
 {
 	down(&br_ioctl_mutex);
 	br_ioctl_hook = hook;
@@ -796,13 +796,15 @@ static int sock_ioctl(struct inode *inode, struct file *file, unsigned int cmd,
 			break;
 		case SIOCGIFBR:
 		case SIOCSIFBR:
+		case SIOCBRADDBR:
+		case SIOCBRDELBR:
 			err = -ENOPKG;
 			if (!br_ioctl_hook)
 				request_module("bridge");
 
 			down(&br_ioctl_mutex);
 			if (br_ioctl_hook) 
-				err = br_ioctl_hook(arg);
+				err = br_ioctl_hook(cmd, arg);
 			up(&br_ioctl_mutex);
 			break;
 		case SIOCGIFVLAN:
