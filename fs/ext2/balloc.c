@@ -166,6 +166,35 @@ found:
 	return bh;
 }
 
+static inline int reserve_blocks(struct super_block *sb, int count)
+{
+	struct ext2_sb_info * sbi = EXT2_SB(sb);
+	struct ext2_super_block * es = sbi->s_es;
+	unsigned free_blocks = le32_to_cpu(es->s_free_blocks_count);
+	unsigned root_blocks = le32_to_cpu(es->s_r_blocks_count);
+
+	if (free_blocks < count)
+		count = free_blocks;
+
+	if (free_blocks < root_blocks + count && !capable(CAP_SYS_RESOURCE) &&
+	    sbi->s_resuid != current->fsuid &&
+	    (sbi->s_resgid == 0 || !in_group_p (sbi->s_resgid))) {
+		/*
+		 * We are too close to reserve and we are not privileged.
+		 * Can we allocate anything at all?
+		 */
+		if (free_blocks > root_blocks)
+			count = free_blocks - root_blocks;
+		else
+			return 0;
+	}
+
+	es->s_free_blocks_count = cpu_to_le32(free_blocks - count);
+	mark_buffer_dirty(sbi->s_sbh);
+	sb->s_dirt = 1;
+	return count;
+}
+
 static inline void release_blocks(struct super_block *sb, int count)
 {
 	if (count) {
@@ -176,6 +205,22 @@ static inline void release_blocks(struct super_block *sb, int count)
 		mark_buffer_dirty(sbi->s_sbh);
 		sb->s_dirt = 1;
 	}
+}
+
+static inline int group_reserve_blocks(struct ext2_group_desc *desc,
+				    struct buffer_head *bh, int count)
+{
+	unsigned free_blocks;
+
+	if (!desc->bg_free_blocks_count)
+		return 0;
+
+	free_blocks = le16_to_cpu(desc->bg_free_blocks_count);
+	if (free_blocks < count)
+		count = free_blocks;
+	desc->bg_free_blocks_count = cpu_to_le16(free_blocks - count);
+	mark_buffer_dirty(bh);
+	return count;
 }
 
 static inline void group_release_blocks(struct ext2_group_desc *desc,
@@ -277,6 +322,56 @@ error_return:
 	DQUOT_FREE_BLOCK(inode, freed);
 }
 
+static int grab_block(char *map, unsigned size, int goal)
+{
+	int k;
+	char *p, *r;
+
+	if (!ext2_test_bit(goal, map))
+		goto got_it;
+	if (goal) {
+		/*
+		 * The goal was occupied; search forward for a free 
+		 * block within the next XX blocks.
+		 *
+		 * end_goal is more or less random, but it has to be
+		 * less than EXT2_BLOCKS_PER_GROUP. Aligning up to the
+		 * next 64-bit boundary is simple..
+		 */
+		k = (goal + 63) & ~63;
+		goal = ext2_find_next_zero_bit(map, k, goal);
+		if (goal < k)
+			goto got_it;
+		/*
+		 * Search in the remainder of the current group.
+		 */
+	}
+
+	p = map + (goal >> 3);
+	r = memscan(p, 0, (size - goal + 7) >> 3);
+	k = (r - map) << 3;
+	if (k < size) {
+		/* 
+		 * We have succeeded in finding a free byte in the block
+		 * bitmap.  Now search backwards to find the start of this
+		 * group of free blocks - won't take more than 7 iterations.
+		 */
+		for (goal = k; goal && !ext2_test_bit (goal - 1, map); goal--)
+			;
+		goto got_it;
+	}
+
+	k = ext2_find_next_zero_bit ((u32 *)map, size, goal);
+	if (k < size) {
+		goal = k;
+		goto got_it;
+	}
+	return -1;
+got_it:
+	ext2_set_bit(goal, map);
+	return goal;
+}
+
 /*
  * ext2_new_block uses a goal block to assist allocation.  If the goal is
  * free, or there is a free block within 32 blocks of the goal, that block
@@ -290,46 +385,54 @@ int ext2_new_block (struct inode * inode, unsigned long goal,
 {
 	struct buffer_head * bh;
 	struct buffer_head * bh2;
-	char * p, * r;
 	int i, j, k, tmp;
-	struct super_block * sb;
-	struct ext2_group_desc * gdp;
-	struct ext2_super_block * es;
+	int block = 0;
+	struct super_block *sb = inode->i_sb;
+	struct ext2_sb_info *sbi = EXT2_SB(sb);
+	struct ext2_super_block *es = sbi->s_es;
+	unsigned group_size = EXT2_BLOCKS_PER_GROUP(sb);
+	struct ext2_group_desc *gdp;
+	unsigned prealloc_goal = es->s_prealloc_blocks;
+	unsigned group_alloc = 0, es_alloc, dq_alloc;
 #ifdef EXT2FS_DEBUG
 	static int goal_hits = 0, goal_attempts = 0;
 #endif
+
+	if (!prealloc_goal--)
+		prealloc_goal = EXT2_DEFAULT_PREALLOC_BLOCKS - 1;
+	if (!prealloc_count || *prealloc_count)
+		prealloc_goal = 0;
+
+	*err = -EDQUOT;
+	if (DQUOT_ALLOC_BLOCK(inode, 1))
+		goto out;
+
+	while (prealloc_goal && !DQUOT_PREALLOC_BLOCK(inode, prealloc_goal))
+		prealloc_goal--;
+
+	dq_alloc = prealloc_goal + 1;
+
 	*err = -ENOSPC;
-	sb = inode->i_sb;
-	if (!sb) {
-		printk ("ext2_new_block: nonexistent device");
-		return 0;
-	}
 
 	lock_super (sb);
-	es = sb->u.ext2_sb.s_es;
-	if (le32_to_cpu(es->s_free_blocks_count) <= le32_to_cpu(es->s_r_blocks_count) &&
-	    ((sb->u.ext2_sb.s_resuid != current->fsuid) &&
-	     (sb->u.ext2_sb.s_resgid == 0 ||
-	      !in_group_p (sb->u.ext2_sb.s_resgid)) && 
-	     !capable(CAP_SYS_RESOURCE)))
-		goto out;
+
+	es_alloc = reserve_blocks(sb, dq_alloc);
+	if (!es_alloc)
+		goto out_unlock;
 
 	ext2_debug ("goal=%lu.\n", goal);
 
-repeat:
-	/*
-	 * First, test whether the goal block is free.
-	 */
 	if (goal < le32_to_cpu(es->s_first_data_block) ||
 	    goal >= le32_to_cpu(es->s_blocks_count))
 		goal = le32_to_cpu(es->s_first_data_block);
-	i = (goal - le32_to_cpu(es->s_first_data_block)) / EXT2_BLOCKS_PER_GROUP(sb);
+	i = (goal - le32_to_cpu(es->s_first_data_block)) / group_size;
 	gdp = ext2_get_group_desc (sb, i, &bh2);
 	if (!gdp)
 		goto io_error;
 
-	if (le16_to_cpu(gdp->bg_free_blocks_count) > 0) {
-		j = ((goal - le32_to_cpu(es->s_first_data_block)) % EXT2_BLOCKS_PER_GROUP(sb));
+	group_alloc = group_reserve_blocks(gdp, bh2, es_alloc);
+	if (group_alloc) {
+		j = ((goal - le32_to_cpu(es->s_first_data_block)) % group_size);
 #ifdef EXT2FS_DEBUG
 		if (j)
 			goal_attempts++;
@@ -340,51 +443,11 @@ repeat:
 		
 		ext2_debug ("goal is at %d:%d.\n", i, j);
 
-		if (!ext2_test_bit(j, bh->b_data)) {
-			ext2_debug("goal bit allocated, %d hits\n",++goal_hits);
+		j = grab_block(bh->b_data, group_size, j);
+		if (j >= 0)
 			goto got_block;
-		}
-		if (j) {
-			/*
-			 * The goal was occupied; search forward for a free 
-			 * block within the next XX blocks.
-			 *
-			 * end_goal is more or less random, but it has to be
-			 * less than EXT2_BLOCKS_PER_GROUP. Aligning up to the
-			 * next 64-bit boundary is simple..
-			 */
-			int end_goal = (j + 63) & ~63;
-			j = ext2_find_next_zero_bit(bh->b_data, end_goal, j);
-			if (j < end_goal)
-				goto got_block;
-		}
-	
-		ext2_debug ("Bit not found near goal\n");
-
-		/*
-		 * There has been no free block found in the near vicinity
-		 * of the goal: do a search forward through the block groups,
-		 * searching in each group first for an entire free byte in
-		 * the bitmap and then for any free bit.
-		 * 
-		 * Search first in the remainder of the current group; then,
-		 * cyclicly search through the rest of the groups.
-		 */
-		p = ((char *) bh->b_data) + (j >> 3);
-		r = memscan(p, 0, (EXT2_BLOCKS_PER_GROUP(sb) - j + 7) >> 3);
-		k = (r - ((char *) bh->b_data)) << 3;
-		if (k < EXT2_BLOCKS_PER_GROUP(sb)) {
-			j = k;
-			goto search_back;
-		}
-
-		k = ext2_find_next_zero_bit ((unsigned long *) bh->b_data, 
-					EXT2_BLOCKS_PER_GROUP(sb),
-					j);
-		if (k < EXT2_BLOCKS_PER_GROUP(sb)) {
-			j = k;
-			goto got_block;
-		}
+		group_release_blocks(gdp, bh2, group_alloc);
+		group_alloc = 0;
 	}
 
 	ext2_debug ("Bit not found in block group %d.\n", i);
@@ -393,119 +456,82 @@ repeat:
 	 * Now search the rest of the groups.  We assume that 
 	 * i and gdp correctly point to the last group visited.
 	 */
-	for (k = 0; k < sb->u.ext2_sb.s_groups_count; k++) {
+	for (k = 0; !group_alloc && k < sbi->s_groups_count; k++) {
 		i++;
-		if (i >= sb->u.ext2_sb.s_groups_count)
+		if (i >= sbi->s_groups_count)
 			i = 0;
 		gdp = ext2_get_group_desc (sb, i, &bh2);
 		if (!gdp)
 			goto io_error;
-		if (le16_to_cpu(gdp->bg_free_blocks_count) > 0)
-			break;
+		group_alloc = group_reserve_blocks(gdp, bh2, es_alloc);
 	}
-	if (k >= sb->u.ext2_sb.s_groups_count)
-		goto out;
+	if (k >= sbi->s_groups_count)
+		goto out_release;
 	bh = load_block_bitmap (sb, i);
 	if (IS_ERR(bh))
 		goto io_error;
 	
-	r = memscan(bh->b_data, 0, EXT2_BLOCKS_PER_GROUP(sb) >> 3);
-	j = (r - bh->b_data) << 3;
-	if (j < EXT2_BLOCKS_PER_GROUP(sb))
-		goto search_back;
-	else
-		j = ext2_find_first_zero_bit ((unsigned long *) bh->b_data,
-					 EXT2_BLOCKS_PER_GROUP(sb));
-	if (j >= EXT2_BLOCKS_PER_GROUP(sb)) {
+	j = grab_block(bh->b_data, group_size, 0);
+	if (j < 0) {
 		ext2_error (sb, "ext2_new_block",
 			    "Free blocks count corrupted for block group %d", i);
-		goto out;
+		group_alloc = 0;
+		goto out_release;
 	}
 
-search_back:
-	/* 
-	 * We have succeeded in finding a free byte in the block
-	 * bitmap.  Now search backwards up to 7 bits to find the
-	 * start of this group of free blocks.
-	 */
-	for (k = 0; k < 7 && j > 0 && !ext2_test_bit (j - 1, bh->b_data); k++, j--);
-	
 got_block:
-
 	ext2_debug ("using block group %d(%d)\n", i, gdp->bg_free_blocks_count);
 
-	/*
-	 * Check quota for allocation of this block.
-	 */
-	if(DQUOT_ALLOC_BLOCK(inode, 1)) {
-		*err = -EDQUOT;
-		goto out;
-	}
-
-	tmp = j + i * EXT2_BLOCKS_PER_GROUP(sb) + le32_to_cpu(es->s_first_data_block);
+	tmp = j + i * group_size + le32_to_cpu(es->s_first_data_block);
 
 	if (tmp == le32_to_cpu(gdp->bg_block_bitmap) ||
 	    tmp == le32_to_cpu(gdp->bg_inode_bitmap) ||
 	    in_range (tmp, le32_to_cpu(gdp->bg_inode_table),
-		      sb->u.ext2_sb.s_itb_per_group))
+		      sbi->s_itb_per_group))
 		ext2_error (sb, "ext2_new_block",
 			    "Allocating block in system zone - "
 			    "block = %u", tmp);
 
-	if (ext2_set_bit (j, bh->b_data)) {
-		ext2_warning (sb, "ext2_new_block",
-			      "bit already set for block %d", j);
-		DQUOT_FREE_BLOCK(inode, 1);
-		goto repeat;
+	if (tmp >= le32_to_cpu(es->s_blocks_count)) {
+		ext2_error (sb, "ext2_new_block",
+			    "block(%d) >= blocks count(%d) - "
+			    "block_group = %d, es == %p ",j,
+			le32_to_cpu(es->s_blocks_count), i, es);
+		goto out_release;
 	}
+	block = tmp;
 
+	/* OK, we _had_ allocated something */
 	ext2_debug ("found bit %d\n", j);
+
+	dq_alloc--;
+	es_alloc--;
+	group_alloc--;
 
 	/*
 	 * Do block preallocation now if required.
 	 */
-#ifdef EXT2_PREALLOCATE
 	/* Writer: ->i_prealloc* */
-	if (prealloc_count && !*prealloc_count) {
-		int	prealloc_goal;
-		unsigned long next_block = tmp + 1;
-
-		prealloc_goal = es->s_prealloc_blocks ?
-			es->s_prealloc_blocks : EXT2_DEFAULT_PREALLOC_BLOCKS;
+	if (group_alloc && !*prealloc_count) {
+		unsigned long next_block = block + 1;
 
 		*prealloc_block = next_block;
 		/* Writer: end */
-		for (k = 1;
-		     k < prealloc_goal && (j + k) < EXT2_BLOCKS_PER_GROUP(sb);
-		     k++, next_block++) {
-			if (DQUOT_PREALLOC_BLOCK(inode, 1))
-				break;
+		while (group_alloc && ++j < group_size) {
 			/* Writer: ->i_prealloc* */
 			if (*prealloc_block + *prealloc_count != next_block ||
-			    ext2_set_bit (j + k, bh->b_data)) {
+			    ext2_set_bit (j, bh->b_data)) {
 				/* Writer: end */
-				DQUOT_FREE_BLOCK(inode, 1);
  				break;
 			}
 			(*prealloc_count)++;
 			/* Writer: end */
+			next_block++;
+			es_alloc--;
+			dq_alloc--;
+			group_alloc--;
 		}	
-		/*
-		 * As soon as we go for per-group spinlocks we'll need these
-		 * done inside the loop above.
-		 */
-		gdp->bg_free_blocks_count =
-			cpu_to_le16(le16_to_cpu(gdp->bg_free_blocks_count) -
-			       (k - 1));
-		es->s_free_blocks_count =
-			cpu_to_le32(le32_to_cpu(es->s_free_blocks_count) -
-			       (k - 1));
-		ext2_debug ("Preallocated a further %lu bits.\n",
-			       (k - 1));
 	}
-#endif
-
-	j = tmp;
 
 	mark_buffer_dirty(bh);
 	if (sb->s_flags & MS_SYNCHRONOUS) {
@@ -513,32 +539,22 @@ got_block:
 		wait_on_buffer (bh);
 	}
 
-	if (j >= le32_to_cpu(es->s_blocks_count)) {
-		ext2_error (sb, "ext2_new_block",
-			    "block(%d) >= blocks count(%d) - "
-			    "block_group = %d, es == %p ",j,
-			le32_to_cpu(es->s_blocks_count), i, es);
-		goto out;
-	}
-
 	ext2_debug ("allocating block %d. "
 		    "Goal hits %d of %d.\n", j, goal_hits, goal_attempts);
 
-	gdp->bg_free_blocks_count = cpu_to_le16(le16_to_cpu(gdp->bg_free_blocks_count) - 1);
-	mark_buffer_dirty(bh2);
-	es->s_free_blocks_count = cpu_to_le32(le32_to_cpu(es->s_free_blocks_count) - 1);
-	mark_buffer_dirty(sb->u.ext2_sb.s_sbh);
-	sb->s_dirt = 1;
-	unlock_super (sb);
+out_release:
+	group_release_blocks(gdp, bh2, group_alloc);
+	release_blocks(sb, es_alloc);
 	*err = 0;
-	return j;
-	
+out_unlock:
+	unlock_super (sb);
+	DQUOT_FREE_BLOCK(inode, dq_alloc);
+out:
+	return block;
+
 io_error:
 	*err = -EIO;
-out:
-	unlock_super (sb);
-	return 0;
-	
+	goto out_release;
 }
 
 unsigned long ext2_count_free_blocks (struct super_block * sb)
