@@ -74,7 +74,7 @@
 #define HTB_HYSTERESIS 1/* whether to use mode hysteresis for speedup */
 #define HTB_QLOCK(S) spin_lock_bh(&(S)->dev->queue_lock)
 #define HTB_QUNLOCK(S) spin_unlock_bh(&(S)->dev->queue_lock)
-#define HTB_VER 0x3000d	/* major must be matched with number suplied by TC as version */
+#define HTB_VER 0x3000e	/* major must be matched with number suplied by TC as version */
 
 #if HTB_VER >> 16 != TC_HTB_PROTOVER
 #error "Mismatched sch_htb.c and pkt_sch.h"
@@ -1386,11 +1386,16 @@ static void htb_destroy(struct Qdisc* sch)
 #ifdef HTB_RATECM
 	del_timer_sync (&q->rttim);
 #endif
+	/* This line used to be after htb_destroy_class call below
+	   and surprisingly it worked in 2.4. But it must precede it 
+	   because filter need its target class alive to be able to call
+	   unbind_filter on it (without Oops). */
+	htb_destroy_filters(&q->filter_list);
+	
 	while (!list_empty(&q->root)) 
 		htb_destroy_class (sch,list_entry(q->root.next,
 					struct htb_class,sibling));
 
-	htb_destroy_filters(&q->filter_list);
 	__skb_queue_purge(&q->direct_queue);
 }
 
