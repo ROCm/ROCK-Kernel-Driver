@@ -170,7 +170,9 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
 
 void dump_stack(void)
 {
+#ifdef CONFIG_DEBUG_ERRORS
 	__backtrace();
+#endif
 }
 
 /*
@@ -530,7 +532,7 @@ void __pgd_error(const char *file, int line, unsigned long val)
 asmlinkage void __div0(void)
 {
 	printk("Division by zero in kernel.\n");
-	__backtrace();
+	dump_stack();
 }
 
 void abort(void)

@@ -578,9 +578,7 @@ void free_irq(unsigned int irq, void *dev_id)
 
 	if (irq >= NR_IRQS || !irq_desc[irq].valid) {
 		printk(KERN_ERR "Trying to free IRQ%d\n",irq);
-#ifdef CONFIG_DEBUG_ERRORS
-		__backtrace();
-#endif
+		dump_stack();
 		return;
 	}
 
@@ -597,9 +595,7 @@ void free_irq(unsigned int irq, void *dev_id)
 
 	if (!action) {
 		printk(KERN_ERR "Trying to free free IRQ%d\n",irq);
-#ifdef CONFIG_DEBUG_ERRORS
-		__backtrace();
-#endif
+		dump_stack();
 	} else {
 		synchronize_irq(irq);
 		kfree(action);
