@@ -1059,12 +1059,8 @@ static struct file_operations raw6_seq_fops = {
 
 int __init raw6_proc_init(void)
 {
-	struct proc_dir_entry *p = create_proc_entry("raw6", S_IRUGO, proc_net);
-
-	if (!p)
+	if (!proc_net_fops_create("raw6", S_IRUGO, &raw6_seq_fops))
 		return -ENOMEM;
-	p->proc_fops = &raw6_seq_fops;
-
 	return 0;
 }
 

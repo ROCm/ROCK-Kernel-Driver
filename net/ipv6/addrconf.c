@@ -2259,16 +2259,11 @@ static struct file_operations if6_fops = {
 
 int __init if6_proc_init(void)
 {
-	struct proc_dir_entry *p;
-	int rc = 0;
-
-	p = create_proc_entry("if_inet6", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &if6_fops;
-	else
-		rc = -ENOMEM;
-	return rc;
+	if (!proc_net_fops_create("if_inet6", S_IRUGO, &if6_fops))
+		return -ENOMEM;
+	return 0;
 }
+
 void if6_proc_exit(void)
 {
 	proc_net_remove("if_inet6");

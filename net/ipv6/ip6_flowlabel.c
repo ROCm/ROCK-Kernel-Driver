@@ -695,12 +695,7 @@ static struct file_operations ip6fl_seq_fops = {
 void ip6_flowlabel_init()
 {
 #ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *p;
-#endif
-#ifdef CONFIG_PROC_FS
-	p = create_proc_entry("ip6_flowlabel", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &ip6fl_seq_fops;
+	proc_net_fops_create("ip6_flowlabel", S_IRUGO, &ip6fl_seq_fops);
 #endif
 }
 

@@ -2378,9 +2378,6 @@ int __init igmp6_init(struct net_proto_family *ops)
 	struct ipv6_pinfo *np;
 	struct sock *sk;
 	int err;
-#ifdef CONFIG_PROC_FS
-	struct proc_dir_entry *p;
-#endif
 
 	err = sock_create(PF_INET6, SOCK_RAW, IPPROTO_ICMPV6, &igmp6_socket);
 	if (err < 0) {
@@ -2399,12 +2396,8 @@ int __init igmp6_init(struct net_proto_family *ops)
 	np->hop_limit = 1;
 
 #ifdef CONFIG_PROC_FS
-	p = create_proc_entry("igmp6", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &igmp6_mc_seq_fops;
-	p = create_proc_entry("mcfilter6", S_IRUGO, proc_net);
-	if (p)
-		p->proc_fops = &igmp6_mcf_seq_fops;
+	proc_net_fops_create("igmp6", S_IRUGO, &igmp6_mc_seq_fops);
+	proc_net_fops_create("mcfilter6", S_IRUGO, &igmp6_mcf_seq_fops);
 #endif
 
 	return 0;
@@ -2414,6 +2407,7 @@ void igmp6_cleanup(void)
 {
 	sock_release(igmp6_socket);
 	igmp6_socket = NULL; /* for safety */
+
 #ifdef CONFIG_PROC_FS
 	proc_net_remove("mcfilter6");
 	proc_net_remove("igmp6");

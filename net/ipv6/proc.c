@@ -273,21 +273,16 @@ int snmp6_unregister_dev(struct inet6_dev *idev)
 int __init ipv6_misc_proc_init(void)
 {
 	int rc = 0;
-	struct proc_dir_entry *p;
 
-	p = create_proc_entry("snmp6", S_IRUGO, proc_net);
-	if (!p)
+	if (!proc_net_fops_create("snmp6", S_IRUGO, &snmp6_seq_fops))
 		goto proc_snmp6_fail;
-	else
-		p->proc_fops = &snmp6_seq_fops;
+
 	proc_net_devsnmp6 = proc_mkdir("dev_snmp6", proc_net);
 	if (!proc_net_devsnmp6)
 		goto proc_dev_snmp6_fail;
-	p = create_proc_entry("sockstat6", S_IRUGO, proc_net);
-	if (!p)
+
+	if (!proc_net_fops_create("sockstat6", S_IRUGO, &sockstat6_seq_fops))
 		goto proc_sockstat6_fail;
-	else
-		p->proc_fops = &sockstat6_seq_fops;
 out:
 	return rc;
 
