@@ -422,9 +422,10 @@ void __init ide_init_amd74xx(struct ata_channel *hwif)
 	hwif->speedproc = &amd_set_drive;
 	hwif->autodma = 0;
 
+	hwif->io_32bit = 1;
+	hwif->unmask = 1;
+
 	for (i = 0; i < 2; i++) {
-		hwif->drives[i].io_32bit = 1;
-		hwif->drives[i].unmask = 1;
 		hwif->drives[i].autotune = 1;
 		hwif->drives[i].dn = hwif->unit * 2 + i;
 	}

@@ -261,11 +261,11 @@ static void ht_set_prefetch(ide_drive_t *drive, byte state)
 	 */
 	if (state) {
 		drive->drive_data |= t;   /* enable prefetch mode */
-		drive->no_unmask = 1;
-		drive->unmask = 0;
+		drive->channel->no_unmask = 1;
+		drive->channel->unmask = 0;
 	} else {
 		drive->drive_data &= ~t;  /* disable prefetch mode */
-		drive->no_unmask = 0;
+		drive->channel->no_unmask = 0;
 	}
 	
 	restore_flags (flags);	/* all CPUs */

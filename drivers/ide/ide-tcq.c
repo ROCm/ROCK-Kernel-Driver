@@ -51,21 +51,17 @@
  */
 #undef IDE_TCQ_FIDDLE_SI
 
-/*
- * wait for data phase before starting DMA or not
- */
-#undef IDE_TCQ_WAIT_DATAPHASE
-
 ide_startstop_t ide_dmaq_intr(ide_drive_t *drive);
 ide_startstop_t ide_service(ide_drive_t *drive);
 
 static inline void drive_ctl_nien(ide_drive_t *drive, int clear)
 {
 #ifdef IDE_TCQ_NIEN
-	int mask = clear ? 0x00 : 0x02;
+	if (IDE_CONTROL_REG) {
+		int mask = clear ? 0x00 : 0x02;
 
-	if (IDE_CONTROL_REG)
 		OUT_BYTE(drive->ctl | mask, IDE_CONTROL_REG);
+	}
 #endif
 }
 
@@ -123,7 +119,6 @@ static void ide_tcq_invalidate_queue(ide_drive_t *drive)
 	init_taskfile_request(ar->ar_rq);
 	ar->ar_rq->rq_dev = mk_kdev(drive->channel->major, (drive->select.b.unit)<<PARTN_BITS);
 	ar->ar_rq->special = ar;
-	ar->ar_flags |= ATA_AR_RETURN;
 	_elv_add_request(q, ar->ar_rq, 0, 0);
 
 	/*
@@ -222,7 +217,7 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 {
 	struct ata_request *ar;
 	byte feat, stat;
-	int tag;
+	int tag, ret;
 
 	TCQ_PRINTK("%s: started service\n", drive->name);
 
@@ -272,9 +267,6 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 		return ide_stopped;
 	}
 
-	/*
-	 * start dma
-	 */
 	tag = feat >> 3;
 	IDE_SET_CUR_TAG(drive, tag);
 
@@ -293,16 +285,16 @@ ide_startstop_t ide_service(ide_drive_t *drive)
 	 */
 	if (rq_data_dir(ar->ar_rq) == READ) {
 		TCQ_PRINTK("ide_service: starting READ %x\n", stat);
-		drive->channel->dmaproc(ide_dma_read_queued, drive);
+		ret = drive->channel->dmaproc(ide_dma_read_queued, drive);
 	} else {
 		TCQ_PRINTK("ide_service: starting WRITE %x\n", stat);
-		drive->channel->dmaproc(ide_dma_write_queued, drive);
+		ret = drive->channel->dmaproc(ide_dma_write_queued, drive);
 	}
 
 	/*
 	 * dmaproc set intr handler
 	 */
-	return ide_started;
+	return !ret ? ide_started : ide_stopped;
 }
 
 ide_startstop_t ide_check_service(ide_drive_t *drive)
@@ -410,14 +402,15 @@ ide_startstop_t ide_dmaq_intr(ide_drive_t *drive)
  */
 static int ide_tcq_configure(ide_drive_t *drive)
 {
+	int tcq_mask = 1 << 1 | 1 << 14;
+	int tcq_bits = tcq_mask | 1 << 15;
 	struct ata_taskfile args;
-	int tcq_supp = 1 << 1 | 1 << 14;
 
 	/*
 	 * bit 14 and 1 must be set in word 83 of the device id to indicate
-	 * support for dma queued protocol
+	 * support for dma queued protocol, and bit 15 must be cleared
 	 */
-	if ((drive->id->command_set_2 & tcq_supp) != tcq_supp)
+	if ((drive->id->command_set_2 & tcq_bits) ^ tcq_mask)
 		return -EIO;
 
 	memset(&args, 0, sizeof(args));
@@ -477,11 +470,14 @@ static int ide_tcq_configure(ide_drive_t *drive)
  */
 static int ide_enable_queued(ide_drive_t *drive, int on)
 {
+	int depth = drive->using_tcq ? drive->queue_depth : 0;
+
 	/*
 	 * disable or adjust queue depth
 	 */
 	if (!on) {
-		printk("%s: TCQ disabled\n", drive->name);
+		if (drive->using_tcq)
+			printk("%s: TCQ disabled\n", drive->name);
 		drive->using_tcq = 0;
 		return 0;
 	}
@@ -491,25 +487,33 @@ static int ide_enable_queued(ide_drive_t *drive, int on)
 		return 1;
 	}
 
+	/*
+	 * possibly expand command list
+	 */
 	if (ide_build_commandlist(drive))
 		return 1;
 
-	printk("%s: tagged command queueing enabled, command queue depth %d\n", drive->name, drive->queue_depth);
+	if (depth != drive->queue_depth)
+		printk("%s: tagged command queueing enabled, command queue depth %d\n", drive->name, drive->queue_depth);
+
 	drive->using_tcq = 1;
+
+	/*
+	 * clear stats
+	 */
 	drive->tcq->max_depth = 0;
 	return 0;
 }
 
 int ide_tcq_wait_dataphase(ide_drive_t *drive)
 {
-#ifdef IDE_TCQ_WAIT_DATAPHASE
 	ide_startstop_t foo;
 
-	if (ide_wait_stat(&startstop, drive, READY_STAT | DRQ_STAT, BUSY_STAT, WAIT_READY)) {
+	if (ide_wait_stat(&foo, drive, READY_STAT | DRQ_STAT, BUSY_STAT, WAIT_READY)) {
 		printk("%s: timeout waiting for data phase\n", drive->name);
 		return 1;
 	}
-#endif
+
 	return 0;
 }
 
@@ -595,6 +599,8 @@ int ide_tcq_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 			if (ide_start_dma(hwif, drive, func))
 				return ide_stopped;
 
+			TCQ_PRINTK("IMMED in queued_start\n");
+
 			/*
 			 * need to arm handler before starting dma engine,
 			 * transfer could complete right away
@@ -612,6 +618,8 @@ int ide_tcq_dmaproc(ide_dma_action_t func, ide_drive_t *drive)
 		case ide_dma_queued_off:
 			enable_tcq = 0;
 		case ide_dma_queued_on:
+			if (enable_tcq && !drive->using_dma)
+				return 1;
 			return ide_enable_queued(drive, enable_tcq);
 		default:
 			break;
