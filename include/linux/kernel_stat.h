@@ -17,6 +17,8 @@ struct cpu_usage_stat {
 	unsigned int user;
 	unsigned int nice;
 	unsigned int system;
+	unsigned int softirq;
+	unsigned int irq;
 	unsigned int idle;
 	unsigned int iowait;
 };

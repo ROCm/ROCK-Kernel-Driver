@@ -295,7 +295,7 @@ static int __init mca_init(void)
 
 	mca_dev->pos_register = 0x7f;
 	outb_p(mca_dev->pos_register, MCA_MOTHERBOARD_SETUP_REG);
-	mca_dev->dev.name[0] = 0;
+	mca_dev->name[0] = 0;
 	mca_read_and_store_pos(mca_dev->pos);
 	mca_configure_adapter_status(mca_dev);
 	/* fake POS and slot for a motherboard */
@@ -315,7 +315,7 @@ static int __init mca_init(void)
 
 	mca_dev->pos_register = 0xdf;
 	outb_p(mca_dev->pos_register, MCA_MOTHERBOARD_SETUP_REG);
-	mca_dev->dev.name[0] = 0;
+	mca_dev->name[0] = 0;
 	mca_read_and_store_pos(mca_dev->pos);
 	mca_configure_adapter_status(mca_dev);
 	/* fake POS and slot for the integrated video */
@@ -414,13 +414,13 @@ static void mca_handle_nmi_device(struct mca_device *mca_dev, int check_flag)
 
 	if(slot == MCA_INTEGSCSI) {
 		printk(KERN_CRIT "NMI: caused by MCA integrated SCSI adapter (%s)\n",
-			mca_dev->dev.name);
+			mca_dev->name);
 	} else if(slot == MCA_INTEGVIDEO) {
 		printk(KERN_CRIT "NMI: caused by MCA integrated video adapter (%s)\n",
-			mca_dev->dev.name);
+			mca_dev->name);
 	} else if(slot == MCA_MOTHERBOARD) {
 		printk(KERN_CRIT "NMI: caused by motherboard (%s)\n",
-			mca_dev->dev.name);
+			mca_dev->name);
 	}
 
 	/* More info available in POS 6 and 7? */

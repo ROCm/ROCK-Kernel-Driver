@@ -18,6 +18,7 @@
 #include <linux/fcdevice.h>
 #include <linux/ioport.h>
 #include <linux/tty.h>
+#include <linux/ethtool.h>
 #include <net/neighbour.h>
 #include <net/snmp.h>
 #include <net/dst.h>
@@ -624,5 +625,11 @@ EXPORT_SYMBOL(wireless_spy_update);
 #endif	/* CONFIG_NET_RADIO */
 
 EXPORT_SYMBOL(linkwatch_fire_event);
+
+/* ethtool.c */
+EXPORT_SYMBOL(ethtool_op_get_link);
+EXPORT_SYMBOL(ethtool_op_get_tx_csum);
+EXPORT_SYMBOL(ethtool_op_get_sg);
+EXPORT_SYMBOL(ethtool_op_set_sg);
 
 #endif  /* CONFIG_NET */

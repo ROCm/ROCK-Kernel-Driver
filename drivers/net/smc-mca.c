@@ -215,7 +215,7 @@ int __init ultramca_probe(struct device *gen_dev)
 	printk(KERN_INFO "%s: %s found in slot %d\n",
 	       dev->name, smc_mca_adapter_names[adapter], slot + 1);
 
-	strncpy(gen_dev->name, smc_mca_adapter_names[adapter], sizeof(gen_dev->name));
+	mca_device_set_name(mca_dev, smc_mca_adapter_names[adapter]);
 	mca_device_set_claim(mca_dev, 1);
 	ultra_found++;
 

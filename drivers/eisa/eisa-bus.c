@@ -25,13 +25,12 @@ struct eisa_device_info {
 	char name[DEVICE_NAME_SIZE];
 };
 
-static struct eisa_device_info __initdata eisa_table[] = {
 #ifdef CONFIG_EISA_NAMES
+static struct eisa_device_info __initdata eisa_table[] = {
 #include "devlist.h"
-#endif
 };
-
 #define EISA_INFOS (sizeof (eisa_table) / (sizeof (struct eisa_device_info)))
+#endif
 
 #define EISA_MAX_FORCED_DEV 16
 #define EISA_FORCED_OFFSET  2
@@ -59,11 +58,11 @@ static int is_forced_dev (int *forced_tab,
 
 static void __init eisa_name_device (struct eisa_device *edev)
 {
+#ifdef CONFIG_EISA_NAMES
 	int i;
-
 	for (i = 0; i < EISA_INFOS; i++) {
 		if (!strcmp (edev->id.sig, eisa_table[i].id.sig)) {
-			strlcpy (edev->dev.name,
+			strlcpy (edev->pretty_name,
 				 eisa_table[i].name,
 				 DEVICE_NAME_SIZE);
 			return;
@@ -71,7 +70,8 @@ static void __init eisa_name_device (struct eisa_device *edev)
 	}
 
 	/* No name was found */
-	sprintf (edev->dev.name, "EISA device %.7s", edev->id.sig);
+	sprintf (edev->pretty_name, "EISA device %.7s", edev->id.sig);
+#endif
 }
 
 static char __init *decode_eisa_sig(unsigned long addr)
@@ -172,7 +172,6 @@ static int __init eisa_init_device (struct eisa_root_device *root,
 {
 	char *sig;
         unsigned long sig_addr;
-	int i;
 
 	sig_addr = SLOT_ADDRESS (root, slot) + EISA_VENDOR_ID_OFFSET;
 
@@ -190,8 +189,13 @@ static int __init eisa_init_device (struct eisa_root_device *root,
 	edev->dev.dma_mask = &edev->dma_mask;
 	sprintf (edev->dev.bus_id, "%02X:%02X", root->bus_nr, slot);
 
-	for (i = 0; i < EISA_MAX_RESOURCES; i++)
-		edev->res[i].name  = edev->dev.name;
+#ifdef CONFIG_EISA_NAMES
+	{
+	  int i;
+	  for (i = 0; i < EISA_MAX_RESOURCES; i++)
+		edev->res[i].name = edev->pretty_name;
+	}
+#endif
 
 	if (is_forced_dev (enable_dev, root, edev))
 		edev->state = EISA_CONFIG_ENABLED | EISA_CONFIG_FORCED;
@@ -270,8 +274,7 @@ static int __init eisa_probe (struct eisa_root_device *root)
         int i, c;
 	struct eisa_device *edev;
 
-        printk (KERN_INFO "EISA: Probing bus %d at %s\n",
-		root->bus_nr, root->dev->name);
+        printk (KERN_INFO "EISA: Probing bus %d\n", root->bus_nr);
 
 	/* First try to get hold of slot 0. If there is no device
 	 * here, simply fail, unless root->force_probe is set. */

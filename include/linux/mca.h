@@ -73,6 +73,7 @@ struct mca_device {
 	void			*proc_dev;
 #endif
 	struct device		dev;
+	char			name[32];
 };
 #define to_mca_device(mdev) container_of(mdev, struct mca_device, dev)
 
@@ -92,6 +93,7 @@ struct mca_bus {
 	int			number;
 	struct mca_bus_accessor_functions f;
 	struct device		dev;
+	char			name[32];
 };
 #define to_mca_bus(mdev) container_of(mdev, struct mca_bus, dev)
 
@@ -118,6 +120,12 @@ extern void *mca_device_transform_memory(struct mca_device *mca_dev,
 					 void *mem);
 extern int mca_device_claimed(struct mca_device *mca_dev);
 extern void mca_device_set_claim(struct mca_device *mca_dev, int val);
+extern void mca_device_set_name(struct mca_device *mca_dev, const char *name);
+static inline char *mca_device_get_name(struct mca_device *mca_dev)
+{
+	return mca_dev ? mca_dev->name : NULL;
+}
+
 extern enum MCA_AdapterStatus mca_device_status(struct mca_device *mca_dev);
 
 extern struct bus_type mca_bus_type;

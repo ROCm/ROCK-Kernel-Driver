@@ -335,7 +335,7 @@ NCR_D700_probe(struct device *dev)
 	}
 
 	mca_device_set_claim(mca_dev, 1);
-	strlcpy(dev->name, "NCR_D700", sizeof(dev->name));
+	mca_device_set_name(mca_dev, "NCR_D700");
 	dev_set_drvdata(dev, p);
 	return 0;
 }

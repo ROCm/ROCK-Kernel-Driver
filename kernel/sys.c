@@ -1399,7 +1399,15 @@ asmlinkage long sys_prctl(int option, unsigned long arg2, unsigned long arg3,
 		case PR_GET_FPEXC:
 			error = GET_FPEXC_CTL(current, arg2);
 			break;
-
+		case PR_GET_TIMING:
+			error = PR_TIMING_STATISTICAL;
+			break;
+		case PR_SET_TIMING:
+			if (arg2 == PR_TIMING_STATISTICAL)
+				error = 0;
+			else
+				error = -EINVAL;
+			break;
 
 		case PR_GET_KEEPCAPS:
 			if (current->keep_capabilities)

@@ -82,7 +82,7 @@ static int DAC960_open(struct inode *inode, struct file *file)
 	} else {
 		DAC960_V2_LogicalDeviceInfo_T *i =
 			p->V2.LogicalDeviceInformation[drive_nr];
-		if (i->LogicalDeviceState == DAC960_V2_LogicalDevice_Offline)
+		if (!i || i->LogicalDeviceState == DAC960_V2_LogicalDevice_Offline)
 			return -ENXIO;
 	}
 

@@ -26,7 +26,7 @@
 /*
  * Version string
  */
-#define LOCKD_VERSION		"0.4"
+#define LOCKD_VERSION		"0.5"
 
 /*
  * Default timeout for RPC calls (seconds)
