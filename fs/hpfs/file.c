@@ -11,6 +11,8 @@
 #include <linux/smp_lock.h>
 #include "hpfs_fn.h"
 
+#define BLOCKS(size) (((size) + 511) >> 9)
+
 /* HUH? */
 int hpfs_open(struct inode *i, struct file *f)
 {
@@ -46,7 +48,7 @@ secno hpfs_bmap(struct inode *inode, unsigned file_secno)
 	unsigned n, disk_secno;
 	struct fnode *fnode;
 	struct buffer_head *bh;
-	if (((inode->i_size + 511) >> 9) <= file_secno) return 0;
+	if (BLOCKS(inode->u.hpfs_i.mmu_private) <= file_secno) return 0;
 	n = file_secno - inode->i_hpfs_file_sec;
 	if (n < inode->i_hpfs_n_secs) return inode->i_hpfs_disk_sec + n;
 	if (!(fnode = hpfs_map_fnode(inode->i_sb, inode->i_ino, &bh))) return 0;

@@ -58,10 +58,6 @@ struct ux_diva_card_s
 	isr_fn_t	*user_isr;
 };
 
-void bcopy(void *pSource, void *pDest, dword dwLength);
-void bzero(void *pDataArea, dword dwLength);
-
-
 /*
  * Get a card handle to enable card to be accessed
  */

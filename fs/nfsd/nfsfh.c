@@ -41,7 +41,7 @@ struct nfsd_getdents_callback {
  * the name matching the specified inode number.
  */
 static int filldir_one(void * __buf, const char * name, int len,
-			off_t pos, ino_t ino, unsigned int d_type)
+			loff_t pos, ino_t ino, unsigned int d_type)
 {
 	struct nfsd_getdents_callback *buf = __buf;
 	struct qstr *qs = buf->name;

@@ -236,7 +236,6 @@ int sa1111_sac_request_dma(dmach_t *channel, const char *device_id,
 	dma->device_id = device_id;
 	dma->callback = NULL;
 	dma->spin_size = 0;
-	dma->ready = 1;
 
 	return 0;
 }

@@ -42,6 +42,7 @@ static int  nfs_fsync(struct file *, struct dentry *dentry, int datasync);
 static int  nfs_file_release(struct inode *, struct file *);
 
 struct file_operations nfs_file_operations = {
+	llseek:		generic_file_llseek,
 	read:		nfs_file_read,
 	write:		nfs_file_write,
 	mmap:		nfs_file_mmap,

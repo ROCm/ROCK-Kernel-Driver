@@ -7,6 +7,7 @@
  *  Dynamic keymap and string allocation - aeb@cwi.nl - May 1994
  *  Restrict VT switching via ioctl() - grif@cs.ucr.edu - Dec 1995
  *  Some code moved for less code duplication - Andi Kleen - Mar 1997
+ *  Check put/get_user, cleanups - acme@conectiva.com.br - Jun 2001
  */
 
 #include <linux/config.h>
@@ -287,8 +288,10 @@ do_kdgkb_ioctl(int cmd, struct kbsentry *user_kdgkb, int perm)
 		p = func_table[i];
 		if(p)
 			for ( ; *p && sz; p++, sz--)
-				put_user(*p, q++);
-		put_user('\0', q);
+				if (put_user(*p, q++))
+					return -EFAULT;
+		if (put_user('\0', q))
+			return -EFAULT;
 		return ((p && *p) ? -EOVERFLOW : 0);
 	case KDSKBSENT:
 		if (!perm)
@@ -739,10 +742,8 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		struct vt_stat *vtstat = (struct vt_stat *)arg;
 		unsigned short state, mask;
 
-		i = verify_area(VERIFY_WRITE,(void *)vtstat, sizeof(struct vt_stat));
-		if (i)
-			return i;
-		put_user(fg_console + 1, &vtstat->v_active);
+		if (put_user(fg_console + 1, &vtstat->v_active))
+			return -EFAULT;
 		state = 1;	/* /dev/tty0 is always open */
 		for (i = 0, mask = 2; i < MAX_NR_CONSOLES && mask; ++i, mask <<= 1)
 			if (VT_IS_IN_USE(i))
@@ -878,11 +879,9 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		ushort ll,cc;
 		if (!perm)
 			return -EPERM;
-		i = verify_area(VERIFY_READ, (void *)vtsizes, sizeof(struct vt_sizes));
-		if (i)
-			return i;
-		get_user(ll, &vtsizes->v_rows);
-		get_user(cc, &vtsizes->v_cols);
+		if (get_user(ll, &vtsizes->v_rows) ||
+		    get_user(cc, &vtsizes->v_cols))
+			return -EFAULT;
 		return vc_resize_all(ll, cc);
 	}
 
@@ -892,15 +891,15 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 		ushort ll,cc,vlin,clin,vcol,ccol;
 		if (!perm)
 			return -EPERM;
-		i = verify_area(VERIFY_READ, (void *)vtconsize, sizeof(struct vt_consize));
-		if (i)
-			return i;
-		get_user(ll, &vtconsize->v_rows);
-		get_user(cc, &vtconsize->v_cols);
-		get_user(vlin, &vtconsize->v_vlin);
-		get_user(clin, &vtconsize->v_clin);
-		get_user(vcol, &vtconsize->v_vcol);
-		get_user(ccol, &vtconsize->v_ccol);
+		if (verify_area(VERIFY_READ, (void *)vtconsize,
+				sizeof(struct vt_consize)))
+			return -EFAULT;
+		__get_user(ll, &vtconsize->v_rows);
+		__get_user(cc, &vtconsize->v_cols);
+		__get_user(vlin, &vtconsize->v_vlin);
+		__get_user(clin, &vtconsize->v_clin);
+		__get_user(vcol, &vtconsize->v_vcol);
+		__get_user(ccol, &vtconsize->v_ccol);
 		vlin = vlin ? vlin : video_scan_lines;
 		if ( clin )
 		  {
@@ -1067,10 +1066,6 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 
 			if (!perm)
 				return -EPERM;
-			i = verify_area(VERIFY_READ, (void *) arg,
-					sizeof(struct vc_mode));
-			if (i)
-				return i;
 			if (copy_from_user(&mode, (void *) arg, sizeof(mode)))
 				return -EFAULT;
 			return console_setmode(&mode, cmd == VC_SETMODE);
@@ -1088,10 +1083,6 @@ int vt_ioctl(struct tty_struct *tty, struct file * file,
 				   was changed from 0x766a to 0x766c */
 				return console_powermode((int) arg);
 			}
-			i = verify_area(VERIFY_READ, (void *) arg,
-					sizeof(int));
-			if (i)
-				return i;
 			if (get_user(cmap_size, (int *) arg))
 				return -EFAULT;
 			if (cmap_size % 3)

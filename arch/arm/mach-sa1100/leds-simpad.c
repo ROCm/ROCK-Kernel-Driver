@@ -31,7 +31,7 @@ void simpad_leds_event(led_event_t evt)
 	switch (evt)
 	{
 	case led_start:
-		hw_led_state = LED_GREEN;
+	        hw_led_state = LED_GREEN;
 		led_state = LED_STATE_ENABLED;
 		break;
 

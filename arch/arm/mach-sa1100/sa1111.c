@@ -300,8 +300,8 @@ static int __init sa1111_ohci_hcd_init(void)
 
 	/* take out of reset */
 	/* set power sense and control lines (this from the diags code) */
-	*Reset = ( PwrSensePolLow << 6 )
-	       | ( PwrCtrlPolLow << 7 );
+        *Reset = ( PwrSensePolLow << 6 )
+               | ( PwrCtrlPolLow << 7 );
 
 	*Status = 0;
 

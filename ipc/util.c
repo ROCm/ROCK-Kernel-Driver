@@ -75,7 +75,7 @@ void __init ipc_init_ids(struct ipc_ids* ids, int size)
 		ids->size = 0;
 	}
 	ids->ary = SPIN_LOCK_UNLOCKED;
-	for(i=0;i<size;i++)
+	for(i=0;i<ids->size;i++)
 		ids->entries[i].p = NULL;
 }
 

@@ -105,7 +105,6 @@
 #ifdef CONFIG_VT
 extern void con_init_devfs (void);
 #endif
-extern int rio_init(void);
 
 #define CONSOLE_DEV MKDEV(TTY_MAJOR,0)
 #define TTY_DEV MKDEV(TTYAUX_MAJOR,0)
@@ -154,7 +153,7 @@ extern void hwc_tty_init(void);
 extern void con3215_init(void);
 extern void tty3215_init(void);
 extern void tub3270_con_init(void);
-extern void tub3270_initfunc(void);
+extern void tub3270_init(void);
 extern void rs285_console_init(void);
 extern void sa1100_rs_console_init(void);
 extern void sgi_serial_console_init(void);
@@ -400,13 +399,8 @@ static int hung_up_tty_ioctl(struct inode * inode, struct file * file,
 	return cmd == TIOCSPGRP ? -ENOTTY : -EIO;
 }
 
-static loff_t tty_lseek(struct file * file, loff_t offset, int orig)
-{
-	return -ESPIPE;
-}
-
 static struct file_operations tty_fops = {
-	llseek:		tty_lseek,
+	llseek:		no_llseek,
 	read:		tty_read,
 	write:		tty_write,
 	poll:		tty_poll,
@@ -417,7 +411,7 @@ static struct file_operations tty_fops = {
 };
 
 static struct file_operations hung_up_tty_fops = {
-	llseek:		tty_lseek,
+	llseek:		no_llseek,
 	read:		hung_up_tty_read,
 	write:		hung_up_tty_write,
 	poll:		hung_up_tty_poll,
@@ -2194,7 +2188,9 @@ void __init console_init(void)
 #if (defined(CONFIG_8xx) || defined(CONFIG_8260))
 	console_8xx_init();
 #elif defined(CONFIG_MAC_SERIAL)
-	mac_scc_console_init();
+ 	mac_scc_console_init();
+#elif defined(CONFIG_PARISC)
+	pdc_console_init();
 #elif defined(CONFIG_SERIAL)
 	serial_console_init();
 #endif /* CONFIG_8xx */
@@ -2211,14 +2207,17 @@ void __init console_init(void)
 	sci_console_init();
 #endif
 #endif
-#ifdef CONFIG_3215
-        con3215_init();
-#endif
-#ifdef CONFIG_3270_CONSOLE
+#ifdef CONFIG_TN3270_CONSOLE
 	tub3270_con_init();
+#endif
+#ifdef CONFIG_TN3215
+	con3215_init();
 #endif
 #ifdef CONFIG_HWC
         hwc_console_init();
+#endif
+#ifdef CONFIG_STDIO_CONSOLE
+	stdio_console_init();
 #endif
 #ifdef CONFIG_SERIAL_21285_CONSOLE
 	rs285_console_init();
@@ -2309,6 +2308,7 @@ void __init tty_init(void)
 
 	kbd_init();
 #endif
+
 #ifdef CONFIG_ESPSERIAL  /* init ESP before rs, so rs doesn't see the port */
 	espserial_init();
 #endif
@@ -2342,9 +2342,6 @@ void __init tty_init(void)
 #ifdef CONFIG_SPECIALIX
 	specialix_init();
 #endif
-#ifdef CONFIG_RIO
-	rio_init();
-#endif
 #if (defined(CONFIG_8xx) || defined(CONFIG_8260))
 	rs_8xx_init();
 #endif /* CONFIG_8xx */
@@ -2358,10 +2355,10 @@ void __init tty_init(void)
 #ifdef CONFIG_VT
 	vcs_init();
 #endif
-#ifdef CONFIG_3270
-	tub3270_initfunc();
+#ifdef CONFIG_TN3270
+	tub3270_init();
 #endif
-#ifdef CONFIG_3215
+#ifdef CONFIG_TN3215
 	tty3215_init();
 #endif
 #ifdef CONFIG_HWC

@@ -370,10 +370,10 @@ err_out1:
 
 static void __devinit emu10k1_midi_cleanup(struct emu10k1_card *card)
 {
-    tasklet_unlock_wait(&card->mpuout->tasklet);
+    tasklet_kill(&card->mpuout->tasklet);
     kfree(card->mpuout);
 
-    tasklet_unlock_wait(&card->mpuin->tasklet);
+    tasklet_kill(&card->mpuin->tasklet);
     kfree(card->mpuin);
 
 #ifdef EMU10K1_SEQUENCER

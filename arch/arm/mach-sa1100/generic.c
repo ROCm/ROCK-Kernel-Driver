@@ -160,10 +160,10 @@ static struct map_desc standard_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xf6000000, 0x20000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* PCMCIA0 IO */
   { 0xf7000000, 0x30000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* PCMCIA1 IO */
-  { 0xf8000000, 0x80000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* PCM */
-  { 0xfa000000, 0x90000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* SCM */
-  { 0xfc000000, 0xa0000000, 0x02000000, DOMAIN_IO, 0, 1, 0, 0 }, /* MER */
-  { 0xfe000000, 0xb0000000, 0x01f00000, DOMAIN_IO, 0, 1, 0, 0 }, /* LCD + DMA */
+  { 0xf8000000, 0x80000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* PCM */
+  { 0xfa000000, 0x90000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* SCM */
+  { 0xfc000000, 0xa0000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* MER */
+  { 0xfe000000, 0xb0000000, 0x00200000, DOMAIN_IO, 0, 1, 0, 0 }, /* LCD + DMA */
   LAST_DESC
 };
 

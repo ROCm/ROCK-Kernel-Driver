@@ -37,7 +37,6 @@
 
 extern int DivasCardNext;
 void UxPause(long ms);
-void bcopy(void *pSource, void *pDest, dword dwLength);
 int DivasGetMem(mem_block_t *);
 
 #define DIA_IOCTL_UNLOCK 12
@@ -157,11 +156,8 @@ unsigned int do_poll(struct file *pFile, struct poll_table_struct *pPollTable)
 {
 	word wMask = 0;
 
-    if (!DivasLogFifoEmpty())
-    {
+	if (!DivasLogFifoEmpty())
 		wMask |= POLLIN | POLLRDNORM;
-	}
-
 	return wMask;
 }
 
@@ -174,14 +170,14 @@ ssize_t do_read(struct file *pFile, char *pUserBuffer, size_t BufferSize, loff_t
 	{
 		printk(KERN_WARNING "Divas: Divalog buffer specifed a size that is too small (%d - %d required)\n",
 			BufferSize, sizeof(klog_t));
-		return 0;
+		return -EIO;
 	}
 
 	pHeadItem = (klog_t *) DivasLogFifoRead();
 
 	if (pHeadItem)
 	{
-		bcopy(pHeadItem, pClientLogBuffer, sizeof(klog_t));
+		memcpy(pClientLogBuffer, pHeadItem, sizeof(klog_t));
 		kfree(pHeadItem);
 		return sizeof(klog_t);
 	}

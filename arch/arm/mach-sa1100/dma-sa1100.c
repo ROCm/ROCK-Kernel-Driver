@@ -115,7 +115,7 @@ static void process_dma(sa1100_dma_t * dma)
 	for (;;) {
 		buf = dma->tail;
 
-		if (!buf) {
+		if (!buf || dma->stopped) {
 			/* no more data available */
 			DPRINTK("process: no more buf (dma %s)\n",
 				dma->curr ? "active" : "inactive");
@@ -388,11 +388,16 @@ int sa1100_dma_get_current(dmach_t channel, void **buf_id, dma_addr_t *addr)
 			*addr = buf->dma_ptr;
 		DPRINTK("curr_pos: b=%#x a=%#x\n", (int)dma->curr->id, *addr);
 		ret = 0;
+	} else if (dma->tail && dma->stopped) {
+		dma_buf_t *buf = dma->tail;
+		if (buf_id)
+			*buf_id = buf->id;
+		*addr = buf->dma_ptr;
+		ret = 0;
 	} else {
 		if (buf_id)
 			*buf_id = NULL;
 		*addr = 0;
-		DPRINTK("curr_pos: spinning\n");
 		ret = -ENXIO;
 	}
 	local_irq_restore(flags);
@@ -403,11 +408,36 @@ int sa1100_dma_get_current(dmach_t channel, void **buf_id, dma_addr_t *addr)
 int sa1100_dma_stop(dmach_t channel)
 {
 	sa1100_dma_t *dma = &dma_chan[channel];
+	int flags;
 
 	if (channel_is_sa1111_sac(channel))
 		return sa1111_dma_stop(channel);
 
+	if (dma->stopped)
+		return 0;
+	local_irq_save(flags);
+	dma->stopped = 1;
+	/*
+	 * Stop DMA and tweak state variables so everything could restart
+	 * from there when resume/wakeup occurs.
+	 */
 	dma->regs->ClrDCSR = DCSR_RUN | DCSR_IE;
+	if (dma->curr) {
+		dma_buf_t *buf = dma->curr;
+		if (dma->spin_ref <= 0) {
+			dma_addr_t curpos;
+			sa1100_dma_get_current(channel, NULL, &curpos);
+			buf->size += buf->dma_ptr - curpos;
+			buf->dma_ptr = curpos;
+		}
+		buf->ref = 0;
+		dma->tail = buf;
+		dma->curr = NULL;
+	}
+	dma->spin_ref = 0;
+	dma->regs->ClrDCSR = DCSR_STRTA|DCSR_STRTB;
+	process_dma(dma);
+	local_irq_restore(flags);
 	return 0;
 }
 
@@ -422,7 +452,15 @@ int sa1100_dma_resume(dmach_t channel)
 	if (channel_is_sa1111_sac(channel))
 		return sa1111_dma_resume(channel);
 
-	dma->regs->SetDCSR = DCSR_RUN | DCSR_IE;
+	if (dma->stopped) {
+		int flags;
+		save_flags_cli(flags);
+		dma->regs->ClrDCSR = DCSR_STRTA|DCSR_STRTB|DCSR_RUN|DCSR_IE;
+		dma->stopped = 0;
+		dma->spin_ref = 0;
+		process_dma(dma);
+		restore_flags(flags);
+	}
 	return 0;
 }
 
@@ -445,9 +483,9 @@ int sa1100_dma_flush_all(dmach_t channel)
 	if (!buf)
 		buf = dma->tail;
 	dma->head = dma->tail = dma->curr = NULL;
+	dma->stopped = 0;
 	dma->spin_ref = 0;
-	if (dma->spin_size)
-		process_dma(dma);
+	process_dma(dma);
 	local_irq_restore(flags);
 	while (buf) {
 		next_buf = buf->next;
@@ -502,7 +540,8 @@ EXPORT_SYMBOL(sa1100_free_dma);
 
 int sa1100_dma_sleep(dmach_t channel)
 {
-	sa1100_dma_t *dma = &dma_chan[channel];
+        sa1100_dma_t *dma = &dma_chan[channel];
+	int orig_state;
 
 	if ((unsigned)channel >= MAX_SA1100_DMA_CHANNELS || !dma->in_use)
 		return -EINVAL;
@@ -515,28 +554,17 @@ int sa1100_dma_sleep(dmach_t channel)
 		return 0;
 	}
 
-	/*
-	 * Stop DMA and tweak state variables so everything could restart
-	 * from there when wakeup occurs.
-	 */
-	dma->regs->ClrDCSR = DCSR_RUN | DCSR_IE;
-	if (dma->curr) {
-		dma_buf_t *buf = dma->curr;
-		dma_addr_t curpos;
-		sa1100_dma_get_current(channel, NULL, &curpos);
-		buf->size += buf->dma_ptr - curpos;
-		buf->dma_ptr = curpos;
-		buf->ref = 0;
-		dma->tail = buf;
-		dma->curr = NULL;
-	}
+	orig_state = dma->stopped;
+	sa1100_dma_stop(channel);
+	dma->regs->ClrDCSR = DCSR_RUN | DCSR_IE | DCSR_STRTA | DCSR_STRTB;
+	dma->stopped = orig_state;
 	dma->spin_ref = 0;
 	return 0;
 }
 
 int sa1100_dma_wakeup(dmach_t channel)
 {
-	sa1100_dma_t *dma = &dma_chan[channel];
+        sa1100_dma_t *dma = &dma_chan[channel];
 	dma_regs_t *regs;
 	int flags;
 

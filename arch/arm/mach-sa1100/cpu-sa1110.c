@@ -3,7 +3,7 @@
  *
  *  Copyright (C) 2001 Russell King
  *
- *  $Id: cpu-sa1110.c,v 1.2 2001/07/24 20:25:25 rmk Exp $
+ *  $Id: cpu-sa1110.c,v 1.3 2001/08/12 15:41:53 rmk Exp $
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 as
@@ -48,7 +48,7 @@ struct sdram_params {
 	u_short refresh;	/* refresh time for array (us)	 */
 };
 
-static struct sdram_params tc59sm716_cl2_params = {
+static struct sdram_params tc59sm716_cl2_params __initdata = {
 	rows:		    12,
 	tck:		    10,
 	trcd:		    20,
@@ -58,7 +58,7 @@ static struct sdram_params tc59sm716_cl2_params = {
 	cas_latency:	     2,
 };
 
-static struct sdram_params tc59sm716_cl3_params = {
+static struct sdram_params tc59sm716_cl3_params __initdata = {
 	rows:		    12,
 	tck:		     8,
 	trcd:		    20,
@@ -67,6 +67,8 @@ static struct sdram_params tc59sm716_cl3_params = {
 	refresh:	 64000,
 	cas_latency:	     3,
 };
+
+static struct sdram_params sdram_params;
 
 /*
  * Given a period in ns and frequency in khz, calculate the number of
@@ -205,7 +207,14 @@ static int
 sdram_notifier(struct notifier_block *nb, unsigned long val, void *data)
 {
 	struct cpufreq_info *ci = data;
-	struct sdram_params *sdram = &tc59sm716_cl3_params;
+	struct sdram_params *sdram = &sdram_params;
+
+	/* were we initialised? */
+	if (sdram->cas_latency == 0) {
+		struct cpufreq_minmax *m = data;
+		m->min_freq = m->max_freq = m->cur_freq;
+		return 0;
+	}
 
 	switch (val) {
 	case CPUFREQ_MINMAX:
@@ -247,11 +256,24 @@ static struct notifier_block sa1110_clkchg_block = {
 
 static int __init sa1110_sdram_init(void)
 {
-	struct sdram_params *sdram = &tc59sm716_cl3_params;
+	struct sdram_params *sdram = NULL;
 	unsigned int cur_freq = cpufreq_get(smp_processor_id());
+	int ret = -ENODEV;
 
-	sdram_update_timing(cur_freq, sdram);
-	sdram_update_refresh(cur_freq, sdram);
+	if (machine_is_assabet())
+		sdram = &tc59sm716_cl3_params;
+
+	if (sdram) {
+		printk(KERN_DEBUG "SDRAM: tck: %d trcd: %d trp: %d"
+			" twr: %d refresh: %d cas_latency: %d",
+			sdram->tck, sdram->trcd, sdram->trp,
+			sdram->twr, sdram->refresh, sdram->cas_latency);
+
+		memcpy(&sdram_params, sdram, sizeof(sdram_params));
+
+		sdram_update_timing(cur_freq, &sdram_params);
+		sdram_update_refresh(cur_freq, &sdram_params);
+	}
 
 	return cpufreq_register_notifier(&sa1110_clkchg_block);
 }

@@ -227,6 +227,12 @@ M:	axboe@suse.de
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
+BLUETOOTH SUBSYSTEM (BlueZ)
+P:	Maxim Krasnyansky
+M:	maxk@qualcomm.com
+W:	http://bluez.sf.net
+S:	Maintained
+
 BTTV VIDEO4LINUX DRIVER
 P:	Gerd Knorr
 M:	kraxel@goldbach.in-berlin.de
@@ -500,6 +506,13 @@ M:	Remy.Card@linux.org
 L:	linux-kernel@vger.kernel.org
 S:	Maintained
 
+FARSYNC SYNCHRONOUS DRIVER
+P:	Bob Dunlop
+M:	rjd@xyzzy.clara.co.uk
+M:	bob.dunlop@farsite.co.uk
+W:	http://www.farsite.co.uk/
+S:	Supported
+
 FILE LOCKING (flock() and fcntl()/lockf())
 P:	Matthew Wilcox
 M:	matthew@wil.cx
@@ -637,7 +650,7 @@ S:      Supported
 IDE DRIVER [GENERAL]
 P:	Andre Hedrick
 M:	andre@linux-ide.org
-M:	ahedrick@atipa.com
+M:	andre@aslab.com
 M:	andre@suse.com
 L:	linux-kernel@vger.kernel.org
 W:	http://www.kernel.org/pub/linux/kernel/people/hedrick/
@@ -691,6 +704,12 @@ IEEE 1394 RAW I/O DRIVER
 P:	Andreas Bombe
 M:	andreas.bombe@munich.netsurf.de
 L:	linux1394-devel@lists.sourceforge.net
+S:	Maintained
+
+IMS TWINTURBO FRAMEBUFFER DRIVER
+P:	Paul Mundt
+M:	lethal@chaoticdreams.org
+L:	linux-fbdev-devel@lists.sourceforge.net
 S:	Maintained
 
 INTEL APIC/IOAPIC, LOWLEVEL X86 SMP SUPPORT
@@ -1601,17 +1620,18 @@ W:	http://www.qsl.net/dl1bke/
 L:	linux-hams@vger.kernel.org
 S:	Maintained
 
+ZF MACHZ WATCHDOG
+P:	Fernando Fuganti
+M:	fuganti@conectiva.com.br
+M:	fuganti@netbank.com.br
+W:	http://cvs.conectiva.com.br/drivers/ZFL-watchdog/
+S:	Maintained
+
 ZR36120 VIDEO FOR LINUX DRIVER
 P:	Pauline Middelink
 M:	middelin@polyware.nl
 W:	http://www.polyware.nl/~middelin/En/hobbies.html
 W:	http://www.polyware.nl/~middelin/hobbies.html
-S:	Maintained
-
-Bluetooth Subsystem (BlueZ)
-P:	Maxim Krasnyansky
-M:	maxk@qualcomm.com
-W:	http://bluez.sf.net
 S:	Maintained
 
 THE REST

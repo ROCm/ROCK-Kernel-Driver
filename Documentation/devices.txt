@@ -1,17 +1,19 @@
+
 		       LINUX ALLOCATED DEVICES
 	     Maintained by H. Peter Anvin <device@lanana.org>
 
-		   Last revised: December 29, 2000
+		      Last revised: 3 June 2001
 
 This list is the Linux Device List, the official registry of allocated
 device numbers and /dev directory nodes for the Linux operating
 system.
 
-The latest version of this list is included with the Linux kernel
-sources.  It is also available separately from 
-http://www.kernel.org/pub/linux/docs/device-list/ or
-ftp://ftp.kernel.org/pub/linux/docs/device-list/.  The LaTeX version
-of this document is no longer maintained.
+The latest version of this list is available from
+http://www.lanana.org/docs/device-list/ or
+ftp://ftp.kernel.org/pub/linux/docs/device-list/.  This version may be
+newer than the one distributed with the Linux kernel.
+
+The LaTeX version of this document is no longer maintained.
 
 This document is included by reference into the Filesystem Hierarchy
 Standard (FHS).	 The FHS is available from http://www.pathname.com/fhs/.
@@ -37,6 +39,13 @@ reply.
 
 
 	  **** DEVICE DRIVERS AUTHORS PLEASE READ THIS ****
+
+THE DEVICE REGISTRY IS OFFICIALLY FROZEN FOR LINUS TORVALDS' KERNEL
+TREE.  At Linus' request, no more allocations will be made official
+for Linus' kernel tree; the 3 June 2001 version of this list is the
+official final version of this registry.  At Alan Cox' request,
+however, the registry will continue to be maintained for the -ac
+series of kernels, and registrations will be accepted.
 
 To have a major number allocated, or a minor number in situations
 where that applies (e.g. busmice), please contact me with the
@@ -391,12 +400,25 @@ Your cooperation is appreciated.
 		199 = /dev/scanners/cuecat :CueCat barcode scanner
 		200 = /dev/net/tun	TAP/TUN network device
 		201 = /dev/button/gulpb	Transmeta GULP-B buttons
-		204 = /dev/video/em8300	    EM8300 DVD decoder control
-		205 = /dev/video/em8300_mv  EM8300 DVD decoder video
-		206 = /dev/video/em8300_ma  EM8300 DVD decoder audio
-		207 = /dev/video/em8300_sp  EM8300 DVD decoder subpicture
-		208 = /dev/compaq/cpqphpc Compaq PCI Hot Plug Controller
-		209 = /dev/compaq/cpqrid  Compaq Remote Insight Driver
+		204 = /dev/video/em8300		EM8300 DVD decoder control
+		205 = /dev/video/em8300_mv	EM8300 DVD decoder video
+		206 = /dev/video/em8300_ma	EM8300 DVD decoder audio
+		207 = /dev/video/em8300_sp	EM8300 DVD decoder subpicture
+		208 = /dev/compaq/cpqphpc	Compaq PCI Hot Plug Controller
+		209 = /dev/compaq/cpqrid	Compaq Remote Insight Driver
+		210 = /dev/impi/bt	IMPI coprocessor block transfer	
+		211 = /dev/impi/smic	IMPI coprocessor stream interface
+		212 = /dev/watchdogs/0	First watchdog device
+		213 = /dev/watchdogs/1	Second watchdog device
+		214 = /dev/watchdogs/2	Third watchdog device
+		215 = /dev/watchdogs/3	Fourth watchdog device
+		216 = /dev/fujitsu/apanel	Fujitsu/Siemens application panel
+		217 = /dev/ni/natmotn		National Instruments Motion
+		218 = /dev/kchuid	Inter-process chuid control
+		219 = /dev/modems/mwave	MWave modem firmware upload
+		220 = /dev/mptctl	Message passing technology (MPT) control
+		221 = /dev/mvista/hssdsi	Montavista PICMG hot swap system driver
+		222 = /dev/mvista/hasi		Montavista PICMG high availability
 		240-255			Reserved for local use
 
  11 char	Raw keyboard device
@@ -430,14 +452,19 @@ Your cooperation is appreciated.
 		  1 = /dev/dos_cd1	Second MSCDEX CD-ROM
 		    ...
 
- 13 char	PC speaker (OBSOLETE)
-		  0 = /dev/pcmixer	Emulates /dev/mixer
-		  1 = /dev/pcsp		Emulates /dev/dsp (8-bit)
-		  4 = /dev/pcaudio	Emulates /dev/audio
-		  5 = /dev/pcsp16	Emulates /dev/dsp (16-bit)
+ 13 char	Input core
+		  0 = /dev/input/js0	First joystick
+		  1 = /dev/input/js1	Second joystick
+		    ...
+		 32 = /dev/input/mouse0	First mouse
+		 33 = /dev/input/mouse1	Second mouse
+		    ...
+		 63 = /dev/input/mice	Unified mouse
+		 64 = /dev/input/event0	First event queue
+		 65 = /dev/input/event1	Second event queue
+		    ...
 
-		The current PC speaker driver uses the Open Sound
-		System interface, and these devices are obsolete.
+		Each device type has 5 bits (32 minors).
 
     block	8-bit MFM/RLL/IDE controller
 		  0 = /dev/xda		First XT disk whole disk
@@ -664,13 +691,12 @@ Your cooperation is appreciated.
 		    ...
 		 31 = /dev/fb31		32nd frame buffer
 
-		Backward compatibility aliases {2.6}
-
-		 32 = /dev/fb1		Second frame buffer
+		For backwards compatibility {2.6} the following
+		progression is also handled by current kernels:
+		  0 = /dev/fb0
+		 32 = /dev/fb1
 		    ...
-		224 = /dev/fb7		Eighth frame buffer
-
-		All additional minor numbers are reserved.
+		224 = /dev/fb7
 
     block	Aztech/Orchid/Okano/Wearnes CD-ROM
 		  0 = /dev/aztcd	Aztech CD-ROM
@@ -945,7 +971,7 @@ Your cooperation is appreciated.
 		  0 = /dev/rd/c0d0	First disk, whole disk
 		  8 = /dev/rd/c0d1	Second disk, whole disk
 		    ...
-		248 = /dev/rd/c0d15	16th disk, whole disk
+		248 = /dev/rd/c0d15	32nd disk, whole disk
 
 		For partitions add:
 		  0 = /dev/rd/c?d?	Whole disk
@@ -961,7 +987,7 @@ Your cooperation is appreciated.
 		  0 = /dev/rd/c1d0	First disk, whole disk
 		  8 = /dev/rd/c1d1	Second disk, whole disk
 		    ...
-		248 = /dev/rd/c1d15	16th disk, whole disk
+		248 = /dev/rd/c1d31	32nd disk, whole disk
 
 		Partitions are handled as for major 48.
 
@@ -971,7 +997,7 @@ Your cooperation is appreciated.
 		  0 = /dev/rd/c2d0	First disk, whole disk
 		  8 = /dev/rd/c2d1	Second disk, whole disk
 		    ...
-		248 = /dev/rd/c2d15	16th disk, whole disk
+		248 = /dev/rd/c2d31	32nd disk, whole disk
 
  51 char	Baycom radio modem
 		  0 = /dev/bc0		First Baycom radio modem
@@ -981,7 +1007,7 @@ Your cooperation is appreciated.
 		  0 = /dev/rd/c3d0	First disk, whole disk
 		  8 = /dev/rd/c3d1	Second disk, whole disk
 		    ...
-		248 = /dev/rd/c3d15	16th disk, whole disk
+		248 = /dev/rd/c3d31	32nd disk, whole disk
 
 		Partitions are handled as for major 48.
 
@@ -994,7 +1020,7 @@ Your cooperation is appreciated.
 		  0 = /dev/rd/c4d0	First disk, whole disk
 		  8 = /dev/rd/c4d1	Second disk, whole disk
 		    ...
-		248 = /dev/rd/c4d15	16th disk, whole disk
+		248 = /dev/rd/c4d31	32nd disk, whole disk
 
 		Partitions are handled as for major 48.
 
@@ -1016,7 +1042,7 @@ Your cooperation is appreciated.
 		  0 = /dev/rd/c5d0	First disk, whole disk
 		  8 = /dev/rd/c5d1	Second disk, whole disk
 		    ...
-		248 = /dev/rd/c5d15	16th disk, whole disk
+		248 = /dev/rd/c5d31	32nd disk, whole disk
 
 		Partitions are handled as for major 48.
 
@@ -1033,7 +1059,7 @@ Your cooperation is appreciated.
 		  0 = /dev/rd/c6d0	First disk, whole disk
 		  8 = /dev/rd/c6d1	Second disk, whole disk
 		    ...
-		248 = /dev/rd/c6d15	16th disk, whole disk
+		248 = /dev/rd/c6d31	32nd disk, whole disk
 
 		Partitions are handled as for major 48.
 
@@ -1043,7 +1069,7 @@ Your cooperation is appreciated.
 		  0 = /dev/rd/c7d0	First disk, whole disk
 		  8 = /dev/rd/c7d1	Second disk, whole disk
 		    ...
-		248 = /dev/rd/c7d15	16th disk, whole disk
+		248 = /dev/rd/c7d31	32nd disk, whole disk
 
 		Partitions are handled as for major 48.
 
@@ -1541,7 +1567,6 @@ Your cooperation is appreciated.
 		Partitions are handled the same way as for the first
 		interface (see major number 3).
 
-
  89 char	I2C bus interface
 		  0 = /dev/i2c-0	First I2C adapter
 		  1 = /dev/i2c-1	Second I2C adapter
@@ -1610,22 +1635,28 @@ Your cooperation is appreciated.
 		  1 = /dev/dcxx1	Second capture card
 		    ...
 
+    block	IBM S/390 DASD block storage
+		  0 = /dev/dasda	First DASD device, major
+		  1 = /dev/dasda1	First DASD device, block 1
+		  2 = /dev/dasda2	First DASD device, block 2
+		  3 = /dev/dasda3	First DASD device, block 3
+		  4 = /dev/dasdb	Second DASD device, major
+		  5 = /dev/dasdb1	Second DASD device, block 1
+		  6 = /dev/dasdb2	Second DASD device, block 2
+		  7 = /dev/dasdb3	Second DASD device, block 3
+		    ...
+
  95 char	IP filter
 		  0 = /dev/ipl		Filter control device/log file
 		  1 = /dev/ipnat	NAT control device/log file
 		  2 = /dev/ipstate	State information log file
 		  3 = /dev/ipauth	Authentication control device/log file
-
-    block	IBM S/390 DASD block storage
-		  0 = /dev/dasd0	First DASD device, major
-		  1 = /dev/dasd0a	First DASD device, block 1
-		  2 = /dev/dasd0b	First DASD device, block 2
-		  3 = /dev/dasd0c	First DASD device, block 3
-		  4 = /dev/dasd1	Second DASD device, major
-		  5 = /dev/dasd1a	Second DASD device, block 1
-		  6 = /dev/dasd1b	Second DASD device, block 2
-		  7 = /dev/dasd1c	Second DASD device, block 3
 		    ...		
+
+    block	IBM S/390 VM/ESA minidisk
+		  0 = /dev/mnda		First VM/ESA minidisk
+		  1 = /dev/mndb		Second VM/ESA minidisk
+		    ...
 
  96 char	Parallel port ATAPI tape devices
 		  0 = /dev/pt0		First parallel port ATAPI tape
@@ -1633,11 +1664,6 @@ Your cooperation is appreciated.
 		    ...
 		128 = /dev/npt0		First p.p. ATAPI tape, no rewind
 		129 = /dev/npt1		Second p.p. ATAPI tape, no rewind
-		    ...
-
-    block	IBM S/390 VM/ESA minidisk
-		  0 = /dev/msd0		First VM/ESA minidisk
-		  1 = /dev/msd1		Second VM/ESA minidisk
 		    ...
 
  97 char	Parallel port generic ATAPI interface
@@ -1705,6 +1731,16 @@ Your cooperation is appreciated.
 		  1 = /dev/tlk1		Second Teletext decoder
 		  2 = /dev/tlk2		Third Teletext decoder
 		  3 = /dev/tlk3		Fourth Teletext decoder
+
+    block	Compressed block device
+		  0 = /dev/cbd/a	First compressed block device, whole device
+		 16 = /dev/cbd/b	Second compressed block device, whole device
+		    ...
+		240 = /dev/cbd/p	16th compressed block device, whole device
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 15.
 
 103 char	Arla network file system
 		  0 = /dev/xfs0		Arla XFS
@@ -1837,9 +1873,28 @@ Your cooperation is appreciated.
 		There is currently a device-naming conflict between
 		these and PAM multimodems (major 78).
 
+    block	IBM iSeries virtual disk
+		  0 = /dev/iseries/vda	First virtual disk, whole disk
+		  8 = /dev/iseries/vdb	Second virtual disk, whole disk
+		    ...
+		200 = /dev/iseries/vdz	26th virtual disk, whole disk
+		208 = /dev/iseries/vdaa	27th virtual disk, whole disk
+		    ...
+		240 = /dev/iseries/vdaf	32nd virtual disk, whole disk
+
+		Partitions are handled in the same way as for IDE
+		disks (see major number 3) except that the limit on
+		partitions is 7.
+
 113 char	ISI serial card - alternate devices
 		  0 = /dev/cum0		Callout device for ttyM0
 		  1 = /dev/cum1		Callout device for ttyM1
+		    ...
+
+    block	IBM iSeries virtual CD-ROM
+
+		  0 = /dev/iseries/vcda	First virtual CD-ROM
+		  1 = /dev/iseries/vcdb	Second virtual CD-ROM
 		    ...
 
 114 char	Picture Elements ISE board
@@ -2005,9 +2060,9 @@ Your cooperation is appreciated.
 		    ...
 
 162 char	Raw block device interface
-		  0 = /dev/raw		Raw I/O control device
-		  1 = /dev/raw1		First raw I/O device
-		  2 = /dev/raw2		Second raw I/O device
+		  0 = /dev/rawctl	Raw I/O control device
+		  1 = /dev/raw/raw1	First raw I/O device
+		  2 = /dev/raw/raw2	Second raw I/O device
 		    ...
 
 163 char	Radio Tech BIM-XXX-RS232 radio modem
@@ -2219,7 +2274,22 @@ Your cooperation is appreciated.
 		    ...
 		255 = /dev/nvidiactl		Nvidia card control device
 
-196-197		UNASSIGNED
+196 char	Tormenta T1 card
+		  0 = /dev/tor/0		Master control channel for all cards
+		  1 = /dev/tor/1		First DS0
+		  2 = /dev/tor/2		Second DS0
+		    ...
+		 48 = /dev/tor/48		48th DS0
+		 49 = /dev/tor/49		First pseudo-channel
+		 50 = /dev/tor/50		Second pseudo-channel
+		    ...
+
+197 char	OpenTNF tracing facility
+		  0 = /dev/tnf/t0		Trace 0 data extraction
+		  1 = /dev/tnf/t1		Trace 1 data extraction
+		    ...
+		128 = /dev/tnf/status		Tracing facility status
+		130 = /dev/tnf/trace		Tracing device
 
 198 char	Total Impact TPMP2 quad coprocessor PCI card
 		  0 = /dev/tpmp2/0		First card
@@ -2288,6 +2358,9 @@ Your cooperation is appreciated.
 		 16 = /dev/ttyAM0		ARM "AMBA" serial port 0
 		    ...
 		 31 = /dev/ttyAM15		ARM "AMBA" serial port 15
+		 32 = /dev/ttyDB0		DataBooster serial port 0
+		    ...
+		 39 = /dev/ttyDB7		DataBooster serial port 7
 
 205 char	Low-density serial ports (alternate device)
 		  0 = /dev/culu0		Callout device for ttyLU0
@@ -2309,6 +2382,9 @@ Your cooperation is appreciated.
 		 16 = /dev/cuam0		Callout device for ttyAM0
 		    ...
 		 31 = /dev/cuam15		Callout device for ttyAM15
+		 32 = /dev/cudb0		Callout device for ttyDB0
+		    ...
+		 39 = /dev/cudb7		Callout device for ttyDB7
 
 206 char	OnStream SC-x0 tape devices
 		  0 = /dev/osst0		First OnStream SCSI tape, mode 0
@@ -2450,7 +2526,59 @@ Your cooperation is appreciated.
 		  1 = /dev/cuy1			Callout device for ttyY1
 		    ...
 
-226-239		UNASSIGNED
+226 char	Direct Rendering Infrastructure (DRI)
+		  0 = /dev/dri/card0		First graphics card
+		  1 = /dev/dri/card1		Second graphics card
+		    ...
+
+227 char	IBM 3270 terminal block-mode access
+		  0 = /dev/3270/tub		Controlling interface
+		  1 = /dev/3270/tub1		First 3270 terminal
+		  2 = /dev/3270/tub2		Second 3270 terminal
+		    ...
+
+228 char	IBM 3270 terminal Unix tty access
+		  1 = /dev/3270/tty1		First 3270 terminal
+		  2 = /dev/3270/tty2		Seconds 3270 terminal
+		    ...
+
+229 char	IBM iSeries virtual console
+		  0 = /dev/iseries/vtty0	First console port
+		  1 = /dev/iseries/vtty1	Second console port
+		    ...
+
+230 char	IBM iSeries virtual tape
+		  0 = /dev/iseries/vt0		First virtual tape, mode 0
+		  1 = /dev/iseries/vt1		Second virtual tape, mode 0
+		    ...
+		 32 = /dev/iseries/vt0l		First virtual tape, mode 1
+		 33 = /dev/iseries/vt1l		Second virtual tape, mode 1
+		    ...
+		 64 = /dev/iseries/vt0m		First virtual tape, mode 2
+		 65 = /dev/iseries/vt1m		Second virtual tape, mode 2
+		    ...
+		 96 = /dev/iseries/vt0a		First virtual tape, mode 3
+		 97 = /dev/iseries/vt1a		Second virtual tape, mode 3
+		      ...
+		128 = /dev/iseries/nvt0		First virtual tape, mode 0, no rewind
+		129 = /dev/iseries/nvt1		Second virtual tape, mode 0, no rewind
+		    ...
+		160 = /dev/iseries/nvt0l	First virtual tape, mode 1, no rewind
+		161 = /dev/iseries/nvt1l	Second virtual tape, mode 1, no rewind
+		    ...
+		192 = /dev/iseries/nvt0m	First virtual tape, mode 2, no rewind
+		193 = /dev/iseries/nvt1m	Second virtual tape, mode 2, no rewind
+		    ...
+		224 = /dev/iseries/nvt0a	First virtual tape, mode 3, no rewind
+		225 = /dev/iseries/nvt1a	Second virtual tape, mode 3, no rewind
+		    ...
+
+		"No rewind" refers to the omission of the default
+		automatic rewind on device close.  The MTREW or MTOFFL
+		ioctl()'s can be used to rewind the tape regardless of
+		the device used to access it.
+
+231-239		UNASSIGNED
 
 240-254		LOCAL/EXPERIMENTAL USE
 
@@ -2647,3 +2775,4 @@ for the slaves; the slaves are named with decimal integers (/dev/pts/#
 in our notation).  This removes the problem of exhausting the
 namespace and enables the kernel to automatically create the device
 nodes for the slaves on demand using the "devpts" filesystem.
+

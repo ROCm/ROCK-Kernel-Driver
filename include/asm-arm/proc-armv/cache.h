@@ -231,7 +231,4 @@ static inline void flush_dcache_page(struct page *page)
  * cache entries for the kernels virtual memory range are written
  * back to the page.
  */
-extern void check_pgcache_dirty(struct page *page);
-
-#define update_mmu_cache(vma,address,pte) check_pgcache_dirty(pte_page(pte))
-
+extern void update_mmu_cache(struct vm_area_struct *vma, unsigned long addr, pte_t pte);

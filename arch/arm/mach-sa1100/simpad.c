@@ -66,7 +66,7 @@ static void __init simpad_map_io(void)
 	iotable_init(simpad_io_desc);
 
 	sa1100_register_uart(0, 3);
-	sa1100_register_uart(1, 1);
+        sa1100_register_uart(1, 1);
 }
 
 

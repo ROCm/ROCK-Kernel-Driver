@@ -1218,7 +1218,6 @@ match:
 		tasklet_init(&woinst->timer.tasklet, emu10k1_waveout_bh, (unsigned long) wave_dev);
 		wave_dev->woinst = woinst;
 		emu10k1_waveout_setformat(wave_dev, &woinst->format);
-
 	}
 
 	file->private_data = (void *) wave_dev;
@@ -1261,7 +1260,7 @@ static int emu10k1_audio_release(struct inode *inode, struct file *file)
 
 		spin_unlock_irqrestore(&woinst->lock, flags);
 		/* wait for the tasklet (bottom-half) to finish */
-		tasklet_unlock_wait(&woinst->timer.tasklet);
+		tasklet_kill(&woinst->timer.tasklet);
 		kfree(wave_dev->woinst);
 	}
 
@@ -1275,7 +1274,7 @@ static int emu10k1_audio_release(struct inode *inode, struct file *file)
 		}
 
 		spin_unlock_irqrestore(&wiinst->lock, flags);
-		tasklet_unlock_wait(&wiinst->timer.tasklet);
+		tasklet_kill(&wiinst->timer.tasklet);
 		kfree(wave_dev->wiinst);
 	}
 
@@ -1491,6 +1490,9 @@ void emu10k1_wavein_bh(unsigned long refdata)
 	u32 bytestocopy;
 	unsigned long flags;
 
+	if (!wiinst)
+		return;
+
 	spin_lock_irqsave(&wiinst->lock, flags);
 
 	if (!(wiinst->state & WAVE_STATE_STARTED)) {
@@ -1517,6 +1519,9 @@ void emu10k1_waveout_bh(unsigned long refdata)
 	struct woinst *woinst = wave_dev->woinst;
 	u32 bytestocopy;
 	unsigned long flags;
+
+	if (!woinst)
+		return;
 
 	spin_lock_irqsave(&woinst->lock, flags);
 

@@ -66,7 +66,7 @@ void lart_leds_event(led_event_t evt)
 #ifdef CONFIG_LEDS_CPU
 	case led_idle_start:
 		/* The LART people like the LED to be off when the
-		   system is idle... */
+                   system is idle... */
 		if (!(led_state & LED_STATE_CLAIMED))
 			hw_led_state &= ~LED_23;
 		break;

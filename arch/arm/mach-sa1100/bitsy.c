@@ -51,9 +51,9 @@ static void bitsy_uart_set_mctrl(struct uart_port *port, u_int mctrl)
 {
 	if (port->mapbase == _Ser3UTCR0) {
 		if (mctrl & TIOCM_RTS)
-			GPSR = GPIO_BITSY_COM_RTS;
-		else
 			GPCR = GPIO_BITSY_COM_RTS;
+		else
+			GPSR = GPIO_BITSY_COM_RTS;
 	}
 }
 
@@ -63,9 +63,9 @@ static int bitsy_uart_get_mctrl(struct uart_port *port)
 
 	if (port->mapbase == _Ser3UTCR0) {
 		int gplr = GPLR;
-		if (!(gplr & GPIO_BITSY_COM_DCD))
+		if (gplr & GPIO_BITSY_COM_DCD)
 			ret &= ~TIOCM_CD;
-		if (!(gplr & GPIO_BITSY_COM_CTS))
+		if (gplr & GPIO_BITSY_COM_CTS)
 			ret &= ~TIOCM_CTS;
 	}
 
@@ -150,7 +150,7 @@ static struct sa1100_port_fns bitsy_port_fns __initdata = {
 static struct map_desc bitsy_io_desc[] __initdata = {
  /* virtual     physical    length      domain     r  w  c  b */
   { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
-  { 0xf0000000, 0x49000000, 0x01000000, DOMAIN_IO, 1, 1, 0, 0 }, /* EGPIO 0 */
+  { 0xf0000000, 0x49000000, 0x00100000, DOMAIN_IO, 0, 1, 0, 0 }, /* EGPIO 0 */
   { 0xf1000000, 0x10000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 2 */
   { 0xf3000000, 0x40000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* static memory bank 4 */
   LAST_DESC

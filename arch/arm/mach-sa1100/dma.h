@@ -34,7 +34,7 @@ typedef struct {
 	dma_buf_t *head;	/* where to insert buffers */
 	dma_buf_t *tail;	/* where to remove buffers */
 	dma_buf_t *curr;	/* buffer currently DMA'ed */
-	int ready;		/* 1 if DMA can occur */
+	int stopped;		/* 1 if DMA is stalled */
 	dma_regs_t *regs;	/* points to appropriate DMA registers */
 	int irq;		/* IRQ used by the channel */
 	dma_callback_t callback; /* ... to call when buffers are done */

@@ -112,15 +112,15 @@ ide_init_default_hwifs(void)
         hw_regs_t hw;
 
         /* Enable GPIO as interrupt line */
-        GPDR &= ~GPIO_GPIO1;
-        set_GPIO_IRQ_edge(GPIO_GPIO1, GPIO_RISING_EDGE);
+        GPDR &= ~LART_GPIO_IDE;
+        set_GPIO_IRQ_edge(LART_GPIO_IDE, GPIO_RISING_EDGE);
         
         /* set PCMCIA interface timing */
         MECR = 0x00060006;
 
         /* init the interface */
 	ide_init_hwif_ports(&hw, PCMCIA_IO_0_BASE + 0x0000, PCMCIA_IO_0_BASE + 0x1000, NULL);
-        hw.irq = IRQ_GPIO1;
+        hw.irq = LART_IRQ_IDE;
         ide_register_hw(&hw, NULL);
 #endif
     }

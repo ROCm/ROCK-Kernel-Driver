@@ -37,9 +37,6 @@
 #define DIVAS_IRQ_RESET		0xC18
 #define DIVAS_IRQ_RESET_VAL	0xFE
 
-#define	PCI_LATENCY	PCI_LATENCY_TIMER
-#define PCI_INTERRUPT	PCI_INTERRUPT_LINE
-
 #define TEST_INT_DIVAS		0x11
 #define TEST_INT_DIVAS_BRI	0x12
 #define TEST_INT_DIVAS_Q	0x13
@@ -478,7 +475,6 @@ void card_isr (void *dev_id)
 int DivasCardNew(dia_card_t *card_info)
 {
 	card_t *card;
-	byte b;
 	static boolean_t first_call = TRUE;
 	boolean_t NeedISRandReset = FALSE;
 
@@ -566,10 +562,6 @@ int DivasCardNew(dia_card_t *card_info)
 			UxCardHandleFree(card->hw);
 			return -1;
 		}
-
-		b = card->cfg.irq;
-
-		UxPciConfigWrite(card->hw, sizeof(b), PCI_INTERRUPT_LINE, &b);
 
 		if (card_info->card_type != DIA_CARD_TYPE_DIVA_SERVER_Q)
 		{
@@ -670,7 +662,7 @@ static int idi_register(card_t *card, byte channels)
 		return -1;
 	}
 
-	bzero(card->e_tbl, sizeof(E_INFO) * num_entities);
+	memset(card->e_tbl, 0, sizeof(E_INFO) * num_entities);
 	card->e_max = num_entities;
 
     DIVA_DIDD_Read(d, sizeof(d));

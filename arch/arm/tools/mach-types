@@ -6,7 +6,7 @@
 # To add an entry into this database, please see Documentation/arm/README,
 # or contact rmk@arm.linux.org.uk
 #
-# Last update: Wed Jul 25 10:07:10 2001
+# Last update: Thu Aug 9 22:46:02 2001
 #
 # machine_is_xxx	CONFIG_xxxx		MACH_TYPE_xxx		number
 #
@@ -114,3 +114,4 @@ sa1100_elf		SA1100_SA1100_ELF	SA1100_ELF		102
 gator			SA1100_GATOR		GATOR			103
 granite			ARCH_GRANITE		GRANITE			104
 consus			SA1100_CONSUS		CONSUS			105
+aaec2000_aaed20		ARCH_AAEC2000_AAED2000	AAEC2000_AAED2000	106

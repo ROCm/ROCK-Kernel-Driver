@@ -51,12 +51,12 @@
 
 #define SA1100_UART1_EXT \
   (struct huw_irq_desc){GPIO_UART1_CTS, IRQ_UART1_CTS, \
-			GPIO_UART1_DCD, IRQ_UART1_DCD, \
-			GPIO_UART1_DSR, IRQ_UART1_DSR}
+                        GPIO_UART1_DCD, IRQ_UART1_DCD, \
+                        GPIO_UART1_DSR, IRQ_UART1_DSR}
 #define SA1100_UART3_EXT \
   (struct huw_irq_desc){GPIO_UART3_CTS, IRQ_UART3_CTS, \
-			GPIO_UART3_DCD, IRQ_UART3_DCD, \
-			GPIO_UART3_DSR, IRQ_UART3_DSR}
+                        GPIO_UART3_DCD, IRQ_UART3_DCD, \
+                        GPIO_UART3_DSR, IRQ_UART3_DSR}
 
 
 /*---  PCMCIA  ---*/

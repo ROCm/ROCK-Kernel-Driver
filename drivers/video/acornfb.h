@@ -115,6 +115,7 @@ struct modex_params {
 #define VID_CTL_25MHz		(1)
 #define VID_CTL_36MHz		(2)
 
+#define VIDC_CTRL_CSYNC		(1 << 7)
 #define VIDC_CTRL_INTERLACE	(1 << 6)
 #define VIDC_CTRL_FIFO_0_4	(0 << 4)
 #define VIDC_CTRL_FIFO_1_5	(1 << 4)

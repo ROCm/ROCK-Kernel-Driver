@@ -2761,10 +2761,10 @@ typedef PCMCIAPrtType	PCMCIAType [PCMCIASp/PCMCIAPrtSp] ;
 #define LCCR1_DisWdth(Pixel)    	/*  Display Width [16..1024 pix.]  */ \
                 	(((Pixel) - 16)/16 << FShft (LCCR1_PPL))
 #define LCCR1_HSW	Fld (6, 10)	/* Horizontal Synchronization      */
-					/* pulse Width - 1 [Tpix] (L_LCLK) */
+                	        	/* pulse Width - 1 [Tpix] (L_LCLK) */
 #define LCCR1_HorSnchWdth(Tpix) 	/*  Horizontal Synchronization     */ \
-					/*  pulse Width [1..64 Tpix]       */ \
-			(((Tpix) - 1) << FShft (LCCR1_HSW))
+                	        	/*  pulse Width [1..64 Tpix]       */ \
+                	(((Tpix) - 1) << FShft (LCCR1_HSW))
 #define LCCR1_ELW	Fld (8, 16)	/* End-of-Line pixel clock Wait    */
                 	        	/* count - 1 [Tpix]                */
 #define LCCR1_EndLnDel(Tpix)    	/*  End-of-Line Delay              */ \

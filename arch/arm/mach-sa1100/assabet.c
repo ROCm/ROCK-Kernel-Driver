@@ -39,7 +39,7 @@ EXPORT_SYMBOL(SCR_value);
 
 static int __init assabet_init(void)
 {
-	if (machine_has_neponset()) {
+	if (machine_is_assabet() && machine_has_neponset()) {
 		/*
 		 * Angel sets this, but other bootloaders may not.
 		 *
@@ -167,6 +167,8 @@ static struct map_desc assabet_io_desc[] __initdata = {
   { 0xe8000000, 0x00000000, 0x02000000, DOMAIN_IO, 1, 1, 0, 0 }, /* Flash bank 0 */
   { 0xf1000000, 0x12000000, 0x00100000, DOMAIN_IO, 1, 1, 0, 0 }, /* Board Control Register */
   { 0xf2800000, 0x4b800000, 0x00800000, DOMAIN_IO, 1, 1, 0, 0 }, /* MQ200 */
+  /*  f3000000 - neponset system registers */
+  /*  f4000000 - neponset SA1111 registers */
   LAST_DESC
 };
 

@@ -23,6 +23,12 @@
 
 #include <asm/arch/keyboard.h>
 
+#ifndef kbd_rate
+struct kbd_repeat;
+
+extern int kbd_rate(struct kbd_repeat *rate) __attribute__((weak));
+#endif
+
 #endif /* __KERNEL__ */
 
 #endif /* __ASM_ARM_KEYBOARD_H */

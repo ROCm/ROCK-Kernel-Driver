@@ -47,7 +47,7 @@ void tty_wait_until_sent(struct tty_struct * tty, long timeout)
 #ifdef TTY_DEBUG_WAIT_UNTIL_SENT
 	char buf[64];
 	
-	printk("%s wait until sent...\n", tty_name(tty, buf));
+	printk(KERN_DEBUG "%s wait until sent...\n", tty_name(tty, buf));
 #endif
 	if (!tty->driver.chars_in_buffer)
 		return;
@@ -56,7 +56,7 @@ void tty_wait_until_sent(struct tty_struct * tty, long timeout)
 		timeout = MAX_SCHEDULE_TIMEOUT;
 	do {
 #ifdef TTY_DEBUG_WAIT_UNTIL_SENT
-		printk("waiting %s...(%d)\n", tty_name(tty, buf),
+		printk(KERN_DEBUG "waiting %s...(%d)\n", tty_name(tty, buf),
 		       tty->driver.chars_in_buffer(tty));
 #endif
 		set_current_state(TASK_INTERRUPTIBLE);
@@ -82,7 +82,7 @@ static void unset_locked_termios(struct termios *termios,
 #define NOSET_MASK(x,y,z) (x = ((x) & ~(z)) | ((y) & (z)))
 
 	if (!locked) {
-		printk("Warning?!? termios_locked is NULL.\n");
+		printk(KERN_WARNING "Warning?!? termios_locked is NULL.\n");
 		return;
 	}
 

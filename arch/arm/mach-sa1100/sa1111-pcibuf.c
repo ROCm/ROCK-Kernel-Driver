@@ -20,6 +20,8 @@
 #include <linux/slab.h>
 #include <linux/pci.h>
 
+#include "pcipool.h"
+
 /*
  * simple buffer allocator for copying of unsafe to safe buffers
  * uses __alloc/__free for actual buffers

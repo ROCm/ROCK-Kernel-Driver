@@ -28,7 +28,7 @@ extern void genarch_init_irq(void);
 
 static void __init
 fixup_anakin(struct machine_desc *desc, struct param_struct *unused,
-	     char **cmdline, struct meminfo *mi)
+             char **cmdline, struct meminfo *mi)
 {
 	ROOT_DEV = MKDEV(RAMDISK_MAJOR, 0);
 	setup_ramdisk(1, 0, 0, CONFIG_BLK_DEV_RAM_SIZE);

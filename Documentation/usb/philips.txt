@@ -1,5 +1,5 @@
 This file contains some additional information for the Philips webcams.
-E-mail: webcam@smcc.demon.nl                        Last updated: 2001-04-25
+E-mail: webcam@smcc.demon.nl                        Last updated: 2001-07-27
 
 The main webpage for the Philips driver is http://www.smcc.demon.nl/webcam/.
 It contains a lot of extra information, a FAQ, and the binary plugin
@@ -29,10 +29,9 @@ fps
 
 palette
    Specifies the desired colour order that should be delivered by read() and
-   mmap(). The string can be one of bgr24, rgb24, rgb32, bgr32, yuyv,
-   yuv420, yuv420p. If the tool you use produces odd colours (more
-   specificly, red and blue are swapped), try palette=bgr24 or
-   palette=rgb24.
+   mmap(). The string can be one of yuv420 or yuv420p; however, yuv420 will
+   be phased out, leaving only yuv420p, so this option will disappear
+   entirely.
 
    Only the native yuv420/yuv420p format is supported by the in kernel driver. 
    If you want to use other formats with in-kernel conversion download the
@@ -73,7 +72,7 @@ power_save
 
 compression (only useful with the plugin)
    With this option you can control the compression factor that the camera
-   use to squeeze the image through the USB bus. You can set the 
+   uses to squeeze the image through the USB bus. You can set the 
    parameter between 0 and 3:
      0 = prefer uncompressed images; if the requested mode is not available
          in an uncompressed format, the driver will silently switch to low
@@ -83,7 +82,7 @@ compression (only useful with the plugin)
      3 = high compression.
       
    High compression takes less bandwidth of course, but it could also
-   introduce some unwanted artefacts. The default is 2, medium compression. 
+   introduce some unwanted artefacts. The default is 2, medium compression.
    See the FAQ on the website for an overview of which modes require
    compression.
       
@@ -91,7 +90,6 @@ compression (only useful with the plugin)
    The 645 and 646 have fixed compression parameters.      
 
 trace
-
    In order to better detect problems, it is now possible to turn on a
    'trace' of some of the calls the module makes; it logs all items in your
    kernel log at debug level.

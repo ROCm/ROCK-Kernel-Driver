@@ -12,6 +12,7 @@
 
 static struct file_operations hpfs_file_ops =
 {
+	llseek:		generic_file_llseek,
 	read:		generic_file_read,
 	write:		hpfs_file_write,
 	mmap:		generic_file_mmap,

@@ -1451,7 +1451,7 @@ static int i810_ioctl(struct inode *inode, struct file *file, unsigned int cmd, 
 		if (get_user(val, (int *)arg))
 			return -EFAULT;
 		if(val==0) {
-			ret = -EINVAL;
+			return -EINVAL;
 		} else {
 			ret = 1;
 		}
