@@ -1089,7 +1089,7 @@ static int irda_create(struct socket *sock, int protocol)
 		return -ENOMEM;
 
 	/* Allocate IrDA socket */
-	self = irda_sk(sk) = kmalloc(sizeof(struct irda_sock), GFP_ATOMIC);
+	self = sk->sk_protinfo = kmalloc(sizeof(struct irda_sock), GFP_ATOMIC);
 	if (self == NULL) {
 		sk_free(sk);
 		return -ENOMEM;
@@ -1208,7 +1208,7 @@ static int irda_release(struct socket *sock)
 	/* Destroy IrDA socket */
 	irda_destroy_socket(irda_sk(sk));
 	/* Prevent sock_def_destruct() to create havoc */
-	irda_sk(sk) = NULL;
+	sk->sk_protinfo = NULL;
 
 	sock_orphan(sk);
 	sock->sk   = NULL;

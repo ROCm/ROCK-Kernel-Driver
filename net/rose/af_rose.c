@@ -133,7 +133,7 @@ static struct sock *rose_alloc_sock(void)
 	if (!sk)
 		goto out;
 
-	rose = rose_sk(sk) = kmalloc(sizeof(*rose), GFP_ATOMIC);
+	rose = sk->sk_protinfo = kmalloc(sizeof(*rose), GFP_ATOMIC);
 	if (!rose)
 		goto frees;
 

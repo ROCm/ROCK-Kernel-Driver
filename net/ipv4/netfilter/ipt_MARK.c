@@ -1,4 +1,12 @@
 /* This is a module which is used for setting the NFMARK field of an skb. */
+
+/* (C) 1999-2001 Marc Boucher <marc@mbsi.ca>
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License version 2 as
+ * published by the Free Software Foundation.
+ */
+
 #include <linux/module.h>
 #include <linux/skbuff.h>
 #include <linux/ip.h>
@@ -59,10 +67,7 @@ static struct ipt_target ipt_mark_reg = {
 
 static int __init init(void)
 {
-	if (ipt_register_target(&ipt_mark_reg))
-		return -EINVAL;
-
-	return 0;
+	return ipt_register_target(&ipt_mark_reg);
 }
 
 static void __exit fini(void)

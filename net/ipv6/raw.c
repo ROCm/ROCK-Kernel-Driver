@@ -81,7 +81,7 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 			     struct in6_addr *loc_addr, struct in6_addr *rmt_addr)
 {
 	struct hlist_node *node;
-	int addr_type = ipv6_addr_type(loc_addr);
+	int is_multicast = ipv6_addr_is_multicast(loc_addr);
 
 	sk_for_each_from(sk, node)
 		if (inet_sk(sk)->num == num) {
@@ -94,7 +94,7 @@ struct sock *__raw_v6_lookup(struct sock *sk, unsigned short num,
 			if (!ipv6_addr_any(&np->rcv_saddr)) {
 				if (!ipv6_addr_cmp(&np->rcv_saddr, loc_addr))
 					goto found;
-				if ((addr_type & IPV6_ADDR_MULTICAST) &&
+				if (is_multicast &&
 				    inet6_mc_check(sk, loc_addr, rmt_addr))
 					goto found;
 				continue;

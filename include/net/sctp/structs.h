@@ -369,7 +369,7 @@ typedef struct sctp_sender_hb_info {
 	struct sctp_paramhdr param_hdr;
 	union sctp_addr daddr;
 	unsigned long sent_at;
-} sctp_sender_hb_info_t __attribute__((packed));
+} __attribute__((packed)) sctp_sender_hb_info_t;
 
 /*
  *  RFC 2960 1.3.2 Sequenced Delivery within Streams
