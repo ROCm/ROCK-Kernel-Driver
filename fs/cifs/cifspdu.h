@@ -1696,6 +1696,40 @@ typedef struct {
 	char FileName[1];
 } FILE_DIRECTORY_INFO;   /* level 257 FF response data area */
 
+typedef struct {
+	__le32 NextEntryOffset;
+	__u32 FileIndex;
+	__le64 CreationTime;
+	__le64 LastAccessTime;
+	__le64 LastWriteTime;
+	__le64 ChangeTime;
+	__le64 EndOfFile;
+	__le64 AllocationSize;
+	__le32 ExtFileAttributes;
+	__le32 FileNameLength;
+	__le32 EaSize; /* length of the xattrs */
+	char FileName[1];
+} FILE_FULL_DIRECTORY_INFO;   /* level 258 FF response data area */
+
+typedef struct {
+	__le32 NextEntryOffset;
+	__u32 FileIndex;
+	__le64 CreationTime;
+	__le64 LastAccessTime;
+	__le64 LastWriteTime;
+	__le64 ChangeTime;
+	__le64 EndOfFile;
+	__le64 AllocationSize;
+	__le32 ExtFileAttributes;
+	__le32 FileNameLength;
+	__le32 EaSize; /* length of the xattrs */
+	__u8   ShortNameLength;
+	__u8   Reserved;
+	__u8   ShortName[12];
+	char FileName[1];
+} FILE_BOTH_DIRECTORY_INFO;   /* level 260 FF response data area */
+
+
 struct gea {
 	unsigned char name_len;
 	char name[1];

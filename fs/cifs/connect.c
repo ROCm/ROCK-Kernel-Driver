@@ -69,6 +69,7 @@ struct smb_vol {
 	unsigned intr:1;
 	unsigned setuids:1;
 	unsigned noperm:1;
+	unsigned server_ino:1; /* use inode numbers from server ie UniqueId */
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
@@ -782,6 +783,10 @@ cifs_parse_mount_options(char *options, const char *devname, struct smb_vol *vol
 			vol->intr = 0;
 		} else if (strnicmp(data, "intr", 4) == 0) {
 			vol->intr = 1;
+		} else if (strnicmp(data, "serverino",7) == 0) {
+			vol->server_ino = 1;
+		} else if (strnicmp(data, "noserverino",9) == 0) {
+			vol->server_ino = 0;
 		} else if (strnicmp(data, "noac", 4) == 0) {
 			printk(KERN_WARNING "CIFS: Mount option noac not supported. Instead set /proc/fs/cifs/LookupCacheEnabled to 0\n");
 		} else
@@ -1395,6 +1400,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_NO_PERM;
 		if(volume_info.setuids)
 			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_SET_UID;
+		if(volume_info.server_ino)
+			cifs_sb->mnt_cifs_flags |= CIFS_MOUNT_SERVER_INUM;
 
 		tcon =
 		    find_unc(sin_server.sin_addr.s_addr, volume_info.UNC,

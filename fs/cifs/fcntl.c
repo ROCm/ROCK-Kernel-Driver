@@ -37,7 +37,7 @@ int cifs_dir_notify(struct file * file, unsigned long arg)
 	struct cifsTconInfo *pTcon;
 	char *full_path = NULL;
 	__u32 filter = FILE_NOTIFY_CHANGE_NAME | FILE_NOTIFY_CHANGE_ATTRIBUTES;
-    __u16 netfid;
+	__u16 netfid;
 
 	xid = GetXid();
 	cifs_sb = CIFS_SB(file->f_dentry->d_sb);

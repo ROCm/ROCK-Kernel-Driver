@@ -85,6 +85,13 @@ cifs_get_inode_info_unix(struct inode **pinode,
 			*pinode = new_inode(sb);
 			if(*pinode == NULL) 
 				return -ENOMEM;
+			/* Is an i_ino of zero legal? */
+			/* Are there sanity checks we can use to ensure that
+			the server is really filling in that field? */
+			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SERVER_INUM) {
+				(*pinode)->i_ino = 
+					(unsigned long)findData.UniqueId;
+			} /* note ino incremented to unique num in new_inode */
 			insert_inode_hash(*pinode);
 		}
 			
@@ -244,6 +251,21 @@ cifs_get_inode_info(struct inode **pinode, const unsigned char *search_path,
 			*pinode = new_inode(sb);
 			if(*pinode == NULL)
 				return -ENOMEM;
+			/* Is an i_ino of zero legal? */
+			/* Are there sanity checks we can use to ensure that
+			the server is really filling in that field? */
+
+			/* We can not use the IndexNumber from either
+			Windows or Samba as it is frequently set to zero */
+			/* There may be higher info levels that work but
+			Are there Windows server or network appliances
+			for which IndexNumber field is not guaranteed unique? */
+		
+			/* if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SERVER_INUM) {
+				(*pinode)->i_ino = 
+					(unsigned long)pfindData->IndexNumber;
+			} */ /*NB: ino incremented to unique num in new_inode*/
+
 			insert_inode_hash(*pinode);
 		}
 		inode = *pinode;
