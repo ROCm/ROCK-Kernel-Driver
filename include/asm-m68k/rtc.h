@@ -13,6 +13,7 @@
 
 #ifdef __KERNEL__
 
+#include <linux/rtc.h>
 #include <asm/machdep.h>
 
 /* a few implementation details for the emulation : */
@@ -43,6 +44,18 @@ static inline void get_rtc_time(struct rtc_time *time)
 static inline int set_rtc_time(struct rtc_time *time)
 {
 	return mach_hwclk(1, time);
+}
+
+static inline unsigned int get_rtc_ss(void)
+{
+	if (mach_get_ss)
+		return mach_get_ss();
+	else{
+		struct rtc_time h;
+
+		get_rtc_time(&h);
+		return h.tm_sec;
+	}
 }
 
 static inline int get_rtc_pll(struct rtc_pll_info *pll)
