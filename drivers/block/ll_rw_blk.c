@@ -565,7 +565,7 @@ void blk_queue_end_tag(request_queue_t *q, struct request *rq)
 		return;
 	}
 
-	list_del(&rq->queuelist);
+	list_del_init(&rq->queuelist);
 	rq->flags &= ~REQ_QUEUED;
 	rq->tag = -1;
 
@@ -649,7 +649,7 @@ void blk_queue_invalidate_tags(request_queue_t *q)
 
 		if (rq->tag == -1) {
 			printk("bad tag found on list\n");
-			list_del(&rq->queuelist);
+			list_del_init(&rq->queuelist);
 			rq->flags &= ~REQ_QUEUED;
 		} else
 			blk_queue_end_tag(q, rq);
@@ -1132,7 +1132,7 @@ static int __blk_cleanup_queue(struct request_list *list)
 
 	while (!list_empty(head)) {
 		rq = list_entry(head->next, struct request, queuelist);
-		list_del(&rq->queuelist);
+		list_del_init(&rq->queuelist);
 		kmem_cache_free(request_cachep, rq);
 		i++;
 	}
@@ -1292,13 +1292,20 @@ static struct request *get_request(request_queue_t *q, int rw)
 
 	if (!list_empty(&rl->free)) {
 		rq = blkdev_free_rq(&rl->free);
-		list_del(&rq->queuelist);
+		list_del_init(&rq->queuelist);
+		rq->ref_count = 1;
 		rl->count--;
 		if (rl->count < queue_congestion_on_threshold())
 			set_queue_congested(q, rw);
 		rq->flags = 0;
 		rq->rq_status = RQ_ACTIVE;
+		rq->errors = 0;
 		rq->special = NULL;
+		rq->buffer = NULL;
+		rq->data = NULL;
+		rq->sense = NULL;
+		rq->waiting = NULL;
+		rq->bio = rq->biotail = NULL;
 		rq->q = q;
 		rq->rl = rl;
 	}
@@ -1497,13 +1504,14 @@ static inline void add_request(request_queue_t * q, struct request * req,
 	__elv_add_request_pos(q, req, insert_here);
 }
 
-/*
- * Must be called with queue lock held and interrupts disabled
- */
-void blk_put_request(struct request *req)
+void __blk_put_request(request_queue_t *q, struct request *req)
 {
 	struct request_list *rl = req->rl;
-	request_queue_t *q = req->q;
+
+	if (unlikely(--req->ref_count))
+		return;
+	if (unlikely(!q))
+		return;
 
 	req->rq_status = RQ_INACTIVE;
 	req->q = NULL;
@@ -1515,6 +1523,8 @@ void blk_put_request(struct request *req)
 	 */
 	if (rl) {
 		int rw = 0;
+
+		BUG_ON(!list_empty(&req->queuelist));
 
 		list_add(&req->queuelist, &rl->free);
 
@@ -1530,6 +1540,23 @@ void blk_put_request(struct request *req)
 			clear_queue_congested(q, rw);
 		if (rl->count >= batch_requests && waitqueue_active(&rl->wait))
 			wake_up(&rl->wait);
+	}
+}
+
+void blk_put_request(struct request *req)
+{
+	request_queue_t *q = req->q;
+	
+	/*
+	 * if req->q isn't set, this request didnt originate from the
+	 * block layer, so it's safe to just disregard it
+	 */
+	if (q) {
+		unsigned long flags;
+
+		spin_lock_irqsave(q->queue_lock, flags);
+		__blk_put_request(q, req);
+		spin_unlock_irqrestore(q->queue_lock, flags);
 	}
 }
 
@@ -1591,7 +1618,7 @@ static void attempt_merge(request_queue_t *q, struct request *req,
 		elv_merge_requests(q, req, next);
 
 		blkdev_dequeue_request(next);
-		blk_put_request(next);
+		__blk_put_request(q, next);
 	}
 }
 
@@ -1784,7 +1811,7 @@ get_rq:
 	add_request(q, req, insert_here);
 out:
 	if (freereq)
-		blk_put_request(freereq);
+		__blk_put_request(q, freereq);
 	spin_unlock_irq(q->queue_lock);
 	return 0;
 
@@ -2069,7 +2096,7 @@ void end_that_request_last(struct request *req)
 	if (req->waiting)
 		complete(req->waiting);
 
-	blk_put_request(req);
+	__blk_put_request(req);
 }
 
 int __init blk_dev_init(void)

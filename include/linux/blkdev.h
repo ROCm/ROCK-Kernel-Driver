@@ -26,6 +26,8 @@ struct request {
 	struct list_head queuelist; /* looking for ->queue? you must _not_
 				     * access it directly, use
 				     * blkdev_dequeue_request! */
+	int ref_count;
+
 	void *elevator_private;
 
 	unsigned char cmd[16];

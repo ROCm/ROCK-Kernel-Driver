@@ -44,7 +44,9 @@ struct request *elv_next_request(request_queue_t *q);
 
 static inline void blkdev_dequeue_request(struct request *req)
 {
-	list_del(&req->queuelist);
+	BUG_ON(list_empty(&req->queuelist));
+
+	list_del_init(&req->queuelist);
 
 	if (req->q)
 		elv_remove_request(req->q, req);
