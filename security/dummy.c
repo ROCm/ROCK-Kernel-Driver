@@ -24,6 +24,7 @@
 #include <linux/skbuff.h>
 #include <linux/netlink.h>
 #include <net/sock.h>
+#include <linux/xattr.h>
 
 static int dummy_ptrace (struct task_struct *parent, struct task_struct *child)
 {
@@ -387,6 +388,10 @@ static void dummy_inode_delete (struct inode *ino)
 static int dummy_inode_setxattr (struct dentry *dentry, char *name, void *value,
 				size_t size, int flags)
 {
+	if (!strncmp(name, XATTR_SECURITY_PREFIX,
+		     sizeof(XATTR_SECURITY_PREFIX) - 1) &&
+	    !capable(CAP_SYS_ADMIN))
+		return -EPERM;
 	return 0;
 }
 
@@ -407,6 +412,10 @@ static int dummy_inode_listxattr (struct dentry *dentry)
 
 static int dummy_inode_removexattr (struct dentry *dentry, char *name)
 {
+	if (!strncmp(name, XATTR_SECURITY_PREFIX,
+		     sizeof(XATTR_SECURITY_PREFIX) - 1) &&
+	    !capable(CAP_SYS_ADMIN))
+		return -EPERM;
 	return 0;
 }
 
