@@ -643,12 +643,14 @@ static int psmouse_reconnect(struct serio *serio)
 {
 	struct psmouse *psmouse = serio->private;
 	struct serio_dev *dev = serio->dev;
-	int old_type = psmouse->type;
+	int old_type;
 
-	if (!dev) {
+	if (!dev || !psmouse) {
 		printk(KERN_DEBUG "psmouse: reconnect request, but serio is disconnected, ignoring...\n");
 		return -1;
 	}
+
+	old_type = psmouse->type;
 
 	psmouse->state = PSMOUSE_NEW_DEVICE;
 	psmouse->type = psmouse->acking = psmouse->cmdcnt = psmouse->pktcnt = 0;
