@@ -2850,45 +2850,11 @@ __init int migration_init(void)
 spinlock_t kernel_flag __cacheline_aligned_in_smp = SPIN_LOCK_UNLOCKED;
 EXPORT_SYMBOL(kernel_flag);
 
-static void kstat_init_cpu(int cpu)
-{
-	/* Add any initialisation to kstat here */
-	/* Useful when cpu offlining logic is added.. */
-}
-
-static int __devinit kstat_cpu_notify(struct notifier_block *self,
-				      unsigned long action, void *hcpu)
-{
-	int cpu = (unsigned long)hcpu;
-	switch(action) {
-	case CPU_UP_PREPARE:
-		kstat_init_cpu(cpu);
-		break;
-	default:
-		break;
-	}
-	return NOTIFY_OK;
-}
-
-static struct notifier_block __devinitdata kstat_nb = {
-	.notifier_call	= kstat_cpu_notify,
-	.next		= NULL,
-};
-
-__init static void init_kstat(void)
-{
-	kstat_cpu_notify(&kstat_nb, (unsigned long)CPU_UP_PREPARE,
-			 (void *)(long)smp_processor_id());
-	register_cpu_notifier(&kstat_nb);
-}
-
 void __init sched_init(void)
 {
 	runqueue_t *rq;
 	int i, j, k;
 
-	/* Init the kstat counters */
-	init_kstat();
 	for (i = 0; i < NR_CPUS; i++) {
 		prio_array_t *array;
 
