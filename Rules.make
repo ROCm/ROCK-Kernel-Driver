@@ -161,7 +161,7 @@ else
 # This sets version suffixes on exported symbols
 # ---------------------------------------------------------------------------
 
-MODVERDIR := include/linux/modules/$(obj)
+MODVERDIR := include/linux/modules/
 
 #
 # Added the SMP separator to stop module accidents between uniprocessor
@@ -176,7 +176,7 @@ endif
 
 #	Don't include modversions.h, we're just about to generate it here.
 
-CFLAGS_MODULE := $(filter-out -include $(HPATH)/linux/modversions.h,$(CFLAGS_MODULE))
+CFLAGS_MODULE := $(filter-out -include linux/modversions.h,$(CFLAGS_MODULE))
 
 $(addprefix $(MODVERDIR)/,$(real-objs-y:.o=.ver)): modkern_cflags := $(CFLAGS_KERNEL)
 $(addprefix $(MODVERDIR)/,$(real-objs-m:.o=.ver)): modkern_cflags := $(CFLAGS_MODULE)
@@ -191,7 +191,7 @@ c_flags = -Wp,-MD,$(depfile) $(CFLAGS) $(NOSTDINC_FLAGS) \
 # files (fix-dep filters them), so touch modversions.h if any of the .ver
 # files changes
 
-quiet_cmd_cc_ver_c = MKVER   include/linux/modules/$(obj)/$*.ver
+quiet_cmd_cc_ver_c = MKVER   include/linux/modules/$*.ver
 cmd_cc_ver_c = $(CPP) $(c_flags) $< | $(GENKSYMS) $(genksyms_smp_prefix) \
 		 -k $(VERSION).$(PATCHLEVEL).$(SUBLEVEL) > $@.tmp
 
