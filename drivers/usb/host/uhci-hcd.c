@@ -2390,7 +2390,6 @@ static const struct hc_driver uhci_driver = {
 
 	.urb_enqueue =		uhci_urb_enqueue,
 	.urb_dequeue =		uhci_urb_dequeue,
-	.free_config =		NULL,
 
 	.get_frame_number =	uhci_hcd_get_frame_number,
 
