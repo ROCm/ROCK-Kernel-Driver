@@ -742,13 +742,13 @@ static unsigned int ata_scsi_rbuf_get(struct scsi_cmnd *cmd, u8 **buf_out)
  *	spin_lock_irqsave(host_set lock)
  */
 
-static inline void ata_scsi_rbuf_put(struct scsi_cmnd *cmd)
+static inline void ata_scsi_rbuf_put(struct scsi_cmnd *cmd, u8 *buf)
 {
 	if (cmd->use_sg) {
 		struct scatterlist *sg;
 
 		sg = (struct scatterlist *) cmd->request_buffer;
-		kunmap_atomic(sg->page, KM_USER0);
+		kunmap_atomic(buf - sg->offset, KM_USER0);
 	}
 }
 
@@ -778,7 +778,7 @@ void ata_scsi_rbuf_fill(struct ata_scsi_args *args,
 	buflen = ata_scsi_rbuf_get(cmd, &rbuf);
 	memset(rbuf, 0, buflen);
 	rc = actor(args, rbuf, buflen);
-	ata_scsi_rbuf_put(cmd);
+	ata_scsi_rbuf_put(cmd, rbuf);
 
 	if (rc)
 		ata_bad_cdb(cmd, args->done);
@@ -1264,7 +1264,7 @@ static int atapi_qc_complete(struct ata_queued_cmd *qc, u8 drv_stat)
 			buflen = ata_scsi_rbuf_get(cmd, &buf);
 			buf[2] = 0x5;
 			buf[3] = (buf[3] & 0xf0) | 2;
-			ata_scsi_rbuf_put(cmd);
+			ata_scsi_rbuf_put(cmd, buf);
 		}
 		cmd->result = SAM_STAT_GOOD;
 	}
