@@ -261,7 +261,7 @@ eeprom_address_size(u16 size)
 {
 	int isize = size;
 	
-	return ffs(isize);
+	return (ffs(isize) - 1);
 }
 
 //----------------------------------------------------------------------------------------
