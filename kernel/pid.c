@@ -273,7 +273,7 @@ void __init pidhash_init(void)
 	pidhash_shift = min(12, pidhash_shift);
 	pidhash_size = 1 << pidhash_shift;
 
-	printk("PID hash table entries: %d (order %d: %d bytes)\n",
+	printk("PID hash table entries: %d (order %d: %Zd bytes)\n",
 		pidhash_size, pidhash_shift,
 		pidhash_size * sizeof(struct list_head));
 
