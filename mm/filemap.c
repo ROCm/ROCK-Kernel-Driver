@@ -142,20 +142,26 @@ static inline int sync_page(struct page *page)
 }
 
 /**
- * filemap_fdatawrite - start writeback against all of a mapping's dirty pages
+ * filemap_fdatawrite_range - start writeback against all of a mapping's
+ * dirty pages that lie within the byte offsets <start, end>
  * @mapping: address space structure to write
+ * @start: offset in bytes where the range starts
+ * @end : offset in bytes where the range ends
  *
  * If sync_mode is WB_SYNC_ALL then this is a "data integrity" operation, as
  * opposed to a regular memory * cleansing writeback.  The difference between
  * these two operations is that if a dirty page/buffer is encountered, it must
  * be waited upon, and not just skipped over.
  */
-static int __filemap_fdatawrite(struct address_space *mapping, int sync_mode)
+static int __filemap_fdatawrite_range(struct address_space *mapping,
+	loff_t start, loff_t end, int sync_mode)
 {
 	int ret;
 	struct writeback_control wbc = {
 		.sync_mode = sync_mode,
 		.nr_to_write = mapping->nrpages * 2,
+		.start = start,
+		.end = end,
 	};
 
 	if (mapping->backing_dev_info->memory_backed)
@@ -165,11 +171,24 @@ static int __filemap_fdatawrite(struct address_space *mapping, int sync_mode)
 	return ret;
 }
 
+static inline int __filemap_fdatawrite(struct address_space *mapping,
+	int sync_mode)
+{
+	return __filemap_fdatawrite_range(mapping, 0, 0, sync_mode);
+}
+
 int filemap_fdatawrite(struct address_space *mapping)
 {
 	return __filemap_fdatawrite(mapping, WB_SYNC_ALL);
 }
 EXPORT_SYMBOL(filemap_fdatawrite);
+
+int filemap_fdatawrite_range(struct address_space *mapping,
+	loff_t start, loff_t end)
+{
+	return __filemap_fdatawrite_range(mapping, start, end, WB_SYNC_ALL);
+}
+EXPORT_SYMBOL(filemap_fdatawrite_range);
 
 /*
  * This is a mostly non-blocking flush.  Not suitable for data-integrity
