@@ -2,10 +2,6 @@
 # Makefile for the gameport drivers.
 #
 
-# The target object and module list name.
-
-O_TARGET	:= gamedrv.o
-
 # Objects that export symbols.
 
 export-objs	:= gameport.o

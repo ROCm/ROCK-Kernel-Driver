@@ -2,8 +2,6 @@
 # S/390 block devices
 #
 
-O_TARGET := s390-block.o
-
 export-objs := dasd.o
 
 dasd_eckd_mod-objs := dasd_eckd.o dasd_3990_erp.o dasd_9343_erp.o

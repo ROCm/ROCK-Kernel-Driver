@@ -1,4 +1,4 @@
-O_TARGET	:= base.o
+# Makefile for the Linux device tree
 
 obj-y		:= core.o sys.o interface.o fs.o power.o
 

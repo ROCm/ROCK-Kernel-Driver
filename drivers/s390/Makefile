@@ -2,14 +2,11 @@
 # Makefile for the S/390 specific device drivers
 #
 
-O_TARGET := io.o
+mod-subdirs := block char misc net
 
-subdir-y := block char misc net
-subdir-m := $(subdir-y)
-
-obj-y := s390io.o s390mach.o s390dyn.o idals.o ccwcache.o
 export-objs += ccwcache.o idals.o s390dyn.o s390io.o
 
-obj-y += $(foreach dir,$(subdir-y),$(dir)/s390-$(dir).o)
+obj-y += s390io.o s390mach.o s390dyn.o idals.o ccwcache.o
+obj-y += block/ char/ misc/ net/
 
 include $(TOPDIR)/Rules.make

@@ -1,9 +1,5 @@
 # Makefile for the kernel ISDN subsystem and device drivers.
 
-# The target object and module list name.
-
-O_TARGET	:= vmlinux-obj.o
-
 # Object files in subdirectories
 
 mod-subdirs				:= i4l hisax capi eicon
