@@ -126,7 +126,7 @@ find_table_max_address(struct smbios_device *sdev)
 	if(keep_going != 0)
 		printk(KERN_INFO "Warning: SMBIOS table does not end with a"
 				" structure type 127. This may indicate a"
-				" truncated table.");
+				" truncated table.\n");
 
 	if(sdev->smbios_table_real_length != max_length)
 		printk(KERN_INFO "Warning: BIOS specified SMBIOS table length"
