@@ -2460,7 +2460,7 @@ acpi_processor_remove (
 static int no_c2c3(struct dmi_system_id *id)
 {
 	printk(KERN_INFO 
-	       "%s detected - C2,C3 disabled. Overwrite with \"processor.c2=1 processor=c3=1\n\"",
+	       "%s detected - C2,C3 disabled. Overwrite with \"processor.c2=1 processor.c3=1\n\"",
 	       id->ident);
 	if (errata.c2 == -1) 
 		errata.c2 = 0;
