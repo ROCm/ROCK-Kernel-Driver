@@ -887,7 +887,7 @@ static irqreturn_t psycho_pcierr_intr_other(struct pci_pbm_info *pbm, int is_pbm
 	}
 	csr = psycho_read(csr_reg);
 	csr_error_bits =
-		csr & (/*PSYCHO_PCICTRL_SBH_ERR |*/ PSYCHO_PCICTRL_SERR);
+		csr & (PSYCHO_PCICTRL_SBH_ERR | PSYCHO_PCICTRL_SERR);
 	if (csr_error_bits) {
 		/* Clear the errors.  */
 		psycho_write(csr_reg, csr);
@@ -1077,16 +1077,16 @@ static void __init psycho_register_error_handlers(struct pci_controller_info *p)
 	 */
 	tmp = psycho_read(base + PSYCHO_PCIA_CTRL);
 	tmp |= (PSYCHO_PCICTRL_SERR |
-		PSYCHO_PCICTRL_SBH_INT |
+		PSYCHO_PCICTRL_SBH_ERR |
 		PSYCHO_PCICTRL_EEN);
-	tmp &= ~(PSYCHO_PCICTRL_SBH_ERR);
+	tmp &= ~(PSYCHO_PCICTRL_SBH_INT);
 	psycho_write(base + PSYCHO_PCIA_CTRL, tmp);
 		     
 	tmp = psycho_read(base + PSYCHO_PCIB_CTRL);
 	tmp |= (PSYCHO_PCICTRL_SERR |
-		PSYCHO_PCICTRL_SBH_INT |
+		PSYCHO_PCICTRL_SBH_ERR |
 		PSYCHO_PCICTRL_EEN);
-	tmp &= ~(PSYCHO_PCICTRL_SBH_ERR);
+	tmp &= ~(PSYCHO_PCICTRL_SBH_INT);
 	psycho_write(base + PSYCHO_PCIB_CTRL, tmp);
 }
 
