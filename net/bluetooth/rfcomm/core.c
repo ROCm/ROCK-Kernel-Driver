@@ -470,32 +470,33 @@ struct rfcomm_session *rfcomm_session_add(struct socket *sock, int state)
 	if (!s)
 		return NULL;
 	memset(s, 0, sizeof(*s));
-	
+
 	BT_DBG("session %p sock %p", s, sock);
 
 	INIT_LIST_HEAD(&s->dlcs);
 	s->state = state;
 	s->sock  = sock;
 
-	s->mtu   = RFCOMM_DEFAULT_MTU;
-	s->cfc   = RFCOMM_CFC_UNKNOWN;
-	
+	s->mtu = RFCOMM_DEFAULT_MTU;
+	s->cfc = RFCOMM_CFC_UNKNOWN;
+
+	/* Do not increment module usage count for listening sessions.
+	 * Otherwise we won't be able to unload the module. */
+	if (state != BT_LISTEN)
+		if (!try_module_get(THIS_MODULE)) {
+			kfree(s);
+			return NULL;
+		}
+
 	list_add(&s->list, &session_list);
 
-	/* Do not increment module usage count for listeting sessions.
-	 * Otherwise we won't be able to unload the module.
-	 * Non listening session are added either by a socket or a TTYs
-	 * which means that we already hold refcount to this module.
-	 */
-	if (state != BT_LISTEN)
-		__module_get(THIS_MODULE);
 	return s;
 }
 
 void rfcomm_session_del(struct rfcomm_session *s)
 {
 	int state = s->state;
-	
+
 	BT_DBG("session %p state %ld", s, s->state);
 
 	list_del(&s->list);

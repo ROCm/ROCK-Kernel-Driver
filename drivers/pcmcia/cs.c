@@ -789,9 +789,10 @@ static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
 	    return 1;
     for (i = 0; i < MAX_IO_WIN; i++) {
 	if (s->io[i].NumPorts == 0) {
-	    if (find_io_region(base, num, align, name, s) == 0) {
+	    s->io[i].res = find_io_region(*base, num, align, name, s);
+	    if (s->io[i].res) {
 		s->io[i].Attributes = attr;
-		s->io[i].BasePort = *base;
+		s->io[i].BasePort = *base = s->io[i].res->start;
 		s->io[i].NumPorts = s->io[i].InUse = num;
 		break;
 	    } else
@@ -801,7 +802,8 @@ static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
 	/* Try to extend top of window */
 	try = s->io[i].BasePort + s->io[i].NumPorts;
 	if ((*base == 0) || (*base == try))
-	    if (find_io_region(&try, num, 0, name, s) == 0) {
+	    if (adjust_io_region(s->io[i].res, s->io[i].res->start,
+				 s->io[i].res->end + num, s) == 0) {
 		*base = try;
 		s->io[i].NumPorts += num;
 		s->io[i].InUse += num;
@@ -810,7 +812,8 @@ static int alloc_io_space(struct pcmcia_socket *s, u_int attr, ioaddr_t *base,
 	/* Try to extend bottom of window */
 	try = s->io[i].BasePort - num;
 	if ((*base == 0) || (*base == try))
-	    if (find_io_region(&try, num, 0, name, s) == 0) {
+	    if (adjust_io_region(s->io[i].res, s->io[i].res->start - num,
+				 s->io[i].res->end, s) == 0) {
 		s->io[i].BasePort = *base = try;
 		s->io[i].NumPorts += num;
 		s->io[i].InUse += num;
@@ -824,15 +827,18 @@ static void release_io_space(struct pcmcia_socket *s, ioaddr_t base,
 			     ioaddr_t num)
 {
     int i;
-    if(!(s->features & SS_CAP_STATIC_MAP))
-	release_region(base, num);
+
     for (i = 0; i < MAX_IO_WIN; i++) {
 	if ((s->io[i].BasePort <= base) &&
 	    (s->io[i].BasePort+s->io[i].NumPorts >= base+num)) {
 	    s->io[i].InUse -= num;
 	    /* Free the window if no one else is using it */
-	    if (s->io[i].InUse == 0)
+	    if (s->io[i].InUse == 0) {
 		s->io[i].NumPorts = 0;
+		release_resource(s->io[i].res);
+		kfree(s->io[i].res);
+		s->io[i].res = NULL;
+	    }
 	}
     }
 }
