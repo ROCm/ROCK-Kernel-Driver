@@ -36,8 +36,8 @@
 /*
  * Literals
  */
-#define IPR_DRIVER_VERSION "2.0.3"
-#define IPR_DRIVER_DATE "(April 14, 2004)"
+#define IPR_DRIVER_VERSION "2.0.4"
+#define IPR_DRIVER_DATE "(April 20, 2004)"
 
 /*
  * IPR_DBG_TRACE: Setting this to 1 will turn on some general function tracing
@@ -668,6 +668,8 @@ struct ipr_hostrcb {
 	u32 hostrcb_dma;
 	struct list_head queue;
 }__attribute__((packed, aligned (4)));
+
+#define IPR_HOSTRCB_SZ offsetof(struct ipr_hostrcb, hostrcb_dma)
 
 /* IPR smart dump table structures */
 struct ipr_sdt_entry {

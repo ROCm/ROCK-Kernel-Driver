@@ -731,15 +731,13 @@ static void ipr_send_hcam(struct ipr_ioa_cfg *ioa_cfg, u8 type,
 		ioarcb->cmd_pkt.request_type = IPR_RQTYPE_HCAM;
 		ioarcb->cmd_pkt.cdb[0] = IPR_HOST_CONTROLLED_ASYNC;
 		ioarcb->cmd_pkt.cdb[1] = type;
-		ioarcb->cmd_pkt.cdb[7] = (sizeof(struct ipr_hostrcb) >> 8) & 0xff;
-		ioarcb->cmd_pkt.cdb[8] = sizeof(struct ipr_hostrcb) & 0xff;
+		ioarcb->cmd_pkt.cdb[7] = (IPR_HOSTRCB_SZ >> 8) & 0xff;
+		ioarcb->cmd_pkt.cdb[8] = IPR_HOSTRCB_SZ & 0xff;
 
-		ioarcb->read_data_transfer_length =
-			cpu_to_be32(sizeof(struct ipr_hostrcb));
-		ioarcb->read_ioadl_len =
-			cpu_to_be32(sizeof(struct ipr_ioadl_desc));
+		ioarcb->read_data_transfer_length = cpu_to_be32(IPR_HOSTRCB_SZ);
+		ioarcb->read_ioadl_len = cpu_to_be32(sizeof(struct ipr_ioadl_desc));
 		ipr_cmd->ioadl[0].flags_and_data_len =
-			cpu_to_be32(IPR_IOADL_FLAGS_READ_LAST | sizeof(struct ipr_hostrcb));
+			cpu_to_be32(IPR_IOADL_FLAGS_READ_LAST | IPR_HOSTRCB_SZ);
 		ipr_cmd->ioadl[0].address = cpu_to_be32(hostrcb->hostrcb_dma);
 
 		if (type == IPR_HCAM_CDB_OP_CODE_CONFIG_CHANGE)
@@ -4848,12 +4846,12 @@ static void ipr_get_unit_check_buffer(struct ipr_ioa_cfg *ioa_cfg)
 	hostrcb = list_entry(ioa_cfg->hostrcb_free_q.next,
 			     struct ipr_hostrcb, queue);
 	list_del(&hostrcb->queue);
-	memset(hostrcb, 0, sizeof(*hostrcb));
+	memset(hostrcb, 0, IPR_HOSTRCB_SZ);
 
 	rc = ipr_get_ldump_data_section(ioa_cfg,
 					be32_to_cpu(sdt.entry[0].bar_str_offset),
 					(u32 *)hostrcb,
-					min(length, (int)(sizeof(*hostrcb) / sizeof(u32))));
+					min(length, (int)IPR_HOSTRCB_SZ) / sizeof(u32));
 
 	if (!rc)
 		ipr_handle_log_data(ioa_cfg, hostrcb);
