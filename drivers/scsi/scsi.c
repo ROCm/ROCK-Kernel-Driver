@@ -53,6 +53,8 @@
 #include <linux/spinlock.h>
 #include <linux/kmod.h>
 #include <linux/interrupt.h>
+#include <linux/notifier.h>
+#include <linux/cpu.h>
 
 #include <scsi/scsi_host.h>
 #include "scsi.h"
@@ -1130,6 +1132,38 @@ int scsi_device_cancel(struct scsi_device *sdev, int recovery)
 	return 0;
 }
 
+#ifdef CONFIG_HOTPLUG_CPU
+static int scsi_cpu_notify(struct notifier_block *self,
+			   unsigned long action, void *hcpu)
+{
+	int cpu = (unsigned long)hcpu;
+
+	switch(action) {
+	case CPU_DEAD:
+		/* Drain scsi_done_q. */
+		local_irq_disable();
+		list_splice_init(&per_cpu(scsi_done_q, cpu),
+				 &__get_cpu_var(scsi_done_q));
+		raise_softirq_irqoff(SCSI_SOFTIRQ);
+		local_irq_enable();
+		break;
+	default:
+		break;
+	}
+	return NOTIFY_OK;
+}
+
+static struct notifier_block __devinitdata scsi_cpu_nb = {
+	.notifier_call	= scsi_cpu_notify,
+};
+
+#define register_scsi_cpu() register_cpu_notifier(&scsi_cpu_nb)
+#define unregister_scsi_cpu() unregister_cpu_notifier(&scsi_cpu_nb)
+#else
+#define register_scsi_cpu()
+#define unregister_scsi_cpu()
+#endif /* CONFIG_HOTPLUG_CPU */
+
 MODULE_DESCRIPTION("SCSI core");
 MODULE_LICENSE("GPL");
 
@@ -1164,6 +1198,7 @@ static int __init init_scsi(void)
 
 	devfs_mk_dir("scsi");
 	open_softirq(SCSI_SOFTIRQ, scsi_softirq, NULL);
+	register_scsi_cpu();
 	printk(KERN_NOTICE "SCSI subsystem initialized\n");
 	return 0;
 
@@ -1191,6 +1226,7 @@ static void __exit exit_scsi(void)
 	devfs_remove("scsi");
 	scsi_exit_procfs();
 	scsi_exit_queue();
+	unregister_scsi_cpu();
 }
 
 subsys_initcall(init_scsi);
