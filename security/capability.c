@@ -25,46 +25,24 @@
 
 #ifdef CONFIG_SECURITY
 
+/* Note: If the capability security module is loaded, we do NOT register
+ * the the capability_security_ops but a second structure capability_ops
+ * that has the identical entries. The reasons:
+ * - we could stack on top of capability if it was stackable
+ * - a loaded capability module will prevent others to register, which
+ *   is the previous behaviour; if capabilities are used as default (not
+ *   because the module has been loaded), we allow the replacement.
+ */
 
-static struct security_operations capability_ops = {
-	.ptrace =			cap_ptrace,
-	.capget =			cap_capget,
-	.capset_check =			cap_capset_check,
-	.capset_set =			cap_capset_set,
-	.capable =			cap_capable,
-	.netlink_send =			cap_netlink_send,
-	.netlink_recv =			cap_netlink_recv,
-
-	.bprm_compute_creds =		cap_bprm_compute_creds,
-	.bprm_set_security =		cap_bprm_set_security,
-	.bprm_secureexec =		cap_bprm_secureexec,
-
-	.inode_setxattr =		cap_inode_setxattr,
-	.inode_removexattr =		cap_inode_removexattr,
-
-	.task_post_setuid =		cap_task_post_setuid,
-	.task_reparent_to_init =	cap_task_reparent_to_init,
-
-	.syslog =                       cap_syslog,
-
-	.vm_enough_memory =             cap_vm_enough_memory,
-};
+/* Struct from commoncaps */
+extern struct security_operations capability_security_ops;
+/* Struct to hold the copy */
+static struct security_operations capability_ops;
 
 #if defined(CONFIG_SECURITY_CAPABILITIES_MODULE)
 #define MY_NAME THIS_MODULE->name
 #else
 #define MY_NAME "capability"
-#endif
-
-#ifdef CONFIG_SECURITY_CAPABILITIES_BOOTPARAM
-int capability_enabled = 1;
-
-static int __init capability_enabled_setup(char *str)
-{
-        capability_enabled = simple_strtol(str, NULL, 0);
-        return 1;
-}
-__setup("capability=", capability_enabled_setup);
 #endif
 
 /* flag to keep track of how we were registered */
@@ -73,13 +51,7 @@ static int secondary;
 
 static int __init capability_init (void)
 {
-#ifdef CONFIG_SECURITY_CAPABILITIES_BOOTPARAM
-	if (!capability_enabled){
-		printk(KERN_INFO "Capability: Disabled at boot.\n");
-		return 0;
-	}
-#endif
-
+	memcpy(&capability_ops, &capability_security_ops, sizeof(capability_ops));
 	/* register ourselves with the security framework */
 	if (register_security (&capability_ops)) {
 		printk (KERN_INFO
@@ -92,6 +64,7 @@ static int __init capability_init (void)
 		}
 		secondary = 1;
 	}
+
 	printk (KERN_INFO "Capability LSM initialized\n");
 	return 0;
 }

@@ -91,7 +91,6 @@ static int __init selinux_enabled_setup(char *str)
 }
 __setup("selinux=", selinux_enabled_setup);
 #endif
-EXPORT_SYMBOL(selinux_enabled);
 
 /* Original (dummy) security module. */
 static struct security_operations *original_ops = NULL;
