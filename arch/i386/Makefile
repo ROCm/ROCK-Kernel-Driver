@@ -102,7 +102,7 @@ SUBDIRS	+= arch/i386/pci
 DRIVERS	+= arch/i386/pci/pci.o
 endif
 
-MAKEBOOT = $(MAKE) -C arch/$(ARCH)/boot
+MAKEBOOT = +$(MAKE) -C arch/$(ARCH)/boot
 
 vmlinux: arch/i386/vmlinux.lds
 
