@@ -111,7 +111,7 @@ int pty_open(int input, int output, int primary, void *d, char **dev_out)
 	if(fd < 0) return(-errno);
 	
 	info.fd = fd;
-	tracing_cb(grantpt_cb, &info);
+	initial_thread_cb(grantpt_cb, &info);
 	unlockpt(fd);
 
 	if(data->raw) raw(fd, 0);

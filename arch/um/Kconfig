@@ -30,6 +30,13 @@ config RWSEM_GENERIC_SPINLOCK
 	bool
 	default y
 
+config MODE_TT
+	bool
+	default y
+
+config MODE_SKAS
+	bool
+	default y
 
 menu "Code maturity level options"
 
