@@ -288,8 +288,6 @@ void scsi_free_sdev(struct scsi_device *sdev)
 
 	if (sdev->request_queue)
 		scsi_free_queue(sdev->request_queue);
-	if (sdev->host->hostt->slave_destroy)
-		sdev->host->hostt->slave_destroy(sdev);
 	if (sdev->inquiry)
 		kfree(sdev->inquiry);
 	spin_lock_irqsave(sdev->host->host_lock, flags);

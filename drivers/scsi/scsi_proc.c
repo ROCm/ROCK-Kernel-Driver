@@ -175,11 +175,11 @@ static int scsi_add_single_device(uint host, uint channel, uint id, uint lun)
 {
 	struct Scsi_Host *shost;
 	struct scsi_device *sdev;
-	int error = -ENODEV;
+	int error = -ENXIO;
 
 	shost = scsi_host_lookup(host);
-	if (!shost)
-		return -ENODEV;
+	if (IS_ERR(shost))
+		return PTR_ERR(shost);
 
 	if (!scsi_find_device(shost, channel, id, lun)) {
 		sdev = scsi_add_device(shost, channel, id, lun);
@@ -197,11 +197,11 @@ static int scsi_remove_single_device(uint host, uint channel, uint id, uint lun)
 {
 	struct scsi_device *sdev;
 	struct Scsi_Host *shost;
-	int error = -ENODEV;
+	int error = -ENXIO;
 
 	shost = scsi_host_lookup(host);
-	if (!shost)
-		return -ENODEV;
+	if (IS_ERR(shost))
+		return PTR_ERR(shost);
 	sdev = scsi_find_device(shost, channel, id, lun);
 	if (!sdev)
 		goto out;
