@@ -11,16 +11,16 @@
 #include <asm/page.h>      /* IO address mapping routines need this */
 #include <asm/system.h>
 
-#define page_to_phys(page)	((page - mem_map) << PAGE_SHIFT)
+#define page_to_phys(page)	(((page) - mem_map) << PAGE_SHIFT)
 
-static inline u32 flip_dword (u32 d)
+static inline u32 flip_dword (u32 l)
 {
-	return ((d&0xff)<<24) | (((d>>8)&0xff)<<16) | (((d>>16)&0xff)<<8)| ((d>>24)&0xff);
+	return ((l&0xff)<<24) | (((l>>8)&0xff)<<16) | (((l>>16)&0xff)<<8)| ((l>>24)&0xff);
 }
 
-static inline u16 flip_word (u16 d)
+static inline u16 flip_word (u16 w)
 {
-	return ((d&0xff) << 8) | ((d>>8)&0xff);
+	return ((w&0xff) << 8) | ((w>>8)&0xff);
 }
 
 /*
@@ -56,14 +56,14 @@ static inline void __raw_writeb(u8 b, unsigned long addr)
 	*(volatile u8 *)addr = b;
 }
 
-static inline void __raw_writew(u16 b, unsigned long addr)
+static inline void __raw_writew(u16 w, unsigned long addr)
 {
-	*(volatile u16 *)addr = b;
+	*(volatile u16 *)addr = w;
 }
 
-static inline void __raw_writel(u32 b, unsigned long addr)
+static inline void __raw_writel(u32 l, unsigned long addr)
 {
-	*(volatile u32 *)addr = b;
+	*(volatile u32 *)addr = l;
 }
 
 static inline u8 __readb(unsigned long addr)
@@ -86,26 +86,26 @@ static inline void __writeb(u8 b, unsigned long addr)
 	*(volatile u8 *)addr = b;
 }
 
-static inline void __writew(u16 b, unsigned long addr)
+static inline void __writew(u16 w, unsigned long addr)
 {
-	*(volatile u16 *)addr = flip_word(b);
+	*(volatile u16 *)addr = flip_word(w);
 }
 
-static inline void __writel(u32 b, unsigned long addr)
+static inline void __writel(u32 l, unsigned long addr)
 {
-	*(volatile u32 *)addr = flip_dword(b);
+	*(volatile u32 *)addr = flip_dword(l);
 }
 
-#define readb(addr)	__readb((unsigned long)(addr))
-#define readw(addr)	__readw((unsigned long)(addr))
-#define readl(addr)	__readl((unsigned long)(addr))
-#define readb_relaxed(addr) readb(addr)
-#define readw_relaxed(addr) readw(addr)
-#define readl_relaxed(addr) readl(addr)
+#define readb(__addr)		__readb((unsigned long)(__addr))
+#define readw(__addr)		__readw((unsigned long)(__addr))
+#define readl(__addr)		__readl((unsigned long)(__addr))
+#define readb_relaxed(__addr)	readb(__addr)
+#define readw_relaxed(__addr)	readw(__addr)
+#define readl_relaxed(__addr)	readl(__addr)
 
-#define writeb(b, addr)	__writeb((b),(unsigned long)(addr))
-#define writew(b, addr)	__writew((b),(unsigned long)(addr))
-#define writel(b, addr)	__writel((b),(unsigned long)(addr))
+#define writeb(__b, __addr)	__writeb((__b),(unsigned long)(__addr))
+#define writew(__w, __addr)	__writew((__w),(unsigned long)(__addr))
+#define writel(__l, __addr)	__writel((__l),(unsigned long)(__addr))
 
 /*
  * I/O space operations
@@ -124,22 +124,22 @@ static inline void __writel(u32 b, unsigned long addr)
  * mapped somewhere into virtual kernel space and we
  * can use inb/outb again.
  */
-#define inb_local(addr)		__readb(addr)
-#define inb(addr)		__readb(addr)
-#define inw(addr)		__readw(addr)
-#define inl(addr)		__readl(addr)
+#define inb_local(__addr)	__readb((unsigned long)(__addr))
+#define inb(__addr)		__readb((unsigned long)(__addr))
+#define inw(__addr)		__readw((unsigned long)(__addr))
+#define inl(__addr)		__readl((unsigned long)(__addr))
 
-#define outb_local(b, addr)	__writeb(b, addr)
-#define outb(b, addr)		__writeb(b, addr)
-#define outw(b, addr)		__writew(b, addr)
-#define outl(b, addr)		__writel(b, addr)
+#define outb_local(__b, __addr)	__writeb(__b, (unsigned long)(__addr))
+#define outb(__b, __addr)	__writeb(__b, (unsigned long)(__addr))
+#define outw(__w, __addr)	__writew(__w, (unsigned long)(__addr))
+#define outl(__l, __addr)	__writel(__l, (unsigned long)(__addr))
 
-#define inb_p inb
-#define outb_p outb
-#define inw_p inw
-#define outw_p outw
-#define inl_p inl
-#define outl_p outl
+#define inb_p(__addr)		inb(__addr)
+#define outb_p(__b, __addr)	outb(__b, __addr)
+#define inw_p(__addr)		inw(__addr)
+#define outw_p(__w, __addr)	outw(__w, __addr)
+#define inl_p(__addr)		inl(__addr)
+#define outl_p(__l, __addr)	outl(__l, __addr)
 
 extern void outsb(unsigned long addr, const void *src, unsigned long cnt);
 extern void outsw(unsigned long addr, const void *src, unsigned long cnt);
@@ -176,25 +176,25 @@ static inline void _sbus_writeb(u8 b, unsigned long addr)
 	*(volatile u8 *)addr = b;
 }
 
-static inline void _sbus_writew(u16 b, unsigned long addr)
+static inline void _sbus_writew(u16 w, unsigned long addr)
 {
-	*(volatile u16 *)addr = b;
+	*(volatile u16 *)addr = w;
 }
 
-static inline void _sbus_writel(u32 b, unsigned long addr)
+static inline void _sbus_writel(u32 l, unsigned long addr)
 {
-	*(volatile u32 *)addr = b;
+	*(volatile u32 *)addr = l;
 }
 
 /*
  * The only reason for #define's is to hide casts to unsigned long.
  */
-#define sbus_readb(a)		_sbus_readb((unsigned long)(a))
-#define sbus_readw(a)		_sbus_readw((unsigned long)(a))
-#define sbus_readl(a)		_sbus_readl((unsigned long)(a))
-#define sbus_writeb(v, a)	_sbus_writeb(v, (unsigned long)(a))
-#define sbus_writew(v, a)	_sbus_writew(v, (unsigned long)(a))
-#define sbus_writel(v, a)	_sbus_writel(v, (unsigned long)(a))
+#define sbus_readb(__addr)		_sbus_readb((unsigned long)(__addr))
+#define sbus_readw(__addr)		_sbus_readw((unsigned long)(__addr))
+#define sbus_readl(__addr)		_sbus_readl((unsigned long)(__addr))
+#define sbus_writeb(__b, __addr)	_sbus_writeb(__b, (unsigned long)(__addr))
+#define sbus_writew(__w, __addr)	_sbus_writew(__w, (unsigned long)(__addr))
+#define sbus_writel(__l, __addr)	_sbus_writel(__l, (unsigned long)(__addr))
 
 static inline void *sbus_memset_io(void *__dst, int c, __kernel_size_t n)
 {
