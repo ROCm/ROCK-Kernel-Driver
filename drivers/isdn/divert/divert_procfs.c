@@ -22,6 +22,7 @@
 #include <linux/isdnif.h>
 #include "isdn_divert.h"
 
+
 /*********************************/
 /* Variables for interface queue */
 /*********************************/
@@ -181,6 +182,7 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 	divert_ioctl dioctl;
 	int i;
 	unsigned long flags;
+	spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
 	divert_rule *rulep;
 	char *cp;
 
@@ -215,10 +217,9 @@ isdn_divert_ioctl(struct inode *inode, struct file *file,
 		case IIOCMODRULE:
 			if (!(rulep = getruleptr(dioctl.getsetrule.ruleidx)))
 				return (-EINVAL);
-			save_flags(flags);
-			cli();
+            spin_lock_irqsave(&divert_lock, flags);
 			*rulep = dioctl.getsetrule.rule;	/* copy data */
-			restore_flags(flags);
+			spin_unlock_irqrestore(&divert_lock, flags);
 			return (0);	/* no copy required */
 			break;
 

@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/version.h>
 #include <linux/init.h>
+
 #include "isdn_divert.h"
 
 MODULE_DESCRIPTION("ISDN4Linux: Call diversion support");
@@ -59,23 +60,24 @@ static int __init divert_init(void)
 /* Module deinit code */
 /**********************/
 static void __exit divert_exit(void)
-{ unsigned long flags;
+{
+  unsigned long flags;
+  spinlock_t divert_lock = SPIN_LOCK_UNLOCKED;
   int i;
 
-  save_flags(flags);
-  cli();
+  spin_lock_irqsave(&divert_lock, flags);
   divert_if.cmd = DIVERT_CMD_REL; /* release */
   if ((i = DIVERT_REG_NAME(&divert_if)) != DIVERT_NO_ERR)
    { printk(KERN_WARNING "dss1_divert: error %d releasing module\n",i);
-     restore_flags(flags);
+     spin_unlock_irqrestore(&divert_lock, flags);
      return;
    } 
   if (divert_dev_deinit()) 
    { printk(KERN_WARNING "dss1_divert: device busy, remove cancelled\n");
-     restore_flags(flags);
+     spin_unlock_irqrestore(&divert_lock, flags);
      return;
    }
-  restore_flags(flags);
+  spin_unlock_irqrestore(&divert_lock, flags);
   deleterule(-1); /* delete all rules and free mem */
   deleteprocs();
   printk(KERN_INFO "dss1_divert module successfully removed \n");
