@@ -32,13 +32,8 @@
  *      A short common prefix is useful for routines within the driver to avoid
  *      conflict with other similar drivers and I chosen to use "fst_" for this
  *      purpose (FarSite T-series).
- *
- *      Finally the device driver needs a short network interface name. Since
- *      "hdlc" is already in use I've chosen the even less informative "sync"
- *      for the present.
  */
 #define FST_NAME                "fst"           /* In debug/info etc */
-#define FST_NDEV_NAME           "sync"          /* For net interface */
 #define FST_DEV_NAME            "farsync"       /* For misc interfaces */
 
 
