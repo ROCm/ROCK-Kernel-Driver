@@ -39,29 +39,6 @@
 
 static struct powernow_k8_data *powernow_data[NR_CPUS];
 
-/*
-The PSB table supplied by BIOS allows for the definition of the number of
-p-states that can be used when running on a/c, and the number of p-states
-that can be used when running on battery. This allows laptop manufacturers
-to force the system to save power when running from battery. The relationship 
-is :
-   1 <= number_of_battery_p_states <= maximum_number_of_p_states
-
-This driver does NOT have the support in it to detect transitions from
-a/c power to battery power, and thus trigger the transition to a lower
-p-state if required. This is because I need ACPI and the 2.6 kernel to do 
-this, and this is a 2.4 kernel driver. Check back for a new improved driver
-for the 2.6 kernel soon.
-
-This code therefore assumes it is on battery at all times, and thus
-restricts performance to number_of_battery_p_states. For desktops, 
-  number_of_battery_p_states == maximum_number_of_pstates, 
-so this is not actually a restriction.
-*/
-
-static u32 batps;	/* limit on the number of p states when on battery */
-			/* - set by BIOS in the PSB/PST                    */
-
  /* Return a frequency in MHz, given an input fid */
 static u32 find_freq_from_fid(u32 fid)
 {
@@ -556,7 +533,7 @@ static int find_psb_table(struct powernow_k8_data *data)
 
 		printk(KERN_INFO PFX "voltage stable in %d usec", data->vstable * 20);
 		if (data->batps)
-			printk(", only %d lowest states on battery", batps);
+			printk(", only %d lowest states on battery", data->batps);
 		printk(", ramp voltage offset: %d", data->rvo);
 		printk(", isochronous relief time: %d", data->irt);
 		printk(", maximum voltage step: %d\n", mvs);
@@ -582,14 +559,14 @@ static int find_psb_table(struct powernow_k8_data *data)
 			return -ENODEV;
 		}
 
-		if (batps == 0) {
-			batps = data->numps;
-		} else if (batps > data->numps) {
+		if (data->batps == 0) {
+			data->batps = data->numps;
+		} else if (data->batps > data->numps) {
 			printk(KERN_ERR BFX "batterypstates > numpstates\n");
-			batps = data->numps;
+			data->batps = data->numps;
 		} else {
 			printk(KERN_ERR PFX
-			       "Restricting operation to %d p-states\n", batps);
+			       "Restricting operation to %d p-states\n", data->batps);
 			printk(KERN_ERR PFX
 			       "Check for an updated driver to access all "
 			       "%d p-states\n", data->numps);
