@@ -245,6 +245,7 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 	unsigned char *buf;
 	int baud;
 	int i;
+	u8 control;
 
 	dbg("%s -  port %d", __FUNCTION__, port->number);
 
@@ -360,17 +361,19 @@ static void pl2303_set_termios (struct usb_serial_port *port, struct termios *ol
 			     0, 0, buf, 7, 100);
 	dbg ("0x21:0x20:0:0  %d", i);
 
-	if (cflag && CBAUD) {
-		u8 control;
-
-		spin_lock_irqsave(&priv->lock, flags);
-		if ((cflag && CBAUD) == B0)
-			priv->line_control &= ~(CONTROL_DTR | CONTROL_RTS);
-		else
-			priv->line_control |= (CONTROL_DTR | CONTROL_RTS);
+	/* change control lines if we are switching to or from B0 */
+	spin_lock_irqsave(&priv->lock, flags);
+	control = priv->line_control;
+	if ((cflag & CBAUD) == B0)
+		priv->line_control &= ~(CONTROL_DTR | CONTROL_RTS);
+	else
+		priv->line_control |= (CONTROL_DTR | CONTROL_RTS);
+	if (control != priv->line_control) {
 		control = priv->line_control;
 		spin_unlock_irqrestore(&priv->lock, flags);
-		set_control_lines (serial->dev, control);
+		set_control_lines(serial->dev, control);
+	} else {
+		spin_unlock_irqrestore(&priv->lock, flags);
 	}
 	
 	buf[0] = buf[1] = buf[2] = buf[3] = buf[4] = buf[5] = buf[6] = 0;
