@@ -421,8 +421,6 @@ static void nfs_readpage_result_partial(struct nfs_read_data *data, int status)
 			memclear_highpage_flush(page,
 						data->args.pgbase + result,
 						request - result);
-			if (!data->res.eof)
-				SetPageError(page);
 		}
 	} else
 		SetPageError(page);
@@ -453,8 +451,6 @@ static void nfs_readpage_result_full(struct nfs_read_data *data, int status)
 					memclear_highpage_flush(page,
 							req->wb_pgbase + count,
 							req->wb_bytes - count);
-				if (!data->res.eof)
-					SetPageError(page);
 				count = 0;
 			} else
 				count -= PAGE_CACHE_SIZE;
@@ -472,11 +468,26 @@ static void nfs_readpage_result_full(struct nfs_read_data *data, int status)
 void nfs_readpage_result(struct rpc_task *task)
 {
 	struct nfs_read_data *data = (struct nfs_read_data *)task->tk_calldata;
+	struct nfs_readargs *argp = &data->args;
+	struct nfs_readres *resp = &data->res;
 	int status = task->tk_status;
 
 	dprintk("NFS: %4d nfs_readpage_result, (status %d)\n",
 		task->tk_pid, status);
 
+	/* Is this a short read? */
+	if (task->tk_status >= 0 && resp->count < argp->count && !resp->eof) {
+		/* Has the server at least made some progress? */
+		if (resp->count != 0) {
+			/* Yes, so retry the read at the end of the data */
+			argp->offset += resp->count;
+			argp->pgbase += resp->count;
+			argp->count -= resp->count;
+			rpc_restart_call(task);
+			return;
+		}
+		task->tk_status = -EIO;
+	}
 	NFS_FLAGS(data->inode) |= NFS_INO_INVALID_ATIME;
 	data->complete(data, status);
 }

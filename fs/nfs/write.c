@@ -1144,20 +1144,8 @@ void nfs_writeback_done(struct rpc_task *task)
 	dprintk("NFS: %4d nfs_writeback_done (status %d)\n",
 		task->tk_pid, task->tk_status);
 
-	/* We can't handle that yet but we check for it nevertheless */
-	if (resp->count < argp->count && task->tk_status >= 0) {
-		static unsigned long    complain;
-		if (time_before(complain, jiffies)) {
-			printk(KERN_WARNING
-			       "NFS: Server wrote less than requested.\n");
-			complain = jiffies + 300 * HZ;
-		}
-		/* Can't do anything about it right now except throw
-		 * an error. */
-		task->tk_status = -EIO;
-	}
 #if defined(CONFIG_NFS_V3) || defined(CONFIG_NFS_V4)
-	if (data->verf.committed < argp->stable && task->tk_status >= 0) {
+	if (resp->verf->committed < argp->stable && task->tk_status >= 0) {
 		/* We tried a write call, but the server did not
 		 * commit data to stable storage even though we
 		 * requested it.
@@ -1172,11 +1160,40 @@ void nfs_writeback_done(struct rpc_task *task)
 			dprintk("NFS: faulty NFS server %s:"
 				" (committed = %d) != (stable = %d)\n",
 				NFS_SERVER(data->inode)->hostname,
-				data->verf.committed, argp->stable);
+				resp->verf->committed, argp->stable);
 			complain = jiffies + 300 * HZ;
 		}
 	}
 #endif
+	/* Is this a short write? */
+	if (task->tk_status >= 0 && resp->count < argp->count) {
+		static unsigned long    complain;
+
+		/* Has the server at least made some progress? */
+		if (resp->count != 0) {
+			/* Was this an NFSv2 write or an NFSv3 stable write? */
+			if (resp->verf->committed != NFS_UNSTABLE) {
+				/* Resend from where the server left off */
+				argp->offset += resp->count;
+				argp->pgbase += resp->count;
+				argp->count -= resp->count;
+			} else {
+				/* Resend as a stable write in order to avoid
+				 * headaches in the case of a server crash.
+				 */
+				argp->stable = NFS_FILE_SYNC;
+			}
+			rpc_restart_call(task);
+			return;
+		}
+		if (time_before(complain, jiffies)) {
+			printk(KERN_WARNING
+			       "NFS: Server wrote less than requested.\n");
+			complain = jiffies + 300 * HZ;
+		}
+		/* Can't do anything about it except throw an error. */
+		task->tk_status = -EIO;
+	}
 
 	/*
 	 * Process the nfs_page list
