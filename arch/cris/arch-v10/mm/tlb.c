@@ -65,7 +65,7 @@ void
 flush_tlb_mm(struct mm_struct *mm)
 {
 	int i;
-	int page_id = mm->context;
+	int page_id = mm->context.page_id;
 	unsigned long flags;
 
 	D(printk("tlb: flush mm context %d (%p)\n", page_id, mm));
@@ -103,7 +103,7 @@ flush_tlb_page(struct vm_area_struct *vma,
 	       unsigned long addr)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	int page_id = mm->context;
+	int page_id = mm->context.page_id;
 	int i;
 	unsigned long flags;
 
@@ -147,7 +147,7 @@ flush_tlb_range(struct vm_area_struct *vma,
 		unsigned long end)
 {
 	struct mm_struct *mm = vma->vm_mm;
-	int page_id = mm->context;
+	int page_id = mm->context.page_id;
 	int i;
 	unsigned long flags;
 
@@ -208,6 +208,18 @@ dump_tlb_all(void)
 }
 #endif
 
+/*
+ * Initialize the context related info for a new mm_struct
+ * instance.
+ */
+
+int
+init_new_context(struct task_struct *tsk, struct mm_struct *mm)
+{
+	mm->context.page_id = NO_CONTEXT;
+	return 0;
+}
+
 /* called in schedule() just before actually doing the switch_to */
 
 void 
@@ -231,6 +243,6 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
 	
 	D(printk("switching mmu_context to %d (%p)\n", next->context, next));
 
-	*R_MMU_CONTEXT = IO_FIELD(R_MMU_CONTEXT, page_id, next->context);
+	*R_MMU_CONTEXT = IO_FIELD(R_MMU_CONTEXT, page_id, next->context.page_id);
 }
 

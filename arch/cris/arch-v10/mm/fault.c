@@ -40,23 +40,25 @@ void
 handle_mmu_bus_fault(struct pt_regs *regs)
 {
 	int cause;
-#ifdef DEBUG
 	int select;
+#ifdef DEBUG
 	int index;
 	int page_id;
 	int acc, inv;
 #endif
-	int miss, we, writeac;
+	pgd_t* pgd = (pgd_t*)current_pgd;
 	pmd_t *pmd;
 	pte_t pte;
+	int miss, we, writeac;
 	unsigned long address;
+	unsigned long flags;
 
 	cause = *R_MMU_CAUSE;
 
 	address = cause & PAGE_MASK; /* get faulting address */
+	select = *R_TLB_SELECT;
 
 #ifdef DEBUG
-	select = *R_TLB_SELECT;
 	page_id = IO_EXTRACT(R_MMU_CAUSE,  page_id,   cause);
 	acc     = IO_EXTRACT(R_MMU_CAUSE,  acc_excp,  cause);
 	inv     = IO_EXTRACT(R_MMU_CAUSE,  inv_excp,  cause);  
@@ -66,85 +68,31 @@ handle_mmu_bus_fault(struct pt_regs *regs)
 	we      = IO_EXTRACT(R_MMU_CAUSE,  we_excp,   cause);
 	writeac = IO_EXTRACT(R_MMU_CAUSE,  wr_rd,     cause);
 
-	/* ETRAX 100LX TR89 bugfix: if the second half of an unaligned
-	 * write causes a MMU-fault, it will not be restarted correctly.
-	 * This could happen if a write crosses a page-boundary and the
-	 * second page is not yet COW'ed or even loaded. The workaround
-	 * is to clear the unaligned bit in the CPU status record, so 
-	 * that the CPU will rerun both the first and second halves of
-	 * the instruction. This will not have any sideeffects unless
-	 * the first half goes to any device or memory that can't be
-	 * written twice, and which is mapped through the MMU.
-	 *
-	 * We only need to do this for writes.
-	 */
-
-	if(writeac)
-		regs->csrinstr &= ~(1 << 5);
-	
 	D(printk("bus_fault from IRP 0x%lx: addr 0x%lx, miss %d, inv %d, we %d, acc %d, dx %d pid %d\n",
 		 regs->irp, address, miss, inv, we, acc, index, page_id));
 
-	/* for a miss, we need to reload the TLB entry */
-
-	if (miss) {
-		/* see if the pte exists at all
-		 * refer through current_pgd, dont use mm->pgd
-		 */
-
-		pmd = (pmd_t *)(current_pgd + pgd_index(address));
-		if (pmd_none(*pmd)) {
-			do_page_fault(address, regs, 0, writeac);
-			return;
-		}
-		if (pmd_bad(*pmd)) {
-			printk("bad pgdir entry 0x%lx at 0x%p\n", *(unsigned long*)pmd, pmd);
-			pmd_clear(pmd);
-			return;
-		}
-		pte = *pte_offset_kernel(pmd, address);
-		if (!pte_present(pte)) {
-			do_page_fault(address, regs, 0, writeac);
-			return;
-		}
-
-#ifdef DEBUG
-		printk(" found pte %lx pg %p ", pte_val(pte), pte_page(pte));
-		if (pte_val(pte) & _PAGE_SILENT_WRITE)
-			printk("Silent-W ");
-		if (pte_val(pte) & _PAGE_KERNEL)
-			printk("Kernel ");
-		if (pte_val(pte) & _PAGE_SILENT_READ)
-			printk("Silent-R ");
-		if (pte_val(pte) & _PAGE_GLOBAL)
-			printk("Global ");
-		if (pte_val(pte) & _PAGE_PRESENT)
-			printk("Present ");
-		if (pte_val(pte) & _PAGE_ACCESSED)
-			printk("Accessed ");
-		if (pte_val(pte) & _PAGE_MODIFIED)
-			printk("Modified ");
-		if (pte_val(pte) & _PAGE_READ)
-			printk("Readable ");
-		if (pte_val(pte) & _PAGE_WRITE)
-			printk("Writeable ");
-		printk("\n");
-#endif
-
-		/* load up the chosen TLB entry
-		 * this assumes the pte format is the same as the TLB_LO layout.
-		 *
-		 * the write to R_TLB_LO also writes the vpn and page_id fields from
-		 * R_MMU_CAUSE, which we in this case obviously want to keep
-		 */
-
-		*R_TLB_LO = pte_val(pte);
-
-		return;
-	}
-
 	/* leave it to the MM system fault handler */
-	do_page_fault(address, regs, 1, we);
+	if (miss)
+		do_page_fault(address, regs, 0, writeac);
+        else
+		do_page_fault(address, regs, 1, we);
+
+        /* Reload TLB with new entry to avoid an extra miss exception.
+	 * do_page_fault may have flushed the TLB so we have to restore
+	 * the MMU registers.
+	 */
+	local_save_flags(flags);
+	local_irq_disable();
+	pmd = (pmd_t *)(pgd + pgd_index(address));
+	if (pmd_none(*pmd))
+		return;
+	pte = *pte_offset_kernel(pmd, address);
+	if (!pte_present(pte))
+		return;
+	*R_TLB_SELECT = select;
+	*R_TLB_HI = cause;
+	*R_TLB_LO = pte_val(pte);
+	local_irq_restore(flags);
 }
 
 /* Called from arch/cris/mm/fault.c to find fixup code. */
