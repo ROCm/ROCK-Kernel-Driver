@@ -876,7 +876,7 @@ CONFIG_SOUND_SA1100=m
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

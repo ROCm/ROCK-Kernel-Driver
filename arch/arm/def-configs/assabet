@@ -949,7 +949,7 @@ CONFIG_SWITCHES_UCB1X00=y
 #
 # Bluetooth support
 #
-# CONFIG_BLUEZ is not set
+# CONFIG_BT is not set
 
 #
 # Kernel hacking

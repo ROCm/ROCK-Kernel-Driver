@@ -4,9 +4,9 @@
 
 export-objs := syms.o
 
-obj-$(CONFIG_BT)		+= bluetooth.o
+obj-$(CONFIG_BT)	+= bluetooth.o
 obj-$(CONFIG_BT_L2CAP)	+= l2cap.o
-obj-$(CONFIG_BT_SCO)		+= sco.o
+obj-$(CONFIG_BT_SCO)	+= sco.o
 obj-$(CONFIG_BT_RFCOMM)	+= rfcomm/
 obj-$(CONFIG_BT_BNEP)	+= bnep/
 
