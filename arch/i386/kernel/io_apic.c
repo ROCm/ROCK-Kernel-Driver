@@ -1116,12 +1116,9 @@ next:
 		goto next;
 
 	if (current_vector > FIRST_SYSTEM_VECTOR) {
-		offset++;
+		offset = (offset + 1) & 7;
 		current_vector = FIRST_DEVICE_VECTOR + offset;
 	}
-
-	if (current_vector == FIRST_SYSTEM_VECTOR)
-		panic("ran out of interrupt sources!");
 
 	IO_APIC_VECTOR(irq) = current_vector;
 	return current_vector;
