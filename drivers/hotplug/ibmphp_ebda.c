@@ -34,6 +34,7 @@
 #include <linux/slab.h>
 #include <linux/pci.h>
 #include <linux/list.h>
+#include <linux/init.h>
 #include "ibmphp.h"
 
 /*
@@ -76,7 +77,7 @@ static struct slot *alloc_ibm_slot (void)
 	return slot;
 }
 
-static struct ebda_hpc_list *alloc_ebda_hpc_list (void)
+static struct ebda_hpc_list * __init alloc_ebda_hpc_list (void)
 {
 	struct ebda_hpc_list *list;
 
@@ -127,7 +128,7 @@ static void free_ebda_hpc (struct controller *controller)
 	kfree (controller);
 }
 
-static struct ebda_rsrc_list *alloc_ebda_rsrc_list (void)
+static struct ebda_rsrc_list * __init alloc_ebda_rsrc_list (void)
 {
 	struct ebda_rsrc_list *list;
 
@@ -149,7 +150,7 @@ static struct ebda_pci_rsrc *alloc_ebda_pci_rsrc (void)
 	return resource;
 }
 
-static void print_bus_info (void)
+static void __init print_bus_info (void)
 {
 	struct bus_info *ptr;
 	struct list_head *ptr1;
@@ -184,7 +185,7 @@ static void print_ebda_pci_rsrc (void)
 	}
 }
 
-static void print_ebda_hpc (void)
+static void __init print_ebda_hpc (void)
 {
 	struct controller *hpc_ptr;
 	struct list_head *ptr1;
@@ -228,7 +229,7 @@ static void print_ebda_hpc (void)
 	}
 }
 
-int ibmphp_access_ebda (void)
+int __init ibmphp_access_ebda (void)
 {
 	u8 format, num_ctlrs, rio_complete, hs_complete;
 	u16 ebda_seg, num_entries, next_offset, offset, blk_id, sub_addr, rc, re, rc_id, re_id, base;
@@ -387,7 +388,7 @@ int ibmphp_access_ebda (void)
  * each hpc from physical address to a list of hot plug controllers based on
  * hpc descriptors.
  */
-static int ebda_rsrc_controller (void)
+static int __init ebda_rsrc_controller (void)
 {
 	u16 addr, addr_slot, addr_bus;
 	u8 ctlr_id, temp, bus_index;
@@ -649,7 +650,7 @@ static int ebda_rsrc_controller (void)
  * map info (bus, devfun, start addr, end addr..) of i/o, memory,
  * pfm from the physical addr to a list of resource.
  */
-static int ebda_rsrc_rsrc (void)
+static int __init ebda_rsrc_rsrc (void)
 {
 	u16 addr;
 	short rsrc;
@@ -717,7 +718,7 @@ static int ebda_rsrc_rsrc (void)
 /*
  * map info of scalability details and rio details from physical address
  */
-static int ebda_rio_table(void)
+static int __init ebda_rio_table(void)
 {
 	u16 offset;
 	u8 i;

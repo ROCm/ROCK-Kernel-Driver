@@ -32,6 +32,7 @@
 #include <linux/module.h>
 #include <linux/pci.h>
 #include <linux/smp_lock.h>
+#include <linux/init.h>
 #include "ibmphp.h"
 
 static int to_debug = FALSE;
@@ -126,7 +127,7 @@ static int hpc_wait_ctlr_notworking (int, struct controller *, void *, u8 *);
 *
 * Action:  initialize semaphores and variables
 *---------------------------------------------------------------------*/
-void ibmphp_hpc_initvars (void)
+void __init ibmphp_hpc_initvars (void)
 {
 	debug ("%s - Entry\n", __FUNCTION__);
 
@@ -1044,19 +1045,19 @@ static int hpc_poll_thread (void *data)
 *
 * Action:  start polling thread
 *---------------------------------------------------------------------*/
-int ibmphp_hpc_start_poll_thread (void)
+int __init ibmphp_hpc_start_poll_thread (void)
 {
 	int rc = 0;
 
-	debug ("ibmphp_hpc_start_poll_thread - Entry\n");
+	debug ("%s - Entry\n", __FUNCTION__);
 
 	tid_poll = kernel_thread (hpc_poll_thread, 0, 0);
 	if (tid_poll < 0) {
-		err ("ibmphp_hpc_start_poll_thread - Error, thread not started\n");
+		err ("%s - Error, thread not started\n", __FUNCTION__);
 		rc = -1;
 	}
 
-	debug ("ibmphp_hpc_start_poll_thread - Exit tid_poll[%d] rc[%d]\n", tid_poll, rc);
+	debug ("%s - Exit tid_poll[%d] rc[%d]\n", __FUNCTION__, tid_poll, rc);
 	return rc;
 }
 
@@ -1065,9 +1066,9 @@ int ibmphp_hpc_start_poll_thread (void)
 *
 * Action:  stop polling thread and cleanup
 *---------------------------------------------------------------------*/
-void ibmphp_hpc_stop_poll_thread (void)
+void __exit ibmphp_hpc_stop_poll_thread (void)
 {
-	debug ("ibmphp_hpc_stop_poll_thread - Entry\n");
+	debug ("%s - Entry\n", __FUNCTION__);
 
 	ibmphp_shutdown = TRUE;
 	ibmphp_lock_operations ();
@@ -1080,7 +1081,7 @@ void ibmphp_hpc_stop_poll_thread (void)
 	ibmphp_unlock_operations ();
 	up (&sem_exit);
 
-	debug ("ibmphp_hpc_stop_poll_thread - Exit\n");
+	debug ("%s - Exit\n", __FUNCTION__);
 }
 
 /*----------------------------------------------------------------------

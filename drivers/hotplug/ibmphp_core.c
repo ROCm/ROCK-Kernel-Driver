@@ -106,7 +106,7 @@ static inline int slot_update (struct slot **sl)
 	return rc;
 }
 
-static int get_max_slots (void)
+static int __init get_max_slots (void)
 {
 	struct list_head * tmp;
 	int slot_count = 0;
@@ -528,7 +528,7 @@ static int get_card_bus_names (struct hotplug_slot *hotplug_slot, char * value)
  * function. It will also power off empty slots that are powered on since BIOS
  * leaves those on, albeit disconnected
  ******************************************************************************/
-static int init_ops (void)
+static int __init init_ops (void)
 {
 	struct slot *slot_cur;
 	int retval;
