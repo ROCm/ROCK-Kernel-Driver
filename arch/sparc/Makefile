@@ -13,7 +13,7 @@
 
 AS              := $(AS) -32
 LDFLAGS		:= -m elf32_sparc
-CHECKFLAGS	+= -D__sparc__=1
+CHECKFLAGS	+= -D__sparc__
 
 #CFLAGS := $(CFLAGS) -g -pipe -fcall-used-g5 -fcall-used-g7
 CFLAGS := $(CFLAGS) -m32 -pipe -mno-fpu -fcall-used-g5 -fcall-used-g7
