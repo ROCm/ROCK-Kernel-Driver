@@ -127,6 +127,8 @@ static __inline__ void serio_cleanup(struct serio *serio)
 #define SERIO_TWIDKBD	0x23
 #define SERIO_TWIDJOY	0x24
 #define SERIO_HIL	0x25
+#define SERIO_SNES232	0x26
+#define SERIO_SEMTECH	0x27
 
 #define SERIO_ID	0xff00UL
 #define SERIO_EXTRA	0xff0000UL
