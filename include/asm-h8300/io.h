@@ -35,27 +35,38 @@
 
 static inline unsigned short _swapw(volatile unsigned short v)
 {
-	unsigned short r,t;
-	__asm__("mov.b %w2,%x1\n\t"
-		"mov.b %x2,%w1\n\t"
-		"mov.w %1,%0"
-		:"=r"(r),"=r"(t)
-		:"r"(v));
+#ifndef H8300_IO_NOSWAP
+	unsigned short r;
+	__asm__("xor.b %w0,%x0\n\t"
+		"xor.b %x0,%w0\n\t"
+		"xor.b %w0,%x0"
+		:"=r"(r)
+		:"0"(v));
 	return r;
+#else
+	return v;
+#endif
 }
 
-static inline unsigned int _swapl(volatile unsigned long v)
+static inline unsigned long _swapl(volatile unsigned long v)
 {
-	unsigned int r,t;
-	__asm__("mov.b %w2,%x1\n\t"
-		"mov.b %x2,%w1\n\t"
-		"mov.w %f1,%e0\n\t"
-		"mov.w %e2,%f1\n\t"
-		"mov.b %w1,%x0\n\t"
-		"mov.b %x1,%w0"
-		:"=r"(r),"=r"(t)
-		:"r"(v));
+#ifndef H8300_IO_NOSWAP
+	unsigned long r;
+	__asm__("xor.b %w0,%x0\n\t"
+		"xor.b %x0,%w0\n\t"
+		"xor.b %w0,%x0\n\t"
+		"xor.w %e0,%f0\n\t"
+		"xor.w %f0,%e0\n\t"
+		"xor.w %e0,%f0\n\t"
+		"xor.b %w0,%x0\n\t"
+		"xor.b %x0,%w0\n\t"
+		"xor.b %w0,%x0"
+		:"=r"(r)
+		:"0"(v));
 	return r;
+#else
+	return v;
+#endif
 }
 
 #define readb(addr) \
@@ -109,10 +120,26 @@ static inline void io_outsw(unsigned int addr, const void *buf, int len)
 
 static inline void io_outsl(unsigned int addr, const void *buf, int len)
 {
-	volatile unsigned int *ap = (volatile unsigned int *) addr;
+	volatile unsigned long *ap = (volatile unsigned long *) addr;
 	unsigned long *bp = (unsigned long *) buf;
 	while (len--)
 		*ap = _swapl(*bp++);
+}
+
+static inline void io_outsw_noswap(unsigned int addr, const void *buf, int len)
+{
+	volatile unsigned short *ap = (volatile unsigned short *) addr;
+	unsigned short *bp = (unsigned short *) buf;
+	while (len--)
+		*ap = *bp++;
+}
+
+static inline void io_outsl_noswap(unsigned int addr, const void *buf, int len)
+{
+	volatile unsigned long *ap = (volatile unsigned long *) addr;
+	unsigned long *bp = (unsigned long *) buf;
+	while (len--)
+		*ap = *bp++;
 }
 
 static inline void io_insb(unsigned int addr, void *buf, int len)
@@ -142,10 +169,26 @@ static inline void io_insw(unsigned int addr, void *buf, int len)
 
 static inline void io_insl(unsigned int addr, void *buf, int len)
 {
-	volatile unsigned int *ap = (volatile unsigned int *) addr;
+	volatile unsigned long *ap = (volatile unsigned long *) addr;
 	unsigned long *bp = (unsigned long *) buf;
 	while (len--)
 		*bp++ = _swapl(*ap);
+}
+
+static inline void io_insw_noswap(unsigned int addr, void *buf, int len)
+{
+	volatile unsigned short *ap = (volatile unsigned short *) addr;
+	unsigned short *bp = (unsigned short *) buf;
+	while (len--)
+		*bp++ = *ap;
+}
+
+static inline void io_insl_noswap(unsigned int addr, void *buf, int len)
+{
+	volatile unsigned long *ap = (volatile unsigned long *) addr;
+	unsigned long *bp = (unsigned long *) buf;
+	while (len--)
+		*bp++ = *ap;
 }
 
 /*
@@ -160,7 +203,8 @@ static inline void io_insl(unsigned int addr, void *buf, int len)
 #define inb(addr)    ((h8300_buswidth(addr))?readw((addr) & ~1) & 0xff:readb(addr))
 #define inw(addr)    _swapw(readw(addr))
 #define inl(addr)    _swapl(readl(addr))
-#define outb(x,addr) ((void)((h8300_buswidth(addr) && ((addr) & 1))?writew(x,(addr) & ~1):writeb(x,addr)))
+#define outb(x,addr) ((void)((h8300_buswidth(addr) && \
+                      ((addr) & 1))?writew(x,(addr) & ~1):writeb(x,addr)))
 #define outw(x,addr) ((void) writew(_swapw(x),addr))
 #define outl(x,addr) ((void) writel(_swapl(x),addr))
 
@@ -227,7 +271,7 @@ static __inline__ unsigned short ctrl_inw(unsigned long addr)
 	return *(volatile unsigned short*)addr;
 }
 
-static __inline__ unsigned int ctrl_inl(unsigned long addr)
+static __inline__ unsigned long ctrl_inl(unsigned long addr)
 {
 	return *(volatile unsigned long*)addr;
 }
@@ -242,7 +286,7 @@ static __inline__ void ctrl_outw(unsigned short b, unsigned long addr)
 	*(volatile unsigned short*)addr = b;
 }
 
-static __inline__ void ctrl_outl(unsigned int b, unsigned long addr)
+static __inline__ void ctrl_outl(unsigned long b, unsigned long addr)
 {
         *(volatile unsigned long*)addr = b;
 }
