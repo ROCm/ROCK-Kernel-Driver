@@ -118,6 +118,14 @@ static inline struct kobj_type * get_ktype(struct kobject * k)
 extern struct kobject * kset_find_obj(struct kset *, const char *);
 
 
+/**
+ * Use this when initializing an embedded kset with no other 
+ * fields to initialize.
+ */
+#define set_kset_name(str)	.kset = { .kobj = { .name = str } }
+
+
+
 struct subsystem {
 	struct kset		kset;
 	struct rw_semaphore	rwsem;

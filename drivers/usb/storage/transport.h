@@ -122,7 +122,8 @@ struct bulk_cs_wrap {
 #define USB_STOR_XFER_GOOD	0	/* good transfer                 */
 #define USB_STOR_XFER_SHORT	1	/* transferred less than expected */
 #define USB_STOR_XFER_STALLED	2	/* endpoint stalled              */
-#define USB_STOR_XFER_ERROR	3	/* transfer died in the middle   */
+#define USB_STOR_XFER_LONG	3	/* device tried to send too much */
+#define USB_STOR_XFER_ERROR	4	/* transfer died in the middle   */
 
 /*
  * Transport return codes
@@ -130,7 +131,8 @@ struct bulk_cs_wrap {
 
 #define USB_STOR_TRANSPORT_GOOD	   0   /* Transport good, command good	   */
 #define USB_STOR_TRANSPORT_FAILED  1   /* Transport good, command failed   */
-#define USB_STOR_TRANSPORT_ERROR   2   /* Transport bad (i.e. device dead) */
+#define USB_STOR_TRANSPORT_NO_SENSE 2  /* Command failed, no auto-sense    */
+#define USB_STOR_TRANSPORT_ERROR   3   /* Transport bad (i.e. device dead) */
 
 /*
  * We used to have USB_STOR_XFER_ABORTED and USB_STOR_TRANSPORT_ABORTED

@@ -9,15 +9,8 @@
 #include <linux/node.h>
 #include <linux/topology.h>
 
-
-static struct class node_class = {
-	.name		= "node",
-};
-
-
-static struct device_driver node_driver = {
-	.name		= "node",
-	.bus		= &system_bus_type,
+static struct sysdev_class node_class = {
+	set_kset_name("node"),
 };
 
 
@@ -26,7 +19,7 @@ static ssize_t node_read_cpumap(struct device * dev, char * buf)
 	struct node *node_dev = to_node(to_root(dev));
         return sprintf(buf,"%lx\n",node_dev->cpumap);
 }
-static DEVICE_ATTR(cpumap,S_IRUGO,node_read_cpumap,NULL);
+static SYSDEV_ATTR(cpumap,S_IRUGO,node_read_cpumap,NULL);
 
 #define K(x) ((x) << (PAGE_SHIFT - 10))
 static ssize_t node_read_meminfo(struct device * dev, char * buf)
@@ -52,7 +45,7 @@ static ssize_t node_read_meminfo(struct device * dev, char * buf)
 		       nid, K(i.freeram-i.freehigh));
 }
 #undef K 
-static DEVICE_ATTR(meminfo,S_IRUGO,node_read_meminfo,NULL);
+static SYSDEV_ATTR(meminfo,S_IRUGO,node_read_meminfo,NULL);
 
 
 /*
@@ -66,17 +59,13 @@ int __init register_node(struct node *node, int num, struct node *parent)
 	int error;
 
 	node->cpumap = node_to_cpumask(num);
-	node->sysroot.id = num;
-	if (parent)
-		node->sysroot.dev.parent = &parent->sysroot.sysdev;
-	snprintf(node->sysroot.dev.name, DEVICE_NAME_SIZE, "Node %u", num);
-	snprintf(node->sysroot.dev.bus_id, BUS_ID_SIZE, "node%u", num);
-	node->sysroot.dev.driver = &node_driver;
-	node->sysroot.dev.bus = &system_bus_type;
-	error = sys_register_root(&node->sysroot);
+	node->sysdev.id = num;
+	node->sysdev.cls = &node_class;
+	error = sys_device_register(&node->sysdev);
+
 	if (!error){
-		device_create_file(&node->sysroot.dev, &dev_attr_cpumap);
-		device_create_file(&node->sysroot.dev, &dev_attr_meminfo);
+		sys_device_create_file(&node->sysroot.dev, &attr_cpumap);
+		sys_device_create_file(&node->sysroot.dev, &attr_meminfo);
 	}
 	return error;
 }
@@ -84,14 +73,6 @@ int __init register_node(struct node *node, int num, struct node *parent)
 
 int __init register_node_type(void)
 {
-	int error;
-	
-	error = class_register(&node_class);
-	if (!error) {
-		error = driver_register(&node_driver);
-		if (error)
-			class_unregister(&node_class);
-	}
-	return error;
+	return sysdev_class_register(&node_class);
 }
 postcore_initcall(register_node_type);

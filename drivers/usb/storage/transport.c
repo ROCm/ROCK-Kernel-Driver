@@ -48,6 +48,7 @@
 #include <linux/config.h>
 #include "transport.h"
 #include "protocol.h"
+#include "scsiglue.h"
 #include "usb.h"
 #include "debug.h"
 
@@ -303,6 +304,11 @@ static int interpret_urb_result(struct us_data *us, unsigned int pipe,
 		US_DEBUGP("-- device NAKed\n");
 		return USB_STOR_XFER_ERROR;
 
+	/* babble - the device tried to send more than we wanted to read */
+	case -EOVERFLOW:
+		US_DEBUGP("-- Babble\n");
+		return USB_STOR_XFER_LONG;
+
 	/* the transfer was cancelled, presumably by an abort */
 	case -ECONNRESET:
 		US_DEBUGP("-- transfer cancelled\n");
@@ -522,6 +528,12 @@ void usb_stor_invoke_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("-- transport indicates error, resetting\n");
 		us->transport_reset(us);
 		srb->result = DID_ERROR << 16;
+		return;
+	}
+
+	/* if the transport provided its own sense data, don't auto-sense */
+	if (result == USB_STOR_TRANSPORT_NO_SENSE) {
+		srb->result = SAM_STAT_CHECK_CONDITION;
 		return;
 	}
 
@@ -764,7 +776,7 @@ int usb_stor_CBI_transport(Scsi_Cmnd *srb, struct us_data *us)
 					srb->request_buffer, transfer_length,
 					srb->use_sg, &srb->resid);
 		US_DEBUGP("CBI data stage result is 0x%x\n", result);
-		if (result == USB_STOR_XFER_ERROR)
+		if (result > USB_STOR_XFER_STALLED)
 			return USB_STOR_TRANSPORT_ERROR;
 	}
 
@@ -854,7 +866,7 @@ int usb_stor_CB_transport(Scsi_Cmnd *srb, struct us_data *us)
 					srb->request_buffer, transfer_length,
 					srb->use_sg, &srb->resid);
 		US_DEBUGP("CB data stage result is 0x%x\n", result);
-		if (result == USB_STOR_XFER_ERROR)
+		if (result > USB_STOR_XFER_STALLED)
 			return USB_STOR_TRANSPORT_ERROR;
 	}
 
@@ -899,6 +911,7 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	struct bulk_cs_wrap bcs;
 	unsigned int transfer_length = srb->request_bufflen;
 	int result;
+	int fake_sense = 0;
 
 	/* set up the command wrapper */
 	bcb.Signature = cpu_to_le32(US_BULK_CB_SIGN);
@@ -936,6 +949,15 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 		US_DEBUGP("Bulk data transfer result 0x%x\n", result);
 		if (result == USB_STOR_XFER_ERROR)
 			return USB_STOR_TRANSPORT_ERROR;
+
+		/* If the device tried to send back more data than the
+		 * amount requested, the spec requires us to transfer
+		 * the CSW anyway.  Since there's no point retrying the
+		 * the command, we'll return fake sense data indicating
+		 * Illegal Request, Invalid Field in CDB.
+		 */
+		if (result == USB_STOR_XFER_LONG)
+			fake_sense = 1;
 	}
 
 	/* See flow chart on pg 15 of the Bulk Only Transport spec for
@@ -975,6 +997,14 @@ int usb_stor_Bulk_transport(Scsi_Cmnd *srb, struct us_data *us)
 	/* based on the status code, we report good or bad */
 	switch (bcs.Status) {
 		case US_BULK_STAT_OK:
+			/* device babbled -- return fake sense data */
+			if (fake_sense) {
+				memcpy(srb->sense_buffer, 
+				       usb_stor_sense_invalidCDB, 
+				       sizeof(usb_stor_sense_invalidCDB));
+				return USB_STOR_TRANSPORT_NO_SENSE;
+			}
+
 			/* command good -- note that data could be short */
 			return USB_STOR_TRANSPORT_GOOD;
 
