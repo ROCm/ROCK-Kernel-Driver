@@ -281,8 +281,6 @@ kdbm_show_page(struct page *page, int first)
 	kdb_page_flags(page, Private);
 	kdb_page_flags(page, Writeback);
 	kdb_page_flags(page, Nosave);
-	if (page->flags & (1UL << PG_maplock))
-		kdb_printf(" maplock");
 	kdb_page_flags(page, SwapCache);
 	kdb_page_flags(page, MappedToDisk);
 	kdb_page_flags(page, Reclaim);

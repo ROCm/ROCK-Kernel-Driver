@@ -100,7 +100,7 @@ kdbm_task(int argc, const char **argv, const char **envp, struct pt_regs *regs)
 
 	kdb_printf(
 	    "  utime=%ld stime=%ld cutime=%ld cstime=%ld\n",
-	    tp->utime, tp->stime, tp->cutime, tp->cstime);
+	    tp->utime, tp->stime, tp->signal->cutime, tp->signal->cstime);
 
 out:
 	if (tp)
