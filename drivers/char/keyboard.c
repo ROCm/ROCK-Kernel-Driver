@@ -66,6 +66,7 @@ extern void ctrl_alt_del(void);
 #endif
 
 struct pt_regs *kbd_pt_regs;
+EXPORT_SYMBOL(kbd_pt_regs);
 void compute_shiftstate(void);
 
 /*

@@ -22,8 +22,8 @@ MODULE_AUTHOR("Vojtech Pavlik <vojtech@ucw.cz>");
 MODULE_DESCRIPTION("PC Speaker beeper driver");
 MODULE_LICENSE("GPL");
 
-static char *pcspkr_name = "PC Speaker";
-static char *pcspkr_phys = "isa0061/input0";
+static char pcspkr_name[] = "PC Speaker";
+static char pcspkr_phys[] = "isa0061/input0";
 static struct input_dev pcspkr_dev;
 
 spinlock_t i8253_beep_lock = SPIN_LOCK_UNLOCKED;

@@ -1,7 +1,7 @@
 Force feedback for Linux.
 By Johann Deneux <deneux@ifrance.com> on 2001/04/22.
-You can redistribute this file, provided you include shape.fig and
-interactive.fig.
+You may redistribute this file. Please remember to include shape.fig and
+interactive.fig as well.
 ----------------------------------------------------------------------------
 
 0. Introduction
@@ -90,12 +90,14 @@ following bits:
 - FF_Y		has an Y axis (usually joysticks)
 - FF_WHEEL	has a wheel (usually sterring wheels)
 - FF_CONSTANT	can render constant force effects
-- FF_PERIODIC	can render periodic effects (sine, ramp, square...)
+- FF_PERIODIC	can render periodic effects (sine, triangle, square...)
+- FF_RAMP       can render ramp effects
 - FF_SPRING	can simulate the presence of a spring
 - FF_FRICTION	can simulate friction 
 - FF_DAMPER	can simulate damper effects
 - FF_RUMBLE	rumble effects (normally the only effect supported by rumble
 		pads)
+- FF_INERTIA    can simulate inertia
 
 
 int ioctl(int fd, EVIOCGEFFECTS, int *n);

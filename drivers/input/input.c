@@ -605,7 +605,7 @@ static int input_devices_read(char *buf, char **start, off_t pos, int count, int
 
 		len += sprintf(buf + len, "N: Name=\"%s\"\n", dev->name ? dev->name : "");
 		len += sprintf(buf + len, "P: Phys=%s\n", dev->phys ? dev->phys : "");
-		len += sprintf(buf + len, "D: Drivers=");
+		len += sprintf(buf + len, "H: Handlers=");
 
 		list_for_each(hnode,&dev->h_list) {
 			struct input_handle * handle = to_handle(hnode);
