@@ -12,27 +12,27 @@
 
 #define __mkw(h,l) (((h)&0x00ff)<< 8|((l)&0x00ff))
 #define __mkl(h,l) (((h)&0xffff)<<16|((l)&0xffff))
-#define __mk4(a,b,c,d) htonl(__mkl(__mkw(a,b),__mkw(c,d)))
+#define __mk4(a,b,c,d) cpu_to_be32(__mkl(__mkw(a,b),__mkw(c,d)))
 #define ROMSB_WORD0 __mk4('-','r','o','m')
 #define ROMSB_WORD1 __mk4('1','f','s','-')
 
 /* On-disk "super block" */
 
 struct romfs_super_block {
-	__u32 word0;
-	__u32 word1;
-	__u32 size;
-	__u32 checksum;
+	__be32 word0;
+	__be32 word1;
+	__be32 size;
+	__be32 checksum;
 	char name[0];		/* volume name */
 };
 
 /* On disk inode */
 
 struct romfs_inode {
-	__u32 next;		/* low 4 bits see ROMFH_ */
-	__u32 spec;
-	__u32 size;
-	__u32 checksum;
+	__be32 next;		/* low 4 bits see ROMFH_ */
+	__be32 spec;
+	__be32 size;
+	__be32 checksum;
 	char name[0];
 };
 
