@@ -223,13 +223,19 @@ struct page {
 		atomic_dec_and_test(&(p)->count);	\
 	})
 
-#define page_count(p)		atomic_read(&(p)->count)
 #define set_page_count(p,v) 	atomic_set(&(p)->count, v)
 #define __put_page(p)		atomic_dec(&(p)->count)
 
 extern void FASTCALL(__page_cache_release(struct page *));
 
 #ifdef CONFIG_HUGETLB_PAGE
+
+static inline int page_count(struct page *p)
+{
+	if (PageCompound(p))
+		p = (struct page *)p->lru.next;
+	return atomic_read(&(p)->count);
+}
 
 static inline void get_page(struct page *page)
 {
@@ -256,6 +262,8 @@ static inline void put_page(struct page *page)
 }
 
 #else		/* CONFIG_HUGETLB_PAGE */
+
+#define page_count(p)		atomic_read(&(p)->count)
 
 static inline void get_page(struct page *page)
 {
