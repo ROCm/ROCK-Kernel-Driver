@@ -16,7 +16,7 @@
 
 #include <linux/config.h>
 #include <linux/kernel.h>
-#include <linux/module.h> 
+#include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/init.h>
 #include <linux/cpufreq.h>
@@ -86,7 +86,7 @@ static int mobile_vid_table[32] = {
 /* divide by 10 to get FID. */
 static int fid_codes[32] = {
     110, 115, 120, 125, 50, 55, 60, 65,
-    70, 75, 80, 85, 90, 95, 100, 105, 
+    70, 75, 80, 85, 90, 95, 100, 105,
     30, 190, 40, 200, 130, 135, 140, 210,
     150, 225, 160, 165, 170, 180, -1, -1,
 };
@@ -144,6 +144,11 @@ static int check_powernow(void)
 	}
 
 	cpuid(0x80000007, &eax, &ebx, &ecx, &edx);
+
+	/* Check we can actually do something before we say anything.*/
+	if (!(edx & (1 << 1 | 1 << 2)))
+		return 0;
+
 	printk (KERN_INFO PFX "PowerNOW! Technology present. Can scale: ");
 
 	if (edx & 1 << 1) {
@@ -157,11 +162,6 @@ static int check_powernow(void)
 	if (edx & 1 << 2) {
 		printk ("voltage");
 		can_scale_vid=1;
-	}
-
-	if (!(edx & (1 << 1 | 1 << 2))) {
-		printk ("nothing.\n");
-		return 0;
 	}
 
 	printk (".\n");
