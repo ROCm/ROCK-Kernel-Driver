@@ -25,7 +25,7 @@
 
 #define RPCDBG_FACILITY	RPCDBG_MISC
 
-static struct proc_dir_entry	*proc_net_rpc = NULL;
+struct proc_dir_entry	*proc_net_rpc = NULL;
 
 /*
  * Get RPC client stats

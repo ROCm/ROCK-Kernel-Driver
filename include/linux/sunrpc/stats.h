@@ -57,6 +57,8 @@ int			svc_proc_read(char *, char **, off_t, int,
 					int *, void *);
 void			svc_proc_zero(struct svc_program *);
 
+extern struct proc_dir_entry	*proc_net_rpc;
+
 #else
 
 static inline void svc_proc_unregister(const char *p) {}

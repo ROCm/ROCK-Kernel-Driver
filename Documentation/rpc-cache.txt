@@ -90,3 +90,52 @@ item does become valid, the deferred copy of the request will be
 revisited (->revisit).  It is expected that this method will
 reschedule the request for processing.
 
+
+Populating a cache
+------------------
+
+Each cache has a name, and when the cache is registered, a directory
+with that name is created in /proc/net/rpc
+
+This directory contains a file called 'channel' which is a channel
+for communicating between kernel and user for populating the cache.
+This directory may later contain other files of interacting
+with the cache.
+
+The 'channel' works a bit like a datagram socket. Each 'write' is
+passed as a whole to the cache for parsing and interpretation.
+Each cache can treat the write requests differently, but it is
+expected that a message written will contain:
+  - a key
+  - an expiry time
+  - a content.
+with the intention that an item in the cache with the give key
+should be create or updated to have the given content, and the
+expiry time should be set on that item.
+
+Reading from a channel is a bit more interesting.  When a cache
+lookup fail, or when it suceeds but finds an entry that may soon
+expiry, a request is lodged for that cache item to be updated by
+user-space.  These requests appear in the channel file.
+
+Successive reads will return successive requests.
+If there are no more requests to return, read will return EOF, but a
+select or poll for read will block waiting for another request to be
+added.
+
+Thus a user-space helper is likely to:
+  open the channel.
+    select for readable
+    read a request
+    write a response
+  loop.
+
+If it dies and needs to be restarted, any requests that have not be
+answered will still appear in the file and will be read by the new
+instance of the helper.
+
+Each cache should define a "cache_parse" method which takes a message
+written from user-space and processes it.  It should return an error
+(which propagates back to the write syscall) or 0.
+
+

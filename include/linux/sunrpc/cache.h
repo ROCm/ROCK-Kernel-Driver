@@ -15,6 +15,7 @@
 
 #include <linux/slab.h>
 #include <asm/atomic.h>
+#include <linux/proc_fs.h>
 
 /*
  * Each cache requires:
@@ -74,6 +75,8 @@ struct cache_detail {
 	/* request and update functions for interaction with userspace
 	 * will go here
 	 */
+	int			(*cache_parse)(struct cache_detail *,
+					       char *buf, int len);
 
 	/* fields below this comment are for internal use
 	 * and should not be touched by cache owners
@@ -83,6 +86,10 @@ struct cache_detail {
 	struct list_head	others;
 	time_t			nextcheck;
 	int			entries;
+
+	/* fields for communication over channel */
+	struct list_head	queue;
+	struct proc_dir_entry	*proc_ent;
 };
 
 
