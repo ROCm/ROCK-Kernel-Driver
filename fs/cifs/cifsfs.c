@@ -165,7 +165,7 @@ cifs_statfs(struct super_block *sb, struct kstatfs *buf)
 					   able to support more than this, but best to be safe
 					   since Win2k and others can not handle very long filenames */
 	buf->f_files = 0;	/* undefined */
-	buf->f_ffree = -1;	/* unlimited */
+	buf->f_ffree = 0;	/* unlimited */
 
 	rc = CIFSSMBQFSInfo(xid, pTcon, buf, cifs_sb->local_nls);
 

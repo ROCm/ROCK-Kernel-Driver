@@ -1,7 +1,12 @@
 Version 0.81
 ------------
 Finish up CIFS packet digital signing for the default
-NTLM security case. 
+NTLM security case. This should help Windows 2003
+network interoperability since it is common for
+packet signing to be required now. Fix statfs (stat -f)
+which recently started returning errors due to 
+invalid value (-1 instead of 0) being set in the
+struct kstatfs f_ffiles field.
 
 Version 0.80
 -----------
