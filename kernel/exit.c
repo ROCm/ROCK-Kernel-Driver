@@ -419,7 +419,7 @@ static inline void __exit_mm(struct task_struct * tsk)
 {
 	struct mm_struct *mm = tsk->mm;
 
-	mm_release();
+	mm_release(tsk, mm);
 	if (!mm)
 		return;
 	/*
