@@ -154,20 +154,20 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 
 MODULE_DEVICE_TABLE (usb, id_table_combined);
 
-static __devinitdata struct usb_device_id id_table_std [] = {
+static struct usb_device_id id_table_std [] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, KEYSPAN_PDA_ID) },
 	{ }						/* Terminating entry */
 };
 
 #ifdef KEYSPAN
-static __devinitdata struct usb_device_id id_table_fake [] = {
+static struct usb_device_id id_table_fake [] = {
 	{ USB_DEVICE(KEYSPAN_VENDOR_ID, KEYSPAN_PDA_FAKE_ID) },
 	{ }						/* Terminating entry */
 };
 #endif
 
 #ifdef XIRCOM
-static __devinitdata struct usb_device_id id_table_fake_xircom [] = {
+static struct usb_device_id id_table_fake_xircom [] = {
         { USB_DEVICE(XIRCOM_VENDOR_ID, XIRCOM_FAKE_ID) },
         { USB_DEVICE(ENTREGRA_VENDOR_ID, ENTREGRA_FAKE_ID) },
         { }                                             
@@ -811,7 +811,7 @@ static struct usb_serial_device_type keyspan_pda_fake_device = {
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
 	num_ports:		1,
-	startup:		keyspan_pda_fake_startup,
+	attach:			keyspan_pda_fake_startup,
 };
 #endif
 
@@ -824,7 +824,7 @@ static struct usb_serial_device_type xircom_pgs_fake_device = {
 	num_bulk_in:		NUM_DONT_CARE,
 	num_bulk_out:		NUM_DONT_CARE,
 	num_ports:		1,
-	startup:		keyspan_pda_fake_startup,
+	attach:			keyspan_pda_fake_startup,
 };
 #endif
 
@@ -848,7 +848,7 @@ static struct usb_serial_device_type keyspan_pda_device = {
 	ioctl:			keyspan_pda_ioctl,
 	set_termios:		keyspan_pda_set_termios,
 	break_ctl:		keyspan_pda_break_ctl,
-	startup:		keyspan_pda_startup,
+	attach:			keyspan_pda_startup,
 	shutdown:		keyspan_pda_shutdown,
 };
 

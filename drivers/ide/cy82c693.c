@@ -204,7 +204,7 @@ static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 	data = IN_BYTE(CY82_DATA_PORT);
 
 	printk (KERN_INFO "%s (ch=%d, dev=%d): DMA mode is %d (single=%d)\n", drive->name, drive->channel->unit, drive->select.b.unit, (data&0x3), ((data>>2)&1));
-#endif /* CY82C693_DEBUG_LOGS */
+#endif
 
 	data = (byte)mode|(byte)(single<<2);
 
@@ -213,7 +213,7 @@ static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 
 #if CY82C693_DEBUG_INFO
 	printk (KERN_INFO "%s (ch=%d, dev=%d): set DMA mode to %d (single=%d)\n", drive->name, drive->channel->unit, drive->select.b.unit, mode, single);
-#endif /* CY82C693_DEBUG_INFO */
+#endif
 
 	/*
 	 * note: below we set the value for Bus Master IDE TimeOut Register
@@ -231,7 +231,7 @@ static void cy82c693_dma_enable(struct ata_device *drive, int mode, int single)
 
 #if CY82C693_DEBUG_INFO
 	printk (KERN_INFO "%s: Set IDE Bus Master TimeOut Register to 0x%X\n", drive->name, data);
-#endif /* CY82C693_DEBUG_INFO */
+#endif
 }
 
 /*
@@ -331,7 +331,7 @@ static void cy82c693_tune_drive(struct ata_device *drive, byte pio)
 
 #if CY82C693_DEBUG_INFO
 	printk (KERN_INFO "%s: Selected PIO mode %d\n", drive->name, pio);
-#endif /* CY82C693_DEBUG_INFO */
+#endif
 
         compute_clocks(pio, &pclk);  /* let's calc the values for this PIO mode */
 

@@ -14,12 +14,12 @@
 #ifndef IO_TABLES_H
 #define IO_TABLES_H
 
-static __devinitdata struct usb_device_id edgeport_1port_id_table [] = {
+static struct usb_device_id edgeport_1port_id_table [] = {
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_EDGEPORT_PARALLEL_PORT) },
 	{ }
 };
 
-static __devinitdata struct usb_device_id edgeport_2port_id_table [] = {
+static struct usb_device_id edgeport_2port_id_table [] = {
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_EDGEPORT_2) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_EDGEPORT_2I) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_EDGEPORT_421) },
@@ -33,7 +33,7 @@ static __devinitdata struct usb_device_id edgeport_2port_id_table [] = {
 	{ }
 };
 
-static __devinitdata struct usb_device_id edgeport_4port_id_table [] = {
+static struct usb_device_id edgeport_4port_id_table [] = {
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_EDGEPORT_4) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_RAPIDPORT_4) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_EDGEPORT_4T) },
@@ -50,7 +50,7 @@ static __devinitdata struct usb_device_id edgeport_4port_id_table [] = {
 	{ }
 };
 
-static __devinitdata struct usb_device_id edgeport_8port_id_table [] = {
+static struct usb_device_id edgeport_8port_id_table [] = {
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_EDGEPORT_8) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_EDGEPORT_16_DUAL_CPU) },
 	{ USB_DEVICE(USB_VENDOR_ID_ION, ION_DEVICE_ID_EDGEPORT_8I) },
@@ -109,7 +109,7 @@ static struct usb_serial_device_type edgeport_1port_device = {
 	close:			edge_close,
 	throttle:		edge_throttle,
 	unthrottle:		edge_unthrottle,
-	startup:		edge_startup,
+	attach:			edge_startup,
 	shutdown:		edge_shutdown,
 	ioctl:			edge_ioctl,
 	set_termios:		edge_set_termios,
@@ -131,7 +131,7 @@ static struct usb_serial_device_type edgeport_2port_device = {
 	close:			edge_close,
 	throttle:		edge_throttle,
 	unthrottle:		edge_unthrottle,
-	startup:		edge_startup,
+	attach:			edge_startup,
 	shutdown:		edge_shutdown,
 	ioctl:			edge_ioctl,
 	set_termios:		edge_set_termios,
@@ -153,7 +153,7 @@ static struct usb_serial_device_type edgeport_4port_device = {
 	close:			edge_close,
 	throttle:		edge_throttle,
 	unthrottle:		edge_unthrottle,
-	startup:		edge_startup,
+	attach:			edge_startup,
 	shutdown:		edge_shutdown,
 	ioctl:			edge_ioctl,
 	set_termios:		edge_set_termios,
@@ -175,7 +175,7 @@ static struct usb_serial_device_type edgeport_8port_device = {
 	close:			edge_close,
 	throttle:		edge_throttle,
 	unthrottle:		edge_unthrottle,
-	startup:		edge_startup,
+	attach:			edge_startup,
 	shutdown:		edge_shutdown,
 	ioctl:			edge_ioctl,
 	set_termios:		edge_set_termios,

@@ -63,7 +63,6 @@ static int hpt34x_tune_chipset(struct ata_device *drive, u8 speed)
 		udma, pio, err);
 #endif
 
-	drive->current_speed = speed;
 	return ide_config_drive_speed(drive, speed);
 }
 

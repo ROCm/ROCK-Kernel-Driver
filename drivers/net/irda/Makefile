@@ -25,5 +25,7 @@ obj-$(CONFIG_LITELINK_DONGLE)	+= litelink.o
 obj-$(CONFIG_OLD_BELKIN_DONGLE)	+= old_belkin.o
 obj-$(CONFIG_EP7211_IR)		+= ep7211_ir.o
 obj-$(CONFIG_MCP2120_DONGLE)	+= mcp2120.o
+obj-$(CONFIG_ACT200L_DONGLE)	+= act200l.o
+obj-$(CONFIG_MA600_DONGLE)	+= ma600.o
 
 include $(TOPDIR)/Rules.make

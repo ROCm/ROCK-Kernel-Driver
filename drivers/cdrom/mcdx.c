@@ -1105,7 +1105,8 @@ int __init mcdx_init_drive(int drive)
 	init_waitqueue_head(&stuffp->sleepq);
 
 	/* check if i/o addresses are available */
-	if (check_region((unsigned int) stuffp->wreg_data, MCDX_IO_SIZE)) {
+	if (!request_region((unsigned int) stuffp->wreg_data, MCDX_IO_SIZE,
+			    "mcdx")) {
 		xwarn("0x%3p,%d: Init failed. "
 		      "I/O ports (0x%3p..0x%3p) already in use.\n",
 		      stuffp->wreg_data, stuffp->irq,
@@ -1125,6 +1126,8 @@ int __init mcdx_init_drive(int drive)
 	xtrace(INIT, "init() get version\n");
 	if (-1 == mcdx_requestversion(stuffp, &version, 4)) {
 		/* failed, next drive */
+		release_region((unsigned long) stuffp->wreg_data,
+			       MCDX_IO_SIZE);
 		xwarn("%s=0x%3p,%d: Init failed. Can't get version.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq);
 		xtrace(MALLOC, "init() free stuffp @ %p\n", stuffp);
@@ -1154,6 +1157,8 @@ int __init mcdx_init_drive(int drive)
 	stuffp->playcmd = READ1X;
 
 	if (!stuffp->present) {
+		release_region((unsigned long) stuffp->wreg_data,
+			       MCDX_IO_SIZE);
 		xwarn("%s=0x%3p,%d: Init failed. No Mitsumi CD-ROM?.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq);
 		kfree(stuffp);
@@ -1162,6 +1167,8 @@ int __init mcdx_init_drive(int drive)
 
 	xtrace(INIT, "init() register blkdev\n");
 	if (devfs_register_blkdev(MAJOR_NR, "mcdx", &mcdx_bdops) != 0) {
+		release_region((unsigned long) stuffp->wreg_data,
+			       MCDX_IO_SIZE);
 		xwarn("%s=0x%3p,%d: Init failed. Can't get major %d.\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, MAJOR_NR);
 		kfree(stuffp);
@@ -1174,6 +1181,8 @@ int __init mcdx_init_drive(int drive)
 	xtrace(INIT, "init() subscribe irq and i/o\n");
 	mcdx_irq_map[stuffp->irq] = stuffp;
 	if (request_irq(stuffp->irq, mcdx_intr, SA_INTERRUPT, "mcdx", NULL)) {
+		release_region((unsigned long) stuffp->wreg_data,
+			       MCDX_IO_SIZE);
 		xwarn("%s=0x%3p,%d: Init failed. Can't get irq (%d).\n",
 		      MCDX, stuffp->wreg_data, stuffp->irq, stuffp->irq);
 		stuffp->irq = 0;
@@ -1181,8 +1190,6 @@ int __init mcdx_init_drive(int drive)
 		kfree(stuffp);
 		return 0;
 	}
-	request_region((unsigned int) stuffp->wreg_data,
-		       MCDX_IO_SIZE, "mcdx");
 
 	xtrace(INIT, "init() get garbage\n");
 	{

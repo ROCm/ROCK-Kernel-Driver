@@ -56,7 +56,6 @@
 #include "hosts.h"
 #include "sr.h"
 #include <scsi/scsi_ioctl.h>	/* For the door lock/unlock commands */
-#include "constants.h"
 
 MODULE_PARM(xa_test, "i");	/* see sr_ioctl.c */
 

@@ -24,6 +24,7 @@
  */
 
 #define ACPI_C
+#define HAVE_NEW_DEVICE_MODEL
 
 #include <linux/config.h>
 #include <linux/kernel.h>
@@ -134,9 +135,11 @@ acpi_system_restore_state (
 
 	/* restore device context */
 	device_resume(RESUME_RESTORE_STATE);
+#else
+#error Resume cant work without driver model
 #endif
 
-	if (dmi_broken & BROKEN_INIT_AFTER_S1) {
+	if ((state == ACPI_STATE_S1) && (dmi_broken & BROKEN_INIT_AFTER_S1)) {
 		printk("Broken toshiba laptop -> kicking interrupts\n");
 		init_8259A(0);
 	}

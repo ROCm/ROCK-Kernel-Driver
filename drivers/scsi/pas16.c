@@ -123,7 +123,6 @@
 #include "pas16.h"
 #define AUTOPROBE_IRQ
 #include "NCR5380.h"
-#include "constants.h"
 #include "sd.h"
 
 #include <linux/stat.h>

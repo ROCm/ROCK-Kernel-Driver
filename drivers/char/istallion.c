@@ -712,7 +712,7 @@ static void	stli_mkasyport(stliport_t *portp, asyport_t *pp, struct termios *tio
 static void	stli_mkasysigs(asysigs_t *sp, int dtr, int rts);
 static long	stli_mktiocm(unsigned long sigvalue);
 static void	stli_read(stlibrd_t *brdp, stliport_t *portp);
-static void	stli_getserial(stliport_t *portp, struct serial_struct *sp);
+static int	stli_getserial(stliport_t *portp, struct serial_struct *sp);
 static int	stli_setserial(stliport_t *portp, struct serial_struct *sp);
 static int	stli_getbrdstats(combrd_t *bp);
 static int	stli_getportstats(stliport_t *portp, comstats_t *cp);
@@ -1676,7 +1676,8 @@ static int stli_write(struct tty_struct *tty, int from_user, const unsigned char
 		restore_flags(flags);
 
 		down(&stli_tmpwritesem);
-		copy_from_user(stli_tmpwritebuf, chbuf, count);
+		if (copy_from_user(stli_tmpwritebuf, chbuf, count)) 
+			return -EFAULT;
 		chbuf = &stli_tmpwritebuf[0];
 	}
 
@@ -1977,7 +1978,7 @@ static int stli_charsinbuffer(struct tty_struct *tty)
  *	Generate the serial struct info.
  */
 
-static void stli_getserial(stliport_t *portp, struct serial_struct *sp)
+static int stli_getserial(stliport_t *portp, struct serial_struct *sp)
 {
 	struct serial_struct	sio;
 	stlibrd_t		*brdp;
@@ -2002,7 +2003,8 @@ static void stli_getserial(stliport_t *portp, struct serial_struct *sp)
 	if (brdp != (stlibrd_t *) NULL)
 		sio.port = brdp->iobase;
 		
-	copy_to_user(sp, &sio, sizeof(struct serial_struct));
+	return copy_to_user(sp, &sio, sizeof(struct serial_struct)) ?
+			-EFAULT : 0;
 }
 
 /*****************************************************************************/
@@ -2129,7 +2131,7 @@ static int stli_ioctl(struct tty_struct *tty, struct file *file, unsigned int cm
 	case TIOCGSERIAL:
 		if ((rc = verify_area(VERIFY_WRITE, (void *) arg,
 		    sizeof(struct serial_struct))) == 0)
-			stli_getserial(portp, (struct serial_struct *) arg);
+			rc = stli_getserial(portp, (struct serial_struct *) arg);
 		break;
 	case TIOCSSERIAL:
 		if ((rc = verify_area(VERIFY_READ, (void *) arg,
@@ -3972,7 +3974,7 @@ static inline int stli_initecp(stlibrd_t *brdp)
 	printk(KERN_DEBUG "stli_initecp(brdp=%x)\n", (int) brdp);
 #endif
 
-	if (!request_region(brdp->iobase, brdp->iosize, name))
+	if (!request_region(brdp->iobase, brdp->iosize, "istallion"))
 		return -EIO;
 	
 	if ((brdp->iobase == 0) || (brdp->memaddr == 0))
@@ -4140,7 +4142,7 @@ static inline int stli_initonb(stlibrd_t *brdp)
 
 	brdp->iosize = ONB_IOSIZE;
 	
-	if (!request_region(brdp->iobase, brdp->iosize, name))
+	if (!request_region(brdp->iobase, brdp->iosize, "istallion"))
 		return -EIO;
 
 /*

@@ -483,12 +483,12 @@ static __devinitdata struct usb_device_id id_table_combined [] = {
 	{ }						/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id id_table_2 [] = {
+static struct usb_device_id id_table_2 [] = {
 	{ USB_DEVICE(DIGI_VENDOR_ID, DIGI_2_ID) },
 	{ }						/* Terminating entry */
 };
 
-static __devinitdata struct usb_device_id id_table_4 [] = {
+static struct usb_device_id id_table_4 [] = {
 	{ USB_DEVICE(DIGI_VENDOR_ID, DIGI_4_ID) },
 	{ }						/* Terminating entry */
 };
@@ -517,7 +517,7 @@ static struct usb_serial_device_type digi_acceleport_2_device = {
 	ioctl:				digi_ioctl,
 	set_termios:			digi_set_termios,
 	break_ctl:			digi_break_ctl,
-	startup:			digi_startup,
+	attach:				digi_startup,
 	shutdown:			digi_shutdown,
 };
 
@@ -541,7 +541,7 @@ static struct usb_serial_device_type digi_acceleport_4_device = {
 	ioctl:				digi_ioctl,
 	set_termios:			digi_set_termios,
 	break_ctl:			digi_break_ctl,
-	startup:			digi_startup,
+	attach:				digi_startup,
 	shutdown:			digi_shutdown,
 };
 

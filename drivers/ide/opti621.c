@@ -342,9 +342,8 @@ int __init init_opti621(void)
 {
 	int i;
 
-	for (i = 0; i < ARRAY_SIZE(chipsets); ++i) {
+	for (i = 0; i < ARRAY_SIZE(chipsets); ++i)
 		ata_register_chipset(&chipsets[i]);
-	}
 
         return 0;
 }

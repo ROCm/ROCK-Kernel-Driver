@@ -234,7 +234,6 @@
 #include "scsi.h"
 #include "sd.h"
 #include "hosts.h"
-#include "constants.h"
 #include <asm/system.h>
 #include <linux/errno.h>
 #include <linux/string.h>

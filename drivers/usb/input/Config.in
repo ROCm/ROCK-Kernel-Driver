@@ -14,5 +14,6 @@ if [ "$CONFIG_USB_HID" != "y" ]; then
    dep_tristate '  USB HIDBP Mouse (basic) support' CONFIG_USB_MOUSE $CONFIG_USB $CONFIG_INPUT
 fi
 
+dep_tristate '  Aiptek 6000U/8000U tablet support' CONFIG_USB_AIPTEK $CONFIG_USB $CONFIG_INPUT
 dep_tristate '  Wacom Intuos/Graphire tablet support' CONFIG_USB_WACOM $CONFIG_USB $CONFIG_INPUT
    

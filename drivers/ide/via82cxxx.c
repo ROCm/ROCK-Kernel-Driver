@@ -199,8 +199,6 @@ static int via_set_drive(struct ata_device *drive, unsigned char speed)
 
 	via_set_speed(drive->channel->pci_dev, drive->dn, &t);
 
-	drive->current_speed = speed;
-
 	return 0;
 }
 

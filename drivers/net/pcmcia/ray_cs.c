@@ -1316,9 +1316,12 @@ static int ray_dev_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 		    err = -E2BIG;
 		    break;
 		}
-		copy_from_user(card_essid,
-			       wrq->u.data.pointer,
-			       wrq->u.data.length);
+		if (copy_from_user(card_essid,
+				   wrq->u.data.pointer,
+				   wrq->u.data.length)) {
+			err = -EFAULT;
+			break;
+		}
 		card_essid[IW_ESSID_MAX_SIZE] = '\0';
 
 		/* Set the ESSID in the card */

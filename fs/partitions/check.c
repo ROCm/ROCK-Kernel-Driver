@@ -412,8 +412,8 @@ void grok_partitions(kdev_t dev, long size)
 
 	g->part[first_minor].nr_sects = size;
 
-	/* No such device or no minors to use for partitions */
-	if (!size || minors == 1)
+	/* No minors to use for partitions */
+	if (minors == 1)
 		return;
 
 	if (g->sizes) {
@@ -422,6 +422,11 @@ void grok_partitions(kdev_t dev, long size)
 			g->sizes[i] = 0;
 	}
 	blk_size[g->major] = g->sizes;
+
+	/* No such device (e.g., media were just removed) */
+	if (!size)
+		return;
+
 	check_partition(g, mk_kdev(g->major, first_minor), 1 + first_minor);
 
  	/*

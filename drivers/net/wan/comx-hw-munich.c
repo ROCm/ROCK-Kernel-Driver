@@ -41,6 +41,7 @@
 #include <asm/io.h>
 #include <linux/ioport.h>
 #include <linux/pci.h>
+#include <linux/init.h>
 
 #define COMX_NEW
 
@@ -2008,7 +2009,8 @@ static int MUNICH_close(struct net_device *dev)
 	if (board->tiq) kfree((void *)board->tiq);
 	if (board->riq) kfree((void *)board->riq);
 	if (board->piq) kfree((void *)board->piq);
-	board->ccb = board->tiq = board->riq = board->piq = NULL;
+	board->ccb = NULL;
+	board->tiq = board->riq = board->piq = NULL;
     }
 
     /* Enable setting of hw parameters */

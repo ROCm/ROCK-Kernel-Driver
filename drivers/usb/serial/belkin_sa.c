@@ -103,7 +103,7 @@ static int  belkin_sa_ioctl		(struct usb_serial_port *port, struct file * file, 
 static void belkin_sa_break_ctl		(struct usb_serial_port *port, int break_state );
 
 
-static __devinitdata struct usb_device_id id_table_combined [] = {
+static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(BELKIN_SA_VID, BELKIN_SA_PID) },
 	{ USB_DEVICE(BELKIN_OLD_VID, BELKIN_OLD_PID) },
 	{ USB_DEVICE(PERACOM_VID, PERACOM_PID) },
@@ -129,7 +129,7 @@ static struct usb_serial_device_type belkin_device = {
 	ioctl:			belkin_sa_ioctl,
 	set_termios:		belkin_sa_set_termios,
 	break_ctl:		belkin_sa_break_ctl,
-	startup:		belkin_sa_startup,
+	attach:			belkin_sa_startup,
 	shutdown:		belkin_sa_shutdown,
 };
 

@@ -57,7 +57,6 @@
 
 #include "scsi.h"
 #include "hosts.h"
-#include "constants.h"
 
 #include "lasi700.h"
 #include "53c700.h"

@@ -66,7 +66,7 @@ static void cyberjack_read_int_callback( struct urb *urb );
 static void cyberjack_read_bulk_callback (struct urb *urb);
 static void cyberjack_write_bulk_callback (struct urb *urb);
 
-static __devinitdata struct usb_device_id id_table [] = {
+static struct usb_device_id id_table [] = {
 	{ USB_DEVICE(CYBERJACK_VENDOR_ID, CYBERJACK_PRODUCT_ID) },
 	{ }			/* Terminating entry */
 };
@@ -81,7 +81,7 @@ static struct usb_serial_device_type cyberjack_device = {
 	num_bulk_in:		1,
 	num_bulk_out:		1,
 	num_ports:		1,
-	startup:		cyberjack_startup,
+	attach:		cyberjack_startup,
 	shutdown:		cyberjack_shutdown,
 	open:			cyberjack_open,
 	close:			cyberjack_close,

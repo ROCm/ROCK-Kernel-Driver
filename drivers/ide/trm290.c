@@ -176,7 +176,7 @@ static void trm290_selectproc(struct ata_device *drive)
 }
 
 #ifdef CONFIG_BLK_DEV_IDEDMA
-static int trm290_udma_start(struct ata_device *drive, struct request *__rq)
+static void trm290_udma_start(struct ata_device *drive, struct request *__rq)
 {
 	/* Nothing to be done here. */
 }

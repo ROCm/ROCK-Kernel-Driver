@@ -433,9 +433,8 @@ static struct usb_serial *get_serial_by_minor (unsigned int minor)
 	return serial_table[minor];
 }
 
-static struct usb_serial *get_free_serial (int num_ports, unsigned int *minor)
+static struct usb_serial *get_free_serial (struct usb_serial *serial, int num_ports, unsigned int *minor)
 {
-	struct usb_serial *serial = NULL;
 	unsigned int i, j;
 	int good_spot;
 
@@ -453,11 +452,14 @@ static struct usb_serial *get_free_serial (int num_ports, unsigned int *minor)
 		if (good_spot == 0)
 			continue;
 			
-		if (!(serial = kmalloc(sizeof(struct usb_serial), GFP_KERNEL))) {
-			err(__FUNCTION__ " - Out of memory");
-			return NULL;
+		if (!serial) {
+			serial = kmalloc(sizeof(*serial), GFP_KERNEL);
+			if (!serial) {
+				err(__FUNCTION__ " - Out of memory");
+				return NULL;
+			}
+			memset(serial, 0, sizeof(*serial));
 		}
-		memset(serial, 0, sizeof(struct usb_serial));
 		serial->magic = USB_SERIAL_MAGIC;
 		serial_table[i] = serial;
 		*minor = i;
@@ -1140,6 +1142,27 @@ static void port_softint(void *private)
 	wake_up_interruptible(&tty->write_wait);
 }
 
+static struct usb_serial * create_serial (struct usb_device *dev, 
+					  struct usb_interface *interface,
+					  struct usb_serial_device_type *type)
+{
+	struct usb_serial *serial;
+
+	serial = kmalloc (sizeof (*serial), GFP_KERNEL);
+	if (!serial) {
+		err ("%s - out of memory", __FUNCTION__);
+		return NULL;
+	}
+	memset (serial, 0, sizeof(*serial));
+	serial->dev = dev;
+	serial->type = type;
+	serial->interface = interface;
+	serial->vendor = dev->descriptor.idVendor;
+	serial->product = dev->descriptor.idProduct;
+
+	return serial;
+}
+
 static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 			       const struct usb_device_id *id)
 {
@@ -1161,7 +1184,7 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	int num_interrupt_in = 0;
 	int num_bulk_in = 0;
 	int num_bulk_out = 0;
-	int num_ports;
+	int num_ports = 0;
 	int max_endpoints;
 	const struct usb_device_id *id_pattern = NULL;
 
@@ -1182,6 +1205,27 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		/* no match */
 		dbg("none matched");
 		return(NULL);
+	}
+
+	/* if this device type has a probe function, call it */
+	if (type->probe) {
+		serial = create_serial (dev, interface, type);
+		if (!serial) {
+			err ("%s - out of memory", __FUNCTION__);
+			return NULL;
+		}
+
+		if (type->owner)
+			__MOD_INC_USE_COUNT(type->owner);
+		retval = type->probe (serial);
+		if (type->owner)
+			__MOD_DEC_USE_COUNT(type->owner);
+
+		if (retval < 0) {
+			dbg ("sub driver rejected device");
+			kfree (serial);
+			return NULL;
+		}
 	}
 
 	/* descriptor matches, let's find the endpoints needed */
@@ -1251,11 +1295,30 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 			err("Generic device with no bulk out, not allowed.");
 			return NULL;
 		}
-	} else
+	}
 #endif
-		num_ports = type->num_ports;
+	if (!num_ports) {
+		/* if this device type has a calc_num_ports function, call it */
+		if (type->calc_num_ports) {
+			if (!serial) {
+				serial = create_serial (dev, interface, type);
+				if (!serial) {
+					err ("%s - out of memory", __FUNCTION__);
+					return NULL;
+				}
+			}
 
-	serial = get_free_serial (num_ports, &minor);
+			if (type->owner)
+				__MOD_INC_USE_COUNT(type->owner);
+			num_ports = type->calc_num_ports (serial);
+			if (type->owner)
+				__MOD_DEC_USE_COUNT(type->owner);
+		}
+		if (!num_ports)
+			num_ports = type->num_ports;
+	}
+
+	serial = get_free_serial (serial, num_ports, &minor);
 	if (serial == NULL) {
 		err("No more free serial devices");
 		return NULL;
@@ -1271,17 +1334,6 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 	serial->num_interrupt_in = num_interrupt_in;
 	serial->vendor = dev->descriptor.idVendor;
 	serial->product = dev->descriptor.idProduct;
-
-	/* if this device type has a startup function, call it */
-	if (type->startup) {
-		if (type->owner)
-			__MOD_INC_USE_COUNT(type->owner);
-		retval = type->startup (serial);
-		if (type->owner)
-			__MOD_DEC_USE_COUNT(type->owner);
-		if (retval)
-			goto probe_error;
-	}
 
 	/* set up the endpoint information */
 	for (i = 0; i < num_bulk_in; ++i) {
@@ -1372,6 +1424,22 @@ static void * usb_serial_probe(struct usb_device *dev, unsigned int ifnum,
 		port->tqueue.routine = port_softint;
 		port->tqueue.data = port;
 		init_MUTEX (&port->sem);
+	}
+
+	/* if this device type has an attach function, call it */
+	if (type->attach) {
+		if (type->owner)
+			__MOD_INC_USE_COUNT(type->owner);
+		retval = type->attach (serial);
+		if (type->owner)
+			__MOD_DEC_USE_COUNT(type->owner);
+		if (retval < 0)
+			goto probe_error;
+		if (retval > 0) {
+			/* quietly accept this device, but don't bind to a serial port
+			 * as it's about to disappear */
+			return serial;
+		}
 	}
 
 	/* initialize the devfs nodes for this device and let the user know what ports we are bound to */

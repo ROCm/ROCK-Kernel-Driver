@@ -177,9 +177,10 @@ static int show_partition(struct seq_file *part, void *v)
 	if (sgp == gendisk_head)
 		seq_puts(part, "major minor  #blocks  name\n\n");
 
-	/* show all non-0 size partitions of this disk */
+	/* show the full disk and all non-0 size partitions of it */
 	for (n = 0; n < (sgp->nr_real << sgp->minor_shift); n++) {
-		if (sgp->part[n].nr_sects == 0)
+		int minormask = (1<<sgp->minor_shift) - 1;
+		if ((n & minormask) && sgp->part[n].nr_sects == 0)
 			continue;
 		seq_printf(part, "%4d  %4d %10d %s\n",
 			sgp->major, n, sgp->sizes[n],
