@@ -306,7 +306,7 @@ static int crd_infd, crd_outfd;
 
 static int  fill_inbuf(void);
 static void flush_window(void);
-static void *malloc(int size);
+static void *malloc(size_t size);
 static void free(void *where);
 static void error(char *m);
 static void gzip_mark(void **);
@@ -314,7 +314,7 @@ static void gzip_release(void **);
 
 #include "../lib/inflate.c"
 
-static void __init *malloc(int size)
+static void __init *malloc(size_t size)
 {
 	return kmalloc(size, GFP_KERNEL);
 }
