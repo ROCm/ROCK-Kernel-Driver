@@ -106,7 +106,9 @@ static int check_powernow(void)
 	/* Get maximum capabilities */
 	maxei = cpuid_eax (0x80000000);
 	if (maxei < 0x80000007) {	/* Any powernow info ? */
+#ifdef MODULE
 		printk (KERN_INFO PFX "No powernow capabilities detected\n");
+#endif
 		return 0;
 	}
 
