@@ -30,7 +30,7 @@
  */
 unsigned char pdacf_ak4117_read(void *private_data, unsigned char reg)
 {
-	pdacf_t *chip = snd_magic_cast(pdacf_t, private_data, return 0);
+	pdacf_t *chip = private_data;
 	unsigned long timeout;
 	unsigned long flags;
 	unsigned char res;
@@ -62,7 +62,7 @@ unsigned char pdacf_ak4117_read(void *private_data, unsigned char reg)
 
 void pdacf_ak4117_write(void *private_data, unsigned char reg, unsigned char val)
 {
-	pdacf_t *chip = snd_magic_cast(pdacf_t, private_data, return);
+	pdacf_t *chip = private_data;
 	unsigned long timeout;
 	unsigned long flags;
 
@@ -130,7 +130,7 @@ void pdacf_reinit(pdacf_t *chip, int resume)
 static void pdacf_proc_read(snd_info_entry_t * entry,
                             snd_info_buffer_t * buffer)
 {
-	pdacf_t *chip = snd_magic_cast(pdacf_t, entry->private_data, return);
+	pdacf_t *chip = entry->private_data;
 	u16 tmp;
 
 	snd_iprintf(buffer, "PDAudioCF\n\n");
@@ -151,7 +151,7 @@ pdacf_t *snd_pdacf_create(snd_card_t *card)
 {
 	pdacf_t *chip;
 
-	chip = snd_magic_kcalloc(pdacf_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return NULL;
 	chip->card = card;
@@ -257,7 +257,7 @@ void snd_pdacf_powerdown(pdacf_t *chip)
 
 int snd_pdacf_suspend(snd_card_t *card, unsigned int state)
 {
-	pdacf_t *chip = snd_magic_cast(pdacf_t, card->pm_private_data, return -EINVAL);
+	pdacf_t *chip = card->pm_private_data;
 	u16 val;
 	
 	snd_pcm_suspend_all(chip->pcm);
@@ -278,7 +278,7 @@ static inline int check_signal(pdacf_t *chip)
 
 int snd_pdacf_resume(snd_card_t *card, unsigned int state)
 {
-	pdacf_t *chip = snd_magic_cast(pdacf_t, card->pm_private_data, return -EINVAL);
+	pdacf_t *chip = card->pm_private_data;
 	int timeout = 40;
 
 	pdacf_reinit(chip, 1);

@@ -27,8 +27,6 @@
 #include <sound/sb.h>
 #include <sound/control.h>
 
-#define chip_t sb_t
-
 #undef IO_DEBUG
 
 void snd_sbmixer_write(sb_t *chip, unsigned char reg, unsigned char data)

@@ -28,6 +28,7 @@
 
 #include <sound/driver.h>
 #include <linux/init.h>
+#include <linux/smp_lock.h>
 #include <linux/slab.h>
 #include <linux/time.h>
 #include <linux/vmalloc.h>
@@ -53,13 +54,10 @@ MODULE_DESCRIPTION("PCM OSS emulation for ALSA.");
 MODULE_LICENSE("GPL");
 module_param_array(dsp_map, int, boot_devs, 0444);
 MODULE_PARM_DESC(dsp_map, "PCM device number assigned to 1st OSS device.");
-MODULE_PARM_SYNTAX(dsp_map, "default:0,skill:advanced");
 module_param_array(adsp_map, int, boot_devs, 0444);
 MODULE_PARM_DESC(adsp_map, "PCM device number assigned to 2nd OSS device.");
-MODULE_PARM_SYNTAX(adsp_map, "default:1,skill:advanced");
 module_param(nonblock_open, bool, 0644);
 MODULE_PARM_DESC(nonblock_open, "Don't block opening busy PCM devices.");
-MODULE_PARM_SYNTAX(nonblock_open, "default:0,skill:advanced");
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_PCM);
 MODULE_ALIAS_SNDRV_MINOR(SNDRV_MINOR_OSS_PCM1);
 
@@ -1177,10 +1175,11 @@ static int snd_pcm_oss_get_formats(snd_pcm_oss_file_t *pcm_oss_file)
 	snd_pcm_substream_t *substream;
 	int err;
 	int direct;
-	snd_pcm_hw_params_t params;
+	snd_pcm_hw_params_t *params;
 	unsigned int formats = 0;
 	snd_mask_t format_mask;
 	int fmt;
+
 	if ((err = snd_pcm_oss_get_active_substream(pcm_oss_file, &substream)) < 0)
 		return err;
 	if (atomic_read(&substream->runtime->mmap_count)) {
@@ -1194,10 +1193,14 @@ static int snd_pcm_oss_get_formats(snd_pcm_oss_file_t *pcm_oss_file)
 		       AFMT_S16_LE | AFMT_S16_BE |
 		       AFMT_S8 | AFMT_U16_LE |
 		       AFMT_U16_BE;
-	_snd_pcm_hw_params_any(&params);
-	err = snd_pcm_hw_refine(substream, &params);
+	params = kmalloc(sizeof(*params), GFP_KERNEL);
+	if (!params)
+		return -ENOMEM;
+	_snd_pcm_hw_params_any(params);
+	err = snd_pcm_hw_refine(substream, params);
+	format_mask = *hw_param_mask(params, SNDRV_PCM_HW_PARAM_FORMAT); 
+	kfree(params);
 	snd_assert(err >= 0, return err);
-	format_mask = *hw_param_mask(&params, SNDRV_PCM_HW_PARAM_FORMAT); 
 	for (fmt = 0; fmt < 32; ++fmt) {
 		if (snd_mask_test(&format_mask, fmt)) {
 			int f = snd_pcm_oss_format_to(fmt);
@@ -1693,7 +1696,7 @@ static int snd_pcm_oss_release_file(snd_pcm_oss_file_t *pcm_oss_file)
 		snd_pcm_oss_release_substream(substream);
 		snd_pcm_release_substream(substream);
 	}
-	snd_magic_kfree(pcm_oss_file);
+	kfree(pcm_oss_file);
 	return 0;
 }
 
@@ -1712,7 +1715,7 @@ static int snd_pcm_oss_open_file(struct file *file,
 	snd_assert(rpcm_oss_file != NULL, return -EINVAL);
 	*rpcm_oss_file = NULL;
 
-	pcm_oss_file = snd_magic_kcalloc(snd_pcm_oss_file_t, 0, GFP_KERNEL);
+	pcm_oss_file = kcalloc(1, sizeof(*pcm_oss_file), GFP_KERNEL);
 	if (pcm_oss_file == NULL)
 		return -ENOMEM;
 
@@ -1892,7 +1895,7 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	snd_pcm_substream_t *substream;
 	snd_pcm_oss_file_t *pcm_oss_file;
 
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	if (substream == NULL)
 		substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
@@ -1908,14 +1911,14 @@ static int snd_pcm_oss_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
-                             unsigned int cmd, unsigned long arg)
+static inline int _snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
+				     unsigned int cmd, unsigned long arg)
 {
 	snd_pcm_oss_file_t *pcm_oss_file;
 	int __user *p = (int __user *)arg;
 	int res;
 
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	if (cmd == OSS_GETVERSION)
 		return put_user(SNDRV_OSS_VERSION, p);
 	if (cmd == OSS_ALSAEMULVER)
@@ -2068,12 +2071,23 @@ static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
 	return -EINVAL;
 }
 
+/* FIXME: need to unlock BKL to allow preemption */
+static int snd_pcm_oss_ioctl(struct inode *inode, struct file *file,
+			     unsigned int cmd, unsigned long arg)
+{
+	int err;
+	unlock_kernel();
+	err = _snd_pcm_oss_ioctl(inode, file, cmd, arg);
+	lock_kernel();
+	return err;
+}
+
 static ssize_t snd_pcm_oss_read(struct file *file, char __user *buf, size_t count, loff_t *offset)
 {
 	snd_pcm_oss_file_t *pcm_oss_file;
 	snd_pcm_substream_t *substream;
 
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
 	if (substream == NULL)
 		return -ENXIO;
@@ -2094,7 +2108,7 @@ static ssize_t snd_pcm_oss_write(struct file *file, const char __user *buf, size
 	snd_pcm_substream_t *substream;
 	long result;
 
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	if (substream == NULL)
 		return -ENXIO;
@@ -2131,7 +2145,7 @@ static unsigned int snd_pcm_oss_poll(struct file *file, poll_table * wait)
 	unsigned int mask;
 	snd_pcm_substream_t *psubstream = NULL, *csubstream = NULL;
 	
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return 0);
+	pcm_oss_file = file->private_data;
 
 	psubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
 	csubstream = pcm_oss_file->streams[SNDRV_PCM_STREAM_CAPTURE];
@@ -2178,7 +2192,7 @@ static int snd_pcm_oss_mmap(struct file *file, struct vm_area_struct *area)
 #ifdef OSS_DEBUG
 	printk("pcm_oss: mmap begin\n");
 #endif
-	pcm_oss_file = snd_magic_cast(snd_pcm_oss_file_t, file->private_data, return -ENXIO);
+	pcm_oss_file = file->private_data;
 	switch ((area->vm_flags & (VM_READ | VM_WRITE))) {
 	case VM_READ | VM_WRITE:
 		substream = pcm_oss_file->streams[SNDRV_PCM_STREAM_PLAYBACK];
@@ -2280,7 +2294,7 @@ static void snd_pcm_oss_proc_write(snd_info_entry_t *entry,
 				   snd_info_buffer_t * buffer)
 {
 	snd_pcm_str_t *pstr = (snd_pcm_str_t *)entry->private_data;
-	char line[512], str[32], task_name[32], *ptr;
+	char line[256], str[32], task_name[32], *ptr;
 	int idx1;
 	snd_pcm_oss_setup_t *setup, *setup1, template;
 

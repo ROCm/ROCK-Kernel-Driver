@@ -69,8 +69,7 @@
 MODULE_AUTHOR("Michael T. Mayers");
 MODULE_DESCRIPTION("MOTU MidiTimePiece AV multiport MIDI");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{MOTU,MidiTimePiece AV multiport MIDI}}");
+MODULE_SUPPORTED_DEVICE("{{MOTU,MidiTimePiece AV multiport MIDI}}");
 
 // io resources
 #define MTPAV_IOBASE		0x378
@@ -85,19 +84,14 @@ static int hwports = MTPAV_MAX_PORTS;	/* use hardware ports 1-8 */
 
 module_param(index, int, 0444);
 MODULE_PARM_DESC(index, "Index value for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param(id, charp, 0444);
 MODULE_PARM_DESC(id, "ID string for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param(port, long, 0444);
 MODULE_PARM_DESC(port, "Parallel port # for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(port, SNDRV_ENABLED ",allows:{{0x378},{0x278}},dialog:list");
 module_param(irq, int, 0444);
 MODULE_PARM_DESC(irq, "Parallel IRQ # for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(irq,  SNDRV_ENABLED ",allows:{{7},{5}},dialog:list");
 module_param(hwports, int, 0444);
 MODULE_PARM_DESC(hwports, "Hardware ports # for MotuMTPAV MIDI.");
-MODULE_PARM_SYNTAX(hwports, SNDRV_ENABLED ",allows:{{1,8}},dialog:list");
 
 /*
  *      defines
@@ -419,7 +413,7 @@ static void snd_mtpav_input_trigger(snd_rawmidi_substream_t * substream, int up)
 
 static void snd_mtpav_output_timer(unsigned long data)
 {
-	mtpav_t *chip = snd_magic_cast(mtpav_t, (void *)data, return);
+	mtpav_t *chip = (mtpav_t *)data;
 	int p;
 
 	spin_lock(&chip->spinlock);
@@ -587,7 +581,7 @@ static void snd_mtpav_read_bytes(mtpav_t * mcrd)
 
 static irqreturn_t snd_mtpav_irqh(int irq, void *dev_id, struct pt_regs *regs)
 {
-	mtpav_t *mcard = snd_magic_cast(mtpav_t, dev_id, return IRQ_NONE);
+	mtpav_t *mcard = dev_id;
 
 	//printk("irqh()\n");
 	spin_lock(&mcard->spinlock);
@@ -695,7 +689,7 @@ static int snd_mtpav_get_RAWMIDI(mtpav_t * mcard)
 
 static mtpav_t *new_mtpav(void)
 {
-	mtpav_t *ncrd = (mtpav_t *) snd_magic_kcalloc(mtpav_t, 0, GFP_KERNEL);
+	mtpav_t *ncrd = kcalloc(1, sizeof(*ncrd), GFP_KERNEL);
 	if (ncrd != NULL) {
 		spin_lock_init(&ncrd->spinlock);
 
@@ -728,7 +722,7 @@ static void free_mtpav(mtpav_t * crd)
 		release_resource(crd->res_port);
 		kfree_nocheck(crd->res_port);
 	}
-	snd_magic_kfree(crd);
+	kfree(crd);
 }
 
 /*

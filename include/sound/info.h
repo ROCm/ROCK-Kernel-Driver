@@ -91,9 +91,12 @@ struct snd_info_entry {
 
 extern int snd_info_check_reserved_words(const char *str);
 
-#ifdef CONFIG_SND_OSSEMUL
+#if defined(CONFIG_SND_OSSEMUL) && defined(CONFIG_PROC_FS)
 extern int snd_info_minor_register(void);
 extern int snd_info_minor_unregister(void);
+#else
+#define snd_info_minor_register() /* NOP */
+#define snd_info_minor_unregister() /* NOP */
 #endif
 
 

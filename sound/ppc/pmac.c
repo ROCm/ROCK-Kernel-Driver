@@ -36,8 +36,6 @@
 #include <asm/feature.h>
 #endif
 
-#define chip_t pmac_t
-
 
 #if defined(CONFIG_PM) && defined(CONFIG_PMAC_PBOOK)
 static int snd_pmac_register_sleep_notifier(pmac_t *chip);
@@ -52,8 +50,8 @@ static int awacs_freqs[8] = {
 	44100, 29400, 22050, 17640, 14700, 11025, 8820, 7350
 };
 /* fixed frequency table for tumbler */
-static int tumbler_freqs[2] = {
-	48000, 44100
+static int tumbler_freqs[1] = {
+	44100
 };
 
 /*
@@ -86,7 +84,7 @@ static void snd_pmac_dbdma_free(pmac_dbdma_t *rec)
  * look up frequency table
  */
 
-static unsigned int snd_pmac_rate_index(pmac_t *chip, pmac_stream_t *rec, unsigned int rate)
+unsigned int snd_pmac_rate_index(pmac_t *chip, pmac_stream_t *rec, unsigned int rate)
 {
 	int i, ok, found;
 
@@ -203,7 +201,6 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 {
 	int i;
 	volatile struct dbdma_cmd *cp;
-	unsigned long flags;
 	snd_pcm_runtime_t *runtime = subs->runtime;
 	int rate_index;
 	long offset;
@@ -226,15 +223,17 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 	/* We really want to execute a DMA stop command, after the AWACS
 	 * is initialized.
 	 * For reasons I don't understand, it stops the hissing noise
-	 * common to many PowerBook G3 systems (like mine :-).
+	 * common to many PowerBook G3 systems and random noise otherwise
+	 * captured on iBook2's about every third time. -ReneR
 	 */
-	spin_lock_irqsave(&chip->reg_lock, flags);
+	spin_lock_irq(&chip->reg_lock);
 	snd_pmac_dma_stop(rec);
-	if (rec->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
-		snd_pmac_dma_set_command(rec, &chip->extra_dma);
-		snd_pmac_dma_run(rec, RUN);
-	}
+	st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
+	snd_pmac_dma_set_command(rec, &chip->extra_dma);
+	snd_pmac_dma_run(rec, RUN);
+	spin_unlock_irq(&chip->reg_lock);
+	mdelay(5);
+	spin_lock_irq(&chip->reg_lock);
 	/* continuous DMA memory type doesn't provide the physical address,
 	 * so we need to resolve the address here...
 	 */
@@ -252,7 +251,7 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 
 	snd_pmac_dma_stop(rec);
 	snd_pmac_dma_set_command(rec, &rec->cmd);
-	spin_unlock_irqrestore(&chip->reg_lock, flags);
+	spin_unlock_irq(&chip->reg_lock);
 
 	return 0;
 }
@@ -264,7 +263,6 @@ static int snd_pmac_pcm_prepare(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substr
 static int snd_pmac_pcm_trigger(pmac_t *chip, pmac_stream_t *rec,
 				snd_pcm_substream_t *subs, int cmd)
 {
-	unsigned long flags;
 	volatile struct dbdma_cmd *cp;
 	int i, command;
 
@@ -275,7 +273,7 @@ static int snd_pmac_pcm_trigger(pmac_t *chip, pmac_stream_t *rec,
 			return -EBUSY;
 		command = (subs->stream == SNDRV_PCM_STREAM_PLAYBACK ?
 			   OUTPUT_MORE : INPUT_MORE) + INTR_ALWAYS;
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 		snd_pmac_beep_stop(chip);
 		snd_pmac_pcm_set_format(chip);
 		for (i = 0, cp = rec->cmd.cmds; i < rec->nperiods; i++, cp++)
@@ -284,18 +282,18 @@ static int snd_pmac_pcm_trigger(pmac_t *chip, pmac_stream_t *rec,
 		(void)in_le32(&rec->dma->status);
 		snd_pmac_dma_run(rec, RUN|WAKE);
 		rec->running = 1;
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 		break;
 
 	case SNDRV_PCM_TRIGGER_STOP:
 	case SNDRV_PCM_TRIGGER_SUSPEND:
-		spin_lock_irqsave(&chip->reg_lock, flags);
+		spin_lock(&chip->reg_lock);
 		rec->running = 0;
 		/*printk("stopped!!\n");*/
 		snd_pmac_dma_stop(rec);
 		for (i = 0, cp = rec->cmd.cmds; i < rec->nperiods; i++, cp++)
 			out_le16(&cp->command, DBDMA_STOP);
-		spin_unlock_irqrestore(&chip->reg_lock, flags);
+		spin_unlock(&chip->reg_lock);
 		break;
 
 	default:
@@ -490,14 +488,12 @@ static int snd_pmac_pcm_open(pmac_t *chip, pmac_stream_t *rec, snd_pcm_substream
 	snd_pcm_runtime_t *runtime = subs->runtime;
 	int i, j, fflags;
 	static int typical_freqs[] = {
-		48000,
 		44100,
 		22050,
 		11025,
 		0,
 	};
 	static int typical_freq_flags[] = {
-		SNDRV_PCM_RATE_48000,
 		SNDRV_PCM_RATE_44100,
 		SNDRV_PCM_RATE_22050,
 		SNDRV_PCM_RATE_11025,
@@ -651,7 +647,7 @@ int __init snd_pmac_pcm_new(pmac_t *chip)
 
 	pcm->private_data = chip;
 	pcm->private_free = pmac_pcm_free;
-	pcm->info_flags = 0;
+	pcm->info_flags = SNDRV_PCM_INFO_JOINT_DUPLEX;
 	strcpy(pcm->name, chip->card->shortname);
 	chip->pcm = pcm;
 
@@ -683,12 +679,41 @@ static void snd_pmac_dbdma_reset(pmac_t *chip)
 
 
 /*
+ * handling beep
+ */
+void snd_pmac_beep_dma_start(pmac_t *chip, int bytes, unsigned long addr, int speed)
+{
+	pmac_stream_t *rec = &chip->playback;
+
+	snd_pmac_dma_stop(rec);
+	st_le16(&chip->extra_dma.cmds->req_count, bytes);
+	st_le16(&chip->extra_dma.cmds->xfer_status, 0);
+	st_le32(&chip->extra_dma.cmds->cmd_dep, chip->extra_dma.addr);
+	st_le32(&chip->extra_dma.cmds->phy_addr, addr);
+	st_le16(&chip->extra_dma.cmds->command, OUTPUT_MORE + BR_ALWAYS);
+	out_le32(&chip->awacs->control,
+		 (in_le32(&chip->awacs->control) & ~0x1f00)
+		 | (speed << 8));
+	out_le32(&chip->awacs->byteswap, 0);
+	snd_pmac_dma_set_command(rec, &chip->extra_dma);
+	snd_pmac_dma_run(rec, RUN);
+}
+
+void snd_pmac_beep_dma_stop(pmac_t *chip)
+{
+	snd_pmac_dma_stop(&chip->playback);
+	st_le16(&chip->extra_dma.cmds->command, DBDMA_STOP);
+	snd_pmac_pcm_set_format(chip); /* reset format */
+}
+
+
+/*
  * interrupt handlers
  */
 static irqreturn_t
 snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
+	pmac_t *chip = devid;
 	snd_pmac_pcm_update(chip, &chip->playback);
 	return IRQ_HANDLED;
 }
@@ -697,7 +722,7 @@ snd_pmac_tx_intr(int irq, void *devid, struct pt_regs *regs)
 static irqreturn_t
 snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
+	pmac_t *chip = devid;
 	snd_pmac_pcm_update(chip, &chip->capture);
 	return IRQ_HANDLED;
 }
@@ -706,7 +731,7 @@ snd_pmac_rx_intr(int irq, void *devid, struct pt_regs *regs)
 static irqreturn_t
 snd_pmac_ctrl_intr(int irq, void *devid, struct pt_regs *regs)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, devid, return IRQ_NONE);
+	pmac_t *chip = devid;
 	int ctrl = in_le32(&chip->awacs->control);
 
 	/*printk("pmac: control interrupt.. 0x%x\n", ctrl);*/
@@ -776,6 +801,8 @@ static int snd_pmac_free(pmac_t *chip)
 	if (chip->mixer_free)
 		chip->mixer_free(chip);
 
+	snd_pmac_detach_beep(chip);
+
 	/* release resources */
 	if (chip->irq >= 0)
 		free_irq(chip->irq, (void*)chip);
@@ -802,7 +829,7 @@ static int snd_pmac_free(pmac_t *chip)
 				release_OF_resource(chip->node, i);
 		}
 	}
-	snd_magic_kfree(chip);
+	kfree(chip);
 	return 0;
 }
 
@@ -812,7 +839,7 @@ static int snd_pmac_free(pmac_t *chip)
  */
 static int snd_pmac_dev_free(snd_device_t *device)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, device->device_data, return -ENXIO);
+	pmac_t *chip = device->device_data;
 	return snd_pmac_free(chip);
 }
 
@@ -862,7 +889,7 @@ static int __init snd_pmac_detect(pmac_t *chip)
 	chip->can_byte_swap = 1;
 	chip->can_duplex = 1;
 	chip->can_capture = 1;
-	chip->num_freqs = 8;
+	chip->num_freqs = ARRAY_SIZE(awacs_freqs);
 	chip->freq_table = awacs_freqs;
 
 	chip->control_mask = MASK_IEPC | MASK_IEE | 0x11; /* default */
@@ -920,14 +947,14 @@ static int __init snd_pmac_detect(pmac_t *chip)
 		chip->can_capture = 0;  /* no capture */
 		chip->can_duplex = 0;
 		// chip->can_byte_swap = 0; /* FIXME: check this */
-		chip->num_freqs = 2;
+		chip->num_freqs = ARRAY_SIZE(tumbler_freqs);
 		chip->freq_table = tumbler_freqs;
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
 	if (device_is_compatible(sound, "snapper")) {
 		chip->model = PMAC_SNAPPER;
 		// chip->can_byte_swap = 0; /* FIXME: check this */
-		chip->num_freqs = 2;
+		chip->num_freqs = ARRAY_SIZE(tumbler_freqs);
 		chip->freq_table = tumbler_freqs;
 		chip->control_mask = MASK_IEPC | 0x11; /* disable IEE */
 	}
@@ -1069,7 +1096,7 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 	snd_runtime_check(chip_return, return -EINVAL);
 	*chip_return = NULL;
 
-	chip = snd_magic_kcalloc(pmac_t, 0, GFP_KERNEL);
+	chip = kcalloc(1, sizeof(*chip), GFP_KERNEL);
 	if (chip == NULL)
 		return -ENOMEM;
 	chip->card = card;
@@ -1206,7 +1233,7 @@ int __init snd_pmac_new(snd_card_t *card, pmac_t **chip_return)
 
 static int snd_pmac_suspend(snd_card_t *card, unsigned int state)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, card->pm_private_data, return -EINVAL);
+	pmac_t *chip = card->pm_private_data;
 	unsigned long flags;
 
 	if (chip->suspend)
@@ -1228,7 +1255,7 @@ static int snd_pmac_suspend(snd_card_t *card, unsigned int state)
 
 static int snd_pmac_resume(snd_card_t *card, unsigned int state)
 {
-	pmac_t *chip = snd_magic_cast(pmac_t, card->pm_private_data, return -EINVAL);
+	pmac_t *chip = card->pm_private_data;
 
 	snd_pmac_sound_feature(chip, 1);
 	if (chip->resume)

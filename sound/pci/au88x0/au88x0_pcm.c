@@ -28,7 +28,6 @@
 #include <sound/pcm_params.h>
 #include "au88x0.h"
 
-#define chip_t vortex_t
 #define VORTEX_PCM_TYPE(x) (x->name[40])
 
 /* hardware definition */
@@ -189,7 +188,7 @@ static int
 snd_vortex_pcm_hw_params(snd_pcm_substream_t * substream,
 			 snd_pcm_hw_params_t * hw_params)
 {
-	chip_t *chip = snd_pcm_substream_chip(substream);
+	vortex_t *chip = snd_pcm_substream_chip(substream);
 	stream_t *stream = (stream_t *) (substream->runtime->private_data);
 	snd_pcm_sgbuf_t *sgbuf;
 	int err;
@@ -250,7 +249,7 @@ snd_vortex_pcm_hw_params(snd_pcm_substream_t * substream,
 /* hw_free callback */
 static int snd_vortex_pcm_hw_free(snd_pcm_substream_t * substream)
 {
-	chip_t *chip = snd_pcm_substream_chip(substream);
+	vortex_t *chip = snd_pcm_substream_chip(substream);
 	stream_t *stream = (stream_t *) (substream->runtime->private_data);
 
 	// Delete audio routes.
@@ -305,7 +304,7 @@ static int snd_vortex_pcm_prepare(snd_pcm_substream_t * substream)
 /* trigger callback */
 static int snd_vortex_pcm_trigger(snd_pcm_substream_t * substream, int cmd)
 {
-	chip_t *chip = snd_pcm_substream_chip(substream);
+	vortex_t *chip = snd_pcm_substream_chip(substream);
 	stream_t *stream = (stream_t *) substream->runtime->private_data;
 	int dma = stream->dma;
 

@@ -38,7 +38,7 @@ snd_util_memhdr_new(int memsize)
 {
 	snd_util_memhdr_t *hdr;
 
-	hdr = snd_kcalloc(sizeof(*hdr), GFP_KERNEL);
+	hdr = kcalloc(1, sizeof(*hdr), GFP_KERNEL);
 	if (hdr == NULL)
 		return NULL;
 	hdr->size = memsize;

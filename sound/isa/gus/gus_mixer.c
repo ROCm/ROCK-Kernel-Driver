@@ -26,8 +26,6 @@
 #include <sound/control.h>
 #include <sound/gus.h>
 
-#define chip_t snd_gus_card_t
-
 /*
  *
  */
@@ -148,15 +146,11 @@ static int snd_ics_put_double(snd_kcontrol_t * kcontrol, snd_ctl_elem_value_t * 
 	return change;
 }
 
-#define GF1_CONTROLS (sizeof(snd_gf1_controls)/sizeof(snd_kcontrol_new_t))
-
 static snd_kcontrol_new_t snd_gf1_controls[] = {
 GF1_SINGLE("Master Playback Switch", 0, 1, 1),
 GF1_SINGLE("Line Switch", 0, 0, 1),
 GF1_SINGLE("Mic Switch", 0, 2, 0)
 };
-
-#define ICS_CONTROLS (sizeof(snd_ics_controls)/sizeof(snd_kcontrol_new_t))
 
 static snd_kcontrol_new_t snd_ics_controls[] = {
 GF1_SINGLE("Master Playback Switch", 0, 1, 1),
@@ -190,13 +184,13 @@ int snd_gf1_new_mixer(snd_gus_card_t * gus)
 	}
 
 	if (!gus->ics_flag) {
-		max = gus->ess_flag ? 1 : GF1_CONTROLS;
+		max = gus->ess_flag ? 1 : ARRAY_SIZE(snd_gf1_controls);
 		for (idx = 0; idx < max; idx++) {
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_gf1_controls[idx], gus))) < 0)
 				return err;
 		}
 	} else {
-		for (idx = 0; idx < ICS_CONTROLS; idx++) {
+		for (idx = 0; idx < ARRAY_SIZE(snd_ics_controls); idx++) {
 			if ((err = snd_ctl_add(card, snd_ctl_new1(&snd_ics_controls[idx], gus))) < 0)
 				return err;
 		}

@@ -50,8 +50,6 @@ int seq_default_timer_resolution = 0;	/* Hz */
 MODULE_AUTHOR("Frank van de Pol <fvdpol@coil.demon.nl>, Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("Advanced Linux Sound Architecture sequencer.");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_SUPPORTED_DEVICE("sound");
 
 static int boot_devs;
 module_param_array(seq_client_load, int, boot_devs, 0444);
@@ -133,6 +131,7 @@ EXPORT_SYMBOL(snd_seq_kernel_client_enqueue_blocking);
 EXPORT_SYMBOL(snd_seq_kernel_client_dispatch);
 EXPORT_SYMBOL(snd_seq_kernel_client_ctl);
 EXPORT_SYMBOL(snd_seq_kernel_client_write_poll);
+EXPORT_SYMBOL(snd_seq_set_queue_tempo);
   /* seq_memory.c */
 EXPORT_SYMBOL(snd_seq_expand_var_event);
 EXPORT_SYMBOL(snd_seq_dump_var_event);

@@ -37,8 +37,7 @@
 MODULE_AUTHOR("Jaroslav Kysela <perex@suse.cz>");
 MODULE_DESCRIPTION("ESS ESx688 AudioDrive");
 MODULE_LICENSE("GPL");
-MODULE_CLASSES("{sound}");
-MODULE_DEVICES("{{ESS,ES688 PnP AudioDrive,pnp:ESS0100},"
+MODULE_SUPPORTED_DEVICE("{{ESS,ES688 PnP AudioDrive,pnp:ESS0100},"
 	        "{ESS,ES1688 PnP AudioDrive,pnp:ESS0102},"
 	        "{ESS,ES688 AudioDrive,pnp:ESS6881},"
 	        "{ESS,ES1688 AudioDrive,pnp:ESS1681}}");
@@ -55,28 +54,20 @@ static int boot_devs;
 
 module_param_array(index, int, boot_devs, 0444);
 MODULE_PARM_DESC(index, "Index value for ESx688 soundcard.");
-MODULE_PARM_SYNTAX(index, SNDRV_INDEX_DESC);
 module_param_array(id, charp, boot_devs, 0444);
 MODULE_PARM_DESC(id, "ID string for ESx688 soundcard.");
-MODULE_PARM_SYNTAX(id, SNDRV_ID_DESC);
 module_param_array(enable, bool, boot_devs, 0444);
 MODULE_PARM_DESC(enable, "Enable ESx688 soundcard.");
-MODULE_PARM_SYNTAX(enable, SNDRV_ENABLE_DESC);
 module_param_array(port, long, boot_devs, 0444);
 MODULE_PARM_DESC(port, "Port # for ESx688 driver.");
-MODULE_PARM_SYNTAX(port, SNDRV_PORT12_DESC);
 module_param_array(mpu_port, long, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_port, "MPU-401 port # for ESx688 driver.");
-MODULE_PARM_SYNTAX(mpu_port, SNDRV_PORT12_DESC);
 module_param_array(irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(irq, "IRQ # for ESx688 driver.");
-MODULE_PARM_SYNTAX(irq, SNDRV_IRQ_DESC);
 module_param_array(mpu_irq, int, boot_devs, 0444);
 MODULE_PARM_DESC(mpu_irq, "MPU-401 IRQ # for ESx688 driver.");
-MODULE_PARM_SYNTAX(mpu_irq, SNDRV_IRQ_DESC);
 module_param_array(dma8, int, boot_devs, 0444);
 MODULE_PARM_DESC(dma8, "8-bit DMA # for ESx688 driver.");
-MODULE_PARM_SYNTAX(dma8, SNDRV_DMA8_DESC);
 
 static snd_card_t *snd_audiodrive_cards[SNDRV_CARDS] = SNDRV_DEFAULT_PTR;
 

@@ -20,8 +20,6 @@
 #include "opl4_local.h"
 #include <sound/control.h>
 
-#define chip_t opl4_t
-
 static int snd_opl4_ctl_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinfo)
 {
 	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
@@ -34,10 +32,13 @@ static int snd_opl4_ctl_info(snd_kcontrol_t *kcontrol, snd_ctl_elem_info_t *uinf
 static int snd_opl4_ctl_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	opl4_t *opl4 = snd_kcontrol_chip(kcontrol);
+	unsigned long flags;
 	u8 reg = kcontrol->private_value;
 	u8 value;
 
+	spin_lock_irqsave(&opl4->reg_lock, flags);
 	value = snd_opl4_read(opl4, reg);
+	spin_unlock_irqrestore(&opl4->reg_lock, flags);
 	ucontrol->value.integer.value[0] = 7 - (value & 7);
 	ucontrol->value.integer.value[1] = 7 - ((value >> 3) & 7);
 	return 0;
@@ -46,13 +47,16 @@ static int snd_opl4_ctl_get(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucon
 static int snd_opl4_ctl_put(snd_kcontrol_t *kcontrol, snd_ctl_elem_value_t *ucontrol)
 {
 	opl4_t *opl4 = snd_kcontrol_chip(kcontrol);
+	unsigned long flags;
 	u8 reg = kcontrol->private_value;
 	u8 value, old_value;
 
 	value = (7 - (ucontrol->value.integer.value[0] & 7)) |
 		((7 - (ucontrol->value.integer.value[1] & 7)) << 3);
+	spin_lock_irqsave(&opl4->reg_lock, flags);
 	old_value = snd_opl4_read(opl4, reg);
 	snd_opl4_write(opl4, reg, value);
+	spin_unlock_irqrestore(&opl4->reg_lock, flags);
 	return value != old_value;
 }
 
@@ -80,9 +84,7 @@ int snd_opl4_create_mixer(opl4_t *opl4)
 	snd_card_t *card = opl4->card;
 	int i, err;
 
-#if 0	/* already set by the codec driver */
-	strcpy(card->mixername, "OPL4 Mixer");
-#endif
+	strcat(card->mixername, ",OPL4");
 
 	for (i = 0; i < 2; ++i) {
 		err = snd_ctl_add(card, snd_ctl_new1(&snd_opl4_controls[i], opl4));
