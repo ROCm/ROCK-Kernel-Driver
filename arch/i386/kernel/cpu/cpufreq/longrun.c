@@ -7,7 +7,7 @@
  */
 
 #include <linux/kernel.h>
-#include <linux/module.h> 
+#include <linux/module.h>
 #include <linux/init.h>
 #include <linux/slab.h>
 #include <linux/cpufreq.h>
@@ -19,7 +19,7 @@
 static struct cpufreq_driver	longrun_driver;
 
 /**
- * longrun_{low,high}_freq is needed for the conversion of cpufreq kHz 
+ * longrun_{low,high}_freq is needed for the conversion of cpufreq kHz
  * values into per cent values. In TMTA microcode, the following is valid:
  * performance_pctg = (current_freq - low_freq)/(high_freq - low_freq)
  */
@@ -42,18 +42,18 @@ static void __init longrun_get_policy(struct cpufreq_policy *policy)
 		policy->policy = CPUFREQ_POLICY_PERFORMANCE;
 	else
 		policy->policy = CPUFREQ_POLICY_POWERSAVE;
-	
+
 	rdmsr(MSR_TMTA_LONGRUN_CTRL, msr_lo, msr_hi);
 	msr_lo &= 0x0000007F;
 	msr_hi &= 0x0000007F;
-	
+
 	if ( longrun_high_freq <= longrun_low_freq ) {
 		/* Assume degenerate Longrun table */
 		policy->min = policy->max = longrun_high_freq;
 	} else {
-		policy->min = longrun_low_freq + msr_lo * 
+		policy->min = longrun_low_freq + msr_lo *
 			((longrun_high_freq - longrun_low_freq) / 100);
-		policy->max = longrun_low_freq + msr_hi * 
+		policy->max = longrun_low_freq + msr_hi *
 			((longrun_high_freq - longrun_low_freq) / 100);
 	}
 	policy->cpu = 0;
@@ -79,9 +79,9 @@ static int longrun_set_policy(struct cpufreq_policy *policy)
 		/* Assume degenerate Longrun table */
 		pctg_lo = pctg_hi = 100;
 	} else {
-		pctg_lo = (policy->min - longrun_low_freq) / 
+		pctg_lo = (policy->min - longrun_low_freq) /
 			((longrun_high_freq - longrun_low_freq) / 100);
-		pctg_hi = (policy->max - longrun_low_freq) / 
+		pctg_hi = (policy->max - longrun_low_freq) /
 			((longrun_high_freq - longrun_low_freq) / 100);
 	}
 
@@ -118,7 +118,7 @@ static int longrun_set_policy(struct cpufreq_policy *policy)
  * longrun_verify_poliy - verifies a new CPUFreq policy
  * @policy: the policy to verify
  *
- * Validates a new CPUFreq policy. This function has to be called with 
+ * Validates a new CPUFreq policy. This function has to be called with
  * cpufreq_driver locked.
  */
 static int longrun_verify_policy(struct cpufreq_policy *policy)
@@ -127,8 +127,8 @@ static int longrun_verify_policy(struct cpufreq_policy *policy)
 		return -EINVAL;
 
 	policy->cpu = 0;
-	cpufreq_verify_within_limits(policy, 
-		policy->cpuinfo.min_freq, 
+	cpufreq_verify_within_limits(policy,
+		policy->cpuinfo.min_freq,
 		policy->cpuinfo.max_freq);
 
 	if ((policy->policy != CPUFREQ_POLICY_POWERSAVE) &&
@@ -160,7 +160,7 @@ static unsigned int longrun_get(unsigned int cpu)
  * TMTA rules:
  * performance_pctg = (target_freq - low_freq)/(high_freq - low_freq)
  */
-static unsigned int __init longrun_determine_freqs(unsigned int *low_freq, 
+static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 						   unsigned int *high_freq)
 {
 	u32 msr_lo, msr_hi;
@@ -174,9 +174,9 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 
 	if (cpu_has(c, X86_FEATURE_LRTI)) {
 		/* if the LongRun Table Interface is present, the
-		 * detection is a bit easier: 
+		 * detection is a bit easier:
 		 * For minimum frequency, read out the maximum
-		 * level (msr_hi), write that into "currently 
+		 * level (msr_hi), write that into "currently
 		 * selected level", and read out the frequency.
 		 * For maximum frequency, read out level zero.
 		 */
@@ -223,7 +223,7 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 		cpuid(0x80860007, &eax, &ebx, &ecx, &edx);
 
 		/* restore values */
-		wrmsr(MSR_TMTA_LONGRUN_CTRL, save_lo, save_hi);	
+		wrmsr(MSR_TMTA_LONGRUN_CTRL, save_lo, save_hi);
 	}
 
 	/* performance_pctg = (current_freq - low_freq)/(high_freq - low_freq)
@@ -237,7 +237,7 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 	if ((ecx > 95) || (ecx == 0) || (eax < ebx))
 		return -EIO;
 
-	edx = (eax - ebx) / (100 - ecx); 
+	edx = (eax - ebx) / (100 - ecx);
 	*low_freq = edx * 1000; /* back to kHz */
 
 	if (*low_freq > *high_freq)
@@ -249,7 +249,7 @@ static unsigned int __init longrun_determine_freqs(unsigned int *low_freq,
 
 static int __init longrun_cpu_init(struct cpufreq_policy *policy)
 {
-	int                     result = 0;
+	int result = 0;
 
 	/* capability check */
 	if (policy->cpu != 0)
@@ -265,15 +265,15 @@ static int __init longrun_cpu_init(struct cpufreq_policy *policy)
 	policy->cpuinfo.max_freq = longrun_high_freq;
 	policy->cpuinfo.transition_latency = CPUFREQ_ETERNAL;
 	longrun_get_policy(policy);
-	
+
 	return 0;
 }
 
 
 static struct cpufreq_driver longrun_driver = {
 	.flags		= CPUFREQ_CONST_LOOPS,
-	.verify 	= longrun_verify_policy,
-	.setpolicy 	= longrun_set_policy,
+	.verify		= longrun_verify_policy,
+	.setpolicy	= longrun_set_policy,
 	.get		= longrun_get,
 	.init		= longrun_cpu_init,
 	.name		= "longrun",
@@ -290,7 +290,7 @@ static int __init longrun_init(void)
 {
 	struct cpuinfo_x86 *c = cpu_data;
 
-	if (c->x86_vendor != X86_VENDOR_TRANSMETA || 
+	if (c->x86_vendor != X86_VENDOR_TRANSMETA ||
 	    !cpu_has(c, X86_FEATURE_LONGRUN))
 		return -ENODEV;
 
