@@ -22,15 +22,17 @@
 
 #include <linux/kernel.h>
 #include <linux/module.h>
+#include <linux/interrupt.h>
 #include <linux/slab.h>
-#include <asm/errno.h>
-#include <asm/io.h>
-#include <asm/uaccess.h>
+#include <linux/errno.h>
 #include <linux/miscdevice.h>
 #include <linux/pci.h>
 #include <linux/wait.h>
 #include <linux/init.h>
 #include <linux/compatmac.h>
+
+#include <asm/io.h>
+#include <asm/uaccess.h>
 
 #include "applicom.h"
 
