@@ -20,7 +20,7 @@
 ENTRY(vidc_fill_1x8_u)
 		mov	ip, #0xff00
 1:		cmp	r0, r1
-		bge	SYMBOL_NAME(vidc_clear)
+		bge	vidc_clear
 		ldrb	r4, [r0], #1
 		eor	r4, r4, #0x80
 		and	r4, ip, r4, lsl #8
@@ -33,7 +33,7 @@ ENTRY(vidc_fill_1x8_u)
 ENTRY(vidc_fill_2x8_u)
 		mov	ip, #0xff00
 1:		cmp	r0, r1
-		bge	SYMBOL_NAME(vidc_clear)
+		bge	vidc_clear
 		ldr	r4, [r0], #2
 		and	r5, r4, ip
 		and	r4, ip, r4, lsl #8
@@ -47,7 +47,7 @@ ENTRY(vidc_fill_2x8_u)
 ENTRY(vidc_fill_1x8_s)
 		mov	ip, #0xff00
 1:		cmp	r0, r1
-		bge	SYMBOL_NAME(vidc_clear)
+		bge	vidc_clear
 		ldrb	r4, [r0], #1
 		and	r4, ip, r4, lsl #8
 		orr	r4, r4, r4, lsl #16
@@ -59,7 +59,7 @@ ENTRY(vidc_fill_1x8_s)
 ENTRY(vidc_fill_2x8_s)
 		mov	ip, #0xff00
 1:		cmp	r0, r1
-		bge	SYMBOL_NAME(vidc_clear)
+		bge	vidc_clear
 		ldr	r4, [r0], #2
 		and	r5, r4, ip
 		and	r4, ip, r4, lsl #8
@@ -74,7 +74,7 @@ ENTRY(vidc_fill_1x16_s)
 		mov	ip, #0xff00
 		orr	ip, ip, ip, lsr #8
 1:		cmp	r0, r1
-		bge	SYMBOL_NAME(vidc_clear)
+		bge	vidc_clear
 		ldr	r5, [r0], #2
 		and	r4, r5, ip
 		orr	r4, r4, r4, lsl #16
@@ -92,7 +92,7 @@ ENTRY(vidc_fill_2x16_s)
 		mov	ip, #0xff00
 		orr	ip, ip, ip, lsr #8
 1:		cmp	r0, r1
-		bge	SYMBOL_NAME(vidc_clear)
+		bge	vidc_clear
 		ldr	r4, [r0], #4
 		str	r4, [r2], #4
 		cmp	r0, r1
@@ -136,10 +136,10 @@ ENTRY(vidc_clear)
 
 ENTRY(vidc_sound_dma_irq)
 		stmfd	sp!, {r4 - r8, lr}
-		ldr	r8, =SYMBOL_NAME(dma_start)
+		ldr	r8, =dma_start
 		ldmia	r8, {r0, r1, r2, r3, r4, r5}
 		teq	r1, #0
-		adreq	r4, SYMBOL_NAME(vidc_fill_noaudio)
+		adreq	r4, vidc_fill_noaudio
 		moveq	r7, #1 << 31
 		movne	r7, #0
 		mov	ip, #IOMD_BASE & 0xff000000
@@ -193,26 +193,26 @@ ENTRY(vidc_sound_dma_irq)
 		mov	pc, lr
 
 		.data
-		.globl	SYMBOL_NAME(dma_interrupt)
-SYMBOL_NAME(dma_interrupt):
+		.globl	dma_interrupt
+dma_interrupt:
 		.long	0				@ r3
-		.globl	SYMBOL_NAME(dma_pbuf)
-SYMBOL_NAME(dma_pbuf):
+		.globl	dma_pbuf
+dma_pbuf:
 		.long	0				@ r4
 		.long	0				@ r5
-		.globl	SYMBOL_NAME(dma_start)
-SYMBOL_NAME(dma_start):
+		.globl	dma_start
+dma_start:
 		.long	0				@ r0
-		.globl	SYMBOL_NAME(dma_count)
-SYMBOL_NAME(dma_count):
+		.globl	dma_count
+dma_count:
 		.long	0				@ r1
-		.globl	SYMBOL_NAME(dma_buf)
-SYMBOL_NAME(dma_buf):
+		.globl	dma_buf
+dma_buf:
 		.long	0				@ r2
 		.long	0				@ r3
-		.globl	SYMBOL_NAME(vidc_filler)
-SYMBOL_NAME(vidc_filler):
-		.long	SYMBOL_NAME(vidc_fill_noaudio)	@ r4
-		.globl	SYMBOL_NAME(dma_bufsize)
-SYMBOL_NAME(dma_bufsize):
+		.globl	vidc_filler
+vidc_filler:
+		.long	vidc_fill_noaudio		@ r4
+		.globl	dma_bufsize
+dma_bufsize:
 		.long	0x1000				@ r5
