@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.strcase.c 1.5 05/17/01 18:14:22 cort
- */
 #include <linux/ctype.h>
 
 int strcasecmp(const char *s1, const char *s2)

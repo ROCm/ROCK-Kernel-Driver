@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * heathrow.h: definitions for using the "Heathrow" I/O controller chip.
  *
  * Grabbed from Open Firmware definitions on a PowerBook G3 Series

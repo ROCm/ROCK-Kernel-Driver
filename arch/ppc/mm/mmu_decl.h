@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Declarations of procedures and variables shared between files
  * in arch/ppc/mm/.
  * 

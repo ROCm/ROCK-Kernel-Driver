@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.signal.h 1.5 05/17/01 18:14:25 cort
- */
 #ifndef _ASMPPC_SIGNAL_H
 #define _ASMPPC_SIGNAL_H
 

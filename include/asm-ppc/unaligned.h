@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.unaligned.h 1.5 05/17/01 18:14:26 cort
- */
 #ifdef __KERNEL__
 #ifndef __PPC_UNALIGNED_H
 #define __PPC_UNALIGNED_H

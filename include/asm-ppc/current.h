@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.current.h 1.5 05/17/01 18:14:24 cort
- */
 #ifdef __KERNEL__
 #ifndef _PPC_CURRENT_H
 #define _PPC_CURRENT_H

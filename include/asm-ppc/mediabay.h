@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * mediabay.h: definitions for using the media bay
  * on PowerBook 3400 and similar computers.
  *

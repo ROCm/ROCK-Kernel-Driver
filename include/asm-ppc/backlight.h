@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.backlight.h 1.5 05/17/01 18:14:24 cort
- */
-/*
  * Routines for handling backlight control on PowerBooks
  * 
  * For now, implementation resides in arch/ppc/kernel/pmac_support.c

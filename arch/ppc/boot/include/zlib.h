@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.zlib.h 1.8 05/18/01 15:17:23 cort
- */
-/*
  * This file is derived from zlib.h and zconf.h from the zlib-0.95
  * distribution by Jean-loup Gailly and Mark Adler, with some additions
  * by Paul Mackerras to aid in implementing Deflate compression and

@@ -28,7 +28,7 @@ images/vmlinux.gz: $(TOPDIR)/vmlinux
 # Subdirs and tools needed for each.  Assume we always need to go into
 # 'simple' unless told otherwise.
 subdir-y			:= lib common simple
-subdir-$(CONFIG_ALL_PPC)	:= chrp pmac prep
+subdir-$(CONFIG_ALL_PPC)	:= openfirmware prep
 tools-$(CONFIG_ALL_PPC)		:= addnote mknote hack-coff mkprep
 tools-$(CONFIG_PPLUS)		:= mkbugboot mkprep
 tools-$(CONFIG_4xx)		:= mktree
@@ -47,6 +47,9 @@ NONBOOT				:= lib common
 # These are the subdirs we want to use
 BOOTDIRS			= $(filter-out $(NONBOOT), $(subdir-y))
 
+makeof1275:
+	$(MAKE) -C of1275
+
 # This will make the tools we need.  We do it like this to ensure that we use
 # HOSTCC. -- Tom
 maketools:
@@ -55,7 +58,7 @@ maketools:
 # The targets all boards support for boot images.
 BOOT_TARGETS = zImage zImage.initrd znetboot znetboot.initrd
 
-$(BOOT_TARGETS): vmapus lib/zlib.a images/vmlinux.gz maketools
+$(BOOT_TARGETS): vmapus lib/zlib.a images/vmlinux.gz makeof1275 maketools
 ifneq ($(BOOTDIRS),)
 	for d in $(BOOTDIRS); do $(MAKE) -C $$d $@; done
 endif
@@ -80,5 +83,6 @@ vmlinux.sm: $(TOPDIR)/vmlinux utils/addSystemMap
 clean:
 	$(MAKE) -C images clean
 	$(MAKE) -C utils clean
+	$(MAKE) -C openfirmware clean
 
 include $(TOPDIR)/Rules.make

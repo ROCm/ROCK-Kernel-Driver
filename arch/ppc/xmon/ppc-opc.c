@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.ppc-opc.c 1.5 05/17/01 18:14:23 cort
- */
 /* ppc-opc.c -- PowerPC opcode list
    Copyright 1994 Free Software Foundation, Inc.
    Written by Ian Lance Taylor, Cygnus Support

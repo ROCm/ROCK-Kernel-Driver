@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.vga.h 1.5 05/17/01 18:14:26 cort
- */
-/*
  *	Access to VGA videoram
  *
  *	(c) 1998 Martin Mares <mj@ucw.cz>

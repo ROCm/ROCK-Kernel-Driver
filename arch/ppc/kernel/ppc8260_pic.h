@@ -1,7 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
 #ifndef _PPC_KERNEL_PPC8260_H
 #define _PPC_KERNEL_PPC8260_H
 

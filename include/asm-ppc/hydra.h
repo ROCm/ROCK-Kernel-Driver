@@ -1,8 +1,5 @@
 /*
- * BK Id: SCCS/s.hydra.h 1.5 05/17/01 18:14:24 cort
- */
-/*
- *  asm-ppc/hydra.h -- Mac I/O `Hydra' definitions
+ *  include/asm-ppc/hydra.h -- Mac I/O `Hydra' definitions
  *
  *  Copyright (C) 1997 Geert Uytterhoeven
  *

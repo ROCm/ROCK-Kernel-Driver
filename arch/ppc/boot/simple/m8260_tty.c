@@ -1,8 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
-
-
 /* Minimal serial functions needed to send messages out the serial
  * port on SMC1.
  */

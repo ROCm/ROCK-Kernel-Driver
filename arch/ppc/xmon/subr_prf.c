@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * Written by Cort Dougan to replace the version originally used
  * by Paul Mackerras, which came from NetBSD and thus had copyright
  * conflicts with Linux.

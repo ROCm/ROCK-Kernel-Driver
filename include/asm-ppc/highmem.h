@@ -1,7 +1,4 @@
 /*
- * BK Id: %F% %I% %G% %U% %#%
- */
-/*
  * highmem.h: virtual kernel memory mappings for high memory
  *
  * PowerPC version, stolen from the i386 version.

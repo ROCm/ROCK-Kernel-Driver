@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 /* Stand alone funtions for QSpan Tundra support.
  */
 #include <linux/types.h>

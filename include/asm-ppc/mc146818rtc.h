@@ -1,7 +1,4 @@
 /*
- * BK Id: SCCS/s.mc146818rtc.h 1.5 05/17/01 18:14:25 cort
- */
-/*
  * Machine dependent access functions for RTC registers.
  */
 #ifdef __KERNEL__

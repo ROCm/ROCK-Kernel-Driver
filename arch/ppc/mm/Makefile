@@ -1,5 +1,3 @@
-# BK Id: %F% %I% %G% %U% %#%
-#
 #
 # Makefile for the linux ppc-specific parts of the memory manager.
 #

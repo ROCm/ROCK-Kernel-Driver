@@ -1,6 +1,3 @@
-/*
- * BK Id: SCCS/s.types.h 1.10 10/15/01 22:51:33 paulus
- */
 #ifndef _PPC_TYPES_H
 #define _PPC_TYPES_H
 

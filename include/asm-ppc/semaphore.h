@@ -1,6 +1,3 @@
-/*
- * BK Id: %F% %I% %G% %U% %#%
- */
 #ifndef _PPC_SEMAPHORE_H
 #define _PPC_SEMAPHORE_H
 

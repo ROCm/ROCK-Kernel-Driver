@@ -1,7 +1,3 @@
-/*
- * BK Id: SCCS/s.op-common.h 1.5 05/17/01 18:14:23 cort
- */
-
 #define _FP_DECL(wc, X)			\
   _FP_I_TYPE X##_c, X##_s, X##_e;	\
   _FP_FRAC_DECL_##wc(X)
