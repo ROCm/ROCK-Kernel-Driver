@@ -73,13 +73,13 @@
 #ifdef EXT3_XATTR_DEBUG
 # define ea_idebug(inode, f...) do { \
 		printk(KERN_DEBUG "inode %s:%ld: ", \
-			kdevname(inode->i_dev), inode->i_ino); \
+			inode->i_sb->s_id, inode->i_ino); \
 		printk(f); \
 		printk("\n"); \
 	} while (0)
 # define ea_bdebug(bh, f...) do { \
 		printk(KERN_DEBUG "block %s:%ld: ", \
-			kdevname(bh->b_dev), bh->b_blocknr); \
+			bdevname(bh->b_bdev), bh->b_blocknr); \
 		printk(f); \
 		printk("\n"); \
 	} while (0)
